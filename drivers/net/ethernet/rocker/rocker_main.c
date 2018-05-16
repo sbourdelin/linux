@@ -1139,8 +1139,8 @@ rocker_cmd_get_port_settings_ethtool_proc(const struct rocker_port *rocker_port,
 	duplex = rocker_tlv_get_u8(info_attrs[ROCKER_TLV_CMD_PORT_SETTINGS_DUPLEX]);
 	autoneg = rocker_tlv_get_u8(info_attrs[ROCKER_TLV_CMD_PORT_SETTINGS_AUTONEG]);
 
-	ethtool_link_ksettings_zero_link_mode(ecmd, supported);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported, TP);
+	ethtool_ks_clear(ecmd, supported);
+	ethtool_ks_add_mode(ecmd, supported, TP);
 
 	ecmd->base.phy_address = 0xff;
 	ecmd->base.port = PORT_TP;

@@ -233,21 +233,19 @@ static int lio_get_link_ksettings(struct net_device *netdev,
 
 	linfo = &lio->linfo;
 
-	ethtool_link_ksettings_zero_link_mode(ecmd, supported);
-	ethtool_link_ksettings_zero_link_mode(ecmd, advertising);
+	ethtool_ks_clear(ecmd, supported);
+	ethtool_ks_clear(ecmd, advertising);
 
 	switch (linfo->link.s.phy_type) {
 	case LIO_PHY_PORT_TP:
 		ecmd->base.port = PORT_TP;
 		ecmd->base.autoneg = AUTONEG_DISABLE;
-		ethtool_link_ksettings_add_link_mode(ecmd, supported, TP);
-		ethtool_link_ksettings_add_link_mode(ecmd, supported, Pause);
-		ethtool_link_ksettings_add_link_mode(ecmd, supported,
-						     10000baseT_Full);
+		ethtool_ks_add_mode(ecmd, supported, TP);
+		ethtool_ks_add_mode(ecmd, supported, Pause);
+		ethtool_ks_add_mode(ecmd, supported, 10000baseT_Full);
 
-		ethtool_link_ksettings_add_link_mode(ecmd, advertising, Pause);
-		ethtool_link_ksettings_add_link_mode(ecmd, advertising,
-						     10000baseT_Full);
+		ethtool_ks_add_mode(ecmd, advertising, Pause);
+		ethtool_ks_add_mode(ecmd, advertising, 10000baseT_Full);
 
 		break;
 
@@ -264,30 +262,27 @@ static int lio_get_link_ksettings(struct net_device *netdev,
 
 		ecmd->base.port = PORT_FIBRE;
 		ecmd->base.autoneg = AUTONEG_DISABLE;
-		ethtool_link_ksettings_add_link_mode(ecmd, supported, FIBRE);
+		ethtool_ks_add_mode(ecmd, supported, FIBRE);
 
-		ethtool_link_ksettings_add_link_mode(ecmd, supported, Pause);
-		ethtool_link_ksettings_add_link_mode(ecmd, advertising, Pause);
+		ethtool_ks_add_mode(ecmd, supported, Pause);
+		ethtool_ks_add_mode(ecmd, advertising, Pause);
 		if (oct->subsystem_id == OCTEON_CN2350_25GB_SUBSYS_ID ||
 		    oct->subsystem_id == OCTEON_CN2360_25GB_SUBSYS_ID) {
 			if (OCTEON_CN23XX_PF(oct)) {
-				ethtool_link_ksettings_add_link_mode
-					(ecmd, supported, 25000baseSR_Full);
-				ethtool_link_ksettings_add_link_mode
-					(ecmd, supported, 25000baseKR_Full);
-				ethtool_link_ksettings_add_link_mode
-					(ecmd, supported, 25000baseCR_Full);
+				ethtool_ks_add_mode(ecmd, supported,
+						    25000baseSR_Full);
+				ethtool_ks_add_mode(ecmd, supported,
+						    25000baseKR_Full);
+				ethtool_ks_add_mode(ecmd, supported,
+						    25000baseCR_Full);
 
 				if (oct->no_speed_setting == 0)  {
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 10000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 10000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 10000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    10000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    10000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    10000baseCR_Full);
 				}
 
 				if (oct->no_speed_setting == 0)
@@ -296,77 +291,57 @@ static int lio_get_link_ksettings(struct net_device *netdev,
 					oct->speed_setting = 25;
 
 				if (oct->speed_setting == 10) {
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 10000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 10000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 10000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    10000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    10000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    10000baseCR_Full);
 				}
 				if (oct->speed_setting == 25) {
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 25000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 25000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 25000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    25000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    25000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    25000baseCR_Full);
 				}
 			} else { /* VF */
 				if (linfo->link.s.speed == 10000) {
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 10000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 10000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 10000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    10000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    10000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    10000baseCR_Full);
 
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 10000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 10000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 10000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    10000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    10000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    10000baseCR_Full);
 				}
 
 				if (linfo->link.s.speed == 25000) {
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 25000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 25000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, supported,
-						 25000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    25000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    25000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, supported,
+							    25000baseCR_Full);
 
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 25000baseSR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 25000baseKR_Full);
-					ethtool_link_ksettings_add_link_mode
-						(ecmd, advertising,
-						 25000baseCR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    25000baseSR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    25000baseKR_Full);
+					ethtool_ks_add_mode(ecmd, advertising,
+							    25000baseCR_Full);
 				}
 			}
 		} else {
-			ethtool_link_ksettings_add_link_mode(ecmd, supported,
-							     10000baseT_Full);
-			ethtool_link_ksettings_add_link_mode(ecmd, advertising,
-							     10000baseT_Full);
+			ethtool_ks_add_mode(ecmd, supported, 10000baseT_Full);
+			ethtool_ks_add_mode(ecmd, advertising, 10000baseT_Full);
 		}
 		break;
 	}

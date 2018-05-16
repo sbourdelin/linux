@@ -191,8 +191,8 @@ static int
 qcaspi_get_link_ksettings(struct net_device *dev,
 			  struct ethtool_link_ksettings *cmd)
 {
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 10baseT_Half);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 10baseT_Half);
 
 	cmd->base.speed = SPEED_10;
 	cmd->base.duplex = DUPLEX_HALF;

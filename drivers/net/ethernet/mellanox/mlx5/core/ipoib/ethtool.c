@@ -217,8 +217,8 @@ static int mlx5i_get_link_ksettings(struct net_device *netdev,
 	if (ret)
 		return ret;
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, supported);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
+	ethtool_ks_clear(link_ksettings, supported);
+	ethtool_ks_clear(link_ksettings, advertising);
 
 	speed = mlx5i_get_speed_settings(ib_link_width_oper, ib_proto_oper);
 	if (speed < 0)

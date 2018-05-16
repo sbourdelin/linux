@@ -5959,12 +5959,11 @@ static int netdev_get_link_ksettings(struct net_device *dev,
 
 	mutex_lock(&hw_priv->lock);
 	mii_ethtool_get_link_ksettings(&priv->mii_if, cmd);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, TP);
+	ethtool_ks_add_mode(cmd, advertising, TP);
 	mutex_unlock(&hw_priv->lock);
 
 	/* Save advertised settings for workaround in next function. */
-	ethtool_convert_link_mode_to_legacy_u32(&priv->advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&priv->advertising, cmd->link_modes.advertising);
 
 	return 0;
 }
@@ -5989,8 +5988,7 @@ static int netdev_set_link_ksettings(struct net_device *dev,
 	u32 advertising;
 	int rc;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	/*
 	 * ethtool utility does not change advertised setting if auto
@@ -6032,8 +6030,7 @@ static int netdev_set_link_ksettings(struct net_device *dev,
 	}
 
 	memcpy(&copy_cmd, cmd, sizeof(copy_cmd));
-	ethtool_convert_legacy_u32_to_link_mode(copy_cmd.link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(copy_cmd.link_modes.advertising, advertising);
 	rc = mii_ethtool_set_link_ksettings(
 		&priv->mii_if,
 		(const struct ethtool_link_ksettings *)&copy_cmd);

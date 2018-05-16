@@ -827,8 +827,7 @@ static int rtl8150_get_link_ksettings(struct net_device *netdev,
 		    DUPLEX_FULL : DUPLEX_HALF;
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(ecmd->link_modes.supported, supported);
 
 	return 0;
 }

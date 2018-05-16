@@ -3613,10 +3613,8 @@ static int sky2_get_link_ksettings(struct net_device *dev,
 		? AUTONEG_ENABLE : AUTONEG_DISABLE;
 	cmd->base.duplex = sky2->duplex;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -3629,8 +3627,7 @@ static int sky2_set_link_ksettings(struct net_device *dev,
 	u32 supported = sky2_supported_modes(hw);
 	u32 new_advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&new_advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&new_advertising, cmd->link_modes.advertising);
 
 	if (cmd->base.autoneg == AUTONEG_ENABLE) {
 		if (new_advertising & ~supported)

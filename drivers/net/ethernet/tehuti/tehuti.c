@@ -2133,14 +2133,12 @@ static const char
 static int bdx_get_link_ksettings(struct net_device *netdev,
 				  struct ethtool_link_ksettings *ecmd)
 {
-	ethtool_link_ksettings_zero_link_mode(ecmd, supported);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported,
-					     10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported, FIBRE);
-	ethtool_link_ksettings_zero_link_mode(ecmd, advertising);
-	ethtool_link_ksettings_add_link_mode(ecmd, advertising,
-					     10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ecmd, advertising, FIBRE);
+	ethtool_ks_clear(ecmd, supported);
+	ethtool_ks_add_mode(ecmd, supported, 10000baseT_Full);
+	ethtool_ks_add_mode(ecmd, supported, FIBRE);
+	ethtool_ks_clear(ecmd, advertising);
+	ethtool_ks_add_mode(ecmd, advertising, 10000baseT_Full);
+	ethtool_ks_add_mode(ecmd, advertising, FIBRE);
 
 	ecmd->base.speed = SPEED_10000;
 	ecmd->base.duplex = DUPLEX_FULL;

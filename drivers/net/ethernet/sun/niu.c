@@ -6819,10 +6819,8 @@ static int niu_get_link_ksettings(struct net_device *dev,
 
 	memset(cmd, 0, sizeof(*cmd));
 	cmd->base.phy_address = np->phy_addr;
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						lp->supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						lp->active_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, lp->supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, lp->active_advertising);
 	cmd->base.autoneg = lp->active_autoneg;
 	cmd->base.speed = lp->active_speed;
 	cmd->base.duplex = lp->active_duplex;
@@ -6837,8 +6835,7 @@ static int niu_set_link_ksettings(struct net_device *dev,
 	struct niu *np = netdev_priv(dev);
 	struct niu_link_config *lp = &np->link_config;
 
-	ethtool_convert_link_mode_to_legacy_u32(&lp->advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&lp->advertising, cmd->link_modes.advertising);
 	lp->speed = cmd->base.speed;
 	lp->duplex = cmd->base.duplex;
 	lp->autoneg = cmd->base.autoneg;

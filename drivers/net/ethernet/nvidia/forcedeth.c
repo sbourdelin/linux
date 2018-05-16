@@ -4333,10 +4333,8 @@ static int nv_get_link_ksettings(struct net_device *dev,
 
 	cmd->base.phy_address = np->phyaddr;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	/* ignore maxtxpkt, maxrxpkt for now */
 	spin_unlock_irq(&np->lock);
@@ -4350,8 +4348,7 @@ static int nv_set_link_ksettings(struct net_device *dev,
 	u32 speed = cmd->base.speed;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (cmd->base.port != PORT_MII)
 		return -EINVAL;

@@ -300,40 +300,40 @@
 
 /* Link mode bit operations */
 #define XGBE_ZERO_SUP(_ls)		\
-	ethtool_link_ksettings_zero_link_mode((_ls), supported)
+	ethtool_ks_clear((_ls), supported)
 
 #define XGBE_SET_SUP(_ls, _mode)	\
-	ethtool_link_ksettings_add_link_mode((_ls), supported, _mode)
+	ethtool_ks_add_mode((_ls), supported, _mode)
 
 #define XGBE_CLR_SUP(_ls, _mode)	\
-	ethtool_link_ksettings_del_link_mode((_ls), supported, _mode)
+	ethtool_ks_del_mode((_ls), supported, _mode)
 
 #define XGBE_IS_SUP(_ls, _mode)	\
-	ethtool_link_ksettings_test_link_mode((_ls), supported, _mode)
+	ethtool_ks_test((_ls), supported, _mode)
 
 #define XGBE_ZERO_ADV(_ls)		\
-	ethtool_link_ksettings_zero_link_mode((_ls), advertising)
+	ethtool_ks_clear((_ls), advertising)
 
 #define XGBE_SET_ADV(_ls, _mode)	\
-	ethtool_link_ksettings_add_link_mode((_ls), advertising, _mode)
+	ethtool_ks_add_mode((_ls), advertising, _mode)
 
 #define XGBE_CLR_ADV(_ls, _mode)	\
-	ethtool_link_ksettings_del_link_mode((_ls), advertising, _mode)
+	ethtool_ks_del_mode((_ls), advertising, _mode)
 
 #define XGBE_ADV(_ls, _mode)		\
-	ethtool_link_ksettings_test_link_mode((_ls), advertising, _mode)
+	ethtool_ks_test((_ls), advertising, _mode)
 
 #define XGBE_ZERO_LP_ADV(_ls)		\
-	ethtool_link_ksettings_zero_link_mode((_ls), lp_advertising)
+	ethtool_ks_clear((_ls), lp_advertising)
 
 #define XGBE_SET_LP_ADV(_ls, _mode)	\
-	ethtool_link_ksettings_add_link_mode((_ls), lp_advertising, _mode)
+	ethtool_ks_add_mode((_ls), lp_advertising, _mode)
 
 #define XGBE_CLR_LP_ADV(_ls, _mode)	\
-	ethtool_link_ksettings_del_link_mode((_ls), lp_advertising, _mode)
+	ethtool_ks_del_mode((_ls), lp_advertising, _mode)
 
 #define XGBE_LP_ADV(_ls, _mode)		\
-	ethtool_link_ksettings_test_link_mode((_ls), lp_advertising, _mode)
+	ethtool_ks_test((_ls), lp_advertising, _mode)
 
 #define XGBE_LM_COPY(_dst, _dname, _src, _sname)	\
 	bitmap_copy((_dst)->link_modes._dname,		\

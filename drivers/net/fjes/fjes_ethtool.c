@@ -178,8 +178,8 @@ static void fjes_get_drvinfo(struct net_device *netdev,
 static int fjes_get_link_ksettings(struct net_device *netdev,
 				   struct ethtool_link_ksettings *ecmd)
 {
-	ethtool_link_ksettings_zero_link_mode(ecmd, supported);
-	ethtool_link_ksettings_zero_link_mode(ecmd, advertising);
+	ethtool_ks_clear(ecmd, supported);
+	ethtool_ks_clear(ecmd, advertising);
 	ecmd->base.duplex = DUPLEX_FULL;
 	ecmd->base.autoneg = AUTONEG_DISABLE;
 	ecmd->base.port = PORT_NONE;

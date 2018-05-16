@@ -950,8 +950,7 @@ static int encx24j600_get_link_ksettings(struct net_device *dev,
 			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
 			 SUPPORTED_Autoneg | SUPPORTED_TP;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	cmd->base.speed = priv->speed;
 	cmd->base.duplex = priv->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;

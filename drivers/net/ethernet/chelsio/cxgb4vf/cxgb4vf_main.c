@@ -1388,9 +1388,9 @@ static int cxgb4vf_get_link_ksettings(struct net_device *dev,
 	if (!netif_running(dev))
 		(void)t4vf_update_port_info(pi);
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, supported);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, lp_advertising);
+	ethtool_ks_clear(link_ksettings, supported);
+	ethtool_ks_clear(link_ksettings, advertising);
+	ethtool_ks_clear(link_ksettings, lp_advertising);
 
 	base->port = from_fw_port_mod_type(pi->port_type, pi->mod_type);
 
@@ -1421,27 +1421,20 @@ static int cxgb4vf_get_link_ksettings(struct net_device *dev,
 
 	if (pi->link_cfg.fc & PAUSE_RX) {
 		if (pi->link_cfg.fc & PAUSE_TX) {
-			ethtool_link_ksettings_add_link_mode(link_ksettings,
-							     advertising,
-							     Pause);
+			ethtool_ks_add_mode(link_ksettings, advertising, Pause);
 		} else {
-			ethtool_link_ksettings_add_link_mode(link_ksettings,
-							     advertising,
-							     Asym_Pause);
+			ethtool_ks_add_mode(link_ksettings, advertising,
+					    Asym_Pause);
 		}
 	} else if (pi->link_cfg.fc & PAUSE_TX) {
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising,
-						     Asym_Pause);
+		ethtool_ks_add_mode(link_ksettings, advertising, Asym_Pause);
 	}
 
 	base->autoneg = pi->link_cfg.autoneg;
 	if (pi->link_cfg.pcaps & FW_PORT_CAP32_ANEG)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, supported, Autoneg);
 	if (pi->link_cfg.autoneg)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, advertising, Autoneg);
 
 	return 0;
 }

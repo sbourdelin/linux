@@ -53,13 +53,13 @@ spider_net_ethtool_get_link_ksettings(struct net_device *netdev,
 	struct spider_net_card *card;
 	card = netdev_priv(netdev);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 1000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 1000baseT_Full);
+	ethtool_ks_add_mode(cmd, supported, FIBRE);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, 1000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
+	ethtool_ks_clear(cmd, advertising);
+	ethtool_ks_add_mode(cmd, advertising, 1000baseT_Full);
+	ethtool_ks_add_mode(cmd, advertising, FIBRE);
 
 	cmd->base.port = PORT_FIBRE;
 	cmd->base.speed = card->phy.speed;

@@ -336,7 +336,7 @@ static int mv3310_config_init(struct phy_device *phydev)
 		}
 	}
 
-	if (!ethtool_convert_link_mode_to_legacy_u32(&mask, supported))
+	if (!ethtool_ks_to_u32(&mask, supported))
 		dev_warn(&phydev->mdio.dev,
 			 "PHY supports (%*pb) more modes than phylib supports, some modes not supported.\n",
 			 __ETHTOOL_LINK_MODE_MASK_NBITS, supported);

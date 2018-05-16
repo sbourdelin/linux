@@ -703,72 +703,61 @@ void aq_nic_get_link_ksettings(struct aq_nic_s *self,
 	cmd->base.duplex = DUPLEX_FULL;
 	cmd->base.autoneg = self->aq_nic_cfg.is_autoneg;
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
+	ethtool_ks_clear(cmd, supported);
 
 	if (self->aq_nic_cfg.aq_hw_caps->link_speed_msk & AQ_NIC_RATE_10G)
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
-						     10000baseT_Full);
+		ethtool_ks_add_mode(cmd, supported, 10000baseT_Full);
 
 	if (self->aq_nic_cfg.aq_hw_caps->link_speed_msk & AQ_NIC_RATE_5G)
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
-						     5000baseT_Full);
+		ethtool_ks_add_mode(cmd, supported, 5000baseT_Full);
 
 	if (self->aq_nic_cfg.aq_hw_caps->link_speed_msk & AQ_NIC_RATE_2GS)
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
-						     2500baseT_Full);
+		ethtool_ks_add_mode(cmd, supported, 2500baseT_Full);
 
 	if (self->aq_nic_cfg.aq_hw_caps->link_speed_msk & AQ_NIC_RATE_1G)
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
-						     1000baseT_Full);
+		ethtool_ks_add_mode(cmd, supported, 1000baseT_Full);
 
 	if (self->aq_nic_cfg.aq_hw_caps->link_speed_msk & AQ_NIC_RATE_100M)
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
-						     100baseT_Full);
+		ethtool_ks_add_mode(cmd, supported, 100baseT_Full);
 
 	if (self->aq_nic_cfg.aq_hw_caps->flow_control)
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     Pause);
 
-	ethtool_link_ksettings_add_link_mode(cmd, supported, Autoneg);
+	ethtool_ks_add_mode(cmd, supported, Autoneg);
 
 	if (self->aq_nic_cfg.aq_hw_caps->media_type == AQ_HW_MEDIA_TYPE_FIBRE)
-		ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
+		ethtool_ks_add_mode(cmd, supported, FIBRE);
 	else
-		ethtool_link_ksettings_add_link_mode(cmd, supported, TP);
+		ethtool_ks_add_mode(cmd, supported, TP);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
+	ethtool_ks_clear(cmd, advertising);
 
 	if (self->aq_nic_cfg.is_autoneg)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
+		ethtool_ks_add_mode(cmd, advertising, Autoneg);
 
 	if (self->aq_nic_cfg.link_speed_msk  & AQ_NIC_RATE_10G)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
-						     10000baseT_Full);
+		ethtool_ks_add_mode(cmd, advertising, 10000baseT_Full);
 
 	if (self->aq_nic_cfg.link_speed_msk  & AQ_NIC_RATE_5G)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
-						     5000baseT_Full);
+		ethtool_ks_add_mode(cmd, advertising, 5000baseT_Full);
 
 	if (self->aq_nic_cfg.link_speed_msk  & AQ_NIC_RATE_2GS)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
-						     2500baseT_Full);
+		ethtool_ks_add_mode(cmd, advertising, 2500baseT_Full);
 
 	if (self->aq_nic_cfg.link_speed_msk  & AQ_NIC_RATE_1G)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
-						     1000baseT_Full);
+		ethtool_ks_add_mode(cmd, advertising, 1000baseT_Full);
 
 	if (self->aq_nic_cfg.link_speed_msk  & AQ_NIC_RATE_100M)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
-						     100baseT_Full);
+		ethtool_ks_add_mode(cmd, advertising, 100baseT_Full);
 
 	if (self->aq_nic_cfg.flow_control)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
-						     Pause);
+		ethtool_ks_add_mode(cmd, advertising, Pause);
 
 	if (self->aq_nic_cfg.aq_hw_caps->media_type == AQ_HW_MEDIA_TYPE_FIBRE)
-		ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
+		ethtool_ks_add_mode(cmd, advertising, FIBRE);
 	else
-		ethtool_link_ksettings_add_link_mode(cmd, advertising, TP);
+		ethtool_ks_add_mode(cmd, advertising, TP);
 }
 
 int aq_nic_set_link_ksettings(struct aq_nic_s *self,

@@ -87,8 +87,8 @@ static int ixgbevf_get_link_ksettings(struct net_device *netdev,
 	u32 link_speed = 0;
 	bool link_up;
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 10000baseT_Full);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 10000baseT_Full);
 	cmd->base.autoneg = AUTONEG_DISABLE;
 	cmd->base.port = -1;
 

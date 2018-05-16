@@ -476,12 +476,12 @@ vmxnet3_get_link_ksettings(struct net_device *netdev,
 {
 	struct vmxnet3_adapter *adapter = netdev_priv(netdev);
 
-	ethtool_link_ksettings_zero_link_mode(ecmd, supported);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported, 10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported, 1000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported, TP);
-	ethtool_link_ksettings_zero_link_mode(ecmd, advertising);
-	ethtool_link_ksettings_add_link_mode(ecmd, advertising, TP);
+	ethtool_ks_clear(ecmd, supported);
+	ethtool_ks_add_mode(ecmd, supported, 10000baseT_Full);
+	ethtool_ks_add_mode(ecmd, supported, 1000baseT_Full);
+	ethtool_ks_add_mode(ecmd, supported, TP);
+	ethtool_ks_clear(ecmd, advertising);
+	ethtool_ks_add_mode(ecmd, advertising, TP);
 	ecmd->base.port = PORT_TP;
 
 	if (adapter->link_speed) {

@@ -3323,8 +3323,7 @@ int qlcnic_83xx_get_link_ksettings(struct qlcnic_adapter *adapter,
 			   SUPPORTED_10000baseT_Full |
 			   SUPPORTED_Autoneg);
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						ecmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, ecmd->link_modes.advertising);
 
 	if (ecmd->base.autoneg == AUTONEG_ENABLE) {
 		if (ahw->port_config & QLC_83XX_10_CAPABLE)
@@ -3381,10 +3380,8 @@ int qlcnic_83xx_get_link_ksettings(struct qlcnic_adapter *adapter,
 	}
 	ecmd->base.phy_address = ahw->physical_port;
 
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(ecmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(ecmd->link_modes.advertising, advertising);
 
 	return status;
 }

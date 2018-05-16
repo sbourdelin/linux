@@ -118,9 +118,8 @@ static int hinic_get_link_ksettings(struct net_device *netdev,
 	struct hinic_port_cap port_cap;
 	int err;
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported,
-					     Autoneg);
+	ethtool_ks_clear(link_ksettings, advertising);
+	ethtool_ks_add_mode(link_ksettings, supported, Autoneg);
 
 	link_ksettings->base.speed   = SPEED_UNKNOWN;
 	link_ksettings->base.autoneg = AUTONEG_DISABLE;
@@ -148,8 +147,7 @@ static int hinic_get_link_ksettings(struct net_device *netdev,
 	set_link_speed(link_ksettings, port_cap.speed);
 
 	if (!!(port_cap.autoneg_cap & HINIC_AUTONEG_SUPPORTED))
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, advertising, Autoneg);
 
 	if (port_cap.autoneg_state == HINIC_AUTONEG_ACTIVE)
 		link_ksettings->base.autoneg = AUTONEG_ENABLE;

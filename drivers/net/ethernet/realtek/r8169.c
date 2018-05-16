@@ -1958,10 +1958,8 @@ static int rtl8169_get_link_ksettings_tbi(struct net_device *dev,
 	cmd->base.speed = SPEED_1000;
 	cmd->base.duplex = DUPLEX_FULL; /* Always set */
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -1996,8 +1994,7 @@ static int rtl8169_set_link_ksettings(struct net_device *dev,
 	int rc;
 	u32 advertising;
 
-	if (!ethtool_convert_link_mode_to_legacy_u32(&advertising,
-	    cmd->link_modes.advertising))
+	if (!ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising))
 		return -EINVAL;
 
 	del_timer_sync(&tp->timer);

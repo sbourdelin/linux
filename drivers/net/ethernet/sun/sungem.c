@@ -1261,8 +1261,7 @@ static void gem_begin_auto_negotiation(struct gem *gp,
 	u32 advertising;
 
 	if (ep)
-		ethtool_convert_link_mode_to_legacy_u32(
-			&advertising, ep->link_modes.advertising);
+		ethtool_ks_to_u32(&advertising, ep->link_modes.advertising);
 
 	if (gp->phy_type != phy_mii_mdio0 &&
      	    gp->phy_type != phy_mii_mdio1)
@@ -2579,10 +2578,8 @@ static int gem_get_link_ksettings(struct net_device *dev,
 		}
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -2594,8 +2591,7 @@ static int gem_set_link_ksettings(struct net_device *dev,
 	u32 speed = cmd->base.speed;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	/* Verify the settings we care about. */
 	if (cmd->base.autoneg != AUTONEG_ENABLE &&

@@ -1559,8 +1559,7 @@ smc_ethtool_get_link_ksettings(struct net_device *dev,
 		cmd->base.duplex = lp->tcr_cur_mode & TCR_SWFDUP ?
 			DUPLEX_FULL : DUPLEX_HALF;
 
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 	}
 
 	return 0;

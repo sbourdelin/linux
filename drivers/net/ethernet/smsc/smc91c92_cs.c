@@ -1863,8 +1863,7 @@ static void smc_netdev_get_ecmd(struct net_device *dev,
 	tmp = inw(ioaddr + TCR);
 	ecmd->base.duplex = (tmp & TCR_FDUPLX) ? DUPLEX_FULL : DUPLEX_HALF;
 
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(ecmd->link_modes.supported, supported);
 }
 
 static int smc_netdev_set_ecmd(struct net_device *dev,

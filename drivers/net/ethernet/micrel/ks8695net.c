@@ -905,10 +905,8 @@ ks8695_wan_get_link_ksettings(struct net_device *ndev,
 			DUPLEX_FULL : DUPLEX_HALF;
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -926,8 +924,7 @@ ks8695_wan_set_link_ksettings(struct net_device *ndev,
 	u32 ctrl;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if ((cmd->base.speed != SPEED_10) && (cmd->base.speed != SPEED_100))
 		return -EINVAL;

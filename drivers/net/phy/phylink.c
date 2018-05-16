@@ -665,9 +665,8 @@ static int phylink_bringup_phy(struct phylink *pl, struct phy_device *phy)
 	int ret;
 
 	memset(&config, 0, sizeof(config));
-	ethtool_convert_legacy_u32_to_link_mode(supported, phy->supported);
-	ethtool_convert_legacy_u32_to_link_mode(config.advertising,
-						phy->advertising);
+	ethtool_u32_to_ks(supported, phy->supported);
+	ethtool_u32_to_ks(config.advertising, phy->advertising);
 	config.interface = pl->link_config.interface;
 
 	/*
@@ -700,7 +699,7 @@ static int phylink_bringup_phy(struct phylink *pl, struct phy_device *phy)
 	linkmode_copy(pl->link_config.advertising, config.advertising);
 
 	/* Restrict the phy advertisement according to the MAC support. */
-	ethtool_convert_link_mode_to_legacy_u32(&advertising, config.advertising);
+	ethtool_ks_to_u32(&advertising, config.advertising);
 	phy->advertising = advertising;
 	mutex_unlock(&pl->state_mutex);
 	mutex_unlock(&phy->lock);

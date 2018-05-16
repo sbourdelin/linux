@@ -2032,10 +2032,8 @@ static int emac_ethtool_get_link_ksettings(struct net_device *ndev,
 	cmd->base.duplex = dev->phy.duplex;
 	mutex_unlock(&dev->link_lock);
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -2048,8 +2046,7 @@ emac_ethtool_set_link_ksettings(struct net_device *ndev,
 	u32 f = dev->phy.features;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	DBG(dev, "set_settings(%d, %d, %d, 0x%08x)" NL,
 	    cmd->base.autoneg, cmd->base.speed, cmd->base.duplex, advertising);

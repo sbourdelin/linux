@@ -248,21 +248,21 @@ nfp_net_set_fec_link_mode(struct nfp_eth_table_port *eth_port,
 {
 	unsigned int modes;
 
-	ethtool_link_ksettings_add_link_mode(c, supported, FEC_NONE);
+	ethtool_ks_add_mode(c, supported, FEC_NONE);
 	if (!nfp_eth_can_support_fec(eth_port)) {
-		ethtool_link_ksettings_add_link_mode(c, advertising, FEC_NONE);
+		ethtool_ks_add_mode(c, advertising, FEC_NONE);
 		return;
 	}
 
 	modes = nfp_eth_supported_fec_modes(eth_port);
 	if (modes & NFP_FEC_BASER) {
-		ethtool_link_ksettings_add_link_mode(c, supported, FEC_BASER);
-		ethtool_link_ksettings_add_link_mode(c, advertising, FEC_BASER);
+		ethtool_ks_add_mode(c, supported, FEC_BASER);
+		ethtool_ks_add_mode(c, advertising, FEC_BASER);
 	}
 
 	if (modes & NFP_FEC_REED_SOLOMON) {
-		ethtool_link_ksettings_add_link_mode(c, supported, FEC_RS);
-		ethtool_link_ksettings_add_link_mode(c, advertising, FEC_RS);
+		ethtool_ks_add_mode(c, supported, FEC_RS);
+		ethtool_ks_add_mode(c, advertising, FEC_RS);
 	}
 }
 
@@ -293,7 +293,7 @@ nfp_net_get_link_ksettings(struct net_device *netdev,
 	u32 sts, ls;
 
 	/* Init to unknowns */
-	ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
+	ethtool_ks_add_mode(cmd, supported, FIBRE);
 	cmd->base.port = PORT_OTHER;
 	cmd->base.speed = SPEED_UNKNOWN;
 	cmd->base.duplex = DUPLEX_UNKNOWN;

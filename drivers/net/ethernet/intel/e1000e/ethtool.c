@@ -185,10 +185,8 @@ static int e1000_get_link_ksettings(struct net_device *netdev,
 	if (hw->phy.media_type != e1000_media_type_copper)
 		cmd->base.eth_tp_mdix_ctrl = ETH_TP_MDI_INVALID;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -256,8 +254,7 @@ static int e1000_set_link_ksettings(struct net_device *netdev,
 	int ret_val = 0;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	pm_runtime_get_sync(netdev->dev.parent);
 

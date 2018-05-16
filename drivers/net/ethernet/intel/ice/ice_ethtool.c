@@ -318,10 +318,8 @@ ice_get_link_ksettings(struct net_device *netdev,
 	hw_link_info = &vsi->port_info->phy.link_info;
 	link_up = hw_link_info->link_info & ICE_AQ_LINK_UP;
 
-	ethtool_link_ksettings_add_link_mode(ks, supported,
-					     10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ks, advertising,
-					     10000baseT_Full);
+	ethtool_ks_add_mode(ks, supported, 10000baseT_Full);
+	ethtool_ks_add_mode(ks, advertising, 10000baseT_Full);
 
 	/* set speed and duplex */
 	if (link_up) {
@@ -362,25 +360,24 @@ ice_get_link_ksettings(struct net_device *netdev,
 	/* set media type settings */
 	switch (vsi->port_info->phy.media_type) {
 	case ICE_MEDIA_FIBER:
-		ethtool_link_ksettings_add_link_mode(ks, supported, FIBRE);
+		ethtool_ks_add_mode(ks, supported, FIBRE);
 		ks->base.port = PORT_FIBRE;
 		break;
 	case ICE_MEDIA_BASET:
-		ethtool_link_ksettings_add_link_mode(ks, supported, TP);
-		ethtool_link_ksettings_add_link_mode(ks, advertising, TP);
+		ethtool_ks_add_mode(ks, supported, TP);
+		ethtool_ks_add_mode(ks, advertising, TP);
 		ks->base.port = PORT_TP;
 		break;
 	case ICE_MEDIA_BACKPLANE:
-		ethtool_link_ksettings_add_link_mode(ks, supported, Autoneg);
-		ethtool_link_ksettings_add_link_mode(ks, supported, Backplane);
-		ethtool_link_ksettings_add_link_mode(ks, advertising, Autoneg);
-		ethtool_link_ksettings_add_link_mode(ks, advertising,
-						     Backplane);
+		ethtool_ks_add_mode(ks, supported, Autoneg);
+		ethtool_ks_add_mode(ks, supported, Backplane);
+		ethtool_ks_add_mode(ks, advertising, Autoneg);
+		ethtool_ks_add_mode(ks, advertising, Backplane);
 		ks->base.port = PORT_NONE;
 		break;
 	case ICE_MEDIA_DA:
-		ethtool_link_ksettings_add_link_mode(ks, supported, FIBRE);
-		ethtool_link_ksettings_add_link_mode(ks, advertising, FIBRE);
+		ethtool_ks_add_mode(ks, supported, FIBRE);
+		ethtool_ks_add_mode(ks, advertising, FIBRE);
 		ks->base.port = PORT_DA;
 		break;
 	default:
@@ -389,26 +386,23 @@ ice_get_link_ksettings(struct net_device *netdev,
 	}
 
 	/* flow control is symmetric and always supported */
-	ethtool_link_ksettings_add_link_mode(ks, supported, Pause);
+	ethtool_ks_add_mode(ks, supported, Pause);
 
 	switch (vsi->port_info->fc.req_mode) {
 	case ICE_FC_FULL:
-		ethtool_link_ksettings_add_link_mode(ks, advertising, Pause);
+		ethtool_ks_add_mode(ks, advertising, Pause);
 		break;
 	case ICE_FC_TX_PAUSE:
-		ethtool_link_ksettings_add_link_mode(ks, advertising,
-						     Asym_Pause);
+		ethtool_ks_add_mode(ks, advertising, Asym_Pause);
 		break;
 	case ICE_FC_RX_PAUSE:
-		ethtool_link_ksettings_add_link_mode(ks, advertising, Pause);
-		ethtool_link_ksettings_add_link_mode(ks, advertising,
-						     Asym_Pause);
+		ethtool_ks_add_mode(ks, advertising, Pause);
+		ethtool_ks_add_mode(ks, advertising, Asym_Pause);
 		break;
 	case ICE_FC_PFC:
 	default:
-		ethtool_link_ksettings_del_link_mode(ks, advertising, Pause);
-		ethtool_link_ksettings_del_link_mode(ks, advertising,
-						     Asym_Pause);
+		ethtool_ks_add_mode(ks, advertising, Pause);
+		ethtool_ks_add_mode(ks, advertising, Asym_Pause);
 		break;
 	}
 

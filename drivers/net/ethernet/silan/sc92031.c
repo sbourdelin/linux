@@ -1178,10 +1178,8 @@ sc92031_ethtool_get_link_ksettings(struct net_device *dev,
 	cmd->base.autoneg = (phy_ctrl & PhyCtrlAne) ?
 		AUTONEG_ENABLE : AUTONEG_DISABLE;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -1197,8 +1195,7 @@ sc92031_ethtool_set_link_ksettings(struct net_device *dev,
 	u32 old_phy_ctrl;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (!(speed == SPEED_10 || speed == SPEED_100))
 		return -EINVAL;

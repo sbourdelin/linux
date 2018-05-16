@@ -222,10 +222,8 @@ static int bnx2x_get_vf_link_ksettings(struct net_device *dev,
 	struct bnx2x *bp = netdev_priv(dev);
 	u32 supported, advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (bp->state == BNX2X_STATE_OPEN) {
 		if (test_bit(BNX2X_LINK_REPORT_FD,
@@ -264,8 +262,7 @@ static int bnx2x_get_link_ksettings(struct net_device *dev,
 	u32 media_type;
 	u32 supported, advertising, lp_advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&lp_advertising,
-						cmd->link_modes.lp_advertising);
+	ethtool_ks_to_u32(&lp_advertising, cmd->link_modes.lp_advertising);
 
 	/* Dual Media boards present all available port types */
 	supported = bp->port.supported[cfg_idx] |
@@ -344,12 +341,9 @@ static int bnx2x_get_link_ksettings(struct net_device *dev,
 			lp_advertising |= ADVERTISED_20000baseKR2_Full;
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising, lp_advertising);
 
 	DP(BNX2X_MSG_ETHTOOL, "ethtool_cmd: cmd %d\n"
 	   "  supported 0x%x  advertising 0x%x  speed %u\n"
@@ -372,10 +366,8 @@ static int bnx2x_set_link_ksettings(struct net_device *dev,
 	u32 supported;
 	u8 duplex = cmd->base.duplex;
 
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (IS_MF_SD(bp))
 		return 0;

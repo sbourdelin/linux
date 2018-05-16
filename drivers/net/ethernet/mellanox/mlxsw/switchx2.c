@@ -809,12 +809,9 @@ mlxsw_sx_port_get_link_ksettings(struct net_device *dev,
 	cmd->base.port = mlxsw_sx_port_connector_port(eth_proto_oper);
 	lp_advertising = mlxsw_sx_from_ptys_advert_link(eth_proto_oper);
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising, lp_advertising);
 
 	return 0;
 }
@@ -872,8 +869,7 @@ mlxsw_sx_port_set_link_ksettings(struct net_device *dev,
 
 	speed = cmd->base.speed;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	eth_proto_new = cmd->base.autoneg == AUTONEG_ENABLE ?
 		mlxsw_sx_to_ptys_advert_link(advertising) :

@@ -1263,8 +1263,7 @@ static int ns83820_get_link_ksettings(struct net_device *ndev,
 		cmd->base.port = PORT_MII;
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	cmd->base.duplex = fullduplex ? DUPLEX_FULL : DUPLEX_HALF;
 	switch (cfg / CFG_SPDSTS0 & 3) {

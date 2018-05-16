@@ -6113,72 +6113,72 @@ EXPORT_SYMBOL_GPL(qeth_core_get_drvinfo);
 static void qeth_set_cmd_adv_sup(struct ethtool_link_ksettings *cmd,
 				int maxspeed, int porttype)
 {
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
-	ethtool_link_ksettings_zero_link_mode(cmd, lp_advertising);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_clear(cmd, advertising);
+	ethtool_ks_clear(cmd, lp_advertising);
 
-	ethtool_link_ksettings_add_link_mode(cmd, supported, Autoneg);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
+	ethtool_ks_add_mode(cmd, supported, Autoneg);
+	ethtool_ks_add_mode(cmd, advertising, Autoneg);
 
 	switch (porttype) {
 	case PORT_TP:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, TP);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising, TP);
+		ethtool_ks_add_mode(cmd, supported, TP);
+		ethtool_ks_add_mode(cmd, advertising, TP);
 		break;
 	case PORT_FIBRE:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
+		ethtool_ks_add_mode(cmd, supported, FIBRE);
+		ethtool_ks_add_mode(cmd, advertising, FIBRE);
 		break;
 	default:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, TP);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising, TP);
+		ethtool_ks_add_mode(cmd, supported, TP);
+		ethtool_ks_add_mode(cmd, advertising, TP);
 		WARN_ON_ONCE(1);
 	}
 
 	/* fallthrough from high to low, to select all legal speeds: */
 	switch (maxspeed) {
 	case SPEED_10000:
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     10000baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     10000baseT_Full);
 	case SPEED_1000:
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     1000baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     1000baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     1000baseT_Half);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     1000baseT_Half);
 	case SPEED_100:
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     100baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     100baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     100baseT_Half);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     100baseT_Half);
 	case SPEED_10:
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     10baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     10baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     10baseT_Half);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     10baseT_Half);
 		/* end fallthrough */
 		break;
 	default:
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     10baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     10baseT_Full);
-		ethtool_link_ksettings_add_link_mode(cmd, supported,
+		ethtool_ks_add_mode(cmd, supported,
 						     10baseT_Half);
-		ethtool_link_ksettings_add_link_mode(cmd, advertising,
+		ethtool_ks_add_mode(cmd, advertising,
 						     10baseT_Half);
 		WARN_ON_ONCE(1);
 	}

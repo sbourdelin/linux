@@ -960,8 +960,7 @@ static int xgbe_phy_find_phy_device(struct xgbe_prv_data *pdata)
 
 	xgbe_phy_external_phy_quirks(pdata);
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						lks->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, lks->link_modes.advertising);
 	phydev->advertising &= advertising;
 
 	phy_start_aneg(phy_data->phydev);
@@ -1666,8 +1665,7 @@ static int xgbe_phy_an_config(struct xgbe_prv_data *pdata)
 	if (!phy_data->phydev)
 		return 0;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						lks->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, lks->link_modes.advertising);
 
 	phy_data->phydev->autoneg = pdata->phy.autoneg;
 	phy_data->phydev->advertising = phy_data->phydev->supported &

@@ -76,7 +76,7 @@ static int i40evf_get_link_ksettings(struct net_device *netdev,
 {
 	struct i40evf_adapter *adapter = netdev_priv(netdev);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
+	ethtool_ks_clear(cmd, supported);
 	cmd->base.autoneg = AUTONEG_DISABLE;
 	cmd->base.port = PORT_NONE;
 	/* Set speed and duplex */

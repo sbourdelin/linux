@@ -74,13 +74,13 @@ vxge_ethtool_set_link_ksettings(struct net_device *dev,
 static int vxge_ethtool_get_link_ksettings(struct net_device *dev,
 					   struct ethtool_link_ksettings *cmd)
 {
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 10000baseT_Full);
+	ethtool_ks_add_mode(cmd, supported, FIBRE);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, 10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
+	ethtool_ks_clear(cmd, advertising);
+	ethtool_ks_add_mode(cmd, advertising, 10000baseT_Full);
+	ethtool_ks_add_mode(cmd, advertising, FIBRE);
 
 	cmd->base.port = PORT_FIBRE;
 

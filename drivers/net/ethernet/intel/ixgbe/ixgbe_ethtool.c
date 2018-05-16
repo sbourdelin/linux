@@ -178,8 +178,7 @@ static int ixgbe_get_link_ksettings(struct net_device *netdev,
 	bool autoneg = false;
 	u32 supported, advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
 
 	hw->mac.ops.get_link_capabilities(hw, &supported_link, &autoneg);
 
@@ -356,10 +355,8 @@ static int ixgbe_get_link_ksettings(struct net_device *netdev,
 		cmd->base.duplex = DUPLEX_UNKNOWN;
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -373,10 +370,8 @@ static int ixgbe_set_link_ksettings(struct net_device *netdev,
 	s32 err = 0;
 	u32 supported, advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if ((hw->phy.media_type == ixgbe_media_type_copper) ||
 	    (hw->phy.multispeed_fiber)) {

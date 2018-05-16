@@ -2476,8 +2476,7 @@ static int hme_get_link_ksettings(struct net_device *dev,
 			DUPLEX_FULL : DUPLEX_HALF;
 	}
 	cmd->base.speed = speed;
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	return 0;
 }

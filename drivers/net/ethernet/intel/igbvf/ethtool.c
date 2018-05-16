@@ -55,10 +55,10 @@ static int igbvf_get_link_ksettings(struct net_device *netdev,
 	struct e1000_hw *hw = &adapter->hw;
 	u32 status;
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 1000baseT_Full);
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, 1000baseT_Full);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 1000baseT_Full);
+	ethtool_ks_clear(cmd, advertising);
+	ethtool_ks_add_mode(cmd, advertising, 1000baseT_Full);
 
 	cmd->base.port = -1;
 

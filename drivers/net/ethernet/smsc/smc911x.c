@@ -1477,8 +1477,7 @@ smc911x_ethtool_get_link_ksettings(struct net_device *dev,
 			(status & (PHY_SPECIAL_SPD_10FULL_ | PHY_SPECIAL_SPD_100FULL_)) ?
 				DUPLEX_FULL : DUPLEX_HALF;
 
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	}
 

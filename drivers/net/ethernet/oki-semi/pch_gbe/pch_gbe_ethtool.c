@@ -88,18 +88,14 @@ static int pch_gbe_get_link_ksettings(struct net_device *netdev,
 
 	mii_ethtool_get_link_ksettings(&adapter->mii, ecmd);
 
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						ecmd->link_modes.supported);
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						ecmd->link_modes.advertising);
+	ethtool_ks_to_u32(&supported, ecmd->link_modes.supported);
+	ethtool_ks_to_u32(&advertising, ecmd->link_modes.advertising);
 
 	supported &= ~(SUPPORTED_TP | SUPPORTED_1000baseT_Half);
 	advertising &= ~(ADVERTISED_TP | ADVERTISED_1000baseT_Half);
 
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(ecmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(ecmd->link_modes.advertising, advertising);
 
 	if (!netif_carrier_ok(adapter->netdev))
 		ecmd->base.speed = SPEED_UNKNOWN;
@@ -143,8 +139,7 @@ static int pch_gbe_set_link_ksettings(struct net_device *netdev,
 	}
 	hw->mac.link_speed = speed;
 	hw->mac.link_duplex = copy_ecmd.base.duplex;
-	ethtool_convert_link_mode_to_legacy_u32(
-		&advertising, copy_ecmd.link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, copy_ecmd.link_modes.advertising);
 	hw->phy.autoneg_advertised = advertising;
 	hw->mac.autoneg = copy_ecmd.base.autoneg;
 

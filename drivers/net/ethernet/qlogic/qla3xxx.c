@@ -1726,10 +1726,8 @@ static int ql_get_link_ksettings(struct net_device *ndev,
 	cmd->base.speed = ql_get_speed(qdev);
 	cmd->base.duplex = ql_get_full_dup(qdev);
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }

@@ -695,13 +695,13 @@ static int catc_get_link_ksettings(struct net_device *dev,
 	if (!catc->is_f5u011)
 		return -EOPNOTSUPP;
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 10baseT_Half);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, TP);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 10baseT_Half);
+	ethtool_ks_add_mode(cmd, supported, TP);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, 10baseT_Half);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, TP);
+	ethtool_ks_clear(cmd, advertising);
+	ethtool_ks_add_mode(cmd, advertising, 10baseT_Half);
+	ethtool_ks_add_mode(cmd, advertising, TP);
 
 	cmd->base.speed = SPEED_10;
 	cmd->base.duplex = DUPLEX_HALF;

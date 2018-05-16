@@ -1492,10 +1492,10 @@ enc28j60_get_link_ksettings(struct net_device *dev,
 {
 	struct enc28j60_net *priv = netdev_priv(dev);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 10baseT_Half);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, 10baseT_Full);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, TP);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, 10baseT_Half);
+	ethtool_ks_add_mode(cmd, supported, 10baseT_Full);
+	ethtool_ks_add_mode(cmd, supported, TP);
 
 	cmd->base.speed = SPEED_10;
 	cmd->base.duplex = priv->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;

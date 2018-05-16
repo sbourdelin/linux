@@ -975,7 +975,7 @@ netvsc_validate_ethtool_ss_cmd(const struct ethtool_link_ksettings *cmd)
 	diff1.base.speed = 0;
 	diff1.base.duplex = 0;
 	/* advertising and cmd are usually set */
-	ethtool_link_ksettings_zero_link_mode(&diff1, advertising);
+	ethtool_ks_clear(&diff1, advertising);
 	diff1.base.cmd = 0;
 	/* We set port to PORT_OTHER */
 	diff2.base.port = PORT_OTHER;

@@ -400,10 +400,8 @@ static int ql_get_link_ksettings(struct net_device *ndev,
 	ecmd->base.speed = SPEED_10000;
 	ecmd->base.duplex = DUPLEX_FULL;
 
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(ecmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(ecmd->link_modes.advertising, advertising);
 
 	return 0;
 }

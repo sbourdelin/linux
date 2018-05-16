@@ -375,10 +375,10 @@ static void ntb_get_drvinfo(struct net_device *ndev,
 static int ntb_get_link_ksettings(struct net_device *dev,
 				  struct ethtool_link_ksettings *cmd)
 {
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, Backplane);
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, Backplane);
+	ethtool_ks_clear(cmd, supported);
+	ethtool_ks_add_mode(cmd, supported, Backplane);
+	ethtool_ks_clear(cmd, advertising);
+	ethtool_ks_add_mode(cmd, advertising, Backplane);
 
 	cmd->base.speed = SPEED_UNKNOWN;
 	cmd->base.duplex = DUPLEX_FULL;

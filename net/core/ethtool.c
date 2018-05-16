@@ -398,17 +398,15 @@ void ethtool_intersect_link_masks(struct ethtool_link_ksettings *dst,
 }
 EXPORT_SYMBOL(ethtool_intersect_link_masks);
 
-void ethtool_convert_legacy_u32_to_link_mode(unsigned long *dst,
-					     u32 legacy_u32)
+void ethtool_u32_to_ks(unsigned long *dst, u32 legacy_u32)
 {
 	bitmap_zero(dst, __ETHTOOL_LINK_MODE_MASK_NBITS);
 	dst[0] = legacy_u32;
 }
-EXPORT_SYMBOL(ethtool_convert_legacy_u32_to_link_mode);
+EXPORT_SYMBOL(ethtool_u32_to_ks);
 
 /* return false if src had higher bits set. lower bits always updated. */
-bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
-					     const unsigned long *src)
+bool ethtool_ks_to_u32(u32 *legacy_u32, const unsigned long *src)
 {
 	bool retval = true;
 
@@ -428,7 +426,7 @@ bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
 	*legacy_u32 = src[0];
 	return retval;
 }
-EXPORT_SYMBOL(ethtool_convert_link_mode_to_legacy_u32);
+EXPORT_SYMBOL(ethtool_ks_to_u32);
 
 /* return false if legacy contained non-0 deprecated fields
  * maxtxpkt/maxrxpkt. rest of ksettings always updated
@@ -450,15 +448,12 @@ convert_legacy_settings_to_link_ksettings(
 	    legacy_settings->maxrxpkt)
 		retval = false;
 
-	ethtool_convert_legacy_u32_to_link_mode(
-		link_ksettings->link_modes.supported,
-		legacy_settings->supported);
-	ethtool_convert_legacy_u32_to_link_mode(
-		link_ksettings->link_modes.advertising,
-		legacy_settings->advertising);
-	ethtool_convert_legacy_u32_to_link_mode(
-		link_ksettings->link_modes.lp_advertising,
-		legacy_settings->lp_advertising);
+	ethtool_u32_to_ks(link_ksettings->link_modes.supported,
+			  legacy_settings->supported);
+	ethtool_u32_to_ks(link_ksettings->link_modes.advertising,
+			  legacy_settings->advertising);
+	ethtool_u32_to_ks(link_ksettings->link_modes.lp_advertising,
+			  legacy_settings->lp_advertising);
 	link_ksettings->base.speed
 		= ethtool_cmd_speed(legacy_settings);
 	link_ksettings->base.duplex
@@ -495,15 +490,12 @@ convert_link_ksettings_to_legacy_settings(
 	 * __u32	maxrxpkt;
 	 */
 
-	retval &= ethtool_convert_link_mode_to_legacy_u32(
-		&legacy_settings->supported,
-		link_ksettings->link_modes.supported);
-	retval &= ethtool_convert_link_mode_to_legacy_u32(
-		&legacy_settings->advertising,
-		link_ksettings->link_modes.advertising);
-	retval &= ethtool_convert_link_mode_to_legacy_u32(
-		&legacy_settings->lp_advertising,
-		link_ksettings->link_modes.lp_advertising);
+	retval &= ethtool_ks_to_u32(&legacy_settings->supported,
+				    link_ksettings->link_modes.supported);
+	retval &= ethtool_ks_to_u32(&legacy_settings->advertising,
+				    link_ksettings->link_modes.advertising);
+	retval &= ethtool_ks_to_u32(&legacy_settings->lp_advertising,
+				    link_ksettings->link_modes.lp_advertising);
 	ethtool_cmd_speed_set(legacy_settings, link_ksettings->base.speed);
 	legacy_settings->duplex
 		= link_ksettings->base.duplex;
