@@ -290,6 +290,7 @@ static struct pstate_funcs pstate_funcs __read_mostly;
 
 static int hwp_active __read_mostly;
 static bool per_cpu_limits __read_mostly;
+static bool hwp_boost __read_mostly;
 
 static struct cpufreq_driver *intel_pstate_driver __read_mostly;
 
@@ -1420,6 +1421,12 @@ static void csd_init(struct cpudata *cpu)
 	cpu->csd.info = cpu;
 }
 
+static inline void intel_pstate_update_util_hwp(struct update_util_data *data,
+						u64 time, unsigned int flags)
+{
+
+}
+
 static inline void intel_pstate_calc_avg_perf(struct cpudata *cpu)
 {
 	struct sample *sample = &cpu->sample;
@@ -1723,7 +1730,7 @@ static void intel_pstate_set_update_util_hook(unsigned int cpu_num)
 {
 	struct cpudata *cpu = all_cpu_data[cpu_num];
 
-	if (hwp_active)
+	if (hwp_active && !hwp_boost)
 		return;
 
 	if (cpu->update_util_set)
@@ -1731,8 +1738,12 @@ static void intel_pstate_set_update_util_hook(unsigned int cpu_num)
 
 	/* Prevent intel_pstate_update_util() from using stale data. */
 	cpu->sample.time = 0;
-	cpufreq_add_update_util_hook(cpu_num, &cpu->update_util,
-				     intel_pstate_update_util);
+	if (hwp_active)
+		cpufreq_add_update_util_hook(cpu_num, &cpu->update_util,
+					     intel_pstate_update_util_hwp);
+	else
+		cpufreq_add_update_util_hook(cpu_num, &cpu->update_util,
+					     intel_pstate_update_util);
 	cpu->update_util_set = true;
 }
 
@@ -1844,8 +1855,15 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 		intel_pstate_set_update_util_hook(policy->cpu);
 	}
 
-	if (hwp_active)
+	if (hwp_active) {
+		if (hwp_boost) {
+			x86_arch_scale_freq_tick_enable();
+		} else {
+			intel_pstate_clear_update_util_hook(policy->cpu);
+			x86_arch_scale_freq_tick_disable();
+		}
 		intel_pstate_hwp_set(policy->cpu);
+	}
 
 	mutex_unlock(&intel_pstate_limits_lock);
 
