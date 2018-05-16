@@ -241,7 +241,7 @@ static int parse_gb_huge_pages(char *param, char* val)
 }
 
 
-static int handle_mem_memmap(void)
+static int handle_mem_options(void)
 {
 	char *args = (char *)get_cmd_line_ptr();
 	size_t len = strlen((char *)args);
@@ -249,7 +249,8 @@ static int handle_mem_memmap(void)
 	char *param, *val;
 	u64 mem_size;
 
-	if (!strstr(args, "memmap=") && !strstr(args, "mem="))
+	if (!strstr(args, "memmap=") && !strstr(args, "mem=") &&
+		!strstr(args,"hugepages"))
 		return 0;
 
 	tmp_cmdline = malloc(len + 1);
@@ -274,6 +275,8 @@ static int handle_mem_memmap(void)
 
 		if (!strcmp(param, "memmap")) {
 			mem_avoid_memmap(val);
+		} else if (strstr(param, "hugepages")) {
+			parse_gb_huge_pages(param, val);
 		} else if (!strcmp(param, "mem")) {
 			char *p = val;
 
@@ -413,7 +416,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	/* We don't need to set a mapping for setup_data. */
 
 	/* Mark the memmap regions we need to avoid */
-	handle_mem_memmap();
+	handle_mem_options();
 
 #ifdef CONFIG_X86_VERBOSE_BOOTUP
 	/* Make sure video RAM can be used. */
@@ -617,7 +620,7 @@ static void process_mem_region(struct mem_vector *entry,
 
 		/* If nothing overlaps, store the region and return. */
 		if (!mem_avoid_overlap(&region, &overlap)) {
-			store_slot_info(&region, image_size);
+			process_gb_huge_page(&region, image_size);
 			return;
 		}
 
@@ -627,7 +630,7 @@ static void process_mem_region(struct mem_vector *entry,
 
 			beginning.start = region.start;
 			beginning.size = overlap.start - region.start;
-			store_slot_info(&beginning, image_size);
+			process_gb_huge_page(&beginning, image_size);
 		}
 
 		/* Return if overlap extends to or past end of region. */
