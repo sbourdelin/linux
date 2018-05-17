@@ -97,19 +97,40 @@ void ftrace_likely_update(struct ftrace_likely_data *f, int val,
  * These macros help objtool understand GCC code flow for unreachable code.
  * The __COUNTER__ based labels are a hack to make each instance of the macros
  * unique, to convince GCC not to merge duplicate inline asm statements.
+ *
+ * The annotation logic is encapsulated within assembly macros, which are then
+ * called on each annotation. This hack is necessary to prevent GCC from
+ * considering the inline assembly blocks as costly in time and space, which can
+ * prevent function inlining and lead to other bad compilation decisions. GCC
+ * computes inline assembly cost according to the number of perceived number of
+ * assembly instruction, based on the number of new-lines and semicolons in the
+ * assembly block. Since the annotations will be discarded during linkage, the
+ * macros make the annotations to be considered "cheap" and let GCC to emit
+ * better code.
  */
+asm(".macro __annotate_reachable counter:req\n"
+    "\\counter:\n\t"
+    ".pushsection .discard.reachable\n\t"
+    ".long \\counter\\()b -.\n\t"
+    ".popsection\n\t"
+    ".endm");
+
 #define annotate_reachable() ({						\
-	asm volatile("%c0:\n\t"						\
-		     ".pushsection .discard.reachable\n\t"		\
-		     ".long %c0b - .\n\t"				\
-		     ".popsection\n\t" : : "i" (__COUNTER__));		\
+	asm volatile("__annotate_reachable %c0" : : "i" (__COUNTER__));	\
 })
+
+asm(".macro __annotate_unreachable counter:req\n"
+    "\\counter:\n\t"
+    ".pushsection .discard.unreachable\n\t"
+    ".long \\counter\\()b -.\n\t"
+    ".popsection\n\t"
+    ".endm");
+
 #define annotate_unreachable() ({					\
-	asm volatile("%c0:\n\t"						\
-		     ".pushsection .discard.unreachable\n\t"		\
-		     ".long %c0b - .\n\t"				\
-		     ".popsection\n\t" : : "i" (__COUNTER__));		\
+	asm volatile("__annotate_unreachable %c0" : :			\
+		     "i" (__COUNTER__));				\
 })
+
 #define ASM_UNREACHABLE							\
 	"999:\n\t"							\
 	".pushsection .discard.unreachable\n\t"				\
