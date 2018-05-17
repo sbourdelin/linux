@@ -1887,7 +1887,7 @@ static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 	struct bpf_prog_info info = {};
 	u32 info_len = attr->info.info_len;
 	char __user *uinsns;
-	u32 ulen;
+	u32 ulen, i;
 	int err;
 
 	err = check_uarg_tail_zero(uinfo, sizeof(info), info_len);
@@ -1913,7 +1913,6 @@ static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 	ulen = min_t(u32, info.nr_map_ids, ulen);
 	if (ulen) {
 		u32 __user *user_map_ids = u64_to_user_ptr(info.map_ids);
-		u32 i;
 
 		for (i = 0; i < ulen; i++)
 			if (put_user(prog->aux->used_maps[i]->id,
@@ -1961,13 +1960,41 @@ static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 	 * for offload.
 	 */
 	ulen = info.jited_prog_len;
-	info.jited_prog_len = prog->jited_len;
+	if (prog->aux->func_cnt) {
+		info.jited_prog_len = 0;
+		for (i = 0; i < prog->aux->func_cnt; i++)
+			info.jited_prog_len += prog->aux->func[i]->jited_len;
+	} else {
+		info.jited_prog_len = prog->jited_len;
+	}
+
 	if (info.jited_prog_len && ulen) {
 		if (bpf_dump_raw_ok()) {
 			uinsns = u64_to_user_ptr(info.jited_prog_insns);
 			ulen = min_t(u32, info.jited_prog_len, ulen);
-			if (copy_to_user(uinsns, prog->bpf_func, ulen))
-				return -EFAULT;
+
+			/* for multi-function programs, copy the JITed
+			 * instructions for all the functions
+			 */
+			if (prog->aux->func_cnt) {
+				u32 len, free;
+				u8 *img;
+
+				free = ulen;
+				for (i = 0; i < prog->aux->func_cnt; i++) {
+					len = prog->aux->func[i]->jited_len;
+					img = (u8 *) prog->aux->func[i]->bpf_func;
+					if (len > free)
+						break;
+					if (copy_to_user(uinsns, img, len))
+						return -EFAULT;
+					uinsns += len;
+					free -= len;
+				}
+			} else {
+				if (copy_to_user(uinsns, prog->bpf_func, ulen))
+					return -EFAULT;
+			}
 		} else {
 			info.jited_prog_insns = 0;
 		}
@@ -1978,7 +2005,6 @@ static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 	if (info.nr_jited_ksyms && ulen) {
 		u64 __user *user_jited_ksyms = u64_to_user_ptr(info.jited_ksyms);
 		ulong ksym_addr;
-		u32 i;
 
 		/* copy the address of the kernel symbol corresponding to
 		 * each function
