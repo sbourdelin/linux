@@ -86,6 +86,28 @@ struct gsc_scaler {
 	unsigned long main_vratio;
 };
 
+/**
+ * struct gsc_driverdata - per device type driver data for init time.
+ *
+ * @limits: picture size limits array
+ * @clk_names: names of clocks needed by this variant
+ * @num_clocks: the number of clocks needed by this variant
+ * @has_in_ic_max: indicate whether GSCALER_IN_CON register has
+ *			IN_IC_MAX field which means maxinum AXI
+ *			read capability.
+ * @in_ic_max_shift: indicate which position IN_IC_MAX field is located.
+ * @in_ic_max_mask: A mask value to IN_IC_MAX field.
+ */
+struct gsc_driverdata {
+	const struct drm_exynos_ipp_limit *limits;
+	int		num_limits;
+	const char	*clk_names[GSC_MAX_CLOCKS];
+	int		num_clocks;
+	unsigned int	has_in_ic_max:1;
+	unsigned int	in_ic_max_shift;
+	unsigned int	in_ic_max_mask;
+};
+
 /*
  * A structure of gsc context.
  *
@@ -96,6 +118,9 @@ struct gsc_scaler {
  * @id: gsc id.
  * @irq: irq number.
  * @rotation: supports rotation of src.
+ * @align_size: A size that GSC_SRCIMG_WIDTH value of GSC_SRCIMG_SIZE
+ *		register should be aligned with(in byte).
+ * @driver_data: a pointer to gsc_driverdata.
  */
 struct gsc_context {
 	struct exynos_drm_ipp ipp;
@@ -114,20 +139,8 @@ struct gsc_context {
 	int	id;
 	int	irq;
 	bool	rotation;
-};
-
-/**
- * struct gsc_driverdata - per device type driver data for init time.
- *
- * @limits: picture size limits array
- * @clk_names: names of clocks needed by this variant
- * @num_clocks: the number of clocks needed by this variant
- */
-struct gsc_driverdata {
-	const struct drm_exynos_ipp_limit *limits;
-	int		num_limits;
-	const char	*clk_names[GSC_MAX_CLOCKS];
-	int		num_clocks;
+	unsigned int align_size;
+	struct gsc_driverdata *driver_data;
 };
 
 /* 8-tap Filter Coefficient */
@@ -1095,6 +1108,18 @@ static void gsc_start(struct gsc_context *ctx)
 	gsc_write(cfg, GSC_ENABLE);
 }
 
+static void gsc_fixup(struct exynos_drm_ipp *ipp,
+			  struct exynos_drm_ipp_task *task)
+{
+	struct gsc_context *ctx = container_of(ipp, struct gsc_context, ipp);
+	struct exynos_drm_ipp_buffer *src = &task->src;
+
+	if (!ctx->driver_data->has_in_ic_max)
+		return;
+
+	src->buf.width = ALIGN(src->buf.width, ctx->align_size);
+}
+
 static int gsc_commit(struct exynos_drm_ipp *ipp,
 			  struct exynos_drm_ipp_task *task)
 {
@@ -1124,6 +1149,32 @@ static int gsc_commit(struct exynos_drm_ipp *ipp,
 	return 0;
 }
 
+static void gsc_get_align_size(struct gsc_context *ctx)
+{
+	u32 cfg, mask, shift;
+
+	mask = ctx->driver_data->in_ic_max_mask;
+	shift = ctx->driver_data->in_ic_max_shift;
+
+	pm_runtime_get_sync(ctx->dev);
+
+	cfg = gsc_read(GSC_IN_CON);
+
+	cfg = (cfg & mask << shift) >> shift;
+
+	if (cfg == 0)
+		ctx->align_size = 4;
+	else if (cfg == 1)
+		ctx->align_size = 8;
+	else
+		ctx->align_size = 16;
+
+	DRM_DEBUG_KMS("align_size = %d\n", ctx->align_size);
+
+	pm_runtime_mark_last_busy(ctx->dev);
+	pm_runtime_put_autosuspend(ctx->dev);
+}
+
 static void gsc_abort(struct exynos_drm_ipp *ipp,
 			  struct exynos_drm_ipp_task *task)
 {
@@ -1142,6 +1193,7 @@ static void gsc_abort(struct exynos_drm_ipp *ipp,
 }
 
 static struct exynos_drm_ipp_funcs ipp_funcs = {
+	.fixup = gsc_fixup,
 	.commit = gsc_commit,
 	.abort = gsc_abort,
 };
@@ -1154,6 +1206,9 @@ static int gsc_bind(struct device *dev, struct device *master, void *data)
 
 	ctx->drm_dev = drm_dev;
 	drm_iommu_attach_device(drm_dev, dev);
+
+	if (ctx->driver_data->has_in_ic_max)
+		gsc_get_align_size(ctx);
 
 	exynos_drm_ipp_register(drm_dev, ipp, &ipp_funcs,
 			DRM_EXYNOS_IPP_CAP_CROP | DRM_EXYNOS_IPP_CAP_ROTATE |
@@ -1221,6 +1276,7 @@ static int gsc_probe(struct platform_device *pdev)
 	}
 	ctx->formats = formats;
 	ctx->num_formats = ARRAY_SIZE(gsc_formats);
+	ctx->driver_data = driver_data;
 
 	/* clock control */
 	for (i = 0; i < ctx->num_clocks; i++) {
@@ -1366,6 +1422,9 @@ static struct gsc_driverdata gsc_exynos5433_drvdata = {
 	.num_clocks = 4,
 	.limits = gsc_5433_limits,
 	.num_limits = ARRAY_SIZE(gsc_5433_limits),
+	.has_in_ic_max = 1,
+	.in_ic_max_shift = 24,
+	.in_ic_max_mask = 0x3,
 };
 
 static const struct of_device_id exynos_drm_gsc_of_match[] = {

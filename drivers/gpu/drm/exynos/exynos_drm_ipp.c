@@ -560,6 +560,14 @@ static int exynos_drm_ipp_check_scale_limits(
 	return 0;
 }
 
+static void exynos_drm_ipp_fixup_buffer(struct exynos_drm_ipp_task *task)
+{
+	struct exynos_drm_ipp *ipp = task->ipp;
+
+	if (ipp->funcs->fixup)
+		ipp->funcs->fixup(ipp, task);
+}
+
 static int exynos_drm_ipp_task_check(struct exynos_drm_ipp_task *task)
 {
 	struct exynos_drm_ipp *ipp = task->ipp;
@@ -618,6 +626,7 @@ static int exynos_drm_ipp_task_check(struct exynos_drm_ipp_task *task)
 					       rotate, false);
 	if (ret)
 		return ret;
+
 	ret = exynos_drm_ipp_check_scale_limits(&src->rect, &dst->rect,
 						src_fmt->limits,
 						src_fmt->num_limits, swap);
@@ -653,6 +662,12 @@ static int exynos_drm_ipp_task_setup_buffers(struct exynos_drm_ipp_task *task,
 	int ret = 0;
 
 	DRM_DEBUG_DRIVER("Setting buffer for task %pK\n", task);
+
+	/*
+	 * image size should be fixed up before setup buffer call
+	 * which verifies whether image size exceeds gem buffer size or not.
+	 */
+	exynos_drm_ipp_fixup_buffer(task);
 
 	ret = exynos_drm_ipp_task_setup_buffer(src, filp);
 	if (ret) {
