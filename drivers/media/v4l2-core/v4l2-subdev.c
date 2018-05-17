@@ -494,6 +494,18 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 
 	case VIDIOC_SUBDEV_S_DV_TIMINGS:
 		return v4l2_subdev_call(sd, video, s_dv_timings, arg);
+
+	case VIDIOC_SUBDEV_G_STD:
+		return v4l2_subdev_call(sd, video, g_std, arg);
+
+	case VIDIOC_SUBDEV_S_STD: {
+		v4l2_std_id *std = arg;
+
+		return v4l2_subdev_call(sd, video, s_std, *std);
+	}
+
+	case VIDIOC_SUBDEV_QUERYSTD:
+		return v4l2_subdev_call(sd, video, querystd, arg);
 #endif
 	default:
 		return v4l2_subdev_call(sd, core, ioctl, cmd, arg);
