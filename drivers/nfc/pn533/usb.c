@@ -150,10 +150,17 @@ static int pn533_usb_send_ack(struct pn533 *dev, gfp_t flags)
 	struct pn533_usb_phy *phy = dev->phy;
 	static const u8 ack[6] = {0x00, 0x00, 0xff, 0x00, 0xff, 0x00};
 	/* spec 7.1.1.3:  Preamble, SoPC (2), ACK Code (2), Postamble */
+	char *buffer;
 	int rc;
+
+	buffer = kmalloc(sizeof(ack), GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+	memcpy(buffer, ack, sizeof(ack));
 
 	phy->out_urb->transfer_buffer = (u8 *)ack;
 	phy->out_urb->transfer_buffer_length = sizeof(ack);
+	phy->out_urb |= URB_FREE_BUFFER;
 	rc = usb_submit_urb(phy->out_urb, flags);
 
 	return rc;
@@ -170,6 +177,7 @@ static int pn533_usb_send_frame(struct pn533 *dev,
 
 	phy->out_urb->transfer_buffer = out->data;
 	phy->out_urb->transfer_buffer_length = out->len;
+	phy->out_urb &= ~URB_FREE_BUFFER;
 
 	print_hex_dump_debug("PN533 TX: ", DUMP_PREFIX_NONE, 16, 1,
 			     out->data, out->len, false);
@@ -375,11 +383,17 @@ static int pn533_acr122_poweron_rdr(struct pn533_usb_phy *phy)
 	/* Power on th reader (CCID cmd) */
 	u8 cmd[10] = {PN533_ACR122_PC_TO_RDR_ICCPOWERON,
 		      0, 0, 0, 0, 0, 0, 3, 0, 0};
+	char *buffer;
 	int rc;
 	void *cntx;
 	struct pn533_acr122_poweron_rdr_arg arg;
 
 	dev_dbg(&phy->udev->dev, "%s\n", __func__);
+
+	buffer = kmalloc(sizeof(cmd), GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+	memcpy(buffer, cmd, sizeof(cmd));
 
 	init_completion(&arg.done);
 	cntx = phy->in_urb->context;  /* backup context */
@@ -389,6 +403,7 @@ static int pn533_acr122_poweron_rdr(struct pn533_usb_phy *phy)
 
 	phy->out_urb->transfer_buffer = cmd;
 	phy->out_urb->transfer_buffer_length = sizeof(cmd);
+	phy->out_urb |= URB_FREE_BUFFER;
 
 	print_hex_dump_debug("ACR122 TX: ", DUMP_PREFIX_NONE, 16, 1,
 		       cmd, sizeof(cmd), false);
