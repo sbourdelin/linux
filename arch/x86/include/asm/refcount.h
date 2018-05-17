@@ -13,35 +13,49 @@
  * the exception handler to use (in mm/extable.c), and then triggers the
  * central refcount exception. The fixup address for the exception points
  * back to the regular execution flow in .text.
+ *
+ * The logic and data are encapsulated within an assembly macro, which is then
+ * called on each use. This hack is necessary to prevent GCC from considering
+ * the inline assembly blocks as costly in time and space, which can prevent
+ * function inlining and lead to other bad compilation decisions. GCC computes
+ * inline assembly cost according to the number of perceived number of assembly
+ * instruction, based on the number of new-lines and semicolons in the assembly
+ * block. The macros will eventually be compiled into a single instruction that
+ * will be actually executed (unless an exception happens). This scheme allows
+ * GCC to better understand the inline asm cost.
  */
-#define _REFCOUNT_EXCEPTION				\
-	".pushsection .text..refcount\n"		\
-	"111:\tlea %[counter], %%" _ASM_CX "\n"		\
-	"112:\t" ASM_UD2 "\n"				\
-	ASM_UNREACHABLE					\
-	".popsection\n"					\
-	"113:\n"					\
-	_ASM_EXTABLE_REFCOUNT(112b, 113b)
+asm(".macro __REFCOUNT_EXCEPTION counter:req\n\t"
+    ".pushsection .text..refcount\n"
+    "111:\tlea \\counter, %" _ASM_CX "\n"
+    "112:\t" ASM_UD2 "\n\t"
+    ASM_UNREACHABLE
+    ".popsection\n"
+    "113:\n\t"
+    _ASM_EXTABLE_REFCOUNT(112b, 113b) "\n\t"
+    ".endm");
 
 /* Trigger refcount exception if refcount result is negative. */
-#define REFCOUNT_CHECK_LT_ZERO				\
-	"js 111f\n\t"					\
-	_REFCOUNT_EXCEPTION
+asm(".macro __REFCOUNT_CHECK_LT_ZERO counter:req\n\t"
+    "js 111f\n\t"
+    "__REFCOUNT_EXCEPTION \\counter\n\t"
+    ".endm");
 
 /* Trigger refcount exception if refcount result is zero or negative. */
-#define REFCOUNT_CHECK_LE_ZERO				\
-	"jz 111f\n\t"					\
-	REFCOUNT_CHECK_LT_ZERO
+asm(".macro __REFCOUNT_CHECK_LE_ZERO counter:req\n\t"
+    "jz 111f\n\t"
+    "__REFCOUNT_CHECK_LT_ZERO counter=\\counter\n\t"
+    ".endm");
 
 /* Trigger refcount exception unconditionally. */
-#define REFCOUNT_ERROR					\
-	"jmp 111f\n\t"					\
-	_REFCOUNT_EXCEPTION
+asm(".macro __REFCOUNT_ERROR counter:req\n\t"
+    "jmp 111f\n\t"
+    "__REFCOUNT_EXCEPTION counter=\\counter\n\t"
+    ".endm");
 
 static __always_inline void refcount_add(unsigned int i, refcount_t *r)
 {
 	asm volatile(LOCK_PREFIX "addl %1,%0\n\t"
-		REFCOUNT_CHECK_LT_ZERO
+		"__REFCOUNT_CHECK_LT_ZERO %[counter]"
 		: [counter] "+m" (r->refs.counter)
 		: "ir" (i)
 		: "cc", "cx");
@@ -50,7 +64,7 @@ static __always_inline void refcount_add(unsigned int i, refcount_t *r)
 static __always_inline void refcount_inc(refcount_t *r)
 {
 	asm volatile(LOCK_PREFIX "incl %0\n\t"
-		REFCOUNT_CHECK_LT_ZERO
+		"__REFCOUNT_CHECK_LT_ZERO %[counter]"
 		: [counter] "+m" (r->refs.counter)
 		: : "cc", "cx");
 }
@@ -58,7 +72,7 @@ static __always_inline void refcount_inc(refcount_t *r)
 static __always_inline void refcount_dec(refcount_t *r)
 {
 	asm volatile(LOCK_PREFIX "decl %0\n\t"
-		REFCOUNT_CHECK_LE_ZERO
+		"__REFCOUNT_CHECK_LE_ZERO %[counter]"
 		: [counter] "+m" (r->refs.counter)
 		: : "cc", "cx");
 }
@@ -66,13 +80,15 @@ static __always_inline void refcount_dec(refcount_t *r)
 static __always_inline __must_check
 bool refcount_sub_and_test(unsigned int i, refcount_t *r)
 {
-	GEN_BINARY_SUFFIXED_RMWcc(LOCK_PREFIX "subl", REFCOUNT_CHECK_LT_ZERO,
+	GEN_BINARY_SUFFIXED_RMWcc(LOCK_PREFIX "subl",
+				  "__REFCOUNT_CHECK_LT_ZERO %[counter]",
 				  r->refs.counter, "er", i, "%0", e, "cx");
 }
 
 static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
 {
-	GEN_UNARY_SUFFIXED_RMWcc(LOCK_PREFIX "decl", REFCOUNT_CHECK_LT_ZERO,
+	GEN_UNARY_SUFFIXED_RMWcc(LOCK_PREFIX "decl",
+				 "__REFCOUNT_CHECK_LT_ZERO %[counter]",
 				 r->refs.counter, "%0", e, "cx");
 }
 
@@ -90,7 +106,7 @@ bool refcount_add_not_zero(unsigned int i, refcount_t *r)
 
 		/* Did we try to increment from/to an undesirable state? */
 		if (unlikely(c < 0 || c == INT_MAX || result < c)) {
-			asm volatile(REFCOUNT_ERROR
+			asm volatile("__REFCOUNT_ERROR %[counter]"
 				     : : [counter] "m" (r->refs.counter)
 				     : "cc", "cx");
 			break;
