@@ -21,15 +21,13 @@
 #include <linux/usb.h>
 #include <linux/usb/tmc.h>
 
+/* Increment API VERSION when changing tmc.h with new flags or ioctls
+ * or when changing a significant behavior of the driver.
+ */
+#define USBTMC_API_VERSION (2)
 
 #define USBTMC_HEADER_SIZE	12
 #define USBTMC_MINOR_BASE	176
-
-/*
- * Size of driver internal IO buffer. Must be multiple of 4 and at least as
- * large as wMaxPacketSize (which is usually 512 bytes).
- */
-#define USBTMC_SIZE_IOBUFFER	2048
 
 /* Minimum USB timeout (in milliseconds) */
 #define USBTMC_MIN_TIMEOUT	100
@@ -512,8 +510,6 @@ static int usbtmc488_ioctl_read_stb(struct usbtmc_file_data *file_data,
 		rv = put_user(stb, (__u8 __user *)arg);
 		dev_dbg(dev, "stb:0x%02x with srq received %d\n",
 			(unsigned int)stb, rv);
-		if (rv)
-			return -EFAULT;
 		return rv;
 	}
 	spin_unlock_irq(&data->dev_lock);
@@ -530,7 +526,7 @@ static int usbtmc488_ioctl_read_stb(struct usbtmc_file_data *file_data,
 			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 			data->iin_bTag,
 			data->ifnum,
-			buffer, 0x03, USBTMC_TIMEOUT);
+			buffer, 0x03, USB_CTRL_GET_TIMEOUT);
 	if (rv < 0) {
 		dev_err(dev, "stb usb_control_msg returned %d\n", rv);
 		goto exit;
@@ -569,10 +565,7 @@ static int usbtmc488_ioctl_read_stb(struct usbtmc_file_data *file_data,
 		stb = buffer[2];
 	}
 
-	if (put_user(stb, (__u8 __user *)arg))
-		rv = -EFAULT;
-	else
-		rv = 0;
+	rv = put_user(stb, (__u8 __user *)arg);
 	dev_dbg(dev, "stb:0x%02x received %d\n", (unsigned int)stb, rv);
 
  exit:
@@ -667,7 +660,7 @@ static int usbtmc488_ioctl_simple(struct usbtmc_device_data *data,
 			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 			wValue,
 			data->ifnum,
-			buffer, 0x01, USBTMC_TIMEOUT);
+			buffer, 0x01, USB_CTRL_GET_TIMEOUT);
 	if (rv < 0) {
 		dev_err(dev, "simple usb_control_msg failed %d\n", rv);
 		goto exit;
@@ -1861,7 +1854,7 @@ static int get_capabilities(struct usbtmc_device_data *data)
 	rv = usb_control_msg(data->usb_dev, usb_rcvctrlpipe(data->usb_dev, 0),
 			     USBTMC_REQUEST_GET_CAPABILITIES,
 			     USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			     0, 0, buffer, 0x18, USBTMC_TIMEOUT);
+			     0, 0, buffer, 0x18, USB_CTRL_GET_TIMEOUT);
 	if (rv < 0) {
 		dev_err(dev, "usb_control_msg returned %d\n", rv);
 		goto err_out;
@@ -1984,6 +1977,9 @@ static const struct attribute_group data_attr_grp = {
 	.attrs = data_attrs,
 };
 
+/*
+ * Flash activity indicator on device
+ */
 static int usbtmc_ioctl_indicator_pulse(struct usbtmc_device_data *data)
 {
 	struct device *dev;
@@ -2000,7 +1996,7 @@ static int usbtmc_ioctl_indicator_pulse(struct usbtmc_device_data *data)
 			     usb_rcvctrlpipe(data->usb_dev, 0),
 			     USBTMC_REQUEST_INDICATOR_PULSE,
 			     USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			     0, 0, buffer, 0x01, USBTMC_TIMEOUT);
+			     0, 0, buffer, 0x01, USB_CTRL_GET_TIMEOUT);
 
 	if (rv < 0) {
 		dev_err(dev, "usb_control_msg returned %d\n", rv);
@@ -2249,6 +2245,11 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						   (void __user *)arg);
 		break;
 
+	case USBTMC_IOCTL_API_VERSION:
+		retval = put_user(USBTMC_API_VERSION,
+				  (unsigned int __user *)arg);
+		break;
+
 	case USBTMC488_IOCTL_GET_CAPS:
 		retval = put_user(data->usb488_caps,
 				  (unsigned char __user *)arg);
@@ -2271,7 +2272,7 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case USBTMC488_IOCTL_LOCAL_LOCKOUT:
 		retval = usbtmc488_ioctl_simple(data, (void __user *)arg,
-						USBTMC488_REQUEST_LOCAL_LOCKOUT);
+					     USBTMC488_REQUEST_LOCAL_LOCKOUT);
 		break;
 
 	case USBTMC488_IOCTL_TRIGGER:
@@ -2477,6 +2478,9 @@ static int usbtmc_probe(struct usb_interface *intf,
 	int retcode;
 
 	dev_dbg(&intf->dev, "%s called\n", __func__);
+
+	pr_info("USBTMC driver with API version %d loaded\n",
+		USBTMC_API_VERSION);
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
