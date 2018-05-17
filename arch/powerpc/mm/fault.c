@@ -72,8 +72,18 @@ static inline bool notify_page_fault(struct pt_regs *regs)
 static bool store_updates_sp(struct pt_regs *regs)
 {
 	unsigned int inst;
+	int ret;
 
-	if (get_user(inst, (unsigned int __user *)regs->nip))
+	/*
+	 * Using get_user_in_atomic() as reading code around nip can result in
+	 * fault, which may cause a deadlock when called with mmap_sem held,
+	 * however since we are reading the instruction that generated the DSI
+	 * we are handling, the page is necessarily already present.
+	 */
+	pagefault_disable();
+	ret = __get_user_inatomic(inst, (unsigned int __user *)regs->nip);
+	pagefault_enable();
+	if (ret)
 		return false;
 	/* check for 1 in the rA field */
 	if (((inst >> 16) & 0x1f) != 1)
@@ -234,8 +244,7 @@ static bool bad_kernel_fault(bool is_exec, unsigned long error_code,
 }
 
 static bool bad_stack_expansion(struct pt_regs *regs, unsigned long address,
-				struct vm_area_struct *vma,
-				bool store_update_sp)
+				struct vm_area_struct *vma)
 {
 	/*
 	 * N.B. The POWER/Open ABI allows programs to access up to
@@ -264,7 +273,7 @@ static bool bad_stack_expansion(struct pt_regs *regs, unsigned long address,
 		 * between the last mapped region and the stack will
 		 * expand the stack rather than segfaulting.
 		 */
-		if (address + 2048 < uregs->gpr[1] && !store_update_sp)
+		if (address + 2048 < uregs->gpr[1] && !store_updates_sp(regs))
 			return true;
 	}
 	return false;
@@ -403,7 +412,6 @@ static int __do_page_fault(struct pt_regs *regs, unsigned long address,
 	int is_user = user_mode(regs);
 	int is_write = page_fault_is_write(error_code);
 	int fault, major = 0;
-	bool store_update_sp = false;
 
 	if (notify_page_fault(regs))
 		return 0;
@@ -448,14 +456,6 @@ static int __do_page_fault(struct pt_regs *regs, unsigned long address,
 	if (error_code & DSISR_KEYFAULT)
 		return bad_key_fault_exception(regs, address,
 					       get_mm_addr_key(mm, address));
-
-	/*
-	 * We want to do this outside mmap_sem, because reading code around nip
-	 * can result in fault, which will cause a deadlock when called with
-	 * mmap_sem held
-	 */
-	if (is_write && is_user)
-		store_update_sp = store_updates_sp(regs);
 
 	if (is_user)
 		flags |= FAULT_FLAG_USER;
@@ -503,7 +503,7 @@ retry:
 		return bad_area(regs, address);
 
 	/* The stack is being expanded, check if it's valid */
-	if (unlikely(bad_stack_expansion(regs, address, vma, store_update_sp)))
+	if (unlikely(bad_stack_expansion(regs, address, vma)))
 		return bad_area(regs, address);
 
 	/* Try to expand it */
