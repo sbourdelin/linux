@@ -1096,6 +1096,10 @@ int ptrace_request(struct task_struct *child, long request,
 		ret = seccomp_get_metadata(child, addr, datavp);
 		break;
 
+	case PTRACE_SECCOMP_GET_LISTENER:
+		ret = seccomp_get_listener(child, addr);
+		break;
+
 	default:
 		break;
 	}
