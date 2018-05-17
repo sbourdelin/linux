@@ -30,6 +30,8 @@
  */
 #define USBTMC_SIZE_IOBUFFER	2048
 
+/* Minimum USB timeout (in milliseconds) */
+#define USBTMC_MIN_TIMEOUT	100
 /* Default USB timeout (in milliseconds) */
 #define USBTMC_TIMEOUT		5000
 
@@ -116,6 +118,7 @@ struct usbtmc_file_data {
 	struct usbtmc_device_data *data;
 	struct list_head file_elem;
 
+	u32            timeout;
 	u8             srq_byte;
 	atomic_t       srq_asserted;
 
@@ -163,6 +166,7 @@ static int usbtmc_open(struct inode *inode, struct file *filp)
 	file_data->data = data;
 
 	/* copy default values from device settings */
+	file_data->timeout = USBTMC_TIMEOUT;
 	file_data->TermChar = data->TermChar;
 	file_data->TermCharEnabled = data->TermCharEnabled;
 	file_data->auto_abort = data->auto_abort;
@@ -478,7 +482,7 @@ static int usbtmc488_ioctl_read_stb(struct usbtmc_file_data *file_data,
 		rv = wait_event_interruptible_timeout(
 			data->waitq,
 			atomic_read(&data->iin_data_valid) != 0,
-			USBTMC_TIMEOUT);
+			file_data->timeout);
 		if (rv < 0) {
 			dev_dbg(dev, "wait interrupted %d\n", rv);
 			goto exit;
@@ -613,7 +617,8 @@ static int send_request_dev_dep_msg_in(struct usbtmc_file_data *file_data,
 	retval = usb_bulk_msg(data->usb_dev,
 			      usb_sndbulkpipe(data->usb_dev,
 					      data->bulk_out),
-			      buffer, USBTMC_HEADER_SIZE, &actual, USBTMC_TIMEOUT);
+			      buffer, USBTMC_HEADER_SIZE,
+			      &actual, file_data->timeout);
 
 	/* Store bTag (in case we need to abort) */
 	data->bTag_last_write = data->bTag;
@@ -681,7 +686,7 @@ static ssize_t usbtmc_read(struct file *filp, char __user *buf,
 				      usb_rcvbulkpipe(data->usb_dev,
 						      data->bulk_in),
 				      buffer, USBTMC_SIZE_IOBUFFER, &actual,
-				      USBTMC_TIMEOUT);
+				      file_data->timeout);
 
 		dev_dbg(dev, "usb_bulk_msg: retval(%u), done(%zu), remaining(%zu), actual(%d)\n", retval, done, remaining, actual);
 
@@ -854,7 +859,7 @@ static ssize_t usbtmc_write(struct file *filp, const char __user *buf,
 					      usb_sndbulkpipe(data->usb_dev,
 							      data->bulk_out),
 					      buffer, n_bytes,
-					      &actual, USBTMC_TIMEOUT);
+					      &actual, file_data->timeout);
 			if (retval != 0)
 				break;
 			n_bytes -= actual;
@@ -1211,6 +1216,41 @@ exit:
 	return rv;
 }
 
+/*
+ * Get the usb timeout value
+ */
+static int usbtmc_ioctl_get_timeout(struct usbtmc_file_data *file_data,
+				void __user *arg)
+{
+	__u32 timeout;
+
+	timeout = file_data->timeout;
+
+	return put_user(timeout, (__u32 __user *)arg);
+}
+
+/*
+ * Set the usb timeout value
+ */
+static int usbtmc_ioctl_set_timeout(struct usbtmc_file_data *file_data,
+				void __user *arg)
+{
+	__u32 timeout;
+
+	if (get_user(timeout, (__u32 __user *)arg))
+		return -EFAULT;
+
+	/* Note that timeout = 0 means
+	 * MAX_SCHEDULE_TIMEOUT in usb_control_msg
+	 */
+	if (timeout < USBTMC_MIN_TIMEOUT)
+		return -EINVAL;
+
+	file_data->timeout = timeout;
+
+	return 0;
+}
+
 static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct usbtmc_file_data *file_data;
@@ -1249,6 +1289,16 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case USBTMC_IOCTL_ABORT_BULK_IN:
 		retval = usbtmc_ioctl_abort_bulk_in(data);
+		break;
+
+	case USBTMC_IOCTL_GET_TIMEOUT:
+		retval = usbtmc_ioctl_get_timeout(file_data,
+						  (void __user *)arg);
+		break;
+
+	case USBTMC_IOCTL_SET_TIMEOUT:
+		retval = usbtmc_ioctl_set_timeout(file_data,
+						  (void __user *)arg);
 		break;
 
 	case USBTMC488_IOCTL_GET_CAPS:
