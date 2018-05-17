@@ -1044,6 +1044,12 @@ int security_kernel_read_file(struct file *file, enum kernel_read_file_id id)
 }
 EXPORT_SYMBOL_GPL(security_kernel_read_file);
 
+int security_kernel_read_blob(enum kernel_read_file_id id)
+{
+	return security_kernel_read_file(NULL, id);
+}
+EXPORT_SYMBOL_GPL(security_kernel_read_blob);
+
 int security_kernel_post_read_file(struct file *file, char *buf, loff_t size,
 				   enum kernel_read_file_id id)
 {
