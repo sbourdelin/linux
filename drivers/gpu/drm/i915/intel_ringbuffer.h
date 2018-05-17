@@ -299,19 +299,30 @@ struct intel_engine_execlists {
 	struct rb_node *first;
 
 	/**
-	 * @fw_domains: forcewake domains for irq tasklet
-	 */
-	unsigned int fw_domains;
-
-	/**
 	 * @csb_head: context status buffer head
 	 */
 	unsigned int csb_head;
 
 	/**
-	 * @csb_use_mmio: access csb through mmio, instead of hwsp
+	 * @csb_read: control register for Context Switch buffer
+	 *
+	 * Note this register is always in mmio.
 	 */
-	bool csb_use_mmio;
+	u32 *csb_read;
+
+	/**
+	 * @csb_write: control register for Context Switch buffer
+	 *
+	 * Note this register may be either mmio or HWSP shadow.
+	 */
+	u32 *csb_write;
+
+	/**
+	 * @csb_status: status array for Context Switch buffer
+	 *
+	 * Note these register may be either mmio or HWSP shadow.
+	 */
+	u32 *csb_status;
 
 	/**
 	 * @preempt_complete_status: expected CSB upon completing preemption
