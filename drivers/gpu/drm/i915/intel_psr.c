@@ -741,6 +741,23 @@ static void hsw_psr_disable(struct intel_dp *intel_dp)
 	psr_aux_io_power_put(intel_dp);
 }
 
+static void psr_disable(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	if (!dev_priv->psr.enabled)
+		return;
+
+	dev_priv->psr.disable_source(intel_dp);
+
+	/* Disable PSR on Sink */
+	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
+	dev_priv->psr.enabled = NULL;
+	cancel_delayed_work_sync(&dev_priv->psr.work);
+}
+
 /**
  * intel_psr_disable - Disable PSR
  * @intel_dp: Intel DP
@@ -762,20 +779,8 @@ void intel_psr_disable(struct intel_dp *intel_dp,
 		return;
 
 	mutex_lock(&dev_priv->psr.lock);
-	if (!dev_priv->psr.enabled) {
-		mutex_unlock(&dev_priv->psr.lock);
-		return;
-	}
-
-	dev_priv->psr.disable_source(intel_dp);
-
-	/* Disable PSR on Sink */
-	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
-
-	dev_priv->psr.enabled = NULL;
+	psr_disable(intel_dp);
 	mutex_unlock(&dev_priv->psr.lock);
-
-	cancel_delayed_work_sync(&dev_priv->psr.work);
 }
 
 static bool psr_wait_for_idle(struct drm_i915_private *dev_priv)
@@ -1013,4 +1018,35 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 	dev_priv->psr.activate = hsw_psr_activate;
 	dev_priv->psr.setup_vsc = hsw_psr_setup_vsc;
 
+}
+
+void intel_psr_short_pulse(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct i915_psr *psr = &dev_priv->psr;
+	uint8_t val;
+
+	if (!HAS_PSR(dev_priv) || !intel_dp_is_edp(intel_dp))
+		return;
+
+	mutex_lock(&psr->lock);
+
+	if (psr->enabled != intel_dp)
+		goto exit;
+
+	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_PSR_STATUS, &val) != 1) {
+		DRM_ERROR("PSR_STATUS dpcd read failed\n");
+		goto exit;
+	}
+
+	if ((val & DP_PSR_SINK_STATE_MASK) == DP_PSR_SINK_INTERNAL_ERROR) {
+		DRM_DEBUG_KMS("PSR sink internal error, disabling PSR\n");
+		psr_disable(intel_dp);
+	}
+
+	/* TODO: handle other PSR/PSR2 errors */
+exit:
+	mutex_unlock(&psr->lock);
 }
