@@ -183,9 +183,15 @@ struct t4_cqe {
 			__be32 wrid_hi;
 			__be32 wrid_low;
 		} gen;
+		struct {
+			__be32 stag;
+			__be32 msn;
+			__be32 reserved;
+			__be32 abs_rqe_idx;
+		} srcqe;
 		u64 drain_cookie;
 	} u;
-	__be64 reserved;
+	__be64 reserved[4];
 	__be64 bits_type_ts;
 };
 
@@ -480,7 +486,6 @@ static inline void t4_rq_produce(struct t4_wq *wq, u8 len16)
 static inline void t4_rq_consume(struct t4_wq *wq)
 {
 	wq->rq.in_use--;
-	wq->rq.msn++;
 	if (++wq->rq.cidx == wq->rq.size)
 		wq->rq.cidx = 0;
 }
@@ -633,12 +638,14 @@ static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
 
 static inline int t4_wq_in_error(struct t4_wq *wq)
 {
-	return wq->rq.queue[wq->rq.size].status.qp_err;
+	return *wq->qp_errp;
 }
 
-static inline void t4_set_wq_in_error(struct t4_wq *wq)
+static inline void t4_set_wq_in_error(struct t4_wq *wq, u32 srqidx)
 {
-	wq->rq.queue[wq->rq.size].status.qp_err = 1;
+	if (srqidx)
+		*wq->srqidxp = srqidx;
+	*wq->qp_errp = 1;
 }
 
 static inline void t4_disable_wq_db(struct t4_wq *wq)
