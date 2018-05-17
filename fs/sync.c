@@ -76,8 +76,10 @@ static void sync_inodes_one_sb(struct super_block *sb, void *arg)
 
 static void sync_fs_one_sb(struct super_block *sb, void *arg)
 {
+	int wait = arg ? 1 : 0;
+
 	if (!sb_rdonly(sb) && sb->s_op->sync_fs)
-		sb->s_op->sync_fs(sb, *(int *)arg);
+		sb->s_op->sync_fs(sb, wait);
 }
 
 static void fdatawrite_one_bdev(struct block_device *bdev, void *arg)
@@ -107,12 +109,10 @@ static void fdatawait_one_bdev(struct block_device *bdev, void *arg)
  */
 void ksys_sync(void)
 {
-	int nowait = 0, wait = 1;
-
 	wakeup_flusher_threads(WB_REASON_SYNC);
 	iterate_supers(sync_inodes_one_sb, NULL);
-	iterate_supers(sync_fs_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &wait);
+	iterate_supers(sync_fs_one_sb, NULL);
+	iterate_supers(sync_fs_one_sb, (void *)1UL);
 	iterate_bdevs(fdatawrite_one_bdev, NULL);
 	iterate_bdevs(fdatawait_one_bdev, NULL);
 	if (unlikely(laptop_mode))
@@ -127,17 +127,15 @@ SYSCALL_DEFINE0(sync)
 
 static void do_sync_work(struct work_struct *work)
 {
-	int nowait = 0;
-
 	/*
 	 * Sync twice to reduce the possibility we skipped some inodes / pages
 	 * because they were temporarily locked
 	 */
-	iterate_supers(sync_inodes_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &nowait);
+	iterate_supers(sync_inodes_one_sb, NULL);
+	iterate_supers(sync_fs_one_sb, NULL);
 	iterate_bdevs(fdatawrite_one_bdev, NULL);
-	iterate_supers(sync_inodes_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &nowait);
+	iterate_supers(sync_inodes_one_sb, NULL);
+	iterate_supers(sync_fs_one_sb, NULL);
 	iterate_bdevs(fdatawrite_one_bdev, NULL);
 	printk("Emergency Sync complete\n");
 	kfree(work);
