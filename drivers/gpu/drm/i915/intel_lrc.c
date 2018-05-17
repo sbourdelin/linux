@@ -2292,7 +2292,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 	kfree(engine);
 }
 
-static void execlists_set_default_submission(struct intel_engine_cs *engine)
+void execlists_set_default_submission(struct intel_engine_cs *engine)
 {
 	engine->submit_request = execlists_submit_request;
 	engine->cancel_requests = execlists_cancel_requests;

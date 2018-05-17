@@ -111,4 +111,6 @@ intel_lr_context_descriptor(struct i915_gem_context *ctx,
 	return to_intel_context(ctx, engine)->lrc_desc;
 }
 
+void execlists_set_default_submission(struct intel_engine_cs *engine);
+
 #endif /* _INTEL_LRC_H_ */
