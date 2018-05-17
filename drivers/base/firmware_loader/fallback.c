@@ -651,6 +651,8 @@ static bool fw_force_sysfs_fallback(unsigned int opt_flags)
 
 static bool fw_run_sysfs_fallback(unsigned int opt_flags)
 {
+	int ret;
+
 	if (fw_fallback_config.ignore_sysfs_fallback) {
 		pr_info_once("Ignoring firmware sysfs fallback due to sysctl knob\n");
 		return false;
@@ -658,6 +660,11 @@ static bool fw_run_sysfs_fallback(unsigned int opt_flags)
 
 	if ((opt_flags & FW_OPT_NOFALLBACK))
 		return false;
+
+	/* Also permit LSMs and IMA to fail firmware sysfs fallback */
+	ret = security_kernel_read_blob(READING_FIRMWARE_FALLBACK_SYSFS);
+	if (ret < 0)
+		return ret;
 
 	return fw_force_sysfs_fallback(opt_flags);
 }
