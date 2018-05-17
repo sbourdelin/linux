@@ -625,6 +625,14 @@ T:	git git://linuxtv.org/anttip/media_tree.git
 S:	Maintained
 F:	drivers/media/usb/airspy/
 
+AKM AK7375 LENS VOICE COIL DRIVER
+M:	Tianshu Qiu <tian.shu.qiu@intel.com>
+L:	linux-media@vger.kernel.org
+T:	git git://linuxtv.org/media_tree.git
+S:	Maintained
+F:	drivers/media/i2c/ak7375.c
+F:	Documentation/devicetree/bindings/media/i2c/akm,ak7375.txt
+
 ALACRITECH GIGABIT ETHERNET DRIVER
 M:	Lino Sanfilippo <LinoSanfilippo@gmx.de>
 S:	Maintained
