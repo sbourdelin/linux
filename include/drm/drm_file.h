@@ -182,6 +182,13 @@ struct drm_file {
 	unsigned atomic:1;
 
 	/**
+	 * @writeback_connectors:
+	 *
+	 * True if client understands writeback connectors
+	 */
+	unsigned writeback_connectors:1;
+
+	/**
 	 * @is_master:
 	 *
 	 * This client is the creator of @master. Protected by struct
