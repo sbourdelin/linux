@@ -22,6 +22,16 @@ menuconfig GPIOLIB
 
 if GPIOLIB
 
+config GPIOLIB_FASTPATH_LIMIT
+	int "Maximum number of GPIOs for fast path"
+	default 512
+	help
+	   This adjusts the point at which certain APIs will switch from
+	   using a statically allocated fixed size buffer to a dynamically
+	   allocated buffer. This is a trade-off in stackspace vs. speed.
+	   You shouldn't need to change this unless you really need to
+	   optimize one of those two.
+
 config OF_GPIO
 	def_bool y
 	depends on OF
