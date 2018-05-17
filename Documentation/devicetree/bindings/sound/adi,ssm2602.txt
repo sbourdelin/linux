@@ -11,9 +11,16 @@ Required properties:
   - reg : the I2C address of the device for I2C, the chip select
           number for SPI.
 
+Optional properties:
+
+  - startup-delay-us : delay between powering on and activating the digital
+                       core, determined by the decoupling capacitor C on the
+		       VMID pin: delay [µs] = C [µF] * 25000 / 3.5
+
  Example:
 
 	ssm2602: ssm2602@1a {
 		compatible = "adi,ssm2602";
 		reg = <0x1a>;
+		startup-delay-us = <34000>; /* 4.7 µF * 25000 / 3.5 -> ~34 ms */
 	};
