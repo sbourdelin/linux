@@ -428,6 +428,8 @@ static void efifb_fixup_resources(struct pci_dev *dev)
 {
 	u64 base = screen_info.lfb_base;
 	u64 size = screen_info.lfb_size;
+	struct pci_bus_region region;
+	struct resource res;
 	int i;
 
 	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
@@ -438,6 +440,14 @@ static void efifb_fixup_resources(struct pci_dev *dev)
 
 	if (!base)
 		return;
+
+	region.start = base;
+	region.end = base + size - 1;
+	res.start = 0;
+	res.flags = IORESOURCE_MEM;
+	pcibios_bus_to_resource(dev->bus, &res, &region);
+	if (res.start)
+		base = res.start;
 
 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
 		struct resource *res = &dev->resource[i];
