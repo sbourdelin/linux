@@ -1754,34 +1754,80 @@ exit:
 	return rv;
 }
 
+/*
+ * set pipe in halt state (stalled)
+ * Needed for test purpose or workarounds.
+ */
+static int usbtmc_set_halt(struct usb_device *dev, int pipe)
+{
+	int rv;
+	int endp = usb_pipeendpoint(pipe);
+
+	if (usb_pipein(pipe))
+		endp |= USB_DIR_IN;
+
+	rv = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			     USB_REQ_SET_FEATURE, USB_RECIP_ENDPOINT,
+			     USB_ENDPOINT_HALT, endp, NULL, 0,
+			     USB_CTRL_SET_TIMEOUT);
+
+	return rv;
+}
+
+static int usbtmc_ioctl_set_out_halt(struct usbtmc_device_data *data)
+{
+	int rv;
+
+	dev_dbg(&data->intf->dev, "%s - called\n", __func__);
+
+	rv = usbtmc_set_halt(data->usb_dev,
+			     usb_sndbulkpipe(data->usb_dev, data->bulk_out));
+
+	if (rv < 0)
+		dev_err(&data->usb_dev->dev, "%s returned %d\n", __func__, rv);
+	return rv;
+}
+
+static int usbtmc_ioctl_set_in_halt(struct usbtmc_device_data *data)
+{
+	int rv;
+
+	dev_dbg(&data->intf->dev, "%s - called\n", __func__);
+
+	rv = usbtmc_set_halt(data->usb_dev,
+			     usb_rcvbulkpipe(data->usb_dev, data->bulk_in));
+
+	if (rv < 0)
+		dev_err(&data->usb_dev->dev, "%s returned %d\n", __func__, rv);
+	return rv;
+}
+
 static int usbtmc_ioctl_clear_out_halt(struct usbtmc_device_data *data)
 {
 	int rv;
 
+	dev_dbg(&data->intf->dev, "%s - called\n", __func__);
+
 	rv = usb_clear_halt(data->usb_dev,
 			    usb_sndbulkpipe(data->usb_dev, data->bulk_out));
 
-	if (rv < 0) {
-		dev_err(&data->usb_dev->dev, "usb_control_msg returned %d\n",
-			rv);
-		return rv;
-	}
-	return 0;
+	if (rv < 0)
+		dev_err(&data->usb_dev->dev, "%s returned %d\n", __func__, rv);
+	return rv;
 }
 
 static int usbtmc_ioctl_clear_in_halt(struct usbtmc_device_data *data)
 {
 	int rv;
 
+	dev_dbg(&data->intf->dev, "%s - called\n", __func__);
+
 	rv = usb_clear_halt(data->usb_dev,
 			    usb_rcvbulkpipe(data->usb_dev, data->bulk_in));
 
-	if (rv < 0) {
-		dev_err(&data->usb_dev->dev, "usb_control_msg returned %d\n",
-			rv);
-		return rv;
-	}
-	return 0;
+	if (rv < 0)
+		dev_err(&data->usb_dev->dev, "%s returned %d\n", __func__, rv);
+	return rv;
 }
 
 static int usbtmc_ioctl_cancel_io(struct usbtmc_file_data *file_data)
@@ -2239,6 +2285,14 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		retval = get_user(tmp_byte, (unsigned char __user *)arg);
 		if (retval == 0)
 			file_data->auto_abort = !!tmp_byte;
+		break;
+
+	case USBTMC_IOCTL_SET_OUT_HALT:
+		retval = usbtmc_ioctl_set_out_halt(data);
+		break;
+
+	case USBTMC_IOCTL_SET_IN_HALT:
+		retval = usbtmc_ioctl_set_in_halt(data);
 		break;
 
 	case USBTMC_IOCTL_CANCEL_IO:
