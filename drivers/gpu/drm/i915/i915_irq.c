@@ -1473,10 +1473,10 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 	}
 }
 
-static void gen8_gt_irq_ack(struct drm_i915_private *i915,
-			    u32 master_ctl, u32 gt_iir[4])
+static void gen8_gt_irq_handler(struct drm_i915_private *i915, u32 master_ctl)
 {
 	void __iomem * const regs = i915->regs;
+	u32 iir;
 
 #define GEN8_GT_IRQS (GEN8_GT_RCS_IRQ | \
 		      GEN8_GT_BCS_IRQ | \
@@ -1487,58 +1487,49 @@ static void gen8_gt_irq_ack(struct drm_i915_private *i915,
 		      GEN8_GT_GUC_IRQ)
 
 	if (master_ctl & (GEN8_GT_RCS_IRQ | GEN8_GT_BCS_IRQ)) {
-		gt_iir[0] = raw_reg_read(regs, GEN8_GT_IIR(0));
-		if (likely(gt_iir[0]))
-			raw_reg_write(regs, GEN8_GT_IIR(0), gt_iir[0]);
+		iir = raw_reg_read(regs, GEN8_GT_IIR(0));
+		if (likely(iir)) {
+			raw_reg_write(regs, GEN8_GT_IIR(0), iir);
+
+			gen8_cs_irq_handler(i915->engine[RCS],
+					    iir >> GEN8_RCS_IRQ_SHIFT);
+			gen8_cs_irq_handler(i915->engine[BCS],
+					    iir >> GEN8_BCS_IRQ_SHIFT);
+		}
 	}
 
 	if (master_ctl & (GEN8_GT_VCS1_IRQ | GEN8_GT_VCS2_IRQ)) {
-		gt_iir[1] = raw_reg_read(regs, GEN8_GT_IIR(1));
-		if (likely(gt_iir[1]))
-			raw_reg_write(regs, GEN8_GT_IIR(1), gt_iir[1]);
+		iir = raw_reg_read(regs, GEN8_GT_IIR(1));
+		if (likely(iir)) {
+			raw_reg_write(regs, GEN8_GT_IIR(1), iir);
+
+			gen8_cs_irq_handler(i915->engine[VCS],
+					    iir >> GEN8_VCS1_IRQ_SHIFT);
+			gen8_cs_irq_handler(i915->engine[VCS2],
+					    iir >> GEN8_VCS2_IRQ_SHIFT);
+		}
+	}
+
+	if (master_ctl & GEN8_GT_VECS_IRQ) {
+		iir = raw_reg_read(regs, GEN8_GT_IIR(3));
+		if (likely(iir)) {
+			raw_reg_write(regs, GEN8_GT_IIR(3), iir);
+
+			gen8_cs_irq_handler(i915->engine[VECS],
+					    iir >> GEN8_VECS_IRQ_SHIFT);
+		}
 	}
 
 	if (master_ctl & (GEN8_GT_PM_IRQ | GEN8_GT_GUC_IRQ)) {
-		gt_iir[2] = raw_reg_read(regs, GEN8_GT_IIR(2));
-		if (likely(gt_iir[2] & (i915->pm_rps_events |
-					i915->pm_guc_events)))
+		iir = raw_reg_read(regs, GEN8_GT_IIR(2));
+		if (likely(iir & (i915->pm_rps_events | i915->pm_guc_events))) {
 			raw_reg_write(regs, GEN8_GT_IIR(2),
-				      gt_iir[2] & (i915->pm_rps_events |
-						   i915->pm_guc_events));
-	}
+				      iir & (i915->pm_rps_events |
+					     i915->pm_guc_events));
 
-	if (master_ctl & GEN8_GT_VECS_IRQ) {
-		gt_iir[3] = raw_reg_read(regs, GEN8_GT_IIR(3));
-		if (likely(gt_iir[3]))
-			raw_reg_write(regs, GEN8_GT_IIR(3), gt_iir[3]);
-	}
-}
-
-static void gen8_gt_irq_handler(struct drm_i915_private *i915,
-				u32 master_ctl, u32 gt_iir[4])
-{
-	if (master_ctl & (GEN8_GT_RCS_IRQ | GEN8_GT_BCS_IRQ)) {
-		gen8_cs_irq_handler(i915->engine[RCS],
-				    gt_iir[0] >> GEN8_RCS_IRQ_SHIFT);
-		gen8_cs_irq_handler(i915->engine[BCS],
-				    gt_iir[0] >> GEN8_BCS_IRQ_SHIFT);
-	}
-
-	if (master_ctl & (GEN8_GT_VCS1_IRQ | GEN8_GT_VCS2_IRQ)) {
-		gen8_cs_irq_handler(i915->engine[VCS],
-				    gt_iir[1] >> GEN8_VCS1_IRQ_SHIFT);
-		gen8_cs_irq_handler(i915->engine[VCS2],
-				    gt_iir[1] >> GEN8_VCS2_IRQ_SHIFT);
-	}
-
-	if (master_ctl & GEN8_GT_VECS_IRQ) {
-		gen8_cs_irq_handler(i915->engine[VECS],
-				    gt_iir[3] >> GEN8_VECS_IRQ_SHIFT);
-	}
-
-	if (master_ctl & (GEN8_GT_PM_IRQ | GEN8_GT_GUC_IRQ)) {
-		gen6_rps_irq_handler(i915, gt_iir[2]);
-		gen9_guc_irq_handler(i915, gt_iir[2]);
+			gen6_rps_irq_handler(i915, iir);
+			gen9_guc_irq_handler(i915, iir);
+		}
 	}
 }
 
@@ -2127,7 +2118,6 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		u32 master_ctl, iir;
 		u32 pipe_stats[I915_MAX_PIPES] = {};
 		u32 hotplug_status = 0;
-		u32 gt_iir[4];
 		u32 ier = 0;
 
 		master_ctl = I915_READ(GEN8_MASTER_IRQ) & ~GEN8_MASTER_IRQ_CONTROL;
@@ -2155,8 +2145,7 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		ier = I915_READ(VLV_IER);
 		I915_WRITE(VLV_IER, 0);
 
-		gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
-		gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
+		gen8_gt_irq_handler(dev_priv, master_ctl);
 
 		if (iir & I915_DISPLAY_PORT_INTERRUPT)
 			hotplug_status = i9xx_hpd_irq_ack(dev_priv);
@@ -2737,7 +2726,6 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 {
 	struct drm_i915_private *dev_priv = to_i915(arg);
 	u32 master_ctl;
-	u32 gt_iir[4];
 
 	if (!intel_irqs_enabled(dev_priv))
 		return IRQ_NONE;
@@ -2750,8 +2738,7 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 	I915_WRITE_FW(GEN8_MASTER_IRQ, 0);
 
 	/* Find, clear, then process each source of interrupt */
-	gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
-	gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
+	gen8_gt_irq_handler(dev_priv, master_ctl);
 
 	/* IRQs are synced during runtime_suspend, we don't require a wakeref */
 	if (master_ctl & ~GEN8_GT_IRQS) {
