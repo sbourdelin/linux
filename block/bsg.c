@@ -649,18 +649,6 @@ static struct bsg_device *bsg_alloc_device(void)
 	return bd;
 }
 
-static void bsg_kref_release_function(struct kref *kref)
-{
-	struct bsg_class_device *bcd =
-		container_of(kref, struct bsg_class_device, ref);
-	struct device *parent = bcd->parent;
-
-	if (bcd->release)
-		bcd->release(bcd->parent);
-
-	put_device(parent);
-}
-
 static int bsg_put_device(struct bsg_device *bd)
 {
 	int ret = 0, do_free;
@@ -693,7 +681,6 @@ static int bsg_put_device(struct bsg_device *bd)
 
 	kfree(bd);
 out:
-	kref_put(&q->bsg_dev.ref, bsg_kref_release_function);
 	if (do_free)
 		blk_put_queue(q);
 	return ret;
@@ -759,8 +746,6 @@ static struct bsg_device *bsg_get_device(struct inode *inode, struct file *file)
 	 */
 	mutex_lock(&bsg_mutex);
 	bcd = idr_find(&bsg_minor_idr, iminor(inode));
-	if (bcd)
-		kref_get(&bcd->ref);
 	mutex_unlock(&bsg_mutex);
 
 	if (!bcd)
@@ -771,8 +756,6 @@ static struct bsg_device *bsg_get_device(struct inode *inode, struct file *file)
 		return bd;
 
 	bd = bsg_add_device(inode, bcd->queue, file);
-	if (IS_ERR(bd))
-		kref_put(&bcd->ref, bsg_kref_release_function);
 
 	return bd;
 }
@@ -901,6 +884,8 @@ static const struct file_operations bsg_fops = {
 
 void bsg_unregister_queue(struct request_queue *q)
 {
+	struct device *parent;
+	void (*release)(struct device *dev);
 	struct bsg_class_device *bcd = &q->bsg_dev;
 
 	if (!bcd->class_dev)
@@ -912,8 +897,21 @@ void bsg_unregister_queue(struct request_queue *q)
 		sysfs_remove_link(&q->kobj, "bsg");
 	device_unregister(bcd->class_dev);
 	bcd->class_dev = NULL;
-	kref_put(&bcd->ref, bsg_kref_release_function);
+	parent = bcd->parent;
+	release = bcd->release;
+	bcd->parent = NULL;
+	bcd->release = NULL;
 	mutex_unlock(&bsg_mutex);
+
+	/*
+	 * The caller of bsg_[un]register_queue must hold a reference
+	 * to the parent device between ..register.. and ..unregister..
+	 * so we do not maintain a refcount to parent here.
+	 * Note: the caller is expected to blk_cleanup_queue(q)
+	 * before releasing the reference to the parent device.
+	 */
+	if (release)
+		release(parent);
 }
 EXPORT_SYMBOL_GPL(bsg_unregister_queue);
 
@@ -954,10 +952,9 @@ int bsg_register_queue(struct request_queue *q, struct device *parent,
 
 	bcd->minor = ret;
 	bcd->queue = q;
-	bcd->parent = get_device(parent);
+	bcd->parent = parent;
 	bcd->release = release;
 	bcd->ops = ops;
-	kref_init(&bcd->ref);
 	dev = MKDEV(bsg_major, bcd->minor);
 	class_dev = device_create(bsg_class, parent, dev, NULL, "%s", devname);
 	if (IS_ERR(class_dev)) {
