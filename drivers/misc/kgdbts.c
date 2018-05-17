@@ -400,13 +400,15 @@ static void skip_back_repeat_test(char *arg)
 	int go_back = simple_strtol(arg, NULL, 10);
 
 	repeat_test--;
-	if (repeat_test <= 0) {
+	if (repeat_test <= 0 || go_back < 0) {
 		ts.idx++;
 	} else {
 		if (repeat_test % 100 == 0)
 			v1printk("kgdbts:RUN ... %d remaining\n", repeat_test);
 
 		ts.idx -= go_back;
+		if (ts.idx < 0)
+			ts.idx = 0;
 	}
 	fill_get_buf(ts.tst[ts.idx].get);
 }
