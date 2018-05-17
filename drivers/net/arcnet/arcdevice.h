@@ -371,6 +371,19 @@ void arcnet_timeout(struct net_device *dev);
 #define BUS_ALIGN  1
 #endif
 
+#ifdef CONFIG_ARCNET_COM20020_IO
+#define arcnet_inb(addr, offset)					\
+	ioread8((void __iomem *)(addr) + BUS_ALIGN * offset)
+
+#define arcnet_outb(value, addr, offset)				\
+	iowrite8(value, (void __iomem *)addr + BUS_ALIGN * offset)
+
+#define arcnet_insb(addr, offset, buffer, count)			\
+	ioread8_rep((void __iomem *)addr + BUS_ALIGN * offset, buffer, count)
+
+#define arcnet_outsb(addr, offset, buffer, count)			\
+	iowrite8_rep((void __iomem *)addr + BUS_ALIGN * offset, buffer, count)
+#else
 /* addr and offset allow register like names to define the actual IO  address.
  * A configuration option multiplies the offset for alignment.
  */
@@ -388,6 +401,7 @@ void arcnet_timeout(struct net_device *dev);
 	readb((addr) + (offset))
 #define arcnet_writeb(value, addr, offset)				\
 	writeb(value, (addr) + (offset))
+#endif
 
 #endif				/* __KERNEL__ */
 #endif				/* _LINUX_ARCDEVICE_H */
