@@ -397,6 +397,7 @@ static int qcom_set_laddr(struct slim_controller *sctrl,
 		u8 instance;
 		u8 laddr;
 	} __packed p;
+	DECLARE_COMPLETION_ONSTACK(done);
 	struct slim_val_inf msg = {0};
 	DEFINE_SLIM_EDEST_TXN(txn, SLIM_MSG_MC_ASSIGN_LOGICAL_ADDRESS,
 			      10, laddr, &msg);
@@ -410,7 +411,11 @@ static int qcom_set_laddr(struct slim_controller *sctrl,
 
 	msg.wbuf = (void *)&p;
 	msg.num_bytes = 7;
-	ret = slim_do_transfer(&ctrl->ctrl, &txn);
+
+	ret = slim_prepare_txn(&ctrl->ctrl, &txn, &done,
+			       slim_tid_txn(txn.mt, txn.mc));
+	if (!ret)
+		ret = slim_do_transfer(&ctrl->ctrl, &txn);
 
 	if (ret)
 		dev_err(ctrl->dev, "set LA:0x%x failed:ret:%d\n",
