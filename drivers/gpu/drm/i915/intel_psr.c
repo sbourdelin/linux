@@ -1046,6 +1046,20 @@ void intel_psr_short_pulse(struct intel_dp *intel_dp)
 		psr_disable(intel_dp);
 	}
 
+	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_PSR_ERROR_STATUS, &val) != 1) {
+		DRM_ERROR("PSR_ERROR_STATUS dpcd read failed\n");
+		goto exit;
+	}
+
+	if (val & DP_PSR_RFB_STORAGE_ERROR) {
+		DRM_DEBUG_KMS("PSR RFB storage error, exiting PSR\n");
+		psr_disable(intel_dp);
+	}
+	if (val & (DP_PSR_VSC_SDP_UNCORRECTABLE_ERROR | DP_PSR_LINK_CRC_ERROR))
+		DRM_ERROR("PSR_ERROR_STATUS not handled %x\n", val);
+	/* clear status register */
+	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_ERROR_STATUS, val);
+
 	/* TODO: handle other PSR/PSR2 errors */
 exit:
 	mutex_unlock(&psr->lock);
