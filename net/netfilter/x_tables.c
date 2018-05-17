@@ -1177,11 +1177,10 @@ struct xt_table_info *xt_alloc_table_info(unsigned int size)
 	 * than shoot all processes down before realizing there is nothing
 	 * more to reclaim.
 	 */
-	info = kvmalloc(sz, GFP_KERNEL | __GFP_NORETRY);
+	info = kvzalloc(sz, GFP_KERNEL | __GFP_NORETRY);
 	if (!info)
 		return NULL;
 
-	memset(info, 0, sizeof(*info));
 	info->size = size;
 	return info;
 }
