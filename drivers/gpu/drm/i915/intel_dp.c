@@ -1102,23 +1102,9 @@ intel_dp_aux_xfer(struct intel_dp *intel_dp,
 	intel_dp_check_edp(intel_dp);
 
 	/* Try to wait for any previous AUX channel activity */
-	for (try = 0; try < 3; try++) {
-		status = I915_READ_NOTRACE(ch_ctl);
-		if ((status & DP_AUX_CH_CTL_SEND_BUSY) == 0)
-			break;
-		msleep(1);
-	}
-
-	if (try == 3) {
-		static u32 last_status = -1;
-		const u32 status = I915_READ(ch_ctl);
-
-		if (status != last_status) {
-			WARN(1, "dp_aux_ch not started status 0x%08x\n",
-			     status);
-			last_status = status;
-		}
-
+	status = intel_dp_aux_wait_done(intel_dp, has_aux_irq);
+	if (status & DP_AUX_CH_CTL_SEND_BUSY) {
+		DRM_WARN("dp_aux_ch not started status 0x%08x\n", status);
 		ret = -EBUSY;
 		goto out;
 	}
