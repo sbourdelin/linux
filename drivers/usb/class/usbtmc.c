@@ -126,6 +126,7 @@ struct usbtmc_file_data {
 	u8             TermChar;
 	bool           TermCharEnabled;
 	bool           auto_abort;
+	u8             eom_val;
 };
 
 /* Forward declarations */
@@ -170,6 +171,7 @@ static int usbtmc_open(struct inode *inode, struct file *filp)
 	file_data->TermChar = data->TermChar;
 	file_data->TermCharEnabled = data->TermCharEnabled;
 	file_data->auto_abort = data->auto_abort;
+	file_data->eom_val = 1;
 
 	INIT_LIST_HEAD(&file_data->file_elem);
 	spin_lock_irq(&data->dev_lock);
@@ -578,6 +580,51 @@ static int usbtmc488_ioctl_simple(struct usbtmc_device_data *data,
 }
 
 /*
+ * Sends a TRIGGER Bulk-OUT command message
+ * See the USBTMC-USB488 specification, Table 2.
+ *
+ * Also updates bTag_last_write.
+ */
+static int usbtmc488_ioctl_trigger(struct usbtmc_file_data *file_data)
+{
+	struct usbtmc_device_data *data = file_data->data;
+	int retval;
+	u8 *buffer;
+	int actual;
+
+	buffer = kzalloc(USBTMC_HEADER_SIZE, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+	buffer[0] = 128;
+	buffer[1] = data->bTag;
+	buffer[2] = ~data->bTag;
+
+	retval = usb_bulk_msg(data->usb_dev,
+			      usb_sndbulkpipe(data->usb_dev,
+					      data->bulk_out),
+			      buffer, USBTMC_HEADER_SIZE,
+			      &actual, file_data->timeout);
+
+	/* Store bTag (in case we need to abort) */
+	data->bTag_last_write = data->bTag;
+
+	/* Increment bTag -- and increment again if zero */
+	data->bTag++;
+	if (!data->bTag)
+		data->bTag++;
+
+	kfree(buffer);
+	if (retval < 0) {
+		dev_err(&data->intf->dev, "%s returned %d\n",
+			__func__, retval);
+		return retval;
+	}
+
+	return 0;
+}
+
+/*
  * Sends a REQUEST_DEV_DEP_MSG_IN message on the Bulk-OUT endpoint.
  * @transfer_size: number of bytes to request from the device.
  *
@@ -829,7 +876,7 @@ static ssize_t usbtmc_write(struct file *filp, const char __user *buf,
 			buffer[8] = 0;
 		} else {
 			this_part = remaining;
-			buffer[8] = 1;
+			buffer[8] = file_data->eom_val;
 		}
 
 		/* Setup IO buffer for DEV_DEP_MSG_OUT message */
@@ -1251,6 +1298,47 @@ static int usbtmc_ioctl_set_timeout(struct usbtmc_file_data *file_data,
 	return 0;
 }
 
+/*
+ * enables/disables sending EOM on write
+ */
+static int usbtmc_ioctl_eom_enable(struct usbtmc_file_data *file_data,
+				void __user *arg)
+{
+	__u8 eom_enable;
+
+	if (copy_from_user(&eom_enable, arg, sizeof(eom_enable)))
+		return -EFAULT;
+
+	if (eom_enable > 1)
+		return -EINVAL;
+
+	file_data->eom_val = eom_enable;
+
+	return 0;
+}
+
+/*
+ * Configure TermChar and TermCharEnable
+ */
+static int usbtmc_ioctl_config_termc(struct usbtmc_file_data *file_data,
+				void __user *arg)
+{
+	struct usbtmc_termchar termc;
+
+	if (copy_from_user(&termc, arg, sizeof(termc)))
+		return -EFAULT;
+
+	if ((termc.term_char_enabled > 1) ||
+		(termc.term_char_enabled &&
+		!(file_data->data->capabilities.device_capabilities & 1)))
+		return -EINVAL;
+
+	file_data->TermChar = termc.term_char;
+	file_data->TermCharEnabled = termc.term_char_enabled;
+
+	return 0;
+}
+
 static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct usbtmc_file_data *file_data;
@@ -1301,12 +1389,19 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						  (void __user *)arg);
 		break;
 
+	case USBTMC_IOCTL_EOM_ENABLE:
+		retval = usbtmc_ioctl_eom_enable(file_data,
+						 (void __user *)arg);
+		break;
+
+	case USBTMC_IOCTL_CONFIG_TERMCHAR:
+		retval = usbtmc_ioctl_config_termc(file_data,
+						   (void __user *)arg);
+		break;
+
 	case USBTMC488_IOCTL_GET_CAPS:
-		retval = copy_to_user((void __user *)arg,
-				&data->usb488_caps,
-				sizeof(data->usb488_caps));
-		if (retval)
-			retval = -EFAULT;
+		retval = put_user(data->usb488_caps,
+				  (unsigned char __user *)arg);
 		break;
 
 	case USBTMC488_IOCTL_READ_STB:
@@ -1327,6 +1422,10 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case USBTMC488_IOCTL_LOCAL_LOCKOUT:
 		retval = usbtmc488_ioctl_simple(data, (void __user *)arg,
 						USBTMC488_REQUEST_LOCAL_LOCKOUT);
+		break;
+
+	case USBTMC488_IOCTL_TRIGGER:
+		retval = usbtmc488_ioctl_trigger(file_data);
 		break;
 	}
 
