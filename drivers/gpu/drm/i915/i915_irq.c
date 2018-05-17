@@ -1472,8 +1472,10 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 	}
 
 	if (iir & GT_RENDER_USER_INTERRUPT) {
+		if (intel_engine_uses_guc(engine))
+			tasklet = true;
+
 		notify_ring(engine);
-		tasklet |= USES_GUC_SUBMISSION(engine->i915);
 	}
 
 	if (tasklet)

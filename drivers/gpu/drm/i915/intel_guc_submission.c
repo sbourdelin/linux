@@ -1312,6 +1312,7 @@ int intel_guc_submission_enable(struct intel_guc *guc)
 		engine->unpark = guc_submission_unpark;
 
 		engine->flags &= ~I915_ENGINE_SUPPORTS_STATS;
+		engine->flags |= I915_ENGINE_USES_GUC;
 	}
 
 	return 0;
