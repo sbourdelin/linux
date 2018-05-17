@@ -494,6 +494,7 @@ static int smc_connect_rdma(struct smc_sock *smc)
 	rc = smc_clc_send_confirm(smc);
 	if (rc)
 		goto out_err_unlock;
+	smc_tx_init(smc);
 
 	if (local_contact == SMC_FIRST_CONTACT) {
 		/* QP confirmation over RoCE fabric */
@@ -505,9 +506,7 @@ static int smc_connect_rdma(struct smc_sock *smc)
 		if (reason_code > 0)
 			goto decline_rdma_unlock;
 	}
-
 	mutex_unlock(&smc_create_lgr_pending);
-	smc_tx_init(smc);
 
 out_connected:
 	smc_copy_sock_settings_to_clc(smc);
@@ -885,6 +884,7 @@ static void smc_listen_work(struct work_struct *work)
 		reason_code = SMC_CLC_DECL_INTERR;
 		goto decline_rdma_unlock;
 	}
+	smc_tx_init(new_smc);
 
 	if (local_contact == SMC_FIRST_CONTACT) {
 		rc = smc_ib_ready_link(link);
@@ -900,8 +900,6 @@ static void smc_listen_work(struct work_struct *work)
 		if (reason_code > 0)
 			goto decline_rdma_unlock;
 	}
-
-	smc_tx_init(new_smc);
 	mutex_unlock(&smc_create_lgr_pending);
 
 out_connected:
