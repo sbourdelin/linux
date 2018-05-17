@@ -4911,11 +4911,15 @@ static void assert_kernel_context_is_current(struct drm_i915_private *i915)
 
 void i915_gem_sanitize(struct drm_i915_private *i915)
 {
-	if (i915_terminally_wedged(&i915->gpu_error)) {
-		mutex_lock(&i915->drm.struct_mutex);
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	int err;
+
+	mutex_lock(&i915->drm.struct_mutex);
+	intel_uncore_forcewake_get(i915, FORCEWAKE_ALL);
+
+	if (i915_terminally_wedged(&i915->gpu_error))
 		i915_gem_unset_wedged(i915);
-		mutex_unlock(&i915->drm.struct_mutex);
-	}
 
 	/*
 	 * If we inherit context state from the BIOS or earlier occupants
@@ -4925,8 +4929,19 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 	 * it may impact the display and we are uncertain about the stability
 	 * of the reset, so this could be applied to even earlier gen.
 	 */
-	if (INTEL_GEN(i915) >= 5 && intel_has_gpu_reset(i915))
-		WARN_ON(intel_gpu_reset(i915, ALL_ENGINES));
+	err = -ENODEV;
+	if (INTEL_GEN(i915) >= 5 && intel_has_gpu_reset(i915)) {
+		if (!WARN_ON(intel_gpu_reset(i915, ALL_ENGINES))) {
+			for_each_engine(engine, i915, id) {
+				if (engine->reset.reset)
+					engine->reset.reset(engine, NULL);
+			}
+			err = 0;
+		}
+	}
+
+	intel_uncore_forcewake_put(i915, FORCEWAKE_ALL);
+	mutex_unlock(&i915->drm.struct_mutex);
 }
 
 int i915_gem_suspend(struct drm_i915_private *dev_priv)
