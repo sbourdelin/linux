@@ -401,6 +401,13 @@ config SECCOMP_FILTER
 
 	  See Documentation/prctl/seccomp_filter.txt for details.
 
+config SECCOMP_USER_NOTIFICATION
+	bool "Enable the SECCOMP_RET_USER_NOTIF seccomp action"
+	depends on SECCOMP_FILTER
+	help
+	  Enable SECCOMP_RET_USER_NOTIF, a return code which can be used by seccomp
+	  programs to notify a userspace listener that a particular event happened.
+
 config HAVE_GCC_PLUGINS
 	bool
 	help
