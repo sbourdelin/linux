@@ -684,9 +684,10 @@ static int emac_tx_q_desc_alloc(struct emac_adapter *adpt,
 {
 	struct emac_ring_header *ring_header = &adpt->ring_header;
 	size_t size;
+	int node = dev_to_node(adpt->netdev->dev.parent);
 
 	size = sizeof(struct emac_buffer) * tx_q->tpd.count;
-	tx_q->tpd.tpbuff = kzalloc(size, GFP_KERNEL);
+	tx_q->tpd.tpbuff = kzalloc_node(size, GFP_KERNEL, node);
 	if (!tx_q->tpd.tpbuff)
 		return -ENOMEM;
 
@@ -725,9 +726,10 @@ static int emac_rx_descs_alloc(struct emac_adapter *adpt)
 	struct emac_ring_header *ring_header = &adpt->ring_header;
 	struct emac_rx_queue *rx_q = &adpt->rx_q;
 	size_t size;
+	int node = dev_to_node(adpt->netdev->dev.parent);
 
 	size = sizeof(struct emac_buffer) * rx_q->rfd.count;
-	rx_q->rfd.rfbuff = kzalloc(size, GFP_KERNEL);
+	rx_q->rfd.rfbuff = kzalloc_node(size, GFP_KERNEL, node);
 	if (!rx_q->rfd.rfbuff)
 		return -ENOMEM;
 
