@@ -34,7 +34,7 @@ static u64 cleancache_failed_gets;
 static u64 cleancache_puts;
 static u64 cleancache_invalidates;
 
-static void cleancache_register_ops_sb(struct super_block *sb, void *unused)
+static void cleancache_register_ops_sb(struct super_block *sb, int unused)
 {
 	switch (sb->cleancache_poolid) {
 	case CLEANCACHE_NO_BACKEND:
@@ -105,7 +105,7 @@ int cleancache_register_ops(const struct cleancache_ops *ops)
 	 * until the corresponding ->init_fs has been actually called and
 	 * cleancache_ops has been set.
 	 */
-	iterate_supers(cleancache_register_ops_sb, NULL);
+	iterate_supers(cleancache_register_ops_sb, 0);
 	return 0;
 }
 EXPORT_SYMBOL(cleancache_register_ops);

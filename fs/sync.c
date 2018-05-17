@@ -68,16 +68,16 @@ int sync_filesystem(struct super_block *sb)
 }
 EXPORT_SYMBOL(sync_filesystem);
 
-static void sync_inodes_one_sb(struct super_block *sb, void *arg)
+static void sync_inodes_one_sb(struct super_block *sb, int unused)
 {
 	if (!sb_rdonly(sb))
 		sync_inodes_sb(sb);
 }
 
-static void sync_fs_one_sb(struct super_block *sb, void *arg)
+static void sync_fs_one_sb(struct super_block *sb, int arg)
 {
 	if (!sb_rdonly(sb) && sb->s_op->sync_fs)
-		sb->s_op->sync_fs(sb, *(int *)arg);
+		sb->s_op->sync_fs(sb, arg);
 }
 
 static void fdatawrite_one_bdev(struct block_device *bdev, void *arg)
@@ -107,14 +107,12 @@ static void fdatawait_one_bdev(struct block_device *bdev, void *arg)
  */
 void ksys_sync(void)
 {
-	int nowait = 0, wait = 1;
-
 	wakeup_flusher_threads(WB_REASON_SYNC);
-	iterate_supers(sync_inodes_one_sb, NULL);
-	iterate_supers(sync_fs_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &wait);
-	iterate_bdevs(fdatawrite_one_bdev, NULL);
-	iterate_bdevs(fdatawait_one_bdev, NULL);
+	iterate_supers(sync_inodes_one_sb, 0);
+	iterate_supers(sync_fs_one_sb, 0);
+	iterate_supers(sync_fs_one_sb, 1);
+	iterate_bdevs(fdatawrite_one_bdev, 0);
+	iterate_bdevs(fdatawait_one_bdev, 0);
 	if (unlikely(laptop_mode))
 		laptop_sync_completion();
 }
@@ -127,18 +125,16 @@ SYSCALL_DEFINE0(sync)
 
 static void do_sync_work(struct work_struct *work)
 {
-	int nowait = 0;
-
 	/*
 	 * Sync twice to reduce the possibility we skipped some inodes / pages
 	 * because they were temporarily locked
 	 */
-	iterate_supers(sync_inodes_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &nowait);
-	iterate_bdevs(fdatawrite_one_bdev, NULL);
-	iterate_supers(sync_inodes_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &nowait);
-	iterate_bdevs(fdatawrite_one_bdev, NULL);
+	iterate_supers(sync_inodes_one_sb, 0);
+	iterate_supers(sync_fs_one_sb, 0);
+	iterate_bdevs(fdatawrite_one_bdev, 0);
+	iterate_supers(sync_inodes_one_sb, 0);
+	iterate_supers(sync_fs_one_sb, 0);
+	iterate_bdevs(fdatawrite_one_bdev, 0);
 	printk("Emergency Sync complete\n");
 	kfree(work);
 }

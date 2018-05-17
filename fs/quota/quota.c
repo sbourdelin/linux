@@ -46,10 +46,8 @@ static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 	return security_quotactl(cmd, type, id, sb);
 }
 
-static void quota_sync_one(struct super_block *sb, void *arg)
+static void quota_sync_one(struct super_block *sb, int type)
 {
-	int type = *(int *)arg;
-
 	if (sb->s_qcop && sb->s_qcop->quota_sync &&
 	    (sb->s_quota_types & (1 << type)))
 		sb->s_qcop->quota_sync(sb, type);
@@ -63,7 +61,7 @@ static int quota_sync_all(int type)
 		return -EINVAL;
 	ret = security_quotactl(Q_SYNC, type, 0, NULL);
 	if (!ret)
-		iterate_supers(quota_sync_one, &type);
+		iterate_supers(quota_sync_one, type);
 	return ret;
 }
 

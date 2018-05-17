@@ -596,6 +596,7 @@ static void __iterate_supers(void (*f)(struct super_block *))
 		__put_super(p);
 	spin_unlock(&sb_lock);
 }
+
 /**
  *	iterate_supers - call function for all active superblocks
  *	@f: function to call
@@ -604,7 +605,7 @@ static void __iterate_supers(void (*f)(struct super_block *))
  *	Scans the superblock list and calls given function, passing it
  *	locked superblock and given argument.
  */
-void iterate_supers(void (*f)(struct super_block *, void *), void *arg)
+void iterate_supers(void (*f)(struct super_block *, int), int arg)
 {
 	struct super_block *sb, *p = NULL;
 

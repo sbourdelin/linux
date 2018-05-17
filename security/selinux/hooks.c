@@ -7138,7 +7138,7 @@ static __init int selinux_init(void)
 	return 0;
 }
 
-static void delayed_superblock_init(struct super_block *sb, void *unused)
+static void delayed_superblock_init(struct super_block *sb, int unused)
 {
 	superblock_doinit(sb, NULL);
 }
@@ -7149,7 +7149,7 @@ void selinux_complete_init(void)
 
 	/* Set up any superblocks initialized prior to the policy load. */
 	printk(KERN_DEBUG "SELinux:  Setting up existing superblocks.\n");
-	iterate_supers(delayed_superblock_init, NULL);
+	iterate_supers(delayed_superblock_init, 0);
 }
 
 /* SELinux requires early initialization in order to label

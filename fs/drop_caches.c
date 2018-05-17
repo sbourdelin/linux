@@ -14,7 +14,7 @@
 /* A global variable is a bit ugly, but it keeps the code simple */
 int sysctl_drop_caches;
 
-static void drop_pagecache_sb(struct super_block *sb, void *unused)
+static void drop_pagecache_sb(struct super_block *sb, int unused)
 {
 	struct inode *inode, *toput_inode = NULL;
 
@@ -52,7 +52,7 @@ int drop_caches_sysctl_handler(struct ctl_table *table, int write,
 		static int stfu;
 
 		if (sysctl_drop_caches & 1) {
-			iterate_supers(drop_pagecache_sb, NULL);
+			iterate_supers(drop_pagecache_sb, 0);
 			count_vm_event(DROP_PAGECACHE);
 		}
 		if (sysctl_drop_caches & 2) {
