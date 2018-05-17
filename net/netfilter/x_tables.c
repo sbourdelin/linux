@@ -1181,7 +1181,7 @@ struct xt_table_info *xt_alloc_table_info(unsigned int size)
 	if (!info)
 		return NULL;
 
-	memset(info, 0, sizeof(*info));
+	memset(info, 0, sz);
 	info->size = size;
 	return info;
 }
