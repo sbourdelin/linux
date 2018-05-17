@@ -450,6 +450,16 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 	unsigned int n;
 
 	/*
+	 * We can skip acquiring intel_runtime_pm_get() here as it was taken
+	 * on our behalf by the request (see i915_gem_mark_busy()) and it will
+	 * not be relinquished until the device is idle (see
+	 * i915_gem_idle_work_handler()). As a precaution, we make sure
+	 * that all ELSP are drained i.e. we have processed the CSB,
+	 * before allowing ourselves to idle and calling intel_runtime_pm_put().
+	 */
+	GEM_BUG_ON(!engine->i915->gt.awake);
+
+	/*
 	 * ELSQ note: the submit queue is not cleared after being submitted
 	 * to the HW so we need to make sure we always clean it up. This is
 	 * currently ensured by the fact that we always write the same number
@@ -960,6 +970,12 @@ static void process_csb(struct intel_engine_cs *engine)
 	struct drm_i915_private *i915 = engine->i915;
 	bool fw = false;
 
+	/*
+	 * We must never release our device wakeref until after we have
+	 * finished processing all potential interrupts from the hardware.
+	 */
+	GEM_BUG_ON(!engine->i915->gt.awake);
+
 	do {
 		/* The HWSP contains a (cacheable) mirror of the CSB */
 		const u32 *buf =
@@ -1139,16 +1155,6 @@ static void execlists_submission_tasklet(unsigned long data)
 		  engine->i915->gt.awake,
 		  engine->execlists.active,
 		  test_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted));
-
-	/*
-	 * We can skip acquiring intel_runtime_pm_get() here as it was taken
-	 * on our behalf by the request (see i915_gem_mark_busy()) and it will
-	 * not be relinquished until the device is idle (see
-	 * i915_gem_idle_work_handler()). As a precaution, we make sure
-	 * that all ELSP are drained i.e. we have processed the CSB,
-	 * before allowing ourselves to idle and calling intel_runtime_pm_put().
-	 */
-	GEM_BUG_ON(!engine->i915->gt.awake);
 
 	/*
 	 * Prefer doing test_and_clear_bit() as a two stage operation to avoid
