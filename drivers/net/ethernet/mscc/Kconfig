@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: (GPL-2.0 OR MIT)
 config NET_VENDOR_MICROSEMI
 	bool "Microsemi devices"
-	default y
+	default n
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
