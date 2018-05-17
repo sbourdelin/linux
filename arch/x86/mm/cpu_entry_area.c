@@ -2,6 +2,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/percpu.h>
+#include <linux/kallsyms.h>
 
 #include <asm/cpu_entry_area.h>
 #include <asm/pgtable.h>
@@ -149,6 +150,28 @@ static void __init setup_cpu_entry_area(int cpu)
 #endif
 	percpu_setup_debug_store(cpu);
 }
+
+#ifdef CONFIG_X86_64
+int arch_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+		     char *name)
+{
+	unsigned int cpu, ncpu;
+
+	if (symnum >= num_possible_cpus())
+		return -EINVAL;
+
+	for (cpu = cpumask_first(cpu_possible_mask), ncpu = 0;
+	     cpu < num_possible_cpus() && ncpu < symnum;
+	     cpu = cpumask_next(cpu, cpu_possible_mask), ncpu++)
+		;
+
+	*value = (unsigned long)&get_cpu_entry_area(cpu)->entry_trampoline;
+	*type = 't';
+	strlcpy(name, "__entry_SYSCALL_64_trampoline", KSYM_NAME_LEN);
+
+	return 0;
+}
+#endif
 
 static __init void setup_cpu_entry_area_ptes(void)
 {
