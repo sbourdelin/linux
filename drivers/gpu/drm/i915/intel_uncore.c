@@ -1720,6 +1720,8 @@ static void gen3_stop_engine(struct intel_engine_cs *engine)
 	if (I915_READ_FW(RING_HEAD(base)) != 0)
 		DRM_DEBUG_DRIVER("%s: ring head not parked\n",
 				 engine->name);
+
+	I915_WRITE_FW(RING_MI_MODE(base), _MASKED_BIT_DISABLE(STOP_RING));
 }
 
 static void i915_stop_engines(struct drm_i915_private *dev_priv,
