@@ -453,7 +453,17 @@ int ima_read_file(struct file *file, enum kernel_read_file_id read_id)
 		}
 		return 0;
 	}
+
+	if (read_id == READING_FIRMWARE_FALLBACK_SYSFS) {
+		if ((ima_appraise & IMA_APPRAISE_FIRMWARE) &&
+		    (ima_appraise & IMA_APPRAISE_ENFORCE)) {
+			pr_err("Prevent firmware sysfs fallback loading.\n");
+			return -EACCES;
+		}
+		return 0;
+	}
 	return 0;
+
 }
 
 static int read_idmap[READING_MAX_ID] = {
