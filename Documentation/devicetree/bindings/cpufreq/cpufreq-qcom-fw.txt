@@ -1,0 +1,68 @@
+Qualcomm Technologies, Inc. CPUFREQ Bindings
+
+CPUFREQ FW is a hardware engine used by some Qualcomm Technologies, Inc. (QTI)
+SoCs to manage frequency in hardware. It is capable of controlling frequency
+for multiple clusters.
+
+Properties:
+- compatible
+	Usage:		required
+	Value type:	<string>
+	Definition:	must be "qcom,cpufreq-fw".
+
+Note that #address-cells, #size-cells, and ranges shall be present to ensure
+the cpufreq can address a freq-domain registers.
+
+A freq-domain sub-node would be defined for the cpus with the following
+properties:
+
+- compatible:
+	Usage:		required
+	Value type:	<string>
+	Definition:	must be "cpufreq".
+
+- reg
+	Usage:		required
+	Value type:	<prop-encoded-array>
+	Definition:	Addresses and sizes for the memory of the perf_base
+			, lut_base and en_base.
+- reg-names
+	Usage:		required
+	Value type:	<stringlist>
+	Definition:	Address names. Must be "perf_base", "lut_base",
+			"en_base".
+			Must be specified in the same order as the
+			corresponding addresses are specified in the reg
+			property.
+
+- qcom,cpulist
+	Usage:		required
+	Value type:	<phandles of CPU>
+	Definition:	List of related cpu handles which are under a cluster.
+
+Example:
+	qcom,cpufreq-fw {
+		compatible = "qcom,cpufreq-fw";
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		freq-domain-0 {
+			compatible = "cpufreq";
+			reg = <0x17d43920 0x4>,
+			     <0x17d43110 0x500>,
+			     <0x17d41000 0x4>;
+			reg-names = "perf_base", "lut_base", "en_base";
+			qcom,cpulist = <&CPU0 &CPU1 &CPU2 &CPU3>;
+		};
+
+		freq-domain-1 {
+			compatible = "cpufreq";
+			reg = <0x17d46120 0x4>,
+			    <0x17d45910 0x500>,
+			    <0x17d45800 0x4>;
+			reg-names = "perf_base", "lut_base", "en_base";
+			qcom,cpulist = <&CPU4 &CPU5 &CPU6 &CPU7>;
+		};
+	};
