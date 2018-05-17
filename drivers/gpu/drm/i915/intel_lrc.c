@@ -575,7 +575,7 @@ static void complete_preempt_context(struct intel_engine_execlists *execlists)
 	execlists_clear_active(execlists, EXECLISTS_ACTIVE_PREEMPT);
 }
 
-static void __execlists_dequeue(struct intel_engine_cs *engine)
+static void execlists_dequeue(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
 	struct execlist_port *port = execlists->port;
@@ -587,7 +587,11 @@ static void __execlists_dequeue(struct intel_engine_cs *engine)
 
 	lockdep_assert_held(&engine->timeline.lock);
 
-	/* Hardware submission is through 2 ports. Conceptually each port
+	if (execlists_is_active(&engine->execlists, EXECLISTS_ACTIVE_PREEMPT))
+		return;
+
+	/*
+	 * Hardware submission is through 2 ports. Conceptually each port
 	 * has a (RING_START, RING_HEAD, RING_TAIL) tuple. RING_START is
 	 * static for a context, and unique to each, so we only execute
 	 * requests belonging to a single context from each ring. RING_HEAD
@@ -775,15 +779,6 @@ done:
 	GEM_BUG_ON(execlists_is_active(&engine->execlists,
 				       EXECLISTS_ACTIVE_USER) ==
 		   !port_isset(engine->execlists.port));
-}
-
-static void execlists_dequeue(struct intel_engine_cs *engine)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&engine->timeline.lock, flags);
-	__execlists_dequeue(engine);
-	spin_unlock_irqrestore(&engine->timeline.lock, flags);
 }
 
 void
@@ -1107,6 +1102,7 @@ void intel_engine_handle_execlists_irq(struct intel_engine_cs *engine)
 	       execlists->csb_read);
 	execlists->csb_head = head;
 
+	execlists_dequeue(engine);
 	spin_unlock(&engine->timeline.lock);
 }
 
@@ -1123,8 +1119,9 @@ static void execlists_submission_tasklet(unsigned long data)
 		  engine->i915->gt.awake,
 		  engine->execlists.active);
 
-	if (!execlists_is_active(&engine->execlists, EXECLISTS_ACTIVE_PREEMPT))
-		execlists_dequeue(engine);
+	spin_lock_irq(&engine->timeline.lock);
+	execlists_dequeue(engine);
+	spin_unlock_irq(&engine->timeline.lock);
 }
 
 static void queue_request(struct intel_engine_cs *engine,
@@ -1135,16 +1132,20 @@ static void queue_request(struct intel_engine_cs *engine,
 		      &lookup_priolist(engine, prio)->requests);
 }
 
-static void __submit_queue(struct intel_engine_cs *engine, int prio)
+static void __update_queue(struct intel_engine_cs *engine, int prio)
 {
 	engine->execlists.queue_priority = prio;
-	tasklet_hi_schedule(&engine->execlists.tasklet);
 }
 
 static void submit_queue(struct intel_engine_cs *engine, int prio)
 {
-	if (prio > engine->execlists.queue_priority)
-		__submit_queue(engine, prio);
+	if (prio > engine->execlists.queue_priority) {
+		__update_queue(engine, prio);
+		if (!intel_engine_uses_guc(engine))
+			execlists_dequeue(engine);
+		else
+			tasklet_hi_schedule(&engine->execlists.tasklet);
+	}
 }
 
 static void execlists_submit_request(struct i915_request *request)
@@ -1156,10 +1157,11 @@ static void execlists_submit_request(struct i915_request *request)
 	spin_lock_irqsave(&engine->timeline.lock, flags);
 
 	queue_request(engine, &request->sched, rq_prio(request));
-	submit_queue(engine, rq_prio(request));
 
 	GEM_BUG_ON(!engine->execlists.first);
 	GEM_BUG_ON(list_empty(&request->sched.link));
+
+	submit_queue(engine, rq_prio(request));
 
 	spin_unlock_irqrestore(&engine->timeline.lock, flags);
 }
@@ -1287,8 +1289,10 @@ static void execlists_schedule(struct i915_request *request,
 		}
 
 		if (prio > engine->execlists.queue_priority &&
-		    i915_sw_fence_done(&sched_to_request(node)->submit))
-			__submit_queue(engine, prio);
+		    i915_sw_fence_done(&sched_to_request(node)->submit)) {
+			__update_queue(engine, prio);
+			tasklet_hi_schedule(&engine->execlists.tasklet);
+		}
 	}
 
 	spin_unlock_irq(&engine->timeline.lock);

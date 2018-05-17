@@ -1462,22 +1462,15 @@ static void snb_gt_irq_handler(struct drm_i915_private *dev_priv,
 static void
 gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 {
-	bool tasklet = false;
-
-	if (iir & GT_CONTEXT_SWITCH_INTERRUPT) {
+	if (iir & GT_CONTEXT_SWITCH_INTERRUPT)
 		intel_engine_handle_execlists_irq(engine);
-		tasklet = true;
-	}
 
 	if (iir & GT_RENDER_USER_INTERRUPT) {
 		if (intel_engine_uses_guc(engine))
-			tasklet = true;
+			tasklet_hi_schedule(&engine->execlists.tasklet);
 
 		notify_ring(engine);
 	}
-
-	if (tasklet)
-		tasklet_hi_schedule(&engine->execlists.tasklet);
 }
 
 static void gen8_gt_irq_ack(struct drm_i915_private *i915,
