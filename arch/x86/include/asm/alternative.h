@@ -28,17 +28,35 @@
  * The very common lock prefix is handled as special case in a
  * separate table which is a pure address list without replacement ptr
  * and size information.  That keeps the table sizes small.
+ *
+ * Saving the lock data is encapsulated within an assembly macro, which is then
+ * called on each use. This hack is necessary to prevent GCC from considering
+ * the inline assembly blocks as costly in time and space, which can prevent
+ * function inlining and lead to other bad compilation decisions. GCC computes
+ * inline assembly cost according to the number of perceived number of assembly
+ * instruction, based on the number of new-lines and semicolons in the assembly
+ * block. The macro will eventually be compiled into a single instruction (and
+ * some data). This scheme allows GCC to better understand the inline asm cost.
  */
 
 #ifdef CONFIG_SMP
-#define LOCK_PREFIX_HERE \
-		".pushsection .smp_locks,\"a\"\n"	\
-		".balign 4\n"				\
-		".long 671f - .\n" /* offset */		\
-		".popsection\n"				\
-		"671:"
 
-#define LOCK_PREFIX LOCK_PREFIX_HERE "\n\tlock; "
+asm(".macro __LOCK_PREFIX_HERE\n\t"
+    ".pushsection .smp_locks,\"a\"\n\t"
+    ".balign 4\n\t"
+    ".long 671f - .\n\t" /* offset */
+    ".popsection\n"
+    "671:\n\t"
+    ".endm");
+
+#define LOCK_PREFIX_HERE "__LOCK_PREFIX_HERE\n\t"
+
+asm(".macro __LOCK_PREFIX ins:vararg\n\t"
+    "__LOCK_PREFIX_HERE\n\t"
+    "lock; \\ins\n\t"
+    ".endm");
+
+#define LOCK_PREFIX "__LOCK_PREFIX "
 
 #else /* ! CONFIG_SMP */
 #define LOCK_PREFIX_HERE ""
