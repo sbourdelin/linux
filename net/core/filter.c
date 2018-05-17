@@ -4098,6 +4098,7 @@ static int bpf_ipv4_fib_lookup(struct net *net, struct bpf_fib_lookup *params,
 	struct fib_nh *nh;
 	struct flowi4 fl4;
 	int err;
+	u32 mtu;
 
 	dev = dev_get_by_index_rcu(net, params->ifindex);
 	if (unlikely(!dev))
@@ -4149,6 +4150,10 @@ static int bpf_ipv4_fib_lookup(struct net *net, struct bpf_fib_lookup *params,
 	if (res.fi->fib_nhs > 1)
 		fib_select_path(net, &res, &fl4, NULL);
 
+	mtu = ip_mtu_from_fib_result(&res, params->ipv4_dst);
+	if (params->tot_len > mtu)
+		return 0;
+
 	nh = &res.fi->fib_nh[res.nh_sel];
 
 	/* do not handle lwt encaps right now */
@@ -4188,6 +4193,7 @@ static int bpf_ipv6_fib_lookup(struct net *net, struct bpf_fib_lookup *params,
 	struct flowi6 fl6;
 	int strict = 0;
 	int oif;
+	u32 mtu;
 
 	/* link local addresses are never forwarded */
 	if (rt6_need_strict(dst) || rt6_need_strict(src))
@@ -4249,6 +4255,10 @@ static int bpf_ipv6_fib_lookup(struct net *net, struct bpf_fib_lookup *params,
 		f6i = ipv6_stub->fib6_multipath_select(net, f6i, &fl6,
 						       fl6.flowi6_oif, NULL,
 						       strict);
+
+	mtu = ip6_mtu_from_fib6(f6i, dst, src);
+	if (params->tot_len > mtu)
+		return 0;
 
 	if (f6i->fib6_nh.nh_lwtstate)
 		return 0;
