@@ -178,8 +178,12 @@ static const char *print_call_pcrel(struct dump_data *dd,
 		snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
 			 "%+d#%s", insn->off, sym->name);
 	else
-		snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
-			 "%+d#0x%lx", insn->off, address);
+		if (address)
+			snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
+				 "%+d#0x%lx", insn->off, address);
+		else
+			snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
+				 "%+d", insn->off);
 	return dd->scratch_buff;
 }
 
@@ -200,14 +204,20 @@ static const char *print_call(void *private_data,
 			      const struct bpf_insn *insn)
 {
 	struct dump_data *dd = private_data;
-	unsigned long address = dd->address_call_base + insn->imm;
-	struct kernel_sym *sym;
+	unsigned long address = 0;
+	struct kernel_sym *sym = NULL;
 
-	sym = kernel_syms_search(dd, address);
-	if (insn->src_reg == BPF_PSEUDO_CALL)
+	if (insn->src_reg == BPF_PSEUDO_CALL) {
+		if (dd->nr_jited_ksyms) {
+			address = dd->jited_ksyms[insn->imm];
+			sym = kernel_syms_search(dd, address);
+		}
 		return print_call_pcrel(dd, sym, address, insn);
-	else
+	} else {
+		address = dd->address_call_base + insn->imm;
+		sym = kernel_syms_search(dd, address);
 		return print_call_helper(dd, sym, address);
+	}
 }
 
 static const char *print_imm(void *private_data,

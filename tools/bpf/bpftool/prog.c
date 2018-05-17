@@ -430,6 +430,10 @@ static int do_dump(int argc, char **argv)
 	unsigned char *buf;
 	__u32 *member_len;
 	__u64 *member_ptr;
+	unsigned int nr_addrs;
+	unsigned long *addrs = NULL;
+	__u32 *ksyms_len;
+	__u64 *ksyms_ptr;
 	ssize_t n;
 	int err;
 	int fd;
@@ -437,6 +441,8 @@ static int do_dump(int argc, char **argv)
 	if (is_prefix(*argv, "jited")) {
 		member_len = &info.jited_prog_len;
 		member_ptr = &info.jited_prog_insns;
+		ksyms_len = &info.nr_jited_ksyms;
+		ksyms_ptr = &info.jited_ksyms;
 	} else if (is_prefix(*argv, "xlated")) {
 		member_len = &info.xlated_prog_len;
 		member_ptr = &info.xlated_prog_insns;
@@ -496,10 +502,23 @@ static int do_dump(int argc, char **argv)
 		return -1;
 	}
 
+	nr_addrs = *ksyms_len;
+	if (nr_addrs) {
+		addrs = malloc(nr_addrs * sizeof(__u64));
+		if (!addrs) {
+			p_err("mem alloc failed");
+			free(buf);
+			close(fd);
+			return -1;
+		}
+	}
+
 	memset(&info, 0, sizeof(info));
 
 	*member_ptr = ptr_to_u64(buf);
 	*member_len = buf_size;
+	*ksyms_ptr = ptr_to_u64(addrs);
+	*ksyms_len = nr_addrs;
 
 	err = bpf_obj_get_info_by_fd(fd, &info, &len);
 	close(fd);
@@ -510,6 +529,11 @@ static int do_dump(int argc, char **argv)
 
 	if (*member_len > buf_size) {
 		p_err("too many instructions returned");
+		goto err_free;
+	}
+
+	if (*ksyms_len > nr_addrs) {
+		p_err("too many addresses returned");
 		goto err_free;
 	}
 
@@ -558,6 +582,9 @@ static int do_dump(int argc, char **argv)
 			dump_xlated_cfg(buf, *member_len);
 	} else {
 		kernel_syms_load(&dd);
+		dd.jited_ksyms = ksyms_ptr;
+		dd.nr_jited_ksyms = *ksyms_len;
+
 		if (json_output)
 			dump_xlated_json(&dd, buf, *member_len, opcodes);
 		else
@@ -566,10 +593,14 @@ static int do_dump(int argc, char **argv)
 	}
 
 	free(buf);
+	if (addrs)
+		free(addrs);
 	return 0;
 
 err_free:
 	free(buf);
+	if (addrs)
+		free(addrs);
 	return -1;
 }
 
