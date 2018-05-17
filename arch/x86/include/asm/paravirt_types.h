@@ -346,20 +346,45 @@ extern struct pv_lock_ops pv_lock_ops;
 /*
  * Generate some code, and mark it as patchable by the
  * apply_paravirt() alternate instruction patcher.
+ *
+ * This generates an indirect call based on the operation type number.
+ * The type number, computed in PARAVIRT_PATCH, is derived from the
+ * offset into the paravirt_patch_template structure, and can therefore be
+ * freely converted back into a structure offset.
+ *
+ * The paravirtual alternative logic and data are encapsulated within an
+ * assembly macro, which is then called on each use. This hack is necessary to
+ * prevent GCC from considering the inline assembly blocks as costly in time and
+ * space, which can prevent function inlining and lead to other bad compilation
+ * decisions. GCC computes inline assembly cost according to the number of
+ * perceived number of assembly instruction, based on the number of new-lines
+ * and semicolons in the assembly block. The macro will eventually be compiled
+ * into a single instruction (and some data). This scheme allows GCC to better
+ * understand the inline asm cost.
  */
-#define _paravirt_alt(insn_string, type, clobber)	\
-	"771:\n\t" insn_string "\n" "772:\n"		\
-	".pushsection .parainstructions,\"a\"\n"	\
-	_ASM_ALIGN "\n"					\
-	_ASM_PTR " 771b\n"				\
-	"  .byte " type "\n"				\
-	"  .byte 772b-771b\n"				\
-	"  .short " clobber "\n"			\
-	".popsection\n"
+asm(".macro __paravirt_alt type:req clobber:req pv_opptr:req\n"
+    "771:\n\t"
+    ANNOTATE_RETPOLINE_SAFE "\n\t"
+    "call *\\pv_opptr\n"
+    "772:\n\t"
+    ".pushsection .parainstructions,\"a\"\n\t"
+    _ASM_ALIGN "\n\t"
+    _ASM_PTR " 771b\n\t"
+    ".byte \\type\n\t"
+    ".byte 772b-771b\n\t"
+    ".short \\clobber\n\t"
+    ".popsection\n\t"
+    ".endm");
+
+#define _paravirt_alt(type, clobber, pv_opptr)				\
+	"__paravirt_alt type=" __stringify(type)			\
+	" clobber=" __stringify(clobber)				\
+	" pv_opptr=" __stringify(pv_opptr) "\n\t"
 
 /* Generate patchable code, with the default asm parameters. */
-#define paravirt_alt(insn_string)					\
-	_paravirt_alt(insn_string, "%c[paravirt_typenum]", "%c[paravirt_clobber]")
+#define paravirt_alt							\
+	_paravirt_alt("%c[paravirt_typenum]", "%c[paravirt_clobber]",	\
+		      "%c[paravirt_opptr]")
 
 /* Simple instruction patching code. */
 #define NATIVE_LABEL(a,x,b) "\n\t.globl " a #x "_" #b "\n" a #x "_" #b ":\n\t"
@@ -386,16 +411,6 @@ unsigned native_patch(u8 type, u16 clobbers, void *ibuf,
 		      unsigned long addr, unsigned len);
 
 int paravirt_disable_iospace(void);
-
-/*
- * This generates an indirect call based on the operation type number.
- * The type number, computed in PARAVIRT_PATCH, is derived from the
- * offset into the paravirt_patch_template structure, and can therefore be
- * freely converted back into a structure offset.
- */
-#define PARAVIRT_CALL					\
-	ANNOTATE_RETPOLINE_SAFE				\
-	"call *%c[paravirt_opptr];"
 
 /*
  * These macros are intended to wrap calls through one of the paravirt
@@ -534,7 +549,7 @@ int paravirt_disable_iospace(void);
 		/* since this condition will never hold */		\
 		if (sizeof(rettype) > sizeof(unsigned long)) {		\
 			asm volatile(pre				\
-				     paravirt_alt(PARAVIRT_CALL)	\
+				     paravirt_alt			\
 				     post				\
 				     : call_clbr, ASM_CALL_CONSTRAINT	\
 				     : paravirt_type(op),		\
@@ -544,7 +559,7 @@ int paravirt_disable_iospace(void);
 			__ret = (rettype)((((u64)__edx) << 32) | __eax); \
 		} else {						\
 			asm volatile(pre				\
-				     paravirt_alt(PARAVIRT_CALL)	\
+				     paravirt_alt			\
 				     post				\
 				     : call_clbr, ASM_CALL_CONSTRAINT	\
 				     : paravirt_type(op),		\
@@ -571,7 +586,7 @@ int paravirt_disable_iospace(void);
 		PVOP_VCALL_ARGS;					\
 		PVOP_TEST_NULL(op);					\
 		asm volatile(pre					\
-			     paravirt_alt(PARAVIRT_CALL)		\
+			     paravirt_alt				\
 			     post					\
 			     : call_clbr, ASM_CALL_CONSTRAINT		\
 			     : paravirt_type(op),			\
