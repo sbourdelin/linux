@@ -594,6 +594,54 @@ static int usbtmc488_ioctl_read_stb(struct usbtmc_file_data *file_data,
 	return rv;
 }
 
+static int usbtmc488_ioctl_wait_srq(struct usbtmc_file_data *file_data,
+				    unsigned int __user *arg)
+{
+	struct usbtmc_device_data *data = file_data->data;
+	struct device *dev = &data->intf->dev;
+	int rv;
+	unsigned int timeout;
+	unsigned long expire;
+
+	if (!data->iin_ep_present) {
+		dev_dbg(dev, "no interrupt endpoint present\n");
+		return -EFAULT;
+	}
+
+	if (get_user(timeout, arg))
+		return -EFAULT;
+
+	expire = msecs_to_jiffies(timeout);
+
+	mutex_unlock(&data->io_mutex);
+
+	rv = wait_event_interruptible_timeout(
+			data->waitq,
+			atomic_read(&file_data->srq_asserted) != 0 ||
+			atomic_read(&file_data->closing),
+			expire);
+
+	mutex_lock(&data->io_mutex);
+
+	/* Note! disconnect or close could be called in the meantime */
+	if (atomic_read(&file_data->closing) || data->zombie)
+		rv = -ENODEV;
+
+	if (rv < 0) {
+		/* dev can be invalid now! */
+		pr_debug("%s - wait interrupted %d\n", __func__, rv);
+		return rv;
+	}
+
+	if (rv == 0) {
+		dev_dbg(dev, "%s - wait timed out\n", __func__);
+		return -ETIMEDOUT;
+	}
+
+	dev_dbg(dev, "%s - srq asserted\n", __func__);
+	return 0;
+}
+
 static int usbtmc488_ioctl_simple(struct usbtmc_device_data *data,
 				void __user *arg, unsigned int cmd)
 {
@@ -2149,6 +2197,11 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		retval = usbtmc488_ioctl_trigger(file_data);
 		break;
 
+	case USBTMC488_IOCTL_WAIT_SRQ:
+		retval = usbtmc488_ioctl_wait_srq(file_data,
+						  (unsigned int __user *)arg);
+		break;
+
 	case USBTMC_IOCTL_CANCEL_IO:
 		retval = usbtmc_ioctl_cancel_io(file_data);
 		break;
@@ -2290,6 +2343,7 @@ static void usbtmc_interrupt(struct urb *urb)
 	case -ESHUTDOWN:
 	case -EILSEQ:
 	case -ETIME:
+	case -EPIPE:
 		/* urb terminated, clean up */
 		dev_dbg(dev, "urb terminated, status: %d\n", status);
 		return;
@@ -2308,7 +2362,9 @@ static void usbtmc_free_int(struct usbtmc_device_data *data)
 		return;
 	usb_kill_urb(data->iin_urb);
 	kfree(data->iin_buffer);
+	data->iin_buffer = NULL;
 	usb_free_urb(data->iin_urb);
+	data->iin_urb = NULL;
 	kref_put(&data->kref, usbtmc_delete);
 }
 
@@ -2420,8 +2476,8 @@ static int usbtmc_probe(struct usb_interface *intf,
 
 	retcode = usb_register_dev(intf, &usbtmc_class);
 	if (retcode) {
-		dev_err(&intf->dev, "Not able to get a minor"
-			" (base %u, slice default): %d\n", USBTMC_MINOR_BASE,
+		dev_err(&intf->dev, "Not able to get a minor (base %u, slice default): %d\n",
+			USBTMC_MINOR_BASE,
 			retcode);
 		goto error_register;
 	}
