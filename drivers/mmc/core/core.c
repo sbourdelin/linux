@@ -2092,8 +2092,14 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 			goto out;
 		}
 
-	} while (!(cmd.resp[0] & R1_READY_FOR_DATA) ||
-		 (R1_CURRENT_STATE(cmd.resp[0]) == R1_STATE_PRG));
+		if ((cmd.resp[0] & R1_READY_FOR_DATA) &&
+		    R1_CURRENT_STATE(cmd.resp[0]) != R1_STATE_PRG)
+			break;
+
+		/* Throttle the calls to MMC_SEND_STATUS */
+		usleep_range(1000, 2000);
+	} while (1);
+
 out:
 	mmc_retune_release(card->host);
 	return err;
