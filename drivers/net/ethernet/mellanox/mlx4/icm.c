@@ -33,6 +33,7 @@
 
 #include <linux/errno.h>
 #include <linux/mm.h>
+#include <linux/vmalloc.h>
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 
@@ -43,12 +44,12 @@
 #include "fw.h"
 
 /*
- * We allocate in as big chunks as we can, up to a maximum of 256 KB
- * per chunk.
+ * We allocate in page size (default 4KB on many archs) chunks to avoid high
+ * order memory allocations in fragmented/high usage memory situation.
  */
 enum {
-	MLX4_ICM_ALLOC_SIZE	= 1 << 18,
-	MLX4_TABLE_CHUNK_SIZE	= 1 << 18
+	MLX4_ICM_ALLOC_SIZE	= PAGE_SIZE,
+	MLX4_TABLE_CHUNK_SIZE	= PAGE_SIZE,
 };
 
 static void mlx4_free_icm_pages(struct mlx4_dev *dev, struct mlx4_icm_chunk *chunk)
@@ -400,7 +401,7 @@ int mlx4_init_icm_table(struct mlx4_dev *dev, struct mlx4_icm_table *table,
 	obj_per_chunk = MLX4_TABLE_CHUNK_SIZE / obj_size;
 	num_icm = (nobj + obj_per_chunk - 1) / obj_per_chunk;
 
-	table->icm      = kcalloc(num_icm, sizeof(*table->icm), GFP_KERNEL);
+	table->icm      = vzalloc(num_icm * sizeof(*table->icm));
 	if (!table->icm)
 		return -ENOMEM;
 	table->virt     = virt;
@@ -446,7 +447,7 @@ err:
 			mlx4_free_icm(dev, table->icm[i], use_coherent);
 		}
 
-	kfree(table->icm);
+	vfree(table->icm);
 
 	return -ENOMEM;
 }
@@ -462,5 +463,5 @@ void mlx4_cleanup_icm_table(struct mlx4_dev *dev, struct mlx4_icm_table *table)
 			mlx4_free_icm(dev, table->icm[i], table->coherent);
 		}
 
-	kfree(table->icm);
+	vfree(table->icm);
 }
