@@ -127,4 +127,10 @@ struct archdr {
 	} soft;
 };
 
+struct com20020_ethtool_regs {
+	__u8 status;
+	__u8 diag_register;
+	__u32 reconf_count;
+};
+
 #endif				/* _LINUX_IF_ARCNET_H */

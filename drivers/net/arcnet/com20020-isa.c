@@ -154,6 +154,7 @@ static int __init com20020_init(void)
 		dev->dev_addr[0] = node;
 
 	dev->netdev_ops = &com20020_netdev_ops;
+	dev->ethtool_ops = &com20020_ethtool_ops;
 
 	lp = netdev_priv(dev);
 	lp->backplane = backplane;
