@@ -1099,6 +1099,9 @@ static int v4l_enumoutput(const struct v4l2_ioctl_ops *ops,
 	if (is_valid_ioctl(vfd, VIDIOC_S_STD))
 		p->capabilities |= V4L2_OUT_CAP_STD;
 
+	if (p->index > INT_MAX)
+		return -EINVAL;
+
 	return ops->vidioc_enum_output(file, fh, p);
 }
 
