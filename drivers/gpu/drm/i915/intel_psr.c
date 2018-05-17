@@ -376,7 +376,6 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
-	uint32_t max_sleep_time = 0x1f;
 	/*
 	 * Let's respect VBT in case VBT asks a higher idle_frame value.
 	 * Let's use 6 as the minimum to cover all known cases including
@@ -387,7 +386,6 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 	uint32_t idle_frames = max(6, dev_priv->vbt.psr.idle_frames);
 	uint32_t val = EDP_PSR_ENABLE;
 
-	val |= max_sleep_time << EDP_PSR_MAX_SLEEP_TIME_SHIFT;
 	val |= idle_frames << EDP_PSR_IDLE_FRAME_SHIFT;
 
 	if (IS_HASWELL(dev_priv))
@@ -640,14 +638,12 @@ static void hsw_psr_enable_source(struct intel_dp *intel_dp,
 		 * preventing  other hw tracking issues now we can rely
 		 * on frontbuffer tracking.
 		 */
-		u32 val = EDP_PSR_DEBUG_MASK_MEMUP |
+		I915_WRITE(EDP_PSR_DEBUG,
+			  EDP_PSR_DEBUG_MASK_MEMUP |
 			  EDP_PSR_DEBUG_MASK_HPD |
 			  EDP_PSR_DEBUG_MASK_LPSP |
-			  EDP_PSR_DEBUG_MASK_DISP_REG_WRITE;
-
-		if (INTEL_GEN(dev_priv) >= 8)
-			val |= EDP_PSR_DEBUG_MASK_MAX_SLEEP;
-		I915_WRITE(EDP_PSR_DEBUG, val);
+			  EDP_PSR_DEBUG_MASK_DISP_REG_WRITE |
+			  EDP_PSR_DEBUG_MASK_MAX_SLEEP);
 	}
 }
 
