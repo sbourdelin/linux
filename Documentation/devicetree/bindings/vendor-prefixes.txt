@@ -14,6 +14,7 @@ adh	AD Holdings Plc.
 adi	Analog Devices, Inc.
 advantech	Advantech Corporation
 aeroflexgaisler	Aeroflex Gaisler AB
+akm	Asahi Kasei Microdevices
 al	Annapurna Labs
 allo	Allo.com
 allwinner	Allwinner Technology Co., Ltd.
