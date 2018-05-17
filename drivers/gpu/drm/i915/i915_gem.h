@@ -79,4 +79,9 @@ static inline void __tasklet_disable_sync_once(struct tasklet_struct *t)
 		tasklet_unlock_wait(t);
 }
 
+static inline bool __tasklet_is_enabled(const struct tasklet_struct *t)
+{
+	return likely(!atomic_read(&t->count));
+}
+
 #endif /* __I915_GEM_H__ */

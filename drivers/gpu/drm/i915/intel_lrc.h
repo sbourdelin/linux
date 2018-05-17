@@ -102,6 +102,7 @@ int logical_xcs_ring_init(struct intel_engine_cs *engine);
 struct drm_i915_private;
 struct i915_gem_context;
 
+void intel_engine_handle_execlists_irq(struct intel_engine_cs *engine);
 void intel_lr_context_resume(struct drm_i915_private *dev_priv);
 
 #endif /* _INTEL_LRC_H_ */

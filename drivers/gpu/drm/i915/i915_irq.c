@@ -1462,13 +1462,11 @@ static void snb_gt_irq_handler(struct drm_i915_private *dev_priv,
 static void
 gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 {
-	struct intel_engine_execlists * const execlists = &engine->execlists;
 	bool tasklet = false;
 
 	if (iir & GT_CONTEXT_SWITCH_INTERRUPT) {
-		if (READ_ONCE(engine->execlists.active))
-			tasklet = !test_and_set_bit(ENGINE_IRQ_EXECLIST,
-						    &engine->irq_posted);
+		intel_engine_handle_execlists_irq(engine);
+		tasklet = true;
 	}
 
 	if (iir & GT_RENDER_USER_INTERRUPT) {
@@ -1479,7 +1477,7 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 	}
 
 	if (tasklet)
-		tasklet_hi_schedule(&execlists->tasklet);
+		tasklet_hi_schedule(&engine->execlists.tasklet);
 }
 
 static void gen8_gt_irq_ack(struct drm_i915_private *i915,
@@ -2165,6 +2163,7 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		I915_WRITE(VLV_IER, 0);
 
 		gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
+		gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
 		if (iir & I915_DISPLAY_PORT_INTERRUPT)
 			hotplug_status = i9xx_hpd_irq_ack(dev_priv);
@@ -2188,8 +2187,6 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		I915_WRITE(VLV_IER, ier);
 		I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
 		POSTING_READ(GEN8_MASTER_IRQ);
-
-		gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
 		if (hotplug_status)
 			i9xx_hpd_irq_handler(dev_priv, hotplug_status);
@@ -2761,6 +2758,7 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 
 	/* Find, clear, then process each source of interrupt */
 	gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
+	gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
 	/* IRQs are synced during runtime_suspend, we don't require a wakeref */
 	if (master_ctl & ~GEN8_GT_IRQS) {
@@ -2770,8 +2768,6 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 	}
 
 	I915_WRITE_FW(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
-
-	gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
 	return IRQ_HANDLED;
 }
