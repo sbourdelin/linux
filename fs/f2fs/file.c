@@ -1869,6 +1869,7 @@ static int f2fs_ioc_shutdown(struct file *filp, unsigned long arg)
 
 	switch (in) {
 	case F2FS_GOING_DOWN_FULLSYNC:
+		mnt_drop_write_file(filp);
 		sb = freeze_bdev(sb->s_bdev);
 		if (IS_ERR(sb)) {
 			ret = PTR_ERR(sb);
@@ -1906,7 +1907,8 @@ static int f2fs_ioc_shutdown(struct file *filp, unsigned long arg)
 
 	f2fs_update_time(sbi, REQ_TIME);
 out:
-	mnt_drop_write_file(filp);
+	if (in != F2FS_GOING_DOWN_FULLSYNC)
+		mnt_drop_write_file(filp);
 	return ret;
 }
 
