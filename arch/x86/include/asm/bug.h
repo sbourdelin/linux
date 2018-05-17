@@ -30,33 +30,51 @@
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 
-#define _BUG_FLAGS(ins, flags)						\
+/*
+ * Saving the bug data is encapsulated within an assembly macro, which is then
+ * called on each use. This hack is necessary to prevent GCC from considering
+ * the inline assembly blocks as costly in time and space, which can prevent
+ * function inlining and lead to other bad compilation decisions. GCC computes
+ * inline assembly cost according to the number of perceived number of assembly
+ * instruction, based on the number of new-lines and semicolons in the assembly
+ * block. The macro will eventually be compiled into a single instruction (and
+ * some data). This scheme allows GCC to better understand the inline asm cost.
+ */
+asm(".macro __BUG_FLAGS ins:req file:req line:req flags:req size:req\n"
+    "1:\t \\ins\n\t"
+    ".pushsection __bug_table,\"aw\"\n"
+    "2:\t "__BUG_REL(1b)		"\t# bug_entry::bug_addr\n\t"
+    __BUG_REL(\\file)			"\t# bug_entry::file\n\t"
+    ".word \\line"			"\t# bug_entry::line\n\t"
+    ".word \\flags"			"\t# bug_entry::flags\n\t"
+    ".org 2b+\\size\n\t"
+    ".popsection\n\t"
+    ".endm");
+
+#define _BUG_FLAGS(ins, flags)                                          \
 do {									\
-	asm volatile("1:\t" ins "\n"					\
-		     ".pushsection __bug_table,\"aw\"\n"		\
-		     "2:\t" __BUG_REL(1b) "\t# bug_entry::bug_addr\n"	\
-		     "\t"  __BUG_REL(%c0) "\t# bug_entry::file\n"	\
-		     "\t.word %c1"        "\t# bug_entry::line\n"	\
-		     "\t.word %c2"        "\t# bug_entry::flags\n"	\
-		     "\t.org 2b+%c3\n"					\
-		     ".popsection"					\
-		     : : "i" (__FILE__), "i" (__LINE__),		\
-			 "i" (flags),					\
+	asm volatile("__BUG_FLAGS \"" ins "\" %c0 %c1 %c2 %c3"		\
+		     : : "i" (__FILE__), "i" (__LINE__),                \
+			 "i" (flags),                                   \
 			 "i" (sizeof(struct bug_entry)));		\
 } while (0)
 
 #else /* !CONFIG_DEBUG_BUGVERBOSE */
 
+asm(".macro __BUG_FLAGS ins:req flags:req size:req\n"
+    "1:\t\\ins\n\t"
+    ".pushsection __bug_table,\"aw\"\n"
+    "2:\t" __BUG_REL(1b)		"\t# bug_entry::bug_addr\n\t"
+    ".word \\flags"			"\t# bug_entry::flags\n\t"
+    ".org 2b+\\size\n\t"
+    ".popsection\n\t"
+    ".endm");
+
 #define _BUG_FLAGS(ins, flags)						\
 do {									\
-	asm volatile("1:\t" ins "\n"					\
-		     ".pushsection __bug_table,\"aw\"\n"		\
-		     "2:\t" __BUG_REL(1b) "\t# bug_entry::bug_addr\n"	\
-		     "\t.word %c0"        "\t# bug_entry::flags\n"	\
-		     "\t.org 2b+%c1\n"					\
-		     ".popsection"					\
-		     : : "i" (flags),					\
-			 "i" (sizeof(struct bug_entry)));		\
+	asm volatile("__BUG_FLAGS \"" ins "\" %c0 %c1"			\
+		    : : "i" (flags),					\
+			"i" (sizeof(struct bug_entry)));		\
 } while (0)
 
 #endif /* CONFIG_DEBUG_BUGVERBOSE */
