@@ -36,6 +36,26 @@ static int sysfs_entries;
 
 /* Helper Routines to convert between drc_index to cpu numbers */
 
+struct cpu_to_drc_index_struct {
+	u32	thread_index;
+	u32	ret;
+};
+
+static int cpu_to_drc_index_checkRun(struct of_drc_info *drc,
+				void *idata, void *not_used, int *ret_code)
+{
+        struct cpu_to_drc_index_struct *cdata = idata;
+
+	if (cdata->thread_index < drc->last_drc_index) {
+		cdata->ret = drc->drc_index_start +
+			(cdata->thread_index * drc->sequential_inc);
+		(*ret_code) = 1;
+		return 1;
+	}
+	(*ret_code) = 0;
+        return 0;
+}
+
 static u32 cpu_to_drc_index(int cpu)
 {
 	struct device_node *dn = NULL;
@@ -51,32 +71,16 @@ static u32 cpu_to_drc_index(int cpu)
 	thread_index = cpu_core_index_of_thread(cpu);
 
 	if (firmware_has_feature(FW_FEATURE_DRC_INFO)) {
-		struct property *info = NULL;
-		struct of_drc_info drc;
-		int j;
-		u32 num_set_entries;
-		const __be32 *value;
+		struct cpu_to_drc_index_struct cdata = {
+			thread_index, 0 };
 
-		info = of_find_property(dn, "ibm,drc-info", NULL);
-		if (info == NULL)
+		rc = drc_info_parser(dn, &cpu_to_drc_index_checkRun,
+				"CPU", &cdata);
+
+		if (rc < 0)
 			goto err_of_node_put;
 
-		value = of_prop_next_u32(info, NULL, &num_set_entries);
-		if (!value)
-			goto err_of_node_put;
-		value++;
-
-		for (j = 0; j < num_set_entries; j++) {
-
-			of_read_drc_info_cell(&info, &value, &drc);
-			if (strncmp(drc.drc_type, "CPU", 3))
-				goto err;
-
-			if (thread_index < drc.last_drc_index)
-				break;
-		}
-
-		ret = drc.drc_index_start + (thread_index * drc.sequential_inc);
+		ret = cdata.ret;
 	} else {
 		const __be32 *indexes;
 
@@ -102,11 +106,36 @@ err:
 	return ret;
 }
 
+struct drc_index_to_cpu_struct {
+	u32	drc_index;
+	u32	thread_index;
+	u32	cpu;
+};
+
+static int drc_index_to_cpu_checkRun(struct of_drc_info *drc,
+				void *idata, void *not_used, int *ret_code)
+{
+        struct drc_index_to_cpu_struct *cdata = idata;
+
+	if (cdata->drc_index > drc->last_drc_index) {
+		cdata->cpu += drc->num_sequential_elems;
+		(*ret_code) = 0;
+		return 0;
+	} else {
+		cdata->cpu += ((cdata->drc_index - drc->drc_index_start) /
+				drc->sequential_inc);
+
+		cdata->thread_index = cpu_first_thread_of_core(cdata->cpu);
+		(*ret_code) = 0;
+		return 0;
+	}
+}
+
 static int drc_index_to_cpu(u32 drc_index)
 {
 	struct device_node *dn = NULL;
 	const int *indexes;
-	int thread_index = 0, cpu = 0;
+	int thread_index = 0;
 	int rc = 1;
 
 	dn = of_find_node_by_path("/cpus");
@@ -114,38 +143,13 @@ static int drc_index_to_cpu(u32 drc_index)
 		goto err;
 
 	if (firmware_has_feature(FW_FEATURE_DRC_INFO)) {
-		struct property *info = NULL;
-		struct of_drc_info drc;
-		int j;
-		u32 num_set_entries;
-		const __be32 *value;
+		struct drc_index_to_cpu_struct cdata = {
+			drc_index, 0, 0 };
 
-		info = of_find_property(dn, "ibm,drc-info", NULL);
-		if (info == NULL)
-			goto err_of_node_put;
+		rc = drc_info_parser(dn, &drc_index_to_cpu_checkRun,
+					"CPU", &cdata);
+		thread_index = cdata.thread_index;
 
-		value = of_prop_next_u32(info, NULL, &num_set_entries);
-		if (!value)
-			goto err_of_node_put;
-		value++;
-
-		for (j = 0; j < num_set_entries; j++) {
-
-			of_read_drc_info_cell(&info, &value, &drc);
-			if (strncmp(drc.drc_type, "CPU", 3))
-				goto err;
-
-			if (drc_index > drc.last_drc_index) {
-				cpu += drc.num_sequential_elems;
-				continue;
-			}
-			cpu += ((drc_index - drc.drc_index_start) /
-				drc.sequential_inc);
-
-			thread_index = cpu_first_thread_of_core(cpu);
-			rc = 0;
-			break;
-		}
 	} else {
 		unsigned long int i;
 
