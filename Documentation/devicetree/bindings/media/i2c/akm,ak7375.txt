@@ -1,0 +1,8 @@
+Asahi Kasei Microdevices AK7375 voice coil lens driver
+
+AK7375 is a 12-bit DAC intended for controlling voice coil lenses.
+
+Mandatory properties:
+
+- compatible: "akm,ak7375"
+- reg: I2C slave address
