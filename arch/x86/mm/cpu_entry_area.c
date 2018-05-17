@@ -149,9 +149,9 @@ static void __init setup_cpu_entry_area(int cpu)
 
 	cea_set_pte(&get_cpu_entry_area(cpu)->entry_trampoline,
 		     __pa_symbol(_entry_trampoline), PAGE_KERNEL_RX);
-	kclist_add(&per_cpu(kcore_entry_trampoline, cpu),
-		   &get_cpu_entry_area(cpu)->entry_trampoline, PAGE_SIZE,
-		   KCORE_TEXT);
+	kclist_add_remap(&per_cpu(kcore_entry_trampoline, cpu),
+			 _entry_trampoline,
+			 &get_cpu_entry_area(cpu)->entry_trampoline, PAGE_SIZE);
 #endif
 	percpu_setup_debug_store(cpu);
 }
