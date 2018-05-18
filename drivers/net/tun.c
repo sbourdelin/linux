@@ -1734,8 +1734,10 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 	int skb_xdp = 1;
 	bool frags = tun_napi_frags_enabled(tun);
 
-	if (!(tun->dev->flags & IFF_UP))
+	if (!(tun->dev->flags & IFF_UP)) {
+		set_bit(SOCKWQ_ASYNC_NOSPACE, &tfile->socket.flags);
 		return -EIO;
+	}
 
 	if (!(tun->flags & IFF_NO_PI)) {
 		if (len < sizeof(pi))
