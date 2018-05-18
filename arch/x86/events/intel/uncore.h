@@ -39,6 +39,7 @@ struct intel_uncore_type {
 	const char *name;
 	int num_counters;
 	int num_boxes;
+	int num_pmus; /* for pci uncore device */
 	int perf_ctr_bits;
 	int fixed_ctr_bits;
 	unsigned perf_ctr;
