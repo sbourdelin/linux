@@ -517,7 +517,7 @@ static inline u64 armv8pmu_read_counter(struct perf_event *event)
 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int idx = hwc->idx;
-	u32 value = 0;
+	u64 value = 0;
 
 	if (!armv8pmu_counter_valid(cpu_pmu, idx))
 		pr_err("CPU%u reading wrong counter %d\n",
@@ -539,15 +539,9 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
 	if (!armv8pmu_counter_valid(cpu_pmu, idx))
 		pr_err("CPU%u writing wrong counter %d\n",
 			smp_processor_id(), idx);
-	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
-		/*
-		 * Set the upper 32bits as this is a 64bit counter but we only
-		 * count using the lower 32bits and we want an interrupt when
-		 * it overflows.
-		 */
-		value |= 0xffffffff00000000ULL;
+	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
 		write_sysreg(value, pmccntr_el0);
-	} else if (armv8pmu_select_counter(idx) == idx)
+	else if (armv8pmu_select_counter(idx) == idx)
 		write_sysreg(value, pmxevcntr_el0);
 }
 
@@ -850,6 +844,9 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
 	hw_event_id = armpmu_map_event(event, &armv8_pmuv3_perf_map,
 				       &armv8_pmuv3_perf_cache_map,
 				       ARMV8_PMU_EVTYPE_EVENT);
+
+	if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
+		event->hw.flags |= ARMPMU_EVT_LONG;
 
 	/* Onl expose micro/arch events supported by this PMU */
 	if ((hw_event_id > 0) && (hw_event_id < ARMV8_PMUV3_MAX_COMMON_EVENTS)
