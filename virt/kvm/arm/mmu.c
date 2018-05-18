@@ -217,7 +217,7 @@ static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
 
 			put_page(virt_to_page(pte));
 		}
-	} while (pte++, addr += PAGE_SIZE, addr != end);
+	} while (pte++, addr += PAGE_SIZE, addr < end);
 
 	if (stage2_pte_table_empty(start_pte))
 		clear_stage2_pmd_entry(kvm, pmd, start_addr);
