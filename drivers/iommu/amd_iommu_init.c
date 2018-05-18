@@ -721,6 +721,7 @@ static void iommu_enable_ppr_log(struct amd_iommu *iommu)
 	/* set head and tail to zero manually */
 	writel(0x00, iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
 	writel(0x00, iommu->mmio_base + MMIO_PPR_TAIL_OFFSET);
+	iommu->ppr_log_head = 0;
 
 	iommu_feature_enable(iommu, CONTROL_PPFLOG_EN);
 	iommu_feature_enable(iommu, CONTROL_PPR_EN);

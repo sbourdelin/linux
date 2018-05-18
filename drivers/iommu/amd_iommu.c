@@ -660,51 +660,56 @@ static void iommu_handle_ppr_entry(struct amd_iommu *iommu, u64 *raw)
 
 static void iommu_poll_ppr_log(struct amd_iommu *iommu)
 {
-	u32 head, tail;
+	u32 tail;
 
 	if (iommu->ppr_log == NULL)
 		return;
 
-	head = readl(iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
 	tail = readl(iommu->mmio_base + MMIO_PPR_TAIL_OFFSET);
 
-	while (head != tail) {
-		volatile u64 *raw;
-		u64 entry[2];
-		int i;
+	while (iommu->ppr_log_head != tail) {
+		uint count = PPR_LOG_ENTRIES / 8;
 
-		raw = (u64 *)(iommu->ppr_log + head);
+		while (iommu->ppr_log_head != tail && count--) {
+			volatile u64 *raw;
+			u64 entry[2];
+			int i;
 
-		/*
-		 * Hardware bug: Interrupt may arrive before the entry is
-		 * written to memory. If this happens we need to wait for the
-		 * entry to arrive.
-		 */
-		for (i = 0; i < LOOP_TIMEOUT; ++i) {
-			if (PPR_REQ_TYPE(raw[0]) != 0)
-				break;
-			udelay(1);
+			raw = (u64 *)(iommu->ppr_log + iommu->ppr_log_head);
+
+			/*
+			 * Hardware bug: Interrupt may arrive before the
+			 * entry is written to memory. If this happens we
+			 * need to wait for the entry to arrive.
+			 */
+			for (i = 0; i < LOOP_TIMEOUT; ++i) {
+				if (PPR_REQ_TYPE(raw[0]) != 0)
+					break;
+				udelay(1);
+			}
+
+			/* Avoid memcpy function-call overhead */
+			entry[0] = raw[0];
+			entry[1] = raw[1];
+
+			/*
+			 * To detect the hardware bug we need to clear the
+			 * entry back to zero.
+			 */
+			raw[0] = raw[1] = 0UL;
+
+			/* Handle PPR entry */
+			iommu_handle_ppr_entry(iommu, entry);
+
+			iommu->ppr_log_head += PPR_ENTRY_SIZE;
+			iommu->ppr_log_head %= PPR_LOG_SIZE;
 		}
 
-		/* Avoid memcpy function-call overhead */
-		entry[0] = raw[0];
-		entry[1] = raw[1];
-
-		/*
-		 * To detect the hardware bug we need to clear the entry
-		 * back to zero.
-		 */
-		raw[0] = raw[1] = 0UL;
-
 		/* Update head pointer of hardware ring-buffer */
-		head = (head + PPR_ENTRY_SIZE) % PPR_LOG_SIZE;
-		writel(head, iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
+		writel(iommu->ppr_log_head,
+		       iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
 
-		/* Handle PPR entry */
-		iommu_handle_ppr_entry(iommu, entry);
-
-		/* Refresh ring-buffer information */
-		head = readl(iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
+		/* Get the current value of tail */
 		tail = readl(iommu->mmio_base + MMIO_PPR_TAIL_OFFSET);
 	}
 }

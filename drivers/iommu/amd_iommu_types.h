@@ -548,6 +548,7 @@ struct amd_iommu {
 
 	/* Base of the PPR log, if present */
 	u8 *ppr_log;
+	u32 ppr_log_head;
 
 	/* Base of the GA log, if present */
 	u8 *ga_log;
