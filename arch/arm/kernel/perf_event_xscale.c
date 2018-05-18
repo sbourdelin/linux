@@ -317,7 +317,7 @@ static void xscale1pmu_stop(struct arm_pmu *cpu_pmu)
 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
 }
 
-static inline u32 xscale1pmu_read_counter(struct perf_event *event)
+static inline u64 xscale1pmu_read_counter(struct perf_event *event)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	int counter = hwc->idx;
@@ -338,7 +338,7 @@ static inline u32 xscale1pmu_read_counter(struct perf_event *event)
 	return val;
 }
 
-static inline void xscale1pmu_write_counter(struct perf_event *event, u32 val)
+static inline void xscale1pmu_write_counter(struct perf_event *event, u64 val)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	int counter = hwc->idx;
