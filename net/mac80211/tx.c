@@ -1559,6 +1559,9 @@ static bool ieee80211_queue_skb(struct ieee80211_local *local,
 	    sdata->vif.type == NL80211_IFTYPE_MONITOR)
 		return false;
 
+	if (local->txqs_stopped)
+		return false;
+
 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
 		sdata = container_of(sdata->bss,
 				     struct ieee80211_sub_if_data, u.ap);

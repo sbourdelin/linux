@@ -213,9 +213,13 @@ static void
 ieee80211_agg_start_txq(struct sta_info *sta, int tid, bool enable)
 {
 	struct ieee80211_txq *txq = sta->sta.txq[tid];
+	struct ieee80211_local *local = sta->local;
 	struct txq_info *txqi;
 
 	if (!txq)
+		return;
+
+	if (local->txqs_stopped)
 		return;
 
 	txqi = to_txq_info(txq);

@@ -1137,6 +1137,11 @@ struct ieee80211_local {
 	/* also used to protect ampdu_ac_queue and amdpu_ac_stop_refcnt */
 	spinlock_t queue_stop_reason_lock;
 
+	/* pause/resume logic for intermediate software queues,
+	 * applicable when wake_tx_queue is defined.
+	 */
+	unsigned long txqs_stopped;
+
 	int open_count;
 	int monitors, cooked_mntrs;
 	/* number of interfaces with corresponding FIF_ flags */

@@ -298,6 +298,9 @@ static void __ieee80211_wake_queue(struct ieee80211_hw *hw, int queue,
 	if (local->q_stop_reasons[queue][reason] == 0)
 		__clear_bit(reason, &local->queue_stop_reasons[queue]);
 
+	if (local->ops->wake_tx_queue)
+		__clear_bit(reason, &local->txqs_stopped);
+
 	if (local->queue_stop_reasons[queue] != 0)
 		/* someone still has this queue stopped */
 		return;
@@ -351,8 +354,10 @@ static void __ieee80211_stop_queue(struct ieee80211_hw *hw, int queue,
 	if (__test_and_set_bit(reason, &local->queue_stop_reasons[queue]))
 		return;
 
-	if (local->ops->wake_tx_queue)
+	if (local->ops->wake_tx_queue) {
+		__set_bit(reason, &local->txqs_stopped);
 		return;
+	}
 
 	if (local->hw.queues < IEEE80211_NUM_ACS)
 		n_acs = 1;
