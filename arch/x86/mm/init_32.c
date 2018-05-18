@@ -430,7 +430,7 @@ static void __init permanent_kmaps_init(pgd_t *pgd_base)
 	pkmap_page_table = pte;
 }
 
-void __init add_highpages_with_active_regions(int nid,
+void __init add_highpages_with_active_regions(int nid, struct zone *zone,
 			 unsigned long start_pfn, unsigned long end_pfn)
 {
 	phys_addr_t start, end;
@@ -441,9 +441,26 @@ void __init add_highpages_with_active_regions(int nid,
 					    start_pfn, end_pfn);
 		unsigned long e_pfn = clamp_t(unsigned long, PFN_DOWN(end),
 					      start_pfn, end_pfn);
-		for ( ; pfn < e_pfn; pfn++)
-			if (pfn_valid(pfn))
-				free_highmem_page(pfn_to_page(pfn));
+		for ( ; pfn < e_pfn; pfn++) {
+			struct page *page;
+
+			if (!pfn_valid(pfn))
+				continue;
+
+			page = pfn_to_page(pfn);
+
+			/*
+			 * If CONFIG_CMA is enabled, it extends the span of
+			 * the MOVABLE_ZONE to manage the CMA memory
+			 * in the future. And, in this case, the span of the
+			 * MOVABLE_ZONE could overlap the other zone's memory.
+			 * We need to avoid freeing this memory here.
+			 */
+			if (IS_ENABLED(CONFIG_CMA) && page_zone(page) != zone)
+				continue;
+
+			free_highmem_page(pfn_to_page(pfn));
+		}
 	}
 }
 #else
