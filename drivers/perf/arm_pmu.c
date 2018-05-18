@@ -33,6 +33,21 @@ static inline u64 arm_pmu_max_period(struct arm_pmu *pmu)
 	return (((u64)1) << (pmu->counter_width)) - 1;
 }
 
+static inline u64 arm_pmu_get_event_max_period(struct arm_pmu *pmu,
+					       struct perf_event *event)
+{
+	u64 period = arm_pmu_max_period(pmu);
+
+	/*
+	 * To prevent shift-counter-overflow warning, create the
+	 * mask, by shift + OR sequence.
+	 */
+	if (event->hw.flags & ARMPMU_EVT_LONG)
+		period = (period << pmu->counter_width) | period;
+
+	return period;
+}
+
 static int
 armpmu_map_cache_event(const unsigned (*cache_map)
 				      [PERF_COUNT_HW_CACHE_MAX]
@@ -122,7 +137,7 @@ int armpmu_event_set_period(struct perf_event *event)
 	u64 max_period;
 	int ret = 0;
 
-	max_period = arm_pmu_max_period(armpmu);
+	max_period = arm_pmu_get_event_max_period(armpmu, event);
 	if (unlikely(left <= -period)) {
 		left = period;
 		local64_set(&hwc->period_left, left);
@@ -148,7 +163,7 @@ int armpmu_event_set_period(struct perf_event *event)
 
 	local64_set(&hwc->prev_count, (u64)-left);
 
-	armpmu->write_counter(event, (u64)(-left) & 0xffffffff);
+	armpmu->write_counter(event, (u64)(-left) & max_period);
 
 	perf_event_update_userpage(event);
 
@@ -160,7 +175,7 @@ u64 armpmu_event_update(struct perf_event *event)
 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	u64 delta, prev_raw_count, new_raw_count;
-	u64 max_period = arm_pmu_max_period(armpmu);
+	u64 max_period = arm_pmu_get_event_max_period(armpmu, event);
 
 again:
 	prev_raw_count = local64_read(&hwc->prev_count);
@@ -368,6 +383,7 @@ __hw_perf_event_init(struct perf_event *event)
 	struct hw_perf_event *hwc = &event->hw;
 	int mapping;
 
+	hwc->flags = 0;
 	mapping = armpmu->map_event(event);
 
 	if (mapping < 0) {
@@ -670,6 +686,9 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
 			continue;
 
 		event = hw_events->events[idx];
+		/* Chained events could use multiple counters */
+		if (!event)
+			continue;
 
 		switch (cmd) {
 		case CPU_PM_ENTER:
