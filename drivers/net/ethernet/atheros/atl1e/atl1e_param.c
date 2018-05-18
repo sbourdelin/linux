@@ -192,7 +192,7 @@ void atl1e_check_options(struct atl1e_adapter *adapter)
 	{ 		/* Transmit Ring Size */
 		struct atl1e_option opt = {
 			.type = range_option,
-			.name = "Transmit Ddescription Count",
+			.name = "Transmit Description Count",
 			.err  = "using default of "
 				__MODULE_STRING(ATL1E_DEFAULT_TX_DESC_CNT),
 			.def  = ATL1E_DEFAULT_TX_DESC_CNT,
