@@ -238,6 +238,76 @@ enum spi_nor_option_flags {
 };
 
 /**
+ * struct spi_nor_erase_command - Structure to describe a SPI NOR erase command
+ * @size:		the size of the sector/block erased by the command.
+ *			JEDEC JESD216B imposes erase sizes to be a power of 2.
+ * @size_shift:		@size is a power of 2, the shift is stored in
+ *			@size_shift.
+ * @size_mask:		the size mask based on @size_shift.
+ * @opcode:		the SPI command op code to erase the sector/block.
+ */
+struct spi_nor_erase_command {
+	u32	size;
+	u32	size_shift;
+	u32	size_mask;
+	u8	opcode;
+};
+
+/**
+ * struct spi_nor_erase_region - Structure to describe a SPI NOR erase region
+ * @offset:		the offset in the data array of erase region start.
+ *			LSB bits are used as a bitmask encoding flags to
+ *			determine if this region is overlaid, if this region is
+ *			the last in the SPI NOR flash memory and to indicate
+ *			all the supported erase commands inside this region.
+ *			The erase types are ordered by size with the biggest
+ *			erase type at BIT(0).
+ * @size:		the size of the region in bytes.
+ */
+struct spi_nor_erase_region {
+	u64		offset;
+	u64		size;
+};
+
+#define SNOR_CMD_ERASE_MAX	4
+#define SNOR_CMD_ERASE_MASK	GENMASK_ULL(SNOR_CMD_ERASE_MAX - 1, 0)
+
+#define SNOR_LAST_REGION	BIT(4)
+#define SNOR_OVERLAID_REGION	BIT(5)
+
+#define SNOR_ERASE_FLAGS_MAX	6
+#define SNOR_ERASE_FLAGS_MASK	GENMASK_ULL(SNOR_ERASE_FLAGS_MAX - 1, 0)
+
+#define SNOR_ERASE_FLAGS_OFFSET(_cmd_mask, _last_region, _overlaid_region, \
+				_offset)				\
+	((((u64)(_offset)) & ~SNOR_ERASE_FLAGS_MASK)	|		\
+	 (((u64)(_cmd_mask)) & SNOR_CMD_ERASE_MASK)	|		\
+	 (((u64)(_last_region)) & SNOR_LAST_REGION)	|		\
+	 (((u64)(_overlaid_region)) & SNOR_OVERLAID_REGION))
+
+/**
+ * struct spi_nor_erase_map - Structure to describe the SPI NOR erase map
+ * @regions:		point to an array describing the boundaries of the erase
+ *			regions.
+ * @uniform_region:	a pre-allocated erase region for SPI NOR with a uniform
+ *			sector size (legacy implementation).
+ * @commands:		an array of erase commands shared by all the regions.
+ *			The erase commands are oredered by size, with the
+ *			biggest erase type command starting at index 0.
+ * @uniform_erase_type:	bitmask encoding erase commands that can erase the
+ *			entire memory. This member is also completed by
+ *			non-uniform erase type SPI NOR flash memories if they
+ *			support at least one erase type command that can erase
+ *			the entire memory.
+ */
+struct spi_nor_erase_map {
+	struct spi_nor_erase_region	*regions;
+	struct spi_nor_erase_region	uniform_region;
+	struct spi_nor_erase_command	commands[SNOR_CMD_ERASE_MAX];
+	u8				uniform_erase_type;
+};
+
+/**
  * struct flash_info - Forward declaration of a structure used internally by
  *		       spi_nor_scan()
  */
@@ -261,6 +331,7 @@ struct flash_info;
  * @write_proto:	the SPI protocol for write operations
  * @reg_proto		the SPI protocol for read_reg/write_reg/erase operations
  * @cmd_buf:		used by the write_reg
+ * @erase_map:		the erase map of the SPI NOR
  * @prepare:		[OPTIONAL] do some preparations for the
  *			read/write/erase/lock/unlock operations
  * @unprepare:		[OPTIONAL] do some post work after the
@@ -296,6 +367,7 @@ struct spi_nor {
 	bool			sst_write_second;
 	u32			flags;
 	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+	struct spi_nor_erase_map	erase_map;
 
 	int (*prepare)(struct spi_nor *nor, enum spi_nor_ops ops);
 	void (*unprepare)(struct spi_nor *nor, enum spi_nor_ops ops);
@@ -315,6 +387,23 @@ struct spi_nor {
 
 	void *priv;
 };
+
+#define spi_nor_region_is_last(region)  (region->offset & SNOR_LAST_REGION)
+
+static inline u64 spi_nor_region_end(const struct spi_nor_erase_region *region)
+{
+	return (region->offset & ~SNOR_ERASE_FLAGS_MASK) + region->size;
+}
+
+static inline void spi_nor_region_mark_end(struct spi_nor_erase_region *region)
+{
+	region->offset |= SNOR_LAST_REGION;
+}
+
+static inline bool spi_nor_has_uniform_erase(const struct spi_nor *nor)
+{
+	return (nor->erase_map.regions == &nor->erase_map.uniform_region);
+}
 
 static inline void spi_nor_set_flash_node(struct spi_nor *nor,
 					  struct device_node *np)
