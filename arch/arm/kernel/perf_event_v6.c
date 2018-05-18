@@ -497,7 +497,7 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
 	cpu_pmu->stop		= armv6pmu_stop;
 	cpu_pmu->map_event	= armv6_map_event;
 	cpu_pmu->num_events	= 3;
-	cpu_pmu->max_period	= (1LLU << 32) - 1;
+	cpu_pmu->counter_width	= 32;
 }
 
 static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
@@ -548,7 +548,7 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
 	cpu_pmu->stop		= armv6pmu_stop;
 	cpu_pmu->map_event	= armv6mpcore_map_event;
 	cpu_pmu->num_events	= 3;
-	cpu_pmu->max_period	= (1LLU << 32) - 1;
+	cpu_pmu->counter_width  = 32;
 
 	return 0;
 }
