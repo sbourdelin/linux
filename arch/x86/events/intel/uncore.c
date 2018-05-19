@@ -818,7 +818,8 @@ static int __init uncore_type_init(struct intel_uncore_type *type, bool setid)
 
 	for (i = 0; i < type->num_boxes; i++) {
 		pmus[i].func_id	= setid ? i : -1;
-		pmus[i].pmu_idx	= i;
+		/* The pmu idx will be decided at probe for pci device. */
+		pmus[i].pmu_idx = setid ? i : -1;
 		pmus[i].type	= type;
 		pmus[i].boxes	= kzalloc(size, GFP_KERNEL);
 		if (!pmus[i].boxes)
@@ -948,6 +949,12 @@ static int uncore_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id
 	pmu->boxes[pkg] = box;
 	if (atomic_inc_return(&pmu->activeboxes) > 1)
 		return 0;
+
+	/*  Count the real number of pmus for pci uncore device */
+	if (pmu->pmu_idx < 0)
+		pmu->pmu_idx = type->num_pmus++;
+	else
+		WARN_ON_ONCE(1);
 
 	/* First active box registers the pmu */
 	ret = uncore_pmu_register(pmu);
