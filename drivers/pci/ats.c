@@ -268,7 +268,9 @@ EXPORT_SYMBOL_GPL(pci_reset_pri);
 int pci_enable_pasid(struct pci_dev *pdev, int features)
 {
 	u16 control, supported;
+	struct pci_dev *bridge;
 	int pos;
+	u32 cap;
 
 	if (WARN_ON(pdev->pasid_enabled))
 		return -EBUSY;
@@ -276,6 +278,20 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PASID);
 	if (!pos)
 		return -EINVAL;
+
+	bridge = pci_upstream_bridge(pdev);
+	while (bridge) {
+		if (!pci_find_capability(bridge, PCI_CAP_ID_EXP))
+			return -EINVAL;
+
+		if (pcie_capability_read_dword(bridge, PCI_EXP_DEVCAP2, &cap))
+			return -EINVAL;
+
+		if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
+			return -EINVAL;
+
+		bridge = pci_upstream_bridge(bridge);
+	}
 
 	pci_read_config_word(pdev, pos + PCI_PASID_CAP, &supported);
 	supported &= PCI_PASID_CAP_EXEC | PCI_PASID_CAP_PRIV;
