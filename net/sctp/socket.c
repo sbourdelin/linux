@@ -4170,6 +4170,28 @@ out:
 	return retval;
 }
 
+static int sctp_setsockopt_reuse_port(struct sock *sk, char __user *optval,
+				      unsigned int optlen)
+{
+	int val;
+
+	if (!sctp_style(sk, TCP))
+		return -EOPNOTSUPP;
+
+	if (sctp_sk(sk)->ep->base.bind_addr.port)
+		return -EFAULT;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+
+	if (get_user(val, (int __user *)optval))
+		return -EFAULT;
+
+	sk->sk_reuse = val ? SK_CAN_REUSE : SK_NO_REUSE;
+
+	return 0;
+}
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -4363,6 +4385,9 @@ static int sctp_setsockopt(struct sock *sk, int level, int optname,
 	case SCTP_INTERLEAVING_SUPPORTED:
 		retval = sctp_setsockopt_interleaving_supported(sk, optval,
 								optlen);
+		break;
+	case SCTP_REUSE_PORT:
+		retval = sctp_setsockopt_reuse_port(sk, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;
@@ -7175,6 +7200,26 @@ out:
 	return retval;
 }
 
+static int sctp_getsockopt_reuse_port(struct sock *sk, int len,
+				      char __user *optval,
+				      int __user *optlen)
+{
+	int val = 0;
+
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	len = sizeof(int);
+	if (sk->sk_reuse != SK_NO_REUSE)
+		val = 1;
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int sctp_getsockopt(struct sock *sk, int level, int optname,
 			   char __user *optval, int __user *optlen)
 {
@@ -7369,6 +7414,9 @@ static int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_INTERLEAVING_SUPPORTED:
 		retval = sctp_getsockopt_interleaving_supported(sk, len, optval,
 								optlen);
+		break;
+	case SCTP_REUSE_PORT:
+		retval = sctp_getsockopt_reuse_port(sk, len, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;
