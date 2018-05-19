@@ -608,6 +608,16 @@ static int sun4i_tcon_init_clocks(struct device *dev,
 		dev_err(dev, "Couldn't get the TCON bus clock\n");
 		return PTR_ERR(tcon->clk);
 	}
+
+	if (tcon->quirks->needs_tcon_top && tcon->quirks->has_channel_1) {
+		tcon->top_clk = devm_clk_get(dev, "tcon-top");
+		if (IS_ERR(tcon->top_clk)) {
+			dev_err(dev, "Couldn't get the TCON TOP bus clock\n");
+			return PTR_ERR(tcon->top_clk);
+		}
+		clk_prepare_enable(tcon->top_clk);
+	}
+
 	clk_prepare_enable(tcon->clk);
 
 	if (tcon->quirks->has_channel_0) {
@@ -632,6 +642,7 @@ static int sun4i_tcon_init_clocks(struct device *dev,
 static void sun4i_tcon_free_clocks(struct sun4i_tcon *tcon)
 {
 	clk_disable_unprepare(tcon->clk);
+	clk_disable_unprepare(tcon->top_clk);
 }
 
 static int sun4i_tcon_init_irq(struct device *dev,
@@ -899,6 +910,23 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
 	tcon->dev = dev;
 	tcon->id = engine->id;
 	tcon->quirks = of_device_get_match_data(dev);
+
+	if (tcon->quirks->needs_tcon_top) {
+		struct device_node *np;
+
+		np = of_parse_phandle(dev->of_node, "allwinner,tcon-top", 0);
+		if (np) {
+			struct platform_device *pdev;
+
+			pdev = of_find_device_by_node(np);
+			if (pdev)
+				tcon->tcon_top = platform_get_drvdata(pdev);
+			of_node_put(np);
+
+			if (!tcon->tcon_top)
+				return -EPROBE_DEFER;
+		}
+	}
 
 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
 	if (IS_ERR(tcon->lcd_rst)) {

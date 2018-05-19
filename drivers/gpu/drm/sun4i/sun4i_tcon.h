@@ -20,6 +20,8 @@
 #include <linux/list.h>
 #include <linux/reset.h>
 
+#include "sun8i_tcon_top.h"
+
 #define SUN4I_TCON_GCTL_REG			0x0
 #define SUN4I_TCON_GCTL_TCON_ENABLE			BIT(31)
 #define SUN4I_TCON_GCTL_IOMAP_MASK			BIT(0)
@@ -178,6 +180,7 @@ struct sun4i_tcon_quirks {
 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
 	bool    needs_edp_reset; /* a80 edp reset needed for tcon0 access */
 	bool	supports_lvds;   /* Does the TCON support an LVDS output? */
+	bool	needs_tcon_top;  /* TCON TOP holds additional muxing configuration */
 
 	/* callback to handle tcon muxing options */
 	int	(*set_mux)(struct sun4i_tcon *, const struct drm_encoder *);
@@ -203,6 +206,9 @@ struct sun4i_tcon {
 	u8				dclk_max_div;
 	u8				dclk_min_div;
 
+	/* TCON TOP clock */
+	struct clk			*top_clk;
+
 	/* Reset control */
 	struct reset_control		*lcd_rst;
 	struct reset_control		*lvds_rst;
@@ -216,6 +222,8 @@ struct sun4i_tcon {
 	struct sun4i_crtc		*crtc;
 
 	int				id;
+
+	struct sun8i_tcon_top		*tcon_top;
 
 	/* TCON list management */
 	struct list_head		list;
