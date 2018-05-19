@@ -1194,6 +1194,31 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
 	return 0;
 }
 
+static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
+				     const struct drm_encoder *encoder,
+				     int index)
+{
+	if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS)
+		sun8i_tcon_top_set_hdmi_src(tcon->tcon_top, index);
+
+	sun8i_tcon_top_de_config(tcon->tcon_top, tcon->id,
+				 tcon_type_tv, index);
+
+	return 0;
+}
+
+static int sun8i_r40_tcon_tv_set_mux_0(struct sun4i_tcon *tcon,
+				       const struct drm_encoder *encoder)
+{
+	return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 0);
+}
+
+static int sun8i_r40_tcon_tv_set_mux_1(struct sun4i_tcon *tcon,
+				       const struct drm_encoder *encoder)
+{
+	return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 1);
+}
+
 static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
 	.has_channel_0		= true,
 	.has_channel_1		= true,
@@ -1241,6 +1266,18 @@ static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
 	.has_channel_1		= true,
 };
 
+static const struct sun4i_tcon_quirks sun8i_r40_tv_0_quirks = {
+	.has_channel_1		= true,
+	.needs_tcon_top		= true,
+	.set_mux		= sun8i_r40_tcon_tv_set_mux_0,
+};
+
+static const struct sun4i_tcon_quirks sun8i_r40_tv_1_quirks = {
+	.has_channel_1		= true,
+	.needs_tcon_top		= true,
+	.set_mux		= sun8i_r40_tcon_tv_set_mux_1,
+};
+
 static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
 	.has_channel_0		= true,
 };
@@ -1265,6 +1302,8 @@ const struct of_device_id sun4i_tcon_of_table[] = {
 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
+	{ .compatible = "allwinner,sun8i-r40-tcon-tv-0", .data = &sun8i_r40_tv_0_quirks },
+	{ .compatible = "allwinner,sun8i-r40-tcon-tv-1", .data = &sun8i_r40_tv_1_quirks },
 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
