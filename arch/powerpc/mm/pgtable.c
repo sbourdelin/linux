@@ -217,14 +217,37 @@ void set_pte_at(struct mm_struct *mm, unsigned long addr, pte_t *ptep,
 int ptep_set_access_flags(struct vm_area_struct *vma, unsigned long address,
 			  pte_t *ptep, pte_t entry, int dirty)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int changed;
+
 	entry = set_access_flags_filter(entry, vma, dirty);
 	changed = !pte_same(*(ptep), entry);
 	if (changed) {
 		if (!is_vm_hugetlb_page(vma))
-			assert_pte_locked(vma->vm_mm, address);
-		__ptep_set_access_flags(vma->vm_mm, ptep, entry, address);
-		flush_tlb_page(vma, address);
+			assert_pte_locked(mm, address);
+		__ptep_set_access_flags(mm, ptep, entry, address);
+		if (IS_ENABLED(CONFIG_PPC_BOOK3S_64)) {
+			/*
+			 * Book3S does not require a TLB flush when relaxing
+			 * access restrictions because the core MMU will reload
+			 * the pte after taking an access fault. However the
+			 * NMMU on POWER9 does not re-load the pte, so flush
+			 * if we have a coprocessor attached to this address
+			 * space.
+			 *
+			 * This could be further refined and pushed out to
+			 * NMMU drivers so TLBIEs are only done for NMMU
+			 * faults, but this is a more minimal fix. The NMMU
+			 * fault handler does a get_user_pages_remote or
+			 * similar to bring the page tables in, and this
+			 * flush_tlb_page will do a global TLBIE because the
+			 * coprocessor is attached to the address space.
+			 */
+			if (atomic_read(&mm->context.copros) > 0)
+				flush_tlb_page(vma, address);
+		} else {
+			flush_tlb_page(vma, address);
+		}
 	}
 	return changed;
 }

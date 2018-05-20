@@ -31,16 +31,20 @@ int (*register_process_table)(unsigned long base, unsigned long page_size,
 int pmdp_set_access_flags(struct vm_area_struct *vma, unsigned long address,
 			  pmd_t *pmdp, pmd_t entry, int dirty)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int changed;
 #ifdef CONFIG_DEBUG_VM
 	WARN_ON(!pmd_trans_huge(*pmdp) && !pmd_devmap(*pmdp));
-	assert_spin_locked(&vma->vm_mm->page_table_lock);
+	assert_spin_locked(&mm->page_table_lock);
 #endif
 	changed = !pmd_same(*(pmdp), entry);
 	if (changed) {
-		__ptep_set_access_flags(vma->vm_mm, pmdp_ptep(pmdp),
+		__ptep_set_access_flags(mm, pmdp_ptep(pmdp),
 					pmd_pte(entry), address);
-		flush_pmd_tlb_range(vma, address, address + HPAGE_PMD_SIZE);
+		/* See ptep_set_access_flags comments */
+		if (atomic_read(&mm->context.copros) > 0)
+			flush_pmd_tlb_range(vma, address,
+					address + HPAGE_PMD_SIZE);
 	}
 	return changed;
 }
