@@ -223,8 +223,10 @@ static int bpf_parse_prog(struct nlattr *attr, struct bpf_lwt_prog *prog,
 
 	fd = nla_get_u32(tb[LWT_BPF_PROG_FD]);
 	p = bpf_prog_get_type(fd, type);
-	if (IS_ERR(p))
+	if (IS_ERR(p)) {
+		kfree(prog->name);
 		return PTR_ERR(p);
+	}
 
 	prog->prog = p;
 
