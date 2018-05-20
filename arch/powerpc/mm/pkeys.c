@@ -15,8 +15,9 @@ bool pkey_execute_disable_supported;
 int  pkeys_total;		/* Total pkeys as per device tree */
 bool pkeys_devtree_defined;	/* pkey property exported by device tree */
 u32  initial_allocation_mask;	/* Bits set for reserved keys */
-u64  pkey_amr_uamor_mask;	/* Bits in AMR/UMOR not to be touched */
+u64  pkey_amr_mask;		/* Bits in AMR not to be touched */
 u64  pkey_iamr_mask;		/* Bits in AMR not to be touched */
+u64  pkey_uamor_mask;		/* Bits in UMOR not to be touched */
 
 #define AMR_BITS_PER_PKEY 2
 #define AMR_RD_BIT 0x1UL
@@ -24,6 +25,7 @@ u64  pkey_iamr_mask;		/* Bits in AMR not to be touched */
 #define IAMR_EX_BIT 0x1UL
 #define PKEY_REG_BITS (sizeof(u64)*8)
 #define pkeyshift(pkey) (PKEY_REG_BITS - ((pkey+1) * AMR_BITS_PER_PKEY))
+#define switch_off(bitmask, i) (bitmask &= ~(0x3ul << pkeyshift(i)))
 
 static void scan_pkey_feature(void)
 {
@@ -120,19 +122,31 @@ int pkey_initialize(void)
 	os_reserved = 0;
 #endif
 	initial_allocation_mask = ~0x0;
-	pkey_amr_uamor_mask = ~0x0ul;
+
+	/* register mask is in BE format */
+	pkey_amr_mask = ~0x0ul;
 	pkey_iamr_mask = ~0x0ul;
-	/*
-	 * key 0, 1 are reserved.
-	 * key 0 is the default key, which allows read/write/execute.
-	 * key 1 is recommended not to be used. PowerISA(3.0) page 1015,
-	 * programming note.
-	 */
-	for (i = 2; i < (pkeys_total - os_reserved); i++) {
-		initial_allocation_mask &= ~(0x1 << i);
-		pkey_amr_uamor_mask &= ~(0x3ul << pkeyshift(i));
+
+	for (i = 0; i < (pkeys_total - os_reserved); i++) {
+		if (i != 0 &&  i != 1) /* 0 and 1 are already allocated */
+			initial_allocation_mask &= ~(0x1 << i);
+		pkey_amr_mask &= ~(0x3ul << pkeyshift(i));
 		pkey_iamr_mask &= ~(0x1ul << pkeyshift(i));
 	}
+
+	pkey_uamor_mask = ~0x0ul;
+	switch_off(pkey_uamor_mask, 0);
+	/*
+	 * key 1 is recommended not to be used.
+	 * PowerISA(3.0) page 1015,
+	 * @TODO: Revisit this. This is only applicable on
+	 * pseries kernel running on powerVM.
+	 */
+	switch_off(pkey_uamor_mask, 1);
+	for (i = (pkeys_total - os_reserved); i < pkeys_total; i++)
+		switch_off(pkey_uamor_mask, i);
+
+	printk("pkey_uamor_mask=0x%llx \n", pkey_uamor_mask);
 	return 0;
 }
 
@@ -280,7 +294,6 @@ void thread_pkey_regs_save(struct thread_struct *thread)
 	 */
 	thread->amr = read_amr();
 	thread->iamr = read_iamr();
-	thread->uamor = read_uamor();
 }
 
 void thread_pkey_regs_restore(struct thread_struct *new_thread,
@@ -289,9 +302,6 @@ void thread_pkey_regs_restore(struct thread_struct *new_thread,
 	if (static_branch_likely(&pkey_disabled))
 		return;
 
-	/*
-	 * TODO: Just set UAMOR to zero if @new_thread hasn't used any keys yet.
-	 */
 	if (old_thread->amr != new_thread->amr)
 		write_amr(new_thread->amr);
 	if (old_thread->iamr != new_thread->iamr)
@@ -305,9 +315,9 @@ void thread_pkey_regs_init(struct thread_struct *thread)
 	if (static_branch_likely(&pkey_disabled))
 		return;
 
-	thread->amr = read_amr() & pkey_amr_uamor_mask;
+	thread->amr = read_amr() & pkey_amr_mask;
 	thread->iamr = read_iamr() & pkey_iamr_mask;
-	thread->uamor = read_uamor() & pkey_amr_uamor_mask;
+	thread->uamor = pkey_uamor_mask;
 }
 
 static inline bool pkey_allows_readwrite(int pkey)
