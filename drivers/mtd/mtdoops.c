@@ -54,6 +54,11 @@ module_param(dump_oops, int, 0600);
 MODULE_PARM_DESC(dump_oops,
 		"set to 1 to dump oopses, 0 to only dump panics (default 1)");
 
+static bool dump_boottime = false;
+module_param(dump_boottime, bool, 0400);
+MODULE_PARM_DESC(dump_boottime,
+		"set to 1 to dump boottime, 0 to disable (default 0)");
+
 static struct mtdoops_context {
 	struct kmsg_dumper dump;
 
@@ -68,6 +73,10 @@ static struct mtdoops_context {
 
 	void *oops_buf;
 } oops_cxt;
+
+/* fake kernel message syslog level and monotonic timestamp */
+#define boottime_prefix "<0>[   0.000000] Boot time "
+static char boottime[100] = {0};
 
 static void mark_page_used(struct mtdoops_context *cxt, int page)
 {
@@ -285,13 +294,17 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 {
 	struct mtdoops_context *cxt = container_of(dumper,
 			struct mtdoops_context, dump);
+	u8 boot_len = strlen(boottime); /* 0 if dump_boottime is not set */
 
 	/* Only dump oopses if dump_oops is set */
 	if (reason == KMSG_DUMP_OOPS && !dump_oops)
 		return;
 
-	kmsg_dump_get_buffer(dumper, true, cxt->oops_buf + MTDOOPS_HEADER_SIZE,
-			     record_size - MTDOOPS_HEADER_SIZE, NULL);
+	strncpy(cxt->oops_buf + MTDOOPS_HEADER_SIZE, boottime, boot_len);
+
+	kmsg_dump_get_buffer(dumper, true, cxt->oops_buf + MTDOOPS_HEADER_SIZE +
+			     boot_len, record_size - (MTDOOPS_HEADER_SIZE +
+			     boot_len), NULL);
 
 	/* Panics must be written immediately */
 	if (reason != KMSG_DUMP_OOPS)
@@ -350,7 +363,13 @@ static void mtdoops_notify_add(struct mtd_info *mtd)
 	cxt->mtd = mtd;
 	cxt->oops_pages = (int)mtd->size / record_size;
 	find_next_position(cxt);
-	printk(KERN_INFO "mtdoops: Attached to MTD device %d\n", mtd->index);
+	if (dump_boottime) {
+	    printk(KERN_INFO "mtdoops: Attached to MTD device %d "
+		   "dumping boottime\n", mtd->index);
+	} else {
+	    printk(KERN_INFO "mtdoops: Attached to MTD device %d "
+		   "not dumping boottime\n", mtd->index);
+	}
 }
 
 static void mtdoops_notify_remove(struct mtd_info *mtd)
@@ -379,6 +398,19 @@ static int __init mtdoops_init(void)
 	struct mtdoops_context *cxt = &oops_cxt;
 	int mtd_index;
 	char *endp;
+	struct timespec64 bt;
+	struct tm tm_val;
+
+	if (dump_boottime) {
+	    /* Precompute boot time ahead of an oops */
+	    getboottime64(&bt);
+	    time_to_tm(bt.tv_sec, 0, &tm_val);
+
+	    snprintf(boottime, sizeof(boottime),
+		     boottime_prefix "%02d/%02d/%4d %02d:%02d:%02d\n",
+		     tm_val.tm_mon + 1, tm_val.tm_mday, tm_val.tm_year + 1900,
+		     tm_val.tm_hour, tm_val.tm_min, tm_val.tm_sec);
+	}
 
 	if (strlen(mtddev) == 0) {
 		printk(KERN_ERR "mtdoops: mtd device (mtddev=name/number) must be supplied\n");
