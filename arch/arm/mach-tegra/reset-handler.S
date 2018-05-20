@@ -121,6 +121,12 @@ ENTRY(__tegra_cpu_reset_handler)
 	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
 
 	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
+
+	adr	r12, __tegra_cpu_reset_handler_data
+	ldr	r0, [r12, #RESET_DATA(TF_PRESENT)]
+	cmp	r0, #0
+	bne	after_errata
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 t20_check:
 	cmp	r6, #TEGRA20
@@ -155,7 +161,6 @@ after_errata:
 	and	r10, r10, #0x3			@ R10 = CPU number
 	mov	r11, #1
 	mov	r11, r11, lsl r10  		@ R11 = CPU mask
-	adr	r12, __tegra_cpu_reset_handler_data
 
 #ifdef CONFIG_SMP
 	/* Does the OS know about this CPU? */
@@ -169,10 +174,9 @@ after_errata:
 	cmp	r6, #TEGRA20
 	bne	1f
 	/* If not CPU0, don't let CPU0 reset CPU1 now that CPU1 is coming up. */
-	mov32	r5, TEGRA_IRAM_BASE + TEGRA_IRAM_RESET_HANDLER_OFFSET
 	mov	r0, #CPU_NOT_RESETTABLE
 	cmp	r10, #0
-	strneb	r0, [r5, #__tegra20_cpu1_resettable_status_offset]
+	strneb	r0, [r12, #RESET_DATA(RESETTABLE_STATUS)]
 1:
 #endif
 
@@ -278,13 +282,20 @@ ENDPROC(__tegra_cpu_reset_handler)
 	.type	__tegra_cpu_reset_handler_data, %object
 	.globl	__tegra_cpu_reset_handler_data
 __tegra_cpu_reset_handler_data:
-	.rept	TEGRA_RESET_DATA_SIZE
-	.long	0
-	.endr
+	.long	0	/* TEGRA_RESET_MASK_PRESENT */
+	.long	0	/* TEGRA_RESET_MASK_LP1 */
+	.long	0	/* TEGRA_RESET_MASK_LP2 */
+	.long	0	/* TEGRA_RESET_STARTUP_SECONDARY */
+	.long	0	/* TEGRA_RESET_STARTUP_LP2 */
+	.long	0	/* TEGRA_RESET_STARTUP_LP1 */
+
 	.globl	__tegra20_cpu1_resettable_status_offset
 	.equ	__tegra20_cpu1_resettable_status_offset, \
 					. - __tegra_cpu_reset_handler_start
-	.byte	0
-	.align L1_CACHE_SHIFT
+	.long	0	/* TEGRA_RESET_RESETTABLE_STATUS */
 
+	.globl	__tegra_tf_present
+	.equ	__tegra_tf_present, . - __tegra_cpu_reset_handler_start
+	.long	0	/* TEGRA_RESET_TF_PRESENT */
+	.align L1_CACHE_SHIFT
 ENTRY(__tegra_cpu_reset_handler_end)
