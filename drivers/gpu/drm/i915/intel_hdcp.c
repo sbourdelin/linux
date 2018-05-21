@@ -32,6 +32,7 @@ int intel_hdcp_read_valid_bksv(struct intel_digital_port *intel_dig_port,
 			       const struct intel_hdcp_shim *shim, u8 *bksv);
 static
 struct intel_digital_port *conn_to_dig_port(struct intel_connector *connector);
+static int intel_hdcp_check_link(struct intel_connector *connector);
 
 static bool panel_supports_hdcp(struct intel_connector *connector)
 {
@@ -78,6 +79,26 @@ static inline bool intel_hdcp2_capable(struct intel_connector *connector)
 {
 	return (connector->hdcp.hdcp2_supported &&
 		panel_supports_hdcp2(connector));
+}
+
+static inline bool intel_hdcp_in_force(struct intel_connector *connector)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	enum port port = connector->encoder->port;
+	u32 reg;
+
+	reg = I915_READ(PORT_HDCP_STATUS(port));
+	return reg & (HDCP_STATUS_AUTH | HDCP_STATUS_ENC);
+}
+
+static inline bool intel_hdcp2_in_force(struct intel_connector *connector)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	enum port port = connector->encoder->port;
+	u32 reg;
+
+	reg = I915_READ(HDCP2_STATUS_DDI(port));
+	return reg & (LINK_ENCRYPTION_STATUS | LINK_AUTH_STATUS);
 }
 
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
@@ -940,7 +961,7 @@ void intel_hdcp_atomic_check(struct drm_connector *connector,
 }
 
 /* Implements Part 3 of the HDCP authorization procedure */
-int intel_hdcp_check_link(struct intel_connector *connector)
+static int intel_hdcp_check_link(struct intel_connector *connector)
 {
 	struct intel_hdcp *hdcp = &connector->hdcp;
 	struct drm_i915_private *dev_priv = connector->base.dev->dev_private;
@@ -1820,4 +1841,12 @@ exit:
 		hdcp->hdcp2_supported = false;
 
 	return ret;
+}
+
+void intel_hdcp_handle_cp_irq(struct intel_connector *connector)
+{
+	if (intel_hdcp_in_force(connector))
+		intel_hdcp_check_link(connector);
+	else if (intel_hdcp2_in_force(connector))
+		intel_hdcp2_check_link(connector);
 }
