@@ -156,22 +156,6 @@ static const char *const fsl_mc_pool_type_strings[] = {
 	[FSL_MC_POOL_IRQ] = "irq",
 };
 
-static int __must_check object_type_to_pool_type(const char *object_type,
-						 enum fsl_mc_pool_type
-								*pool_type)
-{
-	unsigned int i;
-
-	for (i = 0; i < ARRAY_SIZE(fsl_mc_pool_type_strings); i++) {
-		if (strcmp(object_type, fsl_mc_pool_type_strings[i]) == 0) {
-			*pool_type = i;
-			return 0;
-		}
-	}
-
-	return -EINVAL;
-}
-
 int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
 					  enum fsl_mc_pool_type pool_type,
 					  struct fsl_mc_resource **new_resource)
@@ -581,9 +565,11 @@ static int fsl_mc_allocator_probe(struct fsl_mc_device *mc_dev)
 		return -EINVAL;
 
 	mc_bus = to_fsl_mc_bus(mc_bus_dev);
-	error = object_type_to_pool_type(mc_dev->obj_desc.type, &pool_type);
-	if (error < 0)
-		return error;
+	pool_type = match_string(fsl_mc_pool_type_strings,
+				 ARRAY_SIZE(fsl_mc_pool_type_strings),
+				 mc_dev->obj_desc.type);
+	if (pool_type < 0)
+		return pool_type;
 
 	error = fsl_mc_resource_pool_add_device(mc_bus, pool_type, mc_dev);
 	if (error < 0)
