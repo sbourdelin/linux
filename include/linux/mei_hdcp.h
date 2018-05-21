@@ -129,6 +129,12 @@ int mei_verify_lprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_lc_send_lprime *rx_lprime);
 int mei_get_session_key(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 			struct hdcp2_ske_send_eks *ske_data);
+int
+mei_repeater_check_flow_prepare_ack(struct mei_cl_device *cldev,
+				    struct mei_hdcp_data *data,
+				    struct hdcp2_rep_send_receiverid_list
+							*rep_topology,
+				    struct hdcp2_rep_send_ack *rep_send_ack);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -188,6 +194,15 @@ int mei_verify_lprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 static inline
 int mei_get_session_key(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 			struct hdcp2_ske_send_eks *ske_data)
+{
+	return -ENODEV;
+}
+static inline int
+mei_repeater_check_flow_prepare_ack(struct mei_cl_device *cldev,
+				    struct mei_hdcp_data *data,
+				    struct hdcp2_rep_send_receiverid_list
+							*rep_topology,
+				    struct hdcp2_rep_send_ack *rep_send_ack)
 {
 	return -ENODEV;
 }

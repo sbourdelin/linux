@@ -484,6 +484,81 @@ int mei_get_session_key(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 }
 EXPORT_SYMBOL(mei_get_session_key);
 
+/*
+ * mei_repeater_check_flow_prepare_ack:
+ *	Function to validate the Downstream topology and prepare rep_ack.
+ *
+ * cldev		: Pointer for mei client device
+ * data			: Intel HW specific Data
+ * rep_topology		: Pointer for Receiver Id List to be validated.
+ * rep_send_ack		: Pointer for repeater ack
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+int
+mei_repeater_check_flow_prepare_ack(struct mei_cl_device *cldev,
+				    struct mei_hdcp_data *data,
+				    struct hdcp2_rep_send_receiverid_list
+							*rep_topology,
+				    struct hdcp2_rep_send_ack *rep_send_ack)
+{
+	struct wired_cmd_verify_repeater_in verify_repeater_in = { { 0 } };
+	struct wired_cmd_verify_repeater_out verify_repeater_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!rep_topology || !rep_send_ack || !data)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	verify_repeater_in.header.api_version = HDCP_API_VERSION;
+	verify_repeater_in.header.command_id = WIRED_VERIFY_REPEATER;
+	verify_repeater_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	verify_repeater_in.header.buffer_len =
+					WIRED_CMD_BUF_LEN_VERIFY_REPEATER_IN;
+
+	verify_repeater_in.port.integrated_port_type = data->port_type;
+	verify_repeater_in.port.physical_port = data->port;
+
+	memcpy(verify_repeater_in.rx_info, rep_topology->rx_info,
+	       HDCP_2_2_RXINFO_LEN);
+	memcpy(verify_repeater_in.seq_num_v, rep_topology->seq_num_v,
+	       HDCP_2_2_SEQ_NUM_LEN);
+	memcpy(verify_repeater_in.v_prime, rep_topology->v_prime,
+	       HDCP_2_2_LPRIME_HALF_LEN);
+	memcpy(verify_repeater_in.receiver_ids, rep_topology->receiver_ids,
+	       HDCP_2_2_RECEIVER_IDS_MAX_LEN);
+
+	byte = mei_cldev_send(cldev, (u8 *)&verify_repeater_in,
+			      sizeof(verify_repeater_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&verify_repeater_out,
+			      sizeof(verify_repeater_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (verify_repeater_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X failed. status: 0x%X\n",
+			WIRED_VERIFY_REPEATER,
+			verify_repeater_out.header.status);
+		return -EIO;
+	}
+
+	memcpy(rep_send_ack->v, verify_repeater_out.v,
+	       HDCP_2_2_LPRIME_HALF_LEN);
+	rep_send_ack->msg_id = HDCP_2_2_REP_SEND_ACK;
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_repeater_check_flow_prepare_ack);
+
 static void
 mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
 {
