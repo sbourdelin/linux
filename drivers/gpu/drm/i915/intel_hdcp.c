@@ -868,7 +868,9 @@ int intel_hdcp_enable(struct intel_connector *connector)
 	 */
 	if (intel_hdcp2_capable(connector))
 		ret = _intel_hdcp2_enable(connector);
-	else if (intel_hdcp_capable(connector))
+
+	/* When HDCP2.2 fails, HDCP1.4 will be attempted */
+	if (ret && intel_hdcp_capable(connector))
 		ret = _intel_hdcp_enable(connector);
 
 	if (!ret) {
