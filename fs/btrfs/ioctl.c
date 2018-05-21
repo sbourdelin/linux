@@ -2085,7 +2085,7 @@ static noinline int search_ioctl(struct inode *inode,
 		root = btrfs_read_fs_root_no_name(info, &key);
 		if (IS_ERR(root)) {
 			btrfs_free_path(path);
-			return -ENOENT;
+			return PTR_ERR(root);
 		}
 	}
 
@@ -2220,7 +2220,7 @@ static noinline int btrfs_search_path_in_tree(struct btrfs_fs_info *info,
 	root = btrfs_read_fs_root_no_name(info, &key);
 	if (IS_ERR(root)) {
 		btrfs_err(info, "could not find root %llu", tree_id);
-		ret = -ENOENT;
+		ret = PTR_ERR(root);
 		goto out;
 	}
 
