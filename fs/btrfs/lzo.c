@@ -17,6 +17,29 @@
 
 #define LZO_LEN	4
 
+/*
+ * Btrfs LZO compression format
+ *
+ * Regular LZO compressed data extent consists of:
+ * 1.  Header
+ *     Fixed size. LZO_LEN (4) bytes long, LE32.
+ *     Records the total size (*includes* the header) of real compressed data.
+ *
+ * 2.  Segment(s)
+ *     Variable size. Includes one segment header, and then data payload.
+ *     One regular LZO compressed extent can have one or more segments.
+ *
+ * 2.1 Segment header
+ *     Fixed size. LZO_LEN (4) bytes long, LE32.
+ *     Records the total size of the segment (*excludes* the header).
+ *
+ * 2.2 Data Payload
+ *     Variable size. Size up limit should be lzo1x_worst_compress(PAGE_SIZE).
+ *
+ * While for inlined LZO compressed data extent, it doesn't have Header, just
+ * *ONE* Segment.
+ */
+
 struct workspace {
 	void *mem;
 	void *buf;	/* where decompressed data goes */
