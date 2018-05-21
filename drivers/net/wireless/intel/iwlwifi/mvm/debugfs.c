@@ -671,14 +671,9 @@ iwl_dbgfs_bt_force_ant_write(struct iwl_mvm *mvm, char *buf,
 	};
 	int ret, bt_force_ant_mode;
 
-	for (bt_force_ant_mode = 0;
-	     bt_force_ant_mode < ARRAY_SIZE(modes_str);
-	     bt_force_ant_mode++) {
-		if (!strcmp(buf, modes_str[bt_force_ant_mode]))
-			break;
-	}
-
-	if (bt_force_ant_mode >= ARRAY_SIZE(modes_str))
+	bt_force_ant_mode = match_string(modes_str,
+					 ARRAY_SIZE(modes_str), buf);
+	if (bt_force_ant_mode < 0)
 		return -EINVAL;
 
 	ret = 0;
