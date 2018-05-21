@@ -682,6 +682,62 @@ int mei_enable_hdcp_authentication(struct mei_cl_device *cldev,
 }
 EXPORT_SYMBOL(mei_enable_hdcp_authentication);
 
+/*
+ * mei_close_hdcp_session:
+ *	Function to close the Wired HDCP Tx session of ME FW.
+ *	This also disables the authenticated state of the port.
+ *
+ * data			: Intel HW specific Data
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+int mei_close_hdcp_session(struct mei_cl_device *cldev,
+			   struct mei_hdcp_data *data)
+{
+	struct wired_cmd_close_session_in session_close_in = { { 0 } };
+	struct wired_cmd_close_session_out session_close_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	session_close_in.header.api_version = HDCP_API_VERSION;
+	session_close_in.header.command_id = WIRED_CLOSE_SESSION;
+	session_close_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	session_close_in.header.buffer_len =
+				WIRED_CMD_BUF_LEN_CLOSE_SESSION_IN;
+
+	session_close_in.port.integrated_port_type = data->port_type;
+	session_close_in.port.physical_port = data->port;
+
+
+	byte = mei_cldev_send(cldev, (u8 *)&session_close_in,
+			      sizeof(session_close_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&session_close_out,
+			      sizeof(session_close_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (session_close_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "Session Close Failed. status: 0x%X\n",
+			session_close_out.header.status);
+		return -EIO;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_close_hdcp_session);
+
 static void
 mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
 {

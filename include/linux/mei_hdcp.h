@@ -139,6 +139,8 @@ int mei_verify_mprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_rep_stream_ready *stream_ready);
 int mei_enable_hdcp_authentication(struct mei_cl_device *cldev,
 				   struct mei_hdcp_data *data);
+int mei_close_hdcp_session(struct mei_cl_device *cldev,
+			   struct mei_hdcp_data *data);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -218,6 +220,11 @@ int mei_verify_mprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 }
 static inline int mei_enable_hdcp_authentication(struct mei_cl_device *cldev,
 						 struct mei_hdcp_data *data)
+{
+	return -ENODEV;
+}
+static inline int mei_close_hdcp_session(struct mei_cl_device *cldev,
+					 struct mei_hdcp_data *data)
 {
 	return -ENODEV;
 }
