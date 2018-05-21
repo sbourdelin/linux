@@ -371,7 +371,21 @@ __setup("bpf_jit_harden=", bpf_jit_harden_setup);
 int bpf_jit_harden   __read_mostly;
 #endif /* CONFIG_BPF_JIT_HARDEN_BOOTPARAM */
 
+#ifdef CONFIG_BPF_JIT_KALLSYMS_BOOTPARAM
+int bpf_jit_kallsyms __read_mostly = CONFIG_BPF_JIT_KALLSYMS_BOOTPARAM_VALUE;
+
+static int __init bpf_jit_kallsyms_setup(char *str)
+{
+	unsigned long enabled;
+
+	if (!kstrtoul(str, 0, &enabled))
+		bpf_jit_kallsyms = !!enabled;
+	return 1;
+}
+__setup("bpf_jit_kallsyms=", bpf_jit_kallsyms_setup);
+#else /* !CONFIG_BPF_JIT_KALLSYMS_BOOTPARAM */
 int bpf_jit_kallsyms __read_mostly;
+#endif /* CONFIG_BPF_JIT_KALLSYMS_BOOTPARAM */
 
 static __always_inline void
 bpf_get_prog_addr_region(const struct bpf_prog *prog,

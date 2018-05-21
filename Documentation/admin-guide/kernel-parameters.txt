@@ -452,6 +452,16 @@
 			2 - JIT hardening is enabled for all users.
 			Default value is set via kernel config option.
 
+	bpf_jit_kallsyms=
+			Format: { "0" | "1" }
+			Sets initial value of net.core.bpf_jit_kallsyms
+			sysctl knob.
+			0 - Addresses of JIT'ed BPF programs are not exported
+			    to kallsyms.
+			1 - Export of addresses of JIT'ed BPF programs is
+			    enabled for privileged users.
+			Default value is set via kernel config option.
+
 	bttv.card=	[HW,V4L] bttv (bt848 + bt878 based grabber cards)
 	bttv.radio=	Most important insmod options are available as
 			kernel args too.
