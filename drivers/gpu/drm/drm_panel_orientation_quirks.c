@@ -136,7 +136,6 @@ int drm_get_panel_orientation_quirk(int width, int height)
 	const struct dmi_system_id *match;
 	const struct drm_dmi_panel_orientation_data *data;
 	const char *bios_date;
-	int i;
 
 	for (match = dmi_first_match(orientation_data);
 	     match;
@@ -154,10 +153,8 @@ int drm_get_panel_orientation_quirk(int width, int height)
 		if (!bios_date)
 			continue;
 
-		for (i = 0; data->bios_dates[i]; i++) {
-			if (!strcmp(data->bios_dates[i], bios_date))
-				return data->orientation;
-		}
+		if (match_string(data->bios_dates, -1, bios_date) >= 0)
+			return data->orientation;
 	}
 
 	return DRM_MODE_PANEL_ORIENTATION_UNKNOWN;
