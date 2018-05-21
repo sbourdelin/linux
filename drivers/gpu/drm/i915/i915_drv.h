@@ -1202,6 +1202,7 @@ struct skl_wm_level {
 	bool plane_en;
 	uint16_t plane_res_b;
 	uint8_t plane_res_l;
+	uint16_t min_dbuf_req;
 };
 
 /* Stores plane specific WM parameters */
