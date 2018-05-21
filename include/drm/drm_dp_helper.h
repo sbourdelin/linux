@@ -1058,7 +1058,7 @@ struct drm_dp_aux_msg {
 	unsigned int address;
 	u8 request;
 	u8 reply;
-	void *buffer;
+	char *buffer;
 	size_t size;
 };
 
