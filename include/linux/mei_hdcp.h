@@ -110,6 +110,13 @@ int mei_cldev_poll_notification(void);
 int mei_initiate_hdcp2_session(struct mei_cl_device *cldev,
 			       struct mei_hdcp_data *data,
 			       struct hdcp2_ake_init *ake_data);
+int
+mei_verify_receiver_cert_prepare_km(struct mei_cl_device *cldev,
+				    struct mei_hdcp_data *data,
+				    struct hdcp2_ake_send_cert *rx_cert,
+				    bool *km_stored,
+				    struct hdcp2_ake_no_stored_km *ek_pub_km,
+				    size_t *msg_sz);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -127,6 +134,16 @@ static inline
 int mei_initiate_hdcp2_session(struct mei_cl_device *cldev,
 			       struct mei_hdcp_data *data,
 			       struct hdcp2_ake_init *ake_data)
+{
+	return -ENODEV;
+}
+static inline int
+mei_verify_receiver_cert_prepare_km(struct mei_cl_device *cldev,
+				    struct mei_hdcp_data *data,
+				    struct hdcp2_ake_send_cert *rx_cert,
+				    bool *km_stored,
+				    struct hdcp2_ake_no_stored_km *ek_pub_km,
+				    size_t *msg_sz)
 {
 	return -ENODEV;
 }
