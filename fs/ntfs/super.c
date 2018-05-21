@@ -224,7 +224,7 @@ use_utf8:
 				}
 				ntfs_error(vol->sb, "NLS character set %s not "
 						"found. Using previous one %s.",
-						v, old_nls->charset);
+					   v, nls_charset_name(old_nls));
 				nls_map = old_nls;
 			} else /* nls_map */ {
 				unload_nls(old_nls);
@@ -274,7 +274,7 @@ no_mount_options:
 					"on remount.");
 			return false;
 		} /* else (!vol->nls_map) */
-		ntfs_debug("Using NLS character set %s.", nls_map->charset);
+		ntfs_debug("Using NLS character set %s.", nls_charset_name(nls_map));
 		vol->nls_map = nls_map;
 	} else /* (!nls_map) */ {
 		if (!vol->nls_map) {
@@ -285,7 +285,7 @@ no_mount_options:
 				return false;
 			}
 			ntfs_debug("Using default NLS character set (%s).",
-					vol->nls_map->charset);
+				   nls_charset_name(vol->nls_map));
 		}
 	}
 	if (mft_zone_multiplier != -1) {
