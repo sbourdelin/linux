@@ -188,6 +188,65 @@ mei_verify_receiver_cert_prepare_km(struct mei_cl_device *cldev,
 }
 EXPORT_SYMBOL(mei_verify_receiver_cert_prepare_km);
 
+/*
+ * mei_verify_hprime:
+ *	Function to verify AKE_Send_H_prime received, through ME FW.
+ *
+ * cldev		: Pointer for mei client device
+ * data			: Intel HW specific Data
+ * rx_hprime		: Pointer for AKE_Send_H_prime
+ * hprime_sz		: Input buffer size
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+int mei_verify_hprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
+		      struct hdcp2_ake_send_hprime *rx_hprime)
+{
+	struct wired_cmd_ake_send_hprime_in send_hprime_in = { { 0 } };
+	struct wired_cmd_ake_send_hprime_out send_hprime_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data || !rx_hprime)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	send_hprime_in.header.api_version = HDCP_API_VERSION;
+	send_hprime_in.header.command_id = WIRED_AKE_SEND_HPRIME;
+	send_hprime_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	send_hprime_in.header.buffer_len = WIRED_CMD_BUF_LEN_AKE_SEND_HPRIME_IN;
+
+	send_hprime_in.port.integrated_port_type = data->port_type;
+	send_hprime_in.port.physical_port = data->port;
+
+	memcpy(send_hprime_in.h_prime, rx_hprime->h_prime,
+	       sizeof(rx_hprime->h_prime));
+
+	byte = mei_cldev_send(cldev, (u8 *)&send_hprime_in,
+			      sizeof(send_hprime_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&send_hprime_out,
+			      sizeof(send_hprime_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (send_hprime_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X Failed. Status: 0x%X\n",
+			WIRED_AKE_SEND_HPRIME, send_hprime_out.header.status);
+		return -EIO;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_verify_hprime);
+
 static void
 mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
 {
