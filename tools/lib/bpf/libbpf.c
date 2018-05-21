@@ -48,6 +48,8 @@
 #include "bpf.h"
 #include "btf.h"
 
+#include <inttypes.h>   /* PRIi64 */
+
 #ifndef EM_BPF
 #define EM_BPF 247
 #endif
@@ -1042,7 +1044,7 @@ static int bpf_map_find_btf_info(struct bpf_map *map, const struct btf *btf)
 	}
 
 	if (def->key_size != key_size) {
-		pr_warning("map:%s key_type:%s has BTF type_size:%ld != key_size:%u\n",
+		pr_warning("map:%s key_type:%s has BTF type_size:%"PRIi64" != key_size:%u\n",
 			   map->name, name, key_size, def->key_size);
 		return -EINVAL;
 	}
@@ -1069,7 +1071,7 @@ static int bpf_map_find_btf_info(struct bpf_map *map, const struct btf *btf)
 	}
 
 	if (def->value_size != value_size) {
-		pr_warning("map:%s value_type:%s has BTF type_size:%ld != value_size:%u\n",
+		pr_warning("map:%s value_type:%s has BTF type_size:%"PRIi64" != value_size:%u\n",
 			   map->name, name, value_size, def->value_size);
 		return -EINVAL;
 	}
