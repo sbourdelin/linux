@@ -2569,6 +2569,9 @@ intel_info(const struct drm_i915_private *dev_priv)
  */
 #define HAS_AUX_IRQ(dev_priv)   true
 #define HAS_GMBUS_IRQ(dev_priv) (INTEL_GEN(dev_priv) >= 4)
+#define HAS_GMBUS_BURST_READ(dev_priv) (INTEL_GEN(dev_priv) >= 10 || \
+					IS_GEMINILAKE(dev_priv) || \
+					IS_KABYLAKE(dev_priv))
 
 /* With the 945 and later, Y tiling got adjusted so that it was 32 128-byte
  * rows, which changed the alignment requirements and fence programming.
