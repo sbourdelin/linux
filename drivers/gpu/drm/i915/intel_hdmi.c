@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/hdmi.h>
+#include <linux/mei_hdcp.h>
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc.h>
@@ -1106,6 +1107,186 @@ bool intel_hdmi_hdcp_check_link(struct intel_digital_port *intel_dig_port)
 	return true;
 }
 
+static
+int intel_hdmi_hdcp2_read_rx_status(struct intel_digital_port *intel_dig_port,
+				    uint8_t *rx_status)
+{
+	return intel_hdmi_hdcp_read(intel_dig_port,
+				    HDCP_2_2_HDMI_REG_RXSTATUS_OFFSET,
+				    rx_status,
+				    HDCP_2_2_HDMI_RXSTATUS_LEN);
+}
+
+static inline
+int intel_hdmi_hdcp2_timeout_for_msg(uint8_t msg_id, bool is_paired)
+{
+	int timeout;
+
+	switch (msg_id) {
+	case HDCP_2_2_AKE_SEND_CERT:
+		timeout = HDCP_2_2_CERT_TIMEOUT;
+		break;
+	case HDCP_2_2_AKE_SEND_HPRIME:
+		if (is_paired)
+			timeout = HDCP_2_2_HPRIME_PAIRED_TIMEOUT;
+		else
+			timeout = HDCP_2_2_HPRIME_NO_PAIRED_TIMEOUT;
+		break;
+	case HDCP_2_2_AKE_SEND_PAIRING_INFO:
+		timeout = HDCP_2_2_PAIRING_TIMEOUT;
+		break;
+	case HDCP_2_2_LC_SEND_LPRIME:
+		timeout = HDCP_2_2_HDMI_LPRIME_TIMEOUT;
+		break;
+	case HDCP_2_2_REP_SEND_RECVID_LIST:
+		timeout = HDCP_2_2_RECVID_LIST_TIMEOUT;
+		break;
+	case HDCP_2_2_REP_STREAM_READY:
+		timeout = HDCP_2_2_STREAM_READY_TIMEOUT;
+		break;
+	default:
+		timeout = -EINVAL;
+		DRM_ERROR("Unsupported msg_id: %d\n", (int)msg_id);
+	}
+
+	return timeout;
+}
+
+static inline
+int hdcp2_detect_msg_availability(struct intel_digital_port *intel_digital_port,
+				  uint8_t msg_id, bool *msg_ready,
+				  ssize_t *msg_sz)
+{
+	uint8_t rx_status[HDCP_2_2_HDMI_RXSTATUS_LEN];
+	int ret;
+
+	ret = intel_hdmi_hdcp2_read_rx_status(intel_digital_port, rx_status);
+	if (ret < 0) {
+		DRM_DEBUG_KMS("rx_status read failed. Err %d\n", ret);
+		return ret;
+	}
+
+	*msg_sz = ((HDCP_2_2_HDMI_RXSTATUS_MSG_SZ_HI(rx_status[1]) << 8) |
+		  rx_status[0]);
+
+	if (msg_id == HDCP_2_2_REP_SEND_RECVID_LIST)
+		*msg_ready = (HDCP_2_2_HDMI_RXSTATUS_READY(rx_status[1]) &&
+			     *msg_sz);
+	else
+		*msg_ready = *msg_sz;
+
+	return 0;
+}
+
+static ssize_t
+intel_hdmi_hdcp2_wait_for_msg(struct intel_digital_port *intel_dig_port,
+			      uint8_t msg_id, bool paired)
+{
+	bool msg_ready = false;
+	int timeout, ret;
+	ssize_t msg_sz;
+
+	timeout = intel_hdmi_hdcp2_timeout_for_msg(msg_id, paired);
+	if (timeout < 0)
+		return timeout;
+
+	ret = __wait_for(ret = hdcp2_detect_msg_availability(intel_dig_port,
+			 msg_id, &msg_ready, &msg_sz),
+			 !ret && msg_ready && msg_sz, timeout * 1000,
+			 1000, 5 * 1000);
+	if (ret)
+		DRM_ERROR("msg_id: %d, ret: %d, timeout: %d\n",
+			  msg_id, ret, timeout);
+
+	return ret ? ret : msg_sz;
+}
+
+static
+int intel_hdmi_hdcp2_write_msg(struct intel_digital_port *intel_dig_port,
+			       void *buf, size_t size)
+{
+	unsigned int offset;
+
+	offset = HDCP_2_2_HDMI_REG_WR_MSG_OFFSET;
+	return intel_hdmi_hdcp_write(intel_dig_port, offset, buf, size);
+}
+
+static
+int intel_hdmi_hdcp2_read_msg(struct intel_digital_port *intel_dig_port,
+			      uint8_t msg_id, void *buf, size_t size)
+{
+	struct intel_hdmi *hdmi = &intel_dig_port->hdmi;
+	struct intel_hdcp *hdcp = &hdmi->attached_connector->hdcp;
+	unsigned int offset;
+	ssize_t ret;
+
+	ret = intel_hdmi_hdcp2_wait_for_msg(intel_dig_port, msg_id,
+					    hdcp->is_paired);
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * Available msg size should be equal to or lesser than the
+	 * available buffer.
+	 */
+	if (ret > size) {
+		DRM_DEBUG_KMS("msg_sz(%d) is more than exp size(%d)\n",
+			      (int)ret, (int)size);
+		return -1;
+	}
+
+	offset = HDCP_2_2_HDMI_REG_RD_MSG_OFFSET;
+	ret = intel_hdmi_hdcp_read(intel_dig_port, offset, buf, ret);
+	if (ret)
+		DRM_DEBUG_KMS("Failed to read msg_id: %d(%zd)\n", msg_id, ret);
+
+	return ret;
+}
+
+static
+int intel_hdmi_hdcp2_check_link(struct intel_digital_port *intel_dig_port)
+{
+	uint8_t rx_status[HDCP_2_2_HDMI_RXSTATUS_LEN];
+	int ret;
+
+	ret = intel_hdmi_hdcp2_read_rx_status(intel_dig_port, rx_status);
+	if (ret)
+		return ret;
+
+	/*
+	 * Re-auth request and Link Integrity Failures are represented by
+	 * same bit. i.e reauth_req.
+	 */
+	if (HDCP_2_2_HDMI_RXSTATUS_REAUTH_REQ(rx_status[1]))
+		ret = DRM_HDCP_REAUTH_REQUEST;
+	else if (HDCP_2_2_HDMI_RXSTATUS_READY(rx_status[1]))
+		ret = DRM_HDCP_TOPOLOGY_CHANGE;
+
+	return ret;
+}
+
+static
+int intel_hdmi_hdcp2_capable(struct intel_digital_port *intel_dig_port,
+			     bool *capable)
+{
+	uint8_t hdcp2_version;
+	int ret;
+
+	*capable = false;
+	ret = intel_hdmi_hdcp_read(intel_dig_port, HDCP_2_2_HDMI_REG_VER_OFFSET,
+				   &hdcp2_version, sizeof(hdcp2_version));
+	if (!ret && hdcp2_version & HDCP_2_2_HDMI_SUPPORT_MASK)
+		*capable = true;
+
+	return ret;
+}
+
+static
+enum hdcp_protocol intel_hdmi_hdcp2_protocol(void)
+{
+	return HDCP_PROTOCOL_HDMI;
+}
+
 static const struct intel_hdcp_shim intel_hdmi_hdcp_shim = {
 	.write_an_aksv = intel_hdmi_hdcp_write_an_aksv,
 	.read_bksv = intel_hdmi_hdcp_read_bksv,
@@ -1117,6 +1298,11 @@ static const struct intel_hdcp_shim intel_hdmi_hdcp_shim = {
 	.read_v_prime_part = intel_hdmi_hdcp_read_v_prime_part,
 	.toggle_signalling = intel_hdmi_hdcp_toggle_signalling,
 	.check_link = intel_hdmi_hdcp_check_link,
+	.write_2_2_msg = intel_hdmi_hdcp2_write_msg,
+	.read_2_2_msg = intel_hdmi_hdcp2_read_msg,
+	.check_2_2_link	= intel_hdmi_hdcp2_check_link,
+	.hdcp_2_2_capable = intel_hdmi_hdcp2_capable,
+	.hdcp_protocol = intel_hdmi_hdcp2_protocol,
 };
 
 static void intel_hdmi_prepare(struct intel_encoder *encoder,
