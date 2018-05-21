@@ -7327,9 +7327,9 @@ static void __rtl8169_resume(struct net_device *dev)
 	rtl_lock_work(tp);
 	napi_enable(&tp->napi);
 	set_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags);
+	if (netif_running(dev))
+		rtl_reset_work(tp);
 	rtl_unlock_work(tp);
-
-	rtl_schedule_task(tp, RTL_FLAG_TASK_RESET_PENDING);
 }
 
 static int rtl8169_resume(struct device *device)
