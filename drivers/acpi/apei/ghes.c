@@ -425,8 +425,7 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
  * GHES_SEV_RECOVERABLE -> AER_NONFATAL
  * GHES_SEV_RECOVERABLE && CPER_SEC_RESET -> AER_FATAL
  *     These both need to be reported and recovered from by the AER driver.
- * GHES_SEV_PANIC does not make it to this handling since the kernel must
- *     panic.
+ * GHES_SEV_PANIC -> AER_FATAL
  */
 static void ghes_handle_aer(struct acpi_hest_generic_data *gdata)
 {
@@ -457,6 +456,49 @@ static void ghes_handle_aer(struct acpi_hest_generic_data *gdata)
 				  pcie_err->aer_info);
 	}
 #endif
+}
+
+/* PCIe errors should not cause a panic. */
+static int ghes_sec_pcie_severity(struct acpi_hest_generic_data *gdata)
+{
+	struct cper_sec_pcie *pcie_err = acpi_hest_get_payload(gdata);
+
+	if (pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
+	    pcie_err->validation_bits & CPER_PCIE_VALID_AER_INFO &&
+	    IS_ENABLED(CONFIG_ACPI_APEI_PCIEAER))
+		return GHES_SEV_RECOVERABLE;
+
+	return ghes_cper_severity(gdata->error_severity);
+}
+
+/*
+ * The severity field in the status block is an unreliable metric for the
+ * severity. A more reliable way is to look at each subsection and see how safe
+ * it is to call the approproate error handler.
+ * We're not conerned with handling the error. We're concerned with being able
+ * to notify an error handler by crossing the NMI/IRQ boundary, being able to
+ * schedule_work, and so forth.
+ *   - SEC_PCIE: All PCIe errors can be handled by AER.
+ */
+static int ghes_severity(struct ghes *ghes)
+{
+	int worst_sev, sec_sev;
+	struct acpi_hest_generic_data *gdata;
+	const guid_t *section_type;
+	const struct acpi_hest_generic_status *estatus = ghes->estatus;
+
+	worst_sev = GHES_SEV_NO;
+	apei_estatus_for_each_section(estatus, gdata) {
+		section_type = (guid_t *)gdata->section_type;
+		sec_sev = ghes_cper_severity(gdata->error_severity);
+
+		if (guid_equal(section_type, &CPER_SEC_PCIE))
+			sec_sev = ghes_sec_pcie_severity(gdata);
+
+		worst_sev = max(worst_sev, sec_sev);
+	}
+
+	return worst_sev;
 }
 
 static void ghes_do_proc(struct ghes *ghes,
@@ -944,7 +986,7 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
 			ret = NMI_HANDLED;
 		}
 
-		sev = ghes_cper_severity(ghes->estatus->error_severity);
+		sev = ghes_severity(ghes);
 		if (sev >= GHES_SEV_PANIC) {
 			oops_begin();
 			ghes_print_queued_estatus();
