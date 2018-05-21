@@ -31,6 +31,7 @@
 #include <linux/types.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
+#include <linux/mei_hdcp.h>
 #include <asm/byteorder.h>
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
@@ -5088,6 +5089,28 @@ void intel_dp_encoder_suspend(struct intel_encoder *intel_encoder)
 	pps_unlock(intel_dp);
 }
 
+static int intel_dp_hdcp_wait_for_cp_irq(struct intel_hdcp *hdcp,
+					 int timeout)
+{
+	long ret;
+
+	/* Reinit */
+	atomic_set(&hdcp->cp_irq_recved, 0);
+
+#define C (atomic_read(&hdcp->cp_irq_recved) > 0)
+	ret = wait_event_interruptible_timeout(hdcp->cp_irq_queue, C,
+					       msecs_to_jiffies(timeout));
+
+	if (ret > 0) {
+		atomic_set(&hdcp->cp_irq_recved, 0);
+		return 0;
+	} else if (!ret) {
+		return -ETIMEDOUT;
+	}
+	return (int)ret;
+}
+
+
 static
 int intel_dp_hdcp_write_an_aksv(struct intel_digital_port *intel_dig_port,
 				u8 *an)
@@ -5306,6 +5329,335 @@ int intel_dp_hdcp_capable(struct intel_digital_port *intel_dig_port,
 	return 0;
 }
 
+static
+int intel_dpcd_offset_for_hdcp2_msgid(uint8_t byte, unsigned int *offset)
+{
+	switch (byte) {
+	case HDCP_2_2_AKE_INIT:
+		*offset = DP_HDCP_2_2_AKE_INIT_OFFSET;
+		break;
+	case HDCP_2_2_AKE_SEND_CERT:
+		*offset = DP_HDCP_2_2_AKE_SEND_CERT_OFFSET;
+		break;
+	case HDCP_2_2_AKE_NO_STORED_KM:
+		*offset = DP_HDCP_2_2_AKE_NO_STORED_KM_OFFSET;
+		break;
+	case HDCP_2_2_AKE_STORED_KM:
+		*offset = DP_HDCP_2_2_AKE_STORED_KM_OFFSET;
+		break;
+	case HDCP_2_2_AKE_SEND_HPRIME:
+		*offset = DP_HDCP_2_2_AKE_SEND_HPRIME_OFFSET;
+		break;
+	case HDCP_2_2_AKE_SEND_PAIRING_INFO:
+		*offset = DP_HDCP_2_2_AKE_SEND_PAIRING_INFO_OFFSET;
+		break;
+	case HDCP_2_2_LC_INIT:
+		*offset = DP_HDCP_2_2_LC_INIT_OFFSET;
+		break;
+	case HDCP_2_2_LC_SEND_LPRIME:
+		*offset = DP_HDCP_2_2_LC_SEND_LPRIME_OFFSET;
+		break;
+	case HDCP_2_2_SKE_SEND_EKS:
+		*offset = DP_HDCP_2_2_SKE_SEND_EKS_OFFSET;
+		break;
+	case HDCP_2_2_REP_SEND_RECVID_LIST:
+		*offset = DP_HDCP_2_2_REP_SEND_RECVID_LIST_OFFSET;
+		break;
+	case HDCP_2_2_REP_SEND_ACK:
+		*offset = DP_HDCP_2_2_REP_SEND_ACK_OFFSET;
+		break;
+	case HDCP_2_2_REP_STREAM_MANAGE:
+		*offset = DP_HDCP_2_2_REP_STREAM_MANAGE_OFFSET;
+		break;
+	case HDCP_2_2_REP_STREAM_READY:
+		*offset = DP_HDCP_2_2_REP_STREAM_READY_OFFSET;
+		break;
+	case HDCP_2_2_ERRATA_DP_STREAM_TYPE:
+		*offset = DP_HDCP_2_2_REG_STREAM_TYPE_OFFSET;
+		break;
+	default:
+		DRM_ERROR("Unrecognized Msg ID\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static inline
+int intel_dp_hdcp2_read_rx_status(struct intel_digital_port *intel_dig_port,
+				  uint8_t *rx_status)
+{
+	ssize_t ret;
+
+	ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux,
+			       DP_HDCP_2_2_REG_RXSTATUS_OFFSET, rx_status,
+			       HDCP_2_2_DP_RXSTATUS_LEN);
+	if (ret != HDCP_2_2_DP_RXSTATUS_LEN) {
+		DRM_ERROR("Read bstatus from DP/AUX failed (%ld)\n", ret);
+		return ret >= 0 ? -EIO : ret;
+	}
+
+	return 0;
+}
+
+static
+int intel_dp_hdcp2_timeout_for_msg(uint8_t msg_id, bool paired)
+{
+	int timeout;
+
+	switch (msg_id) {
+	case HDCP_2_2_AKE_SEND_CERT:
+		timeout = HDCP_2_2_CERT_TIMEOUT;
+		break;
+	case HDCP_2_2_AKE_SEND_HPRIME:
+		if (paired)
+			timeout = HDCP_2_2_HPRIME_PAIRED_TIMEOUT;
+		else
+			timeout = HDCP_2_2_HPRIME_NO_PAIRED_TIMEOUT;
+		break;
+	case HDCP_2_2_AKE_SEND_PAIRING_INFO:
+		timeout = HDCP_2_2_PAIRING_TIMEOUT;
+		break;
+	case HDCP_2_2_LC_SEND_LPRIME:
+		timeout = HDCP_2_2_DP_LPRIME_TIMEOUT;
+		break;
+	case HDCP_2_2_REP_SEND_RECVID_LIST:
+		timeout = HDCP_2_2_RECVID_LIST_TIMEOUT;
+		break;
+	case HDCP_2_2_REP_STREAM_READY:
+		timeout = HDCP_2_2_STREAM_READY_TIMEOUT;
+		break;
+	default:
+		timeout = -EINVAL;
+		DRM_ERROR("Unsupported msg_id: %d\n", (int)msg_id);
+	}
+
+	return timeout;
+}
+
+static
+int hdcp2_detect_msg_availability(struct intel_digital_port *intel_dig_port,
+				  uint8_t msg_id, bool *msg_ready)
+{
+	uint8_t rx_status;
+	int ret;
+
+	*msg_ready = false;
+	ret = intel_dp_hdcp2_read_rx_status(intel_dig_port, &rx_status);
+	if (ret < 0)
+		return ret;
+
+	switch (msg_id) {
+	case HDCP_2_2_AKE_SEND_HPRIME:
+		if (HDCP_2_2_DP_RXSTATUS_H_PRIME(rx_status))
+			*msg_ready = true;
+		break;
+	case HDCP_2_2_AKE_SEND_PAIRING_INFO:
+		if (HDCP_2_2_DP_RXSTATUS_PAIRING(rx_status))
+			*msg_ready = true;
+		break;
+	case HDCP_2_2_REP_SEND_RECVID_LIST:
+		if (HDCP_2_2_DP_RXSTATUS_READY(rx_status))
+			*msg_ready = true;
+		break;
+	default:
+		DRM_DEBUG_KMS("Unidentified msg_id: %d\n", (int)msg_id);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+
+static ssize_t
+intel_dp_hdcp2_wait_for_msg(struct intel_digital_port *intel_dig_port,
+			    uint8_t msg_id)
+{
+	struct intel_dp *dp = &intel_dig_port->dp;
+	struct intel_hdcp *hdcp = &dp->attached_connector->hdcp;
+	int ret, timeout;
+	bool msg_ready = false;
+
+	timeout = intel_dp_hdcp2_timeout_for_msg(msg_id, hdcp->is_paired);
+	switch (msg_id) {
+
+	/*
+	 * There is no way to detect the CERT, LPRIME and STREAM_READY
+	 * availability. So Wait for timeout and read the msg.
+	 */
+	case HDCP_2_2_AKE_SEND_CERT:
+	case HDCP_2_2_LC_SEND_LPRIME:
+	case HDCP_2_2_REP_STREAM_READY:
+		mdelay(timeout);
+		ret = 0;
+		break;
+	case HDCP_2_2_AKE_SEND_HPRIME:
+	case HDCP_2_2_AKE_SEND_PAIRING_INFO:
+	case HDCP_2_2_REP_SEND_RECVID_LIST:
+		intel_dp_hdcp_wait_for_cp_irq(hdcp, timeout);
+		ret = hdcp2_detect_msg_availability(intel_dig_port, msg_id,
+						    &msg_ready);
+		if (!msg_ready)
+			ret = -ETIMEDOUT;
+		break;
+	default:
+		DRM_DEBUG_KMS("Unidentified msg_id: %d\n", (int)msg_id);
+		return -EINVAL;
+	}
+	if (ret)
+		DRM_ERROR("msg_id %d, ret %d, timeout(mSec): %d\n", msg_id, ret,
+			  timeout);
+
+	return ret;
+}
+
+static
+int intel_dp_hdcp2_write_msg(struct intel_digital_port *intel_dig_port,
+			     void *buf, size_t size)
+{
+	unsigned int offset;
+	uint8_t *byte = buf;
+	ssize_t ret, bytes_to_write, len;
+
+	if (intel_dpcd_offset_for_hdcp2_msgid(*byte, &offset) < 0)
+		return -EINVAL;
+
+	/* No msg_id in DP HDCP2.2 msgs */
+	bytes_to_write = size - 1;
+	byte++;
+
+	while (bytes_to_write) {
+		len = bytes_to_write > DP_AUX_MAX_PAYLOAD_BYTES ?
+				DP_AUX_MAX_PAYLOAD_BYTES : bytes_to_write;
+
+		ret = drm_dp_dpcd_write(&intel_dig_port->dp.aux, offset,
+					(void *)byte, len);
+		if (ret < 0)
+			return ret;
+
+		bytes_to_write -= ret;
+		byte += ret;
+		offset += ret;
+	}
+
+	return size;
+}
+
+static
+int intel_dp_hdcp2_read_msg(struct intel_digital_port *intel_dig_port,
+			    uint8_t msg_id, void *buf, size_t size)
+{
+	unsigned int offset, dev_cnt;
+	uint8_t *byte = buf;
+	uint8_t rx_info[HDCP_2_2_RXINFO_LEN];
+	ssize_t ret, bytes_to_recv, len;
+
+	if (intel_dpcd_offset_for_hdcp2_msgid(msg_id, &offset) < 0)
+		return -EINVAL;
+
+	ret = intel_dp_hdcp2_wait_for_msg(intel_dig_port, msg_id);
+	if (ret < 0)
+		return ret;
+
+	/* Finding the ReceiverID List size */
+	if (msg_id == HDCP_2_2_REP_SEND_RECVID_LIST) {
+		ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux,
+				       DP_HDCP_2_2_REG_RXINFO_OFFSET,
+				       (void *)rx_info, HDCP_2_2_RXINFO_LEN);
+		if (ret != HDCP_2_2_RXINFO_LEN)
+			return ret >= 0 ? -EIO : ret;
+
+		dev_cnt = (HDCP_2_2_DEV_COUNT_HI(rx_info[0]) << 4 |
+			   HDCP_2_2_DEV_COUNT_LO(rx_info[1]));
+
+		if (dev_cnt > HDCP_2_2_MAX_DEVICE_COUNT)
+			dev_cnt = HDCP_2_2_MAX_DEVICE_COUNT;
+
+		size = sizeof(struct hdcp2_rep_send_receiverid_list) -
+		       HDCP_2_2_RECEIVER_IDS_MAX_LEN +
+		       (dev_cnt * HDCP_2_2_RECEIVER_ID_LEN);
+	}
+
+	bytes_to_recv = size - 1;
+
+	/* To skip the msg_id, as msgs in DP adaptation has no msg_id */
+	byte++;
+
+	while (bytes_to_recv) {
+		len = bytes_to_recv > DP_AUX_MAX_PAYLOAD_BYTES ?
+		      DP_AUX_MAX_PAYLOAD_BYTES : bytes_to_recv;
+
+		ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux, offset,
+				       (void *)byte, len);
+		if (ret < 0) {
+			DRM_DEBUG_KMS("msg_id %d, ret %d\n", msg_id, (int)ret);
+			return ret;
+		}
+
+		bytes_to_recv -= ret;
+		byte += ret;
+		offset += ret;
+	}
+	byte = buf;
+	*byte = msg_id;
+
+	return size;
+}
+
+static
+int intel_dp_hdcp2_config_stream_type(struct intel_digital_port *intel_dig_port,
+				      void *buf, size_t size)
+{
+	return intel_dp_hdcp2_write_msg(intel_dig_port, buf, size);
+}
+
+static
+int intel_dp_hdcp2_check_link(struct intel_digital_port *intel_dig_port)
+{
+	uint8_t rx_status;
+	int ret;
+
+	ret = intel_dp_hdcp2_read_rx_status(intel_dig_port, &rx_status);
+	if (ret)
+		return ret;
+
+	if (HDCP_2_2_DP_RXSTATUS_REAUTH_REQ(rx_status))
+		ret = DRM_HDCP_REAUTH_REQUEST;
+	else if (HDCP_2_2_DP_RXSTATUS_LINK_FAILED(rx_status))
+		ret = DRM_HDCP_LINK_INTEGRITY_FAILURE;
+	else if (HDCP_2_2_DP_RXSTATUS_READY(rx_status))
+		ret = DRM_HDCP_TOPOLOGY_CHANGE;
+
+	return ret;
+}
+
+static
+int intel_dp_hdcp2_capable(struct intel_digital_port *intel_dig_port,
+			   bool *capable)
+{
+	uint8_t rx_caps[3];
+	int ret;
+
+	*capable = false;
+	ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux,
+			       DP_HDCP_2_2_REG_RX_CAPS_OFFSET,
+			       rx_caps, HDCP_2_2_RXCAPS_LEN);
+	if (ret != HDCP_2_2_RXCAPS_LEN)
+		return ret >= 0 ? -EIO : ret;
+
+	if (rx_caps[0] == HDCP_2_2_RXCAPS_VERSION_VAL &&
+	    HDCP_2_2_DP_HDCP_CAPABLE(rx_caps[2]))
+		*capable = true;
+
+	return 0;
+}
+
+static
+enum hdcp_protocol intel_dp_hdcp2_protocol(void)
+{
+	return HDCP_PROTOCOL_DP;
+}
+
 static const struct intel_hdcp_shim intel_dp_hdcp_shim = {
 	.write_an_aksv = intel_dp_hdcp_write_an_aksv,
 	.read_bksv = intel_dp_hdcp_read_bksv,
@@ -5318,6 +5670,12 @@ static const struct intel_hdcp_shim intel_dp_hdcp_shim = {
 	.toggle_signalling = intel_dp_hdcp_toggle_signalling,
 	.check_link = intel_dp_hdcp_check_link,
 	.hdcp_capable = intel_dp_hdcp_capable,
+	.write_2_2_msg = intel_dp_hdcp2_write_msg,
+	.read_2_2_msg = intel_dp_hdcp2_read_msg,
+	.config_stream_type = intel_dp_hdcp2_config_stream_type,
+	.check_2_2_link = intel_dp_hdcp2_check_link,
+	.hdcp_2_2_capable = intel_dp_hdcp2_capable,
+	.hdcp_protocol = intel_dp_hdcp2_protocol,
 };
 
 static void intel_edp_panel_vdd_sanitize(struct intel_dp *intel_dp)
