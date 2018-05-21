@@ -480,6 +480,8 @@ extern const struct dentry_operations hfsplus_dentry_operations;
 
 struct inode *hfsplus_new_inode(struct super_block *sb, struct inode *dir,
 				umode_t mode);
+int hfsplus_create_inode(struct inode *dir, struct qstr *name, umode_t mode,
+			 dev_t rdev, struct inode **inode);
 void hfsplus_delete_inode(struct inode *inode);
 void hfsplus_inode_read_fork(struct inode *inode,
 			     struct hfsplus_fork_raw *fork);

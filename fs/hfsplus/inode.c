@@ -413,6 +413,38 @@ struct inode *hfsplus_new_inode(struct super_block *sb, struct inode *dir,
 	return inode;
 }
 
+int hfsplus_create_inode(struct inode *dir, struct qstr *name, umode_t mode,
+			 dev_t rdev, struct inode **inode)
+{
+	int res;
+
+	*inode = hfsplus_new_inode(dir->i_sb, dir, mode);
+	if (!*inode)
+		return -ENOMEM;
+
+	if (S_ISBLK(mode) || S_ISCHR(mode) || S_ISFIFO(mode) || S_ISSOCK(mode))
+		init_special_inode(*inode, mode, rdev);
+
+	res = hfsplus_create_cat((*inode)->i_ino, dir, name, *inode);
+	if (res)
+		goto fail;
+
+	res = hfsplus_init_inode_security(*inode, dir, name);
+	if (res && res != -EOPNOTSUPP) {
+		/* Try to delete anyway without error analysis. */
+		hfsplus_delete_cat((*inode)->i_ino, dir, name);
+		goto fail;
+	}
+	return 0;
+
+fail:
+	clear_nlink(*inode);
+	hfsplus_delete_inode(*inode);
+	iput(*inode);
+	*inode = NULL;
+	return res;
+}
+
 void hfsplus_delete_inode(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;

@@ -514,22 +514,26 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 		goto out_put_alloc_file;
 	}
 
+	/* From here on, most of the cleanup is handled by ->put_super() */
+
 	str.len = sizeof(HFSP_HIDDENDIR_NAME) - 1;
 	str.name = HFSP_HIDDENDIR_NAME;
 	err = hfs_find_init(sbi->cat_tree, &fd);
 	if (err)
-		goto out_put_root;
+		goto out;
 	err = hfsplus_cat_build_key(sb, fd.search_key, HFSPLUS_ROOT_CNID, &str);
 	if (unlikely(err < 0))
-		goto out_put_root;
+		goto out;
 	if (!hfs_brec_read(&fd, &entry, sizeof(entry))) {
 		hfs_find_exit(&fd);
-		if (entry.type != cpu_to_be16(HFSPLUS_FOLDER))
-			goto out_put_root;
+		if (entry.type != cpu_to_be16(HFSPLUS_FOLDER)) {
+			err = -EINVAL;
+			goto out;
+		}
 		inode = hfsplus_iget(sb, be32_to_cpu(entry.folder.id));
 		if (IS_ERR(inode)) {
 			err = PTR_ERR(inode);
-			goto out_put_root;
+			goto out;
 		}
 		sbi->hidden_dir = inode;
 	} else
@@ -549,35 +553,11 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 
 		if (!sbi->hidden_dir) {
 			mutex_lock(&sbi->vh_mutex);
-			sbi->hidden_dir = hfsplus_new_inode(sb, root, S_IFDIR);
-			if (!sbi->hidden_dir) {
-				mutex_unlock(&sbi->vh_mutex);
-				err = -ENOMEM;
-				goto out_put_root;
-			}
-			err = hfsplus_create_cat(sbi->hidden_dir->i_ino, root,
-						 &str, sbi->hidden_dir);
-			if (err) {
-				mutex_unlock(&sbi->vh_mutex);
-				goto out_put_hidden_dir;
-			}
-
-			err = hfsplus_init_inode_security(sbi->hidden_dir,
-								root, &str);
-			if (err == -EOPNOTSUPP)
-				err = 0; /* Operation is not supported. */
-			else if (err) {
-				/*
-				 * Try to delete anyway without
-				 * error analysis.
-				 */
-				hfsplus_delete_cat(sbi->hidden_dir->i_ino,
-							root, &str);
-				mutex_unlock(&sbi->vh_mutex);
-				goto out_put_hidden_dir;
-			}
-
+			err = hfsplus_create_inode(root, &str, S_IFDIR, 0,
+						   &sbi->hidden_dir);
 			mutex_unlock(&sbi->vh_mutex);
+			if (err)
+				goto out;
 			hfsplus_mark_inode_dirty(sbi->hidden_dir,
 						 HFSPLUS_I_CAT_DIRTY);
 		}
@@ -587,11 +567,6 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->nls = nls;
 	return 0;
 
-out_put_hidden_dir:
-	iput(sbi->hidden_dir);
-out_put_root:
-	dput(sb->s_root);
-	sb->s_root = NULL;
 out_put_alloc_file:
 	iput(sbi->alloc_file);
 out_close_attr_tree:
@@ -605,9 +580,9 @@ out_free_vhdr:
 	kfree(sbi->s_backup_vhdr_buf);
 out_unload_nls:
 	unload_nls(sbi->nls);
-	unload_nls(nls);
 	kfree(sbi);
 out:
+	unload_nls(nls);
 	return err;
 }
 
