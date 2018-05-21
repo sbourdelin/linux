@@ -21,6 +21,9 @@
 #define HDCP2_LC_RETRY_CNT		3
 #define TIME_FOR_ENCRYPT_STATUS_CHANGE	32
 
+static int _intel_hdcp2_enable(struct intel_connector *connector);
+static int _intel_hdcp2_disable(struct intel_connector *connector);
+
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
 				    const struct intel_hdcp_shim *shim)
 {
@@ -1453,4 +1456,76 @@ static int hdcp2_disable_encryption(struct intel_connector *connector)
 		hdcp->hdcp_shim->toggle_signalling(intel_dig_port, false);
 
 	return ret;
+}
+
+static int hdcp2_authenticate_and_encrypt(struct intel_connector *connector)
+{
+	int ret, i, tries = 3;
+
+	for (i = 0; i < tries; i++) {
+		ret = hdcp2_authenticate_sink(connector);
+		if (!ret)
+			break;
+
+		/* Clearing the mei hdcp session */
+		hdcp2_deauthenticate_port(&connector->hdcp);
+		DRM_DEBUG_KMS("HDCP2.2 Auth %d of %d Failed.(%d)\n",
+			      i + 1, tries, ret);
+	}
+
+	if (i != tries) {
+
+		/*
+		 * Ensuring the required 200mSec min time interval between
+		 * Session Key Exchange and encryption.
+		 */
+		msleep(HDCP_2_2_DELAY_BEFORE_ENCRYPTION_EN);
+		ret = hdcp2_enable_encryption(connector);
+		if (ret < 0) {
+			DRM_DEBUG_KMS("Encryption Enable Failed.(%d)\n", ret);
+			hdcp2_deauthenticate_port(&connector->hdcp);
+		}
+	}
+
+	return ret;
+}
+
+static int _intel_hdcp2_disable(struct intel_connector *connector)
+{
+	int ret;
+
+	DRM_DEBUG_KMS("[%s:%d] HDCP2.2 is being Disabled\n",
+		      connector->base.name, connector->base.base.id);
+
+	ret = hdcp2_disable_encryption(connector);
+
+	hdcp2_deauthenticate_port(&connector->hdcp);
+
+	return ret;
+}
+
+static int _intel_hdcp2_enable(struct intel_connector *connector)
+{
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	int ret;
+
+	DRM_DEBUG_KMS("[%s:%d] HDCP2.2 is being enabled. Type: %d\n",
+		      connector->base.name, connector->base.base.id,
+		      hdcp->content_type);
+
+	ret = hdcp2_authenticate_and_encrypt(connector);
+	if (ret) {
+		DRM_ERROR("HDCP2 Type%d  Enabling Failed. (%d)\n",
+			   hdcp->content_type, ret);
+		return ret;
+	}
+
+	DRM_DEBUG_KMS("[%s:%d] HDCP2.2 is enabled. Type %d\n",
+		      connector->base.name, connector->base.base.id,
+		      hdcp->content_type);
+
+	hdcp->hdcp_value = DRM_MODE_CONTENT_PROTECTION_ENABLED;
+	schedule_work(&hdcp->hdcp_prop_work);
+
+	return 0;
 }
