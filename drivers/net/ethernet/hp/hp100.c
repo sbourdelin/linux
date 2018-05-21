@@ -335,7 +335,6 @@ static const char *hp100_read_id(int ioaddr)
 static __init int hp100_isa_probe1(struct net_device *dev, int ioaddr)
 {
 	const char *sig;
-	int i;
 
 	if (!request_region(ioaddr, HP100_REGION_SIZE, "hp100"))
 		goto err;
@@ -351,13 +350,7 @@ static __init int hp100_isa_probe1(struct net_device *dev, int ioaddr)
 	if (sig == NULL)
 		goto err;
 
-	for (i = 0; i < ARRAY_SIZE(hp100_isa_tbl); i++) {
-		if (!strcmp(hp100_isa_tbl[i], sig))
-			break;
-
-	}
-
-	if (i < ARRAY_SIZE(hp100_isa_tbl))
+	if (match_string(hp100_isa_tbl, ARRAY_SIZE(hp100_isa_tbl), sig) >= 0)
 		return hp100_probe1(dev, ioaddr, HP100_BUS_ISA, NULL);
  err:
 	return -ENODEV;
