@@ -1435,6 +1435,35 @@ config UNPRIVILEGED_BPF_BOOTPARAM_VALUE
 
 	  If you are unsure how to answer this question, answer 0.
 
+config BPF_JIT_HARDEN_BOOTPARAM
+	bool "BPF JIT harden boot parameter"
+	default n
+	help
+	  This option adds a kernel parameter 'bpf_jit_harden' that allows
+	  configuring default state of the net.core.bpf_jit_harden sysctl knob.
+	  If this option is selected, the default value of the
+	  net.core.bpf_jit_harden sysctl knob can be set on the kernel command
+	  line.  The purpose of this option is to allow enabling BPF JIT
+	  hardening for the BPF programs created during the early boot.
+
+	  If you are unsure how to answer this question, answer N.
+
+config BPF_JIT_HARDEN_BOOTPARAM_VALUE
+	int "BPF JIT harden boot parameter default value"
+	depends on BPF_JIT_HARDEN_BOOTPARAM
+	range 0 2
+	default 0
+	help
+	  This option sets the default value for the kernel parameter
+	  'bpf_jit_enabled' that configures default value of the
+	  net.core.bpf_jit_harden sysctl knob at boot.  If this option is set to
+	  0 (zero), the net.core.bpf_jit_harden will default to 0, which will
+	  lead to no hardening at bootup.  If this option is set to 1 (one),
+	  hardening will be applied only to unprivileged users only.  If this
+	  option is set to 2 (two), JIT hardening will be enabled for all users.
+
+	  If you are unsure how to answer this question, answer 0.
+
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"
 	select ANON_INODES

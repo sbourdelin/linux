@@ -442,6 +442,16 @@
 	bert_disable	[ACPI]
 			Disable BERT OS support on buggy BIOSes.
 
+	bpf_jit_harden=
+			Format: { "0" | "1" | "2" }
+			Sets initial value of net.core.bpf_jit_harden
+			sysctl knob.
+			0 - JIT hardening is disabled.
+			1 - JIT hardening is enabled for unprivileged users
+			    only.
+			2 - JIT hardening is enabled for all users.
+			Default value is set via kernel config option.
+
 	bttv.card=	[HW,V4L] bttv (bt848 + bt878 based grabber cards)
 	bttv.radio=	Most important insmod options are available as
 			kernel args too.
