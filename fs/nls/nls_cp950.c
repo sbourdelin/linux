@@ -9456,11 +9456,15 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 	return n;
 }
 
+static const struct nls_ops charset_ops = {
+	.uni2char = uni2char,
+	.char2uni = char2uni,
+};
+
 static struct nls_table table = {
 	.charset	= "cp950",
 	.alias		= "big5",
-	.uni2char	= uni2char,
-	.char2uni	= char2uni,
+	.ops = &charset_ops,
 	.charset2lower	= charset2lower,
 	.charset2upper	= charset2upper,
 };

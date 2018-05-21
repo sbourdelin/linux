@@ -374,7 +374,7 @@ int udf_get_filename(struct super_block *sb, const uint8_t *sname, int slen,
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_UTF8)) {
 		conv_f = udf_uni2char_utf8;
 	} else if (UDF_QUERY_FLAG(sb, UDF_FLAG_NLS_MAP)) {
-		conv_f = UDF_SB(sb)->s_nls_map->uni2char;
+		conv_f = UDF_SB(sb)->s_nls_map->ops->uni2char;
 	} else
 		BUG();
 
@@ -393,7 +393,7 @@ int udf_put_filename(struct super_block *sb, const uint8_t *sname, int slen,
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_UTF8)) {
 		conv_f = udf_char2uni_utf8;
 	} else if (UDF_QUERY_FLAG(sb, UDF_FLAG_NLS_MAP)) {
-		conv_f = UDF_SB(sb)->s_nls_map->char2uni;
+		conv_f = UDF_SB(sb)->s_nls_map->ops->char2uni;
 	} else
 		BUG();
 

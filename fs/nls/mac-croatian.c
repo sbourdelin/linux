@@ -577,10 +577,14 @@ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
 	return 1;
 }
 
+static const struct nls_ops charset_ops = {
+	.uni2char = uni2char,
+	.char2uni = char2uni,
+};
+
 static struct nls_table table = {
 	.charset	= "maccroatian",
-	.uni2char	= uni2char,
-	.char2uni	= char2uni,
+	.ops = &charset_ops,
 	.charset2lower	= charset2lower,
 	.charset2upper	= charset2upper,
 };

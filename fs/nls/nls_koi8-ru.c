@@ -51,10 +51,14 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 	return n;
 }
 
+static const struct nls_ops charset_ops = {
+	.uni2char = uni2char,
+	.char2uni = char2uni,
+};
+
 static struct nls_table table = {
 	.charset	= "koi8-ru",
-	.uni2char	= uni2char,
-	.char2uni	= char2uni,
+	.ops = &charset_ops,
 };
 
 static int __init init_nls_koi8_ru(void)

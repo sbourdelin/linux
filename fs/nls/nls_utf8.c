@@ -40,10 +40,14 @@ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
 	return n;
 }
 
+static const struct nls_ops charset_ops = {
+	.uni2char = uni2char,
+	.char2uni = char2uni,
+};
+
 static struct nls_table table = {
 	.charset	= "utf8",
-	.uni2char	= uni2char,
-	.char2uni	= char2uni,
+	.ops = &charset_ops,
 	.charset2lower	= identity,	/* no conversion */
 	.charset2upper	= identity,
 };

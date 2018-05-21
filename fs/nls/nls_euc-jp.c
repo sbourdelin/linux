@@ -549,10 +549,14 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 	return euc_offset;
 }
 
+static const struct nls_ops charset_ops = {
+	.uni2char = uni2char,
+	.char2uni = char2uni,
+};
+
 static struct nls_table table = {
 	.charset	= "euc-jp",
-	.uni2char	= uni2char,
-	.char2uni	= char2uni,
+	.ops = &charset_ops,
 };
 
 static int __init init_nls_euc_jp(void)

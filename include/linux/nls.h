@@ -22,12 +22,16 @@ typedef u16 wchar_t;
 /* Arbitrary Unicode character */
 typedef u32 unicode_t;
 
-struct nls_table {
-	const char *charset;
-	const char *alias;
+struct nls_ops {
 	int (*uni2char) (wchar_t uni, unsigned char *out, int boundlen);
 	int (*char2uni) (const unsigned char *rawstring, int boundlen,
 			 wchar_t *uni);
+};
+
+struct nls_table {
+	const char *charset;
+	const char *alias;
+	const struct nls_ops *ops;
 	const unsigned char *charset2lower;
 	const unsigned char *charset2upper;
 	struct module *owner;
@@ -62,14 +66,14 @@ extern int utf16s_to_utf8s(const wchar_t *pwcs, int len,
 static inline int nls_uni2char(const struct nls_table *table, wchar_t uni,
 			       unsigned char *out, int boundlen)
 {
-	return table->uni2char(uni, out, boundlen);
+	return table->ops->uni2char(uni, out, boundlen);
 }
 
 static inline int nls_char2uni(const struct nls_table *table,
 			       const unsigned char *rawstring,
 			       int boundlen, wchar_t *uni)
 {
-	return table->char2uni(rawstring, boundlen, uni);
+	return table->ops->char2uni(rawstring, boundlen, uni);
 }
 
 static inline const char *nls_charset_name(const struct nls_table *table)
@@ -116,7 +120,7 @@ nls_nullsize(const struct nls_table *codepage)
 	int charlen;
 	char tmp[NLS_MAX_CHARSET_SIZE];
 
-	charlen = codepage->uni2char(0, tmp, NLS_MAX_CHARSET_SIZE);
+	charlen = codepage->ops->uni2char(0, tmp, NLS_MAX_CHARSET_SIZE);
 
 	return charlen > 0 ? charlen : 1;
 }
