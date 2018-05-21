@@ -404,6 +404,28 @@ int intel_hdcp_validate_v_prime(struct intel_digital_port *intel_dig_port,
 	return 0;
 }
 
+static
+int intel_hdcp_read_valid_bksv(struct intel_digital_port *intel_dig_port,
+			       const struct intel_hdcp_shim *shim, u8 *bksv)
+{
+	int ret, i, tries = 2;
+
+	/* HDCP spec states that we must retry the bksv if it is invalid */
+	for (i = 0; i < tries; i++) {
+		ret = shim->read_bksv(intel_dig_port, bksv);
+		if (ret)
+			return ret;
+		if (intel_hdcp_is_ksv_valid(bksv))
+			break;
+	}
+	if (i == tries) {
+		DRM_ERROR("Bksv is invalid\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 /* Implements Part 2 of the HDCP authorization procedure */
 static
 int intel_hdcp_auth_downstream(struct intel_digital_port *intel_dig_port,
@@ -537,18 +559,9 @@ static int intel_hdcp_auth(struct intel_digital_port *intel_dig_port,
 
 	memset(&bksv, 0, sizeof(bksv));
 
-	/* HDCP spec states that we must retry the bksv if it is invalid */
-	for (i = 0; i < tries; i++) {
-		ret = shim->read_bksv(intel_dig_port, bksv.shim);
-		if (ret)
-			return ret;
-		if (intel_hdcp_is_ksv_valid(bksv.shim))
-			break;
-	}
-	if (i == tries) {
-		DRM_ERROR("HDCP failed, Bksv is invalid\n");
-		return -ENODEV;
-	}
+	ret = intel_hdcp_read_valid_bksv(intel_dig_port, shim, bksv.shim);
+	if (ret < 0)
+		return ret;
 
 	I915_WRITE(PORT_HDCP_BKSVLO(port), bksv.reg[0]);
 	I915_WRITE(PORT_HDCP_BKSVHI(port), bksv.reg[1]);
