@@ -798,7 +798,7 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	 */
 	mr      r3, r4
 	ld      r4, VCPU_MSR(r3)
-	bl	kvmppc_restore_tm
+	bl	__kvmppc_restore_tm
 	ld	r4, HSTATE_KVM_VCPU(r13)
 91:
 END_FTR_SECTION_IFSET(CPU_FTR_TM)
@@ -1784,7 +1784,7 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	 */
 	mr      r3, r9
 	ld      r4, VCPU_MSR(r3)
-	bl	kvmppc_save_tm
+	bl	__kvmppc_save_tm
 	ld	r9, HSTATE_KVM_VCPU(r13)
 91:
 #endif
@@ -2680,7 +2680,7 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	 */
 	ld      r3, HSTATE_KVM_VCPU(r13)
 	ld      r4, VCPU_MSR(r3)
-	bl	kvmppc_save_tm
+	bl	__kvmppc_save_tm
 91:
 #endif
 
@@ -2800,7 +2800,7 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	 */
 	mr      r3, r4
 	ld      r4, VCPU_MSR(r3)
-	bl	kvmppc_restore_tm
+	bl	__kvmppc_restore_tm
 	ld	r4, HSTATE_KVM_VCPU(r13)
 91:
 #endif
