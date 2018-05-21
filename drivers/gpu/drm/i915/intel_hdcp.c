@@ -19,6 +19,7 @@
 					 (enum hdcp_physical_port) (port))
 #define KEY_LOAD_TRIES	5
 #define HDCP2_LC_RETRY_CNT		3
+#define TIME_FOR_ENCRYPT_STATUS_CHANGE	32
 
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
 				    const struct intel_hdcp_shim *shim)
@@ -1394,6 +1395,62 @@ static int hdcp2_authenticate_sink(struct intel_connector *connector)
 	ret = hdcp2_authenticate_port(hdcp);
 	if (ret < 0)
 		return ret;
+
+	return ret;
+}
+
+static int hdcp2_enable_encryption(struct intel_connector *connector)
+{
+	struct intel_digital_port *intel_dig_port = conn_to_dig_port(connector);
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	enum port port = connector->encoder->port;
+	int ret;
+
+	if (I915_READ(HDCP2_STATUS_DDI(port)) & LINK_ENCRYPTION_STATUS)
+		return 0;
+
+	if (hdcp->hdcp_shim->toggle_signalling)
+		hdcp->hdcp_shim->toggle_signalling(intel_dig_port, true);
+
+	if (I915_READ(HDCP2_STATUS_DDI(port)) & LINK_AUTH_STATUS) {
+
+		/* Link is Authenticated. Now set for Encryption */
+		I915_WRITE(HDCP2_CTL_DDI(port),
+			   I915_READ(HDCP2_CTL_DDI(port)) |
+			   CTL_LINK_ENCRYPTION_REQ);
+	}
+
+	ret = intel_wait_for_register(dev_priv, HDCP2_STATUS_DDI(port),
+				      LINK_ENCRYPTION_STATUS,
+				      LINK_ENCRYPTION_STATUS,
+				      TIME_FOR_ENCRYPT_STATUS_CHANGE);
+
+	return ret;
+}
+
+static int hdcp2_disable_encryption(struct intel_connector *connector)
+{
+	struct intel_digital_port *intel_dig_port = conn_to_dig_port(connector);
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	enum port port = connector->encoder->port;
+	int ret;
+
+	if (!(I915_READ(HDCP2_STATUS_DDI(port)) & LINK_ENCRYPTION_STATUS))
+		return 0;
+
+	I915_WRITE(HDCP2_CTL_DDI(port),
+		   I915_READ(HDCP2_CTL_DDI(port)) & ~CTL_LINK_ENCRYPTION_REQ);
+
+	ret = intel_wait_for_register(dev_priv, HDCP2_STATUS_DDI(port),
+				      LINK_ENCRYPTION_STATUS, 0x0,
+				      TIME_FOR_ENCRYPT_STATUS_CHANGE);
+	if (ret == -ETIMEDOUT)
+		DRM_DEBUG_KMS("Disable Encryption Timedout");
+
+	if (hdcp->hdcp_shim->toggle_signalling)
+		hdcp->hdcp_shim->toggle_signalling(intel_dig_port, false);
 
 	return ret;
 }
