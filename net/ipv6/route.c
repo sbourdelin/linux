@@ -897,7 +897,7 @@ static const int fib6_prop[RTN_MAX + 1] = {
 	[RTN_XRESOLVE]	= -EINVAL,
 };
 
-static int ip6_rt_type_to_error(u8 fib6_type)
+int ip6_rt_type_to_error(u8 fib6_type)
 {
 	return fib6_prop[fib6_type];
 }

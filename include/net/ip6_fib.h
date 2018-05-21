@@ -286,6 +286,8 @@ static inline void fib6_info_release(struct fib6_info *f6i)
 		fib6_info_destroy(f6i);
 }
 
+int ip6_rt_type_to_error(u8 fib6_type);
+
 enum fib6_walk_state {
 #ifdef CONFIG_IPV6_SUBTREES
 	FWS_S,
