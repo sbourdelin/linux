@@ -1,0 +1,23 @@
+Bindings for Intel PECI (Platform Environment Control Interface) cputemp driver.
+
+Required properties:
+- compatible : Should be "intel,peci-cputemp".
+- reg        : Should contain address of a client CPU. Address range of CPU
+	       clients is starting from 0x30 based on PECI specification.
+
+Example:
+	peci-bus@0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		< more properties >
+
+		peci-cputemp@30 {
+			compatible = "intel,peci-cputemp";
+			reg = <0x30>;
+		};
+
+		peci-cputemp@31 {
+			compatible = "intel,peci-cputemp";
+			reg = <0x31>;
+		};
+	};
