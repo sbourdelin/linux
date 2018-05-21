@@ -1621,8 +1621,10 @@ static struct kernfs_node *kernfs_dir_pos(const void *ns,
 static struct kernfs_node *kernfs_dir_next_pos(const void *ns,
 	struct kernfs_node *parent, ino_t ino, struct kernfs_node *pos)
 {
+	struct kernfs_node *orig = pos;
+
 	pos = kernfs_dir_pos(ns, parent, ino, pos);
-	if (pos) {
+	if (pos && kernfs_sd_compare(pos, orig) <= 0) {
 		do {
 			struct rb_node *node = rb_next(&pos->rb);
 			if (!node)
