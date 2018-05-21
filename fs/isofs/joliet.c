@@ -25,7 +25,8 @@ uni16_to_x8(unsigned char *ascii, __be16 *uni, int len, struct nls_table *nls)
 
 	while ((ch = get_unaligned(ip)) && len) {
 		int llen;
-		llen = nls->uni2char(be16_to_cpu(ch), op, NLS_MAX_CHARSET_SIZE);
+		llen = nls_uni2char(nls, be16_to_cpu(ch), op,
+				    NLS_MAX_CHARSET_SIZE);
 		if (llen > 0)
 			op += llen;
 		else

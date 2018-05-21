@@ -911,7 +911,7 @@ static int cifs_ci_hash(const struct dentry *dentry, struct qstr *q)
 
 	hash = init_name_hash(dentry);
 	for (i = 0; i < q->len; i += charlen) {
-		charlen = codepage->char2uni(&q->name[i], q->len - i, &c);
+		charlen = nls_char2uni(codepage, &q->name[i], q->len - i, &c);
 		/* error out if we can't convert the character */
 		if (unlikely(charlen < 0))
 			return charlen;
@@ -940,8 +940,9 @@ static int cifs_ci_compare(const struct dentry *dentry,
 
 	for (i = 0; i < len; i += l1) {
 		/* Convert characters in both strings to UTF-16. */
-		l1 = codepage->char2uni(&str[i], len - i, &c1);
-		l2 = codepage->char2uni(&name->name[i], name->len - i, &c2);
+		l1 = nls_char2uni(codepage, &str[i], len - i, &c1);
+		l2 = nls_char2uni(codepage, &name->name[i], name->len - i,
+				  &c2);
 
 		/*
 		 * If we can't convert either character, just declare it to

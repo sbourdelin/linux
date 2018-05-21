@@ -1157,7 +1157,7 @@ ncp__io2vol(struct ncp_server *server, unsigned char *vname, unsigned int *vlen,
 				iname += 5;
 			} else {
 nospec:;			
-				if ( (chl = in->char2uni(iname, iname_end - iname, &ec)) < 0)
+				if ( (chl = nls_char2uni(in, iname, iname_end - iname, &ec)) < 0)
 					return chl;
 				iname += chl;
 			}
@@ -1165,7 +1165,7 @@ nospec:;
 
 		/* unitoupper should be here! */
 
-		chl = out->uni2char(ec, vname, vname_end - vname);
+		chl = nls_uni2char(out, ec, vname, vname_end - vname);
 		if (chl < 0)
 			return chl;
 
@@ -1219,7 +1219,7 @@ ncp__vol2io(struct ncp_server *server, unsigned char *iname, unsigned int *ilen,
 		wchar_t ec;
 		int chl;
 
-		if ( (chl = in->char2uni(vname, vname_end - vname, &ec)) < 0) {
+		if ( (chl = nls_char2uni(in, vname, vname_end - vname, &ec)) < 0) {
 			err = chl;
 			goto quit;
 		}
@@ -1237,7 +1237,7 @@ ncp__vol2io(struct ncp_server *server, unsigned char *iname, unsigned int *ilen,
 			}
 			iname += k;
 		} else {
-			if ( (chl = out->uni2char(ec, iname, iname_end - iname)) >= 0) {
+			if ( (chl = nls_uni2char(out, ec, iname, iname_end - iname)) >= 0) {
 				iname += chl;
 			} else {
 				int k;

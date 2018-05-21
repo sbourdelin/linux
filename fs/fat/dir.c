@@ -153,7 +153,7 @@ static int uni16_to_x8(struct super_block *sb, unsigned char *ascii,
 
 	while (*ip && ((len - NLS_MAX_CHARSET_SIZE) > 0)) {
 		ec = *ip++;
-		charlen = nls->uni2char(ec, op, NLS_MAX_CHARSET_SIZE);
+		charlen = nls_uni2char(nls, ec, op, NLS_MAX_CHARSET_SIZE);
 		if (charlen > 0) {
 			op += charlen;
 			len -= charlen;
@@ -195,7 +195,7 @@ fat_short2uni(struct nls_table *t, unsigned char *c, int clen, wchar_t *uni)
 {
 	int charlen;
 
-	charlen = t->char2uni(c, clen, uni);
+	charlen = nls_char2uni(t, c, clen, uni);
 	if (charlen < 0) {
 		*uni = 0x003f;	/* a question mark */
 		charlen = 1;
@@ -210,7 +210,7 @@ fat_short2lower_uni(struct nls_table *t, unsigned char *c,
 	int charlen;
 	wchar_t wc;
 
-	charlen = t->char2uni(c, clen, &wc);
+	charlen = nls_char2uni(t, c, clen, &wc);
 	if (charlen < 0) {
 		*uni = 0x003f;	/* a question mark */
 		charlen = 1;
@@ -220,7 +220,7 @@ fat_short2lower_uni(struct nls_table *t, unsigned char *c,
 		if (!nc)
 			nc = *c;
 
-		charlen = t->char2uni(&nc, 1, uni);
+		charlen = nls_char2uni(t, &nc, 1, uni);
 		if (charlen < 0) {
 			*uni = 0x003f;	/* a question mark */
 			charlen = 1;

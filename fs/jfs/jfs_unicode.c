@@ -41,9 +41,8 @@ int jfs_strfromUCS_le(char *to, const __le16 * from,
 		for (i = 0; (i < len) && from[i]; i++) {
 			int charlen;
 			charlen =
-			    codepage->uni2char(le16_to_cpu(from[i]),
-					       &to[outlen],
-					       NLS_MAX_CHARSET_SIZE);
+			    nls_uni2char(codepage, le16_to_cpu(from[i]),
+					 &to[outlen], NLS_MAX_CHARSET_SIZE);
 			if (charlen > 0)
 				outlen += charlen;
 			else
@@ -88,7 +87,7 @@ static int jfs_strtoUCS(wchar_t * to, const unsigned char *from, int len,
 	if (codepage) {
 		for (i = 0; len && *from; i++, from += charlen, len -= charlen)
 		{
-			charlen = codepage->char2uni(from, len, &to[i]);
+			charlen = nls_char2uni(codepage, from, len, &to[i]);
 			if (charlen < 1) {
 				jfs_err("jfs_strtoUCS: char2uni returned %d.",
 					charlen);

@@ -542,7 +542,7 @@ befs_utf2nls(struct super_block *sb, const char *in,
 		/* convert from Unicode to nls */
 		if (uni > MAX_WCHAR_T)
 			goto conv_err;
-		unilen = nls->uni2char(uni, &result[o], in_len - o);
+		unilen = nls_uni2char(nls, uni, &result[o], in_len - o);
 		if (unilen < 0)
 			goto conv_err;
 	}
@@ -616,7 +616,7 @@ befs_nls2utf(struct super_block *sb, const char *in,
 	for (i = o = 0; i < in_len; i += unilen, o += utflen) {
 
 		/* convert from nls to unicode */
-		unilen = nls->char2uni(&in[i], in_len - i, &uni);
+		unilen = nls_char2uni(nls, &in[i], in_len - i, &uni);
 		if (unilen < 0)
 			goto conv_err;
 
