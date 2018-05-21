@@ -271,6 +271,9 @@ struct pmu {
 	/* number of address filters this PMU can do */
 	unsigned int			nr_addr_filters;
 
+	/* fine grained access control */
+	int				perf_event_paranoid;
+
 	/*
 	 * Fully disable/enable this PMU, can be used to protect from the PMI
 	 * as well as for lazy/batch writing of the MSRs.
@@ -1159,6 +1162,9 @@ extern int sysctl_perf_cpu_time_max_percent;
 
 extern void perf_sample_event_took(u64 sample_len_ns);
 
+extern int perf_proc_paranoid_handler(struct ctl_table *table, int write,
+		void __user *buffer, size_t *lenp,
+		loff_t *ppos);
 extern int perf_proc_update_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos);
@@ -1169,19 +1175,19 @@ extern int perf_cpu_time_max_percent_handler(struct ctl_table *table, int write,
 int perf_event_max_stack_handler(struct ctl_table *table, int write,
 				 void __user *buffer, size_t *lenp, loff_t *ppos);
 
-static inline bool perf_paranoid_tracepoint_raw(void)
+static inline bool perf_paranoid_tracepoint_raw(const struct pmu *pmu)
 {
-	return sysctl_perf_event_paranoid > -1;
+	return pmu->perf_event_paranoid > -1;
 }
 
-static inline bool perf_paranoid_cpu(void)
+static inline bool perf_paranoid_cpu(const struct pmu *pmu)
 {
-	return sysctl_perf_event_paranoid > 0;
+	return pmu->perf_event_paranoid > 0;
 }
 
-static inline bool perf_paranoid_kernel(void)
+static inline bool perf_paranoid_kernel(const struct pmu *pmu)
 {
-	return sysctl_perf_event_paranoid > 1;
+	return pmu->perf_event_paranoid > 1;
 }
 
 extern void perf_event_init(void);

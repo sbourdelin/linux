@@ -432,6 +432,24 @@ static void update_perf_cpu_limits(void)
 
 static bool perf_rotate_context(struct perf_cpu_context *cpuctx);
 
+int perf_proc_paranoid_handler(struct ctl_table *table, int write,
+		void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	struct pmu *pmu;
+
+	if (ret || !write)
+		return ret;
+
+	mutex_lock(&pmus_lock);
+	list_for_each_entry(pmu, &pmus, entry)
+		pmu->perf_event_paranoid = sysctl_perf_event_paranoid;
+	mutex_unlock(&pmus_lock);
+
+	return 0;
+}
+
 int perf_proc_update_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)
@@ -4113,7 +4131,7 @@ find_get_context(struct pmu *pmu, struct task_struct *task,
 
 	if (!task) {
 		/* Must be root to operate on a CPU event: */
-		if (perf_paranoid_cpu() && !capable(CAP_SYS_ADMIN))
+		if (perf_paranoid_cpu(pmu) && !capable(CAP_SYS_ADMIN))
 			return ERR_PTR(-EACCES);
 
 		cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
@@ -5679,7 +5697,7 @@ accounting:
 	lock_limit >>= PAGE_SHIFT;
 	locked = vma->vm_mm->pinned_vm + extra;
 
-	if ((locked > lock_limit) && perf_paranoid_tracepoint_raw() &&
+	if ((locked > lock_limit) && perf_paranoid_tracepoint_raw(event->pmu) &&
 		!capable(CAP_IPC_LOCK)) {
 		ret = -EPERM;
 		goto unlock;
@@ -9427,6 +9445,41 @@ static void free_pmu_context(struct pmu *pmu)
 }
 
 /*
+ * Fine-grained access control:
+ */
+static ssize_t
+perf_event_paranoid_show(struct device *dev,
+			 struct device_attribute *attr,
+			 char *page)
+{
+	struct pmu *pmu = dev_get_drvdata(dev);
+
+	return snprintf(page, PAGE_SIZE - 1, "%d\n", pmu->perf_event_paranoid);
+}
+
+static ssize_t
+perf_event_paranoid_store(struct device *dev,
+			  struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct pmu *pmu = dev_get_drvdata(dev);
+	int ret, val;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val < -1 || val > 2)
+		return -EINVAL;
+
+	pmu->perf_event_paranoid = val;
+
+	return count;
+}
+
+DEVICE_ATTR_RW(perf_event_paranoid);
+
+/*
  * Let userspace know that this PMU supports address range filtering:
  */
 static ssize_t nr_addr_filters_show(struct device *dev,
@@ -9540,6 +9593,11 @@ static int pmu_dev_alloc(struct pmu *pmu)
 	if (ret)
 		goto free_dev;
 
+	/* Add fine-grained access control attribute. */
+	ret = device_create_file(pmu->dev, &dev_attr_perf_event_paranoid);
+	if (ret)
+		goto del_dev;
+
 	/* For PMUs with address filters, throw in an extra attribute: */
 	if (pmu->nr_addr_filters)
 		ret = device_create_file(pmu->dev, &dev_attr_nr_addr_filters);
@@ -9571,6 +9629,7 @@ int perf_pmu_register(struct pmu *pmu, const char *name, int type)
 	if (!pmu->pmu_disable_count)
 		goto unlock;
 
+	pmu->perf_event_paranoid = sysctl_perf_event_paranoid;
 	pmu->type = -1;
 	if (!name)
 		goto skip_type;
@@ -10187,10 +10246,6 @@ static int perf_copy_attr(struct perf_event_attr __user *uattr,
 			 */
 			attr->branch_sample_type = mask;
 		}
-		/* privileged levels capture (kernel, hv): check permissions */
-		if ((mask & PERF_SAMPLE_BRANCH_PERM_PLM)
-		    && perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
-			return -EACCES;
 	}
 
 	if (attr->sample_type & PERF_SAMPLE_REGS_USER) {
@@ -10407,11 +10462,6 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (err)
 		return err;
 
-	if (!attr.exclude_kernel) {
-		if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
-			return -EACCES;
-	}
-
 	if (attr.namespaces) {
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
@@ -10424,11 +10474,6 @@ SYSCALL_DEFINE5(perf_event_open,
 		if (attr.sample_period & (1ULL << 63))
 			return -EINVAL;
 	}
-
-	/* Only privileged users can get physical addresses */
-	if ((attr.sample_type & PERF_SAMPLE_PHYS_ADDR) &&
-	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
-		return -EACCES;
 
 	/*
 	 * In cgroup mode, the pid argument is used to pass the fd
@@ -10497,6 +10542,28 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (IS_ERR(event)) {
 		err = PTR_ERR(event);
 		goto err_cred;
+	}
+
+	if (!attr.exclude_kernel) {
+		if (perf_paranoid_kernel(event->pmu) &&
+		    !capable(CAP_SYS_ADMIN)) {
+			err = -EACCES;
+			goto err_alloc;
+		}
+	}
+
+	/* Only privileged users can get physical addresses */
+	if ((attr.sample_type & PERF_SAMPLE_PHYS_ADDR) &&
+	    perf_paranoid_kernel(event->pmu) && !capable(CAP_SYS_ADMIN)) {
+		err = -EACCES;
+		goto err_alloc;
+	}
+
+	/* privileged levels capture (kernel, hv): check permissions */
+	if ((attr.branch_sample_type & PERF_SAMPLE_BRANCH_PERM_PLM) &&
+	    perf_paranoid_kernel(event->pmu) && !capable(CAP_SYS_ADMIN)) {
+		err = -EACCES;
+		goto err_alloc;
 	}
 
 	if (is_sampling_event(event)) {
