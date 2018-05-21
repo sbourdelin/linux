@@ -50,12 +50,10 @@ static int db8500_thermal_match_cdev(struct thermal_cooling_device *cdev,
 	if (!strlen(cdev->type))
 		return -EINVAL;
 
-	for (i = 0; i < COOLING_DEV_MAX; i++) {
-		if (!strcmp(trip_point->cdev_name[i], cdev->type))
-			return 0;
-	}
+	i = match_string((const char **)trip_point->cdev_name,
+			 COOLING_DEV_MAX, cdev->type);
 
-	return -ENODEV;
+	return (i < 0) ? -ENODEV : 0;
 }
 
 /* Callback to bind cooling device to thermal zone */
