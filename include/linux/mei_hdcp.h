@@ -122,6 +122,9 @@ int mei_verify_hprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 int mei_store_pairing_info(struct mei_cl_device *cldev,
 			   struct mei_hdcp_data *data,
 			   struct hdcp2_ake_send_pairing_info *pairing_info);
+int mei_initiate_locality_check(struct mei_cl_device *cldev,
+				struct mei_hdcp_data *data,
+				struct hdcp2_lc_init *lc_init_data);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -162,6 +165,13 @@ static inline
 int mei_store_pairing_info(struct mei_cl_device *cldev,
 			   struct mei_hdcp_data *data,
 			   struct hdcp2_ake_send_pairing_info *pairing_info)
+{
+	return -ENODEV;
+}
+static inline
+int mei_initiate_locality_check(struct mei_cl_device *cldev,
+				struct mei_hdcp_data *data,
+				struct hdcp2_lc_init *lc_init_data)
 {
 	return -ENODEV;
 }

@@ -308,6 +308,63 @@ int mei_store_pairing_info(struct mei_cl_device *cldev,
 }
 EXPORT_SYMBOL(mei_store_pairing_info);
 
+/*
+ * mei_initiate_locality_check:
+ *	Function to prepare LC_Init.
+ *
+ * cldev		: Pointer for mei client device
+ * data			: Intel HW specific Data
+ * hdcp2_lc_init	: Pointer for storing LC_Init
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+int mei_initiate_locality_check(struct mei_cl_device *cldev,
+				struct mei_hdcp_data *data,
+				struct hdcp2_lc_init *lc_init_data)
+{
+	struct wired_cmd_init_locality_check_in lc_init_in = { { 0 } };
+	struct wired_cmd_init_locality_check_out lc_init_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data || !lc_init_data)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	lc_init_in.header.api_version = HDCP_API_VERSION;
+	lc_init_in.header.command_id = WIRED_INIT_LOCALITY_CHECK;
+	lc_init_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	lc_init_in.header.buffer_len = WIRED_CMD_BUF_LEN_INIT_LOCALITY_CHECK_IN;
+
+	lc_init_in.port.integrated_port_type = data->port_type;
+	lc_init_in.port.physical_port = data->port;
+
+	byte = mei_cldev_send(cldev, (u8 *)&lc_init_in, sizeof(lc_init_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&lc_init_out, sizeof(lc_init_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (lc_init_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X Failed. status: 0x%X\n",
+			WIRED_INIT_LOCALITY_CHECK, lc_init_out.header.status);
+		return -EIO;
+	}
+
+	lc_init_data->msg_id = HDCP_2_2_LC_INIT;
+	memcpy(lc_init_data->r_n, lc_init_out.r_n, HDCP_2_2_RN_LEN);
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_initiate_locality_check);
+
 static void
 mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
 {
