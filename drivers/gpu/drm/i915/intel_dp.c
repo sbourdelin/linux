@@ -4485,8 +4485,10 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 
 		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST)
 			intel_dp_handle_test_request(intel_dp);
-		if (sink_irq_vector & (DP_CP_IRQ | DP_SINK_SPECIFIC_IRQ))
-			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
+		if (sink_irq_vector & DP_CP_IRQ)
+			intel_hdcp_check_link(intel_dp->attached_connector);
+		if (sink_irq_vector & DP_SINK_SPECIFIC_IRQ)
+			DRM_DEBUG_DRIVER("Sink specific irq unhandled\n");
 	}
 
 	/* defer to the hotplug work for link retraining if needed */
@@ -5455,9 +5457,6 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 		bool handled;
 
 		handled = intel_dp_short_pulse(intel_dp);
-
-		/* Short pulse can signify loss of hdcp authentication */
-		intel_hdcp_check_link(intel_dp->attached_connector);
 
 		if (!handled) {
 			intel_dp->detect_done = false;
