@@ -91,7 +91,7 @@ int __cgroup_bpf_check_dev_permission(short dev_type, u32 major, u32 minor,
 	int __ret = 0;							       \
 	if (cgroup_bpf_enabled && sk && sk == skb->sk) {		       \
 		typeof(sk) __sk = sk_to_full_sk(sk);			       \
-		if (sk_fullsock(__sk))					       \
+		if (__sk && sk_fullsock(__sk))				       \
 			__ret = __cgroup_bpf_run_filter_skb(__sk, skb,	       \
 						      BPF_CGROUP_INET_EGRESS); \
 	}								       \
