@@ -261,8 +261,6 @@ static int exclude_super_stripes(struct btrfs_fs_info *fs_info,
 		cache->bytes_super += stripe_len;
 		ret = add_excluded_extent(fs_info, cache->key.objectid,
 					  stripe_len);
-		if (ret)
-			return ret;
 	}
 
 	for (i = 0; i < BTRFS_SUPER_MIRROR_MAX; i++) {
@@ -294,10 +292,6 @@ static int exclude_super_stripes(struct btrfs_fs_info *fs_info,
 
 			cache->bytes_super += len;
 			ret = add_excluded_extent(fs_info, start, len);
-			if (ret) {
-				kfree(logical);
-				return ret;
-			}
 		}
 
 		kfree(logical);
