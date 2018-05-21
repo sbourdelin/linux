@@ -11,6 +11,7 @@
 #include <linux/i2c.h>
 #include <linux/random.h>
 #include <linux/mei_hdcp.h>
+#include <linux/notifier.h>
 
 #include "intel_drv.h"
 #include "i915_reg.h"
@@ -25,6 +26,7 @@ static int _intel_hdcp2_enable(struct intel_connector *connector);
 static int _intel_hdcp2_disable(struct intel_connector *connector);
 static void intel_hdcp2_check_work(struct work_struct *work);
 static int intel_hdcp2_check_link(struct intel_connector *connector);
+static int intel_hdcp2_init(struct intel_connector *connector);
 
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
 				    const struct intel_hdcp_shim *shim)
@@ -766,10 +768,14 @@ bool is_hdcp_supported(struct drm_i915_private *dev_priv, enum port port)
 }
 
 int intel_hdcp_init(struct intel_connector *connector,
-		    const struct intel_hdcp_shim *hdcp_shim)
+		    const struct intel_hdcp_shim *hdcp_shim,
+		    bool hdcp2_supported)
 {
 	struct intel_hdcp *hdcp = &connector->hdcp;
 	int ret;
+
+	if (!hdcp_shim)
+		return -EINVAL;
 
 	ret = drm_connector_attach_content_protection_property(
 			&connector->base);
@@ -779,7 +785,12 @@ int intel_hdcp_init(struct intel_connector *connector,
 	hdcp->hdcp_shim = hdcp_shim;
 	mutex_init(&hdcp->hdcp_mutex);
 	INIT_DELAYED_WORK(&hdcp->hdcp_check_work, intel_hdcp_check_work);
+	INIT_DELAYED_WORK(&hdcp->hdcp2_check_work, intel_hdcp2_check_work);
 	INIT_WORK(&hdcp->hdcp_prop_work, intel_hdcp_prop_work);
+
+	if (hdcp2_supported)
+		intel_hdcp2_init(connector);
+
 	return 0;
 }
 
@@ -1636,4 +1647,108 @@ static void intel_hdcp2_check_work(struct work_struct *work)
 	if (!intel_hdcp2_check_link(connector))
 		schedule_delayed_work(&hdcp->hdcp2_check_work,
 				      DRM_HDCP2_CHECK_PERIOD_MS);
+}
+
+static int initialize_mei_hdcp_data(struct intel_connector *connector)
+{
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	enum port port;
+
+	if (connector->encoder) {
+		port = connector->encoder->port;
+		data->port = GET_MEI_DDI_INDEX(port);
+	}
+
+	data->port_type = INTEGRATED;
+	data->protocol = hdcp->hdcp_shim->hdcp_protocol();
+
+	data->k = 1;
+	if (!data->streams)
+		data->streams = kcalloc(data->k,
+					sizeof(struct hdcp2_streamid_type),
+					GFP_KERNEL);
+	if (!data->streams) {
+		DRM_ERROR("Out of Memory\n");
+		return -ENOMEM;
+	}
+
+	data->streams[0].stream_id = 0;
+	data->streams[0].stream_type = hdcp->content_type;
+
+	return 0;
+}
+
+static void intel_hdcp2_exit(struct intel_connector *connector)
+{
+	intel_hdcp_disable(connector);
+	kfree(connector->hdcp.mei_data.streams);
+}
+
+static int mei_cldev_notify(struct notifier_block *nb, unsigned long event,
+			    void *cldev)
+{
+	struct intel_hdcp *hdcp = container_of(nb, struct intel_hdcp,
+					       mei_cldev_nb);
+	struct intel_connector *intel_connector = container_of(hdcp,
+							struct intel_connector,
+							hdcp);
+
+	DRM_DEBUG_KMS("[%s:%d] MEI_HDCP Notification. Interface: %s\n",
+		      intel_connector->base.name, intel_connector->base.base.id,
+		      cldev ? "UP" : "Down");
+
+	if (event == MEI_CLDEV_ENABLED) {
+		hdcp->cldev = cldev;
+		initialize_mei_hdcp_data(intel_connector);
+	} else {
+		hdcp->cldev = NULL;
+		intel_hdcp2_exit(intel_connector);
+	}
+
+	return NOTIFY_OK;
+}
+
+static inline
+bool is_hdcp2_supported(struct drm_i915_private *dev_priv)
+{
+	return (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv) ||
+		IS_KABYLAKE(dev_priv));
+}
+
+static int intel_hdcp2_init(struct intel_connector *connector)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	int ret;
+
+	if (!is_hdcp2_supported(dev_priv))
+		return -EINVAL;
+
+	hdcp->hdcp2_supported = true;
+
+	hdcp->mei_cldev_nb.notifier_call = mei_cldev_notify;
+	ret = mei_cldev_register_notify(&hdcp->mei_cldev_nb);
+	if (ret) {
+		DRM_ERROR("mei_cldev not available. %d\n", ret);
+		goto exit;
+	}
+
+	ret = initialize_mei_hdcp_data(connector);
+	if (ret) {
+		mei_cldev_unregister_notify(&hdcp->mei_cldev_nb);
+		goto exit;
+	}
+
+	/*
+	 * Incase notifier is triggered well before this point, request for
+	 * notification of the mei client device state.
+	 */
+	mei_cldev_poll_notification();
+
+exit:
+	if (ret)
+		hdcp->hdcp2_supported = false;
+
+	return ret;
 }
