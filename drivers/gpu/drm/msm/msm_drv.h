@@ -33,6 +33,7 @@
 #include <linux/of_graph.h>
 #include <linux/of_device.h>
 #include <asm/sizes.h>
+#include <linux/mm_types.h>
 
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
@@ -184,7 +185,7 @@ void msm_gem_shrinker_cleanup(struct drm_device *dev);
 int msm_gem_mmap_obj(struct drm_gem_object *obj,
 			struct vm_area_struct *vma);
 int msm_gem_mmap(struct file *filp, struct vm_area_struct *vma);
-int msm_gem_fault(struct vm_fault *vmf);
+vm_fault_t msm_gem_fault(struct vm_fault *vmf);
 uint64_t msm_gem_mmap_offset(struct drm_gem_object *obj);
 int msm_gem_get_iova(struct drm_gem_object *obj,
 		struct msm_gem_address_space *aspace, uint64_t *iova);
