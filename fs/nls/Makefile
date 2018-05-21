@@ -3,6 +3,7 @@
 # Makefile for native language support
 #
 
+nls_base-y := nls_core.o nls_default.o
 obj-$(CONFIG_NLS)		+= nls_base.o
 
 obj-$(CONFIG_NLS_CODEPAGE_437)	+= nls_cp437.o
