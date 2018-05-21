@@ -365,6 +365,66 @@ int mei_initiate_locality_check(struct mei_cl_device *cldev,
 }
 EXPORT_SYMBOL(mei_initiate_locality_check);
 
+/*
+ * mei_verify_lprime:
+ *	Function to verify lprime.
+ *
+ * cldev		: Pointer for mei client device
+ * data			: Intel HW specific Data
+ * rx_lprime		: Pointer for LC_Send_L_prime
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+int mei_verify_lprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
+		      struct hdcp2_lc_send_lprime *rx_lprime)
+{
+	struct wired_cmd_validate_locality_in verify_lprime_in = { { 0 } };
+	struct wired_cmd_validate_locality_out verify_lprime_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data || !rx_lprime)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	verify_lprime_in.header.api_version = HDCP_API_VERSION;
+	verify_lprime_in.header.command_id = WIRED_VALIDATE_LOCALITY;
+	verify_lprime_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	verify_lprime_in.header.buffer_len =
+					WIRED_CMD_BUF_LEN_VALIDATE_LOCALITY_IN;
+
+	verify_lprime_in.port.integrated_port_type = data->port_type;
+	verify_lprime_in.port.physical_port = data->port;
+
+	memcpy(verify_lprime_in.l_prime, rx_lprime->l_prime,
+	       sizeof(rx_lprime->l_prime));
+
+	byte = mei_cldev_send(cldev, (u8 *)&verify_lprime_in,
+			      sizeof(verify_lprime_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&verify_lprime_out,
+			      sizeof(verify_lprime_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (verify_lprime_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X failed. status: 0x%X\n",
+			WIRED_VALIDATE_LOCALITY,
+			verify_lprime_out.header.status);
+		return -EIO;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_verify_lprime);
+
 static void
 mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
 {
