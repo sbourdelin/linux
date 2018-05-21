@@ -75,16 +75,22 @@ EXPORT_SYMBOL(mmc_gpio_get_ro);
 
 int mmc_gpio_get_cd(struct mmc_host *host)
 {
+	int can_sleep;
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 
 	if (!ctx || !ctx->cd_gpio)
 		return -ENOSYS;
 
-	if (ctx->override_cd_active_level)
-		return !gpiod_get_raw_value_cansleep(ctx->cd_gpio) ^
-			!!(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH);
+	can_sleep = gpiod_cansleep(ctx->cd_gpio);
+	if (ctx->override_cd_active_level) {
+		int value = can_sleep ?
+				gpiod_get_raw_value_cansleep(ctx->cd_gpio) :
+				gpiod_get_raw_value(ctx->cd_gpio);
+		return !value ^ !!(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH);
+	}
 
-	return gpiod_get_value_cansleep(ctx->cd_gpio);
+	return can_sleep ? gpiod_get_value_cansleep(ctx->cd_gpio) :
+			gpiod_get_value(ctx->cd_gpio);
 }
 EXPORT_SYMBOL(mmc_gpio_get_cd);
 
