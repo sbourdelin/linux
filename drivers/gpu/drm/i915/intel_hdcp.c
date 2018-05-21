@@ -1801,7 +1801,6 @@ static int mei_cldev_notify(struct notifier_block *nb, unsigned long event,
 	return NOTIFY_OK;
 }
 
-static inline
 bool is_hdcp2_supported(struct drm_i915_private *dev_priv)
 {
 	return (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv) ||
