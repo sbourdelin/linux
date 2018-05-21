@@ -10,10 +10,13 @@
 #include <drm/drm_hdcp.h>
 #include <linux/i2c.h>
 #include <linux/random.h>
+#include <linux/mei_hdcp.h>
 
 #include "intel_drv.h"
 #include "i915_reg.h"
 
+#define GET_MEI_DDI_INDEX(port)		(((port) == PORT_A) ? DDI_A : \
+					 (enum hdcp_physical_port) (port))
 #define KEY_LOAD_TRIES	5
 
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
@@ -895,4 +898,195 @@ int intel_hdcp_check_link(struct intel_connector *connector)
 out:
 	mutex_unlock(&hdcp->hdcp_mutex);
 	return ret;
+}
+
+static int
+hdcp2_prepare_ake_init(struct intel_hdcp *hdcp, struct hdcp2_ake_init *ake_data)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	struct intel_connector *connector = container_of(hdcp,
+							 struct intel_connector,
+							 hdcp);
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	if (data->port == INVALID_PORT && connector->encoder)
+		data->port = GET_MEI_DDI_INDEX(connector->encoder->port);
+
+	/* Clear ME FW instance for the port, just incase */
+	mei_close_hdcp_session(hdcp->cldev, data);
+
+	return mei_initiate_hdcp2_session(hdcp->cldev, data, ake_data);
+}
+
+static int hdcp2_close_mei_session(struct intel_hdcp *hdcp)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+
+	if (!hdcp->cldev || data->port == INVALID_PORT)
+		return -EINVAL;
+
+	return mei_close_hdcp_session(hdcp->cldev, data);
+}
+
+static int
+hdcp2_verify_rx_cert_prepare_km(struct intel_hdcp *hdcp,
+				struct hdcp2_ake_send_cert *rx_cert,
+				bool *paired,
+				struct hdcp2_ake_no_stored_km *ek_pub_km,
+				size_t *msg_sz)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_verify_receiver_cert_prepare_km(hdcp->cldev, data, rx_cert,
+						  paired, ek_pub_km, msg_sz);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int hdcp2_verify_hprime(struct intel_hdcp *hdcp,
+			       struct hdcp2_ake_send_hprime *rx_hprime)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_verify_hprime(hdcp->cldev, data, rx_hprime);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int
+hdcp2_store_pairing_info(struct intel_hdcp *hdcp,
+			struct hdcp2_ake_send_pairing_info *pairing_info)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_store_pairing_info(hdcp->cldev, data, pairing_info);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int
+hdcp2_prepare_lc_init(struct intel_hdcp *hdcp, struct hdcp2_lc_init *lc_init)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_initiate_locality_check(hdcp->cldev, data, lc_init);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int
+hdcp2_verify_lprime(struct intel_hdcp *hdcp,
+		    struct hdcp2_lc_send_lprime *rx_lprime)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_verify_lprime(hdcp->cldev, data, rx_lprime);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int hdcp2_prepare_skey(struct intel_hdcp *hdcp,
+			      struct hdcp2_ske_send_eks *ske_data)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_get_session_key(hdcp->cldev, data, ske_data);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int
+hdcp2_verify_rep_topology_prepare_ack(
+			struct intel_hdcp *hdcp,
+			struct hdcp2_rep_send_receiverid_list *rep_topology,
+			struct hdcp2_rep_send_ack *rep_send_ack)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_repeater_check_flow_prepare_ack(hdcp->cldev, data,
+						  rep_topology, rep_send_ack);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static int
+hdcp2_verify_mprime(struct intel_hdcp *hdcp,
+		    struct hdcp2_rep_stream_ready *stream_ready)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_verify_mprime(hdcp->cldev, data, stream_ready);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+
+static int hdcp2_authenticate_port(struct intel_hdcp *hdcp)
+{
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	int ret;
+
+	if (!hdcp->cldev)
+		return -EINVAL;
+
+	ret = mei_enable_hdcp_authentication(hdcp->cldev, data);
+	if (ret < 0)
+		mei_close_hdcp_session(hdcp->cldev, data);
+
+	return ret;
+}
+
+static inline int hdcp2_deauthenticate_port(struct intel_hdcp *hdcp)
+{
+	return hdcp2_close_mei_session(hdcp);
 }
