@@ -137,6 +137,8 @@ mei_repeater_check_flow_prepare_ack(struct mei_cl_device *cldev,
 				    struct hdcp2_rep_send_ack *rep_send_ack);
 int mei_verify_mprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_rep_stream_ready *stream_ready);
+int mei_enable_hdcp_authentication(struct mei_cl_device *cldev,
+				   struct mei_hdcp_data *data);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -211,6 +213,11 @@ mei_repeater_check_flow_prepare_ack(struct mei_cl_device *cldev,
 static inline
 int mei_verify_mprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_rep_stream_ready *stream_ready)
+{
+	return -ENODEV;
+}
+static inline int mei_enable_hdcp_authentication(struct mei_cl_device *cldev,
+						 struct mei_hdcp_data *data)
 {
 	return -ENODEV;
 }
