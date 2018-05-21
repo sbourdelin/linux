@@ -707,7 +707,7 @@ static int _intel_hdcp_enable(struct intel_connector *connector)
 		ret = intel_hdcp_auth(conn_to_dig_port(connector),
 				      hdcp->hdcp_shim);
 		if (!ret)
-			return 0;
+			break;
 
 		DRM_DEBUG_KMS("HDCP Auth failure (%d)\n", ret);
 
@@ -715,7 +715,13 @@ static int _intel_hdcp_enable(struct intel_connector *connector)
 		_intel_hdcp_disable(connector);
 	}
 
-	DRM_ERROR("HDCP authentication failed (%d tries/%d)\n", tries, ret);
+	if (i != tries)
+		schedule_delayed_work(&hdcp->hdcp_check_work,
+				      DRM_HDCP_CHECK_PERIOD_MS);
+	else
+		DRM_ERROR("HDCP authentication failed (%d tries/%d)\n",
+			  tries, ret);
+
 	return ret;
 }
 
@@ -810,8 +816,6 @@ int intel_hdcp_enable(struct intel_connector *connector)
 
 	hdcp->hdcp_value = DRM_MODE_CONTENT_PROTECTION_ENABLED;
 	schedule_work(&hdcp->hdcp_prop_work);
-	schedule_delayed_work(&hdcp->hdcp_check_work,
-			      DRM_HDCP_CHECK_PERIOD_MS);
 out:
 	mutex_unlock(&hdcp->hdcp_mutex);
 	return ret;
