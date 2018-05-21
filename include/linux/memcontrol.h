@@ -464,6 +464,9 @@ void mem_cgroup_handle_over_high(void);
 
 unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg);
 
+void mem_cgroup_print_oom_memcg_name(struct mem_cgroup *memcg,
+				struct task_struct *p);
+
 void mem_cgroup_print_oom_info(struct mem_cgroup *memcg,
 				struct task_struct *p);
 
@@ -856,6 +859,12 @@ mem_cgroup_node_nr_lru_pages(struct mem_cgroup *memcg,
 static inline unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg)
 {
 	return 0;
+}
+
+static inline void
+mem_cgroup_print_oom_memcg_name(struct mem_cgroup *memcg,
+					struct task_struct *p)
+{
 }
 
 static inline void

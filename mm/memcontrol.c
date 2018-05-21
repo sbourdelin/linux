@@ -1118,19 +1118,15 @@ static const char *const memcg1_stat_names[] = {
 };
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
+
 /**
- * mem_cgroup_print_oom_info: Print OOM information relevant to memory controller.
+ * mem_cgroup_print_oom_memcg_name: Print the memcg's name which contains the
+ * task that will be killed by the oom-killer.
  * @memcg: The memory cgroup that went over limit
  * @p: Task that is going to be killed
- *
- * NOTE: @memcg and @p's mem_cgroup can be different when hierarchy is
- * enabled
  */
-void mem_cgroup_print_oom_info(struct mem_cgroup *memcg, struct task_struct *p)
+void mem_cgroup_print_oom_memcg_name(struct mem_cgroup *memcg, struct task_struct *p)
 {
-	struct mem_cgroup *iter;
-	unsigned int i;
-
 	rcu_read_lock();
 
 	if (p) {
@@ -1145,7 +1141,22 @@ void mem_cgroup_print_oom_info(struct mem_cgroup *memcg, struct task_struct *p)
 	pr_cont("\n");
 
 	rcu_read_unlock();
+}
 
+/**
+ * mem_cgroup_print_oom_info: Print OOM information relevant to memory controller.
+ * @memcg: The memory cgroup that went over limit
+ * @p: Task that is going to be killed
+ *
+ * NOTE: @memcg and @p's mem_cgroup can be different when hierarchy is
+ * enabled
+ */
+void mem_cgroup_print_oom_info(struct mem_cgroup *memcg, struct task_struct *p)
+{
+	struct mem_cgroup *iter;
+	unsigned int i;
+
+	mem_cgroup_print_oom_memcg_name(memcg, p);
 	pr_info("memory: usage %llukB, limit %llukB, failcnt %lu\n",
 		K((u64)page_counter_read(&memcg->memory)),
 		K((u64)memcg->memory.limit), memcg->memory.failcnt);
