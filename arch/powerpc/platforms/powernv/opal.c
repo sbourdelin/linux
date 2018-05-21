@@ -40,6 +40,16 @@
 
 #include "powernv.h"
 
+#define OPAL_MSG_QUEUE_MAX 16
+
+struct opal_msg_node {
+	struct list_head	list;
+	struct opal_msg		msg;
+};
+
+static DEFINE_SPINLOCK(msg_list_lock);
+static LIST_HEAD(msg_list);
+
 /* /sys/firmware/opal */
 struct kobject *opal_kobj;
 
@@ -54,6 +64,8 @@ struct mcheck_recoverable_range {
 	u64 end_addr;
 	u64 recover_addr;
 };
+
+static int msg_list_size;
 
 static struct mcheck_recoverable_range *mc_recoverable_range;
 static int mc_recoverable_range_len;
@@ -231,6 +243,44 @@ static int __init opal_register_exception_handlers(void)
 }
 machine_early_initcall(powernv, opal_register_exception_handlers);
 
+static void queue_replay_msg(void *msg)
+{
+	struct opal_msg_node *msg_node;
+
+	if (msg_list_size < OPAL_MSG_QUEUE_MAX) {
+		msg_node = kzalloc(sizeof(*msg_node), GFP_ATOMIC);
+		if (msg_node) {
+			INIT_LIST_HEAD(&msg_node->list);
+			memcpy(&msg_node->msg, msg, sizeof(struct opal_msg));
+			list_add_tail(&msg_node->list, &msg_list);
+			msg_list_size++;
+		} else
+			pr_warn_once("message queue no memory\n");
+
+		if (msg_list_size >= OPAL_MSG_QUEUE_MAX)
+			pr_warn_once("message queue full\n");
+	}
+}
+
+static void dequeue_replay_msg(enum opal_msg_type msg_type)
+{
+	/* msg_list_lock held in register to allow operation to complete */
+	/* prior to any subsequent messages                              */
+
+	struct opal_msg_node *msg_node, *tmp;
+
+	list_for_each_entry_safe(msg_node, tmp, &msg_list, list) {
+		if (be32_to_cpu(msg_node->msg.msg_type) != msg_type)
+			continue;
+		atomic_notifier_call_chain(&opal_msg_notifier_head[msg_type],
+					msg_type,
+					&msg_node->msg);
+		list_del(&msg_node->list);
+		kfree(msg_node);
+		msg_list_size--;
+		}
+}
+
 /*
  * Opal message notifier based on message type. Allow subscribers to get
  * notified for specific messgae type.
@@ -238,14 +288,32 @@ machine_early_initcall(powernv, opal_register_exception_handlers);
 int opal_message_notifier_register(enum opal_msg_type msg_type,
 					struct notifier_block *nb)
 {
+	int ret;
+	unsigned long flags;
+
 	if (!nb || msg_type >= OPAL_MSG_TYPE_MAX) {
 		pr_warn("%s: Invalid arguments, msg_type:%d\n",
 			__func__, msg_type);
 		return -EINVAL;
 	}
 
-	return atomic_notifier_chain_register(
-				&opal_msg_notifier_head[msg_type], nb);
+	spin_lock_irqsave(&msg_list_lock, flags);
+	ret = atomic_notifier_chain_register(
+		&opal_msg_notifier_head[msg_type], nb);
+
+	if (ret) {
+		spin_unlock_irqrestore(&msg_list_lock, flags);
+		return ret;
+	}
+
+	/* Replay any queued messages that came in      */
+	/* prior to the notifier chain registration     */
+	/* msg_list_lock held here to assure completion */
+
+	dequeue_replay_msg(msg_type);
+	spin_unlock_irqrestore(&msg_list_lock, flags);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(opal_message_notifier_register);
 
@@ -259,6 +327,23 @@ EXPORT_SYMBOL_GPL(opal_message_notifier_unregister);
 
 static void opal_message_do_notify(uint32_t msg_type, void *msg)
 {
+	unsigned long flags;
+	bool queued = false;
+
+	spin_lock_irqsave(&msg_list_lock, flags);
+	if (opal_msg_notifier_head[msg_type].head == NULL) {
+		/*
+		 * Queue up the msg since no notifiers have registered
+		 * yet for this msg_type.
+		 */
+		queue_replay_msg(msg);
+		queued = true;
+	}
+	spin_unlock_irqrestore(&msg_list_lock, flags);
+
+	if (queued)
+		return;
+
 	/* notify subscribers */
 	atomic_notifier_call_chain(&opal_msg_notifier_head[msg_type],
 					msg_type, msg);
