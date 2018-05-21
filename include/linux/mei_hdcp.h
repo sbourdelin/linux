@@ -119,6 +119,9 @@ mei_verify_receiver_cert_prepare_km(struct mei_cl_device *cldev,
 				    size_t *msg_sz);
 int mei_verify_hprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_ake_send_hprime *rx_hprime);
+int mei_store_pairing_info(struct mei_cl_device *cldev,
+			   struct mei_hdcp_data *data,
+			   struct hdcp2_ake_send_pairing_info *pairing_info);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -152,6 +155,13 @@ mei_verify_receiver_cert_prepare_km(struct mei_cl_device *cldev,
 static inline
 int mei_verify_hprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_ake_send_hprime *rx_hprime)
+{
+	return -ENODEV;
+}
+static inline
+int mei_store_pairing_info(struct mei_cl_device *cldev,
+			   struct mei_hdcp_data *data,
+			   struct hdcp2_ake_send_pairing_info *pairing_info)
 {
 	return -ENODEV;
 }
