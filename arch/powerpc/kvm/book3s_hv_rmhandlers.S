@@ -796,8 +796,12 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	/*
 	 * NOTE THAT THIS TRASHES ALL NON-VOLATILE REGISTERS INCLUDING CR
 	 */
+	mr      r3, r4
+	ld      r4, VCPU_MSR(r3)
 	bl	kvmppc_restore_tm
+	ld	r4, HSTATE_KVM_VCPU(r13)
 91:
+END_FTR_SECTION_IFSET(CPU_FTR_TM)
 #endif
 
 	/* Load guest PMU registers */
@@ -1778,7 +1782,10 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	/*
 	 * NOTE THAT THIS TRASHES ALL NON-VOLATILE REGISTERS INCLUDING CR
 	 */
+	mr      r3, r9
+	ld      r4, VCPU_MSR(r3)
 	bl	kvmppc_save_tm
+	ld	r9, HSTATE_KVM_VCPU(r13)
 91:
 #endif
 
@@ -2671,7 +2678,8 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	/*
 	 * NOTE THAT THIS TRASHES ALL NON-VOLATILE REGISTERS INCLUDING CR
 	 */
-	ld	r9, HSTATE_KVM_VCPU(r13)
+	ld      r3, HSTATE_KVM_VCPU(r13)
+	ld      r4, VCPU_MSR(r3)
 	bl	kvmppc_save_tm
 91:
 #endif
@@ -2790,7 +2798,10 @@ END_FTR_SECTION(CPU_FTR_TM | CPU_FTR_P9_TM_HV_ASSIST, 0)
 	/*
 	 * NOTE THAT THIS TRASHES ALL NON-VOLATILE REGISTERS INCLUDING CR
 	 */
+	mr      r3, r4
+	ld      r4, VCPU_MSR(r3)
 	bl	kvmppc_restore_tm
+	ld	r4, HSTATE_KVM_VCPU(r13)
 91:
 #endif
 

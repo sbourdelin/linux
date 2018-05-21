@@ -26,9 +26,12 @@
 
 /*
  * Save transactional state and TM-related registers.
- * Called with r9 pointing to the vcpu struct.
+ * Called with:
+ * - r3 pointing to the vcpu struct
+ * - r4 points to the MSR with current TS bits:
+ * 	(For HV KVM, it is VCPU_MSR ; For PR KVM, it is host MSR).
  * This can modify all checkpointed registers, but
- * restores r1, r2 and r9 (vcpu pointer) before exit.
+ * restores r1, r2 before exit.
  */
 _GLOBAL(kvmppc_save_tm)
 	mflr	r0
@@ -41,14 +44,11 @@ _GLOBAL(kvmppc_save_tm)
 	rldimi	r8, r0, MSR_TM_LG, 63-MSR_TM_LG
 	mtmsrd	r8
 
-#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
-	ld	r5, VCPU_MSR(r9)
-	rldicl. r5, r5, 64 - MSR_TS_S_LG, 62
+	rldicl. r4, r4, 64 - MSR_TS_S_LG, 62
 	beq	1f	/* TM not active in guest. */
-#endif
 
-	std	r1, HSTATE_HOST_R1(r13)
-	li	r3, TM_CAUSE_KVM_RESCHED
+	std	r1, HSTATE_SCRATCH2(r13)
+	std	r3, HSTATE_SCRATCH1(r13)
 
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
 BEGIN_FTR_SECTION
@@ -65,7 +65,7 @@ END_FTR_SECTION_NESTED(CPU_FTR_P9_TM_XER_SO_BUG, CPU_FTR_P9_TM_XER_SO_BUG, 96)
 3:
 	/* Emulation of the treclaim instruction needs TEXASR before treclaim */
 	mfspr	r6, SPRN_TEXASR
-	std	r6, VCPU_ORIG_TEXASR(r9)
+	std	r6, VCPU_ORIG_TEXASR(r3)
 6:
 END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 #endif
@@ -73,6 +73,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 	/* Clear the MSR RI since r1, r13 are all going to be foobar. */
 	li	r5, 0
 	mtmsrd	r5, 1
+
+	li	r3, TM_CAUSE_KVM_RESCHED
 
 	/* All GPRs are volatile at this point. */
 	TRECLAIM(R3)
@@ -94,7 +96,7 @@ BEGIN_FTR_SECTION
 	 * we already have it), therefore we can now use any volatile GPR.
 	 */
 	/* Reload stack pointer and TOC. */
-	ld	r1, HSTATE_HOST_R1(r13)
+	ld	r1, HSTATE_SCRATCH2(r13)
 	ld	r2, PACATOC(r13)
 	/* Set MSR RI now we have r1 and r13 back. */
 	li	r5, MSR_RI
@@ -118,10 +120,9 @@ END_FTR_SECTION_NESTED(CPU_FTR_P9_TM_XER_SO_BUG, CPU_FTR_P9_TM_XER_SO_BUG, 96)
 	b	11f
 2:
 END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
-
-	ld	r9, HSTATE_KVM_VCPU(r13)
 #endif
 
+	ld	r9, HSTATE_SCRATCH1(r13)
 
 	/* Get a few more GPRs free. */
 	std	r29, VCPU_GPRS_TM(29)(r9)
@@ -153,7 +154,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 	std	r4, VCPU_GPRS_TM(9)(r9)
 
 	/* Reload stack pointer and TOC. */
-	ld	r1, HSTATE_HOST_R1(r13)
+	ld	r1, HSTATE_SCRATCH2(r13)
 	ld	r2, PACATOC(r13)
 
 	/* Set MSR RI now we have r1 and r13 back. */
@@ -208,9 +209,13 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 
 /*
  * Restore transactional state and TM-related registers.
- * Called with r4 pointing to the vcpu struct.
+ * Called with:
+ *  - r3 pointing to the vcpu struct.
+ *  - r4 is the guest MSR with desired TS bits:
+ * 	For HV KVM, it is VCPU_MSR
+ * 	For PR KVM, it is provided by caller
  * This potentially modifies all checkpointed registers.
- * It restores r1, r2, r4 from the PACA.
+ * It restores r1, r2 from the PACA.
  */
 _GLOBAL(kvmppc_restore_tm)
 	mflr	r0
@@ -229,9 +234,9 @@ _GLOBAL(kvmppc_restore_tm)
 	 * The user may change these outside of a transaction, so they must
 	 * always be context switched.
 	 */
-	ld	r5, VCPU_TFHAR(r4)
-	ld	r6, VCPU_TFIAR(r4)
-	ld	r7, VCPU_TEXASR(r4)
+	ld	r5, VCPU_TFHAR(r3)
+	ld	r6, VCPU_TFIAR(r3)
+	ld	r7, VCPU_TEXASR(r3)
 	mtspr	SPRN_TFHAR, r5
 	mtspr	SPRN_TFIAR, r6
 	mtspr	SPRN_TEXASR, r7
@@ -240,12 +245,10 @@ _GLOBAL(kvmppc_restore_tm)
 	li	r0, 0
 	stb	r0, HSTATE_FAKE_SUSPEND(r13)
 #endif
-#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
-	ld	r5, VCPU_MSR(r4)
+	mr	r5, r4
 	rldicl. r5, r5, 64 - MSR_TS_S_LG, 62
 	beqlr		/* TM not active in guest */
-#endif
-	std	r1, HSTATE_HOST_R1(r13)
+	std	r1, HSTATE_SCRATCH2(r13)
 
 	/* Make sure the failure summary is set, otherwise we'll program check
 	 * when we trechkpt.  It's possible that this might have been not set
@@ -272,21 +275,21 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 	 * some SPRs.
 	 */
 
-	mr	r31, r4
+	mr	r31, r3
 	addi	r3, r31, VCPU_FPRS_TM
 	bl	load_fp_state
 	addi	r3, r31, VCPU_VRS_TM
 	bl	load_vr_state
-	mr	r4, r31
-	lwz	r7, VCPU_VRSAVE_TM(r4)
+	mr	r3, r31
+	lwz	r7, VCPU_VRSAVE_TM(r3)
 	mtspr	SPRN_VRSAVE, r7
 
-	ld	r5, VCPU_LR_TM(r4)
-	lwz	r6, VCPU_CR_TM(r4)
-	ld	r7, VCPU_CTR_TM(r4)
-	ld	r8, VCPU_AMR_TM(r4)
-	ld	r9, VCPU_TAR_TM(r4)
-	ld	r10, VCPU_XER_TM(r4)
+	ld	r5, VCPU_LR_TM(r3)
+	lwz	r6, VCPU_CR_TM(r3)
+	ld	r7, VCPU_CTR_TM(r3)
+	ld	r8, VCPU_AMR_TM(r3)
+	ld	r9, VCPU_TAR_TM(r3)
+	ld	r10, VCPU_XER_TM(r3)
 	mtlr	r5
 	mtcr	r6
 	mtctr	r7
@@ -299,8 +302,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 	 * till the last moment to avoid running with userspace PPR and DSCR for
 	 * too long.
 	 */
-	ld	r29, VCPU_DSCR_TM(r4)
-	ld	r30, VCPU_PPR_TM(r4)
+	ld	r29, VCPU_DSCR_TM(r3)
+	ld	r30, VCPU_PPR_TM(r3)
 
 	std	r2, PACATMSCRATCH(r13) /* Save TOC */
 
@@ -332,9 +335,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
 	ld	r29, HSTATE_DSCR(r13)
 	mtspr	SPRN_DSCR, r29
-	ld	r4, HSTATE_KVM_VCPU(r13)
 #endif
-	ld	r1, HSTATE_HOST_R1(r13)
+	ld	r1, HSTATE_SCRATCH2(r13)
 	ld	r2, PACATMSCRATCH(r13)
 
 	/* Set the MSR RI since we have our registers back. */
@@ -353,10 +355,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_P9_TM_HV_ASSIST)
 	b	9b		/* and return */
 10:	stdu	r1, -PPC_MIN_STKFRM(r1)
 	/* guest is in transactional state, so simulate rollback */
-	mr	r3, r4
 	bl	kvmhv_emulate_tm_rollback
 	nop
-	ld      r4, HSTATE_KVM_VCPU(r13) /* our vcpu pointer has been trashed */
 	addi	r1, r1, PPC_MIN_STKFRM
 	b	9b
 #endif
