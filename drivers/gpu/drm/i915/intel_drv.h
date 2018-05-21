@@ -29,6 +29,7 @@
 #include <linux/i2c.h>
 #include <linux/hdmi.h>
 #include <linux/sched/clock.h>
+#include <linux/mei_hdcp.h>
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include <drm/drm_crtc.h>
@@ -383,6 +384,32 @@ struct intel_hdcp_shim {
 	/* Detects panel's hdcp capability. This is optional for HDMI. */
 	int (*hdcp_capable)(struct intel_digital_port *intel_dig_port,
 			    bool *hdcp_capable);
+
+	/* Write HDCP2.2 messages */
+	int (*write_2_2_msg)(struct intel_digital_port *intel_dig_port,
+			     void *buf, size_t size);
+
+	/* Read HDCP2.2 messages */
+	int (*read_2_2_msg)(struct intel_digital_port *intel_dig_port,
+			    uint8_t msg_id, void *buf, size_t size);
+
+	/*
+	 * Implementation of DP HDCP2.2 Errata for the communication of stream
+	 * type to Receivers. In DP HDCP2.2 Stream type is one of the input to
+	 * the HDCP2.2 Chiper for En/De-Cryption. Not applicable for HDMI.
+	 */
+	int (*config_stream_type)(struct intel_digital_port *intel_dig_port,
+				  void *buf, size_t size);
+
+	/* HDCP2.2 Link Integrity Check */
+	int (*check_2_2_link)(struct intel_digital_port *intel_dig_port);
+
+	/* Detects whether Panel is HDCP2.2 capable */
+	int (*hdcp_2_2_capable)(struct intel_digital_port *intel_dig_port,
+				bool *capable);
+
+	/* Detects the HDCP protocol(DP/HDMI) required on the port */
+	enum hdcp_protocol (*hdcp_protocol)(void);
 };
 
 struct intel_hdcp {
@@ -391,6 +418,40 @@ struct intel_hdcp {
 	uint64_t hdcp_value; /* protected by hdcp_mutex */
 	struct delayed_work hdcp_check_work;
 	struct work_struct hdcp_prop_work;
+
+	/* HDCP2.2 related definitions */
+	bool hdcp2_supported;
+
+	/*
+	 * Content Stream Type defined by content owner. TYPE0(0x0) content can
+	 * flow in the link protected by HDCP2.2 or HDCP1.4, where as TYPE1(0x1)
+	 * content can flow only through a link protected by HDCP2.2.
+	 */
+	u8 content_type;
+
+	bool is_paired;
+	bool is_repeater;
+
+	/*
+	 * Count of ReceiverID_List received. Initialized to 0 at AKE_INIT.
+	 * Incremented after processing the RepeaterAuth_Send_ReceiverID_List.
+	 * When it rolls over re-auth has to be triggered.
+	 */
+	uint32_t seq_num_v;
+
+	/*
+	 * Count of RepeaterAuth_Stream_Manage msg propagated.
+	 * Initialized to 0 on AKE_INIT. Incremented after every successful
+	 * transmission of RepeaterAuth_Stream_Manage message. When it rolls
+	 * over re-Auth has to be triggered.
+	 */
+	uint32_t seq_num_m;
+
+	/* mei interface related information */
+	struct mei_cl_device *cldev;
+	struct mei_hdcp_data mei_data;
+
+	struct delayed_work hdcp2_check_work;
 };
 
 struct intel_connector {
