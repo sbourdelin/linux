@@ -35,19 +35,13 @@ static bool force_two_pcm_support(struct fw_unit *unit)
 		"SAFFIRE_PRO_40_1",
 	};
 	char model[32];
-	unsigned int i;
 	int err;
 
 	err = fw_csr_string(unit->directory, CSR_MODEL, model, sizeof(model));
 	if (err < 0)
 		return false;
 
-	for (i = 0; i < ARRAY_SIZE(models); i++) {
-		if (strcmp(models[i], model) == 0)
-			break;
-	}
-
-	return i < ARRAY_SIZE(models);
+	return match_string(models, ARRAY_SIZE(models), model) >= 0;
 }
 
 static int check_dice_category(struct fw_unit *unit)
