@@ -27,6 +27,58 @@ static int _intel_hdcp2_disable(struct intel_connector *connector);
 static void intel_hdcp2_check_work(struct work_struct *work);
 static int intel_hdcp2_check_link(struct intel_connector *connector);
 static int intel_hdcp2_init(struct intel_connector *connector);
+static
+int intel_hdcp_read_valid_bksv(struct intel_digital_port *intel_dig_port,
+			       const struct intel_hdcp_shim *shim, u8 *bksv);
+static
+struct intel_digital_port *conn_to_dig_port(struct intel_connector *connector);
+
+static bool panel_supports_hdcp(struct intel_connector *connector)
+{
+	struct intel_digital_port *intel_dig_port = conn_to_dig_port(connector);
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	bool capable = false;
+	u8 bksv[5];
+
+	if (hdcp->hdcp_shim) {
+		if (hdcp->hdcp_shim->hdcp_capable) {
+			hdcp->hdcp_shim->hdcp_capable(intel_dig_port, &capable);
+		} else {
+			if (!intel_hdcp_read_valid_bksv(intel_dig_port,
+							hdcp->hdcp_shim, bksv))
+				capable = true;
+		}
+	}
+
+	return capable;
+}
+
+static inline
+bool panel_supports_hdcp2(struct intel_connector *connector)
+{
+	struct intel_digital_port *intel_dig_port = conn_to_dig_port(connector);
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	bool capable = false;
+
+	/* Check the panel's hdcp2.2 compliance if platform supports it. */
+	if (hdcp->hdcp2_supported)
+		hdcp->hdcp_shim->hdcp_2_2_capable(intel_dig_port, &capable);
+
+	return capable;
+}
+
+/* Is HDCP1.4 capable on Platform and Panel */
+static inline bool intel_hdcp_capable(struct intel_connector *connector)
+{
+	return (connector->hdcp.hdcp_shim && panel_supports_hdcp(connector));
+}
+
+/* Is HDCP2.2 capable on Platform and Panel */
+static inline bool intel_hdcp2_capable(struct intel_connector *connector)
+{
+	return (connector->hdcp.hdcp2_supported &&
+		panel_supports_hdcp2(connector));
+}
 
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
 				    const struct intel_hdcp_shim *shim)
@@ -803,20 +855,27 @@ int intel_hdcp_init(struct intel_connector *connector,
 int intel_hdcp_enable(struct intel_connector *connector)
 {
 	struct intel_hdcp *hdcp = &connector->hdcp;
-	int ret;
+	int ret = -EINVAL;
 
 	if (!hdcp->hdcp_shim)
 		return -ENOENT;
 
 	mutex_lock(&hdcp->hdcp_mutex);
 
-	ret = _intel_hdcp_enable(connector);
-	if (ret)
-		goto out;
+	/*
+	 * Considering that HDCP2.2 is more secure than HDCP1.4, If the setup
+	 * is capable of HDCP2.2, it is preferred to use HDCP2.2.
+	 */
+	if (intel_hdcp2_capable(connector))
+		ret = _intel_hdcp2_enable(connector);
+	else if (intel_hdcp_capable(connector))
+		ret = _intel_hdcp_enable(connector);
 
-	hdcp->hdcp_value = DRM_MODE_CONTENT_PROTECTION_ENABLED;
-	schedule_work(&hdcp->hdcp_prop_work);
-out:
+	if (!ret) {
+		hdcp->hdcp_value = DRM_MODE_CONTENT_PROTECTION_ENABLED;
+		schedule_work(&hdcp->hdcp_prop_work);
+	}
+
 	mutex_unlock(&hdcp->hdcp_mutex);
 	return ret;
 }
@@ -833,10 +892,14 @@ int intel_hdcp_disable(struct intel_connector *connector)
 
 	if (hdcp->hdcp_value != DRM_MODE_CONTENT_PROTECTION_UNDESIRED) {
 		hdcp->hdcp_value = DRM_MODE_CONTENT_PROTECTION_UNDESIRED;
+		if (hdcp->hdcp2_supported)
+			_intel_hdcp2_disable(connector);
+
 		ret = _intel_hdcp_disable(connector);
 	}
 
 	mutex_unlock(&hdcp->hdcp_mutex);
+	cancel_delayed_work_sync(&hdcp->hdcp2_check_work);
 	cancel_delayed_work_sync(&hdcp->hdcp_check_work);
 	return ret;
 }
