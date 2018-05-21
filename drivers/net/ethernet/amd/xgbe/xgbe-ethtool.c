@@ -705,6 +705,135 @@ out:
 	return 0;
 }
 
+static void xgbe_get_channels(struct net_device *netdev,
+			      struct ethtool_channels *channels)
+{
+	struct xgbe_prv_data *pdata = netdev_priv(netdev);
+	unsigned int rx, tx, combined;
+
+	/* Calculate maximums allowed:
+	 *   - Take into account the number of available IRQs
+	 *   - Do not take into account the number of online CPUs so that
+	 *     the user can over-subscribe if desired
+	 *   - Tx is additionally limited by the number of hardware queues
+	 */
+	rx = min(pdata->hw_feat.rx_ch_cnt, pdata->rx_max_channel_count);
+	rx = min(rx, pdata->channel_irq_count);
+	tx = min(pdata->hw_feat.tx_ch_cnt, pdata->tx_max_channel_count);
+	tx = min(tx, pdata->channel_irq_count);
+	tx = min(tx, pdata->tx_max_q_count);
+
+	combined = min(rx, tx);
+
+	channels->max_combined = combined;
+	channels->max_rx = rx;
+	channels->max_tx = tx;
+
+	/* Current running settings */
+	rx = pdata->rx_ring_count;
+	tx = pdata->tx_ring_count;
+
+	combined = min(rx, tx);
+	rx -= combined;
+	tx -= combined;
+
+	channels->combined_count = combined;
+	channels->rx_count = rx;
+	channels->tx_count = tx;
+}
+
+static void xgbe_print_set_channels_input(struct net_device *netdev,
+					  struct ethtool_channels *channels)
+{
+	netdev_err(netdev, "channel inputs: combined=%u, rx-only=%u, tx-only=%u\n",
+		   channels->combined_count, channels->rx_count,
+		   channels->tx_count);
+}
+
+static int xgbe_set_channels(struct net_device *netdev,
+			     struct ethtool_channels *channels)
+{
+	struct xgbe_prv_data *pdata = netdev_priv(netdev);
+	unsigned int rx, tx, combined;
+
+	/* Calculate maximums allowed:
+	 *   - Take into account the number of available IRQs
+	 *   - Do not take into account the number of online CPUs so that
+	 *     the user can over-subscribe if desired
+	 *   - Tx is additionally limited by the number of hardware queues
+	 */
+	rx = min(pdata->hw_feat.rx_ch_cnt, pdata->rx_max_channel_count);
+	rx = min(rx, pdata->channel_irq_count);
+	tx = min(pdata->hw_feat.tx_ch_cnt, pdata->tx_max_channel_count);
+	tx = min(tx, pdata->tx_max_q_count);
+	tx = min(tx, pdata->channel_irq_count);
+
+	combined = min(rx, tx);
+
+	/* Should not be setting other count */
+	if (channels->other_count) {
+		netdev_err(netdev,
+			   "other channel count must be zero\n");
+		return -EINVAL;
+	}
+
+	/* Require at least one Rx and Tx channel */
+	if (!channels->combined_count) {
+		if (!channels->rx_count || !channels->tx_count) {
+			netdev_err(netdev,
+				   "at least one Rx and one Tx channel is required\n");
+			xgbe_print_set_channels_input(netdev, channels);
+			return -EINVAL;
+		}
+	}
+
+	/* Check combined channels */
+	if (channels->combined_count > combined) {
+		netdev_err(netdev,
+			   "combined channel count cannot exceed %u\n",
+			   combined);
+		xgbe_print_set_channels_input(netdev, channels);
+		return -EINVAL;
+	}
+
+	/* Check for Rx/Tx specific channels */
+	combined = channels->combined_count;
+	tx -= combined;
+	rx -= combined;
+	if (channels->rx_count > rx) {
+		netdev_err(netdev,
+			   "Rx channel count cannot exceed %u when combined channel count is %u\n",
+			   rx, combined);
+		xgbe_print_set_channels_input(netdev, channels);
+		return -EINVAL;
+	}
+
+	if (channels->tx_count > tx) {
+		netdev_err(netdev,
+			   "Tx channel count cannot exceed %u when combined channel count is %u\n",
+			   tx, combined);
+		xgbe_print_set_channels_input(netdev, channels);
+		return -EINVAL;
+	}
+
+	rx = combined + channels->rx_count;
+	tx = combined + channels->tx_count;
+	netdev_notice(netdev, "final channel count assignment: combined=%u, rx-only=%u, tx-only=%u\n",
+		      min(rx, tx), rx - min(rx, tx), tx - min(rx, tx));
+
+	if ((rx == pdata->rx_ring_count) &&
+	    (tx == pdata->tx_ring_count))
+		goto out;
+
+	pdata->new_rx_ring_count = rx;
+	pdata->new_tx_ring_count = tx;
+
+	xgbe_full_restart_dev(pdata);
+
+out:
+	return 0;
+}
+
 static const struct ethtool_ops xgbe_ethtool_ops = {
 	.get_drvinfo = xgbe_get_drvinfo,
 	.get_msglevel = xgbe_get_msglevel,
@@ -729,6 +858,8 @@ static const struct ethtool_ops xgbe_ethtool_ops = {
 	.get_module_eeprom = xgbe_get_module_eeprom,
 	.get_ringparam = xgbe_get_ringparam,
 	.set_ringparam = xgbe_set_ringparam,
+	.get_channels = xgbe_get_channels,
+	.set_channels = xgbe_set_channels,
 };
 
 const struct ethtool_ops *xgbe_get_ethtool_ops(void)
