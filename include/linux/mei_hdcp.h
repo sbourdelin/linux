@@ -127,6 +127,8 @@ int mei_initiate_locality_check(struct mei_cl_device *cldev,
 				struct hdcp2_lc_init *lc_init_data);
 int mei_verify_lprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_lc_send_lprime *rx_lprime);
+int mei_get_session_key(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
+			struct hdcp2_ske_send_eks *ske_data);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -180,6 +182,12 @@ int mei_initiate_locality_check(struct mei_cl_device *cldev,
 static inline
 int mei_verify_lprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 		      struct hdcp2_lc_send_lprime *rx_lprime)
+{
+	return -ENODEV;
+}
+static inline
+int mei_get_session_key(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
+			struct hdcp2_ske_send_eks *ske_data)
 {
 	return -ENODEV;
 }

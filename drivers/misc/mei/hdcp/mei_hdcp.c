@@ -425,6 +425,65 @@ int mei_verify_lprime(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
 }
 EXPORT_SYMBOL(mei_verify_lprime);
 
+/*
+ * mei_get_session_key:
+ *	Function to prepare SKE_Send_Eks.
+ *
+ * cldev		: Pointer for mei client device
+ * data			: Intel HW specific Data
+ * ske_data		: Pointer for SKE_Send_Eks.
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+int mei_get_session_key(struct mei_cl_device *cldev, struct mei_hdcp_data *data,
+			struct hdcp2_ske_send_eks *ske_data)
+{
+	struct wired_cmd_get_session_key_in get_skey_in = { { 0 } };
+	struct wired_cmd_get_session_key_out get_skey_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data || !ske_data)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	get_skey_in.header.api_version = HDCP_API_VERSION;
+	get_skey_in.header.command_id = WIRED_GET_SESSION_KEY;
+	get_skey_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	get_skey_in.header.buffer_len = WIRED_CMD_BUF_LEN_GET_SESSION_KEY_IN;
+
+	get_skey_in.port.integrated_port_type = data->port_type;
+	get_skey_in.port.physical_port = data->port;
+
+	byte = mei_cldev_send(cldev, (u8 *)&get_skey_in, sizeof(get_skey_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&get_skey_out, sizeof(get_skey_out));
+
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (get_skey_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X failed. status: 0x%X\n",
+			WIRED_GET_SESSION_KEY, get_skey_out.header.status);
+		return -EIO;
+	}
+
+	ske_data->msg_id = HDCP_2_2_SKE_SEND_EKS;
+	memcpy(ske_data->e_dkey_ks, get_skey_out.e_dkey_ks,
+	       HDCP_2_2_E_DKEY_KS_LEN);
+	memcpy(ske_data->riv, get_skey_out.r_iv, HDCP_2_2_RIV_LEN);
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_get_session_key);
+
 static void
 mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
 {
