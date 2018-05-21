@@ -36,8 +36,6 @@ static struct device_type power_supply_dev_type;
 static bool __power_supply_is_supplied_by(struct power_supply *supplier,
 					 struct power_supply *supply)
 {
-	int i;
-
 	if (!supply->supplied_from && !supplier->supplied_to)
 		return false;
 
@@ -45,18 +43,16 @@ static bool __power_supply_is_supplied_by(struct power_supply *supplier,
 	if (supply->supplied_from) {
 		if (!supplier->desc->name)
 			return false;
-		for (i = 0; i < supply->num_supplies; i++)
-			if (!strcmp(supplier->desc->name, supply->supplied_from[i]))
-				return true;
+		return match_string((const char **)supply->supplied_from,
+				    supply->num_supplies,
+				    supplier->desc->name) >= 0;
 	} else {
 		if (!supply->desc->name)
 			return false;
-		for (i = 0; i < supplier->num_supplicants; i++)
-			if (!strcmp(supplier->supplied_to[i], supply->desc->name))
-				return true;
+		return match_string((const char **)supplier->supplied_to,
+				    supplier->num_supplicants,
+				    supply->desc->name) >= 0;
 	}
-
-	return false;
 }
 
 static int __power_supply_changed_work(struct device *dev, void *data)
