@@ -2582,7 +2582,7 @@ static int btrfs_ioctl_defrag(struct file *file, void __user *argp)
 	case S_IFREG:
 		if (!capable(CAP_SYS_ADMIN) &&
 		    inode_permission(inode, MAY_WRITE)) {
-			ret = -EINVAL;
+			ret = -EPERM;
 			goto out;
 		}
 
