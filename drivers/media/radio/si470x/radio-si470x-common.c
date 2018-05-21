@@ -110,6 +110,10 @@
 /* kernel includes */
 #include "radio-si470x.h"
 
+/* Hardening for Spectre-v1 */
+#include <linux/nospec.h>
+
+
 /**************************************************************************
  * Module Parameters
  **************************************************************************/
@@ -755,7 +759,7 @@ static int si470x_vidioc_enum_freq_bands(struct file *file, void *priv,
 		return -EINVAL;
 	if (band->index >= ARRAY_SIZE(bands))
 		return -EINVAL;
-	*band = bands[band->index];
+	*band = bands[array_index_nospec(band->index, ARRAY_SIZE(bands))];
 	return 0;
 }
 
