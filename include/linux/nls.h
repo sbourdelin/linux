@@ -29,13 +29,19 @@ struct nls_ops {
 };
 
 struct nls_table {
-	const char *charset;
-	const char *alias;
+	const struct nls_charset *charset;
 	const struct nls_ops *ops;
 	const unsigned char *charset2lower;
 	const unsigned char *charset2upper;
-	struct module *owner;
 	struct nls_table *next;
+};
+
+struct nls_charset {
+	const char *charset;
+	const char *alias;
+	struct module *owner;
+	struct nls_table *tables;
+	struct nls_charset *next;
 };
 
 /* this value hold the maximum octet of charset */
@@ -49,8 +55,8 @@ enum utf16_endian {
 };
 
 /* nls_base.c */
-extern int __register_nls(struct nls_table *, struct module *);
-extern int unregister_nls(struct nls_table *);
+extern int __register_nls(struct nls_charset *, struct module *);
+extern int unregister_nls(struct nls_charset *);
 extern struct nls_table *load_nls(char *);
 extern void unload_nls(struct nls_table *);
 extern struct nls_table *load_nls_default(void);
@@ -78,7 +84,7 @@ static inline int nls_char2uni(const struct nls_table *table,
 
 static inline const char *nls_charset_name(const struct nls_table *table)
 {
-	return table->charset;
+	return table->charset->charset;
 }
 
 static inline unsigned char nls_tolower(struct nls_table *t, unsigned char c)
