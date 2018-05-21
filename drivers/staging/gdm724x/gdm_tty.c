@@ -65,22 +65,14 @@ static int gdm_tty_install(struct tty_driver *driver, struct tty_struct *tty)
 {
 	struct gdm *gdm = NULL;
 	int ret;
-	int i;
-	int j;
 
-	j = GDM_TTY_MINOR;
-	for (i = 0; i < TTY_MAX_COUNT; i++) {
-		if (!strcmp(tty->driver->driver_name, DRIVER_STRING[i])) {
-			j = tty->index;
-			break;
-		}
-	}
-
-	if (j == GDM_TTY_MINOR)
+	ret = match_string((const char **)DRIVER_STRING,
+			   TTY_MAX_COUNT, tty->driver->driver_name);
+	if (ret < 0 || tty->index == GDM_TTY_MINOR)
 		return -ENODEV;
 
 	mutex_lock(&gdm_table_lock);
-	gdm = gdm_table[i][j];
+	gdm = gdm_table[ret][tty->index];
 	if (!gdm) {
 		mutex_unlock(&gdm_table_lock);
 		return -ENODEV;
