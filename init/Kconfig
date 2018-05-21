@@ -1404,6 +1404,37 @@ config BPF_JIT_ALWAYS_ON
 	  Enables BPF JIT and removes BPF interpreter to avoid
 	  speculative execution of BPF instructions by the interpreter
 
+config UNPRIVILEGED_BPF_BOOTPARAM
+	bool "Unprivileged bpf() boot parameter"
+	depends on BPF_SYSCALL
+	default n
+	help
+	  This option adds a kernel parameter 'unprivileged_bpf_disabled'
+	  that allows configuring default state of the
+	  kernel.unprivileged_bpf_disabled sysctl knob.
+	  If this option is selected, unprivileged access to the bpf() syscall
+	  can be disabled with unprivileged_bpf_disabled=1 on the kernel command
+	  line.  The purpose of this option is to allow disabling unprivileged
+	  bpf() syscall access during the early boot.
+
+	  If you are unsure how to answer this question, answer N.
+
+config UNPRIVILEGED_BPF_BOOTPARAM_VALUE
+	int "Unprivileged bpf() boot parameter default value"
+	depends on UNPRIVILEGED_BPF_BOOTPARAM
+	range 0 1
+	default 0
+	help
+	  This option sets the default value for the kernel parameter
+	  'unprivileged_bpf_disabled', which allows disabling unprivileged bpf()
+	  syscall access at boot.  If this option is set to 0 (zero), the
+	  unprivileged bpf() boot kernel parameter will default to 0, allowing
+	  unprivileged bpf() syscall access at bootup.  If this option is
+	  set to 1 (one), the unprivileged bpf() kernel parameter will default
+	  to 1, disabling unprivileged bpf() syscall access at bootup.
+
+	  If you are unsure how to answer this question, answer 0.
+
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"
 	select ANON_INODES
