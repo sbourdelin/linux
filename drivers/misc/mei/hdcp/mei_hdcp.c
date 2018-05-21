@@ -31,6 +31,42 @@
 #include <linux/slab.h>
 #include <linux/uuid.h>
 #include <linux/mei_cl_bus.h>
+#include <linux/notifier.h>
+#include <linux/mei_hdcp.h>
+
+static struct mei_cl_device *mei_cldev;
+static BLOCKING_NOTIFIER_HEAD(mei_cldev_notifier_list);
+
+static void
+mei_cldev_state_notify_clients(struct mei_cl_device *cldev, bool enabled)
+{
+	if (enabled)
+		blocking_notifier_call_chain(&mei_cldev_notifier_list,
+					     MEI_CLDEV_ENABLED, cldev);
+	else
+		blocking_notifier_call_chain(&mei_cldev_notifier_list,
+					     MEI_CLDEV_DISABLED, NULL);
+}
+
+int mei_cldev_register_notify(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&mei_cldev_notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(mei_cldev_register_notify);
+
+int mei_cldev_unregister_notify(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&mei_cldev_notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(mei_cldev_unregister_notify);
+
+int mei_cldev_poll_notification(void)
+{
+	if (mei_cldev)
+		mei_cldev_state_notify_clients(mei_cldev, true);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mei_cldev_poll_notification);
 
 static int mei_hdcp_probe(struct mei_cl_device *cldev,
 			  const struct mei_cl_device_id *id)
@@ -38,14 +74,20 @@ static int mei_hdcp_probe(struct mei_cl_device *cldev,
 	int ret;
 
 	ret = mei_cldev_enable(cldev);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(&cldev->dev, "mei_cldev_enable Failed. %d\n", ret);
+		return ret;
+	}
 
-	return ret;
+	mei_cldev = cldev;
+	mei_cldev_state_notify_clients(cldev, true);
+	return 0;
 }
 
 static int mei_hdcp_remove(struct mei_cl_device *cldev)
 {
+	mei_cldev = NULL;
+	mei_cldev_state_notify_clients(cldev, false);
 	mei_cldev_set_drvdata(cldev, NULL);
 	return mei_cldev_disable(cldev);
 }
