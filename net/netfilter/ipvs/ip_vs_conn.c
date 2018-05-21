@@ -820,6 +820,7 @@ static void ip_vs_conn_rcu_free(struct rcu_head *head)
 static void ip_vs_conn_expire(struct timer_list *t)
 {
 	struct ip_vs_conn *cp = from_timer(cp, t, timer);
+	struct ip_vs_conn *cp_c;
 	struct netns_ipvs *ipvs = cp->ipvs;
 
 	/*
@@ -834,8 +835,15 @@ static void ip_vs_conn_expire(struct timer_list *t)
 		del_timer(&cp->timer);
 
 		/* does anybody control me? */
-		if (cp->control)
+		cp_c = cp->control;
+		if (cp_c) {
 			ip_vs_control_del(cp);
+			if (cp_c->flags & IP_VS_CONN_F_TEMPLATE &&
+			    !(cp_c->flags & IP_VS_CONN_F_TMPL_PERSISTED)) {
+				IP_VS_DBG(4, "del conn template\n");
+				ip_vs_conn_expire_now(cp_c);
+			}
+		}
 
 		if ((cp->flags & IP_VS_CONN_F_NFCT) &&
 		    !(cp->flags & IP_VS_CONN_F_ONE_PACKET)) {

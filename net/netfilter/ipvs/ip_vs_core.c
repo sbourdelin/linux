@@ -221,6 +221,17 @@ ip_vs_conn_fill_param_persist(const struct ip_vs_service *svc,
 	return 0;
 }
 
+static inline bool
+is_new_template_persisted(u16 protocol)
+{
+	switch (protocol) {
+	case IPPROTO_TCP:
+		return false;
+	default:
+		return true;
+	}
+}
+
 /*
  *  IPVS persistent scheduling function
  *  It creates a connection entry according to its template if exists,
@@ -347,8 +358,10 @@ ip_vs_sched_persist(struct ip_vs_service *svc,
 		 * This adds param.pe_data to the template,
 		 * and thus param.pe_data will be destroyed
 		 * when the template expires */
+		flags = IP_VS_CONN_F_TEMPLATE;
+		flags |= is_new_template_persisted(param.protocol) ? IP_VS_CONN_F_TMPL_PERSISTED : 0;
 		ct = ip_vs_conn_new(&param, dest->af, &dest->addr, dport,
-				    IP_VS_CONN_F_TEMPLATE, dest, skb->mark);
+				    flags, dest, skb->mark);
 		if (ct == NULL) {
 			kfree(param.pe_data);
 			*ignored = -1;

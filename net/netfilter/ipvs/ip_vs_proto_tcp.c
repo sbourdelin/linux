@@ -538,6 +538,7 @@ set_tcp_state(struct ip_vs_proto_data *pd, struct ip_vs_conn *cp,
   tcp_state_out:
 	if (new_state != cp->state) {
 		struct ip_vs_dest *dest = cp->dest;
+		struct ip_vs_conn *ct = cp->control;
 
 		IP_VS_DBG_BUF(8, "%s %s [%c%c%c%c] %s:%d->"
 			      "%s:%d state: %s->%s conn->refcnt:%d\n",
@@ -568,6 +569,11 @@ set_tcp_state(struct ip_vs_proto_data *pd, struct ip_vs_conn *cp,
 				atomic_dec(&dest->inactconns);
 				cp->flags &= ~IP_VS_CONN_F_INACTIVE;
 			}
+		}
+
+		if (ct && ct->flags & IP_VS_CONN_F_TEMPLATE) {
+			if (new_state == IP_VS_TCP_S_ESTABLISHED)
+				ct->flags |= IP_VS_CONN_F_TMPL_PERSISTED;
 		}
 	}
 
