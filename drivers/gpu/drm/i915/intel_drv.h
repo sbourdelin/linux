@@ -385,6 +385,14 @@ struct intel_hdcp_shim {
 			    bool *hdcp_capable);
 };
 
+struct intel_hdcp {
+	const struct intel_hdcp_shim *hdcp_shim;
+	struct mutex hdcp_mutex;
+	uint64_t hdcp_value; /* protected by hdcp_mutex */
+	struct delayed_work hdcp_check_work;
+	struct work_struct hdcp_prop_work;
+};
+
 struct intel_connector {
 	struct drm_connector base;
 	/*
@@ -417,11 +425,7 @@ struct intel_connector {
 	/* Work struct to schedule a uevent on link train failure */
 	struct work_struct modeset_retry_work;
 
-	const struct intel_hdcp_shim *hdcp_shim;
-	struct mutex hdcp_mutex;
-	uint64_t hdcp_value; /* protected by hdcp_mutex */
-	struct delayed_work hdcp_check_work;
-	struct work_struct hdcp_prop_work;
+	struct intel_hdcp hdcp;
 };
 
 struct intel_digital_connector_state {
