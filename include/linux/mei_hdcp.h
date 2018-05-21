@@ -28,6 +28,7 @@
 #define _LINUX_MEI_HDCP_H
 
 #include <linux/mei_cl_bus.h>
+#include <drm/drm_hdcp.h>
 
 enum mei_cldev_state {
 	MEI_CLDEV_DISABLED,
@@ -106,6 +107,9 @@ struct mei_hdcp_data {
 int mei_cldev_register_notify(struct notifier_block *nb);
 int mei_cldev_unregister_notify(struct notifier_block *nb);
 int mei_cldev_poll_notification(void);
+int mei_initiate_hdcp2_session(struct mei_cl_device *cldev,
+			       struct mei_hdcp_data *data,
+			       struct hdcp2_ake_init *ake_data);
 #else
 static inline int mei_cldev_register_notify(struct notifier_block *nb)
 {
@@ -116,6 +120,13 @@ static inline int mei_cldev_unregister_notify(struct notifier_block *nb)
 	return -ENODEV;
 }
 static inline int mei_cldev_poll_notification(void)
+{
+	return -ENODEV;
+}
+static inline
+int mei_initiate_hdcp2_session(struct mei_cl_device *cldev,
+			       struct mei_hdcp_data *data,
+			       struct hdcp2_ake_init *ake_data)
 {
 	return -ENODEV;
 }
