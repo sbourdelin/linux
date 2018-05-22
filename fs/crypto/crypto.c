@@ -242,6 +242,7 @@ struct page *fscrypt_encrypt_page(const struct inode *inode,
 				u64 lblk_num, gfp_t gfp_flags)
 
 {
+	unsigned int blocksize;
 	struct fscrypt_ctx *ctx;
 	struct page *ciphertext_page = page;
 	int err;
@@ -271,13 +272,21 @@ struct page *fscrypt_encrypt_page(const struct inode *inode,
 		goto errout;
 
 	ctx->w.control_page = page;
-	err = fscrypt_do_block_crypto(inode, FS_ENCRYPT, lblk_num,
-				     page, ciphertext_page, len, offs,
-				     gfp_flags);
-	if (err) {
-		ciphertext_page = ERR_PTR(err);
-		goto errout;
+
+	blocksize = i_blocksize(inode);
+	while (offs < len) {
+		err = fscrypt_do_block_crypto(inode, FS_ENCRYPT, lblk_num,
+					page, ciphertext_page, blocksize,
+					offs, gfp_flags);
+		if (err) {
+			ciphertext_page = ERR_PTR(err);
+			goto errout;
+		}
+
+		offs += blocksize;
+		++lblk_num;
 	}
+
 	SetPagePrivate(ciphertext_page);
 	set_page_private(ciphertext_page, (unsigned long)ctx);
 	lock_page(ciphertext_page);
