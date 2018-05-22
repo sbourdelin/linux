@@ -305,11 +305,24 @@ EXPORT_SYMBOL(fscrypt_encrypt_page);
 int fscrypt_decrypt_page(const struct inode *inode, struct page *page,
 			unsigned int len, unsigned int offs, u64 lblk_num)
 {
+	unsigned long blocksize = inode->i_sb->s_blocksize;
+	unsigned int last = offs + len;
+	int ret;
+
 	if (!(inode->i_sb->s_cop->flags & FS_CFLG_OWN_PAGES))
 		BUG_ON(!PageLocked(page));
 
-	return fscrypt_do_block_crypto(inode, FS_DECRYPT, lblk_num, page, page,
-				      len, offs, GFP_NOFS);
+	while (offs < last) {
+		ret = fscrypt_do_block_crypto(inode, FS_DECRYPT, lblk_num, page,
+					page, blocksize, offs, GFP_NOFS);
+		if (ret)
+			return ret;
+
+		offs += blocksize;
+		++lblk_num;
+	}
+
+	return 0;
 }
 EXPORT_SYMBOL(fscrypt_decrypt_page);
 
