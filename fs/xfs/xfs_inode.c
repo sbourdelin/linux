@@ -823,6 +823,11 @@ xfs_ialloc(
 			inode->i_mode |= S_ISGID;
 	}
 
+	/* Reset all vfs error state. */
+	inode->i_mapping->wb_err = 0;
+	clear_bit(AS_EIO, &inode->i_mapping->flags);
+	clear_bit(AS_ENOSPC, &inode->i_mapping->flags);
+
 	/*
 	 * If the group ID of the new file does not match the effective group
 	 * ID or one of the supplementary group IDs, the S_ISGID bit is cleared
