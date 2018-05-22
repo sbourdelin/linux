@@ -48,18 +48,24 @@ and return the group to an unconstrained state once more.
 Any updates to a group's bandwidth specification will result in it becoming
 unthrottled if it is in a constrained state.
 
-System wide settings
---------------------
+Slice
+-----
 For efficiency run-time is transferred between the global pool and CPU local
 "silos" in a batch fashion.  This greatly reduces global accounting pressure
 on large systems.  The amount transferred each time such an update is required
 is described as the "slice".
 
-This is tunable via procfs:
-	/proc/sys/kernel/sched_cfs_bandwidth_slice_us (default=5ms)
-
 Larger slice values will reduce transfer overheads, while smaller values allow
 for more fine-grained consumption.
+
+The per-group file cpu.cfs_slice_us controls the slice length within each CPU
+group, different groups could set different values for their own preference.
+Its default value is tunable via procfs:
+
+	/proc/sys/kernel/sched_cfs_bandwidth_slice_us (default=5ms)
+
+Note, updating this file does not automatically update existing groups using
+a default slice.
 
 Statistics
 ----------
