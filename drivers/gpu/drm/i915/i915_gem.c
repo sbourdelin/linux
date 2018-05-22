@@ -3556,6 +3556,18 @@ i915_gem_idle_work_handler(struct work_struct *work)
 		return;
 
 	/*
+	 * Flush out the last user context, leaving only the pinned
+	 * kernel context resident. When we are idling on the kernel_context,
+	 * no more new requests (with a context switch) are emitted and we
+	 * can finally rest. A consequence is that the idle work handler is
+	 * always called at least twice before idling (and if the system is
+	 * idle that implies a round trip through the retire worker).
+	 */
+	mutex_lock(&dev_priv->drm.struct_mutex);
+	i915_gem_switch_to_kernel_context(dev_priv);
+	mutex_unlock(&dev_priv->drm.struct_mutex);
+
+	/*
 	 * Wait for last execlists context complete, but bail out in case a
 	 * new request is submitted. As we don't trust the hardware, we
 	 * continue on if the wait times out. This is necessary to allow
@@ -5009,7 +5021,6 @@ int i915_gem_suspend(struct drm_i915_private *dev_priv)
 
 		assert_kernel_context_is_current(dev_priv);
 	}
-	i915_gem_contexts_lost(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
 
 	intel_uc_suspend(dev_priv);
