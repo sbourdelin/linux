@@ -227,11 +227,16 @@ static int add_excluded_extent(struct btrfs_fs_info *fs_info,
 			       u64 start, u64 num_bytes)
 {
 	u64 end = start + num_bytes - 1;
-	set_extent_bits(&fs_info->freed_extents[0],
+	int ret = 0;
+
+	ret = set_extent_bits(&fs_info->freed_extents[0],
 			start, end, EXTENT_UPTODATE);
-	set_extent_bits(&fs_info->freed_extents[1],
+	if (ret)
+		goto out;
+	ret = set_extent_bits(&fs_info->freed_extents[1],
 			start, end, EXTENT_UPTODATE);
-	return 0;
+out:
+	return ret;
 }
 
 static void free_excluded_extents(struct btrfs_fs_info *fs_info,
@@ -6483,6 +6488,7 @@ int btrfs_exclude_logged_extents(struct btrfs_fs_info *fs_info,
 	struct btrfs_key key;
 	int found_type;
 	int i;
+	int ret = 0;
 
 	if (!btrfs_fs_incompat(fs_info, MIXED_GROUPS))
 		return 0;
@@ -6499,10 +6505,14 @@ int btrfs_exclude_logged_extents(struct btrfs_fs_info *fs_info,
 			continue;
 		key.objectid = btrfs_file_extent_disk_bytenr(eb, item);
 		key.offset = btrfs_file_extent_disk_num_bytes(eb, item);
-		__exclude_logged_extent(fs_info, key.objectid, key.offset);
+		ret = __exclude_logged_extent(fs_info, key.objectid,
+				key.offset);
+		if (ret)
+			goto out;
 	}
 
-	return 0;
+out:
+	return ret;
 }
 
 static void
