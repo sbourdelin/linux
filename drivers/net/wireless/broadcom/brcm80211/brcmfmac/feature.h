@@ -33,6 +33,8 @@
  * MFP: 802.11w Management Frame Protection.
  * GSCAN: enhanced scan offload feature.
  * FWSUP: Firmware supplicant.
+ * MON_802_11_FLAG: monitor packets flagged as 802.11
+ * MON_FMT_RADIOTAP: monitor packets include radiotap header
  */
 #define BRCMF_FEAT_LIST \
 	BRCMF_FEAT_DEF(MBSS) \
@@ -48,7 +50,9 @@
 	BRCMF_FEAT_DEF(WOWL_ARP_ND) \
 	BRCMF_FEAT_DEF(MFP) \
 	BRCMF_FEAT_DEF(GSCAN) \
-	BRCMF_FEAT_DEF(FWSUP)
+	BRCMF_FEAT_DEF(FWSUP) \
+	BRCMF_FEAT_DEF(MON_802_11_FLAG) \
+	BRCMF_FEAT_DEF(MON_FMT_RADIOTAP)
 
 /*
  * Quirks:
