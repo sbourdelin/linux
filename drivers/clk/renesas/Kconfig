@@ -21,6 +21,7 @@ config CLK_RENESAS
 	select CLK_R8A77980 if ARCH_R8A77980
 	select CLK_R8A77990 if ARCH_R8A77990
 	select CLK_R8A77995 if ARCH_R8A77995
+	select CLK_RZN1 if ARCH_RZN1
 	select CLK_SH73A0 if ARCH_SH73A0
 
 if CLK_RENESAS
@@ -150,6 +151,11 @@ config CLK_RCAR_USB2_CLOCK_SEL
 	depends on ARCH_RENESAS || COMPILE_TEST
 	help
 	  This is a driver for R-Car USB2 clock selector
+
+config CLK_RZN1
+	bool "Renesas RZ/N1 clock driver"
+	help
+	  This is a driver for RZ/N1 clocks
 
 # Generic
 config CLK_RENESAS_CPG_MSSR
