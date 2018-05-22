@@ -4069,6 +4069,7 @@ enum {
 #define   EDP_PSR_STATUS_SENDING_TP2_TP3	(1<<8)
 #define   EDP_PSR_STATUS_SENDING_TP1		(1<<4)
 #define   EDP_PSR_STATUS_IDLE_MASK		0xf
+#define   EDP_PSR_STATUS_STATE_SHIFT		29
 
 #define EDP_PSR_PERF_CNT		_MMIO(dev_priv->psr_mmio_base + 0x44)
 #define   EDP_PSR_PERF_CNT_MASK		0xffffff
