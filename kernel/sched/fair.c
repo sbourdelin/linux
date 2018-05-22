@@ -4568,25 +4568,6 @@ static inline u64 default_cfs_period(void)
 	return 100000000ULL;
 }
 
-/*
- * Replenish runtime according to assigned quota and update expiration time.
- * We use sched_clock_cpu directly instead of rq->clock to avoid adding
- * additional synchronization around rq->lock.
- *
- * requires cfs_b->lock
- */
-void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
-{
-	u64 now;
-
-	if (cfs_b->quota == RUNTIME_INF)
-		return;
-
-	now = sched_clock_cpu(smp_processor_id());
-	cfs_b->runtime = cfs_b->quota;
-	cfs_b->runtime_expires = now + ktime_to_ns(cfs_b->period);
-}
-
 static inline struct cfs_bandwidth *tg_cfs_bandwidth(struct task_group *tg)
 {
 	return &tg->cfs_bandwidth;
@@ -4903,6 +4884,31 @@ next:
 }
 
 /*
+ * Replenish runtime according to assigned quota and update expiration time.
+ * We use sched_clock_cpu directly instead of rq->clock to avoid adding
+ * additional synchronization around rq->lock.
+ *
+ * requires cfs_b->lock
+ */
+static void refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
+{
+	u64 now, idle;
+
+	now = sched_clock_cpu(smp_processor_id());
+	idle = now - cfs_b->last_active;
+	if (idle > cfs_b->period)
+		do_div(idle, cfs_b->period);
+	else
+		idle = 1;
+	cfs_b->runtime += idle * cfs_b->quota;
+	if (cfs_b->runtime > cfs_b->burst)
+		cfs_b->runtime = cfs_b->burst;
+	now = sched_clock_cpu(smp_processor_id());
+	cfs_b->last_active = now;
+	cfs_b->runtime_expires = now + ktime_to_ns(cfs_b->period);
+}
+
+/*
  * Responsible for refilling a task_group's bandwidth and unthrottling its
  * cfs_rqs as appropriate. If there has been no activity within the last
  * period the timer is deactivated until scheduling resumes; cfs_b->idle is
@@ -4927,7 +4933,7 @@ static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 	if (cfs_b->idle && !throttled)
 		goto out_deactivate;
 
-	__refill_cfs_bandwidth_runtime(cfs_b);
+	refill_cfs_bandwidth_runtime(cfs_b);
 
 	if (!throttled) {
 		/* mark as potentially idle for the upcoming period */
@@ -5173,8 +5179,10 @@ static enum hrtimer_restart sched_cfs_period_timer(struct hrtimer *timer)
 
 		idle = do_sched_cfs_period_timer(cfs_b, overrun);
 	}
-	if (idle)
+	if (idle) {
 		cfs_b->period_active = 0;
+		cfs_b->last_active = sched_clock_cpu(smp_processor_id());
+	}
 	raw_spin_unlock(&cfs_b->lock);
 
 	return idle ? HRTIMER_NORESTART : HRTIMER_RESTART;
@@ -5192,6 +5200,8 @@ void init_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 	cfs_b->quota = RUNTIME_INF;
 	cfs_b->period = ns_to_ktime(default_cfs_period());
 	cfs_b->slice = cfs_default_bandwidth_slice();
+	cfs_b->burst = nr_cpu_ids * cfs_b->period;
+	cfs_b->last_active = 0;
 
 	INIT_LIST_HEAD(&cfs_b->throttled_cfs_rq);
 	hrtimer_init(&cfs_b->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_PINNED);

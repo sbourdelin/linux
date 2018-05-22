@@ -6586,12 +6586,17 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota)
 	raw_spin_lock_irq(&cfs_b->lock);
 	cfs_b->period = ns_to_ktime(period);
 	cfs_b->quota = quota;
+	if (runtime_enabled) {
+		u64 now;
 
-	__refill_cfs_bandwidth_runtime(cfs_b);
-
-	/* Restart the period timer (if active) to handle new period expiry: */
-	if (runtime_enabled)
+		cfs_b->runtime = cfs_b->quota;
+		cfs_b->burst = nr_cpu_ids * quota;
+		now = sched_clock_cpu(smp_processor_id());
+		cfs_b->last_active = now;
+		cfs_b->runtime_expires = now + ktime_to_ns(cfs_b->period);
+		/* Restart the period timer (if active) to handle new period expiry: */
 		start_cfs_bandwidth(cfs_b);
+	}
 
 	raw_spin_unlock_irq(&cfs_b->lock);
 
@@ -6663,6 +6668,36 @@ long tg_get_cfs_period(struct task_group *tg)
 	return cfs_period_us;
 }
 
+static int tg_set_cfs_burst(struct task_group *tg, long cfs_burst_us)
+{
+	struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
+	u64 quota, burst;
+
+	if (cfs_burst_us <= 0)
+		return -ERANGE;
+	quota = tg->cfs_bandwidth.quota;
+	if (quota == RUNTIME_INF)
+		return -EINVAL;
+	burst = (u64)cfs_burst_us * NSEC_PER_USEC;
+	if (burst < quota)
+		return -EINVAL;
+
+	raw_spin_lock_irq(&cfs_b->lock);
+	cfs_b->burst = burst;
+	raw_spin_unlock_irq(&cfs_b->lock);
+	return 0;
+}
+
+static long tg_get_cfs_burst(struct task_group *tg)
+{
+	u64 burst_us;
+
+	burst_us = tg->cfs_bandwidth.burst;
+	do_div(burst_us, NSEC_PER_USEC);
+
+	return burst_us;
+}
+
 static int tg_set_cfs_slice(struct task_group *tg, long cfs_slice_us)
 {
 	struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
@@ -6715,6 +6750,18 @@ static int cpu_cfs_period_write_u64(struct cgroup_subsys_state *css,
 				    struct cftype *cftype, u64 cfs_period_us)
 {
 	return tg_set_cfs_period(css_tg(css), cfs_period_us);
+}
+
+static s64 cpu_cfs_burst_read_s64(struct cgroup_subsys_state *css,
+				  struct cftype *cft)
+{
+	return tg_get_cfs_burst(css_tg(css));
+}
+
+static int cpu_cfs_burst_write_s64(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, s64 cfs_quota_us)
+{
+	return tg_set_cfs_burst(css_tg(css), cfs_quota_us);
 }
 
 static s64 cpu_cfs_slice_read_s64(struct cgroup_subsys_state *css,
@@ -6870,6 +6917,11 @@ static struct cftype cpu_legacy_files[] = {
 		.name = "cfs_period_us",
 		.read_u64 = cpu_cfs_period_read_u64,
 		.write_u64 = cpu_cfs_period_write_u64,
+	},
+	{
+		.name = "cfs_burst_us",
+		.read_s64 = cpu_cfs_burst_read_s64,
+		.write_s64 = cpu_cfs_burst_write_s64,
 	},
 	{
 		.name = "cfs_slice_us",

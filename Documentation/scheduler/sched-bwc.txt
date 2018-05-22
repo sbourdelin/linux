@@ -67,6 +67,15 @@ Its default value is tunable via procfs:
 Note, updating this file does not automatically update existing groups using
 a default slice.
 
+Burst
+-----
+When a local run queue has no task to run, its unused CPU time is returned
+back to the global pool. If the whole group becomes idle, its periodical
+timer is halted, unused CPU time during this time is accumulated too.
+To avoid burst, a cap should be set by user via cpu.cfs_burst_us, with it
+the accumulated CPU time won't exceed this cap. Its default value allows
+a group to burn all CPU's with the given quota for a whole period.
+
 Statistics
 ----------
 A group's bandwidth statistics are exported via 3 fields in cpu.stat.

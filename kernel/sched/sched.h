@@ -333,8 +333,10 @@ struct cfs_bandwidth {
 	u64			quota;
 	u64			slice;
 	u64			runtime;
+	u64			burst;
 	s64			hierarchical_quota;
 	u64			runtime_expires;
+	u64			last_active;
 
 	int			idle;
 	int			period_active;
@@ -433,7 +435,6 @@ extern void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 			struct sched_entity *parent);
 extern void init_cfs_bandwidth(struct cfs_bandwidth *cfs_b);
 
-extern void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b);
 extern void start_cfs_bandwidth(struct cfs_bandwidth *cfs_b);
 extern void unthrottle_cfs_rq(struct cfs_rq *cfs_rq);
 
