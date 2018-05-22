@@ -734,11 +734,13 @@ struct device_dma_parameters {
  * struct device_connection - Device Connection Descriptor
  * @endpoint: The names of the two devices connected together
  * @id: Unique identifier for the connection
+ * @fwnode: fwnode pointer for finding a connection from graph
  * @list: List head, private, for internal use only
  */
 struct device_connection {
 	const char		*endpoint[2];
 	const char		*id;
+	struct fwnode_handle	*fwnode;
 	struct list_head	list;
 };
 

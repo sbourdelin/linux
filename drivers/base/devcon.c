@@ -7,6 +7,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/property.h>
 
 static DEFINE_MUTEX(devcon_lock);
 static LIST_HEAD(devcon_list);
@@ -31,9 +32,23 @@ void *device_connection_find_match(struct device *dev, const char *con_id,
 	struct device_connection *con;
 	void *ret = NULL;
 	int ep;
+	struct device_connection graph;
+	struct fwnode_handle *fwnode_ep;
+	struct fwnode_handle *remote;
 
 	if (!match)
 		return NULL;
+
+	fwnode_graph_for_each_endpoint(dev->fwnode, fwnode_ep) {
+		remote = fwnode_graph_get_remote_port_parent(fwnode_ep);
+		if (!remote)
+			continue;
+
+		graph.fwnode = remote;
+		ret = match(&graph, 0, data);
+		if (!IS_ERR(ret))
+			return ret;
+	}
 
 	mutex_lock(&devcon_lock);
 

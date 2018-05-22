@@ -19,7 +19,7 @@ Device connections alone do not create a dependency between the two devices.
 They are only descriptions which are not tied to either of the devices directly.
 A dependency between the two devices exists only if one of the two endpoint
 devices requests a reference to the other. The descriptions themselves can be
-defined in firmware (not yet supported) or they can be built-in.
+defined in firmware or they can be built-in.
 
 Usage
 -----
