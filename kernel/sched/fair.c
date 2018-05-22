@@ -4777,6 +4777,7 @@ static void throttle_cfs_rq(struct cfs_rq *cfs_rq)
 
 	cfs_rq->throttled = 1;
 	cfs_rq->throttled_clock = rq_clock(rq);
+	trace_sched_cfs_throttle(cfs_rq);
 	raw_spin_lock(&cfs_b->lock);
 	empty = list_empty(&cfs_b->throttled_cfs_rq);
 
@@ -4807,6 +4808,7 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 	se = cfs_rq->tg->se[cpu_of(rq)];
 
 	cfs_rq->throttled = 0;
+	trace_sched_cfs_unthrottle(cfs_rq);
 
 	update_rq_clock(rq);
 

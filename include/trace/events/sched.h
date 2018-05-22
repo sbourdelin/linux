@@ -570,6 +570,48 @@ TRACE_EVENT(sched_wake_idle_without_ipi,
 
 	TP_printk("cpu=%d", __entry->cpu)
 );
+
+#ifdef CONFIG_CFS_BANDWIDTH
+DECLARE_EVENT_CLASS(sched_fair,
+
+	TP_PROTO(struct cfs_rq *cfs_rq),
+
+	TP_ARGS(cfs_rq),
+
+	TP_STRUCT__entry(
+		__field(	s64,		runtime_remaining	)
+		__field(	int,		cpu			)
+		__dynamic_array(char,		cfs_path,
+				cgroup_path(cfs_rq->tg->css.cgroup, NULL, 0) + 1)
+	),
+
+	TP_fast_assign(
+		__entry->runtime_remaining = cfs_rq->runtime_remaining;
+		__entry->cpu = cpu_of(cfs_rq->rq);
+		cgroup_path(cfs_rq->tg->css.cgroup,
+			    __get_dynamic_array(cfs_path),
+			    __get_dynamic_array_len(cfs_path));
+	),
+
+	TP_printk("path=%s cpu=%d runtime_remaining=%lld", __get_str(cfs_path),
+		  __entry->cpu, __entry->runtime_remaining)
+);
+
+DEFINE_EVENT(sched_fair, sched_cfs_throttle,
+
+	TP_PROTO(struct cfs_rq *cfs_rq),
+
+	TP_ARGS(cfs_rq)
+);
+
+DEFINE_EVENT(sched_fair, sched_cfs_unthrottle,
+
+	TP_PROTO(struct cfs_rq *cfs_rq),
+
+	TP_ARGS(cfs_rq)
+);
+#endif /* CONFIG_CFS_BANDWIDTH */
+
 #endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */
