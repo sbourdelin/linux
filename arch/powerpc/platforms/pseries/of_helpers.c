@@ -6,6 +6,9 @@
 #include <asm/prom.h>
 
 #include "of_helpers.h"
+#include "pseries.h"
+
+#define	MAX_DRC_NAME_LEN 64
 
 /**
  * pseries_of_derive_parent - basically like dirname(1)
@@ -87,3 +90,37 @@ int of_read_drc_info_cell(struct property **prop, const __be32 **curval,
 	return 0;
 }
 EXPORT_SYMBOL(of_read_drc_info_cell);
+
+int drc_info_parser(struct device_node *dn,
+		int (*usercb)(struct of_drc_info *drc,
+				void *data,
+				void *optional_data,
+				int *ret_code),
+		char *opt_drc_type,
+		void *data)
+{
+	struct property *info;
+	unsigned int entries;
+	struct of_drc_info drc;
+	const __be32 *value;
+	int j, done = 0, ret_code = -EINVAL;
+
+	info = of_find_property(dn, "ibm,drc-info", NULL);
+	if (info == NULL)
+		return -EINVAL;
+
+	value = info->value;
+	entries = of_read_number(value++, 1);
+
+	for (j = 0, done = 0; (j < entries) && (!done); j++) {
+		of_read_drc_info_cell(&info, &value, &drc);
+
+		if (opt_drc_type && strcmp(opt_drc_type, drc.drc_type))
+			continue;
+
+		done = usercb(&drc, data, NULL, &ret_code);
+	}
+
+	return ret_code;
+}
+EXPORT_SYMBOL(drc_info_parser);
