@@ -76,13 +76,19 @@ static struct pt_cap_desc {
 	PT_CAP(psb_periods,		1, CPUID_EBX, 0xffff0000),
 };
 
-u32 pt_cap_get(enum pt_capabilities cap)
+u32 pt_cap_decode(u32 *caps, enum pt_capabilities cap)
 {
 	struct pt_cap_desc *cd = &pt_caps[cap];
-	u32 c = pt_pmu.caps[cd->leaf * PT_CPUID_REGS_NUM + cd->reg];
+	u32 c = caps[cd->leaf * PT_CPUID_REGS_NUM + cd->reg];
 	unsigned int shift = __ffs(cd->mask);
 
 	return (c & cd->mask) >> shift;
+}
+EXPORT_SYMBOL_GPL(pt_cap_decode);
+
+u32 pt_cap_get(enum pt_capabilities cap)
+{
+	return pt_cap_decode(pt_pmu.caps, cap);
 }
 EXPORT_SYMBOL_GPL(pt_cap_get);
 
