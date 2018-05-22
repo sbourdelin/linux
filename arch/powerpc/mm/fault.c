@@ -450,9 +450,6 @@ static int __do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * can result in fault, which will cause a deadlock when called with
 	 * mmap_sem held
 	 */
-	if (is_write && is_user)
-		get_user(inst, (unsigned int __user *)regs->nip);
-
 	if (is_user)
 		flags |= FAULT_FLAG_USER;
 	if (is_write)
@@ -497,6 +494,26 @@ retry:
 		goto good_area;
 	if (unlikely(!(vma->vm_flags & VM_GROWSDOWN)))
 		return bad_area(regs, address);
+
+	if (unlikely(is_write && is_user && address + 0x100000 < vma->vm_end &&
+		     !inst)) {
+		unsigned int __user *nip = (unsigned int __user *)regs->nip;
+
+		if (likely(access_ok(VERIFY_READ, nip, sizeof(inst)))) {
+			int res;
+
+			pagefault_disable();
+			res = __get_user_inatomic(inst, nip);
+			pagefault_enable();
+			if (unlikely(res)) {
+				up_read(&mm->mmap_sem);
+				res = __get_user(inst, nip);
+				if (!res && inst)
+					goto retry;
+				return bad_area_nosemaphore(regs, address);
+			}
+		}
+	}
 
 	/* The stack is being expanded, check if it's valid */
 	if (unlikely(bad_stack_expansion(regs, address, vma, inst)))
