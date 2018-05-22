@@ -66,6 +66,9 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
 static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
 static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
 
+static void __pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot);
+static void __pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot);
+
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 			      unsigned long size, pgprot_t vma_prot)
 {
@@ -200,7 +203,7 @@ static void init_pmd(pud_t *pudp, unsigned long addr, unsigned long end,
 		/* try section mapping first */
 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
 		    (flags & NO_BLOCK_MAPPINGS) == 0) {
-			pmd_set_huge(pmdp, phys, prot);
+			__pmd_set_huge(pmdp, phys, prot);
 
 			/*
 			 * After the PMD entry has been populated once, we
@@ -299,7 +302,7 @@ static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
 		 */
 		if (use_1G_block(addr, next, phys) &&
 		    (flags & NO_BLOCK_MAPPINGS) == 0) {
-			pud_set_huge(pudp, phys, prot);
+			__pud_set_huge(pudp, phys, prot);
 
 			/*
 			 * After the PUD entry has been populated once, we
@@ -929,31 +932,40 @@ int __init arch_ioremap_pmd_supported(void)
 	return 1;
 }
 
-int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+void __pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
 {
 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
 					pgprot_val(mk_sect_prot(prot)));
 
+	BUG_ON(phys & ~PUD_MASK);
+	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
+}
+
+int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+{
 	/* ioremap_page_range doesn't honour BBM */
 	if (pud_present(READ_ONCE(*pudp)))
 		return 0;
 
-	BUG_ON(phys & ~PUD_MASK);
-	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
+	__pud_set_huge(pudp, phys, prot);
 	return 1;
+}
+
+static void __pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
+{
+	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
+					pgprot_val(mk_sect_prot(prot)));
+	BUG_ON(phys & ~PMD_MASK);
+	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
 }
 
 int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
 {
-	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
-					pgprot_val(mk_sect_prot(prot)));
-
 	/* ioremap_page_range doesn't honour BBM */
 	if (pmd_present(READ_ONCE(*pmdp)))
 		return 0;
 
-	BUG_ON(phys & ~PMD_MASK);
-	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
+	__pmd_set_huge(pmdp, phys, prot);
 	return 1;
 }
 
