@@ -1039,28 +1039,26 @@ static void unicast_arp_send(struct sk_buff *skb, struct net_device *dev,
 
 		if (!path) {
 			path = path_rec_create(dev, phdr->hwaddr + 4);
+			if (!path)
+				goto drop_and_unlock;
 			new_path = 1;
+		} else {
+			/* make sure there is no changes in the existing path record */
+			init_path_rec(priv, path, phdr->hwaddr + 4);
 		}
-		if (path) {
-			if (!new_path)
-				/* make sure there is no changes in the existing path record */
-				init_path_rec(priv, path, phdr->hwaddr + 4);
 
-			if (skb_queue_len(&path->queue) < IPOIB_MAX_PATH_REC_QUEUE) {
-				push_pseudo_header(skb, phdr->hwaddr);
-				__skb_queue_tail(&path->queue, skb);
-			} else {
-				++dev->stats.tx_dropped;
-				dev_kfree_skb_any(skb);
-			}
+		if (!path->query && path_rec_start(dev, path)) {
+			if (new_path)
+				path_free(dev, path);
+			goto drop_and_unlock;
+		}
 
-			if (!path->query && path_rec_start(dev, path)) {
-				spin_unlock_irqrestore(&priv->lock, flags);
-				if (new_path)
-					path_free(dev, path);
-				return;
-			} else
-				__path_add(dev, path);
+		if (new_path)
+			__path_add(dev, path);
+
+		if (skb_queue_len(&path->queue) < IPOIB_MAX_PATH_REC_QUEUE) {
+			push_pseudo_header(skb, phdr->hwaddr);
+			__skb_queue_tail(&path->queue, skb);
 		} else {
 			goto drop_and_unlock;
 		}
@@ -1069,23 +1067,12 @@ static void unicast_arp_send(struct sk_buff *skb, struct net_device *dev,
 		return;
 	}
 
-	if (path->ah) {
-		ipoib_dbg(priv, "Send unicast ARP to %08x\n",
-			  be32_to_cpu(sa_path_get_dlid(&path->pathrec)));
-
-		spin_unlock_irqrestore(&priv->lock, flags);
-		path->ah->last_send = rn->send(dev, skb, path->ah->ah,
-					       IPOIB_QPN(phdr->hwaddr));
-		return;
-	} else if ((path->query || !path_rec_start(dev, path)) &&
-		   skb_queue_len(&path->queue) < IPOIB_MAX_PATH_REC_QUEUE) {
-		push_pseudo_header(skb, phdr->hwaddr);
-		__skb_queue_tail(&path->queue, skb);
-	} else {
-		goto drop_and_unlock;
-	}
+	ipoib_dbg(priv, "Send unicast ARP to %08x\n",
+		  be32_to_cpu(sa_path_get_dlid(&path->pathrec)));
 
 	spin_unlock_irqrestore(&priv->lock, flags);
+	path->ah->last_send = rn->send(dev, skb, path->ah->ah,
+				       IPOIB_QPN(phdr->hwaddr));
 	return;
 
 drop_and_unlock:
