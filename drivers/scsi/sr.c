@@ -49,6 +49,7 @@
 #include <linux/uaccess.h>
 
 #include <scsi/scsi.h>
+#include <scsi/sg.h>
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
@@ -553,6 +554,7 @@ static int sr_block_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 	struct scsi_cd *cd = scsi_cd(bdev->bd_disk);
 	struct scsi_device *sdev = cd->device;
 	void __user *argp = (void __user *)arg;
+	struct sg_io_hdr hdr;
 	int ret;
 
 	mutex_lock(&sr_mutex);
@@ -571,6 +573,12 @@ static int sr_block_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 	case SCSI_IOCTL_GET_BUS_NUMBER:
 		ret = scsi_ioctl(sdev, cmd, argp);
 		goto out;
+	case SG_IO:
+		if (copy_from_user(&hdr, argp, sizeof(hdr)))
+			break;
+		if (hdr.dxfer_direction == SG_DXFER_TO_DEV)
+			sdev->changed = 1;
+		break;
 	}
 
 	ret = cdrom_ioctl(&cd->cdi, bdev, mode, cmd, arg);
