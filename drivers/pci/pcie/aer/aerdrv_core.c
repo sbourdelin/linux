@@ -95,7 +95,16 @@ int pci_cleanup_aer_error_status_regs(struct pci_dev *dev)
 int pci_aer_init(struct pci_dev *dev)
 {
 	dev->aer_cap = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
+
+	if (!dev->aer_cap || pci_aer_stats_init(dev))
+		return -EIO;
+
 	return pci_cleanup_aer_error_status_regs(dev);
+}
+
+void pci_aer_exit(struct pci_dev *dev)
+{
+	pci_aer_stats_exit(dev);
 }
 
 /**
