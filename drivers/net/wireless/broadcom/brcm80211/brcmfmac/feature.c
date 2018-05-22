@@ -91,6 +91,28 @@ static int brcmf_feat_debugfs_read(struct seq_file *seq, void *data)
 }
 #endif /* DEBUG */
 
+struct brcmf_feat_fwfeat {
+	const char * const fwid;
+	u32 flags;
+};
+
+static const struct brcmf_feat_fwfeat brcmf_feat_fwfeat_map[] = {
+};
+
+static void brcmf_feat_firmware_features(struct brcmf_pub *pub)
+{
+	const struct brcmf_feat_fwfeat *e;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(brcmf_feat_fwfeat_map); i++) {
+		e = &brcmf_feat_fwfeat_map[i];
+		if (!strcmp(e->fwid, pub->fwver)) {
+			pub->feat_flags |= e->flags;
+			break;
+		}
+	}
+}
+
 /**
  * brcmf_feat_iovar_int_get() - determine feature through iovar query.
  *
@@ -215,6 +237,8 @@ void brcmf_feat_attach(struct brcmf_pub *drvr)
 		ifp->drvr->feat_flags &= ~drvr->settings->feature_disable;
 	}
 	brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_FWSUP, "sup_wpa");
+
+	brcmf_feat_firmware_features(drvr);
 
 	/* set chip related quirks */
 	switch (drvr->bus_if->chip) {
