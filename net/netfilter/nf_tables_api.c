@@ -1903,19 +1903,7 @@ static int nf_tables_newexpr(const struct nft_ctx *ctx,
 			goto err1;
 	}
 
-	if (ops->validate) {
-		const struct nft_data *data = NULL;
-
-		err = ops->validate(ctx, expr, &data);
-		if (err < 0)
-			goto err2;
-	}
-
 	return 0;
-
-err2:
-	if (ops->destroy)
-		ops->destroy(ctx, expr);
 err1:
 	expr->ops = NULL;
 	return err;
@@ -2274,6 +2262,53 @@ static void nf_tables_rule_release(const struct nft_ctx *ctx,
 	nf_tables_rule_destroy(ctx, rule);
 }
 
+int nft_chain_validate(const struct nft_ctx *ctx, const struct nft_chain *chain)
+{
+	struct nft_expr *expr, *last;
+	const struct nft_data *data;
+	struct nft_rule *rule;
+	int err;
+
+	list_for_each_entry(rule, &chain->rules, list) {
+		if (!nft_is_active_next(ctx->net, rule))
+			continue;
+
+		nft_rule_for_each_expr(expr, last, rule) {
+			if (!expr->ops->validate)
+				continue;
+
+			err = expr->ops->validate(ctx, expr, &data);
+			if (err < 0)
+				return err;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nft_chain_validate);
+
+static int nf_tables_validate(struct net *net, const struct nft_table *table)
+{
+	struct nft_chain *chain;
+	struct nft_ctx ctx = {
+		.net	= net,
+		.family	= table->family,
+	};
+	int err;
+
+	list_for_each_entry(chain, &table->chains, list) {
+		if (!nft_is_base_chain(chain))
+			continue;
+
+		ctx.chain = chain;
+		err = nft_chain_validate(&ctx, chain);
+		if (err < 0)
+			return err;
+	}
+
+	return 0;
+}
+
 #define NFT_RULE_MAXEXPRS	128
 
 static struct nft_expr_info *info;
@@ -2435,7 +2470,8 @@ static int nf_tables_newrule(struct net *net, struct sock *nlsk,
 		}
 	}
 	chain->use++;
-	return 0;
+
+	return nf_tables_validate(net, table);
 
 err2:
 	nf_tables_rule_release(&ctx, rule);
@@ -4132,7 +4168,7 @@ static int nf_tables_newsetelem(struct net *net, struct sock *nlsk,
 	const struct nlattr *attr;
 	struct nft_set *set;
 	struct nft_ctx ctx;
-	int rem, err = 0;
+	int rem, err;
 
 	if (nla[NFTA_SET_ELEM_LIST_ELEMENTS] == NULL)
 		return -EINVAL;
@@ -4152,9 +4188,10 @@ static int nf_tables_newsetelem(struct net *net, struct sock *nlsk,
 	nla_for_each_nested(attr, nla[NFTA_SET_ELEM_LIST_ELEMENTS], rem) {
 		err = nft_add_set_elem(&ctx, set, attr, nlh->nlmsg_flags);
 		if (err < 0)
-			break;
+			return err;
 	}
-	return err;
+
+	return nf_tables_validate(net, ctx.table);
 }
 
 /**
@@ -6217,7 +6254,8 @@ static int nf_tables_check_loops(const struct nft_ctx *ctx,
 			const struct nft_data *data = NULL;
 			int err;
 
-			if (!expr->ops->validate)
+			if (!expr->ops->validate ||
+			    strcmp(expr->ops->type->name, "immediate"))
 				continue;
 
 			err = expr->ops->validate(ctx, expr, &data);
