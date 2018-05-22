@@ -799,6 +799,9 @@ All cgroup core files are prefixed with "cgroup."
 	When delegating a sub-hierarchy, write access to this file
 	should be granted along with the containing directory.
 
+	If the target cgroup has enabled controllers, writing to this
+	file will fail with EBUSY.
+
 	In a threaded cgroup, reading this file fails with EOPNOTSUPP
 	as all the processes belong to the thread root.  Writing is
 	supported and moves every thread of the process to the cgroup.
@@ -849,6 +852,9 @@ All cgroup core files are prefixed with "cgroup."
 	disables.  If a controller appears more than once on the list,
 	the last one is effective.  When multiple enable and disable
 	operations are specified, either all succeed or all fail.
+
+	If the cgroup has attached tasks, writing to this file will
+	fail with EBUSY.
 
   cgroup.events
 	A read-only flat-keyed file which exists on non-root cgroups.
