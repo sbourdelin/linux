@@ -1,0 +1,44 @@
+* Renesas RZ/N1 Clock Driver
+
+This driver provides the clock infrastructure used by all the other drivers.
+
+One of the 'special' feature of this infrastructure is that Linux doesn't
+necessary 'own' all the clocks on the SoC, some other OS runs on
+the Cortex-M3 core and that OS can access and claim it's own clocks.
+
+Required Properties:
+
+  - compatible: Must be
+    - "renesas,r9a06g032-clocks" for the RZ/N1D
+    and "renesas,rzn1-clocks" as a fallback.
+  - reg: Base address and length of the memory resource used by the driver
+  - #clock-cells: Must be 1
+
+Examples
+--------
+
+  - Clock driver device node:
+
+	clock: clocks@4000c000 {
+		compatible = "renesas,r9a06g032-clocks",
+				"renesas,rzn1-clocks";
+		reg = <0x4000c000 0x1000>;
+		status = "okay";
+		#clock-cells = <1>;
+	};
+
+
+  - Other drivers can use the clocks as in:
+
+	uart0: serial@40060000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x40060000 0x400>;
+		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		clocks = <&clock RZN1_CLK_UART0>;
+		clock-names = "baudclk";
+	};
+    Note the use of RZN1_CLK_UART0 -- these constants are declared in
+    the rzn1-clocks.h header file. These are not hardware based constants
+    and are Linux specific.
