@@ -1199,7 +1199,6 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_put_supported_hw);
 struct opp_table *dev_pm_opp_set_prop_name(struct device *dev, const char *name)
 {
 	struct opp_table *opp_table;
-	int ret;
 
 	opp_table = dev_pm_opp_get_opp_table(dev);
 	if (!opp_table)
@@ -1208,26 +1207,17 @@ struct opp_table *dev_pm_opp_set_prop_name(struct device *dev, const char *name)
 	/* Make sure there are no concurrent readers while updating opp_table */
 	WARN_ON(!list_empty(&opp_table->opp_list));
 
-	/* Do we already have a prop-name associated with opp_table? */
-	if (opp_table->prop_name) {
-		dev_err(dev, "%s: Already have prop-name %s\n", __func__,
-			opp_table->prop_name);
-		ret = -EBUSY;
-		goto err;
-	}
+	/* Another CPU that shares the OPP table has set the property ? */
+	if (opp_table->prop_name)
+		return opp_table;
 
 	opp_table->prop_name = kstrdup(name, GFP_KERNEL);
 	if (!opp_table->prop_name) {
-		ret = -ENOMEM;
-		goto err;
+		dev_pm_opp_put_opp_table(opp_table);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	return opp_table;
-
-err:
-	dev_pm_opp_put_opp_table(opp_table);
-
-	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_set_prop_name);
 
@@ -1243,11 +1233,6 @@ void dev_pm_opp_put_prop_name(struct opp_table *opp_table)
 {
 	/* Make sure there are no concurrent readers while updating opp_table */
 	WARN_ON(!list_empty(&opp_table->opp_list));
-
-	if (!opp_table->prop_name) {
-		pr_err("%s: Doesn't have a prop-name\n", __func__);
-		return;
-	}
 
 	kfree(opp_table->prop_name);
 	opp_table->prop_name = NULL;
