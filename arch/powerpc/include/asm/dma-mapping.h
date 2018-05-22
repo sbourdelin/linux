@@ -115,4 +115,10 @@ extern u64 __dma_get_required_mask(struct device *dev);
 #define ARCH_HAS_DMA_MMAP_COHERENT
 
 #endif /* __KERNEL__ */
+
+#define platform_forces_virtio_dma platform_forces_virtio_dma
+
+struct virtio_device;
+
+extern bool platform_forces_virtio_dma(struct virtio_device *vdev);
 #endif	/* _ASM_DMA_MAPPING_H */

@@ -141,8 +141,18 @@ struct vring_virtqueue {
  * unconditionally on data path.
  */
 
+#ifndef platform_forces_virtio_dma
+static inline bool platform_forces_virtio_dma(struct virtio_device *vdev)
+{
+	return false;
+}
+#endif
+
 static bool vring_use_dma_api(struct virtio_device *vdev)
 {
+	if (platform_forces_virtio_dma(vdev))
+		return true;
+
 	if (!virtio_has_iommu_quirk(vdev))
 		return true;
 

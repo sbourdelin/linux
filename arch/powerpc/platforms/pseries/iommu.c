@@ -38,6 +38,7 @@
 #include <linux/of.h>
 #include <linux/iommu.h>
 #include <linux/rculist.h>
+#include <linux/virtio.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -1396,3 +1397,13 @@ static int __init disable_multitce(char *str)
 __setup("multitce=", disable_multitce);
 
 machine_subsys_initcall_sync(pseries, tce_iommu_bus_notifier_init);
+
+bool platform_forces_virtio_dma(struct virtio_device *vdev)
+{
+	/*
+	 * On protected guest platforms, force virtio core to use DMA
+	 * MAP API for all virtio devices. But there can also be some
+	 * exceptions for individual devices like virtio balloon.
+	 */
+	return (of_find_compatible_node(NULL, NULL, "ibm,ultravisor") != NULL);
+}
