@@ -3147,12 +3147,6 @@ static int btrfs_extent_same(struct inode *src, u64 loff, u64 olen,
 	if (olen == 0)
 		return 0;
 
-	/* don't make the dst file partly checksummed */
-	if ((BTRFS_I(src)->flags & BTRFS_INODE_NODATASUM) !=
-	    (BTRFS_I(dst)->flags & BTRFS_INODE_NODATASUM)) {
-		return -EINVAL;
-	}
-
 	tail_len = olen % BTRFS_MAX_DEDUPE_LEN;
 	chunk_count = div_u64(olen, BTRFS_MAX_DEDUPE_LEN);
 	if (chunk_count == 0)
@@ -3183,6 +3177,13 @@ static int btrfs_extent_same(struct inode *src, u64 loff, u64 olen,
 		inode_lock(src);
 	else
 		btrfs_double_inode_lock(src, dst);
+
+	/* don't make the dst file partly checksummed */
+	if ((BTRFS_I(src)->flags & BTRFS_INODE_NODATASUM) !=
+	    (BTRFS_I(dst)->flags & BTRFS_INODE_NODATASUM)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	for (i = 0; i < chunk_count; i++) {
 		ret = btrfs_extent_same_range(src, loff, BTRFS_MAX_DEDUPE_LEN,
