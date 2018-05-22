@@ -19,6 +19,9 @@ Required properties:
 Optional properties:
   - phys: phandle + phy specifier pair
   - phy-names: must be "usb"
+  - The connection to a usb3.0 host node needs by using OF graph bindings for
+    usb role switch.
+   - port@0 = USB3.0 host port.
 
 Example of R-Car H3 ES1.x:
 	usb3_peri0: usb@ee020000 {
@@ -27,6 +30,12 @@ Example of R-Car H3 ES1.x:
 		reg = <0 0xee020000 0 0x400>;
 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&cpg CPG_MOD 328>;
+
+		port {
+			usb3_peri0_ep: endpoint {
+				remote-endpoint = <&usb3_host0_ep>;
+			};
+		};
 	};
 
 	usb3_peri1: usb@ee060000 {
@@ -35,4 +44,10 @@ Example of R-Car H3 ES1.x:
 		reg = <0 0xee060000 0 0x400>;
 		interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&cpg CPG_MOD 327>;
+
+		port {
+			usb3_peri1_ep: endpoint {
+				remote-endpoint = <&usb3_host1_ep>;
+			};
+		};
 	};
