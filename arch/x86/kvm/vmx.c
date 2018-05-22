@@ -611,6 +611,8 @@ struct vcpu_vmx {
 
 	u64 		      arch_capabilities;
 	u64 		      spec_ctrl;
+	u64		      guest_split_lock_ctrl;
+	u64		      host_split_lock_ctrl;
 
 	u32 vm_entry_controls_shadow;
 	u32 vm_exit_controls_shadow;
@@ -6039,6 +6041,8 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, 0);
 	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(vmx->msr_autoload.guest));
 
+	vmx->guest_split_lock_ctrl = 0;
+
 	if (vmcs_config.vmentry_ctrl & VM_ENTRY_LOAD_IA32_PAT)
 		vmcs_write64(GUEST_IA32_PAT, vmx->vcpu.arch.pat);
 
@@ -6088,6 +6092,7 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 
 	vmx->rmode.vm86_active = 0;
 	vmx->spec_ctrl = 0;
+	vmx->guest_split_lock_ctrl = 0;
 
 	vcpu->arch.microcode_version = 0x100000000ULL;
 	vmx->vcpu.arch.regs[VCPU_REGS_RDX] = get_rdx_init_val();
@@ -9748,6 +9753,9 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	if (vmx->spec_ctrl)
 		native_wrmsrl(MSR_IA32_SPEC_CTRL, vmx->spec_ctrl);
 
+	vmx->host_split_lock_ctrl = native_read_msr(MSR_TEST_CTL);
+	native_wrmsrl(MSR_TEST_CTL, vmx->guest_split_lock_ctrl);
+
 	vmx->__launched = vmx->loaded_vmcs->launched;
 
 	evmcs_rsp = static_branch_unlikely(&enable_evmcs) ?
@@ -9896,6 +9904,9 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 	if (vmx->spec_ctrl)
 		native_wrmsrl(MSR_IA32_SPEC_CTRL, 0);
+
+	vmx->guest_split_lock_ctrl = native_read_msr(MSR_TEST_CTL);
+	native_wrmsrl(MSR_TEST_CTL, vmx->host_split_lock_ctrl);
 
 	/* Eliminate branch target predictions from guest mode */
 	vmexit_fill_RSB();
@@ -10060,6 +10071,8 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_SYSENTER_CS, MSR_TYPE_RW);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_SYSENTER_ESP, MSR_TYPE_RW);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_SYSENTER_EIP, MSR_TYPE_RW);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_TEST_CTL, MSR_TYPE_RW);
+
 	vmx->msr_bitmap_mode = 0;
 
 	vmx->loaded_vmcs = &vmx->vmcs01;
