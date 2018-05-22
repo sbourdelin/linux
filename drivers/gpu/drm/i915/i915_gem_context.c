@@ -602,7 +602,10 @@ static bool engine_has_idle_kernel_context(struct intel_engine_cs *engine)
 	lockdep_assert_held(&engine->i915->drm.struct_mutex);
 
 	list_for_each_entry(ring, active_rings, active_link) {
-		if (last_request_on_engine(ring->timeline, engine))
+		struct i915_request *rq =
+			last_request_on_engine(ring->timeline, engine);
+
+		if (rq && rq->gem_context != engine->i915->kernel_context)
 			return false;
 	}
 
