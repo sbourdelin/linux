@@ -987,6 +987,7 @@ extern void efi_map_pal_code (void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timespec64 *ts);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
+extern bool __init efi_create_rts_wq(void);
 #ifdef CONFIG_X86
 extern void efi_late_init(void);
 extern void efi_free_boot_services(void);
@@ -1650,5 +1651,8 @@ struct linux_efi_tpm_eventlog {
 };
 
 extern int efi_tpm_eventlog_init(void);
+
+/* Workqueue to queue EFI Runtime Services */
+extern struct workqueue_struct *efi_rts_wq;
 
 #endif /* _LINUX_EFI_H */

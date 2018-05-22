@@ -139,6 +139,9 @@ static int __init arm_enable_runtime_services(void)
 		return -ENOMEM;
 	}
 
+	if (!efi_create_rts_wq())
+		return 0;
+
 	/* Set up runtime services function pointers */
 	efi_native_runtime_setup();
 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);

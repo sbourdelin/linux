@@ -893,9 +893,6 @@ static void __init kexec_enter_virtual_mode(void)
 
 	if (efi_enabled(EFI_OLD_MEMMAP) && (__supported_pte_mask & _PAGE_NX))
 		runtime_code_page_mkexec();
-
-	/* clean DUMMY object */
-	efi_delete_dummy_variable();
 #endif
 }
 
@@ -1015,9 +1012,6 @@ static void __init __efi_enter_virtual_mode(void)
 	 * necessary relocation fixups for the new virtual addresses.
 	 */
 	efi_runtime_update_mappings();
-
-	/* clean DUMMY object */
-	efi_delete_dummy_variable();
 }
 
 void __init efi_enter_virtual_mode(void)
@@ -1031,6 +1025,15 @@ void __init efi_enter_virtual_mode(void)
 		__efi_enter_virtual_mode();
 
 	efi_dump_pagetable();
+
+	if (!efi_create_rts_wq())
+		return;
+
+	/*
+	 * Clean DUMMY object calls EFI Runtime Service, set_variable(), so
+	 * it should be invoked only after efi_rts_wq is ready.
+	 */
+	efi_delete_dummy_variable();
 }
 
 static int __init arch_parse_efi_cmdline(char *str)

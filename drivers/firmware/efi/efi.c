@@ -84,6 +84,8 @@ struct mm_struct efi_mm = {
 	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
 };
 
+struct workqueue_struct *efi_rts_wq;
+
 static bool disable_runtime;
 static int __init setup_noefi(char *arg)
 {
@@ -335,6 +337,13 @@ static int __init efisubsys_init(void)
 	int error;
 
 	if (!efi_enabled(EFI_BOOT))
+		return 0;
+
+	/*
+	 * If we failed to create efi_rts_wq, EFI_RUNTIME_SERVICES would
+	 * have been be cleared, check for that condition.
+	 */
+	if (!efi_enabled(EFI_RUNTIME_SERVICES))
 		return 0;
 
 	/* We register the efi directory at /sys/firmware/efi */
@@ -971,3 +980,19 @@ static int register_update_efi_random_seed(void)
 }
 late_initcall(register_update_efi_random_seed);
 #endif
+
+bool __init efi_create_rts_wq(void)
+{
+	/*
+	 * Since we process only one efi_runtime_service() at a time, an
+	 * ordered workqueue (which creates only one execution context)
+	 * should suffice all our needs.
+	 */
+	efi_rts_wq = alloc_ordered_workqueue("efi_rts_wq", 0);
+	if (!efi_rts_wq) {
+		pr_err("Creating efi_rts_wq failed, EFI runtime services disabled.\n");
+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		return false;
+	}
+	return true;
+}
