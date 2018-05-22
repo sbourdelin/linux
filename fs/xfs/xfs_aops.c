@@ -1405,7 +1405,7 @@ xfs_vm_readpage(
 	struct page		*page)
 {
 	trace_xfs_vm_readpage(page->mapping->host, 1);
-	return mpage_readpage(page, xfs_get_blocks);
+	return mpage_readpage(page, xfs_get_blocks, NULL);
 }
 
 STATIC int
@@ -1416,7 +1416,7 @@ xfs_vm_readpages(
 	unsigned		nr_pages)
 {
 	trace_xfs_vm_readpages(mapping->host, nr_pages);
-	return mpage_readpages(mapping, pages, nr_pages, xfs_get_blocks);
+	return mpage_readpages(mapping, pages, nr_pages, xfs_get_blocks, NULL);
 }
 
 /*

@@ -45,7 +45,11 @@
 #include <linux/mpage.h>
 #include <linux/bit_spinlock.h>
 #include <linux/pagevec.h>
+#include <linux/fs.h>
 #include <trace/events/block.h>
+
+#define __FS_HAS_ENCRYPTION IS_ENABLED(CONFIG_EXT4_FS_ENCRYPTION)
+#include <linux/fscrypt.h>
 
 static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
@@ -2197,6 +2201,172 @@ int block_is_partially_uptodate(struct page *page, unsigned long from,
 }
 EXPORT_SYMBOL(block_is_partially_uptodate);
 
+static void end_bio_bh_io_sync(struct bio *bio)
+{
+	post_process_read_t *post_process;
+	struct fscrypt_ctx *ctx;
+	struct buffer_head *bh;
+
+	if (fscrypt_bio_encrypted(bio)) {
+		ctx = bio->bi_private;
+		post_process = fscrypt_get_post_process(ctx);
+
+		if (bio->bi_status || post_process->process_block == NULL) {
+			bh = fscrypt_get_bh(ctx);
+			fscrypt_release_ctx(ctx);
+		} else {
+			fscrypt_enqueue_decrypt_bio(ctx, bio,
+						post_process->process_block);
+			return;
+		}
+	} else {
+		bh = bio->bi_private;
+	}
+
+	if (unlikely(bio_flagged(bio, BIO_QUIET)))
+		set_bit(BH_Quiet, &bh->b_state);
+
+	bh->b_end_io(bh, !bio->bi_status);
+	bio_put(bio);
+}
+
+/*
+ * This allows us to do IO even on the odd last sectors
+ * of a device, even if the block size is some multiple
+ * of the physical sector size.
+ *
+ * We'll just truncate the bio to the size of the device,
+ * and clear the end of the buffer head manually.
+ *
+ * Truly out-of-range accesses will turn into actual IO
+ * errors, this only handles the "we need to be able to
+ * do IO at the final sector" case.
+ */
+void guard_bio_eod(int op, struct bio *bio)
+{
+	sector_t maxsector;
+	struct bio_vec *bvec = bio_last_bvec_all(bio);
+	unsigned truncated_bytes;
+	struct hd_struct *part;
+
+	rcu_read_lock();
+	part = __disk_get_part(bio->bi_disk, bio->bi_partno);
+	if (part)
+		maxsector = part_nr_sects_read(part);
+	else
+		maxsector = get_capacity(bio->bi_disk);
+	rcu_read_unlock();
+
+	if (!maxsector)
+		return;
+
+	/*
+	 * If the *whole* IO is past the end of the device,
+	 * let it through, and the IO layer will turn it into
+	 * an EIO.
+	 */
+	if (unlikely(bio->bi_iter.bi_sector >= maxsector))
+		return;
+
+	maxsector -= bio->bi_iter.bi_sector;
+	if (likely((bio->bi_iter.bi_size >> 9) <= maxsector))
+		return;
+
+	/* Uhhuh. We've got a bio that straddles the device size! */
+	truncated_bytes = bio->bi_iter.bi_size - (maxsector << 9);
+
+	/* Truncate the bio.. */
+	bio->bi_iter.bi_size -= truncated_bytes;
+	bvec->bv_len -= truncated_bytes;
+
+	/* ..and clear the end of the buffer for reads */
+	if (op == REQ_OP_READ) {
+		zero_user(bvec->bv_page, bvec->bv_offset + bvec->bv_len,
+				truncated_bytes);
+	}
+}
+
+struct bio *create_bh_bio(int op, int op_flags, struct buffer_head *bh,
+			enum rw_hint write_hint,
+			post_process_read_t *post_process)
+{
+	struct address_space *mapping;
+	struct fscrypt_ctx *ctx = NULL;
+	struct inode *inode;
+	struct page *page;
+	struct bio *bio;
+
+	BUG_ON(!buffer_locked(bh));
+	BUG_ON(!buffer_mapped(bh));
+	BUG_ON(!bh->b_end_io);
+	BUG_ON(buffer_delay(bh));
+	BUG_ON(buffer_unwritten(bh));
+
+	/*
+	 * Only clear out a write error when rewriting
+	 */
+	if (test_set_buffer_req(bh) && (op == REQ_OP_WRITE))
+		clear_buffer_write_io_error(bh);
+
+	page = bh->b_page;
+
+	if (op == REQ_OP_READ) {
+		mapping = page_mapping(page);
+		if (mapping && !PageSwapCache(page)) {
+			inode = mapping->host;
+			if (IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode)) {
+				ctx = fscrypt_get_ctx(inode, GFP_NOFS);
+				BUG_ON(!ctx);
+				fscrypt_set_bh(ctx, bh);
+				if (post_process)
+					fscrypt_set_post_process(ctx,
+								post_process);
+			}
+		}
+	}
+
+	/*
+	 * from here on down, it's all bio -- do the initial mapping,
+	 * submit_bio -> generic_make_request may further map this bio around
+	 */
+	bio = bio_alloc(GFP_NOIO, 1);
+
+	bio->bi_iter.bi_sector = bh->b_blocknr * (bh->b_size >> 9);
+	bio_set_dev(bio, bh->b_bdev);
+	bio->bi_write_hint = write_hint;
+
+	bio_add_page(bio, bh->b_page, bh->b_size, bh_offset(bh));
+	BUG_ON(bio->bi_iter.bi_size != bh->b_size);
+
+	bio->bi_end_io = end_bio_bh_io_sync;
+
+	if (ctx)
+		bio->bi_private = ctx;
+	else
+		bio->bi_private = bh;
+
+	/* Take care of bh's that straddle the end of the device */
+	guard_bio_eod(op, bio);
+
+	if (buffer_meta(bh))
+		op_flags |= REQ_META;
+	if (buffer_prio(bh))
+		op_flags |= REQ_PRIO;
+	bio_set_op_attrs(bio, op, op_flags);
+
+	return bio;
+}
+
+static int submit_bh_post_process(int op, int op_flags, struct buffer_head *bh,
+		post_process_read_t *post_process)
+{
+	struct bio *bio;
+
+	bio = create_bh_bio(op, op_flags, bh, 0, post_process);
+	submit_bio(bio);
+	return 0;
+}
+
 /*
  * Generic "read page" function for block devices that have the normal
  * get_block functionality. This is most of the block device filesystems.
@@ -2204,7 +2374,8 @@ EXPORT_SYMBOL(block_is_partially_uptodate);
  * set/clear_buffer_uptodate() functions propagate buffer state into the
  * page struct once IO has completed.
  */
-int block_read_full_page(struct page *page, get_block_t *get_block)
+int block_read_full_page(struct page *page, get_block_t *get_block,
+			post_process_read_t *post_process)
 {
 	struct inode *inode = page->mapping->host;
 	sector_t iblock, lblock;
@@ -2284,7 +2455,8 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		if (buffer_uptodate(bh))
 			end_buffer_async_read(bh, 1);
 		else
-			submit_bh(REQ_OP_READ, 0, bh);
+			submit_bh_post_process(REQ_OP_READ, 0, bh,
+					post_process);
 	}
 	return 0;
 }
@@ -2959,124 +3131,12 @@ sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 }
 EXPORT_SYMBOL(generic_block_bmap);
 
-static void end_bio_bh_io_sync(struct bio *bio)
-{
-	struct buffer_head *bh = bio->bi_private;
-
-	if (unlikely(bio_flagged(bio, BIO_QUIET)))
-		set_bit(BH_Quiet, &bh->b_state);
-
-	bh->b_end_io(bh, !bio->bi_status);
-	bio_put(bio);
-}
-
-/*
- * This allows us to do IO even on the odd last sectors
- * of a device, even if the block size is some multiple
- * of the physical sector size.
- *
- * We'll just truncate the bio to the size of the device,
- * and clear the end of the buffer head manually.
- *
- * Truly out-of-range accesses will turn into actual IO
- * errors, this only handles the "we need to be able to
- * do IO at the final sector" case.
- */
-void guard_bio_eod(int op, struct bio *bio)
-{
-	sector_t maxsector;
-	struct bio_vec *bvec = bio_last_bvec_all(bio);
-	unsigned truncated_bytes;
-	struct hd_struct *part;
-
-	rcu_read_lock();
-	part = __disk_get_part(bio->bi_disk, bio->bi_partno);
-	if (part)
-		maxsector = part_nr_sects_read(part);
-	else
-		maxsector = get_capacity(bio->bi_disk);
-	rcu_read_unlock();
-
-	if (!maxsector)
-		return;
-
-	/*
-	 * If the *whole* IO is past the end of the device,
-	 * let it through, and the IO layer will turn it into
-	 * an EIO.
-	 */
-	if (unlikely(bio->bi_iter.bi_sector >= maxsector))
-		return;
-
-	maxsector -= bio->bi_iter.bi_sector;
-	if (likely((bio->bi_iter.bi_size >> 9) <= maxsector))
-		return;
-
-	/* Uhhuh. We've got a bio that straddles the device size! */
-	truncated_bytes = bio->bi_iter.bi_size - (maxsector << 9);
-
-	/* Truncate the bio.. */
-	bio->bi_iter.bi_size -= truncated_bytes;
-	bvec->bv_len -= truncated_bytes;
-
-	/* ..and clear the end of the buffer for reads */
-	if (op == REQ_OP_READ) {
-		zero_user(bvec->bv_page, bvec->bv_offset + bvec->bv_len,
-				truncated_bytes);
-	}
-}
-
-struct bio *create_bh_bio(int op, int op_flags, struct buffer_head *bh,
-                          enum rw_hint write_hint)
-{
-	struct bio *bio;
-
-	BUG_ON(!buffer_locked(bh));
-	BUG_ON(!buffer_mapped(bh));
-	BUG_ON(!bh->b_end_io);
-	BUG_ON(buffer_delay(bh));
-	BUG_ON(buffer_unwritten(bh));
-
-	/*
-	 * Only clear out a write error when rewriting
-	 */
-	if (test_set_buffer_req(bh) && (op == REQ_OP_WRITE))
-		clear_buffer_write_io_error(bh);
-
-	/*
-	 * from here on down, it's all bio -- do the initial mapping,
-	 * submit_bio -> generic_make_request may further map this bio around
-	 */
-	bio = bio_alloc(GFP_NOIO, 1);
-
-	bio->bi_iter.bi_sector = bh->b_blocknr * (bh->b_size >> 9);
-	bio_set_dev(bio, bh->b_bdev);
-	bio->bi_write_hint = write_hint;
-
-	bio_add_page(bio, bh->b_page, bh->b_size, bh_offset(bh));
-	BUG_ON(bio->bi_iter.bi_size != bh->b_size);
-
-	bio->bi_end_io = end_bio_bh_io_sync;
-	bio->bi_private = bh;
-
-	/* Take care of bh's that straddle the end of the device */
-	guard_bio_eod(op, bio);
-
-	if (buffer_meta(bh))
-		op_flags |= REQ_META;
-	if (buffer_prio(bh))
-		op_flags |= REQ_PRIO;
-	bio_set_op_attrs(bio, op, op_flags);
-
-	return bio;
-}
-
 static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
 			 enum rw_hint write_hint, struct writeback_control *wbc)
 {
 	struct bio *bio;
 
-	bio = create_bh_bio(op, op_flags, bh, write_hint);
+	bio = create_bh_bio(op, op_flags, bh, write_hint, NULL);
 
 	if (wbc) {
 		wbc_init_bio(wbc, bio);
@@ -3092,7 +3152,7 @@ int submit_bh_blkcg_css(int op, int op_flags, struct buffer_head *bh,
 {
 	struct bio *bio;
 
-	bio = create_bh_bio(op, op_flags, bh, 0);
+	bio = create_bh_bio(op, op_flags, bh, 0, NULL);
 	bio_associate_blkcg(bio, blkcg_css);
 	submit_bio(bio);
 	return 0;
@@ -3101,11 +3161,7 @@ EXPORT_SYMBOL(submit_bh_blkcg_css);
 
 int submit_bh(int op, int op_flags, struct buffer_head *bh)
 {
-	struct bio *bio;
-
-	bio = create_bh_bio(op, op_flags, bh, 0);
-	submit_bio(bio);
-	return 0;
+	return submit_bh_post_process(op, op_flags, bh, NULL);
 }
 EXPORT_SYMBOL(submit_bh);
 

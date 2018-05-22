@@ -30,6 +30,8 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 #include <linux/cleancache.h>
+#define __FS_HAS_ENCRYPTION IS_ENABLED(CONFIG_EXT4_FS_ENCRYPTION)
+#include <linux/fscrypt.h>
 #include "internal.h"
 
 /*
@@ -46,8 +48,23 @@
  */
 static void mpage_end_io(struct bio *bio)
 {
+	post_process_read_t *post_process;
+	struct fscrypt_ctx *ctx;
 	struct bio_vec *bv;
 	int i;
+
+	if (fscrypt_bio_encrypted(bio)) {
+		ctx = bio->bi_private;
+		post_process = fscrypt_get_post_process(ctx);
+
+		if (bio->bi_status || post_process->process_pages == NULL) {
+			fscrypt_release_ctx(ctx);
+		} else {
+			fscrypt_enqueue_decrypt_bio(ctx, bio,
+						post_process->process_pages);
+			return;
+		}
+	}
 
 	bio_for_each_segment_all(bv, bio, i) {
 		struct page *page = bv->bv_page;
@@ -146,7 +163,7 @@ static struct bio *
 do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 		sector_t *last_block_in_bio, struct buffer_head *map_bh,
 		unsigned long *first_logical_block, get_block_t get_block,
-		gfp_t gfp)
+		post_process_read_t *post_process, gfp_t gfp)
 {
 	struct inode *inode = page->mapping->host;
 	const unsigned blkbits = inode->i_blkbits;
@@ -278,15 +295,26 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 
 alloc_new:
 	if (bio == NULL) {
-		if (first_hole == blocks_per_page) {
+		struct fscrypt_ctx *ctx = NULL;
+
+		if (IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode)) {
+			ctx = fscrypt_get_ctx(inode, gfp & GFP_KERNEL);
+			if (IS_ERR(ctx))
+				goto confused;
+			fscrypt_set_post_process(ctx, post_process);
+		} else if (first_hole == blocks_per_page) {
 			if (!bdev_read_page(bdev, blocks[0] << (blkbits - 9),
 								page))
 				goto out;
 		}
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
 				min_t(int, nr_pages, BIO_MAX_PAGES), gfp);
-		if (bio == NULL)
+		if (bio == NULL) {
+			if (ctx)
+				fscrypt_release_ctx(ctx);
 			goto confused;
+		}
+		bio->bi_private = ctx;
 	}
 
 	length = first_hole << blkbits;
@@ -309,7 +337,7 @@ confused:
 	if (bio)
 		bio = mpage_bio_submit(REQ_OP_READ, 0, bio);
 	if (!PageUptodate(page))
-	        block_read_full_page(page, get_block);
+		block_read_full_page(page, get_block, post_process);
 	else
 		unlock_page(page);
 	goto out;
@@ -361,7 +389,8 @@ confused:
  */
 int
 mpage_readpages(struct address_space *mapping, struct list_head *pages,
-				unsigned nr_pages, get_block_t get_block)
+		unsigned nr_pages, get_block_t get_block,
+		post_process_read_t *post_process)
 {
 	struct bio *bio = NULL;
 	unsigned page_idx;
@@ -384,7 +413,8 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 					nr_pages - page_idx,
 					&last_block_in_bio, &map_bh,
 					&first_logical_block,
-					get_block, gfp);
+					get_block, post_process,
+					gfp);
 		}
 		put_page(page);
 	}
@@ -398,7 +428,8 @@ EXPORT_SYMBOL(mpage_readpages);
 /*
  * This isn't called much at all
  */
-int mpage_readpage(struct page *page, get_block_t get_block)
+int mpage_readpage(struct page *page, get_block_t get_block,
+		post_process_read_t *post_process)
 {
 	struct bio *bio = NULL;
 	sector_t last_block_in_bio = 0;
@@ -409,7 +440,8 @@ int mpage_readpage(struct page *page, get_block_t get_block)
 	map_bh.b_state = 0;
 	map_bh.b_size = 0;
 	bio = do_mpage_readpage(bio, page, 1, &last_block_in_bio,
-			&map_bh, &first_logical_block, get_block, gfp);
+				&map_bh, &first_logical_block, get_block,
+				post_process, gfp);
 	if (bio)
 		mpage_bio_submit(REQ_OP_READ, 0, bio);
 	return 0;

@@ -127,6 +127,8 @@ struct fscrypt_ctx *fscrypt_get_ctx(const struct inode *inode, gfp_t gfp_flags)
 		ctx->flags |= FS_CTX_REQUIRES_FREE_ENCRYPT_FL;
 	} else {
 		ctx->flags &= ~FS_CTX_REQUIRES_FREE_ENCRYPT_FL;
+		ctx->r.post_process.process_block = NULL;
+		ctx->r.post_process.process_pages = NULL;
 	}
 	ctx->flags &= ~FS_CTX_HAS_BOUNCE_BUFFER_FL;
 	return ctx;

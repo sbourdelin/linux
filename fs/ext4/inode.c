@@ -3337,6 +3337,10 @@ static int ext4_readpage(struct file *file, struct page *page)
 {
 	int ret = -EAGAIN;
 	struct inode *inode = page->mapping->host;
+	post_process_read_t post_process = {
+		.process_block = fscrypt_complete_block,
+		.process_pages = fscrypt_complete_pages,
+	};
 
 	trace_ext4_readpage(page);
 
@@ -3344,7 +3348,7 @@ static int ext4_readpage(struct file *file, struct page *page)
 		ret = ext4_readpage_inline(inode, page);
 
 	if (ret == -EAGAIN)
-		return ext4_mpage_readpages(page->mapping, NULL, page, 1);
+		return mpage_readpage(page, ext4_get_block, &post_process);
 
 	return ret;
 }
@@ -3354,12 +3358,17 @@ ext4_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
 	struct inode *inode = mapping->host;
+	post_process_read_t post_process = {
+		.process_block = fscrypt_complete_block,
+		.process_pages = fscrypt_complete_pages,
+	};
 
 	/* If the file has inline data, no need to do readpages. */
 	if (ext4_has_inline_data(inode))
 		return 0;
 
-	return ext4_mpage_readpages(mapping, pages, NULL, nr_pages);
+	return mpage_readpages(mapping, pages, nr_pages, ext4_get_block,
+			&post_process);
 }
 
 static void ext4_invalidatepage(struct page *page, unsigned int offset,

@@ -168,9 +168,44 @@ static inline void fscrypt_decrypt_bio(struct bio *bio)
 {
 }
 
-static inline void fscrypt_enqueue_decrypt_bio(struct fscrypt_ctx *ctx,
-					       struct bio *bio)
+static inline void fscrypt_complete_block(struct work_struct *work)
 {
+}
+
+static inline void fscrypt_complete_pages(struct work_struct *work)
+{
+}
+
+static inline void fscrypt_enqueue_decrypt_bio(struct fscrypt_ctx *ctx,
+					struct bio *bio,
+					void (*process_bio)(struct work_struct *))
+{
+}
+
+static inline bool fscrypt_bio_encrypted(struct bio *bio)
+{
+	return false;
+}
+
+static inline post_process_read_t *
+fscrypt_get_post_process(struct fscrypt_ctx *ctx)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static inline void
+fscrypt_set_post_process(struct fscrypt_ctx *ctx, post_process_read_t *post_process)
+{
+}
+
+static inline void
+fscrypt_set_bh(struct fscrypt_ctx *ctx, struct buffer_head *bh)
+{
+}
+
+static inline struct buffer_head *fscrypt_get_bh(struct fscrypt_ctx *ctx)
+{
+	return ERR_PTR(-EOPNOTSUPP);
 }
 
 static inline void fscrypt_pullback_bio_page(struct page **page, bool restore)

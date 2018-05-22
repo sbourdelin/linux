@@ -869,14 +869,14 @@ static int ext2_writepage(struct page *page, struct writeback_control *wbc)
 
 static int ext2_readpage(struct file *file, struct page *page)
 {
-	return mpage_readpage(page, ext2_get_block);
+	return mpage_readpage(page, ext2_get_block, NULL);
 }
 
 static int
 ext2_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
-	return mpage_readpages(mapping, pages, nr_pages, ext2_get_block);
+	return mpage_readpages(mapping, pages, nr_pages, ext2_get_block, NULL);
 }
 
 static int

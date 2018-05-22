@@ -39,8 +39,10 @@ struct fscrypt_ctx {
 			struct page *control_page;	/* Original page  */
 		} w;
 		struct {
+			struct buffer_head *bh;
 			struct bio *bio;
 			struct work_struct work;
+			post_process_read_t post_process;
 		} r;
 		struct list_head free_list;	/* Free list */
 	};
@@ -190,8 +192,17 @@ static inline bool fscrypt_match_name(const struct fscrypt_name *fname,
 
 /* bio.c */
 extern void fscrypt_decrypt_bio(struct bio *);
+extern void fscrypt_complete_pages(struct work_struct *work);
+extern void fscrypt_complete_block(struct work_struct *work);
 extern void fscrypt_enqueue_decrypt_bio(struct fscrypt_ctx *ctx,
-					struct bio *bio);
+					struct bio *bio,
+					void (*process_bio)(struct work_struct *));
+extern post_process_read_t *fscrypt_get_post_process(struct fscrypt_ctx *ctx);
+extern void fscrypt_set_post_process(struct fscrypt_ctx *ctx,
+				post_process_read_t *post_process);
+extern struct buffer_head *fscrypt_get_bh(struct fscrypt_ctx *ctx);
+extern void fscrypt_set_bh(struct fscrypt_ctx *ctx, struct buffer_head *bh);
+extern bool fscrypt_bio_encrypted(struct bio *bio);
 extern void fscrypt_pullback_bio_page(struct page **, bool);
 extern int fscrypt_zeroout_range(const struct inode *, pgoff_t, sector_t,
 				 unsigned int);

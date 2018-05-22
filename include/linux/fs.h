@@ -83,6 +83,10 @@ typedef int (get_block_t)(struct inode *inode, sector_t iblock,
 			struct buffer_head *bh_result, int create);
 typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 			ssize_t bytes, void *private);
+typedef struct post_process_read {
+	void (*process_block)(struct work_struct *);
+	void (*process_pages)(struct work_struct *);
+} post_process_read_t;
 
 #define MAY_EXEC		0x00000001
 #define MAY_WRITE		0x00000002

@@ -568,13 +568,14 @@ static int blkdev_writepage(struct page *page, struct writeback_control *wbc)
 
 static int blkdev_readpage(struct file * file, struct page * page)
 {
-	return block_read_full_page(page, blkdev_get_block);
+	return block_read_full_page(page, blkdev_get_block, NULL);
 }
 
 static int blkdev_readpages(struct file *file, struct address_space *mapping,
 			struct list_head *pages, unsigned nr_pages)
 {
-	return mpage_readpages(mapping, pages, nr_pages, blkdev_get_block);
+	return mpage_readpages(mapping, pages, nr_pages, blkdev_get_block,
+			NULL);
 }
 
 static int blkdev_write_begin(struct file *file, struct address_space *mapping,

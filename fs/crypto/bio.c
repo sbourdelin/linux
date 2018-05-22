@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/bio.h>
 #include <linux/namei.h>
+#include <linux/buffer_head.h>
 #include "fscrypt_private.h"
 
 static void __fscrypt_decrypt_bio(struct bio *bio, bool done)
@@ -59,7 +60,7 @@ void fscrypt_decrypt_bio(struct bio *bio)
 }
 EXPORT_SYMBOL(fscrypt_decrypt_bio);
 
-static void completion_pages(struct work_struct *work)
+void fscrypt_complete_pages(struct work_struct *work)
 {
 	struct fscrypt_ctx *ctx =
 		container_of(work, struct fscrypt_ctx, r.work);
@@ -69,14 +70,102 @@ static void completion_pages(struct work_struct *work)
 	fscrypt_release_ctx(ctx);
 	bio_put(bio);
 }
+EXPORT_SYMBOL(fscrypt_complete_pages);
 
-void fscrypt_enqueue_decrypt_bio(struct fscrypt_ctx *ctx, struct bio *bio)
+void fscrypt_complete_block(struct work_struct *work)
 {
-	INIT_WORK(&ctx->r.work, completion_pages);
+	struct fscrypt_ctx *ctx =
+		container_of(work, struct fscrypt_ctx, r.work);
+	struct buffer_head *bh;
+	struct bio *bio;
+	struct bio_vec *bv;
+	struct page *page;
+	struct inode *inode;
+	u64 blk_nr;
+	int ret;
+
+	bio = ctx->r.bio;
+	WARN_ON(bio->bi_vcnt != 1);
+
+	bv = bio->bi_io_vec;
+	page = bv->bv_page;
+	inode = page->mapping->host;
+
+	WARN_ON(bv->bv_len != i_blocksize(inode));
+
+	blk_nr = page->index << (PAGE_SHIFT - inode->i_blkbits);
+	blk_nr += bv->bv_offset >> inode->i_blkbits;
+
+	bh = ctx->r.bh;
+
+	ret = fscrypt_decrypt_page(inode, page, bv->bv_len,
+				bv->bv_offset, blk_nr);
+
+	bh->b_end_io(bh, !ret);
+
+	fscrypt_release_ctx(ctx);
+	bio_put(bio);
+}
+EXPORT_SYMBOL(fscrypt_complete_block);
+
+bool fscrypt_bio_encrypted(struct bio *bio)
+{
+	struct address_space *mapping;
+	struct inode *inode;
+	struct page *page;
+
+	if (bio_op(bio) == REQ_OP_READ && bio->bi_vcnt) {
+		page = bio->bi_io_vec->bv_page;
+
+		if (!PageSwapCache(page)) {
+			mapping = page_mapping(page);
+			if (mapping) {
+				inode = mapping->host;
+
+				if (IS_ENCRYPTED(inode) &&
+					S_ISREG(inode->i_mode))
+					return true;
+			}
+		}
+	}
+
+	return false;
+}
+EXPORT_SYMBOL(fscrypt_bio_encrypted);
+
+void fscrypt_enqueue_decrypt_bio(struct fscrypt_ctx *ctx, struct bio *bio,
+			void (*process_bio)(struct work_struct *))
+{
+	BUG_ON(!process_bio);
+	INIT_WORK(&ctx->r.work, process_bio);
 	ctx->r.bio = bio;
 	fscrypt_enqueue_decrypt_work(&ctx->r.work);
 }
 EXPORT_SYMBOL(fscrypt_enqueue_decrypt_bio);
+
+post_process_read_t *fscrypt_get_post_process(struct fscrypt_ctx *ctx)
+{
+	return &(ctx->r.post_process);
+}
+EXPORT_SYMBOL(fscrypt_get_post_process);
+
+void fscrypt_set_post_process(struct fscrypt_ctx *ctx,
+			post_process_read_t *post_process)
+{
+	ctx->r.post_process = *post_process;
+}
+
+struct buffer_head *fscrypt_get_bh(struct fscrypt_ctx *ctx)
+{
+	return ctx->r.bh;
+}
+EXPORT_SYMBOL(fscrypt_get_bh);
+
+void fscrypt_set_bh(struct fscrypt_ctx *ctx, struct buffer_head *bh)
+{
+	ctx->r.bh = bh;
+}
+EXPORT_SYMBOL(fscrypt_set_bh);
 
 void fscrypt_pullback_bio_page(struct page **page, bool restore)
 {
