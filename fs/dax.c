@@ -319,6 +319,13 @@ static unsigned long dax_radix_end_pfn(void *entry)
 	for (pfn = dax_radix_pfn(entry); \
 			pfn < dax_radix_end_pfn(entry); pfn++)
 
+#define for_each_mapped_pfn_reverse(entry, pfn) \
+	for (pfn = dax_radix_end_pfn(entry) - 1; \
+			dax_entry_size(entry) \
+			&& pfn >= dax_radix_pfn(entry); \
+			pfn--)
+
+
 static void dax_associate_entry(void *entry, struct address_space *mapping,
 		struct vm_area_struct *vma, unsigned long address)
 {
@@ -497,6 +504,80 @@ restart:
 	return entry;
 }
 
+static bool dax_lock_pages(struct address_space *mapping, pgoff_t index,
+		void **entry)
+{
+	struct radix_tree_root *pages = &mapping->i_pages;
+	unsigned long pfn;
+	void *entry2;
+
+	xa_lock_irq(pages);
+	*entry = get_unlocked_mapping_entry(mapping, index, NULL);
+	if (!*entry || WARN_ON_ONCE(!radix_tree_exceptional_entry(*entry))) {
+		put_unlocked_mapping_entry(mapping, index, entry);
+		xa_unlock_irq(pages);
+		return false;
+	}
+
+	/*
+	 * In the limited case there are no races to prevent with rmap,
+	 * because rmap can not perform pfn_to_page().
+	 */
+	if (IS_ENABLED(CONFIG_FS_DAX_LIMITED))
+		return true;
+
+	/*
+	 * Now, drop the xa_lock, grab all the page locks then validate
+	 * that the entry has not changed and return with the xa_lock
+	 * held.
+	 */
+	xa_unlock_irq(pages);
+
+	/*
+	 * Retry until the entry stabilizes or someone else invalidates
+	 * the entry;
+	 */
+	for (;;) {
+		for_each_mapped_pfn(*entry, pfn)
+			lock_page(pfn_to_page(pfn));
+
+		xa_lock_irq(pages);
+		entry2 = get_unlocked_mapping_entry(mapping, index, NULL);
+		if (!entry2 || WARN_ON_ONCE(!radix_tree_exceptional_entry(entry2))
+				|| entry2 != *entry) {
+			put_unlocked_mapping_entry(mapping, index, entry2);
+			xa_unlock_irq(pages);
+
+			for_each_mapped_pfn_reverse(*entry, pfn)
+				unlock_page(pfn_to_page(pfn));
+
+			if (!entry2 || !radix_tree_exceptional_entry(entry2))
+				return false;
+			*entry = entry2;
+			continue;
+		}
+		break;
+	}
+
+	return true;
+}
+
+static void dax_unlock_pages(struct address_space *mapping, pgoff_t index,
+		void *entry)
+{
+	struct radix_tree_root *pages = &mapping->i_pages;
+	unsigned long pfn;
+
+	put_unlocked_mapping_entry(mapping, index, entry);
+	xa_unlock_irq(pages);
+
+	if (IS_ENABLED(CONFIG_FS_DAX_LIMITED))
+		return;
+
+	for_each_mapped_pfn_reverse(entry, pfn)
+		unlock_page(pfn_to_page(pfn));
+}
+
 static int __dax_invalidate_mapping_entry(struct address_space *mapping,
 					  pgoff_t index, bool trunc)
 {
@@ -504,10 +585,8 @@ static int __dax_invalidate_mapping_entry(struct address_space *mapping,
 	void *entry;
 	struct radix_tree_root *pages = &mapping->i_pages;
 
-	xa_lock_irq(pages);
-	entry = get_unlocked_mapping_entry(mapping, index, NULL);
-	if (!entry || WARN_ON_ONCE(!radix_tree_exceptional_entry(entry)))
-		goto out;
+	if (!dax_lock_pages(mapping, index, &entry))
+		return ret;
 	if (!trunc &&
 	    (radix_tree_tag_get(pages, index, PAGECACHE_TAG_DIRTY) ||
 	     radix_tree_tag_get(pages, index, PAGECACHE_TAG_TOWRITE)))
@@ -517,8 +596,8 @@ static int __dax_invalidate_mapping_entry(struct address_space *mapping,
 	mapping->nrexceptional--;
 	ret = 1;
 out:
-	put_unlocked_mapping_entry(mapping, index, entry);
-	xa_unlock_irq(pages);
+	dax_unlock_pages(mapping, index, entry);
+
 	return ret;
 }
 /*
