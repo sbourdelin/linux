@@ -12,5 +12,6 @@
 
 #define PWM_POLARITY_INVERTED			(1 << 0)
 #define PWM_MODE_COMPLEMENTARY			(1 << 1)
+#define PWM_MODE_PUSH_PULL			(1 << 2)
 
 #endif
