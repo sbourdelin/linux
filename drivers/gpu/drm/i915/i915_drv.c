@@ -1553,6 +1553,25 @@ static bool suspend_to_idle(struct drm_i915_private *dev_priv)
 	return false;
 }
 
+static int i915_drm_prepare(struct drm_device *dev)
+{
+	struct drm_i915_private *i915 = to_i915(dev);
+	int err;
+
+	disable_rpm_wakeref_asserts(i915);
+
+	err = i915_gem_suspend(i915);
+	if (err) {
+		dev_err(&i915->drm.pdev->dev,
+			"GEM idle failed, suspend/resume might fail\n");
+		goto out;
+	}
+out:
+	enable_rpm_wakeref_asserts(i915);
+
+	return err;
+}
+
 static int i915_drm_suspend(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
@@ -1574,13 +1593,6 @@ static int i915_drm_suspend(struct drm_device *dev)
 	drm_kms_helper_poll_disable(dev);
 
 	pci_save_state(pdev);
-
-	error = i915_gem_suspend(dev_priv);
-	if (error) {
-		dev_err(&pdev->dev,
-			"GEM idle failed, resume might fail\n");
-		goto out;
-	}
 
 	intel_display_suspend(dev);
 
@@ -2079,6 +2091,22 @@ int i915_reset_engine(struct intel_engine_cs *engine, const char *msg)
 out:
 	i915_gem_reset_finish_engine(engine);
 	return ret;
+}
+
+static int i915_pm_prepare(struct device *kdev)
+{
+	struct pci_dev *pdev = to_pci_dev(kdev);
+	struct drm_device *dev = pci_get_drvdata(pdev);
+
+	if (!dev) {
+		dev_err(kdev, "DRM not initialized, aborting suspend.\n");
+		return -ENODEV;
+	}
+
+	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
+		return 0;
+
+	return i915_drm_prepare(dev);
 }
 
 static int i915_pm_suspend(struct device *kdev)
@@ -2731,6 +2759,7 @@ const struct dev_pm_ops i915_pm_ops = {
 	 * S0ix (via system suspend) and S3 event handlers [PMSG_SUSPEND,
 	 * PMSG_RESUME]
 	 */
+	.prepare = i915_pm_prepare,
 	.suspend = i915_pm_suspend,
 	.suspend_late = i915_pm_suspend_late,
 	.resume_early = i915_pm_resume_early,
