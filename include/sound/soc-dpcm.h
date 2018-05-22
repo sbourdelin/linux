@@ -86,6 +86,8 @@ struct snd_soc_dpcm {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_state;
 #endif
+
+	bool be_hw_free_deferred;
 };
 
 /*

@@ -1866,8 +1866,16 @@ int dpcm_be_dai_shutdown(struct snd_soc_pcm_runtime *fe, int stream)
 			continue;
 
 		if ((be->dpcm[stream].state != SND_SOC_DPCM_STATE_HW_FREE) &&
-		    (be->dpcm[stream].state != SND_SOC_DPCM_STATE_OPEN))
-			continue;
+		    (be->dpcm[stream].state != SND_SOC_DPCM_STATE_OPEN)) {
+			if (dpcm->be_hw_free_deferred) {
+				soc_pcm_hw_free(be_substream);
+				be->dpcm[stream].state =
+					SND_SOC_DPCM_STATE_HW_FREE;
+				dpcm->be_hw_free_deferred = false;
+			} else {
+				continue;
+			}
+		}
 
 		dev_dbg(be->dev, "ASoC: close BE %s\n",
 			be->dai_link->name);
@@ -1924,8 +1932,10 @@ int dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 				continue;
 
 		/* do not free hw if this BE is used by other FE */
-		if (be->dpcm[stream].users > 1)
+		if (be->dpcm[stream].users > 1) {
+			dpcm->be_hw_free_deferred = true;
 			continue;
+		}
 
 		if ((be->dpcm[stream].state != SND_SOC_DPCM_STATE_HW_PARAMS) &&
 		    (be->dpcm[stream].state != SND_SOC_DPCM_STATE_PREPARE) &&
@@ -1941,6 +1951,7 @@ int dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 		soc_pcm_hw_free(be_substream);
 
 		be->dpcm[stream].state = SND_SOC_DPCM_STATE_HW_FREE;
+		dpcm->be_hw_free_deferred = false;
 	}
 
 	return 0;
