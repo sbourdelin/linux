@@ -297,6 +297,10 @@ xfs_reinit_inode(
 	uint64_t	version = inode_peek_iversion(inode);
 	umode_t		mode = inode->i_mode;
 	dev_t		dev = inode->i_rdev;
+	errseq_t	old_err = inode->i_mapping->wb_err;
+	bool		as_eio = test_bit(AS_EIO, &inode->i_mapping->flags);
+	bool		as_enospc = test_bit(AS_ENOSPC,
+					     &inode->i_mapping->flags);
 
 	error = inode_init_always(mp->m_super, inode);
 
@@ -305,6 +309,11 @@ xfs_reinit_inode(
 	inode_set_iversion_queried(inode, version);
 	inode->i_mode = mode;
 	inode->i_rdev = dev;
+	inode->i_mapping->wb_err = old_err;
+	if (as_eio)
+		set_bit(AS_EIO, &inode->i_mapping->flags);
+	if (as_enospc)
+		set_bit(AS_ENOSPC, &inode->i_mapping->flags);
 	return error;
 }
 
