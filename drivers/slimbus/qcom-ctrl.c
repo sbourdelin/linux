@@ -478,6 +478,8 @@ static void qcom_slim_prg_slew(struct platform_device *pdev,
 		/* SLEW RATE register for this SLIMbus */
 		slew_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 				"slew");
+		if (!slew_mem)
+			return;
 		ctrl->slew_reg = devm_ioremap(&pdev->dev, slew_mem->start,
 				resource_size(slew_mem));
 		if (!ctrl->slew_reg)
