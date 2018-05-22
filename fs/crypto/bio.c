@@ -33,9 +33,15 @@ static void __fscrypt_decrypt_bio(struct bio *bio, bool done)
 
 	bio_for_each_segment_all(bv, bio, i) {
 		struct page *page = bv->bv_page;
-		int ret = fscrypt_decrypt_page(page->mapping->host, page,
-				PAGE_SIZE, 0, page->index);
+		struct inode *inode = page->mapping->host;
+		u64 blk;
+		int ret;
 
+		blk = page->index << (PAGE_SHIFT - inode->i_blkbits);
+		blk += bv->bv_offset >> inode->i_blkbits;
+
+		ret = fscrypt_decrypt_page(page->mapping->host, page,
+					bv->bv_len, bv->bv_offset, blk);
 		if (ret) {
 			WARN_ON_ONCE(1);
 			SetPageError(page);
