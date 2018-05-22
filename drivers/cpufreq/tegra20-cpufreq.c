@@ -176,6 +176,14 @@ static int tegra20_cpufreq_probe(struct platform_device *pdev)
 		goto put_pll_x;
 	}
 
+	err = clk_prepare_enable(cpufreq->pll_x_clk);
+	if (err)
+		goto put_pll_p;
+
+	err = clk_prepare_enable(cpufreq->pll_p_clk);
+	if (err)
+		goto disable_pll_x;
+
 	cpufreq->dev = &pdev->dev;
 	cpufreq->driver.get = cpufreq_generic_get;
 	cpufreq->driver.attr = cpufreq_generic_attr;
@@ -192,12 +200,16 @@ static int tegra20_cpufreq_probe(struct platform_device *pdev)
 
 	err = cpufreq_register_driver(&cpufreq->driver);
 	if (err)
-		goto put_pll_p;
+		goto disable_pll_p;
 
 	platform_set_drvdata(pdev, cpufreq);
 
 	return 0;
 
+disable_pll_p:
+	clk_disable_unprepare(cpufreq->pll_p_clk);
+disable_pll_x:
+	clk_disable_unprepare(cpufreq->pll_x_clk);
 put_pll_p:
 	clk_put(cpufreq->pll_p_clk);
 put_pll_x:
@@ -214,6 +226,8 @@ static int tegra20_cpufreq_remove(struct platform_device *pdev)
 
 	cpufreq_unregister_driver(&cpufreq->driver);
 
+	clk_disable_unprepare(cpufreq->pll_p_clk);
+	clk_disable_unprepare(cpufreq->pll_x_clk);
 	clk_put(cpufreq->pll_p_clk);
 	clk_put(cpufreq->pll_x_clk);
 	clk_put(cpufreq->cpu_clk);
