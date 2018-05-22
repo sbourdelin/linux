@@ -1933,6 +1933,9 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 			same_queue_rq = NULL;
 		if (same_queue_rq)
 			list_del_init(&same_queue_rq->queuelist);
+		else
+			trace_block_plug(q);
+
 		list_add_tail(&rq->queuelist, &plug->mq_list);
 
 		blk_mq_put_ctx(data.ctx);
