@@ -550,6 +550,7 @@ struct ufs_hba {
 	bool is_irq_enabled;
 
 	u32 dev_ref_clk_freq;
+	struct ufs_config_descr cfgs;
 
 	/* Interrupt aggregation support is broken */
 	#define UFSHCD_QUIRK_BROKEN_INTR_AGGR			0x1

@@ -333,6 +333,7 @@ enum {
 	UFSHCD_AMP		= 3,
 };
 
+#define UFS_BLOCK_SIZE	4096
 #define POWER_DESC_MAX_SIZE			0x62
 #define POWER_DESC_MAX_ACTV_ICC_LVLS		16
 
@@ -423,6 +424,33 @@ enum {
 	MASK_RSP_UPIU_DATA_SEG_LEN	= 0xFFFF,
 	MASK_RSP_EXCEPTION_EVENT        = 0x10000,
 	MASK_TM_SERVICE_RESP		= 0xFF,
+};
+
+struct ufs_unit_desc {
+	u8     bLUEnable;              /* 1 for enabled LU */
+	u8     bBootLunID;             /* 0 for using this LU for boot */
+	u8     bLUWriteProtect;        /* 1 = power on WP, 2 = permanent WP */
+	u8     bMemoryType;            /* 0 for enhanced memory type */
+	u32    dNumAllocUnits;         /* Number of alloc unit for this LU */
+	u8     bDataReliability;       /* 0 for reliable write support */
+	u8     bLogicalBlockSize;      /* See section 13.2.3 of UFS standard */
+	u8     bProvisioningType;      /* 0 for thin provisioning */
+	u16    wContextCapabilities;   /* refer Unit Descriptor Description */
+};
+
+struct ufs_config_descr {
+	u8     bNumberLU;              /* Total number of active LUs */
+	u8     bBootEnable;            /* enabling device for partial init */
+	u8     bDescrAccessEn;         /* desc access during partial init */
+	u8     bInitPowerMode;         /* Initial device power mode */
+	u8     bHighPriorityLUN;       /* LUN of the high priority LU */
+	u8     bSecureRemovalType;     /* Erase config for data removal */
+	u8     bInitActiveICCLevel;    /* ICC level after reset */
+	u16    wPeriodicRTCUpdate;     /* 0 to set a priodic RTC update rate */
+	u32     bConfigDescrLock;      /* 1 to lock Configation Descriptor */
+	u32    qVendorConfigCode;      /* Vendor specific configuration code */
+	struct ufs_unit_desc unit[8];
+	u8	lun_to_grow;
 };
 
 /* Task management service response */
