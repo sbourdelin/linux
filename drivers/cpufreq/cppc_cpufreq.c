@@ -296,10 +296,54 @@ static int cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	return ret;
 }
 
+static int cppc_get_rate_from_fbctrs(struct cppc_perf_fb_ctrs fb_ctrs_t0,
+				     struct cppc_perf_fb_ctrs fb_ctrs_t1)
+{
+	u64 delta_reference, delta_delivered;
+	u64 reference_perf, ratio;
+
+	reference_perf = fb_ctrs_t0.reference_perf;
+	if (fb_ctrs_t1.reference > fb_ctrs_t0.reference)
+		delta_reference = fb_ctrs_t1.reference - fb_ctrs_t0.reference;
+	else /* Counters would have wrapped-around */
+		delta_reference  = ((u64)(~((u64)0)) - fb_ctrs_t0.reference) +
+					fb_ctrs_t1.reference;
+
+	if (fb_ctrs_t1.delivered > fb_ctrs_t0.delivered)
+		delta_delivered = fb_ctrs_t1.delivered - fb_ctrs_t0.delivered;
+	else /* Counters would have wrapped-around */
+		delta_delivered  = ((u64)(~((u64)0)) - fb_ctrs_t0.delivered) +
+					fb_ctrs_t1.delivered;
+
+	if (delta_reference)  /* Check to avoid divide-by zero */
+		ratio = (delta_delivered * 1000) / delta_reference;
+	else
+		return -EINVAL;
+
+	return (reference_perf * ratio) / 1000;
+}
+
+static unsigned int cppc_cpufreq_get_rate(unsigned int cpunum)
+{
+	struct cppc_perf_fb_ctrs fb_ctrs_t0 = {0}, fb_ctrs_t1 = {0};
+	int ret;
+
+	ret = cppc_get_perf_ctrs(cpunum, &fb_ctrs_t0);
+	if (ret)
+		return ret;
+
+	ret = cppc_get_perf_ctrs(cpunum, &fb_ctrs_t1);
+	if (ret)
+		return ret;
+
+	return cppc_get_rate_from_fbctrs(fb_ctrs_t0, fb_ctrs_t1);
+}
+
 static struct cpufreq_driver cppc_cpufreq_driver = {
 	.flags = CPUFREQ_CONST_LOOPS,
 	.verify = cppc_verify_policy,
 	.target = cppc_cpufreq_set_target,
+	.get = cppc_cpufreq_get_rate,
 	.init = cppc_cpufreq_cpu_init,
 	.stop_cpu = cppc_cpufreq_stop_cpu,
 	.name = "cppc_cpufreq",
