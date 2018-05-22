@@ -26,9 +26,32 @@ enum pwm_polarity {
 };
 
 /**
+ * PWM modes capabilities
+ * @PWMC_MODE_NORMAL_BIT: PWM has one output
+ * @PWMC_MODE_COMPLEMENTARY_BIT: PWM has 2 outputs with opposite polarities
+ * @PWMC_MODE_CNT: PWM modes count
+ */
+enum {
+	PWMC_MODE_NORMAL_BIT,
+	PWMC_MODE_COMPLEMENTARY_BIT,
+	PWMC_MODE_CNT,
+};
+
+#define PWMC_MODE(name)		BIT(PWMC_MODE_##name##_BIT)
+
+/**
+ * struct pwm_caps - PWM capabilities
+ * @modes: PWM modes
+ */
+struct pwm_caps {
+	unsigned long modes;
+};
+
+/**
  * struct pwm_args - board-dependent PWM arguments
  * @period: reference period
  * @polarity: reference polarity
+ * @mode: reference mode
  *
  * This structure describes board-dependent arguments attached to a PWM
  * device. These arguments are usually retrieved from the PWM lookup table or
@@ -41,6 +64,7 @@ enum pwm_polarity {
 struct pwm_args {
 	unsigned int period;
 	enum pwm_polarity polarity;
+	unsigned long mode;
 };
 
 enum {
@@ -53,12 +77,14 @@ enum {
  * @period: PWM period (in nanoseconds)
  * @duty_cycle: PWM duty cycle (in nanoseconds)
  * @polarity: PWM polarity
+ * @mode: PWM mode
  * @enabled: PWM enabled status
  */
 struct pwm_state {
 	unsigned int period;
 	unsigned int duty_cycle;
 	enum pwm_polarity polarity;
+	unsigned long mode;
 	bool enabled;
 };
 
@@ -181,6 +207,7 @@ static inline void pwm_init_state(const struct pwm_device *pwm,
 	state->period = args.period;
 	state->polarity = args.polarity;
 	state->duty_cycle = 0;
+	state->mode = args.mode;
 }
 
 /**
@@ -254,6 +281,7 @@ pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int duty_cycle,
  * @get_state: get the current PWM state. This function is only
  *	       called once per PWM device when the PWM chip is
  *	       registered.
+ * @get_caps: get PWM capabilities.
  * @dbg_show: optional routine to show contents in debugfs
  * @owner: helps prevent removal of modules exporting active PWMs
  */
@@ -272,6 +300,8 @@ struct pwm_ops {
 		     struct pwm_state *state);
 	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
 			  struct pwm_state *state);
+	void (*get_caps)(struct pwm_chip *chip, struct pwm_device *pwm,
+			 struct pwm_caps *caps);
 #ifdef CONFIG_DEBUG_FS
 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
 #endif
@@ -287,6 +317,7 @@ struct pwm_ops {
  * @npwm: number of PWMs controlled by this chip
  * @pwms: array of PWM devices allocated by the framework
  * @of_xlate: request a PWM device given a device tree PWM specifier
+ * @get_default_caps: get default PWM capabilities
  * @of_pwm_n_cells: number of cells expected in the device tree PWM specifier
  */
 struct pwm_chip {
@@ -300,6 +331,7 @@ struct pwm_chip {
 
 	struct pwm_device * (*of_xlate)(struct pwm_chip *pc,
 					const struct of_phandle_args *args);
+	void (*get_default_caps)(struct pwm_caps *caps);
 	unsigned int of_pwm_n_cells;
 };
 
@@ -438,6 +470,12 @@ struct pwm_device *pwm_request_from_chip(struct pwm_chip *chip,
 					 unsigned int index,
 					 const char *label);
 
+int pwm_get_caps(struct pwm_chip *chip, struct pwm_device *pwm,
+		 struct pwm_caps *caps);
+unsigned long pwm_mode_get_valid(struct pwm_chip *chip,
+				 struct pwm_device *pwm);
+bool pwm_mode_valid(struct pwm_device *pwm, unsigned long mode);
+const char *pwm_mode_desc(struct pwm_device *pwm, unsigned long mode);
 struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
 		const struct of_phandle_args *args);
 
@@ -592,6 +630,7 @@ static inline void pwm_apply_args(struct pwm_device *pwm)
 	state.enabled = false;
 	state.polarity = pwm->args.polarity;
 	state.period = pwm->args.period;
+	state.mode = pwm->args.mode;
 
 	pwm_apply_state(pwm, &state);
 }
