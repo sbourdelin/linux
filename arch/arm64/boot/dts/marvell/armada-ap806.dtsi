@@ -124,6 +124,25 @@
 				interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
+			sei: sei@3f0200 {
+				compatible = "marvell,armada-8k-sei";
+				reg = <0x3f0200 0x40>;
+				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				sei_wired_controller: sei-wired-controller {
+					marvell,sei-ranges = <0 21>;
+					#interrupt-cells = <1>;
+					interrupt-controller;
+				};
+
+				sei_msi_controller: sei-msi-controller {
+					marvell,sei-ranges = <21 43>;
+					msi-controller;
+				};
+			};
+
 			xor@400000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x400000 0x1000>,
