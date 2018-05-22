@@ -241,6 +241,7 @@ struct net_device;
 struct rgmii_adv;
 struct stmmac_safety_stats;
 struct stmmac_tc_entry;
+struct stmmac_pps_cfg;
 
 /* Helpers to program the MAC core */
 struct stmmac_ops {
@@ -313,6 +314,11 @@ struct stmmac_ops {
 	/* Flexible RX Parser */
 	int (*rxp_config)(void __iomem *ioaddr, struct stmmac_tc_entry *entries,
 			  unsigned int count);
+	/* PPS and Flexible PPS */
+	int (*pps_config)(void __iomem *ioaddr, bool enable);
+	int (*flex_pps_config)(void __iomem *ioaddr, int index,
+			       struct stmmac_pps_cfg *cfg, bool enable,
+			       u32 sub_second_inc, u32 systime_flags);
 };
 
 #define stmmac_core_init(__priv, __args...) \
@@ -379,6 +385,10 @@ struct stmmac_ops {
 	stmmac_do_callback(__priv, mac, safety_feat_dump, __args)
 #define stmmac_rxp_config(__priv, __args...) \
 	stmmac_do_callback(__priv, mac, rxp_config, __args)
+#define stmmac_pps_config(__priv, __args...) \
+	stmmac_do_callback(__priv, mac, pps_config, __args)
+#define stmmac_flex_pps_config(__priv, __args...) \
+	stmmac_do_callback(__priv, mac, flex_pps_config, __args)
 
 /* PTP and HW Timer helpers */
 struct stmmac_hwtimestamp {
