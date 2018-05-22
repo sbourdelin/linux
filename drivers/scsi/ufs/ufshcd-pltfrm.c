@@ -221,6 +221,24 @@ out:
 	return err;
 }
 
+static void ufshcd_parse_dev_ref_clk_freq(struct ufs_hba *hba)
+{
+	struct device *dev = hba->dev;
+	struct device_node *np = dev->of_node;
+	int ret;
+
+	if (!np)
+		return;
+
+	ret = of_property_read_u32(np, "dev-ref-clk-freq",
+				   &hba->dev_ref_clk_freq);
+	if (ret ||
+	    (hba->dev_ref_clk_freq < 0) ||
+	    (hba->dev_ref_clk_freq > REF_CLK_FREQ_52_MHZ))
+		/* default setting */
+		hba->dev_ref_clk_freq = REF_CLK_FREQ_26_MHZ;
+}
+
 #ifdef CONFIG_PM
 /**
  * ufshcd_pltfrm_suspend - suspend power management function
@@ -342,6 +360,8 @@ int ufshcd_pltfrm_init(struct platform_device *pdev,
 
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
+
+	ufshcd_parse_dev_ref_clk_freq(hba);
 
 	ufshcd_init_lanes_per_dir(hba);
 
