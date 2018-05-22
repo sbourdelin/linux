@@ -55,6 +55,7 @@
 #include <linux/hugetlb.h>
 #include <linux/memory_hotplug.h>
 #include <linux/mm_inline.h>
+#include <linux/memremap.h>
 #include <linux/kfifo.h>
 #include <linux/ratelimit.h>
 #include "internal.h"
@@ -1112,6 +1113,117 @@ out:
 	return res;
 }
 
+static unsigned long dax_mapping_size(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+	pgoff_t pgoff = page_to_pgoff(page);
+	struct vm_area_struct *vma;
+	unsigned long size = 0;
+
+	i_mmap_lock_read(mapping);
+	vma_interval_tree_foreach(vma, &mapping->i_mmap, pgoff, pgoff) {
+		unsigned long address = vma_address(page, vma);
+		pgd_t *pgd;
+		p4d_t *p4d;
+		pud_t *pud;
+		pmd_t *pmd;
+		pte_t *pte;
+
+		pgd = pgd_offset(vma->vm_mm, address);
+		if (!pgd_present(*pgd))
+			continue;
+		p4d = p4d_offset(pgd, address);
+		if (!p4d_present(*p4d))
+			continue;
+		pud = pud_offset(p4d, address);
+		if (!pud_present(*pud))
+			continue;
+		if (pud_devmap(*pud)) {
+			size = PUD_SIZE;
+			break;
+		}
+		pmd = pmd_offset(pud, address);
+		if (!pmd_present(*pmd))
+			continue;
+		if (pmd_devmap(*pmd)) {
+			size = PMD_SIZE;
+			break;
+		}
+		pte = pte_offset_map(pmd, address);
+		if (!pte_present(*pte))
+			continue;
+		if (pte_devmap(*pte)) {
+			size = PAGE_SIZE;
+			break;
+		}
+	}
+	i_mmap_unlock_read(mapping);
+	return size;
+}
+
+static int memory_failure_dev_pagemap(unsigned long pfn, int flags,
+		struct dev_pagemap *pgmap)
+{
+	struct page *page = pfn_to_page(pfn);
+	const bool unmap_success = true;
+	unsigned long size;
+	LIST_HEAD(tokill);
+	int rc = -EBUSY;
+	loff_t start;
+
+	lock_page(page);
+	if (hwpoison_filter(page)) {
+		rc = 0;
+		goto out;
+	}
+
+	switch (pgmap->type) {
+	case MEMORY_DEVICE_PRIVATE:
+	case MEMORY_DEVICE_PUBLIC:
+		/*
+		 * TODO: Handle HMM pages which may need coordination
+		 * with device-side memory.
+		 */
+		goto out;
+	default:
+		if (!page->mapping)
+			goto out;
+		break;
+	}
+
+	/*
+	 * If the page is not mapped in userspace then report it as
+	 * unhandled.
+	 */
+	size = dax_mapping_size(page);
+	if (!size) {
+		pr_err("Memory failure: %#lx: failed to unmap page\n", pfn);
+		goto out;
+	}
+
+	SetPageHWPoison(page);
+
+	/*
+	 * Unlike System-RAM there is no possibility to swap in a
+	 * different physical page at a given virtual address, so all
+	 * userspace consumption of ZONE_DEVICE memory necessitates
+	 * SIGBUS (i.e. MF_MUST_KILL)
+	 */
+	flags |= MF_ACTION_REQUIRED | MF_MUST_KILL;
+	collect_procs(page, &tokill, flags & MF_ACTION_REQUIRED);
+
+	start = (page->index << PAGE_SHIFT) & ~(size - 1);
+	unmap_mapping_range(page->mapping, start, start + size, 0);
+
+	kill_procs(&tokill, flags & MF_MUST_KILL, !unmap_success, ilog2(size),
+			pfn, flags);
+	rc = 0;
+out:
+	unlock_page(page);
+	put_dev_pagemap(pgmap);
+	return rc;
+}
+
 /**
  * memory_failure - Handle memory failure of a page.
  * @pfn: Page Number of the corrupted page
@@ -1134,6 +1246,7 @@ int memory_failure(unsigned long pfn, int flags)
 	struct page *p;
 	struct page *hpage;
 	struct page *orig_head;
+	struct dev_pagemap *pgmap;
 	int res;
 	unsigned long page_flags;
 
@@ -1145,6 +1258,10 @@ int memory_failure(unsigned long pfn, int flags)
 			pfn);
 		return -ENXIO;
 	}
+
+	pgmap = get_dev_pagemap(pfn, NULL);
+	if (pgmap)
+		return memory_failure_dev_pagemap(pfn, flags, pgmap);
 
 	p = pfn_to_page(pfn);
 	if (PageHuge(p))
