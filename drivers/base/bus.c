@@ -181,13 +181,15 @@ static ssize_t unbind_store(struct device_driver *drv, const char *buf,
 	struct bus_type *bus = bus_get(drv->bus);
 	struct device *dev;
 	int err = -ENODEV;
+	bool allow_async;
 
+	allow_async = driver_allows_async_probing(drv);
 	dev = bus_find_device_by_name(bus, NULL, buf);
 	if (dev && dev->driver == drv) {
-		if (dev->parent)	/* Needed for USB */
+		if (dev->parent && !allow_async)/* Needed for USB */
 			device_lock(dev->parent);
 		device_release_driver(dev);
-		if (dev->parent)
+		if (dev->parent && !allow_async)
 			device_unlock(dev->parent);
 		err = count;
 	}
@@ -208,15 +210,17 @@ static ssize_t bind_store(struct device_driver *drv, const char *buf,
 	struct bus_type *bus = bus_get(drv->bus);
 	struct device *dev;
 	int err = -ENODEV;
+	bool allow_async;
 
+	allow_async = driver_allows_async_probing(drv);
 	dev = bus_find_device_by_name(bus, NULL, buf);
 	if (dev && dev->driver == NULL && driver_match_device(drv, dev)) {
-		if (dev->parent)	/* Needed for USB */
+		if (dev->parent && !allow_async)/* Needed for USB */
 			device_lock(dev->parent);
 		device_lock(dev);
 		err = driver_probe_device(drv, dev);
 		device_unlock(dev);
-		if (dev->parent)
+		if (dev->parent && !allow_async)
 			device_unlock(dev->parent);
 
 		if (err > 0) {
@@ -769,11 +773,14 @@ EXPORT_SYMBOL_GPL(bus_rescan_devices);
  */
 int device_reprobe(struct device *dev)
 {
+	bool allow_async;
+
 	if (dev->driver) {
-		if (dev->parent)        /* Needed for USB */
+		allow_async = driver_allows_async_probing(dev->driver);
+		if (dev->parent && !allow_async)/* Needed for USB */
 			device_lock(dev->parent);
 		device_release_driver(dev);
-		if (dev->parent)
+		if (dev->parent && !allow_async)
 			device_unlock(dev->parent);
 	}
 	return bus_rescan_devices_helper(dev, NULL);

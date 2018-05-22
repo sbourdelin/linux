@@ -794,6 +794,7 @@ static int __driver_attach(struct device *dev, void *data)
 {
 	struct device_driver *drv = data;
 	int ret;
+	bool allow_async;
 
 	/*
 	 * Lock device and try to bind to it. We drop the error
@@ -817,13 +818,14 @@ static int __driver_attach(struct device *dev, void *data)
 		return ret;
 	} /* ret > 0 means positive match */
 
-	if (dev->parent)	/* Needed for USB */
+	allow_async = driver_allows_async_probing(drv);
+	if (dev->parent && !allow_async)/* Needed for USB */
 		device_lock(dev->parent);
 	device_lock(dev);
 	if (!dev->driver)
 		driver_probe_device(drv, dev);
 	device_unlock(dev);
-	if (dev->parent)
+	if (dev->parent && !allow_async)
 		device_unlock(dev->parent);
 
 	return 0;
@@ -851,19 +853,21 @@ EXPORT_SYMBOL_GPL(driver_attach);
 static void __device_release_driver(struct device *dev, struct device *parent)
 {
 	struct device_driver *drv;
+	bool allow_async;
 
 	drv = dev->driver;
 	if (drv) {
-		if (driver_allows_async_probing(drv))
+		allow_async = driver_allows_async_probing(drv);
+		if (allow_async)
 			async_synchronize_full();
 
 		while (device_links_busy(dev)) {
 			device_unlock(dev);
-			if (parent)
+			if (parent && !allow_async)
 				device_unlock(parent);
 
 			device_links_unbind_consumers(dev);
-			if (parent)
+			if (parent && !allow_async)
 				device_lock(parent);
 
 			device_lock(dev);
@@ -919,7 +923,12 @@ void device_release_driver_internal(struct device *dev,
 				    struct device_driver *drv,
 				    struct device *parent)
 {
-	if (parent)
+	bool allow_async = false;
+
+	if (drv)
+		allow_async = driver_allows_async_probing(drv);
+
+	if (parent && !allow_async)
 		device_lock(parent);
 
 	device_lock(dev);
@@ -927,7 +936,7 @@ void device_release_driver_internal(struct device *dev,
 		__device_release_driver(dev, parent);
 
 	device_unlock(dev);
-	if (parent)
+	if (parent && !allow_async)
 		device_unlock(parent);
 }
 
