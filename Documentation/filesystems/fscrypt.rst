@@ -202,13 +202,13 @@ modes are not currently supported because of the difficulty of dealing
 with ciphertext expansion.
 
 For file contents, each filesystem block is encrypted independently.
-Currently, only the case where the filesystem block size is equal to
-the system's page size (usually 4096 bytes) is supported.  With the
-XTS mode of operation (recommended), the logical block number within
-the file is used as the IV.  With the CBC mode of operation (not
-recommended), ESSIV is used; specifically, the IV for CBC is the
-logical block number encrypted with AES-256, where the AES-256 key is
-the SHA-256 hash of the inode's data encryption key.
+Starting from Linux kernel 4.18, encryption of filesystems with block
+size less than system's page size is supported.  With the XTS mode of
+operation (recommended), the logical block number within the file is
+used as the IV.  With the CBC mode of operation (not recommended),
+ESSIV is used; specifically, the IV for CBC is the logical block
+number encrypted with AES-256, where the AES-256 key is the SHA-256
+hash of the inode's data encryption key.
 
 For filenames, the full filename is encrypted at once.  Because of the
 requirements to retain support for efficient directory lookups and
