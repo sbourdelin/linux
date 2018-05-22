@@ -355,16 +355,10 @@ EXPORT_SYMBOL_GPL(tee_shm_register);
  */
 int tee_shm_get_fd(struct tee_shm *shm)
 {
-	int fd;
-
 	if (!(shm->flags & TEE_SHM_DMA_BUF))
 		return -EINVAL;
 
-	get_dma_buf(shm->dmabuf);
-	fd = dma_buf_fd(shm->dmabuf, O_CLOEXEC);
-	if (fd < 0)
-		dma_buf_put(shm->dmabuf);
-	return fd;
+	return dma_buf_fd(shm->dmabuf, O_CLOEXEC);
 }
 
 /**

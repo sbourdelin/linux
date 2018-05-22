@@ -479,7 +479,7 @@ int intel_vgpu_get_dmabuf(struct intel_vgpu *vgpu, unsigned int dmabuf_id)
 	ret = dma_buf_fd(dmabuf, DRM_CLOEXEC | DRM_RDWR);
 	if (ret < 0) {
 		gvt_vgpu_err("create dma-buf fd failed ret:%d\n", ret);
-		goto out_free_dmabuf;
+		goto out_free_gem;
 	}
 	dmabuf_fd = ret;
 
@@ -502,8 +502,6 @@ int intel_vgpu_get_dmabuf(struct intel_vgpu *vgpu, unsigned int dmabuf_id)
 
 	return dmabuf_fd;
 
-out_free_dmabuf:
-	dma_buf_put(dmabuf);
 out_free_gem:
 	i915_gem_object_put(obj);
 out:

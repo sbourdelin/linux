@@ -662,8 +662,10 @@ out_have_obj:
 	ret = drm_prime_add_buf_handle(&file_priv->prime,
 				       dmabuf, handle);
 	mutex_unlock(&dev->object_name_lock);
-	if (ret)
-		goto fail_put_dmabuf;
+	if (unlikely(ret)) {
+		dma_buf_put(dmabuf);
+		goto out;
+	}
 
 out_have_handle:
 	ret = dma_buf_fd(dmabuf, flags);
@@ -673,17 +675,10 @@ out_have_handle:
 	 * and that is invariant as long as a userspace gem handle exists.
 	 * Closing the handle will clean out the cache anyway, so we don't leak.
 	 */
-	if (ret < 0) {
-		goto fail_put_dmabuf;
-	} else {
+	if (ret >= 0) {
 		*prime_fd = ret;
 		ret = 0;
 	}
-
-	goto out;
-
-fail_put_dmabuf:
-	dma_buf_put(dmabuf);
 out:
 	drm_gem_object_put_unlocked(obj);
 out_unlock:

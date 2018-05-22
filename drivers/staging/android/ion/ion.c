@@ -381,7 +381,6 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 	struct ion_buffer *buffer = NULL;
 	struct ion_heap *heap;
 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
-	int fd;
 	struct dma_buf *dmabuf;
 
 	pr_debug("%s: len %zu heap_id_mask %u flags %x\n", __func__,
@@ -425,11 +424,7 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 		return PTR_ERR(dmabuf);
 	}
 
-	fd = dma_buf_fd(dmabuf, O_CLOEXEC);
-	if (fd < 0)
-		dma_buf_put(dmabuf);
-
-	return fd;
+	return dma_buf_fd(dmabuf, O_CLOEXEC);
 }
 
 int ion_query_heaps(struct ion_heap_query *query)

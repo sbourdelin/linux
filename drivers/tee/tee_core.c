@@ -125,7 +125,6 @@ static int tee_ioctl_version(struct tee_context *ctx,
 static int tee_ioctl_shm_alloc(struct tee_context *ctx,
 			       struct tee_ioctl_shm_alloc_data __user *udata)
 {
-	long ret;
 	struct tee_ioctl_shm_alloc_data data;
 	struct tee_shm *shm;
 
@@ -144,25 +143,18 @@ static int tee_ioctl_shm_alloc(struct tee_context *ctx,
 	data.flags = shm->flags;
 	data.size = shm->size;
 
-	if (copy_to_user(udata, &data, sizeof(data)))
-		ret = -EFAULT;
-	else
-		ret = tee_shm_get_fd(shm);
+	if (unlikely(copy_to_user(udata, &data, sizeof(data)))) {
+		tee_shm_put(shm);
+		return -EFAULT;
+	}
 
-	/*
-	 * When user space closes the file descriptor the shared memory
-	 * should be freed or if tee_shm_get_fd() failed then it will
-	 * be freed immediately.
-	 */
-	tee_shm_put(shm);
-	return ret;
+	return tee_shm_get_fd(shm);
 }
 
 static int
 tee_ioctl_shm_register(struct tee_context *ctx,
 		       struct tee_ioctl_shm_register_data __user *udata)
 {
-	long ret;
 	struct tee_ioctl_shm_register_data data;
 	struct tee_shm *shm;
 
@@ -182,17 +174,12 @@ tee_ioctl_shm_register(struct tee_context *ctx,
 	data.flags = shm->flags;
 	data.length = shm->size;
 
-	if (copy_to_user(udata, &data, sizeof(data)))
-		ret = -EFAULT;
-	else
-		ret = tee_shm_get_fd(shm);
-	/*
-	 * When user space closes the file descriptor the shared memory
-	 * should be freed or if tee_shm_get_fd() failed then it will
-	 * be freed immediately.
-	 */
-	tee_shm_put(shm);
-	return ret;
+	if (unlikely(copy_to_user(udata, &data, sizeof(data)))) {
+		tee_shm_put(shm);
+		return -EFAULT;
+	}
+
+	return tee_shm_get_fd(shm);
 }
 
 static int params_from_user(struct tee_context *ctx, struct tee_param *params,

@@ -1881,15 +1881,13 @@ int vb2_core_expbuf(struct vb2_queue *q, int *fd, unsigned int type,
 	if (ret < 0) {
 		dprintk(3, "buffer %d, plane %d failed to export (%d)\n",
 			index, plane, ret);
-		dma_buf_put(dbuf);
-		return ret;
+	} else {
+		dprintk(3, "buffer %d, plane %d exported as %d descriptor\n",
+			index, plane, ret);
+		*fd = ret;
+		ret = 0;
 	}
-
-	dprintk(3, "buffer %d, plane %d exported as %d descriptor\n",
-		index, plane, ret);
-	*fd = ret;
-
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(vb2_core_expbuf);
 

@@ -471,17 +471,21 @@ EXPORT_SYMBOL_GPL(dma_buf_export);
  */
 int dma_buf_fd(struct dma_buf *dmabuf, int flags)
 {
+	struct file *file;
 	int fd;
 
-	if (!dmabuf || !dmabuf->file)
+	if (!dmabuf)
+		return -EINVAL;
+
+	file = dmabuf->file;
+	if (!file)
 		return -EINVAL;
 
 	fd = get_unused_fd_flags(flags);
-	if (fd < 0)
-		return fd;
-
-	fd_install(fd, dmabuf->file);
-
+	if (fd >= 0)
+		fd_install(fd, file);
+	else
+		fput(file);
 	return fd;
 }
 EXPORT_SYMBOL_GPL(dma_buf_fd);

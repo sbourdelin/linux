@@ -730,8 +730,7 @@ int ttm_prime_handle_to_fd(struct ttm_object_file *tfile,
 	if (ret >= 0) {
 		*prime_fd = ret;
 		ret = 0;
-	} else
-		dma_buf_put(dma_buf);
+	}
 
 out_unref:
 	if (base)
