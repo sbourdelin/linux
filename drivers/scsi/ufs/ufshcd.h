@@ -364,6 +364,11 @@ struct ufs_clk_gating {
 	int active_reqs;
 };
 
+struct ufs_provisioning {
+	struct device_attribute enable_attr;
+	bool is_enabled;
+};
+
 struct ufs_saved_pwr_info {
 	struct ufs_pa_layer_attr info;
 	bool is_valid;
@@ -652,6 +657,7 @@ struct ufs_hba {
 	struct ufs_pwr_mode_info max_pwr_info;
 
 	struct ufs_clk_gating clk_gating;
+	struct ufs_provisioning ufs_provision;
 	/* Control to enable/disable host capabilities */
 	u32 caps;
 	/* Allow dynamic clk gating */
