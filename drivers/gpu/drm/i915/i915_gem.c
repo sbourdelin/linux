@@ -3564,7 +3564,7 @@ i915_gem_idle_work_handler(struct work_struct *work)
 	 * idle that implies a round trip through the retire worker).
 	 */
 	mutex_lock(&dev_priv->drm.struct_mutex);
-	i915_gem_switch_to_kernel_context(dev_priv);
+	i915_gem_switch_to_kernel_context(dev_priv, 0);
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
 	/*
@@ -5009,7 +5009,8 @@ int i915_gem_suspend(struct drm_i915_private *dev_priv)
 	 * not rely on its state.
 	 */
 	if (!i915_terminally_wedged(&dev_priv->gpu_error)) {
-		ret = i915_gem_switch_to_kernel_context(dev_priv);
+		ret = i915_gem_switch_to_kernel_context(dev_priv,
+							I915_SWITCH_BOOST);
 		if (ret)
 			goto err_unlock;
 
@@ -5094,7 +5095,7 @@ void i915_gem_resume(struct drm_i915_private *i915)
 	intel_uc_resume(i915);
 
 	/* Always reload a context for powersaving. */
-	if (i915_gem_switch_to_kernel_context(i915))
+	if (i915_gem_switch_to_kernel_context(i915, 0))
 		goto err_wedged;
 
 out_unlock:
@@ -5289,7 +5290,7 @@ static int __intel_engines_record_defaults(struct drm_i915_private *i915)
 			goto err_active;
 	}
 
-	err = i915_gem_switch_to_kernel_context(i915);
+	err = i915_gem_switch_to_kernel_context(i915, 0);
 	if (err)
 		goto err_active;
 
@@ -5355,7 +5356,7 @@ err_active:
 	 * request, ensure we are pointing at the kernel context and
 	 * then remove it.
 	 */
-	if (WARN_ON(i915_gem_switch_to_kernel_context(i915)))
+	if (WARN_ON(i915_gem_switch_to_kernel_context(i915, 0)))
 		goto out_ctx;
 
 	if (WARN_ON(i915_gem_wait_for_idle(i915, I915_WAIT_LOCKED)))

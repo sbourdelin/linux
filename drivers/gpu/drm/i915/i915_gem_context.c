@@ -612,7 +612,8 @@ static bool engine_has_idle_kernel_context(struct intel_engine_cs *engine)
 	return intel_engine_has_kernel_context(engine);
 }
 
-int i915_gem_switch_to_kernel_context(struct drm_i915_private *i915)
+int i915_gem_switch_to_kernel_context(struct drm_i915_private *i915,
+				      unsigned int flags)
 {
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
@@ -642,6 +643,18 @@ int i915_gem_switch_to_kernel_context(struct drm_i915_private *i915)
 								 &prev->submit,
 								 I915_FENCE_GFP);
 		}
+
+		/*
+		 * "Race-to-idle".
+		 *
+		 * Switching to the kernel context is often used a synchronous
+		 * step prior to idling, e.g. in suspend for flushing all
+		 * current operations to memory before sleeping. These we
+		 * want to complete as quickly as possible to avoid prolonged
+		 * stalls, so allow the gpu to boost to maximum clocks.
+		 */
+		if (flags & I915_SWITCH_BOOST)
+			gen6_rps_boost(rq, NULL);
 
 		/*
 		 * Force a flush after the switch to ensure that all rendering
