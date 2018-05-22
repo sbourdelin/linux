@@ -1746,6 +1746,12 @@
 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
 			resets = <&cpg 328>;
 			status = "disabled";
+
+			port {
+				usb3_host0_ep: endpoint {
+					remote-endpoint = <&usb3_peri0_ep>;
+				};
+			};
 		};
 
 		usb3_peri0: usb@ee020000 {
@@ -1757,6 +1763,12 @@
 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
 			resets = <&cpg 328>;
 			status = "disabled";
+
+			port {
+				usb3_peri0_ep: endpoint {
+					remote-endpoint = <&usb3_host0_ep>;
+				};
+			};
 		};
 
 		usb_dmac0: dma-controller@e65a0000 {
