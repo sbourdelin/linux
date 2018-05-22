@@ -668,6 +668,7 @@ rpc_clone_client_set_auth(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 		.prognumber	= clnt->cl_prog,
 		.version	= clnt->cl_vers,
 		.authflavor	= flavor,
+		.timeout	= clnt->cl_timeout,
 	};
 	return __rpc_clone_client(&args, clnt);
 }
