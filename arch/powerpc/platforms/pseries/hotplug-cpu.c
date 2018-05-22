@@ -411,25 +411,61 @@ static bool dlpar_cpu_exists(struct device_node *parent, u32 drc_index)
 	return found;
 }
 
-static bool valid_cpu_drc_index(struct device_node *parent, u32 drc_index)
+static bool check_cpu_drc_index(struct device_node *parent,
+				int (*cb)(struct of_drc_info *drc,
+					void *data, void *not_used,
+					int *ret_code),
+				void *cdata)
 {
 	bool found = false;
-	int rc, index;
 
-	index = 0;
-	while (!found) {
-		u32 drc;
-
-		rc = of_property_read_u32_index(parent, "ibm,drc-indexes",
-						index++, &drc);
-		if (rc)
-			break;
-
-		if (drc == drc_index)
+	if (firmware_has_feature(FW_FEATURE_DRC_INFO)) {
+		if (drc_info_parser(parent, cb, "CPU", cdata))
 			found = true;
+	} else {
+		int index = 0;
+
+		while (!found) {
+			u32 drc;
+
+			if (of_property_read_u32_index(parent,
+						"ibm,drc-indexes",
+						index++, &drc))
+				break;
+			if (cb(NULL, cdata, &drc, NULL))
+				found = true;
+		}
 	}
 
 	return found;
+}
+
+struct valid_drc_index_struct {
+	u32 targ_drc_index;
+};
+
+static int valid_drc_index_cb(struct of_drc_info *drc, void *idata,
+				void *drc_index, int *ret_code)
+{
+	struct valid_drc_index_struct *cdata = idata;
+
+	if (drc) {
+		if (!((drc->drc_index_start <= cdata->targ_drc_index) &&
+			(cdata->targ_drc_index <= drc->last_drc_index)))
+			return 0;
+	} else {
+		if (*((u32 *)drc_index) != cdata->targ_drc_index)
+			return 0;
+	}
+	(*ret_code) = 1;
+	return 1;
+}
+
+static bool valid_cpu_drc_index(struct device_node *parent, u32 drc_index)
+{
+	struct valid_drc_index_struct cdata = { drc_index };
+
+	return check_cpu_drc_index(parent, valid_drc_index_cb, &cdata);
 }
 
 static ssize_t dlpar_cpu_add(u32 drc_index)
@@ -721,11 +757,43 @@ static int dlpar_cpu_remove_by_count(u32 cpus_to_remove)
 	return rc;
 }
 
+struct cpus_to_add_struct {
+	struct device_node *parent;
+	u32 *cpu_drcs;
+	u32 cpus_to_add;
+	u32 cpus_found;
+};
+
+static int cpus_to_add_cb(struct of_drc_info *drc, void *idata,
+			void *drc_index, int *ret_code)
+{
+	struct cpus_to_add_struct *cdata = idata;
+
+	if (drc) {
+		int k;
+
+		for (k = 0; (k < drc->num_sequential_elems) &&
+			(cdata->cpus_found < cdata->cpus_to_add); k++) {
+			u32 idrc = drc->drc_index_start +
+				(k * drc->sequential_inc);
+
+			if (dlpar_cpu_exists(cdata->parent, idrc))
+				continue;
+			cdata->cpu_drcs[cdata->cpus_found++] = idrc;
+		}
+	} else {
+		if (!dlpar_cpu_exists(cdata->parent, *((u32 *)drc_index)))
+			cdata->cpu_drcs[cdata->cpus_found++] =
+				*((u32 *)drc_index);
+	}
+	return 0;
+}
+
 static int find_dlpar_cpus_to_add(u32 *cpu_drcs, u32 cpus_to_add)
 {
 	struct device_node *parent;
-	int cpus_found = 0;
-	int index, rc;
+	struct cpus_to_add_struct cdata = {
+		NULL, cpu_drcs, cpus_to_add, 0 };
 
 	parent = of_find_node_by_path("/cpus");
 	if (!parent) {
@@ -734,28 +802,14 @@ static int find_dlpar_cpus_to_add(u32 *cpu_drcs, u32 cpus_to_add)
 		return -1;
 	}
 
-	/* Search the ibm,drc-indexes array for possible CPU drcs to
-	 * add. Note that the format of the ibm,drc-indexes array is
-	 * the number of entries in the array followed by the array
-	 * of drc values so we start looking at index = 1.
+	/* Search the appropriate property for possible CPU drcs to
+	 * add.
 	 */
-	index = 1;
-	while (cpus_found < cpus_to_add) {
-		u32 drc;
-
-		rc = of_property_read_u32_index(parent, "ibm,drc-indexes",
-						index++, &drc);
-		if (rc)
-			break;
-
-		if (dlpar_cpu_exists(parent, drc))
-			continue;
-
-		cpu_drcs[cpus_found++] = drc;
-	}
+	cdata.parent = parent;
+	check_cpu_drc_index(parent, cpus_to_add_cb, &cdata);
 
 	of_node_put(parent);
-	return cpus_found;
+	return cdata.cpus_found;
 }
 
 static int dlpar_cpu_add_by_count(u32 cpus_to_add)
