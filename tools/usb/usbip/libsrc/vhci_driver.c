@@ -242,13 +242,20 @@ static int read_record(int rhport, char *host, unsigned long host_len,
 
 int usbip_vhci_driver_open(void)
 {
+	int nports = get_nports();
+
 	udev_context = udev_new();
 	if (!udev_context) {
 		err("udev_new failed");
 		return -1;
 	}
 
-	vhci_driver = calloc(1, sizeof(struct usbip_vhci_driver));
+	vhci_driver = calloc(1, sizeof(struct usbip_vhci_driver) +
+			nports * sizeof(struct usbip_imported_device));
+	if (!vhci_driver) {
+		err("vhci_driver allocation failed");
+		return -1;
+	}
 
 	/* will be freed in usbip_driver_close() */
 	vhci_driver->hc_device =
@@ -260,14 +267,11 @@ int usbip_vhci_driver_open(void)
 		goto err;
 	}
 
-	vhci_driver->nports = get_nports();
+	vhci_driver->nports = nports;
 	dbg("available ports: %d", vhci_driver->nports);
 
 	if (vhci_driver->nports <= 0) {
 		err("no available ports");
-		goto err;
-	} else if (vhci_driver->nports > MAXNPORT) {
-		err("port number exceeds %d", MAXNPORT);
 		goto err;
 	}
 
