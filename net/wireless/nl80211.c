@@ -8028,11 +8028,13 @@ static int nl80211_dump_survey(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct nlattr **attrbuf = genl_family_attrbuf(&nl80211_fam);
 	struct survey_info survey;
+	struct survey_info *survey_data = &survey;
 	struct cfg80211_registered_device *rdev;
 	struct wireless_dev *wdev;
 	int survey_idx = cb->args[2];
 	int res;
 	bool radio_stats;
+	int n_channels;
 
 	rtnl_lock();
 	res = nl80211_prepare_wdev_dump(skb, cb, &rdev, &wdev);
@@ -8052,7 +8054,12 @@ static int nl80211_dump_survey(struct sk_buff *skb, struct netlink_callback *cb)
 		goto out_err;
 	}
 
+	n_channels = ieee80211_get_num_supported_channels(wdev->wiphy);
+
 	while (1) {
+		if (n_channels <= survey_idx)
+			break;
+
 		res = rdev_dump_survey(rdev, wdev->netdev, survey_idx, &survey);
 		if (res == -ENOENT)
 			break;
@@ -8066,10 +8073,35 @@ static int nl80211_dump_survey(struct sk_buff *skb, struct netlink_callback *cb)
 			continue;
 		}
 
+		if (survey.filled & SURVEY_INFO_NON_ACC_DATA) {
+			struct survey_info *cumulative_survey =
+				&wdev->wiphy->cumulative_survey[survey_idx];
+
+			if (cumulative_survey->channel->center_freq !=
+					survey.channel->center_freq) {
+				survey_idx++;
+				continue;
+			}
+			if (survey.filled & SURVEY_INFO_NOISE_DBM)
+				cumulative_survey->noise = survey.noise;
+			if (survey.filled & SURVEY_INFO_TIME)
+				cumulative_survey->time += survey.time;
+			if (survey.filled & SURVEY_INFO_TIME_BUSY)
+				cumulative_survey->time_busy +=
+							survey.time_busy;
+			if (survey.filled & SURVEY_INFO_TIME_RX)
+				cumulative_survey->time_rx += survey.time_rx;
+			if (survey.filled & SURVEY_INFO_TIME_TX)
+				cumulative_survey->time_tx += survey.time_tx;
+
+			cumulative_survey->filled |= survey.filled;
+			survey_data = cumulative_survey;
+		}
+
 		if (nl80211_send_survey(skb,
 				NETLINK_CB(cb->skb).portid,
 				cb->nlh->nlmsg_seq, NLM_F_MULTI,
-				wdev->netdev, radio_stats, &survey) < 0)
+				wdev->netdev, radio_stats, survey_data) < 0)
 			goto out;
 		survey_idx++;
 	}

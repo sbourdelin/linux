@@ -636,6 +636,9 @@ int wiphy_register(struct wiphy *wiphy)
 	struct ieee80211_supported_band *sband;
 	bool have_band = false;
 	int i;
+	int n_channels = 0;
+	int idx = 0;
+
 	u16 ifmodes = wiphy->interface_modes;
 
 #ifdef CONFIG_PM
@@ -785,6 +788,7 @@ int wiphy_register(struct wiphy *wiphy)
 		}
 
 		have_band = true;
+		n_channels += sband->n_channels;
 	}
 
 	if (!have_band) {
@@ -867,6 +871,21 @@ int wiphy_register(struct wiphy *wiphy)
 				    ~supported_on_all))
 				break;
 		}
+	}
+
+	wiphy->cumulative_survey = kcalloc(n_channels,
+					   sizeof(struct survey_info),
+					   GFP_KERNEL);
+	if (!wiphy->cumulative_survey)
+		return -ENOMEM;
+
+	for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		sband = wiphy->bands[band];
+		if (!sband)
+			continue;
+		for (i = 0; i < sband->n_channels; i++)
+			wiphy->cumulative_survey[idx++].channel =
+				&sband->channels[i];
 	}
 
 	rdev->wiphy.registered = true;
@@ -958,6 +977,8 @@ void wiphy_unregister(struct wiphy *wiphy)
 #endif
 	cfg80211_rdev_free_wowlan(rdev);
 	cfg80211_rdev_free_coalesce(rdev);
+
+	kfree(wiphy->cumulative_survey);
 }
 EXPORT_SYMBOL(wiphy_unregister);
 

@@ -581,6 +581,7 @@ ieee80211_chandef_max_power(struct cfg80211_chan_def *chandef)
  * @SURVEY_INFO_TIME_RX: receive time was filled in
  * @SURVEY_INFO_TIME_TX: transmit time was filled in
  * @SURVEY_INFO_TIME_SCAN: scan time was filled in
+ * @SURVEY_INFO_NON_ACC_DATA: non accumulated survey data filled in
  *
  * Used by the driver to indicate which info in &struct survey_info
  * it has filled in during the get_survey().
@@ -594,6 +595,7 @@ enum survey_info_flags {
 	SURVEY_INFO_TIME_RX		= BIT(5),
 	SURVEY_INFO_TIME_TX		= BIT(6),
 	SURVEY_INFO_TIME_SCAN		= BIT(7),
+	SURVEY_INFO_NON_ACC_DATA        = BIT(8),
 };
 
 /**
@@ -3806,6 +3808,7 @@ struct wiphy_iftype_ext_capab {
  *	bitmap of &enum nl80211_band values.  For instance, for
  *	NL80211_BAND_2GHZ, bit 0 would be set
  *	(i.e. BIT(NL80211_BAND_2GHZ)).
+ * @cumulative_survey: cumulated survey information for all channels.
  */
 struct wiphy {
 	/* assign these fields before you register the wiphy */
@@ -3939,6 +3942,8 @@ struct wiphy {
 	u64 cookie_counter;
 
 	u8 nan_supported_bands;
+
+	struct survey_info *cumulative_survey;
 
 	char priv[0] __aligned(NETDEV_ALIGN);
 };
