@@ -850,7 +850,7 @@ static inline struct hns_roce_sqp *hr_to_hr_sqp(struct hns_roce_qp *hr_qp)
 	return container_of(hr_qp, struct hns_roce_sqp, hr_qp);
 }
 
-static inline void hns_roce_write64_k(__be32 val[2], void __iomem *dest)
+static inline void hns_roce_write64_k(__le32 val[2], void __iomem *dest)
 {
 	__raw_writeq(*(u64 *) val, dest);
 }

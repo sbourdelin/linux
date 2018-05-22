@@ -72,7 +72,7 @@ static int hns_roce_v1_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 	int ps_opcode = 0, i = 0;
 	unsigned long flags = 0;
 	void *wqe = NULL;
-	u32 doorbell[2];
+	__le32 doorbell[2];
 	int nreq = 0;
 	u32 ind = 0;
 	int ret = 0;
@@ -330,8 +330,8 @@ out:
 			       SQ_DOORBELL_U32_8_QPN_S, qp->doorbell_qpn);
 		roce_set_bit(sq_db.u32_8, SQ_DOORBELL_HW_SYNC_S, 1);
 
-		doorbell[0] = le32_to_cpu(sq_db.u32_4);
-		doorbell[1] = le32_to_cpu(sq_db.u32_8);
+		doorbell[0] = sq_db.u32_4;
+		doorbell[1] = sq_db.u32_8;
 
 		hns_roce_write64_k(doorbell, qp->sq.db_reg_l);
 		qp->sq_next_wqe = ind;
