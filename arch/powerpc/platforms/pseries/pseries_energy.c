@@ -61,9 +61,8 @@ static u32 cpu_to_drc_index(int cpu)
 		if (info == NULL)
 			goto err_of_node_put;
 
-		value = of_prop_next_u32(info, NULL, &num_set_entries);
-		if (!value)
-			goto err_of_node_put;
+		value = info->value;
+		num_set_entries = of_read_number(value++, 1);
 
 		for (j = 0; j < num_set_entries; j++) {
 
@@ -123,9 +122,8 @@ static int drc_index_to_cpu(u32 drc_index)
 		if (info == NULL)
 			goto err_of_node_put;
 
-		value = of_prop_next_u32(info, NULL, &num_set_entries);
-		if (!value)
-			goto err_of_node_put;
+		value = info->value;
+		num_set_entries = of_read_number(value++, 1);
 
 		for (j = 0; j < num_set_entries; j++) {
 

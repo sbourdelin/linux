@@ -65,29 +65,19 @@ int of_read_drc_info_cell(struct property **prop, const __be32 **curval,
 
 	/* Get drc-index-start:encode-int */
 	p2 = (const __be32 *)p;
-	p2 = of_prop_next_u32(*prop, p2, &data->drc_index_start);
-	if (!p2)
-		return -EINVAL;
+	data->drc_index_start = of_read_number(p2++, 1);
 
 	/* Get drc-name-suffix-start:encode-int */
-	p2 = of_prop_next_u32(*prop, p2, &data->drc_name_suffix_start);
-	if (!p2)
-		return -EINVAL;
+	data->drc_name_suffix_start = of_read_number(p2++, 1);
 
 	/* Get number-sequential-elements:encode-int */
-	p2 = of_prop_next_u32(*prop, p2, &data->num_sequential_elems);
-	if (!p2)
-		return -EINVAL;
+	data->num_sequential_elems = of_read_number(p2++, 1);
 
 	/* Get sequential-increment:encode-int */
-	p2 = of_prop_next_u32(*prop, p2, &data->sequential_inc);
-	if (!p2)
-		return -EINVAL;
+	data->sequential_inc = of_read_number(p2++, 1);
 
 	/* Get drc-power-domain:encode-int */
-	p2 = of_prop_next_u32(*prop, p2, &data->drc_power_domain);
-	if (!p2)
-		return -EINVAL;
+	data->drc_power_domain = of_read_number(p2++, 1);
 
 	/* Should now know end of current entry */
 	(*curval) = (void *)p2;

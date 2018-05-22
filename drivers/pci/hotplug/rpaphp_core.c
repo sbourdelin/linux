@@ -236,9 +236,8 @@ static int rpaphp_check_drc_props_v2(struct device_node *dn, char *drc_name,
 	if (info == NULL)
 		return -EINVAL;
 
-	value = of_prop_next_u32(info, NULL, &entries);
-	if (!value)
-		return -EINVAL;
+	value = info->value;
+	entries = of_read_number(value++, 1);
 
 	for (j = 0; j < entries; j++) {
 		of_read_drc_info_cell(&info, &value, &drc);
