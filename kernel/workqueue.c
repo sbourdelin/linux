@@ -4579,6 +4579,8 @@ void show_workqueue_state(void)
 	rcu_read_unlock_sched();
 }
 
+#ifdef CONFIG_SMP
+
 /*
  * CPU hotplug.
  *
@@ -4798,8 +4800,6 @@ int workqueue_offline_cpu(unsigned int cpu)
 
 	return 0;
 }
-
-#ifdef CONFIG_SMP
 
 struct work_for_cpu {
 	struct work_struct work;
