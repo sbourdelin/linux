@@ -245,11 +245,15 @@ static int cros_ec_keyb_work(struct notifier_block *nb,
 	switch (ckdev->ec->event_data.event_type) {
 	case EC_MKBP_EVENT_KEY_MATRIX:
 		/*
-		 * If EC is not the wake source, discard key state changes
-		 * during suspend.
+		 * If keyb input device is not wake enabled, discard key
+		 * state changes during suspend.
 		 */
-		if (queued_during_suspend)
+		if (queued_during_suspend && ckdev->idev
+		    && !device_may_wakeup(&ckdev->idev->dev))
 			return NOTIFY_OK;
+
+		else if (queued_during_suspend && ckdev->idev)
+			pm_wakeup_event(&ckdev->idev->dev, 0);
 
 		if (ckdev->ec->event_size != ckdev->cols) {
 			dev_err(ckdev->dev,
@@ -270,12 +274,16 @@ static int cros_ec_keyb_work(struct notifier_block *nb,
 	case EC_MKBP_EVENT_BUTTON:
 	case EC_MKBP_EVENT_SWITCH:
 		/*
-		 * If EC is not the wake source, discard key state
+		 * If bs is not wake enabled, discard key state
 		 * changes during suspend. Switches will be re-checked in
 		 * cros_ec_keyb_resume() to be sure nothing is lost.
 		 */
-		if (queued_during_suspend)
+		if (queued_during_suspend && ckdev->bs_idev
+		    && !device_may_wakeup(&ckdev->bs_idev->dev))
 			return NOTIFY_OK;
+
+		else if (queued_during_suspend && ckdev->bs_idev)
+			pm_wakeup_event(&ckdev->bs_idev->dev, 0);
 
 		if (ckdev->ec->event_data.event_type == EC_MKBP_EVENT_BUTTON) {
 			val = get_unaligned_le32(
@@ -522,6 +530,7 @@ static int cros_ec_keyb_register_bs(struct cros_ec_keyb *ckdev)
 		return ret;
 	}
 
+	device_init_wakeup(&idev->dev, true);
 	return 0;
 }
 
@@ -598,6 +607,7 @@ static int cros_ec_keyb_register_matrix(struct cros_ec_keyb *ckdev)
 		return err;
 	}
 
+	device_init_wakeup(&idev->dev, true);
 	return 0;
 }
 
