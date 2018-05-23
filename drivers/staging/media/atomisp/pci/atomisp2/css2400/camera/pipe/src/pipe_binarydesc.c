@@ -554,7 +554,7 @@ void ia_css_pipe_get_primary_binarydesc(
 	struct ia_css_frame_info *vf_info,
 	unsigned int stage_idx)
 {
-	enum ia_css_pipe_version pipe_version = pipe->config.isp_pipe_version;
+	enum ia_css_pipe_version pipe_version;
 	int mode;
 	unsigned int i;
 	struct ia_css_frame_info *out_infos[IA_CSS_BINARY_MAX_OUTPUT_PORTS];
@@ -567,6 +567,7 @@ void ia_css_pipe_get_primary_binarydesc(
 	/*assert(vf_info != NULL);*/
 	IA_CSS_ENTER_PRIVATE("");
 
+	pipe_version = pipe->config.isp_pipe_version;
 	if (pipe_version == IA_CSS_PIPE_VERSION_2_6_1)
 		mode = primary_hq_binary_modes[stage_idx];
 	else
