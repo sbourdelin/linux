@@ -1257,32 +1257,35 @@ err_pci_reg:
 static void e1000_remove(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
-	struct e1000_adapter *adapter = netdev_priv(netdev);
-	struct e1000_hw *hw = &adapter->hw;
-	bool disable_dev;
 
-	e1000_down_and_stop(adapter);
-	e1000_release_manageability(adapter);
+	if (netdev) {
+		struct e1000_adapter *adapter = netdev_priv(netdev);
+		struct e1000_hw *hw = &adapter->hw;
+		bool disable_dev;
 
-	unregister_netdev(netdev);
+		e1000_down_and_stop(adapter);
+		e1000_release_manageability(adapter);
 
-	e1000_phy_hw_reset(hw);
+		unregister_netdev(netdev);
 
-	kfree(adapter->tx_ring);
-	kfree(adapter->rx_ring);
+		e1000_phy_hw_reset(hw);
 
-	if (hw->mac_type == e1000_ce4100)
-		iounmap(hw->ce4100_gbe_mdio_base_virt);
-	iounmap(hw->hw_addr);
-	if (hw->flash_address)
-		iounmap(hw->flash_address);
-	pci_release_selected_regions(pdev, adapter->bars);
+		kfree(adapter->tx_ring);
+		kfree(adapter->rx_ring);
 
-	disable_dev = !test_and_set_bit(__E1000_DISABLED, &adapter->flags);
-	free_netdev(netdev);
+		if (hw->mac_type == e1000_ce4100)
+			iounmap(hw->ce4100_gbe_mdio_base_virt);
+		iounmap(hw->hw_addr);
+		if (hw->flash_address)
+			iounmap(hw->flash_address);
+		pci_release_selected_regions(pdev, adapter->bars);
 
-	if (disable_dev)
-		pci_disable_device(pdev);
+		disable_dev = !test_and_set_bit(__E1000_DISABLED, &adapter->flags);
+		free_netdev(netdev);
+
+		if (disable_dev)
+			pci_disable_device(pdev);
+	}
 }
 
 /**
