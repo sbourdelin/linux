@@ -6552,7 +6552,8 @@ static void DAC960_CreateProcEntries(DAC960_Controller_T *Controller)
 			dac960_initial_status_proc_show, Controller);
 	proc_create_single_data("current_status", 0, ControllerProcEntry,
 			dac960_current_status_proc_show, Controller);
-	proc_create_data("user_command", S_IWUSR | S_IRUSR, ControllerProcEntry, &dac960_user_command_proc_fops, Controller);
+	proc_create_data("user_command", 0600, ControllerProcEntry,
+			 &dac960_user_command_proc_fops, Controller);
 	Controller->ControllerProcEntry = ControllerProcEntry;
 }
 
