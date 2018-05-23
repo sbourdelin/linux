@@ -883,7 +883,6 @@ void atomisp_buf_done(struct atomisp_sub_device *asd, int error,
 	struct videobuf_buffer *vb = NULL;
 	struct atomisp_video_pipe *pipe = NULL;
 	struct atomisp_css_buffer buffer;
-	bool requeue = false;
 	int err;
 	unsigned long irqflags;
 	struct atomisp_css_frame *frame = NULL;
@@ -1223,19 +1222,6 @@ void atomisp_buf_done(struct atomisp_sub_device *asd, int error,
 #ifdef ISP2401
 	atomic_set(&pipe->wdt_count, 0);
 #endif
-	/*
-	 * Requeue should only be done for 3a and dis buffers.
-	 * Queue/dequeue order will change if driver recycles image buffers.
-	 */
-	if (requeue) {
-		err = atomisp_css_queue_buffer(asd,
-					       stream_id, css_pipe_id,
-					       buf_type, &buffer);
-		if (err)
-			dev_err(isp->dev, "%s, q to css fails: %d\n",
-					__func__, err);
-		return;
-	}
 	if (!error && q_buffers)
 		atomisp_qbuffers_to_css(asd);
 #ifdef ISP2401
