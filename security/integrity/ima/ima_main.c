@@ -171,6 +171,20 @@ void ima_file_free(struct file *file)
 	ima_check_last_writer(iint, inode, file);
 }
 
+/*
+ * A file measurement might already exist in the measurement list. Based on
+ * policy, include an additional file measurement containing the appended
+ * signature and file hash, without the appended signature (i.e., the 'd-sig'
+ * field).
+ */
+static bool store_measurement_again(struct integrity_iint_cache *iint,
+				    struct evm_ima_xattr_data *xattr_value)
+{
+	return iint->flags & IMA_READ_MEASURE && xattr_value &&
+		xattr_value->type == IMA_MODSIG &&
+		ima_current_template_has_sig();
+}
+
 static int process_measurement(struct file *file, const struct cred *cred,
 			       u32 secid, char *buf, loff_t size, int mask,
 			       enum ima_hooks func, int opened)
@@ -304,7 +318,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
 
-	if (action & IMA_MEASURE)
+	if (action & IMA_MEASURE || store_measurement_again(iint, xattr_value))
 		ima_store_measurement(iint, file, pathname,
 				      xattr_value, xattr_len, pcr);
 	if (rc == 0 && (action & IMA_APPRAISE_SUBMASK)) {

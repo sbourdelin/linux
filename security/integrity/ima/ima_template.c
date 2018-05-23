@@ -230,6 +230,33 @@ struct ima_template_desc *ima_template_desc_current(void)
 	return ima_template;
 }
 
+/*
+ * Tells whether the current template has fields which reference a file's
+ * signature.
+ */
+bool ima_current_template_has_sig(void)
+{
+	static int ima_template_has_sig = -1;
+
+	if (ima_template_has_sig < 0) {
+		struct ima_template_desc *template;
+		int i;
+
+		template = ima_template_desc_current();
+		for (i = 0; i < template->num_fields; i++)
+			if (!strcmp(template->fields[i]->field_id, "sig") ||
+			    !strcmp(template->fields[i]->field_id, "d-sig")) {
+				ima_template_has_sig = 1;
+				break;
+			}
+
+		if (ima_template_has_sig < 0)
+			ima_template_has_sig = 0;
+	}
+
+	return ima_template_has_sig;
+}
+
 int __init ima_init_template(void)
 {
 	struct ima_template_desc *template = ima_template_desc_current();
