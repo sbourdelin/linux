@@ -11913,6 +11913,12 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 	np = netdev_priv(netdev);
 	np->vsi = vsi;
 
+	np->prov_callbacks.signature = IDC_SIGNATURE;
+	np->prov_callbacks.version = 0;
+	memset(np->prov_callbacks.rsvd, 0, sizeof(np->prov_callbacks.rsvd));
+	np->prov_callbacks.idc_reg_peer_driver = i40e_register_client;
+	np->prov_callbacks.idc_unreg_peer_driver = i40e_unregister_client;
+
 	hw_enc_features = NETIF_F_SG			|
 			  NETIF_F_IP_CSUM		|
 			  NETIF_F_IPV6_CSUM		|

@@ -78,6 +78,7 @@ MODULE_AUTHOR("Intel Corporation, <e1000-rdma@lists.sourceforge.net>");
 MODULE_DESCRIPTION("Intel(R) Ethernet Connection X722 iWARP RDMA Driver");
 MODULE_LICENSE("Dual BSD/GPL");
 
+static struct i40iw_peer_drv peer_drv;
 static struct i40e_client i40iw_client;
 static char i40iw_client_name[I40E_CLIENT_STR_LENGTH] = "i40iw";
 
@@ -102,6 +103,30 @@ static struct notifier_block i40iw_net_notifier = {
 static struct notifier_block i40iw_netdevice_notifier = {
 	.notifier_call = i40iw_netdevice_event
 };
+
+/**
+ * i40iw_open_inc_ref - Increment ref count for a open
+ */
+static void i40iw_open_inc_ref(void)
+{
+	atomic_inc(&peer_drv.peer.ref_count);
+}
+
+/**
+ * i40iw_open_dec_ref - Decrement ref count for a open
+ */
+static void i40iw_open_dec_ref(void)
+{
+	struct i40iw_peer *peer;
+
+	peer = &peer_drv.peer;
+	if (peer->state == I40IW_STATE_VALID &&
+	    atomic_dec_and_test(&peer->ref_count)) {
+		peer->state = I40IW_STATE_INVALID;
+		peer->idc_unreg_peer_driver(&peer_drv.i40iw_client);
+		module_put(peer->module);
+	}
+}
 
 /**
  * i40iw_find_i40e_handler - find a handler given a client info
@@ -1710,6 +1735,7 @@ static int i40iw_open(struct i40e_info *ldev, struct i40e_client *client)
 		if(iwdev->param_wq == NULL)
 			break;
 		i40iw_pr_info("i40iw_open completed\n");
+		i40iw_open_inc_ref();
 		return 0;
 	} while (0);
 
@@ -1801,6 +1827,7 @@ static void i40iw_close(struct i40e_info *ldev, struct i40e_client *client, bool
 	i40iw_cm_teardown_connections(iwdev, NULL, NULL, true);
 	destroy_workqueue(iwdev->virtchnl_wq);
 	i40iw_deinit_device(iwdev);
+	i40iw_open_dec_ref();
 }
 
 /**
@@ -2025,6 +2052,104 @@ static const struct i40e_client_ops i40e_ops = {
 };
 
 /**
+ * i40iw_is_new_peer - check netdev of the peer driver
+ * @netdev: netdev of peer driver
+ */
+bool i40iw_is_new_peer(struct net_device *netdev)
+{
+	struct idc_srv_provider *sp;
+	struct i40iw_peer *peer;
+
+	peer = &peer_drv.peer;
+	if (peer->state == I40IW_STATE_VALID)
+		return false;
+
+	if (netdev->dev.parent && netdev->dev.parent->driver &&
+	    !strncmp(netdev->dev.parent->driver->name, peer->name, sizeof(peer->name))) {
+		sp = (struct idc_srv_provider *)netdev_priv(netdev);
+		if (sp->signature != IDC_SIGNATURE || sp->version)
+			return false;
+
+		/* Found the driver */
+		peer->idc_reg_peer_driver = sp->idc_reg_peer_driver;
+		peer->idc_unreg_peer_driver = sp->idc_unreg_peer_driver;
+		peer->module = netdev->dev.parent->driver->owner;
+
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * i40iw_initialize_client - Setup client struct
+ */
+static void i40iw_initialize_client(void)
+{
+	struct i40e_client *i40iw_client = &peer_drv.i40iw_client;
+
+	i40iw_client->version.major = CLIENT_IW_INTERFACE_VERSION_MAJOR;
+	i40iw_client->version.minor = CLIENT_IW_INTERFACE_VERSION_MINOR;
+	i40iw_client->version.build = CLIENT_IW_INTERFACE_VERSION_BUILD;
+	i40iw_client->ops = &i40e_ops;
+	memcpy(i40iw_client->name, i40iw_client_name, I40E_CLIENT_STR_LENGTH);
+	i40iw_client->type = I40E_CLIENT_IWARP;
+	strncpy(peer_drv.peer.name, "i40e", sizeof(peer_drv.peer.name));
+}
+
+/**
+ * i40iw_reg_peer - Register with peer
+ */
+void i40iw_reg_peer(void)
+{
+	struct i40iw_peer *peer;
+
+	peer = &peer_drv.peer;
+
+	if (peer->state == I40IW_STATE_VALID)
+		return;
+
+	if (peer->idc_reg_peer_driver &&
+	    !peer->idc_reg_peer_driver(&peer_drv.i40iw_client)) {
+		peer->state = I40IW_STATE_VALID;
+		try_module_get(peer->module);
+	} else {
+		peer->state = I40IW_STATE_REG_FAILED;
+	}
+}
+
+/**
+ * i40iw_find_idc_peer - Search netdevs for a peer driver
+ */
+static void i40iw_find_idc_peer(void)
+{
+	struct net_device *dev;
+
+	rcu_read_lock();
+	for_each_netdev_rcu(&init_net, dev) {
+		if (i40iw_is_new_peer(dev))
+			break;
+	}
+	rcu_read_unlock();
+	i40iw_reg_peer();
+}
+
+/**
+ * i40iw_unreg_peer - Unregister with peer
+ */
+static void i40iw_unreg_peer(void)
+{
+	struct i40iw_peer *peer;
+
+	peer = &peer_drv.peer;
+	if (peer->state == I40IW_STATE_VALID) {
+		peer->state = I40IW_STATE_INVALID;
+		peer->idc_unreg_peer_driver(&peer_drv.i40iw_client);
+		module_put(peer->module);
+	}
+}
+
+/**
  * i40iw_init_module - driver initialization function
  *
  * First function to call when the driver is loaded
@@ -2032,20 +2157,12 @@ static const struct i40e_client_ops i40e_ops = {
  */
 static int __init i40iw_init_module(void)
 {
-	int ret;
-
-	memset(&i40iw_client, 0, sizeof(i40iw_client));
-	i40iw_client.version.major = CLIENT_IW_INTERFACE_VERSION_MAJOR;
-	i40iw_client.version.minor = CLIENT_IW_INTERFACE_VERSION_MINOR;
-	i40iw_client.version.build = CLIENT_IW_INTERFACE_VERSION_BUILD;
-	i40iw_client.ops = &i40e_ops;
-	memcpy(i40iw_client.name, i40iw_client_name, I40E_CLIENT_STR_LENGTH);
-	i40iw_client.type = I40E_CLIENT_IWARP;
 	spin_lock_init(&i40iw_handler_lock);
-	ret = i40e_register_client(&i40iw_client);
+	i40iw_initialize_client();
+	i40iw_find_idc_peer();
 	i40iw_register_notifiers();
 
-	return ret;
+	return 0;
 }
 
 /**
@@ -2057,7 +2174,7 @@ static int __init i40iw_init_module(void)
 static void __exit i40iw_exit_module(void)
 {
 	i40iw_unregister_notifiers();
-	i40e_unregister_client(&i40iw_client);
+	i40iw_unreg_peer();
 }
 
 module_init(i40iw_init_module);

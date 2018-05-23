@@ -314,8 +314,11 @@ int i40iw_netdevice_event(struct notifier_block *notifier,
 	event_netdev = netdev_notifier_info_to_dev(ptr);
 
 	hdl = i40iw_find_netdev(event_netdev);
-	if (!hdl)
+	if (!hdl) {
+		if (i40iw_is_new_peer(event_netdev))
+			i40iw_reg_peer();
 		return NOTIFY_DONE;
+	}
 
 	iwdev = &hdl->device;
 	if (iwdev->init_state < RDMA_DEV_REGISTERED || iwdev->closing)

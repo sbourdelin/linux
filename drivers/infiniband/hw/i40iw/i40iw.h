@@ -119,6 +119,30 @@
 #define I40IW_CQP_COMPL_SQ_WQE_FLUSHED    3
 #define I40IW_CQP_COMPL_RQ_SQ_WQE_FLUSHED 4
 
+enum I40IW_IDC_STATE {
+	I40IW_STATE_INVALID,
+	I40IW_STATE_VALID,
+	I40IW_STATE_REG_FAILED
+};
+
+struct i40iw_peer {
+	struct module *module;
+#define MAX_PEER_NAME_SIZE 8
+	char name[MAX_PEER_NAME_SIZE];
+	enum I40IW_IDC_STATE state;
+	atomic_t ref_count;
+	int (*idc_reg_peer_driver)(struct i40e_client *i40iw_client);
+	int (*idc_unreg_peer_driver)(struct i40e_client *i40iw_client);
+};
+
+struct i40iw_peer_drv {
+	struct i40e_client i40iw_client;
+	struct i40iw_peer peer;
+};
+
+bool i40iw_is_new_peer(struct net_device *netdev);
+void i40iw_reg_peer(void);
+
 struct i40iw_cqp_compl_info {
 	u32 op_ret_val;
 	u16 maj_err_code;
