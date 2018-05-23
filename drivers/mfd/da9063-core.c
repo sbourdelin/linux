@@ -101,13 +101,13 @@ static const struct mfd_cell da9063_devs[] = {
 		.of_compatible = "dlg,da9063-onkey",
 	},
 	{
+		.name		= DA9063_DRVNAME_VIBRATION,
+	},
+	{	/* Only present on DA9063 , not on DA9063L */
 		.name		= DA9063_DRVNAME_RTC,
 		.num_resources	= ARRAY_SIZE(da9063_rtc_resources),
 		.resources	= da9063_rtc_resources,
 		.of_compatible	= "dlg,da9063-rtc",
-	},
-	{
-		.name		= DA9063_DRVNAME_VIBRATION,
 	},
 };
 
@@ -163,7 +163,7 @@ int da9063_device_init(struct da9063 *da9063, unsigned int irq)
 {
 	struct da9063_pdata *pdata = da9063->dev->platform_data;
 	int model, variant_id, variant_code;
-	int ret;
+	int da9063_devs_len, ret;
 
 	ret = da9063_clear_fault_log(da9063);
 	if (ret < 0)
@@ -225,9 +225,13 @@ int da9063_device_init(struct da9063 *da9063, unsigned int irq)
 
 	da9063->irq_base = regmap_irq_chip_get_base(da9063->regmap_irq);
 
-	ret = mfd_add_devices(da9063->dev, -1, da9063_devs,
-			      ARRAY_SIZE(da9063_devs), NULL, da9063->irq_base,
-			      NULL);
+	da9063_devs_len = ARRAY_SIZE(da9063_devs);
+	/* RTC, the last device in the list, is only present on DA9063 */
+	if (da9063->type == PMIC_TYPE_DA9063L)
+		da9063_devs_len -= 1;
+
+	ret = mfd_add_devices(da9063->dev, -1, da9063_devs, da9063_devs_len,
+			      NULL, da9063->irq_base, NULL);
 	if (ret)
 		dev_err(da9063->dev, "Cannot add MFD cells\n");
 
