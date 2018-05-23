@@ -28,46 +28,6 @@ struct gpcv2_irqchip_data {
 
 static struct gpcv2_irqchip_data *imx_gpcv2_instance;
 
-static int gpcv2_wakeup_source_save(void)
-{
-	struct gpcv2_irqchip_data *cd;
-	void __iomem *reg;
-	int i;
-
-	cd = imx_gpcv2_instance;
-	if (!cd)
-		return 0;
-
-	for (i = 0; i < IMR_NUM; i++) {
-		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-		cd->saved_irq_mask[i] = readl_relaxed(reg);
-		writel_relaxed(cd->wakeup_sources[i], reg);
-	}
-
-	return 0;
-}
-
-static void gpcv2_wakeup_source_restore(void)
-{
-	struct gpcv2_irqchip_data *cd;
-	void __iomem *reg;
-	int i;
-
-	cd = imx_gpcv2_instance;
-	if (!cd)
-		return;
-
-	for (i = 0; i < IMR_NUM; i++) {
-		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-		writel_relaxed(cd->saved_irq_mask[i], reg);
-	}
-}
-
-static struct syscore_ops imx_gpcv2_syscore_ops = {
-	.suspend	= gpcv2_wakeup_source_save,
-	.resume		= gpcv2_wakeup_source_restore,
-};
-
 static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
 {
 	struct gpcv2_irqchip_data *cd = d->chip_data;
@@ -252,7 +212,6 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
 	writel_relaxed(~0x1, cd->gpc_base + cd->cpu2wakeup);
 
 	imx_gpcv2_instance = cd;
-	register_syscore_ops(&imx_gpcv2_syscore_ops);
 
 	/*
 	 * Clear the OF_POPULATED flag set in of_irq_init so that
