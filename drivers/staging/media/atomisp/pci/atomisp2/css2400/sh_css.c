@@ -455,11 +455,13 @@ static enum ia_css_frame_format yuv422_copy_formats[] = {
 static enum ia_css_err
 verify_copy_out_frame_format(struct ia_css_pipe *pipe)
 {
-	enum ia_css_frame_format out_fmt = pipe->output_info[0].format;
+	enum ia_css_frame_format out_fmt;
 	unsigned int i, found = 0;
 
 	assert(pipe != NULL);
 	assert(pipe->stream != NULL);
+
+	out_fmt = pipe->output_info[0].format;
 
 	switch (pipe->stream->config.input_config.format) {
 	case ATOMISP_INPUT_FORMAT_YUV420_8_LEGACY:
