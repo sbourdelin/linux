@@ -135,6 +135,7 @@ struct bus_type {
 	const struct iommu_ops *iommu_ops;
 
 	struct subsys_private *p;
+	int bus_register_error;
 	struct lock_class_key lock_key;
 
 	bool force_dma;
