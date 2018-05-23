@@ -529,11 +529,12 @@ static enum ia_css_err
 sh_css_config_input_network(struct ia_css_stream *stream)
 {
 	unsigned int fmt_type;
-	struct ia_css_pipe *pipe = stream->last_pipe;
+	struct ia_css_pipe *pipe;
 	struct ia_css_binary *binary = NULL;
 	enum ia_css_err err = IA_CSS_SUCCESS;
 
 	assert(stream != NULL);
+	pipe = stream->last_pipe;
 	assert(pipe != NULL);
 
 	ia_css_debug_dtrace(IA_CSS_DEBUG_TRACE_PRIVATE,
