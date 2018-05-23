@@ -186,6 +186,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	struct evm_ima_xattr_data *xattr_value = NULL;
 	int xattr_len = 0;
 	bool violation_check;
+	bool read_xattr;
 	enum hash_algo hash_algo;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
@@ -279,12 +280,22 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	}
 
 	template_desc = ima_template_desc_current();
-	if ((action & IMA_APPRAISE_SUBMASK) ||
-		    strcmp(template_desc->name, IMA_TEMPLATE_IMA_NAME) != 0)
+	read_xattr = action & IMA_APPRAISE_SUBMASK ||
+		     strcmp(template_desc->name, IMA_TEMPLATE_IMA_NAME) != 0;
+	if (read_xattr)
 		/* read 'security.ima' */
 		xattr_len = ima_read_xattr(file_dentry(file), &xattr_value);
 
 	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
+
+	/*
+	 * Try to find a modsig if there's no xattr sig or if it is signed by an
+	 * unknown key.
+	 */
+	if (read_xattr && iint->flags & IMA_MODSIG_ALLOWED &&
+	    (xattr_len <= 0 || !ima_xattr_sig_known_key(xattr_value,
+							xattr_len)))
+		ima_read_modsig(func, buf, size, &xattr_value, &xattr_len);
 
 	rc = ima_collect_measurement(iint, file, buf, size, hash_algo);
 	if (rc != 0 && rc != -EBADF && rc != -EINVAL)
@@ -312,7 +323,7 @@ out_locked:
 	     !(iint->flags & IMA_NEW_FILE))
 		rc = -EACCES;
 	mutex_unlock(&iint->mutex);
-	kfree(xattr_value);
+	ima_free_xattr_data(xattr_value);
 out:
 	if (pathbuf)
 		__putname(pathbuf);

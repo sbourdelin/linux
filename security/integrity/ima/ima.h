@@ -157,7 +157,8 @@ void ima_init_template_list(void);
 
 static inline bool is_signed(const struct evm_ima_xattr_data *xattr_value)
 {
-	return xattr_value && xattr_value->type == EVM_IMA_XATTR_DIGSIG;
+	return xattr_value && (xattr_value->type == EVM_IMA_XATTR_DIGSIG ||
+			       xattr_value->type == IMA_MODSIG);
 }
 
 /*
@@ -253,6 +254,8 @@ enum integrity_status ima_get_cache_status(struct integrity_iint_cache *iint,
 					   enum ima_hooks func);
 enum hash_algo ima_get_hash_algo(struct evm_ima_xattr_data *xattr_value,
 				 int xattr_len);
+bool ima_xattr_sig_known_key(const struct evm_ima_xattr_data *xattr_value,
+			     int xattr_len);
 int ima_read_xattr(struct dentry *dentry,
 		   struct evm_ima_xattr_data **xattr_value);
 
@@ -291,6 +294,12 @@ ima_get_hash_algo(struct evm_ima_xattr_data *xattr_value, int xattr_len)
 	return ima_hash_algo;
 }
 
+static inline bool ima_xattr_sig_known_key(const struct evm_ima_xattr_data
+					   *xattr_value, int xattr_len)
+{
+	return false;
+}
+
 static inline int ima_read_xattr(struct dentry *dentry,
 				 struct evm_ima_xattr_data **xattr_value)
 {
@@ -301,10 +310,35 @@ static inline int ima_read_xattr(struct dentry *dentry,
 
 #ifdef CONFIG_IMA_APPRAISE_MODSIG
 bool ima_hook_supports_modsig(enum ima_hooks func);
+int ima_read_modsig(enum ima_hooks func, const void *buf, loff_t buf_len,
+		    struct evm_ima_xattr_data **xattr_value,
+		    int *xattr_len);
+int ima_modsig_verify(const unsigned int keyring_id,
+		      struct evm_ima_xattr_data *hdr);
+void ima_free_xattr_data(struct evm_ima_xattr_data *hdr);
 #else
 static inline bool ima_hook_supports_modsig(enum ima_hooks func)
 {
 	return false;
+}
+
+static inline int ima_read_modsig(enum ima_hooks func, const void *buf,
+				  loff_t buf_len,
+				  struct evm_ima_xattr_data **xattr_value,
+				  int *xattr_len)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int ima_modsig_verify(const unsigned int keyring_id,
+				    struct evm_ima_xattr_data *hdr)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void ima_free_xattr_data(struct evm_ima_xattr_data *hdr)
+{
+	kfree(hdr);
 }
 #endif /* CONFIG_IMA_APPRAISE_MODSIG */
 
