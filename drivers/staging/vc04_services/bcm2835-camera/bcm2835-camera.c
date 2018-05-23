@@ -22,7 +22,6 @@
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-common.h>
-#include <linux/delay.h>
 #include <linux/platform_device.h>
 
 #include "mmal-common.h"
@@ -510,12 +509,6 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	/* enable frame capture */
 	dev->capture.frame_count = 1;
-
-	/* if the preview is not already running, wait for a few frames for AGC
-	 * to settle down.
-	 */
-	if (!dev->component[MMAL_COMPONENT_PREVIEW]->enabled)
-		msleep(300);
 
 	/* enable the connection from camera to encoder (if applicable) */
 	if (dev->capture.camera_port != dev->capture.port
