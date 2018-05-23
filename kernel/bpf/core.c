@@ -32,6 +32,7 @@
 #include <linux/kallsyms.h>
 #include <linux/rcupdate.h>
 #include <linux/perf_event.h>
+#include <linux/init.h>
 
 #include <asm/unaligned.h>
 
@@ -303,7 +304,23 @@ struct bpf_prog *bpf_patch_insn_single(struct bpf_prog *prog, u32 off,
 #ifdef CONFIG_BPF_JIT
 /* All BPF JIT sysctl knobs here. */
 int bpf_jit_enable   __read_mostly = IS_BUILTIN(CONFIG_BPF_JIT_ALWAYS_ON);
+
+#ifdef CONFIG_BPF_JIT_HARDEN_BOOTPARAM
+int bpf_jit_harden   __read_mostly = CONFIG_BPF_JIT_HARDEN_BOOTPARAM_VALUE;
+
+static int __init bpf_jit_harden_setup(char *str)
+{
+	unsigned long value;
+
+	if (!kstrtoul(str, 0, &value))
+		bpf_jit_harden = min(value, 2UL);
+	return 1;
+}
+__setup("bpf_jit_harden=", bpf_jit_harden_setup);
+#else /* !CONFIG_BPF_JIT_HARDEN_BOOTPARAM */
 int bpf_jit_harden   __read_mostly;
+#endif /* CONFIG_BPF_JIT_HARDEN_BOOTPARAM */
+
 int bpf_jit_kallsyms __read_mostly;
 
 static __always_inline void
