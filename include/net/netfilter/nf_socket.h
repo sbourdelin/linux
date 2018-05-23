@@ -2,6 +2,9 @@
 #ifndef _NF_SOCK_H_
 #define _NF_SOCK_H_
 
+#include <net/sock.h>
+#include <net/inet_timewait_sock.h>
+
 struct net_device;
 struct sk_buff;
 struct sock;
