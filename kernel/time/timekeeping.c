@@ -2047,10 +2047,6 @@ void update_wall_time(void)
 				   tk->tkr_mono.cycle_last, tk->tkr_mono.mask);
 #endif
 
-	/* Check if there's really nothing to do */
-	if (offset < real_tk->cycle_interval)
-		goto out;
-
 	/* Do some additional sanity checking */
 	timekeeping_check_update(tk, offset);
 
@@ -2331,6 +2327,10 @@ int do_adjtimex(struct timex *txc)
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+
+	/* Update the multiplier immediately if frequency was set directly */
+	if (txc->modes & (ADJ_FREQUENCY | ADJ_TICK))
+		update_wall_time();
 
 	if (tai != orig_tai)
 		clock_was_set();
