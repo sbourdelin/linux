@@ -137,7 +137,7 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 	return 0;
 }
 
-static void pcie_portdrv_remove(struct pci_dev *dev)
+static void __pcie_portdrv_remove(struct pci_dev *dev, bool disable)
 {
 	if (pci_bridge_d3_possible(dev)) {
 		pm_runtime_forbid(&dev->dev);
@@ -145,7 +145,17 @@ static void pcie_portdrv_remove(struct pci_dev *dev)
 		pm_runtime_dont_use_autosuspend(&dev->dev);
 	}
 
-	pcie_port_device_remove(dev);
+	pcie_port_device_remove(dev, disable);
+}
+
+static void pcie_portdrv_remove(struct pci_dev *dev)
+{
+	return __pcie_portdrv_remove(dev, true);
+}
+
+static void pcie_portdrv_shutdown(struct pci_dev *dev)
+{
+	return __pcie_portdrv_remove(dev, false);
 }
 
 static pci_ers_result_t pcie_portdrv_error_detected(struct pci_dev *dev,
@@ -218,7 +228,7 @@ static struct pci_driver pcie_portdriver = {
 
 	.probe		= pcie_portdrv_probe,
 	.remove		= pcie_portdrv_remove,
-	.shutdown	= pcie_portdrv_remove,
+	.shutdown	= pcie_portdrv_shutdown,
 
 	.err_handler	= &pcie_portdrv_err_handler,
 
