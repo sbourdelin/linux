@@ -874,7 +874,7 @@ static const struct dvb_tuner_ops helene_tuner_ops_s = {
 	.info = {
 		.name = "Sony HELENE Sat tuner",
 		.frequency_min = 500000,
-		.frequency_max = 2500000,
+		.frequency_max = 2072000000,
 		.frequency_step = 1000,
 	},
 	.init = helene_init,
@@ -888,7 +888,7 @@ static const struct dvb_tuner_ops helene_tuner_ops = {
 	.info = {
 		.name = "Sony HELENE Sat/Ter tuner",
 		.frequency_min = 500000,
-		.frequency_max = 1200000000,
+		.frequency_max = 2072000000,
 		.frequency_step = 1000,
 	},
 	.init = helene_init,
