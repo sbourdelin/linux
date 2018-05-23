@@ -90,11 +90,7 @@ int atomisp_csi2_set_ffmt(struct v4l2_subdev *sd,
 {
 	struct atomisp_mipi_csi2_device *csi2 = v4l2_get_subdevdata(sd);
 	struct v4l2_mbus_framefmt *actual_ffmt =
-#ifndef ISP2401
 		__csi2_get_format(csi2, cfg, which, pad);
-#else
-	    __csi2_get_format(csi2, cfg, which, pad);
-#endif
 
 	if (pad == CSI2_PAD_SINK) {
 		const struct atomisp_in_fmt_conv *ic;
@@ -121,11 +117,7 @@ int atomisp_csi2_set_ffmt(struct v4l2_subdev *sd,
 
 	/* FIXME: DPCM decompression */
 	*actual_ffmt = *ffmt =
-#ifndef ISP2401
 		*__csi2_get_format(csi2, cfg, which, CSI2_PAD_SINK);
-#else
-	    *__csi2_get_format(csi2, cfg, which, CSI2_PAD_SINK);
-#endif
 
 	return 0;
 }
