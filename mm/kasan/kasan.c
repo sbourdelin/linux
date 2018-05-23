@@ -812,7 +812,7 @@ static bool shadow_mapped(unsigned long addr)
 	/*
 	 * We can't use pud_large() or pud_huge(), the first one
 	 * is arch-specific, the last one depend on HUGETLB_PAGE.
-	 * So let's abuse pud_bad(), if bud is bad it's has to
+	 * So let's abuse pud_bad(), if pud is bad than it's bad
 	 * because it's huge.
 	 */
 	if (pud_bad(*pud))
@@ -871,9 +871,16 @@ static int __meminit kasan_mem_notifier(struct notifier_block *nb,
 		struct vm_struct *vm;
 
 		/*
-		 * Only hot-added memory have vm_area. Freeing shadow
-		 * mapped during boot would be tricky, so we'll just
-		 * have to keep it.
+		 * shadow_start was either mapped during boot by kasan_init()
+		 * or during memory online by __vmalloc_node_range().
+		 * In the latter case we can use vfree() to free shadow.
+		 * Non-NULL result of the find_vm_area() will tell us if
+		 * that was the second case.
+		 *
+		 * Currently it's not possible to free shadow mapped
+		 * during boot by kasan_init(). It's because the code
+		 * to do that hasn't been written yet. So we'll just
+		 * leak the memory.
 		 */
 		vm = find_vm_area((void *)shadow_start);
 		if (vm)
