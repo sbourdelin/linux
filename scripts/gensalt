@@ -1,0 +1,22 @@
+#!/bin/sh
+
+if [[ $1 = "" ]]; then
+	echo "#define BUILD_ID_SALT"
+	exit 0
+fi
+
+BUILD_ID_SALT=$1
+
+echo "SECTIONS {"
+echo ".comment (INFO) :"
+echo " {"
+
+_TAG=`echo $BUILD_ID_SALT | sed -e 's/\(.\)/\1 /g'`
+for c in $_TAG; do
+	_HEX=`echo -n $c | od -A n -t x1 | tr -d ' ' `
+	echo "BYTE(0x$_HEX);"
+done
+echo "BYTE(0x00);"
+
+echo " } "
+echo " } "

@@ -25,7 +25,14 @@ HOSTCFLAGS_asn1_compiler.o = -I$(srctree)/include
 HOSTLOADLIBES_sign-file = -lcrypto
 HOSTLOADLIBES_extract-cert = -lcrypto
 
-always		:= $(hostprogs-y) $(hostprogs-m)
+always		:= $(hostprogs-y) $(hostprogs-m) build-salt.lds
+
+define filechk_build-salt.lds
+	($(CONFIG_SHELL) $(srctree)/scripts/gensalt $(KERNELRELEASE))
+endef
+
+$(obj)/build-salt.lds: $(src)/gensalt FORCE
+	$(call filechk,build-salt.lds)
 
 # The following hostprogs-y programs are only build on demand
 hostprogs-y += unifdef

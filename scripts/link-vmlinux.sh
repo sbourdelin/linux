@@ -84,6 +84,7 @@ modpost_link()
 vmlinux_link()
 {
 	local lds="${objtree}/${KBUILD_LDS}"
+	local extra_lds="${objtree}/${EXTRA_LDS}"
 	local objects
 
 	if [ "${SRCARCH}" != "um" ]; then
@@ -96,7 +97,7 @@ vmlinux_link()
 			${1}"
 
 		${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}	\
-			-T ${lds} ${objects}
+			-T ${lds} -T ${extra_lds} ${objects}
 	else
 		objects="-Wl,--whole-archive			\
 			built-in.a				\
