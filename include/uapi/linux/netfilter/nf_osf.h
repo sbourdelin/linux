@@ -1,6 +1,8 @@
 #ifndef _NF_OSF_H
 #define _NF_OSF_H
 
+#include <linux/types.h>
+
 #define MAXGENRELEN	32
 
 #define NF_OSF_GENRE	(1 << 0)
