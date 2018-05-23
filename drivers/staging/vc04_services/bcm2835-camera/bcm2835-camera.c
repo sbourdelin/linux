@@ -652,189 +652,6 @@ static const struct vb2_ops bm2835_mmal_video_qops = {
  * ------------------------------------------------------------------
  */
 
-static int set_overlay_params(struct bm2835_mmal_dev *dev,
-			      struct vchiq_mmal_port *port)
-{
-	struct mmal_parameter_displayregion prev_config = {
-		.set =	MMAL_DISPLAY_SET_LAYER |
-			MMAL_DISPLAY_SET_ALPHA |
-			MMAL_DISPLAY_SET_DEST_RECT |
-			MMAL_DISPLAY_SET_FULLSCREEN,
-		.layer = PREVIEW_LAYER,
-		.alpha = dev->overlay.global_alpha,
-		.fullscreen = 0,
-		.dest_rect = {
-			.x = dev->overlay.w.left,
-			.y = dev->overlay.w.top,
-			.width = dev->overlay.w.width,
-			.height = dev->overlay.w.height,
-		},
-	};
-	return vchiq_mmal_port_parameter_set(dev->instance, port,
-					     MMAL_PARAMETER_DISPLAYREGION,
-					     &prev_config, sizeof(prev_config));
-}
-
-/* overlay ioctl */
-static int vidioc_enum_fmt_vid_overlay(struct file *file, void *priv,
-				       struct v4l2_fmtdesc *f)
-{
-	struct mmal_fmt *fmt;
-
-	if (f->index >= ARRAY_SIZE(formats))
-		return -EINVAL;
-
-	fmt = &formats[f->index];
-
-	strlcpy((char *)f->description, fmt->name, sizeof(f->description));
-	f->pixelformat = fmt->fourcc;
-	f->flags = fmt->flags;
-
-	return 0;
-}
-
-static int vidioc_g_fmt_vid_overlay(struct file *file, void *priv,
-				    struct v4l2_format *f)
-{
-	struct bm2835_mmal_dev *dev = video_drvdata(file);
-
-	f->fmt.win = dev->overlay;
-
-	return 0;
-}
-
-static int vidioc_try_fmt_vid_overlay(struct file *file, void *priv,
-				      struct v4l2_format *f)
-{
-	struct bm2835_mmal_dev *dev = video_drvdata(file);
-
-	f->fmt.win.field = V4L2_FIELD_NONE;
-	f->fmt.win.chromakey = 0;
-	f->fmt.win.clips = NULL;
-	f->fmt.win.clipcount = 0;
-	f->fmt.win.bitmap = NULL;
-
-	v4l_bound_align_image(&f->fmt.win.w.width, MIN_WIDTH, dev->max_width, 1,
-			      &f->fmt.win.w.height, MIN_HEIGHT, dev->max_height,
-			      1, 0);
-	v4l_bound_align_image(&f->fmt.win.w.left, MIN_WIDTH, dev->max_width, 1,
-			      &f->fmt.win.w.top, MIN_HEIGHT, dev->max_height,
-			      1, 0);
-
-	v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
-		 "Overlay: Now w/h %dx%d l/t %dx%d\n",
-		f->fmt.win.w.width, f->fmt.win.w.height,
-		f->fmt.win.w.left, f->fmt.win.w.top);
-
-	v4l2_dump_win_format(1,
-			     bcm2835_v4l2_debug,
-			     &dev->v4l2_dev,
-			     &f->fmt.win,
-			     __func__);
-	return 0;
-}
-
-static int vidioc_s_fmt_vid_overlay(struct file *file, void *priv,
-				    struct v4l2_format *f)
-{
-	struct bm2835_mmal_dev *dev = video_drvdata(file);
-
-	vidioc_try_fmt_vid_overlay(file, priv, f);
-
-	dev->overlay = f->fmt.win;
-	if (dev->component[MMAL_COMPONENT_PREVIEW]->enabled) {
-		set_overlay_params(dev,
-				   &dev->component[MMAL_COMPONENT_PREVIEW]->input[0]);
-	}
-
-	return 0;
-}
-
-static int vidioc_overlay(struct file *file, void *f, unsigned int on)
-{
-	int ret;
-	struct bm2835_mmal_dev *dev = video_drvdata(file);
-	struct vchiq_mmal_port *src;
-	struct vchiq_mmal_port *dst;
-
-	if ((on && dev->component[MMAL_COMPONENT_PREVIEW]->enabled) ||
-	    (!on && !dev->component[MMAL_COMPONENT_PREVIEW]->enabled))
-		return 0;	/* already in requested state */
-
-	src =
-	    &dev->component[MMAL_COMPONENT_CAMERA]->
-	    output[MMAL_CAMERA_PORT_PREVIEW];
-
-	if (!on) {
-		/* disconnect preview ports and disable component */
-		ret = vchiq_mmal_port_disable(dev->instance, src);
-		if (!ret)
-			ret =
-			    vchiq_mmal_port_connect_tunnel(dev->instance, src,
-							   NULL);
-		if (ret >= 0)
-			ret = vchiq_mmal_component_disable(
-					dev->instance,
-					dev->component[MMAL_COMPONENT_PREVIEW]);
-
-		disable_camera(dev);
-		return ret;
-	}
-
-	/* set preview port format and connect it to output */
-	dst = &dev->component[MMAL_COMPONENT_PREVIEW]->input[0];
-
-	ret = vchiq_mmal_port_set_format(dev->instance, src);
-	if (ret < 0)
-		goto error;
-
-	ret = set_overlay_params(dev, dst);
-	if (ret < 0)
-		goto error;
-
-	if (enable_camera(dev) < 0)
-		goto error;
-
-	ret = vchiq_mmal_component_enable(
-			dev->instance,
-			dev->component[MMAL_COMPONENT_PREVIEW]);
-	if (ret < 0)
-		goto error;
-
-	v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev, "connecting %p to %p\n",
-		 src, dst);
-	ret = vchiq_mmal_port_connect_tunnel(dev->instance, src, dst);
-	if (!ret)
-		ret = vchiq_mmal_port_enable(dev->instance, src, NULL);
-error:
-	return ret;
-}
-
-static int vidioc_g_fbuf(struct file *file, void *fh,
-			 struct v4l2_framebuffer *a)
-{
-	/* The video overlay must stay within the framebuffer and can't be
-	 * positioned independently.
-	 */
-	struct bm2835_mmal_dev *dev = video_drvdata(file);
-	struct vchiq_mmal_port *preview_port =
-		    &dev->component[MMAL_COMPONENT_CAMERA]->
-		    output[MMAL_CAMERA_PORT_PREVIEW];
-
-	a->capability = V4L2_FBUF_CAP_EXTERNOVERLAY |
-			V4L2_FBUF_CAP_GLOBAL_ALPHA;
-	a->flags = V4L2_FBUF_FLAG_OVERLAY;
-	a->fmt.width = preview_port->es.video.width;
-	a->fmt.height = preview_port->es.video.height;
-	a->fmt.pixelformat = V4L2_PIX_FMT_YUV420;
-	a->fmt.bytesperline = preview_port->es.video.width;
-	a->fmt.sizeimage = (preview_port->es.video.width *
-			       preview_port->es.video.height * 3) >> 1;
-	a->fmt.colorspace = V4L2_COLORSPACE_SMPTE170M;
-
-	return 0;
-}
-
 /* input ioctls */
 static int vidioc_enum_input(struct file *file, void *priv,
 			     struct v4l2_input *inp)
@@ -878,8 +695,8 @@ static int vidioc_querycap(struct file *file, void *priv,
 
 	snprintf((char *)cap->bus_info, sizeof(cap->bus_info),
 		 "platform:%s", dev->v4l2_dev.name);
-	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_VIDEO_OVERLAY |
-	    V4L2_CAP_STREAMING | V4L2_CAP_READWRITE;
+	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING |
+			   V4L2_CAP_READWRITE;
 	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
 
 	return 0;
@@ -1090,26 +907,10 @@ static int mmal_setup_components(struct bm2835_mmal_dev *dev,
 	    && camera_port ==
 	    &dev->component[MMAL_COMPONENT_CAMERA]->
 	    output[MMAL_CAMERA_PORT_VIDEO]) {
-		bool overlay_enabled =
-		    !!dev->component[MMAL_COMPONENT_PREVIEW]->enabled;
 		struct vchiq_mmal_port *preview_port =
 		    &dev->component[MMAL_COMPONENT_CAMERA]->
 		    output[MMAL_CAMERA_PORT_PREVIEW];
 		/* Preview and encode ports need to match on resolution */
-		if (overlay_enabled) {
-			/* Need to disable the overlay before we can update
-			 * the resolution
-			 */
-			ret =
-			    vchiq_mmal_port_disable(dev->instance,
-						    preview_port);
-			if (!ret)
-				ret =
-				    vchiq_mmal_port_connect_tunnel(
-						dev->instance,
-						preview_port,
-						NULL);
-		}
 		preview_port->es.video.width = f->fmt.pix.width;
 		preview_port->es.video.height = f->fmt.pix.height;
 		preview_port->es.video.crop.x = 0;
@@ -1121,16 +922,6 @@ static int mmal_setup_components(struct bm2835_mmal_dev *dev,
 		preview_port->es.video.frame_rate.den =
 					  dev->capture.timeperframe.numerator;
 		ret = vchiq_mmal_port_set_format(dev->instance, preview_port);
-		if (overlay_enabled) {
-			ret = vchiq_mmal_port_connect_tunnel(
-				dev->instance,
-				preview_port,
-				&dev->component[MMAL_COMPONENT_PREVIEW]->input[0]);
-			if (!ret)
-				ret = vchiq_mmal_port_enable(dev->instance,
-							     preview_port,
-							     NULL);
-		}
 	}
 
 	if (ret) {
@@ -1412,14 +1203,6 @@ static int vidioc_s_parm(struct file *file, void *priv,
 }
 
 static const struct v4l2_ioctl_ops camera0_ioctl_ops = {
-	/* overlay */
-	.vidioc_enum_fmt_vid_overlay = vidioc_enum_fmt_vid_overlay,
-	.vidioc_g_fmt_vid_overlay = vidioc_g_fmt_vid_overlay,
-	.vidioc_try_fmt_vid_overlay = vidioc_try_fmt_vid_overlay,
-	.vidioc_s_fmt_vid_overlay = vidioc_s_fmt_vid_overlay,
-	.vidioc_overlay = vidioc_overlay,
-	.vidioc_g_fbuf = vidioc_g_fbuf,
-
 	/* inputs */
 	.vidioc_enum_input = vidioc_enum_input,
 	.vidioc_g_input = vidioc_g_input,
@@ -1649,26 +1432,12 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
 	dev->capture.enc_profile = V4L2_MPEG_VIDEO_H264_PROFILE_HIGH;
 	dev->capture.enc_level = V4L2_MPEG_VIDEO_H264_LEVEL_4_0;
 
-	/* get the preview component ready */
-	ret = vchiq_mmal_component_init(
-			dev->instance, "ril.video_render",
-			&dev->component[MMAL_COMPONENT_PREVIEW]);
-	if (ret < 0)
-		goto unreg_camera;
-
-	if (dev->component[MMAL_COMPONENT_PREVIEW]->inputs < 1) {
-		ret = -EINVAL;
-		pr_debug("too few input ports %d needed %d\n",
-			 dev->component[MMAL_COMPONENT_PREVIEW]->inputs, 1);
-		goto unreg_preview;
-	}
-
 	/* get the image encoder component ready */
 	ret = vchiq_mmal_component_init(
 		dev->instance, "ril.image_encode",
 		&dev->component[MMAL_COMPONENT_IMAGE_ENCODE]);
 	if (ret < 0)
-		goto unreg_preview;
+		goto unreg_camera;
 
 	if (dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs < 1) {
 		ret = -EINVAL;
@@ -1733,11 +1502,6 @@ unreg_image_encoder:
 	vchiq_mmal_component_finalise(
 		dev->instance,
 		dev->component[MMAL_COMPONENT_IMAGE_ENCODE]);
-
-unreg_preview:
-	pr_err("Cleanup: Destroy video render\n");
-	vchiq_mmal_component_finalise(dev->instance,
-				      dev->component[MMAL_COMPONENT_PREVIEW]);
 
 unreg_camera:
 	pr_err("Cleanup: Destroy camera\n");
@@ -1809,9 +1573,6 @@ static void bcm2835_cleanup_instance(struct bm2835_mmal_dev *dev)
 				      component[MMAL_COMPONENT_IMAGE_ENCODE]);
 
 	vchiq_mmal_component_finalise(dev->instance,
-				      dev->component[MMAL_COMPONENT_PREVIEW]);
-
-	vchiq_mmal_component_finalise(dev->instance,
 				      dev->component[MMAL_COMPONENT_CAMERA]);
 
 	v4l2_ctrl_handler_free(&dev->ctrl_handler);
@@ -1860,16 +1621,6 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
 		dev->camera_num = camera;
 		dev->max_width = resolutions[camera][0];
 		dev->max_height = resolutions[camera][1];
-
-		/* setup device defaults */
-		dev->overlay.w.left = 150;
-		dev->overlay.w.top = 50;
-		dev->overlay.w.width = 1024;
-		dev->overlay.w.height = 768;
-		dev->overlay.clipcount = 0;
-		dev->overlay.field = V4L2_FIELD_NONE;
-		dev->overlay.global_alpha = 255;
-
 		dev->capture.fmt = &formats[3]; /* JPEG */
 
 		/* v4l device registration */

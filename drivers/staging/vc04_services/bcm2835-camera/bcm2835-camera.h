@@ -16,7 +16,6 @@
 
 enum {
 	MMAL_COMPONENT_CAMERA = 0,
-	MMAL_COMPONENT_PREVIEW,
 	MMAL_COMPONENT_IMAGE_ENCODE,
 	MMAL_COMPONENT_VIDEO_ENCODE,
 	MMAL_COMPONENT_COUNT
@@ -28,8 +27,6 @@ enum {
 	MMAL_CAMERA_PORT_CAPTURE,
 	MMAL_CAMERA_PORT_COUNT
 };
-
-#define PREVIEW_LAYER      2
 
 extern int bcm2835_v4l2_debug;
 
@@ -62,8 +59,6 @@ struct bm2835_mmal_dev {
 	struct vchiq_mmal_instance   *instance;
 	struct vchiq_mmal_component  *component[MMAL_COMPONENT_COUNT];
 	int camera_use_count;
-
-	struct v4l2_window overlay;
 
 	struct {
 		unsigned int     width;  /* width */
@@ -126,17 +121,4 @@ int set_framerate_params(struct bm2835_mmal_dev *dev);
 		(pix_fmt)->width, (pix_fmt)->height, (pix_fmt)->field,	\
 		(pix_fmt)->pixelformat, (pix_fmt)->bytesperline,	\
 		(pix_fmt)->sizeimage, (pix_fmt)->colorspace, (pix_fmt)->priv); \
-}
-#define v4l2_dump_win_format(level, debug, dev, win_fmt, desc)	\
-{	\
-	v4l2_dbg(level, debug, dev,	\
-"%s: w %u h %u l %u t %u  field %u chromakey %06X clip %p " \
-"clipcount %u bitmap %p\n", \
-		desc,	\
-		(win_fmt)->w.width, (win_fmt)->w.height, \
-		(win_fmt)->w.left, (win_fmt)->w.top, \
-		(win_fmt)->field,	\
-		(win_fmt)->chromakey,	\
-		(win_fmt)->clips, (win_fmt)->clipcount,	\
-		(win_fmt)->bitmap); \
 }
