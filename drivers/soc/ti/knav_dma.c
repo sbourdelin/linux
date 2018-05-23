@@ -761,6 +761,7 @@ static int knav_dma_probe(struct platform_device *pdev)
 		ret = dma_init(node, child);
 		if (ret) {
 			dev_err(&pdev->dev, "init failed with %d\n", ret);
+			of_node_put(child);
 			break;
 		}
 	}
