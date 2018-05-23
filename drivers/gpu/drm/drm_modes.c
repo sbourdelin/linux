@@ -1739,8 +1739,11 @@ int drm_mode_convert_umode(struct drm_device *dev,
 	}
 
 	out->status = drm_mode_validate_driver(dev, out);
-	if (out->status != MODE_OK)
+	if (out->status != MODE_OK) {
+		DRM_DEBUG_KMS("Bad user mode:\n");
+		drm_mode_debug_printmodeline(out);
 		return -EINVAL;
+	}
 
 	drm_mode_set_crtcinfo(out, CRTC_INTERLACE_HALVE_V);
 
