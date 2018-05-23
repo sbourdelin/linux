@@ -4592,8 +4592,6 @@ int atomisp_css_isr_thread(struct atomisp_device *isp,
 	 * delete wdt timer. */
 	for (i = 0; i < isp->num_of_streams; i++) {
 		asd = &isp->asd[i];
-		if (!asd)
-			continue;
 		if (asd->streaming != ATOMISP_DEVICE_STREAMING_ENABLED)
 			continue;
 		if (!atomisp_buffers_queued(asd))
