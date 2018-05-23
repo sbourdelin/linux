@@ -1464,6 +1464,36 @@ config BPF_JIT_HARDEN_BOOTPARAM_VALUE
 
 	  If you are unsure how to answer this question, answer 0.
 
+config BPF_JIT_KALLSYMS_BOOTPARAM
+	bool "BPF JIT kallsyms export boot parameter"
+	default n
+	help
+	  This option adds a kernel parameter 'bpf_jit_kallsyms' that allows
+	  configuring default state of the net.core.bpf_jit_kallsyms sysctl
+	  knob.  If this option is selected, the default value of the
+	  net.core.bpf_jit_kallsyms sysctl knob can be set on the kernel command
+	  line.  The purpose of this option is to allow enabling BPF JIT
+	  kallsyms export for the BPF programs created during the early boot,
+	  so they can be traced later.
+
+	  If you are unsure how to answer this question, answer N.
+
+config BPF_JIT_KALLSYMS_BOOTPARAM_VALUE
+	int "BPF JIT kallsyms export boot parameter default value"
+	depends on BPF_JIT_HARDEN_BOOTPARAM
+	range 0 1
+	default 0
+	help
+	  This option sets the default value for the kernel parameter
+	  'bpf_jit_kallsyms' that configures default value of the
+	  net.core.bpf_jit_kallsyms sysctl knob at boot.  If this option is set
+	  to 0 (zero), the net.core.bpf_jit_kallsyms will default to 0, which
+	  will lead to disabling of exporting of addresses of JIT'ed BPF
+	  programs.  If this option is set to 1 (one), addresses of privileged
+	  BPF programs are exported to kallsyms.
+
+	  If you are unsure how to answer this question, answer 0.
+
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"
 	select ANON_INODES
