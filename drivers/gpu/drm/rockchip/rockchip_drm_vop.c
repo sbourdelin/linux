@@ -549,8 +549,6 @@ static int vop_enable(struct drm_crtc *crtc)
 
 	spin_unlock(&vop->reg_lock);
 
-	enable_irq(vop->irq);
-
 	drm_crtc_vblank_on(crtc);
 
 	return 0;
@@ -595,8 +593,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
 	wait_for_completion(&vop->dsp_hold_completion);
 
 	vop_dsp_hold_valid_irq_disable(vop);
-
-	disable_irq(vop->irq);
 
 	vop->is_enabled = false;
 
@@ -1168,6 +1164,13 @@ static irqreturn_t vop_isr(int irq, void *data)
 	int ret = IRQ_NONE;
 
 	/*
+	 * since the irq is shared with iommu, iommu irq is enabled before vop
+	 * enable, so before vop enable we do nothing.
+	 */
+	if (!vop->is_enabled)
+		return IRQ_NONE;
+
+	/*
 	 * interrupt register has interrupt status, enable and clear bits, we
 	 * must hold irq_lock to avoid a race with enable/disable_vblank().
 	*/
@@ -1585,9 +1588,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
 			       IRQF_SHARED, dev_name(dev), vop);
 	if (ret)
 		goto err_disable_pm_runtime;
-
-	/* IRQ is initially disabled; it gets enabled in power_on */
-	disable_irq(vop->irq);
 
 	return 0;
 
