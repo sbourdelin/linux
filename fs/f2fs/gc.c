@@ -653,6 +653,9 @@ static void move_data_block(struct inode *inode, block_t bidx,
 	fio.page = page;
 	fio.new_blkaddr = fio.old_blkaddr = dn.data_blkaddr;
 
+	if (test_opt(fio.sbi, LFS))
+		down_write(&fio.sbi->io_order_lock);
+
 	allocate_data_block(fio.sbi, NULL, fio.old_blkaddr, &newaddr,
 					&sum, CURSEG_COLD_DATA, NULL, false);
 
@@ -709,6 +712,8 @@ static void move_data_block(struct inode *inode, block_t bidx,
 put_page_out:
 	f2fs_put_page(fio.encrypted_page, 1);
 recover_block:
+	if (test_opt(fio.sbi, LFS))
+		up_write(&fio.sbi->io_order_lock);
 	if (err)
 		__f2fs_replace_block(fio.sbi, &sum, newaddr, fio.old_blkaddr,
 								true, true);
