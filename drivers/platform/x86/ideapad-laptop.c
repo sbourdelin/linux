@@ -113,6 +113,10 @@ static bool no_bt_rfkill;
 module_param(no_bt_rfkill, bool, 0444);
 MODULE_PARM_DESC(no_bt_rfkill, "No rfkill for bluetooth.");
 
+static bool init_rfkill_inverted;
+module_param(init_rfkill_inverted, bool, 0444);
+MODULE_PARM_DESC(init_rfkill_inverted, "Invert rfkill on initialization");
+
 /*
  * ACPI Helpers
  */
@@ -650,7 +654,9 @@ static int ideapad_register_rfkill(struct ideapad_private *priv, int dev)
 			 &sw_blocked)) {
 		rfkill_init_sw_state(priv->rfk[dev], 0);
 	} else {
-		sw_blocked = !sw_blocked;
+		/* Do not apply invert for ideapads which haven't hw switch */
+		if (priv->has_hw_rfkill_switch || init_rfkill_inverted)
+			sw_blocked = !sw_blocked;
 		rfkill_init_sw_state(priv->rfk[dev], sw_blocked);
 	}
 
