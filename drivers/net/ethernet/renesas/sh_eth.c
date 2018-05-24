@@ -2252,22 +2252,6 @@ static void sh_eth_get_regs(struct net_device *ndev, struct ethtool_regs *regs,
 	pm_runtime_put_sync(&mdp->pdev->dev);
 }
 
-static int sh_eth_nway_reset(struct net_device *ndev)
-{
-	struct sh_eth_private *mdp = netdev_priv(ndev);
-	unsigned long flags;
-	int ret;
-
-	if (!ndev->phydev)
-		return -ENODEV;
-
-	spin_lock_irqsave(&mdp->lock, flags);
-	ret = phy_start_aneg(ndev->phydev);
-	spin_unlock_irqrestore(&mdp->lock, flags);
-
-	return ret;
-}
-
 static u32 sh_eth_get_msglevel(struct net_device *ndev)
 {
 	struct sh_eth_private *mdp = netdev_priv(ndev);
@@ -2418,7 +2402,7 @@ static int sh_eth_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 static const struct ethtool_ops sh_eth_ethtool_ops = {
 	.get_regs_len	= sh_eth_get_regs_len,
 	.get_regs	= sh_eth_get_regs,
-	.nway_reset	= sh_eth_nway_reset,
+	.nway_reset	= phy_ethtool_nway_reset,
 	.get_msglevel	= sh_eth_get_msglevel,
 	.set_msglevel	= sh_eth_set_msglevel,
 	.get_link	= ethtool_op_get_link,
