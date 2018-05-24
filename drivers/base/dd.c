@@ -226,15 +226,36 @@ void device_unblock_probing(void)
 	driver_deferred_probe_trigger();
 }
 
+static int deferred_probe_timeout = -1;
+static int __init deferred_probe_timeout_setup(char *str)
+{
+	deferred_probe_timeout = simple_strtol(str, NULL, 0);
+	return 1;
+}
+__setup("deferred_probe_timeout=", deferred_probe_timeout_setup);
+
 int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
 {
-	if (optional && initcalls_done) {
+	if ((optional || !deferred_probe_timeout) && initcalls_done) {
 		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
 		return -ENODEV;
 	}
 
 	return -EPROBE_DEFER;
 }
+
+static void deferred_probe_timeout_work_func(struct work_struct *work)
+{
+	struct device_private *private, *p;
+
+	deferred_probe_timeout = 0;
+	driver_deferred_probe_trigger();
+	flush_work(&deferred_probe_work);
+
+	list_for_each_entry_safe(private, p, &deferred_probe_pending_list, deferred_probe)
+		dev_info(private->device, "deferred probe pending");
+}
+static DECLARE_DELAYED_WORK(deferred_probe_timeout_work, deferred_probe_timeout_work_func);
 
 /**
  * deferred_probe_initcall() - Enable probing of deferred devices
@@ -257,6 +278,11 @@ static int deferred_probe_initcall(void)
 	 */
 	driver_deferred_probe_trigger();
 	flush_work(&deferred_probe_work);
+
+	if (deferred_probe_timeout > 0) {
+		schedule_delayed_work(&deferred_probe_timeout_work,
+			deferred_probe_timeout * HZ);
+	}
 	return 0;
 }
 late_initcall(deferred_probe_initcall);
