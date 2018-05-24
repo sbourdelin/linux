@@ -1418,10 +1418,12 @@ static struct page *kmem_getpages(struct kmem_cache *cachep, gfp_t flags,
 	}
 
 	nr_pages = (1 << cachep->gfporder);
-	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
+	if (cachep->flags & SLAB_RECLAIM_ACCOUNT) {
 		mod_lruvec_page_state(page, NR_SLAB_RECLAIMABLE, nr_pages);
-	else
+		mod_node_page_state(page_pgdat(page), NR_RECLAIMABLE, nr_pages);
+	} else {
 		mod_lruvec_page_state(page, NR_SLAB_UNRECLAIMABLE, nr_pages);
+	}
 
 	__SetPageSlab(page);
 	/* Record if ALLOC_NO_WATERMARKS was set when allocating the slab */
@@ -1439,10 +1441,12 @@ static void kmem_freepages(struct kmem_cache *cachep, struct page *page)
 	int order = cachep->gfporder;
 	unsigned long nr_freed = (1 << order);
 
-	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
+	if (cachep->flags & SLAB_RECLAIM_ACCOUNT) {
 		mod_lruvec_page_state(page, NR_SLAB_RECLAIMABLE, -nr_freed);
-	else
+		mod_node_page_state(page_pgdat(page), NR_RECLAIMABLE, -nr_freed);
+	} else {
 		mod_lruvec_page_state(page, NR_SLAB_UNRECLAIMABLE, -nr_freed);
+	}
 
 	BUG_ON(!PageSlab(page));
 	__ClearPageSlabPfmemalloc(page);
