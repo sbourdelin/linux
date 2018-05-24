@@ -110,17 +110,23 @@ static int dt_to_map_one_config(struct pinctrl *p,
 	int ret;
 	struct pinctrl_map *map;
 	unsigned num_maps;
+	bool pctl_optional = false;
 
 	/* Find the pin controller containing np_config */
 	np_pctldev = of_node_get(np_config);
 	for (;;) {
+		if (!pctl_optional)
+			pctl_optional = of_property_read_bool(np_pctldev, "pinctrl-use-default");
+
 		np_pctldev = of_get_next_parent(np_pctldev);
 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
-			dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
-				np_config);
 			of_node_put(np_pctldev);
-			/* OK let's just assume this will appear later then */
-			return -EPROBE_DEFER;
+			ret = driver_deferred_probe_check_init_done(p->dev, pctl_optional);
+			if (ret == -EPROBE_DEFER)
+				/* OK let's just assume this will appear later then */
+				dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
+					np_config);
+			return ret;
 		}
 		/* If we're creating a hog we can use the passed pctldev */
 		if (pctldev && (np_pctldev == p->dev->of_node))
