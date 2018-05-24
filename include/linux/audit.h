@@ -154,6 +154,7 @@ extern void audit_log_task_info(struct audit_buffer *ab,
 				struct task_struct *tsk);
 
 extern int		    audit_update_lsm_rules(void);
+extern void audit_log_tty(struct audit_buffer *ab, struct task_struct *tsk);
 
 				/* Private API (for audit.c only) */
 extern int audit_rule_change(int type, int seq, void *data, size_t datasz);
@@ -201,6 +202,10 @@ static inline int audit_log_task_context(struct audit_buffer *ab)
 }
 static inline void audit_log_task_info(struct audit_buffer *ab,
 				       struct task_struct *tsk)
+{ }
+
+static inline void audit_log_tty(struct audit_buffer *ab,
+				 struct task_struct *tsk)
 { }
 #define audit_enabled 0
 #endif /* CONFIG_AUDIT */

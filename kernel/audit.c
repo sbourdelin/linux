@@ -2305,6 +2305,14 @@ void audit_log_task_info(struct audit_buffer *ab, struct task_struct *tsk)
 }
 EXPORT_SYMBOL(audit_log_task_info);
 
+void audit_log_tty(struct audit_buffer *ab, struct task_struct *tsk)
+{
+	struct tty_struct *tty = audit_get_tty(tsk);
+
+	audit_log_format(ab, " tty=%s", tty ? tty_name(tty) : "(none)");
+	audit_put_tty(tty);
+}
+
 /**
  * audit_log_link_denied - report a link restriction denial
  * @operation: specific link operation
