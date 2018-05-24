@@ -1007,6 +1007,11 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	u8 *src, *dst;
 	struct zswap_header zhdr = { .swpentry = swp_entry(type, offset) };
 
+	if (!zswap_max_pool_percent) {
+		ret = -ENOMEM;
+		goto reject;
+	}
+
 	/* THP isn't supported */
 	if (PageTransHuge(page)) {
 		ret = -EINVAL;
