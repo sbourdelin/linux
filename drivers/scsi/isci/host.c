@@ -1786,7 +1786,7 @@ static void power_control_timeout(struct timer_list *t)
 				 * them out of await_sas_power state.
 				 */
 				if (requester != NULL && requester != iphy) {
-					u8 other = memcmp(requester->frame_rcvd.iaf.sas_addr,
+					int other = memcmp(requester->frame_rcvd.iaf.sas_addr,
 							  iphy->frame_rcvd.iaf.sas_addr,
 							  sizeof(requester->frame_rcvd.iaf.sas_addr));
 
@@ -1840,7 +1840,7 @@ void sci_controller_power_control_queue_insert(struct isci_host *ihost,
 		struct isci_phy *current_phy;
 
 		for (i = 0; i < SCI_MAX_PHYS; i++) {
-			u8 other;
+			int other;
 			current_phy = &ihost->phys[i];
 
 			other = memcmp(current_phy->frame_rcvd.iaf.sas_addr,
