@@ -15,6 +15,7 @@
 #include <linux/integrity.h>
 #include <crypto/sha.h>
 #include <linux/key.h>
+#include <linux/audit.h>
 
 /* iint action cache flags */
 #define IMA_MEASURE		0x00000001
@@ -197,6 +198,11 @@ static inline void evm_load_x509(void)
 void integrity_audit_msg(int audit_msgno, struct inode *inode,
 			 const unsigned char *fname, const char *op,
 			 const char *cause, int result, int info);
+
+void integrity_audit_msg_common(struct audit_buffer *ab, struct inode *inode,
+				const unsigned char *fname, const char *op,
+				const char *cause, int result);
+
 #else
 static inline void integrity_audit_msg(int audit_msgno, struct inode *inode,
 				       const unsigned char *fname,
@@ -204,4 +210,14 @@ static inline void integrity_audit_msg(int audit_msgno, struct inode *inode,
 				       int result, int info)
 {
 }
+
+static inline void integrity_audit_msg_common(struct audit_buffer *ab,
+					      struct inode *inode,
+					      const unsigned char *fname,
+					      const char *op,
+					      const char *cause,
+					      int result)
+{
+}
+
 #endif

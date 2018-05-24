@@ -28,17 +28,12 @@ static int __init integrity_audit_setup(char *str)
 }
 __setup("integrity_audit=", integrity_audit_setup);
 
-void integrity_audit_msg(int audit_msgno, struct inode *inode,
-			 const unsigned char *fname, const char *op,
-			 const char *cause, int result, int audit_info)
+void integrity_audit_msg_common(struct audit_buffer *ab, struct inode *inode,
+				const unsigned char *fname, const char *op,
+				const char *cause, int result)
 {
-	struct audit_buffer *ab;
 	char name[TASK_COMM_LEN];
 
-	if (!integrity_audit_info && audit_info == 1)	/* Skip info messages */
-		return;
-
-	ab = audit_log_start(current->audit_context, GFP_KERNEL, audit_msgno);
 	audit_log_format(ab, "pid=%d uid=%u auid=%u ses=%u",
 			 task_pid_nr(current),
 			 from_kuid(&init_user_ns, current_cred()->uid),
@@ -59,5 +54,18 @@ void integrity_audit_msg(int audit_msgno, struct inode *inode,
 	audit_log_d_path_exe(ab, current->mm);
 	audit_log_tty(ab, current);
 	audit_log_format(ab, " res=%d", !result);
+}
+
+void integrity_audit_msg(int audit_msgno, struct inode *inode,
+			 const unsigned char *fname, const char *op,
+			 const char *cause, int result, int audit_info)
+{
+	struct audit_buffer *ab;
+
+	if (!integrity_audit_info && audit_info == 1)	/* Skip info messages */
+		return;
+
+	ab = audit_log_start(current->audit_context, GFP_KERNEL, audit_msgno);
+	integrity_audit_msg_common(ab, inode, fname, op, cause, result);
 	audit_log_end(ab);
 }
