@@ -399,6 +399,11 @@ static int rvin_parallel_subdevice_attach(struct rvin_dev *vin,
 	ret = rvin_find_pad(subdev, MEDIA_PAD_FL_SINK);
 	vin->parallel->sink_pad = ret < 0 ? 0 : ret;
 
+	if (vin->info->use_mc) {
+		vin->parallel->subdev = subdev;
+		return 0;
+	}
+
 	/* Find compatible subdevices mbus format */
 	vin->mbus_code = 0;
 	code.index = 0;
@@ -460,10 +465,12 @@ static int rvin_parallel_subdevice_attach(struct rvin_dev *vin,
 static void rvin_parallel_subdevice_detach(struct rvin_dev *vin)
 {
 	rvin_v4l2_unregister(vin);
-	v4l2_ctrl_handler_free(&vin->ctrl_handler);
-
-	vin->vdev.ctrl_handler = NULL;
 	vin->parallel->subdev = NULL;
+
+	if (!vin->info->use_mc) {
+		v4l2_ctrl_handler_free(&vin->ctrl_handler);
+		vin->vdev.ctrl_handler = NULL;
+	}
 }
 
 static int rvin_parallel_notify_complete(struct v4l2_async_notifier *notifier)
@@ -552,18 +559,18 @@ static int rvin_parallel_parse_v4l2(struct device *dev,
 	return 0;
 }
 
-static int rvin_parallel_graph_init(struct rvin_dev *vin)
+static int rvin_parallel_init(struct rvin_dev *vin)
 {
 	int ret;
 
-	ret = v4l2_async_notifier_parse_fwnode_endpoints(
-		vin->dev, &vin->notifier,
-		sizeof(struct rvin_parallel_entity), rvin_parallel_parse_v4l2);
+	ret = v4l2_async_notifier_parse_fwnode_endpoints_by_port(
+		vin->dev, &vin->notifier, sizeof(struct rvin_parallel_entity),
+		0, rvin_parallel_parse_v4l2);
 	if (ret)
 		return ret;
 
 	if (!vin->parallel)
-		return -ENODEV;
+		return -ENOTCONN;
 
 	vin_dbg(vin, "Found parallel subdevice %pOF\n",
 		to_of_node(vin->parallel->asd.match.fwnode));
@@ -784,14 +791,8 @@ static int rvin_mc_init(struct rvin_dev *vin)
 {
 	int ret;
 
-	vin->pad.flags = MEDIA_PAD_FL_SINK;
-	ret = media_entity_pads_init(&vin->vdev.entity, 1, &vin->pad);
-	if (ret)
-		return ret;
-
-	ret = rvin_group_get(vin);
-	if (ret)
-		return ret;
+	if (!vin->info->use_mc)
+		return 0;
 
 	ret = rvin_mc_parse_of_graph(vin);
 	if (ret)
@@ -1074,11 +1075,24 @@ static int rcar_vin_probe(struct platform_device *pdev)
 		return ret;
 
 	platform_set_drvdata(pdev, vin);
-	if (vin->info->use_mc)
-		ret = rvin_mc_init(vin);
-	else
-		ret = rvin_parallel_graph_init(vin);
-	if (ret < 0)
+
+	if (vin->info->use_mc) {
+		vin->pad.flags = MEDIA_PAD_FL_SINK;
+		ret = media_entity_pads_init(&vin->vdev.entity, 1, &vin->pad);
+		if (ret)
+			return ret;
+
+		ret = rvin_group_get(vin);
+		if (ret)
+			return ret;
+	}
+
+	ret = rvin_mc_init(vin);
+	if (ret)
+		return ret;
+
+	ret = rvin_parallel_init(vin);
+	if (ret < 0 && ret != -ENOTCONN)
 		goto error;
 
 	pm_suspend_ignore_children(&pdev->dev, true);
