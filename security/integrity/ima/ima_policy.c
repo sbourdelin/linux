@@ -634,7 +634,7 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 	int result = 0;
 
 	ab = integrity_audit_log_start(NULL, GFP_KERNEL,
-				       AUDIT_INTEGRITY_RULE);
+				       AUDIT_INTEGRITY_POLICY_RULE);
 
 	entry->uid = INVALID_UID;
 	entry->fowner = INVALID_UID;
@@ -926,7 +926,8 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 		temp_ima_appraise |= IMA_APPRAISE_FIRMWARE;
 	else if (entry->func == POLICY_CHECK)
 		temp_ima_appraise |= IMA_APPRAISE_POLICY;
-	audit_log_format(ab, "res=%d", !result);
+	integrity_audit_msg_common(ab, NULL, NULL,
+				   "policy_update", "parse_rule", result);
 	audit_log_end(ab);
 	return result;
 }
