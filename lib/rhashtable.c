@@ -166,15 +166,20 @@ static struct bucket_table *nested_bucket_table_alloc(struct rhashtable *ht,
 	return tbl;
 }
 
-static struct bucket_table *bucket_table_alloc(struct rhashtable *ht,
-					       size_t nbuckets,
-					       gfp_t gfp)
+static struct bucket_table *__bucket_table_alloc(struct rhashtable *ht,
+						 size_t nbuckets,
+						 gfp_t gfp, bool retry)
 {
 	struct bucket_table *tbl = NULL;
 	size_t size, max_locks;
 	int i;
 
 	size = sizeof(*tbl) + nbuckets * sizeof(tbl->buckets[0]);
+	if (retry) {
+		gfp |= __GFP_NOFAIL;
+		tbl = kzalloc(size, gfp);
+	} /* fall-through */
+
 	if (gfp != GFP_KERNEL)
 		tbl = kzalloc(size, gfp | __GFP_NOWARN | __GFP_NORETRY);
 	else
@@ -209,6 +214,20 @@ static struct bucket_table *bucket_table_alloc(struct rhashtable *ht,
 		INIT_RHT_NULLS_HEAD(tbl->buckets[i], ht, i);
 
 	return tbl;
+}
+
+static struct bucket_table *bucket_table_alloc(struct rhashtable *ht,
+					       size_t nbuckets,
+					       gfp_t gfp)
+{
+	return __bucket_table_alloc(ht, nbuckets, gfp, false);
+}
+
+static struct bucket_table *bucket_table_alloc_retry(struct rhashtable *ht,
+						     size_t nbuckets,
+						     gfp_t gfp)
+{
+	return __bucket_table_alloc(ht, nbuckets, gfp, true);
 }
 
 static struct bucket_table *rhashtable_last_table(struct rhashtable *ht,
@@ -1067,9 +1086,20 @@ int rhashtable_init(struct rhashtable *ht,
 		}
 	}
 
+	/*
+	 * This is api initialization and thus we need to guarantee the
+	 * initial rhashtable allocation. Upon failure, retry with a
+	 * smallest possible size, otherwise we exhaust our options with
+	 * __GFP_NOFAIL.
+	 */
 	tbl = bucket_table_alloc(ht, size, GFP_KERNEL);
-	if (tbl == NULL)
-		return -ENOMEM;
+	if (unlikely(tbl == NULL)) {
+		size = HASH_MIN_SIZE;
+
+		tbl = bucket_table_alloc(ht, size, GFP_KERNEL);
+		if (tbl == NULL)
+			tbl = bucket_table_alloc_retry(ht, size, GFP_KERNEL);
+	}
 
 	atomic_set(&ht->nelems, 0);
 
