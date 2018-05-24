@@ -226,6 +226,16 @@ void device_unblock_probing(void)
 	driver_deferred_probe_trigger();
 }
 
+int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+{
+	if (optional && initcalls_done) {
+		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
+		return -ENODEV;
+	}
+
+	return -EPROBE_DEFER;
+}
+
 /**
  * deferred_probe_initcall() - Enable probing of deferred devices
  *
@@ -240,6 +250,13 @@ static int deferred_probe_initcall(void)
 	/* Sort as many dependencies as possible before exiting initcalls */
 	flush_work(&deferred_probe_work);
 	initcalls_done = true;
+
+	/*
+	 * Trigger deferred probe again, this time we won't defer anything
+	 * that is optional
+	 */
+	driver_deferred_probe_trigger();
+	flush_work(&deferred_probe_work);
 	return 0;
 }
 late_initcall(deferred_probe_initcall);
