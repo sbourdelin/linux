@@ -380,6 +380,51 @@ int qca_uart_setup_rome(struct hci_dev *hdev, uint8_t baudrate)
 }
 EXPORT_SYMBOL_GPL(qca_uart_setup_rome);
 
+int qca_uart_setup_cherokee(struct hci_dev *hdev, uint8_t baudrate,
+			    u32 *soc_ver)
+{
+	struct rome_config config;
+	int err;
+	u8 rom_ver;
+
+	/* Which firmware files to download are based on ROM version.
+	 * ROM version is derived from last two bytes of soc_ver.
+	 */
+	rom_ver = ((*soc_ver & 0x00000f00) >> 0x04) | (*soc_ver & 0x0000000f);
+	config.user_baud_rate = baudrate;
+	/* Download rampatch file */
+	config.type = TLV_TYPE_PATCH;
+	snprintf(config.fwname, sizeof(config.fwname), "qca/crbtfw%02x.tlv",
+		 rom_ver);
+	err = rome_download_firmware(hdev, &config);
+	if (err < 0) {
+		BT_ERR("%s: Failed to download patch (%d)", hdev->name, err);
+		return err;
+	}
+
+	/* Download NVM configuration */
+	config.type = TLV_TYPE_NVM;
+	snprintf(config.fwname, sizeof(config.fwname), "qca/crnv%02x.bin",
+		 rom_ver);
+	err = rome_download_firmware(hdev, &config);
+	if (err < 0) {
+		BT_ERR("%s: Failed to download NVM (%d)", hdev->name, err);
+		return err;
+	}
+
+	/* Perform HCI reset */
+	err = rome_reset(hdev);
+	if (err < 0) {
+		BT_ERR("%s: Failed to run HCI_RESET (%d)", hdev->name, err);
+		return err;
+	}
+
+	bt_dev_info(hdev, "wcn3990 setup on UART is completed");
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(qca_uart_setup_cherokee);
+
 MODULE_AUTHOR("Ben Young Tae Kim <ytkim@qca.qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth support for Qualcomm Atheros family ver " VERSION);
 MODULE_VERSION(VERSION);
