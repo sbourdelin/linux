@@ -296,10 +296,15 @@ static inline void __check_heap_object(const void *ptr, unsigned long n,
                                (KMALLOC_MIN_SIZE) : 16)
 
 #ifndef CONFIG_SLOB
-extern struct kmem_cache *kmalloc_caches[KMALLOC_SHIFT_HIGH + 1];
+extern struct kmem_cache *kmalloc_caches[2][KMALLOC_SHIFT_HIGH + 1];
 #ifdef CONFIG_ZONE_DMA
 extern struct kmem_cache *kmalloc_dma_caches[KMALLOC_SHIFT_HIGH + 1];
 #endif
+
+static __always_inline unsigned int kmalloc_reclaimable(gfp_t flags)
+{
+	return !!(flags & __GFP_RECLAIMABLE);
+}
 
 /*
  * Figure out which kmalloc slab an allocation of a certain size
@@ -536,12 +541,13 @@ static __always_inline void *kmalloc(size_t size, gfp_t flags)
 #ifndef CONFIG_SLOB
 		if (!(flags & GFP_DMA)) {
 			unsigned int index = kmalloc_index(size);
+			unsigned int recl = kmalloc_reclaimable(flags);
 
 			if (!index)
 				return ZERO_SIZE_PTR;
 
-			return kmem_cache_alloc_trace(kmalloc_caches[index],
-					flags, size);
+			return kmem_cache_alloc_trace(
+				kmalloc_caches[recl][index], flags, size);
 		}
 #endif
 	}
@@ -588,12 +594,13 @@ static __always_inline void *kmalloc_node(size_t size, gfp_t flags, int node)
 	if (__builtin_constant_p(size) &&
 		size <= KMALLOC_MAX_CACHE_SIZE && !(flags & GFP_DMA)) {
 		unsigned int i = kmalloc_index(size);
+		unsigned int recl = kmalloc_reclaimable(flags);
 
 		if (!i)
 			return ZERO_SIZE_PTR;
 
-		return kmem_cache_alloc_node_trace(kmalloc_caches[i],
-						flags, node, size);
+		return kmem_cache_alloc_node_trace(
+			kmalloc_caches[recl][i], flags, node, size);
 	}
 #endif
 	return __kmalloc_node(size, flags, node);
