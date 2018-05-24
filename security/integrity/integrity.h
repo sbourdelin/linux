@@ -203,6 +203,11 @@ void integrity_audit_msg_common(struct audit_buffer *ab, struct inode *inode,
 				const unsigned char *fname, const char *op,
 				const char *cause, int result);
 
+static inline struct audit_buffer *
+integrity_audit_log_start(struct audit_context *ctx, gfp_t gfp_mask, int type)
+{
+	return audit_log_start(ctx, gfp_mask, type);
+}
 #else
 static inline void integrity_audit_msg(int audit_msgno, struct inode *inode,
 				       const unsigned char *fname,
@@ -220,4 +225,9 @@ static inline void integrity_audit_msg_common(struct audit_buffer *ab,
 {
 }
 
+static inline struct audit_buffer *
+integrity_audit_log_start(struct audit_context *ctx, gfp_t gfp_mask, int type)
+{
+	return NULL;
+}
 #endif
