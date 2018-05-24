@@ -93,10 +93,11 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	show_val_kb(m, "Mapped:         ",
 		    global_node_page_state(NR_FILE_MAPPED));
 	show_val_kb(m, "Shmem:          ", i.sharedram);
+	show_val_kb(m, "Reclaimable:    ",
+		    global_node_page_state(NR_RECLAIMABLE));
 	show_val_kb(m, "Slab:           ",
 		    global_node_page_state(NR_SLAB_RECLAIMABLE) +
 		    global_node_page_state(NR_SLAB_UNRECLAIMABLE));
-
 	show_val_kb(m, "SReclaimable:   ",
 		    global_node_page_state(NR_SLAB_RECLAIMABLE));
 	show_val_kb(m, "SUnreclaim:     ",
