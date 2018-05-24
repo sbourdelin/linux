@@ -3188,7 +3188,9 @@ static const struct usb_action ov7620_50HZ[] = {
 				 * don't change autoexposure */
 	{0xdd, 0x00, 0x0100},	/* 00,01,00,dd */
 	{0xaa, 0x2b, 0x0096},	/* 00,2b,96,aa */
-	{0xaa, 0x75, 0x008a},	/* 00,75,8a,aa */
+/*	{0xaa, 0x75, 0x008a},	 * 00,75,8a,aa */
+	/* enable 1/120s & 1/100s exposures for banding filter */
+	{0xaa, 0x75, 0x008e},
 	{0xaa, 0x2d, 0x0005},	/* 00,2d,05,aa */
 	{0xa0, 0x00, ZC3XX_R190_EXPOSURELIMITHIGH},	/* 01,90,00,cc */
 	{0xa0, 0x04, ZC3XX_R191_EXPOSURELIMITMID},	/* 01,91,04,cc */
@@ -3208,7 +3210,9 @@ static const struct usb_action ov7620_60HZ[] = {
 				 * don't change autoexposure */
 	{0xdd, 0x00, 0x0100},			/* 00,01,00,dd */
 	{0xaa, 0x2b, 0x0000},			/* 00,2b,00,aa */
-	{0xaa, 0x75, 0x008a},			/* 00,75,8a,aa */
+/*	{0xaa, 0x75, 0x008a},			 * 00,75,8a,aa */
+	/* enable 1/120s & 1/100s exposures for banding filter */
+	{0xaa, 0x75, 0x008e},
 	{0xaa, 0x2d, 0x0005},			/* 00,2d,05,aa */
 	{0xa0, 0x00, ZC3XX_R190_EXPOSURELIMITHIGH}, /* 01,90,00,cc */
 	{0xa0, 0x04, ZC3XX_R191_EXPOSURELIMITMID}, /* 01,91,04,cc */
@@ -3231,7 +3235,9 @@ static const struct usb_action ov7620_NoFliker[] = {
 				 * don't change autoexposure */
 	{0xdd, 0x00, 0x0100},			/* 00,01,00,dd */
 	{0xaa, 0x2b, 0x0000},			/* 00,2b,00,aa */
-	{0xaa, 0x75, 0x008e},			/* 00,75,8e,aa */
+/*	{0xaa, 0x75, 0x008e},			 * 00,75,8e,aa */
+	/* disable 1/120s & 1/100s exposures for banding filter */
+	{0xaa, 0x75, 0x008a},
 	{0xaa, 0x2d, 0x0001},			/* 00,2d,01,aa */
 	{0xa0, 0x00, ZC3XX_R190_EXPOSURELIMITHIGH}, /* 01,90,00,cc */
 	{0xa0, 0x04, ZC3XX_R191_EXPOSURELIMITMID}, /* 01,91,04,cc */
