@@ -211,10 +211,13 @@ static struct dentry *fuse_ctl_add_dentry(struct dentry *parent,
 	if (!dentry)
 		return NULL;
 
-	fc->ctl_dentry[fc->ctl_ndents++] = dentry;
 	inode = new_inode(fuse_control_sb);
-	if (!inode)
+	if (!inode) {
+		dput(dentry);
 		return NULL;
+	}
+
+	fc->ctl_dentry[fc->ctl_ndents++] = dentry;
 
 	inode->i_ino = get_next_ino();
 	inode->i_mode = mode;
