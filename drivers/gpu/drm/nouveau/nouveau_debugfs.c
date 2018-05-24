@@ -200,7 +200,7 @@ nouveau_drm_debugfs_init(struct drm_minor *minor)
 
 	for (i = 0; i < ARRAY_SIZE(nouveau_debugfs_files); i++) {
 		dentry = debugfs_create_file(nouveau_debugfs_files[i].name,
-					     S_IRUGO | S_IWUSR,
+					     0644,
 					     minor->debugfs_root, minor->dev,
 					     nouveau_debugfs_files[i].fops);
 		if (!dentry)

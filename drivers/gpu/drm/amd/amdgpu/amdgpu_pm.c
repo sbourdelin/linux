@@ -905,39 +905,39 @@ fail:
 	return -EINVAL;
 }
 
-static DEVICE_ATTR(power_dpm_state, S_IRUGO | S_IWUSR, amdgpu_get_dpm_state, amdgpu_set_dpm_state);
-static DEVICE_ATTR(power_dpm_force_performance_level, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(power_dpm_state, 0644, amdgpu_get_dpm_state, amdgpu_set_dpm_state);
+static DEVICE_ATTR(power_dpm_force_performance_level, 0644,
 		   amdgpu_get_dpm_forced_performance_level,
 		   amdgpu_set_dpm_forced_performance_level);
-static DEVICE_ATTR(pp_num_states, S_IRUGO, amdgpu_get_pp_num_states, NULL);
-static DEVICE_ATTR(pp_cur_state, S_IRUGO, amdgpu_get_pp_cur_state, NULL);
-static DEVICE_ATTR(pp_force_state, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_force_state,
-		amdgpu_set_pp_force_state);
-static DEVICE_ATTR(pp_table, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_table,
-		amdgpu_set_pp_table);
-static DEVICE_ATTR(pp_dpm_sclk, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_dpm_sclk,
-		amdgpu_set_pp_dpm_sclk);
-static DEVICE_ATTR(pp_dpm_mclk, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_dpm_mclk,
-		amdgpu_set_pp_dpm_mclk);
-static DEVICE_ATTR(pp_dpm_pcie, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_dpm_pcie,
-		amdgpu_set_pp_dpm_pcie);
-static DEVICE_ATTR(pp_sclk_od, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_sclk_od,
-		amdgpu_set_pp_sclk_od);
-static DEVICE_ATTR(pp_mclk_od, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_mclk_od,
-		amdgpu_set_pp_mclk_od);
-static DEVICE_ATTR(pp_power_profile_mode, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_power_profile_mode,
-		amdgpu_set_pp_power_profile_mode);
-static DEVICE_ATTR(pp_od_clk_voltage, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_od_clk_voltage,
-		amdgpu_set_pp_od_clk_voltage);
+static DEVICE_ATTR(pp_num_states, 0444, amdgpu_get_pp_num_states, NULL);
+static DEVICE_ATTR(pp_cur_state, 0444, amdgpu_get_pp_cur_state, NULL);
+static DEVICE_ATTR(pp_force_state, 0644,
+		   amdgpu_get_pp_force_state,
+		   amdgpu_set_pp_force_state);
+static DEVICE_ATTR(pp_table, 0644,
+		   amdgpu_get_pp_table,
+		   amdgpu_set_pp_table);
+static DEVICE_ATTR(pp_dpm_sclk, 0644,
+		   amdgpu_get_pp_dpm_sclk,
+		   amdgpu_set_pp_dpm_sclk);
+static DEVICE_ATTR(pp_dpm_mclk, 0644,
+		   amdgpu_get_pp_dpm_mclk,
+		   amdgpu_set_pp_dpm_mclk);
+static DEVICE_ATTR(pp_dpm_pcie, 0644,
+		   amdgpu_get_pp_dpm_pcie,
+		   amdgpu_set_pp_dpm_pcie);
+static DEVICE_ATTR(pp_sclk_od, 0644,
+		   amdgpu_get_pp_sclk_od,
+		   amdgpu_set_pp_sclk_od);
+static DEVICE_ATTR(pp_mclk_od, 0644,
+		   amdgpu_get_pp_mclk_od,
+		   amdgpu_set_pp_mclk_od);
+static DEVICE_ATTR(pp_power_profile_mode, 0644,
+		   amdgpu_get_pp_power_profile_mode,
+		   amdgpu_set_pp_power_profile_mode);
+static DEVICE_ATTR(pp_od_clk_voltage, 0644,
+		   amdgpu_get_pp_od_clk_voltage,
+		   amdgpu_set_pp_od_clk_voltage);
 
 static ssize_t amdgpu_hwmon_show_temp(struct device *dev,
 				      struct device_attribute *attr,
@@ -1320,22 +1320,22 @@ static ssize_t amdgpu_hwmon_set_power_cap(struct device *dev,
  *
  */
 
-static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, amdgpu_hwmon_show_temp, NULL, 0);
-static SENSOR_DEVICE_ATTR(temp1_crit, S_IRUGO, amdgpu_hwmon_show_temp_thresh, NULL, 0);
-static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IRUGO, amdgpu_hwmon_show_temp_thresh, NULL, 1);
-static SENSOR_DEVICE_ATTR(pwm1, S_IRUGO | S_IWUSR, amdgpu_hwmon_get_pwm1, amdgpu_hwmon_set_pwm1, 0);
-static SENSOR_DEVICE_ATTR(pwm1_enable, S_IRUGO | S_IWUSR, amdgpu_hwmon_get_pwm1_enable, amdgpu_hwmon_set_pwm1_enable, 0);
-static SENSOR_DEVICE_ATTR(pwm1_min, S_IRUGO, amdgpu_hwmon_get_pwm1_min, NULL, 0);
-static SENSOR_DEVICE_ATTR(pwm1_max, S_IRUGO, amdgpu_hwmon_get_pwm1_max, NULL, 0);
-static SENSOR_DEVICE_ATTR(fan1_input, S_IRUGO, amdgpu_hwmon_get_fan1_input, NULL, 0);
-static SENSOR_DEVICE_ATTR(in0_input, S_IRUGO, amdgpu_hwmon_show_vddgfx, NULL, 0);
-static SENSOR_DEVICE_ATTR(in0_label, S_IRUGO, amdgpu_hwmon_show_vddgfx_label, NULL, 0);
-static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, amdgpu_hwmon_show_vddnb, NULL, 0);
-static SENSOR_DEVICE_ATTR(in1_label, S_IRUGO, amdgpu_hwmon_show_vddnb_label, NULL, 0);
-static SENSOR_DEVICE_ATTR(power1_average, S_IRUGO, amdgpu_hwmon_show_power_avg, NULL, 0);
-static SENSOR_DEVICE_ATTR(power1_cap_max, S_IRUGO, amdgpu_hwmon_show_power_cap_max, NULL, 0);
-static SENSOR_DEVICE_ATTR(power1_cap_min, S_IRUGO, amdgpu_hwmon_show_power_cap_min, NULL, 0);
-static SENSOR_DEVICE_ATTR(power1_cap, S_IRUGO | S_IWUSR, amdgpu_hwmon_show_power_cap, amdgpu_hwmon_set_power_cap, 0);
+static SENSOR_DEVICE_ATTR(temp1_input, 0444, amdgpu_hwmon_show_temp, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_crit, 0444, amdgpu_hwmon_show_temp_thresh, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_crit_hyst, 0444, amdgpu_hwmon_show_temp_thresh, NULL, 1);
+static SENSOR_DEVICE_ATTR(pwm1, 0644, amdgpu_hwmon_get_pwm1, amdgpu_hwmon_set_pwm1, 0);
+static SENSOR_DEVICE_ATTR(pwm1_enable, 0644, amdgpu_hwmon_get_pwm1_enable, amdgpu_hwmon_set_pwm1_enable, 0);
+static SENSOR_DEVICE_ATTR(pwm1_min, 0444, amdgpu_hwmon_get_pwm1_min, NULL, 0);
+static SENSOR_DEVICE_ATTR(pwm1_max, 0444, amdgpu_hwmon_get_pwm1_max, NULL, 0);
+static SENSOR_DEVICE_ATTR(fan1_input, 0444, amdgpu_hwmon_get_fan1_input, NULL, 0);
+static SENSOR_DEVICE_ATTR(in0_input, 0444, amdgpu_hwmon_show_vddgfx, NULL, 0);
+static SENSOR_DEVICE_ATTR(in0_label, 0444, amdgpu_hwmon_show_vddgfx_label, NULL, 0);
+static SENSOR_DEVICE_ATTR(in1_input, 0444, amdgpu_hwmon_show_vddnb, NULL, 0);
+static SENSOR_DEVICE_ATTR(in1_label, 0444, amdgpu_hwmon_show_vddnb_label, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_average, 0444, amdgpu_hwmon_show_power_avg, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_cap_max, 0444, amdgpu_hwmon_show_power_cap_max, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_cap_min, 0444, amdgpu_hwmon_show_power_cap_min, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_cap, 0644, amdgpu_hwmon_show_power_cap, amdgpu_hwmon_set_power_cap, 0);
 
 static struct attribute *hwmon_attributes[] = {
 	&sensor_dev_attr_temp1_input.dev_attr.attr,
@@ -1388,13 +1388,13 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	     attr == &sensor_dev_attr_pwm1.dev_attr.attr) || /* can't query fan */
 	    (!adev->powerplay.pp_funcs->get_fan_control_mode &&
 	     attr == &sensor_dev_attr_pwm1_enable.dev_attr.attr)) /* can't query state */
-		effective_mode &= ~S_IRUGO;
+		effective_mode &= ~0444;
 
 	if ((!adev->powerplay.pp_funcs->set_fan_speed_percent &&
 	     attr == &sensor_dev_attr_pwm1.dev_attr.attr) || /* can't manage fan */
 	    (!adev->powerplay.pp_funcs->set_fan_control_mode &&
 	     attr == &sensor_dev_attr_pwm1_enable.dev_attr.attr)) /* can't manage state */
-		effective_mode &= ~S_IWUSR;
+		effective_mode &= ~0200;
 
 	if ((adev->flags & AMD_IS_APU) &&
 	    (attr == &sensor_dev_attr_power1_cap_max.dev_attr.attr ||

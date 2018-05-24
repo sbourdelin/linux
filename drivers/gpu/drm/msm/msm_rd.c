@@ -253,8 +253,8 @@ static struct msm_rd_state *rd_init(struct drm_minor *minor, const char *name)
 
 	init_waitqueue_head(&rd->fifo_event);
 
-	ent = debugfs_create_file(name, S_IFREG | S_IRUGO,
-			minor->debugfs_root, rd, &rd_debugfs_fops);
+	ent = debugfs_create_file(name, S_IFREG | 0444, minor->debugfs_root,
+				  rd, &rd_debugfs_fops);
 	if (!ent) {
 		DRM_ERROR("Cannot create /sys/kernel/debug/dri/%pd/%s\n",
 				minor->debugfs_root, name);

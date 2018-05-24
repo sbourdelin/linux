@@ -28,8 +28,8 @@
 static int fb_defio = 0;  /* Optionally enable experimental fb_defio mmap support */
 static int fb_bpp = 16;
 
-module_param(fb_bpp, int, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP);
-module_param(fb_defio, int, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP);
+module_param(fb_bpp, int, 0660);
+module_param(fb_defio, int, 0660);
 
 struct udl_fbdev {
 	struct drm_fb_helper helper;

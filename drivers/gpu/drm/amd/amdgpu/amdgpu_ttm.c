@@ -2160,11 +2160,10 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 	struct dentry *ent, *root = minor->debugfs_root;
 
 	for (count = 0; count < ARRAY_SIZE(ttm_debugfs_entries); count++) {
-		ent = debugfs_create_file(
-				ttm_debugfs_entries[count].name,
-				S_IFREG | S_IRUGO, root,
-				adev,
-				ttm_debugfs_entries[count].fops);
+		ent = debugfs_create_file(ttm_debugfs_entries[count].name,
+					  S_IFREG | 0444, root,
+					  adev,
+					  ttm_debugfs_entries[count].fops);
 		if (IS_ERR(ent))
 			return PTR_ERR(ent);
 		if (ttm_debugfs_entries[count].domain == TTM_PL_VRAM)

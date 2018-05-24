@@ -3148,7 +3148,7 @@ static int create_dynamic_oa_sysfs_entry(struct drm_i915_private *dev_priv,
 {
 	sysfs_attr_init(&oa_config->sysfs_metric_id.attr);
 	oa_config->sysfs_metric_id.attr.name = "id";
-	oa_config->sysfs_metric_id.attr.mode = S_IRUGO;
+	oa_config->sysfs_metric_id.attr.mode = 0444;
 	oa_config->sysfs_metric_id.show = show_dynamic_id;
 	oa_config->sysfs_metric_id.store = NULL;
 

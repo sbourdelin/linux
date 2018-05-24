@@ -104,7 +104,7 @@ static int sti_drm_dbg_init(struct drm_minor *minor)
 	if (ret)
 		goto err;
 
-	dentry = debugfs_create_file("fps_show", S_IRUGO | S_IWUSR,
+	dentry = debugfs_create_file("fps_show", 0644,
 				     minor->debugfs_root, minor->dev,
 				     &sti_drm_fps_fops);
 	if (!dentry) {

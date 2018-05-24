@@ -1055,10 +1055,10 @@ int mipi_dbi_debugfs_init(struct drm_minor *minor)
 {
 	struct tinydrm_device *tdev = minor->dev->dev_private;
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
-	umode_t mode = S_IFREG | S_IWUSR;
+	umode_t mode = S_IFREG | 0200;
 
 	if (mipi->read_commands)
-		mode |= S_IRUGO;
+		mode |= 0444;
 	debugfs_create_file("command", mode, minor->debugfs_root, mipi,
 			    &mipi_dbi_debugfs_command_fops);
 

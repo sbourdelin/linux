@@ -655,10 +655,10 @@ static ssize_t radeon_hwmon_get_pwm1(struct device *dev,
 	return sprintf(buf, "%i\n", speed);
 }
 
-static DEVICE_ATTR(power_profile, S_IRUGO | S_IWUSR, radeon_get_pm_profile, radeon_set_pm_profile);
-static DEVICE_ATTR(power_method, S_IRUGO | S_IWUSR, radeon_get_pm_method, radeon_set_pm_method);
-static DEVICE_ATTR(power_dpm_state, S_IRUGO | S_IWUSR, radeon_get_dpm_state, radeon_set_dpm_state);
-static DEVICE_ATTR(power_dpm_force_performance_level, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(power_profile, 0644, radeon_get_pm_profile, radeon_set_pm_profile);
+static DEVICE_ATTR(power_method, 0644, radeon_get_pm_method, radeon_set_pm_method);
+static DEVICE_ATTR(power_dpm_state, 0644, radeon_get_dpm_state, radeon_set_dpm_state);
+static DEVICE_ATTR(power_dpm_force_performance_level, 0644,
 		   radeon_get_dpm_forced_performance_level,
 		   radeon_set_dpm_forced_performance_level);
 
@@ -699,13 +699,13 @@ static ssize_t radeon_hwmon_show_temp_thresh(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", temp);
 }
 
-static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, radeon_hwmon_show_temp, NULL, 0);
-static SENSOR_DEVICE_ATTR(temp1_crit, S_IRUGO, radeon_hwmon_show_temp_thresh, NULL, 0);
-static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IRUGO, radeon_hwmon_show_temp_thresh, NULL, 1);
-static SENSOR_DEVICE_ATTR(pwm1, S_IRUGO | S_IWUSR, radeon_hwmon_get_pwm1, radeon_hwmon_set_pwm1, 0);
-static SENSOR_DEVICE_ATTR(pwm1_enable, S_IRUGO | S_IWUSR, radeon_hwmon_get_pwm1_enable, radeon_hwmon_set_pwm1_enable, 0);
-static SENSOR_DEVICE_ATTR(pwm1_min, S_IRUGO, radeon_hwmon_get_pwm1_min, NULL, 0);
-static SENSOR_DEVICE_ATTR(pwm1_max, S_IRUGO, radeon_hwmon_get_pwm1_max, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_input, 0444, radeon_hwmon_show_temp, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_crit, 0444, radeon_hwmon_show_temp_thresh, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_crit_hyst, 0444, radeon_hwmon_show_temp_thresh, NULL, 1);
+static SENSOR_DEVICE_ATTR(pwm1, 0644, radeon_hwmon_get_pwm1, radeon_hwmon_set_pwm1, 0);
+static SENSOR_DEVICE_ATTR(pwm1_enable, 0644, radeon_hwmon_get_pwm1_enable, radeon_hwmon_set_pwm1_enable, 0);
+static SENSOR_DEVICE_ATTR(pwm1_min, 0444, radeon_hwmon_get_pwm1_min, NULL, 0);
+static SENSOR_DEVICE_ATTR(pwm1_max, 0444, radeon_hwmon_get_pwm1_max, NULL, 0);
 
 
 static struct attribute *hwmon_attributes[] = {
@@ -749,13 +749,13 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	     attr == &sensor_dev_attr_pwm1.dev_attr.attr) || /* can't query fan */
 	    (!rdev->asic->dpm.fan_ctrl_get_mode &&
 	     attr == &sensor_dev_attr_pwm1_enable.dev_attr.attr)) /* can't query state */
-		effective_mode &= ~S_IRUGO;
+		effective_mode &= ~0444;
 
 	if ((!rdev->asic->dpm.set_fan_speed_percent &&
 	     attr == &sensor_dev_attr_pwm1.dev_attr.attr) || /* can't manage fan */
 	    (!rdev->asic->dpm.fan_ctrl_set_mode &&
 	     attr == &sensor_dev_attr_pwm1_enable.dev_attr.attr)) /* can't manage state */
-		effective_mode &= ~S_IWUSR;
+		effective_mode &= ~0200;
 
 	/* hide max/min values if we can't both query and manage the fan */
 	if ((!rdev->asic->dpm.set_fan_speed_percent &&

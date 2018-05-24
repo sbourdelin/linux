@@ -118,12 +118,12 @@ int armada_drm_debugfs_init(struct drm_minor *minor)
 	if (ret)
 		return ret;
 
-	de = debugfs_create_file("reg", S_IFREG | S_IRUSR,
+	de = debugfs_create_file("reg", S_IFREG | 0400,
 				 minor->debugfs_root, minor->dev, &fops_reg_r);
 	if (!de)
 		return -ENOMEM;
 
-	de = debugfs_create_file("reg_wr", S_IFREG | S_IWUSR,
+	de = debugfs_create_file("reg_wr", S_IFREG | 0200,
 				 minor->debugfs_root, minor->dev, &fops_reg_w);
 	if (!de)
 		return -ENOMEM;

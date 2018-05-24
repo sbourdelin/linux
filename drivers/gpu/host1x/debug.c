@@ -177,20 +177,20 @@ static void host1x_debugfs_init(struct host1x *host1x)
 	/* Store the created entry */
 	host1x->debugfs = de;
 
-	debugfs_create_file("status", S_IRUGO, de, host1x, &host1x_debug_fops);
-	debugfs_create_file("status_all", S_IRUGO, de, host1x,
+	debugfs_create_file("status", 0444, de, host1x, &host1x_debug_fops);
+	debugfs_create_file("status_all", 0444, de, host1x,
 			    &host1x_debug_all_fops);
 
-	debugfs_create_u32("trace_cmdbuf", S_IRUGO|S_IWUSR, de,
+	debugfs_create_u32("trace_cmdbuf", 0644, de,
 			   &host1x_debug_trace_cmdbuf);
 
 	host1x_hw_debug_init(host1x, de);
 
-	debugfs_create_u32("force_timeout_pid", S_IRUGO|S_IWUSR, de,
+	debugfs_create_u32("force_timeout_pid", 0644, de,
 			   &host1x_debug_force_timeout_pid);
-	debugfs_create_u32("force_timeout_val", S_IRUGO|S_IWUSR, de,
+	debugfs_create_u32("force_timeout_val", 0644, de,
 			   &host1x_debug_force_timeout_val);
-	debugfs_create_u32("force_timeout_channel", S_IRUGO|S_IWUSR, de,
+	debugfs_create_u32("force_timeout_channel", 0644, de,
 			   &host1x_debug_force_timeout_channel);
 }
 

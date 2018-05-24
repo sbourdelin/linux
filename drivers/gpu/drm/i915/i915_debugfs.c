@@ -4851,7 +4851,7 @@ int i915_debugfs_register(struct drm_i915_private *dev_priv)
 	struct dentry *ent;
 	int ret, i;
 
-	ent = debugfs_create_file("i915_forcewake_user", S_IRUSR,
+	ent = debugfs_create_file("i915_forcewake_user", 0400,
 				  minor->debugfs_root, to_i915(minor->dev),
 				  &i915_forcewake_fops);
 	if (!ent)
@@ -4863,7 +4863,7 @@ int i915_debugfs_register(struct drm_i915_private *dev_priv)
 
 	for (i = 0; i < ARRAY_SIZE(i915_debugfs_files); i++) {
 		ent = debugfs_create_file(i915_debugfs_files[i].name,
-					  S_IRUGO | S_IWUSR,
+					  0644,
 					  minor->debugfs_root,
 					  to_i915(minor->dev),
 					  i915_debugfs_files[i].fops);
@@ -4979,11 +4979,11 @@ int i915_debugfs_connector_add(struct drm_connector *connector)
 
 	if (connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
 	    connector->connector_type == DRM_MODE_CONNECTOR_eDP)
-		debugfs_create_file("i915_dpcd", S_IRUGO, root,
+		debugfs_create_file("i915_dpcd", 0444, root,
 				    connector, &i915_dpcd_fops);
 
 	if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
-		debugfs_create_file("i915_panel_timings", S_IRUGO, root,
+		debugfs_create_file("i915_panel_timings", 0444, root,
 				    connector, &i915_panel_fops);
 
 	return 0;

@@ -54,23 +54,23 @@ struct ttm_mem_zone {
 
 static struct attribute ttm_mem_sys = {
 	.name = "zone_memory",
-	.mode = S_IRUGO
+	.mode = 0444
 };
 static struct attribute ttm_mem_emer = {
 	.name = "emergency_memory",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 static struct attribute ttm_mem_max = {
 	.name = "available_memory",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 static struct attribute ttm_mem_swap = {
 	.name = "swap_limit",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 static struct attribute ttm_mem_used = {
 	.name = "used_memory",
-	.mode = S_IRUGO
+	.mode = 0444
 };
 
 static void ttm_mem_zone_kobj_release(struct kobject *kobj)
@@ -170,7 +170,7 @@ static struct kobj_type ttm_mem_zone_kobj_type = {
 
 static struct attribute ttm_mem_global_lower_mem_limit = {
 	.name = "lower_mem_limit",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 
 static ssize_t ttm_mem_global_show(struct kobject *kobj,

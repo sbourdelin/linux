@@ -268,12 +268,10 @@ static ssize_t tpo_td043_gamma_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(vmirror, S_IRUGO | S_IWUSR,
-		tpo_td043_vmirror_show, tpo_td043_vmirror_store);
-static DEVICE_ATTR(mode, S_IRUGO | S_IWUSR,
-		tpo_td043_mode_show, tpo_td043_mode_store);
-static DEVICE_ATTR(gamma, S_IRUGO | S_IWUSR,
-		tpo_td043_gamma_show, tpo_td043_gamma_store);
+static DEVICE_ATTR(vmirror, 0644,
+		   tpo_td043_vmirror_show, tpo_td043_vmirror_store);
+static DEVICE_ATTR(mode, 0644, tpo_td043_mode_show, tpo_td043_mode_store);
+static DEVICE_ATTR(gamma, 0644, tpo_td043_gamma_show, tpo_td043_gamma_store);
 
 static struct attribute *tpo_td043_attrs[] = {
 	&dev_attr_vmirror.attr,

@@ -100,11 +100,11 @@ show_media_rc6_ms(struct device *kdev, struct device_attribute *attr, char *buf)
 	return snprintf(buf, PAGE_SIZE, "%u\n", rc6_residency);
 }
 
-static DEVICE_ATTR(rc6_enable, S_IRUGO, show_rc6_mask, NULL);
-static DEVICE_ATTR(rc6_residency_ms, S_IRUGO, show_rc6_ms, NULL);
-static DEVICE_ATTR(rc6p_residency_ms, S_IRUGO, show_rc6p_ms, NULL);
-static DEVICE_ATTR(rc6pp_residency_ms, S_IRUGO, show_rc6pp_ms, NULL);
-static DEVICE_ATTR(media_rc6_residency_ms, S_IRUGO, show_media_rc6_ms, NULL);
+static DEVICE_ATTR(rc6_enable, 0444, show_rc6_mask, NULL);
+static DEVICE_ATTR(rc6_residency_ms, 0444, show_rc6_ms, NULL);
+static DEVICE_ATTR(rc6p_residency_ms, 0444, show_rc6p_ms, NULL);
+static DEVICE_ATTR(rc6pp_residency_ms, 0444, show_rc6pp_ms, NULL);
+static DEVICE_ATTR(media_rc6_residency_ms, 0444, show_media_rc6_ms, NULL);
 
 static struct attribute *rc6_attrs[] = {
 	&dev_attr_rc6_enable.attr,
@@ -237,7 +237,7 @@ out:
 }
 
 static const struct bin_attribute dpf_attrs = {
-	.attr = {.name = "l3_parity", .mode = (S_IRUSR | S_IWUSR)},
+	.attr = {.name = "l3_parity", .mode = 0600},
 	.size = GEN7_L3LOG_SIZE,
 	.read = i915_l3_read,
 	.write = i915_l3_write,
@@ -246,7 +246,7 @@ static const struct bin_attribute dpf_attrs = {
 };
 
 static const struct bin_attribute dpf_attrs_1 = {
-	.attr = {.name = "l3_parity_slice_1", .mode = (S_IRUSR | S_IWUSR)},
+	.attr = {.name = "l3_parity_slice_1", .mode = 0600},
 	.size = GEN7_L3LOG_SIZE,
 	.read = i915_l3_read,
 	.write = i915_l3_write,
@@ -460,9 +460,9 @@ static DEVICE_ATTR_RW(gt_min_freq_mhz);
 static DEVICE_ATTR_RO(vlv_rpe_freq_mhz);
 
 static ssize_t gt_rp_mhz_show(struct device *kdev, struct device_attribute *attr, char *buf);
-static DEVICE_ATTR(gt_RP0_freq_mhz, S_IRUGO, gt_rp_mhz_show, NULL);
-static DEVICE_ATTR(gt_RP1_freq_mhz, S_IRUGO, gt_rp_mhz_show, NULL);
-static DEVICE_ATTR(gt_RPn_freq_mhz, S_IRUGO, gt_rp_mhz_show, NULL);
+static DEVICE_ATTR(gt_RP0_freq_mhz, 0444, gt_rp_mhz_show, NULL);
+static DEVICE_ATTR(gt_RP1_freq_mhz, 0444, gt_rp_mhz_show, NULL);
+static DEVICE_ATTR(gt_RPn_freq_mhz, 0444, gt_rp_mhz_show, NULL);
 
 /* For now we have a static number of RP states */
 static ssize_t gt_rp_mhz_show(struct device *kdev, struct device_attribute *attr, char *buf)
@@ -555,7 +555,7 @@ static ssize_t error_state_write(struct file *file, struct kobject *kobj,
 
 static const struct bin_attribute error_state_attr = {
 	.attr.name = "error",
-	.attr.mode = S_IRUSR | S_IWUSR,
+	.attr.mode = 0600,
 	.size = 0,
 	.read = error_state_read,
 	.write = error_state_write,

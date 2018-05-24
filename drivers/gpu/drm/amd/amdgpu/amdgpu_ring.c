@@ -553,8 +553,7 @@ static int amdgpu_debugfs_ring_init(struct amdgpu_device *adev,
 
 	sprintf(name, "amdgpu_ring_%s", ring->name);
 
-	ent = debugfs_create_file(name,
-				  S_IFREG | S_IRUGO, root,
+	ent = debugfs_create_file(name, S_IFREG | 0444, root,
 				  ring, &amdgpu_debugfs_ring_fops);
 	if (!ent)
 		return -ENOMEM;

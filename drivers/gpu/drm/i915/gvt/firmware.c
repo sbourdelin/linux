@@ -60,7 +60,7 @@ gvt_firmware_read(struct file *filp, struct kobject *kobj,
 }
 
 static struct bin_attribute firmware_attr = {
-	.attr = {.name = "gvt_firmware", .mode = (S_IRUSR)},
+	.attr = {.name = "gvt_firmware", .mode = 0400},
 	.read = gvt_firmware_read,
 	.write = NULL,
 	.mmap = NULL,

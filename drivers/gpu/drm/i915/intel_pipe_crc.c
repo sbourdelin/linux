@@ -903,7 +903,7 @@ int intel_pipe_crc_create(struct drm_minor *minor)
 		struct pipe_crc_info *info = &i915_pipe_crc_data[i];
 
 		info->dev_priv = dev_priv;
-		ent = debugfs_create_file(info->name, S_IRUGO,
+		ent = debugfs_create_file(info->name, 0444,
 					  minor->debugfs_root, info,
 					  &i915_pipe_crc_fops);
 		if (!ent)

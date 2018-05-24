@@ -830,7 +830,7 @@ int amdgpu_debugfs_regs_init(struct amdgpu_device *adev)
 
 	for (i = 0; i < ARRAY_SIZE(debugfs_regs); i++) {
 		ent = debugfs_create_file(debugfs_regs_names[i],
-					  S_IFREG | S_IRUGO, root,
+					  S_IFREG | 0444, root,
 					  adev, debugfs_regs[i]);
 		if (IS_ERR(ent)) {
 			for (j = 0; j < i; j++) {

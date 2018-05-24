@@ -47,7 +47,7 @@ static void ttm_bo_global_kobj_release(struct kobject *kobj);
 
 static struct attribute ttm_bo_count = {
 	.name = "bo_count",
-	.mode = S_IRUGO
+	.mode = 0444
 };
 
 /* default destructor */

@@ -492,10 +492,8 @@ static ssize_t show_cabc_available_modes(struct device *dev,
 	return len < PAGE_SIZE ? len : PAGE_SIZE - 1;
 }
 
-static DEVICE_ATTR(cabc_mode, S_IRUGO | S_IWUSR,
-		show_cabc_mode, store_cabc_mode);
-static DEVICE_ATTR(cabc_available_modes, S_IRUGO,
-		show_cabc_available_modes, NULL);
+static DEVICE_ATTR(cabc_mode, 0644, show_cabc_mode, store_cabc_mode);
+static DEVICE_ATTR(cabc_available_modes, 0444, show_cabc_available_modes, NULL);
 
 static struct attribute *bldev_attrs[] = {
 	&dev_attr_cabc_mode.attr,

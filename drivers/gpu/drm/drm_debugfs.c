@@ -99,7 +99,7 @@ int drm_debugfs_create_files(const struct drm_info_list *files, int count,
 			ret = -1;
 			goto fail;
 		}
-		ent = debugfs_create_file(files[i].name, S_IFREG | S_IRUGO,
+		ent = debugfs_create_file(files[i].name, S_IFREG | 0444,
 					  root, tmp, &drm_debugfs_fops);
 		if (!ent) {
 			DRM_ERROR("Cannot create /sys/kernel/debug/dri/%pd/%s\n",
@@ -357,13 +357,13 @@ int drm_debugfs_connector_add(struct drm_connector *connector)
 	connector->debugfs_entry = root;
 
 	/* force */
-	ent = debugfs_create_file("force", S_IRUGO | S_IWUSR, root, connector,
+	ent = debugfs_create_file("force", 0644, root, connector,
 				  &drm_connector_fops);
 	if (!ent)
 		goto error;
 
 	/* edid */
-	ent = debugfs_create_file("edid_override", S_IRUGO | S_IWUSR, root,
+	ent = debugfs_create_file("edid_override", 0644, root,
 				  connector, &drm_edid_fops);
 	if (!ent)
 		goto error;

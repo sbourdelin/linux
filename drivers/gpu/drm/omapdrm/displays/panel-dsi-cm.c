@@ -569,12 +569,11 @@ static ssize_t dsicm_show_ulps_timeout(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u\n", t);
 }
 
-static DEVICE_ATTR(num_dsi_errors, S_IRUGO, dsicm_num_errors_show, NULL);
-static DEVICE_ATTR(hw_revision, S_IRUGO, dsicm_hw_revision_show, NULL);
-static DEVICE_ATTR(ulps, S_IRUGO | S_IWUSR,
-		dsicm_show_ulps, dsicm_store_ulps);
-static DEVICE_ATTR(ulps_timeout, S_IRUGO | S_IWUSR,
-		dsicm_show_ulps_timeout, dsicm_store_ulps_timeout);
+static DEVICE_ATTR(num_dsi_errors, 0444, dsicm_num_errors_show, NULL);
+static DEVICE_ATTR(hw_revision, 0444, dsicm_hw_revision_show, NULL);
+static DEVICE_ATTR(ulps, 0644, dsicm_show_ulps, dsicm_store_ulps);
+static DEVICE_ATTR(ulps_timeout, 0644,
+		   dsicm_show_ulps_timeout, dsicm_store_ulps_timeout);
 
 static struct attribute *dsicm_attrs[] = {
 	&dev_attr_num_dsi_errors.attr,

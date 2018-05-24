@@ -1136,13 +1136,13 @@ static int radeon_ttm_debugfs_init(struct radeon_device *rdev)
 	struct drm_minor *minor = rdev->ddev->primary;
 	struct dentry *ent, *root = minor->debugfs_root;
 
-	ent = debugfs_create_file("radeon_vram", S_IFREG | S_IRUGO, root,
+	ent = debugfs_create_file("radeon_vram", S_IFREG | 0444, root,
 				  rdev, &radeon_ttm_vram_fops);
 	if (IS_ERR(ent))
 		return PTR_ERR(ent);
 	rdev->mman.vram = ent;
 
-	ent = debugfs_create_file("radeon_gtt", S_IFREG | S_IRUGO, root,
+	ent = debugfs_create_file("radeon_gtt", S_IFREG | 0444, root,
 				  rdev, &radeon_ttm_gtt_fops);
 	if (IS_ERR(ent))
 		return PTR_ERR(ent);

@@ -178,15 +178,15 @@ static struct ttm_pool_manager *_manager;
 
 static struct attribute ttm_page_pool_max = {
 	.name = "pool_max_size",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 static struct attribute ttm_page_pool_small = {
 	.name = "pool_small_allocation",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 static struct attribute ttm_page_pool_alloc_size = {
 	.name = "pool_allocation_size",
-	.mode = S_IRUGO | S_IWUSR
+	.mode = 0644
 };
 
 static struct attribute *ttm_pool_attrs[] = {

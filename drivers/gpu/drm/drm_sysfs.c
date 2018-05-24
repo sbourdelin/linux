@@ -50,7 +50,7 @@ static char *drm_devnode(struct device *dev, umode_t *mode)
 	return kasprintf(GFP_KERNEL, "dri/%s", dev_name(dev));
 }
 
-static CLASS_ATTR_STRING(version, S_IRUGO, "drm 1.1.0 20060810");
+static CLASS_ATTR_STRING(version, 0444, "drm 1.1.0 20060810");
 
 /**
  * drm_sysfs_init - initialize sysfs helpers

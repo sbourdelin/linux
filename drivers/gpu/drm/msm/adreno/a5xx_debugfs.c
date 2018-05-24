@@ -177,9 +177,8 @@ int a5xx_debugfs_init(struct msm_gpu *gpu, struct drm_minor *minor)
 		return ret;
 	}
 
-	ent = debugfs_create_file("reset", S_IWUGO,
-		minor->debugfs_root,
-		dev, &reset_fops);
+	ent = debugfs_create_file("reset", 0222, minor->debugfs_root,
+				  dev, &reset_fops);
 	if (!ent)
 		return -ENOMEM;
 
