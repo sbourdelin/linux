@@ -14,6 +14,7 @@
 #define MAX_CMDS_PER_TCS		16
 #define MAX_TCS_PER_TYPE		3
 #define MAX_TCS_NR			(MAX_TCS_PER_TYPE * TCS_TYPE_NR)
+#define RPMH_MAX_CTRLR			2
 
 struct rsc_drv;
 
@@ -52,6 +53,7 @@ struct tcs_group {
  * @tcs:        TCS groups
  * @tcs_in_use: s/w state of the TCS
  * @lock:       synchronize state of the controller
+ * @list:       element in list of drv
  */
 struct rsc_drv {
 	const char *name;
@@ -61,9 +63,13 @@ struct rsc_drv {
 	struct tcs_group tcs[TCS_TYPE_NR];
 	DECLARE_BITMAP(tcs_in_use, MAX_TCS_NR);
 	spinlock_t lock;
+	struct list_head list;
 };
 
+extern struct list_head rsc_drv_list;
 
 int rpmh_rsc_send_data(struct rsc_drv *drv, const struct tcs_request *msg);
+
+void rpmh_tx_done(const struct tcs_request *msg, int r);
 
 #endif /* __RPM_INTERNAL_H__ */

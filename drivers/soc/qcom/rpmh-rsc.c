@@ -61,6 +61,8 @@
 #define CMD_STATUS_ISSUED		BIT(8)
 #define CMD_STATUS_COMPL		BIT(16)
 
+LIST_HEAD(rsc_drv_list);
+
 static u32 read_tcs_reg(struct rsc_drv *drv, int reg, int tcs_id, int cmd_id)
 {
 	return readl_relaxed(drv->tcs_base + reg + RSC_DRV_TCS_OFFSET * tcs_id +
@@ -176,6 +178,8 @@ skip:
 		spin_lock(&drv->lock);
 		clear_bit(i, drv->tcs_in_use);
 		spin_unlock(&drv->lock);
+		if (req)
+			rpmh_tx_done(req, err);
 	}
 
 	return IRQ_HANDLED;
@@ -467,6 +471,10 @@ static int rpmh_rsc_probe(struct platform_device *pdev)
 
 	/* Enable the active TCS to send requests immediately */
 	write_tcs_reg(drv, RSC_DRV_IRQ_ENABLE, 0, drv->tcs[ACTIVE_TCS].mask);
+
+	INIT_LIST_HEAD(&drv->list);
+	list_add(&drv->list, &rsc_drv_list);
+	dev_set_drvdata(&pdev->dev, drv);
 
 	return devm_of_platform_populate(&pdev->dev);
 }
