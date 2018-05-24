@@ -144,6 +144,8 @@ extern void		    audit_log_untrustedstring(struct audit_buffer *ab,
 extern void		    audit_log_d_path(struct audit_buffer *ab,
 					     const char *prefix,
 					     const struct path *path);
+extern void		    audit_log_d_path_exe(struct audit_buffer *ab,
+						 struct mm_struct *mm);
 extern void		    audit_log_key(struct audit_buffer *ab,
 					  char *key);
 extern void		    audit_log_link_denied(const char *operation);
@@ -192,6 +194,9 @@ static inline void audit_log_d_path(struct audit_buffer *ab,
 				    const char *prefix,
 				    const struct path *path)
 { }
+static inline void audit_log_d_path_exe(struct audit_buffer *ab,
+					struct mm_struct *mm)
+{}
 static inline void audit_log_key(struct audit_buffer *ab, char *key)
 { }
 static inline void audit_log_link_denied(const char *string)
