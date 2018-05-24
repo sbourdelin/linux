@@ -20,6 +20,18 @@ struct exynos_drm_ipp_task;
  */
 struct exynos_drm_ipp_funcs {
 	/**
+	 * @fixup:
+	 *
+	 * Correct buffer size according to hardware limit of each DMA device.
+	 * Some DMA device has maximum memory read capability through AXI bus,
+	 * which reads data from memory as a given bytes.
+	 * Therefore, IPP driver needs to check if the buffer size meets
+	 * the HW limlit of each DMA device such as GScaler, Scaler,
+	 * Rotator and FIMC.
+	 */
+	void (*fixup)(struct exynos_drm_ipp *ipp,
+		     struct exynos_drm_ipp_task *task);
+	/**
 	 * @commit:
 	 *
 	 * This is the main entry point to start framebuffer processing

@@ -510,9 +510,7 @@ static int exynos_drm_ipp_check_size_limits(struct exynos_drm_ipp_buffer *buf,
 	}
 	__get_size_limit(limits, num_limits, id, &l);
 	if (!__size_limit_check(buf->rect.w, lh) ||
-	    !__align_check(buf->rect.x, lh->align) ||
-	    !__size_limit_check(buf->rect.h, lv) ||
-	    !__align_check(buf->rect.y, lv->align))
+	    !__size_limit_check(buf->rect.h, lv))
 		return -EINVAL;
 
 	return 0;
@@ -558,6 +556,14 @@ static int exynos_drm_ipp_check_scale_limits(
 		return -EINVAL;
 
 	return 0;
+}
+
+static void exynos_drm_ipp_fixup_buffer(struct exynos_drm_ipp_task *task)
+{
+	struct exynos_drm_ipp *ipp = task->ipp;
+
+	if (ipp->funcs->fixup)
+		ipp->funcs->fixup(ipp, task);
 }
 
 static int exynos_drm_ipp_task_check(struct exynos_drm_ipp_task *task)
@@ -606,6 +612,12 @@ static int exynos_drm_ipp_task_check(struct exynos_drm_ipp_task *task)
 		DRM_DEBUG_DRIVER("Task %pK: hw capabilities exceeded\n", task);
 		return -EINVAL;
 	}
+
+	/*
+	 * image size should be fixed up before setup buffer call
+	 * which verifies whether image size exceeds gem buffer size or not.
+	 */
+	exynos_drm_ipp_fixup_buffer(task);
 
 	src_fmt = __ipp_format_get(ipp, src->buf.fourcc, src->buf.modifier,
 				   DRM_EXYNOS_IPP_FORMAT_SOURCE);
