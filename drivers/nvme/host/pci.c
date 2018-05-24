@@ -1485,7 +1485,15 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 		goto out;
 
 	result = adapter_alloc_sq(dev, qid, nvmeq);
-	if (result < 0)
+	/*
+	 * If return -EINTR, it means the allocate sq command times out and is completed
+	 * with NVME_REQ_CANCELLED. At the time, the controller has been disabled
+	 * and admin request queue has been quiesced. So don't try to send delete cq
+	 * command any more.
+	 */
+	if (result == -EINTR)
+		goto out;
+	else if (result < 0)
 		goto release_cq;
 
 	/*
