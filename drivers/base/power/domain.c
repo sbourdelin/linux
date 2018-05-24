@@ -2218,7 +2218,7 @@ int genpd_dev_pm_attach(struct device *dev)
 		mutex_unlock(&gpd_list_lock);
 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
 			__func__, PTR_ERR(pd));
-		return -EPROBE_DEFER;
+		return driver_deferred_probe_check_init_done(dev, true);
 	}
 
 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
