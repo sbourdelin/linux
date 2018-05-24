@@ -409,6 +409,41 @@ int cpsw_ale_del_mcast(struct cpsw_ale *ale, u8 *addr, int port_mask,
 }
 EXPORT_SYMBOL_GPL(cpsw_ale_del_mcast);
 
+static int cpsw_ale_read_mc(struct cpsw_ale *ale, u8 *addr, int flags, u16 vid)
+{
+	u32 ale_entry[ALE_ENTRY_WORDS] = {0, 0, 0};
+	int idx;
+
+	idx = cpsw_ale_match_addr(ale, addr, (flags & ALE_VLAN) ? vid : 0);
+	if (idx >= 0)
+		cpsw_ale_read(ale, idx, ale_entry);
+
+	return cpsw_ale_get_port_mask(ale_entry, ale->port_mask_bits);
+}
+
+int cpsw_ale_mcast_add_modify(struct cpsw_ale *ale, u8 *addr, int port_mask,
+			      int flags, u16 vid, int mcast_state)
+{
+	int mcast_members, ret;
+
+	mcast_members = cpsw_ale_read_mc(ale, addr, flags, vid) | port_mask;
+	ret = cpsw_ale_add_mcast(ale, addr, mcast_members, flags, vid, 0);
+
+	return ret;
+}
+
+int cpsw_ale_mcast_del_modify(struct cpsw_ale *ale, u8 *addr, int port_mask,
+			      int flags, u16 vid)
+{
+	int mcast_members, ret;
+
+	mcast_members = cpsw_ale_read_mc(ale, addr, flags, vid) & ~port_mask;
+	ret = cpsw_ale_del_mcast(ale, addr, mcast_members, flags, vid);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cpsw_ale_mcast_del_modify);
+
 /* ALE NetCP NU switch specific vlan functions */
 static void cpsw_ale_set_vlan_mcast(struct cpsw_ale *ale, u32 *ale_entry,
 				    int reg_mcast, int unreg_mcast)
@@ -422,6 +457,52 @@ static void cpsw_ale_set_vlan_mcast(struct cpsw_ale *ale, u32 *ale_entry,
 	/* Set VLAN unregistered multicast flood mask */
 	idx = cpsw_ale_get_vlan_unreg_mcast_idx(ale_entry);
 	writel(unreg_mcast, ale->params.ale_regs + ALE_VLAN_MASK_MUX(idx));
+}
+
+static int cpsw_ale_read_untagged(struct cpsw_ale *ale, u16 vid)
+{
+	u32 ale_entry[ALE_ENTRY_WORDS] = {0, 0, 0};
+	int idx;
+
+	idx = cpsw_ale_match_vlan(ale, vid);
+	if (idx >= 0)
+		cpsw_ale_read(ale, idx, ale_entry);
+
+	return cpsw_ale_get_vlan_untag_force(ale_entry, ale->vlan_field_bits);
+}
+
+/* returns mask of current members for specificed vlan */
+static int cpsw_ale_read_vlan_members(struct cpsw_ale *ale, u16 vid)
+{
+	u32 ale_entry[ALE_ENTRY_WORDS] = {0, 0, 0};
+	int idx;
+
+	idx = cpsw_ale_match_vlan(ale, vid);
+	if (idx >= 0)
+		cpsw_ale_read(ale, idx, ale_entry);
+
+	return cpsw_ale_get_vlan_member_list(ale_entry, ale->vlan_field_bits);
+}
+
+/* returns mask of registered/unregistered multicast registration */
+static int cpsw_ale_read_reg_unreg_mc(struct cpsw_ale *ale, u16 vid, bool unreg)
+{
+	u32 ale_entry[ALE_ENTRY_WORDS] = {0, 0, 0};
+	int idx;
+	int ret;
+
+	idx = cpsw_ale_match_vlan(ale, vid);
+	if (idx >= 0)
+		cpsw_ale_read(ale, idx, ale_entry);
+
+	if (unreg)
+		ret = cpsw_ale_get_vlan_unreg_mcast(ale_entry,
+						    ale->vlan_field_bits);
+	else
+		ret = cpsw_ale_get_vlan_reg_mcast(ale_entry,
+						  ale->vlan_field_bits);
+
+	return ret;
 }
 
 int cpsw_ale_add_vlan(struct cpsw_ale *ale, u16 vid, int port, int untag,
@@ -481,6 +562,54 @@ int cpsw_ale_del_vlan(struct cpsw_ale *ale, u16 vid, int port_mask)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(cpsw_ale_del_vlan);
+
+int cpsw_ale_vlan_add_modify(struct cpsw_ale *ale, u16 vid, int port_mask,
+			     int untag_mask, int reg_mask, int unreg_mask)
+{
+	int ret = 0;
+	int vlan_members = cpsw_ale_read_vlan_members(ale, vid) & ~port_mask;
+	int reg_mcast_members =
+		cpsw_ale_read_reg_unreg_mc(ale, vid, 0) & ~port_mask;
+	int unreg_mcast_members =
+		cpsw_ale_read_reg_unreg_mc(ale, vid, 1) & ~port_mask;
+	int untag_members = cpsw_ale_read_untagged(ale, vid) & ~port_mask;
+
+	vlan_members |= port_mask;
+	untag_members |= untag_mask;
+	reg_mcast_members |= reg_mask;
+	unreg_mcast_members |= unreg_mask;
+
+	ret = cpsw_ale_add_vlan(ale, vid, vlan_members, untag_members,
+				reg_mcast_members, unreg_mcast_members);
+	if (ret) {
+		dev_err(ale->params.dev, "Unable to add vlan\n");
+		return ret;
+	}
+	dev_dbg(ale->params.dev,  "port mask 0x%x untag 0x%x\n", vlan_members,
+		untag_mask);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cpsw_ale_vlan_add_modify);
+
+int cpsw_ale_vlan_del_modify(struct cpsw_ale *ale, u16 vid, int port_mask)
+{
+	int ret = 0;
+	int vlan_members;
+
+	vlan_members = cpsw_ale_read_vlan_members(ale, vid);
+	vlan_members &= ~port_mask;
+
+	ret = cpsw_ale_del_vlan(ale, vid, vlan_members);
+	if (ret) {
+		dev_err(ale->params.dev, "Unable to del vlan\n");
+		return ret;
+	}
+	dev_dbg(ale->params.dev, "port mask 0x%x\n", port_mask);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cpsw_ale_vlan_del_modify);
 
 void cpsw_ale_set_allmulti(struct cpsw_ale *ale, int allmulti)
 {
