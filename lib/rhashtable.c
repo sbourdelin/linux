@@ -1024,12 +1024,11 @@ int rhashtable_init(struct rhashtable *ht,
 
 	size = HASH_DEFAULT_SIZE;
 
-	if ((!params->key_len && !params->obj_hashfn) ||
-	    (params->obj_hashfn && !params->obj_cmpfn))
-		return -EINVAL;
+	WARN_ON((!params->key_len && !params->obj_hashfn) ||
+		(params->obj_hashfn && !params->obj_cmpfn));
 
-	if (params->nulls_base && params->nulls_base < (1U << RHT_BASE_SHIFT))
-		return -EINVAL;
+	WARN_ON(params->nulls_base &&
+		params->nulls_base < (1U << RHT_BASE_SHIFT));
 
 	memset(ht, 0, sizeof(*ht));
 	mutex_init(&ht->mutex);
