@@ -22,6 +22,8 @@
 #include "rpmh-internal.h"
 
 #define RPMH_TIMEOUT_MS			msecs_to_jiffies(10000)
+#define RPMH_MAX_REQ_IN_BATCH		10
+#define RPMH_MAX_BATCH_CACHE		(2 * RPMH_MAX_REQ_IN_BATCH)
 
 #define DEFINE_RPMH_MSG_ONSTACK(dev, s, q, name)	\
 	struct rpmh_request name = {			\
@@ -35,6 +37,7 @@
 		.completion = q,			\
 		.dev = dev,				\
 		.needs_free = false,				\
+		.wait_count = NULL,			\
 	}
 
 /**
@@ -61,6 +64,7 @@ struct cache_req {
  * @dev: the device making the request
  * @err: err return from the controller
  * @needs_free: check to free dynamically allocated request object
+ * @wait_count: count of waiters for this completion
  */
 struct rpmh_request {
 	struct tcs_request msg;
@@ -69,6 +73,7 @@ struct rpmh_request {
 	const struct device *dev;
 	int err;
 	bool needs_free;
+	atomic_t *wait_count;
 };
 
 /**
@@ -78,12 +83,14 @@ struct rpmh_request {
  * @cache: the list of cached requests
  * @cache_lock: synchronize access to the cache data
  * @dirty: was the cache updated since flush
+ * @batch_cache: Cache sleep and wake requests sent as batch
  */
 struct rpmh_ctrlr {
 	struct rsc_drv *drv;
 	struct list_head cache;
 	spinlock_t cache_lock;
 	bool dirty;
+	const struct rpmh_request *batch_cache[RPMH_MAX_BATCH_CACHE];
 };
 
 static struct rpmh_ctrlr rpmh_rsc[RPMH_MAX_CTRLR];
@@ -134,6 +141,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
 	struct rpmh_request *rpm_msg = container_of(msg, struct rpmh_request,
 						    msg);
 	struct completion *compl = rpm_msg->completion;
+	atomic_t *wc = rpm_msg->wait_count;
 
 	rpm_msg->err = r;
 
@@ -141,10 +149,16 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
 		dev_err(rpm_msg->dev, "RPMH TX fail in msg addr=%#x, err=%d\n",
 			rpm_msg->msg.cmds[0].addr, r);
 
-	/* Signal the blocking thread we are done */
-	if (compl)
-		complete(compl);
+	if (!compl)
+		goto exit;
 
+	if (wc && !atomic_dec_and_test(wc))
+		goto exit;
+
+	/* Signal the blocking thread we are done */
+	complete(compl);
+
+exit:
 	if (rpm_msg->needs_free)
 		kfree(rpm_msg);
 }
@@ -332,6 +346,139 @@ int rpmh_write(const struct device *dev, enum rpmh_state state,
 	return (ret > 0) ? 0 : -ETIMEDOUT;
 }
 
+static int cache_batch(struct rpmh_ctrlr *ctrlr,
+		       struct rpmh_request **rpm_msg, int count)
+{
+	unsigned long flags;
+	int ret = 0;
+	int index = 0;
+	int i;
+
+	spin_lock_irqsave(&ctrlr->cache_lock, flags);
+	while (index < RPMH_MAX_BATCH_CACHE && ctrlr->batch_cache[index])
+		index++;
+	if (index + count >= RPMH_MAX_BATCH_CACHE) {
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	for (i = 0; i < count; i++)
+		ctrlr->batch_cache[index + i] = rpm_msg[i];
+exit:
+	spin_unlock_irqrestore(&ctrlr->cache_lock, flags);
+
+	return ret;
+}
+
+static int flush_batch(struct rpmh_ctrlr *ctrlr)
+{
+	const struct rpmh_request *rpm_msg;
+	unsigned long flags;
+	int ret = 0;
+	int i;
+
+	/* Send Sleep/Wake requests to the controller, expect no response */
+	spin_lock_irqsave(&ctrlr->cache_lock, flags);
+	for (i = 0; i < RPMH_MAX_BATCH_CACHE && ctrlr->batch_cache[i]; i++) {
+		rpm_msg = ctrlr->batch_cache[i];
+		ret = rpmh_rsc_write_ctrl_data(ctrlr->drv, &rpm_msg->msg);
+		if (ret)
+			break;
+	}
+	spin_unlock_irqrestore(&ctrlr->cache_lock, flags);
+
+	return ret;
+}
+
+static void invalidate_batch(struct rpmh_ctrlr *ctrlr)
+{
+	unsigned long flags;
+	int index = 0;
+
+	spin_lock_irqsave(&ctrlr->cache_lock, flags);
+	while (index < RPMH_MAX_BATCH_CACHE && ctrlr->batch_cache[index]) {
+		if (ctrlr->batch_cache[index]->needs_free)
+			kfree(ctrlr->batch_cache[index]);
+		ctrlr->batch_cache[index] = NULL;
+		index++;
+	}
+	spin_unlock_irqrestore(&ctrlr->cache_lock, flags);
+}
+
+/**
+ * rpmh_write_batch: Write multiple sets of RPMH commands and wait for the
+ * batch to finish.
+ *
+ * @dev: the device making the request
+ * @state: Active/sleep set
+ * @cmd: The payload data
+ * @n: The array of count of elements in each batch, 0 terminated.
+ *
+ * Write a request to the RSC controller without caching. If the request
+ * state is ACTIVE, then the requests are treated as completion request
+ * and sent to the controller immediately. The function waits until all the
+ * commands are complete. If the request was to SLEEP or WAKE_ONLY, then the
+ * request is sent as fire-n-forget and no ack is expected.
+ *
+ * May sleep. Do not call from atomic contexts for ACTIVE_ONLY requests.
+ */
+int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+		     const struct tcs_cmd *cmd, u32 *n)
+{
+	struct rpmh_request *rpm_msg[RPMH_MAX_REQ_IN_BATCH] = { NULL };
+	DECLARE_COMPLETION_ONSTACK(compl);
+	atomic_t wait_count = ATOMIC_INIT(0);
+	struct rpmh_ctrlr *ctrlr = get_rpmh_ctrlr(dev);
+	int count = 0;
+	int ret, i, j;
+
+	if (IS_ERR(ctrlr) || !cmd || !n)
+		return -EINVAL;
+
+	while (n[count++] > 0)
+		;
+	count--;
+	if (!count || count > RPMH_MAX_REQ_IN_BATCH)
+		return -EINVAL;
+
+	for (i = 0; i < count; i++) {
+		rpm_msg[i] = __get_rpmh_msg_async(state, cmd, n[i]);
+		if (IS_ERR(rpm_msg[i])) {
+			ret = PTR_ERR(rpm_msg[i]);
+			for (j = i-1; j >= 0; j--) {
+				if (rpm_msg[j]->needs_free)
+					kfree(rpm_msg[j]);
+			}
+			return ret;
+		}
+		cmd += n[i];
+	}
+
+	if (state != RPMH_ACTIVE_ONLY_STATE)
+		return cache_batch(ctrlr, rpm_msg, count);
+
+	atomic_set(&wait_count, count);
+
+	for (i = 0; i < count; i++) {
+		rpm_msg[i]->completion = &compl;
+		rpm_msg[i]->wait_count = &wait_count;
+		ret = rpmh_rsc_send_data(ctrlr->drv, &rpm_msg[i]->msg);
+		if (ret) {
+			int j;
+
+			pr_err("Error(%d) sending RPMH message addr=%#x\n",
+			       ret, rpm_msg[i]->msg.cmds[0].addr);
+			for (j = i; j < count; j++)
+				rpmh_tx_done(&rpm_msg[j]->msg, ret);
+			break;
+		}
+	}
+
+	ret = wait_for_completion_timeout(&compl, RPMH_TIMEOUT_MS);
+	return (ret > 0) ? 0 : -ETIMEDOUT;
+
+}
+
 static int is_req_valid(struct cache_req *req)
 {
 	return (req->sleep_val != UINT_MAX &&
@@ -383,6 +530,11 @@ int rpmh_flush(const struct device *dev)
 		return 0;
 	}
 
+	/* First flush the cached batch requests */
+	ret = flush_batch(ctrlr);
+	if (ret)
+		return ret;
+
 	/*
 	 * Nobody else should be calling this function other than system PM,
 	 * hence we can run without locks.
@@ -423,6 +575,7 @@ int rpmh_invalidate(const struct device *dev)
 	if (IS_ERR(ctrlr))
 		return PTR_ERR(ctrlr);
 
+	invalidate_batch(ctrlr);
 	ctrlr->dirty = true;
 
 	do {
