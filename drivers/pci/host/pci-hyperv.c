@@ -88,6 +88,8 @@ static enum pci_protocol_version_t pci_protocol_version;
 
 #define STATUS_REVISION_MISMATCH 0xC0000059
 
+#define SLOT_NAME_SIZE	16
+
 /*
  * Message Types
  */
@@ -504,6 +506,7 @@ struct hv_pci_dev {
 	struct list_head list_entry;
 	refcount_t refs;
 	enum hv_pcichild_state state;
+	struct pci_slot *pci_slot;
 	struct pci_function_description desc;
 	bool reported_missing;
 	struct hv_pcibus_device *hbus;
@@ -1443,6 +1446,29 @@ static void prepopulate_bars(struct hv_pcibus_device *hbus)
 	spin_unlock_irqrestore(&hbus->device_list_lock, flags);
 }
 
+static void hv_pci_assign_slots(struct hv_pcibus_device *hbus)
+{
+	struct hv_pci_dev *hpdev;
+	char name[SLOT_NAME_SIZE];
+	unsigned long flags;
+	int slot_nr;
+
+	spin_lock_irqsave(&hbus->device_list_lock, flags);
+	list_for_each_entry(hpdev, &hbus->children, list_entry) {
+		if (hpdev->pci_slot)
+			continue;
+
+		slot_nr = PCI_SLOT(wslot_to_devfn(hpdev->desc.win_slot.slot));
+		snprintf(name, SLOT_NAME_SIZE, "%u", hpdev->desc.ser);
+		pr_info("%s slot %u name '%s'\n", __func__, slot_nr, name);
+		hpdev->pci_slot = pci_create_slot(hbus->pci_bus, slot_nr,
+					  name, NULL);
+		if (!hpdev->pci_slot)
+			pr_warn("pci_create slot failed\n");
+	}
+	spin_unlock_irqrestore(&hbus->device_list_lock, flags);
+}
+
 /**
  * create_root_hv_pci_bus() - Expose a new root PCI bus
  * @hbus:	Root PCI bus, as understood by this driver
@@ -1466,6 +1492,7 @@ static int create_root_hv_pci_bus(struct hv_pcibus_device *hbus)
 	pci_lock_rescan_remove();
 	pci_scan_child_bus(hbus->pci_bus);
 	pci_bus_assign_resources(hbus->pci_bus);
+	hv_pci_assign_slots(hbus);
 	pci_bus_add_devices(hbus->pci_bus);
 	pci_unlock_rescan_remove();
 	hbus->state = hv_pcibus_installed;
@@ -1748,6 +1775,7 @@ static void pci_devices_present_work(struct work_struct *work)
 		 */
 		pci_lock_rescan_remove();
 		pci_scan_child_bus(hbus->pci_bus);
+		hv_pci_assign_slots(hbus);
 		pci_unlock_rescan_remove();
 		break;
 
@@ -1863,6 +1891,9 @@ static void hv_eject_device_work(struct work_struct *work)
 	spin_lock_irqsave(&hpdev->hbus->device_list_lock, flags);
 	list_del(&hpdev->list_entry);
 	spin_unlock_irqrestore(&hpdev->hbus->device_list_lock, flags);
+
+	if (hpdev->pci_slot)
+		pci_destroy_slot(hpdev->pci_slot);
 
 	memset(&ctxt, 0, sizeof(ctxt));
 	ejct_pkt = (struct pci_eject_response *)&ctxt.pkt.message;
