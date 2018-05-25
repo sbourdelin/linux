@@ -305,6 +305,43 @@ static void handle_percpu_devid_nmi(struct irq_desc *desc)
 		chip->irq_eoi(&desc->irq_data);
 }
 
+static int gic_irq_set_irqchip_prio(struct irq_data *d, bool val)
+{
+	u8 prio;
+	irq_flow_handler_t handler;
+
+	if (gic_peek_irq(d, GICD_ISENABLER)) {
+		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
+		return -EPERM;
+	}
+
+	if (val) {
+		prio = GICD_INT_NMI_PRI;
+
+		if (gic_irq(d) < 32)
+			handler = handle_percpu_devid_nmi;
+		else
+			handler = handle_fasteoi_nmi;
+	} else {
+		prio = GICD_INT_DEF_PRI;
+
+		if (gic_irq(d) < 32)
+			handler = handle_percpu_devid_irq;
+		else
+			handler = handle_fasteoi_irq;
+	}
+
+	/*
+	 * Already in a locked context for the desc from calling
+	 * irq_set_irq_chip_state.
+	 * It should be safe to simply modify the handler.
+	 */
+	irq_to_desc(d->irq)->handle_irq = handler;
+	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), prio);
+
+	return 0;
+}
+
 static int gic_irq_set_irqchip_state(struct irq_data *d,
 				     enum irqchip_irq_state which, bool val)
 {
@@ -325,6 +362,16 @@ static int gic_irq_set_irqchip_state(struct irq_data *d,
 	case IRQCHIP_STATE_MASKED:
 		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
 		break;
+
+	case IRQCHIP_STATE_NMI:
+		if (gic_supports_nmi()) {
+			return gic_irq_set_irqchip_prio(d, val);
+		} else if (val) {
+			pr_warn("Failed to set IRQ %u as NMI, NMIs are unsupported\n",
+				gic_irq(d));
+			return -EINVAL;
+		}
+		return 0;
 
 	default:
 		return -EINVAL;
@@ -351,6 +398,13 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
 
 	case IRQCHIP_STATE_MASKED:
 		*val = !gic_peek_irq(d, GICD_ISENABLER);
+		break;
+
+	case IRQCHIP_STATE_NMI:
+		if (!gic_supports_nmi())
+			return -EINVAL;
+		*val = (gic_get_irq_prio(gic_irq(d), gic_dist_base(d)) ==
+			GICD_INT_NMI_PRI);
 		break;
 
 	default:

@@ -419,6 +419,7 @@ enum irqchip_irq_state {
 	IRQCHIP_STATE_ACTIVE,		/* Is interrupt in progress? */
 	IRQCHIP_STATE_MASKED,		/* Is interrupt masked? */
 	IRQCHIP_STATE_LINE_LEVEL,	/* Is IRQ line high? */
+	IRQCHIP_STATE_NMI,		/* Is IRQ an NMI? */
 };
 
 extern int irq_get_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
