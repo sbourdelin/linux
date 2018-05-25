@@ -994,6 +994,7 @@ extern efi_status_t efi_query_variable_store(u32 attributes,
 					     unsigned long size,
 					     bool nonblocking);
 extern void efi_find_mirror(void);
+extern void efi_delete_dummy_variable(void);
 #else
 static inline void efi_late_init(void) {}
 static inline void efi_free_boot_services(void) {}
@@ -1004,6 +1005,8 @@ static inline efi_status_t efi_query_variable_store(u32 attributes,
 {
 	return EFI_SUCCESS;
 }
+
+static inline void efi_delete_dummy_variable(void) {}
 #endif
 extern void __iomem *efi_lookup_mapped_addr(u64 phys_addr);
 
