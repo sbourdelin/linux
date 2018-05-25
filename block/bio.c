@@ -913,6 +913,41 @@ done:
 }
 EXPORT_SYMBOL(bio_add_page);
 
+static unsigned convert_to_segs(struct bio* bio, struct page **pages,
+				unsigned char *page_cnt,
+				unsigned nr_pages)
+{
+
+	unsigned idx;
+	unsigned nr_seg = 0;
+	struct request_queue *q = NULL;
+
+	if (bio->bi_disk)
+		q = bio->bi_disk->queue;
+
+	if (!q || !blk_queue_cluster(q)) {
+		memset(page_cnt, 0, nr_pages);
+		return nr_pages;
+	}
+
+	page_cnt[nr_seg] = 0;
+	for (idx = 1; idx < nr_pages; idx++) {
+		struct page *pg_s = pages[nr_seg];
+		struct page *pg = pages[idx];
+
+		if (page_to_pfn(pg_s) + page_cnt[nr_seg] + 1 ==
+		    page_to_pfn(pg)) {
+			page_cnt[nr_seg]++;
+		} else {
+			page_cnt[++nr_seg] = 0;
+			if (nr_seg < idx)
+				pages[nr_seg] = pg;
+		}
+	}
+
+	return nr_seg + 1;
+}
+
 /**
  * bio_iov_iter_get_pages - pin user or kernel pages and add them to a bio
  * @bio: bio to add pages to
@@ -928,6 +963,8 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	struct page **pages = (struct page **)bv;
 	size_t offset, diff;
 	ssize_t size;
+	unsigned short nr_segs;
+	unsigned char page_cnt[nr_pages];	/* at most 256 pages */
 
 	size = iov_iter_get_pages(iter, pages, LONG_MAX, nr_pages, &offset);
 	if (unlikely(size <= 0))
@@ -943,13 +980,18 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	 * need to be reflected here as well.
 	 */
 	bio->bi_iter.bi_size += size;
-	bio->bi_vcnt += nr_pages;
-
 	diff = (nr_pages * PAGE_SIZE - offset) - size;
-	while (nr_pages--) {
-		bv[nr_pages].bv_page = pages[nr_pages];
-		bv[nr_pages].bv_len = PAGE_SIZE;
-		bv[nr_pages].bv_offset = 0;
+
+	/* convert into segments */
+	nr_segs = convert_to_segs(bio, pages, page_cnt, nr_pages);
+	bio->bi_vcnt += nr_segs;
+
+	while (nr_segs--) {
+		unsigned cnt = (unsigned)page_cnt[nr_segs] + 1;
+
+		bv[nr_segs].bv_page = pages[nr_segs];
+		bv[nr_segs].bv_len = PAGE_SIZE * cnt;
+		bv[nr_segs].bv_offset = 0;
 	}
 
 	bv[0].bv_offset += offset;
