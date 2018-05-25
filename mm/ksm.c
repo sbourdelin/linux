@@ -25,7 +25,6 @@
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
 #include <linux/spinlock.h>
-#include <linux/jhash.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
@@ -39,6 +38,9 @@
 #include <linux/freezer.h>
 #include <linux/oom.h>
 #include <linux/numa.h>
+#include <crypto/hash.h>
+#include <linux/crc32c.h>
+#include <linux/xxhash.h>
 
 #include <asm/tlbflush.h>
 #include "internal.h"
@@ -302,6 +304,47 @@ static DEFINE_SPINLOCK(ksm_mmlist_lock);
 #define KSM_KMEM_CACHE(__struct, __flags) kmem_cache_create("ksm_"#__struct,\
 		sizeof(struct __struct), __alignof__(struct __struct),\
 		(__flags), NULL)
+
+static DEFINE_STATIC_KEY_FALSE(ksm_use_crc32c);
+static DEFINE_STATIC_KEY_FALSE(ksm_use_xxhash);
+
+static void fasthash_setup(void)
+{
+	struct crypto_shash *shash = crypto_alloc_shash("crc32c", 0, 0);
+
+	if (!IS_ERR(shash)) {
+		/* Use crc32c if any non-generic version is available.
+		 * Generic crypto algorithms have priority 100.
+		 */
+		if (crypto_tfm_alg_priority(&shash->base) > 100) {
+			static_branch_enable(&ksm_use_crc32c);
+			pr_info("ksm: using crc32c as hash function");
+		}
+		crypto_free_shash(shash);
+	}
+
+	if (!static_branch_likely(&ksm_use_crc32c)) {
+		static_branch_enable(&ksm_use_xxhash);
+		pr_info("ksm: using xxhash as hash function");
+	}
+}
+
+static u32 fasthash(const void *input, size_t length)
+{
+	if (static_branch_likely(&ksm_use_crc32c))
+		return crc32c(0, input, length);
+
+	if (static_branch_likely(&ksm_use_xxhash))
+		return (u32)xxhash(input, length, 0);
+
+	/* Is done only once on the first call of fasthash() */
+	fasthash_setup();
+
+	/* Now, that we know the hash alg., calculate checksum for zero page */
+	zero_checksum = fasthash(ZERO_PAGE(0), PAGE_SIZE);
+
+	return fasthash(input, length);
+}
 
 static int __init ksm_slab_init(void)
 {
@@ -1009,7 +1052,7 @@ static u32 calc_checksum(struct page *page)
 {
 	u32 checksum;
 	void *addr = kmap_atomic(page);
-	checksum = jhash2(addr, PAGE_SIZE / 4, 17);
+	checksum = fasthash(addr, PAGE_SIZE);
 	kunmap_atomic(addr);
 	return checksum;
 }
@@ -3134,8 +3177,6 @@ static int __init ksm_init(void)
 	struct task_struct *ksm_thread;
 	int err;
 
-	/* The correct value depends on page size and endianness */
-	zero_checksum = calc_checksum(ZERO_PAGE(0));
 	/* Default to false for backwards compatibility */
 	ksm_use_zero_pages = false;
 
