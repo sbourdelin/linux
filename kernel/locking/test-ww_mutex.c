@@ -26,7 +26,7 @@
 #include <linux/slab.h>
 #include <linux/ww_mutex.h>
 
-static DEFINE_WW_CLASS(ww_class);
+static DEFINE_WW_CLASS(ww_class, true);
 struct workqueue_struct *wq;
 
 struct test_mutex {
