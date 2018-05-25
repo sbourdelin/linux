@@ -910,6 +910,7 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 	pr_info("EEH: Notify device driver to resume\n");
 	eeh_pe_dev_traverse(pe, eeh_report_resume, NULL);
 
+	pr_info("EEH: Recovery successful.\n");
 	goto final;
 
 hard_fail:
