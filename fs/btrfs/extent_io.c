@@ -2459,7 +2459,7 @@ static void end_bio_extent_writepage(struct bio *bio)
 	struct bvec_iter_all bia;
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
-	bio_for_each_page_all2(bvec, bio, i, bia) {
+	bio_for_each_page_all(bvec, bio, i, bia) {
 		struct page *page = bvec->bv_page;
 		struct inode *inode = page->mapping->host;
 		struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
@@ -2531,7 +2531,7 @@ static void end_bio_extent_readpage(struct bio *bio)
 	struct bvec_iter_all bia;
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
-	bio_for_each_page_all2(bvec, bio, i, bia) {
+	bio_for_each_page_all(bvec, bio, i, bia) {
 		struct page *page = bvec->bv_page;
 		struct inode *inode = page->mapping->host;
 		struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
@@ -3686,7 +3686,7 @@ static void end_bio_extent_buffer_writepage(struct bio *bio)
 	struct bvec_iter_all bia;
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
-	bio_for_each_page_all2(bvec, bio, i, bia) {
+	bio_for_each_page_all(bvec, bio, i, bia) {
 		struct page *page = bvec->bv_page;
 
 		eb = (struct extent_buffer *)page->private;

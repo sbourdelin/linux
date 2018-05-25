@@ -236,7 +236,7 @@ static inline bool bio_rewind_iter(struct bio *bio, struct bvec_iter *iter,
  * bio_for_each_segment_all() and make sure it is correctly used since
  * bvec may points to one multipage bvec.
  */
-#define bio_for_each_page_all2(bvl, bio, i, bi)			\
+#define bio_for_each_page_all(bvl, bio, i, bi)			\
 	for ((bi).iter = BVEC_ITER_ALL_INIT, i = 0, bvl = &(bi).bv;	\
 	     (bi).iter.bi_idx < (bio)->bi_vcnt &&			\
 		(((bi).bv = bio_iter_iovec((bio), (bi).iter)), 1);	\
@@ -372,7 +372,7 @@ static inline unsigned bio_pages_all(struct bio *bio)
 
 	WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED));
 
-	bio_for_each_page_all2(bv, bio, i, bia)
+	bio_for_each_page_all(bv, bio, i, bia)
 		;
 	return i;
 }

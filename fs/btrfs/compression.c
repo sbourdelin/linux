@@ -173,7 +173,7 @@ csum_failed:
 		 * checked so the end_io handlers know about it
 		 */
 		ASSERT(!bio_flagged(bio, BIO_CLONED));
-		bio_for_each_page_all2(bvec, cb->orig_bio, i, bia)
+		bio_for_each_page_all(bvec, cb->orig_bio, i, bia)
 			SetPageChecked(bvec->bv_page);
 
 		bio_endio(cb->orig_bio);

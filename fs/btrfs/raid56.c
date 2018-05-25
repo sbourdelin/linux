@@ -1449,7 +1449,7 @@ static void set_bio_pages_uptodate(struct bio *bio)
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
 
-	bio_for_each_page_all2(bvec, bio, i, bia)
+	bio_for_each_page_all(bvec, bio, i, bia)
 		SetPageUptodate(bvec->bv_page);
 }
 

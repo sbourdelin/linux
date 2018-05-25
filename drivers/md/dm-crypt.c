@@ -1452,7 +1452,7 @@ static void crypt_free_buffer_pages(struct crypt_config *cc, struct bio *clone)
 	struct bio_vec *bv;
 	struct bvec_iter_all bia;
 
-	bio_for_each_page_all2(bv, clone, i, bia) {
+	bio_for_each_page_all(bv, clone, i, bia) {
 		BUG_ON(!bv->bv_page);
 		mempool_free(bv->bv_page, cc->page_pool);
 	}
