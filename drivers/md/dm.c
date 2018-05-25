@@ -1050,14 +1050,13 @@ static long dm_dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
 
 	if (!ti)
 		goto out;
-	if (!ti->type->direct_access)
+	if (!blk_queue_dax(md->queue))
 		goto out;
 	len = max_io_len(sector, ti) / PAGE_SECTORS;
 	if (len < 1)
 		goto out;
 	nr_pages = min(len, nr_pages);
-	if (ti->type->direct_access)
-		ret = ti->type->direct_access(ti, pgoff, nr_pages, kaddr, pfn);
+	ret = ti->type->direct_access(ti, pgoff, nr_pages, kaddr, pfn);
 
  out:
 	dm_put_live_table(md, srcu_idx);
