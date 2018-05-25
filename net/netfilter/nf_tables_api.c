@@ -23,6 +23,8 @@
 #include <net/net_namespace.h>
 #include <net/sock.h>
 
+#define NFT_SET_IDA_SIZE  BITS_PER_BYTE * PAGE_SIZE
+
 static LIST_HEAD(nf_tables_expressions);
 static LIST_HEAD(nf_tables_objects);
 static LIST_HEAD(nf_tables_flowtables);
@@ -2682,17 +2684,14 @@ static int nf_tables_set_alloc_name(struct nft_ctx *ctx, struct nft_set *set,
 {
 	const struct nft_set *i;
 	const char *p;
-	unsigned long *inuse;
-	unsigned int n = 0, min = 0;
+	int n = 0, min = 0, id;
+	DEFINE_IDA(inuse);
 
 	p = strchr(name, '%');
 	if (p != NULL) {
 		if (p[1] != 'd' || strchr(p + 2, '%'))
 			return -EINVAL;
 
-		inuse = (unsigned long *)get_zeroed_page(GFP_KERNEL);
-		if (inuse == NULL)
-			return -ENOMEM;
 cont:
 		list_for_each_entry(i, &ctx->table->sets, list) {
 			int tmp;
@@ -2701,22 +2700,34 @@ cont:
 				continue;
 			if (!sscanf(i->name, name, &tmp))
 				continue;
-			if (tmp < min || tmp >= min + BITS_PER_BYTE * PAGE_SIZE)
+			if (tmp < min || tmp >= min + NFT_SET_IDA_SIZE)
 				continue;
 
-			set_bit(tmp - min, inuse);
+			n = ida_get_new_above(&inuse, tmp - min, &id);
+			if (n < 0) {
+				if (n == -EAGAIN)
+					goto cont;
+
+				return n;
+			}
+		}
+		n = ida_get_new_above(&inuse, 0, &id);
+
+		if (n < 0) {
+			if (n == -EAGAIN)
+				goto cont;
+			else if (n == -ENOSPC) {
+				min += NFT_SET_IDA_SIZE;
+				ida_destroy(&inuse);
+				goto cont;
+			} else
+				return n;
 		}
 
-		n = find_first_zero_bit(inuse, BITS_PER_BYTE * PAGE_SIZE);
-		if (n >= BITS_PER_BYTE * PAGE_SIZE) {
-			min += BITS_PER_BYTE * PAGE_SIZE;
-			memset(inuse, 0, PAGE_SIZE);
-			goto cont;
-		}
-		free_page((unsigned long)inuse);
+		ida_destroy(&inuse);
 	}
 
-	set->name = kasprintf(GFP_KERNEL, name, min + n);
+	set->name = kasprintf(GFP_KERNEL, name, id);
 	if (!set->name)
 		return -ENOMEM;
 
