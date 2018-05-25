@@ -564,6 +564,9 @@ int drm_plane_check_pixel_format(struct drm_plane *plane,
 	if (!plane->modifier_count)
 		return 0;
 
+	if (modifier == DRM_FORMAT_MOD_NONE)
+		return 0;
+
 	for (i = 0; i < plane->modifier_count; i++) {
 		if (modifier == plane->modifiers[i])
 			break;
