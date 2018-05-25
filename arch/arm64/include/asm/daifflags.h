@@ -18,8 +18,17 @@
 
 #include <linux/irqflags.h>
 
-#define DAIF_PROCCTX		0
-#define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
+#include <asm/arch_gicv3.h>
+
+#define DAIF_PROCCTX							\
+	(gic_prio_masking_enabled() ?					\
+		MAKE_ARCH_FLAGS(0, ICC_PMR_EL1_UNMASKED) :		\
+		0)
+
+#define DAIF_PROCCTX_NOIRQ						\
+	(gic_prio_masking_enabled() ?					\
+		MAKE_ARCH_FLAGS(0, ICC_PMR_EL1_MASKED) :		\
+		PSR_I_BIT)
 
 /* mask/save/unmask/restore all exceptions, including interrupts. */
 static inline void local_daif_mask(void)
@@ -51,6 +60,10 @@ static inline void local_daif_unmask(void)
 		:
 		:
 		: "memory");
+
+	/* Unmask IRQs in PMR if needed */
+	if (gic_prio_masking_enabled())
+		arch_local_irq_enable();
 }
 
 static inline void local_daif_restore(unsigned long flags)
