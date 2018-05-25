@@ -1,0 +1,65 @@
+Qualcomm RPMh Powerdomains
+
+* For RPMh powerdomains, we communicate a performance state to RPMh
+which then translates it into a corresponding voltage on a rail
+
+Required Properties:
+ - compatible: Should be one of the following
+	* qcom,sdm845-rpmhpd: RPMh powerdomain for the sdm845 family of SoC
+ - power-domain-cells: number of cells in power domain specifier
+	must be 1
+ - operating-points-v2: Phandle to the OPP table for the power-domain.
+	Refer to Documentation/devicetree/bindings/power/power_domain.txt
+	and Documentation/devicetree/bindings/opp/qcom-opp.txt for more details
+
+Example:
+
+	rpmhpd: power-controller {
+		compatible = "qcom,sdm845-rpmhpd";
+		#power-domain-cells = <1>;
+		operating-points-v2 = <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>,
+				      <&rpmhpd_opp_table>;
+	};
+
+	rpmhpd_opp_table: opp-table {
+		compatible = "operating-points-v2-qcom-level", "operating-points-v2";
+
+		rpmhpd_opp1: opp@1 {
+			qcom-corner = <16>;
+		};
+
+		rpmhpd_opp2: opp@2 {
+			qcom-corner = <48>;
+		};
+
+		rpmhpd_opp3: opp@3 {
+			qcom-corner = <64>;
+		};
+
+		rpmhpd_opp4: opp@4 {
+			qcom-corner = <128>;
+		};
+
+		rpmhpd_opp5: opp@5 {
+			qcom-corner = <192>;
+		};
+
+		rpmhpd_opp6: opp@6 {
+			qcom-corner = <256>;
+		};
+
+		rpmhpd_opp7: opp@7 {
+			qcom-corner = <320>;
+		};
+
+		rpmhpd_opp8: opp@8 {
+			qcom-corner = <416>;
+		};
+	};
