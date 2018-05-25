@@ -227,9 +227,9 @@ static inline bool bio_rewind_iter(struct bio *bio, struct bvec_iter *iter,
 
 #define bio_iter_last(bvec, iter) ((iter).bi_size == (bvec).bv_len)
 
-static inline unsigned bio_pages(struct bio *bio)
+static inline unsigned __bio_elements(struct bio *bio, bool seg)
 {
-	unsigned segs = 0;
+	unsigned elems = 0;
 	struct bio_vec bv;
 	struct bvec_iter iter;
 
@@ -249,10 +249,25 @@ static inline unsigned bio_pages(struct bio *bio)
 		break;
 	}
 
-	bio_for_each_page(bv, bio, iter)
-		segs++;
+	if (!seg) {
+		bio_for_each_page(bv, bio, iter)
+			elems++;
+	} else {
+		bio_for_each_segment(bv, bio, iter)
+			elems++;
+	}
 
-	return segs;
+	return elems;
+}
+
+static inline unsigned bio_pages(struct bio *bio)
+{
+	return __bio_elements(bio, false);
+}
+
+static inline unsigned bio_segments(struct bio *bio)
+{
+	return __bio_elements(bio, true);
 }
 
 /*
