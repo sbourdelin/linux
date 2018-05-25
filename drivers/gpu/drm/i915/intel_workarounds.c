@@ -910,6 +910,9 @@ static void icl_whitelist_build(struct whitelist *w)
 
 	/* WaAllowUMDToModifySamplerMode:icl */
 	whitelist_reg(w, GEN10_SAMPLER_MODE);
+
+	/* WaEnablePreemptionGranularityControlByUMD:icl */
+	whitelist_reg(w, GEN8_CS_CHICKEN1);
 }
 
 static struct whitelist *whitelist_build(struct intel_engine_cs *engine,
