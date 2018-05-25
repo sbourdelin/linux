@@ -465,7 +465,7 @@ static struct dasd_ccw_req *dasd_fba_build_cp_regular(
 	/* Check struct bio and count the number of blocks for the request. */
 	count = 0;
 	cidaw = 0;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		if (bv.bv_len & (blksize - 1))
 			/* Fba can only do full blocks. */
 			return ERR_PTR(-EINVAL);
@@ -506,7 +506,7 @@ static struct dasd_ccw_req *dasd_fba_build_cp_regular(
 		locate_record(ccw++, LO_data++, rq_data_dir(req), 0, count);
 	}
 	recid = first_rec;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		dst = page_address(bv.bv_page) + bv.bv_offset;
 		if (dasd_page_cache) {
 			char *copy = kmem_cache_alloc(dasd_page_cache,
@@ -588,7 +588,7 @@ dasd_fba_free_cp(struct dasd_ccw_req *cqr, struct request *req)
 	ccw++;
 	if (private->rdc_data.mode.bits.data_chain != 0)
 		ccw++;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		dst = page_address(bv.bv_page) + bv.bv_offset;
 		for (off = 0; off < bv.bv_len; off += blksize) {
 			/* Skip locate record. */

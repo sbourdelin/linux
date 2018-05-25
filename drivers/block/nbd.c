@@ -604,7 +604,7 @@ static struct nbd_cmd *nbd_read_stat(struct nbd_device *nbd, int index)
 		struct req_iterator iter;
 		struct bio_vec bvec;
 
-		rq_for_each_segment(bvec, req, iter) {
+		rq_for_each_page(bvec, req, iter) {
 			iov_iter_bvec(&to, ITER_BVEC | READ,
 				      &bvec, 1, bvec.bv_len);
 			result = sock_xmit(nbd, index, 0, &to, MSG_WAITALL, NULL);

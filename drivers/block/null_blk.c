@@ -1136,7 +1136,7 @@ static int null_handle_rq(struct nullb_cmd *cmd)
 	}
 
 	spin_lock_irq(&nullb->lock);
-	rq_for_each_segment(bvec, rq, iter) {
+	rq_for_each_page(bvec, rq, iter) {
 		len = bvec.bv_len;
 		err = null_transfer(nullb, bvec.bv_page, len, bvec.bv_offset,
 				     op_is_write(req_op(rq)), sector,

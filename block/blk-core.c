@@ -3423,7 +3423,7 @@ void rq_flush_dcache_pages(struct request *rq)
 	struct req_iterator iter;
 	struct bio_vec bvec;
 
-	rq_for_each_segment(bvec, rq, iter)
+	rq_for_each_page(bvec, rq, iter)
 		flush_dcache_page(bvec.bv_page);
 }
 EXPORT_SYMBOL_GPL(rq_flush_dcache_pages);

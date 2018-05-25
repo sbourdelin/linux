@@ -290,7 +290,7 @@ static int lo_write_simple(struct loop_device *lo, struct request *rq,
 	struct req_iterator iter;
 	int ret = 0;
 
-	rq_for_each_segment(bvec, rq, iter) {
+	rq_for_each_page(bvec, rq, iter) {
 		ret = lo_write_bvec(lo->lo_backing_file, &bvec, &pos);
 		if (ret < 0)
 			break;
@@ -317,7 +317,7 @@ static int lo_write_transfer(struct loop_device *lo, struct request *rq,
 	if (unlikely(!page))
 		return -ENOMEM;
 
-	rq_for_each_segment(bvec, rq, iter) {
+	rq_for_each_page(bvec, rq, iter) {
 		ret = lo_do_transfer(lo, WRITE, page, 0, bvec.bv_page,
 			bvec.bv_offset, bvec.bv_len, pos >> 9);
 		if (unlikely(ret))
@@ -343,7 +343,7 @@ static int lo_read_simple(struct loop_device *lo, struct request *rq,
 	struct iov_iter i;
 	ssize_t len;
 
-	rq_for_each_segment(bvec, rq, iter) {
+	rq_for_each_page(bvec, rq, iter) {
 		iov_iter_bvec(&i, ITER_BVEC, &bvec, 1, bvec.bv_len);
 		len = vfs_iter_read(lo->lo_backing_file, &i, &pos, 0);
 		if (len < 0)
@@ -378,7 +378,7 @@ static int lo_read_transfer(struct loop_device *lo, struct request *rq,
 	if (unlikely(!page))
 		return -ENOMEM;
 
-	rq_for_each_segment(bvec, rq, iter) {
+	rq_for_each_page(bvec, rq, iter) {
 		loff_t offset = pos;
 
 		b.bv_page = page;
@@ -530,10 +530,10 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 		/*
 		 * The bios of the request may be started from the middle of
 		 * the 'bvec' because of bio splitting, so we can't directly
-		 * copy bio->bi_iov_vec to new bvec. The rq_for_each_segment
+		 * copy bio->bi_iov_vec to new bvec. The rq_for_each_page
 		 * API will take care of all details for us.
 		 */
-		rq_for_each_segment(tmp, rq, iter) {
+		rq_for_each_page(tmp, rq, iter) {
 			*bvec = tmp;
 			bvec++;
 		}

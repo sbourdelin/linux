@@ -99,7 +99,7 @@ static void ps3disk_scatter_gather(struct ps3_storage_device *dev,
 	size_t size;
 	void *buf;
 
-	rq_for_each_segment(bvec, req, iter) {
+	rq_for_each_page(bvec, req, iter) {
 		unsigned long flags;
 		dev_dbg(&dev->sbd.core, "%s:%u: bio %u: %u sectors from %lu\n",
 			__func__, __LINE__, i, bio_sectors(iter.bio),
@@ -132,7 +132,7 @@ static int ps3disk_submit_request_sg(struct ps3_storage_device *dev,
 	struct bio_vec bv;
 	struct req_iterator iter;
 
-	rq_for_each_segment(bv, req, iter)
+	rq_for_each_page(bv, req, iter)
 		n++;
 	dev_dbg(&dev->sbd.core,
 		"%s:%u: %s req has %u bvecs for %u sectors\n",
