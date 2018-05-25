@@ -368,5 +368,11 @@ static inline bool gic_prio_masking_enabled(void)
 	return false;
 }
 
+static inline void gic_start_pmr_masking(void)
+{
+	/* Should not get called */
+	WARN_ON(true);
+}
+
 #endif /* !__ASSEMBLY__ */
 #endif /* !__ASM_ARCH_GICV3_H */

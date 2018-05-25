@@ -355,12 +355,18 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 
 	irqnr = gic_read_iar();
 
+	if (arch_uses_gic_prios()) {
+		isb();
+		/* Masking IRQs earlier would prevent to ack the current interrupt */
+		gic_start_pmr_masking();
+	}
+
 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
 		int err;
 
 		if (static_branch_likely(&supports_deactivate_key))
 			gic_write_eoir(irqnr);
-		else
+		else if (!arch_uses_gic_prios())
 			isb();
 
 		err = handle_domain_irq(gic_data.domain, irqnr, regs);

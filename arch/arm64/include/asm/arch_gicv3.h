@@ -160,5 +160,11 @@ static inline bool gic_prio_masking_enabled(void)
 	return cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
 }
 
+static inline void gic_start_pmr_masking(void)
+{
+	gic_write_pmr(ICC_PMR_EL1_MASKED);
+	asm volatile ("msr daifclr, #2" : : : "memory");
+}
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARCH_GICV3_H */
