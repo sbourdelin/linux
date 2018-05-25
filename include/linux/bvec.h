@@ -126,8 +126,16 @@ struct bvec_iter {
 	.bv_offset	= bvec_iter_offset((bvec), (iter)),	\
 })
 
-static inline bool bvec_iter_advance(const struct bio_vec *bv,
-		struct bvec_iter *iter, unsigned bytes)
+#define bvec_iter_segment_bvec(bvec, iter)				\
+((struct bio_vec) {							\
+	.bv_page	= bvec_iter_segment_page((bvec), (iter)),	\
+	.bv_len		= bvec_iter_segment_len((bvec), (iter)),	\
+	.bv_offset	= bvec_iter_segment_offset((bvec), (iter)),	\
+})
+
+static inline bool __bvec_iter_advance(const struct bio_vec *bv,
+				       struct bvec_iter *iter,
+				       unsigned bytes, bool segment)
 {
 	if (WARN_ONCE(bytes > iter->bi_size,
 		     "Attempted to advance past end of bvec iter\n")) {
@@ -136,8 +144,14 @@ static inline bool bvec_iter_advance(const struct bio_vec *bv,
 	}
 
 	while (bytes) {
-		unsigned iter_len = bvec_iter_len(bv, *iter);
-		unsigned len = min(bytes, iter_len);
+		unsigned len;
+
+		if (segment)
+			len = bvec_iter_segment_len(bv, *iter);
+		else
+			len = bvec_iter_len(bv, *iter);
+
+		len = min(bytes, len);
 
 		bytes -= len;
 		iter->bi_size -= len;
@@ -174,6 +188,20 @@ static inline bool bvec_iter_rewind(const struct bio_vec *bv,
 		iter->bi_bvec_done -= len;
 	}
 	return true;
+}
+
+static inline bool bvec_iter_advance(const struct bio_vec *bv,
+				     struct bvec_iter *iter,
+				     unsigned bytes)
+{
+	return __bvec_iter_advance(bv, iter, bytes, false);
+}
+
+static inline bool bvec_iter_seg_advance(const struct bio_vec *bv,
+					 struct bvec_iter *iter,
+					 unsigned bytes)
+{
+	return __bvec_iter_advance(bv, iter, bytes, true);
 }
 
 #define for_each_bvec(bvl, bio_vec, iter, start)			\
