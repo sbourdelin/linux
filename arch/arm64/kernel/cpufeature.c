@@ -1013,6 +1013,8 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
 
 static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
 {
+	u64 tmp = 0;
+
 	/*
 	 * Copy register values that aren't redirected by hardware.
 	 *
@@ -1021,8 +1023,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
 	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
 	 * do anything here.
 	 */
-	if (!alternatives_applied)
-		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+	asm volatile(ALTERNATIVE(
+		"mrs	%0, tpidr_el1\n"
+		"msr	tpidr_el2, %0",
+		"nop\n"
+		"nop",
+		ARM64_HAS_VIRT_HOST_EXTN)
+		: "+r" (tmp)
+		:
+		: "memory");
 }
 #endif
 
