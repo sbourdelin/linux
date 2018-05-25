@@ -199,6 +199,17 @@ static void *eeh_dev_save_state(struct eeh_dev *edev, void *userdata)
 	return NULL;
 }
 
+static void eeh_set_channel_state(struct eeh_pe *root, enum pci_channel_state s)
+{
+	struct eeh_pe *pe;
+	struct eeh_dev *edev, *tmp;
+
+	eeh_for_each_pe(root, pe)
+		eeh_pe_for_each_dev(pe, edev, tmp)
+			if (eeh_edev_actionable(edev))
+				edev->pdev->error_state = s;
+}
+
 /**
  * eeh_report_error - Report pci error to each device driver
  * @data: eeh device
@@ -218,7 +229,6 @@ static void *eeh_report_error(struct eeh_dev *edev, void *userdata)
 		return NULL;
 
 	device_lock(&dev->dev);
-	dev->error_state = pci_channel_io_frozen;
 
 	driver = eeh_pcid_get(dev);
 	if (!driver) goto out_no_dev;
@@ -301,7 +311,6 @@ static void *eeh_report_reset(struct eeh_dev *edev, void *userdata)
 		return NULL;
 
 	device_lock(&dev->dev);
-	dev->error_state = pci_channel_io_normal;
 
 	driver = eeh_pcid_get(dev);
 	if (!driver) goto out_no_dev;
@@ -371,7 +380,6 @@ static void *eeh_report_resume(struct eeh_dev *edev, void *userdata)
 		return NULL;
 
 	device_lock(&dev->dev);
-	dev->error_state = pci_channel_io_normal;
 
 	driver = eeh_pcid_get(dev);
 	if (!driver) goto out_no_dev;
@@ -795,6 +803,7 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 	 * hotplug for this case.
 	 */
 	pr_info("EEH: Notify device drivers to shutdown\n");
+	eeh_set_channel_state(pe, pci_channel_io_frozen);
 	eeh_pe_dev_traverse(pe, eeh_report_error, &result);
 	if ((pe->type & EEH_PE_PHB) &&
 	    result != PCI_ERS_RESULT_NONE &&
@@ -885,6 +894,7 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 		pr_info("EEH: Notify device drivers "
 			"the completion of reset\n");
 		result = PCI_ERS_RESULT_NONE;
+		eeh_set_channel_state(pe, pci_channel_io_normal);
 		eeh_pe_dev_traverse(pe, eeh_report_reset, &result);
 	}
 
@@ -906,6 +916,7 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 
 	/* Tell all device drivers that they can resume operations */
 	pr_info("EEH: Notify device driver to resume\n");
+	eeh_set_channel_state(pe, pci_channel_io_normal);
 	eeh_pe_dev_traverse(pe, eeh_report_resume, NULL);
 
 	pr_info("EEH: Recovery successful.\n");
@@ -924,6 +935,7 @@ hard_fail:
 	eeh_slot_error_detail(pe, EEH_LOG_PERM);
 
 	/* Notify all devices that they're about to go down. */
+	eeh_set_channel_state(pe, pci_channel_io_perm_failure);
 	eeh_pe_dev_traverse(pe, eeh_report_failure, NULL);
 
 	/* Mark the PE to be removed permanently */
@@ -1033,6 +1045,7 @@ void eeh_handle_special_event(void)
 
 				/* Notify all devices to be down */
 				eeh_pe_state_clear(pe, EEH_PE_PRI_BUS);
+				eeh_set_channel_state(pe, pci_channel_io_perm_failure);
 				eeh_pe_dev_traverse(pe,
 					eeh_report_failure, NULL);
 				bus = eeh_pe_bus_get(phb_pe);
