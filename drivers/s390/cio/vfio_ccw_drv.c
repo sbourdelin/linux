@@ -77,6 +77,14 @@ static void vfio_ccw_sch_io_todo(struct work_struct *work)
 		private->state = VFIO_CCW_STATE_IDLE;
 }
 
+static void vfio_ccw_sch_event_todo(struct work_struct *work)
+{
+	struct vfio_ccw_private *private;
+
+	private = container_of(work, struct vfio_ccw_private, event_work);
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_SCHIB_CHANGED);
+}
+
 /*
  * Css driver callbacks
  */
@@ -124,6 +132,7 @@ static int vfio_ccw_sch_probe(struct subchannel *sch)
 		goto out_disable;
 
 	INIT_WORK(&private->io_work, vfio_ccw_sch_io_todo);
+	INIT_WORK(&private->event_work, vfio_ccw_sch_event_todo);
 	atomic_set(&private->avail, 1);
 	private->state = VFIO_CCW_STATE_STANDBY;
 
@@ -170,28 +179,10 @@ static void vfio_ccw_sch_shutdown(struct subchannel *sch)
 static int vfio_ccw_sch_event(struct subchannel *sch, int process)
 {
 	struct vfio_ccw_private *private = dev_get_drvdata(&sch->dev);
-	unsigned long flags;
 
-	spin_lock_irqsave(sch->lock, flags);
-	if (!device_is_registered(&sch->dev))
-		goto out_unlock;
-
-	if (work_pending(&sch->todo_work))
-		goto out_unlock;
-
-	if (cio_update_schib(sch)) {
-		vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_NOT_OPER);
-		goto out_unlock;
-	}
-
-	private = dev_get_drvdata(&sch->dev);
-	if (private->state == VFIO_CCW_STATE_NOT_OPER) {
-		private->state = private->mdev ? VFIO_CCW_STATE_IDLE :
-				 VFIO_CCW_STATE_STANDBY;
-	}
-
-out_unlock:
-	spin_unlock_irqrestore(sch->lock, flags);
+	if (work_pending(&private->event_work))
+		return -EAGAIN;
+	queue_work(vfio_ccw_work_q, &private->event_work);
 
 	return 0;
 }

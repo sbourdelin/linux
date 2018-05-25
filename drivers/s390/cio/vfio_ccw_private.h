@@ -33,6 +33,7 @@
  * @scsw: scsw info
  * @io_trigger: eventfd ctx for signaling userspace I/O results
  * @io_work: work for deferral process of I/O handling
+ * @event_work: work for deferral process of sub-channel event
  */
 struct vfio_ccw_private {
 	struct subchannel	*sch;
@@ -49,6 +50,7 @@ struct vfio_ccw_private {
 
 	struct eventfd_ctx	*io_trigger;
 	struct work_struct	io_work;
+	struct work_struct	event_work;
 } __aligned(8);
 
 extern int vfio_ccw_mdev_reg(struct subchannel *sch);
@@ -76,6 +78,7 @@ enum vfio_ccw_event {
 	VFIO_CCW_EVENT_NOT_OPER,
 	VFIO_CCW_EVENT_IO_REQ,
 	VFIO_CCW_EVENT_INTERRUPT,
+	VFIO_CCW_EVENT_SCHIB_CHANGED,
 	/* last element! */
 	NR_VFIO_CCW_EVENTS
 };
