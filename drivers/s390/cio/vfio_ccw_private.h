@@ -51,6 +51,7 @@ struct vfio_ccw_private {
 	struct eventfd_ctx	*io_trigger;
 	struct work_struct	io_work;
 	struct work_struct	event_work;
+	struct mutex		state_mutex;
 } __aligned(8);
 
 extern int vfio_ccw_mdev_reg(struct subchannel *sch);
@@ -92,7 +93,9 @@ extern fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS];
 static inline void vfio_ccw_fsm_event(struct vfio_ccw_private *private,
 				     int event)
 {
+	mutex_lock(&private->state_mutex);
 	private->state = vfio_ccw_jumptable[private->state][event](private);
+	mutex_unlock(&private->state_mutex);
 }
 
 extern struct workqueue_struct *vfio_ccw_work_q;
