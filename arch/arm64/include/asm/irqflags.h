@@ -153,5 +153,8 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
 	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
 		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
 }
+
+void maybe_switch_to_sysreg_gic_cpuif(void);
+
 #endif
 #endif

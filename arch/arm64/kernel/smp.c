@@ -185,6 +185,8 @@ asmlinkage void secondary_start_kernel(void)
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu;
 
+	maybe_switch_to_sysreg_gic_cpuif();
+
 	cpu = task_cpu(current);
 	set_my_cpu_offset(per_cpu_offset(cpu));
 
@@ -417,6 +419,9 @@ void __init smp_prepare_boot_cpu(void)
 	 * and/or scheduling is enabled.
 	 */
 	apply_boot_alternatives();
+
+	/* Conditionally switch to GIC PMR for interrupt masking */
+	maybe_switch_to_sysreg_gic_cpuif();
 }
 
 static u64 __init of_get_cpu_mpidr(struct device_node *dn)
