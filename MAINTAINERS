@@ -9105,13 +9105,8 @@ W:	http://www.mellanox.com
 Q:	http://patchwork.ozlabs.org/project/netdev/list/
 F:	drivers/net/ethernet/mellanox/mlx5/core/en_*
 
-<<<<<<< HEAD
-MELLANOX ETHERNET INNOVA DRIVER
-R:	Boris Pismenny <borisp@mellanox.com>
-=======
 MELLANOX ETHERNET INNOVA DRIVERS
 M:	Boris Pismenny <borisp@mellanox.com>
->>>>>>> linux-next/akpm-base
 L:	netdev@vger.kernel.org
 S:	Supported
 W:	http://www.mellanox.com
@@ -9121,18 +9116,6 @@ F:	drivers/net/ethernet/mellanox/mlx5/core/accel/*
 F:	drivers/net/ethernet/mellanox/mlx5/core/fpga/*
 F:	include/linux/mlx5/mlx5_ifc_fpga.h
 
-<<<<<<< HEAD
-MELLANOX ETHERNET INNOVA IPSEC DRIVER
-R:	Boris Pismenny <borisp@mellanox.com>
-L:	netdev@vger.kernel.org
-S:	Supported
-W:	http://www.mellanox.com
-Q:	http://patchwork.ozlabs.org/project/netdev/list/
-F:	drivers/net/ethernet/mellanox/mlx5/core/en_ipsec/*
-F:	drivers/net/ethernet/mellanox/mlx5/core/ipsec*
-
-=======
->>>>>>> linux-next/akpm-base
 MELLANOX ETHERNET SWITCH DRIVERS
 M:	Jiri Pirko <jiri@mellanox.com>
 M:	Ido Schimmel <idosch@mellanox.com>
@@ -9937,10 +9920,7 @@ F:	net/netfilter/xt_CONNSECMARK.c
 F:	net/netfilter/xt_SECMARK.c
 
 NETWORKING [TLS]
-<<<<<<< HEAD
-=======
 M:	Boris Pismenny <borisp@mellanox.com>
->>>>>>> linux-next/akpm-base
 M:	Aviad Yehezkel <aviadye@mellanox.com>
 M:	Dave Watson <davejwatson@fb.com>
 L:	netdev@vger.kernel.org
