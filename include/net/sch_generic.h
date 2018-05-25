@@ -20,6 +20,9 @@ struct qdisc_walker;
 struct tcf_walker;
 struct module;
 
+typedef int tc_setup_cb_t(enum tc_setup_type type,
+			  void *type_data, void *cb_priv);
+
 struct qdisc_rate_table {
 	struct tc_ratespec rate;
 	u32		data[256];
@@ -256,6 +259,9 @@ struct tcf_proto_ops {
 					  bool *last,
 					  struct netlink_ext_ack *);
 	void			(*walk)(struct tcf_proto*, struct tcf_walker *arg);
+	int			(*offload)(struct tcf_proto *, bool,
+					   tc_setup_cb_t *, void *,
+					   struct netlink_ext_ack *);
 	void			(*bind_class)(void *, u32, unsigned long);
 
 	/* rtnetlink specific */
