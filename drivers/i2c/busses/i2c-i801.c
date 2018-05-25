@@ -1710,8 +1710,7 @@ static void i801_shutdown(struct pci_dev *dev)
 	pci_write_config_byte(dev, SMBHSTCFG, priv->original_hstcfg);
 }
 
-#ifdef CONFIG_PM
-static int i801_suspend(struct device *dev)
+static int __maybe_unused i801_suspend(struct device *dev)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
 	struct i801_priv *priv = pci_get_drvdata(pci_dev);
@@ -1720,7 +1719,7 @@ static int i801_suspend(struct device *dev)
 	return 0;
 }
 
-static int i801_resume(struct device *dev)
+static int __maybe_unused i801_resume(struct device *dev)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
 	struct i801_priv *priv = pci_get_drvdata(pci_dev);
@@ -1729,7 +1728,6 @@ static int i801_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
 static SIMPLE_DEV_PM_OPS(i801_pm_ops, i801_suspend, i801_resume);
 
