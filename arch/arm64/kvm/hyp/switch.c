@@ -21,6 +21,7 @@
 
 #include <kvm/arm_psci.h>
 
+#include <asm/arch_gicv3.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_hyp.h>
@@ -442,6 +443,19 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
 	struct kvm_cpu_context *guest_ctxt;
 	bool fp_enabled;
 	u64 exit_code;
+	u32 host_pmr = ICC_PMR_EL1_UNMASKED;
+
+	/*
+	 * Having IRQs masked via PMR when entering the guest means the GIC
+	 * will not signal the CPU of interrupts of lower priority, and the
+	 * only way to get out will be via guest exceptions.
+	 * Naturally, we want to avoid this.
+	 */
+	if (gic_prio_masking_enabled()) {
+		host_pmr = gic_read_pmr();
+		gic_write_pmr(ICC_PMR_EL1_UNMASKED);
+		dsb(sy);
+	}
 
 	vcpu = kern_hyp_va(vcpu);
 
@@ -495,6 +509,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
 	 * system may enable SPE here and make use of the TTBRs.
 	 */
 	__debug_switch_to_host(vcpu);
+
+	if (gic_prio_masking_enabled())
+		gic_write_pmr(host_pmr);
 
 	return exit_code;
 }
