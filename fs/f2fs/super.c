@@ -1930,19 +1930,13 @@ static bool f2fs_dummy_context(struct inode *inode)
 	return DUMMY_ENCRYPTION_ENABLED(F2FS_I_SB(inode));
 }
 
-static unsigned f2fs_max_namelen(struct inode *inode)
-{
-	return S_ISLNK(inode->i_mode) ?
-			inode->i_sb->s_blocksize : F2FS_NAME_LEN;
-}
-
 static const struct fscrypt_operations f2fs_cryptops = {
 	.key_prefix	= "f2fs:",
 	.get_context	= f2fs_get_context,
 	.set_context	= f2fs_set_context,
 	.dummy_context	= f2fs_dummy_context,
 	.empty_dir	= f2fs_empty_dir,
-	.max_namelen	= f2fs_max_namelen,
+	.max_namelen	= F2FS_NAME_LEN,
 };
 #endif
 
@@ -2702,7 +2696,6 @@ try_onemore:
 	sb->s_flags = (sb->s_flags & ~SB_POSIXACL) |
 		(test_opt(sbi, POSIX_ACL) ? SB_POSIXACL : 0);
 	memcpy(&sb->s_uuid, raw_super->uuid, sizeof(raw_super->uuid));
-	sb->s_iflags |= SB_I_CGROUPWB;
 
 	/* init f2fs-specific super block info */
 	sbi->valid_super_block = valid_super_block;
@@ -3092,8 +3085,13 @@ static int __init init_f2fs_fs(void)
 	err = f2fs_create_root_stats();
 	if (err)
 		goto free_filesystem;
+	err = f2fs_init_post_read_processing();
+	if (err)
+		goto free_root_stats;
 	return 0;
 
+free_root_stats:
+	f2fs_destroy_root_stats();
 free_filesystem:
 	unregister_filesystem(&f2fs_fs_type);
 free_shrinker:
@@ -3116,6 +3114,7 @@ fail:
 
 static void __exit exit_f2fs_fs(void)
 {
+	f2fs_destroy_post_read_processing();
 	f2fs_destroy_root_stats();
 	unregister_filesystem(&f2fs_fs_type);
 	unregister_shrinker(&f2fs_shrinker_info);

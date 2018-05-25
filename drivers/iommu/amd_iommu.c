@@ -354,6 +354,9 @@ static bool pci_iommuv2_capable(struct pci_dev *pdev)
 	};
 	int i, pos;
 
+	if (pci_ats_disabled())
+		return false;
+
 	for (i = 0; i < 3; ++i) {
 		pos = pci_find_ext_capability(pdev, caps[i]);
 		if (pos == 0)
@@ -544,7 +547,7 @@ static void amd_iommu_report_page_fault(u16 devid, u16 domain_id,
 static void iommu_print_event(struct amd_iommu *iommu, void *__evt)
 {
 	struct device *dev = iommu->iommu.dev;
-	int type, devid, domid, flags;
+	int type, devid, pasid, flags, tag;
 	volatile u32 *event = __evt;
 	int count = 0;
 	u64 address;
@@ -552,7 +555,7 @@ static void iommu_print_event(struct amd_iommu *iommu, void *__evt)
 retry:
 	type    = (event[1] >> EVENT_TYPE_SHIFT)  & EVENT_TYPE_MASK;
 	devid   = (event[0] >> EVENT_DEVID_SHIFT) & EVENT_DEVID_MASK;
-	domid   = (event[1] >> EVENT_DOMID_SHIFT) & EVENT_DOMID_MASK;
+	pasid   = PPR_PASID(*(u64 *)&event[0]);
 	flags   = (event[1] >> EVENT_FLAGS_SHIFT) & EVENT_FLAGS_MASK;
 	address = (u64)(((u64)event[3]) << 32) | event[2];
 
@@ -567,7 +570,7 @@ retry:
 	}
 
 	if (type == EVENT_TYPE_IO_FAULT) {
-		amd_iommu_report_page_fault(devid, domid, address, flags);
+		amd_iommu_report_page_fault(devid, pasid, address, flags);
 		return;
 	} else {
 		dev_err(dev, "AMD-Vi: Event logged [");
@@ -575,10 +578,9 @@ retry:
 
 	switch (type) {
 	case EVENT_TYPE_ILL_DEV:
-		dev_err(dev, "ILLEGAL_DEV_TABLE_ENTRY device=%02x:%02x.%x "
-			"address=0x%016llx flags=0x%04x]\n",
+		dev_err(dev, "ILLEGAL_DEV_TABLE_ENTRY device=%02x:%02x.%x pasid=0x%05x address=0x%016llx flags=0x%04x]\n",
 			PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
-			address, flags);
+			pasid, address, flags);
 		dump_dte_entry(devid);
 		break;
 	case EVENT_TYPE_DEV_TAB_ERR:
@@ -588,34 +590,38 @@ retry:
 			address, flags);
 		break;
 	case EVENT_TYPE_PAGE_TAB_ERR:
-		dev_err(dev, "PAGE_TAB_HARDWARE_ERROR device=%02x:%02x.%x "
-			"domain=0x%04x address=0x%016llx flags=0x%04x]\n",
+		dev_err(dev, "PAGE_TAB_HARDWARE_ERROR device=%02x:%02x.%x domain=0x%04x address=0x%016llx flags=0x%04x]\n",
 			PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
-			domid, address, flags);
+			pasid, address, flags);
 		break;
 	case EVENT_TYPE_ILL_CMD:
 		dev_err(dev, "ILLEGAL_COMMAND_ERROR address=0x%016llx]\n", address);
 		dump_command(address);
 		break;
 	case EVENT_TYPE_CMD_HARD_ERR:
-		dev_err(dev, "COMMAND_HARDWARE_ERROR address=0x%016llx "
-			"flags=0x%04x]\n", address, flags);
+		dev_err(dev, "COMMAND_HARDWARE_ERROR address=0x%016llx flags=0x%04x]\n",
+			address, flags);
 		break;
 	case EVENT_TYPE_IOTLB_INV_TO:
-		dev_err(dev, "IOTLB_INV_TIMEOUT device=%02x:%02x.%x "
-			"address=0x%016llx]\n",
+		dev_err(dev, "IOTLB_INV_TIMEOUT device=%02x:%02x.%x address=0x%016llx]\n",
 			PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
 			address);
 		break;
 	case EVENT_TYPE_INV_DEV_REQ:
-		dev_err(dev, "INVALID_DEVICE_REQUEST device=%02x:%02x.%x "
-			"address=0x%016llx flags=0x%04x]\n",
+		dev_err(dev, "INVALID_DEVICE_REQUEST device=%02x:%02x.%x pasid=0x%05x address=0x%016llx flags=0x%04x]\n",
 			PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
-			address, flags);
+			pasid, address, flags);
+		break;
+	case EVENT_TYPE_INV_PPR_REQ:
+		pasid = ((event[0] >> 16) & 0xFFFF)
+			| ((event[1] << 6) & 0xF0000);
+		tag = event[1] & 0x03FF;
+		dev_err(dev, "INVALID_PPR_REQUEST device=%02x:%02x.%x pasid=0x%05x address=0x%016llx flags=0x%04x]\n",
+			PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
+			pasid, address, flags);
 		break;
 	default:
-		dev_err(dev, KERN_ERR "UNKNOWN event[0]=0x%08x event[1]=0x%08x "
-			"event[2]=0x%08x event[3]=0x%08x\n",
+		dev_err(dev, "UNKNOWN event[0]=0x%08x event[1]=0x%08x event[2]=0x%08x event[3]=0x%08x\n",
 			event[0], event[1], event[2], event[3]);
 	}
 
@@ -3523,9 +3529,11 @@ int amd_iommu_device_info(struct pci_dev *pdev,
 
 	memset(info, 0, sizeof(*info));
 
-	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ATS);
-	if (pos)
-		info->flags |= AMD_IOMMU_DEVICE_FLAG_ATS_SUP;
+	if (!pci_ats_disabled()) {
+		pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ATS);
+		if (pos)
+			info->flags |= AMD_IOMMU_DEVICE_FLAG_ATS_SUP;
+	}
 
 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
 	if (pos)

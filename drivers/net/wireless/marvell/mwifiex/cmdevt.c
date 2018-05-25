@@ -25,7 +25,6 @@
 #include "main.h"
 #include "wmm.h"
 #include "11n.h"
-#include "11ac.h"
 
 static void mwifiex_cancel_pending_ioctl(struct mwifiex_adapter *adapter);
 
@@ -675,6 +674,7 @@ int mwifiex_send_cmd(struct mwifiex_private *priv, u16 cmd_no,
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(mwifiex_send_cmd);
 
 /*
  * This function queues a command to the command pending queue.

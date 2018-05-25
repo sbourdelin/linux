@@ -36,6 +36,7 @@
 #include <linux/delayed_call.h>
 #include <linux/uuid.h>
 #include <linux/errseq.h>
+#include <linux/fsnotify_obj.h>
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
@@ -96,7 +97,7 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 
 /*
  * flags in file.f_mode.  Note that FMODE_READ and FMODE_WRITE must correspond
- * to O_WRONLY and O_RDWR via the strange trick in __dentry_open()
+ * to O_WRONLY and O_RDWR via the strange trick in do_dentry_open()
  */
 
 /* file is open for reading */
@@ -562,8 +563,6 @@ is_uncached_acl(struct posix_acl *acl)
 #define IOP_XATTR	0x0008
 #define IOP_DEFAULT_READLINK	0x0010
 
-struct fsnotify_mark_connector;
-
 /*
  * Keep mostly read-only and often accessed (especially for
  * the RCU path lookup and 'stat' data) fields at the beginning
@@ -660,12 +659,14 @@ struct inode {
 		unsigned		i_dir_seq;
 	};
 
-	__u32			i_generation;
-
 #ifdef CONFIG_FSNOTIFY
-	__u32			i_fsnotify_mask; /* all events this inode cares about */
-	struct fsnotify_mark_connector __rcu	*i_fsnotify_marks;
+	struct fsnotify_obj	i_fsnotify;
+	/*
+	 * struct fsnotify_obj is packed to word multiple so it's better to
+	 * have a field requiring only word alignment after it.
+	 */
 #endif
+	__u32			i_generation;
 
 #if IS_ENABLED(CONFIG_FS_ENCRYPTION)
 	struct fscrypt_info	*i_crypt_info;
@@ -673,6 +674,13 @@ struct inode {
 
 	void			*i_private; /* fs or device private pointer */
 } __randomize_layout;
+
+#ifdef CONFIG_FSNOTIFY
+static inline struct inode *fsnotify_obj_inode(struct fsnotify_obj *obj)
+{
+	return container_of(obj, struct inode, i_fsnotify);
+}
+#endif
 
 static inline unsigned int i_blocksize(const struct inode *node)
 {
@@ -1252,7 +1260,7 @@ static inline int locks_lock_file_wait(struct file *filp, struct file_lock *fl)
 }
 
 struct fasync_struct {
-	spinlock_t		fa_lock;
+	rwlock_t		fa_lock;
 	int			magic;
 	int			fa_fd;
 	struct fasync_struct	*fa_next; /* singly linked list */
@@ -1316,7 +1324,6 @@ extern int send_sigurg(struct fown_struct *fown);
 #define UMOUNT_UNUSED	0x80000000	/* Flag guaranteed to be unused */
 
 /* sb->s_iflags */
-#define SB_I_CGROUPWB	0x00000001	/* cgroup-aware writeback enabled */
 #define SB_I_NOEXEC	0x00000002	/* Ignore executables on this fs */
 #define SB_I_NODEV	0x00000004	/* Ignore devices on this fs */
 #define SB_I_MULTIROOT	0x00000008	/* Multiple roots to the dentry tree */
@@ -1366,9 +1373,9 @@ struct super_block {
 	void                    *s_security;
 #endif
 	const struct xattr_handler **s_xattr;
-
+#if IS_ENABLED(CONFIG_FS_ENCRYPTION)
 	const struct fscrypt_operations	*s_cop;
-
+#endif
 	struct hlist_bl_head	s_roots;	/* alternate root dentries for NFS */
 	struct list_head	s_mounts;	/* list of mounts; _not_ for fs use */
 	struct block_device	*s_bdev;
@@ -1597,6 +1604,11 @@ static inline void sb_start_pagefault(struct super_block *sb)
 static inline void sb_start_intwrite(struct super_block *sb)
 {
 	__sb_start_write(sb, SB_FREEZE_FS, true);
+}
+
+static inline int sb_start_intwrite_trylock(struct super_block *sb)
+{
+	return __sb_start_write(sb, SB_FREEZE_FS, false);
 }
 
 
@@ -1870,6 +1882,7 @@ struct super_operations {
 #define S_DAX		0	/* Make all the DAX code disappear */
 #endif
 #define S_ENCRYPTED	16384	/* Encrypted file (using fs/crypto/) */
+#define S_CGROUPWB	32768	/* Enable cgroup writeback for this inode */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system
@@ -1910,6 +1923,7 @@ static inline bool sb_rdonly(const struct super_block *sb) { return sb->s_flags 
 #define IS_NOSEC(inode)		((inode)->i_flags & S_NOSEC)
 #define IS_DAX(inode)		((inode)->i_flags & S_DAX)
 #define IS_ENCRYPTED(inode)	((inode)->i_flags & S_ENCRYPTED)
+#define IS_CGROUPWB(inode)	((inode)->i_flags & S_CGROUPWB)
 
 #define IS_WHITEOUT(inode)	(S_ISCHR(inode->i_mode) && \
 				 (inode)->i_rdev == WHITEOUT_DEV)
