@@ -172,14 +172,16 @@ err_out:
 static void fsm_irq(struct vfio_ccw_private *private,
 		    enum vfio_ccw_event event)
 {
-	struct irb *irb = this_cpu_ptr(&cio_irb);
+	struct irb *irb = &private->irb;
 
-	memcpy(&private->irb, irb, sizeof(*irb));
+	if (scsw_is_solicited(&irb->scsw)) {
+		cp_update_scsw(&private->cp, &irb->scsw);
+		cp_free(&private->cp);
+	}
+	memcpy(private->io_region.irb_area, irb, sizeof(*irb));
 
-	queue_work(vfio_ccw_work_q, &private->io_work);
-
-	if (private->completion)
-		complete(private->completion);
+	if (private->io_trigger)
+		eventfd_signal(private->io_trigger, 1);
 }
 
 /*
