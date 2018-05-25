@@ -183,6 +183,7 @@ static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
 	struct vfio_ccw_private *private;
 	struct ccw_io_region *region;
 	union scsw *scsw;
+	DECLARE_COMPLETION_ONSTACK(completion);
 
 	if (*ppos + count > sizeof(*region))
 		return -EINVAL;
@@ -196,6 +197,11 @@ static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
 	scsw = (union scsw *) &region->scsw_area;
 	switch (scsw->cmd.fctl) {
 	case SCSW_FCTL_START_FUNC:
+		if (private->state == VFIO_CCW_STATE_BUSY) {
+			private->io_completion = &completion;
+			if (wait_for_completion_interruptible(&completion))
+				return -EINTR;
+		}
 		vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_SSCH_REQ);
 		break;
 	default:

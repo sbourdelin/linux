@@ -39,6 +39,7 @@ struct vfio_ccw_private {
 	struct subchannel	*sch;
 	int			state;
 	struct completion	*completion;
+	struct completion	*io_completion;
 	atomic_t		avail;
 	struct mdev_device	*mdev;
 	struct notifier_block	nb;

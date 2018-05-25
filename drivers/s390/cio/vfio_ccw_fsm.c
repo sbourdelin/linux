@@ -200,6 +200,10 @@ static int fsm_irq(struct vfio_ccw_private *private)
 
 	if (private->io_trigger)
 		eventfd_signal(private->io_trigger, 1);
+
+	if (private->io_completion)
+		complete(private->io_completion);
+
 	return VFIO_CCW_STATE_IDLE;
 }
 
