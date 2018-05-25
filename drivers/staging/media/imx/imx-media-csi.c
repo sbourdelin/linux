@@ -629,12 +629,10 @@ static void csi_idmac_stop(struct csi_priv *priv)
 /* Update the CSI whole sensor and active windows */
 static int csi_setup(struct csi_priv *priv)
 {
-	struct v4l2_mbus_framefmt *infmt, *outfmt;
+	struct v4l2_mbus_framefmt *infmt;
 	struct v4l2_mbus_config mbus_cfg;
-	struct v4l2_mbus_framefmt if_fmt;
 
 	infmt = &priv->format_mbus[CSI_SINK_PAD];
-	outfmt = &priv->format_mbus[priv->active_output_pad];
 
 	/* compose mbus_config from the upstream endpoint */
 	mbus_cfg.type = priv->upstream_ep.bus_type;
@@ -642,20 +640,13 @@ static int csi_setup(struct csi_priv *priv)
 		priv->upstream_ep.bus.mipi_csi2.flags :
 		priv->upstream_ep.bus.parallel.flags;
 
-	/*
-	 * we need to pass input frame to CSI interface, but
-	 * with translated field type from output format
-	 */
-	if_fmt = *infmt;
-	if_fmt.field = outfmt->field;
-
 	ipu_csi_set_window(priv->csi, &priv->crop);
 
 	ipu_csi_set_downsize(priv->csi,
 			     priv->crop.width == 2 * priv->compose.width,
 			     priv->crop.height == 2 * priv->compose.height);
 
-	ipu_csi_init_interface(priv->csi, &mbus_cfg, &if_fmt);
+	ipu_csi_init_interface(priv->csi, &mbus_cfg, infmt);
 
 	ipu_csi_set_dest(priv->csi, priv->dest);
 
