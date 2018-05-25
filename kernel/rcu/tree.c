@@ -3708,6 +3708,11 @@ int rcutree_online_cpu(unsigned int cpu)
 	struct rcu_node *rnp;
 	struct rcu_state *rsp;
 
+	if (per_cpu(rcu_cpu_started, cpu))
+		return;
+
+	per_cpu(rcu_cpu_started, cpu) = 1;
+
 	for_each_rcu_flavor(rsp) {
 		rdp = per_cpu_ptr(rsp->rda, cpu);
 		rnp = rdp->mynode;
@@ -3774,6 +3779,8 @@ int rcutree_dead_cpu(unsigned int cpu)
 	}
 	return 0;
 }
+
+static DEFINE_PER_CPU(int, rcu_cpu_started);
 
 /*
  * Mark the specified CPU as being online so that subsequent grace periods
@@ -3852,6 +3859,8 @@ void rcu_report_dead(unsigned int cpu)
 	preempt_enable();
 	for_each_rcu_flavor(rsp)
 		rcu_cleanup_dying_idle_cpu(cpu, rsp);
+
+	per_cpu(rcu_cpu_started, cpu) = 0;
 }
 
 /* Migrate the dead CPU's callbacks to the current CPU. */
