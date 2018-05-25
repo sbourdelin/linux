@@ -369,10 +369,11 @@ static inline unsigned bio_pages_all(struct bio *bio)
 {
 	unsigned i;
 	struct bio_vec *bv;
+	struct bvec_iter_all bia;
 
 	WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED));
 
-	bio_for_each_page_all(bv, bio, i)
+	bio_for_each_page_all2(bv, bio, i, bia)
 		;
 	return i;
 }
