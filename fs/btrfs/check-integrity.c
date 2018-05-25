@@ -2800,7 +2800,7 @@ static void __btrfsic_submit_bio(struct bio *bio)
 		struct bvec_iter iter;
 		int bio_is_patched;
 		char **mapped_datav;
-		unsigned int segs = bio_segments(bio);
+		unsigned int segs = bio_pages(bio);
 
 		dev_bytenr = 512 * bio->bi_iter.bi_sector;
 		bio_is_patched = 0;

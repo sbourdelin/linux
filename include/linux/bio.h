@@ -199,7 +199,7 @@ static inline bool bio_rewind_iter(struct bio *bio, struct bvec_iter *iter,
 
 #define bio_iter_last(bvec, iter) ((iter).bi_size == (bvec).bv_len)
 
-static inline unsigned bio_segments(struct bio *bio)
+static inline unsigned bio_pages(struct bio *bio)
 {
 	unsigned segs = 0;
 	struct bio_vec bv;

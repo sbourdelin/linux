@@ -302,7 +302,7 @@ void blk_recount_segments(struct request_queue *q, struct bio *bio)
 
 	/* estimate segment number by bi_vcnt for non-cloned bio */
 	if (bio_flagged(bio, BIO_CLONED))
-		seg_cnt = bio_segments(bio);
+		seg_cnt = bio_pages(bio);
 	else
 		seg_cnt = bio->bi_vcnt;
 

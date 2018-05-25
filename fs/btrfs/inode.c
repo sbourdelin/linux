@@ -7844,7 +7844,7 @@ static blk_status_t dio_read_error(struct inode *inode, struct bio *failed_bio,
 		return BLK_STS_IOERR;
 	}
 
-	segs = bio_segments(failed_bio);
+	segs = bio_pages(failed_bio);
 	bio_get_first_bvec(failed_bio, &bvec);
 	if (segs > 1 ||
 	    (bvec.bv_len > btrfs_inode_sectorsize(inode)))
