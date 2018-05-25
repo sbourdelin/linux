@@ -68,7 +68,9 @@ struct msm_gpu_funcs {
 	/* for generation specific debugfs: */
 	int (*debugfs_init)(struct msm_gpu *gpu, struct drm_minor *minor);
 #endif
-	int (*gpu_busy)(struct msm_gpu *gpu, uint64_t *value);
+	u64 (*gpu_busy)(struct msm_gpu *gpu);
+	u64 (*gpu_get_freq)(struct msm_gpu *gpu);
+	int (*gpu_set_freq)(struct msm_gpu *gpu, u64 freq);
 };
 
 struct msm_gpu {
