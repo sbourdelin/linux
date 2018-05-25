@@ -272,9 +272,9 @@ drm_helper_probe_detect_ctx(struct drm_connector *connector, bool force)
 retry:
 	ret = drm_modeset_lock(&connector->dev->mode_config.connection_mutex, &ctx);
 	if (!ret) {
-		if (funcs->detect_ctx)
+		if (funcs && funcs->detect_ctx)
 			ret = funcs->detect_ctx(connector, &ctx, force);
-		else if (connector->funcs->detect)
+		else if (connector->funcs && connector->funcs->detect)
 			ret = connector->funcs->detect(connector, force);
 		else
 			ret = connector_status_connected;
@@ -320,9 +320,9 @@ drm_helper_probe_detect(struct drm_connector *connector,
 	if (ret)
 		return ret;
 
-	if (funcs->detect_ctx)
+	if (funcs && funcs->detect_ctx)
 		return funcs->detect_ctx(connector, ctx, force);
-	else if (connector->funcs->detect)
+	else if (connector->funcs && connector->funcs->detect)
 		return connector->funcs->detect(connector, force);
 	else
 		return connector_status_connected;
@@ -480,7 +480,8 @@ retry:
 		goto prune;
 	}
 
-	count = (*connector_funcs->get_modes)(connector);
+	if (connector_funcs && connector_funcs->get_modes)
+		count = (*connector_funcs->get_modes)(connector);
 
 	if (count == 0 && connector->status == connector_status_connected)
 		count = drm_add_modes_noedid(connector, 1024, 768);

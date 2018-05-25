@@ -112,9 +112,9 @@ static int handle_conflicting_encoders(struct drm_atomic_state *state,
 		if (!new_conn_state->crtc)
 			continue;
 
-		if (funcs->atomic_best_encoder)
+		if (funcs && funcs->atomic_best_encoder)
 			new_encoder = funcs->atomic_best_encoder(connector, new_conn_state);
-		else if (funcs->best_encoder)
+		else if (funcs && funcs->best_encoder)
 			new_encoder = funcs->best_encoder(connector);
 		else
 			new_encoder = drm_atomic_helper_best_encoder(connector);
@@ -308,10 +308,10 @@ update_connector_routing(struct drm_atomic_state *state,
 
 	funcs = connector->helper_private;
 
-	if (funcs->atomic_best_encoder)
+	if (funcs && funcs->atomic_best_encoder)
 		new_encoder = funcs->atomic_best_encoder(connector,
 							 new_connector_state);
-	else if (funcs->best_encoder)
+	else if (funcs && funcs->best_encoder)
 		new_encoder = funcs->best_encoder(connector);
 	else
 		new_encoder = drm_atomic_helper_best_encoder(connector);
@@ -438,7 +438,7 @@ mode_fixup(struct drm_atomic_state *state)
 			continue;
 
 		funcs = crtc->helper_private;
-		if (!funcs->mode_fixup)
+		if (!funcs || !funcs->mode_fixup)
 			continue;
 
 		ret = funcs->mode_fixup(crtc, &new_crtc_state->mode,
@@ -639,7 +639,7 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 				new_crtc_state->connectors_changed = true;
 		}
 
-		if (funcs->atomic_check)
+		if (funcs && funcs->atomic_check)
 			ret = funcs->atomic_check(connector, new_connector_state);
 		if (ret)
 			return ret;
@@ -681,7 +681,7 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 		if (connectors_mask & BIT(i))
 			continue;
 
-		if (funcs->atomic_check)
+		if (funcs && funcs->atomic_check)
 			ret = funcs->atomic_check(connector, new_connector_state);
 		if (ret)
 			return ret;
@@ -972,14 +972,16 @@ disable_outputs(struct drm_device *dev, struct drm_atomic_state *old_state)
 
 
 		/* Right function depends upon target state. */
-		if (new_crtc_state->enable && funcs->prepare)
-			funcs->prepare(crtc);
-		else if (funcs->atomic_disable)
-			funcs->atomic_disable(crtc, old_crtc_state);
-		else if (funcs->disable)
-			funcs->disable(crtc);
-		else
-			funcs->dpms(crtc, DRM_MODE_DPMS_OFF);
+		if (funcs) {
+			if (new_crtc_state->enable && funcs->prepare)
+				funcs->prepare(crtc);
+			else if (funcs->atomic_disable)
+				funcs->atomic_disable(crtc, old_crtc_state);
+			else if (funcs->disable)
+				funcs->disable(crtc);
+			else
+				funcs->dpms(crtc, DRM_MODE_DPMS_OFF);
+		}
 
 		if (!(dev->irq_enabled && dev->num_crtcs))
 			continue;
@@ -1093,7 +1095,7 @@ crtc_set_mode(struct drm_device *dev, struct drm_atomic_state *old_state)
 
 		funcs = crtc->helper_private;
 
-		if (new_crtc_state->enable && funcs->mode_set_nofb) {
+		if (new_crtc_state->enable && funcs && funcs->mode_set_nofb) {
 			DRM_DEBUG_ATOMIC("modeset on [CRTC:%d:%s]\n",
 					 crtc->base.id, crtc->name);
 
@@ -1197,7 +1199,7 @@ void drm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 
 		funcs = crtc->helper_private;
 
-		if (new_crtc_state->enable) {
+		if (funcs && new_crtc_state->enable) {
 			DRM_DEBUG_ATOMIC("enabling [CRTC:%d:%s]\n",
 					 crtc->base.id, crtc->name);
 
@@ -2117,7 +2119,7 @@ int drm_atomic_helper_prepare_planes(struct drm_device *dev,
 
 		funcs = plane->helper_private;
 
-		if (funcs->prepare_fb) {
+		if (funcs && funcs->prepare_fb) {
 			ret = funcs->prepare_fb(plane, new_plane_state);
 			if (ret)
 				goto fail;
@@ -2135,7 +2137,7 @@ fail:
 
 		funcs = plane->helper_private;
 
-		if (funcs->cleanup_fb)
+		if (funcs && funcs->cleanup_fb)
 			funcs->cleanup_fb(plane, new_plane_state);
 	}
 
@@ -2412,7 +2414,7 @@ void drm_atomic_helper_cleanup_planes(struct drm_device *dev,
 
 		funcs = plane->helper_private;
 
-		if (funcs->cleanup_fb)
+		if (funcs && funcs->cleanup_fb)
 			funcs->cleanup_fb(plane, plane_state);
 	}
 }
