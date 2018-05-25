@@ -288,4 +288,26 @@ int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
 }
 EXPORT_SYMBOL_GPL(qcom_cc_probe);
 
+int qcom_cc_register_rcg_dfs(struct platform_device *pdev,
+			    struct clk_rcg2 **rcgs, int num_clks)
+{
+	struct clk_rcg2 *rcg;
+	int i, ret = 0;
+
+	for (i = 0; i < num_clks; i++) {
+		rcg = rcgs[i];
+		ret = clk_rcg2_enable_dfs(rcg, &pdev->dev);
+		if (ret) {
+			const char *name = (rcg->clkr.hw.init->name);
+
+			dev_err(&pdev->dev,
+				"%s DFS frequencies update failed\n", name);
+			break;
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(qcom_cc_register_rcg_dfs);
+
 MODULE_LICENSE("GPL v2");

@@ -10,8 +10,10 @@
 #include <linux/export.h>
 #include <linux/clk-provider.h>
 #include <linux/delay.h>
+#include <linux/device.h>
 #include <linux/regmap.h>
 #include <linux/math64.h>
+#include <linux/slab.h>
 
 #include <asm/div64.h>
 
@@ -39,6 +41,14 @@
 #define M_REG			0x8
 #define N_REG			0xc
 #define D_REG			0x10
+
+/* Dynamic Frequency Scaling */
+#define MAX_PERF_LEVEL		16
+#define SE_CMD_DFSR_OFFSET	0x14
+#define SE_CMD_DFS_EN		BIT(0)
+#define SE_PERF_DFSR(level)	(0x1c + 0x4 * (level))
+#define SE_PERF_M_DFSR(level)	(0x5c + 0x4 * (level))
+#define SE_PERF_N_DFSR(level)	(0x9c + 0x4 * (level))
 
 enum freq_policy {
 	FLOOR,
@@ -929,3 +939,265 @@ const struct clk_ops clk_rcg2_shared_ops = {
 	.set_rate_and_parent = clk_rcg2_shared_set_rate_and_parent,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_shared_ops);
+
+/* Common APIs to be used for DFS based RCGR */
+struct dfs_table {
+	u8 src_index;
+	unsigned long prate;
+};
+
+static struct dfs_table *dfs_entry;
+
+static int clk_index_pre_div_and_mode(struct clk_hw *hw, u32 offset,
+		u32 *mode, u8 *pre_div)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	int i, num_parents, ret;
+	u32 cfg, mask;
+
+	num_parents = clk_hw_get_num_parents(hw);
+
+	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + offset, &cfg);
+	if (ret)
+		goto err;
+
+	mask = BIT(rcg->hid_width) - 1;
+	*pre_div = cfg & mask ? (cfg & mask) : 1;
+
+	*mode = cfg & CFG_MODE_MASK;
+	*mode >>= CFG_MODE_SHIFT;
+
+	cfg &= CFG_SRC_SEL_MASK;
+	cfg >>= CFG_SRC_SEL_SHIFT;
+
+	for (i = 0; i < num_parents; i++)
+		if (cfg == rcg->parent_map[i].cfg)
+			return i;
+err:
+	return 0;
+}
+
+static int calculate_m_and_n(struct clk_hw *hw, u32 m_offset, u32 n_offset,
+		struct freq_tbl *f)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	u32 val, mask;
+	int ret;
+
+	/* Calculate M & N values */
+	mask = BIT(rcg->mnd_width) - 1;
+	ret =  regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + m_offset, &val);
+	if (ret) {
+		pr_err("Failed to read M offset register\n");
+		return ret;
+	}
+
+	val &= mask;
+	f->m  = val;
+
+	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + n_offset, &val);
+	if (ret) {
+		pr_err("Failed to read N offset register\n");
+		return ret;
+	}
+
+	/* val ~(N-M) */
+	val = ~val;
+	val &= mask;
+	val += f->m;
+	f->n = val;
+
+	return 0;
+}
+
+int clk_rcg2_dfs_determine_rate_lazy(struct clk_rcg2 *rcg)
+{
+	struct freq_tbl *dfs_freq_tbl;
+	int i, j, index, ret = 0;
+	unsigned long calc_freq, prate;
+	u32 mode = 0;
+
+	if (rcg->dfs_enable) {
+		pr_debug("DFS tables already populated\n");
+		return 0;
+	}
+
+	dfs_freq_tbl = kcalloc(MAX_PERF_LEVEL, sizeof(struct freq_tbl),
+				GFP_KERNEL);
+	if (!dfs_freq_tbl)
+		return -ENOMEM;
+
+	/* Populate the Perf Level frequencies */
+	for (i = 0; i < MAX_PERF_LEVEL; i++) {
+		/* Get parent index and mode */
+		index = clk_index_pre_div_and_mode(&rcg->clkr.hw,
+						SE_PERF_DFSR(i), &mode,
+						&dfs_freq_tbl[i].pre_div);
+		if (index < 0) {
+			pr_err("Failed to get parent index & mode %d\n", index);
+			kzfree(dfs_freq_tbl);
+			return index;
+		}
+
+		/* Fill parent src */
+		dfs_freq_tbl[i].src = rcg->parent_map[index].src;
+		prate = dfs_entry[index].prate;
+
+		if (mode) {
+			ret = calculate_m_and_n(&rcg->clkr.hw,
+						SE_PERF_M_DFSR(i),
+						SE_PERF_N_DFSR(i),
+						&dfs_freq_tbl[i]);
+			if (ret)
+				goto err;
+		} else {
+			dfs_freq_tbl[i].m = 0;
+			dfs_freq_tbl[i].n = 0;
+		}
+
+		/* calculate the final frequency */
+		calc_freq = calc_rate(prate, dfs_freq_tbl[i].m,
+					dfs_freq_tbl[i].n, mode,
+					dfs_freq_tbl[i].pre_div);
+
+		/* Check for duplicate frequencies */
+		for (j = 0; j  < i; j++) {
+			if (dfs_freq_tbl[j].freq == calc_freq)
+				goto done;
+		}
+
+		dfs_freq_tbl[i].freq = calc_freq;
+	}
+done:
+	rcg->freq_tbl = dfs_freq_tbl;
+err:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(clk_rcg2_dfs_determine_rate_lazy);
+
+static int _freq_tbl_determine_dfs_rate(struct clk_hw *hw)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	struct clk_hw *phw;
+	int i, num_parents;
+
+	num_parents = clk_hw_get_num_parents(hw);
+
+	dfs_entry = kcalloc(num_parents, sizeof(struct dfs_table), GFP_KERNEL);
+	if (!dfs_entry)
+		return -ENOMEM;
+
+	for (i = 0; i < num_parents; i++) {
+		dfs_entry[i].src_index = rcg->parent_map[i].src;
+		if (rcg->parent_map[i].cfg == 7)
+			break;
+		phw = clk_hw_get_parent_by_index(&rcg->clkr.hw, i);
+		if (!phw) {
+			kzfree(dfs_entry);
+			return -EINVAL;
+		}
+		dfs_entry[i].prate = clk_hw_get_rate(phw);
+	}
+
+	return 0;
+}
+
+static int clk_rcg2_dfs_determine_rate(struct clk_hw *hw,
+				   struct clk_rate_request *req)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	int ret;
+
+	if (!rcg->dfs_enable) {
+		ret = _freq_tbl_determine_dfs_rate(hw);
+		if (ret) {
+			pr_err("Failed to setup DFS frequency table\n");
+			return ret;
+		}
+
+		ret = clk_rcg2_dfs_determine_rate_lazy(rcg);
+		if (ret) {
+			pr_err("Failed to update DFS tables\n");
+			return ret;
+		}
+	}
+
+	return clk_rcg2_shared_ops.determine_rate(hw, req);
+}
+
+static int clk_rcg2_dfs_set_parent(struct clk_hw *hw, u8 index)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+
+	/* DFS hardware takes care of setting the parent */
+	if (rcg->dfs_enable)
+		return 0;
+
+	return clk_rcg2_shared_ops.set_parent(hw, index);
+}
+
+static int clk_rcg2_dfs_set_rate(struct clk_hw *hw, unsigned long rate,
+				    unsigned long prate)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+
+	if (rcg->dfs_enable)
+		return 0;
+
+	return clk_rcg2_shared_ops.set_rate(hw, rate, prate);
+}
+
+static int clk_rcg2_dfs_set_rate_and_parent(struct clk_hw *hw,
+				    unsigned long rate,
+				    unsigned long prate, u8 index)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+
+	if (rcg->dfs_enable)
+		return 0;
+
+	return clk_rcg2_shared_ops.set_rate_and_parent(hw, rate, prate, index);
+}
+
+const struct clk_ops clk_rcg2_dfs_ops = {
+	.is_enabled = clk_rcg2_is_enabled,
+	.get_parent = clk_rcg2_get_parent,
+	.set_parent = clk_rcg2_dfs_set_parent,
+	.recalc_rate = clk_rcg2_recalc_rate,
+	.determine_rate = clk_rcg2_dfs_determine_rate,
+	.set_rate = clk_rcg2_dfs_set_rate,
+	.set_rate_and_parent = clk_rcg2_dfs_set_rate_and_parent,
+};
+EXPORT_SYMBOL_GPL(clk_rcg2_dfs_ops);
+
+int clk_rcg2_enable_dfs(struct clk_rcg2 *rcg, struct device *dev)
+{
+	struct regmap *regmap;
+	struct clk_rate_request req = { };
+	u32 val;
+	int ret;
+
+	regmap = dev_get_regmap(dev, NULL);
+	if (!regmap)
+		return -EINVAL;
+
+	/* Check for DFS_EN */
+	ret = regmap_read(regmap, rcg->cmd_rcgr + SE_CMD_DFSR_OFFSET,
+			 &val);
+	if (ret) {
+		dev_err(dev, "Failed to read DFS enable register\n");
+		return -EINVAL;
+	}
+
+	if (!(val & SE_CMD_DFS_EN))
+		return ret;
+
+	ret = __clk_determine_rate(&rcg->clkr.hw, &req);
+	if (ret)
+		return ret;
+
+	rcg->dfs_enable = true;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(clk_rcg2_enable_dfs);

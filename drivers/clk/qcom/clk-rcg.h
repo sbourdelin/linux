@@ -138,6 +138,7 @@ extern const struct clk_ops clk_dyn_rcg_ops;
  * @parent_map: map from software's parent index to hardware's src_sel field
  * @freq_tbl: frequency table
  * @clkr: regmap clock handle
+ * @dfs_enable: corresponds to dfs mode enable
  *
  */
 struct clk_rcg2 {
@@ -148,6 +149,7 @@ struct clk_rcg2 {
 	const struct parent_map	*parent_map;
 	const struct freq_tbl	*freq_tbl;
 	struct clk_regmap	clkr;
+	bool			dfs_enable;
 };
 
 #define to_clk_rcg2(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg2, clkr)
@@ -160,5 +162,9 @@ extern const struct clk_ops clk_byte2_ops;
 extern const struct clk_ops clk_pixel_ops;
 extern const struct clk_ops clk_gfx3d_ops;
 extern const struct clk_ops clk_rcg2_shared_ops;
+extern const struct clk_ops clk_rcg2_dfs_ops;
+
+extern int clk_rcg2_enable_dfs(struct clk_rcg2 *clk, struct device *dev);
+extern int clk_rcg2_dfs_determine_rate_lazy(struct clk_rcg2 *clk);
 
 #endif
