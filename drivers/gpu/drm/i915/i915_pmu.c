@@ -127,6 +127,7 @@ static void __i915_pmu_maybe_start_timer(struct drm_i915_private *i915)
 {
 	if (!i915->pmu.timer_enabled && pmu_needs_timer(i915, true)) {
 		i915->pmu.timer_enabled = true;
+		i915->pmu.timestamp = ktime_get();
 		hrtimer_start_range_ns(&i915->pmu.timer,
 				       ns_to_ktime(PERIOD), 0,
 				       HRTIMER_MODE_REL_PINNED);
@@ -160,7 +161,7 @@ update_sample(struct i915_pmu_sample *sample, u32 unit, u32 val)
 	sample->cur += mul_u32_u32(val, unit);
 }
 
-static void engines_sample(struct drm_i915_private *dev_priv)
+static void engines_sample(struct drm_i915_private *dev_priv, u64 period)
 {
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
@@ -183,7 +184,7 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 		val = !i915_seqno_passed(current_seqno, last_seqno);
 
 		update_sample(&engine->pmu.sample[I915_SAMPLE_BUSY],
-			      PERIOD, val);
+			      period, val);
 
 		if (val && (engine->pmu.enable &
 		    (BIT(I915_SAMPLE_WAIT) | BIT(I915_SAMPLE_SEMA)))) {
@@ -195,10 +196,10 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 		}
 
 		update_sample(&engine->pmu.sample[I915_SAMPLE_WAIT],
-			      PERIOD, !!(val & RING_WAIT));
+			      period, !!(val & RING_WAIT));
 
 		update_sample(&engine->pmu.sample[I915_SAMPLE_SEMA],
-			      PERIOD, !!(val & RING_WAIT_SEMAPHORE));
+			      period, !!(val & RING_WAIT_SEMAPHORE));
 	}
 
 	if (fw)
@@ -207,7 +208,7 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 	intel_runtime_pm_put(dev_priv);
 }
 
-static void frequency_sample(struct drm_i915_private *dev_priv)
+static void frequency_sample(struct drm_i915_private *dev_priv, u64 period)
 {
 	if (dev_priv->pmu.enable &
 	    config_enabled_mask(I915_PMU_ACTUAL_FREQUENCY)) {
@@ -237,12 +238,17 @@ static enum hrtimer_restart i915_sample(struct hrtimer *hrtimer)
 {
 	struct drm_i915_private *i915 =
 		container_of(hrtimer, struct drm_i915_private, pmu.timer);
+	ktime_t now, period;
 
 	if (!READ_ONCE(i915->pmu.timer_enabled))
 		return HRTIMER_NORESTART;
 
-	engines_sample(i915);
-	frequency_sample(i915);
+	now = ktime_get();
+	period = ktime_sub(now, i915->pmu.timestamp);
+	i915->pmu.timestamp = now;
+
+	engines_sample(i915, period);
+	frequency_sample(i915, period);
 
 	hrtimer_forward_now(hrtimer, ns_to_ktime(PERIOD));
 	return HRTIMER_RESTART;

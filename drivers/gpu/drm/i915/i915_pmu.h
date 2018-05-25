@@ -53,6 +53,10 @@ struct i915_pmu {
 	 */
 	struct hrtimer timer;
 	/**
+	 * @timestamp: Timestamp of last internal i915 PMU sampling.
+	 */
+	ktime_t timestamp;
+	/**
 	 * @enable: Bitmask of all currently enabled events.
 	 *
 	 * Bits are derived from uAPI event numbers in a way that low 16 bits
