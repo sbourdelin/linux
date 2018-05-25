@@ -30,41 +30,13 @@ int vfio_ccw_sch_quiesce(struct subchannel *sch)
 {
 	struct vfio_ccw_private *private = dev_get_drvdata(&sch->dev);
 	DECLARE_COMPLETION_ONSTACK(completion);
-	int iretry, ret = 0;
 
-	spin_lock_irq(sch->lock);
-	if (!sch->schib.pmcw.ena)
-		goto out_unlock;
-	ret = cio_disable_subchannel(sch);
-	if (ret != -EBUSY)
-		goto out_unlock;
-
-	do {
-		iretry = 255;
-
-		ret = cio_cancel_halt_clear(sch, &iretry);
-		while (ret == -EBUSY) {
-			/*
-			 * Flush all I/O and wait for
-			 * cancel/halt/clear completion.
-			 */
-			private->completion = &completion;
-			spin_unlock_irq(sch->lock);
-
-			wait_for_completion_timeout(&completion, 3*HZ);
-
-			spin_lock_irq(sch->lock);
-			private->completion = NULL;
-			flush_workqueue(vfio_ccw_work_q);
-			ret = cio_cancel_halt_clear(sch, &iretry);
-		};
-
-		ret = cio_disable_subchannel(sch);
-	} while (ret == -EBUSY);
-out_unlock:
-	private->state = VFIO_CCW_STATE_NOT_OPER;
-	spin_unlock_irq(sch->lock);
-	return ret;
+	private->completion = &completion;
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_OFFLINE);
+	wait_for_completion_interruptible_timeout(&completion, jiffies + 3*HZ);
+	if (private->state != VFIO_CCW_STATE_STANDBY)
+		return -EFAULT;
+	return 0;
 }
 
 static void vfio_ccw_sch_io_todo(struct work_struct *work)
@@ -95,8 +67,6 @@ static void vfio_ccw_sch_irq(struct subchannel *sch)
 	memcpy(&private->irb, irb, sizeof(*irb));
 
 	queue_work(vfio_ccw_work_q, &private->io_work);
-	if (private->completion)
-		complete(private->completion);
 }
 
 static int vfio_ccw_sch_probe(struct subchannel *sch)

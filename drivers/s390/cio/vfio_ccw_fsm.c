@@ -73,6 +73,53 @@ static int fsm_notoper(struct vfio_ccw_private *private)
 	return VFIO_CCW_STATE_NOT_OPER;
 }
 
+static int fsm_online(struct vfio_ccw_private *private)
+{
+	struct subchannel *sch = private->sch;
+	int ret = VFIO_CCW_STATE_IDLE;
+
+	spin_lock_irq(sch->lock);
+	if (cio_enable_subchannel(sch, (u32)(unsigned long)sch))
+		ret = VFIO_CCW_STATE_NOT_OPER;
+	spin_unlock_irq(sch->lock);
+
+	return ret;
+}
+static int fsm_offline(struct vfio_ccw_private *private)
+{
+	struct subchannel *sch = private->sch;
+	int ret = VFIO_CCW_STATE_STANDBY;
+
+	spin_lock_irq(sch->lock);
+	if (cio_disable_subchannel(sch))
+		ret = VFIO_CCW_STATE_NOT_OPER;
+	spin_unlock_irq(sch->lock);
+	if (private->completion)
+		complete(private->completion);
+
+	return ret;
+}
+static int fsm_quiescing(struct vfio_ccw_private *private)
+{
+	struct subchannel *sch = private->sch;
+	int ret = VFIO_CCW_STATE_STANDBY;
+	int iretry = 255;
+
+	spin_lock_irq(sch->lock);
+	ret = cio_cancel_halt_clear(sch, &iretry);
+	if (ret == -EBUSY)
+		ret = VFIO_CCW_STATE_QUIESCING;
+	else if (private->completion)
+		complete(private->completion);
+	spin_unlock_irq(sch->lock);
+	return ret;
+}
+static int fsm_quiescing_done(struct vfio_ccw_private *private)
+{
+	if (private->completion)
+		complete(private->completion);
+	return VFIO_CCW_STATE_STANDBY;
+}
 /*
  * No operation action.
  */
@@ -178,15 +225,10 @@ static int fsm_sch_event(struct vfio_ccw_private *private)
 static int fsm_init(struct vfio_ccw_private *private)
 {
 	struct subchannel *sch = private->sch;
-	int ret = VFIO_CCW_STATE_STANDBY;
 
-	spin_lock_irq(sch->lock);
 	sch->isc = VFIO_CCW_ISC;
-	if (cio_enable_subchannel(sch, (u32)(unsigned long)sch))
-		ret = VFIO_CCW_STATE_NOT_OPER;
-	spin_unlock_irq(sch->lock);
 
-	return ret;
+	return VFIO_CCW_STATE_STANDBY;
 }
 
 
@@ -196,6 +238,8 @@ static int fsm_init(struct vfio_ccw_private *private)
 fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS] = {
 	[VFIO_CCW_STATE_NOT_OPER] = {
 		[VFIO_CCW_EVENT_INIT]		= fsm_init,
+		[VFIO_CCW_EVENT_ONLINE]		= fsm_nop,
+		[VFIO_CCW_EVENT_OFFLINE]	= fsm_nop,
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_nop,
 		[VFIO_CCW_EVENT_SSCH_REQ]	= fsm_nop,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_nop,
@@ -203,13 +247,17 @@ fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS] = {
 	},
 	[VFIO_CCW_STATE_STANDBY] = {
 		[VFIO_CCW_EVENT_INIT]		= fsm_nop,
+		[VFIO_CCW_EVENT_ONLINE]		= fsm_online,
+		[VFIO_CCW_EVENT_OFFLINE]	= fsm_offline,
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_SSCH_REQ]	= fsm_io_error,
-		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
+		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_disabled_irq,
 		[VFIO_CCW_EVENT_SCHIB_CHANGED]	= fsm_sch_event,
 	},
 	[VFIO_CCW_STATE_IDLE] = {
 		[VFIO_CCW_EVENT_INIT]		= fsm_nop,
+		[VFIO_CCW_EVENT_ONLINE]		= fsm_nop,
+		[VFIO_CCW_EVENT_OFFLINE]	= fsm_offline,
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_SSCH_REQ]	= fsm_io_request,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
@@ -217,6 +265,8 @@ fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS] = {
 	},
 	[VFIO_CCW_STATE_BOXED] = {
 		[VFIO_CCW_EVENT_INIT]		= fsm_nop,
+		[VFIO_CCW_EVENT_ONLINE]		= fsm_nop,
+		[VFIO_CCW_EVENT_OFFLINE]	= fsm_quiescing,
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_SSCH_REQ]	= fsm_io_busy,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
@@ -224,9 +274,20 @@ fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS] = {
 	},
 	[VFIO_CCW_STATE_BUSY] = {
 		[VFIO_CCW_EVENT_INIT]		= fsm_nop,
+		[VFIO_CCW_EVENT_ONLINE]		= fsm_nop,
+		[VFIO_CCW_EVENT_OFFLINE]	= fsm_quiescing,
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_SSCH_REQ]	= fsm_io_busy,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
+		[VFIO_CCW_EVENT_SCHIB_CHANGED]	= fsm_sch_event,
+	},
+	[VFIO_CCW_STATE_QUIESCING] = {
+		[VFIO_CCW_EVENT_INIT]		= fsm_nop,
+		[VFIO_CCW_EVENT_ONLINE]		= fsm_nop,
+		[VFIO_CCW_EVENT_OFFLINE]	= fsm_nop,
+		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
+		[VFIO_CCW_EVENT_SSCH_REQ]	= fsm_io_busy,
+		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_quiescing_done,
 		[VFIO_CCW_EVENT_SCHIB_CHANGED]	= fsm_sch_event,
 	},
 };

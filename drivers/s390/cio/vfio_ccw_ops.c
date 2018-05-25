@@ -21,21 +21,14 @@ static int vfio_ccw_mdev_reset(struct mdev_device *mdev)
 
 	private = dev_get_drvdata(mdev_parent_dev(mdev));
 	sch = private->sch;
-	/*
-	 * TODO:
-	 * In the cureent stage, some things like "no I/O running" and "no
-	 * interrupt pending" are clear, but we are not sure what other state
-	 * we need to care about.
-	 * There are still a lot more instructions need to be handled. We
-	 * should come back here later.
-	 */
+
 	ret = vfio_ccw_sch_quiesce(sch);
 	if (ret)
 		return ret;
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_ONLINE);
 
-	ret = cio_enable_subchannel(sch, (u32)(unsigned long)sch);
-	if (!ret)
-		private->state = VFIO_CCW_STATE_IDLE;
+	if (!(private->state == VFIO_CCW_STATE_IDLE))
+		ret = -EFAULT;
 
 	return ret;
 }
