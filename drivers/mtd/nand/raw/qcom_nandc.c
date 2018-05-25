@@ -1769,41 +1769,6 @@ static int read_page_ecc(struct qcom_nand_host *host, u8 *data_buf,
 	return parse_read_errors(host, data_buf_start, oob_buf_start);
 }
 
-/*
- * a helper that copies the last step/codeword of a page (containing free oob)
- * into our local buffer
- */
-static int copy_last_cw(struct qcom_nand_host *host, int page)
-{
-	struct nand_chip *chip = &host->chip;
-	struct qcom_nand_controller *nandc = get_qcom_nand_controller(chip);
-	struct nand_ecc_ctrl *ecc = &chip->ecc;
-	int size;
-	int ret;
-
-	clear_read_regs(nandc);
-
-	size = host->use_ecc ? host->cw_data : host->cw_size;
-
-	/* prepare a clean read buffer */
-	memset(nandc->data_buffer, 0xff, size);
-
-	set_address(host, host->cw_size * (ecc->steps - 1), page);
-	update_rw_regs(host, 1, true);
-
-	config_nand_single_cw_page_read(nandc);
-
-	read_data_dma(nandc, FLASH_BUF_ACC, nandc->data_buffer, size, 0);
-
-	ret = submit_descs(nandc);
-	if (ret)
-		dev_err(nandc->dev, "failed to copy last codeword\n");
-
-	free_descs(nandc);
-
-	return ret;
-}
-
 /* implements ecc->read_page() */
 static int qcom_nandc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 				uint8_t *buf, int oob_required, int page)
@@ -2118,6 +2083,7 @@ static int qcom_nandc_block_bad(struct mtd_info *mtd, loff_t ofs)
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
 	int page, ret, bbpos, bad = 0;
 	u32 flash_status;
+	u8 *bbm_bytes_buf = chip->data_buf;
 
 	page = (int)(ofs >> chip->page_shift) & chip->pagemask;
 
@@ -2128,11 +2094,31 @@ static int qcom_nandc_block_bad(struct mtd_info *mtd, loff_t ofs)
 	 * that contains the BBM
 	 */
 	host->use_ecc = false;
+	bbpos = mtd->writesize - host->cw_size * (ecc->steps - 1);
 
 	clear_bam_transaction(nandc);
-	ret = copy_last_cw(host, page);
-	if (ret)
+	clear_read_regs(nandc);
+
+	set_address(host, host->cw_size * (ecc->steps - 1), page);
+	update_rw_regs(host, 1, true);
+
+	/*
+	 * The last codeword data will be copied from NAND device to NAND
+	 * controller internal HW buffer. Copy only required BBM size bytes
+	 * from this HW buffer to bbm_bytes_buf which is present at
+	 * bbpos offset.
+	 */
+	nandc_set_read_loc(nandc, 0, bbpos, host->bbm_size, 1);
+	config_nand_single_cw_page_read(nandc);
+	read_data_dma(nandc, FLASH_BUF_ACC + bbpos, bbm_bytes_buf,
+		      host->bbm_size, 0);
+
+	ret = submit_descs(nandc);
+	free_descs(nandc);
+	if (ret) {
+		dev_err(nandc->dev, "failed to copy bad block bytes\n");
 		goto err;
+	}
 
 	flash_status = le32_to_cpu(nandc->reg_read_buf[0]);
 
@@ -2141,12 +2127,10 @@ static int qcom_nandc_block_bad(struct mtd_info *mtd, loff_t ofs)
 		goto err;
 	}
 
-	bbpos = mtd->writesize - host->cw_size * (ecc->steps - 1);
-
-	bad = nandc->data_buffer[bbpos] != 0xff;
+	bad = bbm_bytes_buf[0] != 0xff;
 
 	if (chip->options & NAND_BUSWIDTH_16)
-		bad = bad || (nandc->data_buffer[bbpos + 1] != 0xff);
+		bad = bad || (bbm_bytes_buf[1] != 0xff);
 err:
 	return bad;
 }
