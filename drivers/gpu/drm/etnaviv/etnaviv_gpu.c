@@ -1743,7 +1743,7 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 
 	gpu->dev = &pdev->dev;
 	mutex_init(&gpu->lock);
-	mutex_init(&gpu->fence_idr_lock);
+	mutex_init(&gpu->fence_lock);
 
 	/* Map registers: */
 	gpu->mmio = etnaviv_ioremap(pdev, NULL, dev_name(gpu->dev));
