@@ -308,6 +308,46 @@
 				#clock-cells = <1>;
 			};
 
+			rpmpd: power-controller {
+				compatible = "qcom,msm8996-rpmpd";
+				#power-domain-cells = <1>;
+				operating-points-v2 = <&rpmpd_opp_table>, /* cx */
+						      <&rpmpd_opp_table>, /* cx_ao */
+						      <&rpmpd_opp_table>, /* cx_vfc */
+						      <&rpmpd_opp_table>, /* mx */
+						      <&rpmpd_opp_table>, /* mx_ao */
+						      <&rpmpd_opp_table>, /* sscx */
+						      <&rpmpd_opp_table>; /* sscx_vfc */
+			};
+
+			rpmpd_opp_table: opp-table {
+				compatible = "operating-points-v2-qcom-level", "operating-points-v2";
+
+				rpmpd_opp1: opp@1 {
+					qcom,level = <1>;
+				};
+
+				rpmpd_opp2: opp@2 {
+					qcom,level = <2>;
+				};
+
+				rpmpd_opp3: opp@3 {
+					qcom,level = <3>;
+				};
+
+				rpmpd_opp4: opp@4 {
+					qcom,level = <4>;
+				};
+
+				rpmpd_opp5: opp@5 {
+					qcom,level = <5>;
+				};
+
+				rpmpd_opp6: opp@6 {
+					qcom,level = <6>;
+				};
+			};
+
 			pm8994-regulators {
 				compatible = "qcom,rpm-pm8994-regulators";
 
