@@ -323,6 +323,15 @@ static int rpmhpd_probe(struct platform_device *pdev)
 		pm_genpd_init(&rpmhpds[i]->pd, NULL, true);
 
 		data->domains[i] = &rpmhpds[i]->pd;
+
+		/*
+		 * Until we have all consumers voting on corners
+		 * just vote the max corner on all PDs
+		 * This should ideally be *removed* once we have
+		 * all (most) consumers being able to vote
+		 */
+		rpmhpd_power_on(&rpmhpds[i]->pd);
+		rpmhpd_set_performance(&rpmhpds[i]->pd, rpmhpds[i]->level_count - 1);
 	}
 
 	return of_genpd_add_provider_onecell(pdev->dev.of_node, data);
