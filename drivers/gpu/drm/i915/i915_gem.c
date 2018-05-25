@@ -139,6 +139,8 @@ int i915_mutex_lock_interruptible(struct drm_device *dev)
 
 static u32 __i915_gem_park(struct drm_i915_private *i915)
 {
+	GEM_TRACE("\n");
+
 	lockdep_assert_held(&i915->drm.struct_mutex);
 	GEM_BUG_ON(i915->gt.active_requests);
 	GEM_BUG_ON(!list_empty(&i915->gt.active_rings));
@@ -193,6 +195,8 @@ void i915_gem_park(struct drm_i915_private *i915)
 
 void i915_gem_unpark(struct drm_i915_private *i915)
 {
+	GEM_TRACE("\n");
+
 	lockdep_assert_held(&i915->drm.struct_mutex);
 	GEM_BUG_ON(!i915->gt.active_requests);
 
@@ -3556,6 +3560,21 @@ i915_gem_idle_work_handler(struct work_struct *work)
 		return;
 
 	/*
+	 * Flush out the last user context, leaving only the pinned
+	 * kernel context resident. When we are idling on the kernel_context,
+	 * no more new requests (with a context switch) are emitted and we
+	 * can finally rest. A consequence is that the idle work handler is
+	 * always called at least twice before idling (and if the system is
+	 * idle that implies a round trip through the retire worker).
+	 */
+	mutex_lock(&dev_priv->drm.struct_mutex);
+	i915_gem_switch_to_kernel_context(dev_priv);
+	mutex_unlock(&dev_priv->drm.struct_mutex);
+
+	GEM_TRACE("active_requests=%d (after switch-to-kernel-context)\n",
+		  READ_ONCE(dev_priv->gt.active_requests));
+
+	/*
 	 * Wait for last execlists context complete, but bail out in case a
 	 * new request is submitted. As we don't trust the hardware, we
 	 * continue on if the wait times out. This is necessary to allow
@@ -4960,11 +4979,9 @@ static void assert_kernel_context_is_current(struct drm_i915_private *i915)
 
 void i915_gem_sanitize(struct drm_i915_private *i915)
 {
-	if (i915_terminally_wedged(&i915->gpu_error)) {
-		mutex_lock(&i915->drm.struct_mutex);
+	mutex_lock(&i915->drm.struct_mutex);
+	if (i915_terminally_wedged(&i915->gpu_error))
 		i915_gem_unset_wedged(i915);
-		mutex_unlock(&i915->drm.struct_mutex);
-	}
 
 	/*
 	 * If we inherit context state from the BIOS or earlier occupants
@@ -4976,6 +4993,9 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 	 */
 	if (INTEL_GEN(i915) >= 5 && intel_has_gpu_reset(i915))
 		WARN_ON(intel_gpu_reset(i915, ALL_ENGINES));
+
+	i915_gem_contexts_lost(i915);
+	mutex_unlock(&i915->drm.struct_mutex);
 }
 
 int i915_gem_suspend(struct drm_i915_private *dev_priv)
@@ -5009,7 +5029,6 @@ int i915_gem_suspend(struct drm_i915_private *dev_priv)
 
 		assert_kernel_context_is_current(dev_priv);
 	}
-	i915_gem_contexts_lost(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
 
 	intel_uc_suspend(dev_priv);
