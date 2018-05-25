@@ -76,7 +76,7 @@ enum vfio_ccw_state {
  */
 enum vfio_ccw_event {
 	VFIO_CCW_EVENT_NOT_OPER,
-	VFIO_CCW_EVENT_IO_REQ,
+	VFIO_CCW_EVENT_SSCH_REQ,
 	VFIO_CCW_EVENT_INTERRUPT,
 	VFIO_CCW_EVENT_SCHIB_CHANGED,
 	/* last element! */
