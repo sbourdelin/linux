@@ -6,6 +6,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/spinlock.h>
 #include <dt-bindings/memory/tegra20-mc.h>
 
 #include "mc.h"
