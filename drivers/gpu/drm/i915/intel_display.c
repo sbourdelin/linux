@@ -12854,6 +12854,170 @@ skl_max_scale(struct intel_crtc *intel_crtc, struct intel_crtc_state *crtc_state
 	return max_scale;
 }
 
+int
+intel_clip_src_rect(struct intel_plane *plane,
+		    struct intel_crtc_state *crtc_state,
+		    struct intel_plane_state *state)
+{
+	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
+	struct drm_framebuffer *fb = state->base.fb;
+	int crtc_x, crtc_y;
+	unsigned int crtc_w, crtc_h;
+	uint32_t src_x, src_y, src_w, src_h;
+	struct drm_rect *src = &state->base.src;
+	struct drm_rect *dst = &state->base.dst;
+	struct drm_rect clip = {};
+	int hscale, vscale;
+	int max_scale, min_scale;
+	bool can_scale;
+
+	*src = drm_plane_state_src(&state->base);
+	*dst = drm_plane_state_dest(&state->base);
+
+	/* setup can_scale, min_scale, max_scale */
+	if (INTEL_GEN(dev_priv) >= 9) {
+		/* use scaler when colorkey is not required */
+		if (!state->ckey.flags) {
+			can_scale = 1;
+			min_scale = 1;
+			max_scale = skl_max_scale(crtc, crtc_state);
+		} else {
+			can_scale = 0;
+			min_scale = DRM_PLANE_HELPER_NO_SCALING;
+			max_scale = DRM_PLANE_HELPER_NO_SCALING;
+		}
+	} else {
+		can_scale = plane->can_scale;
+		max_scale = plane->max_downscale << 16;
+		min_scale = plane->can_scale ? 1 : (1 << 16);
+	}
+
+	/*
+	 * FIXME the following code does a bunch of fuzzy adjustments to the
+	 * coordinates and sizes. We probably need some way to decide whether
+	 * more strict checking should be done instead.
+	 */
+	drm_rect_rotate(src, fb->width << 16, fb->height << 16,
+			state->base.rotation);
+
+	hscale = drm_rect_calc_hscale_relaxed(src, dst, min_scale, max_scale);
+	BUG_ON(hscale < 0);
+
+	vscale = drm_rect_calc_vscale_relaxed(src, dst, min_scale, max_scale);
+	BUG_ON(vscale < 0);
+
+	if (crtc_state->base.enable)
+		drm_mode_get_hv_timing(&crtc_state->base.mode,
+				       &clip.x2, &clip.y2);
+
+	state->base.visible = drm_rect_clip_scaled(src, dst, &clip, hscale, vscale);
+
+	crtc_x = dst->x1;
+	crtc_y = dst->y1;
+	crtc_w = drm_rect_width(dst);
+	crtc_h = drm_rect_height(dst);
+
+	if (state->base.visible) {
+		/* check again in case clipping clamped the results */
+		hscale = drm_rect_calc_hscale(src, dst, min_scale, max_scale);
+		if (hscale < 0) {
+			DRM_DEBUG_KMS("Horizontal scaling factor out of limits\n");
+			drm_rect_debug_print("src: ", src, true);
+			drm_rect_debug_print("dst: ", dst, false);
+
+			return hscale;
+		}
+
+		vscale = drm_rect_calc_vscale(src, dst, min_scale, max_scale);
+		if (vscale < 0) {
+			DRM_DEBUG_KMS("Vertical scaling factor out of limits\n");
+			drm_rect_debug_print("src: ", src, true);
+			drm_rect_debug_print("dst: ", dst, false);
+
+			return vscale;
+		}
+
+		/* Make the source viewport size an exact multiple of the scaling factors. */
+		drm_rect_adjust_size(src,
+				     drm_rect_width(dst) * hscale - drm_rect_width(src),
+				     drm_rect_height(dst) * vscale - drm_rect_height(src));
+
+		drm_rect_rotate_inv(src, fb->width << 16, fb->height << 16,
+				    state->base.rotation);
+
+		/* sanity check to make sure the src viewport wasn't enlarged */
+		WARN_ON(src->x1 < (int) state->base.src_x ||
+			src->y1 < (int) state->base.src_y ||
+			src->x2 > (int) state->base.src_x + state->base.src_w ||
+			src->y2 > (int) state->base.src_y + state->base.src_h);
+
+		/*
+		 * Hardware doesn't handle subpixel coordinates.
+		 * Adjust to (macro)pixel boundary, but be careful not to
+		 * increase the source viewport size, because that could
+		 * push the downscaling factor out of bounds.
+		 */
+		src_x = src->x1 >> 16;
+		src_w = drm_rect_width(src) >> 16;
+		src_y = src->y1 >> 16;
+		src_h = drm_rect_height(src) >> 16;
+
+		if (intel_format_is_yuv(fb->format->format)) {
+			src_x &= ~1;
+			src_w &= ~1;
+
+			/*
+			 * Must keep src and dst the
+			 * same if we can't scale.
+			 */
+			if (!can_scale)
+				crtc_w &= ~1;
+
+			if (crtc_w == 0)
+				state->base.visible = false;
+		}
+	}
+
+	/* Check size restrictions when scaling */
+	if (state->base.visible && (src_w != crtc_w || src_h != crtc_h)) {
+		unsigned int width_bytes;
+		int cpp = fb->format->cpp[0];
+
+		WARN_ON(!can_scale);
+
+		/* FIXME interlacing min height is 6 */
+
+		if (crtc_w < 3 || crtc_h < 3)
+			state->base.visible = false;
+
+		if (src_w < 3 || src_h < 3)
+			state->base.visible = false;
+
+		width_bytes = ((src_x * cpp) & 63) + src_w * cpp;
+
+		if (INTEL_GEN(dev_priv) < 9 && (src_w > 2048 || src_h > 2048 ||
+		    width_bytes > 4096 || fb->pitches[0] > 4096)) {
+			DRM_DEBUG_KMS("Source dimensions exceed hardware limits\n");
+			return -EINVAL;
+		}
+	}
+
+	if (state->base.visible) {
+		src->x1 = src_x << 16;
+		src->x2 = (src_x + src_w) << 16;
+		src->y1 = src_y << 16;
+		src->y2 = (src_y + src_h) << 16;
+	}
+
+	dst->x1 = crtc_x;
+	dst->x2 = crtc_x + crtc_w;
+	dst->y1 = crtc_y;
+	dst->y2 = crtc_y + crtc_h;
+
+	return 0;
+}
+
 static int
 intel_check_primary_plane(struct intel_plane *plane,
 			  struct intel_crtc_state *crtc_state,
@@ -12884,6 +13048,12 @@ intel_check_primary_plane(struct intel_plane *plane,
 
 	if (!state->base.fb)
 		return 0;
+
+	if (intel_format_is_yuv(state->base.fb->format->format)) {
+		ret = intel_clip_src_rect(plane, crtc_state, state);
+		if (ret)
+			return ret;
+	}
 
 	if (INTEL_GEN(dev_priv) >= 9) {
 		ret = skl_check_plane_surface(crtc_state, state);
