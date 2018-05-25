@@ -2083,6 +2083,10 @@ static struct nvme_subsystem *__nvme_find_get_subsystem(const char *subsysnqn)
 	return NULL;
 }
 
+#define SUBSYS_ATTR_RW(_name)			      \
+	struct device_attribute subsys_attr_##_name = \
+		__ATTR_RW(_name)
+
 #define SUBSYS_ATTR_RO(_name, _mode, _show)			\
 	struct device_attribute subsys_attr_##_name = \
 		__ATTR(_name, _mode, _show, NULL)
@@ -2113,11 +2117,62 @@ nvme_subsys_show_str_function(model);
 nvme_subsys_show_str_function(serial);
 nvme_subsys_show_str_function(firmware_rev);
 
+
+#ifdef CONFIG_NVME_MULTIPATH
+static ssize_t mpath_personality_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct nvme_subsystem *subsys =
+		container_of(dev, struct nvme_subsystem, dev);
+	ssize_t ret;
+
+	if (subsys->native_mpath)
+		ret = scnprintf(buf, PAGE_SIZE, "[native] other\n");
+	else
+		ret = scnprintf(buf, PAGE_SIZE, "native [other]\n");
+
+	return ret;
+}
+
+static ssize_t mpath_personality_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct nvme_subsystem *subsys =
+		container_of(dev, struct nvme_subsystem, dev);
+	bool native_mpath = false;
+	int ret = 0;
+
+	if (!strncmp(buf, "native", strlen("native")))
+		native_mpath = true;
+	else if (!strncmp(buf, "other", strlen("other")))
+		native_mpath = false;
+	else {
+		pr_warn("unknown value %s\n", buf);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (subsys->native_mpath != native_mpath) {
+		subsys->native_mpath = native_mpath;
+		ret = nvme_mpath_change_personality(subsys);
+	}
+
+out:
+	return ret ? ret : count;
+}
+static SUBSYS_ATTR_RW(mpath_personality);
+#endif
+
 static struct attribute *nvme_subsys_attrs[] = {
 	&subsys_attr_model.attr,
 	&subsys_attr_serial.attr,
 	&subsys_attr_firmware_rev.attr,
 	&subsys_attr_subsysnqn.attr,
+#ifdef CONFIG_NVME_MULTIPATH
+	&subsys_attr_mpath_personality.attr,
+#endif
 	NULL,
 };
 
@@ -2220,6 +2275,10 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	mutex_lock(&subsys->lock);
 	list_add_tail(&ctrl->subsys_entry, &subsys->ctrls);
 	mutex_unlock(&subsys->lock);
+
+#ifdef CONFIG_NVME_MULTIPATH
+	subsys->native_mpath = nvme_multipath;
+#endif
 
 	return 0;
 
@@ -2850,6 +2909,10 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	head->subsys = ctrl->subsys;
 	head->ns_id = nsid;
 	kref_init(&head->ref);
+
+#ifdef CONFIG_NVME_MULTIPATH
+	head->native_mpath = ctrl->subsys->native_mpath;
+#endif
 
 	nvme_report_ns_ids(ctrl, nsid, id, &head->ids);
 

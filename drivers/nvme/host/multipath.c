@@ -14,8 +14,8 @@
 #include <linux/moduleparam.h>
 #include "nvme.h"
 
-static bool multipath = true;
-module_param(multipath, bool, 0444);
+bool nvme_multipath = true;
+module_param_named(multipath, nvme_multipath, bool, 0444);
 MODULE_PARM_DESC(multipath,
 	"turn on native support for multiple controllers per subsystem");
 
@@ -29,7 +29,7 @@ MODULE_PARM_DESC(multipath,
 void nvme_set_disk_name(char *disk_name, struct nvme_ns *ns,
 			struct nvme_ctrl *ctrl, int *flags)
 {
-	if (!multipath) {
+	if (!ctrl->subsys->native_mpath) {
 		sprintf(disk_name, "nvme%dn%d", ctrl->instance, ns->head->instance);
 	} else if (ns->head->disk) {
 		sprintf(disk_name, "nvme%dc%dn%d", ctrl->subsys->instance,
@@ -181,7 +181,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	 * We also do this for private namespaces as the namespace sharing data could
 	 * change after a rescan.
 	 */
-	if (!(ctrl->subsys->cmic & (1 << 1)) || !multipath)
+	if (!(ctrl->subsys->cmic & (1 << 1)) || !ctrl->subsys->native_mpath)
 		return 0;
 
 	q = blk_alloc_queue_node(GFP_KERNEL, NUMA_NO_NODE, NULL);
@@ -218,7 +218,7 @@ out:
 
 void nvme_mpath_add_disk(struct nvme_ns_head *head)
 {
-	if (!head->disk)
+	if (!head->disk || !head->native_mpath)
 		return;
 
 	mutex_lock(&head->subsys->lock);
@@ -245,4 +245,28 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	flush_work(&head->requeue_work);
 	blk_cleanup_queue(head->disk->queue);
 	put_disk(head->disk);
+}
+
+int nvme_mpath_change_personality(struct nvme_subsystem *subsys)
+{
+	struct nvme_ctrl *ctrl;
+	int ret = 0;
+
+restart:
+	mutex_lock(&subsys->lock);
+	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry) {
+		if (!list_empty(&ctrl->namespaces)) {
+			mutex_unlock(&subsys->lock);
+			nvme_remove_namespaces(ctrl);
+			goto restart;
+		}
+	}
+	mutex_unlock(&subsys->lock);
+
+	mutex_lock(&subsys->lock);
+	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
+		nvme_queue_scan(ctrl);
+	mutex_unlock(&subsys->lock);
+
+	return ret;
 }

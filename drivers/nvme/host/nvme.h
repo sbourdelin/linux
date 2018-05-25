@@ -32,6 +32,8 @@ extern unsigned int admin_timeout;
 #define NVME_DEFAULT_KATO	5
 #define NVME_KATO_GRACE		10
 
+extern bool nvme_multipath;
+
 extern struct workqueue_struct *nvme_wq;
 extern struct workqueue_struct *nvme_reset_wq;
 extern struct workqueue_struct *nvme_delete_wq;
@@ -227,6 +229,10 @@ struct nvme_subsystem {
 	u8			cmic;
 	u16			vendor_id;
 	struct ida		ns_ida;
+
+#ifdef CONFIG_NVME_MULTIPATH
+	bool native_mpath;
+#endif
 };
 
 /*
@@ -252,6 +258,7 @@ struct nvme_ns_head {
 	struct bio_list		requeue_list;
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work;
+	bool native_mpath;
 #endif
 	struct list_head	list;
 	struct srcu_struct      srcu;
@@ -444,6 +451,7 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl);
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl,struct nvme_ns_head *head);
 void nvme_mpath_add_disk(struct nvme_ns_head *head);
 void nvme_mpath_remove_disk(struct nvme_ns_head *head);
+int nvme_mpath_change_personality(struct nvme_subsystem *subsys);
 
 static inline void nvme_mpath_clear_current_path(struct nvme_ns *ns)
 {
