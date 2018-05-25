@@ -1452,7 +1452,7 @@ static blk_qc_t btt_make_request(struct request_queue *q, struct bio *bio)
 		return BLK_QC_T_NONE;
 
 	do_acct = nd_iostat_start(bio, &start);
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		unsigned int len = bvec.bv_len;
 
 		if (len > PAGE_SIZE || len < btt->sector_size ||

@@ -1156,7 +1156,7 @@ void dm_remap_zone_report(struct dm_target *ti, struct bio *bio, sector_t start)
 	 * Remap the start sector of the reported zones. For sequential zones,
 	 * also remap the write pointer position.
 	 */
-	bio_for_each_segment(bvec, report_bio, iter) {
+	bio_for_each_page(bvec, report_bio, iter) {
 		addr = kmap_atomic(bvec.bv_page);
 
 		/* Remember the report header in the first page */

@@ -108,7 +108,7 @@ static blk_qc_t simdisk_make_request(struct request_queue *q, struct bio *bio)
 	struct bvec_iter iter;
 	sector_t sector = bio->bi_iter.bi_sector;
 
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		char *buffer = kmap_atomic(bvec.bv_page) + bvec.bv_offset;
 		unsigned len = bvec.bv_len >> SECTOR_SHIFT;
 

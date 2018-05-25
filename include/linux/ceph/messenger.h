@@ -135,7 +135,7 @@ struct ceph_bio_iter {
 									      \
 		__cur_iter = (it)->iter;				      \
 		__cur_iter.bi_size = __cur_n;				      \
-		__bio_for_each_segment(bv, (it)->bio, __cur_iter, __cur_iter) \
+		__bio_for_each_page(bv, (it)->bio, __cur_iter, __cur_iter) \
 			(void)(BVEC_STEP);				      \
 	}))
 

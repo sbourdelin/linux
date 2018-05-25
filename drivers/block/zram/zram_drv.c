@@ -1197,7 +1197,7 @@ static void __zram_make_request(struct zram *zram, struct bio *bio)
 		break;
 	}
 
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		struct bio_vec bv = bvec;
 		unsigned int unwritten = bvec.bv_len;
 

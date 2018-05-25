@@ -121,7 +121,7 @@ void bch_data_verify(struct cached_dev *dc, struct bio *bio)
 	submit_bio_wait(check);
 
 	citer.bi_size = UINT_MAX;
-	bio_for_each_segment(bv, bio, iter) {
+	bio_for_each_page(bv, bio, iter) {
 		void *p1 = kmap_atomic(bv.bv_page);
 		void *p2;
 

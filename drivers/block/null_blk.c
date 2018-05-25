@@ -1171,7 +1171,7 @@ static int null_handle_bio(struct nullb_cmd *cmd)
 	}
 
 	spin_lock_irq(&nullb->lock);
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		len = bvec.bv_len;
 		err = null_transfer(nullb, bvec.bv_page, len, bvec.bv_offset,
 				     op_is_write(bio_op(bio)), sector,

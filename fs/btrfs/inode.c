@@ -7894,7 +7894,7 @@ static void btrfs_retry_endio_nocsum(struct bio *bio)
 
 	done->uptodate = 1;
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
-	bio_for_each_segment_all(bvec, bio, i)
+	bio_for_each_page_all(bvec, bio, i)
 		clean_io_failure(BTRFS_I(inode)->root->fs_info, failure_tree,
 				 io_tree, done->start, bvec->bv_page,
 				 btrfs_ino(BTRFS_I(inode)), 0);
@@ -7924,7 +7924,7 @@ static blk_status_t __btrfs_correct_data_nocsum(struct inode *inode,
 	done.inode = inode;
 	io_bio->bio.bi_iter = io_bio->iter;
 
-	bio_for_each_segment(bvec, &io_bio->bio, iter) {
+	bio_for_each_page(bvec, &io_bio->bio, iter) {
 		nr_sectors = BTRFS_BYTES_TO_BLKS(fs_info, bvec.bv_len);
 		pgoff = bvec.bv_offset;
 
@@ -7986,7 +7986,7 @@ static void btrfs_retry_endio(struct bio *bio)
 	failure_tree = &BTRFS_I(inode)->io_failure_tree;
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
-	bio_for_each_segment_all(bvec, bio, i) {
+	bio_for_each_page_all(bvec, bio, i) {
 		ret = __readpage_endio_check(inode, io_bio, i, bvec->bv_page,
 					     bvec->bv_offset, done->start,
 					     bvec->bv_len);
@@ -8031,7 +8031,7 @@ static blk_status_t __btrfs_subio_endio_read(struct inode *inode,
 	done.inode = inode;
 	io_bio->bio.bi_iter = io_bio->iter;
 
-	bio_for_each_segment(bvec, &io_bio->bio, iter) {
+	bio_for_each_page(bvec, &io_bio->bio, iter) {
 		nr_sectors = BTRFS_BYTES_TO_BLKS(fs_info, bvec.bv_len);
 
 		pgoff = bvec.bv_offset;

@@ -119,7 +119,7 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	 */
 	struct bvec_iter from_iter = BVEC_ITER_ALL_INIT;
 
-	bio_for_each_segment(tovec, to, iter) {
+	bio_for_each_page(tovec, to, iter) {
 		fromvec = bio_iter_iovec(from, from_iter);
 		if (tovec.bv_page != fromvec.bv_page) {
 			/*
@@ -147,7 +147,7 @@ static void bounce_end_io(struct bio *bio, mempool_t *pool)
 	/*
 	 * free up bounce indirect pages used
 	 */
-	bio_for_each_segment_all(bvec, bio, i) {
+	bio_for_each_page_all(bvec, bio, i) {
 		orig_vec = bio_iter_iovec(bio_orig, orig_iter);
 		if (bvec->bv_page != orig_vec.bv_page) {
 			dec_zone_page_state(bvec->bv_page, NR_BOUNCE);
@@ -204,7 +204,7 @@ static void __blk_queue_bounce(struct request_queue *q, struct bio **bio_orig,
 	int sectors = 0;
 	bool passthrough = bio_is_passthrough(*bio_orig);
 
-	bio_for_each_segment(from, *bio_orig, iter) {
+	bio_for_each_page(from, *bio_orig, iter) {
 		if (i++ < BIO_MAX_PAGES)
 			sectors += from.bv_len >> 9;
 		if (page_to_pfn(from.bv_page) > q->limits.bounce_pfn)
@@ -222,7 +222,7 @@ static void __blk_queue_bounce(struct request_queue *q, struct bio **bio_orig,
 	bio = bio_clone_bioset(*bio_orig, GFP_NOIO, passthrough ? NULL :
 			bounce_bio_set);
 
-	bio_for_each_segment_all(to, bio, i) {
+	bio_for_each_page_all(to, bio, i) {
 		struct page *page = to->bv_page;
 
 		if (page_to_pfn(page) <= q->limits.bounce_pfn)

@@ -204,7 +204,7 @@ static blk_status_t bio_integrity_process(struct bio *bio,
 	iter.seed = proc_iter->bi_sector;
 	iter.prot_buf = prot_buf;
 
-	__bio_for_each_segment(bv, bio, bviter, *proc_iter) {
+	__bio_for_each_page(bv, bio, bviter, *proc_iter) {
 		void *kaddr = kmap_atomic(bv.bv_page);
 
 		iter.data_buf = kaddr + bv.bv_offset;

@@ -2123,7 +2123,7 @@ static void process_checks(struct r1bio *r1_bio)
 		/* Now we can 'fixup' the error value */
 		sbio->bi_status = 0;
 
-		bio_for_each_segment_all(bi, sbio, j)
+		bio_for_each_page_all(bi, sbio, j)
 			page_len[j] = bi->bv_len;
 
 		if (!status) {

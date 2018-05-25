@@ -2817,7 +2817,7 @@ static void __btrfsic_submit_bio(struct bio *bio)
 			goto leave;
 		cur_bytenr = dev_bytenr;
 
-		bio_for_each_segment(bvec, bio, iter) {
+		bio_for_each_page(bvec, bio, iter) {
 			BUG_ON(bvec.bv_len != PAGE_SIZE);
 			mapped_datav[i] = kmap(bvec.bv_page);
 			i++;
@@ -2832,7 +2832,7 @@ static void __btrfsic_submit_bio(struct bio *bio)
 					      mapped_datav, segs,
 					      bio, &bio_is_patched,
 					      NULL, bio->bi_opf);
-		bio_for_each_segment(bvec, bio, iter)
+		bio_for_each_page(bvec, bio, iter)
 			kunmap(bvec.bv_page);
 		kfree(mapped_datav);
 	} else if (NULL != dev_state && (bio->bi_opf & REQ_PREFLUSH)) {

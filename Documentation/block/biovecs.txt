@@ -28,10 +28,10 @@ normal code doesn't have to deal with bi_bvec_done.
    constructed from the raw biovecs but taking into account bi_bvec_done and
    bi_size.
 
-   bio_for_each_segment() has been updated to take a bvec_iter argument
+   bio_for_each_page() has been updated to take a bvec_iter argument
    instead of an integer (that corresponded to bi_idx); for a lot of code the
    conversion just required changing the types of the arguments to
-   bio_for_each_segment().
+   bio_for_each_page().
 
  * Advancing a bvec_iter is done with bio_advance_iter(); bio_advance() is a
    wrapper around bio_advance_iter() that operates on bio->bi_iter, and also

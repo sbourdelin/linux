@@ -1161,7 +1161,7 @@ static void index_rbio_pages(struct btrfs_raid_bio *rbio)
 		if (bio_flagged(bio, BIO_CLONED))
 			bio->bi_iter = btrfs_io_bio(bio)->iter;
 
-		bio_for_each_segment(bvec, bio, iter) {
+		bio_for_each_page(bvec, bio, iter) {
 			rbio->bio_pages[page_index + i] = bvec.bv_page;
 			i++;
 		}
@@ -1448,7 +1448,7 @@ static void set_bio_pages_uptodate(struct bio *bio)
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
 
-	bio_for_each_segment_all(bvec, bio, i)
+	bio_for_each_page_all(bvec, bio, i)
 		SetPageUptodate(bvec->bv_page);
 }
 

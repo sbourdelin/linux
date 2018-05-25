@@ -190,7 +190,7 @@ int blkdev_report_zones(struct block_device *bdev,
 	n = 0;
 	nz = 0;
 	nr_rep = 0;
-	bio_for_each_segment_all(bv, bio, i) {
+	bio_for_each_page_all(bv, bio, i) {
 
 		if (!bv->bv_page)
 			break;
@@ -223,7 +223,7 @@ int blkdev_report_zones(struct block_device *bdev,
 
 	*nr_zones = nz;
 out:
-	bio_for_each_segment_all(bv, bio, i)
+	bio_for_each_page_all(bv, bio, i)
 		__free_page(bv->bv_page);
 	bio_put(bio);
 

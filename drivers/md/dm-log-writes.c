@@ -732,7 +732,7 @@ static int log_writes_map(struct dm_target *ti, struct bio *bio)
 	 * can't just hold onto the page until some later point, we have to
 	 * manually copy the contents.
 	 */
-	bio_for_each_segment(bv, bio, iter) {
+	bio_for_each_page(bv, bio, iter) {
 		struct page *page;
 		void *src, *dst;
 

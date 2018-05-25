@@ -502,7 +502,7 @@ send_pages:
 		struct bvec_iter iter;
 		struct bio_vec bvec;
 
-		bio_for_each_segment(bvec, bio, iter) {
+		bio_for_each_page(bvec, bio, iter) {
 			bool is_last = !next && bio_iter_last(bvec, iter);
 			int flags = is_last ? 0 : MSG_MORE;
 

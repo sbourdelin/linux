@@ -157,7 +157,7 @@ static inline void *bio_data(struct bio *bio)
  * drivers should _never_ use the all version - the bio may have been split
  * before it got to the driver and the driver won't own all of it
  */
-#define bio_for_each_segment_all(bvl, bio, i)				\
+#define bio_for_each_page_all(bvl, bio, i)				\
 	for (i = 0, bvl = (bio)->bi_io_vec; i < (bio)->bi_vcnt; i++, bvl++)
 
 static inline void bio_advance_iter(struct bio *bio, struct bvec_iter *iter,
@@ -188,14 +188,14 @@ static inline bool bio_rewind_iter(struct bio *bio, struct bvec_iter *iter,
 	return bvec_iter_rewind(bio->bi_io_vec, iter, bytes);
 }
 
-#define __bio_for_each_segment(bvl, bio, iter, start)			\
+#define __bio_for_each_page(bvl, bio, iter, start)			\
 	for (iter = (start);						\
 	     (iter).bi_size &&						\
 		((bvl = bio_iter_iovec((bio), (iter))), 1);		\
 	     bio_advance_iter((bio), &(iter), (bvl).bv_len))
 
-#define bio_for_each_segment(bvl, bio, iter)				\
-	__bio_for_each_segment(bvl, bio, iter, (bio)->bi_iter)
+#define bio_for_each_page(bvl, bio, iter)				\
+	__bio_for_each_page(bvl, bio, iter, (bio)->bi_iter)
 
 #define bio_iter_last(bvec, iter) ((iter).bi_size == (bvec).bv_len)
 
@@ -221,7 +221,7 @@ static inline unsigned bio_segments(struct bio *bio)
 		break;
 	}
 
-	bio_for_each_segment(bv, bio, iter)
+	bio_for_each_page(bv, bio, iter)
 		segs++;
 
 	return segs;

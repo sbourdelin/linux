@@ -299,7 +299,7 @@ skb_fillup(struct sk_buff *skb, struct bio *bio, struct bvec_iter iter)
 	int frag = 0;
 	struct bio_vec bv;
 
-	__bio_for_each_segment(bv, bio, iter, iter)
+	__bio_for_each_page(bv, bio, iter, iter)
 		skb_fill_page_desc(skb, frag++, bv.bv_page,
 				   bv.bv_offset, bv.bv_len);
 }
@@ -1031,7 +1031,7 @@ bvcpy(struct sk_buff *skb, struct bio *bio, struct bvec_iter iter, long cnt)
 
 	iter.bi_size = cnt;
 
-	__bio_for_each_segment(bv, bio, iter, iter) {
+	__bio_for_each_page(bv, bio, iter, iter) {
 		char *p = kmap_atomic(bv.bv_page) + bv.bv_offset;
 		skb_copy_bits(skb, soff, p, bv.bv_len);
 		kunmap_atomic(p);
