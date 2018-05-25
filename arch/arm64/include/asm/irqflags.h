@@ -18,7 +18,27 @@
 
 #ifdef __KERNEL__
 
+#include <asm/alternative.h>
+#include <asm/cpufeature.h>
 #include <asm/ptrace.h>
+#include <asm/sysreg.h>
+
+
+/*
+ * When ICC_PMR_EL1 is used for interrupt masking, only the bit indicating
+ * whether the normal interrupts are masked is kept along with the daif
+ * flags.
+ */
+#define ARCH_FLAG_PMR_EN 0x1
+
+#define MAKE_ARCH_FLAGS(daif, pmr)					\
+	((daif) | (((pmr) >> ICC_PMR_EL1_EN_SHIFT) & ARCH_FLAG_PMR_EN))
+
+#define ARCH_FLAGS_GET_PMR(flags)				\
+	((((flags) & ARCH_FLAG_PMR_EN) << ICC_PMR_EL1_EN_SHIFT) \
+		| ICC_PMR_EL1_MASKED)
+
+#define ARCH_FLAGS_GET_DAIF(flags) ((flags) & ~ARCH_FLAG_PMR_EN)
 
 /*
  * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
@@ -38,31 +58,50 @@
  */
 static inline unsigned long arch_local_irq_save(void)
 {
-	unsigned long flags;
-	asm volatile(
+	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
+	unsigned long pmr = 0;
+
+	asm volatile(ALTERNATIVE(
 		"mrs	%0, daif		// arch_local_irq_save\n"
-		"msr	daifset, #2"
-		: "=r" (flags)
-		:
+		"msr	daifset, #2\n"
+		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
+		/* --- */
+		"mrs	%0, daif\n"
+		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1) "\n"
+		"msr_s	" __stringify(SYS_ICC_PMR_EL1) ", %2",
+		ARM64_HAS_IRQ_PRIO_MASKING)
+		: "=&r" (flags), "=&r" (pmr)
+		: "r" (masked)
 		: "memory");
-	return flags;
+
+	return MAKE_ARCH_FLAGS(flags, pmr);
 }
 
 static inline void arch_local_irq_enable(void)
 {
-	asm volatile(
-		"msr	daifclr, #2		// arch_local_irq_enable"
+	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
+
+	asm volatile(ALTERNATIVE(
+		"msr	daifclr, #2		// arch_local_irq_enable\n"
+		"nop",
+		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
+		"dsb	sy",
+		ARM64_HAS_IRQ_PRIO_MASKING)
 		:
-		:
+		: "r" (unmasked)
 		: "memory");
 }
 
 static inline void arch_local_irq_disable(void)
 {
-	asm volatile(
-		"msr	daifset, #2		// arch_local_irq_disable"
+	unsigned long masked = ICC_PMR_EL1_MASKED;
+
+	asm volatile(ALTERNATIVE(
+		"msr	daifset, #2		// arch_local_irq_disable",
+		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0",
+		ARM64_HAS_IRQ_PRIO_MASKING)
 		:
-		:
+		: "r" (masked)
 		: "memory");
 }
 
@@ -72,12 +111,19 @@ static inline void arch_local_irq_disable(void)
 static inline unsigned long arch_local_save_flags(void)
 {
 	unsigned long flags;
-	asm volatile(
-		"mrs	%0, daif		// arch_local_save_flags"
-		: "=r" (flags)
+	unsigned long pmr = 0;
+
+	asm volatile(ALTERNATIVE(
+		"mrs	%0, daif		// arch_local_save_flags\n"
+		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
+		"mrs	%0, daif\n"
+		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1),
+		ARM64_HAS_IRQ_PRIO_MASKING)
+		: "=r" (flags), "=r" (pmr)
 		:
 		: "memory");
-	return flags;
+
+	return MAKE_ARCH_FLAGS(flags, pmr);
 }
 
 /*
@@ -85,16 +131,27 @@ static inline unsigned long arch_local_save_flags(void)
  */
 static inline void arch_local_irq_restore(unsigned long flags)
 {
-	asm volatile(
-		"msr	daif, %0		// arch_local_irq_restore"
+	unsigned long pmr = ARCH_FLAGS_GET_PMR(flags);
+
+	flags = ARCH_FLAGS_GET_DAIF(flags);
+
+	asm volatile(ALTERNATIVE(
+		"msr	daif, %0		// arch_local_irq_restore\n"
+		"nop\n"
+		"nop",
+		"msr	daif, %0\n"
+		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%1\n"
+		"dsb	sy",
+		ARM64_HAS_IRQ_PRIO_MASKING)
 	:
-	: "r" (flags)
+	: "r" (flags), "r" (pmr)
 	: "memory");
 }
 
 static inline int arch_irqs_disabled_flags(unsigned long flags)
 {
-	return flags & PSR_I_BIT;
+	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
+		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
 }
 #endif
 #endif

@@ -23,6 +23,7 @@
 #ifndef __ASM_ASSEMBLER_H
 #define __ASM_ASSEMBLER_H
 
+#include <asm/alternative.h>
 #include <asm/asm-offsets.h>
 #include <asm/cpufeature.h>
 #include <asm/debug-monitors.h>
@@ -62,12 +63,24 @@
 /*
  * Enable and disable interrupts.
  */
-	.macro	disable_irq
+	.macro	disable_irq, tmp
+	mov	\tmp, #ICC_PMR_EL1_MASKED
+alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
 	msr	daifset, #2
+alternative_else
+	msr_s	SYS_ICC_PMR_EL1, \tmp
+alternative_endif
 	.endm
 
-	.macro	enable_irq
+	.macro	enable_irq, tmp
+	mov     \tmp, #ICC_PMR_EL1_UNMASKED
+alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
 	msr	daifclr, #2
+	nop
+alternative_else
+	msr_s	SYS_ICC_PMR_EL1, \tmp
+	dsb	sy
+alternative_endif
 	.endm
 
 	.macro	save_and_disable_irq, flags

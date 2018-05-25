@@ -25,8 +25,11 @@
 #define CurrentEL_EL1		(1 << 2)
 #define CurrentEL_EL2		(2 << 2)
 
-/* PMR value use to unmask interrupts */
+/* PMR values used to mask/unmask interrupts */
 #define ICC_PMR_EL1_UNMASKED    0xf0
+#define ICC_PMR_EL1_EN_SHIFT	6
+#define ICC_PMR_EL1_EN_BIT	(1 << ICC_PMR_EL1_EN_SHIFT) // PMR IRQ enable
+#define ICC_PMR_EL1_MASKED      (ICC_PMR_EL1_UNMASKED ^ ICC_PMR_EL1_EN_BIT)
 
 /* AArch32-specific ptrace requests */
 #define COMPAT_PTRACE_GETREGS		12
@@ -174,8 +177,9 @@ static inline void forget_syscall(struct pt_regs *regs)
 #define processor_mode(regs) \
 	((regs)->pstate & PSR_MODE_MASK)
 
-#define interrupts_enabled(regs) \
-	(!((regs)->pstate & PSR_I_BIT))
+#define interrupts_enabled(regs)			\
+	((!((regs)->pstate & PSR_I_BIT)) &&		\
+	 ((regs)->pmr_save & ICC_PMR_EL1_EN_BIT))
 
 #define fast_interrupts_enabled(regs) \
 	(!((regs)->pstate & PSR_F_BIT))
