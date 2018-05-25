@@ -391,6 +391,16 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
 	mov	sp, x19
 	.endm
 
+	/* Should be checked on return from irq handlers */
+	.macro	branch_if_was_nmi, tmp, target
+	alternative_if ARM64_HAS_IRQ_PRIO_MASKING
+	mrs	\tmp, daif
+	alternative_else
+	mov	\tmp, #0
+	alternative_endif
+	tbnz	\tmp, #7, \target // Exiting an NMI
+	.endm
+
 /*
  * These are the registers used in the syscall handler, and allow us to
  * have in theory up to 7 arguments to a function - x0 to x6.
@@ -611,11 +621,29 @@ ENDPROC(el1_sync)
 el1_irq:
 	kernel_entry 1
 	enable_da_f
+
 #ifdef CONFIG_TRACE_IRQFLAGS
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	ldr	x20, [sp, #S_PMR_SAVE]
+	/* Irqs were disabled, don't trace */
+	tbz	x20, ICC_PMR_EL1_EN_SHIFT, 1f
+#endif
 	bl	trace_hardirqs_off
+1:
 #endif
 
 	irq_handler
+
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	/*
+	 * Irqs were disabled, we have an nmi.
+	 * We might have interrupted a context with interrupt disabled that set
+	 * NEED_RESCHED flag.
+	 * Skip preemption and irq tracing if needed.
+	 */
+	tbz	x20, ICC_PMR_EL1_EN_SHIFT, untraced_irq_exit
+	branch_if_was_nmi x0, skip_preempt
+#endif
 
 #ifdef CONFIG_PREEMPT
 	ldr	w24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
@@ -625,9 +653,13 @@ el1_irq:
 	bl	el1_preempt
 1:
 #endif
+
+skip_preempt:
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_on
 #endif
+
+untraced_irq_exit:
 	kernel_exit 1
 ENDPROC(el1_irq)
 
@@ -858,6 +890,9 @@ el0_irq_naked:
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_on
 #endif
+
+	branch_if_was_nmi x2, nmi_ret_to_user
+
 	b	ret_to_user
 ENDPROC(el0_irq)
 
@@ -1353,3 +1388,11 @@ alternative_else_nop_endif
 ENDPROC(__sdei_asm_handler)
 NOKPROBE(__sdei_asm_handler)
 #endif /* CONFIG_ARM_SDE_INTERFACE */
+
+/*
+ * NMI return path to EL0
+ */
+nmi_ret_to_user:
+	ldr	x1, [tsk, #TSK_TI_FLAGS]
+	b	finish_ret_to_user
+ENDPROC(nmi_ret_to_user)

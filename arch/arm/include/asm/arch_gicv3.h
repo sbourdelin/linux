@@ -374,5 +374,11 @@ static inline void gic_start_pmr_masking(void)
 	WARN_ON(true);
 }
 
+static inline void gic_set_nmi_active(void)
+{
+	/* Should not get called */
+	WARN_ON(true);
+}
+
 #endif /* !__ASSEMBLY__ */
 #endif /* !__ASM_ARCH_GICV3_H */

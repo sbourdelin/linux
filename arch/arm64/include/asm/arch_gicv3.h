@@ -166,5 +166,11 @@ static inline void gic_start_pmr_masking(void)
 	asm volatile ("msr daifclr, #2" : : : "memory");
 }
 
+/* Notify an NMI is active, blocking other NMIs */
+static inline void gic_set_nmi_active(void)
+{
+	asm volatile ("msr daifset, #2" : : : "memory");
+}
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARCH_GICV3_H */

@@ -41,6 +41,8 @@
 
 #include "irq-gic-common.h"
 
+#define GICD_INT_NMI_PRI		0xa0
+
 struct redist_region {
 	void __iomem		*redist_base;
 	phys_addr_t		phys_base;
@@ -253,6 +255,12 @@ static inline bool arch_uses_gic_prios(void)
 	return IS_ENABLED(CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS);
 }
 
+static inline bool gic_supports_nmi(void)
+{
+	return arch_uses_gic_prios()
+	       && static_branch_likely(&have_non_secure_prio_view);
+}
+
 static int gic_irq_set_irqchip_state(struct irq_data *d,
 				     enum irqchip_irq_state which, bool val)
 {
@@ -371,6 +379,20 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
 	return aff;
 }
 
+static void do_handle_nmi(unsigned int hwirq, struct pt_regs *regs)
+{
+	struct pt_regs *old_regs = set_irq_regs(regs);
+	unsigned int irq;
+
+	nmi_enter();
+
+	irq = irq_find_mapping(gic_data.domain, hwirq);
+	generic_handle_irq(irq);
+
+	nmi_exit();
+	set_irq_regs(old_regs);
+}
+
 static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 {
 	u32 irqnr;
@@ -385,6 +407,23 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 
 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
 		int err;
+
+		if (gic_supports_nmi()
+		    && unlikely(gic_read_rpr() == GICD_INT_NMI_PRI)) {
+			/*
+			 * We need to prevent other NMIs to occur even after a
+			 * priority drop.
+			 * We keep I flag set until cpsr is restored from
+			 * kernel_exit.
+			 */
+			gic_set_nmi_active();
+
+			if (static_branch_likely(&supports_deactivate_key))
+				gic_write_eoir(irqnr);
+
+			do_handle_nmi(irqnr, regs);
+			return;
+		}
 
 		if (static_branch_likely(&supports_deactivate_key))
 			gic_write_eoir(irqnr);
@@ -1183,6 +1222,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
 	if (arch_uses_gic_prios()) {
 		if (!gic_has_group0() || gic_dist_security_disabled())
 			static_branch_enable(&have_non_secure_prio_view);
+		else
+			pr_warn("SCR_EL3.FIQ set, cannot enable use of pseudo-NMIs\n");
 	}
 
 	return 0;
