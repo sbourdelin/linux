@@ -3360,8 +3360,12 @@ static int macb_init(struct platform_device *pdev)
 		dev->hw_features |= MACB_NETIF_LSO;
 
 	/* Checksum offload is only available on gem with packet buffer */
-	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE))
-		dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_RXCSUM;
+	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE)) {
+		if (!(bp->caps & MACB_CAPS_DISABLE_TX_HW_CSUM))
+			dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_RXCSUM;
+		else
+			dev->hw_features |= NETIF_F_RXCSUM;
+	}
 	if (bp->caps & MACB_CAPS_SG_DISABLED)
 		dev->hw_features &= ~NETIF_F_SG;
 	dev->features = dev->hw_features;
