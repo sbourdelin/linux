@@ -368,10 +368,10 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 {
 	struct imx_media_video_dev *vdev = priv->vdev;
 	struct v4l2_mbus_framefmt *infmt;
+	bool passthrough, interweave;
 	struct ipu_image image;
 	u32 passthrough_bits;
 	dma_addr_t phys[2];
-	bool passthrough;
 	u32 burst_size;
 	int ret;
 
@@ -388,6 +388,10 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 
 	image.phys0 = phys[0];
 	image.phys1 = phys[1];
+
+	interweave = (image.pix.field == V4L2_FIELD_NONE &&
+		      (V4L2_FIELD_HAS_BOTH(infmt->field) ||
+		       infmt->field == V4L2_FIELD_ALTERNATE));
 
 	/*
 	 * Check for conditions that require the IPU to handle the
@@ -422,8 +426,12 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 			      ((image.pix.width & 0xf) ? 8 : 16) : 32) : 64;
 		passthrough = is_parallel_16bit_bus(&priv->upstream_ep);
 		passthrough_bits = 16;
-		/* Skip writing U and V components to odd rows */
-		ipu_cpmem_skip_odd_chroma_rows(priv->idmac_ch);
+		/*
+		 * Skip writing U and V components to odd rows (but not
+		 * when enabling IDMAC interweaving, they are incompatible).
+		 */
+		if (!interweave)
+			ipu_cpmem_skip_odd_chroma_rows(priv->idmac_ch);
 		break;
 	case V4L2_PIX_FMT_YUYV:
 	case V4L2_PIX_FMT_UYVY:
@@ -477,9 +485,7 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 
 	ipu_smfc_set_burstsize(priv->smfc, burst_size);
 
-	if (image.pix.field == V4L2_FIELD_NONE &&
-	    (V4L2_FIELD_HAS_BOTH(infmt->field) ||
-	     infmt->field == V4L2_FIELD_ALTERNATE))
+	if (interweave)
 		ipu_cpmem_interlaced_scan(priv->idmac_ch,
 					  image.pix.bytesperline);
 
