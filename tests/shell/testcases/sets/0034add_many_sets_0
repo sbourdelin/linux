@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# This testscase checks addition of multiple sets.
+
+COUNT=40000
+
+tmpfile=$(mktemp)
+if [ ! -w $tmpfile ] ; then
+        echo "Failed to create tmp file" >&2
+        exit 0
+fi
+
+trap "rm -rf $tmpfile" EXIT # cleanup if aborted
+
+generate() {
+        for ((i=1; i<=COUNT; i++)) ; do
+		echo "add set x y${i} { type ipv4_addr; }"
+        done
+}
+
+echo "add table x
+$(generate)" > $tmpfile
+
+set -e
+$NFT -f $tmpfile
