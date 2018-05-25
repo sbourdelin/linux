@@ -108,6 +108,7 @@ static void emac_sgmii_link_init(struct emac_adapter *adpt)
 	writel(val, phy->base + EMAC_SGMII_PHY_AUTONEG_CFG2);
 }
 
+#ifdef CONFIG_ACPI
 static int emac_sgmii_irq_clear(struct emac_adapter *adpt, u8 irq_bits)
 {
 	struct emac_sgmii *phy = &adpt->phy;
@@ -288,6 +289,7 @@ static struct sgmii_ops qdf2400_ops = {
 	.link_change = emac_sgmii_common_link_change,
 	.reset = emac_sgmii_common_reset,
 };
+#endif
 
 static int emac_sgmii_acpi_match(struct device *dev, void *data)
 {
