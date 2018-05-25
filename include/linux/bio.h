@@ -225,6 +225,24 @@ static inline bool bio_rewind_iter(struct bio *bio, struct bvec_iter *iter,
 #define bio_for_each_segment(bvl, bio, iter)			\
 	__bio_for_each_segment(bvl, bio, iter, (bio)->bi_iter)
 
+#define bio_for_each_segment_all(bvl, bio, i) \
+	bio_for_each_page_all((bvl), (bio), (i))
+
+/*
+ * This helper returns singlepage bvec to caller, and the sp bvec is
+ * generated in-flight from multipage bvec stored in bvec table. So we
+ * can _not_ change the bvec stored in bio->bi_io_vec[] via this helper.
+ *
+ * If bvec need to be updated in the table, please use
+ * bio_for_each_segment_all() and make sure it is correctly used since
+ * bvec may points to one multipage bvec.
+ */
+#define bio_for_each_page_all2(bvl, bio, i, bi)			\
+	for ((bi).iter = BVEC_ITER_ALL_INIT, i = 0, bvl = &(bi).bv;	\
+	     (bi).iter.bi_idx < (bio)->bi_vcnt &&			\
+		(((bi).bv = bio_iter_iovec((bio), (bi).iter)), 1);	\
+	     bio_advance_iter((bio), &(bi).iter, (bi).bv.bv_len), i++)
+
 #define bio_iter_last(bvec, iter) ((iter).bi_size == (bvec).bv_len)
 
 static inline unsigned __bio_elements(struct bio *bio, bool seg)

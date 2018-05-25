@@ -84,6 +84,12 @@ struct bvec_iter {
 						   current bvec */
 };
 
+/* this iter is only for implementing bio_for_each_page_all2() */
+struct bvec_iter_all {
+	struct bvec_iter	iter;
+	struct bio_vec		bv;      /* in-flight singlepage bvec */
+};
+
 /*
  * various member access, note that bio_data should of course not be used
  * on highmem page vectors
