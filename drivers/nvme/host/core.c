@@ -2120,12 +2120,9 @@ nvme_subsys_show_str_function(serial);
 nvme_subsys_show_str_function(firmware_rev);
 
 #ifdef CONFIG_NVME_MULTIPATH
-static ssize_t nvme_subsys_show_mpath_personality(struct device *dev,
-						  struct device_attribute *attr,
-						  char *buf)
+static ssize_t __nvme_subsys_show_mpath_personality(struct nvme_subsystem *subsys,
+						    char *buf)
 {
-	struct nvme_subsystem *subsys =
-		container_of(dev, struct nvme_subsystem, dev);
 	ssize_t ret;
 
 	if (subsys->native_mpath)
@@ -2136,12 +2133,9 @@ static ssize_t nvme_subsys_show_mpath_personality(struct device *dev,
 	return ret;
 }
 
-static ssize_t nvme_subsys_store_mpath_personality(struct device *dev,
-						   struct device_attribute *attr,
-						   const char *buf, size_t count)
+static ssize_t __nvme_subsys_store_mpath_personality(struct nvme_subsystem *subsys,
+						     const char *buf, size_t count)
 {
-	struct nvme_subsystem *subsys =
-		container_of(dev, struct nvme_subsystem, dev);
 	bool native_mpath = false;
 	int ret = 0;
 
@@ -2162,6 +2156,24 @@ static ssize_t nvme_subsys_store_mpath_personality(struct device *dev,
 
 out:
 	return ret ? ret : count;
+}
+
+static ssize_t nvme_subsys_show_mpath_personality(struct device *dev,
+						  struct device_attribute *attr,
+						  char *buf)
+{
+	struct nvme_subsystem *subsys =
+		container_of(dev, struct nvme_subsystem, dev);
+	return __nvme_subsys_show_mpath_personality(subsys, buf);
+}
+
+static ssize_t nvme_subsys_store_mpath_personality(struct device *dev,
+						   struct device_attribute *attr,
+						   const char *buf, size_t count)
+{
+	struct nvme_subsystem *subsys =
+		container_of(dev, struct nvme_subsystem, dev);
+	return __nvme_subsys_store_mpath_personality(subsys, buf, count);
 }
 static SUBSYS_ATTR_RW(mpath_personality, nvme_subsys_show_mpath_personality,
 		      nvme_subsys_store_mpath_personality);
@@ -2820,6 +2832,28 @@ static ssize_t nvme_sysfs_show_address(struct device *dev,
 }
 static DEVICE_ATTR(address, S_IRUGO, nvme_sysfs_show_address, NULL);
 
+#ifdef CONFIG_NVME_MULTIPATH
+static ssize_t nvme_sysfs_show_mpath_personality(struct device *dev,
+						 struct device_attribute *attr,
+						 char *buf)
+{
+	struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
+
+	return __nvme_subsys_show_mpath_personality(ctrl->subsys, buf);
+}
+
+static ssize_t nvme_sysfs_store_mpath_personality(struct device *dev,
+						  struct device_attribute *attr,
+						  const char *buf, size_t count)
+{
+	struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
+
+	return __nvme_subsys_store_mpath_personality(ctrl->subsys, buf, count);
+}
+static DEVICE_ATTR(mpath_personality, 0644,
+		   nvme_sysfs_show_mpath_personality, nvme_sysfs_store_mpath_personality);
+#endif
+
 static struct attribute *nvme_dev_attrs[] = {
 	&dev_attr_reset_controller.attr,
 	&dev_attr_rescan_controller.attr,
@@ -2832,6 +2866,9 @@ static struct attribute *nvme_dev_attrs[] = {
 	&dev_attr_subsysnqn.attr,
 	&dev_attr_address.attr,
 	&dev_attr_state.attr,
+#ifdef CONFIG_NVME_MULTIPATH
+	&dev_attr_mpath_personality.attr,
+#endif
 	NULL
 };
 
