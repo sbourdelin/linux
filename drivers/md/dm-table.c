@@ -866,7 +866,6 @@ EXPORT_SYMBOL(dm_consume_args);
 static bool __table_type_bio_based(enum dm_queue_mode table_type)
 {
 	return (table_type == DM_TYPE_BIO_BASED ||
-		table_type == DM_TYPE_DAX_BIO_BASED ||
 		table_type == DM_TYPE_NVME_BIO_BASED);
 }
 
@@ -888,7 +887,7 @@ static int device_supports_dax(struct dm_target *ti, struct dm_dev *dev,
 	return bdev_dax_supported(dev->bdev, PAGE_SIZE);
 }
 
-static bool dm_table_supports_dax(struct dm_table *t)
+bool dm_table_supports_dax(struct dm_table *t)
 {
 	struct dm_target *ti;
 	unsigned i;
@@ -907,6 +906,7 @@ static bool dm_table_supports_dax(struct dm_table *t)
 
 	return true;
 }
+EXPORT_SYMBOL_GPL(dm_table_supports_dax);
 
 static bool dm_table_does_not_support_partial_completion(struct dm_table *t);
 
@@ -944,7 +944,6 @@ static int dm_table_determine_type(struct dm_table *t)
 			/* possibly upgrade to a variant of bio-based */
 			goto verify_bio_based;
 		}
-		BUG_ON(t->type == DM_TYPE_DAX_BIO_BASED);
 		BUG_ON(t->type == DM_TYPE_NVME_BIO_BASED);
 		goto verify_rq_based;
 	}
@@ -981,18 +980,14 @@ static int dm_table_determine_type(struct dm_table *t)
 verify_bio_based:
 		/* We must use this table as bio-based */
 		t->type = DM_TYPE_BIO_BASED;
-		if (dm_table_supports_dax(t) ||
-		    (list_empty(devices) && live_md_type == DM_TYPE_DAX_BIO_BASED)) {
-			t->type = DM_TYPE_DAX_BIO_BASED;
-		} else {
-			/* Check if upgrading to NVMe bio-based is valid or required */
-			tgt = dm_table_get_immutable_target(t);
-			if (tgt && !tgt->max_io_len && dm_table_does_not_support_partial_completion(t)) {
-				t->type = DM_TYPE_NVME_BIO_BASED;
-				goto verify_rq_based; /* must be stacked directly on NVMe (blk-mq) */
-			} else if (list_empty(devices) && live_md_type == DM_TYPE_NVME_BIO_BASED) {
-				t->type = DM_TYPE_NVME_BIO_BASED;
-			}
+
+		/* Check if upgrading to NVMe bio-based is valid or required */
+		tgt = dm_table_get_immutable_target(t);
+		if (tgt && !tgt->max_io_len && dm_table_does_not_support_partial_completion(t)) {
+			t->type = DM_TYPE_NVME_BIO_BASED;
+			goto verify_rq_based; /* must be stacked directly on NVMe (blk-mq) */
+		} else if (list_empty(devices) && live_md_type == DM_TYPE_NVME_BIO_BASED) {
+			t->type = DM_TYPE_NVME_BIO_BASED;
 		}
 		return 0;
 	}
