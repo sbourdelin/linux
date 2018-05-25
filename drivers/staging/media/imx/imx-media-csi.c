@@ -477,7 +477,8 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 	ipu_smfc_set_burstsize(priv->smfc, burst_size);
 
 	if (image.pix.field == V4L2_FIELD_NONE &&
-	    V4L2_FIELD_HAS_BOTH(infmt->field))
+	    (V4L2_FIELD_HAS_BOTH(infmt->field) ||
+	     infmt->field == V4L2_FIELD_ALTERNATE))
 		ipu_cpmem_interlaced_scan(priv->idmac_ch,
 					  image.pix.bytesperline);
 
