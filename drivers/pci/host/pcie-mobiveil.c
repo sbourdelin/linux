@@ -845,6 +845,7 @@ error:
 
 static const struct of_device_id mobiveil_pcie_of_match[] = {
 	{.compatible = "mbvl,gpex40-pcie",},
+	{},
 };
 
 MODULE_DEVICE_TABLE(of, mobiveil_pcie_of_match);
