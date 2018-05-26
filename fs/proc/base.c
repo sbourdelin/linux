@@ -762,8 +762,9 @@ static const struct file_operations proc_single_file_operations = {
 	.release	= single_release,
 };
 
-
-struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
+struct mm_struct *proc_mem_open(struct inode *inode,
+				unsigned int mode,
+				fmode_t f_mode)
 {
 	struct task_struct *task = get_proc_task(inode);
 	struct mm_struct *mm = ERR_PTR(-ESRCH);
@@ -773,10 +774,20 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 		put_task_struct(task);
 
 		if (!IS_ERR_OR_NULL(mm)) {
-			/* ensure this mm_struct can't be freed */
-			mmgrab(mm);
-			/* but do not pin its memory */
-			mmput(mm);
+			/*
+			 * Prevent this interface from being used as a mean
+			 * to bypass memory restrictions, including those
+			 * imposed by LSMs.
+			 */
+			if (mm == current->mm &&
+			    f_mode & FMODE_WRITE)
+				mm = ERR_PTR(-EACCES);
+			else {
+				/* ensure this mm_struct can't be freed */
+				mmgrab(mm);
+				/* but do not pin its memory */
+				mmput(mm);
+			}
 		}
 	}
 
@@ -785,7 +796,7 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 
 static int __mem_open(struct inode *inode, struct file *file, unsigned int mode)
 {
-	struct mm_struct *mm = proc_mem_open(inode, mode);
+	struct mm_struct *mm = proc_mem_open(inode, mode, file->f_mode);
 
 	if (IS_ERR(mm))
 		return PTR_ERR(mm);
