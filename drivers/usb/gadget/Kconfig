@@ -149,6 +149,9 @@ config USB_LIBCOMPOSITE
 config USB_F_ACM
 	tristate
 
+config USB_F_CCID
+	tristate
+
 config USB_F_SS_LB
 	tristate
 
@@ -247,6 +250,20 @@ config USB_CONFIGFS_ACM
 	help
 	  ACM serial link.  This function can be used to interoperate with
 	  MS-Windows hosts or with the Linux-USB "cdc-acm" driver.
+
+config USB_CONFIGFS_CCID
+	bool "Chip Card Interface Device (CCID)"
+	depends on USB_CONFIGFS
+	select USB_F_CCID
+	help
+	  The CCID function driver provides generic emulation of a
+	  Chip Card Interface Device (CCID).
+
+	  You will need a user space server talking to /dev/ccidg*,
+	  since the kernel itself does not implement CCID/TPDU/APDU
+	  protocol.
+
+	  For more information, see Documentation/usb/gadget_ccid.rst.
 
 config USB_CONFIGFS_OBEX
 	bool "Object Exchange Model (CDC OBEX)"
