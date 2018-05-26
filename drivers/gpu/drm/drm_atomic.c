@@ -799,6 +799,24 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 		state->rotation = val;
 	} else if (property == plane->zpos_property) {
 		state->zpos = val;
+	} else if (property == plane->colorkey.mode_property) {
+		state->colorkey.mode = val;
+	} else if (property == plane->colorkey.min_property) {
+		state->colorkey.min = val;
+	} else if (property == plane->colorkey.max_property) {
+		state->colorkey.max = val;
+	} else if (property == plane->colorkey.format_property) {
+		state->colorkey.format = val;
+	} else if (property == plane->colorkey.mask_property) {
+		state->colorkey.mask = val;
+	} else if (property == plane->colorkey.inverted_match_property) {
+		state->colorkey.inverted_match = val;
+	} else if (property == plane->colorkey.replacement_mask_property) {
+		state->colorkey.replacement_mask = val;
+	} else if (property == plane->colorkey.replacement_value_property) {
+		state->colorkey.replacement_value = val;
+	} else if (property == plane->colorkey.replacement_format_property) {
+		state->colorkey.replacement_format = val;
 	} else if (property == plane->color_encoding_property) {
 		state->color_encoding = val;
 	} else if (property == plane->color_range_property) {
@@ -864,6 +882,24 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
 		*val = state->rotation;
 	} else if (property == plane->zpos_property) {
 		*val = state->zpos;
+	} else if (property == plane->colorkey.mode_property) {
+		*val = state->colorkey.mode;
+	} else if (property == plane->colorkey.min_property) {
+		*val = state->colorkey.min;
+	} else if (property == plane->colorkey.max_property) {
+		*val = state->colorkey.max;
+	} else if (property == plane->colorkey.format_property) {
+		*val = state->colorkey.format;
+	} else if (property == plane->colorkey.mask_property) {
+		*val = state->colorkey.mask;
+	} else if (property == plane->colorkey.inverted_match_property) {
+		*val = state->colorkey.inverted_match;
+	} else if (property == plane->colorkey.replacement_mask_property) {
+		*val = state->colorkey.replacement_mask;
+	} else if (property == plane->colorkey.replacement_value_property) {
+		*val = state->colorkey.replacement_value;
+	} else if (property == plane->colorkey.replacement_format_property) {
+		*val = state->colorkey.replacement_format;
 	} else if (property == plane->color_encoding_property) {
 		*val = state->color_encoding;
 	} else if (property == plane->color_range_property) {

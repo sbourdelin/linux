@@ -33,6 +33,42 @@ struct drm_printer;
 struct drm_modeset_acquire_ctx;
 
 /**
+ * enum drm_plane_colorkey_mode - uapi plane colorkey mode enumeration
+ */
+enum drm_plane_colorkey_mode {
+	/**
+	 * @DRM_PLANE_COLORKEY_MODE_DISABLED:
+	 *
+	 * No color matching performed in this mode. This is the default
+	 * common mode.
+	 */
+	DRM_PLANE_COLORKEY_MODE_DISABLED,
+
+	/**
+	 * @DRM_PLANE_COLORKEY_MODE_SRC:
+	 *
+	 * In this mode color matching is performed with the pixels of
+	 * the given plane and the matched pixels are fully (or partially)
+	 * replaced with the replacement color or become completely
+	 * transparent.
+	 */
+	DRM_PLANE_COLORKEY_MODE_SRC,
+
+	/**
+	 * @DRM_PLANE_COLORKEY_MODE_DST:
+	 *
+	 * In this mode color matching is performed with the pixels of the
+	 * planes z-positioned under the given plane and the pixels of the
+	 * hovering plane that are xy-positioned as the underlying
+	 * color-matched pixels are fully (or partially) replaced with the
+	 * replacement color or become completely transparent.
+	 */
+	DRM_PLANE_COLORKEY_MODE_DST,
+
+	DRM_PLANE_COLORKEY_MODES_NUM,
+};
+
+/**
  * struct drm_plane_state - mutable plane state
  * @plane: backpointer to the plane
  * @crtc_w: width of visible portion of plane on crtc
@@ -54,6 +90,21 @@ struct drm_modeset_acquire_ctx;
  *	where N is the number of active planes for given crtc. Note that
  *	the driver must set drm_mode_config.normalize_zpos or call
  *	drm_atomic_normalize_zpos() to update this before it can be trusted.
+ * @colorkey.mode: color key mode
+ * @colorkey.min: color key range minimum. The value is stored in AXYZ16161616
+ *	format, where A is the alpha value and X, Y and Z correspond to the
+ *	color components of the plane's pixel format (usually RGB or YUV)
+ * @colorkey.max: color key range maximum (in AXYZ16161616 format)
+ * @colorkey.mask: color key mask value (in AXYZ16161616 format)
+ * @colorkey.format: color key min/max/mask values pixel format (in
+ * 	DRM_FORMAT_AXYZ16161616 form)
+ * @colorkey.inverted_match: color key min-max matching range is inverted
+ * @colorkey.replacement_mask: color key replacement mask value (in
+ * 	AXYZ16161616 format)
+ * @colorkey.replacement_value: color key replacement value (in
+ * 	AXYZ16161616 format)
+ * @colorkey.replacement_format: color key replacement value / mask
+ *	pixel format (in DRM_FORMAT_AXYZ16161616 form)
  * @src: clipped source coordinates of the plane (in 16.16)
  * @dst: clipped destination coordinates of the plane
  * @state: backpointer to global drm_atomic_state
@@ -123,6 +174,19 @@ struct drm_plane_state {
 	/* Plane zpos */
 	unsigned int zpos;
 	unsigned int normalized_zpos;
+
+	/* Plane colorkey */
+	struct {
+		enum drm_plane_colorkey_mode mode;
+		u64 min;
+		u64 max;
+		u64 mask;
+		u32 format;
+		bool inverted_match;
+		u64 replacement_mask;
+		u64 replacement_value;
+		u32 replacement_format;
+	} colorkey;
 
 	/**
 	 * @color_encoding:
@@ -510,6 +574,7 @@ enum drm_plane_type {
  * @alpha_property: alpha property for this plane
  * @zpos_property: zpos property for this plane
  * @rotation_property: rotation property for this plane
+ * @colorkey: colorkey properties for this plane
  * @helper_private: mid-layer private data
  */
 struct drm_plane {
@@ -586,6 +651,18 @@ struct drm_plane {
 	struct drm_property *alpha_property;
 	struct drm_property *zpos_property;
 	struct drm_property *rotation_property;
+
+	struct {
+		struct drm_property *min_property;
+		struct drm_property *max_property;
+		struct drm_property *mode_property;
+		struct drm_property *mask_property;
+		struct drm_property *format_property;
+		struct drm_property *inverted_match_property;
+		struct drm_property *replacement_mask_property;
+		struct drm_property *replacement_value_property;
+		struct drm_property *replacement_format_property;
+	} colorkey;
 
 	/**
 	 * @color_encoding_property:
