@@ -146,7 +146,6 @@ void HTDebugHTCapability(u8 *CapIE, u8 *TitleString)
 	IEEE80211_DEBUG(IEEE80211_DL_HT,  "\tMCS Rate Set = [%x][%x][%x][%x][%x]\n", pCapELE->MCS[0],\
 				pCapELE->MCS[1], pCapELE->MCS[2], pCapELE->MCS[3], pCapELE->MCS[4]);
 	return;
-
 }
 
 /********************************************************************************************************************
@@ -159,7 +158,6 @@ void HTDebugHTCapability(u8 *CapIE, u8 *TitleString)
  * *****************************************************************************************************************/
 void HTDebugHTInfo(u8 *InfoIE, u8 *TitleString)
 {
-
 	static u8	EWC11NHTInfo[] = {0x00, 0x90, 0x4c, 0x34};	// For 11n EWC definition, 2007.07.17, by Emily
 	PHT_INFORMATION_ELE		pHTInfoEle;
 
@@ -260,7 +258,6 @@ static bool IsHTHalfNmodeSGI(struct ieee80211_device *ieee, bool is40MHz)
 
 u16 HTHalfMcsToDataRate(struct ieee80211_device *ieee,	u8	nMcsRate)
 {
-
 	u8	is40MHz;
 	u8	isShortGI;
 
@@ -613,7 +610,6 @@ void HTConstructCapabilityElement(struct ieee80211_device *ieee, u8 *posHTCap, u
 	//Print each field in detail. Driver should not print out this message by default
 //	HTDebugHTCapability(posHTCap, (u8*)"HTConstructCapability()");
 	return;
-
 }
 
 /********************************************************************************************************************
@@ -1117,7 +1113,6 @@ void HTInitializeHTInfo(struct ieee80211_device *ieee)
 ********************************************************************************************************************/
 void HTInitializeBssDesc(PBSS_HT pBssHT)
 {
-
 	pBssHT->bdSupportHT = false;
 	memset(pBssHT->bdHTCapBuf, 0, sizeof(pBssHT->bdHTCapBuf));
 	pBssHT->bdHTCapLen = 0;
