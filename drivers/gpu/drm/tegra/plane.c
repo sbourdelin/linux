@@ -57,6 +57,7 @@ tegra_plane_atomic_duplicate_state(struct drm_plane *plane)
 	copy->format = state->format;
 	copy->swap = state->swap;
 	copy->opaque = state->opaque;
+	copy->ckey_enabled = state->ckey_enabled;
 
 	for (i = 0; i < 2; i++)
 		copy->blending[i] = state->blending[i];
@@ -464,6 +465,148 @@ static int tegra_plane_setup_transparency(struct tegra_plane *tegra,
 	return 0;
 }
 
+static int tegra_plane_setup_colorkey(struct tegra_plane *tegra,
+				      struct tegra_plane_state *tegra_state)
+{
+	struct drm_plane_state *state;
+	struct drm_plane_state *new_plane;
+	struct drm_plane_state *old_plane;
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc_state *new_crtc;
+	struct tegra_dc_state *dc_state;
+	struct drm_plane *plane;
+	unsigned int mode;
+	u32 min, max;
+	u32 format;
+
+	/* at first check if plane has the colorkey property attached */
+	if (!tegra->base.colorkey.mode_property)
+		return 0;
+
+	format = tegra_state->base.colorkey.format;
+	mode = tegra_state->base.colorkey.mode;
+	min = tegra_state->base.colorkey.min;
+	max = tegra_state->base.colorkey.max;
+
+	state = &tegra_state->base;
+	old_plane = drm_atomic_get_old_plane_state(state->state, &tegra->base);
+
+	/* no need to proceed if color keying is (and was) disabled */
+	if (mode == DRM_PLANE_COLORKEY_MODE_DISABLED &&
+		(!old_plane || old_plane->colorkey.mode == mode))
+			return 0;
+
+	/*
+	 * Currently color keying implemented only for the middle plane
+	 * to simplify things, hence check the ordering.
+	 */
+	if (state->normalized_zpos != 1) {
+		if (mode == DRM_PLANE_COLORKEY_MODE_DISABLED)
+			goto update_planes;
+
+		return -EINVAL;
+	}
+
+	/* validate the color key mode */
+	if (mode != DRM_PLANE_COLORKEY_MODE_DST)
+		return -EINVAL;
+
+	/* validate the color key mask */
+	if ((state->colorkey.mask & 0xFFFFFF) != 0xFFFFFF)
+		return -EINVAL;
+
+	/* validate the replacement mask */
+	if (state->colorkey.replacement_mask != 0)
+		return -EINVAL;
+
+	/* validate the color key inversion mode */
+	if (state->colorkey.inverted_match != true)
+		return -EINVAL;
+
+	/*
+	 * There is no need to proceed, adding CRTC and other planes to
+	 * the atomic update, if color key value is unchanged.
+	 */
+	if (old_plane &&
+	    old_plane->colorkey.mode != DRM_PLANE_COLORKEY_MODE_DISABLED &&
+	    old_plane->colorkey.format == format &&
+	    old_plane->colorkey.min == min &&
+	    old_plane->colorkey.max == max)
+		return 0;
+
+	/* validate pixel format and convert color key value if necessary */
+	switch (format) {
+	case DRM_FORMAT_XBGR8888:
+#define XBGR8888_to_XRGB8888(v)	\
+	((((v) & 0xFF0000) >> 16) | ((v) & 0x00FF00) | (((v) & 0x0000FF) << 16))
+
+		min = XBGR8888_to_XRGB8888(min);
+		max = XBGR8888_to_XRGB8888(max);
+		break;
+
+	case DRM_FORMAT_XRGB8888:
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	/*
+	 * Tegra's HW stores the color key values within CRTC, hence adjust
+	 * planes CRTC atomic state.
+	 */
+	crtc_state = drm_atomic_get_crtc_state(state->state, state->crtc);
+	if (IS_ERR(crtc_state))
+		return PTR_ERR(crtc_state);
+
+	new_crtc = drm_atomic_get_new_crtc_state(state->state, state->crtc);
+	if (IS_ERR(new_crtc))
+		return PTR_ERR(new_crtc);
+
+	dc_state = to_dc_state(new_crtc);
+
+	/* update CRTC's color key state */
+	dc_state->ckey[0].lower = min;
+	dc_state->ckey[0].upper = max;
+
+update_planes:
+	/*
+	 * Currently the only supported color keying mode is
+	 * "dst-match-src-replace", i.e. in our case the actual matching
+	 * is performed by the underlying plane. Hence setup the color
+	 * matching for that plane and update other planes by including
+	 * them into the atomic update.
+	 */
+	drm_for_each_plane(plane, tegra->base.dev) {
+		struct tegra_plane *p = to_tegra_plane(plane);
+
+		/* skip this plane and planes on different CRTCs */
+		if (p == tegra || p->dc != tegra->dc)
+			continue;
+
+		state = drm_atomic_get_plane_state(state->state, plane);
+		if (IS_ERR(state))
+			return PTR_ERR(state);
+
+		new_plane = drm_atomic_get_new_plane_state(state->state, plane);
+		tegra_state = to_tegra_plane_state(new_plane);
+
+		/* skip planes hovering this plane */
+		if (new_plane->normalized_zpos > 1) {
+			tegra_state->ckey_enabled = false;
+			continue;
+		}
+
+		/* update planes color keying state */
+		if (mode == DRM_PLANE_COLORKEY_MODE_DISABLED)
+			tegra_state->ckey_enabled = false;
+		else
+			tegra_state->ckey_enabled = true;
+	}
+
+	return 0;
+}
+
 int tegra_plane_setup_legacy_state(struct tegra_plane *tegra,
 				   struct tegra_plane_state *state)
 {
@@ -474,6 +617,10 @@ int tegra_plane_setup_legacy_state(struct tegra_plane *tegra,
 		return err;
 
 	err = tegra_plane_setup_transparency(tegra, state);
+	if (err < 0)
+		return err;
+
+	err = tegra_plane_setup_colorkey(tegra, state);
 	if (err < 0)
 		return err;
 

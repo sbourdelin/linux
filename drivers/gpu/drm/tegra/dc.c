@@ -172,6 +172,11 @@ static void tegra_plane_setup_blending_legacy(struct tegra_plane *plane)
 
 	state = to_tegra_plane_state(plane->base.state);
 
+	if (state->ckey_enabled) {
+		background[0] |= BLEND_COLOR_KEY_0;
+		background[2] |= BLEND_COLOR_KEY_0;
+	}
+
 	if (state->opaque) {
 		/*
 		 * Since custom fix-weight blending isn't utilized and weight
@@ -776,6 +781,11 @@ static struct drm_plane *tegra_primary_plane_create(struct drm_device *drm,
 	drm_plane_helper_add(&plane->base, &tegra_plane_helper_funcs);
 	drm_plane_create_zpos_property(&plane->base, plane->index, 0, 255);
 
+	if (dc->soc->has_legacy_blending)
+		drm_plane_create_colorkey_properties(&plane->base,
+					BIT(DRM_PLANE_COLORKEY_MODE_DISABLED) |
+					BIT(DRM_PLANE_COLORKEY_MODE_DST));
+
 	return &plane->base;
 }
 
@@ -1053,6 +1063,11 @@ static struct drm_plane *tegra_dc_overlay_plane_create(struct drm_device *drm,
 	drm_plane_helper_add(&plane->base, &tegra_plane_helper_funcs);
 	drm_plane_create_zpos_property(&plane->base, plane->index, 0, 255);
 
+	if (dc->soc->has_legacy_blending)
+		drm_plane_create_colorkey_properties(&plane->base,
+					BIT(DRM_PLANE_COLORKEY_MODE_DISABLED) |
+					BIT(DRM_PLANE_COLORKEY_MODE_DST));
+
 	return &plane->base;
 }
 
@@ -1153,6 +1168,7 @@ tegra_crtc_atomic_duplicate_state(struct drm_crtc *crtc)
 {
 	struct tegra_dc_state *state = to_dc_state(crtc->state);
 	struct tegra_dc_state *copy;
+	unsigned int i;
 
 	copy = kmalloc(sizeof(*copy), GFP_KERNEL);
 	if (!copy)
@@ -1163,6 +1179,9 @@ tegra_crtc_atomic_duplicate_state(struct drm_crtc *crtc)
 	copy->pclk = state->pclk;
 	copy->div = state->div;
 	copy->planes = state->planes;
+
+	for (i = 0; i < 2; i++)
+		copy->ckey[i] = state->ckey[i];
 
 	return &copy->base;
 }
@@ -1892,6 +1911,18 @@ static void tegra_crtc_atomic_flush(struct drm_crtc *crtc,
 	struct tegra_dc_state *state = to_dc_state(crtc->state);
 	struct tegra_dc *dc = to_tegra_dc(crtc);
 	u32 value;
+
+	if (dc->soc->has_legacy_blending) {
+		tegra_dc_writel(dc,
+				state->ckey[0].lower, DC_DISP_COLOR_KEY0_LOWER);
+		tegra_dc_writel(dc,
+				state->ckey[0].upper, DC_DISP_COLOR_KEY0_UPPER);
+
+		tegra_dc_writel(dc,
+				state->ckey[1].lower, DC_DISP_COLOR_KEY1_LOWER);
+		tegra_dc_writel(dc,
+				state->ckey[1].upper, DC_DISP_COLOR_KEY1_UPPER);
+	}
 
 	value = state->planes << 8 | GENERAL_UPDATE;
 	tegra_dc_writel(dc, value, DC_CMD_STATE_CONTROL);

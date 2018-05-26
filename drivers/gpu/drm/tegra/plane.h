@@ -49,6 +49,7 @@ struct tegra_plane_state {
 	/* used for legacy blending support only */
 	struct tegra_plane_legacy_blending_state blending[2];
 	bool opaque;
+	bool ckey_enabled;
 };
 
 static inline struct tegra_plane_state *

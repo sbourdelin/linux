@@ -18,6 +18,11 @@
 
 struct tegra_output;
 
+struct tegra_dc_color_key_state {
+	u32 lower;
+	u32 upper;
+};
+
 struct tegra_dc_state {
 	struct drm_crtc_state base;
 
@@ -26,6 +31,8 @@ struct tegra_dc_state {
 	unsigned int div;
 
 	u32 planes;
+
+	struct tegra_dc_color_key_state ckey[2];
 };
 
 static inline struct tegra_dc_state *to_dc_state(struct drm_crtc_state *state)
