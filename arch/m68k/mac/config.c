@@ -17,6 +17,7 @@
 #include <linux/tty.h>
 #include <linux/console.h>
 #include <linux/interrupt.h>
+#include <linux/dma-mapping.h>
 /* keyb */
 #include <linux/random.h>
 #include <linux/delay.h>
@@ -971,6 +972,15 @@ static const struct resource mac_scsi_ccl_rsrc[] __initconst = {
 	},
 };
 
+static struct platform_device macsonic_dev = {
+	.name           = "macsonic",
+	.id             = -1,
+	.dev            = {
+		.dma_mask = &macsonic_dev.dev.coherent_dma_mask,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+	},
+};
+
 int __init mac_platform_init(void)
 {
 	u8 *swim_base;
@@ -1088,7 +1098,7 @@ int __init mac_platform_init(void)
 
 	if (macintosh_config->ether_type == MAC_ETHER_SONIC ||
 	    macintosh_config->expansion_type == MAC_EXP_PDS_COMM)
-		platform_device_register_simple("macsonic", -1, NULL, 0);
+		platform_device_register(&macsonic_dev);
 
 	if (macintosh_config->expansion_type == MAC_EXP_PDS ||
 	    macintosh_config->expansion_type == MAC_EXP_PDS_COMM)
