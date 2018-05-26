@@ -117,6 +117,7 @@ static ssize_t chars_chartab_store(struct kobject *kobj,
 	char *outptr = NULL;	/* Will hold keyword or desc. */
 	char *temp = NULL;
 	char *desc = NULL;
+	char *num = NULL; /* The number part of cp */
 	ssize_t retval = count;
 	unsigned long flags;
 	unsigned long index = 0;
@@ -154,7 +155,17 @@ static ssize_t chars_chartab_store(struct kobject *kobj,
 			continue;
 		}
 
-		index = simple_strtoul(cp, &temp, 10);
+		i = 0;
+		while (isdigit(*(cp + i)))
+			i = i + 1;
+		temp = cp + i;
+
+		num = kmalloc(i + 2, GFP_ATOMIC);
+		strscpy(num, cp, i + 1);
+
+		if (kstrtoul(num, 10, &index) != 0)
+			pr_warn("overflow or parsing error has occurred");
+
 		if (index > 255) {
 			rejected++;
 			cp = linefeed + 1;
@@ -751,6 +762,7 @@ static ssize_t message_store_helper(const char *buf, size_t count,
 	char *end = cp + count;
 	char *linefeed = NULL;
 	char *temp = NULL;
+	char *num = NULL;
 	ssize_t msg_stored = 0;
 	ssize_t retval = count;
 	size_t desc_length = 0;
@@ -759,6 +771,7 @@ static ssize_t message_store_helper(const char *buf, size_t count,
 	int used = 0;
 	int rejected = 0;
 	int reset = 0;
+	int i;
 	enum msg_index_t firstmessage = group->start;
 	enum msg_index_t lastmessage = group->end;
 	enum msg_index_t curmessage;
@@ -787,7 +800,17 @@ static ssize_t message_store_helper(const char *buf, size_t count,
 			continue;
 		}
 
-		index = simple_strtoul(cp, &temp, 10);
+		i = 0;
+		while (isdigit(*(cp + i)))
+			i = i + 1;
+
+		temp = cp + i;
+
+		num = kmalloc(i + 2, GFP_ATOMIC);
+		strscpy(num, cp, i + 1);
+
+		if  (kstrtoul(num, 10, &index) != 0)
+			pr_warn("overflow or parsing error has occurred");
 
 		while ((temp < linefeed) && (*temp == ' ' || *temp == '\t'))
 			temp++;
