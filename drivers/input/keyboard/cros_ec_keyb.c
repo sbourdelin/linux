@@ -245,11 +245,16 @@ static int cros_ec_keyb_work(struct notifier_block *nb,
 	switch (ckdev->ec->event_data.event_type) {
 	case EC_MKBP_EVENT_KEY_MATRIX:
 		/*
-		 * If EC is not the wake source, discard key state changes
+		 * If Keyb is not wake enabled, discard key state changes
 		 * during suspend.
 		 */
-		if (queued_during_suspend)
+		if (queued_during_suspend
+		    && !device_may_wakeup(ckdev->dev))
 			return NOTIFY_OK;
+
+		if (device_may_wakeup(ckdev->dev))
+			pm_wakeup_event(ckdev->dev, 0);
+
 
 		if (ckdev->ec->event_size != ckdev->cols) {
 			dev_err(ckdev->dev,
@@ -265,17 +270,24 @@ static int cros_ec_keyb_work(struct notifier_block *nb,
 		val = get_unaligned_le32(&ckdev->ec->event_data.data.sysrq);
 		dev_dbg(ckdev->dev, "sysrq code from EC: %#x\n", val);
 		handle_sysrq(val);
+
+		if (device_may_wakeup(ckdev->dev))
+			pm_wakeup_event(ckdev->dev, 0);
 		break;
 
 	case EC_MKBP_EVENT_BUTTON:
 	case EC_MKBP_EVENT_SWITCH:
 		/*
-		 * If EC is not the wake source, discard key state
+		 * If keyb is not wake enabled, discard key state
 		 * changes during suspend. Switches will be re-checked in
 		 * cros_ec_keyb_resume() to be sure nothing is lost.
 		 */
-		if (queued_during_suspend)
+		if (queued_during_suspend
+		    && !device_may_wakeup(ckdev->dev))
 			return NOTIFY_OK;
+
+		if (device_may_wakeup(ckdev->dev))
+			pm_wakeup_event(ckdev->dev, 0);
 
 		if (ckdev->ec->event_data.event_type == EC_MKBP_EVENT_BUTTON) {
 			val = get_unaligned_le32(
@@ -639,6 +651,7 @@ static int cros_ec_keyb_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	device_init_wakeup(ckdev->dev, true);
 	return 0;
 }
 
