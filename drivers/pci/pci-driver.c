@@ -443,6 +443,7 @@ static int pci_device_remove(struct device *dev)
 		}
 		pcibios_free_irq(pci_dev);
 		pci_dev->driver = NULL;
+		pci_sriov_drv_cleanup(pci_dev);
 	}
 
 	/* Undo the runtime PM settings in local_pci_probe() */
