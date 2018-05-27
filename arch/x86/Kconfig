@@ -448,6 +448,18 @@ config INTEL_RDT
 
 	  Say N if unsure.
 
+config SPLIT_LOCK_AC
+	bool "#AC exception for split locked accesses support"
+	default y
+	depends on X86 && CPU_SUP_INTEL
+	help
+	  Select to support #AC exception for split locked accesses. More
+	  detailed information about the feature can be found in
+	  Intel Architecture Instruction Set Extensions and Future Feature
+	  Programming Reference.
+
+	  Say N if unsure.
+
 if X86_32
 config X86_BIGSMP
 	bool "Support for big SMP systems with more than 8 CPUs"

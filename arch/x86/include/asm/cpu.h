@@ -40,4 +40,9 @@ int mwait_usable(const struct cpuinfo_x86 *);
 unsigned int x86_family(unsigned int sig);
 unsigned int x86_model(unsigned int sig);
 unsigned int x86_stepping(unsigned int sig);
+#ifdef CONFIG_SPLIT_LOCK_AC
+void detect_split_lock_ac(void);
+#else /* CONFIG_SPLIT_LOCK_AC */
+static inline void detect_split_lock_ac(void) {}
+#endif /* CONFIG_SPLIT_LOCK_AC */
 #endif /* _ASM_X86_CPU_H */

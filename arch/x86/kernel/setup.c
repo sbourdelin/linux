@@ -1272,6 +1272,8 @@ void __init setup_arch(char **cmdline_p)
 
 	mcheck_init();
 
+	detect_split_lock_ac();
+
 	arch_init_ideal_nops();
 
 	register_refined_jiffies(CLOCK_TICK_RATE);
