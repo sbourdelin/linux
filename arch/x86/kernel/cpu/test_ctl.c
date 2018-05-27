@@ -17,6 +17,7 @@
 #include <linux/mm.h>
 #include <linux/reboot.h>
 #include <linux/syscore_ops.h>
+#include <linux/debugfs.h>
 #include <asm/msr.h>
 
 #define DISABLE_SPLIT_LOCK_AC		0
@@ -33,6 +34,14 @@ static DEFINE_MUTEX(reexecute_split_lock_mutex);
 
 static int split_lock_ac_kernel = DISABLE_SPLIT_LOCK_AC;
 static int split_lock_ac_firmware = DISABLE_SPLIT_LOCK_AC;
+
+static DEFINE_MUTEX(split_lock_mutex);
+
+struct debugfs_file {
+	char				name[32];
+	int				mode;
+	const struct file_operations	*fops;
+};
 
 /* Detete feature of #AC for split lock by probing bit 29 in MSR_TEST_CTL. */
 void detect_split_lock_ac(void)
@@ -292,12 +301,95 @@ static struct syscore_ops split_lock_syscore_ops = {
 	.resume		= split_lock_bsp_resume,
 };
 
+static int enable_show(void *data, u64 *val)
+{
+	*val = split_lock_ac_kernel;
+
+	return 0;
+}
+
+static int enable_store(void *data, u64 val)
+{
+	u64 msr_val;
+	int cpu;
+
+	if (val != DISABLE_SPLIT_LOCK_AC && val != ENABLE_SPLIT_LOCK_AC)
+		return -EINVAL;
+
+	/* No need to update MSR if new setting is the same as old one. */
+	if (val == split_lock_ac_kernel)
+		return 0;
+
+	mutex_lock(&split_lock_mutex);
+	mutex_lock(&reexecute_split_lock_mutex);
+
+	/*
+	 * Wait until it's out of any re-executed split lock instruction
+	 * window.
+	 */
+	wait_for_reexecution();
+
+	split_lock_ac_kernel = val;
+	/* Read split lock setting on the current CPU. */
+	rdmsrl(MSR_TEST_CTL, msr_val);
+	/* Change the split lock setting. */
+	if (split_lock_ac_kernel == DISABLE_SPLIT_LOCK_AC)
+		msr_val &= ~MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK;
+	else
+		msr_val |= MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK;
+	/* Update the split lock setting on all online CPUs. */
+	for_each_online_cpu(cpu)
+		wrmsrl_on_cpu(cpu, MSR_TEST_CTL, msr_val);
+
+	mutex_unlock(&reexecute_split_lock_mutex);
+	mutex_unlock(&split_lock_mutex);
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(enable_ops, enable_show, enable_store, "%llx\n");
+
+static int __init debugfs_setup_split_lock(void)
+{
+	struct debugfs_file debugfs_files[] = {
+		{"enable",      0600, &enable_ops},
+	};
+	struct dentry *split_lock_dir, *fd;
+	int i;
+
+	split_lock_dir = debugfs_create_dir("split_lock", arch_debugfs_dir);
+	if (!split_lock_dir)
+		goto out;
+
+	/*  Create files under split_lock_dir. */
+	for (i = 0; i < ARRAY_SIZE(debugfs_files); i++) {
+		fd = debugfs_create_file(debugfs_files[i].name,
+					 debugfs_files[i].mode,
+					 split_lock_dir, NULL,
+					 debugfs_files[i].fops);
+		if (!fd)
+			goto out_cleanup;
+	}
+
+	return 0;
+
+out_cleanup:
+	debugfs_remove_recursive(split_lock_dir);
+out:
+
+	return -ENOMEM;
+}
+
 static int __init split_lock_init(void)
 {
 	int ret;
 
 	if (!boot_cpu_has(X86_FEATURE_SPLIT_LOCK_AC))
 		return -ENODEV;
+
+	ret = debugfs_setup_split_lock();
+	if (ret)
+		pr_warn("debugfs for #AC for split lock cannot be set up\n");
 
 	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "x86/split_lock:online",
 				split_lock_online, split_lock_offline);
