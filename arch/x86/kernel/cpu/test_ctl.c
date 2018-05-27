@@ -516,12 +516,38 @@ static const struct file_operations user_mode_ops = {
 	.llseek	= default_llseek,
 };
 
+static int firmware_show(void *data, u64 *val)
+{
+	*val = split_lock_ac_firmware;
+
+	return 0;
+}
+
+static int firmware_store(void *data, u64 val)
+{
+	if (val != DISABLE_SPLIT_LOCK_AC && val != ENABLE_SPLIT_LOCK_AC)
+		return -EINVAL;
+
+	/* No need to update setting if new setting is the same as old one. */
+	if (val == split_lock_ac_firmware)
+		return 0;
+
+	mutex_lock(&split_lock_mutex);
+	split_lock_ac_firmware = val;
+	mutex_unlock(&split_lock_mutex);
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(firmware_ops, firmware_show, firmware_store, "%llx\n");
+
 static int __init debugfs_setup_split_lock(void)
 {
 	struct debugfs_file debugfs_files[] = {
 		{"enable",      0600, &enable_ops},
 		{"kernel_mode",	0600, &kernel_mode_ops },
 		{"user_mode",	0600, &user_mode_ops },
+		{"firmware",	0600, &firmware_ops },
 	};
 	struct dentry *split_lock_dir, *fd;
 	int i;
