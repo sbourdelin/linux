@@ -15,6 +15,7 @@
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
 #include <linux/mm.h>
+#include <linux/reboot.h>
 #include <asm/msr.h>
 
 #define DISABLE_SPLIT_LOCK_AC		0
@@ -29,6 +30,7 @@ static unsigned long disable_split_lock_jiffies;
 static DEFINE_MUTEX(reexecute_split_lock_mutex);
 
 static int split_lock_ac_kernel = DISABLE_SPLIT_LOCK_AC;
+static int split_lock_ac_firmware = DISABLE_SPLIT_LOCK_AC;
 
 /* Detete feature of #AC for split lock by probing bit 29 in MSR_TEST_CTL. */
 void detect_split_lock_ac(void)
@@ -62,6 +64,12 @@ void detect_split_lock_ac(void)
 	 * before leaving.
 	 */
 	wrmsrl(MSR_TEST_CTL, orig_val);
+
+	/* Get previous firmware setting. */
+	if (orig_val & MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK)
+		split_lock_ac_firmware = ENABLE_SPLIT_LOCK_AC;
+	else
+		split_lock_ac_firmware = DISABLE_SPLIT_LOCK_AC;
 }
 
 static void _setup_split_lock(int split_lock_ac_val)
@@ -85,6 +93,41 @@ static void _setup_split_lock(int split_lock_ac_val)
 
 	wrmsrl(MSR_TEST_CTL, val);
 }
+
+static void restore_split_lock_ac(int split_lock_ac_val)
+{
+	_setup_split_lock(split_lock_ac_val);
+}
+
+/* Restore firmware setting for #AC exception for split lock. */
+void restore_split_lock_ac_firmware(void)
+{
+	if (!boot_cpu_has(X86_FEATURE_SPLIT_LOCK_AC))
+		return;
+
+	/* Don't restore the firmware setting if kernel didn't change it. */
+	if (split_lock_ac_kernel == split_lock_ac_firmware)
+		return;
+
+	restore_split_lock_ac(split_lock_ac_firmware);
+}
+
+static void split_lock_cpu_reboot(void *unused)
+{
+	restore_split_lock_ac_firmware();
+}
+
+static int split_lock_reboot_notify(struct notifier_block *nb,
+				    unsigned long code, void *unused)
+{
+	on_each_cpu_mask(cpu_online_mask, split_lock_cpu_reboot, NULL, 1);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block split_lock_reboot_nb = {
+	.notifier_call = split_lock_reboot_notify,
+};
 
 void setup_split_lock(void)
 {
@@ -220,6 +263,8 @@ static int __init split_lock_init(void)
 				split_lock_online, split_lock_offline);
 	if (ret < 0)
 		return ret;
+
+	register_reboot_notifier(&split_lock_reboot_nb);
 
 	return 0;
 }
