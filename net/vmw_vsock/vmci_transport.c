@@ -612,6 +612,13 @@ static int vmci_transport_recv_dgram_cb(void *data, struct vmci_datagram *dg)
 	if (!vmci_transport_allow_dgram(vsk, dg->src.context))
 		return VMCI_ERROR_NO_ACCESS;
 
+	bh_lock_sock(sk);
+	if (sk->sk_state == TCP_CLOSE) {
+		bh_unlock_sock(sk);
+		return VMCI_ERROR_DATAGRAM_FAILED;
+	}
+	bh_unlock_sock(sk);
+
 	size = VMCI_DG_SIZE(dg);
 
 	/* Attach the packet to the socket's receive queue as an sk_buff. */
