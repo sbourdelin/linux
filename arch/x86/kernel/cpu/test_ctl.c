@@ -16,6 +16,7 @@
 #include <linux/cpu.h>
 #include <linux/mm.h>
 #include <linux/reboot.h>
+#include <linux/syscore_ops.h>
 #include <asm/msr.h>
 
 #define DISABLE_SPLIT_LOCK_AC		0
@@ -110,6 +111,15 @@ void restore_split_lock_ac_firmware(void)
 		return;
 
 	restore_split_lock_ac(split_lock_ac_firmware);
+}
+
+/* Restore kernel setting for #AC enable bit for split lock. */
+void restore_split_lock_ac_kernel(void)
+{
+	if (!boot_cpu_has(X86_FEATURE_SPLIT_LOCK_AC))
+		return;
+
+	restore_split_lock_ac(split_lock_ac_kernel);
 }
 
 static void split_lock_cpu_reboot(void *unused)
@@ -247,10 +257,28 @@ static int split_lock_online(unsigned int cpu)
 
 static int split_lock_offline(unsigned int cpu)
 {
+	restore_split_lock_ac_firmware();
 	cancel_delayed_work(&per_cpu(reenable_delayed_work, cpu));
 
 	return 0;
 }
+
+static int split_lock_bsp_suspend(void)
+{
+	restore_split_lock_ac_firmware();
+
+	return 0;
+}
+
+static void split_lock_bsp_resume(void)
+{
+	restore_split_lock_ac_kernel();
+}
+
+static struct syscore_ops split_lock_syscore_ops = {
+	.suspend	= split_lock_bsp_suspend,
+	.resume		= split_lock_bsp_resume,
+};
 
 static int __init split_lock_init(void)
 {
@@ -263,6 +291,8 @@ static int __init split_lock_init(void)
 				split_lock_online, split_lock_offline);
 	if (ret < 0)
 		return ret;
+
+	register_syscore_ops(&split_lock_syscore_ops);
 
 	register_reboot_notifier(&split_lock_reboot_nb);
 

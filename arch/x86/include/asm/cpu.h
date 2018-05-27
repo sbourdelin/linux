@@ -45,6 +45,7 @@ void detect_split_lock_ac(void);
 bool do_split_lock_exception(struct pt_regs *regs, unsigned long error_code);
 void setup_split_lock(void);
 void restore_split_lock_ac_firmware(void);
+void restore_split_lock_ac_kernel(void);
 #else /* CONFIG_SPLIT_LOCK_AC */
 static inline void detect_split_lock_ac(void) {}
 static inline bool
@@ -55,5 +56,6 @@ do_split_lock_exception(struct pt_regs *regs, unsigned long error_code)
 
 static inline void setup_split_lock(void) {}
 static inline void restore_split_lock_ac_firmware(void) {}
+static inline void restore_split_lock_ac_kernel(void) {}
 #endif /* CONFIG_SPLIT_LOCK_AC */
 #endif /* _ASM_X86_CPU_H */
