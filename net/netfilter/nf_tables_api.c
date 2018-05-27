@@ -5616,7 +5616,7 @@ static int nf_tables_getgen(struct net *net, struct sock *nlsk,
 	struct sk_buff *skb2;
 	int err;
 
-	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
+	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (skb2 == NULL)
 		return -ENOMEM;
 
@@ -5708,7 +5708,7 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.policy		= nft_set_elem_list_policy,
 	},
 	[NFT_MSG_GETGEN] = {
-		.call		= nf_tables_getgen,
+		.call_rcu	= nf_tables_getgen,
 	},
 	[NFT_MSG_NEWOBJ] = {
 		.call_batch	= nf_tables_newobj,
