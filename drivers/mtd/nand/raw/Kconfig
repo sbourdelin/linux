@@ -534,4 +534,10 @@ config MTD_NAND_MTK
 	  Enables support for NAND controller on MTK SoCs.
 	  This controller is found on mt27xx, mt81xx, mt65xx SoCs.
 
+config MTD_NAND_TEGRA
+	tristate "Support for NAND on NVIDIA Tegra"
+	depends on ARCH_TEGRA || COMPILE_TEST
+	help
+	  Enables support for NAND flash on NVIDIA Tegra SoC based boards.
+
 endif # MTD_NAND
