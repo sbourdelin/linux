@@ -407,11 +407,24 @@ static void wb_shutdown(struct bdi_writeback *wb)
 
 	cgwb_remove_from_bdi_list(wb);
 	/*
+	 * mod_delayed_work() is not appropriate here, for
+	 * delayed_work_timer_fn() from wb_wakeup_delayed() does not check
+	 * WB_registered before calling __queue_work().
+	 */
+	del_timer_sync(&wb->dwork.timer);
+	/*
+	 * Clear WORK_STRUCT_PENDING_BIT in order to make sure that next
+	 * queue_delayed_work() actually enqueues this work to the tail, for
+	 * wb_wakeup_delayed() already set WORK_STRUCT_PENDING_BIT before
+	 * scheduling delayed_work_timer_fn().
+	 */
+	cancel_delayed_work_sync(&wb->dwork);
+	/*
 	 * Drain work list and shutdown the delayed_work.  !WB_registered
 	 * tells wb_workfn() that @wb is dying and its work_list needs to
 	 * be drained no matter what.
 	 */
-	mod_delayed_work(bdi_wq, &wb->dwork, 0);
+	queue_delayed_work(bdi_wq, &wb->dwork, 0);
 	flush_delayed_work(&wb->dwork);
 	WARN_ON(!list_empty(&wb->work_list));
 	/*
