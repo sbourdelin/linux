@@ -541,6 +541,64 @@ static int firmware_store(void *data, u64 val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(firmware_ops, firmware_show, firmware_store, "%llx\n");
 
+#ifdef CONFIG_SPLIT_LOCK_AC_TEST
+/* Execute locked btsl instruction with split lock operand. */
+static void split_lock_test_kernel(void)
+{
+	char cptr[128] __aligned(64);
+	int *iptr;
+
+	/*
+	 * Change the pointer, making it 3-byte away from the next cache
+	 * line.
+	 */
+	iptr = (int *)(cptr + 61);
+
+	/* Initial value 0 in iptr */
+	*iptr = 0;
+
+	pr_info("split lock test: split lock address=0x%lx\n",
+		(unsigned long)iptr);
+
+	/*
+	 * The distance between iptr and next cache line is 3 bytes.
+	 * Operand size in "btsl" is 4 bytes. So iptr will span two cache
+	 * lines. "lock btsl" instruction will trigger #AC in hardware
+	 * and kernel will either re-execute the instruction or go to panic
+	 * depending on user configuration in
+	 * /sys/kernel/debug/x86/split_lock/kernel_mode.
+	 */
+	asm volatile ("lock btsl $0, %0\n\t"
+		      : "=m" (*iptr));
+
+	if (*iptr == 1)
+		pr_info("split lock kernel test passes\n");
+	else
+		pr_info("split lock kernel test fails\n");
+}
+
+/*
+ * Writing 1 to /sys/kernel/debug/x86/split_lock/test_kernel triggers
+ * split locke daccess in kernel mode.
+ */
+static int test_kernel_store(void *data, u64 val)
+{
+	if (split_lock_ac_kernel == DISABLE_SPLIT_LOCK_AC)
+		return -ENODEV;
+
+	if (val != 1)
+		return -EINVAL;
+
+	mutex_lock(&split_lock_mutex);
+	split_lock_test_kernel();
+	mutex_unlock(&split_lock_mutex);
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(test_kernel_ops, NULL, test_kernel_store, "%llx\n");
+#endif /* CONFIG_SPLIT_LOCK_AC_TEST */
+
 static int __init debugfs_setup_split_lock(void)
 {
 	struct debugfs_file debugfs_files[] = {
@@ -548,6 +606,9 @@ static int __init debugfs_setup_split_lock(void)
 		{"kernel_mode",	0600, &kernel_mode_ops },
 		{"user_mode",	0600, &user_mode_ops },
 		{"firmware",	0600, &firmware_ops },
+#ifdef CONFIG_SPLIT_LOCK_AC_TEST
+		{"test_kernel",	0200, &test_kernel_ops },
+#endif
 	};
 	struct dentry *split_lock_dir, *fd;
 	int i;

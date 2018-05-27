@@ -487,6 +487,16 @@ config SPLIT_LOCK_AC_PANIC_ON_KERNEL
 
 	  Say N if unsure.
 
+config SPLIT_LOCK_AC_TEST
+	bool "Test #AC exception for split locked accesses"
+	default n
+	depends on SPLIT_LOCK_AC
+	help
+	  Select to enable testing #AC exception for split lock accesses.
+	  This adds interface /sys/kernel/debug/x86/split_lock/test_kernel
+	  to allow user to trigger split locked access in kernel and test
+	  split lock handling.
+
 if X86_32
 config X86_BIGSMP
 	bool "Support for big SMP systems with more than 8 CPUs"
