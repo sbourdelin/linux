@@ -924,7 +924,7 @@ static struct nft_chain *nft_chain_lookup(const struct nft_table *table,
 	if (nla == NULL)
 		return ERR_PTR(-EINVAL);
 
-	list_for_each_entry(chain, &table->chains, list) {
+	list_for_each_entry_rcu(chain, &table->chains, list) {
 		if (!nla_strcmp(nla, chain->name) &&
 		    nft_active_genmask(chain, genmask))
 			return chain;
@@ -1126,6 +1126,7 @@ done:
 	return skb->len;
 }
 
+/* called with rcu_read_lock held */
 static int nf_tables_getchain(struct net *net, struct sock *nlsk,
 			      struct sk_buff *skb, const struct nlmsghdr *nlh,
 			      const struct nlattr * const nla[],
@@ -1142,8 +1143,10 @@ static int nf_tables_getchain(struct net *net, struct sock *nlsk,
 	if (nlh->nlmsg_flags & NLM_F_DUMP) {
 		struct netlink_dump_control c = {
 			.dump = nf_tables_dump_chains,
+			.module = THIS_MODULE,
 		};
-		return netlink_dump_start(nlsk, skb, nlh, &c);
+
+		return nft_netlink_dump_start_rcu(nlsk, skb, nlh, &c);
 	}
 
 	table = nft_table_lookup(net, nla[NFTA_CHAIN_TABLE], family, genmask);
@@ -1158,7 +1161,7 @@ static int nf_tables_getchain(struct net *net, struct sock *nlsk,
 		return PTR_ERR(chain);
 	}
 
-	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
+	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (!skb2)
 		return -ENOMEM;
 
@@ -5673,7 +5676,7 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.policy		= nft_chain_policy,
 	},
 	[NFT_MSG_GETCHAIN] = {
-		.call		= nf_tables_getchain,
+		.call_rcu	= nf_tables_getchain,
 		.attr_count	= NFTA_CHAIN_MAX,
 		.policy		= nft_chain_policy,
 	},
