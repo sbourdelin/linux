@@ -43,6 +43,14 @@ struct debugfs_file {
 	const struct file_operations	*fops;
 };
 
+enum {
+	KERNEL_MODE_RE_EXECUTE,
+	KERNEL_MODE_PANIC,
+	KERNEL_MODE_LAST
+};
+
+static int kernel_mode_reaction = KERNEL_MODE_RE_EXECUTE;
+
 /* Detete feature of #AC for split lock by probing bit 29 in MSR_TEST_CTL. */
 void detect_split_lock_ac(void)
 {
@@ -238,6 +246,10 @@ bool do_split_lock_exception(struct pt_regs *regs, unsigned long error_code)
 	struct task_struct *tsk = current;
 	int cpu = task_cpu(tsk);
 
+	/* If configured as panic for split lock in kernel mode, panic. */
+	if (kernel_mode_reaction == KERNEL_MODE_PANIC && !user_mode(regs))
+		panic("Alignment Check exception for split lock in kernel.");
+
 	if (!re_execute(regs))
 		return false;
 
@@ -390,6 +402,9 @@ static int __init split_lock_init(void)
 	ret = debugfs_setup_split_lock();
 	if (ret)
 		pr_warn("debugfs for #AC for split lock cannot be set up\n");
+
+	if (IS_ENABLED(CONFIG_SPLIT_LOCK_AC_PANIC_ON_KERNEL))
+		kernel_mode_reaction = KERNEL_MODE_PANIC;
 
 	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "x86/split_lock:online",
 				split_lock_online, split_lock_offline);
