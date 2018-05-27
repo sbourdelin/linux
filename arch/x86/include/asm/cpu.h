@@ -42,7 +42,13 @@ unsigned int x86_model(unsigned int sig);
 unsigned int x86_stepping(unsigned int sig);
 #ifdef CONFIG_SPLIT_LOCK_AC
 void detect_split_lock_ac(void);
+bool do_split_lock_exception(struct pt_regs *regs, unsigned long error_code);
 #else /* CONFIG_SPLIT_LOCK_AC */
 static inline void detect_split_lock_ac(void) {}
+static inline bool
+do_split_lock_exception(struct pt_regs *regs, unsigned long error_code)
+{
+	return false;
+}
 #endif /* CONFIG_SPLIT_LOCK_AC */
 #endif /* _ASM_X86_CPU_H */
