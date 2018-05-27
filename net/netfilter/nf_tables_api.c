@@ -4960,7 +4960,7 @@ struct nft_flowtable *nft_flowtable_lookup(const struct nft_table *table,
 {
 	struct nft_flowtable *flowtable;
 
-	list_for_each_entry(flowtable, &table->flowtables, list) {
+	list_for_each_entry_rcu(flowtable, &table->flowtables, list) {
 		if (!nla_strcmp(nla, flowtable->name) &&
 		    nft_active_genmask(flowtable, genmask))
 			return flowtable;
@@ -5421,13 +5421,13 @@ nft_flowtable_filter_alloc(const struct nlattr * const nla[])
 {
 	struct nft_flowtable_filter *filter;
 
-	filter = kzalloc(sizeof(*filter), GFP_KERNEL);
+	filter = kzalloc(sizeof(*filter), GFP_ATOMIC);
 	if (!filter)
 		return ERR_PTR(-ENOMEM);
 
 	if (nla[NFTA_FLOWTABLE_TABLE]) {
 		filter->table = nla_strdup(nla[NFTA_FLOWTABLE_TABLE],
-					   GFP_KERNEL);
+					   GFP_ATOMIC);
 		if (!filter->table) {
 			kfree(filter);
 			return ERR_PTR(-ENOMEM);
@@ -5436,6 +5436,7 @@ nft_flowtable_filter_alloc(const struct nlattr * const nla[])
 	return filter;
 }
 
+/* called with rcu_read_lock held */
 static int nf_tables_getflowtable(struct net *net, struct sock *nlsk,
 				  struct sk_buff *skb,
 				  const struct nlmsghdr *nlh,
@@ -5454,6 +5455,7 @@ static int nf_tables_getflowtable(struct net *net, struct sock *nlsk,
 		struct netlink_dump_control c = {
 			.dump = nf_tables_dump_flowtable,
 			.done = nf_tables_dump_flowtable_done,
+			.module = THIS_MODULE,
 		};
 
 		if (nla[NFTA_FLOWTABLE_TABLE]) {
@@ -5465,7 +5467,7 @@ static int nf_tables_getflowtable(struct net *net, struct sock *nlsk,
 
 			c.data = filter;
 		}
-		return netlink_dump_start(nlsk, skb, nlh, &c);
+		return nft_netlink_dump_start_rcu(nlsk, skb, nlh, &c);
 	}
 
 	if (!nla[NFTA_FLOWTABLE_NAME])
@@ -5481,7 +5483,7 @@ static int nf_tables_getflowtable(struct net *net, struct sock *nlsk,
 	if (IS_ERR(flowtable))
 		return PTR_ERR(flowtable);
 
-	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
+	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (!skb2)
 		return -ENOMEM;
 
@@ -5765,7 +5767,7 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.policy		= nft_flowtable_policy,
 	},
 	[NFT_MSG_GETFLOWTABLE] = {
-		.call		= nf_tables_getflowtable,
+		.call_rcu	= nf_tables_getflowtable,
 		.attr_count	= NFTA_FLOWTABLE_MAX,
 		.policy		= nft_flowtable_policy,
 	},
