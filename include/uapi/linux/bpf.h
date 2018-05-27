@@ -259,8 +259,8 @@ struct bpf_stack_build_id {
 	__s32		status;
 	unsigned char	build_id[BPF_BUILD_ID_SIZE];
 	union {
-		__u64	offset;
-		__u64	ip;
+		__aligned_u64	offset;
+		__aligned_u64	ip;
 	};
 };
 
@@ -288,7 +288,7 @@ union bpf_attr {
 			__aligned_u64 value;
 			__aligned_u64 next_key;
 		};
-		__u64		flags;
+		__aligned_u64	flags;
 	};
 
 	struct { /* anonymous struct used by BPF_PROG_LOAD command */
@@ -360,7 +360,7 @@ union bpf_attr {
 	} query;
 
 	struct {
-		__u64 name;
+		__aligned_u64 name;
 		__u32 prog_fd;
 	} raw_tracepoint;
 } __attribute__((aligned(8)));
@@ -1011,7 +1011,7 @@ struct bpf_prog_info {
 	__u32 xlated_prog_len;
 	__aligned_u64 jited_prog_insns;
 	__aligned_u64 xlated_prog_insns;
-	__u64 load_time;	/* ns since boottime */
+	__aligned_u64 load_time;	/* ns since boottime */
 	__u32 created_by_uid;
 	__u32 nr_map_ids;
 	__aligned_u64 map_ids;
@@ -1101,8 +1101,8 @@ struct bpf_sock_ops {
 	__u32 lost_out;
 	__u32 sacked_out;
 	__u32 sk_txhash;
-	__u64 bytes_received;
-	__u64 bytes_acked;
+	__aligned_u64 bytes_received;
+	__aligned_u64 bytes_acked;
 };
 
 /* Definitions for bpf_sock_ops_cb_flags */
@@ -1189,9 +1189,9 @@ enum {
 #define TCP_BPF_SNDCWND_CLAMP	1002	/* Set sndcwnd_clamp */
 
 struct bpf_perf_event_value {
-	__u64 counter;
-	__u64 enabled;
-	__u64 running;
+	__aligned_u64 counter;
+	__aligned_u64 enabled;
+	__aligned_u64 running;
 };
 
 #define BPF_DEVCG_ACC_MKNOD	(1ULL << 0)
@@ -1209,7 +1209,7 @@ struct bpf_cgroup_dev_ctx {
 };
 
 struct bpf_raw_tracepoint_args {
-	__u64 args[0];
+	__aligned_u64 args[0];
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */
