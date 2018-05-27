@@ -8,6 +8,7 @@
 #include <asm/tlb.h>
 #include <asm/nospec-branch.h>
 #include <asm/mmu_context.h>
+#include <asm/cpu.h>
 
 /*
  * We map the EFI regions needed for runtime services non-contiguously,
@@ -41,12 +42,14 @@ extern asmlinkage unsigned long efi_call_phys(void *, ...);
 #define arch_efi_call_virt_setup()					\
 ({									\
 	kernel_fpu_begin();						\
+	restore_split_lock_ac_firmware();				\
 	firmware_restrict_branch_speculation_start();			\
 })
 
 #define arch_efi_call_virt_teardown()					\
 ({									\
 	firmware_restrict_branch_speculation_end();			\
+	restore_split_lock_ac_kernel();				\
 	kernel_fpu_end();						\
 })
 
@@ -84,6 +87,7 @@ struct efi_scratch {
 	efi_sync_low_kernel_mappings();					\
 	preempt_disable();						\
 	__kernel_fpu_begin();						\
+	restore_split_lock_ac_firmware();				\
 	firmware_restrict_branch_speculation_start();			\
 									\
 	if (!efi_enabled(EFI_OLD_MEMMAP))				\
@@ -99,6 +103,7 @@ struct efi_scratch {
 		efi_switch_mm(efi_scratch.prev_mm);			\
 									\
 	firmware_restrict_branch_speculation_end();			\
+	restore_split_lock_ac_kernel();				\
 	__kernel_fpu_end();						\
 	preempt_enable();						\
 })
