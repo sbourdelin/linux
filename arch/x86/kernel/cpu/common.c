@@ -1347,6 +1347,8 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 	/* Init Machine Check Exception if available. */
 	mcheck_cpu_init(c);
 
+	setup_split_lock();
+
 	select_idle_routine(c);
 
 #ifdef CONFIG_NUMA

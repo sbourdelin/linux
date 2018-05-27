@@ -28,6 +28,8 @@ static DEFINE_PER_CPU(struct delayed_work, reenable_delayed_work);
 static unsigned long disable_split_lock_jiffies;
 static DEFINE_MUTEX(reexecute_split_lock_mutex);
 
+static int split_lock_ac_kernel = DISABLE_SPLIT_LOCK_AC;
+
 /* Detete feature of #AC for split lock by probing bit 29 in MSR_TEST_CTL. */
 void detect_split_lock_ac(void)
 {
@@ -82,6 +84,18 @@ static void _setup_split_lock(int split_lock_ac_val)
 	}
 
 	wrmsrl(MSR_TEST_CTL, val);
+}
+
+void setup_split_lock(void)
+{
+	if (!boot_cpu_has(X86_FEATURE_SPLIT_LOCK_AC))
+		return;
+
+	_setup_split_lock(split_lock_ac_kernel);
+
+	pr_info_once("#AC execption for split lock is %sd\n",
+		     split_lock_ac_kernel == ENABLE_SPLIT_LOCK_AC ? "enable"
+		     : "disable");
 }
 
 static void wait_for_reexecution(void)
