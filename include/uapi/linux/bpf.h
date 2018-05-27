@@ -1017,8 +1017,8 @@ struct bpf_prog_info {
 	__aligned_u64 map_ids;
 	char name[BPF_OBJ_NAME_LEN];
 	__u32 ifindex;
-	__u64 netns_dev;
-	__u64 netns_ino;
+	__aligned_u64 netns_dev;
+	__aligned_u64 netns_ino;
 } __attribute__((aligned(8)));
 
 struct bpf_map_info {
@@ -1030,8 +1030,8 @@ struct bpf_map_info {
 	__u32 map_flags;
 	char  name[BPF_OBJ_NAME_LEN];
 	__u32 ifindex;
-	__u64 netns_dev;
-	__u64 netns_ino;
+	__aligned_u64 netns_dev;
+	__aligned_u64 netns_ino;
 } __attribute__((aligned(8)));
 
 /* User bpf_sock_addr struct to access socket fields and sockaddr struct passed
