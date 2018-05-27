@@ -18,6 +18,7 @@
 #include <linux/reboot.h>
 #include <linux/syscore_ops.h>
 #include <linux/debugfs.h>
+#include <linux/uaccess.h>
 #include <asm/msr.h>
 
 #define DISABLE_SPLIT_LOCK_AC		0
@@ -47,6 +48,11 @@ enum {
 	KERNEL_MODE_RE_EXECUTE,
 	KERNEL_MODE_PANIC,
 	KERNEL_MODE_LAST
+};
+
+static const char * const kernel_modes[KERNEL_MODE_LAST] = {
+	[KERNEL_MODE_RE_EXECUTE]	= "re-execute",
+	[KERNEL_MODE_PANIC]		= "panic",
 };
 
 static int kernel_mode_reaction = KERNEL_MODE_RE_EXECUTE;
@@ -361,10 +367,93 @@ static int enable_store(void *data, u64 val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(enable_ops, enable_show, enable_store, "%llx\n");
 
+static ssize_t
+mode_show(char __user *user_buf, const char * const *modes, int start_reaction,
+	  int last_reaction, int mode_reaction, size_t count, loff_t *ppos)
+{
+	char buf[32], *s = buf;
+	int reaction, len;
+
+	mutex_lock(&split_lock_mutex);
+	for (reaction = start_reaction; reaction < last_reaction; reaction++) {
+		if (reaction == mode_reaction)
+			s += sprintf(s, "[%s] ", modes[reaction]);
+		else
+			s += sprintf(s, "%s ", modes[reaction]);
+	}
+
+	if (s != buf)
+		/* convert the last space to a newline */
+		*(s - 1) = '\n';
+	mutex_unlock(&split_lock_mutex);
+
+	len = strlen(buf);
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t
+mode_store(const char __user *user_buf, size_t count, const char * const *modes,
+	   int start_reaction, int last_reaction, int *mode_reaction)
+{
+	int reaction, len, ret = -EINVAL;
+	const char * const *s, *p;
+	char buf[32];
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+
+	mutex_lock(&split_lock_mutex);
+	p = memchr(buf, '\n', count);
+	len = p ? p - buf : count;
+
+	reaction = start_reaction;
+	for (s = &modes[reaction]; reaction < last_reaction; s++, reaction++) {
+		if (*s && len == strlen(*s) && !strncmp(buf, *s, len)) {
+			*mode_reaction = reaction;
+			ret = 0;
+			break;
+		}
+	}
+	mutex_unlock(&split_lock_mutex);
+
+	return ret;
+}
+
+static ssize_t kernel_mode_show(struct file *file, char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	return mode_show(user_buf, kernel_modes, KERNEL_MODE_RE_EXECUTE,
+			 KERNEL_MODE_LAST, kernel_mode_reaction, count, ppos);
+}
+
+static ssize_t kernel_mode_store(struct file *file, const char __user *user_buf,
+				 size_t count, loff_t *ppos)
+{
+	int ret;
+
+	ret = mode_store(user_buf, count, kernel_modes, KERNEL_MODE_RE_EXECUTE,
+			 KERNEL_MODE_LAST, &kernel_mode_reaction);
+	if (ret)
+		return ret;
+
+	return count;
+}
+
+static const struct file_operations kernel_mode_ops = {
+	.read	= kernel_mode_show,
+	.write	= kernel_mode_store,
+	.llseek	= default_llseek,
+};
+
 static int __init debugfs_setup_split_lock(void)
 {
 	struct debugfs_file debugfs_files[] = {
 		{"enable",      0600, &enable_ops},
+		{"kernel_mode",	0600, &kernel_mode_ops },
 	};
 	struct dentry *split_lock_dir, *fd;
 	int i;
