@@ -65,15 +65,15 @@ static const struct cpuid_dep cpuid_deps[] = {
 static inline void clear_feature(struct cpuinfo_x86 *c, unsigned int feature)
 {
 	/*
-	 * Note: This could use the non atomic __*_bit() variants, but the
-	 * rest of the cpufeature code uses atomics as well, so keep it for
-	 * consistency. Cleanup all of it separately.
+	 * Because this code is only called during boot time and there
+	 * is no need to be atomic, use non atomic __*_bit() for better
+	 * performance and to avoid #AC exception for split locked access.
 	 */
 	if (!c) {
 		clear_cpu_cap(&boot_cpu_data, feature);
-		set_bit(feature, (unsigned long *)cpu_caps_cleared);
+		__set_bit(feature, (unsigned long *)cpu_caps_cleared);
 	} else {
-		clear_bit(feature, (unsigned long *)c->x86_capability);
+		__clear_bit(feature, (unsigned long *)c->x86_capability);
 	}
 }
 
