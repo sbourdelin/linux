@@ -3735,7 +3735,7 @@ static int nft_get_set_elem(struct nft_ctx *ctx, struct nft_set *set,
 	ext = nft_set_elem_ext(set, &elem);
 
 	err = -ENOMEM;
-	skb = nlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	skb = nlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (skb == NULL)
 		goto err1;
 
@@ -3757,6 +3757,7 @@ err1:
 	return err == -EAGAIN ? -ENOBUFS : err;
 }
 
+/* called with rcu_read_lock held */
 static int nf_tables_getsetelem(struct net *net, struct sock *nlsk,
 				struct sk_buff *skb, const struct nlmsghdr *nlh,
 				const struct nlattr * const nla[],
@@ -3781,10 +3782,11 @@ static int nf_tables_getsetelem(struct net *net, struct sock *nlsk,
 		struct netlink_dump_control c = {
 			.dump = nf_tables_dump_set,
 			.done = nf_tables_dump_set_done,
+			.module = THIS_MODULE,
 		};
 		struct nft_set_dump_ctx *dump_ctx;
 
-		dump_ctx = kmalloc(sizeof(*dump_ctx), GFP_KERNEL);
+		dump_ctx = kmalloc(sizeof(*dump_ctx), GFP_ATOMIC);
 		if (!dump_ctx)
 			return -ENOMEM;
 
@@ -3792,7 +3794,7 @@ static int nf_tables_getsetelem(struct net *net, struct sock *nlsk,
 		dump_ctx->ctx = ctx;
 
 		c.data = dump_ctx;
-		return netlink_dump_start(nlsk, skb, nlh, &c);
+		return nft_netlink_dump_start_rcu(nlsk, skb, nlh, &c);
 	}
 
 	if (!nla[NFTA_SET_ELEM_LIST_ELEMENTS])
@@ -5723,7 +5725,7 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.policy		= nft_set_elem_list_policy,
 	},
 	[NFT_MSG_GETSETELEM] = {
-		.call		= nf_tables_getsetelem,
+		.call_rcu	= nf_tables_getsetelem,
 		.attr_count	= NFTA_SET_ELEM_LIST_MAX,
 		.policy		= nft_set_elem_list_policy,
 	},
