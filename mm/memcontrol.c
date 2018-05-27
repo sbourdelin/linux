@@ -1118,33 +1118,54 @@ static const char *const memcg1_stat_names[] = {
 };
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
-/**
- * mem_cgroup_print_oom_info: Print OOM information relevant to memory controller.
- * @memcg: The memory cgroup that went over limit
+/*
+ * mem_cgroup_print_oom_context: Print OOM context information relevant to
+ * memory controller, which includes allocation constraint, nodemask, origin
+ * memcg that has reached its limit, kill memcg that contains the killed
+ * process, killed process's command, pid and uid.
+ * @memcg: The origin memory cgroup that went over limit
  * @p: Task that is going to be killed
+ * @constraint: The allocation constraint
+ * @nodemask: The allocation nodemask
  *
  * NOTE: @memcg and @p's mem_cgroup can be different when hierarchy is
  * enabled
  */
-void mem_cgroup_print_oom_info(struct mem_cgroup *memcg, struct task_struct *p)
+void mem_cgroup_print_oom_context(struct mem_cgroup *memcg, struct task_struct *p,
+			enum oom_constraint constraint, nodemask_t *nodemask)
+{
+	static char origin_memcg_name[PATH_MAX], kill_memcg_name[PATH_MAX];
+	struct cgroup *origin_cgrp, *kill_cgrp;
+
+	rcu_read_lock();
+	if (memcg) {
+		origin_cgrp = memcg->css.cgroup;
+		cgroup_path(origin_cgrp, origin_memcg_name, PATH_MAX);
+	}
+	kill_cgrp = task_cgroup(p, memory_cgrp_id);
+	cgroup_path(kill_cgrp, kill_memcg_name, PATH_MAX);
+
+	if (p)
+		pr_info("oom-kill: constrain=%s, nodemask=%*pbl, origin_memcg=%s, kill_memcg=%s, task=%s, pid=%5d, uid=%5d\n",
+			oom_constraint_text[constraint], nodemask_pr_args(nodemask),
+			origin_memcg_name, kill_memcg_name, p->comm, p->pid,
+			from_kuid(&init_user_ns, task_uid(p)));
+	else
+		pr_info("oom-kill: constrain=%s, nodemask=%*pbl, origin_memcg=%s, kill_memcg=%s\n",
+			oom_constraint_text[constraint], nodemask_pr_args(nodemask),
+			origin_memcg_name, kill_memcg_name);
+	rcu_read_unlock();
+}
+
+/**
+ * mem_cgroup_print_oom_info: Print OOM information relevant to memory controller.
+ * @memcg: The memory cgroup that went over limit
+ * @p: Task that is going to be killed
+ */
+void mem_cgroup_print_oom_meminfo(struct mem_cgroup *memcg)
 {
 	struct mem_cgroup *iter;
 	unsigned int i;
-
-	rcu_read_lock();
-
-	if (p) {
-		pr_info("Task in ");
-		pr_cont_cgroup_path(task_cgroup(p, memory_cgrp_id));
-		pr_cont(" killed as a result of limit of ");
-	} else {
-		pr_info("Memory limit reached of cgroup ");
-	}
-
-	pr_cont_cgroup_path(memcg->css.cgroup);
-	pr_cont("\n");
-
-	rcu_read_unlock();
 
 	pr_info("memory: usage %llukB, limit %llukB, failcnt %lu\n",
 		K((u64)page_counter_read(&memcg->memory)),
