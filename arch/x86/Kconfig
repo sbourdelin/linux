@@ -460,6 +460,20 @@ config SPLIT_LOCK_AC
 
 	  Say N if unsure.
 
+config SPLIT_LOCK_AC_ENABLE_DEFAULT
+	int "#AC for split lock enable value (0-2) at boot time"
+	range 0 2
+	default "2"
+	depends on SPLIT_LOCK_AC
+	help
+	  Set #AC for split lock enable default value at boot time
+		0: Explicitly disable #AC for split lock at boot time.
+		1: Explicitly enable #AC for split lock at boot time.
+		2: Don't explicitly enable or disable #AC for split lock.
+		   Inherit setting of #AC for split lock from firmware.
+
+	  Leave this to the default value of 2 if you are unsure.
+
 if X86_32
 config X86_BIGSMP
 	bool "Support for big SMP systems with more than 8 CPUs"

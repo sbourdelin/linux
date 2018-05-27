@@ -21,6 +21,7 @@
 
 #define DISABLE_SPLIT_LOCK_AC		0
 #define ENABLE_SPLIT_LOCK_AC		1
+#define INHERIT_SPLIT_LOCK_AC_FIRMWARE	2
 
 /* After disabling #AC for split lock in handler, re-enable it 1 msec later. */
 #define reenable_split_lock_delay	msecs_to_jiffies(1)
@@ -71,6 +72,17 @@ void detect_split_lock_ac(void)
 		split_lock_ac_firmware = ENABLE_SPLIT_LOCK_AC;
 	else
 		split_lock_ac_firmware = DISABLE_SPLIT_LOCK_AC;
+
+	/*
+	 * By default configuration, kernel inherits firmware split lock
+	 * setting. Kernel can be configured to explicitly enable or disable
+	 * #AC for split lock to override firmware setting.
+	 */
+	if (CONFIG_SPLIT_LOCK_AC_ENABLE_DEFAULT ==
+	    INHERIT_SPLIT_LOCK_AC_FIRMWARE)
+		split_lock_ac_kernel = split_lock_ac_firmware;
+	else
+		split_lock_ac_kernel = CONFIG_SPLIT_LOCK_AC_ENABLE_DEFAULT;
 }
 
 static void _setup_split_lock(int split_lock_ac_val)
