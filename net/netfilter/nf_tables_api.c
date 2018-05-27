@@ -4415,7 +4415,7 @@ struct nft_object *nft_obj_lookup(const struct nft_table *table,
 {
 	struct nft_object *obj;
 
-	list_for_each_entry(obj, &table->objects, list) {
+	list_for_each_entry_rcu(obj, &table->objects, list) {
 		if (!nla_strcmp(nla, obj->name) &&
 		    objtype == obj->ops->type->type &&
 		    nft_active_genmask(obj, genmask))
@@ -4745,12 +4745,12 @@ nft_obj_filter_alloc(const struct nlattr * const nla[])
 {
 	struct nft_obj_filter *filter;
 
-	filter = kzalloc(sizeof(*filter), GFP_KERNEL);
+	filter = kzalloc(sizeof(*filter), GFP_ATOMIC);
 	if (!filter)
 		return ERR_PTR(-ENOMEM);
 
 	if (nla[NFTA_OBJ_TABLE]) {
-		filter->table = nla_strdup(nla[NFTA_OBJ_TABLE], GFP_KERNEL);
+		filter->table = nla_strdup(nla[NFTA_OBJ_TABLE], GFP_ATOMIC);
 		if (!filter->table) {
 			kfree(filter);
 			return ERR_PTR(-ENOMEM);
@@ -4762,6 +4762,7 @@ nft_obj_filter_alloc(const struct nlattr * const nla[])
 	return filter;
 }
 
+/* called with rcu_read_lock held */
 static int nf_tables_getobj(struct net *net, struct sock *nlsk,
 			    struct sk_buff *skb, const struct nlmsghdr *nlh,
 			    const struct nlattr * const nla[],
@@ -4781,6 +4782,7 @@ static int nf_tables_getobj(struct net *net, struct sock *nlsk,
 		struct netlink_dump_control c = {
 			.dump = nf_tables_dump_obj,
 			.done = nf_tables_dump_obj_done,
+			.module = THIS_MODULE,
 		};
 
 		if (nla[NFTA_OBJ_TABLE] ||
@@ -4793,7 +4795,7 @@ static int nf_tables_getobj(struct net *net, struct sock *nlsk,
 
 			c.data = filter;
 		}
-		return netlink_dump_start(nlsk, skb, nlh, &c);
+		return nft_netlink_dump_start_rcu(nlsk, skb, nlh, &c);
 	}
 
 	if (!nla[NFTA_OBJ_NAME] ||
@@ -4813,7 +4815,7 @@ static int nf_tables_getobj(struct net *net, struct sock *nlsk,
 		return PTR_ERR(obj);
 	}
 
-	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
+	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (!skb2)
 		return -ENOMEM;
 
@@ -5743,7 +5745,7 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.policy		= nft_obj_policy,
 	},
 	[NFT_MSG_GETOBJ] = {
-		.call		= nf_tables_getobj,
+		.call_rcu	= nf_tables_getobj,
 		.attr_count	= NFTA_OBJ_MAX,
 		.policy		= nft_obj_policy,
 	},
@@ -5753,7 +5755,7 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.policy		= nft_obj_policy,
 	},
 	[NFT_MSG_GETOBJ_RESET] = {
-		.call		= nf_tables_getobj,
+		.call_rcu	= nf_tables_getobj,
 		.attr_count	= NFTA_OBJ_MAX,
 		.policy		= nft_obj_policy,
 	},
