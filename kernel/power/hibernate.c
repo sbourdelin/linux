@@ -830,9 +830,17 @@ static int software_resume(void)
 	 * integer format. (e.g. major:minor)
 	 */
 	if (isdigit(resume_file[0]) && resume_wait) {
+		struct gendisk *disk;
 		int partno;
-		while (!get_gendisk(swsusp_resume_device, &partno))
+
+		while (1) {
+			disk = get_gendisk(swsusp_resume_device, &partno);
+			if (disk) {
+				put_disk_and_module(disk);
+				break;
+			}
 			msleep(10);
+		}
 	}
 
 	if (!swsusp_resume_device) {
