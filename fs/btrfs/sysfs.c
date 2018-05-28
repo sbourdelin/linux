@@ -18,6 +18,7 @@
 #include "transaction.h"
 #include "sysfs.h"
 #include "volumes.h"
+#include "send.h"
 
 static inline struct btrfs_fs_info *to_fs_info(struct kobject *kobj);
 static inline struct btrfs_fs_devices *to_fs_devs(struct kobject *kobj);
@@ -884,6 +885,26 @@ static int btrfs_init_debugfs(void)
 	return 0;
 }
 
+static ssize_t send_stream_version_show(struct kobject *kobj,
+					struct kobj_attribute *a,
+					char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			BTRFS_SEND_STREAM_VERSION_LATEST);
+}
+
+BTRFS_ATTR(, stream_version, send_stream_version_show);
+
+static struct attribute *btrfs_send_attrs[] = {
+	BTRFS_ATTR_PTR(, stream_version),
+	NULL
+};
+
+static const struct attribute_group btrfs_send_attr_group = {
+	.name = "send",
+	.attrs = btrfs_send_attrs,
+};
+
 int __init btrfs_init_sysfs(void)
 {
 	int ret;
@@ -900,8 +921,13 @@ int __init btrfs_init_sysfs(void)
 	ret = sysfs_create_group(&btrfs_kset->kobj, &btrfs_feature_attr_group);
 	if (ret)
 		goto out2;
+	ret = sysfs_create_group(&btrfs_kset->kobj, &btrfs_send_attr_group);
+	if (ret)
+		goto out3;
 
 	return 0;
+out3:
+	sysfs_remove_group(&btrfs_kset->kobj, &btrfs_feature_attr_group);
 out2:
 	debugfs_remove_recursive(btrfs_debugfs_root_dentry);
 out1:
@@ -913,6 +939,7 @@ out1:
 void __cold btrfs_exit_sysfs(void)
 {
 	sysfs_remove_group(&btrfs_kset->kobj, &btrfs_feature_attr_group);
+	sysfs_remove_group(&btrfs_kset->kobj, &btrfs_send_attr_group);
 	kset_unregister(btrfs_kset);
 	debugfs_remove_recursive(btrfs_debugfs_root_dentry);
 }
