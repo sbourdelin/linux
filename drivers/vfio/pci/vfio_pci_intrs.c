@@ -368,7 +368,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
 	}
 
 	if (ret) {
-		for (--j; j >= (int)start; j--)
+		for (--j; j >= start; j--)
 			vfio_msi_set_vector_signal(vdev, j, -1, msix);
 	}
 
