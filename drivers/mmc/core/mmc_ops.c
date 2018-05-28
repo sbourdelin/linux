@@ -451,10 +451,10 @@ int mmc_switch_status(struct mmc_card *card)
 	return __mmc_switch_status(card, true);
 }
 
-static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
-			bool send_status, bool retry_crc_err, bool use_r1b_resp,
-			u32 *resp_status, bool check_busy(u32 device_status),
-			bool poll_for_switch)
+int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
+		      bool send_status, bool retry_crc_err, bool use_r1b_resp,
+		      u32 *resp_status, bool check_busy(u32 device_status),
+		      bool poll_for_switch)
 {
 	struct mmc_host *host = card->host;
 	int err;
@@ -523,6 +523,7 @@ static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(mmc_poll_for_busy);
 
 static inline bool mmc_switch_in_prg_state(u32 status)
 {
