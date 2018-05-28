@@ -447,7 +447,8 @@ int mmc_switch_status(struct mmc_card *card)
 }
 
 static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
-			bool send_status, bool retry_crc_err, bool use_r1b_resp)
+			bool send_status, bool retry_crc_err, bool use_r1b_resp,
+			u32 *resp_status, bool check_busy(u32 device_status))
 {
 	struct mmc_host *host = card->host;
 	int err;
@@ -459,6 +460,9 @@ static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 	/* If SPI or using HW busy detection, then we don't need to poll. */
 	if (((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp) ||
 		mmc_host_is_spi(host))
+		return 0;
+
+	if (WARN_ON(!check_busy))
 		return 0;
 
 	/* We have an unspecified cmd timeout, use the fallback value. */
@@ -487,6 +491,9 @@ static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 			busy = host->ops->card_busy(host);
 		} else {
 			err = mmc_send_status(card, &status);
+			/* Accumulate any response error bits seen */
+			if (resp_status)
+				*resp_status |= status;
 			if (retry_crc_err && err == -EILSEQ) {
 				busy = true;
 			} else if (err) {
@@ -495,7 +502,7 @@ static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 				err = mmc_switch_status_error(host, status);
 				if (err)
 					return err;
-				busy = R1_CURRENT_STATE(status) == R1_STATE_PRG;
+				busy = check_busy(status);
 			}
 		}
 
@@ -508,6 +515,11 @@ static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 	} while (busy);
 
 	return 0;
+}
+
+static inline bool mmc_switch_in_prg_state(u32 status)
+{
+	return R1_CURRENT_STATE(status) == R1_STATE_PRG;
 }
 
 /**
@@ -577,7 +589,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 
 	/* Let's try to poll to find out when the command is completed. */
 	err = mmc_poll_for_busy(card, timeout_ms, send_status, retry_crc_err,
-				use_r1b_resp);
+				use_r1b_resp, NULL, &mmc_switch_in_prg_state);
 	if (err)
 		goto out;
 
