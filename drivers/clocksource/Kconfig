@@ -568,6 +568,18 @@ config H8300_TPU
 	  This enables the clocksource for the H8300 platform with the
 	  H8S2678 cpu.
 
+config CLKSRC_IMX_EPIT
+	bool "Clocksource using i.MX EPIT"
+	depends on ARM && CLKDEV_LOOKUP && (ARCH_MXC || COMPILE_TEST)
+	select CLKSRC_OF if OF
+	select CLKSRC_MMIO
+	help
+	  This enables EPIT support available on some i.MX platforms.
+	  Normally you don't have a reason to do so as the EPIT has
+	  the same features and uses the same clocks as the GPT.
+	  Anyway, on some systems the GPT may be in use for other
+	  purposes.
+
 config CLKSRC_IMX_GPT
 	bool "Clocksource using i.MX GPT" if COMPILE_TEST
 	depends on ARM && CLKDEV_LOOKUP
