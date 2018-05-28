@@ -6351,7 +6351,7 @@ static int update_block_group(struct btrfs_trans_handle *trans,
 		 * cache writeout.
 		 */
 		if (!alloc && old_val == 0)
-			btrfs_mark_bg_unused(cache);
+			btrfs_mark_bg_unused(cache, trans);
 
 		btrfs_put_block_group(cache);
 		total -= num_bytes;
@@ -10194,7 +10194,7 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 			inc_block_group_ro(cache, 1);
 		} else if (btrfs_block_group_used(&cache->item) == 0) {
 			ASSERT(list_empty(&cache->bg_list));
-			btrfs_mark_bg_unused(cache);
+			btrfs_mark_bg_unused(cache, NULL);
 		}
 	}
 
@@ -11119,15 +11119,41 @@ void btrfs_wait_for_snapshot_creation(struct btrfs_root *root)
 	}
 }
 
-void btrfs_mark_bg_unused(struct btrfs_block_group_cache *bg)
+/*
+ * Get a block group cache and mark it as unused (if not already
+ * unused/deleted)
+ *
+ * NOTE:
+ * Since qgroup could search commit root at any time, we can't just
+ * delete the block group and its chunk mapping in current trans.
+ * So we record bgs to be deleted in trans->transaction and then
+ * queue them into fs_info->unused_bgs.
+ *
+ * @bg:		The block group cache
+ * @trans:	The trans handler
+ */
+void btrfs_mark_bg_unused(struct btrfs_block_group_cache *bg,
+			  struct btrfs_trans_handle *trans)
 {
 	struct btrfs_fs_info *fs_info = bg->fs_info;
 
 	spin_lock(&fs_info->unused_bgs_lock);
 	if (list_empty(&bg->bg_list)) {
+		/*
+		 * Get one reference, will be freed at btrfs_delete_unused_bgs()
+		 */
 		btrfs_get_block_group(bg);
 		trace_btrfs_add_unused_block_group(bg);
-		list_add_tail(&bg->bg_list, &fs_info->unused_bgs);
+
+		/*
+		 * If we don't have a trans, it means we are at mount time.
+		 * It's completely fine to mark it ready to be deleted.
+		 */
+		if (!trans)
+			list_add_tail(&bg->bg_list, &fs_info->unused_bgs);
+		else
+			list_add_tail(&bg->bg_list,
+				      &trans->transaction->pending_unused_bgs);
 	}
 	spin_unlock(&fs_info->unused_bgs_lock);
 }

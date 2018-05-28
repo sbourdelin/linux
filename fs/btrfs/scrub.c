@@ -3981,7 +3981,7 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 		if (!cache->removed && !cache->ro && cache->reserved == 0 &&
 		    btrfs_block_group_used(&cache->item) == 0) {
 			spin_unlock(&cache->lock);
-			btrfs_mark_bg_unused(cache);
+			btrfs_mark_bg_unused(cache, NULL);
 		} else {
 			spin_unlock(&cache->lock);
 		}

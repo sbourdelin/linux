@@ -58,6 +58,16 @@ struct btrfs_transaction {
 	struct list_head dirty_bgs;
 
 	/*
+	 * Unused block groups waiting to be deleted after current transaction.
+	 * Protected by fs_info->unused_bgs_lock.
+	 *
+	 * Since qgroup could search commit root, we can't delete unused block
+	 * group in the same trans when it get emptied, but delay it to next
+	 * transaction (or next mount if power loss happens)
+	 */
+	struct list_head pending_unused_bgs;
+
+	/*
 	 * There is no explicit lock which protects io_bgs, rather its
 	 * consistency is implied by the fact that all the sites which modify
 	 * it do so under some form of transaction critical section, namely:
