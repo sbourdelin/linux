@@ -39,6 +39,7 @@
 #include <linux/device-mapper.h>
 
 #define DM_MSG_PREFIX "crypt"
+#define REQ_INLINE_ENCRYPTION REQ_DRV
 
 /*
  * context holding the current state of a multi-part conversion
@@ -125,7 +126,8 @@ struct iv_tcw_private {
  * and encrypts / decrypts at the same time.
  */
 enum flags { DM_CRYPT_SUSPENDED, DM_CRYPT_KEY_VALID,
-	     DM_CRYPT_SAME_CPU, DM_CRYPT_NO_OFFLOAD };
+	     DM_CRYPT_SAME_CPU, DM_CRYPT_NO_OFFLOAD,
+		 DM_CRYPT_INLINE_ENCRYPT };
 
 enum cipher_flags {
 	CRYPT_MODE_INTEGRITY_AEAD,	/* Use authenticated mode for cihper */
@@ -215,6 +217,10 @@ struct crypt_config {
 
 	u8 *authenc_key; /* space for keys in authenc() format (if used) */
 	u8 key[0];
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+	void *ie_private; /* crypto context for inline enc drivers */
+	int key_cfg_idx;  /* key configuration index for inline enc */
+#endif
 };
 
 #define MIN_IOS		64
@@ -1470,6 +1476,20 @@ static void crypt_io_init(struct dm_crypt_io *io, struct crypt_config *cc,
 	atomic_set(&io->io_pending, 0);
 }
 
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+static void crypt_inline_encrypt_submit(struct crypt_config *cc,
+	struct dm_target *ti, struct bio *bio)
+{
+	bio_set_dev(bio, cc->dev->bdev);
+	if (bio_sectors(bio))
+		bio->bi_iter.bi_sector = cc->start +
+			dm_target_offset(ti, bio->bi_iter.bi_sector);
+	bio->bi_opf |= REQ_INLINE_ENCRYPTION;
+	bio->bi_ie_private = cc->ie_private;
+	generic_make_request(bio);
+}
+#endif
+
 static void crypt_inc_pending(struct dm_crypt_io *io)
 {
 	atomic_inc(&io->io_pending);
@@ -1960,6 +1980,9 @@ static int crypt_setkey(struct crypt_config *cc)
 
 	/* Ignore extra keys (which are used for IV etc) */
 	subkey_size = crypt_subkey_size(cc);
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+	cc->key_cfg_idx = -1;
+#endif
 
 	if (crypt_integrity_hmac(cc)) {
 		if (subkey_size < cc->key_mac_size)
@@ -1978,10 +2001,19 @@ static int crypt_setkey(struct crypt_config *cc)
 			r = crypto_aead_setkey(cc->cipher_tfm.tfms_aead[i],
 					       cc->key + (i * subkey_size),
 					       subkey_size);
-		else
+		else {
 			r = crypto_skcipher_setkey(cc->cipher_tfm.tfms[i],
 						   cc->key + (i * subkey_size),
 						   subkey_size);
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+			if (r > 0) {
+				cc->key_cfg_idx = r;
+				cc->ie_private = cc->cipher_tfm.tfms[i];
+				r = 0;
+			}
+#endif
+		}
+
 		if (r)
 			err = r;
 	}
@@ -2654,6 +2686,10 @@ static int crypt_ctr_optional(struct dm_target *ti, unsigned int argc, char **ar
 			cc->sector_shift = __ffs(cc->sector_size) - SECTOR_SHIFT;
 		} else if (!strcasecmp(opt_string, "iv_large_sectors"))
 			set_bit(CRYPT_IV_LARGE_SECTORS, &cc->cipher_flags);
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+		else if (!strcasecmp(opt_string, "perform_inline_encrypt"))
+			set_bit(DM_CRYPT_INLINE_ENCRYPT, &cc->flags);
+#endif
 		else {
 			ti->error = "Invalid feature arguments";
 			return -EINVAL;
@@ -2892,6 +2928,13 @@ static int crypt_map(struct dm_target *ti, struct bio *bio)
 	if (unlikely(bio->bi_iter.bi_size & (cc->sector_size - 1)))
 		return DM_MAPIO_KILL;
 
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+	if (cc->key_cfg_idx > 0) {
+		crypt_inline_encrypt_submit(cc, ti, bio);
+		return DM_MAPIO_SUBMITTED;
+	}
+#endif
+
 	io = dm_per_bio_data(bio, cc->per_bio_data_size);
 	crypt_io_init(io, cc, bio, dm_target_offset(ti, bio->bi_iter.bi_sector));
 
@@ -2954,6 +2997,10 @@ static void crypt_status(struct dm_target *ti, status_type_t type,
 		num_feature_args += test_bit(DM_CRYPT_NO_OFFLOAD, &cc->flags);
 		num_feature_args += cc->sector_size != (1 << SECTOR_SHIFT);
 		num_feature_args += test_bit(CRYPT_IV_LARGE_SECTORS, &cc->cipher_flags);
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+		num_feature_args +=
+			test_bit(DM_CRYPT_INLINE_ENCRYPT, &cc->flags);
+#endif
 		if (cc->on_disk_tag_size)
 			num_feature_args++;
 		if (num_feature_args) {
@@ -2970,6 +3017,10 @@ static void crypt_status(struct dm_target *ti, status_type_t type,
 				DMEMIT(" sector_size:%d", cc->sector_size);
 			if (test_bit(CRYPT_IV_LARGE_SECTORS, &cc->cipher_flags))
 				DMEMIT(" iv_large_sectors");
+#ifdef CONFIG_BLK_DEV_INLINE_ENCRYPTION
+			if (test_bit(DM_CRYPT_INLINE_ENCRYPT, &cc->flags))
+				DMEMIT(" perform_inline_encrypt");
+#endif
 		}
 
 		break;
