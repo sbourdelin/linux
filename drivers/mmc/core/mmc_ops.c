@@ -411,17 +411,22 @@ int mmc_spi_set_crc(struct mmc_host *host, int use_crc)
 	return err;
 }
 
-static int mmc_switch_status_error(struct mmc_host *host, u32 status)
+static int mmc_send_status_error(struct mmc_host *host, u32 status,
+				 bool check_switch_err)
 {
-	if (mmc_host_is_spi(host)) {
-		if (status & R1_SPI_ILLEGAL_COMMAND)
-			return -EBADMSG;
+	if (check_switch_err) {
+		if (mmc_host_is_spi(host)) {
+			if (status & R1_SPI_ILLEGAL_COMMAND)
+				return -EBADMSG;
+		} else {
+			if (R1_STATUS(status))
+				pr_warn("%s: unexpected status %#x after switch\n",
+					mmc_hostname(host), status);
+			if (status & R1_SWITCH_ERROR)
+				return -EBADMSG;
+		}
 	} else {
-		if (R1_STATUS(status))
-			pr_warn("%s: unexpected status %#x after switch\n",
-				mmc_hostname(host), status);
-		if (status & R1_SWITCH_ERROR)
-			return -EBADMSG;
+		return R1_STATUS(status) ? -EIO : 0;
 	}
 	return 0;
 }
@@ -438,7 +443,7 @@ int __mmc_switch_status(struct mmc_card *card, bool crc_err_fatal)
 	if (err)
 		return err;
 
-	return mmc_switch_status_error(card->host, status);
+	return mmc_send_status_error(card->host, status, true);
 }
 
 int mmc_switch_status(struct mmc_card *card)
@@ -448,7 +453,8 @@ int mmc_switch_status(struct mmc_card *card)
 
 static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 			bool send_status, bool retry_crc_err, bool use_r1b_resp,
-			u32 *resp_status, bool check_busy(u32 device_status))
+			u32 *resp_status, bool check_busy(u32 device_status),
+			bool poll_for_switch)
 {
 	struct mmc_host *host = card->host;
 	int err;
@@ -499,7 +505,8 @@ static int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 			} else if (err) {
 				return err;
 			} else {
-				err = mmc_switch_status_error(host, status);
+				err = mmc_send_status_error(host, status,
+						poll_for_switch);
 				if (err)
 					return err;
 				busy = check_busy(status);
@@ -589,7 +596,8 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 
 	/* Let's try to poll to find out when the command is completed. */
 	err = mmc_poll_for_busy(card, timeout_ms, send_status, retry_crc_err,
-				use_r1b_resp, NULL, &mmc_switch_in_prg_state);
+				use_r1b_resp, NULL, &mmc_switch_in_prg_state,
+				true);
 	if (err)
 		goto out;
 
