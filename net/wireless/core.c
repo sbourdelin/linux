@@ -664,6 +664,12 @@ int wiphy_register(struct wiphy *wiphy)
 		return -EINVAL;
 #endif
 
+	if (WARN_ON(wiphy_ext_feature_isset(wiphy,
+					    NL80211_EXT_FEATURE_RATE_STATS) &&
+		    !rdev->ops->rate_stats))
+		return -EINVAL;
+
+
 	/*
 	 * if a wiphy has unsupported modes for regulatory channel enforcement,
 	 * opt-out of enforcement checking
@@ -872,6 +878,12 @@ int wiphy_register(struct wiphy *wiphy)
 				break;
 		}
 	}
+	
+	if (wiphy_ext_feature_isset(&rdev->wiphy,
+				    NL80211_EXT_FEATURE_RATE_STATS) &&
+	    genl_has_listeners(&nl80211_fam, wiphy_net(wiphy),
+			       NL80211_MCGRP_RATE_STATS))
+		rdev_rate_stats(rdev, CFG80211_RATE_STATS_START);
 
 	rdev->wiphy.registered = true;
 	rtnl_unlock();
@@ -922,6 +934,12 @@ void wiphy_unregister(struct wiphy *wiphy)
 		rfkill_unregister(rdev->rfkill);
 
 	rtnl_lock();
+	if (wiphy_ext_feature_isset(&rdev->wiphy,
+				    NL80211_EXT_FEATURE_RATE_STATS) &&
+	    genl_has_listeners(&nl80211_fam, wiphy_net(wiphy),
+			       NL80211_MCGRP_RATE_STATS))
+		rdev_rate_stats(rdev, CFG80211_RATE_STATS_STOP);
+
 	nl80211_notify_wiphy(rdev, NL80211_CMD_DEL_WIPHY);
 	rdev->wiphy.registered = false;
 

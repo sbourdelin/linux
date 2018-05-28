@@ -51,6 +51,7 @@
 #define NL80211_MULTICAST_GROUP_VENDOR		"vendor"
 #define NL80211_MULTICAST_GROUP_NAN		"nan"
 #define NL80211_MULTICAST_GROUP_TESTMODE	"testmode"
+#define NL80211_MULTICAST_GROUP_RATE_STATS	"rate-stats"
 
 /**
  * DOC: Station handling
@@ -1033,6 +1034,10 @@
  *	&NL80211_ATTR_CHANNEL_WIDTH,&NL80211_ATTR_NSS attributes with its
  *	address(specified in &NL80211_ATTR_MAC).
  *
+ * @NL80211_CMD_GET_RATE_STATS: This command can be used to trigger the
+ *	rate statistics dump to userspace, which also clears the data in the
+ *	kernel (driver). See the "per-rate statistics" documentation section.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1244,6 +1249,8 @@ enum nl80211_commands {
 	NL80211_CMD_STA_OPMODE_CHANGED,
 
 	NL80211_CMD_CONTROL_PORT_FRAME,
+
+	NL80211_CMD_GET_RATE_STATS,
 
 	/* add new commands above here */
 
@@ -2238,6 +2245,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_TXQ_QUANTUM: TXQ scheduler quantum (bytes). Number of bytes
  *      a flow is assigned on each round of the DRR scheduler.
  *
+ * @NL80211_ATTR_RATE_STATS: per-rate statistics container attribute, this is
+ *	contains the attributes from &enum nl80211_rate_stats.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2677,6 +2687,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_TXQ_MEMORY_LIMIT,
 	NL80211_ATTR_TXQ_QUANTUM,
 
+	NL80211_ATTR_RATE_STATS,
+
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
@@ -3115,6 +3127,67 @@ enum nl80211_txq_stats {
 	NL80211_TXQ_STATS_MAX = NUM_NL80211_TXQ_STATS - 1
 };
 
+/**
+ * DOC: per-rate statistics
+ *
+ * The nl80211 API provides a way to subscribe to per-bitrate statistics. Since
+ * there are many bitrates it isn't always desirable to keep statistics for all
+ * of the rates in the kernel. As a consequence, the API allows the drivers to
+ * dump the information to userspace and reset their internal values. As it can
+ * also be expensive to keep the counters, this is only done when subscribers
+ * exist.
+ *
+ * To use this facility, a userspace client must subscribe to the data using the
+ * rate statistics multicast group (%NL80211_MULTICAST_GROUP_RATE_STATS).
+ * This is used by the kernel to start data collection. If, at this point,
+ * other clients exist, those are also sent the current statistics in order to
+ * allow the new client to collect only the data obtained while subscribed.
+ *
+ * While subscribed, the client must listen for %NL80211_CMD_GET_RATE_STATS
+ * events sent to the subscribed socket, and accumulate data retrieved in them.
+ * Every time such an event is sent by the kernel, the in-kernel data is also
+ * cleared. Therefore, to achieve data collection over longer periods of time,
+ * the subscribers must accumulate data. No guarantees are made about how long
+ * the kernel will collect data, but (as an implementation guideline) the data
+ * shouldn't be sent out frequently, and only while traffic is keeping the CPU
+ * busy anyway (i.e. it is recommended to not use timers in drivers supporting
+ * this facility.)
+ *
+ * In order to obtain a sample or clear the statistics at a given point in time,
+ * the %NL80211_CMD_GET_RATE_STATS command can be used. This command can
+ * be called by any nl80211 client (even non-subscribers) and causes the kernel
+ * to send out and clear (atomically) the currently accumulated data to all of
+ * the subscribers.
+ *
+ * Note that the data sent out in each notification contains only some data for
+ * a single station (identified by the interface index and the station's MAC
+ * address.) It is therefore expected that multiple messages will be received
+ * by an application, possibly even multiple messages for the same station and
+ * the same rate (e.g. for separate RX and TX counters), and subscribers need
+ * to ensure that their socket buffers are big enough to retrieve all the data.
+ */
+
+/**
+ * enum nl80211_rate_stats - per-rate stats attributes
+ * @__NL80211_RATE_STATS_INVALID :attribute number 0 is reserved
+ * @NL80211_ATTR_RATE_STATS_RATE :identifier for the encoded rate field.
+ * @NL80211_ATTR_RATE_STATS_RX_PACKETS: Number of packets which are received
+ *	per @rate for this specific station identified by @NL80211_ATTR_MAC.
+ * @NL80211_ATTR_RATE_STATS_RX_BYTES: Number of bytes which are received
+ *	per @rate for this specific station identified by @NL80211_ATTR_MAC.
+ * @NUM_NL80211_ATTR_RATE_STATS: Total number of rate-stats attributes
+ * @NL80211_ATTR_RATE_STATS_MAX: MAX rate-stats attribute number.
+ */
+enum nl80211_rate_stats {
+	__NL80211_RATE_STATS_INVALID,
+	NL80211_ATTR_RATE_STATS_RATE,
+	NL80211_ATTR_RATE_STATS_RX_PACKETS,
+	NL80211_ATTR_RATE_STATS_RX_BYTES,
+
+	/* keep last */
+	NUM_NL80211_ATTR_RATE_STATS,
+	NL80211_ATTR_RATE_STATS_MAX = NUM_NL80211_ATTR_RATE_STATS - 1
+};
 /**
  * enum nl80211_mpath_flags - nl80211 mesh path flags
  *
@@ -5133,6 +5206,8 @@ enum nl80211_feature_flags {
  *	support to nl80211.
  * @NL80211_EXT_FEATURE_TXQS: Driver supports FQ-CoDel-enabled intermediate
  *      TXQs.
+ * @NL80211_EXT_FEATURE_RATE_STATS: This device supports the per-rate
+ *	statistics subscription API.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -5167,6 +5242,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211,
 	NL80211_EXT_FEATURE_DATA_ACK_SIGNAL_SUPPORT,
 	NL80211_EXT_FEATURE_TXQS,
+	NL80211_EXT_FEATURE_RATE_STATS,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,

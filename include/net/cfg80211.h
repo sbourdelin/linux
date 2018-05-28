@@ -1236,6 +1236,37 @@ struct station_info {
 	s8 avg_ack_signal;
 };
 
+/**
+ * struct cfg80211_rate_stats - per rate statistics of station
+ *
+ * @rate: encoded rate value
+ * @bytes: Total number of bytes received at this @rate
+ * @packets: Packet count received at this @rate
+ */
+struct cfg80211_rate_stats {
+	u32 rate;
+	u32 bytes;
+	u16 packets;
+};
+
+/**
+ * cfg80211_report_rate_stats - report rate statistics for a station
+ * @wiphy: the wiphy that's reporting the data
+ * @wdev: the virtual interface the data is reported for
+ * @mac_addr: the station MAC address
+ * @rate_table_len: length of rate table
+ * @rate_stats_buf: per-rate,per-station statistics buffer
+ * @gfp: allocation flags
+ *
+ * Note that it is valid to call this function multiple times even for the
+ * same station, if the data isn't actually stored in an array.
+ */
+void cfg80211_report_rate_stats(struct wiphy *wiphy, struct wireless_dev *wdev,
+				const u8 *mac_addr, unsigned int rate_table_len,
+				struct cfg80211_rate_stats *rate_stats_buf,
+				gfp_t gfp);
+
+
 #if IS_ENABLED(CONFIG_CFG80211)
 /**
  * cfg80211_get_station - retrieve information about a given station
@@ -2693,6 +2724,20 @@ struct cfg80211_external_auth_params {
 };
 
 /**
+ * enum cfg80211_rate_stats_ops - rate statistics operations
+ *
+ * @CFG80211_RATE_STATS_START: start data collection
+ * @CFG80211_RATE_STATS_DUMP: dump and clear the data
+ *	(using cfg80211_report_rate_stats() to report it)
+ * @CFG80211_RATE_STATS_STOP: stop data collection
+ */
+enum cfg80211_rate_stats_ops {
+	CFG80211_RATE_STATS_START,
+	CFG80211_RATE_STATS_DUMP,
+	CFG80211_RATE_STATS_STOP,
+};
+
+/**
  * struct cfg80211_ops - backend description for wireless configuration
  *
  * This struct is registered by fullmac card drivers and/or wireless stacks
@@ -3024,6 +3069,9 @@ struct cfg80211_external_auth_params {
  *
  * @tx_control_port: TX a control port frame (EAPoL).  The noencrypt parameter
  *	tells the driver that the frame should not be encrypted.
+ *
+ * @rate_stats: rate statistics operation - if supported all operations must be
+ *	supported, see &enum cfg80211_rate_stats_ops.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3329,6 +3377,9 @@ struct cfg80211_ops {
 				   const u8 *buf, size_t len,
 				   const u8 *dest, const __be16 proto,
 				   const bool noencrypt);
+
+	void	(*rate_stats)(struct wiphy *wiphy,
+			      enum cfg80211_rate_stats_ops op);
 };
 
 /*

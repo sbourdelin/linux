@@ -35,18 +35,8 @@ static int nl80211_crypto_settings(struct cfg80211_registered_device *rdev,
 				   int cipher_limit);
 
 /* the netlink family */
-static struct genl_family nl80211_fam;
+struct genl_family nl80211_fam;
 
-/* multicast groups */
-enum nl80211_multicast_groups {
-	NL80211_MCGRP_CONFIG,
-	NL80211_MCGRP_SCAN,
-	NL80211_MCGRP_REGULATORY,
-	NL80211_MCGRP_MLME,
-	NL80211_MCGRP_VENDOR,
-	NL80211_MCGRP_NAN,
-	NL80211_MCGRP_TESTMODE /* keep last - ifdef! */
-};
 
 static const struct genl_multicast_group nl80211_mcgrps[] = {
 	[NL80211_MCGRP_CONFIG] = { .name = NL80211_MULTICAST_GROUP_CONFIG },
@@ -55,6 +45,9 @@ static const struct genl_multicast_group nl80211_mcgrps[] = {
 	[NL80211_MCGRP_MLME] = { .name = NL80211_MULTICAST_GROUP_MLME },
 	[NL80211_MCGRP_VENDOR] = { .name = NL80211_MULTICAST_GROUP_VENDOR },
 	[NL80211_MCGRP_NAN] = { .name = NL80211_MULTICAST_GROUP_NAN },
+	[NL80211_MCGRP_RATE_STATS] = {
+		.name = NL80211_MULTICAST_GROUP_RATE_STATS
+	},
 #ifdef CONFIG_NL80211_TESTMODE
 	[NL80211_MCGRP_TESTMODE] = { .name = NL80211_MULTICAST_GROUP_TESTMODE }
 #endif
@@ -4811,6 +4804,28 @@ static int nl80211_get_station(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	return genlmsg_reply(msg, info);
+}
+
+static int nl80211_get_rate_stats(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev;
+
+	if (!genl_has_listeners(&nl80211_fam, genl_info_net(info),
+				NL80211_MCGRP_RATE_STATS))
+		return -ENODATA;
+
+	list_for_each_entry(rdev, &cfg80211_rdev_list, list) {
+		if (wiphy_net(&rdev->wiphy) != genl_info_net(info))
+			continue;
+
+		if (!wiphy_ext_feature_isset(&rdev->wiphy,
+					     NL80211_EXT_FEATURE_RATE_STATS))
+			continue;
+
+		rdev_rate_stats(rdev, CFG80211_RATE_STATS_DUMP);
+	}
+
+	return 0;
 }
 
 int cfg80211_check_station_change(struct wiphy *wiphy,
@@ -12991,6 +13006,56 @@ static void nl80211_post_doit(const struct genl_ops *ops, struct sk_buff *skb,
 	}
 }
 
+static void nl80211_do_rate_stats(struct net *net,
+				  enum cfg80211_rate_stats_ops op)
+{
+	struct cfg80211_registered_device *rdev;
+
+	rtnl_lock();
+
+	list_for_each_entry(rdev, &cfg80211_rdev_list, list) {
+		if (wiphy_net(&rdev->wiphy) != net)
+			continue;
+
+		if (!wiphy_ext_feature_isset(&rdev->wiphy,
+					     NL80211_EXT_FEATURE_RATE_STATS))
+			continue;
+
+		rdev_rate_stats(rdev, op);
+	}
+
+	rtnl_unlock();
+}
+
+static int nl80211_mcast_bind(struct net *net, int group)
+{
+	enum cfg80211_rate_stats_ops op;
+
+	switch (group) {
+	case NL80211_MCGRP_RATE_STATS:
+		if (!genl_has_listeners(&nl80211_fam, net,
+					NL80211_MCGRP_RATE_STATS))
+			op = CFG80211_RATE_STATS_START;
+		else
+			op = CFG80211_RATE_STATS_DUMP;
+		nl80211_do_rate_stats(net, op);
+		break;
+	}
+
+	return 0;
+}
+
+static void nl80211_mcast_unbind(struct net *net, int group)
+{
+	switch (group) {
+	case NL80211_MCGRP_RATE_STATS:
+		if (!genl_has_listeners(&nl80211_fam, net,
+					NL80211_MCGRP_RATE_STATS))
+			nl80211_do_rate_stats(net, CFG80211_RATE_STATS_STOP);
+		break;
+	}
+}
+
 static const struct genl_ops nl80211_ops[] = {
 	{
 		.cmd = NL80211_CMD_GET_WIPHY,
@@ -13799,9 +13864,16 @@ static const struct genl_ops nl80211_ops[] = {
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL,
 	},
+	{
+		.cmd = NL80211_CMD_GET_RATE_STATS,
+		.doit = nl80211_get_rate_stats,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_RTNL,
+	},
 };
 
-static struct genl_family nl80211_fam __ro_after_init = {
+struct genl_family nl80211_fam __ro_after_init = {
 	.name = NL80211_GENL_NAME,	/* have users key off the name instead */
 	.hdrsize = 0,			/* no private header */
 	.version = 1,			/* no particular meaning now */
@@ -13814,6 +13886,8 @@ static struct genl_family nl80211_fam __ro_after_init = {
 	.n_ops = ARRAY_SIZE(nl80211_ops),
 	.mcgrps = nl80211_mcgrps,
 	.n_mcgrps = ARRAY_SIZE(nl80211_mcgrps),
+	.mcast_bind = nl80211_mcast_bind,
+	.mcast_unbind = nl80211_mcast_unbind,
 };
 
 /* notification functions */
@@ -15884,6 +15958,81 @@ void cfg80211_crit_proto_stopped(struct wireless_dev *wdev, gfp_t gfp)
 	nlmsg_free(msg);
 }
 EXPORT_SYMBOL(cfg80211_crit_proto_stopped);
+
+void cfg80211_report_rate_stats(struct wiphy *wiphy, struct wireless_dev *wdev,
+				const u8 *mac_addr, unsigned int rate_table_len,
+				struct cfg80211_rate_stats *rate_stats_buf,
+				gfp_t gfp)
+{
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
+	struct sk_buff *msg;
+	void *hdr;
+	struct nlattr *rstatsattr, *rentryattr;
+	struct cfg80211_rate_stats *report;
+	int rid;
+
+	if (!genl_has_listeners(&nl80211_fam, wiphy_net(wiphy),
+				NL80211_MCGRP_RATE_STATS))
+		return;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return;
+
+	hdr = nl80211hdr_put(msg, 0, 0, 0,
+			     NL80211_CMD_GET_RATE_STATS);
+	if (!hdr)
+		goto out;
+
+	if (nla_put_u32(msg, NL80211_ATTR_WIPHY, rdev->wiphy_idx) ||
+	    nla_put_u32(msg, NL80211_ATTR_IFINDEX, wdev->netdev->ifindex) ||
+	    nla_put_u64_64bit(msg, NL80211_ATTR_WDEV, wdev_id(wdev),
+			      NL80211_ATTR_PAD))
+		goto out;
+
+	if (nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, mac_addr))
+		goto out;
+
+	if (1 && rate_table_len && rate_stats_buf) {
+		rstatsattr = nla_nest_start(msg, NL80211_ATTR_RATE_STATS);
+
+		if (!rstatsattr)
+			goto out;
+
+		report = rate_stats_buf;
+
+		for (rid = 0; rid < rate_table_len ; rid++) {
+			rentryattr = nla_nest_start(msg, rid + 1);
+			if (!rentryattr)
+				goto out;
+
+			nla_put_u32(msg, NL80211_ATTR_RATE_STATS_RATE,
+				    report->rate);
+			nla_put_u16(msg, NL80211_ATTR_RATE_STATS_RX_PACKETS,
+				    report->packets);
+			nla_put_u32(msg, NL80211_ATTR_RATE_STATS_RX_BYTES,
+				    report->bytes);
+			nla_nest_end(msg, rentryattr);
+
+			if (rid + 1 < rate_table_len)
+				report++;
+		}
+
+		nla_nest_end(msg, rstatsattr);
+	}
+
+
+	genlmsg_end(msg, hdr);
+
+	genlmsg_multicast_netns(&nl80211_fam, wiphy_net(wiphy), msg, 0,
+				NL80211_MCGRP_RATE_STATS, GFP_KERNEL);
+	return;
+
+ out:
+	nlmsg_free(msg);
+}
+
+EXPORT_SYMBOL_GPL(cfg80211_report_rate_stats);
 
 void nl80211_send_ap_stopped(struct wireless_dev *wdev)
 {

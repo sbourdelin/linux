@@ -222,6 +222,16 @@ static inline int rdev_dump_station(struct cfg80211_registered_device *rdev,
 	return ret;
 }
 
+static inline void
+rdev_rate_stats(struct cfg80211_registered_device *rdev,
+		enum cfg80211_rate_stats_ops op)
+{
+	trace_rdev_rate_stats(&rdev->wiphy, op);
+	if (rdev->ops->rate_stats)
+		rdev->ops->rate_stats(&rdev->wiphy, op);
+	trace_rdev_return_void(&rdev->wiphy);
+}
+
 static inline int rdev_add_mpath(struct cfg80211_registered_device *rdev,
 				 struct net_device *dev, u8 *dst, u8 *next_hop)
 {

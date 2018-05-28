@@ -2368,6 +2368,21 @@ TRACE_EVENT(rdev_external_auth,
 		      __entry->bssid, __entry->ssid, __entry->status)
 );
 
+TRACE_EVENT(rdev_rate_stats,
+	TP_PROTO(struct wiphy *wiphy, enum cfg80211_rate_stats_ops op),
+	TP_ARGS(wiphy, op),
+	TP_STRUCT__entry(
+		WIPHY_ENTRY
+		__field(u32, op)
+	),
+	TP_fast_assign(
+		WIPHY_ASSIGN;
+		__entry->op = op;
+	),
+	TP_printk(WIPHY_PR_FMT ", op=%d", WIPHY_PR_ARG, __entry->op)
+);
+
+
 /*************************************************************
  *	     cfg80211 exported functions traces		     *
  *************************************************************/
