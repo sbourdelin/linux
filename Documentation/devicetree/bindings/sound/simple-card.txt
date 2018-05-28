@@ -97,6 +97,10 @@ Optional CPU/CODEC subnodes properties:
 - system-clock-index			: index of the system clock to use when
 					  the mclk frequency is on the CPU/CODEC
 					  DAI. Defaults to 0.
+- clock-dividers                        : Array of index/value pairs for CPU/CODEC
+					  specific clock dividers to configure at
+					  stream start time. Optional. No divider
+					  is configured if not specified.
 
 Example 1 - single DAI link:
 
@@ -152,6 +156,7 @@ sound {
 		format = "i2s";
 		cpu {
 			sound-dai = <&audio1 0>;
+			clock-dividers = <0 4>;
 		};
 		codec {
 			sound-dai = <&tda998x 0>;

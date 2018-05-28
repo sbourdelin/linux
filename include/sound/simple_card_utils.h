@@ -12,6 +12,11 @@
 
 #include <sound/soc.h>
 
+struct asoc_simple_clkdiv {
+	int div_id;
+	int div;
+};
+
 struct asoc_simple_dai {
 	const char *name;
 	unsigned int sysclk;
@@ -22,6 +27,8 @@ struct asoc_simple_dai {
 	unsigned int rx_slot_mask;
 	struct clk *clk;
 	int sysclk_id;
+	struct asoc_simple_clkdiv *clkdiv;
+	int num_clkdiv;
 };
 
 struct asoc_simple_card_data {
@@ -54,6 +61,17 @@ int asoc_simple_card_parse_clk(struct device *dev,
 			       const char *name);
 int asoc_simple_card_clk_enable(struct asoc_simple_dai *dai);
 void asoc_simple_card_clk_disable(struct asoc_simple_dai *dai);
+
+#define asoc_simple_card_parse_clkdiv_cpu(dev, node, dai_link, simple_dai)	\
+	asoc_simple_card_parse_clkdiv(dev, node, simple_dai,			\
+				      dai_link->cpu_dai_name)
+#define asoc_simple_card_parse_clkdiv_codec(dev, node, dai_link, simple_dai)	\
+	asoc_simple_card_parse_clkdiv(dev, node, simple_dai,			\
+				      dai_link->codec_dai_name)
+int asoc_simple_card_parse_clkdiv(struct device *dev,
+				  struct device_node *node,
+				  struct asoc_simple_dai *simple_dai,
+				  const char *name);
 
 #define asoc_simple_card_parse_cpu(node, dai_link,				\
 				   list_name, cells_name, is_single_link)	\

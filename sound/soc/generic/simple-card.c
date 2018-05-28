@@ -135,6 +135,23 @@ static void asoc_simple_card_shutdown(struct snd_pcm_substream *substream)
 	asoc_simple_card_clk_disable(&dai_props->codec_dai);
 }
 
+static int asoc_simple_card_set_clkdiv(struct snd_soc_dai *dai,
+				       unsigned int mclk,
+				       const struct asoc_simple_dai *simple_dai)
+{
+	int ret, i;
+
+	for (i = 0; i < simple_dai->num_clkdiv; i++) {
+		ret = snd_soc_dai_set_clkdiv(dai,
+					     simple_dai->clkdiv[i].div_id,
+					     simple_dai->clkdiv[i].div);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
 				      struct snd_pcm_hw_params *params)
 {
@@ -164,9 +181,19 @@ static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
 		if (ret && ret != -ENOTSUPP)
 			goto err;
 
+		ret = asoc_simple_card_set_clkdiv(codec_dai, mclk,
+						  &dai_props->codec_dai);
+		if (ret && ret != -ENOTSUPP)
+			goto err;
+
 		ret = snd_soc_dai_set_sysclk(cpu_dai,
 					     dai_props->cpu_dai.sysclk_id,
 					     mclk, SND_SOC_CLOCK_OUT);
+		if (ret && ret != -ENOTSUPP)
+			goto err;
+
+		ret = asoc_simple_card_set_clkdiv(cpu_dai, mclk,
+						  &dai_props->cpu_dai);
 		if (ret && ret != -ENOTSUPP)
 			goto err;
 	}
@@ -284,6 +311,14 @@ static int asoc_simple_card_dai_link_of(struct device_node *node,
 		goto dai_link_of_err;
 
 	ret = asoc_simple_card_parse_clk_codec(dev, codec, dai_link, codec_dai);
+	if (ret < 0)
+		goto dai_link_of_err;
+
+	ret = asoc_simple_card_parse_clkdiv_cpu(dev, cpu, dai_link, cpu_dai);
+	if (ret < 0)
+		goto dai_link_of_err;
+
+	ret = asoc_simple_card_parse_clkdiv_codec(dev, codec, dai_link, codec_dai);
 	if (ret < 0)
 		goto dai_link_of_err;
 

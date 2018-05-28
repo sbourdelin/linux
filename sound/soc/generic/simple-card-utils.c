@@ -209,6 +209,53 @@ int asoc_simple_card_parse_clk(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(asoc_simple_card_parse_clk);
 
+int asoc_simple_card_parse_clkdiv(struct device *dev,
+				  struct device_node *node,
+				  struct asoc_simple_dai *simple_dai,
+				  const char *name)
+{
+	const char *pname = "clock-dividers";
+	int i, ret, count;
+	u32 val;
+
+	count = of_property_count_u32_elems(node, pname);
+	if (count <= 0)
+		return 0;
+
+	if (count & 1) {
+		dev_err(dev, "Invalid number of values for %s property", pname);
+		return -EINVAL;
+	}
+
+	simple_dai->num_clkdiv = count / 2;
+	simple_dai->clkdiv = devm_kcalloc(dev, simple_dai->num_clkdiv,
+					  sizeof(struct asoc_simple_clkdiv),
+					  GFP_KERNEL);
+	if (!simple_dai->clkdiv)
+		return -ENOMEM;
+
+	for (i = 0; i < simple_dai->num_clkdiv; i++) {
+		ret = of_property_read_u32_index(node, pname, i * 2, &val);
+		if (ret < 0)
+			return ret;
+
+		simple_dai->clkdiv[i].div_id = val;
+
+		ret = of_property_read_u32_index(node, pname, i * 2 + 1, &val);
+		if (ret < 0)
+			return ret;
+
+		simple_dai->clkdiv[i].div = val;
+
+		dev_dbg(dev, "%s : clkdiv #%d = %d\n", name,
+			simple_dai->clkdiv[i].div_id,
+			simple_dai->clkdiv[i].div);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(asoc_simple_card_parse_clkdiv);
+
 int asoc_simple_card_parse_dai(struct device_node *node,
 				    struct device_node **dai_of_node,
 				    const char **dai_name,
