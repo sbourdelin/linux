@@ -802,6 +802,12 @@ static const char * const typec_port_types[] = {
 	[TYPEC_PORT_DRP] = "dual",
 };
 
+static const char * const typec_data_caps[] = {
+	[TYPEC_PORT_DFP] = "host",
+	[TYPEC_PORT_UFP] = "device",
+	[TYPEC_PORT_DRD] = "dual",
+};
+
 static const char * const typec_port_types_drp[] = {
 	[TYPEC_PORT_SRC] = "dual [source] sink",
 	[TYPEC_PORT_SNK] = "dual source [sink]",
@@ -1251,6 +1257,50 @@ void typec_set_pwr_opmode(struct typec_port *port,
 	}
 }
 EXPORT_SYMBOL_GPL(typec_set_pwr_opmode);
+
+/**
+ * typec_find_port_power_role - Get the typec port power capability
+ * @name: port power capability string
+ *
+ * This routine is used to find the typec_port_type by its string name.
+ *
+ * Returns typec_port_type if success, otherwise negative error code.
+ */
+int typec_find_port_power_role(const char *name)
+{
+	return match_string(typec_port_types, ARRAY_SIZE(typec_port_types),
+			    name);
+}
+EXPORT_SYMBOL_GPL(typec_find_power_type);
+
+/**
+ * typec_find_power_role - Find the typec one specific power role
+ * @name: power role string
+ *
+ * This routine is used to find the typec_role by its string name.
+ *
+ * Returns typec_role if success, otherwise negative error code.
+ */
+int typec_find_power_role(const char *name)
+{
+	return match_string(typec_roles, ARRAY_SIZE(typec_roles), name);
+}
+EXPORT_SYMBOL_GPL(typec_find_preferred_role);
+
+/**
+ * typec_find_port_data_role - Get the typec port data capability
+ * @name: port data capability string
+ *
+ * This routine is used to find the typec_port_data by its string name.
+ *
+ * Returns typec_port_data if success, otherwise negative error code.
+ */
+int typec_find_port_data_role(const char *name)
+{
+	return match_string(typec_data_caps, ARRAY_SIZE(typec_data_caps),
+			    name);
+}
+EXPORT_SYMBOL_GPL(typec_find_data_type);
 
 /* ------------------------------------------ */
 /* API for Multiplexer/DeMultiplexer Switches */
