@@ -1461,6 +1461,8 @@ struct btrfs_map_token {
 	unsigned long offset;
 };
 
+unsigned int btrfs_flags_to_ioctl(unsigned int flags);
+
 #define BTRFS_BYTES_TO_BLKS(fs_info, bytes) \
 				((bytes) >> (fs_info)->sb->s_blocksize_bits)
 

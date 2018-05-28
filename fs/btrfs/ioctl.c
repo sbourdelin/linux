@@ -106,7 +106,7 @@ static unsigned int btrfs_mask_flags(umode_t mode, unsigned int flags)
 /*
  * Export inode flags to the format expected by the FS_IOC_GETFLAGS ioctl.
  */
-static unsigned int btrfs_flags_to_ioctl(unsigned int flags)
+unsigned int btrfs_flags_to_ioctl(unsigned int flags)
 {
 	unsigned int iflags = 0;
 
