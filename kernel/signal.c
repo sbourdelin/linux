@@ -2214,14 +2214,14 @@ static bool do_signal_stop(int signr)
 		/* Now we don't run again until woken by SIGCONT or SIGKILL */
 		freezable_schedule();
 		return true;
-	} else {
-		/*
-		 * While ptraced, group stop is handled by STOP trap.
-		 * Schedule it and let the caller deal with it.
-		 */
-		task_set_jobctl_pending(current, JOBCTL_TRAP_STOP);
-		return false;
 	}
+
+	/*
+	 * While ptraced, group stop is handled by STOP trap.
+	 * Schedule it and let the caller deal with it.
+	 */
+	task_set_jobctl_pending(current, JOBCTL_TRAP_STOP);
+	return false;
 }
 
 /**
