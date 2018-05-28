@@ -2598,6 +2598,7 @@ static void tcpm_reset_port(struct tcpm_port *port)
 	tcpm_set_attached_state(port, false);
 	port->try_src_count = 0;
 	port->try_snk_count = 0;
+	port->cc_req = TYPEC_CC_OPEN;
 	port->supply_voltage = 0;
 	port->current_limit = 0;
 	port->usb_type = POWER_SUPPLY_USB_TYPE_C;
@@ -2830,6 +2831,8 @@ static void run_state_machine(struct tcpm_port *port)
 		break;
 
 	case SRC_ATTACHED:
+		if (port->cc_req == TYPEC_CC_OPEN)
+			tcpm_set_cc(port, tcpm_rp_cc(port));
 		ret = tcpm_src_attach(port);
 		tcpm_set_state(port, SRC_UNATTACHED,
 			       ret < 0 ? 0 : PD_T_PS_SOURCE_ON);
@@ -3003,6 +3006,8 @@ static void run_state_machine(struct tcpm_port *port)
 		tcpm_set_state(port, SNK_UNATTACHED, PD_T_PD_DEBOUNCE);
 		break;
 	case SNK_ATTACHED:
+		if (port->cc_req == TYPEC_CC_OPEN)
+			tcpm_set_cc(port, TYPEC_CC_RD);
 		ret = tcpm_snk_attach(port);
 		if (ret < 0)
 			tcpm_set_state(port, SNK_UNATTACHED, 0);
