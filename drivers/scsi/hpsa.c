@@ -8970,7 +8970,6 @@ static struct pci_driver hpsa_pci_driver = {
 	.probe = hpsa_init_one,
 	.remove = hpsa_remove_one,
 	.id_table = hpsa_pci_device_id,	/* id_table */
-	.shutdown = hpsa_shutdown,
 	.suspend = hpsa_suspend,
 	.resume = hpsa_resume,
 };
