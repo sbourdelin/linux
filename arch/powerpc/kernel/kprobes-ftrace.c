@@ -26,8 +26,8 @@
 #include <linux/ftrace.h>
 
 static nokprobe_inline
-int __skip_singlestep(struct kprobe *p, struct pt_regs *regs,
-		      struct kprobe_ctlblk *kcb, unsigned long orig_nip)
+int skip_singlestep(struct kprobe *p, struct pt_regs *regs,
+		    struct kprobe_ctlblk *kcb, unsigned long orig_nip)
 {
 	/*
 	 * Emulate singlestep (and also recover regs->nip)
@@ -43,16 +43,6 @@ int __skip_singlestep(struct kprobe *p, struct pt_regs *regs,
 		regs->nip = orig_nip;
 	return 1;
 }
-
-int skip_singlestep(struct kprobe *p, struct pt_regs *regs,
-		    struct kprobe_ctlblk *kcb)
-{
-	if (kprobe_ftrace(p))
-		return __skip_singlestep(p, regs, kcb, 0);
-	else
-		return 0;
-}
-NOKPROBE_SYMBOL(skip_singlestep);
 
 /* Ftrace callback handler for kprobes */
 void kprobe_ftrace_handler(unsigned long nip, unsigned long parent_nip,
@@ -82,7 +72,7 @@ void kprobe_ftrace_handler(unsigned long nip, unsigned long parent_nip,
 		__this_cpu_write(current_kprobe, p);
 		kcb->kprobe_status = KPROBE_HIT_ACTIVE;
 		if (!p->pre_handler || !p->pre_handler(p, regs))
-			__skip_singlestep(p, regs, kcb, orig_nip);
+			skip_singlestep(p, regs, kcb, orig_nip);
 		else {
 			/*
 			 * If pre_handler returns !0, it sets regs->nip and
