@@ -98,9 +98,10 @@ struct send_ctx {
 	 */
 	u64 cur_ino;
 	u64 cur_inode_gen;
-	int cur_inode_new;
-	int cur_inode_new_gen;
-	int cur_inode_deleted;
+	u8 cur_inode_new:1;
+	u8 cur_inode_new_gen:1;
+	u8 cur_inode_skip_truncate:1;
+	u8 cur_inode_deleted:1;
 	u64 cur_inode_size;
 	u64 cur_inode_mode;
 	u64 cur_inode_rdev;
@@ -5313,6 +5314,19 @@ out:
 	return ret;
 }
 
+static int truncate_before_falloc(struct send_ctx *sctx)
+{
+	int ret = 0;
+
+	if (!sctx->cur_inode_skip_truncate) {
+		ret = send_truncate(sctx, sctx->cur_ino,
+				    sctx->cur_inode_gen,
+				    sctx->cur_inode_size);
+		sctx->cur_inode_skip_truncate = 1;
+	}
+	return ret;
+}
+
 static int send_write_or_clone(struct send_ctx *sctx,
 			       struct btrfs_path *path,
 			       struct btrfs_key *key,
@@ -5354,8 +5368,7 @@ static int send_write_or_clone(struct send_ctx *sctx,
 	}
 
 	if (sctx->phase == SEND_PHASE_COMPUTE_DATA_SIZE) {
-		if (offset < sctx->cur_inode_size)
-			sctx->total_data_size += len;
+		sctx->total_data_size += len;
 		goto out;
 	}
 
@@ -5373,6 +5386,21 @@ static int send_write_or_clone(struct send_ctx *sctx,
 		 offset < sctx->cur_inode_size) {
 		ret = send_fallocate(sctx, BTRFS_SEND_PUNCH_HOLE_FALLOC_FLAGS,
 				     offset, len);
+	} else if (type == BTRFS_FILE_EXTENT_PREALLOC &&
+		   (sctx->flags & BTRFS_SEND_FLAG_STREAM_V2)) {
+		u32 flags = 0;
+		if (offset < sctx->cur_inode_size) {
+			ret = send_fallocate(sctx,
+					     BTRFS_SEND_PUNCH_HOLE_FALLOC_FLAGS,
+					     offset, len);
+		} else {
+			flags |= BTRFS_SEND_A_FALLOCATE_FLAG_KEEP_SIZE;
+			ret = truncate_before_falloc(sctx);
+		}
+		if (ret)
+			goto out;
+		ret = send_fallocate(sctx, flags, offset, len);
+
 	} else {
 		ret = send_extent_data(sctx, offset, len);
 	}
@@ -5775,19 +5803,24 @@ static int process_extent(struct send_ctx *sctx,
 		ei = btrfs_item_ptr(path->nodes[0], path->slots[0],
 				    struct btrfs_file_extent_item);
 		type = btrfs_file_extent_type(path->nodes[0], ei);
-		if (type == BTRFS_FILE_EXTENT_PREALLOC ||
-		    type == BTRFS_FILE_EXTENT_REG) {
-			/*
-			 * The send spec does not have a prealloc command yet,
-			 * so just leave a hole for prealloc'ed extents until
-			 * we have enough commands queued up to justify rev'ing
-			 * the send spec.
-			 */
-			if (type == BTRFS_FILE_EXTENT_PREALLOC) {
-				ret = 0;
-				goto out;
-			}
+		if (type == BTRFS_FILE_EXTENT_PREALLOC &&
+		    (sctx->flags & BTRFS_SEND_FLAG_STREAM_V2)) {
+			u64 len;
+			u32 flags = 0;
 
+			len = btrfs_file_extent_num_bytes(path->nodes[0], ei);
+			if (key->offset >= sctx->cur_inode_size) {
+				flags |= BTRFS_SEND_A_FALLOCATE_FLAG_KEEP_SIZE;
+				ret = truncate_before_falloc(sctx);
+				if (ret)
+					goto out;
+			}
+			ret = send_fallocate(sctx, flags, key->offset, len);
+			goto out;
+		} else if (type == BTRFS_FILE_EXTENT_PREALLOC) {
+			ret = 0;
+			goto out;
+		} else if (type == BTRFS_FILE_EXTENT_REG) {
 			/* Have a hole, just skip it. */
 			if (btrfs_file_extent_disk_bytenr(path->nodes[0], ei) == 0) {
 				ret = 0;
@@ -5982,7 +6015,7 @@ truncate_inode:
 					goto out;
 			}
 		}
-		if (need_truncate) {
+		if (need_truncate && !sctx->cur_inode_skip_truncate) {
 			ret = send_truncate(sctx, sctx->cur_ino,
 					    sctx->cur_inode_gen,
 					    sctx->cur_inode_size);
@@ -6044,6 +6077,7 @@ static int changed_inode(struct send_ctx *sctx,
 	sctx->cur_inode_new_gen = 0;
 	sctx->cur_inode_last_extent = (u64)-1;
 	sctx->cur_inode_next_write_offset = 0;
+	sctx->cur_inode_skip_truncate = 0;
 
 	/*
 	 * Set send_progress to current inode. This will tell all get_cur_xxx
