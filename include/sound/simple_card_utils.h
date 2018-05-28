@@ -21,6 +21,7 @@ struct asoc_simple_dai {
 	unsigned int tx_slot_mask;
 	unsigned int rx_slot_mask;
 	struct clk *clk;
+	int sysclk_id;
 };
 
 struct asoc_simple_card_data {

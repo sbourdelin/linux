@@ -158,13 +158,15 @@ static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
 		if (dai_props->cpu_dai.clk)
 			clk_set_rate(dai_props->cpu_dai.clk, mclk);
 
-		ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
-					     SND_SOC_CLOCK_IN);
+		ret = snd_soc_dai_set_sysclk(codec_dai,
+					     dai_props->codec_dai.sysclk_id,
+					     mclk, SND_SOC_CLOCK_IN);
 		if (ret && ret != -ENOTSUPP)
 			goto err;
 
-		ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
-					     SND_SOC_CLOCK_OUT);
+		ret = snd_soc_dai_set_sysclk(cpu_dai,
+					     dai_props->cpu_dai.sysclk_id,
+					     mclk, SND_SOC_CLOCK_OUT);
 		if (ret && ret != -ENOTSUPP)
 			goto err;
 	}

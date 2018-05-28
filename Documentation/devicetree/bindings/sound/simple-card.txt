@@ -94,6 +94,9 @@ Optional CPU/CODEC subnodes properties:
 - system-clock-direction-out		: specifies clock direction as 'out' on
 					  initialization. It is useful for some aCPUs with
 					  fixed clocks.
+- system-clock-index			: index of the system clock to use when
+					  the mclk frequency is on the CPU/CODEC
+					  DAI. Defaults to 0.
 
 Example 1 - single DAI link:
 
