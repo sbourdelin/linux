@@ -145,6 +145,8 @@ CFLAGS-$(CONFIG_PPC64)	+= $(call cc-option,-mno-pointers-to-nested-functions)
 CFLAGS-$(CONFIG_PPC32)	:= -ffixed-r2 $(MULTIPLEWORD)
 CFLAGS-$(CONFIG_PPC32)	+= $(call cc-option,-mno-readonly-in-sdata)
 
+CFLAGS-y += $(call cc-option,-Wno-attribute-alias)
+
 ifeq ($(CONFIG_PPC_BOOK3S_64),y)
 ifeq ($(CONFIG_CPU_LITTLE_ENDIAN),y)
 CFLAGS-$(CONFIG_GENERIC_CPU) += -mcpu=power8
