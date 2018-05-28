@@ -76,6 +76,20 @@
 		      <0x00000008 0x80000000 0 0x80000000>;
 	};
 
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* Chipselect 2 is physically at 0x48000000 */
+		vram: vram@48000000 {
+			/* 8 MB of designated video RAM */
+			compatible = "shared-dma-pool";
+			reg = <0x48000000 0x00800000>;
+			no-map;
+		};
+	};
+
 	gic: interrupt-controller@2c001000 {
 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
 		#interrupt-cells = <3>;
