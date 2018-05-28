@@ -126,7 +126,7 @@
 /* GFP bitmask for kmemleak internal allocations */
 #define gfp_kmemleak_mask(gfp)	(((gfp) & (GFP_KERNEL | GFP_ATOMIC)) | \
 				 __GFP_NORETRY | __GFP_NOMEMALLOC | \
-				 __GFP_NOWARN | __GFP_NOFAIL)
+				 __GFP_NOWARN)
 
 /* scanning area inside a memory block */
 struct kmemleak_scan_area {
@@ -548,10 +548,12 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 					     int min_count, gfp_t gfp)
 {
 	unsigned long flags;
-	struct kmemleak_object *object, *parent;
+	struct kmemleak_object *object = NULL, *parent;
 	struct rb_node **link, *rb_parent;
+	unsigned int i;
 
-	object = kmem_cache_alloc(object_cache, gfp_kmemleak_mask(gfp));
+	for (i = 0; i < 10 && !object; i++)
+		object = kmem_cache_alloc(object_cache, gfp_kmemleak_mask(gfp));
 	if (!object) {
 		pr_warn("Cannot allocate a kmemleak_object structure\n");
 		kmemleak_disable();
@@ -763,7 +765,8 @@ static void add_scan_area(unsigned long ptr, size_t size, gfp_t gfp)
 {
 	unsigned long flags;
 	struct kmemleak_object *object;
-	struct kmemleak_scan_area *area;
+	struct kmemleak_scan_area *area = NULL;
+	unsigned int i;
 
 	object = find_and_get_object(ptr, 1);
 	if (!object) {
@@ -772,7 +775,9 @@ static void add_scan_area(unsigned long ptr, size_t size, gfp_t gfp)
 		return;
 	}
 
-	area = kmem_cache_alloc(scan_area_cache, gfp_kmemleak_mask(gfp));
+	for (i = 0; i < 10 && !area; i++)
+		area = kmem_cache_alloc(scan_area_cache,
+					gfp_kmemleak_mask(gfp));
 	if (!area) {
 		pr_warn("Cannot allocate a scan area\n");
 		goto out;
