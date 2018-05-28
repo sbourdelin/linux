@@ -21,52 +21,10 @@
 struct gpcv2_irqchip_data {
 	struct raw_spinlock	rlock;
 	void __iomem		*gpc_base;
-	u32			wakeup_sources[IMR_NUM];
-	u32			saved_irq_mask[IMR_NUM];
 	u32			cpu2wakeup;
 };
 
 static struct gpcv2_irqchip_data *imx_gpcv2_instance;
-
-static int gpcv2_wakeup_source_save(void)
-{
-	struct gpcv2_irqchip_data *cd;
-	void __iomem *reg;
-	int i;
-
-	cd = imx_gpcv2_instance;
-	if (!cd)
-		return 0;
-
-	for (i = 0; i < IMR_NUM; i++) {
-		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-		cd->saved_irq_mask[i] = readl_relaxed(reg);
-		writel_relaxed(cd->wakeup_sources[i], reg);
-	}
-
-	return 0;
-}
-
-static void gpcv2_wakeup_source_restore(void)
-{
-	struct gpcv2_irqchip_data *cd;
-	void __iomem *reg;
-	int i;
-
-	cd = imx_gpcv2_instance;
-	if (!cd)
-		return;
-
-	for (i = 0; i < IMR_NUM; i++) {
-		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-		writel_relaxed(cd->saved_irq_mask[i], reg);
-	}
-}
-
-static struct syscore_ops imx_gpcv2_syscore_ops = {
-	.suspend	= gpcv2_wakeup_source_save,
-	.resume		= gpcv2_wakeup_source_restore,
-};
 
 static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
 {
@@ -79,9 +37,9 @@ static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
 	raw_spin_lock_irqsave(&cd->rlock, flags);
 	reg = cd->gpc_base + cd->cpu2wakeup + idx * 4;
 	mask = 1 << d->hwirq % 32;
-	val = cd->wakeup_sources[idx];
-
-	cd->wakeup_sources[idx] = on ? (val & ~mask) : (val | mask);
+	val = readl_relaxed(reg);
+	val = on ? (val & ~mask) : (val | mask);
+	writel_relaxed(val, reg);
 	raw_spin_unlock_irqrestore(&cd->rlock, flags);
 
 	/*
@@ -238,7 +196,6 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
 	for (i = 0; i < IMR_NUM; i++) {
 		writel_relaxed(~0, cd->gpc_base + GPC_IMR1_CORE0 + i * 4);
 		writel_relaxed(~0, cd->gpc_base + GPC_IMR1_CORE1 + i * 4);
-		cd->wakeup_sources[i] = ~0;
 	}
 
 	/* Let CORE0 as the default CPU to wake up by GPC */
@@ -252,7 +209,6 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
 	writel_relaxed(~0x1, cd->gpc_base + cd->cpu2wakeup);
 
 	imx_gpcv2_instance = cd;
-	register_syscore_ops(&imx_gpcv2_syscore_ops);
 
 	/*
 	 * Clear the OF_POPULATED flag set in of_irq_init so that
