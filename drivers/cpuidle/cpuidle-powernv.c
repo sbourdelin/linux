@@ -133,7 +133,7 @@ static int stop_loop(struct cpuidle_device *dev,
 static struct cpuidle_state powernv_states[CPUIDLE_STATE_MAX] = {
 	{ /* Snooze */
 		.name = "snooze",
-		.desc = "snooze",
+		.desc = "idle polling state",
 		.exit_latency = 0,
 		.target_residency = 0,
 		.enter = snooze_loop },
@@ -206,6 +206,7 @@ static int powernv_cpuidle_driver_init(void)
 }
 
 static inline void add_powernv_state(int index, const char *name,
+				     const char *desc,
 				     unsigned int flags,
 				     int (*idle_fn)(struct cpuidle_device *,
 						    struct cpuidle_driver *,
@@ -215,7 +216,7 @@ static inline void add_powernv_state(int index, const char *name,
 				     u64 psscr_val, u64 psscr_mask)
 {
 	strlcpy(powernv_states[index].name, name, CPUIDLE_NAME_LEN);
-	strlcpy(powernv_states[index].desc, name, CPUIDLE_NAME_LEN);
+	strlcpy(powernv_states[index].desc, desc, CPUIDLE_DESC_LEN);
 	powernv_states[index].flags = flags;
 	powernv_states[index].target_residency = target_residency;
 	powernv_states[index].exit_latency = exit_latency;
@@ -250,6 +251,7 @@ static int powernv_add_idle_states(void)
 	u64 psscr_val[CPUIDLE_STATE_MAX];
 	u64 psscr_mask[CPUIDLE_STATE_MAX];
 	const char *names[CPUIDLE_STATE_MAX];
+	const char *descs[CPUIDLE_STATE_MAX];
 	u32 has_stop_states = 0;
 	int i, rc;
 	u32 supported_flags = pnv_get_supported_cpuidle_states();
@@ -309,6 +311,11 @@ static int powernv_add_idle_states(void)
 	if (of_property_read_string_array(power_mgt,
 		"ibm,cpu-idle-state-names", names, dt_idle_states) < 0) {
 		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-names in DT\n");
+		goto out;
+	}
+	if (of_property_read_string_array(power_mgt,
+		"ibm,cpu-idle-state-descs", descs, dt_idle_states) < 0) {
+		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-descs in DT\n");
 		goto out;
 	}
 
@@ -414,10 +421,11 @@ static int powernv_add_idle_states(void)
 				target_residency = 100;
 			/* Add NAP state */
 			add_powernv_state(nr_idle_states, "Nap",
+					  "stop processor execution",
 					  CPUIDLE_FLAG_NONE, nap_loop,
 					  target_residency, exit_latency, 0, 0);
 		} else if (has_stop_states && !stops_timebase) {
-			add_powernv_state(nr_idle_states, names[i],
+			add_powernv_state(nr_idle_states, names[i], descs[i],
 					  CPUIDLE_FLAG_NONE, stop_loop,
 					  target_residency, exit_latency,
 					  psscr_val[i], psscr_mask[i]);
@@ -434,11 +442,12 @@ static int powernv_add_idle_states(void)
 				target_residency = 300000;
 			/* Add FASTSLEEP state */
 			add_powernv_state(nr_idle_states, "FastSleep",
+					  "Core and L2 clock gating",
 					  CPUIDLE_FLAG_TIMER_STOP,
 					  fastsleep_loop,
 					  target_residency, exit_latency, 0, 0);
 		} else if (has_stop_states && stops_timebase) {
-			add_powernv_state(nr_idle_states, names[i],
+			add_powernv_state(nr_idle_states, names[i], descs[i],
 					  CPUIDLE_FLAG_TIMER_STOP, stop_loop,
 					  target_residency, exit_latency,
 					  psscr_val[i], psscr_mask[i]);
