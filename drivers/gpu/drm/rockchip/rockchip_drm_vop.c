@@ -570,8 +570,6 @@ static int vop_enable(struct drm_crtc *crtc)
 
 	spin_unlock(&vop->reg_lock);
 
-	enable_irq(vop->irq);
-
 	drm_crtc_vblank_on(crtc);
 
 	return 0;
@@ -614,8 +612,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
 	wait_for_completion(&vop->dsp_hold_completion);
 
 	vop_dsp_hold_valid_irq_disable(vop);
-
-	disable_irq(vop->irq);
 
 	vop->is_enabled = false;
 
@@ -1186,6 +1182,16 @@ static irqreturn_t vop_isr(int irq, void *data)
 	int ret = IRQ_NONE;
 
 	/*
+	 * The irq is shared with the iommu. If the power-domain is off
+	 * the irq has to be targetted at the iommu.
+	 */
+	if (!pm_runtime_get_if_in_use(vop->dev))
+		return IRQ_NONE;
+
+	if (WARN_ON(vop_core_clks_enable(vop)))
+		goto out;
+
+	/*
 	 * interrupt register has interrupt status, enable and clear bits, we
 	 * must hold irq_lock to avoid a race with enable/disable_vblank().
 	*/
@@ -1199,8 +1205,11 @@ static irqreturn_t vop_isr(int irq, void *data)
 	spin_unlock(&vop->irq_lock);
 
 	/* This is expected for vop iommu irqs, since the irq is shared */
-	if (!active_irqs)
-		return IRQ_NONE;
+	if (!active_irqs) {
+		ret = IRQ_NONE;
+		vop_core_clks_disable(vop);
+		goto out;
+	}
 
 	if (active_irqs & DSP_HOLD_VALID_INTR) {
 		complete(&vop->dsp_hold_completion);
@@ -1226,6 +1235,10 @@ static irqreturn_t vop_isr(int irq, void *data)
 		DRM_DEV_ERROR(vop->dev, "Unknown VOP IRQs: %#02x\n",
 			      active_irqs);
 
+	vop_core_clks_disable(vop);
+
+out:
+	pm_runtime_put(vop->dev);
 	return ret;
 }
 
@@ -1603,9 +1616,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
 			       IRQF_SHARED, dev_name(dev), vop);
 	if (ret)
 		goto err_disable_pm_runtime;
-
-	/* IRQ is initially disabled; it gets enabled in power_on */
-	disable_irq(vop->irq);
 
 	return 0;
 
