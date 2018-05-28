@@ -244,15 +244,42 @@ out:
 }
 
 /**
- * printk_safe_flush - flush all per-cpu nmi buffers.
+ * printk_safe_flush - flush all per-cpu nmi buffers. it can be called even in NMI
+ *                     context.
+ * @panic: true when the system goes down. It does the best effort to get NMI messages
+ *         into the main ring buffer. Note that it could try harder when there is only
+ *         one CPU online.
  *
- * The buffers are flushed automatically via IRQ work. This function
+ * The buffers are flushed automatically via IRQ work in normal cases. This function
  * is useful only when someone wants to be sure that all buffers have
  * been flushed at some point.
  */
-void printk_safe_flush(void)
+void printk_safe_flush(bool panic)
 {
 	int cpu;
+
+	/*
+	 * Make sure that we could access the main ring buffer.
+	 * Do not risk a double release when more CPUs are up on panic.
+	 */
+	if (this_cpu_read(printk_context) & PRINTK_NMI_CONTEXT_MASK) {
+		if (panic) {
+			if (num_online_cpus() > 1)
+				return;
+
+			debug_locks_off();
+			raw_spin_lock_init(&logbuf_lock);
+		} else {
+			/*
+			 * Just avoid deadlocks here, we could loose the messages in
+			 * per-cpu nmi buffer in the case that hardlockup happens but
+			 * panic() is not called (irq_work won't work).
+			 * The flushing can be delayed by the next irq_work if flushing
+			 * is skiped here in normal cases.
+			 */
+			return;
+		}
+	}
 
 	for_each_possible_cpu(cpu) {
 #ifdef CONFIG_PRINTK_NMI
@@ -260,33 +287,6 @@ void printk_safe_flush(void)
 #endif
 		__printk_safe_flush(&per_cpu(safe_print_seq, cpu).work);
 	}
-}
-
-/**
- * printk_safe_flush_on_panic - flush all per-cpu nmi buffers when the system
- *	goes down.
- *
- * Similar to printk_safe_flush() but it can be called even in NMI context when
- * the system goes down. It does the best effort to get NMI messages into
- * the main ring buffer.
- *
- * Note that it could try harder when there is only one CPU online.
- */
-void printk_safe_flush_on_panic(void)
-{
-	/*
-	 * Make sure that we could access the main ring buffer.
-	 * Do not risk a double release when more CPUs are up.
-	 */
-	if (in_nmi() && raw_spin_is_locked(&logbuf_lock)) {
-		if (num_online_cpus() > 1)
-			return;
-
-		debug_locks_off();
-		raw_spin_lock_init(&logbuf_lock);
-	}
-
-	printk_safe_flush();
 }
 
 #ifdef CONFIG_PRINTK_NMI
@@ -404,5 +404,5 @@ void __init printk_safe_init(void)
 	printk_safe_irq_ready = 1;
 
 	/* Flush pending messages that did not have scheduled IRQ works. */
-	printk_safe_flush();
+	printk_safe_flush(false);
 }
