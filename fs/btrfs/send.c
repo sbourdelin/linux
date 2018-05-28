@@ -649,7 +649,10 @@ static int send_header(struct send_ctx *sctx)
 	struct btrfs_stream_header hdr;
 
 	strcpy(hdr.magic, BTRFS_SEND_STREAM_MAGIC);
-	hdr.version = cpu_to_le32(BTRFS_SEND_STREAM_VERSION);
+	if (sctx->flags & BTRFS_SEND_FLAG_STREAM_V2)
+		hdr.version = cpu_to_le32(BTRFS_SEND_STREAM_VERSION_2);
+	else
+		hdr.version = cpu_to_le32(BTRFS_SEND_STREAM_VERSION_1);
 
 	return write_buf(sctx->send_filp, &hdr, sizeof(hdr),
 					&sctx->send_off);
@@ -6535,6 +6538,8 @@ long btrfs_ioctl_send(struct file *mnt_file, struct btrfs_ioctl_send_args *arg)
 	INIT_LIST_HEAD(&sctx->name_cache_list);
 
 	sctx->flags = arg->flags;
+	if (sctx->flags & BTRFS_SEND_FLAG_CALCULATE_DATA_SIZE)
+		sctx->flags |= BTRFS_SEND_FLAG_STREAM_V2;
 
 	sctx->send_filp = fget(arg->send_fd);
 	if (!sctx->send_filp) {
