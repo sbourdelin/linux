@@ -345,8 +345,8 @@ static int msg_loop(int fd, int iov_count, int iov_length, int cnt,
 		if (err < 0)
 			perror("recv start time: ");
 		while (s->bytes_recvd < total_bytes) {
-			timeout.tv_sec = 0;
-			timeout.tv_usec = 10;
+			timeout.tv_sec = 1;
+			timeout.tv_usec = 0;
 
 			/* FD sets */
 			FD_ZERO(&w);
