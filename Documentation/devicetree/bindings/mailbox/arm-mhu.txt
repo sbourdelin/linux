@@ -3,12 +3,24 @@ ARM MHU Mailbox Driver
 
 The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
 3 independent channels/links to communicate with remote processor(s).
- MHU links are hardwired on a platform. A link raises interrupt for any
+MHU links are hardwired on a platform. A link raises interrupt for any
 received data. However, there is no specified way of knowing if the sent
 data has been read by the remote. This driver assumes the sender polls
 STAT register and the remote clears it after having read the data.
 The last channel is specified to be a 'Secure' resource, hence can't be
 used by Linux running NS.
+
+The latest MHUv2 is now a distributed IP with different peripheral views
+(registers) for the sender and receiver. Also, the peripheral views
+(registers) for Secure & Non-Secure have been separated out into two
+different register map where there is only one Secure channel but two
+Non-Secure channels viz. High Priority & Low Priority.
+
+Another difference is that MHUv1 duplex channels are now split into
+simplex/half duplex in MHUv2. MHUv2 has a configurable number of
+communication channels. There is a capability register (MSG_NO_CAP) to
+find out how many channels are available in a system for a specific
+register map (secure/non-secure).
 
 Mailbox Device Node:
 ====================
@@ -18,12 +30,18 @@ Required properties:
 - compatible:		Shall be "arm,mhu" & "arm,primecell"
 - reg:			Contains the mailbox register address range (base
 			address and length)
+			Shall have two set of register address range in
+			which case, the first one will be receive base
+			& second will be transmit base. (transmit base is
+			required for MHUv2)
 - #mbox-cells		Shall be 1 - the index of the channel needed.
 - interrupts:		Contains the interrupt information corresponding to
 			each of the 3 links of MHU.
 
 Example:
 --------
+
+1. Older controller which doesn't have different transmit & receive channel
 
 	mhu: mailbox@2b1f0000 {
 		#mbox-cells = <1>;
@@ -41,3 +59,18 @@ Example:
 		reg = <0 0x2e000000 0x4000>;
 		mboxes = <&mhu 1>; /* HP-NonSecure */
 	};
+
+2. Latest MHUv2 controller which have different transmit & receive channel
+
+        mhuv2: mailbox@2b1c0000 {
+                #mbox-cells = <1>;
+                compatible = "arm,mhu", "arm,primecell";
+                reg = <0x0 0x2b1c0000 0x0 0x1000>,
+                      <0x0 0x2b1d0000 0x0 0x1000>;
+                interrupts = <0 36 4>, /* LP-NonSecure */
+                             <0 35 4>; /* HP-NonSecure */
+                interrupt-names = "mhu_lpri_rx",
+                                  "mhu_hpri_rx";
+                clocks = <&clock 0 2 1>;
+                clock-names = "apb_pclk";
+        };
