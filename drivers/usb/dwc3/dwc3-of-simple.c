@@ -121,6 +121,9 @@ static int dwc3_of_simple_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_resetc_assert;
 
+	pm_runtime_enable(dev);
+	pm_runtime_get_sync(dev);
+
 	ret = of_platform_populate(np, NULL, NULL, dev);
 	if (ret) {
 		for (i = 0; i < simple->num_clocks; i++) {
@@ -130,10 +133,6 @@ static int dwc3_of_simple_probe(struct platform_device *pdev)
 
 		goto err_resetc_assert;
 	}
-
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
-	pm_runtime_get_sync(dev);
 
 	return 0;
 
