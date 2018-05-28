@@ -31,6 +31,8 @@
 #include "mesh.h"
 #include "wme.h"
 
+void ieee80211_rate_stats_dump(struct work_struct *wk);
+
 /**
  * DOC: STA information lifetime rules
  *
@@ -324,6 +326,7 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 	spin_lock_init(&sta->ps_lock);
 	INIT_WORK(&sta->drv_deliver_wk, sta_deliver_ps_frames);
 	INIT_WORK(&sta->ampdu_mlme.work, ieee80211_ba_session_work);
+	INIT_WORK(&sta->rate_stats_dump_wk, ieee80211_rate_stats_dump);
 	mutex_init(&sta->ampdu_mlme.mtx);
 #ifdef CONFIG_MAC80211_MESH
 	if (ieee80211_vif_is_mesh(&sdata->vif)) {
@@ -608,6 +611,11 @@ static int sta_info_insert_finish(struct sta_info *sta) __acquires(RCU)
 
 	if (ieee80211_vif_is_mesh(&sdata->vif))
 		mesh_accept_plinks_update(sdata);
+
+	RCU_INIT_POINTER(sta->rate_table, NULL);
+
+	if (local->rate_stats_active)
+		ieee80211_sta_rate_table_init(sta);
 
 	return 0;
  out_remove:
@@ -1005,6 +1013,10 @@ static void __sta_info_destroy_part2(struct sta_info *sta)
 	}
 
 	sta_dbg(sdata, "Removed STA %pM\n", sta->sta.addr);
+
+	ieee80211_sta_rate_table_free(sta->rate_table);
+
+	RCU_INIT_POINTER(sta->rate_table, NULL);
 
 	sinfo = kzalloc(sizeof(*sinfo), GFP_KERNEL);
 	if (sinfo)
@@ -2370,4 +2382,204 @@ void ieee80211_sta_set_expected_throughput(struct ieee80211_sta *pubsta,
 	struct sta_info *sta = container_of(pubsta, struct sta_info, sta);
 
 	sta_update_codel_params(sta, thr);
+}
+
+static u32 rate_table_hash(const void *rate, u32 len, u32 seed)
+{
+	return jhash_1word(*(u32 *)rate, seed);
+}
+
+static const struct rhashtable_params rate_rht_params = {
+	.nelem_hint = 5,
+	.automatic_shrinking = true,
+	.key_len = IEEE80211_ENCODED_RATE_LEN,
+	.key_offset = offsetof(struct ieee80211_sta_rate_entry, rate),
+	.head_offset = offsetof(struct ieee80211_sta_rate_entry, rhash),
+	.hashfn = rate_table_hash,
+};
+
+int ieee80211_sta_rate_table_init(struct sta_info *sta)
+{
+	struct rhashtable *new_rt;
+
+	new_rt = kmalloc(sizeof(*sta->rate_table), GFP_KERNEL);
+	rcu_assign_pointer(sta->rate_table, new_rt);
+
+	if (!sta->rate_table)
+		return -ENOMEM;
+
+	return rhashtable_init(sta->rate_table, &rate_rht_params);
+}
+
+static struct ieee80211_sta_rate_entry*
+ieee80211_sta_rate_table_lookup(struct rhashtable *rate_table, u32 rate)
+{
+	if (!rate_table)
+		return NULL;
+
+	return rhashtable_lookup_fast(rate_table, &rate, rate_rht_params);
+}
+
+static int
+ieee80211_sta_rate_entry_insert(struct rhashtable *rate_table,
+				struct ieee80211_sta_rate_entry *entry)
+{
+	if (!rate_table)
+		return -EINVAL;
+
+	return rhashtable_lookup_insert_fast(rate_table, &entry->rhash,
+					     rate_rht_params);
+}
+
+static void ieee80211_sta_rate_entry_free(void *ptr, void *arg)
+{
+	struct ieee80211_sta_rate_entry *entry = ptr;
+
+	kfree_rcu(entry, rcu);
+}
+
+void ieee80211_sta_rate_table_free(struct rhashtable *rate_table)
+{
+	if (!rate_table)
+		return;
+	rhashtable_free_and_destroy(rate_table,
+				    ieee80211_sta_rate_entry_free, NULL);
+	kfree(rate_table);
+}
+
+static int
+ieee80211_sta_get_rate_stats_report(struct rhashtable *rate_table,
+				    struct cfg80211_rate_stats **report_buf,
+				    int *len)
+{
+	int i = 0, ret, rt_len;
+	struct ieee80211_sta_rate_entry *entry = NULL;
+	struct rhashtable_iter iter;
+	struct cfg80211_rate_stats *report;
+
+	if (!rate_table)
+		return -EINVAL;
+
+	ret = rhashtable_walk_init(rate_table, &iter, GFP_KERNEL);
+
+	if (ret)
+		return -EINVAL;
+
+	rhashtable_walk_start(&iter);
+
+	rt_len = atomic_read(&(iter.ht->nelems));
+
+	/* Caller should take care of freeing this memory */
+	*report_buf = kzalloc(sizeof(struct cfg80211_rate_stats) * rt_len,
+			      GFP_KERNEL);
+
+	if (*report_buf  == NULL) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	while ((entry = rhashtable_walk_next(&iter))) {
+		if (IS_ERR(entry) && PTR_ERR(entry) == -EAGAIN)
+			continue;
+		if (IS_ERR(entry))
+			break;
+		if (i >= rt_len)
+			break;
+
+		report = *report_buf + i++;
+		report->rate = entry->rate;
+		report->packets = entry->packets;
+		report->bytes = entry->bytes;
+	}
+
+	*len = i;
+err:
+	rhashtable_walk_stop(&iter);
+	rhashtable_walk_exit(&iter);
+	return ret;
+}
+
+void ieee80211_rate_stats_dump(struct work_struct *wk)
+{
+	struct sta_info *sta;
+	struct cfg80211_rate_stats *report_buf = NULL;
+	struct rhashtable *old_rate_table;
+	unsigned int len = 0;
+
+	sta = container_of(wk, struct sta_info, rate_stats_dump_wk);
+
+	if (sta->dead)
+		return;
+
+	synchronize_net();
+	mutex_lock(&sta->local->sta_mtx);
+	old_rate_table = rcu_dereference(sta->rate_table);
+	if (!old_rate_table) {
+		mutex_unlock(&sta->local->sta_mtx);
+		return;
+	}
+
+	ieee80211_sta_rate_table_init(sta);
+	mutex_unlock(&sta->local->sta_mtx);
+
+	ieee80211_sta_get_rate_stats_report(old_rate_table, &report_buf, &len);
+
+	cfg80211_report_rate_stats(sta->local->hw.wiphy, &sta->sdata->wdev,
+				   sta->sta.addr, len, report_buf,
+				   GFP_KERNEL);
+
+	ieee80211_sta_rate_table_free(old_rate_table);
+	kfree(report_buf);
+}
+
+void ieee80211_sta_update_rate_stats(struct sta_info **sta_ptr)
+{
+	struct ieee80211_sta_rate_entry *entry;
+	struct sta_info *sta = *sta_ptr;
+	struct rhashtable *current_rate_table;
+	struct ieee80211_rx_data *rx;
+	u32 rx_pkt_len;
+	u32 rate;
+	int ret;
+
+	if (!sta->local->rate_stats_active)
+		return;
+
+	rx = container_of(sta_ptr, struct ieee80211_rx_data, sta);
+
+	rx_pkt_len = rx->skb->len;
+	rate = sta->rx_stats.last_rate;
+
+	if (!sta->rate_table)
+		return;
+
+	rcu_read_lock();
+
+	current_rate_table = rcu_dereference(sta->rate_table);
+
+	entry = ieee80211_sta_rate_table_lookup(current_rate_table, rate);
+	if (!entry) {
+		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+		if (!entry) {
+			rcu_read_unlock();
+			return;
+		}
+		entry->rate = rate;
+		ret = ieee80211_sta_rate_entry_insert(current_rate_table, entry);
+		if (ret) {
+			kfree(entry);
+			rcu_read_unlock();
+			return;
+		}
+	}
+
+	entry->packets++;
+	entry->bytes += rx_pkt_len;
+
+	if ((atomic_read(&(current_rate_table->nelems)) >= MAX_RATE_TABLE_ELEMS)
+	    || (entry->packets >= MAX_RATE_TABLE_PACKETS)) {
+		ieee80211_queue_work(&sta->sdata->local->hw,
+				     &sta->rate_stats_dump_wk);
+	}
+	rcu_read_unlock();
 }

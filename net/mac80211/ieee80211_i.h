@@ -1384,6 +1384,8 @@ struct ieee80211_local {
 	/* TDLS channel switch */
 	struct work_struct tdls_chsw_work;
 	struct sk_buff_head skb_queue_tdls_chsw;
+
+	bool rate_stats_active;
 };
 
 static inline struct ieee80211_sub_if_data *

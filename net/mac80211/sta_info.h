@@ -583,8 +583,23 @@ struct sta_info {
 
 	struct cfg80211_chan_def tdls_chandef;
 
+	struct rhashtable *rate_table;
+	struct work_struct rate_stats_dump_wk;
+
 	/* keep last! */
 	struct ieee80211_sta sta;
+};
+
+#define IEEE80211_ENCODED_RATE_LEN 4
+#define MAX_RATE_TABLE_ELEMS	   10
+#define MAX_RATE_TABLE_PACKETS	   65000
+
+struct ieee80211_sta_rate_entry {
+	u32 rate;
+	u32 bytes;
+	struct rcu_head rcu;
+	struct rhash_head rhash;
+	u16 packets;
 };
 
 static inline enum nl80211_plink_state sta_plink_state(struct sta_info *sta)
@@ -758,6 +773,11 @@ void ieee80211_sta_ps_deliver_poll_response(struct sta_info *sta);
 void ieee80211_sta_ps_deliver_uapsd(struct sta_info *sta);
 
 unsigned long ieee80211_sta_last_active(struct sta_info *sta);
+
+void ieee80211_sta_rate_table_free(struct rhashtable *rate_table);
+int ieee80211_sta_rate_table_init(struct sta_info *sta);
+void ieee80211_rate_stats_dump(struct work_struct *wk);
+void ieee80211_sta_update_rate_stats(struct sta_info **sta_ptr);
 
 enum sta_stats_type {
 	STA_STATS_RATE_TYPE_INVALID = 0,

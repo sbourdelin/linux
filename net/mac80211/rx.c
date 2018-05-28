@@ -1561,9 +1561,11 @@ ieee80211_rx_h_sta_process(struct ieee80211_rx_data *rx)
 		    test_sta_flag(sta, WLAN_STA_AUTHORIZED)) {
 			sta->rx_stats.last_rx = jiffies;
 			if (ieee80211_is_data(hdr->frame_control) &&
-			    !is_multicast_ether_addr(hdr->addr1))
+			    !is_multicast_ether_addr(hdr->addr1)) {
 				sta->rx_stats.last_rate =
 					sta_stats_encode_rate(status);
+				ieee80211_sta_update_rate_stats(&sta);
+			}
 		}
 	} else if (rx->sdata->vif.type == NL80211_IFTYPE_OCB) {
 		sta->rx_stats.last_rx = jiffies;
@@ -1573,8 +1575,10 @@ ieee80211_rx_h_sta_process(struct ieee80211_rx_data *rx)
 		 * match the current local configuration when processed.
 		 */
 		sta->rx_stats.last_rx = jiffies;
-		if (ieee80211_is_data(hdr->frame_control))
+		if (ieee80211_is_data(hdr->frame_control)) {
 			sta->rx_stats.last_rate = sta_stats_encode_rate(status);
+			ieee80211_sta_update_rate_stats(&sta);
+		}
 	}
 
 	if (rx->sdata->vif.type == NL80211_IFTYPE_STATION)
@@ -4066,6 +4070,8 @@ static bool ieee80211_invoke_fast_rx(struct ieee80211_rx_data *rx,
 
 	stats->last_rx = jiffies;
 	stats->last_rate = sta_stats_encode_rate(status);
+
+	ieee80211_sta_update_rate_stats(&sta);
 
 	stats->fragments++;
 	stats->packets++;

@@ -3803,6 +3803,41 @@ out:
 	return ret;
 }
 
+static void
+ieee80211_rate_stats(struct wiphy *wiphy, enum cfg80211_rate_stats_ops ops)
+{
+	struct ieee80211_local *local = wiphy_priv(wiphy);
+	struct sta_info *sta;
+
+	mutex_lock(&local->sta_mtx);
+
+	switch (ops) {
+	case CFG80211_RATE_STATS_START:
+		local->rate_stats_active = true;
+		list_for_each_entry(sta, &local->sta_list, list) {
+			ieee80211_sta_rate_table_init(sta);
+		}
+		break;
+
+	case CFG80211_RATE_STATS_STOP:
+		local->rate_stats_active = false;
+		list_for_each_entry(sta, &local->sta_list, list) {
+			ieee80211_sta_rate_table_free(sta->rate_table);
+			RCU_INIT_POINTER(sta->rate_table, NULL);
+		}
+		break;
+
+	case CFG80211_RATE_STATS_DUMP:
+		list_for_each_entry(sta, &local->sta_list, list) {
+				    ieee80211_queue_work(&local->hw,
+				    &sta->rate_stats_dump_wk);
+		}
+		break;
+	}
+
+	mutex_unlock(&local->sta_mtx);
+}
+
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
 	.del_virtual_intf = ieee80211_del_iface,
@@ -3897,4 +3932,5 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.set_multicast_to_unicast = ieee80211_set_multicast_to_unicast,
 	.tx_control_port = ieee80211_tx_control_port,
 	.get_txq_stats = ieee80211_get_txq_stats,
+	.rate_stats = ieee80211_rate_stats,
 };
