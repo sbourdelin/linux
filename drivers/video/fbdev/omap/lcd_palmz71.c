@@ -66,3 +66,6 @@ static struct platform_driver palmz71_panel_driver = {
 };
 
 module_platform_driver(palmz71_panel_driver);
+MODULE_AUTHOR("Marek Vasut");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("LCD panel support for the Palm Zire71");

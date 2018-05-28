@@ -59,3 +59,6 @@ static struct platform_driver palmte_panel_driver = {
 };
 
 module_platform_driver(palmte_panel_driver);
+MODULE_AUTHOR("Romain Goyet <r.goyet@gmail.com>");
+MODULE_DESCRIPTION("LCD panel support for the Palm Tungsten E");
+MODULE_LICENSE("GPL");
