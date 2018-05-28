@@ -920,6 +920,7 @@ static void mark_nxdata_nx(void)
 	set_pages_nx(virt_to_page(start), size >> PAGE_SHIFT);
 }
 
+#ifdef CONFIG_STRICT_KERNEL_RWX
 void mark_rodata_ro(void)
 {
 	unsigned long start = PFN_ALIGN(_text);
@@ -957,3 +958,4 @@ void mark_rodata_ro(void)
 	if (__supported_pte_mask & _PAGE_NX)
 		debug_checkwx();
 }
+#endif /*end of CONFIG_STRICT_KERNEL_RWX*/
