@@ -1134,7 +1134,14 @@ static void mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 	from = blk_rq_pos(req);
 	nr = blk_rq_sectors(req);
 
-	if (mmc_can_discard(card))
+	/*
+	 * DISCARD says the contents of a write block where the discard
+	 * function has been applied shold be 'don't care'. But TRIM and
+	 * ERASE should have explicit '1' or '0' indicated by
+	 * card->erased_byte. So REQ_OP_WRITE_ZEROES should use TRIM/ERASE
+	 * instead.
+	 */
+	if (mmc_can_discard(card) && req_op(req) != REQ_OP_WRITE_ZEROES)
 		arg = MMC_DISCARD_ARG;
 	else if (mmc_can_trim(card))
 		arg = MMC_TRIM_ARG;
@@ -2230,6 +2237,7 @@ enum mmc_issued mmc_blk_mq_issue_rq(struct mmc_queue *mq, struct request *req)
 			mmc_blk_issue_drv_op(mq, req);
 			break;
 		case REQ_OP_DISCARD:
+		case REQ_OP_WRITE_ZEROES:
 			mmc_blk_issue_discard_rq(mq, req);
 			break;
 		case REQ_OP_SECURE_ERASE:
