@@ -4762,12 +4762,19 @@
 			never -- do not unplug even if version check succeeds
 
 	xen_nopvspin	[X86,XEN]
+			[Deprecated - use xen_nopv=spin]
 			Disables the ticketlock slowpath using Xen PV
 			optimizations.
 
-	xen_nopv	[X86]
-			Disables the PV optimizations forcing the HVM guest to
-			run as generic HVM guest with no PV drivers.
+	xen_nopv=	[X86,XEN]
+			Disables various (or all) PV optimizations forcing the
+			HVM (or PV) guest to run without them. No value
+			specified defaults to 'all'.
+			Format: { [spin,][ipi,] | all }
+			all -- every PV feature on HVM, including PV drivers.
+			spin -- Disables the ticketlock slowpath using Xen PV
+			         optimizations (PV and HVM).
+			ipi -- Disable PV IPIs (on HVM).
 
 	xirc2ps_cs=	[NET,PCMCIA]
 			Format:

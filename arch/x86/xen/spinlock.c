@@ -21,7 +21,6 @@
 
 static DEFINE_PER_CPU(int, lock_kicker_irq) = -1;
 static DEFINE_PER_CPU(char *, irq_name);
-static bool xen_pvspin = true;
 
 static void xen_qlock_kick(int cpu)
 {
@@ -80,7 +79,7 @@ void xen_init_lock_cpu(int cpu)
 	int irq;
 	char *name;
 
-	if (!xen_pvspin) {
+	if (xen_nopv_spin()) {
 		if (cpu == 0)
 			static_branch_disable(&virt_spin_lock_key);
 		return;
@@ -108,7 +107,7 @@ void xen_init_lock_cpu(int cpu)
 
 void xen_uninit_lock_cpu(int cpu)
 {
-	if (!xen_pvspin)
+	if (xen_nopv_spin())
 		return;
 
 	unbind_from_irqhandler(per_cpu(lock_kicker_irq, cpu), NULL);
@@ -130,7 +129,7 @@ PV_CALLEE_SAVE_REGS_THUNK(xen_vcpu_stolen);
 void __init xen_init_spinlocks(void)
 {
 
-	if (!xen_pvspin) {
+	if (xen_nopv_spin()) {
 		printk(KERN_DEBUG "xen: PV spinlocks disabled\n");
 		return;
 	}
@@ -146,7 +145,7 @@ void __init xen_init_spinlocks(void)
 
 static __init int xen_parse_nopvspin(char *arg)
 {
-	xen_pvspin = false;
+	xen_set_nopv(XEN_NOPV_SPIN);
 	return 0;
 }
 early_param("xen_nopvspin", xen_parse_nopvspin);

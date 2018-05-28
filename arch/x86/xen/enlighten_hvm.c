@@ -208,17 +208,62 @@ static void __init xen_hvm_guest_init(void)
 #endif
 }
 
-static bool xen_nopv;
+static unsigned int xen_nopv_feat;
+
+static bool xen_nopv(void)
+{
+	return xen_nopv_feat == XEN_NOPV_ALL;
+}
+
+bool xen_nopv_ipi(void)
+{
+	return xen_nopv_feat & XEN_NOPV_IPI;
+}
+
+bool xen_nopv_spin(void)
+{
+	return xen_nopv_feat & XEN_NOPV_SPIN;
+}
+
+void xen_set_nopv(unsigned int mask)
+{
+	xen_nopv_feat |= mask;
+}
+
 static __init int xen_parse_nopv(char *arg)
 {
-       xen_nopv = true;
-       return 0;
+	char *p, *q;
+	int l;
+
+	xen_nopv_feat = arg ? 0 : XEN_NOPV_ALL;
+
+	for (p = arg; p; p = q) {
+		q = strchr(p, ',');
+		if (q) {
+			l = q - p;
+			q++;
+		} else {
+			l = strlen(p);
+		}
+		if (!strncmp(p, "spin", l))
+			xen_nopv_feat |= XEN_NOPV_SPIN;
+		else if (!strncmp(p, "ipi", l))
+			xen_nopv_feat |= XEN_NOPV_IPI;
+		else if (!strncmp(p, "all", l))
+			xen_nopv_feat = XEN_NOPV_ALL;
+		else
+			pr_warn("unrecognised option '%s' for 'xen_nopv'\n", p);
+	}
+
+	pr_debug("xen_nopv_feat = 0x%x\n", xen_nopv_feat);
+
+	return 0;
 }
 early_param("xen_nopv", xen_parse_nopv);
 
 bool xen_hvm_need_lapic(void)
 {
-	if (xen_nopv)
+	if (xen_nopv())
 		return false;
 	if (xen_pv_domain())
 		return false;
@@ -232,7 +277,7 @@ EXPORT_SYMBOL_GPL(xen_hvm_need_lapic);
 
 static uint32_t __init xen_platform_hvm(void)
 {
-	if (xen_pv_domain() || xen_nopv)
+	if (xen_pv_domain() || xen_nopv())
 		return 0;
 
 	return xen_cpuid_base();

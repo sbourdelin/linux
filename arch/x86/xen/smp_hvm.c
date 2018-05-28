@@ -66,11 +66,19 @@ void __init xen_hvm_smp_init(void)
 	if (!xen_have_vector_callback)
 		return;
 
+	smp_ops.smp_cpus_done = xen_smp_cpus_done;
+	smp_ops.smp_prepare_boot_cpu = xen_hvm_smp_prepare_boot_cpu;
 	smp_ops.smp_prepare_cpus = xen_hvm_smp_prepare_cpus;
-	smp_ops.smp_send_reschedule = xen_smp_send_reschedule;
 	smp_ops.cpu_die = xen_hvm_cpu_die;
+
+	if (xen_nopv_ipi()) {
+		pr_debug("xen: PV IPI disabled\n");
+		return;
+	}
+
+	pr_debug("xen: PV IPI enabled\n");
+
+	smp_ops.smp_send_reschedule = xen_smp_send_reschedule;
 	smp_ops.send_call_func_ipi = xen_smp_send_call_function_ipi;
 	smp_ops.send_call_func_single_ipi = xen_smp_send_call_function_single_ipi;
-	smp_ops.smp_prepare_boot_cpu = xen_hvm_smp_prepare_boot_cpu;
-	smp_ops.smp_cpus_done = xen_smp_cpus_done;
 }

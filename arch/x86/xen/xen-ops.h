@@ -164,4 +164,13 @@ void xen_hvm_post_suspend(int suspend_cancelled);
 static inline void xen_hvm_post_suspend(int suspend_cancelled) {}
 #endif
 
+#define XEN_NOPV_PLATFORM (1<<0)
+#define XEN_NOPV_SPIN     (1<<1)
+#define XEN_NOPV_IPI      (1<<2)
+#define XEN_NOPV_ALL      (XEN_NOPV_PLATFORM | XEN_NOPV_SPIN | XEN_NOPV_IPI)
+
+void xen_set_nopv(unsigned int mask);
+bool xen_nopv_spin(void);
+bool xen_nopv_ipi(void);
+
 #endif /* XEN_OPS_H */
