@@ -837,6 +837,14 @@ struct bnxt_vf_info {
 	u32	func_flags; /* func cfg flags */
 	u32	min_tx_rate;
 	u32	max_tx_rate;
+	u16	min_tx_rings;
+	u16	max_tx_rings;
+	u16	min_rx_rings;
+	u16	max_rx_rings;
+	u16	min_cp_rings;
+	u16	min_stat_ctxs;
+	u16	min_ring_grps;
+	u16	min_vnics;
 	void	*hwrm_cmd_req_addr;
 	dma_addr_t	hwrm_cmd_req_dma_addr;
 };
@@ -1351,6 +1359,7 @@ struct bnxt {
 #ifdef CONFIG_BNXT_SRIOV
 	int			nr_vfs;
 	struct bnxt_vf_info	vf;
+	struct hwrm_func_vf_resource_cfg_input vf_resc_cfg_input;
 	wait_queue_head_t	sriov_cfg_wait;
 	bool			sriov_cfg;
 #define BNXT_SRIOV_CFG_WAIT_TMO	msecs_to_jiffies(10000)

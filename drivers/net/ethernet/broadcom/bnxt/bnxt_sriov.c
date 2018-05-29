@@ -171,6 +171,10 @@ int bnxt_get_vf_config(struct net_device *dev, int vf_id,
 		ivi->linkstate = IFLA_VF_LINK_STATE_ENABLE;
 	else
 		ivi->linkstate = IFLA_VF_LINK_STATE_DISABLE;
+	ivi->min_tx_queues = vf->min_tx_rings;
+	ivi->max_tx_queues = vf->max_tx_rings;
+	ivi->min_rx_queues = vf->min_rx_rings;
+	ivi->max_rx_queues = vf->max_rx_rings;
 
 	return 0;
 }
@@ -498,6 +502,8 @@ static int bnxt_hwrm_func_vf_resc_cfg(struct bnxt *bp, int num_vfs)
 
 	mutex_lock(&bp->hwrm_cmd_lock);
 	for (i = 0; i < num_vfs; i++) {
+		struct bnxt_vf_info *vf = &pf->vf[i];
+
 		req.vf_id = cpu_to_le16(pf->first_vf_id + i);
 		rc = _hwrm_send_message(bp, &req, sizeof(req),
 					HWRM_CMD_TIMEOUT);
@@ -506,7 +512,15 @@ static int bnxt_hwrm_func_vf_resc_cfg(struct bnxt *bp, int num_vfs)
 			break;
 		}
 		pf->active_vfs = i + 1;
-		pf->vf[i].fw_fid = pf->first_vf_id + i;
+		vf->fw_fid = pf->first_vf_id + i;
+		vf->min_tx_rings = le16_to_cpu(req.min_tx_rings);
+		vf->max_tx_rings = vf_tx_rings;
+		vf->min_rx_rings = le16_to_cpu(req.min_rx_rings);
+		vf->max_rx_rings = vf_rx_rings;
+		vf->min_cp_rings = le16_to_cpu(req.min_cmpl_rings);
+		vf->min_stat_ctxs = le16_to_cpu(req.min_stat_ctx);
+		vf->min_ring_grps = le16_to_cpu(req.min_hw_ring_grps);
+		vf->min_vnics = le16_to_cpu(req.min_vnics);
 	}
 	mutex_unlock(&bp->hwrm_cmd_lock);
 	if (pf->active_vfs) {
@@ -521,6 +535,7 @@ static int bnxt_hwrm_func_vf_resc_cfg(struct bnxt *bp, int num_vfs)
 		hw_resc->max_stat_ctxs -= le16_to_cpu(req.min_stat_ctx) * n;
 		hw_resc->max_vnics -= le16_to_cpu(req.min_vnics) * n;
 
+		memcpy(&bp->vf_resc_cfg_input, &req, sizeof(req));
 		rc = pf->active_vfs;
 	}
 	return rc;
@@ -585,6 +600,7 @@ static int bnxt_hwrm_func_cfg(struct bnxt *bp, int num_vfs)
 
 	mutex_lock(&bp->hwrm_cmd_lock);
 	for (i = 0; i < num_vfs; i++) {
+		struct bnxt_vf_info *vf = &pf->vf[i];
 		int vf_tx_rsvd = vf_tx_rings;
 
 		req.fid = cpu_to_le16(pf->first_vf_id + i);
@@ -593,12 +609,15 @@ static int bnxt_hwrm_func_cfg(struct bnxt *bp, int num_vfs)
 		if (rc)
 			break;
 		pf->active_vfs = i + 1;
-		pf->vf[i].fw_fid = le16_to_cpu(req.fid);
-		rc = __bnxt_hwrm_get_tx_rings(bp, pf->vf[i].fw_fid,
-					      &vf_tx_rsvd);
+		vf->fw_fid = le16_to_cpu(req.fid);
+		rc = __bnxt_hwrm_get_tx_rings(bp, vf->fw_fid, &vf_tx_rsvd);
 		if (rc)
 			break;
 		total_vf_tx_rings += vf_tx_rsvd;
+		vf->min_tx_rings = vf_tx_rsvd;
+		vf->max_tx_rings = vf_tx_rsvd;
+		vf->min_rx_rings = vf_rx_rings;
+		vf->max_rx_rings = vf_rx_rings;
 	}
 	mutex_unlock(&bp->hwrm_cmd_lock);
 	if (rc)
