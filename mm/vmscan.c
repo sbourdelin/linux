@@ -83,9 +83,6 @@ struct scan_control {
 	 */
 	struct mem_cgroup *target_mem_cgroup;
 
-	/* Scan (total_size >> priority) pages at once */
-	int priority;
-
 	/* The highest zone to isolate pages for reclaim from */
 	enum zone_type reclaim_idx;
 
@@ -110,6 +107,9 @@ struct scan_control {
 
 	/* One of the zones is ready for compaction */
 	unsigned int compaction_ready:1;
+
+	/* Scan (total_size >> priority) pages at once */
+	s8 priority;
 
 	/* Incremented by the number of inactive pages that were scanned */
 	unsigned long nr_scanned;
