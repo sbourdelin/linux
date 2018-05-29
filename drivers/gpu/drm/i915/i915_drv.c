@@ -209,10 +209,11 @@ static bool intel_is_virt_pch(unsigned short id,
 		 sdevice == PCI_SUBDEVICE_ID_QEMU));
 }
 
-static unsigned short
-intel_virt_detect_pch(const struct drm_i915_private *dev_priv)
+static void
+intel_virt_update_pch(struct drm_i915_private *dev_priv)
 {
 	unsigned short id = 0;
+	enum intel_pch pch_type = PCH_NONE;
 
 	/*
 	 * In a virtualized passthrough environment we can be in a
@@ -221,25 +222,37 @@ intel_virt_detect_pch(const struct drm_i915_private *dev_priv)
 	 * make an educated guess as to which PCH is really there.
 	 */
 
-	if (IS_GEN5(dev_priv))
+	if (IS_GEN5(dev_priv)) {
 		id = INTEL_PCH_IBX_DEVICE_ID_TYPE;
-	else if (IS_GEN6(dev_priv) || IS_IVYBRIDGE(dev_priv))
+		pch_type = intel_pch_type(dev_priv, id);
+		DRM_DEBUG_KMS("Assuming Ibex Peak PCH id %04x\n", id);
+	} else if (IS_GEN6(dev_priv) || IS_IVYBRIDGE(dev_priv)) {
 		id = INTEL_PCH_CPT_DEVICE_ID_TYPE;
-	else if (IS_HSW_ULT(dev_priv) || IS_BDW_ULT(dev_priv))
-		id = INTEL_PCH_LPT_LP_DEVICE_ID_TYPE;
-	else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
-		id = INTEL_PCH_LPT_DEVICE_ID_TYPE;
-	else if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
+		pch_type = intel_pch_type(dev_priv, id);
+		DRM_DEBUG_KMS("Assuming CougarPoint PCH id %04x\n", id);
+	} else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
+		if (IS_HSW_ULT(dev_priv) || IS_BDW_ULT(dev_priv))
+			id = INTEL_PCH_LPT_LP_DEVICE_ID_TYPE;
+		else
+			id = INTEL_PCH_LPT_DEVICE_ID_TYPE;
+		pch_type = intel_pch_type(dev_priv, id);
+		DRM_DEBUG_KMS("Assuming LynxPoint PCH id %04x\n", id);
+	} else if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
 		id = INTEL_PCH_SPT_DEVICE_ID_TYPE;
-	else if (IS_COFFEELAKE(dev_priv) || IS_CANNONLAKE(dev_priv))
+		pch_type = intel_pch_type(dev_priv, id);
+		DRM_DEBUG_KMS("Assuming SunrisePoint PCH id %04x\n", id);
+	} else if (IS_COFFEELAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		id = INTEL_PCH_CNP_DEVICE_ID_TYPE;
+		pch_type = intel_pch_type(dev_priv, id);
+		DRM_DEBUG_KMS("Assuming CannonPoint PCH id %04x\n", id);
+	} else {
+		id = 0;
+		pch_type = PCH_NOP;
+		DRM_DEBUG_KMS("Assuming NOP PCH\n");
+	}
 
-	if (id)
-		DRM_DEBUG_KMS("Assuming PCH ID %04x\n", id);
-	else
-		DRM_DEBUG_KMS("Assuming no PCH\n");
-
-	return id;
+	dev_priv->pch_type = pch_type;
+	dev_priv->pch_id = id;
 }
 
 static void intel_detect_pch(struct drm_i915_private *dev_priv)
@@ -281,16 +294,7 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 			break;
 		} else if (intel_is_virt_pch(id, pch->subsystem_vendor,
 					 pch->subsystem_device)) {
-			id = intel_virt_detect_pch(dev_priv);
-			if (id) {
-				pch_type = intel_pch_type(dev_priv, id);
-				if (WARN_ON(pch_type == PCH_NONE))
-					pch_type = PCH_NOP;
-			} else {
-				pch_type = PCH_NOP;
-			}
-			dev_priv->pch_type = pch_type;
-			dev_priv->pch_id = id;
+			intel_virt_update_pch(dev_priv);
 			break;
 		}
 	}
