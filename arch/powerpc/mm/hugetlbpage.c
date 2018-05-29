@@ -63,7 +63,11 @@ static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
 		cachep = hugepte_cache;
 		num_hugepd = 1 << (pshift - pdshift);
 	} else {
+#ifdef CONFIG_PPC_8xx
+		cachep = PGT_CACHE(PTE_SHIFT);
+#else
 		cachep = PGT_CACHE(pdshift - pshift);
+#endif
 		num_hugepd = 1;
 	}
 
@@ -328,7 +332,11 @@ static void free_hugepd_range(struct mmu_gather *tlb, hugepd_t *hpdp, int pdshif
 	if (shift >= pdshift)
 		hugepd_free(tlb, hugepte);
 	else
+#ifdef CONFIG_PPC_8xx
+		pgtable_free_tlb(tlb, hugepte, PTE_SHIFT);
+#else
 		pgtable_free_tlb(tlb, hugepte, pdshift - shift);
+#endif
 }
 
 static void hugetlb_free_pmd_range(struct mmu_gather *tlb, pud_t *pud,
@@ -696,7 +704,11 @@ static int __init hugetlbpage_init(void)
 		 * use pgt cache for hugepd.
 		 */
 		if (pdshift > shift)
+#ifdef CONFIG_PPC_8xx
+			pgtable_cache_add(PTE_SHIFT, NULL);
+#else
 			pgtable_cache_add(pdshift - shift, NULL);
+#endif
 #if defined(CONFIG_PPC_FSL_BOOK3E) || defined(CONFIG_PPC_8xx)
 		else if (!hugepte_cache) {
 			/*
