@@ -196,4 +196,5 @@ static inline u32 next_pseudo_random32(u32 seed)
 	return seed * 1664525 + 1013904223;
 }
 
+extern int crng_ready(void);
 #endif /* _LINUX_RANDOM_H */
