@@ -245,12 +245,14 @@ static int xt_ct_tg_check(const struct xt_tgchk_param *par,
 	}
 
 	if (info->helper[0]) {
+		info->helper[sizeof(info->helper) - 1] = '\0';
 		ret = xt_ct_set_helper(ct, info->helper, par);
 		if (ret < 0)
 			goto err3;
 	}
 
 	if (info->timeout[0]) {
+		info->timeout[sizeof(info->timeout) - 1] = '\0';
 		ret = xt_ct_set_timeout(ct, par, info->timeout);
 		if (ret < 0)
 			goto err4;
