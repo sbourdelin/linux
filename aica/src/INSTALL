@@ -1,0 +1,7 @@
+To build this you will need the following on the host system:
+
+    * GNU Make
+    * GNU C cross-compiler for ARM:
+        - arm-none-eabi-gcc
+        - arm-none-eabi-objcopy
+        - arm-none-eabi-as
