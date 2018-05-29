@@ -78,10 +78,12 @@
 #define GF_M(_p)               (CONFIG_BCH_CONST_M)
 #define GF_T(_p)               (CONFIG_BCH_CONST_T)
 #define GF_N(_p)               ((1 << (CONFIG_BCH_CONST_M))-1)
+#define BCH_MAX_M              (CONFIG_BCH_CONST_M)
 #else
 #define GF_M(_p)               ((_p)->m)
 #define GF_T(_p)               ((_p)->t)
 #define GF_N(_p)               ((_p)->n)
+#define BCH_MAX_M              15
 #endif
 
 #define BCH_ECC_WORDS(_p)      DIV_ROUND_UP(GF_M(_p)*GF_T(_p), 32)
@@ -187,7 +189,7 @@ void encode_bch(struct bch_control *bch, const uint8_t *data,
 	const unsigned int l = BCH_ECC_WORDS(bch)-1;
 	unsigned int i, mlen;
 	unsigned long m;
-	uint32_t w, r[l+1];
+	uint32_t w;
 	const uint32_t * const tab0 = bch->mod8_tab;
 	const uint32_t * const tab1 = tab0 + 256*(l+1);
 	const uint32_t * const tab2 = tab1 + 256*(l+1);
@@ -198,7 +200,7 @@ void encode_bch(struct bch_control *bch, const uint8_t *data,
 		/* load ecc parity bytes into internal 32-bit buffer */
 		load_ecc8(bch, bch->ecc_buf, ecc);
 	} else {
-		memset(bch->ecc_buf, 0, sizeof(r));
+		memset(bch->ecc_work, 0, bch->ecc_bytes);
 	}
 
 	/* process first unaligned data bytes */
@@ -215,7 +217,7 @@ void encode_bch(struct bch_control *bch, const uint8_t *data,
 	mlen  = len/4;
 	data += 4*mlen;
 	len  -= 4*mlen;
-	memcpy(r, bch->ecc_buf, sizeof(r));
+	memcpy(bch->ecc_work, bch->ecc_buf, bch->ecc_bytes);
 
 	/*
 	 * split each 32-bit word into 4 polynomials of weight 8 as follows:
@@ -229,6 +231,8 @@ void encode_bch(struct bch_control *bch, const uint8_t *data,
 	 * xxxxxxxx  yyyyyyyy  zzzzzzzz  tttttttt  mod g = r0^r1^r2^r3
 	 */
 	while (mlen--) {
+		uint32_t *r = bch->ecc_work;
+
 		/* input data is read in big-endian format */
 		w = r[0]^cpu_to_be32(*pdata++);
 		p0 = tab0 + (l+1)*((w >>  0) & 0xff);
@@ -241,7 +245,7 @@ void encode_bch(struct bch_control *bch, const uint8_t *data,
 
 		r[l] = p0[l]^p1[l]^p2[l]^p3[l];
 	}
-	memcpy(bch->ecc_buf, r, sizeof(r));
+	memcpy(bch->ecc_buf, bch->ecc_work, bch->ecc_bytes);
 
 	/* process last unaligned bytes */
 	if (len)
@@ -434,7 +438,7 @@ static int solve_linear_system(struct bch_control *bch, unsigned int *rows,
 {
 	const int m = GF_M(bch);
 	unsigned int tmp, mask;
-	int rem, c, r, p, k, param[m];
+	int rem, c, r, p, k, param[BCH_MAX_M];
 
 	k = 0;
 	mask = 1 << m;
@@ -1009,10 +1013,10 @@ int decode_bch(struct bch_control *bch, const uint8_t *data, unsigned int len,
 		}
 		/* load received ecc or assume it was XORed in calc_ecc */
 		if (recv_ecc) {
-			load_ecc8(bch, bch->ecc_buf2, recv_ecc);
+			load_ecc8(bch, bch->ecc_work, recv_ecc);
 			/* XOR received and calculated ecc */
 			for (i = 0, sum = 0; i < (int)ecc_words; i++) {
-				bch->ecc_buf[i] ^= bch->ecc_buf2[i];
+				bch->ecc_buf[i] ^= bch->ecc_work[i];
 				sum |= bch->ecc_buf[i];
 			}
 			if (!sum)
@@ -1114,7 +1118,7 @@ static int build_deg2_base(struct bch_control *bch)
 {
 	const int m = GF_M(bch);
 	int i, j, r;
-	unsigned int sum, x, y, remaining, ak = 0, xi[m];
+	unsigned int sum, x, y, remaining, ak = 0, xi[BCH_MAX_M];
 
 	/* find k s.t. Tr(a^k) = 1 and 0 <= k < m */
 	for (i = 0; i < m; i++) {
@@ -1254,7 +1258,6 @@ struct bch_control *init_bch(int m, int t, unsigned int prim_poly)
 	struct bch_control *bch = NULL;
 
 	const int min_m = 5;
-	const int max_m = 15;
 
 	/* default primitive polynomials */
 	static const unsigned int prim_poly_tab[] = {
@@ -1270,7 +1273,7 @@ struct bch_control *init_bch(int m, int t, unsigned int prim_poly)
 		goto fail;
 	}
 #endif
-	if ((m < min_m) || (m > max_m))
+	if ((m < min_m) || (m > BCH_MAX_M))
 		/*
 		 * values of m greater than 15 are not currently supported;
 		 * supporting m > 15 would require changing table base type
@@ -1300,7 +1303,7 @@ struct bch_control *init_bch(int m, int t, unsigned int prim_poly)
 	bch->a_log_tab = bch_alloc((1+bch->n)*sizeof(*bch->a_log_tab), &err);
 	bch->mod8_tab  = bch_alloc(words*1024*sizeof(*bch->mod8_tab), &err);
 	bch->ecc_buf   = bch_alloc(words*sizeof(*bch->ecc_buf), &err);
-	bch->ecc_buf2  = bch_alloc(words*sizeof(*bch->ecc_buf2), &err);
+	bch->ecc_work  = bch_alloc(words*sizeof(*bch->ecc_work), &err);
 	bch->xi_tab    = bch_alloc(m*sizeof(*bch->xi_tab), &err);
 	bch->syn       = bch_alloc(2*t*sizeof(*bch->syn), &err);
 	bch->cache     = bch_alloc(2*t*sizeof(*bch->cache), &err);
@@ -1349,7 +1352,7 @@ void free_bch(struct bch_control *bch)
 		kfree(bch->a_log_tab);
 		kfree(bch->mod8_tab);
 		kfree(bch->ecc_buf);
-		kfree(bch->ecc_buf2);
+		kfree(bch->ecc_work);
 		kfree(bch->xi_tab);
 		kfree(bch->syn);
 		kfree(bch->cache);

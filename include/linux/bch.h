@@ -39,7 +39,7 @@
  * @a_log_tab:  Galois field GF(2^m) log lookup table
  * @mod8_tab:   remainder generator polynomial lookup tables
  * @ecc_buf:    ecc parity words buffer
- * @ecc_buf2:   ecc parity words buffer
+ * @ecc_work:   ecc parity words working buffer
  * @xi_tab:     GF(2^m) base for solving degree 2 polynomial roots
  * @syn:        syndrome buffer
  * @cache:      log-based polynomial representation buffer
@@ -57,7 +57,7 @@ struct bch_control {
 	uint16_t       *a_log_tab;
 	uint32_t       *mod8_tab;
 	uint32_t       *ecc_buf;
-	uint32_t       *ecc_buf2;
+	uint32_t       *ecc_work;
 	unsigned int   *xi_tab;
 	unsigned int   *syn;
 	int            *cache;
