@@ -2021,11 +2021,11 @@ static u64 logarithmic_accumulation(struct timekeeper *tk, u64 offset,
 	return offset;
 }
 
-/**
- * update_wall_time - Uses the current clocksource to increment the wall time
- *
+/*
+ * timekeeping_advance - Updates the timekeeper to the current time and
+ * current NTP tick length
  */
-void update_wall_time(void)
+static void timekeeping_advance(bool force_update)
 {
 	struct timekeeper *real_tk = &tk_core.timekeeper;
 	struct timekeeper *tk = &shadow_timekeeper;
@@ -2048,7 +2048,7 @@ void update_wall_time(void)
 #endif
 
 	/* Check if there's really nothing to do */
-	if (offset < real_tk->cycle_interval)
+	if (offset < real_tk->cycle_interval && !force_update)
 		goto out;
 
 	/* Do some additional sanity checking */
@@ -2103,6 +2103,15 @@ out:
 	if (clock_set)
 		/* Have to call _delayed version, since in irq context*/
 		clock_was_set_delayed();
+}
+
+/**
+ * update_wall_time - Uses the current clocksource to increment the wall time
+ *
+ */
+void update_wall_time(void)
+{
+	timekeeping_advance(false);
 }
 
 /**
@@ -2331,6 +2340,10 @@ int do_adjtimex(struct timex *txc)
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+
+	/* Update the multiplier immediately if frequency was set directly */
+	if (txc->modes & (ADJ_FREQUENCY | ADJ_TICK))
+		timekeeping_advance(true);
 
 	if (tai != orig_tai)
 		clock_was_set();
