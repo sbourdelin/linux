@@ -327,6 +327,102 @@ static const struct attribute_group ufs_sysfs_device_descriptor_group = {
 	.attrs = ufs_sysfs_device_descriptor,
 };
 
+static ssize_t cfg_unit_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", hba->sysfs_config_unit);
+}
+
+static ssize_t cfg_unit_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	unsigned long max_value, value;
+
+	if (kstrtoul(buf, 0, &value))
+		return -EINVAL;
+
+	if (hba->desc_size.conf_desc < CONFIGURATION_DESC_PARAM_UNIT0)
+		return -EINVAL;
+
+	max_value = (hba->desc_size.conf_desc -
+		CONFIGURATION_DESC_PARAM_UNIT0) / CONFIGURATION_UNIT_DESC_SIZE;
+
+	if (value >= max_value)
+		return -EINVAL;
+
+	hba->sysfs_config_unit = value;
+	return count;
+}
+
+#define UFS_CONFIG_DESC_PARAM(_name, _uname, _size)			\
+	UFS_DESC_PARAM(cfg_##_name, _uname, CONFIGURATION, _size)
+
+#define UFS_CONFIG_UNIT_DESC_PARAM(_name, _uname, _size)		\
+static ssize_t unit_##_name##_show(struct device *dev,			\
+	struct device_attribute *attr, char *buf)			\
+{									\
+	struct ufs_hba *hba = dev_get_drvdata(dev);			\
+	size_t offset = CONFIGURATION_DESC_PARAM_UNIT0 +		\
+		(hba->sysfs_config_unit *				\
+		 CONFIGURATION_UNIT_DESC_SIZE) +			\
+		 CONFIGURATION_UNIT_DESC_PARAM_##_uname;		\
+	if (offset + _size > hba->desc_size.conf_desc) {		\
+		return -EINVAL;						\
+	}								\
+	return ufs_sysfs_read_desc_param(hba,				\
+		QUERY_DESC_IDN_CONFIGURATION, 0, offset, buf, _size);	\
+}									\
+static DEVICE_ATTR_RO(unit_##_name)
+
+UFS_CONFIG_DESC_PARAM(number_of_luns, _NUM_LU, 1);
+UFS_CONFIG_DESC_PARAM(boot_enable, _BOOT_ENBL, 1);
+UFS_CONFIG_DESC_PARAM(descriptor_access_enable, _DESC_ACCSS_ENBL, 1);
+UFS_CONFIG_DESC_PARAM(initial_power_mode, _INIT_PWR_MODE, 1);
+UFS_CONFIG_DESC_PARAM(high_priority_lun, _HIGH_PR_LUN, 1);
+UFS_CONFIG_DESC_PARAM(secure_removal_type, _SEC_RMV_TYPE, 1);
+UFS_CONFIG_DESC_PARAM(init_active_icc_level, _ACTVE_ICC_LVL, 1);
+UFS_CONFIG_DESC_PARAM(periodic_rtc_update, _FRQ_RTC, 2);
+DEVICE_ATTR_RW(cfg_unit);
+UFS_CONFIG_UNIT_DESC_PARAM(lu_enable, LU_ENABLE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(boot_lun_id, BOOT_LUN_ID, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(lu_write_protect, LU_WR_PROTECT, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(memory_type, MEM_TYPE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(allocation_units, NUM_ALLOC_UNITS, 4);
+UFS_CONFIG_UNIT_DESC_PARAM(data_reliability, DATA_RELIABILITY, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(logical_block_size, LOGICAL_BLK_SIZE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(provisioning_type, PROVISIONING_TYPE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(context_capabilities, CTX_CAPABILITIES, 2);
+
+static struct attribute *ufs_sysfs_config_descriptor[] = {
+	&dev_attr_cfg_number_of_luns.attr,
+	&dev_attr_cfg_boot_enable.attr,
+	&dev_attr_cfg_descriptor_access_enable.attr,
+	&dev_attr_cfg_initial_power_mode.attr,
+	&dev_attr_cfg_high_priority_lun.attr,
+	&dev_attr_cfg_secure_removal_type.attr,
+	&dev_attr_cfg_init_active_icc_level.attr,
+	&dev_attr_cfg_periodic_rtc_update.attr,
+	&dev_attr_cfg_unit.attr,
+	&dev_attr_unit_lu_enable.attr,
+	&dev_attr_unit_boot_lun_id.attr,
+	&dev_attr_unit_lu_write_protect.attr,
+	&dev_attr_unit_memory_type.attr,
+	&dev_attr_unit_allocation_units.attr,
+	&dev_attr_unit_data_reliability.attr,
+	&dev_attr_unit_logical_block_size.attr,
+	&dev_attr_unit_provisioning_type.attr,
+	&dev_attr_unit_context_capabilities.attr,
+	NULL,
+};
+
+static const struct attribute_group ufs_sysfs_config_descriptor_group = {
+	.name = "config_descriptor",
+	.attrs = ufs_sysfs_config_descriptor,
+};
+
 #define UFS_INTERCONNECT_DESC_PARAM(_name, _uname, _size)		\
 	UFS_DESC_PARAM(_name, _uname, INTERCONNECT, _size)
 
@@ -713,6 +809,7 @@ static const struct attribute_group ufs_sysfs_attributes_group = {
 static const struct attribute_group *ufs_sysfs_groups[] = {
 	&ufs_sysfs_default_group,
 	&ufs_sysfs_device_descriptor_group,
+	&ufs_sysfs_config_descriptor_group,
 	&ufs_sysfs_interconnect_descriptor_group,
 	&ufs_sysfs_geometry_descriptor_group,
 	&ufs_sysfs_health_descriptor_group,

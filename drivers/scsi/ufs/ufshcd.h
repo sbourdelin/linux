@@ -683,6 +683,9 @@ struct ufs_hba {
 
 	struct rw_semaphore clk_scaling_lock;
 	struct ufs_desc_size desc_size;
+
+	/* Which unit descriptor is showing in the sysfs config descriptor. */
+	int sysfs_config_unit;
 };
 
 /* Returns true if clocks can be gated. Otherwise false */
