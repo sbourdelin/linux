@@ -47,10 +47,11 @@
 #define _PAGE_RO	0x0600	/* Supervisor RO, User no access */
 
 #define _PMD_PRESENT	0x0001
-#define _PMD_BAD	0x0fd0
+#define _PMD_BAD	0x0fc0
 #define _PMD_PAGE_MASK	0x000c
 #define _PMD_PAGE_8M	0x000c
 #define _PMD_PAGE_512K	0x0004
+#define _PMD_GUARDED	0x0010
 #define _PMD_USER	0x0020	/* APG 1 */
 
 /* Until my rework is finished, 8xx still needs atomic PTE updates */
