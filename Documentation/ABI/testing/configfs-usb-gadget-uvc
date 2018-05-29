@@ -194,6 +194,14 @@ Description:	Specific MJPEG frame descriptors
 		bmCapabilities		- still image support, fixed frame-rate
 					support
 
+Date:		May 2018
+KernelVersion:	4.17
+
+		bFrameIndex		- unique id for this framedescriptor;
+					only defined after parent format is
+					linked into the streaming header;
+					read-only
+
 What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/uncompressed
 Date:		Dec 2014
 KernelVersion:	4.0
@@ -240,6 +248,16 @@ Description:	Specific uncompressed frame descriptors
 		wWidth			- width of decoded bitmam frame in px
 		bmCapabilities		- still image support, fixed frame-rate
 					support
+
+Date:           May 2018
+KernelVersion:  4.17
+
+                bFrameIndex             - unique id for this framedescriptor;
+                                        only defined after parent format is
+                                        linked into the streaming header;
+                                        read-only
+
+
 
 What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/header
 Date:		Dec 2014
