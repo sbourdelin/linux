@@ -33,11 +33,11 @@ struct pci_host_bridge;
 
 struct machdep_calls {
 	char		*name;
-#ifdef CONFIG_PPC64
 	void __iomem *	(*ioremap)(phys_addr_t addr, unsigned long size,
 				   unsigned long flags, void *caller);
 	void		(*iounmap)(volatile void __iomem *token);
 
+#ifdef CONFIG_PPC64
 #ifdef CONFIG_PM
 	void		(*iommu_save)(void);
 	void		(*iommu_restore)(void);
