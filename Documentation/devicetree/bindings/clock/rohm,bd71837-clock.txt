@@ -1,0 +1,37 @@
+ROHM BD71837 Power Management Integrated Circuit clock bindings
+
+BD71837 clock node should be sub node of the BD71837 MFD node.
+See BD71837 MFD bindings at
+Documentation/devicetree/bindings/mfd/rohm,bd71837-pmic.txt
+
+Required properties:
+- compatible		: Should be "rohm,bd71837-clk"
+- clock-frequency	: Should be 32768
+- #clock-cells		: Should be 0
+
+Optional properties:
+- clock-output-names	: Should contain name for output clock.
+  Name "bd71837-32k-out" is used if this is not given.
+
+
+Example:
+
+pmic: bd71837@4b {
+	compatible = "rohm,bd71837";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	reg = <0x4b>;
+	interrupt-parent = <&gpio1>;
+	interrupts = <29 GPIO_ACTIVE_LOW>;
+	interrupt-names = "irq";
+	#interrupt-cells = <1>;
+	interrupt-controller;
+
+	/* Clock node */
+	clk: bd71837-32k-out {
+		compatible = "rohm,bd71837-clk";
+		#clock-cells = <0>;
+		clock-frequency  = <32768>;
+		clock-output-names = "bd71837-32k-out";
+	};
+};
