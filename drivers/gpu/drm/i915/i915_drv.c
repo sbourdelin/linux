@@ -245,6 +245,10 @@ intel_virt_update_pch(struct drm_i915_private *dev_priv)
 		id = INTEL_PCH_CNP_DEVICE_ID_TYPE;
 		pch_type = intel_pch_type(dev_priv, id);
 		DRM_DEBUG_KMS("Assuming CannonPoint PCH id %04x\n", id);
+	} else if (IS_BROXTON(dev_priv)) {
+		id = 0;
+		pch_type = intel_pch_type(dev_priv, id);
+		DRM_DEBUG_KMS("Assuming no PCH\n");
 	} else {
 		id = 0;
 		pch_type = PCH_NOP;
