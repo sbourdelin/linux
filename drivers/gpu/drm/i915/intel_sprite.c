@@ -564,7 +564,7 @@ vlv_update_plane(struct intel_plane *plane,
 	if (IS_CHERRYVIEW(dev_priv) && pipe == PIPE_B)
 		chv_update_csc(plane_state);
 
-	if (key->flags) {
+	if (key->flags & I915_SET_COLORKEY_SOURCE) {
 		I915_WRITE_FW(SPKEYMINVAL(pipe, plane_id), key->min_value);
 		I915_WRITE_FW(SPKEYMAXVAL(pipe, plane_id), key->max_value);
 		I915_WRITE_FW(SPKEYMSK(pipe, plane_id), key->channel_mask >> 24);
@@ -1092,13 +1092,15 @@ intel_check_sprite_plane(struct intel_plane *plane,
 
 static bool has_dst_key_in_primary_plane(struct drm_i915_private *dev_priv)
 {
-	return INTEL_GEN(dev_priv) >= 9;
+	return INTEL_GEN(dev_priv) >= 9 ||
+		IS_CHERRYVIEW(dev_priv) || IS_VALLEYVIEW(dev_priv);
 }
 
 static void intel_plane_set_ckey(struct intel_plane_state *plane_state,
 				 const struct drm_intel_sprite_colorkey *set)
 {
 	struct intel_plane *plane = to_intel_plane(plane_state->base.plane);
+	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
 	struct drm_intel_sprite_colorkey *key = &plane_state->ckey;
 
 	*key = *set;
@@ -1114,8 +1116,13 @@ static void intel_plane_set_ckey(struct intel_plane_state *plane_state,
 	/*
 	 * On SKL+ we want dst key enabled on
 	 * the primary and not on the sprite.
+	 *
+	 * On VLV/CHV we want to keep the dst key flag even on the
+	 * sprites to make the crtc_state->dst_colorkey[] stuff work.
+	 * vlv_update_plane() won't do anything with the dst key flag
+	 * anyway, so leaving it on doesn't hurt.
 	 */
-	if (plane->id != PLANE_PRIMARY &&
+	if (INTEL_GEN(dev_priv) >= 9 && plane->id != PLANE_PRIMARY &&
 	    set->flags & I915_SET_COLORKEY_DESTINATION)
 		key->flags = 0;
 }
@@ -1139,10 +1146,6 @@ int intel_sprite_set_colorkey_ioctl(struct drm_device *dev, void *data,
 
 	/* Make sure we don't try to enable both src & dest simultaneously */
 	if ((set->flags & (I915_SET_COLORKEY_DESTINATION | I915_SET_COLORKEY_SOURCE)) == (I915_SET_COLORKEY_DESTINATION | I915_SET_COLORKEY_SOURCE))
-		return -EINVAL;
-
-	if ((IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) &&
-	    set->flags & I915_SET_COLORKEY_DESTINATION)
 		return -EINVAL;
 
 	plane = drm_plane_find(dev, file_priv, set->plane_id);
@@ -1177,6 +1180,10 @@ int intel_sprite_set_colorkey_ioctl(struct drm_device *dev, void *data,
 		/*
 		 * On some platforms we have to configure
 		 * the dst colorkey on the primary plane.
+		 *
+		 * FIXME this won't work properly for multiple
+		 * sprite planes on VLV/CHV if each is trying to
+		 * use a different colorkey value/mask.
 		 */
 		if (!ret && has_dst_key_in_primary_plane(dev_priv)) {
 			struct intel_crtc *crtc =

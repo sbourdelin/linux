@@ -200,6 +200,9 @@ int intel_plane_atomic_check_with_state(const struct intel_crtc_state *old_crtc_
 	 */
 	crtc_state->raw_zpos[intel_plane->id] =
 		intel_plane_raw_zpos(crtc_state, intel_state);
+	crtc_state->raw_dst_colorkey[intel_plane->id] =
+		intel_state->base.visible &&
+		intel_state->ckey.flags & I915_SET_COLORKEY_DESTINATION;
 
 	return intel_plane_atomic_calc_changes(old_crtc_state,
 					       &crtc_state->base,

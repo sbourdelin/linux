@@ -3357,6 +3357,7 @@ static void i9xx_update_plane(struct intel_plane *plane,
 	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
 	const struct drm_framebuffer *fb = plane_state->base.fb;
 	enum i9xx_plane_id i9xx_plane = plane->i9xx_plane;
+	const struct drm_intel_sprite_colorkey *key = &plane_state->ckey;
 	u32 linear_offset;
 	u32 dspcntr = plane_state->ctl;
 	i915_reg_t reg = DSPCNTR(i9xx_plane);
@@ -3372,7 +3373,16 @@ static void i9xx_update_plane(struct intel_plane *plane,
 	else
 		dspaddr_offset = linear_offset;
 
+	if (crtc_state->dst_colorkey[plane->id])
+		dspcntr |= DISPPLANE_SRC_KEY_ENABLE |
+			DISPPLANE_SRC_KEY_WINDOW_ENABLE;
+
 	spin_lock_irqsave(&dev_priv->uncore.lock, irqflags);
+
+	if (crtc_state->dst_colorkey[plane->id]) {
+		I915_WRITE_FW(DSPKEYVAL(i9xx_plane), key->min_value);
+		I915_WRITE_FW(DSPKEYMSK(i9xx_plane), key->channel_mask);
+	}
 
 	if (INTEL_GEN(dev_priv) < 4) {
 		/* pipesrc and dspsize control the size that is scaled from,
@@ -10964,6 +10974,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	struct intel_shared_dpll *shared_dpll;
 	struct intel_crtc_wm_state wm_state;
 	u8 raw_zpos[I915_MAX_PLANES];
+	u8 raw_dst_colorkey[I915_MAX_PLANES];
 	bool force_thru, ips_force_disable;
 
 	/* FIXME: before the switch to atomic started, a new pipe_config was
@@ -10980,6 +10991,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		wm_state = crtc_state->wm;
 	memcpy(raw_zpos, crtc_state->raw_zpos, sizeof(raw_zpos));
+	memcpy(raw_dst_colorkey, crtc_state->raw_dst_colorkey, sizeof(raw_dst_colorkey));
 
 	/* Keep base drm_crtc_state intact, only clear our extended struct */
 	BUILD_BUG_ON(offsetof(struct intel_crtc_state, base));
@@ -10995,6 +11007,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		crtc_state->wm = wm_state;
 	memcpy(crtc_state->raw_zpos, raw_zpos, sizeof(raw_zpos));
+	memcpy(crtc_state->raw_dst_colorkey, raw_dst_colorkey, sizeof(raw_dst_colorkey));
 }
 
 static int
@@ -12270,6 +12283,55 @@ static void vlv_normalize_zpos(struct intel_crtc_state *crtc_state)
 	}
 }
 
+static int vlv_fixup_colorkey_zpos(struct intel_crtc_state *crtc_state)
+{
+	/* disable dst colorkey if the primary is above the sprite */
+	crtc_state->dst_colorkey[PLANE_SPRITE0] =
+		crtc_state->raw_dst_colorkey[PLANE_SPRITE0] &&
+		crtc_state->zpos[PLANE_SPRITE0] > crtc_state->zpos[PLANE_PRIMARY];
+
+	crtc_state->dst_colorkey[PLANE_SPRITE1] =
+		crtc_state->raw_dst_colorkey[PLANE_SPRITE1] &&
+		crtc_state->zpos[PLANE_SPRITE1] > crtc_state->zpos[PLANE_PRIMARY];
+
+	/* lift the primary above the sprites that have dst colorkey enabled */
+	if (crtc_state->dst_colorkey[PLANE_SPRITE0] &&
+	    crtc_state->dst_colorkey[PLANE_SPRITE1]) {
+		/*
+		 * FIXME should make sure both planes have
+		 * the same dst colorkey value+mask.
+		 */
+		crtc_state->zpos[PLANE_SPRITE0]--;
+		crtc_state->zpos[PLANE_SPRITE1]--;
+		crtc_state->zpos[PLANE_PRIMARY] = 2;
+	} else if (crtc_state->dst_colorkey[PLANE_SPRITE0]) {
+		if (crtc_state->zpos[PLANE_SPRITE1] <
+		    crtc_state->zpos[PLANE_SPRITE0]) {
+			DRM_DEBUG_KMS("Sprite 0 dst colorkey conflicts with zpos\n");
+			return -EINVAL;
+		}
+
+		swap(crtc_state->zpos[PLANE_PRIMARY],
+		     crtc_state->zpos[PLANE_SPRITE0]);
+	} else if (crtc_state->dst_colorkey[PLANE_SPRITE1]) {
+		if (crtc_state->zpos[PLANE_SPRITE0] <
+		    crtc_state->zpos[PLANE_SPRITE1]) {
+			DRM_DEBUG_KMS("Sprite 1 dst colorkey conflicts with zpos\n");
+			return -EINVAL;
+		}
+
+		swap(crtc_state->zpos[PLANE_PRIMARY],
+		     crtc_state->zpos[PLANE_SPRITE1]);
+	}
+
+	/* enable the dst colorkey on the primary if either sprite needs it */
+	crtc_state->dst_colorkey[PLANE_PRIMARY] =
+		crtc_state->dst_colorkey[PLANE_SPRITE0] ||
+		crtc_state->dst_colorkey[PLANE_SPRITE1];
+
+	return 0;
+}
+
 static int vlv_update_zpos(struct drm_i915_private *dev_priv,
 			   struct intel_atomic_state *state)
 {
@@ -12279,16 +12341,26 @@ static int vlv_update_zpos(struct drm_i915_private *dev_priv,
 
 	for_each_oldnew_intel_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 		struct drm_plane *plane;
+		bool primary_changed;
 		bool sprites_changed;
+		int ret;
 
 		vlv_normalize_zpos(new_crtc_state);
+
+		ret = vlv_fixup_colorkey_zpos(new_crtc_state);
+		if (ret)
+			return ret;
+
+		primary_changed =
+			new_crtc_state->dst_colorkey[PLANE_PRIMARY] !=
+			old_crtc_state->dst_colorkey[PLANE_PRIMARY];
 
 		sprites_changed =
 			memcmp(new_crtc_state->zpos,
 			       old_crtc_state->zpos,
 			       sizeof(new_crtc_state->zpos)) != 0;
 
-		if (!sprites_changed)
+		if (!primary_changed && !sprites_changed)
 			continue;
 
 		drm_for_each_plane_mask(plane, &dev_priv->drm,
@@ -12296,14 +12368,23 @@ static int vlv_update_zpos(struct drm_i915_private *dev_priv,
 			struct drm_plane_state *plane_state;
 			enum plane_id plane_id = to_intel_plane(plane)->id;
 
-			if (plane_id == PLANE_CURSOR ||
-			    plane_id == PLANE_PRIMARY)
+			if (plane_id == PLANE_CURSOR)
 				continue;
+
+			if (plane_id == PLANE_PRIMARY) {
+				if (!primary_changed)
+					continue;
+			} else {
+				if (!sprites_changed)
+					continue;
+			}
 
 			/*
 			 * zpos is configured via sprite registers, so must
 			 * add them to the state if anything significant
-			 * changed.
+			 * changed. dst colorkeying is configured via the primary
+			 * plane registers, so similarly we may need to reconfigure
+			 * it as well.
 			 */
 			plane_state = drm_atomic_get_plane_state(&state->base, plane);
 			if (IS_ERR(plane_state))

@@ -5977,8 +5977,8 @@ enum {
 #define   DISPPLANE_SEL_PIPE_SHIFT		24
 #define   DISPPLANE_SEL_PIPE_MASK		(3<<DISPPLANE_SEL_PIPE_SHIFT)
 #define   DISPPLANE_SEL_PIPE(pipe)		((pipe)<<DISPPLANE_SEL_PIPE_SHIFT)
+#define   DISPPLANE_SRC_KEY_WINDOW_ENABLE	(1<<23) /* planes A/B */
 #define   DISPPLANE_SRC_KEY_ENABLE		(1<<22)
-#define   DISPPLANE_SRC_KEY_DISABLE		0
 #define   DISPPLANE_LINE_DOUBLE			(1<<20)
 #define   DISPPLANE_NO_LINE_DOUBLE		0
 #define   DISPPLANE_STEREO_POLARITY_FIRST	0
@@ -5991,8 +5991,12 @@ enum {
 #define _DSPAADDR				0x70184
 #define _DSPASTRIDE				0x70188
 #define _DSPAPOS				0x7018C /* reserved */
+#define _DSPAKEYVAL				0x70194 /* planes A/B */
+#define _DSPAMINKEYVAL				0x70194 /* plane C */
+#define _DSPAKEYMSK				0x70198
 #define _DSPASIZE				0x70190
 #define _DSPASURF				0x7019C /* 965+ only */
+#define _DSPAMAXKEYVAL				0x701A0 /* plane C */
 #define _DSPATILEOFF				0x701A4 /* 965+ only */
 #define _DSPAOFFSET				0x701A4 /* HSW */
 #define _DSPASURFLIVE				0x701AC
@@ -6001,6 +6005,9 @@ enum {
 #define DSPADDR(plane)		_MMIO_PIPE2(plane, _DSPAADDR)
 #define DSPSTRIDE(plane)	_MMIO_PIPE2(plane, _DSPASTRIDE)
 #define DSPPOS(plane)		_MMIO_PIPE2(plane, _DSPAPOS)
+#define DSPKEYVAL(plane)	_MMIO_PIPE2(plane, _DSPAKEYVAL)
+#define DSPMINKEYVAL(plane)	_MMIO_PIPE2(plane, _DSPAMINKEYVAL)
+#define DSPKEYMSK(plane)	_MMIO_PIPE2(plane, _DSPAKEYMSK)
 #define DSPSIZE(plane)		_MMIO_PIPE2(plane, _DSPASIZE)
 #define DSPSURF(plane)		_MMIO_PIPE2(plane, _DSPASURF)
 #define DSPTILEOFF(plane)	_MMIO_PIPE2(plane, _DSPATILEOFF)

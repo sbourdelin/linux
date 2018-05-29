@@ -896,6 +896,9 @@ struct intel_crtc_state {
 	u8 raw_zpos[I915_MAX_PLANES]; /* raw property value (or 0xff for disabled planes) */
 	u8 zpos[I915_MAX_PLANES]; /* final zpos for each plane */
 
+	u8 raw_dst_colorkey[I915_MAX_PLANES]; /* dst colorkey yes/no? */
+	u8 dst_colorkey[I915_MAX_PLANES]; /* dst colorkey yes/no? */
+
 	/* HDMI scrambling status */
 	bool hdmi_scrambling;
 
