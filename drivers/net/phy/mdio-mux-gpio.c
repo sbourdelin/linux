@@ -26,11 +26,15 @@ static int mdio_mux_gpio_switch_fn(int current_child, int desired_child,
 				   void *data)
 {
 	struct mdio_mux_gpio_state *s = data;
-	int values[s->gpios->ndescs];
+	int *values;
 	unsigned int n;
 
 	if (current_child == desired_child)
 		return 0;
+
+	values = kmalloc_array(s->gpios->ndescs, sizeof(*values), GFP_KERNEL);
+	if (!values)
+		return -ENOMEM;
 
 	for (n = 0; n < s->gpios->ndescs; n++)
 		values[n] = (desired_child >> n) & 1;
@@ -38,6 +42,7 @@ static int mdio_mux_gpio_switch_fn(int current_child, int desired_child,
 	gpiod_set_array_value_cansleep(s->gpios->ndescs, s->gpios->desc,
 				       values);
 
+	kfree(values);
 	return 0;
 }
 
