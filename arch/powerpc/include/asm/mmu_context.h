@@ -262,5 +262,58 @@ static inline u64 pte_to_hpte_pkey_bits(u64 pteflags)
 
 #endif /* CONFIG_PPC_MEM_KEYS */
 
+#ifdef CONFIG_NEED_PTE_FRAG
+static inline void pte_frag_destroy(void *pte_frag)
+{
+	int count;
+	struct page *page;
+
+	page = virt_to_page(pte_frag);
+	/* drop all the pending references */
+	count = ((unsigned long)pte_frag & ~PAGE_MASK) >> PTE_FRAG_SIZE_SHIFT;
+	/* We allow PTE_FRAG_NR fragments from a PTE page */
+	if (page_ref_sub_and_test(page, PTE_FRAG_NR - count)) {
+		pgtable_page_dtor(page);
+		free_unref_page(page);
+	}
+}
+#endif
+
+#ifdef CONFIG_NEED_PMD_FRAG
+static inline void pmd_frag_destroy(void *pmd_frag)
+{
+	int count;
+	struct page *page;
+
+	page = virt_to_page(pmd_frag);
+	/* drop all the pending references */
+	count = ((unsigned long)pmd_frag & ~PAGE_MASK) >> PMD_FRAG_SIZE_SHIFT;
+	/* We allow PTE_FRAG_NR fragments from a PTE page */
+	if (page_ref_sub_and_test(page, PMD_FRAG_NR - count)) {
+		pgtable_pmd_page_dtor(page);
+		free_unref_page(page);
+	}
+}
+#endif
+
+static inline void destroy_pagetable_page(struct mm_struct *mm)
+{
+#ifdef CONFIG_NEED_PAGE_FRAG
+	void *frag;
+
+#ifdef CONFIG_NEED_PTE_FRAG
+	frag = mm->context.pte_frag;
+	if (frag)
+		pte_frag_destroy(frag);
+#endif
+
+#ifdef CONFIG_NEED_PMD_FRAG
+	frag = mm->context.pmd_frag;
+	if (frag)
+		pmd_frag_destroy(frag);
+#endif
+#endif
+}
+
 #endif /* __KERNEL__ */
 #endif /* __ASM_POWERPC_MMU_CONTEXT_H */
