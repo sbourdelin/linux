@@ -20,6 +20,9 @@ extern int icache_44x_need_flush;
 
 #if defined(CONFIG_PPC_8xx) && defined(CONFIG_PPC_16K_PAGES)
 #define PTE_INDEX_SIZE  (PTE_SHIFT - 2)
+#define PTE_FRAG_NR		4
+#define PTE_FRAG_SIZE_SHIFT	12
+#define PTE_FRAG_SIZE		(1UL << PTE_FRAG_SIZE_SHIFT)
 #else
 #define PTE_INDEX_SIZE	PTE_SHIFT
 #endif
@@ -319,7 +322,7 @@ static inline int pte_young(pte_t pte)
  */
 #ifndef CONFIG_BOOKE
 #define pmd_page_vaddr(pmd)	\
-	((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+	((unsigned long) __va(pmd_val(pmd) & ~(PTE_TABLE_SIZE - 1)))
 #define pmd_page(pmd)		\
 	pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT)
 #else
@@ -342,9 +345,14 @@ static inline int pte_young(pte_t pte)
 #define pte_offset_kernel(dir, addr)	\
 	(pmd_bad(*(dir)) ? NULL : (pte_t *)pmd_page_vaddr(*(dir)) + \
 				  pte_index(addr))
+#ifdef CONFIG_NEED_PTE_FRAG
+#define pte_offset_map(dir, addr)	pte_offset_kernel(dir, addr)
+#define pte_unmap(pte)		do {} while (0)
+#else
 #define pte_offset_map(dir, addr)		\
 	((pte_t *) kmap_atomic(pmd_page(*(dir))) + pte_index(addr))
 #define pte_unmap(pte)		kunmap_atomic(pte)
+#endif
 
 /*
  * Encode and decode a swap entry.

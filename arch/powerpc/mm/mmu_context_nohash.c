@@ -344,6 +344,9 @@ int init_new_context(struct task_struct *t, struct mm_struct *mm)
 #endif
 	mm->context.id = MMU_NO_CONTEXT;
 	mm->context.active = 0;
+#ifdef CONFIG_NEED_PTE_FRAG
+	mm->context.pte_frag = NULL;
+#endif
 	return 0;
 }
 
@@ -372,6 +375,7 @@ void destroy_context(struct mm_struct *mm)
 		nr_free_contexts++;
 	}
 	raw_spin_unlock_irqrestore(&context_lock, flags);
+	destroy_pagetable_page(mm);
 }
 
 #ifdef CONFIG_SMP

@@ -347,6 +347,7 @@ config NEED_PAGE_FRAG
 config NEED_PTE_FRAG
 	bool
 	default y if PPC_BOOK3S_64
+	default y if PPC_8xx && PPC_16K_PAGES
 	default n
 	select NEED_PAGE_FRAG
 

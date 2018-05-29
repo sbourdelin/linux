@@ -69,11 +69,22 @@ static inline void pmd_populate_kernel_g(struct mm_struct *mm, pmd_t *pmdp,
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmdp,
 				pgtable_t pte_page)
 {
+#ifdef CONFIG_NEED_PTE_FRAG
+	*pmdp = __pmd(__pa(pte_page) | _PMD_USER | _PMD_PRESENT);
+#else
 	*pmdp = __pmd((page_to_pfn(pte_page) << PAGE_SHIFT) | _PMD_USER |
 		      _PMD_PRESENT);
+#endif
 }
 
+#ifdef CONFIG_NEED_PTE_FRAG
+static inline pgtable_t pmd_pgtable(pmd_t pmd)
+{
+	return (pgtable_t)pmd_page_vaddr(pmd);
+}
+#else
 #define pmd_pgtable(pmd) pmd_page(pmd)
+#endif
 #else
 
 static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp,
@@ -95,6 +106,32 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmdp,
 	((unlikely(pmd_none(*(pmd))) && __pte_alloc_kernel_g(pmd, address))? \
 		NULL: pte_offset_kernel(pmd, address))
 
+#ifdef CONFIG_NEED_PTE_FRAG
+extern pte_t *pte_fragment_alloc(struct mm_struct *, unsigned long, int);
+extern void pte_fragment_free(unsigned long *, int);
+
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
+					  unsigned long address)
+{
+	return (pte_t *)pte_fragment_alloc(mm, address, 1);
+}
+
+static inline pgtable_t pte_alloc_one(struct mm_struct *mm,
+				      unsigned long address)
+{
+	return (pgtable_t)pte_fragment_alloc(mm, address, 0);
+}
+
+static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
+{
+	pte_fragment_free((unsigned long *)pte, 1);
+}
+
+static inline void pte_free(struct mm_struct *mm, pgtable_t ptepage)
+{
+	pte_fragment_free((unsigned long *)ptepage, 0);
+}
+#else
 extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr);
 extern pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long addr);
 
@@ -108,11 +145,12 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t ptepage)
 	pgtable_page_dtor(ptepage);
 	__free_page(ptepage);
 }
+#endif
 
 static inline void pgtable_free(void *table, unsigned index_size)
 {
 	if (!index_size) {
-		free_page((unsigned long)table);
+		pte_free_kernel(NULL, table);
 	} else {
 		BUG_ON(index_size > MAX_PGTABLE_INDEX_SIZE);
 		kmem_cache_free(PGT_CACHE(index_size), table);
@@ -150,7 +188,11 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t table,
 				  unsigned long address)
 {
 	tlb_flush_pgtable(tlb, address);
+#ifdef CONFIG_NEED_PTE_FRAG
+	pgtable_free_tlb(tlb, table, 0);
+#else
 	pgtable_page_dtor(table);
 	pgtable_free_tlb(tlb, page_address(table), 0);
+#endif
 }
 #endif /* _ASM_POWERPC_PGALLOC_32_H */

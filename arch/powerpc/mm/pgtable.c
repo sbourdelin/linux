@@ -23,6 +23,7 @@
 
 #include <linux/kernel.h>
 #include <linux/gfp.h>
+#include <linux/memblock.h>
 #include <linux/mm.h>
 #include <linux/percpu.h>
 #include <linux/hardirq.h>
@@ -327,10 +328,17 @@ static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
 	return (pte_t *)ret;
 }
 
-pte_t *pte_fragment_alloc(struct mm_struct *mm, unsigned long vmaddr, int kernel)
+__ref pte_t *pte_fragment_alloc(struct mm_struct *mm, unsigned long vmaddr, int kernel)
 {
 	pte_t *pte;
 
+	if (kernel && !slab_is_available()) {
+		pte = __va(memblock_alloc(PTE_FRAG_SIZE, PTE_FRAG_SIZE));
+		if (pte)
+			memset(pte, 0, PTE_FRAG_SIZE);
+
+		return pte;
+	}
 	pte = get_pte_from_cache(mm);
 	if (pte)
 		return pte;
