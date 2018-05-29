@@ -3538,6 +3538,9 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 	if (!PAGE_ALIGNED(vaddr) || !PAGE_ALIGNED(resource_size(res)))
 		return -EINVAL;
 
+	if (!PAGE_ALIGNED(phys_addr))
+		return -EINVAL;
+
 	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
 				  pgprot_device(PAGE_KERNEL));
 #else
