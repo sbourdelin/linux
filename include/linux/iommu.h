@@ -698,4 +698,15 @@ const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode)
 
 #endif /* CONFIG_IOMMU_API */
 
+#ifdef CONFIG_IOMMU_DEBUGFS
+void iommu_debugfs_setup(void);
+struct dentry *iommu_debugfs_new_driver_dir(const char *vendor);
+#else
+static inline void iommu_debugfs_setup(void) {}
+static inline struct dentry *iommu_debugfs_new_driver_dir(const char *vendor)
+{
+	return NULL;
+}
+#endif
+
 #endif /* __LINUX_IOMMU_H */
