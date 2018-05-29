@@ -1245,6 +1245,7 @@ void set_kernel_text_ro(void)
 	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
 }
 
+#ifdef CONFIG_STRICT_KERNEL_RWX
 void mark_rodata_ro(void)
 {
 	unsigned long start = PFN_ALIGN(_text);
@@ -1298,6 +1299,7 @@ void mark_rodata_ro(void)
 	 */
 	pti_clone_kernel_text();
 }
+#endif
 
 int kern_addr_valid(unsigned long addr)
 {
