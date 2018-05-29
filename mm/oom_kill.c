@@ -1154,7 +1154,7 @@ out:
 	if (delay)
 		schedule_timeout_killable(1);
 
-	return !!oc->chosen_task;
+	return !!(oc->chosen_task | oc->chosen_memcg);
 }
 
 /*
