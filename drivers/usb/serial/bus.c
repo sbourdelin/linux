@@ -166,6 +166,7 @@ struct bus_type usb_serial_bus_type = {
 	.probe =	usb_serial_device_probe,
 	.remove =	usb_serial_device_remove,
 	.drv_groups = 	usb_serial_drv_groups,
+	.need_parent_lock =	1,
 };
 
 int usb_serial_bus_register(struct usb_serial_driver *driver)

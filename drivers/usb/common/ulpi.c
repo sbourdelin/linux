@@ -94,6 +94,7 @@ static struct bus_type ulpi_bus = {
 	.uevent = ulpi_uevent,
 	.probe = ulpi_probe,
 	.remove = ulpi_remove,
+	.need_parent_lock = 1,
 };
 
 /* -------------------------------------------------------------------------- */
