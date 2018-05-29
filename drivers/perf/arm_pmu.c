@@ -226,6 +226,16 @@ static void armpmu_start(struct perf_event *event, int flags)
 	armpmu->enable(event);
 }
 
+static void armpmu_clear_event_idx(struct arm_pmu *armpmu,
+				   struct pmu_hw_events *hw_events,
+				   struct perf_event *event)
+{
+	if (armpmu->clear_event_idx)
+		armpmu->clear_event_idx(hw_events, event);
+	else
+		clear_bit(event->hw.idx, hw_events->used_mask);
+}
+
 static void
 armpmu_del(struct perf_event *event, int flags)
 {
@@ -236,10 +246,7 @@ armpmu_del(struct perf_event *event, int flags)
 
 	armpmu_stop(event, PERF_EF_UPDATE);
 	hw_events->events[idx] = NULL;
-	clear_bit(idx, hw_events->used_mask);
-	if (armpmu->clear_event_idx)
-		armpmu->clear_event_idx(hw_events, event);
-
+	armpmu_clear_event_idx(armpmu, hw_events, event);
 	perf_event_update_userpage(event);
 }
 
