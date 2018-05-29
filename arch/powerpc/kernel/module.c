@@ -72,6 +72,14 @@ int module_finalize(const Elf_Ehdr *hdr,
 		do_feature_fixups(powerpc_firmware_features,
 				  (void *)sect->sh_addr,
 				  (void *)sect->sh_addr + sect->sh_size);
+
+#ifdef PPC64_ELF_ABI_v1
+	sect = find_section(hdr, sechdrs, ".opd");
+	if (sect != NULL) {
+		me->arch.start_opd = sect->sh_addr;
+		me->arch.end_opd = sect->sh_addr + sect->sh_size;
+	}
+#endif
 #endif
 
 	sect = find_section(hdr, sechdrs, "__lwsync_fixup");
