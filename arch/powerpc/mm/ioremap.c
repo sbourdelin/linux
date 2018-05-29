@@ -28,10 +28,14 @@
 
 #include "mmu_decl.h"
 
-#ifdef CONFIG_PPC32
-
+#if defined(CONFIG_PPC_BOOK3S_64) || defined(CONFIG_PPC32)
 unsigned long ioremap_bot;
+#else
+unsigned long ioremap_bot = IOREMAP_BASE;
+#endif
 EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
+
+#ifdef CONFIG_PPC32
 
 void __iomem *
 ioremap(phys_addr_t addr, unsigned long size)
@@ -90,7 +94,7 @@ __ioremap_caller(phys_addr_t addr, unsigned long size, unsigned long flags,
 	/*
 	 * Choose an address to map it to.
 	 * Once the vmalloc system is running, we use it.
-	 * Before then, we use space going down from IOREMAP_TOP
+	 * Before then, we use space going up from IOREMAP_BASE
 	 * (ioremap_bot records where we're up to).
 	 */
 	p = addr & PAGE_MASK;
@@ -135,7 +139,8 @@ __ioremap_caller(phys_addr_t addr, unsigned long size, unsigned long flags,
 		area->phys_addr = p;
 		v = (unsigned long) area->addr;
 	} else {
-		v = (ioremap_bot -= size);
+		v = ioremap_bot;
+		ioremap_bot += size;
 	}
 
 	/*
@@ -164,18 +169,12 @@ void iounmap(volatile void __iomem *addr)
 	if (v_block_mapped((unsigned long)addr))
 		return;
 
-	if (addr > high_memory && (unsigned long) addr < ioremap_bot)
+	if ((unsigned long) addr >= ioremap_bot)
 		vunmap((void *) (PAGE_MASK & (unsigned long)addr));
 }
 EXPORT_SYMBOL(iounmap);
 
 #else
-
-#ifdef CONFIG_PPC_BOOK3S_64
-unsigned long ioremap_bot;
-#else /* !CONFIG_PPC_BOOK3S_64 */
-unsigned long ioremap_bot = IOREMAP_BASE;
-#endif
 
 /**
  * __ioremap_at - Low level function to establish the page tables

@@ -43,7 +43,7 @@
  * can be further configured for specific applications under
  * the "Advanced Setup" menu. -Matt
  */
-#define CONSISTENT_BASE		(IOREMAP_TOP)
+#define CONSISTENT_BASE		(IOREMAP_END)
 #define CONSISTENT_END 		(CONSISTENT_BASE + CONFIG_CONSISTENT_SIZE)
 #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
 

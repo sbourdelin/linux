@@ -452,11 +452,11 @@ static void populate_markers(void)
 	address_markers[i++].start_address =  VMEMMAP_BASE;
 #endif
 #else /* !CONFIG_PPC64 */
+	address_markers[i++].start_address = IOREMAP_BASE;
 	address_markers[i++].start_address = ioremap_bot;
-	address_markers[i++].start_address = IOREMAP_TOP;
 #ifdef CONFIG_NOT_COHERENT_CACHE
-	address_markers[i++].start_address = IOREMAP_TOP;
-	address_markers[i++].start_address = IOREMAP_TOP +
+	address_markers[i++].start_address = IOREMAP_END;
+	address_markers[i++].start_address = IOREMAP_END +
 					     CONFIG_CONSISTENT_SIZE;
 #endif
 #ifdef CONFIG_HIGHMEM

@@ -69,6 +69,17 @@ extern int icache_44x_need_flush;
  * virtual space that goes below PKMAP and FIXMAP
  */
 #ifdef CONFIG_HIGHMEM
+#ifdef CONFIG_PPC_4K_PAGES
+#define PKMAP_ORDER	PTE_SHIFT
+#else
+#define PKMAP_ORDER	9
+#endif
+#define LAST_PKMAP	(1 << PKMAP_ORDER)
+#ifndef CONFIG_PPC_4K_PAGES
+#define PKMAP_BASE	(FIXADDR_START - PAGE_SIZE*(LAST_PKMAP + 1))
+#else
+#define PKMAP_BASE	((FIXADDR_START - PAGE_SIZE*(LAST_PKMAP + 1)) & PMD_MASK)
+#endif
 #define KVIRT_TOP	PKMAP_BASE
 #else
 #define KVIRT_TOP	(0xfe000000UL)	/* for now, could be FIXMAP_BASE ? */
@@ -80,10 +91,11 @@ extern int icache_44x_need_flush;
  * and ioremap space
  */
 #ifdef CONFIG_NOT_COHERENT_CACHE
-#define IOREMAP_TOP	((KVIRT_TOP - CONFIG_CONSISTENT_SIZE) & PAGE_MASK)
+#define IOREMAP_END	((KVIRT_TOP - CONFIG_CONSISTENT_SIZE) & PAGE_MASK)
 #else
-#define IOREMAP_TOP	KVIRT_TOP
+#define IOREMAP_END	KVIRT_TOP
 #endif
+#define IOREMAP_BASE	VMALLOC_BASE
 
 /*
  * Just any arbitrary offset to the start of the vmalloc VM area: the
@@ -94,21 +106,16 @@ extern int icache_44x_need_flush;
  * area for the same reason. ;)
  *
  * We no longer map larger than phys RAM with the BATs so we don't have
- * to worry about the VMALLOC_OFFSET causing problems.  We do have to worry
- * about clashes between our early calls to ioremap() that start growing down
- * from IOREMAP_TOP being run into the VM area allocations (growing upwards
- * from VMALLOC_START).  For this reason we have ioremap_bot to check when
- * we actually run into our mappings setup in the early boot with the VM
- * system.  This really does become a problem for machines with good amounts
- * of RAM.  -- Cort
+ * to worry about the VMALLOC_OFFSET causing problems.
  */
 #define VMALLOC_OFFSET (0x1000000) /* 16M */
 #ifdef PPC_PIN_SIZE
-#define VMALLOC_START (((_ALIGN((long)high_memory, PPC_PIN_SIZE) + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
+#define VMALLOC_BASE (((_ALIGN((long)high_memory, PPC_PIN_SIZE) + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
 #else
-#define VMALLOC_START ((((long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
+#define VMALLOC_BASE ((((long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
 #endif
-#define VMALLOC_END	ioremap_bot
+#define VMALLOC_START	ioremap_bot
+#define VMALLOC_END	IOREMAP_END
 
 /*
  * Bits in a linux-style PTE.  These match the bits in the
@@ -324,6 +331,8 @@ static inline int pte_young(pte_t pte)
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val << 3 })
 
 int map_kernel_page(unsigned long va, phys_addr_t pa, int flags);
+
+#include <asm/fixmap.h>
 
 #endif /* !__ASSEMBLY__ */
 
