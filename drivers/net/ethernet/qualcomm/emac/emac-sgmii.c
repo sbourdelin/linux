@@ -108,6 +108,7 @@ static void emac_sgmii_link_init(struct emac_adapter *adpt)
 	writel(val, phy->base + EMAC_SGMII_PHY_AUTONEG_CFG2);
 }
 
+#ifdef CONFIG_ACPI
 static int emac_sgmii_irq_clear(struct emac_adapter *adpt, u8 irq_bits)
 {
 	struct emac_sgmii *phy = &adpt->phy;
@@ -291,7 +292,6 @@ static struct sgmii_ops qdf2400_ops = {
 
 static int emac_sgmii_acpi_match(struct device *dev, void *data)
 {
-#ifdef CONFIG_ACPI
 	static const struct acpi_device_id match_table[] = {
 		{
 			.id = "QCOM8071",
@@ -327,10 +327,16 @@ static int emac_sgmii_acpi_match(struct device *dev, void *data)
 			return 1;
 		}
 	}
-#endif
 
 	return 0;
 }
+#else
+static int emac_sgmii_acpi_match(struct device *dev, void *data)
+{
+	return 0;
+}
+
+#endif
 
 static const struct of_device_id emac_sgmii_dt_match[] = {
 	{
