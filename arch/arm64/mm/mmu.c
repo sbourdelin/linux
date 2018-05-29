@@ -491,6 +491,7 @@ static void __init map_mem(pgd_t *pgdp)
 #endif
 }
 
+#ifdef CONFIG_STRICT_KERNEL_RWX
 void mark_rodata_ro(void)
 {
 	unsigned long section_size;
@@ -505,6 +506,7 @@ void mark_rodata_ro(void)
 
 	debug_checkwx();
 }
+#endif
 
 static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
 				      pgprot_t prot, struct vm_struct *vma,
