@@ -254,6 +254,16 @@ void printk_safe_flush(void)
 {
 	int cpu;
 
+	/*
+	 * Just avoid deadlocks here, we could loose the messages in per-cpu nmi buffer
+	 * in the case that hardlockup happens but panic() is not called (irq_work won't
+	 * work).
+	 * The flushing can be delayed by the next irq_work if flushing is skippped here
+	 * in normal cases.
+	 */
+	if (this_cpu_read(printk_context) & PRINTK_NMI_CONTEXT_MASK)
+		return;
+
 	for_each_possible_cpu(cpu) {
 #ifdef CONFIG_PRINTK_NMI
 		__printk_safe_flush(&per_cpu(nmi_print_seq, cpu).work);
