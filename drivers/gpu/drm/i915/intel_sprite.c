@@ -1209,6 +1209,22 @@ static uint32_t skl_planar_formats[] = {
 	DRM_FORMAT_NV12,
 };
 
+static uint32_t glk_planar_formats[] = {
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_P010,
+	DRM_FORMAT_P012,
+	DRM_FORMAT_P016,
+};
+
 static const uint64_t skl_plane_format_modifiers_noccs[] = {
 	I915_FORMAT_MOD_Yf_TILED,
 	I915_FORMAT_MOD_Y_TILED,
@@ -1398,7 +1414,28 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 	}
 	intel_plane->base.state = &state->base;
 
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (IS_GEMINILAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) {
+		intel_plane->can_scale = true;
+		state->scaler_id = -1;
+
+		intel_plane->update_plane = skl_update_plane;
+		intel_plane->disable_plane = skl_disable_plane;
+		intel_plane->get_hw_state = skl_plane_get_hw_state;
+
+		if (skl_plane_has_planar(dev_priv, pipe,
+					 PLANE_SPRITE0 + plane)) {
+			plane_formats = glk_planar_formats;
+			num_plane_formats = ARRAY_SIZE(glk_planar_formats);
+		} else {
+			plane_formats = skl_plane_formats;
+			num_plane_formats = ARRAY_SIZE(skl_plane_formats);
+		}
+
+		if (skl_plane_has_ccs(dev_priv, pipe, PLANE_SPRITE0 + plane))
+			modifiers = skl_plane_format_modifiers_ccs;
+		else
+			modifiers = skl_plane_format_modifiers_noccs;
+	} else if (INTEL_GEN(dev_priv) >= 9) {
 		intel_plane->can_scale = true;
 		state->scaler_id = -1;
 
