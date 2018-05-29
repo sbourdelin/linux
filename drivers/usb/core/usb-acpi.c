@@ -224,7 +224,11 @@ static struct acpi_device *usb_acpi_find_companion(struct device *dev)
 
 static bool usb_acpi_bus_match(struct device *dev)
 {
-	return is_usb_device(dev) || is_usb_port(dev);
+	if (is_usb_device(dev) || is_usb_port(dev)) {
+		dev->need_parent_lock = 1;
+		return 1;
+	}
+	return 0;
 }
 
 static struct acpi_bus_type usb_acpi_bus = {

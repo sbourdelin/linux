@@ -40,13 +40,21 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
 	const struct ulpi_device_id *id;
 
 	/* Some ULPI devices don't have a vendor id so rely on OF match */
-	if (ulpi->id.vendor == 0)
-		return of_driver_match_device(dev, driver);
-
-	for (id = drv->id_table; id->vendor; id++)
-		if (id->vendor == ulpi->id.vendor &&
-		    id->product == ulpi->id.product)
+	if (ulpi->id.vendor == 0) {
+		if (of_driver_match_device(dev, driver)) {
+			dev->need_parent_lock = 1;
 			return 1;
+		}
+		return o;
+	}
+
+	for (id = drv->id_table; id->vendor; id++) {
+		if (id->vendor == ulpi->id.vendor &&
+		    id->product == ulpi->id.product) {
+			dev->need_parent_lock = 1;
+			return 1;
+		}
+	}
 
 	return 0;
 }

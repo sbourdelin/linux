@@ -808,6 +808,7 @@ static int usb_device_match(struct device *dev, struct device_driver *drv)
 			return 0;
 
 		/* TODO: Add real matching code */
+		dev->need_parent_lock = 1;
 		return 1;
 
 	} else if (is_usb_interface(dev)) {
@@ -823,12 +824,16 @@ static int usb_device_match(struct device *dev, struct device_driver *drv)
 		usb_drv = to_usb_driver(drv);
 
 		id = usb_match_id(intf, usb_drv->id_table);
-		if (id)
+		if (id) {
+			dev->need_parent_lock = 1;
 			return 1;
+		}
 
 		id = usb_match_dynamic_id(intf, usb_drv);
-		if (id)
+		if (id) {
+			dev->need_parent_lock = 1;
 			return 1;
+		}
 	}
 
 	return 0;

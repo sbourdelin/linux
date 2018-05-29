@@ -29,8 +29,10 @@ static int usb_serial_device_match(struct device *dev,
 
 	driver = to_usb_serial_driver(drv);
 
-	if (driver == port->serial->type)
+	if (driver == port->serial->type) {
+		dev->need_parent_lock = 1;
 		return 1;
+	}
 
 	return 0;
 }
