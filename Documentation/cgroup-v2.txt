@@ -1542,6 +1542,32 @@ Cpuset Interface Files
 	Further changes made to "cpuset.cpus" is allowed as long as
 	the first condition above is still true.
 
+	A parent scheduling domain root cgroup cannot distribute all
+	its CPUs to its child scheduling domain root cgroups unless
+	its load balancing flag is turned off.
+
+  cpuset.sched.load_balance
+	A read-write single value file which exists on non-root
+	cpuset-enabled cgroups.  It is a binary value flag that accepts
+	either "0" (off) or "1" (on).  This flag is set by the parent
+	and is not delegatable.  It is on by default in the root cgroup.
+
+	When it is on, tasks within this cpuset will be load-balanced
+	by the kernel scheduler.  Tasks will be moved from CPUs with
+	high load to other CPUs within the same cpuset with less load
+	periodically.
+
+	When it is off, there will be no load balancing among CPUs on
+	this cgroup.  Tasks will stay in the CPUs they are running on
+	and will not be moved to other CPUs.
+
+	The load balancing state of a cgroup can only be changed on a
+	scheduling domain root cgroup with no cpuset-enabled children.
+	All cgroups within a scheduling domain or partition must have
+	the same load balancing state.	As descendant cgroups of a
+	scheduling domain root are created, they inherit the same load
+	balancing state of their root.
+
 
 Device controller
 -----------------

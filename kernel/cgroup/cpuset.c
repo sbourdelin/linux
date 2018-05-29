@@ -510,7 +510,7 @@ static int validate_change(struct cpuset *cur, struct cpuset *trial)
 
 	par = parent_cs(cur);
 
-	/* On legacy hiearchy, we must be a subset of our parent cpuset. */
+	/* On legacy hierarchy, we must be a subset of our parent cpuset. */
 	ret = -EACCES;
 	if (!is_in_v2_mode() && !is_cpuset_subset(trial, par))
 		goto out;
@@ -1063,6 +1063,14 @@ static int update_isolated_cpumask(struct cpuset *cpuset,
 		goto out;
 
 	/*
+	 * A parent can't distribute all its CPUs to child scheduling
+	 * domain root cpusets unless load balancing is off.
+	 */
+	if (adding & !deleting && is_sched_load_balance(parent) &&
+	    cpumask_equal(addmask, parent->effective_cpus))
+		goto out;
+
+	/*
 	 * Check if any CPUs in addmask or delmask are in a sibling cpuset.
 	 * An empty sibling cpus_allowed means it is the same as parent's
 	 * effective_cpus. This checking is skipped if the cpuset is dying.
@@ -1539,6 +1547,18 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 
 	domain_flag_changed = (is_sched_domain_root(cs) !=
 			       is_sched_domain_root(trialcs));
+
+	/*
+	 * On default hierachy, a load balance flag change is only allowed
+	 * in a scheduling domain root with no child cpuset as all the
+	 * cpusets within the same scheduling domain/partition must have the
+	 * same load balancing state.
+	 */
+	if (cgroup_subsys_on_dfl(cpuset_cgrp_subsys) && balance_flag_changed &&
+	   (!is_sched_domain_root(cs) || css_has_online_children(&cs->css))) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	if (domain_flag_changed) {
 		err = turning_on
@@ -2196,6 +2216,14 @@ static struct cftype dfl_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 	},
 
+	{
+		.name = "sched.load_balance",
+		.read_u64 = cpuset_read_u64,
+		.write_u64 = cpuset_write_u64,
+		.private = FILE_SCHED_LOAD_BALANCE,
+		.flags = CFTYPE_NOT_ON_ROOT,
+	},
+
 	{ }	/* terminate */
 };
 
@@ -2209,19 +2237,38 @@ static struct cgroup_subsys_state *
 cpuset_css_alloc(struct cgroup_subsys_state *parent_css)
 {
 	struct cpuset *cs;
+	struct cgroup_subsys_state *errptr = ERR_PTR(-ENOMEM);
 
 	if (!parent_css)
 		return &top_cpuset.css;
 
 	cs = kzalloc(sizeof(*cs), GFP_KERNEL);
 	if (!cs)
-		return ERR_PTR(-ENOMEM);
+		return errptr;
 	if (!alloc_cpumask_var(&cs->cpus_allowed, GFP_KERNEL))
 		goto free_cs;
 	if (!alloc_cpumask_var(&cs->effective_cpus, GFP_KERNEL))
 		goto free_cpus;
 
-	set_bit(CS_SCHED_LOAD_BALANCE, &cs->flags);
+	/*
+	 * On default hierarchy, inherit parent's CS_SCHED_LOAD_BALANCE flag.
+	 * Creating new cpuset is also not allowed if the effective_cpus of
+	 * its parent is empty.
+	 */
+	if (cgroup_subsys_on_dfl(cpuset_cgrp_subsys)) {
+		struct cpuset *parent = css_cs(parent_css);
+
+		if (test_bit(CS_SCHED_LOAD_BALANCE, &parent->flags))
+			set_bit(CS_SCHED_LOAD_BALANCE, &cs->flags);
+
+		if (cpumask_empty(parent->effective_cpus)) {
+			errptr = ERR_PTR(-EINVAL);
+			goto free_cpus;
+		}
+	} else {
+		set_bit(CS_SCHED_LOAD_BALANCE, &cs->flags);
+	}
+
 	cpumask_clear(cs->cpus_allowed);
 	nodes_clear(cs->mems_allowed);
 	cpumask_clear(cs->effective_cpus);
@@ -2235,7 +2282,7 @@ free_cpus:
 	free_cpumask_var(cs->cpus_allowed);
 free_cs:
 	kfree(cs);
-	return ERR_PTR(-ENOMEM);
+	return errptr;
 }
 
 static int cpuset_css_online(struct cgroup_subsys_state *css)
