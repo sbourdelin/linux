@@ -1292,15 +1292,6 @@ static int populate_table(struct dm_table *table,
 	return dm_table_complete(table);
 }
 
-static bool is_valid_type(enum dm_queue_mode cur, enum dm_queue_mode new)
-{
-	if (cur == new ||
-	    (cur == DM_TYPE_BIO_BASED && new == DM_TYPE_DAX_BIO_BASED))
-		return true;
-
-	return false;
-}
-
 static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_size)
 {
 	int r;
@@ -1343,11 +1334,16 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 			DMWARN("unable to set up device queue for new table.");
 			goto err_unlock_md_type;
 		}
-	} else if (!is_valid_type(dm_get_md_type(md), dm_table_get_type(t))) {
+	} else if (dm_get_md_type(md) != dm_table_get_type(t)) {
 		DMWARN("can't change device type after initial table load.");
 		r = -EINVAL;
 		goto err_unlock_md_type;
 	}
+
+	if (dm_table_supports_dax(t))
+		blk_queue_flag_set(QUEUE_FLAG_DAX, md->queue);
+	else
+		blk_queue_flag_clear(QUEUE_FLAG_DAX, md->queue);
 
 	dm_unlock_md_type(md);
 

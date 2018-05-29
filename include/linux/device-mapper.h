@@ -27,8 +27,7 @@ enum dm_queue_mode {
 	DM_TYPE_BIO_BASED	 = 1,
 	DM_TYPE_REQUEST_BASED	 = 2,
 	DM_TYPE_MQ_REQUEST_BASED = 3,
-	DM_TYPE_DAX_BIO_BASED	 = 4,
-	DM_TYPE_NVME_BIO_BASED	 = 5,
+	DM_TYPE_NVME_BIO_BASED	 = 4,
 };
 
 typedef enum { STATUSTYPE_INFO, STATUSTYPE_TABLE } status_type_t;
@@ -459,6 +458,11 @@ void dm_table_add_target_callbacks(struct dm_table *t, struct dm_target_callback
  * and request-based).
  */
 void dm_table_set_type(struct dm_table *t, enum dm_queue_mode type);
+
+/*
+ * Check to see if this target type and all table devices support DAX.
+ */
+bool dm_table_supports_dax(struct dm_table *t);
 
 /*
  * Finally call this to make the table ready for use.
