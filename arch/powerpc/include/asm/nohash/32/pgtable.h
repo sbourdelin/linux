@@ -80,9 +80,14 @@ extern int icache_44x_need_flush;
 #else
 #define PKMAP_BASE	((FIXADDR_START - PAGE_SIZE*(LAST_PKMAP + 1)) & PMD_MASK)
 #endif
-#define KVIRT_TOP	PKMAP_BASE
+#define _KVIRT_TOP	PKMAP_BASE
 #else
-#define KVIRT_TOP	(0xfe000000UL)	/* for now, could be FIXMAP_BASE ? */
+#define _KVIRT_TOP	(0xfe000000UL)	/* for now, could be FIXMAP_BASE ? */
+#endif
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+#define KVIRT_TOP	_ALIGN_DOWN(_KVIRT_TOP, PGDIR_SIZE)
+#else
+#define KVIRT_TOP	_KVIRT_TOP
 #endif
 
 /*
@@ -95,7 +100,11 @@ extern int icache_44x_need_flush;
 #else
 #define IOREMAP_END	KVIRT_TOP
 #endif
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+#define IOREMAP_BASE	_ALIGN_UP(VMALLOC_BASE + (IOREMAP_END - VMALLOC_BASE) / 2, PGDIR_SIZE)
+#else
 #define IOREMAP_BASE	VMALLOC_BASE
+#endif
 
 /*
  * Just any arbitrary offset to the start of the vmalloc VM area: the
@@ -114,8 +123,13 @@ extern int icache_44x_need_flush;
 #else
 #define VMALLOC_BASE _ALIGN_DOWN((long)high_memory + VMALLOC_OFFSET, VMALLOC_OFFSET)
 #endif
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+#define VMALLOC_START	VMALLOC_BASE
+#define VMALLOC_END	IOREMAP_BASE
+#else
 #define VMALLOC_START	ioremap_bot
 #define VMALLOC_END	IOREMAP_END
+#endif
 
 /*
  * Bits in a linux-style PTE.  These match the bits in the

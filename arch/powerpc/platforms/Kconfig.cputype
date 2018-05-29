@@ -323,6 +323,8 @@ config ARCH_ENABLE_HUGEPAGE_MIGRATION
 	def_bool y
 	depends on PPC_BOOK3S_64 && HUGETLB_PAGE && MIGRATION
 
+config PPC_GUARDED_PAGE_IN_PMD
+	bool
 
 config PPC_MMU_NOHASH
 	def_bool y

@@ -386,10 +386,19 @@ void __init mem_init(void)
 	pr_info("  * 0x%08lx..0x%08lx  : consistent mem\n",
 		IOREMAP_END, IOREMAP_END + CONFIG_CONSISTENT_SIZE);
 #endif /* CONFIG_NOT_COHERENT_CACHE */
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+	pr_info("  * 0x%08lx..0x%08lx  : ioremap\n",
+		ioremap_bot, IOREMAP_END);
 	pr_info("  * 0x%08lx..0x%08lx  : early ioremap\n",
 		IOREMAP_BASE, ioremap_bot);
+	pr_info("  * 0x%08lx..0x%08lx  : vmalloc\n",
+		VMALLOC_START, VMALLOC_END);
+#else
 	pr_info("  * 0x%08lx..0x%08lx  : vmalloc & ioremap\n",
 		VMALLOC_START, VMALLOC_END);
+	pr_info("  * 0x%08lx..0x%08lx  : early ioremap\n",
+		IOREMAP_BASE, ioremap_bot);
+#endif
 #endif /* CONFIG_PPC32 */
 }
 
