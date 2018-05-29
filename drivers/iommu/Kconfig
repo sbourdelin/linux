@@ -137,6 +137,10 @@ config AMD_IOMMU
 	  your BIOS for an option to enable it or if you have an IVRS ACPI
 	  table.
 
+config AMD_IOMMU_DEBUGFS
+	def_bool y
+	depends on AMD_IOMMU && IOMMU_DEBUGFS
+
 config AMD_IOMMU_V2
 	tristate "AMD IOMMU Version 2 driver"
 	depends on AMD_IOMMU
