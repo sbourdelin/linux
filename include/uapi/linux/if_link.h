@@ -658,6 +658,7 @@ enum {
 	IFLA_VF_IB_NODE_GUID,	/* VF Infiniband node GUID */
 	IFLA_VF_IB_PORT_GUID,	/* VF Infiniband port GUID */
 	IFLA_VF_VLAN_LIST,	/* nested list of vlans, option for QinQ */
+	IFLA_VF_QUEUES,		/* Min and Max TX/RX queues */
 	__IFLA_VF_MAX,
 };
 
@@ -746,6 +747,14 @@ enum {
 struct ifla_vf_trust {
 	__u32 vf;
 	__u32 setting;
+};
+
+struct ifla_vf_queues {
+	__u32 vf;
+	__u32 min_tx_queues;	/* min guaranteed tx queues */
+	__u32 max_tx_queues;	/* max non guaranteed tx queues */
+	__u32 min_rx_queues;	/* min guaranteed rx queues */
+	__u32 max_rx_queues;	/* max non guaranteed rx queues */
 };
 
 /* VF ports management section

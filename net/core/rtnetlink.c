@@ -921,7 +921,8 @@ static inline int rtnl_vfinfo_size(const struct net_device *dev,
 			 nla_total_size_64bit(sizeof(__u64)) +
 			 /* IFLA_VF_STATS_TX_DROPPED */
 			 nla_total_size_64bit(sizeof(__u64)) +
-			 nla_total_size(sizeof(struct ifla_vf_trust)));
+			 nla_total_size(sizeof(struct ifla_vf_trust)) +
+			 nla_total_size(sizeof(struct ifla_vf_queues)));
 		return size;
 	} else
 		return 0;
@@ -1181,6 +1182,7 @@ static noinline_for_stack int rtnl_fill_vfinfo(struct sk_buff *skb,
 	struct ifla_vf_vlan_info vf_vlan_info;
 	struct ifla_vf_spoofchk vf_spoofchk;
 	struct ifla_vf_tx_rate vf_tx_rate;
+	struct ifla_vf_queues vf_queues;
 	struct ifla_vf_stats vf_stats;
 	struct ifla_vf_trust vf_trust;
 	struct ifla_vf_vlan vf_vlan;
@@ -1198,6 +1200,10 @@ static noinline_for_stack int rtnl_fill_vfinfo(struct sk_buff *skb,
 	ivi.spoofchk = -1;
 	ivi.rss_query_en = -1;
 	ivi.trusted = -1;
+	ivi.min_tx_queues = -1;
+	ivi.max_tx_queues = -1;
+	ivi.min_rx_queues = -1;
+	ivi.max_rx_queues = -1;
 	/* The default value for VF link state is "auto"
 	 * IFLA_VF_LINK_STATE_AUTO which equals zero
 	 */
@@ -1217,7 +1223,8 @@ static noinline_for_stack int rtnl_fill_vfinfo(struct sk_buff *skb,
 		vf_spoofchk.vf =
 		vf_linkstate.vf =
 		vf_rss_query_en.vf =
-		vf_trust.vf = ivi.vf;
+		vf_trust.vf =
+		vf_queues.vf = ivi.vf;
 
 	memcpy(vf_mac.mac, ivi.mac, sizeof(ivi.mac));
 	vf_vlan.vlan = ivi.vlan;
@@ -1232,6 +1239,10 @@ static noinline_for_stack int rtnl_fill_vfinfo(struct sk_buff *skb,
 	vf_linkstate.link_state = ivi.linkstate;
 	vf_rss_query_en.setting = ivi.rss_query_en;
 	vf_trust.setting = ivi.trusted;
+	vf_queues.min_tx_queues = ivi.min_tx_queues;
+	vf_queues.max_tx_queues = ivi.max_tx_queues;
+	vf_queues.min_rx_queues = ivi.min_rx_queues;
+	vf_queues.max_rx_queues = ivi.max_rx_queues;
 	vf = nla_nest_start(skb, IFLA_VF_INFO);
 	if (!vf)
 		goto nla_put_vfinfo_failure;
@@ -1249,7 +1260,9 @@ static noinline_for_stack int rtnl_fill_vfinfo(struct sk_buff *skb,
 		    sizeof(vf_rss_query_en),
 		    &vf_rss_query_en) ||
 	    nla_put(skb, IFLA_VF_TRUST,
-		    sizeof(vf_trust), &vf_trust))
+		    sizeof(vf_trust), &vf_trust) ||
+	    nla_put(skb, IFLA_VF_QUEUES,
+		    sizeof(vf_queues), &vf_queues))
 		goto nla_put_vf_failure;
 	vfvlanlist = nla_nest_start(skb, IFLA_VF_VLAN_LIST);
 	if (!vfvlanlist)
@@ -1706,6 +1719,7 @@ static const struct nla_policy ifla_vf_policy[IFLA_VF_MAX+1] = {
 	[IFLA_VF_TRUST]		= { .len = sizeof(struct ifla_vf_trust) },
 	[IFLA_VF_IB_NODE_GUID]	= { .len = sizeof(struct ifla_vf_guid) },
 	[IFLA_VF_IB_PORT_GUID]	= { .len = sizeof(struct ifla_vf_guid) },
+	[IFLA_VF_QUEUES]	= { .len = sizeof(struct ifla_vf_queues) },
 };
 
 static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
@@ -2206,6 +2220,18 @@ static int do_setvfinfo(struct net_device *dev, struct nlattr **tb)
 			return -EOPNOTSUPP;
 
 		return handle_vf_guid(dev, ivt, IFLA_VF_IB_PORT_GUID);
+	}
+
+	if (tb[IFLA_VF_QUEUES]) {
+		struct ifla_vf_queues *ivq = nla_data(tb[IFLA_VF_QUEUES]);
+
+		err = -EOPNOTSUPP;
+		if (ops->ndo_set_vf_queues)
+			err = ops->ndo_set_vf_queues(dev, ivq->vf,
+					ivq->min_tx_queues, ivq->max_tx_queues,
+					ivq->min_rx_queues, ivq->max_rx_queues);
+		if (err < 0)
+			return err;
 	}
 
 	return err;

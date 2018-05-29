@@ -1023,6 +1023,8 @@ struct dev_ifalias {
  *      with PF and querying it may introduce a theoretical security risk.
  * int (*ndo_set_vf_rss_query_en)(struct net_device *dev, int vf, bool setting);
  * int (*ndo_get_vf_port)(struct net_device *dev, int vf, struct sk_buff *skb);
+ * int (*ndo_set_vf_queues)(struct net_device *dev, int vf, int min_txq,
+ *			    int max_txq, int min_rxq, int max_rxq);
  * int (*ndo_setup_tc)(struct net_device *dev, enum tc_setup_type type,
  *		       void *type_data);
  *	Called to setup any 'tc' scheduler, classifier or action on @dev.
@@ -1272,6 +1274,10 @@ struct net_device_ops {
 	int			(*ndo_set_vf_rss_query_en)(
 						   struct net_device *dev,
 						   int vf, bool setting);
+	int			(*ndo_set_vf_queues)(struct net_device *dev,
+						     int vf,
+						     int min_txq, int max_txq,
+						     int min_rxq, int max_rxq);
 	int			(*ndo_setup_tc)(struct net_device *dev,
 						enum tc_setup_type type,
 						void *type_data);
