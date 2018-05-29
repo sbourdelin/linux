@@ -12,7 +12,6 @@ Description:
 		The following file operations are supported:
 
 		open(2)
-		Currently the only useful flags are O_RDWR.
 
 		ioctl(2)
 		Initiate various actions.

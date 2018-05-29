@@ -1,0 +1,109 @@
+The JTAG API
+=============
+
+JTAG master devices can be accessed through a character misc-device.
+Each JTAG master interface can be accessed by using /dev/jtagN.
+
+JTAG system calls set:
+- SIR (Scan Instruction Register, IEEE 1149.1 Instruction Register scan);
+- SDR (Scan Data Register, IEEE 1149.1 Data Register scan);
+- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
+number of clocks.
+
+open(), close()
+-------
+open() opens JTAG device.
+
+Open/Close  device:
+- jtag_fd = open("/dev/jtag0", O_RDWR);
+- close(jtag_fd);
+
+ioctl()
+-------
+All access operations to JTAG devices are erformed through ioctl interface.
+The IOCTL interface supports these requests:
+	JTAG_IOCRUNTEST - Force JTAG state machine to RUN_TEST/IDLE state
+	JTAG_SIOCFREQ - Set JTAG TCK frequency
+	JTAG_GIOCFREQ - Get JTAG TCK frequency
+	JTAG_IOCXFER - send JTAG data Xfer
+	JTAG_GIOCSTATUS - get current JTAG TAP status
+	JTAG_SIOCMODE - set JTAG mode flags.
+
+JTAG_SIOCFREQ, JTAG_GIOCFREQ
+------
+Set/Get JTAG clock speed:
+
+	unsigned int jtag_fd;
+	ioctl(jtag_fd, JTAG_SIOCFREQ, &frq);
+	ioctl(jtag_fd, JTAG_GIOCFREQ, &frq);
+
+JTAG_IOCRUNTEST
+------
+Force JTAG state machine to RUN_TEST/IDLE state
+
+struct jtag_run_test_idle {
+	__u8	reset;
+	__u8	endstate;
+	__u8	tck;
+};
+
+reset:
+	JTAG_NO_RESET - run IDLE/PAUSE from current state
+	JTAG_FORCE_RESET - go through TEST_LOGIC/RESET state before IDLE/PAUSE
+endstate: completion flag
+tck: clock counter
+
+Example:
+	struct jtag_run_test_idle runtest;
+
+	runtest.endstate = JTAG_STATE_IDLE;
+	runtest.reset = 0;
+	runtest.tck = data_p->tck;
+	usleep(25 * 1000);
+	ioctl(jtag_fd, JTAG_IOCRUNTEST, &runtest);
+
+JTAG_IOCXFER
+------
+Send SDR/SIR transaction
+
+struct jtag_xfer {
+	__u8	type;
+	__u8	direction;
+	__u8	endstate;
+	__u8	padding;
+	__u32	length;
+	__u64	tdio;
+};
+
+type: transfer type - JTAG_SIR_XFER/JTAG_SDR_XFER
+direction: xfer direction - JTAG_SIR_XFER/JTAG_SDR_XFER
+length: xfer data length in bits
+tdio : xfer data array
+endstate: xfer end state after transaction finish
+	   can be: JTAG_STATE_IDLE/JTAG_STATE_PAUSEIR/JTAG_STATE_PAUSEDR
+
+Example:
+	struct jtag_xfer xfer;
+	static char buf[64];
+	static unsigned int buf_len = 0;
+	[...]
+	xfer.type = JTAG_SDR_XFER;
+	xfer.tdio = (__u64)buf;
+	xfer.length = buf_len;
+	xfer.endstate = JTAG_STATE_IDLE;
+
+	if (is_read)
+		xfer.direction = JTAG_READ_XFER;
+	else
+		xfer.direction = JTAG_WRITE_XFER;
+
+	ioctl(jtag_fd, JTAG_IOCXFER, &xfer);
+
+JTAG_SIOCMODE
+------
+If hardware driver can support different running modes you can change it.
+
+Example:
+	unsigned int mode;
+	mode = JTAG_XFER_HW_MODE;
+	ioctl(jtag_fd, JTAG_SIOCMODE, &mode);
