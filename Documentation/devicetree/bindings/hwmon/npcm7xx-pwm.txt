@@ -1,0 +1,25 @@
+Nuvoton NPCM7xx Pulse-width modulation (PWM) controller device driver
+
+The NPCM7xx has two identical PWM controller modules,
+Each module has four PWM controller outputs.
+NPCM7xx PWM controller module 0 outputs PWM0-3 and NPCM7xx PWM controller
+module 1 outputs PWM4-7.
+
+Required properties:
+- compatible	: "nuvoton,npcm750-pwm" for Poleg NPCM7XX.
+- reg		: Offset and length of the registers set for the device.
+- clocks	: phandle of pwm reference clock.
+- pinctrl-names	: a pinctrl state named "default" must be defined.
+- pinctrl-0 	: phandle referencing pin configuration of the PWM ports.
+
+pwm:pwm@f0103000 {
+	compatible = "nuvoton,npcm750-pwm";
+	reg = <0xf0103000 0x50
+		0xf0104000 0x50>;
+	clocks = <&clk NPCM7XX_CLK_APB3>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm0_pins &pwm1_pins
+			&pwm2_pins &pwm3_pins
+			&pwm4_pins &pwm5_pins
+			&pwm6_pins &pwm7_pins>;
+};
