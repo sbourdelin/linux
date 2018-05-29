@@ -5,5 +5,5 @@ controlling voice coil lenses.
 
 Mandatory properties:
 
-- compatible: "dongwoon,dw9807"
+- compatible: "dongwoon,dw9807-vcm"
 - reg: I2C slave address
