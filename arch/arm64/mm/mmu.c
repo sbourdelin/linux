@@ -56,6 +56,7 @@ u64 kimage_voffset __ro_after_init;
 EXPORT_SYMBOL(kimage_voffset);
 
 phys_addr_t __pa_swapper_pg_dir;
+pgd_t *new_swapper_pg_dir = swapper_pg_dir;
 
 /*
  * Empty_zero_page is a special page that is used for zero-initialized data
