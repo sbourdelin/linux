@@ -236,7 +236,7 @@ int kallsyms_symbol_next(char *prefix_name, int flag)
 
 	while ((name = kdb_walk_kallsyms(&pos))) {
 		if (strncmp(name, prefix_name, prefix_len) == 0) {
-			strncpy(prefix_name, name, strlen(name)+1);
+			strlcpy(prefix_name, name, prefix_len);
 			return 1;
 		}
 	}
