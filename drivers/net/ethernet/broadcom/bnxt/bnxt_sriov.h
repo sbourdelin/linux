@@ -35,6 +35,8 @@ int bnxt_set_vf_bw(struct net_device *, int, int, int);
 int bnxt_set_vf_link_state(struct net_device *, int, int);
 int bnxt_set_vf_spoofchk(struct net_device *, int, bool);
 int bnxt_set_vf_trust(struct net_device *dev, int vf_id, bool trust);
+int bnxt_set_vf_queues(struct net_device *dev, int vf_id, int min_txq,
+		       int max_txq, int min_rxq, int max_rxq);
 int bnxt_sriov_configure(struct pci_dev *pdev, int num_vfs);
 void bnxt_sriov_disable(struct bnxt *);
 void bnxt_hwrm_exec_fwd_req(struct bnxt *);

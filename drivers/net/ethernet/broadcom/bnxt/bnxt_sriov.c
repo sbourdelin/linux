@@ -138,6 +138,136 @@ int bnxt_set_vf_trust(struct net_device *dev, int vf_id, bool trusted)
 	return 0;
 }
 
+static bool bnxt_param_ok(int new, u16 curr, u16 avail)
+{
+	int delta;
+
+	if (new <= curr)
+		return true;
+
+	delta = new - curr;
+	if (delta <= avail)
+		return true;
+	return false;
+}
+
+static void bnxt_adjust_ring_resc(struct bnxt *bp, struct bnxt_vf_info *vf,
+				  struct hwrm_func_vf_resource_cfg_input *req)
+{
+	struct bnxt_hw_resc *hw_resc = &bp->hw_resc;
+	u16 avail_cp_rings, avail_stat_ctx;
+	u16 avail_vnics, avail_ring_grps;
+	u16 cp, grp, stat, vnic;
+	u16 min_tx, min_rx;
+
+	min_tx = le16_to_cpu(req->min_tx_rings);
+	min_rx = le16_to_cpu(req->min_rx_rings);
+	avail_cp_rings = hw_resc->max_cp_rings - bp->cp_nr_rings;
+	avail_stat_ctx = hw_resc->max_stat_ctxs - bp->num_stat_ctxs;
+	avail_ring_grps = hw_resc->max_hw_ring_grps - bp->rx_nr_rings;
+	avail_vnics = hw_resc->max_vnics - bp->nr_vnics;
+
+	cp = max_t(u16, 2 * min_tx, min_rx);
+	if (cp > vf->min_cp_rings)
+		cp = min_t(u16, cp, avail_cp_rings + vf->min_cp_rings);
+	grp = min_tx;
+	if (grp > vf->min_ring_grps)
+		grp = min_t(u16, grp, avail_ring_grps + vf->min_ring_grps);
+	stat = min_rx;
+	if (stat > vf->min_stat_ctxs)
+		stat = min_t(u16, stat, avail_stat_ctx + vf->min_stat_ctxs);
+	vnic = min_rx;
+	if (vnic > vf->min_vnics)
+		vnic = min_t(u16, vnic, avail_vnics + vf->min_vnics);
+
+	req->min_cmpl_rings = req->max_cmpl_rings = cpu_to_le16(cp);
+	req->min_hw_ring_grps = req->max_hw_ring_grps = cpu_to_le16(grp);
+	req->min_stat_ctx = req->max_stat_ctx = cpu_to_le16(stat);
+	req->min_vnics = req->max_vnics = cpu_to_le16(vnic);
+}
+
+static void bnxt_record_ring_resc(struct bnxt *bp, struct bnxt_vf_info *vf,
+				  struct hwrm_func_vf_resource_cfg_input *req)
+{
+	struct bnxt_hw_resc *hw_resc = &bp->hw_resc;
+
+	hw_resc->max_tx_rings += vf->min_tx_rings;
+	hw_resc->max_rx_rings += vf->min_rx_rings;
+	vf->min_tx_rings = le16_to_cpu(req->min_tx_rings);
+	vf->max_tx_rings = le16_to_cpu(req->max_tx_rings);
+	vf->min_rx_rings = le16_to_cpu(req->min_rx_rings);
+	vf->max_rx_rings = le16_to_cpu(req->max_rx_rings);
+	hw_resc->max_tx_rings -= vf->min_tx_rings;
+	hw_resc->max_rx_rings -= vf->min_rx_rings;
+	if (bp->pf.vf_resv_strategy == BNXT_VF_RESV_STRATEGY_MAXIMAL) {
+		hw_resc->max_cp_rings += vf->min_cp_rings;
+		hw_resc->max_hw_ring_grps += vf->min_ring_grps;
+		hw_resc->max_stat_ctxs += vf->min_stat_ctxs;
+		hw_resc->max_vnics += vf->min_vnics;
+		vf->min_cp_rings = le16_to_cpu(req->min_cmpl_rings);
+		vf->min_ring_grps = le16_to_cpu(req->min_hw_ring_grps);
+		vf->min_stat_ctxs = le16_to_cpu(req->min_stat_ctx);
+		vf->min_vnics = le16_to_cpu(req->min_vnics);
+		hw_resc->max_cp_rings -= vf->min_cp_rings;
+		hw_resc->max_hw_ring_grps -= vf->min_ring_grps;
+		hw_resc->max_stat_ctxs -= vf->min_stat_ctxs;
+		hw_resc->max_vnics -= vf->min_vnics;
+	}
+}
+
+int bnxt_set_vf_queues(struct net_device *dev, int vf_id, int min_txq,
+		       int max_txq, int min_rxq, int max_rxq)
+{
+	struct hwrm_func_vf_resource_cfg_input req = {0};
+	struct bnxt *bp = netdev_priv(dev);
+	u16 avail_tx_rings, avail_rx_rings;
+	struct bnxt_hw_resc *hw_resc;
+	struct bnxt_vf_info *vf;
+	int rc;
+
+	if (bnxt_vf_ndo_prep(bp, vf_id))
+		return -EINVAL;
+
+	if (!(bp->flags & BNXT_FLAG_NEW_RM) || bp->hwrm_spec_code < 0x10902)
+		return -EOPNOTSUPP;
+
+	vf = &bp->pf.vf[vf_id];
+	hw_resc = &bp->hw_resc;
+
+	avail_tx_rings = hw_resc->max_tx_rings - bp->tx_nr_rings;
+	if (bp->flags & BNXT_FLAG_AGG_RINGS)
+		avail_rx_rings = hw_resc->max_rx_rings - bp->rx_nr_rings * 2;
+	else
+		avail_rx_rings = hw_resc->max_rx_rings - bp->rx_nr_rings;
+
+	if (!bnxt_param_ok(min_txq, vf->min_tx_rings, avail_tx_rings))
+		return -ENOBUFS;
+	if (!bnxt_param_ok(min_rxq, vf->min_rx_rings, avail_rx_rings))
+		return -ENOBUFS;
+	if (!bnxt_param_ok(max_txq, vf->max_tx_rings, avail_tx_rings))
+		return -ENOBUFS;
+	if (!bnxt_param_ok(max_rxq, vf->max_rx_rings, avail_rx_rings))
+		return -ENOBUFS;
+
+	bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_FUNC_VF_RESOURCE_CFG, -1, -1);
+	memcpy(&req, &bp->vf_resc_cfg_input, sizeof(req));
+	req.vf_id = cpu_to_le16(vf->fw_fid);
+	req.min_tx_rings = cpu_to_le16(min_txq);
+	req.min_rx_rings = cpu_to_le16(min_rxq);
+	req.max_tx_rings = cpu_to_le16(max_txq);
+	req.max_rx_rings = cpu_to_le16(max_rxq);
+
+	if (bp->pf.vf_resv_strategy == BNXT_VF_RESV_STRATEGY_MAXIMAL)
+		bnxt_adjust_ring_resc(bp, vf, &req);
+
+	rc = hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
+	if (rc)
+		return -EIO;
+
+	bnxt_record_ring_resc(bp, vf, &req);
+	return 0;
+}
+
 int bnxt_get_vf_config(struct net_device *dev, int vf_id,
 		       struct ifla_vf_info *ivi)
 {
