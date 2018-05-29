@@ -1421,7 +1421,7 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 	const uint64_t *modifiers;
 	unsigned int supported_rotations;
 	int num_plane_formats;
-	int ret;
+	int ret, zpos;
 
 	intel_plane = kzalloc(sizeof(*intel_plane), GFP_KERNEL);
 	if (!intel_plane) {
@@ -1551,6 +1551,9 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 					  BIT(DRM_COLOR_YCBCR_FULL_RANGE),
 					  DRM_COLOR_YCBCR_BT709,
 					  DRM_COLOR_YCBCR_LIMITED_RANGE);
+
+	zpos = plane + 1;
+	drm_plane_create_zpos_immutable_property(&intel_plane->base, zpos);
 
 	drm_plane_helper_add(&intel_plane->base, &intel_plane_helper_funcs);
 

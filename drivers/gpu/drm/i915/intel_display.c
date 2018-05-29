@@ -13475,7 +13475,7 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	unsigned int supported_rotations;
 	unsigned int num_formats;
 	const uint64_t *modifiers;
-	int ret;
+	int ret, zpos;
 
 	primary = kzalloc(sizeof(*primary), GFP_KERNEL);
 	if (!primary) {
@@ -13619,6 +13619,9 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 						  DRM_COLOR_YCBCR_BT709,
 						  DRM_COLOR_YCBCR_LIMITED_RANGE);
 
+	zpos = 0;
+	drm_plane_create_zpos_immutable_property(&primary->base, zpos);
+
 	drm_plane_helper_add(&primary->base, &intel_plane_helper_funcs);
 
 	return primary;
@@ -13636,7 +13639,7 @@ intel_cursor_plane_create(struct drm_i915_private *dev_priv,
 {
 	struct intel_plane *cursor = NULL;
 	struct intel_plane_state *state = NULL;
-	int ret;
+	int ret, zpos;
 
 	cursor = kzalloc(sizeof(*cursor), GFP_KERNEL);
 	if (!cursor) {
@@ -13692,6 +13695,9 @@ intel_cursor_plane_create(struct drm_i915_private *dev_priv,
 						   DRM_MODE_ROTATE_0,
 						   DRM_MODE_ROTATE_0 |
 						   DRM_MODE_ROTATE_180);
+
+	zpos = INTEL_INFO(dev_priv)->num_sprites[pipe] + 1;
+	drm_plane_create_zpos_immutable_property(&cursor->base, zpos);
 
 	if (INTEL_GEN(dev_priv) >= 9)
 		state->scaler_id = -1;
