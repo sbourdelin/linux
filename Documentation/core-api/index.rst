@@ -25,6 +25,7 @@ Core utilities
    genalloc
    errseq
    printk-formats
+   gfp_mask-from-fs-io
 
 Interfaces for kernel debugging
 ===============================
