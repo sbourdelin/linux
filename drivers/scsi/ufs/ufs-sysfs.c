@@ -252,6 +252,31 @@ static ssize_t ufs_sysfs_read_desc_param(struct ufs_hba *hba,
 	return ret;
 }
 
+static ssize_t ufs_sysfs_write_desc_param(struct ufs_hba *hba,
+				  enum desc_idn desc_id,
+				  u8 desc_index,
+				  u8 param_offset,
+				  const char *buf,
+				  ssize_t buf_size,
+				  u8 width)
+{
+	int ret;
+	unsigned long long value;
+
+	if (kstrtoull(buf, 0, &value))
+		return -EINVAL;
+
+	/* Convert to big endian, and send only the appropriate width. */
+	value = cpu_to_be64(value);
+	ret = ufshcd_rw_desc_param(hba, UPIU_QUERY_OPCODE_WRITE_DESC, desc_id,
+				desc_index, param_offset,
+				(u8 *)&value + 8 - width, width);
+	if (ret)
+		return -EINVAL;
+
+	return buf_size;
+}
+
 #define UFS_DESC_PARAM(_name, _puname, _duname, _size)			\
 static ssize_t _name##_show(struct device *dev,				\
 	struct device_attribute *attr, char *buf)			\
@@ -357,8 +382,25 @@ static ssize_t cfg_unit_store(struct device *dev,
 	return count;
 }
 
-#define UFS_CONFIG_DESC_PARAM(_name, _uname, _size)			\
-	UFS_DESC_PARAM(cfg_##_name, _uname, CONFIGURATION, _size)
+#define UFS_CONFIG_DESC_PARAM(_name, _puname, _size)			\
+static ssize_t cfg_##_name##_show(struct device *dev,			\
+	struct device_attribute *attr, char *buf)			\
+{									\
+	struct ufs_hba *hba = dev_get_drvdata(dev);			\
+	return ufs_sysfs_read_desc_param(hba,				\
+		QUERY_DESC_IDN_CONFIGURATION, 0,			\
+		CONFIGURATION_DESC_PARAM##_puname, buf, _size);		\
+}									\
+static ssize_t cfg_##_name##_store(struct device *dev,			\
+		struct device_attribute *attr, const char *buf,		\
+		size_t count)						\
+{									\
+	struct ufs_hba *hba = dev_get_drvdata(dev);			\
+	return ufs_sysfs_write_desc_param(hba,				\
+		QUERY_DESC_IDN_CONFIGURATION, 0,			\
+		CONFIGURATION_DESC_PARAM##_puname, buf, count, _size);	\
+}									\
+static DEVICE_ATTR_RW(cfg_##_name)
 
 #define UFS_CONFIG_UNIT_DESC_PARAM(_name, _uname, _size)		\
 static ssize_t unit_##_name##_show(struct device *dev,			\
@@ -375,7 +417,23 @@ static ssize_t unit_##_name##_show(struct device *dev,			\
 	return ufs_sysfs_read_desc_param(hba,				\
 		QUERY_DESC_IDN_CONFIGURATION, 0, offset, buf, _size);	\
 }									\
-static DEVICE_ATTR_RO(unit_##_name)
+static ssize_t unit_##_name##_store(struct device *dev,			\
+		struct device_attribute *attr, const char *buf,		\
+		size_t count)						\
+{									\
+	struct ufs_hba *hba = dev_get_drvdata(dev);			\
+	size_t offset = CONFIGURATION_DESC_PARAM_UNIT0 +		\
+		(hba->sysfs_config_unit *				\
+		 CONFIGURATION_UNIT_DESC_SIZE) +			\
+		 CONFIGURATION_UNIT_DESC_PARAM_##_uname;		\
+	if (offset + _size > hba->desc_size.conf_desc) {		\
+		return -EINVAL;						\
+	}								\
+	return ufs_sysfs_write_desc_param(hba,				\
+		QUERY_DESC_IDN_CONFIGURATION, 0, offset, buf, count,	\
+		_size);							\
+}									\
+static DEVICE_ATTR_RW(unit_##_name)
 
 UFS_CONFIG_DESC_PARAM(number_of_luns, _NUM_LU, 1);
 UFS_CONFIG_DESC_PARAM(boot_enable, _BOOT_ENBL, 1);
