@@ -193,6 +193,14 @@ int intel_plane_atomic_check_with_state(const struct intel_crtc_state *old_crtc_
 	else
 		crtc_state->nv12_planes &= ~BIT(intel_plane->id);
 
+	/*
+	 * Copy over the zpos to the crtc state so that we don't
+	 * need to add every plane on the crtc to the state to
+	 * recompute the final zpos.
+	 */
+	crtc_state->raw_zpos[intel_plane->id] =
+		intel_plane_raw_zpos(crtc_state, intel_state);
+
 	return intel_plane_atomic_calc_changes(old_crtc_state,
 					       &crtc_state->base,
 					       old_plane_state,

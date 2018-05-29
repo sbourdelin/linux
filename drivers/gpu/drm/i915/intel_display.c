@@ -30,6 +30,7 @@
 #include <linux/i2c.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/sort.h>
 #include <linux/vgaarb.h>
 #include <drm/drm_edid.h>
 #include <drm/drmP.h>
@@ -2803,6 +2804,8 @@ intel_set_plane_visible(struct intel_crtc_state *crtc_state,
 		crtc_state->active_planes &= ~BIT(plane->id);
 	}
 
+	crtc_state->raw_zpos[plane->id] = intel_plane_raw_zpos(crtc_state, plane_state);
+
 	DRM_DEBUG_KMS("%s active planes 0x%x\n",
 		      crtc_state->base.crtc->name,
 		      crtc_state->active_planes);
@@ -3251,8 +3254,8 @@ int skl_check_plane_surface(const struct intel_crtc_state *crtc_state,
 static u32 i9xx_plane_ctl(const struct intel_crtc_state *crtc_state,
 			  const struct intel_plane_state *plane_state)
 {
-	struct drm_i915_private *dev_priv =
-		to_i915(plane_state->base.plane->dev);
+	struct intel_plane *plane = to_intel_plane(plane_state->base.plane);
+	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
 	const struct drm_framebuffer *fb = plane_state->base.fb;
 	unsigned int rotation = plane_state->base.rotation;
@@ -10960,6 +10963,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	struct intel_dpll_hw_state dpll_hw_state;
 	struct intel_shared_dpll *shared_dpll;
 	struct intel_crtc_wm_state wm_state;
+	u8 raw_zpos[I915_MAX_PLANES];
 	bool force_thru, ips_force_disable;
 
 	/* FIXME: before the switch to atomic started, a new pipe_config was
@@ -10975,6 +10979,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	if (IS_G4X(dev_priv) ||
 	    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		wm_state = crtc_state->wm;
+	memcpy(raw_zpos, crtc_state->raw_zpos, sizeof(raw_zpos));
 
 	/* Keep base drm_crtc_state intact, only clear our extended struct */
 	BUILD_BUG_ON(offsetof(struct intel_crtc_state, base));
@@ -10989,6 +10994,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	if (IS_G4X(dev_priv) ||
 	    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		crtc_state->wm = wm_state;
+	memcpy(crtc_state->raw_zpos, raw_zpos, sizeof(raw_zpos));
 }
 
 static int
@@ -12189,6 +12195,130 @@ static int calc_watermark_data(struct drm_atomic_state *state)
 	return 0;
 }
 
+int intel_plane_raw_zpos(const struct intel_crtc_state *crtc_state,
+			 const struct intel_plane_state *plane_state)
+{
+	struct intel_plane *plane = to_intel_plane(plane_state->base.plane);
+
+	/*
+	 * We'll keep the cursor always at the top regardless of
+	 * whether it's enabled or not. This avoids changes to the
+	 * sorted zpos of other planes when turning the cursor on/off,
+	 * and thus we can easily avoid having to add the other
+	 * planes to the atomic state.
+	 */
+	if (plane->id == PLANE_CURSOR)
+		return 0x20;
+
+	/*
+	 * For other planes we stack the disabled planes on top
+	 * of any enabled planes. This simplifies our life by
+	 * allowing us to keep the SP_BOTTOM and SP_ZORDER bits
+	 * cleared for any disabled planes on VLV/CHV. Thus we
+	 * don't have to worry about zpos in .disable_plane().
+	 */
+	if (plane_state->base.visible)
+		return plane_state->base.zpos;
+	else
+		return 0x10;
+}
+
+struct intel_plane_zpos {
+	u32 obj_id;
+	enum plane_id plane_id;
+	u8 zpos;
+};
+
+static int intel_zpos_cmp(const void *a, const void *b)
+{
+	const struct intel_plane_zpos *za = (const struct intel_plane_zpos *)a;
+	const struct intel_plane_zpos *zb = (const struct intel_plane_zpos *)b;
+
+	if (za->zpos != zb->zpos)
+		return za->zpos - zb->zpos;
+	else
+		return za->obj_id - zb->obj_id;
+}
+
+static void vlv_normalize_zpos(struct intel_crtc_state *crtc_state)
+{
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	struct intel_plane_zpos zpos[I915_MAX_PLANES] = {};
+	struct intel_plane *plane;
+	int i, num_planes;
+
+	i = 0;
+	for_each_intel_plane_on_crtc(&dev_priv->drm, crtc, plane) {
+		zpos[i].obj_id = plane->base.base.id;
+		zpos[i].plane_id = plane->id;
+		zpos[i].zpos = crtc_state->raw_zpos[plane->id];
+		i++;
+	}
+
+	num_planes = i;
+
+	/* sort according to zpos/plane obj id */
+	sort(zpos, num_planes, sizeof(zpos[0]),
+	     intel_zpos_cmp, NULL);
+
+	/* copy over sorted zpos */
+	for (i = 0; i < num_planes; i++) {
+		enum plane_id plane_id = zpos[i].plane_id;
+
+		crtc_state->zpos[plane_id] = i;
+	}
+}
+
+static int vlv_update_zpos(struct drm_i915_private *dev_priv,
+			   struct intel_atomic_state *state)
+{
+	struct intel_crtc *crtc;
+	struct intel_crtc_state *old_crtc_state, *new_crtc_state;
+	int i;
+
+	for_each_oldnew_intel_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+		struct drm_plane *plane;
+		bool sprites_changed;
+
+		vlv_normalize_zpos(new_crtc_state);
+
+		sprites_changed =
+			memcmp(new_crtc_state->zpos,
+			       old_crtc_state->zpos,
+			       sizeof(new_crtc_state->zpos)) != 0;
+
+		if (!sprites_changed)
+			continue;
+
+		drm_for_each_plane_mask(plane, &dev_priv->drm,
+					new_crtc_state->base.plane_mask) {
+			struct drm_plane_state *plane_state;
+			enum plane_id plane_id = to_intel_plane(plane)->id;
+
+			if (plane_id == PLANE_CURSOR ||
+			    plane_id == PLANE_PRIMARY)
+				continue;
+
+			/*
+			 * zpos is configured via sprite registers, so must
+			 * add them to the state if anything significant
+			 * changed.
+			 */
+			plane_state = drm_atomic_get_plane_state(&state->base, plane);
+			if (IS_ERR(plane_state))
+				return PTR_ERR(plane_state);
+		}
+
+		DRM_DEBUG_KMS("pipe %c zpos sprite %c: %d, sprite %c: %d\n",
+			      pipe_name(crtc->pipe),
+			      sprite_name(crtc->pipe, 0), new_crtc_state->zpos[PLANE_SPRITE0],
+			      sprite_name(crtc->pipe, 1), new_crtc_state->zpos[PLANE_SPRITE1]);
+	}
+
+	return 0;
+}
+
 /**
  * intel_atomic_check - validate state object
  * @dev: drm device
@@ -12264,7 +12394,14 @@ static int intel_atomic_check(struct drm_device *dev,
 	if (ret)
 		return ret;
 
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
+		ret = vlv_update_zpos(dev_priv, intel_state);
+		if (ret)
+			return ret;
+	}
+
 	intel_fbc_choose_crtc(dev_priv, intel_state);
+
 	return calc_watermark_data(state);
 }
 
@@ -13620,7 +13757,10 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 						  DRM_COLOR_YCBCR_LIMITED_RANGE);
 
 	zpos = 0;
-	drm_plane_create_zpos_immutable_property(&primary->base, zpos);
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+		drm_plane_create_zpos_property(&primary->base, zpos, 0, 2);
+	else
+		drm_plane_create_zpos_immutable_property(&primary->base, zpos);
 
 	drm_plane_helper_add(&primary->base, &intel_plane_helper_funcs);
 

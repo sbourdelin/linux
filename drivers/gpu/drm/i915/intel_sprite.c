@@ -511,6 +511,22 @@ static u32 vlv_sprite_ctl(const struct intel_crtc_state *crtc_state,
 	return sprctl;
 }
 
+static u32 vlv_sprctl_zpos(struct intel_plane *plane,
+			   const struct intel_crtc_state *crtc_state)
+{
+	enum plane_id plane_id = plane->id;
+	enum plane_id other_plane_id = plane_id == PLANE_SPRITE0 ?
+		PLANE_SPRITE1 : PLANE_SPRITE0;
+
+	if (crtc_state->zpos[plane_id] == 0)
+		return SP_BOTTOM;
+	else if (crtc_state->zpos[plane_id] ==
+		 crtc_state->zpos[other_plane_id] + 1)
+		return SP_ZORDER;
+
+	return 0;
+}
+
 static void
 vlv_update_plane(struct intel_plane *plane,
 		 const struct intel_crtc_state *crtc_state,
@@ -537,6 +553,9 @@ vlv_update_plane(struct intel_plane *plane,
 	crtc_h--;
 
 	linear_offset = intel_fb_xy_to_linear(x, y, plane_state, 0);
+
+	/* final zpos value is computed after vlv_sprite_ctl() */
+	sprctl |= vlv_sprctl_zpos(plane, crtc_state);
 
 	spin_lock_irqsave(&dev_priv->uncore.lock, irqflags);
 
@@ -1553,7 +1572,10 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 					  DRM_COLOR_YCBCR_LIMITED_RANGE);
 
 	zpos = plane + 1;
-	drm_plane_create_zpos_immutable_property(&intel_plane->base, zpos);
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+		drm_plane_create_zpos_property(&intel_plane->base, zpos, 0, 2);
+	else
+		drm_plane_create_zpos_immutable_property(&intel_plane->base, zpos);
 
 	drm_plane_helper_add(&intel_plane->base, &intel_plane_helper_funcs);
 

@@ -892,6 +892,10 @@ struct intel_crtc_state {
 	u8 active_planes;
 	u8 nv12_planes;
 
+	/* VLV/CHV zpos for each plane */
+	u8 raw_zpos[I915_MAX_PLANES]; /* raw property value (or 0xff for disabled planes) */
+	u8 zpos[I915_MAX_PLANES]; /* final zpos for each plane */
+
 	/* HDMI scrambling status */
 	bool hdmi_scrambling;
 
@@ -1457,6 +1461,9 @@ void intel_dump_cdclk_state(const struct intel_cdclk_state *cdclk_state,
 			    const char *context);
 
 /* intel_display.c */
+int intel_plane_raw_zpos(const struct intel_crtc_state *crtc_state,
+			 const struct intel_plane_state *plane_state);
+void intel__enable_pipe(struct drm_i915_private *dev_priv, enum pipe pipe);
 void i830_enable_pipe(struct drm_i915_private *dev_priv, enum pipe pipe);
 void i830_disable_pipe(struct drm_i915_private *dev_priv, enum pipe pipe);
 enum pipe intel_crtc_pch_transcoder(struct intel_crtc *crtc);
