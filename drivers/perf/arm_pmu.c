@@ -679,6 +679,12 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
 			continue;
 
 		event = hw_events->events[idx];
+		/*
+		 * If there is no event at this idx (e.g, an idx used
+		 * by a chained event in Arm v8 PMUv3), skip it.
+		 */
+		if (!event)
+			continue;
 
 		switch (cmd) {
 		case CPU_PM_ENTER:
