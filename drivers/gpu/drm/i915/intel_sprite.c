@@ -548,7 +548,7 @@ vlv_update_plane(struct intel_plane *plane,
 	if (key->flags) {
 		I915_WRITE_FW(SPKEYMINVAL(pipe, plane_id), key->min_value);
 		I915_WRITE_FW(SPKEYMAXVAL(pipe, plane_id), key->max_value);
-		I915_WRITE_FW(SPKEYMSK(pipe, plane_id), key->channel_mask);
+		I915_WRITE_FW(SPKEYMSK(pipe, plane_id), key->channel_mask >> 24);
 	}
 	I915_WRITE_FW(SPSTRIDE(pipe, plane_id), fb->pitches[0]);
 	I915_WRITE_FW(SPPOS(pipe, plane_id), (crtc_y << 16) | crtc_x);
