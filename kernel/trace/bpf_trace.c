@@ -84,7 +84,7 @@ EXPORT_SYMBOL_GPL(trace_call_bpf);
 BPF_CALL_2(bpf_override_return, struct pt_regs *, regs, unsigned long, rc)
 {
 	regs_set_return_value(regs, rc);
-	override_function_with_return(regs);
+	instruction_pointer_set(regs, (unsigned long)&just_return_func);
 	return 0;
 }
 

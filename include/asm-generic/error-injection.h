@@ -3,6 +3,9 @@
 #define _ASM_GENERIC_ERROR_INJECTION_H
 
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
+#include <linux/compiler.h>
+#include <linux/linkage.h>
+
 enum {
 	EI_ETYPE_NONE,		/* Dummy value for undefined case */
 	EI_ETYPE_NULL,		/* Return NULL if failure */
@@ -27,6 +30,9 @@ static struct error_injection_entry __used				\
 		.addr = (unsigned long)fname,				\
 		.etype = EI_ETYPE_##_etype,				\
 	};
+
+asmlinkage void just_return_func(void);
+
 #else
 #define ALLOW_ERROR_INJECTION(fname, _etype)
 #endif

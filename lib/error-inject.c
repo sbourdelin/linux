@@ -20,6 +20,14 @@ struct ei_entry {
 	void *priv;
 };
 
+asm(
+	".type just_return_func, @function\n"
+	".globl just_return_func\n"
+	"just_return_func:\n"
+	ARCH_FUNC_RET "\n"
+	".size just_return_func, .-just_return_func\n"
+);
+
 bool within_error_injection_list(unsigned long addr)
 {
 	struct ei_entry *ent;

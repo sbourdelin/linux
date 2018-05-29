@@ -4,6 +4,7 @@
 
 #ifdef CONFIG_FUNCTION_ERROR_INJECTION
 
+#include <linux/types.h>
 #include <asm/error-injection.h>
 
 extern bool within_error_injection_list(unsigned long addr);
