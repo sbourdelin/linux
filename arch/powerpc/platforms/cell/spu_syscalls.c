@@ -67,6 +67,8 @@ static inline void spufs_calls_put(struct spufs_calls *calls) { }
 
 #endif /* CONFIG_SPU_FS_MODULE */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattribute-alias"
 SYSCALL_DEFINE4(spu_create, const char __user *, name, unsigned int, flags,
 	umode_t, mode, int, neighbor_fd)
 {
@@ -111,6 +113,7 @@ SYSCALL_DEFINE3(spu_run,int, fd, __u32 __user *, unpc, __u32 __user *, ustatus)
 	spufs_calls_put(calls);
 	return ret;
 }
+#pragma GCC diagnostic pop
 
 #ifdef CONFIG_COREDUMP
 int elf_coredump_extra_notes_size(void)
