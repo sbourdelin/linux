@@ -188,7 +188,7 @@ int intel_plane_atomic_check_with_state(const struct intel_crtc_state *old_crtc_
 	else
 		crtc_state->active_planes &= ~BIT(intel_plane->id);
 
-	if (state->visible && state->fb->format->format == DRM_FORMAT_NV12)
+	if (state->visible && is_planar_yuv_format(state->fb->format->format))
 		crtc_state->nv12_planes |= BIT(intel_plane->id);
 	else
 		crtc_state->nv12_planes &= ~BIT(intel_plane->id);

@@ -331,8 +331,7 @@ int intel_atomic_setup_scalers(struct drm_i915_private *dev_priv,
 		/* set scaler mode */
 		if ((INTEL_GEN(dev_priv) >= 9) &&
 		    plane_state && plane_state->base.fb &&
-		    plane_state->base.fb->format->format ==
-		    DRM_FORMAT_NV12) {
+		    is_planar_yuv_format(plane_state->base.fb->format->format)) {
 			if (INTEL_GEN(dev_priv) == 9 &&
 			    !IS_GEMINILAKE(dev_priv) &&
 			    !IS_SKYLAKE(dev_priv))

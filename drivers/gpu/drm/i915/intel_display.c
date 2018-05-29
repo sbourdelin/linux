@@ -2707,6 +2707,12 @@ int skl_format_to_fourcc(int format, bool rgb_order, bool alpha)
 		return DRM_FORMAT_RGB565;
 	case PLANE_CTL_FORMAT_NV12:
 		return DRM_FORMAT_NV12;
+	case PLANE_CTL_FORMAT_P010:
+		return DRM_FORMAT_P010;
+	case PLANE_CTL_FORMAT_P012:
+		return DRM_FORMAT_P012;
+	case PLANE_CTL_FORMAT_P016:
+		return DRM_FORMAT_P016;
 	default:
 	case PLANE_CTL_FORMAT_XRGB_8888:
 		if (rgb_order) {
@@ -3223,7 +3229,7 @@ int skl_check_plane_surface(const struct intel_crtc_state *crtc_state,
 	 * Handle the AUX surface first since
 	 * the main surface setup depends on it.
 	 */
-	if (fb->format->format == DRM_FORMAT_NV12) {
+	if (is_planar_yuv_format(fb->format->format)) {
 		ret = skl_check_nv12_surface(crtc_state, plane_state);
 		if (ret)
 			return ret;
@@ -3539,6 +3545,12 @@ static u32 skl_plane_ctl_format(uint32_t pixel_format)
 		return PLANE_CTL_FORMAT_YUV422 | PLANE_CTL_YUV422_VYUY;
 	case DRM_FORMAT_NV12:
 		return PLANE_CTL_FORMAT_NV12;
+	case DRM_FORMAT_P010:
+		return PLANE_CTL_FORMAT_P010;
+	case DRM_FORMAT_P012:
+		return PLANE_CTL_FORMAT_P012;
+	case DRM_FORMAT_P016:
+		return PLANE_CTL_FORMAT_P016;
 	default:
 		MISSING_CASE(pixel_format);
 	}
@@ -3690,7 +3702,7 @@ u32 glk_plane_color_ctl(const struct intel_crtc_state *crtc_state,
 	plane_color_ctl |= glk_plane_color_ctl_alpha(fb->format->format);
 
 	if (intel_format_is_yuv(fb->format->format)) {
-		if (fb->format->format == DRM_FORMAT_NV12) {
+		if (is_planar_yuv_format(fb->format->format)) {
 			plane_color_ctl |=
 				PLANE_COLOR_CSC_MODE_YUV709_TO_RGB709;
 			goto out;
@@ -4805,8 +4817,7 @@ skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
 	need_scaling = src_w != dst_w || src_h != dst_h;
 
 	if (plane_scaler_check)
-		if (pixel_format == DRM_FORMAT_NV12)
-			need_scaling = true;
+		need_scaling = is_planar_yuv_format(pixel_format);
 
 	if (crtc_state->ycbcr420 && scaler_user == SKL_CRTC_INDEX)
 		need_scaling = true;
@@ -4847,7 +4858,7 @@ skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
 		return 0;
 	}
 
-	if (plane_scaler_check && pixel_format == DRM_FORMAT_NV12 &&
+	if (plane_scaler_check && is_planar_yuv_format(pixel_format) &&
 	    (src_h < SKL_MIN_YUV_420_SRC_H || src_w < SKL_MIN_YUV_420_SRC_W)) {
 		DRM_DEBUG_KMS("NV12: src dimensions not met\n");
 		return -EINVAL;
@@ -4952,6 +4963,9 @@ static int skl_update_scaler_plane(struct intel_crtc_state *crtc_state,
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 		break;
 	default:
 		DRM_DEBUG_KMS("[PLANE:%d:%s] FB:%d unsupported scaling format 0x%x\n",
@@ -13039,7 +13053,7 @@ skl_max_scale(struct intel_crtc *intel_crtc,
 	 *            or
 	 *    cdclk/crtc_clock
 	 */
-	mult = pixel_format == DRM_FORMAT_NV12 ? 2 : 3;
+	mult = is_planar_yuv_format(pixel_format) ? 2 : 3;
 	tmpclk1 = (1 << 16) * mult - 1;
 	tmpclk2 = (1 << 8) * ((max_dotclk << 8) / crtc_clock);
 	max_scale = min(tmpclk1, tmpclk2);
@@ -13235,6 +13249,9 @@ static bool skl_mod_supported(uint32_t format, uint64_t modifier)
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 		if (modifier == I915_FORMAT_MOD_Yf_TILED)
 			return true;
 		/* fall through */
@@ -14367,6 +14384,23 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 			goto err;
 		}
 		break;
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+		if (mode_cmd->modifier[0] == I915_FORMAT_MOD_Y_TILED_CCS ||
+		    mode_cmd->modifier[0] == I915_FORMAT_MOD_Yf_TILED_CCS) {
+			DRM_DEBUG_KMS("RC not to be enabled with %s\n",
+				      drm_get_format_name(mode_cmd->pixel_format,
+				      &format_name));
+			goto err;
+		}
+		if (!IS_GEMINILAKE(dev_priv) && !IS_CANNONLAKE(dev_priv)) {
+			DRM_DEBUG_KMS("unsupported pixel format: %s\n",
+				      drm_get_format_name(mode_cmd->pixel_format,
+				      &format_name));
+			goto err;
+		}
+		break;
 	default:
 		DRM_DEBUG_KMS("unsupported pixel format: %s\n",
 			      drm_get_format_name(mode_cmd->pixel_format, &format_name));
@@ -14379,7 +14413,7 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 
 	drm_helper_mode_fill_fb_struct(&dev_priv->drm, fb, mode_cmd);
 
-	if (fb->format->format == DRM_FORMAT_NV12 &&
+	if (is_planar_yuv_format(fb->format->format) &&
 	    (fb->width < SKL_MIN_YUV_420_SRC_W ||
 	     fb->height < SKL_MIN_YUV_420_SRC_H ||
 	     (fb->width % 4) != 0 || (fb->height % 4) != 0)) {

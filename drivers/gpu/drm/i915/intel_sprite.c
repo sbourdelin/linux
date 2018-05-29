@@ -49,6 +49,22 @@ bool intel_format_is_yuv(u32 format)
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool is_planar_yuv_format(uint32_t pixelformat)
+{
+	switch (pixelformat) {
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 		return true;
 	default:
 		return false;
@@ -1011,7 +1027,7 @@ intel_check_sprite_plane(struct intel_plane *plane,
 		src->y2 = (src_y + src_h) << 16;
 
 		if (intel_format_is_yuv(fb->format->format) &&
-    		    fb->format->format != DRM_FORMAT_NV12 &&
+		    !is_planar_yuv_format(fb->format->format) &&
 		    (src_x % 2 || src_w % 2)) {
 			DRM_DEBUG_KMS("src x/w (%u, %u) must be a multiple of 2 for YUV planes\n",
 				      src_x, src_w);
@@ -1288,6 +1304,9 @@ static bool skl_mod_supported(uint32_t format, uint64_t modifier)
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 		if (modifier == I915_FORMAT_MOD_Yf_TILED)
 			return true;
 		/* fall through */

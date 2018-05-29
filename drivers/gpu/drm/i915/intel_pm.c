@@ -3911,7 +3911,7 @@ skl_ddb_get_hw_plane_state(struct drm_i915_private *dev_priv,
 	val = I915_READ(PLANE_BUF_CFG(pipe, plane_id));
 	val2 = I915_READ(PLANE_NV12_BUF_CFG(pipe, plane_id));
 
-	if (fourcc == DRM_FORMAT_NV12) {
+	if (is_planar_yuv_format(fourcc)) {
 		skl_ddb_entry_init_from_hw(dev_priv,
 					   &ddb->plane[pipe][plane_id], val2);
 		skl_ddb_entry_init_from_hw(dev_priv,
@@ -4119,7 +4119,7 @@ skl_plane_relative_data_rate(const struct intel_crtc_state *cstate,
 
 	if (intel_plane->id == PLANE_CURSOR)
 		return 0;
-	if (plane == 1 && format != DRM_FORMAT_NV12)
+	if (plane == 1 && !is_planar_yuv_format(format))
 		return 0;
 
 	/*
@@ -4131,7 +4131,7 @@ skl_plane_relative_data_rate(const struct intel_crtc_state *cstate,
 	height = drm_rect_height(&intel_pstate->base.src) >> 16;
 
 	/* UV plane does 1/2 pixel sub-sampling */
-	if (plane == 1 && format == DRM_FORMAT_NV12) {
+	if (plane == 1 && is_planar_yuv_format(format)) {
 		width /= 2;
 		height /= 2;
 	}
@@ -4198,7 +4198,7 @@ skl_ddb_min_alloc(const struct drm_plane_state *pstate, const int plane)
 		return 0;
 
 	/* For packed formats, and uv-plane, return 0 */
-	if (plane == 1 && fb->format->format != DRM_FORMAT_NV12)
+	if (plane == 1 && !is_planar_yuv_format(fb->format->format))
 		return 0;
 
 	/* For Non Y-tile return 8-blocks */
@@ -4216,7 +4216,7 @@ skl_ddb_min_alloc(const struct drm_plane_state *pstate, const int plane)
 	src_w = drm_rect_width(&intel_pstate->base.src) >> 16;
 	src_h = drm_rect_height(&intel_pstate->base.src) >> 16;
 
-	/* Halve UV plane width and height for NV12 */
+	/* Halve UV plane width and height for NV12 and other planar yuv */
 	if (plane == 1) {
 		src_w /= 2;
 		src_h /= 2;
@@ -4495,8 +4495,8 @@ skl_compute_plane_wm_params(const struct drm_i915_private *dev_priv,
 		return 0;
 
 	/* only NV12 format has two planes */
-	if (plane_id == 1 && fb->format->format != DRM_FORMAT_NV12) {
-		DRM_DEBUG_KMS("Non NV12 format have single plane\n");
+	if (plane_id == 1 && !is_planar_yuv_format(fb->format->format)) {
+		DRM_DEBUG_KMS("Non planar format have single plane\n");
 		return -EINVAL;
 	}
 
@@ -4507,7 +4507,7 @@ skl_compute_plane_wm_params(const struct drm_i915_private *dev_priv,
 	wp->x_tiled = fb->modifier == I915_FORMAT_MOD_X_TILED;
 	wp->rc_surface = fb->modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
 			 fb->modifier == I915_FORMAT_MOD_Yf_TILED_CCS;
-	wp->is_planar = fb->format->format == DRM_FORMAT_NV12;
+	wp->is_planar = is_planar_yuv_format(fb->format->format);
 
 	if (plane->id == PLANE_CURSOR) {
 		wp->width = intel_pstate->base.crtc_w;
@@ -4782,8 +4782,7 @@ skl_compute_wm_levels(const struct drm_i915_private *dev_priv,
 			return ret;
 	}
 
-	if (intel_pstate->base.fb->format->format == DRM_FORMAT_NV12)
-		wm->is_planar = true;
+	wm->is_planar = is_planar_yuv_format(intel_pstate->base.fb->format->format);
 
 	return 0;
 }
