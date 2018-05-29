@@ -799,8 +799,6 @@ static int hideep_init_input(struct hideep_ts *ts)
 	input_set_capability(ts->input_dev, EV_ABS, ABS_MT_POSITION_Y);
 	input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE, 0, 65535, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
-	input_set_abs_params(ts->input_dev, ABS_MT_TOOL_TYPE,
-			     0, MT_TOOL_MAX, 0, 0);
 	touchscreen_parse_properties(ts->input_dev, true, &ts->prop);
 
 	if (ts->prop.max_x == 0 || ts->prop.max_y == 0) {

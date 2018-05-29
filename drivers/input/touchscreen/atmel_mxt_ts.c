@@ -2019,8 +2019,6 @@ static int mxt_initialize_input_device(struct mxt_data *data)
 	}
 
 	if (data->multitouch == MXT_TOUCH_MULTITOUCHSCREEN_T100) {
-		input_set_abs_params(input_dev, ABS_MT_TOOL_TYPE,
-				     0, MT_TOOL_MAX, 0, 0);
 		input_set_abs_params(input_dev, ABS_MT_DISTANCE,
 				     MXT_DISTANCE_ACTIVE_TOUCH,
 				     MXT_DISTANCE_HOVERING,

@@ -57,6 +57,7 @@ int input_mt_init_slots(struct input_dev *dev, unsigned int num_slots,
 	mt->flags = flags;
 	input_set_abs_params(dev, ABS_MT_SLOT, 0, num_slots - 1, 0, 0);
 	input_set_abs_params(dev, ABS_MT_TRACKING_ID, 0, TRKID_MAX, 0, 0);
+	input_set_abs_params(dev, ABS_MT_TOOL_TYPE, 0, MT_TOOL_MAX, 0, 0);
 
 	if (flags & (INPUT_MT_POINTER | INPUT_MT_DIRECT)) {
 		__set_bit(EV_KEY, dev->evbit);
