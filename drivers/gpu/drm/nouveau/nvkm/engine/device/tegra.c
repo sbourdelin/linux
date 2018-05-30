@@ -105,6 +105,11 @@ nvkm_device_tegra_probe_iommu(struct nvkm_device_tegra *tdev)
 	unsigned long pgsize_bitmap;
 	int ret;
 
+#if IS_ENABLED(CONFIG_ARM)
+	/* make sure we can use the IOMMU exclusively */
+	arm_dma_iommu_detach_device(dev);
+#endif
+
 	if (!tdev->func->iommu_bit)
 		return;
 
