@@ -190,6 +190,17 @@ int devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write,
 	return 0;
 }
 
+u64 (*boot_printk_clock_fn)(void) __read_mostly;
+
+static u64 printk_clock(void)
+{
+	/* If platform provides early boot printk clock, then use it */
+	if (unlikely(system_state == SYSTEM_BOOTING && boot_printk_clock_fn))
+		return boot_printk_clock_fn();
+	else
+		return local_clock();
+}
+
 /*
  * Number of registered extended console drivers.
  *
@@ -628,7 +639,7 @@ static int log_store(int facility, int level,
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
-		msg->ts_nsec = local_clock();
+		msg->ts_nsec = printk_clock();
 	memset(log_dict(msg) + dict_len, 0, pad_len);
 	msg->len = size;
 
@@ -1775,7 +1786,7 @@ static bool cont_add(int facility, int level, enum log_flags flags, const char *
 		cont.facility = facility;
 		cont.level = level;
 		cont.owner = current;
-		cont.ts_nsec = local_clock();
+		cont.ts_nsec = printk_clock();
 		cont.flags = flags;
 	}
 
