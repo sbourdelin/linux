@@ -14,6 +14,7 @@
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables.h>
 #include <net/netfilter/nf_dup_netdev.h>
+#include <net/neighbour.h>
 
 struct nft_fwd_netdev {
 	enum nft_registers	sreg_dev:8;
@@ -32,6 +33,8 @@ static void nft_fwd_netdev_eval(const struct nft_expr *expr,
 
 static const struct nla_policy nft_fwd_netdev_policy[NFTA_FWD_MAX + 1] = {
 	[NFTA_FWD_SREG_DEV]	= { .type = NLA_U32 },
+	[NFTA_FWD_SREG_ADDR]	= { .type = NLA_U32 },
+	[NFTA_FWD_NFPROTO]	= { .type = NLA_U32 },
 };
 
 static int nft_fwd_netdev_init(const struct nft_ctx *ctx,
@@ -62,7 +65,106 @@ nla_put_failure:
 	return -1;
 }
 
+struct nft_fwd_neigh {
+	enum nft_registers	sreg_dev:8;
+	enum nft_registers	sreg_addr:8;
+	u8			nfproto;
+};
+
+static void nft_fwd_neigh_eval(const struct nft_expr *expr,
+			      struct nft_regs *regs,
+			      const struct nft_pktinfo *pkt)
+{
+	struct nft_fwd_neigh *priv = nft_expr_priv(expr);
+	void *addr = &regs->data[priv->sreg_addr];
+	int oif = regs->data[priv->sreg_dev];
+	struct sk_buff *skb = pkt->skb;
+	struct net_device *dev;
+	int neigh_table;
+
+	dev = dev_get_by_index_rcu(nft_net(pkt), oif);
+	if (dev == NULL)
+		return;
+
+	skb->dev = dev;
+
+	switch (priv->nfproto) {
+	case NFPROTO_IPV4:
+		neigh_table = NEIGH_ARP_TABLE;
+		break;
+	case NFPROTO_IPV6:
+		neigh_table = NEIGH_ND_TABLE;
+		break;
+	default:
+		regs->verdict.code = NF_DROP;
+		return;
+	}
+	neigh_xmit(neigh_table, dev, addr, skb);
+
+	regs->verdict.code = NF_STOLEN;
+}
+
+static int nft_fwd_neigh_init(const struct nft_ctx *ctx,
+			      const struct nft_expr *expr,
+			      const struct nlattr * const tb[])
+{
+	struct nft_fwd_neigh *priv = nft_expr_priv(expr);
+	unsigned int addr_len;
+	int err;
+
+	if (!tb[NFTA_FWD_SREG_DEV] ||
+	    !tb[NFTA_FWD_SREG_ADDR] ||
+	    !tb[NFTA_FWD_NFPROTO])
+		return -EINVAL;
+
+	priv->sreg_dev = nft_parse_register(tb[NFTA_FWD_SREG_DEV]);
+	priv->sreg_addr = nft_parse_register(tb[NFTA_FWD_SREG_ADDR]);
+	priv->nfproto = nft_parse_register(tb[NFTA_FWD_NFPROTO]);
+
+	addr_len = nla_len(tb[NFTA_FWD_SREG_ADDR]);
+	switch (addr_len) {
+	case 4:
+		priv->nfproto = NFPROTO_IPV4;
+		break;
+	case 16:
+		priv->nfproto = NFPROTO_IPV6;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	err = nft_validate_register_load(priv->sreg_dev, sizeof(int));
+	if (err < 0)
+		return err;
+
+	return nft_validate_register_load(priv->sreg_addr, addr_len);
+}
+
+static const struct nft_expr_ops nft_fwd_netdev_ingress_ops;
+
+static int nft_fwd_neigh_dump(struct sk_buff *skb, const struct nft_expr *expr)
+{
+	struct nft_fwd_neigh *priv = nft_expr_priv(expr);
+
+	if (nft_dump_register(skb, NFTA_FWD_SREG_DEV, priv->sreg_dev) ||
+	    nft_dump_register(skb, NFTA_FWD_SREG_ADDR, priv->sreg_addr))
+		goto nla_put_failure;
+
+	return 0;
+
+nla_put_failure:
+	return -1;
+}
+
 static struct nft_expr_type nft_fwd_netdev_type;
+static const struct nft_expr_ops nft_fwd_neigh_netdev_ops = {
+	.type		= &nft_fwd_netdev_type,
+	.size		= NFT_EXPR_SIZE(sizeof(struct nft_fwd_neigh)),
+	.eval		= nft_fwd_neigh_eval,
+	.init		= nft_fwd_neigh_init,
+	.dump		= nft_fwd_neigh_dump,
+};
+
 static const struct nft_expr_ops nft_fwd_netdev_ops = {
 	.type		= &nft_fwd_netdev_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_fwd_netdev)),
@@ -71,10 +173,22 @@ static const struct nft_expr_ops nft_fwd_netdev_ops = {
 	.dump		= nft_fwd_netdev_dump,
 };
 
+static const struct nft_expr_ops *
+nft_fwd_select_ops(const struct nft_ctx *ctx,
+		   const struct nlattr * const tb[])
+{
+	if (tb[NFTA_FWD_SREG_ADDR])
+		return &nft_fwd_neigh_netdev_ops;
+	if (tb[NFTA_FWD_SREG_DEV])
+		return &nft_fwd_netdev_ops;
+
+        return ERR_PTR(-EOPNOTSUPP);
+}
+
 static struct nft_expr_type nft_fwd_netdev_type __read_mostly = {
 	.family		= NFPROTO_NETDEV,
 	.name		= "fwd",
-	.ops		= &nft_fwd_netdev_ops,
+	.select_ops	= &nft_fwd_select_ops,
 	.policy		= nft_fwd_netdev_policy,
 	.maxattr	= NFTA_FWD_MAX,
 	.owner		= THIS_MODULE,
