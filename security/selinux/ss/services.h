@@ -33,7 +33,7 @@ struct selinux_ruleset {
 };
 struct selinux_ss {
 	struct selinux_ruleset *active_set; /* rcu pointer */
-	rwlock_t policy_rwlock;
+	spinlock_t policy_lock;
 	u32 latest_granting;
 	struct page *status_page;
 	struct mutex status_lock;
