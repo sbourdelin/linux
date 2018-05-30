@@ -1610,6 +1610,17 @@ static void __timekeeping_inject_sleeptime(struct timekeeper *tk,
  */
 bool timekeeping_rtc_skipresume(void)
 {
+	struct timekeeper *tk = &tk_core.timekeeper;
+	/*
+	 * This is to ensure that we don't end up injecting
+	 * the sleeptime via rtc_resume() for non-stop clocksource
+	 * when we fail to sleep.
+	 */
+	if (!sleeptime_injected)
+		sleeptime_injected = ((tk->tkr_mono.clock->flags &
+			CLOCK_SOURCE_SUSPEND_NONSTOP) ||
+			(persistent_clock_exists)) ? true : false;
+
 	return sleeptime_injected;
 }
 
