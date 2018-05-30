@@ -139,6 +139,13 @@ config BLK_CMDLINE_PARSER
 
 	See Documentation/block/cmdline-partition.txt for more information.
 
+config BLK_DEBUG_WB_WORKFN_RACE
+	bool "Dump upon hitting wb_workfn() versus bdi_unregister() race bug."
+	default n
+	---help---
+	This is a temporary option used for obtaining information for
+	specific bug. This option will be removed after the bug is fixed.
+
 config BLK_WBT
 	bool "Enable support for block device writeback throttling"
 	default n
