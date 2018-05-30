@@ -176,6 +176,7 @@ struct spi_controller_mem_ops {
 			    const struct spi_mem_op *op);
 	int (*exec_op)(struct spi_mem *mem,
 		       const struct spi_mem_op *op);
+	const char *(*get_name)(struct spi_mem *mem);
 };
 
 /**
@@ -233,6 +234,8 @@ bool spi_mem_supports_op(struct spi_mem *mem,
 
 int spi_mem_exec_op(struct spi_mem *mem,
 		    const struct spi_mem_op *op);
+
+const char *spi_mem_get_name(struct spi_mem *mem);
 
 int spi_mem_driver_register_with_owner(struct spi_mem_driver *drv,
 				       struct module *owner);
