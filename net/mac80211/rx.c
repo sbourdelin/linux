@@ -1569,6 +1569,29 @@ static void ieee80211_sta_rx_signal_thold_check(struct ieee80211_rx_data *rx)
 				sig, GFP_ATOMIC);
 		}
 	}
+
+	if (sta->rssi_low) {
+		int last_event = sta->last_sta_mon_event_signal;
+		int sig = -ewma_signal_read(&sta->rx_stats_avg.signal);
+		int low = sta->rssi_low;
+		int high = sta->rssi_high;
+
+		if (sig < low &&
+		    (last_event == 0 || last_event >= low)) {
+			sta->last_sta_mon_event_signal = sig;
+			cfg80211_sta_mon_rssi_notify(
+				rx->sdata->dev, sta->addr,
+				NL80211_STA_MON_RSSI_THRESHOLD_EVENT_LOW,
+				sig, GFP_ATOMIC);
+		} else if (sig > high &&
+			   (last_event == 0 || last_event <= high)) {
+			sta->last_sta_mon_event_signal = sig;
+			cfg80211_sta_mon_rssi_notify(
+				rx->sdata->dev, sta->addr,
+				NL80211_STA_MON_RSSI_THRESHOLD_EVENT_HIGH,
+				sig, GFP_ATOMIC);
+		}
+	}
 }
 
 static ieee80211_rx_result debug_noinline

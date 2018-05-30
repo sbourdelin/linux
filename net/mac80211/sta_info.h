@@ -487,6 +487,10 @@ struct ieee80211_sta_rx_stats {
  *	should cause an event to be sent indicating where the current value
  *	is in relation to the newly configured threshold
  * @rssi_hyst: Station's RSSI hysteresis
+ * @rssi_low: RSSI lower threshold to monitor station's signal strength, a zero
+ *	value implies disabled.  This is an alternative mechanism to the single
+ *	threshold event and can't be enabled simultaneously with it
+ * @rssi_high: RSSI upper threshold for station
  * @last_sta_mon_event_signal: Last signal strength average for a station
  *	that triggered a sta_mon event. 0 indicates that no event has been
  *	generated for the current association
@@ -596,6 +600,8 @@ struct sta_info {
 
 	s32 rssi_thold;
 	u32 rssi_hyst;
+	s32 rssi_low;
+	s32 rssi_high;
 	int last_sta_mon_event_signal;
 	unsigned int count_rx_signal;
 
