@@ -320,7 +320,11 @@ extern int policydb_type_isvalid(struct policydb *p, unsigned int type);
 extern int policydb_role_isvalid(struct policydb *p, unsigned int role);
 extern int policydb_read(struct policydb *p, void *fp);
 extern int policydb_write(struct policydb *p, void *fp);
-
+extern int policydb_copy(struct policydb *olddb, struct policydb *newdb,
+			 void **tmpstorage, size_t size);
+extern int policydb_flattened_alloc(struct policydb *db,
+				    void **tmpbuf, size_t *size);
+extern int policydb_flattened_free(void *tmpbuf);
 #define PERM_SYMTAB_SIZE 32
 
 #define POLICYDB_CONFIG_MLS    1

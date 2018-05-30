@@ -44,7 +44,6 @@ int hashtab_insert(struct hashtab *h, void *key, void *datum)
 	u32 hvalue;
 	struct hashtab_node *prev, *cur, *newnode;
 
-	cond_resched();
 
 	if (!h || h->nel == HASHTAB_MAX_NODES)
 		return -EINVAL;

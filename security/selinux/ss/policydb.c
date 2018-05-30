@@ -3535,3 +3535,51 @@ int policydb_write(struct policydb *p, void *fp)
 
 	return 0;
 }
+
+int policydb_flattened_alloc(struct policydb *db, void **tmpbuf, size_t *size)
+{
+	int rc = 0;
+
+	*size = db->len;
+	*tmpbuf = vmalloc(*size);
+
+	if (!*tmpbuf) {
+		rc = -ENOMEM;
+		printk(KERN_ERR "SELinux: vmalloc failed for %ld\n", *size);
+	}
+	return rc;
+}
+
+int policydb_flattened_free(void *tmpbuf)
+{
+	vfree(tmpbuf);
+	return 0;
+}
+
+int policydb_copy(struct policydb *olddb, struct policydb *newdb,
+		  void **tmpstorage, size_t size)
+{
+	struct policy_file fp;
+	void *data = *tmpstorage;
+	int rc;
+
+	if (size != olddb->len) {
+		rc = -EAGAIN;
+		goto out;
+	}
+	fp.data = data;
+	fp.len = size;
+	rc = policydb_write(olddb, &fp);
+	if (rc)
+		goto out;
+
+	fp.len = size;
+	fp.data = data;
+	rc = policydb_read(newdb, &fp);
+	if (rc)
+		goto out;
+
+	newdb->len = size;
+out:
+	return rc;
+}

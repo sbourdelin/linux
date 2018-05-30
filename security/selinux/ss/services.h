@@ -23,12 +23,18 @@ struct selinux_map {
 	u16 size; /* array size of mapping */
 };
 
-struct selinux_ss {
-	struct sidtab sidtab;
+/* sidtab is stored as a pointer. We can then choice to
+ * use the old pointer or create a new sittab.
+ */
+struct selinux_ruleset {
+	struct sidtab *sidtab;
 	struct policydb policydb;
+	struct selinux_map map;
+};
+struct selinux_ss {
+	struct selinux_ruleset *active_set; /* rcu pointer */
 	rwlock_t policy_rwlock;
 	u32 latest_granting;
-	struct selinux_map map;
 	struct page *status_page;
 	struct mutex status_lock;
 };
