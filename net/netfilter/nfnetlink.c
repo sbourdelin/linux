@@ -28,6 +28,7 @@
 
 #include <net/netlink.h>
 #include <linux/netfilter/nfnetlink.h>
+#include <linux/netfilter/nf_tables.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
@@ -36,6 +37,11 @@ MODULE_ALIAS_NET_PF_PROTO(PF_NETLINK, NETLINK_NETFILTER);
 #define nfnl_dereference_protected(id) \
 	rcu_dereference_protected(table[(id)].subsys, \
 				  lockdep_nfnl_is_held((id)))
+
+#define NFTA_MAX_ATTR	max(max(max(NFTA_CHAIN_MAX, NFTA_FLOWTABLE_MAX),\
+				max(NFTA_OBJ_MAX, NFTA_RULE_MAX)),	\
+			    max(NFTA_TABLE_MAX,				\
+				max(NFTA_SET_ELEM_LIST_MAX, NFTA_SET_MAX)))
 
 static struct {
 	struct mutex				mutex;
@@ -185,10 +191,16 @@ replay:
 	{
 		int min_len = nlmsg_total_size(sizeof(struct nfgenmsg));
 		u8 cb_id = NFNL_MSG_TYPE(nlh->nlmsg_type);
-		struct nlattr *cda[ss->cb[cb_id].attr_count + 1];
+		struct nlattr *cda[NFTA_MAX_ATTR + 1];
 		struct nlattr *attr = (void *)nlh + min_len;
 		int attrlen = nlh->nlmsg_len - min_len;
 		__u8 subsys_id = NFNL_SUBSYS_ID(type);
+
+		/* Sanity-check NFTA_MAX_ATTR */
+		if (ss->cb[cb_id].attr_count > NFTA_MAX_ATTR) {
+			rcu_read_unlock();
+			return -ENOMEM;
+		}
 
 		err = nla_parse(cda, ss->cb[cb_id].attr_count, attr, attrlen,
 				ss->cb[cb_id].policy, extack);
@@ -379,9 +391,15 @@ replay:
 		{
 			int min_len = nlmsg_total_size(sizeof(struct nfgenmsg));
 			u8 cb_id = NFNL_MSG_TYPE(nlh->nlmsg_type);
-			struct nlattr *cda[ss->cb[cb_id].attr_count + 1];
+			struct nlattr *cda[NFTA_MAX_ATTR + 1];
 			struct nlattr *attr = (void *)nlh + min_len;
 			int attrlen = nlh->nlmsg_len - min_len;
+
+			/* Sanity-check NFTA_MAX_ATTR */
+			if (ss->cb[cb_id].attr_count > NFTA_MAX_ATTR) {
+				err = -ENOMEM;
+				goto ack;
+			}
 
 			err = nla_parse(cda, ss->cb[cb_id].attr_count, attr,
 					attrlen, ss->cb[cb_id].policy, NULL);
