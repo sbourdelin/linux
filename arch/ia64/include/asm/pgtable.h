@@ -336,7 +336,7 @@ static inline void set_pte(pte_t *ptep, pte_t pteval)
 	if (pte_present_exec_user(pteval) &&
 	    (!pte_present(*ptep) ||
 		pte_pfn(*ptep) != pte_pfn(pteval)))
-		/* load_module() calles flush_icache_range() explicitly*/
+		/* load_module() calls flush_icache_range() explicitly*/
 		__ia64_sync_icache_dcache(pteval);
 	*ptep = pteval;
 }
