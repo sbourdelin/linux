@@ -260,10 +260,12 @@ struct cfg80211_beacon_registration {
 	u32 nlportid;
 };
 
-struct cfg80211_cqm_config {
+struct cfg80211_rssi_config {
+	struct list_head list;
 	u32 rssi_hyst;
 	s32 last_rssi_event_value;
 	int n_rssi_thresholds;
+	u8 addr[ETH_ALEN];
 	s32 rssi_thresholds[0];
 };
 
@@ -514,6 +516,6 @@ void cfg80211_stop_nan(struct cfg80211_registered_device *rdev,
 #define CFG80211_DEV_WARN_ON(cond)	({bool __r = (cond); __r; })
 #endif
 
-void cfg80211_cqm_config_free(struct wireless_dev *wdev);
+void cfg80211_rssi_config_free(struct wireless_dev *wdev, const u8 *peer);
 
 #endif /* __NET_WIRELESS_CORE_H */

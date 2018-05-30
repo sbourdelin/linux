@@ -3200,6 +3200,7 @@ static int nl80211_new_interface(struct sk_buff *skb, struct genl_info *info)
 		spin_lock_init(&wdev->event_lock);
 		INIT_LIST_HEAD(&wdev->mgmt_registrations);
 		spin_lock_init(&wdev->mgmt_registrations_lock);
+		INIT_LIST_HEAD(&wdev->rssi_config_list);
 
 		wdev->identifier = ++rdev->wdev_id;
 		list_add_rcu(&wdev->list, &rdev->wiphy.wdev_list);
@@ -10140,7 +10141,7 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 	int err;
 
 	/* RSSI reporting disabled? */
-	if (!wdev->cqm_config)
+	if (!wdev->rssi_config)
 		return rdev_set_cqm_rssi_range_config(rdev, dev, 0, 0);
 
 	/*
@@ -10149,7 +10150,7 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 	 * connection is established and enough beacons received to calculate
 	 * the average.
 	 */
-	if (!wdev->cqm_config->last_rssi_event_value && wdev->current_bss &&
+	if (!wdev->rssi_config->last_rssi_event_value && wdev->current_bss &&
 	    rdev->ops->get_station) {
 		struct station_info sinfo = {};
 		u8 *mac_addr;
@@ -10161,24 +10162,54 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 			return err;
 
 		if (sinfo.filled & BIT(NL80211_STA_INFO_BEACON_SIGNAL_AVG))
-			wdev->cqm_config->last_rssi_event_value =
+			wdev->rssi_config->last_rssi_event_value =
 				(s8) sinfo.rx_beacon_signal_avg;
 	}
 
-	last = wdev->cqm_config->last_rssi_event_value;
-	hyst = wdev->cqm_config->rssi_hyst;
-	n = wdev->cqm_config->n_rssi_thresholds;
+	last = wdev->rssi_config->last_rssi_event_value;
+	hyst = wdev->rssi_config->rssi_hyst;
+	n = wdev->rssi_config->n_rssi_thresholds;
 
 	for (i = 0; i < n; i++)
-		if (last < wdev->cqm_config->rssi_thresholds[i])
+		if (last < wdev->rssi_config->rssi_thresholds[i])
 			break;
 
 	low = i > 0 ?
-		(wdev->cqm_config->rssi_thresholds[i - 1] - hyst) : S32_MIN;
+		(wdev->rssi_config->rssi_thresholds[i - 1] - hyst) : S32_MIN;
 	high = i < n ?
-		(wdev->cqm_config->rssi_thresholds[i] + hyst - 1) : S32_MAX;
+		(wdev->rssi_config->rssi_thresholds[i] + hyst - 1) : S32_MAX;
 
 	return rdev_set_cqm_rssi_range_config(rdev, dev, low, high);
+}
+
+static struct cfg80211_rssi_config *
+cfg80211_get_rssi_config(struct wireless_dev *wdev, const s32 *thresholds,
+			 int n_thresholds, u32 hysteresis, const u8 *peer)
+{
+	struct cfg80211_rssi_config *rssi_config;
+
+	if (!peer)
+		return NULL;
+
+	if (list_empty(&wdev->rssi_config_list))
+		goto new;
+
+	list_for_each_entry(rssi_config, &wdev->rssi_config_list, list) {
+		if (!memcmp(rssi_config->addr, peer, ETH_ALEN))
+			goto found;
+	}
+
+new:
+	rssi_config = kzalloc(sizeof(struct cfg80211_rssi_config) +
+			      n_thresholds * sizeof(s32), GFP_KERNEL);
+	list_add(&rssi_config->list, &wdev->rssi_config_list);
+found:
+	rssi_config->rssi_hyst = hysteresis;
+	rssi_config->n_rssi_thresholds = n_thresholds;
+	memcpy(rssi_config->addr, peer, ETH_ALEN);
+	memcpy(rssi_config->rssi_thresholds, thresholds,
+	       n_thresholds * sizeof(s32));
+	return rssi_config;
 }
 
 static int nl80211_set_cqm_rssi(struct genl_info *info,
@@ -10204,7 +10235,7 @@ static int nl80211_set_cqm_rssi(struct genl_info *info,
 		return -EOPNOTSUPP;
 
 	wdev_lock(wdev);
-	cfg80211_cqm_config_free(wdev);
+	cfg80211_rssi_config_free(wdev, NULL);
 	wdev_unlock(wdev);
 
 	if (n_thresholds <= 1 && rdev->ops->set_cqm_rssi_config) {
@@ -10224,21 +10255,14 @@ static int nl80211_set_cqm_rssi(struct genl_info *info,
 
 	wdev_lock(wdev);
 	if (n_thresholds) {
-		struct cfg80211_cqm_config *cqm_config;
-
-		cqm_config = kzalloc(sizeof(struct cfg80211_cqm_config) +
-				     n_thresholds * sizeof(s32), GFP_KERNEL);
-		if (!cqm_config) {
+		wdev->rssi_config = cfg80211_get_rssi_config(
+						wdev, thresholds,
+						n_thresholds, hysteresis,
+						wdev->current_bss->pub.bssid);
+		if (!wdev->rssi_config) {
 			err = -ENOMEM;
 			goto unlock;
 		}
-
-		cqm_config->rssi_hyst = hysteresis;
-		cqm_config->n_rssi_thresholds = n_thresholds;
-		memcpy(cqm_config->rssi_thresholds, thresholds,
-		       n_thresholds * sizeof(s32));
-
-		wdev->cqm_config = cqm_config;
 	}
 
 	err = cfg80211_cqm_rssi_update(rdev, dev);
@@ -15053,13 +15077,13 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 		    rssi_event != NL80211_CQM_RSSI_THRESHOLD_EVENT_HIGH))
 		return;
 
-	if (wdev->cqm_config) {
-		wdev->cqm_config->last_rssi_event_value = rssi_level;
+	if (wdev->rssi_config) {
+		wdev->rssi_config->last_rssi_event_value = rssi_level;
 
 		cfg80211_cqm_rssi_update(rdev, dev);
 
 		if (rssi_level == 0)
-			rssi_level = wdev->cqm_config->last_rssi_event_value;
+			rssi_level = wdev->rssi_config->last_rssi_event_value;
 	}
 
 	msg = cfg80211_prepare_cqm(dev, NULL, gfp);

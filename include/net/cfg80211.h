@@ -4139,7 +4139,7 @@ void wiphy_free(struct wiphy *wiphy);
 struct cfg80211_conn;
 struct cfg80211_internal_bss;
 struct cfg80211_cached_keys;
-struct cfg80211_cqm_config;
+struct cfg80211_rssi_config;
 
 /**
  * struct wireless_dev - wireless device state
@@ -4204,7 +4204,7 @@ struct cfg80211_cqm_config;
  * @event_lock: (private) lock for event list
  * @owner_nlportid: (private) owner socket port ID
  * @nl_owner_dead: (private) owner socket went away
- * @cqm_config: (private) nl80211 RSSI monitor state
+ * @rssi_config: (private) nl80211 RSSI monitor state
  */
 struct wireless_dev {
 	struct wiphy *wiphy;
@@ -4275,7 +4275,8 @@ struct wireless_dev {
 	} wext;
 #endif
 
-	struct cfg80211_cqm_config *cqm_config;
+	struct cfg80211_rssi_config *rssi_config;
+	struct list_head rssi_config_list;
 };
 
 static inline u8 *wdev_address(struct wireless_dev *wdev)

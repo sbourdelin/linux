@@ -994,10 +994,28 @@ void wiphy_rfkill_set_hw_state(struct wiphy *wiphy, bool blocked)
 }
 EXPORT_SYMBOL(wiphy_rfkill_set_hw_state);
 
-void cfg80211_cqm_config_free(struct wireless_dev *wdev)
+void cfg80211_rssi_config_free(struct wireless_dev *wdev, const u8 *peer)
 {
-	kfree(wdev->cqm_config);
-	wdev->cqm_config = NULL;
+	struct cfg80211_rssi_config *rssi_config, *tmp;
+
+	if (list_empty(&wdev->rssi_config_list))
+		goto free;
+
+	list_for_each_entry_safe(rssi_config, tmp, &wdev->rssi_config_list,
+				 list) {
+		if (peer && memcmp(rssi_config->addr, peer, ETH_ALEN))
+			continue;
+
+		list_del(&rssi_config->list);
+		kfree(rssi_config);
+		if (list_empty(&wdev->rssi_config_list) || peer)
+			goto out;
+	}
+
+free:
+	kfree(wdev->rssi_config);
+out:
+	wdev->rssi_config = NULL;
 }
 
 void cfg80211_unregister_wdev(struct wireless_dev *wdev)
@@ -1027,7 +1045,7 @@ void cfg80211_unregister_wdev(struct wireless_dev *wdev)
 		break;
 	}
 
-	cfg80211_cqm_config_free(wdev);
+	cfg80211_rssi_config_free(wdev, NULL);
 }
 EXPORT_SYMBOL(cfg80211_unregister_wdev);
 
@@ -1163,6 +1181,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		spin_lock_init(&wdev->event_lock);
 		INIT_LIST_HEAD(&wdev->mgmt_registrations);
 		spin_lock_init(&wdev->mgmt_registrations_lock);
+		INIT_LIST_HEAD(&wdev->rssi_config_list);
 
 		/*
 		 * We get here also when the interface changes network namespaces,
@@ -1292,7 +1311,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			kzfree(wdev->wext.keys);
 #endif
 			flush_work(&wdev->disconnect_wk);
-			cfg80211_cqm_config_free(wdev);
+			cfg80211_rssi_config_free(wdev, NULL);
 		}
 		/*
 		 * synchronise (so that we won't find this netdev
