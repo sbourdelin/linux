@@ -543,6 +543,19 @@ static int add_jump_destinations(struct objtool_file *file)
 				  dest_off);
 			return -1;
 		}
+
+		/*
+		 * For GCC 8+, create parent/child links for any cold
+		 * subfunctions.
+		 */
+		if (insn->func && insn->jump_dest->func &&
+		    insn->func != insn->jump_dest->func &&
+		    insn->func->cfunc == insn->func &&
+		    !strstr(insn->func->name, ".cold.") &&
+		    strstr(insn->jump_dest->func->name, ".cold.")) {
+			insn->func->cfunc = insn->jump_dest->func;
+			insn->jump_dest->func->pfunc = insn->func;
+		}
 	}
 
 	return 0;
