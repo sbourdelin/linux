@@ -668,7 +668,7 @@ static int dsi_calc_clk_rate(struct msm_dsi_host *msm_host)
 	const struct msm_dsi_cfg_handler *cfg_hnd = msm_host->cfg_hnd;
 	u8 lanes = msm_host->lanes;
 	u32 bpp = dsi_get_bpp(msm_host->format);
-	u32 pclk_rate;
+	u64 pclk_rate;
 
 	if (!mode) {
 		pr_err("%s: mode not set\n", __func__);
@@ -683,7 +683,7 @@ static int dsi_calc_clk_rate(struct msm_dsi_host *msm_host)
 		msm_host->byte_clk_rate = (pclk_rate * bpp) / 8;
 	}
 
-	DBG("pclk=%d, bclk=%d", pclk_rate, msm_host->byte_clk_rate);
+	DBG("pclk=%llu, bclk=%d", pclk_rate, msm_host->byte_clk_rate);
 
 	msm_host->esc_clk_rate = clk_get_rate(msm_host->esc_clk);
 
