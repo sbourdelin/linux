@@ -43,6 +43,8 @@ struct drm_modeset_acquire_ctx;
  *	plane (in 16.16)
  * @src_w: width of visible portion of plane (in 16.16)
  * @src_h: height of visible portion of plane (in 16.16)
+ * @pixel_blend_mode: how the plane's framebuffer alpha channel is used when
+ *	blending with the background colour.
  * @rotation: rotation of the plane
  * @zpos: priority of the given plane on crtc (optional)
  *	Note that multiple active planes on the same crtc can have an identical
@@ -105,6 +107,8 @@ struct drm_plane_state {
 	/* Source values are 16.16 fixed point */
 	uint32_t src_x, src_y;
 	uint32_t src_h, src_w;
+
+	uint16_t pixel_blend_mode;
 
 	/* Plane rotation */
 	unsigned int rotation;
@@ -498,6 +502,7 @@ enum drm_plane_type {
  * @type: type of plane (overlay, primary, cursor)
  * @zpos_property: zpos property for this plane
  * @rotation_property: rotation property for this plane
+ * @blend_mode_property: blend mode property for this plane
  * @helper_private: mid-layer private data
  */
 struct drm_plane {
@@ -573,6 +578,7 @@ struct drm_plane {
 
 	struct drm_property *zpos_property;
 	struct drm_property *rotation_property;
+	struct drm_property *blend_mode_property;
 
 	/**
 	 * @color_encoding_property:
