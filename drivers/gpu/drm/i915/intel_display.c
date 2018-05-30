@@ -13062,7 +13062,7 @@ intel_check_primary_plane(struct intel_plane *plane,
 
 	if (INTEL_GEN(dev_priv) >= 9) {
 		/* use scaler when colorkey is not required */
-		if (!state->ckey.flags) {
+		if (!state->ckey.flags && intel_fb_scalable(state->base.fb)) {
 			min_scale = 1;
 			if (state->base.fb)
 				pixel_format = state->base.fb->format->format;
