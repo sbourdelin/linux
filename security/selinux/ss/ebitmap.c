@@ -403,7 +403,8 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 
 		if (!n || startbit >= n->startbit + EBITMAP_SIZE) {
 			struct ebitmap_node *tmp;
-			tmp = kmem_cache_zalloc(ebitmap_node_cachep, GFP_KERNEL);
+			tmp = kmem_cache_zalloc(ebitmap_node_cachep,
+						GFP_ATOMIC);
 			if (!tmp) {
 				printk(KERN_ERR
 				       "SELinux: ebitmap: out of memory\n");

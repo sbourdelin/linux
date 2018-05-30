@@ -178,7 +178,7 @@ int cond_init_bool_indexes(struct policydb *p)
 	kfree(p->bool_val_to_struct);
 	p->bool_val_to_struct = kmalloc_array(p->p_bools.nprim,
 					      sizeof(*p->bool_val_to_struct),
-					      GFP_KERNEL);
+					      GFP_ATOMIC);
 	if (!p->bool_val_to_struct)
 		return -ENOMEM;
 	return 0;
@@ -205,7 +205,7 @@ int cond_index_bool(void *key, void *datum, void *datap)
 
 	fa = p->sym_val_to_name[SYM_BOOLS];
 	if (flex_array_put_ptr(fa, booldatum->value - 1, key,
-			       GFP_KERNEL | __GFP_ZERO))
+			       GFP_ATOMIC | __GFP_ZERO))
 		BUG();
 	p->bool_val_to_struct[booldatum->value - 1] = booldatum;
 
@@ -227,7 +227,7 @@ int cond_read_bool(struct policydb *p, struct hashtab *h, void *fp)
 	u32 len;
 	int rc;
 
-	booldatum = kzalloc(sizeof(*booldatum), GFP_KERNEL);
+	booldatum = kzalloc(sizeof(*booldatum), GFP_ATOMIC);
 	if (!booldatum)
 		return -ENOMEM;
 
@@ -247,7 +247,7 @@ int cond_read_bool(struct policydb *p, struct hashtab *h, void *fp)
 		goto err;
 
 	rc = -ENOMEM;
-	key = kmalloc(len + 1, GFP_KERNEL);
+	key = kmalloc(len + 1, GFP_ATOMIC);
 	if (!key)
 		goto err;
 	rc = next_entry(key, fp, len);
@@ -332,7 +332,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k, struct avtab_datum
 		goto err;
 	}
 
-	list = kzalloc(sizeof(*list), GFP_KERNEL);
+	list = kzalloc(sizeof(*list), GFP_ATOMIC);
 	if (!list) {
 		rc = -ENOMEM;
 		goto err;
@@ -420,7 +420,7 @@ static int cond_read_node(struct policydb *p, struct cond_node *node, void *fp)
 			goto err;
 
 		rc = -ENOMEM;
-		expr = kzalloc(sizeof(*expr), GFP_KERNEL);
+		expr = kzalloc(sizeof(*expr), GFP_ATOMIC);
 		if (!expr)
 			goto err;
 
@@ -471,7 +471,7 @@ int cond_read_list(struct policydb *p, void *fp)
 
 	for (i = 0; i < len; i++) {
 		rc = -ENOMEM;
-		node = kzalloc(sizeof(*node), GFP_KERNEL);
+		node = kzalloc(sizeof(*node), GFP_ATOMIC);
 		if (!node)
 			goto err;
 

@@ -72,13 +72,13 @@ avtab_insert_node(struct avtab *h, int hvalue,
 {
 	struct avtab_node *newnode;
 	struct avtab_extended_perms *xperms;
-	newnode = kmem_cache_zalloc(avtab_node_cachep, GFP_KERNEL);
+	newnode = kmem_cache_zalloc(avtab_node_cachep, GFP_ATOMIC);
 	if (newnode == NULL)
 		return NULL;
 	newnode->key = *key;
 
 	if (key->specified & AVTAB_XPERMS) {
-		xperms = kmem_cache_zalloc(avtab_xperms_cachep, GFP_KERNEL);
+		xperms = kmem_cache_zalloc(avtab_xperms_cachep, GFP_ATOMIC);
 		if (xperms == NULL) {
 			kmem_cache_free(avtab_node_cachep, newnode);
 			return NULL;
@@ -95,7 +95,7 @@ avtab_insert_node(struct avtab *h, int hvalue,
 	} else {
 		newnode->next = flex_array_get_ptr(h->htable, hvalue);
 		if (flex_array_put_ptr(h->htable, hvalue, newnode,
-				       GFP_KERNEL|__GFP_ZERO)) {
+				       GFP_ATOMIC|__GFP_ZERO)) {
 			kmem_cache_free(avtab_node_cachep, newnode);
 			return NULL;
 		}
@@ -330,7 +330,7 @@ int avtab_alloc(struct avtab *h, u32 nrules)
 	mask = nslot - 1;
 
 	h->htable = flex_array_alloc(sizeof(struct avtab_node *), nslot,
-				     GFP_KERNEL | __GFP_ZERO);
+				     GFP_ATOMIC | __GFP_ZERO);
 	if (!h->htable)
 		return -ENOMEM;
 
