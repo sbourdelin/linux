@@ -1248,4 +1248,19 @@ rdev_set_sta_mon_rssi_config(struct cfg80211_registered_device *rdev,
 	return ret;
 }
 
+static inline int
+rdev_set_sta_mon_rssi_range_config(struct cfg80211_registered_device *rdev,
+				   struct net_device *dev, const u8 *peer,
+				   s32 low, s32 high)
+{
+	int ret;
+
+	trace_rdev_set_sta_mon_rssi_range_config(&rdev->wiphy, dev, peer,
+						 low, high);
+	ret = rdev->ops->set_sta_mon_rssi_range_config(&rdev->wiphy, dev, peer,
+						       low, high);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
 #endif /* __CFG80211_RDEV_OPS */
