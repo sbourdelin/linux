@@ -1033,6 +1033,9 @@
  *	&NL80211_ATTR_CHANNEL_WIDTH,&NL80211_ATTR_NSS attributes with its
  *	address(specified in &NL80211_ATTR_MAC).
  *
+ * @NL80211_CMD_SET_STA_MON: This command is used to configure station's
+ *	connection monitoring notification trigger levels.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1244,6 +1247,8 @@ enum nl80211_commands {
 	NL80211_CMD_STA_OPMODE_CHANGED,
 
 	NL80211_CMD_CONTROL_PORT_FRAME,
+
+	NL80211_CMD_SET_STA_MON,
 
 	/* add new commands above here */
 
@@ -2238,6 +2243,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_TXQ_QUANTUM: TXQ scheduler quantum (bytes). Number of bytes
  *      a flow is assigned on each round of the DRR scheduler.
  *
+ * @NL80211_ATTR_STA_MON: Station's connection monitor configuration in a
+ *	nested attribute with %NL80211_ATTR_STA_MON_* sub-attributes.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2676,6 +2684,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_TXQ_LIMIT,
 	NL80211_ATTR_TXQ_MEMORY_LIMIT,
 	NL80211_ATTR_TXQ_QUANTUM,
+
+	NL80211_ATTR_STA_MON,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4276,6 +4286,46 @@ enum nl80211_ps_state {
 };
 
 /**
+ * enum nl80211_attr_sta_mon - Attributes to monitor station's connection
+ * @NL80211_ATTR_STA_MON_RSSI_THOLD: RSSI threshold in dBm. This value specifies
+ *	the threshold for the RSSI level at which an event will be sent. Zero
+ *	to disable.  Alternatively, if %NL80211_EXT_FEATURE_STA_MON_RSSI_LIST is
+ *	set, multiple values can be supplied as a low-to-high sorted array of\
+ *	threshold values in dBm.  Events will be sent when the RSSI value
+ *	crosses any of the thresholds. This threshold values are station
+ *	specific.
+ * @NL80211_ATTR_STA_MON_RSSI_HYST: RSSI hysteresis in dBm. This value specifies
+ *	the minimum amount the RSSI level must change after an event before a
+ *	new event may be issued (to reduce effects of RSSI oscillation).
+ * @NL80211_ATTR_STA_MON_RSSI_THRESHOLD_EVENT: RSSI threshold event
+ * @NL80211_ATTR_STA_MON_RSSI_LEVEL: the RSSI value in dBm that triggered the
+ *	RSSI threshold event.
+ */
+enum nl80211_attr_sta_mon {
+	__NL80211_ATTR_STA_MON_INVALID,
+	NL80211_ATTR_STA_MON_RSSI_THOLD,
+	NL80211_ATTR_STA_MON_RSSI_HYST,
+	NL80211_ATTR_STA_MON_RSSI_THRESHOLD_EVENT,
+	NL80211_ATTR_STA_MON_RSSI_LEVEL,
+
+	/* keep last */
+	__NL80211_ATTR_STA_MON_AFTER_LAST,
+	NL80211_ATTR_STA_MON_MAX = __NL80211_ATTR_STA_MON_AFTER_LAST - 1,
+};
+
+/**
+ * enum nl80211_sta_mon_rssi_threshold_event - RSSI threshold event
+ * @NL80211_STA_MON_RSSI_THRESHOLD_EVENT_LOW: The RSSI level is lower than the
+ *	configured threshold
+ * @NL80211_STA_MON_RSSI_THRESHOLD_EVENT_HIGH: The RSSI is higher than the
+ *	configured threshold
+ */
+enum nl80211_sta_mon_rssi_threshold_event {
+	NL80211_STA_MON_RSSI_THRESHOLD_EVENT_LOW,
+	NL80211_STA_MON_RSSI_THRESHOLD_EVENT_HIGH,
+};
+
+/**
  * enum nl80211_attr_cqm - connection quality monitor attributes
  * @__NL80211_ATTR_CQM_INVALID: invalid
  * @NL80211_ATTR_CQM_RSSI_THOLD: RSSI threshold in dBm. This value specifies
@@ -5134,6 +5184,10 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_TXQS: Driver supports FQ-CoDel-enabled intermediate
  *      TXQs.
  *
+ * @NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG: With this driver can set
+ *	rssi threshold using %NL80211_ATTR_STA_MON_RSSI_THOLD attribute
+ *	for a connected station.
+ *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
  */
@@ -5167,6 +5221,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211,
 	NL80211_EXT_FEATURE_DATA_ACK_SIGNAL_SUPPORT,
 	NL80211_EXT_FEATURE_TXQS,
+	NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
