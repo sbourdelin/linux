@@ -2912,8 +2912,10 @@ static u64 vmx_read_l1_tsc_offset(struct kvm_vcpu *vcpu)
 /*
  * writes 'offset' into guest's timestamp counter offset register
  */
-static void vmx_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
+static void vmx_write_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
 {
+	u64 g_tsc_offset = 0;
+
 	if (is_guest_mode(vcpu)) {
 		/*
 		 * We're here if L1 chose not to trap WRMSR to TSC. According
@@ -2921,17 +2923,16 @@ static void vmx_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
 		 * set for L2 remains unchanged, and still needs to be added
 		 * to the newly set TSC to get L2's TSC.
 		 */
-		struct vmcs12 *vmcs12;
-		/* recalculate vmcs02.TSC_OFFSET: */
-		vmcs12 = get_vmcs12(vcpu);
-		vmcs_write64(TSC_OFFSET, offset +
-			(nested_cpu_has(vmcs12, CPU_BASED_USE_TSC_OFFSETING) ?
-			 vmcs12->tsc_offset : 0));
+		struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
+
+		if (nested_cpu_has(vmcs12, CPU_BASED_USE_TSC_OFFSETING))
+			g_tsc_offset = vmcs12->tsc_offset;
 	} else {
 		trace_kvm_write_tsc_offset(vcpu->vcpu_id,
 					   vmcs_read64(TSC_OFFSET), offset);
-		vmcs_write64(TSC_OFFSET, offset);
 	}
+	vmcs_write64(TSC_OFFSET, offset + g_tsc_offset);
+	vcpu->arch.tsc_offset = offset + g_tsc_offset;
 }
 
 /*
@@ -12740,7 +12741,7 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.has_wbinvd_exit = cpu_has_vmx_wbinvd_exit,
 
 	.read_l1_tsc_offset = vmx_read_l1_tsc_offset,
-	.write_tsc_offset = vmx_write_tsc_offset,
+	.write_l1_tsc_offset = vmx_write_l1_tsc_offset,
 
 	.set_tdp_cr3 = vmx_set_cr3,
 

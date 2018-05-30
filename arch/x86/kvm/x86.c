@@ -1545,10 +1545,9 @@ u64 kvm_read_l1_tsc(struct kvm_vcpu *vcpu, u64 host_tsc)
 }
 EXPORT_SYMBOL_GPL(kvm_read_l1_tsc);
 
-static void kvm_vcpu_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
+static void kvm_vcpu_write_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
 {
-	kvm_x86_ops->write_tsc_offset(vcpu, offset);
-	vcpu->arch.tsc_offset = offset;
+	kvm_x86_ops->write_l1_tsc_offset(vcpu, offset);
 }
 
 static inline bool kvm_check_tsc_unstable(void)
@@ -1657,7 +1656,7 @@ void kvm_write_tsc(struct kvm_vcpu *vcpu, struct msr_data *msr)
 	if (!msr->host_initiated && guest_cpuid_has(vcpu, X86_FEATURE_TSC_ADJUST))
 		update_ia32_tsc_adjust_msr(vcpu, offset);
 
-	kvm_vcpu_write_tsc_offset(vcpu, offset);
+	kvm_vcpu_write_l1_tsc_offset(vcpu, offset);
 	raw_spin_unlock_irqrestore(&kvm->arch.tsc_write_lock, flags);
 
 	spin_lock(&kvm->arch.pvclock_gtod_sync_lock);
@@ -1676,7 +1675,7 @@ EXPORT_SYMBOL_GPL(kvm_write_tsc);
 static inline void adjust_tsc_offset_guest(struct kvm_vcpu *vcpu,
 					   s64 adjustment)
 {
-	kvm_vcpu_write_tsc_offset(vcpu, vcpu->arch.tsc_offset + adjustment);
+	kvm_vcpu_write_l1_tsc_offset(vcpu, vcpu->arch.tsc_offset + adjustment);
 }
 
 static inline void adjust_tsc_offset_host(struct kvm_vcpu *vcpu, s64 adjustment)
@@ -3078,7 +3077,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		if (kvm_check_tsc_unstable()) {
 			u64 offset = kvm_compute_tsc_offset(vcpu,
 						vcpu->arch.last_guest_tsc);
-			kvm_vcpu_write_tsc_offset(vcpu, offset);
+			kvm_vcpu_write_l1_tsc_offset(vcpu, offset);
 			vcpu->arch.tsc_catchup = 1;
 		}
 
