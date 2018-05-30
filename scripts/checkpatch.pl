@@ -2513,6 +2513,14 @@ sub process {
 			$in_commit_log = 0;
 		}
 
+# Check format of Fixes line
+		if ($in_commit_log && $line =~ /^\s*fixes:/i) {
+			if ($line !~ /^\s*fixes:\s+[0-9a-f]{5,}/i) {
+				WARN("FIXES_LINE_SYNTAX",
+				     "Fixes line is not of form \"Fixes: <12+ chars of sha1> [...]");
+			}
+		}
+
 # Check if MAINTAINERS is being updated.  If so, there's probably no need to
 # emit the "does MAINTAINERS need updating?" message on file add/move/delete
 		if ($line =~ /^\s*MAINTAINERS\s*\|/) {
@@ -2643,11 +2651,9 @@ sub process {
 		if ($in_commit_log && !$commit_log_possible_stack_dump &&
 		    $line !~ /^\s*(?:Link|Patchwork|http|https|BugLink):/i &&
 		    $line !~ /^This reverts commit [0-9a-f]{7,40}/ &&
-		    ($line =~ /\bcommit\s+[0-9a-f]{5,}\b/i ||
+		    ($line =~ /\b(?:commit|fixes:)\s+[0-9a-f]{5,}\b/i ||
 		     ($line =~ /(?:\s|^)[0-9a-f]{12,40}(?:[\s"'\(\[]|$)/i &&
-		      $line !~ /[\<\[][0-9a-f]{12,40}[\>\]]/i &&
-		      $line !~ /\bfixes:\s*[0-9a-f]{12,40}/i))) {
-			my $init_char = "c";
+		      $line !~ /[\<\[][0-9a-f]{12,40}[\>\]]/i))) {
 			my $orig_commit = "";
 			my $short = 1;
 			my $long = 0;
@@ -2658,19 +2664,29 @@ sub process {
 			my $id = '0123456789ab';
 			my $orig_desc = "commit description";
 			my $description = "";
+			my $keyword = "commit";
+			my $keywordcase = "[Cc]ommit";
+			my $pre = '';
+			my $post = '';
 
-			if ($line =~ /\b(c)ommit\s+([0-9a-f]{5,})\b/i) {
-				$init_char = $1;
+			if ($line =~ /\bfixes:\s+[0-9a-f]{5,}\b/i) {
+				$keywordcase = "Fixes:";
+				$pre = '^';
+				$post = '$';
+			}
+
+			if ($line =~ /\b($keywordcase)\s+([0-9a-f]{5,})\b/i) {
+				$keyword = $1;
 				$orig_commit = lc($2);
 			} elsif ($line =~ /\b([0-9a-f]{12,40})\b/i) {
 				$orig_commit = lc($1);
 			}
 
-			$short = 0 if ($line =~ /\bcommit\s+[0-9a-f]{12,40}/i);
-			$long = 1 if ($line =~ /\bcommit\s+[0-9a-f]{41,}/i);
-			$space = 0 if ($line =~ /\bcommit [0-9a-f]/i);
-			$case = 0 if ($line =~ /\b[Cc]ommit\s+[0-9a-f]{5,40}[^A-F]/);
-			if ($line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("([^"]+)"\)/i) {
+			$short = 0 if ($line =~ /\b$keyword\s+[0-9a-f]{12,40}/i);
+			$long = 1 if ($line =~ /\b$keyword\s+[0-9a-f]{41,}/i);
+			$space = 0 if ($line =~ /\b$keyword [0-9a-f]/i);
+			$case = 0 if ($line =~ /\b$keywordcase\s+[0-9a-f]{5,40}[^A-F]/);
+			if ($line =~ /$pre\b$keyword\s+[0-9a-f]{5,}\s+\("([^"]+)"\)$post/i) {
 				$orig_desc = $1;
 				$hasparens = 1;
 			} elsif ($line =~ /\bcommit\s+[0-9a-f]{5,}\s*$/i &&
@@ -2694,7 +2710,7 @@ sub process {
 			if (defined($id) &&
 			   ($short || $long || $space || $case || ($orig_desc ne $description) || !$hasparens)) {
 				ERROR("GIT_COMMIT_ID",
-				      "Please use git commit description style 'commit <12+ chars of sha1> (\"<title line>\")' - ie: '${init_char}ommit $id (\"$description\")'\n" . $herecurr);
+				      "Please use git commit description style '$keyword <12+ chars of sha1> (\"<title line>\")' - ie: '$keyword $id (\"$description\")'\n" . $herecurr);
 			}
 		}
 
