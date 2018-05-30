@@ -13352,88 +13352,86 @@ static bool i9xx_plane_has_fbc(struct drm_i915_private *dev_priv,
 static struct intel_plane *
 intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 {
-	struct intel_plane *primary;
-	const uint32_t *intel_primary_formats;
+	struct intel_plane *plane;
 	unsigned int supported_rotations;
 	unsigned int possible_crtcs;
-	unsigned int num_formats;
-	const uint64_t *modifiers;
+	const u64 *modifiers;
+	const u32 *formats;
+	int num_formats;
 	int ret;
 
 	if (INTEL_GEN(dev_priv) >= 9) {
-		primary = skl_universal_plane_create(dev_priv, pipe,
-						     PLANE_PRIMARY);
-		if (IS_ERR(primary))
-			return primary;
+		plane = skl_universal_plane_create(dev_priv, pipe,
+						   PLANE_PRIMARY);
+		if (IS_ERR(plane))
+			return plane;
 
 		/* FIXME unify */
-		primary->check_plane = intel_check_primary_plane;
+		plane->check_plane = intel_check_primary_plane;
 
-		return primary;
+		return plane;
 	}
 
-	primary = intel_plane_alloc();
-	if (IS_ERR(primary))
-		return primary;
+	plane = intel_plane_alloc();
+	if (IS_ERR(plane))
+		return plane;
 
-	primary->can_scale = false;
-	primary->max_downscale = 1;
-	primary->pipe = pipe;
+	plane->can_scale = false;
+	plane->max_downscale = 1;
+	plane->pipe = pipe;
 	/*
 	 * On gen2/3 only plane A can do FBC, but the panel fitter and LVDS
 	 * port is hooked to pipe B. Hence we want plane A feeding pipe B.
 	 */
 	if (HAS_FBC(dev_priv) && INTEL_GEN(dev_priv) < 4)
-		primary->i9xx_plane = (enum i9xx_plane_id) !pipe;
+		plane->i9xx_plane = (enum i9xx_plane_id) !pipe;
 	else
-		primary->i9xx_plane = (enum i9xx_plane_id) pipe;
-	primary->id = PLANE_PRIMARY;
-	primary->frontbuffer_bit = INTEL_FRONTBUFFER(pipe, primary->id);
+		plane->i9xx_plane = (enum i9xx_plane_id) pipe;
+	plane->id = PLANE_PRIMARY;
+	plane->frontbuffer_bit = INTEL_FRONTBUFFER(pipe, plane->id);
 
-	primary->has_fbc = i9xx_plane_has_fbc(dev_priv, primary->i9xx_plane);
-	if (primary->has_fbc) {
+	plane->has_fbc = i9xx_plane_has_fbc(dev_priv, plane->i9xx_plane);
+	if (plane->has_fbc) {
 		struct intel_fbc *fbc = &dev_priv->fbc;
 
-		fbc->possible_framebuffer_bits |= primary->frontbuffer_bit;
+		fbc->possible_framebuffer_bits |= plane->frontbuffer_bit;
 	}
 
-	primary->check_plane = intel_check_primary_plane;
+	plane->check_plane = intel_check_primary_plane;
 
 	if (INTEL_GEN(dev_priv) >= 4) {
-		intel_primary_formats = i965_primary_formats;
+		formats = i965_primary_formats;
 		num_formats = ARRAY_SIZE(i965_primary_formats);
 		modifiers = i9xx_format_modifiers;
 
-		primary->update_plane = i9xx_update_plane;
-		primary->disable_plane = i9xx_disable_plane;
-		primary->get_hw_state = i9xx_plane_get_hw_state;
+		plane->update_plane = i9xx_update_plane;
+		plane->disable_plane = i9xx_disable_plane;
+		plane->get_hw_state = i9xx_plane_get_hw_state;
 	} else {
-		intel_primary_formats = i8xx_primary_formats;
+		formats = i8xx_primary_formats;
 		num_formats = ARRAY_SIZE(i8xx_primary_formats);
 		modifiers = i9xx_format_modifiers;
 
-		primary->update_plane = i9xx_update_plane;
-		primary->disable_plane = i9xx_disable_plane;
-		primary->get_hw_state = i9xx_plane_get_hw_state;
+		plane->update_plane = i9xx_update_plane;
+		plane->disable_plane = i9xx_disable_plane;
+		plane->get_hw_state = i9xx_plane_get_hw_state;
 	}
 
 	possible_crtcs = BIT(pipe);
 
 	if (INTEL_GEN(dev_priv) >= 5 || IS_G4X(dev_priv))
-		ret = drm_universal_plane_init(&dev_priv->drm, &primary->base,
+		ret = drm_universal_plane_init(&dev_priv->drm, &plane->base,
 					       possible_crtcs, &i9xx_plane_funcs,
-					       intel_primary_formats, num_formats,
-					       modifiers,
+					       formats, num_formats, modifiers,
 					       DRM_PLANE_TYPE_PRIMARY,
 					       "primary %c", pipe_name(pipe));
 	else
-		ret = drm_universal_plane_init(&dev_priv->drm, &primary->base,
+		ret = drm_universal_plane_init(&dev_priv->drm, &plane->base,
 					       possible_crtcs, &i9xx_plane_funcs,
-					       intel_primary_formats, num_formats,
-					       modifiers,
+					       formats, num_formats, modifiers,
 					       DRM_PLANE_TYPE_PRIMARY,
 					       "plane %c",
-					       plane_name(primary->i9xx_plane));
+					       plane_name(plane->i9xx_plane));
 	if (ret)
 		goto fail;
 
@@ -13449,12 +13447,12 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	}
 
 	if (INTEL_GEN(dev_priv) >= 4)
-		drm_plane_create_rotation_property(&primary->base,
+		drm_plane_create_rotation_property(&plane->base,
 						   DRM_MODE_ROTATE_0,
 						   supported_rotations);
 
 	if (INTEL_GEN(dev_priv) >= 9)
-		drm_plane_create_color_properties(&primary->base,
+		drm_plane_create_color_properties(&plane->base,
 						  BIT(DRM_COLOR_YCBCR_BT601) |
 						  BIT(DRM_COLOR_YCBCR_BT709),
 						  BIT(DRM_COLOR_YCBCR_LIMITED_RANGE) |
@@ -13462,12 +13460,12 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 						  DRM_COLOR_YCBCR_BT709,
 						  DRM_COLOR_YCBCR_LIMITED_RANGE);
 
-	drm_plane_helper_add(&primary->base, &intel_plane_helper_funcs);
+	drm_plane_helper_add(&plane->base, &intel_plane_helper_funcs);
 
-	return primary;
+	return plane;
 
 fail:
-	intel_plane_free(primary);
+	intel_plane_free(plane);
 
 	return ERR_PTR(ret);
 }
