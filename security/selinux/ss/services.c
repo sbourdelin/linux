@@ -1891,19 +1891,6 @@ int security_change_sid(struct selinux_state *state,
 				    out_sid, false);
 }
 
-/* Clone the SID into the new SID table. */
-static int clone_sid(u32 sid,
-		     struct context *context,
-		     void *arg)
-{
-	struct sidtab *s = arg;
-
-	if (sid > SECINITSID_NUM)
-		return sidtab_insert(s, sid, context);
-	else
-		return 0;
-}
-
 static inline int convert_context_handle_invalid_context(
 	struct selinux_state *state,
 	struct context *context)
@@ -2199,10 +2186,7 @@ int security_load_policy(struct selinux_state *state, void *data, size_t len)
 		goto err;
 	}
 
-	/* Clone the SID table. */
-	sidtab_shutdown(old_set->sidtab);
-
-	rc = sidtab_map(old_set->sidtab, clone_sid, next_set->sidtab);
+	rc = sidtab_clone(old_set->sidtab, next_set->sidtab);
 	if (rc)
 		goto err;
 
@@ -2926,8 +2910,6 @@ int security_set_bools(struct selinux_state *state, int len, int *values)
 			goto out;
 	}
 
-	seqno = ++state->ss->latest_granting;
-	state->ss->active_set = next_set;
 	rc = 0;
 out:
 	if (!rc) {

@@ -27,7 +27,7 @@ int sidtab_init(struct sidtab *s)
 	s->nel = 0;
 	s->next_sid = 1;
 	s->shutdown = 0;
-	spin_lock_init(&s->lock);
+	rwlock_init(&s->lock);
 	return 0;
 }
 
@@ -116,6 +116,31 @@ struct context *sidtab_search_force(struct sidtab *s, u32 sid)
 	return sidtab_search_core(s, sid, 1);
 }
 
+int sidtab_clone(struct sidtab *s, struct sidtab *d)
+{
+	int i, rc = 0;
+	struct sidtab_node *cur;
+
+	if (!s || !d)
+		goto errout;
+
+	read_lock(&s->lock);
+	for (i = 0; i < SIDTAB_SIZE; i++) {
+		cur = s->htable[i];
+		while (cur) {
+			if (cur->sid > SECINITSID_NUM)
+				rc =  sidtab_insert(d, cur->sid, &cur->context);
+			if (rc)
+				goto out;
+			cur = cur->next;
+		}
+	}
+out:
+	read_unlock(&s->lock);
+errout:
+	return rc;
+}
+
 int sidtab_map(struct sidtab *s,
 	       int (*apply) (u32 sid,
 			     struct context *context,
@@ -202,7 +227,7 @@ int sidtab_context_to_sid(struct sidtab *s,
 	if (!sid)
 		sid = sidtab_search_context(s, context);
 	if (!sid) {
-		spin_lock_irqsave(&s->lock, flags);
+		write_lock_irqsave(&s->lock, flags);
 		/* Rescan now that we hold the lock. */
 		sid = sidtab_search_context(s, context);
 		if (sid)
@@ -221,7 +246,7 @@ int sidtab_context_to_sid(struct sidtab *s,
 		if (ret)
 			s->next_sid--;
 unlock_out:
-		spin_unlock_irqrestore(&s->lock, flags);
+		write_unlock_irqrestore(&s->lock, flags);
 	}
 
 	if (ret)
@@ -287,21 +312,21 @@ void sidtab_set(struct sidtab *dst, struct sidtab *src)
 	unsigned long flags;
 	int i;
 
-	spin_lock_irqsave(&src->lock, flags);
+	write_lock_irqsave(&src->lock, flags);
 	dst->htable = src->htable;
 	dst->nel = src->nel;
 	dst->next_sid = src->next_sid;
 	dst->shutdown = 0;
 	for (i = 0; i < SIDTAB_CACHE_LEN; i++)
 		dst->cache[i] = NULL;
-	spin_unlock_irqrestore(&src->lock, flags);
+	write_unlock_irqrestore(&src->lock, flags);
 }
 
 void sidtab_shutdown(struct sidtab *s)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&s->lock, flags);
+	write_lock_irqsave(&s->lock, flags);
 	s->shutdown = 1;
-	spin_unlock_irqrestore(&s->lock, flags);
+	write_unlock_irqrestore(&s->lock, flags);
 }

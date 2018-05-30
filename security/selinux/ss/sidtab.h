@@ -29,7 +29,7 @@ struct sidtab {
 	unsigned char shutdown;
 #define SIDTAB_CACHE_LEN	3
 	struct sidtab_node *cache[SIDTAB_CACHE_LEN];
-	spinlock_t lock;
+	rwlock_t lock;
 };
 
 int sidtab_init(struct sidtab *s);
@@ -51,6 +51,7 @@ void sidtab_hash_eval(struct sidtab *h, char *tag);
 void sidtab_destroy(struct sidtab *s);
 void sidtab_set(struct sidtab *dst, struct sidtab *src);
 void sidtab_shutdown(struct sidtab *s);
+int sidtab_clone(struct sidtab *s, struct sidtab *d);
 
 #endif	/* _SS_SIDTAB_H_ */
 
