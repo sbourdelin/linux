@@ -264,6 +264,7 @@ loop:
 
 	INIT_LIST_HEAD(&cur_trans->pending_snapshots);
 	INIT_LIST_HEAD(&cur_trans->pending_chunks);
+	INIT_LIST_HEAD(&cur_trans->pending_unused_bgs);
 	INIT_LIST_HEAD(&cur_trans->switch_commits);
 	INIT_LIST_HEAD(&cur_trans->dirty_bgs);
 	INIT_LIST_HEAD(&cur_trans->io_bgs);
@@ -2247,6 +2248,12 @@ int btrfs_commit_transaction(struct btrfs_trans_handle *trans)
 	cur_trans->state = TRANS_STATE_COMPLETED;
 	wake_up(&cur_trans->commit_wait);
 	clear_bit(BTRFS_FS_NEED_ASYNC_COMMIT, &fs_info->flags);
+
+	/* transaction is done, queue pending unused bgs to cleaner */
+	spin_lock(&fs_info->unused_bgs_lock);
+	list_splice_tail_init(&cur_trans->pending_unused_bgs,
+			      &fs_info->unused_bgs);
+	spin_unlock(&fs_info->unused_bgs_lock);
 
 	spin_lock(&fs_info->trans_lock);
 	list_del_init(&cur_trans->list);
