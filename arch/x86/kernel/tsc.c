@@ -281,6 +281,57 @@ static int __init tsc_setup(char *str)
 
 __setup("tsc=", tsc_setup);
 
+
+/*
+ * This is to provide a not-so-accurate clock for printk timestamp in
+ * early boot phase (before sched_clock is setup).It could be used for
+ * analyzing/optimising kernel boot time and tools like bootchart.
+ *
+ * User can use it by simply append something like
+ *	"boot_tsc=1881M"
+ * to cmdline for a platform with a stable 1881MHz TSC.
+ */
+static u64 boot_tsc_mhz;
+static u64 boot_tsc_offset;
+
+static u64 boot_tsc_clock(void)
+{
+	u64 cur_tsc, cur_ns;
+
+	cur_tsc	= rdtsc();
+	cur_tsc -= boot_tsc_offset;
+
+	/* return value in ns */
+	cur_ns = div64_u64(cur_tsc * 1000, boot_tsc_mhz);
+	return cur_ns;
+}
+
+static int __init boot_tsc_setup(char *p)
+{
+	u64 tsc_hz;
+
+	if (!p)
+		return -EINVAL;
+
+	boot_tsc_offset = rdtsc();
+
+	tsc_hz = memparse(p, &p);
+	boot_tsc_mhz = div64_u64(tsc_hz, 1024 * 1024);
+	if (boot_tsc_mhz == 0)
+		return -EINVAL;
+
+	pr_info("TSC has run for %lld us\n",
+		div64_u64(boot_tsc_offset, boot_tsc_mhz));
+
+	/* Setup the early printk clock */
+	boot_printk_clock_fn = boot_tsc_clock;
+	pr_info("TSC: Setup early printk timestamp with %lldM TSC.",
+		boot_tsc_mhz);
+
+	return 0;
+}
+early_param("boot_tsc", boot_tsc_setup);
+
 #define MAX_RETRIES     5
 #define SMI_TRESHOLD    50000
 
