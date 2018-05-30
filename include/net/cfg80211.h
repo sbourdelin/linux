@@ -5915,6 +5915,22 @@ void cfg80211_cqm_txe_notify(struct net_device *dev, const u8 *peer,
 void cfg80211_cqm_beacon_loss_notify(struct net_device *dev, gfp_t gfp);
 
 /**
+ * cfg80211_sta_mon_rssi_notify - Station's rssi out of range event
+ * @dev: network device
+ * @peer: Station's mac address
+ * @rssi_event: the triggered RSSI event
+ * @rssi_level: new RSSI level value or 0 if not available
+ * @gfp: context flags
+ *
+ * This function is called when a configured rssi threshold reached event
+ * occurs for a station.
+ */
+void
+cfg80211_sta_mon_rssi_notify(struct net_device *dev, const u8 *peer,
+		enum nl80211_sta_mon_rssi_threshold_event rssi_event,
+		s32 rssi_level, gfp_t gfp);
+
+/**
  * cfg80211_radar_event - radar detection event
  * @wiphy: the wiphy
  * @chandef: chandef for the current channel

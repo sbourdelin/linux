@@ -1249,6 +1249,7 @@ enum nl80211_commands {
 	NL80211_CMD_CONTROL_PORT_FRAME,
 
 	NL80211_CMD_SET_STA_MON,
+	NL80211_CMD_NOTIFY_STA_MON,
 
 	/* add new commands above here */
 

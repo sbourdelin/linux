@@ -3282,6 +3282,28 @@ TRACE_EVENT(rdev_set_sta_mon_rssi_config,
 		  WIPHY_PR_ARG, NETDEV_PR_ARG, MAC_PR_ARG(peer),
 		  __entry->rssi_thold, __entry->rssi_hyst)
 );
+TRACE_EVENT(cfg80211_sta_mon_rssi_notify,
+	TP_PROTO(struct net_device *netdev, const u8 *peer,
+		 enum nl80211_sta_mon_rssi_threshold_event rssi_event,
+		 s32 rssi_level),
+	TP_ARGS(netdev, peer, rssi_event, rssi_level),
+	TP_STRUCT__entry(
+		NETDEV_ENTRY
+		MAC_ENTRY(peer)
+		__field(enum nl80211_sta_mon_rssi_threshold_event, rssi_event)
+		__field(s32, rssi_level)
+	),
+	TP_fast_assign(
+		NETDEV_ASSIGN;
+		MAC_ASSIGN(peer, peer);
+		__entry->rssi_event = rssi_event;
+		__entry->rssi_level = rssi_level;
+	),
+	TP_printk(NETDEV_PR_FMT ", peer: " MAC_PR_FMT
+		  ", rssi event: %d, rssi : %d",
+		  NETDEV_PR_ARG, MAC_PR_ARG(peer),
+		  __entry->rssi_event, __entry->rssi_level)
+);
 #endif /* !__RDEV_OPS_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH

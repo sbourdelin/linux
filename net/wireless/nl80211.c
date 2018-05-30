@@ -15364,6 +15364,104 @@ void cfg80211_pmksa_candidate_notify(struct net_device *dev, int index,
 }
 EXPORT_SYMBOL(cfg80211_pmksa_candidate_notify);
 
+static struct sk_buff *cfg80211_prepare_sta_mon(struct net_device *dev,
+						const char *mac, gfp_t gfp)
+{
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
+	struct sk_buff *msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
+	void **cb;
+
+	if (!msg)
+		return NULL;
+
+	cb = (void **)msg->cb;
+
+	cb[0] = nl80211hdr_put(msg, 0, 0, 0, NL80211_CMD_NOTIFY_STA_MON);
+	if (!cb[0]) {
+		nlmsg_free(msg);
+		return NULL;
+	}
+
+	if (nla_put_u32(msg, NL80211_ATTR_WIPHY, rdev->wiphy_idx) ||
+	    nla_put_u32(msg, NL80211_ATTR_IFINDEX, dev->ifindex))
+		goto nla_put_failure;
+
+	if (nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, mac))
+		goto nla_put_failure;
+
+	cb[1] = nla_nest_start(msg, NL80211_ATTR_STA_MON);
+	if (!cb[1])
+		goto nla_put_failure;
+
+	cb[2] = rdev;
+
+	return msg;
+nla_put_failure:
+	nlmsg_free(msg);
+	return NULL;
+}
+
+static void cfg80211_send_sta_mon(struct sk_buff *msg, gfp_t gfp)
+{
+	void **cb = (void **)msg->cb;
+	struct cfg80211_registered_device *rdev = cb[2];
+
+	nla_nest_end(msg, cb[1]);
+	genlmsg_end(msg, cb[0]);
+
+	memset(msg->cb, 0, sizeof(msg->cb));
+
+	genlmsg_multicast_netns(&nl80211_fam, wiphy_net(&rdev->wiphy), msg, 0,
+				NL80211_MCGRP_MLME, gfp);
+}
+
+void cfg80211_sta_mon_rssi_notify(struct net_device *dev, const u8 *peer,
+		enum nl80211_sta_mon_rssi_threshold_event rssi_event,
+		s32 rssi_level, gfp_t gfp)
+{
+	struct sk_buff *msg;
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct cfg80211_rssi_config *rssi_config;
+
+	if (WARN_ON(!peer))
+		return;
+
+	if (WARN_ON(rssi_event != NL80211_STA_MON_RSSI_THRESHOLD_EVENT_LOW &&
+		    rssi_event != NL80211_STA_MON_RSSI_THRESHOLD_EVENT_HIGH))
+		return;
+
+	trace_cfg80211_sta_mon_rssi_notify(dev, peer, rssi_event, rssi_level);
+
+	list_for_each_entry(rssi_config, &wdev->rssi_config_list, list) {
+		if (!memcmp(rssi_config->addr, peer, ETH_ALEN)) {
+			wdev->rssi_config = rssi_config;
+			wdev->rssi_config->last_rssi_event_value = rssi_level;
+			break;
+		}
+	}
+
+	msg = cfg80211_prepare_sta_mon(dev, peer, gfp);
+	if (!msg)
+		return;
+
+	if (nla_put_u32(msg, NL80211_ATTR_STA_MON_RSSI_THRESHOLD_EVENT,
+			rssi_event))
+		goto nla_put_failure;
+
+	if (rssi_level && nla_put_s32(msg, NL80211_ATTR_STA_MON_RSSI_LEVEL,
+				      rssi_level))
+		goto nla_put_failure;
+
+	cfg80211_send_sta_mon(msg, gfp);
+
+	return;
+
+nla_put_failure:
+	nlmsg_free(msg);
+}
+EXPORT_SYMBOL(cfg80211_sta_mon_rssi_notify);
+
 static void nl80211_ch_switch_notify(struct cfg80211_registered_device *rdev,
 				     struct net_device *netdev,
 				     struct cfg80211_chan_def *chandef,
