@@ -802,6 +802,12 @@ enum mac80211_rate_control_flags {
 	IEEE80211_TX_RC_160_MHZ_WIDTH		= BIT(10),
 };
 
+/*
+ * How many frames need to have been used in average station's
+ * signal strength before checking against the threshold
+ */
+#define IEEE80211_STA_SIGNAL_AVE_MIN_COUNT	4
+
 
 /* there are 40 bytes if you don't need the rateset to be kept */
 #define IEEE80211_TX_INFO_DRIVER_DATA_SIZE 40
