@@ -453,7 +453,8 @@ static inline int map_symbol__tui_annotate(struct map_symbol *ms __maybe_unused,
 
 static inline int hist_entry__tui_annotate(struct hist_entry *he __maybe_unused,
 					   struct perf_evsel *evsel __maybe_unused,
-					   struct hist_browser_timer *hbt __maybe_unused)
+					   struct hist_browser_timer *hbt __maybe_unused,
+					   struct annotation_options *annotation_opts __maybe_unused)
 {
 	return 0;
 }
