@@ -1873,6 +1873,11 @@ static int sock_map_update_elem(struct bpf_map *map,
 		return -EOPNOTSUPP;
 	}
 
+	if (skops.sk->sk_family != AF_INET) {
+		fput(socket->file);
+		return -EAFNOSUPPORT;
+	}
+
 	err = sock_map_ctx_update_elem(&skops, map, key, flags);
 	fput(socket->file);
 	return err;
