@@ -971,12 +971,17 @@ static int update_cpumask(struct cpuset *cs, struct cpuset *trialcs,
 	if (!*buf) {
 		cpumask_clear(trialcs->cpus_allowed);
 	} else {
+		struct cpuset *parent = parent_cs(cs);
+
 		retval = cpulist_parse(buf, trialcs->cpus_allowed);
 		if (retval < 0)
 			return retval;
 
+		/*
+		 * The cpu list must be a subset of the parent.
+		 */
 		if (!cpumask_subset(trialcs->cpus_allowed,
-				    top_cpuset.cpus_allowed))
+				    parent->cpus_allowed))
 			return -EINVAL;
 	}
 
