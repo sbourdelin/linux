@@ -1365,6 +1365,9 @@ static int dwc2_hsotg_ep_queue(struct usb_ep *ep, struct usb_request *req,
 			return 0;
 		}
 
+		if (using_desc_dma(hs))
+			return 0;
+
 		/* Update current frame number value. */
 		hs->frame_number = dwc2_hsotg_read_frameno(hs);
 		while (dwc2_gadget_target_frame_elapsed(hs_ep)) {
