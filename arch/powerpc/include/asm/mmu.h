@@ -6,7 +6,6 @@
 #include <linux/types.h>
 
 #include <asm/asm-compat.h>
-#include <asm/feature-fixups.h>
 
 /*
  * MMU features bit definitions
