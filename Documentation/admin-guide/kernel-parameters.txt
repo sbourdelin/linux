@@ -3149,6 +3149,8 @@
 		noari		do not use PCIe ARI.
 		noats		[PCIE, Intel-IOMMU, AMD-IOMMU]
 				do not use PCIe ATS (and IOMMU device IOTLB).
+		safemode	turns of all optinal PCI features. Useful
+				for bringup/troubleshooting.
 		pcie_scan_all	Scan all possible PCIe devices.  Otherwise we
 				only look for one device below a PCIe downstream
 				port.

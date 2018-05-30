@@ -8,6 +8,8 @@
 
 extern const unsigned char pcie_link_speed[];
 
+extern bool pci_safe_mode;
+
 bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
 
 /* Functions internal to the PCI core code */

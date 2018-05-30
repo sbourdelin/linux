@@ -115,6 +115,9 @@ static bool pcie_ari_disabled;
 /* If set, the PCIe ATS capability will not be used. */
 static bool pcie_ats_disabled;
 
+/* If set, disables most of the optional PCI features */
+bool pci_safe_mode;
+
 bool pci_ats_disabled(void)
 {
 	return pcie_ats_disabled;
@@ -5828,6 +5831,10 @@ static int __init pci_setup(char *str)
 		if (*str && (str = pcibios_setup(str)) && *str) {
 			if (!strcmp(str, "nomsi")) {
 				pci_no_msi();
+			} else if (!strncmp(str, "safemode", 8)) {
+				pr_info("PCI: safe mode with minimum features\n");
+				pci_safe_mode = true;
+				pcie_bus_config = PCIE_BUS_SAFE;
 			} else if (!strncmp(str, "noats", 5)) {
 				pr_info("PCIe: ATS is disabled\n");
 				pcie_ats_disabled = true;

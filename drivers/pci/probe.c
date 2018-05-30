@@ -2047,6 +2047,9 @@ static void pci_configure_device(struct pci_dev *dev)
 	struct hotplug_params hpp;
 	int ret;
 
+	if (pci_safe_mode)
+		return;
+
 	pci_configure_mps(dev);
 	pci_configure_extended_tags(dev, NULL);
 	pci_configure_relaxed_ordering(dev);
@@ -2212,6 +2215,9 @@ static void pci_init_capabilities(struct pci_dev *dev)
 
 	/* Setup MSI caps & disable MSI/MSI-X interrupts */
 	pci_msi_setup_pci_dev(dev);
+
+	if (pci_safe_mode)
+		return;
 
 	/* Buffers for saving PCIe and PCI-X capabilities */
 	pci_allocate_cap_save_buffers(dev);

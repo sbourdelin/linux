@@ -311,7 +311,7 @@ int pcie_port_device_register(struct pci_dev *dev)
 
 	/* Get and check PCI Express port services */
 	capabilities = get_port_device_capability(dev);
-	if (!capabilities)
+	if (!capabilities || pci_safe_mode)
 		return 0;
 
 	pci_set_master(dev);
