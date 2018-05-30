@@ -112,9 +112,9 @@ static int handle_conflicting_encoders(struct drm_atomic_state *state,
 		if (!new_conn_state->crtc)
 			continue;
 
-		if (funcs->atomic_best_encoder)
+		if (funcs && funcs->atomic_best_encoder)
 			new_encoder = funcs->atomic_best_encoder(connector, new_conn_state);
-		else if (funcs->best_encoder)
+		else if (funcs && funcs->best_encoder)
 			new_encoder = funcs->best_encoder(connector);
 		else
 			new_encoder = drm_atomic_helper_best_encoder(connector);
@@ -308,10 +308,10 @@ update_connector_routing(struct drm_atomic_state *state,
 
 	funcs = connector->helper_private;
 
-	if (funcs->atomic_best_encoder)
+	if (funcs && funcs->atomic_best_encoder)
 		new_encoder = funcs->atomic_best_encoder(connector,
 							 new_connector_state);
-	else if (funcs->best_encoder)
+	else if (funcs && funcs->best_encoder)
 		new_encoder = funcs->best_encoder(connector);
 	else
 		new_encoder = drm_atomic_helper_best_encoder(connector);
@@ -438,7 +438,7 @@ mode_fixup(struct drm_atomic_state *state)
 			continue;
 
 		funcs = crtc->helper_private;
-		if (!funcs->mode_fixup)
+		if (!funcs || !funcs->mode_fixup)
 			continue;
 
 		ret = funcs->mode_fixup(crtc, &new_crtc_state->mode,
@@ -639,7 +639,7 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 				new_crtc_state->connectors_changed = true;
 		}
 
-		if (funcs->atomic_check)
+		if (funcs && funcs->atomic_check)
 			ret = funcs->atomic_check(connector, new_connector_state);
 		if (ret)
 			return ret;
@@ -2117,7 +2117,7 @@ int drm_atomic_helper_prepare_planes(struct drm_device *dev,
 
 		funcs = plane->helper_private;
 
-		if (funcs->prepare_fb) {
+		if (funcs && funcs->prepare_fb) {
 			ret = funcs->prepare_fb(plane, new_plane_state);
 			if (ret)
 				goto fail;
@@ -2412,7 +2412,7 @@ void drm_atomic_helper_cleanup_planes(struct drm_device *dev,
 
 		funcs = plane->helper_private;
 
-		if (funcs->cleanup_fb)
+		if (funcs && funcs->cleanup_fb)
 			funcs->cleanup_fb(plane, plane_state);
 	}
 }

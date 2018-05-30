@@ -320,7 +320,7 @@ drm_helper_probe_detect(struct drm_connector *connector,
 	if (ret)
 		return ret;
 
-	if (funcs->detect_ctx)
+	if (funcs && funcs->detect_ctx)
 		return funcs->detect_ctx(connector, ctx, force);
 	else if (connector->funcs->detect)
 		return connector->funcs->detect(connector, force);
@@ -480,7 +480,8 @@ retry:
 		goto prune;
 	}
 
-	count = (*connector_funcs->get_modes)(connector);
+	if (connector_funcs && connector_funcs->get_modes)
+		count = (*connector_funcs->get_modes)(connector);
 
 	if (count == 0 && connector->status == connector_status_connected)
 		count = drm_add_modes_noedid(connector, 1024, 768);
