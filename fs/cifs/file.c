@@ -2955,6 +2955,18 @@ cifs_read_allocate_pages(struct cifs_readdata *rdata, unsigned int nr_pages)
 	return rc;
 }
 
+static void cifs_direct_readdata_release(struct kref *refcount)
+{
+	struct cifs_readdata *rdata = container_of(refcount,
+					struct cifs_readdata, refcount);
+	unsigned int i;
+
+	for (i = 0; i < rdata->nr_pages; i++)
+		put_page(rdata->pages[i]);
+
+	cifs_readdata_release(refcount);
+}
+
 static void
 cifs_uncached_readdata_release(struct kref *refcount)
 {
@@ -3265,6 +3277,143 @@ again:
 		ctx->iocb->ki_complete(ctx->iocb, ctx->rc, 0);
 	else
 		complete(&ctx->done);
+}
+
+static void cifs_direct_readv_complete(struct work_struct *work)
+{
+	struct cifs_readdata *rdata =
+		container_of(work, struct cifs_readdata, work);
+
+	complete(&rdata->done);
+	kref_put(&rdata->refcount, cifs_direct_readdata_release);
+}
+
+ssize_t cifs_direct_readv(struct kiocb *iocb, struct iov_iter *to)
+{
+	size_t len, cur_len, start;
+	unsigned int npages, rsize, credits;
+	struct file *file;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsFileInfo *cfile;
+	struct cifs_tcon *tcon;
+	struct page **pagevec;
+	ssize_t rc, total_read = 0;
+	struct TCP_Server_Info *server;
+	loff_t offset = iocb->ki_pos;
+	pid_t pid;
+	struct cifs_readdata *rdata;
+
+	/*
+	 * iov_iter_get_pages_alloc() doesn't work with ITER_KVEC,
+	 * fall back to data copy read path
+	 */
+	if (to->type & ITER_KVEC) {
+		cifs_dbg(FYI, "use non-direct cifs_user_readv for kvec I/O\n");
+		return cifs_user_readv(iocb, to);
+	}
+
+	len = iov_iter_count(to);
+	if (!len)
+		return 0;
+
+	file = iocb->ki_filp;
+	cifs_sb = CIFS_FILE_SB(file);
+	cfile = file->private_data;
+	tcon = tlink_tcon(cfile->tlink);
+	server = tcon->ses->server;
+
+	if (!server->ops->async_readv)
+		return -ENOSYS;
+
+	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_RWPIDFORWARD)
+		pid = cfile->pid;
+	else
+		pid = current->tgid;
+
+	if ((file->f_flags & O_ACCMODE) == O_WRONLY)
+		cifs_dbg(FYI, "attempting read on write only file instance\n");
+
+	do {
+		rc = server->ops->wait_mtu_credits(server, cifs_sb->rsize,
+					&rsize, &credits);
+		if (rc)
+			break;
+
+		cur_len = min_t(const size_t, len, rsize);
+
+		rc = iov_iter_get_pages_alloc(to, &pagevec, cur_len, &start);
+		if (rc < 0) {
+			cifs_dbg(VFS,
+				"couldn't get user pages (rc=%zd) iter type %d"
+				" iov_offset %lu count %lu\n",
+				rc, to->type, to->iov_offset, to->count);
+			dump_stack();
+			break;
+		}
+
+		rdata = cifs_readdata_direct_alloc(
+				pagevec, cifs_direct_readv_complete);
+		if (!rdata) {
+			add_credits_and_wake_if(server, credits, 0);
+			rc = -ENOMEM;
+			break;
+		}
+
+		npages = (rc + start + PAGE_SIZE-1) / PAGE_SIZE;
+		rdata->nr_pages = npages;
+		rdata->page_offset = start;
+		rdata->pagesz = PAGE_SIZE;
+		rdata->tailsz = npages > 1 ?
+				rc-(PAGE_SIZE-start)-(npages-2)*PAGE_SIZE :
+				rc;
+		cur_len = rc;
+
+		rdata->cfile = cifsFileInfo_get(cfile);
+		rdata->offset = offset;
+		rdata->bytes = rc;
+		rdata->pid = pid;
+		rdata->read_into_pages = cifs_uncached_read_into_pages;
+		rdata->copy_into_pages = cifs_uncached_copy_into_pages;
+		rdata->credits = credits;
+
+		rc = 0;
+		if (rdata->cfile->invalidHandle)
+			rc = cifs_reopen_file(rdata->cfile, true);
+
+		if (!rc)
+			rc = server->ops->async_readv(rdata);
+
+		if (rc) {
+			add_credits_and_wake_if(server, rdata->credits, 0);
+			kref_put(&rdata->refcount,
+				 cifs_direct_readdata_release);
+			if (rc == -EAGAIN)
+				continue;
+			break;
+		}
+
+		wait_for_completion(&rdata->done);
+		rc = rdata->result;
+		if (rc) {
+			kref_put(
+				&rdata->refcount,
+				cifs_direct_readdata_release);
+			if (rc == -EAGAIN)
+				continue;
+			break;
+		}
+
+		total_read += rdata->got_bytes;
+		kref_put(&rdata->refcount, cifs_direct_readdata_release);
+
+		iov_iter_advance(to, cur_len);
+		len -= cur_len;
+		offset += cur_len;
+	} while (len);
+
+	iocb->ki_pos += total_read;
+
+	return total_read;
 }
 
 ssize_t cifs_user_readv(struct kiocb *iocb, struct iov_iter *to)
