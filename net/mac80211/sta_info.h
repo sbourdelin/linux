@@ -482,6 +482,14 @@ struct ieee80211_sta_rx_stats {
  * @pcpu_rx_stats: per-CPU RX statistics, assigned only if the driver needs
  *	this (by advertising the USES_RSS hw flag)
  * @status_stats: TX status statistics
+ * @rssi_thold: RSSI threshold to monitor station's signal strength, a zero
+ *	value implies disabled. As with the cfg80211 callback, a change here
+ *	should cause an event to be sent indicating where the current value
+ *	is in relation to the newly configured threshold
+ * @rssi_hyst: Station's RSSI hysteresis
+ * @last_sta_mon_event_signal: Last signal strength average for a station
+ *	that triggered a sta_mon event. 0 indicates that no event has been
+ *	generated for the current association
  */
 struct sta_info {
 	/* General information, mostly static */
@@ -582,6 +590,10 @@ struct sta_info {
 	u8 reserved_tid;
 
 	struct cfg80211_chan_def tdls_chandef;
+
+	s32 rssi_thold;
+	u32 rssi_hyst;
+	int last_sta_mon_event_signal;
 
 	/* keep last! */
 	struct ieee80211_sta sta;
