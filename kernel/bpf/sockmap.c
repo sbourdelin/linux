@@ -2300,6 +2300,11 @@ static int sock_hash_update_elem(struct bpf_map *map,
 		return -EINVAL;
 	}
 
+	if (skops.sk->sk_family != AF_INET) {
+		fput(socket->file);
+		return -EAFNOSUPPORT;
+	}
+
 	err = sock_hash_ctx_update_elem(&skops, map, key, flags);
 	fput(socket->file);
 	return err;
