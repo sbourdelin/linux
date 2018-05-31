@@ -21,6 +21,7 @@
 #include <linux/inetdevice.h>
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
+#include <net/netfilter/nf_socket.h>
 
 #include <net/netfilter/ipv4/nf_defrag_ipv4.h>
 
@@ -42,19 +43,8 @@ enum nf_tproxy_lookup_t {
 
 static bool tproxy_sk_is_transparent(struct sock *sk)
 {
-	switch (sk->sk_state) {
-	case TCP_TIME_WAIT:
-		if (inet_twsk(sk)->tw_transparent)
-			return true;
-		break;
-	case TCP_NEW_SYN_RECV:
-		if (inet_rsk(inet_reqsk(sk))->no_srccheck)
-			return true;
-		break;
-	default:
-		if (inet_sk(sk)->transparent)
-			return true;
-	}
+	if (nf_sk_is_transparent(sk))
+		return true;
 
 	sock_gen_put(sk);
 	return false;
