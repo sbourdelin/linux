@@ -1934,6 +1934,34 @@ void wb_workfn(struct work_struct *work)
 						struct bdi_writeback, dwork);
 	long pages_written;
 
+#ifdef CONFIG_BLK_DEBUG_WB_WORKFN_RACE
+	if (!wb->bdi->dev) {
+		pr_warn("WARNING: %s: device is NULL\n", __func__);
+		pr_warn("wb->state=%lx\n", wb->state);
+		pr_warn("(wb == &wb->bdi->wb)=%u\n", wb == &wb->bdi->wb);
+		pr_warn("list_empty(&wb->work_list)=%u\n",
+			list_empty(&wb->work_list));
+		pr_warn("list_empty(&wb->bdi->bdi_list)=%u\n",
+			list_empty(&wb->bdi->bdi_list));
+		pr_warn("wb->bdi->wb.state=%lx\n", wb->bdi->wb.state);
+		if (!wb->congested)
+			pr_warn("wb->congested == NULL\n");
+#ifdef CONFIG_CGROUP_WRITEBACK
+		else if (!wb->congested->__bdi)
+			pr_warn("wb->congested->__bdi == NULL\n");
+		else {
+			pr_warn("(wb->congested->__bdi == wb->bdi)=%u\n",
+				wb->congested->__bdi == wb->bdi);
+			pr_warn("list_empty(&wb->congested->__bdi->bdi_list)=%u\n",
+				list_empty(&wb->congested->__bdi->bdi_list));
+			pr_warn("wb->congested->__bdi->wb.state=%lx\n",
+				wb->congested->__bdi->wb.state);
+		}
+#endif
+		/* Will halt shortly due to NULL pointer dereference... */
+	}
+#endif
+
 	set_worker_desc("flush-%s", dev_name(wb->bdi->dev));
 	current->flags |= PF_SWAPWRITE;
 
