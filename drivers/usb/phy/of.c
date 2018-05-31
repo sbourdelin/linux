@@ -28,16 +28,16 @@ static const char *const usbphy_modes[] = {
 enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
 {
 	const char *phy_type;
-	int err, i;
+	int err;
 
 	err = of_property_read_string(np, "phy_type", &phy_type);
 	if (err < 0)
 		return USBPHY_INTERFACE_MODE_UNKNOWN;
 
-	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
-		if (!strcmp(phy_type, usbphy_modes[i]))
-			return i;
+	err = match_string(usbphy_modes, ARRAY_SIZE(usbphy_modes), phy_type);
+	if (err < 0)
+		return USBPHY_INTERFACE_MODE_UNKNOWN;
 
-	return USBPHY_INTERFACE_MODE_UNKNOWN;
+	return err;
 }
 EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
