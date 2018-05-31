@@ -24,6 +24,8 @@
 #include <asm/icswx.h>
 #include <asm/vas.h>
 #include <asm/reg.h>
+#include <asm/opal-api.h>
+#include <asm/opal.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Dan Streetman <ddstreet@ieee.org>");
@@ -803,9 +805,26 @@ static int __init vas_cfg_coproc_info(struct device_node *dn, int chip_id,
 	if (!coproc)
 		return -ENOMEM;
 
-	if (!strcmp(priority, "High"))
+	if (!strcmp(priority, "High")) {
+		/*
+		 * (lpid, pid, tid) combination has to be unique for each
+		 * coprocessor instance in the system. So to make it
+		 * unique, skiboot uses coprocessor type such as 842 or
+		 * GZIP for pid and provides this value to kernel in pid
+		 * device-tree property.
+		 *
+		 * Initialize each NX instance for both high and normal
+		 * priority FIFOs.
+		 */
+		ret = opal_nx_coproc_init(chip_id, pid);
+		if (ret) {
+			pr_err("Failed to initialize NX coproc: %d\n", ret);
+			ret = opal_error_code(ret);
+			goto err_out;
+		}
+
 		coproc->ct = VAS_COP_TYPE_842_HIPRI;
-	else if (!strcmp(priority, "Normal"))
+	} else if (!strcmp(priority, "Normal"))
 		coproc->ct = VAS_COP_TYPE_842;
 	else {
 		pr_err("Invalid RxFIFO priority value\n");
