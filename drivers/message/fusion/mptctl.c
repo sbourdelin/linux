@@ -1018,7 +1018,7 @@ fwdl_out:
  * Outputs:	frags - number of scatter gather elements
  *		blp - point to the buflist pointer
  *		sglbuf_dma - pointer to the (dma) sgl
- * Returns:	Null if failes
+ * Returns:	Null if fails
  *		pointer to the (virtual) sgl if successful.
  */
 static MptSge_t *
