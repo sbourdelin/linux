@@ -349,10 +349,9 @@ static int console_msg_format = MSG_FORMAT_DEFAULT;
  */
 
 enum log_flags {
-	LOG_NOCONS	= 1,	/* already flushed, do not print to console */
-	LOG_NEWLINE	= 2,	/* text ended with a newline */
-	LOG_PREFIX	= 4,	/* text started with a prefix */
-	LOG_CONT	= 8,	/* text is a fragment of a continuation line */
+	LOG_NEWLINE	= 1,	/* text ended with a newline */
+	LOG_PREFIX	= 2,	/* text started with a prefix */
+	LOG_CONT	= 4,	/* text is a fragment of a continuation line */
 };
 
 struct printk_log {
