@@ -589,6 +589,7 @@ static void inject_preempt_context(struct work_struct *work)
 	data[6] = intel_guc_ggtt_offset(guc, guc->shared_data);
 
 	if (WARN_ON(intel_guc_send(guc, data, ARRAY_SIZE(data)))) {
+		engine->flags &= ~I915_ENGINE_HAS_PREEMPTION; /* XXX racy! */
 		execlists_clear_active(&engine->execlists,
 				       EXECLISTS_ACTIVE_PREEMPT);
 		tasklet_schedule(&engine->execlists.tasklet);
