@@ -4782,6 +4782,14 @@ S:	Maintained
 F:	drivers/gpu/drm/omapdrm/
 F:	Documentation/devicetree/bindings/display/ti/
 
+DRM DRIVERS FOR TI KEYSTONE
+M:	Tomi Valkeinen <tomi.valkeinen@ti.com>
+R:	Jyri Sarha <jsarha@ti.com>
+L:	dri-devel@lists.freedesktop.org
+S:	Maintained
+F:	drivers/gpu/drm/tidss/
+F:	Documentation/devicetree/bindings/display/ti/ti,k2g-dss.txt
+
 DRM DRIVERS FOR VC4
 M:	Eric Anholt <eric@anholt.net>
 T:	git git://github.com/anholt/linux
