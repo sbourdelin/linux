@@ -225,6 +225,11 @@ struct scrub_copy_nocow_ctx {
 	u64			physical_for_dev_replace;
 	struct list_head	inodes;
 	struct btrfs_work	work;
+
+	/* All these members are only for falling back to scrub_pages() */
+	u64			fb_physical;
+	struct btrfs_device	*fb_dev;
+	u64			fb_gen;
 };
 
 struct scrub_warning {
@@ -295,6 +300,7 @@ static int write_page_nocow(struct scrub_ctx *sctx,
 static int copy_nocow_pages_for_inode(u64 inum, u64 offset, u64 root,
 				      struct scrub_copy_nocow_ctx *ctx);
 static int copy_nocow_pages(struct scrub_ctx *sctx, u64 logical, u64 len,
+			    u64 physical, struct btrfs_device *dev, u64 gen,
 			    int mirror_num, u64 physical_for_dev_replace);
 static void copy_nocow_pages_worker(struct btrfs_work *work);
 static void __scrub_blocked_if_needed(struct btrfs_fs_info *fs_info);
@@ -2757,8 +2763,8 @@ static int scrub_extent(struct scrub_ctx *sctx, u64 logical, u64 len,
 				++sctx->stat.no_csum;
 			if (sctx->is_dev_replace && !have_csum) {
 				ret = copy_nocow_pages(sctx, logical, l,
-						       mirror_num,
-						      physical_for_dev_replace);
+						physical, dev, gen, mirror_num,
+						physical_for_dev_replace);
 				goto behind_scrub_pages;
 			}
 		}
@@ -4312,6 +4318,7 @@ static void scrub_remap_extent(struct btrfs_fs_info *fs_info,
 }
 
 static int copy_nocow_pages(struct scrub_ctx *sctx, u64 logical, u64 len,
+			    u64 physical, struct btrfs_device *dev, u64 gen,
 			    int mirror_num, u64 physical_for_dev_replace)
 {
 	struct scrub_copy_nocow_ctx *nocow_ctx;
@@ -4332,6 +4339,11 @@ static int copy_nocow_pages(struct scrub_ctx *sctx, u64 logical, u64 len,
 	nocow_ctx->len = len;
 	nocow_ctx->mirror_num = mirror_num;
 	nocow_ctx->physical_for_dev_replace = physical_for_dev_replace;
+
+	nocow_ctx->fb_physical = physical;
+	nocow_ctx->fb_gen = gen;
+	nocow_ctx->fb_dev = dev;
+
 	btrfs_init_work(&nocow_ctx->work, btrfs_scrubnc_helper,
 			copy_nocow_pages_worker, NULL, NULL);
 	INIT_LIST_HEAD(&nocow_ctx->inodes);
@@ -4440,7 +4452,7 @@ out:
 }
 
 static int check_extent_to_block(struct btrfs_inode *inode, u64 start, u64 len,
-				 u64 logical)
+				 u64 logical, int *compressed)
 {
 	struct extent_state *cached_state = NULL;
 	struct btrfs_ordered_extent *ordered;
@@ -4475,6 +4487,7 @@ static int check_extent_to_block(struct btrfs_inode *inode, u64 start, u64 len,
 		ret = 1;
 		goto out_unlock;
 	}
+	*compressed = em->compress_type;
 	free_extent_map(em);
 
 out_unlock:
@@ -4496,6 +4509,7 @@ static int copy_nocow_pages_for_inode(u64 inum, u64 offset, u64 root,
 	u64 nocow_ctx_logical;
 	u64 len = nocow_ctx->len;
 	unsigned long index;
+	int compressed;
 	int srcu_index;
 	int ret = 0;
 	int err = 0;
@@ -4529,11 +4543,19 @@ static int copy_nocow_pages_for_inode(u64 inum, u64 offset, u64 root,
 	nocow_ctx_logical = nocow_ctx->logical;
 
 	ret = check_extent_to_block(BTRFS_I(inode), offset, len,
-			nocow_ctx_logical);
+			nocow_ctx_logical, &compressed);
 	if (ret) {
 		ret = ret > 0 ? 0 : ret;
 		goto out;
 	}
+
+	/*
+	 * We hit the damn nodatasum compressed extent, we can't use any page
+	 * from inode as they are all *UNCOMPRESSED*.
+	 * We fall back to scrub_pages() for such case.
+	 */
+	if (compressed)
+		goto fallback;
 
 	while (len >= PAGE_SIZE) {
 		index = offset >> PAGE_SHIFT;
@@ -4577,10 +4599,15 @@ again:
 		}
 
 		ret = check_extent_to_block(BTRFS_I(inode), offset, len,
-					    nocow_ctx_logical);
+					    nocow_ctx_logical, &compressed);
 		if (ret) {
 			ret = ret > 0 ? 0 : ret;
 			goto next_page;
+		}
+		if (compressed) {
+			unlock_page(page);
+			put_page(page);
+			goto fallback;
 		}
 
 		err = write_page_nocow(nocow_ctx->sctx,
@@ -4603,6 +4630,19 @@ next_page:
 out:
 	inode_unlock(inode);
 	iput(inode);
+	return ret;
+
+fallback:
+	inode_unlock(inode);
+	iput(inode);
+
+	ret = scrub_pages(nocow_ctx->sctx, nocow_ctx->logical,
+			  nocow_ctx->len, nocow_ctx->fb_physical,
+			  nocow_ctx->fb_dev, BTRFS_EXTENT_FLAG_DATA,
+			  nocow_ctx->fb_gen, nocow_ctx->mirror_num,
+			  NULL, 0, physical_for_dev_replace);
+	if (!ret)
+		ret = COPY_COMPLETE;
 	return ret;
 }
 
