@@ -638,6 +638,9 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 		entry->edx &= boot_cpu_data.x86_power;
 		entry->eax = entry->ebx = entry->ecx = 0;
 		break;
+	case 0x80000006:
+		/* L2 cache and TLB: pass through host info. */
+		break;
 	case 0x80000008: {
 		unsigned g_phys_as = (entry->eax >> 16) & 0xff;
 		unsigned virt_as = max((entry->eax >> 8) & 0xff, 48U);
