@@ -18,6 +18,7 @@ struct dma_coherent_mem {
 	unsigned long	*bitmap;
 	spinlock_t	spinlock;
 	bool		use_dev_dma_pfn_offset;
+	int		avail;
 };
 
 static struct dma_coherent_mem *dma_coherent_default_memory __ro_after_init;
@@ -73,6 +74,7 @@ static int dma_init_coherent_memory(
 	dma_mem->device_base = device_addr;
 	dma_mem->pfn_base = PFN_DOWN(phys_addr);
 	dma_mem->size = pages;
+	dma_mem->avail = pages;
 	dma_mem->flags = flags;
 	spin_lock_init(&dma_mem->spinlock);
 
@@ -141,6 +143,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
 					dma_addr_t device_addr, size_t size)
 {
 	struct dma_coherent_mem *mem = dev->dma_mem;
+	int order = get_order(size);
 	unsigned long flags;
 	int pos, err;
 
@@ -151,7 +154,9 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 	pos = PFN_DOWN(device_addr - dma_get_device_base(dev, mem));
-	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
+	err = bitmap_allocate_region(mem->bitmap, pos, order);
+	if (!err)
+		mem->avail -= 1 << order;
 	spin_unlock_irqrestore(&mem->spinlock, flags);
 
 	if (err != 0)
@@ -170,7 +175,7 @@ static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 
-	if (unlikely(size > (mem->size << PAGE_SHIFT)))
+	if (unlikely(size > (mem->avail << PAGE_SHIFT)))
 		goto err;
 
 	pageno = bitmap_find_free_region(mem->bitmap, mem->size, order);
@@ -182,6 +187,7 @@ static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
 	 */
 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
 	ret = mem->virt_base + (pageno << PAGE_SHIFT);
+	mem->avail -= 1 << order;
 	spin_unlock_irqrestore(&mem->spinlock, flags);
 	memset(ret, 0, size);
 	return ret;
@@ -244,6 +250,7 @@ static int __dma_release_from_coherent(struct dma_coherent_mem *mem,
 
 		spin_lock_irqsave(&mem->spinlock, flags);
 		bitmap_release_region(mem->bitmap, page, order);
+		mem->avail += 1 << order;
 		spin_unlock_irqrestore(&mem->spinlock, flags);
 		return 1;
 	}
