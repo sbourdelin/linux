@@ -463,7 +463,7 @@ static int alsa_prepare(struct snd_pcm_substream *substream)
 
 	if (!stream->is_open) {
 		struct snd_pcm_runtime *runtime = substream->runtime;
-		u8 sndif_format;
+		int sndif_format;
 		int ret;
 
 		sndif_format = to_sndif_format(runtime->format);
