@@ -509,6 +509,10 @@ static long vc5_fod_round_rate(struct clk_hw *hw, unsigned long rate,
 	u32 div_int;
 	u64 div_frc;
 
+	/* prevent div-by-0 */
+	if (rate == 0)
+		return 0;
+
 	/* Determine integer part, which is 12 bit wide */
 	div_int = f_in / rate;
 	/*
