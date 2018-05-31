@@ -55,7 +55,8 @@
 #define MT7621_CPOL		BIT(4)
 #define MT7621_LSB_FIRST	BIT(3)
 
-#define RT2880_SPI_MODE_BITS	(SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_CS_HIGH)
+#define RT2880_SPI_MODE_BITS	(SPI_CPOL | SPI_CPHA |		\
+				SPI_LSB_FIRST | SPI_CS_HIGH)
 
 struct mt7621_spi;
 
@@ -104,7 +105,7 @@ static void mt7621_spi_set_cs(struct spi_device *spi, int enable)
 	int cs = spi->chip_select;
 	u32 polar = 0;
 
-        mt7621_spi_reset(rs, cs);
+	mt7621_spi_reset(rs, cs);
 	if (enable)
 		polar = BIT(cs);
 	mt7621_spi_write(rs, MT7621_SPI_POLAR, polar);
@@ -137,18 +138,18 @@ static int mt7621_spi_prepare(struct spi_device *spi, unsigned int speed)
 		reg |= MT7621_LSB_FIRST;
 
 	reg &= ~(MT7621_CPHA | MT7621_CPOL);
-	switch(spi->mode & (SPI_CPOL | SPI_CPHA)) {
-		case SPI_MODE_0:
-			break;
-		case SPI_MODE_1:
-			reg |= MT7621_CPHA;
-			break;
-		case SPI_MODE_2:
-			reg |= MT7621_CPOL;
-			break;
-		case SPI_MODE_3:
-			reg |= MT7621_CPOL | MT7621_CPHA;
-			break;
+	switch (spi->mode & (SPI_CPOL | SPI_CPHA)) {
+	case SPI_MODE_0:
+		break;
+	case SPI_MODE_1:
+		reg |= MT7621_CPHA;
+		break;
+	case SPI_MODE_2:
+		reg |= MT7621_CPOL;
+		break;
+	case SPI_MODE_3:
+		reg |= MT7621_CPOL | MT7621_CPHA;
+		break;
 	}
 	mt7621_spi_write(rs, MT7621_SPI_MASTER, reg);
 
@@ -164,9 +165,8 @@ static inline int mt7621_spi_wait_till_ready(struct spi_device *spi)
 		u32 status;
 
 		status = mt7621_spi_read(rs, MT7621_SPI_TRANS);
-		if ((status & SPITRANS_BUSY) == 0) {
+		if ((status & SPITRANS_BUSY) == 0)
 			return 0;
-		}
 		cpu_relax();
 		udelay(1);
 	}
