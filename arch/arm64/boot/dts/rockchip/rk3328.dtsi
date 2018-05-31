@@ -309,6 +309,13 @@
 			mode-loader = <BOOT_BL_DOWNLOAD>;
 		};
 
+		/* Use <&gpio_mute 0> to refer to GPIO_MUTE pin */
+		gpio_mute: gpio-mute {
+			compatible = "rockchip,rk3328-gpio-mute";
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
 	};
 
 	uart0: serial@ff110000 {
