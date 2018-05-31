@@ -31,12 +31,59 @@
 #endif
 
 #ifdef CONFIG_SECCOMP_FILTER
+#include <linux/file.h>
 #include <linux/filter.h>
 #include <linux/pid.h>
 #include <linux/ptrace.h>
 #include <linux/security.h>
 #include <linux/tracehook.h>
 #include <linux/uaccess.h>
+
+#ifdef CONFIG_SECCOMP_USER_NOTIFICATION
+#include <linux/anon_inodes.h>
+
+enum notify_state {
+	SECCOMP_NOTIFY_INIT,
+	SECCOMP_NOTIFY_SENT,
+	SECCOMP_NOTIFY_REPLIED,
+};
+
+struct seccomp_knotif {
+	/* The pid whose filter triggered the notification */
+	pid_t pid;
+
+	/*
+	 * The "cookie" for this request; this is unique for this filter.
+	 */
+	u32 id;
+
+	/*
+	 * The seccomp data. This pointer is valid the entire time this
+	 * notification is active, since it comes from __seccomp_filter which
+	 * eclipses the entire lifecycle here.
+	 */
+	const struct seccomp_data *data;
+
+	/*
+	 * Notification states. When SECCOMP_RET_USER_NOTIF is returned, a
+	 * struct seccomp_knotif is created and starts out in INIT. Once the
+	 * handler reads the notification off of an FD, it transitions to READ.
+	 * If a signal is received the state transitions back to INIT and
+	 * another message is sent. When the userspace handler replies, state
+	 * transitions to REPLIED.
+	 */
+	enum notify_state state;
+
+	/* The return values, only valid when in SECCOMP_NOTIFY_REPLIED */
+	int error;
+	long val;
+
+	/* Signals when this has entered SECCOMP_NOTIFY_REPLIED */
+	struct completion ready;
+
+	struct list_head list;
+};
+#endif
 
 /**
  * struct seccomp_filter - container for seccomp BPF programs
@@ -64,6 +111,27 @@ struct seccomp_filter {
 	bool log;
 	struct seccomp_filter *prev;
 	struct bpf_prog *prog;
+
+#ifdef CONFIG_SECCOMP_USER_NOTIFICATION
+	/*
+	 * A semaphore that users of this notification can wait on for
+	 * changes. Actual reads and writes are still controlled with
+	 * filter->notify_lock.
+	 */
+	struct semaphore request;
+
+	/* A lock for all notification-related accesses. */
+	struct mutex notify_lock;
+
+	/* Is there currently an attached listener? */
+	bool has_listener;
+
+	/* The id of the next request. */
+	u64 next_id;
+
+	/* A list of struct seccomp_knotif elements. */
+	struct list_head notifications;
+#endif
 };
 
 /* Limit any path through the tree to 256KB worth of instructions. */
@@ -383,6 +451,13 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 	if (!sfilter)
 		return ERR_PTR(-ENOMEM);
 
+#ifdef CONFIG_SECCOMP_USER_NOTIFICATION
+	mutex_init(&sfilter->notify_lock);
+	sema_init(&sfilter->request, 0);
+	INIT_LIST_HEAD(&sfilter->notifications);
+	sfilter->next_id = get_random_u64();
+#endif
+
 	ret = bpf_prog_create_from_user(&sfilter->prog, fprog,
 					seccomp_check_filter, save_orig);
 	if (ret < 0) {
@@ -547,13 +622,15 @@ static void seccomp_send_sigsys(int syscall, int reason)
 #define SECCOMP_LOG_TRACE		(1 << 4)
 #define SECCOMP_LOG_LOG			(1 << 5)
 #define SECCOMP_LOG_ALLOW		(1 << 6)
+#define SECCOMP_LOG_USER_NOTIF		(1 << 7)
 
 static u32 seccomp_actions_logged = SECCOMP_LOG_KILL_PROCESS |
 				    SECCOMP_LOG_KILL_THREAD  |
 				    SECCOMP_LOG_TRAP  |
 				    SECCOMP_LOG_ERRNO |
 				    SECCOMP_LOG_TRACE |
-				    SECCOMP_LOG_LOG;
+				    SECCOMP_LOG_LOG |
+				    SECCOMP_LOG_USER_NOTIF;
 
 static inline void seccomp_log(unsigned long syscall, long signr, u32 action,
 			       bool requested)
@@ -571,6 +648,9 @@ static inline void seccomp_log(unsigned long syscall, long signr, u32 action,
 		break;
 	case SECCOMP_RET_TRACE:
 		log = requested && seccomp_actions_logged & SECCOMP_LOG_TRACE;
+		break;
+	case SECCOMP_RET_USER_NOTIF:
+		log = requested && seccomp_actions_logged & SECCOMP_LOG_USER_NOTIF;
 		break;
 	case SECCOMP_RET_LOG:
 		log = seccomp_actions_logged & SECCOMP_LOG_LOG;
@@ -644,6 +724,81 @@ void secure_computing_strict(int this_syscall)
 		BUG();
 }
 #else
+
+#ifdef CONFIG_SECCOMP_USER_NOTIFICATION
+static u64 seccomp_next_notify_id(struct seccomp_filter *filter)
+{
+	/* Note: overflow is ok here, the id just needs to be unique */
+	return filter->next_id++;
+}
+
+static void seccomp_do_user_notification(int this_syscall,
+					 struct seccomp_filter *match,
+					 const struct seccomp_data *sd)
+{
+	int err;
+	long ret = 0;
+	struct seccomp_knotif n = {};
+
+	mutex_lock(&match->notify_lock);
+	err = -ENOSYS;
+	if (!match->has_listener)
+		goto out;
+
+	n.pid = current->pid;
+	n.state = SECCOMP_NOTIFY_INIT;
+	n.data = sd;
+	n.id = seccomp_next_notify_id(match);
+	init_completion(&n.ready);
+
+	list_add(&n.list, &match->notifications);
+
+	mutex_unlock(&match->notify_lock);
+	up(&match->request);
+
+	err = wait_for_completion_interruptible(&n.ready);
+	mutex_lock(&match->notify_lock);
+
+	/*
+	 * Here it's possible we got a signal and then had to wait on the mutex
+	 * while the reply was sent, so let's be sure there wasn't a response
+	 * in the meantime.
+	 */
+	if (err < 0 && n.state != SECCOMP_NOTIFY_REPLIED) {
+		/*
+		 * We got a signal. Let's tell userspace about it (potentially
+		 * again, if we had already notified them about the first one).
+		 */
+		if (n.state == SECCOMP_NOTIFY_SENT) {
+			n.state = SECCOMP_NOTIFY_INIT;
+			up(&match->request);
+		}
+		mutex_unlock(&match->notify_lock);
+		err = wait_for_completion_killable(&n.ready);
+		mutex_lock(&match->notify_lock);
+		if (err < 0)
+			goto remove_list;
+	}
+
+	ret = n.val;
+	err = n.error;
+
+remove_list:
+	list_del(&n.list);
+out:
+	mutex_unlock(&match->notify_lock);
+	syscall_set_return_value(current, task_pt_regs(current),
+				 err, ret);
+}
+#else
+static void seccomp_do_user_notification(int this_syscall,
+					 struct seccomp_filter *match,
+					 const struct seccomp_data *sd)
+{
+	seccomp_log(this_syscall, SIGSYS, SECCOMP_RET_USER_NOTIF, true);
+	do_exit(SIGSYS);
+}
+#endif
 
 #ifdef CONFIG_SECCOMP_FILTER
 static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
@@ -722,6 +877,9 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 
 		return 0;
 
+	case SECCOMP_RET_USER_NOTIF:
+		seccomp_do_user_notification(this_syscall, match, sd);
+		goto skip;
 	case SECCOMP_RET_LOG:
 		seccomp_log(this_syscall, 0, action, true);
 		return 0;
@@ -828,6 +986,9 @@ out:
 }
 
 #ifdef CONFIG_SECCOMP_FILTER
+static struct file *init_listener(struct task_struct *,
+				  struct seccomp_filter *);
+
 /**
  * seccomp_set_mode_filter: internal function for setting seccomp filter
  * @flags:  flags to change filter behavior
@@ -847,6 +1008,8 @@ static long seccomp_set_mode_filter(unsigned int flags,
 	const unsigned long seccomp_mode = SECCOMP_MODE_FILTER;
 	struct seccomp_filter *prepared = NULL;
 	long ret = -EINVAL;
+	int listener = 0;
+	struct file *listener_f = NULL;
 
 	/* Validate flags. */
 	if (flags & ~SECCOMP_FILTER_FLAG_MASK)
@@ -857,13 +1020,28 @@ static long seccomp_set_mode_filter(unsigned int flags,
 	if (IS_ERR(prepared))
 		return PTR_ERR(prepared);
 
+	if (flags & SECCOMP_FILTER_FLAG_GET_LISTENER) {
+		listener = get_unused_fd_flags(O_RDWR);
+		if (listener < 0) {
+			ret = listener;
+			goto out_free;
+		}
+
+		listener_f = init_listener(current, prepared);
+		if (IS_ERR(listener_f)) {
+			put_unused_fd(listener);
+			ret = PTR_ERR(listener_f);
+			goto out_free;
+		}
+	}
+
 	/*
 	 * Make sure we cannot change seccomp or nnp state via TSYNC
 	 * while another thread is in the middle of calling exec.
 	 */
 	if (flags & SECCOMP_FILTER_FLAG_TSYNC &&
 	    mutex_lock_killable(&current->signal->cred_guard_mutex))
-		goto out_free;
+		goto out_put_fd;
 
 	spin_lock_irq(&current->sighand->siglock);
 
@@ -881,6 +1059,16 @@ out:
 	spin_unlock_irq(&current->sighand->siglock);
 	if (flags & SECCOMP_FILTER_FLAG_TSYNC)
 		mutex_unlock(&current->signal->cred_guard_mutex);
+out_put_fd:
+	if (flags & SECCOMP_FILTER_FLAG_GET_LISTENER) {
+		if (ret < 0) {
+			fput(listener_f);
+			put_unused_fd(listener);
+		} else {
+			fd_install(listener, listener_f);
+			ret = listener;
+		}
+	}
 out_free:
 	seccomp_filter_free(prepared);
 	return ret;
@@ -909,6 +1097,9 @@ static long seccomp_get_action_avail(const char __user *uaction)
 	case SECCOMP_RET_LOG:
 	case SECCOMP_RET_ALLOW:
 		break;
+	case SECCOMP_RET_USER_NOTIF:
+		if (IS_ENABLED(CONFIG_SECCOMP_USER_NOTIFICATION))
+			break;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -1105,6 +1296,7 @@ long seccomp_get_metadata(struct task_struct *task,
 #define SECCOMP_RET_KILL_THREAD_NAME	"kill_thread"
 #define SECCOMP_RET_TRAP_NAME		"trap"
 #define SECCOMP_RET_ERRNO_NAME		"errno"
+#define SECCOMP_RET_USER_NOTIF_NAME	"user_notif"
 #define SECCOMP_RET_TRACE_NAME		"trace"
 #define SECCOMP_RET_LOG_NAME		"log"
 #define SECCOMP_RET_ALLOW_NAME		"allow"
@@ -1114,6 +1306,7 @@ static const char seccomp_actions_avail[] =
 				SECCOMP_RET_KILL_THREAD_NAME	" "
 				SECCOMP_RET_TRAP_NAME		" "
 				SECCOMP_RET_ERRNO_NAME		" "
+				SECCOMP_RET_USER_NOTIF_NAME     " "
 				SECCOMP_RET_TRACE_NAME		" "
 				SECCOMP_RET_LOG_NAME		" "
 				SECCOMP_RET_ALLOW_NAME;
@@ -1131,6 +1324,7 @@ static const struct seccomp_log_name seccomp_log_names[] = {
 	{ SECCOMP_LOG_TRACE, SECCOMP_RET_TRACE_NAME },
 	{ SECCOMP_LOG_LOG, SECCOMP_RET_LOG_NAME },
 	{ SECCOMP_LOG_ALLOW, SECCOMP_RET_ALLOW_NAME },
+	{ SECCOMP_LOG_USER_NOTIF, SECCOMP_RET_USER_NOTIF_NAME },
 	{ }
 };
 
@@ -1279,3 +1473,203 @@ static int __init seccomp_sysctl_init(void)
 device_initcall(seccomp_sysctl_init)
 
 #endif /* CONFIG_SYSCTL */
+
+#ifdef CONFIG_SECCOMP_USER_NOTIFICATION
+static int seccomp_notify_release(struct inode *inode, struct file *file)
+{
+	struct seccomp_filter *filter = file->private_data;
+	struct seccomp_knotif *knotif;
+
+	mutex_lock(&filter->notify_lock);
+
+	/*
+	 * If this file is being closed because e.g. the task who owned it
+	 * died, let's wake everyone up who was waiting on us.
+	 */
+	list_for_each_entry(knotif, &filter->notifications, list) {
+		if (knotif->state == SECCOMP_NOTIFY_REPLIED)
+			continue;
+
+		knotif->state = SECCOMP_NOTIFY_REPLIED;
+		knotif->error = -ENOSYS;
+		knotif->val = 0;
+
+		complete(&knotif->ready);
+	}
+
+	filter->has_listener = false;
+	mutex_unlock(&filter->notify_lock);
+	__put_seccomp_filter(filter);
+	return 0;
+}
+
+static ssize_t seccomp_notify_read(struct file *f, char __user *buf,
+				   size_t size, loff_t *ppos)
+{
+	struct seccomp_filter *filter = f->private_data;
+	struct seccomp_knotif *knotif = NULL, *cur;
+	struct seccomp_notif unotif;
+	ssize_t ret;
+
+	/* No offset reads. */
+	if (*ppos != 0)
+		return -EINVAL;
+
+	ret = down_interruptible(&filter->request);
+	if (ret < 0)
+		return ret;
+
+	mutex_lock(&filter->notify_lock);
+	list_for_each_entry(cur, &filter->notifications, list) {
+		if (cur->state == SECCOMP_NOTIFY_INIT) {
+			knotif = cur;
+			break;
+		}
+	}
+
+	/*
+	 * If we didn't find a notification, it could be that the task was
+	 * interrupted between the time we were woken and when we were able to
+	 * acquire the rw lock. Should we retry here or just -ENOENT? -ENOENT
+	 * for now.
+	 */
+	if (!knotif) {
+		ret = -ENOENT;
+		goto out;
+	}
+
+	unotif.id = knotif->id;
+	unotif.pid = knotif->pid;
+	unotif.data = *(knotif->data);
+
+	size = min_t(size_t, size, sizeof(struct seccomp_notif));
+	if (copy_to_user(buf, &unotif, size)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = sizeof(unotif);
+	knotif->state = SECCOMP_NOTIFY_SENT;
+
+out:
+	mutex_unlock(&filter->notify_lock);
+	return ret;
+}
+
+static ssize_t seccomp_notify_write(struct file *file, const char __user *buf,
+				    size_t size, loff_t *ppos)
+{
+	struct seccomp_filter *filter = file->private_data;
+	struct seccomp_notif_resp resp = {};
+	struct seccomp_knotif *knotif = NULL;
+	ssize_t ret = -EINVAL;
+
+	/* No partial writes. */
+	if (*ppos != 0)
+		return -EINVAL;
+
+	size = min_t(size_t, size, sizeof(resp));
+	if (copy_from_user(&resp, buf, size))
+		return -EFAULT;
+
+	ret = mutex_lock_interruptible(&filter->notify_lock);
+	if (ret < 0)
+		return ret;
+
+	list_for_each_entry(knotif, &filter->notifications, list) {
+		if (knotif->id == resp.id)
+			break;
+	}
+
+	if (!knotif || knotif->id != resp.id) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* Allow exactly one reply. */
+	if (knotif->state != SECCOMP_NOTIFY_SENT) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = size;
+	knotif->state = SECCOMP_NOTIFY_REPLIED;
+	knotif->error = resp.error;
+	knotif->val = resp.val;
+	complete(&knotif->ready);
+out:
+	mutex_unlock(&filter->notify_lock);
+	return ret;
+}
+
+static __poll_t seccomp_notify_poll(struct file *file,
+				    struct poll_table_struct *poll_tab)
+{
+	struct seccomp_filter *filter = file->private_data;
+	__poll_t ret = 0;
+	struct seccomp_knotif *cur;
+
+	ret = mutex_lock_interruptible(&filter->notify_lock);
+	if (ret < 0)
+		return ret;
+
+	list_for_each_entry(cur, &filter->notifications, list) {
+		if (cur->state == SECCOMP_NOTIFY_INIT)
+			ret |= EPOLLIN | EPOLLRDNORM;
+		if (cur->state == SECCOMP_NOTIFY_SENT)
+			ret |= EPOLLOUT | EPOLLWRNORM;
+	}
+
+	mutex_unlock(&filter->notify_lock);
+
+	return ret;
+}
+
+static const struct file_operations seccomp_notify_ops = {
+	.read = seccomp_notify_read,
+	.write = seccomp_notify_write,
+	.poll = seccomp_notify_poll,
+	.release = seccomp_notify_release,
+};
+
+static struct file *init_listener(struct task_struct *task,
+				  struct seccomp_filter *filter)
+{
+	struct file *ret = ERR_PTR(-EBUSY);
+	struct seccomp_filter *cur;
+	bool have_listener = false;
+	int filter_nesting = 0;
+
+	for (cur = task->seccomp.filter; cur; cur = cur->prev) {
+		mutex_lock_nested(&cur->notify_lock, filter_nesting);
+		filter_nesting++;
+		if (cur->has_listener)
+			have_listener = true;
+	}
+
+	if (have_listener)
+		goto out;
+
+	ret = anon_inode_getfile("seccomp notify", &seccomp_notify_ops,
+				 filter, O_RDWR);
+	if (IS_ERR(ret))
+		goto out;
+
+
+	/* The file has a reference to it now */
+	__get_seccomp_filter(filter);
+	filter->has_listener = true;
+
+out:
+	for (cur = task->seccomp.filter; cur; cur = cur->prev)
+		mutex_unlock(&cur->notify_lock);
+
+	return ret;
+}
+#else
+static struct file *init_listener(struct task_struct *task,
+				  struct seccomp_filter *filter)
+{
+	return ERR_PTR(-EINVAL);
+}
+#endif
