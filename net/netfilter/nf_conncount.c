@@ -79,24 +79,27 @@ static int key_diff(const u32 *a, const u32 *b, unsigned int klen)
 	return memcmp(a, b, klen * sizeof(u32));
 }
 
-static bool add_hlist(struct hlist_head *head,
+bool nf_conncount_add(struct kmem_cache *conncount_cache,
+		      struct hlist_head *head,
 		      const struct nf_conntrack_tuple *tuple)
 {
 	struct nf_conncount_tuple *conn;
 
-	conn = kmem_cache_alloc(conncount_conn_cachep, GFP_ATOMIC);
+	conn = kmem_cache_alloc(conncount_cache, GFP_ATOMIC);
 	if (conn == NULL)
 		return false;
 	conn->tuple = *tuple;
 	hlist_add_head(&conn->node, head);
 	return true;
 }
+EXPORT_SYMBOL_GPL(nf_conncount_add);
 
-static unsigned int check_hlist(struct net *net,
-				struct hlist_head *head,
-				const struct nf_conntrack_tuple *tuple,
-				const struct nf_conntrack_zone *zone,
-				bool *addit)
+unsigned int nf_conncount_lookup(struct net *net,
+				 struct kmem_cache *conncount_cache,
+				 struct hlist_head *head,
+				 const struct nf_conntrack_tuple *tuple,
+				 const struct nf_conntrack_zone *zone,
+				 bool *addit)
 {
 	const struct nf_conntrack_tuple_hash *found;
 	struct nf_conncount_tuple *conn;
@@ -131,7 +134,7 @@ static unsigned int check_hlist(struct net *net,
 			 */
 			nf_ct_put(found_ct);
 			hlist_del(&conn->node);
-			kmem_cache_free(conncount_conn_cachep, conn);
+			kmem_cache_free(conncount_cache, conn);
 			continue;
 		}
 
@@ -187,13 +190,17 @@ count_tree(struct net *net, struct rb_root *root,
 		} else {
 			/* same source network -> be counted! */
 			unsigned int count;
-			count = check_hlist(net, &rbconn->hhead, tuple, zone, &addit);
+
+			count = nf_conncount_lookup(net, conncount_conn_cachep,
+						    &rbconn->hhead, tuple,
+						    zone, &addit);
 
 			tree_nodes_free(root, gc_nodes, gc_count);
 			if (!addit)
 				return count;
 
-			if (!add_hlist(&rbconn->hhead, tuple))
+			if (!nf_conncount_add(conncount_conn_cachep,
+					      &rbconn->hhead, tuple))
 				return 0; /* hotdrop */
 
 			return count + 1;
@@ -203,7 +210,8 @@ count_tree(struct net *net, struct rb_root *root,
 			continue;
 
 		/* only used for GC on hhead, retval and 'addit' ignored */
-		check_hlist(net, &rbconn->hhead, tuple, zone, &addit);
+		nf_conncount_lookup(net, conncount_conn_cachep, &rbconn->hhead,
+				    tuple, zone, &addit);
 		if (hlist_empty(&rbconn->hhead))
 			gc_nodes[gc_count++] = rbconn;
 	}
@@ -303,11 +311,19 @@ struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int family
 }
 EXPORT_SYMBOL_GPL(nf_conncount_init);
 
-static void destroy_tree(struct rb_root *r)
+void nf_conncount_cache_free(struct kmem_cache *cache, struct hlist_head *hhead)
 {
 	struct nf_conncount_tuple *conn;
-	struct nf_conncount_rb *rbconn;
 	struct hlist_node *n;
+
+	hlist_for_each_entry_safe(conn, n, hhead, node)
+		kmem_cache_free(conncount_conn_cachep, conn);
+}
+EXPORT_SYMBOL_GPL(nf_conncount_cache_free);
+
+static void destroy_tree(struct rb_root *r)
+{
+	struct nf_conncount_rb *rbconn;
 	struct rb_node *node;
 
 	while ((node = rb_first(r)) != NULL) {
@@ -315,8 +331,7 @@ static void destroy_tree(struct rb_root *r)
 
 		rb_erase(node, r);
 
-		hlist_for_each_entry_safe(conn, n, &rbconn->hhead, node)
-			kmem_cache_free(conncount_conn_cachep, conn);
+		nf_conncount_cache_free(conncount_conn_cachep, &rbconn->hhead);
 
 		kmem_cache_free(conncount_rb_cachep, rbconn);
 	}
@@ -336,6 +351,20 @@ void nf_conncount_destroy(struct net *net, unsigned int family,
 }
 EXPORT_SYMBOL_GPL(nf_conncount_destroy);
 
+struct kmem_cache *nf_conncount_cache_alloc(void)
+{
+	struct kmem_cache *conncount_cache;
+
+	conncount_cache = kmem_cache_create("nf_conncount_tuple",
+					    sizeof(struct nf_conncount_tuple),
+					    0, 0, NULL);
+	if (!conncount_cache)
+		return ERR_PTR(-ENOMEM);
+
+	return conncount_cache;
+}
+EXPORT_SYMBOL_GPL(nf_conncount_cache_alloc);
+
 static int __init nf_conncount_modinit(void)
 {
 	int i;
@@ -346,10 +375,8 @@ static int __init nf_conncount_modinit(void)
 	for (i = 0; i < CONNCOUNT_LOCK_SLOTS; ++i)
 		spin_lock_init(&nf_conncount_locks[i]);
 
-	conncount_conn_cachep = kmem_cache_create("nf_conncount_tuple",
-					   sizeof(struct nf_conncount_tuple),
-					   0, 0, NULL);
-	if (!conncount_conn_cachep)
+	conncount_conn_cachep = nf_conncount_cache_alloc();
+	if (IS_ERR(conncount_conn_cachep))
 		return -ENOMEM;
 
 	conncount_rb_cachep = kmem_cache_create("nf_conncount_rb",

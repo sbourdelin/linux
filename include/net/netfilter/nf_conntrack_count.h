@@ -13,4 +13,19 @@ unsigned int nf_conncount_count(struct net *net,
 				const u32 *key,
 				const struct nf_conntrack_tuple *tuple,
 				const struct nf_conntrack_zone *zone);
+
+struct kmem_cache;
+
+struct kmem_cache *nf_conncount_cache_alloc(void);
+void nf_conncount_cache_free(struct kmem_cache *cache, struct hlist_head *hhead);
+
+unsigned int nf_conncount_lookup(struct net *net, struct kmem_cache *cache,
+				 struct hlist_head *head,
+				 const struct nf_conntrack_tuple *tuple,
+				 const struct nf_conntrack_zone *zone,
+				 bool *addit);
+
+bool nf_conncount_add(struct kmem_cache *cache, struct hlist_head *head,
+		      const struct nf_conntrack_tuple *tuple);
+
 #endif
