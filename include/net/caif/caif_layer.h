@@ -22,7 +22,7 @@ struct caif_packet_funcs;
  * @assert: expression to evaluate.
  *
  * This function will print a error message and a do WARN_ON if the
- * assertion failes. Normally this will do a stack up at the current location.
+ * assertion fails. Normally this will do a stack up at the current location.
  */
 #define caif_assert(assert)					\
 do {								\

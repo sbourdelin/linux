@@ -85,7 +85,7 @@ static struct cfpkt *rfm_append(struct cfrfml *rfml, char *seghead,
 	tmppkt = cfpkt_append(rfml->incomplete_frm, pkt,
 			rfml->pdu_size + RFM_HEAD_SIZE);
 
-	/* If cfpkt_append failes input pkts are not freed */
+	/* If cfpkt_append fails input pkts are not freed */
 	*err = -ENOMEM;
 	if (tmppkt == NULL)
 		return NULL;
