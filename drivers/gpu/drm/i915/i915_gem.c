@@ -5182,7 +5182,7 @@ int i915_gem_init_hw(struct drm_i915_private *dev_priv)
 		I915_WRITE(MI_PREDICATE_RESULT_2, IS_HSW_GT3(dev_priv) ?
 			   LOWER_SLICE_ENABLED : LOWER_SLICE_DISABLED);
 
-	if (HAS_PCH_NOP(dev_priv)) {
+	if (INTEL_INFO(dev_priv)->num_pipes == 0) {
 		if (IS_IVYBRIDGE(dev_priv)) {
 			u32 temp = I915_READ(GEN7_MSG_CTL);
 			temp &= ~(WAIT_FOR_PCH_FLR_ACK | WAIT_FOR_PCH_RESET_ACK);
