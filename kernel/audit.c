@@ -424,7 +424,7 @@ static int audit_do_config_change(char *function_name, u32 *to_change, u32 new)
 	else
 		allow_changes = 1;
 
-	if (audit_enabled != AUDIT_OFF) {
+	if (audit_enabled) {
 		rc = audit_log_config_change(function_name, new, old, allow_changes);
 		if (rc)
 			allow_changes = 0;
@@ -1097,7 +1097,7 @@ static void audit_log_feature_change(int which, u32 old_feature, u32 new_feature
 {
 	struct audit_buffer *ab;
 
-	if (audit_enabled == AUDIT_OFF)
+	if (!audit_enabled)
 		return;
 	ab = audit_log_start(audit_context(), GFP_KERNEL, AUDIT_FEATURE_CHANGE);
 	if (!ab)
@@ -1270,7 +1270,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 				err = auditd_set(req_pid,
 						 NETLINK_CB(skb).portid,
 						 sock_net(NETLINK_CB(skb).sk));
-				if (audit_enabled != AUDIT_OFF)
+				if (audit_enabled)
 					audit_log_config_change("audit_pid",
 								new_pid,
 								auditd_pid,
@@ -1281,7 +1281,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 				/* try to process any backlog */
 				wake_up_interruptible(&kauditd_wait);
 			} else {
-				if (audit_enabled != AUDIT_OFF)
+				if (audit_enabled)
 					audit_log_config_change("audit_pid",
 								new_pid,
 								auditd_pid, 1);
