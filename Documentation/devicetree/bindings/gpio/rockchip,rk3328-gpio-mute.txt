@@ -1,0 +1,28 @@
+Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE pin.
+
+In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec mute
+control, can also be used for general purpose. It is manipulated by the
+GRF_SOC_CON10 register.
+
+Required properties:
+- compatible: Should contain "rockchip,rk3328-gpio-mute".
+- gpio-controller: Marks the device node as a gpio controller.
+- #gpio-cells: Should be 2. The first cell is the pin number and
+  the second cell is used to specify the gpio polarity:
+    0 = Active high,
+    1 = Active low.
+
+Example:
+
+	grf: syscon@ff100000 {
+		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
+
+		gpio_mute: gpio-mute {
+			compatible = "rockchip,rk3328-gpio-mute";
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+	};
+
+Note: The gpio_mute node should be declared as the child of the GRF (General
+Register File) node. The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
