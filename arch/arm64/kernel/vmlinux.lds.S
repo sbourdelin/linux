@@ -220,8 +220,11 @@ SECTIONS
 	. += IDMAP_DIR_SIZE;
 
 #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	. = ALIGN(SEGMENT_ALIGN);
+	__tramp_pgdir_segment_start = .;
 	tramp_pg_dir = .;
 	. += PAGE_SIZE;
+	__tramp_pgdir_segment_end = .;
 #endif
 
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN

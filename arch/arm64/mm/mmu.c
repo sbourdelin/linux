@@ -573,6 +573,9 @@ static void __init map_kernel(pgd_t *pgdp)
 {
 	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_inittext,
 				vmlinux_initdata, vmlinux_data;
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	static struct vm_struct vmlinux_tramp_pgdir, vmlinux_data_end;
+#endif
 
 	/*
 	 * External debuggers may need to write directly to the text
@@ -593,7 +596,17 @@ static void __init map_kernel(pgd_t *pgdp)
 			   &vmlinux_inittext, 0, VM_NO_GUARD);
 	map_kernel_segment(pgdp, __initdata_begin, __initdata_end, PAGE_KERNEL,
 			   &vmlinux_initdata, 0, VM_NO_GUARD);
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	map_kernel_segment(pgdp, _data, __tramp_pgdir_segment_start,
+			PAGE_KERNEL, &vmlinux_data, 0, VM_NO_GUARD);
+	map_kernel_segment(pgdp, __tramp_pgdir_segment_start,
+			__tramp_pgdir_segment_end, PAGE_KERNEL,
+			&vmlinux_tramp_pgdir, NO_CONT_MAPPINGS, VM_NO_GUARD);
+	map_kernel_segment(pgdp, __tramp_pgdir_segment_end, _end, PAGE_KERNEL,
+			&vmlinux_data_end, 0, 0);
+#else
 	map_kernel_segment(pgdp, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
+#endif
 
 	if (!READ_ONCE(pgd_val(*pgd_offset_raw(pgdp, FIXADDR_START)))) {
 		/*
