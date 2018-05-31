@@ -896,6 +896,8 @@ void msm_gpu_cleanup(struct msm_gpu *gpu)
 
 	WARN_ON(!list_empty(&gpu->active_list));
 
+	devfreq_remove_device(gpu->devfreq.devfreq);
+
 	for (i = 0; i < ARRAY_SIZE(gpu->rb); i++) {
 		msm_ringbuffer_destroy(gpu->rb[i]);
 		gpu->rb[i] = NULL;
