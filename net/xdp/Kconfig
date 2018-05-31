@@ -1,5 +1,5 @@
 config XDP_SOCKETS
-	bool "XDP sockets"
+	bool "XDP sockets" if n
 	depends on BPF_SYSCALL
 	default n
 	help
