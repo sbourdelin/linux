@@ -61,4 +61,10 @@ OUT_RING(struct msm_ringbuffer *ring, uint32_t data)
 	*(ring->next++) = data;
 }
 
+static inline void
+OUT_RING64(struct msm_ringbuffer *ring, uint64_t data)
+{
+	OUT_RING(ring, lower_32_bits(data));
+	OUT_RING(ring, upper_32_bits(data));
+}
 #endif /* __MSM_RINGBUFFER_H__ */

@@ -223,8 +223,7 @@ static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
 
 	/* Set the save preemption record for the ring/command */
 	OUT_PKT4(ring, REG_A5XX_CP_CONTEXT_SWITCH_SAVE_ADDR_LO, 2);
-	OUT_RING(ring, lower_32_bits(a5xx_gpu->preempt_iova[submit->ring->id]));
-	OUT_RING(ring, upper_32_bits(a5xx_gpu->preempt_iova[submit->ring->id]));
+	OUT_RING64(ring, a5xx_gpu->preempt_iova[submit->ring->id]);
 
 	/* Turn back on protected mode */
 	OUT_PKT7(ring, CP_SET_PROTECTED_MODE, 1);
@@ -248,8 +247,7 @@ static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
 				break;
 		case MSM_SUBMIT_CMD_BUF:
 			OUT_PKT7(ring, CP_INDIRECT_BUFFER_PFE, 3);
-			OUT_RING(ring, lower_32_bits(submit->cmd[i].iova));
-			OUT_RING(ring, upper_32_bits(submit->cmd[i].iova));
+			OUT_RING64(ring, submit->cmd[i].iova);
 			OUT_RING(ring, submit->cmd[i].size);
 			ibs++;
 			break;
@@ -282,8 +280,7 @@ static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
 	 */
 	OUT_PKT7(ring, CP_EVENT_WRITE, 4);
 	OUT_RING(ring, CACHE_FLUSH_TS | (1 << 31));
-	OUT_RING(ring, lower_32_bits(rbmemptr(ring, fence)));
-	OUT_RING(ring, upper_32_bits(rbmemptr(ring, fence)));
+	OUT_RING64(ring, rbmemptr(ring, fence));
 	OUT_RING(ring, submit->seqno);
 
 	/* Yield the floor on command completion */
@@ -469,8 +466,7 @@ static int a5xx_preempt_start(struct msm_gpu *gpu)
 
 	/* Set the save preemption record for the ring/command */
 	OUT_PKT4(ring, REG_A5XX_CP_CONTEXT_SWITCH_SAVE_ADDR_LO, 2);
-	OUT_RING(ring, lower_32_bits(a5xx_gpu->preempt_iova[ring->id]));
-	OUT_RING(ring, upper_32_bits(a5xx_gpu->preempt_iova[ring->id]));
+	OUT_RING64(ring, a5xx_gpu->preempt_iova[ring->id]);
 
 	/* Turn back on protected mode */
 	OUT_PKT7(ring, CP_SET_PROTECTED_MODE, 1);
