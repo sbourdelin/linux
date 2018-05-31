@@ -782,17 +782,11 @@ static int cudbg_get_mem_region(struct adapter *padap,
 	if (rc)
 		return rc;
 
-	for (i = 0; i < ARRAY_SIZE(cudbg_region); i++) {
-		if (!strcmp(cudbg_region[i], region_name)) {
-			found = 1;
-			idx = i;
-			break;
-		}
-	}
-	if (!found)
-		return -EINVAL;
+	rc = match_string(cudbg_region, ARRAY_SIZE(cudbg_region), region_name);
+	if (rc < 0)
+		return rc;
 
-	found = 0;
+	idx = rc;
 	for (i = 0; i < meminfo->mem_c; i++) {
 		if (meminfo->mem[i].idx >= ARRAY_SIZE(cudbg_region))
 			continue; /* Skip holes */
