@@ -360,8 +360,16 @@ struct printk_log {
 	u16 text_len;		/* length of text buffer */
 	u16 dict_len;		/* length of dictionary buffer */
 	u8 facility;		/* syslog facility */
-	u8 flags:5;		/* internal record flags */
+	u8 flags:4;		/* internal record flags */
 	u8 level:3;		/* syslog level */
+	/*
+	 * whether to print this msg on console or not?
+	 * due to async printk, printk thread can miss
+	 * prints at the time of console_flush because of
+	 * change in print level afterwards.
+	 */
+	u8 console_print:1;
+
 }
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 __packed __aligned(4)
@@ -623,7 +631,12 @@ static int log_store(int facility, int level,
 	msg->dict_len = dict_len;
 	msg->facility = facility;
 	msg->level = level & 7;
-	msg->flags = flags & 0x1f;
+	if (msg->level >= console_loglevel)
+		msg->console_print = 0;
+	else
+		msg->console_print = 1;
+
+	msg->flags = flags & 0xf;
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
@@ -1144,9 +1157,9 @@ module_param(ignore_loglevel, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(ignore_loglevel,
 		 "ignore loglevel setting (prints all kernel messages to the console)");
 
-static bool suppress_message_printing(int level)
+static bool suppress_message_printing(int console_print)
 {
-	return (level >= console_loglevel && !ignore_loglevel);
+	return (!console_print && !ignore_loglevel);
 }
 
 #ifdef CONFIG_BOOT_PRINTK_DELAY
@@ -1172,13 +1185,13 @@ static int __init boot_delay_setup(char *str)
 }
 early_param("boot_delay", boot_delay_setup);
 
-static void boot_delay_msec(int level)
+static void boot_delay_msec(int console_print)
 {
 	unsigned long long k;
 	unsigned long timeout;
 
 	if ((boot_delay == 0 || system_state >= SYSTEM_RUNNING)
-		|| suppress_message_printing(level)) {
+		|| suppress_message_printing(console_print)) {
 		return;
 	}
 
@@ -1199,7 +1212,7 @@ static void boot_delay_msec(int level)
 	}
 }
 #else
-static inline void boot_delay_msec(int level)
+static inline void boot_delay_msec(int console_print)
 {
 }
 #endif
@@ -1840,7 +1853,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 		in_sched = true;
 	}
 
-	boot_delay_msec(level);
+	boot_delay_msec(level < console_loglevel);
 	printk_delay();
 
 	/* This stops the holder of console_sem just where we want him */
@@ -2011,7 +2024,7 @@ static void call_console_drivers(const char *ext_text, size_t ext_len,
 				 const char *text, size_t len) {}
 static size_t msg_print_text(const struct printk_log *msg,
 			     bool syslog, char *buf, size_t size) { return 0; }
-static bool suppress_message_printing(int level) { return false; }
+static bool suppress_message_printing(int console_print) { return false; }
 
 #endif /* CONFIG_PRINTK */
 
@@ -2354,7 +2367,7 @@ skip:
 			break;
 
 		msg = log_from_idx(console_idx);
-		if (suppress_message_printing(msg->level)) {
+		if (suppress_message_printing(msg->console_print)) {
 			/*
 			 * Skip record we have buffered and already printed
 			 * directly to the console when we received it, and
