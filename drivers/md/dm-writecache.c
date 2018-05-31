@@ -1865,9 +1865,10 @@ static int writecache_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	}
 
 	wc->dm_io = dm_io_client_create();
-	if (!wc->dm_io) {
-		r = -ENOMEM;
+	if (IS_ERR(wc->dm_io)) {
+		r = PTR_ERR(wc->dm_io);
 		ti->error = "Unable to allocate dm-io client";
+		wc->dm_io = NULL;
 		goto bad;
 	}
 
@@ -2087,9 +2088,10 @@ invalid_optional:
 		}
 
 		wc->dm_kcopyd = dm_kcopyd_client_create(&dm_kcopyd_throttle);
-		if (!wc->dm_kcopyd) {
-			r = -ENOMEM;
+		if (IS_ERR(wc->dm_kcopyd)) {
+			r = PTR_ERR(wc->dm_kcopyd);
 			ti->error = "Unable to allocate dm-kcopyd client";
+			wc->dm_kcopyd = NULL;
 			goto bad;
 		}
 
