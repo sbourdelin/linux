@@ -111,4 +111,15 @@ static inline long seccomp_get_metadata(struct task_struct *task,
 	return -EINVAL;
 }
 #endif /* CONFIG_SECCOMP_FILTER && CONFIG_CHECKPOINT_RESTORE */
+
+#ifdef CONFIG_SECCOMP_USER_NOTIFICATION
+extern long seccomp_get_listener(struct task_struct *task,
+				 unsigned long filter_off);
+#else
+static inline long seccomp_get_listener(struct task_struct *task,
+					unsigned long filter_off)
+{
+	return -EINVAL;
+}
+#endif/* CONFIG_SECCOMP_USER_NOTIFICATION */
 #endif /* _LINUX_SECCOMP_H */
