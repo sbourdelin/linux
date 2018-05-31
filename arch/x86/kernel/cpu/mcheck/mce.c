@@ -1727,6 +1727,7 @@ static void __mcheck_cpu_init_early(struct cpuinfo_x86 *c)
 	}
 }
 
+#ifdef CONFIG_X86_MCE_CENTAUR
 static void mce_centaur_feature_init(struct cpuinfo_x86 *c)
 {
 	struct mca_config *cfg = &mca_cfg;
@@ -1740,7 +1741,12 @@ static void mce_centaur_feature_init(struct cpuinfo_x86 *c)
 		if (cfg->monarch_timeout < 0)
 			cfg->monarch_timeout = USEC_PER_SEC;
 	}
+	mce_intel_feature_init(c);
+	mce_adjust_timer = cmci_intel_adjust_timer;
 }
+#else
+static inline void mce_centaur_feature_init(struct cpuinfo_x86 *c) { }
+#endif
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
