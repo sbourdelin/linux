@@ -241,9 +241,9 @@ static inline int validate_dt_prop_sizes(const char *prop1, int prop1_len,
 extern u32 pnv_get_supported_cpuidle_states(void);
 static int powernv_add_idle_states(void)
 {
-	struct device_node *power_mgt;
+	struct device_node *power_mgt,*np_new;
 	int nr_idle_states = 1; /* Snooze */
-	int dt_idle_states, count;
+	int dt_idle_states, count, additional_states;
 	u32 latency_ns[CPUIDLE_STATE_MAX];
 	u32 residency_ns[CPUIDLE_STATE_MAX];
 	u32 flags[CPUIDLE_STATE_MAX];
@@ -365,6 +365,62 @@ static int powernv_add_idle_states(void)
 						residency_ns, dt_idle_states);
 	}
 
+	/* Support new dt format for idle states */
+
+	np_new = of_find_node_by_path("/ibm,opal/power-mgt/ibm,idle-states");
+	if (!np_new) {
+		pr_info("opal: PowerMgmt/ibm,idle-states Node not found\n");
+	} else {
+		additional_states = of_property_count_u32_elems(np_new,
+			"ibm,cpu-idle-state-flags");
+		if (additional_states < 0) 
+			pr_info("cpuidle-powernv: no idle states found in the DT\n");
+		else {
+			if (of_property_read_u32_array(np_new,
+				"ibm,cpu-idle-state-flags", flags+dt_idle_states, additional_states)) {
+				pr_warn("cpuidle-powernv : missing ibm,cpu-idle-state-flags in DT\n");
+				goto out;
+			}
+
+			if (of_property_read_u32_array(np_new,
+				"ibm,cpu-idle-state-latencies-ns", latency_ns+dt_idle_states,
+				additional_states)) {
+				pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-latencies-ns in DT\n");
+				goto out;
+			}
+			if (of_property_read_u32_array(np_new,
+				"ibm,cpu-idle-state-residencies-ns", residency_ns+dt_idle_states,
+				additional_states)) {
+				pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-residencies-ns in DT\n");
+				goto out;
+			}
+			if (of_property_read_string_array(np_new,
+				"ibm,cpu-idle-state-names", names+dt_idle_states, additional_states) < 0) {
+				pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-names in DT\n");
+				goto out;
+			}
+			if (of_property_read_string_array(np_new,
+				"ibm,cpu-idle-state-versions", versions, additional_states) < 0) {
+				pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-names in DT\n");
+				goto out;
+			}
+			if (of_property_read_u64_array(np_new,
+			    "ibm,cpu-idle-state-psscr", psscr_val+ dt_idle_states, additional_states)) {
+				pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-psscr in DT\n");
+				goto out;
+			}
+
+			if (of_property_read_u64_array(power_mgt,
+					       "ibm,cpu-idle-state-psscr-mask",
+						psscr_mask + dt_idle_states,additional_states)) {
+				pr_warn("cpuidle-powernv:Missing ibm,cpu-idle-state-psscr-mask in DT\n");
+				goto out;
+			}
+		
+
+			dt_idle_states += additional_states;
+		}
+	}
 	for (i = 0; i < dt_idle_states; i++) {
 		unsigned int exit_latency, target_residency;
 		bool stops_timebase = false;
@@ -375,6 +431,11 @@ static int powernv_add_idle_states(void)
 		 */
 		if ((flags[i] & supported_flags) != flags[i])
 			continue;
+
+		/* Supported version */
+		if (!( strcmp(version[i] , "ibm,idle-state-v1"))
+				continue;
+				
 		/*
 		 * If an idle state has exit latency beyond
 		 * POWERNV_THRESHOLD_LATENCY_NS then don't use it

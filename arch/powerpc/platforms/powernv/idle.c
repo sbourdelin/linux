@@ -622,8 +622,8 @@ int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
  * @dt_idle_states: Number of idle state entries
  * Returns 0 on success
  */
-static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
-					int dt_idle_states)
+static int __init pnv_power9_idle_init(struct device_node *np, struct device_node *np_new,u32 *flags,
+					int dt_idle_states, int additional_states)
 {
 	u64 *psscr_val = NULL;
 	u64 *psscr_mask = NULL;
@@ -631,9 +631,10 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	u64 max_residency_ns = 0;
 	int rc = 0, i;
 
-	psscr_val = kcalloc(dt_idle_states, sizeof(*psscr_val), GFP_KERNEL);
-	psscr_mask = kcalloc(dt_idle_states, sizeof(*psscr_mask), GFP_KERNEL);
-	residency_ns = kcalloc(dt_idle_states, sizeof(*residency_ns),
+	/* TODO: remove ugliness of using additional_states count*/
+	psscr_val = kcalloc(dt_idle_states+additional_states, sizeof(*psscr_val), GFP_KERNEL);
+	psscr_mask = kcalloc(dt_idle_states+additional_states, sizeof(*psscr_mask), GFP_KERNEL);
+	residency_ns = kcalloc(dt_idle_states+additional_states, sizeof(*residency_ns),
 			       GFP_KERNEL);
 
 	if (!psscr_val || !psscr_mask || !residency_ns) {
@@ -648,10 +649,24 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 		rc = -1;
 		goto out;
 	}
+	if (of_property_read_u64_array(np_new,
+		"ibm,cpu-idle-state-psscr",
+		psscr_val + dt_idle_states, additional_states)) {
+		pr_warn("cpuidle-powernv: missing addtional ibm,cpu-idle-state-psscr in DT\n");
+		rc = -1;
+		goto out;
+	}
 
 	if (of_property_read_u64_array(np,
 				       "ibm,cpu-idle-state-psscr-mask",
 				       psscr_mask, dt_idle_states)) {
+		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-psscr-mask in DT\n");
+		rc = -1;
+		goto out;
+	}
+	if (of_property_read_u64_array(np_new,
+				       "ibm,cpu-idle-state-psscr-mask",
+				       psscr_mask + dt_idle_states, additional_states)) {
 		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-psscr-mask in DT\n");
 		rc = -1;
 		goto out;
@@ -664,7 +679,13 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 		rc = -1;
 		goto out;
 	}
-
+	if (of_property_read_u32_array(np_new,
+				       "ibm,cpu-idle-state-residency-ns",
+					residency_ns + dt_idle_states,additional_states)) {
+		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-residency-ns in DT\n");
+		rc = -1;
+		goto out;
+	}
 	/*
 	 * Set pnv_first_deep_stop_state, pnv_deepest_stop_psscr_{val,mask},
 	 * and the pnv_default_stop_{val,mask}.
@@ -679,7 +700,7 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	 * the shallowest (OPAL_PM_STOP_INST_FAST) loss-less stop state.
 	 */
 	pnv_first_deep_stop_state = MAX_STOP_STATE;
-	for (i = 0; i < dt_idle_states; i++) {
+	for (i = 0; i < dt_idle_states+additional_states; i++) {
 		int err;
 		u64 psscr_rl = psscr_val[i] & PSSCR_RL_MASK;
 
@@ -740,10 +761,11 @@ out:
  */
 static void __init pnv_probe_idle_states(void)
 {
-	struct device_node *np;
+	struct device_node *np,*np_new;
 	int dt_idle_states;
 	u32 *flags = NULL;
 	int i;
+	int additional_states=0;
 
 	np = of_find_node_by_path("/ibm,opal/power-mgt");
 	if (!np) {
@@ -756,21 +778,37 @@ static void __init pnv_probe_idle_states(void)
 		pr_warn("cpuidle-powernv: no idle states found in the DT\n");
 		goto out;
 	}
+	/* Support new device tree */
+	np_new = of_find_node_by_path("/ibm,opal/power-mgt/ibm,idle-states");
+	if (!np_new) {
+		pr_info("opal: PowerMgmt/ibm,idle-states Node not found\n");
+	} else {
+		additional_states = of_property_count_u32_elems(np_new,
+			"ibm,cpu-idle-state-flags");
+		if (additional_states < 0) 
+			pr_info("cpuidle-powernv: no idle states found in the DT\n");
+	}
 
-	flags = kcalloc(dt_idle_states, sizeof(*flags),  GFP_KERNEL);
+	flags = kcalloc(dt_idle_states + additional_states, sizeof(*flags),  GFP_KERNEL);
 
 	if (of_property_read_u32_array(np,
 			"ibm,cpu-idle-state-flags", flags, dt_idle_states)) {
 		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-flags in DT\n");
 		goto out;
 	}
+	if (of_property_read_u32_array(np_new,
+			"ibm,cpu-idle-state-flags", flags + dt_idle_states, additional_states)) {
+		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-flags in DT\n");
+		goto out;
+	}
+
 
 	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
-		if (pnv_power9_idle_init(np, flags, dt_idle_states))
+		if (pnv_power9_idle_init(np, np_new, flags, dt_idle_states,additional_states))
 			goto out;
 	}
 
-	for (i = 0; i < dt_idle_states; i++)
+	for (i = 0; i < dt_idle_states+additional_states; i++)
 		supported_cpuidle_states |= flags[i];
 
 out:
