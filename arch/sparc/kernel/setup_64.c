@@ -512,10 +512,9 @@ static unsigned long __init mdesc_cpu_hwcap_list(void)
 				break;
 			}
 		}
-		for (i = 0; i < ARRAY_SIZE(crypto_hwcaps); i++) {
-			if (!strcmp(prop, crypto_hwcaps[i]))
-				caps |= HWCAP_SPARC_CRYPTO;
-		}
+		i = match_string(crypto_hwcaps, ARRAY_SIZE(crypto_hwcaps), prop);
+		if (i >= 0)
+			caps |= HWCAP_SPARC_CRYPTO;
 
 		plen = strlen(prop) + 1;
 		prop += plen;
