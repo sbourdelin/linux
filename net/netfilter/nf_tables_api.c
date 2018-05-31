@@ -4630,7 +4630,7 @@ err3:
 	kfree(obj->name);
 err2:
 	if (obj->ops->destroy)
-		obj->ops->destroy(obj);
+		obj->ops->destroy(&ctx, obj);
 	kfree(obj);
 err1:
 	module_put(type->owner);
@@ -4835,10 +4835,10 @@ err:
 	return err;
 }
 
-static void nft_obj_destroy(struct nft_object *obj)
+static void nft_obj_destroy(const struct nft_ctx *ctx, struct nft_object *obj)
 {
 	if (obj->ops->destroy)
-		obj->ops->destroy(obj);
+		obj->ops->destroy(ctx, obj);
 
 	module_put(obj->ops->type->owner);
 	kfree(obj->name);
@@ -5819,7 +5819,7 @@ static void nft_commit_release(struct nft_trans *trans)
 					   nft_trans_elem(trans).priv);
 		break;
 	case NFT_MSG_DELOBJ:
-		nft_obj_destroy(nft_trans_obj(trans));
+		nft_obj_destroy(&trans->ctx, nft_trans_obj(trans));
 		break;
 	case NFT_MSG_DELFLOWTABLE:
 		nf_tables_flowtable_destroy(nft_trans_flowtable(trans));
@@ -5999,7 +5999,7 @@ static void nf_tables_abort_release(struct nft_trans *trans)
 				     nft_trans_elem(trans).priv, true);
 		break;
 	case NFT_MSG_NEWOBJ:
-		nft_obj_destroy(nft_trans_obj(trans));
+		nft_obj_destroy(&trans->ctx, nft_trans_obj(trans));
 		break;
 	case NFT_MSG_NEWFLOWTABLE:
 		nf_tables_flowtable_destroy(nft_trans_flowtable(trans));
@@ -6688,7 +6688,7 @@ static void __nft_release_tables(struct net *net)
 		list_for_each_entry_safe(obj, ne, &table->objects, list) {
 			list_del(&obj->list);
 			table->use--;
-			nft_obj_destroy(obj);
+			nft_obj_destroy(&ctx, obj);
 		}
 		list_for_each_entry_safe(chain, nc, &table->chains, list) {
 			ctx.chain = chain;
