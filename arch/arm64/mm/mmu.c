@@ -542,6 +542,7 @@ static int __init map_entry_trampoline(void)
 {
 	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
 	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
+	int segment_size;
 
 	/* The trampoline is always mapped and can therefore be global */
 	pgprot_val(prot) &= ~PTE_NG;
@@ -550,6 +551,11 @@ static int __init map_entry_trampoline(void)
 	memset(tramp_pg_dir, 0, PGD_SIZE);
 	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
 			     prot, pgd_pgtable_alloc, 0);
+
+	segment_size = __tramp_pgdir_segment_end - __tramp_pgdir_segment_start;
+	update_mapping_prot(__pa_symbol(__tramp_pgdir_segment_start),
+				(unsigned long)__tramp_pgdir_segment_start,
+				segment_size, PAGE_KERNEL_RO);
 
 	/* Map both the text and data into the kernel page table */
 	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
