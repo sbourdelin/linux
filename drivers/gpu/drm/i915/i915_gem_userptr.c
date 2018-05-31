@@ -789,10 +789,12 @@ i915_gem_userptr_ioctl(struct drm_device *dev,
 		return -EFAULT;
 
 	if (args->flags & I915_USERPTR_READ_ONLY) {
-		/* On almost all of the current hw, we cannot tell the GPU that a
-		 * page is readonly, so this is just a placeholder in the uAPI.
+		/*
+		 * On almost all of the older hw, we cannot tell the GPU that
+		 * a page is readonly.
 		 */
-		return -ENODEV;
+		if (INTEL_GEN(dev_priv) < 8 || !USES_PPGTT(dev_priv))
+			return -ENODEV;
 	}
 
 	obj = i915_gem_object_alloc(dev_priv);
@@ -806,7 +808,10 @@ i915_gem_userptr_ioctl(struct drm_device *dev,
 	i915_gem_object_set_cache_coherency(obj, I915_CACHE_LLC);
 
 	obj->userptr.ptr = args->user_ptr;
-	obj->userptr.read_only = !!(args->flags & I915_USERPTR_READ_ONLY);
+	if (args->flags & I915_USERPTR_READ_ONLY) {
+		obj->userptr.read_only = true;
+		obj->gt_ro = true;
+	}
 
 	/* And keep a pointer to the current->mm for resolving the user pages
 	 * at binding. This means that we need to hook into the mmu_notifier
