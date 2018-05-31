@@ -623,17 +623,19 @@ int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
  * Returns 0 on success
  */
 static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
-					int dt_idle_states)
+					int dt_idle_states, int additional_states)
 {
 	u64 *psscr_val = NULL;
 	u64 *psscr_mask = NULL;
 	u32 *residency_ns = NULL;
 	u64 max_residency_ns = 0;
-	int rc = 0, i;
-
-	psscr_val = kcalloc(dt_idle_states, sizeof(*psscr_val), GFP_KERNEL);
-	psscr_mask = kcalloc(dt_idle_states, sizeof(*psscr_mask), GFP_KERNEL);
-	residency_ns = kcalloc(dt_idle_states, sizeof(*residency_ns),
+	int rc = 0, i, orig_dt_idle_states;
+	struct device_node *dt_node;
+	orig_dt_idle_states = dt_idle_states;
+	/* TODO: remove ugliness of using additional_states count*/
+	psscr_val = kcalloc(dt_idle_states+additional_states, sizeof(*psscr_val), GFP_KERNEL);
+	psscr_mask = kcalloc(dt_idle_states+additional_states, sizeof(*psscr_mask), GFP_KERNEL);
+	residency_ns = kcalloc(dt_idle_states+additional_states, sizeof(*residency_ns),
 			       GFP_KERNEL);
 
 	if (!psscr_val || !psscr_mask || !residency_ns) {
@@ -664,7 +666,37 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 		rc = -1;
 		goto out;
 	}
+	for_each_compatible_node( dt_node, NULL, "ibm,cpuoffline-state_v1" ) {
+		printk("Found a state\n");
+		rc = of_property_read_u32(dt_node, "residency-ns" , &(residency_ns[dt_idle_states]));
+		if (rc)
+			printk("error reading residency rc= %d\n",rc);
+		rc = of_property_read_u64(dt_node, "psscr-mask" , &(psscr_mask[dt_idle_states]));
+		if (rc)
+			printk("error reading psscr-mask rc= %d\n",rc);
+		rc = of_property_read_u64(dt_node, "psscr" , &(psscr_val[dt_idle_states]));
+		if (rc)
+			printk("error reading psscr rc= %d\n",rc);
+		dt_idle_states++;
+	}
+	/* Fall back if no cpuoffline state found */
+	if ( orig_dt_idle_states == dt_idle_states) {
 
+		for_each_compatible_node( dt_node, NULL, "ibm,cpuidle-state_v1" ) {
+			printk("Found a state\n");
+			rc = of_property_read_u32(dt_node, "residency-ns" , &(residency_ns[dt_idle_states]));
+			if (rc)
+				printk("error reading residency rc= %d\n",rc);
+			rc = of_property_read_u64(dt_node, "psscr-mask" , &(psscr_mask[dt_idle_states]));
+			if (rc)
+				printk("error reading psscr-mask rc= %d\n",rc);
+			rc = of_property_read_u64(dt_node, "psscr" , &(psscr_val[dt_idle_states]));
+			if (rc)
+				printk("error reading psscr rc= %d\n",rc);
+			dt_idle_states++;
+		}
+	}
+	
 	/*
 	 * Set pnv_first_deep_stop_state, pnv_deepest_stop_psscr_{val,mask},
 	 * and the pnv_default_stop_{val,mask}.
@@ -740,10 +772,11 @@ out:
  */
 static void __init pnv_probe_idle_states(void)
 {
-	struct device_node *np;
+	struct device_node *np,*dt_node;
 	int dt_idle_states;
 	u32 *flags = NULL;
-	int i;
+	int i,rc;
+	int additional_states=0;
 
 	np = of_find_node_by_path("/ibm,opal/power-mgt");
 	if (!np) {
@@ -765,12 +798,29 @@ static void __init pnv_probe_idle_states(void)
 		goto out;
 	}
 
+
+	for_each_compatible_node( dt_node, NULL, "ibm,cpuidle-state-v1" ) {
+
+		i = dt_idle_states + additional_states;
+		rc = of_property_read_u32(dt_node, "flags" , &(flags[i]));
+		if (rc)
+			printk("error reading flags rc= %d\n",rc);
+		additional_states++;
+	}
+	for_each_compatible_node( dt_node, NULL, "ibm,cpuoffline-state-v1" ) {
+
+		i = dt_idle_states + additional_states;
+		rc = of_property_read_u32(dt_node, "flags" , &(flags[i]));
+		if (rc)
+			printk("error reading flags rc= %d\n",rc);
+		additional_states++;
+	}
 	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
-		if (pnv_power9_idle_init(np, flags, dt_idle_states))
+		if (pnv_power9_idle_init(np, flags, dt_idle_states,additional_states))
 			goto out;
 	}
 
-	for (i = 0; i < dt_idle_states; i++)
+	for (i = 0; i < dt_idle_states+additional_states; i++)
 		supported_cpuidle_states |= flags[i];
 
 out:

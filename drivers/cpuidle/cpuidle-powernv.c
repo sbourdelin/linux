@@ -241,7 +241,7 @@ static inline int validate_dt_prop_sizes(const char *prop1, int prop1_len,
 extern u32 pnv_get_supported_cpuidle_states(void);
 static int powernv_add_idle_states(void)
 {
-	struct device_node *power_mgt;
+	struct device_node *power_mgt,*dt_node;
 	int nr_idle_states = 1; /* Snooze */
 	int dt_idle_states, count;
 	u32 latency_ns[CPUIDLE_STATE_MAX];
@@ -363,6 +363,30 @@ static int powernv_add_idle_states(void)
 		rc = of_property_read_u32_array(power_mgt,
 						"ibm,cpu-idle-state-residency-ns",
 						residency_ns, dt_idle_states);
+	}
+
+	/* Support new dt format for idle states */
+	for_each_compatible_node( dt_node, NULL, "ibm,cpuidle-state-v1" ) {
+		printk("Found a state\n");
+		rc = of_property_read_string(dt_node, "name" , &(names[dt_idle_states]));
+		if (rc)
+			printk("error reading names rc= %d\n",rc);
+		rc = of_property_read_u32(dt_node, "residency-ns" , &(residency_ns[dt_idle_states]));
+		if (rc)
+			printk("error reading residency rc= %d\n",rc);
+		rc = of_property_read_u32(dt_node, "latency-ns" , &(latency_ns[dt_idle_states]));
+		if (rc)
+			printk("error reading latency rc= %d\n",rc);
+		rc = of_property_read_u32(dt_node, "flags" , &(flags[dt_idle_states]));
+		if (rc)
+			printk("error reading flags rc= %d\n",rc);
+		rc = of_property_read_u64(dt_node, "psscr-mask" , &(psscr_mask[dt_idle_states]));
+		if (rc)
+			printk("error reading psscr-mask rc= %d\n",rc);
+		rc = of_property_read_u64(dt_node, "psscr" , &(psscr_val[dt_idle_states]));
+		if (rc)
+			printk("error reading psscr rc= %d\n",rc);
+		dt_idle_states++;
 	}
 
 	for (i = 0; i < dt_idle_states; i++) {
