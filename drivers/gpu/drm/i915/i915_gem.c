@@ -2005,6 +2005,10 @@ int i915_gem_fault(struct vm_fault *vmf)
 	unsigned int flags;
 	int ret;
 
+	/* Sanity check that we allow writing into this object */
+	if (obj->gt_ro && (write || !ggtt->base.has_read_only))
+		return VM_FAULT_SIGBUS;
+
 	/* We don't use vmf->pgoff since that has the fake offset */
 	page_offset = (vmf->address - area->vm_start) >> PAGE_SHIFT;
 
@@ -2291,10 +2295,17 @@ i915_gem_mmap_gtt(struct drm_file *file,
 	if (!obj)
 		return -ENOENT;
 
+	/* If we will not be able to create the GGTT vma, reject it early. */
+	if (obj->gt_ro && !to_i915(dev)->ggtt.base.has_read_only) {
+		ret = -ENODEV;
+		goto out;
+	}
+
 	ret = i915_gem_object_create_mmap_offset(obj);
 	if (ret == 0)
 		*offset = drm_vma_node_offset_addr(&obj->base.vma_node);
 
+out:
 	i915_gem_object_put(obj);
 	return ret;
 }
