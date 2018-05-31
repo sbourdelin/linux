@@ -2877,7 +2877,7 @@ out_acl:
 out:
 #ifdef CONFIG_NFSD_V4_SECURITY_LABEL
 	if (context)
-		security_release_secctx(context, contextlen);
+		kfree(context);
 #endif /* CONFIG_NFSD_V4_SECURITY_LABEL */
 	kfree(acl);
 	if (tempfh) {

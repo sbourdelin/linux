@@ -369,7 +369,8 @@ static int kernfs_security_xattr_set(const struct xattr_handler *handler,
 	mutex_unlock(&kernfs_mutex);
 
 	if (secdata)
-		security_release_secctx(secdata, secdata_len);
+		kfree(secdata);
+
 	return error;
 }
 
