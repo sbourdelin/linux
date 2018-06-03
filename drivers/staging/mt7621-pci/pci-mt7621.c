@@ -308,7 +308,7 @@ pci_config_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u
 	}
 }
 
-struct pci_ops mt7621_pci_ops= {
+struct pci_ops mt7621_pci_ops = {
 	.read		=  pci_config_read,
 	.write		= pci_config_write,
 };
@@ -584,8 +584,8 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	unsigned long val = 0;
 
 	iomem_resource.start = 0;
-	iomem_resource.end= ~0;
-	ioport_resource.start= 0;
+	iomem_resource.end = ~0;
+	ioport_resource.start = 0;
 	ioport_resource.end = ~0;
 
 #if defined (CONFIG_PCIE_PORT0)
