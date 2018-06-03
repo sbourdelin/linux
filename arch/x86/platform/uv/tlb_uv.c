@@ -22,6 +22,7 @@
 #include <asm/tsc.h>
 #include <asm/irq_vectors.h>
 #include <asm/timer.h>
+#include <asm/reboot.h>
 
 static struct bau_operations ops __ro_after_init;
 
@@ -2197,6 +2198,32 @@ static const struct bau_operations uv4_bau_ops __initconst = {
 	.wait_completion         = uv4_wait_completion,
 };
 
+#ifdef CONFIG_KEXEC_CORE
+/*
+ * Bring BAU to quiesence by disabling future broadcasts and abandoning
+ * current broadcasts during panic.
+ */
+void uv_bau_crash_shutdown(struct pt_regs *regs)
+{
+	set_bau_off();
+	nobau_perm = 1;
+
+	for_each_possible_blade(uvhub) {
+		if (!uv_blade_nr_possible_cpus(uvhub))
+			continue;
+		int pnode = uv_blade_to_pnode(uvhub);
+		/* Set STATUS registers to idle to free source cpus */
+		write_gmmr(pnode, UVH_LB_BAU_SB_ACTIVATION_STATUS_0, 0x0);
+		write_gmmr(pnode, UVH_LB_BAU_SB_ACTIVATION_STATUS_1, 0x0);
+		write_gmmr(pnode, UVH_LB_BAU_SB_ACTIVATION_STATUS_2, 0x0);
+		/* Clear TIMEOUT and PENDING bits to free up BAU resources */
+		ops.write_g_sw_ack(pnode, ops.read_g_sw_ack(pnode) & 0xFFFF);
+	}
+
+	native_machine_crash_shutdown(regs);
+}
+#endif
+
 /*
  * Initialization of BAU-related structures
  */
@@ -2268,6 +2295,10 @@ static int __init uv_bau_init(void)
 				write_mmr_data_broadcast(pnode, mmr);
 		}
 	}
+
+#ifdef CONFIG_KEXEC_CORE
+	machine_ops.crash_shutdown = uv_bau_crash_shutdown;
+#endif
 
 	return 0;
 
