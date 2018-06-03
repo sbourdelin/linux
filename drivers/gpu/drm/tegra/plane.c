@@ -465,6 +465,104 @@ static int tegra_plane_setup_transparency(struct tegra_plane *tegra,
 	return 0;
 }
 
+static u32 tegra_plane_convert_colorkey_format(u64 value)
+{
+	/* convert ARGB16161616 to ARGB8888 */
+	u16 a = (value >> 48) & 0xFFFF;
+	u16 r = (value >> 32) & 0xFFFF;
+	u16 g = (value >> 16) & 0xFFFF;
+	u16 b = (value >>  0) & 0xFFFF;
+
+	a = min_t(u16, 0xff, a / 256);
+	r = min_t(u16, 0xff, r / 256);
+	g = min_t(u16, 0xff, g / 256);
+	b = min_t(u16, 0xff, b / 256);
+
+	return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+static bool tegra_plane_format_invalid_for_colorkey(
+						struct drm_plane_state *state)
+{
+	/*
+	 * Older Tegra's do not support alpha channel matching. It should
+	 * be possible to support certain cases where planes format has alpha
+	 * channel, but for simplicity these cases currently are unsupported.
+	 */
+	if (state->fb && __drm_format_has_alpha(state->fb->format->format))
+		return true;
+
+	return false;
+}
+
+static int tegra_plane_setup_colorkey(struct tegra_plane *tegra,
+				      struct tegra_plane_state *tegra_state)
+{
+	enum drm_plane_colorkey_mode mode;
+	struct drm_plane_state *old_plane;
+	struct drm_crtc_state *crtc_state;
+	struct tegra_dc_state *dc_state;
+	struct drm_plane_state *state;
+	u64 min, max;
+
+	mode = tegra_state->base.colorkey.mode;
+	min = tegra_state->base.colorkey.min;
+	max = tegra_state->base.colorkey.max;
+
+	/* no need to proceed if color keying is disabled */
+	if (mode == DRM_PLANE_COLORKEY_MODE_DISABLED)
+		return 0;
+
+	state = &tegra_state->base;
+	old_plane = drm_atomic_get_old_plane_state(state->state, &tegra->base);
+
+	/*
+	 * Currently color keying implemented for the middle plane only
+	 * to simplify things.
+	 */
+	if (state->normalized_zpos != 1) {
+		/* foreground-clip has no effect when applied to bottom plane */
+		if (state->normalized_zpos == 0)
+			return 0;
+
+		return -EINVAL;
+	}
+
+	/*
+	 * There is no need to proceed, adding CRTC and other planes to
+	 * the atomic update, if color keying state is unchanged.
+	 */
+	if (old_plane &&
+	    old_plane->colorkey.mode == mode &&
+	    old_plane->colorkey.min == min &&
+	    old_plane->colorkey.max == max)
+		return 0;
+
+	/* convert color key values to HW format */
+	min = tegra_plane_convert_colorkey_format(min);
+	max = tegra_plane_convert_colorkey_format(max);
+
+	/* validate planes format */
+	if (tegra_plane_format_invalid_for_colorkey(state))
+		return -EINVAL;
+
+	/*
+	 * Tegra's HW stores color key values within CRTC, hence adjust
+	 * planes CRTC atomic state.
+	 */
+	crtc_state = drm_atomic_get_crtc_state(state->state, state->crtc);
+	if (IS_ERR(crtc_state))
+		return PTR_ERR(crtc_state);
+
+	dc_state = to_dc_state(crtc_state);
+
+	/* update CRTC's color key state */
+	dc_state->ckey.min = min;
+	dc_state->ckey.max = max;
+
+	return 0;
+}
+
 int tegra_plane_setup_legacy_state(struct tegra_plane *tegra,
 				   struct tegra_plane_state *state)
 {
@@ -475,6 +573,10 @@ int tegra_plane_setup_legacy_state(struct tegra_plane *tegra,
 		return err;
 
 	err = tegra_plane_setup_transparency(tegra, state);
+	if (err < 0)
+		return err;
+
+	err = tegra_plane_setup_colorkey(tegra, state);
 	if (err < 0)
 		return err;
 
