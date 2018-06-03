@@ -407,6 +407,57 @@ void queue_hotplug_event(struct pseries_hp_errorlog *hp_errlog,
 	}
 }
 
+struct DlparWork {
+	struct list_head list;
+	int resource;
+	int action;
+	u32 drc_index;
+} DlparWorkQ;
+
+int dlpar_delayed_queue_action(int resource, int action, u32 drc_index)
+{
+	struct DlparWork *dwq;
+
+	dwq = kmalloc(sizeof(struct DlparWork), GFP_KERNEL);
+	if (!dwq)
+		return -ENOMEM;
+
+	dwq->resource = resource;
+	dwq->action = action;
+	dwq->drc_index = drc_index;
+
+	list_add_tail(&dwq->list, &DlparWorkQ.list);
+
+	return 0;
+}
+
+int dlpar_schedule_delayed_queue(void)
+{
+	struct DlparWork *iter;
+	struct list_head *pos, *q;
+
+	list_for_each_entry(iter, &DlparWorkQ.list, list) {
+	        struct pseries_hp_errorlog hp_elog;
+
+        	hp_elog.resource = iter->resource;
+        	hp_elog.action = iter->action;
+        	hp_elog.id_type = PSERIES_HP_ELOG_ID_DRC_INDEX;
+        	hp_elog._drc_u.drc_index = cpu_to_be32(iter->drc_index);
+
+		handle_dlpar_errorlog(&hp_elog);
+	}
+
+	list_for_each_safe(pos, q, &DlparWorkQ.list) {
+		struct DlparWork *tmp;
+
+		tmp = list_entry(pos, struct DlparWork, list);
+		list_del(pos);
+		kfree(tmp);
+	}
+
+	return 0;
+}
+
 static int dlpar_parse_resource(char **cmd, struct pseries_hp_errorlog *hp_elog)
 {
 	char *arg;
