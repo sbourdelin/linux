@@ -3325,6 +3325,18 @@ static void flip_smm_bit(void *data)
 	}
 }
 
+static int read_smm_bit(void)
+{
+	u64 val;
+
+	if (!rdmsrl_safe(MSR_IA32_DEBUGCTLMSR, &val)) {
+		if (val & DEBUGCTLMSR_FREEZE_IN_SMM)
+			return 1;
+	}
+
+	return 0;
+}
+
 static void intel_pmu_cpu_starting(int cpu)
 {
 	struct cpu_hw_events *cpuc = &per_cpu(cpu_hw_events, cpu);
@@ -4422,6 +4434,8 @@ __init int intel_pmu_init(void)
 		x86_pmu.perfctr = MSR_IA32_PMC0;
 		pr_cont("full-width counters, ");
 	}
+
+	x86_pmu.attr_freeze_on_smi = read_smm_bit();
 
 	kfree(to_free);
 	return 0;
