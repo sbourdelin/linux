@@ -1079,6 +1079,7 @@ static void reset_topology_timer(void);
 static int topology_timer_secs = 1;
 static int topology_inited;
 static int topology_update_needed;
+static struct mutex topology_update_lock;
 
 /*
  * Change polling interval for associativity changes.
@@ -1320,6 +1321,11 @@ int numa_update_cpu_topology(bool cpus_locked)
 	if (!updates)
 		return 0;
 
+	if (!mutex_trylock(&topology_update_lock)) {
+		kfree(updates);
+		return 0;
+	}
+
 	cpumask_clear(&updated_cpus);
 
 	for_each_cpu(cpu, &cpu_associativity_changes_mask) {
@@ -1424,6 +1430,7 @@ int numa_update_cpu_topology(bool cpus_locked)
 out:
 	kfree(updates);
 	topology_update_needed = 0;
+	mutex_unlock(&topology_update_lock);
 	return changed;
 }
 
@@ -1597,6 +1604,8 @@ static const struct file_operations topology_ops = {
 
 static int topology_update_init(void)
 {
+	mutex_init(&topology_update_lock);
+
 	/* Do not poll for changes if disabled at boot */
 	if (topology_updates_enabled)
 		start_topology_update();
