@@ -2054,6 +2054,12 @@ union bpf_attr {
  *
  *	Return
  *		0
+ *
+ * u64 bpf_get_current_cgroup_id(void)
+ * 	Return
+ * 		A 64-bit integer containing the current cgroup id based
+ * 		on the cgroup within which the current task is running.
+ *
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -2134,7 +2140,8 @@ union bpf_attr {
 	FN(lwt_seg6_adjust_srh),	\
 	FN(lwt_seg6_action),		\
 	FN(rc_repeat),			\
-	FN(rc_keydown),
+	FN(rc_keydown),			\
+	FN(get_current_cgroup_id),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
