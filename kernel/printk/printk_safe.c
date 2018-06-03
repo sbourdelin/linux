@@ -254,6 +254,17 @@ void printk_safe_flush(void)
 {
 	int cpu;
 
+	/*
+	 * Just avoid a deadlock here.
+	 * It makes sure that we continue and eventually call
+	 * printk_safe_flush_on_panic() from panic() that has better chances to succeed.
+	 * There is a risk that logbuf_lock was not part of a soft- or dead-lockup and
+	 * we might just loose the messages. But then there is a high chance that
+	 * irq_work will get called and the messages will get flushed the normal way.
+	 */
+	if (this_cpu_read(printk_context) & PRINTK_NMI_CONTEXT_MASK)
+		return;
+
 	for_each_possible_cpu(cpu) {
 #ifdef CONFIG_PRINTK_NMI
 		__printk_safe_flush(&per_cpu(nmi_print_seq, cpu).work);
