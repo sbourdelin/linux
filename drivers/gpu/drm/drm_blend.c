@@ -107,6 +107,11 @@
  *	planes. Without this property the primary plane is always below the cursor
  *	plane, and ordering between all other planes is undefined.
  *
+ * colorkey:
+ *	Color keying is set up with drm_plane_create_colorkey_properties().
+ *	It adds support for replacing a range of colors with a transparent
+ *	color in the plane.
+ *
  * Note that all the property extensions described here apply either to the
  * plane or the CRTC (e.g. for the background color, which currently is not
  * exposed and assumed to be black).
@@ -448,3 +453,97 @@ int drm_atomic_normalize_zpos(struct drm_device *dev,
 	return 0;
 }
 EXPORT_SYMBOL(drm_atomic_normalize_zpos);
+
+static const char * const plane_colorkey_mode_name[] = {
+	[DRM_PLANE_COLORKEY_MODE_DISABLED] = "disabled",
+	[DRM_PLANE_COLORKEY_MODE_FOREGROUND_CLIP] = "foreground-clip",
+};
+
+/**
+ * drm_plane_create_colorkey_properties - create colorkey properties
+ * @plane: drm plane
+ * @supported_modes: bitmask of supported color keying modes
+ *
+ * This function creates the generic color keying properties and attach them to
+ * the plane to enable color keying control for blending operations.
+ *
+ * Color keying is controlled by these properties:
+ *
+ * colorkey.mode:
+ *	The mode is an enumerated property that controls how color keying
+ *	operates.
+ *
+ * colorkey.min, colorkey.max:
+ *	These two properties specify the colors that are treated as the color
+ *	key. Pixel whose value is in the [min, max] range is the color key
+ *	matching pixel. The minimum and maximum values are expressed as a
+ *	64-bit integer in ARGB16161616 format, where A is the alpha value and
+ *	R, G and B correspond to the color components. Drivers shall convert
+ *	ARGB16161616 value into appropriate format within planes atomic check.
+ *
+ *	When a single color key is desired instead of a range, userspace shall
+ *	set the min and max properties to the same value.
+ *
+ *	Drivers return an error from their plane atomic check if range can't be
+ *	handled.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_plane_create_colorkey_properties(struct drm_plane *plane,
+					 u32 supported_modes)
+{
+	struct drm_prop_enum_list modes_list[DRM_PLANE_COLORKEY_MODES_NUM];
+	struct drm_property *mode_prop;
+	struct drm_property *min_prop;
+	struct drm_property *max_prop;
+	unsigned int modes_num = 0;
+	unsigned int i;
+
+	/* modes are driver-specific, build the list of supported modes */
+	for (i = 0; i < DRM_PLANE_COLORKEY_MODES_NUM; i++) {
+		if (!(supported_modes & BIT(i)))
+			continue;
+
+		modes_list[modes_num].name = plane_colorkey_mode_name[i];
+		modes_list[modes_num].type = i;
+		modes_num++;
+	}
+
+	/* at least one mode should be supported */
+	if (!modes_num)
+		return -EINVAL;
+
+	mode_prop = drm_property_create_enum(plane->dev, 0, "colorkey.mode",
+					     modes_list, modes_num);
+	if (!mode_prop)
+		return -ENOMEM;
+
+	min_prop = drm_property_create_range(plane->dev, 0, "colorkey.min",
+					     0, U64_MAX);
+	if (!min_prop)
+		goto err_destroy_mode_prop;
+
+	max_prop = drm_property_create_range(plane->dev, 0, "colorkey.max",
+					     0, U64_MAX);
+	if (!max_prop)
+		goto err_destroy_min_prop;
+
+	drm_object_attach_property(&plane->base, mode_prop, 0);
+	drm_object_attach_property(&plane->base, min_prop, 0);
+	drm_object_attach_property(&plane->base, max_prop, 0);
+
+	plane->colorkey.mode_property = mode_prop;
+	plane->colorkey.min_property = min_prop;
+	plane->colorkey.max_property = max_prop;
+
+	return 0;
+
+err_destroy_min_prop:
+	drm_property_destroy(plane->dev, min_prop);
+err_destroy_mode_prop:
+	drm_property_destroy(plane->dev, mode_prop);
+
+	return -ENOMEM;
+}
+EXPORT_SYMBOL(drm_plane_create_colorkey_properties);
