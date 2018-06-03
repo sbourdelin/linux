@@ -4263,7 +4263,9 @@ static int ip6_route_multipath_add(struct fib6_config *cfg,
 
 	err_nh = NULL;
 	list_for_each_entry(nh, &rt6_nh_list, next) {
+		dst_release(&rt_last->dst);
 		rt_last = nh->rt6_info;
+		dst_hold(&rt_last->dst);
 		err = __ip6_ins_rt(nh->rt6_info, info, &nh->mxc, extack);
 		/* save reference to first route for notification */
 		if (!rt_notif && !err)
@@ -4317,7 +4319,7 @@ cleanup:
 		list_del(&nh->next);
 		kfree(nh);
 	}
-
+	dst_release(&rt_last->dst);
 	return err;
 }
 
