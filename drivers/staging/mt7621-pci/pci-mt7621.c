@@ -417,13 +417,13 @@ pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 			irq = RALINK_INT_PCIE1;
 		}
 		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
-	} else if ((dev->bus->number ==3) && (slot == 0x0)) {
+	} else if ((dev->bus->number == 3) && (slot == 0x0)) {
 		irq = RALINK_INT_PCIE2;
 		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
-	} else if ((dev->bus->number ==3) && (slot == 0x1)) {
+	} else if ((dev->bus->number == 3) && (slot == 0x1)) {
 		irq = RALINK_INT_PCIE2;
 		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
-	} else if ((dev->bus->number ==3) && (slot == 0x2)) {
+	} else if ((dev->bus->number == 3) && (slot == 0x2)) {
 		irq = RALINK_INT_PCIE2;
 		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
 	} else {
