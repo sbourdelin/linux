@@ -5690,7 +5690,8 @@ mpt_inactive_raid_volumes(MPT_ADAPTER *ioc, u8 channel, u8 id)
 		    buffer->PhysDisk[i].PhysDiskNum, &phys_disk) != 0)
 			continue;
 
-		if (!(component_info = kmalloc(sizeof(*component_info), GFP_KERNEL)))
+		if (!(component_info = kmalloc(sizeof(*component_info),
+		      GFP_KERNEL)))
 			continue;
 
 		component_info->volumeID = id;
