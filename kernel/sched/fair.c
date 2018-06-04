@@ -1535,14 +1535,22 @@ static bool load_too_imbalanced(long src_load, long dst_load,
 }
 
 /*
+ * Maximum numa importance can be 1998 (2*999);
+ * SMALLIMP @ 30 would be close to 1998/64.
+ * Used to deter task migration.
+ */
+#define SMALLIMP	30
+
+/*
  * This checks if the overall compute and NUMA accesses of the system would
  * be improved if the source tasks was migrated to the target dst_cpu taking
  * into account that it might be best if task running on the dst_cpu should
  * be exchanged with the source task
  */
 static void task_numa_compare(struct task_numa_env *env,
-			      long taskimp, long groupimp, bool move)
+			      long taskimp, long groupimp, bool *move)
 {
+	pg_data_t *pgdat = NODE_DATA(cpu_to_node(env->dst_cpu));
 	struct rq *dst_rq = cpu_rq(env->dst_cpu);
 	struct task_struct *cur;
 	long src_load, dst_load;
@@ -1553,6 +1561,9 @@ static void task_numa_compare(struct task_numa_env *env,
 
 	if (READ_ONCE(dst_rq->numa_migrate_on))
 		return;
+
+	if (*move && READ_ONCE(pgdat->active_node_migrate))
+		*move = false;
 
 	rcu_read_lock();
 	cur = task_rcu_dereference(&dst_rq->curr);
@@ -1567,10 +1578,10 @@ static void task_numa_compare(struct task_numa_env *env,
 		goto unlock;
 
 	if (!cur) {
-		if (!move || imp <= env->best_imp)
-			goto unlock;
-		else
+		if (*move && moveimp >= env->best_imp)
 			goto assign;
+		else
+			goto unlock;
 	}
 
 	/*
@@ -1610,14 +1621,20 @@ static void task_numa_compare(struct task_numa_env *env,
 			       task_weight(cur, env->dst_nid, dist);
 	}
 
-	if (imp <= env->best_imp)
-		goto unlock;
-
-	if (move && moveimp > imp && moveimp > env->best_imp) {
-		imp = moveimp - 1;
+	if (*move && moveimp > imp && moveimp > env->best_imp) {
+		imp = moveimp;
 		cur = NULL;
 		goto assign;
 	}
+
+	/*
+	 * If the numa importance is less than SMALLIMP,
+	 * task migration might only result in ping pong
+	 * of tasks and also hurt performance due to cache
+	 * misses.
+	 */
+	if (imp < SMALLIMP || imp <= env->best_imp + SMALLIMP / 2)
+		goto unlock;
 
 	/*
 	 * In the overloaded case, try and keep the load balanced.
@@ -1675,7 +1692,7 @@ static void task_numa_find_cpu(struct task_numa_env *env,
 			continue;
 
 		env->dst_cpu = cpu;
-		task_numa_compare(env, taskimp, groupimp, move);
+		task_numa_compare(env, taskimp, groupimp, &move);
 	}
 }
 
