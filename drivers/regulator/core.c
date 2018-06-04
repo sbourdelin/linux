@@ -1571,6 +1571,7 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
 	struct device *dev = rdev->dev.parent;
 	int ret;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	/* No supply to resovle? */
 	if (!rdev->supply_name)
 		return 0;
@@ -2211,6 +2212,7 @@ static int _regulator_enable(struct regulator_dev *rdev)
 {
 	int ret;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	lockdep_assert_held_once(&rdev->mutex);
 
 	/* check voltage and requested load before enabling */
@@ -2259,6 +2261,7 @@ int regulator_enable(struct regulator *regulator)
 	struct regulator_dev *rdev = regulator->rdev;
 	int ret = 0;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	if (regulator->always_on)
 		return 0;
 
@@ -2275,6 +2278,7 @@ int regulator_enable(struct regulator *regulator)
 	if (ret != 0 && rdev->supply)
 		regulator_disable(rdev->supply);
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(regulator_enable);
@@ -2373,6 +2377,7 @@ int regulator_disable(struct regulator *regulator)
 	struct regulator_dev *rdev = regulator->rdev;
 	int ret = 0;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	if (regulator->always_on)
 		return 0;
 
@@ -2383,6 +2388,7 @@ int regulator_disable(struct regulator *regulator)
 	if (ret == 0 && rdev->supply)
 		regulator_disable(rdev->supply);
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(regulator_disable);
@@ -2858,6 +2864,7 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 	const struct regulator_ops *ops = rdev->desc->ops;
 	int old_uV = _regulator_get_voltage(rdev);
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	trace_regulator_set_voltage(rdev_get_name(rdev), min_uV, max_uV);
 
 	min_uV += rdev->constraints->uV_offset;
@@ -2992,6 +2999,7 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
 	int best_supply_uV = 0;
 	int supply_change_uV = 0;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	/* If we're setting the same range as last time the change
 	 * should be a noop (some cpufreq implementations use the same
 	 * voltage for multiple frequencies, for example).
@@ -3124,6 +3132,7 @@ int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
 {
 	int ret = 0;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	regulator_lock_supply(regulator->rdev);
 
 	ret = regulator_set_voltage_unlocked(regulator, min_uV, max_uV,
