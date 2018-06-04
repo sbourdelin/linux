@@ -136,6 +136,10 @@ int cpudl_find(struct cpudl *cp, struct task_struct *p,
 
 		WARN_ON(best_cpu != -1 && !cpu_present(best_cpu));
 
+		/* The heap tree is empty, just return. */
+		if (best_cpu == -1)
+			return 0;
+
 		if (cpumask_test_cpu(best_cpu, &p->cpus_allowed) &&
 		    dl_time_before(dl_se->deadline, cpudl_maximum_dl(cp))) {
 			if (later_mask)
@@ -172,6 +176,13 @@ void cpudl_clear(struct cpudl *cp, int cpu)
 		 * This could happen if a rq_offline_dl is
 		 * called for a CPU without -dl tasks running.
 		 */
+	} else if (cp->size == 1){
+		/* Only one element in the heap, clear it. */
+		cp->elements[0].cpu = -1;
+		cp->elements[cpu].idx = IDX_INVALID;
+		cp->size = 0;
+
+		cpumask_set_cpu(cpu, cp->free_cpus);
 	} else {
 		new_cpu = cp->elements[cp->size - 1].cpu;
 		cp->elements[old_idx].dl = cp->elements[cp->size - 1].dl;
@@ -266,6 +277,9 @@ int cpudl_init(struct cpudl *cp)
 
 	for_each_possible_cpu(i)
 		cp->elements[i].idx = IDX_INVALID;
+
+	/* Mark heap as initially empty. */
+	cp->elements[i].cpu = -1;
 
 	return 0;
 }
