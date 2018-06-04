@@ -312,3 +312,12 @@ config ARM_PXA2xx_CPUFREQ
 	  This add the CPUFreq driver support for Intel PXA2xx SOCs.
 
 	  If in doubt, say N.
+
+config ARM_QCOM_CPUFREQ_FW
+	bool "QCOM CPUFreq FW driver"
+	help
+	 Support for the CPUFreq FW driver.
+	 The CPUfreq FW preset in some QCOM chipsets offloads the steps
+	 necessary for changing the frequency of CPUs. The driver
+	 implements the cpufreq driver interface for this firmware.
+	 Say Y if you want to support CPUFreq FW.
