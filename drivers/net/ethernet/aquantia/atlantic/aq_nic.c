@@ -89,8 +89,8 @@ void aq_nic_cfg_start(struct aq_nic_s *self)
 	aq_nic_rss_init(self, cfg->num_rss_queues);
 
 	/*descriptors */
-	cfg->rxds = min(cfg->aq_hw_caps->rxds, AQ_CFG_RXDS_DEF);
-	cfg->txds = min(cfg->aq_hw_caps->txds, AQ_CFG_TXDS_DEF);
+	cfg->rxds = min(cfg->aq_hw_caps->rxds_max, AQ_CFG_RXDS_DEF);
+	cfg->txds = min(cfg->aq_hw_caps->txds_max, AQ_CFG_TXDS_DEF);
 
 	/*rss rings */
 	cfg->vecs = min(cfg->aq_hw_caps->vecs, AQ_CFG_VECS_DEF);
@@ -158,6 +158,8 @@ static void aq_nic_service_timer_cb(struct timer_list *t)
 	int ctimer = AQ_CFG_SERVICE_TIMER_INTERVAL;
 	int err = 0;
 
+	mutex_lock(&self->aq_mutex);
+
 	if (aq_utils_obj_test(&self->flags, AQ_NIC_FLAGS_IS_NOT_READY))
 		goto err_exit;
 
@@ -175,6 +177,7 @@ static void aq_nic_service_timer_cb(struct timer_list *t)
 		ctimer = max(ctimer / 2, 1);
 
 err_exit:
+	mutex_unlock(&self->aq_mutex);
 	mod_timer(&self->service_timer, jiffies + ctimer);
 }
 
@@ -287,6 +290,8 @@ int aq_nic_init(struct aq_nic_s *self)
 	for (i = 0U, aq_vec = self->aq_vec[0];
 		self->aq_vecs > i; ++i, aq_vec = self->aq_vec[i])
 		aq_vec_init(aq_vec, self->aq_hw_ops, self->aq_hw);
+
+	mutex_init(&self->aq_mutex);
 
 	netif_carrier_off(self->ndev);
 
