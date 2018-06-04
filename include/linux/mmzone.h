@@ -677,6 +677,7 @@ typedef struct pglist_data {
 
 	/* Number of pages migrated during the rate limiting time interval */
 	unsigned long numabalancing_migrate_nr_pages;
+	int active_node_migrate;
 #endif
 	/*
 	 * This is a per-node reserve of pages that are not available

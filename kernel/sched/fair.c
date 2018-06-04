@@ -1478,10 +1478,21 @@ struct task_numa_env {
 static void task_numa_assign(struct task_numa_env *env,
 			     struct task_struct *p, long imp)
 {
+	pg_data_t *pgdat = NODE_DATA(cpu_to_node(env->dst_cpu));
 	struct rq *rq = cpu_rq(env->dst_cpu);
 
 	if (xchg(&rq->numa_migrate_on, 1))
 		return;
+
+	if (!env->best_task && env->best_cpu != -1)
+		WRITE_ONCE(pgdat->active_node_migrate, 0);
+
+	if (!p) {
+		if (xchg(&pgdat->active_node_migrate, 1)) {
+			WRITE_ONCE(rq->numa_migrate_on, 0);
+			return;
+		}
+	}
 
 	if (env->best_cpu != -1) {
 		rq = cpu_rq(env->best_cpu);
@@ -1819,8 +1830,11 @@ static int task_numa_migrate(struct task_struct *p)
 
 	best_rq = cpu_rq(env.best_cpu);
 	if (env.best_task == NULL) {
+		pg_data_t *pgdat = NODE_DATA(cpu_to_node(env.dst_cpu));
+
 		ret = migrate_task_to(p, env.best_cpu);
 		WRITE_ONCE(best_rq->numa_migrate_on, 0);
+		WRITE_ONCE(pgdat->active_node_migrate, 0);
 		if (ret != 0)
 			trace_sched_stick_numa(p, env.src_cpu, env.best_cpu);
 		return ret;
