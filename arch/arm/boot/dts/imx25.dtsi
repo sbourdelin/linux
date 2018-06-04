@@ -386,15 +386,19 @@
 			};
 
 			epit1: timer@53f94000 {
-				compatible = "fsl,imx25-epit";
+				compatible = "fsl,imx25-epit", "fsl,imx31-epit";
 				reg = <0x53f94000 0x4000>;
 				interrupts = <28>;
+				clocks = <&clks 83>;
+				status = "disabled";
 			};
 
 			epit2: timer@53f98000 {
-				compatible = "fsl,imx25-epit";
+				compatible = "fsl,imx25-epit", "fsl,imx31-epit";
 				reg = <0x53f98000 0x4000>;
 				interrupts = <27>;
+				clocks = <&clks 84>;
+				status = "disabled";
 			};
 
 			gpio4: gpio@53f9c000 {

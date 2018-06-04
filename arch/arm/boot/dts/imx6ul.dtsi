@@ -649,14 +649,20 @@
 				};
 			};
 
-			epit1: epit@20d0000 {
+			epit1: timer@20d0000 {
+				compatible = "fsl,imx6ul-epit", "fsl,imx31-epit";
 				reg = <0x020d0000 0x4000>;
 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clks IMX6UL_CLK_EPIT1>;
+				status = "disabled";
 			};
 
-			epit2: epit@20d4000 {
+			epit2: timer@20d4000 {
+				compatible = "fsl,imx6ul-epit", "fsl,imx31-epit";
 				reg = <0x020d4000 0x4000>;
 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clks IMX6UL_CLK_EPIT2>;
+				status = "disabled";
 			};
 
 			src: src@20d8000 {
