@@ -29,6 +29,9 @@ vc4_atomic_complete_commit(struct drm_atomic_state *state)
 {
 	struct drm_device *dev = state->dev;
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct drm_connector *connector;
+	struct drm_connector_state *new_conn_state;
+	int i;
 
 	drm_atomic_helper_wait_for_fences(dev, state, false);
 
@@ -37,6 +40,28 @@ vc4_atomic_complete_commit(struct drm_atomic_state *state)
 	drm_atomic_helper_commit_modeset_disables(dev, state);
 
 	drm_atomic_helper_commit_planes(dev, state, 0);
+
+	/* Enable DSI link. */
+	for_each_new_connector_in_state(state, connector, new_conn_state, i) {
+		struct drm_encoder *encoder;
+		struct vc4_encoder *vc4_encoder;
+
+		if (!new_conn_state->best_encoder)
+			continue;
+
+		if (!new_conn_state->crtc->state->active ||
+		    !drm_atomic_crtc_needs_modeset(new_conn_state->crtc->state))
+			continue;
+
+		(void)connector;
+		encoder = new_conn_state->best_encoder;
+		vc4_encoder = to_vc4_encoder(encoder);
+
+		if (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
+		    vc4_encoder->type == VC4_ENCODER_TYPE_DSI1) {
+			vc4_dsi_prepare(encoder);
+		}
+	}
 
 	drm_atomic_helper_commit_modeset_enables(dev, state);
 

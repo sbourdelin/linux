@@ -673,6 +673,7 @@ int vc4_dpi_debugfs_regs(struct seq_file *m, void *unused);
 /* vc4_dsi.c */
 extern struct platform_driver vc4_dsi_driver;
 int vc4_dsi_debugfs_regs(struct seq_file *m, void *unused);
+void vc4_dsi_prepare(struct drm_encoder *encoder);
 
 /* vc4_fence.c */
 extern const struct dma_fence_ops vc4_fence_ops;
