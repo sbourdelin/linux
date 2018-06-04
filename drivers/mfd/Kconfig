@@ -194,7 +194,6 @@ config MFD_CROS_EC
 	tristate "ChromeOS Embedded Controller"
 	select MFD_CORE
 	select CHROME_PLATFORMS
-	select CROS_EC_PROTO
 	depends on X86 || ARM || ARM64 || COMPILE_TEST
 	help
 	  If you say Y here you get support for the ChromeOS Embedded
