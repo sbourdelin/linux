@@ -341,12 +341,11 @@ static int vrtc_mrst_do_probe(struct device *dev, struct resource *iomem,
 	mrst_rtc.dev = dev;
 	dev_set_drvdata(dev, &mrst_rtc);
 
-	mrst_rtc.rtc = rtc_device_register(driver_name, dev,
-				&mrst_rtc_ops, THIS_MODULE);
-	if (IS_ERR(mrst_rtc.rtc)) {
-		retval = PTR_ERR(mrst_rtc.rtc);
-		goto cleanup0;
-	}
+	mrst_rtc.rtc = devm_rtc_allocate_device(dev);
+	if (IS_ERR(mrst_rtc.rtc))
+		return PTR_ERR(mrst_rtc.rtc);
+
+	mrst_rtc.rtc->ops = &mrst_rtc_ops;
 
 	rename_region(iomem, dev_name(&mrst_rtc.rtc->dev));
 
@@ -365,14 +364,21 @@ static int vrtc_mrst_do_probe(struct device *dev, struct resource *iomem,
 		if (retval < 0) {
 			dev_dbg(dev, "IRQ %d is already in use, err %d\n",
 				rtc_irq, retval);
-			goto cleanup1;
+			goto cleanup0;
 		}
 	}
+
+	retval = rtc_register_device(mrst_rtc.rtc);
+	if (retval) {
+		retval = PTR_ERR(mrst_rtc.rtc);
+		goto cleanup1;
+	}
+
 	dev_dbg(dev, "initialised\n");
 	return 0;
 
 cleanup1:
-	rtc_device_unregister(mrst_rtc.rtc);
+	free_irq(rtc_irq, mrst->rtc);
 cleanup0:
 	mrst_rtc.dev = NULL;
 	release_mem_region(iomem->start, resource_size(iomem));
@@ -397,7 +403,6 @@ static void rtc_mrst_do_remove(struct device *dev)
 	if (mrst->irq)
 		free_irq(mrst->irq, mrst->rtc);
 
-	rtc_device_unregister(mrst->rtc);
 	mrst->rtc = NULL;
 
 	iomem = mrst->iomem;
