@@ -2296,6 +2296,11 @@ int regulator_enable(struct regulator *regulator)
 	int ret = 0;
 
 	pr_err("%s: %d\n", __func__, __LINE__);
+	if (rdev->coupling_desc.n_resolved != rdev->coupling_desc.n_coupled) {
+		rdev_err(rdev, "not all coupled regulators registered\n");
+		return -EPERM;
+	}
+
 	if (regulator->always_on)
 		return 0;
 
@@ -2307,6 +2312,9 @@ int regulator_enable(struct regulator *regulator)
 
 	regulator_lock_dependent(rdev);
 	ret = _regulator_enable(rdev);
+	/* balance only if there are regulators coupled */
+	if (rdev->coupling_desc.n_coupled > 1)
+		regulator_balance_voltage(rdev, PM_SUSPEND_ON);
 	regulator_unlock_dependent(rdev);
 
 	if (ret != 0 && rdev->supply)
@@ -2417,6 +2425,8 @@ int regulator_disable(struct regulator *regulator)
 
 	regulator_lock_dependent(rdev);
 	ret = _regulator_disable(rdev);
+	if (rdev->coupling_desc.n_coupled > 1)
+		regulator_balance_voltage(rdev, PM_SUSPEND_ON);
 	regulator_unlock_dependent(rdev);
 
 	if (ret == 0 && rdev->supply)
@@ -2470,6 +2480,8 @@ int regulator_force_disable(struct regulator *regulator)
 	regulator_lock_dependent(rdev);
 	regulator->uA_load = 0;
 	ret = _regulator_force_disable(regulator->rdev);
+	if (rdev->coupling_desc.n_coupled > 1)
+		regulator_balance_voltage(rdev, PM_SUSPEND_ON);
 	regulator_unlock_dependent(rdev);
 
 	if (rdev->supply)
@@ -3031,7 +3043,16 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
 	int old_min_uV, old_max_uV;
 	int current_uV;
 
+<<<<<<< HEAD
 	pr_err("%s: %d\n", __func__, __LINE__);
+=======
+	if (rdev->coupling_desc.n_resolved != rdev->coupling_desc.n_coupled) {
+		rdev_err(rdev, "not all coupled regulators registered\n");
+		ret = -EPERM;
+		goto out;
+	}
+
+>>>>>>> fcbf6fa... regulator: core: Enable voltage balancing
 	/* If we're setting the same range as last time the change
 	 * should be a noop (some cpufreq implementations use the same
 	 * voltage for multiple frequencies, for example).
@@ -3074,7 +3095,8 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
 	if (ret < 0)
 		goto out2;
 
-	ret = regulator_set_voltage_rdev(rdev, min_uV, max_uV, state);
+	/* for not coupled regulators this will just set the voltage */
+	ret = regulator_balance_voltage(rdev, state);
 	if (ret < 0)
 		goto out2;
 
