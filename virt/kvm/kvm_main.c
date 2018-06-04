@@ -251,11 +251,21 @@ bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 #ifndef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
 void kvm_flush_remote_tlbs(struct kvm *kvm)
 {
+	long dirty_count;
+
+	/*
+	 * Call tlb_remote_flush first and go back old way when
+	 * return failure.
+	 */
+	if (kvm_x86_ops->tlb_remote_flush &&
+	    !kvm_x86_ops->tlb_remote_flush(kvm))
+		return;
+
 	/*
 	 * Read tlbs_dirty before setting KVM_REQ_TLB_FLUSH in
 	 * kvm_make_all_cpus_request.
 	 */
-	long dirty_count = smp_load_acquire(&kvm->tlbs_dirty);
+	dirty_count = smp_load_acquire(&kvm->tlbs_dirty);
 
 	/*
 	 * We want to publish modifications to the page tables before reading
