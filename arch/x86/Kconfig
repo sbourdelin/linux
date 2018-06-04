@@ -1138,6 +1138,18 @@ config X86_MCE_AMD
 	   Additional support for AMD specific MCE features such as
 	   the DRAM Error Threshold.
 
+config X86_MCE_CENTAUR
+	def_bool y
+	prompt "CENTAUR MCE features"
+	depends on CPU_SUP_CENTAUR && X86_MCE_INTEL
+	help
+	   Additional support for Centaur specific MCE features such as
+	   MCE broadcasting and CMCI support.
+	   New Centaur CPU support MCE broadcasting.
+	   New Centaur CPU support CMCI which is fully compliant with Intel CMCI.
+
+	   If unsure, say N here.
+
 config X86_ANCIENT_MCE
 	bool "Support for old Pentium 5 / WinChip machine checks"
 	depends on X86_32 && X86_MCE

@@ -85,7 +85,8 @@ static int cmci_supported(int *banks)
 	 * initialization is vendor keyed and this
 	 * makes sure none of the backdoors are entered otherwise.
 	 */
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
+	if ((boot_cpu_data.x86_vendor != X86_VENDOR_INTEL &&
+		boot_cpu_data.x86_vendor != X86_VENDOR_CENTAUR))
 		return 0;
 	if (!boot_cpu_has(X86_FEATURE_APIC) || lapic_get_maxlvt() < 6)
 		return 0;
@@ -506,10 +507,20 @@ static void intel_ppin_init(struct cpuinfo_x86 *c)
 
 void mce_intel_feature_init(struct cpuinfo_x86 *c)
 {
-	intel_init_thermal(c);
-	intel_init_cmci();
-	intel_init_lmce();
-	intel_ppin_init(c);
+
+	switch (c->x86_vendor) {
+	case X86_VENDOR_INTEL:
+		intel_init_thermal(c);
+		intel_init_cmci();
+		intel_init_lmce();
+		intel_ppin_init(c);
+		break;
+	case X86_VENDOR_CENTAUR:
+		intel_init_cmci();
+		break;
+	default:
+		break;
+	}
 }
 
 void mce_intel_feature_clear(struct cpuinfo_x86 *c)
