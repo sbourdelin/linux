@@ -4737,6 +4737,17 @@ static inline void __vmx_flush_tlb(struct kvm_vcpu *vcpu, int vpid,
 	}
 }
 
+static int vmx_remote_flush_tlb(struct kvm *kvm)
+{
+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
+
+	if (!VALID_PAGE(vcpu->arch.mmu.root_hpa))
+		return -1;
+
+	return hyperv_flush_guest_mapping(construct_eptp(vcpu,
+		vcpu->arch.mmu.root_hpa));
+}
+
 static void vmx_flush_tlb(struct kvm_vcpu *vcpu, bool invalidate_gpa)
 {
 	__vmx_flush_tlb(vcpu, to_vmx(vcpu)->vpid, invalidate_gpa);
@@ -7494,6 +7505,10 @@ static __init int hardware_setup(void)
 
 	if (enable_ept && !cpu_has_vmx_ept_2m_page())
 		kvm_disable_largepages();
+
+	if (ms_hyperv.nested_features & HV_X64_NESTED_GUSET_MAPPING_FLUSH
+	    && enable_ept)
+		kvm_x86_ops->tlb_remote_flush = vmx_remote_flush_tlb;
 
 	if (!cpu_has_vmx_ple()) {
 		ple_gap = 0;
