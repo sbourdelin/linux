@@ -16,7 +16,7 @@
 #include <asm/vgtod.h>
 #include <asm/vvar.h>
 
-int vclocks_used __read_mostly;
+int vclocks_used;
 
 DEFINE_VVAR(struct vsyscall_gtod_data, vsyscall_gtod_data);
 
