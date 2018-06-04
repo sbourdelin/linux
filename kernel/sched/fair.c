@@ -750,19 +750,22 @@ static void attach_entity_cfs_rq(struct sched_entity *se);
 void post_init_entity_util_avg(struct sched_entity *se)
 {
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
-	struct sched_avg *sa = &se->avg;
 	long cap = (long)(SCHED_CAPACITY_SCALE - cfs_rq->avg.util_avg) / 2;
 
 	if (cap > 0) {
-		if (cfs_rq->avg.util_avg != 0) {
-			sa->util_avg  = cfs_rq->avg.util_avg * se->load.weight;
-			sa->util_avg /= (cfs_rq->avg.load_avg + 1);
+		struct sched_avg *sa = &se->avg;
+		u64 util_avg = READ_ONCE(sa->util_avg);
 
-			if (sa->util_avg > cap)
-				sa->util_avg = cap;
+		if (cfs_rq->avg.util_avg != 0) {
+			util_avg  =  cfs_rq->avg.util_avg * se->load.weight;
+			util_avg /= (cfs_rq->avg.load_avg + 1);
+			if (util_avg > cap)
+				util_avg = cap;
 		} else {
-			sa->util_avg = cap;
+			util_avg = cap;
 		}
+
+		WRITE_ONCE(sa->util_avg, util_avg);
 	}
 
 	if (entity_is_task(se)) {
