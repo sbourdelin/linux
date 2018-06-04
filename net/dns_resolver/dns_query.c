@@ -81,7 +81,9 @@ int dns_query(const char *type, const char *name, size_t namelen,
 	kenter("%s,%*.*s,%zu,%s",
 	       type, (int)namelen, (int)namelen, name, namelen, options);
 
-	if (!name || namelen == 0)
+	if (!name || namelen < 3 || namelen > 255)
+		return -EINVAL;
+	if (namelen > strnlen(name, 256)) /*maybe only need part of name*/
 		return -EINVAL;
 
 	/* construct the query key description as "[<type>:]<name>" */
@@ -94,10 +96,6 @@ int dns_query(const char *type, const char *name, size_t namelen,
 		desclen += typelen + 1;
 	}
 
-	if (!namelen)
-		namelen = strnlen(name, 256);
-	if (namelen < 3 || namelen > 255)
-		return -EINVAL;
 	desclen += namelen + 1;
 
 	desc = kmalloc(desclen, GFP_KERNEL);
