@@ -1016,7 +1016,6 @@ struct task_struct {
 	u64				last_sum_exec_runtime;
 	struct callback_head		numa_work;
 
-	struct list_head		numa_entry;
 	struct numa_group		*numa_group;
 
 	/*
