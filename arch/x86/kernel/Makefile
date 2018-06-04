@@ -9,6 +9,12 @@ extra-y	+= ebda.o
 extra-y	+= platform-quirks.o
 extra-y	+= vmlinux.lds
 
+$(obj)/macros.s: $(obj)/macros.S FORCE
+	$(call if_changed_dep,cpp_s_S)
+
+macros: $(obj)/macros.s
+	@:
+
 CPPFLAGS_vmlinux.lds += -U$(UTS_MACHINE)
 
 ifdef CONFIG_FUNCTION_TRACER
