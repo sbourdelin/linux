@@ -113,7 +113,22 @@
 };
 
 &pcie {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie_pins>;
 	status = "okay";
+
+	pcie@0,0 {
+		status = "okay";
+	};
+
+	pcie@1,0 {
+		status = "okay";
+	};
+
+	pcie@2,0 {
+		status = "okay";
+	};
+
 };
 
 &ethernet {
