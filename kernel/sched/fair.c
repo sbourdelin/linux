@@ -3161,6 +3161,8 @@ accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
 		sa->runnable_load_sum =
 			decay_load(sa->runnable_load_sum, periods);
 		sa->util_sum = decay_load((u64)(sa->util_sum), periods);
+		if (running)
+			sa->running_sum = decay_load(sa->running_sum, periods);
 
 		/*
 		 * Step 2
@@ -3176,8 +3178,10 @@ accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
 		sa->load_sum += load * contrib;
 	if (runnable)
 		sa->runnable_load_sum += runnable * contrib;
-	if (running)
+	if (running) {
 		sa->util_sum += contrib * scale_cpu;
+		sa->running_sum += contrib * scale_cpu;
+	}
 
 	return periods;
 }
@@ -3963,6 +3967,12 @@ static inline void util_est_enqueue(struct cfs_rq *cfs_rq,
 	WRITE_ONCE(cfs_rq->avg.util_est.enqueued, enqueued);
 }
 
+static inline void util_est_enqueue_running(struct task_struct *p)
+{
+	/* Initilize the (non-preempted) utilization */
+	p->se.avg.running_sum = p->se.avg.util_sum;
+}
+
 /*
  * Check if a (signed) value is within a specified (unsigned) margin,
  * based on the observation that:
@@ -4018,7 +4028,7 @@ util_est_dequeue(struct cfs_rq *cfs_rq, struct task_struct *p, bool task_sleep)
 	 * Skip update of task's estimated utilization when its EWMA is
 	 * already ~1% close to its last activation value.
 	 */
-	ue.enqueued = (task_util(p) | UTIL_AVG_UNCHANGED);
+	ue.enqueued = p->se.avg.running_sum / LOAD_AVG_MAX;
 	last_ewma_diff = ue.enqueued - ue.ewma;
 	if (within_margin(last_ewma_diff, (SCHED_CAPACITY_SCALE / 100)))
 		return;
@@ -5436,6 +5446,8 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se)
 		add_nr_running(rq, 1);
+
+	util_est_enqueue_running(p);
 
 	hrtick_update(rq);
 }
