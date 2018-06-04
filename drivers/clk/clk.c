@@ -2431,6 +2431,7 @@ EXPORT_SYMBOL_GPL(clk_is_match);
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
+#include <linux/uaccess.h>
 
 static struct dentry *rootdir;
 static int inited = 0;
@@ -2609,6 +2610,158 @@ static int possible_parents_show(struct seq_file *s, void *data)
 }
 DEFINE_SHOW_ATTRIBUTE(possible_parents);
 
+static int debugfs_clk_rate_set(void *core, u64 val)
+{
+	clk_prepare_lock();
+	clk_core_set_rate_nolock((struct clk_core *)core, val);
+	clk_prepare_unlock();
+	return 0;
+}
+
+static int debugfs_clk_rate_get(void *core, u64 *val)
+{
+	*val = clk_core_get_rate((struct clk_core *)core);
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_clk_rate, debugfs_clk_rate_get,
+			 debugfs_clk_rate_set, "%llu\n");
+
+static int debugfs_clk_enable_count_set(void *core, u64 val)
+{
+	struct clk_core *this_core = (struct clk_core *)core;
+
+	if (this_core->enable_count + 1 == val) {
+		if (this_core->prepare_count == 0) {
+			pr_err("Clock not yet prepared for enabling\n");
+			return 0;
+		}
+		return clk_core_enable_lock(this_core);
+	} else if (this_core->enable_count-1 == val) {
+		clk_core_disable_lock(this_core);
+		return 0;
+	} else if (this_core->enable_count == val)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+static int debugfs_clk_enable_count_get(void *core, u64 *val)
+{
+	*val = ((struct clk_core *)core)->enable_count;
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_clk_enable_count, debugfs_clk_enable_count_get,
+			 debugfs_clk_enable_count_set, "%llu\n");
+
+
+static int debugfs_clk_prepare_count_set(void *core, u64 val)
+{
+	struct clk_core *this_core = (struct clk_core *)core;
+
+	if (this_core->prepare_count + 1 == val)
+		return clk_core_prepare_lock(this_core);
+	else if (this_core->prepare_count - 1 == val) {
+		if ((val == 0) && (this_core->enable_count > 0)) {
+			pr_err("Can't unprepare, this clock is enabled\n");
+			return 0;
+		}
+		clk_core_unprepare_lock(this_core);
+		return 0;
+	} else if (this_core->prepare_count == val)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+static int debugfs_clk_prepare_count_get(void *core, u64 *val)
+{
+	*val = ((struct clk_core *)core)->prepare_count;
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_clk_prepare_count, debugfs_clk_prepare_count_get,
+			 debugfs_clk_prepare_count_set, "%llu\n");
+
+
+static int clk_parent_open(struct inode *inode, struct file *filp)
+{
+	filp->private_data = inode->i_private;
+	return 0;
+}
+
+static ssize_t clk_parent_write(struct file *filp, const char __user *userbuf,
+				size_t count, loff_t *ppos)
+{
+	struct clk_core *core, *parent;
+	char *parent_name;
+	int ret;
+
+	core = (struct clk_core *)filp->private_data;
+
+	parent_name = kzalloc(128, GFP_KERNEL);
+	if (!parent_name)
+		return -ENOMEM;
+
+	if (copy_from_user(parent_name + *ppos, userbuf, count))
+		return -EFAULT;
+
+	if (count > 0 && parent_name[count-1] == '\n')
+		parent_name[count-1] = '\0';
+
+	*ppos += count;
+
+	parent = clk_core_lookup(parent_name);
+	kfree(parent_name);
+
+	ret = clk_core_set_parent_nolock(core, parent);
+
+	if (ret)
+		return ret;
+
+	return count;
+}
+
+static ssize_t clk_parent_read(struct file *filp, char __user *userbuf,
+			       size_t count, loff_t *ppos)
+{
+	struct clk_core *core;
+	char *parent_name;
+
+	core = (struct clk_core *)filp->private_data;
+
+	parent_name = kzalloc(128, GFP_KERNEL);
+	if (!parent_name)
+		return -ENOMEM;
+
+	clk_prepare_lock();
+	if (core->parent) {
+		sprintf(parent_name, "%s\n", core->parent->name);
+		count = strlen(parent_name) - *ppos;
+	} else {
+		sprintf(parent_name, "NULL\n");
+		count = strlen(parent_name) - *ppos;
+	}
+	clk_prepare_unlock();
+
+	if (copy_to_user(userbuf, parent_name, count)) {
+		kfree(parent_name);
+		return -EFAULT;
+	}
+
+	*ppos += count;
+
+	kfree(parent_name);
+	return count;
+}
+
+static const struct file_operations fops_clk_parent = {
+	.write	= clk_parent_write,
+	.open	= clk_parent_open,
+	.read	= clk_parent_read,
+};
+
 static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 {
 	struct dentry *d;
@@ -2625,7 +2778,8 @@ static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 
 	core->dentry = d;
 
-	d = debugfs_create_ulong("clk_rate", 0444, core->dentry, &core->rate);
+	d = debugfs_create_file("clk_rate", 0664, core->dentry,
+				 core, &fops_clk_rate);
 	if (!d)
 		goto err_out;
 
@@ -2643,13 +2797,13 @@ static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_u32("clk_prepare_count", 0444, core->dentry,
-			       &core->prepare_count);
+	d = debugfs_create_file("clk_prepare_count", 0664, core->dentry,
+				core, &fops_clk_prepare_count);
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_u32("clk_enable_count", 0444, core->dentry,
-			       &core->enable_count);
+	d = debugfs_create_file("clk_enable_count", 0664, core->dentry,
+				core, &fops_clk_enable_count);
 	if (!d)
 		goto err_out;
 
@@ -2669,6 +2823,11 @@ static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 		if (!d)
 			goto err_out;
 	}
+
+	d = debugfs_create_file("clk_parent", 0664, core->dentry,
+				core, &fops_clk_parent);
+	if (!d)
+		goto err_out;
 
 	if (core->ops->debug_init) {
 		ret = core->ops->debug_init(core->hw, core->dentry);
