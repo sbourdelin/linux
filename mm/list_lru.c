@@ -305,6 +305,9 @@ static void __memcg_destroy_list_lru_node(struct list_lru_memcg *memcg_lrus,
 {
 	int i;
 
+	if (unlikely(begin >= end))
+		return;
+
 	for (i = begin; i < end; i++)
 		kfree(memcg_lrus->lru[i]);
 }
@@ -429,6 +432,8 @@ static int memcg_init_list_lru(struct list_lru *lru, bool memcg_aware)
 	}
 	return 0;
 fail:
+	if (unlikely(i == 0))
+		return -ENOMEM;
 	for (i = i - 1; i >= 0; i--) {
 		if (!lru->node[i].memcg_lrus)
 			continue;
@@ -463,6 +468,8 @@ static int memcg_update_list_lru(struct list_lru *lru,
 	}
 	return 0;
 fail:
+	if (unlikely(i == 0))
+		return -ENOMEM;
 	for (i = i - 1; i >= 0; i--) {
 		if (!lru->node[i].memcg_lrus)
 			continue;
