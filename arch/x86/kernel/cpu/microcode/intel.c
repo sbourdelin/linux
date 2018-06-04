@@ -346,12 +346,10 @@ scan_microcode(void *data, size_t size, struct ucode_cpu_info *uci, bool save)
 				goto next;
 
 		} else {
-			struct microcode_header_intel *phdr = &patch->hdr;
-
 			if (!has_newer_microcode(data,
-						 phdr->sig,
-						 phdr->pf,
-						 phdr->rev))
+						 uci->cpu_sig.sig,
+						 uci->cpu_sig.pf,
+						 patch->hdr.rev))
 				goto next;
 		}
 
