@@ -51,11 +51,9 @@ void kprobe_ftrace_handler(unsigned long nip, unsigned long parent_nip,
 	struct kprobe *p;
 	struct kprobe_ctlblk *kcb;
 
-	preempt_disable();
-
 	p = get_kprobe((kprobe_opcode_t *)nip);
 	if (unlikely(!p) || kprobe_disabled(p))
-		goto end;
+		return;
 
 	kcb = get_kprobe_ctlblk();
 	if (kprobe_running()) {
@@ -75,15 +73,14 @@ void kprobe_ftrace_handler(unsigned long nip, unsigned long parent_nip,
 			skip_singlestep(p, regs, kcb, orig_nip);
 		else {
 			/*
-			 * If pre_handler returns !0, it sets regs->nip and
-			 * resets current kprobe. In this case, we should not
-			 * re-enable preemption.
+			 * If pre_handler returns !0, this handler
+			 * modifies regs->ip and goes back to there
+			 * directly without single stepping.
+			 * So let's just clear current kprobe.
 			 */
-			return;
+			__this_cpu_write(current_kprobe, NULL);
 		}
 	}
-end:
-	preempt_enable_no_resched();
 }
 NOKPROBE_SYMBOL(kprobe_ftrace_handler);
 
