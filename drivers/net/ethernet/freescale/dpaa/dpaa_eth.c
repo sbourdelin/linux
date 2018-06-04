@@ -1168,7 +1168,11 @@ static int dpaa_eth_init_tx_port(struct fman_port *port, struct dpaa_fq *errq,
 	buf_prefix_content.priv_data_size = buf_layout->priv_data_size;
 	buf_prefix_content.pass_prs_result = true;
 	buf_prefix_content.pass_hash_result = true;
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	buf_prefix_content.pass_time_stamp = true;
+#else
 	buf_prefix_content.pass_time_stamp = false;
+#endif
 	buf_prefix_content.data_align = DPAA_FD_DATA_ALIGNMENT;
 
 	params.specific_params.non_rx_params.err_fqid = errq->fqid;
@@ -1210,7 +1214,11 @@ static int dpaa_eth_init_rx_port(struct fman_port *port, struct dpaa_bp **bps,
 	buf_prefix_content.priv_data_size = buf_layout->priv_data_size;
 	buf_prefix_content.pass_prs_result = true;
 	buf_prefix_content.pass_hash_result = true;
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	buf_prefix_content.pass_time_stamp = true;
+#else
 	buf_prefix_content.pass_time_stamp = false;
+#endif
 	buf_prefix_content.data_align = DPAA_FD_DATA_ALIGNMENT;
 
 	rx_p = &params.specific_params.rx_params;
@@ -1592,6 +1600,18 @@ static int dpaa_eth_refill_bpools(struct dpaa_priv *priv)
 	return 0;
 }
 
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+static int dpaa_get_tstamp_ns(struct net_device *net_dev, u64 *ns,
+			      struct fman_port *port, const void *data)
+{
+	if (!fman_port_get_tstamp_field(port, data, ns)) {
+		be64_to_cpus(ns);
+		return 0;
+	}
+	return -EINVAL;
+}
+#endif
+
 /* Cleanup function for outgoing frame descriptors that were built on Tx path,
  * either contiguous frames or scatter/gather ones.
  * Skb freeing is not handled here.
@@ -1615,6 +1635,24 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
 	skbh = (struct sk_buff **)phys_to_virt(addr);
 	skb = *skbh;
 
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	if (priv->tx_tstamp &&
+	    skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
+		struct skb_shared_hwtstamps shhwtstamps;
+		u64 ns;
+
+		memset(&shhwtstamps, 0, sizeof(shhwtstamps));
+
+		if (!dpaa_get_tstamp_ns(priv->net_dev, &ns,
+					priv->mac_dev->port[TX],
+					(void *)skbh)) {
+			shhwtstamps.hwtstamp = ns_to_ktime(ns);
+			skb_tstamp_tx(skb, &shhwtstamps);
+		} else {
+			dev_warn(dev, "dpaa_get_tstamp_ns failed!\n");
+		}
+	}
+#endif
 	if (unlikely(qm_fd_get_format(fd) == qm_fd_sg)) {
 		nr_frags = skb_shinfo(skb)->nr_frags;
 		dma_unmap_single(dev, addr, qm_fd_get_offset(fd) +
@@ -2086,6 +2124,14 @@ static int dpaa_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 	if (unlikely(err < 0))
 		goto skb_to_fd_failed;
 
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	if (priv->tx_tstamp &&
+	    skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
+		fd.cmd |= FM_FD_CMD_UPD;
+		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+	}
+#endif
+
 	if (likely(dpaa_xmit(priv, percpu_stats, queue_mapping, &fd) == 0))
 		return NETDEV_TX_OK;
 
@@ -2303,6 +2349,23 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
 		skb = sg_fd_to_skb(priv, fd);
 	if (!skb)
 		return qman_cb_dqrr_consume;
+
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	if (priv->rx_tstamp) {
+		struct skb_shared_hwtstamps *shhwtstamps;
+		u64 ns;
+
+		shhwtstamps = skb_hwtstamps(skb);
+		memset(shhwtstamps, 0, sizeof(*shhwtstamps));
+
+		if (!dpaa_get_tstamp_ns(priv->net_dev, &ns,
+					priv->mac_dev->port[RX],
+					vaddr))
+			shhwtstamps->hwtstamp = ns_to_ktime(ns);
+		else
+			dev_warn(net_dev->dev.parent, "dpaa_get_tstamp_ns failed!\n");
+	}
+#endif
 
 	skb->protocol = eth_type_trans(skb, net_dev);
 
@@ -2523,11 +2586,61 @@ static int dpaa_eth_stop(struct net_device *net_dev)
 	return err;
 }
 
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+static int dpaa_ts_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	struct dpaa_priv *priv = netdev_priv(dev);
+	struct hwtstamp_config config;
+
+	if (copy_from_user(&config, rq->ifr_data, sizeof(config)))
+		return -EFAULT;
+
+	switch (config.tx_type) {
+	case HWTSTAMP_TX_OFF:
+		/* Couldn't disable rx/tx timestamping separately.
+		 * Do nothing here.
+		 */
+		priv->tx_tstamp = false;
+		break;
+	case HWTSTAMP_TX_ON:
+		priv->mac_dev->set_tstamp(priv->mac_dev->fman_mac, true);
+		priv->tx_tstamp = true;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	if (config.rx_filter == HWTSTAMP_FILTER_NONE) {
+		/* Couldn't disable rx/tx timestamping separately.
+		 * Do nothing here.
+		 */
+		priv->rx_tstamp = false;
+	} else {
+		priv->mac_dev->set_tstamp(priv->mac_dev->fman_mac, true);
+		priv->rx_tstamp = true;
+		/* TS is set for all frame types, not only those requested */
+		config.rx_filter = HWTSTAMP_FILTER_ALL;
+	}
+
+	return copy_to_user(rq->ifr_data, &config, sizeof(config)) ?
+			-EFAULT : 0;
+}
+#endif /* CONFIG_FSL_DPAA_ETH_TS */
+
 static int dpaa_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 {
-	if (!net_dev->phydev)
-		return -EINVAL;
-	return phy_mii_ioctl(net_dev->phydev, rq, cmd);
+	int ret = -EINVAL;
+
+	if (cmd == SIOCGMIIREG) {
+		if (net_dev->phydev)
+			return phy_mii_ioctl(net_dev->phydev, rq, cmd);
+	}
+
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	if (cmd == SIOCSHWTSTAMP)
+		return dpaa_ts_ioctl(net_dev, rq, cmd);
+#endif
+	return ret;
 }
 
 static const struct net_device_ops dpaa_ops = {

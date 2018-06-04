@@ -8,3 +8,15 @@ menuconfig FSL_DPAA_ETH
 	  supporting the Freescale QorIQ chips.
 	  Depends on Freescale Buffer Manager and Queue Manager
 	  driver and Frame Manager Driver.
+
+if FSL_DPAA_ETH
+config FSL_DPAA_ETH_TS
+	bool "DPAA hardware timestamping support"
+	select PTP_1588_CLOCK_QORIQ
+	default n
+	help
+	  Enable DPAA hardware timestamping support.
+	  This option is useful for applications to get
+	  hardware time stamps on the Ethernet packets
+	  using the SO_TIMESTAMPING API.
+endif

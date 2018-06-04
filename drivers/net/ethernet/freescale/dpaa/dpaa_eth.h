@@ -182,6 +182,11 @@ struct dpaa_priv {
 
 	struct dpaa_buffer_layout buf_layout[2];
 	u16 rx_headroom;
+
+#ifdef CONFIG_FSL_DPAA_ETH_TS
+	bool tx_tstamp; /* Tx timestamping enabled */
+	bool rx_tstamp; /* Rx timestamping enabled */
+#endif
 };
 
 /* from dpaa_ethtool.c */
