@@ -1,0 +1,38 @@
+ROHM BD71837 Power Management Integrated Circuit clock bindings
+
+This is a part of device tree bindings of ROHM BD71837 multi-function
+device. See generic BD71837 MFD bindings at:
+	Documentation/devicetree/bindings/mfd/rohm,bd71837-pmic.txt
+
+BD71837 contains one 32,768 KHz clock output which can be enabled and
+disabled via i2c.
+
+Following properties should be present in main device node of the MFD chip.
+
+Required properties:
+- clock-frequency	: Should be 32768
+- #clock-cells		: Should be 0
+
+Optional properties:
+- clock-output-names	: Should contain name for output clock.
+
+Example:
+
+/* MFD node */
+
+pmic: pmic@4b {
+	compatible = "rohm,bd71837";
+	/* ... */
+	#clock-cells = <0>;
+	clock-frequency  = <32768>;
+	/* ... */
+};
+
+/* Clock consumer node */
+
+foo@0 {
+	compatible = "bar,foo";
+	/* ... */
+	clock-names = "my-clock";
+	clocks = <&pmic>;
+};
