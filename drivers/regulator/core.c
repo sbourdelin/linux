@@ -2305,9 +2305,9 @@ int regulator_enable(struct regulator *regulator)
 			return ret;
 	}
 
-	regulator_lock(rdev);
+	regulator_lock_dependent(rdev);
 	ret = _regulator_enable(rdev);
-	regulator_unlock(rdev);
+	regulator_unlock_dependent(rdev);
 
 	if (ret != 0 && rdev->supply)
 		regulator_disable(rdev->supply);
@@ -2415,9 +2415,9 @@ int regulator_disable(struct regulator *regulator)
 	if (regulator->always_on)
 		return 0;
 
-	regulator_lock(rdev);
+	regulator_lock_dependent(rdev);
 	ret = _regulator_disable(rdev);
-	regulator_unlock(rdev);
+	regulator_unlock_dependent(rdev);
 
 	if (ret == 0 && rdev->supply)
 		regulator_disable(rdev->supply);
@@ -2467,10 +2467,10 @@ int regulator_force_disable(struct regulator *regulator)
 	struct regulator_dev *rdev = regulator->rdev;
 	int ret;
 
-	regulator_lock(rdev);
+	regulator_lock_dependent(rdev);
 	regulator->uA_load = 0;
 	ret = _regulator_force_disable(regulator->rdev);
-	regulator_unlock(rdev);
+	regulator_unlock_dependent(rdev);
 
 	if (rdev->supply)
 		while (rdev->open_count--)
