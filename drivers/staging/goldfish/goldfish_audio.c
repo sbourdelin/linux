@@ -308,8 +308,11 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "platform_get_irq failed\n");
 		return -ENODEV;
 	}
-	data->buffer_virt = dmam_alloc_coherent(&pdev->dev,
-				COMBINED_BUFFER_SIZE, &buf_addr, GFP_KERNEL);
+	data->buffer_virt =
+		dmam_alloc_coherent(&pdev->dev,
+				    COMBINED_BUFFER_SIZE,
+				    &buf_addr,
+				    GFP_KERNEL);
 	if (!data->buffer_virt) {
 		dev_err(&pdev->dev, "allocate buffer failed\n");
 		return -ENOMEM;
