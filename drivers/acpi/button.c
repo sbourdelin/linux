@@ -235,9 +235,6 @@ static int acpi_lid_notify_state(struct acpi_device *device, int state)
 		button->last_time = ktime_get();
 	}
 
-	if (state)
-		acpi_pm_wakeup_event(&device->dev);
-
 	ret = blocking_notifier_call_chain(&acpi_lid_notifier, state, device);
 	if (ret == NOTIFY_DONE)
 		ret = blocking_notifier_call_chain(&acpi_lid_notifier, state,
@@ -417,6 +414,7 @@ static void acpi_button_notify(struct acpi_device *device, u32 event)
 		/* fall through */
 	case ACPI_BUTTON_NOTIFY_STATUS:
 		input = button->input;
+		acpi_pm_wakeup_event(&device->dev);
 		if (button->type == ACPI_BUTTON_TYPE_LID) {
 			mutex_lock(&button->input->mutex);
 			users = button->input->users;
@@ -426,7 +424,6 @@ static void acpi_button_notify(struct acpi_device *device, u32 event)
 		} else {
 			int keycode;
 
-			acpi_pm_wakeup_event(&device->dev);
 			if (button->suspended)
 				break;
 
