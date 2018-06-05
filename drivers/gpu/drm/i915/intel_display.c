@@ -13061,16 +13061,6 @@ static bool intel_primary_plane_format_mod_supported(struct drm_plane *plane,
 		return i8xx_mod_supported(format, modifier);
 }
 
-static bool intel_cursor_plane_format_mod_supported(struct drm_plane *plane,
-						    uint32_t format,
-						    uint64_t modifier)
-{
-	if (WARN_ON(modifier == DRM_FORMAT_MOD_INVALID))
-		return false;
-
-	return modifier == DRM_FORMAT_MOD_LINEAR && format == DRM_FORMAT_ARGB8888;
-}
-
 static struct drm_plane_funcs intel_plane_funcs = {
 	.update_plane = drm_atomic_helper_update_plane,
 	.disable_plane = drm_atomic_helper_disable_plane,
@@ -13080,17 +13070,6 @@ static struct drm_plane_funcs intel_plane_funcs = {
 	.atomic_duplicate_state = intel_plane_duplicate_state,
 	.atomic_destroy_state = intel_plane_destroy_state,
 	.format_mod_supported = intel_primary_plane_format_mod_supported,
-};
-
-static const struct drm_plane_funcs intel_cursor_plane_funcs = {
-	.update_plane = drm_atomic_helper_update_plane,
-	.disable_plane = drm_atomic_helper_disable_plane,
-	.destroy = intel_plane_destroy,
-	.atomic_get_property = intel_plane_atomic_get_property,
-	.atomic_set_property = intel_plane_atomic_set_property,
-	.atomic_duplicate_state = intel_plane_duplicate_state,
-	.atomic_destroy_state = intel_plane_destroy_state,
-	.format_mod_supported = intel_cursor_plane_format_mod_supported,
 };
 
 static bool i9xx_plane_has_fbc(struct drm_i915_private *dev_priv,
@@ -13326,7 +13305,7 @@ intel_cursor_plane_create(struct drm_i915_private *dev_priv,
 		cursor->cursor.size = ~0;
 
 	ret = drm_universal_plane_init(&dev_priv->drm, &cursor->base,
-				       0, &intel_cursor_plane_funcs,
+				       0, &intel_plane_funcs,
 				       intel_cursor_formats,
 				       ARRAY_SIZE(intel_cursor_formats),
 				       cursor_format_modifiers,
