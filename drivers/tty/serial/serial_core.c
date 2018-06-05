@@ -532,9 +532,15 @@ static int uart_put_char(struct tty_struct *tty, unsigned char c)
 	unsigned long flags;
 	int ret = 0;
 
+	/*
+	 * state->xmit.buf is protected by state->port.mutex, see the note in
+	 * uart_port_startup()
+	 */
+	mutex_lock(&state->port.mutex);
+
 	circ = &state->xmit;
 	if (!circ->buf)
-		return 0;
+		goto out;
 
 	port = uart_port_lock(state, flags);
 	if (port && uart_circ_chars_free(circ) != 0) {
@@ -543,6 +549,9 @@ static int uart_put_char(struct tty_struct *tty, unsigned char c)
 		ret = 1;
 	}
 	uart_port_unlock(port, flags);
+
+out:
+	mutex_unlock(&state->port.mutex);
 	return ret;
 }
 
