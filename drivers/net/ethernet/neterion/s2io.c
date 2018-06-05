@@ -733,8 +733,8 @@ static int init_shared_mem(struct s2io_nic *nic)
 
 			rx_blocks = &ring->rx_blocks[j];
 			size = SIZE_OF_BLOCK;	/* size is always page size */
-			tmp_v_addr = pci_alloc_consistent(nic->pdev, size,
-							  &tmp_p_addr);
+			tmp_v_addr = pci_zalloc_consistent(nic->pdev, size,
+							   &tmp_p_addr);
 			if (tmp_v_addr == NULL) {
 				/*
 				 * In case of failure, free_shared_mem()
@@ -746,7 +746,6 @@ static int init_shared_mem(struct s2io_nic *nic)
 				return -ENOMEM;
 			}
 			mem_allocated += size;
-			memset(tmp_v_addr, 0, size);
 
 			size = sizeof(struct rxd_info) *
 				rxd_count[nic->rxd_mode];
@@ -835,8 +834,8 @@ static int init_shared_mem(struct s2io_nic *nic)
 	/* Allocation and initialization of Statistics block */
 	size = sizeof(struct stat_block);
 	mac_control->stats_mem =
-		pci_alloc_consistent(nic->pdev, size,
-				     &mac_control->stats_mem_phy);
+		pci_zalloc_consistent(nic->pdev, size,
+				      &mac_control->stats_mem_phy);
 
 	if (!mac_control->stats_mem) {
 		/*
@@ -851,7 +850,6 @@ static int init_shared_mem(struct s2io_nic *nic)
 
 	tmp_v_addr = mac_control->stats_mem;
 	mac_control->stats_info = tmp_v_addr;
-	memset(tmp_v_addr, 0, size);
 	DBG_PRINT(INIT_DBG, "%s: Ring Mem PHY: 0x%llx\n",
 		dev_name(&nic->pdev->dev), (unsigned long long)tmp_p_addr);
 	mac_control->stats_info->sw_stat.mem_allocated += mem_allocated;
