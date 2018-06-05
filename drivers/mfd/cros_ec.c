@@ -1,21 +1,11 @@
-/*
- * ChromeOS EC multi-function device
- *
- * Copyright (C) 2012 Google, Inc
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * The ChromeOS EC multi function device is used to mux all the requests
- * to the EC device for its multiple features: keyboard controller,
- * battery charging and regulator control, firmware update.
- */
+// SPDX-License-Identifier: GPL-2.0+
+// ChromeOS EC multi-function device.
+//
+// Copyright (C) 2012 Google, Inc
+//
+// The ChromeOS EC multi function device is used to mux all the requests
+// to the EC device for its multiple features: keyboard controller,
+// battery charging and regulator control, firmware update.
 
 #include <linux/of_platform.h>
 #include <linux/interrupt.h>
