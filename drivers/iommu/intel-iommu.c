@@ -2875,19 +2875,24 @@ static bool device_has_rmrr(struct device *dev)
  * any use of the RMRR regions will be torn down before assigning the device
  * to a guest.
  */
+static bool rmrr_is_ignored(struct device *dev)
+{
+	if (dev_is_pci(dev)) {
+		struct pci_dev *pdev = to_pci_dev(dev);
+
+		if (IS_USB_DEVICE(pdev) || IS_GFX_DEVICE(pdev))
+			return true;
+	}
+
+	return false;
+}
+
 static bool device_is_rmrr_locked(struct device *dev)
 {
 	if (!device_has_rmrr(dev))
 		return false;
 
-	if (dev_is_pci(dev)) {
-		struct pci_dev *pdev = to_pci_dev(dev);
-
-		if (IS_USB_DEVICE(pdev) || IS_GFX_DEVICE(pdev))
-			return false;
-	}
-
-	return true;
+	return !rmrr_is_ignored(dev);
 }
 
 static int iommu_should_identity_map(struct device *dev, int startup)
@@ -5138,17 +5143,19 @@ static void intel_iommu_get_resv_regions(struct device *device,
 	struct device *i_dev;
 	int i;
 
-	rcu_read_lock();
-	for_each_rmrr_units(rmrr) {
-		for_each_active_dev_scope(rmrr->devices, rmrr->devices_cnt,
-					  i, i_dev) {
-			if (i_dev != device)
-				continue;
+	if (!rmrr_is_ignored(device)) {
+		rcu_read_lock();
+		for_each_rmrr_units(rmrr) {
+			for_each_active_dev_scope(rmrr->devices,
+						  rmrr->devices_cnt, i, i_dev) {
+				if (i_dev != device)
+					continue;
 
-			list_add_tail(&rmrr->resv->list, head);
+				list_add_tail(&rmrr->resv->list, head);
+			}
 		}
+		rcu_read_unlock();
 	}
-	rcu_read_unlock();
 
 	reg = iommu_alloc_resv_region(IOAPIC_RANGE_START,
 				      IOAPIC_RANGE_END - IOAPIC_RANGE_START + 1,
