@@ -56,6 +56,8 @@ Optional properties:
 				     the length can vary between hw versions.
 - <supply-name>-supply: handle to the regulator device tree node
 			   optional "supply-name" is "vdd-0.8-cx-mx".
+- msa-fixed-region: phandle, specifier to children of reserved MSA memory.
+- msa-size: MSA memory size for fw internal use.
 
 Example (to supply the calibration data alone):
 
@@ -133,6 +135,8 @@ wifi@18000000 {
 		compatible = "qcom,wcn3990-wifi";
 		reg = <0x18800000 0x800000>;
 		reg-names = "membase";
+		msa-fixed-region = <&wlan_msa_mem>;
+		msa-size = <0x100000>;
 		clocks = <&clock_gcc clk_aggre2_noc_clk>;
 		clock-names = "smmu_aggre2_noc_clk"
 		interrupts =
