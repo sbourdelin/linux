@@ -12106,6 +12106,9 @@ static int intel_atomic_check(struct drm_device *dev,
 	if (ret)
 		return ret;
 
+	if (state->legacy_cursor_update)
+		state->async_update = !drm_atomic_helper_async_check(dev,
+								     state);
 	intel_fbc_choose_crtc(dev_priv, intel_state);
 	return calc_watermark_data(state);
 }
@@ -12510,37 +12513,26 @@ static int intel_atomic_commit(struct drm_device *dev,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret = 0;
 
-	drm_atomic_state_get(state);
-	i915_sw_fence_init(&intel_state->commit_ready,
-			   intel_atomic_commit_ready);
-
 	/*
-	 * The intel_legacy_cursor_update() fast path takes care
+	 * The atomic async update fast path takes care
 	 * of avoiding the vblank waits for simple cursor
 	 * movement and flips. For cursor on/off and size changes,
 	 * we want to perform the vblank waits so that watermark
 	 * updates happen during the correct frames. Gen9+ have
 	 * double buffered watermarks and so shouldn't need this.
-	 *
-	 * Unset state->legacy_cursor_update before the call to
-	 * drm_atomic_helper_setup_commit() because otherwise
-	 * drm_atomic_helper_wait_for_flip_done() is a noop and
-	 * we get FIFO underruns because we didn't wait
-	 * for vblank.
-	 *
-	 * FIXME doing watermarks and fb cleanup from a vblank worker
-	 * (assuming we had any) would solve these problems.
 	 */
-	if (INTEL_GEN(dev_priv) < 9 && state->legacy_cursor_update) {
-		struct intel_crtc_state *new_crtc_state;
-		struct intel_crtc *crtc;
-		int i;
+	if (state->async_update) {
+		ret = drm_atomic_helper_prepare_planes(dev, state);
+		if (ret)
+			return ret;
 
-		for_each_new_intel_crtc_in_state(intel_state, crtc, new_crtc_state, i)
-			if (new_crtc_state->wm.need_postvbl_update ||
-			    new_crtc_state->update_wm_post)
-				state->legacy_cursor_update = false;
+		drm_atomic_helper_async_commit(dev, state);
+		return 0;
 	}
+
+	drm_atomic_state_get(state);
+	i915_sw_fence_init(&intel_state->commit_ready,
+			   intel_atomic_commit_ready);
 
 	ret = intel_atomic_prepare_commit(dev, state);
 	if (ret) {
@@ -12720,6 +12712,9 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
 	struct drm_i915_gem_object *old_obj = intel_fb_obj(plane->state->fb);
 	int ret;
+
+	if (new_state->state->async_update)
+		return 0;
 
 	if (old_obj) {
 		struct drm_crtc_state *crtc_state =
@@ -13087,121 +13082,8 @@ static struct drm_plane_funcs intel_plane_funcs = {
 	.format_mod_supported = intel_primary_plane_format_mod_supported,
 };
 
-static int
-intel_legacy_cursor_update(struct drm_plane *plane,
-			   struct drm_crtc *crtc,
-			   struct drm_framebuffer *fb,
-			   int crtc_x, int crtc_y,
-			   unsigned int crtc_w, unsigned int crtc_h,
-			   uint32_t src_x, uint32_t src_y,
-			   uint32_t src_w, uint32_t src_h,
-			   struct drm_modeset_acquire_ctx *ctx)
-{
-	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
-	int ret;
-	struct drm_plane_state *old_plane_state, *new_plane_state;
-	struct intel_plane *intel_plane = to_intel_plane(plane);
-	struct drm_framebuffer *old_fb;
-	struct drm_crtc_state *crtc_state = crtc->state;
-
-	/*
-	 * When crtc is inactive or there is a modeset pending,
-	 * wait for it to complete in the slowpath
-	 */
-	if (!crtc_state->active || needs_modeset(crtc_state) ||
-	    to_intel_crtc_state(crtc_state)->update_pipe)
-		goto slow;
-
-	old_plane_state = plane->state;
-	/*
-	 * Don't do an async update if there is an outstanding commit modifying
-	 * the plane.  This prevents our async update's changes from getting
-	 * overridden by a previous synchronous update's state.
-	 */
-	if (old_plane_state->commit &&
-	    !try_wait_for_completion(&old_plane_state->commit->hw_done))
-		goto slow;
-
-	/*
-	 * If any parameters change that may affect watermarks,
-	 * take the slowpath. Only changing fb or position should be
-	 * in the fastpath.
-	 */
-	if (old_plane_state->crtc != crtc ||
-	    old_plane_state->src_w != src_w ||
-	    old_plane_state->src_h != src_h ||
-	    old_plane_state->crtc_w != crtc_w ||
-	    old_plane_state->crtc_h != crtc_h ||
-	    !old_plane_state->fb != !fb)
-		goto slow;
-
-	new_plane_state = intel_plane_duplicate_state(plane);
-	if (!new_plane_state)
-		return -ENOMEM;
-
-	drm_atomic_set_fb_for_plane(new_plane_state, fb);
-
-	new_plane_state->src_x = src_x;
-	new_plane_state->src_y = src_y;
-	new_plane_state->src_w = src_w;
-	new_plane_state->src_h = src_h;
-	new_plane_state->crtc_x = crtc_x;
-	new_plane_state->crtc_y = crtc_y;
-	new_plane_state->crtc_w = crtc_w;
-	new_plane_state->crtc_h = crtc_h;
-
-	ret = intel_plane_atomic_check_with_state(to_intel_crtc_state(crtc->state),
-						  to_intel_crtc_state(crtc->state), /* FIXME need a new crtc state? */
-						  to_intel_plane_state(plane->state),
-						  to_intel_plane_state(new_plane_state));
-	if (ret)
-		goto out_free;
-
-	ret = mutex_lock_interruptible(&dev_priv->drm.struct_mutex);
-	if (ret)
-		goto out_free;
-
-	ret = intel_plane_pin_fb(to_intel_plane_state(new_plane_state));
-	if (ret)
-		goto out_unlock;
-
-	old_fb = old_plane_state->fb;
-
-	i915_gem_track_fb(intel_fb_obj(old_fb), intel_fb_obj(fb),
-			  intel_plane->frontbuffer_bit);
-
-	/* Swap plane state */
-	plane->state = new_plane_state;
-
-	if (plane->state->visible) {
-		trace_intel_update_plane(plane, to_intel_crtc(crtc));
-		intel_plane->update_plane(intel_plane,
-					  to_intel_crtc_state(crtc->state),
-					  to_intel_plane_state(plane->state));
-	} else {
-		trace_intel_disable_plane(plane, to_intel_crtc(crtc));
-		intel_plane->disable_plane(intel_plane, to_intel_crtc(crtc));
-	}
-
-	intel_plane_unpin_fb(to_intel_plane_state(old_plane_state));
-
-out_unlock:
-	mutex_unlock(&dev_priv->drm.struct_mutex);
-out_free:
-	if (ret)
-		intel_plane_destroy_state(plane, new_plane_state);
-	else
-		intel_plane_destroy_state(plane, old_plane_state);
-	return ret;
-
-slow:
-	return drm_atomic_helper_update_plane(plane, crtc, fb,
-					      crtc_x, crtc_y, crtc_w, crtc_h,
-					      src_x, src_y, src_w, src_h, ctx);
-}
-
 static const struct drm_plane_funcs intel_cursor_plane_funcs = {
-	.update_plane = intel_legacy_cursor_update,
+	.update_plane = drm_atomic_helper_update_plane,
 	.disable_plane = drm_atomic_helper_disable_plane,
 	.destroy = intel_plane_destroy,
 	.atomic_get_property = intel_plane_atomic_get_property,
