@@ -1,16 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * cros_ec_lpc_reg - LPC access to the Chrome OS Embedded Controller
+ * LPC register access to the ChromeOS Embedded Controller
  *
  * Copyright (C) 2016 Google, Inc
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  * This driver uses the Chrome OS EC byte-level message-based protocol for
  * communicating the keyboard state (which keys are pressed) from a keyboard EC
