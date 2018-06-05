@@ -940,7 +940,9 @@ struct ath10k {
 		u32 subsystem_device;
 
 		bool bmi_ids_valid;
+		bool qmi_ids_valid;
 		u8 bmi_board_id;
+		u8 qmi_board_id;
 		u8 bmi_chip_id;
 
 		char bdf_ext[ATH10K_SMBIOS_BDF_EXT_STR_LENGTH];
