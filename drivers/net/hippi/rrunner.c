@@ -93,7 +93,6 @@ static int rr_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	static int version_disp;
 	u8 pci_latency;
 	struct rr_private *rrpriv;
-	void *tmpptr;
 	dma_addr_t ring_dma;
 	int ret = -ENOMEM;
 
@@ -155,29 +154,26 @@ static int rr_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto out;
 	}
 
-	tmpptr = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
-	rrpriv->tx_ring = tmpptr;
+	rrpriv->tx_ring = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
 	rrpriv->tx_ring_dma = ring_dma;
 
-	if (!tmpptr) {
+	if (!rrpriv->tx_ring) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	tmpptr = pci_alloc_consistent(pdev, RX_TOTAL_SIZE, &ring_dma);
-	rrpriv->rx_ring = tmpptr;
+	rrpriv->rx_ring = pci_alloc_consistent(pdev, RX_TOTAL_SIZE, &ring_dma);
 	rrpriv->rx_ring_dma = ring_dma;
 
-	if (!tmpptr) {
+	if (!rrpriv->rx_ring) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	tmpptr = pci_alloc_consistent(pdev, EVT_RING_SIZE, &ring_dma);
-	rrpriv->evt_ring = tmpptr;
+	rrpriv->evt_ring = pci_alloc_consistent(pdev, EVT_RING_SIZE, &ring_dma);
 	rrpriv->evt_ring_dma = ring_dma;
 
-	if (!tmpptr) {
+	if (!trrpriv->evt_ring) {
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -1192,24 +1188,22 @@ static int rr_open(struct net_device *dev)
 		goto error;
 	}
 
-	rrpriv->rx_ctrl = pci_alloc_consistent(pdev,
-					       256 * sizeof(struct ring_ctrl),
-					       &dma_addr);
+	rrpriv->rx_ctrl = pci_zalloc_consistent(pdev,
+						256 * sizeof(struct ring_ctrl),
+						&dma_addr);
 	if (!rrpriv->rx_ctrl) {
 		ecode = -ENOMEM;
 		goto error;
 	}
 	rrpriv->rx_ctrl_dma = dma_addr;
-	memset(rrpriv->rx_ctrl, 0, 256*sizeof(struct ring_ctrl));
 
-	rrpriv->info = pci_alloc_consistent(pdev, sizeof(struct rr_info),
-					    &dma_addr);
+	rrpriv->info = pci_zalloc_consistent(pdev, sizeof(struct rr_info),
+					     &dma_addr);
 	if (!rrpriv->info) {
 		ecode = -ENOMEM;
 		goto error;
 	}
 	rrpriv->info_dma = dma_addr;
-	memset(rrpriv->info, 0, sizeof(struct rr_info));
 	wmb();
 
 	spin_lock_irqsave(&rrpriv->lock, flags);
