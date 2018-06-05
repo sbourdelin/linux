@@ -267,7 +267,6 @@ nx_fw_cmd_set_gbe_port(struct netxen_adapter *adapter,
 static int
 nx_fw_cmd_create_rx_ctx(struct netxen_adapter *adapter)
 {
-	void *addr;
 	nx_hostrq_rx_ctx_t *prq;
 	nx_cardrsp_rx_ctx_t *prsp;
 	nx_hostrq_rds_ring_t *prq_rds;
@@ -297,19 +296,17 @@ nx_fw_cmd_create_rx_ctx(struct netxen_adapter *adapter)
 	rsp_size =
 		SIZEOF_CARDRSP_RX(nx_cardrsp_rx_ctx_t, nrds_rings, nsds_rings);
 
-	addr = pci_alloc_consistent(adapter->pdev,
-				rq_size, &hostrq_phys_addr);
-	if (addr == NULL)
+	prq = pci_alloc_consistent(adapter->pdev,
+				   rq_size, &hostrq_phys_addr);
+	if (!prq)
 		return -ENOMEM;
-	prq = addr;
 
-	addr = pci_alloc_consistent(adapter->pdev,
-			rsp_size, &cardrsp_phys_addr);
-	if (addr == NULL) {
+	prsp = pci_alloc_consistent(adapter->pdev,
+				    rsp_size, &cardrsp_phys_addr);
+	if (!prsp) {
 		err = -ENOMEM;
 		goto out_free_rq;
 	}
-	prsp = addr;
 
 	prq->host_rsp_dma_addr = cpu_to_le64(cardrsp_phys_addr);
 
@@ -445,23 +442,20 @@ nx_fw_cmd_create_tx_ctx(struct netxen_adapter *adapter)
 	struct netxen_cmd_args cmd;
 
 	rq_size = SIZEOF_HOSTRQ_TX(nx_hostrq_tx_ctx_t);
-	rq_addr = pci_alloc_consistent(adapter->pdev,
-		rq_size, &rq_phys_addr);
+	rq_addr = pci_zalloc_consistent(adapter->pdev,
+					rq_size, &rq_phys_addr);
 	if (!rq_addr)
 		return -ENOMEM;
 
 	rsp_size = SIZEOF_CARDRSP_TX(nx_cardrsp_tx_ctx_t);
-	rsp_addr = pci_alloc_consistent(adapter->pdev,
-		rsp_size, &rsp_phys_addr);
+	rsp_addr = pci_zalloc_consistent(adapter->pdev,
+					 rsp_size, &rsp_phys_addr);
 	if (!rsp_addr) {
 		err = -ENOMEM;
 		goto out_free_rq;
 	}
 
-	memset(rq_addr, 0, rq_size);
 	prq = rq_addr;
-
-	memset(rsp_addr, 0, rsp_size);
 	prsp = rsp_addr;
 
 	prq->host_rsp_dma_addr = cpu_to_le64(rsp_phys_addr);
