@@ -24,6 +24,7 @@
 #include <linux/uaccess.h>
 #include <linux/mm-arch-hooks.h>
 #include <linux/userfaultfd_k.h>
+#include <linux/mm_inline.h>
 
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -112,6 +113,44 @@ static pte_t move_soft_dirty_pte(pte_t pte)
 	return pte;
 }
 
+/* Returns true if a TLB must be flushed before PTL is dropped */
+static bool should_force_flush(pte_t pte)
+{
+	bool is_swapcache;
+	struct page *page;
+
+	if (!pte_present(pte) || !pte_dirty(pte))
+		return false;
+
+	/*
+	 * If we are remapping a dirty file PTE, make sure to flush TLB
+	 * before we drop the PTL for the old PTE or we may race with
+	 * page_mkclean().
+	 */
+	page = pte_page(pte);
+	if (page_is_file_cache(page))
+		return true;
+
+	/*
+	 * For anonymous pages, only flush swap cache pages that could
+	 * be unmapped and queued for swap since flush_tlb_batched_pending was
+	 * last called. Reclaim itself takes care that the TLB is flushed
+	 * before IO is queued. If a page is not in swap cache and a stale TLB
+	 * is used before mremap is complete then the write hits the same
+	 * physical page and there is no lost data loss.
+	 *
+	 * Check under the page lock to avoid any potential race with reclaim.
+	 * trylock is necessary as spinlocks are currently held. In the unlikely
+	 * event of contention, flush the TLB to be safe.
+	 */
+	if (!trylock_page(page))
+		return true;
+	is_swapcache = PageSwapCache(page);
+	unlock_page(page);
+
+	return is_swapcache;
+}
+
 static void move_ptes(struct vm_area_struct *vma, pmd_t *old_pmd,
 		unsigned long old_addr, unsigned long old_end,
 		struct vm_area_struct *new_vma, pmd_t *new_pmd,
@@ -163,15 +202,11 @@ static void move_ptes(struct vm_area_struct *vma, pmd_t *old_pmd,
 
 		pte = ptep_get_and_clear(mm, old_addr, old_pte);
 		/*
-		 * If we are remapping a dirty PTE, make sure
-		 * to flush TLB before we drop the PTL for the
-		 * old PTE or we may race with page_mkclean().
-		 *
 		 * This check has to be done after we removed the
 		 * old PTE from page tables or another thread may
 		 * dirty it after the check and before the removal.
 		 */
-		if (pte_present(pte) && pte_dirty(pte))
+		if (should_force_flush(pte))
 			force_flush = true;
 		pte = move_pte(pte, new_vma->vm_page_prot, old_addr, new_addr);
 		pte = move_soft_dirty_pte(pte);
