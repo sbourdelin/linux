@@ -1262,6 +1262,7 @@ static int __ip6_append_data(struct sock *sk,
 	int exthdrlen = 0;
 	int dst_exthdrlen = 0;
 	int hh_len;
+	int t_len;
 	int copy;
 	int err;
 	int offset = 0;
@@ -1283,6 +1284,7 @@ static int __ip6_append_data(struct sock *sk,
 	orig_mtu = mtu;
 
 	hh_len = LL_RESERVED_SPACE(rt->dst.dev);
+	t_len = rt->dst.dev->needed_tailroom;
 
 	fragheaderlen = sizeof(struct ipv6hdr) + rt->rt6i_nfheader_len +
 			(opt ? opt->opt_nflen : 0);
@@ -1425,13 +1427,13 @@ alloc_new_skb:
 			}
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk,
-						alloclen + hh_len,
+						alloclen + hh_len + t_len,
 						(flags & MSG_DONTWAIT), &err);
 			} else {
 				skb = NULL;
 				if (refcount_read(&sk->sk_wmem_alloc) + wmem_alloc_delta <=
 				    2 * sk->sk_sndbuf)
-					skb = alloc_skb(alloclen + hh_len,
+					skb = alloc_skb(alloclen + hh_len + t_len,
 							sk->sk_allocation);
 				if (unlikely(!skb))
 					err = -ENOBUFS;
