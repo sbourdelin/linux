@@ -168,8 +168,20 @@ int cros_ec_register(struct cros_ec_device *ec_dev)
 	 */
 	err = cros_ec_sleep_event(ec_dev, 0);
 	if (err < 0)
-		dev_dbg(ec_dev->dev, "Error %d clearing sleep event to ec",
+		dev_dbg(dev, "Error %d clearing sleep event to ec",
 			err);
+
+	if (ec_dev->xfer_fcn_owner != NULL) {
+		err = try_module_get(ec_dev->xfer_fcn_owner);
+		if (err < 0) {
+			dev_err(dev, "Error %d acquiring transfer module", err);
+			return err;
+		}
+		dev_info(dev, "Transfer module %p get successfully",
+			 ec_dev->xfer_fcn_owner);
+	} else {
+		dev_warn(dev, "No transfer module registered");
+	}
 
 	dev_info(dev, "Chrome EC device registered\n");
 
@@ -192,6 +204,9 @@ int cros_ec_remove(struct cros_ec_device *ec_dev)
 
 	if (ec_dev->irq)
 		free_irq(ec_dev->irq, ec_dev);
+
+	if (ec_dev->xfer_fcn_owner != NULL)
+		module_put(ec_dev->xfer_fcn_owner);
 
 	return 0;
 }
