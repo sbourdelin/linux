@@ -226,10 +226,7 @@ static inline void list_move_tail(struct list_head *list,
 /**
  * Check if the list is empty.
  *
- * Example:
- * list_empty(&bar->list_of_foos);
- *
- * @return True if the list contains one or more elements or False otherwise.
+ * @return True if the list is empty (head->next == head) or False otherwise.
  */
 static inline bool
 list_empty(struct list_head *head)
