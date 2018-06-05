@@ -1,19 +1,11 @@
-/*
- * Copyright(c) 2016, Analogix Semiconductor.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * Based on anx7808 driver obtained from chromeos with copyright:
- * Copyright(c) 2013, Google Inc.
- *
- */
+// SPDX-License-Identifier: GPL-2.0
+// Driver for ANX78xx SlimPort transmitter.
+//
+// Copyright (C) 2016 Analogix Semiconductor.
+// Copyright (C) 2016 Google, Inc.
+//
+// Author: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
