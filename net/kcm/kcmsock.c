@@ -188,6 +188,7 @@ static void kcm_rfree(struct sk_buff *skb)
 	}
 }
 
+/* RX mux lock held */
 static int kcm_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct sk_buff_head *list = &sk->sk_receive_queue;
@@ -1157,7 +1158,9 @@ msg_finished:
 			/* Finished with message */
 			msg->msg_flags |= MSG_EOR;
 			KCM_STATS_INCR(kcm->stats.rx_msgs);
+			spin_lock_bh(&kcm->mux->rx_lock);
 			skb_unlink(skb, &sk->sk_receive_queue);
+			spin_unlock_bh(&kcm->mux->rx_lock);
 			kfree_skb(skb);
 		}
 	}
