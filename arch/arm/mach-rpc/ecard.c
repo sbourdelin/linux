@@ -413,12 +413,12 @@ static int ecard_def_fiq_pending(ecard_t *ec)
 }
 
 static expansioncard_ops_t ecard_default_ops = {
-	ecard_def_irq_enable,
-	ecard_def_irq_disable,
-	ecard_def_irq_pending,
-	ecard_def_fiq_enable,
-	ecard_def_fiq_disable,
-	ecard_def_fiq_pending
+	.irqenable  = ecard_def_irq_enable,
+	.irqdisable = ecard_def_irq_disable,
+	.irqpending = ecard_def_irq_pending,
+	.fiqenable  = ecard_def_fiq_enable,
+	.fiqdisable = ecard_def_fiq_disable,
+	.fiqpending = ecard_def_fiq_pending
 };
 
 /*
