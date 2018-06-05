@@ -73,7 +73,6 @@ enum da9063_irqs {
 };
 
 #define DA9063_IRQ_BASE_OFFSET	0
-#define DA9063_NUM_IRQ		(DA9063_IRQ_GPI15 + 1 - DA9063_IRQ_BASE_OFFSET)
 
 struct da9063 {
 	/* Device */
