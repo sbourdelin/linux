@@ -233,8 +233,6 @@ void panic(const char *fmt, ...)
 	if (_crash_kexec_post_notifiers)
 		__crash_kexec(NULL);
 
-	bust_spinlocks(0);
-
 	/*
 	 * We may have ended up stopping the CPU holding the lock (in
 	 * smp_send_stop()) while still having some valuable data in the console
@@ -245,6 +243,8 @@ void panic(const char *fmt, ...)
 	 */
 	debug_locks_off();
 	console_flush_on_panic();
+
+	bust_spinlocks(0);
 
 	if (!panic_blink)
 		panic_blink = no_blink;
