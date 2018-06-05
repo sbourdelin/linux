@@ -6,31 +6,10 @@
 
 #include <linux/netdevice.h>
 
-struct failover_ops {
-	int (*slave_pre_register)(struct net_device *slave_dev,
-				  struct net_device *failover_dev);
-	int (*slave_register)(struct net_device *slave_dev,
-			      struct net_device *failover_dev);
-	int (*slave_pre_unregister)(struct net_device *slave_dev,
-				    struct net_device *failover_dev);
-	int (*slave_unregister)(struct net_device *slave_dev,
-				struct net_device *failover_dev);
-	int (*slave_link_change)(struct net_device *slave_dev,
-				 struct net_device *failover_dev);
-	int (*slave_name_change)(struct net_device *slave_dev,
-				 struct net_device *failover_dev);
-	rx_handler_result_t (*slave_handle_frame)(struct sk_buff **pskb);
-};
-
-struct failover {
-	struct list_head list;
-	struct net_device __rcu *failover_dev;
-	struct failover_ops __rcu *ops;
-};
-
-struct failover *failover_register(struct net_device *dev,
-				   struct failover_ops *ops);
-void failover_unregister(struct failover *failover);
-int failover_slave_unregister(struct net_device *slave_dev);
+int netdev_failover_join(struct net_device *lower, struct net_device *upper,
+			 rx_handler_func_t *rx_handler);
+struct net_device *netdev_failover_upper_get(struct net_device *lower);
+void netdev_failover_unjoin(struct net_device *lower,
+			    struct net_device *upper);
 
 #endif /* _FAILOVER_H */

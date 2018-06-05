@@ -70,6 +70,8 @@ static int debug = -1;
 module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
+static LIST_HEAD(netvsc_dev_list);
+
 static void netvsc_change_rx_flags(struct net_device *net, int change)
 {
 	struct net_device_context *ndev_ctx = netdev_priv(net);
@@ -1846,33 +1848,63 @@ static void netvsc_vf_setup(struct work_struct *w)
 	}
 
 	vf_netdev = rtnl_dereference(ndev_ctx->vf_netdev);
-	if (vf_netdev)
+	if (vf_netdev) {
 		__netvsc_vf_setup(ndev, vf_netdev);
-
+		dev_put(vf_netdev);
+	}
 	rtnl_unlock();
 }
 
-static int netvsc_pre_register_vf(struct net_device *vf_netdev,
-				  struct net_device *ndev)
+static struct net_device *get_netvsc_bymac(const u8 *mac)
 {
-	struct net_device_context *net_device_ctx;
-	struct netvsc_device *netvsc_dev;
+	struct net_device_context *ndev_ctx;
 
-	net_device_ctx = netdev_priv(ndev);
-	netvsc_dev = rtnl_dereference(net_device_ctx->nvdev);
-	if (!netvsc_dev || rtnl_dereference(net_device_ctx->vf_netdev))
-		return -ENODEV;
+	ASSERT_RTNL();
 
-	return 0;
+	list_for_each_entry(ndev_ctx, &netvsc_dev_list, list) {
+		struct net_device *dev = hv_get_drvdata(ndev_ctx->device_ctx);
+
+		if (ether_addr_equal(mac, dev->perm_addr))
+			return dev;
+	}
+
+	return NULL;
 }
 
-static int netvsc_register_vf(struct net_device *vf_netdev,
-			      struct net_device *ndev)
+static int netvsc_register_vf(struct net_device *vf_netdev)
 {
-	struct net_device_context *ndev_ctx = netdev_priv(ndev);
+	struct net_device *ndev;
+	struct net_device_context *ndev_ctx;
+
+	/* Must use Ethernet addresses */
+	if (vf_netdev->addr_len != ETH_ALEN)
+		return NOTIFY_DONE;
+
+	/* VF must be a physical device not VLAN, etc */
+	if (!vf_netdev->dev.parent)
+		return NOTIFY_DONE;
+
+	/* Use the MAC address to locate the synthetic interface to
+	 * associate with the VF interface.
+	 */
+	ndev = get_netvsc_bymac(vf_netdev->perm_addr);
+	if (!ndev)
+		return NOTIFY_DONE;
+
+	/* If network device is being removed, don't do anything */
+	ndev_ctx = netdev_priv(ndev);
+	if (!rtnl_dereference(ndev_ctx->nvdev))
+		return NOTIFY_DONE;
+
+	if (netdev_failover_join(vf_netdev, ndev, netvsc_vf_handle_frame)) {
+		netdev_err(vf_netdev, "could not join: %s", ndev->name);
+		return NOTIFY_DONE;
+	}
 
 	/* set slave flag before open to prevent IPv6 addrconf */
 	vf_netdev->flags |= IFF_SLAVE;
+
+	dev_hold(vf_netdev);
 
 	schedule_delayed_work(&ndev_ctx->vf_takeover, VF_TAKEOVER_INT);
 
@@ -1880,66 +1912,55 @@ static int netvsc_register_vf(struct net_device *vf_netdev,
 
 	netdev_info(vf_netdev, "joined to %s\n", ndev->name);
 
-	dev_hold(vf_netdev);
 	rcu_assign_pointer(ndev_ctx->vf_netdev, vf_netdev);
 
-	return 0;
+	return NOTIFY_OK;
 }
 
 /* VF up/down change detected, schedule to change data path */
-static int netvsc_vf_changed(struct net_device *vf_netdev,
-			     struct net_device *ndev)
+static int netvsc_vf_changed(struct net_device *vf_netdev)
 {
 	struct net_device_context *net_device_ctx;
 	struct netvsc_device *netvsc_dev;
+	struct net_device *ndev;
 	bool vf_is_up = netif_running(vf_netdev);
+
+	ndev = netdev_failover_upper_get(vf_netdev);
+	if (!ndev)
+		return NOTIFY_DONE;
 
 	net_device_ctx = netdev_priv(ndev);
 	netvsc_dev = rtnl_dereference(net_device_ctx->nvdev);
 	if (!netvsc_dev)
-		return -ENODEV;
+		return NOTIFY_DONE;
 
 	netvsc_switch_datapath(ndev, vf_is_up);
 	netdev_info(ndev, "Data path switched %s VF: %s\n",
 		    vf_is_up ? "to" : "from", vf_netdev->name);
 
-	return 0;
+	return NOTIFY_OK;
 }
 
-static int netvsc_pre_unregister_vf(struct net_device *vf_netdev,
-				    struct net_device *ndev)
+static int netvsc_unregister_vf(struct net_device *vf_netdev)
 {
 	struct net_device_context *net_device_ctx;
+	struct net_device *ndev;
+
+	ndev = netdev_failover_upper_get(vf_netdev);
+	if (!ndev)
+		return NOTIFY_DONE;
 
 	net_device_ctx = netdev_priv(ndev);
-	cancel_delayed_work_sync(&net_device_ctx->vf_takeover);
-
-	return 0;
-}
-
-static int netvsc_unregister_vf(struct net_device *vf_netdev,
-				struct net_device *ndev)
-{
-	struct net_device_context *net_device_ctx;
-
-	net_device_ctx = netdev_priv(ndev);
+	if (cancel_delayed_work_sync(&net_device_ctx->vf_takeover))
+		dev_put(vf_netdev);
 
 	netdev_info(ndev, "VF unregistering: %s\n", vf_netdev->name);
 
+	netdev_failover_unjoin(vf_netdev, ndev);
 	RCU_INIT_POINTER(net_device_ctx->vf_netdev, NULL);
-	dev_put(vf_netdev);
 
-	return 0;
+	return NOTIFY_OK;
 }
-
-static struct failover_ops netvsc_failover_ops = {
-	.slave_pre_register	= netvsc_pre_register_vf,
-	.slave_register		= netvsc_register_vf,
-	.slave_pre_unregister	= netvsc_pre_unregister_vf,
-	.slave_unregister	= netvsc_unregister_vf,
-	.slave_link_change	= netvsc_vf_changed,
-	.slave_handle_frame	= netvsc_vf_handle_frame,
-};
 
 static int netvsc_probe(struct hv_device *dev,
 			const struct hv_vmbus_device_id *dev_id)
@@ -2009,6 +2030,8 @@ static int netvsc_probe(struct hv_device *dev,
 
 	memcpy(net->dev_addr, device_info.mac_adr, ETH_ALEN);
 
+	net->priv_flags |= IFF_FAILOVER;
+
 	/* hw_features computed in rndis_netdev_set_hwcaps() */
 	net->features = net->hw_features |
 		NETIF_F_HIGHDMA | NETIF_F_SG |
@@ -2024,23 +2047,19 @@ static int netvsc_probe(struct hv_device *dev,
 	else
 		net->max_mtu = ETH_DATA_LEN;
 
-	ret = register_netdev(net);
+	rtnl_lock();
+	ret = register_netdevice(net);
 	if (ret != 0) {
 		pr_err("Unable to register netdev.\n");
 		goto register_failed;
 	}
 
-	net_device_ctx->failover = failover_register(net, &netvsc_failover_ops);
-	if (IS_ERR(net_device_ctx->failover)) {
-		ret = PTR_ERR(net_device_ctx->failover);
-		goto err_failover;
-	}
+	list_add(&net_device_ctx->list, &netvsc_dev_list);
+	rtnl_unlock();
+	return 0;
 
-	return ret;
-
-err_failover:
-	unregister_netdev(net);
 register_failed:
+	rtnl_unlock();
 	rndis_filter_device_remove(dev, nvdev);
 rndis_failed:
 	free_percpu(net_device_ctx->vf_stats);
@@ -2079,15 +2098,17 @@ static int netvsc_remove(struct hv_device *dev)
 	 */
 	rtnl_lock();
 	vf_netdev = rtnl_dereference(ndev_ctx->vf_netdev);
-	if (vf_netdev)
-		failover_slave_unregister(vf_netdev);
+	if (vf_netdev) {
+		netdev_failover_unjoin(vf_netdev, net);
+		dev_put(vf_netdev);
+	}
 
 	if (nvdev)
 		rndis_filter_device_remove(dev, nvdev);
 
 	unregister_netdevice(net);
 
-	failover_unregister(ndev_ctx->failover);
+	list_del(&ndev_ctx->list);
 
 	rtnl_unlock();
 	rcu_read_unlock();
@@ -2115,8 +2136,47 @@ static struct  hv_driver netvsc_drv = {
 	.remove = netvsc_remove,
 };
 
+/* On Hyper-V, every VF interface is matched with a corresponding
+ * synthetic interface. The synthetic interface is presented first
+ * to the guest. When the corresponding VF instance is registered,
+ * we will take care of switching the data path.
+ */
+static int netvsc_netdev_event(struct notifier_block *this,
+			       unsigned long event, void *ptr)
+{
+	struct net_device *event_dev = netdev_notifier_info_to_dev(ptr);
+
+	/* Skip parent events */
+	if (netif_is_failover(event_dev))
+		return NOTIFY_DONE;
+
+	/* Avoid non-Ethernet type devices */
+	if (event_dev->type != ARPHRD_ETHER)
+		return NOTIFY_DONE;
+
+	switch (event) {
+	case NETDEV_REGISTER:
+		return netvsc_register_vf(event_dev);
+
+	case NETDEV_UNREGISTER:
+		return netvsc_unregister_vf(event_dev);
+
+	case NETDEV_UP:
+	case NETDEV_DOWN:
+		return netvsc_vf_changed(event_dev);
+
+	default:
+		return NOTIFY_DONE;
+	}
+}
+
+static struct notifier_block netvsc_netdev_notifier = {
+	.notifier_call = netvsc_netdev_event,
+};
+
 static void __exit netvsc_drv_exit(void)
 {
+	unregister_netdevice_notifier(&netvsc_netdev_notifier);
 	vmbus_driver_unregister(&netvsc_drv);
 }
 
@@ -2136,6 +2196,7 @@ static int __init netvsc_drv_init(void)
 	if (ret)
 		return ret;
 
+	register_netdevice_notifier(&netvsc_netdev_notifier);
 	return 0;
 }
 

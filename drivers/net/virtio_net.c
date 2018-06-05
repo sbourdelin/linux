@@ -215,7 +215,7 @@ struct virtnet_info {
 	unsigned long guest_offloads;
 
 	/* failover when STANDBY feature enabled */
-	struct failover *failover;
+	struct net_device *failover;
 };
 
 struct padded_vnet_hdr {
@@ -2934,11 +2934,10 @@ static int virtnet_probe(struct virtio_device *vdev)
 	virtnet_init_settings(dev);
 
 	if (virtio_has_feature(vdev, VIRTIO_NET_F_STANDBY)) {
-		vi->failover = net_failover_create(vi->dev);
-		if (IS_ERR(vi->failover)) {
-			err = PTR_ERR(vi->failover);
+		err = -ENOMEM;
+		vi->failover = net_failover_create(dev);
+		if (!vi->failover)
 			goto free_vqs;
-		}
 	}
 
 	err = register_netdev(dev);

@@ -28,6 +28,46 @@
 #include <uapi/linux/if_arp.h>
 #include <net/net_failover.h>
 
+static LIST_HEAD(net_failover_list);
+
+/* failover state */
+struct net_failover_info {
+	struct net_device *failover_dev;
+
+	/* list of failover virtual devices */
+	struct list_head list;
+
+	/* primary netdev with same MAC */
+	struct net_device __rcu *primary_dev;
+
+	/* standby netdev */
+	struct net_device __rcu *standby_dev;
+
+	/* primary netdev stats */
+	struct rtnl_link_stats64 primary_stats;
+
+	/* standby netdev stats */
+	struct rtnl_link_stats64 standby_stats;
+
+	/* aggregated stats */
+	struct rtnl_link_stats64 failover_stats;
+
+	/* spinlock while updating stats */
+	spinlock_t stats_lock;
+
+	/* delayed setup of slave */
+	struct delayed_work standby_init;
+};
+
+#define FAILOVER_VLAN_FEATURES	(NETIF_F_HW_CSUM | NETIF_F_SG | \
+				 NETIF_F_FRAGLIST | NETIF_F_ALL_TSO | \
+				 NETIF_F_HIGHDMA | NETIF_F_LRO)
+
+#define FAILOVER_ENC_FEATURES	(NETIF_F_HW_CSUM | NETIF_F_SG | \
+				 NETIF_F_RXCSUM | NETIF_F_ALL_TSO)
+
+#define FAILOVER_SETUP_INTERVAL	(HZ / 10)
+
 static bool net_failover_xmit_ready(struct net_device *dev)
 {
 	return netif_running(dev) && netif_carrier_ok(dev);
@@ -459,22 +499,42 @@ static void net_failover_lower_state_changed(struct net_device *slave_dev,
 	netdev_lower_state_changed(slave_dev, &info);
 }
 
-static int net_failover_slave_pre_register(struct net_device *slave_dev,
-					   struct net_device *failover_dev)
+static struct net_device *get_net_failover_bymac(const u8 *mac)
 {
-	struct net_device *standby_dev, *primary_dev;
+	struct net_failover_info *nfo_info;
+
+	ASSERT_RTNL();
+
+	list_for_each_entry(nfo_info, &net_failover_list, list) {
+		struct net_device *failover_dev = nfo_info->failover_dev;
+
+		if (ether_addr_equal(mac, failover_dev->perm_addr))
+			return failover_dev;
+	}
+
+	return NULL;
+}
+
+static int net_failover_register_event(struct net_device *slave_dev)
+{
+	struct net_device *failover_dev, *standby_dev, *primary_dev;
 	struct net_failover_info *nfo_info;
 	bool slave_is_standby;
+
+	failover_dev = get_net_failover_bymac(slave_dev->perm_addr);
+	if (!failover_dev)
+		return NOTIFY_DONE;
 
 	nfo_info = netdev_priv(failover_dev);
 	standby_dev = rtnl_dereference(nfo_info->standby_dev);
 	primary_dev = rtnl_dereference(nfo_info->primary_dev);
 	slave_is_standby = slave_dev->dev.parent == failover_dev->dev.parent;
 	if (slave_is_standby ? standby_dev : primary_dev) {
-		netdev_err(failover_dev, "%s attempting to register as slave dev when %s already present\n",
+		netdev_err(failover_dev,
+			   "%s attempting to register as slave dev when %s already present\n",
 			   slave_dev->name,
 			   slave_is_standby ? "standby" : "primary");
-		return -EINVAL;
+		return NOTIFY_DONE;
 	}
 
 	/* We want to allow only a direct attached VF device as a primary
@@ -483,23 +543,33 @@ static int net_failover_slave_pre_register(struct net_device *slave_dev,
 	 */
 	if (!slave_is_standby && (!slave_dev->dev.parent ||
 				  !dev_is_pci(slave_dev->dev.parent)))
-		return -EINVAL;
+		return NOTIFY_DONE;
 
 	if (failover_dev->features & NETIF_F_VLAN_CHALLENGED &&
 	    vlan_uses_dev(failover_dev)) {
-		netdev_err(failover_dev, "Device %s is VLAN challenged and failover device has VLAN set up\n",
+		netdev_err(failover_dev,
+			   "Device %s is VLAN challenged and failover device has VLAN set up\n",
 			   failover_dev->name);
-		return -EINVAL;
+		return NOTIFY_DONE;
 	}
 
-	return 0;
+	if (netdev_failover_join(slave_dev, failover_dev,
+				 net_failover_handle_frame)) {
+		netdev_err(failover_dev, "could not join: %s", slave_dev->name);
+		return NOTIFY_DONE;
+	}
+
+	/* Trigger rest of setup in process context */
+	schedule_delayed_work(&nfo_info->standby_init, FAILOVER_SETUP_INTERVAL);
+
+	return NOTIFY_OK;
 }
 
-static int net_failover_slave_register(struct net_device *slave_dev,
-				       struct net_device *failover_dev)
+static void __net_failover_setup(struct net_device *failover_dev)
 {
+	struct net_failover_info *nfo_info = netdev_priv(failover_dev);
+	struct net_device *slave_dev = rtnl_dereference(nfo_info->standby_dev);
 	struct net_device *standby_dev, *primary_dev;
-	struct net_failover_info *nfo_info;
 	bool slave_is_standby;
 	u32 orig_mtu;
 	int err;
@@ -508,12 +578,11 @@ static int net_failover_slave_register(struct net_device *slave_dev,
 	orig_mtu = slave_dev->mtu;
 	err = dev_set_mtu(slave_dev, failover_dev->mtu);
 	if (err) {
-		netdev_err(failover_dev, "unable to change mtu of %s to %u register failed\n",
+		netdev_err(failover_dev,
+			   "unable to change mtu of %s to %u register failed\n",
 			   slave_dev->name, failover_dev->mtu);
 		goto done;
 	}
-
-	dev_hold(slave_dev);
 
 	if (netif_running(failover_dev)) {
 		err = dev_open(slave_dev);
@@ -536,7 +605,6 @@ static int net_failover_slave_register(struct net_device *slave_dev,
 		goto err_vlan_add;
 	}
 
-	nfo_info = netdev_priv(failover_dev);
 	standby_dev = rtnl_dereference(nfo_info->standby_dev);
 	primary_dev = rtnl_dereference(nfo_info->primary_dev);
 	slave_is_standby = slave_dev->dev.parent == failover_dev->dev.parent;
@@ -561,52 +629,56 @@ static int net_failover_slave_register(struct net_device *slave_dev,
 	netdev_info(failover_dev, "failover %s slave:%s registered\n",
 		    slave_is_standby ? "standby" : "primary", slave_dev->name);
 
-	return 0;
+	return;
 
 err_vlan_add:
 	dev_uc_unsync(slave_dev, failover_dev);
 	dev_mc_unsync(slave_dev, failover_dev);
 	dev_close(slave_dev);
 err_dev_open:
-	dev_put(slave_dev);
 	dev_set_mtu(slave_dev, orig_mtu);
 done:
-	return err;
+	return;
 }
 
-static int net_failover_slave_pre_unregister(struct net_device *slave_dev,
-					     struct net_device *failover_dev)
+static void net_failover_setup(struct work_struct *w)
 {
-	struct net_device *standby_dev, *primary_dev;
+	struct net_failover_info *nfo_info
+		= container_of(w, struct net_failover_info, standby_init.work);
+	struct net_device *failover_dev = nfo_info->failover_dev;
+
+	/* handle race with cancel delayed work on removal */
+	if (!rtnl_trylock()) {
+		schedule_delayed_work(&nfo_info->standby_init, 0);
+		return;
+	}
+
+	__net_failover_setup(failover_dev);
+	rtnl_unlock();
+}
+
+static int net_failover_unregister_event(struct net_device *slave_dev)
+{
+	struct net_device *failover_dev, *primary_dev, *standby_dev;
 	struct net_failover_info *nfo_info;
+	bool slave_is_standby;
+
+	failover_dev = netdev_failover_upper_get(slave_dev);
+	if (!failover_dev)
+		return NOTIFY_DONE;
 
 	nfo_info = netdev_priv(failover_dev);
 	primary_dev = rtnl_dereference(nfo_info->primary_dev);
 	standby_dev = rtnl_dereference(nfo_info->standby_dev);
 
 	if (slave_dev != primary_dev && slave_dev != standby_dev)
-		return -ENODEV;
-
-	return 0;
-}
-
-static int net_failover_slave_unregister(struct net_device *slave_dev,
-					 struct net_device *failover_dev)
-{
-	struct net_device *standby_dev, *primary_dev;
-	struct net_failover_info *nfo_info;
-	bool slave_is_standby;
-
-	nfo_info = netdev_priv(failover_dev);
-	primary_dev = rtnl_dereference(nfo_info->primary_dev);
-	standby_dev = rtnl_dereference(nfo_info->standby_dev);
+		return NOTIFY_DONE;
 
 	vlan_vids_del_by_dev(slave_dev, failover_dev);
 	dev_uc_unsync(slave_dev, failover_dev);
 	dev_mc_unsync(slave_dev, failover_dev);
 	dev_close(slave_dev);
 
-	nfo_info = netdev_priv(failover_dev);
 	dev_get_stats(failover_dev, &nfo_info->failover_stats);
 
 	slave_is_standby = slave_dev->dev.parent == failover_dev->dev.parent;
@@ -627,22 +699,25 @@ static int net_failover_slave_unregister(struct net_device *slave_dev,
 	netdev_info(failover_dev, "failover %s slave:%s unregistered\n",
 		    slave_is_standby ? "standby" : "primary", slave_dev->name);
 
-	return 0;
+	return NOTIFY_OK;
 }
 
-static int net_failover_slave_link_change(struct net_device *slave_dev,
-					  struct net_device *failover_dev)
+static int net_failover_link_event(struct net_device *slave_dev)
+
 {
-	struct net_device *primary_dev, *standby_dev;
+	struct net_device *failover_dev, *primary_dev, *standby_dev;
 	struct net_failover_info *nfo_info;
 
-	nfo_info = netdev_priv(failover_dev);
+	failover_dev = netdev_failover_upper_get(slave_dev);
+	if (!failover_dev)
+		return NOTIFY_DONE;
 
+	nfo_info = netdev_priv(failover_dev);
 	primary_dev = rtnl_dereference(nfo_info->primary_dev);
 	standby_dev = rtnl_dereference(nfo_info->standby_dev);
 
 	if (slave_dev != primary_dev && slave_dev != standby_dev)
-		return -ENODEV;
+		return NOTIFY_DONE;
 
 	if ((primary_dev && net_failover_xmit_ready(primary_dev)) ||
 	    (standby_dev && net_failover_xmit_ready(standby_dev))) {
@@ -656,43 +731,11 @@ static int net_failover_slave_link_change(struct net_device *slave_dev,
 
 	net_failover_lower_state_changed(slave_dev, primary_dev, standby_dev);
 
-	return 0;
+	return NOTIFY_DONE;
 }
-
-static int net_failover_slave_name_change(struct net_device *slave_dev,
-					  struct net_device *failover_dev)
-{
-	struct net_device *primary_dev, *standby_dev;
-	struct net_failover_info *nfo_info;
-
-	nfo_info = netdev_priv(failover_dev);
-
-	primary_dev = rtnl_dereference(nfo_info->primary_dev);
-	standby_dev = rtnl_dereference(nfo_info->standby_dev);
-
-	if (slave_dev != primary_dev && slave_dev != standby_dev)
-		return -ENODEV;
-
-	/* We need to bring up the slave after the rename by udev in case
-	 * open failed with EBUSY when it was registered.
-	 */
-	dev_open(slave_dev);
-
-	return 0;
-}
-
-static struct failover_ops net_failover_ops = {
-	.slave_pre_register	= net_failover_slave_pre_register,
-	.slave_register		= net_failover_slave_register,
-	.slave_pre_unregister	= net_failover_slave_pre_unregister,
-	.slave_unregister	= net_failover_slave_unregister,
-	.slave_link_change	= net_failover_slave_link_change,
-	.slave_name_change	= net_failover_slave_name_change,
-	.slave_handle_frame	= net_failover_handle_frame,
-};
 
 /**
- * net_failover_create - Create and register a failover instance
+ * net_failover_create - Create and register a failover device
  *
  * @dev: standby netdev
  *
@@ -702,13 +745,12 @@ static struct failover_ops net_failover_ops = {
  * the original standby netdev and a VF netdev with the same MAC gets
  * registered as primary netdev.
  *
- * Return: pointer to failover instance
+ * Return: pointer to failover network device
  */
-struct failover *net_failover_create(struct net_device *standby_dev)
+struct net_device *net_failover_create(struct net_device *standby_dev)
 {
-	struct device *dev = standby_dev->dev.parent;
+	struct net_failover_info *nfo_info;
 	struct net_device *failover_dev;
-	struct failover *failover;
 	int err;
 
 	/* Alloc at least 2 queues, for now we are going with 16 assuming
@@ -716,18 +758,22 @@ struct failover *net_failover_create(struct net_device *standby_dev)
 	 */
 	failover_dev = alloc_etherdev_mq(sizeof(struct net_failover_info), 16);
 	if (!failover_dev) {
-		dev_err(dev, "Unable to allocate failover_netdev!\n");
-		return ERR_PTR(-ENOMEM);
+		netdev_err(standby_dev, "Unable to allocate failover_netdev!\n");
+		return NULL;
 	}
 
+	nfo_info = netdev_priv(failover_dev);
 	dev_net_set(failover_dev, dev_net(standby_dev));
-	SET_NETDEV_DEV(failover_dev, dev);
+	nfo_info->failover_dev = failover_dev;
+	INIT_DELAYED_WORK(&nfo_info->standby_init, net_failover_setup);
 
 	failover_dev->netdev_ops = &failover_dev_ops;
 	failover_dev->ethtool_ops = &failover_ethtool_ops;
 
 	/* Initialize the device options */
-	failover_dev->priv_flags |= IFF_UNICAST_FLT | IFF_NO_QUEUE;
+	failover_dev->priv_flags |= IFF_UNICAST_FLT |
+				    IFF_NO_QUEUE |
+				    IFF_FAILOVER;
 	failover_dev->priv_flags &= ~(IFF_XMIT_DST_RELEASE |
 				       IFF_TX_SKB_SHARING);
 
@@ -745,29 +791,38 @@ struct failover *net_failover_create(struct net_device *standby_dev)
 	failover_dev->hw_features |= NETIF_F_GSO_ENCAP_ALL;
 	failover_dev->features |= failover_dev->hw_features;
 
-	memcpy(failover_dev->dev_addr, standby_dev->dev_addr,
-	       failover_dev->addr_len);
+	ether_addr_copy(failover_dev->dev_addr, standby_dev->dev_addr);
+	ether_addr_copy(failover_dev->perm_addr, standby_dev->perm_addr);
 
 	failover_dev->min_mtu = standby_dev->min_mtu;
 	failover_dev->max_mtu = standby_dev->max_mtu;
 
-	err = register_netdev(failover_dev);
+	netif_carrier_off(failover_dev);
+
+	rtnl_lock();
+	err = register_netdevice(failover_dev);
 	if (err) {
-		dev_err(dev, "Unable to register failover_dev!\n");
+		netdev_err(standby_dev, "Unable to register failover_dev!\n");
 		goto err_register_netdev;
 	}
 
-	netif_carrier_off(failover_dev);
+	err = netdev_failover_join(standby_dev, failover_dev,
+				   net_failover_handle_frame);
+	if (err) {
+		netdev_err(failover_dev, "Unable to join with %s\n",
+			   standby_dev->name);
+		goto err_failover_join;
+	}
 
-	failover = failover_register(failover_dev, &net_failover_ops);
-	if (IS_ERR(failover))
-		goto err_failover_register;
+	list_add(&nfo_info->list, &net_failover_list);
+	rtnl_unlock();
 
-	return failover;
+	return failover_dev;
 
-err_failover_register:
-	unregister_netdev(failover_dev);
+err_failover_join:
+	unregister_netdevice(failover_dev);
 err_register_netdev:
+	rtnl_unlock();
 	free_netdev(failover_dev);
 
 	return ERR_PTR(err);
@@ -785,31 +840,27 @@ EXPORT_SYMBOL_GPL(net_failover_create);
  * netdev. Used by paravirtual drivers that use 3-netdev model.
  *
  */
-void net_failover_destroy(struct failover *failover)
+void net_failover_destroy(struct net_device *failover_dev)
 {
-	struct net_failover_info *nfo_info;
-	struct net_device *failover_dev;
+	struct net_failover_info *nfo_info = netdev_priv(failover_dev);
 	struct net_device *slave_dev;
-
-	if (!failover)
-		return;
-
-	failover_dev = rcu_dereference(failover->failover_dev);
-	nfo_info = netdev_priv(failover_dev);
 
 	netif_device_detach(failover_dev);
 
 	rtnl_lock();
-
 	slave_dev = rtnl_dereference(nfo_info->primary_dev);
-	if (slave_dev)
-		failover_slave_unregister(slave_dev);
+	if (slave_dev) {
+		netdev_failover_unjoin(slave_dev, failover_dev);
+		dev_put(slave_dev);
+	}
 
 	slave_dev = rtnl_dereference(nfo_info->standby_dev);
-	if (slave_dev)
-		failover_slave_unregister(slave_dev);
+	if (slave_dev) {
+		netdev_failover_unjoin(slave_dev, failover_dev);
+		dev_put(slave_dev);
+	}
 
-	failover_unregister(failover);
+	list_del(&nfo_info->list);
 
 	unregister_netdevice(failover_dev);
 
@@ -819,9 +870,53 @@ void net_failover_destroy(struct failover *failover)
 }
 EXPORT_SYMBOL_GPL(net_failover_destroy);
 
+static int net_failover_event(struct notifier_block *this,
+			      unsigned long event, void *ptr)
+{
+	struct net_device *event_dev = netdev_notifier_info_to_dev(ptr);
+
+	/* Skip parent events */
+	if (netif_is_failover(event_dev))
+		return NOTIFY_DONE;
+
+	/* Avoid non-Ethernet type devices */
+	if (event_dev->type != ARPHRD_ETHER)
+		return NOTIFY_DONE;
+
+	/* Avoid Vlan dev with same MAC registering as VF */
+	if (is_vlan_dev(event_dev))
+		return NOTIFY_DONE;
+
+	/* Avoid Bonding master dev with same MAC registering as VF */
+	if ((event_dev->priv_flags & IFF_BONDING) &&
+	    (event_dev->flags & IFF_MASTER))
+		return NOTIFY_DONE;
+
+	switch (event) {
+	case NETDEV_REGISTER:
+		return net_failover_register_event(event_dev);
+
+	case NETDEV_UNREGISTER:
+		return net_failover_unregister_event(event_dev);
+
+	case NETDEV_UP:
+	case NETDEV_DOWN:
+	case NETDEV_CHANGE:
+		return net_failover_link_event(event_dev);
+
+	default:
+		return NOTIFY_DONE;
+	}
+}
+
+static struct notifier_block net_failover_notifier = {
+	.notifier_call = net_failover_event,
+};
+
 static __init int
 net_failover_init(void)
 {
+	register_netdevice_notifier(&net_failover_notifier);
 	return 0;
 }
 module_init(net_failover_init);
@@ -829,6 +924,7 @@ module_init(net_failover_init);
 static __exit
 void net_failover_exit(void)
 {
+	unregister_netdevice_notifier(&net_failover_notifier);
 }
 module_exit(net_failover_exit);
 
