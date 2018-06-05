@@ -1,21 +1,12 @@
-/*
- * Driver for older Chrome OS EC accelerometer
- *
- * Copyright 2017 Google, Inc
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * This driver uses the memory mapper cros-ec interface to communicate
- * with the Chrome OS EC about accelerometer data.
- * Accelerometer access is presented through iio sysfs.
- */
+// SPDX-License-Identifier: GPL-2.0+
+// Driver for older ChromeOS EC accelerometer
+//
+// Copyright (C) 2017 Google, Inc.
+// Author: Gwendal Grignou <gwendal@chromium.org>
+//
+// This driver uses the memory mapper cros-ec interface to communicate
+// with the ChromeOS EC about accelerometer data.
+// Accelerometer access is presented through iio sysfs.
 
 #include <linux/delay.h>
 #include <linux/device.h>
