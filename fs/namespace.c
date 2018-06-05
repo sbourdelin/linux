@@ -3046,6 +3046,9 @@ int ksys_mount(char __user *dev_name, char __user *dir_name, char __user *type,
 	char *kernel_dev;
 	void *options;
 
+	if (!may_mount())
+		return -EPERM;
+
 	kernel_type = copy_mount_string(type);
 	ret = PTR_ERR(kernel_type);
 	if (IS_ERR(kernel_type))
