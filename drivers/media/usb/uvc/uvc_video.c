@@ -1246,6 +1246,7 @@ static void uvc_video_next_buffers(struct uvc_streaming *stream,
 		*meta_buf = uvc_queue_next_buffer(&stream->meta.queue,
 						  *meta_buf);
 	}
+	uvc_video_validate_buffer(stream, *video_buf);
 	*video_buf = uvc_queue_next_buffer(&stream->queue, *video_buf);
 }
 
@@ -1270,10 +1271,8 @@ static void uvc_video_decode_isoc(struct urb *urb, struct uvc_streaming *stream,
 		do {
 			ret = uvc_video_decode_start(stream, buf, mem,
 				urb->iso_frame_desc[i].actual_length);
-			if (ret == -EAGAIN) {
-				uvc_video_validate_buffer(stream, buf);
+			if (ret == -EAGAIN)
 				uvc_video_next_buffers(stream, &buf, &meta_buf);
-			}
 		} while (ret == -EAGAIN);
 
 		if (ret < 0)
@@ -1289,10 +1288,8 @@ static void uvc_video_decode_isoc(struct urb *urb, struct uvc_streaming *stream,
 		uvc_video_decode_end(stream, buf, mem,
 			urb->iso_frame_desc[i].actual_length);
 
-		if (buf->state == UVC_BUF_STATE_READY) {
-			uvc_video_validate_buffer(stream, buf);
+		if (buf->state == UVC_BUF_STATE_READY)
 			uvc_video_next_buffers(stream, &buf, &meta_buf);
-		}
 	}
 }
 
