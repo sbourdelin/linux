@@ -829,7 +829,7 @@ static int atl1e_setup_ring_resources(struct atl1e_adapter *adapter)
 						       &adapter->ring_dma);
 	if (adapter->ring_vir_addr == NULL) {
 		netdev_err(adapter->netdev,
-			   "pci_alloc_consistent failed, size = D%d\n", size);
+			   "pci_zalloc_consistent failed, size = D%d\n", size);
 		return -ENOMEM;
 	}
 

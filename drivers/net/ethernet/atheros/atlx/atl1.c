@@ -1069,15 +1069,13 @@ static s32 atl1_setup_ring_resources(struct atl1_adapter *adapter)
 		+ sizeof(struct stats_msg_block)
 		+ 40;
 
-	ring_header->desc = pci_alloc_consistent(pdev, ring_header->size,
-		&ring_header->dma);
+	ring_header->desc = pci_zalloc_consistent(pdev, ring_header->size,
+						  &ring_header->dma);
 	if (unlikely(!ring_header->desc)) {
 		if (netif_msg_drv(adapter))
-			dev_err(&pdev->dev, "pci_alloc_consistent failed\n");
+			dev_err(&pdev->dev, "pci_zalloc_consistent failed\n");
 		goto err_nomem;
 	}
-
-	memset(ring_header->desc, 0, ring_header->size);
 
 	/* init TPD ring */
 	tpd_ring->dma = ring_header->dma;
