@@ -19,16 +19,13 @@
 
 struct aa_label;
 
-/* secid value that will not be allocated */
-#define AA_SECID_INVALID 0
-
 struct aa_label *aa_secid_to_label(u32 secid);
 int apparmor_secid_to_secctx(u32 secid, char **secdata, u32 *seclen);
 int apparmor_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid);
 void apparmor_release_secctx(char *secdata, u32 seclen);
 
 
-u32 aa_alloc_secid(struct aa_label *label, gfp_t gfp);
+int aa_alloc_secid(struct aa_label *label, gfp_t gfp);
 void aa_free_secid(u32 secid);
 void aa_secid_update(u32 secid, struct aa_label *label);
 
