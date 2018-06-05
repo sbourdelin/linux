@@ -407,23 +407,21 @@ static  int skfp_driver_init(struct net_device *dev)
 	if (bp->SharedMemSize > 0) {
 		bp->SharedMemSize += 16;	// for descriptor alignment
 
-		bp->SharedMemAddr = pci_alloc_consistent(&bp->pdev,
-							 bp->SharedMemSize,
-							 &bp->SharedMemDMA);
+		bp->SharedMemAddr = pci_zalloc_consistent(&bp->pdev,
+							  bp->SharedMemSize,
+							  &bp->SharedMemDMA);
 		if (!bp->SharedMemAddr) {
 			printk("could not allocate mem for ");
 			printk("hardware module: %ld byte\n",
 			       bp->SharedMemSize);
 			goto fail;
 		}
-		bp->SharedMemHeap = 0;	// Nothing used yet.
 
 	} else {
 		bp->SharedMemAddr = NULL;
-		bp->SharedMemHeap = 0;
 	}			// SharedMemSize > 0
 
-	memset(bp->SharedMemAddr, 0, bp->SharedMemSize);
+	bp->SharedMemHeap = 0;
 
 	card_stop(smc);		// Reset adapter.
 
