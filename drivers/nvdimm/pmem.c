@@ -414,6 +414,8 @@ static int pmem_attach_disk(struct device *dev,
 		return -ENOMEM;
 	}
 	dax_write_cache(dax_dev, wbc);
+	dax_flush_on_sync(dax_dev,
+			!test_bit(ND_REGION_PERSIST_CACHE, &nd_region->flags));
 	pmem->dax_dev = dax_dev;
 
 	gendev = disk_to_dev(disk);
