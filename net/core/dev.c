@@ -2081,6 +2081,8 @@ int netdev_txq_to_tc(struct net_device *dev, unsigned int txq)
 EXPORT_SYMBOL(netdev_txq_to_tc);
 
 #ifdef CONFIG_XPS
+struct static_key xps_needed __read_mostly;
+EXPORT_SYMBOL(xps_needed);
 static DEFINE_MUTEX(xps_map_mutex);
 #define xmap_dereference(P)		\
 	rcu_dereference_protected((P), lockdep_is_held(&xps_map_mutex))
@@ -2189,6 +2191,7 @@ static void netif_reset_xps_queues(struct net_device *dev, u16 offset,
 out_no_maps:
 		type++;
 	}
+	static_key_slow_dec(&xps_needed);
 	mutex_unlock(&xps_map_mutex);
 }
 
@@ -2308,6 +2311,8 @@ int __netif_set_xps_queue(struct net_device *dev, const unsigned long *mask,
 
 	if (!new_dev_maps)
 		goto out_no_new_maps;
+
+	static_key_slow_inc(&xps_needed);
 
 	for (j = -1; j = attrmask_next(j, possible_mask, nr_ids),
 	     j < nr_ids;) {
@@ -3480,6 +3485,9 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 	struct xps_dev_maps *dev_maps;
 	struct xps_map *map;
 	int queue_index = -1;
+
+	if (!static_key_false(&xps_needed))
+		return -1;
 
 	rcu_read_lock();
 	dev_maps = rcu_dereference(dev->xps_cpus_map);
