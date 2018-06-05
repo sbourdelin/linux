@@ -152,6 +152,8 @@ enum dax_device_flags {
 	DAXDEV_ALIVE,
 	/* gate whether dax_flush() calls the low level flush routine */
 	DAXDEV_WRITE_CACHE,
+	/* only flush the CPU caches if they are not power fail protected */
+	DAXDEV_FLUSH_ON_SYNC,
 };
 
 /**
@@ -283,7 +285,8 @@ EXPORT_SYMBOL_GPL(dax_copy_from_iter);
 void arch_wb_cache_pmem(void *addr, size_t size);
 void dax_flush(struct dax_device *dax_dev, void *addr, size_t size)
 {
-	if (unlikely(!dax_write_cache_enabled(dax_dev)))
+	if (unlikely(!dax_write_cache_enabled(dax_dev)) ||
+			!test_bit(DAXDEV_FLUSH_ON_SYNC, &dax_dev->flags))
 		return;
 
 	arch_wb_cache_pmem(addr, size);
@@ -309,6 +312,15 @@ bool dax_write_cache_enabled(struct dax_device *dax_dev)
 	return test_bit(DAXDEV_WRITE_CACHE, &dax_dev->flags);
 }
 EXPORT_SYMBOL_GPL(dax_write_cache_enabled);
+
+void dax_flush_on_sync(struct dax_device *dax_dev, bool flush)
+{
+	if (flush)
+		set_bit(DAXDEV_FLUSH_ON_SYNC, &dax_dev->flags);
+	else
+		clear_bit(DAXDEV_FLUSH_ON_SYNC, &dax_dev->flags);
+}
+EXPORT_SYMBOL_GPL(dax_flush_on_sync);
 
 bool dax_alive(struct dax_device *dax_dev)
 {

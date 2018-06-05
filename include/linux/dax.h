@@ -32,6 +32,7 @@ void put_dax(struct dax_device *dax_dev);
 void kill_dax(struct dax_device *dax_dev);
 void dax_write_cache(struct dax_device *dax_dev, bool wc);
 bool dax_write_cache_enabled(struct dax_device *dax_dev);
+void dax_flush_on_sync(struct dax_device *dax_dev, bool flush);
 #else
 static inline struct dax_device *dax_get_by_host(const char *host)
 {
@@ -58,6 +59,9 @@ static inline void dax_write_cache(struct dax_device *dax_dev, bool wc)
 static inline bool dax_write_cache_enabled(struct dax_device *dax_dev)
 {
 	return false;
+}
+static inline void dax_flush_on_sync(struct dax_device *dax_dev, bool flush)
+{
 }
 #endif
 
