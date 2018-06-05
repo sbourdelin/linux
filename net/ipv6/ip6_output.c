@@ -235,7 +235,7 @@ int ip6_xmit(const struct sock *sk, struct sk_buff *skb, struct flowi6 *fl6,
 
 	skb_push(skb, sizeof(struct ipv6hdr));
 	skb_reset_network_header(skb);
-	hdr = ipv6_hdr(skb);
+	hdr = (struct ipv6hdr *)skb->data;
 
 	/*
 	 *	Fill in the IPv6 header
@@ -1658,7 +1658,7 @@ struct sk_buff *__ip6_make_skb(struct sock *sk,
 
 	skb_push(skb, sizeof(struct ipv6hdr));
 	skb_reset_network_header(skb);
-	hdr = ipv6_hdr(skb);
+	hdr = (struct ipv6hdr *)skb->data;
 
 	ip6_flow_hdr(hdr, v6_cork->tclass,
 		     ip6_make_flowlabel(net, skb, fl6->flowlabel,

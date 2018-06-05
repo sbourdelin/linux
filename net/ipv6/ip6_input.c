@@ -113,7 +113,7 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	if (unlikely(!pskb_may_pull(skb, sizeof(*hdr))))
 		goto err;
 
-	hdr = ipv6_hdr(skb);
+	hdr = (const struct ipv6hdr *)skb->data;
 
 	if (hdr->version != 6)
 		goto err;
@@ -189,7 +189,7 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 			__IP6_INC_STATS(net, idev, IPSTATS_MIB_INHDRERRORS);
 			goto drop;
 		}
-		hdr = ipv6_hdr(skb);
+		hdr = (const struct ipv6hdr *)skb->data;
 	}
 
 	if (hdr->nexthdr == NEXTHDR_HOP) {
