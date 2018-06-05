@@ -1896,6 +1896,9 @@ static struct hv_driver storvsc_drv = {
 	.id_table = id_table,
 	.probe = storvsc_probe,
 	.remove = storvsc_remove,
+	.driver = {
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
+	},
 };
 
 #if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
