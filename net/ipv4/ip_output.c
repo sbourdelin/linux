@@ -96,7 +96,7 @@ EXPORT_SYMBOL(ip_send_check);
 
 int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
-	struct iphdr *iph = ip_hdr(skb);
+	struct iphdr *iph = (struct iphdr *)skb->data;
 
 	iph->tot_len = htons(skb->len);
 	ip_send_check(iph);
@@ -151,7 +151,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, const struct sock *sk,
 	/* Build the IP header. */
 	skb_push(skb, sizeof(struct iphdr) + (opt ? opt->opt.optlen : 0));
 	skb_reset_network_header(skb);
-	iph = ip_hdr(skb);
+	iph = (struct iphdr *)skb->data;
 	iph->version  = 4;
 	iph->ihl      = 5;
 	iph->tos      = inet->tos;
@@ -477,7 +477,7 @@ packet_routed:
 	/* OK, we know where to send it, allocate and build IP header. */
 	skb_push(skb, sizeof(struct iphdr) + (inet_opt ? inet_opt->opt.optlen : 0));
 	skb_reset_network_header(skb);
-	iph = ip_hdr(skb);
+	iph = (struct iphdr *)skb->data;
 	*((__be16 *)iph) = htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
 	if (ip_dont_fragment(sk, &rt->dst) && !skb->ignore_df)
 		iph->frag_off = htons(IP_DF);
@@ -659,7 +659,7 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 				__skb_push(frag, hlen);
 				skb_reset_network_header(frag);
 				memcpy(skb_network_header(frag), iph, hlen);
-				iph = ip_hdr(frag);
+				iph = (struct iphdr *)skb->data;
 				iph->tot_len = htons(frag->len);
 				ip_copy_metadata(frag, skb);
 				if (offset == 0)

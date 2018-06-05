@@ -309,7 +309,7 @@ drop:
 
 static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
-	const struct iphdr *iph = ip_hdr(skb);
+	const struct iphdr *iph = (const struct iphdr *)skb->data;
 	int (*edemux)(struct sk_buff *skb);
 	struct net_device *dev = skb->dev;
 	struct rtable *rt;
@@ -335,7 +335,7 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 			if (unlikely(err))
 				goto drop_error;
 			/* must reload iph, skb->head might have changed */
-			iph = ip_hdr(skb);
+			iph = (const struct iphdr *)skb->data;
 		}
 	}
 
@@ -433,7 +433,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
 		goto inhdr_error;
 
-	iph = ip_hdr(skb);
+	iph = (const struct iphdr *)skb->data;
 
 	/*
 	 *	RFC1122: 3.2.1.2 MUST silently discard any IP frame that fails the checksum.
@@ -459,7 +459,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	if (!pskb_may_pull(skb, iph->ihl*4))
 		goto inhdr_error;
 
-	iph = ip_hdr(skb);
+	iph = (const struct iphdr *)skb->data;
 
 	if (unlikely(ip_fast_csum((u8 *)iph, iph->ihl)))
 		goto csum_error;
