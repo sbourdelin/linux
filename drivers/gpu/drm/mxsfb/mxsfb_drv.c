@@ -102,7 +102,9 @@ static void mxsfb_pipe_enable(struct drm_simple_display_pipe *pipe,
 			      struct drm_crtc_state *crtc_state)
 {
 	struct mxsfb_drm_private *mxsfb = drm_pipe_to_mxsfb_drm_private(pipe);
+	struct drm_device *drm = pipe->plane.dev;
 
+	pm_runtime_get_sync(drm->dev);
 	drm_panel_prepare(mxsfb->panel);
 	mxsfb_crtc_enable(mxsfb);
 	drm_panel_enable(mxsfb->panel);
@@ -111,10 +113,12 @@ static void mxsfb_pipe_enable(struct drm_simple_display_pipe *pipe,
 static void mxsfb_pipe_disable(struct drm_simple_display_pipe *pipe)
 {
 	struct mxsfb_drm_private *mxsfb = drm_pipe_to_mxsfb_drm_private(pipe);
+	struct drm_device *drm = pipe->plane.dev;
 
 	drm_panel_disable(mxsfb->panel);
 	mxsfb_crtc_disable(mxsfb);
 	drm_panel_unprepare(mxsfb->panel);
+	pm_runtime_put_sync(drm->dev);
 }
 
 static void mxsfb_pipe_update(struct drm_simple_display_pipe *pipe,
@@ -177,6 +181,7 @@ static int mxsfb_load(struct drm_device *drm, unsigned long flags)
 
 	drm->dev_private = mxsfb;
 	mxsfb->devdata = &mxsfb_devdata[pdev->id_entry->driver_data];
+	platform_set_drvdata(pdev, drm);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mxsfb->base = devm_ioremap_resource(drm->dev, res);
@@ -257,8 +262,6 @@ static int mxsfb_load(struct drm_device *drm, unsigned long flags)
 		dev_err(drm->dev, "Failed to init FB CMA area\n");
 		goto err_cma;
 	}
-
-	platform_set_drvdata(pdev, drm);
 
 	drm_helper_hpd_irq_event(drm);
 
@@ -419,6 +422,70 @@ static int mxsfb_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int mxsfb_runtime_suspend(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
+	if (!drm->registered)
+		return 0;
+
+	if (mxsfb->enabled) {
+		mxsfb_crtc_disable(mxsfb);
+		mxsfb->suspended = true;
+	}
+
+	return 0;
+}
+
+static int mxsfb_runtime_resume(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
+	if (!drm->registered || !mxsfb->suspended)
+		return 0;
+
+	mxsfb_crtc_enable(mxsfb);
+	mxsfb->suspended = false;
+
+	return 0;
+}
+
+static int mxsfb_suspend(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
+	if (mxsfb->enabled) {
+		mxsfb_crtc_disable(mxsfb);
+		mxsfb->suspended = true;
+	}
+
+	return 0;
+}
+
+static int mxsfb_resume(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
+	if (!mxsfb->suspended)
+		return 0;
+
+	mxsfb_crtc_enable(mxsfb);
+	mxsfb->suspended = false;
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops mxsfb_pm_ops = {
+	SET_RUNTIME_PM_OPS(mxsfb_runtime_suspend, mxsfb_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(mxsfb_suspend, mxsfb_resume)
+};
+
 static struct platform_driver mxsfb_platform_driver = {
 	.probe		= mxsfb_probe,
 	.remove		= mxsfb_remove,
@@ -426,6 +493,7 @@ static struct platform_driver mxsfb_platform_driver = {
 	.driver	= {
 		.name		= "mxsfb",
 		.of_match_table	= mxsfb_dt_ids,
+		.pm = &mxsfb_pm_ops,
 	},
 };
 

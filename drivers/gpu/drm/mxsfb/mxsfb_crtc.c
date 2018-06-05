@@ -196,6 +196,21 @@ static int mxsfb_reset_block(void __iomem *reset_addr)
 	return clear_poll_bit(reset_addr, MODULE_CLKGATE);
 }
 
+static void mxsfb_update_hw_next_buf(struct mxsfb_drm_private *mxsfb)
+{
+	struct drm_framebuffer *fb = mxsfb->pipe.plane.state->fb;
+	struct drm_gem_cma_object *gem;
+
+	if (!fb)
+		return;
+
+	gem = drm_fb_cma_get_gem_obj(fb, 0);
+	if (!gem)
+		return;
+
+	writel(gem->paddr, mxsfb->base + mxsfb->devdata->next_buf);
+}
+
 static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
 {
 	struct drm_display_mode *m = &mxsfb->pipe.crtc.state->adjusted_mode;
@@ -270,18 +285,29 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
 	writel(SET_DOTCLK_H_VALID_DATA_CNT(m->hdisplay),
 	       mxsfb->base + LCDC_VDCTRL4);
 
+	mxsfb_update_hw_next_buf(mxsfb);
 	mxsfb_disable_axi_clk(mxsfb);
 }
 
 void mxsfb_crtc_enable(struct mxsfb_drm_private *mxsfb)
 {
+	if (mxsfb->enabled)
+		return;
+
 	mxsfb_crtc_mode_set_nofb(mxsfb);
 	mxsfb_enable_controller(mxsfb);
+
+	mxsfb->enabled = true;
 }
 
 void mxsfb_crtc_disable(struct mxsfb_drm_private *mxsfb)
 {
+	if (!mxsfb->enabled)
+		return;
+
 	mxsfb_disable_controller(mxsfb);
+
+	mxsfb->enabled = false;
 }
 
 void mxsfb_plane_atomic_update(struct mxsfb_drm_private *mxsfb,
@@ -289,12 +315,7 @@ void mxsfb_plane_atomic_update(struct mxsfb_drm_private *mxsfb,
 {
 	struct drm_simple_display_pipe *pipe = &mxsfb->pipe;
 	struct drm_crtc *crtc = &pipe->crtc;
-	struct drm_framebuffer *fb = pipe->plane.state->fb;
 	struct drm_pending_vblank_event *event;
-	struct drm_gem_cma_object *gem;
-
-	if (!crtc)
-		return;
 
 	spin_lock_irq(&crtc->dev->event_lock);
 	event = crtc->state->event;
@@ -309,12 +330,7 @@ void mxsfb_plane_atomic_update(struct mxsfb_drm_private *mxsfb,
 	}
 	spin_unlock_irq(&crtc->dev->event_lock);
 
-	if (!fb)
-		return;
-
-	gem = drm_fb_cma_get_gem_obj(fb, 0);
-
 	mxsfb_enable_axi_clk(mxsfb);
-	writel(gem->paddr, mxsfb->base + mxsfb->devdata->next_buf);
+	mxsfb_update_hw_next_buf(mxsfb);
 	mxsfb_disable_axi_clk(mxsfb);
 }
