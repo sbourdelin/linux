@@ -136,6 +136,9 @@ static inline void sk_mark_napi_id(struct sock *sk, const struct sk_buff *skb)
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	sk->sk_napi_id = skb->napi_id;
 #endif
+#ifdef CONFIG_XPS
+	sk->sk_rx_queue_mapping = skb_get_rx_queue(skb);
+#endif
 }
 
 /* variant used for unconnected sockets */

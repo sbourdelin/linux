@@ -139,6 +139,7 @@ typedef __u64 __bitwise __addrpair;
  *	@skc_node: main hash linkage for various protocol lookup tables
  *	@skc_nulls_node: main hash linkage for TCP/UDP/UDP-Lite protocol
  *	@skc_tx_queue_mapping: tx queue number for this connection
+ *	@skc_rx_queue_mapping: rx queue number for this connection
  *	@skc_flags: place holder for sk_flags
  *		%SO_LINGER (l_onoff), %SO_BROADCAST, %SO_KEEPALIVE,
  *		%SO_OOBINLINE settings, %SO_TIMESTAMPING settings
@@ -215,6 +216,9 @@ struct sock_common {
 		struct hlist_nulls_node skc_nulls_node;
 	};
 	int			skc_tx_queue_mapping;
+#ifdef CONFIG_XPS
+	int			skc_rx_queue_mapping;
+#endif
 	union {
 		int		skc_incoming_cpu;
 		u32		skc_rcv_wnd;
@@ -326,6 +330,9 @@ struct sock {
 #define sk_nulls_node		__sk_common.skc_nulls_node
 #define sk_refcnt		__sk_common.skc_refcnt
 #define sk_tx_queue_mapping	__sk_common.skc_tx_queue_mapping
+#ifdef CONFIG_XPS
+#define sk_rx_queue_mapping	__sk_common.skc_rx_queue_mapping
+#endif
 
 #define sk_dontcopy_begin	__sk_common.skc_dontcopy_begin
 #define sk_dontcopy_end		__sk_common.skc_dontcopy_end
@@ -1694,6 +1701,13 @@ static inline void sk_tx_queue_clear(struct sock *sk)
 static inline int sk_tx_queue_get(const struct sock *sk)
 {
 	return sk ? sk->sk_tx_queue_mapping : -1;
+}
+
+static inline void sk_mark_rx_queue(struct sock *sk, struct sk_buff *skb)
+{
+#ifdef CONFIG_XPS
+	sk->sk_rx_queue_mapping = skb_get_rx_queue(skb);
+#endif
 }
 
 static inline void sk_set_socket(struct sock *sk, struct socket *sock)
