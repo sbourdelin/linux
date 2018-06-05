@@ -1217,13 +1217,12 @@ int vnic_dev_classifier(struct vnic_dev *vdev, u8 cmd, u16 *entry,
 		tlv_size = sizeof(struct filter) +
 			   sizeof(struct filter_action) +
 			   2 * sizeof(struct filter_tlv);
-		tlv_va = pci_alloc_consistent(vdev->pdev, tlv_size, &tlv_pa);
+		tlv_va = pci_zalloc_consistent(vdev->pdev, tlv_size, &tlv_pa);
 		if (!tlv_va)
 			return -ENOMEM;
 		tlv = tlv_va;
 		a0 = tlv_pa;
 		a1 = tlv_size;
-		memset(tlv, 0, tlv_size);
 		tlv->type = CLSF_TLV_FILTER;
 		tlv->length = sizeof(struct filter);
 		*(struct filter *)&tlv->val = *data;
