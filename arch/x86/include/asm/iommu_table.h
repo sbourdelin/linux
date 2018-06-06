@@ -65,7 +65,7 @@ struct iommu_table_entry {
 #define IOMMU_INIT_POST(_detect)					\
 	__IOMMU_INIT(_detect, pci_swiotlb_detect_4gb,  NULL, NULL, 0)
 
-#define IOMMU_INIT_POST_FINISH(detect)					\
+#define IOMMU_INIT_POST_FINISH(_detect)					\
 	__IOMMU_INIT(_detect, pci_swiotlb_detect_4gb,  NULL, NULL, 1)
 
 /*
