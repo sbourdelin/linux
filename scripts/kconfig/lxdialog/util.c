@@ -332,6 +332,7 @@ int init_dialog(const char *backtitle)
 
 	keypad(stdscr, TRUE);
 	cbreak();
+	raw();			/* Enable CTRL-sequences*/
 	noecho();
 	dialog_clear();
 

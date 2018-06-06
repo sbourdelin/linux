@@ -56,7 +56,12 @@
  * fscanf would read in 'scroll', and eventually that value would get used.
  */
 
+#include <string.h>
 #include "dialog.h"
+
+#define ISEARCH_LEN 32
+#define ISEARCH_INDICATOR_LEN (ISEARCH_LEN + 8)
+static char isearch_str[ISEARCH_LEN] = "";
 
 static int menu_width, item_x;
 
@@ -104,6 +109,32 @@ do {									\
 	item_set(index);						\
 	do_print_item(menu, item_str(), choice, selected, !item_is_tag(':')); \
 } while (0)
+
+
+/*
+* Print the isearch indicator.
+*/
+static void print_isearch(WINDOW * win, int y, int x, int height, bool isearch)
+{
+	unsigned char i = 0;
+
+	wmove(win, y, x);
+
+	y = y + height + 1;
+	wmove(win, y, x);
+
+	if (isearch) {
+		wattrset(win, dlg.button_key_inactive.atr);
+		waddstr(win, "isearch: ");
+		waddstr(win, isearch_str);
+		i = ISEARCH_INDICATOR_LEN - strlen(isearch_str);
+	}
+
+	wattrset(win, dlg.menubox_border.atr);
+
+	for ( ; i < ISEARCH_INDICATOR_LEN; i++ )
+		waddch(win, ACS_HLINE);
+}
 
 /*
  * Print the scroll indicators.
@@ -176,6 +207,110 @@ static void do_scroll(WINDOW *win, int *scroll, int n)
 	scrollok(win, FALSE);
 	*scroll = *scroll + n;
 	wrefresh(win);
+}
+
+/*
+ * Incremental search for text in dialog menu entries.
+ * The search operates as a ring search, continuing at the top after
+ * the last entry has been visited.
+ */
+int do_isearch(char *str, int choice, int scroll)
+{
+	int i;
+
+	for (i = 0; i < item_count(); i++) {
+		item_set((choice + scroll + i)%item_count());
+		if (strcasestr(item_str(), str))
+			break;
+	}
+
+	return (choice + scroll + i)%item_count();
+}
+
+/*
+ * Incremental search in dialog menu
+ *
+ * This function is executed after CTRL-S has been pressed and it
+ * navigates to and highlights menu entries that match the string
+ * formed by subsequently entered characters.  To find further matches
+ * of an entered string, CTRL-S has to be entered instead of further
+ * characters.
+ *
+ * Subsequently pressing just CTRL-S keys results in searches for empty
+ * strings (any line matches) and thus results in navigating through
+ * the menu, line by line.
+ *
+ * Incremental search is terminated by pressing either ESC or ENTER.
+ */
+void dialog_isearch(WINDOW *menu, WINDOW *dialog, int *choice, int max_choice,
+		   int box_x, int box_y, int menu_height, int *scroll)
+{
+	int i;
+	int key = KEY_CTRL_S;
+
+	while (key != KEY_ESC) {
+		key = wgetch(menu);
+
+		if ((key == KEY_ESC || key == KEY_ENTR)) {
+			isearch_str[0] = '\0';
+			print_isearch(dialog, box_y, box_x + item_x + 5, menu_height, false);
+			print_arrows(dialog, item_count(), *scroll,
+				     box_y, box_x + item_x + 1, menu_height);
+			print_item(*scroll + *choice, *choice, true);
+			return;
+		}
+
+		if (key == KEY_CTRL_S) {
+			/* Remove highligt of current item */
+			print_item(*scroll + *choice, *choice, FALSE);
+			*choice += 1;
+			i = do_isearch(isearch_str, *choice, *scroll);
+		} else {
+			if ( key == KEY_BACKSPACE && isearch_str[0] ) {
+				isearch_str[i = (strlen(isearch_str) - 1)] = '\0';
+			} else {
+				if ( isalnum(key) || key == ' ') {
+					if (strlen(isearch_str) < ISEARCH_LEN - 1) {
+						isearch_str[i = strlen(isearch_str)] = key;
+						isearch_str[i+1] = '\0';
+					} else
+						continue;
+				}
+			}
+			/* Remove highligt of current item */
+			print_item(*scroll + *choice, *choice, FALSE);
+			i = do_isearch(isearch_str, *choice, *scroll);
+		}
+		i -= *scroll;
+
+		if (i >= max_choice)
+			/*
+			 * Handle matches below the currently visible menu entries.
+			 */
+			while (i >= max_choice) {
+				do_scroll(menu, scroll, 1);
+				i--;
+				print_item(max_choice + *scroll - 1, max_choice - 1, false);
+			}
+		else if (i < *scroll)
+			/*
+			 * Handle matches higher in the menu (ring search).
+			 */
+			while (i < *scroll) {
+				do_scroll(menu, scroll, -1);
+				i++;
+				print_item(*scroll, 0, false);
+			}
+		*choice = i;
+
+		print_item(*scroll + *choice, *choice, TRUE);
+		print_isearch(dialog, box_y, box_x + item_x + 5, menu_height, true);
+		print_arrows(dialog, item_count(), *scroll,
+			     box_y, box_x + item_x + 1, menu_height);
+
+		wnoutrefresh(dialog);
+		wrefresh(menu);
+	}
 }
 
 /*
@@ -282,6 +417,10 @@ do_resize:
 	while (key != KEY_ESC) {
 		key = wgetch(menu);
 
+		if (key == KEY_CTRL_S)
+			dialog_isearch(menu, dialog, &choice, max_choice,
+				       box_x, box_y, menu_height, &scroll);
+
 		if (key < 256 && isalpha(key))
 			key = tolower(key);
 
@@ -366,7 +505,6 @@ do_resize:
 
 			wnoutrefresh(dialog);
 			wrefresh(menu);
-
 			continue;	/* wait for another key press */
 		}
 
