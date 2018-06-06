@@ -1085,36 +1085,6 @@ static inline size_t flow_keys_hash_length(const struct flow_keys *flow)
 	return (sizeof(*flow) - diff) / sizeof(u32);
 }
 
-__be32 flow_get_u32_src(const struct flow_keys *flow)
-{
-	switch (flow->control.addr_type) {
-	case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
-		return flow->addrs.v4addrs.src;
-	case FLOW_DISSECTOR_KEY_IPV6_ADDRS:
-		return (__force __be32)ipv6_addr_hash(
-			&flow->addrs.v6addrs.src);
-	case FLOW_DISSECTOR_KEY_TIPC:
-		return flow->addrs.tipckey.key;
-	default:
-		return 0;
-	}
-}
-EXPORT_SYMBOL(flow_get_u32_src);
-
-__be32 flow_get_u32_dst(const struct flow_keys *flow)
-{
-	switch (flow->control.addr_type) {
-	case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
-		return flow->addrs.v4addrs.dst;
-	case FLOW_DISSECTOR_KEY_IPV6_ADDRS:
-		return (__force __be32)ipv6_addr_hash(
-			&flow->addrs.v6addrs.dst);
-	default:
-		return 0;
-	}
-}
-EXPORT_SYMBOL(flow_get_u32_dst);
-
 static inline void __flow_hash_consistentify(struct flow_keys *keys)
 {
 	int addr_diff, i;
@@ -1162,49 +1132,6 @@ static inline u32 __flow_hash_from_keys(struct flow_keys *keys, u32 keyval)
 	return hash;
 }
 
-u32 flow_hash_from_keys(struct flow_keys *keys)
-{
-	__flow_hash_secret_init();
-	return __flow_hash_from_keys(keys, hashrnd);
-}
-EXPORT_SYMBOL(flow_hash_from_keys);
-
-static inline u32 ___skb_get_hash(const struct sk_buff *skb,
-				  struct flow_keys *keys, u32 keyval)
-{
-	skb_flow_dissect_flow_keys(skb, keys,
-				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
-
-	return __flow_hash_from_keys(keys, keyval);
-}
-
-struct _flow_keys_digest_data {
-	__be16	n_proto;
-	u8	ip_proto;
-	u8	padding;
-	__be32	ports;
-	__be32	src;
-	__be32	dst;
-};
-
-void make_flow_keys_digest(struct flow_keys_digest *digest,
-			   const struct flow_keys *flow)
-{
-	struct _flow_keys_digest_data *data =
-	    (struct _flow_keys_digest_data *)digest;
-
-	BUILD_BUG_ON(sizeof(*data) > sizeof(*digest));
-
-	memset(digest, 0, sizeof(*digest));
-
-	data->n_proto = flow->basic.n_proto;
-	data->ip_proto = flow->basic.ip_proto;
-	data->ports = flow->ports.ports;
-	data->src = flow->addrs.v4addrs.src;
-	data->dst = flow->addrs.v4addrs.dst;
-}
-EXPORT_SYMBOL(make_flow_keys_digest);
-
 static struct flow_dissector flow_keys_dissector_symmetric __read_mostly;
 
 u32 __skb_get_hash_symmetric(const struct sk_buff *skb)
@@ -1221,36 +1148,6 @@ u32 __skb_get_hash_symmetric(const struct sk_buff *skb)
 	return __flow_hash_from_keys(&keys, hashrnd);
 }
 EXPORT_SYMBOL_GPL(__skb_get_hash_symmetric);
-
-/**
- * __skb_get_hash: calculate a flow hash
- * @skb: sk_buff to calculate flow hash from
- *
- * This function calculates a flow hash based on src/dst addresses
- * and src/dst port numbers.  Sets hash in skb to non-zero hash value
- * on success, zero indicates no valid hash.  Also, sets l4_hash in skb
- * if hash is a canonical 4-tuple hash over transport ports.
- */
-void __skb_get_hash(struct sk_buff *skb)
-{
-	struct flow_keys keys;
-	u32 hash;
-
-	__flow_hash_secret_init();
-
-	hash = ___skb_get_hash(skb, &keys, hashrnd);
-
-	__skb_set_sw_hash(skb, hash, flow_keys_have_l4(&keys));
-}
-EXPORT_SYMBOL(__skb_get_hash);
-
-__u32 skb_get_hash_perturb(const struct sk_buff *skb, u32 perturb)
-{
-	struct flow_keys keys;
-
-	return ___skb_get_hash(skb, &keys, perturb);
-}
-EXPORT_SYMBOL(skb_get_hash_perturb);
 
 u32 __skb_get_poff(const struct sk_buff *skb, void *data,
 		   const struct flow_keys *keys, int hlen)
@@ -1321,6 +1218,109 @@ u32 skb_get_poff(const struct sk_buff *skb)
 
 	return __skb_get_poff(skb, skb->data, &keys, skb_headlen(skb));
 }
+
+__be32 flow_get_u32_src(const struct flow_keys *flow)
+{
+	switch (flow->control.addr_type) {
+	case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
+		return flow->addrs.v4addrs.src;
+	case FLOW_DISSECTOR_KEY_IPV6_ADDRS:
+		return (__force __be32)ipv6_addr_hash(
+			&flow->addrs.v6addrs.src);
+	case FLOW_DISSECTOR_KEY_TIPC:
+		return flow->addrs.tipckey.key;
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(flow_get_u32_src);
+
+__be32 flow_get_u32_dst(const struct flow_keys *flow)
+{
+	switch (flow->control.addr_type) {
+	case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
+		return flow->addrs.v4addrs.dst;
+	case FLOW_DISSECTOR_KEY_IPV6_ADDRS:
+		return (__force __be32)ipv6_addr_hash(
+			&flow->addrs.v6addrs.dst);
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(flow_get_u32_dst);
+
+u32 flow_hash_from_keys(struct flow_keys *keys)
+{
+	__flow_hash_secret_init();
+	return __flow_hash_from_keys(keys, hashrnd);
+}
+EXPORT_SYMBOL(flow_hash_from_keys);
+
+static inline u32 ___skb_get_hash(const struct sk_buff *skb,
+				  struct flow_keys *keys, u32 keyval)
+{
+	skb_flow_dissect_flow_keys(skb, keys,
+				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
+
+	return __flow_hash_from_keys(keys, keyval);
+}
+
+struct _flow_keys_digest_data {
+	__be16	n_proto;
+	u8	ip_proto;
+	u8	padding;
+	__be32	ports;
+	__be32	src;
+	__be32	dst;
+};
+
+void make_flow_keys_digest(struct flow_keys_digest *digest,
+			   const struct flow_keys *flow)
+{
+	struct _flow_keys_digest_data *data =
+	    (struct _flow_keys_digest_data *)digest;
+
+	BUILD_BUG_ON(sizeof(*data) > sizeof(*digest));
+
+	memset(digest, 0, sizeof(*digest));
+
+	data->n_proto = flow->basic.n_proto;
+	data->ip_proto = flow->basic.ip_proto;
+	data->ports = flow->ports.ports;
+	data->src = flow->addrs.v4addrs.src;
+	data->dst = flow->addrs.v4addrs.dst;
+}
+EXPORT_SYMBOL(make_flow_keys_digest);
+
+/**
+ * __skb_get_hash: calculate a flow hash
+ * @skb: sk_buff to calculate flow hash from
+ *
+ * This function calculates a flow hash based on src/dst addresses
+ * and src/dst port numbers.  Sets hash in skb to non-zero hash value
+ * on success, zero indicates no valid hash.  Also, sets l4_hash in skb
+ * if hash is a canonical 4-tuple hash over transport ports.
+ */
+void __skb_get_hash(struct sk_buff *skb)
+{
+	struct flow_keys keys;
+	u32 hash;
+
+	__flow_hash_secret_init();
+
+	hash = ___skb_get_hash(skb, &keys, hashrnd);
+
+	__skb_set_sw_hash(skb, hash, flow_keys_have_l4(&keys));
+}
+EXPORT_SYMBOL(__skb_get_hash);
+
+__u32 skb_get_hash_perturb(const struct sk_buff *skb, u32 perturb)
+{
+	struct flow_keys keys;
+
+	return ___skb_get_hash(skb, &keys, perturb);
+}
+EXPORT_SYMBOL(skb_get_hash_perturb);
 
 __u32 __get_hash_from_flowi6(const struct flowi6 *fl6, struct flow_keys *keys)
 {
