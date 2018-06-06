@@ -428,6 +428,116 @@ int __cgroup_bpf_query(struct cgroup *cgrp, const union bpf_attr *attr,
 	return ret;
 }
 
+int bpf_prog_attach_check_attach_type(const struct bpf_prog *prog,
+				      enum bpf_attach_type attach_type)
+{
+	switch (prog->type) {
+	case BPF_PROG_TYPE_CGROUP_SOCK:
+	case BPF_PROG_TYPE_CGROUP_SOCK_ADDR:
+		return attach_type == prog->expected_attach_type ? 0 : -EINVAL;
+	default:
+		return 0;
+	}
+}
+
+int sockmap_get_from_fd(const union bpf_attr *attr, int type, bool attach)
+{
+	struct bpf_prog *prog = NULL;
+	int ufd = attr->target_fd;
+	struct bpf_map *map;
+	struct fd f;
+	int err;
+
+	f = fdget(ufd);
+	map = __bpf_map_get(f);
+	if (IS_ERR(map))
+		return PTR_ERR(map);
+
+	if (attach) {
+		prog = bpf_prog_get_type(attr->attach_bpf_fd, type);
+		if (IS_ERR(prog)) {
+			fdput(f);
+			return PTR_ERR(prog);
+		}
+	}
+
+	err = sock_map_prog(map, prog, attr->attach_type);
+	if (err) {
+		fdput(f);
+		if (prog)
+			bpf_prog_put(prog);
+		return err;
+	}
+
+	fdput(f);
+	return 0;
+}
+
+int cgroup_bpf_prog_attach(const union bpf_attr *attr, enum bpf_prog_type ptype)
+{
+	struct bpf_prog *prog;
+	struct cgroup *cgrp;
+	int ret;
+
+	prog = bpf_prog_get_type(attr->attach_bpf_fd, ptype);
+	if (IS_ERR(prog))
+		return PTR_ERR(prog);
+
+	if (bpf_prog_attach_check_attach_type(prog, attr->attach_type)) {
+		bpf_prog_put(prog);
+		return -EINVAL;
+	}
+
+	cgrp = cgroup_get_from_fd(attr->target_fd);
+	if (IS_ERR(cgrp)) {
+		bpf_prog_put(prog);
+		return PTR_ERR(cgrp);
+	}
+
+	ret = cgroup_bpf_attach(cgrp, prog, attr->attach_type,
+				attr->attach_flags);
+	if (ret)
+		bpf_prog_put(prog);
+	cgroup_put(cgrp);
+
+	return ret;
+}
+
+int cgroup_bpf_prog_detach(const union bpf_attr *attr, enum bpf_prog_type ptype)
+{
+	struct bpf_prog *prog;
+	struct cgroup *cgrp;
+	int ret;
+
+	cgrp = cgroup_get_from_fd(attr->target_fd);
+	if (IS_ERR(cgrp))
+		return PTR_ERR(cgrp);
+
+	prog = bpf_prog_get_type(attr->attach_bpf_fd, ptype);
+	if (IS_ERR(prog))
+		prog = NULL;
+
+	ret = cgroup_bpf_detach(cgrp, prog, attr->attach_type, 0);
+	if (prog)
+		bpf_prog_put(prog);
+	cgroup_put(cgrp);
+	return ret;
+}
+
+int cgroup_bpf_prog_query(const union bpf_attr *attr,
+			  union bpf_attr __user *uattr)
+{
+	struct cgroup *cgrp;
+	int ret;
+
+	cgrp = cgroup_get_from_fd(attr->query.target_fd);
+	if (IS_ERR(cgrp))
+		return PTR_ERR(cgrp);
+	ret = cgroup_bpf_query(cgrp, attr, uattr);
+	cgroup_put(cgrp);
+	return ret;
+}
+
 /**
  * __cgroup_bpf_run_filter_skb() - Run a program for packet filtering
  * @sk: The socket sending or receiving traffic

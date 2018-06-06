@@ -188,11 +188,42 @@ int __cgroup_bpf_check_dev_permission(short dev_type, u32 major, u32 minor,
 									      \
 	__ret;								      \
 })
+int sockmap_get_from_fd(const union bpf_attr *attr, int type, bool attach);
+int cgroup_bpf_prog_attach(const union bpf_attr *attr,
+			   enum bpf_prog_type ptype);
+int cgroup_bpf_prog_detach(const union bpf_attr *attr,
+			   enum bpf_prog_type ptype);
+int cgroup_bpf_prog_query(const union bpf_attr *attr,
+			  union bpf_attr __user *uattr);
 #else
 
 struct cgroup_bpf {};
 static inline void cgroup_bpf_put(struct cgroup *cgrp) {}
 static inline int cgroup_bpf_inherit(struct cgroup *cgrp) { return 0; }
+
+static inline int sockmap_get_from_fd(const union bpf_attr *attr,
+				      int type, bool attach)
+{
+	return -EINVAL;
+}
+
+static inline int cgroup_bpf_prog_attach(const union bpf_attr *attr,
+					 enum bpf_prog_type ptype)
+{
+	return -EINVAL;
+}
+
+static inline int cgroup_bpf_prog_detach(const union bpf_attr *attr,
+					 enum bpf_prog_type ptype)
+{
+	return -EINVAL;
+}
+
+static inline int cgroup_bpf_prog_query(const union bpf_attr *attr,
+					union bpf_attr __user *uattr)
+{
+	return -EINVAL;
+}
 
 #define cgroup_bpf_enabled (0)
 #define BPF_CGROUP_PRE_CONNECT_ENABLED(sk) (0)
