@@ -3528,6 +3528,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 {
 #if defined(PCI_IOBASE) && defined(CONFIG_MMU)
 	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+	unsigned long last_vaddr;
 
 	if (!(res->flags & IORESOURCE_IO))
 		return -EINVAL;
@@ -3535,7 +3536,16 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 	if (res->end > IO_SPACE_LIMIT)
 		return -EINVAL;
 
-	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+	/* It will be mess if vaddr's offset is not equal to phys_addr's */
+	if ((vaddr & ~PAGE_MASK) != (phys_addr & ~PAGE_MASK))
+		return -EINVAL;
+
+	/* Mappings have to be page-aligned */
+	last_vaddr = PAGE_ALIGN(vaddr + resource_size(res));
+	phys_addr &= PAGE_MASK;
+	vaddr &= PAGE_MASK;
+
+	return ioremap_page_range(vaddr, last_vaddr, phys_addr,
 				  pgprot_device(PAGE_KERNEL));
 #else
 	/* this architecture does not have memory mapped I/O space,
