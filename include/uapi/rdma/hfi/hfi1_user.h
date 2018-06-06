@@ -58,6 +58,7 @@
 #define _LINUX__HFI1_USER_H
 
 #include <linux/types.h>
+#include <linux/compiler.h>
 #include <rdma/rdma_user_ioctl.h>
 
 /*

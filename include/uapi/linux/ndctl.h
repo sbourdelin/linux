@@ -13,6 +13,7 @@
 #ifndef __NDCTL_H__
 #define __NDCTL_H__
 
+#include <linux/compiler.h>
 #include <linux/types.h>
 
 struct nd_cmd_dimm_flags {

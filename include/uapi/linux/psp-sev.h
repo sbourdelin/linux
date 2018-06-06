@@ -18,6 +18,7 @@
 #define __PSP_SEV_USER_H__
 
 #include <linux/types.h>
+#include <linux/compiler.h>
 
 /**
  * SEV platform commands

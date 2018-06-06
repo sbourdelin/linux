@@ -25,6 +25,7 @@
 
 #include <linux/netlink.h>
 #include <linux/types.h>
+#include <stdint.h>
 
 /*
  * This file intended to be included by both kernel and user space

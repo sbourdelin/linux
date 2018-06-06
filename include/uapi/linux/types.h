@@ -11,6 +11,7 @@
 #endif /* __EXPORTED_HEADERS__ */
 #endif
 
+#include <linux/compiler_types.h>
 #include <linux/posix_types.h>
 
 

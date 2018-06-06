@@ -56,6 +56,9 @@
 
 #include <linux/types.h>
 #include <linux/socket.h>
+#ifndef __KERNEL__
+#include <stdint.h>
+#endif
 
 typedef __s32 sctp_assoc_t;
 

@@ -3,6 +3,8 @@
 #define __ASM_GENERIC_SHMBUF_H
 
 #include <asm/bitsperlong.h>
+#include <asm-generic/ipcbuf.h>
+#include <stddef.h>
 
 /*
  * The shmid64_ds structure for x86 architecture.

@@ -19,6 +19,9 @@
  */
 #define NFS4_MOUNT_VERSION	1
 
+#include <linux/socket.h> /* for struct sockaddr. */
+#include <linux/compiler.h>
+
 struct nfs_string {
 	unsigned int len;
 	const char __user * data;

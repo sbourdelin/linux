@@ -31,7 +31,7 @@
 #endif
 
 #ifndef __KERNEL__
-#include <stdlib.h>
+#include<linux/time.h>
 #endif
 
 /*

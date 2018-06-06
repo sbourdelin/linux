@@ -24,6 +24,8 @@
 #ifndef _UAPISDLA_H
 #define _UAPISDLA_H
 
+#include <linux/compiler.h>
+
 /* adapter type */
 #define SDLA_TYPES
 #define SDLA_S502A			5020

@@ -11,6 +11,7 @@
 
 #include <asm/bitsperlong.h>
 #include <linux/types.h>
+#include <linux/compiler.h>
 
 /*
  * We cannot use linux' compiletime_assert here because it expects to be used

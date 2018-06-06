@@ -24,7 +24,6 @@
 #include <linux/kernel.h>
 #include <linux/ioctl.h>
 #else /* __KERNEL__ */
-#include <stdio.h>
 #include <sys/ioctl.h>
 #define DISK_NAME_LEN 32
 #endif /* __KERNEL__ */

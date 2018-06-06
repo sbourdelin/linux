@@ -9,6 +9,7 @@
 #define __UAPI_VBOXGUEST_H__
 
 #include <asm/bitsperlong.h>
+#include <linux/compiler.h>
 #include <linux/ioctl.h>
 #include <linux/vbox_err.h>
 #include <linux/vbox_vmmdev_types.h>

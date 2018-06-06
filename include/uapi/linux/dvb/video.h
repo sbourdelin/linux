@@ -26,9 +26,6 @@
 #define _UAPI_DVBVIDEO_H_
 
 #include <linux/types.h>
-#ifndef __KERNEL__
-#include <time.h>
-#endif
 
 typedef enum {
 	VIDEO_FORMAT_4_3,     /* Select 4:3 format */

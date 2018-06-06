@@ -2,6 +2,11 @@
 #ifndef __ASM_GENERIC_UCONTEXT_H
 #define __ASM_GENERIC_UCONTEXT_H
 
+#ifndef __KERNEL__
+#include <asm-generic/signal.h>
+#include <asm/sigcontext.h>
+#endif
+
 struct ucontext {
 	unsigned long	  uc_flags;
 	struct ucontext  *uc_link;

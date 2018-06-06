@@ -25,6 +25,7 @@
 
 #include <drm/drm.h>
 #include <linux/ioctl.h>
+#include <stdint.h>
 
 #define KFD_IOCTL_MAJOR_VERSION 1
 #define KFD_IOCTL_MINOR_VERSION 1

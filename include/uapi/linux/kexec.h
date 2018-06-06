@@ -8,6 +8,7 @@
  */
 
 #include <linux/types.h>
+#include <stddef.h>
 
 /* kexec flags for different usage scenarios */
 #define KEXEC_ON_CRASH		0x00000001

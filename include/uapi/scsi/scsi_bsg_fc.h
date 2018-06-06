@@ -23,6 +23,8 @@
 #ifndef SCSI_BSG_FC_H
 #define SCSI_BSG_FC_H
 
+#include <stdint.h>
+
 /*
  * This file intended to be included by both kernel and user space
  */

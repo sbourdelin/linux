@@ -3,6 +3,11 @@
  * ioctl interface for the scsi media changer driver
  */
 
+#ifndef _UAPI_CHIO_H
+#define _UAPI_CHIO_H
+
+#include <linux/compiler.h>
+
 /* changer element types */
 #define CHET_MT   0	/* media transport element (robot) */
 #define CHET_ST   1	/* storage element (media slots) */
@@ -167,3 +172,4 @@ struct changer_set_voltag {
  * c-basic-offset: 8
  * End:
  */
+#endif

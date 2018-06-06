@@ -16,6 +16,7 @@
 #include <linux/types.h>
 #include <linux/if.h>
 #include <linux/netfilter_bridge.h>
+#include <stdint.h>
 
 #define EBT_TABLE_MAXNAMELEN 32
 #define EBT_CHAIN_MAXNAMELEN EBT_TABLE_MAXNAMELEN

@@ -26,9 +26,6 @@
 #define _UAPI_DVBDMX_H_
 
 #include <linux/types.h>
-#ifndef __KERNEL__
-#include <time.h>
-#endif
 
 
 #define DMX_FILTER_SIZE 16

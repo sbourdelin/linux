@@ -3,6 +3,9 @@
 #define __ASM_GENERIC_MSGBUF_H
 
 #include <asm/bitsperlong.h>
+#include <asm-generic/ipcbuf.h>
+#include <linux/posix_types.h>
+
 /*
  * generic msqid64_ds structure.
  *
