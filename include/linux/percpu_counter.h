@@ -133,6 +133,7 @@ static inline void
 percpu_counter_add(struct percpu_counter *fbc, s64 amount)
 {
 	preempt_disable();
+	/* possible signed integer overflow */
 	fbc->count += amount;
 	preempt_enable();
 }
@@ -154,7 +155,10 @@ static inline s64 percpu_counter_read(struct percpu_counter *fbc)
  */
 static inline s64 percpu_counter_read_positive(struct percpu_counter *fbc)
 {
-	return fbc->count;
+	if (fbc->count >= 0)
+		return fbc->count;
+
+	return 0;
 }
 
 static inline s64 percpu_counter_sum_positive(struct percpu_counter *fbc)
