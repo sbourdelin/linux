@@ -153,6 +153,8 @@ void drm_bridge_detach(struct drm_bridge *bridge)
 	if (bridge->funcs->detach)
 		bridge->funcs->detach(bridge);
 
+	bridge->disable_midlayer_calls = false;
+
 	bridge->dev = NULL;
 }
 
@@ -248,6 +250,8 @@ void drm_bridge_disable(struct drm_bridge *bridge)
 	if (!bridge)
 		return;
 
+	bridge->disable_called = true;
+
 	drm_bridge_disable(bridge->next);
 
 	if (bridge->funcs->disable)
@@ -269,6 +273,9 @@ void drm_bridge_post_disable(struct drm_bridge *bridge)
 {
 	if (!bridge)
 		return;
+
+	WARN_ON(!bridge->disable_called);
+	bridge->post_disable_called = true;
 
 	if (bridge->funcs->post_disable)
 		bridge->funcs->post_disable(bridge);
@@ -319,6 +326,8 @@ void drm_bridge_pre_enable(struct drm_bridge *bridge)
 	if (!bridge)
 		return;
 
+	bridge->pre_enable_called = true;
+
 	drm_bridge_pre_enable(bridge->next);
 
 	if (bridge->funcs->pre_enable)
@@ -340,6 +349,9 @@ void drm_bridge_enable(struct drm_bridge *bridge)
 {
 	if (!bridge)
 		return;
+
+	WARN_ON(!bridge->pre_enable_called);
+	bridge->enable_called = true;
 
 	if (bridge->funcs->enable)
 		bridge->funcs->enable(bridge);

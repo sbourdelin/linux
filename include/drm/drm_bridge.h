@@ -278,6 +278,27 @@ struct drm_bridge {
 	const struct drm_bridge_funcs *funcs;
 	/** @driver_private: pointer to the bridge driver's internal context */
 	void *driver_private;
+
+	/**
+	 * @disable_midlayer_calls:
+	 *
+	 * disables the calls from the DRM atomic helpers into the
+	 * bridge, leaving them to be performed by the driver.  This
+	 * may be useful for encoders such as DSI, where the
+	 * pre_enable/post_disable hooks want to be called while the
+	 * bus is still enabled but before/after video packets are
+	 * being sent.
+	 */
+	bool disable_midlayer_calls : 1;
+
+	/* private: flags for atomic helpers to check that the driver
+	 * called the bridge functions properly if
+	 * @disable_midlayer_calls was set.
+	 */
+	bool pre_enable_called : 1;
+	bool enable_called : 1;
+	bool disable_called : 1;
+	bool post_disable_called : 1;
 };
 
 void drm_bridge_add(struct drm_bridge *bridge);
