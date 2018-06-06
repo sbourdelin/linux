@@ -1219,6 +1219,7 @@ u32 skb_get_poff(const struct sk_buff *skb)
 	return __skb_get_poff(skb, skb->data, &keys, skb_headlen(skb));
 }
 
+#if defined(CONFIG_NET)
 __be32 flow_get_u32_src(const struct flow_keys *flow)
 {
 	switch (flow->control.addr_type) {
@@ -1340,6 +1341,7 @@ __u32 __get_hash_from_flowi6(const struct flowi6 *fl6, struct flow_keys *keys)
 	return flow_hash_from_keys(keys);
 }
 EXPORT_SYMBOL(__get_hash_from_flowi6);
+#endif  // CONFIG_NET
 
 static const struct flow_dissector_key flow_keys_dissector_keys[] = {
 	{
