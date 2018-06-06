@@ -479,5 +479,5 @@ static void __exit cros_ec_lpc_exit(void)
 module_init(cros_ec_lpc_init);
 module_exit(cros_ec_lpc_exit);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("ChromeOS EC LPC driver");

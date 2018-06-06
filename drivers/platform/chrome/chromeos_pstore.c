@@ -139,4 +139,4 @@ module_init(chromeos_pstore_init);
 module_exit(chromeos_pstore_exit);
 
 MODULE_DESCRIPTION("Chrome OS pstore module");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
