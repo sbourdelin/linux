@@ -262,5 +262,5 @@ EXPORT_SYMBOL(cros_ec_resume);
 
 #endif
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("ChromeOS EC core driver");

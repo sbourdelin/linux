@@ -382,5 +382,5 @@ static struct i2c_driver cros_ec_driver = {
 
 module_i2c_driver(cros_ec_driver);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("ChromeOS EC multi function device");
