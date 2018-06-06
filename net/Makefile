@@ -11,6 +11,11 @@ obj-$(CONFIG_NET)		:= socket.o core/
 tmp-$(CONFIG_COMPAT) 		:= compat.o
 obj-$(CONFIG_NET)		+= $(tmp-y)
 
+ifneq ($(CONFIG_NET),y)
+obj-$(CONFIG_SECCOMP_FILTER)    += core/filter.o
+obj-$(CONFIG_SECCOMP_FILTER)    += core/flow_dissector.o
+endif
+
 # LLC has to be linked before the files in net/802/
 obj-$(CONFIG_LLC)		+= llc/
 obj-$(CONFIG_NET)		+= ethernet/ 802/ sched/ netlink/ bpf/
