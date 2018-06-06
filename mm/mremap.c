@@ -191,7 +191,7 @@ static void move_ptes(struct vm_area_struct *vma, pmd_t *old_pmd,
 		drop_rmap_locks(vma);
 }
 
-#define LATENCY_LIMIT	(64 * PAGE_SIZE)
+#define LATENCY_LIMIT	(PMD_SIZE)
 
 unsigned long move_page_tables(struct vm_area_struct *vma,
 		unsigned long old_addr, struct vm_area_struct *new_vma,
