@@ -56,6 +56,13 @@ u64 kimage_voffset __ro_after_init;
 EXPORT_SYMBOL(kimage_voffset);
 
 /*
+ * Ensure that hibernate will re-clean this value to the PoC once
+ * it has restored the memory.
+ */
+volatile phys_addr_t __section(".mmuoff.data.read")
+__pa_swapper_pg_dir;
+
+/*
  * Empty_zero_page is a special page that is used for zero-initialized data
  * and COW.
  */
@@ -631,6 +638,15 @@ void __init paging_init(void)
 	phys_addr_t pgd_phys = early_pgtable_alloc();
 	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
 
+	__pa_swapper_pg_dir = __pa_symbol(swapper_pg_dir);
+
+	/*
+	 * We need to clean '__pa_swapper_pg_dir' to the PoC, so that
+	 * secondaries will read the new value.
+	 */
+	__flush_dcache_area((void *)&__pa_swapper_pg_dir,
+			    sizeof(__pa_swapper_pg_dir));
+
 	map_kernel(pgdp);
 	map_mem(pgdp);
 
@@ -642,9 +658,9 @@ void __init paging_init(void)
 	 *
 	 * To do this we need to go via a temporary pgd.
 	 */
-	cpu_replace_ttbr1(__va(pgd_phys));
+	cpu_replace_ttbr1(pgd_phys);
 	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
-	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+	cpu_replace_ttbr1(__pa_swapper_pg_dir);
 
 	pgd_clear_fixmap();
 	memblock_free(pgd_phys, PAGE_SIZE);
