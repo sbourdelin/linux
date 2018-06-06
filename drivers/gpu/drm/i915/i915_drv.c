@@ -58,6 +58,7 @@ static struct drm_driver driver;
 
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
 static unsigned int i915_load_fail_count;
+static int i915_load_error_level = KERN_ERR;
 
 bool __i915_inject_load_failure(const char *func, int line)
 {
@@ -67,11 +68,15 @@ bool __i915_inject_load_failure(const char *func, int line)
 	if (++i915_load_fail_count == i915_modparams.inject_load_failure) {
 		DRM_INFO("Injecting failure at checkpoint %u [%s:%d]\n",
 			 i915_modparams.inject_load_failure, func, line);
+		i915_modparams.inject_load_failure = 0;
+		i915_load_error_level = KERN_DEBUG;
 		return true;
 	}
 
 	return false;
 }
+#else
+#define i915_load_error_level KERN_ERR
 #endif
 
 #define FDO_BUG_URL "https://bugs.freedesktop.org/enter_bug.cgi?product=DRI"
@@ -114,20 +119,8 @@ __i915_printk(struct drm_i915_private *dev_priv, const char *level,
 	va_end(args);
 }
 
-static bool i915_error_injected(struct drm_i915_private *dev_priv)
-{
-#if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-	return i915_modparams.inject_load_failure &&
-	       i915_load_fail_count == i915_modparams.inject_load_failure;
-#else
-	return false;
-#endif
-}
-
 #define i915_load_error(dev_priv, fmt, ...)				     \
-	__i915_printk(dev_priv,						     \
-		      i915_error_injected(dev_priv) ? KERN_DEBUG : KERN_ERR, \
-		      fmt, ##__VA_ARGS__)
+	__i915_printk(dev_priv, i915_load_error_level, fmt, ##__VA_ARGS__)
 
 /* Map PCH device id to PCH type, or PCH_NONE if unknown. */
 static enum intel_pch
