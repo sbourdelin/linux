@@ -59,58 +59,6 @@
 #include <net/tcp.h>
 #include <linux/bpf_trace.h>
 
-/**
- *	sk_filter_trim_cap - run a packet through a socket filter
- *	@sk: sock associated with &sk_buff
- *	@skb: buffer to filter
- *	@cap: limit on how short the eBPF program may trim the packet
- *
- * Run the eBPF program and then cut skb->data to correct size returned by
- * the program. If pkt_len is 0 we toss packet. If skb->len is smaller
- * than pkt_len we keep whole skb->data. This is the socket level
- * wrapper to BPF_PROG_RUN. It returns 0 if the packet should
- * be accepted or -EPERM if the packet should be tossed.
- *
- */
-int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap)
-{
-	int err;
-	struct sk_filter *filter;
-
-	/*
-	 * If the skb was allocated from pfmemalloc reserves, only
-	 * allow SOCK_MEMALLOC sockets to use it as this socket is
-	 * helping free memory
-	 */
-	if (skb_pfmemalloc(skb) && !sock_flag(sk, SOCK_MEMALLOC)) {
-		NET_INC_STATS(sock_net(sk), LINUX_MIB_PFMEMALLOCDROP);
-		return -ENOMEM;
-	}
-	err = BPF_CGROUP_RUN_PROG_INET_INGRESS(sk, skb);
-	if (err)
-		return err;
-
-	err = security_sock_rcv_skb(sk, skb);
-	if (err)
-		return err;
-
-	rcu_read_lock();
-	filter = rcu_dereference(sk->sk_filter);
-	if (filter) {
-		struct sock *save_sk = skb->sk;
-		unsigned int pkt_len;
-
-		skb->sk = sk;
-		pkt_len = bpf_prog_run_save_cb(filter->prog, skb);
-		skb->sk = save_sk;
-		err = pkt_len ? pskb_trim(skb, max(cap, pkt_len)) : -EPERM;
-	}
-	rcu_read_unlock();
-
-	return err;
-}
-EXPORT_SYMBOL(sk_filter_trim_cap);
-
 BPF_CALL_1(__skb_get_pay_offset, struct sk_buff *, skb)
 {
 	return skb_get_poff(skb);
@@ -164,12 +112,6 @@ BPF_CALL_0(__get_raw_cpu_id)
 {
 	return raw_smp_processor_id();
 }
-
-static const struct bpf_func_proto bpf_get_raw_smp_processor_id_proto = {
-	.func		= __get_raw_cpu_id,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-};
 
 static u32 convert_skb_access(int skb_field, int dst_reg, int src_reg,
 			      struct bpf_insn *insn_buf)
@@ -954,71 +896,6 @@ static void __bpf_prog_release(struct bpf_prog *prog)
 	}
 }
 
-static void __sk_filter_release(struct sk_filter *fp)
-{
-	__bpf_prog_release(fp->prog);
-	kfree(fp);
-}
-
-/**
- * 	sk_filter_release_rcu - Release a socket filter by rcu_head
- *	@rcu: rcu_head that contains the sk_filter to free
- */
-static void sk_filter_release_rcu(struct rcu_head *rcu)
-{
-	struct sk_filter *fp = container_of(rcu, struct sk_filter, rcu);
-
-	__sk_filter_release(fp);
-}
-
-/**
- *	sk_filter_release - release a socket filter
- *	@fp: filter to remove
- *
- *	Remove a filter from a socket and release its resources.
- */
-static void sk_filter_release(struct sk_filter *fp)
-{
-	if (refcount_dec_and_test(&fp->refcnt))
-		call_rcu(&fp->rcu, sk_filter_release_rcu);
-}
-
-void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp)
-{
-	u32 filter_size = bpf_prog_size(fp->prog->len);
-
-	atomic_sub(filter_size, &sk->sk_omem_alloc);
-	sk_filter_release(fp);
-}
-
-/* try to charge the socket memory if there is space available
- * return true on success
- */
-static bool __sk_filter_charge(struct sock *sk, struct sk_filter *fp)
-{
-	u32 filter_size = bpf_prog_size(fp->prog->len);
-
-	/* same check as in sock_kmalloc() */
-	if (filter_size <= sysctl_optmem_max &&
-	    atomic_read(&sk->sk_omem_alloc) + filter_size < sysctl_optmem_max) {
-		atomic_add(filter_size, &sk->sk_omem_alloc);
-		return true;
-	}
-	return false;
-}
-
-bool sk_filter_charge(struct sock *sk, struct sk_filter *fp)
-{
-	if (!refcount_inc_not_zero(&fp->refcnt))
-		return false;
-
-	if (!__sk_filter_charge(sk, fp)) {
-		sk_filter_release(fp);
-		return false;
-	}
-	return true;
-}
-
 static struct bpf_prog *bpf_migrate_filter(struct bpf_prog *fp)
 {
 	struct sock_filter *old_prog;
@@ -1127,50 +1004,6 @@ static struct bpf_prog *bpf_prepare_filter(struct bpf_prog *fp,
 }
 
 /**
- *	bpf_prog_create - create an unattached filter
- *	@pfp: the unattached filter that is created
- *	@fprog: the filter program
- *
- * Create a filter independent of any socket. We first run some
- * sanity checks on it to make sure it does not explode on us later.
- * If an error occurs or there is insufficient memory for the filter
- * a negative errno code is returned. On success the return is zero.
- */
-int bpf_prog_create(struct bpf_prog **pfp, struct sock_fprog_kern *fprog)
-{
-	unsigned int fsize = bpf_classic_proglen(fprog);
-	struct bpf_prog *fp;
-
-	/* Make sure new filter is there and in the right amounts. */
-	if (!bpf_check_basics_ok(fprog->filter, fprog->len))
-		return -EINVAL;
-
-	fp = bpf_prog_alloc(bpf_prog_size(fprog->len), 0);
-	if (!fp)
-		return -ENOMEM;
-
-	memcpy(fp->insns, fprog->filter, fsize);
-
-	fp->len = fprog->len;
-	/* Since unattached filters are not copied back to user
-	 * space through sk_get_filter(), we do not need to hold
-	 * a copy here, and can spare us the work.
-	 */
-	fp->orig_prog = NULL;
-
-	/* bpf_prepare_filter() already takes care of freeing
-	 * memory in case something goes wrong.
-	 */
-	fp = bpf_prepare_filter(fp, NULL);
-	if (IS_ERR(fp))
-		return PTR_ERR(fp);
-
-	*pfp = fp;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(bpf_prog_create);
-
-/**
  *	bpf_prog_create_from_user - create an unattached filter from user buffer
  *	@pfp: the unattached filter that is created
  *	@fprog: the filter program
@@ -1229,6 +1062,173 @@ void bpf_prog_destroy(struct bpf_prog *fp)
 	__bpf_prog_release(fp);
 }
 EXPORT_SYMBOL_GPL(bpf_prog_destroy);
+
+/**
+ *	sk_filter_trim_cap - run a packet through a socket filter
+ *	@sk: sock associated with &sk_buff
+ *	@skb: buffer to filter
+ *	@cap: limit on how short the eBPF program may trim the packet
+ *
+ * Run the eBPF program and then cut skb->data to correct size returned by
+ * the program. If pkt_len is 0 we toss packet. If skb->len is smaller
+ * than pkt_len we keep whole skb->data. This is the socket level
+ * wrapper to BPF_PROG_RUN. It returns 0 if the packet should
+ * be accepted or -EPERM if the packet should be tossed.
+ *
+ */
+int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap)
+{
+	int err;
+	struct sk_filter *filter;
+
+	/*
+	 * If the skb was allocated from pfmemalloc reserves, only
+	 * allow SOCK_MEMALLOC sockets to use it as this socket is
+	 * helping free memory
+	 */
+	if (skb_pfmemalloc(skb) && !sock_flag(sk, SOCK_MEMALLOC)) {
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_PFMEMALLOCDROP);
+		return -ENOMEM;
+	}
+	err = BPF_CGROUP_RUN_PROG_INET_INGRESS(sk, skb);
+	if (err)
+		return err;
+
+	err = security_sock_rcv_skb(sk, skb);
+	if (err)
+		return err;
+
+	rcu_read_lock();
+	filter = rcu_dereference(sk->sk_filter);
+	if (filter) {
+		struct sock *save_sk = skb->sk;
+		unsigned int pkt_len;
+
+		skb->sk = sk;
+		pkt_len = bpf_prog_run_save_cb(filter->prog, skb);
+		skb->sk = save_sk;
+		err = pkt_len ? pskb_trim(skb, max(cap, pkt_len)) : -EPERM;
+	}
+	rcu_read_unlock();
+
+	return err;
+}
+EXPORT_SYMBOL(sk_filter_trim_cap);
+
+static const struct bpf_func_proto bpf_get_raw_smp_processor_id_proto = {
+	.func		= __get_raw_cpu_id,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+};
+
+static void __sk_filter_release(struct sk_filter *fp)
+{
+	__bpf_prog_release(fp->prog);
+	kfree(fp);
+}
+
+/**
+ * 	sk_filter_release_rcu - Release a socket filter by rcu_head
+ *	@rcu: rcu_head that contains the sk_filter to free
+ */
+static void sk_filter_release_rcu(struct rcu_head *rcu)
+{
+	struct sk_filter *fp = container_of(rcu, struct sk_filter, rcu);
+
+	__sk_filter_release(fp);
+}
+
+/**
+ *	sk_filter_release - release a socket filter
+ *	@fp: filter to remove
+ *
+ *	Remove a filter from a socket and release its resources.
+ */
+static void sk_filter_release(struct sk_filter *fp)
+{
+	if (refcount_dec_and_test(&fp->refcnt))
+		call_rcu(&fp->rcu, sk_filter_release_rcu);
+}
+
+void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp)
+{
+	u32 filter_size = bpf_prog_size(fp->prog->len);
+
+	atomic_sub(filter_size, &sk->sk_omem_alloc);
+	sk_filter_release(fp);
+}
+
+/* try to charge the socket memory if there is space available
+ * return true on success
+ */
+static bool __sk_filter_charge(struct sock *sk, struct sk_filter *fp)
+{
+	u32 filter_size = bpf_prog_size(fp->prog->len);
+
+	/* same check as in sock_kmalloc() */
+	if (filter_size <= sysctl_optmem_max &&
+	    atomic_read(&sk->sk_omem_alloc) + filter_size < sysctl_optmem_max) {
+		atomic_add(filter_size, &sk->sk_omem_alloc);
+		return true;
+	}
+	return false;
+}
+
+bool sk_filter_charge(struct sock *sk, struct sk_filter *fp)
+{
+	if (!refcount_inc_not_zero(&fp->refcnt))
+		return false;
+
+	if (!__sk_filter_charge(sk, fp)) {
+		sk_filter_release(fp);
+		return false;
+	}
+	return true;
+}
+
+/**
+ *	bpf_prog_create - create an unattached filter
+ *	@pfp: the unattached filter that is created
+ *	@fprog: the filter program
+ *
+ * Create a filter independent of any socket. We first run some
+ * sanity checks on it to make sure it does not explode on us later.
+ * If an error occurs or there is insufficient memory for the filter
+ * a negative errno code is returned. On success the return is zero.
+ */
+int bpf_prog_create(struct bpf_prog **pfp, struct sock_fprog_kern *fprog)
+{
+	unsigned int fsize = bpf_classic_proglen(fprog);
+	struct bpf_prog *fp;
+
+	/* Make sure new filter is there and in the right amounts. */
+	if (!bpf_check_basics_ok(fprog->filter, fprog->len))
+		return -EINVAL;
+
+	fp = bpf_prog_alloc(bpf_prog_size(fprog->len), 0);
+	if (!fp)
+		return -ENOMEM;
+
+	memcpy(fp->insns, fprog->filter, fsize);
+
+	fp->len = fprog->len;
+	/* Since unattached filters are not copied back to user
+	 * space through sk_get_filter(), we do not need to hold
+	 * a copy here, and can spare us the work.
+	 */
+	fp->orig_prog = NULL;
+
+	/* bpf_prepare_filter() already takes care of freeing
+	 * memory in case something goes wrong.
+	 */
+	fp = bpf_prepare_filter(fp, NULL);
+	if (IS_ERR(fp))
+		return PTR_ERR(fp);
+
+	*pfp = fp;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(bpf_prog_create);
 
 static int __sk_attach_prog(struct bpf_prog *prog, struct sock *sk)
 {
