@@ -3,14 +3,14 @@ subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
 subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
 
 obj-$(CONFIG_LUSTRE_FS) += ptlrpc.o
-LDLM := ../../lustre/ldlm/
 
-ldlm_objs := $(LDLM)l_lock.o $(LDLM)ldlm_lock.o
-ldlm_objs += $(LDLM)ldlm_resource.o $(LDLM)ldlm_lib.o
-ldlm_objs += $(LDLM)ldlm_plain.o $(LDLM)ldlm_extent.o
-ldlm_objs += $(LDLM)ldlm_request.o $(LDLM)ldlm_lockd.o
-ldlm_objs += $(LDLM)ldlm_flock.o $(LDLM)ldlm_inodebits.o
-ldlm_objs += $(LDLM)ldlm_pool.o
+ldlm_objs := l_lock.o ldlm_lock.o
+ldlm_objs += ldlm_resource.o ldlm_lib.o
+ldlm_objs += ldlm_plain.o ldlm_extent.o
+ldlm_objs += ldlm_request.o ldlm_lockd.o
+ldlm_objs += ldlm_flock.o ldlm_inodebits.o
+ldlm_objs += ldlm_pool.o
+
 ptlrpc_objs := client.o recover.o connection.o niobuf.o pack_generic.o
 ptlrpc_objs += events.o ptlrpc_module.o service.o pinger.o
 ptlrpc_objs += llog_net.o llog_client.o import.o ptlrpcd.o
