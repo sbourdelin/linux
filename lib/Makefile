@@ -163,7 +163,9 @@ obj-$(CONFIG_HAVE_ARCH_TRACEHOOK) += syscall.o
 
 obj-$(CONFIG_DYNAMIC_DEBUG) += dynamic_debug.o
 
-obj-$(CONFIG_NLATTR) += nlattr.o
+ifneq ($(filter y,$(CONFIG_NLATTR) $(CONFIG_SECCOMP_FILTER)),)
+obj-y += nlattr.o
+endif
 
 obj-$(CONFIG_LRU_CACHE) += lru_cache.o
 
