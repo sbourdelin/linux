@@ -243,6 +243,14 @@ static void tmio_mmc_reset(struct tmio_mmc_host *host)
 
 }
 
+static void tmio_mmc_hw_reset(struct mmc_host *mmc)
+{
+	struct tmio_mmc_host *host = mmc_priv(mmc);
+
+	if (host->hw_reset)
+		host->hw_reset(host);
+}
+
 static void tmio_mmc_reset_work(struct work_struct *work)
 {
 	struct tmio_mmc_host *host = container_of(work, struct tmio_mmc_host,
@@ -767,14 +775,6 @@ static int tmio_mmc_start_data(struct tmio_mmc_host *host,
 	tmio_mmc_start_dma(host, data);
 
 	return 0;
-}
-
-static void tmio_mmc_hw_reset(struct mmc_host *mmc)
-{
-	struct tmio_mmc_host *host = mmc_priv(mmc);
-
-	if (host->hw_reset)
-		host->hw_reset(host);
 }
 
 static int tmio_mmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
