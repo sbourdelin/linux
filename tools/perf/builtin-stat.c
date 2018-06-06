@@ -1318,6 +1318,7 @@ static void collect_all_aliases(struct perf_evsel *counter,
 			    void *data)
 {
 	struct perf_evsel *alias;
+	int cnt = 0;
 
 	alias = list_prepare_entry(counter, &(evsel_list->entries), node);
 	list_for_each_entry_continue (alias, &evsel_list->entries, node) {
@@ -1329,7 +1330,15 @@ static void collect_all_aliases(struct perf_evsel *counter,
 			break;
 		alias->merged_stat = true;
 		cb(alias, data, false);
+		cnt++;
 	}
+
+	/*
+	 * There's no matching event to aggregate
+	 * counts with, fix the event name
+	 */
+	if (!cnt)
+		uniquify_event_name(counter);
 }
 
 static bool collect_data(struct perf_evsel *counter,
