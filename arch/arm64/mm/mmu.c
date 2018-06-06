@@ -62,6 +62,8 @@ EXPORT_SYMBOL(kimage_voffset);
 volatile phys_addr_t __section(".mmuoff.data.read")
 __pa_swapper_pg_dir;
 
+pgd_t *new_swapper_pg_dir = swapper_pg_dir;
+
 /*
  * Empty_zero_page is a special page that is used for zero-initialized data
  * and COW.
