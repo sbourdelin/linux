@@ -3174,7 +3174,7 @@ EXPORT_SYMBOL_GPL(snd_soc_dapm_get_volsw);
  *
  * Callback to set the value of a dapm mixer control.
  *
- * Returns 0 for success.
+ * Returns either 0 or 1 for success: 1 if changed, 0 if unchanged.
  */
 int snd_soc_dapm_put_volsw(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -3307,7 +3307,7 @@ EXPORT_SYMBOL_GPL(snd_soc_dapm_get_enum_double);
  *
  * Callback to set the value of a dapm enumerated double mixer control.
  *
- * Returns 0 for success.
+ * Returns either 0 or 1 for success: 1 if changed, 0 if unchanged.
  */
 int snd_soc_dapm_put_enum_double(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
