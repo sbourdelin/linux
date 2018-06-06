@@ -57,14 +57,11 @@
 static struct drm_driver driver;
 
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-static unsigned int i915_load_fail_count;
 
-bool __i915_inject_load_failure(const char *func, int line)
+bool __i915_inject_load_failure(struct drm_i915_private *i915,
+				const char *func, int line)
 {
-	if (i915_load_fail_count >= i915_modparams.inject_load_failure)
-		return false;
-
-	if (++i915_load_fail_count == i915_modparams.inject_load_failure) {
+	if (++i915->load_fail_count == i915_modparams.inject_load_failure) {
 		DRM_INFO("Injecting failure at checkpoint %u [%s:%d]\n",
 			 i915_modparams.inject_load_failure, func, line);
 		return true;
@@ -114,11 +111,11 @@ __i915_printk(struct drm_i915_private *dev_priv, const char *level,
 	va_end(args);
 }
 
-static bool i915_error_injected(struct drm_i915_private *dev_priv)
+static bool i915_error_injected(struct drm_i915_private *i915)
 {
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
 	return i915_modparams.inject_load_failure &&
-	       i915_load_fail_count == i915_modparams.inject_load_failure;
+	       i915->load_fail_count == i915_modparams.inject_load_failure;
 #else
 	return false;
 #endif

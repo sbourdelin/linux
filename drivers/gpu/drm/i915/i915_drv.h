@@ -107,9 +107,10 @@
 	I915_STATE_WARN((x), "%s", "WARN_ON(" __stringify(x) ")")
 
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-bool __i915_inject_load_failure(const char *func, int line);
+bool __i915_inject_load_failure(struct drm_i915_private *i915,
+				const char *func, int line);
 #define i915_inject_load_failure() \
-	__i915_inject_load_failure(__func__, __LINE__)
+	__i915_inject_load_failure(dev_priv, __func__, __LINE__)
 #else
 #define i915_inject_load_failure() false
 #endif
@@ -2118,6 +2119,8 @@ struct drm_i915_private {
 	} lpe_audio;
 
 	struct i915_pmu pmu;
+
+	unsigned int load_fail_count;
 
 	/*
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch

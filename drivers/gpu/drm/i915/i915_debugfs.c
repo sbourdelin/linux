@@ -2266,6 +2266,17 @@ static int i915_rps_boost_info(struct seq_file *m, void *data)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
+static int i915_fail_injection_info(struct seq_file *m, void *data)
+{
+	struct drm_i915_private *i915 = node_to_i915(m->private);
+
+	seq_printf(m, "Available checkpoints: %u\n", i915->load_fail_count);
+
+	return 0;
+}
+#endif
+
 static int i915_llc(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
@@ -4811,6 +4822,9 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_sseu_status", i915_sseu_status, 0},
 	{"i915_drrs_status", i915_drrs_status, 0},
 	{"i915_rps_boost_info", i915_rps_boost_info, 0},
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
+	{"i915_fail_injection_info", i915_fail_injection_info, 0},
+#endif
 };
 #define I915_DEBUGFS_ENTRIES ARRAY_SIZE(i915_debugfs_list)
 
