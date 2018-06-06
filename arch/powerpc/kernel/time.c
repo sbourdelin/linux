@@ -412,9 +412,6 @@ void vtime_flush(struct task_struct *tsk)
 	if (acct->gtime)
 		account_guest_time(tsk, cputime_to_nsecs(acct->gtime));
 
-	if (acct->steal_time)
-		account_steal_time(cputime_to_nsecs(acct->steal_time));
-
 	if (acct->idle_time)
 		account_idle_time(cputime_to_nsecs(acct->idle_time));
 
@@ -431,13 +428,17 @@ void vtime_flush(struct task_struct *tsk)
 
 	acct->utime = 0;
 	acct->gtime = 0;
-	acct->steal_time = 0;
 	acct->idle_time = 0;
 	acct->stime = 0;
 	acct->hardirq_time = 0;
 	acct->softirq_time = 0;
 
 	vtime_flush_scaled(tsk, acct);
+
+	if (IS_ENABLED(CONFIG_PPC_SPLPAR) && acct->steal_time) {
+		account_steal_time(cputime_to_nsecs(acct->steal_time));
+		acct->steal_time = 0;
+	}
 }
 
 #else /* ! CONFIG_VIRT_CPU_ACCOUNTING_NATIVE */
