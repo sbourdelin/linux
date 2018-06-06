@@ -39,6 +39,7 @@
 #include <media/v4l2-fwnode.h>
 #include <media/v4l2-image-sizes.h>
 #include <media/v4l2-ioctl.h>
+#include <media/v4l2-mc.h>
 #include <media/v4l2-mediabus.h>
 #include <media/videobuf2-dma-contig.h>
 
@@ -158,6 +159,9 @@ struct ceu_subdev {
 	/* per-subdevice mbus configuration options */
 	unsigned int mbus_flags;
 	struct ceu_mbus_fmt mbus_fmt;
+#ifdef CONFIG_MEDIA_CONTROLLER
+	int source_pad;
+#endif
 };
 
 static struct ceu_subdev *to_ceu_subdev(struct v4l2_async_subdev *asd)
@@ -172,6 +176,11 @@ struct ceu_device {
 	struct device		*dev;
 	struct video_device	vdev;
 	struct v4l2_device	v4l2_dev;
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+	struct media_device	mdev;
+	struct media_pad	pad;
+#endif
 
 	/* subdevices descriptors */
 	struct ceu_subdev	*subdevs;
@@ -1316,6 +1325,60 @@ static void ceu_vdev_release(struct video_device *vdev)
 	kfree(ceudev);
 }
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+static int ceu_find_pad(struct v4l2_subdev *sd, int direction)
+{
+	unsigned int pad;
+
+	if (sd->entity.num_pads <= 1)
+		return 0;
+
+	for (pad = 0; pad < sd->entity.num_pads; pad++)
+		if (sd->entity.pads[pad].flags & direction)
+			return pad;
+
+	return -EINVAL;
+}
+
+static int ceu_notify_complete_mc(struct ceu_device *ceudev)
+{
+	struct video_device *vdev = &ceudev->vdev;
+	struct media_entity *source;
+	struct media_entity *sink;
+
+	unsigned int i;
+	int ret;
+
+	ret = media_device_register(&ceudev->mdev);
+	if (ret) {
+		v4l2_err(vdev->v4l2_dev,
+			 "media_device_register failed : %d\n", ret);
+		return ret;
+	}
+
+	ret = v4l2_device_register_subdev_nodes(&ceudev->v4l2_dev);
+	if (ret)
+		return ret;
+
+	/* Link subdev's first available source pad to CEU sink one. */
+	for (i = 0; i < ceudev->num_sd; i++) {
+		int source_pad = ceudev->subdevs[i].source_pad;
+
+		if (source_pad < 0)
+			continue;
+
+		source = &ceudev->subdevs[i].v4l2_sd->entity;
+		sink = &vdev->entity;
+
+		ret = media_create_pad_link(source, source_pad, sink, 0, 0);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+#endif
+
 static int ceu_notify_bound(struct v4l2_async_notifier *notifier,
 			    struct v4l2_subdev *v4l2_sd,
 			    struct v4l2_async_subdev *asd)
@@ -1326,6 +1389,11 @@ static int ceu_notify_bound(struct v4l2_async_notifier *notifier,
 
 	ceu_sd->v4l2_sd = v4l2_sd;
 	ceudev->num_sd++;
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+	/* Cache the entity source pad for later link creation. */
+	ceu_sd->source_pad = ceu_find_pad(v4l2_sd, MEDIA_PAD_FL_SOURCE);
+#endif
 
 	return 0;
 }
@@ -1394,6 +1462,14 @@ static int ceu_notify_complete(struct v4l2_async_notifier *notifier)
 		return ret;
 	}
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+	ret = ceu_notify_complete_mc(ceudev);
+	if (ret) {
+		video_unregister_device(&ceudev->vdev);
+		return ret;
+	}
+#endif
+
 	return 0;
 }
 
@@ -1401,6 +1477,12 @@ static const struct v4l2_async_notifier_operations ceu_notify_ops = {
 	.bound		= ceu_notify_bound,
 	.complete	= ceu_notify_complete,
 };
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+static const struct media_device_ops ceu_media_ops = {
+	.link_notify = v4l2_pipeline_link_notify,
+};
+#endif
 
 /*
  * ceu_init_async_subdevs() - Initialize CEU subdevices and async_subdevs in
@@ -1566,6 +1648,9 @@ static int ceu_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	const struct ceu_data *ceu_data;
 	struct ceu_device *ceudev;
+#ifdef CONFIG_MEDIA_CONTROLLER
+	struct media_device *mdev;
+#endif
 	struct resource *res;
 	unsigned int irq;
 	int num_subdevs;
@@ -1604,6 +1689,24 @@ static int ceu_probe(struct platform_device *pdev)
 	}
 
 	pm_runtime_enable(dev);
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+	mdev = &ceudev->mdev;
+	mdev->dev = dev;
+	mdev->ops = &ceu_media_ops;
+	strlcpy(mdev->driver_name, KBUILD_MODNAME, sizeof(mdev->driver_name));
+	strlcpy(mdev->model, KBUILD_MODNAME, sizeof(mdev->model));
+	snprintf(mdev->bus_info, sizeof(mdev->bus_info), "platform:%s",
+		 dev_name(mdev->dev));
+
+	media_device_init(mdev);
+	ceudev->v4l2_dev.mdev = mdev;
+
+	ceudev->pad.flags = MEDIA_PAD_FL_SINK;
+	ret = media_entity_pads_init(&ceudev->vdev.entity, 1, &ceudev->pad);
+	if (ret)
+		goto error_pm_disable;
+#endif
 
 	ret = v4l2_device_register(dev, &ceudev->v4l2_dev);
 	if (ret)
@@ -1644,6 +1747,9 @@ error_v4l2_unregister:
 	v4l2_device_unregister(&ceudev->v4l2_dev);
 error_pm_disable:
 	pm_runtime_disable(dev);
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_device_cleanup(&ceudev->mdev);
+#endif
 error_free_ceudev:
 	kfree(ceudev);
 
@@ -1657,6 +1763,11 @@ static int ceu_remove(struct platform_device *pdev)
 	pm_runtime_disable(ceudev->dev);
 
 	v4l2_async_notifier_unregister(&ceudev->notifier);
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_device_cleanup(&ceudev->mdev);
+	media_device_unregister(&ceudev->mdev);
+#endif
 
 	v4l2_device_unregister(&ceudev->v4l2_dev);
 
