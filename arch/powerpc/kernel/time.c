@@ -171,19 +171,6 @@ static void calc_cputime_factors(void)
 	__cputime_usec_factor = res.result_low;
 }
 
-/*
- * Read the SPURR on systems that have it, otherwise the PURR,
- * or if that doesn't exist return the timebase value passed in.
- */
-static unsigned long read_spurr(unsigned long tb)
-{
-	if (cpu_has_feature(CPU_FTR_SPURR))
-		return mfspr(SPRN_SPURR);
-	if (cpu_has_feature(CPU_FTR_PURR))
-		return mfspr(SPRN_PURR);
-	return tb;
-}
-
 #ifdef CONFIG_PPC_SPLPAR
 
 /*
@@ -277,30 +264,27 @@ static inline u64 calculate_stolen_time(u64 stop_tb)
 
 #endif /* CONFIG_PPC_SPLPAR */
 
-/*
- * Account time for a transition between system, hard irq
- * or soft irq state.
- */
-static unsigned long vtime_delta(struct task_struct *tsk,
-				 unsigned long *stime_scaled,
-				 unsigned long *steal_time)
+static unsigned long vtime_delta_scaled(struct cpu_accounting_data *acct,
+					unsigned long now, unsigned long stime)
 {
-	unsigned long now, nowscaled, deltascaled;
-	unsigned long stime;
+#ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
+	unsigned long nowscaled, deltascaled;
 	unsigned long utime, utime_scaled;
-	struct cpu_accounting_data *acct = get_accounting(tsk);
+	unsigned long stime_scaled;
 
-	WARN_ON_ONCE(!irqs_disabled());
+	/*
+	 * Read the SPURR on systems that have it, otherwise the PURR,
+	 * or if that doesn't exist user the timebase value passed in.
+	 */
+	if (cpu_has_feature(CPU_FTR_SPURR))
+		nowscaled = mfspr(SPRN_SPURR);
+	else if (cpu_has_feature(CPU_FTR_PURR))
+		nowscaled = mfspr(SPRN_PURR);
+	else
+		nowscaled = now;
 
-	now = mftb();
-	nowscaled = read_spurr(now);
-	stime = now - acct->starttime;
-	acct->starttime = now;
 	deltascaled = nowscaled - acct->startspurr;
 	acct->startspurr = nowscaled;
-
-	*steal_time = calculate_stolen_time(now);
-
 	utime = acct->utime - acct->utime_sspurr;
 	acct->utime_sspurr = acct->utime;
 
@@ -314,17 +298,45 @@ static unsigned long vtime_delta(struct task_struct *tsk,
 	 * the user ticks get saved up in paca->user_time_scaled to be
 	 * used by account_process_tick.
 	 */
-	*stime_scaled = stime;
+	stime_scaled = stime;
 	utime_scaled = utime;
 	if (deltascaled != stime + utime) {
 		if (utime) {
-			*stime_scaled = deltascaled * stime / (stime + utime);
-			utime_scaled = deltascaled - *stime_scaled;
+			stime_scaled = deltascaled * stime / (stime + utime);
+			utime_scaled = deltascaled - stime_scaled;
 		} else {
-			*stime_scaled = deltascaled;
+			stime_scaled = deltascaled;
 		}
 	}
 	acct->utime_scaled += utime_scaled;
+
+	return stime_scaled;
+#else
+	return 0;
+#endif
+}
+
+/*
+ * Account time for a transition between system, hard irq
+ * or soft irq state.
+ */
+static unsigned long vtime_delta(struct task_struct *tsk,
+				 unsigned long *stime_scaled,
+				 unsigned long *steal_time)
+{
+	unsigned long now;
+	unsigned long stime;
+	struct cpu_accounting_data *acct = get_accounting(tsk);
+
+	WARN_ON_ONCE(!irqs_disabled());
+
+	now = mftb();
+	stime = now - acct->starttime;
+	acct->starttime = now;
+
+	*stime_scaled = vtime_delta_scaled(acct, now, stime);
+
+	*steal_time = calculate_stolen_time(now);
 
 	return stime;
 }
@@ -341,7 +353,9 @@ void vtime_account_system(struct task_struct *tsk)
 
 	if ((tsk->flags & PF_VCPU) && !irq_count()) {
 		acct->gtime += stime;
+#ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
 		acct->utime_scaled += stime_scaled;
+#endif
 	} else {
 		if (hardirq_count())
 			acct->hardirq_time += stime;
@@ -350,7 +364,9 @@ void vtime_account_system(struct task_struct *tsk)
 		else
 			acct->stime += stime;
 
+#ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
 		acct->stime_scaled += stime_scaled;
+#endif
 	}
 }
 EXPORT_SYMBOL_GPL(vtime_account_system);
@@ -362,6 +378,21 @@ void vtime_account_idle(struct task_struct *tsk)
 
 	stime = vtime_delta(tsk, &stime_scaled, &steal_time);
 	acct->idle_time += stime + steal_time;
+}
+
+static void vtime_flush_scaled(struct task_struct *tsk,
+			       struct cpu_accounting_data *acct)
+{
+#ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
+	if (acct->utime_scaled)
+		tsk->utimescaled += cputime_to_nsecs(acct->utime_scaled);
+	if (acct->stime_scaled)
+		tsk->stimescaled += cputime_to_nsecs(acct->stime_scaled);
+
+	acct->utime_scaled = 0;
+	acct->utime_sspurr = 0;
+	acct->stime_scaled = 0;
+#endif
 }
 
 /*
@@ -378,9 +409,6 @@ void vtime_flush(struct task_struct *tsk)
 	if (acct->utime)
 		account_user_time(tsk, cputime_to_nsecs(acct->utime));
 
-	if (acct->utime_scaled)
-		tsk->utimescaled += cputime_to_nsecs(acct->utime_scaled);
-
 	if (acct->gtime)
 		account_guest_time(tsk, cputime_to_nsecs(acct->gtime));
 
@@ -393,8 +421,6 @@ void vtime_flush(struct task_struct *tsk)
 	if (acct->stime)
 		account_system_index_time(tsk, cputime_to_nsecs(acct->stime),
 					  CPUTIME_SYSTEM);
-	if (acct->stime_scaled)
-		tsk->stimescaled += cputime_to_nsecs(acct->stime_scaled);
 
 	if (acct->hardirq_time)
 		account_system_index_time(tsk, cputime_to_nsecs(acct->hardirq_time),
@@ -404,15 +430,14 @@ void vtime_flush(struct task_struct *tsk)
 					  CPUTIME_SOFTIRQ);
 
 	acct->utime = 0;
-	acct->utime_scaled = 0;
-	acct->utime_sspurr = 0;
 	acct->gtime = 0;
 	acct->steal_time = 0;
 	acct->idle_time = 0;
 	acct->stime = 0;
-	acct->stime_scaled = 0;
 	acct->hardirq_time = 0;
 	acct->softirq_time = 0;
+
+	vtime_flush_scaled(tsk, acct);
 }
 
 #else /* ! CONFIG_VIRT_CPU_ACCOUNTING_NATIVE */
