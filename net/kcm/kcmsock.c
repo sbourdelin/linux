@@ -223,7 +223,7 @@ static void requeue_rx_msgs(struct kcm_mux *mux, struct sk_buff_head *head)
 	struct sk_buff *skb;
 	struct kcm_sock *kcm;
 
-	while ((skb = __skb_dequeue(head))) {
+	while ((skb = skb_dequeue(head))) {
 		/* Reset destructor to avoid calling kcm_rcv_ready */
 		skb->destructor = sock_rfree;
 		skb_orphan(skb);
@@ -1080,12 +1080,17 @@ out_error:
 	return err;
 }
 
-static struct sk_buff *kcm_wait_data(struct sock *sk, int flags,
+static struct sk_buff *kcm_wait_data(struct sock *sk, int flags, bool peek,
 				     long timeo, int *err)
 {
 	struct sk_buff *skb;
 
-	while (!(skb = skb_peek(&sk->sk_receive_queue))) {
+	for (;; ) {
+		skb = peek ? skb_peek(&sk->sk_receive_queue) :
+			     skb_dequeue(&sk->sk_receive_queue);
+		if (skb)
+			break;
+
 		if (sk->sk_err) {
 			*err = sock_error(sk);
 			return NULL;
@@ -1116,6 +1121,7 @@ static int kcm_recvmsg(struct socket *sock, struct msghdr *msg,
 {
 	struct sock *sk = sock->sk;
 	struct kcm_sock *kcm = kcm_sk(sk);
+	bool peek = flags & MSG_PEEK;
 	int err = 0;
 	long timeo;
 	struct strp_msg *stm;
@@ -1126,7 +1132,7 @@ static int kcm_recvmsg(struct socket *sock, struct msghdr *msg,
 
 	lock_sock(sk);
 
-	skb = kcm_wait_data(sk, flags, timeo, &err);
+	skb = kcm_wait_data(sk, flags, peek, timeo, &err);
 	if (!skb)
 		goto out;
 
@@ -1142,7 +1148,7 @@ static int kcm_recvmsg(struct socket *sock, struct msghdr *msg,
 		goto out;
 
 	copied = len;
-	if (likely(!(flags & MSG_PEEK))) {
+	if (likely(!peek)) {
 		KCM_STATS_ADD(kcm->stats.rx_bytes, copied);
 		if (copied < stm->full_len) {
 			if (sock->type == SOCK_DGRAM) {
@@ -1157,7 +1163,6 @@ msg_finished:
 			/* Finished with message */
 			msg->msg_flags |= MSG_EOR;
 			KCM_STATS_INCR(kcm->stats.rx_msgs);
-			skb_unlink(skb, &sk->sk_receive_queue);
 			kfree_skb(skb);
 		}
 	}
@@ -1186,7 +1191,7 @@ static ssize_t kcm_splice_read(struct socket *sock, loff_t *ppos,
 
 	lock_sock(sk);
 
-	skb = kcm_wait_data(sk, flags, timeo, &err);
+	skb = kcm_wait_data(sk, flags, true, timeo, &err);
 	if (!skb)
 		goto err_out;
 
