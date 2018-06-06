@@ -69,6 +69,20 @@ enum {
 	REF_CTR_OFFSET
 };
 
+/*
+ * List of {consumer, mm} tupple. Unlike uprobe->consumers,
+ * uc is not a list here. It's just a single consumer. Ex,
+ * if there are 2 consumers and 3 target mms for a uprobe,
+ * total number of elements in uprobe->sml = 2 * 3 = 6. This
+ * list is used to ensure reference counter increment and
+ * decrement happen in sync.
+ */
+struct sdt_mm_list {
+	struct list_head list;
+	struct uprobe_consumer *uc;
+	struct mm_struct *mm;
+};
+
 struct uprobe {
 	struct rb_node		rb_node;	/* node in the rb tree */
 	atomic_t		ref;
@@ -79,6 +93,8 @@ struct uprobe {
 	struct inode		*inode;		/* Also hold a ref to inode */
 	loff_t			offset;
 	loff_t			ref_ctr_offset;
+	struct sdt_mm_list	sml;
+	struct mutex		sml_lock;
 	unsigned long		flags;
 
 	/*
@@ -503,6 +519,8 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
 	uprobe->ref_ctr_offset = ref_ctr_offset;
 	init_rwsem(&uprobe->register_rwsem);
 	init_rwsem(&uprobe->consumer_rwsem);
+	mutex_init(&uprobe->sml_lock);
+	INIT_LIST_HEAD(&(uprobe->sml.list));
 
 	/* add to uprobes_tree, sorted on inode:offset */
 	cur_uprobe = insert_uprobe(uprobe);
@@ -848,6 +866,49 @@ register_for_each_vma(struct uprobe *uprobe, struct uprobe_consumer *new)
 	return err;
 }
 
+static bool sdt_check_mm_list(struct uprobe *uprobe, struct mm_struct *mm,
+			      struct uprobe_consumer *uc)
+{
+	struct sdt_mm_list *sml;
+
+	list_for_each_entry(sml, &(uprobe->sml.list), list)
+		if (sml->mm == mm && sml->uc == uc)
+			return true;
+
+	return false;
+}
+
+static int sdt_add_mm_list(struct uprobe *uprobe, struct mm_struct *mm,
+			   struct uprobe_consumer *uc)
+{
+	struct sdt_mm_list *sml  = kzalloc(sizeof(*sml), GFP_KERNEL);
+
+	if (!sml) {
+		pr_info("Failed to add mm into list.\n");
+		return -ENOMEM;
+	}
+
+	sml->mm = mm;
+	sml->uc = uc;
+	list_add(&(sml->list), &(uprobe->sml.list));
+	return 0;
+}
+
+static void sdt_del_mm_list(struct uprobe *uprobe, struct mm_struct *mm,
+			    struct uprobe_consumer *uc)
+{
+	struct list_head *pos, *q;
+	struct sdt_mm_list *sml;
+
+	list_for_each_safe(pos, q, &(uprobe->sml.list)) {
+		sml = list_entry(pos, struct sdt_mm_list, list);
+		if (sml->mm == mm && sml->uc == uc) {
+			list_del(pos);
+			kfree(sml);
+		}
+	}
+}
+
 static bool sdt_valid_vma(struct uprobe *uprobe,
 			  struct vm_area_struct *vma,
 			  unsigned long vaddr)
@@ -917,7 +978,8 @@ out:
 	return ret;
 }
 
-static int sdt_increment_ref_ctr(struct uprobe *uprobe)
+static int
+sdt_increment_ref_ctr(struct uprobe *uprobe, struct uprobe_consumer *uc)
 {
 	struct map_info *info, *first = NULL;
 	int ctr = 0, ret = 0, tmp = 0;
@@ -934,16 +996,35 @@ static int sdt_increment_ref_ctr(struct uprobe *uprobe)
 	first = info;
 	while (info) {
 		down_write(&info->mm->mmap_sem);
+		mutex_lock(&uprobe->sml_lock);
+
+		if (sdt_check_mm_list(uprobe, info->mm, uc)) {
+			mutex_unlock(&uprobe->sml_lock);
+			up_write(&info->mm->mmap_sem);
+			info = info->next;
+			continue;
+		}
+
 		if (sdt_find_vma(uprobe, info->mm, info->vaddr)) {
 			ret = sdt_update_ref_ctr(info->mm, info->vaddr, 1);
 			if (unlikely(ret)) {
+				mutex_unlock(&uprobe->sml_lock);
+				up_write(&info->mm->mmap_sem);
+				goto rollback;
+			}
+
+			ctr++;
+
+			ret = sdt_add_mm_list(uprobe, info->mm, uc);
+			if (unlikely(ret)) {
+				mutex_unlock(&uprobe->sml_lock);
 				up_write(&info->mm->mmap_sem);
 				goto rollback;
 			}
 		}
+		mutex_unlock(&uprobe->sml_lock);
 		up_write(&info->mm->mmap_sem);
 		info = info->next;
-		ctr++;
 	}
 	ret = 0;
 	goto out;
@@ -956,11 +1037,15 @@ rollback:
 	info = first;
 	while (ctr) {
 		down_write(&info->mm->mmap_sem);
+		mutex_lock(&uprobe->sml_lock);
 		if (sdt_find_vma(uprobe, info->mm, info->vaddr)) {
 			tmp = sdt_update_ref_ctr(info->mm, info->vaddr, -1);
 			if (unlikely(tmp))
 				pr_warn("ref_ctr rollback failed. (%d)\n", tmp);
+
+			sdt_del_mm_list(uprobe, info->mm, uc);
 		}
+		mutex_unlock(&uprobe->sml_lock);
 		up_write(&info->mm->mmap_sem);
 		info = info->next;
 		ctr--;
@@ -977,7 +1062,12 @@ out:
 	return ret;
 }
 
-static int sdt_decrement_ref_ctr(struct uprobe *uprobe)
+/*
+ * We don't check presence of {uc,mm} in sml here. We just decrement
+ * the reference counter if we find vma holding the reference counter.
+ */
+static int
+sdt_decrement_ref_ctr(struct uprobe *uprobe, struct uprobe_consumer *uc)
 {
 	struct map_info *info;
 	int ret = 0, err = 0;
@@ -990,6 +1080,7 @@ static int sdt_decrement_ref_ctr(struct uprobe *uprobe)
 
 	while (info) {
 		down_write(&info->mm->mmap_sem);
+		mutex_lock(&uprobe->sml_lock);
 
 		if (sdt_find_vma(uprobe, info->mm, info->vaddr)) {
 			ret = sdt_update_ref_ctr(info->mm, info->vaddr, -1);
@@ -997,6 +1088,8 @@ static int sdt_decrement_ref_ctr(struct uprobe *uprobe)
 			err = !err && ret ? ret : err;
 		}
 
+		sdt_del_mm_list(uprobe, info->mm, uc);
+		mutex_unlock(&uprobe->sml_lock);
 		up_write(&info->mm->mmap_sem);
 		mmput(info->mm);
 		info = free_map_info(info);
@@ -1014,7 +1107,7 @@ static void __uprobe_unregister(struct uprobe *uprobe,
 	int err;
 
 	if (ref_ctr_dec && uprobe->ref_ctr_offset)
-		sdt_decrement_ref_ctr(uprobe);
+		sdt_decrement_ref_ctr(uprobe, uc);
 
 	if (WARN_ON(!consumer_del(uprobe, uc)))
 		return;
@@ -1102,7 +1195,7 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
 
 		ret = register_for_each_vma(uprobe, uc);
 		if (!ret && ref_ctr_offset)
-			ret = sdt_increment_ref_ctr(uprobe);
+			ret = sdt_increment_ref_ctr(uprobe, uc);
 
 		if (ret)
 			__uprobe_unregister(uprobe, uc, false);
@@ -1258,6 +1351,26 @@ static void build_probe_list(struct inode *inode, int off_type,
 	spin_unlock(&uprobes_treelock);
 }
 
+static int __sdt_uprobe_mmap(struct uprobe *uprobe, struct mm_struct *mm,
+			     unsigned long vaddr, struct uprobe_consumer *uc)
+{
+	int ret;
+
+	if (sdt_check_mm_list(uprobe, mm, uc))
+		return 0;
+
+	ret = sdt_update_ref_ctr(mm, vaddr, 1);
+	if (unlikely(ret))
+		return ret;
+
+	ret = sdt_add_mm_list(uprobe, mm, uc);
+	if (likely(!ret))
+		return ret;
+
+	/* Failed to add mm into the list. Rollback ref_ctr update */
+	return sdt_update_ref_ctr(mm, vaddr, -1);
+}
+
 /* Called with down_write(&vma->vm_mm->mmap_sem) */
 static int sdt_uprobe_mmap(struct vm_area_struct *vma, struct inode *inode)
 {
@@ -1280,10 +1393,14 @@ static int sdt_uprobe_mmap(struct vm_area_struct *vma, struct inode *inode)
 
 		/* Increment reference counter for each consumer. */
 		down_read(&uprobe->consumer_rwsem);
+		mutex_lock(&uprobe->sml_lock);
+
 		for (uc = uprobe->consumers; uc; uc = uc->next) {
-			ret = sdt_update_ref_ctr(vma->vm_mm, vaddr, 1);
+			ret = __sdt_uprobe_mmap(uprobe, vma->vm_mm, vaddr, uc);
 			err = !err && ret ? ret : err;
 		}
+
+		mutex_unlock(&uprobe->sml_lock);
 		up_read(&uprobe->consumer_rwsem);
 		put_uprobe(uprobe);
 	}
@@ -1477,12 +1594,39 @@ static struct xol_area *get_xol_area(void)
 	return area;
 }
 
+static void sdt_mm_release(struct rb_node *n, struct mm_struct *mm)
+{
+	struct uprobe *uprobe;
+	struct uprobe_consumer *uc;
+
+	if (!n)
+		return;
+
+	uprobe = rb_entry(n, struct uprobe, rb_node);
+
+	down_read(&uprobe->consumer_rwsem);
+	mutex_lock(&uprobe->sml_lock);
+
+	for (uc = uprobe->consumers; uc; uc = uc->next)
+		sdt_del_mm_list(uprobe, mm, uc);
+
+	mutex_unlock(&uprobe->sml_lock);
+	up_read(&uprobe->consumer_rwsem);
+
+	sdt_mm_release(n->rb_left, mm);
+	sdt_mm_release(n->rb_right, mm);
+}
+
 /*
  * uprobe_clear_state - Free the area allocated for slots.
  */
 void uprobe_clear_state(struct mm_struct *mm)
 {
 	struct xol_area *area = mm->uprobes_state.xol_area;
+
+	spin_lock(&uprobes_treelock);
+	sdt_mm_release(uprobes_tree.rb_node, mm);
+	spin_unlock(&uprobes_treelock);
 
 	if (!area)
 		return;
