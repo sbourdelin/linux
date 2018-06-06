@@ -64,6 +64,11 @@ static struct percpu_rw_semaphore dup_mmap_sem;
 /* Have a copy of original instruction */
 #define UPROBE_COPY_INSN	0
 
+enum {
+	UPROBE_OFFSET = 0,
+	REF_CTR_OFFSET
+};
+
 struct uprobe {
 	struct rb_node		rb_node;	/* node in the rb tree */
 	atomic_t		ref;
@@ -73,6 +78,7 @@ struct uprobe {
 	struct uprobe_consumer	*consumers;
 	struct inode		*inode;		/* Also hold a ref to inode */
 	loff_t			offset;
+	loff_t			ref_ctr_offset;
 	unsigned long		flags;
 
 	/*
@@ -483,7 +489,8 @@ static struct uprobe *insert_uprobe(struct uprobe *uprobe)
 	return u;
 }
 
-static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
+static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
+				   loff_t ref_ctr_offset)
 {
 	struct uprobe *uprobe, *cur_uprobe;
 
@@ -493,6 +500,7 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
 
 	uprobe->inode = inode;
 	uprobe->offset = offset;
+	uprobe->ref_ctr_offset = ref_ctr_offset;
 	init_rwsem(&uprobe->register_rwsem);
 	init_rwsem(&uprobe->consumer_rwsem);
 
@@ -840,10 +848,173 @@ register_for_each_vma(struct uprobe *uprobe, struct uprobe_consumer *new)
 	return err;
 }
 
-static void
-__uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
+static bool sdt_valid_vma(struct uprobe *uprobe,
+			  struct vm_area_struct *vma,
+			  unsigned long vaddr)
+{
+	return uprobe->ref_ctr_offset &&
+		vma->vm_file &&
+		file_inode(vma->vm_file) == uprobe->inode &&
+		vma->vm_flags & VM_WRITE &&
+		vma->vm_start <= vaddr &&
+		vma->vm_end > vaddr;
+}
+
+static struct vm_area_struct *sdt_find_vma(struct uprobe *uprobe,
+					   struct mm_struct *mm,
+					   unsigned long vaddr)
+{
+	struct vm_area_struct *vma = find_vma(mm, vaddr);
+
+	return (vma && sdt_valid_vma(uprobe, vma, vaddr)) ? vma : NULL;
+}
+
+/*
+ * Reference counter gate the invocation of probe. If present,
+ * by default reference counter is 0. One needs to increment
+ * it before tracing the probe and decrement it when done.
+ */
+static int
+sdt_update_ref_ctr(struct mm_struct *mm, unsigned long vaddr, short d)
+{
+	void *kaddr;
+	struct page *page;
+	struct vm_area_struct *vma;
+	int ret = 0;
+	short *ptr;
+
+	if (vaddr == 0 || d == 0)
+		return -EINVAL;
+
+	ret = get_user_pages_remote(NULL, mm, vaddr, 1,
+		FOLL_FORCE | FOLL_WRITE, &page, &vma, NULL);
+	if (unlikely(ret <= 0)) {
+		/*
+		 * We are asking for 1 page. If get_user_pages_remote() fails,
+		 * it may return 0, in that case we have to return error.
+		 */
+		ret = (ret == 0) ? -EBUSY : ret;
+		pr_warn("Failed to %s ref_ctr. (%d)\n",
+			d > 0 ? "increment" : "decrement", ret);
+		return ret;
+	}
+
+	kaddr = kmap_atomic(page);
+	ptr = kaddr + (vaddr & ~PAGE_MASK);
+
+	if (unlikely(*ptr + d < 0)) {
+		pr_warn("ref_ctr going negative. vaddr: 0x%lx, "
+			"curr val: %d, delta: %d\n", vaddr, *ptr, d);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	*ptr += d;
+	ret = 0;
+out:
+	kunmap_atomic(kaddr);
+	put_page(page);
+	return ret;
+}
+
+static int sdt_increment_ref_ctr(struct uprobe *uprobe)
+{
+	struct map_info *info, *first = NULL;
+	int ctr = 0, ret = 0, tmp = 0;
+
+	percpu_down_write(&dup_mmap_sem);
+
+	info = build_map_info(uprobe->inode->i_mapping,
+			      uprobe->ref_ctr_offset, false);
+	if (IS_ERR(info)) {
+		percpu_up_write(&dup_mmap_sem);
+		return PTR_ERR(info);
+	}
+
+	first = info;
+	while (info) {
+		down_write(&info->mm->mmap_sem);
+		if (sdt_find_vma(uprobe, info->mm, info->vaddr)) {
+			ret = sdt_update_ref_ctr(info->mm, info->vaddr, 1);
+			if (unlikely(ret)) {
+				up_write(&info->mm->mmap_sem);
+				goto rollback;
+			}
+		}
+		up_write(&info->mm->mmap_sem);
+		info = info->next;
+		ctr++;
+	}
+	ret = 0;
+	goto out;
+
+rollback:
+	/*
+	 * We failed to update reference counter in any one of
+	 * the target mm. Rollback alredy updated mms.
+	 */
+	info = first;
+	while (ctr) {
+		down_write(&info->mm->mmap_sem);
+		if (sdt_find_vma(uprobe, info->mm, info->vaddr)) {
+			tmp = sdt_update_ref_ctr(info->mm, info->vaddr, -1);
+			if (unlikely(tmp))
+				pr_warn("ref_ctr rollback failed. (%d)\n", tmp);
+		}
+		up_write(&info->mm->mmap_sem);
+		info = info->next;
+		ctr--;
+	}
+
+out:
+	info = first;
+	while (info) {
+		mmput(info->mm);
+		info = free_map_info(info);
+	}
+
+	percpu_up_write(&dup_mmap_sem);
+	return ret;
+}
+
+static int sdt_decrement_ref_ctr(struct uprobe *uprobe)
+{
+	struct map_info *info;
+	int ret = 0, err = 0;
+
+	percpu_down_write(&dup_mmap_sem);
+	info = build_map_info(uprobe->inode->i_mapping,
+			      uprobe->ref_ctr_offset, false);
+	if (IS_ERR(info))
+		goto out;
+
+	while (info) {
+		down_write(&info->mm->mmap_sem);
+
+		if (sdt_find_vma(uprobe, info->mm, info->vaddr)) {
+			ret = sdt_update_ref_ctr(info->mm, info->vaddr, -1);
+			/* Save error and continue. */
+			err = !err && ret ? ret : err;
+		}
+
+		up_write(&info->mm->mmap_sem);
+		mmput(info->mm);
+		info = free_map_info(info);
+	}
+
+out:
+	percpu_up_write(&dup_mmap_sem);
+	return err;
+}
+
+static void __uprobe_unregister(struct uprobe *uprobe,
+				struct uprobe_consumer *uc,
+				bool ref_ctr_dec)
 {
 	int err;
+
+	if (ref_ctr_dec && uprobe->ref_ctr_offset)
+		sdt_decrement_ref_ctr(uprobe);
 
 	if (WARN_ON(!consumer_del(uprobe, uc)))
 		return;
@@ -869,7 +1040,7 @@ void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consume
 		return;
 
 	down_write(&uprobe->register_rwsem);
-	__uprobe_unregister(uprobe, uc);
+	__uprobe_unregister(uprobe, uc, true);
 	up_write(&uprobe->register_rwsem);
 	put_uprobe(uprobe);
 }
@@ -880,21 +1051,27 @@ EXPORT_SYMBOL_GPL(uprobe_unregister);
  * @inode: the file in which the probe has to be placed.
  * @offset: offset from the start of the file.
  * @uc: information on howto handle the probe..
+ * @ref_ctr_offset: Reference counter offset
  *
  * Apart from the access refcount, __uprobe_register() takes a creation
  * refcount (thro alloc_uprobe) if and only if this @uprobe is getting
- * inserted into the rbtree (i.e first consumer for a @inode:@offset
- * tuple).  Creation refcount stops uprobe_unregister from freeing the
- * @uprobe even before the register operation is complete. Creation
- * refcount is released when the last @uc for the @uprobe
- * unregisters. Caller of __uprobe_register() is required to keep @inode
- * (and the containing mount) referenced.
+ * inserted into the rbtree (i.e first consumer for a
+ * @inode:@offset:@ref_ctr_offset tuple). Creation refcount stops
+ * uprobe_unregister from freeing the @uprobe even before the register
+ * operation is complete. Creation refcount is released when the last
+ * @uc for the @uprobe unregisters. Caller of __uprobe_register() is
+ * required to keep @inode (and the containing mount) referenced.
  *
- * Return errno if it cannot successully install probes
- * else return 0 (success)
+ * Note that, 'refcount' and 'ref_ctr_offset' are totally different
+ * entities and each has it's own purpose. 'ref_ctr_offset' is the file
+ * offset of the counter which gates the uprobe and it has nothing to
+ * do with the value of 'refcount'.
+ *
+ * Return errno if it cannot successully install probes else return 0
+ * (success).
  */
 static int __uprobe_register(struct inode *inode, loff_t offset,
-			     struct uprobe_consumer *uc)
+			     struct uprobe_consumer *uc, loff_t ref_ctr_offset)
 {
 	struct uprobe *uprobe;
 	int ret;
@@ -907,11 +1084,11 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
 	if (!inode->i_mapping->a_ops->readpage && !shmem_mapping(inode->i_mapping))
 		return -EIO;
 	/* Racy, just to catch the obvious mistakes */
-	if (offset > i_size_read(inode))
+	if (offset > i_size_read(inode) || ref_ctr_offset > i_size_read(inode))
 		return -EINVAL;
 
  retry:
-	uprobe = alloc_uprobe(inode, offset);
+	uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
 	if (!uprobe)
 		return -ENOMEM;
 	/*
@@ -922,9 +1099,13 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
 	ret = -EAGAIN;
 	if (likely(uprobe_is_active(uprobe))) {
 		consumer_add(uprobe, uc);
+
 		ret = register_for_each_vma(uprobe, uc);
+		if (!ret && ref_ctr_offset)
+			ret = sdt_increment_ref_ctr(uprobe);
+
 		if (ret)
-			__uprobe_unregister(uprobe, uc);
+			__uprobe_unregister(uprobe, uc, false);
 	}
 	up_write(&uprobe->register_rwsem);
 	put_uprobe(uprobe);
@@ -937,9 +1118,16 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
 int uprobe_register(struct inode *inode, loff_t offset,
 		    struct uprobe_consumer *uc)
 {
-	return __uprobe_register(inode, offset, uc);
+	return __uprobe_register(inode, offset, uc, 0);
 }
 EXPORT_SYMBOL_GPL(uprobe_register);
+
+/* Currently, the only user of this is trace_uprobe. */
+int uprobe_register_refctr(struct inode *inode, loff_t offset,
+			   struct uprobe_consumer *uc, loff_t ref_ctr_offset)
+{
+	return __uprobe_register(inode, offset, uc, ref_ctr_offset);
+}
 
 /*
  * uprobe_apply - unregister a already registered probe.
@@ -997,22 +1185,30 @@ static int unapply_uprobe(struct uprobe *uprobe, struct mm_struct *mm)
 	return err;
 }
 
+static loff_t uprobe_get_offset(struct uprobe *u, int off_type)
+{
+	return (off_type == UPROBE_OFFSET) ? u->offset : u->ref_ctr_offset;
+}
+
 static struct rb_node *
-find_node_in_range(struct inode *inode, loff_t min, loff_t max)
+find_node_in_range(struct inode *inode, int off_type, loff_t min, loff_t max)
 {
 	struct rb_node *n = uprobes_tree.rb_node;
+	struct uprobe *u;
+	loff_t offset;
 
 	while (n) {
-		struct uprobe *u = rb_entry(n, struct uprobe, rb_node);
+		u = rb_entry(n, struct uprobe, rb_node);
+		offset = uprobe_get_offset(u, off_type);
 
 		if (inode < u->inode) {
 			n = n->rb_left;
 		} else if (inode > u->inode) {
 			n = n->rb_right;
 		} else {
-			if (max < u->offset)
+			if (max < offset)
 				n = n->rb_left;
-			else if (min > u->offset)
+			else if (min > offset)
 				n = n->rb_right;
 			else
 				break;
@@ -1025,7 +1221,7 @@ find_node_in_range(struct inode *inode, loff_t min, loff_t max)
 /*
  * For a given range in vma, build a list of probes that need to be inserted.
  */
-static void build_probe_list(struct inode *inode,
+static void build_probe_list(struct inode *inode, int off_type,
 				struct vm_area_struct *vma,
 				unsigned long start, unsigned long end,
 				struct list_head *head)
@@ -1033,30 +1229,66 @@ static void build_probe_list(struct inode *inode,
 	loff_t min, max;
 	struct rb_node *n, *t;
 	struct uprobe *u;
+	loff_t offset;
 
 	INIT_LIST_HEAD(head);
 	min = vaddr_to_offset(vma, start);
 	max = min + (end - start) - 1;
 
 	spin_lock(&uprobes_treelock);
-	n = find_node_in_range(inode, min, max);
+	n = find_node_in_range(inode, off_type, min, max);
 	if (n) {
 		for (t = n; t; t = rb_prev(t)) {
 			u = rb_entry(t, struct uprobe, rb_node);
-			if (u->inode != inode || u->offset < min)
+			offset = uprobe_get_offset(u, off_type);
+			if (u->inode != inode || offset < min)
 				break;
 			list_add(&u->pending_list, head);
 			get_uprobe(u);
 		}
 		for (t = n; (t = rb_next(t)); ) {
 			u = rb_entry(t, struct uprobe, rb_node);
-			if (u->inode != inode || u->offset > max)
+			offset = uprobe_get_offset(u, off_type);
+			if (u->inode != inode || offset > max)
 				break;
 			list_add(&u->pending_list, head);
 			get_uprobe(u);
 		}
 	}
 	spin_unlock(&uprobes_treelock);
+}
+
+/* Called with down_write(&vma->vm_mm->mmap_sem) */
+static int sdt_uprobe_mmap(struct vm_area_struct *vma, struct inode *inode)
+{
+	struct list_head tmp_list;
+	struct uprobe *uprobe, *u;
+	struct uprobe_consumer *uc;
+	unsigned long vaddr;
+	int ret = 0, err = 0;
+
+	build_probe_list(inode, REF_CTR_OFFSET, vma, vma->vm_start,
+			 vma->vm_end, &tmp_list);
+
+	list_for_each_entry_safe(uprobe, u, &tmp_list, pending_list) {
+		if (!uprobe->ref_ctr_offset || !uprobe_is_active(uprobe))
+			continue;
+
+		vaddr = offset_to_vaddr(vma, uprobe->ref_ctr_offset);
+		if (!sdt_valid_vma(uprobe, vma, vaddr))
+			continue;
+
+		/* Increment reference counter for each consumer. */
+		down_read(&uprobe->consumer_rwsem);
+		for (uc = uprobe->consumers; uc; uc = uc->next) {
+			ret = sdt_update_ref_ctr(vma->vm_mm, vaddr, 1);
+			err = !err && ret ? ret : err;
+		}
+		up_read(&uprobe->consumer_rwsem);
+		put_uprobe(uprobe);
+	}
+
+	return err;
 }
 
 /*
@@ -1071,7 +1303,7 @@ int uprobe_mmap(struct vm_area_struct *vma)
 	struct uprobe *uprobe, *u;
 	struct inode *inode;
 
-	if (no_uprobe_events() || !valid_vma(vma, true))
+	if (no_uprobe_events())
 		return 0;
 
 	inode = file_inode(vma->vm_file);
@@ -1079,7 +1311,14 @@ int uprobe_mmap(struct vm_area_struct *vma)
 		return 0;
 
 	mutex_lock(uprobes_mmap_hash(inode));
-	build_probe_list(inode, vma, vma->vm_start, vma->vm_end, &tmp_list);
+	if (vma->vm_flags & VM_WRITE)
+		sdt_uprobe_mmap(vma, inode);
+
+	if (!valid_vma(vma, true))
+		goto out;
+
+	build_probe_list(inode, UPROBE_OFFSET, vma, vma->vm_start,
+			 vma->vm_end, &tmp_list);
 	/*
 	 * We can race with uprobe_unregister(), this uprobe can be already
 	 * removed. But in this case filter_chain() must return false, all
@@ -1093,8 +1332,9 @@ int uprobe_mmap(struct vm_area_struct *vma)
 		}
 		put_uprobe(uprobe);
 	}
-	mutex_unlock(uprobes_mmap_hash(inode));
 
+out:
+	mutex_unlock(uprobes_mmap_hash(inode));
 	return 0;
 }
 
@@ -1111,7 +1351,7 @@ vma_has_uprobes(struct vm_area_struct *vma, unsigned long start, unsigned long e
 	max = min + (end - start) - 1;
 
 	spin_lock(&uprobes_treelock);
-	n = find_node_in_range(inode, min, max);
+	n = find_node_in_range(inode, UPROBE_OFFSET, min, max);
 	spin_unlock(&uprobes_treelock);
 
 	return !!n;
