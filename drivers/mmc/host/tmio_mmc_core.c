@@ -247,6 +247,10 @@ static void tmio_mmc_hw_reset(struct mmc_host *mmc)
 {
 	struct tmio_mmc_host *host = mmc_priv(mmc);
 
+	tmio_mmc_reset(host);
+
+	tmio_mmc_abort_dma(host);
+
 	if (host->hw_reset)
 		host->hw_reset(host);
 }
@@ -289,7 +293,7 @@ static void tmio_mmc_reset_work(struct work_struct *work)
 
 	spin_unlock_irqrestore(&host->lock, flags);
 
-	tmio_mmc_reset(host);
+	tmio_mmc_hw_reset(host->mmc);
 
 	/* Ready for new calls */
 	host->mrq = NULL;
@@ -1271,7 +1275,7 @@ int tmio_mmc_host_probe(struct tmio_mmc_host *_host)
 		_host->sdio_irq_mask = TMIO_SDIO_MASK_ALL;
 
 	tmio_mmc_clk_stop(_host);
-	tmio_mmc_reset(_host);
+	tmio_mmc_hw_reset(mmc);
 
 	sd_ctrl_write32_as_16_and_16(_host, CTL_IRQ_MASK, TMIO_MASK_INIT);
 	_host->sdcard_irq_mask = sd_ctrl_read16_and_16_as_32(_host, CTL_IRQ_MASK);
@@ -1372,8 +1376,8 @@ int tmio_mmc_host_runtime_resume(struct device *dev)
 {
 	struct tmio_mmc_host *host = dev_get_drvdata(dev);
 
-	tmio_mmc_reset(host);
 	tmio_mmc_clk_enable(host);
+	tmio_mmc_hw_reset(host->mmc);
 
 	if (host->clk_cache)
 		tmio_mmc_set_clock(host, host->clk_cache);
