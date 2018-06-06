@@ -2371,6 +2371,10 @@
 			Note that if CONFIG_MODULE_SIG_FORCE is set, that
 			is always true, so this option does nothing.
 
+	module.sig_unenforce
+			[KNL] This parameter allows modules without signatures
+			to be loaded, overriding CONFIG_MODULE_SIG_FORCE.
+
 	module_blacklist=  [KNL] Do not load a comma-separated list of
 			modules.  Useful for debugging problem modules.
 
