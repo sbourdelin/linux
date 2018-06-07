@@ -349,7 +349,7 @@ static int rt2880_pinmux_pins(struct rt2880_priv *p)
 	p->pads = devm_kzalloc(p->dev,
 		sizeof(struct pinctrl_pin_desc) * p->max_pins,
 		GFP_KERNEL);
-	if (!p->pads || !p->gpio ) {
+	if (!p->pads || !p->gpio) {
 		dev_err(p->dev, "Failed to allocate gpio data\n");
 		return -ENOMEM;
 	}
