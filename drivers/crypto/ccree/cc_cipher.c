@@ -616,9 +616,18 @@ static void cc_cipher_complete(struct device *dev, void *cc_req, int err)
 		memcpy(req->iv, req_ctx->backup_info, ivsize);
 		kzfree(req_ctx->backup_info);
 	} else if (!err) {
-		scatterwalk_map_and_copy(req->iv, req->dst,
-					 (req->cryptlen - ivsize),
-					 ivsize, 0);
+		unsigned int len;
+
+		if (req->cryptlen > ivsize) {
+			len = req->cryptlen - ivsize;
+		} else {
+			memset(req->iv, 0, ivsize);
+			len = 0;
+			ivsize = req->cryptlen;
+
+		}
+
+		scatterwalk_map_and_copy(req->iv, req->dst, len, ivsize, 0);
 	}
 
 	skcipher_request_complete(req, err);
@@ -755,17 +764,26 @@ static int cc_cipher_decrypt(struct skcipher_request *req)
 	struct cipher_req_ctx *req_ctx = skcipher_request_ctx(req);
 	unsigned int ivsize = crypto_skcipher_ivsize(sk_tfm);
 	gfp_t flags = cc_gfp_flags(&req->base);
+	unsigned int len;
 
 	/*
 	 * Allocate and save the last IV sized bytes of the source, which will
 	 * be lost in case of in-place decryption and might be needed for CTS.
 	 */
-	req_ctx->backup_info = kmalloc(ivsize, flags);
+	req_ctx->backup_info = kzalloc(ivsize, flags);
 	if (!req_ctx->backup_info)
 		return -ENOMEM;
 
-	scatterwalk_map_and_copy(req_ctx->backup_info, req->src,
-				 (req->cryptlen - ivsize), ivsize, 0);
+
+	if (req->cryptlen > ivsize) {
+		len = req->cryptlen - ivsize;
+	} else {
+		len = 0;
+		ivsize = req->cryptlen;
+	}
+
+	scatterwalk_map_and_copy(req_ctx->backup_info, req->src, len, ivsize,
+				 0);
 	req_ctx->is_giv = false;
 
 	return cc_cipher_process(req, DRV_CRYPTO_DIRECTION_DECRYPT);
