@@ -599,6 +599,72 @@ again:
 	return ret;
 }
 EXPORT_SYMBOL(ida_simple_get);
+/**
+ * ida_simple_get_cyclic - get a new id.
+ * @ida: the (initialized) ida.
+ * @start: the minimum id (inclusive, < 0x8000000)
+ * @end: the maximum id (exclusive, < 0x8000000 or 0)
+ * @gfp_mask: memory allocation flags
+ *
+ * Allocates an id in the range start <= id < end, or returns -ENOSPC.
+ * On memory allocation failure, returns -ENOMEM.
+ * The search for an unused id will start at the last id allocated and will
+ * wrap around to @start if no free ids are found before reaching @end.
+ *
+ * Compared to ida_get_new_above() this function does its own locking, and
+ * should be used unless there are special requirements.
+ *
+ * Use ida_simple_remove() to get rid of an id.
+ */
+int ida_simple_get_cyclic(struct ida *ida, unsigned int start, unsigned int end,
+		   gfp_t gfp_mask)
+{
+	int ret, id, next;
+	unsigned int max;
+	unsigned long flags;
+
+	WARN_ON((int)start < 0);
+	WARN_ON((int)end < 0);
+
+	if (end == 0) {
+		max = 0x80000000;
+	} else {
+		WARN_ON(end < start);
+		max = end - 1;
+	}
+
+again:
+	if (!ida_pre_get(ida, gfp_mask))
+		return -ENOMEM;
+
+	spin_lock_irqsave(&simple_ida_lock, flags);
+	next = ida->ida_next;
+	if (next < start || next >= end)
+		next = start;
+
+	ret = ida_get_new_above(ida, next, &id);
+	if (likely(!ret)) {
+		if (unlikely(id >= max)) {
+			ida_remove(ida, id);
+			if (next == start) {
+				ret = -ENOSPC;
+			} else {
+				ida->ida_next = start;
+				spin_unlock_irqrestore(&simple_ida_lock, flags);
+				goto again;
+			}
+		} else {
+			ida->ida_next = id + 1;
+			ret = id;
+		}
+	}
+	spin_unlock_irqrestore(&simple_ida_lock, flags);
+
+	if (unlikely(ret == -EAGAIN))
+		goto again;
+	return ret;
+}
+EXPORT_SYMBOL(ida_simple_get_cyclic);
 
 /**
  * ida_simple_remove - remove an allocated id.
