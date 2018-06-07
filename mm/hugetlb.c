@@ -3292,7 +3292,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 				 *
 				 * See Documentation/vm/mmu_notifier.txt
 				 */
-				huge_ptep_set_wrprotect(src, addr, src_pte);
+				huge_ptep_set_wrprotect_flush(vma, addr, src_pte);
 			}
 			entry = huge_ptep_get(src_pte);
 			ptepage = pte_page(entry);
