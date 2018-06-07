@@ -2237,6 +2237,13 @@ static const struct user_regset compat_regsets[] = {
 		.active = vr_active, .get = vr_get, .set = vr_set
 	},
 #endif
+#ifdef CONFIG_VSX
+	[REGSET_VSX] = {
+		.core_note_type = NT_PPC_VSX, .n = 32,
+		.size = sizeof(double), .align = sizeof(double),
+		.active = vsr_active, .get = vsr_get, .set = vsr_set
+	},
+#endif
 #ifdef CONFIG_SPE
 	[REGSET_SPE] = {
 		.core_note_type = NT_PPC_SPE, .n = 35,
