@@ -146,6 +146,17 @@ struct intel_device_info {
 	u16 device_id;
 	u16 gen_mask;
 
+	u8 first_product_revid;
+	/* Set to corresponding first production hardware revision or:
+	 *
+	 * 0x00 == uninitialized == no known preliminary hw (legacy gens)
+	 * 0xff == PRODUCT_REVID_UNKNOWN == no known production hw yet
+	 *
+	 * Do not set first product revid unless you are certain
+	 * that testing infrastructure is already on top of production
+	 * revid machines.
+	 */
+
 	u8 gen;
 	u8 gt; /* GT number, 0 if undefined */
 	u8 num_rings;

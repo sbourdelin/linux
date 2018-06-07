@@ -2428,6 +2428,10 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define IS_ALPHA_SUPPORT(intel_info) ((intel_info)->is_alpha_support)
 
+#define PRODUCT_REVID_UNKNOWN	REVID_FOREVER
+#define FIRST_PRODUCT_REVID(intel_info) ((intel_info)->first_product_revid)
+#define IS_PREPRODUCTION_HW(dev_priv)   (INTEL_REVID(dev_priv) < FIRST_PRODUCT_REVID(INTEL_INFO(dev_priv)))
+
 #define SKL_REVID_A0		0x0
 #define SKL_REVID_B0		0x1
 #define SKL_REVID_C0		0x2
@@ -2459,6 +2463,7 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define GLK_REVID_A0		0x0
 #define GLK_REVID_A1		0x1
+#define GLK_REVID_B0		0x3
 
 #define IS_GLK_REVID(dev_priv, since, until) \
 	(IS_GEMINILAKE(dev_priv) && IS_REVID(dev_priv, since, until))
@@ -2466,6 +2471,8 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define CNL_REVID_A0		0x0
 #define CNL_REVID_B0		0x1
 #define CNL_REVID_C0		0x2
+#define CNL_REVID_D0		0x4
+#define CNL_REVID_G0		0x5
 
 #define IS_CNL_REVID(p, since, until) \
 	(IS_CANNONLAKE(p) && IS_REVID(p, since, until))

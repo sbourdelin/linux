@@ -467,6 +467,7 @@ static const struct intel_device_info intel_cherryview_info = {
 
 #define SKL_PLATFORM \
 	GEN9_FEATURES, \
+	.first_product_revid = SKL_REVID_G0, \
 	PLATFORM(INTEL_SKYLAKE)
 
 static const struct intel_device_info intel_skylake_gt1_info = {
@@ -520,6 +521,7 @@ static const struct intel_device_info intel_skylake_gt4_info = {
 	.has_reset_engine = 1, \
 	.has_snoop = true, \
 	.has_ipc = 1, \
+	.first_product_revid = PRODUCT_REVID_UNKNOWN, \
 	GEN9_DEFAULT_PAGE_SIZES, \
 	GEN_DEFAULT_PIPEOFFSETS, \
 	IVB_CURSOR_OFFSETS, \
@@ -528,6 +530,7 @@ static const struct intel_device_info intel_skylake_gt4_info = {
 static const struct intel_device_info intel_broxton_info = {
 	GEN9_LP_FEATURES,
 	PLATFORM(INTEL_BROXTON),
+	.first_product_revid = BXT_REVID_C0,
 	.ddb_size = 512,
 };
 
@@ -540,7 +543,8 @@ static const struct intel_device_info intel_geminilake_info = {
 
 #define KBL_PLATFORM \
 	GEN9_FEATURES, \
-	PLATFORM(INTEL_KABYLAKE)
+	PLATFORM(INTEL_KABYLAKE), \
+	.first_product_revid = KBL_REVID_B0
 
 static const struct intel_device_info intel_kabylake_gt1_info = {
 	KBL_PLATFORM,
@@ -560,7 +564,8 @@ static const struct intel_device_info intel_kabylake_gt3_info = {
 
 #define CFL_PLATFORM \
 	GEN9_FEATURES, \
-	PLATFORM(INTEL_COFFEELAKE)
+	PLATFORM(INTEL_COFFEELAKE), \
+	.first_product_revid = KBL_REVID_B0
 
 static const struct intel_device_info intel_coffeelake_gt1_info = {
 	CFL_PLATFORM,
