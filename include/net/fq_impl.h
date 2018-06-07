@@ -78,7 +78,10 @@ begin:
 			return NULL;
 	}
 
-	flow = list_first_entry(head, struct fq_flow, flowchain);
+	flow = list_first_entry_or_null(head, struct fq_flow, flowchain);
+
+	if (WARN_ON_ONCE(!flow))
+		return NULL;
 
 	if (flow->deficit <= 0) {
 		flow->deficit += fq->quantum;
