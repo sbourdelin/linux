@@ -249,8 +249,9 @@ static void tce_iommu_userspace_view_free(struct iommu_table *tbl,
 	decrement_locked_vm(mm, cb >> PAGE_SHIFT);
 }
 
-static bool tce_page_is_contained(struct page *page, unsigned page_shift)
+static bool tce_page_is_contained(unsigned long hpa, unsigned page_shift)
 {
+	struct page *page = pfn_to_page(hpa >> PAGE_SHIFT);
 	/*
 	 * Check that the TCE table granularity is not bigger than the size of
 	 * a page we just found. Otherwise the hardware can get access to
@@ -549,7 +550,6 @@ static long tce_iommu_build(struct tce_container *container,
 		enum dma_data_direction direction)
 {
 	long i, ret = 0;
-	struct page *page;
 	unsigned long hpa;
 	enum dma_data_direction dirtmp;
 
@@ -560,8 +560,7 @@ static long tce_iommu_build(struct tce_container *container,
 		if (ret)
 			break;
 
-		page = pfn_to_page(hpa >> PAGE_SHIFT);
-		if (!tce_page_is_contained(page, tbl->it_page_shift)) {
+		if (!tce_page_is_contained(hpa, tbl->it_page_shift)) {
 			ret = -EPERM;
 			break;
 		}
@@ -595,7 +594,6 @@ static long tce_iommu_build_v2(struct tce_container *container,
 		enum dma_data_direction direction)
 {
 	long i, ret = 0;
-	struct page *page;
 	unsigned long hpa;
 	enum dma_data_direction dirtmp;
 
@@ -615,8 +613,7 @@ static long tce_iommu_build_v2(struct tce_container *container,
 		if (ret)
 			break;
 
-		page = pfn_to_page(hpa >> PAGE_SHIFT);
-		if (!tce_page_is_contained(page, tbl->it_page_shift)) {
+		if (!tce_page_is_contained(hpa, tbl->it_page_shift)) {
 			ret = -EPERM;
 			break;
 		}
