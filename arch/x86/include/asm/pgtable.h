@@ -1117,11 +1117,27 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm,
 	return pte;
 }
 
-#define __HAVE_ARCH_PTEP_SET_WRPROTECT
-static inline void ptep_set_wrprotect(struct mm_struct *mm,
-				      unsigned long addr, pte_t *ptep)
+#define __HAVE_ARCH_PTEP_SET_WRPROTECT_FLUSH
+extern pte_t ptep_clear_flush(struct vm_area_struct *vma,
+			      unsigned long address,
+			      pte_t *ptep);
+static inline void ptep_set_wrprotect_flush(struct vm_area_struct *vma,
+					    unsigned long addr, pte_t *ptep)
 {
-	clear_bit(_PAGE_BIT_RW, (unsigned long *)&ptep->pte);
+	bool rw;
+
+	rw = test_and_clear_bit(_PAGE_BIT_RW, (unsigned long *)&ptep->pte);
+	if (IS_ENABLED(CONFIG_X86_INTEL_SHADOW_STACK_USER)) {
+		struct mm_struct *mm = vma->vm_mm;
+		pte_t pte;
+
+		if (rw && (atomic_read(&mm->mm_users) > 1))
+			pte = ptep_clear_flush(vma, addr, ptep);
+		else
+			pte = *ptep;
+		pte = pte_move_flags(pte, _PAGE_DIRTY_HW, _PAGE_DIRTY_SW);
+		set_pte_at(mm, addr, ptep, pte);
+	}
 }
 
 #define flush_tlb_fix_spurious_fault(vma, address) do { } while (0)
@@ -1167,11 +1183,33 @@ static inline pud_t pudp_huge_get_and_clear(struct mm_struct *mm,
 	return native_pudp_get_and_clear(pudp);
 }
 
-#define __HAVE_ARCH_PMDP_SET_WRPROTECT
-static inline void pmdp_set_wrprotect(struct mm_struct *mm,
-				      unsigned long addr, pmd_t *pmdp)
+#define __HAVE_ARCH_HUGE_PTEP_SET_WRPROTECT_FLUSH
+static inline void huge_ptep_set_wrprotect_flush(struct vm_area_struct *vma,
+						 unsigned long addr, pte_t *ptep)
 {
-	clear_bit(_PAGE_BIT_RW, (unsigned long *)pmdp);
+	ptep_set_wrprotect_flush(vma, addr, ptep);
+}
+
+#define __HAVE_ARCH_PMDP_SET_WRPROTECT_FLUSH
+extern pmd_t pmdp_huge_clear_flush(struct vm_area_struct *vma,
+				   unsigned long address,
+				   pmd_t *pmdp);
+static inline void pmdp_set_wrprotect_flush(struct vm_area_struct *vma,
+					    unsigned long addr, pmd_t *pmdp)
+{	bool rw;
+
+	rw = test_and_clear_bit(_PAGE_BIT_RW, (unsigned long *)&pmdp);
+	if (IS_ENABLED(CONFIG_X86_INTEL_SHADOW_STACK_USER)) {
+		struct mm_struct *mm = vma->vm_mm;
+		pmd_t pmd;
+
+		if (rw && (atomic_read(&mm->mm_users) > 1))
+			pmd = pmdp_huge_clear_flush(vma, addr, pmdp);
+		else
+			pmd = *pmdp;
+		pmd = pmd_move_flags(pmd, _PAGE_DIRTY_HW, _PAGE_DIRTY_SW);
+		set_pmd_at(mm, addr, pmdp, pmd);
+	}
 }
 
 #define pud_write pud_write

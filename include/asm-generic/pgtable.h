@@ -121,6 +121,15 @@ static inline int pmdp_clear_flush_young(struct vm_area_struct *vma,
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 #endif
 
+#ifndef __HAVE_ARCH_HUGE_PTEP_SET_WRPROTECT_FLUSH
+static inline void huge_ptep_set_wrorptect_flush(struct vm_area_struct *vma,
+						 unsigned long addr,
+						 pte_t *ptep)
+{
+	huge_ptep_set_wrprotect(vma->vm_mm, addr, ptep);
+}
+#endif
+
 #ifndef __HAVE_ARCH_PTEP_GET_AND_CLEAR
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 				       unsigned long address,
@@ -226,6 +235,15 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
 }
 #endif
 
+#ifndef __HAVE_ARCH_PTEP_SET_WRPROTECT_FLUSH
+static inline void ptep_set_wrprotect_flush(struct vm_area_struct *vma,
+					    unsigned long address,
+					    pte_t *ptep)
+{
+	ptep_set_wrprotect(vma->vm_mm, address, ptep);
+}
+#endif
+
 #ifndef pte_savedwrite
 #define pte_savedwrite pte_write
 #endif
@@ -265,6 +283,14 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
 	BUILD_BUG();
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+#endif
+#ifndef __HAVE_ARCH_PMDP_SET_WRPROTECT_FLUSH
+static inline void pmdp_set_wrprotect_flush(struct vm_area_struct *vma,
+					    unsigned long address,
+					    pmd_t *pmdp)
+{
+	pmdp_set_wrprotect(vma->vm_mm, address, pmdp);
+}
 #endif
 #ifndef __HAVE_ARCH_PUDP_SET_WRPROTECT
 #ifdef CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD
