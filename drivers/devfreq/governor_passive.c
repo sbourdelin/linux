@@ -99,12 +99,12 @@ static int update_devfreq_passive(struct devfreq *devfreq, unsigned long freq)
 {
 	int ret;
 
-	if (!devfreq->governor)
+	if (!devfreq->policy.governor)
 		return -EINVAL;
 
 	mutex_lock_nested(&devfreq->lock, SINGLE_DEPTH_NESTING);
 
-	ret = devfreq->governor->get_target_freq(devfreq, &freq);
+	ret = devfreq->policy.governor->get_target_freq(devfreq, &freq);
 	if (ret < 0)
 		goto out;
 
