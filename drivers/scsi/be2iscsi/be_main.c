@@ -5583,6 +5583,8 @@ static int beiscsi_dev_probe(struct pci_dev *pcidev,
 	case OC_DEVICE_ID3:
 		phba->generation = BE_GEN3;
 		phba->iotask_fn = beiscsi_iotask;
+		dev_warn(&pcidev->dev,
+			 "Obsolete/Unsupported BE3 Adapter Family\n");
 		break;
 	case OC_SKH_ID1:
 		phba->generation = BE_GEN4;
