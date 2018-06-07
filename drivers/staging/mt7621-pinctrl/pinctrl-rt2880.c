@@ -343,7 +343,7 @@ static int rt2880_pinmux_pins(struct rt2880_priv *p)
 	}
 
 	/* the buffer that tells us which pins are gpio */
-	p->gpio = devm_kzalloc(p->dev,sizeof(uint8_t) * p->max_pins,
+	p->gpio = devm_kzalloc(p->dev, sizeof(uint8_t) * p->max_pins,
 		GFP_KERNEL);
 	/* the pads needed to tell pinctrl about our pins */
 	p->pads = devm_kzalloc(p->dev,
