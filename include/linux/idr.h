@@ -218,10 +218,12 @@ DECLARE_PER_CPU(struct ida_bitmap *, ida_bitmap);
 
 struct ida {
 	struct radix_tree_root	ida_rt;
+	unsigned int		ida_next;
 };
 
-#define IDA_INIT(name)	{						\
-	.ida_rt = RADIX_TREE_INIT(name, IDR_RT_MARKER | GFP_NOWAIT),	\
+#define IDA_INIT(name)	{						     \
+		.ida_rt = RADIX_TREE_INIT(name, IDR_RT_MARKER | GFP_NOWAIT), \
+		.ida_next = 0,						     \
 }
 #define DEFINE_IDA(name)	struct ida name = IDA_INIT(name)
 
@@ -232,6 +234,8 @@ void ida_destroy(struct ida *ida);
 
 int ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
 		   gfp_t gfp_mask);
+int ida_simple_get_cyclic(struct ida *ida, unsigned int start, unsigned int end,
+			  gfp_t gfp_mask);
 void ida_simple_remove(struct ida *ida, unsigned int id);
 
 static inline void ida_init(struct ida *ida)
