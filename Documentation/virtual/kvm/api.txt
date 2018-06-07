@@ -835,10 +835,12 @@ struct kvm_clock_data {
 
 Capability: KVM_CAP_VCPU_EVENTS
 Extended by: KVM_CAP_INTR_SHADOW
-Architectures: x86
+Architectures: x86, arm, arm64
 Type: vm ioctl
 Parameters: struct kvm_vcpu_event (out)
 Returns: 0 on success, -1 on error
+
+X86:
 
 Gets currently pending exceptions, interrupts, and NMIs as well as related
 states of the vcpu.
@@ -881,14 +883,31 @@ Only two fields are defined in the flags field:
 - KVM_VCPUEVENT_VALID_SMM may be set in the flags field to signal that
   smi contains a valid state.
 
+ARM, ARM64:
+
+Gets currently pending SError exceptions as well as related states of the vcpu.
+
+struct kvm_vcpu_events {
+	struct {
+		__u8 serror_pending;
+		__u8 serror_has_esr;
+		/* Align it to 8 bytes */
+		__u8 pad[6];
+		__u64 serror_esr;
+	} exception;
+	__u32 reserved[12];
+};
+
 4.32 KVM_SET_VCPU_EVENTS
 
-Capability: KVM_CAP_VCPU_EVENTS
+Capebility: KVM_CAP_VCPU_EVENTS
 Extended by: KVM_CAP_INTR_SHADOW
-Architectures: x86
+Architectures: x86, arm, arm64
 Type: vm ioctl
 Parameters: struct kvm_vcpu_event (in)
 Returns: 0 on success, -1 on error
+
+X86:
 
 Set pending exceptions, interrupts, and NMIs as well as related states of the
 vcpu.
@@ -909,6 +928,12 @@ the flags field to signal that interrupt.shadow contains a valid state and
 shall be written into the VCPU.
 
 KVM_VCPUEVENT_VALID_SMM can only be set if KVM_CAP_X86_SMM is available.
+
+ARM, ARM64:
+
+Set pending SError exceptions as well as related states of the vcpu.
+
+See KVM_GET_VCPU_EVENTS for the data structure.
 
 
 4.33 KVM_GET_DEBUGREGS
