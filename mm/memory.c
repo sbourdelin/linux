@@ -1022,7 +1022,7 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	 * in the parent and the child
 	 */
 	if (is_cow_mapping(vm_flags)) {
-		ptep_set_wrprotect(src_mm, addr, src_pte);
+		ptep_set_wrprotect_flush(vma, addr, src_pte);
 		pte = pte_wrprotect(pte);
 	}
 
@@ -2444,7 +2444,13 @@ static inline void wp_page_reuse(struct vm_fault *vmf)
 
 	flush_cache_page(vma, vmf->address, pte_pfn(vmf->orig_pte));
 	entry = pte_mkyoung(vmf->orig_pte);
-	entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+
+	if (is_shstk_mapping(vma->vm_flags))
+		entry = pte_mkdirty_shstk(entry);
+	else
+		entry = pte_mkdirty(entry);
+
+	entry = maybe_mkwrite(entry, vma);
 	if (ptep_set_access_flags(vma, vmf->address, vmf->pte, entry, 1))
 		update_mmu_cache(vma, vmf->address, vmf->pte);
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -2517,7 +2523,11 @@ static int wp_page_copy(struct vm_fault *vmf)
 		}
 		flush_cache_page(vma, vmf->address, pte_pfn(vmf->orig_pte));
 		entry = mk_pte(new_page, vma->vm_page_prot);
-		entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+		if (is_shstk_mapping(vma->vm_flags))
+			entry = pte_mkdirty_shstk(entry);
+		else
+			entry = pte_mkdirty(entry);
+		entry = maybe_mkwrite(entry, vma);
 		/*
 		 * Clear the pte entry and flush it first, before updating the
 		 * pte with the new entry. This will avoid a race condition
@@ -3208,6 +3218,14 @@ static int do_anonymous_page(struct vm_fault *vmf)
 	mem_cgroup_commit_charge(page, memcg, false, false);
 	lru_cache_add_active_or_unevictable(page, vma);
 setpte:
+	/*
+	 * If this is within a shadow stack mapping, mark
+	 * the PTE dirty.  We don't use pte_mkdirty(),
+	 * because the PTE must have _PAGE_DIRTY_HW set.
+	 */
+	if (is_shstk_mapping(vma->vm_flags))
+		entry = pte_mkdirty_shstk(entry);
+
 	set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);
 
 	/* No need to invalidate - it was non-present before */
@@ -3990,6 +4008,14 @@ static int handle_pte_fault(struct vm_fault *vmf)
 	entry = vmf->orig_pte;
 	if (unlikely(!pte_same(*vmf->pte, entry)))
 		goto unlock;
+
+	/*
+	 * Shadow stack PTEs are copy-on-access, so do_wp_page()
+	 * handling on them no matter if we have write fault or not.
+	 */
+	if (is_shstk_mapping(vmf->vma->vm_flags))
+		return do_wp_page(vmf);
+
 	if (vmf->flags & FAULT_FLAG_WRITE) {
 		if (!pte_write(entry))
 			return do_wp_page(vmf);
