@@ -280,6 +280,14 @@ static inline bool is_data_mapping(vm_flags_t flags)
 	return (flags & (VM_WRITE | VM_SHARED | VM_STACK)) == VM_WRITE;
 }
 
+/*
+ * Shadow stack area
+ */
+static inline bool is_shstk_mapping(vm_flags_t flags)
+{
+	return (flags & VM_SHSTK);
+}
+
 /* mm/util.c */
 void __vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_area_struct *prev, struct rb_node *rb_parent);
