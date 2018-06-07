@@ -175,13 +175,7 @@ ifdef CONFIG_MPROFILE_KERNEL
     endif
 endif
 
-CFLAGS-$(CONFIG_CELL_CPU) += $(call cc-option,-mcpu=cell)
-CFLAGS-$(CONFIG_POWER5_CPU) += $(call cc-option,-mcpu=power5)
-CFLAGS-$(CONFIG_POWER6_CPU) += $(call cc-option,-mcpu=power6)
-CFLAGS-$(CONFIG_POWER7_CPU) += $(call cc-option,-mcpu=power7)
-CFLAGS-$(CONFIG_POWER8_CPU) += $(call cc-option,-mcpu=power8)
-CFLAGS-$(CONFIG_POWER9_CPU) += $(call cc-option,-mcpu=power9)
-CFLAGS-$(CONFIG_PPC_8xx) += $(call cc-option,-mcpu=860)
+CFLAGS-$(CONFIG_SPECIAL_CPU_BOOL) += $(call cc-option,-mcpu=$(CONFIG_SPECIAL_CPU))
 
 # Altivec option not allowed with e500mc64 in GCC.
 ifeq ($(CONFIG_ALTIVEC),y)
