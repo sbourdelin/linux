@@ -2355,6 +2355,16 @@ static int skl_modeset_calc_cdclk(struct drm_atomic_state *state)
 	 */
 	cdclk = skl_calc_cdclk(min_cdclk, vco);
 
+	/*
+	 * The following CDCLK rates are unsupported on SKL. In theory this
+	 * should never happen since only the eDP1.4 2.16 and 4.32Gbps rates
+	 * require it, but eDP1.4 is not supported on SKL, see display
+	 * WA#1183.
+	 */
+	if (IS_SKYLAKE(to_i915(state->dev)) &&
+	    (cdclk == 308571 || cdclk == 617143))
+		DRM_WARN_ONCE("Unsupported CDCLK rate.\n");
+
 	intel_state->cdclk.logical.vco = vco;
 	intel_state->cdclk.logical.cdclk = cdclk;
 	intel_state->cdclk.logical.voltage_level =
