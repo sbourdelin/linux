@@ -1,0 +1,4 @@
+* cros_ec_throttler driver
+
+Required properties:
+- compatible: "google,cros-ec-throttler"
