@@ -19,10 +19,10 @@
 #define XSAVE_YMM_SIZE	    256
 #define XSAVE_YMM_OFFSET    (XSAVE_HDR_SIZE + XSAVE_HDR_OFFSET)
 
-/* System features */
-#define XFEATURE_MASK_SYSTEM (XFEATURE_MASK_PT)
-
-/* All currently supported features */
+/*
+ * SUPPORTED_XFEATURES_MASK indicates all features
+ * implemented in and supported by the kernel.
+ */
 #define SUPPORTED_XFEATURES_MASK (XFEATURE_MASK_FP | \
 				  XFEATURE_MASK_SSE | \
 				  XFEATURE_MASK_YMM | \
@@ -40,6 +40,7 @@
 #endif
 
 extern u64 xfeatures_mask_user;
+extern u64 xfeatures_mask_all;
 extern u64 xstate_fx_sw_bytes[USER_XSTATE_FX_SW_WORDS];
 
 extern void __init update_regset_xstate_info(unsigned int size,
