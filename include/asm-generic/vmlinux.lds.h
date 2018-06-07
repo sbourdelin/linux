@@ -600,6 +600,7 @@
 	IRQCHIP_OF_MATCH_TABLE()					\
 	ACPI_PROBE_TABLE(irqchip)					\
 	ACPI_PROBE_TABLE(timer)						\
+	ACPI_PROBE_TABLE(pmu)						\
 	EARLYCON_TABLE()
 
 #define INIT_TEXT							\

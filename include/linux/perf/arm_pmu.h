@@ -123,6 +123,7 @@ int armpmu_map_event(struct perf_event *event,
 		     u32 raw_event_mask);
 
 typedef int (*armpmu_init_fn)(struct arm_pmu *);
+typedef int (*armpmu_acpi_init_fn)(struct arm_pmu *, struct device *);
 
 struct pmu_probe_info {
 	unsigned int cpuid;
