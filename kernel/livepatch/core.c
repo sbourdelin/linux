@@ -645,6 +645,10 @@ static void klp_free_object_loaded(struct klp_object *obj)
 {
 	struct klp_func *func;
 
+	/*
+	 * Drop the reference from klp_init_object_loaded()
+	 */
+	module_put(obj->mod);
 	obj->mod = NULL;
 
 	klp_for_each_func(obj, func)
@@ -663,6 +667,9 @@ static void klp_free_objects_limited(struct klp_patch *patch,
 	for (obj = patch->objs; obj->funcs && obj != limit; obj++) {
 		klp_free_funcs_limited(obj, NULL);
 		kobject_put(&obj->kobj);
+
+		if (klp_is_module(obj) && klp_is_object_loaded(obj))
+			module_put(obj->mod);
 	}
 }
 
@@ -738,6 +745,14 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 			return -ENOENT;
 		}
 	}
+
+	/*
+	 * Do not allow patched modules to be removed.
+	 *
+	 * All callers of klp_init_object_loaded() set obj->mod.
+	 */
+	if (klp_is_module(obj) && !try_module_get(obj->mod))
+		return -ENODEV;
 
 	return 0;
 }
@@ -984,7 +999,7 @@ int klp_module_coming(struct module *mod)
 			if (ret) {
 				pr_warn("pre-patch callback failed for object '%s'\n",
 					obj->name);
-				goto err;
+				goto err_after_init;
 			}
 
 			ret = klp_patch_object(obj);
@@ -993,7 +1008,7 @@ int klp_module_coming(struct module *mod)
 					patch->mod->name, obj->mod->name, ret);
 
 				klp_post_unpatch_callback(obj);
-				goto err;
+				goto err_after_init;
 			}
 
 			if (patch != klp_transition_patch)
@@ -1007,6 +1022,11 @@ int klp_module_coming(struct module *mod)
 
 	return 0;
 
+err_after_init:
+	/*
+	 * Drop the reference from klp_init_object_loaded().
+	 */
+	module_put(obj->mod);
 err:
 	/*
 	 * If a patch is unsuccessfully applied, return
