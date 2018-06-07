@@ -1701,7 +1701,7 @@ static int ebb_set(struct task_struct *target,
 	if (!cpu_has_feature(CPU_FTR_ARCH_207S))
 		return -ENODEV;
 
-	if (target->thread.used_ebb)
+	if (!target->thread.used_ebb)
 		return -ENODATA;
 
 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
