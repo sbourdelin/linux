@@ -38,7 +38,7 @@ struct rt2880_priv {
 	const char **group_names;
 	int group_count;
 
-	uint8_t *gpio;
+	u8 *gpio;
 	int max_pins;
 };
 
@@ -341,7 +341,7 @@ static int rt2880_pinmux_pins(struct rt2880_priv *p)
 	}
 
 	/* the buffer that tells us which pins are gpio */
-	size = sizeof(uint8_t) * p->max_pins;
+	size = sizeof(u8) * p->max_pins;
 	p->gpio = devm_kzalloc(p->dev, size, GFP_KERNEL);
 	/* the pads needed to tell pinctrl about our pins */
 	size = sizeof(struct pinctrl_pin_desc) * p->max_pins;
@@ -351,7 +351,7 @@ static int rt2880_pinmux_pins(struct rt2880_priv *p)
 		return -ENOMEM;
 	}
 
-	memset(p->gpio, 1, sizeof(uint8_t) * p->max_pins);
+	memset(p->gpio, 1, sizeof(u8) * p->max_pins);
 	for (i = 0; i < p->func_count; i++) {
 		if (!p->func[i]->pin_count)
 			continue;
