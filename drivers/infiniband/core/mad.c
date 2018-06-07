@@ -41,6 +41,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/security.h>
+#include <linux/idr.h>
 #include <rdma/ib_cache.h>
 
 #include "mad_priv.h"
@@ -59,8 +60,7 @@ module_param_named(recv_queue_size, mad_recvq_size, int, 0444);
 MODULE_PARM_DESC(recv_queue_size, "Size of receive queue in number of work requests");
 
 static struct list_head ib_mad_port_list;
-static atomic_t ib_mad_client_id = ATOMIC_INIT(0);
-
+static DEFINE_IDA(ib_mad_client_ids);
 /* Port list lock */
 static DEFINE_SPINLOCK(ib_mad_port_list_lock);
 
@@ -212,7 +212,7 @@ struct ib_mad_agent *ib_register_mad_agent(struct ib_device *device,
 	int ret2, qpn;
 	unsigned long flags;
 	u8 mgmt_class, vclass;
-
+	u32 ib_mad_client_id;
 	/* Validate parameters */
 	qpn = get_spl_qp_index(qp_type);
 	if (qpn == -1) {
@@ -375,9 +375,19 @@ struct ib_mad_agent *ib_register_mad_agent(struct ib_device *device,
 		ret = ERR_PTR(ret2);
 		goto error4;
 	}
+	ib_mad_client_id = ida_simple_get_cyclic(&ib_mad_client_ids,
+						1,
+						BIT(24) - 1,
+						GFP_KERNEL);
+	if (ib_mad_client_id < 0) {
+		pr_err("Couldn't allocate agent tid; errcode: %#x\n",
+			ib_mad_client_id);
+		ret = ERR_PTR(ib_mad_client_id);
+		goto error4;
+	}
+	mad_agent_priv->agent.hi_tid = ib_mad_client_id;
 
 	spin_lock_irqsave(&port_priv->reg_lock, flags);
-	mad_agent_priv->agent.hi_tid = atomic_inc_return(&ib_mad_client_id);
 
 	/*
 	 * Make sure MAD registration (if supplied)
@@ -428,6 +438,8 @@ struct ib_mad_agent *ib_register_mad_agent(struct ib_device *device,
 error5:
 	spin_unlock_irqrestore(&port_priv->reg_lock, flags);
 	ib_mad_agent_security_cleanup(&mad_agent_priv->agent);
+	ida_simple_remove(&ib_mad_client_ids, ib_mad_client_id);
+
 error4:
 	kfree(reg_req);
 error3:
@@ -576,6 +588,7 @@ static void unregister_mad_agent(struct ib_mad_agent_private *mad_agent_priv)
 {
 	struct ib_mad_port_private *port_priv;
 	unsigned long flags;
+	u32 ib_mad_client_id;
 
 	/* Note that we could still be handling received MADs */
 
@@ -586,6 +599,8 @@ static void unregister_mad_agent(struct ib_mad_agent_private *mad_agent_priv)
 	cancel_mads(mad_agent_priv);
 	port_priv = mad_agent_priv->qp_info->port_priv;
 	cancel_delayed_work(&mad_agent_priv->timed_work);
+
+	ib_mad_client_id = mad_agent_priv->agent.hi_tid;
 
 	spin_lock_irqsave(&port_priv->reg_lock, flags);
 	remove_mad_reg_req(mad_agent_priv);
@@ -602,6 +617,7 @@ static void unregister_mad_agent(struct ib_mad_agent_private *mad_agent_priv)
 
 	kfree(mad_agent_priv->reg_req);
 	kfree(mad_agent_priv);
+	ida_simple_remove(&ib_mad_client_ids, ib_mad_client_id);
 }
 
 static void unregister_mad_snoop(struct ib_mad_snoop_private *mad_snoop_priv)
@@ -3347,4 +3363,5 @@ int ib_mad_init(void)
 void ib_mad_cleanup(void)
 {
 	ib_unregister_client(&mad_client);
+	ida_destroy(&ib_mad_client_ids);
 }
