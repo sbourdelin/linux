@@ -179,7 +179,7 @@ struct fotg210_hcd {			/* one per controller */
 	struct fotg210_stats	stats;
 #	define COUNT(x) ((x)++)
 #else
-#	define COUNT(x)
+#	define COUNT(x) do {} while (0)
 #endif
 
 	/* debug files */
