@@ -1019,7 +1019,6 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 		mod->exit();
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_GOING, mod);
-	klp_module_going(mod);
 	ftrace_release_mod(mod);
 
 	async_synchronize_full();
