@@ -77,7 +77,6 @@ enum intel_platform {
 #define DEV_INFO_FOR_EACH_FLAG(func) \
 	func(is_mobile); \
 	func(is_lp); \
-	func(is_alpha_support); \
 	/* Keep has_* in alphabetical order */ \
 	func(has_64bit_reloc); \
 	func(has_aliasing_ppgtt); \
@@ -155,6 +154,10 @@ struct intel_device_info {
 	 * Do not set first product revid unless you are certain
 	 * that testing infrastructure is already on top of production
 	 * revid machines.
+	 *
+	 * When set to an actual released first product revision id,
+	 * IS_ALPHA_SUPPORT macro will start to return false on that
+	 * platform.
 	 */
 
 	u8 gen;

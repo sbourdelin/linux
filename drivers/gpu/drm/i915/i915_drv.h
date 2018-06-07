@@ -2426,11 +2426,10 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define IS_CNL_WITH_PORT_F(dev_priv)   (IS_CANNONLAKE(dev_priv) && \
 					(INTEL_DEVID(dev_priv) & 0x0004) == 0x0004)
 
-#define IS_ALPHA_SUPPORT(intel_info) ((intel_info)->is_alpha_support)
-
 #define PRODUCT_REVID_UNKNOWN	REVID_FOREVER
 #define FIRST_PRODUCT_REVID(intel_info) ((intel_info)->first_product_revid)
 #define IS_PREPRODUCTION_HW(dev_priv)   (INTEL_REVID(dev_priv) < FIRST_PRODUCT_REVID(INTEL_INFO(dev_priv)))
+#define IS_ALPHA_SUPPORT(intel_info)    (FIRST_PRODUCT_REVID(intel_info) == PRODUCT_REVID_UNKNOWN)
 
 #define SKL_REVID_A0		0x0
 #define SKL_REVID_B0		0x1
