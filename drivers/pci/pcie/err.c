@@ -288,6 +288,7 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
 	struct pci_dev *pdev, *temp;
 	pci_ers_result_t result;
 
+	dev->error_state = pci_channel_io_frozen;
 	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE)
 		udev = dev;
 	else
@@ -323,6 +324,7 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
 		if (pcie_wait_for_link(udev, true))
 			pci_rescan_bus(udev->bus);
 		pci_info(dev, "Device recovery from fatal error successful\n");
+		dev->error_state = pci_channel_io_normal;
 	} else {
 		pci_uevent_ers(dev, PCI_ERS_RESULT_DISCONNECT);
 		pci_info(dev, "Device recovery from fatal error failed\n");
