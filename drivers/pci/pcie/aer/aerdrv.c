@@ -341,12 +341,8 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
  */
 static void aer_error_resume(struct pci_dev *dev)
 {
-	u16 reg16;
-
 	/* Clean up Root device status */
-	pcie_capability_read_word(dev, PCI_EXP_DEVSTA, &reg16);
-	pcie_capability_write_word(dev, PCI_EXP_DEVSTA, reg16);
-
+	pci_cleanup_aer_error_device_status(dev);
 	/* Clean AER Root Error Status */
 	pci_cleanup_aer_uncorrect_error_status(dev);
 }
