@@ -223,7 +223,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	 * We need to register disabled CPU as well to permit
 	 * counting disabled CPUs. This allows us to size
 	 * cpus_possible_map more accurately, to permit
-	 * to not preallocating memory for all NR_CPUS
+	 * to preallocating memory for all NR_CPUS
 	 * when we use CPU hotplug.
 	 */
 	if (!apic->apic_id_valid(apic_id)) {
@@ -260,7 +260,7 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	 * We need to register disabled CPU as well to permit
 	 * counting disabled CPUs. This allows us to size
 	 * cpus_possible_map more accurately, to permit
-	 * to not preallocating memory for all NR_CPUS
+	 * to preallocating memory for all NR_CPUS
 	 * when we use CPU hotplug.
 	 */
 	acpi_register_lapic(processor->id,	/* APIC ID */
