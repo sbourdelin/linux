@@ -1067,6 +1067,11 @@ ENTRY(general_protection)
 	jmp	common_exception
 END(general_protection)
 
+ENTRY(control_protection)
+	pushl	$do_control_protection
+	jmp	common_exception
+END(control_protection)
+
 #ifdef CONFIG_KVM_GUEST
 ENTRY(async_page_fault)
 	ASM_CLAC
