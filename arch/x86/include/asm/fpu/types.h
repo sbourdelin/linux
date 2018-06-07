@@ -114,6 +114,9 @@ enum xfeature {
 	XFEATURE_Hi16_ZMM,
 	XFEATURE_PT_UNIMPLEMENTED_SO_FAR,
 	XFEATURE_PKRU,
+	XFEATURE_RESERVED,
+	XFEATURE_SHSTK_USER,
+	XFEATURE_SHSTK_KERNEL,
 
 	XFEATURE_MAX,
 };
@@ -128,6 +131,8 @@ enum xfeature {
 #define XFEATURE_MASK_Hi16_ZMM		(1 << XFEATURE_Hi16_ZMM)
 #define XFEATURE_MASK_PT		(1 << XFEATURE_PT_UNIMPLEMENTED_SO_FAR)
 #define XFEATURE_MASK_PKRU		(1 << XFEATURE_PKRU)
+#define XFEATURE_MASK_SHSTK_USER	(1 << XFEATURE_SHSTK_USER)
+#define XFEATURE_MASK_SHSTK_KERNEL	(1 << XFEATURE_SHSTK_KERNEL)
 
 #define XFEATURE_MASK_FPSSE		(XFEATURE_MASK_FP | XFEATURE_MASK_SSE)
 #define XFEATURE_MASK_AVX512		(XFEATURE_MASK_OPMASK \
@@ -227,6 +232,23 @@ struct avx_512_hi16_state {
 struct pkru_state {
 	u32				pkru;
 	u32				pad;
+} __packed;
+
+/*
+ * State component 11 is Control flow Enforcement user states
+ */
+struct cet_user_state {
+	u64 u_cet;	/* user control flow settings */
+	u64 user_ssp;	/* user shadow stack pointer */
+} __packed;
+
+/*
+ * State component 12 is Control flow Enforcement kernel states
+ */
+struct cet_kernel_state {
+	u64 kernel_ssp;	/* kernel shadow stack */
+	u64 pl1_ssp;	/* ring-1 shadow stack */
+	u64 pl2_ssp;	/* ring-2 shadow stack */
 } __packed;
 
 struct xstate_header {
