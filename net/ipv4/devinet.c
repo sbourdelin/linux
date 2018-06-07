@@ -331,13 +331,14 @@ int inet_addr_onlink(struct in_device *in_dev, __be32 a, __be32 b)
 }
 
 static void __inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
-			 int destroy, struct nlmsghdr *nlh, u32 portid)
+			   int destroy, struct nlmsghdr *nlh, u32 portid,
+			   bool flush)
 {
 	struct in_ifaddr *promote = NULL;
 	struct in_ifaddr *ifa, *ifa1 = *ifap;
 	struct in_ifaddr *last_prim = in_dev->ifa_list;
 	struct in_ifaddr *prev_prom = NULL;
-	int do_promote = IN_DEV_PROMOTE_SECONDARIES(in_dev);
+	int do_promote = IN_DEV_PROMOTE_SECONDARIES(in_dev) && !flush;
 
 	ASSERT_RTNL();
 
@@ -437,7 +438,7 @@ no_promotions:
 static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 			 int destroy)
 {
-	__inet_del_ifa(in_dev, ifap, destroy, NULL, 0);
+	__inet_del_ifa(in_dev, ifap, destroy, NULL, 0, false);
 }
 
 static void check_lifetime(struct work_struct *work);
@@ -607,6 +608,7 @@ static int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh,
 	struct in_device *in_dev;
 	struct ifaddrmsg *ifm;
 	struct in_ifaddr *ifa, **ifap;
+	bool flush = false;
 	int err = -EINVAL;
 
 	ASSERT_RTNL();
@@ -622,6 +624,9 @@ static int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh,
 		err = -ENODEV;
 		goto errout;
 	}
+
+	if (tb[IFA_FLAGS])
+		flush = !!(nla_get_u32(tb[IFA_FLAGS]) & IFA_F_FLUSH);
 
 	for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
 	     ifap = &ifa->ifa_next) {
@@ -639,7 +644,8 @@ static int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 		if (ipv4_is_multicast(ifa->ifa_address))
 			ip_mc_config(net->ipv4.mc_autojoin_sk, false, ifa);
-		__inet_del_ifa(in_dev, ifap, 1, nlh, NETLINK_CB(skb).portid);
+		__inet_del_ifa(in_dev, ifap, 1, nlh, NETLINK_CB(skb).portid,
+			       flush);
 		return 0;
 	}
 
