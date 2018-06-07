@@ -2317,6 +2317,11 @@ static const struct user_regset compat_regsets[] = {
 		.size = sizeof(u64), .align = sizeof(u64),
 		.active = ebb_active, .get = ebb_get, .set = ebb_set
 	},
+	[REGSET_PMR] = {
+		.core_note_type = NT_PPC_PMU, .n = ELF_NPMU,
+		.size = sizeof(u64), .align = sizeof(u64),
+		.active = pmu_active, .get = pmu_get, .set = pmu_set
+	},
 #endif
 };
 
