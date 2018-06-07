@@ -1733,6 +1733,9 @@ static int pmu_get(struct task_struct *target,
 		      unsigned int pos, unsigned int count,
 		      void *kbuf, void __user *ubuf)
 {
+	int ret = 0;
+	unsigned long mmcr0 = target->thread.mmcr0;
+
 	/* Build tests */
 	BUILD_BUG_ON(TSO(siar) + sizeof(unsigned long) != TSO(sdar));
 	BUILD_BUG_ON(TSO(sdar) + sizeof(unsigned long) != TSO(sier));
@@ -1742,9 +1745,16 @@ static int pmu_get(struct task_struct *target,
 	if (!cpu_has_feature(CPU_FTR_ARCH_207S))
 		return -ENODEV;
 
-	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-			&target->thread.siar, 0,
+	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+		&target->thread.siar, 0,
+		4 * sizeof(unsigned long));
+
+	if (!ret)
+		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+			&mmcr0, 4 * sizeof(unsigned long),
 			5 * sizeof(unsigned long));
+
+	return ret;
 }
 
 static int pmu_set(struct task_struct *target,
@@ -1753,6 +1763,12 @@ static int pmu_set(struct task_struct *target,
 		      const void *kbuf, const void __user *ubuf)
 {
 	int ret = 0;
+
+#ifdef __BIG_ENDIAN
+	int mmcr0_offset = sizeof(unsigned);
+#else
+	int mmcr0_offset = 0;
+#endif
 
 	/* Build tests */
 	BUILD_BUG_ON(TSO(siar) + sizeof(unsigned long) != TSO(sdar));
@@ -1783,9 +1799,16 @@ static int pmu_set(struct task_struct *target,
 			4 * sizeof(unsigned long));
 
 	if (!ret)
+		ret = user_regset_copyin_ignore(&pos, &count, &kbuf,
+			&ubuf, 4 * sizeof(unsigned long),
+			4 * sizeof(unsigned long) + mmcr0_offset);
+
+	if (!ret)
 		ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-			&target->thread.mmcr0, 4 * sizeof(unsigned long),
-			5 * sizeof(unsigned long));
+			&target->thread.mmcr0,
+			4 * sizeof(unsigned long) + mmcr0_offset,
+			4 * sizeof(unsigned long) + mmcr0_offset
+			+ sizeof (unsigned));
 	return ret;
 }
 #endif
