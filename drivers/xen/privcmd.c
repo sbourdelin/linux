@@ -822,11 +822,18 @@ static long privcmd_ioctl_mmap_resource(struct file *file, void __user *udata)
 		unsigned int domid =
 			(xdata.flags & XENMEM_rsrc_acq_caller_owned) ?
 			DOMID_SELF : kdata.dom;
+		int *errs;
 		int num;
+
+		errs = kcalloc(kdata.num, sizeof(*errs), GFP_KERNEL);
+		if (!errs) {
+			rc = -ENOMEM;
+			goto out;
+		}
 
 		num = xen_remap_domain_mfn_array(vma,
 						 kdata.addr & PAGE_MASK,
-						 pfns, kdata.num, (int *)pfns,
+						 pfns, kdata.num, errs,
 						 vma->vm_page_prot,
 						 domid,
 						 vma->vm_private_data);
@@ -836,12 +843,14 @@ static long privcmd_ioctl_mmap_resource(struct file *file, void __user *udata)
 			unsigned int i;
 
 			for (i = 0; i < num; i++) {
-				rc = pfns[i];
+				rc = errs[i];
 				if (rc < 0)
 					break;
 			}
 		} else
 			rc = 0;
+
+		kfree(errs);
 	}
 
 out:
