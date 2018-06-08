@@ -117,6 +117,16 @@
 			pinctrl-0 = <&sdc2_clk_on &sdc2_cmd_on &sdc2_data_on &sdc2_cd_on>;
 			pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off &sdc2_cd_off>;
 			cd-gpios = <&msmgpio 38 0x1>;
+			vmmc-supply = <&pm8994_l21>;
+			vqmmc-supply = <&pm8994_l13>;
+			status = "okay";
+		};
+
+		phy@627000 {
+			status = "okay";
+		};
+
+		ufshc@624000 {
 			status = "okay";
 		};
 
@@ -169,6 +179,7 @@
 			pinctrl-0 = <&usb2_vbus_det_gpio>;
 		};
 
+<<<<<<< HEAD
 		bt_en: bt-en-1-8v {
 			pinctrl-names = "default";
 			pinctrl-0 = <&bt_en_gpios>;
@@ -182,6 +193,8 @@
 			enable-active-high;
 		};
 
+=======
+>>>>>>> linux-next/akpm-base
 		wlan_en: wlan-en-1-8v {
 			pinctrl-names = "default";
 			pinctrl-0 = <&wlan_en_gpios>;
@@ -198,19 +211,26 @@
 		};
 
 		agnoc@0 {
+<<<<<<< HEAD
 			qcom,pcie@600000 {
 				status = "okay";
 				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
 				vddpe-supply = <&wlan_en>;
 				vddpe1-supply = <&bt_en>;
+=======
+			pcie@600000 {
+				status = "okay";
+				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
+				vddpe-3v3-supply = <&wlan_en>;
+>>>>>>> linux-next/akpm-base
 			};
 
-			qcom,pcie@608000 {
+			pcie@608000 {
 				status = "okay";
 				perst-gpio = <&msmgpio 130 GPIO_ACTIVE_LOW>;
 			};
 
-			qcom,pcie@610000 {
+			pcie@610000 {
 				status = "okay";
 				perst-gpio = <&msmgpio 114 GPIO_ACTIVE_LOW>;
 			};

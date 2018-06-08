@@ -1317,7 +1317,10 @@ static int pnp_seq_show(struct seq_file *seq, void *v)
 			   &ic_servaddr);
 	return 0;
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> linux-next/akpm-base
 /* Create the /proc/net/ipconfig directory */
 static int __init ipconfig_proc_net_init(void)
 {

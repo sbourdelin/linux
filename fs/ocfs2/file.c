@@ -222,7 +222,7 @@ static int ocfs2_sync_file(struct file *file, loff_t start, loff_t end,
 int ocfs2_should_update_atime(struct inode *inode,
 			      struct vfsmount *vfsmnt)
 {
-	struct timespec now;
+	struct timespec64 now;
 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	if (ocfs2_is_hard_readonly(osb) || ocfs2_is_soft_readonly(osb))
@@ -248,8 +248,8 @@ int ocfs2_should_update_atime(struct inode *inode,
 		return 0;
 
 	if (vfsmnt->mnt_flags & MNT_RELATIME) {
-		if ((timespec_compare(&inode->i_atime, &inode->i_mtime) <= 0) ||
-		    (timespec_compare(&inode->i_atime, &inode->i_ctime) <= 0))
+		if ((timespec64_compare(&inode->i_atime, &inode->i_mtime) <= 0) ||
+		    (timespec64_compare(&inode->i_atime, &inode->i_ctime) <= 0))
 			return 1;
 
 		return 0;
@@ -2537,11 +2537,11 @@ static int ocfs2_file_clone_range(struct file *file_in,
 					 len, false);
 }
 
-static ssize_t ocfs2_file_dedupe_range(struct file *src_file,
-				       u64 loff,
-				       u64 len,
-				       struct file *dst_file,
-				       u64 dst_loff)
+static loff_t ocfs2_file_dedupe_range(struct file *src_file,
+				      loff_t loff,
+				      struct file *dst_file,
+				      loff_t dst_loff,
+				      loff_t len)
 {
 	int error;
 

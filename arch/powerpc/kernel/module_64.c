@@ -466,7 +466,11 @@ static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 	return (unsigned long)&stubs[i];
 }
 
+<<<<<<< HEAD
 #ifdef CC_USING_MPROFILE_KERNEL
+=======
+#ifdef CONFIG_MPROFILE_KERNEL
+>>>>>>> linux-next/akpm-base
 static bool is_mprofile_mcount_callsite(const char *name, u32 *instruction)
 {
 	if (strcmp("_mcount", name))
@@ -753,7 +757,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 
-#ifdef CC_USING_MPROFILE_KERNEL
+#ifdef CONFIG_MPROFILE_KERNEL
 
 #define PACATOC offsetof(struct paca_struct, kernel_toc)
 

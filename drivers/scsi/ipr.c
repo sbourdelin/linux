@@ -435,6 +435,8 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"4080: IOA exceeded maximum operating temperature"},
 	{0x060B8000, 0, IPR_DEFAULT_LOG_LEVEL,
 	"4085: Service required"},
+	{0x060B8100, 0, IPR_DEFAULT_LOG_LEVEL,
+	"4086: SAS Adapter Hardware Configuration Error"},
 	{0x06288000, 0, IPR_DEFAULT_LOG_LEVEL,
 	"3140: Device bus not ready to ready transition"},
 	{0x06290000, 0, IPR_DEFAULT_LOG_LEVEL,
@@ -762,9 +764,9 @@ static void ipr_mask_and_clear_interrupts(struct ipr_ioa_cfg *ioa_cfg,
 
 	/* Set interrupt mask to stop all new interrupts */
 	if (ioa_cfg->sis64)
-		writeq(~0, ioa_cfg->regs.set_interrupt_mask_reg);
+		writeq_relaxed(~0, ioa_cfg->regs.set_interrupt_mask_reg);
 	else
-		writel(~0, ioa_cfg->regs.set_interrupt_mask_reg);
+		writel_relaxed(~0, ioa_cfg->regs.set_interrupt_mask_reg);
 
 	/* Clear any pending interrupts */
 	if (ioa_cfg->sis64)
@@ -8402,7 +8404,8 @@ static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 	wmb();
 	if (ioa_cfg->sis64) {
 		/* Set the adapter to the correct endian mode. */
-		writel(IPR_ENDIAN_SWAP_KEY, ioa_cfg->regs.endian_swap_reg);
+		writel_relaxed(IPR_ENDIAN_SWAP_KEY,
+			       ioa_cfg->regs.endian_swap_reg);
 		int_reg = readl(ioa_cfg->regs.endian_swap_reg);
 	}
 

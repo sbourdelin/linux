@@ -1191,7 +1191,6 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_flags |= SB_POSIXACL;
 #endif
 	sb->s_flags |= SB_I_VERSION;
-	sb->s_iflags |= SB_I_CGROUPWB;
 
 	err = super_setup_bdi(sb);
 	if (err) {
@@ -2331,7 +2330,6 @@ static const struct super_operations btrfs_super_ops = {
 	.sync_fs	= btrfs_sync_fs,
 	.show_options	= btrfs_show_options,
 	.show_devname	= btrfs_show_devname,
-	.write_inode	= btrfs_write_inode,
 	.alloc_inode	= btrfs_alloc_inode,
 	.destroy_inode	= btrfs_destroy_inode,
 	.statfs		= btrfs_statfs,

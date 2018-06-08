@@ -153,9 +153,15 @@ void btrfs_sync_inode_flags_to_i_flags(struct inode *inode)
 		new_fl |= S_NOATIME;
 	if (binode->flags & BTRFS_INODE_DIRSYNC)
 		new_fl |= S_DIRSYNC;
+	/*
+	 * The btree_inode will be always in the root cgroup. The cgroup
+	 * writeback can be enabled on regular inodes selectively.
+	 */
+	new_fl |= S_CGROUPWB;
 
 	set_mask_bits(&inode->i_flags,
-		      S_SYNC | S_APPEND | S_IMMUTABLE | S_NOATIME | S_DIRSYNC,
+		      S_SYNC | S_APPEND | S_IMMUTABLE | S_NOATIME | S_DIRSYNC |
+		      S_CGROUPWB,
 		      new_fl);
 }
 
@@ -562,7 +568,7 @@ static noinline int create_subvol(struct inode *dir,
 	struct btrfs_root *root = BTRFS_I(dir)->root;
 	struct btrfs_root *new_root;
 	struct btrfs_block_rsv block_rsv;
-	struct timespec cur_time = current_time(dir);
+	struct timespec64 cur_time = current_time(dir);
 	struct inode *inode;
 	int ret;
 	int err;
@@ -2438,6 +2444,10 @@ static int btrfs_search_path_in_tree_user(struct inode *inode,
 			}
 
 			temp_inode = btrfs_iget(sb, &key2, root, NULL);
+			if (IS_ERR(temp_inode)) {
+				ret = PTR_ERR(temp_inode);
+				goto out;
+			}
 			ret = inode_permission(temp_inode, MAY_READ | MAY_EXEC);
 			iput(temp_inode);
 			if (ret) {
@@ -3596,13 +3606,14 @@ out_free:
 	return ret;
 }
 
-ssize_t btrfs_dedupe_file_range(struct file *src_file, u64 loff, u64 olen,
-				struct file *dst_file, u64 dst_loff)
+loff_t btrfs_dedupe_file_range(struct file *src_file, loff_t loff,
+			       struct file *dst_file, loff_t dst_loff,
+			       loff_t olen)
 {
 	struct inode *src = file_inode(src_file);
 	struct inode *dst = file_inode(dst_file);
 	u64 bs = BTRFS_I(src)->root->fs_info->sb->s_blocksize;
-	ssize_t res;
+	int res;
 
 	if (WARN_ON_ONCE(bs < PAGE_SIZE)) {
 		/*
@@ -5391,7 +5402,7 @@ static long _btrfs_ioctl_set_received_subvol(struct file *file,
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct btrfs_root_item *root_item = &root->root_item;
 	struct btrfs_trans_handle *trans;
-	struct timespec ct = current_time(inode);
+	struct timespec64 ct = current_time(inode);
 	int ret = 0;
 	int received_uuid_changed;
 

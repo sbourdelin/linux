@@ -245,9 +245,6 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 				     int expected_gts)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
-	int max_gts = 0;
-	enum pci_bus_speed speed = PCI_SPEED_UNKNOWN;
-	enum pcie_link_width width = PCIE_LNK_WIDTH_UNKNOWN;
 	struct pci_dev *pdev;
 
 	/* Some devices are not connected over PCIe and thus do not negotiate
@@ -263,49 +260,7 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 	else
 		pdev = adapter->pdev;
 
-	if (pcie_get_minimum_link(pdev, &speed, &width) ||
-	    speed == PCI_SPEED_UNKNOWN || width == PCIE_LNK_WIDTH_UNKNOWN) {
-		e_dev_warn("Unable to determine PCI Express bandwidth.\n");
-		return;
-	}
-
-	switch (speed) {
-	case PCIE_SPEED_2_5GT:
-		/* 8b/10b encoding reduces max throughput by 20% */
-		max_gts = 2 * width;
-		break;
-	case PCIE_SPEED_5_0GT:
-		/* 8b/10b encoding reduces max throughput by 20% */
-		max_gts = 4 * width;
-		break;
-	case PCIE_SPEED_8_0GT:
-		/* 128b/130b encoding reduces throughput by less than 2% */
-		max_gts = 8 * width;
-		break;
-	default:
-		e_dev_warn("Unable to determine PCI Express bandwidth.\n");
-		return;
-	}
-
-	e_dev_info("PCI Express bandwidth of %dGT/s available\n",
-		   max_gts);
-	e_dev_info("(Speed:%s, Width: x%d, Encoding Loss:%s)\n",
-		   (speed == PCIE_SPEED_8_0GT ? "8.0GT/s" :
-		    speed == PCIE_SPEED_5_0GT ? "5.0GT/s" :
-		    speed == PCIE_SPEED_2_5GT ? "2.5GT/s" :
-		    "Unknown"),
-		   width,
-		   (speed == PCIE_SPEED_2_5GT ? "20%" :
-		    speed == PCIE_SPEED_5_0GT ? "20%" :
-		    speed == PCIE_SPEED_8_0GT ? "<2%" :
-		    "Unknown"));
-
-	if (max_gts < expected_gts) {
-		e_dev_warn("This is not sufficient for optimal performance of this card.\n");
-		e_dev_warn("For optimal performance, at least %dGT/s of bandwidth is required.\n",
-			expected_gts);
-		e_dev_warn("A slot with more lanes and/or higher speed is suggested.\n");
-	}
+	pcie_print_link_status(pdev);
 }
 
 static void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
@@ -9816,6 +9771,7 @@ static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
 	 */
 	if (!macvlan_supports_dest_filter(vdev))
 		return ERR_PTR(-EMEDIUMTYPE);
+<<<<<<< HEAD
 
 	pool = find_first_zero_bit(adapter->fwd_bitmask, adapter->num_rx_pools);
 	if (pool == adapter->num_rx_pools) {
@@ -9876,6 +9832,68 @@ static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
 	accel->pool = pool;
 	accel->netdev = vdev;
 
+=======
+
+	pool = find_first_zero_bit(adapter->fwd_bitmask, adapter->num_rx_pools);
+	if (pool == adapter->num_rx_pools) {
+		u16 used_pools = adapter->num_vfs + adapter->num_rx_pools;
+		u16 reserved_pools;
+
+		if (((adapter->flags & IXGBE_FLAG_DCB_ENABLED) &&
+		     adapter->num_rx_pools >= (MAX_TX_QUEUES / tcs)) ||
+		    adapter->num_rx_pools > IXGBE_MAX_MACVLANS)
+			return ERR_PTR(-EBUSY);
+
+		/* Hardware has a limited number of available pools. Each VF,
+		 * and the PF require a pool. Check to ensure we don't
+		 * attempt to use more then the available number of pools.
+		 */
+		if (used_pools >= IXGBE_MAX_VF_FUNCTIONS)
+			return ERR_PTR(-EBUSY);
+
+		/* Enable VMDq flag so device will be set in VM mode */
+		adapter->flags |= IXGBE_FLAG_VMDQ_ENABLED |
+				  IXGBE_FLAG_SRIOV_ENABLED;
+
+		/* Try to reserve as many queues per pool as possible,
+		 * we start with the configurations that support 4 queues
+		 * per pools, followed by 2, and then by just 1 per pool.
+		 */
+		if (used_pools < 32 && adapter->num_rx_pools < 16)
+			reserved_pools = min_t(u16,
+					       32 - used_pools,
+					       16 - adapter->num_rx_pools);
+		else if (adapter->num_rx_pools < 32)
+			reserved_pools = min_t(u16,
+					       64 - used_pools,
+					       32 - adapter->num_rx_pools);
+		else
+			reserved_pools = 64 - used_pools;
+
+
+		if (!reserved_pools)
+			return ERR_PTR(-EBUSY);
+
+		adapter->ring_feature[RING_F_VMDQ].limit += reserved_pools;
+
+		/* Force reinit of ring allocation with VMDQ enabled */
+		err = ixgbe_setup_tc(pdev, adapter->hw_tcs);
+		if (err)
+			return ERR_PTR(err);
+
+		if (pool >= adapter->num_rx_pools)
+			return ERR_PTR(-ENOMEM);
+	}
+
+	accel = kzalloc(sizeof(*accel), GFP_KERNEL);
+	if (!accel)
+		return ERR_PTR(-ENOMEM);
+
+	set_bit(pool, adapter->fwd_bitmask);
+	accel->pool = pool;
+	accel->netdev = vdev;
+
+>>>>>>> linux-next/akpm-base
 	if (!netif_running(pdev))
 		return accel;
 
