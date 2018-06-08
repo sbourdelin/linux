@@ -69,7 +69,6 @@ MODULE_PARM_DESC(experimental_zcopytx, "Enable Zero Copy TX;"
 
 enum {
 	VHOST_NET_FEATURES = VHOST_FEATURES |
-			 (1ULL << VHOST_NET_F_VIRTIO_NET_HDR) |
 			 (1ULL << VIRTIO_NET_F_MRG_RXBUF) |
 			 (1ULL << VIRTIO_F_IOMMU_PLATFORM)
 };
@@ -1266,15 +1265,11 @@ static int vhost_net_set_features(struct vhost_net *n, u64 features)
 			       (1ULL << VIRTIO_F_VERSION_1))) ?
 			sizeof(struct virtio_net_hdr_mrg_rxbuf) :
 			sizeof(struct virtio_net_hdr);
-	if (features & (1 << VHOST_NET_F_VIRTIO_NET_HDR)) {
-		/* vhost provides vnet_hdr */
-		vhost_hlen = hdr_len;
-		sock_hlen = 0;
-	} else {
-		/* socket provides vnet_hdr */
-		vhost_hlen = 0;
-		sock_hlen = hdr_len;
-	}
+
+        /* socket provides vnet_hdr */
+	vhost_hlen = 0;
+	sock_hlen = hdr_len;
+
 	mutex_lock(&n->dev.mutex);
 	if ((features & (1 << VHOST_F_LOG_ALL)) &&
 	    !vhost_log_access_ok(&n->dev))
