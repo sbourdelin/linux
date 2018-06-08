@@ -9771,7 +9771,6 @@ static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
 	 */
 	if (!macvlan_supports_dest_filter(vdev))
 		return ERR_PTR(-EMEDIUMTYPE);
-<<<<<<< HEAD
 
 	pool = find_first_zero_bit(adapter->fwd_bitmask, adapter->num_rx_pools);
 	if (pool == adapter->num_rx_pools) {
@@ -9832,68 +9831,6 @@ static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
 	accel->pool = pool;
 	accel->netdev = vdev;
 
-=======
-
-	pool = find_first_zero_bit(adapter->fwd_bitmask, adapter->num_rx_pools);
-	if (pool == adapter->num_rx_pools) {
-		u16 used_pools = adapter->num_vfs + adapter->num_rx_pools;
-		u16 reserved_pools;
-
-		if (((adapter->flags & IXGBE_FLAG_DCB_ENABLED) &&
-		     adapter->num_rx_pools >= (MAX_TX_QUEUES / tcs)) ||
-		    adapter->num_rx_pools > IXGBE_MAX_MACVLANS)
-			return ERR_PTR(-EBUSY);
-
-		/* Hardware has a limited number of available pools. Each VF,
-		 * and the PF require a pool. Check to ensure we don't
-		 * attempt to use more then the available number of pools.
-		 */
-		if (used_pools >= IXGBE_MAX_VF_FUNCTIONS)
-			return ERR_PTR(-EBUSY);
-
-		/* Enable VMDq flag so device will be set in VM mode */
-		adapter->flags |= IXGBE_FLAG_VMDQ_ENABLED |
-				  IXGBE_FLAG_SRIOV_ENABLED;
-
-		/* Try to reserve as many queues per pool as possible,
-		 * we start with the configurations that support 4 queues
-		 * per pools, followed by 2, and then by just 1 per pool.
-		 */
-		if (used_pools < 32 && adapter->num_rx_pools < 16)
-			reserved_pools = min_t(u16,
-					       32 - used_pools,
-					       16 - adapter->num_rx_pools);
-		else if (adapter->num_rx_pools < 32)
-			reserved_pools = min_t(u16,
-					       64 - used_pools,
-					       32 - adapter->num_rx_pools);
-		else
-			reserved_pools = 64 - used_pools;
-
-
-		if (!reserved_pools)
-			return ERR_PTR(-EBUSY);
-
-		adapter->ring_feature[RING_F_VMDQ].limit += reserved_pools;
-
-		/* Force reinit of ring allocation with VMDQ enabled */
-		err = ixgbe_setup_tc(pdev, adapter->hw_tcs);
-		if (err)
-			return ERR_PTR(err);
-
-		if (pool >= adapter->num_rx_pools)
-			return ERR_PTR(-ENOMEM);
-	}
-
-	accel = kzalloc(sizeof(*accel), GFP_KERNEL);
-	if (!accel)
-		return ERR_PTR(-ENOMEM);
-
-	set_bit(pool, adapter->fwd_bitmask);
-	accel->pool = pool;
-	accel->netdev = vdev;
-
->>>>>>> linux-next/akpm-base
 	if (!netif_running(pdev))
 		return accel;
 

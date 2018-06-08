@@ -121,19 +121,11 @@ static int ovl_mkdir_real(struct inode *dir, struct dentry **newdentry,
 {
 	int err;
 	struct dentry *d, *dentry = *newdentry;
-<<<<<<< HEAD
 
 	err = ovl_do_mkdir(dir, dentry, mode);
 	if (err)
 		return err;
 
-=======
-
-	err = ovl_do_mkdir(dir, dentry, mode);
-	if (err)
-		return err;
-
->>>>>>> linux-next/akpm-base
 	if (likely(!d_unhashed(dentry)))
 		return 0;
 
@@ -252,11 +244,7 @@ static int ovl_instantiate(struct dentry *dentry, struct inode *inode,
 		.newinode = inode,
 	};
 
-<<<<<<< HEAD
-	ovl_dentry_version_inc(dentry->d_parent, false);
-=======
 	ovl_dir_modified(dentry->d_parent, false);
->>>>>>> linux-next/akpm-base
 	ovl_dentry_set_upper_alias(dentry);
 	if (!hardlink) {
 		/*

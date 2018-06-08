@@ -509,11 +509,7 @@ ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC) $(KBUILD_CFLA
   KBUILD_AFLAGS += -DCC_HAVE_ASM_GOTO
 endif
 
-<<<<<<< HEAD
-ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/cc-can-link.sh $(CC)), y)
-=======
 ifeq ($(call shell-cached,$(CONFIG_SHELL) $(srctree)/scripts/cc-can-link.sh $(CC)), y)
->>>>>>> linux-next/akpm-base
   CC_CAN_LINK := y
   export CC_CAN_LINK
 endif

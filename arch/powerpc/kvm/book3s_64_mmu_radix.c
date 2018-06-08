@@ -208,8 +208,6 @@ static void kvmppc_pmd_free(pmd_t *pmdp)
 	kmem_cache_free(kvm_pmd_cache, pmdp);
 }
 
-<<<<<<< HEAD
-=======
 static void kvmppc_unmap_pte(struct kvm *kvm, pte_t *pte,
 			     unsigned long gpa, unsigned int shift)
 
@@ -371,7 +369,6 @@ static void kvmppc_unmap_free_pud_entry_table(struct kvm *kvm, pud_t *pud,
  */
 #define PTE_BITS_MUST_MATCH (~(_PAGE_WRITE | _PAGE_DIRTY | _PAGE_ACCESSED))
 
->>>>>>> linux-next/akpm-base
 static int kvmppc_create_pte(struct kvm *kvm, pte_t pte, unsigned long gpa,
 			     unsigned int level, unsigned long mmu_seq)
 {
@@ -878,63 +875,11 @@ int kvmppc_init_vm_radix(struct kvm *kvm)
 
 static void pte_ctor(void *addr)
 {
-<<<<<<< HEAD
-	unsigned long ig, iu, im;
-	pte_t *pte;
-	pmd_t *pmd;
-	pud_t *pud;
-	pgd_t *pgd;
-
-	if (!kvm->arch.pgtable)
-		return;
-	pgd = kvm->arch.pgtable;
-	for (ig = 0; ig < PTRS_PER_PGD; ++ig, ++pgd) {
-		if (!pgd_present(*pgd))
-			continue;
-		pud = pud_offset(pgd, 0);
-		for (iu = 0; iu < PTRS_PER_PUD; ++iu, ++pud) {
-			if (!pud_present(*pud))
-				continue;
-			if (pud_huge(*pud)) {
-				pud_clear(pud);
-				continue;
-			}
-			pmd = pmd_offset(pud, 0);
-			for (im = 0; im < PTRS_PER_PMD; ++im, ++pmd) {
-				if (pmd_is_leaf(*pmd)) {
-					pmd_clear(pmd);
-					continue;
-				}
-				if (!pmd_present(*pmd))
-					continue;
-				pte = pte_offset_map(pmd, 0);
-				memset(pte, 0, sizeof(long) << PTE_INDEX_SIZE);
-				kvmppc_pte_free(pte);
-				pmd_clear(pmd);
-			}
-			kvmppc_pmd_free(pmd_offset(pud, 0));
-			pud_clear(pud);
-		}
-		pud_free(kvm->mm, pud_offset(pgd, 0));
-		pgd_clear(pgd);
-	}
-	pgd_free(kvm->mm, kvm->arch.pgtable);
-	kvm->arch.pgtable = NULL;
-=======
-	memset(addr, 0, RADIX_PTE_TABLE_SIZE);
->>>>>>> linux-next/akpm-base
-}
-
-static void pmd_ctor(void *addr)
-{
-<<<<<<< HEAD
 	memset(addr, 0, RADIX_PTE_TABLE_SIZE);
 }
 
 static void pmd_ctor(void *addr)
 {
-=======
->>>>>>> linux-next/akpm-base
 	memset(addr, 0, RADIX_PMD_TABLE_SIZE);
 }
 

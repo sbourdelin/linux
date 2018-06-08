@@ -820,11 +820,7 @@ struct inode *ovl_get_inode(struct super_block *sb,
 	bool bylower = ovl_hash_bylower(sb, upperdentry, lowerdentry,
 					oip->index);
 	int fsid = bylower ? oip->lowerpath->layer->fsid : 0;
-<<<<<<< HEAD
-	bool is_dir;
-=======
 	bool is_dir, metacopy = false;
->>>>>>> linux-next/akpm-base
 	unsigned long ino = 0;
 	int err = -ENOMEM;
 

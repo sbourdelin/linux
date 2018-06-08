@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+q// SPDX-License-Identifier: GPL-2.0
 /*
  *  Automatic Configuration of IP -- use DHCP, BOOTP, RARP, or
  *  user-supplied information to configure own IP address and routes.
@@ -1317,10 +1317,6 @@ static int pnp_seq_show(struct seq_file *seq, void *v)
 			   &ic_servaddr);
 	return 0;
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> linux-next/akpm-base
 /* Create the /proc/net/ipconfig directory */
 static int __init ipconfig_proc_net_init(void)
 {

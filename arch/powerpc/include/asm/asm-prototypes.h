@@ -134,11 +134,6 @@ unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip);
 void pnv_power9_force_smt4_catch(void);
 void pnv_power9_force_smt4_release(void);
 
-<<<<<<< HEAD
-void tm_enable(void);
-void tm_disable(void);
-void tm_abort(uint8_t cause);
-=======
 /* Transaction memory related */
 void tm_enable(void);
 void tm_disable(void);
@@ -148,5 +143,4 @@ struct kvm_vcpu;
 void _kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu, u64 guest_msr);
 void _kvmppc_save_tm_pr(struct kvm_vcpu *vcpu, u64 guest_msr);
 
->>>>>>> linux-next/akpm-base
 #endif /* _ASM_POWERPC_ASM_PROTOTYPES_H */

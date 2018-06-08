@@ -892,10 +892,7 @@ static int udf_load_pvoldesc(struct super_block *sb, sector_t block)
 		  ts->minute, le16_to_cpu(ts->typeAndTimezone));
 #endif
 
-<<<<<<< HEAD
-=======
 
->>>>>>> linux-next/akpm-base
 	ret = udf_dstrCS0toChar(sb, outstr, 31, pvoldesc->volIdent, 32);
 	if (ret < 0)
 		goto out_bh;

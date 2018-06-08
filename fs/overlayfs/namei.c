@@ -1056,12 +1056,9 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 			.lowerpath = stack,
 			.index = index,
 			.numlower = ctr,
-<<<<<<< HEAD
-=======
 			.redirect = upperredirect,
 			.lowerdata = (ctr > 1 && !d.is_dir) ?
 				      stack[ctr - 1].dentry : NULL,
->>>>>>> linux-next/akpm-base
 		};
 
 		inode = ovl_get_inode(dentry->d_sb, &oip);

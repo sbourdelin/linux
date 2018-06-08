@@ -2758,13 +2758,7 @@ static struct ib_uflow_resources *flow_resources_alloc(size_t num_specs)
 {
 	struct ib_uflow_resources *resources;
 
-<<<<<<< HEAD
-	resources =
-		kmalloc(struct_size(resources, collection, num_specs),
-			GFP_KERNEL);
-=======
 	resources = kzalloc(sizeof(*resources), GFP_KERNEL);
->>>>>>> linux-next/akpm-base
 
 	if (!resources)
 		goto err_res;

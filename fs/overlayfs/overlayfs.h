@@ -358,11 +358,8 @@ struct ovl_inode_params {
 	struct ovl_path *lowerpath;
 	struct dentry *index;
 	unsigned int numlower;
-<<<<<<< HEAD
-=======
 	char *redirect;
 	struct dentry *lowerdata;
->>>>>>> linux-next/akpm-base
 };
 struct inode *ovl_new_inode(struct super_block *sb, umode_t mode, dev_t rdev);
 struct inode *ovl_lookup_inode(struct super_block *sb, struct dentry *real,
@@ -404,12 +401,9 @@ struct dentry *ovl_create_real(struct inode *dir, struct dentry *newdentry,
 			       struct ovl_cattr *attr);
 int ovl_cleanup(struct inode *dir, struct dentry *dentry);
 struct dentry *ovl_create_temp(struct dentry *workdir, struct ovl_cattr *attr);
-<<<<<<< HEAD
-=======
 
 /* file.c */
 extern const struct file_operations ovl_file_operations;
->>>>>>> linux-next/akpm-base
 
 /* copy_up.c */
 int ovl_copy_up(struct dentry *dentry);
