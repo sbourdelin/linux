@@ -883,3 +883,19 @@ Contact:	Subhash Jadavani <subhashj@codeaurora.org>
 Description:	This entry shows the target state of an UFS UIC link
 		for the chosen system power management level.
 		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/ufs_provision
+Date:		February 2018
+Contact:	Sayali Lokhande <sayalil@codeaurora.org>
+Description:	This file shows the status of runtime ufs provisioning.
+		This can be used to provision ufs device if bConfigDescrLock is 0.
+		Configuration buffer needs to be written in space separated format
+		specificied as:
+		echo <bNumberLU> <bBootEnable> <bDescrAccessEn> <bInitPowerMode>
+		<bHighPriorityLUN> <bSecureRemovalType> <bInitActiveICCLevel>
+		<wPeriodicRTCUpdate> <bConfigDescrLock> <LUNum> <bLUEnable>
+		<bBootLunID> <size_in_kb> <bDataReliability> <bLUWriteProtect>
+		<bMemoryType> <bLogicalBlockSize> <bProvisioningType>
+		<wContextCapabilities> > ufs_provision
+		To check updated configuration check unit_descriptor and
+		device_descriptor sysfs fields.

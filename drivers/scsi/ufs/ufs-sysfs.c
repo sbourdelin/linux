@@ -252,6 +252,30 @@ static ssize_t ufs_sysfs_read_desc_param(struct ufs_hba *hba,
 	return ret;
 }
 
+static ssize_t ufs_provision_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return ufshcd_desc_config_show(dev, attr, buf);
+}
+
+static ssize_t ufs_provision_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	return ufshcd_desc_config_store(dev, attr, buf, count);
+}
+
+DEVICE_ATTR_RW(ufs_provision);
+
+static struct attribute *ufs_sysfs_config_descriptor[] = {
+	&dev_attr_ufs_provision.attr,
+	NULL,
+};
+
+static const struct attribute_group ufs_sysfs_config_descriptor_group = {
+	.name = "config_descriptor",
+	.attrs = ufs_sysfs_config_descriptor,
+};
+
 #define UFS_DESC_PARAM(_name, _puname, _duname, _size)			\
 static ssize_t _name##_show(struct device *dev,				\
 	struct device_attribute *attr, char *buf)			\
@@ -713,6 +737,7 @@ static const struct attribute_group ufs_sysfs_attributes_group = {
 static const struct attribute_group *ufs_sysfs_groups[] = {
 	&ufs_sysfs_default_group,
 	&ufs_sysfs_device_descriptor_group,
+	&ufs_sysfs_config_descriptor_group,
 	&ufs_sysfs_interconnect_descriptor_group,
 	&ufs_sysfs_geometry_descriptor_group,
 	&ufs_sysfs_health_descriptor_group,

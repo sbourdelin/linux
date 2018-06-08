@@ -651,6 +651,7 @@ struct ufs_hba {
 	struct ufs_pwr_mode_info max_pwr_info;
 
 	struct ufs_clk_gating clk_gating;
+	bool provision_enabled;
 	/* Control to enable/disable host capabilities */
 	u32 caps;
 	/* Allow dynamic clk gating */
@@ -867,6 +868,10 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 
 int ufshcd_hold(struct ufs_hba *hba, bool async);
 void ufshcd_release(struct ufs_hba *hba);
+ssize_t ufshcd_desc_config_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+ssize_t ufshcd_desc_config_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
 
 int ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id,
 	int *desc_length);
