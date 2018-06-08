@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/tracepoint-defs.h>
+#include <uapi/asm-generic/mman-common.h>
 
 /*
  * The set of flags that only affect watermark checking and reclaim
@@ -45,7 +46,24 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
 
 static inline bool can_madv_dontneed_vma(struct vm_area_struct *vma)
 {
+	return !(((vma->vm_flags & (VM_LOCKED|VM_LOCKONFAULT)) == VM_LOCKED) ||
+		 (vma->vm_flags & (VM_HUGETLB|VM_PFNMAP)));
+}
+
+static inline bool can_madv_free_vma(struct vm_area_struct *vma)
+{
 	return !(vma->vm_flags & (VM_LOCKED|VM_HUGETLB|VM_PFNMAP));
+}
+
+static inline bool can_madv_dontneed_or_free_vma(struct vm_area_struct *vma,
+						 int behavior)
+{
+	if (behavior == MADV_DONTNEED)
+		return can_madv_dontneed_vma(vma);
+	else if (behavior == MADV_FREE)
+		return can_madv_free_vma(vma);
+	else
+		return 0;
 }
 
 void unmap_page_range(struct mmu_gather *tlb,
