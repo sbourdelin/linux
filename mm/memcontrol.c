@@ -5840,6 +5840,9 @@ enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
 	elow = memcg->memory.low;
 
 	parent = parent_mem_cgroup(memcg);
+	if (!parent)
+		return MEMCG_PROT_NONE;
+
 	if (parent == root_mem_cgroup)
 		goto exit;
 
