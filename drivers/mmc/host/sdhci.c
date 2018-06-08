@@ -805,6 +805,7 @@ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 {
 	u8 ctrl;
+	u32 reg;
 	struct mmc_data *data = cmd->data;
 
 	if (sdhci_data_line_cmd(cmd))
@@ -894,8 +895,10 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 					     SDHCI_ADMA_ADDRESS_HI);
 		} else {
 			WARN_ON(sg_cnt != 1);
+			reg = host->v4_mode ? SDHCI_ADMA_ADDRESS :
+				SDHCI_DMA_ADDRESS;
 			sdhci_writel(host, sdhci_sdma_address(host),
-				     SDHCI_DMA_ADDRESS);
+				     reg);
 		}
 	}
 
@@ -2721,6 +2724,7 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		 */
 		if (intmask & SDHCI_INT_DMA_END) {
 			u32 dmastart, dmanow;
+			u32 reg;
 
 			dmastart = sdhci_sdma_address(host);
 			dmanow = dmastart + host->data->bytes_xfered;
@@ -2733,7 +2737,9 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 			host->data->bytes_xfered = dmanow - dmastart;
 			DBG("DMA base 0x%08x, transferred 0x%06x bytes, next 0x%08x\n",
 			    dmastart, host->data->bytes_xfered, dmanow);
-			sdhci_writel(host, dmanow, SDHCI_DMA_ADDRESS);
+			reg = host->v4_mode ? SDHCI_ADMA_ADDRESS :
+				SDHCI_DMA_ADDRESS;
+			sdhci_writel(host, dmanow, reg);
 		}
 
 		if (intmask & SDHCI_INT_DATA_END) {
