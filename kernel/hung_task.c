@@ -40,6 +40,11 @@ int __read_mostly sysctl_hung_task_check_count = PID_MAX_LIMIT;
  */
 unsigned long __read_mostly sysctl_hung_task_timeout_secs = CONFIG_DEFAULT_HUNG_TASK_TIMEOUT;
 
+/*
+ * Zero (default value) means use sysctl_hung_task_timeout_secs:
+ */
+unsigned long __read_mostly sysctl_hung_task_period_secs;
+
 int __read_mostly sysctl_hung_task_warnings = 10;
 
 static int __read_mostly did_panic;
@@ -97,8 +102,11 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 
 	if (switch_count != t->last_switch_count) {
 		t->last_switch_count = switch_count;
+		t->last_switch_time = jiffies;
 		return;
 	}
+	if (time_is_after_jiffies(t->last_switch_time + timeout * HZ))
+		return;
 
 	trace_sched_process_hang(t);
 
@@ -242,8 +250,13 @@ static int watchdog(void *dummy)
 
 	for ( ; ; ) {
 		unsigned long timeout = sysctl_hung_task_timeout_secs;
-		long t = hung_timeout_jiffies(hung_last_checked, timeout);
+		unsigned long period = sysctl_hung_task_period_secs;
+		long t;
 
+		if (period == 0)
+			period = timeout;
+		period = min_t(unsigned long, period, timeout);
+		t = hung_timeout_jiffies(hung_last_checked, period);
 		if (t <= 0) {
 			if (!atomic_xchg(&reset_hung_task, 0))
 				check_hung_uninterruptible_tasks(timeout);
