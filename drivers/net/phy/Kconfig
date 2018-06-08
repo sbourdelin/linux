@@ -422,6 +422,14 @@ config TERANETICS_PHY
 	---help---
 	  Currently supports the Teranetics TN2020
 
+config TJA1100_PHY
+	tristate "NXP TJA1100 PHY"
+	help
+	  Support of NXP TJA1100 BroadR-REACH ethernet PHY.
+	  Generic driver is not suitable for TJA1100 PHY while the PHY does not
+	  advertise any standard IEEE capabilities. It uses BroadR-REACH able
+	  flag instead. This driver configures capabilities of the PHY properly.
+
 config VITESSE_PHY
 	tristate "Vitesse PHYs"
 	---help---
