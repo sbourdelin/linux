@@ -131,6 +131,12 @@
 #define IS_PREPRODUCTION_HW(dev_priv)   (INTEL_REVID(dev_priv) < FIRST_PRODUCT_REVID(INTEL_INFO(dev_priv)))
 #define IS_PLATFORM_SUPPORT_ALPHA(intel_info) (FIRST_PRODUCT_REVID(intel_info) == PRODUCT_REVID_UNKNOWN)
 
+#define BUILD_BUG_ON_REVID_LT(revid, production_revid) ({ \
+		BUILD_BUG_ON((production_revid) != PRODUCT_REVID_UNKNOWN && \
+			     (revid) < (production_revid)); \
+		1; \
+	})
+
 #define SKL_REVID_A0		0x0
 #define SKL_REVID_B0		0x1
 #define SKL_REVID_C0		0x2
@@ -141,7 +147,9 @@
 #define SKL_REVID_PRODUCT	SKL_REVID_G0
 #define SKL_REVID_H0		0x7
 
-#define IS_SKL_REVID(p, since, until) (IS_SKYLAKE(p) && IS_REVID(p, since, until))
+#define IS_SKL_REVID(p, since, until) \
+	(BUILD_BUG_ON_REVID_LT(until, SKL_REVID_PRODUCT) && \
+	 IS_SKYLAKE(p) && IS_REVID(p, since, until))
 
 #define BXT_REVID_A0		0x0
 #define BXT_REVID_A1		0x1
@@ -151,7 +159,8 @@
 #define BXT_REVID_PRODUCT	BXT_REVID_C0
 
 #define IS_BXT_REVID(dev_priv, since, until) \
-	(IS_BROXTON(dev_priv) && IS_REVID(dev_priv, since, until))
+	(BUILD_BUG_ON_REVID_LT(until, BXT_REVID_PRODUCT) && \
+	 IS_BROXTON(dev_priv) && IS_REVID(dev_priv, since, until))
 
 #define KBL_REVID_A0		0x0
 #define KBL_REVID_B0		0x1
@@ -161,29 +170,36 @@
 #define KBL_REVID_E0		0x4
 
 #define IS_KBL_REVID(dev_priv, since, until) \
-	(IS_KABYLAKE(dev_priv) && IS_REVID(dev_priv, since, until))
+	(BUILD_BUG_ON_REVID_LT(until, KBL_REVID_PRODUCT) && \
+	 IS_KABYLAKE(dev_priv) && IS_REVID(dev_priv, since, until))
 
 #define GLK_REVID_A0		0x0
 #define GLK_REVID_A1		0x1
+#define GLK_REVID_PRODUCT	PRODUCT_REVID_UNKNOWN
 
-#define IS_GLK_REVID(dev_priv, since, until) \
-	(IS_GEMINILAKE(dev_priv) && IS_REVID(dev_priv, since, until))
+#define IS_GLK_REVID(dev_priv, since, until)		    \
+	(BUILD_BUG_ON_REVID_LT(until, GLK_REVID_PRODUCT) && \
+	 IS_GEMINILAKE(dev_priv) && IS_REVID(dev_priv, since, until))
 
 #define CNL_REVID_A0		0x0
 #define CNL_REVID_B0		0x1
 #define CNL_REVID_C0		0x2
+#define CNL_REVID_PRODUCT	PRODUCT_REVID_UNKNOWN
 
 #define IS_CNL_REVID(p, since, until) \
-	(IS_CANNONLAKE(p) && IS_REVID(p, since, until))
+	(BUILD_BUG_ON_REVID_LT(until, CNL_REVID_PRODUCT) && \
+	 IS_CANNONLAKE(p) && IS_REVID(p, since, until))
 
 #define ICL_REVID_A0		0x0
 #define ICL_REVID_A2		0x1
 #define ICL_REVID_B0		0x3
 #define ICL_REVID_B2		0x4
 #define ICL_REVID_C0		0x5
+#define ICL_REVID_PRODUCT	PRODUCT_REVID_UNKNOWN
 
 #define IS_ICL_REVID(p, since, until) \
-	(IS_ICELAKE(p) && IS_REVID(p, since, until))
+	(BUILD_BUG_ON_REVID_LT(until, ICL_REVID_PRODUCT) && \
+	IS_ICELAKE(p) && IS_REVID(p, since, until))
 
 /*
  * The genX designation typically refers to the render engine, so render
