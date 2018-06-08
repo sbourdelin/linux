@@ -19,10 +19,16 @@
 #ifdef CONFIG_PRINTK
 
 #define PRINTK_SAFE_CONTEXT_MASK	 0x3fffffff
-#define PRINTK_NMI_DEFERRED_CONTEXT_MASK 0x40000000
+#define PRINTK_NMI_DIRECT_CONTEXT_MASK	 0x40000000
 #define PRINTK_NMI_CONTEXT_MASK		 0x80000000
 
 extern raw_spinlock_t logbuf_lock;
+
+#ifdef CONFIG_PRINTK_NMI
+__printf(1, 0) int vprintk_nmi(const char *fmt, va_list args);
+#else
+__printf(1, 0) int vprintk_nmi(const char *fmt, va_list args) { return 0; }
+#endif
 
 __printf(1, 0) int vprintk_default(const char *fmt, va_list args);
 __printf(1, 0) int vprintk_deferred(const char *fmt, va_list args);

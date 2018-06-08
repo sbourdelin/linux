@@ -1845,7 +1845,13 @@ asmlinkage int vprintk_emit(int facility, int level,
 	printk_delay();
 
 	/* This stops the holder of console_sem just where we want him */
-	logbuf_lock_irqsave(flags);
+	printk_safe_enter_irqsave(flags);
+	if (in_nmi() && !raw_spin_trylock(&logbuf_lock)) {
+		printed_len = vprintk_nmi(fmt, args);
+		printk_safe_exit_irqrestore(flags);
+		return printed_len;
+	} else
+		raw_spin_lock(&logbuf_lock);
 	/*
 	 * The printf needs to come first; we need the syslog
 	 * prefix which might be passed-in as a parameter.
