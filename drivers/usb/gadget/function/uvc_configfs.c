@@ -929,6 +929,30 @@ static struct uvcg_frame *to_uvcg_frame(struct config_item *item)
 	return container_of(item, struct uvcg_frame, item);
 }
 
+#define UVCG_FRAME_ATTR_RO(cname, aname, to_cpu_endian, to_little_endian, bits) \
+static ssize_t uvcg_frame_##cname##_show(struct config_item *item, char *page)\
+{									\
+	struct uvcg_frame *f = to_uvcg_frame(item);			\
+	struct f_uvc_opts *opts;					\
+	struct config_item *opts_item;					\
+	struct mutex *su_mutex = &f->item.ci_group->cg_subsys->su_mutex;\
+	int result;							\
+									\
+	mutex_lock(su_mutex); /* for navigating configfs hierarchy */	\
+									\
+	opts_item = f->item.ci_parent->ci_parent->ci_parent->ci_parent;	\
+	opts = to_f_uvc_opts(opts_item);				\
+									\
+	mutex_lock(&opts->lock);					\
+	result = sprintf(page, "%d\n", to_cpu_endian(f->frame.cname));	\
+	mutex_unlock(&opts->lock);					\
+									\
+	mutex_unlock(su_mutex);						\
+	return result;							\
+}									\
+									\
+UVC_ATTR_RO(uvcg_frame_, cname, aname);
+
 #define UVCG_FRAME_ATTR(cname, aname, to_cpu_endian, to_little_endian, bits) \
 static ssize_t uvcg_frame_##cname##_show(struct config_item *item, char *page)\
 {									\
