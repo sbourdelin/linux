@@ -77,7 +77,6 @@ enum intel_platform {
 #define DEV_INFO_FOR_EACH_FLAG(func) \
 	func(is_mobile); \
 	func(is_lp); \
-	func(is_alpha_support); \
 	/* Keep has_* in alphabetical order */ \
 	func(has_64bit_reloc); \
 	func(has_aliasing_ppgtt); \
