@@ -190,8 +190,7 @@ static int a5xx_gpmu_init(struct msm_gpu *gpu)
 
 	/* Kick off the IB to load the GPMU microcode */
 	OUT_PKT7(ring, CP_INDIRECT_BUFFER_PFE, 3);
-	OUT_RING(ring, lower_32_bits(a5xx_gpu->gpmu_iova));
-	OUT_RING(ring, upper_32_bits(a5xx_gpu->gpmu_iova));
+	OUT_RING64(ring, a5xx_gpu->gpmu_iova);
 	OUT_RING(ring, a5xx_gpu->gpmu_dwords);
 
 	/* Turn back on protected mode */
