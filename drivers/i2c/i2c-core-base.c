@@ -721,7 +721,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	if (info->archdata)
 		client->dev.archdata = *info->archdata;
 
-	client->flags = info->flags;
+	client->flags = info->flags & ~I2C_CLIENT_IGNORE_BUSY;
 	client->addr = info->addr;
 
 	client->irq = info->irq;
@@ -739,9 +739,12 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	}
 
 	/* Check for address business */
-	status = i2c_check_addr_busy(adap, i2c_encode_flags_to_addr(client));
-	if (status)
-		goto out_err;
+	if (!(info->flags & I2C_CLIENT_IGNORE_BUSY)) {
+		status = i2c_check_addr_busy(adap,
+					     i2c_encode_flags_to_addr(client));
+		if (status)
+			goto out_err;
+	}
 
 	client->dev.parent = &client->adapter->dev;
 	client->dev.bus = &i2c_bus_type;

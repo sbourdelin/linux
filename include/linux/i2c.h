@@ -775,6 +775,9 @@ i2c_unlock_adapter(struct i2c_adapter *adapter)
 #define I2C_CLIENT_SLAVE	0x20	/* we are the slave */
 #define I2C_CLIENT_HOST_NOTIFY	0x40	/* We want to use I2C host notify */
 #define I2C_CLIENT_WAKE		0x80	/* for board_info; true iff can wake */
+#define I2C_CLIENT_IGNORE_BUSY	0x100	/* For board_info; skip busy check */
+					/* Do NOT use, reserved for use by */
+					/* drv/i2c/i2c-multi-instantiate.c */
 #define I2C_CLIENT_SCCB		0x9000	/* Use Omnivision SCCB protocol */
 					/* Must match I2C_M_STOP|IGNORE_NAK */
 
