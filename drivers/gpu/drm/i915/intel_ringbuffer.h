@@ -809,6 +809,18 @@ static inline u32 intel_ring_wrap(const struct intel_ring *ring, u32 pos)
 	return pos & (ring->size - 1);
 }
 
+static inline bool
+intel_ring_offset_valid(const struct intel_ring *ring, u32 pos)
+{
+	if (pos & -ring->size) /* must be strictly within the ring */
+		return false;
+
+	if (!IS_ALIGNED(pos, 8)) /* must be qword aligned */
+		return false;
+
+	return true;
+}
+
 static inline u32 intel_ring_offset(const struct i915_request *rq, void *addr)
 {
 	/* Don't write ring->size (equivalent to 0) as that hangs some GPUs. */
