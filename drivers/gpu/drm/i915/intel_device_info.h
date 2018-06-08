@@ -146,6 +146,16 @@ struct intel_device_info {
 	u16 device_id;
 	u16 gen_mask;
 
+	/*
+	 * First known production hardware pci revision id, or:
+	 * - uninitialized (0x00):         no known preliminary hw, (gen < 9)
+	 * - PRODUCT_REVID_UNKNOWN (0xff): no known production hw yet (gen >= 9)
+	 *
+	 * Do not set first product revid unless you are certain that testing
+	 * infrastructure is already on top of production revid machines.
+	 */
+	u8 first_product_revid;
+
 	u8 gen;
 	u8 gt; /* GT number, 0 if undefined */
 	u8 num_rings;
