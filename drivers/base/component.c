@@ -228,16 +228,18 @@ static int try_to_bring_up_master(struct master *master,
 		return 0;
 	}
 
-	if (!devres_open_group(master->dev, NULL, GFP_KERNEL))
+	if (!devres_open_group(master->dev, master, GFP_KERNEL))
 		return -ENOMEM;
 
 	/* Found all components */
 	ret = master->ops->bind(master->dev);
 	if (ret < 0) {
-		devres_release_group(master->dev, NULL);
+		devres_release_group(master->dev, master);
 		dev_info(master->dev, "master bind failed: %d\n", ret);
 		return ret;
 	}
+
+	devres_close_group(master->dev, master);
 
 	master->bound = true;
 	return 1;
@@ -263,7 +265,7 @@ static void take_down_master(struct master *master)
 {
 	if (master->bound) {
 		master->ops->unbind(master->dev);
-		devres_release_group(master->dev, NULL);
+		devres_release_group(master->dev, master);
 		master->bound = false;
 	}
 }
