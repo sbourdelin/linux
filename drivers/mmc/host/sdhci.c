@@ -585,6 +585,8 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 	void *desc, *align;
 	char *buffer;
 	int len, offset, i;
+	unsigned int adma2_align = SDHCI_ADMA2_ALIGN(host);
+	unsigned int adma2_mask = SDHCI_ADMA2_MASK(host);
 
 	/*
 	 * The spec does not specify endianness of descriptor table.
@@ -608,8 +610,8 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 		 * buffer for the (up to three) bytes that screw up the
 		 * alignment.
 		 */
-		offset = (SDHCI_ADMA2_ALIGN - (addr & SDHCI_ADMA2_MASK)) &
-			 SDHCI_ADMA2_MASK;
+		offset = (adma2_align - (addr & adma2_align)) &
+			 adma2_mask;
 		if (offset) {
 			if (data->flags & MMC_DATA_WRITE) {
 				buffer = sdhci_kmap_atomic(sg, &flags);
@@ -623,8 +625,8 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 
 			BUG_ON(offset > 65536);
 
-			align += SDHCI_ADMA2_ALIGN;
-			align_addr += SDHCI_ADMA2_ALIGN;
+			align += adma2_align;
+			align_addr += adma2_align;
 
 			desc += host->desc_sz;
 
@@ -668,13 +670,15 @@ static void sdhci_adma_table_post(struct sdhci_host *host,
 	void *align;
 	char *buffer;
 	unsigned long flags;
+	unsigned int adma2_align = SDHCI_ADMA2_ALIGN(host);
+	unsigned int adma2_mask = SDHCI_ADMA2_MASK(host);
 
 	if (data->flags & MMC_DATA_READ) {
 		bool has_unaligned = false;
 
 		/* Do a quick scan of the SG list for any unaligned mappings */
 		for_each_sg(data->sg, sg, host->sg_count, i)
-			if (sg_dma_address(sg) & SDHCI_ADMA2_MASK) {
+			if (sg_dma_address(sg) & adma2_mask) {
 				has_unaligned = true;
 				break;
 			}
@@ -686,15 +690,15 @@ static void sdhci_adma_table_post(struct sdhci_host *host,
 			align = host->align_buffer;
 
 			for_each_sg(data->sg, sg, host->sg_count, i) {
-				if (sg_dma_address(sg) & SDHCI_ADMA2_MASK) {
-					size = SDHCI_ADMA2_ALIGN -
-					       (sg_dma_address(sg) & SDHCI_ADMA2_MASK);
+				if (sg_dma_address(sg) & adma2_mask) {
+					size = adma2_align -
+					       (sg_dma_address(sg) & adma2_mask);
 
 					buffer = sdhci_kmap_atomic(sg, &flags);
 					memcpy(buffer, align, size);
 					sdhci_kunmap_atomic(buffer, &flags);
 
-					align += SDHCI_ADMA2_ALIGN;
+					align += adma2_align;
 				}
 			}
 		}
@@ -3400,6 +3404,26 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
 	return 0;
 }
 
+static inline bool sdhci_use_64bit_dma(struct sdhci_host *host)
+{
+	u32 addr64bit_en;
+
+	/*
+	 * According to SD Host Controller spec v4.10, bit[27] added from
+	 * version 4.10 in Capabilities Register is used as 64-bit System
+	 * Address support for V4 mode, 64-bit DMA Addressing for V4 mode
+	 * is enabled only if 64-bit Addressing =1 in the Host Control 2
+	 * register.
+	 */
+	if (host->version == SDHCI_SPEC_410 && host->v4_mode) {
+		addr64bit_en = (sdhci_readw(host, SDHCI_HOST_CONTROL2) &
+				SDHCI_CTRL_64BIT_ADDR);
+		return addr64bit_en && (host->caps & SDHCI_CAN_64BIT_V4);
+	}
+
+	return host->caps & SDHCI_CAN_64BIT;
+}
+
 int sdhci_setup_host(struct sdhci_host *host)
 {
 	struct mmc_host *mmc;
@@ -3471,7 +3495,7 @@ int sdhci_setup_host(struct sdhci_host *host)
 	 * SDHCI_QUIRK2_BROKEN_64_BIT_DMA must be left to the drivers to
 	 * implement.
 	 */
-	if (host->caps & SDHCI_CAN_64BIT)
+	if (sdhci_use_64bit_dma(host))
 		host->flags |= SDHCI_USE_64_BIT_DMA;
 
 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
@@ -3505,15 +3529,15 @@ int sdhci_setup_host(struct sdhci_host *host)
 		 */
 		if (host->flags & SDHCI_USE_64_BIT_DMA) {
 			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
-					      SDHCI_ADMA2_64_DESC_SZ;
-			host->desc_sz = SDHCI_ADMA2_64_DESC_SZ;
+					      SDHCI_ADMA2_64_DESC_SZ(host);
+			host->desc_sz = SDHCI_ADMA2_64_DESC_SZ(host);
 		} else {
 			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
 					      SDHCI_ADMA2_32_DESC_SZ;
 			host->desc_sz = SDHCI_ADMA2_32_DESC_SZ;
 		}
 
-		host->align_buffer_sz = SDHCI_MAX_SEGS * SDHCI_ADMA2_ALIGN;
+		host->align_buffer_sz = SDHCI_MAX_SEGS * SDHCI_ADMA2_ALIGN(host);
 		buf = dma_alloc_coherent(mmc_dev(mmc), host->align_buffer_sz +
 					 host->adma_table_sz, &dma, GFP_KERNEL);
 		if (!buf) {
