@@ -795,16 +795,16 @@ int wiphy_register(struct wiphy *wiphy)
 
 			iftd = &sband->iftype_data[i];
 
-			if (WARN_ON(!iftd->types))
+			if (WARN_ON(!iftd->types_mask))
 				return -EINVAL;
-			if (WARN_ON(types & iftd->types))
+			if (WARN_ON(types & iftd->types_mask))
 				return -EINVAL;
 
 			/* at least one piece of information must be present */
 			if (WARN_ON(!iftd->he_cap.has_he))
 				return -EINVAL;
 
-			types |= iftd->types;
+			types |= iftd->types_mask;
 		}
 
 		have_band = true;
