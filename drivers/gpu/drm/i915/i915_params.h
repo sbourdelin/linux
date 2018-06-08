@@ -65,7 +65,7 @@ struct drm_printer;
 	param(bool, load_detect_test, false) \
 	param(bool, force_reset_modeset_test, false) \
 	param(bool, error_capture, true) \
-	param(bool, disable_display, false) \
+	param(bool, disable_display, true) \
 	param(bool, verbose_state_checks, true) \
 	param(bool, nuclear_pageflip, false) \
 	param(bool, enable_dp_mst, true) \
