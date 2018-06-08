@@ -13,8 +13,7 @@ Required properties:
     * p_clk: register bank clock
     * pixel_if[0-3]_clk: pixel stream output clock, one for each stream
                          implemented in hardware, between 0 and 3
-
-Optional properties:
+    * hs_clock: dphy module clock
   - phys: phandle to the external D-PHY, phy-names must be provided
   - phy-names: must contain "dphy", if the implementation uses an
                external D-PHY
@@ -38,18 +37,43 @@ Required subnodes:
            in the design.Since there is only one endpoint per port,
            the endpoints are not numbered.
 
+Cadence DPHY
+============
+
+Cadence DPHY block.
+
+Required properties:
+- compatible: should be set to "cdns,dphy".
+- reg: physical base address and length of the DPHY registers.
+- clocks: DPHY reference clocks.
+- clock-names: must contain "psm" and "hs_clk".
+- #phy-cells: must be set to 0.
+
 
 Example:
+
+dphy1:  dphy@fd0d0000 {
+	compatible = "cdns,dphy";
+	reg = <0x0 0xfd0d0000 0x0 0x1000>;
+	clocks = <&dphy_psm_clk>;
+	clock-names = "psm";
+	clock-output-names = "hs_clk";
+	#phy-cells = <0>;
 
 csi2rx: csi-bridge@0d060000 {
 	compatible = "cdns,csi2rx";
 	reg = <0x0d060000 0x1000>;
 	clocks = <&byteclock>, <&byteclock>
 		 <&coreclock>, <&coreclock>,
-		 <&coreclock>, <&coreclock>;
+		 <&coreclock>, <&coreclock>,
+		 <&dphy_rx_byte_hs_clk>;
 	clock-names = "sys_clk", "p_clk",
 		      "pixel_if0_clk", "pixel_if1_clk",
-		      "pixel_if2_clk", "pixel_if3_clk";
+		      "pixel_if2_clk", "pixel_if3_clk",
+		      "hs_clk";	
+
+	phys = <&dphy1>;
+	phy-names = "dphy";
 
 	ports {
 		#address-cells = <1>;
