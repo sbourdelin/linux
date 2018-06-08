@@ -1014,6 +1014,8 @@ UVC_ATTR(uvcg_frame_, cname, aname);
 
 #define noop_conversion(x) (x)
 
+UVCG_FRAME_ATTR_RO(b_frame_index, bFrameIndex, noop_conversion,
+		noop_conversion, 8);
 UVCG_FRAME_ATTR(bm_capabilities, bmCapabilities, noop_conversion,
 		noop_conversion, 8);
 UVCG_FRAME_ATTR(w_width, wWidth, le16_to_cpu, cpu_to_le16, 16);
@@ -1160,6 +1162,7 @@ end:
 UVC_ATTR(uvcg_frame_, dw_frame_interval, dwFrameInterval);
 
 static struct configfs_attribute *uvcg_frame_attrs[] = {
+	&uvcg_frame_attr_b_frame_index,
 	&uvcg_frame_attr_bm_capabilities,
 	&uvcg_frame_attr_w_width,
 	&uvcg_frame_attr_w_height,
@@ -1976,12 +1979,15 @@ static int __uvcg_fill_strm(void *priv1, void *priv2, void *priv3, int n,
 			sizeof(*frm->dw_frame_interval);
 		memcpy(*dest, frm->dw_frame_interval, sz);
 		*dest += sz;
-		if (frm->fmt_type == UVCG_UNCOMPRESSED)
+		if (frm->fmt_type == UVCG_UNCOMPRESSED) {
 			h->bLength = UVC_DT_FRAME_UNCOMPRESSED_SIZE(
 				frm->frame.b_frame_interval_type);
-		else if (frm->fmt_type == UVCG_MJPEG)
+			frm->frame.b_frame_index = n + 1;
+		} else if (frm->fmt_type == UVCG_MJPEG) {
 			h->bLength = UVC_DT_FRAME_MJPEG_SIZE(
 				frm->frame.b_frame_interval_type);
+			frm->frame.b_frame_index = n + 1;
+		}
 	}
 	break;
 	}
