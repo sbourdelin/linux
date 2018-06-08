@@ -147,9 +147,11 @@ Its default value is "include/generated/autoconf.h".
 menuconfig
 --------------------------------------------------
 
-SEARCHING for CONFIG symbols
+Menuconfig offers two search capabilities:
+	1) SEARCHING for CONFIG symbols
+	2) Incremental search in menus
 
-Searching in menuconfig:
+Searching for CONFIG symbols:
 
 	The Search function searches for kernel configuration symbol
 	names, so you have to know something close to what you are
@@ -177,6 +179,18 @@ Searching in menuconfig:
 	of which only ATH5K and ATH9K match exactly and so are sorted
 	first (and in alphabetical order), then come all other symbols,
 	sorted in alphabetical order.
+
+Incremental search in menus:
+
+	Isearch is started by pressing <\>.  After that, any alphanumerical
+	character typed in is used to form a growing string that is searched
+	for in the menu items.
+
+	Isearch is realized as a ring search, restarting at the top if it
+	reaches the last menu item.
+
+	Further matches of an already entered string can be found by
+	pressing <\> instead of more alphanumerical characters.
 
 ______________________________________________________________________
 User interface options for 'menuconfig'

@@ -28,6 +28,8 @@ int saved_x, saved_y;
 
 struct dialog_info dlg;
 
+int raw_mode;			/* Toggle raw mode */
+
 static void set_mono_theme(void)
 {
 	dlg.screen.atr = A_NORMAL;
@@ -237,6 +239,17 @@ static void color_setup(const char *theme)
 }
 
 /*
+ * Setup raw mode if MENUCONFIG_RAW_MODE
+ */
+static void raw_setup(const char *val)
+{
+	if (val && atoi(val)) {
+		raw_mode = 1;
+		raw();			/* Enable CTRL-sequences*/
+	}
+}
+
+/*
  * Set window to attribute 'attr'
  */
 void attr_clear(WINDOW * win, int height, int width, chtype attr)
@@ -332,6 +345,7 @@ int init_dialog(const char *backtitle)
 
 	keypad(stdscr, TRUE);
 	cbreak();
+	raw_setup(getenv("MENUCONFIG_RAW_MODE"));
 	noecho();
 	dialog_clear();
 

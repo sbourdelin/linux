@@ -50,6 +50,8 @@
 #define TR(params) _tracef params
 
 #define KEY_ESC 27
+#define KEY_CTRL_S 19
+#define KEY_ENTR 10
 #define TAB 9
 #define MAX_LEN 2048
 #define BUF_SIZE (10*1024)
@@ -145,6 +147,7 @@ struct dialog_info {
 extern struct dialog_info dlg;
 extern char dialog_input_result[];
 extern int saved_x, saved_y;		/* Needed in signal handler in mconf.c */
+extern int raw_mode;			/* Toggle raw mode */
 
 /*
  * Function prototypes
@@ -238,6 +241,9 @@ int dialog_checklist(const char *title, const char *prompt, int height,
 		     int width, int list_height);
 int dialog_inputbox(const char *title, const char *prompt, int height,
 		    int width, const char *init);
+int do_isearch(char *str, int choice, int scroll);
+int dialog_isearch(WINDOW *menu, WINDOW *dialog, int *choice, int max_choice,
+		   int box_x, int box_y, int menu_height, int *scroll);
 
 /*
  * This is the base for fictitious keys, which activate
