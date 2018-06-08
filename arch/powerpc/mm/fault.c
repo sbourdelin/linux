@@ -428,9 +428,6 @@ static int __do_page_fault(struct pt_regs *regs, unsigned long address,
 		return SIGBUS;
 	}
 
-	/* Additional sanity check(s) */
-	sanity_check_fault(is_write, error_code);
-
 	/*
 	 * The kernel should never take an execute fault nor should it
 	 * take a page fault to a kernel address.
@@ -529,6 +526,10 @@ retry:
 		return bad_area(regs, address);
 
 good_area:
+	/* Additional sanity check(s) */
+	sanity_check_fault(is_write, error_code);
+
+	/* Check for VMA access permissions */
 	if (unlikely(access_error(is_write, is_exec, vma)))
 		return bad_access(regs, address);
 
