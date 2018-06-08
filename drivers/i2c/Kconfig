@@ -120,6 +120,14 @@ config I2C_SLAVE_EEPROM
 
 endif
 
+config I2C_MULTI_INSTANTIATE
+	tristate "I2C multi instantiate pseudo device driver"
+	depends on ACPI
+	help
+	  Some ACPI bases systems list multiple i2c-devices in a single ACPI
+	  firmware-node. This driver will instantiate separate i2c-clients
+	  for each device in the firmware-node.
+
 config I2C_DEBUG_CORE
 	bool "I2C Core debugging messages"
 	help
