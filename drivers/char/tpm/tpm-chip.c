@@ -33,6 +33,11 @@
 DEFINE_IDR(dev_nums_idr);
 static DEFINE_MUTEX(idr_lock);
 
+static short override_rng_quality = -1;
+module_param(override_rng_quality, short, 0644);
+MODULE_PARM_DESC(override_rng_quality,
+		 "tpm-rng quality (overrides values provided by drivers)");
+
 struct class *tpm_class;
 struct class *tpmrm_class;
 dev_t tpm_devt;
@@ -409,6 +414,13 @@ static int tpm_add_hwrng(struct tpm_chip *chip)
 		 "tpm-rng-%d", chip->dev_num);
 	chip->hwrng.name = chip->hwrng_name;
 	chip->hwrng.read = tpm_hwrng_read;
+	if (override_rng_quality > -1) {
+		dev_info(&chip->dev,
+			 "Overriding hwrng quality for %s: driver default=%d, override=%d",
+			 chip->hwrng.name, chip->hwrng.quality,
+			 override_rng_quality);
+		chip->hwrng.quality = override_rng_quality;
+	}
 	return hwrng_register(&chip->hwrng);
 }
 
