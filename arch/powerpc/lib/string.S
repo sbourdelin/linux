@@ -67,3 +67,79 @@ _GLOBAL(memchr)
 2:	li	r3,0
 	blr
 EXPORT_SYMBOL(memchr)
+
+_GLOBAL(strlen)
+	andi.   r9, r3, (SZL - 1)
+	addi	r10, r3, -SZL
+	bne-	1f
+2:	lis	r6, 0x8080
+	ori	r6, r6, 0x8080		/* r6 = 0x80808080 (himagic) */
+#ifdef CONFIG_PPC64
+	rldimi	r6, r6, 32, 0		/* r6 = 0x8080808080808080 (himagic) */
+#endif
+	PPC_ROTLI  r7, r6, 1 		/* r7 = 0x01010101(01010101) (lomagic)*/
+	.balign IFETCH_ALIGN_BYTES
+3:	PPC_LLU	r9, SZL(r10)
+	/* ((x - lomagic) & ~x & himagic) == 0 means no byte in x is NUL */
+	subf	r8, r7, r9
+	and.	r8, r8, r6
+	beq+	3b
+	andc.	r8, r8, r9
+	beq+	3b
+#ifdef CPU_LITTLE_ENDIAN
+	rldicl.	r8, r9, 0, 56
+	beq	20f
+	rldicl.	r8, r9, 56, 56
+	beq	21f
+	rldicl.	r8, r9, 48, 56
+	beq	22f
+	rldicl.	r8, r9, 40, 56
+	beq	23f
+	addi	r10, r10, 4
+	rldicl.	r8, r9, 32, 56
+	beq	20f
+	rldicl.	r8, r9, 24, 56
+	beq	21f
+	rldicl.	r8, r9, 16, 56
+	beq	22f
+	rldicl.	r8, r9, 8, 56
+#else
+#ifdef CONFIG_PPC64
+	rldicl.	r8, r9, 8, 56
+	beq	20f
+	rldicl.	r8, r9, 16, 56
+	beq	21f
+	rldicl.	r8, r9, 24, 56
+	beq	22f
+	rldicl.	r8, r9, 32, 56
+	beq	23f
+	addi	r10, r10, 4
+#endif
+	rlwinm.	r8, r9, 0, 0xff000000
+	beq	20f
+	rlwinm.	r8, r9, 0, 0x00ff0000
+	beq	21f
+	rlwinm.	r8, r9, 0, 0x0000ff00
+	beq	22f
+#endif /* CPU_LITTLE_ENDIAN */
+23:	subf	r3, r3, r10
+	addi	r3, r3, 3
+	blr
+22:	subf	r3, r3, r10
+	addi	r3, r3, 2
+	blr
+21:	subf	r3, r3, r10
+	addi	r3, r3, 1
+	blr
+19:	addi	r10, r10, (SZL - 1)
+20:	subf	r3, r3, r10
+	blr
+
+1:	lbz	r9, SZL(r10)
+	addi	r10, r10, 1
+	cmpwi	cr1, r9, 0
+	andi.	r9, r10, (SZL - 1)
+	beq	cr1, 19b
+	bne	1b
+	b	2b
+EXPORT_SYMBOL(strlen)
