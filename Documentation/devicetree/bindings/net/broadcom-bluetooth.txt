@@ -21,6 +21,12 @@ Optional properties:
  - clocks: clock specifier if external clock provided to the controller
  - clock-names: should be "extclk"
 
+ SCO routing parameters:
+ - sco-routing: 0-3 (PCM, Transport, Codec, I2S)
+ - pcm-interface-rate: 0-4 (128 Kbps - 2048 Kbps)
+ - pcm-frame-type: 0 (short), 1 (long)
+ - pcm-sync-mode: 0 (slave), 1 (master)
+ - pcm-clock-mode: 0 (slave), 1 (master)
 
 Example:
 
@@ -31,5 +37,6 @@ Example:
        bluetooth {
                compatible = "brcm,bcm43438-bt";
                max-speed = <921600>;
+               sco-routing = <1>; /* 1 = transport (UART) */
        };
 };
