@@ -1773,6 +1773,7 @@ static int __init init_hw_perf_events(void)
 	case X86_VENDOR_INTEL:
 		err = intel_pmu_init();
 		break;
+	case X86_VENDOR_HYGON:
 	case X86_VENDOR_AMD:
 		err = amd_pmu_init();
 		break;
