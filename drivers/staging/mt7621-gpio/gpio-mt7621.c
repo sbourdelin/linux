@@ -8,7 +8,6 @@
 #include <linux/gpio/driver.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/irqdomain.h>
 #include <linux/module.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
@@ -54,22 +53,14 @@ struct mtk_gc {
  * @dev: device instance
  * @gpio_membase: memory base address
  * @gpio_irq: irq number from the device tree
- * @gpio_irq_domain: irq domain for this chip
  * @gc_map: array of the gpio chips
  */
 struct mtk_data {
 	struct device *dev;
 	void __iomem *gpio_membase;
 	int gpio_irq;
-	struct irq_domain *gpio_irq_domain;
 	struct mtk_gc gc_map[MTK_BANK_CNT];
 };
-
-static inline struct mtk_gc *
-to_mediatek_gpio(struct gpio_chip *chip)
-{
-	return container_of(chip, struct mtk_gc, chip);
-}
 
 static inline void
 mtk_gpio_w32(struct mtk_gc *rg, u32 offset, u32 val)
@@ -89,63 +80,6 @@ mtk_gpio_r32(struct mtk_gc *rg, u32 offset)
 	return gc->read_reg(gpio_data->gpio_membase + offset);
 }
 
-static int
-mediatek_gpio_to_irq(struct gpio_chip *chip, unsigned int pin)
-{
-	struct mtk_data *gpio_data = gpiochip_get_data(chip);
-	struct mtk_gc *rg = to_mediatek_gpio(chip);
-
-	return irq_create_mapping(gpio_data->gpio_irq_domain,
-				  pin + (rg->bank * MTK_BANK_WIDTH));
-}
-
-static int
-mediatek_gpio_bank_probe(struct platform_device *pdev, struct device_node *bank)
-{
-	struct mtk_data *gpio_data = dev_get_drvdata(&pdev->dev);
-	const __be32 *id = of_get_property(bank, "reg", NULL);
-	struct mtk_gc *rg;
-	int ret;
-
-	if (!id || be32_to_cpu(*id) >= MTK_BANK_CNT)
-		return -EINVAL;
-
-	rg = &gpio_data->gc_map[be32_to_cpu(*id)];
-	memset(rg, 0, sizeof(*rg));
-
-	spin_lock_init(&rg->lock);
-	rg->bank = be32_to_cpu(*id);
-
-	ret = bgpio_init(&rg->chip, &pdev->dev, 4,
-			 gpio_data->gpio_membase + GPIO_REG_DATA(rg->bank),
-			 gpio_data->gpio_membase + GPIO_REG_DSET(rg->bank),
-			 gpio_data->gpio_membase + GPIO_REG_DCLR(rg->bank),
-			 gpio_data->gpio_membase + GPIO_REG_CTRL(rg->bank),
-			 gpio_data->gpio_membase + GPIO_REG_CTRL(rg->bank),
-			 0);
-	if (ret) {
-		dev_err(&pdev->dev, "bgpio_init() failed\n");
-		return ret;
-	}
-
-	if (gpio_data->gpio_irq_domain)
-		rg->chip.to_irq = mediatek_gpio_to_irq;
-
-	ret = devm_gpiochip_add_data(&pdev->dev, &rg->chip, gpio_data);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Could not register gpio %d, ret=%d\n",
-			rg->chip.ngpio, ret);
-		return ret;
-	}
-
-	/* set polarity to low for all gpios */
-	mtk_gpio_w32(rg, GPIO_REG_POL(rg->bank), 0);
-
-	dev_info(&pdev->dev, "registering %d gpios\n", rg->chip.ngpio);
-
-	return 0;
-}
-
 static void
 mediatek_gpio_irq_handler(struct irq_desc *desc)
 {
@@ -163,7 +97,7 @@ mediatek_gpio_irq_handler(struct irq_desc *desc)
 		pending = mtk_gpio_r32(rg, GPIO_REG_STAT(rg->bank));
 
 		for_each_set_bit(bit, &pending, MTK_BANK_WIDTH) {
-			u32 map = irq_find_mapping(gpio_data->gpio_irq_domain,
+			u32 map = irq_find_mapping(rg->chip.irq.domain,
 						   (MTK_BANK_WIDTH * i) + bit);
 
 			generic_handle_irq(map);
@@ -308,6 +242,62 @@ static const struct irq_domain_ops irq_domain_ops = {
 };
 
 static int
+mediatek_gpio_bank_probe(struct platform_device *pdev, struct device_node *bank)
+{
+	struct mtk_data *gpio_data = dev_get_drvdata(&pdev->dev);
+	const __be32 *id = of_get_property(bank, "reg", NULL);
+	struct mtk_gc *rg;
+	int ret;
+
+	if (!id || be32_to_cpu(*id) >= MTK_BANK_CNT)
+		return -EINVAL;
+
+	rg = &gpio_data->gc_map[be32_to_cpu(*id)];
+	memset(rg, 0, sizeof(*rg));
+
+	spin_lock_init(&rg->lock);
+	rg->bank = be32_to_cpu(*id);
+
+	ret = bgpio_init(&rg->chip, &pdev->dev, 4,
+			 gpio_data->gpio_membase + GPIO_REG_DATA(rg->bank),
+			 gpio_data->gpio_membase + GPIO_REG_DSET(rg->bank),
+			 gpio_data->gpio_membase + GPIO_REG_DCLR(rg->bank),
+			 gpio_data->gpio_membase + GPIO_REG_CTRL(rg->bank),
+			 gpio_data->gpio_membase + GPIO_REG_CTRL(rg->bank),
+			 0);
+	if (ret) {
+		dev_err(&pdev->dev, "bgpio_init() failed\n");
+		return ret;
+	}
+
+	ret = devm_gpiochip_add_data(&pdev->dev, &rg->chip, gpio_data);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Could not register gpio %d, ret=%d\n",
+			rg->chip.ngpio, ret);
+		return ret;
+	}
+
+	ret = gpiochip_irqchip_add(&rg->chip, &mediatek_gpio_irq_chip,
+				   0, handle_simple_irq, IRQ_TYPE_NONE);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to add gpiochip_irqchip\n");
+		return ret;
+	}
+
+	gpiochip_set_chained_irqchip(&rg->chip, &mediatek_gpio_irq_chip,
+				     gpio_data->gpio_irq,
+				     mediatek_gpio_irq_handler);
+
+	/* set polarity to low for all gpios */
+	mtk_gpio_w32(rg, GPIO_REG_POL(rg->bank), 0);
+
+	dev_info(&pdev->dev, "registering %d gpios\n", rg->chip.ngpio);
+
+	return 0;
+}
+
+
+static int
 mediatek_gpio_probe(struct platform_device *pdev)
 {
 	struct device_node *bank, *np = pdev->dev.of_node;
@@ -323,25 +313,12 @@ mediatek_gpio_probe(struct platform_device *pdev)
 		return PTR_ERR(gpio_data->gpio_membase);
 
 	gpio_data->gpio_irq = irq_of_parse_and_map(np, 0);
-	if (gpio_data->gpio_irq) {
-		gpio_data->gpio_irq_domain = irq_domain_add_linear(np,
-			MTK_BANK_CNT * MTK_BANK_WIDTH,
-			&irq_domain_ops, gpio_data);
-		if (!gpio_data->gpio_irq_domain)
-			dev_err(&pdev->dev, "irq_domain_add_linear failed\n");
-	}
-
 	gpio_data->dev = &pdev->dev;
 	platform_set_drvdata(pdev, gpio_data);
 
 	for_each_child_of_node(np, bank)
 		if (of_device_is_compatible(bank, "mediatek,mt7621-gpio-bank"))
 			mediatek_gpio_bank_probe(pdev, bank);
-
-	if (gpio_data->gpio_irq_domain)
-		irq_set_chained_handler_and_data(gpio_data->gpio_irq,
-						 mediatek_gpio_irq_handler,
-						 gpio_data);
 
 	return 0;
 }
