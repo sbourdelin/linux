@@ -49,7 +49,8 @@ static inline void k8_check_syscfg_dram_mod_en(void)
 {
 	u32 lo, hi;
 
-	if (!((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
+	if (!((boot_cpu_data.x86_vendor == X86_VENDOR_AMD ||
+	       boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) &&
 	      (boot_cpu_data.x86 >= 0x0f)))
 		return;
 
