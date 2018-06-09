@@ -623,12 +623,13 @@ static void rtsx_release_resources(struct rtsx_dev *dev)
 
 	if (dev->irq > 0)
 		free_irq(dev->irq, (void *)dev);
-	if (dev->chip->msi_en)
+	if (dev->chip && dev->chip->msi_en)
 		pci_disable_msi(dev->pci);
 	if (dev->remap_addr)
 		iounmap(dev->remap_addr);
+	if (dev->chip)
+		rtsx_release_chip(dev->chip);
 
-	rtsx_release_chip(dev->chip);
 	kfree(dev->chip);
 }
 
