@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/platform_data/ams-delta-fiq.h>
+#include <linux/platform_device.h>
 
 #include <mach/board-ams-delta.h>
 
@@ -84,7 +85,8 @@ static irqreturn_t deferred_fiq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-void __init ams_delta_init_fiq(struct gpio_chip *chip)
+void __init ams_delta_init_fiq(struct gpio_chip *chip,
+			       struct platform_device *serio)
 {
 	struct gpio_desc *gpiod, *data = NULL, *clk = NULL;
 	void *fiqhandler_start;
@@ -200,6 +202,10 @@ void __init ams_delta_init_fiq(struct gpio_chip *chip)
 	offset = IRQ_ILR0_REG_OFFSET + (INT_GPIO_BANK1 - NR_IRQS_LEGACY) * 0x4;
 	val = omap_readl(OMAP_IH1_BASE + offset) | 1;
 	omap_writel(val, OMAP_IH1_BASE + offset);
+
+	/* Initialize serio device IRQ resource */
+	serio->resource[0].start = gpiod_to_irq(clk);
+	serio->resource[0].end = serio->resource[0].start;
 
 	return;
 
