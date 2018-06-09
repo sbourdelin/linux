@@ -2596,7 +2596,8 @@ static void rtllib_start_ibss_wq(void *data)
 
 	if (ieee->current_network.ssid_len == 0) {
 		strcpy(ieee->current_network.ssid, RTLLIB_DEFAULT_TX_ESSID);
-		ieee->current_network.ssid_len = strlen(RTLLIB_DEFAULT_TX_ESSID);
+		ieee->current_network.ssid_len =
+			strlen(RTLLIB_DEFAULT_TX_ESSID);
 		ieee->ssid_set = 1;
 	}
 
