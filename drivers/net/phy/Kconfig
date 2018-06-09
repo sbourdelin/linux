@@ -387,6 +387,15 @@ config NATIONAL_PHY
 	---help---
 	  Currently supports the DP83865 PHY.
 
+config NXP_TJA1100_PHY
+	tristate "NXP TJA1100 PHY"
+	help
+	  Support of NXP TJA1100 BroadR-REACH ethernet PHY.
+	  Generic driver is not suitable for TJA1100 PHY while the PHY does not
+	  advertise any standard IEEE capabilities. It uses custom BroadR-REACH
+	  able flag instead. This driver configures capabilities of the PHY
+	  properly.
+
 config QSEMI_PHY
 	tristate "Quality Semiconductor PHYs"
 	---help---
