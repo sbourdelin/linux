@@ -46,6 +46,7 @@ struct veth_priv {
 	unsigned		requested_headroom;
 	bool			rx_notify_masked;
 	struct ptr_ring		xdp_ring;
+	struct ptr_ring		xdp_tx_ring;
 	struct xdp_rxq_info	xdp_rxq;
 };
 
@@ -113,6 +114,11 @@ static const struct ethtool_ops veth_ethtool_ops = {
 };
 
 /* general routines */
+
+static void veth_xdp_free(void *frame)
+{
+	xdp_return_frame(frame);
+}
 
 static void __veth_xdp_flush(struct veth_priv *priv)
 {
@@ -248,6 +254,61 @@ static struct sk_buff *veth_build_skb(void *head, int headroom, int len,
 	return skb;
 }
 
+static struct sk_buff *veth_xdp_rcv_one(struct veth_priv *priv,
+					struct xdp_frame *frame)
+{
+	int len = frame->len, delta = 0;
+	struct bpf_prog *xdp_prog;
+	unsigned int headroom;
+	struct sk_buff *skb;
+
+	rcu_read_lock();
+	xdp_prog = rcu_dereference(priv->xdp_prog);
+	if (xdp_prog) {
+		struct xdp_buff xdp;
+		u32 act;
+
+		xdp.data_hard_start = frame->data - frame->headroom;
+		xdp.data = frame->data;
+		xdp.data_end = frame->data + frame->len;
+		xdp.data_meta = frame->data - frame->metasize;
+		xdp.rxq = &priv->xdp_rxq;
+
+		act = bpf_prog_run_xdp(xdp_prog, &xdp);
+
+		switch (act) {
+		case XDP_PASS:
+			delta = frame->data - xdp.data;
+			len = xdp.data_end - xdp.data;
+			break;
+		default:
+			bpf_warn_invalid_xdp_action(act);
+		case XDP_ABORTED:
+			trace_xdp_exception(priv->dev, xdp_prog, act);
+		case XDP_DROP:
+			goto err_xdp;
+		}
+	}
+	rcu_read_unlock();
+
+	headroom = frame->data - delta - (void *)frame;
+	skb = veth_build_skb(frame, headroom, len, 0);
+	if (!skb) {
+		xdp_return_frame(frame);
+		goto err;
+	}
+
+	memset(frame, 0, sizeof(*frame));
+	skb->protocol = eth_type_trans(skb, priv->dev);
+err:
+	return skb;
+err_xdp:
+	rcu_read_unlock();
+	xdp_return_frame(frame);
+
+	return NULL;
+}
+
 static struct sk_buff *veth_xdp_rcv_skb(struct veth_priv *priv,
 					struct sk_buff *skb)
 {
@@ -352,21 +413,53 @@ drop:
 
 static int veth_xdp_rcv(struct veth_priv *priv, int budget)
 {
-	int i, done = 0;
+	int done = 0;
+	bool more;
 
-	for (i = 0; i < budget; i++) {
-		struct sk_buff *skb = __ptr_ring_consume(&priv->xdp_ring);
+	do {
+		int curr_budget, i;
+		bool curr_more;
 
-		if (!skb)
-			break;
+		more = false;
 
-		skb = veth_xdp_rcv_skb(priv, skb);
+		curr_more = true;
+		curr_budget = min(budget - done, budget >> 1);
+		for (i = 0; i < curr_budget; i++) {
+			struct xdp_frame *frame;
+			struct sk_buff *skb;
 
-		if (skb)
-			napi_gro_receive(&priv->xdp_napi, skb);
+			frame = __ptr_ring_consume(&priv->xdp_tx_ring);
+			if (!frame) {
+				curr_more = false;
+				break;
+			}
 
-		done++;
-	}
+			skb = veth_xdp_rcv_one(priv, frame);
+			if (skb)
+				napi_gro_receive(&priv->xdp_napi, skb);
+
+			done++;
+		}
+		more |= curr_more;
+
+		curr_more = true;
+		curr_budget = min(budget - done, budget >> 1);
+		for (i = 0; i < curr_budget; i++) {
+			struct sk_buff *skb = __ptr_ring_consume(&priv->xdp_ring);
+
+			if (!skb) {
+				curr_more = false;
+				break;
+			}
+
+			skb = veth_xdp_rcv_skb(priv, skb);
+			if (skb)
+				napi_gro_receive(&priv->xdp_napi, skb);
+
+			done++;
+		}
+		more |= curr_more;
+	} while (more && done < budget);
 
 	return done;
 }
@@ -382,7 +475,8 @@ static int veth_poll(struct napi_struct *napi, int budget)
 	if (done < budget && napi_complete_done(napi, done)) {
 		/* Write rx_notify_masked before reading ptr_ring */
 		smp_store_mb(priv->rx_notify_masked, false);
-		if (unlikely(!__ptr_ring_empty(&priv->xdp_ring))) {
+		if (unlikely(!__ptr_ring_empty(&priv->xdp_tx_ring) ||
+			     !__ptr_ring_empty(&priv->xdp_ring))) {
 			priv->rx_notify_masked = true;
 			napi_schedule(&priv->xdp_napi);
 		}
@@ -400,10 +494,18 @@ static int veth_napi_add(struct net_device *dev)
 	if (err)
 		return err;
 
+	err = ptr_ring_init(&priv->xdp_tx_ring, VETH_RING_SIZE, GFP_KERNEL);
+	if (err)
+		goto err_xdp_tx_ring;
+
 	netif_napi_add(dev, &priv->xdp_napi, veth_poll, NAPI_POLL_WEIGHT);
 	napi_enable(&priv->xdp_napi);
 
 	return 0;
+err_xdp_tx_ring:
+	ptr_ring_cleanup(&priv->xdp_ring, __skb_array_destroy_skb);
+
+	return err;
 }
 
 static void veth_napi_del(struct net_device *dev)
@@ -413,6 +515,7 @@ static void veth_napi_del(struct net_device *dev)
 	napi_disable(&priv->xdp_napi);
 	netif_napi_del(&priv->xdp_napi);
 	ptr_ring_cleanup(&priv->xdp_ring, __skb_array_destroy_skb);
+	ptr_ring_cleanup(&priv->xdp_tx_ring, veth_xdp_free);
 }
 
 static int veth_enable_xdp(struct net_device *dev)
