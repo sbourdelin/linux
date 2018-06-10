@@ -138,7 +138,7 @@ static void __veth_xdp_flush(struct veth_rq *rq)
 
 static int veth_xdp_rx(struct veth_rq *rq, struct sk_buff *skb)
 {
-	if (unlikely(ptr_ring_produce(&rq->xdp_ring, skb))) {
+	if (unlikely(__ptr_ring_produce(&rq->xdp_ring, skb))) {
 		dev_kfree_skb_any(skb);
 		return NET_RX_DROP;
 	}
@@ -188,7 +188,7 @@ drop:
 		atomic64_inc(&priv->dropped);
 	}
 
-	if (rcv_xdp)
+	if (rcv_xdp && !skb->xmit_more)
 		__veth_xdp_flush(rq);
 
 	rcu_read_unlock();
@@ -829,14 +829,20 @@ static netdev_features_t veth_fix_features(struct net_device *dev,
 {
 	struct veth_priv *priv = netdev_priv(dev);
 	struct net_device *peer;
+	bool xdp = false;
 
 	peer = rtnl_dereference(priv->peer);
 	if (peer) {
 		struct veth_priv *peer_priv = netdev_priv(peer);
 
 		if (rtnl_dereference(peer_priv->rq[0].xdp_prog))
-			features &= ~NETIF_F_GSO_SOFTWARE;
+			xdp = true;
 	}
+
+	if (xdp)
+		features &= ~(NETIF_F_GSO_SOFTWARE | NETIF_F_LLTX);
+	else
+		features |= NETIF_F_LLTX;
 
 	return features;
 }
