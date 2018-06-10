@@ -44,6 +44,7 @@ struct veth_priv {
 	struct bpf_prog __rcu	*xdp_prog;
 	struct net_device __rcu	*peer;
 	atomic64_t		dropped;
+	struct xdp_mem_info	xdp_mem;
 	unsigned		requested_headroom;
 	bool			rx_notify_masked;
 	struct ptr_ring		xdp_ring;
@@ -292,10 +293,42 @@ static int veth_xdp_xmit(struct net_device *dev, int n,
 	return n - drops;
 }
 
+static void veth_xdp_flush(struct net_device *dev)
+{
+	struct veth_priv *rcv_priv, *priv = netdev_priv(dev);
+	struct net_device *rcv;
+
+	rcu_read_lock();
+	rcv = rcu_dereference(priv->peer);
+	if (unlikely(!rcv))
+		goto out;
+
+	rcv_priv = netdev_priv(rcv);
+	/* xdp_ring is initialized on receive side? */
+	if (unlikely(!rcu_access_pointer(rcv_priv->xdp_prog)))
+		goto out;
+
+	__veth_xdp_flush(rcv_priv);
+out:
+	rcu_read_unlock();
+}
+
+static int veth_xdp_tx(struct net_device *dev, struct xdp_buff *xdp)
+{
+	struct xdp_frame *frame = convert_to_xdp_frame(xdp);
+
+	if (unlikely(!frame))
+		return -EOVERFLOW;
+
+	return veth_xdp_xmit(dev, 1, &frame, 0);
+}
+
 static struct sk_buff *veth_xdp_rcv_one(struct veth_priv *priv,
-					struct xdp_frame *frame)
+					struct xdp_frame *frame, bool *xdp_xmit,
+					bool *xdp_redir)
 {
 	int len = frame->len, delta = 0;
+	struct xdp_frame orig_frame;
 	struct bpf_prog *xdp_prog;
 	unsigned int headroom;
 	struct sk_buff *skb;
@@ -319,6 +352,31 @@ static struct sk_buff *veth_xdp_rcv_one(struct veth_priv *priv,
 			delta = frame->data - xdp.data;
 			len = xdp.data_end - xdp.data;
 			break;
+		case XDP_TX:
+			orig_frame = *frame;
+			xdp.data_hard_start = frame;
+			xdp.rxq->mem = frame->mem;
+			xdp.rxq->mem.flags |= XDP_MEM_RF_NO_DIRECT;
+			if (unlikely(veth_xdp_tx(priv->dev, &xdp))) {
+				trace_xdp_exception(priv->dev, xdp_prog, act);
+				frame = &orig_frame;
+				goto err_xdp;
+			}
+			*xdp_xmit = true;
+			rcu_read_unlock();
+			goto xdp_xmit;
+		case XDP_REDIRECT:
+			orig_frame = *frame;
+			xdp.data_hard_start = frame;
+			xdp.rxq->mem = frame->mem;
+			xdp.rxq->mem.flags |= XDP_MEM_RF_NO_DIRECT;
+			if (xdp_do_redirect(priv->dev, &xdp, xdp_prog)) {
+				frame = &orig_frame;
+				goto err_xdp;
+			}
+			*xdp_redir = true;
+			rcu_read_unlock();
+			goto xdp_xmit;
 		default:
 			bpf_warn_invalid_xdp_action(act);
 		case XDP_ABORTED:
@@ -343,12 +401,13 @@ err:
 err_xdp:
 	rcu_read_unlock();
 	xdp_return_frame(frame);
-
+xdp_xmit:
 	return NULL;
 }
 
 static struct sk_buff *veth_xdp_rcv_skb(struct veth_priv *priv,
-					struct sk_buff *skb)
+					struct sk_buff *skb, bool *xdp_xmit,
+					bool *xdp_redir)
 {
 	u32 pktlen, headroom, act, metalen;
 	void *orig_data, *orig_data_end;
@@ -417,6 +476,26 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_priv *priv,
 	switch (act) {
 	case XDP_PASS:
 		break;
+	case XDP_TX:
+		get_page(virt_to_page(xdp.data));
+		dev_consume_skb_any(skb);
+		xdp.rxq->mem = priv->xdp_mem;
+		if (unlikely(veth_xdp_tx(priv->dev, &xdp))) {
+			trace_xdp_exception(priv->dev, xdp_prog, act);
+			goto err_xdp;
+		}
+		*xdp_xmit = true;
+		rcu_read_unlock();
+		goto xdp_xmit;
+	case XDP_REDIRECT:
+		get_page(virt_to_page(xdp.data));
+		dev_consume_skb_any(skb);
+		xdp.rxq->mem = priv->xdp_mem;
+		if (xdp_do_redirect(priv->dev, &xdp, xdp_prog))
+			goto err_xdp;
+		*xdp_redir = true;
+		rcu_read_unlock();
+		goto xdp_xmit;
 	default:
 		bpf_warn_invalid_xdp_action(act);
 	case XDP_ABORTED:
@@ -447,9 +526,15 @@ drop:
 	rcu_read_unlock();
 	dev_kfree_skb_any(skb);
 	return NULL;
+err_xdp:
+	rcu_read_unlock();
+	page_frag_free(xdp.data);
+xdp_xmit:
+	return NULL;
 }
 
-static int veth_xdp_rcv(struct veth_priv *priv, int budget)
+static int veth_xdp_rcv(struct veth_priv *priv, int budget, bool *xdp_xmit,
+			bool *xdp_redir)
 {
 	int done = 0;
 	bool more;
@@ -472,7 +557,7 @@ static int veth_xdp_rcv(struct veth_priv *priv, int budget)
 				break;
 			}
 
-			skb = veth_xdp_rcv_one(priv, frame);
+			skb = veth_xdp_rcv_one(priv, frame, xdp_xmit, xdp_redir);
 			if (skb)
 				napi_gro_receive(&priv->xdp_napi, skb);
 
@@ -490,7 +575,7 @@ static int veth_xdp_rcv(struct veth_priv *priv, int budget)
 				break;
 			}
 
-			skb = veth_xdp_rcv_skb(priv, skb);
+			skb = veth_xdp_rcv_skb(priv, skb, xdp_xmit, xdp_redir);
 			if (skb)
 				napi_gro_receive(&priv->xdp_napi, skb);
 
@@ -506,9 +591,11 @@ static int veth_poll(struct napi_struct *napi, int budget)
 {
 	struct veth_priv *priv =
 		container_of(napi, struct veth_priv, xdp_napi);
+	bool xdp_xmit = false;
+	bool xdp_redir = false;
 	int done;
 
-	done = veth_xdp_rcv(priv, budget);
+	done = veth_xdp_rcv(priv, budget, &xdp_xmit, &xdp_redir);
 
 	if (done < budget && napi_complete_done(napi, done)) {
 		/* Write rx_notify_masked before reading ptr_ring */
@@ -519,6 +606,11 @@ static int veth_poll(struct napi_struct *napi, int budget)
 			napi_schedule(&priv->xdp_napi);
 		}
 	}
+
+	if (xdp_xmit)
+		veth_xdp_flush(priv->dev);
+	if (xdp_redir)
+		xdp_do_flush_map();
 
 	return done;
 }
@@ -570,6 +662,9 @@ static int veth_enable_xdp(struct net_device *dev)
 	if (err < 0)
 		goto err;
 
+	/* Save original mem info as it can be overwritten */
+	priv->xdp_mem = priv->xdp_rxq.mem;
+
 	err = veth_napi_add(dev);
 	if (err)
 		goto err;
@@ -586,6 +681,7 @@ static void veth_disable_xdp(struct net_device *dev)
 	struct veth_priv *priv = netdev_priv(dev);
 
 	veth_napi_del(dev);
+	priv->xdp_rxq.mem = priv->xdp_mem;
 	xdp_rxq_info_unreg(&priv->xdp_rxq);
 }
 
