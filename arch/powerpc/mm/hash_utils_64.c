@@ -845,8 +845,6 @@ static void __init hash_init_partition_table(phys_addr_t hash_table,
 	htab_size =  __ilog2(htab_size) - 18;
 	mmu_partition_table_set_entry(0, hash_table | htab_size, 0);
 	pr_info("Partition table %p\n", partition_tb);
-	if (cpu_has_feature(CPU_FTR_POWER9_DD1))
-		update_hid_for_hash();
 }
 
 static void __init htab_initialize(void)
@@ -1076,9 +1074,6 @@ void hash__early_init_mmu_secondary(void)
 {
 	/* Initialize hash table for that CPU */
 	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
-
-		if (cpu_has_feature(CPU_FTR_POWER9_DD1))
-			update_hid_for_hash();
 
 		if (!cpu_has_feature(CPU_FTR_ARCH_300))
 			mtspr(SPRN_SDR1, _SDR1);

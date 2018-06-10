@@ -25,18 +25,6 @@ static void GLUE(X_PFX,ack_pending)(struct kvmppc_xive_vcpu *xc)
 	 */
 	eieio();
 
-	/*
-	 * DD1 bug workaround: If PIPR is less favored than CPPR
-	 * ignore the interrupt or we might incorrectly lose an IPB
-	 * bit.
-	 */
-	if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
-		__be64 qw1 = __x_readq(__x_tima + TM_QW1_OS);
-		u8 pipr = be64_to_cpu(qw1) & 0xff;
-		if (pipr >= xc->hw_cppr)
-			return;
-	}
-
 	/* Perform the acknowledge OS to register cycle. */
 	ack = be16_to_cpu(__x_readw(__x_tima + TM_SPC_ACK_OS_REG));
 
@@ -105,7 +93,7 @@ static void GLUE(X_PFX,source_eoi)(u32 hw_irq, struct xive_irq_data *xd)
 		 *
 		 * For LSIs, using the HW EOI cycle works around a problem
 		 * on P9 DD1 PHBs where the other ESB accesses don't work
-		 * properly.
+		 * properly. XXX: can this be removed?
 		 */
 		if (xd->flags & XIVE_IRQ_FLAG_LSI)
 			__x_readq(__x_eoi_page(xd) + XIVE_ESB_LOAD_EOI);
