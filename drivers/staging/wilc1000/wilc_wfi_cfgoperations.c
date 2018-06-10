@@ -1431,7 +1431,7 @@ void wilc_wfi_p2p_rx(struct net_device *dev, u8 *buff, u32 size)
 
 	freq = ieee80211_channel_to_frequency(curr_channel, NL80211_BAND_2GHZ);
 
-	if (!ieee80211_is_action(buff[FRAME_TYPE_ID])) {
+	if (!ieee80211_is_action(cpu_to_le16(buff[FRAME_TYPE_ID]))) {
 		cfg80211_rx_mgmt(priv->wdev, freq, 0, buff, size, 0);
 		return;
 	}
