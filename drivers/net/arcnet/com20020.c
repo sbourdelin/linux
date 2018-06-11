@@ -43,7 +43,7 @@
 #include "com20020.h"
 
 static const char * const clockrates[] = {
-	"XXXXXXX", "XXXXXXXX", "XXXXXX", "2.5 Mb/s",
+	"10 Mb/s", "XXXXXXXX", "XXXXXX", "2.5 Mb/s",
 	"1.25Mb/s", "625 Kb/s", "312.5 Kb/s", "156.25 Kb/s",
 	"Reserved", "Reserved", "Reserved"
 };
@@ -429,7 +429,8 @@ static void com20020_set_mc_list(struct net_device *dev)
 
 #if defined(CONFIG_ARCNET_COM20020_PCI_MODULE) || \
     defined(CONFIG_ARCNET_COM20020_ISA_MODULE) || \
-    defined(CONFIG_ARCNET_COM20020_CS_MODULE)
+    defined(CONFIG_ARCNET_COM20020_CS_MODULE)  || \
+    defined(CONFIG_ARCNET_COM20020_IO)
 EXPORT_SYMBOL(com20020_check);
 EXPORT_SYMBOL(com20020_found);
 EXPORT_SYMBOL(com20020_netdev_ops);
