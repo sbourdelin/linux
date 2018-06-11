@@ -38,6 +38,8 @@
  * @bank: gpio bank number for the chip
  * @rising: mask for rising irqs
  * @falling: mask for falling irqs
+ * @hlevel: mask for high level irqs
+ * @llevel: mask for low level irqs
  */
 struct mtk_gc {
 	struct gpio_chip chip;
@@ -45,6 +47,8 @@ struct mtk_gc {
 	int bank;
 	u32 rising;
 	u32 falling;
+	u32 hlevel;
+	u32 llevel;
 };
 
 /**
@@ -184,7 +188,7 @@ mediatek_gpio_irq_unmask(struct irq_data *d)
 	int bank = pin / MTK_BANK_WIDTH;
 	struct mtk_gc *rg = &gpio_data->gc_map[bank];
 	unsigned long flags;
-	u32 rise, fall;
+	u32 rise, fall, high, low;
 
 	if (!rg)
 		return;
@@ -192,8 +196,12 @@ mediatek_gpio_irq_unmask(struct irq_data *d)
 	spin_lock_irqsave(&rg->lock, flags);
 	rise = mtk_gpio_r32(rg, GPIO_REG_REDGE);
 	fall = mtk_gpio_r32(rg, GPIO_REG_FEDGE);
+	high = mtk_gpio_r32(rg, GPIO_REG_HLVL);
+	low = mtk_gpio_r32(rg, GPIO_REG_LLVL);
 	mtk_gpio_w32(rg, GPIO_REG_REDGE, rise | (PIN_MASK(pin) & rg->rising));
 	mtk_gpio_w32(rg, GPIO_REG_FEDGE, fall | (PIN_MASK(pin) & rg->falling));
+	mtk_gpio_w32(rg, GPIO_REG_HLVL, high | (PIN_MASK(pin) & rg->hlevel));
+	mtk_gpio_w32(rg, GPIO_REG_LLVL, low | (PIN_MASK(pin) & rg->llevel));
 	spin_unlock_irqrestore(&rg->lock, flags);
 }
 
@@ -205,7 +213,7 @@ mediatek_gpio_irq_mask(struct irq_data *d)
 	int bank = pin / MTK_BANK_WIDTH;
 	struct mtk_gc *rg = &gpio_data->gc_map[bank];
 	unsigned long flags;
-	u32 rise, fall;
+	u32 rise, fall, high, low;
 
 	if (!rg)
 		return;
@@ -213,8 +221,12 @@ mediatek_gpio_irq_mask(struct irq_data *d)
 	spin_lock_irqsave(&rg->lock, flags);
 	rise = mtk_gpio_r32(rg, GPIO_REG_REDGE);
 	fall = mtk_gpio_r32(rg, GPIO_REG_FEDGE);
+	high = mtk_gpio_r32(rg, GPIO_REG_HLVL);
+	low = mtk_gpio_r32(rg, GPIO_REG_LLVL);
 	mtk_gpio_w32(rg, GPIO_REG_FEDGE, fall & ~PIN_MASK(pin));
 	mtk_gpio_w32(rg, GPIO_REG_REDGE, rise & ~PIN_MASK(pin));
+	mtk_gpio_w32(rg, GPIO_REG_HLVL, high & ~PIN_MASK(pin));
+	mtk_gpio_w32(rg, GPIO_REG_LLVL, low & ~PIN_MASK(pin));
 	spin_unlock_irqrestore(&rg->lock, flags);
 }
 
@@ -231,21 +243,34 @@ mediatek_gpio_irq_type(struct irq_data *d, unsigned int type)
 		return -1;
 
 	if (type == IRQ_TYPE_PROBE) {
-		if ((rg->rising | rg->falling) & mask)
+		if ((rg->rising | rg->falling |
+		     rg->hlevel | rg->llevel) & mask)
 			return 0;
 
-		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
+		type = (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING |
+			IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW);
 	}
 
-	if (type & IRQ_TYPE_EDGE_RISING)
-		rg->rising |= mask;
-	else
-		rg->rising &= ~mask;
+	if (type & IRQ_TYPE_EDGE_RISING ||
+	    type & IRQ_TYPE_EDGE_FALLING) {
+		if (type & IRQ_TYPE_EDGE_RISING)
+			rg->rising |= mask;
+		else
+			rg->rising &= ~mask;
 
-	if (type & IRQ_TYPE_EDGE_FALLING)
-		rg->falling |= mask;
-	else
-		rg->falling &= ~mask;
+		if (type & IRQ_TYPE_EDGE_FALLING)
+			rg->falling |= mask;
+		else
+			rg->falling &= ~mask;
+	} else {
+		if (type & IRQ_TYPE_LEVEL_HIGH) {
+			rg->hlevel |= mask;
+			rg->llevel &= ~mask;
+		} else {
+			rg->llevel |= mask;
+			rg->hlevel &= ~mask;
+		}
+	}
 
 	return 0;
 }
