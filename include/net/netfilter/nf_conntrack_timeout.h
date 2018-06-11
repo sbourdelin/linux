@@ -8,6 +8,7 @@
 #include <linux/refcount.h>
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_extend.h>
+#include <net/netfilter/nf_conntrack_l4proto.h>
 
 #define CTNL_TIMEOUT_NAME_MAX	32
 

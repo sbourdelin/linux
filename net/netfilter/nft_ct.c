@@ -22,6 +22,9 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_ecache.h>
 #include <net/netfilter/nf_conntrack_labels.h>
+#include <linux/netfilter/nfnetlink_cttimeout.h>
+#include <net/netfilter/nf_conntrack_timeout.h>
+#include <net/netfilter/nf_conntrack_l4proto.h>
 
 struct nft_ct {
 	enum nft_ct_keys	key:8;
@@ -32,10 +35,15 @@ struct nft_ct {
 	};
 };
 
-struct nft_ct_helper_obj  {
+struct nft_ct_helper_obj {
 	struct nf_conntrack_helper *helper4;
 	struct nf_conntrack_helper *helper6;
 	u8 l4proto;
+};
+
+struct nft_ct_timeout_obj {
+	struct ctnl_timeout *timeout;
+	struct nf_conn *tmpl;
 };
 
 #ifdef CONFIG_NF_CONNTRACK_ZONES
@@ -412,7 +420,6 @@ static int nft_ct_get_init(const struct nft_ctx *ctx,
 			return -EINVAL;
 		len = NF_CT_HELPER_NAME_LEN;
 		break;
-
 	case NFT_CT_L3PROTOCOL:
 	case NFT_CT_PROTOCOL:
 		/* For compatibility, do not report error if NFTA_CT_DIRECTION
@@ -765,6 +772,165 @@ static struct nft_expr_type nft_notrack_type __read_mostly = {
 	.owner		= THIS_MODULE,
 };
 
+static int
+ctnl_timeout_parse_policy(void *timeouts,
+			  const struct nf_conntrack_l4proto *l4proto,
+			  struct net *net, const struct nlattr *attr)
+{
+	int ret = 0;
+	struct nlattr **tb;
+
+	if (!l4proto->ctnl_timeout.nlattr_to_obj)
+		return 0;
+
+	tb = kcalloc(l4proto->ctnl_timeout.nlattr_max + 1, sizeof(*tb),
+		     GFP_KERNEL);
+
+	if (!tb)
+		return -ENOMEM;
+
+	ret = nla_parse_nested(tb, l4proto->ctnl_timeout.nlattr_max,
+			       attr, l4proto->ctnl_timeout.nla_policy,
+			       NULL);
+	if (ret < 0)
+		goto err;
+
+	ret = l4proto->ctnl_timeout.nlattr_to_obj(tb, net, timeouts);
+
+err:
+	kfree(tb);
+	return ret;
+}
+
+static void nft_ct_timeout_obj_eval(struct nft_object *obj,
+				    struct nft_regs *regs,
+				    const struct nft_pktinfo *pkt)
+{
+	const struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
+	struct ctnl_timeout *to_assign = NULL;
+	struct nf_conn_timeout *timeout_ext;
+	struct sk_buff *skb = pkt->skb;
+
+	if (!priv->tmpl ||
+	    nf_ct_is_confirmed(priv->tmpl))
+		return;
+
+	to_assign = priv->timeout;
+
+	nf_ct_set(skb, priv->tmpl, IP_CT_NEW);
+	timeout_ext = nf_ct_timeout_ext_add(priv->tmpl, priv->timeout, GFP_ATOMIC);
+
+	if (timeout_ext) {
+		rcu_assign_pointer(timeout_ext->timeout, to_assign);
+		__set_bit(IPS_CONFIRMED_BIT, &priv->tmpl->status);
+	}
+}
+
+static int nft_ct_timeout_obj_init(const struct nft_ctx *ctx,
+				   const struct nlattr * const tb[],
+				   struct nft_object *obj)
+{
+	__u8 l4num;
+	struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
+	const struct nf_conntrack_l4proto *l4proto;
+	struct ctnl_timeout *timeout, *matching = NULL;
+	struct nf_conn *tmpl;
+	const struct nf_conntrack_zone *zone = &nf_ct_zone_dflt;
+	int ret;
+	int l3num = ctx->family;
+
+	if (!tb[NFTA_CT_TIMEOUT_L4PROTO] ||
+	    !tb[NFTA_CT_TIMEOUT_DATA])
+		return -EINVAL;
+
+	if (tb[NFTA_CT_TIMEOUT_L3PROTO])
+		l3num = ntohs(nla_get_be16(tb[NFTA_CT_TIMEOUT_L3PROTO]));
+	l4num = nla_get_u8(tb[NFTA_CT_TIMEOUT_L4PROTO]);
+
+	INIT_LIST_HEAD(&ctx->net->nfct_timeout_list);
+	list_for_each_entry(timeout, &ctx->net->nfct_timeout_list, head) {
+		matching = timeout;
+		break;
+	}
+
+	if (matching) {
+		if (matching->l3num != l3num ||
+		    matching->l4proto->l4proto != l4num)
+			return -EINVAL;
+		return ctnl_timeout_parse_policy(&matching->data,
+						 matching->l4proto, ctx->net,
+						 tb[NFTA_CT_TIMEOUT_DATA]);
+	}
+
+	l4proto = nf_ct_l4proto_find_get(l3num, l4num);
+
+	if (l4proto->l4proto != l4num) {
+		ret = -EOPNOTSUPP;
+		goto err_proto_put;
+	}
+
+	timeout = kzalloc(sizeof(struct ctnl_timeout) +
+			  l4proto->ctnl_timeout.obj_size, GFP_KERNEL);
+	if (timeout == NULL) {
+		ret = -ENOMEM;
+		goto err_proto_put;
+	}
+
+	ret = ctnl_timeout_parse_policy(&timeout->data, l4proto, ctx->net,
+					tb[NFTA_CT_TIMEOUT_DATA]);
+	if (ret < 0)
+		goto err;
+	timeout->l3num = l3num;
+	timeout->l4proto = l4proto;
+	list_add_tail_rcu(&timeout->head, &ctx->net->nfct_timeout_list);
+	priv->timeout = timeout;
+	tmpl = nf_ct_tmpl_alloc(ctx->net, zone, GFP_ATOMIC);
+	tmpl->zone.id = 4;
+	priv->tmpl = tmpl;
+
+	return 0;
+err:
+	kfree(timeout);
+err_proto_put:
+	nf_ct_l4proto_put(l4proto);
+	return ret;
+}
+
+static void nft_ct_timeout_obj_destroy(const struct nft_ctx *ctx,
+				       struct nft_object *obj)
+{
+	struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
+
+	if (refcount_dec_if_one(&priv->timeout->refcnt)) {
+		nf_ct_l4proto_put(priv->timeout->l4proto);
+		list_del_rcu(&priv->timeout->head);
+		nf_ct_tmpl_free(priv->tmpl);
+	}
+}
+
+static int nft_ct_timeout_obj_dump(struct sk_buff *skb,
+				   struct nft_object *obj, bool reset)
+{
+	const struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
+	const struct ctnl_timeout *timeout = priv->timeout;
+	struct nlattr *nest_params;
+	int ret;
+
+	if (nla_put_u8(skb, NFTA_CT_TIMEOUT_L4PROTO, timeout->l4proto->l4proto) ||
+	    nla_put_be16(skb, NFTA_CT_TIMEOUT_L3PROTO, htons(priv->timeout->l3num)))
+		return -1;
+
+	nest_params = nla_nest_start(skb, NFTA_CT_TIMEOUT_DATA | NLA_F_NESTED);
+	if (!nest_params)
+		return -1;
+
+	ret = timeout->l4proto->ctnl_timeout.obj_to_nlattr(skb, &timeout->data);
+	if (ret < 0)
+		return -1;
+	nla_nest_end(skb, nest_params);
+	return 0;
+}
+
 static int nft_ct_helper_obj_init(const struct nft_ctx *ctx,
 				  const struct nlattr * const tb[],
 				  struct nft_object *obj)
@@ -932,6 +1098,30 @@ static struct nft_object_type nft_ct_helper_obj_type __read_mostly = {
 	.owner		= THIS_MODULE,
 };
 
+static const struct nla_policy nft_ct_timeout_policy[NFTA_CT_TIMEOUT_MAX + 1] = {
+	[NFTA_CT_TIMEOUT_L3PROTO] = {.type = NLA_U16 },
+	[NFTA_CT_TIMEOUT_L4PROTO] = {.type = NLA_U8 },
+	[NFTA_CT_TIMEOUT_DATA]	  = {.type = NLA_NESTED },
+};
+
+static struct nft_object_type nft_ct_timeout_obj_type;
+static const struct nft_object_ops nft_ct_timeout_obj_ops = {
+	.type		= &nft_ct_timeout_obj_type,
+	.size		= sizeof(struct nft_ct_timeout_obj),
+	.eval		= nft_ct_timeout_obj_eval,
+	.init		= nft_ct_timeout_obj_init,
+	.destroy	= nft_ct_timeout_obj_destroy,
+	.dump		= nft_ct_timeout_obj_dump,
+};
+
+static struct nft_object_type nft_ct_timeout_obj_type __read_mostly = {
+	.type		= NFT_OBJECT_CT_TIMEOUT,
+	.ops		= &nft_ct_timeout_obj_ops,
+	.maxattr = NFTA_CT_TIMEOUT_MAX,
+	.policy	= nft_ct_timeout_policy,
+	.owner		= THIS_MODULE,
+};
+
 static int __init nft_ct_module_init(void)
 {
 	int err;
@@ -949,6 +1139,9 @@ static int __init nft_ct_module_init(void)
 	err = nft_register_obj(&nft_ct_helper_obj_type);
 	if (err < 0)
 		goto err2;
+	err = nft_register_obj(&nft_ct_timeout_obj_type);
+	if (err < 0)
+		goto err2;
 
 	return 0;
 
@@ -962,6 +1155,7 @@ err1:
 static void __exit nft_ct_module_exit(void)
 {
 	nft_unregister_obj(&nft_ct_helper_obj_type);
+	nft_unregister_obj(&nft_ct_timeout_obj_type);
 	nft_unregister_expr(&nft_notrack_type);
 	nft_unregister_expr(&nft_ct_type);
 }
@@ -974,3 +1168,4 @@ MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
 MODULE_ALIAS_NFT_EXPR("ct");
 MODULE_ALIAS_NFT_EXPR("notrack");
 MODULE_ALIAS_NFT_OBJ(NFT_OBJECT_CT_HELPER);
+MODULE_ALIAS_NFT_OBJ(NFT_OBJECT_CT_TIMEOUT);
