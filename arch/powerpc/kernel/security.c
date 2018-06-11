@@ -183,3 +183,18 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr, c
 }
 #endif /* CONFIG_PPC_BOOK3S_64 */
 
+#ifdef CONFIG_PPC_FSL_BOOK3E
+ssize_t cpu_show_spectre_v1(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	if (barrier_nospec_enabled)
+		return sprintf(buf, "Mitigation: __user pointer sanitization\n");
+
+	return sprintf(buf, "Vulnerable\n");
+}
+
+ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "Vulnerable\n");
+}
+#endif /* CONFIG_PPC_FSL_BOOK3E */
+
