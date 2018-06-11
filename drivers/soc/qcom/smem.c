@@ -22,7 +22,7 @@
 #include <linux/soc/qcom/smem.h>
 
 /*
- * The Qualcomm shared memory system is a allocate only heap structure that
+ * The Qualcomm shared memory system is an allocate only heap structure that
  * consists of one of more memory areas that can be accessed by the processors
  * in the SoC.
  *
@@ -94,11 +94,11 @@
 #define SMEM_HOST_COUNT		10
 
 /**
-  * struct smem_proc_comm - proc_comm communication struct (legacy)
-  * @command:	current command to be executed
-  * @status:	status of the currently requested command
-  * @params:	parameters to the command
-  */
+ * struct smem_proc_comm - proc_comm communication struct (legacy)
+ * @command:	current command to be executed
+ * @status:	status of the currently requested command
+ * @params:	parameters to the command
+ */
 struct smem_proc_comm {
 	__le32 command;
 	__le32 status;
@@ -276,7 +276,7 @@ struct qcom_smem {
 	size_t cacheline[SMEM_HOST_COUNT];
 	u32 item_count;
 
-	unsigned num_regions;
+	unsigned int num_regions;
 	struct smem_region regions[0];
 };
 
@@ -350,7 +350,7 @@ static struct qcom_smem *__smem;
 
 static int qcom_smem_alloc_private(struct qcom_smem *smem,
 				   struct smem_partition_header *phdr,
-				   unsigned item,
+				   unsigned int item,
 				   size_t size)
 {
 	struct smem_private_entry *hdr, *end;
@@ -400,7 +400,7 @@ static int qcom_smem_alloc_private(struct qcom_smem *smem,
 }
 
 static int qcom_smem_alloc_global(struct qcom_smem *smem,
-				  unsigned item,
+				  unsigned int item,
 				  size_t size)
 {
 	struct smem_global_entry *entry;
@@ -441,7 +441,7 @@ static int qcom_smem_alloc_global(struct qcom_smem *smem,
  * Allocate space for a given smem item of size @size, given that the item is
  * not yet allocated.
  */
-int qcom_smem_alloc(unsigned host, unsigned item, size_t size)
+int qcom_smem_alloc(unsigned int host, unsigned int item, size_t size)
 {
 	struct smem_partition_header *phdr;
 	unsigned long flags;
@@ -482,14 +482,14 @@ int qcom_smem_alloc(unsigned host, unsigned item, size_t size)
 EXPORT_SYMBOL(qcom_smem_alloc);
 
 static void *qcom_smem_get_global(struct qcom_smem *smem,
-				  unsigned item,
+				  unsigned int item,
 				  size_t *size)
 {
 	struct smem_header *header;
 	struct smem_region *area;
 	struct smem_global_entry *entry;
 	u32 aux_base;
-	unsigned i;
+	unsigned int i;
 
 	header = smem->regions[0].virt_base;
 	entry = &header->toc[item];
@@ -514,7 +514,7 @@ static void *qcom_smem_get_global(struct qcom_smem *smem,
 static void *qcom_smem_get_private(struct qcom_smem *smem,
 				   struct smem_partition_header *phdr,
 				   size_t cacheline,
-				   unsigned item,
+				   unsigned int item,
 				   size_t *size)
 {
 	struct smem_private_entry *e, *end;
@@ -575,7 +575,7 @@ invalid_canary:
  * Looks up smem item and returns pointer to it. Size of smem
  * item is returned in @size.
  */
-void *qcom_smem_get(unsigned host, unsigned item, size_t *size)
+void *qcom_smem_get(unsigned int host, unsigned int item, size_t *size)
 {
 	struct smem_partition_header *phdr;
 	unsigned long flags;
@@ -621,11 +621,11 @@ EXPORT_SYMBOL(qcom_smem_get);
  * To be used by smem clients as a quick way to determine if any new
  * allocations has been made.
  */
-int qcom_smem_get_free_space(unsigned host)
+int qcom_smem_get_free_space(unsigned int host)
 {
 	struct smem_partition_header *phdr;
 	struct smem_header *header;
-	unsigned ret;
+	unsigned int ret;
 
 	if (!__smem)
 		return -EPROBE_DEFER;
@@ -902,9 +902,12 @@ static int qcom_smem_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	if (num_regions > 1 && (ret = qcom_smem_map_memory(smem, &pdev->dev,
-					"qcom,rpm-msg-ram", 1)))
-		return ret;
+	if (num_regions > 1) {
+		ret = qcom_smem_map_memory(smem, &pdev->dev,
+					"qcom,rpm-msg-ram", 1);
+		if (ret)
+			return ret;
+	}
 
 	header = smem->regions[0].virt_base;
 	if (le32_to_cpu(header->initialized) != 1 ||
