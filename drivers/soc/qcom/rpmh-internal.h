@@ -14,6 +14,7 @@
 #define MAX_CMDS_PER_TCS		16
 #define MAX_TCS_PER_TYPE		3
 #define MAX_TCS_NR			(MAX_TCS_PER_TYPE * TCS_TYPE_NR)
+#define RPMH_MAX_CTRLR			2
 
 struct rsc_drv;
 
@@ -63,7 +64,8 @@ struct rsc_drv {
 	spinlock_t lock;
 };
 
-
 int rpmh_rsc_send_data(struct rsc_drv *drv, const struct tcs_request *msg);
+
+void rpmh_tx_done(const struct tcs_request *msg, int r);
 
 #endif /* __RPM_INTERNAL_H__ */
