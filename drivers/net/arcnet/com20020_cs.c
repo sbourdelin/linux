@@ -241,6 +241,7 @@ static int com20020_config(struct pcmcia_device *link)
 	}
 
 	dev->irq = link->irq;
+	dev->ethtool_ops = &com20020_ethtool_ops;
 
 	ret = pcmcia_enable_device(link);
 	if (ret)

@@ -203,6 +203,7 @@ static int com20020_probe(struct platform_device *pdev)
 
 	dev = alloc_arcdev(NULL);
 	dev->netdev_ops = &com20020_netdev_ops;
+	dev->ethtool_ops = &com20020_ethtool_ops;
 	lp = netdev_priv(dev);
 
 	lp->card_flags = ARC_CAN_10MBIT;

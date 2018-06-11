@@ -232,6 +232,29 @@ const struct net_device_ops com20020_netdev_ops = {
 	.ndo_set_rx_mode = com20020_set_mc_list,
 };
 
+static int com20020_ethtool_regs_len(struct net_device *netdev)
+{
+	return sizeof(struct com20020_ethtool_regs);
+}
+
+static void com20020_ethtool_regs_read(struct net_device *dev,
+				       struct ethtool_regs *regs, void *p)
+{
+	struct arcnet_local *lp = netdev_priv(dev);
+	struct com20020_ethtool_regs *com_reg = p;
+
+	memset(p, 0, sizeof(struct com20020_ethtool_regs));
+
+	com_reg->status = lp->hw.status(dev) & 0xFF;
+	com_reg->diag_register = (lp->hw.status(dev) >> 8) & 0xFF;
+	com_reg->reconf_count = lp->num_recons;
+}
+
+const struct ethtool_ops com20020_ethtool_ops = {
+	.get_regs = com20020_ethtool_regs_read,
+	.get_regs_len  = com20020_ethtool_regs_len,
+};
+
 /* Set up the struct net_device associated with this card.  Called after
  * probing succeeds.
  */
@@ -438,6 +461,7 @@ static void com20020_set_mc_list(struct net_device *dev)
 EXPORT_SYMBOL(com20020_check);
 EXPORT_SYMBOL(com20020_found);
 EXPORT_SYMBOL(com20020_netdev_ops);
+EXPORT_SYMBOL(com20020_ethtool_ops);
 #endif
 
 MODULE_LICENSE("GPL");
