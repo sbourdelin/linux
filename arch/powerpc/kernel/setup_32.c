@@ -116,6 +116,11 @@ notrace void __init machine_init(u64 dt_ptr)
 	/* Do some early initialization based on the flat device tree */
 	early_init_devtree(__va(dt_ptr));
 
+	/* Apply the speculation barrier fixup */
+#ifdef CONFIG_PPC_FSL_BOOK3E
+	setup_barrier_nospec();
+#endif
+
 	early_init_mmu();
 
 	setup_kdump_trampoline();

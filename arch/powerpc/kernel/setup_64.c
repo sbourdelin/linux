@@ -327,6 +327,12 @@ void __init early_setup(unsigned long dt_ptr)
 
 	/* Apply all the dynamic patching */
 	apply_feature_fixups();
+
+	/* Apply the speculation barrier fixup */
+#ifdef CONFIG_PPC_FSL_BOOK3E
+	setup_barrier_nospec();
+#endif /* CONFIG_PPC_FSL_BOOK3E */
+
 	setup_feature_keys();
 
 	/* Initialize the hash table or TLB handling */

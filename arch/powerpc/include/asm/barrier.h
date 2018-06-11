@@ -86,6 +86,16 @@ do {									\
 // This also acts as a compiler barrier due to the memory clobber.
 #define barrier_nospec() asm (stringify_in_c(barrier_nospec_asm) ::: "memory")
 
+#elif defined(CONFIG_PPC_FSL_BOOK3E)
+/*
+ * Prevent the execution of subsequent instructions speculatively using a
+ * isync;sync instruction sequence.
+ */
+#define barrier_nospec_asm NOSPEC_BARRIER_FIXUP_SECTION; nop; nop
+
+// This also acts as a compiler barrier due to the memory clobber.
+#define barrier_nospec() asm (stringify_in_c(barrier_nospec_asm) ::: "memory")
+
 #else /* !CONFIG_PPC_BOOK3S_64 */
 #define barrier_nospec_asm
 #define barrier_nospec()

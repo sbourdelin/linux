@@ -13,7 +13,9 @@
 #include <asm/setup.h>
 
 
+#ifdef CONFIG_PPC_BOOK3S_64
 unsigned long powerpc_security_features __read_mostly = SEC_FTR_DEFAULT;
+#endif /* CONFIG_PPC_BOOK3S_64 */
 
 bool barrier_nospec_enabled;
 static bool no_nospec;
@@ -24,6 +26,7 @@ static void enable_barrier_nospec(bool enable)
 	do_barrier_nospec_fixups(enable);
 }
 
+#ifdef CONFIG_PPC_BOOK3S_64
 void setup_barrier_nospec(void)
 {
 	bool enable;
@@ -46,6 +49,15 @@ void setup_barrier_nospec(void)
 	if (!no_nospec)
 		enable_barrier_nospec(enable);
 }
+#endif /* CONFIG_PPC_BOOK3S_64 */
+
+#ifdef CONFIG_PPC_FSL_BOOK3E
+void setup_barrier_nospec(void)
+{
+	if (!no_nospec)
+		enable_barrier_nospec(true);
+}
+#endif /* CONFIG_PPC_FSL_BOOK3E */
 
 static int __init handle_nospectre_v1(char *p)
 {
@@ -92,6 +104,7 @@ static __init int barrier_nospec_debugfs_init(void)
 device_initcall(barrier_nospec_debugfs_init);
 #endif /* CONFIG_DEBUG_FS */
 
+#ifdef CONFIG_PPC_BOOK3S_64
 ssize_t cpu_show_meltdown(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	bool thread_priv;
@@ -168,3 +181,5 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr, c
 
 	return s.len;
 }
+#endif /* CONFIG_PPC_BOOK3S_64 */
+

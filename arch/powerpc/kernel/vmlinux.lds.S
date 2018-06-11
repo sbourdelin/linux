@@ -139,14 +139,16 @@ SECTIONS
 		*(__rfi_flush_fixup)
 		__stop___rfi_flush_fixup = .;
 	}
+#endif /* CONFIG_PPC64 */
 
+#if defined(CONFIG_PPC64) || defined(CONFIG_PPC_FSL_BOOK3E)
 	. = ALIGN(8);
 	__spec_barrier_fixup : AT(ADDR(__spec_barrier_fixup) - LOAD_OFFSET) {
 		__start___barrier_nospec_fixup = .;
 		*(__barrier_nospec_fixup)
 		__stop___barrier_nospec_fixup = .;
 	}
-#endif
+#endif /* CONFIG_PPC64 || CONFIG_PPC_FSL_BOOK3E */
 
 	EXCEPTION_TABLE(0)
 
