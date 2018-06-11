@@ -275,6 +275,11 @@ static bool packet_use_direct_xmit(const struct packet_sock *po)
 	return po->xmit == packet_direct_xmit;
 }
 
+static u16 packet_fallback(struct net_device *dev, struct sk_buff *skb)
+{
+	return dev_pick_tx_cpu_id(dev, skb, NULL);
+}
+
 static u16 packet_pick_tx_queue(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
@@ -283,10 +288,10 @@ static u16 packet_pick_tx_queue(struct sk_buff *skb)
 
 	if (ops->ndo_select_queue) {
 		queue_index = ops->ndo_select_queue(dev, skb, NULL,
-						    dev_pick_tx_cpu_id);
+						    packet_fallback);
 		queue_index = netdev_cap_txqueue(dev, queue_index);
 	} else {
-		queue_index = dev_pick_tx_cpu_id(dev, skb);
+		queue_index = dev_pick_tx_cpu_id(dev, skb, NULL);
 	}
 
 	return queue_index;
