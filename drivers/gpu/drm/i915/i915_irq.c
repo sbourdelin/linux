@@ -1998,10 +1998,35 @@ static void valleyview_pipestat_irq_handler(struct drm_i915_private *dev_priv,
 
 static u32 i9xx_hpd_irq_ack(struct drm_i915_private *dev_priv)
 {
-	u32 hotplug_status = I915_READ(PORT_HOTPLUG_STAT);
+	u32 hotplug_status, hotplug_en;
 
-	if (hotplug_status)
-		I915_WRITE(PORT_HOTPLUG_STAT, hotplug_status);
+	hotplug_status = I915_READ(PORT_HOTPLUG_STAT);
+
+	if (IS_G4X(dev_priv) ||
+	    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+		hotplug_status &= HOTPLUG_INT_STATUS_G4X |
+			DP_AUX_CHANNEL_MASK_INT_STATUS_G4X;
+	else
+		hotplug_status &= HOTPLUG_INT_STATUS_I915;
+
+	if (hotplug_status == 0)
+		return 0;
+
+	spin_lock(&dev_priv->irq_lock);
+
+	/*
+	 * Toggle all PORT_HOTPLUG_EN bits to make sure we
+	 * get an edge in the ISR port interrupt bit if we
+	 * don't clear all the enabled status bits. Otherwise
+	 * the edge triggered IIR on i965/g4x wouldn't notice
+	 * that an interrupt is still pending.
+	 */
+	hotplug_en = I915_READ(PORT_HOTPLUG_EN);
+	I915_WRITE(PORT_HOTPLUG_EN, 0);
+	I915_WRITE(PORT_HOTPLUG_STAT, hotplug_status);
+	I915_WRITE(PORT_HOTPLUG_EN, hotplug_en);
+
+	spin_unlock(&dev_priv->irq_lock);
 
 	return hotplug_status;
 }
