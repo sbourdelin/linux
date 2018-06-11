@@ -955,6 +955,10 @@ static int ntrig_probe(struct hid_device *hdev, const struct hid_device_id *id)
 
 	ret = sysfs_create_group(&hdev->dev.kobj,
 			&ntrig_attribute_group);
+	if (ret) {
+		hid_err(hdev, "cannot create sysfs group\n");
+		goto err_free;
+	}
 
 	return 0;
 err_free:
