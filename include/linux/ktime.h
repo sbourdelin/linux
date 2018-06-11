@@ -96,6 +96,10 @@ static inline ktime_t timeval_to_ktime(struct timeval tv)
 /* Convert ktime_t to nanoseconds - NOP in the scalar storage format: */
 #define ktime_to_ns(kt)			(kt)
 
+/* ktime to jiffies and back */
+#define ktime_to_jiffies(kt)		nsecs_to_jiffies(kt)
+#define jiffies_to_ktime(j)		jiffies_to_nsecs(j)
+
 /**
  * ktime_compare - Compares two ktime_t variables for less, greater or equal
  * @cmp1:	comparable1
