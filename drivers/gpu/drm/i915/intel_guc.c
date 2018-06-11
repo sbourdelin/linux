@@ -208,8 +208,6 @@ static u32 get_log_control_flags(void)
 	u32 level = i915_modparams.guc_log_level;
 	u32 flags = 0;
 
-	GEM_BUG_ON(level < 0);
-
 	if (!GUC_LOG_LEVEL_IS_ENABLED(level))
 		flags |= GUC_LOG_DEFAULT_DISABLED;
 
