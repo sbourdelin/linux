@@ -545,6 +545,8 @@ static int init_tp_parity(struct adapter *adap)
 	if (skb == adap->nofail_skb) {
 		i = await_mgmt_replies(adap, cnt, 16 + 2048 + 2048 + 1);
 		adap->nofail_skb = alloc_skb(sizeof(*greq), GFP_KERNEL);
+		if (!adap->nofail_skb)
+			goto alloc_skb_fail;
 	}
 
 	t3_tp_set_offload_mode(adap, 0);
@@ -3362,6 +3364,10 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	err = sysfs_create_group(&adapter->port[0]->dev.kobj,
 				 &cxgb3_attr_group);
+	if (err) {
+		dev_err(&pdev->dev, "cannot create sysfs group\n");
+		goto out_free_dev;
+	}
 
 	print_port_info(adapter, ai);
 	return 0;
