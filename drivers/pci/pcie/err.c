@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/aer.h>
+#include <linux/pm_runtime.h>
 #include "portdrv.h"
 #include "../pci.h"
 
@@ -294,6 +295,7 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
 		udev = dev->bus->self;
 
 	parent = udev->subordinate;
+	pm_runtime_forbid(&udev->dev);
 	pci_lock_rescan_remove();
 	list_for_each_entry_safe_reverse(pdev, temp, &parent->devices,
 					 bus_list) {
@@ -329,6 +331,7 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
 	}
 
 	pci_unlock_rescan_remove();
+	pm_runtime_allow(&udev->dev);
 }
 
 /**
