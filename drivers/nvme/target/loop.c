@@ -83,10 +83,11 @@ static inline int nvme_loop_queue_idx(struct nvme_loop_queue *queue)
 static void nvme_loop_complete_rq(struct request *req)
 {
 	struct nvme_loop_iod *iod = blk_mq_rq_to_pdu(req);
+	struct nvme_ctrl *ctrl = iod->queue->ctrl->ctrl;
 
 	nvme_cleanup_cmd(req);
 	sg_free_table_chained(&iod->sg_table, true);
-	nvme_complete_rq(req);
+	nvme_complete_rq(ctrl, req);
 }
 
 static struct blk_mq_tags *nvme_loop_tagset(struct nvme_loop_queue *queue)
@@ -165,7 +166,7 @@ static blk_status_t nvme_loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(ret))
 		return ret;
 
-	ret = nvme_setup_cmd(ns, req, &iod->cmd);
+	ret = nvme_setup_cmd(queue->ctrl->ctrl, ns, req, &iod->cmd);
 	if (ret)
 		return ret;
 

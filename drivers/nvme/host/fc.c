@@ -2288,7 +2288,7 @@ nvme_fc_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(ret))
 		return ret;
 
-	ret = nvme_setup_cmd(ns, rq, sqe);
+	ret = nvme_setup_cmd(ctrl->ctrl, ns, rq, sqe);
 	if (ret)
 		return ret;
 
@@ -2369,7 +2369,7 @@ nvme_fc_complete_rq(struct request *rq)
 	atomic_set(&op->state, FCPOP_STATE_IDLE);
 
 	nvme_fc_unmap_data(ctrl, rq, op);
-	nvme_complete_rq(rq);
+	nvme_complete_rq(ctrl->ctrl, rq);
 	nvme_fc_ctrl_put(ctrl);
 }
 

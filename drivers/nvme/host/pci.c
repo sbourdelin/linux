@@ -877,7 +877,7 @@ static blk_status_t nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(nvmeq->cq_vector < 0))
 		return BLK_STS_IOERR;
 
-	ret = nvme_setup_cmd(ns, req, &cmnd);
+	ret = nvme_setup_cmd(&dev->ctrl, ns, req, &cmnd);
 	if (ret)
 		return ret;
 
@@ -904,9 +904,10 @@ out_free_cmd:
 static void nvme_pci_complete_rq(struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
+	struct nvme_dev *dev = iod->nvmeq->dev;
 
-	nvme_unmap_data(iod->nvmeq->dev, req);
-	nvme_complete_rq(req);
+	nvme_unmap_data(dev, req);
+	nvme_complete_rq(&dev->ctrl, req);
 }
 
 /* We read the CQE phase first to check if the rest of the entry is valid */

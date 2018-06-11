@@ -1627,7 +1627,7 @@ static blk_status_t nvme_rdma_queue_rq(struct blk_mq_hw_ctx *hctx,
 	ib_dma_sync_single_for_cpu(dev, sqe->dma,
 			sizeof(struct nvme_command), DMA_TO_DEVICE);
 
-	ret = nvme_setup_cmd(ns, rq, c);
+	ret = nvme_setup_cmd(&queue->ctrl->ctrl, ns, rq, c);
 	if (ret)
 		return ret;
 
@@ -1684,9 +1684,10 @@ static int nvme_rdma_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
 static void nvme_rdma_complete_rq(struct request *rq)
 {
 	struct nvme_rdma_request *req = blk_mq_rq_to_pdu(rq);
+	struct nvme_ctrl *ctrl = &req->queue->ctrl->ctrl;
 
 	nvme_rdma_unmap_data(req->queue, rq);
-	nvme_complete_rq(rq);
+	nvme_complete_rq(ctrl, rq);
 }
 
 static int nvme_rdma_map_queues(struct blk_mq_tag_set *set)

@@ -229,11 +229,11 @@ static inline bool nvme_req_needs_retry(struct request *req)
 	return true;
 }
 
-void nvme_complete_rq(struct request *req)
+void nvme_complete_rq(struct nvme_ctrl *ctrl, struct request *req)
 {
 	blk_status_t status = nvme_error_status(req);
 
-	trace_nvme_complete_rq(req);
+	trace_nvme_complete_rq(ctrl->cntlid, req);
 
 	if (unlikely(status != BLK_STS_OK && nvme_req_needs_retry(req))) {
 		if (nvme_req_needs_failover(req, status)) {
@@ -622,8 +622,8 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 	return 0;
 }
 
-blk_status_t nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
-		struct nvme_command *cmd)
+blk_status_t nvme_setup_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
+			    struct request *req, struct nvme_command *cmd)
 {
 	blk_status_t ret = BLK_STS_OK;
 
@@ -653,9 +653,9 @@ blk_status_t nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
 
 	cmd->common.command_id = req->tag;
 	if (ns)
-		trace_nvme_setup_nvm_cmd(req->q->id, cmd);
+		trace_nvme_setup_nvm_cmd(ns->disk->disk_name, req->q->id, cmd);
 	else
-		trace_nvme_setup_admin_cmd(cmd);
+		trace_nvme_setup_admin_cmd(ctrl->cntlid, cmd);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(nvme_setup_cmd);
