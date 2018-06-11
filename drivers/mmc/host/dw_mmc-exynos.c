@@ -193,6 +193,9 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
 	struct dw_mci_exynos_priv_data *priv = host->priv;
 	u32 clksel;
 
+	clk_prepare_enable(host->biu_clk);
+	clk_prepare_enable(host->ciu_clk);
+
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
 		clksel = mci_readl(host, CLKSEL64);
@@ -206,6 +209,9 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
 		else
 			mci_writel(host, CLKSEL, clksel);
 	}
+
+	clk_disable_unprepare(host->biu_clk);
+	clk_disable_unprepare(host->ciu_clk);
 
 	return 0;
 }
