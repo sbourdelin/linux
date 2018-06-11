@@ -34,6 +34,7 @@
 		.cmd = { { 0 } },			\
 		.completion = q,			\
 		.dev = dev,				\
+		.needs_free = false,				\
 	}
 
 /**
@@ -59,6 +60,7 @@ struct cache_req {
  * @completion: triggered when request is done
  * @dev: the device making the request
  * @err: err return from the controller
+ * @needs_free: check to free dynamically allocated request object
  */
 struct rpmh_request {
 	struct tcs_request msg;
@@ -66,6 +68,7 @@ struct rpmh_request {
 	struct completion *completion;
 	const struct device *dev;
 	int err;
+	bool needs_free;
 };
 
 /**
@@ -131,6 +134,9 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
 	/* Signal the blocking thread we are done */
 	if (compl)
 		complete(compl);
+
+	if (rpm_msg->needs_free)
+		kfree(rpm_msg);
 }
 EXPORT_SYMBOL(rpmh_tx_done);
 
@@ -238,6 +244,53 @@ static int __rpmh_write(const struct device *dev, enum rpmh_state state,
 
 	return ret;
 }
+
+static struct rpmh_request *__get_rpmh_msg_async(enum rpmh_state state,
+						 const struct tcs_cmd *cmd,
+						 u32 n)
+{
+	struct rpmh_request *req;
+
+	if (!cmd || !n || n > MAX_RPMH_PAYLOAD)
+		return ERR_PTR(-EINVAL);
+
+	req = kzalloc(sizeof(*req), GFP_ATOMIC);
+	if (!req)
+		return ERR_PTR(-ENOMEM);
+
+	memcpy(req->cmd, cmd, n * sizeof(*cmd));
+
+	req->msg.state = state;
+	req->msg.cmds = req->cmd;
+	req->msg.num_cmds = n;
+	req->needs_free = true;
+
+	return req;
+}
+
+/**
+ * rpmh_write_async: Write a set of RPMH commands
+ *
+ * @dev: The device making the request
+ * @state: Active/sleep set
+ * @cmd: The payload data
+ * @n: The number of elements in payload
+ *
+ * Write a set of RPMH commands, the order of commands is maintained
+ * and will be sent as a single shot.
+ */
+int rpmh_write_async(const struct device *dev, enum rpmh_state state,
+		     const struct tcs_cmd *cmd, u32 n)
+{
+	struct rpmh_request *rpm_msg;
+
+	rpm_msg = __get_rpmh_msg_async(state, cmd, n);
+	if (IS_ERR(rpm_msg))
+		return PTR_ERR(rpm_msg);
+
+	return __rpmh_write(dev, state, rpm_msg);
+}
+EXPORT_SYMBOL(rpmh_write_async);
 
 /**
  * rpmh_write: Write a set of RPMH commands and block until response
