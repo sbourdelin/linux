@@ -405,7 +405,6 @@ static void wb_shutdown(struct bdi_writeback *wb)
 	set_bit(WB_shutting_down, &wb->state);
 	spin_unlock_bh(&wb->work_lock);
 
-	cgwb_remove_from_bdi_list(wb);
 	/*
 	 * Drain work list and shutdown the delayed_work.  !WB_registered
 	 * tells wb_workfn() that @wb is dying and its work_list needs to
@@ -414,6 +413,7 @@ static void wb_shutdown(struct bdi_writeback *wb)
 	mod_delayed_work(bdi_wq, &wb->dwork, 0);
 	flush_delayed_work(&wb->dwork);
 	WARN_ON(!list_empty(&wb->work_list));
+	cgwb_remove_from_bdi_list(wb);
 	/*
 	 * Make sure bit gets cleared after shutdown is finished. Matches with
 	 * the barrier provided by test_and_clear_bit() above.
@@ -576,6 +576,9 @@ static void cgwb_remove_from_bdi_list(struct bdi_writeback *wb)
 	spin_lock_irq(&cgwb_lock);
 	list_del_rcu(&wb->bdi_node);
 	spin_unlock_irq(&cgwb_lock);
+	/* Last wb of the bdi? Wake up waiters for shutdown of all wbs. */
+	if (list_empty(&wb->bdi->wb_list))
+		wake_up_all(&wb->bdi->wb_waitq);
 }
 
 static int cgwb_create(struct backing_dev_info *bdi,
@@ -745,22 +748,16 @@ static void cgwb_bdi_unregister(struct backing_dev_info *bdi)
 {
 	struct radix_tree_iter iter;
 	void **slot;
-	struct bdi_writeback *wb;
 
 	WARN_ON(test_bit(WB_registered, &bdi->wb.state));
 
 	spin_lock_irq(&cgwb_lock);
 	radix_tree_for_each_slot(slot, &bdi->cgwb_tree, &iter, 0)
 		cgwb_kill(*slot);
-
-	while (!list_empty(&bdi->wb_list)) {
-		wb = list_first_entry(&bdi->wb_list, struct bdi_writeback,
-				      bdi_node);
-		spin_unlock_irq(&cgwb_lock);
-		wb_shutdown(wb);
-		spin_lock_irq(&cgwb_lock);
-	}
 	spin_unlock_irq(&cgwb_lock);
+
+	/* Wait for all writeback structures to shutdown */
+	wait_event(bdi->wb_waitq, list_empty(&bdi->wb_list));
 }
 
 /**
