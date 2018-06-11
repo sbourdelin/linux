@@ -439,7 +439,7 @@ static int ima_release_policy(struct inode *inode, struct file *file)
 #elif defined(CONFIG_IMA_WRITE_POLICY)
 	clear_bit(IMA_FS_BUSY, &ima_fs_flags);
 #elif defined(CONFIG_IMA_READ_POLICY)
-	inode->i_mode &= ~S_IWUSR;
+	inode->i_mode &= ~0200;
 #endif
 	return 0;
 }
@@ -465,28 +465,29 @@ int __init ima_fs_init(void)
 
 	binary_runtime_measurements =
 	    securityfs_create_file("binary_runtime_measurements",
-				   S_IRUSR | S_IRGRP, ima_dir, NULL,
+				   0440, ima_dir, NULL,
 				   &ima_measurements_ops);
 	if (IS_ERR(binary_runtime_measurements))
 		goto out;
 
 	ascii_runtime_measurements =
 	    securityfs_create_file("ascii_runtime_measurements",
-				   S_IRUSR | S_IRGRP, ima_dir, NULL,
+				   0440, ima_dir, NULL,
 				   &ima_ascii_measurements_ops);
 	if (IS_ERR(ascii_runtime_measurements))
 		goto out;
 
 	runtime_measurements_count =
 	    securityfs_create_file("runtime_measurements_count",
-				   S_IRUSR | S_IRGRP, ima_dir, NULL,
+				   0440, ima_dir, NULL,
 				   &ima_measurements_count_ops);
 	if (IS_ERR(runtime_measurements_count))
 		goto out;
 
 	violations =
-	    securityfs_create_file("violations", S_IRUSR | S_IRGRP,
-				   ima_dir, NULL, &ima_htable_violations_ops);
+		securityfs_create_file("violations",
+				       0440, ima_dir, NULL,
+				       &ima_htable_violations_ops);
 	if (IS_ERR(violations))
 		goto out;
 

@@ -314,9 +314,9 @@ static inline int security_filter_rule_match(u32 secid, u32 field, u32 op,
 #endif /* CONFIG_IMA_LSM_RULES */
 
 #ifdef	CONFIG_IMA_READ_POLICY
-#define	POLICY_FILE_FLAGS	(S_IWUSR | S_IRUSR)
+#define	POLICY_FILE_FLAGS	0600
 #else
-#define	POLICY_FILE_FLAGS	S_IWUSR
+#define	POLICY_FILE_FLAGS	0200
 #endif /* CONFIG_IMA_READ_POLICY */
 
 #endif /* __LINUX_IMA_H */

@@ -2857,55 +2857,53 @@ static int smk_fill_super(struct super_block *sb, void *data, int silent)
 
 	static const struct tree_descr smack_files[] = {
 		[SMK_LOAD] = {
-			"load", &smk_load_ops, S_IRUGO|S_IWUSR},
+			"load", &smk_load_ops, 0644},
 		[SMK_CIPSO] = {
-			"cipso", &smk_cipso_ops, S_IRUGO|S_IWUSR},
+			"cipso", &smk_cipso_ops, 0644},
 		[SMK_DOI] = {
-			"doi", &smk_doi_ops, S_IRUGO|S_IWUSR},
+			"doi", &smk_doi_ops, 0644},
 		[SMK_DIRECT] = {
-			"direct", &smk_direct_ops, S_IRUGO|S_IWUSR},
+			"direct", &smk_direct_ops, 0644},
 		[SMK_AMBIENT] = {
-			"ambient", &smk_ambient_ops, S_IRUGO|S_IWUSR},
+			"ambient", &smk_ambient_ops, 0644},
 		[SMK_NET4ADDR] = {
-			"netlabel", &smk_net4addr_ops, S_IRUGO|S_IWUSR},
+			"netlabel", &smk_net4addr_ops, 0644},
 		[SMK_ONLYCAP] = {
-			"onlycap", &smk_onlycap_ops, S_IRUGO|S_IWUSR},
+			"onlycap", &smk_onlycap_ops, 0644},
 		[SMK_LOGGING] = {
-			"logging", &smk_logging_ops, S_IRUGO|S_IWUSR},
+			"logging", &smk_logging_ops, 0644},
 		[SMK_LOAD_SELF] = {
-			"load-self", &smk_load_self_ops, S_IRUGO|S_IWUGO},
+			"load-self", &smk_load_self_ops, 0666},
 		[SMK_ACCESSES] = {
-			"access", &smk_access_ops, S_IRUGO|S_IWUGO},
+			"access", &smk_access_ops, 0666},
 		[SMK_MAPPED] = {
-			"mapped", &smk_mapped_ops, S_IRUGO|S_IWUSR},
+			"mapped", &smk_mapped_ops, 0644},
 		[SMK_LOAD2] = {
-			"load2", &smk_load2_ops, S_IRUGO|S_IWUSR},
+			"load2", &smk_load2_ops, 0644},
 		[SMK_LOAD_SELF2] = {
-			"load-self2", &smk_load_self2_ops, S_IRUGO|S_IWUGO},
+			"load-self2", &smk_load_self2_ops, 0666},
 		[SMK_ACCESS2] = {
-			"access2", &smk_access2_ops, S_IRUGO|S_IWUGO},
+			"access2", &smk_access2_ops, 0666},
 		[SMK_CIPSO2] = {
-			"cipso2", &smk_cipso2_ops, S_IRUGO|S_IWUSR},
+			"cipso2", &smk_cipso2_ops, 0644},
 		[SMK_REVOKE_SUBJ] = {
-			"revoke-subject", &smk_revoke_subj_ops,
-			S_IRUGO|S_IWUSR},
+			"revoke-subject", &smk_revoke_subj_ops, 0644},
 		[SMK_CHANGE_RULE] = {
-			"change-rule", &smk_change_rule_ops, S_IRUGO|S_IWUSR},
+			"change-rule", &smk_change_rule_ops, 0644},
 		[SMK_SYSLOG] = {
-			"syslog", &smk_syslog_ops, S_IRUGO|S_IWUSR},
+			"syslog", &smk_syslog_ops, 0644},
 		[SMK_PTRACE] = {
-			"ptrace", &smk_ptrace_ops, S_IRUGO|S_IWUSR},
+			"ptrace", &smk_ptrace_ops, 0644},
 #ifdef CONFIG_SECURITY_SMACK_BRINGUP
 		[SMK_UNCONFINED] = {
-			"unconfined", &smk_unconfined_ops, S_IRUGO|S_IWUSR},
+			"unconfined", &smk_unconfined_ops, 0644},
 #endif
 #if IS_ENABLED(CONFIG_IPV6)
 		[SMK_NET6ADDR] = {
-			"ipv6host", &smk_net6addr_ops, S_IRUGO|S_IWUSR},
+			"ipv6host", &smk_net6addr_ops, 0644},
 #endif /* CONFIG_IPV6 */
 		[SMK_RELABEL_SELF] = {
-			"relabel-self", &smk_relabel_self_ops,
-				S_IRUGO|S_IWUGO},
+			"relabel-self", &smk_relabel_self_ops, 0666},
 		/* last one */
 			{""}
 	};

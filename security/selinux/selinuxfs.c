@@ -1376,7 +1376,7 @@ static int sel_make_bools(struct selinux_fs_info *fsi)
 			goto out;
 
 		ret = -ENOMEM;
-		inode = sel_make_inode(dir->d_sb, S_IFREG | S_IRUGO | S_IWUSR);
+		inode = sel_make_inode(dir->d_sb, S_IFREG | 0644);
 		if (!inode)
 			goto out;
 
@@ -1582,10 +1582,10 @@ static int sel_make_avc_files(struct dentry *dir)
 	int i;
 	static const struct tree_descr files[] = {
 		{ "cache_threshold",
-		  &sel_avc_cache_threshold_ops, S_IRUGO|S_IWUSR },
-		{ "hash_stats", &sel_avc_hash_stats_ops, S_IRUGO },
+		  &sel_avc_cache_threshold_ops, 0644 },
+		{ "hash_stats", &sel_avc_hash_stats_ops, 0444 },
 #ifdef CONFIG_SECURITY_SELINUX_AVC_STATS
-		{ "cache_stats", &sel_avc_cache_stats_ops, S_IRUGO },
+		{ "cache_stats", &sel_avc_cache_stats_ops, 0444 },
 #endif
 	};
 
@@ -1643,7 +1643,7 @@ static int sel_make_initcon_files(struct dentry *dir)
 		if (!dentry)
 			return -ENOMEM;
 
-		inode = sel_make_inode(dir->d_sb, S_IFREG|S_IRUGO);
+		inode = sel_make_inode(dir->d_sb, S_IFREG | 0444);
 		if (!inode)
 			return -ENOMEM;
 
@@ -1744,7 +1744,7 @@ static int sel_make_perm_files(char *objclass, int classvalue,
 			goto out;
 
 		rc = -ENOMEM;
-		inode = sel_make_inode(dir->d_sb, S_IFREG|S_IRUGO);
+		inode = sel_make_inode(dir->d_sb, S_IFREG | 0444);
 		if (!inode)
 			goto out;
 
@@ -1774,7 +1774,7 @@ static int sel_make_class_dir_entries(char *classname, int index,
 	if (!dentry)
 		return -ENOMEM;
 
-	inode = sel_make_inode(dir->d_sb, S_IFREG|S_IRUGO);
+	inode = sel_make_inode(dir->d_sb, S_IFREG | 0444);
 	if (!inode)
 		return -ENOMEM;
 
@@ -1870,7 +1870,7 @@ static struct dentry *sel_make_dir(struct dentry *dir, const char *name,
 	if (!dentry)
 		return ERR_PTR(-ENOMEM);
 
-	inode = sel_make_inode(dir->d_sb, S_IFDIR | S_IRUGO | S_IXUGO);
+	inode = sel_make_inode(dir->d_sb, S_IFDIR | 0555);
 	if (!inode) {
 		dput(dentry);
 		return ERR_PTR(-ENOMEM);
@@ -1899,25 +1899,24 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode_security_struct *isec;
 
 	static const struct tree_descr selinux_files[] = {
-		[SEL_LOAD] = {"load", &sel_load_ops, S_IRUSR|S_IWUSR},
-		[SEL_ENFORCE] = {"enforce", &sel_enforce_ops, S_IRUGO|S_IWUSR},
-		[SEL_CONTEXT] = {"context", &transaction_ops, S_IRUGO|S_IWUGO},
-		[SEL_ACCESS] = {"access", &transaction_ops, S_IRUGO|S_IWUGO},
-		[SEL_CREATE] = {"create", &transaction_ops, S_IRUGO|S_IWUGO},
-		[SEL_RELABEL] = {"relabel", &transaction_ops, S_IRUGO|S_IWUGO},
-		[SEL_USER] = {"user", &transaction_ops, S_IRUGO|S_IWUGO},
-		[SEL_POLICYVERS] = {"policyvers", &sel_policyvers_ops, S_IRUGO},
-		[SEL_COMMIT_BOOLS] = {"commit_pending_bools", &sel_commit_bools_ops, S_IWUSR},
-		[SEL_MLS] = {"mls", &sel_mls_ops, S_IRUGO},
-		[SEL_DISABLE] = {"disable", &sel_disable_ops, S_IWUSR},
-		[SEL_MEMBER] = {"member", &transaction_ops, S_IRUGO|S_IWUGO},
-		[SEL_CHECKREQPROT] = {"checkreqprot", &sel_checkreqprot_ops, S_IRUGO|S_IWUSR},
-		[SEL_REJECT_UNKNOWN] = {"reject_unknown", &sel_handle_unknown_ops, S_IRUGO},
-		[SEL_DENY_UNKNOWN] = {"deny_unknown", &sel_handle_unknown_ops, S_IRUGO},
-		[SEL_STATUS] = {"status", &sel_handle_status_ops, S_IRUGO},
-		[SEL_POLICY] = {"policy", &sel_policy_ops, S_IRUGO},
-		[SEL_VALIDATE_TRANS] = {"validatetrans", &sel_transition_ops,
-					S_IWUGO},
+		[SEL_LOAD] = {"load", &sel_load_ops, 0600},
+		[SEL_ENFORCE] = {"enforce", &sel_enforce_ops, 0644},
+		[SEL_CONTEXT] = {"context", &transaction_ops, 0666},
+		[SEL_ACCESS] = {"access", &transaction_ops, 0666},
+		[SEL_CREATE] = {"create", &transaction_ops, 0666},
+		[SEL_RELABEL] = {"relabel", &transaction_ops, 0666},
+		[SEL_USER] = {"user", &transaction_ops, 0666},
+		[SEL_POLICYVERS] = {"policyvers", &sel_policyvers_ops, 0444},
+		[SEL_COMMIT_BOOLS] = {"commit_pending_bools", &sel_commit_bools_ops, 0200},
+		[SEL_MLS] = {"mls", &sel_mls_ops, 0444},
+		[SEL_DISABLE] = {"disable", &sel_disable_ops, 0200},
+		[SEL_MEMBER] = {"member", &transaction_ops, 0666},
+		[SEL_CHECKREQPROT] = {"checkreqprot", &sel_checkreqprot_ops, 0644},
+		[SEL_REJECT_UNKNOWN] = {"reject_unknown", &sel_handle_unknown_ops, 0444},
+		[SEL_DENY_UNKNOWN] = {"deny_unknown", &sel_handle_unknown_ops, 0444},
+		[SEL_STATUS] = {"status", &sel_handle_status_ops, 0444},
+		[SEL_POLICY] = {"policy", &sel_policy_ops, 0444},
+		[SEL_VALIDATE_TRANS] = {"validatetrans", &sel_transition_ops, 0222},
 		/* last one */ {""}
 	};
 
@@ -1943,7 +1942,7 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 		goto err;
 
 	ret = -ENOMEM;
-	inode = sel_make_inode(sb, S_IFCHR | S_IRUGO | S_IWUGO);
+	inode = sel_make_inode(sb, S_IFCHR | 0666);
 	if (!inode)
 		goto err;
 
@@ -1953,7 +1952,7 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 	isec->sclass = SECCLASS_CHR_FILE;
 	isec->initialized = LABEL_INITIALIZED;
 
-	init_special_inode(inode, S_IFCHR | S_IRUGO | S_IWUGO, MKDEV(MEM_MAJOR, 3));
+	init_special_inode(inode, S_IFCHR | 0666, MKDEV(MEM_MAJOR, 3));
 	d_add(dentry, inode);
 
 	dentry = sel_make_dir(sb->s_root, "avc", &fsi->last_ino);

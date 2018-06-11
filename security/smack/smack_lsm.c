@@ -2945,11 +2945,11 @@ static int smack_flags_to_may(int flags)
 {
 	int may = 0;
 
-	if (flags & S_IRUGO)
+	if (flags & 0444)
 		may |= MAY_READ;
-	if (flags & S_IWUGO)
+	if (flags & 0222)
 		may |= MAY_WRITE;
-	if (flags & S_IXUGO)
+	if (flags & 0111)
 		may |= MAY_EXEC;
 
 	return may;

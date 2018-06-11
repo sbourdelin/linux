@@ -874,31 +874,31 @@ bool tomoyo_condition(struct tomoyo_request_info *r,
 				value = S_ISVTX;
 				break;
 			case TOMOYO_MODE_OWNER_READ:
-				value = S_IRUSR;
+				value = 0400;
 				break;
 			case TOMOYO_MODE_OWNER_WRITE:
-				value = S_IWUSR;
+				value = 0200;
 				break;
 			case TOMOYO_MODE_OWNER_EXECUTE:
-				value = S_IXUSR;
+				value = 0100;
 				break;
 			case TOMOYO_MODE_GROUP_READ:
-				value = S_IRGRP;
+				value = 0040;
 				break;
 			case TOMOYO_MODE_GROUP_WRITE:
-				value = S_IWGRP;
+				value = 0020;
 				break;
 			case TOMOYO_MODE_GROUP_EXECUTE:
-				value = S_IXGRP;
+				value = 0010;
 				break;
 			case TOMOYO_MODE_OTHERS_READ:
-				value = S_IROTH;
+				value = 0004;
 				break;
 			case TOMOYO_MODE_OTHERS_WRITE:
-				value = S_IWOTH;
+				value = 0002;
 				break;
 			case TOMOYO_MODE_OTHERS_EXECUTE:
-				value = S_IXOTH;
+				value = 0001;
 				break;
 			case TOMOYO_EXEC_ARGC:
 				if (!bprm)
