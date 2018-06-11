@@ -340,7 +340,7 @@ static int vctrl_init_vtable(struct platform_device *pdev)
 		}
 	}
 
-	if (rdesc->n_voltages == 0) {
+	if (rdesc->n_voltages <= 0) {
 		dev_err(&pdev->dev, "invalid configuration\n");
 		return -EINVAL;
 	}
