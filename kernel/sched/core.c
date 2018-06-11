@@ -5102,6 +5102,9 @@ again:
 	if (task_running(p_rq, p) || p->state)
 		goto out_unlock;
 
+	if (!cpumask_test_cpu(smp_processor_id(), &p->cpus_allowed))
+		goto out_unlock;
+
 	yielded = curr->sched_class->yield_to_task(rq, p, preempt);
 	if (yielded) {
 		schedstat_inc(rq->yld_count);
