@@ -2245,17 +2245,40 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 EXPORT_SYMBOL_GPL(kvm_vcpu_kick);
 #endif /* !CONFIG_S390 */
 
-int kvm_vcpu_yield_to(struct kvm_vcpu *target)
+struct task_struct *vcpu_to_task(struct kvm_vcpu *target)
 {
 	struct pid *pid;
 	struct task_struct *task = NULL;
-	int ret = 0;
 
 	rcu_read_lock();
 	pid = rcu_dereference(target->pid);
 	if (pid)
 		task = get_pid_task(pid, PIDTYPE_PID);
 	rcu_read_unlock();
+	return task;
+}
+
+bool kvm_vcpu_allow_yield(struct kvm_vcpu *target)
+{
+	struct task_struct *task = NULL;
+	bool ret = false;
+
+	task = vcpu_to_task(target);
+	if (!task)
+		return ret;
+	if (cpumask_test_cpu(raw_smp_processor_id(), &task->cpus_allowed))
+		ret = true;
+	put_task_struct(task);
+
+	return ret;
+}
+
+int kvm_vcpu_yield_to(struct kvm_vcpu *target)
+{
+	struct task_struct *task = NULL;
+	int ret = 0;
+
+	task = vcpu_to_task(target);
 	if (!task)
 		return ret;
 	ret = yield_to(task, 1);
@@ -2338,6 +2361,8 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 			if (yield_to_kernel_mode && !kvm_arch_vcpu_in_kernel(vcpu))
 				continue;
 			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
+				continue;
+			if (!kvm_vcpu_allow_yield(vcpu))
 				continue;
 
 			yielded = kvm_vcpu_yield_to(vcpu);
