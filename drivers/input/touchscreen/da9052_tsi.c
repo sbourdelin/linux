@@ -319,8 +319,11 @@ err_free_mem:
 static int  da9052_ts_remove(struct platform_device *pdev)
 {
 	struct da9052_tsi *tsi = platform_get_drvdata(pdev);
+	int error;
 
-	da9052_reg_write(tsi->da9052, DA9052_LDO9_REG, 0x19);
+	error = da9052_reg_write(tsi->da9052, DA9052_LDO9_REG, 0x19);
+	if (error < 0)
+		return error;
 
 	da9052_free_irq(tsi->da9052, DA9052_IRQ_TSIREADY, tsi);
 	da9052_free_irq(tsi->da9052, DA9052_IRQ_PENDOWN, tsi);
