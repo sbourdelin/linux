@@ -103,7 +103,6 @@ config ARCNET_RIM_I
 
 config ARCNET_COM20020
 	tristate "ARCnet COM20020 chipset driver"
-	depends on LEDS_CLASS
 	help
 	  This is the driver for the new COM20020 chipset. It supports such
 	  things as promiscuous mode, so packet sniffing is possible, and
@@ -118,6 +117,7 @@ config ARCNET_COM20020_ISA
 
 config ARCNET_COM20020_PCI
 	tristate "Support for COM20020 on PCI"
+	depends on LEDS_CLASS
 	depends on ARCNET_COM20020 && PCI
 
 config ARCNET_COM20020_CS
