@@ -2812,11 +2812,11 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 			err = -EPERM;
 		else if (val == 1) {
 			tp->repair = 1;
-			sk->sk_reuse = SK_FORCE_REUSE;
+			sk->sk_force_reuse = 1;
 			tp->repair_queue = TCP_NO_QUEUE;
 		} else if (val == 0) {
 			tp->repair = 0;
-			sk->sk_reuse = SK_NO_REUSE;
+			sk->sk_force_reuse = 0;
 			tcp_send_window_probe(sk);
 		} else
 			err = -EINVAL;
