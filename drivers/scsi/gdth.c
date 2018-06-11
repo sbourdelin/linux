@@ -5198,6 +5198,11 @@ static int __init gdth_init(void)
 	TRACE2(("gdth_detect() %d controller detected\n", gdth_ctr_count));
 
 	major = register_chrdev(0,"gdth", &gdth_fops);
+	if (major < 0) {
+		printk("GDT-HA: Unable to register char device gdth.\n");
+		return major;
+	}
+
 	register_reboot_notifier(&gdth_notifier);
 	gdth_polling = FALSE;
 	return 0;
