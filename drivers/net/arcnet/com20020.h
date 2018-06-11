@@ -118,14 +118,19 @@ struct com20020_dev {
 #define SUB_BUSCTL	5	/* bus control options */
 #define SUB_DMACOUNT	6	/* DMA count options */
 
+unsigned int com20020_def_arc_inb(int addr, int offset);
+void com20020_def_arc_outb(int value, int addr, int offset);
+void com20020_def_arc_insb(int addr, int offset, void *buffer, int count);
+void com20020_def_arc_outsb(int addr, int offset, void *buffer, int count);
+
 static inline void com20020_set_subaddress(struct arcnet_local *lp,
 					   int ioaddr, int val)
 {
 	if (val < 4) {
 		lp->config = (lp->config & ~0x03) | val;
-		arcnet_outb(lp->config, ioaddr, COM20020_REG_W_CONFIG);
+		lp->hw.arc_outb(lp->config, ioaddr, COM20020_REG_W_CONFIG);
 	} else {
-		arcnet_outb(val, ioaddr, COM20020_REG_W_SUBADR);
+		lp->hw.arc_outb(val, ioaddr, COM20020_REG_W_SUBADR);
 	}
 }
 

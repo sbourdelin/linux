@@ -324,6 +324,10 @@ struct arcnet_local {
 		void (*close)(struct net_device *dev);
 		void (*datatrigger) (struct net_device * dev, int enable);
 		void (*recontrigger) (struct net_device * dev, int enable);
+		unsigned int (*arc_inb)(int addr, int offset);
+		void (*arc_outb)(int value, int addr, int offset);
+		void (*arc_insb)(int addr, int offset, void *buff, int cnt);
+		void (*arc_outsb)(int addr, int offset, void *buff, int cnt);
 
 		void (*copy_to_card)(struct net_device *dev, int bufnum,
 				     int offset, void *buf, int count);

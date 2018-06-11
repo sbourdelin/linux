@@ -53,29 +53,31 @@ static void regdump(struct net_device *dev)
 {
 #ifdef DEBUG
 	int ioaddr = dev->base_addr;
+	struct arcnet_local *lp = netdev_priv(dev);
 	int count;
 
 	netdev_dbg(dev, "register dump:\n");
 	for (count = 0; count < 16; count++) {
 		if (!(count % 16))
 			pr_cont("%04X:", ioaddr + count);
-		pr_cont(" %02X", arcnet_inb(ioaddr, count));
+		pr_cont(" %02X", lp->hw.arc_inb(ioaddr, count));
 	}
 	pr_cont("\n");
 
 	netdev_dbg(dev, "buffer0 dump:\n");
 	/* set up the address register */
 	count = 0;
-	arcnet_outb((count >> 8) | RDDATAflag | AUTOINCflag,
-		    ioaddr, com20020_REG_W_ADDR_HI);
-	arcnet_outb(count & 0xff, ioaddr, COM20020_REG_W_ADDR_LO);
+	lp->hw.arc_outb((count >> 8) | RDDATAflag | AUTOINCflag,
+			ioaddr, com20020_REG_W_ADDR_HI);
+	lp->hw.arc_outb(count & 0xff, ioaddr, COM20020_REG_W_ADDR_LO);
 
 	for (count = 0; count < 256 + 32; count++) {
 		if (!(count % 16))
 			pr_cont("%04X:", count);
 
 		/* copy the data */
-		pr_cont(" %02X", arcnet_inb(ioaddr, COM20020_REG_RW_MEMDATA));
+		pr_cont(" %02X", lp->hw.arc_inb(ioaddr,
+						COM20020_REG_RW_MEMDATA));
 	}
 	pr_cont("\n");
 #endif
@@ -126,6 +128,12 @@ static int com20020_probe(struct pcmcia_device *p_dev)
 		goto fail_alloc_dev;
 
 	lp = netdev_priv(dev);
+
+	lp->hw.arc_inb = com20020_def_arc_inb;
+	lp->hw.arc_outb = com20020_def_arc_outb;
+	lp->hw.arc_insb = com20020_def_arc_insb;
+	lp->hw.arc_outsb = com20020_def_arc_outsb;
+
 	lp->timeout = timeout;
 	lp->backplane = backplane;
 	lp->clockp = clockp;
@@ -293,9 +301,10 @@ static int com20020_resume(struct pcmcia_device *link)
 		int ioaddr = dev->base_addr;
 		struct arcnet_local *lp = netdev_priv(dev);
 
-		arcnet_outb(lp->config | 0x80, ioaddr, COM20020_REG_W_CONFIG);
+		lp->hw.arc_outb(lp->config | 0x80, ioaddr,
+				COM20020_REG_W_CONFIG);
 		udelay(5);
-		arcnet_outb(lp->config, ioaddr, COM20020_REG_W_CONFIG);
+		lp->hw.arc_outb(lp->config, ioaddr, COM20020_REG_W_CONFIG);
 	}
 
 	return 0;

@@ -67,7 +67,7 @@ static int __init com20020isa_probe(struct net_device *dev)
 			   ioaddr, ioaddr + ARCNET_TOTAL_SIZE - 1);
 		return -ENXIO;
 	}
-	if (arcnet_inb(ioaddr, COM20020_REG_R_STATUS) == 0xFF) {
+	if (lp->hw.arc_inb(ioaddr, COM20020_REG_R_STATUS) == 0xFF) {
 		arc_printk(D_NORMAL, dev, "IO address %x empty\n", ioaddr);
 		err = -ENODEV;
 		goto out;
@@ -83,20 +83,21 @@ static int __init com20020isa_probe(struct net_device *dev)
 		 * we tell it to start receiving.
 		 */
 		arc_printk(D_INIT_REASONS, dev, "intmask was %02Xh\n",
-			   arcnet_inb(ioaddr, COM20020_REG_R_STATUS));
-		arcnet_outb(0, ioaddr, COM20020_REG_W_INTMASK);
+			   lp->hw.arc_inb(ioaddr, COM20020_REG_R_STATUS));
+		lp->hw.arc_outb(0, ioaddr, COM20020_REG_W_INTMASK);
 		airqmask = probe_irq_on();
-		arcnet_outb(NORXflag, ioaddr, COM20020_REG_W_INTMASK);
+		lp->hw.arc_outb(NORXflag, ioaddr, COM20020_REG_W_INTMASK);
 		udelay(1);
-		arcnet_outb(0, ioaddr, COM20020_REG_W_INTMASK);
+		lp->hw.arc_outb(0, ioaddr, COM20020_REG_W_INTMASK);
 		dev->irq = probe_irq_off(airqmask);
 
 		if ((int)dev->irq <= 0) {
 			arc_printk(D_INIT_REASONS, dev, "Autoprobe IRQ failed first time\n");
 			airqmask = probe_irq_on();
-			arcnet_outb(NORXflag, ioaddr, COM20020_REG_W_INTMASK);
+			lp->hw.arc_outb(NORXflag, ioaddr,
+					COM20020_REG_W_INTMASK);
 			udelay(5);
-			arcnet_outb(0, ioaddr, COM20020_REG_W_INTMASK);
+			lp->hw.arc_outb(0, ioaddr, COM20020_REG_W_INTMASK);
 			dev->irq = probe_irq_off(airqmask);
 			if ((int)dev->irq <= 0) {
 				arc_printk(D_NORMAL, dev, "Autoprobe IRQ failed.\n");
@@ -156,6 +157,12 @@ static int __init com20020_init(void)
 	dev->netdev_ops = &com20020_netdev_ops;
 
 	lp = netdev_priv(dev);
+
+	lp->hw.arc_inb = com20020_def_arc_inb;
+	lp->hw.arc_outb = com20020_def_arc_outb;
+	lp->hw.arc_insb = com20020_def_arc_insb;
+	lp->hw.arc_outsb = com20020_def_arc_outsb;
+
 	lp->backplane = backplane;
 	lp->clockp = clockp & 7;
 	lp->clockm = clockm & 3;
