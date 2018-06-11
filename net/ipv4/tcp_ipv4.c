@@ -1744,7 +1744,13 @@ process:
 			th = (const struct tcphdr *)skb->data;
 			iph = ip_hdr(skb);
 			tcp_v4_fill_cb(skb, iph, th);
-			nsk = tcp_check_req(sk, skb, req, false, &req_stolen);
+
+			if (tcp_checksum_complete(skb)) {
+				__TCP_INC_STATS(net, TCP_MIB_CSUMERRORS);
+			} else {
+				nsk = tcp_check_req(sk, skb, req, false,
+						    &req_stolen);
+			}
 		}
 		if (!nsk) {
 			reqsk_put(req);

@@ -1490,7 +1490,13 @@ process:
 			th = (const struct tcphdr *)skb->data;
 			hdr = ipv6_hdr(skb);
 			tcp_v6_fill_cb(skb, hdr, th);
-			nsk = tcp_check_req(sk, skb, req, false, &req_stolen);
+
+			if (tcp_checksum_complete(skb)) {
+				__TCP_INC_STATS(net, TCP_MIB_CSUMERRORS);
+			} else {
+				nsk = tcp_check_req(sk, skb, req, false,
+						    &req_stolen);
+			}
 		}
 		if (!nsk) {
 			reqsk_put(req);
