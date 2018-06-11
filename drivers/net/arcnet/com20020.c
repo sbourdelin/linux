@@ -133,6 +133,10 @@ int com20020_check(struct net_device *dev)
 	lp->setup = lp->clockm ? 0 : (lp->clockp << 1);
 	lp->setup2 = (lp->clockm << 4) | 8;
 
+	/* If clock is major of 40Mhz, SLOWARB bit must be set */
+	if (lp->clockm > 1)
+		lp->setup2 |= SLOWARB;
+
 	/* CHECK: should we do this for SOHARD cards ? */
 	/* Enable P1Mode for backplane mode */
 	lp->setup = lp->setup | P1MODE;
