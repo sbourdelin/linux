@@ -36,7 +36,7 @@ static const match_table_t tokens = {
 	{Opt_err, NULL},
 };
 
-int proc_parse_options(char *options, struct pid_namespace *pid)
+static int proc_parse_options(char *options, struct pid_namespace *pid)
 {
 	char *p;
 	substring_t args[MAX_OPT_ARGS];
@@ -97,6 +97,9 @@ static struct dentry *proc_mount(struct file_system_type *fs_type,
 	} else {
 		ns = task_active_pid_ns(current);
 	}
+
+	if (!proc_parse_options(data, ns))
+		return ERR_PTR(-EINVAL);
 
 	return mount_ns(fs_type, flags, data, ns, ns->user_ns, proc_fill_super);
 }
