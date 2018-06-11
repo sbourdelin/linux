@@ -20,6 +20,9 @@
 #include <linux/in.h>
 #include <linux/refcount.h>
 #include <uapi/linux/igmp.h>
+#ifdef CONFIG_IP_MULTICAST
+#include <linux/alarmtimer.h>
+#endif
 
 static inline struct igmphdr *igmp_hdr(const struct sk_buff *skb)
 {
@@ -83,7 +86,9 @@ struct ip_mc_list {
 		struct ip_mc_list __rcu *next_rcu;
 	};
 	struct ip_mc_list __rcu *next_hash;
-	struct timer_list	timer;
+#ifdef CONFIG_IP_MULTICAST
+	struct alarm		alarm;
+#endif
 	int			users;
 	refcount_t		refcnt;
 	spinlock_t		lock;

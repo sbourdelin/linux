@@ -199,7 +199,7 @@ static void ip_ma_put(struct ip_mc_list *im)
 static void igmp_stop_timer(struct ip_mc_list *im)
 {
 	spin_lock_bh(&im->lock);
-	if (del_timer(&im->timer))
+	if (alarm_cancel(&im->alarm))
 		refcount_dec(&im->refcnt);
 	im->tm_running = 0;
 	im->reporter = 0;
@@ -210,11 +210,11 @@ static void igmp_stop_timer(struct ip_mc_list *im)
 /* It must be called with locked im->lock */
 static void igmp_start_timer(struct ip_mc_list *im, int max_delay)
 {
-	int tv = prandom_u32() % max_delay;
+	ktime_t expiry = jiffies_to_ktime(prandom_u32() % max_delay + 2);
 
 	im->tm_running = 1;
-	if (!mod_timer(&im->timer, jiffies+tv+2))
-		refcount_inc(&im->refcnt);
+	alarm_start_relative(&im->alarm, expiry);
+	refcount_inc(&im->refcnt);
 }
 
 static void igmp_gq_start_timer(struct in_device *in_dev)
@@ -241,11 +241,14 @@ static void igmp_ifc_start_timer(struct in_device *in_dev, int delay)
 
 static void igmp_mod_timer(struct ip_mc_list *im, int max_delay)
 {
+	ktime_t expiry;
+
 	spin_lock_bh(&im->lock);
 	im->unsolicit_count = 0;
-	if (del_timer(&im->timer)) {
-		if ((long)(im->timer.expires-jiffies) < max_delay) {
-			add_timer(&im->timer);
+	expiry = alarm_expires_remaining(&im->alarm);
+	if (alarm_cancel(&im->alarm)) {
+		if (ktime_to_jiffies(expiry) < max_delay) {
+			alarm_start_relative(&im->alarm, expiry);
 			im->tm_running = 1;
 			spin_unlock_bh(&im->lock);
 			return;
@@ -812,9 +815,9 @@ static void igmp_ifc_event(struct in_device *in_dev)
 }
 
 
-static void igmp_timer_expire(struct timer_list *t)
+enum alarmtimer_restart igmp_timer_expire(struct alarm *alarm, ktime_t now)
 {
-	struct ip_mc_list *im = from_timer(im, t, timer);
+	struct ip_mc_list *im = container_of(alarm, struct ip_mc_list, alarm);
 	struct in_device *in_dev = im->interface;
 
 	spin_lock(&im->lock);
@@ -835,6 +838,8 @@ static void igmp_timer_expire(struct timer_list *t)
 		igmp_send_report(in_dev, im, IGMPV3_HOST_MEMBERSHIP_REPORT);
 
 	ip_ma_put(im);
+
+	return ALARMTIMER_NORESTART;
 }
 
 /* mark EXCLUDE-mode sources */
@@ -1413,7 +1418,7 @@ void ip_mc_inc_group(struct in_device *in_dev, __be32 addr)
 	refcount_set(&im->refcnt, 1);
 	spin_lock_init(&im->lock);
 #ifdef CONFIG_IP_MULTICAST
-	timer_setup(&im->timer, igmp_timer_expire, 0);
+	alarm_init(&im->alarm, ALARM_BOOTTIME, igmp_timer_expire);
 	im->unsolicit_count = net->ipv4.sysctl_igmp_qrv;
 #endif
 
@@ -2811,7 +2816,7 @@ static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 				   state->dev->ifindex, state->dev->name, state->in_dev->mc_count, querier);
 		}
 
-		delta = im->timer.expires - jiffies;
+		delta = ktime_to_jiffies(alarm_expires_remaining(&im->alarm));
 		seq_printf(seq,
 			   "\t\t\t\t%08X %5d %d:%08lX\t\t%d\n",
 			   im->multiaddr, im->users,
