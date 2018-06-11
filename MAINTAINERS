@@ -2286,7 +2286,7 @@ F:	drivers/hwmon/asc7621.c
 
 ASUS NOTEBOOKS AND EEEPC ACPI/WMI EXTRAS DRIVERS
 M:	Corentin Chary <corentin.chary@gmail.com>
-L:	acpi4asus-user@lists.sourceforge.net
+L:	acpi4asus-user@lists.sourceforge.net (moderated for non-subscribers)
 L:	platform-driver-x86@vger.kernel.org
 W:	http://acpi4asus.sf.net
 S:	Maintained
