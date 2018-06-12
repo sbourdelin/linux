@@ -168,6 +168,9 @@ static int __init integrity_iintcache_init(void)
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, init_once);
+	if (!iint_cache)
+		return -ENOMEM;
+
 	return 0;
 }
 security_initcall(integrity_iintcache_init);
