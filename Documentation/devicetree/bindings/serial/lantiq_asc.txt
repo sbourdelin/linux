@@ -6,6 +6,10 @@ Required properties:
 - interrupts: the 3 (tx rx err) interrupt numbers. The interrupt specifier
   depends on the interrupt-parent interrupt controller.
 
+Optional properties:
+- clocks: Should contain frequency clock and gate clock
+- clock-names: Should be "freq" and "asc"
+
 Example:
 
 asc1: serial@e100c00 {
@@ -13,4 +17,15 @@ asc1: serial@e100c00 {
 	reg = <0xE100C00 0x400>;
 	interrupt-parent = <&icu0>;
 	interrupts = <112 113 114>;
+};
+
+asc0: serial@600000 {
+	compatible = "lantiq,asc";
+	reg = <0x600000 0x100000>;
+	interrupt-parent = <&gic>;
+	interrupts = <GIC_SHARED 103 IRQ_TYPE_LEVEL_HIGH>,
+	<GIC_SHARED 105 IRQ_TYPE_LEVEL_HIGH>,
+	<GIC_SHARED 106 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&pll0aclk SSX4_CLK>, <&clkgate1 GATE_URT_CLK>;
+	clock-names = "freq", "asc";
 };
