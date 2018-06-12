@@ -77,6 +77,8 @@
 #define PROC_KPAGEFLAGS		"/proc/kpageflags"
 #define PROC_KPAGECGROUP	"/proc/kpagecgroup"
 
+#define SYS_KERNEL_MM_PAGE_IDLE "/sys/kernel/mm/page_idle/bitmap"
+
 /* [32-] kernel hacking assistances */
 #define KPF_RESERVED		32
 #define KPF_MLOCKED		33
@@ -168,6 +170,7 @@ static const char * const debugfs_known_mountpoints[] = {
 
 static int		opt_raw;	/* for kernel developers */
 static int		opt_list;	/* list pages (in ranges) */
+static int		opt_mark_idle;	/* set accessed bit */
 static int		opt_no_summary;	/* don't show summary */
 static pid_t		opt_pid;	/* process to walk */
 const char		*opt_file;	/* file or directory path */
@@ -195,6 +198,7 @@ static int		page_size;
 static int		pagemap_fd;
 static int		kpageflags_fd;
 static int		kpagecgroup_fd = -1;
+static int		page_idle_fd = -1;
 
 static int		opt_hwpoison;
 static int		opt_unpoison;
@@ -567,6 +571,30 @@ static int unpoison_page(unsigned long offset)
 	return 0;
 }
 
+static int mark_page_idle(unsigned long offset)
+{
+	static unsigned long off;
+	static uint64_t buf;
+	int len;
+
+	if ((offset / 64 == off / 64) || buf == 0) {
+		buf |= 1UL << (offset % 64);
+		off = offset;
+		return 0;
+	}
+
+	len = pwrite(page_idle_fd, &buf, 8, 8 * (off / 64));
+	if (len < 0) {
+		perror("mark page idle");
+		return len;
+	}
+
+	buf = 1UL << (offset % 64);
+	off = offset;
+
+	return 0;
+}
+
 /*
  * page frame walker
  */
@@ -613,6 +641,9 @@ static void add_page(unsigned long voffset, unsigned long offset,
 		hwpoison_page(offset);
 	if (opt_unpoison)
 		unpoison_page(offset);
+
+	if (opt_mark_idle)
+		mark_page_idle(offset);
 
 	if (opt_list == 1)
 		show_page_range(voffset, offset, 1, flags, cgroup);
@@ -756,6 +787,9 @@ static void walk_addr_ranges(void)
 		else
 			walk_task(opt_offset[i], opt_size[i]);
 
+	if (opt_mark_idle)
+		mark_page_idle(0);
+
 	close(kpageflags_fd);
 }
 
@@ -786,6 +820,7 @@ static void usage(void)
 "            -c|--cgroup  path|@inode   Walk pages within memory cgroup\n"
 "            -p|--pid     pid           Walk process address space\n"
 "            -f|--file    filename      Walk file address space\n"
+"            -i|--mark-idle             Mark pages idle\n"
 "            -l|--list                  Show page details in ranges\n"
 "            -L|--list-each             Show page details one by one\n"
 "            -C|--list-cgroup           Show cgroup inode for pages\n"
@@ -1190,6 +1225,7 @@ static const struct option opts[] = {
 	{ "bits"      , 1, NULL, 'b' },
 	{ "cgroup"    , 1, NULL, 'c' },
 	{ "describe"  , 1, NULL, 'd' },
+	{ "mark-idle" , 0, NULL, 'i' },
 	{ "list"      , 0, NULL, 'l' },
 	{ "list-each" , 0, NULL, 'L' },
 	{ "list-cgroup", 0, NULL, 'C' },
@@ -1208,7 +1244,7 @@ int main(int argc, char *argv[])
 	page_size = getpagesize();
 
 	while ((c = getopt_long(argc, argv,
-				"rp:f:a:b:d:c:ClLNXxF:h", opts, NULL)) != -1) {
+				"rp:f:a:b:d:c:CilLNXxF:h", opts, NULL)) != -1) {
 		switch (c) {
 		case 'r':
 			opt_raw = 1;
@@ -1234,6 +1270,9 @@ int main(int argc, char *argv[])
 		case 'd':
 			describe_flags(optarg);
 			exit(0);
+		case 'i':
+			opt_mark_idle = 1;
+			break;
 		case 'l':
 			opt_list = 1;
 			break;
@@ -1269,6 +1308,9 @@ int main(int argc, char *argv[])
 	if (opt_cgroup || opt_list_cgroup)
 		kpagecgroup_fd = checked_open(PROC_KPAGECGROUP, O_RDONLY);
 
+	if (opt_mark_idle && opt_file)
+		page_idle_fd = checked_open(SYS_KERNEL_MM_PAGE_IDLE, O_RDWR);
+
 	if (opt_list && opt_pid)
 		printf("voffset\t");
 	if (opt_list && opt_file)
@@ -1295,6 +1337,9 @@ int main(int argc, char *argv[])
 		printf("\n\n");
 
 	show_summary();
+
+	if (page_idle_fd >= 0)
+		close(page_idle_fd);
 
 	return 0;
 }
