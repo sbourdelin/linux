@@ -71,7 +71,8 @@ static int isdn_add_channels(isdn_driver_t *d, int drvidx, int n, int adding);
 static inline void
 isdn_lock_driver(isdn_driver_t *drv)
 {
-	try_module_get(drv->interface->owner);
+	if (!try_module_get(drv->interface->owner))
+		printk(KERN_WARNING "isdn_lock_driver: cannot get module\n");
 	drv->locks++;
 }
 
