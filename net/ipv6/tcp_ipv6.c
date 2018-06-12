@@ -1429,6 +1429,7 @@ static int tcp_v6_rcv(struct sk_buff *skb)
 	const struct tcphdr *th;
 	const struct ipv6hdr *hdr;
 	bool refcounted;
+	bool csumerr = false;
 	struct sock *sk;
 	int ret;
 	struct net *net = dev_net(skb->dev);
@@ -1490,7 +1491,12 @@ process:
 			th = (const struct tcphdr *)skb->data;
 			hdr = ipv6_hdr(skb);
 			tcp_v6_fill_cb(skb, hdr, th);
-			nsk = tcp_check_req(sk, skb, req, false, &req_stolen);
+
+			csumerr = tcp_checksum_complete(skb);
+			if (!csumerr) {
+				nsk = tcp_check_req(sk, skb, req, false,
+						    &req_stolen);
+			}
 		}
 		if (!nsk) {
 			reqsk_put(req);
@@ -1581,6 +1587,8 @@ discard_and_relse:
 	sk_drops_add(sk, skb);
 	if (refcounted)
 		sock_put(sk);
+	if (csumerr)
+		goto csum_error;
 	goto discard_it;
 
 do_time_wait:

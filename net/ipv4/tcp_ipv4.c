@@ -1680,6 +1680,7 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	const struct iphdr *iph;
 	const struct tcphdr *th;
 	bool refcounted;
+	bool csumerr = false;
 	struct sock *sk;
 	int ret;
 
@@ -1744,7 +1745,12 @@ process:
 			th = (const struct tcphdr *)skb->data;
 			iph = ip_hdr(skb);
 			tcp_v4_fill_cb(skb, iph, th);
-			nsk = tcp_check_req(sk, skb, req, false, &req_stolen);
+
+			csumerr = tcp_checksum_complete(skb);
+			if (!csumerr) {
+				nsk = tcp_check_req(sk, skb, req, false,
+						    &req_stolen);
+			}
 		}
 		if (!nsk) {
 			reqsk_put(req);
@@ -1839,6 +1845,8 @@ discard_and_relse:
 	sk_drops_add(sk, skb);
 	if (refcounted)
 		sock_put(sk);
+	if (csumerr)
+		goto csum_error;
 	goto discard_it;
 
 do_time_wait:
