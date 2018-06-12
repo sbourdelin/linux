@@ -4,6 +4,10 @@
 	#size-cells = <1>;
 	compatible = "lantiq,xway", "lantiq,danube";
 
+	aliases {
+		serial0 = &asc1;
+	};
+
 	cpus {
 		cpu@0 {
 			compatible = "mips,mips24Kc";
@@ -74,7 +78,7 @@
 			reg = <0xE100A00 0x100>;
 		};
 
-		serial@E100C00 {
+		asc1: serial@E100C00 {
 			compatible = "lantiq,asc";
 			reg = <0xE100C00 0x400>;
 			interrupt-parent = <&icu0>;
