@@ -581,3 +581,200 @@ struct mmci_dma_ops dmaengine = {
 #else
 struct mmci_dma_ops dmaengine = {};
 #endif
+
+#define SDMMC_LLI_BUF_LEN	PAGE_SIZE
+#define SDMMC_IDMA_BURST	BIT(MMCI_STM32_IDMABNDT_SHIFT)
+
+struct sdmmc_lli_desc {
+	u32 idmalar;
+	u32 idmabase;
+	u32 idmasize;
+};
+
+struct sdmmc_next {
+	s32 cookie;
+};
+
+struct sdmmc_priv {
+	dma_addr_t sg_dma;
+	void *sg_cpu;
+	struct sdmmc_next next_data;
+};
+
+static int __sdmmc_idma_prep_data(struct mmci_host *host, struct mmc_data *data)
+{
+	int n_elem;
+
+	n_elem = dma_map_sg(mmc_dev(host->mmc),
+			    data->sg,
+			    data->sg_len,
+			    mmc_get_dma_dir(data));
+
+	if (!n_elem) {
+		dev_err(mmc_dev(host->mmc), "dma_map_sg failed\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int sdmmc_idma_validate_data(struct mmci_host *host,
+			     struct mmc_data *data)
+{
+	struct sdmmc_priv *idma = host->dma_priv;
+	struct sdmmc_next *nd = &idma->next_data;
+	struct scatterlist *sg;
+	int ret, i;
+
+	/* Check if next job is not already prepared. */
+	if (data->host_cookie != nd->cookie) {
+		ret = __sdmmc_idma_prep_data(host, data);
+		if (ret)
+			return ret;
+	}
+
+	/*
+	 * idma has constraints on idmabase & idmasize for each element
+	 * excepted the last element which has no constraint on idmasize
+	 */
+	for_each_sg(data->sg, sg, data->sg_len - 1, i) {
+		if (!IS_ALIGNED(sg_dma_address(data->sg), sizeof(u32)) ||
+		    !IS_ALIGNED(sg_dma_len(data->sg), SDMMC_IDMA_BURST)) {
+			dev_err(mmc_dev(host->mmc),
+				"unaligned scatterlist: ofst:%x length:%d\n",
+				data->sg->offset, data->sg->length);
+			return -EINVAL;
+		}
+	}
+
+	if (!IS_ALIGNED(sg_dma_address(data->sg), sizeof(u32))) {
+		dev_err(mmc_dev(host->mmc),
+			"unaligned last scatterlist: ofst:%x length:%d\n",
+			data->sg->offset, data->sg->length);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static void sdmmc_idma_pre_req(struct mmci_host *host, struct mmc_data *data)
+{
+	struct sdmmc_priv *idma = host->dma_priv;
+	struct sdmmc_next *nd = &idma->next_data;
+
+	if (!__sdmmc_idma_prep_data(host, data))
+		data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
+}
+
+static void sdmmc_idma_post_req(struct mmci_host *host, struct mmc_data *data,
+				int err)
+{
+	if (!data || !data->host_cookie)
+		return;
+
+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+		     mmc_get_dma_dir(data));
+
+	data->host_cookie = 0;
+}
+
+static int sdmmc_idma_setup(struct mmci_host *host)
+{
+	struct sdmmc_priv *idma;
+
+	idma = devm_kzalloc(mmc_dev(host->mmc), sizeof(*idma), GFP_KERNEL);
+	if (!idma)
+		return -ENOMEM;
+
+	host->dma_priv = idma;
+
+	if (host->variant->dma_lli) {
+		idma->sg_cpu = dmam_alloc_coherent(mmc_dev(host->mmc),
+						   SDMMC_LLI_BUF_LEN,
+						   &idma->sg_dma, GFP_KERNEL);
+		if (!idma->sg_cpu) {
+			dev_err(mmc_dev(host->mmc),
+				"Failed to alloc IDMA descriptor\n");
+			return -ENOMEM;
+		}
+		host->mmc->max_segs = SDMMC_LLI_BUF_LEN /
+			sizeof(struct sdmmc_lli_desc);
+		host->mmc->max_seg_size = host->variant->stm32_idmabsize_mask;
+	} else {
+		host->mmc->max_segs = 1;
+		host->mmc->max_seg_size = host->mmc->max_req_size;
+	}
+
+	/* initialize pre request cookie */
+	idma->next_data.cookie = 1;
+
+	return 0;
+}
+
+static int sdmmc_idma_start(struct mmci_host *host, unsigned int datactrl)
+
+{
+	struct sdmmc_priv *idma = host->dma_priv;
+	struct sdmmc_lli_desc *desc = (struct sdmmc_lli_desc *)idma->sg_cpu;
+	struct mmc_data *data = host->data;
+	struct scatterlist *sg;
+	int i;
+
+	if (!host->variant->dma_lli || data->sg_len == 1) {
+		writel_relaxed(sg_dma_address(data->sg),
+			       host->base + MMCI_STM32_IDMABASE0R);
+		writel_relaxed(MMCI_STM32_IDMAEN,
+			       host->base + MMCI_STM32_IDMACTRLR);
+		goto out;
+	}
+
+	for_each_sg(data->sg, sg, data->sg_len, i) {
+		desc[i].idmalar = (i + 1) * sizeof(struct sdmmc_lli_desc);
+		desc[i].idmalar |= MMCI_STM32_ULA | MMCI_STM32_ULS
+			| MMCI_STM32_ABR;
+		desc[i].idmabase = sg_dma_address(sg);
+		desc[i].idmasize = sg_dma_len(sg);
+	}
+
+	/* notice the end of link list */
+	desc[data->sg_len - 1].idmalar &= ~MMCI_STM32_ULA;
+
+	dma_wmb();
+	writel_relaxed(idma->sg_dma, host->base + MMCI_STM32_IDMABAR);
+	writel_relaxed(desc[0].idmalar, host->base + MMCI_STM32_IDMALAR);
+	writel_relaxed(desc[0].idmabase, host->base + MMCI_STM32_IDMABASE0R);
+	writel_relaxed(desc[0].idmasize, host->base + MMCI_STM32_IDMABSIZER);
+	writel_relaxed(MMCI_STM32_IDMAEN | MMCI_STM32_IDMALLIEN,
+		       host->base + MMCI_STM32_IDMACTRLR);
+
+	/* mask & datactrl */
+out:
+	mmci_write_datactrlreg(host, datactrl);
+	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
+	       host->base + MMCIMASK0);
+
+	return 0;
+}
+
+static void sdmmc_idma_finalize(struct mmci_host *host, struct mmc_data *data)
+{
+	writel_relaxed(0, host->base + MMCI_STM32_IDMACTRLR);
+}
+
+static void sdmmc_idma_get_next_data(struct mmci_host *host,
+				     struct mmc_data *data)
+{
+	struct sdmmc_priv *idma = host->dma_priv;
+	struct sdmmc_next *next = &idma->next_data;
+
+	WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
+}
+
+struct mmci_dma_ops sdmmc_idma = {
+	.setup = sdmmc_idma_setup,
+	.pre_req = sdmmc_idma_pre_req,
+	.start = sdmmc_idma_start,
+	.finalize = sdmmc_idma_finalize,
+	.post_req = sdmmc_idma_post_req,
+	.get_next_data = sdmmc_idma_get_next_data,
+};

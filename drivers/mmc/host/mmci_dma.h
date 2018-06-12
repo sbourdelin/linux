@@ -28,4 +28,6 @@ void mmci_dma_post_req(struct mmci_host *host,
 void mmci_dma_error(struct mmci_host *host);
 void mmci_dma_get_next_data(struct mmci_host *host, struct mmc_data *data);
 
+int sdmmc_idma_validate_data(struct mmci_host *host,
+			     struct mmc_data *data);
 #endif /* __MMC_DMA_H__ */
