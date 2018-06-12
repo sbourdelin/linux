@@ -267,6 +267,29 @@ static struct variant_data variant_stm32 = {
 	.mmci_dma		= &dmaengine,
 };
 
+static struct variant_data variant_stm32_sdmmc = {
+	.fifosize		= 16 * 4,
+	.fifohalfsize		= 8 * 4,
+	.f_max			= 208000000,
+	.stm32_clkdiv		= true,
+	.reset			= true,
+	.cmdreg_cpsm_enable	= MCI_CPSM_STM32_ENABLE,
+	.cmdreg_lrsp_crc	= MCI_CPSM_STM32_LRSP_CRC,
+	.cmdreg_srsp_crc	= MCI_CPSM_STM32_SRSP_CRC,
+	.cmdreg_srsp		= MCI_CPSM_STM32_SRSP,
+	.cmdreg_stop		= MCI_CPSM_STM32_CMDSTOP,
+	.data_cmd_enable	= MCI_CPSM_STM32_CMDTRANS,
+	.irq_pio_mask		= MCI_IRQ_PIO_STM32_MASK,
+	.datactrl_first		= true,
+	.datalength_bits	= 25,
+	.datactrl_blocksz	= 14,
+	.mmci_dma		= &sdmmc_idma,
+	.stm32_idmabsize_mask	= GENMASK(12, 5),
+	.validate_data		= sdmmc_idma_validate_data,
+	.set_clkreg		= mmci_sdmmc_set_clkreg,
+	.set_pwrreg		= mmci_sdmmc_set_pwrreg,
+};
+
 static struct variant_data variant_qcom = {
 	.fifosize		= 16 * 4,
 	.fifohalfsize		= 8 * 4,
@@ -1906,6 +1929,11 @@ static const struct amba_id mmci_ids[] = {
 		.id     = 0x00880180,
 		.mask   = 0x00ffffff,
 		.data	= &variant_stm32,
+	},
+	{
+		.id     = 0x10153180,
+		.mask	= 0xf0ffffff,
+		.data	= &variant_stm32_sdmmc,
 	},
 	/* Qualcomm variants */
 	{
