@@ -115,6 +115,7 @@ struct pi433_device {
 
 struct pi433_instance {
 	struct pi433_device	*device;
+	struct mutex		tx_cfg_lock; /* guards race conditions when updating tx config */
 	struct pi433_tx_cfg	tx_cfg;
 };
 
@@ -902,9 +903,13 @@ pi433_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		break;
 	case PI433_IOC_WR_TX_CFG:
+		mutex_lock(&instance->tx_cfg_lock);
 		if (copy_from_user(&instance->tx_cfg, argp,
-				   sizeof(struct pi433_tx_cfg)))
+				   sizeof(struct pi433_tx_cfg))) {
+			mutex_unlock(&instance->tx_cfg_lock);
 			return -EFAULT;
+		}
+		mutex_unlock(&instance->tx_cfg_lock);
 		break;
 	case PI433_IOC_RD_RX_CFG:
 		if (copy_to_user(argp, &device->rx_cfg,
@@ -978,6 +983,8 @@ static int pi433_open(struct inode *inode, struct file *filp)
 	instance->device = device;
 	instance->tx_cfg.bit_rate = 4711;
 	// TODO: fill instance->tx_cfg;
+
+	mutex_init(&instance->tx_cfg_lock);
 
 	/* instance data as context */
 	filp->private_data = instance;
