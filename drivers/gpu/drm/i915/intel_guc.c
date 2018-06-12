@@ -205,7 +205,7 @@ void intel_guc_fini(struct intel_guc *guc)
 
 static u32 get_log_control_flags(void)
 {
-	u32 level = i915_modparams.guc_log_level;
+	s32 level = i915_modparams.guc_log_level;
 	u32 flags = 0;
 
 	GEM_BUG_ON(level < 0);
