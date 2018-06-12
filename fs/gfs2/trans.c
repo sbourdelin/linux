@@ -130,6 +130,9 @@ static struct gfs2_bufdata *gfs2_alloc_bufdata(struct gfs2_glock *gl,
 	struct gfs2_bufdata *bd;
 
 	bd = kmem_cache_zalloc(gfs2_bufdata_cachep, GFP_NOFS | __GFP_NOFAIL);
+	if (!bd)
+		return NULL;
+
 	bd->bd_bh = bh;
 	bd->bd_gl = gl;
 	bd->bd_ops = lops;
