@@ -132,9 +132,12 @@ static void __comedi_buf_alloc(struct comedi_device *dev,
 	spin_unlock_irqrestore(&s->spin_lock, flags);
 
 	/* vmap the prealloc_buf if all the pages were allocated */
-	if (i == n_pages)
+	if (i == n_pages) {
 		async->prealloc_buf = vmap(pages, n_pages, VM_MAP,
 					   COMEDI_PAGE_PROTECTION);
+		if (!async->prealloc_buf)
+			dev_err(dev->class_dev, "failed to vmap pages\n");
+	}
 
 	vfree(pages);
 }
