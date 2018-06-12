@@ -71,9 +71,9 @@ out:
 
 static int rxe_param_set_add(const char *val, const struct kernel_param *kp)
 {
-	int len;
 	int err = 0;
-	char intf[32];
+	char **intf_argv = NULL;
+	int intf_argc, i;
 	struct net_device *ndev = NULL;
 	struct rxe_dev *rxe;
 
@@ -82,38 +82,45 @@ static int rxe_param_set_add(const char *val, const struct kernel_param *kp)
 		err = -EINVAL;
 		goto err;
 	}
-	len = sanitize_arg(val, intf, sizeof(intf));
-	if (!len) {
-		pr_err("add: invalid interface name\n");
-		err = -EINVAL;
-		goto err;
-	}
+	intf_argv = argv_split(GFP_KERNEL, val, &intf_argc);
+	for (i = 0; i < intf_argc; i++) {
+		ndev = dev_get_by_name(&init_net, intf_argv[i]);
+		if (!ndev) {
+			pr_err("interface %s not found\n", intf_argv[i]);
+			err = -EINVAL;
+			goto err;
+		}
 
-	ndev = dev_get_by_name(&init_net, intf);
-	if (!ndev) {
-		pr_err("interface %s not found\n", intf);
-		err = -EINVAL;
-		goto err;
-	}
+		if (net_to_rxe(ndev)) {
+			pr_err("already configured on %s\n", intf_argv[i]);
+			err = -EINVAL;
+			goto err;
+		}
 
-	if (net_to_rxe(ndev)) {
-		pr_err("already configured on %s\n", intf);
-		err = -EINVAL;
-		goto err;
-	}
+		rxe = rxe_net_add(ndev);
+		if (!rxe) {
+			pr_err("failed to add %s\n", intf_argv[i]);
+			err = -EINVAL;
+			goto err;
+		}
 
-	rxe = rxe_net_add(ndev);
-	if (!rxe) {
-		pr_err("failed to add %s\n", intf);
-		err = -EINVAL;
-		goto err;
+		rxe_set_port_state(ndev);
+		pr_info("added %s to %s\n", rxe->ib_dev.name, intf_argv[i]);
 	}
-
-	rxe_set_port_state(ndev);
-	pr_info("added %s to %s\n", rxe->ib_dev.name, intf);
 err:
 	if (ndev)
 		dev_put(ndev);
+
+	if (intf_argv) {
+		for (i = 0; i < intf_argc; i++) {
+			rxe = get_rxe_by_name(intf_argv[i]);
+			if (rxe) {
+				list_del(&rxe->list);
+				rxe_remove(rxe);
+			}
+		}
+		argv_free(intf_argv);
+	}
 	return err;
 }
 
