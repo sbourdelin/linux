@@ -86,6 +86,7 @@ char *qfprom_read(struct device *, const char *);
 void compute_intercept_slope(struct tsens_device *, u32 *, u32 *, u32);
 int init_common(struct tsens_device *);
 int get_temp_common(struct tsens_device *, int, int *);
+int get_temp_tsens_v2(struct tsens_device *, int, int *);
 
 extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
 
