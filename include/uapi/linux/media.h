@@ -81,6 +81,7 @@ struct media_device_info {
 #define MEDIA_ENT_F_IO_DTV			(MEDIA_ENT_F_BASE + 0x01001)
 #define MEDIA_ENT_F_IO_VBI			(MEDIA_ENT_F_BASE + 0x01002)
 #define MEDIA_ENT_F_IO_SWRADIO			(MEDIA_ENT_F_BASE + 0x01003)
+#define MEDIA_ENT_F_IO_DMAENGINE		(MEDIA_ENT_F_BASE + 0x01004)
 
 /*
  * Sensor functions
@@ -132,6 +133,7 @@ struct media_device_info {
 #define MEDIA_ENT_F_PROC_VIDEO_LUT		(MEDIA_ENT_F_BASE + 0x4004)
 #define MEDIA_ENT_F_PROC_VIDEO_SCALER		(MEDIA_ENT_F_BASE + 0x4005)
 #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
+#define MEDIA_ENT_F_PROC_VIDEO_TRANSFORM	(MEDIA_ENT_F_BASE + 0x4007)
 
 /*
  * Switch and bridge entity functions

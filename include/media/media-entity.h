@@ -206,6 +206,9 @@ struct media_entity_operations {
  *	The entity is embedded in a struct video_device instance.
  * @MEDIA_ENTITY_TYPE_V4L2_SUBDEV:
  *	The entity is embedded in a struct v4l2_subdev instance.
+ * @MEDIA_ENTITY_TYPE_V4L2_MEM2MEM:
+ *	The entity is not embedded in any struct, but part of
+ *	a memory-to-memory topology.
  *
  * Media entity objects are often not instantiated directly, but the media
  * entity structure is inherited by (through embedding) other subsystem-specific
@@ -222,6 +225,7 @@ enum media_entity_type {
 	MEDIA_ENTITY_TYPE_BASE,
 	MEDIA_ENTITY_TYPE_VIDEO_DEVICE,
 	MEDIA_ENTITY_TYPE_V4L2_SUBDEV,
+	MEDIA_ENTITY_TYPE_MEM2MEM,
 };
 
 /**

@@ -17,9 +17,11 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 
+#include <media/media-device.h>
 #include <media/videobuf2-v4l2.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/v4l2-dev.h>
+#include <media/v4l2-device.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
 
@@ -50,6 +52,11 @@ module_param(debug, bool, 0644);
  * offsets but for different queues */
 #define DST_QUEUE_OFF_BASE	(1 << 30)
 
+struct v4l2_m2m_entity {
+	struct media_entity entity;
+	struct media_pad pads[2];
+	char name[64];
+};
 
 /**
  * struct v4l2_m2m_dev - per-device context
@@ -60,6 +67,10 @@ module_param(debug, bool, 0644);
  */
 struct v4l2_m2m_dev {
 	struct v4l2_m2m_ctx	*curr_ctx;
+#ifdef CONFIG_MEDIA_CONTROLLER
+	struct v4l2_m2m_entity	entities[3];
+	struct media_intf_devnode *intf_devnode;
+#endif
 
 	struct list_head	job_queue;
 	spinlock_t		job_spinlock;
@@ -594,6 +605,152 @@ int v4l2_m2m_mmap(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
 	return vb2_mmap(vq, vma);
 }
 EXPORT_SYMBOL(v4l2_m2m_mmap);
+
+void v4l2_m2m_unregister_media_controller(struct v4l2_m2m_dev *m2m_dev)
+{
+	int i;
+
+	media_remove_intf_links(&m2m_dev->intf_devnode->intf);
+	media_devnode_remove(m2m_dev->intf_devnode);
+
+	for (i = 0; i < 3; i++)
+		media_entity_remove_links(&m2m_dev->entities[i].entity);
+	for (i = 0; i < 3; i++)
+		media_device_unregister_entity(&m2m_dev->entities[i].entity);
+}
+EXPORT_SYMBOL_GPL(v4l2_m2m_unregister_media_controller);
+
+#define MEM2MEM_ENT_TYPE_INPUT	1
+#define MEM2MEM_ENT_TYPE_OUTPUT	2
+#define MEM2MEM_ENT_TYPE_PROC	3
+
+static int v4l2_m2m_register_entity(struct media_device *mdev,
+		struct v4l2_m2m_entity *m2m_entity, int type)
+{
+	unsigned int function;
+	int num_pads;
+	int ret;
+
+	switch (type) {
+	case MEM2MEM_ENT_TYPE_INPUT:
+		function = MEDIA_ENT_F_IO_DMAENGINE;
+		m2m_entity->pads[0].flags = MEDIA_PAD_FL_SOURCE;
+		strlcpy(m2m_entity->name, "input", sizeof(m2m_entity->name));
+		num_pads = 1;
+		break;
+	case MEM2MEM_ENT_TYPE_OUTPUT:
+		function = MEDIA_ENT_F_IO_DMAENGINE;
+		m2m_entity->pads[0].flags = MEDIA_PAD_FL_SINK;
+		strlcpy(m2m_entity->name, "output", sizeof(m2m_entity->name));
+		num_pads = 1;
+		break;
+	case MEM2MEM_ENT_TYPE_PROC:
+		function = MEDIA_ENT_F_PROC_VIDEO_TRANSFORM;
+		m2m_entity->pads[0].flags = MEDIA_PAD_FL_SOURCE;
+		m2m_entity->pads[1].flags = MEDIA_PAD_FL_SINK;
+		strlcpy(m2m_entity->name, "proc", sizeof(m2m_entity->name));
+		num_pads = 2;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ret = media_entity_pads_init(&m2m_entity->entity, num_pads, m2m_entity->pads);
+	if (ret)
+		return ret;
+
+	m2m_entity->entity.obj_type = MEDIA_ENTITY_TYPE_MEM2MEM;
+	m2m_entity->entity.function = function;
+	m2m_entity->entity.name = m2m_entity->name;
+	ret = media_device_register_entity(mdev, &m2m_entity->entity);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+int v4l2_m2m_register_media_controller(struct v4l2_m2m_dev *m2m_dev, struct video_device *vdev)
+{
+#if defined(CONFIG_MEDIA_CONTROLLER)
+	struct media_device *mdev = vdev->v4l2_dev->mdev;
+	struct media_link *link;
+	int ret;
+
+	if (!mdev)
+		return 0;
+
+	/* A memory-to-memory device consists in two
+	 * DMA engine and one video processing entities.
+	 * The DMA engine entities are linked to a V4L interface
+	 */
+
+	/* Create the three entities with their pads */
+	ret = v4l2_m2m_register_entity(mdev, &m2m_dev->entities[0], MEM2MEM_ENT_TYPE_INPUT);
+	if (ret)
+		return ret;
+	ret = v4l2_m2m_register_entity(mdev, &m2m_dev->entities[1], MEM2MEM_ENT_TYPE_PROC);
+	if (ret)
+		goto err_rel_entity0;
+	ret = v4l2_m2m_register_entity(mdev, &m2m_dev->entities[2], MEM2MEM_ENT_TYPE_OUTPUT);
+	if (ret)
+		goto err_rel_entity1;
+
+	/* Connect the three entities */
+        ret = media_create_pad_link(&m2m_dev->entities[0].entity, 0,
+			&m2m_dev->entities[1].entity, 1,
+                        MEDIA_LNK_FL_IMMUTABLE | MEDIA_LNK_FL_ENABLED);
+	if (ret)
+		goto err_rel_entity2;
+
+        ret = media_create_pad_link(&m2m_dev->entities[1].entity, 0,
+			&m2m_dev->entities[2].entity, 0,
+                        MEDIA_LNK_FL_IMMUTABLE | MEDIA_LNK_FL_ENABLED);
+	if (ret)
+		goto err_rm_links0;
+
+	/* Create video interface */
+	m2m_dev->intf_devnode = media_devnode_create(mdev, MEDIA_INTF_T_V4L_VIDEO, 0, VIDEO_MAJOR, vdev->minor);
+	if (!m2m_dev->intf_devnode) {
+		ret = -ENOMEM;
+		goto err_rm_links1;
+	}
+
+	/* Connect the two DMA engines to the interface */
+	link = media_create_intf_link(&m2m_dev->entities[0].entity, &m2m_dev->intf_devnode->intf,
+				MEDIA_LNK_FL_ENABLED);
+	if (!link) {
+		ret = -ENOMEM;
+		goto err_rm_devnode;
+	}
+
+	link = media_create_intf_link(&m2m_dev->entities[1].entity, &m2m_dev->intf_devnode->intf,
+				MEDIA_LNK_FL_ENABLED);
+	if (!link) {
+		ret = -ENOMEM;
+		goto err_rm_intf_link;
+	}
+	return 0;
+
+err_rm_intf_link:
+	media_remove_intf_links(&m2m_dev->intf_devnode->intf);
+err_rm_devnode:
+	media_devnode_remove(m2m_dev->intf_devnode);
+err_rm_links1:
+	media_entity_remove_links(&m2m_dev->entities[2].entity);
+err_rm_links0:
+	media_entity_remove_links(&m2m_dev->entities[1].entity);
+	media_entity_remove_links(&m2m_dev->entities[0].entity);
+err_rel_entity2:
+	media_device_unregister_entity(&m2m_dev->entities[2].entity);
+err_rel_entity1:
+	media_device_unregister_entity(&m2m_dev->entities[1].entity);
+err_rel_entity0:
+	media_device_unregister_entity(&m2m_dev->entities[0].entity);
+	return ret;
+#endif
+	return 0;
+}
+EXPORT_SYMBOL_GPL(v4l2_m2m_register_media_controller);
 
 struct v4l2_m2m_dev *v4l2_m2m_init(const struct v4l2_m2m_ops *m2m_ops)
 {
