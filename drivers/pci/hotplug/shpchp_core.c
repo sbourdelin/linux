@@ -287,6 +287,13 @@ static int shpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	int rc;
 	struct controller *ctrl;
 
+	/* do not claim pcie port device */
+	if (pci_is_pcie(dev) &&
+	    ((pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT) ||
+	     (pci_pcie_type(dev) == PCI_EXP_TYPE_UPSTREAM) ||
+	     (pci_pcie_type(dev) == PCI_EXP_TYPE_DOWNSTREAM)))
+		return -ENODEV;
+
 	if (!is_shpc_capable(pdev))
 		return -ENODEV;
 
