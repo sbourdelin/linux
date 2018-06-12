@@ -656,6 +656,12 @@ static int gic_dist_supports_lpis(void)
 	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS) && !gicv3_nolpi;
 }
 
+/* Check whether it's single security state view */
+static bool gic_dist_security_disabled(void)
+{
+	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
+}
+
 static void gic_cpu_init(void)
 {
 	void __iomem *rbase;
@@ -664,7 +670,8 @@ static void gic_cpu_init(void)
 	if (gic_populate_rdist())
 		return;
 
-	gic_enable_redist(true);
+	if (gic_dist_security_disabled())
+		gic_enable_redist(true);
 
 	rbase = gic_data_rdist_sgi_base();
 
@@ -819,11 +826,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 #endif
 
 #ifdef CONFIG_CPU_PM
-/* Check whether it's single security state view */
-static bool gic_dist_security_disabled(void)
-{
-	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
-}
 
 static int gic_cpu_pm_notifier(struct notifier_block *self,
 			       unsigned long cmd, void *v)
