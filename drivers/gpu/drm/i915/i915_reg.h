@@ -8841,6 +8841,10 @@ enum skl_power_gate {
  * SKL Clocks
  */
 
+/* Power well 2 */
+#define POWER_WELL_2			_MMIO(0x45404)
+#define POWER_WELL_2_REQUEST		(1<<31)
+
 /* CDCLK_CTL */
 #define CDCLK_CTL			_MMIO(0x46000)
 #define  CDCLK_FREQ_SEL_MASK		(3 << 26)
