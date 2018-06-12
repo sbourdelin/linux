@@ -853,8 +853,11 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 		else
 			radix__flush_all_mm(mm);
 	} else {
-		unsigned long start = tlb->start;
-		unsigned long end = tlb->end;
+		unsigned long start = tlb->page_start;
+		unsigned long end = tlb->page_end;
+
+		if (end < start)
+			end = start;
 
 		if (!tlb->need_flush_all)
 			radix__flush_tlb_range_psize(mm, start, end, psize);
