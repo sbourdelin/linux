@@ -1,0 +1,46 @@
+Device Tree Clock bindings for GRX500 PLL controller.
+
+This binding uses the common clock binding:
+	Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+This GRX500 PLL controller provides the 5 main clock domain of the SoC: CPU/DDR, XBAR,
+Voice, WLAN, PCIe and gate clocks for HW modules.
+
+Required properties for osc clock node
+- compatible: Should be intel,grx500-xxx-clk
+- reg: offset address of the controller memory area.
+- clocks: phandle of the external reference clock
+- #clock-cells: can be one or zero.
+- clock-output-names: Names of the output clocks.
+
+Example:
+	pll0aclk: pll0aclk {
+		#clock-cells = <1>;
+		compatible = "intel,grx500-pll0a-clk";
+		clocks = <&pll0a>;
+		reg = <0x8>;
+		clock-output-names = "cbmclk", "ngiclk", "ssx4clk", "cpu0clk";
+	};
+
+	cpuclk: cpuclk {
+		#clock-cells = <0>;
+		compatible = "intel,grx500-cpu-clk";
+		clocks = <&pll0aclk CPU0_CLK>, <&pll0bclk CPU1_CLK>;
+		reg = <0x8>;
+		clock-output-names = "cpu";
+	};
+
+Required properties for gate node:
+- compatible: Should be intel,grx500-gatex-clk
+- reg: offset address of the controller memory area.
+- #clock-cells: Should be <1>
+- clock-output-names: Names of the output clocks.
+
+Example:
+	clkgate0: clkgate0 {
+		#clock-cells = <1>;
+		compatible = "intel,grx500-gate0-clk";
+		reg = <0x114>;
+		clock-output-names = "gate_xbar0", "gate_xbar1", "gate_xbar2",
+		"gate_xbar3", "gate_xbar6", "gate_xbar7";
+	};

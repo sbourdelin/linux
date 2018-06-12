@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-2.0
+config COMMON_CLK_INTEL
+	depends on COMMON_CLK
+	depends on INTEL_MIPS || COMPILE_TEST
+	select MFD_SYSCON
+	bool "Intel clock controller support"
+	help
+	  This driver support Intel GRX500 crystal oscillator clock
+	  using common clock framework.
+
+choice
+	prompt "SoC platform selection"
+	depends on COMMON_CLK_INTEL
+	default INTEL_GRX500_CLK
+
+config INTEL_GRX500_CLK
+	bool "GRX500 CLK"
+	help
+	  Clock driver of GRX500 platform.
+
+endchoice
