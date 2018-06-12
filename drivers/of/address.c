@@ -877,6 +877,41 @@ void __iomem *of_io_request_and_map(struct device_node *np, int index,
 }
 EXPORT_SYMBOL(of_io_request_and_map);
 
+/*
+ * devm_of_iomap - Requests a resource and maps the memory mapped IO
+ *		   for a given device_node managed by a given device
+ *
+ * Checks that a resource is a valid memory region, requests the memory
+ * region and ioremaps it. All operations are managed and will be undone
+ * on driver detach of the device.
+ *
+ * This is to be used when a device requests/maps resources described
+ * by other device tree nodes (children or otherwise).
+ *
+ * @dev:	The device "managing" the resource
+ * @node:       The device-tree node where the resource resides
+ * @index:	index of the MMIO range in the "reg" property
+ * @size:	Returns the size of the resource (pass NULL if not needed)
+ * Returns a pointer to the requested and mapped memory or an ERR_PTR() encoded
+ * error code on failure. Usage example:
+ *
+ *	base = devm_of_iomap(&pdev->dev, node, 0, NULL);
+ *	if (IS_ERR(base))
+ *		return PTR_ERR(base);
+ */
+void __iomem *devm_of_iomap(struct device *dev, struct device_node *node, int index,
+			    resource_size_t *size)
+{
+	struct resource res;
+
+	if (of_address_to_resource(node, index, &res))
+		return IOMEM_ERR_PTR(-EINVAL);
+	if (size)
+		*size = resource_size(&res);
+	return devm_ioremap_resource(dev, &res);
+}
+EXPORT_SYMBOL(devm_of_iomap);
+
 /**
  * of_dma_get_range - Get DMA range info
  * @np:		device node to get DMA range info

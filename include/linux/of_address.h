@@ -41,6 +41,11 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
 void __iomem *of_io_request_and_map(struct device_node *device,
 				    int index, const char *name);
 
+/* Request and map, wrapper on devm_ioremap_resource */
+extern void __iomem *devm_of_iomap(struct device *dev,
+				   struct device_node *node, int index,
+				   resource_size_t *size);
+
 /* Extract an address from a device, returns the region size and
  * the address space flags too. The PCI version uses a BAR number
  * instead of an absolute index
