@@ -24,6 +24,7 @@ static int tpm_open(struct inode *inode, struct file *file)
 {
 	struct tpm_chip *chip;
 	struct file_priv *priv;
+	int rc = -ENOMEM;
 
 	chip = container_of(inode->i_cdev, struct tpm_chip, cdev);
 
@@ -37,15 +38,21 @@ static int tpm_open(struct inode *inode, struct file *file)
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (priv == NULL)
-		goto out;
+		goto out_clear;
 
-	tpm_common_open(file, chip, priv, NULL);
+	rc = tpm_common_open(file, chip, priv, NULL);
+	if (rc)
+		goto out_free;
 
 	return 0;
 
- out:
+out_free:
+	kfree(priv);
+
+out_clear:
 	clear_bit(0, &chip->is_open);
-	return -ENOMEM;
+
+	return rc;
 }
 
 /*
@@ -68,5 +75,6 @@ const struct file_operations tpm_fops = {
 	.open = tpm_open,
 	.read = tpm_common_read,
 	.write = tpm_common_write,
+	.poll = tpm_common_poll,
 	.release = tpm_release,
 };
