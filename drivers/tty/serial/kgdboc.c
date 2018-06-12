@@ -286,8 +286,10 @@ static void kgdboc_pre_exp_handler(void)
 		con_debug_enter(vc_cons[fg_console].d);
 	}
 	/* Increment the module count when the debugger is active */
-	if (!kgdb_connected)
-		try_module_get(THIS_MODULE);
+	if (!kgdb_connected) {
+		if (!try_module_get(THIS_MODULE))
+			printk(KERN_ERR "kgdboc: cannot get module.\n");
+	}
 }
 
 static void kgdboc_post_exp_handler(void)
