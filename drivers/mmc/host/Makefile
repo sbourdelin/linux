@@ -5,7 +5,6 @@
 
 obj-$(CONFIG_MMC_ARMMMCI) += armmmci.o
 armmmci-y := mmci.o mmci_dma.o
-armmmci-$(CONFIG_MMC_QCOM_DML) += mmci_qcom_dml.o
 obj-$(CONFIG_MMC_PXA)		+= pxamci.o
 obj-$(CONFIG_MMC_MXC)		+= mxcmmc.o
 obj-$(CONFIG_MMC_MXS)		+= mxs-mmc.o

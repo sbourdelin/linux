@@ -43,7 +43,6 @@
 
 #include "mmci.h"
 #include "mmci_dma.h"
-#include "mmci_qcom_dml.h"
 
 #define DRIVER_NAME "mmci-pl18x"
 
