@@ -7687,7 +7687,10 @@ ddb_logout_clr_sess:
 	 * to be seamless without actually destroying the
 	 * session
 	 **/
-	try_module_get(qla4xxx_iscsi_transport.owner);
+	if (!try_module_get(qla4xxx_iscsi_transport.owner))
+		ql4_printk(KERN_WARNING, ha,
+			"%s: cannot get module.\n", __func__);
+
 	iscsi_destroy_endpoint(ddb_entry->conn->ep);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -8970,7 +8973,9 @@ static void qla4xxx_destroy_fw_ddb_session(struct scsi_qla_host *ha)
 			 * to be seamless without actually destroying the
 			 * session
 			 **/
-			try_module_get(qla4xxx_iscsi_transport.owner);
+			if (!try_module_get(qla4xxx_iscsi_transport.owner))
+				ql4_printk(KERN_WARNING, ha,
+					"%s: cannot get module.\n", __func__);
 			iscsi_destroy_endpoint(ddb_entry->conn->ep);
 			qla4xxx_free_ddb(ha, ddb_entry);
 			iscsi_session_teardown(ddb_entry->sess);
