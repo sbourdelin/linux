@@ -1027,8 +1027,9 @@ static void scsiback_do_add_lun(struct vscsibk_info *info, const char *state,
 			scsiback_del_translation_entry(info, vir);
 		}
 	} else if (!try) {
-		xenbus_printf(XBT_NIL, info->dev->nodename, state,
-			      "%d", XenbusStateClosed);
+		if (xenbus_printf(XBT_NIL, info->dev->nodename, state,
+			      "%d", XenbusStateClosed))
+			pr_err("xenbus_printf error %s\n", state);
 	}
 }
 
@@ -1067,8 +1068,9 @@ static void scsiback_do_1lun_hotplug(struct vscsibk_info *info, int op,
 	snprintf(str, sizeof(str), "vscsi-devs/%s/p-dev", ent);
 	val = xenbus_read(XBT_NIL, dev->nodename, str, NULL);
 	if (IS_ERR(val)) {
-		xenbus_printf(XBT_NIL, dev->nodename, state,
-			      "%d", XenbusStateClosed);
+		if (xenbus_printf(XBT_NIL, dev->nodename, state,
+			      "%d", XenbusStateClosed))
+			pr_err("xenbus_printf error %s\n", state);
 		return;
 	}
 	strlcpy(phy, val, VSCSI_NAMELEN);
@@ -1079,8 +1081,9 @@ static void scsiback_do_1lun_hotplug(struct vscsibk_info *info, int op,
 	err = xenbus_scanf(XBT_NIL, dev->nodename, str, "%u:%u:%u:%u",
 			   &vir.hst, &vir.chn, &vir.tgt, &vir.lun);
 	if (XENBUS_EXIST_ERR(err)) {
-		xenbus_printf(XBT_NIL, dev->nodename, state,
-			      "%d", XenbusStateClosed);
+		if (xenbus_printf(XBT_NIL, dev->nodename, state,
+			      "%d", XenbusStateClosed))
+			pr_err("xenbus_printf error %s\n", state);
 		return;
 	}
 
