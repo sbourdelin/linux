@@ -3,6 +3,7 @@ subdir-y	+= brcm
 subdir-y	+= cavium-octeon
 subdir-y	+= img
 subdir-y	+= ingenic
+subdir-y	+= intel-mips
 subdir-y	+= lantiq
 subdir-y	+= mscc
 subdir-y	+= mti
