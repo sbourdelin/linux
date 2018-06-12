@@ -64,6 +64,17 @@ reset_shadow_zero_bits_mask(struct kvm_vcpu *vcpu, struct kvm_mmu *context);
 void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu);
 void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
 			     bool accessed_dirty);
+
+union kvm_mmu_page_role
+kvm_mmu_calc_root_page_role(struct kvm_vcpu *vcpu);
+
+union kvm_mmu_page_role
+kvm_calc_shadow_mmu_root_page_role(struct kvm_vcpu *vcpu);
+
+union kvm_mmu_page_role
+kvm_mmu_calc_shadow_ept_root_page_role(struct kvm_vcpu *vcpu,
+				       bool accessed_dirty);
+
 bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu);
 int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
 				u64 fault_address, char *insn, int insn_len);
