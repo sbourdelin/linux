@@ -830,6 +830,12 @@
 #define PERCPU_DECRYPTED_SECTION
 #endif
 
+#define	BUILD_SALT							\
+	. = ALIGN(32);							\
+	.salt : AT(ADDR(.salt) - LOAD_OFFSET) {				\
+	  LONG(0xffaa5500);						\
+	  . = ALIGN(32);						\
+	} = CONFIG_BUILD_ID_SALT					\
 
 /*
  * Default discarded sections.

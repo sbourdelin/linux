@@ -1967,3 +1967,12 @@ config ARCH_HAS_SYNC_CORE_BEFORE_USERMODE
 # <asm/syscall_wrapper.h>.
 config ARCH_HAS_SYSCALL_WRAPPER
 	def_bool n
+
+config BUILD_ID_SALT
+	hex "Build ID Salt"
+	default 0x12345678
+	help
+	   The build ID is used to link binaries and their debug info. Setting
+	   this option will use the value in the calculation of the build id.
+	   This is mostly useful for distributions which want to ensure the
+	   build is unique between builds. It's safe to leave the default.

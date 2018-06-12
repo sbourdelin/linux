@@ -3,6 +3,9 @@
  * Archs are free to supply their own linker scripts.  ld will
  * combine them automatically.
  */
+
+#include <asm-generic/vmlinux.lds.h>
+
 SECTIONS {
 	/DISCARD/ : {
 		*(.discard)
@@ -23,4 +26,5 @@ SECTIONS {
 	.init_array		0 : ALIGN(8) { *(SORT(.init_array.*)) *(.init_array) }
 
 	__jump_table		0 : ALIGN(8) { KEEP(*(__jump_table)) }
+	BUILD_SALT
 }
