@@ -378,4 +378,5 @@ struct va_alignment {
 
 extern struct va_alignment va_align;
 extern unsigned long align_vdso_addr(unsigned long);
+extern unsigned long get_align_mask(void);
 #endif /* _ASM_X86_ELF_H */

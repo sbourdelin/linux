@@ -156,17 +156,25 @@ static int map_vdso(const struct vdso_image *image, unsigned long addr)
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	unsigned long text_start;
+	unsigned long area_size = image->size - image->sym_vvar_start;
 	int ret = 0;
 
 	if (down_write_killable(&mm->mmap_sem))
 		return -EINTR;
 
-	addr = get_unmapped_area(NULL, addr,
-				 image->size - image->sym_vvar_start, 0, 0);
+	/* Find a bigger place for vma then needed - to align vdso later. */
+	area_size += get_align_mask();
+	addr = get_unmapped_area(NULL, addr, area_size, 0, 0);
 	if (IS_ERR_VALUE(addr)) {
 		ret = addr;
 		goto up_fail;
 	}
+
+	/*
+	 * Forcibly align the final address in case we have a hardware
+	 * issue that requires alignment for performance reasons.
+	 */
+	addr = align_vdso_addr(addr);
 
 	text_start = addr - image->sym_vvar_start;
 
@@ -240,12 +248,6 @@ static unsigned long vdso_addr(unsigned long start, unsigned len)
 	} else {
 		addr = start;
 	}
-
-	/*
-	 * Forcibly align the final address in case we have a hardware
-	 * issue that requires alignment for performance reasons.
-	 */
-	addr = align_vdso_addr(addr);
 
 	return addr;
 }
