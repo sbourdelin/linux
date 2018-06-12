@@ -1603,8 +1603,15 @@ w83793_detect_subclients(struct i2c_client *client)
 	}
 
 	tmp = w83793_read_value(client, W83793_REG_I2C_SUBADDR);
-	if (!(tmp & 0x08))
+	if (!(tmp & 0x08)) {
 		data->lm75[0] = i2c_new_dummy(adapter, 0x48 + (tmp & 0x7));
+		if (data->lm75[0] == NULL) {
+			dev_err(&client->dev,
+				"Failed to allocate I2C device\n");
+			err = -ENODEV;
+			goto ERROR_SC_1;
+		}
+	}
 	if (!(tmp & 0x80)) {
 		if ((data->lm75[0] != NULL)
 		    && ((tmp & 0x7) == ((tmp >> 4) & 0x7))) {
@@ -1616,6 +1623,12 @@ w83793_detect_subclients(struct i2c_client *client)
 		}
 		data->lm75[1] = i2c_new_dummy(adapter,
 					      0x48 + ((tmp >> 4) & 0x7));
+		if (data->lm75[1] == NULL) {
+			dev_err(&client->dev,
+				"Failed to allocate I2C device\n");
+			err = -ENODEV;
+			goto ERROR_SC_1;
+		}
 	}
 
 	return 0;
