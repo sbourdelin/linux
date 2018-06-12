@@ -4059,6 +4059,7 @@ static bool fast_cr3_switch(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 
 			kvm_make_request(KVM_REQ_LOAD_CR3, vcpu);
 			kvm_make_request(KVM_REQ_MMU_SYNC, vcpu);
+			kvm_x86_ops->tlb_flush(vcpu, true);
 			__clear_sp_write_flooding_count(
 				page_header(mmu->root_hpa));
 
@@ -4841,6 +4842,7 @@ int kvm_mmu_load(struct kvm_vcpu *vcpu)
 	if (r)
 		goto out;
 	kvm_mmu_load_cr3(vcpu);
+	kvm_x86_ops->tlb_flush(vcpu, true);
 out:
 	return r;
 }
