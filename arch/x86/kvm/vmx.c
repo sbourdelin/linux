@@ -8682,9 +8682,13 @@ static int handle_invpcid(struct kvm_vcpu *vcpu)
 			kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
 		}
 
+		if (kvm_get_pcid(vcpu, vcpu->arch.mmu.prev_root.cr3)
+		    == operand.pcid)
+			kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
+
 		/*
 		 * If the current cr3 does not use the given PCID, then nothing
-		 * needs to be done here because a resync will happen anyway
+		 * needs to be synced here because a resync will happen anyway
 		 * before switching to any other CR3.
 		 */
 
@@ -10652,13 +10656,17 @@ static unsigned long nested_ept_get_cr3(struct kvm_vcpu *vcpu)
 
 static int nested_ept_init_mmu_context(struct kvm_vcpu *vcpu)
 {
+	union kvm_mmu_page_role role;
+
 	WARN_ON(mmu_is_nested(vcpu));
 	if (!valid_ept_address(vcpu, nested_ept_get_cr3(vcpu)))
 		return 1;
 
-	kvm_mmu_new_cr3(vcpu, nested_ept_get_cr3(vcpu),
-			kvm_mmu_calc_shadow_ept_root_page_role(vcpu,
-				nested_ept_ad_enabled(vcpu)));
+	role = kvm_mmu_calc_shadow_ept_root_page_role(vcpu,
+			nested_ept_ad_enabled(vcpu));
+
+	kvm_mmu_new_cr3(vcpu, nested_ept_get_cr3(vcpu), role, false);
+
 	kvm_init_shadow_ept_mmu(vcpu,
 			to_vmx(vcpu)->nested.msrs.ept_caps &
 			VMX_EPT_EXECUTE_ONLY_BIT,
@@ -11216,7 +11224,8 @@ static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool ne
 	}
 
 	if (!nested_ept)
-		kvm_mmu_new_cr3(vcpu, cr3, kvm_mmu_calc_root_page_role(vcpu));
+		kvm_mmu_new_cr3(vcpu, cr3, kvm_mmu_calc_root_page_role(vcpu),
+				false);
 
 	vcpu->arch.cr3 = cr3;
 	__set_bit(VCPU_EXREG_CR3, (ulong *)&vcpu->arch.regs_avail);
