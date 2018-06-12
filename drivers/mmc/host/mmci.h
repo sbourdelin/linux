@@ -231,6 +231,7 @@
 
 struct clk;
 struct dma_chan;
+struct mmci_host;
 
 /**
  * struct variant_data - MMCI variant-specific quirks
@@ -273,6 +274,8 @@ struct dma_chan;
  *	       register.
  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
  * @mmci_dma: Pointer to platform-specific DMA callbacks.
+ * @set_clk_ios: if clock procedure of variant is specific
+ * @set_pwr_ios: if power procedure of variant is specific
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -307,6 +310,9 @@ struct variant_data {
 	u32			start_err;
 	u32			opendrain;
 	struct mmci_dma_ops	*mmci_dma;
+	void (*set_clkreg)(struct mmci_host *host, unsigned int desired);
+	void (*set_pwrreg)(struct mmci_host *host, unsigned char power_mode,
+			   unsigned int pwr);
 };
 
 struct mmci_host {
@@ -328,6 +334,7 @@ struct mmci_host {
 	u32			pwr_reg;
 	u32			pwr_reg_add;
 	u32			clk_reg;
+	u32			clk_reg_add;
 	u32			datactrl_reg;
 	u32			busy_status;
 	u32			mask1_reg;

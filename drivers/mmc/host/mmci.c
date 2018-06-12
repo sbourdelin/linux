@@ -374,6 +374,52 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
 	mmci_write_clkreg(host, clk);
 }
 
+static void mmci_set_pwrreg(struct mmci_host *host, unsigned char power_mode,
+			    unsigned int pwr)
+{
+	struct variant_data *variant = host->variant;
+	struct mmc_host *mmc = host->mmc;
+
+	switch (power_mode) {
+	case MMC_POWER_OFF:
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+
+		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
+			regulator_disable(mmc->supply.vqmmc);
+			host->vqmmc_enabled = false;
+		}
+
+		break;
+	case MMC_POWER_UP:
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+					      mmc->ios.vdd);
+
+		/*
+		 * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
+		 * and instead uses MCI_PWR_ON so apply whatever value is
+		 * configured in the variant data.
+		 */
+		pwr |= variant->pwrreg_powerup;
+
+		break;
+	case MMC_POWER_ON:
+		if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
+			if (regulator_enable(mmc->supply.vqmmc) < 0)
+				dev_err(mmc_dev(mmc),
+					"failed to enable vqmmc regulator\n");
+			else
+				host->vqmmc_enabled = true;
+		}
+
+		pwr |= MCI_PWR_ON;
+		break;
+	}
+
+	mmci_write_pwrreg(host, pwr);
+}
+
 static void
 mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 {
@@ -1031,7 +1077,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct mmci_host *host = mmc_priv(mmc);
 	struct variant_data *variant = host->variant;
-	u32 pwr = 0;
+	unsigned int pwr = 0;
 	unsigned long flags;
 	int ret;
 
@@ -1039,42 +1085,6 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		host->plat->ios_handler(mmc_dev(mmc), ios))
 			dev_err(mmc_dev(mmc), "platform ios_handler failed\n");
 
-	switch (ios->power_mode) {
-	case MMC_POWER_OFF:
-		if (!IS_ERR(mmc->supply.vmmc))
-			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-
-		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
-			regulator_disable(mmc->supply.vqmmc);
-			host->vqmmc_enabled = false;
-		}
-
-		break;
-	case MMC_POWER_UP:
-		if (!IS_ERR(mmc->supply.vmmc))
-			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
-
-		/*
-		 * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
-		 * and instead uses MCI_PWR_ON so apply whatever value is
-		 * configured in the variant data.
-		 */
-		pwr |= variant->pwrreg_powerup;
-
-		break;
-	case MMC_POWER_ON:
-		if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
-			ret = regulator_enable(mmc->supply.vqmmc);
-			if (ret < 0)
-				dev_err(mmc_dev(mmc),
-					"failed to enable vqmmc regulator\n");
-			else
-				host->vqmmc_enabled = true;
-		}
-
-		pwr |= MCI_PWR_ON;
-		break;
-	}
 
 	if (variant->signal_direction && ios->power_mode != MMC_POWER_OFF) {
 		/*
@@ -1126,8 +1136,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	spin_lock_irqsave(&host->lock, flags);
 
-	mmci_set_clkreg(host, ios->clock);
-	mmci_write_pwrreg(host, pwr);
+	if (variant->set_clkreg)
+		variant->set_clkreg(host, ios->clock);
+	else
+		mmci_set_clkreg(host, ios->clock);
+
+	if (variant->set_pwrreg)
+		variant->set_pwrreg(host, ios->power_mode, pwr);
+	else
+		mmci_set_pwrreg(host, ios->power_mode, pwr);
+
 	mmci_reg_delay(host);
 
 	spin_unlock_irqrestore(&host->lock, flags);
