@@ -805,6 +805,8 @@ static int __init inotify_user_setup(void)
 	BUG_ON(hweight32(ALL_INOTIFY_BITS) != 21);
 
 	inotify_inode_mark_cachep = KMEM_CACHE(inotify_inode_mark, SLAB_PANIC);
+	if (!inotify_inode_mark_cachep)
+		return -ENOMEM;
 
 	inotify_max_queued_events = 16384;
 	init_user_ns.ucount_max[UCOUNT_INOTIFY_INSTANCES] = 128;
