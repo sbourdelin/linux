@@ -242,6 +242,9 @@ static int gpio_flash_probe(struct platform_device *pdev)
 	state->map.phys       = NO_XIP;
 	state->map.map_priv_1 = (unsigned long)state;
 
+	if (!state->map.virt)
+		return -ENOMEM;
+
 	platform_set_drvdata(pdev, state);
 
 	i = 0;
