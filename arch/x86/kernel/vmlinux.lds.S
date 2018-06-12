@@ -172,6 +172,7 @@ SECTIONS
 		_edata = .;
 	} :data
 
+	BUILD_SALT
 	BUG_TABLE
 
 	ORC_UNWIND_TABLE
