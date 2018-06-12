@@ -504,7 +504,9 @@ static ssize_t show_docked(struct device *dev,
 	struct dock_station *dock_station = dev->platform_data;
 	struct acpi_device *adev = NULL;
 
-	acpi_bus_get_device(dock_station->handle, &adev);
+	if (acpi_bus_get_device(dock_station->handle, &adev))
+		return -ENODEV;
+
 	return snprintf(buf, PAGE_SIZE, "%u\n", acpi_device_enumerated(adev));
 }
 static DEVICE_ATTR(docked, S_IRUGO, show_docked, NULL);
