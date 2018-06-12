@@ -70,20 +70,9 @@ out_unlock:
 static void vfio_ccw_sch_io_todo(struct work_struct *work)
 {
 	struct vfio_ccw_private *private;
-	struct irb *irb;
 
 	private = container_of(work, struct vfio_ccw_private, io_work);
-	irb = &private->irb;
-
-	if (scsw_is_solicited(&irb->scsw)) {
-		cp_update_scsw(&private->cp, &irb->scsw);
-		cp_free(&private->cp);
-	}
-	memcpy(private->io_region.irb_area, irb, sizeof(*irb));
-
-	if (private->io_trigger)
-		eventfd_signal(private->io_trigger, 1);
-
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_INTERRUPT);
 	if (private->mdev)
 		private->state = VFIO_CCW_STATE_IDLE;
 }
@@ -94,9 +83,14 @@ static void vfio_ccw_sch_io_todo(struct work_struct *work)
 static void vfio_ccw_sch_irq(struct subchannel *sch)
 {
 	struct vfio_ccw_private *private = dev_get_drvdata(&sch->dev);
+	struct irb *irb = this_cpu_ptr(&cio_irb);
 
 	inc_irq_stat(IRQIO_CIO);
-	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_INTERRUPT);
+	memcpy(&private->irb, irb, sizeof(*irb));
+
+	queue_work(vfio_ccw_work_q, &private->io_work);
+	if (private->completion)
+		complete(private->completion);
 }
 
 static int vfio_ccw_sch_probe(struct subchannel *sch)
