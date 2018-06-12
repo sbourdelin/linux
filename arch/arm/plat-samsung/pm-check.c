@@ -46,8 +46,8 @@ typedef u32 *(run_fn_t)(struct resource *ptr, u32 *arg);
 static void s3c_pm_run_res(struct resource *ptr, run_fn_t fn, u32 *arg)
 {
 	while (ptr != NULL) {
-		if (ptr->child != NULL)
-			s3c_pm_run_res(ptr->child, fn, arg);
+		if (!list_empty(&ptr->child))
+			s3c_pm_run_res(resource_first_child(&ptr->child), fn, arg);
 
 		if ((ptr->flags & IORESOURCE_SYSTEM_RAM)
 				== IORESOURCE_SYSTEM_RAM) {
@@ -57,7 +57,7 @@ static void s3c_pm_run_res(struct resource *ptr, run_fn_t fn, u32 *arg)
 			arg = (fn)(ptr, arg);
 		}
 
-		ptr = ptr->sibling;
+		ptr = resource_sibling(ptr);
 	}
 }
 

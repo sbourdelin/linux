@@ -1412,9 +1412,8 @@ static acpi_status vmbus_walk_resources(struct acpi_resource *res, void *ctx)
 {
 	resource_size_t start = 0;
 	resource_size_t end = 0;
-	struct resource *new_res;
+	struct resource *new_res, *tmp;
 	struct resource **old_res = &hyperv_mmio;
-	struct resource **prev_res = NULL;
 
 	switch (res->type) {
 
@@ -1461,44 +1460,36 @@ static acpi_status vmbus_walk_resources(struct acpi_resource *res, void *ctx)
 	/*
 	 * If two ranges are adjacent, merge them.
 	 */
-	do {
-		if (!*old_res) {
-			*old_res = new_res;
-			break;
-		}
-
-		if (((*old_res)->end + 1) == new_res->start) {
-			(*old_res)->end = new_res->end;
+	if (!*old_res) {
+		*old_res = new_res;
+		return AE_OK;
+	}
+	tmp = *old_res;
+	list_for_each_entry_from(tmp, &tmp->parent->child, sibling) {
+		if ((tmp->end + 1) == new_res->start) {
+			tmp->end = new_res->end;
 			kfree(new_res);
 			break;
 		}
 
-		if ((*old_res)->start == new_res->end + 1) {
-			(*old_res)->start = new_res->start;
+		if (tmp->start == new_res->end + 1) {
+			tmp->start = new_res->start;
 			kfree(new_res);
 			break;
 		}
 
-		if ((*old_res)->start > new_res->end) {
-			new_res->sibling = *old_res;
-			if (prev_res)
-				(*prev_res)->sibling = new_res;
-			*old_res = new_res;
+		if (tmp->start > new_res->end) {
+			list_add(&new_res->sibling, tmp->sibling.prev);
 			break;
 		}
-
-		prev_res = old_res;
-		old_res = &(*old_res)->sibling;
-
-	} while (1);
+	}
 
 	return AE_OK;
 }
 
 static int vmbus_acpi_remove(struct acpi_device *device)
 {
-	struct resource *cur_res;
-	struct resource *next_res;
+	struct resource *res;
 
 	if (hyperv_mmio) {
 		if (fb_mmio) {
@@ -1507,10 +1498,9 @@ static int vmbus_acpi_remove(struct acpi_device *device)
 			fb_mmio = NULL;
 		}
 
-		for (cur_res = hyperv_mmio; cur_res; cur_res = next_res) {
-			next_res = cur_res->sibling;
-			kfree(cur_res);
-		}
+		res = hyperv_mmio;
+		list_for_each_entry_from(res, &res->parent->child, sibling)
+			kfree(res);
 	}
 
 	return 0;
@@ -1596,7 +1586,8 @@ int vmbus_allocate_mmio(struct resource **new, struct hv_device *device_obj,
 		}
 	}
 
-	for (iter = hyperv_mmio; iter; iter = iter->sibling) {
+	iter = hyperv_mmio;
+	list_for_each_entry_from(iter, &iter->parent->child, sibling) {
 		if ((iter->start >= max) || (iter->end <= min))
 			continue;
 
@@ -1639,7 +1630,8 @@ void vmbus_free_mmio(resource_size_t start, resource_size_t size)
 	struct resource *iter;
 
 	down(&hyperv_mmio_lock);
-	for (iter = hyperv_mmio; iter; iter = iter->sibling) {
+	iter = hyperv_mmio;
+	list_for_each_entry_from(iter, &iter->parent->child, sibling) {
 		if ((iter->start >= start + size) || (iter->end <= start))
 			continue;
 

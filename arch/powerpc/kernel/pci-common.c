@@ -761,7 +761,9 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			res->flags = range.flags;
 			res->start = range.cpu_addr;
 			res->end = range.cpu_addr + range.size - 1;
-			res->parent = res->child = res->sibling = NULL;
+			res->parent = NULL;
+			INIT_LIST_HEAD(&res->child);
+			INIT_LIST_HEAD(&res->sibling);
 		}
 	}
 }

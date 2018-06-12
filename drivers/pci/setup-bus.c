@@ -2107,7 +2107,7 @@ int pci_reassign_bridge_resources(struct pci_dev *bridge, unsigned long type)
 				continue;
 
 			/* Ignore BARs which are still in use */
-			if (res->child)
+			if (!list_empty(&res->child))
 				continue;
 
 			ret = add_to_list(&saved, bridge, res, 0, 0);

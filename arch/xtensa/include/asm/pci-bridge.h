@@ -71,8 +71,8 @@ static inline void pcibios_init_resource(struct resource *res,
 	res->flags = flags;
 	res->name = name;
 	res->parent = NULL;
-	res->sibling = NULL;
-	res->child = NULL;
+	INIT_LIST_HEAD(&res->child);
+	INIT_LIST_HEAD(&res->sibling);
 }
 
 

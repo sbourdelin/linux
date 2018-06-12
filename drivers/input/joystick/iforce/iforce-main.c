@@ -305,8 +305,8 @@ int iforce_init_device(struct iforce *iforce)
 	iforce->device_memory.end = 200;
 	iforce->device_memory.flags = IORESOURCE_MEM;
 	iforce->device_memory.parent = NULL;
-	iforce->device_memory.child = NULL;
-	iforce->device_memory.sibling = NULL;
+	INIT_LIST_HEAD(&iforce->device_memory.child);
+	INIT_LIST_HEAD(&iforce->device_memory.sibling);
 
 /*
  * Wait until device ready - until it sends its first response.

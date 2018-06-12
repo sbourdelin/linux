@@ -330,7 +330,9 @@ int of_pci_range_to_resource(struct of_pci_range *range,
 {
 	int err;
 	res->flags = range->flags;
-	res->parent = res->child = res->sibling = NULL;
+	res->parent = NULL;
+	INIT_LIST_HEAD(&res->child);
+	INIT_LIST_HEAD(&res->sibling);
 	res->name = np->full_name;
 
 	if (res->flags & IORESOURCE_IO) {
