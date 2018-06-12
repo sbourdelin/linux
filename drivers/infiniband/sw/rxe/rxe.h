@@ -92,6 +92,8 @@ static inline u32 rxe_crc32(struct rxe_dev *rxe,
 	return retval;
 }
 
+extern bool rxe_init_done;
+
 void rxe_set_mtu(struct rxe_dev *rxe, unsigned int dev_mtu);
 
 int rxe_add(struct rxe_dev *rxe, unsigned int mtu);

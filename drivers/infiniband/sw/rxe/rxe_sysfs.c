@@ -77,6 +77,11 @@ static int rxe_param_set_add(const char *val, const struct kernel_param *kp)
 	struct net_device *ndev = NULL;
 	struct rxe_dev *rxe;
 
+	if (!rxe_init_done) {
+		pr_err("add: module not initializes\n");
+		err = -EINVAL;
+		goto err;
+	}
 	len = sanitize_arg(val, intf, sizeof(intf));
 	if (!len) {
 		pr_err("add: invalid interface name\n");
