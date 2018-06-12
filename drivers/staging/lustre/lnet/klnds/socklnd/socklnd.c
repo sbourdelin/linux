@@ -2422,7 +2422,10 @@ ksocknal_base_startup(void)
 
 	/* flag lists/ptrs/locks initialised */
 	ksocknal_data.ksnd_init = SOCKNAL_INIT_DATA;
-	try_module_get(THIS_MODULE);
+	if (!try_module_get(THIS_MODULE)) {
+		CERROR("%s: cannot get module\n", __func__);
+		goto failed;
+	}
 
 	ksocknal_data.ksnd_sched_info = cfs_percpt_alloc(lnet_cpt_table(),
 							 sizeof(*info));
