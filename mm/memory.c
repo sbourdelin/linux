@@ -277,8 +277,10 @@ void arch_tlb_finish_mmu(struct mmu_gather *tlb,
 {
 	struct mmu_gather_batch *batch, *next;
 
-	if (force)
+	if (force) {
 		__tlb_adjust_range(tlb, start, end - start);
+		__tlb_adjust_page_range(tlb, start, end - start);
+	}
 
 	tlb_flush_mmu(tlb);
 

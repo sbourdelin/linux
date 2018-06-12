@@ -96,6 +96,8 @@ struct mmu_gather {
 #endif
 	unsigned long		start;
 	unsigned long		end;
+	unsigned long		page_start;
+	unsigned long		page_end;
 	/* we are in the middle of an operation to clear
 	 * a full mm and can make some optimizations */
 	unsigned int		fullmm : 1,
@@ -128,13 +130,25 @@ static inline void __tlb_adjust_range(struct mmu_gather *tlb,
 	tlb->end = max(tlb->end, address + range_size);
 }
 
+static inline void __tlb_adjust_page_range(struct mmu_gather *tlb,
+				      unsigned long address,
+				      unsigned int range_size)
+{
+	tlb->page_start = min(tlb->page_start, address);
+	tlb->page_end = max(tlb->page_end, address + range_size);
+}
+
+
 static inline void __tlb_reset_range(struct mmu_gather *tlb)
 {
 	if (tlb->fullmm) {
 		tlb->start = tlb->end = ~0;
+		tlb->page_start = tlb->page_end = ~0;
 	} else {
 		tlb->start = TASK_SIZE;
 		tlb->end = 0;
+		tlb->page_start = TASK_SIZE;
+		tlb->page_end = 0;
 	}
 }
 
@@ -210,12 +224,14 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 #define tlb_remove_tlb_entry(tlb, ptep, address)		\
 	do {							\
 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
+		__tlb_adjust_page_range(tlb, address, PAGE_SIZE); \
 		__tlb_remove_tlb_entry(tlb, ptep, address);	\
 	} while (0)
 
 #define tlb_remove_huge_tlb_entry(h, tlb, ptep, address)	     \
 	do {							     \
 		__tlb_adjust_range(tlb, address, huge_page_size(h)); \
+		__tlb_adjust_page_range(tlb, address, huge_page_size(h)); \
 		__tlb_remove_tlb_entry(tlb, ptep, address);	     \
 	} while (0)
 
@@ -230,6 +246,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 #define tlb_remove_pmd_tlb_entry(tlb, pmdp, address)			\
 	do {								\
 		__tlb_adjust_range(tlb, address, HPAGE_PMD_SIZE);	\
+		__tlb_adjust_page_range(tlb, address, HPAGE_PMD_SIZE);	\
 		__tlb_remove_pmd_tlb_entry(tlb, pmdp, address);		\
 	} while (0)
 
@@ -244,6 +261,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 #define tlb_remove_pud_tlb_entry(tlb, pudp, address)			\
 	do {								\
 		__tlb_adjust_range(tlb, address, HPAGE_PUD_SIZE);	\
+		__tlb_adjust_page_range(tlb, address, HPAGE_PUD_SIZE);	\
 		__tlb_remove_pud_tlb_entry(tlb, pudp, address);		\
 	} while (0)
 
@@ -262,6 +280,11 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
  * architecture to do its own odd thing, not cause pain for others
  * http://lkml.kernel.org/r/CA+55aFzBggoXtNXQeng5d_mRoDnaMBE5Y+URs+PHR67nUpMtaw@mail.gmail.com
  *
+ * Powerpc (Book3S 64-bit) with the radix MMU has an architected "page
+ * walk cache" that is invalidated with a specific instruction. It uses
+ * need_flush_all to issue this instruction, which is set by its own
+ * __p??_free_tlb functions.
+ *
  * For now w.r.t page table cache, mark the range_size as PAGE_SIZE
  */
 
@@ -273,7 +296,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 
 #define pmd_free_tlb(tlb, pmdp, address)			\
 	do {							\
-		__tlb_adjust_range(tlb, address, PAGE_SIZE);		\
+		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
 		__pmd_free_tlb(tlb, pmdp, address);		\
 	} while (0)
 
@@ -288,7 +311,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 #ifndef __ARCH_HAS_5LEVEL_HACK
 #define p4d_free_tlb(tlb, pudp, address)			\
 	do {							\
-		__tlb_adjust_range(tlb, address, PAGE_SIZE);		\
+		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
 		__p4d_free_tlb(tlb, pudp, address);		\
 	} while (0)
 #endif
