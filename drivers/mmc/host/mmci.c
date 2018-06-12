@@ -24,6 +24,7 @@
 #include <linux/mmc/pm.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
+#include <linux/mmc/mmc.h>
 #include <linux/mmc/slot-gpio.h>
 #include <linux/amba/bus.h>
 #include <linux/clk.h>
@@ -522,11 +523,28 @@ static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
 	host->mask1_reg = mask;
 }
 
-static void mmci_stop_data(struct mmci_host *host)
+static int mmci_stop_data(struct mmci_host *host)
 {
+	struct mmc_command *stop = &host->stop_abort;
+	struct mmc_data *data = host->data;
+	unsigned int cmd = 0;
+
 	mmci_write_datactrlreg(host, 0);
 	mmci_set_mask1(host, 0);
 	host->data = NULL;
+
+	if (host->variant->cmdreg_stop) {
+		cmd |= host->variant->cmdreg_stop;
+		if (!data->stop) {
+			memset(stop, 0, sizeof(struct mmc_command));
+			stop->opcode = MMC_STOP_TRANSMISSION;
+			stop->arg = 0;
+			stop->flags = MMC_RSP_R1B | MMC_CMD_AC;
+			data->stop = stop;
+		}
+	}
+
+	return cmd;
 }
 
 static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
@@ -703,6 +721,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	      unsigned int status)
 {
 	unsigned int status_err;
+	unsigned int cmd_reg = 0;
 
 	/* Make sure we have data to handle */
 	if (!data)
@@ -761,7 +780,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	if (status & MCI_DATAEND || data->error) {
 		mmci_dma_finalize(host, data);
 
-		mmci_stop_data(host);
+		cmd_reg = mmci_stop_data(host);
 
 		if (!data->error)
 			/* The error clause is handled above, success! */
@@ -770,7 +789,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 		if (!data->stop || host->mrq->sbc) {
 			mmci_request_end(host, data->mrq);
 		} else {
-			mmci_start_command(host, data->stop, 0);
+			mmci_start_command(host, data->stop, cmd_reg);
 		}
 	}
 }
@@ -780,6 +799,8 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	     unsigned int status)
 {
 	void __iomem *base = host->base;
+	struct mmc_data *data = host->data;
+	unsigned int cmd_reg = 0;
 	bool sbc;
 
 	if (!cmd)
@@ -865,11 +886,16 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	}
 
 	if ((!sbc && !cmd->data) || cmd->error) {
-		if (host->data) {
+		if (data) {
 			/* Terminate the DMA transfer */
 			mmci_dma_error(host);
 
-			mmci_stop_data(host);
+			cmd_reg = mmci_stop_data(host);
+
+			if (data->stop) {
+				mmci_start_command(host, data->stop, cmd_reg);
+				return;
+			}
 		}
 		mmci_request_end(host, host->mrq);
 	} else if (sbc) {
