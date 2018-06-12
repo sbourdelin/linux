@@ -252,6 +252,7 @@ struct dma_chan;
  * @blksz_datactrl4: true if Block size is at b4..b16 position in datactrl
  *		     register
  * @datactrl_mask_sdio: SDIO enable mask in datactrl register
+ * @datactrl_blksz: block size in power of two
  * @pwrreg_powerup: power up value for MMCIPOWER register
  * @f_max: maximum clk frequency supported by the controller.
  * @signal_direction: input/out direction of bus signals can be indicated
@@ -284,6 +285,7 @@ struct variant_data {
 	unsigned int		data_cmd_enable;
 	unsigned int		datactrl_mask_ddrmode;
 	unsigned int		datactrl_mask_sdio;
+	unsigned int		datactrl_blocksz;
 	bool			st_sdio;
 	bool			st_clkdiv;
 	bool			blksz_datactrl16;
