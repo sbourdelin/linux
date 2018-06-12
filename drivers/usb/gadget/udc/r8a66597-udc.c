@@ -1830,6 +1830,11 @@ static int r8a66597_sudmac_ioremap(struct r8a66597 *r8a66597,
 	struct resource *res;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sudmac");
+	if (!res) {
+		dev_err(&pdev->dev, "could not allocate resource.\n");
+		return -ENODEV;
+	}
+
 	r8a66597->sudmac_reg = devm_ioremap_resource(&pdev->dev, res);
 	return PTR_ERR_OR_ZERO(r8a66597->sudmac_reg);
 }
