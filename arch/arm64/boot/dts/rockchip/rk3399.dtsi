@@ -160,7 +160,7 @@
 		};
 	};
 
-	display-subsystem {
+	display_subsystem: display-subsystem {
 		compatible = "rockchip,display-subsystem";
 		ports = <&vopl_out>, <&vopb_out>;
 	};
@@ -1936,14 +1936,19 @@
 			drive-strength = <12>;
 		};
 
-		pcfg_pull_up_8ma: pcfg-pull-up-8ma {
-			bias-pull-up;
-			drive-strength = <8>;
+		pcfg_pull_none_13ma: pcfg-pull-none-13ma {
+			bias-disable;
+			drive-strength = <13>;
 		};
 
-		pcfg_pull_down_4ma: pcfg-pull-down-4ma {
-			bias-pull-down;
-			drive-strength = <4>;
+		pcfg_pull_none_18ma: pcfg-pull-none-18ma {
+			bias-disable;
+			drive-strength = <18>;
+		};
+
+		pcfg_pull_none_20ma: pcfg-pull-none-20ma {
+			bias-disable;
+			drive-strength = <20>;
 		};
 
 		pcfg_pull_up_2ma: pcfg-pull-up-2ma {
@@ -1951,14 +1956,52 @@
 			drive-strength = <2>;
 		};
 
+		pcfg_pull_up_8ma: pcfg-pull-up-8ma {
+			bias-pull-up;
+			drive-strength = <8>;
+		};
+
+		pcfg_pull_up_18ma: pcfg-pull-up-18ma {
+			bias-pull-up;
+			drive-strength = <18>;
+		};
+
+		pcfg_pull_up_20ma: pcfg-pull-up-20ma {
+			bias-pull-up;
+			drive-strength = <20>;
+		};
+
+		pcfg_pull_down_4ma: pcfg-pull-down-4ma {
+			bias-pull-down;
+			drive-strength = <4>;
+		};
+
+		pcfg_pull_down_8ma: pcfg-pull-down-8ma {
+			bias-pull-down;
+			drive-strength = <8>;
+		};
+
 		pcfg_pull_down_12ma: pcfg-pull-down-12ma {
 			bias-pull-down;
 			drive-strength = <12>;
 		};
 
-		pcfg_pull_none_13ma: pcfg-pull-none-13ma {
-			bias-disable;
-			drive-strength = <13>;
+		pcfg_pull_down_18ma: pcfg-pull-down-18ma {
+			bias-pull-down;
+			drive-strength = <18>;
+		};
+
+		pcfg_pull_down_20ma: pcfg-pull-down-20ma {
+			bias-pull-down;
+			drive-strength = <18>;
+		};
+
+		pcfg_output_high: pcfg-output-high {
+			output-high;	
+		};
+
+		pcfg_output_low: pcfg-output-low {
+			output-low;	
 		};
 
 		clock {
@@ -2484,10 +2527,21 @@
 					<4 18 RK_FUNC_1 &pcfg_pull_none>;
 			};
 
+			pwm0_pin_pull_down: pwm0-pin-pull-down {
+				rockchip,pins =
+					<4 18 RK_FUNC_1 &pcfg_pull_down>;
+			};
+
 			vop0_pwm_pin: vop0-pwm-pin {
 				rockchip,pins =
 					<4 18 RK_FUNC_2 &pcfg_pull_none>;
 			};
+
+			vop1_pwm_pin: vop1-pwm-pin {
+				rockchip,pins =
+					<4 18 RK_FUNC_3 &pcfg_pull_none>;
+			};
+
 		};
 
 		pwm1 {
@@ -2496,14 +2550,19 @@
 					<4 22 RK_FUNC_1 &pcfg_pull_none>;
 			};
 
-			vop1_pwm_pin: vop1-pwm-pin {
+			pwm1_pin_pull_down: pwm1-pin-pull-down {
 				rockchip,pins =
-					<4 18 RK_FUNC_3 &pcfg_pull_none>;
+					<4 22 RK_FUNC_1 &pcfg_pull_down>;
 			};
 		};
 
 		pwm2 {
 			pwm2_pin: pwm2-pin {
+				rockchip,pins =
+					<1 19 RK_FUNC_1 &pcfg_pull_none>;
+			};
+
+			pwm2_pin_pull_down: pwm2-pin-pull-down {
 				rockchip,pins =
 					<1 19 RK_FUNC_1 &pcfg_pull_none>;
 			};
@@ -2526,25 +2585,35 @@
 		hdmi {
 			hdmi_i2c_xfer: hdmi-i2c-xfer {
 				rockchip,pins =
-					<4 RK_PC1 RK_FUNC_3 &pcfg_pull_none>,
-					<4 RK_PC0 RK_FUNC_3 &pcfg_pull_none>;
+					<4 17 RK_FUNC_3 &pcfg_pull_none>,
+					<4 16 RK_FUNC_3 &pcfg_pull_none>;
 			};
 
 			hdmi_cec: hdmi-cec {
 				rockchip,pins =
-					<4 RK_PC7 RK_FUNC_1 &pcfg_pull_none>;
+					<4 23 RK_FUNC_1 &pcfg_pull_none>;
 			};
 		};
 
 		pcie {
+			pcie_clkreqn: pci-clkreqn {
+				rockchip,pins =
+					<2 26 RK_FUNC_2 &pcfg_pull_none>;
+			};
+
+			pcie_clkreqnb: pci-clkreqnb {
+				rockchip,pins =
+					<4 24 RK_FUNC_1 &pcfg_pull_none>;
+			};
+
 			pcie_clkreqn_cpm: pci-clkreqn-cpm {
 				rockchip,pins =
-					<2 RK_PD2 RK_FUNC_GPIO &pcfg_pull_none>;
+					<2 26 RK_FUNC_GPIO &pcfg_pull_none>;
 			};
 
 			pcie_clkreqnb_cpm: pci-clkreqnb-cpm {
 				rockchip,pins =
-					<4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
+					<4 24 RK_FUNC_GPIO &pcfg_pull_none>;
 			};
 		};
 
