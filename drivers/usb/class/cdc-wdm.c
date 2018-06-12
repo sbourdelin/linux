@@ -152,7 +152,7 @@ static void wdm_out_callback(struct urb *urb)
 }
 
 /* forward declaration */
-static int service_outstanding_interrupt(struct wdm_device *desc);
+static int service_outstanding_interrupt(struct wdm_device *desc, bool en_irq);
 
 static void wdm_in_callback(struct urb *urb)
 {
@@ -219,7 +219,7 @@ skip_error:
 		 * We should respond to further attempts from the device to send
 		 * data, so that we can get unstuck.
 		 */
-		service_outstanding_interrupt(desc);
+		service_outstanding_interrupt(desc, false);
 	}
 
 	spin_unlock(&desc->iuspin);
@@ -448,7 +448,7 @@ out_free_mem:
  *
  * Called with desc->iuspin locked
  */
-static int service_outstanding_interrupt(struct wdm_device *desc)
+static int service_outstanding_interrupt(struct wdm_device *desc, bool en_irq)
 {
 	int rv = 0;
 
@@ -457,9 +457,15 @@ static int service_outstanding_interrupt(struct wdm_device *desc)
 		goto out;
 
 	set_bit(WDM_RESPONDING, &desc->flags);
-	spin_unlock_irq(&desc->iuspin);
-	rv = usb_submit_urb(desc->response, GFP_KERNEL);
-	spin_lock_irq(&desc->iuspin);
+	if (en_irq) {
+		spin_unlock_irq(&desc->iuspin);
+		rv = usb_submit_urb(desc->response, GFP_KERNEL);
+		spin_lock_irq(&desc->iuspin);
+	} else {
+		spin_unlock(&desc->iuspin);
+		rv = usb_submit_urb(desc->response, GFP_ATOMIC);
+		spin_lock(&desc->iuspin);
+	}
 	if (rv) {
 		dev_err(&desc->intf->dev,
 			"usb_submit_urb failed with result %d\n", rv);
@@ -544,7 +550,7 @@ retry:
 		if (!desc->reslength) { /* zero length read */
 			dev_dbg(&desc->intf->dev, "zero length - clearing WDM_READ\n");
 			clear_bit(WDM_READ, &desc->flags);
-			rv = service_outstanding_interrupt(desc);
+			rv = service_outstanding_interrupt(desc, true);
 			spin_unlock_irq(&desc->iuspin);
 			if (rv < 0)
 				goto err;
@@ -571,7 +577,7 @@ retry:
 	/* in case we had outstanding data */
 	if (!desc->length) {
 		clear_bit(WDM_READ, &desc->flags);
-		service_outstanding_interrupt(desc);
+		service_outstanding_interrupt(desc, true);
 	}
 	spin_unlock_irq(&desc->iuspin);
 	rv = cntr;
