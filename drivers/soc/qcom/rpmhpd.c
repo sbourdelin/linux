@@ -329,7 +329,7 @@ static int rpmhpd_update_level_mapping(struct rpmhpd *rpmhpd)
 
 static int rpmhpd_probe(struct platform_device *pdev)
 {
-	int i, ret;
+	int i, ret, max_level;
 	size_t num;
 	struct genpd_onecell_data *data;
 	struct rpmhpd **rpmhpds;
@@ -390,6 +390,16 @@ static int rpmhpd_probe(struct platform_device *pdev)
 		pm_genpd_init(&rpmhpds[i]->pd, NULL, true);
 
 		data->domains[i] = &rpmhpds[i]->pd;
+
+		/*
+		 * Until we have all consumers voting on corners
+		 * just vote the max corner on all PDs
+		 * This should ideally be *removed* once we have
+		 * all (most) consumers being able to vote
+		 */
+		max_level = rpmhpds[i]->level_count - 1;
+		rpmhpd_set_performance(&rpmhpds[i]->pd, rpmhpds[i]->level[max_level]);
+		rpmhpd_power_on(&rpmhpds[i]->pd);
 	}
 
 	return of_genpd_add_provider_onecell(pdev->dev.of_node, data);
