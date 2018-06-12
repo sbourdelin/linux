@@ -4043,7 +4043,7 @@ static bool fast_cr3_switch(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 			return false;
 
 		swap(mmu->root_hpa, mmu->prev_root.hpa);
-		mmu->prev_root.cr3 = kvm_read_cr3(vcpu);
+		mmu->prev_root.cr3 = mmu->get_cr3(vcpu);
 
 		if (new_cr3 == prev_cr3 &&
 		    VALID_PAGE(mmu->root_hpa) &&
@@ -4075,6 +4075,7 @@ void kvm_mmu_new_cr3(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 	if (!fast_cr3_switch(vcpu, new_cr3, new_role))
 		kvm_mmu_free_roots(vcpu, false);
 }
+EXPORT_SYMBOL_GPL(kvm_mmu_new_cr3);
 
 static unsigned long get_cr3(struct kvm_vcpu *vcpu)
 {
