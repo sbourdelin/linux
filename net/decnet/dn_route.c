@@ -1861,6 +1861,9 @@ void __init dn_route_init(void)
 	dn_dst_ops.kmem_cachep =
 		kmem_cache_create("dn_dst_cache", sizeof(struct dn_route), 0,
 				  SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL);
+	if (!dn_dst_ops.kmem_cachep)
+		panic("Failed to create dn_dst_cache cache\n");
+
 	dst_entries_init(&dn_dst_ops);
 	timer_setup(&dn_route_timer, dn_dst_check_expire, 0);
 	dn_route_timer.expires = jiffies + decnet_dst_gc_interval * HZ;
