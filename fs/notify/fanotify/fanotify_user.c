@@ -959,9 +959,14 @@ static int __init fanotify_user_setup(void)
 {
 	fanotify_mark_cache = KMEM_CACHE(fsnotify_mark, SLAB_PANIC);
 	fanotify_event_cachep = KMEM_CACHE(fanotify_event_info, SLAB_PANIC);
+	if (!fanotify_mark_cache || !fanotify_event_cachep)
+		return -ENOMEM;
+
 	if (IS_ENABLED(CONFIG_FANOTIFY_ACCESS_PERMISSIONS)) {
 		fanotify_perm_event_cachep =
 			KMEM_CACHE(fanotify_perm_event_info, SLAB_PANIC);
+		if (!fanotify_perm_event_cachep)
+			return -ENOMEM;
 	}
 
 	return 0;
