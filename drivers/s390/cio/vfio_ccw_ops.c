@@ -188,25 +188,24 @@ static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
 {
 	struct vfio_ccw_private *private;
 	struct ccw_io_region *region;
+	union scsw *scsw;
 
 	if (*ppos + count > sizeof(*region))
 		return -EINVAL;
 
 	private = dev_get_drvdata(mdev_parent_dev(mdev));
-	if (private->state != VFIO_CCW_STATE_IDLE)
-		return -EACCES;
 
 	region = &private->io_region;
 	if (copy_from_user((void *)region + *ppos, buf, count))
 		return -EFAULT;
 
-	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_IO_REQ);
-	if (region->ret_code != 0) {
-		private->state = VFIO_CCW_STATE_IDLE;
-		return region->ret_code;
-	}
+	scsw = (union scsw *) &region->scsw_area;
+	if (scsw->cmd.fctl & SCSW_FCTL_START_FUNC)
+		vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_IO_REQ);
+	else
+		return -EOPNOTSUPP;
 
-	return count;
+	return region->ret_code ? region->ret_code : count;
 }
 
 static int vfio_ccw_mdev_get_device_info(struct vfio_device_info *info)
