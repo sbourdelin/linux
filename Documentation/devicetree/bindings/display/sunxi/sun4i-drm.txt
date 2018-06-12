@@ -187,6 +187,51 @@ And on the A23, A31, A31s and A33, you need one more clock line:
    - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
                  clock, that can be used to drive the LVDS clock
 
+TCON TOP
+--------
+
+TCON TOPs main purpose is to configure whole display pipeline. It determines
+relationships between mixers and TCONs, selects source TCON for HDMI, muxes
+LCD and TV encoder GPIO output, selects TV encoder clock source and contains
+additional TV TCON and DSI gates.
+
+It allows display pipeline to be configured in very different ways:
+
+                             / LCD0/LVDS0
+                 / TCON-LCD0
+                 |           \ MIPI DSI
+ mixer0          |
+        \        / TCON-LCD1 - LCD1/LVDS1
+         TCON-TOP
+        /        \ TCON-TV0 - TVE0/RGB
+ mixer1          |          \
+                 |           TCON-TOP - HDMI
+                 |          /
+                 \ TCON-TV1 - TVE1/RGB
+
+Note that both TCON TOP references same physical unit.
+
+Required properties:
+  - compatible: value must be one of:
+    * allwinner,sun8i-r40-tcon-top
+  - reg: base address and size of the memory-mapped region.
+  - clocks: phandle to the clocks feeding the TCON TOP
+    * bus: TCON TOP interface clock
+  - clock-names: clock name mentioned above
+  - resets: phandle to the reset line driving the DRC
+    * rst: TCON TOP reset line
+  - reset-names: reset name mentioned above
+  - #clock-cells : must contain 1
+
+- ports: A ports node with endpoint definitions as defined in
+    Documentation/devicetree/bindings/media/video-interfaces.txt. The first port
+    should be the input for mixer0 mux. The second should be the output for that
+    mux. Third port should be input for mixer1 mux. Fourth port should be output
+    for mixer1 mux. Fifth port should be input for HDMI mux. Sixth port should
+    be output for it. All output endpoints should have reg property with the id
+    of the target TCON. All ports should have only one enpoint connected to
+    remote endpoint.
+
 DRC
 ---
 
