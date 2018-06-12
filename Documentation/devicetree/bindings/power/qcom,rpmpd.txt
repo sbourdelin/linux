@@ -1,0 +1,49 @@
+Qualcomm RPM Power domains
+
+For RPM Power domains, we communicate a performance state to RPM
+which then translates it into a corresponding voltage on a rail
+
+Required Properties:
+ - compatible: Should be one of the following
+	* qcom,msm8996-rpmpd: RPM Power domain for the msm8996 family of SoC
+ - power-domain-cells: number of cells in Power domain specifier
+	must be 1.
+ - operating-points-v2: Phandle to the OPP table for the Power domain.
+	Refer to Documentation/devicetree/bindings/power/power_domain.txt
+	and Documentation/devicetree/bindings/opp/qcom-opp.txt for more details
+
+Example:
+
+	rpmpd: power-controller {
+		compatible = "qcom,msm8996-rpmpd";
+		#power-domain-cells = <1>;
+		operating-points-v2 = <&rpmpd_opp_table>;
+	};
+
+	rpmpd_opp_table: opp-table {
+		compatible = "operating-points-v2-qcom-level";
+
+		rpmpd_opp1: opp1 {
+			qcom,level = <1>;
+		};
+
+		rpmpd_opp2: opp2 {
+			qcom,level = <2>;
+		};
+
+		rpmpd_opp3: opp3 {
+			qcom,level = <3>;
+		};
+
+		rpmpd_opp4: opp4 {
+			qcom,level = <4>;
+		};
+
+		rpmpd_opp5: opp5 {
+			qcom,level = <5>;
+		};
+
+		rpmpd_opp6: opp6 {
+			qcom,level = <6>;
+		};
+	};
