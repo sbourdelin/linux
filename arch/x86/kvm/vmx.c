@@ -8682,14 +8682,15 @@ static int handle_invpcid(struct kvm_vcpu *vcpu)
 			kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
 		}
 
-		if (kvm_get_pcid(vcpu, vcpu->arch.mmu.prev_root.cr3)
+		if (kvm_get_pcid(vcpu, vcpu->arch.mmu.prev_root.cr3) 
 		    == operand.pcid)
-			kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
+			kvm_mmu_free_roots(vcpu, KVM_MMU_ROOT_PREVIOUS);
+
 
 		/*
-		 * If the current cr3 does not use the given PCID, then nothing
-		 * needs to be synced here because a resync will happen anyway
-		 * before switching to any other CR3.
+		 * If neither the current cr3 nor the prev_root.cr3 use the
+		 * given PCID, then nothing needs to be done here because a
+		 * resync will happen anyway before switching to any other CR3.
 		 */
 
 		skip_emulated_instruction(vcpu);
