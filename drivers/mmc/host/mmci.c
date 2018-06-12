@@ -312,6 +312,8 @@ static int mmci_card_busy(struct mmc_host *mmc)
 static int mmci_validate_data(struct mmci_host *host,
 			      struct mmc_data *data)
 {
+	struct variant_data *variant = host->variant;
+
 	if (!data)
 		return 0;
 
@@ -320,6 +322,9 @@ static int mmci_validate_data(struct mmci_host *host,
 			"unsupported block size (%d bytes)\n", data->blksz);
 		return -EINVAL;
 	}
+
+	if (variant->validate_data)
+		return variant->validate_data(host, data);
 
 	return 0;
 }
