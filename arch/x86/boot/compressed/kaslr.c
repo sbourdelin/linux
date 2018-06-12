@@ -31,6 +31,7 @@
 
 #include "misc.h"
 #include "error.h"
+#include "acpitb.h"
 #include "../string.h"
 
 #include <generated/compile.h>
@@ -103,6 +104,17 @@ static bool memmap_too_large;
 
 /* Store memory limit specified by "mem=nn[KMG]" or "memmap=nn[KMG]" */
 unsigned long long mem_limit = ULLONG_MAX;
+
+/* Store the max numbers of acpi tables */
+#define ACPI_MAX_TABLES		128
+
+#ifdef CONFIG_MEMORY_HOTREMOVE
+/* Store the movable memory */
+struct mem_vector immovable_mem[MAX_NUMNODES*2];
+
+/* Store the num of movable mem regions */
+static int num_immovable_mem;
+#endif
 
 
 enum mem_avoid_index {
@@ -266,6 +278,44 @@ static int handle_mem_memmap(void)
 	return 0;
 }
 
+#ifdef CONFIG_MEMORY_HOTREMOVE
+/*
+ * According to ACPI table, filter the immvoable memory regions
+ * and store them in immovable_mem[].
+ */
+static void handle_movable_mem(void)
+{
+	struct acpi_table_header *table_header;
+	struct acpi_subtable_header *asth;
+	struct acpi_srat_mem_affinity *ma;
+	unsigned long table_size;
+	unsigned long table_end;
+	int i = 0;
+
+	table_header = get_acpi_srat_table();
+
+	table_size = sizeof(struct acpi_table_srat);
+	table_end = (unsigned long)table_header + table_header->length;
+	asth = (struct acpi_subtable_header *)
+		((unsigned long)table_header + table_size);
+
+	while (((unsigned long)asth) +
+			sizeof(struct acpi_subtable_header) < table_end) {
+		if (asth->type == 1) {
+			ma = (struct acpi_srat_mem_affinity *)asth;
+			if (!(ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)) {
+				immovable_mem[i].start = ma->base_address;
+				immovable_mem[i].size = ma->length;
+				i++;
+			}
+		}
+		asth = (struct acpi_subtable_header *)
+			((unsigned long)asth + asth->length);
+	}
+	num_immovable_mem = i;
+}
+#endif
+
 /*
  * In theory, KASLR can put the kernel anywhere in the range of [16M, 64T).
  * The mem_avoid array is used to store the ranges that need to be avoided
@@ -388,6 +438,11 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 
 	/* Mark the memmap regions we need to avoid */
 	handle_mem_memmap();
+
+#ifdef CONFIG_MEMORY_HOTREMOVE
+	/* Mark the hotplug SB regions we need choose */
+	handle_movable_mem();
+#endif
 
 #ifdef CONFIG_X86_VERBOSE_BOOTUP
 	/* Make sure video RAM can be used. */
