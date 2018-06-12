@@ -104,6 +104,9 @@ void __init proc_init_kmemcache(void)
 	pde_opener_cache =
 		kmem_cache_create("pde_opener", sizeof(struct pde_opener), 0,
 				  SLAB_ACCOUNT|SLAB_PANIC, NULL);
+	if (!proc_inode_cachep || !pde_opener_cache)
+		return -ENOMEM;
+
 	proc_dir_entry_cache = kmem_cache_create_usercopy(
 		"proc_dir_entry", sizeof(struct proc_dir_entry), 0, SLAB_PANIC,
 		offsetof(struct proc_dir_entry, inline_name),
