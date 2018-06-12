@@ -88,6 +88,9 @@ int init_common(struct tsens_device *);
 int get_temp_common(struct tsens_device *, int, int *);
 int get_temp_tsens_v2(struct tsens_device *, int, int *);
 
-extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
+/* TSENS v1 targets */
+extern const struct tsens_data data_8916, data_8974, data_8960;
+/* TSENS v2 targets */
+extern const struct tsens_data data_8996, data_sdm845;
 
 #endif /* __QCOM_TSENS_H__ */
