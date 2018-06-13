@@ -964,6 +964,7 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 	case IP_DROP_SOURCE_MEMBERSHIP:
 	{
 		struct ip_mreq_source mreqs;
+		bool is_new = false;
 		int omode, add;
 
 		if (optlen != sizeof(struct ip_mreq_source))
@@ -989,11 +990,12 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 				break;
 			omode = MCAST_INCLUDE;
 			add = 1;
+			is_new = true;
 		} else /* IP_DROP_SOURCE_MEMBERSHIP */ {
 			omode = MCAST_INCLUDE;
 			add = 0;
 		}
-		err = ip_mc_source(add, omode, sk, &mreqs, 0);
+		err = ip_mc_source(add, omode, sk, &mreqs, 0, is_new);
 		break;
 	}
 	case MCAST_JOIN_GROUP:
@@ -1029,6 +1031,7 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 		struct group_source_req greqs;
 		struct ip_mreq_source mreqs;
 		struct sockaddr_in *psin;
+		bool is_new = false;
 		int omode, add;
 
 		if (optlen != sizeof(struct group_source_req))
@@ -1067,12 +1070,13 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 			greqs.gsr_interface = mreq.imr_ifindex;
 			omode = MCAST_INCLUDE;
 			add = 1;
+			is_new = true;
 		} else /* MCAST_LEAVE_SOURCE_GROUP */ {
 			omode = MCAST_INCLUDE;
 			add = 0;
 		}
 		err = ip_mc_source(add, omode, sk, &mreqs,
-				   greqs.gsr_interface);
+				   greqs.gsr_interface, is_new);
 		break;
 	}
 	case MCAST_MSFILTER:

@@ -2249,8 +2249,27 @@ out:
 }
 EXPORT_SYMBOL(ip_mc_leave_group);
 
+static void ip_mc_clear_cr(struct in_device *in_dev, __be32 pmca)
+{
+#ifdef CONFIG_IP_MULTICAST
+	struct ip_mc_list *pmc;
+
+	rcu_read_lock();
+	for_each_pmc_rcu(in_dev, pmc) {
+		if (pmca == pmc->multiaddr)
+			break;
+	}
+	if (pmc) {
+		spin_lock_bh(&pmc->lock);
+		pmc->crcount = 0;
+		spin_unlock_bh(&pmc->lock);
+	}
+	rcu_read_unlock();
+#endif
+}
+
 int ip_mc_source(int add, int omode, struct sock *sk, struct
-	ip_mreq_source *mreqs, int ifindex)
+	ip_mreq_source *mreqs, int ifindex, bool is_new)
 {
 	int err;
 	struct ip_mreqn imr;
@@ -2301,6 +2320,12 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 		ip_mc_del_src(in_dev, &mreqs->imr_multiaddr, pmc->sfmode, 0,
 			NULL, 0);
 		pmc->sfmode = omode;
+		/* Based on RFC3376 5.1, for newly added INCLUDE SSM, we should
+		 * not send filter-mode change record as the mode should be
+		 * from IN() to IN(A).
+		 */
+		if (is_new)
+			ip_mc_clear_cr(in_dev, mreqs->imr_multiaddr);
 	}
 
 	psl = rtnl_dereference(pmc->sflist);

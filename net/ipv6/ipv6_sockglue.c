@@ -695,6 +695,7 @@ done:
 	case MCAST_UNBLOCK_SOURCE:
 	{
 		struct group_source_req greqs;
+		bool is_new = false;
 		int omode, add;
 
 		if (optlen < sizeof(struct group_source_req))
@@ -725,11 +726,12 @@ done:
 				break;
 			omode = MCAST_INCLUDE;
 			add = 1;
+			is_new = true;
 		} else /* MCAST_LEAVE_SOURCE_GROUP */ {
 			omode = MCAST_INCLUDE;
 			add = 0;
 		}
-		retv = ip6_mc_source(add, omode, sk, &greqs);
+		retv = ip6_mc_source(add, omode, sk, &greqs, is_new);
 		break;
 	}
 	case MCAST_MSFILTER:

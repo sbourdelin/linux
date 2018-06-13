@@ -315,8 +315,25 @@ void ipv6_sock_mc_close(struct sock *sk)
 	rtnl_unlock();
 }
 
+static void ip6_mc_clear_cr(struct inet6_dev *idev, const struct in6_addr *pmca)
+{
+	struct ifmcaddr6 *pmc;
+
+	read_lock_bh(&idev->lock);
+	for (pmc = idev->mc_list; pmc; pmc = pmc->next) {
+		if (ipv6_addr_equal(pmca, &pmc->mca_addr))
+			break;
+	}
+	if (pmc) {
+		spin_lock_bh(&pmc->mca_lock);
+		pmc->mca_crcount = 0;
+		spin_unlock_bh(&pmc->mca_lock);
+	}
+	read_unlock_bh(&idev->lock);
+}
+
 int ip6_mc_source(int add, int omode, struct sock *sk,
-	struct group_source_req *pgsr)
+	struct group_source_req *pgsr, bool is_new)
 {
 	struct in6_addr *source, *group;
 	struct ipv6_mc_socklist *pmc;
@@ -365,6 +382,12 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 		ip6_mc_add_src(idev, group, omode, 0, NULL, 0);
 		ip6_mc_del_src(idev, group, pmc->sfmode, 0, NULL, 0);
 		pmc->sfmode = omode;
+		/* Based on RFC3810 6.1, for newly added INCLUDE SSM, we
+		 * should not send filter-mode change record as the mode
+		 * should be from IN() to IN(A).
+		 */
+		if (is_new)
+			ip6_mc_clear_cr(idev, group);
 	}
 
 	write_lock(&pmc->sflock);

@@ -1068,7 +1068,7 @@ struct group_source_req;
 struct group_filter;
 
 int ip6_mc_source(int add, int omode, struct sock *sk,
-		  struct group_source_req *pgsr);
+		  struct group_source_req *pgsr, bool is_new);
 int ip6_mc_msfilter(struct sock *sk, struct group_filter *gsf);
 int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 		  struct group_filter __user *optval, int __user *optlen);
