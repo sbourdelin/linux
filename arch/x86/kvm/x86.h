@@ -110,6 +110,16 @@ static inline bool is_la57_mode(struct kvm_vcpu *vcpu)
 #endif
 }
 
+static inline bool x86_exception_has_error_code(unsigned int nr,
+						bool protected_mode)
+{
+	static u32 exception_has_error_code = BIT(DF_VECTOR) | BIT(TS_VECTOR) |
+			BIT(NP_VECTOR) | BIT(SS_VECTOR) | BIT(GP_VECTOR) |
+			BIT(PF_VECTOR) | BIT(AC_VECTOR);
+
+	return protected_mode && ((1U << nr) & exception_has_error_code);
+}
+
 static inline bool mmu_is_nested(struct kvm_vcpu *vcpu)
 {
 	return vcpu->arch.walk_mmu == &vcpu->arch.nested_mmu;
