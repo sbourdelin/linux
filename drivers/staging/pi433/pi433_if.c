@@ -880,6 +880,7 @@ pi433_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	int			retval = 0;
 	struct pi433_instance	*instance;
 	struct pi433_device	*device;
+	struct pi433_tx_cfg	tx_cfg_buffer;
 	void __user *argp = (void __user *)arg;
 
 	/* Check type and command number */
@@ -902,9 +903,15 @@ pi433_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		break;
 	case PI433_IOC_WR_TX_CFG:
-		if (copy_from_user(&instance->tx_cfg, argp,
-				   sizeof(struct pi433_tx_cfg)))
+		/* do not modify tx config while it is being copied to fifo */
+		mutex_lock(&device->tx_fifo_lock);
+		if (copy_from_user(&tx_cfg_buffer, argp,
+				   sizeof(struct pi433_tx_cfg))) {
+			mutex_unlock(&device->tx_fifo_lock);
 			return -EFAULT;
+		}
+		memcpy(&instance->tx_cfg, &tx_cfg_buffer, sizeof(struct pi433_tx_cfg));
+		mutex_unlock(&device->tx_fifo_lock);
 		break;
 	case PI433_IOC_RD_RX_CFG:
 		if (copy_to_user(argp, &device->rx_cfg,
