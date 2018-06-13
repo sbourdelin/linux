@@ -70,7 +70,7 @@
  * lists and lookup data structures.
  */
 
-static DEFINE_WW_CLASS(crtc_ww_class, true);
+static DEFINE_WW_CLASS(crtc_ww_class, false);
 
 /**
  * drm_modeset_lock_all - take all modeset locks
