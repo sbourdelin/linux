@@ -704,37 +704,23 @@ static void advk_pcie_remove_msi_irq_domain(struct advk_pcie *pcie)
 static int advk_pcie_init_irq_domain(struct advk_pcie *pcie)
 {
 	struct device *dev = &pcie->pdev->dev;
-	struct device_node *node = dev->of_node;
-	struct device_node *pcie_intc_node;
 	struct irq_chip *irq_chip;
-
-	pcie_intc_node =  of_get_next_child(node, NULL);
-	if (!pcie_intc_node) {
-		dev_err(dev, "No PCIe Intc node found\n");
-		return -ENODEV;
-	}
 
 	irq_chip = &pcie->irq_chip;
 
 	irq_chip->name = devm_kasprintf(dev, GFP_KERNEL, "%s-irq",
 					dev_name(dev));
-	if (!irq_chip->name) {
-		of_node_put(pcie_intc_node);
+	if (!irq_chip->name)
 		return -ENOMEM;
-	}
 
 	irq_chip->irq_mask = advk_pcie_irq_mask;
 	irq_chip->irq_mask_ack = advk_pcie_irq_mask;
 	irq_chip->irq_unmask = advk_pcie_irq_unmask;
 
-	pcie->irq_domain =
-		irq_domain_add_linear(pcie_intc_node, PCI_NUM_INTX,
-				      &advk_pcie_irq_domain_ops, pcie);
-	if (!pcie->irq_domain) {
-		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-		of_node_put(pcie_intc_node);
-		return -ENOMEM;
-	}
+	pcie->irq_domain = pci_host_alloc_intx_irqd(dev, pcie, false,
+				&advk_pcie_irq_domain_ops, NULL);
+	if (IS_ERR(pcie->irq_domain))
+		return PTR_ERR(pcie->irq_domain);
 
 	return 0;
 }
