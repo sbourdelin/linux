@@ -346,24 +346,19 @@ static int faraday_pci_setup_cascaded_irq(struct faraday_pci *p)
 	int irq;
 	int i;
 
-	if (!intc) {
-		dev_err(p->dev, "missing child interrupt-controller node\n");
-		return -EINVAL;
-	}
+	p->irqdomain = pci_host_alloc_intx_irqd(p->dev, p, false,
+					   &faraday_pci_irqdomain_ops, intc);
+	if (IS_ERR(p->irqdomain))
+		return PTR_ERR(p->irqdomain);
 
 	/* All PCI IRQs cascade off this one */
 	irq = of_irq_get(intc, 0);
 	if (irq <= 0) {
 		dev_err(p->dev, "failed to get parent IRQ\n");
+		irq_domain_remove(p->irqdomain);
 		return irq ?: -EINVAL;
 	}
 
-	p->irqdomain = irq_domain_add_linear(intc, PCI_NUM_INTX,
-					     &faraday_pci_irqdomain_ops, p);
-	if (!p->irqdomain) {
-		dev_err(p->dev, "failed to create Gemini PCI IRQ domain\n");
-		return -EINVAL;
-	}
 
 	irq_set_chained_handler_and_data(irq, faraday_pci_irq_handler, p);
 
