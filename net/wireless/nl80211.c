@@ -10134,20 +10134,68 @@ static int nl80211_set_cqm_txe(struct genl_info *info,
 
 static const struct nla_policy
 nl80211_attr_sta_mon_policy[NL80211_ATTR_STA_MON_MAX + 1] = {
-	[NL80211_ATTR_STA_MON_RSSI_THOLD] = { .type = NLA_U32 },
+	[NL80211_ATTR_STA_MON_RSSI_THOLD] = { .type = NLA_BINARY },
 	[NL80211_ATTR_STA_MON_RSSI_HYST] = { .type = NLA_U32 },
 	[NL80211_ATTR_STA_MON_RSSI_THRESHOLD_EVENT] = { .type = NLA_U32 },
 	[NL80211_ATTR_STA_MON_RSSI_LEVEL] = { .type = NLA_S32 },
 };
 
+static int cfg80211_set_rssi_range(struct cfg80211_registered_device *rdev,
+				   struct net_device *dev, const u8 *mac_addr,
+				   bool get_last_rssi)
+{
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	s32 low, high, last;
+	u32 hyst;
+	int i, n, err;
+
+	if (get_last_rssi && mac_addr) {
+		struct station_info sinfo = {};
+
+		err = rdev_get_station(rdev, dev, mac_addr, &sinfo);
+		if (err)
+			return err;
+
+		if (wdev->iftype != NL80211_IFTYPE_STATION &&
+		    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT) {
+			if (sinfo.filled & BIT(NL80211_STA_INFO_SIGNAL_AVG))
+				wdev->rssi_config->last_rssi_event_value =
+					(s8)sinfo.signal_avg;
+		} else {
+			if (sinfo.filled &
+			    BIT(NL80211_STA_INFO_BEACON_SIGNAL_AVG))
+				wdev->rssi_config->last_rssi_event_value =
+					(s8)sinfo.rx_beacon_signal_avg;
+		}
+	}
+
+	last = wdev->rssi_config->last_rssi_event_value;
+	hyst = wdev->rssi_config->rssi_hyst;
+	n = wdev->rssi_config->n_rssi_thresholds;
+
+	for (i = 0; i < n; i++) {
+		if (last < wdev->rssi_config->rssi_thresholds[i])
+			break;
+	}
+
+	low = i > 0 ?
+		(wdev->rssi_config->rssi_thresholds[i - 1] - hyst) : S32_MIN;
+	high = i < n ?
+		(wdev->rssi_config->rssi_thresholds[i] + hyst - 1) : S32_MAX;
+
+	if (wdev->iftype == NL80211_IFTYPE_STATION ||
+	    wdev->iftype == NL80211_IFTYPE_P2P_CLIENT)
+		return rdev_set_cqm_rssi_range_config(rdev, dev, low, high);
+
+	return rdev_set_sta_mon_rssi_range_config(rdev, dev, mac_addr,
+						  low, high);
+}
+
 static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 				    struct net_device *dev)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
-	s32 last, low, high;
-	u32 hyst;
-	int i, n;
-	int err;
+	u8 *mac_addr = NULL;
 
 	/* RSSI reporting disabled? */
 	if (!wdev->rssi_config)
@@ -10160,35 +10208,27 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 	 * the average.
 	 */
 	if (!wdev->rssi_config->last_rssi_event_value && wdev->current_bss &&
-	    rdev->ops->get_station) {
-		struct station_info sinfo = {};
-		u8 *mac_addr;
-
+	    rdev->ops->get_station)
 		mac_addr = wdev->current_bss->pub.bssid;
 
-		err = rdev_get_station(rdev, dev, mac_addr, &sinfo);
-		if (err)
-			return err;
+	return cfg80211_set_rssi_range(rdev, dev, mac_addr,
+				!wdev->rssi_config->last_rssi_event_value);
+}
 
-		if (sinfo.filled & BIT(NL80211_STA_INFO_BEACON_SIGNAL_AVG))
-			wdev->rssi_config->last_rssi_event_value =
-				(s8) sinfo.rx_beacon_signal_avg;
+static int nl80211_validate_rssi_tholds(const s32 *thresholds, int n_thresholds)
+{
+	int i;
+	s32 prev = S32_MIN;
+
+	/* Check all values negative and sorted */
+	for (i = 0; i < n_thresholds; i++) {
+		if (thresholds[i] > 0 || thresholds[i] <= prev)
+			return -EINVAL;
+
+		prev = thresholds[i];
 	}
 
-	last = wdev->rssi_config->last_rssi_event_value;
-	hyst = wdev->rssi_config->rssi_hyst;
-	n = wdev->rssi_config->n_rssi_thresholds;
-
-	for (i = 0; i < n; i++)
-		if (last < wdev->rssi_config->rssi_thresholds[i])
-			break;
-
-	low = i > 0 ?
-		(wdev->rssi_config->rssi_thresholds[i - 1] - hyst) : S32_MIN;
-	high = i < n ?
-		(wdev->rssi_config->rssi_thresholds[i] + hyst - 1) : S32_MAX;
-
-	return rdev_set_cqm_rssi_range_config(rdev, dev, low, high);
+	return 0;
 }
 
 static struct cfg80211_rssi_config *
@@ -10228,16 +10268,11 @@ static int nl80211_set_cqm_rssi(struct genl_info *info,
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
 	struct net_device *dev = info->user_ptr[1];
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
-	int i, err;
-	s32 prev = S32_MIN;
+	int err;
 
-	/* Check all values negative and sorted */
-	for (i = 0; i < n_thresholds; i++) {
-		if (thresholds[i] > 0 || thresholds[i] <= prev)
-			return -EINVAL;
-
-		prev = thresholds[i];
-	}
+	err = nl80211_validate_rssi_tholds(thresholds, n_thresholds);
+	if (err)
+		return err;
 
 	if (wdev->iftype != NL80211_IFTYPE_STATION &&
 	    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT)
@@ -10275,6 +10310,8 @@ static int nl80211_set_cqm_rssi(struct genl_info *info,
 	}
 
 	err = cfg80211_cqm_rssi_update(rdev, dev);
+	if (err)
+		cfg80211_rssi_config_free(wdev, NULL);
 
 unlock:
 	wdev_unlock(wdev);
@@ -12922,21 +12959,13 @@ static int nl80211_tx_control_port(struct sk_buff *skb, struct genl_info *info)
 }
 
 static int nl80211_set_sta_mon_rssi(struct genl_info *info,
-				    const u8 *peer, s32 threshold,
-				    u32 hysteresis)
+				    const u8 *peer, const s32 *thresholds,
+				    int n_thresholds, u32 hysteresis)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
 	struct net_device *dev = info->user_ptr[1];
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
-
-	if (threshold > 0)
-		return -EINVAL;
-
-	if (threshold == 0)
-		hysteresis = 0;
-
-	if (!rdev->ops->set_sta_mon_rssi_config)
-		return -EOPNOTSUPP;
+	int err;
 
 	if ((wdev->iftype != NL80211_IFTYPE_AP &&
 	     wdev->iftype != NL80211_IFTYPE_P2P_GO &&
@@ -12945,8 +12974,46 @@ static int nl80211_set_sta_mon_rssi(struct genl_info *info,
 				NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG))
 		return -EOPNOTSUPP;
 
-	return rdev_set_sta_mon_rssi_config(rdev, dev, peer,
-					    threshold, hysteresis);
+	err = nl80211_validate_rssi_tholds(thresholds, n_thresholds);
+	if (err)
+		return err;
+
+	if (n_thresholds <= 1 && rdev->ops->set_sta_mon_rssi_config) {
+		if (n_thresholds == 0 || thresholds[0] == 0)
+			return rdev_set_sta_mon_rssi_config(rdev, dev,
+							    peer, 0, 0);
+
+		return rdev_set_sta_mon_rssi_config(rdev, dev, peer,
+						    thresholds[0], hysteresis);
+	}
+
+	if (!rdev->ops->set_sta_mon_rssi_range_config ||
+	    !wiphy_ext_feature_isset(&rdev->wiphy,
+				     NL80211_EXT_FEATURE_STA_MON_RSSI_LIST))
+		return -EOPNOTSUPP;
+
+	/* Disabling */
+	if (!n_thresholds || (n_thresholds == 1 && thresholds[0] == 0))
+		return rdev_set_sta_mon_rssi_range_config(rdev, dev,
+							  peer, 0, 0);
+
+	wdev_lock(wdev);
+	wdev->rssi_config = cfg80211_get_rssi_config(wdev, thresholds,
+						     n_thresholds, hysteresis,
+						     peer);
+	if (!wdev->rssi_config) {
+		err = -ENOMEM;
+		goto unlock;
+	}
+
+	err = cfg80211_set_rssi_range(rdev, dev, peer,
+				!wdev->rssi_config->last_rssi_event_value);
+	if (err)
+		cfg80211_rssi_config_free(wdev, peer);
+
+unlock:
+	wdev_unlock(wdev);
+	return err;
 }
 
 static int nl80211_sta_mon(struct sk_buff *skb, struct genl_info *info)
@@ -12970,12 +13037,16 @@ static int nl80211_sta_mon(struct sk_buff *skb, struct genl_info *info)
 	addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
 	if (attrs[NL80211_ATTR_STA_MON_RSSI_THOLD] &&
 	    attrs[NL80211_ATTR_STA_MON_RSSI_HYST]) {
-		s32 threshold =
-			nla_get_s32(attrs[NL80211_ATTR_STA_MON_RSSI_THOLD]);
+		const s32 *tholds =
+			nla_data(attrs[NL80211_ATTR_STA_MON_RSSI_THOLD]);
 		u32 hysteresis =
 			nla_get_u32(attrs[NL80211_ATTR_STA_MON_RSSI_HYST]);
+		int len = nla_len(attrs[NL80211_ATTR_STA_MON_RSSI_THOLD]);
 
-		return nl80211_set_sta_mon_rssi(info, addr, threshold,
+		if (len % 4)
+			return -EINVAL;
+
+		return nl80211_set_sta_mon_rssi(info, addr, tholds, len / 4,
 						hysteresis);
 	}
 	return -EINVAL;
@@ -15422,6 +15493,7 @@ void cfg80211_sta_mon_rssi_notify(struct net_device *dev, const u8 *peer,
 {
 	struct sk_buff *msg;
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
 	struct cfg80211_rssi_config *rssi_config;
 
 	if (WARN_ON(!peer))
@@ -15437,6 +15509,8 @@ void cfg80211_sta_mon_rssi_notify(struct net_device *dev, const u8 *peer,
 		if (!memcmp(rssi_config->addr, peer, ETH_ALEN)) {
 			wdev->rssi_config = rssi_config;
 			wdev->rssi_config->last_rssi_event_value = rssi_level;
+			cfg80211_set_rssi_range(rdev, dev, peer,
+				!wdev->rssi_config->last_rssi_event_value);
 			break;
 		}
 	}

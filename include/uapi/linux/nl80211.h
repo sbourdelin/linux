@@ -5188,6 +5188,9 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG: With this driver can set
  *	rssi threshold using %NL80211_ATTR_STA_MON_RSSI_THOLD attribute
  *	for a connected station.
+ * @NL80211_EXT_FEATURE_STA_MON_RSSI_LIST: With this driver the
+ *	%NL80211_ATTR_STA_MON_RSSI_THOLD attribute accepts a list of zero or
+ *	more RSSI threshold values to monitor rather than exactly one threshold.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -5223,6 +5226,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_DATA_ACK_SIGNAL_SUPPORT,
 	NL80211_EXT_FEATURE_TXQS,
 	NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG,
+	NL80211_EXT_FEATURE_STA_MON_RSSI_LIST,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,

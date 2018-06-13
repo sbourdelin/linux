@@ -3029,6 +3029,12 @@ struct cfg80211_external_auth_params {
  *	the current level of a station is above/below the configured threshold;
  *	this may need some care when the configuration is changed
  *	(without first being disabled.)
+ * @set_sta_mon_rssi_range_config: Configure two RSSI thresholds in the
+ *	station's rssi monitor.  An event is to be sent only when the
+ *	signal level of a station is found to be outside the two values.
+ *	The driver should advertise %NL80211_EXT_FEATURE_STA_MON_RSSI_LIST if
+ *	this method is implemented. If it is provided then there's no point
+ *	providing @set_sta_mon_rssi_config
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3338,6 +3344,10 @@ struct cfg80211_ops {
 					   struct net_device *dev,
 					   const u8 *addr,
 					   s32 rssi_thold, u32 rssi_hyst);
+	int	(*set_sta_mon_rssi_range_config)(struct wiphy *wiphy,
+						 struct net_device *dev,
+						 const u8 *addr,
+						 s32 rssi_low, s32 rssi_high);
 };
 
 /*
