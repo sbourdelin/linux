@@ -753,6 +753,7 @@ struct ubi_ainf_volume {
  * @aeb_slab_cache: slab cache for &struct ubi_ainf_peb objects
  * @ech: temporary EC header. Only available during scan
  * @vidh: temporary VID buffer. Only available during scan
+ * @bb_trans: bad block translation table, used by fastmap, NULL otherwise
  *
  * This data structure contains the result of attaching an MTD device and may
  * be used by other UBI sub-systems to build final UBI data structures, further
@@ -783,6 +784,7 @@ struct ubi_attach_info {
 	struct kmem_cache *aeb_slab_cache;
 	struct ubi_ec_hdr *ech;
 	struct ubi_vid_io_buf *vidb;
+	int *bb_trans;
 };
 
 /**

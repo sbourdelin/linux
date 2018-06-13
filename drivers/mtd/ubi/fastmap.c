@@ -107,6 +107,9 @@ static bool read_pnum(struct ubi_device *ubi, struct ubi_attach_info *ai,
 	int ret = true;
 	int max_pnum = ubi->peb_count;
 
+	if (ai->bb_trans)
+		max_pnum -= ai->bad_peb_count;
+
 	pnum = be32_to_cpu(pnum);
 	if (pnum == UBI_UNKNOWN) {
 		*out_pnum = pnum;
@@ -117,9 +120,12 @@ static bool read_pnum(struct ubi_device *ubi, struct ubi_attach_info *ai,
 		ubi_err(ubi, "fastmap references PEB out of range: %i", pnum);
 		ret = false;
 		goto out;
-	} else {
-		*out_pnum = pnum;
 	}
+
+	if (!ai->bb_trans)
+		*out_pnum = pnum;
+	else
+		*out_pnum = ai->bb_trans[pnum];
 
 out:
 	return ret;
@@ -880,6 +886,61 @@ static struct ubi_ainf_peb *clone_aeb(struct ubi_attach_info *ai,
 	return new;
 }
 
+/*
+ * build_bb_trans_table - create a translation table to fix PEB numbers.
+ * @ubi: UBI device object
+ * @ai: UBI attach info object
+ *
+ * A preseeded Fastmap has no knowledge of bad blocks. During first attach
+ * UBI has to update PEB numbers to leave out existing bad blocks.
+ */
+static int build_bb_trans_table(struct ubi_device *ubi,
+				struct ubi_attach_info *ai)
+{
+	int pnum, new_pnum, ret;
+	unsigned long *claimed_blocks;
+
+	ret = -ENOMEM;
+	claimed_blocks = kcalloc(BITS_TO_LONGS(ubi->peb_count),
+			       sizeof(unsigned long), GFP_KERNEL);
+	if (!claimed_blocks)
+		goto out;
+
+	/* ai->bb_trans will get free'ed via destroy_ai() */
+	ai->bb_trans = kcalloc(ubi->peb_count, sizeof(int), GFP_KERNEL);
+	if (!ai->bb_trans)
+		goto out;
+
+	/* Find all bad blocks and mark them as claimed */
+	for (pnum = 0; pnum < ubi->peb_count; pnum++) {
+		ret = ubi_io_is_bad(ubi, pnum);
+		if (ret < 0)
+			goto out;
+
+		if (ret == 1) {
+			set_bit(pnum, claimed_blocks);
+			ai->bad_peb_count++;
+		}
+	}
+
+	/*
+	 * Start with PEB 0 and try to place each PEB around all bad blocks
+	 * to create the translation table.
+	 */
+	for (pnum = 0; pnum < ubi->peb_count - ai->bad_peb_count; pnum++) {
+		ubi_assert(!bitmap_full(claimed_blocks, ubi->peb_count));
+
+		new_pnum = find_first_zero_bit(claimed_blocks, ubi->peb_count);
+		ai->bb_trans[pnum] = new_pnum;
+		set_bit(new_pnum, claimed_blocks);
+	}
+
+out:
+	kfree(claimed_blocks);
+
+	return ret;
+}
+
 /**
  * ubi_scan_fastmap - scan the fastmap.
  * @ubi: UBI device object
@@ -985,6 +1046,15 @@ int ubi_scan_fastmap(struct ubi_device *ubi, struct ubi_attach_info *ai,
 			fm_size, ubi->fm_size);
 		ret = UBI_BAD_FASTMAP;
 		goto free_fm_sb;
+	}
+
+	if (fm->flags & UBI_FM_SB_PRESEEDED_FLG) {
+		ubi_msg(ubi, "preseeded fastmap found");
+		ret = build_bb_trans_table(ubi, ai);
+		if (ret) {
+			ubi_err(ubi, "failed to construct bb translation table");
+			goto free_fm_sb;
+		}
 	}
 
 	ech = kzalloc(ubi->ec_hdr_alsize, GFP_KERNEL);
