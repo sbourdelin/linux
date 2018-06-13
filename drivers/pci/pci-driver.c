@@ -275,6 +275,10 @@ static const struct pci_device_id *pci_match_device(struct pci_driver *drv,
 	if (!found_id && dev->driver_override)
 		found_id = &pci_device_id_any;
 
+	/* more strictly matching besides id_table */
+	if (drv->extra_match && drv->extra_match(dev) < 0)
+		found_id = NULL;
+
 	return found_id;
 }
 

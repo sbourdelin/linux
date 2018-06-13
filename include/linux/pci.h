@@ -744,10 +744,12 @@ struct pci_error_handlers {
 
 
 struct module;
+typedef int (*ematch)(struct pci_dev *pdev);
 struct pci_driver {
 	struct list_head	node;
 	const char		*name;
 	const struct pci_device_id *id_table;	/* Must be non-NULL for probe to be called */
+	ematch extra_match;	/* more strictly matching besides id_table */
 	int  (*probe)(struct pci_dev *dev, const struct pci_device_id *id);	/* New device inserted */
 	void (*remove)(struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
 	int  (*suspend)(struct pci_dev *dev, pm_message_t state);	/* Device suspended */
