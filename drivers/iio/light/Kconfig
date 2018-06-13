@@ -182,6 +182,15 @@ config SENSORS_ISL29028
 	 Proximity value via iio. The ISL29028 provides the concurrent sensing
 	 of ambient light and proximity.
 
+config ISL29033
+	tristate "Intersil ISL29033 Ultra-Low Lux, Low Power, Integrated Digital Ambient Light Sensor"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	 Provides driver for the Intersil's ISL29033 device.
+	 This driver supports the sysfs interface to get the ALS and IR intensity
+	 value via IIO.
+
 config ISL29125
 	tristate "Intersil ISL29125 digital color light sensor"
 	depends on I2C
