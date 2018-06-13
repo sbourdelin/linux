@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: GPL-2.0
  *
  * Maintained by:	Xavier Deguillard <xdeguillard@vmware.com>
- *			Philip Moltmann <moltmann@vmware.com>
+ *			Nadav Amit <namit@vmware.com>
  */
 
 /*
