@@ -29,6 +29,7 @@
 #include <linux/freezer.h>
 #include <linux/compat.h>
 #include <linux/module.h>
+#include <linux/persistent_clock.h>
 
 #include "posix-timers.h"
 
@@ -892,6 +893,9 @@ static int __init alarmtimer_init(void)
 		error = PTR_ERR(pdev);
 		goto out_drv;
 	}
+
+	/* Start one alarmtimer to update persistent clock */
+	persistent_clock_start_alarmtimer();
 	return 0;
 
 out_drv:

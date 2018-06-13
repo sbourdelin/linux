@@ -47,6 +47,10 @@ config GENERIC_CLOCKEVENTS_MIN_ADJUST
 config GENERIC_CMOS_UPDATE
 	bool
 
+# Persistent clock support
+config PERSISTENT_CLOCK
+	bool
+
 if GENERIC_CLOCKEVENTS
 menu "Timers subsystem"
 
