@@ -2001,7 +2001,8 @@ void tcp_enter_loss(struct sock *sk)
 	 */
 	tp->frto = net->ipv4.sysctl_tcp_frto &&
 		   (new_recovery || icsk->icsk_retransmits) &&
-		   !inet_csk(sk)->icsk_mtup.probe_size;
+		   !inet_csk(sk)->icsk_mtup.probe_size &&
+		   (tcp_is_sack(tp) || tp->rx_opt.tstamp_ok);
 }
 
 /* If ACK arrived pointing to a remembered SACK, it means that our
