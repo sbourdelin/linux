@@ -464,6 +464,13 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 		start = bitmap_no + mask + 1;
 	}
 
+	if (ret == 0 && gfp_mask & __GFP_ZERO) {
+		int i;
+
+		for (i = 0; i < count; i++)
+			clear_highpage(page + i);
+	}
+
 	trace_cma_alloc(pfn, page, count, align);
 
 	if (ret && !(gfp_mask & __GFP_NOWARN)) {
