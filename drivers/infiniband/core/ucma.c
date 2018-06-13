@@ -341,13 +341,15 @@ static int ucma_event_handler(struct rdma_cm_id *cm_id,
 {
 	struct ucma_event *uevent;
 	struct ucma_context *ctx = cm_id->context;
+	struct ucma_file *cur_file;
 	int ret = 0;
 
 	uevent = kzalloc(sizeof(*uevent), GFP_KERNEL);
 	if (!uevent)
 		return event->event == RDMA_CM_EVENT_CONNECT_REQUEST;
 
-	mutex_lock(&ctx->file->mut);
+	cur_file = ctx->file;
+	mutex_lock(&cur_file->mut);
 	uevent->cm_id = cm_id;
 	ucma_set_event_context(ctx, event, uevent);
 	uevent->resp.event = event->event;
@@ -382,12 +384,12 @@ static int ucma_event_handler(struct rdma_cm_id *cm_id,
 		goto out;
 	}
 
-	list_add_tail(&uevent->list, &ctx->file->event_list);
-	wake_up_interruptible(&ctx->file->poll_wait);
+	list_add_tail(&uevent->list, &cur_file->event_list);
+	wake_up_interruptible(&cur_file->poll_wait);
 	if (event->event == RDMA_CM_EVENT_DEVICE_REMOVAL)
 		ucma_removal_event_handler(cm_id);
 out:
-	mutex_unlock(&ctx->file->mut);
+	mutex_unlock(&cur_file->mut);
 	return ret;
 }
 
