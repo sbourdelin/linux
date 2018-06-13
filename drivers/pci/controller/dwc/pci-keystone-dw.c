@@ -470,15 +470,12 @@ int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
 	ks_pcie->app = *res;
 
 	/* Create legacy IRQ domain */
-	ks_pcie->legacy_irq_domain =
-			irq_domain_add_linear(ks_pcie->legacy_intc_np,
-					PCI_NUM_INTX,
+	ks_pcie->legacy_irq_domain = pci_host_alloc_intx_irqd(dev, ks_pcie,
+					false,
 					&ks_dw_pcie_legacy_irq_domain_ops,
-					NULL);
-	if (!ks_pcie->legacy_irq_domain) {
-		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
-		return -EINVAL;
-	}
+					ks_pcie->legacy_intc_np);
+	if (IS_ERR(ks_pcie->legacy_irq_domain))
+		return PTR_ERR(ks_pcie->legacy_irq_domain);
 
 	return dw_pcie_host_init(pp);
 }
