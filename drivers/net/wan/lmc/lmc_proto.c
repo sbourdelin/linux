@@ -99,23 +99,27 @@ void lmc_proto_close(lmc_softc_t *sc)
 
 __be16 lmc_proto_type(lmc_softc_t *sc, struct sk_buff *skb) /*FOLD00*/
 {
+	__be16 ret;
+
 	lmc_trace(sc->lmc_device, "lmc_proto_type in");
 	switch (sc->if_type) {
 	case LMC_PPP:
-		return hdlc_type_trans(skb, sc->lmc_device);
+		ret = hdlc_type_trans(skb, sc->lmc_device);
 		break;
 	case LMC_NET:
-		return htons(ETH_P_802_2);
+		ret = htons(ETH_P_802_2);
 		break;
 	case LMC_RAW: /* Packet type for skbuff kind of useless */
-		return htons(ETH_P_802_2);
+		ret = htons(ETH_P_802_2);
 		break;
 	default:
 		printk(KERN_WARNING "%s: No protocol set for this interface, assuming 802.2 (which is wrong!!)\n", sc->name);
-		return htons(ETH_P_802_2);
+		ret = htons(ETH_P_802_2);
 		break;
 	}
-	lmc_trace(sc->lmc_device, "lmc_proto_tye out");
+	lmc_trace(sc->lmc_device, "lmc_proto_type out");
+
+	return ret;
 }
 
 void lmc_proto_netif(lmc_softc_t *sc, struct sk_buff *skb) /*FOLD00*/
