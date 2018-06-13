@@ -1,0 +1,18 @@
+Intersil ISL29033 Ultra-Low Lux, Low Power, Integrated Digital Ambient Light Sensor
+
+Required properties:
+  - compatible : Must be "isil,isl29033".
+  - reg: the I2C address of the device
+
+Optional properties:
+  - isil,rext-kohms: External resistor nominal in kOhms used for ADC
+    reference. If not specified, 499 kOhm value will be used.
+
+Example:
+
+        als_sensor@44 {
+            compatible = "isil,isl29033";
+            reg = <0x44>;
+            isil,rext-kohms = <1000>;
+        };
+
