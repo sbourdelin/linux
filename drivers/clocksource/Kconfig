@@ -308,6 +308,7 @@ config ARC_TIMERS_64BIT
 
 config ARM_ARCH_TIMER
 	bool
+	select PERSISTENT_CLOCK
 	select TIMER_OF if OF
 	select TIMER_ACPI if ACPI
 

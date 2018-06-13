@@ -32,6 +32,7 @@
 #include <asm/virt.h>
 
 #include <clocksource/arm_arch_timer.h>
+#include <linux/persistent_clock.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt) "arch_timer: " fmt
@@ -950,6 +951,15 @@ static void __init arch_counter_register(unsigned type)
 
 	/* 56 bits minimum, so we assume worst case rollover */
 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+
+	/*
+	 * Register the persistent clock if the clocksource will not be stopped
+	 * in suspend state.
+	 */
+	if (!arch_counter_suspend_stop)
+		persistent_clock_init_and_register(arch_timer_read_counter,
+						   CLOCKSOURCE_MASK(56),
+						   arch_timer_rate, 0);
 }
 
 static void arch_timer_stop(struct clock_event_device *clk)
