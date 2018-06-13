@@ -1697,10 +1697,18 @@ int ubi_wl_init(struct ubi_device *ubi, struct ubi_attach_info *ai)
 			err = erase_aeb(ubi, aeb, sync);
 			if (err)
 				goto out_free;
-		}
 
-		found_pebs++;
+			/*
+			 * If no fastmap is used, all fastmap PEBs will get be
+			 * erased and are member of ai->fastmap.
+			 */
+			if (!ubi->fm)
+				found_pebs++;
+		}
 	}
+
+	if (ubi->fm)
+		found_pebs += ubi->fm->used_blocks;
 
 	dbg_wl("found %i PEBs", found_pebs);
 
