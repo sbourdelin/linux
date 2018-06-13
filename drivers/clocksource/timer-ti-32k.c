@@ -41,6 +41,7 @@
 #include <linux/clocksource.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/persistent_clock.h>
 
 /*
  * 32KHz clocksource ... always available, on pretty most chips except
@@ -120,6 +121,9 @@ static int __init ti_32k_timer_init(struct device_node *np)
 	}
 
 	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
+	persistent_clock_init_and_register(omap_32k_read_sched_clock,
+					   CLOCKSOURCE_MASK(32), 32768, 0);
+
 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
 
 	return 0;
