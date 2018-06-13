@@ -235,12 +235,19 @@ enum {
 	UBI_VOL_PROP_DIRECT_WRITE = 1,
 };
 
+enum {
+	UBI_ATTACH_MODE_AUTO = 0x0,
+	UBI_ATTACH_MODE_SCAN = 0x1,
+	UBI_ATTACH_MODE_MAX = UBI_ATTACH_MODE_SCAN,
+};
+
 /**
  * struct ubi_attach_req - attach MTD device request.
  * @ubi_num: UBI device number to create
  * @mtd_num: MTD device number to attach
  * @vid_hdr_offset: VID header offset (use defaults if %0)
  * @max_beb_per1024: maximum expected number of bad PEB per 1024 PEBs
+ * @attach_mode: selects the attach mode
  * @padding: reserved for future, not used, has to be zeroed
  *
  * This data structure is used to specify MTD device UBI has to attach and the
@@ -276,13 +283,18 @@ enum {
  * eraseblocks for new bad eraseblocks, but attempts to use available
  * eraseblocks (if any). The accepted range is 0-768. If 0 is given, the
  * default kernel value of %CONFIG_MTD_UBI_BEB_LIMIT will be used.
+ *
+ * @attach_mode is %UBI_ATTACH_MODE_AUTO by default, and let's the UBI
+ * implementation decide how to attach. If %UBI_ATTACH_MODE_SCAN is selected
+ * a full scan is forced.
  */
 struct ubi_attach_req {
 	__s32 ubi_num;
 	__s32 mtd_num;
 	__s32 vid_hdr_offset;
 	__s16 max_beb_per1024;
-	__s8 padding[10];
+	__s8 attach_mode;
+	__s8 padding[9];
 };
 
 /**
