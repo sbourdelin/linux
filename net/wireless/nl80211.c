@@ -428,6 +428,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_TXQ_LIMIT] = { .type = NLA_U32 },
 	[NL80211_ATTR_TXQ_MEMORY_LIMIT] = { .type = NLA_U32 },
 	[NL80211_ATTR_TXQ_QUANTUM] = { .type = NLA_U32 },
+	[NL80211_ATTR_STA_MON] = { .type = NLA_NESTED },
 };
 
 /* policy for the key attributes */
@@ -10131,6 +10132,14 @@ static int nl80211_set_cqm_txe(struct genl_info *info,
 	return rdev_set_cqm_txe_config(rdev, dev, rate, pkts, intvl);
 }
 
+static const struct nla_policy
+nl80211_attr_sta_mon_policy[NL80211_ATTR_STA_MON_MAX + 1] = {
+	[NL80211_ATTR_STA_MON_RSSI_THOLD] = { .type = NLA_U32 },
+	[NL80211_ATTR_STA_MON_RSSI_HYST] = { .type = NLA_U32 },
+	[NL80211_ATTR_STA_MON_RSSI_THRESHOLD_EVENT] = { .type = NLA_U32 },
+	[NL80211_ATTR_STA_MON_RSSI_LEVEL] = { .type = NLA_S32 },
+};
+
 static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 				    struct net_device *dev)
 {
@@ -12912,6 +12921,66 @@ static int nl80211_tx_control_port(struct sk_buff *skb, struct genl_info *info)
 	return err;
 }
 
+static int nl80211_set_sta_mon_rssi(struct genl_info *info,
+				    const u8 *peer, s32 threshold,
+				    u32 hysteresis)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+
+	if (threshold > 0)
+		return -EINVAL;
+
+	if (threshold == 0)
+		hysteresis = 0;
+
+	if (!rdev->ops->set_sta_mon_rssi_config)
+		return -EOPNOTSUPP;
+
+	if ((wdev->iftype != NL80211_IFTYPE_AP &&
+	     wdev->iftype != NL80211_IFTYPE_P2P_GO &&
+	     wdev->iftype != NL80211_IFTYPE_AP_VLAN) ||
+	    !wiphy_ext_feature_isset(&rdev->wiphy,
+				NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG))
+		return -EOPNOTSUPP;
+
+	return rdev_set_sta_mon_rssi_config(rdev, dev, peer,
+					    threshold, hysteresis);
+}
+
+static int nl80211_sta_mon(struct sk_buff *skb, struct genl_info *info)
+{
+	struct nlattr *attrs[NL80211_ATTR_STA_MON_MAX + 1];
+	struct nlattr *sta_mon;
+	u8 *addr = NULL;
+	int err;
+
+	sta_mon = info->attrs[NL80211_ATTR_STA_MON];
+	if (!sta_mon || !(info->attrs[NL80211_ATTR_MAC]))
+		return -EINVAL;
+
+	err = nla_parse_nested(attrs, NL80211_ATTR_STA_MON_MAX,
+			       sta_mon, nl80211_attr_sta_mon_policy,
+			       info->extack);
+
+	if (err)
+		return err;
+
+	addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
+	if (attrs[NL80211_ATTR_STA_MON_RSSI_THOLD] &&
+	    attrs[NL80211_ATTR_STA_MON_RSSI_HYST]) {
+		s32 threshold =
+			nla_get_s32(attrs[NL80211_ATTR_STA_MON_RSSI_THOLD]);
+		u32 hysteresis =
+			nla_get_u32(attrs[NL80211_ATTR_STA_MON_RSSI_HYST]);
+
+		return nl80211_set_sta_mon_rssi(info, addr, threshold,
+						hysteresis);
+	}
+	return -EINVAL;
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -13818,6 +13887,14 @@ static const struct genl_ops nl80211_ops[] = {
 	{
 		.cmd = NL80211_CMD_CONTROL_PORT_FRAME,
 		.doit = nl80211_tx_control_port,
+		.policy = nl80211_policy,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_SET_STA_MON,
+		.doit = nl80211_sta_mon,
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |

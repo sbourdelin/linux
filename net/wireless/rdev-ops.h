@@ -1232,4 +1232,20 @@ rdev_external_auth(struct cfg80211_registered_device *rdev,
 	return ret;
 }
 
+static inline int
+rdev_set_sta_mon_rssi_config(struct cfg80211_registered_device *rdev,
+			     struct net_device *dev, const u8 *peer,
+			     s32 rssi_thold, u32 rssi_hyst)
+
+{
+	int ret;
+
+	trace_rdev_set_sta_mon_rssi_config(&rdev->wiphy, dev, peer,
+					   rssi_thold, rssi_hyst);
+	ret = rdev->ops->set_sta_mon_rssi_config(&rdev->wiphy, dev, peer,
+						 rssi_thold, rssi_hyst);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
 #endif /* __CFG80211_RDEV_OPS */

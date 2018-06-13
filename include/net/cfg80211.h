@@ -3024,6 +3024,11 @@ struct cfg80211_external_auth_params {
  *
  * @tx_control_port: TX a control port frame (EAPoL).  The noencrypt parameter
  *	tells the driver that the frame should not be encrypted.
+ * @set_sta_mon_rssi_config: Configure  RSSI threshold for a station.
+ *	After configuration, the driver should (soon) send an event indicating
+ *	the current level of a station is above/below the configured threshold;
+ *	this may need some care when the configuration is changed
+ *	(without first being disabled.)
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3329,6 +3334,10 @@ struct cfg80211_ops {
 				   const u8 *buf, size_t len,
 				   const u8 *dest, const __be16 proto,
 				   const bool noencrypt);
+	int	(*set_sta_mon_rssi_config)(struct wiphy *wiphy,
+					   struct net_device *dev,
+					   const u8 *addr,
+					   s32 rssi_thold, u32 rssi_hyst);
 };
 
 /*
