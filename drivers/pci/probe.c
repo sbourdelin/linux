@@ -3139,3 +3139,77 @@ int pci_hp_add_bridge(struct pci_dev *dev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pci_hp_add_bridge);
+
+static int pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+			 irq_hw_number_t hwirq)
+{
+	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+	irq_set_chip_data(irq, domain->host_data);
+
+	return 0;
+}
+
+/**
+ * pci_host_alloc_intx_irqd() - Allocate INTx IRQ domain
+ * @dev: device associated with the PCI controller.
+ * @host: pointer to host specific data struct
+ * @general_xlate: flag for whether use pci_irqd_intx_xlate() helper
+ * @intx_domain_ops: pointer to driver specific struct irq_domain_ops
+ * @local_intc: pointer to driver specific interrupt controller node
+ *
+ * A simple helper for drivers to allocate IRQ domain for INTx. If
+ * intx_domain_ops is NULL, use pci_intx_domain_ops by default. And if
+ * local_intc is present, then use it firstly, otherwise, fallback to get
+ * interrupt controller node from @dev.
+ *
+ * Returns valid pointer of struct irq_domain on success, or PTR_ERR(-EINVAL)
+ * if failure occurred.
+ */
+struct irq_domain *pci_host_alloc_intx_irqd(struct device *dev, void *host,
+	bool general_xlate, const struct irq_domain_ops *intx_domain_ops,
+	struct device_node *local_intc)
+{
+	struct device_node *intc = local_intc;
+	struct irq_domain *domain = NULL;
+	struct irq_domain_ops *irqd_ops;
+	bool need_put = false;
+	int err = -EINVAL;
+
+	if (!intc) {
+		intc = of_get_next_child(dev->of_node, NULL);
+		if (!intc) {
+			dev_err(dev, "missing child interrupt-controller node\n");
+			goto err_out;
+		}
+		need_put = true;
+	}
+
+	if (!intx_domain_ops) {
+		irqd_ops = (struct irq_domain_ops *)devm_kmalloc(dev,
+				sizeof(struct irq_domain_ops), GFP_KERNEL);
+		if (!irqd_ops) {
+			err = -ENOMEM;
+			goto err_out;
+		}
+
+		irqd_ops->map = &pcie_intx_map;
+		if (general_xlate)
+			irqd_ops->xlate = &pci_irqd_intx_xlate;
+		intx_domain_ops = irqd_ops;
+	}
+#ifdef CONFIG_IRQ_DOMAIN
+	domain = irq_domain_add_linear(intc, PCI_NUM_INTX,
+				       intx_domain_ops, host);
+#endif
+	if (!domain) {
+		dev_err(dev, "failed to get a INTx IRQ domain\n");
+		goto err_out;
+	}
+
+	return domain;
+err_out:
+	if (need_put)
+		of_node_put(intc);
+	return ERR_PTR(err);
+}
+EXPORT_SYMBOL_GPL(pci_host_alloc_intx_irqd);

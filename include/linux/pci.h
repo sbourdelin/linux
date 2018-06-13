@@ -31,6 +31,9 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
+#include <linux/of_irq.h>
 #include <linux/resource_ext.h>
 #include <uapi/linux/pci.h>
 
@@ -1453,6 +1456,10 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
 	return 0;
 }
 
+extern struct irq_domain *pci_host_alloc_intx_irqd(struct device *dev,
+				void *host, bool general_xlate,
+				const struct irq_domain_ops *intx_domain_ops,
+				struct device_node *local_intc);
 #ifdef CONFIG_PCIEPORTBUS
 extern bool pcie_ports_disabled;
 extern bool pcie_ports_native;
@@ -1688,6 +1695,12 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
 				      unsigned long *out_hwirq,
 				      unsigned int *out_type)
 { return -EINVAL; }
+
+static struct irq_domain *pci_host_alloc_intx_irqd(struct device *dev,
+				void *host, bool general_xlate,
+				const struct irq_domain_ops *intx_domain_ops,
+				struct device_node *local_intc)
+{ return ERR_PTR(-EINVAL); }
 #endif /* CONFIG_PCI */
 
 /* Include architecture-dependent settings and functions */
