@@ -725,7 +725,16 @@ static int ubi_attach_fastmap(struct ubi_device *ubi,
 	}
 
 	ai->mean_ec = div_u64(ai->ec_sum, ai->ec_count);
-	ai->bad_peb_count = be32_to_cpu(fmhdr->bad_peb_count);
+
+	if (fm->flags & UBI_FM_SB_PRESEEDED_FLG) {
+		/* When we have a preseeded Fastmap we cannot use the provided bad block number */
+		if (be32_to_cpu(fmhdr->bad_peb_count) != 0) {
+			ubi_err(ubi, "Bad block count in preseeded Fastmap is non-zero");
+			goto fail_bad;
+		}
+	} else {
+		ai->bad_peb_count = be32_to_cpu(fmhdr->bad_peb_count);
+	}
 
 	/* Iterate over all volumes and read their EBA table */
 	for (i = 0; i < be32_to_cpu(fmhdr->vol_count); i++) {
