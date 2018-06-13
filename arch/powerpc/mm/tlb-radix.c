@@ -689,21 +689,15 @@ EXPORT_SYMBOL(radix__flush_tlb_kernel_range);
 static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
 static unsigned long tlb_local_single_page_flush_ceiling __read_mostly = POWER9_TLB_SETS_RADIX * 2;
 
-void radix__flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
+static void __flush_tlb_range(struct mm_struct *mm, unsigned long start,
 		     unsigned long end)
 
 {
-	struct mm_struct *mm = vma->vm_mm;
 	unsigned long pid;
 	unsigned int page_shift = mmu_psize_defs[mmu_virtual_psize].shift;
 	unsigned long page_size = 1UL << page_shift;
 	unsigned long nr_pages = (end - start) >> page_shift;
 	bool local, full;
-
-#ifdef CONFIG_HUGETLB_PAGE
-	if (is_vm_hugetlb_page(vma))
-		return radix__flush_hugetlb_tlb_range(vma, start, end);
-#endif
 
 	pid = mm->context.id;
 	if (unlikely(pid == MMU_NO_CONTEXT))
@@ -768,6 +762,18 @@ is_local:
 		}
 	}
 	preempt_enable();
+}
+
+void radix__flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
+		     unsigned long end)
+
+{
+#ifdef CONFIG_HUGETLB_PAGE
+	if (is_vm_hugetlb_page(vma))
+		return radix__flush_hugetlb_tlb_range(vma, start, end);
+#endif
+
+	__flush_tlb_range(vma->vm_mm, start, end);
 }
 EXPORT_SYMBOL(radix__flush_tlb_range);
 
@@ -837,6 +843,8 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 	int psize = 0;
 	struct mm_struct *mm = tlb->mm;
 	int page_size = tlb->page_size;
+	unsigned long start = tlb->start;
+	unsigned long end = tlb->end;
 
 	/*
 	 * if page size is not something we understand, do a full mm flush
@@ -844,18 +852,43 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 	 * A "fullmm" flush must always do a flush_all_mm (RIC=2) flush
 	 * that flushes the process table entry cache upon process teardown.
 	 * See the comment for radix in arch_exit_mmap().
+	 *
+	 * If there is a concurrent TLB invalidation operation
 	 */
 	if (tlb->fullmm) {
 		__flush_all_mm(mm, true);
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	} else if (mm_tlb_flush_pending(mm)) {
+		/*
+		 * If there is a concurrent invalidation that is clearing ptes,
+		 * then it's possible this invalidation will miss one of those
+		 * cleared ptes and miss flushing the TLB. If this invalidate
+		 * returns before the other one flushes TLBs, that can result
+		 * in it returning while there are still valid TLBs inside the
+		 * range to be invalidated.
+		 *
+		 * See mm/memory.c:tlb_finish_mmu() for more details.
+		 *
+		 * The solution to this is ensure the entire range is always
+		 * flushed here. The problem for powerpc is that the flushes
+		 * are page size specific, so this "forced flush" would not
+		 * do the right thing if there are a mix of page sizes in
+		 * the range to be invalidated. So use __flush_tlb_range
+		 * which invalidates all possible page sizes in the range.
+		 *
+		 * PWC flush probably is not be required because the core code
+		 * shouldn't free page tables in this path, but accounting
+		 * for the possibility makes us a bit more robust.
+		 */
+		WARN_ON_ONCE(tlb->need_flush_all);
+		__flush_tlb_range(mm, start, end);
+#endif
 	} else if ( (psize = radix_get_mmu_psize(page_size)) == -1) {
 		if (!tlb->need_flush_all)
 			radix__flush_tlb_mm(mm);
 		else
 			radix__flush_all_mm(mm);
 	} else {
-		unsigned long start = tlb->start;
-		unsigned long end = tlb->end;
-
 		if (!tlb->need_flush_all)
 			radix__flush_tlb_range_psize(mm, start, end, psize);
 		else
