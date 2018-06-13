@@ -1,7 +1,7 @@
 /*
  * VMware Balloon driver.
  *
- * Copyright (C) 2000-2014, VMware, Inc. All Rights Reserved.
+ * Copyright (C) 2000-2018, VMware, Inc. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -13,9 +13,7 @@
  * NON INFRINGEMENT.  See the GNU General Public License for more
  * details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * SPDX-License-Identifier: GPL-2.0
  *
  * Maintained by:	Xavier Deguillard <xdeguillard@vmware.com>
  *			Philip Moltmann <moltmann@vmware.com>
