@@ -766,3 +766,37 @@ cuda_input(unsigned char *buf, int nb)
 	               buf, nb, false);
     }
 }
+
+/* Offset between Unix time (1970-based) and Mac time (1904-based) */
+#define RTC_OFFSET	2082844800
+
+unsigned long cuda_get_time(void)
+{
+	struct adb_request req;
+	unsigned long now;
+
+	if (cuda_request(&req, NULL, 2, CUDA_PACKET, CUDA_GET_TIME) < 0)
+		return 0;
+	while (!req.complete)
+		cuda_poll();
+	if (req.reply_len != 7)
+		pr_err("%s: got %d byte reply\n", __func__, req.reply_len);
+	now = (req.reply[3] << 24) + (req.reply[4] << 16) +
+	      (req.reply[5] << 8) + req.reply[6];
+	return now - RTC_OFFSET;
+}
+
+int cuda_set_time(unsigned long now)
+{
+	struct adb_request req;
+
+	now += RTC_OFFSET;
+	if (cuda_request(&req, NULL, 6, CUDA_PACKET, CUDA_SET_TIME,
+			now >> 24, now >> 16, now >> 8, now) < 0)
+		return -ENXIO;
+	while (!req.complete)
+		cuda_poll();
+	if ((req.reply_len != 3) && (req.reply_len != 7))
+		pr_err("%s: got %d byte reply\n", __func__, req.reply_len);
+	return 0;
+}

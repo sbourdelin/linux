@@ -1820,6 +1820,38 @@ pmu_shutdown(void)
 		;
 }
 
+/* Offset between Unix time (1970-based) and Mac time (1904-based) */
+#define RTC_OFFSET	2082844800
+
+unsigned long pmu_get_time(void)
+{
+	struct adb_request req;
+	unsigned long now;
+
+	if (pmu_request(&req, NULL, 1, PMU_READ_RTC) < 0)
+		return 0;
+	pmu_wait_complete(&req);
+	if (req.reply_len != 4)
+		pr_err("%s: got %d byte reply\n", __func__, req.reply_len);
+	now = (req.reply[0] << 24) + (req.reply[1] << 16) +
+	      (req.reply[2] << 8) + req.reply[3];
+	return now - RTC_OFFSET;
+}
+
+int pmu_set_time(unsigned long now)
+{
+	struct adb_request req;
+
+	now += RTC_OFFSET;
+	if (pmu_request(&req, NULL, 5, PMU_SET_RTC,
+			now >> 24, now >> 16, now >> 8, now) < 0)
+		return -ENXIO;
+	pmu_wait_complete(&req);
+	if (req.reply_len != 0)
+		pr_err("%s: got %d byte reply\n", __func__, req.reply_len);
+	return 0;
+}
+
 int
 pmu_present(void)
 {

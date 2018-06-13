@@ -34,6 +34,9 @@ static inline void pmu_resume(void)
 {}
 #endif
 
+extern unsigned long pmu_get_time(void);
+extern int pmu_set_time(unsigned long now);
+
 extern void pmu_enable_irled(int on);
 
 extern void pmu_restart(void);

@@ -42,9 +42,6 @@
 #define DBG(x...)
 #endif
 
-/* Apparently the RTC stores seconds since 1 Jan 1904 */
-#define RTC_OFFSET	2082844800
-
 /*
  * Calibrate the decrementer frequency with the VIA timer 1.
  */
@@ -103,43 +100,8 @@ static unsigned long from_rtc_time(struct rtc_time *tm)
 #endif
 
 #ifdef CONFIG_ADB_CUDA
-static unsigned long cuda_get_time(void)
-{
-	struct adb_request req;
-	unsigned int now;
-
-	if (cuda_request(&req, NULL, 2, CUDA_PACKET, CUDA_GET_TIME) < 0)
-		return 0;
-	while (!req.complete)
-		cuda_poll();
-	if (req.reply_len != 7)
-		printk(KERN_ERR "cuda_get_time: got %d byte reply\n",
-		       req.reply_len);
-	now = (req.reply[3] << 24) + (req.reply[4] << 16)
-		+ (req.reply[5] << 8) + req.reply[6];
-	return ((unsigned long)now) - RTC_OFFSET;
-}
-
 #define cuda_get_rtc_time(tm)	to_rtc_time(cuda_get_time(), (tm))
-
-static int cuda_set_rtc_time(struct rtc_time *tm)
-{
-	unsigned int nowtime;
-	struct adb_request req;
-
-	nowtime = from_rtc_time(tm) + RTC_OFFSET;
-	if (cuda_request(&req, NULL, 6, CUDA_PACKET, CUDA_SET_TIME,
-			 nowtime >> 24, nowtime >> 16, nowtime >> 8,
-			 nowtime) < 0)
-		return -ENXIO;
-	while (!req.complete)
-		cuda_poll();
-	if ((req.reply_len != 3) && (req.reply_len != 7))
-		printk(KERN_ERR "cuda_set_rtc_time: got %d byte reply\n",
-		       req.reply_len);
-	return 0;
-}
-
+#define cuda_set_rtc_time(tm)	cuda_set_time(from_rtc_time(tm))
 #else
 #define cuda_get_time()		0
 #define cuda_get_rtc_time(tm)
@@ -147,40 +109,8 @@ static int cuda_set_rtc_time(struct rtc_time *tm)
 #endif
 
 #ifdef CONFIG_ADB_PMU
-static unsigned long pmu_get_time(void)
-{
-	struct adb_request req;
-	unsigned int now;
-
-	if (pmu_request(&req, NULL, 1, PMU_READ_RTC) < 0)
-		return 0;
-	pmu_wait_complete(&req);
-	if (req.reply_len != 4)
-		printk(KERN_ERR "pmu_get_time: got %d byte reply from PMU\n",
-		       req.reply_len);
-	now = (req.reply[0] << 24) + (req.reply[1] << 16)
-		+ (req.reply[2] << 8) + req.reply[3];
-	return ((unsigned long)now) - RTC_OFFSET;
-}
-
 #define pmu_get_rtc_time(tm)	to_rtc_time(pmu_get_time(), (tm))
-
-static int pmu_set_rtc_time(struct rtc_time *tm)
-{
-	unsigned int nowtime;
-	struct adb_request req;
-
-	nowtime = from_rtc_time(tm) + RTC_OFFSET;
-	if (pmu_request(&req, NULL, 5, PMU_SET_RTC, nowtime >> 24,
-			nowtime >> 16, nowtime >> 8, nowtime) < 0)
-		return -ENXIO;
-	pmu_wait_complete(&req);
-	if (req.reply_len != 0)
-		printk(KERN_ERR "pmu_set_rtc_time: %d byte reply from PMU\n",
-		       req.reply_len);
-	return 0;
-}
-
+#define pmu_set_rtc_time(tm)	pmu_set_time(from_rtc_time(tm))
 #else
 #define pmu_get_time()		0
 #define pmu_get_rtc_time(tm)
