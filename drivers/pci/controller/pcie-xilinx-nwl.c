@@ -546,24 +546,12 @@ static int nwl_pcie_init_msi_irq_domain(struct nwl_pcie *pcie)
 static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
 {
 	struct device *dev = pcie->dev;
-	struct device_node *node = dev->of_node;
-	struct device_node *legacy_intc_node;
 
-	legacy_intc_node = of_get_next_child(node, NULL);
-	if (!legacy_intc_node) {
-		dev_err(dev, "No legacy intc node found\n");
-		return -EINVAL;
-	}
-
-	pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
-							PCI_NUM_INTX,
-							&legacy_domain_ops,
-							pcie);
-
-	if (!pcie->legacy_irq_domain) {
-		dev_err(dev, "failed to create IRQ domain\n");
-		return -ENOMEM;
-	}
+	pcie->legacy_irq_domain = pci_host_alloc_intx_irqd(dev, pcie, false,
+							   &legacy_domain_ops,
+							   NULL);
+	if (IS_ERR(pcie->legacy_irq_domain))
+		return PTR_ERR(pcie->legacy_irq_domain);
 
 	raw_spin_lock_init(&pcie->leg_mask_lock);
 	nwl_pcie_init_msi_irq_domain(pcie);
