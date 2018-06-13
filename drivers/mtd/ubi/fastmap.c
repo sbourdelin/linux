@@ -949,9 +949,24 @@ int ubi_scan_fastmap(struct ubi_device *ubi, struct ubi_attach_info *ai,
 		goto free_fm_sb;
 	}
 
-	if (fmsb->version != UBI_FM_FMT_VERSION) {
-		ubi_err(ubi, "bad fastmap version: %i, expected: %i",
-			fmsb->version, UBI_FM_FMT_VERSION);
+	fm->flags = be32_to_cpu(fmsb->flags);
+
+	if (fmsb->version == 1) {
+		if (fm->flags != 0) {
+			ubi_err(ubi, "fastmap flags are non-zero: %#x",
+				fm->flags);
+			ret = UBI_BAD_FASTMAP;
+			goto free_fm_sb;
+		}
+	} else if (fmsb->version == 2) {
+		if ((fm->flags & UBI_FM_SB_FLG_MASK) != UBI_FM_SB_FLG_MASK) {
+			ubi_err(ubi, "unsupported fastmap flags present: %#x",
+				fm->flags);
+			ret = UBI_BAD_FASTMAP;
+			goto free_fm_sb;
+		}
+	} else {
+		ubi_err(ubi, "bad fastmap version: %i", fmsb->version);
 		ret = UBI_BAD_FASTMAP;
 		goto free_fm_sb;
 	}
@@ -1209,10 +1224,11 @@ static int ubi_write_fastmap(struct ubi_device *ubi,
 	ubi_assert(fm_pos <= ubi->fm_size);
 
 	fmsb->magic = cpu_to_be32(UBI_FM_SB_MAGIC);
-	fmsb->version = UBI_FM_FMT_VERSION;
+	fmsb->version = UBI_FM_FMT_WRITE_VERSION;
 	fmsb->used_blocks = cpu_to_be32(new_fm->used_blocks);
 	/* the max sqnum will be filled in while *reading* the fastmap */
 	fmsb->sqnum = 0;
+	fmsb->flags = 0;
 
 	fmh->magic = cpu_to_be32(UBI_FM_HDR_MAGIC);
 	free_peb_count = 0;

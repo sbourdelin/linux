@@ -381,7 +381,10 @@ struct ubi_vtbl_record {
 #define UBI_FM_DATA_VOLUME_ID	(UBI_LAYOUT_VOLUME_ID + 2)
 
 /* fastmap on-flash data structure format version */
-#define UBI_FM_FMT_VERSION	1
+#define UBI_FM_FMT_VERSION		2
+
+/* this implementation writes always version 1 */
+#define UBI_FM_FMT_WRITE_VERSION	1
 
 #define UBI_FM_SB_MAGIC		0x7B11D69F
 #define UBI_FM_HDR_MAGIC	0xD4B82EF7
@@ -403,6 +406,8 @@ struct ubi_vtbl_record {
 #define UBI_FM_MIN_POOL_SIZE	8
 #define UBI_FM_MAX_POOL_SIZE	256
 
+#define UBI_FM_SB_FLG_MASK	0
+
 /**
  * struct ubi_fm_sb - UBI fastmap super block
  * @magic: fastmap super block magic number (%UBI_FM_SB_MAGIC)
@@ -412,6 +417,7 @@ struct ubi_vtbl_record {
  * @block_loc: an array containing the location of all PEBs of the fastmap
  * @block_ec: the erase counter of each used PEB
  * @sqnum: highest sequence number value at the time while taking the fastmap
+ * @flags: fastmap specific flags, only used with @version > 1, zero otherwise
  *
  */
 struct ubi_fm_sb {
@@ -423,7 +429,8 @@ struct ubi_fm_sb {
 	__be32 block_loc[UBI_FM_MAX_BLOCKS];
 	__be32 block_ec[UBI_FM_MAX_BLOCKS];
 	__be64 sqnum;
-	__u8 padding2[32];
+	__be32 flags;
+	__u8 padding2[28];
 } __packed;
 
 /**

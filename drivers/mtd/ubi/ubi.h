@@ -249,6 +249,7 @@ struct ubi_volume_desc;
  * @used_blocks: number of used PEBs
  * @max_pool_size: maximal size of the user pool
  * @max_wl_pool_size: maximal size of the pool used by the WL sub-system
+ * @flags: fastmap flags
  */
 struct ubi_fastmap_layout {
 	struct ubi_wl_entry *e[UBI_FM_MAX_BLOCKS];
@@ -256,6 +257,7 @@ struct ubi_fastmap_layout {
 	int used_blocks;
 	int max_pool_size;
 	int max_wl_pool_size;
+	int flags;
 };
 
 /**
