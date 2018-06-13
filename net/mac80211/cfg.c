@@ -3803,6 +3803,40 @@ out:
 	return ret;
 }
 
+static int ieee80211_set_sta_mon_rssi_config(struct wiphy *wiphy,
+					     struct net_device *dev,
+					     const u8 *peer, s32 rssi_thold,
+					     u32 rssi_hyst)
+{
+	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct sta_info *sta;
+
+	if (sdata->vif.type == NL80211_IFTYPE_AP &&
+	    (!sdata->vif.bss_conf.enable_beacon ||
+	     !wiphy_ext_feature_isset(sdata->local->hw.wiphy,
+				 NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG)))
+		return -EOPNOTSUPP;
+
+	mutex_lock(&sdata->local->sta_mtx);
+
+	sta = sta_info_get_bss(sdata, peer);
+	if (!sta) {
+		mutex_unlock(&sdata->local->sta_mtx);
+		return -ENOENT;
+	}
+
+	if (sta->rssi_thold == rssi_thold &&
+	    sta->rssi_hyst == rssi_hyst)
+		goto unlock;
+
+	sta->rssi_thold = rssi_thold;
+	sta->rssi_hyst = rssi_hyst;
+	sta->last_sta_mon_event_signal = 0;
+unlock:
+	mutex_unlock(&sdata->local->sta_mtx);
+	return 0;
+}
+
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
 	.del_virtual_intf = ieee80211_del_iface,
@@ -3897,4 +3931,5 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.set_multicast_to_unicast = ieee80211_set_multicast_to_unicast,
 	.tx_control_port = ieee80211_tx_control_port,
 	.get_txq_stats = ieee80211_get_txq_stats,
+	.set_sta_mon_rssi_config = ieee80211_set_sta_mon_rssi_config,
 };
