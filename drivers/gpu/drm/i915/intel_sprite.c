@@ -1168,7 +1168,7 @@ static const uint32_t vlv_plane_formats[] = {
 	DRM_FORMAT_VYUY,
 };
 
-static uint32_t skl_plane_formats[] = {
+static const uint32_t skl_plane_formats[] = {
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_ABGR8888,
 	DRM_FORMAT_ARGB8888,
@@ -1180,7 +1180,7 @@ static uint32_t skl_plane_formats[] = {
 	DRM_FORMAT_VYUY,
 };
 
-static uint32_t skl_planar_formats[] = {
+static const uint32_t skl_planar_formats[] = {
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_ABGR8888,
 	DRM_FORMAT_ARGB8888,
