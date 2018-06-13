@@ -57,12 +57,9 @@ config MTD_UBI_BEB_LIMIT
 	  Leave the default value if unsure.
 
 config MTD_UBI_FASTMAP
-	bool "UBI Fastmap (Experimental feature)"
+	bool "UBI Fastmap"
 	default n
 	help
-	   Important: this feature is experimental so far and the on-flash
-	   format for fastmap may change in the next kernel versions
-
 	   Fastmap is a mechanism which allows attaching an UBI device
 	   in nearly constant time. Instead of scanning the whole MTD device it
 	   only has to locate a checkpoint (called fastmap) on the device.
@@ -74,6 +71,8 @@ config MTD_UBI_FASTMAP
 	   images are still usable with UBI implementations without
 	   fastmap support. On typical flash devices the whole fastmap fits
 	   into one PEB. UBI will reserve PEBs to hold two fastmaps.
+	   While Fastmap is considered correct it weakens UBI wrt. robustness,
+	   a full scan of the MTD allows UBI to react better to bad flashes.
 
 	   If in doubt, say "N".
 
