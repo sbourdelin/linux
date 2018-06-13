@@ -47,6 +47,8 @@ struct redist_region {
 	bool			single_redist;
 };
 
+#define GICV3_FLAGS_WORKAROUND_IW_GICR_WAKER	(1ULL << 0)
+
 struct gic_chip_data {
 	struct fwnode_handle	*fwnode;
 	void __iomem		*dist_base;
@@ -55,6 +57,7 @@ struct gic_chip_data {
 	struct irq_domain	*domain;
 	u64			redist_stride;
 	u32			nr_redist_regions;
+	u64			flags;
 	bool			has_rss;
 	unsigned int		irq_nr;
 	struct partition_desc	*ppi_descs[16];
@@ -138,6 +141,9 @@ static void gic_enable_redist(bool enable)
 	void __iomem *rbase;
 	u32 count = 1000000;	/* 1s! */
 	u32 val;
+
+	if (gic_data.flags & GICV3_FLAGS_WORKAROUND_IW_GICR_WAKER)
+		return;
 
 	rbase = gic_data_rdist_rd_base();
 
@@ -1064,6 +1070,31 @@ static const struct irq_domain_ops partition_domain_ops = {
 	.select = gic_irq_domain_select,
 };
 
+static bool __maybe_unused gicv3_enable_quirk_msm8996(void *data)
+{
+	struct gic_chip_data *d = data;
+
+	d->flags |= GICV3_FLAGS_WORKAROUND_IW_GICR_WAKER;
+
+	return true;
+}
+
+static const struct gic_quirk gicv3_quirks[] = {
+	{
+		.desc	= "GICV3: Qualcomm MSM8996 WAKER IW",
+		.iidr	= 0x00001070,	/* MSM8996 */
+		.mask	= 0x0000ffff,
+		.init	= gicv3_enable_quirk_msm8996,
+	},
+};
+
+static void gic_v3_enable_quirks(struct gic_chip_data *gic_data)
+{
+	u32 iidr = readl_relaxed(gic_data->dist_base + GICD_IIDR);
+
+	gic_enable_quirks(iidr, gicv3_quirks, gic_data);
+}
+
 static int __init gic_init_bases(void __iomem *dist_base,
 				 struct redist_region *rdist_regs,
 				 u32 nr_redist_regions,
@@ -1126,6 +1157,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
 	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
 		its_init(handle, &gic_data.rdists, gic_data.domain);
 
+	gic_v3_enable_quirks(&gic_data);
 	gic_smp_init();
 	gic_dist_init();
 	gic_cpu_init();
