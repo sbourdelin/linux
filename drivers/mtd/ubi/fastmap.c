@@ -949,14 +949,16 @@ static int ubi_attach_fastmap(struct ubi_device *ubi,
 	ubi_assert(list_empty(&free));
 
 	/*
-	 * If fastmap is leaking PEBs (must not happen), raise a
-	 * fat warning and fall back to scanning mode.
-	 * We do this here because in ubi_wl_init() it's too late
-	 * and we cannot fall back to scanning.
+	 * The orginal purpose of this check was detecting fastmap bugs were
+	 * it missed blocks. Now it helps to detect mis-flashed UBIs.
+	 * E.g. when a fastmap enabled UBI is copied to another target with
+	 * different bad blocks.
 	 */
-	if (WARN_ON(count_fastmap_pebs(ai) != ubi->peb_count -
-		    ai->bad_peb_count - fm->used_blocks))
+	if (count_fastmap_pebs(ai) != ubi->peb_count - ai->bad_peb_count -
+		fm->used_blocks) {
+		ubi_err(ubi, "number of PEBs referenced by fastmap does not match MTD!");
 		goto fail_bad;
+	}
 
 	return 0;
 
