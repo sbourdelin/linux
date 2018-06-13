@@ -385,27 +385,21 @@ out_put_bdi:
 
 static void cgwb_remove_from_bdi_list(struct bdi_writeback *wb);
 
-/*
- * Remove bdi from the global list and shutdown any threads we have running
- */
-static void wb_shutdown(struct bdi_writeback *wb)
+static bool wb_start_shutdown(struct bdi_writeback *wb)
 {
 	/* Make sure nobody queues further work */
 	spin_lock_bh(&wb->work_lock);
 	if (!test_and_clear_bit(WB_registered, &wb->state)) {
 		spin_unlock_bh(&wb->work_lock);
-		/*
-		 * Wait for wb shutdown to finish if someone else is just
-		 * running wb_shutdown(). Otherwise we could proceed to wb /
-		 * bdi destruction before wb_shutdown() is finished.
-		 */
-		wait_on_bit(&wb->state, WB_shutting_down, TASK_UNINTERRUPTIBLE);
-		return;
+		return false;
 	}
 	set_bit(WB_shutting_down, &wb->state);
 	spin_unlock_bh(&wb->work_lock);
+	return true;
+}
 
-	cgwb_remove_from_bdi_list(wb);
+static void __wb_shutdown(struct bdi_writeback *wb)
+{
 	/*
 	 * Drain work list and shutdown the delayed_work.  !WB_registered
 	 * tells wb_workfn() that @wb is dying and its work_list needs to
@@ -414,12 +408,30 @@ static void wb_shutdown(struct bdi_writeback *wb)
 	mod_delayed_work(bdi_wq, &wb->dwork, 0);
 	flush_delayed_work(&wb->dwork);
 	WARN_ON(!list_empty(&wb->work_list));
+	cgwb_remove_from_bdi_list(wb);
 	/*
 	 * Make sure bit gets cleared after shutdown is finished. Matches with
 	 * the barrier provided by test_and_clear_bit() above.
 	 */
 	smp_wmb();
 	clear_and_wake_up_bit(WB_shutting_down, &wb->state);
+}
+
+/*
+ * Remove bdi from the global list and shutdown any threads we have running
+ */
+static void wb_shutdown(struct bdi_writeback *wb)
+{
+	if (!wb_start_shutdown(wb)) {
+		/*
+		 * Wait for wb shutdown to finish if someone else is just
+		 * running wb_shutdown(). Otherwise we could proceed to wb /
+		 * bdi destruction before wb_shutdown() is finished.
+		 */
+		wait_on_bit(&wb->state, WB_shutting_down, TASK_UNINTERRUPTIBLE);
+		return;
+	}
+	__wb_shutdown(wb);
 }
 
 static void wb_exit(struct bdi_writeback *wb)
@@ -741,6 +753,35 @@ static int cgwb_bdi_init(struct backing_dev_info *bdi)
 	return ret;
 }
 
+/*
+ * Mark writeback structure as shutting down. The function returns true if
+ * we successfully marked the structure, false if shutdown was already in
+ * progress (in which case we also wait for it to finish).
+ *
+ * The function requires cgwb_lock to be held and releases it. Note that the
+ * caller need not hold reference to the writeback structure and thus once
+ * cgwb_lock is released, the writeback structure can be freed.
+ */
+static bool cgwb_start_shutdown(struct bdi_writeback *wb)
+	__releases(cgwb_lock)
+{
+	if (!wb_start_shutdown(wb)) {
+		DEFINE_WAIT(wait);
+		wait_queue_head_t *wqh = bit_waitqueue(&wb->state,
+						       WB_shutting_down);
+		bool sleep;
+
+		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
+		sleep = test_bit(WB_shutting_down, &wb->state);
+		spin_unlock_irq(&cgwb_lock);
+		if (sleep)
+			schedule();
+		return false;
+	}
+	spin_unlock_irq(&cgwb_lock);
+	return true;
+}
+
 static void cgwb_bdi_unregister(struct backing_dev_info *bdi)
 {
 	struct radix_tree_iter iter;
@@ -756,8 +797,8 @@ static void cgwb_bdi_unregister(struct backing_dev_info *bdi)
 	while (!list_empty(&bdi->wb_list)) {
 		wb = list_first_entry(&bdi->wb_list, struct bdi_writeback,
 				      bdi_node);
-		spin_unlock_irq(&cgwb_lock);
-		wb_shutdown(wb);
+		if (cgwb_start_shutdown(wb))
+			__wb_shutdown(wb);
 		spin_lock_irq(&cgwb_lock);
 	}
 	spin_unlock_irq(&cgwb_lock);
