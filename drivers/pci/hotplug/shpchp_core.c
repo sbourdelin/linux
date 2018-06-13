@@ -324,6 +324,18 @@ static void shpc_remove(struct pci_dev *dev)
 	kfree(ctrl);
 }
 
+static int shpc_extra_match(struct pci_dev *pdev)
+{
+	/* do not claim pcie port device */
+	if (pci_is_pcie(pdev) &&
+	    (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT ||
+	     pci_pcie_type(pdev) == PCI_EXP_TYPE_UPSTREAM ||
+	     pci_pcie_type(pdev) == PCI_EXP_TYPE_DOWNSTREAM))
+		return -ENODEV;
+
+	return 0;
+}
+
 static const struct pci_device_id shpcd_pci_tbl[] = {
 	{PCI_DEVICE_CLASS(((PCI_CLASS_BRIDGE_PCI << 8) | 0x00), ~0)},
 	{ /* end: all zeroes */ }
@@ -333,6 +345,7 @@ MODULE_DEVICE_TABLE(pci, shpcd_pci_tbl);
 static struct pci_driver shpc_driver = {
 	.name =		SHPC_MODULE_NAME,
 	.id_table =	shpcd_pci_tbl,
+	.extra_match =	shpc_extra_match,
 	.probe =	shpc_probe,
 	.remove =	shpc_remove,
 };
