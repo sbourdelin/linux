@@ -490,6 +490,9 @@ struct ieee80211_sta_rx_stats {
  * @last_sta_mon_event_signal: Last signal strength average for a station
  *	that triggered a sta_mon event. 0 indicates that no event has been
  *	generated for the current association
+ * @count_rx_signal: Number of data frames used in averaging station signal.
+ *	This can be used to avoid generating less reliable station rssi cross
+ *	events that would be based only on couple of received frames
  */
 struct sta_info {
 	/* General information, mostly static */
@@ -594,6 +597,7 @@ struct sta_info {
 	s32 rssi_thold;
 	u32 rssi_hyst;
 	int last_sta_mon_event_signal;
+	unsigned int count_rx_signal;
 
 	/* keep last! */
 	struct ieee80211_sta sta;
