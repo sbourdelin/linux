@@ -925,7 +925,7 @@ out_unlock:
 	return err;
 }
 
-static bool vol_ignored(int vol_id)
+static bool vol_ignored(struct ubi_attach_info *ai, int vol_id)
 {
 	switch (vol_id) {
 		case UBI_LAYOUT_VOLUME_ID:
@@ -933,6 +933,9 @@ static bool vol_ignored(int vol_id)
 	}
 
 #ifdef CONFIG_MTD_UBI_FASTMAP
+	if (ai->force_full_scan)
+		return false;
+
 	return ubi_is_fm_vol(vol_id);
 #else
 	return false;
@@ -1143,7 +1146,7 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 	}
 
 	vol_id = be32_to_cpu(vidh->vol_id);
-	if (vol_id > UBI_MAX_VOLUMES && !vol_ignored(vol_id)) {
+	if (vol_id > UBI_MAX_VOLUMES && !vol_ignored(ai, vol_id)) {
 		int lnum = be32_to_cpu(vidh->lnum);
 
 		/* Unsupported internal volume */
@@ -1581,9 +1584,11 @@ int ubi_attach(struct ubi_device *ubi, int force_scan)
 		force_scan = 1;
 	}
 
-	if (force_scan)
+	if (force_scan) {
+		ubi_msg(ubi, "full scan forced");
+		ai->force_full_scan = 1;
 		err = scan_all(ubi, ai, 0);
-	else {
+	} else {
 		err = scan_fast(ubi, &ai);
 		if (err > 0 || mtd_is_eccerr(err)) {
 			if (err != UBI_NO_FASTMAP) {

@@ -83,6 +83,7 @@ static struct mtd_dev_param mtd_dev_param[UBI_MAX_DEVICES];
 static bool fm_autoconvert;
 static bool fm_debug;
 #endif
+static bool force_scan;
 
 /* Slab cache for wear-leveling entries */
 struct kmem_cache *ubi_wl_entry_slab;
@@ -955,7 +956,7 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 	if (!ubi->fm_buf)
 		goto out_free;
 #endif
-	err = ubi_attach(ubi, 0);
+	err = ubi_attach(ubi, force_scan);
 	if (err) {
 		ubi_err(ubi, "failed to attach mtd%d, error %d",
 			mtd->index, err);
@@ -1454,6 +1455,8 @@ module_param(fm_autoconvert, bool, 0644);
 MODULE_PARM_DESC(fm_autoconvert, "Set this parameter to enable fastmap automatically on images without a fastmap.");
 module_param(fm_debug, bool, 0);
 MODULE_PARM_DESC(fm_debug, "Set this parameter to enable fastmap debugging by default. Warning, this will make fastmap slow!");
+module_param(force_scan, bool, 0644);
+MODULE_PARM_DESC(force_scan, "Always do a full scan of the MTD and drop possible fastmap structures from the MTD.");
 #endif
 MODULE_VERSION(__stringify(UBI_VERSION));
 MODULE_DESCRIPTION("UBI - Unsorted Block Images");
