@@ -455,6 +455,7 @@ config SPRD_TIMER
 	depends on (ARCH_SPRD || COMPILE_TEST)
 	default ARCH_SPRD
 	select TIMER_OF
+	select PERSISTENT_CLOCK
 	help
 	  Enables support for the Spreadtrum timer driver.
 

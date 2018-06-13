@@ -3,8 +3,11 @@
  * Copyright (C) 2017 Spreadtrum Communications Inc.
  */
 
+#include <linux/clk.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/of_address.h>
+#include <linux/persistent_clock.h>
 
 #include "timer-of.h"
 
@@ -157,3 +160,80 @@ static int __init sprd_timer_init(struct device_node *np)
 }
 
 TIMER_OF_DECLARE(sc9860_timer, "sprd,sc9860-timer", sprd_timer_init);
+
+void __iomem *pbase;
+
+static u64 sprd_persistent_timer_read(void)
+{
+	return ~(u64)readl_relaxed(pbase + TIMER_VALUE_SHDW_LO) &
+		CLOCKSOURCE_MASK(32);
+}
+
+static void sprd_persistent_timer_disable(void)
+{
+	sprd_timer_disable(pbase);
+}
+
+static void sprd_persistent_timer_enable(void)
+{
+	sprd_timer_disable(pbase);
+	sprd_timer_update_counter(pbase, TIMER_VALUE_LO_MASK);
+	sprd_timer_enable(pbase, TIMER_CTL_PERIOD_MODE);
+}
+
+static int __init sprd_persistent_timer_init(struct device_node *np)
+{
+	struct clk *clk;
+	u32 freq;
+	int ret;
+
+	clk = of_clk_get(np, 0);
+	if (IS_ERR(clk)) {
+		pr_err("Can't get timer clock for %pOF\n", np);
+		return PTR_ERR(clk);
+	}
+
+	ret = clk_prepare_enable(clk);
+	if (ret) {
+		pr_err("Failed to enable clock for %pOF\n", np);
+		clk_put(clk);
+		return ret;
+	}
+
+	freq = clk_get_rate(clk);
+	if (!freq) {
+		pr_err("Failed to get clock rate for %pOF\n", np);
+		ret = -EINVAL;
+		goto clk_rate_err;
+	}
+
+	pbase = of_io_request_and_map(np, 0, of_node_full_name(np));
+	if (IS_ERR(pbase)) {
+		pr_err("Can't map timer registers for %pOF\n", np);
+		ret = PTR_ERR(pbase);
+		goto clk_rate_err;
+	}
+
+	sprd_persistent_timer_enable();
+
+	ret = persistent_clock_init_and_register(sprd_persistent_timer_read,
+						 CLOCKSOURCE_MASK(32), freq, 0);
+	if (ret) {
+		pr_err("Failed to register persistent clock for %pOF\n", np);
+		goto persist_err;
+	}
+
+	return 0;
+
+persist_err:
+	sprd_persistent_timer_disable();
+	iounmap(pbase);
+clk_rate_err:
+	clk_disable_unprepare(clk);
+	clk_put(clk);
+
+	return ret;
+}
+
+TIMER_OF_DECLARE(sc9860_persistent_timer, "sprd,sc9860-persistent-timer",
+		 sprd_persistent_timer_init);
