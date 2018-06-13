@@ -645,8 +645,15 @@ static int ubi_attach_fastmap(struct ubi_device *ubi,
 
 	pool_size = be16_to_cpu(fmpl->size);
 	wl_pool_size = be16_to_cpu(fmpl_wl->size);
-	fm->max_pool_size = be16_to_cpu(fmpl->max_size);
-	fm->max_wl_pool_size = be16_to_cpu(fmpl_wl->max_size);
+
+	if (fm->flags & UBI_FM_SB_PRESEEDED_FLG) {
+		fm->max_pool_size = ubi->fm_pool.max_size;
+		fm->max_wl_pool_size = ubi->fm_wl_pool.max_size;
+
+	} else {
+		fm->max_pool_size = be16_to_cpu(fmpl->max_size);
+		fm->max_wl_pool_size = be16_to_cpu(fmpl_wl->max_size);
+	}
 
 	if (pool_size > UBI_FM_MAX_POOL_SIZE || pool_size < 0) {
 		ubi_err(ubi, "bad pool size: %i", pool_size);
