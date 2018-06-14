@@ -88,14 +88,9 @@ static void nft_flow_offload_eval(const struct nft_expr *expr,
 		goto out;
 	}
 
-	if (test_bit(IPS_HELPER_BIT, &ct->status))
-		goto out;
-
-	if (ctinfo == IP_CT_NEW ||
-	    ctinfo == IP_CT_RELATED)
-		goto out;
-
-	if (test_and_set_bit(IPS_OFFLOAD_BIT, &ct->status))
+	if (test_bit(IPS_HELPER_BIT, &ct->status) ||
+	    !test_bit(IPS_CONFIRMED_BIT, &ct->status) ||
+	    test_and_set_bit(IPS_OFFLOAD_BIT, &ct->status))
 		goto out;
 
 	dir = CTINFO2DIR(ctinfo);
