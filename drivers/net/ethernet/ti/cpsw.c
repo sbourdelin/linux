@@ -147,9 +147,6 @@ do {								\
 #define CPSW_CMINTMAX_INTVL	(1000 / CPSW_CMINTMIN_CNT)
 #define CPSW_CMINTMIN_INTVL	((1000 / CPSW_CMINTMAX_CNT) + 1)
 
-#define cpsw_slave_index(cpsw, priv)				\
-		((cpsw->data.dual_emac) ? priv->emac_port :	\
-		cpsw->data.active_slave)
 #define IRQ_NUM			2
 #define CPSW_MAX_QUEUES		8
 #define CPSW_CPDMA_DESCS_POOL_SIZE_DEFAULT 256
@@ -181,6 +178,9 @@ MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
 static int descs_pool_size = CPSW_CPDMA_DESCS_POOL_SIZE_DEFAULT;
 module_param(descs_pool_size, int, 0444);
 MODULE_PARM_DESC(descs_pool_size, "Number of CPDMA CPPI descriptors in pool");
+
+static int cpsw_is_dual_mac(u8 switch_mode);
+static int cpsw_is_switch(u8 switch_mode);
 
 struct cpsw_wr_regs {
 	u32	id_ver;
@@ -434,8 +434,9 @@ static const struct cpsw_stats cpsw_gstrings_ch_stats[] = {
 		struct cpsw_slave *slave;				\
 		struct cpsw_common *cpsw = (priv)->cpsw;		\
 		int n;							\
-		if (cpsw->data.dual_emac)				\
-			(func)((cpsw)->slaves + priv->emac_port, ##arg);\
+		if (!cpsw_is_switch(cpsw->data.switch_mode))		\
+			(func)((cpsw)->slaves + priv->emac_port - 1,	\
+			       ##arg);					\
 		else							\
 			for (n = cpsw->data.slaves,			\
 					slave = cpsw->slaves;		\
@@ -445,7 +446,7 @@ static const struct cpsw_stats cpsw_gstrings_ch_stats[] = {
 
 #define cpsw_dual_emac_src_port_detect(cpsw, status, ndev, skb)		\
 	do {								\
-		if (!cpsw->data.dual_emac)				\
+		if (cpsw_is_switch(cpsw->data.switch_mode))		\
 			break;						\
 		if (CPDMA_RX_SOURCE_PORT(status) == 1) {		\
 			ndev = cpsw->slaves[0].ndev;			\
@@ -457,7 +458,7 @@ static const struct cpsw_stats cpsw_gstrings_ch_stats[] = {
 	} while (0)
 #define cpsw_add_mcast(cpsw, priv, addr)				\
 	do {								\
-		if (cpsw->data.dual_emac) {				\
+		if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {		\
 			struct cpsw_slave *slave = cpsw->slaves +	\
 						priv->emac_port;	\
 			int slave_port = cpsw_get_slave_port(		\
@@ -477,13 +478,31 @@ static inline int cpsw_get_slave_port(u32 slave_num)
 	return slave_num + 1;
 }
 
+static int cpsw_is_dual_mac(u8 switch_mode)
+{
+	return switch_mode == CPSW_DUAL_EMAC;
+}
+
+static int cpsw_is_switch(u8 switch_mode)
+{
+	return switch_mode == CPSW_TI_SWITCH;
+}
+
+static int cpsw_slave_index(struct cpsw_priv *priv)
+{
+	struct cpsw_common *cpsw = priv->cpsw;
+
+	return cpsw->data.switch_mode ? priv->emac_port - 1 :
+		cpsw->data.active_slave;
+}
+
 static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 {
 	struct cpsw_common *cpsw = ndev_to_cpsw(ndev);
 	struct cpsw_ale *ale = cpsw->ale;
 	int i;
 
-	if (cpsw->data.dual_emac) {
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {
 		bool flag = false;
 
 		/* Enabling promiscuous mode for one interface will be
@@ -509,7 +528,7 @@ static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 			cpsw_ale_control_set(ale, 0, ALE_BYPASS, 0);
 			dev_dbg(&ndev->dev, "promiscuity disabled\n");
 		}
-	} else {
+	} else if (cpsw_is_switch(cpsw->data.switch_mode)) {
 		if (enable) {
 			unsigned long timeout = jiffies + HZ;
 
@@ -556,10 +575,11 @@ static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
+	int slave_no = cpsw_slave_index(priv);
 	int vid;
 
-	if (cpsw->data.dual_emac)
-		vid = cpsw->slaves[priv->emac_port].port_vlan;
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode))
+		vid = cpsw->slaves[slave_no].port_vlan;
 	else
 		vid = cpsw->data.default_vlan;
 
@@ -630,8 +650,9 @@ static void cpsw_tx_handler(void *token, int len, int status)
 static void cpsw_rx_vlan_encap(struct sk_buff *skb)
 {
 	struct cpsw_priv *priv = netdev_priv(skb->dev);
-	struct cpsw_common *cpsw = priv->cpsw;
 	u32 rx_vlan_encap_hdr = *((u32 *)skb->data);
+	struct cpsw_common *cpsw = priv->cpsw;
+	int slave_no = cpsw_slave_index(priv);
 	u16 vtag, vid, prio, pkt_type;
 
 	/* Remove VLAN header encapsulation word */
@@ -652,8 +673,8 @@ static void cpsw_rx_vlan_encap(struct sk_buff *skb)
 	if (!vid)
 		return;
 	/* Ignore default vlans in dual mac mode */
-	if (cpsw->data.dual_emac &&
-	    vid == cpsw->slaves[priv->emac_port].port_vlan)
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode) &&
+	    vid == cpsw->slaves[slave_no].port_vlan)
 		return;
 
 	prio = (rx_vlan_encap_hdr >>
@@ -682,9 +703,9 @@ static void cpsw_rx_handler(void *token, int len, int status)
 	cpsw_dual_emac_src_port_detect(cpsw, status, ndev, skb);
 
 	if (unlikely(status < 0) || unlikely(!netif_running(ndev))) {
-		/* In dual emac mode check for all interfaces */
-		if (cpsw->data.dual_emac && cpsw->usage_count &&
-		    (status >= 0)) {
+		/* In any other that switch mode check for all interfaces */
+		if (!cpsw_is_switch(cpsw->data.switch_mode) &&
+		    cpsw->usage_count && status >= 0) {
 			/* The packet received is for the interface which
 			 * is already down and the other interface is up
 			 * and running, instead of freeing which results
@@ -1235,11 +1256,11 @@ static inline int cpsw_tx_packet_submit(struct cpsw_priv *priv,
 					struct sk_buff *skb,
 					struct cpdma_chan *txch)
 {
-	struct cpsw_common *cpsw = priv->cpsw;
 
 	skb_tx_timestamp(skb);
+
 	return cpdma_chan_submit(txch, skb, skb->data, skb->len,
-				 priv->emac_port + cpsw->data.dual_emac);
+				 priv->emac_port);
 }
 
 static inline void cpsw_add_dual_emac_def_ale_entries(
@@ -1314,7 +1335,7 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
 
 	slave_port = cpsw_get_slave_port(slave->slave_num);
 
-	if (cpsw->data.dual_emac)
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode))
 		cpsw_add_dual_emac_def_ale_entries(priv, slave, slave_port);
 	else
 		cpsw_ale_add_mcast(cpsw->ale, priv->ndev->broadcast,
@@ -1393,8 +1414,8 @@ static void cpsw_init_host_port(struct cpsw_priv *priv)
 	control_reg = readl(&cpsw->regs->control);
 	control_reg |= CPSW_VLAN_AWARE | CPSW_RX_VLAN_ENCAP;
 	writel(control_reg, &cpsw->regs->control);
-	fifo_mode = (cpsw->data.dual_emac) ? CPSW_FIFO_DUAL_MAC_MODE :
-		     CPSW_FIFO_NORMAL_MODE;
+	fifo_mode = cpsw_is_dual_mac(cpsw->data.switch_mode) ?
+		CPSW_FIFO_DUAL_MAC_MODE : CPSW_FIFO_NORMAL_MODE;
 	writel(fifo_mode, &cpsw->host_port_regs->tx_in_ctl);
 
 	/* setup host port priority mapping */
@@ -1405,7 +1426,7 @@ static void cpsw_init_host_port(struct cpsw_priv *priv)
 	cpsw_ale_control_set(cpsw->ale, HOST_PORT_NUM,
 			     ALE_PORT_STATE, ALE_PORT_STATE_FORWARD);
 
-	if (!cpsw->data.dual_emac) {
+	if (!cpsw_is_dual_mac(cpsw->data.switch_mode)) {
 		cpsw_ale_add_ucast(cpsw->ale, priv->mac_addr, HOST_PORT_NUM,
 				   0, 0);
 		cpsw_ale_add_mcast(cpsw->ale, priv->ndev->broadcast,
@@ -1508,7 +1529,7 @@ static int cpsw_ndo_open(struct net_device *ndev)
 	for_each_slave(priv, cpsw_slave_open, priv);
 
 	/* Add default VLAN */
-	if (!cpsw->data.dual_emac)
+	if (!cpsw_is_dual_mac(cpsw->data.switch_mode))
 		cpsw_add_default_vlan(priv);
 	else
 		cpsw_ale_add_vlan(cpsw->ale, cpsw->data.default_vlan,
@@ -1685,9 +1706,13 @@ static void cpsw_hwtstamp_v2(struct cpsw_priv *priv)
 {
 	struct cpsw_slave *slave;
 	struct cpsw_common *cpsw = priv->cpsw;
+	int slave_no = cpsw_slave_index(priv);
 	u32 ctrl, mtype;
 
-	slave = &cpsw->slaves[cpsw_slave_index(cpsw, priv)];
+	if (slave_no < 0)
+		return;
+
+	slave = &cpsw->slaves[slave_no];
 
 	ctrl = slave_read(slave, CPSW2_CONTROL);
 	switch (cpsw->version) {
@@ -1822,7 +1847,7 @@ static int cpsw_ndo_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 {
 	struct cpsw_priv *priv = netdev_priv(dev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
 
 	if (!netif_running(dev))
 		return -EINVAL;
@@ -1863,6 +1888,7 @@ static int cpsw_ndo_set_mac_address(struct net_device *ndev, void *p)
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct sockaddr *addr = (struct sockaddr *)p;
 	struct cpsw_common *cpsw = priv->cpsw;
+	int slave_no = cpsw_slave_index(priv);
 	int flags = 0;
 	u16 vid = 0;
 	int ret;
@@ -1876,8 +1902,8 @@ static int cpsw_ndo_set_mac_address(struct net_device *ndev, void *p)
 		return ret;
 	}
 
-	if (cpsw->data.dual_emac) {
-		vid = cpsw->slaves[priv->emac_port].port_vlan;
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {
+		vid = cpsw->slaves[slave_no].port_vlan;
 		flags = ALE_VLAN;
 	}
 
@@ -1915,8 +1941,8 @@ static inline int cpsw_add_vlan_ale_entry(struct cpsw_priv *priv,
 	u32 port_mask;
 	struct cpsw_common *cpsw = priv->cpsw;
 
-	if (cpsw->data.dual_emac) {
-		port_mask = (1 << (priv->emac_port + 1)) | ALE_PORT_HOST;
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {
+		port_mask = (1 << priv->emac_port) | ALE_PORT_HOST;
 
 		if (priv->ndev->flags & IFF_ALLMULTI)
 			unreg_mcast_mask = port_mask;
@@ -1969,7 +1995,7 @@ static int cpsw_ndo_vlan_rx_add_vid(struct net_device *ndev,
 		return ret;
 	}
 
-	if (cpsw->data.dual_emac) {
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {
 		/* In dual EMAC, reserved VLAN id should not be used for
 		 * creating VLAN interfaces as this can break the dual
 		 * EMAC port separation
@@ -2005,7 +2031,7 @@ static int cpsw_ndo_vlan_rx_kill_vid(struct net_device *ndev,
 		return ret;
 	}
 
-	if (cpsw->data.dual_emac) {
+	if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {
 		int i;
 
 		for (i = 0; i < cpsw->data.slaves; i++) {
@@ -2183,7 +2209,10 @@ static int cpsw_get_link_ksettings(struct net_device *ndev,
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
 
 	if (!cpsw->slaves[slave_no].phy)
 		return -EOPNOTSUPP;
@@ -2197,7 +2226,10 @@ static int cpsw_set_link_ksettings(struct net_device *ndev,
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
 
 	if (cpsw->slaves[slave_no].phy)
 		return phy_ethtool_ksettings_set(cpsw->slaves[slave_no].phy,
@@ -2210,7 +2242,10 @@ static void cpsw_get_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return;
 
 	wol->supported = 0;
 	wol->wolopts = 0;
@@ -2223,7 +2258,10 @@ static int cpsw_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
 
 	if (cpsw->slaves[slave_no].phy)
 		return phy_ethtool_set_wol(cpsw->slaves[slave_no].phy, wol);
@@ -2487,7 +2525,10 @@ static int cpsw_get_eee(struct net_device *ndev, struct ethtool_eee *edata)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
 
 	if (cpsw->slaves[slave_no].phy)
 		return phy_ethtool_get_eee(cpsw->slaves[slave_no].phy, edata);
@@ -2499,7 +2540,10 @@ static int cpsw_set_eee(struct net_device *ndev, struct ethtool_eee *edata)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
 
 	if (cpsw->slaves[slave_no].phy)
 		return phy_ethtool_set_eee(cpsw->slaves[slave_no].phy, edata);
@@ -2511,7 +2555,10 @@ static int cpsw_nway_reset(struct net_device *ndev)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
-	int slave_no = cpsw_slave_index(cpsw, priv);
+	int slave_no = cpsw_slave_index(priv);
+
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
 
 	if (cpsw->slaves[slave_no].phy)
 		return genphy_restart_aneg(cpsw->slaves[slave_no].phy);
@@ -2662,7 +2709,7 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 	data->mac_control = prop;
 
 	if (of_property_read_bool(node, "dual_emac"))
-		data->dual_emac = 1;
+		data->switch_mode = CPSW_DUAL_EMAC;
 
 	/*
 	 * Populate all the child nodes here...
@@ -2743,7 +2790,7 @@ no_phy_slave:
 			if (ret)
 				return ret;
 		}
-		if (data->dual_emac) {
+		if (cpsw_is_dual_mac(data->switch_mode)) {
 			if (of_property_read_u32(slave_node, "dual_emac_res_vlan",
 						 &prop)) {
 				dev_err(&pdev->dev, "Missing dual_emac_res_vlan in DT.\n");
@@ -2823,7 +2870,7 @@ static int cpsw_probe_dual_emac(struct cpsw_priv *priv)
 	}
 	memcpy(ndev->dev_addr, priv_sl2->mac_addr, ETH_ALEN);
 
-	priv_sl2->emac_port = 1;
+	priv_sl2->emac_port = 2;
 	cpsw->slaves[1].ndev = ndev;
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 
@@ -2947,7 +2994,10 @@ static int cpsw_probe(struct platform_device *pdev)
 		cpsw->slaves[i].slave_num = i;
 
 	cpsw->slaves[0].ndev = ndev;
-	priv->emac_port = 0;
+	if (cpsw_is_switch(cpsw->data.switch_mode))
+		priv->emac_port = HOST_PORT_NUM;
+	else
+		priv->emac_port = 1;
 
 	clk = devm_clk_get(&pdev->dev, "fck");
 	if (IS_ERR(clk)) {
@@ -3106,7 +3156,7 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_dma_ret;
 	}
 
-	if (cpsw->data.dual_emac) {
+	if (!cpsw_is_switch(cpsw->data.switch_mode)) {
 		ret = cpsw_probe_dual_emac(priv);
 		if (ret) {
 			cpsw_err(priv, probe, "error probe slave 2 emac interface\n");
@@ -3186,7 +3236,7 @@ static int cpsw_remove(struct platform_device *pdev)
 		return ret;
 	}
 
-	if (cpsw->data.dual_emac)
+	if (!cpsw_is_switch(cpsw->data.switch_mode))
 		unregister_netdev(cpsw->slaves[1].ndev);
 	unregister_netdev(ndev);
 
@@ -3195,7 +3245,7 @@ static int cpsw_remove(struct platform_device *pdev)
 	cpsw_remove_dt(pdev);
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-	if (cpsw->data.dual_emac)
+	if (!cpsw_is_switch(cpsw->data.switch_mode))
 		free_netdev(cpsw->slaves[1].ndev);
 	free_netdev(ndev);
 	return 0;
@@ -3208,7 +3258,7 @@ static int cpsw_suspend(struct device *dev)
 	struct net_device	*ndev = platform_get_drvdata(pdev);
 	struct cpsw_common	*cpsw = ndev_to_cpsw(ndev);
 
-	if (cpsw->data.dual_emac) {
+	if (!cpsw_is_switch(cpsw->data.switch_mode)) {
 		int i;
 
 		for (i = 0; i < cpsw->data.slaves; i++) {
@@ -3237,7 +3287,7 @@ static int cpsw_resume(struct device *dev)
 
 	/* shut up ASSERT_RTNL() warning in netif_set_real_num_tx/rx_queues */
 	rtnl_lock();
-	if (cpsw->data.dual_emac) {
+	if (!cpsw_is_switch(cpsw->data.switch_mode)) {
 		int i;
 
 		for (i = 0; i < cpsw->data.slaves; i++) {

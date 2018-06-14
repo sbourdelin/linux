@@ -30,6 +30,11 @@
 #define CPSW2_TX_PRI_MAP    0x18 /* Tx Header Priority to Switch Pri Mapping */
 #define CPSW2_TS_SEQ_MTYPE  0x1c /* Time Sync Sequence ID Offset and Msg Type */
 
+enum {
+	CPSW_TI_SWITCH,
+	CPSW_DUAL_EMAC,
+};
+
 struct cpsw_slave_data {
 	struct	device_node *phy_node;
 	char	phy_id[MII_BUS_ID_SIZE];
@@ -48,7 +53,7 @@ struct cpsw_platform_data {
 	u32	bd_ram_size;  /*buffer descriptor ram size */
 	u32	mac_control;	/* Mac control register */
 	u16	default_vlan;	/* Def VLAN for ALE lookup in VLAN aware mode*/
-	bool	dual_emac;	/* Enable Dual EMAC mode */
+	u8	switch_mode;    /* Enable Dual EMAC/switchdev mode */
 };
 
 struct cpsw_slave {
