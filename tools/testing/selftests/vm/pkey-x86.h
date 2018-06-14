@@ -49,6 +49,11 @@
 #define pkey_reg_t		u32
 #define PKEY_REG_FMT		"%016x"
 
+static inline u32 pkey_bit_position(int pkey)
+{
+	return pkey * PKEY_BITS_PER_PKEY;
+}
+
 static inline void __page_o_noops(void)
 {
 	/* 8-bytes of instruction * 512 bytes = 1 page */

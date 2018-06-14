@@ -80,6 +80,35 @@ extern void abort_hooks(void);
 #error Architecture not supported
 #endif /* arch */
 
+static inline pkey_reg_t clear_pkey_flags(int pkey, pkey_reg_t flags)
+{
+	u32 shift = pkey_bit_position(pkey);
+
+	return ~(flags << shift);
+}
+
+/*
+ * Takes pkey flags and puts them at the right bit position for the given key so
+ * that the result can be ORed into the register.
+ */
+static inline pkey_reg_t left_shift_bits(int pkey, pkey_reg_t bits)
+{
+	u32 shift = pkey_bit_position(pkey);
+
+	return (bits << shift);
+}
+
+/*
+ * Takes pkey register values and puts the flags for the given pkey at the least
+ * significant bits of the returned value.
+ */
+static inline pkey_reg_t right_shift_bits(int pkey, pkey_reg_t bits)
+{
+	u32 shift = pkey_bit_position(pkey);
+
+	return (bits >> shift);
+}
+
 extern pkey_reg_t shadow_pkey_reg;
 
 static inline pkey_reg_t _read_pkey_reg(int line)
