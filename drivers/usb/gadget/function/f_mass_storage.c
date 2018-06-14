@@ -3392,6 +3392,7 @@ static struct usb_function_instance *fsg_alloc_inst(void)
 release_buffers:
 	fsg_common_free_buffers(opts->common);
 release_opts:
+	fsg_common_put(opts->common);
 	kfree(opts);
 	return ERR_PTR(rc);
 }
