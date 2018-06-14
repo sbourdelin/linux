@@ -346,31 +346,6 @@ static void xilinx_pcie_enable_msi(struct xilinx_pcie_port *port)
 	pcie_write(port, msg_addr, XILINX_PCIE_REG_MSIBASE2);
 }
 
-/* INTx Functions */
-
-/**
- * xilinx_pcie_intx_map - Set the handler for the INTx and mark IRQ as valid
- * @domain: IRQ domain
- * @irq: Virtual IRQ number
- * @hwirq: HW interrupt number
- *
- * Return: Always returns 0.
- */
-static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
-				irq_hw_number_t hwirq)
-{
-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-	irq_set_chip_data(irq, domain->host_data);
-
-	return 0;
-}
-
-/* INTx IRQ Domain operations */
-static const struct irq_domain_ops intx_domain_ops = {
-	.map = xilinx_pcie_intx_map,
-	.xlate = pci_irqd_intx_xlate,
-};
-
 /* PCIe HW Functions */
 
 /**
@@ -497,22 +472,11 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
 {
 	struct device *dev = port->dev;
 	struct device_node *node = dev->of_node;
-	struct device_node *pcie_intc_node;
 
-	/* Setup INTx */
-	pcie_intc_node = of_get_next_child(node, NULL);
-	if (!pcie_intc_node) {
-		dev_err(dev, "No PCIe Intc node found\n");
-		return -ENODEV;
-	}
-
-	port->leg_domain = irq_domain_add_linear(pcie_intc_node, PCI_NUM_INTX,
-						 &intx_domain_ops,
-						 port);
-	if (!port->leg_domain) {
-		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-		return -ENODEV;
-	}
+	port->leg_domain = pci_host_alloc_intx_irqd(dev, port, true, NULL,
+						    NULL);
+	if (IS_ERR(port->leg_domain))
+		return PTR_ERR(port->leg_domain);
 
 	/* Setup MSI */
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
