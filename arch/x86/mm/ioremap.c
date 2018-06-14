@@ -24,6 +24,7 @@
 #include <asm/pgalloc.h>
 #include <asm/pat.h>
 #include <asm/setup.h>
+#include <linux/crash_dump.h>
 
 #include "physaddr.h"
 
@@ -694,6 +695,9 @@ pgprot_t __init early_memremap_pgprot_adjust(resource_size_t phys_addr,
 	}
 
 	if (encrypted_prot && memremap_should_map_decrypted(phys_addr, size))
+		encrypted_prot = false;
+
+	if (sme_active() && is_kdump_kernel())
 		encrypted_prot = false;
 
 	return encrypted_prot ? pgprot_encrypted(prot)

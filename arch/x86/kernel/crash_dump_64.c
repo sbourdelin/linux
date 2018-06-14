@@ -11,6 +11,23 @@
 #include <linux/uaccess.h>
 #include <linux/io.h>
 
+static ssize_t copy_to(void *to, void *vaddr, unsigned long offset,
+		       size_t size, int userbuf)
+{
+	if (userbuf) {
+		if (copy_to_user(to, vaddr + offset, size)) {
+			iounmap(vaddr);
+			return -ENOMEM;
+		}
+	} else
+		memcpy(to, vaddr + offset, size);
+
+	set_iounmap_nonlazy();
+	iounmap(vaddr);
+
+	return size;
+}
+
 /**
  * copy_oldmem_page - copy one page from "oldmem"
  * @pfn: page frame number to be copied
@@ -36,15 +53,20 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
 	if (!vaddr)
 		return -ENOMEM;
 
-	if (userbuf) {
-		if (copy_to_user(buf, vaddr + offset, csize)) {
-			iounmap(vaddr);
-			return -EFAULT;
-		}
-	} else
-		memcpy(buf, vaddr + offset, csize);
+	return copy_to(buf, vaddr, offset, csize, userbuf);
+}
 
-	set_iounmap_nonlazy();
-	iounmap(vaddr);
-	return csize;
+ssize_t copy_oldmem_page_encrypted(unsigned long pfn, char *buf,
+		size_t csize, unsigned long offset, int userbuf)
+{
+	void  *vaddr;
+
+	if (!csize)
+		return 0;
+
+	vaddr = ioremap_encrypted(pfn << PAGE_SHIFT, PAGE_SIZE);
+	if (!vaddr)
+		return -ENOMEM;
+
+	return copy_to(buf, vaddr, offset, csize, userbuf);
 }
