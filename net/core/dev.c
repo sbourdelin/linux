@@ -468,7 +468,21 @@ void dev_remove_pack(struct packet_type *pt)
 }
 EXPORT_SYMBOL(dev_remove_pack);
 
+struct packet_offload *dev_get_packet_offload(__be16 type, int priority)
+{
+	struct list_head *offload_head = &offload_base;
+	struct packet_offload *ptype;
 
+	list_for_each_entry_rcu(ptype, offload_head, list) {
+		if (ptype->type != type || !ptype->callbacks.gro_receive || !ptype->callbacks.gro_complete || ptype->priority < priority)
+			continue;
+
+		return ptype;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(dev_get_packet_offload);
 /**
  *	dev_add_offload - register offload handlers
  *	@po: protocol offload declaration

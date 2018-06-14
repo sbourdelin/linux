@@ -2523,6 +2523,7 @@ void dev_remove_pack(struct packet_type *pt);
 void __dev_remove_pack(struct packet_type *pt);
 void dev_add_offload(struct packet_offload *po);
 void dev_remove_offload(struct packet_offload *po);
+struct packet_offload *dev_get_packet_offload(__be16 type, int priority);
 
 int dev_get_iflink(const struct net_device *dev);
 int dev_fill_metadata_dst(struct net_device *dev, struct sk_buff *skb);
