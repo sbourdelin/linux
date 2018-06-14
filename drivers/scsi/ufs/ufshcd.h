@@ -41,6 +41,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/configfs.h>
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -552,6 +553,7 @@ struct ufs_hba {
 	bool is_irq_enabled;
 	u32 dev_ref_clk_freq;
 	struct ufs_config_descr cfgs;
+	bool provision_enabled;
 
 	/* Interrupt aggregation support is broken */
 	#define UFSHCD_QUIRK_BROKEN_INTR_AGGR			0x1
@@ -888,7 +890,12 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 
 int ufshcd_hold(struct ufs_hba *hba, bool async);
 void ufshcd_release(struct ufs_hba *hba);
+
+/* Expose UFS configfs API's */
 int ufshcd_do_config_device(struct ufs_hba *hba);
+ssize_t ufshcd_desc_configfs_store(const char *buf, size_t count);
+int ufshcd_configfs_init(struct ufs_hba *hba_ufs);
+void ufshcd_configfs_exit(void);
 
 int ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id,
 	int *desc_length);
