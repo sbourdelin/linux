@@ -760,6 +760,11 @@ bfad_pci_init(struct pci_dev *pdev, struct bfad_s *bfad)
 		goto out_release_region;
 	}
 
+	if (bfad->pci_bar2_kva == NULL) {
+		printk(KERN_ERR "Fail to map bar2\n");
+		goto out_unmap_bar0;
+	}
+
 	bfad->hal_pcidev.pci_slot = PCI_SLOT(pdev->devfn);
 	bfad->hal_pcidev.pci_func = PCI_FUNC(pdev->devfn);
 	bfad->hal_pcidev.pci_bar_kva = bfad->pci_bar0_kva;
@@ -797,6 +802,8 @@ bfad_pci_init(struct pci_dev *pdev, struct bfad_s *bfad)
 
 	return 0;
 
+out_unmap_bar0:
+	pci_iounmap(pdev, bfad->pci_bar0_kva);
 out_release_region:
 	pci_release_regions(pdev);
 out_disable_device:
