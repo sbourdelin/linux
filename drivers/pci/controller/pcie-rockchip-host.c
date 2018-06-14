@@ -699,39 +699,6 @@ static void rockchip_pcie_enable_interrupts(struct rockchip_pcie *rockchip)
 	rockchip_pcie_enable_bw_int(rockchip);
 }
 
-static int rockchip_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
-				  irq_hw_number_t hwirq)
-{
-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-	irq_set_chip_data(irq, domain->host_data);
-
-	return 0;
-}
-
-static const struct irq_domain_ops intx_domain_ops = {
-	.map = rockchip_pcie_intx_map,
-};
-
-static int rockchip_pcie_init_irq_domain(struct rockchip_pcie *rockchip)
-{
-	struct device *dev = rockchip->dev;
-	struct device_node *intc = of_get_next_child(dev->of_node, NULL);
-
-	if (!intc) {
-		dev_err(dev, "missing child interrupt-controller node\n");
-		return -EINVAL;
-	}
-
-	rockchip->irq_domain = irq_domain_add_linear(intc, PCI_NUM_INTX,
-						    &intx_domain_ops, rockchip);
-	if (!rockchip->irq_domain) {
-		dev_err(dev, "failed to get a INTx IRQ domain\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int rockchip_pcie_prog_ob_atu(struct rockchip_pcie *rockchip,
 				     int region_no, int type, u8 num_pass_bits,
 				     u32 lower_addr, u32 upper_addr)
@@ -990,8 +957,9 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 
 	rockchip_pcie_enable_interrupts(rockchip);
 
-	err = rockchip_pcie_init_irq_domain(rockchip);
-	if (err < 0)
+	rockchip->irq_domain = pci_host_alloc_intx_irqd(dev, rockchip, false,
+							NULL, NULL);
+	if (IS_ERR(rockchip->irq_domain))
 		goto err_deinit_port;
 
 	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
