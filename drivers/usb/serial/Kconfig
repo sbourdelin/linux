@@ -181,6 +181,17 @@ config USB_SERIAL_FTDI_SIO
 	  To compile this driver as a module, choose M here: the
 	  module will be called ftdi_sio.
 
+config USB_SERIAL_FTDI_SIO_NVMEM
+        bool "FTDI MTP non-volatile memory support"
+	depends on USB_SERIAL_FTDI_SIO
+        select NVMEM
+        default y
+        help
+	  Say yes here to add support for the MTP non-volatile memory
+	  present on FTDI. Most of FTDI's devices have an EEPROM which
+	  records FTDI device's configuration setting as well as user
+	  data.
+
 config USB_SERIAL_VISOR
 	tristate "USB Handspring Visor / Palm m50x / Sony Clie Driver"
 	help

@@ -36,6 +36,8 @@
 #define FTDI_SIO_SET_ERROR_CHAR		7 /* Set the error character */
 #define FTDI_SIO_SET_LATENCY_TIMER	9 /* Set the latency timer */
 #define FTDI_SIO_GET_LATENCY_TIMER	10 /* Get the latency timer */
+#define FTDI_SIO_READ_EEPROM		0x90 /* Read eeprom */
+#define FTDI_SIO_WRITE_EEPROM		0x91 /* Write eeprom */
 
 /* Interface indices for FT2232, FT2232H and FT4232H devices */
 #define INTERFACE_A		1
@@ -397,6 +399,32 @@ enum ftdi_sio_baudrate {
  *           0 = disabled
  *           1 = enabled
  *  B9..15 Reserved
+ *
+ */
+
+ /* FTDI_SIO_READ_EEPROM */
+#define FTDI_SIO_READ_EEPROM_REQUEST_TYPE 0xc0
+#define FTDI_SIO_READ_EEPROM_REQUEST FTDI_SIO_READ_EEPROM
+/*
+ *  BmRequestType:   1100 0000b
+ *  bRequest:        FTDI_SIO_READ_EEPROM
+ *  wValue:          0
+ *  wIndex:          Word Index
+ *  wLength:         2
+ *  Data:            return data (a word)
+ *
+ */
+
+/* FTDI_SIO_WRITE_EEPROM */
+#define FTDI_SIO_WRITE_EEPROM_REQUEST_TYPE 0x40
+#define FTDI_SIO_WRITE_EEPROM_REQUEST FTDI_SIO_WRITE_EEPROM
+/*
+ *  BmRequestType:   0100 0000b
+ *  bRequest:        FTDI_SIO_WRITE_EEPROM
+ *  wValue:          Data (word)
+ *  wIndex:          Word Index
+ *  wLength:         0
+ *  Data:            None
  *
  */
 
