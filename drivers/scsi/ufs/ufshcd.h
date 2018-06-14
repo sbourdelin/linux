@@ -551,6 +551,7 @@ struct ufs_hba {
 	unsigned int irq;
 	bool is_irq_enabled;
 	u32 dev_ref_clk_freq;
+	struct ufs_config_descr cfgs;
 
 	/* Interrupt aggregation support is broken */
 	#define UFSHCD_QUIRK_BROKEN_INTR_AGGR			0x1
@@ -887,6 +888,7 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 
 int ufshcd_hold(struct ufs_hba *hba, bool async);
 void ufshcd_release(struct ufs_hba *hba);
+int ufshcd_do_config_device(struct ufs_hba *hba);
 
 int ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id,
 	int *desc_length);

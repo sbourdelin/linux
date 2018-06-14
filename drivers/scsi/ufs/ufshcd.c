@@ -42,6 +42,7 @@
 #include <linux/nls.h>
 #include <linux/of.h>
 #include <linux/bitfield.h>
+#include <asm/unaligned.h>
 #include "ufshcd.h"
 #include "ufs_quirks.h"
 #include "unipro.h"
@@ -3150,6 +3151,14 @@ static inline int ufshcd_read_power_desc(struct ufs_hba *hba,
 {
 	return ufshcd_read_desc(hba, QUERY_DESC_IDN_POWER, 0, buf, size);
 }
+
+static inline int ufshcd_read_geometry_desc(struct ufs_hba *hba,
+					 u8 *buf,
+					 u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_GEOMETRY, 0, buf, size);
+}
+
 
 static int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size)
 {
@@ -6533,6 +6542,177 @@ static int ufshcd_set_dev_ref_clk(struct ufs_hba *hba)
 
 out:
 	return err;
+}
+
+/**
+ * ufshcd_do_config_device - API function for UFS provisioning
+ * hba: per-adapter instance
+ * Returns 0 for success, non-zero in case of failure.
+ */
+int ufshcd_do_config_device(struct ufs_hba *hba)
+{
+	struct ufs_config_descr *cfg = &hba->cfgs;
+	int buff_len = QUERY_DESC_CONFIGURATION_DEF_SIZE;
+	u8 desc_buf[QUERY_DESC_CONFIGURATION_DEF_SIZE] = {0};
+	int i, ret = 0;
+	int lun_to_grow = -1;
+	u64 qTotalRawDeviceCapacity;
+	u16 wEnhanced1CapAdjFac, wEnhanced2CapAdjFac;
+	u32 dEnhanced1MaxNAllocU, dEnhanced2MaxNAllocU;
+	size_t alloc_units, units_to_create = 0;
+	size_t capacity_to_alloc_factor;
+	size_t enhanced1_units = 0, enhanced2_units = 0;
+	size_t conversion_ratio = 1;
+	u8 *pt;
+	u32 blocks_per_alloc_unit = 1024;
+	int geo_len = hba->desc_size.geom_desc;
+	u8 geo_buf[hba->desc_size.geom_desc];
+	unsigned int max_partitions = 8;
+
+	WARN_ON(!hba || !cfg);
+
+	ret = ufshcd_read_geometry_desc(hba, geo_buf, geo_len);
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed getting geometry_desc %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	/*
+	 * Get Geomtric parameters like total configurable memory
+	 * quantity (Offset 0x04 to 0x0b), Capacity Adjustment
+	 * Factors (Offset 0x30, 0x31, 0x36, 0x37), Max allocation
+	 * units (Offset 0x2c to 0x2f, 0x32 to 0x35) used to configure
+	 * the device logical units.
+	 */
+	qTotalRawDeviceCapacity = get_unaligned_be64(&geo_buf[0x04]);
+	wEnhanced1CapAdjFac = get_unaligned_be16(&geo_buf[0x30]);
+	wEnhanced2CapAdjFac = get_unaligned_be16(&geo_buf[0x36]);
+	dEnhanced1MaxNAllocU = get_unaligned_be32(&geo_buf[0x2c]);
+	dEnhanced2MaxNAllocU = get_unaligned_be32(&geo_buf[0x32]);
+
+	capacity_to_alloc_factor =
+		(blocks_per_alloc_unit * UFS_BLOCK_SIZE) / 512;
+
+	if (qTotalRawDeviceCapacity % capacity_to_alloc_factor != 0) {
+		dev_err(hba->dev,
+			"%s: Raw capacity(%llu) not multiple of alloc factor(%zu)\n",
+			__func__, qTotalRawDeviceCapacity,
+			capacity_to_alloc_factor);
+		return -EINVAL;
+	}
+	alloc_units = (qTotalRawDeviceCapacity / capacity_to_alloc_factor);
+	units_to_create = 0;
+	enhanced1_units = enhanced2_units = 0;
+
+	/*
+	 * Calculate number of allocation units to be assigned to a logical unit
+	 * considering the capacity adjustment factor of respective memory type.
+	 */
+	for (i = 0; i < (max_partitions - 1) &&
+		units_to_create <= alloc_units; i++) {
+		if ((cfg->unit[i].dNumAllocUnits % blocks_per_alloc_unit) == 0)
+			cfg->unit[i].dNumAllocUnits /= blocks_per_alloc_unit;
+		else
+			cfg->unit[i].dNumAllocUnits =
+			cfg->unit[i].dNumAllocUnits / blocks_per_alloc_unit + 1;
+
+		if (cfg->unit[i].bMemoryType == 0)
+			units_to_create += cfg->unit[i].dNumAllocUnits;
+		else if (cfg->unit[i].bMemoryType == 3) {
+			enhanced1_units += cfg->unit[i].dNumAllocUnits;
+			cfg->unit[i].dNumAllocUnits *=
+				(wEnhanced1CapAdjFac / 0x100);
+			units_to_create += cfg->unit[i].dNumAllocUnits;
+		} else if (cfg->unit[i].bMemoryType == 4) {
+			enhanced2_units += cfg->unit[i].dNumAllocUnits;
+			cfg->unit[i].dNumAllocUnits *=
+				(wEnhanced1CapAdjFac / 0x100);
+			units_to_create += cfg->unit[i].dNumAllocUnits;
+		} else {
+			dev_err(hba->dev, "%s: Unsupported memory type %d\n",
+				__func__, cfg->unit[i].bMemoryType);
+			return -EINVAL;
+		}
+	}
+	if (enhanced1_units > dEnhanced1MaxNAllocU) {
+		dev_err(hba->dev, "%s: size %zu exceeds max enhanced1 area size %u\n",
+			__func__, enhanced1_units, dEnhanced1MaxNAllocU);
+		return -ERANGE;
+	}
+	if (enhanced2_units > dEnhanced2MaxNAllocU) {
+		dev_err(hba->dev, "%s: size %zu exceeds max enhanced2 area size %u\n",
+			__func__, enhanced2_units, dEnhanced2MaxNAllocU);
+		return -ERANGE;
+	}
+	if (units_to_create > alloc_units) {
+		dev_err(hba->dev, "%s: Specified size %zu exceeds device size %zu\n",
+			__func__, units_to_create, alloc_units);
+		return -ERANGE;
+	}
+	lun_to_grow = cfg->lun_to_grow;
+	if (lun_to_grow != -1) {
+		if (cfg->unit[i].bMemoryType == 0)
+			conversion_ratio = 1;
+		else if (cfg->unit[i].bMemoryType == 3)
+			conversion_ratio = (wEnhanced1CapAdjFac / 0x100);
+		else if (cfg->unit[i].bMemoryType == 4)
+			conversion_ratio = (wEnhanced2CapAdjFac / 0x100);
+
+		cfg->unit[lun_to_grow].dNumAllocUnits +=
+		((alloc_units - units_to_create) / conversion_ratio);
+		dev_dbg(hba->dev, "%s: conversion_ratio %zu for lun %d\n",
+			__func__, conversion_ratio, i);
+	}
+
+	/* Fill in the buffer with configuration data */
+	pt = desc_buf;
+	*pt++ = 0x90;        // bLength
+	*pt++ = 0x01;        // bDescriptorType
+	*pt++ = 0;           // Reserved in UFS2.0 and onward
+	*pt++ = cfg->bBootEnable;
+	*pt++ = cfg->bDescrAccessEn;
+	*pt++ = cfg->bInitPowerMode;
+	*pt++ = cfg->bHighPriorityLUN;
+	*pt++ = cfg->bSecureRemovalType;
+	*pt++ = cfg->bInitActiveICCLevel;
+	put_unaligned_be16(cfg->wPeriodicRTCUpdate, pt);
+	pt = pt + 7; // Reserved fields set to 0
+
+	/* Fill in the buffer with per logical unit data */
+	for (i = 0; i < UFS_UPIU_MAX_GENERAL_LUN; i++) {
+		*pt++ = cfg->unit[i].bLUEnable;
+		*pt++ = cfg->unit[i].bBootLunID;
+		*pt++ = cfg->unit[i].bLUWriteProtect;
+		*pt++ = cfg->unit[i].bMemoryType;
+		put_unaligned_be32(cfg->unit[i].dNumAllocUnits, pt);
+		pt = pt + 4;
+		*pt++ = cfg->unit[i].bDataReliability;
+		*pt++ = cfg->unit[i].bLogicalBlockSize;
+		*pt++ = cfg->unit[i].bProvisioningType;
+		put_unaligned_be16(cfg->unit[i].wContextCapabilities, pt);
+		pt = pt + 5; // Reserved fields set to 0
+	}
+
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_WRITE_DESC,
+		QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf, &buff_len);
+
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed writing descriptor. desc_idn %d, opcode %x ret %d\n",
+		__func__, QUERY_DESC_IDN_CONFIGURATION,
+		UPIU_QUERY_OPCODE_WRITE_DESC, ret);
+		return ret;
+	}
+
+	if (cfg->bConfigDescrLock == 1) {
+		ret = ufshcd_query_attr(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
+		QUERY_ATTR_IDN_CONF_DESC_LOCK, 0, 0, &cfg->bConfigDescrLock);
+		if (ret)
+			dev_err(hba->dev, "%s: Failed writing bConfigDescrLock %d\n",
+				__func__, ret);
+	}
+
+	return ret;
 }
 
 /**
