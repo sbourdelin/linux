@@ -5,6 +5,7 @@
 #include <net/arp.h>
 #include <net/udp.h>
 #include <net/tcp.h>
+#include <net/esp.h>
 #include <net/protocol.h>
 #include <crypto/aead.h>
 #include <net/netfilter/early_ingress.h>
@@ -272,6 +273,41 @@ out:
 	NAPI_GRO_CB(skb)->flush |= (flush != 0);
 
 	return pp;
+}
+
+struct sk_buff *nft_esp_gso_segment(struct sk_buff *skb,
+				    netdev_features_t features)
+{
+	struct xfrm_offload *xo = xfrm_offload(skb);
+	netdev_features_t esp_features = features;
+	struct crypto_aead *aead;
+	struct ip_esp_hdr *esph;
+	struct xfrm_state *x;
+
+	if (!xo)
+		return ERR_PTR(-EINVAL);
+
+	x = skb->sp->xvec[skb->sp->len - 1];
+	aead = x->data;
+	esph = ip_esp_hdr(skb);
+
+	if (esph->spi != x->id.spi)
+		return ERR_PTR(-EINVAL);
+
+	if (!pskb_may_pull(skb, sizeof(*esph) + crypto_aead_ivsize(aead)))
+		return ERR_PTR(-EINVAL);
+
+	__skb_pull(skb, sizeof(*esph) + crypto_aead_ivsize(aead));
+
+	skb->encap_hdr_csum = 1;
+
+	if (!(features & NETIF_F_HW_ESP) || !x->xso.offload_handle ||
+	    (x->xso.dev != skb->dev))
+		esp_features = features & ~(NETIF_F_SG | NETIF_F_CSUM_MASK);
+
+	xo->flags |= XFRM_GSO_SEGMENT;
+
+	return x->outer_mode->gso_segment(x, skb, esp_features);
 }
 
 static inline bool nf_hook_early_ingress_active(const struct sk_buff *skb)

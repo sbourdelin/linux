@@ -5,6 +5,7 @@
 #include <net/arp.h>
 #include <net/udp.h>
 #include <net/tcp.h>
+#include <net/esp.h>
 #include <net/protocol.h>
 #include <net/netfilter/early_ingress.h>
 
@@ -303,9 +304,16 @@ static const struct net_offload nft_tcp4_offload = {
 	},
 };
 
+static const struct net_offload nft_esp4_offload = {
+	.callbacks = {
+		.gso_segment = nft_esp_gso_segment,
+	},
+};
+
 static const struct net_offload __rcu *nft_ip_offloads[MAX_INET_PROTOS] __read_mostly = {
 	[IPPROTO_UDP]	= &nft_udp4_offload,
 	[IPPROTO_TCP]	= &nft_tcp4_offload,
+	[IPPROTO_ESP]	= &nft_esp4_offload,
 };
 
 void nf_early_ingress_ip_enable(void)

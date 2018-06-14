@@ -8,6 +8,8 @@ struct sk_buff **nft_udp_gro_receive(struct sk_buff **head,
 				     struct sk_buff *skb);
 struct sk_buff **nft_tcp_gro_receive(struct sk_buff **head,
 				     struct sk_buff *skb);
+struct sk_buff *nft_esp_gso_segment(struct sk_buff *skb,
+				    netdev_features_t features);
 
 int nf_hook_early_ingress(struct sk_buff *skb);
 
