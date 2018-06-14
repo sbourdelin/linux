@@ -343,6 +343,7 @@ static int ip4ip6_gro_complete(struct sk_buff *skb, int nhoff)
 
 static struct packet_offload ipv6_packet_offload __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IPV6),
+	.priority = 1,
 	.callbacks = {
 		.gso_segment = ipv6_gso_segment,
 		.gro_receive = ipv6_gro_receive,
