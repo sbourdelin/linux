@@ -109,6 +109,11 @@ int netlink_send(struct sock *sock, int group, u16 type, void *msg, int len)
 	seq++;
 
 	nlh = nlmsg_put(skb, 0, seq, type, len, 0);
+	if (!nlh) {
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
+
 	memcpy(NLMSG_DATA(nlh), msg, len);
 	NETLINK_CB(skb).portid = 0;
 	NETLINK_CB(skb).dst_group = 0;
