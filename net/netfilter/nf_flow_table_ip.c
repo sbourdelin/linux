@@ -11,6 +11,7 @@
 #include <net/ip6_route.h>
 #include <net/neighbour.h>
 #include <net/netfilter/nf_flow_table.h>
+#include <net/xfrm.h>
 /* For layer 4 checksum field offset. */
 #include <linux/tcp.h>
 #include <linux/udp.h>
@@ -487,3 +488,64 @@ nf_flow_offload_ipv6_hook(void *priv, struct sk_buff *skb,
 	return NF_STOLEN;
 }
 EXPORT_SYMBOL_GPL(nf_flow_offload_ipv6_hook);
+
+unsigned int
+nf_flow_offload_early_ingress_ip_hook(void *priv, struct sk_buff *skb,
+				      const struct nf_hook_state *state)
+{
+	struct flow_offload_tuple_rhash *tuplehash;
+	struct nf_flowtable *flow_table = priv;
+	struct flow_offload_tuple tuple = {};
+	enum flow_offload_tuple_dir dir;
+	struct flow_offload *flow;
+	struct net_device *outdev;
+	const struct rtable *rt;
+	unsigned int thoff;
+	struct iphdr *iph;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		return NF_ACCEPT;
+
+	if (nf_flow_tuple_ip(skb, state->in, &tuple) < 0)
+		return NF_ACCEPT;
+
+	tuplehash = flow_offload_lookup(flow_table, &tuple);
+	if (tuplehash == NULL)
+		return NF_ACCEPT;
+
+	outdev = dev_get_by_index_rcu(state->net, tuplehash->tuple.oifidx);
+	if (!outdev)
+		return NF_ACCEPT;
+
+	dir = tuplehash->tuple.dir;
+	flow = container_of(tuplehash, struct flow_offload, tuplehash[dir]);
+	rt = (const struct rtable *)flow->tuplehash[dir].tuple.dst_cache;
+
+	if (unlikely(nf_flow_exceeds_mtu(skb, flow->tuplehash[dir].tuple.mtu)) &&
+	    (ip_hdr(skb)->frag_off & htons(IP_DF)) != 0)
+		return NF_ACCEPT;
+
+	if (skb_try_make_writable(skb, sizeof(*iph)))
+		return NF_DROP;
+
+	thoff = ip_hdr(skb)->ihl * 4;
+	if (nf_flow_state_check(flow, ip_hdr(skb)->protocol, skb, thoff))
+		return NF_ACCEPT;
+
+	if (flow->flags & (FLOW_OFFLOAD_SNAT | FLOW_OFFLOAD_DNAT) &&
+	    nf_flow_nat_ip(flow, skb, thoff, dir) < 0)
+		return NF_DROP;
+
+	flow->timeout = (u32)jiffies + NF_FLOW_TIMEOUT;
+
+	skb_dst_set_noref(skb, flow->tuplehash[dir].tuple.dst_cache);
+
+	if (skb_dst(skb)->xfrm &&
+	    !xfrm_dev_offload_ok(skb, skb_dst(skb)->xfrm))
+		return NF_ACCEPT;
+
+	NAPI_GRO_CB(skb)->is_ffwd = 1;
+
+	return NF_STOLEN;
+}
+EXPORT_SYMBOL_GPL(nf_flow_offload_early_ingress_ip_hook);

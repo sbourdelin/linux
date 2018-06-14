@@ -14,15 +14,26 @@ static struct nf_flowtable_type flowtable_ipv4 = {
 	.owner		= THIS_MODULE,
 };
 
+static struct nf_flowtable_type flowtable_ipv4_early = {
+	.family		= NFPROTO_IPV4,
+	.hooknum	= NF_NETDEV_EARLY_INGRESS,
+	.init		= nf_flow_table_init,
+	.free		= nf_flow_table_free,
+	.hook		= nf_flow_offload_early_ingress_ip_hook,
+	.owner		= THIS_MODULE,
+};
+
 static int __init nf_flow_ipv4_module_init(void)
 {
 	nft_register_flowtable_type(&flowtable_ipv4);
+	nft_register_flowtable_type(&flowtable_ipv4_early);
 
 	return 0;
 }
 
 static void __exit nf_flow_ipv4_module_exit(void)
 {
+	nft_unregister_flowtable_type(&flowtable_ipv4_early);
 	nft_unregister_flowtable_type(&flowtable_ipv4);
 }
 
