@@ -13,6 +13,8 @@ int nf_hook_early_ingress(struct sk_buff *skb);
 
 void nf_early_ingress_ip_enable(void);
 void nf_early_ingress_ip_disable(void);
+void nf_early_ingress_ip6_enable(void);
+void nf_early_ingress_ip6_disable(void);
 
 void nf_early_ingress_enable(void);
 void nf_early_ingress_disable(void);

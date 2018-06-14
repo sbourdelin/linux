@@ -312,6 +312,7 @@ void nf_early_ingress_enable(void)
 	if (nf_early_ingress_use++ == 0) {
 		nf_early_ingress_use++;
 		nf_early_ingress_ip_enable();
+		nf_early_ingress_ip6_enable();
 	}
 }
 
@@ -319,5 +320,6 @@ void nf_early_ingress_disable(void)
 {
 	if (--nf_early_ingress_use == 0) {
 		nf_early_ingress_ip_disable();
+		nf_early_ingress_ip6_disable();
 	}
 }

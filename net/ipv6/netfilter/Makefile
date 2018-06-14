@@ -2,6 +2,7 @@
 #
 # Makefile for the netfilter modules on top of IPv6.
 #
+obj-$(CONFIG_NETFILTER_EARLY_INGRESS) += early_ingress.o
 
 # Link order matters here.
 obj-$(CONFIG_IP6_NF_IPTABLES) += ip6_tables.o
