@@ -138,8 +138,7 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 {
 	struct file *old_file;
 	struct file *new_file;
-	loff_t old_pos = 0;
-	loff_t new_pos = 0;
+	loff_t pos = 0;
 	int error = 0;
 
 	if (len == 0)
@@ -155,38 +154,27 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 		goto out_fput;
 	}
 
-	/* Try to use clone_file_range to clone up within the same fs */
-	error = vfs_clone_file_range(old_file, 0, new_file, 0, len);
-	if (!error)
-		goto out;
-	/* Couldn't clone, so now we try to copy the data */
-	error = 0;
-
-	/* FIXME: copy up sparse files efficiently */
-	while (len) {
+	while (pos < len) {
 		size_t this_len = OVL_COPY_UP_CHUNK_SIZE;
 		long bytes;
 
-		if (len < this_len)
-			this_len = len;
+		if (len - pos < this_len)
+			this_len = len - pos;
 
 		if (signal_pending_state(TASK_KILLABLE, current)) {
 			error = -EINTR;
 			break;
 		}
 
-		bytes = do_splice_direct(old_file, &old_pos,
-					 new_file, &new_pos,
-					 this_len, SPLICE_F_MOVE);
+		bytes = do_copy_file_range(old_file, pos,
+					 new_file, pos,
+					 this_len, 0, SPLICE_F_MOVE);
 		if (bytes <= 0) {
 			error = bytes;
 			break;
 		}
-		WARN_ON(old_pos != new_pos);
-
-		len -= bytes;
+		pos += bytes;
 	}
-out:
 	if (!error)
 		error = vfs_fsync(new_file, 0);
 	fput(new_file);

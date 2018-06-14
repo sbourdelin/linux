@@ -1542,9 +1542,10 @@ COMPAT_SYSCALL_DEFINE4(sendfile64, int, out_fd, int, in_fd,
 }
 #endif
 
-static ssize_t do_copy_file_range(struct file *file_in, loff_t pos_in,
+ssize_t do_copy_file_range(struct file *file_in, loff_t pos_in,
 			    struct file *file_out, loff_t pos_out,
-			    size_t len, unsigned int flags)
+			    size_t len, unsigned int flags,
+			    unsigned int splice_flags)
 {
 	struct inode *inode_in = file_inode(file_in);
 	struct inode *inode_out = file_inode(file_out);
@@ -1629,6 +1630,7 @@ hole:
 out:
 	return total ? total : ret;
 }
+EXPORT_SYMBOL(do_copy_file_range);
 
 /*
  * copy_file_range() differs from regular file read and write in that it
@@ -1667,7 +1669,7 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 	file_start_write(file_out);
 
 	ret = do_copy_file_range(file_in, pos_in,
-			file_out, pos_out, len, flags);
+			file_out, pos_out, len, flags, 0);
 
 	if (ret > 0) {
 		fsnotify_access(file_in);
