@@ -1170,6 +1170,19 @@ config DEBUG_LOCK_ALLOC
 	 spin_lock_init()/mutex_init()/etc., or whether there is any lock
 	 held during task exit.
 
+config LOCKDEP_REPORT_FSFREEZE_FROM_USERSPACE
+       bool "Allow lockdep splat upon ioctl(FIFREEZE) request"
+       depends on PROVE_LOCKING
+       default n
+       help
+	 Freezing filesystems and not thawing shortly will kill the system with
+	 hung tasks. Since ioctl(FIFREEZE) request returns to userspace with
+	 locks held, in order to suppress lockdep splat messages, information
+	 of held locks is cleared without actually releasing locks held. But
+	 doing so might hide possible deadlock bugs. Thus, this option allows
+	 lockdep splat if ioctl(FIFREEZE) is requested, in order to help
+	 finding possible deadlock bugs.
+
 config LOCKDEP
 	bool
 	depends on DEBUG_KERNEL && LOCK_DEBUGGING_SUPPORT

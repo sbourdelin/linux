@@ -1428,10 +1428,12 @@ static void sb_wait_write(struct super_block *sb, int level)
  */
 static void lockdep_sb_freeze_release(struct super_block *sb)
 {
+#ifndef CONFIG_LOCKDEP_REPORT_FSFREEZE_FROM_USERSPACE
 	int level;
 
 	for (level = SB_FREEZE_LEVELS - 1; level >= 0; level--)
 		percpu_rwsem_release(sb->s_writers.rw_sem + level, 0, _THIS_IP_);
+#endif
 }
 
 /*
@@ -1439,10 +1441,12 @@ static void lockdep_sb_freeze_release(struct super_block *sb)
  */
 static void lockdep_sb_freeze_acquire(struct super_block *sb)
 {
+#ifndef CONFIG_LOCKDEP_REPORT_FSFREEZE_FROM_USERSPACE
 	int level;
 
 	for (level = 0; level < SB_FREEZE_LEVELS; ++level)
 		percpu_rwsem_acquire(sb->s_writers.rw_sem + level, 0, _THIS_IP_);
+#endif
 }
 
 static void sb_freeze_unlock(struct super_block *sb)
