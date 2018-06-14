@@ -1012,6 +1012,7 @@ static u8 smp_random(struct smp_chan *smp)
 			return SMP_UNSPECIFIED;
 
 		hci_le_start_enc(hcon, ediv, rand, stk, smp->enc_key_size);
+		smp_distribute_keys(smp);
 		hcon->enc_key_size = smp->enc_key_size;
 		set_bit(HCI_CONN_STK_ENCRYPT, &hcon->flags);
 	} else {
@@ -2837,6 +2838,7 @@ static int smp_cmd_dhkey_check(struct l2cap_conn *conn, struct sk_buff *skb)
 
 	if (hcon->out) {
 		hci_le_start_enc(hcon, 0, 0, smp->tk, smp->enc_key_size);
+		smp_distribute_keys(smp);
 		hcon->enc_key_size = smp->enc_key_size;
 	}
 
@@ -3067,7 +3069,6 @@ static void smp_resume_cb(struct l2cap_chan *chan)
 
 	cancel_delayed_work(&smp->security_timer);
 
-	smp_distribute_keys(smp);
 }
 
 static void smp_ready_cb(struct l2cap_chan *chan)
