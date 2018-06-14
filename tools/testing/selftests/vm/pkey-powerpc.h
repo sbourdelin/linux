@@ -62,9 +62,19 @@ static inline void __write_pkey_reg(pkey_reg_t pkey_reg)
 			pkey_reg);
 }
 
-static inline int cpu_has_pku(void)
+static inline bool is_pkey_supported(void)
 {
-	return 1;
+	/*
+	 * No simple way to determine this.
+	 * Lets try allocating a key and see if it succeeds.
+	 */
+	int ret = sys_pkey_alloc(0, 0);
+
+	if (ret > 0) {
+		sys_pkey_free(ret);
+		return true;
+	}
+	return false;
 }
 
 static inline int arch_reserved_keys(void)
