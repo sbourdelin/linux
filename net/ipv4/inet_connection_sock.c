@@ -306,7 +306,7 @@ tb_not_found:
 		goto fail_unlock;
 tb_found:
 	if (!hlist_empty(&tb->owners)) {
-		if (sk->sk_reuse == SK_FORCE_REUSE)
+		if (sk->sk_force_reuse)
 			goto success;
 
 		if ((tb->fastreuse > 0 && reuse) ||
