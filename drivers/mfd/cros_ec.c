@@ -91,6 +91,10 @@ static int cros_ec_sleep_event(struct cros_ec_device *ec_dev, u8 sleep_event)
 	return cros_ec_cmd_xfer(ec_dev, &buf.msg);
 }
 
+static const struct mfd_cell ec_throttler_cell = {
+	.name = "cros-ec-throttler",
+};
+
 int cros_ec_register(struct cros_ec_device *ec_dev)
 {
 	struct device *dev = ec_dev->dev;
@@ -152,6 +156,18 @@ int cros_ec_register(struct cros_ec_device *ec_dev)
 		if (err) {
 			dev_err(dev,
 				"Failed to register Power Delivery subdevice %d\n",
+				err);
+			return err;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_CROS_EC_THROTTLER)) {
+		err = mfd_add_devices(ec_dev->dev, PLATFORM_DEVID_AUTO,
+				      &ec_throttler_cell, 1, NULL, ec_dev->irq,
+				      NULL);
+		if (err) {
+			dev_err(dev,
+				"Failed to register throttler subdevice %d\n",
 				err);
 			return err;
 		}
