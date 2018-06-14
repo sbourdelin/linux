@@ -916,10 +916,10 @@ void expected_pkey_fault(int pkey)
 		pkey_assert(last_si_pkey == pkey);
 
 	/*
-	 * The signal handler shold have cleared out PKEY register to let the
+	 * The signal handler should have cleared out pkey-register to let the
 	 * test program continue.  We now have to restore it.
 	 */
-	if (__read_pkey_reg() != 0)
+	if (__read_pkey_reg() != shadow_pkey_reg)
 		pkey_assert(0);
 
 	__write_pkey_reg(shadow_pkey_reg);
