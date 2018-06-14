@@ -176,4 +176,9 @@ void expect_fault_on_read_execonly_key(void *p1, u16 pkey)
 	expected_pkey_fault(pkey);
 }
 
+void *malloc_pkey_with_mprotect_subpage(long size, int prot, u16 pkey)
+{
+	return PTR_ERR_ENOTSUP;
+}
+
 #endif /* _PKEYS_X86_H */
