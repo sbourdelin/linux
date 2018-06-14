@@ -341,9 +341,18 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 	 * I expect to be a sort of Security System Revision number.
 	 * Since the A80 seems to have an other version of SS
 	 * this info could be useful
+	 * Detect virtual machine with non-implemented hardware
+	 * (qemu-cubieboard) by checking the register value after a write to it.
+	 * On non-implemented hardware, all registers are read as 0.
+	 * On real hardware we should have a value > 0.
 	 */
 	writel(SS_ENABLED, ss->base + SS_CTL);
 	v = readl(ss->base + SS_CTL);
+	if (!v) {
+		dev_err(&pdev->dev, "Qemu with non-implemented SS detected.\n");
+		err = -ENODEV;
+		goto error_rst;
+	}
 	v >>= 16;
 	v &= 0x07;
 	dev_info(&pdev->dev, "Die ID %d\n", v);
@@ -398,6 +407,7 @@ error_alg:
 			break;
 		}
 	}
+error_rst:
 	if (ss->reset)
 		reset_control_assert(ss->reset);
 error_clk:
