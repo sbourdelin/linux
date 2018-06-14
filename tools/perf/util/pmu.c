@@ -294,7 +294,7 @@ static int __perf_pmu__new_alias(struct list_head *list, char *dir, char *name,
 
 static int perf_pmu__new_alias(struct list_head *list, char *dir, char *name, FILE *file)
 {
-	char buf[256];
+	char *cp, buf[256];
 	int ret;
 
 	ret = fread(buf, 1, sizeof(buf), file);
@@ -302,6 +302,11 @@ static int perf_pmu__new_alias(struct list_head *list, char *dir, char *name, FI
 		return -EINVAL;
 
 	buf[ret] = 0;
+
+	/* Remove trailing newline from sysfs file */
+	cp = strrchr(buf, '\n');
+	if (cp)
+		*cp = '\0';
 
 	return __perf_pmu__new_alias(list, dir, name, NULL, buf, NULL, NULL, NULL,
 				     NULL, NULL, NULL);
