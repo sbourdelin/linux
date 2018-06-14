@@ -179,4 +179,14 @@ static inline void __pkey_write_allow(int pkey, int do_allow_write)
 #define __stringify_1(x...)     #x
 #define __stringify(x...)       __stringify_1(x)
 
+static inline int open_hugepage_file(int flag)
+{
+	return open(HUGEPAGE_FILE, flag);
+}
+
+static inline int get_start_key(void)
+{
+	return 1;
+}
+
 #endif /* _PKEYS_HELPER_H */
