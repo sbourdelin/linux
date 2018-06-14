@@ -4864,7 +4864,8 @@ static int napi_gro_complete(struct sk_buff *skb)
 
 	BUILD_BUG_ON(sizeof(struct napi_gro_cb) > sizeof(skb->cb));
 
-	if (NAPI_GRO_CB(skb)->count == 1) {
+	if (NAPI_GRO_CB(skb)->count == 1 &&
+	    !(NAPI_GRO_CB(skb)->is_ffwd)) {
 		skb_shinfo(skb)->gso_size = 0;
 		goto out;
 	}
@@ -4880,8 +4881,10 @@ static int napi_gro_complete(struct sk_buff *skb)
 	rcu_read_unlock();
 
 	if (err) {
-		WARN_ON(&ptype->list == head);
-		kfree_skb(skb);
+		if (err != -EINPROGRESS) {
+			WARN_ON(&ptype->list == head);
+			kfree_skb(skb);
+		}
 		return NET_RX_SUCCESS;
 	}
 
@@ -4936,8 +4939,10 @@ static void gro_list_prepare(struct napi_struct *napi, struct sk_buff *skb)
 
 		diffs = (unsigned long)p->dev ^ (unsigned long)skb->dev;
 		diffs |= p->vlan_tci ^ skb->vlan_tci;
-		diffs |= skb_metadata_dst_cmp(p, skb);
-		diffs |= skb_metadata_differs(p, skb);
+		if (!NAPI_GRO_CB(p)->is_ffwd) {
+			diffs |= skb_metadata_dst_cmp(p, skb);
+			diffs |= skb_metadata_differs(p, skb);
+		}
 		if (maclen == ETH_HLEN)
 			diffs |= compare_ether_header(skb_mac_header(p),
 						      skb_mac_header(skb));
@@ -5019,6 +5024,7 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 		NAPI_GRO_CB(skb)->is_fou = 0;
 		NAPI_GRO_CB(skb)->is_atomic = 1;
 		NAPI_GRO_CB(skb)->gro_remcsum_start = 0;
+		NAPI_GRO_CB(skb)->is_ffwd = 0;
 
 		/* Setup for GRO checksum validation */
 		switch (skb->ip_summed) {
@@ -5044,9 +5050,14 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	if (&ptype->list == head)
 		goto normal;
 
-	if (IS_ERR(pp) && PTR_ERR(pp) == -EINPROGRESS) {
-		ret = GRO_CONSUMED;
-		goto ok;
+	if (IS_ERR(pp)) {
+		int err;
+
+		err = PTR_ERR(pp);
+		if (err == -EINPROGRESS || err == -EPERM) {
+			ret = GRO_CONSUMED;
+			goto ok;
+		}
 	}
 
 	same_flow = NAPI_GRO_CB(skb)->same_flow;
@@ -5064,8 +5075,15 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	if (same_flow)
 		goto ok;
 
-	if (NAPI_GRO_CB(skb)->flush)
+	if (NAPI_GRO_CB(skb)->flush) {
+		if (NAPI_GRO_CB(skb)->is_ffwd) {
+			napi_gro_complete(skb);
+			ret = GRO_CONSUMED;
+			goto ok;
+		}
+
 		goto normal;
+	}
 
 	if (unlikely(napi->gro_count >= MAX_GRO_SKBS)) {
 		struct sk_buff *nskb = napi->gro_list;
