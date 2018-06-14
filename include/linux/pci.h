@@ -31,6 +31,9 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
+#include <linux/of_irq.h>
 #include <linux/resource_ext.h>
 #include <uapi/linux/pci.h>
 
@@ -1453,6 +1456,10 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
 	return 0;
 }
 
+struct irq_domain *pci_host_alloc_intx_irqd(struct device *dev,
+				void *host, bool general_xlate,
+				const struct irq_domain_ops *intx_domain_ops,
+				struct device_node *local_intc);
 #ifdef CONFIG_PCIEPORTBUS
 extern bool pcie_ports_disabled;
 extern bool pcie_ports_native;
