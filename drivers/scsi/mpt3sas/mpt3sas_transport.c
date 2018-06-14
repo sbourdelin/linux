@@ -995,7 +995,7 @@ mpt3sas_transport_add_expander_phy(struct MPT3SAS_ADAPTER *ioc, struct _sas_phy
  * @ioc: per adapter object
  * @sas_address: sas address of parent expander or sas host
  * @handle: attached device handle
- * @phy_numberv: phy number
+ * @phy_number: phy number
  * @link_rate: new link rate
  *
  * Returns nothing.
@@ -1311,7 +1311,8 @@ _transport_get_linkerrors(struct sas_phy *phy)
 
 /**
  * _transport_get_enclosure_identifier -
- * @phy: The sas phy object
+ * @rphy: The sas phy object
+ * @identifier: ?
  *
  * Obtain the enclosure logical id for an expander.
  * Returns 0 for success, non-zero for failure.
@@ -1342,7 +1343,7 @@ _transport_get_enclosure_identifier(struct sas_rphy *rphy, u64 *identifier)
 
 /**
  * _transport_get_bay_identifier -
- * @phy: The sas phy object
+ * @rphy: The sas phy object
  *
  * Returns the slot id for a device that resides inside an enclosure.
  */
@@ -1400,6 +1401,7 @@ struct phy_control_reply {
  * _transport_expander_phy_control - expander phy control
  * @ioc: per adapter object
  * @phy: The sas phy object
+ * @phy_operation: ?
  *
  * Returns 0 for success, non-zero for failure.
  *
@@ -1904,9 +1906,9 @@ _transport_unmap_smp_buffer(struct device *dev, struct bsg_buffer *buf,
 
 /**
  * _transport_smp_handler - transport portal for smp passthru
+ * @job: ?
  * @shost: shost object
  * @rphy: sas transport rphy object
- * @req:
  *
  * This used primarily for smp_utils.
  * Example:

@@ -284,6 +284,8 @@ struct _scsi_io_transfer {
 
 /**
  * _scsih_set_debug_level - global setting of ioc->logging_level.
+ * @val: ?
+ * @kp: ?
  *
  * Note: The logging levels are defined in mpt3sas_debug.h.
  */
@@ -356,7 +358,7 @@ _scsih_srch_boot_encl_slot(u64 enclosure_logical_id, u16 slot_number,
  * @sas_address: sas address
  * @device_name: device name specified in INDENTIFY fram
  * @enclosure_logical_id: enclosure logical id
- * @slot_number: slot number
+ * @slot: slot number
  * @form: specifies boot device form
  * @boot_device: boot device object from bios page 2
  *
@@ -398,6 +400,7 @@ _scsih_is_boot_device(u64 sas_address, u64 device_name,
 
 /**
  * _scsih_get_sas_address - set the sas_address for given device handle
+ * @ioc: ?
  * @handle: device handle
  * @sas_address: sas address
  *
@@ -1273,7 +1276,7 @@ mpt3sas_raid_device_find_by_handle(struct MPT3SAS_ADAPTER *ioc, u16 handle)
 /**
  * _scsih_raid_device_find_by_wwid - raid device search
  * @ioc: per adapter object
- * @handle: sas device handle (assigned by firmware)
+ * @wwid: ?
  * Context: Calling function should acquire ioc->raid_device_lock
  *
  * This searches for raid_device based on wwid, then return raid_device
@@ -1905,7 +1908,7 @@ _scsih_display_sata_capabilities(struct MPT3SAS_ADAPTER *ioc,
 
 /**
  * scsih_is_raid - return boolean indicating device is raid volume
- * @dev the device struct object
+ * @dev: the device struct object
  */
 static int
 scsih_is_raid(struct device *dev)
@@ -1928,7 +1931,7 @@ scsih_is_nvme(struct device *dev)
 
 /**
  * scsih_get_resync - get raid volume resync percent complete
- * @dev the device struct object
+ * @dev: the device struct object
  */
 static void
 scsih_get_resync(struct device *dev)
@@ -1989,7 +1992,7 @@ scsih_get_resync(struct device *dev)
 
 /**
  * scsih_get_state - get raid volume level
- * @dev the device struct object
+ * @dev: the device struct object
  */
 static void
 scsih_get_state(struct device *dev)
@@ -2055,6 +2058,7 @@ scsih_get_state(struct device *dev)
 
 /**
  * _scsih_set_level - set raid level
+ * @ioc: ?
  * @sdev: scsi device struct
  * @volume_type: volume type
  */
@@ -2096,7 +2100,7 @@ _scsih_set_level(struct MPT3SAS_ADAPTER *ioc,
 /**
  * _scsih_get_volume_capabilities - volume capabilities
  * @ioc: per adapter object
- * @sas_device: the raid_device object
+ * @raid_device: the raid_device object
  *
  * Returns 0 for success, else 1
  */
@@ -3367,7 +3371,7 @@ _scsih_ublock_io_all_device(struct MPT3SAS_ADAPTER *ioc)
 /**
  * _scsih_ublock_io_device - prepare device to be deleted
  * @ioc: per adapter object
- * @sas_addr: sas address
+ * @sas_address: sas address
  *
  * unblock then put device in offline state
  */
@@ -3393,7 +3397,6 @@ _scsih_ublock_io_device(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
 /**
  * _scsih_block_io_all_device - set the device state to SDEV_BLOCK
  * @ioc: per adapter object
- * @handle: device handle
  *
  * During device pull we need to appropriately set the sdev state.
  */
@@ -4621,8 +4624,8 @@ _scsih_eedp_error_handling(struct scsi_cmnd *scmd, u16 ioc_status)
 
 /**
  * scsih_qcmd - main scsi request entry point
+ * @shost: SCSI host pointer
  * @scmd: pointer to scsi command object
- * @done: function pointer to be invoked on completion
  *
  * The callback index is set inside `ioc->scsi_io_cb_idx`.
  *
@@ -4813,6 +4816,7 @@ _scsih_normalize_sense(char *sense_buffer, struct sense_info *data)
  * @ioc: per adapter object
  * @scmd: pointer to scsi command object
  * @mpi_reply: reply mf payload returned from firmware
+ * @smid: ?
  *
  * scsi_status - SCSI Status code returned from target device
  * scsi_state - state info associated with SCSI_IO determined by ioc
@@ -5891,7 +5895,7 @@ _scsih_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
  * @ioc: per adapter object
  * @sas_address: sas address
  * @handle: sas device handle
- * @access_flags: errors returned during discovery of the device
+ * @access_status: errors returned during discovery of the device
  *
  * Return 0 for success, else failure
  */
@@ -5955,7 +5959,7 @@ _scsih_check_access_status(struct MPT3SAS_ADAPTER *ioc, u64 sas_address,
  * @ioc: per adapter object
  * @parent_sas_address: sas address of parent expander or sas host
  * @handle: attached device handle
- * @phy_numberv: phy number
+ * @phy_number: phy number
  * @link_rate: new link rate
  *
  * Returns nothing.
@@ -6207,7 +6211,7 @@ _scsih_add_device(struct MPT3SAS_ADAPTER *ioc, u16 handle, u8 phy_num,
 /**
  * _scsih_remove_device -  removing sas device object
  * @ioc: per adapter object
- * @sas_device_delete: the sas_device object
+ * @sas_device: the sas_device object
  *
  * Return nothing.
  */
@@ -6475,6 +6479,7 @@ _scsih_sas_topology_change_event(struct MPT3SAS_ADAPTER *ioc,
 
 /**
  * _scsih_sas_device_status_change_event_debug - debug for device event
+ * @ioc: ?
  * @event_data: event data payload
  * Context: user.
  *
@@ -6608,7 +6613,7 @@ out:
  * @ioc: per adapter object
  * @wwid: wwid
  * @handle: sas device handle
- * @access_flags: errors returned during discovery of the device
+ * @access_status: errors returned during discovery of the device
  *
  * Return 0 for success, else failure
  */
@@ -7188,8 +7193,8 @@ _scsih_pcie_topology_change_event(struct MPT3SAS_ADAPTER *ioc,
 }
 
 /**
- * _scsih_pcie_device_status_change_event_debug - debug for
- * device event
+ * _scsih_pcie_device_status_change_event_debug - debug for device event
+ * @ioc: ?
  * @event_data: event data payload
  * Context: user.
  *
@@ -9575,7 +9580,6 @@ out:
 
 /**
  * _firmware_event_work
- * @ioc: per adapter object
  * @work: The fw_event_work object
  * Context: user.
  *
