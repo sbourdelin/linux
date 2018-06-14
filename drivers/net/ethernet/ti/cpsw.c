@@ -18,12 +18,10 @@
 #include <linux/clk.h>
 #include <linux/timer.h>
 #include <linux/module.h>
-#include <linux/platform_device.h>
 #include <linux/irqreturn.h>
 #include <linux/interrupt.h>
 #include <linux/if_ether.h>
 #include <linux/etherdevice.h>
-#include <linux/netdevice.h>
 #include <linux/net_tstamp.h>
 #include <linux/phy.h>
 #include <linux/workqueue.h>
@@ -43,6 +41,7 @@
 #include "cpsw.h"
 #include "cpsw_ale.h"
 #include "cpsw_priv.h"
+#include "cpsw_switchdev.h"
 #include "cpts.h"
 #include "davinci_cpdma.h"
 
@@ -361,6 +360,13 @@ struct cpsw_hw_stats {
 	u32	rxdmaoverruns;
 };
 
+struct cpsw_switchdev_event_work {
+	struct work_struct work;
+	struct switchdev_notifier_fdb_info fdb_info;
+	struct cpsw_priv *priv;
+	unsigned long event;
+};
+
 #define CPSW_STAT(m)		CPSW_STATS,				\
 				sizeof(((struct cpsw_hw_stats *)0)->m), \
 				offsetof(struct cpsw_hw_stats, m)
@@ -488,12 +494,30 @@ static int cpsw_is_switch(u8 switch_mode)
 	return switch_mode == CPSW_TI_SWITCH;
 }
 
+static int cpsw_is_switchdev(u8 switch_mode)
+{
+	return switch_mode == CPSW_SWITCHDEV;
+}
+
 static int cpsw_slave_index(struct cpsw_priv *priv)
 {
 	struct cpsw_common *cpsw = priv->cpsw;
 
+#if IS_ENABLED(CONFIG_TI_CPSW_SWITCHDEV)
+	if (priv->emac_port == HOST_PORT_NUM)
+		return -1;
+#endif
+
 	return cpsw->data.switch_mode ? priv->emac_port - 1 :
 		cpsw->data.active_slave;
+}
+
+static void cpsw_switchdev_port_enable(struct net_device *ndev)
+{
+#if IS_ENABLED(CONFIG_TI_CPSW_SWITCHDEV)
+	cpsw_port_switchdev_init(ndev);
+	ndev->features |= NETIF_F_NETNS_LOCAL;
+#endif
 }
 
 static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
@@ -521,6 +545,7 @@ static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 		if (enable) {
 			/* Enable Bypass */
 			cpsw_ale_control_set(ale, 0, ALE_BYPASS, 1);
+			cpsw_ale_set_allmulti(ale, IFF_ALLMULTI);
 
 			dev_dbg(&ndev->dev, "promiscuity enabled\n");
 		} else {
@@ -554,6 +579,7 @@ static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 
 			/* Flood All Unicast Packets to Host port */
 			cpsw_ale_control_set(ale, 0, ALE_P0_UNI_FLOOD, 1);
+			cpsw_ale_set_allmulti(ale, IFF_ALLMULTI);
 			dev_dbg(&ndev->dev, "promiscuity enabled\n");
 		} else {
 			/* Don't Flood All Unicast Packets to Host port */
@@ -568,6 +594,19 @@ static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 			}
 			dev_dbg(&ndev->dev, "promiscuity disabled\n");
 		}
+	} else if (cpsw_is_switchdev(cpsw->data.switch_mode)) {
+		/* When interfaces are placed into a bridge they'll switch to
+		 * promiscuous mode. In switchdev case ALE_P0_UNI_FLOOD is
+		 * changed whether any switch port participates in the bridge
+		 * or not
+		 */
+		struct cpsw_priv *priv = netdev_priv(ndev);
+		int slave_idx = cpsw_slave_index(priv);
+		int slave_num;
+
+		slave_num = cpsw_get_slave_port(slave_idx);
+		cpsw_ale_control_set(ale, slave_num, ALE_PORT_NOLEARN, 0);
+		cpsw_ale_control_set(ale, slave_num, ALE_PORT_NO_SA_UPDATE, 0);
 	}
 }
 
@@ -586,7 +625,6 @@ static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 	if (ndev->flags & IFF_PROMISC) {
 		/* Enable promiscuous mode */
 		cpsw_set_promiscious(ndev, true);
-		cpsw_ale_set_allmulti(cpsw->ale, IFF_ALLMULTI);
 		return;
 	} else {
 		/* Disable promiscuous mode */
@@ -721,6 +759,10 @@ static void cpsw_rx_handler(void *token, int len, int status)
 		return;
 	}
 
+#if IS_ENABLED(CONFIG_TI_CPSW_SWITCHDEV)
+	if (cpsw_is_switchdev(cpsw->data.switch_mode))
+		skb->offload_fwd_mark = 1;
+#endif
 	new_skb = netdev_alloc_skb_ip_align(ndev, cpsw->rx_packet_max);
 	if (new_skb) {
 		skb_copy_queue_mapping(new_skb, skb);
@@ -1427,10 +1469,13 @@ static void cpsw_init_host_port(struct cpsw_priv *priv)
 			     ALE_PORT_STATE, ALE_PORT_STATE_FORWARD);
 
 	if (!cpsw_is_dual_mac(cpsw->data.switch_mode)) {
-		cpsw_ale_add_ucast(cpsw->ale, priv->mac_addr, HOST_PORT_NUM,
-				   0, 0);
+		char stpa[] = {0x01, 0x80, 0xc2, 0x0, 0x0, 0x0};
+
 		cpsw_ale_add_mcast(cpsw->ale, priv->ndev->broadcast,
 				   ALE_PORT_HOST, 0, 0, ALE_MCAST_FWD_2);
+		cpsw_ale_add_mcast(cpsw->ale, stpa,
+				   ALE_PORT_HOST, ALE_SUPER, 0,
+				   ALE_MCAST_BLOCK_LEARN_FWD);
 	}
 }
 
@@ -1529,11 +1574,14 @@ static int cpsw_ndo_open(struct net_device *ndev)
 	for_each_slave(priv, cpsw_slave_open, priv);
 
 	/* Add default VLAN */
-	if (!cpsw_is_dual_mac(cpsw->data.switch_mode))
+	if (!cpsw_is_dual_mac(cpsw->data.switch_mode)) {
 		cpsw_add_default_vlan(priv);
-	else
+		cpsw_ale_add_ucast(cpsw->ale, priv->mac_addr, HOST_PORT_NUM, 0,
+				   0);
+	} else {
 		cpsw_ale_add_vlan(cpsw->ale, cpsw->data.default_vlan,
 				  ALE_ALL_PORTS, ALE_ALL_PORTS, 0, 0);
+	}
 
 	/* initialize shared resources for every ndev */
 	if (!cpsw->usage_count) {
@@ -1852,6 +1900,9 @@ static int cpsw_ndo_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 	if (!netif_running(dev))
 		return -EINVAL;
 
+	if (slave_no < 0)
+		return -EOPNOTSUPP;
+
 	switch (cmd) {
 	case SIOCSHWTSTAMP:
 		return cpsw_hwtstamp_set(dev, req);
@@ -1941,7 +1992,7 @@ static inline int cpsw_add_vlan_ale_entry(struct cpsw_priv *priv,
 	u32 port_mask;
 	struct cpsw_common *cpsw = priv->cpsw;
 
-	if (cpsw_is_dual_mac(cpsw->data.switch_mode)) {
+	if (!cpsw_is_switch(cpsw->data.switch_mode)) {
 		port_mask = (1 << priv->emac_port) | ALE_PORT_HOST;
 
 		if (priv->ndev->flags & IFF_ALLMULTI)
@@ -1989,6 +2040,10 @@ static int cpsw_ndo_vlan_rx_add_vid(struct net_device *ndev,
 	if (vid == cpsw->data.default_vlan)
 		return 0;
 
+	if (cpsw_is_switchdev(cpsw->data.switch_mode) &&
+	    (netif_is_bridge_port(ndev)))
+		return -EOPNOTSUPP;
+
 	ret = pm_runtime_get_sync(cpsw->dev);
 	if (ret < 0) {
 		pm_runtime_put_noidle(cpsw->dev);
@@ -2025,6 +2080,10 @@ static int cpsw_ndo_vlan_rx_kill_vid(struct net_device *ndev,
 	if (vid == cpsw->data.default_vlan)
 		return 0;
 
+	if (cpsw_is_switchdev(cpsw->data.switch_mode) &&
+	    (netif_is_bridge_port(ndev)))
+		return -EOPNOTSUPP;
+
 	ret = pm_runtime_get_sync(cpsw->dev);
 	if (ret < 0) {
 		pm_runtime_put_noidle(cpsw->dev);
@@ -2054,6 +2113,24 @@ static int cpsw_ndo_vlan_rx_kill_vid(struct net_device *ndev,
 				 0, ALE_VLAN, vid);
 	pm_runtime_put(cpsw->dev);
 	return ret;
+}
+
+static int cpsw_ndo_get_phys_port_name(struct net_device *ndev, char *name,
+				       size_t len)
+{
+	struct cpsw_priv *priv = netdev_priv(ndev);
+	struct cpsw_common *cpsw = priv->cpsw;
+	int err;
+
+	if (!cpsw_is_switchdev(cpsw->data.switch_mode))
+		return -EOPNOTSUPP;
+
+	err = snprintf(name, len, "p%d", priv->emac_port);
+
+	if (err >= len)
+		return -EINVAL;
+
+	return 0;
 }
 
 static int cpsw_ndo_set_tx_maxrate(struct net_device *ndev, int queue, u32 rate)
@@ -2122,6 +2199,7 @@ static const struct net_device_ops cpsw_netdev_ops = {
 #endif
 	.ndo_vlan_rx_add_vid	= cpsw_ndo_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= cpsw_ndo_vlan_rx_kill_vid,
+	.ndo_get_phys_port_name = cpsw_ndo_get_phys_port_name,
 };
 
 static int cpsw_get_regs_len(struct net_device *ndev)
@@ -2711,6 +2789,10 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 	if (of_property_read_bool(node, "dual_emac"))
 		data->switch_mode = CPSW_DUAL_EMAC;
 
+	/* switchdev overrides DTS */
+	if (IS_ENABLED(CONFIG_TI_CPSW_SWITCHDEV))
+		data->switch_mode = CPSW_SWITCHDEV;
+
 	/*
 	 * Populate all the child nodes here...
 	 */
@@ -2874,6 +2956,9 @@ static int cpsw_probe_dual_emac(struct cpsw_priv *priv)
 	cpsw->slaves[1].ndev = ndev;
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 
+	if (cpsw_is_switchdev(cpsw->data.switch_mode))
+		cpsw_switchdev_port_enable(ndev);
+
 	ndev->netdev_ops = &cpsw_netdev_ops;
 	ndev->ethtool_ops = &cpsw_ethtool_ops;
 
@@ -2902,6 +2987,196 @@ static const struct soc_device_attribute cpsw_soc_devices[] = {
 	{ .family = "AM33xx", .revision = "ES1.0"},
 	{ /* sentinel */ }
 };
+
+static bool cpsw_port_dev_check(const struct net_device *dev)
+{
+	return dev->netdev_ops == &cpsw_netdev_ops;
+}
+
+static void cpsw_fdb_offload_notify(struct net_device *ndev,
+				    struct switchdev_notifier_fdb_info *rcv)
+{
+	struct switchdev_notifier_fdb_info info;
+
+	info.addr = rcv->addr;
+	info.vid = rcv->vid;
+	call_switchdev_notifiers(SWITCHDEV_FDB_OFFLOADED,
+				 ndev, &info.info);
+}
+
+static void cpsw_switchdev_event_work(struct work_struct *work)
+{
+	struct cpsw_switchdev_event_work *switchdev_work =
+		container_of(work, struct cpsw_switchdev_event_work, work);
+	struct cpsw_priv *priv = switchdev_work->priv;
+	struct switchdev_notifier_fdb_info *fdb;
+	struct cpsw_common *cpsw = priv->cpsw;
+	int port = priv->emac_port;
+
+	rtnl_lock();
+	switch (switchdev_work->event) {
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+		fdb = &switchdev_work->fdb_info;
+		if (memcmp(priv->mac_addr, (u8 *)fdb->addr, ETH_ALEN) == 0)
+			port = HOST_PORT_NUM;
+		cpsw_ale_add_ucast(cpsw->ale, (u8 *)fdb->addr, port, ALE_VLAN,
+				   fdb->vid);
+		cpsw_fdb_offload_notify(priv->ndev, fdb);
+		break;
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		fdb = &switchdev_work->fdb_info;
+		if (memcmp(priv->mac_addr, (u8 *)fdb->addr, ETH_ALEN) == 0)
+			port = HOST_PORT_NUM;
+		cpsw_ale_del_ucast(cpsw->ale, (u8 *)fdb->addr, port, ALE_VLAN,
+				   fdb->vid);
+		break;
+	default:
+		break;
+	}
+	rtnl_unlock();
+
+	kfree(switchdev_work->fdb_info.addr);
+	kfree(switchdev_work);
+	dev_put(priv->ndev);
+}
+
+/* called under rcu_read_lock() */
+static int cpsw_switchdev_event(struct notifier_block *unused,
+				unsigned long event, void *ptr)
+{
+	struct net_device *ndev = switchdev_notifier_info_to_dev(ptr);
+	struct switchdev_notifier_fdb_info *fdb_info = ptr;
+	struct cpsw_switchdev_event_work *switchdev_work;
+	struct cpsw_priv *priv = netdev_priv(ndev);
+
+	if (!cpsw_port_dev_check(ndev))
+		return NOTIFY_DONE;
+
+	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
+	if (WARN_ON(!switchdev_work))
+		return NOTIFY_BAD;
+
+	INIT_WORK(&switchdev_work->work, cpsw_switchdev_event_work);
+	switchdev_work->priv = priv;
+	switchdev_work->event = event;
+
+	switch (event) {
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		memcpy(&switchdev_work->fdb_info, ptr,
+		       sizeof(switchdev_work->fdb_info));
+		switchdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
+		ether_addr_copy((u8 *)switchdev_work->fdb_info.addr,
+				fdb_info->addr);
+		dev_hold(ndev);
+		break;
+	default:
+		kfree(switchdev_work);
+		return NOTIFY_DONE;
+	}
+
+	queue_work(system_long_wq, &switchdev_work->work);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block cpsw_switchdev_notifier = {
+	.notifier_call = cpsw_switchdev_event,
+};
+
+static void cpsw_netdevice_port_link(struct net_device *ndev)
+{
+	struct cpsw_priv *priv = netdev_priv(ndev);
+	struct cpsw_common *cpsw = priv->cpsw;
+
+	if (!cpsw->br_members) {
+		cpsw_ale_control_set(cpsw->ale, HOST_PORT_NUM, ALE_P0_UNI_FLOOD,
+				     1);
+		dev_dbg(&ndev->dev, "Set P0_UNI_FLOOD\n");
+	}
+	cpsw->br_members++;
+}
+
+static void cpsw_netdevice_port_unlink(struct net_device *ndev)
+{
+	struct cpsw_priv *priv = netdev_priv(ndev);
+	struct cpsw_common *cpsw = priv->cpsw;
+
+	cpsw->br_members--;
+	if (!cpsw->br_members) {
+		cpsw_ale_control_set(cpsw->ale, HOST_PORT_NUM, ALE_P0_UNI_FLOOD,
+				     0);
+		dev_dbg(&ndev->dev, "unset P0_UNI_FLOOD\n");
+	}
+}
+
+/* netdev notifier */
+static int cpsw_netdevice_event(struct notifier_block *unused,
+				unsigned long event, void *ptr)
+{
+	struct net_device *ndev = netdev_notifier_info_to_dev(ptr);
+	struct netdev_notifier_changeupper_info *info;
+
+	switch (event) {
+	case NETDEV_CHANGEUPPER:
+		info = ptr;
+		if (!info->master)
+			goto out;
+		if (info->linking)
+			cpsw_netdevice_port_link(ndev);
+		else
+			cpsw_netdevice_port_unlink(ndev);
+		break;
+	default:
+		return NOTIFY_DONE;
+	}
+
+out:
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block cpsw_netdevice_nb __read_mostly = {
+	.notifier_call = cpsw_netdevice_event,
+};
+
+static int cpsw_register_notifiers(struct cpsw_priv *priv)
+{
+	int ret;
+
+	ret = register_netdevice_notifier(&cpsw_netdevice_nb);
+	if (ret) {
+		cpsw_err(priv, probe, "can't register netdevice notifier\n");
+		return ret;
+	}
+
+	ret = register_switchdev_notifier(&cpsw_switchdev_notifier);
+	if (ret) {
+		cpsw_err(priv, probe, "can't register switchdev notifier\n");
+		goto unreg_netdevice;
+	}
+
+	return ret;
+
+unreg_netdevice:
+	ret = unregister_netdevice_notifier(&cpsw_netdevice_nb);
+
+	return ret;
+}
+
+static int cpsw_unregister_notifiers(struct cpsw_priv *priv)
+{
+	int ret;
+
+	ret = unregister_switchdev_notifier(&cpsw_switchdev_notifier);
+	if (ret)
+		dev_err(priv->dev, "can't unregister switchdev notifier\n");
+
+	ret += unregister_netdevice_notifier(&cpsw_netdevice_nb);
+	if (ret)
+		dev_err(priv->dev, "can't unregister netdevice notifier\n");
+
+	return ret;
+}
 
 static int cpsw_probe(struct platform_device *pdev)
 {
@@ -3135,6 +3410,9 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_dma_ret;
 	}
 
+	if (cpsw_is_switchdev(cpsw->data.switch_mode))
+		cpsw_switchdev_port_enable(ndev);
+
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_HW_VLAN_CTAG_RX;
 
 	ndev->netdev_ops = &cpsw_netdev_ops;
@@ -3202,6 +3480,12 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_dma_ret;
 	}
 
+	if (cpsw_is_switchdev(cpsw->data.switch_mode)) {
+		ret = cpsw_register_notifiers(priv);
+		if (ret)
+			goto clean_dma_ret;
+	}
+
 	cpsw_notice(priv, probe,
 		    "initialized device (regs %pa, irq %d, pool size %d)\n",
 		    &ss_res->start, ndev->irq, dma_params.descs_pool_size);
@@ -3227,7 +3511,8 @@ clean_ndev_ret:
 static int cpsw_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
-	struct cpsw_common *cpsw = ndev_to_cpsw(ndev);
+	struct cpsw_priv *priv = netdev_priv(ndev);
+	struct cpsw_common *cpsw = priv->cpsw;
 	int ret;
 
 	ret = pm_runtime_get_sync(&pdev->dev);
@@ -3235,6 +3520,9 @@ static int cpsw_remove(struct platform_device *pdev)
 		pm_runtime_put_noidle(&pdev->dev);
 		return ret;
 	}
+
+	if (cpsw_is_switchdev(cpsw->data.switch_mode))
+		ret = cpsw_unregister_notifiers(priv);
 
 	if (!cpsw_is_switch(cpsw->data.switch_mode))
 		unregister_netdev(cpsw->slaves[1].ndev);

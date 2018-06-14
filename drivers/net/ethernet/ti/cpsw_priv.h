@@ -33,6 +33,7 @@
 enum {
 	CPSW_TI_SWITCH,
 	CPSW_DUAL_EMAC,
+	CPSW_SWITCHDEV,
 };
 
 struct cpsw_slave_data {
@@ -98,6 +99,7 @@ struct cpsw_common {
 	int				rx_ch_num, tx_ch_num;
 	int				speed;
 	int				usage_count;
+	u8				br_members;
 };
 
 struct cpsw_priv {
