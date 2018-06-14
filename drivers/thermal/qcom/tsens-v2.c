@@ -69,8 +69,15 @@ static const struct tsens_ops ops_v2 = {
 	.get_temp	= get_temp_tsens_v2,
 };
 
+const struct tsens_data data_tsens_v2 = {
+	.ops            = &ops_v2,
+};
+
+/* Kept around for backward compatibility with old msm8996.dtsi.
+ * New platforms should use data_tsens_v2 if possible and define
+ * the #qcom,sensors property in DT.
+ */
 const struct tsens_data data_8996 = {
 	.num_sensors	= 13,
 	.ops		= &ops_v2,
 };
-
