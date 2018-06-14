@@ -2558,17 +2558,15 @@ static void fsg_lun_release(struct device *dev)
 	/* Nothing needs to be done */
 }
 
-void fsg_common_get(struct fsg_common *common)
+static void __maybe_unused fsg_common_get(struct fsg_common *common)
 {
 	kref_get(&common->ref);
 }
-EXPORT_SYMBOL_GPL(fsg_common_get);
 
-void fsg_common_put(struct fsg_common *common)
+static void fsg_common_put(struct fsg_common *common)
 {
 	kref_put(&common->ref, fsg_common_release);
 }
-EXPORT_SYMBOL_GPL(fsg_common_put);
 
 static struct fsg_common *fsg_common_setup(struct fsg_common *common)
 {
