@@ -54,6 +54,7 @@ enum nf_inet_hooks {
 
 enum nf_dev_hooks {
 	NF_NETDEV_INGRESS,
+	NF_NETDEV_EARLY_INGRESS,
 	NF_NETDEV_NUMHOOKS
 };
 

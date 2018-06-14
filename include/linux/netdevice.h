@@ -1880,6 +1880,8 @@ struct net_device {
 	rx_handler_func_t __rcu	*rx_handler;
 	void __rcu		*rx_handler_data;
 
+	struct nf_hook_entries __rcu *nf_hooks_early_ingress;
+
 #ifdef CONFIG_NET_CLS_ACT
 	struct mini_Qdisc __rcu	*miniq_ingress;
 #endif

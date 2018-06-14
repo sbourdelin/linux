@@ -306,6 +306,11 @@ nf_hook_entry_head(struct net *net, int pf, unsigned int hooknum,
 			return &dev->nf_hooks_ingress;
 	}
 #endif
+	if (hooknum == NF_NETDEV_EARLY_INGRESS) {
+		if (dev && dev_net(dev) == net)
+			return &dev->nf_hooks_early_ingress;
+	}
+
 	WARN_ON_ONCE(1);
 	return NULL;
 }
@@ -321,7 +326,8 @@ static int __nf_register_net_hook(struct net *net, int pf,
 		if (reg->hooknum == NF_NETDEV_INGRESS)
 			return -EOPNOTSUPP;
 #endif
-		if (reg->hooknum != NF_NETDEV_INGRESS ||
+		if ((reg->hooknum != NF_NETDEV_INGRESS &&
+		     reg->hooknum != NF_NETDEV_EARLY_INGRESS) ||
 		    !reg->dev || dev_net(reg->dev) != net)
 			return -EINVAL;
 	}
@@ -347,6 +353,9 @@ static int __nf_register_net_hook(struct net *net, int pf,
 	if (pf == NFPROTO_NETDEV && reg->hooknum == NF_NETDEV_INGRESS)
 		net_inc_ingress_queue();
 #endif
+	if (pf == NFPROTO_NETDEV && reg->hooknum == NF_NETDEV_EARLY_INGRESS)
+		nf_early_ingress_enable();
+
 #ifdef HAVE_JUMP_LABEL
 	static_key_slow_inc(&nf_hooks_needed[pf][reg->hooknum]);
 #endif
@@ -404,6 +413,9 @@ static void __nf_unregister_net_hook(struct net *net, int pf,
 #ifdef CONFIG_NETFILTER_INGRESS
 		if (pf == NFPROTO_NETDEV && reg->hooknum == NF_NETDEV_INGRESS)
 			net_dec_ingress_queue();
+
+		if (pf == NFPROTO_NETDEV && reg->hooknum == NF_NETDEV_EARLY_INGRESS)
+			nf_early_ingress_disable();
 #endif
 #ifdef HAVE_JUMP_LABEL
 		static_key_slow_dec(&nf_hooks_needed[pf][reg->hooknum]);
@@ -535,6 +547,27 @@ int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
 }
 EXPORT_SYMBOL(nf_hook_slow);
 
+int nf_hook_netdev(struct sk_buff *skb, struct nf_hook_state *state,
+		   const struct nf_hook_entries *e)
+{
+	unsigned int verdict, s, v = NF_ACCEPT;
+
+	for (s = 0; s < e->num_hook_entries; s++) {
+		verdict = nf_hook_entry_hookfn(&e->hooks[s], skb, state);
+		v = verdict & NF_VERDICT_MASK;
+		switch (v) {
+		case NF_ACCEPT:
+			break;
+		case NF_DROP:
+			kfree_skb(skb);
+			/* Fall through */
+		default:
+			return v;
+		}
+	}
+
+	return v;
+}
 
 int skb_make_writable(struct sk_buff *skb, unsigned int writable_len)
 {

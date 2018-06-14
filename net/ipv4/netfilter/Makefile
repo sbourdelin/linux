@@ -2,6 +2,7 @@
 #
 # Makefile for the netfilter modules on top of IPv4.
 #
+obj-$(CONFIG_NETFILTER_EARLY_INGRESS) += early_ingress.o
 
 # objects for l3 independent conntrack
 nf_conntrack_ipv4-y	:=  nf_conntrack_l3proto_ipv4.o nf_conntrack_proto_icmp.o
