@@ -16,7 +16,6 @@
  * Status: unknown
  */
 
-/* include files ----------------------------------------------------------- */
 
 #include <linux/module.h>
 #include "../comedidev.h"
