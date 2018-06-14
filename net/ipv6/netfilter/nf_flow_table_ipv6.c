@@ -8,6 +8,7 @@
 
 static struct nf_flowtable_type flowtable_ipv6 = {
 	.family		= NFPROTO_IPV6,
+	.hooknum	= NF_NETDEV_INGRESS,
 	.init		= nf_flow_table_init,
 	.free		= nf_flow_table_free,
 	.hook		= nf_flow_offload_ipv6_hook,

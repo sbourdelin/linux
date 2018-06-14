@@ -14,6 +14,7 @@ struct nf_flowtable;
 struct nf_flowtable_type {
 	struct list_head		list;
 	int				family;
+	unsigned int			hooknum;
 	int				(*init)(struct nf_flowtable *ft);
 	void				(*free)(struct nf_flowtable *ft);
 	nf_hookfn			*hook;

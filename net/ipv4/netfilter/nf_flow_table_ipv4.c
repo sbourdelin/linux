@@ -7,6 +7,7 @@
 
 static struct nf_flowtable_type flowtable_ipv4 = {
 	.family		= NFPROTO_IPV4,
+	.hooknum	= NF_NETDEV_INGRESS,
 	.init		= nf_flow_table_init,
 	.free		= nf_flow_table_free,
 	.hook		= nf_flow_offload_ip_hook,

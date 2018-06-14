@@ -22,6 +22,7 @@ nf_flow_offload_inet_hook(void *priv, struct sk_buff *skb,
 
 static struct nf_flowtable_type flowtable_inet = {
 	.family		= NFPROTO_INET,
+	.hooknum	= NF_NETDEV_INGRESS,
 	.init		= nf_flow_table_init,
 	.free		= nf_flow_table_free,
 	.hook		= nf_flow_offload_inet_hook,

@@ -5267,6 +5267,40 @@ err1:
 	return err;
 }
 
+static const struct nf_flowtable_type *__nft_flowtable_type_get(u8 family,
+								int hooknum)
+{
+	const struct nf_flowtable_type *type;
+
+	list_for_each_entry(type, &nf_tables_flowtables, list) {
+		if (family == type->family &&
+		    hooknum == type->hooknum)
+			return type;
+	}
+	return NULL;
+}
+
+static const struct nf_flowtable_type *nft_flowtable_type_get(u8 family,
+							      int hooknum)
+{
+	const struct nf_flowtable_type *type;
+
+	type = __nft_flowtable_type_get(family, hooknum);
+	if (type != NULL && try_module_get(type->owner))
+		return type;
+
+#ifdef CONFIG_MODULES
+	if (type == NULL) {
+		nfnl_unlock(NFNL_SUBSYS_NFTABLES);
+		request_module("nf-flowtable-%u", family);
+		nfnl_lock(NFNL_SUBSYS_NFTABLES);
+		if (__nft_flowtable_type_get(family, hooknum))
+			return ERR_PTR(-EAGAIN);
+	}
+#endif
+	return ERR_PTR(-ENOENT);
+}
+
 static const struct nla_policy nft_flowtable_hook_policy[NFTA_FLOWTABLE_HOOK_MAX + 1] = {
 	[NFTA_FLOWTABLE_HOOK_NUM]	= { .type = NLA_U32 },
 	[NFTA_FLOWTABLE_HOOK_PRIORITY]	= { .type = NLA_U32 },
@@ -5279,6 +5313,7 @@ static int nf_tables_flowtable_parse_hook(const struct nft_ctx *ctx,
 {
 	struct net_device *dev_array[NFT_FLOWTABLE_DEVICE_MAX];
 	struct nlattr *tb[NFTA_FLOWTABLE_HOOK_MAX + 1];
+	const struct nf_flowtable_type *type;
 	struct nf_hook_ops *ops;
 	int hooknum, priority;
 	int err, n = 0, i;
@@ -5294,19 +5329,31 @@ static int nf_tables_flowtable_parse_hook(const struct nft_ctx *ctx,
 		return -EINVAL;
 
 	hooknum = ntohl(nla_get_be32(tb[NFTA_FLOWTABLE_HOOK_NUM]));
-	if (hooknum != NF_NETDEV_INGRESS)
+	if (hooknum != NF_NETDEV_INGRESS &&
+	    hooknum != NF_NETDEV_EARLY_INGRESS)
 		return -EINVAL;
+
+	type = nft_flowtable_type_get(ctx->family, hooknum);
+	if (IS_ERR(type))
+		return PTR_ERR(type);
+
+	flowtable->data.type = type;
+	err = type->init(&flowtable->data);
+	if (err < 0)
+		goto err1;
 
 	priority = ntohl(nla_get_be32(tb[NFTA_FLOWTABLE_HOOK_PRIORITY]));
 
 	err = nf_tables_parse_devices(ctx, tb[NFTA_FLOWTABLE_HOOK_DEVS],
 				      dev_array, &n);
 	if (err < 0)
-		return err;
+		goto err2;
 
 	ops = kzalloc(sizeof(struct nf_hook_ops) * n, GFP_KERNEL);
-	if (!ops)
-		return -ENOMEM;
+	if (!ops) {
+		err = -ENOMEM;
+		goto err2;
+	}
 
 	flowtable->hooknum	= hooknum;
 	flowtable->priority	= priority;
@@ -5324,38 +5371,13 @@ static int nf_tables_flowtable_parse_hook(const struct nft_ctx *ctx,
 							  GFP_KERNEL);
 	}
 
+	return 0;
+err2:
+	flowtable->data.type->free(&flowtable->data);
+err1:
+	module_put(type->owner);
+
 	return err;
-}
-
-static const struct nf_flowtable_type *__nft_flowtable_type_get(u8 family)
-{
-	const struct nf_flowtable_type *type;
-
-	list_for_each_entry(type, &nf_tables_flowtables, list) {
-		if (family == type->family)
-			return type;
-	}
-	return NULL;
-}
-
-static const struct nf_flowtable_type *nft_flowtable_type_get(u8 family)
-{
-	const struct nf_flowtable_type *type;
-
-	type = __nft_flowtable_type_get(family);
-	if (type != NULL && try_module_get(type->owner))
-		return type;
-
-#ifdef CONFIG_MODULES
-	if (type == NULL) {
-		nfnl_unlock(NFNL_SUBSYS_NFTABLES);
-		request_module("nf-flowtable-%u", family);
-		nfnl_lock(NFNL_SUBSYS_NFTABLES);
-		if (__nft_flowtable_type_get(family))
-			return ERR_PTR(-EAGAIN);
-	}
-#endif
-	return ERR_PTR(-ENOENT);
 }
 
 static void nft_unregister_flowtable_net_hooks(struct net *net,
@@ -5378,7 +5400,6 @@ static int nf_tables_newflowtable(struct net *net, struct sock *nlsk,
 				  struct netlink_ext_ack *extack)
 {
 	const struct nfgenmsg *nfmsg = nlmsg_data(nlh);
-	const struct nf_flowtable_type *type;
 	struct nft_flowtable *flowtable, *ft;
 	u8 genmask = nft_genmask_next(net);
 	int family = nfmsg->nfgen_family;
@@ -5430,21 +5451,10 @@ static int nf_tables_newflowtable(struct net *net, struct sock *nlsk,
 		goto err1;
 	}
 
-	type = nft_flowtable_type_get(family);
-	if (IS_ERR(type)) {
-		err = PTR_ERR(type);
-		goto err2;
-	}
-
-	flowtable->data.type = type;
-	err = type->init(&flowtable->data);
-	if (err < 0)
-		goto err3;
-
 	err = nf_tables_flowtable_parse_hook(&ctx, nla[NFTA_FLOWTABLE_HOOK],
 					     flowtable);
 	if (err < 0)
-		goto err4;
+		goto err2;
 
 	for (i = 0; i < flowtable->ops_len; i++) {
 		if (!flowtable->ops[i].dev)
@@ -5458,37 +5468,33 @@ static int nf_tables_newflowtable(struct net *net, struct sock *nlsk,
 				if (flowtable->ops[i].dev == ft->ops[k].dev &&
 				    flowtable->ops[i].pf == ft->ops[k].pf) {
 					err = -EBUSY;
-					goto err5;
+					goto err3;
 				}
 			}
 		}
 
 		err = nf_register_net_hook(net, &flowtable->ops[i]);
 		if (err < 0)
-			goto err5;
+			goto err3;
 	}
 
 	err = nft_trans_flowtable_add(&ctx, NFT_MSG_NEWFLOWTABLE, flowtable);
 	if (err < 0)
-		goto err6;
+		goto err4;
 
 	list_add_tail_rcu(&flowtable->list, &table->flowtables);
 	table->use++;
 
 	return 0;
-err6:
+err4:
 	i = flowtable->ops_len;
-err5:
+err3:
 	for (k = i - 1; k >= 0; k--) {
 		kfree(flowtable->dev_name[k]);
 		nf_unregister_net_hook(net, &flowtable->ops[k]);
 	}
 
 	kfree(flowtable->ops);
-err4:
-	flowtable->data.type->free(&flowtable->data);
-err3:
-	module_put(type->owner);
 err2:
 	kfree(flowtable->name);
 err1:
