@@ -631,6 +631,7 @@ struct __test_metadata {
 	void (*fn)(struct __test_metadata *);
 	int termsig;
 	int passed;
+	int skipped;
 	int trigger; /* extra handler after the evaluation */
 	__u8 step;
 	bool no_print; /* manual trigger when TH_LOG_STREAM is not available */
@@ -694,6 +695,7 @@ void __run_test(struct __test_metadata *t)
 	int status;
 
 	t->passed = 1;
+	t->skipped = 0;
 	t->trigger = 0;
 	printf("[ RUN      ] %s\n", t->name);
 	child_pid = fork();
@@ -716,9 +718,12 @@ void __run_test(struct __test_metadata *t)
 					t->name,
 					WEXITSTATUS(status));
 			} else if (!t->passed) {
+				if (WEXITSTATUS(status) == KSFT_SKIP)
+					t->skipped = 1;
 				fprintf(TH_LOG_STREAM,
-					"%s: Test failed at step #%d\n",
+					"%s: Test %s at step #%d\n",
 					t->name,
+					(t->skipped ? "skipped" : "failed"),
 					WEXITSTATUS(status));
 			}
 		} else if (WIFSIGNALED(status)) {
@@ -743,7 +748,11 @@ void __run_test(struct __test_metadata *t)
 				status);
 		}
 	}
-	printf("[     %4s ] %s\n", (t->passed ? "OK" : "FAIL"), t->name);
+	if (t->skipped)
+		printf("[     %4s ] %s\n", "SKIP", t->name);
+	else
+		printf("[     %4s ] %s\n", (t->passed ? "OK" : "FAIL"),
+			t->name);
 }
 
 static int test_harness_run(int __attribute__((unused)) argc,
@@ -762,6 +771,8 @@ static int test_harness_run(int __attribute__((unused)) argc,
 		__run_test(t);
 		if (t->passed)
 			pass_count++;
+		else if (t->skipped)
+			return KSFT_SKIP;
 		else
 			ret = 1;
 	}
