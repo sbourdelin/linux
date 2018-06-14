@@ -443,19 +443,6 @@ static void altera_pcie_retrain(struct altera_pcie *pcie)
 	}
 }
 
-static int altera_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
-				irq_hw_number_t hwirq)
-{
-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-	irq_set_chip_data(irq, domain->host_data);
-	return 0;
-}
-
-static const struct irq_domain_ops intx_domain_ops = {
-	.map = altera_pcie_intx_map,
-	.xlate = pci_irqd_intx_xlate,
-};
-
 static void altera_pcie_isr(struct irq_desc *desc)
 {
 	struct irq_chip *chip = irq_desc_get_chip(desc);
@@ -519,22 +506,6 @@ out_release_res:
 	return err;
 }
 
-static int altera_pcie_init_irq_domain(struct altera_pcie *pcie)
-{
-	struct device *dev = &pcie->pdev->dev;
-	struct device_node *node = dev->of_node;
-
-	/* Setup INTx */
-	pcie->irq_domain = irq_domain_add_linear(node, PCI_NUM_INTX,
-					&intx_domain_ops, pcie);
-	if (!pcie->irq_domain) {
-		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-		return -ENOMEM;
-	}
-
-	return 0;
-}
-
 static int altera_pcie_parse_dt(struct altera_pcie *pcie)
 {
 	struct device *dev = &pcie->pdev->dev;
@@ -592,11 +563,10 @@ static int altera_pcie_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = altera_pcie_init_irq_domain(pcie);
-	if (ret) {
-		dev_err(dev, "Failed creating IRQ Domain\n");
-		return ret;
-	}
+	pcie->irq_domain = pci_host_alloc_intx_irqd(dev, pcie, true, NULL,
+						    dev->of_node);
+	if (IS_ERR(pcie->irq_domain))
+		return PTR_ERR(pcie->irq_domain);
 
 	/* clear all interrupts */
 	cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
