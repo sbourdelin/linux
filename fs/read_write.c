@@ -1545,10 +1545,15 @@ static ssize_t do_copy_file_range(struct file *file_in, loff_t pos_in,
 			    struct file *file_out, loff_t pos_out,
 			    size_t len, unsigned int flags)
 {
+	struct inode *inode_in = file_inode(file_in);
+	struct inode *inode_out = file_inode(file_out);
 	ssize_t ret = 0;
 
 	if (len == 0)
 		return 0;
+
+	if (inode_in->i_sb != inode_out->i_sb)
+		goto splice;
 
 	/*
 	 * Try cloning first, this is supported by more file systems, and
@@ -1567,7 +1572,7 @@ static ssize_t do_copy_file_range(struct file *file_in, loff_t pos_in,
 		if (ret != -EOPNOTSUPP)
 			return ret;
 	}
-
+splice:
 	ret = do_splice_direct(file_in, &pos_in, file_out, &pos_out,
 			len > MAX_RW_COUNT ? MAX_RW_COUNT : len, 0);
 	return ret;
@@ -1606,10 +1611,6 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 	    !(file_out->f_mode & FMODE_WRITE) ||
 	    (file_out->f_flags & O_APPEND))
 		return -EBADF;
-
-	/* this could be relaxed once a method supports cross-fs copies */
-	if (inode_in->i_sb != inode_out->i_sb)
-		return -EXDEV;
 
 	file_start_write(file_out);
 
