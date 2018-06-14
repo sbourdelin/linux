@@ -1,0 +1,46 @@
+Qualcomm LPASS Clock Controller Binding
+-----------------------------------------------
+
+Required properties :
+- compatible	: shall contain "qcom,sdm845-lpasscc"
+- #clock-cells	: from common clock binding, shall contain 1.
+
+Note that #address-cells, #size-cells, and ranges shall be present to ensure
+the lpasscc can address the various lpass cc registers.
+
+Child Node Properties :
+The Low Pass Audio clock controller would need to define the following child
+nodes with the properties.
+- compatible	: shall contain all of the below for clocks in each LPASS domain
+			"qcom,sdm845-lpass-gcc",
+			"qcom,sdm845-lpass-cc",
+			"qcom,sdm845-lpass-qdsp6ss"
+- reg		: shall contain base register address and size,
+
+Example:
+
+The below node has to be defined in the cases where the LPASS peripheral loader
+would bring the subsystem out of reset.
+
+	lpasscc: clock-controller {
+		compatible = "qcom,sdm845-lpasscc";
+			#clock-cells = <1>;
+	                #address-cells = <1>;
+		        #size-cells = <1>;
+			ranges;
+
+			lpass_gcc@100000 {
+				compatible = "qcom,sdm845-lpass-gcc";
+				reg = <0x00147000 0x20>;
+			};
+
+			lpass@17014000 {
+				compatible = "qcom,sdm845-lpass-cc";
+				reg = <0x17014000 0x1f004>;
+			};
+
+			lpass_q6@17300020 {
+				compatible = "qcom,sdm845-lpass-qdsp6ss";
+				reg = <0x17300020 0x20>;
+			};
+		 };
