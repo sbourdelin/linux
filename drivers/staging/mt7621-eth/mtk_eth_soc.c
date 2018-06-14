@@ -2012,8 +2012,11 @@ static int mtk_add_mac(struct mtk_eth *eth, struct device_node *np)
 		mac->hw_stats = devm_kzalloc(eth->dev,
 					     sizeof(*mac->hw_stats),
 					     GFP_KERNEL);
-		if (!mac->hw_stats)
-			return -ENOMEM;
+		if (!mac->hw_stats) {
+			dev_err(eth->dev, "failed to allocate hw_stats\n");
+			err = -ENOMEM;
+			goto free_netdev;
+		}
 		spin_lock_init(&mac->hw_stats->stats_lock);
 		mac->hw_stats->reg_offset = id * MTK_STAT_OFFSET;
 	}
@@ -2037,7 +2040,8 @@ static int mtk_add_mac(struct mtk_eth *eth, struct device_node *np)
 	err = register_netdev(eth->netdev[id]);
 	if (err) {
 		dev_err(eth->dev, "error bringing up device\n");
-		return err;
+		err = -ENOMEM;
+		goto free_hw_stats;
 	}
 	eth->netdev[id]->irq = eth->irq;
 	netif_info(eth, probe, eth->netdev[id],
@@ -2045,6 +2049,12 @@ static int mtk_add_mac(struct mtk_eth *eth, struct device_node *np)
 		   eth->netdev[id]->base_addr, eth->netdev[id]->irq);
 
 	return 0;
+
+free_hw_stats:
+	devm_kfree(eth->dev, mac->hw_stats);
+free_netdev:
+	free_netdev(eth->netdev[id]);
+	return err;
 }
 
 static int mtk_probe(struct platform_device *pdev)
