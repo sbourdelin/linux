@@ -504,7 +504,7 @@ static int mlx4_en_complete_rx_desc(struct mlx4_en_priv *priv,
 			u32 sz_align = ALIGN(frag_size, SMP_CACHE_BYTES);
 
 			frags->page_offset += sz_align;
-			release = frags->page_offset + frag_info->frag_size > PAGE_SIZE;
+			release = frags->page_offset + frag_info->frag_stride > PAGE_SIZE;
 		}
 		if (release) {
 			dma_unmap_page(priv->ddev, dma, PAGE_SIZE, priv->dma_dir);
