@@ -534,6 +534,8 @@ int intel_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 int intel_ctx_workarounds_emit(struct i915_request *rq)
 {
 	struct i915_workarounds *w = &rq->i915->workarounds;
+	struct i915_wa_reg *reg = w->reg;
+	unsigned int remain;
 	u32 *cs;
 	int ret, i;
 
@@ -544,18 +546,27 @@ int intel_ctx_workarounds_emit(struct i915_request *rq)
 	if (ret)
 		return ret;
 
-	cs = intel_ring_begin(rq, (w->count * 2 + 2));
-	if (IS_ERR(cs))
-		return PTR_ERR(cs);
+	remain = w->count;
+	do {
+		unsigned int count;
 
-	*cs++ = MI_LOAD_REGISTER_IMM(w->count);
-	for (i = 0; i < w->count; i++) {
-		*cs++ = w->reg[i].addr;
-		*cs++ = w->reg[i].value;
-	}
-	*cs++ = MI_NOOP;
+		count = min(remain, 15u);
+		remain -= count;
 
-	intel_ring_advance(rq, cs);
+		cs = intel_ring_begin(rq, 2 * count + 2);
+		if (IS_ERR(cs))
+			return PTR_ERR(cs);
+
+		*cs++ = MI_LOAD_REGISTER_IMM(count);
+		for (i = 0; i < count; i++) {
+			*cs++ = reg->addr;
+			*cs++ = reg->value;
+			reg++;
+		}
+		*cs++ = MI_NOOP;
+
+		intel_ring_advance(rq, cs);
+	} while (remain);
 
 	ret = rq->engine->emit_flush(rq, EMIT_BARRIER);
 	if (ret)
