@@ -116,13 +116,13 @@ static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
 		return 0;
 
 	if (c > 0) {
-		spin_lock_irqsave(&to->port->lock, flags);
+		tty_port_lock_irqsave(&to->port->lock, flags);
 		/* Stuff the data into the input queue of the other end */
 		c = tty_insert_flip_string(to->port, buf, c);
 		/* And shovel */
 		if (c)
 			tty_flip_buffer_push(to->port);
-		spin_unlock_irqrestore(&to->port->lock, flags);
+		tty_port_unlock_irqrestore(&to->port->lock, flags);
 	}
 	return c;
 }

@@ -1480,9 +1480,9 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 
 		state = drv->state + tty->index;
 		port = &state->port;
-		spin_lock_irq(&port->lock);
+		tty_port_lock_irq(&port->lock);
 		--port->count;
-		spin_unlock_irq(&port->lock);
+		tty_port_unlock_irq(&port->lock);
 		return;
 	}
 
@@ -1603,9 +1603,9 @@ static void uart_hangup(struct tty_struct *tty)
 	if (tty_port_active(port)) {
 		uart_flush_buffer(tty);
 		uart_shutdown(tty, state);
-		spin_lock_irqsave(&port->lock, flags);
+		tty_port_lock_irqsave(&port->lock, flags);
 		port->count = 0;
-		spin_unlock_irqrestore(&port->lock, flags);
+		tty_port_unlock_irqrestore(&port->lock, flags);
 		tty_port_set_active(port, 0);
 		tty_port_tty_set(port, NULL);
 		if (uport && !uart_console(uport))
