@@ -145,7 +145,8 @@ udl_detect(struct drm_connector *connector, bool force)
 }
 
 static struct drm_encoder*
-udl_best_single_encoder(struct drm_connector *connector)
+udl_best_single_encoder(struct drm_connector *connector,
+			struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	return drm_encoder_find(connector->dev, NULL, enc_id);

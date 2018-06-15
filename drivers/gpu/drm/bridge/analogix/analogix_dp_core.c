@@ -1137,7 +1137,8 @@ static int analogix_dp_get_modes(struct drm_connector *connector)
 }
 
 static struct drm_encoder *
-analogix_dp_best_encoder(struct drm_connector *connector)
+analogix_dp_best_encoder(struct drm_connector *connector,
+			 struct drm_crtc *crtc)
 {
 	struct analogix_dp_device *dp = to_dp(connector);
 

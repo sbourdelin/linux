@@ -1063,7 +1063,8 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 }
 
 static struct drm_encoder *
-nouveau_connector_best_encoder(struct drm_connector *connector)
+nouveau_connector_best_encoder(struct drm_connector *connector,
+			       struct drm_crtc *crtc)
 {
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 

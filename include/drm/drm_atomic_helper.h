@@ -143,7 +143,8 @@ int drm_atomic_helper_page_flip_target(
 				uint32_t target,
 				struct drm_modeset_acquire_ctx *ctx);
 struct drm_encoder *
-drm_atomic_helper_best_encoder(struct drm_connector *connector);
+drm_atomic_helper_best_encoder(struct drm_connector *connector,
+			       struct drm_crtc *crtc);
 
 /* default implementations for state handling */
 void drm_atomic_helper_crtc_reset(struct drm_crtc *crtc);

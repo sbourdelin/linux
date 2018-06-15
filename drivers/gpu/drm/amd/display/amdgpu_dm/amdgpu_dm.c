@@ -2756,7 +2756,8 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.atomic_get_property = amdgpu_dm_connector_atomic_get_property
 };
 
-static struct drm_encoder *best_encoder(struct drm_connector *connector)
+static struct drm_encoder *best_encoder(struct drm_connector *connector,
+					struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	struct drm_mode_object *obj;
@@ -3291,7 +3292,7 @@ static void amdgpu_dm_get_native_mode(struct drm_connector *connector)
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
 
-	encoder = helper->best_encoder(connector);
+	encoder = helper->best_encoder(connector, NULL);
 
 	if (encoder == NULL)
 		return;
@@ -3425,7 +3426,7 @@ static int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
 	struct drm_encoder *encoder;
 	struct edid *edid = amdgpu_dm_connector->edid;
 
-	encoder = helper->best_encoder(connector);
+	encoder = helper->best_encoder(connector, NULL);
 	amdgpu_dm_connector_ddc_get_modes(connector, edid);
 	amdgpu_dm_connector_add_common_modes(encoder, connector);
 

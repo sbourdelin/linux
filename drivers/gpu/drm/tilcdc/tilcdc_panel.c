@@ -178,8 +178,9 @@ static int panel_connector_mode_valid(struct drm_connector *connector,
 	return tilcdc_crtc_mode_valid(priv->crtc, mode);
 }
 
-static struct drm_encoder *panel_connector_best_encoder(
-		struct drm_connector *connector)
+static struct drm_encoder *
+panel_connector_best_encoder(struct drm_connector *connector,
+			     struct drm_crtc *crtc)
 {
 	struct panel_connector *panel_connector = to_panel_connector(connector);
 	return panel_connector->encoder;

@@ -426,7 +426,8 @@ static int dsi_mgr_connector_mode_valid(struct drm_connector *connector,
 }
 
 static struct drm_encoder *
-dsi_mgr_connector_best_encoder(struct drm_connector *connector)
+dsi_mgr_connector_best_encoder(struct drm_connector *connector,
+			       struct drm_crtc *crtc)
 {
 	int id = dsi_mgr_connector_get_id(connector);
 	struct msm_dsi *msm_dsi = dsi_mgr_get_dsi(id);

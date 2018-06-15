@@ -1155,7 +1155,8 @@ static void tc_connector_set_polling(struct tc_data *tc,
 }
 
 static struct drm_encoder *
-tc_connector_best_encoder(struct drm_connector *connector)
+tc_connector_best_encoder(struct drm_connector *connector,
+			  struct drm_crtc *crtc)
 {
 	struct tc_data *tc = connector_to_tc(connector);
 

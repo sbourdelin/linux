@@ -709,7 +709,8 @@ static void ast_encoder_destroy(struct drm_encoder *encoder)
 }
 
 
-static struct drm_encoder *ast_best_single_encoder(struct drm_connector *connector)
+static struct drm_encoder *ast_best_single_encoder(struct drm_connector *connector,
+						   struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	/* pick the encoder ids */

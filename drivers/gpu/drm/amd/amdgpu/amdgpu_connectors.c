@@ -135,7 +135,8 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 		else {
 			const struct drm_connector_helper_funcs *connector_funcs =
 				connector->helper_private;
-			struct drm_encoder *encoder = connector_funcs->best_encoder(connector);
+			struct drm_encoder *encoder = connector_funcs->best_encoder(connector,
+										    NULL);
 			struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
 			struct amdgpu_encoder_atom_dig *dig = amdgpu_encoder->enc_priv;
 
@@ -218,7 +219,7 @@ amdgpu_connector_update_scratch_regs(struct drm_connector *connector,
 	bool connected;
 	int i;
 
-	best_encoder = connector_funcs->best_encoder(connector);
+	best_encoder = connector_funcs->best_encoder(connector, NULL);
 
 	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
 		if (connector->encoder_ids[i] == 0)
@@ -358,7 +359,8 @@ static int amdgpu_connector_ddc_get_modes(struct drm_connector *connector)
 }
 
 static struct drm_encoder *
-amdgpu_connector_best_single_encoder(struct drm_connector *connector)
+amdgpu_connector_best_single_encoder(struct drm_connector *connector,
+				     struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 
@@ -370,7 +372,7 @@ amdgpu_connector_best_single_encoder(struct drm_connector *connector)
 
 static void amdgpu_get_native_mode(struct drm_connector *connector)
 {
-	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
+	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 	struct amdgpu_encoder *amdgpu_encoder;
 
 	if (encoder == NULL)
@@ -593,7 +595,7 @@ static int amdgpu_connector_set_property(struct drm_connector *connector,
 			amdgpu_encoder = to_amdgpu_encoder(connector->encoder);
 		} else {
 			const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
-			amdgpu_encoder = to_amdgpu_encoder(connector_funcs->best_encoder(connector));
+			amdgpu_encoder = to_amdgpu_encoder(connector_funcs->best_encoder(connector, NULL));
 		}
 
 		switch (val) {
@@ -663,7 +665,7 @@ static int amdgpu_connector_lvds_get_modes(struct drm_connector *connector)
 	amdgpu_connector_get_edid(connector);
 	ret = amdgpu_connector_ddc_get_modes(connector);
 	if (ret > 0) {
-		encoder = amdgpu_connector_best_single_encoder(connector);
+		encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 		if (encoder) {
 			amdgpu_connector_fixup_lcd_native_mode(encoder, connector);
 			/* add scaled modes */
@@ -672,7 +674,7 @@ static int amdgpu_connector_lvds_get_modes(struct drm_connector *connector)
 		return ret;
 	}
 
-	encoder = amdgpu_connector_best_single_encoder(connector);
+	encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 	if (!encoder)
 		return 0;
 
@@ -694,7 +696,7 @@ static int amdgpu_connector_lvds_get_modes(struct drm_connector *connector)
 static enum drm_mode_status amdgpu_connector_lvds_mode_valid(struct drm_connector *connector,
 					     struct drm_display_mode *mode)
 {
-	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
+	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 
 	if ((mode->hdisplay < 320) || (mode->vdisplay < 240))
 		return MODE_PANEL;
@@ -725,7 +727,7 @@ static enum drm_connector_status
 amdgpu_connector_lvds_detect(struct drm_connector *connector, bool force)
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
-	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
+	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 	enum drm_connector_status ret = connector_status_disconnected;
 	int r;
 
@@ -798,7 +800,7 @@ static int amdgpu_connector_set_lcd_property(struct drm_connector *connector,
 		amdgpu_encoder = to_amdgpu_encoder(connector->encoder);
 	else {
 		const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
-		amdgpu_encoder = to_amdgpu_encoder(connector_funcs->best_encoder(connector));
+		amdgpu_encoder = to_amdgpu_encoder(connector_funcs->best_encoder(connector, NULL));
 	}
 
 	switch (value) {
@@ -873,7 +875,7 @@ amdgpu_connector_vga_detect(struct drm_connector *connector, bool force)
 			return connector_status_disconnected;
 	}
 
-	encoder = amdgpu_connector_best_single_encoder(connector);
+	encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 	if (!encoder)
 		ret = connector_status_disconnected;
 
@@ -1130,7 +1132,8 @@ exit:
 
 /* okay need to be smart in here about which encoder to pick */
 static struct drm_encoder *
-amdgpu_connector_dvi_encoder(struct drm_connector *connector)
+amdgpu_connector_dvi_encoder(struct drm_connector *connector,
+			     struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
@@ -1224,7 +1227,7 @@ static int amdgpu_connector_dp_get_modes(struct drm_connector *connector)
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct amdgpu_connector_atom_dig *amdgpu_dig_connector = amdgpu_connector->con_priv;
-	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
+	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 	int ret;
 
 	if ((connector->connector_type == DRM_MODE_CONNECTOR_eDP) ||
@@ -1363,7 +1366,7 @@ amdgpu_connector_dp_detect(struct drm_connector *connector, bool force)
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	enum drm_connector_status ret = connector_status_disconnected;
 	struct amdgpu_connector_atom_dig *amdgpu_dig_connector = amdgpu_connector->con_priv;
-	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
+	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 	int r;
 
 	if (!drm_kms_helper_is_poll_worker()) {
@@ -1458,7 +1461,7 @@ static enum drm_mode_status amdgpu_connector_dp_mode_valid(struct drm_connector 
 
 	if ((connector->connector_type == DRM_MODE_CONNECTOR_eDP) ||
 	    (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)) {
-		struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
+		struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector, NULL);
 
 		if ((mode->hdisplay < 320) || (mode->vdisplay < 240))
 			return MODE_PANEL;

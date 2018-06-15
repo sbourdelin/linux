@@ -158,7 +158,7 @@ int radeon_get_monitor_bpc(struct drm_connector *connector)
 		else if (ASIC_IS_DCE41(rdev) || ASIC_IS_DCE5(rdev)) {
 			const struct drm_connector_helper_funcs *connector_funcs =
 				connector->helper_private;
-			struct drm_encoder *encoder = connector_funcs->best_encoder(connector);
+			struct drm_encoder *encoder = connector_funcs->best_encoder(connector, NULL);
 			struct radeon_encoder *radeon_encoder = to_radeon_encoder(encoder);
 			struct radeon_encoder_atom_dig *dig = radeon_encoder->enc_priv;
 
@@ -250,7 +250,7 @@ radeon_connector_update_scratch_regs(struct drm_connector *connector, enum drm_c
 	bool connected;
 	int i;
 
-	best_encoder = connector_funcs->best_encoder(connector);
+	best_encoder = connector_funcs->best_encoder(connector, NULL);
 
 	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
 		if (connector->encoder_ids[i] == 0)
@@ -391,7 +391,8 @@ static int radeon_ddc_get_modes(struct drm_connector *connector)
 	return 0;
 }
 
-static struct drm_encoder *radeon_best_single_encoder(struct drm_connector *connector)
+static struct drm_encoder *radeon_best_single_encoder(struct drm_connector *connector,
+						      struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	/* pick the encoder ids */
@@ -402,7 +403,7 @@ static struct drm_encoder *radeon_best_single_encoder(struct drm_connector *conn
 
 static void radeon_get_native_mode(struct drm_connector *connector)
 {
-	struct drm_encoder *encoder = radeon_best_single_encoder(connector);
+	struct drm_encoder *encoder = radeon_best_single_encoder(connector, NULL);
 	struct radeon_encoder *radeon_encoder;
 
 	if (encoder == NULL)
@@ -728,7 +729,7 @@ static int radeon_connector_set_property(struct drm_connector *connector, struct
 			radeon_encoder = to_radeon_encoder(connector->encoder);
 		else {
 			const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
-			radeon_encoder = to_radeon_encoder(connector_funcs->best_encoder(connector));
+			radeon_encoder = to_radeon_encoder(connector_funcs->best_encoder(connector, NULL));
 		}
 
 		switch (val) {
@@ -755,7 +756,7 @@ static int radeon_connector_set_property(struct drm_connector *connector, struct
 			radeon_encoder = to_radeon_encoder(connector->encoder);
 		else {
 			const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
-			radeon_encoder = to_radeon_encoder(connector_funcs->best_encoder(connector));
+			radeon_encoder = to_radeon_encoder(connector_funcs->best_encoder(connector, NULL));
 		}
 
 		if (radeon_encoder->output_csc == val)
@@ -824,7 +825,7 @@ static int radeon_lvds_get_modes(struct drm_connector *connector)
 	radeon_connector_get_edid(connector);
 	ret = radeon_ddc_get_modes(connector);
 	if (ret > 0) {
-		encoder = radeon_best_single_encoder(connector);
+		encoder = radeon_best_single_encoder(connector, NULL);
 		if (encoder) {
 			radeon_fixup_lvds_native_mode(encoder, connector);
 			/* add scaled modes */
@@ -833,7 +834,7 @@ static int radeon_lvds_get_modes(struct drm_connector *connector)
 		return ret;
 	}
 
-	encoder = radeon_best_single_encoder(connector);
+	encoder = radeon_best_single_encoder(connector, NULL);
 	if (!encoder)
 		return 0;
 
@@ -855,7 +856,7 @@ static int radeon_lvds_get_modes(struct drm_connector *connector)
 static enum drm_mode_status radeon_lvds_mode_valid(struct drm_connector *connector,
 				  struct drm_display_mode *mode)
 {
-	struct drm_encoder *encoder = radeon_best_single_encoder(connector);
+	struct drm_encoder *encoder = radeon_best_single_encoder(connector, NULL);
 
 	if ((mode->hdisplay < 320) || (mode->vdisplay < 240))
 		return MODE_PANEL;
@@ -888,7 +889,7 @@ radeon_lvds_detect(struct drm_connector *connector, bool force)
 	struct drm_device *dev = connector->dev;
 	struct radeon_device *rdev = dev->dev_private;
 	struct radeon_connector *radeon_connector = to_radeon_connector(connector);
-	struct drm_encoder *encoder = radeon_best_single_encoder(connector);
+	struct drm_encoder *encoder = radeon_best_single_encoder(connector, NULL);
 	enum drm_connector_status ret = connector_status_disconnected;
 	int r;
 
@@ -965,7 +966,7 @@ static int radeon_lvds_set_property(struct drm_connector *connector,
 		radeon_encoder = to_radeon_encoder(connector->encoder);
 	else {
 		const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
-		radeon_encoder = to_radeon_encoder(connector_funcs->best_encoder(connector));
+		radeon_encoder = to_radeon_encoder(connector_funcs->best_encoder(connector, NULL));
 	}
 
 	switch (value) {
@@ -1044,7 +1045,7 @@ radeon_vga_detect(struct drm_connector *connector, bool force)
 			return connector_status_disconnected;
 	}
 
-	encoder = radeon_best_single_encoder(connector);
+	encoder = radeon_best_single_encoder(connector, NULL);
 	if (!encoder)
 		ret = connector_status_disconnected;
 
@@ -1139,7 +1140,7 @@ static int radeon_tv_get_modes(struct drm_connector *connector)
 	struct drm_display_mode *tv_mode;
 	struct drm_encoder *encoder;
 
-	encoder = radeon_best_single_encoder(connector);
+	encoder = radeon_best_single_encoder(connector, NULL);
 	if (!encoder)
 		return 0;
 
@@ -1182,7 +1183,7 @@ radeon_tv_detect(struct drm_connector *connector, bool force)
 			return connector_status_disconnected;
 	}
 
-	encoder = radeon_best_single_encoder(connector);
+	encoder = radeon_best_single_encoder(connector, NULL);
 	if (!encoder)
 		ret = connector_status_disconnected;
 	else {
@@ -1439,7 +1440,7 @@ out:
 		const struct drm_connector_helper_funcs *connector_funcs =
 			connector->helper_private;
 
-		encoder = connector_funcs->best_encoder(connector);
+		encoder = connector_funcs->best_encoder(connector, NULL);
 		if (encoder && (encoder->encoder_type == DRM_MODE_ENCODER_TMDS)) {
 			radeon_connector_get_edid(connector);
 			radeon_audio_detect(connector, encoder, ret);
@@ -1456,7 +1457,8 @@ exit:
 }
 
 /* okay need to be smart in here about which encoder to pick */
-static struct drm_encoder *radeon_dvi_encoder(struct drm_connector *connector)
+static struct drm_encoder *radeon_dvi_encoder(struct drm_connector *connector,
+					      struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	struct radeon_connector *radeon_connector = to_radeon_connector(connector);
@@ -1556,7 +1558,7 @@ static int radeon_dp_get_modes(struct drm_connector *connector)
 {
 	struct radeon_connector *radeon_connector = to_radeon_connector(connector);
 	struct radeon_connector_atom_dig *radeon_dig_connector = radeon_connector->con_priv;
-	struct drm_encoder *encoder = radeon_best_single_encoder(connector);
+	struct drm_encoder *encoder = radeon_best_single_encoder(connector, NULL);
 	int ret;
 
 	if ((connector->connector_type == DRM_MODE_CONNECTOR_eDP) ||
@@ -1695,7 +1697,7 @@ radeon_dp_detect(struct drm_connector *connector, bool force)
 	struct radeon_connector *radeon_connector = to_radeon_connector(connector);
 	enum drm_connector_status ret = connector_status_disconnected;
 	struct radeon_connector_atom_dig *radeon_dig_connector = radeon_connector->con_priv;
-	struct drm_encoder *encoder = radeon_best_single_encoder(connector);
+	struct drm_encoder *encoder = radeon_best_single_encoder(connector, NULL);
 	int r;
 
 	if (radeon_dig_connector->is_mst)
@@ -1812,7 +1814,7 @@ static enum drm_mode_status radeon_dp_mode_valid(struct drm_connector *connector
 
 	if ((connector->connector_type == DRM_MODE_CONNECTOR_eDP) ||
 	    (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)) {
-		struct drm_encoder *encoder = radeon_best_single_encoder(connector);
+		struct drm_encoder *encoder = radeon_best_single_encoder(connector, NULL);
 
 		if ((mode->hdisplay < 320) || (mode->vdisplay < 240))
 			return MODE_PANEL;

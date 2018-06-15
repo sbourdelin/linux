@@ -230,7 +230,8 @@ extern void oaktrail_lvds_i2c_init(struct drm_encoder *encoder);
 extern void mid_dsi_init(struct drm_device *dev,
 		    struct psb_intel_mode_device *mode_dev, int dsi_num);
 
-extern struct drm_encoder *gma_best_encoder(struct drm_connector *connector);
+extern struct drm_encoder *gma_best_encoder(struct drm_connector *connector,
+					    struct drm_crtc *crtc);
 extern void gma_connector_attach_encoder(struct gma_connector *connector,
 					 struct gma_encoder *encoder);
 

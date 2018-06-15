@@ -269,7 +269,8 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 	return ret;
 }
 
-static struct drm_encoder *dm_mst_best_encoder(struct drm_connector *connector)
+static struct drm_encoder *dm_mst_best_encoder(struct drm_connector *connector,
+					       struct drm_crtc *crtc)
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector = to_amdgpu_dm_connector(connector);
 
@@ -302,7 +303,7 @@ dm_dp_create_fake_mst_encoder(struct amdgpu_dm_connector *connector)
 	const struct drm_connector_helper_funcs *connector_funcs =
 		connector->base.helper_private;
 	struct drm_encoder *enc_master =
-		connector_funcs->best_encoder(&connector->base);
+		connector_funcs->best_encoder(&connector->base, NULL);
 
 	DRM_DEBUG_KMS("enc master is %p\n", enc_master);
 	amdgpu_encoder = kzalloc(sizeof(*amdgpu_encoder), GFP_KERNEL);

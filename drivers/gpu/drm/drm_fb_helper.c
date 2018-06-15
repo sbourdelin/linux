@@ -2338,9 +2338,8 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
 	int c, o;
 	struct drm_connector *connector;
 	const struct drm_connector_helper_funcs *connector_funcs;
-	struct drm_encoder *encoder;
 	int my_score, best_score, score;
-	struct drm_fb_helper_crtc **crtcs, *crtc;
+	struct drm_fb_helper_crtc **crtcs;
 	struct drm_fb_helper_connector *fb_helper_conn;
 
 	if (n == fb_helper->connector_count)
@@ -2370,27 +2369,31 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
 	connector_funcs = connector->helper_private;
 
 	/*
-	 * If the DRM device implements atomic hooks and ->best_encoder() is
-	 * NULL we fallback to the default drm_atomic_helper_best_encoder()
-	 * helper.
-	 */
-	if (drm_drv_uses_atomic_modeset(fb_helper->dev) &&
-	    !connector_funcs->best_encoder)
-		encoder = drm_atomic_helper_best_encoder(connector);
-	else
-		encoder = connector_funcs->best_encoder(connector);
-
-	if (!encoder)
-		goto out;
-
-	/*
 	 * select a crtc for this connector and then attempt to configure
 	 * remaining connectors
 	 */
 	for (c = 0; c < fb_helper->crtc_count; c++) {
-		crtc = &fb_helper->crtc_info[c];
+		struct drm_encoder *encoder;
+		struct drm_fb_helper_crtc *crtc = &fb_helper->crtc_info[c];
 
-		if ((encoder->possible_crtcs & (1 << c)) == 0)
+		/*
+		 * If the DRM device implements atomic hooks and ->best_encoder() is
+		 * NULL we fallback to the default drm_atomic_helper_best_encoder()
+		 * helper.
+		 */
+		if (drm_drv_uses_atomic_modeset(fb_helper->dev) &&
+		    !connector_funcs->best_encoder)
+			encoder = drm_atomic_helper_best_encoder(connector,
+								 crtc->mode_set.crtc);
+		else
+			encoder = connector_funcs->best_encoder(connector,
+								crtc->mode_set.crtc);
+
+		if (!encoder)
+			continue;
+
+		if ((encoder->possible_crtcs &
+		     drm_crtc_mask(crtc->mode_set.crtc)) == 0)
 			continue;
 
 		for (o = 0; o < n; o++)
@@ -2417,7 +2420,7 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
 			       sizeof(struct drm_fb_helper_crtc *));
 		}
 	}
-out:
+
 	kfree(crtcs);
 	return best_score;
 }

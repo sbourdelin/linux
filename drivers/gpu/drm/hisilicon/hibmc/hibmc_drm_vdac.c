@@ -34,7 +34,8 @@ static enum drm_mode_status hibmc_connector_mode_valid(struct drm_connector *con
 }
 
 static struct drm_encoder *
-hibmc_connector_best_encoder(struct drm_connector *connector)
+hibmc_connector_best_encoder(struct drm_connector *connector,
+			     struct drm_crtc *crtc)
 {
 	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
 }

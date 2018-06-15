@@ -191,8 +191,9 @@ static int tfp410_connector_mode_valid(struct drm_connector *connector,
 	return tilcdc_crtc_mode_valid(priv->crtc, mode);
 }
 
-static struct drm_encoder *tfp410_connector_best_encoder(
-		struct drm_connector *connector)
+static struct drm_encoder *
+tfp410_connector_best_encoder(struct drm_connector *connector,
+			      struct drm_crtc *crtc)
 {
 	struct tfp410_connector *tfp410_connector = to_tfp410_connector(connector);
 	return tfp410_connector->encoder;

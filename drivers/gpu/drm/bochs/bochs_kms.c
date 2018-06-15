@@ -208,7 +208,8 @@ static enum drm_mode_status bochs_connector_mode_valid(struct drm_connector *con
 }
 
 static struct drm_encoder *
-bochs_connector_best_encoder(struct drm_connector *connector)
+bochs_connector_best_encoder(struct drm_connector *connector,
+			     struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	/* pick the encoder ids */

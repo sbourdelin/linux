@@ -377,8 +377,9 @@ static enum drm_mode_status mdfld_dsi_connector_mode_valid(struct drm_connector 
 	return MODE_OK;
 }
 
-static struct drm_encoder *mdfld_dsi_connector_best_encoder(
-				struct drm_connector *connector)
+static struct drm_encoder *
+mdfld_dsi_connector_best_encoder(struct drm_connector *connector,
+				 struct drm_crtc *crtc)
 {
 	struct mdfld_dsi_connector *dsi_connector =
 				mdfld_dsi_connector(connector);

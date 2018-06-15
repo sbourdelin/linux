@@ -224,7 +224,8 @@ radeon_dp_mst_mode_valid(struct drm_connector *connector,
 }
 
 static struct
-drm_encoder *radeon_mst_best_encoder(struct drm_connector *connector)
+drm_encoder *radeon_mst_best_encoder(struct drm_connector *connector,
+				     struct drm_crtc *crtc)
 {
 	struct radeon_connector *radeon_connector = to_radeon_connector(connector);
 
@@ -613,7 +614,7 @@ radeon_dp_create_fake_mst_encoder(struct radeon_connector *connector)
 	struct radeon_encoder_mst *mst_enc;
 	struct drm_encoder *encoder;
 	const struct drm_connector_helper_funcs *connector_funcs = connector->base.helper_private;
-	struct drm_encoder *enc_master = connector_funcs->best_encoder(&connector->base);
+	struct drm_encoder *enc_master = connector_funcs->best_encoder(&connector->base, NULL);
 
 	DRM_DEBUG_KMS("enc master is %p\n", enc_master);
 	radeon_encoder = kzalloc(sizeof(*radeon_encoder), GFP_KERNEL);

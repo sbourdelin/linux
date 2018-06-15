@@ -265,8 +265,9 @@ static int imx_tve_connector_mode_valid(struct drm_connector *connector,
 	return MODE_BAD;
 }
 
-static struct drm_encoder *imx_tve_connector_best_encoder(
-		struct drm_connector *connector)
+static struct drm_encoder *
+imx_tve_connector_best_encoder(struct drm_connector *connector,
+			       struct drm_crtc *crtc)
 {
 	struct imx_tve *tve = con_to_tve(connector);
 

@@ -1253,7 +1253,8 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
 	return drm_mode_validate_size(mode, 0x1fff, 0x1fff);
 }
 
-static struct drm_encoder *mtk_hdmi_conn_best_enc(struct drm_connector *conn)
+static struct drm_encoder *mtk_hdmi_conn_best_enc(struct drm_connector *conn,
+						  struct drm_crtc *crtc)
 {
 	struct mtk_hdmi *hdmi = hdmi_ctx_from_conn(conn);
 

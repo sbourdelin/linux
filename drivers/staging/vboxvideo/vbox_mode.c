@@ -370,8 +370,9 @@ static void vbox_encoder_destroy(struct drm_encoder *encoder)
 	kfree(encoder);
 }
 
-static struct drm_encoder *vbox_best_single_encoder(struct drm_connector
-						    *connector)
+static struct drm_encoder *
+vbox_best_single_encoder(struct drm_connector *connector,
+			 struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 

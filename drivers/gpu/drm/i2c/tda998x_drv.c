@@ -1258,7 +1258,8 @@ static enum drm_mode_status tda998x_connector_mode_valid(struct drm_connector *c
 }
 
 static struct drm_encoder *
-tda998x_connector_best_encoder(struct drm_connector *connector)
+tda998x_connector_best_encoder(struct drm_connector *connector,
+			       struct drm_crtc *crtc)
 {
 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
 

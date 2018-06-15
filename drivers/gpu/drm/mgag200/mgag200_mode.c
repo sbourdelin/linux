@@ -1664,8 +1664,9 @@ static enum drm_mode_status mga_vga_mode_valid(struct drm_connector *connector,
 	return MODE_OK;
 }
 
-static struct drm_encoder *mga_connector_best_encoder(struct drm_connector
-						  *connector)
+static struct drm_encoder *
+mga_connector_best_encoder(struct drm_connector *connector,
+			   struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	/* pick the encoder ids */

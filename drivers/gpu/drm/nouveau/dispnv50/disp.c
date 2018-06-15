@@ -826,7 +826,8 @@ nv50_mstc_atomic_best_encoder(struct drm_connector *connector,
 }
 
 static struct drm_encoder *
-nv50_mstc_best_encoder(struct drm_connector *connector)
+nv50_mstc_best_encoder(struct drm_connector *connector,
+		       struct drm_crtc *crtc)
 {
 	struct nv50_mstc *mstc = nv50_mstc(connector);
 	if (mstc->port) {

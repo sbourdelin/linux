@@ -885,7 +885,8 @@ struct drm_connector_helper_funcs {
 	/**
 	 * @best_encoder:
 	 *
-	 * This function should select the best encoder for the given connector.
+	 * This function should select the best encoder for the given connector
+	 * and crtc. For some driver internal use crtc may be NULL.
 	 *
 	 * This function is used by both the atomic helpers (in the
 	 * drm_atomic_helper_check_modeset() function) and in the legacy CRTC
@@ -911,7 +912,8 @@ struct drm_connector_helper_funcs {
 	 * will ensure that encoders aren't used twice, drivers should not check
 	 * for this.
 	 */
-	struct drm_encoder *(*best_encoder)(struct drm_connector *connector);
+	struct drm_encoder *(*best_encoder)(struct drm_connector *connector,
+					    struct drm_crtc *crtc);
 
 	/**
 	 * @atomic_best_encoder:

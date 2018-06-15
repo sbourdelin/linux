@@ -978,7 +978,8 @@ static enum drm_mode_status qxl_conn_mode_valid(struct drm_connector *connector,
 	return MODE_BAD;
 }
 
-static struct drm_encoder *qxl_best_encoder(struct drm_connector *connector)
+static struct drm_encoder *qxl_best_encoder(struct drm_connector *connector,
+					    struct drm_crtc *crtc)
 {
 	struct qxl_output *qxl_output =
 		drm_connector_to_qxl_output(connector);

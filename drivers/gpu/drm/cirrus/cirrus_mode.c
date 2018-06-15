@@ -457,8 +457,9 @@ static int cirrus_vga_get_modes(struct drm_connector *connector)
 	return count;
 }
 
-static struct drm_encoder *cirrus_connector_best_encoder(struct drm_connector
-						  *connector)
+static struct drm_encoder *
+cirrus_connector_best_encoder(struct drm_connector *connector,
+			      struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	/* pick the encoder ids */

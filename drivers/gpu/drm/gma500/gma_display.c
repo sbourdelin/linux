@@ -652,7 +652,8 @@ void gma_encoder_destroy(struct drm_encoder *encoder)
 }
 
 /* Currently there is only a 1:1 mapping of encoders and connectors */
-struct drm_encoder *gma_best_encoder(struct drm_connector *connector)
+struct drm_encoder *gma_best_encoder(struct drm_connector *connector,
+				     struct drm_crtc *crtc)
 {
 	struct gma_encoder *gma_encoder = gma_attached_encoder(connector);
 

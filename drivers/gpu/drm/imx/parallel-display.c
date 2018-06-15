@@ -89,8 +89,9 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
 	return num_modes;
 }
 
-static struct drm_encoder *imx_pd_connector_best_encoder(
-		struct drm_connector *connector)
+static struct drm_encoder *
+imx_pd_connector_best_encoder(struct drm_connector *connector,
+			      struct drm_crtc *crtc)
 {
 	struct imx_parallel_display *imxpd = con_to_imxpd(connector);
 

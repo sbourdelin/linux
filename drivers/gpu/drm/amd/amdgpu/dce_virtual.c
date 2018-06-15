@@ -267,7 +267,8 @@ static int dce_virtual_early_init(void *handle)
 }
 
 static struct drm_encoder *
-dce_virtual_encoder(struct drm_connector *connector)
+dce_virtual_encoder(struct drm_connector *connector,
+		    struct drm_crtc *crtc)
 {
 	int enc_id = connector->encoder_ids[0];
 	struct drm_encoder *encoder;

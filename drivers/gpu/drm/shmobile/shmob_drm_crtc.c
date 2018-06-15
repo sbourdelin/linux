@@ -626,7 +626,8 @@ static int shmob_drm_connector_get_modes(struct drm_connector *connector)
 }
 
 static struct drm_encoder *
-shmob_drm_connector_best_encoder(struct drm_connector *connector)
+shmob_drm_connector_best_encoder(struct drm_connector *connector,
+				 struct drm_crtc *crtc)
 {
 	struct shmob_drm_connector *scon = to_shmob_connector(connector);
 
