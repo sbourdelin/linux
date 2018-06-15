@@ -5043,6 +5043,58 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 	show_swap_cache_info();
 }
 
+/**
+ * get_from_free_page_list - get free page blocks from a free page list
+ * @order: the order of the free page list to check
+ * @buf: the array to store the physical addresses of the free page blocks
+ * @size: the array size
+ *
+ * This function offers hints about free pages. There is no guarantee that
+ * the obtained free pages are still on the free page list after the function
+ * returns. pfn_to_page on the obtained free pages is strongly discouraged
+ * and if there is an absolute need for that, make sure to contact MM people
+ * to discuss potential problems.
+ *
+ * The addresses are currently stored to the array in little endian. This
+ * avoids the overhead of converting endianness by the caller who needs data
+ * in the little endian format. Big endian support can be added on demand in
+ * the future.
+ *
+ * Return the number of free page blocks obtained from the free page list.
+ * The maximum number of free page blocks that can be obtained is limited to
+ * the caller's array size.
+ */
+uint32_t get_from_free_page_list(int order, __le64 buf[], uint32_t size)
+{
+	struct zone *zone;
+	enum migratetype mt;
+	struct page *page;
+	struct list_head *list;
+	unsigned long addr, flags;
+	uint32_t index = 0;
+
+	for_each_populated_zone(zone) {
+		spin_lock_irqsave(&zone->lock, flags);
+		for (mt = 0; mt < MIGRATE_TYPES; mt++) {
+			list = &zone->free_area[order].free_list[mt];
+			list_for_each_entry(page, list, lru) {
+				addr = page_to_pfn(page) << PAGE_SHIFT;
+				if (likely(index < size)) {
+					buf[index++] = cpu_to_le64(addr);
+				} else {
+					spin_unlock_irqrestore(&zone->lock,
+							       flags);
+					return index;
+				}
+			}
+		}
+		spin_unlock_irqrestore(&zone->lock, flags);
+	}
+
+	return index;
+}
+EXPORT_SYMBOL_GPL(get_from_free_page_list);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
