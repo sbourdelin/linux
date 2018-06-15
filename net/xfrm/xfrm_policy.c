@@ -2988,12 +2988,13 @@ static struct pernet_operations __net_initdata xfrm_net_ops = {
 void __init xfrm_init(void)
 {
 	int i;
+	unsigned int nr_cpus = num_possible_cpus();
 
-	xfrm_pcpu_work = kmalloc_array(NR_CPUS, sizeof(*xfrm_pcpu_work),
+	xfrm_pcpu_work = kmalloc_array(nr_cpus, sizeof(*xfrm_pcpu_work),
 				       GFP_KERNEL);
 	BUG_ON(!xfrm_pcpu_work);
 
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < nr_cpus; i++)
 		INIT_WORK(&xfrm_pcpu_work[i], xfrm_pcpu_work_fn);
 
 	register_pernet_subsys(&xfrm_net_ops);
