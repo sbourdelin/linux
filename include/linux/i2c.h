@@ -768,6 +768,24 @@ i2c_unlock_adapter(struct i2c_adapter *adapter)
 	i2c_unlock_bus(adapter, I2C_LOCK_ROOT_ADAPTER);
 }
 
+static inline void
+i2c_lock_segment(struct i2c_adapter *adapter)
+{
+	i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
+}
+
+static inline int
+i2c_trylock_segment(struct i2c_adapter *adapter)
+{
+	return i2c_trylock_bus(adapter, I2C_LOCK_SEGMENT);
+}
+
+static inline void
+i2c_unlock_segment(struct i2c_adapter *adapter)
+{
+	i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
+}
+
 /*flags for the client struct: */
 #define I2C_CLIENT_PEC		0x04	/* Use Packet Error Checking */
 #define I2C_CLIENT_TEN		0x10	/* we have a ten bit chip address */
