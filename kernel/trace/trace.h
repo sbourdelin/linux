@@ -1295,13 +1295,14 @@ __event_trigger_test_discard(struct trace_event_file *file,
 			     enum event_trigger_type *tt)
 {
 	unsigned long eflags = file->flags;
+	bool filtered = (file->flags & EVENT_FILE_FL_FILTERED) &&
+			 !filter_match_preds(file->filter, entry);
 
-	if (eflags & EVENT_FILE_FL_TRIGGER_COND)
+	if (!filtered && (eflags & EVENT_FILE_FL_TRIGGER_COND))
 		*tt = event_triggers_call(file, entry, event);
 
 	if (test_bit(EVENT_FILE_FL_SOFT_DISABLED_BIT, &file->flags) ||
-	    (unlikely(file->flags & EVENT_FILE_FL_FILTERED) &&
-	     !filter_match_preds(file->filter, entry))) {
+	    filtered) {
 		__trace_event_discard_commit(buffer, event);
 		return true;
 	}
