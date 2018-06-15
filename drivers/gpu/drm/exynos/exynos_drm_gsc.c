@@ -1196,7 +1196,12 @@ static int gsc_probe(struct platform_device *pdev)
 	struct exynos_drm_ipp_formats *formats;
 	struct gsc_context *ctx;
 	struct resource *res;
-	int ret, i;
+	int ret, i, id;
+
+	ret = of_alias_get_id(pdev->dev.of_node, "gsc");
+	if (ret < 0)
+		return ret;
+	id = ret;
 
 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
@@ -1255,7 +1260,7 @@ static int gsc_probe(struct platform_device *pdev)
 	}
 
 	/* context initailization */
-	ctx->id = pdev->id;
+	ctx->id = id;
 
 	platform_set_drvdata(pdev, ctx);
 
