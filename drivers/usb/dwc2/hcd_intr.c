@@ -1104,6 +1104,7 @@ static void dwc2_hc_xfercomp_intr(struct dwc2_hsotg *hsotg,
 	}
 
 handle_xfercomp_done:
+	qtd->num_naks = 0;
 	disable_hc_int(hsotg, chnum, HCINTMSK_XFERCOMPL);
 }
 
