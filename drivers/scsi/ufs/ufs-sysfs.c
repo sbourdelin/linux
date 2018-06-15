@@ -252,6 +252,56 @@ static ssize_t ufs_sysfs_read_desc_param(struct ufs_hba *hba,
 	return ret;
 }
 
+static ssize_t ufs_sysfs_write_desc_param(struct ufs_hba *hba,
+				  enum desc_idn desc_id,
+				  u8 desc_index,
+				  u8 param_offset,
+				  const char *buf,
+				  ssize_t buf_size,
+				  u8 width)
+{
+	int ret;
+	unsigned long long value;
+	u8 value8;
+	__be16 value16;
+	__be32 value32;
+	__be64 value64;
+	u8 *valueptr;
+
+	if (kstrtoull(buf, 0, &value))
+		return -EINVAL;
+
+	switch (width) {
+	case 1:
+		value8 = (u8)value;
+		valueptr = &value8;
+		break;
+
+	case 2:
+		value16 = cpu_to_be16(value);
+		valueptr = (u8 *)&value16;
+		break;
+
+	case 4:
+		value32 = cpu_to_be32(value);
+		valueptr = (u8 *)&value32;
+		break;
+
+	case 8:
+		value64 = cpu_to_be64(value);
+		valueptr = (u8 *)&value64;
+		break;
+	}
+
+	ret = ufshcd_rw_desc_param(hba, UPIU_QUERY_OPCODE_WRITE_DESC, desc_id,
+				desc_index, param_offset,
+				valueptr, width);
+	if (ret)
+		return -EINVAL;
+
+	return buf_size;
+}
+
 #define UFS_DESC_PARAM(_name, _puname, _duname, _size)			\
 static ssize_t _name##_show(struct device *dev,				\
 	struct device_attribute *attr, char *buf)			\
@@ -346,7 +396,7 @@ struct ufs_config_desc_attr {
 #define UFS_CONFIG_DESC_PARAM(_name, _uname, _size)			\
 static struct ufs_config_desc_attr ufs_cfg_attr_##_name = {		\
 	.attr = {.name = __stringify(_name),				\
-		 .mode = VERIFY_OCTAL_PERMISSIONS(0444) }, \
+		 .mode = VERIFY_OCTAL_PERMISSIONS(0644) }, 		\
 	.offset = CONFIGURATION_DESC_PARAM##_uname,			\
 	.size = _size							\
 }
@@ -375,7 +425,7 @@ static struct attribute *ufs_sysfs_config_descriptor[] = {
 #define UFS_CONFIG_UNIT_DESC_PARAM(_name, _uname, _size)		\
 static struct ufs_config_desc_attr ufs_cfg_unit_attr_##_name = {	\
 	.attr = {.name = __stringify(_name),				\
-		 .mode = VERIFY_OCTAL_PERMISSIONS(0444) },		\
+		 .mode = VERIFY_OCTAL_PERMISSIONS(0644) },		\
 	.offset = CONFIGURATION_UNIT_DESC_PARAM##_uname,		\
 	.size = _size							\
 }
@@ -430,8 +480,37 @@ static ssize_t ufs_cfg_attr_show(struct kobject *kobj, struct attribute *attr,
 					 offset, buf, cfg_attr->size);
 }
 
+static ssize_t ufs_cfg_attr_store(struct kobject *kobj, struct attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct ufs_config_desc_attr *cfg_attr = to_ufs_cfg_desc_attr(attr);
+	struct ufs_cfg_object *cfg_obj = to_ufs_cfg_obj(kobj);
+	u8 offset = cfg_attr->offset;
+	struct device *dev;
+	struct ufs_hba *hba;
+
+	/*
+	 * For unit config descriptors, add the unit's offset and get the
+	 * device parent two up.
+	 */
+	if (cfg_obj->index >= 0) {
+		offset += CONFIGURATION_DESC_PARAM_UNIT0 +
+			(CONFIGURATION_UNIT_DESC_SIZE * cfg_obj->index);
+
+		dev = kobj_to_dev(cfg_obj->kobj.parent->parent);
+
+	} else {
+		dev = kobj_to_dev(cfg_obj->kobj.parent);
+	}
+
+	hba = dev_get_drvdata(dev);
+	return ufs_sysfs_write_desc_param(hba, QUERY_DESC_IDN_CONFIGURATION, 0,
+					 offset, buf, count, cfg_attr->size);
+}
+
 static const struct sysfs_ops ufs_sysfs_config_descriptor_ops = {
 	.show	= ufs_cfg_attr_show,
+	.store	= ufs_cfg_attr_store,
 };
 
 static void ufs_cfg_kobject_release(struct kobject *kobj)
