@@ -35,6 +35,9 @@ asmlinkage int sys32_sigsuspend(compat_sigset_t __user *uset)
 	return compat_sys_rt_sigsuspend(uset, sizeof(compat_sigset_t));
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wattribute-alias"
 SYSCALL_DEFINE3(32_sigaction, long, sig, const struct compat_sigaction __user *, act,
 	struct compat_sigaction __user *, oact)
 {
@@ -76,3 +79,4 @@ SYSCALL_DEFINE3(32_sigaction, long, sig, const struct compat_sigaction __user *,
 
 	return ret;
 }
+#pragma GCC diagnostic pop
