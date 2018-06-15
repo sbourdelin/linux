@@ -1063,6 +1063,7 @@ hdm_probe(struct usb_interface *interface, const struct usb_device_id *id)
 	mdev->iface.dma_free = hdm_dma_free;
 	mdev->iface.description = mdev->description;
 	mdev->iface.num_channels = num_endpoints;
+	mdev->iface.extra_attrs = XACT_ATTRS;
 
 	snprintf(mdev->description, sizeof(mdev->description),
 		 "usb_device %d-%s:%d.%d",

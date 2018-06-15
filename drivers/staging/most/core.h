@@ -235,6 +235,11 @@ struct most_interface {
 	enum most_interface_type interface;
 	const char *description;
 	unsigned int num_channels;
+	enum {
+		NO_ATTRS = 0,
+		XACT_ATTRS,
+		DBR_ATTRS
+	} extra_attrs;
 	struct most_channel_capability *channel_vector;
 	void *(*dma_alloc)(struct mbo *mbo, u32 size);
 	void (*dma_free)(struct mbo *mbo, u32 size);

@@ -25,6 +25,7 @@
 
 #define MAX_CHANNELS	64
 #define STRING_SIZE	80
+#define MAX_NUM_ATTRS	14
 
 static struct ida mdev_id;
 static int dummy_num_buffers;
@@ -459,7 +460,7 @@ static DEVICE_ATTR_RW(set_subbuffer_size);
 static DEVICE_ATTR_RW(set_packets_per_xact);
 static DEVICE_ATTR_RW(set_dbr_size);
 
-static struct attribute *channel_attrs[] = {
+static struct attribute *channel_attrs[MAX_NUM_ATTRS] = {
 	DEV_ATTR(available_directions),
 	DEV_ATTR(available_datatypes),
 	DEV_ATTR(number_of_packet_buffers),
@@ -472,8 +473,6 @@ static struct attribute *channel_attrs[] = {
 	DEV_ATTR(set_direction),
 	DEV_ATTR(set_datatype),
 	DEV_ATTR(set_subbuffer_size),
-	DEV_ATTR(set_packets_per_xact),
-	DEV_ATTR(set_dbr_size),
 	NULL,
 };
 
@@ -1416,6 +1415,13 @@ int most_register_interface(struct most_interface *iface)
 	iface->dev.init_name = iface->p->name;
 	iface->dev.bus = &mc.bus;
 	iface->dev.parent = &mc.dev;
+	if (iface->extra_attrs == XACT_ATTRS) {
+		channel_attrs[12] = DEV_ATTR(set_packets_per_xact);
+		channel_attrs[13] = NULL;
+	} else if (iface->extra_attrs == DBR_ATTRS) {
+		channel_attrs[12] = DEV_ATTR(set_dbr_size);
+		channel_attrs[13] = NULL;
+	}
 	iface->dev.groups = interface_attr_groups;
 	iface->dev.release = release_interface;
 	if (device_register(&iface->dev)) {
