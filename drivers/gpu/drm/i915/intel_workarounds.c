@@ -303,6 +303,12 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	if (IS_GEN9_LP(dev_priv))
 		WA_SET_BIT_MASKED(GEN9_WM_CHICKEN3, GEN9_FACTOR_IN_CLR_VAL_HIZ);
 
+	/* BSpec: 11391 */
+	WA_SET_BIT_MASKED(FF_SLICE_CHICKEN,
+			  FF_SLICE_CHICKEN_CL_PROVOKING_VERTEX_FIX);
+	/* BSpec: 11299 */
+	WA_SET_BIT_MASKED(_3D_CHICKEN3, _3D_CHICKEN_SF_PROVOKING_VERTEX_FIX);
+
 	return 0;
 }
 
