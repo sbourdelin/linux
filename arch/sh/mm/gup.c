@@ -234,6 +234,9 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
 	if (end < start)
 		goto slow_irqon;
 
+	if (IS_ENABLED(CONFIG_SMP))
+		goto slow_irqon;
+
 	local_irq_disable();
 	pgdp = pgd_offset(mm, addr);
 	do {
