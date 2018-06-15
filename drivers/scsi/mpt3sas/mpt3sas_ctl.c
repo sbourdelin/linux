@@ -253,8 +253,8 @@ _ctl_display_some_debug(struct MPT3SAS_ADAPTER *ioc, u16 smid,
  *
  * The callback handler when using ioc->ctl_cb_idx.
  *
- * Return 1 meaning mf should be freed from _base_interrupt
- *        0 means the mf is freed from this function.
+ * Return: 1 meaning mf should be freed from _base_interrupt
+ *         0 means the mf is freed from this function.
  */
 u8
 mpt3sas_ctl_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index,
@@ -317,7 +317,7 @@ mpt3sas_ctl_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index,
  * The bitmask in ioc->event_type[] indicates which events should be
  * be saved in the driver event_log.  This bitmask is set by application.
  *
- * Returns 1 when event should be captured, or zero means no match.
+ * Return: 1 when event should be captured, or zero means no match.
  */
 static int
 _ctl_check_event_type(struct MPT3SAS_ADAPTER *ioc, u16 event)
@@ -339,8 +339,6 @@ _ctl_check_event_type(struct MPT3SAS_ADAPTER *ioc, u16 event)
  * mpt3sas_ctl_add_to_event_log - add event
  * @ioc: per adapter object
  * @mpi_reply: reply message frame
- *
- * Return nothing.
  */
 void
 mpt3sas_ctl_add_to_event_log(struct MPT3SAS_ADAPTER *ioc,
@@ -395,8 +393,8 @@ mpt3sas_ctl_add_to_event_log(struct MPT3SAS_ADAPTER *ioc,
  * This function merely adds a new work task into ioc->firmware_event_thread.
  * The tasks are worked from _firmware_event_work in user context.
  *
- * Return 1 meaning mf should be freed from _base_interrupt
- *        0 means the mf is freed from this function.
+ * Return: 1 meaning mf should be freed from _base_interrupt
+ *         0 means the mf is freed from this function.
  */
 u8
 mpt3sas_ctl_event_callback(struct MPT3SAS_ADAPTER *ioc, u8 msix_index,
@@ -412,12 +410,12 @@ mpt3sas_ctl_event_callback(struct MPT3SAS_ADAPTER *ioc, u8 msix_index,
 
 /**
  * _ctl_verify_adapter - validates ioc_number passed from application
- * @ioc: per adapter object
+ * @ioc_number: ?
  * @iocpp: The ioc pointer is returned in this.
  * @mpi_version: will be MPI2_VERSION for mpt2ctl ioctl device &
  * MPI25_VERSION | MPI26_VERSION for mpt3ctl ioctl device.
  *
- * Return (-1) means error, else ioc_number.
+ * Return: (-1) means error, else ioc_number.
  */
 static int
 _ctl_verify_adapter(int ioc_number, struct MPT3SAS_ADAPTER **iocpp,
@@ -525,9 +523,9 @@ void mpt3sas_ctl_reset_done_handler(struct MPT3SAS_ADAPTER *ioc)
 
 /**
  * _ctl_fasync -
- * @fd -
- * @filep -
- * @mode -
+ * @fd: ?
+ * @filep: ?
+ * @mode: ?
  *
  * Called when application request fasyn callback handler.
  */
@@ -539,8 +537,8 @@ _ctl_fasync(int fd, struct file *filep, int mode)
 
 /**
  * _ctl_poll -
- * @file -
- * @wait -
+ * @filep: ?
+ * @wait: ?
  *
  */
 static __poll_t
@@ -565,10 +563,10 @@ _ctl_poll(struct file *filep, poll_table *wait)
 /**
  * _ctl_set_task_mid - assign an active smid to tm request
  * @ioc: per adapter object
- * @karg - (struct mpt3_ioctl_command)
- * @tm_request - pointer to mf from user space
+ * @karg: (struct mpt3_ioctl_command)
+ * @tm_request: pointer to mf from user space
  *
- * Returns 0 when an smid if found, else fail.
+ * Return: 0 when an smid if found, else fail.
  * during failure, the reply frame is filled.
  */
 static int
@@ -643,8 +641,8 @@ _ctl_set_task_mid(struct MPT3SAS_ADAPTER *ioc, struct mpt3_ioctl_command *karg,
 /**
  * _ctl_do_mpt_command - main handler for MPT3COMMAND opcode
  * @ioc: per adapter object
- * @karg - (struct mpt3_ioctl_command)
- * @mf - pointer to mf in user space
+ * @karg: (struct mpt3_ioctl_command)
+ * @mf: pointer to mf in user space
  */
 static long
 _ctl_do_mpt_command(struct MPT3SAS_ADAPTER *ioc, struct mpt3_ioctl_command karg,
@@ -1124,7 +1122,7 @@ _ctl_do_mpt_command(struct MPT3SAS_ADAPTER *ioc, struct mpt3_ioctl_command karg,
 /**
  * _ctl_getiocinfo - main handler for MPT3IOCINFO opcode
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_getiocinfo(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -1178,7 +1176,7 @@ _ctl_getiocinfo(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_eventquery - main handler for MPT3EVENTQUERY opcode
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_eventquery(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -1209,7 +1207,7 @@ _ctl_eventquery(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_eventenable - main handler for MPT3EVENTENABLE opcode
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_eventenable(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -1247,7 +1245,7 @@ _ctl_eventenable(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_eventreport - main handler for MPT3EVENTREPORT opcode
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_eventreport(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -1291,7 +1289,7 @@ _ctl_eventreport(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_do_reset - main handler for MPT3HARDRESET opcode
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_do_reset(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -1429,7 +1427,7 @@ _ctl_btdh_search_raid_device(struct MPT3SAS_ADAPTER *ioc,
 /**
  * _ctl_btdh_mapping - main handler for MPT3BTDHMAPPING opcode
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_btdh_mapping(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -1729,7 +1727,7 @@ mpt3sas_enable_diag_buffer(struct MPT3SAS_ADAPTER *ioc, u8 bits_to_register)
 /**
  * _ctl_diag_register - application register with driver
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  *
  * This will allow the driver to setup any required buffers that will be
  * needed by firmware to communicate with the driver.
@@ -1753,7 +1751,7 @@ _ctl_diag_register(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_diag_unregister - application unregister with driver
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  *
  * This will allow the driver to cleanup any memory allocated for diag
  * messages and to free up any resources.
@@ -1826,7 +1824,7 @@ _ctl_diag_unregister(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_diag_query - query relevant info associated with diag buffers
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  *
  * The application will send only buffer_type and unique_id.  Driver will
  * inspect unique_id first, if valid, fill in all the info.  If unique_id is
@@ -1913,8 +1911,8 @@ _ctl_diag_query(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * mpt3sas_send_diag_release - Diag Release Message
  * @ioc: per adapter object
- * @buffer_type - specifies either TRACE, SNAPSHOT, or EXTENDED
- * @issue_reset - specifies whether host reset is required.
+ * @buffer_type: specifies either TRACE, SNAPSHOT, or EXTENDED
+ * @issue_reset: specifies whether host reset is required.
  *
  */
 int
@@ -2019,7 +2017,8 @@ mpt3sas_send_diag_release(struct MPT3SAS_ADAPTER *ioc, u8 buffer_type,
 
 /**
  * _ctl_diag_release - request to send Diag Release Message to firmware
- * @arg - user space buffer containing ioctl content
+ * @ioc: ?
+ * @arg: user space buffer containing ioctl content
  *
  * This allows ownership of the specified buffer to returned to the driver,
  * allowing an application to read the buffer without fear that firmware is
@@ -2108,7 +2107,7 @@ _ctl_diag_release(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_diag_read_buffer - request for copy of the diag buffer
  * @ioc: per adapter object
- * @arg - user space buffer containing ioctl content
+ * @arg: user space buffer containing ioctl content
  */
 static long
 _ctl_diag_read_buffer(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
@@ -2294,8 +2293,8 @@ _ctl_diag_read_buffer(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 /**
  * _ctl_compat_mpt_command - convert 32bit pointers to 64bit.
  * @ioc: per adapter object
- * @cmd - ioctl opcode
- * @arg - (struct mpt3_ioctl_command32)
+ * @cmd: ioctl opcode
+ * @arg: (struct mpt3_ioctl_command32)
  *
  * MPT3COMMAND32 - Handle 32bit applications running on 64bit os.
  */
@@ -2338,10 +2337,10 @@ _ctl_compat_mpt_command(struct MPT3SAS_ADAPTER *ioc, unsigned cmd,
 
 /**
  * _ctl_ioctl_main - main ioctl entry point
- * @file - (struct file)
- * @cmd - ioctl opcode
- * @arg - user space data buffer
- * @compat - handles 32 bit applications in 64bit os
+ * @file:  (struct file)
+ * @cmd:  ioctl opcode
+ * @arg:  user space data buffer
+ * @compat:  handles 32 bit applications in 64bit os
  * @mpi_version: will be MPI2_VERSION for mpt2ctl ioctl device &
  * MPI25_VERSION | MPI26_VERSION for mpt3ctl ioctl device.
  */
@@ -2472,9 +2471,9 @@ out_unlock_pciaccess:
 
 /**
  * _ctl_ioctl - mpt3ctl main ioctl entry point (unlocked)
- * @file - (struct file)
- * @cmd - ioctl opcode
- * @arg -
+ * @file: (struct file)
+ * @cmd: ioctl opcode
+ * @arg: ?
  */
 static long
 _ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -2492,9 +2491,9 @@ _ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 /**
  * _ctl_mpt2_ioctl - mpt2ctl main ioctl entry point (unlocked)
- * @file - (struct file)
- * @cmd - ioctl opcode
- * @arg -
+ * @file: (struct file)
+ * @cmd: ioctl opcode
+ * @arg: ?
  */
 static long
 _ctl_mpt2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -2510,9 +2509,9 @@ _ctl_mpt2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_COMPAT
 /**
  *_ ctl_ioctl_compat - main ioctl entry point (compat)
- * @file -
- * @cmd -
- * @arg -
+ * @file: ?
+ * @cmd: ?
+ * @arg: ?
  *
  * This routine handles 32 bit applications in 64bit os.
  */
@@ -2528,9 +2527,9 @@ _ctl_ioctl_compat(struct file *file, unsigned cmd, unsigned long arg)
 
 /**
  *_ ctl_mpt2_ioctl_compat - main ioctl entry point (compat)
- * @file -
- * @cmd -
- * @arg -
+ * @file: ?
+ * @cmd: ?
+ * @arg: ?
  *
  * This routine handles 32 bit applications in 64bit os.
  */
@@ -2547,8 +2546,9 @@ _ctl_mpt2_ioctl_compat(struct file *file, unsigned cmd, unsigned long arg)
 /* scsi host attributes */
 /**
  * _ctl_version_fw_show - firmware version
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2569,8 +2569,9 @@ static DEVICE_ATTR(version_fw, S_IRUGO, _ctl_version_fw_show, NULL);
 
 /**
  * _ctl_version_bios_show - bios version
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2593,8 +2594,9 @@ static DEVICE_ATTR(version_bios, S_IRUGO, _ctl_version_bios_show, NULL);
 
 /**
  * _ctl_version_mpi_show - MPI (message passing interface) version
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2612,8 +2614,9 @@ static DEVICE_ATTR(version_mpi, S_IRUGO, _ctl_version_mpi_show, NULL);
 
 /**
  * _ctl_version_product_show - product name
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2630,8 +2633,9 @@ static DEVICE_ATTR(version_product, S_IRUGO, _ctl_version_product_show, NULL);
 
 /**
  * _ctl_version_nvdata_persistent_show - ndvata persistent version
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2650,8 +2654,9 @@ static DEVICE_ATTR(version_nvdata_persistent, S_IRUGO,
 
 /**
  * _ctl_version_nvdata_default_show - nvdata default version
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2670,8 +2675,9 @@ static DEVICE_ATTR(version_nvdata_default, S_IRUGO,
 
 /**
  * _ctl_board_name_show - board name
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2688,8 +2694,9 @@ static DEVICE_ATTR(board_name, S_IRUGO, _ctl_board_name_show, NULL);
 
 /**
  * _ctl_board_assembly_show - board assembly name
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2706,8 +2713,9 @@ static DEVICE_ATTR(board_assembly, S_IRUGO, _ctl_board_assembly_show, NULL);
 
 /**
  * _ctl_board_tracer_show - board tracer number
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -2724,8 +2732,9 @@ static DEVICE_ATTR(board_tracer, S_IRUGO, _ctl_board_tracer_show, NULL);
 
 /**
  * _ctl_io_delay_show - io missing delay
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is for firmware implemention for deboucing device
  * removal events.
@@ -2745,8 +2754,9 @@ static DEVICE_ATTR(io_delay, S_IRUGO, _ctl_io_delay_show, NULL);
 
 /**
  * _ctl_device_delay_show - device missing delay
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is for firmware implemention for deboucing device
  * removal events.
@@ -2766,8 +2776,9 @@ static DEVICE_ATTR(device_delay, S_IRUGO, _ctl_device_delay_show, NULL);
 
 /**
  * _ctl_fw_queue_depth_show - global credits
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is firmware queue depth limit
  *
@@ -2786,8 +2797,9 @@ static DEVICE_ATTR(fw_queue_depth, S_IRUGO, _ctl_fw_queue_depth_show, NULL);
 
 /**
  * _ctl_sas_address_show - sas address
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is the controller sas address
  *
@@ -2809,8 +2821,9 @@ static DEVICE_ATTR(host_sas_address, S_IRUGO,
 
 /**
  * _ctl_logging_level_show - logging level
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -2844,8 +2857,9 @@ static DEVICE_ATTR(logging_level, S_IRUGO | S_IWUSR, _ctl_logging_level_show,
 
 /**
  * _ctl_fwfault_debug_show - show/store fwfault_debug
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * mpt3sas_fwfault_debug is command line option
  * A sysfs 'read/write' shost attribute.
@@ -2880,8 +2894,9 @@ static DEVICE_ATTR(fwfault_debug, S_IRUGO | S_IWUSR,
 
 /**
  * _ctl_ioc_reset_count_show - ioc reset count
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is firmware queue depth limit
  *
@@ -2900,8 +2915,9 @@ static DEVICE_ATTR(ioc_reset_count, S_IRUGO, _ctl_ioc_reset_count_show, NULL);
 
 /**
  * _ctl_ioc_reply_queue_count_show - number of reply queues
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is number of reply queues
  *
@@ -2928,8 +2944,9 @@ static DEVICE_ATTR(reply_queue_count, S_IRUGO, _ctl_ioc_reply_queue_count_show,
 
 /**
  * _ctl_BRM_status_show - Backup Rail Monitor Status
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is number of reply queues
  *
@@ -3014,8 +3031,9 @@ struct DIAG_BUFFER_START {
 
 /**
  * _ctl_host_trace_buffer_size_show - host buffer size (trace only)
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read-only' shost attribute.
  */
@@ -3059,8 +3077,9 @@ static DEVICE_ATTR(host_trace_buffer_size, S_IRUGO,
 
 /**
  * _ctl_host_trace_buffer_show - firmware ring buffer (trace only)
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  *
@@ -3124,8 +3143,9 @@ static DEVICE_ATTR(host_trace_buffer, S_IRUGO | S_IWUSR,
 
 /**
  * _ctl_host_trace_buffer_enable_show - firmware ring buffer (trace only)
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  *
@@ -3210,8 +3230,9 @@ static DEVICE_ATTR(host_trace_buffer_enable, S_IRUGO | S_IWUSR,
 
 /**
  * _ctl_diag_trigger_master_show - show the diag_trigger_master attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3234,8 +3255,10 @@ _ctl_diag_trigger_master_show(struct device *cdev,
 
 /**
  * _ctl_diag_trigger_master_store - store the diag_trigger_master attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
+ * @count: ?
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3265,8 +3288,9 @@ static DEVICE_ATTR(diag_trigger_master, S_IRUGO | S_IWUSR,
 
 /**
  * _ctl_diag_trigger_event_show - show the diag_trigger_event attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3288,8 +3312,10 @@ _ctl_diag_trigger_event_show(struct device *cdev,
 
 /**
  * _ctl_diag_trigger_event_store - store the diag_trigger_event attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
+ * @count: ?
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3319,8 +3345,9 @@ static DEVICE_ATTR(diag_trigger_event, S_IRUGO | S_IWUSR,
 
 /**
  * _ctl_diag_trigger_scsi_show - show the diag_trigger_scsi attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3342,8 +3369,10 @@ _ctl_diag_trigger_scsi_show(struct device *cdev,
 
 /**
  * _ctl_diag_trigger_scsi_store - store the diag_trigger_scsi attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
+ * @count: ?
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3372,8 +3401,9 @@ static DEVICE_ATTR(diag_trigger_scsi, S_IRUGO | S_IWUSR,
 
 /**
  * _ctl_diag_trigger_scsi_show - show the diag_trigger_mpi attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3395,8 +3425,10 @@ _ctl_diag_trigger_mpi_show(struct device *cdev,
 
 /**
  * _ctl_diag_trigger_mpi_store - store the diag_trigger_mpi attribute
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @cdev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
+ * @count: ?
  *
  * A sysfs 'read/write' shost attribute.
  */
@@ -3460,8 +3492,9 @@ struct device_attribute *mpt3sas_host_attrs[] = {
 
 /**
  * _ctl_device_sas_address_show - sas address
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @dev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is the sas address for the target
  *
@@ -3481,8 +3514,9 @@ static DEVICE_ATTR(sas_address, S_IRUGO, _ctl_device_sas_address_show, NULL);
 
 /**
  * _ctl_device_handle_show - device handle
- * @cdev - pointer to embedded class device
- * @buf - the buffer returned
+ * @dev: pointer to embedded class device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * This is the firmware assigned device handle
  *
@@ -3502,8 +3536,9 @@ static DEVICE_ATTR(sas_device_handle, S_IRUGO, _ctl_device_handle_show, NULL);
 
 /**
  * _ctl_device_ncq_io_prio_show - send prioritized io commands to device
- * @dev - pointer to embedded device
- * @buf - the buffer returned
+ * @dev: pointer to embedded device
+ * @attr: ?
+ * @buf: the buffer returned
  *
  * A sysfs 'read/write' sdev attribute, only works with SATA
  */
@@ -3583,7 +3618,7 @@ static struct miscdevice gen2_ctl_dev = {
 
 /**
  * mpt3sas_ctl_init - main entry point for ctl.
- *
+ * @hbas_to_enumerate: ?
  */
 void
 mpt3sas_ctl_init(ushort hbas_to_enumerate)
@@ -3611,7 +3646,7 @@ mpt3sas_ctl_init(ushort hbas_to_enumerate)
 
 /**
  * mpt3sas_ctl_exit - exit point for ctl
- *
+ * @hbas_to_enumerate: ?
  */
 void
 mpt3sas_ctl_exit(ushort hbas_to_enumerate)
