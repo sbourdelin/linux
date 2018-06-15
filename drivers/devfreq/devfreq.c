@@ -11,6 +11,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/kmod.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/err.h>
@@ -649,10 +650,35 @@ struct devfreq *devfreq_add_device(struct device *dev,
 
 	governor = find_devfreq_governor(devfreq->governor_name);
 	if (IS_ERR(governor)) {
-		dev_err(dev, "%s: Unable to find governor for the device\n",
-			__func__);
-		err = PTR_ERR(governor);
-		goto err_init;
+		list_del(&devfreq->node);
+		mutex_unlock(&devfreq_list_lock);
+
+		/*
+		 * If the governor is not found, then request the module and
+		 * try again. This can happen when both drivers (the governor
+		 * driver and the driver that calls devfreq_add_device) are
+		 * built as modules.
+		 */
+		if (!strncmp(devfreq->governor_name,
+			     DEVFREQ_GOV_SIMPLE_ONDEMAND, DEVFREQ_NAME_LEN))
+			err = request_module("governor_%s", "simpleondemand");
+		else
+			err = request_module("governor_%s",
+					     devfreq->governor_name);
+		if (err)
+			goto err_unregister;
+
+		mutex_lock(&devfreq_list_lock);
+		list_add(&devfreq->node, &devfreq_list);
+
+		governor = find_devfreq_governor(devfreq->governor_name);
+		if (IS_ERR(governor)) {
+			dev_err(dev,
+				"%s: Unable to find governor for the device\n",
+				__func__);
+			err = PTR_ERR(governor);
+			goto err_init;
+		}
 	}
 
 	devfreq->governor = governor;
@@ -670,7 +696,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
 err_init:
 	list_del(&devfreq->node);
 	mutex_unlock(&devfreq_list_lock);
-
+err_unregister:
 	device_unregister(&devfreq->dev);
 err_dev:
 	if (devfreq)
