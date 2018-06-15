@@ -110,8 +110,6 @@ static void flow_offload_fixup_tcp(struct ip_ct_tcp *tcp)
 static void flow_offload_fixup_ct_state(struct nf_conn *ct)
 {
 	const struct nf_conntrack_l4proto *l4proto;
-	struct net *net = nf_ct_net(ct);
-	unsigned int *timeouts;
 	unsigned int timeout;
 	int l4num;
 
@@ -123,14 +121,10 @@ static void flow_offload_fixup_ct_state(struct nf_conn *ct)
 	if (!l4proto)
 		return;
 
-	timeouts = l4proto->get_timeouts(net);
-	if (!timeouts)
-		return;
-
 	if (l4num == IPPROTO_TCP)
-		timeout = timeouts[TCP_CONNTRACK_ESTABLISHED];
+		timeout = 2 * 60 * HZ;
 	else if (l4num == IPPROTO_UDP)
-		timeout = timeouts[UDP_CT_REPLIED];
+		timeout = 30 * HZ;
 	else
 		return;
 
