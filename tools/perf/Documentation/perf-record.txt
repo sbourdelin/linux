@@ -90,6 +90,20 @@ OPTIONS
 	  prevent the shell interpretation.  You also need to use --group on
 	  "perf report" to view group events together.
 
+	Note that if workload does a lot of kernel entry/exit we may see
+	kernel samples even if :u is specified. That is due to skid existing.
+	This might be a security issue because it can leak kernel address even
+	though kernel sampling support is disabled. We have a sysctl to turn
+	on/off the dropping of leaked kernel samples.
+
+	/sys/devices/cpu/perf_allow_sample_leakage
+
+	0 - drop the leaked kernel samples, default option.
+	1 - don't drop the leaked kernel samples.
+
+	For example, write 1 to perf_allow_sample_leakage
+	echo 1 > /sys/devices/cpu/perf_allow_sample_leakage
+
 --filter=<filter>::
         Event filter. This option should follow a event selector (-e) which
 	selects either tracepoint event(s) or a hardware trace PMU
