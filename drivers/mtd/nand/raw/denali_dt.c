@@ -81,38 +81,39 @@ MODULE_DEVICE_TABLE(of, denali_nand_dt_ids);
 
 static int denali_dt_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct resource *res;
 	struct denali_dt *dt;
 	const struct denali_dt_data *data;
 	struct denali_nand_info *denali;
 	int ret;
 
-	dt = devm_kzalloc(&pdev->dev, sizeof(*dt), GFP_KERNEL);
+	dt = devm_kzalloc(dev, sizeof(*dt), GFP_KERNEL);
 	if (!dt)
 		return -ENOMEM;
 	denali = &dt->denali;
 
-	data = of_device_get_match_data(&pdev->dev);
+	data = of_device_get_match_data(dev);
 	if (data) {
 		denali->revision = data->revision;
 		denali->caps = data->caps;
 		denali->ecc_caps = data->ecc_caps;
 	}
 
-	denali->dev = &pdev->dev;
+	denali->dev = dev;
 	denali->irq = platform_get_irq(pdev, 0);
 	if (denali->irq < 0) {
-		dev_err(&pdev->dev, "no irq defined\n");
+		dev_err(dev, "no irq defined\n");
 		return denali->irq;
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "denali_reg");
-	denali->reg = devm_ioremap_resource(&pdev->dev, res);
+	denali->reg = devm_ioremap_resource(dev, res);
 	if (IS_ERR(denali->reg))
 		return PTR_ERR(denali->reg);
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nand_data");
-	denali->host = devm_ioremap_resource(&pdev->dev, res);
+	denali->host = devm_ioremap_resource(dev, res);
 	if (IS_ERR(denali->host))
 		return PTR_ERR(denali->host);
 
@@ -120,19 +121,19 @@ static int denali_dt_probe(struct platform_device *pdev)
 	 * A single anonymous clock is supported for the backward compatibility.
 	 * New platforms should support all the named clocks.
 	 */
-	dt->clk = devm_clk_get(&pdev->dev, "nand");
+	dt->clk = devm_clk_get(dev, "nand");
 	if (IS_ERR(dt->clk))
-		dt->clk = devm_clk_get(&pdev->dev, NULL);
+		dt->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(dt->clk)) {
-		dev_err(&pdev->dev, "no clk available\n");
+		dev_err(dev, "no clk available\n");
 		return PTR_ERR(dt->clk);
 	}
 
-	dt->clk_x = devm_clk_get(&pdev->dev, "nand_x");
+	dt->clk_x = devm_clk_get(dev, "nand_x");
 	if (IS_ERR(dt->clk_x))
 		dt->clk_x = NULL;
 
-	dt->clk_ecc = devm_clk_get(&pdev->dev, "ecc");
+	dt->clk_ecc = devm_clk_get(dev, "ecc");
 	if (IS_ERR(dt->clk_ecc))
 		dt->clk_ecc = NULL;
 
@@ -155,7 +156,7 @@ static int denali_dt_probe(struct platform_device *pdev)
 		 * Hardcode the clock rates for the backward compatibility.
 		 * This works for both SOCFPGA and UniPhier.
 		 */
-		dev_notice(&pdev->dev,
+		dev_notice(dev,
 			   "necessary clock is missing. default clock rates are used.\n");
 		denali->clk_x_rate = 200000000;
 	}
