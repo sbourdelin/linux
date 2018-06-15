@@ -1502,9 +1502,13 @@ void __weak read_persistent_clock64(struct timespec64 *ts64)
  * Function to read the exact time the system has been started.
  * Returns a timespec64 with tv_sec=0 and tv_nsec=0 if unsupported.
  *
+ * Argument 'now' contains time from persistent clock to calculate offset from
+ * epoch. May contain zeros if persist ant clock is not available.
+ *
  *  XXX - Do be sure to remove it once all arches implement it.
  */
-void __weak read_boot_clock64(struct timespec64 *ts)
+void __weak __init read_boot_clock64(struct timespec64 *now,
+				     struct timespec64 *ts)
 {
 	ts->tv_sec = 0;
 	ts->tv_nsec = 0;
@@ -1535,7 +1539,7 @@ void __init timekeeping_init(void)
 	} else if (now.tv_sec || now.tv_nsec)
 		persistent_clock_exists = true;
 
-	read_boot_clock64(&boot);
+	read_boot_clock64(&now, &boot);
 	if (!timespec64_valid_strict(&boot)) {
 		pr_warn("WARNING: Boot clock returned invalid value!\n"
 			"         Check your CMOS/BIOS settings.\n");

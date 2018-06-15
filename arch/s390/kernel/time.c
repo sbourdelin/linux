@@ -221,7 +221,7 @@ void read_persistent_clock64(struct timespec64 *ts)
 	ext_to_timespec64(clk, ts);
 }
 
-void read_boot_clock64(struct timespec64 *ts)
+void __init read_boot_clock64(struct timespec64 *now, struct timespec64 *ts)
 {
 	unsigned char clk[STORE_CLOCK_EXT_SIZE];
 	__u64 delta;

@@ -243,7 +243,7 @@ extern void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot);
 extern int persistent_clock_is_local;
 
 extern void read_persistent_clock64(struct timespec64 *ts);
-extern void read_boot_clock64(struct timespec64 *ts);
+extern void read_boot_clock64(struct timespec64 *now, struct timespec64 *ts);
 extern int update_persistent_clock64(struct timespec64 now);
 
 /*

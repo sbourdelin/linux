@@ -90,7 +90,7 @@ void read_persistent_clock64(struct timespec64 *ts)
 	__read_persistent_clock(ts);
 }
 
-void read_boot_clock64(struct timespec64 *ts)
+void __init read_boot_clock64(struct timespec64 *now, struct timespec64 *ts)
 {
 	__read_boot_clock(ts);
 }
