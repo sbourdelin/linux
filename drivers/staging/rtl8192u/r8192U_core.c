@@ -1648,13 +1648,17 @@ static short rtl8192_usb_initendpoints(struct net_device *dev)
 #ifndef JACKSON_NEW_RX
 	for (i = 0; i < (MAX_RX_URB + 1); i++) {
 		priv->rx_urb[i] = usb_alloc_urb(0, GFP_KERNEL);
-		if (!priv->rx_urb[i])
+		if (!priv->rx_urb[i]) {
+			kfree(priv->rx_urb);
 			return -ENOMEM;
+		}
 
 		priv->rx_urb[i]->transfer_buffer =
 			kmalloc(RX_URB_SIZE, GFP_KERNEL);
-		if (!priv->rx_urb[i]->transfer_buffer)
+		if (!priv->rx_urb[i]->transfer_buffer) {
+			kfree(priv->rx_urb);
 			return -ENOMEM;
+		}
 
 		priv->rx_urb[i]->transfer_buffer_length = RX_URB_SIZE;
 	}
@@ -1666,9 +1670,17 @@ static short rtl8192_usb_initendpoints(struct net_device *dev)
 		void *oldaddr, *newaddr;
 
 		priv->rx_urb[16] = usb_alloc_urb(0, GFP_KERNEL);
-		priv->oldaddr = kmalloc(16, GFP_KERNEL);
-		if (!priv->oldaddr)
+		if (!priv->rx_urb[16]) {
+			kfree(priv->rx_urb);
 			return -ENOMEM;
+		}
+
+		priv->oldaddr = kmalloc(16, GFP_KERNEL);
+		if (!priv->oldaddr) {
+			kfree(priv->rx_urb);
+			return -ENOMEM;
+		}
+
 		oldaddr = priv->oldaddr;
 		align = ((long)oldaddr) & 3;
 		if (align) {
