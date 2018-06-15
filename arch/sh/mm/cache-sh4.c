@@ -149,13 +149,17 @@ static void flush_icache_all(void)
 static void flush_dcache_all(void)
 {
 	unsigned long addr, end_addr, entry_offset;
+	struct sh_cpuinfo *cpud;
+	int cpu;
+
+	cpu = get_cpu();
+	cpud = &cpu_data[cpu];
 
 	end_addr = CACHE_OC_ADDRESS_ARRAY +
-		(current_cpu_data.dcache.sets <<
-		 current_cpu_data.dcache.entry_shift) *
-			current_cpu_data.dcache.ways;
+		(cpud->dcache.sets << cpud->dcache.entry_shift) *
+		cpud->dcache.ways;
 
-	entry_offset = 1 << current_cpu_data.dcache.entry_shift;
+	entry_offset = 1 << cpud->dcache.entry_shift;
 
 	for (addr = CACHE_OC_ADDRESS_ARRAY; addr < end_addr; ) {
 		__raw_writel(0, addr); addr += entry_offset;
@@ -167,6 +171,8 @@ static void flush_dcache_all(void)
 		__raw_writel(0, addr); addr += entry_offset;
 		__raw_writel(0, addr); addr += entry_offset;
 	}
+
+	put_cpu();
 }
 
 static void sh4_flush_cache_all(void *unused)
