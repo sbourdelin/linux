@@ -189,6 +189,7 @@ struct backing_dev_info {
 #ifdef CONFIG_CGROUP_WRITEBACK
 	struct radix_tree_root cgwb_tree; /* radix tree of active cgroup wbs */
 	struct rb_root cgwb_congested_tree; /* their congested states */
+	struct mutex cgwb_release_mutex;  /* protect shutdown of wb structs */
 #else
 	struct bdi_writeback_congested *wb_congested;
 #endif
