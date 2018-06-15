@@ -738,7 +738,7 @@ static int mxsfb_init_fbinfo_dt(struct fb_info *fb_info,
 	display_np = of_parse_phandle(np, "display", 0);
 	if (!display_np) {
 		dev_err(dev, "failed to find display phandle\n");
-		return -ENOENT;
+		return -ENODEV;
 	}
 
 	ret = of_property_read_u32(display_np, "bus-width", &width);
