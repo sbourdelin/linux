@@ -159,7 +159,8 @@ static int bsg_scsi_fill_hdr(struct request *rq, struct sg_io_v4 *hdr,
 	return 0;
 }
 
-static int bsg_scsi_complete_rq(struct request *rq, struct sg_io_v4 *hdr)
+static int bsg_scsi_complete_rq(struct request *rq, struct sg_io_v4 *hdr,
+		bool cleaning_up)
 {
 	struct scsi_request *sreq = scsi_req(rq);
 	int ret = 0;
@@ -179,7 +180,9 @@ static int bsg_scsi_complete_rq(struct request *rq, struct sg_io_v4 *hdr)
 		int len = min_t(unsigned int, hdr->max_response_len,
 					sreq->sense_len);
 
-		if (copy_to_user(uptr64(hdr->response), sreq->sense, len))
+		if (cleaning_up)
+			ret = -EINVAL;
+		else if (copy_to_user(uptr64(hdr->response), sreq->sense, len))
 			ret = -EFAULT;
 		else
 			hdr->response_len = len;
@@ -383,11 +386,12 @@ static struct bsg_command *bsg_get_done_cmd(struct bsg_device *bd)
 }
 
 static int blk_complete_sgv4_hdr_rq(struct request *rq, struct sg_io_v4 *hdr,
-				    struct bio *bio, struct bio *bidi_bio)
+				    struct bio *bio, struct bio *bidi_bio,
+				    bool cleaning_up)
 {
 	int ret;
 
-	ret = rq->q->bsg_dev.ops->complete_rq(rq, hdr);
+	ret = rq->q->bsg_dev.ops->complete_rq(rq, hdr, cleaning_up);
 
 	if (rq->next_rq) {
 		blk_rq_unmap_user(bidi_bio);
@@ -453,7 +457,7 @@ static int bsg_complete_all_commands(struct bsg_device *bd)
 			break;
 
 		tret = blk_complete_sgv4_hdr_rq(bc->rq, &bc->hdr, bc->bio,
-						bc->bidi_bio);
+						bc->bidi_bio, true);
 		if (!ret)
 			ret = tret;
 
@@ -488,7 +492,7 @@ __bsg_read(char __user *buf, size_t count, struct bsg_device *bd,
 		 * bsg_complete_work() cannot do that for us
 		 */
 		ret = blk_complete_sgv4_hdr_rq(bc->rq, &bc->hdr, bc->bio,
-					       bc->bidi_bio);
+					       bc->bidi_bio, false);
 
 		if (copy_to_user(buf, &bc->hdr, sizeof(bc->hdr)))
 			ret = -EFAULT;
@@ -531,6 +535,12 @@ bsg_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	struct bsg_device *bd = file->private_data;
 	int ret;
 	ssize_t bytes_read;
+
+	if (!scsi_safe_file_access(file)) {
+		pr_err_once("%s: process %d (%s) changed security contexts after opening file descriptor, this is not allowed.\n",
+			__func__, task_tgid_vnr(current), current->comm);
+		return -EINVAL;
+	}
 
 	bsg_dbg(bd, "read %zd bytes\n", count);
 
@@ -608,8 +618,11 @@ bsg_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 
 	bsg_dbg(bd, "write %zd bytes\n", count);
 
-	if (unlikely(uaccess_kernel()))
+	if (!scsi_safe_file_access(file)) {
+		pr_err_once("%s: process %d (%s) changed security contexts after opening file descriptor, this is not allowed.\n",
+			__func__, task_tgid_vnr(current), current->comm);
 		return -EINVAL;
+	}
 
 	bsg_set_block(bd, file);
 
@@ -859,7 +872,7 @@ static long bsg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		at_head = (0 == (hdr.flags & BSG_FLAG_Q_AT_TAIL));
 		blk_execute_rq(bd->queue, NULL, rq, at_head);
-		ret = blk_complete_sgv4_hdr_rq(rq, &hdr, bio, bidi_bio);
+		ret = blk_complete_sgv4_hdr_rq(rq, &hdr, bio, bidi_bio, false);
 
 		if (copy_to_user(uarg, &hdr, sizeof(hdr)))
 			return -EFAULT;

@@ -8,6 +8,8 @@
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/scatterlist.h>
+#include <linux/cred.h> /* for scsi_safe_file_access() */
+#include <linux/fs.h> /* for scsi_safe_file_access() */
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_request.h>
 
@@ -361,6 +363,23 @@ static inline unsigned scsi_transfer_length(struct scsi_cmnd *scmd)
 		xfer_len += (xfer_len >> ilog2(prot_interval)) * 8;
 
 	return xfer_len;
+}
+
+/*
+ * The SCSI interfaces that use read() and write() as an asynchronous variant of
+ * ioctl(..., SG_IO, ...) are fundamentally unsafe, since there are lots of ways
+ * to trigger read() and write() calls from various contexts with elevated
+ * privileges. This can lead to kernel memory corruption (e.g. if these
+ * interfaces are called through splice()) and privilege escalation inside
+ * userspace (e.g. if a process with access to such a device passes a file
+ * descriptor to a SUID binary as stdin/stdout/stderr).
+ *
+ * This function provides protection for the legacy API by restricting the
+ * calling context.
+ */
+static inline bool scsi_safe_file_access(struct file *filp)
+{
+	return filp->f_cred == current_cred() && !uaccess_kernel();
 }
 
 #endif /* _SCSI_SCSI_CMND_H */

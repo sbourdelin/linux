@@ -53,7 +53,8 @@ static int bsg_transport_fill_hdr(struct request *rq, struct sg_io_v4 *hdr,
 	return 0;
 }
 
-static int bsg_transport_complete_rq(struct request *rq, struct sg_io_v4 *hdr)
+static int bsg_transport_complete_rq(struct request *rq, struct sg_io_v4 *hdr,
+		bool cleaning_up)
 {
 	struct bsg_job *job = blk_mq_rq_to_pdu(rq);
 	int ret = 0;
@@ -79,6 +80,8 @@ static int bsg_transport_complete_rq(struct request *rq, struct sg_io_v4 *hdr)
 	if (job->reply_len && hdr->response) {
 		int len = min(hdr->max_response_len, job->reply_len);
 
+		if (unlikely(cleaning_up))
+			ret = -EINVAL;
 		if (copy_to_user(uptr64(hdr->response), job->reply, len))
 			ret = -EFAULT;
 		else

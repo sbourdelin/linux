@@ -11,7 +11,8 @@ struct bsg_ops {
 	int	(*check_proto)(struct sg_io_v4 *hdr);
 	int	(*fill_hdr)(struct request *rq, struct sg_io_v4 *hdr,
 				fmode_t mode);
-	int	(*complete_rq)(struct request *rq, struct sg_io_v4 *hdr);
+	int	(*complete_rq)(struct request *rq, struct sg_io_v4 *hdr,
+				bool cleaning_up);
 	void	(*free_rq)(struct request *rq);
 };
 
