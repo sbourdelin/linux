@@ -172,7 +172,7 @@ static inline int rdmsrl_safe(unsigned msr, unsigned long long *p)
 
 static inline unsigned long long paravirt_sched_clock(void)
 {
-	return PVOP_CALL0(unsigned long long, pv_time_ops.sched_clock);
+	return PVOP_CALL0(unsigned long long, pv_time_ops.active_sched_clock);
 }
 
 struct static_key;
