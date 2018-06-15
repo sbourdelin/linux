@@ -58,20 +58,37 @@
 
 #include "dialog.h"
 
+#define ISEARCH_LEN 32
+char isearch_str[ISEARCH_LEN] = "";
+
 static int menu_width, item_x;
 
+int focus_on_buttons;
+
+static const char isearch_instructions[] =
+	"I-search: Arrow keys navigate the menu.  "
+	"<Enter> selects submenus and/or clears i-search string.  "
+	"Type any character to search for menu items, "
+	"press <\\> to find further matches, <Esc><Esc> to exit. "
+	"Legend: [*] built-in  [ ] excluded  <M> module  < > module capable";
 /*
  * Print menu item
  */
 static void do_print_item(WINDOW * win, const char *item, int line_y,
 			  int selected, int hotkey)
 {
+	int i;
 	int j;
+	int isearch_match_pos;
+	char *isearch_match;
 	char *menu_item = malloc(menu_width + 1);
 
 	strncpy(menu_item, item, menu_width - item_x);
 	menu_item[menu_width - item_x] = '\0';
 	j = first_alpha(menu_item, "YyNnMmHh");
+
+	isearch_match = strcasestr(menu_item, isearch_str);
+	isearch_match_pos = isearch_match - menu_item;
 
 	/* Clear 'residue' of last item */
 	wattrset(win, dlg.menubox.atr);
@@ -85,16 +102,31 @@ static void do_print_item(WINDOW * win, const char *item, int line_y,
 #else
 	wclrtoeol(win);
 #endif
-	wattrset(win, selected ? dlg.item_selected.atr : dlg.item.atr);
+	if (focus_on_buttons)
+		wattrset(win, selected ? A_UNDERLINE : dlg.item.atr);
+	else
+		wattrset(win, selected ? dlg.item_selected.atr : dlg.item.atr);
 	mvwaddstr(win, line_y, item_x, menu_item);
-	if (hotkey) {
+	if (hotkey && focus_on_buttons) {
 		wattrset(win, selected ? dlg.tag_key_selected.atr
 			 : dlg.tag_key.atr);
 		mvwaddch(win, line_y, item_x + j, menu_item[j]);
 	}
-	if (selected) {
-		wmove(win, line_y, item_x + 1);
+
+	if (selected && !focus_on_buttons) {
+		/*
+		 * Highlight i-search matching part of selected menu item
+		 */
+		if (isearch_match) {
+			for (i = 0; i < strlen(isearch_str); i++) {
+				wattrset(win, dlg.tag_key_selected.atr);
+				mvwaddch(win, line_y, item_x + isearch_match_pos + i,
+					 menu_item[isearch_match_pos + i]);
+			}
+		}
+
 	}
+	wmove(win, line_y, item_x + 1);
 	free(menu_item);
 	wrefresh(win);
 }
@@ -102,8 +134,35 @@ static void do_print_item(WINDOW * win, const char *item, int line_y,
 #define print_item(index, choice, selected)				\
 do {									\
 	item_set(index);						\
-	do_print_item(menu, item_str(), choice, selected, !item_is_tag(':')); \
+	do_print_item(menu, item_str(), choice, selected, !item_is_tag(':'));		\
 } while (0)
+
+/*
+* Print the isearch indicator.
+*/
+static void print_isearch(WINDOW * win, int y, int x, int height, bool isearch)
+{
+	unsigned char i = 0;
+	int text_size = ISEARCH_LEN - 1;
+	wmove(win, y, x);
+
+	y = y + height + 1;
+	wmove(win, y, x);
+
+	if (isearch) {
+		wattrset(win, dlg.button_key_inactive.atr);
+		waddstr(win, "isearch: ");
+		waddstr(win, isearch_str);
+		i = strlen(isearch_str);
+	} else {
+		text_size += 9; /* also overwrite "isearch: " */
+	}
+
+	wattrset(win, dlg.menubox_border.atr);
+
+	for ( ; i < text_size; i++ )
+		waddch(win, ACS_HLINE);
+}
 
 /*
  * Print the scroll indicators.
@@ -156,12 +215,22 @@ static void print_buttons(WINDOW * win, int height, int width, int selected)
 {
 	int x = width / 2 - 28;
 	int y = height - 2;
+	int highlight;
 
-	print_button(win, "Select", y, x, selected == 0);
-	print_button(win, " Exit ", y, x + 12, selected == 1);
-	print_button(win, " Help ", y, x + 24, selected == 2);
-	print_button(win, " Save ", y, x + 36, selected == 3);
-	print_button(win, " Load ", y, x + 48, selected == 4);
+	/*
+	 * Don't highlight the selected button if the buttons don't have
+	 * the focus.
+	 */
+	if (!focus_on_buttons)
+		highlight = -1;
+	else
+		highlight = selected;
+
+	print_button(win, "Select", y, x, highlight == 0);
+	print_button(win, " Exit ", y, x + 12, highlight == 1);
+	print_button(win, " Help ", y, x + 24, highlight == 2);
+	print_button(win, " Save ", y, x + 36, highlight == 3);
+	print_button(win, " Load ", y, x + 48, highlight == 4);
 
 	wmove(win, y, x + 1 + 12 * selected);
 	wrefresh(win);
@@ -224,7 +293,9 @@ do_resize:
 	print_title(dialog, title, width);
 
 	wattrset(dialog, dlg.dialog.atr);
-	print_autowrap(dialog, prompt, width - 2, 1, 3);
+	print_autowrap(dialog,
+		       focus_on_buttons ? prompt : isearch_instructions,
+		       width - 2, 4, 1, 3);
 
 	menu_width = width - 6;
 	box_y = height - menu_height - 5;
@@ -275,6 +346,7 @@ do_resize:
 	print_arrows(dialog, item_count(), scroll,
 		     box_y, box_x + item_x + 1, menu_height);
 
+	print_isearch(dialog, box_y, box_x + item_x + 5, menu_height, !focus_on_buttons);
 	print_buttons(dialog, height, width, 0);
 	wmove(menu, choice, item_x + 1);
 	wrefresh(menu);
@@ -285,22 +357,24 @@ do_resize:
 		if (key < 256 && isalpha(key))
 			key = tolower(key);
 
-		if (strchr("ynmh", key))
-			i = max_choice;
-		else {
-			for (i = choice + 1; i < max_choice; i++) {
-				item_set(scroll + i);
-				j = first_alpha(item_str(), "YyNnMmHh");
-				if (key == tolower(item_str()[j]))
-					break;
-			}
-			if (i == max_choice)
-				for (i = 0; i < max_choice; i++) {
+		if (focus_on_buttons) {
+			if (strchr("ynmh", key))
+				i = max_choice;
+			else {
+				for (i = choice + 1; i < max_choice; i++) {
 					item_set(scroll + i);
 					j = first_alpha(item_str(), "YyNnMmHh");
 					if (key == tolower(item_str()[j]))
 						break;
 				}
+				if (i == max_choice)
+					for (i = 0; i < max_choice; i++) {
+						item_set(scroll + i);
+						j = first_alpha(item_str(), "YyNnMmHh");
+						if (key == tolower(item_str()[j]))
+							break;
+					}
+			}
 		}
 
 		if (item_count() != 0 &&
@@ -370,13 +444,68 @@ do_resize:
 			continue;	/* wait for another key press */
 		}
 
+		if (!focus_on_buttons) {
+			if (key == KEY_BACKSPACE) {
+				i = max_choice;
+				if (isearch_str[0]) {
+					isearch_str[strlen(isearch_str) - 1] = '\0';
+					print_item(scroll + choice, choice, true);
+					print_isearch(dialog, box_y, box_x + item_x + 5,
+						      menu_height, !focus_on_buttons);
+					print_buttons(dialog, height, width, button);
+					wrefresh(menu);
+				}
+				continue;
+			}
+
+			if (key == KEY_DC) {
+				isearch_str[0] = '\0';
+				print_item(scroll + choice, choice, true);
+				print_isearch(dialog, box_y, box_x + item_x + 5,
+					      menu_height, !focus_on_buttons);
+				print_buttons(dialog, height, width, button);
+				wrefresh(menu);
+				continue;
+			}
+
+			if (isprint(key)) {
+				item_set(choice);
+				if (strlen(isearch_str) < ISEARCH_LEN - 1
+				    && key != '\\') {
+					isearch_str[i = strlen(isearch_str)] = key;
+					isearch_str[i+1] = '\0';
+					/* Remove highlight of current item */
+					print_item(scroll + choice, choice, FALSE);
+				}
+				if (key == '\\')
+					item_set(choice + 1 < max_choice ? choice + 1 : 0);
+				return key;
+			}
+		}
+
 		switch (key) {
 		case KEY_LEFT:
-		case TAB:
 		case KEY_RIGHT:
 			button = ((key == KEY_LEFT ? --button : ++button) < 0)
 			    ? 4 : (button > 4 ? 0 : button);
-
+			focus_on_buttons = 0; /* see next
+					       * modification below! */
+			/* fallthrough */
+		case TAB:
+			focus_on_buttons = !focus_on_buttons;
+			/* Print the menu */
+			for (i = 0; i < max_choice; i++) {
+				print_item(scroll + i, i, false);
+			}
+			/*
+			 * Print current item again to have the cursor
+			 * positioned
+			 */
+			print_item(scroll + choice, choice, true);
+			wattrset(dialog, dlg.dialog.atr);
+			print_autowrap(dialog, focus_on_buttons ? prompt : isearch_instructions,
+				       width - 2, 4, 1, 3);
+			print_isearch(dialog, box_y, box_x + item_x + 5, menu_height, !focus_on_buttons);
 			print_buttons(dialog, height, width, button);
 			wrefresh(menu);
 			break;

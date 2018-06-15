@@ -160,7 +160,7 @@ do_resize:
 	print_title(dialog, title, width);
 
 	wattrset(dialog, dlg.dialog.atr);
-	print_autowrap(dialog, prompt, width - 2, 1, 3);
+	print_autowrap(dialog, prompt, width - 2, 3, 1, 3);
 
 	list_width = width - 6;
 	box_y = height - list_height - 5;
