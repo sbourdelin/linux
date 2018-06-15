@@ -757,13 +757,13 @@ i2c_unlock_bus(struct i2c_adapter *adapter, unsigned int flags)
 }
 
 static inline void
-i2c_lock_adapter(struct i2c_adapter *adapter)
+i2c_lock_root(struct i2c_adapter *adapter)
 {
 	i2c_lock_bus(adapter, I2C_LOCK_ROOT_ADAPTER);
 }
 
 static inline void
-i2c_unlock_adapter(struct i2c_adapter *adapter)
+i2c_unlock_root(struct i2c_adapter *adapter)
 {
 	i2c_unlock_bus(adapter, I2C_LOCK_ROOT_ADAPTER);
 }

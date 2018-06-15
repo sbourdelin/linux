@@ -82,18 +82,18 @@ static int fops_##wire##_get(void *data, u64 *val)	\
 {							\
 	struct i2c_gpio_private_data *priv = data;	\
 							\
-	i2c_lock_adapter(&priv->adap);			\
+	i2c_lock_root(&priv->adap);			\
 	*val = get##wire(&priv->bit_data);		\
-	i2c_unlock_adapter(&priv->adap);		\
+	i2c_unlock_root(&priv->adap);			\
 	return 0;					\
 }							\
 static int fops_##wire##_set(void *data, u64 val)	\
 {							\
 	struct i2c_gpio_private_data *priv = data;	\
 							\
-	i2c_lock_adapter(&priv->adap);			\
+	i2c_lock_root(&priv->adap);			\
 	set##wire(&priv->bit_data, val);		\
-	i2c_unlock_adapter(&priv->adap);		\
+	i2c_unlock_root(&priv->adap);			\
 	return 0;					\
 }							\
 DEFINE_DEBUGFS_ATTRIBUTE(fops_##wire, fops_##wire##_get, fops_##wire##_set, "%llu\n")
@@ -113,7 +113,7 @@ static int fops_incomplete_transfer_set(void *data, u64 addr)
 	/* ADDR (7 bit) + RD (1 bit) + SDA hi (1 bit) */
 	pattern = (addr << 2) | 3;
 
-	i2c_lock_adapter(&priv->adap);
+	i2c_lock_root(&priv->adap);
 
 	/* START condition */
 	setsda(bit_data, 0);
@@ -129,7 +129,7 @@ static int fops_incomplete_transfer_set(void *data, u64 addr)
 		udelay(bit_data->udelay);
 	}
 
-	i2c_unlock_adapter(&priv->adap);
+	i2c_unlock_root(&priv->adap);
 
 	return 0;
 }

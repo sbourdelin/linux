@@ -921,9 +921,9 @@ static int s3c24xx_i2c_cpufreq_transition(struct notifier_block *nb,
 
 	if ((val == CPUFREQ_POSTCHANGE && delta_f < 0) ||
 	    (val == CPUFREQ_PRECHANGE && delta_f > 0)) {
-		i2c_lock_adapter(&i2c->adap);
+		i2c_lock_root(&i2c->adap);
 		ret = s3c24xx_i2c_clockrate(i2c, &got);
-		i2c_unlock_adapter(&i2c->adap);
+		i2c_unlock_root(&i2c->adap);
 
 		if (ret < 0)
 			dev_err(i2c->dev, "cannot find frequency (%d)\n", ret);
