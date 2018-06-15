@@ -354,6 +354,9 @@ static struct usb_serial_driver * const serial_drivers[] = {
 #define CP210X_PARTNUM_CP2104	0x04
 #define CP210X_PARTNUM_CP2105	0x05
 #define CP210X_PARTNUM_CP2108	0x08
+#define CP210X_PARTNUM_CP2102N_QFN28	0x20
+#define CP210X_PARTNUM_CP2102N_QFN24	0x21
+#define CP210X_PARTNUM_CP2102N_QFN20	0x22
 #define CP210X_PARTNUM_UNKNOWN	0xFF
 
 /* CP210X_GET_COMM_STATUS returns these 0x13 bytes */
@@ -755,8 +758,12 @@ static int cp210x_get_line_ctl(struct usb_serial_port *port, u16 *ctl)
 /*
  * cp210x_quantise_baudrate
  * Quantises the baud rate as per AN205 Table 1
+ * The CP2102N is fully (except for baud rate aliasing) software-
+ * compatible, but supports some additional baudrates. However, there is
+ * no quantitisation table available for this model, so in this case we
+ * take the supported baudrate which is closest to the requested one.
  */
-static unsigned int cp210x_quantise_baudrate(unsigned int baud)
+static unsigned int cp210x_quantise_baudrate(unsigned int baud, bool cp2102n)
 {
 	if (baud <= 300)
 		baud = 300;
@@ -787,10 +794,17 @@ static unsigned int cp210x_quantise_baudrate(unsigned int baud)
 	else if (baud <= 491520)   baud = 460800;
 	else if (baud <= 567138)   baud = 500000;
 	else if (baud <= 670254)   baud = 576000;
-	else if (baud < 1000000)
-		baud = 921600;
-	else if (baud > 2000000)
-		baud = 2000000;
+	else if (cp2102n) {
+		if (baud <= 960800)        baud = 921600;
+		else if (baud <= 1100000)  baud = 1000000;
+		else if (baud <= 1350000)  baud = 1200000;
+		else if (baud <= 1750000)  baud = 1500000;
+		else if (baud <= 2500000)  baud = 2000000;
+		else                       baud = 3000000;
+	} else {
+		if (baud < 1000000)        baud = 921600;
+		else if (baud > 2000000)   baud = 2000000;
+	}
 	return baud;
 }
 
@@ -1042,16 +1056,19 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 static void cp210x_change_speed(struct tty_struct *tty,
 		struct usb_serial_port *port, struct ktermios *old_termios)
 {
-	u32 baud;
+	bool is_cp2102n;
+	u32 baud = tty->termios.c_ospeed;
+	struct cp210x_serial_private *priv = usb_get_serial_data(port->serial);
 
-	baud = tty->termios.c_ospeed;
-
-	/* This maps the requested rate to a rate valid on cp2102 or cp2103,
-	 * or to an arbitrary rate in [1M,2M].
+	/* This maps the requested rate to a rate valid on cp2102(n) or
+	 * cp2103 or to an arbitrary rate in [1M,2M].
 	 *
 	 * NOTE: B0 is not implemented.
 	 */
-	baud = cp210x_quantise_baudrate(baud);
+	is_cp2102n =	(priv->partnum == CP210X_PARTNUM_CP2102N_QFN28) ||
+			(priv->partnum == CP210X_PARTNUM_CP2102N_QFN24) ||
+			(priv->partnum == CP210X_PARTNUM_CP2102N_QFN20);
+	baud = cp210x_quantise_baudrate(baud, is_cp2102n);
 
 	dev_dbg(&port->dev, "%s - setting baud rate to %u\n", __func__, baud);
 	if (cp210x_write_u32_reg(port, CP210X_SET_BAUDRATE, baud)) {
