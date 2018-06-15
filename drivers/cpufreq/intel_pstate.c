@@ -308,6 +308,12 @@ static struct global_params global;
 static DEFINE_MUTEX(intel_pstate_driver_lock);
 static DEFINE_MUTEX(intel_pstate_limits_lock);
 
+#define INTEL_PSTATE_HWP_FEATURE_DISABLE_EE	0x01
+#define INTEL_PSTATE_HWP_PERF_BOOST		0x02
+#define INTEL_PSTATE_HWP_BROADWELL		0x04
+
+static u32 intel_pstate_hwp_features;
+
 #ifdef CONFIG_ACPI
 
 static bool intel_pstate_get_ppc_enable_status(void)
@@ -1413,7 +1419,16 @@ static void intel_pstate_get_cpu_pstates(struct cpudata *cpu)
 	cpu->pstate.turbo_pstate = pstate_funcs.get_turbo();
 	cpu->pstate.scaling = pstate_funcs.get_scaling();
 	cpu->pstate.max_freq = cpu->pstate.max_pstate * cpu->pstate.scaling;
-	cpu->pstate.turbo_freq = cpu->pstate.turbo_pstate * cpu->pstate.scaling;
+
+	if (hwp_active &&
+	    !(intel_pstate_hwp_features & INTEL_PSTATE_HWP_BROADWELL)) {
+		unsigned int phy_max, current_max;
+
+		intel_pstate_get_hwp_max(cpu->cpu, &phy_max, &current_max);
+		cpu->pstate.turbo_freq = phy_max * cpu->pstate.scaling;
+	} else {
+		cpu->pstate.turbo_freq = cpu->pstate.turbo_pstate * cpu->pstate.scaling;
+	}
 
 	if (pstate_funcs.get_aperf_mperf_shift)
 		cpu->aperf_mperf_shift = pstate_funcs.get_aperf_mperf_shift();
@@ -1789,14 +1804,16 @@ static const struct x86_cpu_id intel_pstate_cpu_oob_ids[] __initconst = {
 	{}
 };
 
-static const struct x86_cpu_id intel_pstate_cpu_ee_disable_ids[] = {
-	ICPU(INTEL_FAM6_KABYLAKE_DESKTOP, core_funcs),
-	{}
-};
+#define ICPU1(model, feature) \
+	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_APERFMPERF,\
+	 feature}
 
-static const struct x86_cpu_id intel_pstate_hwp_boost_ids[] = {
-	ICPU(INTEL_FAM6_SKYLAKE_X, core_funcs),
-	ICPU(INTEL_FAM6_SKYLAKE_DESKTOP, core_funcs),
+static const struct x86_cpu_id intel_pstate_hwp_feature_ids[] = {
+	ICPU1(INTEL_FAM6_BROADWELL_X, INTEL_PSTATE_HWP_BROADWELL),
+	ICPU1(INTEL_FAM6_BROADWELL_XEON_D, INTEL_PSTATE_HWP_BROADWELL),
+	ICPU1(INTEL_FAM6_KABYLAKE_DESKTOP, INTEL_PSTATE_HWP_FEATURE_DISABLE_EE),
+	ICPU1(INTEL_FAM6_SKYLAKE_DESKTOP, INTEL_PSTATE_HWP_PERF_BOOST),
+	ICPU1(INTEL_FAM6_SKYLAKE_X, INTEL_PSTATE_HWP_PERF_BOOST),
 	{}
 };
 
@@ -1825,14 +1842,16 @@ static int intel_pstate_init_cpu(unsigned int cpunum)
 	if (hwp_active) {
 		const struct x86_cpu_id *id;
 
-		id = x86_match_cpu(intel_pstate_cpu_ee_disable_ids);
+		id = x86_match_cpu(intel_pstate_hwp_feature_ids);
 		if (id)
+			intel_pstate_hwp_features = id->driver_data;
+
+		if (intel_pstate_hwp_features & INTEL_PSTATE_HWP_FEATURE_DISABLE_EE)
 			intel_pstate_disable_ee(cpunum);
 
 		intel_pstate_hwp_enable(cpu);
 
-		id = x86_match_cpu(intel_pstate_hwp_boost_ids);
-		if (id)
+		if (intel_pstate_hwp_features & INTEL_PSTATE_HWP_PERF_BOOST)
 			hwp_boost = true;
 	}
 
