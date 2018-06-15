@@ -7721,6 +7721,28 @@ int perf_event_account_interrupt(struct perf_event *event)
 	return __perf_event_account_interrupt(event, 1);
 }
 
+static int perf_allow_sample_leakage __read_mostly;
+
+static bool sample_is_allowed(struct perf_event *event, struct pt_regs *regs)
+{
+	int allow_leakage = READ_ONCE(perf_allow_sample_leakage);
+
+	if (allow_leakage)
+		return true;
+
+	/*
+	 * Due to interrupt latency (AKA "skid"), we may enter the
+	 * kernel before taking an overflow, even if the PMU is only
+	 * counting user events.
+	 * To avoid leaking information to userspace, we must always
+	 * reject kernel samples when exclude_kernel is set.
+	 */
+	if (event->attr.exclude_kernel && !user_mode(regs))
+		return false;
+
+	return true;
+}
+
 /*
  * Generic event overflow handling, sampling.
  */
@@ -7740,6 +7762,12 @@ static int __perf_event_overflow(struct perf_event *event,
 		return 0;
 
 	ret = __perf_event_account_interrupt(event, throttle);
+
+	/*
+	 * For security, drop the skid kernel samples if necessary.
+	 */
+	if (!sample_is_allowed(event, regs))
+		return ret;
 
 	/*
 	 * XXX event_limit might not quite work as expected on inherited
@@ -9500,9 +9528,39 @@ perf_event_mux_interval_ms_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(perf_event_mux_interval_ms);
 
+static ssize_t
+perf_allow_sample_leakage_show(struct device *dev,
+			       struct device_attribute *attr, char *page)
+{
+	int allow_leakage = READ_ONCE(perf_allow_sample_leakage);
+
+	return snprintf(page, PAGE_SIZE-1, "%d\n", allow_leakage);
+}
+
+static ssize_t
+perf_allow_sample_leakage_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	int allow_leakage, ret;
+
+	ret = kstrtoint(buf, 0, &allow_leakage);
+	if (ret)
+		return ret;
+
+	if (allow_leakage != 0 && allow_leakage != 1)
+		return -EINVAL;
+
+	WRITE_ONCE(perf_allow_sample_leakage, allow_leakage);
+
+	return count;
+}
+static DEVICE_ATTR_RW(perf_allow_sample_leakage);
+
 static struct attribute *pmu_dev_attrs[] = {
 	&dev_attr_type.attr,
 	&dev_attr_perf_event_mux_interval_ms.attr,
+	&dev_attr_perf_allow_sample_leakage.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(pmu_dev);
