@@ -1469,6 +1469,8 @@ static void dwc2_wait_timer_fn(struct timer_list *t)
 {
 	struct dwc2_qh *qh = from_timer(qh, t, wait_timer);
 	struct dwc2_hsotg *hsotg = qh->hsotg;
+	enum dwc2_transaction_type tr_type;
+	u32 intr_mask;
 	unsigned long flags;
 
 	spin_lock_irqsave(&hsotg->lock, flags);
@@ -1477,19 +1479,22 @@ static void dwc2_wait_timer_fn(struct timer_list *t)
 	 * We'll set wait_timer_cancel to true if we want to cancel this
 	 * operation in dwc2_hcd_qh_unlink().
 	 */
-	if (!qh->wait_timer_cancel) {
-		enum dwc2_transaction_type tr_type;
+	if (qh->wait_timer_cancel)
+		goto out_unlock;
 
-		qh->want_wait = false;
+	list_move(&qh->qh_list_entry, &hsotg->non_periodic_sched_inactive);
 
-		list_move(&qh->qh_list_entry,
-			  &hsotg->non_periodic_sched_inactive);
+	/* See if we should kick the controller if it was idle */
+	intr_mask = dwc2_readl(hsotg->regs + GINTMSK);
+	if (intr_mask & GINTSTS_SOF)
+		goto out_unlock;
 
-		tr_type = dwc2_hcd_select_transactions(hsotg);
-		if (tr_type != DWC2_TRANSACTION_NONE)
-			dwc2_hcd_queue_transactions(hsotg, tr_type);
-	}
+	/* The controller was idle, let's try queue our postponed work */
+	tr_type = dwc2_hcd_select_transactions(hsotg);
+	if (tr_type != DWC2_TRANSACTION_NONE)
+		dwc2_hcd_queue_transactions(hsotg, tr_type);
 
+out_unlock:
 	spin_unlock_irqrestore(&hsotg->lock, flags);
 }
 
@@ -1723,10 +1728,6 @@ int dwc2_hcd_qh_add(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 
 	/* Add the new QH to the appropriate schedule */
 	if (dwc2_qh_is_non_per(qh)) {
-		/* Schedule right away */
-		qh->start_active_frame = hsotg->frame_number;
-		qh->next_active_frame = qh->start_active_frame;
-
 		if (qh->want_wait) {
 			list_add_tail(&qh->qh_list_entry,
 				      &hsotg->non_periodic_sched_waiting);
@@ -1734,6 +1735,10 @@ int dwc2_hcd_qh_add(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 			mod_timer(&qh->wait_timer,
 				  jiffies + DWC2_RETRY_WAIT_DELAY + 1);
 		} else {
+			/* Schedule right away */
+			qh->start_active_frame = hsotg->frame_number;
+			qh->next_active_frame = qh->start_active_frame;
+
 			list_add_tail(&qh->qh_list_entry,
 				      &hsotg->non_periodic_sched_inactive);
 		}
