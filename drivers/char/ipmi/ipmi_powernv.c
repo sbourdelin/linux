@@ -31,6 +31,12 @@ struct ipmi_smi_powernv {
 	spinlock_t		msg_lock;
 	struct ipmi_smi_msg	*cur_msg;
 	struct opal_ipmi_msg	*opal_msg;
+
+	/**
+	 * Marker denoting if we should be draining the ipmi queue of any
+	 * outstanding messages
+	 */
+	bool			in_drain;
 };
 
 static int ipmi_powernv_start_processing(void *send_info, ipmi_smi_t intf)
@@ -96,6 +102,7 @@ static void ipmi_powernv_send(void *send_info, struct ipmi_smi_msg *msg)
 
 	if (!rc) {
 		smi->cur_msg = msg;
+		smi->in_drain = false;
 		spin_unlock_irqrestore(&smi->msg_lock, flags);
 		return;
 	}
@@ -121,8 +128,14 @@ static int ipmi_powernv_recv(struct ipmi_smi_powernv *smi)
 	spin_lock_irqsave(&smi->msg_lock, flags);
 
 	if (!smi->cur_msg) {
+		bool in_drain = READ_ONCE(smi->in_drain);
 		spin_unlock_irqrestore(&smi->msg_lock, flags);
-		pr_warn("no current message?\n");
+		/**
+		 * We don't want to print spurious errors if we are draining
+		 * leftover messages prior to sending our first message.
+		 */
+		if (!in_drain)
+			pr_warn("no current message?\n");
 		return 0;
 	}
 
@@ -225,6 +238,11 @@ static int ipmi_powernv_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	spin_lock_init(&ipmi->msg_lock);
+
+	/* Our channel may have stale messages from a previous kernel
+	 * let the recv code know we haven't actually sent anything yet
+	 */
+	ipmi->in_drain = true;
 
 	rc = of_property_read_u32(dev->of_node, "ibm,ipmi-interface-id",
 			&prop);
