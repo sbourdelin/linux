@@ -252,6 +252,30 @@ struct tty_port {
 	void 			*client_data;
 };
 
+#define tty_port_lock_irq(lock)				\
+	do {						\
+		printk_safe_enter_irq();		\
+		spin_lock(lock);			\
+	} while (0)
+
+#define tty_port_unlock_irq(lock)			\
+	do {						\
+		spin_unlock(lock);			\
+		printk_safe_exit_irq();			\
+	} while (0)
+
+#define tty_port_lock_irqsave(lock, flags)		\
+	do {						\
+		printk_safe_enter_irqsave(flags);	\
+		spin_lock(lock);			\
+	} while (0)
+
+#define tty_port_unlock_irqrestore(lock, flags)		\
+	do {						\
+		spin_unlock(lock);			\
+		printk_safe_exit_irqrestore(flags);	\
+	} while (0)
+
 /* tty_port::iflags bits -- use atomic bit ops */
 #define TTY_PORT_INITIALIZED	0	/* device is initialized */
 #define TTY_PORT_SUSPENDED	1	/* device is suspended */
