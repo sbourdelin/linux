@@ -1555,58 +1555,25 @@ sector_t bmap(struct inode *inode, sector_t block)
 EXPORT_SYMBOL(bmap);
 
 /*
- * Update times in overlayed inode from underlying real inode
- */
-static void update_ovl_inode_times(struct dentry *dentry, struct inode *inode,
-			       bool rcu)
-{
-	struct dentry *upperdentry;
-
-	/*
-	 * Nothing to do if in rcu or if non-overlayfs
-	 */
-	if (rcu || likely(!(dentry->d_flags & DCACHE_OP_REAL)))
-		return;
-
-	upperdentry = d_real(dentry, NULL, 0, D_REAL_UPPER);
-
-	/*
-	 * If file is on lower then we can't update atime, so no worries about
-	 * stale mtime/ctime.
-	 */
-	if (upperdentry) {
-		struct inode *realinode = d_inode(upperdentry);
-
-		if ((!timespec_equal(&inode->i_mtime, &realinode->i_mtime) ||
-		     !timespec_equal(&inode->i_ctime, &realinode->i_ctime))) {
-			inode->i_mtime = realinode->i_mtime;
-			inode->i_ctime = realinode->i_ctime;
-		}
-	}
-}
-
-/*
  * With relative atime, only update atime if the previous atime is
  * earlier than either the ctime or mtime or if at least a day has
  * passed since the last atime update.
  */
-static int relatime_need_update(const struct path *path, struct inode *inode,
-				struct timespec now, bool rcu)
+static int relatime_need_update(struct vfsmount *mnt, struct inode *inode,
+			     struct timespec now)
 {
 
-	if (!(path->mnt->mnt_flags & MNT_RELATIME))
+	if (!(mnt->mnt_flags & MNT_RELATIME))
 		return 1;
-
-	update_ovl_inode_times(path->dentry, inode, rcu);
 	/*
 	 * Is mtime younger than atime? If yes, update atime:
 	 */
-	if (timespec_compare(&inode->i_mtime, &inode->i_atime) >= 0)
+	if (timespec64_compare(&inode->i_mtime, &inode->i_atime) >= 0)
 		return 1;
 	/*
 	 * Is ctime younger than atime? If yes, update atime:
 	 */
-	if (timespec_compare(&inode->i_ctime, &inode->i_atime) >= 0)
+	if (timespec64_compare(&inode->i_ctime, &inode->i_atime) >= 0)
 		return 1;
 
 	/*
@@ -1621,7 +1588,7 @@ static int relatime_need_update(const struct path *path, struct inode *inode,
 	return 0;
 }
 
-int generic_update_time(struct inode *inode, struct timespec *time, int flags)
+int generic_update_time(struct inode *inode, struct timespec64 *time, int flags)
 {
 	int iflags = I_DIRTY_TIME;
 	bool dirty = false;
@@ -1649,9 +1616,9 @@ EXPORT_SYMBOL(generic_update_time);
  * This does the actual work of updating an inodes time or version.  Must have
  * had called mnt_want_write() before calling this.
  */
-static int update_time(struct inode *inode, struct timespec *time, int flags)
+static int update_time(struct inode *inode, struct timespec64 *time, int flags)
 {
-	int (*update_time)(struct inode *, struct timespec *, int);
+	int (*update_time)(struct inode *, struct timespec64 *, int);
 
 	update_time = inode->i_op->update_time ? inode->i_op->update_time :
 		generic_update_time;
@@ -1668,11 +1635,10 @@ static int update_time(struct inode *inode, struct timespec *time, int flags)
  *	This function automatically handles read only file systems and media,
  *	as well as the "noatime" flag and inode specific "noatime" markers.
  */
-bool __atime_needs_update(const struct path *path, struct inode *inode,
-			  bool rcu)
+bool atime_needs_update(const struct path *path, struct inode *inode)
 {
 	struct vfsmount *mnt = path->mnt;
-	struct timespec now;
+	struct timespec64 now;
 
 	if (inode->i_flags & S_NOATIME)
 		return false;
@@ -1695,10 +1661,10 @@ bool __atime_needs_update(const struct path *path, struct inode *inode,
 
 	now = current_time(inode);
 
-	if (!relatime_need_update(path, inode, now, rcu))
+	if (!relatime_need_update(mnt, inode, timespec64_to_timespec(now)))
 		return false;
 
-	if (timespec_equal(&inode->i_atime, &now))
+	if (timespec64_equal(&inode->i_atime, &now))
 		return false;
 
 	return true;
@@ -1708,9 +1674,9 @@ void touch_atime(const struct path *path)
 {
 	struct vfsmount *mnt = path->mnt;
 	struct inode *inode = d_inode(path->dentry);
-	struct timespec now;
+	struct timespec64 now;
 
-	if (!__atime_needs_update(path, inode, false))
+	if (!atime_needs_update(path, inode))
 		return;
 
 	if (!sb_start_write_trylock(inode->i_sb))
@@ -1842,7 +1808,7 @@ EXPORT_SYMBOL(file_remove_privs);
 int file_update_time(struct file *file)
 {
 	struct inode *inode = file_inode(file);
-	struct timespec now;
+	struct timespec64 now;
 	int sync_it = 0;
 	int ret;
 
@@ -1851,10 +1817,10 @@ int file_update_time(struct file *file)
 		return 0;
 
 	now = current_time(inode);
-	if (!timespec_equal(&inode->i_mtime, &now))
+	if (!timespec64_equal(&inode->i_mtime, &now))
 		sync_it = S_MTIME;
 
-	if (!timespec_equal(&inode->i_ctime, &now))
+	if (!timespec64_equal(&inode->i_ctime, &now))
 		sync_it |= S_CTIME;
 
 	if (IS_I_VERSION(inode) && inode_iversion_need_inc(inode))
@@ -2098,6 +2064,30 @@ void inode_nohighmem(struct inode *inode)
 EXPORT_SYMBOL(inode_nohighmem);
 
 /**
+ * timespec64_trunc - Truncate timespec64 to a granularity
+ * @t: Timespec64
+ * @gran: Granularity in ns.
+ *
+ * Truncate a timespec64 to a granularity. Always rounds down. gran must
+ * not be 0 nor greater than a second (NSEC_PER_SEC, or 10^9 ns).
+ */
+struct timespec64 timespec64_trunc(struct timespec64 t, unsigned gran)
+{
+	/* Avoid division in the common cases 1 ns and 1 s. */
+	if (gran == 1) {
+		/* nothing */
+	} else if (gran == NSEC_PER_SEC) {
+		t.tv_nsec = 0;
+	} else if (gran > 1 && gran < NSEC_PER_SEC) {
+		t.tv_nsec -= t.tv_nsec % gran;
+	} else {
+		WARN(1, "illegal file time granularity: %u", gran);
+	}
+	return t;
+}
+EXPORT_SYMBOL(timespec64_trunc);
+
+/**
  * current_time - Return FS time
  * @inode: inode.
  *
@@ -2107,15 +2097,15 @@ EXPORT_SYMBOL(inode_nohighmem);
  * Note that inode and inode->sb cannot be NULL.
  * Otherwise, the function warns and returns time without truncation.
  */
-struct timespec current_time(struct inode *inode)
+struct timespec64 current_time(struct inode *inode)
 {
-	struct timespec now = current_kernel_time();
+	struct timespec64 now = current_kernel_time64();
 
 	if (unlikely(!inode->i_sb)) {
 		WARN(1, "current_time() called with uninitialized super_block in the inode");
 		return now;
 	}
 
-	return timespec_trunc(now, inode->i_sb->s_time_gran);
+	return timespec64_trunc(now, inode->i_sb->s_time_gran);
 }
 EXPORT_SYMBOL(current_time);

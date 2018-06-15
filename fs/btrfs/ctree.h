@@ -3197,7 +3197,7 @@ int btrfs_merge_bio_hook(struct page *page, unsigned long offset,
 			 size_t size, struct bio *bio,
 			 unsigned long bio_flags);
 void btrfs_set_range_writeback(void *private_data, u64 start, u64 end);
-int btrfs_page_mkwrite(struct vm_fault *vmf);
+vm_fault_t btrfs_page_mkwrite(struct vm_fault *vmf);
 int btrfs_readpage(struct file *file, struct page *page);
 void btrfs_evict_inode(struct inode *inode);
 int btrfs_write_inode(struct inode *inode, struct writeback_control *wbc);
@@ -3247,8 +3247,9 @@ void btrfs_get_block_group_info(struct list_head *groups_list,
 				struct btrfs_ioctl_space_info *space);
 void btrfs_update_ioctl_balance_args(struct btrfs_fs_info *fs_info,
 			       struct btrfs_ioctl_balance_args *bargs);
-ssize_t btrfs_dedupe_file_range(struct file *src_file, u64 loff, u64 olen,
-			   struct file *dst_file, u64 dst_loff);
+loff_t btrfs_dedupe_file_range(struct file *src_file, loff_t loff,
+			       struct file *dst_file, loff_t dst_loff,
+			       loff_t olen);
 
 /* file.c */
 int __init btrfs_auto_defrag_init(void);

@@ -320,6 +320,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval,
 		   struct iattr *iattr, struct nfs4_acl **acl,
 		   struct xdr_netobj *label, int *umask)
 {
+	struct timespec ts;
 	int expected_len, len = 0;
 	u32 dummy32;
 	char *buf;
@@ -421,7 +422,8 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval,
 		switch (dummy32) {
 		case NFS4_SET_TO_CLIENT_TIME:
 			len += 12;
-			status = nfsd4_decode_time(argp, &iattr->ia_atime);
+			status = nfsd4_decode_time(argp, &ts);
+			iattr->ia_atime = timespec_to_timespec64(ts);
 			if (status)
 				return status;
 			iattr->ia_valid |= (ATTR_ATIME | ATTR_ATIME_SET);
@@ -440,7 +442,8 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval,
 		switch (dummy32) {
 		case NFS4_SET_TO_CLIENT_TIME:
 			len += 12;
-			status = nfsd4_decode_time(argp, &iattr->ia_mtime);
+			status = nfsd4_decode_time(argp, &ts);
+			iattr->ia_mtime = timespec_to_timespec64(ts);
 			if (status)
 				return status;
 			iattr->ia_valid |= (ATTR_MTIME | ATTR_MTIME_SET);
@@ -2003,6 +2006,30 @@ static __be32 *encode_change(__be32 *p, struct kstat *stat, struct inode *inode,
 	return p;
 }
 
+/*
+ * ctime (in NFSv4, time_metadata) is not writeable, and the client
+ * doesn't really care what resolution could theoretically be stored by
+ * the filesystem.
+ *
+ * The client cares how close together changes can be while still
+ * guaranteeing ctime changes.  For most filesystems (which have
+ * timestamps with nanosecond fields) that is limited by the resolution
+ * of the time returned from current_time().
+ */
+static __be32 *encode_time_delta(__be32 *p, struct inode *inode)
+{
+	struct timespec ts;
+	u32 ns;
+
+	ns = max(ktime_get_resolution_ns(), inode->i_sb->s_time_gran);
+	ts = ns_to_timespec(ns);
+
+	p = xdr_encode_hyper(p, ts.tv_sec);
+	*p++ = cpu_to_be32(ts.tv_nsec);
+
+	return p;
+}
+
 static __be32 *encode_cinfo(__be32 *p, struct nfsd4_change_info *c)
 {
 	*p++ = cpu_to_be32(c->atomic);
@@ -2794,9 +2821,7 @@ out_acl:
 		p = xdr_reserve_space(xdr, 12);
 		if (!p)
 			goto out_resource;
-		*p++ = cpu_to_be32(0);
-		*p++ = cpu_to_be32(1);
-		*p++ = cpu_to_be32(0);
+		p = encode_time_delta(p, d_inode(dentry));
 	}
 	if (bmval1 & FATTR4_WORD1_TIME_METADATA) {
 		p = xdr_reserve_space(xdr, 12);
@@ -2863,6 +2888,18 @@ out_acl:
 		status = nfsd4_encode_bitmap(xdr, supp[0], supp[1], supp[2]);
 		if (status)
 			goto out;
+	}
+
+	if (bmval2 & FATTR4_WORD2_CHANGE_ATTR_TYPE) {
+		p = xdr_reserve_space(xdr, 4);
+		if (!p)
+			goto out_resource;
+		if (IS_I_VERSION(d_inode(dentry)))
+			*p++ = cpu_to_be32(
+				NFS4_CHANGE_TYPE_IS_MONOTONIC_INCR);
+		else
+			*p++ = cpu_to_be32(
+				NFS4_CHANGE_TYPE_IS_TIME_METADATA);
 	}
 
 	if (bmval2 & FATTR4_WORD2_SECURITY_LABEL) {

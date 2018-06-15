@@ -557,6 +557,9 @@ static int parse_options(char *options, struct super_block *sb,
 			set_opt (opts->s_mount_opt, NO_UID32);
 			break;
 		case Opt_nocheck:
+			ext2_msg(sb, KERN_WARNING,
+				"Option nocheck/check=none is deprecated and"
+				" will be removed in June 2020.");
 			clear_opt (opts->s_mount_opt, CHECK);
 			break;
 		case Opt_debug:
@@ -930,7 +933,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_flags = (sb->s_flags & ~SB_POSIXACL) |
 		((EXT2_SB(sb)->s_mount_opt & EXT2_MOUNT_POSIX_ACL) ?
 		 SB_POSIXACL : 0);
-	sb->s_iflags |= SB_I_CGROUPWB;
 
 	if (le32_to_cpu(es->s_rev_level) == EXT2_GOOD_OLD_REV &&
 	    (EXT2_HAS_COMPAT_FEATURE(sb, ~0U) ||
@@ -1335,9 +1337,6 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 	new_opts.s_resgid = sbi->s_resgid;
 	spin_unlock(&sbi->s_lock);
 
-	/*
-	 * Allow the "check" option to be passed as a remount option.
-	 */
 	if (!parse_options(data, sb, &new_opts))
 		return -EINVAL;
 
