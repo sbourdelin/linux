@@ -15,6 +15,7 @@
 #include <linux/i8253.h>
 #include <linux/time.h>
 #include <linux/export.h>
+#include <linux/sched/clock.h>
 
 #include <asm/vsyscall.h>
 #include <asm/x86_init.h>
@@ -103,4 +104,33 @@ static __init void x86_late_time_init(void)
 void __init time_init(void)
 {
 	late_time_init = x86_late_time_init;
+}
+
+/*
+ * Called once during to boot to initialize boot time.
+ * This function returns timestamp in timespec format which is sec/nsec from
+ * epoch of when boot started.
+ * We use sched_clock_cpu() that gives us nanoseconds from when this clock has
+ * been started and it happens quiet early during boot process. To calculate
+ * offset from epoch we use information provided in 'now' by the caller
+ *
+ * If sched_clock_cpu() is not available or if there is any kind of error
+ * i.e. time from epoch is smaller than boot time, we must return zeros in ts,
+ * and the caller will take care of the error: by assuming that the time when
+ * this function was called is the beginning of boot time.
+ */
+void __init read_boot_clock64(struct timespec64 *now, struct timespec64 *ts)
+{
+	u64 ns_boot = sched_clock_cpu(smp_processor_id());
+	bool valid_clock;
+	u64 ns_now;
+
+	ns_now = timespec64_to_ns(now);
+	valid_clock = ns_boot && timespec64_valid_strict(now) &&
+			(ns_now > ns_boot);
+
+	if (!valid_clock)
+		*ts = (struct timespec64){0, 0};
+	else
+		*ts = ns_to_timespec64(ns_now - ns_boot);
 }
