@@ -3056,22 +3056,24 @@ int ufshcd_map_desc_id_to_length(struct ufs_hba *hba,
 EXPORT_SYMBOL(ufshcd_map_desc_id_to_length);
 
 /**
- * ufshcd_read_desc_param - read the specified descriptor parameter
+ * ufshcd_rw_desc_param - read or write the specified descriptor parameter
  * @hba: Pointer to adapter instance
+ * @opcode: indicates whether to read or write
  * @desc_id: descriptor idn value
  * @desc_index: descriptor index
- * @param_offset: offset of the parameter to read
- * @param_read_buf: pointer to buffer where parameter would be read
- * @param_size: sizeof(param_read_buf)
+ * @param_offset: offset of the parameter to read or write
+ * @param_buf: pointer to buffer to be read or written
+ * @param_size: sizeof(param_buf)
  *
  * Return 0 in case of success, non-zero otherwise
  */
-int ufshcd_read_desc_param(struct ufs_hba *hba,
-			   enum desc_idn desc_id,
-			   int desc_index,
-			   u8 param_offset,
-			   u8 *param_read_buf,
-			   u8 param_size)
+int ufshcd_rw_desc_param(struct ufs_hba *hba,
+			 enum query_opcode opcode,
+			 enum desc_idn desc_id,
+			 int desc_index,
+			 u8 param_offset,
+			 u8 *param_buf,
+			 u8 param_size)
 {
 	int ret;
 	u8 *desc_buf;
@@ -3082,7 +3084,8 @@ int ufshcd_read_desc_param(struct ufs_hba *hba,
 	if (desc_id >= QUERY_DESC_IDN_MAX || !param_size)
 		return -EINVAL;
 
-	/* Get the max length of descriptor from structure filled up at probe
+	/*
+	 * Get the max length of descriptor from structure filled up at probe
 	 * time.
 	 */
 	ret = ufshcd_map_desc_id_to_length(hba, desc_id, &buff_len);
@@ -3094,26 +3097,53 @@ int ufshcd_read_desc_param(struct ufs_hba *hba,
 		return ret;
 	}
 
+	if (param_offset > buff_len)
+		return -EINVAL;
+
+	/* Lock the descriptor mutex to prevent simultaneous changes. */
+	mutex_lock(&hba->desc_mutex);
+
 	/* Check whether we need temp memory */
 	if (param_offset != 0 || param_size < buff_len) {
-		desc_buf = kmalloc(buff_len, GFP_KERNEL);
-		if (!desc_buf)
-			return -ENOMEM;
+		desc_buf = kzalloc(buff_len, GFP_KERNEL);
+		if (!desc_buf) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		/*
+		 * If it's a write, first read the complete descriptor, then
+		 * copy in the parts being changed.
+		 */
+		if (opcode == UPIU_QUERY_OPCODE_WRITE_DESC) {
+			if (param_offset + param_size > buff_len) {
+				ret = -EINVAL;
+				goto out;
+			}
+
+			ret = ufshcd_query_descriptor_retry(hba,
+						UPIU_QUERY_OPCODE_READ_DESC,
+						desc_id, desc_index, 0,
+						desc_buf, &buff_len);
+
+			if (ret)
+				goto out;
+
+			memcpy(desc_buf + param_offset, param_buf, param_size);
+		}
+
 	} else {
-		desc_buf = param_read_buf;
+		desc_buf = param_buf;
 		is_kmalloc = false;
 	}
 
-	/* Request for full descriptor */
-	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+	/* Read or write the entire descriptor. */
+	ret = ufshcd_query_descriptor_retry(hba, opcode,
 					desc_id, desc_index, 0,
 					desc_buf, &buff_len);
 
-	if (ret) {
-		dev_err(hba->dev, "%s: Failed reading descriptor. desc_id %d, desc_index %d, param_offset %d, ret %d",
-			__func__, desc_id, desc_index, param_offset, ret);
+	if (ret)
 		goto out;
-	}
 
 	/* Sanity check */
 	if (desc_buf[QUERY_DESC_DESC_TYPE_OFFSET] != desc_id) {
@@ -3123,13 +3153,29 @@ int ufshcd_read_desc_param(struct ufs_hba *hba,
 		goto out;
 	}
 
-	/* Check wherher we will not copy more data, than available */
-	if (is_kmalloc && param_size > buff_len)
-		param_size = buff_len;
+	/*
+	 * Copy data to the output. The offset is already validated to be
+	 * within the buffer.
+	 */
+	if (is_kmalloc && (opcode == UPIU_QUERY_OPCODE_READ_DESC)) {
+		if (param_offset + param_size > buff_len) {
+			memset(param_buf + buff_len - param_offset, 0,
+			       param_offset + param_size - buff_len);
 
-	if (is_kmalloc)
-		memcpy(param_read_buf, &desc_buf[param_offset], param_size);
+			param_size = buff_len - param_offset;
+		}
+
+		memcpy(param_buf, &desc_buf[param_offset], param_size);
+	}
+
 out:
+	mutex_unlock(&hba->desc_mutex);
+	if (ret)
+		dev_err(hba->dev, "Failed %s descriptor. desc_id %d, desc_index %d, param_offset %d, ret %d",
+			opcode == UPIU_QUERY_OPCODE_READ_DESC ?
+			"reading" : "writing",
+			desc_id, desc_index, param_offset, ret);
+
 	if (is_kmalloc)
 		kfree(desc_buf);
 	return ret;
@@ -3141,7 +3187,8 @@ static inline int ufshcd_read_desc(struct ufs_hba *hba,
 				   u8 *buf,
 				   u32 size)
 {
-	return ufshcd_read_desc_param(hba, desc_id, desc_index, 0, buf, size);
+	return ufshcd_rw_desc_param(hba, UPIU_QUERY_OPCODE_READ_DESC, desc_id,
+					desc_index, 0, buf, size);
 }
 
 static inline int ufshcd_read_power_desc(struct ufs_hba *hba,
@@ -3247,8 +3294,9 @@ static inline int ufshcd_read_unit_desc_param(struct ufs_hba *hba,
 	if (!ufs_is_valid_unit_desc_lun(lun))
 		return -EOPNOTSUPP;
 
-	return ufshcd_read_desc_param(hba, QUERY_DESC_IDN_UNIT, lun,
-				      param_offset, param_read_buf, param_size);
+	return ufshcd_rw_desc_param(hba, UPIU_QUERY_OPCODE_READ_DESC,
+				    QUERY_DESC_IDN_UNIT, lun, param_offset,
+				    param_read_buf, param_size);
 }
 
 /**
@@ -7979,8 +8027,9 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	INIT_WORK(&hba->eh_work, ufshcd_err_handler);
 	INIT_WORK(&hba->eeh_work, ufshcd_exception_event_handler);
 
-	/* Initialize UIC command mutex */
+	/* Initialize UIC command and descriptor mutexes */
 	mutex_init(&hba->uic_cmd_mutex);
+	mutex_init(&hba->desc_mutex);
 
 	/* Initialize mutex for device management commands */
 	mutex_init(&hba->dev_cmd.lock);
