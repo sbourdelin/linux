@@ -327,6 +327,132 @@ static const struct attribute_group ufs_sysfs_device_descriptor_group = {
 	.attrs = ufs_sysfs_device_descriptor,
 };
 
+/*
+ * Define a unique attribute structure for configuration descriptors, since
+ * the sysfs attributes look at both the description and the parent kobject
+ * to find the index.
+ */
+
+struct ufs_config_desc_attr {
+	struct attribute attr;
+	u8 offset;
+	u8 size;
+};
+
+#define to_ufs_cfg_obj(_kobj) container_of(_kobj, struct ufs_cfg_object, kobj)
+#define to_ufs_cfg_desc_attr(_attr) \
+	container_of(_attr, struct ufs_config_desc_attr, attr)
+
+#define UFS_CONFIG_DESC_PARAM(_name, _uname, _size)			\
+static struct ufs_config_desc_attr ufs_cfg_attr_##_name = {		\
+	.attr = {.name = __stringify(_name),				\
+		 .mode = VERIFY_OCTAL_PERMISSIONS(0444) }, \
+	.offset = CONFIGURATION_DESC_PARAM##_uname,			\
+	.size = _size							\
+}
+
+UFS_CONFIG_DESC_PARAM(number_of_luns, _NUM_LU, 1);
+UFS_CONFIG_DESC_PARAM(boot_enable, _BOOT_ENBL, 1);
+UFS_CONFIG_DESC_PARAM(descriptor_access_enable, _DESC_ACCSS_ENBL, 1);
+UFS_CONFIG_DESC_PARAM(initial_power_mode, _INIT_PWR_MODE, 1);
+UFS_CONFIG_DESC_PARAM(high_priority_lun, _HIGH_PR_LUN, 1);
+UFS_CONFIG_DESC_PARAM(secure_removal_type, _SEC_RMV_TYPE, 1);
+UFS_CONFIG_DESC_PARAM(init_active_icc_level, _ACTVE_ICC_LVL, 1);
+UFS_CONFIG_DESC_PARAM(periodic_rtc_update, _FRQ_RTC, 2);
+
+static struct attribute *ufs_sysfs_config_descriptor[] = {
+	&ufs_cfg_attr_number_of_luns.attr,
+	&ufs_cfg_attr_boot_enable.attr,
+	&ufs_cfg_attr_descriptor_access_enable.attr,
+	&ufs_cfg_attr_initial_power_mode.attr,
+	&ufs_cfg_attr_high_priority_lun.attr,
+	&ufs_cfg_attr_secure_removal_type.attr,
+	&ufs_cfg_attr_init_active_icc_level.attr,
+	&ufs_cfg_attr_periodic_rtc_update.attr,
+	NULL,
+};
+
+#define UFS_CONFIG_UNIT_DESC_PARAM(_name, _uname, _size)		\
+static struct ufs_config_desc_attr ufs_cfg_unit_attr_##_name = {	\
+	.attr = {.name = __stringify(_name),				\
+		 .mode = VERIFY_OCTAL_PERMISSIONS(0444) },		\
+	.offset = CONFIGURATION_UNIT_DESC_PARAM##_uname,		\
+	.size = _size							\
+}
+
+UFS_CONFIG_UNIT_DESC_PARAM(lu_enable, _LU_ENABLE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(boot_lun_id, _BOOT_LUN_ID, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(lu_write_protect, _LU_WR_PROTECT, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(memory_type, _MEM_TYPE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(allocation_units, _NUM_ALLOC_UNITS, 4);
+UFS_CONFIG_UNIT_DESC_PARAM(data_reliability, _DATA_RELIABILITY, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(logical_block_size, _LOGICAL_BLK_SIZE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(provisioning_type, _PROVISIONING_TYPE, 1);
+UFS_CONFIG_UNIT_DESC_PARAM(context_capabilities, _CTX_CAPABILITIES, 2);
+
+static struct attribute *ufs_sysfs_config_unit_descriptor[] = {
+	&ufs_cfg_unit_attr_lu_enable.attr,
+	&ufs_cfg_unit_attr_boot_lun_id.attr,
+	&ufs_cfg_unit_attr_lu_write_protect.attr,
+	&ufs_cfg_unit_attr_memory_type.attr,
+	&ufs_cfg_unit_attr_allocation_units.attr,
+	&ufs_cfg_unit_attr_data_reliability.attr,
+	&ufs_cfg_unit_attr_logical_block_size.attr,
+	&ufs_cfg_unit_attr_provisioning_type.attr,
+	&ufs_cfg_unit_attr_context_capabilities.attr,
+	NULL
+};
+
+static ssize_t ufs_cfg_attr_show(struct kobject *kobj, struct attribute *attr,
+			     char *buf)
+{
+	struct ufs_config_desc_attr *cfg_attr = to_ufs_cfg_desc_attr(attr);
+	struct ufs_cfg_object *cfg_obj = to_ufs_cfg_obj(kobj);
+	u8 offset = cfg_attr->offset;
+	struct device *dev;
+	struct ufs_hba *hba;
+
+	/* For unit config descriptors, add the unit's offset and get the
+	 * device parent two up.
+	 */
+	if (cfg_obj->index >= 0) {
+		offset += CONFIGURATION_DESC_PARAM_UNIT0 +
+			(CONFIGURATION_UNIT_DESC_SIZE * cfg_obj->index);
+
+		dev = kobj_to_dev(cfg_obj->kobj.parent->parent);
+
+	} else {
+		dev = kobj_to_dev(cfg_obj->kobj.parent);
+	}
+
+	hba = dev_get_drvdata(dev);
+	return ufs_sysfs_read_desc_param(hba, QUERY_DESC_IDN_CONFIGURATION, 0,
+					 offset, buf, cfg_attr->size);
+}
+
+static const struct sysfs_ops ufs_sysfs_config_descriptor_ops = {
+	.show	= ufs_cfg_attr_show,
+};
+
+static void ufs_cfg_kobject_release(struct kobject *kobj)
+{
+	struct ufs_cfg_object *cfg = to_ufs_cfg_obj(kobj);
+
+	kfree(cfg);
+}
+
+static struct kobj_type ufs_cfg_kobject_type = {
+	.release = ufs_cfg_kobject_release,
+	.sysfs_ops = &ufs_sysfs_config_descriptor_ops,
+	.default_attrs = ufs_sysfs_config_descriptor,
+};
+
+static struct kobj_type ufs_cfg_unit_kobject_type = {
+	.release = ufs_cfg_kobject_release,
+	.sysfs_ops = &ufs_sysfs_config_descriptor_ops,
+	.default_attrs = ufs_sysfs_config_unit_descriptor,
+};
+
 #define UFS_INTERCONNECT_DESC_PARAM(_name, _uname, _size)		\
 	UFS_DESC_PARAM(_name, _uname, INTERCONNECT, _size)
 
@@ -800,6 +926,21 @@ const struct attribute_group ufs_sysfs_lun_attributes_group = {
 	.attrs = ufs_sysfs_lun_attributes,
 };
 
+static void ufs_sysfs_destroy_unit_groups(struct device *dev)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < hba->cfg_object_count; i++) {
+		kobject_uevent(&hba->cfg_objects[i]->kobj, KOBJ_REMOVE);
+		kobject_put(&hba->cfg_objects[i]->kobj);
+	}
+
+	kfree(hba->cfg_objects);
+	hba->cfg_objects = NULL;
+	hba->cfg_object_count = 0;
+}
+
 void ufs_sysfs_add_nodes(struct device *dev)
 {
 	int ret;
@@ -811,7 +952,92 @@ void ufs_sysfs_add_nodes(struct device *dev)
 			__func__, ret);
 }
 
+void ufs_sysfs_add_units(struct device *dev)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	int conf_len, i, inited = 0, unit_count, ret;
+
+	/* Determine the number of units from the descriptor length. */
+	ret = ufshcd_map_desc_id_to_length(hba,
+				QUERY_DESC_IDN_CONFIGURATION, &conf_len);
+
+	if (ret || conf_len < CONFIGURATION_DESC_PARAM_UNIT0)
+		return;
+
+	unit_count = (conf_len - CONFIGURATION_DESC_PARAM_UNIT0) /
+			CONFIGURATION_UNIT_DESC_SIZE;
+
+	/* Skip if the right number of units are already set up. */
+	if (hba->cfg_object_count == unit_count + 1)
+		return;
+
+	/* Clean up any old unit descriptor groups. */
+	if (hba->cfg_object_count)
+		ufs_sysfs_destroy_unit_groups(dev);
+
+	/*
+	 * Create kobjects for the config descriptor and each unit descriptor.
+	 * The first element is the config descriptor itself.
+	 */
+	hba->cfg_objects = kzalloc(
+		(unit_count + 1) * sizeof(void *), GFP_ATOMIC);
+
+	if (!hba->cfg_objects)
+		return;
+
+	hba->cfg_objects[0] = kzalloc(sizeof(struct ufs_cfg_object),
+				      GFP_ATOMIC);
+	if (!hba->cfg_objects[0])
+		goto err;
+
+	hba->cfg_objects[0]->index = -1;
+	ret = kobject_init_and_add(&hba->cfg_objects[0]->kobj,
+				   &ufs_cfg_kobject_type, &dev->kobj,
+				   "%s", "config_descriptor");
+
+	if (ret) {
+		kfree(hba->cfg_objects[0]);
+		goto err;
+	}
+
+	inited++;
+	for (i = 0; i < unit_count; i++, inited++) {
+		hba->cfg_objects[i + 1] = kzalloc(sizeof(struct ufs_cfg_object),
+						  GFP_ATOMIC);
+
+		if (!hba->cfg_objects[i + 1])
+			goto err;
+
+		hba->cfg_objects[i + 1]->index = i;
+		ret = kobject_init_and_add(&hba->cfg_objects[i + 1]->kobj,
+					   &ufs_cfg_unit_kobject_type,
+					   &hba->cfg_objects[0]->kobj,
+					   "unit%d", i);
+
+		if (ret) {
+			kfree(hba->cfg_objects[i + 1]);
+			goto err;
+		}
+	}
+
+	hba->cfg_object_count = unit_count + 1;
+	for (i = 0; i < inited; i++)
+		kobject_uevent(&hba->cfg_objects[i]->kobj, KOBJ_ADD);
+
+	return;
+
+err:
+	dev_err(dev, "error %d creating unit sysfs groups\n", ret);
+	for (i = inited - 1; i >= 0; i--)
+		kobject_put(&hba->cfg_objects[i]->kobj);
+
+	kfree(hba->cfg_objects);
+	hba->cfg_objects = NULL;
+	hba->cfg_object_count = 0;
+}
+
 void ufs_sysfs_remove_nodes(struct device *dev)
 {
 	sysfs_remove_groups(&dev->kobj, ufs_sysfs_groups);
+	ufs_sysfs_destroy_unit_groups(dev);
 }

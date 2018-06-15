@@ -237,6 +237,162 @@ Description:	This file shows the command maximum timeout for a change
 		The file is read only.
 
 
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/boot_enable
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows whether or not the UFS boot feature is enabled.
+		This is one of the UFS configuration descriptor parameters.
+		More information about the descriptor can be found in the UFS
+		2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/descriptor_access_enable
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows whether or not access will be permitted to the
+		Device Descriptor after the partial initialization phase of the
+		boot sequence. This is one of the UFS configuration descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/high_priority_lun
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the identifier of the high priority logical
+		unit. This is one of the UFS configuration descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/init_active_icc_level
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the ICC level in active mode after device
+		initialization or hardware reset. This is one of the UFS
+		configuration descriptor parameters. More information about the
+		descriptor can be found in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/initial_power_mode
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the power mode after device initialization or
+		hardware reset. This is one of the UFS configuration descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/number_of_luns
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the number of logical units that the device will
+		support. This is one of the UFS configuration descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/periodic_rtc_update
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the frequency and method of real time clock
+		updates. This is one of the UFS configuration descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/secure_removal_type
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the secure removal type of the UFS device. This
+		is one of the UFS configuration descriptor parameters. More
+		information about the descriptor can be found in the UFS 2.1
+		specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/allocation_units
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the number of allocation units assigned to the
+		particular logical unit. This is one of the UFS configuration
+		unit descriptor parameters. More information about the
+		descriptor can be found in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/boot_lun_id
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the boot LUN ID for this particular logical
+		unit, indicating whether it is Boot A, Boot B, or not special.
+		This is one of the UFS configuration unit descriptor parameters.
+		More information about the descriptor can be found in the UFS
+		2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/context_capabilities
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the context capabilities for the particular
+		logical unit. This is one of the UFS configuration unit
+		descriptor parameters. More information about the descriptor
+		can be found in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/data_reliability
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the data reliability for the particular logical
+		unit. This is one of the UFS configuration unit descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/logical_block_size
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the logical block size for the particular
+		logical unit as a power of two. This is one of the UFS
+		configuration unit descriptor parameters. More information
+		about the descriptor can be found in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/lu_enable
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows whether or not the particular logical unit is
+		enabled. This is one of the UFS configuration unit descriptor
+		parameters. More information about the descriptor can be found
+		in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/lu_write_protect
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the write protect status for the particular
+		logical unit. This is one of the UFS configuration unit
+		descriptor parameters. More information about the descriptor
+		can be found in the UFS 2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/memory_type
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the memory type for the particular logical unit.
+		This is one of the UFS configuration unit descriptor parameters.
+		More information about the descriptor can be found in the UFS
+		2.1 specification.
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/config_descriptor/unit*/provisioning_type
+Date:		May 2018
+Contact:	Evan Green <evgreen@chromium.org>
+Description:	This file shows the provisioning type information for the
+		particular logical unit. This is one of the UFS configuration
+		uint descriptor parameters. More information about the
+		descriptor can be found in the UFS 2.1 specification.
+		The file is read only.
+
+
 What:		/sys/bus/platform/drivers/ufshcd/*/interconnect_descriptor/unipro_version
 Date:		February 2018
 Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>

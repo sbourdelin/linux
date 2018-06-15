@@ -448,6 +448,16 @@ struct ufs_stats {
 };
 
 /**
+ * struct ufs_cfg_object - Configuration descriptor unit object.
+ * @kobj: Kernel object
+ * @index: Stores the index of the unit being described.
+ */
+struct ufs_cfg_object {
+	struct kobject kobj;
+	int index;
+};
+
+/**
  * struct ufs_hba - per adapter private structure
  * @mmio_base: UFSHCI base register address
  * @ucdl_base_addr: UFS Command Descriptor base address
@@ -501,6 +511,8 @@ struct ufs_stats {
  * @is_urgent_bkops_lvl_checked: keeps track if the urgent bkops level for
  *  device is known or not.
  * @scsi_block_reqs_cnt: reference counting for scsi block requests
+ * @cfg_objects: Stores the array of kobjects created for the config descriptor.
+ * @cfg_object_count: Stores the number of elements in cfg_objects.
  */
 struct ufs_hba {
 	void __iomem *mmio_base;
@@ -702,6 +714,9 @@ struct ufs_hba {
 	struct rw_semaphore clk_scaling_lock;
 	struct ufs_desc_size desc_size;
 	atomic_t scsi_block_reqs_cnt;
+
+	struct ufs_cfg_object **cfg_objects;
+	size_t cfg_object_count;
 };
 
 /* Returns true if clocks can be gated. Otherwise false */

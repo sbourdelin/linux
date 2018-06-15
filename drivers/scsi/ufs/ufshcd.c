@@ -6563,6 +6563,7 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 
 	/* set the state as operational after switching to desired gear */
 	hba->ufshcd_state = UFSHCD_STATE_OPERATIONAL;
+	ufs_sysfs_add_units(hba->dev);
 
 	/*
 	 * If we are in error handling context or in power management callbacks
