@@ -256,6 +256,41 @@ struct uart_port {
 	void			*private_data;		/* generic platform data pointer */
 };
 
+#define uart_port_lock_irq(lock)				\
+	do {							\
+		printk_safe_enter_irq();			\
+		spin_lock(lock);				\
+	} while (0)
+
+#define uart_port_unlock_irq(lock)				\
+	do {							\
+		spin_unlock(lock);				\
+		printk_safe_exit_irq();				\
+	} while (0)
+
+#define uart_port_lock_irqsave(lock, flags)			\
+	do {							\
+		printk_safe_enter_irqsave(flags);		\
+		spin_lock(lock);				\
+	} while (0)
+
+#define uart_port_trylock_irqsave(lock, flags)			\
+	({							\
+		int locked;					\
+								\
+		printk_safe_enter_irqsave(flags);		\
+		locked = spin_trylock(lock);			\
+		if (!locked)					\
+			printk_safe_exit_irqrestore(flags);	\
+		locked;						\
+	})
+
+#define uart_port_unlock_irqrestore(lock, flags)		\
+	do {							\
+		spin_unlock(lock);				\
+		printk_safe_exit_irqrestore(flags);		\
+	} while (0)
+
 static inline int serial_port_in(struct uart_port *up, int offset)
 {
 	return up->serial_in(up, offset);
