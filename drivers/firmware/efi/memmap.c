@@ -50,6 +50,33 @@ phys_addr_t __init efi_memmap_alloc(unsigned int num_entries)
 }
 
 /**
+ * efi_memmap_free - Free memory allocated by efi_memmap_alloc()
+ * @mem: Physical address allocated by efi_memmap_alloc()
+ * @num_entries: Number of entries in the allocated map.
+ *
+ * efi_memmap_alloc() allocates memory depending on whether mm_init()
+ * has already been invoked or not. It uses either memblock or "normal"
+ * page allocation. Use this function to free the memory allocated by
+ * efi_memmap_alloc(). Since the allocation is done in two different
+ * ways, similarly, we free it in two different ways.
+ *
+ */
+void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries)
+{
+	unsigned long size = num_entries * efi.memmap.desc_size;
+	unsigned int order = get_order(size);
+	phys_addr_t end = mem + size - 1;
+
+	if (slab_is_available()) {
+		__free_pages(pfn_to_page(PHYS_PFN(mem)), order);
+		return;
+	}
+
+	if (memblock_free(mem, size))
+		pr_err("Failed to free mem from %pa to %pa\n", &mem, &end);
+}
+
+/**
  * __efi_memmap_init - Common code for mapping the EFI memory map
  * @data: EFI memory map data
  * @late: Use early or late mapping function?
