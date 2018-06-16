@@ -7,7 +7,8 @@
  */
 /*
  * umwait.c adds control of user wait states that user enters through user wait
- * instructions umwait or tpause.
+ * instructions umwait or tpause. It also dumps tsc_khz to user so user process
+ * can convert seconds to tsc for umwait or other usages.
  */
 #include <linux/cpu.h>
 #include <asm/msr.h>
@@ -49,7 +50,14 @@ static ssize_t umwait_disable_c0_2_store(struct device *dev,
 	return count;
 }
 
+static ssize_t tsc_khz_show(struct device *dev, struct device_attribute *attr,
+			    char *buf)
+{
+	return sprintf(buf, "%d\n", tsc_khz);
+}
+
 static DEVICE_ATTR_RW(umwait_disable_c0_2);
+static DEVICE_ATTR_RO(tsc_khz);
 
 static struct attribute *umwait_attrs[] = {
 	&dev_attr_umwait_disable_c0_2.attr,
@@ -91,6 +99,15 @@ static int __init umwait_init(void)
 	ret = sysfs_create_group(&dev->kobj, &umwait_attr_group);
 	if (ret)
 		return ret;
+
+	/* Only add the tsc_khz interface when the value is known. */
+	if (boot_cpu_has(X86_FEATURE_TSC_KNOWN_FREQ)) {
+		ret = sysfs_add_file_to_group(&dev->kobj,
+					      &dev_attr_tsc_khz.attr,
+					      umwait_attr_group.name);
+		if (ret)
+			goto out_group;
+	}
 
 	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "umwait/intel:online",
 				umwait_cpu_online, NULL);
