@@ -89,14 +89,7 @@ int proc_remount(struct super_block *sb, int *flags, char *data)
 static struct dentry *proc_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
-	struct pid_namespace *ns;
-
-	if (flags & SB_KERNMOUNT) {
-		ns = data;
-		data = NULL;
-	} else {
-		ns = task_active_pid_ns(current);
-	}
+	struct pid_namespace *ns = task_active_pid_ns(current);
 
 	return mount_ns(fs_type, flags, data, ns, ns->user_ns, proc_fill_super);
 }
@@ -110,6 +103,8 @@ static void proc_kill_sb(struct super_block *sb)
 		dput(ns->proc_self);
 	if (ns->proc_thread_self)
 		dput(ns->proc_thread_self);
+	WRITE_ONCE(ns->proc_super, NULL);
+	smp_wmb(); /* Let proc_flush_task know the sb is gone */
 	kill_anon_super(sb);
 	put_pid_ns(ns);
 }
@@ -208,19 +203,19 @@ struct proc_dir_entry proc_root = {
 	.inline_name	= "/proc",
 };
 
-int pid_ns_prepare_proc(struct pid_namespace *ns)
+#if defined(CONFIG_SYSCTL_SYSCALL) || defined(CONFIG_MCONSOLE)
+struct file *file_open_proc(const char *pathname, int flags, umode_t mode)
 {
 	struct vfsmount *mnt;
+	struct file *file;
 
-	mnt = kern_mount_data(&proc_fs_type, ns);
+	mnt = vfs_kern_mount(&proc_fs_type, 0, proc_fs_type.name, NULL);
 	if (IS_ERR(mnt))
-		return PTR_ERR(mnt);
+		return ERR_CAST(mnt);
 
-	ns->proc_mnt = mnt;
-	return 0;
-}
+	file = file_open_root(mnt->mnt_root, mnt, pathname, flags, mode);
+	mntput(mnt);
 
-void pid_ns_release_proc(struct pid_namespace *ns)
-{
-	kern_unmount(ns->proc_mnt);
+	return file;
 }
+#endif

@@ -532,5 +532,10 @@ int proc_fill_super(struct super_block *s, void *data, int silent)
 	if (ret) {
 		return ret;
 	}
-	return proc_setup_thread_self(s);
+	ret = proc_setup_thread_self(s);
+
+	WRITE_ONCE(ns->proc_super, s);
+	smp_wmb(); /* Let proc_flush_task know sb->s_root is valid */
+
+	return ret;
 }
