@@ -119,12 +119,23 @@ static int internal_create_group(struct kobject *kobj, int update,
 		return -EINVAL;
 	}
 	if (grp->name) {
-		kn = kernfs_create_dir(kobj->sd, grp->name,
-				       S_IRWXU | S_IRUGO | S_IXUGO, kobj);
-		if (IS_ERR(kn)) {
-			if (PTR_ERR(kn) == -EEXIST)
-				sysfs_warn_dup(kobj->sd, grp->name);
-			return PTR_ERR(kn);
+		if (update) {
+			kn = kernfs_find_and_get(kobj->sd, grp->name);
+			if (!kn) {
+				WARN(1,
+				     "Can't update unknown attr grp name: %s/%s\n",
+				     kobj->name, grp->name);
+				return -EINVAL;
+			}
+		} else {
+			kn = kernfs_create_dir(kobj->sd, grp->name,
+					       S_IRWXU | S_IRUGO | S_IXUGO,
+					       kobj);
+			if (IS_ERR(kn)) {
+				if (PTR_ERR(kn) == -EEXIST)
+					sysfs_warn_dup(kobj->sd, grp->name);
+				return PTR_ERR(kn);
+			}
 		}
 	} else
 		kn = kobj->sd;
@@ -199,7 +210,8 @@ EXPORT_SYMBOL_GPL(sysfs_create_groups);
  * of the attribute files being created already exist.  Furthermore,
  * if the visibility of the files has changed through the is_visible()
  * callback, it will update the permissions and add or remove the
- * relevant files.
+ * relevant files. Changing a group's name (subdirectory name under
+ * kobj's directory in sysfs) is not allowed.
  *
  * The primary use for this function is to call it after making a change
  * that affects group visibility.
