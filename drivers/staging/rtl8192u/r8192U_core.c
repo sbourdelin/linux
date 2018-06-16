@@ -1678,8 +1678,9 @@ short rtl8192_tx(struct net_device *dev, struct sk_buff *skb)
 static short rtl8192_usb_initendpoints(struct net_device *dev)
 {
 	struct r8192_priv *priv = ieee80211_priv(dev);
+	int i;
 
-	priv->rx_urb = kmalloc(sizeof(struct urb *) * (MAX_RX_URB + 1),
+	priv->rx_urb = kcalloc(MAX_RX_URB + 1, sizeof(struct urb *),
 			       GFP_KERNEL);
 	if (!priv->rx_urb)
 		return -ENOMEM;
@@ -1688,12 +1689,12 @@ static short rtl8192_usb_initendpoints(struct net_device *dev)
 	for (i = 0; i < (MAX_RX_URB + 1); i++) {
 		priv->rx_urb[i] = usb_alloc_urb(0, GFP_KERNEL);
 		if (!priv->rx_urb[i])
-			return -ENOMEM;
+			goto out_release_mem;
 
 		priv->rx_urb[i]->transfer_buffer =
 			kmalloc(RX_URB_SIZE, GFP_KERNEL);
 		if (!priv->rx_urb[i]->transfer_buffer)
-			return -ENOMEM;
+			goto out_release_mem;
 
 		priv->rx_urb[i]->transfer_buffer_length = RX_URB_SIZE;
 	}
@@ -1705,9 +1706,13 @@ static short rtl8192_usb_initendpoints(struct net_device *dev)
 		void *oldaddr, *newaddr;
 
 		priv->rx_urb[16] = usb_alloc_urb(0, GFP_KERNEL);
+		if (!priv->rx_urb[16])
+			goto out_release_mem;
+
 		priv->oldaddr = kmalloc(16, GFP_KERNEL);
 		if (!priv->oldaddr)
-			return -ENOMEM;
+			goto out_release_mem;
+
 		oldaddr = priv->oldaddr;
 		align = ((long)oldaddr) & 3;
 		if (align) {
@@ -1725,17 +1730,19 @@ static short rtl8192_usb_initendpoints(struct net_device *dev)
 	priv->pp_rxskb = kcalloc(MAX_RX_URB, sizeof(struct sk_buff *),
 				 GFP_KERNEL);
 	if (!priv->pp_rxskb) {
-		kfree(priv->rx_urb);
-
-		priv->pp_rxskb = NULL;
-		priv->rx_urb = NULL;
-
 		DMESGE("Endpoint Alloc Failure");
-		return -ENOMEM;
+		goto out_release_mem;
 	}
 
 	netdev_dbg(dev, "End of initendpoints\n");
 	return 0;
+
+out_release_mem:
+	for (i = 0; i < (MAX_RX_URB + 1); i++)
+		kfree(priv->rx_urb[i]);
+	kfree(priv->rx_urb);
+	priv->rx_urb = NULL;
+	return -ENOMEM;
 }
 
 #ifdef THOMAS_BEACON
