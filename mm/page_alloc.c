@@ -1898,6 +1898,7 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
 {
 	set_page_private(page, 0);
 	set_page_refcounted(page);
+	ClearPageDmaPinned(page);
 
 	arch_alloc_page(page, order);
 	kernel_map_pages(page, 1 << order, 1);

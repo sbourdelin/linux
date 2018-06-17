@@ -659,7 +659,7 @@ static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned int gup_flags, struct page **pages,
 		struct vm_area_struct **vmas, int *nonblocking)
 {
-	long i = 0;
+	long i = 0, j;
 	int err = 0;
 	unsigned int page_mask;
 	struct vm_area_struct *vma = NULL;
@@ -764,6 +764,10 @@ next_page:
 	} while (nr_pages);
 
 out:
+	if (pages)
+		for (j = 0; j < i; j++)
+			SetPageDmaPinned(pages[j]);
+
 	return i ? i : err;
 }
 
@@ -1843,7 +1847,7 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
 			struct page **pages)
 {
 	unsigned long addr, len, end;
-	int nr = 0, ret = 0;
+	int nr = 0, ret = 0, i;
 
 	start &= PAGE_MASK;
 	addr = start;
@@ -1863,6 +1867,9 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
 		local_irq_enable();
 		ret = nr;
 	}
+
+	for (i = 0; i < nr; i++)
+		SetPageDmaPinned(pages[i]);
 
 	if (nr < nr_pages) {
 		/* Try to get the remaining pages with get_user_pages */

@@ -1360,6 +1360,8 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				flags & TTU_SPLIT_FREEZE, page);
 	}
 
+	if (PageDmaPinned(page))
+		return false;
 	/*
 	 * We have to assume the worse case ie pmd for invalidation. Note that
 	 * the page can not be free in this function as call of try_to_unmap()
