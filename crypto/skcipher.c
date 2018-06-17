@@ -44,8 +44,6 @@ struct skcipher_walk_buffer {
 	u8 buffer[];
 };
 
-static int skcipher_walk_next(struct skcipher_walk *walk);
-
 static inline void skcipher_unmap(struct scatter_walk *walk, void *vaddr)
 {
 	if (PageHighMem(scatterwalk_page(walk)))
@@ -335,7 +333,7 @@ static int skcipher_next_fast(struct skcipher_walk *walk)
 	return 0;
 }
 
-static int skcipher_walk_next(struct skcipher_walk *walk)
+int skcipher_walk_next(struct skcipher_walk *walk)
 {
 	unsigned int bsize;
 	unsigned int n;

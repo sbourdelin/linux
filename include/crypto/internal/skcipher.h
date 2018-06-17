@@ -154,6 +154,7 @@ int skcipher_walk_aead_encrypt(struct skcipher_walk *walk,
 int skcipher_walk_aead_decrypt(struct skcipher_walk *walk,
 			       struct aead_request *req, bool atomic);
 void skcipher_walk_complete(struct skcipher_walk *walk, int err);
+int skcipher_walk_next(struct skcipher_walk *walk);
 
 static inline void ablkcipher_request_complete(struct ablkcipher_request *req,
 					       int err)
