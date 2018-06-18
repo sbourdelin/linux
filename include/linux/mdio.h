@@ -78,6 +78,7 @@ void mdio_device_reset(struct mdio_device *mdiodev, int value);
 int mdio_driver_register(struct mdio_driver *drv);
 void mdio_driver_unregister(struct mdio_driver *drv);
 int mdio_device_bus_match(struct device *dev, struct device_driver *drv);
+extern struct class mdio_bus_class;
 
 static inline bool mdio_phy_id_is_c45(int phy_id)
 {

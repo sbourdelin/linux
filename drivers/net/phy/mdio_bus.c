@@ -240,10 +240,25 @@ static void mdiobus_release(struct device *d)
 	kfree(bus);
 }
 
-static struct class mdio_bus_class = {
+struct class mdio_bus_class = {
 	.name		= "mdio_bus",
 	.dev_release	= mdiobus_release,
 };
+EXPORT_SYMBOL_GPL(mdio_bus_class);
+
+static BLOCKING_NOTIFIER_HEAD(mdio_bus_notifier_list);
+
+int mdiobus_register_notifier(struct notifier_block *nb)
+{
+    return blocking_notifier_chain_register(
+				&mdio_bus_notifier_list, nb);
+}
+
+int mdiobus_unregister_notifier(struct notifier_block *nb)
+{
+    return blocking_notifier_chain_unregister(
+				&mdio_bus_notifier_list, nb);
+}
 
 #if IS_ENABLED(CONFIG_OF_MDIO)
 /* Helper function for of_mdio_find_bus */
@@ -418,6 +433,8 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
 	mdiobus_setup_mdiodev_from_board_info(bus, mdiobus_create_device);
 
 	bus->state = MDIOBUS_REGISTERED;
+	blocking_notifier_call_chain(&mdio_bus_notifier_list,
+					BUS_NOTIFY_ADD_DEVICE, &bus->dev);
 	pr_info("%s: probed\n", bus->name);
 	return 0;
 
@@ -446,6 +463,8 @@ void mdiobus_unregister(struct mii_bus *bus)
 	int i;
 
 	BUG_ON(bus->state != MDIOBUS_REGISTERED);
+	blocking_notifier_call_chain(&mdio_bus_notifier_list,
+					BUS_NOTIFY_DEL_DEVICE, &bus->dev);
 	bus->state = MDIOBUS_UNREGISTERED;
 
 	for (i = 0; i < PHY_MAX_ADDR; i++) {

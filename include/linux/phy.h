@@ -246,6 +246,8 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner);
 #define mdiobus_register(bus) __mdiobus_register(bus, THIS_MODULE)
 void mdiobus_unregister(struct mii_bus *bus);
 void mdiobus_free(struct mii_bus *bus);
+int mdiobus_register_notifier(struct notifier_block *nb);
+int mdiobus_unregister_notifier(struct notifier_block *nb);
 struct mii_bus *devm_mdiobus_alloc_size(struct device *dev, int sizeof_priv);
 static inline struct mii_bus *devm_mdiobus_alloc(struct device *dev)
 {
