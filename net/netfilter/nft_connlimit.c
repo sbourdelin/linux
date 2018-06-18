@@ -51,7 +51,7 @@ static inline void nft_connlimit_do_eval(struct nft_connlimit *priv,
 	if (!addit)
 		goto out;
 
-	if (!nf_conncount_add(&priv->list, tuple_ptr, zone)) {
+	if (nf_conncount_add(&priv->list, tuple_ptr, zone) == NF_CONNCOUNT_ERR) {
 		regs->verdict.code = NF_DROP;
 		return;
 	}
