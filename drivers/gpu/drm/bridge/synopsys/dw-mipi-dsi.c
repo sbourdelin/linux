@@ -835,6 +835,9 @@ static int dw_mipi_dsi_bridge_attach(struct drm_bridge *bridge)
 		return -ENODEV;
 	}
 
+	if (!dsi->panel_bridge)
+		return -EPROBE_DEFER;
+
 	/* Set the encoder type as caller does not know it */
 	bridge->encoder->encoder_type = DRM_MODE_ENCODER_DSI;
 
