@@ -5180,6 +5180,8 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 		chip->parameters.onfi.version = 20;
 	else if (val & (1 << 1))
 		chip->parameters.onfi.version = 10;
+	else if (val == 0)
+		chip->parameters.onfi.version = 10;
 
 	if (!chip->parameters.onfi.version) {
 		pr_info("unsupported ONFI version: %d\n", val);
