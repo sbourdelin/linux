@@ -698,6 +698,7 @@ config ARCH_VIRT
 	select ARM_GIC_V3_ITS if PCI
 	select ARM_PSCI
 	select HAVE_ARM_ARCH_TIMER
+	select PCI_DOMAINS if PCI
 
 #
 # This is sorted alphabetically by mach-* pathname.  However, plat-*
