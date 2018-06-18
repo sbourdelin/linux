@@ -1,0 +1,41 @@
+* Atmel Quad Serial Peripheral Interface (QSPI)
+
+Required properties:
+- compatible:     Should be "atmel,sama5d2-spi-qspi".
+- reg:            Should contain the locations and lengths of the base registers
+                  and the mapped memory.
+- reg-names:      Should contain the resource reg names:
+                  - qspi_base: configuration register address space
+                  - qspi_mmap: memory mapped address space
+- interrupts:     Should contain the interrupt for the device.
+- clocks:         The phandle of the clock needed by the QSPI controller.
+- #address-cells: Should be <1>.
+- #size-cells:    Should be <0>.
+
+Example:
+
+qspi1: spi@f0024000 {
+	compatible = "atmel,sama5d2-spi-qspi";
+	reg = <0xf0024000 0x100>, <0xd8000000 0x08000000>;
+	reg-names = "qspi_base", "qspi_mmap";
+	interrupts = <53 IRQ_TYPE_LEVEL_HIGH 7>;
+	clocks = <&qspi1_clk>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_qspi1_default>;
+	status = "okay";
+
+	flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "winbond,w25m02gv", "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <83000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <4>;
+
+		...
+	};
+};
+
