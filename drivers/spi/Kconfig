@@ -83,6 +83,15 @@ config SPI_ATMEL
 	  This selects a driver for the Atmel SPI Controller, present on
 	  many AT91 ARM chips.
 
+config SPI_ATMEL_QSPI
+	tristate "Atmel QuadSPI Controller"
+	depends on ARCH_AT91 || (ARM && COMPILE_TEST)
+	depends on OF && HAS_IOMEM
+	help
+	  This selects a driver for the Atmel QSPI Controller on SAMA5D2.
+	  This controller does not support generic SPI, it supports only
+	  spi-mem interface.
+
 config SPI_AU1550
 	tristate "Au1550/Au1200/Au1300 SPI Controller"
 	depends on MIPS_ALCHEMY
