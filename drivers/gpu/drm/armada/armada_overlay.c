@@ -228,7 +228,7 @@ armada_ovl_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 		 * Take a reference on the new framebuffer - we want to
 		 * hold on to it while the hardware is displaying it.
 		 */
-		drm_framebuffer_reference(fb);
+		drm_framebuffer_get(fb);
 
 		work->old_fb = plane->fb;
 	} else {

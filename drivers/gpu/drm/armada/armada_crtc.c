@@ -1220,7 +1220,7 @@ static int armada_drm_primary_update(struct drm_plane *plane,
 		 * Take a reference on the new framebuffer - we want to
 		 * hold on to it while the hardware is displaying it.
 		 */
-		drm_framebuffer_reference(fb);
+		drm_framebuffer_get(fb);
 
 		work->old_fb = plane->fb;
 	} else {
@@ -1239,7 +1239,7 @@ static int armada_drm_primary_update(struct drm_plane *plane,
 	if (!dplane->state.vsync_update) {
 		work->fn(dcrtc, work);
 		if (work->old_fb)
-			drm_framebuffer_unreference(work->old_fb);
+			drm_framebuffer_put(work->old_fb);
 		return 0;
 	}
 
@@ -1248,7 +1248,7 @@ static int armada_drm_primary_update(struct drm_plane *plane,
 	if (ret) {
 		work->fn(dcrtc, work);
 		if (work->old_fb)
-			drm_framebuffer_unreference(work->old_fb);
+			drm_framebuffer_put(work->old_fb);
 	}
 
 	dplane->next_work = !dplane->next_work;
@@ -1308,7 +1308,7 @@ int armada_drm_plane_disable(struct drm_plane *plane,
 	if (armada_drm_plane_work_queue(dcrtc, work)) {
 		work->fn(dcrtc, work);
 		if (work->old_fb)
-			drm_framebuffer_unreference(work->old_fb);
+			drm_framebuffer_put(work->old_fb);
 	}
 
 	dplane->next_work = !dplane->next_work;
