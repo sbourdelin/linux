@@ -1626,6 +1626,13 @@ Cpuset Interface Files
 	2) No CPU that has been distributed to child scheduling domain
 	   roots is deleted.
 
+	When all the CPUs allocated to a scheduling domain are offlined,
+	that scheduling domain will be temporaily gone and all the
+	tasks in that scheduling domain will migrate to another one that
+	belongs to the parent of the scheduling domain root.  When any
+	of those offlined CPUs is onlined again, a new scheduling domain
+	will be re-created and the tasks will be migrated back.
+
 
 Device controller
 -----------------
