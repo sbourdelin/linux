@@ -56,6 +56,11 @@ module_param_named(xino_auto, ovl_xino_auto_def, bool, 0644);
 MODULE_PARM_DESC(ovl_xino_auto_def,
 		 "Auto enable xino feature");
 
+static bool __read_mostly ovl_caller_credentials;
+module_param_named(caller_credentials, ovl_caller_credentials, bool, 0644);
+MODULE_PARM_DESC(ovl_caller_credentials,
+		 "Use caller credentials rather than creator credentials for accesses");
+
 static void ovl_entry_stack_free(struct ovl_entry *oe)
 {
 	unsigned int i;
@@ -376,6 +381,10 @@ static int ovl_show_options(struct seq_file *m, struct dentry *dentry)
 						"on" : "off");
 	if (ofs->config.xino != ovl_xino_def())
 		seq_printf(m, ",xino=%s", ovl_xino_str[ofs->config.xino]);
+	if (ofs->config.caller_credentials)
+		seq_puts(m, ",caller_credentials");
+	else
+		seq_puts(m, ",creator_credentials");
 	return 0;
 }
 
@@ -413,6 +422,8 @@ enum {
 	OPT_XINO_ON,
 	OPT_XINO_OFF,
 	OPT_XINO_AUTO,
+	OPT_CREATOR_CREDENTIALS,
+	OPT_CALLER_CREDENTIALS,
 	OPT_ERR,
 };
 
@@ -429,6 +440,8 @@ static const match_table_t ovl_tokens = {
 	{OPT_XINO_ON,			"xino=on"},
 	{OPT_XINO_OFF,			"xino=off"},
 	{OPT_XINO_AUTO,			"xino=auto"},
+	{OPT_CREATOR_CREDENTIALS,	"creator_credentials"},
+	{OPT_CALLER_CREDENTIALS,	"caller_credentials"},
 	{OPT_ERR,			NULL}
 };
 
@@ -486,6 +499,7 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 	if (!config->redirect_mode)
 		return -ENOMEM;
 
+	config->caller_credentials = ovl_caller_credentials;
 	while ((p = ovl_next_opt(&opt)) != NULL) {
 		int token;
 		substring_t args[MAX_OPT_ARGS];
@@ -553,6 +567,14 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 
 		case OPT_XINO_AUTO:
 			config->xino = OVL_XINO_AUTO;
+			break;
+
+		case OPT_CREATOR_CREDENTIALS:
+			config->caller_credentials = false;
+			break;
+
+		case OPT_CALLER_CREDENTIALS:
+			config->caller_credentials = true;
 			break;
 
 		default:

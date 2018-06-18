@@ -289,7 +289,8 @@ static int ovl_check_whiteouts(struct dentry *dir, struct ovl_readdir_data *rdd)
 		}
 		inode_unlock(dir->d_inode);
 	}
-	revert_creds(old_cred);
+	if (old_cred)
+		revert_creds(old_cred);
 
 	return err;
 }
@@ -906,7 +907,8 @@ int ovl_check_empty_dir(struct dentry *dentry, struct list_head *list)
 
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = ovl_dir_read_merged(dentry, list, &root);
-	revert_creds(old_cred);
+	if (old_cred)
+		revert_creds(old_cred);
 	if (err)
 		return err;
 
