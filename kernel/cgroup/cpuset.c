@@ -109,6 +109,9 @@ struct cpuset {
 	cpumask_var_t effective_cpus;
 	nodemask_t effective_mems;
 
+	/* CPUs reserved for child scheduling domains */
+	cpumask_var_t reserved_cpus;
+
 	/*
 	 * This is old Memory Nodes tasks took on.
 	 *
@@ -134,6 +137,9 @@ struct cpuset {
 
 	/* for custom sched domain */
 	int relax_domain_level;
+
+	/* number of CPUs in reserved_cpus */
+	int nr_reserved;
 };
 
 static inline struct cpuset *css_cs(struct cgroup_subsys_state *css)
@@ -175,6 +181,7 @@ typedef enum {
 	CS_SCHED_LOAD_BALANCE,
 	CS_SPREAD_PAGE,
 	CS_SPREAD_SLAB,
+	CS_SCHED_DOMAIN_ROOT,
 } cpuset_flagbits_t;
 
 /* convenient tests for these bits */
@@ -203,6 +210,11 @@ static inline int is_sched_load_balance(const struct cpuset *cs)
 	return test_bit(CS_SCHED_LOAD_BALANCE, &cs->flags);
 }
 
+static inline int is_sched_domain_root(const struct cpuset *cs)
+{
+	return test_bit(CS_SCHED_DOMAIN_ROOT, &cs->flags);
+}
+
 static inline int is_memory_migrate(const struct cpuset *cs)
 {
 	return test_bit(CS_MEMORY_MIGRATE, &cs->flags);
@@ -220,7 +232,7 @@ static inline int is_spread_slab(const struct cpuset *cs)
 
 static struct cpuset top_cpuset = {
 	.flags = ((1 << CS_ONLINE) | (1 << CS_CPU_EXCLUSIVE) |
-		  (1 << CS_MEM_EXCLUSIVE)),
+		  (1 << CS_MEM_EXCLUSIVE) | (1 << CS_SCHED_DOMAIN_ROOT)),
 };
 
 /**
@@ -881,6 +893,27 @@ static void update_tasks_cpumask(struct cpuset *cs)
 	css_task_iter_end(&it);
 }
 
+/**
+ * compute_effective_cpumask - Compute the effective cpumask of the cpuset
+ * @new_cpus: the temp variable for the new effective_cpus mask
+ * @cs: the cpuset the need to recompute the new effective_cpus mask
+ * @parent: the parent cpuset
+ *
+ * If the parent has reserved CPUs, include them in the list of allowable
+ * CPUs in computing the new effective_cpus mask.
+ */
+static void compute_effective_cpumask(struct cpumask *new_cpus,
+				      struct cpuset *cs, struct cpuset *parent)
+{
+	if (parent->nr_reserved) {
+		cpumask_or(new_cpus, parent->effective_cpus,
+			   parent->reserved_cpus);
+		cpumask_and(new_cpus, new_cpus, cs->cpus_allowed);
+	} else {
+		cpumask_and(new_cpus, cs->cpus_allowed, parent->effective_cpus);
+	}
+}
+
 /*
  * update_cpumasks_hier - Update effective cpumasks and tasks in the subtree
  * @cs: the cpuset to consider
@@ -903,7 +936,7 @@ static void update_cpumasks_hier(struct cpuset *cs, struct cpumask *new_cpus)
 	cpuset_for_each_descendant_pre(cp, pos_css, cs) {
 		struct cpuset *parent = parent_cs(cp);
 
-		cpumask_and(new_cpus, cp->cpus_allowed, parent->effective_cpus);
+		compute_effective_cpumask(new_cpus, cp, parent);
 
 		/*
 		 * If it becomes empty, inherit the effective mask of the
@@ -949,6 +982,130 @@ static void update_cpumasks_hier(struct cpuset *cs, struct cpumask *new_cpus)
 }
 
 /**
+ * update_reserved_cpumask - update the reserved_cpus mask of parent cpuset
+ * @cpuset:  The cpuset that requests CPU reservation
+ * @delmask: The old reserved cpumask to be removed from the parent
+ * @addmask: The new reserved cpumask to be added to the parent
+ * Return: 0 if successful, an error code otherwise
+ *
+ * Changes to the reserved CPUs are not allowed if any of CPUs changing
+ * state are in any of the child cpusets of the parent except the requesting
+ * child.
+ *
+ * If the sched_domain_root flag changes, either the delmask (0=>1) or the
+ * addmask (1=>0) will be NULL.
+ *
+ * Called with cpuset_mutex held.
+ */
+static int update_reserved_cpumask(struct cpuset *cpuset,
+	struct cpumask *delmask, struct cpumask *addmask)
+{
+	int retval;
+	struct cpuset *parent = parent_cs(cpuset);
+	struct cpuset *sibling;
+	struct cgroup_subsys_state *pos_css;
+	int old_count = parent->nr_reserved;
+
+	/*
+	 * The parent must be a scheduling domain root.
+	 * The new cpumask, if present, must not be empty.
+	 */
+	if (!is_sched_domain_root(parent) ||
+	   (addmask && cpumask_empty(addmask)))
+		return -EINVAL;
+
+	/*
+	 * The delmask, if present, must be a subset of parent's reserved
+	 * CPUs.
+	 */
+	if (delmask && !cpumask_empty(delmask) && (!parent->nr_reserved ||
+		       !cpumask_subset(delmask, parent->reserved_cpus))) {
+		WARN_ON_ONCE(1);
+		return -EINVAL;
+	}
+
+	/*
+	 * A sched_domain_root state change is not allowed if there are
+	 * online children.
+	 */
+	if (css_has_online_children(&cpuset->css))
+		return -EBUSY;
+
+	if (!old_count) {
+		if (!zalloc_cpumask_var(&parent->reserved_cpus, GFP_KERNEL)) {
+			retval = -ENOMEM;
+			goto out;
+		}
+		old_count = 1;
+	}
+
+	retval = -EBUSY;
+
+	/*
+	 * The cpus to be added must be a proper subset of the parent's
+	 * effective_cpus mask but not in the reserved_cpus mask.
+	 */
+	if (addmask) {
+		if (!cpumask_subset(addmask, parent->effective_cpus) ||
+		     cpumask_equal(addmask, parent->effective_cpus))
+			goto out;
+		if (parent->nr_reserved &&
+		    cpumask_intersects(parent->reserved_cpus, addmask))
+			goto out;
+	}
+
+	/*
+	 * Check if any CPUs in addmask or delmask are in the effective_cpus
+	 * of a sibling cpuset. The implied cpu_exclusive of a scheduling
+	 * domain root will ensure there are no overlap in cpus_allowed.
+	 */
+	rcu_read_lock();
+	cpuset_for_each_child(sibling, pos_css, parent) {
+		if ((sibling == cpuset) || !(sibling->css.flags & CSS_ONLINE))
+			continue;
+		if (addmask &&
+		    cpumask_intersects(sibling->effective_cpus, addmask))
+			goto out_unlock;
+		if (delmask &&
+		    cpumask_intersects(sibling->effective_cpus, delmask))
+			goto out_unlock;
+	}
+	rcu_read_unlock();
+
+	/*
+	 * Change the reserved CPU list.
+	 * Newly added reserved CPUs will be removed from effective_cpus
+	 * and newly deleted ones will be added back if they are online.
+	 */
+	spin_lock_irq(&callback_lock);
+	if (addmask) {
+		cpumask_or(parent->reserved_cpus,
+			   parent->reserved_cpus, addmask);
+		cpumask_andnot(parent->effective_cpus,
+			       parent->effective_cpus, addmask);
+	}
+	if (delmask) {
+		cpumask_andnot(parent->reserved_cpus,
+			       parent->reserved_cpus, delmask);
+		cpumask_or(parent->effective_cpus,
+			   parent->effective_cpus, delmask);
+	}
+
+	parent->nr_reserved = cpumask_weight(parent->reserved_cpus);
+	spin_unlock_irq(&callback_lock);
+	retval = 0;
+out:
+	if (old_count && !parent->nr_reserved)
+		free_cpumask_var(parent->reserved_cpus);
+
+	return retval;
+
+out_unlock:
+	rcu_read_unlock();
+	goto out;
+}
+
+/**
  * update_cpumask - update the cpus_allowed mask of a cpuset and all tasks in it
  * @cs: the cpuset to consider
  * @trialcs: trial cpuset
@@ -988,6 +1145,9 @@ static int update_cpumask(struct cpuset *cs, struct cpuset *trialcs,
 	retval = validate_change(cs, trialcs);
 	if (retval < 0)
 		return retval;
+
+	if (is_sched_domain_root(cs))
+		return -EBUSY;
 
 	spin_lock_irq(&callback_lock);
 	cpumask_copy(cs->cpus_allowed, trialcs->cpus_allowed);
@@ -1317,6 +1477,7 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	struct cpuset *trialcs;
 	int balance_flag_changed;
 	int spread_flag_changed;
+	int domain_flag_changed;
 	int err;
 
 	trialcs = alloc_trial_cpuset(cs);
@@ -1328,6 +1489,18 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	else
 		clear_bit(bit, &trialcs->flags);
 
+	/*
+	 *  Turning on sched.domain flag (default hierarchy only) implies
+	 *  an implicit cpu_exclusive. Turning off sched.domain will clear
+	 *  the cpu_exclusive flag.
+	 */
+	if (bit == CS_SCHED_DOMAIN_ROOT) {
+		if (turning_on)
+			set_bit(CS_CPU_EXCLUSIVE, &trialcs->flags);
+		else
+			clear_bit(CS_CPU_EXCLUSIVE, &trialcs->flags);
+	}
+
 	err = validate_change(cs, trialcs);
 	if (err < 0)
 		goto out;
@@ -1338,11 +1511,27 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	spread_flag_changed = ((is_spread_slab(cs) != is_spread_slab(trialcs))
 			|| (is_spread_page(cs) != is_spread_page(trialcs)));
 
+	domain_flag_changed = (is_sched_domain_root(cs) !=
+			       is_sched_domain_root(trialcs));
+
+	if (domain_flag_changed) {
+		err = turning_on
+		    ? update_reserved_cpumask(cs, NULL, cs->cpus_allowed)
+		    : update_reserved_cpumask(cs, cs->cpus_allowed, NULL);
+		if (err < 0)
+			goto out;
+		/*
+		 * At this point, the state has been changed.
+		 * So we can't back out with error anymore.
+		 */
+	}
+
 	spin_lock_irq(&callback_lock);
 	cs->flags = trialcs->flags;
 	spin_unlock_irq(&callback_lock);
 
-	if (!cpumask_empty(trialcs->cpus_allowed) && balance_flag_changed)
+	if (!cpumask_empty(trialcs->cpus_allowed) &&
+	   (balance_flag_changed || domain_flag_changed))
 		rebuild_sched_domains_locked();
 
 	if (spread_flag_changed)
@@ -1597,6 +1786,7 @@ typedef enum {
 	FILE_MEM_EXCLUSIVE,
 	FILE_MEM_HARDWALL,
 	FILE_SCHED_LOAD_BALANCE,
+	FILE_SCHED_DOMAIN_ROOT,
 	FILE_SCHED_RELAX_DOMAIN_LEVEL,
 	FILE_MEMORY_PRESSURE_ENABLED,
 	FILE_MEMORY_PRESSURE,
@@ -1629,6 +1819,9 @@ static int cpuset_write_u64(struct cgroup_subsys_state *css, struct cftype *cft,
 		break;
 	case FILE_SCHED_LOAD_BALANCE:
 		retval = update_flag(CS_SCHED_LOAD_BALANCE, cs, val);
+		break;
+	case FILE_SCHED_DOMAIN_ROOT:
+		retval = update_flag(CS_SCHED_DOMAIN_ROOT, cs, val);
 		break;
 	case FILE_MEMORY_MIGRATE:
 		retval = update_flag(CS_MEMORY_MIGRATE, cs, val);
@@ -1791,6 +1984,8 @@ static u64 cpuset_read_u64(struct cgroup_subsys_state *css, struct cftype *cft)
 		return is_mem_hardwall(cs);
 	case FILE_SCHED_LOAD_BALANCE:
 		return is_sched_load_balance(cs);
+	case FILE_SCHED_DOMAIN_ROOT:
+		return is_sched_domain_root(cs);
 	case FILE_MEMORY_MIGRATE:
 		return is_memory_migrate(cs);
 	case FILE_MEMORY_PRESSURE_ENABLED:
@@ -1964,6 +2159,14 @@ static struct cftype dfl_files[] = {
 		.name = "mems.effective",
 		.seq_show = cpuset_common_seq_show,
 		.private = FILE_EFFECTIVE_MEMLIST,
+		.flags = CFTYPE_NOT_ON_ROOT,
+	},
+
+	{
+		.name = "sched.domain_root",
+		.read_u64 = cpuset_read_u64,
+		.write_u64 = cpuset_write_u64,
+		.private = FILE_SCHED_DOMAIN_ROOT,
 		.flags = CFTYPE_NOT_ON_ROOT,
 	},
 
