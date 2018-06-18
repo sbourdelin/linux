@@ -447,6 +447,11 @@ static int print_iface_handler(struct nl_msg *msg, void *arg)
 		printf("%s\tmulticast TXQ:%s\n", indent, buf);
 	}
 
+	if (tb_msg[NL80211_ATTR_4ADDR]) {
+		uint8_t use_4addr = nla_get_u8(tb_msg[NL80211_ATTR_4ADDR]);
+		printf("%s\t4addr: %d\n", indent, use_4addr);
+	}
+
 	return NL_SKIP;
 }
 
