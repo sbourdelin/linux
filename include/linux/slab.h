@@ -296,11 +296,12 @@ static inline void __check_heap_object(const void *ptr, unsigned long n,
                                (KMALLOC_MIN_SIZE) : 16)
 
 #define KMALLOC_NORMAL	0
+#define KMALLOC_RECLAIM	1
 #ifdef CONFIG_ZONE_DMA
-#define KMALLOC_DMA	1
-#define KMALLOC_TYPES	2
+#define KMALLOC_DMA	2
+#define KMALLOC_TYPES	3
 #else
-#define KMALLOC_TYPES	1
+#define KMALLOC_TYPES	2
 #endif
 
 #ifndef CONFIG_SLOB
@@ -309,12 +310,19 @@ extern struct kmem_cache *kmalloc_caches[KMALLOC_TYPES][KMALLOC_SHIFT_HIGH + 1];
 static __always_inline unsigned int kmalloc_type(gfp_t flags)
 {
 	int is_dma = 0;
+	int is_reclaimable;
 
 #ifdef CONFIG_ZONE_DMA
 	is_dma = !!(flags & __GFP_DMA);
 #endif
 
-	return is_dma;
+	is_reclaimable = !!(flags & __GFP_RECLAIMABLE);
+
+	/*
+	 * If an allocation is botth __GFP_DMA and __GFP_RECLAIMABLE, return
+	 * KMALLOC_DMA and effectively ignore __GFP_RECLAIMABLE
+	 */
+	return (is_dma * 2) + (is_reclaimable & !is_dma);
 }
 
 /*
