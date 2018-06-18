@@ -1043,7 +1043,8 @@ static inline void __switch_to_tm(struct task_struct *prev,
 				prev->thread.regs->msr &= ~MSR_TM;
 		}
 
-		tm_recheckpoint_new_task(new);
+		if (tm_enabled(new))
+			tm_recheckpoint_new_task(new);
 	}
 }
 
