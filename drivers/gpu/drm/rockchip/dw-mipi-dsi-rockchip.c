@@ -218,6 +218,10 @@ struct dw_mipi_dsi_rockchip {
 	struct clk *grf_clk;
 	struct clk *phy_cfg_clk;
 
+	/* dual-channel */
+	bool is_slave;
+	struct dw_mipi_dsi_rockchip *slave;
+
 	unsigned int lane_mbps; /* per lane */
 	u16 input_div;
 	u16 feedback_div;
@@ -604,6 +608,8 @@ static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	}
 
 	dw_mipi_dsi_rockchip_config(dsi, mux);
+	if (dsi->slave)
+		dw_mipi_dsi_rockchip_config(dsi->slave, mux);
 
 	clk_disable_unprepare(dsi->grf_clk);
 }
@@ -632,6 +638,8 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
 	}
 
 	s->output_type = DRM_MODE_CONNECTOR_DSI;
+	if (dsi->slave)
+		s->output_flags = ROCKCHIP_OUTPUT_DSI_DUAL;
 
 	return 0;
 }
@@ -641,6 +649,8 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
 	struct dw_mipi_dsi_rockchip *dsi = to_dsi(encoder);
 
 	pm_runtime_put(dsi->dev);
+	if (dsi->slave)
+		pm_runtime_put(dsi->slave->dev);
 }
 
 static const struct drm_encoder_helper_funcs
@@ -681,17 +691,69 @@ static int dw_mipi_dsi_rockchip_bind(struct device *dev,
 {
 	struct dw_mipi_dsi_rockchip *dsi = dev_get_drvdata(dev);
 	struct drm_device *drm_dev = data;
+	struct device_node *second_np;
 	struct drm_bridge *bridge;
 	struct drm_panel *panel;
+	bool master1, master2;
 	int ret;
 
 	/*
-	 * Handle probe-deferrals due to missing display.
+	 * At this point both DSIs (if in use) should have probed and found
+	 * any connected displays or bridges.
+	 * This also takes care of handling possible probe-deferrals.
 	 */
 	ret = drm_of_find_panel_or_bridge(dsi->dev->of_node, 1, 0,
 					  &panel, &bridge);
 	if (ret)
 		return ret;
+
+	second_np = of_mipi_dsi_find_second_host(dsi->dev->of_node, 1, 0);
+	if (IS_ERR(second_np))
+		return PTR_ERR(second_np);
+
+	if (second_np) {
+		struct platform_device *pdev;
+
+		master1 = of_property_read_bool(dsi->dev->of_node,
+						"clock-master");
+		master2 = of_property_read_bool(second_np, "clock-master");
+
+		if (master1 && master2) {
+			DRM_DEV_ERROR(dsi->dev, "only one clock-master allowed\n");
+			of_node_put(second_np);
+			return -EINVAL;
+		}
+
+		if (!master1 && !master2) {
+			DRM_DEV_ERROR(dsi->dev, "no clock-master defined\n");
+			of_node_put(second_np);
+			return -EINVAL;
+		}
+
+		/* we are the slave in dual-DSI */
+		if (!master1) {
+			dsi->is_slave = true;
+			of_node_put(second_np);
+			return 0;
+		}
+
+		pdev = of_find_device_by_node(second_np);
+		if (!pdev) {
+			DRM_DEV_ERROR(dev, "could not find slave controller\n");
+			return -ENODEV;
+		}
+
+		dsi->slave = platform_get_drvdata(pdev);
+		if (!dsi->slave) {
+			DRM_DEV_ERROR(dev, "could not get slaves platform-data\n");
+			return -ENODEV;
+		}
+
+		dsi->slave->is_slave = true;
+		dw_mipi_dsi_set_slave(dsi->dmd, dsi->slave->dmd);
+
+		of_node_put(second_np);
+	}
 
 	ret = rockchip_dsi_drm_create_encoder(dsi, drm_dev);
 	if (ret) {
@@ -713,6 +775,9 @@ static void dw_mipi_dsi_rockchip_unbind(struct device *dev,
 					void *data)
 {
 	struct dw_mipi_dsi_rockchip *dsi = dev_get_drvdata(dev);
+
+	if (dsi->is_slave)
+		return;
 
 	dw_mipi_dsi_unbind(dsi->dmd);
 }
