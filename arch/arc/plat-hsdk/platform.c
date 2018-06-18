@@ -42,6 +42,45 @@ static void __init hsdk_init_per_cpu(unsigned int cpu)
 #define SDIO_UHS_REG_EXT	(SDIO_BASE + 0x108)
 #define SDIO_UHS_REG_EXT_DIV_2	(2 << 30)
 
+#define HSDK_GPIO_INTC          (ARC_PERIPHERAL_BASE + 0x3000)
+#define GPIO_INTEN              (HSDK_GPIO_INTC + 0x30)
+#define GPIO_INTMASK            (HSDK_GPIO_INTC + 0x34)
+#define GPIO_INTTYPE_LEVEL      (HSDK_GPIO_INTC + 0x38)
+#define GPIO_INT_POLARITY       (HSDK_GPIO_INTC + 0x3c)
+
+#define GPIO_BLUETOOTH_INT	0x00000001
+#define GPIO_HAPS_INT		0x00000004
+#define GPIO_AUDIO_INT		0x00000008
+/* PMOD_A header */
+#define GPIO_PIN_08_INT		0x00000100
+#define GPIO_PIN_09_INT		0x00000200
+#define GPIO_PIN_10_INT		0x00000400
+#define GPIO_PIN_11_INT		0x00000800
+/* PMOD_B header */
+#define GPIO_PIN_12_INT		0x00001000
+#define GPIO_PIN_13_INT		0x00002000
+#define GPIO_PIN_14_INT		0x00004000
+#define GPIO_PIN_15_INT		0x00008000
+/* PMOD_C header */
+#define GPIO_PIN_16_INT		0x00010000
+#define GPIO_PIN_17_INT		0x00020000
+#define GPIO_PIN_18_INT		0x00040000
+#define GPIO_PIN_19_INT		0x00080000
+#define GPIO_PIN_20_INT		0x00100000
+#define GPIO_PIN_21_INT		0x00200000
+#define GPIO_PIN_22_INT		0x00400000
+#define GPIO_PIN_23_INT		0x00800000
+static void __init hsdk_enable_gpio_intc_wire(void)
+{
+	u32 val = GPIO_HAPS_INT;
+
+	iowrite32(0xffffffff, (void __iomem *) GPIO_INTMASK);
+	iowrite32(~val, (void __iomem *) GPIO_INTMASK);
+	iowrite32(0x00000000, (void __iomem *) GPIO_INTTYPE_LEVEL);
+	iowrite32(0xffffffff, (void __iomem *) GPIO_INT_POLARITY);
+	iowrite32(val, (void __iomem *) GPIO_INTEN);
+}
+
 static void __init hsdk_init_early(void)
 {
 	/*
@@ -62,6 +101,8 @@ static void __init hsdk_init_early(void)
 	 * minimum possible div-by-2.
 	 */
 	iowrite32(SDIO_UHS_REG_EXT_DIV_2, (void __iomem *) SDIO_UHS_REG_EXT);
+
+	sdk_enable_gpio_intc_wire();
 }
 
 static const char *hsdk_compat[] __initconst = {
