@@ -1617,6 +1617,15 @@ Cpuset Interface Files
 	There must be at least one cpu left in the parent scheduling
 	domain root cgroup.
 
+	In a scheduling domain root, changes to "cpuset.cpus" is allowed
+	as long as the first condition above as well as the following
+	two additional conditions are true.
+
+	1) Any added CPUs must be a proper subset of the parent's
+	   "cpuset.cpus.effective".
+	2) No CPU that has been distributed to child scheduling domain
+	   roots is deleted.
+
 
 Device controller
 -----------------
