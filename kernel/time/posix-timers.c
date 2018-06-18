@@ -228,7 +228,7 @@ static int posix_ktime_get_ts(clockid_t which_clock, struct timespec64 *tp)
  */
 static int posix_get_monotonic_raw(clockid_t which_clock, struct timespec64 *tp)
 {
-	getrawmonotonic64(tp);
+	ktime_get_raw_ts64(tp);
 	return 0;
 }
 
