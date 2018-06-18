@@ -999,11 +999,11 @@ static ssize_t ibmvmc_read(struct file *file, char *buf, size_t nbytes,
  * Return:
  *	poll.h return values
  */
-static unsigned int ibmvmc_poll(struct file *file, poll_table *wait)
+static __poll_t ibmvmc_poll(struct file *file, poll_table *wait)
 {
 	struct ibmvmc_file_session *session;
 	struct ibmvmc_hmc *hmc;
-	unsigned int mask = 0;
+	__poll_t mask = 0;
 
 	session = file->private_data;
 	if (!session)
@@ -1016,7 +1016,7 @@ static unsigned int ibmvmc_poll(struct file *file, poll_table *wait)
 	poll_wait(file, &ibmvmc_read_wait, wait);
 
 	if (hmc->queue_head != hmc->queue_tail)
-		mask |= POLLIN | POLLRDNORM;
+		mask |= EPOLLIN | EPOLLRDNORM;
 
 	return mask;
 }

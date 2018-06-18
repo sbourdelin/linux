@@ -307,9 +307,9 @@ static __poll_t xsk_poll_mask(struct socket *sock, __poll_t events)
 	struct xdp_sock *xs = xdp_sk(sk);
 
 	if (xs->rx && !xskq_empty_desc(xs->rx))
-		mask |= POLLIN | POLLRDNORM;
+		mask |= EPOLLIN | EPOLLRDNORM;
 	if (xs->tx && !xskq_full_desc(xs->tx))
-		mask |= POLLOUT | POLLWRNORM;
+		mask |= EPOLLOUT | EPOLLWRNORM;
 
 	return mask;
 }

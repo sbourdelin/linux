@@ -39,7 +39,7 @@ __poll_t vfs_poll(struct file *file, struct poll_table_struct *pt)
 	if (file->f_op->poll) {
 		return file->f_op->poll(file, pt);
 	} else if (file_has_poll_mask(file)) {
-		unsigned int events = poll_requested_events(pt);
+		__poll_t events = poll_requested_events(pt);
 		struct wait_queue_head *head;
 
 		if (pt && pt->_qproc) {

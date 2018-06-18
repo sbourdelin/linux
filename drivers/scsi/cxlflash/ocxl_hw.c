@@ -1015,20 +1015,20 @@ static inline bool ctx_event_pending(struct ocxlflash_context *ctx)
  *
  * Return: poll mask
  */
-static unsigned int afu_poll(struct file *file, struct poll_table_struct *poll)
+static __poll_t afu_poll(struct file *file, struct poll_table_struct *poll)
 {
 	struct ocxlflash_context *ctx = file->private_data;
 	struct device *dev = ctx->hw_afu->dev;
 	ulong lock_flags;
-	int mask = 0;
+	__poll_t mask = 0;
 
 	poll_wait(file, &ctx->wq, poll);
 
 	spin_lock_irqsave(&ctx->slock, lock_flags);
 	if (ctx_event_pending(ctx))
-		mask |= POLLIN | POLLRDNORM;
+		mask |= EPOLLIN | EPOLLRDNORM;
 	else if (ctx->state == CLOSED)
-		mask |= POLLERR;
+		mask |= EPOLLERR;
 	spin_unlock_irqrestore(&ctx->slock, lock_flags);
 
 	dev_dbg(dev, "%s: Poll wait completed for pe %i mask %i\n",

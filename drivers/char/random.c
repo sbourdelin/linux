@@ -722,7 +722,7 @@ retry:
 		/* should we wake readers? */
 		if (entropy_bits >= random_read_wakeup_bits &&
 		    wq_has_sleeper(&random_wait)) {
-			wake_up_interruptible_poll(&random_wait, POLLIN);
+			wake_up_interruptible_poll(&random_wait, EPOLLIN);
 			kill_fasync(&fasync, SIGIO, POLL_IN);
 		}
 		/* If the input pool is getting full, send some
@@ -1396,7 +1396,7 @@ retry:
 	trace_debit_entropy(r->name, 8 * ibytes);
 	if (ibytes &&
 	    (r->entropy_count >> ENTROPY_SHIFT) < random_write_wakeup_bits) {
-		wake_up_interruptible_poll(&random_wait, POLLOUT);
+		wake_up_interruptible_poll(&random_wait, EPOLLOUT);
 		kill_fasync(&fasync, SIGIO, POLL_OUT);
 	}
 
