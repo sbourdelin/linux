@@ -47,12 +47,14 @@ struct nf_conncount_tuple {
 	struct list_head		node;
 	struct nf_conntrack_tuple	tuple;
 	struct nf_conntrack_zone	zone;
+	struct rcu_head			rcu_head;
 };
 
 struct nf_conncount_rb {
 	struct rb_node node;
 	struct nf_conncount_list list;
 	u32 key[MAX_KEYLEN];
+	struct rcu_head rcu_head;
 };
 
 static spinlock_t nf_conncount_locks[CONNCOUNT_LOCK_SLOTS] __cacheline_aligned_in_smp;
@@ -94,21 +96,42 @@ bool nf_conncount_add(struct nf_conncount_list *list,
 		return false;
 	conn->tuple = *tuple;
 	conn->zone = *zone;
+	spin_lock(&list->list_lock);
 	list_add_tail(&conn->node, &list->head);
 	list->count++;
+	spin_unlock(&list->list_lock);
 	return true;
 }
 EXPORT_SYMBOL_GPL(nf_conncount_add);
 
-static void conn_free(struct nf_conncount_list *list,
+static void __conn_free(struct rcu_head *h)
+{
+	struct nf_conncount_tuple *conn;
+
+	conn = container_of(h, struct nf_conncount_tuple, rcu_head);
+	kmem_cache_free(conncount_conn_cachep, conn);
+}
+
+static bool conn_free(struct nf_conncount_list *list,
 		      struct nf_conncount_tuple *conn)
 {
-	if (WARN_ON_ONCE(list->count == 0))
-		return;
+	bool free_entry = false;
+
+	spin_lock(&list->list_lock);
+
+	if (list->count == 0) {
+		spin_unlock(&list->list_lock);
+                return free_entry;
+	}
 
 	list->count--;
-	list_del(&conn->node);
-	kmem_cache_free(conncount_conn_cachep, conn);
+	list_del_rcu(&conn->node);
+	if (list->count == 0)
+		free_entry = true;
+
+	spin_unlock(&list->list_lock);
+	call_rcu(&conn->rcu_head, __conn_free);
+	return free_entry;
 }
 
 void nf_conncount_lookup(struct net *net,
@@ -166,12 +189,14 @@ EXPORT_SYMBOL_GPL(nf_conncount_lookup);
 
 void nf_conncount_list_init(struct nf_conncount_list *list)
 {
+	spin_lock_init(&list->list_lock);
 	INIT_LIST_HEAD(&list->head);
 	list->count = 1;
 }
 EXPORT_SYMBOL_GPL(nf_conncount_list_init);
 
-void nf_conncount_gc_list(struct net *net,
+/* Return true if the list is empty */
+bool nf_conncount_gc_list(struct net *net,
 			  struct nf_conncount_list *list)
 {
 	const struct nf_conntrack_tuple_hash *found;
@@ -182,7 +207,8 @@ void nf_conncount_gc_list(struct net *net,
 	list_for_each_entry_safe(conn, conn_n, &list->head, node) {
 		found = nf_conntrack_find_get(net, &conn->zone, &conn->tuple);
 		if (found == NULL) {
-			conn_free(list, conn);
+			if(conn_free(list, conn))
+				return true;
 			collected++;
 			continue;
 		}
@@ -194,17 +220,27 @@ void nf_conncount_gc_list(struct net *net,
 			 * closed already -> ditch it
 			 */
 			nf_ct_put(found_ct);
-			conn_free(list, conn);
+			if (conn_free(list, conn))
+				return true;
 			collected++;
 			continue;
 		}
 
 		nf_ct_put(found_ct);
 		if (collected > CONNCOUNT_GC_MAX_NODES)
-			return;
+			return false;
 	}
+	return false;
 }
 EXPORT_SYMBOL_GPL(nf_conncount_gc_list);
+
+static void __tree_nodes_free(struct rcu_head *h)
+{
+	struct nf_conncount_rb *rbconn;
+
+	rbconn = container_of(h, struct nf_conncount_rb, rcu_head);
+	kmem_cache_free(conncount_rb_cachep, rbconn);
+}
 
 static void tree_nodes_free(struct rb_root *root,
 			    struct nf_conncount_rb *gc_nodes[],
@@ -215,7 +251,7 @@ static void tree_nodes_free(struct rb_root *root,
 	while (gc_count) {
 		rbconn = gc_nodes[--gc_count];
 		rb_erase(&rbconn->node, root);
-		kmem_cache_free(conncount_rb_cachep, rbconn);
+		call_rcu(&rbconn->rcu_head, __tree_nodes_free);
 	}
 }
 
@@ -293,62 +329,59 @@ count_tree(struct net *net,
 {
 	struct nf_conncount_rb *gc_nodes[CONNCOUNT_GC_MAX_NODES];
 	struct rb_root *root;
-	struct rb_node **rbnode, *parent;
+	struct rb_node *parent;
 	struct nf_conncount_rb *rbconn;
 	unsigned int gc_count, hash;
 	bool no_gc = false;
-	unsigned int count = 0;
 	u8 keylen = data->keylen;
 
 	hash = jhash2(key, data->keylen, conncount_rnd) % CONNCOUNT_SLOTS;
 	root = &data->root[hash];
 
-	spin_lock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
  restart:
 	gc_count = 0;
-	parent = NULL;
-	rbnode = &(root->rb_node);
-	while (*rbnode) {
+	parent = rcu_dereference_raw(root->rb_node);
+	while (parent) {
 		int diff;
 		bool addit;
 
-		rbconn = rb_entry(*rbnode, struct nf_conncount_rb, node);
+		rbconn = rb_entry(parent, struct nf_conncount_rb, node);
 
-		parent = *rbnode;
 		diff = key_diff(key, rbconn->key, keylen);
 		if (diff < 0) {
-			rbnode = &((*rbnode)->rb_left);
+			parent = rcu_dereference_raw(parent->rb_left);
 		} else if (diff > 0) {
-			rbnode = &((*rbnode)->rb_right);
+			parent = rcu_dereference_raw(parent->rb_right);
 		} else {
 			/* same source network -> be counted! */
 			nf_conncount_lookup(net, &rbconn->list, tuple, zone,
 					    &addit);
-			count = rbconn->list.count;
 
+			spin_lock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
 			tree_nodes_free(root, gc_nodes, gc_count);
+			spin_unlock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
+
 			if (!addit)
-				goto out_unlock;
+				return rbconn->list.count;
 
 			if (!nf_conncount_add(&rbconn->list, tuple, zone))
-				count = 0; /* hotdrop */
-				goto out_unlock;
+				return 0; /* hotdrop */
 
-			count++;
-			goto out_unlock;
+			return rbconn->list.count;
 		}
 
 		if (no_gc || gc_count >= ARRAY_SIZE(gc_nodes))
 			continue;
 
-		nf_conncount_gc_list(net, &rbconn->list);
-		if (list_empty(&rbconn->list.head))
+		if (nf_conncount_gc_list(net, &rbconn->list))
 			gc_nodes[gc_count++] = rbconn;
 	}
 
 	if (gc_count) {
 		no_gc = true;
+		spin_lock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
 		tree_nodes_free(root, gc_nodes, gc_count);
+		spin_unlock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
 		/* tree_node_free before new allocation permits
 		 * allocator to re-use newly free'd object.
 		 *
@@ -358,20 +391,15 @@ count_tree(struct net *net,
 		goto restart;
 	}
 
-	count = 0;
 	if (!tuple)
-		goto out_unlock;
+		return 0;
 
-	spin_unlock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
 	return insert_tree(root, hash, key, keylen, tuple, zone);
-
-out_unlock:
-	spin_unlock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
-	return count;
 }
 
 /* Count and return number of conntrack entries in 'net' with particular 'key'.
  * If 'tuple' is not null, insert it into the accounting data structure.
+ * Call with RCU read lock.
  */
 unsigned int nf_conncount_count(struct net *net,
 				struct nf_conncount_data *data,
