@@ -75,6 +75,7 @@ static int ipvlan_set_port_mode(struct ipvl_port *port, u16 nval)
 {
 	struct ipvl_dev *ipvlan;
 	struct net_device *mdev = port->dev;
+	unsigned int flags;
 	int err = 0;
 
 	ASSERT_RTNL();
@@ -94,10 +95,13 @@ static int ipvlan_set_port_mode(struct ipvl_port *port, u16 nval)
 			mdev->l3mdev_ops = NULL;
 		}
 		list_for_each_entry(ipvlan, &port->ipvlans, pnode) {
+			flags = ipvlan->dev->flags;
 			if (nval == IPVLAN_MODE_L3 || nval == IPVLAN_MODE_L3S)
-				ipvlan->dev->flags |= IFF_NOARP;
+				dev_change_flags(ipvlan->dev,
+						 flags | IFF_NOARP);
 			else
-				ipvlan->dev->flags &= ~IFF_NOARP;
+				dev_change_flags(ipvlan->dev,
+						 flags & ~IFF_NOARP);
 		}
 		port->mode = nval;
 	}
