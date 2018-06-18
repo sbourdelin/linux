@@ -254,6 +254,7 @@ skl_update_plane(struct intel_plane *plane,
 	uint32_t src_w = drm_rect_width(&plane_state->base.src) >> 16;
 	uint32_t src_h = drm_rect_height(&plane_state->base.src) >> 16;
 	unsigned long irqflags;
+	u32 val;
 
 	/* Sizes are 0 based */
 	src_w--;
@@ -300,6 +301,8 @@ skl_update_plane(struct intel_plane *plane,
 		I915_WRITE_FW(PLANE_POS(pipe, plane_id), (crtc_y << 16) | crtc_x);
 	}
 
+	val = I915_READ_FW(PLANE_CTL(pipe, plane_id));
+	plane_ctl |= val;
 	I915_WRITE_FW(PLANE_CTL(pipe, plane_id), plane_ctl);
 	I915_WRITE_FW(PLANE_SURF(pipe, plane_id),
 		      intel_plane_ggtt_offset(plane_state) + surf_addr);
