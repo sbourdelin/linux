@@ -1024,7 +1024,8 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		OVL_I(inode)->redirect = upperredirect;
 	}
 
-	revert_creds(old_cred);
+	if (old_cred)
+		revert_creds(old_cred);
 	dput(index);
 	kfree(stack);
 	kfree(d.redirect);
@@ -1043,7 +1044,8 @@ out_put_upper:
 	kfree(upperredirect);
 out:
 	kfree(d.redirect);
-	revert_creds(old_cred);
+	if (old_cred)
+		revert_creds(old_cred);
 	return ERR_PTR(err);
 }
 
@@ -1097,7 +1099,8 @@ bool ovl_lower_positive(struct dentry *dentry)
 			dput(this);
 		}
 	}
-	revert_creds(old_cred);
+	if (old_cred)
+		revert_creds(old_cred);
 
 	return positive;
 }
