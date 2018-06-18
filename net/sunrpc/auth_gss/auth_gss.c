@@ -75,6 +75,8 @@ static unsigned int gss_key_expire_timeo = GSS_KEY_EXPIRE_TIMEO;
  * using integrity (two 4-byte integers): */
 #define GSS_VERF_SLACK		100
 
+#define GSS_UPCALL_TIMEO (5 * HZ)
+
 static DEFINE_HASHTABLE(gss_auth_hash_table, 4);
 static DEFINE_SPINLOCK(gss_auth_hash_lock);
 
@@ -658,7 +660,14 @@ retry:
 			err = -ERESTARTSYS;
 			goto out_intr;
 		}
-		schedule();
+		if (schedule_timeout(GSS_UPCALL_TIMEO) == 0) {
+			warn_gssd();
+			if (!gssd_running(net))
+				err = -EACCES;
+			else
+				err = -ETIMEDOUT;
+			goto out_intr;
+		}
 	}
 	if (gss_msg->ctx)
 		gss_cred_set_ctx(cred, gss_msg->ctx);
