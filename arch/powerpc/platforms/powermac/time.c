@@ -42,7 +42,11 @@
 #define DBG(x...)
 #endif
 
-/* Apparently the RTC stores seconds since 1 Jan 1904 */
+/*
+ * Offset between Unix time (1970-based) and Mac time (1904-based). Cuda and PMU
+ * times wrap in 2040. If we need to handle later times, the read_time functions
+ * need to be changed to interpret wrapped times as post-2040.
+ */
 #define RTC_OFFSET	2082844800
 
 /*
@@ -97,8 +101,11 @@ static time64_t cuda_get_time(void)
 	if (req.reply_len != 7)
 		printk(KERN_ERR "cuda_get_time: got %d byte reply\n",
 		       req.reply_len);
-	now = (req.reply[3] << 24) + (req.reply[4] << 16)
-		+ (req.reply[5] << 8) + req.reply[6];
+	now = (u32)((req.reply[3] << 24) + (req.reply[4] << 16) +
+		    (req.reply[5] << 8) + req.reply[6]);
+	/* it's either after year 2040, or the RTC has gone backwards */
+	WARN_ON(now < RTC_OFFSET);
+
 	return now - RTC_OFFSET;
 }
 
@@ -140,8 +147,12 @@ static time64_t pmu_get_time(void)
 	if (req.reply_len != 4)
 		printk(KERN_ERR "pmu_get_time: got %d byte reply from PMU\n",
 		       req.reply_len);
-	now = (req.reply[0] << 24) + (req.reply[1] << 16)
-		+ (req.reply[2] << 8) + req.reply[3];
+	now = (u32)((req.reply[0] << 24) + (req.reply[1] << 16)	+
+		    (req.reply[2] << 8) + req.reply[3]);
+
+	/* it's either after year 2040, or the RTC has gone backwards */
+	WARN_ON(now < RTC_OFFSET);
+
 	return now - RTC_OFFSET;
 }
 
