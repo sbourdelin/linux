@@ -70,6 +70,9 @@
 #define OV5645_SDE_SAT_U		0x5583
 #define OV5645_SDE_SAT_V		0x5584
 
+/* Number of frames needed for AE and AWB to converge */
+#define OV5645_NUM_OF_SKIP_FRAMES 5
+
 struct reg_value {
 	u16 reg;
 	u8 val;
@@ -1071,6 +1074,13 @@ static int ov5645_s_stream(struct v4l2_subdev *subdev, int enable)
 	return 0;
 }
 
+static int ov5645_get_skip_frames(struct v4l2_subdev *sd, u32 *frames)
+{
+	*frames = OV5645_NUM_OF_SKIP_FRAMES;
+
+	return 0;
+}
+
 static const struct v4l2_subdev_core_ops ov5645_core_ops = {
 	.s_power = ov5645_s_power,
 };
@@ -1088,10 +1098,15 @@ static const struct v4l2_subdev_pad_ops ov5645_subdev_pad_ops = {
 	.get_selection = ov5645_get_selection,
 };
 
+static const struct v4l2_subdev_sensor_ops ov5645_sensor_ops = {
+	.g_skip_frames = ov5645_get_skip_frames,
+};
+
 static const struct v4l2_subdev_ops ov5645_subdev_ops = {
 	.core = &ov5645_core_ops,
 	.video = &ov5645_video_ops,
 	.pad = &ov5645_subdev_pad_ops,
+	.sensor = &ov5645_sensor_ops,
 };
 
 static int ov5645_probe(struct i2c_client *client,
