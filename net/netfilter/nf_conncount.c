@@ -44,14 +44,14 @@
 
 /* we will save the tuples of all connections we care about */
 struct nf_conncount_tuple {
-	struct hlist_node		node;
+	struct list_head		node;
 	struct nf_conntrack_tuple	tuple;
 	struct nf_conntrack_zone	zone;
 };
 
 struct nf_conncount_rb {
 	struct rb_node node;
-	struct hlist_head hhead; /* connections/hosts in same subnet */
+	struct nf_conncount_list list;
 	u32 key[MAX_KEYLEN];
 };
 
@@ -80,41 +80,55 @@ static int key_diff(const u32 *a, const u32 *b, unsigned int klen)
 	return memcmp(a, b, klen * sizeof(u32));
 }
 
-bool nf_conncount_add(struct hlist_head *head,
+bool nf_conncount_add(struct nf_conncount_list *list,
 		      const struct nf_conntrack_tuple *tuple,
 		      const struct nf_conntrack_zone *zone)
 {
 	struct nf_conncount_tuple *conn;
+
+	if (WARN_ON_ONCE(list->count > INT_MAX))
+		return false;
 
 	conn = kmem_cache_alloc(conncount_conn_cachep, GFP_ATOMIC);
 	if (conn == NULL)
 		return false;
 	conn->tuple = *tuple;
 	conn->zone = *zone;
-	hlist_add_head(&conn->node, head);
+	list_add_tail(&conn->node, &list->head);
+	list->count++;
 	return true;
 }
 EXPORT_SYMBOL_GPL(nf_conncount_add);
 
-unsigned int nf_conncount_lookup(struct net *net, struct hlist_head *head,
+static void conn_free(struct nf_conncount_list *list,
+		      struct nf_conncount_tuple *conn)
+{
+	if (WARN_ON_ONCE(list->count == 0))
+		return;
+
+	list->count--;
+	list_del(&conn->node);
+	kmem_cache_free(conncount_conn_cachep, conn);
+}
+
+unsigned int nf_conncount_lookup(struct net *net,
+				 struct nf_conncount_list *list,
 				 const struct nf_conntrack_tuple *tuple,
 				 const struct nf_conntrack_zone *zone,
 				 bool *addit)
 {
 	const struct nf_conntrack_tuple_hash *found;
-	struct nf_conncount_tuple *conn;
-	struct hlist_node *n;
+	struct nf_conncount_tuple *conn, *conn_n;
 	struct nf_conn *found_ct;
 	unsigned int length = 0;
 
 	*addit = tuple ? true : false;
 
 	/* check the saved connections */
-	hlist_for_each_entry_safe(conn, n, head, node) {
+	list_for_each_entry_safe(conn, conn_n, &list->head, node) {
 		found = nf_conntrack_find_get(net, &conn->zone, &conn->tuple);
 		if (found == NULL) {
-			hlist_del(&conn->node);
-			kmem_cache_free(conncount_conn_cachep, conn);
+			conn_free(list, conn);
 			continue;
 		}
 
@@ -134,8 +148,7 @@ unsigned int nf_conncount_lookup(struct net *net, struct hlist_head *head,
 			 * closed already -> ditch it
 			 */
 			nf_ct_put(found_ct);
-			hlist_del(&conn->node);
-			kmem_cache_free(conncount_conn_cachep, conn);
+			conn_free(list, conn);
 			continue;
 		}
 
@@ -147,20 +160,25 @@ unsigned int nf_conncount_lookup(struct net *net, struct hlist_head *head,
 }
 EXPORT_SYMBOL_GPL(nf_conncount_lookup);
 
+void nf_conncount_list_init(struct nf_conncount_list *list)
+{
+	INIT_LIST_HEAD(&list->head);
+	list->count = 1;
+}
+EXPORT_SYMBOL_GPL(nf_conncount_list_init);
+
 static void nf_conncount_gc_list(struct net *net,
-				 struct nf_conncount_rb *rbconn)
+				 struct nf_conncount_list *list)
 {
 	const struct nf_conntrack_tuple_hash *found;
-	struct nf_conncount_tuple *conn;
-	struct hlist_node *n;
+	struct nf_conncount_tuple *conn, *conn_n;
 	struct nf_conn *found_ct;
 	unsigned int collected = 0;
 
-	hlist_for_each_entry_safe(conn, n, &rbconn->hhead, node) {
+	list_for_each_entry_safe(conn, conn_n, &list->head, node) {
 		found = nf_conntrack_find_get(net, &conn->zone, &conn->tuple);
 		if (found == NULL) {
-			hlist_del(&conn->node);
-			kmem_cache_free(conncount_conn_cachep, conn);
+			conn_free(list, conn);
 			collected++;
 			continue;
 		}
@@ -172,8 +190,7 @@ static void nf_conncount_gc_list(struct net *net,
 			 * closed already -> ditch it
 			 */
 			nf_ct_put(found_ct);
-			hlist_del(&conn->node);
-			kmem_cache_free(conncount_conn_cachep, conn);
+			conn_free(list, conn);
 			collected++;
 			continue;
 		}
@@ -230,14 +247,14 @@ count_tree(struct net *net, struct rb_root *root,
 			/* same source network -> be counted! */
 			unsigned int count;
 
-			count = nf_conncount_lookup(net, &rbconn->hhead, tuple,
+			count = nf_conncount_lookup(net, &rbconn->list, tuple,
 						    zone, &addit);
 
 			tree_nodes_free(root, gc_nodes, gc_count);
 			if (!addit)
 				return count;
 
-			if (!nf_conncount_add(&rbconn->hhead, tuple, zone))
+			if (!nf_conncount_add(&rbconn->list, tuple, zone))
 				return 0; /* hotdrop */
 
 			return count + 1;
@@ -246,8 +263,8 @@ count_tree(struct net *net, struct rb_root *root,
 		if (no_gc || gc_count >= ARRAY_SIZE(gc_nodes))
 			continue;
 
-		nf_conncount_gc_list(net, rbconn);
-		if (hlist_empty(&rbconn->hhead))
+		nf_conncount_gc_list(net, &rbconn->list);
+		if (list_empty(&rbconn->list.head))
 			gc_nodes[gc_count++] = rbconn;
 	}
 
@@ -281,8 +298,8 @@ count_tree(struct net *net, struct rb_root *root,
 	conn->zone = *zone;
 	memcpy(rbconn->key, key, sizeof(u32) * keylen);
 
-	INIT_HLIST_HEAD(&rbconn->hhead);
-	hlist_add_head(&conn->node, &rbconn->hhead);
+	nf_conncount_list_init(&rbconn->list);
+	list_add(&conn->node, &rbconn->list.head);
 
 	rb_link_node(&rbconn->node, parent, rbnode);
 	rb_insert_color(&rbconn->node, root);
@@ -347,12 +364,11 @@ struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int family
 }
 EXPORT_SYMBOL_GPL(nf_conncount_init);
 
-void nf_conncount_cache_free(struct hlist_head *hhead)
+void nf_conncount_cache_free(struct nf_conncount_list *list)
 {
-	struct nf_conncount_tuple *conn;
-	struct hlist_node *n;
+	struct nf_conncount_tuple *conn, *conn_n;
 
-	hlist_for_each_entry_safe(conn, n, hhead, node)
+	list_for_each_entry_safe(conn, conn_n, &list->head, node)
 		kmem_cache_free(conncount_conn_cachep, conn);
 }
 EXPORT_SYMBOL_GPL(nf_conncount_cache_free);
@@ -367,7 +383,7 @@ static void destroy_tree(struct rb_root *r)
 
 		rb_erase(node, r);
 
-		nf_conncount_cache_free(&rbconn->hhead);
+		nf_conncount_cache_free(&rbconn->list);
 
 		kmem_cache_free(conncount_rb_cachep, rbconn);
 	}
