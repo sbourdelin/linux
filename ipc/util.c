@@ -113,7 +113,7 @@ static const struct rhashtable_params ipc_kht_params = {
  * @ids: ipc identifier set
  *
  * Set up the sequence range to use for the ipc identifier range (limited
- * below IPCMNI) then initialise the keys hashtable and ids idr.
+ * below ipc_mni) then initialise the keys hashtable and ids idr.
  */
 int ipc_init_ids(struct ipc_ids *ids)
 {
@@ -214,7 +214,7 @@ static inline int ipc_buildid(int id, struct ipc_ids *ids,
 		ids->next_id = -1;
 	}
 
-	return SEQ_MULTIPLIER * new->seq + id;
+	return (new->seq << SEQ_SHIFT) + id;
 }
 
 #else
@@ -228,7 +228,7 @@ static inline int ipc_buildid(int id, struct ipc_ids *ids,
 	if (ids->seq > IPCID_SEQ_MAX)
 		ids->seq = 0;
 
-	return SEQ_MULTIPLIER * new->seq + id;
+	return (new->seq << SEQ_SHIFT) + id;
 }
 
 #endif /* CONFIG_CHECKPOINT_RESTORE */
@@ -252,8 +252,8 @@ int ipc_addid(struct ipc_ids *ids, struct kern_ipc_perm *new, int limit)
 	kgid_t egid;
 	int id, err;
 
-	if (limit > IPCMNI)
-		limit = IPCMNI;
+	if (limit > ipc_mni)
+		limit = ipc_mni;
 
 	if (!ids->tables_initialized || ids->in_use >= limit)
 		return -ENOSPC;
@@ -777,7 +777,7 @@ static struct kern_ipc_perm *sysvipc_find_ipc(struct ipc_ids *ids, loff_t pos,
 	if (total >= ids->in_use)
 		return NULL;
 
-	for (; pos < IPCMNI; pos++) {
+	for (; pos < ipc_mni; pos++) {
 		ipc = idr_find(&ids->ipcs_idr, pos);
 		if (ipc != NULL) {
 			*new_pos = pos + 1;
