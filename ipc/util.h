@@ -29,6 +29,7 @@
 #ifdef CONFIG_SYSVIPC_SYSCTL
 extern int ipc_mni;
 extern int ipc_mni_shift;
+extern int ipcmni_max;
 extern bool ipc_mni_extended;
 
 #define SEQ_SHIFT		ipc_mni_shift
@@ -244,10 +245,10 @@ void free_ipcs(struct ipc_namespace *ns, struct ipc_ids *ids,
 
 static inline int sem_check_semmni(struct ipc_namespace *ns) {
 	/*
-	 * Check semmni range [0, ipc_mni]
+	 * Check semmni range [0, ipcmni_max]
 	 * semmni is the last element of sem_ctls[4] array
 	 */
-	return ((ns->sem_ctls[3] < 0) || (ns->sem_ctls[3] > ipc_mni))
+	return ((ns->sem_ctls[3] < 0) || (ns->sem_ctls[3] > ipcmni_max))
 		? -ERANGE : 0;
 }
 

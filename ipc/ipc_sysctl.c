@@ -18,6 +18,8 @@
 #include <linux/msg.h>
 #include "util.h"
 
+static int ipcmni_compat;
+
 static void *get_ipc(struct ctl_table *table)
 {
 	char *which = table->data;
@@ -108,6 +110,25 @@ static int proc_ipc_sem_dointvec(struct ctl_table *table, int write,
 	return ret;
 }
 
+static int proc_ipcmni_compat_minmax(struct ctl_table *table, int write,
+	void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+
+	if (ret)
+		return ret;
+
+	/*
+	 * ipcmni_compat can only be set if !ipcmni_extend.
+	 */
+	if (ipcmni_compat && ipc_mni_extended) {
+		ipcmni_compat = 0;
+		return -EINVAL;
+	}
+	ipcmni_max = ipcmni_compat ? INT_MAX : ipc_mni;
+	return 0;
+}
+
 #else
 #define proc_ipc_doulongvec_minmax NULL
 #define proc_ipc_dointvec	   NULL
@@ -115,11 +136,13 @@ static int proc_ipc_sem_dointvec(struct ctl_table *table, int write,
 #define proc_ipc_dointvec_minmax_orphans   NULL
 #define proc_ipc_auto_msgmni	   NULL
 #define proc_ipc_sem_dointvec	   NULL
+#define proc_ipcmni_compat_minmax  NULL
 #endif
 
 static int zero;
 static int one = 1;
 static int int_max = INT_MAX;
+int ipcmni_max = IPCMNI;
 int ipc_mni = IPCMNI;
 int ipc_mni_shift = IPCMNI_SHIFT;
 bool ipc_mni_extended;
@@ -146,7 +169,7 @@ static struct ctl_table ipc_kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_ipc_dointvec_minmax,
 		.extra1		= &zero,
-		.extra2		= &ipc_mni,
+		.extra2		= &ipcmni_max,
 	},
 	{
 		.procname	= "shm_rmid_forced",
@@ -173,7 +196,7 @@ static struct ctl_table ipc_kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_ipc_dointvec_minmax,
 		.extra1		= &zero,
-		.extra2		= &ipc_mni,
+		.extra2		= &ipcmni_max,
 	},
 	{
 		.procname	= "auto_msgmni",
@@ -229,6 +252,19 @@ static struct ctl_table ipc_kern_table[] = {
 		.extra2		= &int_max,
 	},
 #endif
+	/*
+	 * Unlike other IPC sysctl parameters above, the following sysctl
+	 * parameter is global and affect behavior for all the namespaces.
+	 */
+	{
+		.procname	= "ipcmni_compat",
+		.data		= &ipcmni_compat,
+		.maxlen		= sizeof(ipcmni_compat),
+		.mode		= 0644,
+		.proc_handler	= proc_ipcmni_compat_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 	{}
 };
 
@@ -251,7 +287,7 @@ device_initcall(ipc_sysctl_init);
 
 static int __init ipc_mni_extend(char *str)
 {
-	ipc_mni = IPCMNI_EXTEND;
+	ipc_mni = ipcmni_max = IPCMNI_EXTEND;
 	ipc_mni_shift = IPCMNI_EXTEND_SHIFT;
 	ipc_mni_extended = true;
 	pr_info("IPCMNI extended to %d.\n", ipc_mni);

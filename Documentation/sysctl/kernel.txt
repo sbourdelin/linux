@@ -39,6 +39,7 @@ show up in /proc/sys/kernel:
 - hung_task_check_count
 - hung_task_timeout_secs
 - hung_task_warnings
+- ipcmni_compat
 - kexec_load_disabled
 - kptr_restrict
 - l2cr                        [ PPC only ]
@@ -371,6 +372,20 @@ When this value reaches 0, no more warnings will be reported.
 This file shows up if CONFIG_DETECT_HUNG_TASK is enabled.
 
 -1: report an infinite number of warnings.
+
+==============================================================
+
+ipcmni_compat:
+
+A boolean flag to control range checking behavior of msgmni, shmmni
+and the mni portion of sem.
+
+0: Range limits will be strictly enforced and error will be returned
+   if limits are exceeded.
+1: Range limits will only be enforced internally and no error will be
+   returned if the upper limit is exceeded. This compatibility behavior
+   can only be selected if the ipcmni_extend kernel boot parameter is
+   not specified.
 
 ==============================================================
 
