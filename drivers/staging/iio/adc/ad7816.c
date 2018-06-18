@@ -373,7 +373,7 @@ static int ad7816_probe(struct spi_device *spi_dev)
 	if (ret) {
 		dev_err(&spi_dev->dev, "Fail to request rdwr gpio PIN %d.\n",
 			chip->rdwr_pin);
-		return ret;
+		goto device_free;
 	}
 	gpio_direction_input(chip->rdwr_pin);
 	ret = devm_gpio_request(&spi_dev->dev, chip->convert_pin,
@@ -381,7 +381,7 @@ static int ad7816_probe(struct spi_device *spi_dev)
 	if (ret) {
 		dev_err(&spi_dev->dev, "Fail to request convert gpio PIN %d.\n",
 			chip->convert_pin);
-		return ret;
+		goto free_rdwr_pin;
 	}
 	gpio_direction_input(chip->convert_pin);
 	ret = devm_gpio_request(&spi_dev->dev, chip->busy_pin,
@@ -389,7 +389,7 @@ static int ad7816_probe(struct spi_device *spi_dev)
 	if (ret) {
 		dev_err(&spi_dev->dev, "Fail to request busy gpio PIN %d.\n",
 			chip->busy_pin);
-		return ret;
+		goto free_convert_pin;
 	}
 	gpio_direction_input(chip->busy_pin);
 
@@ -407,17 +407,29 @@ static int ad7816_probe(struct spi_device *spi_dev)
 						indio_dev->name,
 						indio_dev);
 		if (ret)
-			return ret;
+			goto free_busy_pin;
 	}
 
 	ret = devm_iio_device_register(&spi_dev->dev, indio_dev);
 	if (ret)
-		return ret;
+		goto free_dev_irq;
 
 	dev_info(&spi_dev->dev, "%s temperature sensor and ADC registered.\n",
 		 indio_dev->name);
 
 	return 0;
+free_dev_irq:
+	devm_free_irq(&spi_dev->dev, spi_dev->irq, indio_dev);
+free_busy_pin:
+	devm_gpio_free(&spi_dev->dev, chip->busy_pin);
+free_convert_pin:
+	devm_gpio_free(&spi_dev->dev, chip->convert_pin);
+free_rdwr_pin:
+	devm_gpio_free(&spi_dev->dev, chip->rdwr_pin);
+device_free:
+	devm_iio_device_free(&spi_dev->dev, indio_dev);
+
+	return ret;
 }
 
 static const struct spi_device_id ad7816_id[] = {
