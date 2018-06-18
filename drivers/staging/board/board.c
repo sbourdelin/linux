@@ -67,6 +67,7 @@ int __init board_staging_gic_setup_xlate(const char *gic_match,
 	if (!irqc_node)
 		return -ENOENT;
 
+	of_node_put(irqc_node);
 	irqc_base = base;
 	return 0;
 }
