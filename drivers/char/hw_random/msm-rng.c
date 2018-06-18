@@ -17,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 
 /* Device specific register offsets */
@@ -132,10 +133,16 @@ static struct hwrng msm_rng = {
 	.read = msm_rng_read,
 };
 
+static struct hwrng msm_rng_v2 = {
+	.name = KBUILD_MODNAME,
+	.read = msm_rng_read,
+};
+
 static int msm_rng_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	struct msm_rng *rng;
+	unsigned int version;
 	int ret;
 
 	rng = devm_kzalloc(&pdev->dev, sizeof(*rng), GFP_KERNEL);
@@ -154,6 +161,9 @@ static int msm_rng_probe(struct platform_device *pdev)
 		return PTR_ERR(rng->clk);
 
 	rng->hwrng = &msm_rng;
+	version = (unsigned long)of_device_get_match_data(&pdev->dev);
+	if (version)
+		rng->hwrng = &msm_rng_v2;
 
 	rng->hwrng->priv = (unsigned long)rng;
 	ret = devm_hwrng_register(&pdev->dev, rng->hwrng);
@@ -166,7 +176,8 @@ static int msm_rng_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id msm_rng_of_match[] = {
-	{ .compatible = "qcom,prng", },
+	{ .compatible = "qcom,prng", .data = (void *)0},
+	{ .compatible = "qcom,prng-v2", .data = (void *)1},
 	{}
 };
 MODULE_DEVICE_TABLE(of, msm_rng_of_match);
