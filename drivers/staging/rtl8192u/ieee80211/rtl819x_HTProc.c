@@ -643,7 +643,7 @@ void HTConstructCapabilityElement(struct ieee80211_device *ieee, u8 *posHTCap, u
  *  output:  none
  *  return:  none
  *  notice:  posHTCap can't be null and be initialized before.
-             Only AP and IBSS sta should do this
+ *           Only AP and IBSS sta should do this
  */
 void HTConstructInfoElement(struct ieee80211_device *ieee, u8 *posHTInfo, u8 *len, u8 IsEncrypt)
 {
@@ -724,7 +724,7 @@ void HTConstructRT2RTAggElement(struct ieee80211_device *ieee, u8 *posRT2RTAgg, 
 	*posRT2RTAgg++ = 0x4c;
 	*posRT2RTAgg++ = 0x02;
 	*posRT2RTAgg++ = 0x01;
-	*posRT2RTAgg = 0x10;//*posRT2RTAgg = 0x02;
+	*posRT2RTAgg = 0x10;   // *posRT2RTAgg = 0x02;
 
 	if (ieee->bSupportRemoteWakeUp)
 		*posRT2RTAgg |= 0x08;//RT_HT_CAP_USE_WOW;
@@ -734,16 +734,15 @@ void HTConstructRT2RTAggElement(struct ieee80211_device *ieee, u8 *posRT2RTAgg, 
 #ifdef TODO
 #if (HAL_CODE_BASE == RTL8192 && DEV_BUS_TYPE == USB_INTERFACE)
 	/*
-	//Emily. If it is required to Ask Realtek AP to send AMPDU during AES mode, enable this
-	   section of code.
+	 * Emily. If it is required to Ask Realtek AP to send AMPDU during AES
+	 * mode, enable this section of code.
+	 */
+#if 0
 	if(IS_UNDER_11N_AES_MODE(Adapter))
-	{
 		posRT2RTAgg->Octet[5] |=RT_HT_CAP_USE_AMPDU;
-	}else
-	{
+	else
 		posRT2RTAgg->Octet[5] &= 0xfb;
-	}
-	*/
+#endif
 #else
 	// Do Nothing
 #endif
