@@ -40,6 +40,7 @@
 
 static struct equiv_cpu_table {
 	struct equiv_cpu_entry *table;
+	unsigned int entries;
 } equiv_table;
 
 /*
@@ -65,12 +66,18 @@ static u8 amd_ucode_patch[PATCH_MAX_SIZE];
 static const char
 ucode_path[] __maybe_unused = "kernel/x86/microcode/AuthenticAMD.bin";
 
-static u16 find_equiv_id(struct equiv_cpu_entry *equiv_table, u32 sig)
+static u16 find_equiv_id(const struct equiv_cpu_entry *equiv_table,
+			 unsigned int equiv_table_entries, u32 sig)
 {
-	for (; equiv_table && equiv_table->installed_cpu; equiv_table++) {
-		if (sig == equiv_table->installed_cpu)
-			return equiv_table->equiv_cpu;
-	}
+	unsigned int i;
+
+	if (!equiv_table)
+		return 0;
+
+	for (i = 0; i < equiv_table_entries && equiv_table[i].installed_cpu;
+	     i++)
+		if (sig == equiv_table[i].installed_cpu)
+			return equiv_table[i].equiv_cpu;
 
 	return 0;
 }
@@ -312,7 +319,8 @@ static size_t parse_container(u8 *ucode, size_t size, struct cont_desc *desc)
 	eq = (struct equiv_cpu_entry *)(buf + CONTAINER_HDR_SZ);
 
 	/* Find the equivalence ID of our CPU in this table: */
-	eq_id = find_equiv_id(eq, desc->cpuid_1_eax);
+	eq_id = find_equiv_id(eq, equiv_tbl_len / sizeof(*eq),
+			      desc->cpuid_1_eax);
 
 	buf  += CONTAINER_HDR_SZ;
 	buf  += equiv_tbl_len;
@@ -583,20 +591,21 @@ void reload_ucode_amd(void)
 static u16 __find_equiv_id(unsigned int cpu)
 {
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-	return find_equiv_id(equiv_table.table, uci->cpu_sig.sig);
+	return find_equiv_id(equiv_table.table, equiv_table.entries,
+			     uci->cpu_sig.sig);
 }
 
 static u32 find_cpu_family_by_equiv_cpu(u16 equiv_cpu)
 {
-	int i = 0;
+	unsigned int i;
 
 	BUG_ON(!equiv_table.table);
 
-	while (equiv_table.table[i].equiv_cpu != 0) {
+	for (i = 0; i < equiv_table.entries &&
+		     equiv_table.table[i].equiv_cpu != 0; i++)
 		if (equiv_cpu == equiv_table.table[i].equiv_cpu)
 			return equiv_table.table[i].installed_cpu;
-		i++;
-	}
+
 	return 0;
 }
 
@@ -740,6 +749,7 @@ static unsigned int install_equiv_cpu_table(const u8 *buf, size_t buf_size)
 	}
 
 	memcpy(equiv_table.table, buf + CONTAINER_HDR_SZ, equiv_tbl_len);
+	equiv_table.entries = equiv_tbl_len / sizeof(struct equiv_cpu_entry);
 
 	return equiv_tbl_len;
 }
@@ -748,6 +758,7 @@ static void free_equiv_cpu_table(void)
 {
 	vfree(equiv_table.table);
 	equiv_table.table = NULL;
+	equiv_table.entries = 0;
 }
 
 static void cleanup(void)
