@@ -4110,7 +4110,6 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, int flags)
 
 	atomic_set(&jl->j_older_commits_done, 0);
 	jl->j_trans_id = journal->j_trans_id;
-	jl->j_timestamp = journal->j_trans_start_time;
 	jl->j_commit_bh = c_bh;
 	jl->j_start = journal->j_start;
 	jl->j_len = journal->j_len;
