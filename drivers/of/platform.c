@@ -14,6 +14,7 @@
 #include <linux/amba/bus.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
@@ -159,6 +160,19 @@ struct platform_device *of_device_alloc(struct device_node *np,
 }
 EXPORT_SYMBOL(of_device_alloc);
 
+static void of_platform_log_inittime(struct device_node *node,
+				     ktime_t starttime)
+{
+	ktime_t delta, endtime;
+	unsigned long long duration;
+
+	endtime = ktime_get();
+	delta = ktime_sub(endtime, starttime);
+	duration = (unsigned long long) ktime_to_ns(delta) >> 10;
+	pr_debug("of platform device create %s took %lld usecs\n",
+		 node->full_name, duration);
+}
+
 /**
  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
  * @np: pointer to node to create device for
@@ -176,6 +190,8 @@ static struct platform_device *of_platform_device_create_pdata(
 					struct device *parent)
 {
 	struct platform_device *dev;
+	ktime_t starttime = 0;
+	int ret;
 
 	if (!of_device_is_available(np) ||
 	    of_node_test_and_set_flag(np, OF_POPULATED))
@@ -187,9 +203,14 @@ static struct platform_device *of_platform_device_create_pdata(
 
 	dev->dev.bus = &platform_bus_type;
 	dev->dev.platform_data = platform_data;
+	if (initcall_debug)
+		starttime = ktime_get();
 	of_msi_configure(&dev->dev, dev->dev.of_node);
+	ret = of_device_add(dev);
+	if (initcall_debug)
+		of_platform_log_inittime(np, starttime);
 
-	if (of_device_add(dev) != 0) {
+	if (ret != 0) {
 		platform_device_put(dev);
 		goto err_clear_flag;
 	}
@@ -352,6 +373,7 @@ static int of_platform_bus_create(struct device_node *bus,
 	struct platform_device *dev;
 	const char *bus_id = NULL;
 	void *platform_data = NULL;
+	ktime_t starttime = 0;
 	int rc = 0;
 
 	/* Make sure it has a compatible property */
@@ -384,7 +406,11 @@ static int of_platform_bus_create(struct device_node *bus,
 		 * Don't return an error here to keep compatibility with older
 		 * device tree files.
 		 */
+		if (initcall_debug)
+			starttime = ktime_get();
 		of_amba_device_create(bus, bus_id, platform_data, parent);
+		if (initcall_debug)
+			of_platform_log_inittime(bus, starttime);
 		return 0;
 	}
 
