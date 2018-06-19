@@ -322,6 +322,17 @@ static inline struct w1_master* dev_to_w1_master(struct device *dev)
 	return container_of(dev, struct w1_master, dev);
 }
 
+#ifdef CONFIG_OF
+struct w1_slave *w1_of_get_slave(struct device_node *np,
+				 const char *name, int index);
+#else
+static inline struct w1_slave *w1_of_get_slave(struct device_node *np,
+					       const char *name, int index)
+{
+	return NULL;
+}
+#endif /* CONFIG_OF */
+
 #endif /* __KERNEL__ */
 
 #endif /* __LINUX_W1_H */

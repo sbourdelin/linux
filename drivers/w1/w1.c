@@ -1185,6 +1185,43 @@ int w1_process(void *data)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+struct w1_slave *w1_of_get_slave(struct device_node *np,
+				 const char *name, int index)
+{
+	struct device_node *slave_node;
+	struct w1_master *master;
+	struct w1_slave *sl;
+	bool found = false;
+
+	slave_node = of_parse_phandle(np, name, index);
+	if (!slave_node)
+		return NULL;
+
+	mutex_lock(&w1_mlock);
+	list_for_each_entry(master, &w1_masters, w1_master_entry) {
+		mutex_lock(&master->list_mutex);
+		list_for_each_entry(sl, &master->slist, w1_slave_entry) {
+			if (sl->dev.of_node == slave_node) {
+				found = true;
+				break;
+			}
+		}
+		mutex_unlock(&master->list_mutex);
+
+		if (found)
+			break;
+	}
+	mutex_unlock(&w1_mlock);
+
+	if (!found)
+		return NULL;
+
+	return sl;
+}
+EXPORT_SYMBOL_GPL(w1_of_get_slave);
+#endif /* CONFIG_OF */
+
 static int __init w1_init(void)
 {
 	int retval;
