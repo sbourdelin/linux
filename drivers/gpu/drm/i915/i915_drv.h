@@ -1692,6 +1692,7 @@ struct drm_i915_private {
 	unsigned int hpll_freq;
 	unsigned int fdi_pll_freq;
 	unsigned int czclk_freq;
+	u32 get_put_refcount;
 
 	struct {
 		/*
@@ -1709,6 +1710,8 @@ struct drm_i915_private {
 		struct intel_cdclk_state actual;
 		/* The current hardware cdclk state */
 		struct intel_cdclk_state hw;
+
+		int force_min_cdclk;
 	} cdclk;
 
 	/**
