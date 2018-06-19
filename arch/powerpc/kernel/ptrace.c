@@ -845,17 +845,10 @@ static int tm_cgpr_get(struct task_struct *target,
 			unsigned int pos, unsigned int count,
 			void *kbuf, void __user *ubuf)
 {
-	int ret;
+	int ret = tm_flush_if_active(target);
 
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
-
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
-
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
+	if (ret)
+		return ret;
 
 	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
 				  &target->thread.ckpt_regs,
@@ -910,17 +903,11 @@ static int tm_cgpr_set(struct task_struct *target,
 			const void *kbuf, const void __user *ubuf)
 {
 	unsigned long reg;
-	int ret;
 
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
+	int ret = tm_flush_if_active(target);
 
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
-
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
+	if (ret)
+		return ret;
 
 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
 				 &target->thread.ckpt_regs,
@@ -1014,15 +1001,10 @@ static int tm_cfpr_get(struct task_struct *target,
 	u64 buf[33];
 	int i;
 
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
+	int ret = tm_flush_if_active(target);
 
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
-
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
+	if (ret)
+		return ret;
 
 	/* copy to local buffer then write that out */
 	for (i = 0; i < 32 ; i++)
@@ -1060,15 +1042,10 @@ static int tm_cfpr_set(struct task_struct *target,
 	u64 buf[33];
 	int i;
 
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
+	int ret = tm_flush_if_active(target);
 
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
-
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
+	if (ret)
+		return ret;
 
 	for (i = 0; i < 32; i++)
 		buf[i] = target->thread.TS_CKFPR(i);
@@ -1131,20 +1108,12 @@ static int tm_cvmx_get(struct task_struct *target,
 			unsigned int pos, unsigned int count,
 			void *kbuf, void __user *ubuf)
 {
-	int ret;
+	int ret = tm_flush_if_active(target);
+
+	if (ret)
+		return ret;
 
 	BUILD_BUG_ON(TVSO(vscr) != TVSO(vr[32]));
-
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
-
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
-
-	/* Flush the state */
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
 
 	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
 					&target->thread.ckvr_state, 0,
@@ -1193,19 +1162,12 @@ static int tm_cvmx_set(struct task_struct *target,
 			unsigned int pos, unsigned int count,
 			const void *kbuf, const void __user *ubuf)
 {
-	int ret;
+	int ret = tm_flush_if_active(target);
+
+	if (ret)
+		return ret;
 
 	BUILD_BUG_ON(TVSO(vscr) != TVSO(vr[32]));
-
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
-
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
-
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
 
 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
 					&target->thread.ckvr_state, 0,
@@ -1276,18 +1238,13 @@ static int tm_cvsx_get(struct task_struct *target,
 			void *kbuf, void __user *ubuf)
 {
 	u64 buf[32];
-	int ret, i;
+	int i;
 
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
+	int ret = tm_flush_if_active(target);
 
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
+	if (ret)
+		return ret;
 
-	/* Flush the state */
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
 	flush_vsx_to_thread(target);
 
 	for (i = 0; i < 32 ; i++)
@@ -1324,18 +1281,13 @@ static int tm_cvsx_set(struct task_struct *target,
 			const void *kbuf, const void __user *ubuf)
 {
 	u64 buf[32];
-	int ret, i;
+	int i;
 
-	if (!cpu_has_feature(CPU_FTR_TM))
-		return -ENODEV;
+	int ret = tm_flush_if_active(target);
 
-	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
-		return -ENODATA;
+	if (ret)
+		return ret;
 
-	/* Flush the state */
-	flush_tmregs_to_thread(target);
-	flush_fp_to_thread(target);
-	flush_altivec_to_thread(target);
 	flush_vsx_to_thread(target);
 
 	for (i = 0; i < 32 ; i++)
