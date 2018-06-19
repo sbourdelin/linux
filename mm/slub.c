@@ -3673,8 +3673,22 @@ static void free_partial(struct kmem_cache *s, struct kmem_cache_node *n)
 
 bool __kmem_cache_empty(struct kmem_cache *s)
 {
-	int node;
+	int cpu, node;
 	struct kmem_cache_node *n;
+
+	/*
+	 * slabs_node will always be 0 for !CONFIG_SLUB_DEBUG. So, manually
+	 * check slabs for all cpus.
+	 */
+	if (!IS_ENABLED(CONFIG_SLUB_DEBUG)) {
+		for_each_online_cpu(cpu) {
+			struct kmem_cache_cpu *c;
+
+			c = per_cpu_ptr(s->cpu_slab, cpu);
+			if (c->page || slub_percpu_partial(c))
+				return false;
+		}
+	}
 
 	for_each_kmem_cache_node(s, node, n)
 		if (n->nr_partial || slabs_node(s, node))
