@@ -195,12 +195,32 @@
 	.irp	c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
 	.macro	badr\c, rd, sym
 #ifdef CONFIG_THUMB2_KERNEL
-	adr\c	\rd, \sym + 1
+	__badr	\c, \rd, \sym
 #else
 	adr\c	\rd, \sym
 #endif
 	.endm
 	.endr
+
+	/*
+	 * GAS's behavior with respect to setting the Thumb bit on addresses
+	 * of locally defined symbols taken using adr instructions is
+	 * inconsistent, and so we are better off letting the linker handle
+	 * it instead. So emit the reference as a relocation, and force a
+	 * wide encoding so that we can support both forward and backward
+	 * references, and avoid the R_ARM_THM_PC8 relocation that operates
+	 * on the narrow encoding, which is documented as not taking the
+	 * Thumb bit into account. (IHI 0044E ELF for the ARM Architecture)
+	 *
+	 * Note that this needs to be a separate macro or \@ does not work
+	 * correctly.
+	 */
+	.macro		__badr, c, rd, sym
+	.set		.Lsym\@, \sym
+	.type		.Lsym\@, %function
+	.reloc		., R_ARM_THM_ALU_PREL_11_0, .Lsym\@
+	adr\c\().w	\rd, .
+	.endm
 
 /*
  * Get current thread_info.
