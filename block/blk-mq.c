@@ -863,7 +863,7 @@ static void blk_mq_timeout_work(struct work_struct *work)
 	blk_mq_queue_tag_busy_iter(q, blk_mq_check_expired, &next);
 
 	if (next != 0) {
-		mod_timer(&q->timeout, next);
+		mod_timer(&q->timeout, blk_rq_timeout(round_jiffies_up(next)));
 	} else {
 		/*
 		 * Request timeouts are handled as a forward rolling timer. If
