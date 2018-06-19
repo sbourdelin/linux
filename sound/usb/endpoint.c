@@ -772,6 +772,8 @@ static int data_ep_set_params(struct snd_usb_endpoint *ep,
 	/* allocate and initialize data urbs */
 	for (i = 0; i < ep->nurbs; i++) {
 		struct snd_urb_ctx *u = &ep->urb[i];
+		void *buf;
+
 		u->index = i;
 		u->ep = ep;
 		u->packets = urb_packs;
@@ -783,16 +785,13 @@ static int data_ep_set_params(struct snd_usb_endpoint *ep,
 		if (!u->urb)
 			goto out_of_memory;
 
-		u->urb->transfer_buffer =
-			usb_alloc_coherent(ep->chip->dev, u->buffer_size,
-					   GFP_KERNEL, &u->urb->transfer_dma);
-		if (!u->urb->transfer_buffer)
+		buf = usb_alloc_coherent(ep->chip->dev, u->buffer_size,
+					 GFP_KERNEL, &u->urb->transfer_dma);
+		if (!buf)
 			goto out_of_memory;
-		u->urb->pipe = ep->pipe;
+		usb_fill_int_urb(u->urb, NULL, ep->pipe, buf, u->buffer_size,
+				 snd_complete_urb, u, ep->datainterval + 1);
 		u->urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
-		u->urb->interval = 1 << ep->datainterval;
-		u->urb->context = u;
-		u->urb->complete = snd_complete_urb;
 		INIT_LIST_HEAD(&u->ready_list);
 	}
 
@@ -823,15 +822,12 @@ static int sync_ep_set_params(struct snd_usb_endpoint *ep)
 		u->urb = usb_alloc_urb(1, GFP_KERNEL);
 		if (!u->urb)
 			goto out_of_memory;
-		u->urb->transfer_buffer = ep->syncbuf + i * 4;
+		usb_fill_int_urb(u->urb, NULL, ep->pipe, ep->syncbuf + i * 4, 4,
+				 snd_complete_urb, u, ep->syncinterval + 1);
+
 		u->urb->transfer_dma = ep->sync_dma + i * 4;
-		u->urb->transfer_buffer_length = 4;
-		u->urb->pipe = ep->pipe;
 		u->urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
 		u->urb->number_of_packets = 1;
-		u->urb->interval = 1 << ep->syncinterval;
-		u->urb->context = u;
-		u->urb->complete = snd_complete_urb;
 	}
 
 	ep->nurbs = SYNC_URBS;
