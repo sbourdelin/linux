@@ -325,6 +325,8 @@ static int usX2Y_usbpcm_urbs_allocate(struct snd_usX2Y_substream *subs)
 	/* allocate and initialize data urbs */
 	for (i = 0; i < NRURBS; i++) {
 		struct urb **purb = subs->urb + i;
+		void *buf;
+
 		if (*purb) {
 			usb_kill_urb(*purb);
 			continue;
@@ -334,18 +336,19 @@ static int usX2Y_usbpcm_urbs_allocate(struct snd_usX2Y_substream *subs)
 			usX2Y_usbpcm_urbs_release(subs);
 			return -ENOMEM;
 		}
-		(*purb)->transfer_buffer = is_playback ?
-			subs->usX2Y->hwdep_pcm_shm->playback : (
-				subs->endpoint == 0x8 ?
-				subs->usX2Y->hwdep_pcm_shm->capture0x8 :
-				subs->usX2Y->hwdep_pcm_shm->capture0xA);
+		if (is_playback) {
+			buf = subs->usX2Y->hwdep_pcm_shm->playback;
+		} else {
+			if (subs->endpoint == 0x8)
+				buf = subs->usX2Y->hwdep_pcm_shm->capture0x8;
+			else
+				buf = subs->usX2Y->hwdep_pcm_shm->capture0xA;
+		}
+		usb_fill_int_urb(*purb, dev, pipe, buf,
+				 subs->maxpacksize * nr_of_packs(),
+				 i_usX2Y_usbpcm_subs_startup, subs, 1);
 
-		(*purb)->dev = dev;
-		(*purb)->pipe = pipe;
 		(*purb)->number_of_packets = nr_of_packs();
-		(*purb)->context = subs;
-		(*purb)->interval = 1;
-		(*purb)->complete = i_usX2Y_usbpcm_subs_startup;
 	}
 	return 0;
 }
