@@ -53,11 +53,14 @@ static ssize_t blk_mq_sysfs_show(struct kobject *kobj, struct attribute *attr,
 	if (!entry->show)
 		return -EIO;
 
-	res = -ENOENT;
-	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
-		res = entry->show(ctx, page);
-	mutex_unlock(&q->sysfs_lock);
+	res = -EAGAIN;
+	if (mutex_trylock(&q->sysfs_lock)) {
+		if (!blk_queue_dying(q))
+			res = entry->show(ctx, page);
+		else
+			res = -ENOENT;
+		mutex_unlock(&q->sysfs_lock);
+	}
 	return res;
 }
 
@@ -76,11 +79,14 @@ static ssize_t blk_mq_sysfs_store(struct kobject *kobj, struct attribute *attr,
 	if (!entry->store)
 		return -EIO;
 
-	res = -ENOENT;
-	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
-		res = entry->store(ctx, page, length);
-	mutex_unlock(&q->sysfs_lock);
+	res = -EAGAIN;
+	if (mutex_trylock(&q->sysfs_lock)) {
+		if (!blk_queue_dying(q))
+			res = entry->store(ctx, page, length);
+		else
+			res = -ENOENT;
+		mutex_unlock(&q->sysfs_lock);
+	}
 	return res;
 }
 
@@ -99,11 +105,14 @@ static ssize_t blk_mq_hw_sysfs_show(struct kobject *kobj,
 	if (!entry->show)
 		return -EIO;
 
-	res = -ENOENT;
-	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
-		res = entry->show(hctx, page);
-	mutex_unlock(&q->sysfs_lock);
+	res = -EAGAIN;
+	if (mutex_trylock(&q->sysfs_lock)) {
+		if (!blk_queue_dying(q))
+			res = entry->show(hctx, page);
+		else
+			res = -ENOENT;
+		mutex_unlock(&q->sysfs_lock);
+	}
 	return res;
 }
 
@@ -123,11 +132,14 @@ static ssize_t blk_mq_hw_sysfs_store(struct kobject *kobj,
 	if (!entry->store)
 		return -EIO;
 
-	res = -ENOENT;
-	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
-		res = entry->store(hctx, page, length);
-	mutex_unlock(&q->sysfs_lock);
+	res = -EAGAIN;
+	if (mutex_trylock(&q->sysfs_lock)) {
+		if (!blk_queue_dying(q))
+			res = entry->store(hctx, page, length);
+		else
+			res = -ENOENT;
+		mutex_unlock(&q->sysfs_lock);
+	}
 	return res;
 }
 
