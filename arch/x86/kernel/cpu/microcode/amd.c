@@ -717,28 +717,26 @@ static enum ucode_state apply_microcode_amd(int cpu)
 	return UCODE_UPDATED;
 }
 
-static int install_equiv_cpu_table(const u8 *buf)
+static unsigned int install_equiv_cpu_table(const u8 *buf, size_t buf_size)
 {
-	unsigned int *ibuf = (unsigned int *)buf;
-	unsigned int type = ibuf[1];
-	unsigned int size = ibuf[2];
+	const u32 *hdr;
+	u32 equiv_tbl_len;
 
-	if (type != UCODE_EQUIV_CPU_TABLE_TYPE || !size) {
-		pr_err("empty section/"
-		       "invalid type field in container file section header\n");
-		return -EINVAL;
-	}
+	if (!verify_equivalence_table(buf, buf_size, false))
+		return 0;
 
-	equiv_cpu_table = vmalloc(size);
+	hdr = (const u32 *)buf;
+	equiv_tbl_len = hdr[2];
+
+	equiv_cpu_table = vmalloc(equiv_tbl_len);
 	if (!equiv_cpu_table) {
 		pr_err("failed to allocate equivalent CPU table\n");
-		return -ENOMEM;
+		return 0;
 	}
 
-	memcpy(equiv_cpu_table, buf + CONTAINER_HDR_SZ, size);
+	memcpy(equiv_cpu_table, buf + CONTAINER_HDR_SZ, equiv_tbl_len);
 
-	/* add header length */
-	return size + CONTAINER_HDR_SZ;
+	return equiv_tbl_len;
 }
 
 static void free_equiv_cpu_table(void)
@@ -763,14 +761,18 @@ static void cleanup(void)
 static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover,
 				unsigned int *crnt_size)
 {
+	const u32 *hdr;
 	struct microcode_header_amd *mc_hdr;
 	struct ucode_patch *patch;
-	unsigned int patch_size;
+	u32 patch_size;
 	u32 proc_fam;
 	u16 proc_id;
 
-	patch_size  = *(u32 *)(fw + 4);
-	*crnt_size  = patch_size + SECTION_HDR_SIZE;
+	if (!verify_patch(family, fw, leftover, crnt_size, false))
+		return 0;
+
+	hdr = (const u32 *)fw;
+	patch_size  = hdr[1];
 	mc_hdr	    = (struct microcode_header_amd *)(fw + SECTION_HDR_SIZE);
 	proc_id	    = mc_hdr->processor_rev_id;
 
@@ -788,11 +790,6 @@ static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover,
 	if (mc_hdr->nb_dev_id || mc_hdr->sb_dev_id) {
 		pr_err("Patch-ID 0x%08x: chipset-specific code unsupported.\n",
 			mc_hdr->patch_id);
-		return 0;
-	}
-
-	if (!verify_patch(family, fw, leftover, crnt_size, false)) {
-		pr_err("Patch-ID 0x%08x: size mismatch.\n", mc_hdr->patch_id);
 		return 0;
 	}
 
@@ -828,21 +825,19 @@ static enum ucode_state __load_microcode_amd(u8 family, const u8 *data,
 	enum ucode_state ret = UCODE_ERROR;
 	unsigned int leftover;
 	u8 *fw = (u8 *)data;
-	int offset;
+	unsigned int offset;
 
-	offset = install_equiv_cpu_table(data);
-	if (offset < 0) {
-		pr_err("failed to create equivalent cpu table\n");
+	offset = install_equiv_cpu_table(data, size);
+	if (!offset)
 		return ret;
-	}
+
+	/*
+	 * Skip also the container header, since install_equiv_cpu_table()
+	 * returns just the raw equivalence table size without the header.
+	 */
+	fw += CONTAINER_HDR_SZ;
 	fw += offset;
-	leftover = size - offset;
-
-	if (*(u32 *)fw != UCODE_UCODE_TYPE) {
-		pr_err("invalid type field in container file section header\n");
-		free_equiv_cpu_table();
-		return ret;
-	}
+	leftover = size - CONTAINER_HDR_SZ - offset;
 
 	while (leftover) {
 		unsigned int crnt_size;
@@ -930,10 +925,8 @@ static enum ucode_state request_microcode_amd(int cpu, struct device *device,
 	}
 
 	ret = UCODE_ERROR;
-	if (*(u32 *)fw->data != UCODE_MAGIC) {
-		pr_err("invalid magic value (0x%08x)\n", *(u32 *)fw->data);
+	if (!verify_container(fw->data, fw->size, false))
 		goto fw_release;
-	}
 
 	ret = load_microcode_amd(bsp, c->x86, fw->data, fw->size);
 
