@@ -245,6 +245,8 @@ extern void hfs_mark_mdb_dirty(struct super_block *sb);
  *	Unix:	unsigned lil-endian since 00:00 GMT, Jan. 1, 1970
  *	mac:	unsigned big-endian since 00:00 GMT, Jan. 1, 1904
  *
+ * We treat all timestamps before 1970 as times after 2038, so this
+ * actually works until year 2106
  */
 #define __hfs_u_to_mtime(sec)	cpu_to_be32(sec + 2082844800U - sys_tz.tz_minuteswest * 60)
 #define __hfs_m_to_utime(sec)	(be32_to_cpu(sec) - 2082844800U  + sys_tz.tz_minuteswest * 60)
@@ -252,9 +254,9 @@ extern void hfs_mark_mdb_dirty(struct super_block *sb);
 #define HFS_I(inode)	(container_of(inode, struct hfs_inode_info, vfs_inode))
 #define HFS_SB(sb)	((struct hfs_sb_info *)(sb)->s_fs_info)
 
-#define hfs_m_to_utime(time)	(struct timespec){ .tv_sec = __hfs_m_to_utime(time) }
+#define hfs_m_to_utime(time)	(struct timespec64){ .tv_sec = __hfs_m_to_utime(time) }
 #define hfs_u_to_mtime(time)	__hfs_u_to_mtime((time).tv_sec)
-#define hfs_mtime()		__hfs_u_to_mtime(get_seconds())
+#define hfs_mtime()		__hfs_u_to_mtime(ktime_get_real_seconds())
 
 static inline const char *hfs_mdb_name(struct super_block *sb)
 {
