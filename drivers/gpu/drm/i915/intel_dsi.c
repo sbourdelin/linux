@@ -1005,8 +1005,7 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 	intel_dsi_msleep(intel_dsi, intel_dsi->panel_pwr_cycle_delay);
 }
 
-static bool intel_dsi_get_hw_state(struct intel_encoder *encoder,
-				   enum pipe *pipe)
+bool intel_dsi_get_hw_state(struct intel_encoder *encoder, enum pipe *pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
