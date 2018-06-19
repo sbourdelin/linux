@@ -48,6 +48,7 @@ static const struct brcmf_feat_fwcap brcmf_fwcap_map[] = {
 	{ BRCMF_FEAT_MBSS, "mbss" },
 	{ BRCMF_FEAT_MCHAN, "mchan" },
 	{ BRCMF_FEAT_P2P, "p2p" },
+	{ BRCMF_FEAT_MONITOR, "monitor" },
 };
 
 #ifdef DEBUG
@@ -90,6 +91,26 @@ static int brcmf_feat_debugfs_read(struct seq_file *seq, void *data)
 	return 0;
 }
 #endif /* DEBUG */
+
+static void brcmf_feat_cmd_int_get(struct brcmf_if *ifp, enum brcmf_feat_id id,
+				   u32 cmd)
+{
+	u32 data;
+	int err;
+
+	ifp->fwil_fwerr = true;
+
+	err = brcmf_fil_cmd_int_get(ifp, cmd, &data);
+	if (err == 0) {
+		brcmf_dbg(INFO, "enabling feature: %s\n", brcmf_feat_names[id]);
+		ifp->drvr->feat_flags |= BIT(id);
+	} else {
+		brcmf_dbg(TRACE, "%s feature check failed: %d\n",
+			  brcmf_feat_names[id], err);
+	}
+
+	ifp->fwil_fwerr = false;
+}
 
 /**
  * brcmf_feat_iovar_int_get() - determine feature through iovar query.
@@ -250,6 +271,11 @@ void brcmf_feat_attach(struct brcmf_pub *drvr)
 		ifp->drvr->feat_flags &= ~drvr->settings->feature_disable;
 	}
 	brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_FWSUP, "sup_wpa");
+
+	/* Fallback detection for older firmwares */
+	if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MONITOR))
+		brcmf_feat_cmd_int_get(ifp, BRCMF_FEAT_MONITOR,
+				       BRCMF_C_GET_MONITOR);
 
 	/* set chip related quirks */
 	switch (drvr->bus_if->chip) {
