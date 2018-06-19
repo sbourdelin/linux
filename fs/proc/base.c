@@ -209,7 +209,8 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 			      size_t count, loff_t *ppos)
 {
 	unsigned long arg_start, arg_end, env_start, env_end;
-	unsigned long pos, len;
+	unsigned long req_pos, pos, len;
+	bool end_found = false;
 	char *page;
 
 	/* Check if process spawned far enough to have cmdline. */
@@ -236,25 +237,27 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 		env_start = env_end = arg_end;
 
 	/* We're not going to care if "*ppos" has high bits set */
-	pos = arg_start + *ppos;
+	req_pos = arg_start + *ppos;
 
 	/* .. but we do check the result is in the proper range */
-	if (pos < arg_start || pos >= env_end)
+	if (req_pos < arg_start || req_pos >= env_end)
 		return 0;
 
 	/* .. and we never go past env_end */
-	if (env_end - pos < count)
+	if (env_end - req_pos < count)
 		count = env_end - pos;
 
+	pos = min_t(unsigned long, req_pos, arg_end - 1);
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
 
 	len = 0;
-	while (count) {
+	while (count && !end_found) {
 		int got;
-		size_t size = min_t(size_t, PAGE_SIZE, count);
+		size_t size = count + (pos < req_pos ? req_pos - pos : 0);
 
+		size = min_t(size_t, PAGE_SIZE, size);
 		got = access_remote_vm(mm, pos, page, size, FOLL_ANON);
 		if (got <= 0)
 			break;
@@ -276,11 +279,23 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 				n = arg_end - pos - 1;
 
 			/* Cut off at first NUL after 'n' */
-			got = n + strnlen(page+n, got-n);
+			n += strnlen(page+n, got-n);
+			got = min_t(int, got, n + 1);
+			end_found = !page[n];
 			if (!got)
 				break;
 		}
 
+		if (pos + got <= req_pos) {
+			/* got > 0 here so that pos always advances */
+			pos += got;
+			continue;
+		}
+
+		if (pos < req_pos) {
+			got -= (req_pos - pos);
+			pos = req_pos;
+		}
 		got -= copy_to_user(buf, page, got);
 		if (unlikely(!got)) {
 			if (!len)
