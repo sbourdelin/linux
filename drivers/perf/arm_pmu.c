@@ -674,14 +674,13 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
 	int idx;
 
 	for (idx = 0; idx < armpmu->num_events; idx++) {
-		/*
-		 * If the counter is not used skip it, there is no
-		 * need of stopping/restarting it.
-		 */
-		if (!test_bit(idx, hw_events->used_mask))
-			continue;
-
 		event = hw_events->events[idx];
+		/*
+		 * If there is no event at this idx (e.g, an idx used
+		 * by a chained event in Arm v8 PMUv3), skip it.
+		 */
+		if (!event)
+			continue;
 
 		switch (cmd) {
 		case CPU_PM_ENTER:
