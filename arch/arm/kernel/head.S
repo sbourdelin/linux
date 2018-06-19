@@ -80,10 +80,9 @@
 ENTRY(stext)
  ARM_BE8(setend	be )			@ ensure we are in BE8 mode
 
- THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
- THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
- THUMB(	.thumb			)	@ switch to Thumb now.
- THUMB(1:			)
+ THUMB(	sub	pc, pc, #3	)	@ Kernel is always entered in ARM.
+ THUMB(	.thumb			)	@ If this is a Thumb-2 kernel,
+					@ switch to Thumb now.
 
 #ifdef CONFIG_ARM_VIRT_EXT
 	bl	__hyp_stub_install
@@ -364,10 +363,10 @@ __turn_mmu_on_loc:
 	.text
 	.arm
 ENTRY(secondary_startup_arm)
- THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
- THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
- THUMB(	.thumb			)	@ switch to Thumb now.
- THUMB(1:			)
+ THUMB(	sub	pc, pc, #3	)	@ Kernel is entered in ARM.
+ THUMB(	.thumb			)	@ If this is a Thumb-2 kernel,
+					@ switch to Thumb now.
+
 ENTRY(secondary_startup)
 	/*
 	 * Common entry point for secondary CPUs.

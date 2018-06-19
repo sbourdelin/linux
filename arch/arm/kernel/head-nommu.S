@@ -47,10 +47,9 @@ ENTRY(stext)
 	.arm
 ENTRY(stext)
 
- THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
- THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
- THUMB(	.thumb			)	@ switch to Thumb now.
- THUMB(1:			)
+ THUMB(	sub	pc, pc, #3	)	@ Kernel is always entered in ARM.
+ THUMB(	.thumb			)	@ If this is a Thumb-2 kernel,
+					@ switch to Thumb now.
 #endif
 
 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode

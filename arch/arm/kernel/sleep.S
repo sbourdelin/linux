@@ -123,10 +123,9 @@ ENDPROC(cpu_resume_after_mmu)
 #ifdef CONFIG_MMU
 	.arm
 ENTRY(cpu_resume_arm)
- THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
- THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
- THUMB(	.thumb			)	@ switch to Thumb now.
- THUMB(1:			)
+ THUMB(	sub	pc, pc, #3	)	@ Kernel is entered in ARM.
+ THUMB(	.thumb			)	@ If this is a Thumb-2 kernel,
+					@ switch to Thumb now.
 #endif
 
 ENTRY(cpu_resume)
