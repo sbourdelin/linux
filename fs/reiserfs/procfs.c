@@ -303,6 +303,10 @@ static int show_journal(struct seq_file *m, void *unused)
 	struct reiserfs_sb_info *r = REISERFS_SB(sb);
 	struct reiserfs_super_block *rs = r->s_rs;
 	struct journal_params *jp = &rs->s_v1.s_journal;
+	ktime_t j_trans_start_ktime = ktime_set(JF(j_trans_start_time), 0);
+
+	/* print as CLOCK_REALTIME */
+	j_trans_start_ktime = ktime_mono_to_real(j_trans_start_ktime);
 
 	seq_printf(m,		/* on-disk fields */
 		   "jp_journal_1st_block: \t%i\n"
@@ -325,7 +329,7 @@ static int show_journal(struct seq_file *m, void *unused)
 		   "j_bcount: \t%lu\n"
 		   "j_first_unflushed_offset: \t%lu\n"
 		   "j_last_flush_trans_id: \t%u\n"
-		   "j_trans_start_time: \t%li\n"
+		   "j_trans_start_time: \t%lli\n"
 		   "j_list_bitmap_index: \t%i\n"
 		   "j_must_wait: \t%i\n"
 		   "j_next_full_flush: \t%i\n"
@@ -366,7 +370,7 @@ static int show_journal(struct seq_file *m, void *unused)
 		   JF(j_bcount),
 		   JF(j_first_unflushed_offset),
 		   JF(j_last_flush_trans_id),
-		   JF(j_trans_start_time),
+		   ktime_divns(j_trans_start_ktime, NSEC_PER_SEC),
 		   JF(j_list_bitmap_index),
 		   JF(j_must_wait),
 		   JF(j_next_full_flush),
