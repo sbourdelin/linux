@@ -425,6 +425,9 @@ static int usX2Y_urbs_allocate(struct snd_usX2Y_substream *subs)
 	/* allocate and initialize data urbs */
 	for (i = 0; i < NRURBS; i++) {
 		struct urb **purb = subs->urb + i;
+		void *buf = NULL;
+		unsigned int len = 0;
+
 		if (*purb) {
 			usb_kill_urb(*purb);
 			continue;
@@ -434,22 +437,18 @@ static int usX2Y_urbs_allocate(struct snd_usX2Y_substream *subs)
 			usX2Y_urbs_release(subs);
 			return -ENOMEM;
 		}
-		if (!is_playback && !(*purb)->transfer_buffer) {
+		if (!is_playback) {
 			/* allocate a capture buffer per urb */
-			(*purb)->transfer_buffer =
-				kmalloc_array(subs->maxpacksize,
-					      nr_of_packs(), GFP_KERNEL);
-			if (NULL == (*purb)->transfer_buffer) {
+			len = subs->maxpacksize * nr_of_packs();
+			buf = kmalloc(len, GFP_KERNEL);
+			if (!buf) {
 				usX2Y_urbs_release(subs);
 				return -ENOMEM;
 			}
 		}
-		(*purb)->dev = dev;
-		(*purb)->pipe = pipe;
+		usb_fill_int_urb(*purb, dev, pipe, buf, len,
+				 i_usX2Y_subs_startup, subs, 1);
 		(*purb)->number_of_packets = nr_of_packs();
-		(*purb)->context = subs;
-		(*purb)->interval = 1;
-		(*purb)->complete = i_usX2Y_subs_startup;
 	}
 	return 0;
 }
@@ -485,12 +484,10 @@ static int usX2Y_urbs_start(struct snd_usX2Y_substream *subs)
 			unsigned long pack;
 			if (0 == i)
 				atomic_set(&subs->state, state_STARTING3);
-			urb->dev = usX2Y->dev;
 			for (pack = 0; pack < nr_of_packs(); pack++) {
 				urb->iso_frame_desc[pack].offset = subs->maxpacksize * pack;
 				urb->iso_frame_desc[pack].length = subs->maxpacksize;
 			}
-			urb->transfer_buffer_length = subs->maxpacksize * nr_of_packs(); 
 			if ((err = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
 				snd_printk (KERN_ERR "cannot submit datapipe for urb %d, err = %d\n", i, err);
 				err = -EPIPE;
