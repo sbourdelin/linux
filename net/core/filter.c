@@ -121,6 +121,53 @@ int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap)
 }
 EXPORT_SYMBOL(sk_filter_trim_cap);
 
+int sg_filter_run(struct sock *sk, struct scatterlist *sg)
+{
+	struct sk_filter *filter;
+	int err;
+
+	rcu_read_lock();
+	filter = rcu_dereference(sk->sk_filter);
+	if (filter) {
+		struct bpf_scatterlist bpfsg;
+		int num_sg;
+
+		if (!sg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		num_sg = sg_nents(sg);
+		if (num_sg <= 0) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		/* We store a reference  to the sg list so it can later used by
+		 * eBPF helpers to retrieve the next sg element.
+		 */
+		bpfsg.num_sg = num_sg;
+		bpfsg.cur_sg = 0;
+		bpfsg.sg = sg;
+
+		/* For the first sg element, we store the pkt access pointers
+		 * into start and end so eBPF program can have pkt access using
+		 * data and data_end. The pkt access for subsequent element of
+		 * sg list is possible when eBPF program invokes bpf_sg_next
+		 * which takes care of setting start and end to the correct sg
+		 * element.
+		 */
+		bpfsg.start = sg_virt(sg);
+		bpfsg.end = bpfsg.start + sg->length;
+		BPF_PROG_RUN(filter->prog, &bpfsg);
+	}
+out:
+	rcu_read_unlock();
+
+	return err;
+}
+EXPORT_SYMBOL(sg_filter_run);
+
 BPF_CALL_1(bpf_skb_get_pay_offset, struct sk_buff *, skb)
 {
 	return skb_get_poff(skb);
@@ -3753,6 +3800,29 @@ static const struct bpf_func_proto bpf_get_socket_uid_proto = {
 	.arg1_type      = ARG_PTR_TO_CTX,
 };
 
+BPF_CALL_1(bpf_sg_next, struct bpf_scatterlist *, bpfsg)
+{
+	struct scatterlist *sg = bpfsg->sg;
+	int cur_sg = bpfsg->cur_sg;
+
+	cur_sg++;
+	if (cur_sg >= bpfsg->num_sg)
+		return -ENODATA;
+
+	bpfsg->cur_sg = cur_sg;
+	bpfsg->start = sg_virt(&sg[cur_sg]);
+	bpfsg->end = bpfsg->start + sg[cur_sg].length;
+
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_sg_next_proto = {
+	.func		= bpf_sg_next,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+};
+
 BPF_CALL_5(bpf_setsockopt, struct bpf_sock_ops_kern *, bpf_sock,
 	   int, level, int, optname, char *, optval, int, optlen)
 {
@@ -4720,6 +4790,8 @@ static const struct bpf_func_proto *
 socksg_filter_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
 	switch (func_id) {
+	case BPF_FUNC_sg_next:
+		return &bpf_sg_next_proto;
 	default:
 		return bpf_base_func_proto(func_id);
 	}

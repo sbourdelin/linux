@@ -1072,4 +1072,6 @@ struct bpf_sock_ops_kern {
 					 */
 };
 
+int sg_filter_run(struct sock *sk, struct scatterlist *sg);
+
 #endif /* __LINUX_FILTER_H__ */
