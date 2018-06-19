@@ -276,6 +276,19 @@ static int hfsplus_setattr(struct dentry *dentry, struct iattr *attr)
 	return 0;
 }
 
+int hfsplus_getattr(const struct path *path, struct kstat *stat,
+		     u32 request_mask, unsigned int query_flags)
+{
+	struct inode *inode = d_backing_inode(path->dentry);
+
+	generic_fillattr(inode, stat);
+
+	stat->btime = hfsp_mt2ut(HFSPLUS_I(inode)->create_date);
+	stat->result_mask |= STATX_BTIME;
+
+	return 0;
+}
+
 int hfsplus_file_fsync(struct file *file, loff_t start, loff_t end,
 		       int datasync)
 {
@@ -335,6 +348,7 @@ int hfsplus_file_fsync(struct file *file, loff_t start, loff_t end,
 
 static const struct inode_operations hfsplus_file_inode_operations = {
 	.setattr	= hfsplus_setattr,
+	.getattr	= hfsplus_getattr,
 	.listxattr	= hfsplus_listxattr,
 #ifdef CONFIG_HFSPLUS_FS_POSIX_ACL
 	.get_acl	= hfsplus_get_posix_acl,
