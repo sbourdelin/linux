@@ -754,45 +754,46 @@ static void cleanup(void)
 }
 
 /*
- * We return the current size even if some of the checks failed so that
- * we can skip over the next patch. If we return a negative value, we
- * signal a grave error like a memory allocation has failed and the
- * driver cannot continue functioning normally. In such cases, we tear
- * down everything we've used up so far and exit.
+ * We return zero (success) and the current patch data size in @crnt_size
+ * even if some of the checks failed so that we can skip over the next patch.
+ * If we return a negative value, we signal a grave error like a memory
+ * allocation has failed and the driver cannot continue functioning normally.
+ * In such cases, we tear down everything we've used up so far and exit.
  */
-static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover)
+static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover,
+				unsigned int *crnt_size)
 {
 	struct microcode_header_amd *mc_hdr;
 	struct ucode_patch *patch;
-	unsigned int patch_size, crnt_size;
+	unsigned int patch_size;
 	u32 proc_fam;
 	u16 proc_id;
 
 	patch_size  = *(u32 *)(fw + 4);
-	crnt_size   = patch_size + SECTION_HDR_SIZE;
+	*crnt_size  = patch_size + SECTION_HDR_SIZE;
 	mc_hdr	    = (struct microcode_header_amd *)(fw + SECTION_HDR_SIZE);
 	proc_id	    = mc_hdr->processor_rev_id;
 
 	proc_fam = find_cpu_family_by_equiv_cpu(proc_id);
 	if (!proc_fam) {
 		pr_err("No patch family for equiv ID: 0x%04x\n", proc_id);
-		return crnt_size;
+		return 0;
 	}
 
 	/* check if patch is for the current family */
 	proc_fam = ((proc_fam >> 8) & 0xf) + ((proc_fam >> 20) & 0xff);
 	if (proc_fam != family)
-		return crnt_size;
+		return 0;
 
 	if (mc_hdr->nb_dev_id || mc_hdr->sb_dev_id) {
 		pr_err("Patch-ID 0x%08x: chipset-specific code unsupported.\n",
 			mc_hdr->patch_id);
-		return crnt_size;
+		return 0;
 	}
 
-	if (!verify_patch(family, fw, leftover, &crnt_size, false)) {
+	if (!verify_patch(family, fw, leftover, crnt_size, false)) {
 		pr_err("Patch-ID 0x%08x: size mismatch.\n", mc_hdr->patch_id);
-		return crnt_size;
+		return 0;
 	}
 
 	patch = kzalloc(sizeof(*patch), GFP_KERNEL);
@@ -818,7 +819,7 @@ static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover)
 	/* ... and add to cache. */
 	update_cache(patch);
 
-	return crnt_size;
+	return 0;
 }
 
 static enum ucode_state __load_microcode_amd(u8 family, const u8 *data,
@@ -827,7 +828,6 @@ static enum ucode_state __load_microcode_amd(u8 family, const u8 *data,
 	enum ucode_state ret = UCODE_ERROR;
 	unsigned int leftover;
 	u8 *fw = (u8 *)data;
-	int crnt_size = 0;
 	int offset;
 
 	offset = install_equiv_cpu_table(data);
@@ -845,8 +845,9 @@ static enum ucode_state __load_microcode_amd(u8 family, const u8 *data,
 	}
 
 	while (leftover) {
-		crnt_size = verify_and_add_patch(family, fw, leftover);
-		if (crnt_size < 0)
+		unsigned int crnt_size;
+
+		if (verify_and_add_patch(family, fw, leftover, &crnt_size) < 0)
 			return ret;
 
 		fw	 += crnt_size;
