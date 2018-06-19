@@ -778,6 +778,29 @@ static int evr_set(struct task_struct *target, const struct user_regset *regset,
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 /**
+ * tm_flush_if_active - flush TM, fpu and altivec state if TM active
+ * @target:	The target task.
+ *
+ * This function flushes the TM, fpu and altivec state to the target
+ * task and returns 0 if TM is available and active in the target, and
+ * returns an error code suitable for ptrace otherwise.
+ */
+static int tm_flush_if_active (struct task_struct *target)
+{
+	if (!cpu_has_feature(CPU_FTR_TM))
+		return -ENODEV;
+
+	if (!MSR_TM_ACTIVE(target->thread.regs->msr))
+		return -ENODATA;
+
+	flush_tmregs_to_thread(target);
+	flush_fp_to_thread(target);
+	flush_altivec_to_thread(target);
+
+	return 0;
+}
+
+/**
  * tm_cgpr_active - get active number of registers in CGPR
  * @target:	The target task.
  * @regset:	The user regset structure.
@@ -2124,6 +2147,11 @@ static int tm_cgpr32_get(struct task_struct *target,
 		     unsigned int pos, unsigned int count,
 		     void *kbuf, void __user *ubuf)
 {
+	int ret = tm_flush_if_active(target);
+
+	if (ret)
+		return ret;
+
 	return gpr32_get_common(target, regset, pos, count, kbuf, ubuf,
 			&target->thread.ckpt_regs.gpr[0]);
 }
@@ -2133,6 +2161,11 @@ static int tm_cgpr32_set(struct task_struct *target,
 		     unsigned int pos, unsigned int count,
 		     const void *kbuf, const void __user *ubuf)
 {
+	int ret = tm_flush_if_active(target);
+
+	if (ret)
+		return ret;
+
 	return gpr32_set_common(target, regset, pos, count, kbuf, ubuf,
 			&target->thread.ckpt_regs.gpr[0]);
 }
