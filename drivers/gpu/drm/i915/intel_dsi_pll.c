@@ -279,8 +279,10 @@ static u32 vlv_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
 	pll_div = vlv_cck_read(dev_priv, CCK_REG_DSI_PLL_DIVIDER);
 	mutex_unlock(&dev_priv->sb_lock);
 
-	config->dsi_pll.ctrl = pll_ctl & ~DSI_PLL_LOCK;
-	config->dsi_pll.div = pll_div;
+	if (config) {
+		config->dsi_pll.ctrl = pll_ctl & ~DSI_PLL_LOCK;
+		config->dsi_pll.div = pll_div;
+	}
 
 	/* mask out other bits and extract the P1 divisor */
 	pll_ctl &= DSI_PLL_P1_POST_DIV_MASK;
@@ -330,6 +332,7 @@ static u32 vlv_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
 static u32 bxt_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
 			    struct intel_crtc_state *config)
 {
+	u32 ctrl;
 	u32 pclk;
 	u32 dsi_clk;
 	u32 dsi_ratio;
@@ -342,9 +345,12 @@ static u32 bxt_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
 		return 0;
 	}
 
-	config->dsi_pll.ctrl = I915_READ(BXT_DSI_PLL_CTL);
+	ctrl = I915_READ(BXT_DSI_PLL_CTL);
 
-	dsi_ratio = config->dsi_pll.ctrl & BXT_DSI_PLL_RATIO_MASK;
+	if (config)
+		config->dsi_pll.ctrl = ctrl;
+
+	dsi_ratio = ctrl & BXT_DSI_PLL_RATIO_MASK;
 
 	dsi_clk = (dsi_ratio * BXT_REF_CLOCK_KHZ) / 2;
 
