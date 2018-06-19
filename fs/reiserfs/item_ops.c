@@ -33,11 +33,11 @@ static int sd_is_left_mergeable(struct reiserfs_key *key, unsigned long bsize)
 	return 0;
 }
 
-static char *print_time(time_t t)
+static char *print_time(time64_t t)
 {
 	static char timebuf[256];
 
-	sprintf(timebuf, "%ld", t);
+	sprintf(timebuf, "%lld", t);
 	return timebuf;
 }
 
