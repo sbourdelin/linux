@@ -332,10 +332,12 @@ int drm_pcie_get_speed_cap_mask(struct drm_device *dev, u32 *mask)
 	u32 lnkcap, lnkcap2;
 
 	*mask = 0;
-	if (!dev->pdev)
+	if (!dev->pdev || !dev->pdev->bus)
 		return -EINVAL;
 
 	root = dev->pdev->bus->self;
+	if (!root)
+		return -EINVAL;
 
 	/* we've been informed via and serverworks don't make the cut */
 	if (root->vendor == PCI_VENDOR_ID_VIA ||
