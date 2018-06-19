@@ -106,6 +106,7 @@ int rxe_cq_from_init(struct rxe_dev *rxe, struct rxe_cq *cq, int cqe,
 		cq->is_user = 1;
 
 	cq->is_dying = false;
+	cq->comp_vector = comp_vector;
 
 	tasklet_init(&cq->comp_task, rxe_send_complete, (unsigned long)cq);
 

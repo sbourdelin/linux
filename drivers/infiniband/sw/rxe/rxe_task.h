@@ -34,6 +34,8 @@
 #ifndef RXE_TASK_H
 #define RXE_TASK_H
 
+#include <linux/smp.h>
+
 enum {
 	TASK_STATE_START	= 0,
 	TASK_STATE_BUSY		= 1,
@@ -48,13 +50,16 @@ enum {
 struct rxe_task {
 	void			*obj;
 	struct tasklet_struct	tasklet;
+	int			cpu;
 	int			state;
 	spinlock_t		state_lock; /* spinlock for task state */
 	void			*arg;
 	int			(*func)(void *arg);
+	call_single_data_t	csd;
 	int			ret;
 	char			name[16];
 	bool			destroyed;
+	bool			scheduled;
 };
 
 /*
@@ -62,7 +67,7 @@ struct rxe_task {
  *	arg  => parameter to pass to fcn
  *	fcn  => function to call until it returns != 0
  */
-int rxe_init_task(void *obj, struct rxe_task *task,
+int rxe_init_task(void *obj, struct rxe_task *task, int cpu,
 		  void *arg, int (*func)(void *), char *name);
 
 /* cleanup task */

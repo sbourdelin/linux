@@ -92,6 +92,7 @@ struct rxe_cq {
 	u8			notify;
 	bool			is_dying;
 	int			is_user;
+	int			comp_vector;
 	struct tasklet_struct	comp_task;
 };
 

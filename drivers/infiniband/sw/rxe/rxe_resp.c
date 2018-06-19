@@ -107,15 +107,9 @@ static char *resp_state_name[] = {
 void rxe_resp_queue_pkt(struct rxe_dev *rxe, struct rxe_qp *qp,
 			struct sk_buff *skb)
 {
-	int must_sched;
-	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
-
 	skb_queue_tail(&qp->req_pkts, skb);
 
-	must_sched = (pkt->opcode == IB_OPCODE_RC_RDMA_READ_REQUEST) ||
-			(skb_queue_len(&qp->req_pkts) > 1);
-
-	rxe_run_task(&qp->resp.task, must_sched);
+	rxe_run_task(&qp->resp.task, 1);
 }
 
 static inline enum resp_states get_req(struct rxe_qp *qp,

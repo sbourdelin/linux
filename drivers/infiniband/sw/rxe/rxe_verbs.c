@@ -813,8 +813,7 @@ static int rxe_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 	}
 
 	if (qp->is_user) {
-		/* Utilize process context to do protocol processing */
-		rxe_run_task(&qp->req.task, 0);
+		rxe_run_task(&qp->req.task, 1);
 		return 0;
 	} else
 		return rxe_post_send_kernel(qp, wr, bad_wr);

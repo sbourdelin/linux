@@ -37,6 +37,8 @@
 
 #include "rxe_task.h"
 
+static void rxe_run_task_local(void *data);
+
 int __rxe_do_task(struct rxe_task *task)
 
 {
@@ -63,6 +65,7 @@ void rxe_do_task(unsigned long data)
 	struct rxe_task *task = (struct rxe_task *)data;
 
 	spin_lock_irqsave(&task->state_lock, flags);
+	task->scheduled = false;
 	switch (task->state) {
 	case TASK_STATE_START:
 		task->state = TASK_STATE_BUSY;
@@ -108,20 +111,27 @@ void rxe_do_task(unsigned long data)
 			pr_warn("%s failed with bad state %d\n", __func__,
 				task->state);
 		}
+
+		if (!cont && task->scheduled)
+			tasklet_schedule(&task->tasklet);
 		spin_unlock_irqrestore(&task->state_lock, flags);
 	} while (cont);
 
 	task->ret = ret;
 }
 
-int rxe_init_task(void *obj, struct rxe_task *task,
+int rxe_init_task(void *obj, struct rxe_task *task, int cpu,
 		  void *arg, int (*func)(void *), char *name)
 {
+	task->cpu	= cpu;
 	task->obj	= obj;
 	task->arg	= arg;
 	task->func	= func;
+	task->csd.func  = rxe_run_task_local;
+	task->csd.info  = task;
 	snprintf(task->name, sizeof(task->name), "%s", name);
 	task->destroyed	= false;
+	task->scheduled	= false;
 
 	tasklet_init(&task->tasklet, rxe_do_task, (unsigned long)task);
 
@@ -151,15 +161,44 @@ void rxe_cleanup_task(struct rxe_task *task)
 	tasklet_kill(&task->tasklet);
 }
 
-void rxe_run_task(struct rxe_task *task, int sched)
+static void rxe_run_task_local(void *data)
 {
+	struct rxe_task *task = (struct rxe_task *)data;
+
 	if (task->destroyed)
 		return;
 
-	if (sched)
+	tasklet_schedule(&task->tasklet);
+}
+
+void rxe_run_task(struct rxe_task *task, int sched)
+{
+	int cpu;
+	unsigned long flags;
+
+	if (task->destroyed)
+		return;
+
+	if (!sched) {
+		rxe_do_task((unsigned long)task);
+		return;
+	}
+
+	spin_lock_irqsave(&task->state_lock, flags);
+	if (task->scheduled || task->state != TASK_STATE_START) {
+		task->scheduled = true;
+		spin_unlock_irqrestore(&task->state_lock, flags);
+		return;
+	}
+	task->scheduled = true;
+	spin_unlock_irqrestore(&task->state_lock, flags);
+
+	cpu = get_cpu();
+	if (task->cpu == cpu || !cpu_online(task->cpu))
 		tasklet_schedule(&task->tasklet);
 	else
-		rxe_do_task((unsigned long)task);
+		smp_call_function_single_async(task->cpu, &task->csd);
+	put_cpu();
 }
 
 void rxe_disable_task(struct rxe_task *task)
