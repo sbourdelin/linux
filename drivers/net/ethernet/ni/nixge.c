@@ -122,7 +122,7 @@ struct nixge_hw_dma_bd {
 	u32 sw_id_offset;
 	u32 reserved5;
 	u32 reserved6;
-};
+} __packed;
 
 struct nixge_tx_skb {
 	struct sk_buff *skb;
