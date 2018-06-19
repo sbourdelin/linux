@@ -36,7 +36,7 @@ static int wil_fw_get_crash_dump_bounds(struct wil6210_priv *wil,
 	for (i = 1; i < ARRAY_SIZE(fw_mapping); i++) {
 		map = &fw_mapping[i];
 
-		if (!map->fw)
+		if (!map->crash_dump)
 			continue;
 
 		if (map->host < host_min)
@@ -85,7 +85,7 @@ int wil_fw_copy_crash_dump(struct wil6210_priv *wil, void *dest, u32 size)
 	for (i = 0; i < ARRAY_SIZE(fw_mapping); i++) {
 		map = &fw_mapping[i];
 
-		if (!map->fw)
+		if (!map->crash_dump)
 			continue;
 
 		data = (void * __force)wil->csr + HOSTADDR(map->host);
