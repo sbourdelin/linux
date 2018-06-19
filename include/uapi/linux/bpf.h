@@ -144,6 +144,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
 	BPF_PROG_TYPE_LWT_SEG6LOCAL,
 	BPF_PROG_TYPE_LIRC_MODE2,
+	BPF_PROG_TYPE_SOCKET_SG_FILTER,
 };
 
 enum bpf_attach_type {
@@ -2356,6 +2357,12 @@ struct xdp_md {
 enum sk_action {
 	SK_DROP = 0,
 	SK_PASS,
+};
+
+/* use accessible scatterlist */
+struct sg_filter_md {
+	void *data; /* sg_virt(sg) */
+	void *data_end; /* sg_virt(sg) + sg->length */
 };
 
 /* user accessible metadata for SK_MSG packet hook, new fields must

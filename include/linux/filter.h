@@ -517,6 +517,14 @@ struct bpf_skb_data_end {
 	void *data_end;
 };
 
+struct bpf_scatterlist {
+	struct scatterlist *sg;
+	void *start;
+	void *end;
+	int cur_sg;
+	int num_sg;
+};
+
 struct sk_msg_buff {
 	void *data;
 	void *data_end;
