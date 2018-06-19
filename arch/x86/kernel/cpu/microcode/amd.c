@@ -38,7 +38,9 @@
 #include <asm/cpu.h>
 #include <asm/msr.h>
 
-static struct equiv_cpu_entry *equiv_cpu_table;
+static struct equiv_cpu_table {
+	struct equiv_cpu_entry *table;
+} equiv_table;
 
 /*
  * This points to the current valid container of microcode patches which we will
@@ -581,18 +583,18 @@ void reload_ucode_amd(void)
 static u16 __find_equiv_id(unsigned int cpu)
 {
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-	return find_equiv_id(equiv_cpu_table, uci->cpu_sig.sig);
+	return find_equiv_id(equiv_table.table, uci->cpu_sig.sig);
 }
 
 static u32 find_cpu_family_by_equiv_cpu(u16 equiv_cpu)
 {
 	int i = 0;
 
-	BUG_ON(!equiv_cpu_table);
+	BUG_ON(!equiv_table.table);
 
-	while (equiv_cpu_table[i].equiv_cpu != 0) {
-		if (equiv_cpu == equiv_cpu_table[i].equiv_cpu)
-			return equiv_cpu_table[i].installed_cpu;
+	while (equiv_table.table[i].equiv_cpu != 0) {
+		if (equiv_cpu == equiv_table.table[i].equiv_cpu)
+			return equiv_table.table[i].installed_cpu;
 		i++;
 	}
 	return 0;
@@ -731,21 +733,21 @@ static unsigned int install_equiv_cpu_table(const u8 *buf, size_t buf_size)
 	hdr = (const u32 *)buf;
 	equiv_tbl_len = hdr[2];
 
-	equiv_cpu_table = vmalloc(equiv_tbl_len);
-	if (!equiv_cpu_table) {
+	equiv_table.table = vmalloc(equiv_tbl_len);
+	if (!equiv_table.table) {
 		pr_err("failed to allocate equivalent CPU table\n");
 		return 0;
 	}
 
-	memcpy(equiv_cpu_table, buf + CONTAINER_HDR_SZ, equiv_tbl_len);
+	memcpy(equiv_table.table, buf + CONTAINER_HDR_SZ, equiv_tbl_len);
 
 	return equiv_tbl_len;
 }
 
 static void free_equiv_cpu_table(void)
 {
-	vfree(equiv_cpu_table);
-	equiv_cpu_table = NULL;
+	vfree(equiv_table.table);
+	equiv_table.table = NULL;
 }
 
 static void cleanup(void)
