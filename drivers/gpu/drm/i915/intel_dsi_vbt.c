@@ -517,6 +517,7 @@ bool intel_dsi_vbt_init(struct intel_dsi *intel_dsi, u16 panel_id)
 	u32 mul;
 	u16 burst_mode_ratio;
 	enum port port;
+	enum pipe pipe;
 
 	DRM_DEBUG_KMS("\n");
 
@@ -582,6 +583,19 @@ bool intel_dsi_vbt_init(struct intel_dsi *intel_dsi, u16 panel_id)
 		}
 	} else
 		burst_mode_ratio = 100;
+
+	/*
+	 * On BYT / CRC the GOP sometimes picks a slightly different pclk,
+	 * read back the GOP configured pclk and prefer it over ours.
+	 */
+	if ((IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) &&
+	    intel_dsi_get_hw_state(&intel_dsi->base, &pipe)) {
+		u32 gop = intel_dsi_get_pclk(&intel_dsi->base, bpp, NULL);
+
+		DRM_DEBUG_KMS("Calculated pclk %d GOP %d\n", pclk, gop);
+		if (gop >= (pclk * 9 / 10) && gop <= (pclk * 11 / 10))
+			pclk = gop;
+	}
 
 	intel_dsi->burst_mode_ratio = burst_mode_ratio;
 	intel_dsi->pclk = pclk;
