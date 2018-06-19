@@ -82,6 +82,8 @@ void rds_tcp_data_ready(struct sock *sk);
 int rds_tcp_recv_path(struct rds_conn_path *cp);
 void rds_tcp_inc_free(struct rds_incoming *inc);
 int rds_tcp_inc_copy_to_user(struct rds_incoming *inc, struct iov_iter *to);
+int rds_tcp_inc_to_sg_get(struct rds_incoming *inc, struct scatterlist **sg);
+void rds_tcp_inc_to_sg_put(struct scatterlist **sg);
 
 /* tcp_send.c */
 void rds_tcp_xmit_path_prepare(struct rds_conn_path *cp);

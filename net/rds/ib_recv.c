@@ -219,6 +219,18 @@ void rds_ib_inc_free(struct rds_incoming *inc)
 	rds_ib_recv_cache_put(&ibinc->ii_cache_entry, &ic->i_cache_incs);
 }
 
+int rds_ib_inc_to_sg_get(struct rds_incoming *inc, struct scatterlist **sg)
+{
+	struct rds_ib_incoming *ibinc;
+	struct rds_page_frag *frag;
+
+	ibinc = container_of(inc, struct rds_ib_incoming, ii_inc);
+	frag = list_entry(ibinc->ii_frags.next, struct rds_page_frag, f_item);
+	*sg =  &frag->f_sg;
+
+	return 0;
+}
+
 static void rds_ib_recv_clear_one(struct rds_ib_connection *ic,
 				  struct rds_ib_recv_work *recv)
 {

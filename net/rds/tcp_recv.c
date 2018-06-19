@@ -56,6 +56,44 @@ void rds_tcp_inc_free(struct rds_incoming *inc)
 	kmem_cache_free(rds_tcp_incoming_slab, tinc);
 }
 
+#define MAX_SG 17
+int rds_tcp_inc_to_sg_get(struct rds_incoming *inc, struct scatterlist **sg)
+{
+	struct scatterlist *sg_list;
+	struct rds_tcp_incoming *tinc;
+	struct sk_buff *skb;
+	int num_sg = 0;
+
+	tinc = container_of(inc, struct rds_tcp_incoming, ti_inc);
+
+	/* For now we are assuming that the max sg elements we need is MAX_SG.
+	 * To determine actual number of sg elements we need to traverse the
+	 * skb queue e.g.
+	 *
+	 * skb_queue_walk(&tinc->ti_skb_list, skb) {
+	 *	num_sg += skb_shinfo(skb)->nr_frags + 1;
+	 * }
+	 */
+	sg_list = kzalloc(sizeof(*sg_list) * MAX_SG, GFP_KERNEL);
+	if (!sg_list)
+		return -ENOMEM;
+
+	sg_init_table(sg_list, MAX_SG);
+	skb_queue_walk(&tinc->ti_skb_list, skb) {
+		num_sg += skb_to_sgvec_nomark(skb, &sg_list[num_sg], 0,
+					      skb->len);
+	}
+	sg_mark_end(&sg_list[num_sg - 1]);
+	*sg = sg_list;
+
+	return 0;
+}
+
+void rds_tcp_inc_to_sg_put(struct scatterlist **sg)
+{
+	kfree(*sg);
+}
+
 /*
  * this is pretty lame, but, whatever.
  */
