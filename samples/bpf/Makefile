@@ -52,6 +52,7 @@ hostprogs-y += xdp_adjust_tail
 hostprogs-y += xdpsock
 hostprogs-y += xdp_fwd
 hostprogs-y += task_fd_query
+hostprogs-y += rds_filter
 
 # Libbpf dependencies
 LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
@@ -107,6 +108,7 @@ xdp_adjust_tail-objs := xdp_adjust_tail_user.o
 xdpsock-objs := bpf_load.o xdpsock_user.o
 xdp_fwd-objs := bpf_load.o xdp_fwd_user.o
 task_fd_query-objs := bpf_load.o task_fd_query_user.o $(TRACE_HELPERS)
+rds_filter-objs := bpf_load.o rds_filter_user.o
 
 # Tell kbuild to always build the programs
 always := $(hostprogs-y)
@@ -163,6 +165,7 @@ always += xdp_adjust_tail_kern.o
 always += xdpsock_kern.o
 always += xdp_fwd_kern.o
 always += task_fd_query_kern.o
+always += rds_filter_kern.o
 
 HOSTCFLAGS += -I$(objtree)/usr/include
 HOSTCFLAGS += -I$(srctree)/tools/lib/
