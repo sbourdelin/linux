@@ -291,7 +291,7 @@ static void aer_set_firmware_first(struct pci_dev *pci_dev)
 
 	rc = apei_hest_parse(aer_hest_parse, &info);
 
-	if (rc)
+	if (rc || pcie_ports_native)
 		pci_dev->__aer_firmware_first = 0;
 	else
 		pci_dev->__aer_firmware_first = info.firmware_first;
@@ -327,6 +327,9 @@ bool aer_acpi_firmware_first(void)
 		apei_hest_parse(aer_hest_parse, &info);
 		aer_firmware_first = info.firmware_first;
 		parsed = true;
+		if (pcie_ports_native)
+			aer_firmware_first = 0;
+
 	}
 	return aer_firmware_first;
 }
