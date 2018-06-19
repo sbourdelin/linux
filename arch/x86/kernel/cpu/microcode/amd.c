@@ -284,29 +284,35 @@ static bool verify_patch(u8 family, const u8 *buf, size_t buf_size,
  * Returns the amount of bytes consumed while scanning. @desc contains all the
  * data we're going to use in later stages of the application.
  */
-static ssize_t parse_container(u8 *ucode, ssize_t size, struct cont_desc *desc)
+static size_t parse_container(u8 *ucode, size_t size, struct cont_desc *desc)
 {
 	struct equiv_cpu_entry *eq;
-	ssize_t orig_size = size;
+	size_t orig_size = size;
 	u32 *hdr = (u32 *)ucode;
+	u32 equiv_tbl_len;
 	u16 eq_id;
 	u8 *buf;
 
-	/* Am I looking at an equivalence table header? */
-	if (hdr[0] != UCODE_MAGIC ||
-	    hdr[1] != UCODE_EQUIV_CPU_TABLE_TYPE ||
-	    hdr[2] == 0)
-		return CONTAINER_HDR_SZ;
+	/*
+	 * Skip one byte when a container cannot be parsed successfully
+	 * so the parser will correctly skip unknown data of any size until
+	 * it hopefully arrives at something that it is able to recognize.
+	 */
+	if (!verify_equivalence_table(ucode, size, true))
+		return 1;
 
 	buf = ucode;
 
+	equiv_tbl_len = hdr[2];
 	eq = (struct equiv_cpu_entry *)(buf + CONTAINER_HDR_SZ);
 
 	/* Find the equivalence ID of our CPU in this table: */
 	eq_id = find_equiv_id(eq, desc->cpuid_1_eax);
 
-	buf  += hdr[2] + CONTAINER_HDR_SZ;
-	size -= hdr[2] + CONTAINER_HDR_SZ;
+	buf  += CONTAINER_HDR_SZ;
+	buf  += equiv_tbl_len;
+	size -= CONTAINER_HDR_SZ;
+	size -= equiv_tbl_len;
 
 	/*
 	 * Scan through the rest of the container to find where it ends. We do
@@ -314,30 +320,36 @@ static ssize_t parse_container(u8 *ucode, ssize_t size, struct cont_desc *desc)
 	 */
 	while (size > 0) {
 		struct microcode_amd *mc;
+		unsigned int crnt_size;
 		u32 patch_size;
 
+		/*
+		 * If this patch section hasn't got a plausible header we
+		 * probably have arrived at the beginning of a next container.
+		 * Bail out from patch processing here so this new container
+		 * can be scanned.
+		 */
+		if (!verify_patch_section(buf, size, true))
+			break;
+
+		if (!verify_patch(x86_family(desc->cpuid_1_eax),
+				  buf, size, &crnt_size, true))
+			goto next_patch;
+
 		hdr = (u32 *)buf;
-
-		if (hdr[0] != UCODE_UCODE_TYPE)
-			break;
-
-		/* Sanity-check patch size. */
 		patch_size = hdr[1];
-		if (patch_size > PATCH_MAX_SIZE)
-			break;
 
-		/* Skip patch section header: */
-		buf  += SECTION_HDR_SIZE;
-		size -= SECTION_HDR_SIZE;
+		mc = (struct microcode_amd *)(buf + SECTION_HDR_SIZE);
+		if (eq_id != mc->hdr.processor_rev_id)
+			goto next_patch;
 
-		mc = (struct microcode_amd *)buf;
-		if (eq_id == mc->hdr.processor_rev_id) {
-			desc->psize = patch_size;
-			desc->mc = mc;
-		}
+		/* We have found a matching patch! */
+		desc->psize = patch_size;
+		desc->mc = mc;
 
-		buf  += patch_size;
-		size -= patch_size;
+next_patch:
+		buf  += crnt_size;
+		size -= crnt_size;
 	}
 
 	/*
@@ -363,15 +375,13 @@ static ssize_t parse_container(u8 *ucode, ssize_t size, struct cont_desc *desc)
  */
 static void scan_containers(u8 *ucode, size_t size, struct cont_desc *desc)
 {
-	ssize_t rem = size;
-
-	while (rem >= 0) {
-		ssize_t s = parse_container(ucode, rem, desc);
+	while (size > 0) {
+		size_t s = parse_container(ucode, size, desc);
 		if (!s)
 			return;
 
 		ucode += s;
-		rem   -= s;
+		size  -= s;
 	}
 }
 
