@@ -472,7 +472,7 @@ struct bnx2fc_cmd *bnx2fc_cmd_alloc(struct bnx2fc_rport *tgt)
 	u32 free_sqes;
 	u32 max_sqes;
 	u16 xid;
-	int index = get_cpu();
+	int index = get_cpu() % num_possible_cpus();
 
 	max_sqes = BNX2FC_SCSI_MAX_SQES;
 	/*
