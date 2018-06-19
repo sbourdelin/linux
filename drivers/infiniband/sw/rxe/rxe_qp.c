@@ -227,6 +227,8 @@ static int rxe_qp_init_req(struct rxe_dev *rxe, struct rxe_qp *qp,
 		return err;
 	qp->sk->sk->sk_user_data = qp;
 
+	qp->src_port            = RXE_ROCE_V2_SPORT;
+
 	qp->sq.max_wr		= init->cap.max_send_wr;
 	qp->sq.max_sge		= init->cap.max_send_sge;
 	qp->sq.max_inline	= init->cap.max_inline_data;
@@ -706,8 +708,12 @@ int rxe_qp_from_attr(struct rxe_qp *qp, struct ib_qp_attr *attr, int mask,
 	if (mask & IB_QP_PATH_MIG_STATE)
 		qp->attr.path_mig_state = attr->path_mig_state;
 
-	if (mask & IB_QP_DEST_QPN)
+	if (mask & IB_QP_DEST_QPN) {
 		qp->attr.dest_qp_num = attr->dest_qp_num;
+		qp->src_port = RXE_ROCE_V2_SPORT +
+			(hash_64_generic(((u64)attr->dest_qp_num << 24) +
+					 (u64)qp_num(qp), 14) & 0x3fff);
+	}
 
 	if (mask & IB_QP_STATE) {
 		qp->attr.qp_state = attr->qp_state;
