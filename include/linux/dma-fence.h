@@ -36,6 +36,8 @@ struct dma_fence_cb;
 
 /**
  * struct dma_fence - software synchronization primitive
+ * @owner: the module that contains fence_ops functions.
+ *	   Usually THIS_MODULE.
  * @refcount: refcount for this fence
  * @ops: dma_fence_ops associated with this fence
  * @rcu: used for releasing fence with kfree_rcu
@@ -71,6 +73,7 @@ struct dma_fence_cb;
  * been completed, or never called at all.
  */
 struct dma_fence {
+	struct module *owner;
 	struct kref refcount;
 	const struct dma_fence_ops *ops;
 	struct rcu_head rcu;
@@ -249,8 +252,11 @@ struct dma_fence_ops {
 				   char *str, int size);
 };
 
-void dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
-		    spinlock_t *lock, u64 context, unsigned seqno);
+#define dma_fence_init(fence, ops, lock, context, seqno) _dma_fence_init( \
+		THIS_MODULE, fence, ops, lock, context, seqno)
+void _dma_fence_init(struct module *module, struct dma_fence *fence,
+		const struct dma_fence_ops *ops, spinlock_t *lock, u64 context,
+		unsigned seqno);
 
 void dma_fence_release(struct kref *kref);
 void dma_fence_free(struct dma_fence *fence);

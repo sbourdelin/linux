@@ -18,6 +18,7 @@
  * more details.
  */
 
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/export.h>
 #include <linux/atomic.h>
@@ -168,6 +169,7 @@ void dma_fence_release(struct kref *kref)
 {
 	struct dma_fence *fence =
 		container_of(kref, struct dma_fence, refcount);
+	struct module *module = fence->owner;
 
 	trace_dma_fence_destroy(fence);
 
@@ -178,6 +180,8 @@ void dma_fence_release(struct kref *kref)
 		fence->ops->release(fence);
 	else
 		dma_fence_free(fence);
+
+	module_put(module);
 }
 EXPORT_SYMBOL(dma_fence_release);
 
@@ -556,8 +560,9 @@ EXPORT_SYMBOL(dma_fence_wait_any_timeout);
  * to check which fence is later by simply using dma_fence_later.
  */
 void
-dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
-	       spinlock_t *lock, u64 context, unsigned seqno)
+_dma_fence_init(struct module *module, struct dma_fence *fence,
+		const struct dma_fence_ops *ops, spinlock_t *lock,
+		u64 context, unsigned seqno)
 {
 	BUG_ON(!lock);
 	BUG_ON(!ops || !ops->wait || !ops->enable_signaling ||
@@ -571,7 +576,11 @@ dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
 	fence->seqno = seqno;
 	fence->flags = 0UL;
 	fence->error = 0;
+	fence->owner = module;
+
+	if (!try_module_get(module))
+		fence->owner = NULL;
 
 	trace_dma_fence_init(fence);
 }
-EXPORT_SYMBOL(dma_fence_init);
+EXPORT_SYMBOL(_dma_fence_init);
