@@ -93,6 +93,8 @@ struct pnv_idle_states_t {
 	u32 flags;
 };
 
+extern struct pnv_idle_states_t *pnv_idle_states;
+extern int nr_pnv_idle_states;
 extern u32 pnv_fastsleep_workaround_at_entry[];
 extern u32 pnv_fastsleep_workaround_at_exit[];
 
