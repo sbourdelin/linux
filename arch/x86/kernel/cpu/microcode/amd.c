@@ -74,6 +74,182 @@ static u16 find_equiv_id(struct equiv_cpu_entry *equiv_table, u32 sig)
 }
 
 /*
+ * Check whether there is a valid microcode container file at the beginning
+ * of a passed buffer @buf of size @buf_size.
+ * If @early is set do not print errors so this function is usable by the
+ * early microcode loader.
+ */
+static bool verify_container(const u8 *buf, size_t buf_size, bool early)
+{
+	u32 cont_magic;
+
+	if (buf_size <= CONTAINER_HDR_SZ) {
+		if (!early)
+			pr_err("Truncated microcode container header.\n");
+
+		return false;
+	}
+
+	cont_magic = *(const u32 *)buf;
+	if (cont_magic != UCODE_MAGIC) {
+		if (!early)
+			pr_err("Invalid magic value (0x%08x).\n", cont_magic);
+
+		return false;
+	}
+
+	return true;
+}
+
+/*
+ * Check whether there is a valid, non-truncated CPU equivalence table
+ * at the beginning of a passed buffer @buf of size @buf_size.
+ * If @early is set do not print errors so this function is usable by the
+ * early microcode loader.
+ */
+static bool verify_equivalence_table(const u8 *buf, size_t buf_size, bool early)
+{
+	const u32 *hdr = (const u32 *)buf;
+	u32 cont_type, equiv_tbl_len;
+
+	if (!verify_container(buf, buf_size, early))
+		return false;
+
+	cont_type = hdr[1];
+	if (cont_type != UCODE_EQUIV_CPU_TABLE_TYPE) {
+		if (!early)
+			pr_err("Wrong microcode container equivalence table type: %u.\n",
+			       cont_type);
+
+		return false;
+	}
+
+	equiv_tbl_len = hdr[2];
+	if (equiv_tbl_len < sizeof(struct equiv_cpu_entry) ||
+	    buf_size - CONTAINER_HDR_SZ < equiv_tbl_len) {
+		if (!early)
+			pr_err("Truncated equivalence table.\n");
+
+		return false;
+	}
+
+	return true;
+}
+
+/*
+ * Check whether there is a valid, non-truncated microcode patch section
+ * at the beginning of a passed buffer @buf of size @buf_size.
+ * If @early is set do not print errors so this function is usable by the
+ * early microcode loader.
+ */
+static bool verify_patch_section(const u8 *buf, size_t buf_size, bool early)
+{
+	const u32 *hdr;
+	u32 patch_type, patch_size;
+
+	if (buf_size < SECTION_HDR_SIZE) {
+		if (!early)
+			pr_err("Truncated patch section.\n");
+
+		return false;
+	}
+
+	hdr = (const u32 *)buf;
+	patch_type = hdr[0];
+	patch_size = hdr[1];
+
+	if (patch_type != UCODE_UCODE_TYPE) {
+		if (!early)
+			pr_err("Invalid type field (%u) in container file section header.\n",
+				patch_type);
+
+		return false;
+	}
+
+	if (patch_size < sizeof(struct microcode_header_amd)) {
+		if (!early)
+			pr_err("Patch of size %u too short.\n", patch_size);
+
+		return false;
+	}
+
+	return true;
+}
+
+static unsigned int verify_patch_size(u8 family, u32 patch_size,
+				      unsigned int size);
+
+/*
+ * Check whether there is a valid, non-truncated microcode patch of the
+ * right size for a particular family @family at the beginning of a passed
+ * buffer @buf, buffer that is of size @buf_size.
+ * Will return the length of current patch data in @crnt_size (even on
+ * failure), so the caller knows how many bytes it should skip.
+ * If @early is set do not print errors so this function is usable by the
+ * early microcode loader.
+ */
+static bool verify_patch(u8 family, const u8 *buf, size_t buf_size,
+			 unsigned int *crnt_size, bool early)
+{
+	const u32 *hdr;
+	u32 patch_size;
+	const struct microcode_header_amd *mc_hdr;
+	u8 patch_fam;
+
+	if (!verify_patch_section(buf, buf_size, early)) {
+		*crnt_size = min_t(unsigned int, 1, buf_size);
+		return false;
+	}
+
+	hdr = (const u32 *)buf;
+	patch_size = hdr[1];
+
+	if (buf_size - SECTION_HDR_SIZE < patch_size) {
+		if (!early)
+			pr_err("Patch of size %u truncated.\n", patch_size);
+
+		*crnt_size = buf_size;
+		return false;
+	}
+
+	/*
+	 * Set a patch length limit of slightly less than U32_MAX to
+	 * prevent overflowing 32-bit variables holding the whole
+	 * patch section size.
+	 */
+	if (patch_size > U32_MAX - SECTION_HDR_SIZE) {
+		if (!early)
+			pr_err("Patch of size %u too large.\n", patch_size);
+
+		*crnt_size = SECTION_HDR_SIZE + PATCH_MAX_SIZE;
+		return false;
+	}
+
+	*crnt_size = SECTION_HDR_SIZE + patch_size;
+
+	mc_hdr = (const struct microcode_header_amd *)(buf + SECTION_HDR_SIZE);
+	patch_fam = 0xf + (mc_hdr->processor_rev_id >> 12);
+
+	/* Is the patch for the proper CPU family? */
+	if (family != patch_fam)
+		return false;
+
+	/*
+	 * The section header length is not included in this indicated size
+	 * but is present in the leftover file length so we need to subtract
+	 * it before passing this value to the function below.
+	 */
+	if (!verify_patch_size(family, patch_size, buf_size - SECTION_HDR_SIZE)) {
+		if (!early)
+			pr_err("Patch of size %u too large.\n", patch_size);
+
+		return false;
+	}
+
+	return true;
+}
+
+/*
  * This scans the ucode blob for the proper container as we can have multiple
  * containers glued together. Returns the equivalence ID from the equivalence
  * table or 0 if none found.
@@ -494,10 +670,8 @@ static unsigned int verify_patch_size(u8 family, u32 patch_size, unsigned int si
 		break;
 	}
 
-	if (patch_size > min_t(u32, size, max_size)) {
-		pr_err("patch size mismatch\n");
+	if (patch_size > min_t(u32, size, max_size))
 		return 0;
-	}
 
 	return patch_size;
 }
