@@ -1378,9 +1378,11 @@ void drm_atomic_helper_wait_for_flip_done(struct drm_device *dev,
 	int i;
 
 	for_each_new_crtc_in_state(old_state, crtc, new_crtc_state, i) {
-		struct drm_crtc_commit *commit = new_crtc_state->commit;
+		struct drm_crtc_commit *commit;
 		int ret;
 
+		new_crtc_state = drm_atomic_get_crtc_state(old_state, crtc);
+		commit = new_crtc_state->commit;
 		if (!commit)
 			continue;
 
