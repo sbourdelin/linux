@@ -672,6 +672,14 @@ static int fsl_espi_probe(struct device *dev, struct resource *mem,
 
 	dev_set_drvdata(dev, master);
 
+	if (dev->of_node) {
+		u32 cell_index;
+
+		if (!of_property_read_u32(dev->of_node, "cell-index",
+					  &cell_index))
+			master->bus_num = cell_index;
+	}
+
 	master->mode_bits = SPI_RX_DUAL | SPI_CPOL | SPI_CPHA | SPI_CS_HIGH |
 			    SPI_LSB_FIRST | SPI_LOOP;
 	master->dev.of_node = dev->of_node;
