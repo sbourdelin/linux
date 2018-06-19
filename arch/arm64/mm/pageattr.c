@@ -19,6 +19,8 @@
 #include <asm/pgtable.h>
 #include <asm/set_memory.h>
 #include <asm/tlbflush.h>
+#include <asm/sysreg.h>
+#include <asm/barrier.h>
 
 struct page_change_data {
 	pgprot_t set_mask;
@@ -185,3 +187,38 @@ bool kernel_page_present(struct page *page)
 }
 #endif /* CONFIG_HIBERNATION */
 #endif /* CONFIG_DEBUG_PAGEALLOC */
+
+/*
+ * For virtual addresses where the underlyine physical memory may not be
+ * contiguous and the normal virt_to_phys gives the wrong result. This
+ * function does an actual translation using the 'at' instruction.
+ */
+phys_addr_t slow_virt_to_phys(void *virt_addr)
+{
+	phys_addr_t	result;
+	unsigned long	input = (unsigned long)virt_addr;
+	char		touch;
+	int		i;
+
+	/* Try up to 3 times (an arbitrary number) */
+	for (i = 0; i < 3; i++) {
+		/* Do the translation and check that it worked */
+		asm volatile("at s1e1r, %0" : : "r" (input));
+		isb();
+		result = read_sysreg(par_el1);
+		if (likely(!(result & 0x1)))
+			return (result & GENMASK_ULL(51, 12)) |
+				(input & GENMASK_ULL(11, 0));
+		/*
+		 * Something failed. Read the page to fault in anything
+		 * that isn't resident, then try again. "Anything"
+		 * could include the page itself or hypervisor page tables.
+		 */
+		touch = READ_ONCE(*(char *)input);
+		dmb(sy);
+	}
+
+	/* Let the caller sort it out. */
+	return  -1;
+}
+EXPORT_SYMBOL_GPL(slow_virt_to_phys);

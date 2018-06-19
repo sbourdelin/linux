@@ -265,6 +265,12 @@ static inline void *phys_to_virt(phys_addr_t x)
 }
 
 /*
+ * For memory where the underlying physical pages may not
+ * be contiguous.
+ */
+extern phys_addr_t slow_virt_to_phys(void *vaddr);
+
+/*
  * Drivers should NOT use these either.
  */
 #define __pa(x)			__virt_to_phys((unsigned long)(x))
