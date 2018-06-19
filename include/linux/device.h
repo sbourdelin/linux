@@ -133,6 +133,7 @@ struct bus_type {
 	const struct dev_pm_ops *pm;
 
 	const struct iommu_ops *iommu_ops;
+	struct notifier_block *iommu_nb;
 
 	struct subsys_private *p;
 	struct lock_class_key lock_key;

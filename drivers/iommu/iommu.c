@@ -1166,6 +1166,7 @@ static int iommu_bus_init(struct bus_type *bus, const struct iommu_ops *ops)
 	if (err)
 		goto out_err;
 
+	bus->iommu_nb = nb;
 
 	return 0;
 
@@ -1179,6 +1180,27 @@ out_free:
 
 	return err;
 }
+
+void bus_unset_iommu(struct bus_type *bus, const struct iommu_ops *ops)
+{
+	struct iommu_callback_data cb = {
+		.ops = ops,
+	};
+
+	if (!bus->iommu_ops)
+		return;
+
+	bus_for_each_dev(bus, NULL, &cb, remove_iommu_group);
+
+	if (bus->iommu_nb) {
+		bus_unregister_notifier(bus, bus->iommu_nb);
+		kfree(bus->iommu_nb);
+		bus->iommu_nb = NULL;
+	}
+
+	bus->iommu_ops = NULL;
+}
+EXPORT_SYMBOL_GPL(bus_unset_iommu);
 
 /**
  * bus_set_iommu - set iommu-callbacks for the bus
