@@ -6,6 +6,7 @@
  *	Vaibhav Bedia, Dave Gerlach
  */
 
+#include <linux/clk.h>
 #include <linux/cpu.h>
 #include <linux/err.h>
 #include <linux/genalloc.h>
@@ -52,6 +53,14 @@ static int am33xx_pm_suspend(suspend_state_t suspend_state)
 {
 	int i, ret = 0;
 
+	/*
+	 * For RTC only mode with DDR in selfresh we need to save
+	 * clocks context at the very end
+	 */
+	if (suspend_state == PM_SUSPEND_MEM &&
+	    pm_ops->check_off_mode_enable())
+		clk_save_context();
+
 	ret = pm_ops->soc_suspend((unsigned long)suspend_state,
 				  am33xx_do_wfi_sram);
 
@@ -76,6 +85,10 @@ static int am33xx_pm_suspend(suspend_state_t suspend_state)
 			ret = -1;
 		}
 	}
+
+	if (suspend_state == PM_SUSPEND_MEM &&
+	    pm_ops->check_off_mode_enable())
+		clk_restore_context();
 
 	return ret;
 }
