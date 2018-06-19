@@ -411,6 +411,7 @@ struct phy_device *phy_device_create(struct mii_bus *bus, int addr, int phy_id,
 	mdiodev->dev.parent = &bus->dev;
 	mdiodev->dev.bus = &mdio_bus_type;
 	mdiodev->dev.type = &mdio_bus_phy_type;
+	mdiodev->dev.of_node = bus->dev.of_node;
 	mdiodev->bus = bus;
 	mdiodev->bus_match = phy_bus_match;
 	mdiodev->addr = addr;
