@@ -27,6 +27,7 @@ struct mm_iommu_table_group_mem_t {
 	struct rcu_head rcu;
 	unsigned long used;
 	atomic64_t mapped;
+	unsigned int pageshift;
 	u64 ua;			/* userspace address */
 	u64 entries;		/* number of entries in hpas[] */
 	u64 *hpas;		/* vmalloc'ed */
@@ -166,6 +167,8 @@ long mm_iommu_get(struct mm_struct *mm, unsigned long ua, unsigned long entries,
 		goto unlock_exit;
 	}
 
+	mem->pageshift = 30; /* start from 1G pages - the biggest we have */
+
 	for (i = 0; i < entries; ++i) {
 		if (1 != get_user_pages_fast(ua + (i << PAGE_SHIFT),
 					1/* pages */, 1/* iswrite */, &page)) {
@@ -199,6 +202,9 @@ long mm_iommu_get(struct mm_struct *mm, unsigned long ua, unsigned long entries,
 			}
 		}
 populate:
+		mem->pageshift = min_t(unsigned int, mem->pageshift,
+				PAGE_SHIFT +
+				compound_order(compound_head(page)));
 		mem->hpas[i] = page_to_pfn(page) << PAGE_SHIFT;
 	}
 
@@ -349,12 +355,15 @@ struct mm_iommu_table_group_mem_t *mm_iommu_find(struct mm_struct *mm,
 EXPORT_SYMBOL_GPL(mm_iommu_find);
 
 long mm_iommu_ua_to_hpa(struct mm_iommu_table_group_mem_t *mem,
-		unsigned long ua, unsigned long *hpa)
+		unsigned long ua, unsigned int pageshift, unsigned long *hpa)
 {
 	const long entry = (ua - mem->ua) >> PAGE_SHIFT;
 	u64 *va = &mem->hpas[entry];
 
 	if (entry >= mem->entries)
+		return -EFAULT;
+
+	if (pageshift > mem->pageshift)
 		return -EFAULT;
 
 	*hpa = *va | (ua & ~PAGE_MASK);
@@ -364,13 +373,16 @@ long mm_iommu_ua_to_hpa(struct mm_iommu_table_group_mem_t *mem,
 EXPORT_SYMBOL_GPL(mm_iommu_ua_to_hpa);
 
 long mm_iommu_ua_to_hpa_rm(struct mm_iommu_table_group_mem_t *mem,
-		unsigned long ua, unsigned long *hpa)
+		unsigned long ua, unsigned int pageshift, unsigned long *hpa)
 {
 	const long entry = (ua - mem->ua) >> PAGE_SHIFT;
 	void *va = &mem->hpas[entry];
 	unsigned long *pa;
 
 	if (entry >= mem->entries)
+		return -EFAULT;
+
+	if (pageshift > mem->pageshift)
 		return -EFAULT;
 
 	pa = (void *) vmalloc_to_phys(va);
