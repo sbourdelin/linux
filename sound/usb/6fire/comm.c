@@ -26,12 +26,9 @@ static void usb6fire_comm_init_urb(struct comm_runtime *rt, struct urb *urb,
 		u8 *buffer, void *context, void(*handler)(struct urb *urb))
 {
 	usb_init_urb(urb);
-	urb->transfer_buffer = buffer;
-	urb->pipe = usb_sndintpipe(rt->chip->dev, COMM_EP);
-	urb->complete = handler;
-	urb->context = context;
-	urb->interval = 1;
-	urb->dev = rt->chip->dev;
+	usb_fill_int_urb(urb, rt->chip->dev,
+			 usb_sndintpipe(rt->chip->dev, COMM_EP),
+			 buffer, 0, handler, context, 1);
 }
 
 static void usb6fire_comm_receiver_handler(struct urb *urb)
@@ -168,13 +165,10 @@ int usb6fire_comm_init(struct sfire_chip *chip)
 	rt->write16 = usb6fire_comm_write16;
 
 	/* submit an urb that receives communication data from device */
-	urb->transfer_buffer = rt->receiver_buffer;
-	urb->transfer_buffer_length = COMM_RECEIVER_BUFSIZE;
-	urb->pipe = usb_rcvintpipe(chip->dev, COMM_EP);
-	urb->dev = chip->dev;
-	urb->complete = usb6fire_comm_receiver_handler;
-	urb->context = rt;
-	urb->interval = 1;
+	usb_fill_int_urb(urb, chip->dev, usb_rcvintpipe(chip->dev, COMM_EP),
+			 rt->receiver_buffer, COMM_RECEIVER_BUFSIZE,
+			 usb6fire_comm_receiver_handler, rt, 1);
+
 	ret = usb_submit_urb(urb, GFP_KERNEL);
 	if (ret < 0) {
 		kfree(rt->receiver_buffer);

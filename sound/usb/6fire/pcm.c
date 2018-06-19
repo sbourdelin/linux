@@ -569,20 +569,14 @@ static const struct snd_pcm_ops pcm_ops = {
 };
 
 static void usb6fire_pcm_init_urb(struct pcm_urb *urb,
-				  struct sfire_chip *chip, bool in, int ep,
+				  struct sfire_chip *chip, unsigned int pipe,
 				  void (*handler)(struct urb *))
 {
 	urb->chip = chip;
 	usb_init_urb(&urb->instance);
-	urb->instance.transfer_buffer = urb->buffer;
-	urb->instance.transfer_buffer_length =
-			PCM_N_PACKETS_PER_URB * PCM_MAX_PACKET_SIZE;
-	urb->instance.dev = chip->dev;
-	urb->instance.pipe = in ? usb_rcvisocpipe(chip->dev, ep)
-			: usb_sndisocpipe(chip->dev, ep);
-	urb->instance.interval = 1;
-	urb->instance.complete = handler;
-	urb->instance.context = urb;
+	usb_fill_int_urb(&urb->instance, chip->dev, pipe, urb->buffer,
+			 PCM_N_PACKETS_PER_URB * PCM_MAX_PACKET_SIZE,
+			 handler, urb, 1);
 	urb->instance.number_of_packets = PCM_N_PACKETS_PER_URB;
 }
 
@@ -643,10 +637,13 @@ int usb6fire_pcm_init(struct sfire_chip *chip)
 	spin_lock_init(&rt->capture.lock);
 
 	for (i = 0; i < PCM_N_URBS; i++) {
-		usb6fire_pcm_init_urb(&rt->in_urbs[i], chip, true, IN_EP,
-				usb6fire_pcm_in_urb_handler);
-		usb6fire_pcm_init_urb(&rt->out_urbs[i], chip, false, OUT_EP,
-				usb6fire_pcm_out_urb_handler);
+		usb6fire_pcm_init_urb(&rt->in_urbs[i], chip,
+				      usb_rcvisocpipe(chip->dev, IN_EP),
+				      usb6fire_pcm_in_urb_handler);
+
+		usb6fire_pcm_init_urb(&rt->out_urbs[i], chip,
+				      usb_sndisocpipe(chip->dev, OUT_EP),
+				      usb6fire_pcm_out_urb_handler);
 
 		rt->in_urbs[i].peer = &rt->out_urbs[i];
 		rt->out_urbs[i].peer = &rt->in_urbs[i];
