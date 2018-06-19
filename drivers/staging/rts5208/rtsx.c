@@ -879,7 +879,7 @@ static int rtsx_probe(struct pci_dev *pci,
 	if (!dev->remap_addr) {
 		dev_err(&pci->dev, "ioremap error\n");
 		err = -ENXIO;
-		goto errout;
+		goto err_chip_free;
 	}
 
 	/*
@@ -894,7 +894,7 @@ static int rtsx_probe(struct pci_dev *pci,
 	if (!dev->rtsx_resv_buf) {
 		dev_err(&pci->dev, "alloc dma buffer fail\n");
 		err = -ENXIO;
-		goto errout;
+		goto err_addr_unmap;
 	}
 	dev->chip->host_cmds_ptr = dev->rtsx_resv_buf;
 	dev->chip->host_cmds_addr = dev->rtsx_resv_buf_addr;
@@ -915,7 +915,7 @@ static int rtsx_probe(struct pci_dev *pci,
 
 	if (rtsx_acquire_irq(dev) < 0) {
 		err = -EBUSY;
-		goto errout;
+		goto err_disable_msi;
 	}
 
 	pci_set_master(pci);
@@ -935,14 +935,14 @@ static int rtsx_probe(struct pci_dev *pci,
 	if (IS_ERR(th)) {
 		dev_err(&pci->dev, "Unable to start control thread\n");
 		err = PTR_ERR(th);
-		goto errout;
+		goto err_rtsx_release;
 	}
 	dev->ctl_thread = th;
 
 	err = scsi_add_host(host, &pci->dev);
 	if (err) {
 		dev_err(&pci->dev, "Unable to add the scsi host\n");
-		goto errout;
+		goto err_complete_control_thread;
 	}
 
 	/* Start up the thread for delayed SCSI-device scanning */
@@ -950,18 +950,16 @@ static int rtsx_probe(struct pci_dev *pci,
 	if (IS_ERR(th)) {
 		dev_err(&pci->dev, "Unable to start the device-scanning thread\n");
 		complete(&dev->scanning_done);
-		quiesce_and_remove_host(dev);
 		err = PTR_ERR(th);
-		goto errout;
+		goto err_stop_host;
 	}
 
 	/* Start up the thread for polling thread */
 	th = kthread_run(rtsx_polling_thread, dev, "rtsx-polling");
 	if (IS_ERR(th)) {
 		dev_err(&pci->dev, "Unable to start the device-polling thread\n");
-		quiesce_and_remove_host(dev);
 		err = PTR_ERR(th);
-		goto errout;
+		goto err_stop_host;
 	}
 	dev->polling_thread = th;
 
@@ -970,9 +968,25 @@ static int rtsx_probe(struct pci_dev *pci,
 	return 0;
 
 	/* We come here if there are any problems */
+err_stop_host:
+	quiesce_and_remove_host(dev);
+err_complete_control_thread:
+	complete(&dev->cmnd_ready);
+	wait_for_completion(&dev->control_exit);
+err_rtsx_release:
+	free_irq(dev->irq, (void *)dev);
+	rtsx_release_chip(dev->chip);
+err_disable_msi:
+	dev->chip->host_cmds_ptr = NULL;
+	dev->chip->host_sg_tbl_ptr = NULL;
+	if (dev->chip->msi_en)
+		pci_disable_msi(dev->pci);
+err_addr_unmap:
+	iounmap(dev->remap_addr);
+err_chip_free:
+	kfree(dev->chip);
 errout:
 	dev_err(&pci->dev, "%s failed\n", __func__);
-	release_everything(dev);
 
 	return err;
 }
