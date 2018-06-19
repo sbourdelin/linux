@@ -2988,11 +2988,11 @@ void __init xfrm_init(void)
 {
 	int i;
 
-	xfrm_pcpu_work = kmalloc_array(NR_CPUS, sizeof(*xfrm_pcpu_work),
+	xfrm_pcpu_work = kmalloc_array(nr_cpu_ids, sizeof(*xfrm_pcpu_work),
 				       GFP_KERNEL);
 	BUG_ON(!xfrm_pcpu_work);
 
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < nr_cpu_ids; i++)
 		INIT_WORK(&xfrm_pcpu_work[i], xfrm_pcpu_work_fn);
 
 	register_pernet_subsys(&xfrm_net_ops);
