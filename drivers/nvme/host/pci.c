@@ -2333,7 +2333,7 @@ static void nvme_reset_work(struct work_struct *work)
 	if (!nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_CONNECTING)) {
 		dev_warn(dev->ctrl.device,
 			"failed to mark controller CONNECTING\n");
-		goto out;
+		goto fail_state;
 	}
 
 	result = nvme_pci_enable(dev);
@@ -2405,13 +2405,22 @@ static void nvme_reset_work(struct work_struct *work)
 	if (!nvme_change_ctrl_state(&dev->ctrl, new_state)) {
 		dev_warn(dev->ctrl.device,
 			"failed to mark controller state %d\n", new_state);
-		goto out;
+		goto fail_state;
 	}
 
 	nvme_start_ctrl(&dev->ctrl);
 	return;
 
- out:
+fail_state:
+	/*
+	 * The only possible state here is DELETING, there must be someone
+	 * removing the ctrl right now, so needn't invoke nvme_remove_dead_ctrl.
+	 * The queues may have been quiesced, start them to avoid io hang.
+	 */
+	WARN_ON(dev->ctrl.state != NVME_CTRL_DELETING);
+	nvme_start_queues(&dev->ctrl);
+	return;
+out:
 	nvme_remove_dead_ctrl(dev, result);
 }
 
