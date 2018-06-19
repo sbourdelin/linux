@@ -26,8 +26,6 @@ void microblaze_setup_heartbeat(void);
 extern void mmu_reset(void);
 #   endif /* CONFIG_MMU */
 
-extern void of_platform_reset_gpio_probe(void);
-
 void time_init(void);
 void init_IRQ(void);
 void machine_early_init(const char *cmdline, unsigned int ram,
