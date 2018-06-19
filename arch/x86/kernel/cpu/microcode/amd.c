@@ -215,6 +215,9 @@ static bool verify_patch(u8 family, const u8 *buf, size_t buf_size,
 	/*
 	 * Check whether patch_size isn't something nonsensically huge so
 	 * we don't skip over good patches by mistake.
+	 *
+	 * If you modify these values or add a new one also check whether
+	 * PATCH_MAX_SIZE in include/asm/microcode_amd.h needs updating, too.
 	 */
 #define F1XH_MPB_MAX_SIZE 2048
 #define F14H_MPB_MAX_SIZE 1824

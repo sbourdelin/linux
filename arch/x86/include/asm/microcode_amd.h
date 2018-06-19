@@ -41,6 +41,7 @@ struct microcode_amd {
 	unsigned int			mpb[0];
 };
 
+/* Maximum patch size of all supported families */
 #define PATCH_MAX_SIZE PAGE_SIZE
 
 #ifdef CONFIG_MICROCODE_AMD
