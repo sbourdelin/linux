@@ -98,8 +98,8 @@ void HTUpdateDefaultSetting(struct ieee80211_device *ieee)
 	pMgntInfo->bTxEnableFwCalcDur = (BOOLEAN)pNdisCommon->bRegTxEnableFwCalcDur;
 #endif
 	/*
-	 * 8190 only, Realtek proprietary aggregation mode Set MPDUDensity=2,   
-	 * 1: Set MPDUDensity=2(32k) for Realtek AP 
+	 * 8190 only, Realtek proprietary aggregation mode Set MPDUDensity=2,
+	 * 1: Set MPDUDensity=2(32k) for Realtek AP
 	 * and set MPDUDensity=0(8k) for others
 	 */
 	pHTInfo->bRegRT2RTAggregation = 1;//0: Set MPDUDensity=2,   1: Set MPDUDensity=2(32k)  for Realtek AP and set MPDUDensity=0(8k) for others
@@ -121,7 +121,7 @@ void HTUpdateDefaultSetting(struct ieee80211_device *ieee)
 }
 
 /*
- *function:  This function print out each field on HT capability 
+ *function:  This function print out each field on HT capability
  *           IE mainly from (Beacon/ProbeRsp/AssocReq)
  *   input:  u8*	CapIE       //Capability IE to be printed out
  *	     u8*	TitleString //mainly print out caller function
@@ -393,7 +393,7 @@ static void HTIOTPeerDetermine(struct ieee80211_device *ieee)
 }
 
 /*
- *function:  Check whether driver should declare received rate up to MCS13 
+ *function:  Check whether driver should declare received rate up to MCS13
  *           only since some chipset is not good
  *	     at receiving MCS14~15 frame from some AP.
  *   input:  struct ieee80211_device*	ieee
@@ -409,7 +409,7 @@ static u8 HTIOTActIsDisableMCS14(struct ieee80211_device *ieee, u8 *PeerMacAddr)
 /*
  * Function:	HTIOTActIsDisableMCS15
  *
- * Overview:	Check whether driver should declare capability of receiving 
+ * Overview:	Check whether driver should declare capability of receiving
  *              MCS15
  *
  * Input:
@@ -447,7 +447,7 @@ static bool HTIOTActIsDisableMCS15(struct ieee80211_device *ieee)
 /*
  * Function:	HTIOTActIsDisableMCSTwoSpatialStream
  *
- * Overview:	Check whether driver should declare capability of receiving 
+ * Overview:	Check whether driver should declare capability of receiving
  *              All 2 ss packets
  *
  * Input:
@@ -481,7 +481,7 @@ static u8 HTIOTActIsDisableEDCATurbo(struct ieee80211_device *ieee,
 }
 
 /*
- *function:  Check whether we need to use OFDM to send MGNT frame for 
+ *function:  Check whether we need to use OFDM to send MGNT frame for
  *           broadcom AP
  *   input:  struct ieee80211_network *network   //current network we live
  *  output:  none
@@ -602,7 +602,7 @@ void HTConstructCapabilityElement(struct ieee80211_device *ieee, u8 *posHTCap, u
 
 	/*
 	 * 2008.06.12
-	 * For RTL819X, if pairwisekey = wep/tkip, ap is ralink, 
+	 * For RTL819X, if pairwisekey = wep/tkip, ap is ralink,
 	 * we support only MCS0~7.
 	 */
 	if (ieee->GetHalfNmodeSupportByAPsHandler(ieee->dev)) {
@@ -997,7 +997,7 @@ void HTOnAssocRsp(struct ieee80211_device *ieee)
 			pHTInfo->CurrentAMPDUFactor = pHTInfo->AMPDU_Factor;
 	} else {
 		/*
-		 * Set MPDU density to 2 to Realtek AP, 
+		 * Set MPDU density to 2 to Realtek AP,
 		 * and set it to 0 for others
 		 * Replace MPDU factor declared in original association
 		 * response frame format. 2007.08.20 by Emily
@@ -1112,7 +1112,7 @@ void HTInitializeHTInfo(struct ieee80211_device *ieee)
 	/*
 	 * CCK rate support
 	 * This flag is set to true to support CCK rate by default.
-	 * It will be affected by "pHTInfo->bRegSuppCCK" and AP capabilities 
+	 * It will be affected by "pHTInfo->bRegSuppCCK" and AP capabilities
 	 * only when associate to 11N BSS.
 	 */
 	pHTInfo->bCurSuppCCK = true;
@@ -1177,7 +1177,7 @@ void HTInitializeBssDesc(PBSS_HT pBssHT)
 /*
  *function:  initialize Bss HT structure(struct PBSS_HT)
  *   input:  struct ieee80211_device	*ieee
- *	     struct ieee80211_network	*pNetwork //usually current network 
+ *	     struct ieee80211_network	*pNetwork //usually current network
  *                                                  we are live in
  *  output:  none
  *  return:  none
@@ -1197,7 +1197,7 @@ void HTResetSelfAndSavePeerSetting(struct ieee80211_device *ieee,	struct ieee802
 	//
 	IEEE80211_DEBUG(IEEE80211_DL_HT, "==============>%s()\n", __func__);
 	/*
-	 * unmark bEnableHT flag here is the same reason why unmarked in 
+	 * unmark bEnableHT flag here is the same reason why unmarked in
 	 * function ieee80211_softmac_new_net. WB 2008.09.10
 	 */
 //	if( pHTInfo->bEnableHT &&  pNetwork->bssht.bdSupportHT)
@@ -1226,7 +1226,7 @@ void HTResetSelfAndSavePeerSetting(struct ieee80211_device *ieee,	struct ieee802
 
 		/*
 		 * Decide IOT Action
-		 * Must be called after the parameter of 
+		 * Must be called after the parameter of
 		 * pHTInfo->bCurrentRT2RTAggregation is decided
 		 */
 		pHTInfo->IOTAction = 0;
