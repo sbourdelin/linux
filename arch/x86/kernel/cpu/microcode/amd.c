@@ -176,9 +176,6 @@ static bool verify_patch_section(const u8 *buf, size_t buf_size, bool early)
 	return true;
 }
 
-static unsigned int verify_patch_size(u8 family, u32 patch_size,
-				      unsigned int size);
-
 /*
  * Check whether there is a valid, non-truncated microcode patch of the
  * right size for a particular family @family at the beginning of a passed
@@ -192,7 +189,7 @@ static bool verify_patch(u8 family, const u8 *buf, size_t buf_size,
 			 unsigned int *crnt_size, bool early)
 {
 	const u32 *hdr;
-	u32 patch_size;
+	u32 patch_size, max_size;
 	const struct microcode_header_amd *mc_hdr;
 	u8 patch_fam;
 
@@ -204,6 +201,65 @@ static bool verify_patch(u8 family, const u8 *buf, size_t buf_size,
 	hdr = (const u32 *)buf;
 	patch_size = hdr[1];
 
+	if (buf_size - SECTION_HDR_SIZE < sizeof(*mc_hdr)) {
+		if (!early)
+			pr_err("Truncated patch header.\n");
+
+		*crnt_size = buf_size;
+		return false;
+	}
+
+	mc_hdr = (const struct microcode_header_amd *)(buf + SECTION_HDR_SIZE);
+	patch_fam = 0xf + (mc_hdr->processor_rev_id >> 12);
+
+	/*
+	 * Check whether patch_size isn't something nonsensically huge so
+	 * we don't skip over good patches by mistake.
+	 */
+#define F1XH_MPB_MAX_SIZE 2048
+#define F14H_MPB_MAX_SIZE 1824
+#define F15H_MPB_MAX_SIZE 4096
+#define F16H_MPB_MAX_SIZE 3458
+#define F17H_MPB_MAX_SIZE 3200
+
+	switch (patch_fam) {
+	case 0x10 ... 0x13:
+		max_size = F1XH_MPB_MAX_SIZE;
+		break;
+	case 0x14:
+		max_size = F14H_MPB_MAX_SIZE;
+		break;
+	case 0x15:
+		max_size = F15H_MPB_MAX_SIZE;
+		break;
+	case 0x16:
+		max_size = F16H_MPB_MAX_SIZE;
+		break;
+	case 0x17:
+		max_size = F17H_MPB_MAX_SIZE;
+		break;
+	default:
+		/*
+		 * Don't know the max size for future families...
+		 * Set a patch length limit of slightly less than U32_MAX to
+		 * prevent overflowing 32-bit variables holding the whole
+		 * patch section size.
+		 */
+		max_size = U32_MAX - SECTION_HDR_SIZE;
+		break;
+	}
+
+	if (patch_size > max_size) {
+		if (!early)
+			pr_err("Patch of size %u exceeds family maximum.\n",
+			       patch_size);
+
+		*crnt_size = min_t(unsigned int,
+				   SECTION_HDR_SIZE + max_size,
+				   buf_size);
+		return false;
+	}
+
 	if (buf_size - SECTION_HDR_SIZE < patch_size) {
 		if (!early)
 			pr_err("Patch of size %u truncated.\n", patch_size);
@@ -212,39 +268,11 @@ static bool verify_patch(u8 family, const u8 *buf, size_t buf_size,
 		return false;
 	}
 
-	/*
-	 * Set a patch length limit of slightly less than U32_MAX to
-	 * prevent overflowing 32-bit variables holding the whole
-	 * patch section size.
-	 */
-	if (patch_size > U32_MAX - SECTION_HDR_SIZE) {
-		if (!early)
-			pr_err("Patch of size %u too large.\n", patch_size);
-
-		*crnt_size = SECTION_HDR_SIZE + PATCH_MAX_SIZE;
-		return false;
-	}
-
 	*crnt_size = SECTION_HDR_SIZE + patch_size;
-
-	mc_hdr = (const struct microcode_header_amd *)(buf + SECTION_HDR_SIZE);
-	patch_fam = 0xf + (mc_hdr->processor_rev_id >> 12);
 
 	/* Is the patch for the proper CPU family? */
 	if (family != patch_fam)
 		return false;
-
-	/*
-	 * The section header length is not included in this indicated size
-	 * but is present in the leftover file length so we need to subtract
-	 * it before passing this value to the function below.
-	 */
-	if (!verify_patch_size(family, patch_size, buf_size - SECTION_HDR_SIZE)) {
-		if (!early)
-			pr_err("Patch of size %u too large.\n", patch_size);
-
-		return false;
-	}
 
 	return true;
 }
@@ -637,45 +665,6 @@ static int collect_cpu_info_amd(int cpu, struct cpu_signature *csig)
 	return 0;
 }
 
-/*
- * Check whether the passed remaining file @size is large enough to contain a
- * patch of the indicated @patch_size (and also whether this size does not
- * exceed the per-family maximum).
- */
-static unsigned int verify_patch_size(u8 family, u32 patch_size, unsigned int size)
-{
-	u32 max_size;
-
-#define F1XH_MPB_MAX_SIZE 2048
-#define F14H_MPB_MAX_SIZE 1824
-#define F15H_MPB_MAX_SIZE 4096
-#define F16H_MPB_MAX_SIZE 3458
-#define F17H_MPB_MAX_SIZE 3200
-
-	switch (family) {
-	case 0x14:
-		max_size = F14H_MPB_MAX_SIZE;
-		break;
-	case 0x15:
-		max_size = F15H_MPB_MAX_SIZE;
-		break;
-	case 0x16:
-		max_size = F16H_MPB_MAX_SIZE;
-		break;
-	case 0x17:
-		max_size = F17H_MPB_MAX_SIZE;
-		break;
-	default:
-		max_size = F1XH_MPB_MAX_SIZE;
-		break;
-	}
-
-	if (patch_size > min_t(u32, size, max_size))
-		return 0;
-
-	return patch_size;
-}
-
 static enum ucode_state apply_microcode_amd(int cpu)
 {
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
@@ -765,7 +754,7 @@ static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover)
 {
 	struct microcode_header_amd *mc_hdr;
 	struct ucode_patch *patch;
-	unsigned int patch_size, crnt_size, ret;
+	unsigned int patch_size, crnt_size;
 	u32 proc_fam;
 	u16 proc_id;
 
@@ -791,13 +780,7 @@ static int verify_and_add_patch(u8 family, u8 *fw, unsigned int leftover)
 		return crnt_size;
 	}
 
-	/*
-	 * The section header length is not included in this indicated size
-	 * but is present in the leftover file length so we need to subtract
-	 * it before passing this value to the function below.
-	 */
-	ret = verify_patch_size(family, patch_size, leftover - SECTION_HDR_SIZE);
-	if (!ret) {
+	if (!verify_patch(family, fw, leftover, &crnt_size, false)) {
 		pr_err("Patch-ID 0x%08x: size mismatch.\n", mc_hdr->patch_id);
 		return crnt_size;
 	}
