@@ -96,6 +96,16 @@ config INPUT_ATMEL_CAPTOUCH
 	  To compile this driver as a module, choose M here: the
 	  module will be called atmel_captouch.
 
+config INPUT_BD718XX_PWRKEY
+	tristate "ROHM BD71837/BD71847 power key support"
+	depends on MFD_BD71837
+	help
+	  Say Y here if you want support for the power key usually found
+	  on boards using a ROHM BD71837/BD71847 compatible PMIC.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called bd718xx-pwrkey.
+
 config INPUT_BMA150
 	tristate "BMA150/SMB380 acceleration sensor support"
 	depends on I2C
