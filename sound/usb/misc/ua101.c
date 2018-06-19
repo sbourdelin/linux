@@ -1118,16 +1118,12 @@ static int alloc_stream_urbs(struct ua101 *ua, struct ua101_stream *stream,
 			if (!urb)
 				return -ENOMEM;
 			usb_init_urb(&urb->urb);
-			urb->urb.dev = ua->dev;
-			urb->urb.pipe = stream->usb_pipe;
+			usb_fill_int_urb(&urb->urb, ua->dev, stream->usb_pipe,
+					 addr, max_packet_size, urb_complete,
+					 ua, 1);
 			urb->urb.transfer_flags = URB_NO_TRANSFER_DMA_MAP;
-			urb->urb.transfer_buffer = addr;
 			urb->urb.transfer_dma = dma;
-			urb->urb.transfer_buffer_length = max_packet_size;
 			urb->urb.number_of_packets = 1;
-			urb->urb.interval = 1;
-			urb->urb.context = ua;
-			urb->urb.complete = urb_complete;
 			urb->urb.iso_frame_desc[0].offset = 0;
 			urb->urb.iso_frame_desc[0].length = max_packet_size;
 			stream->urbs[u++] = urb;
