@@ -32,6 +32,8 @@ extern int amd_iommu_init_devices(void);
 extern void amd_iommu_uninit_devices(void);
 extern void amd_iommu_init_notifier(void);
 extern int amd_iommu_init_api(void);
+extern void amd_iommu_uninit_api(void);
+extern bool amd_iommu_failed_initialize(void);
 
 /* Needed for interrupt remapping */
 extern int amd_iommu_prepare(void);

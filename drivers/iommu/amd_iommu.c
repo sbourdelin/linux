@@ -380,6 +380,9 @@ static bool check_device(struct device *dev)
 {
 	int devid;
 
+	if (amd_iommu_failed_initialize())
+		return false;
+
 	if (!dev || !dev->dma_mask)
 		return false;
 
@@ -485,7 +488,7 @@ static void iommu_uninit_device(struct device *dev)
 	iommu_group_remove_device(dev);
 
 	/* Remove dma-ops */
-	dev->dma_ops = NULL;
+	dev->dma_ops = &dma_direct_ops;
 
 	/*
 	 * We keep dev_data around for unplugged devices and reuse it when the
@@ -2719,6 +2722,15 @@ static int init_reserved_iova_ranges(void)
 	}
 
 	return 0;
+}
+
+void __init amd_iommu_uninit_api(void)
+{
+	bus_unset_iommu(&pci_bus_type, &amd_iommu_ops);
+#ifdef CONFIG_ARM_AMBA
+	bus_unset_iommu(&amba_bustype, &amd_iommu_ops);
+#endif
+	bus_unset_iommu(&platform_bus_type, &amd_iommu_ops);
 }
 
 int __init amd_iommu_init_api(void)

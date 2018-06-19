@@ -244,6 +244,7 @@ enum iommu_init_state {
 	IOMMU_INITIALIZED,
 	IOMMU_NOT_FOUND,
 	IOMMU_INIT_ERROR,
+	IOMMU_RESOURCE_FREE,
 	IOMMU_CMDLINE_DISABLED,
 };
 
@@ -304,6 +305,11 @@ static inline unsigned long tbl_size(int entry_size)
 int amd_iommu_get_num_iommus(void)
 {
 	return amd_iommus_present;
+}
+
+bool amd_iommu_failed_initialize(void)
+{
+	return init_state == IOMMU_RESOURCE_FREE;
 }
 
 /* Access to l1 and l2 indexed register spaces */
@@ -2308,10 +2314,14 @@ static void __init free_iommu_resources(void)
 
 	free_iommu_all();
 
+	/*
+	 * We failed to initialize the AMD IOMMU driver,
+	 * and all resources are freed.
+	 */
+	init_state = IOMMU_RESOURCE_FREE;
 #ifdef CONFIG_GART_IOMMU
 	/*
-	 * We failed to initialize the AMD IOMMU - try fallback to GART
-	 * if possible.
+	 * try fallback to GART if possible.
 	 */
 	gart_iommu_init();
 
@@ -2560,6 +2570,8 @@ static int amd_iommu_enable_interrupts(void)
 	}
 
 out:
+	if (ret)
+		pr_err("AMD-Vi: Failed to enable IOMMU interrupts.\n");
 	return ret;
 }
 
@@ -2642,6 +2654,7 @@ static int __init state_next(void)
 		break;
 	case IOMMU_NOT_FOUND:
 	case IOMMU_INIT_ERROR:
+	case IOMMU_RESOURCE_FREE:
 	case IOMMU_CMDLINE_DISABLED:
 		/* Error states => do nothing */
 		ret = -EINVAL;
@@ -2661,6 +2674,7 @@ static int __init iommu_go_to_state(enum iommu_init_state state)
 	while (init_state != state) {
 		if (init_state == IOMMU_NOT_FOUND         ||
 		    init_state == IOMMU_INIT_ERROR        ||
+		    init_state == IOMMU_RESOURCE_FREE     ||
 		    init_state == IOMMU_CMDLINE_DISABLED)
 			break;
 		ret = state_next();
@@ -2725,6 +2739,7 @@ static int __init amd_iommu_init(void)
 
 	ret = iommu_go_to_state(IOMMU_INITIALIZED);
 	if (ret) {
+		amd_iommu_uninit_api();
 		free_dma_resources();
 		if (!irq_remapping_enabled) {
 			disable_iommus();
