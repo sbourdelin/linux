@@ -1,0 +1,17 @@
+Generic devicetree bindings for onewire (w1) busses
+===================================================
+
+Onewire busses are described through nodes of their master bus controller.
+Slave devices are listed as sub-nodes of such master devices.
+
+Example:
+
+	onewire {
+		compatible = "w1-gpio";
+		gpios = <&gpio 0 GPIO_ACTIVE_HIGH>;
+
+		w1_slave: slave@0 {
+			compatible = "maxim,w1-ds2760";
+		};
+	};
+
