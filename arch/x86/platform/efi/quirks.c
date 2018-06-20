@@ -247,6 +247,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 	efi_memory_desc_t md;
 	int num_entries;
 	void *new;
+	bool late;
 
 	if (efi_mem_desc_lookup(addr, &md)) {
 		pr_err("Failed to lookup EFI memory descriptor for %pa\n", &addr);
@@ -275,7 +276,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 
 	new_size = efi.memmap.desc_size * num_entries;
 
-	new_phys = efi_memmap_alloc(num_entries);
+	new_phys = efi_memmap_alloc(num_entries, &late);
 	if (!new_phys) {
 		pr_err("Could not allocate boot services memmap\n");
 		return;
@@ -284,6 +285,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 	new = early_memremap(new_phys, new_size);
 	if (!new) {
 		pr_err("Failed to map new boot services memmap\n");
+		efi_memmap_free(new_phys, num_entries, late);
 		return;
 	}
 
@@ -374,6 +376,7 @@ void __init efi_free_boot_services(void)
 	efi_memory_desc_t *md;
 	int num_entries = 0;
 	void *new, *new_md;
+	bool late;
 
 	for_each_efi_memory_desc(md) {
 		unsigned long long start = md->phys_addr;
@@ -419,7 +422,7 @@ void __init efi_free_boot_services(void)
 		return;
 
 	new_size = efi.memmap.desc_size * num_entries;
-	new_phys = efi_memmap_alloc(num_entries);
+	new_phys = efi_memmap_alloc(num_entries, &late);
 	if (!new_phys) {
 		pr_err("Failed to allocate new EFI memmap\n");
 		return;
@@ -428,7 +431,7 @@ void __init efi_free_boot_services(void)
 	new = memremap(new_phys, new_size, MEMREMAP_WB);
 	if (!new) {
 		pr_err("Failed to map new EFI memmap\n");
-		return;
+		goto free_mem;
 	}
 
 	/*
@@ -451,8 +454,13 @@ void __init efi_free_boot_services(void)
 
 	if (efi_memmap_install(new_phys, num_entries)) {
 		pr_err("Could not install new EFI memmap\n");
-		return;
+		goto free_mem;
 	}
+
+	return;
+
+free_mem:
+	efi_memmap_free(new_phys, num_entries, late);
 }
 
 /*

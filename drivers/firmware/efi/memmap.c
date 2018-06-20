@@ -32,6 +32,7 @@ static phys_addr_t __init __efi_memmap_alloc_late(unsigned long size)
 /**
  * efi_memmap_alloc - Allocate memory for the EFI memory map
  * @num_entries: Number of entries in the allocated map.
+ * @late: Type of allocation performed (late or early?).
  *
  * Depending on whether mm_init() has already been invoked or not,
  * either memblock or "normal" page allocation is used.
@@ -39,14 +40,47 @@ static phys_addr_t __init __efi_memmap_alloc_late(unsigned long size)
  * Returns the physical address of the allocated memory map on
  * success, zero on failure.
  */
-phys_addr_t __init efi_memmap_alloc(unsigned int num_entries)
+phys_addr_t __init efi_memmap_alloc(unsigned int num_entries, bool *late)
 {
 	unsigned long size = num_entries * efi.memmap.desc_size;
 
-	if (slab_is_available())
+	if (!late)
+		return 0;
+
+	*late = slab_is_available();
+
+	if (*late)
 		return __efi_memmap_alloc_late(size);
 
 	return __efi_memmap_alloc_early(size);
+}
+
+/**
+ * efi_memmap_free - Free memory allocated by efi_memmap_alloc()
+ * @mem: Physical address allocated by efi_memmap_alloc().
+ * @num_entries: Number of entries in the allocated map.
+ * @late: What type of allocation did efi_memmap_alloc() perform?
+ *
+ * Use this function _only_ in conjunction with efi_memmap_alloc().
+ * efi_memmap_alloc() allocates memory depending on whether mm_init()
+ * has already been invoked or not. It uses either memblock or "normal"
+ * page allocation. Since the allocation is done in two different ways,
+ * similarly, we free it in two different ways.
+ *
+ */
+void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries, bool late)
+{
+	unsigned long size = num_entries * efi.memmap.desc_size;
+	unsigned int order = get_order(size);
+	phys_addr_t end = mem + size - 1;
+
+	if (late) {
+		__free_pages(pfn_to_page(PHYS_PFN(mem)), order);
+		return;
+	}
+
+	if (memblock_free(mem, size))
+		pr_err("Failed to free mem from %pa to %pa\n", &mem, &end);
 }
 
 /**
