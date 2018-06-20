@@ -21,6 +21,7 @@
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 #include <linux/err.h>
+#include <linux/reboot.h>
 
 #include "ima.h"
 
@@ -104,10 +105,23 @@ void __init ima_load_x509(void)
 }
 #endif
 
+static int ima_shutdown(struct notifier_block *this, unsigned long action,
+			void *data)
+{
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ima_reboot_notifier = {
+	.notifier_call = ima_shutdown,
+	.priority = 0,
+};
+
 int __init ima_init(void)
 {
 	u8 pcr_i[TPM_DIGEST_SIZE];
 	int rc;
+
+	register_reboot_notifier(&ima_reboot_notifier);
 
 	ima_used_chip = 0;
 	rc = tpm_pcr_read(NULL, 0, pcr_i);
