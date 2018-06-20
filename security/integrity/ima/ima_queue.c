@@ -143,7 +143,7 @@ static int ima_pcr_extend(const u8 *hash, int pcr)
 	int result = 0;
 
 	down_read(&ima_tpm_chip_lock);
-	if (!ima_used_chip)
+	if (!ima_tpm_chip)
 		goto out;
 
 	result = tpm_pcr_extend(ima_tpm_chip, pcr, hash);

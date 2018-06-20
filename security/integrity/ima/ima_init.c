@@ -27,7 +27,6 @@
 
 /* name for boot aggregate entry */
 static const char *boot_aggregate_name = "boot_aggregate";
-int ima_used_chip;
 struct rw_semaphore ima_tpm_chip_lock = __RWSEM_INITIALIZER(ima_tpm_chip_lock);
 struct tpm_chip *ima_tpm_chip;
 
@@ -67,7 +66,7 @@ static int __init ima_add_boot_aggregate(void)
 	iint->ima_hash->algo = HASH_ALGO_SHA1;
 	iint->ima_hash->length = SHA1_DIGEST_SIZE;
 
-	if (ima_used_chip) {
+	if (ima_tpm_chip) {
 		result = ima_calc_boot_aggregate(&hash.hdr);
 		if (result < 0) {
 			audit_cause = "hashing_error";
@@ -114,7 +113,6 @@ static int ima_shutdown(struct notifier_block *this, unsigned long action,
 	if (ima_tpm_chip) {
 		tpm_chip_put(ima_tpm_chip);
 		ima_tpm_chip = NULL;
-		ima_used_chip = 0;
 	}
 	up_write(&ima_tpm_chip_lock);
 	return NOTIFY_DONE;
@@ -133,8 +131,7 @@ int __init ima_init(void)
 
 	ima_tpm_chip = tpm_chip_find();
 
-	ima_used_chip = (ima_tpm_chip != NULL);
-	if (!ima_used_chip)
+	if (!ima_tpm_chip)
 		pr_info("No TPM chip found, activating TPM-bypass!\n");
 
 	rc = integrity_init_keyring(INTEGRITY_KEYRING_IMA);
