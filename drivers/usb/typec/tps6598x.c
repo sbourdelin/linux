@@ -81,11 +81,16 @@ struct tps6598x {
 	struct typec_capability typec_cap;
 };
 
+#define TPS_MAX_LEN	sizeof(u64)
+
 static int
 tps6598x_block_read(struct tps6598x *tps, u8 reg, void *val, size_t len)
 {
-	u8 data[len + 1];
+	u8 data[TPS_MAX_LEN + 1];
 	int ret;
+
+	if (WARN_ON(len + 1 > sizeof(data)))
+		return -EINVAL;
 
 	if (!tps->i2c_protocol)
 		return regmap_raw_read(tps->regmap, reg, val, len);
