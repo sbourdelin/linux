@@ -57,6 +57,7 @@ void __init efi_fake_memmap(void)
 	phys_addr_t new_memmap_phy;
 	void *new_memmap;
 	int i;
+	bool late;
 
 	if (!nr_fake_mem)
 		return;
@@ -71,7 +72,7 @@ void __init efi_fake_memmap(void)
 	}
 
 	/* allocate memory for new EFI memmap */
-	new_memmap_phy = efi_memmap_alloc(new_nr_map);
+	new_memmap_phy = efi_memmap_alloc(new_nr_map, &late);
 	if (!new_memmap_phy)
 		return;
 
@@ -79,7 +80,7 @@ void __init efi_fake_memmap(void)
 	new_memmap = early_memremap(new_memmap_phy,
 				    efi.memmap.desc_size * new_nr_map);
 	if (!new_memmap) {
-		memblock_free(new_memmap_phy, efi.memmap.desc_size * new_nr_map);
+		efi_memmap_free(new_memmap_phy, new_nr_map, late);
 		return;
 	}
 
