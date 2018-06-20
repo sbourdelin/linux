@@ -1657,7 +1657,8 @@ static inline void usb_fill_bulk_urb(struct urb *urb,
  *	the endpoint descriptor's bInterval value.
  *
  * Initializes a interrupt urb with the proper information needed to submit
- * it to a device.
+ * it to a device. This function can also be used to initialize an isochronous
+ * urb.
  *
  * Note that High Speed and SuperSpeed(+) interrupt endpoints use a logarithmic
  * encoding of the endpoint interval, and express polling intervals in
