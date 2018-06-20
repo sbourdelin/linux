@@ -2539,14 +2539,18 @@ struct feature_ops {
 	}
 
 /* feature_ops not implemented: */
+#define write_last_feature	NULL
+
 #define print_tracing_data	NULL
 #define print_build_id		NULL
+#define print_last_feature	NULL
 
 #define process_branch_stack	NULL
 #define process_stat		NULL
+#define process_last_feature	NULL
 
 
-static const struct feature_ops feat_ops[HEADER_LAST_FEATURE] = {
+static const struct feature_ops feat_ops[HEADER_LAST_FEATURE + 1] = {
 	FEAT_OPN(TRACING_DATA,	tracing_data,	false),
 	FEAT_OPN(BUILD_ID,	build_id,	false),
 	FEAT_OPR(HOSTNAME,	hostname,	false),
@@ -2569,6 +2573,7 @@ static const struct feature_ops feat_ops[HEADER_LAST_FEATURE] = {
 	FEAT_OPN(CACHE,		cache,		true),
 	FEAT_OPR(SAMPLE_TIME,	sample_time,	false),
 	FEAT_OPR(MEM_TOPOLOGY,	mem_topology,	true),
+	FEAT_OPN(LAST_FEATURE,	last_feature,	false),
 };
 
 struct header_print_data {
