@@ -190,6 +190,10 @@ static int psci_cpu_off(u32 state)
 	int err;
 	u32 fn;
 
+	/* If running OSI mode, detach the CPU device from its PM domain. */
+	if (psci_osi_mode_enabled)
+		of_genpd_detach_cpu(smp_processor_id());
+
 	fn = psci_function_id[PSCI_FN_CPU_OFF];
 	err = invoke_psci_fn(fn, state, 0, 0);
 	return psci_to_linux_errno(err);
@@ -204,6 +208,10 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
 	/* Clear the domain state to start fresh. */
 	psci_set_domain_state(0);
+
+	if (!err && psci_osi_mode_enabled)
+		of_genpd_attach_cpu(cpuid);
+
 	return psci_to_linux_errno(err);
 }
 
