@@ -541,7 +541,8 @@ out_unlock:
 		err = -EIO;
 	mutex_unlock(&i915->drm.struct_mutex);
 
-	kernel_context_close(ctx);
+	if (!IS_ERR(ctx))
+		kernel_context_close(ctx);
 	return err;
 }
 
