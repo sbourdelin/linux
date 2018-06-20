@@ -1010,6 +1010,33 @@ int unregister_oom_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(unregister_oom_notifier);
 
 /**
+ * try_oom_notifier - Try to reclaim memory from OOM notifier list.
+ *
+ * Returns non-zero if notifier callbacks released something, zero otherwise.
+ */
+unsigned long try_oom_notifier(void)
+{
+	static DEFINE_MUTEX(oom_notifier_lock);
+	unsigned long freed = 0;
+
+	/*
+	 * Since OOM notifier callbacks must not depend on __GFP_DIRECT_RECLAIM
+	 * && !__GFP_NORETRY memory allocation, waiting for mutex here is safe.
+	 * If lockdep reports possible deadlock dependency, it will be a bug in
+	 * OOM notifier callbacks.
+	 *
+	 * If SIGKILL is pending, it is likely that current thread was selected
+	 * as an OOM victim. In that case, current thread should return as soon
+	 * as possible using memory reserves.
+	 */
+	if (mutex_lock_killable(&oom_notifier_lock))
+		return 0;
+	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
+	mutex_unlock(&oom_notifier_lock);
+	return freed;
+}
+
+/**
  * out_of_memory - kill the "best" process when we run out of memory
  * @oc: pointer to struct oom_control
  *
@@ -1020,18 +1047,10 @@ EXPORT_SYMBOL_GPL(unregister_oom_notifier);
  */
 bool out_of_memory(struct oom_control *oc)
 {
-	unsigned long freed = 0;
 	enum oom_constraint constraint = CONSTRAINT_NONE;
 
 	if (oom_killer_disabled)
 		return false;
-
-	if (!is_memcg_oom(oc)) {
-		blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
-		if (freed > 0)
-			/* Got some memory back in the last second. */
-			return true;
-	}
 
 	/*
 	 * If current has a pending SIGKILL or is exiting, then automatically
