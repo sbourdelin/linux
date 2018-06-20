@@ -7517,6 +7517,46 @@ enum {
 #define  PORTE_HOTPLUG_SHORT_DETECT	(1 << 0)
 #define  PORTE_HOTPLUG_LONG_DETECT	(2 << 0)
 
+/* ICP */
+#define   SDE_TC4_HOTPLUG_ICP		(1 << 27)
+#define   SDE_TC3_HOTPLUG_ICP		(1 << 26)
+#define   SDE_TC2_HOTPLUG_ICP		(1 << 25)
+#define   SDE_TC1_HOTPLUG_ICP		(1 << 24)
+#define   SDE_GMBUS_ICP			(1 << 23)
+#define   SDE_DDIB_HOTPLUG_ICP		(1 << 17)
+#define   SDE_DDIA_HOTPLUG_ICP		(1 << 16)
+
+#define SDE_DDI_MASK_ICP		(SDE_DDIB_HOTPLUG_ICP |	\
+					 SDE_DDIA_HOTPLUG_ICP)
+
+#define SDE_TC_MASK_ICP			(SDE_TC4_HOTPLUG_ICP |	\
+					 SDE_TC3_HOTPLUG_ICP |	\
+					 SDE_TC2_HOTPLUG_ICP |	\
+					 SDE_TC1_HOTPLUG_ICP)
+
+/* This register is a reuse of PCH_PORT_HOTPLUG register. The Spec
+ * has the name SHOTPLUG_CTL_DDI for ICP. Let us stick to the Spec.
+ */
+
+#define SHOTPLUG_CTL_DDI			_MMIO(0xc4030)
+#define   ICP_DDIB_HPD_ENABLE			(1 << 7)
+#define   ICP_DDIB_HPD_STATUS_MASK		(3 << 4)
+#define   ICP_DDIB_HPD_NO_DETECT		(0 << 4)
+#define   ICP_DDIB_HPD_SHORT_DETECT		(1 << 4)
+#define   ICP_DDIB_HPD_LONG_DETECT		(2 << 4)
+#define   ICP_DDIB_HPD_SHORT_LONG_DETECT	(3 << 4)
+#define   ICP_DDIA_HPD_ENABLE			(1 << 3)
+#define   ICP_DDIA_HPD_STATUS_MASK		(3 << 0)
+#define   ICP_DDIA_HPD_NO_DETECT		(0 << 0)
+#define   ICP_DDIA_HPD_SHORT_DETECT		(1 << 0)
+#define   ICP_DDIA_HPD_LONG_DETECT		(2 << 0)
+#define   ICP_DDIA_HPD_SHORT_LONG_DETECT	(3 << 0)
+
+#define SHOTPLUG_CTL_TC				_MMIO(0xc4034)
+#define   ICP_TC_HPD_ENABLE(tc_port)		(8 << (tc_port) * 4)
+#define   ICP_TC_HPD_LONG_DETECT(tc_port)	(2 << (tc_port) * 4)
+#define   ICP_TC_HPD_SHORT_DETECT(tc_port)	(1 << (tc_port) * 4)
+
 #define PCH_GPIOA               _MMIO(0xc5010)
 #define PCH_GPIOB               _MMIO(0xc5014)
 #define PCH_GPIOC               _MMIO(0xc5018)
