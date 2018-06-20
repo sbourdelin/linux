@@ -28,6 +28,8 @@
 /* name for boot aggregate entry */
 static const char *boot_aggregate_name = "boot_aggregate";
 int ima_used_chip;
+struct rw_semaphore ima_tpm_chip_lock = __RWSEM_INITIALIZER(ima_tpm_chip_lock);
+struct tpm_chip *ima_tpm_chip;
 
 /* Add the boot aggregate to the IMA measurement list and extend
  * the PCR register.
@@ -108,6 +110,13 @@ void __init ima_load_x509(void)
 static int ima_shutdown(struct notifier_block *this, unsigned long action,
 			void *data)
 {
+	down_write(&ima_tpm_chip_lock);
+	if (ima_tpm_chip) {
+		tpm_chip_put(ima_tpm_chip);
+		ima_tpm_chip = NULL;
+		ima_used_chip = 0;
+	}
+	up_write(&ima_tpm_chip_lock);
 	return NOTIFY_DONE;
 }
 
@@ -118,19 +127,15 @@ static struct notifier_block ima_reboot_notifier = {
 
 int __init ima_init(void)
 {
-	u8 pcr_i[TPM_DIGEST_SIZE];
 	int rc;
 
 	register_reboot_notifier(&ima_reboot_notifier);
 
-	ima_used_chip = 0;
-	rc = tpm_pcr_read(NULL, 0, pcr_i);
-	if (rc == 0)
-		ima_used_chip = 1;
+	ima_tpm_chip = tpm_chip_find();
 
+	ima_used_chip = (ima_tpm_chip != NULL);
 	if (!ima_used_chip)
-		pr_info("No TPM chip found, activating TPM-bypass! (rc=%d)\n",
-			rc);
+		pr_info("No TPM chip found, activating TPM-bypass!\n");
 
 	rc = integrity_init_keyring(INTEGRITY_KEYRING_IMA);
 	if (rc)

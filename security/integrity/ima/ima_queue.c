@@ -142,10 +142,13 @@ static int ima_pcr_extend(const u8 *hash, int pcr)
 {
 	int result = 0;
 
+	down_read(&ima_tpm_chip_lock);
 	if (!ima_used_chip)
-		return result;
+		goto out;
 
-	result = tpm_pcr_extend(NULL, pcr, hash);
+	result = tpm_pcr_extend(ima_tpm_chip, pcr, hash);
+out:
+	up_read(&ima_tpm_chip_lock);
 	if (result != 0)
 		pr_err("Error Communicating to TPM chip, result: %d\n", result);
 	return result;
