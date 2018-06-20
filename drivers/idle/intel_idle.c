@@ -916,13 +916,6 @@ static __cpuidle int intel_idle(struct cpuidle_device *dev,
 	bool uninitialized_var(tick);
 	int cpu = smp_processor_id();
 
-	/*
-	 * leave_mm() to avoid costly and often unnecessary wakeups
-	 * for flushing the user TLB's associated with the active mm.
-	 */
-	if (state->flags & CPUIDLE_FLAG_TLB_FLUSHED)
-		leave_mm(cpu);
-
 	if (!static_cpu_has(X86_FEATURE_ARAT)) {
 		cstate = (((eax) >> MWAIT_SUBSTATE_SIZE) &
 				MWAIT_CSTATE_MASK) + 1;

@@ -61,6 +61,4 @@ typedef struct {
 		.ctx_id = 1,						\
 	}
 
-void leave_mm(int cpu);
-
 #endif /* _ASM_X86_MMU_H */
