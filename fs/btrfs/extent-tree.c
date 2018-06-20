@@ -1038,10 +1038,10 @@ out_free:
 
 #ifdef BTRFS_COMPAT_EXTENT_TREE_V0
 static int convert_extent_item_v0(struct btrfs_trans_handle *trans,
-				  struct btrfs_fs_info *fs_info,
 				  struct btrfs_path *path,
 				  u64 owner, u32 extra_size)
 {
+	struct btrfs_fs_info *fs_info = trans->fs_info;
 	struct btrfs_root *root = fs_info->extent_root;
 	struct btrfs_extent_item *item;
 	struct btrfs_extent_item_v0 *ei0;
@@ -1682,8 +1682,7 @@ again:
 			err = -ENOENT;
 			goto out;
 		}
-		ret = convert_extent_item_v0(trans, fs_info, path, owner,
-					     extra_size);
+		ret = convert_extent_item_v0(trans, path, owner, extra_size);
 		if (ret < 0) {
 			err = ret;
 			goto out;
@@ -2384,7 +2383,7 @@ again:
 	item_size = btrfs_item_size_nr(leaf, path->slots[0]);
 #ifdef BTRFS_COMPAT_EXTENT_TREE_V0
 	if (item_size < sizeof(*ei)) {
-		ret = convert_extent_item_v0(trans, fs_info, path, (u64)-1, 0);
+		ret = convert_extent_item_v0(trans, path, (u64)-1, 0);
 		if (ret < 0) {
 			err = ret;
 			goto out;
@@ -6937,8 +6936,7 @@ static int __btrfs_free_extent(struct btrfs_trans_handle *trans,
 #ifdef BTRFS_COMPAT_EXTENT_TREE_V0
 	if (item_size < sizeof(*ei)) {
 		BUG_ON(found_extent || extent_slot != path->slots[0]);
-		ret = convert_extent_item_v0(trans, info, path, owner_objectid,
-					     0);
+		ret = convert_extent_item_v0(trans, path, owner_objectid, 0);
 		if (ret < 0) {
 			btrfs_abort_transaction(trans, ret);
 			goto out;
