@@ -4798,7 +4798,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
  *
  * Return 0 on success, non-zero on error.
  */
-int pci_reset_slot(struct pci_slot *slot)
+static int __pci_reset_slot(struct pci_slot *slot)
 {
 	int rc;
 
@@ -4814,7 +4814,6 @@ int pci_reset_slot(struct pci_slot *slot)
 
 	return rc;
 }
-EXPORT_SYMBOL_GPL(pci_reset_slot);
 
 /**
  * __pci_try_reset_slot - Try to reset a PCI slot
@@ -4878,7 +4877,7 @@ int pci_probe_reset_bus(struct pci_bus *bus)
 EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
 
 /**
- * pci_reset_bus - reset a PCI bus
+ * __pci_reset_bus - reset a PCI bus
  * @bus: top level PCI bus to reset
  *
  * Do a bus reset on the given bus and any subordinate buses, saving
@@ -4886,7 +4885,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
  *
  * Return 0 on success, non-zero on error.
  */
-int pci_reset_bus(struct pci_bus *bus)
+static int __pci_reset_bus(struct pci_bus *bus)
 {
 	int rc;
 
@@ -4901,6 +4900,26 @@ int pci_reset_bus(struct pci_bus *bus)
 	pci_bus_restore(bus);
 
 	return rc;
+}
+
+/**
+ * pci_reset_bus - reset a PCI bus
+ * @pdev: top level PCI device to reset via slot/bus
+ *
+ * Do a slot/bus reset on the given bus and any subordinate buses, saving
+ * and restoring state of all devices.
+ *
+ * Return 0 on success, non-zero on error.
+ */
+int pci_reset_bus(struct pci_dev *pdev)
+{
+	bool slot = false;
+
+	if (!pci_probe_reset_slot(pdev->slot))
+		slot = true;
+
+	return slot ? __pci_reset_slot(pdev->slot) :
+			__pci_reset_bus(pdev->bus);
 }
 EXPORT_SYMBOL_GPL(pci_reset_bus);
 
