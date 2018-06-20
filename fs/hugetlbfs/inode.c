@@ -1482,8 +1482,10 @@ static int __init init_hugetlbfs_fs(void)
 	i = 0;
 	for_each_hstate(h) {
 		mnt = mount_one_hugetlbfs(h);
-		if (IS_ERR(mnt) && i == 0)
+		if (IS_ERR(mnt) && i == 0) {
+			error = PTR_ERR(mnt);
 			goto out;
+		}
 		hugetlbfs_vfsmount[i] = mnt;
 		i++;
 	}
