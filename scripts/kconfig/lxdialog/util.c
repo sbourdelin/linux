@@ -378,8 +378,12 @@ void print_title(WINDOW *dialog, const char *title, int width)
  * next line if the string is too long to fit on one line. Newline
  * characters '\n' are propperly processed.  We start on a new line
  * if there is no room for at least 4 nonblanks following a double-space.
+ *
+ * This function fills all of and at most the area width x height so
+ * that it can be used to overwrite previosly displayed text.
  */
-void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x)
+void print_autowrap(WINDOW * win, const char *prompt, int width,
+			int height, int y, int x)
 {
 	int newl, cur_x, cur_y;
 	int prompt_len, room, wlen;
@@ -390,8 +394,16 @@ void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x)
 	prompt_len = strlen(tempstr);
 
 	if (prompt_len <= width - x * 2) {	/* If prompt is short */
+		cur_x = x;
+		cur_y = y;
+		wmove(win, cur_y, cur_x);
+		while (cur_x < (width - prompt_len) / 2) {
+			waddch(win, ' ');
+			cur_x++;
+		}
 		wmove(win, y, (width - prompt_len) / 2);
 		waddstr(win, tempstr);
+		getyx(win, cur_y, cur_x);
 	} else {
 		cur_x = x;
 		cur_y = y;
@@ -415,7 +427,13 @@ void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x)
 			     && wlen + 1 + strlen(sp) > room
 			     && (!(sp2 = strpbrk(sp, "\n "))
 				 || wlen + 1 + (sp2 - sp) > room))) {
+				while (cur_x < width) {
+					waddch(win, ' ');
+					cur_x++;
+				}
 				cur_y++;
+				if (cur_y - y >= height)
+					return;
 				cur_x = x;
 			}
 			wmove(win, cur_y, cur_x);
@@ -424,13 +442,24 @@ void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x)
 
 			/* Move to the next line if the word separator was a newline */
 			if (newline_separator) {
+				while (cur_x < width) {
+					waddch(win, ' ');
+					cur_x++;
+				}
 				cur_y++;
+				if (cur_y - y >= height)
+					return;
 				cur_x = x;
 				newline_separator = 0;
-			} else
+			} else {
+				if (cur_x < width)
+					waddch(win, ' ');
 				cur_x++;
+			}
 
 			if (sp && *sp == ' ') {
+				if (cur_x < width)
+					waddch(win, ' ');
 				cur_x++;	/* double space */
 				while (*++sp == ' ') ;
 				newl = 1;
@@ -438,6 +467,18 @@ void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x)
 				newl = 0;
 			word = sp;
 		}
+	}
+
+	/*
+	 * Fill remaining space to overwrite possibly existing text.
+	 */
+	while (cur_y - y < height) {
+		while (cur_x < width) {
+			waddch(win, ' ');
+			cur_x++;
+		}
+		wmove(win, cur_y + 1, x);
+		getyx(win, cur_y, cur_x);
 	}
 }
 

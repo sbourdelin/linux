@@ -21,6 +21,10 @@
 #include "lkc.h"
 #include "lxdialog/dialog.h"
 
+extern int focus_on_buttons;
+extern char isearch_str[];
+static int in_isearch;	      /* Ensure at most one instance of i-search is active */
+
 static const char mconf_readme[] =
 "Overview\n"
 "--------\n"
@@ -36,20 +40,74 @@ static const char mconf_readme[] =
 "while *, M or whitespace inside braces means to build in, build as\n"
 "a module or to exclude the feature respectively.\n"
 "\n"
-"To change any of these features, highlight it with the cursor\n"
-"keys and press <Y> to build it in, <M> to make it a module or\n"
+"Operation modes\n"
+"---------------\n"
+"Menuconfig operates in two modes, depending on the focus that can be\n"
+"either on the menu or the buttons below it. The focus is on the\n"
+"buttons if one button (the selected one) is highlighted, otherwise it\n"
+"is on the menu.\n"
+"\n"
+"To change any of the above features, it has to be navigated to (see\n"
+"below) so that it is highlighted, focus then has to be on the buttons\n"
+"before you press <Y> to build it in, <M> to make it a module or\n"
 "<N> to remove it.  You may also press the <Space Bar> to cycle\n"
 "through the available options (i.e. Y->N->M->Y).\n"
+"\n"
+"Navigation\n"
+"----------\n"
+"The following keys work independently of the current focus:\n"
+"\n"
+"o vertical arrow keys are used to navigate to menu items\n"
+"\n"
+"o horizontal arrow keys put the focus on the buttons and cycle\n"
+"  between the buttons.\n"
+"\n"
+"o <PAGE UP> and <PAGE DOWN> scroll invisible items into view.\n"
+"\n"
+"o <ENTER> visits a submenu\n"
+"  Submenus are designated by \"--->\", empty ones by \"----\".\n"
+"\n"
+"o <ESC><ESC> leaves a submenu or (in the main menu) exits menuconfig\n"
+"  and clears the current i-search string."
+"\n"
+"o <TAB> is reserved to toggle the focus between menu and buttons\n"
+"\n"
+"When menuconfig starts, the focus is on the menu and i-search mode\n"
+"is active.  I-search performs continuous cyclic searches for an entered\n"
+"string in the prompt texts of the whole menu tree.\n"
+"\n"
+"Subsequent characters can be entered to build a search-string the\n"
+"menu items are searched for and each time a character is added the\n"
+"current string is searched for starting from the current position in\n"
+"the menu tree.  If a match is found it is immediately navigated to.\n"
+"\n"
+"Keys with a special meaning are:\n"
+"\n"
+"o <BACKSPACE> removes the last character from the current search string\n"
+"\n"
+"o <DEL> clears the search string\n"
+"\n"
+"o <\\> (backslash) can be used to find further matches of a string\n"
+"\n"
+"When the focus is on the buttons the following keys can be used:\n"
+"\n"
+"o <x> can be used for exit identical to <ESC><ESC>\n"
+"\n"
+"o <y>, <n>, <m> or <SPACE> change the selected item\n"
+"\n"
+"o <+> and <-> keys navigate menu items identical to vertical arrow\n"
+"  keys\n"
+"\n"
+"o <h> or <?> display help messages\n"
+"\n"
+"o <z> toggles the display of hidden options\n"
 "\n"
 "Some additional keyboard hints:\n"
 "\n"
 "Menus\n"
 "----------\n"
-"o  Use the Up/Down arrow keys (cursor keys) to highlight the item you\n"
-"   wish to change or the submenu you wish to select and press <Enter>.\n"
-"   Submenus are designated by \"--->\", empty ones by \"----\".\n"
-"\n"
-"   Shortcut: Press the option's highlighted letter (hotkey).\n"
+"o  Hotkeys (available with focus on buttons): Press the target option's\n"
+"             highlighted letter (hotkey).\n"
 "             Pressing a hotkey more than once will sequence\n"
 "             through all visible items which use that hotkey.\n"
 "\n"
@@ -280,7 +338,7 @@ static int show_all_options;
 static int save_and_exit;
 static int silent;
 
-static void conf(struct menu *menu, struct menu *active_menu);
+static int conf(struct menu *menu, struct menu *active_menu);
 static void conf_choice(struct menu *menu);
 static void conf_string(struct menu *menu);
 static void conf_load(void);
@@ -641,13 +699,94 @@ conf_childs:
 	indent -= doint;
 }
 
-static void conf(struct menu *menu, struct menu *active_menu)
+void menu_isearch(void);
+void menu_isearch(void)
+{
+	struct menu *submenu, *menu_start;
+	int res;
+	int isearch_match = 1;	/* Enable cyclic navigation through
+				   matches */
+	struct gstr sttext;
+	struct subtitle_part stpart;
+
+	/*
+	 * Position to current menu item to start search from there.
+	 */
+	menu_start = rootmenu.list;
+	do {
+		if (menu_start == item_data())
+			break;
+		menu_start = menu_get_next(menu_start);
+	} while (menu_start != rootmenu.list);
+
+	in_isearch = 1;
+
+	/* Extend the subtitle by i-search indicator */
+	sttext = str_new();
+	str_printf(&sttext, "i-search");
+	stpart.text = str_get(&sttext);
+	list_add_tail(&stpart.entries, &trail);
+	set_subtitle();
+
+	while (isearch_str[0] != '\0' && isearch_match) {
+		isearch_match = 0;
+		submenu = menu_start;
+		do {
+			if (!submenu->prompt ||
+			    (!show_all_options && !menu_is_visible(submenu))) {
+				submenu = menu_get_next(submenu);
+				continue;
+			}
+
+			if (submenu->prompt->type == P_COMMENT &&
+			    (!show_all_options && !menu_is_visible(submenu->parent))) {
+				submenu = menu_get_next(submenu);
+				continue;
+			}
+
+			if (strcasestr(submenu->prompt->text, isearch_str) == NULL) {
+				submenu = menu_get_next(submenu);
+				continue;
+			}
+
+			isearch_match = 1;
+
+			res = conf(submenu->parent, submenu);
+
+			/*
+			 * We are done when focus was changed to
+			 * buttons or other than a printable character
+			 * (i.e. ESC) was pressed.
+			 */
+			if (focus_on_buttons || !isprint(res)) {
+				in_isearch = 0;
+				/* Remove us from subtitle */
+				list_del(trail.prev);
+				/* ESC clears i-search string */
+				if (!isprint(res))
+					isearch_str[0] = '\0';
+				return;
+			}
+
+			if (res == '\\')
+				submenu = menu_get_next(submenu);
+		} while (submenu != menu_start);
+	}
+
+	/* i-search string is empty, we are done */
+	in_isearch = 0;
+	/* Remove us from subtitle */
+	list_del(trail.prev);
+	return;
+}
+
+static int conf(struct menu *menu, struct menu *active_menu)
 {
 	struct menu *submenu;
 	const char *prompt = menu_get_prompt(menu);
 	struct subtitle_part stpart;
 	struct symbol *sym;
-	int res;
+	int res = KEY_ESC;
 	int s_scroll = 0;
 
 	if (menu != &rootmenu)
@@ -681,6 +820,18 @@ static void conf(struct menu *menu, struct menu *active_menu)
 			sym = submenu->sym;
 		else
 			sym = NULL;
+
+		if (!focus_on_buttons && isprint(res)) {
+			if (in_isearch) {
+				/*
+				 * We were called from menu_isearch(),
+				 * return to there.
+				 */
+				list_del(trail.prev);
+				return res;
+			}
+			menu_isearch();
+		}
 
 		switch (res) {
 		case 0:
@@ -750,6 +901,7 @@ static void conf(struct menu *menu, struct menu *active_menu)
 	}
 
 	list_del(trail.prev);
+	return res;
 }
 
 static int show_textbox_ext(const char *title, char *text, int r, int c, int
@@ -1033,6 +1185,7 @@ int main(int ac, char **av)
 
 	set_config_filename(conf_get_configname());
 	conf_set_message_callback(conf_message_callback);
+
 	do {
 		conf(&rootmenu, NULL);
 		res = handle_exit();
