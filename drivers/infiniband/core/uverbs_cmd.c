@@ -2027,13 +2027,35 @@ static int modify_qp(struct ib_uverbs_file *file,
 	attr->alt_timeout	  = cmd->base.alt_timeout;
 	attr->rate_limit	  = cmd->rate_limit;
 
-	if (cmd->base.attr_mask & IB_QP_AV)
+	if (cmd->base.attr_mask & IB_QP_AV) {
+		unsigned int primary_port = (cmd->base.attr_mask & IB_QP_PORT) ?
+						    cmd->base.port_num :
+						    qp->port;
+
+		/*
+		 * The Linux ABI specifies the primary port number both
+		 * loosely in the struct (as IBA suggests) and also in the
+		 * AV. The primary AV port number must always agree with the
+		 * primary port number set by IB_QP_PORT.
+		 */
+		if (cmd->base.dest.port_num != primary_port) {
+			ret = -EINVAL;
+			goto release_qp;
+		}
 		copy_ah_attr_from_uverbs(qp->device, &attr->ah_attr,
 					 &cmd->base.dest);
+	}
 
-	if (cmd->base.attr_mask & IB_QP_ALT_PATH)
+	if (cmd->base.attr_mask & IB_QP_ALT_PATH) {
+		if (!rdma_is_port_valid(qp->device,
+					cmd->base.alt_dest.port_num)) {
+			ret = -EINVAL;
+			goto release_qp;
+		}
+
 		copy_ah_attr_from_uverbs(qp->device, &attr->alt_ah_attr,
 					 &cmd->base.alt_dest);
+	}
 
 	ret = ib_modify_qp_with_udata(qp, attr,
 				      modify_qp_mask(qp->qp_type,
