@@ -473,6 +473,7 @@ static void __blk_mq_free_request(struct request *rq)
 	struct blk_mq_hw_ctx *hctx = blk_mq_map_queue(q, ctx->cpu);
 	const int sched_tag = rq->internal_tag;
 
+	WRITE_ONCE(rq->state, MQ_RQ_IDLE);
 	if (rq->tag != -1)
 		blk_mq_put_tag(hctx, hctx->tags, ctx, rq->tag);
 	if (sched_tag != -1)
@@ -509,7 +510,6 @@ void blk_mq_free_request(struct request *rq)
 	if (blk_rq_rl(rq))
 		blk_put_rl(blk_rq_rl(rq));
 
-	WRITE_ONCE(rq->state, MQ_RQ_IDLE);
 	if (refcount_dec_and_test(&rq->ref))
 		__blk_mq_free_request(rq);
 }
@@ -552,15 +552,17 @@ static void __blk_mq_complete_request_remote(void *data)
 	rq->q->softirq_done_fn(rq);
 }
 
-static void __blk_mq_complete_request(struct request *rq)
+/*
+ * The LLDD timeout path must invoke this interface to complete
+ * the request.
+ */
+void __blk_mq_complete_request(struct request *rq)
 {
 	struct blk_mq_ctx *ctx = rq->mq_ctx;
 	bool shared = false;
 	int cpu;
 
-	if (cmpxchg(&rq->state, MQ_RQ_IN_FLIGHT, MQ_RQ_COMPLETE) !=
-			MQ_RQ_IN_FLIGHT)
-		return;
+	WARN_ON(blk_mq_rq_state(rq) != MQ_RQ_COMPLETE);
 
 	if (rq->internal_tag != -1)
 		blk_mq_sched_completed_request(rq);
@@ -584,6 +586,7 @@ static void __blk_mq_complete_request(struct request *rq)
 	}
 	put_cpu();
 }
+EXPORT_SYMBOL(__blk_mq_complete_request);
 
 static void hctx_unlock(struct blk_mq_hw_ctx *hctx, int srcu_idx)
 	__releases(hctx->srcu)
@@ -617,7 +620,9 @@ void blk_mq_complete_request(struct request *rq)
 {
 	if (unlikely(blk_should_fake_timeout(rq->q)))
 		return;
-	__blk_mq_complete_request(rq);
+
+	if (blk_mq_mark_rq_complete(rq))
+		__blk_mq_complete_request(rq);
 }
 EXPORT_SYMBOL(blk_mq_complete_request);
 
@@ -783,6 +788,7 @@ static void blk_mq_rq_timed_out(struct request *req, bool reserved)
 
 	req->rq_flags &= ~RQF_TIMED_OUT;
 	blk_add_timer(req);
+	WRITE_ONCE(req->state, MQ_RQ_IN_FLIGHT);
 }
 
 static bool blk_mq_req_expired(struct request *rq, unsigned long *next)
@@ -835,8 +841,10 @@ static void blk_mq_check_expired(struct blk_mq_hw_ctx *hctx,
 	 * expired; if it is not expired, then the request was completed and
 	 * reallocated as a new request.
 	 */
-	if (blk_mq_req_expired(rq, next))
+	if (blk_mq_req_expired(rq, next) &&
+		blk_mq_mark_rq_complete(rq)) {
 		blk_mq_rq_timed_out(rq, reserved);
+	}
 	if (refcount_dec_and_test(&rq->ref))
 		__blk_mq_free_request(rq);
 }
