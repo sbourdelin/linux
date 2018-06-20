@@ -16,12 +16,14 @@
 #include <linux/of.h>
 #include <linux/notifier.h>
 #include <linux/spinlock.h>
+#include <linux/cpumask.h>
 
 /* Defines used for the flags field in the struct generic_pm_domain */
 #define GENPD_FLAG_PM_CLK	 (1U << 0) /* PM domain uses PM clk */
 #define GENPD_FLAG_IRQ_SAFE	 (1U << 1) /* PM domain operates in atomic */
 #define GENPD_FLAG_ALWAYS_ON	 (1U << 2) /* PM domain is always powered on */
 #define GENPD_FLAG_ACTIVE_WAKEUP (1U << 3) /* Keep devices active if wakeup */
+#define GENPD_FLAG_CPU_DOMAIN	 (1U << 4) /* PM domain manages CPUs */
 
 enum gpd_status {
 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
@@ -68,6 +70,7 @@ struct generic_pm_domain {
 	unsigned int suspended_count;	/* System suspend device counter */
 	unsigned int prepared_count;	/* Suspend counter of prepared devices */
 	unsigned int performance_state;	/* Aggregated max performance state */
+	cpumask_var_t cpus;		/* A cpumask of the attached CPUs */
 	int (*power_off)(struct generic_pm_domain *domain);
 	int (*power_on)(struct generic_pm_domain *domain);
 	unsigned int (*opp_to_performance_state)(struct generic_pm_domain *genpd,
