@@ -903,6 +903,9 @@ struct snd_soc_dai_link {
 	struct snd_soc_dai_link_component *codecs;
 	unsigned int num_codecs;
 
+	struct snd_soc_dai_link_component *cpu_dai;
+	unsigned int num_cpu_dai;
+
 	/*
 	 * You MAY specify the link's platform/PCM/DMA driver, either by
 	 * device name, or by DT/OF node, but not both. Some forms of link
@@ -1124,6 +1127,9 @@ struct snd_soc_pcm_runtime {
 
 	struct snd_soc_dai **codec_dais;
 	unsigned int num_codecs;
+
+	struct snd_soc_dai **cpu_dais;
+	unsigned int num_cpu_dai;
 
 	struct delayed_work delayed_work;
 #ifdef CONFIG_DEBUG_FS
