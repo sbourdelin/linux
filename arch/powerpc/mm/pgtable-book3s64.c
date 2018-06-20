@@ -335,23 +335,21 @@ static pte_t *get_pte_from_cache(struct mm_struct *mm)
 
 static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
 {
+	gfp_t gfp_mask = PGALLOC_GFP;
 	void *ret = NULL;
 	struct page *page;
 
-	if (!kernel) {
-		page = alloc_page(PGALLOC_GFP | __GFP_ACCOUNT);
-		if (!page)
-			return NULL;
-		if (!pgtable_page_ctor(page)) {
-			__free_page(page);
-			return NULL;
-		}
-	} else {
-		page = alloc_page(PGALLOC_GFP);
-		if (!page)
-			return NULL;
-	}
+	if (!kernel)
+		gfp_mask |= __GFP_ACCOUNT;
 
+	page = alloc_page(gfp_mask);
+	if (!page)
+		return NULL;
+
+	if (!pgtable_page_ctor(page)) {
+		__free_page(page);
+		return NULL;
+	}
 
 	ret = page_address(page);
 	/*
@@ -391,8 +389,7 @@ void pte_fragment_free(unsigned long *table, int kernel)
 	struct page *page = virt_to_page(table);
 
 	if (put_page_testzero(page)) {
-		if (!kernel)
-			pgtable_page_dtor(page);
+		pgtable_page_dtor(page);
 		free_unref_page(page);
 	}
 }
