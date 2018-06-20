@@ -20,6 +20,7 @@
 #include <linux/linkage.h>
 #include <linux/of.h>
 #include <linux/pm.h>
+#include <linux/pm_domain.h>
 #include <linux/printk.h>
 #include <linux/psci.h>
 #include <linux/reboot.h>
@@ -91,6 +92,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
 
 static DEFINE_PER_CPU(u32, domain_state);
 static u32 psci_cpu_suspend_feature;
+static bool psci_osi_mode_enabled;
 
 u32 psci_get_domain_state(void)
 {
@@ -339,6 +341,14 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
 
 	/* Idle states parsed correctly, initialize per-cpu pointer */
 	per_cpu(psci_power_state, cpu) = psci_states;
+
+	/* If running OSI mode, attach the CPU device to its PM domain. */
+	if (psci_osi_mode_enabled) {
+		ret = of_genpd_attach_cpu(cpu);
+		if (ret)
+			goto free_mem;
+	}
+
 	return 0;
 
 free_mem:
@@ -753,6 +763,7 @@ int __init psci_dt_topology_init(void)
 		goto out;
 	}
 
+	psci_osi_mode_enabled = true;
 	pr_info("OSI mode enabled.\n");
 out:
 	of_node_put(np);
