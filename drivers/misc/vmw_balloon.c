@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * VMware Balloon driver.
  *
@@ -247,7 +248,7 @@ struct vmballoon_stats {
 	unsigned int doorbell_unset;
 };
 
-#define STATS_INC(stat) (stat)++
+#define STATS_INC(stat) ((stat)++)
 #else
 #define STATS_INC(stat)
 #endif
@@ -275,7 +276,7 @@ struct vmballoon {
 	struct vmballoon_page_size page_sizes[VMW_BALLOON_NUM_PAGE_SIZES];
 
 	/* supported page sizes. 1 == 4k pages only, 2 == 4k and 2m pages */
-	unsigned supported_page_sizes;
+	unsigned int supported_page_sizes;
 
 	/* balloon size in pages */
 	unsigned int size;
@@ -559,7 +560,7 @@ static void vmballoon_free_page(struct page *page, bool is_2m_page)
 static void vmballoon_pop(struct vmballoon *b)
 {
 	struct page *page, *next;
-	unsigned is_2m_pages;
+	unsigned int is_2m_pages;
 
 	for (is_2m_pages = 0; is_2m_pages < VMW_BALLOON_NUM_PAGE_SIZES;
 			is_2m_pages++) {
@@ -790,7 +791,7 @@ static void vmballoon_add_batched_page(struct vmballoon *b, int idx,
  */
 static void vmballoon_inflate(struct vmballoon *b)
 {
-	unsigned rate;
+	unsigned int rate;
 	unsigned int allocations = 0;
 	unsigned int num_pages = 0;
 	int error = 0;
@@ -930,7 +931,7 @@ static void vmballoon_inflate(struct vmballoon *b)
  */
 static void vmballoon_deflate(struct vmballoon *b)
 {
-	unsigned is_2m_pages;
+	unsigned int is_2m_pages;
 
 	pr_debug("%s - size: %d, target %d\n", __func__, b->size, b->target);
 
@@ -1225,7 +1226,7 @@ static int __init vmballoon_debugfs_init(struct vmballoon *b)
 {
 	int error;
 
-	b->dbg_entry = debugfs_create_file("vmmemctl", S_IRUGO, NULL, b,
+	b->dbg_entry = debugfs_create_file("vmmemctl", 0444, NULL, b,
 					   &vmballoon_debug_fops);
 	if (IS_ERR(b->dbg_entry)) {
 		error = PTR_ERR(b->dbg_entry);
@@ -1257,7 +1258,7 @@ static inline void vmballoon_debugfs_exit(struct vmballoon *b)
 static int __init vmballoon_init(void)
 {
 	int error;
-	unsigned is_2m_pages;
+	unsigned int is_2m_pages;
 	/*
 	 * Check if we are running on VMware's hypervisor and bail out
 	 * if we are not.
