@@ -721,7 +721,7 @@ struct ceph_aio_request {
 	struct list_head osd_reqs;
 	unsigned num_reqs;
 	atomic_t pending_reqs;
-	struct timespec mtime;
+	struct timespec64 mtime;
 	struct ceph_cap_flush *prealloc_cf;
 };
 
@@ -923,7 +923,7 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 	int num_pages = 0;
 	int flags;
 	int ret;
-	struct timespec mtime = timespec64_to_timespec(current_time(inode));
+	struct timespec64 mtime = current_time(inode);
 	size_t count = iov_iter_count(iter);
 	loff_t pos = iocb->ki_pos;
 	bool write = iov_iter_rw(iter) == WRITE;
@@ -1013,7 +1013,7 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 			truncate_inode_pages_range(inode->i_mapping, pos,
 					(pos+len) | (PAGE_SIZE - 1));
 
-			req->r_mtime = mtime;
+			req->r_mtime = current_time(inode);
 		}
 
 		osd_req_op_extent_osd_data_bvecs(req, 0, bvecs, num_pages, len);
@@ -1131,7 +1131,6 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 	int flags;
 	int ret;
 	bool check_caps = false;
-	struct timespec mtime = timespec64_to_timespec(current_time(inode));
 	size_t count = iov_iter_count(from);
 
 	if (ceph_snap(file_inode(file)) != CEPH_NOSNAP)
@@ -1201,7 +1200,7 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 		osd_req_op_extent_osd_data_pages(req, 0, pages, len, 0,
 						false, true);
 
-		req->r_mtime = mtime;
+		req->r_mtime = current_time(inode);
 		ret = ceph_osdc_start_request(&fsc->client->osdc, req, false);
 		if (!ret)
 			ret = ceph_osdc_wait_request(&fsc->client->osdc, req);
@@ -1663,7 +1662,7 @@ static int ceph_zero_partial_object(struct inode *inode,
 		goto out;
 	}
 
-	req->r_mtime = timespec64_to_timespec(inode->i_mtime);
+	req->r_mtime = inode->i_mtime;
 	ret = ceph_osdc_start_request(&fsc->client->osdc, req, false);
 	if (!ret) {
 		ret = ceph_osdc_wait_request(&fsc->client->osdc, req);
