@@ -2351,6 +2351,7 @@ static void blk_mq_update_tag_set_depth(struct blk_mq_tag_set *set,
 static void blk_mq_del_queue_tag_set(struct request_queue *q)
 {
 	struct blk_mq_tag_set *set = q->tag_set;
+	bool shared = true;
 
 	mutex_lock(&set->tag_list_lock);
 	list_del_rcu(&q->tag_set_list);
@@ -2359,9 +2360,11 @@ static void blk_mq_del_queue_tag_set(struct request_queue *q)
 		set->flags &= ~BLK_MQ_F_TAG_SHARED;
 		/* update existing queue */
 		blk_mq_update_tag_set_depth(set, false);
+		shared = true;
 	}
 	mutex_unlock(&set->tag_list_lock);
-	synchronize_rcu();
+	if (shared)
+		synchronize_rcu();
 	INIT_LIST_HEAD(&q->tag_set_list);
 }
 
