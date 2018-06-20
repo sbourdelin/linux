@@ -203,6 +203,17 @@ static int fl_init(struct tcf_proto *tp)
 	return rhashtable_init(&head->ht, &mask_ht_params);
 }
 
+static void fl_mask_free(struct fl_flow_mask *mask)
+{
+	rhashtable_destroy(&mask->ht);
+	kfree(mask);
+}
+
+static void fl_mask_free_rcu(struct rcu_head *entry)
+{
+	fl_mask_free(container_of(entry, struct fl_flow_mask, rcu));
+}
+
 static bool fl_mask_put(struct cls_fl_head *head, struct fl_flow_mask *mask,
 			bool async)
 {
@@ -210,12 +221,11 @@ static bool fl_mask_put(struct cls_fl_head *head, struct fl_flow_mask *mask,
 		return false;
 
 	rhashtable_remove_fast(&head->ht, &mask->ht_node, mask_ht_params);
-	rhashtable_destroy(&mask->ht);
 	list_del_rcu(&mask->list);
 	if (async)
-		kfree_rcu(mask, rcu);
+		call_rcu(&mask->rcu, fl_mask_free_rcu);
 	else
-		kfree(mask);
+		fl_mask_free(mask);
 
 	return true;
 }
