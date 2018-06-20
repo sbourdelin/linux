@@ -605,6 +605,8 @@ static int smc_connect(struct socket *sock, struct sockaddr *addr,
 
 	smc_copy_sock_settings_to_clc(smc);
 	tcp_sk(smc->clcsock->sk)->syn_smc = 1;
+	if (flags & O_NONBLOCK)
+		sock->sk->sk_wq = smc->clcsock->sk->sk_wq;
 	rc = kernel_connect(smc->clcsock, addr, alen, flags);
 	if (rc)
 		goto out;
@@ -1285,12 +1287,9 @@ static __poll_t smc_poll_mask(struct socket *sock, __poll_t events)
 
 	smc = smc_sk(sock->sk);
 	sock_hold(sk);
-	lock_sock(sk);
 	if ((sk->sk_state == SMC_INIT) || smc->use_fallback) {
 		/* delegate to CLC child sock */
-		release_sock(sk);
 		mask = smc->clcsock->ops->poll_mask(smc->clcsock, events);
-		lock_sock(sk);
 		sk->sk_err = smc->clcsock->sk->sk_err;
 		if (sk->sk_err) {
 			mask |= EPOLLERR;
@@ -1299,7 +1298,10 @@ static __poll_t smc_poll_mask(struct socket *sock, __poll_t events)
 			if (sk->sk_state == SMC_INIT &&
 			    mask & EPOLLOUT &&
 			    smc->clcsock->sk->sk_state != TCP_CLOSE) {
+				sock->sk->sk_wq = smc->smcwq;
+				lock_sock(sk);
 				rc = __smc_connect(smc);
+				release_sock(sk);
 				if (rc < 0)
 					mask |= EPOLLERR;
 				/* success cases including fallback */
@@ -1334,7 +1336,6 @@ static __poll_t smc_poll_mask(struct socket *sock, __poll_t events)
 			mask |= EPOLLPRI;
 
 	}
-	release_sock(sk);
 	sock_put(sk);
 
 	return mask;
@@ -1663,6 +1664,7 @@ static int smc_create(struct net *net, struct socket *sock, int protocol,
 		sk_common_release(sk);
 		goto out;
 	}
+	smc->smcwq = sk->sk_wq;
 	smc->sk.sk_sndbuf = max(smc->clcsock->sk->sk_sndbuf, SMC_BUF_MIN_SIZE);
 	smc->sk.sk_rcvbuf = max(smc->clcsock->sk->sk_rcvbuf, SMC_BUF_MIN_SIZE);
 
