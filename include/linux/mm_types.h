@@ -427,8 +427,6 @@ struct mm_struct {
 
 	struct linux_binfmt *binfmt;
 
-	cpumask_var_t cpu_vm_mask_var;
-
 	/* Architecture-specific MM context */
 	mm_context_t context;
 
@@ -465,9 +463,6 @@ struct mm_struct {
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) && !USE_SPLIT_PMD_PTLOCKS
 	pgtable_t pmd_huge_pte; /* protected by page_table_lock */
 #endif
-#ifdef CONFIG_CPUMASK_OFFSTACK
-	struct cpumask cpumask_allocation;
-#endif
 #ifdef CONFIG_NUMA_BALANCING
 	/*
 	 * numa_next_scan is the next time that the PTEs will be marked
@@ -502,22 +497,25 @@ struct mm_struct {
 	/* HMM needs to track a few things per mm */
 	struct hmm *hmm;
 #endif
+
+	/*
+	 * The mm_cpumask needs to be at the end of mm_struct, because it
+	 * is dynamically sized based on nr_cpu_ids.
+	 */
+	unsigned long cpu_bitmap[];
 } __randomize_layout;
 
 extern struct mm_struct init_mm;
 
 static inline void mm_init_cpumask(struct mm_struct *mm)
 {
-#ifdef CONFIG_CPUMASK_OFFSTACK
-	mm->cpu_vm_mask_var = &mm->cpumask_allocation;
-#endif
-	cpumask_clear(mm->cpu_vm_mask_var);
+	cpumask_clear((struct cpumask *)&mm->cpu_bitmap);
 }
 
 /* Future-safe accessor for struct mm_struct's cpu_vm_mask. */
 static inline cpumask_t *mm_cpumask(struct mm_struct *mm)
 {
-	return mm->cpu_vm_mask_var;
+	return (struct cpumask *)&mm->cpu_bitmap;
 }
 
 struct mmu_gather;
