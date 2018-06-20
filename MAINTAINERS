@@ -6388,6 +6388,14 @@ F:	include/linux/freezer.h
 F:	include/linux/pm.h
 F:	arch/*/include/asm/suspend*.h
 
+HIBERNATION CRYPTO UTILITY
+M:	"Chen Yu" <yu.c.chen@intel.com>
+M:	"Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+L:	linux-pm@vger.kernel.org
+B:	https://bugzilla.kernel.org
+S:	Supported
+F:	tools/power/crypto/
+
 HID CORE LAYER
 M:	Jiri Kosina <jikos@kernel.org>
 R:	Benjamin Tissoires <benjamin.tissoires@redhat.com>
