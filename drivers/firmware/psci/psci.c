@@ -691,8 +691,13 @@ static int __init psci_1_0_init(struct device_node *np)
 	if (err)
 		return err;
 
-	if (psci_has_osi_support())
+	if (psci_has_osi_support()) {
 		pr_info("OSI mode supported.\n");
+
+		/* Make sure we default to PC mode. */
+		invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
+			       PSCI_1_0_SUSPEND_MODE_PC, 0, 0);
+	}
 
 	return 0;
 }
@@ -719,6 +724,37 @@ int __init psci_dt_init(void)
 	init_fn = (psci_initcall_t)matched_np->data;
 	ret = init_fn(np);
 
+	of_node_put(np);
+	return ret;
+}
+
+int __init psci_dt_topology_init(void)
+{
+	struct device_node *np;
+	int ret;
+
+	if (!psci_has_osi_support())
+		return 0;
+
+	np = of_find_matching_node_and_match(NULL, psci_of_match, NULL);
+	if (!np)
+		return -ENODEV;
+
+	/* Initialize the CPU PM domains based on topology described in DT. */
+	ret = psci_dt_init_pm_domains(np);
+	if (ret <= 0)
+		goto out;
+
+	/* Enable OSI mode. */
+	ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
+			     PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
+	if (ret) {
+		pr_info("failed to enable OSI mode: %d\n", ret);
+		goto out;
+	}
+
+	pr_info("OSI mode enabled.\n");
+out:
 	of_node_put(np);
 	return ret;
 }
