@@ -58,6 +58,8 @@ int tpm_try_get_ops(struct tpm_chip *chip)
 	if (!chip->ops)
 		goto out_lock;
 
+	kref_get(&chip->kref);
+
 	return 0;
 out_lock:
 	up_read(&chip->ops_sem);
@@ -77,6 +79,7 @@ void tpm_put_ops(struct tpm_chip *chip)
 {
 	up_read(&chip->ops_sem);
 	put_device(&chip->dev);
+	tpm_chip_put(chip);
 }
 EXPORT_SYMBOL_GPL(tpm_put_ops);
 
@@ -129,7 +132,7 @@ static void tpm_chip_free(struct kref *kref)
 	kfree(chip);
 }
 
-static void tpm_chip_put(struct tpm_chip *chip)
+void tpm_chip_put(struct tpm_chip *chip)
 {
 	if (chip)
 		kref_put(&chip->kref, tpm_chip_free);
