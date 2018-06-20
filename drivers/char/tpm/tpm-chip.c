@@ -119,8 +119,24 @@ struct tpm_chip *tpm_chip_find_get(struct tpm_chip *chip)
 	return res;
 }
 
+static void tpm_chip_free(struct kref *kref)
+{
+	struct tpm_chip *chip = container_of(kref, struct tpm_chip, kref);
+
+	kfree(chip->log.bios_event_log);
+	kfree(chip->work_space.context_buf);
+	kfree(chip->work_space.session_buf);
+	kfree(chip);
+}
+
+static void tpm_chip_put(struct tpm_chip *chip)
+{
+	if (chip)
+		kref_put(&chip->kref, tpm_chip_free);
+}
+
 /**
- * tpm_dev_release() - free chip memory and the device number
+ * tpm_dev_release() - free the device number and release reference to chip
  * @dev: the character device for the TPM chip
  *
  * This is used as the release function for the character device.
@@ -133,10 +149,7 @@ static void tpm_dev_release(struct device *dev)
 	idr_remove(&dev_nums_idr, chip->dev_num);
 	mutex_unlock(&idr_lock);
 
-	kfree(chip->log.bios_event_log);
-	kfree(chip->work_space.context_buf);
-	kfree(chip->work_space.session_buf);
-	kfree(chip);
+	tpm_chip_put(chip);
 }
 
 static void tpm_devs_release(struct device *dev)
@@ -195,6 +208,7 @@ struct tpm_chip *tpm_chip_alloc(struct device *pdev,
 
 	mutex_init(&chip->tpm_mutex);
 	init_rwsem(&chip->ops_sem);
+	kref_init(&chip->kref);
 
 	chip->ops = ops;
 

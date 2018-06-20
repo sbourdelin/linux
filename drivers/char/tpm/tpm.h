@@ -211,6 +211,7 @@ struct tpm_chip {
 	struct cdev cdev;
 	struct cdev cdevs;
 
+	struct kref kref;
 	/* A driver callback under ops cannot be run unless ops_sem is held
 	 * (sometimes implicitly, eg for the sysfs code). ops becomes null
 	 * when the driver is unregistered, see tpm_try_get_ops.
