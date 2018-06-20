@@ -1,0 +1,111 @@
+==========================
+PCIe Device AER statistics
+==========================
+These attributes show up under all the devices that are AER capable. These
+statistical counters indicate the errors "as seen/reported by the device".
+Note that this may mean that if an end point is causing problems, the AER
+counters may increment at its link partner (e.g. root port) because the
+errors will be "seen" / reported by the link partner and not the the
+problematic end point itself (which may report all counters as 0 as it never
+saw any problems).
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/dev_total_cor_errs
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Total number of correctable errors seen and reported by this
+		PCI device using ERR_COR.
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/dev_total_fatal_errs
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Total number of uncorrectable fatal errors seen and reported
+		by this PCI device using ERR_FATAL.
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/dev_total_nonfatal_errs
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Total number of uncorrectable non-fatal errors seen and reported
+		by this PCI device using ERR_NONFATAL.
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/dev_breakdown_correctable
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Breakdown of correctable errors seen and reported by this
+		PCI device using ERR_COR. Note that the sum total of all errors
+		in dev_breakdown_correctable may exceed dev_total_cor_errs
+		because a device is allowed to merge multiple correctable and
+		send a single ERR_COR for them (which is what dev_total_cor_errs
+		counts). A sample output for this attribute looks like this:
+-----------------------------------------
+Receiver Error = 174
+Bad TLP = 19
+Bad DLLP = 3
+RELAY_NUM Rollover = 0
+Replay Timer Timeout = 1
+Advisory Non-Fatal = 0
+Corrected Internal Error = 0
+Header Log Overflow = 0
+-----------------------------------------
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/dev_breakdown_uncorrectable
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Breakdown of of correctable errors seen and reported by this
+		PCI device using ERR_FATAL or ERR_NONFATAL. Note that the sum
+		total of all errors in dev_breakdown_uncorrectable may exceed
+		(dev_total_fatal_errs + dev_total_nonfatal_errs) because a
+		device is allowed to merge multiple errors at the same severity
+		and send a single ERR_FATAL/ERR_NON_FATAL for them.
+		A sample output for this attribute looks like this:
+-----------------------------------------
+Undefined = 0
+Data Link Protocol = 0
+Surprise Down Error = 0
+Poisoned TLP = 0
+Flow Control Protocol = 0
+Completion Timeout = 0
+Completer Abort = 0
+Unexpected Completion = 0
+Receiver Overflow = 0
+Malformed TLP = 0
+ECRC = 0
+Unsupported Request = 0
+ACS Violation = 0
+Uncorrectable Internal Error = 0
+MC Blocked TLP = 0
+AtomicOp Egress Blocked = 0
+TLP Prefix Blocked Error = 0
+-----------------------------------------
+
+============================
+PCIe Rootport AER statistics
+============================
+These attributes showup under only the rootports that are AER capable. These
+indicate the number of error messages as "reported to" the rootport. Please note
+that the rootports also transmit (internally) the ERR_* messages for errors seen
+by the internal rootport PCI device, so these counters includes them and are
+thus cumulative of all the error messages on the PCI hierarchy originating
+at that root port.
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/rootport_total_cor_errs
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Total number of ERR_COR messages reported to rootport.
+
+Where:		/sys/bus/pci/devices/<dev>/aer_stats/rootport_total_fatal_errs
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Total number of ERR_FATAL messages reported to rootport.
+
+Where:	    /sys/bus/pci/devices/<dev>/aer_stats/rootport_total_nonfatal_errs
+Date:		May 2018
+Kernel Version: 4.17.0
+Contact:	linux-pci@vger.kernel.org, rajatja@google.com
+Description:	Total number of ERR_NONFATAL messages reported to rootport.
