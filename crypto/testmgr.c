@@ -3453,6 +3453,27 @@ static const struct alg_test_desc alg_test_descs[] = {
 			.hash = __VECS(sha512_tv_template)
 		}
 	}, {
+		.alg = "skein1024",
+		.test = alg_test_hash,
+		.fips_allowed = 1,
+		.suite = {
+			.hash = __VECS(skein1024_tv_template)
+		}
+	}, {
+		.alg = "skein256",
+		.test = alg_test_hash,
+		.fips_allowed = 1,
+		.suite = {
+			.hash = __VECS(skein256_tv_template)
+		}
+	}, {
+		.alg = "skein512",
+		.test = alg_test_hash,
+		.fips_allowed = 1,
+		.suite = {
+			.hash = __VECS(skein512_tv_template)
+		}
+	}, {
 		.alg = "sm3",
 		.test = alg_test_hash,
 		.suite = {
