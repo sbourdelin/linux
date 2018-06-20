@@ -354,7 +354,7 @@ static enum blk_eh_timer_return nbd_xmit_timeout(struct request *req,
 	sock_shutdown(nbd);
 	nbd_config_put(nbd);
 done:
-	blk_mq_complete_request(req);
+	__blk_mq_complete_request(req);
 	return BLK_EH_DONE;
 }
 
