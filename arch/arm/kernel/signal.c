@@ -544,7 +544,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
 	 * Increment event counter and perform fixup for the pre-signal
 	 * frame.
 	 */
-	rseq_signal_deliver(regs);
+	rseq_signal_deliver(ksig, regs);
 
 	/*
 	 * Set up the stack frame
