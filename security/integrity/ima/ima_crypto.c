@@ -635,7 +635,7 @@ static void __init ima_pcrread(int idx, u8 *pcr)
 
 	down_read(&ima_tpm_chip_lock);
 
-	if (!ima_used_chip)
+	if (!ima_tpm_chip)
 		goto out;
 
 	result = tpm_pcr_read(ima_tpm_chip, idx, pcr);
