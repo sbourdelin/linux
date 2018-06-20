@@ -12,6 +12,7 @@
 static inline void ext4_truncate_failed_write(struct inode *inode)
 {
 	down_write(&EXT4_I(inode)->i_mmap_sem);
+	ext4_break_layouts(inode);
 	truncate_inode_pages(inode->i_mapping, inode->i_size);
 	ext4_truncate(inode);
 	up_write(&EXT4_I(inode)->i_mmap_sem);
