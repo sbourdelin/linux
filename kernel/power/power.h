@@ -69,6 +69,43 @@ extern void enable_restore_image_protection(void);
 static inline void enable_restore_image_protection(void) {}
 #endif /* CONFIG_STRICT_KERNEL_RWX */
 
+#if IS_ENABLED(CONFIG_CRYPTO_HIBERNATION)
+#define HIBERNATE_SALT_BYTES	16
+#define HIBERNATE_KEY_BYTES	64
+#define HIBERNATE_IV_SIZE	16
+#define TOTAL_USER_INFO_LEN	(HIBERNATE_SALT_BYTES+HIBERNATE_KEY_BYTES)
+
+struct hibernation_crypto_keys {
+	char derived_key[HIBERNATE_KEY_BYTES];
+	char salt[HIBERNATE_SALT_BYTES];
+	bool user_key_valid;
+};
+
+struct hibernation_crypto {
+	/* For data encryption */
+	struct crypto_skcipher *tfm_sk;
+	struct skcipher_request *req_sk;
+
+	/* For IV generation */
+	struct crypto_cipher *essiv_tfm;
+	struct crypto_shash *essiv_hash_tfm;
+
+	struct hibernation_crypto_keys keys;
+
+	int (*crypto_data)(const char *inbuf, int inlen,
+			   char *outbuf, int outlen,
+			   bool encrypt, int page_idx);
+	void (*save)(void *buf);
+	void (*restore)(void *buf);
+	int (*init)(bool suspend);
+};
+
+extern void set_hibernation_ops(struct hibernation_crypto *ops);
+
+#else
+#define HIBERNATE_SALT_BYTES	0
+#endif
+
 #else /* !CONFIG_HIBERNATION */
 
 static inline void hibernate_reserved_size_init(void) {}

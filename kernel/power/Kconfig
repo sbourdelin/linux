@@ -101,6 +101,19 @@ config PM_STD_PARTITION
 	  suspended image to. It will simply pick the first available swap 
 	  device.
 
+config CRYPTO_HIBERNATION
+	tristate "Encryption of snapshot for hibernation"
+	depends on HIBERNATION && CRYPTO_AES && KEYS
+	default n
+	help
+	  Allow the kernel to encrypt the snapshot data based on
+	  user provided passphrase. The user should provide a valid
+	  symmetrical key to the kernel via ioctl, so the kernel
+	  will use that key to encrypt the hibernation snapshot pages.
+	  A typical tool can be found under tools/power/crypto/.
+
+	  If in doubt, say N.
+
 config PM_SLEEP
 	def_bool y
 	depends on SUSPEND || HIBERNATE_CALLBACKS
