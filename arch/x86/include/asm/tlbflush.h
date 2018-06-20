@@ -171,6 +171,7 @@ struct tlb_context {
 
 #define TLBSTATE_OK	0
 #define TLBSTATE_LAZY	1
+#define TLBSTATE_FLUSH	2
 
 struct tlb_state {
 	/*
@@ -199,6 +200,10 @@ struct tlb_state {
 	 *    We're heuristically guessing that the CR3 load we
 	 *    skipped more than makes up for the overhead added by
 	 *    lazy mode.
+	 *
+	 *  - Lazily using a real mm, which has seen a TLB invalidation on
+	 *    other CPUs. TLB needs to be flushed at context switch time,
+	 *    state == TLBSTATE_FLUSH.
 	 */
 	int state;
 

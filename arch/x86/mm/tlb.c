@@ -7,6 +7,7 @@
 #include <linux/export.h>
 #include <linux/cpu.h>
 #include <linux/debugfs.h>
+#include <linux/gfp.h>
 
 #include <asm/tlbflush.h>
 #include <asm/mmu_context.h>
@@ -227,8 +228,6 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 		__flush_tlb_all();
 	}
 #endif
-	this_cpu_write(cpu_tlbstate.state, TLBSTATE_OK);
-
 	/*
 	 * The membarrier system call requires a full memory barrier and
 	 * core serialization before returning to user-space, after
@@ -236,8 +235,11 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 	 * memory barrier and core serializing instruction.
 	 */
 	if (real_prev == next) {
+		int *tlbstate = this_cpu_ptr(&cpu_tlbstate.state);
+		int oldstate = *tlbstate;
+
 		VM_WARN_ON(this_cpu_read(cpu_tlbstate.ctxs[prev_asid].ctx_id) !=
-			   next->context.ctx_id);
+				next->context.ctx_id);
 
 		/*
 		 * We don't currently support having a real mm loaded without
@@ -250,6 +252,26 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 				 !cpumask_test_cpu(cpu, mm_cpumask(next))))
 			cpumask_set_cpu(cpu, mm_cpumask(next));
 
+		/*
+		 * In lazy TLB mode. The atomic exchange makes sure there was
+		 * no TLB shootdown all the way to this context switch.
+		 */
+		if (oldstate == TLBSTATE_LAZY)
+			oldstate = cmpxchg(tlbstate, oldstate, TLBSTATE_OK);
+
+		/*
+		 * There was a TLB invalidation while this CPU was idle.
+		 * The code in choose_new_asid will figure out what kind
+		 * of flush is needed.
+		 */
+		if (oldstate == TLBSTATE_FLUSH)
+			goto reload_cr3;
+
+		/*
+		 * Nothing to do. Either we are switching between two
+		 * threads in the same process, or we were in TLBSTATE_LAZY
+		 * without any TLB invalidations happening.
+		 */
 		return;
 	} else {
 		u16 new_asid;
@@ -294,6 +316,8 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 		 * Start remote flushes and then read tlb_gen.
 		 */
 		cpumask_set_cpu(cpu, mm_cpumask(next));
+ reload_cr3:
+		this_cpu_write(cpu_tlbstate.state, TLBSTATE_OK);
 		next_tlb_gen = atomic64_read(&next->context.tlb_gen);
 
 		choose_new_asid(next, next_tlb_gen, &new_asid, &need_flush);
@@ -454,6 +478,9 @@ static void flush_tlb_func_common(const struct flush_tlb_info *f,
 		 * paging-structure cache to avoid speculatively reading
 		 * garbage into our TLB.  Since switching to init_mm is barely
 		 * slower than a minimal flush, just switch to init_mm.
+		 *
+		 * This should be rare, with native_flush_tlb_others skipping
+		 * IPIs to lazy TLB mode CPUs.
 		 */
 		switch_mm_irqs_off(NULL, &init_mm, NULL);
 		return;
@@ -557,9 +584,57 @@ static void flush_tlb_func_remote(void *info)
 	flush_tlb_func_common(f, false, TLB_REMOTE_SHOOTDOWN);
 }
 
+/*
+ * Determine whether a CPU's TLB needs to be flushed now, or whether the
+ * flush can be delayed until the next context switch, by changing the
+ * tlbstate from TLBSTATE_LAZY to TLBSTATE_FLUSH.
+ */
+static bool lazy_tlb_can_skip_flush(int cpu)
+{
+	int *tlbstate = &per_cpu(cpu_tlbstate.state, cpu);
+	int old;
+
+	switch (*tlbstate) {
+	case TLBSTATE_FLUSH:
+		/* The TLB will be flushed on the next context switch. */
+		return true;
+	case TLBSTATE_LAZY:
+		/*
+		 * The CPU is in TLBSTATE_LAZY, which could context switch back
+		 * to TLBSTATE_OK, re-using the old TLB state without a flush.
+		 * if that happened, send a TLB flush IPI.
+		 *
+		 * Otherwise, the state is now TLBSTATE_FLUSH, and TLB will
+		 * be flushed at the next context switch. Skip the IPI.
+		 */
+		old = cmpxchg(tlbstate, TLBSTATE_LAZY, TLBSTATE_FLUSH);
+		return old != TLBSTATE_OK;
+	case TLBSTATE_OK:
+	default:
+		/* A task on the CPU is actively using the mm. Flush the TLB. */
+		return false;
+	}
+}
+
 void native_flush_tlb_others(const struct cpumask *cpumask,
 			     const struct flush_tlb_info *info)
 {
+	cpumask_t *mask = (struct cpumask *)cpumask;
+	cpumask_var_t varmask;
+	bool can_lazy_flush = false;
+	unsigned int cpu;
+
+	/*
+	 * A temporary cpumask allows the kernel to skip sending IPIs
+	 * to CPUs in lazy TLB state, without also removing them from
+	 * mm_cpumask(mm).
+	 */
+	if (alloc_cpumask_var(&varmask, GFP_ATOMIC)) {
+		cpumask_copy(varmask, cpumask);
+		mask = varmask;
+		can_lazy_flush = true;
+	}
+
 	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH);
 	if (info->end == TLB_FLUSH_ALL)
 		trace_tlb_flush(TLB_REMOTE_SEND_IPI, TLB_FLUSH_ALL);
@@ -583,17 +658,30 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 		 * that UV should be updated so that smp_call_function_many(),
 		 * etc, are optimal on UV.
 		 */
-		unsigned int cpu;
-
 		cpu = smp_processor_id();
-		cpumask = uv_flush_tlb_others(cpumask, info);
-		if (cpumask)
-			smp_call_function_many(cpumask, flush_tlb_func_remote,
+		mask = uv_flush_tlb_others(mask, info);
+		if (mask)
+			smp_call_function_many(mask, flush_tlb_func_remote,
 					       (void *)info, 1);
-		return;
+		goto out;
 	}
-	smp_call_function_many(cpumask, flush_tlb_func_remote,
+
+	/*
+	 * Instead of sending IPIs to CPUs in lazy TLB mode, move that
+	 * CPU's TLB state to TLBSTATE_FLUSH, causing the TLB to be flushed
+	 * at the next context switch, or at page table free time.
+	 */
+	if (can_lazy_flush) {
+		for_each_cpu(cpu, mask) {
+			if (lazy_tlb_can_skip_flush(cpu))
+				cpumask_clear_cpu(cpu, mask);
+		}
+	}
+
+	smp_call_function_many(mask, flush_tlb_func_remote,
 			       (void *)info, 1);
+ out:
+	free_cpumask_var(varmask);
 }
 
 /*
