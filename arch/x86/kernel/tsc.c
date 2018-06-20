@@ -39,6 +39,9 @@ EXPORT_SYMBOL(tsc_khz);
 static int __read_mostly tsc_unstable;
 
 static DEFINE_STATIC_KEY_FALSE(__use_tsc);
+static DEFINE_STATIC_KEY_TRUE(tsc_early_enabled);
+
+static bool tsc_early_sched_clock;
 
 int tsc_clocksource_reliable;
 
@@ -133,22 +136,13 @@ static inline unsigned long long cycles_2_ns(unsigned long long cyc)
 	return ns;
 }
 
-static void set_cyc2ns_scale(unsigned long khz, int cpu,
-			     unsigned long long tsc_now,
-			     unsigned long long sched_now)
+static void __set_cyc2ns_scale(unsigned long khz, int cpu,
+			       unsigned long long tsc_now,
+			       unsigned long long sched_now)
 {
-	unsigned long long ns_now;
+	unsigned long long ns_now = cycles_2_ns(tsc_now) + sched_now;
 	struct cyc2ns_data data;
 	struct cyc2ns *c2n;
-	unsigned long flags;
-
-	local_irq_save(flags);
-	sched_clock_idle_sleep_event();
-
-	if (!khz)
-		goto done;
-
-	ns_now = cycles_2_ns(tsc_now) + sched_now;
 
 	/*
 	 * Compute a new multiplier as per the above comment and ensure our
@@ -178,10 +172,34 @@ static void set_cyc2ns_scale(unsigned long khz, int cpu,
 	c2n->data[0] = data;
 	raw_write_seqcount_latch(&c2n->seq);
 	c2n->data[1] = data;
+}
 
-done:
+static void set_cyc2ns_scale(unsigned long khz, int cpu,
+			     unsigned long long tsc_now,
+			     unsigned long long sched_now)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	sched_clock_idle_sleep_event();
+
+	if (khz)
+		__set_cyc2ns_scale(khz, cpu, tsc_now, sched_now);
+
 	sched_clock_idle_wakeup_event();
 	local_irq_restore(flags);
+}
+
+static void __init sched_clock_early_init(unsigned int khz)
+{
+	cyc2ns_init(smp_processor_id());
+	__set_cyc2ns_scale(khz, smp_processor_id(), rdtsc(), 0);
+	tsc_early_sched_clock = true;
+}
+
+static void __init sched_clock_early_exit(void)
+{
+	static_branch_disable(&tsc_early_enabled);
 }
 
 /*
@@ -189,11 +207,12 @@ done:
  */
 u64 native_sched_clock(void)
 {
-	if (static_branch_likely(&__use_tsc)) {
-		u64 tsc_now = rdtsc();
+	if (static_branch_likely(&__use_tsc))
+		return cycles_2_ns(rdtsc());
 
-		/* return the value in ns */
-		return cycles_2_ns(tsc_now);
+	if (static_branch_unlikely(&tsc_early_enabled)) {
+		if (tsc_early_sched_clock)
+			return cycles_2_ns(rdtsc());
 	}
 
 	/*
@@ -1354,9 +1373,10 @@ void __init tsc_early_delay_calibrate(void)
 	lpj = tsc_khz * 1000;
 	do_div(lpj, HZ);
 	loops_per_jiffy = lpj;
+	sched_clock_early_init(tsc_khz);
 }
 
-void __init tsc_init(void)
+static void __init __tsc_init(void)
 {
 	u64 lpj, cyc, sch;
 	int cpu;
@@ -1431,6 +1451,12 @@ void __init tsc_init(void)
 
 	clocksource_register_khz(&clocksource_tsc_early, tsc_khz);
 	detect_art();
+}
+
+void __init tsc_init(void)
+{
+	__tsc_init();
+	sched_clock_early_exit();
 }
 
 #ifdef CONFIG_SMP
