@@ -64,6 +64,11 @@ static struct percpu_rw_semaphore dup_mmap_sem;
 /* Have a copy of original instruction */
 #define UPROBE_COPY_INSN	0
 
+enum {
+	UPROBE_OFFSET = 0,
+	REF_CTR_OFFSET
+};
+
 struct uprobe {
 	struct rb_node		rb_node;	/* node in the rb tree */
 	atomic_t		ref;
@@ -73,6 +78,7 @@ struct uprobe {
 	struct uprobe_consumer	*consumers;
 	struct inode		*inode;		/* Also hold a ref to inode */
 	loff_t			offset;
+	loff_t			ref_ctr_offset;
 	unsigned long		flags;
 
 	/*
@@ -87,6 +93,15 @@ struct uprobe {
 	 */
 	struct arch_uprobe	arch;
 };
+
+struct delayed_uprobe {
+	struct list_head list;
+	struct uprobe *uprobe;
+	struct mm_struct *mm;
+};
+
+static DEFINE_MUTEX(delayed_uprobe_lock);
+static LIST_HEAD(delayed_uprobe_list);
 
 /*
  * Execute out of line area: anonymous executable mapping installed
@@ -282,6 +297,158 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
 	return 1;
 }
 
+static loff_t uprobe_get_offset(struct uprobe *u, int off_type)
+{
+	return (off_type == UPROBE_OFFSET) ? u->offset : u->ref_ctr_offset;
+}
+
+static struct delayed_uprobe *
+delayed_uprobe_check(struct uprobe *uprobe, struct mm_struct *mm)
+{
+	struct delayed_uprobe *du;
+
+	list_for_each_entry(du, &delayed_uprobe_list, list)
+		if (du->uprobe == uprobe && du->mm == mm)
+			return du;
+	return NULL;
+}
+
+static int delayed_uprobe_add(struct uprobe *uprobe, struct mm_struct *mm)
+{
+	struct delayed_uprobe *du;
+
+	if (delayed_uprobe_check(uprobe, mm))
+		return 0;
+
+	du  = kzalloc(sizeof(*du), GFP_KERNEL);
+	if (!du)
+		return -ENOMEM;
+
+	du->uprobe = uprobe;
+	du->mm = mm;
+	list_add(&du->list, &delayed_uprobe_list);
+	return 0;
+}
+
+static void delayed_uprobe_delete(struct delayed_uprobe *du)
+{
+	if (!du)
+		return;
+	list_del(&du->list);
+	kfree(du);
+}
+
+static void delayed_uprobe_remove(struct uprobe *uprobe, struct mm_struct *mm)
+{
+	struct list_head *pos, *q;
+	struct delayed_uprobe *du;
+
+	list_for_each_safe(pos, q, &delayed_uprobe_list) {
+		du = list_entry(pos, struct delayed_uprobe, list);
+		if (uprobe) {
+			if (du->uprobe == uprobe && du->mm == mm)
+				delayed_uprobe_delete(du);
+		} else if (du->mm == mm) {
+			delayed_uprobe_delete(du);
+		}
+	}
+}
+
+static bool valid_ref_ctr_vma(struct uprobe *uprobe,
+			      struct vm_area_struct *vma)
+{
+	unsigned long vaddr = offset_to_vaddr(vma, uprobe->ref_ctr_offset);
+
+	return uprobe->ref_ctr_offset &&
+		vma->vm_file &&
+		file_inode(vma->vm_file) == uprobe->inode &&
+		vma->vm_flags & VM_WRITE &&
+		vma->vm_start <= vaddr &&
+		vma->vm_end > vaddr;
+}
+
+static struct vm_area_struct *
+find_ref_ctr_vma(struct uprobe *uprobe, struct mm_struct *mm)
+{
+	struct vm_area_struct *tmp;
+
+	for (tmp = mm->mmap; tmp; tmp = tmp->vm_next)
+		if (valid_ref_ctr_vma(uprobe, tmp))
+			return tmp;
+
+	return NULL;
+}
+
+static int
+__update_ref_ctr(struct mm_struct *mm, unsigned long vaddr, short d)
+{
+	void *kaddr;
+	struct page *page;
+	struct vm_area_struct *vma;
+	int ret = 0;
+	short *ptr;
+
+	if (vaddr == 0 || d == 0)
+		return -EINVAL;
+
+	ret = get_user_pages_remote(NULL, mm, vaddr, 1,
+		FOLL_FORCE | FOLL_WRITE, &page, &vma, NULL);
+	if (unlikely(ret <= 0)) {
+		/*
+		 * We are asking for 1 page. If get_user_pages_remote() fails,
+		 * it may return 0, in that case we have to return error.
+		 */
+		ret = (ret == 0) ? -EBUSY : ret;
+		pr_warn("Failed to %s ref_ctr. (%d)\n",
+			d > 0 ? "increment" : "decrement", ret);
+		return ret;
+	}
+
+	kaddr = kmap_atomic(page);
+	ptr = kaddr + (vaddr & ~PAGE_MASK);
+
+	if (unlikely(*ptr + d < 0)) {
+		pr_warn("ref_ctr going negative. vaddr: 0x%lx, "
+			"curr val: %d, delta: %d\n", vaddr, *ptr, d);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	*ptr += d;
+	ret = 0;
+out:
+	kunmap_atomic(kaddr);
+	put_page(page);
+	return ret;
+}
+
+static int update_ref_ctr(struct uprobe *uprobe, struct mm_struct *mm,
+			  bool is_register)
+{
+	struct vm_area_struct *rc_vma;
+	unsigned long rc_vaddr;
+	int ret = 0;
+
+	rc_vma = find_ref_ctr_vma(uprobe, mm);
+
+	if (rc_vma) {
+		rc_vaddr = offset_to_vaddr(rc_vma, uprobe->ref_ctr_offset);
+		ret = __update_ref_ctr(mm, rc_vaddr, is_register ? 1 : -1);
+
+		if (is_register)
+			return ret;
+	}
+
+	mutex_lock(&delayed_uprobe_lock);
+	if (is_register)
+		ret = delayed_uprobe_add(uprobe, mm);
+	else
+		delayed_uprobe_remove(uprobe, mm);
+	mutex_unlock(&delayed_uprobe_lock);
+
+	return ret;
+}
+
 /*
  * NOTE:
  * Expect the breakpoint instruction to be the smallest size instruction for
@@ -305,7 +472,9 @@ int uprobe_write_opcode(struct uprobe *uprobe, struct mm_struct *mm,
 {
 	struct page *old_page, *new_page;
 	struct vm_area_struct *vma;
-	int ret;
+	int ret, is_register, ref_ctr_updated = 0;
+
+	is_register = is_swbp_insn(&opcode);
 
 retry:
 	/* Read the page with vaddr into memory */
@@ -317,6 +486,15 @@ retry:
 	ret = verify_opcode(old_page, vaddr, &opcode);
 	if (ret <= 0)
 		goto put_old;
+
+	/* Update the ref_ctr if we are going to replace instruction. */
+	if (!ref_ctr_updated) {
+		ret = update_ref_ctr(uprobe, mm, is_register);
+		if (ret)
+			goto put_old;
+
+		ref_ctr_updated = 1;
+	}
 
 	ret = anon_vma_prepare(vma);
 	if (ret)
@@ -338,6 +516,11 @@ put_old:
 
 	if (unlikely(ret == -EAGAIN))
 		goto retry;
+
+	/* Revert back reference counter if instruction update failed. */
+	if (ret && is_register && ref_ctr_updated)
+		update_ref_ctr(uprobe, mm, false);
+
 	return ret;
 }
 
@@ -485,7 +668,8 @@ static struct uprobe *insert_uprobe(struct uprobe *uprobe)
 	return u;
 }
 
-static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
+static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
+				   loff_t ref_ctr_offset)
 {
 	struct uprobe *uprobe, *cur_uprobe;
 
@@ -495,6 +679,7 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
 
 	uprobe->inode = inode;
 	uprobe->offset = offset;
+	uprobe->ref_ctr_offset = ref_ctr_offset;
 	init_rwsem(&uprobe->register_rwsem);
 	init_rwsem(&uprobe->consumer_rwsem);
 
@@ -896,7 +1081,7 @@ EXPORT_SYMBOL_GPL(uprobe_unregister);
  * else return 0 (success)
  */
 static int __uprobe_register(struct inode *inode, loff_t offset,
-			     struct uprobe_consumer *uc)
+			     loff_t ref_ctr_offset, struct uprobe_consumer *uc)
 {
 	struct uprobe *uprobe;
 	int ret;
@@ -913,7 +1098,7 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
 		return -EINVAL;
 
  retry:
-	uprobe = alloc_uprobe(inode, offset);
+	uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
 	if (!uprobe)
 		return -ENOMEM;
 	/*
@@ -939,9 +1124,16 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
 int uprobe_register(struct inode *inode, loff_t offset,
 		    struct uprobe_consumer *uc)
 {
-	return __uprobe_register(inode, offset, uc);
+	return __uprobe_register(inode, offset, 0, uc);
 }
 EXPORT_SYMBOL_GPL(uprobe_register);
+
+int uprobe_register_refctr(struct inode *inode, loff_t offset,
+			   loff_t ref_ctr_offset, struct uprobe_consumer *uc)
+{
+	return __uprobe_register(inode, offset, ref_ctr_offset, uc);
+}
+EXPORT_SYMBOL_GPL(uprobe_register_refctr);
 
 /*
  * uprobe_apply - unregister a already registered probe.
@@ -1000,21 +1192,22 @@ static int unapply_uprobe(struct uprobe *uprobe, struct mm_struct *mm)
 }
 
 static struct rb_node *
-find_node_in_range(struct inode *inode, loff_t min, loff_t max)
+find_node_in_range(struct inode *inode, int off_type, loff_t min, loff_t max)
 {
 	struct rb_node *n = uprobes_tree.rb_node;
 
 	while (n) {
 		struct uprobe *u = rb_entry(n, struct uprobe, rb_node);
+		loff_t offset = uprobe_get_offset(u, off_type);
 
 		if (inode < u->inode) {
 			n = n->rb_left;
 		} else if (inode > u->inode) {
 			n = n->rb_right;
 		} else {
-			if (max < u->offset)
+			if (max < offset)
 				n = n->rb_left;
-			else if (min > u->offset)
+			else if (min > offset)
 				n = n->rb_right;
 			else
 				break;
@@ -1028,6 +1221,7 @@ find_node_in_range(struct inode *inode, loff_t min, loff_t max)
  * For a given range in vma, build a list of probes that need to be inserted.
  */
 static void build_probe_list(struct inode *inode,
+				int off_type,
 				struct vm_area_struct *vma,
 				unsigned long start, unsigned long end,
 				struct list_head *head)
@@ -1035,30 +1229,72 @@ static void build_probe_list(struct inode *inode,
 	loff_t min, max;
 	struct rb_node *n, *t;
 	struct uprobe *u;
+	loff_t offset;
 
 	INIT_LIST_HEAD(head);
 	min = vaddr_to_offset(vma, start);
 	max = min + (end - start) - 1;
 
 	spin_lock(&uprobes_treelock);
-	n = find_node_in_range(inode, min, max);
+	n = find_node_in_range(inode, off_type, min, max);
 	if (n) {
 		for (t = n; t; t = rb_prev(t)) {
 			u = rb_entry(t, struct uprobe, rb_node);
-			if (u->inode != inode || u->offset < min)
+			offset = uprobe_get_offset(u, off_type);
+
+			if (u->inode != inode || offset < min)
 				break;
 			list_add(&u->pending_list, head);
 			get_uprobe(u);
 		}
 		for (t = n; (t = rb_next(t)); ) {
 			u = rb_entry(t, struct uprobe, rb_node);
-			if (u->inode != inode || u->offset > max)
+			offset = uprobe_get_offset(u, off_type);
+
+			if (u->inode != inode || offset > max)
 				break;
 			list_add(&u->pending_list, head);
 			get_uprobe(u);
 		}
 	}
 	spin_unlock(&uprobes_treelock);
+}
+
+static int
+delayed_uprobe_install(struct vm_area_struct *vma, struct inode *inode)
+{
+	struct list_head tmp_list;
+	struct uprobe *uprobe, *u;
+	struct delayed_uprobe *du;
+	unsigned long vaddr;
+	int ret = 0, err = 0;
+
+	build_probe_list(inode, REF_CTR_OFFSET, vma, vma->vm_start,
+			 vma->vm_end, &tmp_list);
+
+	list_for_each_entry_safe(uprobe, u, &tmp_list, pending_list) {
+		if (!uprobe->ref_ctr_offset ||
+		    !uprobe_is_active(uprobe) ||
+		    !valid_ref_ctr_vma(uprobe, vma))
+			goto cont;
+
+		mutex_lock(&delayed_uprobe_lock);
+		du = delayed_uprobe_check(uprobe, vma->vm_mm);
+		if (!du) {
+			mutex_unlock(&delayed_uprobe_lock);
+			goto cont;
+		}
+
+		vaddr = offset_to_vaddr(vma, uprobe->ref_ctr_offset);
+		ret = __update_ref_ctr(vma->vm_mm, vaddr, 1);
+		/* Record an error and continue. */
+		err = ret & !err ? ret : err;
+		delayed_uprobe_delete(du);
+		mutex_unlock(&delayed_uprobe_lock);
+cont:
+		put_uprobe(uprobe);
+	}
+	return err;
 }
 
 /*
@@ -1073,7 +1309,7 @@ int uprobe_mmap(struct vm_area_struct *vma)
 	struct uprobe *uprobe, *u;
 	struct inode *inode;
 
-	if (no_uprobe_events() || !valid_vma(vma, true))
+	if (no_uprobe_events())
 		return 0;
 
 	inode = file_inode(vma->vm_file);
@@ -1081,7 +1317,14 @@ int uprobe_mmap(struct vm_area_struct *vma)
 		return 0;
 
 	mutex_lock(uprobes_mmap_hash(inode));
-	build_probe_list(inode, vma, vma->vm_start, vma->vm_end, &tmp_list);
+	if (vma->vm_flags & VM_WRITE)
+		delayed_uprobe_install(vma, inode);
+
+	if (!valid_vma(vma, true))
+		goto out;
+
+	build_probe_list(inode, UPROBE_OFFSET, vma, vma->vm_start,
+			 vma->vm_end, &tmp_list);
 	/*
 	 * We can race with uprobe_unregister(), this uprobe can be already
 	 * removed. But in this case filter_chain() must return false, all
@@ -1095,8 +1338,8 @@ int uprobe_mmap(struct vm_area_struct *vma)
 		}
 		put_uprobe(uprobe);
 	}
+out:
 	mutex_unlock(uprobes_mmap_hash(inode));
-
 	return 0;
 }
 
@@ -1113,7 +1356,7 @@ vma_has_uprobes(struct vm_area_struct *vma, unsigned long start, unsigned long e
 	max = min + (end - start) - 1;
 
 	spin_lock(&uprobes_treelock);
-	n = find_node_in_range(inode, min, max);
+	n = find_node_in_range(inode, UPROBE_OFFSET, min, max);
 	spin_unlock(&uprobes_treelock);
 
 	return !!n;
@@ -1245,6 +1488,10 @@ static struct xol_area *get_xol_area(void)
 void uprobe_clear_state(struct mm_struct *mm)
 {
 	struct xol_area *area = mm->uprobes_state.xol_area;
+
+	mutex_lock(&delayed_uprobe_lock);
+	delayed_uprobe_remove(NULL, mm);
+	mutex_unlock(&delayed_uprobe_lock);
 
 	if (!area)
 		return;
