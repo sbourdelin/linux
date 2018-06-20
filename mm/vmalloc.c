@@ -18,6 +18,7 @@
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/debugfs.h>
 #include <linux/debugobjects.h>
 #include <linux/kallsyms.h>
 #include <linux/list.h>
@@ -33,6 +34,7 @@
 #include <linux/bitops.h>
 
 #include <linux/uaccess.h>
+#include <asm/setup.h>
 #include <asm/tlbflush.h>
 #include <asm/shmparam.h>
 
@@ -2785,7 +2787,113 @@ static int __init proc_vmalloc_init(void)
 		proc_create_seq("vmallocinfo", 0400, NULL, &vmalloc_op);
 	return 0;
 }
-module_init(proc_vmalloc_init);
-
+#else
+static int proc_vmalloc_init(void)
+{
+	return 0;
+}
 #endif
 
+#ifdef CONFIG_DEBUG_FS
+#if defined(CONFIG_RANDOMIZE_BASE) && defined(CONFIG_X86_64)
+static void print_backup_area(struct seq_file *m, unsigned long backup_cnt)
+{
+	if (kaslr_enabled())
+		seq_printf(m, "Allocations in backup area:\t%lu\n", backup_cnt);
+}
+static unsigned long get_backup_start(void)
+{
+	return MODULES_VADDR + MODULES_RAND_LEN;
+}
+#else
+static void print_backup_area(struct seq_file *m, unsigned long backup_cnt)
+{
+}
+static unsigned long get_backup_start(void)
+{
+	return 0;
+}
+#endif
+
+static int modulefraginfo_debug_show(struct seq_file *m, void *v)
+{
+	struct list_head *i;
+	unsigned long last_end = MODULES_VADDR;
+	unsigned long total_free = 0;
+	unsigned long largest_free = 0;
+	unsigned long backup_cnt = 0;
+	unsigned long gap;
+
+	spin_lock(&vmap_area_lock);
+
+	list_for_each(i, &vmap_area_list) {
+		struct vmap_area *obj = list_entry(i, struct vmap_area, list);
+
+		if (!(obj->flags & VM_LAZY_FREE)
+			&& obj->va_start >= MODULES_VADDR
+			&& obj->va_end <= MODULES_END) {
+
+			if (obj->va_start >= get_backup_start())
+				backup_cnt++;
+
+			gap = (obj->va_start - last_end);
+			if (gap > largest_free)
+				largest_free = gap;
+			total_free += gap;
+
+			last_end = obj->va_end;
+		}
+	}
+
+	gap = (MODULES_END - last_end);
+	if (gap > largest_free)
+		largest_free = gap;
+	total_free += gap;
+
+	spin_unlock(&vmap_area_lock);
+
+	seq_printf(m, "Largest free space:\t\t%lu\n", largest_free);
+	if (total_free)
+		seq_printf(m, "External Memory Fragementation:\t%lu%%\n",
+			100-(100*largest_free/total_free));
+	else
+		seq_puts(m, "External Memory Fragementation:\t0%%\n");
+
+	print_backup_area(m, backup_cnt);
+
+	return 0;
+}
+
+static int proc_module_frag_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, modulefraginfo_debug_show, NULL);
+}
+
+static const struct file_operations debug_module_frag_operations = {
+	.open       = proc_module_frag_debug_open,
+	.read       = seq_read,
+	.llseek     = seq_lseek,
+	.release    = single_release,
+};
+
+static void debug_modfrag_init(void)
+{
+	debugfs_create_file("modfraginfo", 0x0400, NULL, NULL,
+			&debug_module_frag_operations);
+}
+#else
+static void debug_modfrag_init(void)
+{
+}
+#endif
+
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_PROC_FS)
+static int __init info_vmalloc_init(void)
+{
+	proc_vmalloc_init();
+	debug_modfrag_init();
+	return 0;
+}
+
+module_init(info_vmalloc_init);
+#endif
