@@ -66,6 +66,10 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
 static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
 static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
 
+#ifdef CONFIG_STRICT_KERNEL_RWX
+DEFINE_SPINLOCK(pgdir_lock);
+#endif
+
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 			      unsigned long size, pgprot_t vma_prot)
 {
@@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
 
 void __init mark_linear_text_alias_ro(void)
 {
+	unsigned long size;
+
 	/*
 	 * Remove the write permissions from the linear alias of .text/.rodata
+	 *
+	 * We free some pages in .rodata at paging_init(), which generates a
+	 * hole. And the hole splits .rodata into two pieces.
 	 */
+	size = (unsigned long)swapper_pg_dir + PAGE_SIZE - (unsigned long)_text;
 	update_mapping_prot(__pa_symbol(_text), (unsigned long)lm_alias(_text),
-			    (unsigned long)__init_begin - (unsigned long)_text,
-			    PAGE_KERNEL_RO);
+			    size, PAGE_KERNEL_RO);
+
+	size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
+	update_mapping_prot(__pa_symbol(swapper_pg_end),
+			    (unsigned long)lm_alias(swapper_pg_end),
+			    size, PAGE_KERNEL_RO);
 }
 
 static void __init map_mem(pgd_t *pgdp)
@@ -587,8 +601,9 @@ static void __init map_kernel(pgd_t *pgdp)
 	 */
 	map_kernel_segment(pgdp, _text, _etext, text_prot, &vmlinux_text, 0,
 			   VM_NO_GUARD);
-	map_kernel_segment(pgdp, __start_rodata, __inittext_begin, PAGE_KERNEL,
-			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
+	map_kernel_segment(pgdp, __start_rodata, __inittext_begin,
+			   PAGE_KERNEL, &vmlinux_rodata,
+			   NO_CONT_MAPPINGS | NO_BLOCK_MAPPINGS, VM_NO_GUARD);
 	map_kernel_segment(pgdp, __inittext_begin, __inittext_end, text_prot,
 			   &vmlinux_inittext, 0, VM_NO_GUARD);
 	map_kernel_segment(pgdp, __initdata_begin, __initdata_end, PAGE_KERNEL,

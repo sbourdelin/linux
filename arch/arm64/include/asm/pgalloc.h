@@ -29,6 +29,10 @@
 #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
 #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
 
+#if CONFIG_STRICT_KERNEL_RWX
+extern spinlock_t pgdir_lock;
+#endif
+
 #if CONFIG_PGTABLE_LEVELS > 2
 
 static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
@@ -78,6 +82,21 @@ static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pudp, pgdval_t prot)
 
 static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgdp, pud_t *pudp)
 {
+#if CONFIG_STRICT_KERNEL_RWX
+	if (mm == &init_mm) {
+		pgd_t *pgd;
+
+		spin_lock(&pgdir_lock);
+		pgd = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
+
+		pgd = (pgd_t *)((unsigned long)pgd + pgdp - swapper_pg_dir);
+		__pgd_populate(pgdp, __pa(pudp), PUD_TYPE_TABLE);
+
+		pgd_clear_fixmap();
+		spin_unlock(&pgdir_lock);
+		return;
+	}
+#endif
 	__pgd_populate(pgdp, __pa(pudp), PUD_TYPE_TABLE);
 }
 #else
