@@ -104,4 +104,8 @@ struct i915_gem_context;
 
 void intel_lr_context_resume(struct drm_i915_private *dev_priv);
 
+int
+intel_lr_context_modify_data_port_coherency(struct i915_gem_context *ctx,
+					     bool enable);
+
 #endif /* _INTEL_LRC_H_ */

@@ -711,6 +711,24 @@ static bool client_is_banned(struct drm_i915_file_private *file_priv)
 	return atomic_read(&file_priv->ban_score) >= I915_CLIENT_SCORE_BANNED;
 }
 
+static int i915_gem_context_set_data_port_coherent(struct i915_gem_context *ctx)
+{
+	int ret;
+	ret = intel_lr_context_modify_data_port_coherency(ctx, true);
+	if (!GEM_WARN_ON(ret))
+		__set_bit(CONTEXT_DATA_PORT_COHERENT, &ctx->flags);
+	return ret;
+}
+
+static int i915_gem_context_clear_data_port_coherent(struct i915_gem_context *ctx)
+{
+	int ret;
+	ret = intel_lr_context_modify_data_port_coherency(ctx, false);
+	if (!GEM_WARN_ON(ret))
+		__clear_bit(CONTEXT_DATA_PORT_COHERENT, &ctx->flags);
+	return ret;
+}
+
 int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 				  struct drm_file *file)
 {
@@ -784,6 +802,7 @@ out:
 int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct drm_i915_gem_context_param *args = data;
 	struct i915_gem_context *ctx;
@@ -818,6 +837,16 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_CONTEXT_PARAM_PRIORITY:
 		args->value = ctx->sched.priority;
 		break;
+	case I915_CONTEXT_PARAM_COHERENCY:
+		/*
+		 * ENODEV if the feature is not supported. This removes the need
+		 * of separate IS_SUPPORTED parameter.
+		 */
+		if (INTEL_GEN(dev_priv) < 9)
+			ret = -ENODEV;
+		else
+			args->value = i915_gem_context_is_data_port_coherent(ctx);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -830,6 +859,7 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct drm_i915_gem_context_param *args = data;
 	struct i915_gem_context *ctx;
@@ -891,6 +921,17 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 			else
 				ctx->sched.priority = priority;
 		}
+		break;
+
+	case I915_CONTEXT_PARAM_COHERENCY:
+		if (args->size)
+			ret = -EINVAL;
+		else if (INTEL_GEN(dev_priv) < 9)
+			ret = -ENODEV;
+		else if (args->value)
+			ret = i915_gem_context_set_data_port_coherent(ctx);
+		else
+			ret = i915_gem_context_clear_data_port_coherent(ctx);
 		break;
 
 	default:
