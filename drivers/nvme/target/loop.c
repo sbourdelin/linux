@@ -148,6 +148,7 @@ nvme_loop_timeout(struct request *rq, bool reserved)
 	/* fail with DNR on admin cmd timeout */
 	nvme_req(rq)->status = NVME_SC_ABORT_REQ | NVME_SC_DNR;
 
+	__blk_mq_complete_request(rq);
 	return BLK_EH_DONE;
 }
 

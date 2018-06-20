@@ -1203,6 +1203,7 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 		nvme_warn_reset(dev, csts);
 		nvme_dev_disable(dev, false);
 		nvme_reset_ctrl(&dev->ctrl);
+		__blk_mq_complete_request(req);
 		return BLK_EH_DONE;
 	}
 
@@ -1213,6 +1214,11 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 		dev_warn(dev->ctrl.device,
 			 "I/O %d QID %d timeout, completion polled\n",
 			 req->tag, nvmeq->qid);
+		/*
+		 * nvme_end_request will invoke blk_mq_complete_request,
+		 * it will do nothing for this timed out request.
+		 */
+		__blk_mq_complete_request(req);
 		return BLK_EH_DONE;
 	}
 
@@ -1230,6 +1236,7 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 			 req->tag, nvmeq->qid);
 		nvme_dev_disable(dev, false);
 		nvme_req(req)->flags |= NVME_REQ_CANCELLED;
+		__blk_mq_complete_request(req);
 		return BLK_EH_DONE;
 	default:
 		break;
@@ -1248,6 +1255,7 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 		nvme_reset_ctrl(&dev->ctrl);
 
 		nvme_req(req)->flags |= NVME_REQ_CANCELLED;
+		__blk_mq_complete_request(req);
 		return BLK_EH_DONE;
 	}
 
