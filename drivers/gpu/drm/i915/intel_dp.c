@@ -4955,21 +4955,17 @@ static void
 intel_dp_force(struct drm_connector *connector)
 {
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
-	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
-	struct drm_i915_private *dev_priv = to_i915(intel_encoder->base.dev);
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 	intel_dp_unset_edid(intel_dp);
 
-	if (connector->status != connector_status_connected)
-		return;
-
-	intel_display_power_get(dev_priv, intel_dp->aux_power_domain);
-
-	intel_dp_set_edid(intel_dp);
-
-	intel_display_power_put(dev_priv, intel_dp->aux_power_domain);
+	/*
+	 * Force enable doesn't really work with DP. Try the normal detect path
+	 * anyway to read the DPCD etc.
+	 */
+	if (connector->status == connector_status_connected)
+		drm_helper_probe_detect(connector, NULL, false);
 }
 
 static int intel_dp_get_modes(struct drm_connector *connector)
