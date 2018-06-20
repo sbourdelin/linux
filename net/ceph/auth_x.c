@@ -154,7 +154,7 @@ static int process_one_ticket(struct ceph_auth_client *ac,
 	void **ptp;
 	struct ceph_crypto_key new_session_key = { 0 };
 	struct ceph_buffer *new_ticket_blob;
-	unsigned long new_expires, new_renew_after;
+	u32 new_expires, new_renew_after;
 	u64 new_secret_id;
 	int ret;
 
@@ -191,9 +191,9 @@ static int process_one_ticket(struct ceph_auth_client *ac,
 
 	ceph_decode_timespec(&validity, dp);
 	dp += sizeof(struct ceph_timespec);
-	new_expires = get_seconds() + validity.tv_sec;
+	new_expires = (u32)ktime_get_real_seconds() + validity.tv_sec;
 	new_renew_after = new_expires - (validity.tv_sec / 4);
-	dout(" expires=%lu renew_after=%lu\n", new_expires,
+	dout(" expires=%u renew_after=%u\n", new_expires,
 	     new_renew_after);
 
 	/* ticket blob for service */
@@ -385,13 +385,13 @@ static bool need_key(struct ceph_x_ticket_handler *th)
 	if (!th->have_key)
 		return true;
 
-	return get_seconds() >= th->renew_after;
+	return ktime_get_real_seconds() >= th->renew_after;
 }
 
 static bool have_key(struct ceph_x_ticket_handler *th)
 {
 	if (th->have_key) {
-		if (get_seconds() >= th->expires)
+		if (ktime_get_real_seconds() >= th->expires)
 			th->have_key = false;
 	}
 
