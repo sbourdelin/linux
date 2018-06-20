@@ -262,6 +262,8 @@ static const struct file_operations fops = {
 #endif
 };
 
+static void __remove(struct device *dev) { }
+
 static void cros_ec_sensors_register(struct cros_ec_dev *ec)
 {
 	/*
