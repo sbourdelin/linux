@@ -211,7 +211,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
 
 /**
  * set_swbp - store breakpoint at a given address.
- * @auprobe: arch specific probepoint information.
+ * @uprobe: uprobe object.
  * @mm: the probed process address space.
  * @vaddr: the virtual address to insert the opcode.
  *
@@ -221,7 +221,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
  * This version overrides the weak version in kernel/events/uprobes.c.
  * It is required to handle MIPS16 and microMIPS.
  */
-int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
+int __weak set_swbp(struct uprobe *uprobe, struct mm_struct *mm,
 	unsigned long vaddr)
 {
 	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
