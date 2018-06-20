@@ -214,8 +214,10 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
 	struct generic_pm_domain *genpd = pd_to_genpd(pd);
 	struct gpd_link *link;
 
-	if (!genpd->max_off_time_changed)
+	if (!genpd->max_off_time_changed) {
+		genpd->state_idx = genpd->cached_power_down_state_idx;
 		return genpd->cached_power_down_ok;
+	}
 
 	/*
 	 * We have to invalidate the cached results for the masters, so
@@ -240,6 +242,7 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
 		genpd->state_idx--;
 	}
 
+	genpd->cached_power_down_state_idx = genpd->state_idx;
 	return genpd->cached_power_down_ok;
 }
 
@@ -254,6 +257,10 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
 	ktime_t domain_wakeup, cpu_wakeup;
 	s64 idle_duration_ns;
 	int cpu, i;
+
+	/* Validate dev PM QoS constraints. */
+	if (!default_power_down_ok(pd))
+		return false;
 
 	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
 		return true;
@@ -276,9 +283,9 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
 	/*
 	 * Find the deepest idle state that has its residency value satisfied
 	 * and by also taking into account the power off latency for the state.
-	 * Start at the deepest supported state.
+	 * Start at the state picked by the dev PM QoS constraint validation.
 	 */
-	i = genpd->state_count - 1;
+	i = genpd->state_idx;
 	do {
 		if (!genpd->states[i].residency_ns)
 			break;
@@ -312,6 +319,6 @@ struct dev_power_governor pm_domain_always_on_gov = {
 };
 
 struct dev_power_governor pm_domain_cpu_gov = {
-	.suspend_ok = NULL,
+	.suspend_ok = default_suspend_ok,
 	.power_down_ok = cpu_power_down_ok,
 };
