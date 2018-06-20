@@ -18,10 +18,24 @@
 #include <linux/mtd/rawnand.h>
 
 /*
- * Special Micron status bit that indicates when the block has been
- * corrected by on-die ECC and should be rewritten
+ * Special Micron status bit 3 indicates that the block has been
+ * corrected by on-die ECC and should be rewritten.
+ *
+ * On chips with 8-bit ECC and additional bit can be used to distinguish
+ * cases where a errors were corrected without needing a rewrite
+ *
+ * Bit 4 Bit 3 Bit 0 Description
+ * ----- ----- ----- -----------
+ * 0     0     0     No Errors
+ * 0     0     1     Multiple uncorrected errors
+ * 0     1     0     4 - 6 errors corrected, recommend rewrite
+ * 0     0     1     Reserved
+ * 1     0     0     1 - 3 errors corrected
+ * 1     0     1     Reserved
+ * 1     1     0     7 - 8 errors corrected, recommend rewrite
  */
 #define NAND_STATUS_WRITE_RECOMMENDED	BIT(3)
+#define NAND_STATUS_ERRORS_CORRECTED	BIT(4)
 
 struct nand_onfi_vendor_micron {
 	u8 two_plane_read;
@@ -139,7 +153,7 @@ micron_nand_read_page_on_die_ecc(struct mtd_info *mtd, struct nand_chip *chip,
 		mtd->ecc_stats.failed++;
 
 	/*
-	 * The internal ECC doesn't tell us the number of bitflips
+	 * The internal 4-bit ECC doesn't tell us the number of bitflips
 	 * that have been corrected, but tells us if it recommends to
 	 * rewrite the block. If it's the case, then we pretend we had
 	 * a number of bitflips equal to the ECC strength, which will
@@ -147,6 +161,12 @@ micron_nand_read_page_on_die_ecc(struct mtd_info *mtd, struct nand_chip *chip,
 	 */
 	else if (status & NAND_STATUS_WRITE_RECOMMENDED)
 		max_bitflips = chip->ecc.strength;
+	/*
+	 * Chips with 8-bit internal ECC do tell us if errors 1 to 3 bit
+	 * errors have been corrected without recommending a rewrite.
+	 */
+	else if (status & NAND_STATUS_ERRORS_CORRECTED)
+		max_bitflips = 3;
 
 	ret = nand_read_data_op(chip, buf, mtd->writesize, false);
 	if (!ret && oob_required)
@@ -238,9 +258,9 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
 
 	/*
 	 * Some Micron NANDs have an on-die ECC of 4/512, some other
-	 * 8/512. We only support the former.
+	 * 8/512.
 	 */
-	if (chip->ecc_strength_ds != 4)
+	if (chip->ecc_strength_ds != 4 && chip->ecc_strength_ds != 8)
 		return MICRON_ON_DIE_UNSUPPORTED;
 
 	return MICRON_ON_DIE_SUPPORTED;
@@ -272,9 +292,9 @@ static int micron_nand_init(struct nand_chip *chip)
 			return -EINVAL;
 		}
 
-		chip->ecc.bytes = 8;
+		chip->ecc.bytes = chip->ecc_strength_ds * 2;
 		chip->ecc.size = 512;
-		chip->ecc.strength = 4;
+		chip->ecc.strength = chip->ecc_strength_ds;
 		chip->ecc.algo = NAND_ECC_BCH;
 		chip->ecc.read_page = micron_nand_read_page_on_die_ecc;
 		chip->ecc.write_page = micron_nand_write_page_on_die_ecc;
