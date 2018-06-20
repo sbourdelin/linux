@@ -752,11 +752,31 @@ void tlb_flush_remove_tables_local(void *arg)
 void tlb_flush_remove_tables(struct mm_struct *mm)
 {
 	int cpu = get_cpu();
-	/*
-	 * XXX: this really only needs to be called for CPUs in lazy TLB mode.
-	 */
-	if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids)
+	cpumask_var_t varmask;
+
+	if (cpumask_any_but(mm_cpumask(mm), cpu) >= nr_cpu_ids)
+		return;
+
+	if (!zalloc_cpumask_var(&varmask, GFP_ATOMIC)) {
+		/* Flush the TLB on all CPUs that have this mm loaded. */
 		smp_call_function_many(mm_cpumask(mm), tlb_flush_remove_tables_local, (void *)mm, 1);
+	}
+
+	/*
+	 * CPUs in TLBSTATE_OK either received a TLB flush IPI while the user
+	 * pages in this address range were unmapped, or have context switched
+	 * and reloaded %CR3 since then.
+	 *
+	 * Shootdown IPIs at page table freeing time only need to be sent to
+	 * CPUs that may have out of date TLB contents.
+	 */
+	for_each_cpu(cpu, mm_cpumask(mm)) {
+		if (per_cpu(cpu_tlbstate.state, cpu) != TLBSTATE_OK)
+			cpumask_set_cpu(cpu, varmask);
+	}
+
+	smp_call_function_many(varmask, tlb_flush_remove_tables_local, (void *)mm, 1);
+	free_cpumask_var(varmask);
 }
 
 static void do_flush_tlb_all(void *info)
