@@ -1710,6 +1710,42 @@ fail:
 }
 
 /**
+ *	__vmalloc_try_addr  -  try to alloc at a specific address
+ *	@addr:		address to try
+ *	@size:		size to try
+ *	@gfp_mask:	flags for the page level allocator
+ *	@prot:		protection mask for the allocated pages
+ *	@vm_flags:	additional vm area flags (e.g. %VM_NO_GUARD)
+ *	@node:		node to use for allocation or NUMA_NO_NODE
+ *	@caller:	caller's return address
+ *
+ *	Try to allocate at the specific address. If it succeeds the address is
+ *	returned. If it fails NULL is returned.  It may trigger TLB flushes.
+ */
+void *__vmalloc_node_try_addr(unsigned long addr, unsigned long size,
+			gfp_t gfp_mask,	pgprot_t prot, unsigned long vm_flags,
+			int node, const void *caller)
+{
+	unsigned long addr_end;
+	unsigned long vsize = PAGE_ALIGN(size);
+
+	if (!vsize || (vsize >> PAGE_SHIFT) > totalram_pages)
+		return NULL;
+
+	if (!(vm_flags & VM_NO_GUARD))
+		vsize += PAGE_SIZE;
+
+	addr_end = addr + vsize;
+
+	if (addr > addr_end)
+		return NULL;
+
+	return __vmalloc_node_range(size, 1, addr, addr_end,
+				gfp_mask | __GFP_NOWARN, prot, vm_flags, node,
+				caller);
+}
+
+/**
  *	__vmalloc_node_range  -  allocate virtually contiguous memory
  *	@size:		allocation size
  *	@align:		desired alignment
@@ -1759,8 +1795,9 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 	return addr;
 
 fail:
-	warn_alloc(gfp_mask, NULL,
-			  "vmalloc: allocation failure: %lu bytes", real_size);
+	if (!(gfp_mask & __GFP_NOWARN))
+		warn_alloc(gfp_mask, NULL,
+			"vmalloc: allocation failure: %lu bytes", real_size);
 	return NULL;
 }
 
