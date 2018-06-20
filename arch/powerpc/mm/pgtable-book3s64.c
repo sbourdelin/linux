@@ -333,25 +333,23 @@ static pte_t *get_pte_from_cache(struct mm_struct *mm)
 	return (pte_t *)ret;
 }
 
-static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
+static pte_t *__alloc_for_ptecache(struct mm_struct *mm)
 {
+	gfp_t gfp_mask = PGALLOC_GFP;
 	void *ret = NULL;
 	struct page *page;
 
-	if (!kernel) {
-		page = alloc_page(PGALLOC_GFP | __GFP_ACCOUNT);
-		if (!page)
-			return NULL;
-		if (!pgtable_page_ctor(page)) {
-			__free_page(page);
-			return NULL;
-		}
-	} else {
-		page = alloc_page(PGALLOC_GFP);
-		if (!page)
-			return NULL;
-	}
+	if (mm != &init_mm)
+		gfp_mask |= __GFP_ACCOUNT;
 
+	page = alloc_page(gfp_mask);
+	if (!page)
+		return NULL;
+
+	if (!pgtable_page_ctor(page)) {
+		__free_page(page);
+		return NULL;
+	}
 
 	ret = page_address(page);
 	/*
@@ -375,7 +373,7 @@ static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
 	return (pte_t *)ret;
 }
 
-pte_t *pte_fragment_alloc(struct mm_struct *mm, unsigned long vmaddr, int kernel)
+pte_t *pte_fragment_alloc(struct mm_struct *mm, unsigned long vmaddr)
 {
 	pte_t *pte;
 
@@ -383,16 +381,15 @@ pte_t *pte_fragment_alloc(struct mm_struct *mm, unsigned long vmaddr, int kernel
 	if (pte)
 		return pte;
 
-	return __alloc_for_ptecache(mm, kernel);
+	return __alloc_for_ptecache(mm);
 }
 
-void pte_fragment_free(unsigned long *table, int kernel)
+void pte_fragment_free(unsigned long *table)
 {
 	struct page *page = virt_to_page(table);
 
 	if (put_page_testzero(page)) {
-		if (!kernel)
-			pgtable_page_dtor(page);
+		pgtable_page_dtor(page);
 		free_unref_page(page);
 	}
 }
@@ -401,7 +398,7 @@ static inline void pgtable_free(void *table, int index)
 {
 	switch (index) {
 	case PTE_INDEX:
-		pte_fragment_free(table, 0);
+		pte_fragment_free(table);
 		break;
 	case PMD_INDEX:
 		pmd_fragment_free(table);
