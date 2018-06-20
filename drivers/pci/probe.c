@@ -2042,6 +2042,22 @@ static void pci_configure_ltr(struct pci_dev *dev)
 #endif
 }
 
+static void pci_configure_eetlp_prefix(struct pci_dev *dev)
+{
+#ifdef CONFIG_PCI_PASID
+	u32 cap;
+
+	if (!pci_is_pcie(dev))
+		return;
+
+	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
+	if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
+		return;
+
+	dev->eetlp_prefix = 1;
+#endif
+}
+
 static void pci_configure_device(struct pci_dev *dev)
 {
 	struct hotplug_params hpp;
@@ -2051,6 +2067,7 @@ static void pci_configure_device(struct pci_dev *dev)
 	pci_configure_extended_tags(dev, NULL);
 	pci_configure_relaxed_ordering(dev);
 	pci_configure_ltr(dev);
+	pci_configure_eetlp_prefix(dev);
 
 	memset(&hpp, 0, sizeof(hpp));
 	ret = pci_get_hp_params(dev, &hpp);
