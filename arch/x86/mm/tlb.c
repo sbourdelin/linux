@@ -136,7 +136,7 @@ void leave_mm(int cpu)
 		return;
 
 	/* Warn if we're not lazy. */
-	WARN_ON(!this_cpu_read(cpu_tlbstate.is_lazy));
+	WARN_ON((this_cpu_read(cpu_tlbstate.state) == TLBSTATE_OK));
 
 	switch_mm(NULL, &init_mm, NULL);
 }
@@ -227,7 +227,7 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 		__flush_tlb_all();
 	}
 #endif
-	this_cpu_write(cpu_tlbstate.is_lazy, false);
+	this_cpu_write(cpu_tlbstate.state, TLBSTATE_OK);
 
 	/*
 	 * The membarrier system call requires a full memory barrier and
@@ -364,7 +364,7 @@ void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 		 * old mm loaded and only switch to init_mm when
 		 * tlb_remove_page() happens.
 		 */
-		this_cpu_write(cpu_tlbstate.is_lazy, true);
+		this_cpu_write(cpu_tlbstate.state, TLBSTATE_LAZY);
 	} else {
 		switch_mm(NULL, &init_mm, NULL);
 	}
@@ -448,7 +448,7 @@ static void flush_tlb_func_common(const struct flush_tlb_info *f,
 	VM_WARN_ON(this_cpu_read(cpu_tlbstate.ctxs[loaded_mm_asid].ctx_id) !=
 		   loaded_mm->context.ctx_id);
 
-	if (this_cpu_read(cpu_tlbstate.is_lazy)) {
+	if (this_cpu_read(cpu_tlbstate.state) != TLBSTATE_OK) {
 		/*
 		 * We're in lazy mode.  We need to at least flush our
 		 * paging-structure cache to avoid speculatively reading
@@ -651,7 +651,7 @@ void tlb_flush_remove_tables_local(void *arg)
 	struct mm_struct *mm = arg;
 
 	if (this_cpu_read(cpu_tlbstate.loaded_mm) == mm &&
-			this_cpu_read(cpu_tlbstate.is_lazy))
+			this_cpu_read(cpu_tlbstate.state) != TLBSTATE_OK)
 		/*
 		 * We're in lazy mode.  We need to at least flush our
 		 * paging-structure cache to avoid speculatively reading

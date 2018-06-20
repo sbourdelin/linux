@@ -169,6 +169,9 @@ struct tlb_context {
 	u64 tlb_gen;
 };
 
+#define TLBSTATE_OK	0
+#define TLBSTATE_LAZY	1
+
 struct tlb_state {
 	/*
 	 * cpu_tlbstate.loaded_mm should match CR3 whenever interrupts
@@ -186,18 +189,18 @@ struct tlb_state {
 	 * We can be in one of several states:
 	 *
 	 *  - Actively using an mm.  Our CPU's bit will be set in
-	 *    mm_cpumask(loaded_mm) and is_lazy == false;
+	 *    mm_cpumask(loaded_mm) and state == TLBSTATE_OK
 	 *
 	 *  - Not using a real mm.  loaded_mm == &init_mm.  Our CPU's bit
-	 *    will not be set in mm_cpumask(&init_mm) and is_lazy == false.
+	 *    will not be set in mm_cpumask(&init_mm) and state == TLBSTATE_OK
 	 *
 	 *  - Lazily using a real mm.  loaded_mm != &init_mm, our bit
-	 *    is set in mm_cpumask(loaded_mm), but is_lazy == true.
+	 *    is set in mm_cpumask(loaded_mm), but state == TLBSTATE_LAZY.
 	 *    We're heuristically guessing that the CR3 load we
 	 *    skipped more than makes up for the overhead added by
 	 *    lazy mode.
 	 */
-	bool is_lazy;
+	int state;
 
 	/*
 	 * If set we changed the page tables in such a way that we
