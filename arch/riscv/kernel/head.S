@@ -94,6 +94,7 @@ relocate:
 	or a0, a0, a1
 	sfence.vma
 	csrw sptbr, a0
+.align 2
 1:
 	/* Set trap vector to spin forever to help debug */
 	la a0, .Lsecondary_park
