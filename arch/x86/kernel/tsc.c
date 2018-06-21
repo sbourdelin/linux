@@ -133,22 +133,13 @@ static inline unsigned long long cycles_2_ns(unsigned long long cyc)
 	return ns;
 }
 
-static void set_cyc2ns_scale(unsigned long khz, int cpu,
-			     unsigned long long tsc_now,
-			     unsigned long long sched_now)
+static void __set_cyc2ns_scale(unsigned long khz, int cpu,
+			       unsigned long long tsc_now,
+			       unsigned long long sched_now)
 {
-	unsigned long long ns_now;
+	unsigned long long ns_now = cycles_2_ns(tsc_now) + sched_now;
 	struct cyc2ns_data data;
 	struct cyc2ns *c2n;
-	unsigned long flags;
-
-	local_irq_save(flags);
-	sched_clock_idle_sleep_event();
-
-	if (!khz)
-		goto done;
-
-	ns_now = cycles_2_ns(tsc_now) + sched_now;
 
 	/*
 	 * Compute a new multiplier as per the above comment and ensure our
@@ -178,10 +169,29 @@ static void set_cyc2ns_scale(unsigned long khz, int cpu,
 	c2n->data[0] = data;
 	raw_write_seqcount_latch(&c2n->seq);
 	c2n->data[1] = data;
+}
 
-done:
+static void set_cyc2ns_scale(unsigned long khz, int cpu,
+			     unsigned long long tsc_now,
+			     unsigned long long sched_now)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	sched_clock_idle_sleep_event();
+
+	if (khz)
+		__set_cyc2ns_scale(khz, cpu, tsc_now, sched_now);
+
 	sched_clock_idle_wakeup_event();
 	local_irq_restore(flags);
+}
+
+static void __init sched_clock_early_init(unsigned int khz)
+{
+	cyc2ns_init(smp_processor_id());
+	__set_cyc2ns_scale(khz, smp_processor_id(), rdtsc(), 0);
+	static_branch_enable(&__use_tsc);
 }
 
 /*
@@ -1354,6 +1364,7 @@ void __init tsc_early_delay_calibrate(void)
 	lpj = tsc_khz * 1000;
 	do_div(lpj, HZ);
 	loops_per_jiffy = lpj;
+	sched_clock_early_init(tsc_khz);
 }
 
 void __init tsc_init(void)
@@ -1382,6 +1393,7 @@ void __init tsc_init(void)
 	if (!tsc_khz) {
 		mark_tsc_unstable("could not calculate TSC khz");
 		setup_clear_cpu_cap(X86_FEATURE_TSC_DEADLINE_TIMER);
+		static_branch_disable(&__use_tsc);
 		return;
 	}
 
