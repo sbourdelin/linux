@@ -2937,6 +2937,10 @@ config X86_DMA_REMAP
 config HAVE_GENERIC_GUP
 	def_bool y
 
+config X86_TLS_AREA
+       def_bool y
+       depends on IA32_EMULATION || X86_32
+
 source "net/Kconfig"
 
 source "drivers/Kconfig"
