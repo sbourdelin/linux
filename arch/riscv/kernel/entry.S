@@ -357,6 +357,7 @@ ENTRY(__switch_to)
 	ret
 ENDPROC(__switch_to)
 
+#ifdef CONFIG_FPU
 ENTRY(__fstate_save)
 	li  a2,  TASK_THREAD_F0
 	add a0, a0, a2
@@ -442,7 +443,7 @@ ENTRY(__fstate_restore)
 	csrc sstatus, t1
 	ret
 ENDPROC(__fstate_restore)
-
+#endif
 
 	.section ".rodata"
 	/* Exception vector table */

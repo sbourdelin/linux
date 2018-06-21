@@ -207,6 +207,10 @@ config RISCV_BASE_PMU
 
 endmenu
 
+config FPU
+	bool "FPU support"
+	default y
+
 endmenu
 
 menu "Kernel type"

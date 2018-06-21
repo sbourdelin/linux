@@ -37,6 +37,7 @@ struct rt_sigframe {
 	struct ucontext uc;
 };
 
+#ifdef CONFIG_FPU
 static long restore_d_state(struct pt_regs *regs,
 	struct __riscv_d_ext_state __user *state)
 {
@@ -53,6 +54,7 @@ static long save_d_state(struct pt_regs *regs,
 	fstate_save(current, regs);
 	return __copy_to_user(state, &current->thread.fstate, sizeof(*state));
 }
+#endif
 
 static long restore_sigcontext(struct pt_regs *regs,
 	struct sigcontext __user *sc)
@@ -63,6 +65,7 @@ static long restore_sigcontext(struct pt_regs *regs,
 	err = __copy_from_user(regs, &sc->sc_regs, sizeof(sc->sc_regs));
 	if (unlikely(err))
 		return err;
+#ifdef CONFIG_FPU
 	/* Restore the floating-point state. */
 	err = restore_d_state(regs, &sc->sc_fpregs.d);
 	if (unlikely(err))
@@ -76,6 +79,7 @@ static long restore_sigcontext(struct pt_regs *regs,
 		if (value != 0)
 			return -EINVAL;
 	}
+#endif
 	return err;
 }
 
@@ -127,11 +131,13 @@ static long setup_sigcontext(struct rt_sigframe __user *frame,
 	size_t i;
 	/* sc_regs is structured the same as the start of pt_regs */
 	err = __copy_to_user(&sc->sc_regs, regs, sizeof(sc->sc_regs));
+#ifdef CONFIG_FPU
 	/* Save the floating-point state. */
 	err |= save_d_state(regs, &sc->sc_fpregs.d);
 	/* We support no other extension state at this time. */
 	for (i = 0; i < ARRAY_SIZE(sc->sc_fpregs.q.reserved); i++)
 		err |= __put_user(0, &sc->sc_fpregs.q.reserved[i]);
+#endif
 	return err;
 }
 
