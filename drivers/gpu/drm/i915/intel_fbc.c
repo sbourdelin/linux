@@ -41,6 +41,9 @@
 #include "intel_drv.h"
 #include "i915_drv.h"
 
+static void __intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv);
+static int intel_fbc_alloc_cfb(struct intel_crtc *crtc);
+
 static inline bool fbc_supported(struct drm_i915_private *dev_priv)
 {
 	return HAS_FBC(dev_priv);
@@ -446,6 +449,15 @@ retry:
 		goto retry;
 	}
 
+	if (fbc->cfb_try_resize) {
+		fbc->cfb_try_resize = false;
+		__intel_fbc_cleanup_cfb(dev_priv);
+		if (intel_fbc_alloc_cfb(crtc)) {
+			fbc->no_fbc_reason = "not enough stolen memory";
+			goto out;
+		}
+	}
+
 	intel_fbc_hw_activate(dev_priv);
 
 	work->scheduled = false;
@@ -846,22 +858,6 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 		return false;
 	}
 
-	/* It is possible for the required CFB size change without a
-	 * crtc->disable + crtc->enable since it is possible to change the
-	 * stride without triggering a full modeset. Since we try to
-	 * over-allocate the CFB, there's a chance we may keep FBC enabled even
-	 * if this happens, but if we exceed the current CFB size we'll have to
-	 * disable FBC. Notice that it would be possible to disable FBC, wait
-	 * for a frame, free the stolen node, then try to reenable FBC in case
-	 * we didn't get any invalidate/deactivate calls, but this would require
-	 * a lot of tracking just for a specific case. If we conclude it's an
-	 * important case, we can implement it later. */
-	if (intel_fbc_calculate_cfb_size(dev_priv, &fbc->state_cache) >
-	    fbc->compressed_fb.size * fbc->threshold) {
-		fbc->no_fbc_reason = "CFB requirements changed";
-		return false;
-	}
-
 	/*
 	 * Work around a problem on GEN9+ HW, where enabling FBC on a plane
 	 * having a Y offset that isn't divisible by 4 causes FIFO underrun
@@ -871,6 +867,22 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 	    (fbc->state_cache.plane.adjusted_y & 3)) {
 		fbc->no_fbc_reason = "plane Y offset is misaligned";
 		return false;
+	}
+
+	if (!drm_mm_node_allocated(&fbc->compressed_fb))
+		return false;
+
+	/* It is possible for the required CFB size change without a
+	 * crtc->disable + crtc->enable since it is possible to change the
+	 * stride without triggering a full modeset. Since we try to
+	 * over-allocate the CFB, there's a chance we may keep FBC enabled even
+	 * if this happens, but if we exceed the current CFB size we'll have to
+	 * resize CFB.
+	 */
+	if (intel_fbc_calculate_cfb_size(dev_priv, &fbc->state_cache) >
+	    (fbc->compressed_fb.size * fbc->threshold)) {
+		fbc->cfb_try_resize = true;
+		DRM_DEBUG_KMS("CFB memory requirements have changed");
 	}
 
 	return true;
@@ -1204,6 +1216,7 @@ void intel_fbc_enable(struct intel_crtc *crtc,
 
 	fbc->enabled = true;
 	fbc->crtc = crtc;
+	fbc->cfb_try_resize = false;
 out:
 	mutex_unlock(&fbc->lock);
 }
