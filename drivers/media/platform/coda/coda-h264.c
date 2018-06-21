@@ -108,6 +108,7 @@ int coda_h264_level(int level_idc)
 	case 32: return V4L2_MPEG_VIDEO_H264_LEVEL_3_2;
 	case 40: return V4L2_MPEG_VIDEO_H264_LEVEL_4_0;
 	case 41: return V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
+	case 42: return V4L2_MPEG_VIDEO_H264_LEVEL_4_2;
 	default: return -EINVAL;
 	}
 }
