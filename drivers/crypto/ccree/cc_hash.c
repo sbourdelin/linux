@@ -500,8 +500,12 @@ static int cc_hash_digest(struct ahash_request *req)
 }
 
 static int cc_restore_hash(struct cc_hw_desc *desc, struct cc_hash_ctx *ctx,
-			   struct ahash_req_ctx *state, unsigned int idx)
+			   struct ahash_req_ctx *state, unsigned int idx,
+			   bool hash_padding)
 {
+	enum cc_hash_conf_pad pad_conf = hash_padding ? HASH_PADDING_ENABLED :
+			HASH_PADDING_DISABLED;
+
 	/* Restore hash digest */
 	hw_desc_init(&desc[idx]);
 	set_cipher_mode(&desc[idx], ctx->hw_mode);
@@ -514,7 +518,7 @@ static int cc_restore_hash(struct cc_hw_desc *desc, struct cc_hash_ctx *ctx,
 	/* Restore hash current length */
 	hw_desc_init(&desc[idx]);
 	set_cipher_mode(&desc[idx], ctx->hw_mode);
-	set_cipher_config1(&desc[idx], HASH_PADDING_DISABLED);
+	set_cipher_config1(&desc[idx], pad_conf);
 	set_din_type(&desc[idx], DMA_DLLI, state->digest_bytes_len_dma_addr,
 		     ctx->drvdata->hash_len_sz, NS_BIT);
 	set_flow_mode(&desc[idx], S_DIN_to_HASH);
@@ -572,7 +576,7 @@ static int cc_hash_update(struct ahash_request *req)
 	cc_req.user_cb = cc_update_complete;
 	cc_req.user_arg = req;
 
-	idx = cc_restore_hash(desc, ctx, state, idx);
+	idx = cc_restore_hash(desc, ctx, state, idx, false);
 
 	/* store the hash digest result in context */
 	hw_desc_init(&desc[idx]);
@@ -644,7 +648,7 @@ static int cc_hash_finup(struct ahash_request *req)
 	cc_req.user_cb = cc_hash_complete;
 	cc_req.user_arg = req;
 
-	idx = cc_restore_hash(desc, ctx, state, idx);
+	idx = cc_restore_hash(desc, ctx, state, idx, true);
 
 	if (is_hmac)
 		idx = cc_fin_hmac(desc, req, idx);
@@ -704,7 +708,7 @@ static int cc_hash_final(struct ahash_request *req)
 	cc_req.user_cb = cc_hash_complete;
 	cc_req.user_arg = req;
 
-	idx = cc_restore_hash(desc, ctx, state, idx);
+	idx = cc_restore_hash(desc, ctx, state, idx, false);
 
 	/* "DO-PAD" must be enabled only when writing current length to HW */
 	hw_desc_init(&desc[idx]);
