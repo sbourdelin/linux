@@ -509,14 +509,14 @@ void mem_cgroup_print_oom_info(struct mem_cgroup *memcg,
 
 static inline void mem_cgroup_oom_enable(void)
 {
-	WARN_ON(current->memcg_may_oom);
-	current->memcg_may_oom = 1;
+	WARN_ON(current->in_user_fault);
+	current->in_user_fault = 1;
 }
 
 static inline void mem_cgroup_oom_disable(void)
 {
-	WARN_ON(!current->memcg_may_oom);
-	current->memcg_may_oom = 0;
+	WARN_ON(!current->in_user_fault);
+	current->in_user_fault = 0;
 }
 
 static inline bool task_in_memcg_oom(struct task_struct *p)
