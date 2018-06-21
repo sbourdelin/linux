@@ -618,9 +618,8 @@ ssize_t proc_set_wait_hiq_empty(struct file *file, const char __user *buffer, si
 	if (count < 1)
 		return -EFAULT;
 
-	if (buffer && !copy_from_user(tmp, buffer, sizeof(tmp))) {
+	if (buffer && !copy_from_user(tmp, buffer, sizeof(tmp)))
 		sscanf(tmp, "%u", &g_wait_hiq_empty);
-	}
 
 	return count;
 }
@@ -1425,9 +1424,8 @@ int proc_get_btcoex_info(struct seq_file *m, void *v)
 	padapter = (struct adapter *)rtw_netdev_priv(dev);
 
 	pbuf = rtw_zmalloc(bufsize);
-	if (NULL == pbuf) {
+	if (!pbuf)
 		return -ENOMEM;
-	}
 
 	rtw_btcoex_DisplayBtCoexInfo(padapter, pbuf, bufsize);
 
