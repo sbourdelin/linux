@@ -1789,10 +1789,15 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 
 			/*
 			 * Calculate the maximum number of bytes to transfer,
-			 * making sure it is less than the hw limit
+			 * making sure it is less than the hw limit and that
+			 * the next chunck start address is aligned
 			 */
-			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
-				     XILINX_DMA_MAX_TRANS_LEN);
+			copy = sg_dma_len(sg) - sg_used;
+			if (copy > XILINX_DMA_MAX_TRANS_LEN &&
+			    chan->xdev->common.copy_align)
+				copy = rounddown(XILINX_DMA_MAX_TRANS_LEN,
+					 (1 << chan->xdev->common.copy_align));
+
 			hw = &segment->hw;
 
 			/* Fill in the descriptor */
@@ -1894,10 +1899,15 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
 
 			/*
 			 * Calculate the maximum number of bytes to transfer,
-			 * making sure it is less than the hw limit
+			 * making sure it is less than the hw limit and that
+			 * the next chunck start address is aligned
 			 */
-			copy = min_t(size_t, period_len - sg_used,
-				     XILINX_DMA_MAX_TRANS_LEN);
+			copy = period_len - sg_used;
+			if (copy > XILINX_DMA_MAX_TRANS_LEN &&
+			    chan->xdev->common.copy_align)
+				copy = rounddown(XILINX_DMA_MAX_TRANS_LEN,
+					 (1 << chan->xdev->common.copy_align));
+
 			hw = &segment->hw;
 			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
 					  period_len * i);
