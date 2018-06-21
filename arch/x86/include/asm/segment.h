@@ -116,6 +116,11 @@
 #define GDT_ENTRIES			32
 
 /*
+ * Last user-visible GDT slot
+ */
+#define GDT_LAST_USER			GDT_ENTRY_DEFAULT_USER_DS
+
+/*
  * Segment selector values corresponding to the above entries:
  */
 
@@ -193,6 +198,11 @@
  * Number of entries in the GDT table:
  */
 #define GDT_ENTRIES			16
+
+/*
+ * Last user-visible GDT slot
+ */
+#define GDT_LAST_USER			GDT_ENTRY_PER_CPU
 
 /*
  * Segment selector values corresponding to the above entries:
