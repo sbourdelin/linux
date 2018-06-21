@@ -275,7 +275,8 @@ static int shpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	int rc;
 	struct controller *ctrl;
 
-	if (acpi_get_hp_hw_control_from_firmware(pdev))
+	if (!shpchp_is_native(pdev) ||
+	    acpi_get_hp_hw_control_from_firmware(pdev))
 		return -ENODEV;
 
 	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
