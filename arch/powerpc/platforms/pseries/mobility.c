@@ -377,7 +377,7 @@ static ssize_t migration_store(struct class *class,
 	post_mobility_fixup();
 
 	/* Apply any necessary changes identified during fixup */
-	dlpar_schedule_delayed_queue();
+	dlpar_queued_actions_run();
 
 	return count;
 }
