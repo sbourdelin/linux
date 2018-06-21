@@ -1620,7 +1620,7 @@ int mq_init_ns(struct ipc_namespace *ns)
 
 	m = mq_create_mount(&init_ipc_ns);
 	if (IS_ERR(m))
-		return PTR_ERR(ns->mq_mnt);
+		return PTR_ERR(m);
 	ns->mq_mnt = m;
 	return 0;
 }
