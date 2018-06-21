@@ -350,7 +350,7 @@ void __init kvmclock_init(void)
 
 int __init kvm_setup_vsyscall_timeinfo(void)
 {
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86_64 || defined(CONFIG_X86_32)
 	int cpu;
 	u8 flags;
 	struct pvclock_vcpu_time_info *vcpu_time;
