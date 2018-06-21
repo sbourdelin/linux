@@ -172,10 +172,6 @@ void panic(const char *fmt, ...)
 
 	console_verbose();
 	bust_spinlocks(1);
-	va_start(args, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, args);
-	va_end(args);
-	pr_emerg("Kernel panic - not syncing: %s\n", buf);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
@@ -216,6 +212,11 @@ void panic(const char *fmt, ...)
 	 * add information to the kmsg dump output.
 	 */
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+	pr_emerg("Kernel panic - not syncing: %s\n", buf);
 
 	/* Call flush even twice. It tries harder with a single online CPU */
 	printk_safe_flush_on_panic();
