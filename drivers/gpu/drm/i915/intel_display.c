@@ -15633,11 +15633,21 @@ get_encoder_power_domains(struct drm_i915_private *dev_priv)
 	for_each_intel_encoder(&dev_priv->drm, encoder) {
 		u64 get_domains;
 		enum intel_display_power_domain domain;
+		struct intel_crtc_state *crtc_state;
 
 		if (!encoder->get_power_domains)
 			continue;
 
-		get_domains = encoder->get_power_domains(encoder);
+		/*
+		 * In case of a dangling encoder without a crtc we still need
+		 * to get power domain refs. Such encoders will be disabled
+		 * dropping these references.
+		 */
+		crtc_state = encoder->base.crtc ?
+			     to_intel_crtc_state(encoder->base.crtc->state) :
+			     NULL;
+
+		get_domains = encoder->get_power_domains(encoder, crtc_state);
 		for_each_power_domain(domain, get_domains)
 			intel_display_power_get(dev_priv, domain);
 	}
