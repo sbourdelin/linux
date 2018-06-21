@@ -1983,15 +1983,36 @@ out:
 	return ret;
 }
 
-static u64 intel_ddi_get_power_domains(struct intel_encoder *encoder)
+static u64 intel_ddi_get_power_domains(struct intel_encoder *encoder,
+				       struct intel_crtc_state *crtc_state)
 {
 	struct intel_digital_port *dig_port = enc_to_dig_port(&encoder->base);
 	enum pipe pipe;
+	u64 domains;
 
-	if (intel_ddi_get_hw_state(encoder, &pipe))
-		return BIT_ULL(dig_port->ddi_io_power_domain);
+	if (!intel_ddi_get_hw_state(encoder, &pipe))
+		return 0;
 
-	return 0;
+	domains = BIT_ULL(dig_port->ddi_io_power_domain);
+	if (!crtc_state)
+		return domains;
+
+	/*
+	 * TODO: Add support for MST encoders. Atm, the following should never
+	 * happen since this function will be called only for the primary
+	 * encoder which doesn't have its own pipe/crtc_state.
+	 */
+	if (WARN_ON(intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST)))
+		return domains;
+
+	/* AUX power is only needed for (e)DP mode, not for HDMI. */
+	if (!intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI)) {
+		struct intel_dp *intel_dp = &dig_port->dp;
+
+		domains |= BIT_ULL(intel_dp->aux_power_domain);
+	}
+
+	return domains;
 }
 
 void intel_ddi_enable_pipe_clock(const struct intel_crtc_state *crtc_state)
@@ -2631,6 +2652,8 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 
 	WARN_ON(is_mst && (port == PORT_A || port == PORT_E));
 
+	intel_display_power_get(dev_priv, intel_dp->aux_power_domain);
+
 	intel_dp_set_link_params(intel_dp, crtc_state->port_clock,
 				 crtc_state->lane_count, is_mst);
 
@@ -2775,6 +2798,8 @@ static void intel_ddi_post_disable_dp(struct intel_encoder *encoder,
 	intel_display_power_put(dev_priv, dig_port->ddi_io_power_domain);
 
 	intel_ddi_clk_disable(encoder);
+
+	intel_display_power_put(dev_priv, intel_dp->aux_power_domain);
 }
 
 static void intel_ddi_post_disable_hdmi(struct intel_encoder *encoder,
