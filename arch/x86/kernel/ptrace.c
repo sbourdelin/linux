@@ -1340,6 +1340,16 @@ static struct user_regset x86_64_regsets[] __ro_after_init = {
 		.active = gdt_active, .get = gdt_get,
 		.set = regset_gdt_set
 	},
+#ifdef CONFIG_MODIFY_LDT_SYSCALL
+	[REGSET_LDT] = {
+		.core_note_type = NT_X86_LDT,
+		.n = LDT_ENTRIES,
+		.size = sizeof(struct user_desc),
+		.align = sizeof(struct user_desc),
+		.active = regset_ldt_active, .get = regset_ldt_get,
+		.set = regset_ldt_set
+	},
+#endif
 };
 
 static const struct user_regset_view user_x86_64_view = {
@@ -1404,6 +1414,16 @@ static struct user_regset x86_32_regsets[] __ro_after_init = {
 		.active = gdt_active,
 		.get = gdt_get, .set = regset_gdt_set
 	},
+#ifdef CONFIG_MODIFY_LDT_SYSCALL
+	[REGSET_LDT] = {
+		.core_note_type = NT_X86_LDT,
+		.n = LDT_ENTRIES,
+		.size = sizeof(struct user_desc),
+		.align = sizeof(struct user_desc),
+		.active = regset_ldt_active,
+		.get = regset_ldt_get, .set = regset_ldt_set
+	},
+#endif
 };
 
 static const struct user_regset_view user_x86_32_view = {

@@ -392,53 +392,39 @@ static int read_default_ldt(void __user *ptr, unsigned long bytecount)
 	return bytecount;
 }
 
-static int write_ldt(void __user *ptr, unsigned long bytecount, int oldmode)
+
+static int do_write_ldt(const struct task_struct *target,
+			const void *kbuf, const void __user *ubuf,
+			unsigned long bytecount, unsigned int index,
+			bool oldmode)
 {
-	struct mm_struct *mm = current->mm;
+	struct mm_struct *mm = target->mm;
 	struct ldt_struct *new_ldt, *old_ldt;
-	unsigned int old_nr_entries, new_nr_entries;
+	unsigned int count, old_nr_entries, new_nr_entries;
 	struct user_desc ldt_info;
+	const struct user_desc *kptr = kbuf;
+	const struct user_desc __user *uptr = ubuf;
 	struct desc_struct ldt;
+	unsigned short first_index, last_index;
 	int error;
 
-	error = -EINVAL;
-	if (bytecount != sizeof(ldt_info))
-		goto out;
-	error = -EFAULT;
-	if (copy_from_user(&ldt_info, ptr, sizeof(ldt_info)))
-		goto out;
+	if (bytecount % sizeof(ldt_info) ||
+	    bytecount >= LDT_ENTRY_SIZE*LDT_ENTRIES)
+		return -EINVAL;
 
-	error = -EINVAL;
-	if (ldt_info.entry_number >= LDT_ENTRIES)
-		goto out;
-	if (ldt_info.contents == 3) {
-		if (oldmode)
-			goto out;
-		if (ldt_info.seg_not_present == 0)
-			goto out;
-	}
+	count = bytecount/sizeof(ldt_info);
+	if (index >= LDT_ENTRIES || index + count > LDT_ENTRIES)
+		return -EINVAL;
 
-	if ((oldmode && !ldt_info.base_addr && !ldt_info.limit) ||
-	    LDT_empty(&ldt_info)) {
-		/* The user wants to clear the entry. */
-		memset(&ldt, 0, sizeof(ldt));
-	} else {
-		if (!IS_ENABLED(CONFIG_X86_16BIT) && !ldt_info.seg_32bit) {
-			error = -EINVAL;
-			goto out;
-		}
-
-		fill_ldt(&ldt, &ldt_info);
-		if (oldmode)
-			ldt.avl = 0;
-	}
+	first_index = index;
+	last_index = index + count - 1;
 
 	if (down_write_killable(&mm->context.ldt_usr_sem))
 		return -EINTR;
 
-	old_ldt       = mm->context.ldt;
+	old_ldt	       = mm->context.ldt;
 	old_nr_entries = old_ldt ? old_ldt->nr_entries : 0;
-	new_nr_entries = max(ldt_info.entry_number + 1, old_nr_entries);
+	new_nr_entries = max(index + count, old_nr_entries);
 
 	error = -ENOMEM;
 	new_ldt = alloc_ldt_struct(new_nr_entries);
@@ -446,9 +432,46 @@ static int write_ldt(void __user *ptr, unsigned long bytecount, int oldmode)
 		goto out_unlock;
 
 	if (old_ldt)
-		memcpy(new_ldt->entries, old_ldt->entries, old_nr_entries * LDT_ENTRY_SIZE);
+		memcpy(new_ldt->entries, old_ldt->entries,
+		       old_nr_entries * LDT_ENTRY_SIZE);
 
-	new_ldt->entries[ldt_info.entry_number] = ldt;
+	while (count--) {
+		error = -EFAULT;
+		if (kptr) {
+			memcpy(&ldt_info, kptr++, sizeof(ldt_info));
+		} else {
+			if (__copy_from_user(&ldt_info, uptr++,
+					     sizeof(ldt_info)))
+				goto out_free;
+		}
+
+		error = -EINVAL;
+		if (ldt_info.contents == 3) {
+			if (oldmode)
+				goto out_free;
+			if (ldt_info.seg_not_present == 0)
+				goto out_free;
+		}
+
+		if ((oldmode && !ldt_info.base_addr && !ldt_info.limit) ||
+		    LDT_empty(&ldt_info)) {
+			/* The user wants to clear the entry. */
+			memset(&ldt, 0, sizeof(ldt));
+		} else {
+			if (!IS_ENABLED(CONFIG_X86_16BIT) &&
+			    !ldt_info.seg_32bit) {
+				error = -EINVAL;
+				goto out_free;
+			}
+		}
+
+		fill_ldt(&ldt, &ldt_info);
+		if (oldmode)
+			ldt.avl = 0;
+
+		new_ldt->entries[index++] = ldt;
+	}
+
 	finalize_ldt_struct(new_ldt);
 
 	/*
@@ -466,18 +489,39 @@ static int write_ldt(void __user *ptr, unsigned long bytecount, int oldmode)
 		 */
 		if (!WARN_ON_ONCE(old_ldt))
 			free_ldt_pgtables(mm);
-		free_ldt_struct(new_ldt);
-		goto out_unlock;
+		goto out_free;
 	}
 
-	install_ldt(mm, new_ldt, ldt_info.entry_number, ldt_info.entry_number);
-	free_ldt_struct(old_ldt);
+	install_ldt(mm, new_ldt, first_index, last_index);
+
+	/* Success! */
+	new_ldt = old_ldt;	/* Free the old LDT, not the new one */
 	error = 0;
 
+out_free:
+	free_ldt_struct(new_ldt);
 out_unlock:
 	up_write(&mm->context.ldt_usr_sem);
-out:
 	return error;
+}
+
+static int write_ldt(void __user *ptr, unsigned long bytecount, bool oldmode)
+{
+	struct user_desc ldt_info;
+
+	/*
+	 * We have to read the LDT entry number from the structure
+	 * ahead of time, so it is not practical to allow more than
+	 * one update here.
+	 */
+	if (bytecount != sizeof(ldt_info))
+		return -EINVAL;
+
+	if (copy_from_user(&ldt_info, ptr, sizeof(ldt_info)))
+		return -EFAULT;
+
+	return do_write_ldt(current, &ldt_info, NULL, sizeof(ldt_info),
+			    ldt_info.entry_number, oldmode);
 }
 
 SYSCALL_DEFINE3(modify_ldt, int , func , void __user * , ptr ,
@@ -490,13 +534,13 @@ SYSCALL_DEFINE3(modify_ldt, int , func , void __user * , ptr ,
 		ret = read_ldt(ptr, bytecount);
 		break;
 	case 1:
-		ret = write_ldt(ptr, bytecount, 1);
+		ret = write_ldt(ptr, bytecount, true);
 		break;
 	case 2:
 		ret = read_default_ldt(ptr, bytecount);
 		break;
 	case 0x11:
-		ret = write_ldt(ptr, bytecount, 0);
+		ret = write_ldt(ptr, bytecount, false);
 		break;
 	}
 	/*
@@ -509,4 +553,83 @@ SYSCALL_DEFINE3(modify_ldt, int , func , void __user * , ptr ,
 	 * taking the value from int->long.
 	 */
 	return (unsigned int)ret;
+}
+
+int regset_ldt_active(struct task_struct *target,
+		      const struct user_regset *regset)
+{
+	struct mm_struct *mm = target->mm;
+	const struct desc_struct *p;
+	int n;
+
+	down_read(&mm->context.ldt_usr_sem);
+
+	if (!mm->context.ldt) {
+		n = 0;
+	} else {
+		n = mm->context.ldt->nr_entries;
+		p = mm->context.ldt->entries + n;
+		while (n > 0 && desc_empty(--p))
+		       n--;
+	}
+
+	up_read(&mm->context.ldt_usr_sem);
+	return n;
+}
+
+int regset_ldt_get(struct task_struct *target,
+		   const struct user_regset *regset,
+		   unsigned int pos, unsigned int count,
+		   void *kbuf, void __user *ubuf)
+{
+	struct mm_struct *mm = target->mm;
+	const struct desc_struct *p;
+	struct user_desc udesc;
+	unsigned int index, nr_entries;
+	int err = 0;
+
+	if (pos % sizeof(struct user_desc))
+		return -EINVAL;
+
+	index = pos/sizeof(struct user_desc);
+
+	down_read(&mm->context.ldt_usr_sem);
+
+	if (!mm->context.ldt) {
+		nr_entries = 0;
+		p = NULL;
+	} else {
+		nr_entries = mm->context.ldt->nr_entries;
+		p = mm->context.ldt->entries + index;
+	}
+
+	while (count >= sizeof(struct user_desc) && index < nr_entries) {
+		fill_user_desc(&udesc, index++, p++);
+		err = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+					  &udesc, pos, pos + sizeof(udesc));
+		if (err)
+			goto out_unlock;
+	}
+
+
+	up_read(&mm->context.ldt_usr_sem);
+
+	return user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf,
+					nr_entries*sizeof(struct user_desc),
+					LDT_ENTRIES*sizeof(struct user_desc));
+out_unlock:
+	up_read(&mm->context.ldt_usr_sem);
+	return err;
+}
+
+int regset_ldt_set(struct task_struct *target,
+		   const struct user_regset *regset,
+		   unsigned int pos, unsigned int count,
+		   const void *kbuf, const void __user *ubuf)
+{
+	if (pos % sizeof(struct user_desc))
+		return -EINVAL;
+
+	pos /= sizeof(struct user_desc);
+	return do_write_ldt(target, kbuf, ubuf, count, pos, false);
 }

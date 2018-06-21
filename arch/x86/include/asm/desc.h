@@ -3,7 +3,7 @@
 #define _ASM_X86_DESC_H
 
 #include <asm/desc_defs.h>
-#include <asm/ldt.h>
+#include <uapi/asm/ldt.h>
 #include <asm/mmu.h>
 #include <asm/fixmap.h>
 #include <asm/irq_vectors.h>
