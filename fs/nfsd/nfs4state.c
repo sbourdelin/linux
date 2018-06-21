@@ -2715,7 +2715,7 @@ static __be32 check_forechannel_attrs(struct nfsd4_channel_attrs *ca, struct nfs
 	 */
 	ca->maxreqs = nfsd4_get_drc_mem(ca);
 	if (!ca->maxreqs)
-		return nfserr_jukebox;
+		return nfserr_nospc;
 
 	return nfs_ok;
 }
