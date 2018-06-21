@@ -686,12 +686,20 @@ void *__init_or_module text_poke_early(void *addr, const void *opcode,
  *
  * Note: Must be called under text_mutex.
  */
-void *text_poke(void *addr, const void *opcode, size_t len)
+void __ref *text_poke(void *addr, const void *opcode, size_t len)
 {
 	unsigned long flags;
 	char *vaddr;
 	struct page *pages[2];
 	int i;
+
+	/* While boot memory allocator is runnig we cannot use struct
+	 * pages as they are not yet initialized. However, we also know
+	 * that this is early in boot, and it is safe to fallback to
+	 * text_poke_early.
+	 */
+	if (unlikely(!after_bootmem))
+		return text_poke_early(addr, opcode, len);
 
 	if (!core_kernel_text((unsigned long)addr)) {
 		pages[0] = vmalloc_to_page(addr);
