@@ -13945,6 +13945,13 @@ T:	git git://repo.or.cz/linux-2.6/linux-acpi-2.6/ibm-acpi-2.6.git
 S:	Maintained
 F:	drivers/platform/x86/thinkpad_acpi.c
 
+THROTTLER DRIVERS
+M:	Matthias Kaehlcke <mka@chromium.org>
+L:	linux-pm@vger.kernel.org
+S:	Maintained
+F:	drivers/misc/throttler/
+F:	include/linux/throttler.h
+
 THUNDERBOLT DRIVER
 M:	Andreas Noever <andreas.noever@gmail.com>
 M:	Michael Jamet <michael.jamet@intel.com>
