@@ -29,36 +29,68 @@
 #include <asm/mmu_context.h>
 #include <asm/syscalls.h>
 
-static void refresh_ldt_segments(void)
-{
+struct flush_ldt_info {
+	struct mm_struct *mm;
+	unsigned short first_desc;
+	unsigned short last_desc;
+};
+
 #ifdef CONFIG_X86_64
+
+static inline bool
+need_requalify(unsigned short sel, const struct flush_ldt_info *info)
+{
+	/* Must be an LDT segment descriptor with an RPL of 3 */
+	if ((sel & (SEGMENT_TI_MASK|SEGMENT_RPL_MASK)) != (SEGMENT_LDT|3))
+		return false;
+
+	return sel >= info->first_desc && sel <= info->last_desc;
+}
+
+static void refresh_ldt_segments(const struct flush_ldt_info *info)
+{
 	unsigned short sel;
 
 	/*
-	 * Make sure that the cached DS and ES descriptors match the updated
-	 * LDT.
+	 * Make sure that the cached DS/ES/FS/GS descriptors
+	 * match the updated LDT, if the specific selectors point
+	 * to LDT entries that have changed.
 	 */
 	savesegment(ds, sel);
-	if ((sel & SEGMENT_TI_MASK) == SEGMENT_LDT)
+	if (need_requalify(sel, info))
 		loadsegment(ds, sel);
 
 	savesegment(es, sel);
-	if ((sel & SEGMENT_TI_MASK) == SEGMENT_LDT)
+	if (need_requalify(sel, info))
 		loadsegment(es, sel);
-#endif
+
+	savesegment(fs, sel);
+	if (need_requalify(sel, info))
+		loadsegment(fs, sel);
+
+	savesegment(gs, sel);
+	if (need_requalify(sel, info))
+		load_gs_index(sel);
 }
 
-/* context.lock is held by the task which issued the smp function call */
-static void flush_ldt(void *__mm)
+#else
+/* On 32 bits, entry_32.S takes care of this on kernel exit */
+static void refresh_ldt_segments(const struct flush_ldt_info *info)
 {
-	struct mm_struct *mm = __mm;
+	(void)info;
+}
+#endif
 
-	if (this_cpu_read(cpu_tlbstate.loaded_mm) != mm)
+/* context.lock is held by the task which issued the smp function call */
+static void flush_ldt(void *_info)
+{
+	const struct flush_ldt_info *info = _info;
+
+	if (this_cpu_read(cpu_tlbstate.loaded_mm) != info->mm)
 		return;
 
-	load_mm_ldt(mm);
-
-	refresh_ldt_segments();
+	load_mm_ldt(info->mm);
+	refresh_ldt_segments(info);
 }
 
 /* The caller must call finalize_ldt_struct on the result. LDT starts zeroed. */
@@ -223,15 +255,21 @@ static void finalize_ldt_struct(struct ldt_struct *ldt)
 	paravirt_alloc_ldt(ldt->entries, ldt->nr_entries);
 }
 
-static void install_ldt(struct mm_struct *mm, struct ldt_struct *ldt)
+static void install_ldt(struct mm_struct *mm, struct ldt_struct *ldt,
+			unsigned short first_index, unsigned short last_index)
 {
+	struct flush_ldt_info info;
+
 	mutex_lock(&mm->context.lock);
 
 	/* Synchronizes with READ_ONCE in load_mm_ldt. */
 	smp_store_release(&mm->context.ldt, ldt);
 
 	/* Activate the LDT for all CPUs using currents mm. */
-	on_each_cpu_mask(mm_cpumask(mm), flush_ldt, mm, true);
+	info.mm = mm;
+	info.first_desc = (first_index << 3)|SEGMENT_LDT|3;
+	info.last_desc  = (last_index << 3)|SEGMENT_LDT|3;
+	on_each_cpu_mask(mm_cpumask(mm), flush_ldt, &info, true);
 
 	mutex_unlock(&mm->context.lock);
 }
@@ -436,7 +474,7 @@ static int write_ldt(void __user *ptr, unsigned long bytecount, int oldmode)
 		goto out_unlock;
 	}
 
-	install_ldt(mm, new_ldt);
+	install_ldt(mm, new_ldt, ldt_info.entry_number, ldt_info.entry_number);
 	free_ldt_struct(old_ldt);
 	error = 0;
 
