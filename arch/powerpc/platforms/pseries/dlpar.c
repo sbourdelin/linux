@@ -449,6 +449,9 @@ static int dlpar_pmt(struct pseries_hp_errorlog *work)
 		kfree(tmp);
 	}
 
+	ssleep(5);
+	rebuild_sched_domains();
+
 	return 0;
 }
 
