@@ -440,8 +440,12 @@ int khugepaged_enter_vma_merge(struct vm_area_struct *vma,
 		 * page fault if needed.
 		 */
 		return 0;
-	if (vma->vm_ops || (vm_flags & VM_NO_KHUGEPAGED))
-		/* khugepaged not yet working on file or special mappings */
+	if ((vma->vm_ops && !shmem_file(vma->vm_file)) ||
+	    (vm_flags & VM_NO_KHUGEPAGED))
+		/*
+		 * khugepaged not yet working on non-shmem file or special
+		 * mappings
+		 */
 		return 0;
 	hstart = (vma->vm_start + ~HPAGE_PMD_MASK) & HPAGE_PMD_MASK;
 	hend = vma->vm_end & HPAGE_PMD_MASK;
@@ -1517,6 +1521,8 @@ tree_unlocked:
 		unlock_page(new_page);
 
 		*hpage = NULL;
+
+		khugepaged_pages_collapsed++;
 	} else {
 		/* Something went wrong: rollback changes to the radix-tree */
 		shmem_uncharge(mapping->host, nr_none);
