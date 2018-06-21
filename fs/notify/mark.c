@@ -443,7 +443,7 @@ static int fsnotify_attach_connector_to_object(
 {
 	struct fsnotify_mark_connector *conn;
 
-	conn = kmem_cache_alloc(fsnotify_mark_connector_cachep, GFP_KERNEL);
+	conn = kmem_cache_alloc(fsnotify_mark_connector_cachep, GFP_ATOMIC);
 	if (!conn)
 		return -ENOMEM;
 	spin_lock_init(&conn->lock);
