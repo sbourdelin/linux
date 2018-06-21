@@ -368,7 +368,6 @@ int rw_verify_area(int read_write, struct file *file, const loff_t *ppos, size_t
 	loff_t pos;
 	int retval = -EINVAL;
 
-	inode = file_inode(file);
 	if (unlikely((ssize_t) count < 0))
 		return retval;
 	pos = *ppos;
@@ -382,6 +381,7 @@ int rw_verify_area(int read_write, struct file *file, const loff_t *ppos, size_t
 			return retval;
 	}
 
+	inode = file_inode(file);
 	if (unlikely(inode->i_flctx && mandatory_lock(inode))) {
 		retval = locks_mandatory_area(inode, file, pos, pos + count - 1,
 				read_write == READ ? F_RDLCK : F_WRLCK);
