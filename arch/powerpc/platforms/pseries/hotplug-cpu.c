@@ -686,14 +686,18 @@ static int dlpar_cpu_readd_by_index(u32 drc_index)
 
 	pr_info("Attempting to re-add CPU, drc index %x\n", drc_index);
 
+	rtas_event_scan_disable();
 	arch_update_cpu_topology_suspend();
 	rc = dlpar_cpu_remove_by_index(drc_index, false);
 	arch_update_cpu_topology_resume();
+	rtas_event_scan_enable();
 
 	if (!rc) {
+		rtas_event_scan_disable();
 		arch_update_cpu_topology_suspend();
 		rc = dlpar_cpu_add(drc_index, false);
 		arch_update_cpu_topology_resume();
+		rtas_event_scan_enable();
 	}
 
 	if (rc)
