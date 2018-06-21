@@ -381,6 +381,8 @@ int nfs41_discover_server_trunking(struct nfs_client *clp,
 	}
 	nfs4_schedule_state_manager(clp);
 	status = nfs_wait_client_init_complete(clp);
+	if (!status) /* -ERESTARTSYS */
+		status = nfs_client_init_status(clp);
 	if (status < 0)
 		nfs_put_client(clp);
 	return status;
@@ -1919,6 +1921,9 @@ static int nfs4_handle_reclaim_lease_error(struct nfs_client *clp, int status)
 		dprintk("%s: exit with error %d for server %s\n",
 				__func__, -EPROTONOSUPPORT, clp->cl_hostname);
 		return -EPROTONOSUPPORT;
+	case -NFS4ERR_NOSPC:
+		nfs_mark_client_ready(clp, status);
+		/*fall through*/
 	case -NFS4ERR_NOT_SAME: /* FixMe: implement recovery
 				 * in nfs4_exchange_id */
 	default:
@@ -2186,6 +2191,7 @@ again:
 	case 0:
 	case -EINTR:
 	case -ERESTARTSYS:
+	case -NFS4ERR_NOSPC:
 		break;
 	case -ETIMEDOUT:
 		if (clnt->cl_softrtry)
