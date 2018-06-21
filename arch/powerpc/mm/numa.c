@@ -1079,6 +1079,7 @@ static void reset_topology_timer(void);
 static int topology_timer_secs = 1;
 static int topology_inited;
 static int topology_update_needed;
+static int topology_update_enabled = 1;
 static struct mutex topology_update_lock;
 
 /*
@@ -1313,6 +1314,9 @@ int numa_update_cpu_topology(bool cpus_locked)
 		return 0;
 	}
 
+	if (!topology_update_enabled)
+		return 0;
+
 	weight = cpumask_weight(&cpu_associativity_changes_mask);
 	if (!weight)
 		return 0;
@@ -1437,6 +1441,16 @@ out:
 int arch_update_cpu_topology(void)
 {
 	return numa_update_cpu_topology(true);
+}
+
+void arch_update_cpu_topology_suspend(void)
+{
+	topology_update_enabled = 0;
+}
+
+void arch_update_cpu_topology_resume(void)
+{
+	topology_update_enabled = 1;
 }
 
 static void topology_work_fn(struct work_struct *work)
