@@ -1,26 +1,32 @@
 TPO TPG110 Panel
 ================
 
-This binding builds on the DPI bindings, adding a few properties
-as a superset of a DPI. See panel-dpi.txt for the required DPI
-bindings.
+This panel driver can driver a variety of panels. It requires
+a few GPIO lines for control of its reset line and custom serial
+protocol.
 
 Required properties:
-- compatible : "tpo,tpg110"
+- compatible : one of:
+  "ste,nomadik-nhk15-display", "tpo,tpg110"
+  "tpo,tpg110"
 - grestb-gpios : panel reset GPIO
 - scen-gpios : serial control enable GPIO
 - scl-gpios : serial control clock line GPIO
 - sda-gpios : serial control data line GPIO
+- width-mm : see display/panel/panel-common.txt
+- height-mm : see display/panel/panel-common.txt
 
-Required nodes:
-- Video port for DPI input, see panel-dpi.txt
-- Panel timing for DPI setup, see panel-dpi.txt
+The device node can contain one 'port' child node with one child
+'endpoint' node, according to the bindings defined in
+media/video-interfaces.txt. This node should describe panel's video bus.
 
 Example
 -------
 
 panel {
-	compatible = "tpo,tpg110", "panel-dpi";
+	compatible = "tpo,tpg110";
+	width-mm = <116>;
+	height-mm = <87>;
 	grestb-gpios = <&stmpe_gpio44 5 GPIO_ACTIVE_LOW>;
 	scen-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
 	scl-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
@@ -31,17 +37,5 @@ panel {
 		nomadik_clcd_panel: endpoint {
 			remote-endpoint = <&nomadik_clcd_pads>;
 		};
-	};
-
-	panel-timing {
-		clock-frequency = <33200000>;
-		hactive = <800>;
-		hback-porch = <216>;
-		hfront-porch = <40>;
-		hsync-len = <1>;
-		vactive = <480>;
-		vback-porch = <35>;
-		vfront-porch = <10>;
-		vsync-len = <1>;
 	};
 };
