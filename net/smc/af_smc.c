@@ -23,6 +23,7 @@
 #include <linux/workqueue.h>
 #include <linux/in.h>
 #include <linux/sched/signal.h>
+#include <linux/rcupdate.h>
 
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -605,6 +606,13 @@ static int smc_connect(struct socket *sock, struct sockaddr *addr,
 
 	smc_copy_sock_settings_to_clc(smc);
 	tcp_sk(smc->clcsock->sk)->syn_smc = 1;
+	if (flags & O_NONBLOCK) {
+		rcu_read_lock();
+		smc->smcwq = rcu_dereference(sk->sk_wq);
+		rcu_assign_pointer(sock->sk->sk_wq,
+				   rcu_dereference(smc->clcsock->sk->sk_wq));
+		rcu_read_unlock();
+	}
 	rc = kernel_connect(smc->clcsock, addr, alen, flags);
 	if (rc)
 		goto out;
@@ -1285,12 +1293,9 @@ static __poll_t smc_poll_mask(struct socket *sock, __poll_t events)
 
 	smc = smc_sk(sock->sk);
 	sock_hold(sk);
-	lock_sock(sk);
 	if ((sk->sk_state == SMC_INIT) || smc->use_fallback) {
 		/* delegate to CLC child sock */
-		release_sock(sk);
 		mask = smc->clcsock->ops->poll_mask(smc->clcsock, events);
-		lock_sock(sk);
 		sk->sk_err = smc->clcsock->sk->sk_err;
 		if (sk->sk_err) {
 			mask |= EPOLLERR;
@@ -1299,7 +1304,10 @@ static __poll_t smc_poll_mask(struct socket *sock, __poll_t events)
 			if (sk->sk_state == SMC_INIT &&
 			    mask & EPOLLOUT &&
 			    smc->clcsock->sk->sk_state != TCP_CLOSE) {
+				lock_sock(sk);
+				rcu_assign_pointer(sock->sk->sk_wq, smc->smcwq);
 				rc = __smc_connect(smc);
+				release_sock(sk);
 				if (rc < 0)
 					mask |= EPOLLERR;
 				/* success cases including fallback */
@@ -1334,7 +1342,6 @@ static __poll_t smc_poll_mask(struct socket *sock, __poll_t events)
 			mask |= EPOLLPRI;
 
 	}
-	release_sock(sk);
 	sock_put(sk);
 
 	return mask;
