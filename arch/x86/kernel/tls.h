@@ -14,8 +14,12 @@
 
 #include <linux/regset.h>
 
+#ifdef CONFIG_X86_TLS_AREA
 extern user_regset_active_fn regset_tls_active;
-extern user_regset_get_fn regset_tls_get;
-extern user_regset_set_fn regset_tls_set;
+extern user_regset_set_fn regset_gdt_set;
+#else
+#define regset_tls_active NULL
+#define regset_gdt_set NULL
+#endif
 
 #endif	/* _ARCH_X86_KERNEL_TLS_H */

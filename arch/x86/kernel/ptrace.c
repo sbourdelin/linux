@@ -50,6 +50,7 @@ enum x86_regset {
 	REGSET_XSTATE,
 	REGSET_TLS,
 	REGSET_IOPERM32,
+	REGSET_GDT
 };
 
 struct pt_regs_offset {
@@ -748,6 +749,60 @@ static int ioperm_get(struct task_struct *target,
 }
 
 /*
+ * These provide read access to the GDT.  As the only part that is
+ * writable is the TLS area, that code is in tls.c.
+ */
+static int gdt_get(struct task_struct *target,
+		   const struct user_regset *regset,
+		   unsigned int pos, unsigned int count,
+		   void *kbuf, void __user *ubuf)
+{
+	struct desc_struct gdt_copy[GDT_LAST_USER + 1];
+	const struct desc_struct *p;
+	struct user_desc udesc;
+	unsigned int index, endindex;
+	int err;
+
+	if (pos % sizeof(struct user_desc))
+		return -EINVAL;
+
+	/* Get a snapshot of the GDT from an arbitrary CPU */
+	memcpy(gdt_copy, get_current_gdt_ro(), sizeof(gdt_copy));
+
+	/* Copy over the TLS area */
+	memcpy(&gdt_copy[GDT_ENTRY_TLS_MIN], target->thread.tls_array,
+	       sizeof(target->thread.tls_array));
+
+	/* Descriptor zero is never accessible */
+	memset(&gdt_copy[0], 0, sizeof(gdt_copy[0]));
+
+	index = pos/sizeof(struct user_desc);
+	endindex = index + count/sizeof(struct user_desc);
+	endindex = min_t(unsigned int, GDT_LAST_USER + 1 - regset->bias,
+			endindex);
+
+	p = &gdt_copy[index + regset->bias];
+
+	while (count && index < endindex) {
+		fill_user_desc(&udesc, index++, p++);
+		err = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &udesc,
+					 pos, pos + sizeof(udesc));
+		if (err)
+			return err;
+	}
+
+	/* Return zero for the rest of the regset, if applicable. */
+	return user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf, 0, -1);
+}
+
+static int gdt_active(struct task_struct  *target,
+		      const struct user_regset *regset)
+{
+	(void)target;
+	return GDT_LAST_USER + 1;
+}
+
+/*
  * Called by kernel/ptrace.c when detaching..
  *
  * Make sure the single step bit is not set.
@@ -1262,7 +1317,8 @@ static struct user_regset x86_64_regsets[] __ro_after_init = {
 		.core_note_type = NT_PRFPREG,
 		.n = sizeof(struct user_i387_struct) / sizeof(long),
 		.size = sizeof(long), .align = sizeof(long),
-		.active = regset_xregset_fpregs_active, .get = xfpregs_get, .set = xfpregs_set
+		.active = regset_xregset_fpregs_active, .get = xfpregs_get,
+		.set = xfpregs_set
 	},
 	[REGSET_XSTATE] = {
 		.core_note_type = NT_X86_XSTATE,
@@ -1275,6 +1331,14 @@ static struct user_regset x86_64_regsets[] __ro_after_init = {
 		.n = IO_BITMAP_LONGS,
 		.size = sizeof(long), .align = sizeof(long),
 		.active = ioperm_active, .get = ioperm_get
+	},
+	[REGSET_GDT] = {
+		.core_note_type = NT_X86_GDT,
+		.n = LDT_ENTRIES, /* Theoretical maximum */
+		.size = sizeof(struct user_desc),
+		.align = sizeof(struct user_desc),
+		.active = gdt_active, .get = gdt_get,
+		.set = regset_gdt_set
 	},
 };
 
@@ -1309,7 +1373,8 @@ static struct user_regset x86_32_regsets[] __ro_after_init = {
 		.core_note_type = NT_PRXFPREG,
 		.n = sizeof(struct user32_fxsr_struct) / sizeof(u32),
 		.size = sizeof(u32), .align = sizeof(u32),
-		.active = regset_xregset_fpregs_active, .get = xfpregs_get, .set = xfpregs_set
+		.active = regset_xregset_fpregs_active, .get = xfpregs_get,
+		.set = xfpregs_set
 	},
 	[REGSET_XSTATE] = {
 		.core_note_type = NT_X86_XSTATE,
@@ -1323,13 +1388,21 @@ static struct user_regset x86_32_regsets[] __ro_after_init = {
 		.size = sizeof(struct user_desc),
 		.align = sizeof(struct user_desc),
 		.active = regset_tls_active,
-		.get = regset_tls_get, .set = regset_tls_set
+		.get = gdt_get, .set = regset_gdt_set
 	},
 	[REGSET_IOPERM32] = {
 		.core_note_type = NT_386_IOPERM,
 		.n = IO_BITMAP_BYTES / sizeof(u32),
 		.size = sizeof(u32), .align = sizeof(u32),
 		.active = ioperm_active, .get = ioperm_get
+	},
+	[REGSET_GDT] = {
+		.core_note_type = NT_X86_GDT,
+		.n = LDT_ENTRIES, /* Theoretical maximum */
+		.size = sizeof(struct user_desc),
+		.align = sizeof(struct user_desc),
+		.active = gdt_active,
+		.get = gdt_get, .set = regset_gdt_set
 	},
 };
 
@@ -1399,3 +1472,7 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
 	/* Send us the fake SIGTRAP */
 	force_sig_info(SIGTRAP, &info, tsk);
 }
+
+/*
+ * Copy out a set of segment descriptors in user_desc format.
+ */

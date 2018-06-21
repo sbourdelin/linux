@@ -231,67 +231,46 @@ int regset_tls_active(struct task_struct *target,
 	return n;
 }
 
-int regset_tls_get(struct task_struct *target, const struct user_regset *regset,
-		   unsigned int pos, unsigned int count,
-		   void *kbuf, void __user *ubuf)
-{
-	const struct desc_struct *tls;
-
-	if (pos >= GDT_ENTRY_TLS_ENTRIES * sizeof(struct user_desc) ||
-	    (pos % sizeof(struct user_desc)) != 0 ||
-	    (count % sizeof(struct user_desc)) != 0)
-		return -EINVAL;
-
-	pos /= sizeof(struct user_desc);
-	count /= sizeof(struct user_desc);
-
-	tls = &target->thread.tls_array[pos];
-
-	if (kbuf) {
-		struct user_desc *info = kbuf;
-		while (count-- > 0)
-			fill_user_desc(info++, GDT_ENTRY_TLS_MIN + pos++,
-				       tls++);
-	} else {
-		struct user_desc __user *u_info = ubuf;
-		while (count-- > 0) {
-			struct user_desc info;
-			fill_user_desc(&info, GDT_ENTRY_TLS_MIN + pos++, tls++);
-			if (__copy_to_user(u_info++, &info, sizeof(info)))
-				return -EFAULT;
-		}
-	}
-
-	return 0;
-}
-
-int regset_tls_set(struct task_struct *target, const struct user_regset *regset,
+/* The only part of the GDT that is settable is the TLS area */
+int regset_gdt_set(struct task_struct *target,
+		   const struct user_regset *regset,
 		   unsigned int pos, unsigned int count,
 		   const void *kbuf, const void __user *ubuf)
 {
 	struct user_desc infobuf[GDT_ENTRY_TLS_ENTRIES];
-	const struct user_desc *info;
-	int i;
+	const struct user_desc * const info = infobuf;
+	const unsigned int minpos =
+		GDT_ENTRY_TLS_MIN * sizeof(struct user_desc);
+	const unsigned int maxpos =
+		(GDT_ENTRY_TLS_MAX+1) * sizeof(struct user_desc);
+	int err;
+	unsigned int index, ntls, i;
 
-	if (pos >= GDT_ENTRY_TLS_ENTRIES * sizeof(struct user_desc) ||
-	    (pos % sizeof(struct user_desc)) != 0 ||
-	    (count % sizeof(struct user_desc)) != 0)
+	if (pos % sizeof(struct user_desc))
 		return -EINVAL;
 
-	if (kbuf)
-		info = kbuf;
-	else if (__copy_from_user(infobuf, ubuf, count))
-		return -EFAULT;
-	else
-		info = infobuf;
+	pos += regset->bias * sizeof(struct user_desc);
 
-	for (i = 0; i < count / sizeof(struct user_desc); i++)
-		if (!tls_desc_okay(info + i))
+	/* Ignore entries before the TLS region */
+	err = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf, 0, minpos);
+	if (err)
+		return err;
+
+	/* Load the TLS descriptor information */
+	index = pos/sizeof(struct user_desc);
+	ntls = count/sizeof(struct user_desc);
+	ntls  = min_t(unsigned int, GDT_ENTRY_TLS_ENTRIES, ntls);
+	err = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				infobuf, minpos, maxpos);
+	if (err)
+		return err;
+
+	for (i = 0; i < ntls; i++) {
+		if (!tls_desc_okay(&info[i]))
 			return -EINVAL;
+	}
 
-	set_tls_desc(target,
-		     GDT_ENTRY_TLS_MIN + (pos / sizeof(struct user_desc)),
-		     info, count / sizeof(struct user_desc));
+	set_tls_desc(target, index, info, ntls);
 
 	return 0;
 }
