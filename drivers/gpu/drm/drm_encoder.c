@@ -128,6 +128,12 @@ int drm_encoder_init(struct drm_device *dev,
 		encoder->name = kvasprintf(GFP_KERNEL, name, ap);
 		va_end(ap);
 	} else {
+		/* Make sure that the requested encoder type is in the list */
+		if (encoder_type >= ARRAY_SIZE(drm_encoder_enum_list)) {
+			ret = -EINVAL;
+			goto out_put;
+		}
+
 		encoder->name = kasprintf(GFP_KERNEL, "%s-%d",
 					  drm_encoder_enum_list[encoder_type].name,
 					  encoder->base.id);
