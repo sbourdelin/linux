@@ -881,7 +881,7 @@ out:
 	return ret;
 }
 
-void intel_crt_reset(struct drm_encoder *encoder)
+static void intel_crt_reset(struct drm_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->dev);
 	struct intel_crt *crt = intel_encoder_to_crt(to_intel_encoder(encoder));
