@@ -455,10 +455,24 @@ static DECLARE_DELAYED_WORK(event_scan_work, rtas_event_scan);
  */
 static unsigned long event_scan_delay = 1*HZ;
 static int first_pass = 1;
+static int res_enable = 1;
+
+void rtas_event_scan_disable(void)
+{
+	res_enable = 0;
+}
+
+void rtas_event_scan_enable(void)
+{
+	res_enable = 1;
+}
 
 static void rtas_event_scan(struct work_struct *w)
 {
 	unsigned int cpu;
+
+	if (!res_enable)
+		return;
 
 	do_event_scan();
 
