@@ -329,7 +329,7 @@ choice
 	default ARCH_MULTIPLATFORM if MMU
 
 config ARCH_MULTIPLATFORM
-	bool "Allow multiple platforms to be selected"
+	bool "Common platforms (\"multiplatform\")"
 	depends on MMU
 	select ARM_HAS_SG_CHAIN
 	select ARM_PATCH_PHYS_VIRT
@@ -342,6 +342,13 @@ config ARCH_MULTIPLATFORM
 	select PCI_DOMAINS if PCI
 	select SPARSE_IRQ
 	select USE_OF
+	help
+	  Support for systems implemented using the common "multiplatform"
+	  framework.
+
+	  Unless specialized options depending on intimate platform
+	  details, like XIP or NOMMU, are enabled, this allows to build a
+	  single kernel that boots on multiple platforms.
 
 config ARM_SINGLE_ARMV7M
 	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
