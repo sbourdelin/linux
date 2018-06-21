@@ -383,12 +383,8 @@ out_unlock:
 
 static int read_default_ldt(void __user *ptr, unsigned long bytecount)
 {
-	/* CHECKME: Can we use _one_ random number ? */
-#ifdef CONFIG_X86_32
-	unsigned long size = 5 * sizeof(struct desc_struct);
-#else
-	unsigned long size = 128;
-#endif
+	const unsigned long size = 128;
+
 	if (bytecount > size)
 		bytecount = size;
 	if (clear_user(ptr, bytecount))
