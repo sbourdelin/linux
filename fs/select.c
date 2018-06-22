@@ -528,6 +528,24 @@ static int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
 					wait_key_set(wait, in, out, bit,
 						     busy_flag);
 					mask = vfs_poll(f.file, wait);
+					if (f.file->f_op->poll) {
+						mask = f.file->f_op->poll(f.file, wait);
+					} else if (file_has_poll_mask(f.file)) {
+						struct wait_queue_head *head;
+
+						head = f.file->f_op->get_poll_head(f.file, wait->_key);
+						if (!head) {
+							mask = DEFAULT_POLLMASK;
+						} else if (IS_ERR(head)) {
+							mask = EPOLLERR;
+						} else {
+							if (wait->_qproc)
+								__pollwait(f.file, head, wait);
+							mask = f.file->f_op->poll_mask(f.file, wait->_key);
+						}
+					} else {
+						mask = DEFAULT_POLLMASK;
+					}
 
 					fdput(f);
 					if ((mask & POLLIN_SET) && (in & bit)) {
@@ -845,7 +863,25 @@ static inline __poll_t do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 	/* userland u16 ->events contains POLL... bitmap */
 	filter = demangle_poll(pollfd->events) | EPOLLERR | EPOLLHUP;
 	pwait->_key = filter | busy_flag;
-	mask = vfs_poll(f.file, pwait);
+	if (f.file->f_op->poll) {
+		mask = f.file->f_op->poll(f.file, pwait);
+	} else if (file_has_poll_mask(f.file)) {
+		struct wait_queue_head *head;
+
+		head = f.file->f_op->get_poll_head(f.file, pwait->_key);
+		if (!head) {
+			mask = DEFAULT_POLLMASK;
+		} else if (IS_ERR(head)) {
+			mask = EPOLLERR;
+		} else {
+			if (pwait->_qproc)
+				__pollwait(f.file, head, pwait);
+			mask = f.file->f_op->poll_mask(f.file, pwait->_key);
+		}
+	} else {
+		mask = DEFAULT_POLLMASK;
+	}
+
 	if (mask & busy_flag)
 		*can_busy_poll = true;
 	mask &= filter;		/* Mask out unneeded events. */
