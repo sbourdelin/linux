@@ -27,6 +27,10 @@ struct builtin_fw {
 	unsigned long size;
 };
 
+struct firmware_opts {
+	bool optional;
+};
+
 /* We have to play tricks here much like stringify() to get the
    __COUNTER__ macro to be expanded as we want it */
 #define __fw_concat1(x, y) x##y
@@ -52,6 +56,10 @@ int request_firmware_direct(const struct firmware **fw, const char *name,
 			    struct device *device);
 int request_firmware_into_buf(const struct firmware **firmware_p,
 	const char *name, struct device *device, void *buf, size_t size);
+int __request_firmware_async(struct module *module, const char *name,
+			     struct firmware_opts *fw_opts, struct device *dev,
+			     void *context,
+			     void (*cont)(const struct firmware *fw, void *context));
 
 void release_firmware(const struct firmware *fw);
 #else
@@ -94,8 +102,20 @@ static inline int request_firmware_into_buf(const struct firmware **firmware_p,
 	return -EINVAL;
 }
 
+int __request_firmware_async(struct module *module, const char *name,
+			     struct firmware_opts *fw_opts, struct device *dev,
+			     void *context,
+			     void (*cont)(const struct firmware *fw, void *context))
+{
+	return -EINVAL;
+}
+
 #endif
 
 int firmware_request_cache(struct device *device, const char *name);
+
+#define request_firmware_async(name, fw_opts, dev, context, cont)	\
+	__request_firmware_async(THIS_MODULE, name, fw_opts, dev,	\
+				 context, cont)
 
 #endif
