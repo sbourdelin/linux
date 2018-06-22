@@ -1040,6 +1040,77 @@ static int ipv6_renew_option(void *ohdr,
 	return 0;
 }
 
+static int ipv6_renew_option_kern(void *ohdr,
+				  struct ipv6_opt_hdr *newopt, int newoptlen,
+				  int inherit,
+				  struct ipv6_opt_hdr **hdr,
+				  char **p)
+{
+	if (inherit) {
+		if (ohdr) {
+			memcpy(*p, ohdr,
+			       ipv6_optlen((struct ipv6_opt_hdr *)ohdr));
+			*hdr = (struct ipv6_opt_hdr *)*p;
+			*p += CMSG_ALIGN(ipv6_optlen(*hdr));
+		}
+	} else if (newopt) {
+		memcpy(*p, newopt, newoptlen);
+		*hdr = (struct ipv6_opt_hdr *)*p;
+		if (ipv6_optlen(*hdr) > newoptlen)
+			return -EINVAL;
+		*p += CMSG_ALIGN(newoptlen);
+	}
+	return 0;
+}
+
+/**
+ * ipv6_renew_option_alloc - helper function for allocating ipv6_txoptions
+ *
+ * @sk: sock from which to allocate memory
+ * @opt: original options
+ * @newtype: option type to replace in @opt
+ * @newoptlen: length of the new option
+ *
+ * This really should only ever be called by ipv6_renew_option() or
+ * ipv6_renew_option_kern().
+ */
+static struct ipv6_txoptions *ipv6_renew_option_alloc(struct sock *sk,
+						      struct ipv6_txoptions *opt,
+						      int newtype,
+						      int newoptlen)
+{
+	int tot_len = 0;
+	struct ipv6_txoptions *opt2;
+
+	if (opt) {
+		if (newtype != IPV6_HOPOPTS && opt->hopopt)
+			tot_len += CMSG_ALIGN(ipv6_optlen(opt->hopopt));
+		if (newtype != IPV6_RTHDRDSTOPTS && opt->dst0opt)
+			tot_len += CMSG_ALIGN(ipv6_optlen(opt->dst0opt));
+		if (newtype != IPV6_RTHDR && opt->srcrt)
+			tot_len += CMSG_ALIGN(ipv6_optlen(opt->srcrt));
+		if (newtype != IPV6_DSTOPTS && opt->dst1opt)
+			tot_len += CMSG_ALIGN(ipv6_optlen(opt->dst1opt));
+	}
+
+	if (newoptlen)
+		tot_len += CMSG_ALIGN(newoptlen);
+
+	if (!tot_len)
+		return NULL;
+
+	tot_len += sizeof(*opt2);
+	opt2 = sock_kmalloc(sk, tot_len, GFP_ATOMIC);
+	if (!opt2)
+		return ERR_PTR(-ENOBUFS);
+
+	memset(opt2, 0, tot_len);
+	refcount_set(&opt2->refcnt, 1);
+	opt2->tot_len = tot_len;
+
+	return opt2;
+}
+
 /**
  * ipv6_renew_options - replace a specific ext hdr with a new one.
  *
@@ -1066,36 +1137,14 @@ ipv6_renew_options(struct sock *sk, struct ipv6_txoptions *opt,
 		   int newtype,
 		   struct ipv6_opt_hdr __user *newopt, int newoptlen)
 {
-	int tot_len = 0;
 	char *p;
 	struct ipv6_txoptions *opt2;
 	int err;
 
-	if (opt) {
-		if (newtype != IPV6_HOPOPTS && opt->hopopt)
-			tot_len += CMSG_ALIGN(ipv6_optlen(opt->hopopt));
-		if (newtype != IPV6_RTHDRDSTOPTS && opt->dst0opt)
-			tot_len += CMSG_ALIGN(ipv6_optlen(opt->dst0opt));
-		if (newtype != IPV6_RTHDR && opt->srcrt)
-			tot_len += CMSG_ALIGN(ipv6_optlen(opt->srcrt));
-		if (newtype != IPV6_DSTOPTS && opt->dst1opt)
-			tot_len += CMSG_ALIGN(ipv6_optlen(opt->dst1opt));
-	}
-
-	if (newopt && newoptlen)
-		tot_len += CMSG_ALIGN(newoptlen);
-
-	if (!tot_len)
-		return NULL;
-
-	tot_len += sizeof(*opt2);
-	opt2 = sock_kmalloc(sk, tot_len, GFP_ATOMIC);
-	if (!opt2)
-		return ERR_PTR(-ENOBUFS);
-
-	memset(opt2, 0, tot_len);
-	refcount_set(&opt2->refcnt, 1);
-	opt2->tot_len = tot_len;
+	opt2 = ipv6_renew_option_alloc(sk, opt, newtype,
+				       newopt && newoptlen ? newoptlen : 0);
+	if (!opt2 || IS_ERR(opt2))
+		return opt2;
 	p = (char *)(opt2 + 1);
 
 	err = ipv6_renew_option(opt ? opt->hopopt : NULL, newopt, newoptlen,
@@ -1142,23 +1191,61 @@ out:
  * @newopt: new option of type @newtype to replace (kernel-mem)
  * @newoptlen: length of @newopt
  *
- * See ipv6_renew_options().  The difference is that @newopt is
- * kernel memory, rather than user memory.
+ * See ipv6_renew_options().  The difference is that @newopt is kernel memory,
+ * rather than user memory.
  */
 struct ipv6_txoptions *
 ipv6_renew_options_kern(struct sock *sk, struct ipv6_txoptions *opt,
-			int newtype, struct ipv6_opt_hdr *newopt,
-			int newoptlen)
+			int newtype,
+			struct ipv6_opt_hdr *newopt, int newoptlen)
 {
-	struct ipv6_txoptions *ret_val;
-	const mm_segment_t old_fs = get_fs();
+	char *p;
+	struct ipv6_txoptions *opt2;
+	int err;
 
-	set_fs(KERNEL_DS);
-	ret_val = ipv6_renew_options(sk, opt, newtype,
-				     (struct ipv6_opt_hdr __user *)newopt,
-				     newoptlen);
-	set_fs(old_fs);
-	return ret_val;
+	opt2 = ipv6_renew_option_alloc(sk, opt, newtype,
+				       newopt && newoptlen ? newoptlen : 0);
+	if (!opt2 || IS_ERR(opt2))
+		return opt2;
+	p = (char *)(opt2 + 1);
+
+	err = ipv6_renew_option_kern(opt ? opt->hopopt : NULL,
+				     newopt, newoptlen,
+				     newtype != IPV6_HOPOPTS,
+				     &opt2->hopopt, &p);
+	if (err)
+		goto out;
+
+	err = ipv6_renew_option_kern(opt ? opt->dst0opt : NULL,
+				     newopt, newoptlen,
+				     newtype != IPV6_RTHDRDSTOPTS,
+				     &opt2->dst0opt, &p);
+	if (err)
+		goto out;
+
+	err = ipv6_renew_option_kern(opt ? opt->srcrt : NULL,
+				     newopt, newoptlen,
+				     newtype != IPV6_RTHDR,
+				     (struct ipv6_opt_hdr **)&opt2->srcrt, &p);
+	if (err)
+		goto out;
+
+	err = ipv6_renew_option_kern(opt ? opt->dst1opt : NULL,
+				     newopt, newoptlen,
+				     newtype != IPV6_DSTOPTS,
+				     &opt2->dst1opt, &p);
+	if (err)
+		goto out;
+
+	opt2->opt_nflen = (opt2->hopopt ? ipv6_optlen(opt2->hopopt) : 0) +
+			  (opt2->dst0opt ? ipv6_optlen(opt2->dst0opt) : 0) +
+			  (opt2->srcrt ? ipv6_optlen(opt2->srcrt) : 0);
+	opt2->opt_flen = (opt2->dst1opt ? ipv6_optlen(opt2->dst1opt) : 0);
+
+	return opt2;
+out:
+	sock_kfree_s(sk, opt2, opt2->tot_len);
+	return ERR_PTR(err);
 }
 
 struct ipv6_txoptions *ipv6_fixup_options(struct ipv6_txoptions *opt_space,
