@@ -42,9 +42,10 @@ struct posix_acl *btrfs_get_acl(struct inode *inode, int type)
 	}
 	if (size > 0) {
 		acl = posix_acl_from_xattr(&init_user_ns, value, size);
-	} else if (size == -ERANGE || size == -ENODATA || size == 0) {
+	} else if (size == -ENODATA || size == 0) {
 		acl = NULL;
 	} else {
+		pr_err_ratelimited("BTRFS: get acl failed, err=%d\n", size);
 		acl = ERR_PTR(-EIO);
 	}
 	kfree(value);
