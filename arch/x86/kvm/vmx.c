@@ -2167,6 +2167,19 @@ static __always_inline void vmcs_writel(unsigned long field, unsigned long value
 	__vmcs_writel(field, value);
 }
 
+static bool cpu_has_vmcs_field(unsigned long field)
+{
+	unsigned long value;
+	u8 error;
+
+	asm volatile (__ex_clear(ASM_VMX_VMREAD_RDX_RAX, "%0") "; seta %1"
+		      : "=a"(value), "=qm"(error)
+		      : "d"(field)
+		      : "cc");
+
+	return error;
+}
+
 static __always_inline void vmcs_clear_bits(unsigned long field, u32 mask)
 {
         BUILD_BUG_ON_MSG(__builtin_constant_p(field) && ((field) & 0x6000) == 0x2000,
