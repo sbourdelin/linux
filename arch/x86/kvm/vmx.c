@@ -4441,7 +4441,10 @@ static void free_loaded_vmcs(struct loaded_vmcs *loaded_vmcs)
 	loaded_vmcs->vmcs = NULL;
 	if (loaded_vmcs->msr_bitmap)
 		free_page((unsigned long)loaded_vmcs->msr_bitmap);
-	WARN_ON(loaded_vmcs->shadow_vmcs != NULL);
+	if (loaded_vmcs->shadow_vmcs) {
+		free_vmcs(loaded_vmcs->shadow_vmcs);
+		loaded_vmcs->shadow_vmcs = NULL;
+	}
 }
 
 static struct vmcs *alloc_vmcs(bool shadow)
@@ -11354,6 +11357,11 @@ static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12)
 
 	if (nested_cpu_has_xsaves(vmcs12))
 		vmcs_write64(XSS_EXIT_BITMAP, vmcs12->xss_exit_bitmap);
+
+	if (nested_cpu_has2(vmcs12, SECONDARY_EXEC_SHADOW_VMCS) &&
+	    enable_shadow_vmcs && alloc_shadow_vmcs(vcpu)) {
+		/* TODO: IMPLEMENT */
+	}
 	vmcs_write64(VMCS_LINK_POINTER, -1ull);
 
 	if (cpu_has_vmx_posted_intr())
