@@ -4513,7 +4513,8 @@ enum vmcs_field_width {
 	VMCS_FIELD_WIDTH_U16 = 0,
 	VMCS_FIELD_WIDTH_U64 = 1,
 	VMCS_FIELD_WIDTH_U32 = 2,
-	VMCS_FIELD_WIDTH_NATURAL_WIDTH = 3
+	VMCS_FIELD_WIDTH_NATURAL_WIDTH = 3,
+	VMCS_FIELD_WIDTHS,
 };
 
 static inline int vmcs_field_width(unsigned long field)
@@ -4527,7 +4528,8 @@ enum vmcs_field_type {
 	VMCS_FIELD_TYPE_CONTROL = 0,
 	VMCS_FIELD_TYPE_READ_ONLY_DATA = 1,
 	VMCS_FIELD_TYPE_GUEST = 2,
-	VMCS_FIELD_TYPE_HOST = 3
+	VMCS_FIELD_TYPE_HOST = 3,
+	VMCS_FIELD_TYPES,
 };
 
 static inline int vmcs_field_type(unsigned long field)
@@ -8324,6 +8326,70 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	preempt_enable();
 }
 
+/*
+ * The IA32_VMX_VMCS_ENUM MSR reports the highest index value (bits
+ * 9:1) used in the encoding of any vmcs field supported by the processor.
+ * For 64 bit-values, bit 0 of the encoding can be set to access only
+ * the high 32-bits of the field. Hence, the maxiumum number of fields
+ * with the same field width and type is the value reported by this
+ * MSR plus two.
+ */
+static unsigned nested_vmcs_fields_per_group(struct vcpu_vmx *vmx)
+{
+	return vmx->nested.msrs.vmcs_enum + 2;
+}
+
+/*
+ * Copy a group of VMCS fields (fields having the same width and type)
+ * from the hardware VMCS shadow to the cached guest VMCS shadow. Only
+ * fields with vmwrite permission are copied, since they are the only
+ * fields that can change while running L2.
+ * This function assumes nested_vmcs_field_per_group() <=
+ * BITS_PER_LONG, a constraint that is checked in prepare_vmcs02().
+ */
+static void copy_shadow_vmcs02_to_shadow_vmcs12_group(struct vcpu_vmx *vmx,
+						      unsigned long base)
+{
+	unsigned long bit;
+	unsigned long offset = base / BITS_PER_LONG;
+
+	for_each_clear_bit(bit, vmx->nested.vmwrite_bitmap + offset,
+			   nested_vmcs_fields_per_group(vmx)) {
+		unsigned long field = base + bit;
+		u64 field_value = __vmcs_readl(field);
+		vmcs12_write_any(get_shadow_vmcs12(&vmx->vcpu),
+				 field, field_value);
+	}
+}
+
+/*
+ * Copy any potentially modified VMCS fields from the hardware VMCS
+ * shadow to the cached guest VMCS shadow.
+ */
+static void copy_shadow_vmcs02_to_shadow_vmcs12(struct vcpu_vmx *vmx)
+{
+	enum vmcs_field_width width;
+	enum vmcs_field_type type;
+
+	/* Should be called when vmcs02 is loaded */
+	WARN_ON(vmx->loaded_vmcs == &vmx->vmcs01);
+
+	preempt_disable();
+
+	vmcs_load(vmx->loaded_vmcs->shadow_vmcs);
+
+	for (width = 0; width < VMCS_FIELD_WIDTHS; width++) {
+		for (type = 0; type < VMCS_FIELD_TYPES; type++) {
+			unsigned long base = encode_vmcs_field(width, type, 0, false);
+			copy_shadow_vmcs02_to_shadow_vmcs12_group(vmx, base);
+		}
+	}
+
+	vmcs_load(vmx->loaded_vmcs->vmcs);
+
+	preempt_enable();
+}
+
 static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
 {
 	const u16 *fields[] = {
@@ -8351,6 +8417,58 @@ static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
 
 	vmcs_clear(shadow_vmcs);
 	vmcs_load(vmx->loaded_vmcs->vmcs);
+}
+
+/*
+ * Copy a group of VMCS fields (fields having the same width and type)
+ * from the cached guest VMCS shadow to the hardware VMCS shadow. Only
+ * fields with vmread or vmwrite permission are copied.
+ * This function assumes nested_vmcs_fields_per_group() <=
+ * BITS_PER_LONG, a constraint that is checked in prepare_vmcs02().
+ */
+static void copy_shadow_vmcs12_to_shadow_vmcs02_group(struct vcpu_vmx *vmx,
+						      unsigned long base)
+{
+	unsigned long bit;
+	unsigned long offset = base / BITS_PER_LONG;
+	unsigned long merged = (vmx->nested.vmread_bitmap[offset] &
+				vmx->nested.vmwrite_bitmap[offset]);
+
+	for_each_clear_bit(bit, &merged, nested_vmcs_fields_per_group(vmx)) {
+		unsigned long field = base + bit;
+		u64 field_value;
+		if (!vmcs12_read_any(get_shadow_vmcs12(&vmx->vcpu),
+				     field, &field_value))
+			__vmcs_writel(field, field_value);
+	}
+}
+
+/*
+ * Copy any readable or writable VMCS fields from the cached guest VMCS
+ * shadow to the hardware VMCS shadow.
+ */
+static void copy_shadow_vmcs12_to_shadow_vmcs02(struct vcpu_vmx *vmx)
+{
+	enum vmcs_field_width width;
+	enum vmcs_field_type type;
+
+	/* Should be called when vmcs02 is loaded */
+	WARN_ON(vmx->loaded_vmcs == &vmx->vmcs01);
+
+	preempt_disable();
+
+	vmcs_load(vmx->loaded_vmcs->shadow_vmcs);
+
+	for (width = 0; width < VMCS_FIELD_WIDTHS; width++) {
+		for (type = 0; type < VMCS_FIELD_TYPES; type++) {
+			unsigned long base = encode_vmcs_field(width, type, 0, false);
+			copy_shadow_vmcs12_to_shadow_vmcs02_group(vmx, base);
+		}
+	}
+
+	vmcs_load(vmx->loaded_vmcs->vmcs);
+
+	preempt_enable();
 }
 
 /*
@@ -11639,9 +11757,16 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 		 * Otherwise, emulate VMCS shadowing by disabling VMCS
 		 * shadowing at vmcs02 and emulate vmread/vmwrite to
 		 * read/write from/to shadow vmcs12.
+		 *
+		 * Note: Due to limitations of
+		 * copy_shadow_vmcs12_to_shadow_vmcs02_group(), fall
+		 * back to VMCS shadowing emulation if
+		 * nested_vmcs_fields_per_group() > BITS_PER_LONG.
 		 */
 		if ((exec_control & SECONDARY_EXEC_SHADOW_VMCS) &&
-		    enable_shadow_vmcs && !alloc_vmcs_shadowing_pages(vcpu)) {
+		    enable_shadow_vmcs &&
+		    nested_vmcs_fields_per_group(vmx) <= BITS_PER_LONG &&
+		    !alloc_vmcs_shadowing_pages(vcpu)) {
 			vmcs_write64(VMCS_LINK_POINTER,
 				     vmcs12->vmcs_link_pointer == -1ull ?
 				     -1ull : __pa(vmx->loaded_vmcs->shadow_vmcs));
