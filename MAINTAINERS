@@ -14470,6 +14470,7 @@ Q:	https://patchwork.kernel.org/project/linux-integrity/list/
 W:	https://kernsec.org/wiki/index.php/Linux_Kernel_Integrity
 T:	git git://git.infradead.org/users/jjs/linux-tpmdd.git
 S:	Maintained
+F:	Documentation/devicetree/bindings/security/tpm/
 F:	drivers/char/tpm/
 
 TRACING
