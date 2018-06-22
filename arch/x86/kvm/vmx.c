@@ -675,6 +675,9 @@ struct nested_vmx {
 	bool pi_pending;
 	u16 posted_intr_nv;
 
+	unsigned long *vmread_bitmap;
+	unsigned long *vmwrite_bitmap;
+
 	struct hrtimer preemption_timer;
 	bool preemption_timer_expired;
 
@@ -8088,6 +8091,14 @@ static void free_nested(struct vcpu_vmx *vmx)
 		vmcs_clear(vmx->vmcs01.shadow_vmcs);
 		free_vmcs(vmx->vmcs01.shadow_vmcs);
 		vmx->vmcs01.shadow_vmcs = NULL;
+		if (vmx->nested.vmread_bitmap) {
+			free_page((unsigned long)vmx->nested.vmread_bitmap);
+			vmx->nested.vmread_bitmap = NULL;
+		}
+		if (vmx->nested.vmwrite_bitmap) {
+			free_page((unsigned long)vmx->nested.vmwrite_bitmap);
+			vmx->nested.vmwrite_bitmap = NULL;
+		}
 	}
 	kfree(vmx->nested.cached_vmcs12);
 	kfree(vmx->nested.cached_shadow_vmcs12);
@@ -11313,6 +11324,40 @@ static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool ne
 	return 0;
 }
 
+/*
+ * Allocate three pages for virtualizing VMCS shadowing: the shadow
+ * itself and the vmread and vmwrite bitmaps. These pages are
+ * allocated when first needed and freed when leaving virtual VMX
+ * operation. If previously allocated, the existing pages are
+ * reused. When first allocated, the VMREAD and VMWRITE bitmaps are
+ * initialized to all 1's.
+ */
+static int alloc_vmcs_shadowing_pages(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	if (!alloc_shadow_vmcs(vcpu))
+		return -ENOMEM;
+
+	if (!vmx->nested.vmread_bitmap) {
+		vmx->nested.vmread_bitmap =
+			(unsigned long *)__get_free_page(GFP_KERNEL);
+		if (!vmx->nested.vmread_bitmap)
+			return -ENOMEM;
+		memset(vmx->nested.vmread_bitmap, 0xff, PAGE_SIZE);
+	}
+
+	if (!vmx->nested.vmwrite_bitmap) {
+		vmx->nested.vmwrite_bitmap =
+			(unsigned long *)__get_free_page(GFP_KERNEL);
+		if (!vmx->nested.vmwrite_bitmap)
+			return -ENOMEM;
+		memset(vmx->nested.vmwrite_bitmap, 0xff, PAGE_SIZE);
+	}
+
+	return 0;
+}
+
 static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -11357,12 +11402,6 @@ static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12)
 
 	if (nested_cpu_has_xsaves(vmcs12))
 		vmcs_write64(XSS_EXIT_BITMAP, vmcs12->xss_exit_bitmap);
-
-	if (nested_cpu_has2(vmcs12, SECONDARY_EXEC_SHADOW_VMCS) &&
-	    enable_shadow_vmcs && alloc_shadow_vmcs(vcpu)) {
-		/* TODO: IMPLEMENT */
-	}
-	vmcs_write64(VMCS_LINK_POINTER, -1ull);
 
 	if (cpu_has_vmx_posted_intr())
 		vmcs_write16(POSTED_INTR_NV, POSTED_INTR_NESTED_VECTOR);
@@ -11534,6 +11573,7 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 				  SECONDARY_EXEC_XSAVES |
 				  SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 				  SECONDARY_EXEC_APIC_REGISTER_VIRT |
+				  SECONDARY_EXEC_SHADOW_VMCS |
 				  SECONDARY_EXEC_ENABLE_VMFUNC);
 		if (nested_cpu_has(vmcs12,
 				   CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)) {
@@ -11541,9 +11581,6 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 				~SECONDARY_EXEC_ENABLE_PML;
 			exec_control |= vmcs12_exec_ctrl;
 		}
-
-		/* VMCS shadowing for L2 is emulated for now */
-		exec_control &= ~SECONDARY_EXEC_SHADOW_VMCS;
 
 		if (exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
 			vmcs_write16(GUEST_INTR_STATUS,
@@ -11556,6 +11593,29 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 		 */
 		if (exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 			vmcs_write64(APIC_ACCESS_ADDR, -1ull);
+
+		/*
+		 * If L0 enables VMCS shadowing and vmcs12 enables
+		 * VMCS shadowing, virtualize VMCS shadowing by
+		 * allocating a shadow VMCS and vmread/vmwrite bitmaps
+		 * for vmcs02. vmread/vmwrite bitmaps are init at this
+		 * point to intercept all vmread/vmwrite.
+		 *
+		 * Otherwise, emulate VMCS shadowing by disabling VMCS
+		 * shadowing at vmcs02 and emulate vmread/vmwrite to
+		 * read/write from/to shadow vmcs12.
+		 */
+		if ((exec_control & SECONDARY_EXEC_SHADOW_VMCS) &&
+		    enable_shadow_vmcs && !alloc_vmcs_shadowing_pages(vcpu)) {
+			vmcs_write64(VMCS_LINK_POINTER,
+				     vmcs12->vmcs_link_pointer == -1ull ?
+				     -1ull : __pa(vmx->loaded_vmcs->shadow_vmcs));
+			vmcs_write64(VMREAD_BITMAP, __pa(vmx->nested.vmread_bitmap));
+			vmcs_write64(VMWRITE_BITMAP, __pa(vmx->nested.vmwrite_bitmap));
+		} else {
+			exec_control &= ~SECONDARY_EXEC_SHADOW_VMCS;
+			vmcs_write64(VMCS_LINK_POINTER, -1ull);
+		}
 
 		vmcs_write32(SECONDARY_VM_EXEC_CONTROL, exec_control);
 	}
