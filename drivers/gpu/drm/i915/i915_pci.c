@@ -775,3 +775,5 @@ MODULE_AUTHOR("Intel Corporation");
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
+
+MODULE_SOFTDEP("post: kvmgt");
