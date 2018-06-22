@@ -12,6 +12,11 @@ Required properties:
 		have specific request line
 - clocks: clock required
 
+Optional properties:
+- dma_min_chan: the minimum number of DMA channel which begin to use
+		the default value is 0, but in some platform is
+		configured 1, like hi3660 platform
+
 Example:
 
 Controller:
@@ -21,6 +26,7 @@ Controller:
 			#dma-cells = <1>;
 			dma-channels = <16>;
 			dma-requests = <27>;
+			dma_min_chan = <1>;
 			interrupts = <0 12 4>;
 			clocks = <&pclk>;
 		};
