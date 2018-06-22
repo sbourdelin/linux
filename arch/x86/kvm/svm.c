@@ -251,6 +251,9 @@ struct vcpu_svm {
 
 	/* which host CPU was used for running this vcpu */
 	unsigned int last_cpu;
+
+	/* MSRC001_0015 Hardware Configuration */
+	u64 msr_hwcr;
 };
 
 /*
@@ -4154,7 +4157,7 @@ static int svm_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		msr_info->data = svm->msr_decfg;
 		break;
 	case MSR_K7_HWCR:
-		msr_info->data = 0;
+		msr_info->data = svm->msr_hwcr;
 		break;
 	default:
 		return kvm_get_msr_common(vcpu, msr_info);
@@ -4364,8 +4367,11 @@ static int svm_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr)
 		data &= ~(u64)0x40;	/* ignore flush filter disable */
 		data &= ~(u64)0x100;	/* ignore ignne emulation enable */
 		data &= ~(u64)0x8;	/* ignore TLB cache disable */
-		data &= ~(u64)0x40000;  /* ignore Mc status write enable */
-		if (data != 0) {
+
+		/* Handle McStatusWrEn */
+		if (data == BIT_ULL(18)) {
+			svm->msr_hwcr = data;
+		} else if (data != 0) {
 			vcpu_unimpl(vcpu, "unimplemented HWCR wrmsr: 0x%llx\n",
 				    data);
 			return 1;
