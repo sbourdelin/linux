@@ -569,8 +569,8 @@ static int sr030pc30_base_config(struct v4l2_subdev *sd)
 	if (!ret)
 		ret = sr030pc30_pwr_ctrl(sd, false, false);
 
-	if (!ret && !info->pdata)
-		return ret;
+	if (ret || !info->pdata)
+		return -EIO;
 
 	expmin = EXPOS_MIN_MS * info->pdata->clk_rate / (8 * 1000);
 	expmax = EXPOS_MAX_MS * info->pdata->clk_rate / (8 * 1000);
