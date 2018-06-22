@@ -72,6 +72,8 @@ Optional properties:
 
   - wp-gpios: GPIO to which the write-protect pin of the chip is connected.
 
+  - address-width : number of address bits (one of 8, 16).
+
 Example:
 
 eeprom@52 {
@@ -79,4 +81,5 @@ eeprom@52 {
 	reg = <0x52>;
 	pagesize = <32>;
 	wp-gpios = <&gpio1 3 0>;
+	address-width = <16>;
 };
