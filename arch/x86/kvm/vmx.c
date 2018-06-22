@@ -675,6 +675,7 @@ struct nested_vmx {
 	bool pi_pending;
 	u16 posted_intr_nv;
 
+	bool virtualize_shadow_vmcs;
 	unsigned long *vmread_bitmap;
 	unsigned long *vmwrite_bitmap;
 
@@ -10918,6 +10919,8 @@ static void vmx_inject_page_fault_nested(struct kvm_vcpu *vcpu,
 
 static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 						 struct vmcs12 *vmcs12);
+static inline bool nested_vmx_setup_shadow_bitmaps(struct kvm_vcpu *vcpu,
+						   struct vmcs12 *vmcs12);
 
 static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu,
 					struct vmcs12 *vmcs12)
@@ -11007,6 +11010,15 @@ static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu,
 	else
 		vmcs_clear_bits(CPU_BASED_VM_EXEC_CONTROL,
 				CPU_BASED_USE_MSR_BITMAPS);
+
+	if (vmx->nested.virtualize_shadow_vmcs) {
+		if (nested_vmx_setup_shadow_bitmaps(vcpu, vmcs12)) {
+			copy_shadow_vmcs12_to_shadow_vmcs02(vmx);
+		} else {
+			vmx->nested.virtualize_shadow_vmcs = false;
+			vmx_disable_shadow_vmcs(vmx);
+		}
+	}
 }
 
 static void vmx_start_preemption_timer(struct kvm_vcpu *vcpu)
@@ -11286,6 +11298,9 @@ static void nested_flush_cached_shadow_vmcs12(struct kvm_vcpu *vcpu,
 	if (!nested_cpu_has_shadow_vmcs(vmcs12) ||
 	    vmcs12->vmcs_link_pointer == -1ull)
 		return;
+
+	if (vmx->nested.virtualize_shadow_vmcs)
+		copy_shadow_vmcs02_to_shadow_vmcs12(to_vmx(vcpu));
 
 	kvm_write_guest(vmx->vcpu.kvm, vmcs12->vmcs_link_pointer,
 			get_shadow_vmcs12(vcpu), VMCS12_SIZE);
@@ -11849,7 +11864,10 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 		 * VMCS shadowing, virtualize VMCS shadowing by
 		 * allocating a shadow VMCS and vmread/vmwrite bitmaps
 		 * for vmcs02. vmread/vmwrite bitmaps are init at this
-		 * point to intercept all vmread/vmwrite.
+		 * point to intercept all vmread/vmwrite. Later,
+		 * nested_get_vmcs12_pages() will either update bitmaps to
+		 * handle some vmread/vmwrite by hardware or remove
+		 * VMCS shadowing from vmcs02.
 		 *
 		 * Otherwise, emulate VMCS shadowing by disabling VMCS
 		 * shadowing at vmcs02 and emulate vmread/vmwrite to
@@ -11860,10 +11878,12 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 		 * back to VMCS shadowing emulation if
 		 * nested_vmcs_fields_per_group() > BITS_PER_LONG.
 		 */
-		if ((exec_control & SECONDARY_EXEC_SHADOW_VMCS) &&
-		    enable_shadow_vmcs &&
-		    nested_vmcs_fields_per_group(vmx) <= BITS_PER_LONG &&
-		    !alloc_vmcs_shadowing_pages(vcpu)) {
+		vmx->nested.virtualize_shadow_vmcs =
+			(exec_control & SECONDARY_EXEC_SHADOW_VMCS) &&
+			enable_shadow_vmcs &&
+			nested_vmcs_fields_per_group(vmx) <= BITS_PER_LONG &&
+			!alloc_vmcs_shadowing_pages(vcpu);
+		if (vmx->nested.virtualize_shadow_vmcs) {
 			vmcs_write64(VMCS_LINK_POINTER,
 				     vmcs12->vmcs_link_pointer == -1ull ?
 				     -1ull : __pa(vmx->loaded_vmcs->shadow_vmcs));
@@ -12236,8 +12256,6 @@ static int enter_vmx_non_root_mode(struct kvm_vcpu *vcpu)
 	if (prepare_vmcs02(vcpu, vmcs12, &exit_qual))
 		goto fail;
 
-	nested_get_vmcs12_pages(vcpu, vmcs12);
-
 	r = EXIT_REASON_MSR_LOAD_FAIL;
 	msr_entry_idx = nested_vmx_load_msr(vcpu,
 					    vmcs12->vm_entry_msr_load_addr,
@@ -12364,6 +12382,12 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	 * exist on destination host yet).
 	 */
 	nested_cache_shadow_vmcs12(vcpu, vmcs12);
+	/*
+	 * Must be called after nested_cache_shadow_vmcs12()
+	 * because it may internally copy cached shadow vmcs12
+	 * into shadow vmcs02.
+	 */
+	nested_get_vmcs12_pages(vcpu, vmcs12);
 
 	/*
 	 * If we're entering a halted L2 vcpu and the L2 vcpu won't be woken
