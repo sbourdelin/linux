@@ -107,13 +107,21 @@ void intel_pipe_update_start(const struct intel_crtc_state *new_crtc_state)
 						      VBLANK_EVASION_TIME_US);
 	max = vblank_start - 1;
 
-	local_irq_disable();
-
 	if (min <= 0 || max <= 0)
 		return;
 
 	if (WARN_ON(drm_crtc_vblank_get(&crtc->base)))
 		return;
+
+	/*
+	 * Wait for psr to idle out after enabling the VBL interrupts
+	 * VBL interrupts will start the PSR exit and prevent a PSR
+	 * re-entry as well.
+	 */
+	if (intel_psr_wait_for_idle(dev_priv))
+		DRM_ERROR("PSR idle timed out, atomic update may fail\n");
+
+	local_irq_disable();
 
 	crtc->debug.min_vbl = min;
 	crtc->debug.max_vbl = max;
