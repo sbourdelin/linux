@@ -11162,6 +11162,103 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+/*
+ * For all valid VMCS fields in a group (having the same width and
+ * type), clear the permission bit in the vmcs02 bitmap if it is clear
+ * in the vmcs12 bitmap and the field is supported by kvm and the
+ * physical CPU. All other permission bits are set.
+ */
+static void nested_vmx_setup_shadow_bitmap_group(struct kvm_vcpu *vcpu,
+						 unsigned long *vmcs02_bitmap,
+						 unsigned long *vmcs12_bitmap,
+						 unsigned long base)
+{
+	unsigned long offset = base / BITS_PER_LONG;
+	unsigned long val = ~0l;
+	unsigned long bit;
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	for_each_clear_bit(bit, vmcs12_bitmap + offset,
+			   nested_vmcs_fields_per_group(vmx)) {
+		unsigned long field = base + bit;
+
+		if (vmcs_field_to_offset(field) >= 0 &&
+		    cpu_has_vmcs_field(field))
+			val &= ~(1ul << bit);
+	}
+
+	vmcs02_bitmap[offset] = val;
+}
+
+/*
+ * Set up a vmcs02 vmread/vmwrite bitmap based on a vmcs12
+ * vmread/vmwrite bitmap. Only fields supported by kvm and the
+ * physical CPU may be shadowed (i.e. have a clear permission bit).
+ */
+static bool nested_vmx_setup_shadow_bitmap(struct kvm_vcpu *vcpu,
+					   unsigned long *vmcs02_bitmap,
+					   gpa_t vmcs12_bitmap_gpa,
+					   bool is_write_bitmap)
+{
+	struct page *page;
+	unsigned long *vmcs12_bitmap;
+	enum vmcs_field_width width;
+	enum vmcs_field_type type;
+	bool intercept_read_only_fields;
+
+	page = kvm_vcpu_gpa_to_page(vcpu, vmcs12_bitmap_gpa);
+	if (is_error_page(page))
+		return false;
+
+	/*
+	 * If L1 cannot VMWRITE into read-only VMCS fields,
+	 * then L0 needs to intercept VMWRITEs to these fields
+	 * in order to simulate VMWRITE failure for L2.
+	 */
+	intercept_read_only_fields =
+		is_write_bitmap &&
+		!nested_cpu_has_vmwrite_any_field(vcpu);
+
+	vmcs12_bitmap = (unsigned long *)kmap(page);
+	for (width = 0; width < VMCS_FIELD_WIDTHS; width++) {
+		for (type = 0; type < VMCS_FIELD_TYPES; type++) {
+			unsigned long base = encode_vmcs_field(width, type, 0, false);
+			if (intercept_read_only_fields &&
+			    (type == VMCS_FIELD_TYPE_READ_ONLY_DATA))
+				vmcs02_bitmap[base / BITS_PER_LONG] = ~0l;
+			else
+				nested_vmx_setup_shadow_bitmap_group(vcpu,
+							     vmcs02_bitmap,
+							     vmcs12_bitmap,
+							     base);
+		}
+	}
+	kunmap(page);
+
+	kvm_release_page_clean(page);
+
+	return true;
+}
+
+/*
+ * Set up the vmcs02 vmread and vmwrite permission bitmaps based on
+ * the corresponding vmcs12 permission bitmaps.
+ */
+static inline bool nested_vmx_setup_shadow_bitmaps(struct kvm_vcpu *vcpu,
+						   struct vmcs12 *vmcs12)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	return nested_vmx_setup_shadow_bitmap(vcpu,
+					      vmx->nested.vmread_bitmap,
+					      vmcs12->vmread_bitmap,
+					      false) &&
+		nested_vmx_setup_shadow_bitmap(vcpu,
+					       vmx->nested.vmwrite_bitmap,
+					       vmcs12->vmwrite_bitmap,
+					       true);
+}
+
 static void nested_cache_shadow_vmcs12(struct kvm_vcpu *vcpu,
 				       struct vmcs12 *vmcs12)
 {
