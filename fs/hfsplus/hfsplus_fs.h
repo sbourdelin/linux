@@ -530,8 +530,9 @@ int hfsplus_submit_bio(struct super_block *sb, sector_t sector, void *buf,
 		       void **data, int op, int op_flags);
 int hfsplus_read_wrapper(struct super_block *sb);
 
-/* time macros */
-#define __hfsp_mt2ut(t)		(be32_to_cpu(t) - 2082844800U)
+/* time macros: convert between 1904-2040 and 1970-2106 range,
+ * pre-1970 timestamps are interpreted as post-2038 times after wrap-around */
+#define __hfsp_mt2ut(t)		((time64_t)be32_to_cpu(t) - 2082844800U)
 #define __hfsp_ut2mt(t)		(cpu_to_be32(t + 2082844800U))
 
 /* compatibility */
