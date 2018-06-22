@@ -1240,6 +1240,7 @@ int release_mem_region_adjustable(struct resource *parent,
 	struct resource *res;
 	struct resource *new_res;
 	resource_size_t end;
+	resource_size_t new_start = start;
 	int ret = -EINVAL;
 
 	end = start + size - 1;
@@ -1257,7 +1258,7 @@ int release_mem_region_adjustable(struct resource *parent,
 			break;
 
 		/* look for the next resource if it does not fit into */
-		if (res->start > start || res->end < end) {
+		if (res->end < new_start) {
 			p = &res->sibling;
 			continue;
 		}
@@ -1271,42 +1272,54 @@ int release_mem_region_adjustable(struct resource *parent,
 		}
 
 		/* found the target resource; let's adjust accordingly */
-		if (res->start == start && res->end == end) {
+		if (res->start == new_start && res->end == end) {
 			/* free the whole entry */
 			*p = res->sibling;
 			free_resource(res);
 			ret = 0;
-		} else if (res->start == start && res->end != end) {
-			/* adjust the start */
-			ret = __adjust_resource(res, end + 1,
-						res->end - end);
-		} else if (res->start != start && res->end == end) {
-			/* adjust the end */
-			ret = __adjust_resource(res, res->start,
-						start - res->start);
-		} else {
-			/* split into two entries */
-			if (!new_res) {
-				ret = -ENOMEM;
-				break;
+		} else if (res->end > end) {
+			if (res->start >= new_start) {
+				/* adjust the start */
+				ret = __adjust_resource(res, end + 1,
+							res->end - end);
+			} else {
+				/* split into two entries */
+				if (!new_res) {
+					ret = -ENOMEM;
+					break;
+				}
+				new_res->name = res->name;
+				new_res->start = end + 1;
+				new_res->end = res->end;
+				new_res->flags = res->flags;
+				new_res->desc = res->desc;
+				new_res->parent = res->parent;
+				new_res->sibling = res->sibling;
+				new_res->child = NULL;
+
+				ret = __adjust_resource(res, res->start,
+							new_start - res->start);
+				if (ret)
+					break;
+				res->sibling = new_res;
+				new_res = NULL;
 			}
-			new_res->name = res->name;
-			new_res->start = end + 1;
-			new_res->end = res->end;
-			new_res->flags = res->flags;
-			new_res->desc = res->desc;
-			new_res->parent = res->parent;
-			new_res->sibling = res->sibling;
-			new_res->child = NULL;
-
-			ret = __adjust_resource(res, res->start,
-						start - res->start);
-			if (ret)
-				break;
-			res->sibling = new_res;
-			new_res = NULL;
+		} else {
+			if (res->start < new_start) {
+				/* adjust the end */
+				ret = __adjust_resource(res, res->start,
+							new_start - res->start);
+				new_start = res->end+1;
+				p = &res->sibling;
+			} else {
+				new_start = res->end+1;
+				*p = res->sibling;
+				free_resource(res);
+				ret = 0;
+			}
+			if (res->end < end)
+				continue;
 		}
-
 		break;
 	}
 
