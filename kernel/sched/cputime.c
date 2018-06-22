@@ -590,69 +590,54 @@ drop_precision:
 void cputime_adjust(struct task_cputime *curr, struct prev_cputime *prev,
 		    u64 *ut, u64 *st)
 {
-	u64 rtime, stime, utime;
+	u64 rtime_delta, stime_delta, utime_delta;
 	unsigned long flags;
 
 	/* Serialize concurrent callers such that we can honour our guarantees */
 	raw_spin_lock_irqsave(&prev->lock, flags);
-	rtime = curr->sum_exec_runtime;
 
 	/*
 	 * This is possible under two circumstances:
-	 *  - rtime isn't monotonic after all (a bug);
+	 *  - task_cputime isn't monotonic after all (a bug);
 	 *  - we got reordered by the lock.
 	 *
 	 * In both cases this acts as a filter such that the rest of the code
 	 * can assume it is monotonic regardless of anything else.
 	 */
-	if (prev->stime + prev->utime >= rtime)
+	if (prev->cputime.utime > curr->utime ||
+	    prev->cputime.stime > curr->stime ||
+	    prev->cputime.sum_exec_runtime >= curr->sum_exec_runtime)
 		goto out;
 
-	stime = curr->stime;
-	utime = curr->utime;
+	stime_delta = curr->stime - prev->cputime.stime;
+	utime_delta = curr->utime - prev->cputime.utime;
+	rtime_delta = curr->sum_exec_runtime - prev->cputime.sum_exec_runtime;
 
 	/*
-	 * If either stime or utime are 0, assume all runtime is userspace.
-	 * Once a task gets some ticks, the monotonicy code at 'update:'
-	 * will ensure things converge to the observed ratio.
+	 * If either stime or utime increase are 0, assume all runtime
+	 * is userspace. Once a task gets some ticks, the monotonicy code
+	 * at 'update:' will ensure things converge to the observed ratio.
 	 */
-	if (stime == 0) {
-		utime = rtime;
+	if (stime_delta == 0) {
+		utime_delta = rtime_delta;
 		goto update;
 	}
 
-	if (utime == 0) {
-		stime = rtime;
+	if (utime_delta == 0) {
+		stime_delta = rtime_delta;
 		goto update;
 	}
 
-	stime = scale_stime(stime, rtime, stime + utime);
+	stime_delta = scale_stime(stime_delta, rtime_delta,
+				stime_delta + utime_delta);
+	if (stime_delta > rtime_delta)
+		stime_delta = rtime_delta;
+	utime_delta = rtime_delta - stime_delta;
 
 update:
-	/*
-	 * Make sure stime doesn't go backwards; this preserves monotonicity
-	 * for utime because rtime is monotonic.
-	 *
-	 *  utime_i+1 = rtime_i+1 - stime_i
-	 *            = rtime_i+1 - (rtime_i - utime_i)
-	 *            = (rtime_i+1 - rtime_i) + utime_i
-	 *            >= utime_i
-	 */
-	if (stime < prev->stime)
-		stime = prev->stime;
-	utime = rtime - stime;
-
-	/*
-	 * Make sure utime doesn't go backwards; this still preserves
-	 * monotonicity for stime, analogous argument to above.
-	 */
-	if (utime < prev->utime) {
-		utime = prev->utime;
-		stime = rtime - utime;
-	}
-
-	prev->stime = stime;
-	prev->utime = utime;
+	prev->cputime = *curr;
+	prev->utime += utime_delta;
+	prev->stime += stime_delta;
 out:
 	*ut = prev->utime;
 	*st = prev->stime;

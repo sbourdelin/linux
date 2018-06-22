@@ -175,10 +175,20 @@ static inline void account_group_exec_runtime(struct task_struct *tsk,
 	atomic64_add(ns, &cputimer->cputime_atomic.sum_exec_runtime);
 }
 
-static inline void prev_cputime_init(struct prev_cputime *prev)
+static inline void prev_cputime_clear(struct prev_cputime *prev)
 {
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 	prev->utime = prev->stime = 0;
+	prev->cputime.utime = 0;
+	prev->cputime.stime = 0;
+	prev->cputime.sum_exec_runtime = 0;
+#endif
+}
+
+static inline void prev_cputime_init(struct prev_cputime *prev)
+{
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+	prev_cputime_clear(prev);
 	raw_spin_lock_init(&prev->lock);
 #endif
 }

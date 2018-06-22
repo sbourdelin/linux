@@ -224,23 +224,6 @@ extern long io_schedule_timeout(long timeout);
 extern void io_schedule(void);
 
 /**
- * struct prev_cputime - snapshot of system and user cputime
- * @utime: time spent in user mode
- * @stime: time spent in system mode
- * @lock: protects the above two fields
- *
- * Stores previous user/system time values such that we can guarantee
- * monotonicity.
- */
-struct prev_cputime {
-#ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
-	u64				utime;
-	u64				stime;
-	raw_spinlock_t			lock;
-#endif
-};
-
-/**
  * struct task_cputime - collected CPU time counts
  * @utime:		time spent in user mode, in nanoseconds
  * @stime:		time spent in kernel mode, in nanoseconds
@@ -254,6 +237,24 @@ struct task_cputime {
 	u64				utime;
 	u64				stime;
 	unsigned long long		sum_exec_runtime;
+};
+
+/**
+ * struct prev_cputime - snapshot of system and user cputime
+ * @utime: time spent in user mode
+ * @stime: time spent in system mode
+ * @lock: protects the above two fields
+ *
+ * Stores previous user/system time values such that we can guarantee
+ * monotonicity.
+ */
+struct prev_cputime {
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+	u64				utime;
+	u64				stime;
+	struct task_cputime		cputime;
+	raw_spinlock_t			lock;
+#endif
 };
 
 /* Alternate field names when used on cache expirations: */
