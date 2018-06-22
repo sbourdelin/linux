@@ -726,6 +726,10 @@ int rxe_qp_from_attr(struct rxe_qp *qp, struct ib_qp_attr *attr, int mask,
 
 		case IB_QPS_RTR:
 			pr_debug("qp#%d state -> RTR\n", qp_num(qp));
+			qp->src_port = RXE_ROCE_V2_SPORT +
+				(hash_64_generic
+				 (((u64)qp->attr.dest_qp_num << 24) +
+				  (u64)qp_num(qp), 14) & 0x3fff);
 			qp->resp.state = QP_STATE_READY;
 			break;
 
