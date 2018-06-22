@@ -15739,6 +15739,7 @@ XILLYBUS DRIVER
 M:	Eli Billauer <eli.billauer@gmail.com>
 L:	linux-kernel@vger.kernel.org
 S:	Supported
+F:	Documentation/devicetree/bindings/xillybus/
 F:	drivers/char/xillybus/
 
 XLP9XX I2C DRIVER
