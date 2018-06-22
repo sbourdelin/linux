@@ -46,6 +46,7 @@
 #define SCALER_RATIO_MAX 16
 
 extern struct vfe_hw_ops vfe_ops_4_1;
+extern struct vfe_hw_ops vfe_ops_4_7;
 
 static const struct {
 	u32 code;
@@ -693,6 +694,8 @@ static int vfe_enable(struct vfe_line *line)
 		vfe->ops->bus_enable_wr_if(vfe, 1);
 
 		vfe->ops->set_qos(vfe);
+
+		vfe->ops->set_ds(vfe);
 	}
 
 	vfe->stream_count++;
@@ -1853,6 +1856,8 @@ int msm_vfe_subdev_init(struct camss *camss, struct vfe_device *vfe,
 
 	if (camss->version == CAMSS_8x16)
 		vfe->ops = &vfe_ops_4_1;
+	else if (camss->version == CAMSS_8x96)
+		vfe->ops = &vfe_ops_4_7;
 	else
 		return -EINVAL;
 
