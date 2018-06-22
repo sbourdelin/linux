@@ -4527,6 +4527,16 @@ static inline int vmcs_field_readonly(unsigned long field)
 	return (vmcs_field_type(field) == VMCS_FIELD_TYPE_READ_ONLY_DATA);
 }
 
+static inline unsigned long encode_vmcs_field(enum vmcs_field_width width,
+					      enum vmcs_field_type type,
+					      unsigned short index,
+					      bool high)
+{
+	WARN_ON(index >= 1u << 9);
+	index &= (1u << 9) - 1;
+	return (width << 13) | (type << 10) | (index << 1) | (high ? 1 : 0);
+}
+
 static void init_vmcs_shadow_fields(void)
 {
 	int i, j;
