@@ -276,6 +276,9 @@ static inline enum comp_state check_ack(struct rxe_qp *qp,
 	case IB_OPCODE_RC_RDMA_READ_RESPONSE_MIDDLE:
 		if (wqe->wr.opcode != IB_WR_RDMA_READ &&
 		    wqe->wr.opcode != IB_WR_RDMA_READ_WITH_INV) {
+			pr_err("%s: opcode wr %d <> pkt %d\n", __func__,
+			       wqe->wr.opcode, pkt->opcode);
+			wqe->status = IB_WC_FATAL_ERR;
 			return COMPST_ERROR;
 		}
 		reset_retry_counters(qp);
