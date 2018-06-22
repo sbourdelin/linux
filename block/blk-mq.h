@@ -30,6 +30,9 @@ struct blk_mq_ctx {
 	struct kobject		kobj;
 } ____cacheline_aligned_in_smp;
 
+int blk_mq_register_dev(struct device *dev, struct request_queue *q);
+void blk_mq_unregister_dev(struct device *dev, struct request_queue *q);
+
 void blk_mq_freeze_queue(struct request_queue *q);
 void blk_mq_free_queue(struct request_queue *q);
 int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr);
