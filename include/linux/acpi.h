@@ -1153,6 +1153,17 @@ int __acpi_probe_device_table(struct acpi_probe_entry *start, int nr);
 					  (&ACPI_PROBE_TABLE_END(t) -	\
 					   &ACPI_PROBE_TABLE(t)));	\
 	})
+
+#define ACPI_DECLARE_PMU_VARIANT(name, hid, init_fn)			\
+	static const struct acpi_device_id __acpi_probe_##name		\
+		__used __section(__pmu_acpi_probe_table)		\
+		= { .id = hid, .driver_data = (kernel_ulong_t)init_fn }
+
+#define ACPI_DECLARE_PMU_SENTINEL()					\
+	static const struct acpi_device_id __acpi_probe_sentinel	\
+		__used __section(__pmu_acpi_probe_table_end)		\
+		= { .id = "", .driver_data = 0 }
+
 #else
 static inline int acpi_dev_get_property(struct acpi_device *adev,
 					const char *name, acpi_object_type type,
