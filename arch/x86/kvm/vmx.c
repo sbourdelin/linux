@@ -4510,9 +4510,21 @@ static inline int vmcs_field_width(unsigned long field)
 	return (field >> 13) & 0x3 ;
 }
 
+enum vmcs_field_type {
+	VMCS_FIELD_TYPE_CONTROL = 0,
+	VMCS_FIELD_TYPE_READ_ONLY_DATA = 1,
+	VMCS_FIELD_TYPE_GUEST = 2,
+	VMCS_FIELD_TYPE_HOST = 3
+};
+
+static inline int vmcs_field_type(unsigned long field)
+{
+	return (field >> 10) & 0x3;
+}
+
 static inline int vmcs_field_readonly(unsigned long field)
 {
-	return (((field >> 10) & 0x3) == 1);
+	return (vmcs_field_type(field) == VMCS_FIELD_TYPE_READ_ONLY_DATA);
 }
 
 static void init_vmcs_shadow_fields(void)
