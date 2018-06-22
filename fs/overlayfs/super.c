@@ -56,6 +56,12 @@ module_param_named(xino_auto, ovl_xino_auto_def, bool, 0644);
 MODULE_PARM_DESC(ovl_xino_auto_def,
 		 "Auto enable xino feature");
 
+static bool __read_mostly ovl_default_override_creds =
+	IS_ENABLED(CONFIG_OVERLAY_FS_OVERRIDE_CREDS);
+module_param_named(override_creds, ovl_default_override_creds, bool, 0644);
+MODULE_PARM_DESC(ovl_default_override_creds,
+		 "Use mounter's credentials for accesses");
+
 static void ovl_entry_stack_free(struct ovl_entry *oe)
 {
 	unsigned int i;
@@ -376,6 +382,8 @@ static int ovl_show_options(struct seq_file *m, struct dentry *dentry)
 						"on" : "off");
 	if (ofs->config.xino != ovl_xino_def())
 		seq_printf(m, ",xino=%s", ovl_xino_str[ofs->config.xino]);
+	seq_show_option(m, "override_creds",
+			ofs->config.override_creds ? "on" : "off");
 	return 0;
 }
 
@@ -413,6 +421,8 @@ enum {
 	OPT_XINO_ON,
 	OPT_XINO_OFF,
 	OPT_XINO_AUTO,
+	OPT_OVERRIDE_CREDS_ON,
+	OPT_OVERRIDE_CREDS_OFF,
 	OPT_ERR,
 };
 
@@ -429,6 +439,8 @@ static const match_table_t ovl_tokens = {
 	{OPT_XINO_ON,			"xino=on"},
 	{OPT_XINO_OFF,			"xino=off"},
 	{OPT_XINO_AUTO,			"xino=auto"},
+	{OPT_OVERRIDE_CREDS_ON,		"override_creds=on"},
+	{OPT_OVERRIDE_CREDS_OFF,	"override_creds=off"},
 	{OPT_ERR,			NULL}
 };
 
@@ -485,6 +497,7 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 	config->redirect_mode = kstrdup(ovl_redirect_mode_def(), GFP_KERNEL);
 	if (!config->redirect_mode)
 		return -ENOMEM;
+	config->override_creds = ovl_default_override_creds;
 
 	while ((p = ovl_next_opt(&opt)) != NULL) {
 		int token;
@@ -553,6 +566,14 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 
 		case OPT_XINO_AUTO:
 			config->xino = OVL_XINO_AUTO;
+			break;
+
+		case OPT_OVERRIDE_CREDS_ON:
+			config->override_creds = true;
+			break;
+
+		case OPT_OVERRIDE_CREDS_OFF:
+			config->override_creds = false;
 			break;
 
 		default:
