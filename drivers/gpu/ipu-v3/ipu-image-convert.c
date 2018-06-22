@@ -1852,9 +1852,8 @@ void ipu_image_convert_adjust(struct ipu_image *in, struct ipu_image *out,
 	}
 
 	/* align output width/height */
-	w_align = ilog2(tile_width_align(outfmt) * num_out_cols);
-	h_align = ilog2(tile_height_align(IMAGE_CONVERT_OUT, rot_mode) *
-			num_out_rows);
+	w_align = ilog2(tile_width_align(outfmt));
+	h_align = ilog2(tile_height_align(IMAGE_CONVERT_OUT, rot_mode));
 	out->pix.width = clamp_align(out->pix.width, MIN_W, MAX_W, w_align);
 	out->pix.height = clamp_align(out->pix.height, MIN_H, MAX_H, h_align);
 
