@@ -869,7 +869,8 @@ void elv_unregister_queue(struct request_queue *q)
 		kobject_del(&e->kobj);
 		e->registered = 0;
 		/* Re-enable throttling in case elevator disabled it */
-		wbt_enable_default(q);
+		if (blk_queue_registered(q))
+			wbt_enable_default(q);
 	}
 }
 

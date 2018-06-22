@@ -55,7 +55,9 @@ static ssize_t blk_mq_sysfs_show(struct kobject *kobj, struct attribute *attr,
 
 	res = -ENOENT;
 	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
+	if (!blk_queue_dying(q) &&
+	    blk_queue_registered(q) &&
+	    q->mq_sysfs_ready)
 		res = entry->show(ctx, page);
 	mutex_unlock(&q->sysfs_lock);
 	return res;
@@ -78,7 +80,9 @@ static ssize_t blk_mq_sysfs_store(struct kobject *kobj, struct attribute *attr,
 
 	res = -ENOENT;
 	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
+	if (!blk_queue_dying(q) &&
+	    blk_queue_registered(q) &&
+	    q->mq_sysfs_ready)
 		res = entry->store(ctx, page, length);
 	mutex_unlock(&q->sysfs_lock);
 	return res;
@@ -101,7 +105,9 @@ static ssize_t blk_mq_hw_sysfs_show(struct kobject *kobj,
 
 	res = -ENOENT;
 	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
+	if (!blk_queue_dying(q) &&
+	    blk_queue_registered(q) &&
+	    q->mq_sysfs_ready)
 		res = entry->show(hctx, page);
 	mutex_unlock(&q->sysfs_lock);
 	return res;
@@ -125,7 +131,9 @@ static ssize_t blk_mq_hw_sysfs_store(struct kobject *kobj,
 
 	res = -ENOENT;
 	mutex_lock(&q->sysfs_lock);
-	if (!blk_queue_dying(q))
+	if (!blk_queue_dying(q) &&
+	    blk_queue_registered(q) &&
+	    q->mq_sysfs_ready)
 		res = entry->store(hctx, page, length);
 	mutex_unlock(&q->sysfs_lock);
 	return res;
@@ -253,7 +261,9 @@ void blk_mq_unregister_dev(struct device *dev, struct request_queue *q)
 	struct blk_mq_hw_ctx *hctx;
 	int i;
 
-	lockdep_assert_held(&q->sysfs_lock);
+	mutex_lock(&q->sysfs_lock);
+	q->mq_sysfs_ready = false;
+	mutex_unlock(&q->sysfs_lock);
 
 	queue_for_each_hw_ctx(q, hctx, i)
 		blk_mq_unregister_hctx(hctx);
@@ -262,7 +272,6 @@ void blk_mq_unregister_dev(struct device *dev, struct request_queue *q)
 	kobject_del(&q->mq_kobj);
 	kobject_put(&dev->kobj);
 
-	q->mq_sysfs_init_done = false;
 }
 
 void blk_mq_hctx_kobj_init(struct blk_mq_hw_ctx *hctx)
@@ -295,13 +304,22 @@ void blk_mq_sysfs_init(struct request_queue *q)
 	}
 }
 
+/*
+ * blk_mq_register_dev/blk_mq_unregister_dev are only invoked by
+ * blk_register_queue/blk_unregister_queue. So we could use
+ * QUEUE_FLAG_REGISTERED to sync with blk_mq_sysfs_register/unregister.
+ * If QUEUE_FLAG_REGISTERED is set, q->mq_kobj is ok, otherwise, it is
+ * not there.
+ * blk_mq_register/unregister_dev blk_mq_sysfs_register/unregister all
+ * use q->mq_sysfs_ready to sync with mq and hctx sysfs entries' store
+ * and show method.
+ */
 int blk_mq_register_dev(struct device *dev, struct request_queue *q)
 {
 	struct blk_mq_hw_ctx *hctx;
 	int ret, i;
 
 	WARN_ON_ONCE(!q->kobj.parent);
-	lockdep_assert_held(&q->sysfs_lock);
 
 	ret = kobject_add(&q->mq_kobj, kobject_get(&dev->kobj), "%s", "mq");
 	if (ret < 0)
@@ -315,7 +333,9 @@ int blk_mq_register_dev(struct device *dev, struct request_queue *q)
 			goto unreg;
 	}
 
-	q->mq_sysfs_init_done = true;
+	mutex_lock(&q->sysfs_lock);
+	q->mq_sysfs_ready = true;
+	mutex_unlock(&q->sysfs_lock);
 
 out:
 	return ret;
@@ -335,15 +355,20 @@ void blk_mq_sysfs_unregister(struct request_queue *q)
 	struct blk_mq_hw_ctx *hctx;
 	int i;
 
+	/*
+	 * If QUEUE_FLAG_REGISTERED is not set, q->mq_kobj
+	 * is not ready.
+	 */
 	mutex_lock(&q->sysfs_lock);
-	if (!q->mq_sysfs_init_done)
-		goto unlock;
+	if (!blk_queue_registered(q)) {
+		mutex_unlock(&q->sysfs_lock);
+		return;
+	}
+	q->mq_sysfs_ready = false;
+	mutex_unlock(&q->sysfs_lock);
 
 	queue_for_each_hw_ctx(q, hctx, i)
 		blk_mq_unregister_hctx(hctx);
-
-unlock:
-	mutex_unlock(&q->sysfs_lock);
 }
 
 int blk_mq_sysfs_register(struct request_queue *q)
@@ -351,9 +376,16 @@ int blk_mq_sysfs_register(struct request_queue *q)
 	struct blk_mq_hw_ctx *hctx;
 	int i, ret = 0;
 
+	/*
+	 * If QUEUE_FLAG_REGISTERED is not set, q->mq_kobj
+	 * is not ready.
+	 */
 	mutex_lock(&q->sysfs_lock);
-	if (!q->mq_sysfs_init_done)
-		goto unlock;
+	if (!blk_queue_registered(q)) {
+		mutex_unlock(&q->sysfs_lock);
+		return ret;
+	}
+	mutex_unlock(&q->sysfs_lock);
 
 	queue_for_each_hw_ctx(q, hctx, i) {
 		ret = blk_mq_register_hctx(hctx);
@@ -361,8 +393,8 @@ int blk_mq_sysfs_register(struct request_queue *q)
 			break;
 	}
 
-unlock:
+	mutex_lock(&q->sysfs_lock);
+	q->mq_sysfs_ready = true;
 	mutex_unlock(&q->sysfs_lock);
-
 	return ret;
 }

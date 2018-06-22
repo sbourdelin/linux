@@ -659,7 +659,7 @@ struct request_queue {
 	struct dentry		*sched_debugfs_dir;
 #endif
 
-	bool			mq_sysfs_init_done;
+	bool			mq_sysfs_ready;
 
 	size_t			cmd_size;
 	void			*rq_alloc_data;
