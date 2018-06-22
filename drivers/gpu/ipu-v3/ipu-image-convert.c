@@ -544,7 +544,7 @@ static inline u32 tile_top_align(const struct ipu_image_pixfmt *fmt)
  */
 static inline u32 tile_width_align(const struct ipu_image_pixfmt *fmt)
 {
-	return fmt->planar ? 8 * fmt->uv_width_dec : 8;
+	return (fmt->planar && !fmt->uv_packed) ? 8 * fmt->uv_width_dec : 8;
 }
 
 /*
