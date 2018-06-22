@@ -107,13 +107,15 @@ void intel_pipe_update_start(const struct intel_crtc_state *new_crtc_state)
 						      VBLANK_EVASION_TIME_US);
 	max = vblank_start - 1;
 
-	local_irq_disable();
-
 	if (min <= 0 || max <= 0)
 		return;
 
 	if (WARN_ON(drm_crtc_vblank_get(&crtc->base)))
 		return;
+
+	psr_wait_for_idle_lockless(dev_priv);
+
+	local_irq_disable();
 
 	crtc->debug.min_vbl = min;
 	crtc->debug.max_vbl = max;
