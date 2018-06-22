@@ -529,21 +529,6 @@ static inline struct inode *d_backing_inode(const struct dentry *upper)
 	return inode;
 }
 
-/**
- * d_backing_dentry - Get upper or lower dentry we should be using
- * @upper: The upper layer
- *
- * This is the helper that should be used to get the dentry of the inode that
- * will be used if this dentry were opened as a file.  It may be the upper
- * dentry or it may be a lower dentry pinned by the upper.
- *
- * Normal filesystems should not use this to access their own dentries.
- */
-static inline struct dentry *d_backing_dentry(struct dentry *upper)
-{
-	return upper;
-}
-
 /* d_real() flags */
 #define D_REAL_UPPER	0x2	/* return upper dentry or NULL if non-upper */
 
