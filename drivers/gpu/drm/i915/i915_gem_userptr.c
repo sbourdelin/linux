@@ -112,10 +112,11 @@ static void del_object(struct i915_mmu_object *mo)
 	mo->attached = false;
 }
 
-static void i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
+static int i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
 						       struct mm_struct *mm,
 						       unsigned long start,
-						       unsigned long end)
+						       unsigned long end,
+						       bool blockable)
 {
 	struct i915_mmu_notifier *mn =
 		container_of(_mn, struct i915_mmu_notifier, mn);
@@ -124,7 +125,7 @@ static void i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
 	LIST_HEAD(cancelled);
 
 	if (RB_EMPTY_ROOT(&mn->objects.rb_root))
-		return;
+		return 0;
 
 	/* interval ranges are inclusive, but invalidate range is exclusive */
 	end--;
@@ -152,7 +153,8 @@ static void i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
 		del_object(mo);
 	spin_unlock(&mn->lock);
 
-	if (!list_empty(&cancelled))
+	/* TODO: can we skip waiting here? */
+	if (!list_empty(&cancelled) && blockable)
 		flush_workqueue(mn->wq);
 }
 

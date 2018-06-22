@@ -465,14 +465,20 @@ static void unmap_if_in_range(struct grant_map *map,
 	WARN_ON(err);
 }
 
-static void mn_invl_range_start(struct mmu_notifier *mn,
+static int mn_invl_range_start(struct mmu_notifier *mn,
 				struct mm_struct *mm,
-				unsigned long start, unsigned long end)
+				unsigned long start, unsigned long end,
+				bool blockable)
 {
 	struct gntdev_priv *priv = container_of(mn, struct gntdev_priv, mn);
 	struct grant_map *map;
 
-	mutex_lock(&priv->lock);
+	/* TODO do we really need a mutex here? */
+	if (blockable)
+		mutex_lock(&priv->lock);
+	else if (!mutex_trylock(&priv->lock))
+		return -EAGAIN;
+
 	list_for_each_entry(map, &priv->maps, next) {
 		unmap_if_in_range(map, start, end);
 	}
@@ -480,6 +486,8 @@ static void mn_invl_range_start(struct mmu_notifier *mn,
 		unmap_if_in_range(map, start, end);
 	}
 	mutex_unlock(&priv->lock);
+
+	return true;
 }
 
 static void mn_release(struct mmu_notifier *mn,

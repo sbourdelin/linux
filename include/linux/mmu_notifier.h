@@ -230,7 +230,8 @@ extern int __mmu_notifier_test_young(struct mm_struct *mm,
 extern void __mmu_notifier_change_pte(struct mm_struct *mm,
 				      unsigned long address, pte_t pte);
 extern void __mmu_notifier_invalidate_range_start(struct mm_struct *mm,
-				  unsigned long start, unsigned long end);
+				  unsigned long start, unsigned long end,
+				  bool blockable);
 extern void __mmu_notifier_invalidate_range_end(struct mm_struct *mm,
 				  unsigned long start, unsigned long end,
 				  bool only_end);
@@ -281,7 +282,17 @@ static inline void mmu_notifier_invalidate_range_start(struct mm_struct *mm,
 				  unsigned long start, unsigned long end)
 {
 	if (mm_has_notifiers(mm))
-		__mmu_notifier_invalidate_range_start(mm, start, end);
+		__mmu_notifier_invalidate_range_start(mm, start, end, true);
+}
+
+static inline int mmu_notifier_invalidate_range_start_nonblock(struct mm_struct *mm,
+				  unsigned long start, unsigned long end)
+{
+	int ret = 0;
+	if (mm_has_notifiers(mm))
+		ret = __mmu_notifier_invalidate_range_start(mm, start, end, false);
+
+	return ret;
 }
 
 static inline void mmu_notifier_invalidate_range_end(struct mm_struct *mm,

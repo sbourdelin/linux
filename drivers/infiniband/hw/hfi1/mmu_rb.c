@@ -284,10 +284,11 @@ void hfi1_mmu_rb_remove(struct mmu_rb_handler *handler,
 	handler->ops->remove(handler->ops_arg, node);
 }
 
-static void mmu_notifier_range_start(struct mmu_notifier *mn,
+static int mmu_notifier_range_start(struct mmu_notifier *mn,
 				     struct mm_struct *mm,
 				     unsigned long start,
-				     unsigned long end)
+				     unsigned long end,
+				     bool blockable)
 {
 	struct mmu_rb_handler *handler =
 		container_of(mn, struct mmu_rb_handler, mn);
@@ -313,6 +314,8 @@ static void mmu_notifier_range_start(struct mmu_notifier *mn,
 
 	if (added)
 		queue_work(handler->wq, &handler->del_work);
+
+	return 0;
 }
 
 /*

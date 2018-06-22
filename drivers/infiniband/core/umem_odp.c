@@ -207,22 +207,29 @@ static int invalidate_range_start_trampoline(struct ib_umem *item, u64 start,
 	return 0;
 }
 
-static void ib_umem_notifier_invalidate_range_start(struct mmu_notifier *mn,
+static int ib_umem_notifier_invalidate_range_start(struct mmu_notifier *mn,
 						    struct mm_struct *mm,
 						    unsigned long start,
-						    unsigned long end)
+						    unsigned long end,
+						    bool blockable)
 {
 	struct ib_ucontext *context = container_of(mn, struct ib_ucontext, mn);
 
 	if (!context->invalidate_range)
-		return;
+		return 0;
+
+	if (blockable)
+		down_read(&context->umem_rwsem);
+	else if (!down_read_trylock(&context->umem_rwsem))
+		return -EAGAIN;
 
 	ib_ucontext_notifier_start_account(context);
-	down_read(&context->umem_rwsem);
 	rbt_ib_umem_for_each_in_range(&context->umem_tree, start,
 				      end,
 				      invalidate_range_start_trampoline, NULL);
 	up_read(&context->umem_rwsem);
+
+	return 0;
 }
 
 static int invalidate_range_end_trampoline(struct ib_umem *item, u64 start,
