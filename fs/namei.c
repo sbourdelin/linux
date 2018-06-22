@@ -1538,7 +1538,7 @@ static int lookup_fast(struct nameidata *nd,
 		 * This sequence count validates that the inode matches
 		 * the dentry name information from lookup.
 		 */
-		*inode = d_backing_inode(dentry);
+		*inode = d_inode(dentry);
 		negative = d_is_negative(dentry);
 		if (unlikely(read_seqcount_retry(&dentry->d_seq, seq)))
 			return -ECHILD;
@@ -1593,7 +1593,7 @@ static int lookup_fast(struct nameidata *nd,
 	path->dentry = dentry;
 	err = follow_managed(path, nd);
 	if (likely(err > 0))
-		*inode = d_backing_inode(path->dentry);
+		*inode = d_inode(path->dentry);
 	return err;
 }
 
@@ -1782,7 +1782,7 @@ static int walk_component(struct nameidata *nd, int flags)
 		}
 
 		seq = 0;	/* we are already out of RCU mode */
-		inode = d_backing_inode(path.dentry);
+		inode = d_inode(path.dentry);
 	}
 
 	return step_into(nd, &path, flags, inode, seq);
@@ -2257,7 +2257,7 @@ static int handle_lookup_down(struct nameidata *nd)
 		err = follow_managed(&path, nd);
 		if (unlikely(err < 0))
 			return err;
-		inode = d_backing_inode(path.dentry);
+		inode = d_inode(path.dentry);
 		seq = 0;
 	}
 	path_to_nameidata(&path, nd);
@@ -2649,7 +2649,7 @@ mountpoint_last(struct nameidata *nd)
 		return -ENOENT;
 	}
 	path.mnt = nd->path.mnt;
-	return step_into(nd, &path, 0, d_backing_inode(path.dentry), 0);
+	return step_into(nd, &path, 0, d_inode(path.dentry), 0);
 }
 
 /**
@@ -2770,7 +2770,7 @@ EXPORT_SYMBOL(__check_sticky);
  */
 static int may_delete(struct inode *dir, struct dentry *victim, bool isdir)
 {
-	struct inode *inode = d_backing_inode(victim);
+	struct inode *inode = d_inode(victim);
 	int error;
 
 	if (d_is_negative(victim))
@@ -3365,7 +3365,7 @@ static int do_last(struct nameidata *nd,
 	}
 
 	seq = 0;	/* out of RCU mode, so the value doesn't matter */
-	inode = d_backing_inode(path.dentry);
+	inode = d_inode(path.dentry);
 finish_lookup:
 	error = step_into(nd, &path, 0, inode, seq);
 	if (unlikely(error))

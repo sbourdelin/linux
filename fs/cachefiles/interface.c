@@ -295,7 +295,7 @@ static void cachefiles_drop_object(struct fscache_object *_object)
 		    _object != cache->cache.fsdef
 		    ) {
 			_debug("- retire object OBJ%x", object->fscache.debug_id);
-			inode = d_backing_inode(object->dentry);
+			inode = d_inode(object->dentry);
 			if (inode)
 				i_blocks = inode->i_blocks;
 
@@ -460,7 +460,7 @@ static int cachefiles_attr_changed(struct fscache_object *_object)
 
 	fscache_set_store_limit(&object->fscache, ni_size);
 
-	oi_size = i_size_read(d_backing_inode(object->backer));
+	oi_size = i_size_read(d_inode(object->backer));
 	if (oi_size == ni_size)
 		return 0;
 

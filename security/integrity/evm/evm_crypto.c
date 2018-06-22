@@ -191,7 +191,7 @@ static int evm_calc_hmac_or_hash(struct dentry *dentry,
 				size_t req_xattr_value_len,
 				char type, char *digest)
 {
-	struct inode *inode = d_backing_inode(dentry);
+	struct inode *inode = d_inode(dentry);
 	struct xattr_list *xattr;
 	struct shash_desc *desc;
 	size_t xattr_size = 0;
@@ -302,7 +302,7 @@ static int evm_is_immutable(struct dentry *dentry, struct inode *inode)
 int evm_update_evmxattr(struct dentry *dentry, const char *xattr_name,
 			const char *xattr_value, size_t xattr_value_len)
 {
-	struct inode *inode = d_backing_inode(dentry);
+	struct inode *inode = d_inode(dentry);
 	struct evm_ima_xattr_data xattr_data;
 	int rc = 0;
 

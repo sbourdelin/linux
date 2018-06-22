@@ -897,7 +897,7 @@ posix_acl_xattr_set(const struct xattr_handler *handler,
 static bool
 posix_acl_xattr_list(struct dentry *dentry)
 {
-	return IS_POSIXACL(d_backing_inode(dentry));
+	return IS_POSIXACL(d_inode(dentry));
 }
 
 const struct xattr_handler posix_acl_access_xattr_handler = {

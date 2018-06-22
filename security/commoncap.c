@@ -301,7 +301,7 @@ int cap_capset(struct cred *new,
  */
 int cap_inode_need_killpriv(struct dentry *dentry)
 {
-	struct inode *inode = d_backing_inode(dentry);
+	struct inode *inode = d_inode(dentry);
 	int error;
 
 	error = __vfs_getxattr(dentry, inode, XATTR_NAME_CAPS, NULL, 0);
@@ -486,7 +486,7 @@ int cap_convert_nscap(struct dentry *dentry, void **ivalue, size_t size)
 	uid_t nsrootid;
 	const struct vfs_cap_data *cap = *ivalue;
 	__u32 magic, nsmagic;
-	struct inode *inode = d_backing_inode(dentry);
+	struct inode *inode = d_inode(dentry);
 	struct user_namespace *task_ns = current_user_ns(),
 		*fs_ns = inode->i_sb->s_user_ns;
 	kuid_t rootid;
@@ -577,7 +577,7 @@ static inline int bprm_caps_from_vfs_caps(struct cpu_vfs_cap_data *caps,
  */
 int get_vfs_caps_from_disk(const struct dentry *dentry, struct cpu_vfs_cap_data *cpu_caps)
 {
-	struct inode *inode = d_backing_inode(dentry);
+	struct inode *inode = d_inode(dentry);
 	__u32 magic_etc;
 	unsigned tocopy, i;
 	int size;
@@ -960,7 +960,7 @@ int cap_inode_removexattr(struct dentry *dentry, const char *name)
 
 	if (strcmp(name, XATTR_NAME_CAPS) == 0) {
 		/* security.capability gets namespaced */
-		struct inode *inode = d_backing_inode(dentry);
+		struct inode *inode = d_inode(dentry);
 		if (!inode)
 			return -EINVAL;
 		if (!capable_wrt_inode_uidgid(inode, CAP_SETFCAP))

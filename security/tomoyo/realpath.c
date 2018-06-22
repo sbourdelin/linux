@@ -98,7 +98,7 @@ static char *tomoyo_get_absolute_path(const struct path *path, char * const buff
 		/* go to whatever namespace root we are under */
 		pos = d_absolute_path(path, buffer, buflen - 1);
 		if (!IS_ERR(pos) && *pos == '/' && pos[1]) {
-			struct inode *inode = d_backing_inode(path->dentry);
+			struct inode *inode = d_inode(path->dentry);
 			if (inode && S_ISDIR(inode->i_mode)) {
 				buffer[buflen - 2] = '/';
 				buffer[buflen - 1] = '\0';
@@ -126,7 +126,7 @@ static char *tomoyo_get_dentry_path(struct dentry *dentry, char * const buffer,
 	if (buflen >= 256) {
 		pos = dentry_path_raw(dentry, buffer, buflen - 1);
 		if (!IS_ERR(pos) && *pos == '/' && pos[1]) {
-			struct inode *inode = d_backing_inode(dentry);
+			struct inode *inode = d_inode(dentry);
 			if (inode && S_ISDIR(inode->i_mode)) {
 				buffer[buflen - 2] = '/';
 				buffer[buflen - 1] = '\0';
@@ -169,7 +169,7 @@ static char *tomoyo_get_local_path(struct dentry *dentry, char * const buffer,
 	if (!MAJOR(sb->s_dev))
 		goto prepend_filesystem_name;
 	{
-		struct inode *inode = d_backing_inode(sb->s_root);
+		struct inode *inode = d_inode(sb->s_root);
 		/*
 		 * Use filesystem name if filesystem does not support rename()
 		 * operation.
@@ -220,7 +220,7 @@ out:
 static char *tomoyo_get_socket_name(const struct path *path, char * const buffer,
 				    const int buflen)
 {
-	struct inode *inode = d_backing_inode(path->dentry);
+	struct inode *inode = d_inode(path->dentry);
 	struct socket *sock = inode ? SOCKET_I(inode) : NULL;
 	struct sock *sk = sock ? sock->sk : NULL;
 	if (sk) {
@@ -278,7 +278,7 @@ char *tomoyo_realpath_from_path(const struct path *path)
 			pos = dentry->d_op->d_dname(dentry, buf, buf_len - 1);
 			goto encode;
 		}
-		inode = d_backing_inode(sb->s_root);
+		inode = d_inode(sb->s_root);
 		/*
 		 * Get local name for filesystems without rename() operation
 		 * or dentry without vfsmount.

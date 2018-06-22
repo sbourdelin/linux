@@ -390,7 +390,7 @@ retry:
 	if (res)
 		goto out;
 
-	inode = d_backing_inode(path.dentry);
+	inode = d_inode(path.dentry);
 
 	if ((mode & MAY_EXEC) && S_ISREG(inode->i_mode)) {
 		/*
@@ -854,7 +854,7 @@ int finish_open(struct file *file, struct dentry *dentry,
 	BUG_ON(*opened & FILE_OPENED); /* once it's opened, it's opened */
 
 	file->f_path.dentry = dentry;
-	error = do_dentry_open(file, d_backing_inode(dentry), open,
+	error = do_dentry_open(file, d_inode(dentry), open,
 			       current_cred());
 	if (!error)
 		*opened |= FILE_OPENED;
@@ -905,7 +905,7 @@ int vfs_open(const struct path *path, struct file *file,
 		return PTR_ERR(dentry);
 
 	file->f_path = *path;
-	return do_dentry_open(file, d_backing_inode(dentry), NULL, cred);
+	return do_dentry_open(file, d_inode(dentry), NULL, cred);
 }
 
 struct file *dentry_open(const struct path *path, int flags,

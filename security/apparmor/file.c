@@ -161,7 +161,7 @@ int aa_audit_file(struct aa_profile *profile, struct aa_perms *perms,
  */
 static inline bool is_deleted(struct dentry *dentry)
 {
-	if (d_unlinked(dentry) && d_backing_inode(dentry)->i_nlink == 0)
+	if (d_unlinked(dentry) && d_inode(dentry)->i_nlink == 0)
 		return 1;
 	return 0;
 }
@@ -470,8 +470,8 @@ int aa_path_link(struct aa_label *label, struct dentry *old_dentry,
 	struct path link = { .mnt = new_dir->mnt, .dentry = new_dentry };
 	struct path target = { .mnt = new_dir->mnt, .dentry = old_dentry };
 	struct path_cond cond = {
-		d_backing_inode(old_dentry)->i_uid,
-		d_backing_inode(old_dentry)->i_mode
+		d_inode(old_dentry)->i_uid,
+		d_inode(old_dentry)->i_mode
 	};
 	char *buffer = NULL, *buffer2 = NULL;
 	struct aa_profile *profile;

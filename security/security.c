@@ -517,7 +517,7 @@ EXPORT_SYMBOL(security_old_inode_init_security);
 int security_path_mknod(const struct path *dir, struct dentry *dentry, umode_t mode,
 			unsigned int dev)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dir->dentry))))
 		return 0;
 	return call_int_hook(path_mknod, 0, dir, dentry, mode, dev);
 }
@@ -525,7 +525,7 @@ EXPORT_SYMBOL(security_path_mknod);
 
 int security_path_mkdir(const struct path *dir, struct dentry *dentry, umode_t mode)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dir->dentry))))
 		return 0;
 	return call_int_hook(path_mkdir, 0, dir, dentry, mode);
 }
@@ -533,14 +533,14 @@ EXPORT_SYMBOL(security_path_mkdir);
 
 int security_path_rmdir(const struct path *dir, struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dir->dentry))))
 		return 0;
 	return call_int_hook(path_rmdir, 0, dir, dentry);
 }
 
 int security_path_unlink(const struct path *dir, struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dir->dentry))))
 		return 0;
 	return call_int_hook(path_unlink, 0, dir, dentry);
 }
@@ -549,7 +549,7 @@ EXPORT_SYMBOL(security_path_unlink);
 int security_path_symlink(const struct path *dir, struct dentry *dentry,
 			  const char *old_name)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dir->dentry))))
 		return 0;
 	return call_int_hook(path_symlink, 0, dir, dentry, old_name);
 }
@@ -557,7 +557,7 @@ int security_path_symlink(const struct path *dir, struct dentry *dentry,
 int security_path_link(struct dentry *old_dentry, const struct path *new_dir,
 		       struct dentry *new_dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(old_dentry))))
 		return 0;
 	return call_int_hook(path_link, 0, old_dentry, new_dir, new_dentry);
 }
@@ -566,8 +566,8 @@ int security_path_rename(const struct path *old_dir, struct dentry *old_dentry,
 			 const struct path *new_dir, struct dentry *new_dentry,
 			 unsigned int flags)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
-		     (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
+	if (unlikely(IS_PRIVATE(d_inode(old_dentry)) ||
+		     (d_is_positive(new_dentry) && IS_PRIVATE(d_inode(new_dentry)))))
 		return 0;
 
 	if (flags & RENAME_EXCHANGE) {
@@ -584,21 +584,21 @@ EXPORT_SYMBOL(security_path_rename);
 
 int security_path_truncate(const struct path *path)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(path->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(path->dentry))))
 		return 0;
 	return call_int_hook(path_truncate, 0, path);
 }
 
 int security_path_chmod(const struct path *path, umode_t mode)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(path->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(path->dentry))))
 		return 0;
 	return call_int_hook(path_chmod, 0, path, mode);
 }
 
 int security_path_chown(const struct path *path, kuid_t uid, kgid_t gid)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(path->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(path->dentry))))
 		return 0;
 	return call_int_hook(path_chown, 0, path, uid, gid);
 }
@@ -620,14 +620,14 @@ EXPORT_SYMBOL_GPL(security_inode_create);
 int security_inode_link(struct dentry *old_dentry, struct inode *dir,
 			 struct dentry *new_dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(old_dentry))))
 		return 0;
 	return call_int_hook(inode_link, 0, old_dentry, dir, new_dentry);
 }
 
 int security_inode_unlink(struct inode *dir, struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	return call_int_hook(inode_unlink, 0, dir, dentry);
 }
@@ -650,7 +650,7 @@ EXPORT_SYMBOL_GPL(security_inode_mkdir);
 
 int security_inode_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	return call_int_hook(inode_rmdir, 0, dir, dentry);
 }
@@ -666,8 +666,8 @@ int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
 			   struct inode *new_dir, struct dentry *new_dentry,
 			   unsigned int flags)
 {
-        if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
-            (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
+	if (unlikely(IS_PRIVATE(d_inode(old_dentry)) ||
+	    (d_is_positive(new_dentry) && IS_PRIVATE(d_inode(new_dentry)))))
 		return 0;
 
 	if (flags & RENAME_EXCHANGE) {
@@ -683,7 +683,7 @@ int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 int security_inode_readlink(struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	return call_int_hook(inode_readlink, 0, dentry);
 }
@@ -707,7 +707,7 @@ int security_inode_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	int ret;
 
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	ret = call_int_hook(inode_setattr, 0, dentry, attr);
 	if (ret)
@@ -718,7 +718,7 @@ EXPORT_SYMBOL_GPL(security_inode_setattr);
 
 int security_inode_getattr(const struct path *path)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(path->dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(path->dentry))))
 		return 0;
 	return call_int_hook(inode_getattr, 0, path);
 }
@@ -728,7 +728,7 @@ int security_inode_setxattr(struct dentry *dentry, const char *name,
 {
 	int ret;
 
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	/*
 	 * SELinux and Smack integrate the cap call,
@@ -750,7 +750,7 @@ int security_inode_setxattr(struct dentry *dentry, const char *name,
 void security_inode_post_setxattr(struct dentry *dentry, const char *name,
 				  const void *value, size_t size, int flags)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return;
 	call_void_hook(inode_post_setxattr, dentry, name, value, size, flags);
 	evm_inode_post_setxattr(dentry, name, value, size);
@@ -758,14 +758,14 @@ void security_inode_post_setxattr(struct dentry *dentry, const char *name,
 
 int security_inode_getxattr(struct dentry *dentry, const char *name)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	return call_int_hook(inode_getxattr, 0, dentry, name);
 }
 
 int security_inode_listxattr(struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	return call_int_hook(inode_listxattr, 0, dentry);
 }
@@ -774,7 +774,7 @@ int security_inode_removexattr(struct dentry *dentry, const char *name)
 {
 	int ret;
 
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	if (unlikely(IS_PRIVATE(d_inode(dentry))))
 		return 0;
 	/*
 	 * SELinux and Smack integrate the cap call,

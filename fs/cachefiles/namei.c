@@ -262,7 +262,7 @@ void cachefiles_mark_object_inactive(struct cachefiles_cache *cache,
 				     blkcnt_t i_blocks)
 {
 	struct dentry *dentry = object->dentry;
-	struct inode *inode = d_backing_inode(dentry);
+	struct inode *inode = d_inode(dentry);
 
 	trace_cachefiles_mark_inactive(object, dentry, inode);
 
@@ -445,7 +445,7 @@ int cachefiles_delete_object(struct cachefiles_cache *cache,
 	_enter(",OBJ%x{%p}", object->fscache.debug_id, object->dentry);
 
 	ASSERT(object->dentry);
-	ASSERT(d_backing_inode(object->dentry));
+	ASSERT(d_inode(object->dentry));
 	ASSERT(object->dentry->d_parent);
 
 	dir = dget_parent(object->dentry);
@@ -505,7 +505,7 @@ int cachefiles_walk_to_object(struct cachefiles_object *parent,
 	path.mnt = cache->mnt;
 
 	ASSERT(parent->dentry);
-	ASSERT(d_backing_inode(parent->dentry));
+	ASSERT(d_inode(parent->dentry));
 
 	if (!(d_is_dir(parent->dentry))) {
 		// TODO: convert file to dir
@@ -539,7 +539,7 @@ lookup_again:
 		goto lookup_error;
 	}
 
-	inode = d_backing_inode(next);
+	inode = d_inode(next);
 	trace_cachefiles_lookup(object, next, inode);
 	_debug("next -> %p %s", next, inode ? "positive" : "negative");
 
@@ -577,14 +577,14 @@ lookup_again:
 				inode_unlock(d_inode(dir));
 				goto lookup_again;
 			}
-			ASSERT(d_backing_inode(next));
+			ASSERT(d_inode(next));
 
 			_debug("mkdir -> %p{%p{ino=%lu}}",
-			       next, d_backing_inode(next), d_backing_inode(next)->i_ino);
+			       next, d_inode(next), d_inode(next)->i_ino);
 
 		} else if (!d_can_lookup(next)) {
 			pr_err("inode %lu is not a directory\n",
-			       d_backing_inode(next)->i_ino);
+			       d_inode(next)->i_ino);
 			ret = -ENOBUFS;
 			goto error;
 		}
@@ -607,16 +607,16 @@ lookup_again:
 			if (ret < 0)
 				goto create_error;
 
-			ASSERT(d_backing_inode(next));
+			ASSERT(d_inode(next));
 
 			_debug("create -> %p{%p{ino=%lu}}",
-			       next, d_backing_inode(next), d_backing_inode(next)->i_ino);
+			       next, d_inode(next), d_inode(next)->i_ino);
 
 		} else if (!d_can_lookup(next) &&
 			   !d_is_reg(next)
 			   ) {
 			pr_err("inode %lu is not a file or directory\n",
-			       d_backing_inode(next)->i_ino);
+			       d_inode(next)->i_ino);
 			ret = -ENOBUFS;
 			goto error;
 		}
@@ -693,7 +693,7 @@ lookup_again:
 			const struct address_space_operations *aops;
 
 			ret = -EPERM;
-			aops = d_backing_inode(object->dentry)->i_mapping->a_ops;
+			aops = d_inode(object->dentry)->i_mapping->a_ops;
 			if (!aops->bmap)
 				goto check_error;
 			if (object->dentry->d_sb->s_blocksize > PAGE_SIZE)
@@ -708,7 +708,7 @@ lookup_again:
 	object->new = 0;
 	fscache_obtained_object(&object->fscache);
 
-	_leave(" = 0 [%lu]", d_backing_inode(object->dentry)->i_ino);
+	_leave(" = 0 [%lu]", d_inode(object->dentry)->i_ino);
 	return 0;
 
 no_space_error:
@@ -726,7 +726,7 @@ mark_active_timed_out:
 check_error:
 	_debug("check error %d", ret);
 	cachefiles_mark_object_inactive(
-		cache, object, d_backing_inode(object->dentry)->i_blocks);
+		cache, object, d_inode(object->dentry)->i_blocks);
 release_dentry:
 	dput(object->dentry);
 	object->dentry = NULL;
@@ -780,7 +780,7 @@ retry:
 	}
 
 	_debug("subdir -> %p %s",
-	       subdir, d_backing_inode(subdir) ? "positive" : "negative");
+	       subdir, d_inode(subdir) ? "positive" : "negative");
 
 	/* we need to create the subdir if it doesn't exist yet */
 	if (d_is_negative(subdir)) {
@@ -803,18 +803,18 @@ retry:
 			dput(subdir);
 			goto retry;
 		}
-		ASSERT(d_backing_inode(subdir));
+		ASSERT(d_inode(subdir));
 
 		_debug("mkdir -> %p{%p{ino=%lu}}",
 		       subdir,
-		       d_backing_inode(subdir),
-		       d_backing_inode(subdir)->i_ino);
+		       d_inode(subdir),
+		       d_inode(subdir)->i_ino);
 	}
 
 	inode_unlock(d_inode(dir));
 
 	/* we need to make sure the subdir is a directory */
-	ASSERT(d_backing_inode(subdir));
+	ASSERT(d_inode(subdir));
 
 	if (!d_can_lookup(subdir)) {
 		pr_err("%s is not a directory\n", dirname);
@@ -823,16 +823,16 @@ retry:
 	}
 
 	ret = -EPERM;
-	if (!(d_backing_inode(subdir)->i_opflags & IOP_XATTR) ||
-	    !d_backing_inode(subdir)->i_op->lookup ||
-	    !d_backing_inode(subdir)->i_op->mkdir ||
-	    !d_backing_inode(subdir)->i_op->create ||
-	    !d_backing_inode(subdir)->i_op->rename ||
-	    !d_backing_inode(subdir)->i_op->rmdir ||
-	    !d_backing_inode(subdir)->i_op->unlink)
+	if (!(d_inode(subdir)->i_opflags & IOP_XATTR) ||
+	    !d_inode(subdir)->i_op->lookup ||
+	    !d_inode(subdir)->i_op->mkdir ||
+	    !d_inode(subdir)->i_op->create ||
+	    !d_inode(subdir)->i_op->rename ||
+	    !d_inode(subdir)->i_op->rmdir ||
+	    !d_inode(subdir)->i_op->unlink)
 		goto check_error;
 
-	_leave(" = [%lu]", d_backing_inode(subdir)->i_ino);
+	_leave(" = [%lu]", d_inode(subdir)->i_ino);
 	return subdir;
 
 check_error:
@@ -887,7 +887,7 @@ static struct dentry *cachefiles_check_active(struct cachefiles_cache *cache,
 		goto lookup_error;
 
 	//_debug("victim -> %p %s",
-	//       victim, d_backing_inode(victim) ? "positive" : "negative");
+	//       victim, d_inode(victim) ? "positive" : "negative");
 
 	/* if the object is no longer there then we probably retired the object
 	 * at the netfs's request whilst the cull was in progress
@@ -964,7 +964,7 @@ int cachefiles_cull(struct cachefiles_cache *cache, struct dentry *dir,
 		return PTR_ERR(victim);
 
 	_debug("victim -> %p %s",
-	       victim, d_backing_inode(victim) ? "positive" : "negative");
+	       victim, d_inode(victim) ? "positive" : "negative");
 
 	/* okay... the victim is not being used so we can cull it
 	 * - start by marking it as stale
