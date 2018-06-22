@@ -1386,6 +1386,7 @@ __execlists_context_pin(struct intel_engine_cs *engine,
 {
 	void *vaddr;
 	int ret;
+	enum i915_map_type map = HAS_LLC(ctx->i915) ? I915_MAP_WB : I915_MAP_WC;
 
 	ret = execlists_context_deferred_alloc(ctx, engine, ce);
 	if (ret)
@@ -1396,7 +1397,7 @@ __execlists_context_pin(struct intel_engine_cs *engine,
 	if (ret)
 		goto err;
 
-	vaddr = i915_gem_object_pin_map(ce->state->obj, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(ce->state->obj, map);
 	if (IS_ERR(vaddr)) {
 		ret = PTR_ERR(vaddr);
 		goto unpin_vma;
@@ -2728,6 +2729,7 @@ populate_lr_context(struct i915_gem_context *ctx,
 		    struct intel_engine_cs *engine,
 		    struct intel_ring *ring)
 {
+	enum i915_map_type map = HAS_LLC(ctx->i915) ? I915_MAP_WB : I915_MAP_WC;
 	void *vaddr;
 	u32 *regs;
 	int ret;
@@ -2738,7 +2740,7 @@ populate_lr_context(struct i915_gem_context *ctx,
 		return ret;
 	}
 
-	vaddr = i915_gem_object_pin_map(ctx_obj, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(ctx_obj, map);
 	if (IS_ERR(vaddr)) {
 		ret = PTR_ERR(vaddr);
 		DRM_DEBUG_DRIVER("Could not map object pages! (%d)\n", ret);
@@ -2756,7 +2758,7 @@ populate_lr_context(struct i915_gem_context *ctx,
 		void *defaults;
 
 		defaults = i915_gem_object_pin_map(engine->default_state,
-						   I915_MAP_WB);
+						   map);
 		if (IS_ERR(defaults)) {
 			ret = PTR_ERR(defaults);
 			goto err_unpin_ctx;
