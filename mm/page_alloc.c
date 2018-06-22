@@ -5477,8 +5477,16 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	 * Honor reservation requested by the driver for this ZONE_DEVICE
 	 * memory
 	 */
-	if (altmap && start_pfn == altmap->base_pfn)
+	if (altmap && start_pfn == altmap->base_pfn) {
+		unsigned long i;
+
+		for (i = 0; i < altmap->reserve; i++) {
+			page = pfn_to_page(start_pfn + i);
+			__init_single_page(page, start_pfn + i, zone, nid);
+			SetPageReserved(page);
+		}
 		start_pfn += altmap->reserve;
+	}
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 		/*
