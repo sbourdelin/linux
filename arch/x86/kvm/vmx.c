@@ -8263,6 +8263,13 @@ static inline int vmcs12_write_any(struct vmcs12 *vmcs12,
 	if (offset < 0)
 		return offset;
 
+	/*
+	 * For compatibility with Haswell and later, mask off the
+	 * irrelevant bits of the guest access rights fields.
+	 */
+	if (field >= GUEST_ES_AR_BYTES && field <= GUEST_TR_AR_BYTES)
+		field_value &= 0x1f0ff;
+
 	switch (vmcs_field_width(field)) {
 	case VMCS_FIELD_WIDTH_U16:
 		*(u16 *)p = field_value;
