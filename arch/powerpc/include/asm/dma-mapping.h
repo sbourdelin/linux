@@ -74,6 +74,7 @@ static inline unsigned long device_to_mask(struct device *dev)
 extern struct dma_map_ops dma_iommu_ops;
 #endif
 extern const struct dma_map_ops dma_nommu_ops;
+extern const struct dma_map_ops dma_pseudo_bypass_ops;
 
 static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
 {

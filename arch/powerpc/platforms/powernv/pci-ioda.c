@@ -25,6 +25,7 @@
 #include <linux/iommu.h>
 #include <linux/rculist.h>
 #include <linux/sizes.h>
+#include <linux/vmalloc.h>
 
 #include <asm/sections.h>
 #include <asm/io.h>
@@ -1088,6 +1089,9 @@ static struct pnv_ioda_pe *pnv_ioda_setup_dev_PE(struct pci_dev *dev)
 	pe->pbus = NULL;
 	pe->mve_number = -1;
 	pe->rid = dev->bus->number << 8 | pdn->devfn;
+	pe->tces = NULL;
+	pe->tce_tracker = NULL;
+	pe->tce_bitmap = NULL;
 
 	pe_info(pe, "Associated device to PE\n");
 
@@ -1569,6 +1573,9 @@ static void pnv_ioda_setup_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 		pe->mve_number = -1;
 		pe->rid = (pci_iov_virtfn_bus(pdev, vf_index) << 8) |
 			   pci_iov_virtfn_devfn(pdev, vf_index);
+		pe->tces = NULL;
+		pe->tce_tracker = NULL;
+		pe->tce_bitmap = NULL;
 
 		pe_info(pe, "VF %04d:%02d:%02d.%d associated with PE#%x\n",
 			hose->global_number, pdev->bus->number,
@@ -1774,43 +1781,40 @@ static bool pnv_pci_ioda_pe_single_vendor(struct pnv_ioda_pe *pe)
 	return true;
 }
 
-/*
- * Reconfigure TVE#0 to be usable as 64-bit DMA space.
- *
- * The first 4GB of virtual memory for a PE is reserved for 32-bit accesses.
- * Devices can only access more than that if bit 59 of the PCI address is set
- * by hardware, which indicates TVE#1 should be used instead of TVE#0.
- * Many PCI devices are not capable of addressing that many bits, and as a
- * result are limited to the 4GB of virtual memory made available to 32-bit
- * devices in TVE#0.
- *
- * In order to work around this, reconfigure TVE#0 to be suitable for 64-bit
- * devices by configuring the virtual memory past the first 4GB inaccessible
- * by 64-bit DMAs.  This should only be used by devices that want more than
- * 4GB, and only on PEs that have no 32-bit devices.
- *
- * Currently this will only work on PHB3 (POWER8).
- */
-static int pnv_pci_ioda_dma_64bit_bypass(struct pnv_ioda_pe *pe)
+static int pnv_pci_pseudo_bypass_setup(struct pnv_ioda_pe *pe)
 {
-	u64 window_size, table_size, tce_count, addr;
+	u64 tce_count, table_size, window_size;
+	struct pnv_phb *p = pe->phb;
 	struct page *table_pages;
-	u64 tce_order = 28; /* 256MB TCEs */
 	__be64 *tces;
-	s64 rc;
+	int rc = -ENOMEM;
+	int bitmap_size, tracker_entries;
 
 	/*
-	 * Window size needs to be a power of two, but needs to account for
-	 * shifting memory by the 4GB offset required to skip 32bit space.
+	 * XXX These are factors for scaling the size of the TCE table, and
+	 * the table that tracks these allocations.  These should eventually
+	 * be kernel command line options with defaults above 1, for situations
+	 * where your memory expands after the machine has booted.
 	 */
-	window_size = roundup_pow_of_two(memory_hotplug_max() + (1ULL << 32));
-	tce_count = window_size >> tce_order;
+	int tce_size_factor = 1;
+	int tracking_table_factor = 1;
+
+	/*
+	 * The window size covers all of memory (and optionally more), with
+	 * enough tracker entries to cover them all being allocated.  So we
+	 * create enough TCEs to cover all of memory at once.
+	 */
+	window_size = roundup_pow_of_two(tce_size_factor * memory_hotplug_max());
+	tracker_entries = (tracking_table_factor * memory_hotplug_max()) >>
+		p->ioda.max_tce_order;
+	tce_count = window_size >> p->ioda.max_tce_order;
+	bitmap_size = BITS_TO_LONGS(tce_count) * sizeof(unsigned long);
 	table_size = tce_count << 3;
 
 	if (table_size < PAGE_SIZE)
 		table_size = PAGE_SIZE;
 
-	table_pages = alloc_pages_node(pe->phb->hose->node, GFP_KERNEL,
+	table_pages = alloc_pages_node(p->hose->node, GFP_KERNEL,
 				       get_order(table_size));
 	if (!table_pages)
 		goto err;
@@ -1821,26 +1825,33 @@ static int pnv_pci_ioda_dma_64bit_bypass(struct pnv_ioda_pe *pe)
 
 	memset(tces, 0, table_size);
 
-	for (addr = 0; addr < memory_hotplug_max(); addr += (1 << tce_order)) {
-		tces[(addr + (1ULL << 32)) >> tce_order] =
-			cpu_to_be64(addr | TCE_PCI_READ | TCE_PCI_WRITE);
-	}
+	pe->tces = tces;
+	pe->tce_count = tce_count;
+	pe->tce_bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+	/* The tracking table has two u64s per TCE */
+	pe->tce_tracker = vzalloc(sizeof(u64) * 2 * tracker_entries);
+	spin_lock_init(&pe->tce_alloc_lock);
+
+	/* mark the first 4GB as reserved so this can still be used for 32bit */
+	bitmap_set(pe->tce_bitmap, 0, 1ULL << (32 - p->ioda.max_tce_order));
+
+	pe_info(pe, "pseudo-bypass sizes: tracker %d bitmap %d TCEs %lld\n",
+		tracker_entries, bitmap_size, tce_count);
 
 	rc = opal_pci_map_pe_dma_window(pe->phb->opal_id,
 					pe->pe_number,
-					/* reconfigure window 0 */
 					(pe->pe_number << 1) + 0,
 					1,
 					__pa(tces),
 					table_size,
-					1 << tce_order);
+					1 << p->ioda.max_tce_order);
 	if (rc == OPAL_SUCCESS) {
-		pe_info(pe, "Using 64-bit DMA iommu bypass (through TVE#0)\n");
+		pe_info(pe, "TCE tables configured for pseudo-bypass\n");
 		return 0;
 	}
 err:
-	pe_err(pe, "Error configuring 64-bit DMA bypass\n");
-	return -EIO;
+	pe_err(pe, "error configuring pseudo-bypass\n");
+	return rc;
 }
 
 static int pnv_pci_ioda_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
@@ -1851,7 +1862,6 @@ static int pnv_pci_ioda_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
 	struct pnv_ioda_pe *pe;
 	uint64_t top;
 	bool bypass = false;
-	s64 rc;
 
 	if (WARN_ON(!pdn || pdn->pe_number == IODA_INVALID_PE))
 		return -ENODEV;
@@ -1868,21 +1878,15 @@ static int pnv_pci_ioda_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
 	} else {
 		/*
 		 * If the device can't set the TCE bypass bit but still wants
-		 * to access 4GB or more, on PHB3 we can reconfigure TVE#0 to
-		 * bypass the 32-bit region and be usable for 64-bit DMAs.
-		 * The device needs to be able to address all of this space.
+		 * to access 4GB or more, we need to use a different set of DMA
+		 * operations with an indirect mapping.
 		 */
 		if (dma_mask >> 32 &&
-		    dma_mask > (memory_hotplug_max() + (1ULL << 32)) &&
-		    pnv_pci_ioda_pe_single_vendor(pe) &&
-		    phb->model == PNV_PHB_MODEL_PHB3) {
-			/* Configure the bypass mode */
-			rc = pnv_pci_ioda_dma_64bit_bypass(pe);
-			if (rc)
-				return rc;
-			/* 4GB offset bypasses 32-bit space */
-			set_dma_offset(&pdev->dev, (1ULL << 32));
-			set_dma_ops(&pdev->dev, &dma_nommu_ops);
+		    phb->model != PNV_PHB_MODEL_P7IOC &&
+		    pnv_pci_ioda_pe_single_vendor(pe)) {
+			if (!pe->tces)
+				pnv_pci_pseudo_bypass_setup(pe);
+			set_dma_ops(&pdev->dev, &dma_pseudo_bypass_ops);
 		} else if (dma_mask >> 32 && dma_mask != DMA_BIT_MASK(64)) {
 			/*
 			 * Fail the request if a DMA mask between 32 and 64 bits
