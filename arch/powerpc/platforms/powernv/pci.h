@@ -173,6 +173,9 @@ struct pnv_phb {
 		struct list_head	pe_list;
 		struct mutex            pe_list_mutex;
 
+		/* Largest supported TCE order bits */
+		uint8_t			max_tce_order;
+
 		/* Reverse map of PEs, indexed by {bus, devfn} */
 		unsigned int		pe_rmap[0x10000];
 	} ioda;

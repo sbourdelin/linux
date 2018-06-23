@@ -3873,11 +3873,13 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	struct resource r;
 	const __be64 *prop64;
 	const __be32 *prop32;
+	struct property *prop;
 	int len;
 	unsigned int segno;
 	u64 phb_id;
 	void *aux;
 	long rc;
+	u32 val;
 
 	if (!of_device_is_available(np))
 		return;
@@ -4015,6 +4017,20 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 			phb->ioda.dma32_segmap[segno] = IODA_INVALID_PE;
 	}
 	phb->ioda.pe_array = aux + pemap_off;
+
+	phb->ioda.max_tce_order = 0;
+	// Get TCE order from the DT.  If it's not present, assume P8
+	if (!of_get_property(np, "ibm,supported-tce-sizes", NULL)) {
+		phb->ioda.max_tce_order = 28; // assume P8 256mb TCEs
+	} else {
+		of_property_for_each_u32(np, "ibm,supported-tce-sizes", prop,
+					 prop32, val) {
+			if (val > phb->ioda.max_tce_order)
+				phb->ioda.max_tce_order = val;
+		}
+		pr_debug("PHB%llx Found max TCE order of %d bits\n",
+			 phb->opal_id, phb->ioda.max_tce_order);
+	}
 
 	/*
 	 * Choose PE number for root bus, which shouldn't have
