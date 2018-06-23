@@ -29,6 +29,29 @@ struct bpf_prog;
 struct dentry;
 struct nsim_vf_config;
 
+#if IS_ENABLED(CONFIG_XFRM_OFFLOAD)
+#define NSIM_IPSEC_MAX_SA_COUNT		33
+#define NSIM_IPSEC_VALID		BIT(31)
+
+struct nsim_sa {
+	struct xfrm_state *xs;
+	__be32 ipaddr[4];
+	u32 key[4];
+	u32 salt;
+	bool used;
+	bool crypt;
+	bool rx;
+};
+
+struct nsim_ipsec {
+	struct nsim_sa sa[NSIM_IPSEC_MAX_SA_COUNT];
+	struct dentry *pfile;
+	u32 count;
+	u32 tx;
+	u32 ok;
+};
+#endif
+
 struct netdevsim {
 	struct net_device *netdev;
 
@@ -66,6 +89,9 @@ struct netdevsim {
 	struct list_head bpf_bound_maps;
 #if IS_ENABLED(CONFIG_NET_DEVLINK)
 	struct devlink *devlink;
+#endif
+#if IS_ENABLED(CONFIG_XFRM_OFFLOAD)
+	struct nsim_ipsec ipsec;
 #endif
 };
 
@@ -146,6 +172,17 @@ static inline int nsim_devlink_init(void)
 static inline void nsim_devlink_exit(void)
 {
 }
+#endif
+
+#if IS_ENABLED(CONFIG_XFRM_OFFLOAD)
+void nsim_ipsec_init(struct netdevsim *ns);
+void nsim_ipsec_teardown(struct netdevsim *ns);
+int nsim_ipsec_tx(struct netdevsim *ns, struct sk_buff *skb);
+#else
+static inline void nsim_ipsec_init(struct netdevsim *ns) {};
+static inline void nsim_ipsec_teardown(struct netdevsim *ns) {};
+static inline int nsim_ipsec_tx(struct netdevsim *ns, struct sk_buff *skb)
+								{ return 1; };
 #endif
 
 static inline struct netdevsim *to_nsim(struct device *ptr)
