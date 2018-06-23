@@ -29,8 +29,9 @@ static int dma_pseudo_bypass_select_tce(struct pnv_ioda_pe *pe, phys_addr_t addr
 {
 	int tce;
 	__be64 old, new;
+	unsigned long flags;
 
-	spin_lock(&pe->tce_alloc_lock);
+	spin_lock_irqsave(&pe->tce_alloc_lock, flags);
 	tce = bitmap_find_next_zero_area(pe->tce_bitmap,
 					 pe->tce_count,
 					 0,
@@ -40,9 +41,10 @@ static int dma_pseudo_bypass_select_tce(struct pnv_ioda_pe *pe, phys_addr_t addr
 	old = pe->tces[tce];
 	new = cpu_to_be64(addr | TCE_PCI_READ | TCE_PCI_WRITE);
 	pe->tces[tce] = new;
+	mb();
 	pe_info(pe, "allocating TCE %i 0x%016llx (old 0x%016llx)\n",
 		tce, new, old);
-	spin_unlock(&pe->tce_alloc_lock);
+	spin_unlock_irqrestore(&pe->tce_alloc_lock, flags);
 
 	return tce;
 }
