@@ -1783,7 +1783,7 @@ static bool pnv_pci_ioda_pe_single_vendor(struct pnv_ioda_pe *pe)
 
 static int pnv_pci_pseudo_bypass_setup(struct pnv_ioda_pe *pe)
 {
-	u64 tce_count, table_size, window_size;
+	u64 i, tce_count, table_size, window_size;
 	struct pnv_phb *p = pe->phb;
 	struct page *table_pages;
 	__be64 *tces;
@@ -1834,6 +1834,12 @@ static int pnv_pci_pseudo_bypass_setup(struct pnv_ioda_pe *pe)
 
 	/* mark the first 4GB as reserved so this can still be used for 32bit */
 	bitmap_set(pe->tce_bitmap, 0, 1ULL << (32 - p->ioda.max_tce_order));
+
+	/* make sure reserved first 4GB TCEs are not used by the mapper
+	 * set each address to -1, which will never match an incoming request
+	 */
+	for (i = 0; i < 4; i++)
+		pe->tce_tracker[i * 2] = -1;
 
 	pe_info(pe, "pseudo-bypass sizes: tracker %d bitmap %d TCEs %lld\n",
 		tracker_entries, bitmap_size, tce_count);
