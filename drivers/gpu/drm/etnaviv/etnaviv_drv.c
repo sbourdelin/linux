@@ -693,6 +693,8 @@ static struct platform_driver etnaviv_platform_driver = {
 	},
 };
 
+static struct platform_device *etnaviv_drm;
+
 static int __init etnaviv_init(void)
 {
 	int ret;
@@ -716,7 +718,8 @@ static int __init etnaviv_init(void)
 		if (!of_device_is_available(np))
 			continue;
 
-		platform_device_register_simple("etnaviv", -1, NULL, 0);
+		etnaviv_drm = platform_device_register_simple("etnaviv", -1,
+							      NULL, 0);
 		of_node_put(np);
 		break;
 	}
@@ -727,8 +730,9 @@ module_init(etnaviv_init);
 
 static void __exit etnaviv_exit(void)
 {
-	platform_driver_unregister(&etnaviv_gpu_driver);
+	platform_device_unregister(etnaviv_drm);
 	platform_driver_unregister(&etnaviv_platform_driver);
+	platform_driver_unregister(&etnaviv_gpu_driver);
 }
 module_exit(etnaviv_exit);
 
