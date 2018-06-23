@@ -42,8 +42,7 @@ static int dma_pseudo_bypass_select_tce(struct pnv_ioda_pe *pe, phys_addr_t addr
 	new = cpu_to_be64(addr | TCE_PCI_READ | TCE_PCI_WRITE);
 	pe->tces[tce] = new;
 	mb();
-	pe_info(pe, "allocating TCE %i 0x%016llx (old 0x%016llx)\n",
-		tce, new, old);
+	pnv_pci_ioda2_tce_invalidate_pe(pe);
 	spin_unlock_irqrestore(&pe->tce_alloc_lock, flags);
 
 	return tce;
