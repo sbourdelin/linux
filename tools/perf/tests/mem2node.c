@@ -21,7 +21,7 @@ static unsigned long *get_bitmap(const char *str, int nbits)
 	unsigned long *bm = NULL;
 	int i;
 
-	bm = bitmap_alloc(nbits);
+	bm = bitmap_zalloc(nbits, 0);
 
 	if (map && bm) {
 		for (i = 0; i < map->nr; i++)
@@ -65,7 +65,7 @@ int test__mem2node(struct test *t __maybe_unused, int subtest __maybe_unused)
 	T("failed: mem2node__node", -1 == mem2node__node(&map, 0x1050));
 
 	for (i = 0; i < ARRAY_SIZE(nodes); i++)
-		free(nodes[i].set);
+		bitmap_free(nodes[i].set);
 
 	mem2node__exit(&map);
 	return 0;

@@ -13,7 +13,7 @@ static unsigned long *get_bitmap(const char *str, int nbits)
 	unsigned long *bm = NULL;
 	int i;
 
-	bm = bitmap_alloc(nbits);
+	bm = bitmap_zalloc(nbits, 0);
 
 	if (map && bm) {
 		for (i = 0; i < map->nr; i++)
@@ -35,7 +35,7 @@ static int test_bitmap(const char *str)
 	pr_debug("bitmap: %s\n", buf);
 
 	ret = !strcmp(buf, str);
-	free(bm);
+	bitmap_free(bm);
 	return ret;
 }
 

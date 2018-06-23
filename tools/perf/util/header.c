@@ -275,7 +275,7 @@ static int do_read_bitmap(struct feat_fd *ff, unsigned long **pset, u64 *psize)
 	if (ret)
 		return ret;
 
-	set = bitmap_alloc(size);
+	set = bitmap_zalloc(size, 0);
 	if (!set)
 		return -ENOMEM;
 
@@ -284,7 +284,7 @@ static int do_read_bitmap(struct feat_fd *ff, unsigned long **pset, u64 *psize)
 	for (i = 0; (u64) i < BITS_TO_U64(size); i++) {
 		ret = do_read_u64(ff, p + i);
 		if (ret < 0) {
-			free(set);
+			bitmap_free(set);
 			return ret;
 		}
 	}
@@ -1277,7 +1277,7 @@ static int memory_node__read(struct memory_node *n, unsigned long idx)
 
 	size++;
 
-	n->set = bitmap_alloc(size);
+	n->set = bitmap_zalloc(size, 0);
 	if (!n->set) {
 		closedir(dir);
 		return -ENOMEM;

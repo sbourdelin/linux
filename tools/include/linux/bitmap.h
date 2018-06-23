@@ -97,12 +97,23 @@ static inline int test_and_set_bit(int nr, unsigned long *addr)
 }
 
 /**
- * bitmap_alloc - Allocate bitmap
- * @nbits: Number of bits
+ * Allocation and deallocation of bitmap.
  */
-static inline unsigned long *bitmap_alloc(int nbits)
+static inline unsigned long *bitmap_alloc(unsigned int nbits, gfp_t flags)
 {
-	return calloc(1, BITS_TO_LONGS(nbits) * sizeof(unsigned long));
+	(void) flags;
+	return malloc(BITS_TO_LONGS(nbits) * sizeof(unsigned long));
+}
+
+static inline unsigned long *bitmap_zalloc(unsigned int nbits, gfp_t flags)
+{
+	(void) flags;
+	return calloc(BITS_TO_LONGS(nbits), sizeof(unsigned long));
+}
+
+static inline void bitmap_free(const unsigned long *bitmap)
+{
+	free((unsigned long *)bitmap);
 }
 
 /*

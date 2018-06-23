@@ -127,11 +127,11 @@ static void *c2c_he_zalloc(size_t size)
 	if (!c2c_he)
 		return NULL;
 
-	c2c_he->cpuset = bitmap_alloc(c2c.cpus_cnt);
+	c2c_he->cpuset = bitmap_zalloc(c2c.cpus_cnt, 0);
 	if (!c2c_he->cpuset)
 		return NULL;
 
-	c2c_he->nodeset = bitmap_alloc(c2c.nodes_cnt);
+	c2c_he->nodeset = bitmap_zalloc(c2c.nodes_cnt, 0);
 	if (!c2c_he->nodeset)
 		return NULL;
 
@@ -156,8 +156,8 @@ static void c2c_he_free(void *he)
 		free(c2c_he->hists);
 	}
 
-	free(c2c_he->cpuset);
-	free(c2c_he->nodeset);
+	bitmap_free(c2c_he->cpuset);
+	bitmap_free(c2c_he->nodeset);
 	free(c2c_he->nodestr);
 	free(c2c_he->node_stats);
 	free(c2c_he);
@@ -2051,7 +2051,7 @@ static int setup_nodes(struct perf_session *session)
 		struct cpu_map *map = n[node].map;
 		unsigned long *set;
 
-		set = bitmap_alloc(c2c.cpus_cnt);
+		set = bitmap_zalloc(c2c.cpus_cnt, 0);
 		if (!set)
 			return -ENOMEM;
 
