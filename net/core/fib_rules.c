@@ -416,6 +416,12 @@ static struct fib_rule *rule_find(struct fib_rules_ops *ops,
 		if (rule->mark && r->mark != rule->mark)
 			continue;
 
+		if (r->suppress_ifgroup != rule->suppress_ifgroup)
+			continue;
+
+		if (r->suppress_prefixlen != rule->suppress_prefixlen)
+			continue;
+
 		if (rule->mark_mask && r->mark_mask != rule->mark_mask)
 			continue;
 
