@@ -117,9 +117,14 @@ __setup_efi_pci(efi_pci_io_protocol_t *pci, struct pci_setup_rom **__rom)
 	uint64_t attributes, romsize;
 	void *romimage;
 
-	status = efi_call_proto(efi_pci_io_protocol, attributes, pci,
-				EfiPciIoAttributeOperationGet, 0, 0,
-				&attributes);
+	if (efi_early->is64)
+		status = efi_call_proto(efi_pci_io_protocol, attributes, pci,
+					EfiPciIoAttributeOperationGet, 0,
+					&attributes);
+	else
+		status = efi_call_proto(efi_pci_io_protocol, attributes, pci,
+					EfiPciIoAttributeOperationGet, 0, 0,
+					&attributes);
 	if (status != EFI_SUCCESS)
 		return status;
 
