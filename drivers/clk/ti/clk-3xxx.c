@@ -254,6 +254,8 @@ static struct ti_dt_clk omap36xx_am35xx_omap3430es2plus_clks[] = {
 };
 
 static struct ti_dt_clk am35xx_clks[] = {
+	DT_CLK("davinci_emac.0", NULL, "emac_ick"),
+	DT_CLK("davinci_mdio.0", NULL, "emac_fck"),
 	DT_CLK(NULL, "hsotgusb_ick", "hsotgusb_ick_am35xx"),
 	DT_CLK(NULL, "hsotgusb_fck", "hsotgusb_fck_am35xx"),
 	DT_CLK(NULL, "uart4_ick", "uart4_ick_am35xx"),
