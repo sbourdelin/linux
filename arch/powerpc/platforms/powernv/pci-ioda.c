@@ -3342,6 +3342,47 @@ static int pnv_pci_diag_data_set(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(pnv_pci_diag_data_fops, NULL,
 			pnv_pci_diag_data_set, "%llu\n");
 
+static int pnv_pci_sketchy_set(void *data, u64 val)
+{
+	struct pci_controller *hose;
+	struct pnv_ioda_pe *pe;
+	struct pnv_phb *phb;
+	u64 entry1, entry2;
+	int i;
+
+	hose = (struct pci_controller *)data;
+	if (!hose || !hose->private_data)
+		return -ENODEV;
+
+	phb = hose->private_data;
+	pe = &phb->ioda.pe_array[val];
+
+	if (!pe)
+		return -EINVAL;
+
+	if (!pe->tces || !pe->tce_tracker)
+		return -EIO;
+
+	for (i = 0; i < pe->tce_count; i++) {
+		if (i > 16 && pe->tces[i] == 0)
+			break;
+		pr_info("%3d: %016llx\n", i, be64_to_cpu(pe->tces[i]));
+	}
+
+	for (i = 0; i < pe->tce_count; i++) {
+		entry1 = pe->tce_tracker[i * 2];
+		entry2 = pe->tce_tracker[i * 2 + 1];
+		if (!entry1)
+			break;
+		pr_info("%3d: %016llx %016llx\n", i, entry1, entry2);
+	}
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(pnv_pci_sketchy_fops, NULL,
+			pnv_pci_sketchy_set, "%llu\n");
+
+
 #endif /* CONFIG_DEBUG_FS */
 
 static void pnv_pci_ioda_create_dbgfs(void)
@@ -3367,6 +3408,8 @@ static void pnv_pci_ioda_create_dbgfs(void)
 
 		debugfs_create_file("dump_diag_regs", 0200, phb->dbgfs, hose,
 				    &pnv_pci_diag_data_fops);
+		debugfs_create_file("sketchy", 0200, phb->dbgfs, hose,
+				    &pnv_pci_sketchy_fops);
 	}
 #endif /* CONFIG_DEBUG_FS */
 }
