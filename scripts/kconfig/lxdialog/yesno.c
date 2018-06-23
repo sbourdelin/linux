@@ -71,7 +71,7 @@ do_resize:
 	print_title(dialog, title, width);
 
 	wattrset(dialog, dlg.dialog.atr);
-	print_autowrap(dialog, prompt, width - 2, 1, 3);
+	print_autowrap(dialog, prompt, width - 2, 2, 1, 3);
 
 	print_buttons(dialog, height, width, 0);
 

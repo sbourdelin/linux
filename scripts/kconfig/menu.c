@@ -18,6 +18,34 @@ static struct menu **last_entry_ptr;
 struct file *file_list;
 struct file *current_file;
 
+/*
+ * Return successor of m in cyclic depth-first order.
+ *
+ * Example:
+ * For any of the nodes of the below tree, the returned successor
+ * will be the node that is alphabetically next and the successor of
+ * 'f' will be 'a'.
+ *
+ * a-c-d-f
+ * |   |
+ * b   e
+ *
+ */
+struct menu *menu_get_next(struct menu *m)
+{
+	if (m->list)
+		return m->list;
+	if (m->next)
+		return m->next;
+
+	while (m->parent) {
+		if (m->parent->next)
+			return m->parent->next;
+		m = m->parent;
+	}
+	return rootmenu.list;
+}
+
 void menu_warn(struct menu *menu, const char *fmt, ...)
 {
 	va_list ap;
