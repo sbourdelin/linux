@@ -21,6 +21,18 @@ union e1000_adv_tx_desc {
 	} wb;
 };
 
+/* Adv Transmit Descriptor Config Masks */
+#define E1000_ADVTXD_MAC_TSTAMP	0x00080000 /* IEEE1588 Timestamp packet */
+#define E1000_ADVTXD_DTYP_CTXT	0x00200000 /* Advanced Context Descriptor */
+#define E1000_ADVTXD_DTYP_DATA	0x00300000 /* Advanced Data Descriptor */
+#define E1000_ADVTXD_DCMD_EOP	0x01000000 /* End of Packet */
+#define E1000_ADVTXD_DCMD_IFCS	0x02000000 /* Insert FCS (Ethernet CRC) */
+#define E1000_ADVTXD_DCMD_RS	0x08000000 /* Report Status */
+#define E1000_ADVTXD_DCMD_DEXT	0x20000000 /* Descriptor extension (1=Adv) */
+#define E1000_ADVTXD_DCMD_VLE	0x40000000 /* VLAN pkt enable */
+#define E1000_ADVTXD_DCMD_TSE	0x80000000 /* TCP Seg enable */
+#define E1000_ADVTXD_PAYLEN_SHIFT	14 /* Adv desc PAYLEN shift */
+
 struct e1000_adv_data_desc {
 	__le64 buffer_addr;    /* Address of the descriptor's data buffer */
 	union {
@@ -74,6 +86,9 @@ union e1000_adv_rx_desc {
 		} upper;
 	} wb;  /* writeback */
 };
+
+/* Adv Transmit Descriptor Config Masks */
+#define E1000_ADVTXD_PAYLEN_SHIFT	14 /* Adv desc PAYLEN shift */
 
 /* Additional Transmit Descriptor Control definitions */
 #define E1000_TXDCTL_QUEUE_ENABLE	0x02000000 /* Ena specific Tx Queue */

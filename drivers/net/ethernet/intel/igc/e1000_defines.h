@@ -101,6 +101,29 @@
 #define E1000_GPIE_EIAME	0x40000000
 #define E1000_GPIE_PBA		0x80000000
 
+/* Transmit Descriptor bit definitions */
+#define E1000_TXD_DTYP_D	0x00100000 /* Data Descriptor */
+#define E1000_TXD_DTYP_C	0x00000000 /* Context Descriptor */
+#define E1000_TXD_POPTS_IXSM	0x01       /* Insert IP checksum */
+#define E1000_TXD_POPTS_TXSM	0x02       /* Insert TCP/UDP checksum */
+#define E1000_TXD_CMD_EOP	0x01000000 /* End of Packet */
+#define E1000_TXD_CMD_IFCS	0x02000000 /* Insert FCS (Ethernet CRC) */
+#define E1000_TXD_CMD_IC	0x04000000 /* Insert Checksum */
+#define E1000_TXD_CMD_RS	0x08000000 /* Report Status */
+#define E1000_TXD_CMD_RPS	0x10000000 /* Report Packet Sent */
+#define E1000_TXD_CMD_DEXT	0x20000000 /* Desc extension (0 = legacy) */
+#define E1000_TXD_CMD_VLE	0x40000000 /* Add VLAN tag */
+#define E1000_TXD_CMD_IDE	0x80000000 /* Enable Tidv register */
+#define E1000_TXD_STAT_DD	0x00000001 /* Descriptor Done */
+#define E1000_TXD_STAT_EC	0x00000002 /* Excess Collisions */
+#define E1000_TXD_STAT_LC	0x00000004 /* Late Collisions */
+#define E1000_TXD_STAT_TU	0x00000008 /* Transmit underrun */
+#define E1000_TXD_CMD_TCP	0x01000000 /* TCP packet */
+#define E1000_TXD_CMD_IP	0x02000000 /* IP packet */
+#define E1000_TXD_CMD_TSE	0x04000000 /* TCP Seg enable */
+#define E1000_TXD_STAT_TC	0x00000004 /* Tx Underrun */
+#define E1000_TXD_EXTCMD_TSTAMP	0x00000010 /* IEEE1588 Timestamp packet */
+
 /* Transmit Control */
 #define E1000_TCTL_EN		0x00000002 /* enable Tx */
 #define E1000_TCTL_PSP		0x00000008 /* pad short packets */
@@ -130,9 +153,38 @@
 #define E1000_RCTL_RDMTS_HALF	0x00000000 /* Rx desc min thresh size */
 #define E1000_RCTL_BAM		0x00008000 /* broadcast enable */
 
+/* Receive Descriptor bit definitions */
+#define E1000_RXD_STAT_DD	0x01    /* Descriptor Done */
+#define E1000_RXD_STAT_EOP	0x02    /* End of Packet */
+#define E1000_RXD_STAT_IXSM	0x04    /* Ignore checksum */
+#define E1000_RXD_STAT_VP	0x08    /* IEEE VLAN Packet */
+#define E1000_RXD_STAT_UDPCS	0x10    /* UDP xsum calculated */
+#define E1000_RXD_STAT_TCPCS	0x20    /* TCP xsum calculated */
+#define E1000_RXD_STAT_TS	0x10000 /* Pkt was time stamped */
+
+#define E1000_RXDEXT_STATERR_LB		0x00040000
+#define E1000_RXDEXT_STATERR_CE		0x01000000
+#define E1000_RXDEXT_STATERR_SE		0x02000000
+#define E1000_RXDEXT_STATERR_SEQ	0x04000000
+#define E1000_RXDEXT_STATERR_CXE	0x10000000
+#define E1000_RXDEXT_STATERR_TCPE	0x20000000
+#define E1000_RXDEXT_STATERR_IPE	0x40000000
+#define E1000_RXDEXT_STATERR_RXE	0x80000000
+
+/* Same mask, but for extended and packet split descriptors */
+#define E1000_RXDEXT_ERR_FRAME_ERR_MASK ( \
+	E1000_RXDEXT_STATERR_CE  |            \
+	E1000_RXDEXT_STATERR_SE  |            \
+	E1000_RXDEXT_STATERR_SEQ |            \
+	E1000_RXDEXT_STATERR_CXE |            \
+	E1000_RXDEXT_STATERR_RXE)
+
 /* Header split receive */
 #define E1000_RFCTL_IPV6_EX_DIS	0x00010000
 #define E1000_RFCTL_LEF		0x00040000
+
+#define I225_RXPBSIZE_DEFAULT	0x000000A2 /* RXPBSIZE default */
+#define I225_TXPBSIZE_DEFAULT	0x04000014 /* TXPBSIZE default */
 
 /* these buffer sizes are valid if E1000_RCTL_BSEX is 0 */
 #define E1000_RCTL_SZ_2048	0x00000000 /* Rx buffer size 2048 */
