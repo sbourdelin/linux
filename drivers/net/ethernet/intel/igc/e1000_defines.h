@@ -30,6 +30,22 @@
 #define E1000_PCI_PMCSR			0x44
 #define E1000_PCI_PMCSR_D3		0x03
 
+/* Physical Func Reset Done Indication */
+#define E1000_CTRL_EXT_LINK_MODE_MASK	0x00C00000
+
+/* Number of 100 microseconds we wait for PCI Express master disable */
+#define MASTER_DISABLE_TIMEOUT		800
+/*Blocks new Master requests */
+#define E1000_CTRL_GIO_MASTER_DISABLE	0x00000004
+/* Status of Master requests. */
+#define E1000_STATUS_GIO_MASTER_ENABLE	0x00080000
+
+/* PCI Express Control */
+#define E1000_GCR_CMPL_TMOUT_MASK	0x0000F000
+#define E1000_GCR_CMPL_TMOUT_10ms	0x00001000
+#define E1000_GCR_CMPL_TMOUT_RESEND	0x00010000
+#define E1000_GCR_CAP_VER2		0x00040000
+
 /* Receive Address
  * Number of high/low register pairs in the RAR. The RAR (Receive Address
  * Registers) holds the directed and multicast addresses that we monitor.
@@ -48,9 +64,25 @@
 #define E1000_ERR_PARAM				4
 #define E1000_ERR_MAC_INIT			5
 #define E1000_ERR_RESET				9
+#define E1000_ERR_MASTER_REQUESTS_PENDING	10
+#define E1000_ERR_SWFW_SYNC			13
+
+/* Device Control */
+#define E1000_CTRL_RST		0x04000000  /* Global reset */
 
 /* PBA constants */
 #define E1000_PBA_34K			0x0022
+
+/* SW Semaphore Register */
+#define E1000_SWSM_SMBI		0x00000001 /* Driver Semaphore bit */
+#define E1000_SWSM_SWESMBI	0x00000002 /* FW Semaphore bit */
+
+/* NVM Control */
+#define E1000_EECD_PRES		0x00000100 /* NVM Present */
+
+/* Number of milliseconds for NVM auto read done after MAC reset. */
+#define AUTO_READ_DONE_TIMEOUT		10
+#define E1000_EECD_AUTO_RD	0x00000200  /* NVM Auto Read done */
 
 /* Device Status */
 #define E1000_STATUS_FD		0x00000001      /* Full duplex.0=half,1=full */
@@ -134,6 +166,13 @@
 
 #define E1000_CT_SHIFT			4
 #define E1000_COLLISION_THRESHOLD	15
+
+/* Flow Control Constants */
+#define FLOW_CONTROL_ADDRESS_LOW	0x00C28001
+#define FLOW_CONTROL_ADDRESS_HIGH	0x00000100
+#define FLOW_CONTROL_TYPE		0x8808
+/* Enable XON frame transmission */
+#define E1000_FCRTL_XONE		0x80000000
 
 /* Management Control */
 #define E1000_MANC_RCV_TCO_EN	0x00020000 /* Receive TCO Packets Enabled */

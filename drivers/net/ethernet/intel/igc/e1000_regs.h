@@ -7,6 +7,7 @@
 /* General Register Descriptions */
 #define E1000_CTRL		0x00000  /* Device Control - RW */
 #define E1000_STATUS		0x00008  /* Device Status - RO */
+#define E1000_EECD		0x00010  /* EEPROM/Flash Control - RW */
 #define E1000_CTRL_EXT		0x00018  /* Extended Device Control - RW */
 #define E1000_MDIC		0x00020  /* MDI Control - RW */
 #define E1000_MDICNFG		0x00E04  /* MDC/MDIO Configuration - RW */
@@ -75,6 +76,30 @@
 #define E1000_IVAR_MISC		0x01740   /* IVAR for "other" causes - RW */
 #define E1000_GPIE		0x01514  /* General Purpose Intr Enable - RW */
 
+/* Interrupt Cause Rx Packet Timer Expire Count */
+#define E1000_ICRXPTC		0x04104
+/* Interrupt Cause Rx Absolute Timer Expire Count */
+#define E1000_ICRXATC		0x04108
+/* Interrupt Cause Tx Packet Timer Expire Count */
+#define E1000_ICTXPTC		0x0410C
+/* Interrupt Cause Tx Absolute Timer Expire Count */
+#define E1000_ICTXATC		0x04110
+/* Interrupt Cause Tx Queue Empty Count */
+#define E1000_ICTXQEC		0x04118
+/* Interrupt Cause Tx Queue Minimum Threshold Count */
+#define E1000_ICTXQMTC		0x0411C
+/* Interrupt Cause Rx Descriptor Minimum Threshold Count */
+#define E1000_ICRXDMTC		0x04120
+/* Interrupt Cause Receiver Overrun Count */
+#define E1000_ICRXOC		0x04124
+
+#define E1000_CBTMPC		0x0402C  /* Circuit Breaker TX Packet Count */
+#define E1000_HTDPMC		0x0403C  /* Host Transmit Discarded Packets */
+#define E1000_CBRMPC		0x040FC  /* Circuit Breaker RX Packet Count */
+#define E1000_RPTHC		0x04104  /* Rx Packets To Host */
+#define E1000_HGPTC		0x04118  /* Host Good Packets TX Count */
+#define E1000_HTCBDPC		0x04124  /* Host TX Circ.Breaker Drop Count */
+
 /* MSI-X Table Register Descriptions */
 #define E1000_PBACL		0x05B68  /* MSIx PBA Clear - R/W 1 to clear */
 
@@ -92,6 +117,8 @@
 #define E1000_RXCSUM		0x05000  /* Rx Checksum Control - RW */
 #define E1000_RLPML		0x05004  /* Rx Long Packet Max Length */
 #define E1000_RFCTL		0x05008  /* Receive Filter Control*/
+#define E1000_MTA		0x05200  /* Multicast Table Array - RW Array */
+#define E1000_UTA		0x0A000 /* Unicast Table Array - RW */
 #define E1000_RAL(_n)		(0x05400 + ((_n) * 0x08))
 #define E1000_RAH(_n)		(0x05404 + ((_n) * 0x08))
 #define E1000_VLAPQF		0x055B0  /* VLAN Priority Queuue - RW */

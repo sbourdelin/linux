@@ -6,6 +6,8 @@
 
 #include <linux/types.h>
 #include <linux/if_ether.h>
+#include <linux/netdevice.h>
+
 #include "e1000_regs.h"
 #include "e1000_defines.h"
 #include "e1000_mac.h"
@@ -20,6 +22,16 @@ struct e1000_hw;
 
 /* Function pointers for the MAC. */
 struct e1000_mac_operations {
+	s32 (*check_for_link)(struct e1000_hw *hw);
+	s32 (*reset_hw)(struct e1000_hw *hw);
+	s32 (*init_hw)(struct e1000_hw *hw);
+	s32 (*setup_physical_interface)(struct e1000_hw *hw);
+	void (*rar_set)(struct e1000_hw *hw, u8 *address, u32 index);
+	s32 (*read_mac_addr)(struct e1000_hw *hw);
+	s32 (*get_speed_and_duplex)(struct e1000_hw *hw, u16 *speed,
+				    u16 *duplex);
+	s32 (*acquire_swfw_sync)(struct e1000_hw *hw, u16 mask);
+	void (*release_swfw_sync)(struct e1000_hw *hw, u16 mask);
 };
 
 enum e1000_mac_type {
@@ -32,6 +44,12 @@ enum e1000_phy_type {
 	e1000_phy_unknown = 0,
 	e1000_phy_none,
 	e1000_phy_i225,
+};
+
+enum e1000_nvm_type {
+	e1000_nvm_unknown = 0,
+	e1000_nvm_flash_hw,
+	e1000_nvm_invm,
 };
 
 enum e1000_bus_type {
@@ -54,6 +72,13 @@ enum e1000_bus_width {
 	e1000_bus_width_pcie_x4 = 4,
 	e1000_bus_width_pcie_x8 = 8,
 	e1000_bus_width_reserved
+};
+
+struct e1000_info {
+	s32 (*get_invariants)(struct e1000_hw *hw);
+	struct e1000_mac_operations *mac_ops;
+	const struct e1000_phy_operations *phy_ops;
+	struct e1000_nvm_operations *nvm_ops;
 };
 
 struct e1000_mac_info {
@@ -91,6 +116,30 @@ struct e1000_mac_info {
 	bool get_link_status;
 };
 
+struct e1000_nvm_operations {
+	s32 (*acquire)(struct e1000_hw *hw);
+	s32 (*read)(struct e1000_hw *hw, u16 offset, u16 i, u16 *data);
+	void (*release)(struct e1000_hw *hw);
+	s32 (*write)(struct e1000_hw *hw, u16 offset, u16 i, u16 *data);
+	s32 (*update)(struct e1000_hw *hw);
+	s32 (*validate)(struct e1000_hw *hw);
+	s32 (*valid_led_default)(struct e1000_hw *hw, u16 *data);
+};
+
+struct e1000_nvm_info {
+	struct e1000_nvm_operations ops;
+	enum e1000_nvm_type type;
+
+	u32 flash_bank_size;
+	u32 flash_base_addr;
+
+	u16 word_size;
+	u16 delay_usec;
+	u16 address_bits;
+	u16 opcode_bits;
+	u16 page_size;
+};
+
 struct e1000_bus_info {
 	enum e1000_bus_type type;
 	enum e1000_bus_speed speed;
@@ -98,6 +147,32 @@ struct e1000_bus_info {
 
 	u16 func;
 	u16 pci_cmd_word;
+};
+
+enum e1000_fc_mode {
+	e1000_fc_none = 0,
+	e1000_fc_rx_pause,
+	e1000_fc_tx_pause,
+	e1000_fc_full,
+	e1000_fc_default = 0xFF
+};
+
+struct e1000_fc_info {
+	u32 high_water;     /* Flow control high-water mark */
+	u32 low_water;      /* Flow control low-water mark */
+	u16 pause_time;     /* Flow control pause timer */
+	bool send_xon;      /* Flow control send XON */
+	bool strict_ieee;   /* Strict IEEE mode */
+	enum e1000_fc_mode current_mode; /* Type of flow control */
+	enum e1000_fc_mode requested_mode;
+};
+
+struct e1000_dev_spec_base {
+	bool global_device_reset;
+	bool eee_disable;
+	bool clear_semaphore_once;
+	bool module_plugged;
+	u8 media_port;
 };
 
 struct e1000_hw {
@@ -108,8 +183,14 @@ struct e1000_hw {
 	unsigned long io_base;
 
 	struct e1000_mac_info  mac;
+	struct e1000_fc_info   fc;
+	struct e1000_nvm_info  nvm;
 
 	struct e1000_bus_info bus;
+
+	union {
+		struct e1000_dev_spec_base	_base;
+	} dev_spec;
 
 	u16 device_id;
 	u16 subsystem_vendor_id;
@@ -202,6 +283,10 @@ struct e1000_hw_stats {
 	u64 b2ospc;
 	u64 b2ogprc;
 };
+
+struct net_device *igc_get_hw_dev(struct e1000_hw *hw);
+#define hw_dbg(format, arg...) \
+	netdev_dbg(igc_get_hw_dev(hw), format, ##arg)
 
 /* These functions must be implemented by drivers */
 s32  igc_read_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value);
