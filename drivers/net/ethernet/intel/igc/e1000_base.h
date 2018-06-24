@@ -6,6 +6,7 @@
 
 /* forward declaration */
 void igc_rx_fifo_flush_base(struct e1000_hw *hw);
+void igc_power_down_phy_copper_base(struct e1000_hw *hw);
 
 /* Transmit Descriptor - Advanced */
 union e1000_adv_tx_desc {

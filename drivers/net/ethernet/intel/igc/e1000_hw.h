@@ -11,12 +11,15 @@
 #include "e1000_regs.h"
 #include "e1000_defines.h"
 #include "e1000_mac.h"
+#include "e1000_phy.h"
 #include "e1000_nvm.h"
 #include "e1000_i225.h"
 #include "e1000_base.h"
 
 #define E1000_DEV_ID_I225_LM			0x15F2
 #define E1000_DEV_ID_I225_V			0x15F3
+
+#define E1000_FUNC_0				0
 
 /* Forward declaration */
 struct e1000_hw;
@@ -45,6 +48,12 @@ enum e1000_phy_type {
 	e1000_phy_unknown = 0,
 	e1000_phy_none,
 	e1000_phy_i225,
+};
+
+enum e1000_media_type {
+	e1000_media_type_unknown = 0,
+	e1000_media_type_copper = 1,
+	e1000_num_media_types
 };
 
 enum e1000_nvm_type {
@@ -112,6 +121,7 @@ struct e1000_mac_info {
 
 	bool adaptive_ifs;
 	bool has_fwsm;
+	bool asf_firmware_present;
 	bool arc_subsystem_valid;
 
 	bool autoneg;
@@ -129,6 +139,20 @@ struct e1000_nvm_operations {
 	s32 (*valid_led_default)(struct e1000_hw *hw, u16 *data);
 };
 
+struct e1000_phy_operations {
+	s32 (*acquire)(struct e1000_hw *hw);
+	s32 (*check_polarity)(struct e1000_hw *hw);
+	s32 (*check_reset_block)(struct e1000_hw *hw);
+	s32 (*force_speed_duplex)(struct e1000_hw *hw);
+	s32 (*get_cfg_done)(struct e1000_hw *hw);
+	s32 (*get_cable_length)(struct e1000_hw *hw);
+	s32 (*get_phy_info)(struct e1000_hw *hw);
+	s32 (*read_reg)(struct e1000_hw *hw, u32 address, u16 *data);
+	void (*release)(struct e1000_hw *hw);
+	s32 (*reset)(struct e1000_hw *hw);
+	s32 (*write_reg)(struct e1000_hw *hw, u32 address, u16 data);
+};
+
 struct e1000_nvm_info {
 	struct e1000_nvm_operations ops;
 	enum e1000_nvm_type type;
@@ -141,6 +165,35 @@ struct e1000_nvm_info {
 	u16 address_bits;
 	u16 opcode_bits;
 	u16 page_size;
+};
+
+struct e1000_phy_info {
+	struct e1000_phy_operations ops;
+
+	enum e1000_phy_type type;
+
+	u32 addr;
+	u32 id;
+	u32 reset_delay_us; /* in usec */
+	u32 revision;
+
+	enum e1000_media_type media_type;
+
+	u16 autoneg_advertised;
+	u16 autoneg_mask;
+	u16 cable_length;
+	u16 max_cable_length;
+	u16 min_cable_length;
+	u16 pair_length[4];
+
+	u8 mdix;
+
+	bool disable_polarity_correction;
+	bool is_mdix;
+	bool polarity_correction;
+	bool reset_disable;
+	bool speed_downgraded;
+	bool autoneg_wait_to_complete;
 };
 
 struct e1000_bus_info {
@@ -188,6 +241,7 @@ struct e1000_hw {
 	struct e1000_mac_info  mac;
 	struct e1000_fc_info   fc;
 	struct e1000_nvm_info  nvm;
+	struct e1000_phy_info  phy;
 
 	struct e1000_bus_info bus;
 

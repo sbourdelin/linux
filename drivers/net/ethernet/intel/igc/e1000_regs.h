@@ -55,6 +55,9 @@
 #define E1000_SWSM		0x05B50  /* SW Semaphore */
 #define E1000_FWSM		0x05B54  /* FW Semaphore */
 
+/* Function Active and Power State to MNG */
+#define E1000_FACTPS		0x05B30
+
 /* Interrupt Register Description */
 #define E1000_PICAUSE		0x05B88  /* PCIe Interrupt Cause - RW1/C */
 #define E1000_PIENA		0x05B8C  /* PCIe Interrupt enable - RW */

@@ -7,4 +7,5 @@
 
 obj-$(CONFIG_IGC) += igc.o
 
-igc-objs := igc_main.o e1000_mac.o e1000_i225.o e1000_base.o e1000_nvm.o
+igc-objs := igc_main.o e1000_mac.o e1000_i225.o e1000_base.o e1000_nvm.o \
+e1000_phy.o
