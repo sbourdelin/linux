@@ -229,6 +229,9 @@
 #define E1000_TLPIC	0x4148 /* EEE Tx LPI Count - TLPIC */
 #define E1000_RLPIC	0x414C /* EEE Rx LPI Count - RLPIC */
 
+/* Management registers */
+#define E1000_MANC	0x05820  /* Management Control - RW */
+
 /* forward declaration */
 struct e1000_hw;
 u32 igc_rd32(struct e1000_hw *hw, u32 reg);

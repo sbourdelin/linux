@@ -71,6 +71,10 @@
 #define E1000_ICR_RXO		0x00000040 /* Rx overrun */
 #define E1000_ICR_RXT0		0x00000080 /* Rx timer intr (ring 0) */
 #define E1000_ICR_DRSTA		0x40000000 /* Device Reset Asserted */
+
+/* If this bit asserted, the driver should claim the interrupt */
+#define E1000_ICR_INT_ASSERTED	0x80000000
+
 #define E1000_ICS_RXT0		E1000_ICR_RXT0      /* Rx timer intr */
 
 #define IMS_ENABLE_MASK ( \
@@ -96,5 +100,54 @@
 #define E1000_GPIE_MSIX_MODE	0x00000010
 #define E1000_GPIE_EIAME	0x40000000
 #define E1000_GPIE_PBA		0x80000000
+
+/* Transmit Control */
+#define E1000_TCTL_EN		0x00000002 /* enable Tx */
+#define E1000_TCTL_PSP		0x00000008 /* pad short packets */
+#define E1000_TCTL_CT		0x00000ff0 /* collision threshold */
+#define E1000_TCTL_COLD		0x003ff000 /* collision distance */
+#define E1000_TCTL_RTLC		0x01000000 /* Re-transmit on late collision */
+#define E1000_TCTL_MULR		0x10000000 /* Multiple request support */
+
+#define E1000_CT_SHIFT			4
+#define E1000_COLLISION_THRESHOLD	15
+
+/* Management Control */
+#define E1000_MANC_RCV_TCO_EN	0x00020000 /* Receive TCO Packets Enabled */
+
+/* Receive Control */
+#define E1000_RCTL_RST		0x00000001 /* Software reset */
+#define E1000_RCTL_EN		0x00000002 /* enable */
+#define E1000_RCTL_SBP		0x00000004 /* store bad packet */
+#define E1000_RCTL_UPE		0x00000008 /* unicast promisc enable */
+#define E1000_RCTL_MPE		0x00000010 /* multicast promisc enable */
+#define E1000_RCTL_LPE		0x00000020 /* long packet enable */
+#define E1000_RCTL_LBM_NO	0x00000000 /* no loopback mode */
+#define E1000_RCTL_LBM_MAC	0x00000040 /* MAC loopback mode */
+#define E1000_RCTL_LBM_TCVR	0x000000C0 /* tcvr loopback mode */
+#define E1000_RCTL_DTYP_PS	0x00000400 /* Packet Split descriptor */
+
+#define E1000_RCTL_RDMTS_HALF	0x00000000 /* Rx desc min thresh size */
+#define E1000_RCTL_BAM		0x00008000 /* broadcast enable */
+
+/* Header split receive */
+#define E1000_RFCTL_IPV6_EX_DIS	0x00010000
+#define E1000_RFCTL_LEF		0x00040000
+
+/* these buffer sizes are valid if E1000_RCTL_BSEX is 0 */
+#define E1000_RCTL_SZ_2048	0x00000000 /* Rx buffer size 2048 */
+#define E1000_RCTL_SZ_1024	0x00010000 /* Rx buffer size 1024 */
+#define E1000_RCTL_SZ_512	0x00020000 /* Rx buffer size 512 */
+#define E1000_RCTL_SZ_256	0x00030000 /* Rx buffer size 256 */
+/* these buffer sizes are valid if E1000_RCTL_BSEX is 1 */
+#define E1000_RCTL_SZ_16384	0x00010000 /* Rx buffer size 16384 */
+#define E1000_RCTL_SZ_8192	0x00020000 /* Rx buffer size 8192 */
+#define E1000_RCTL_SZ_4096	0x00030000 /* Rx buffer size 4096 */
+
+#define E1000_RCTL_MO_SHIFT	12 /* multicast offset shift */
+#define E1000_RCTL_CFIEN	0x00080000 /* canonical form enable */
+#define E1000_RCTL_DPF		0x00400000 /* discard pause frames */
+#define E1000_RCTL_PMCF		0x00800000 /* pass MAC control frames */
+#define E1000_RCTL_SECRC	0x04000000 /* Strip Ethernet CRC */
 
 #endif /* _E1000_DEFINES_H_ */

@@ -29,11 +29,21 @@ static const struct pci_device_id igc_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, igc_pci_tbl);
 
 /* forward declaration */
+static int igc_setup_all_tx_resources(struct igc_adapter *adapter);
+static void igc_clean_tx_ring(struct igc_ring *tx_ring);
+static void igc_free_all_tx_resources(struct igc_adapter *adapter);
+static int igc_setup_all_rx_resources(struct igc_adapter *adapter);
 static int igc_sw_init(struct igc_adapter *);
 static void igc_configure(struct igc_adapter *adapter);
+static void igc_configure_tx(struct igc_adapter *);
+static void igc_configure_rx(struct igc_adapter *adapter);
 static void igc_power_down_link(struct igc_adapter *adapter);
 static void igc_set_default_mac_filter(struct igc_adapter *adapter);
+static void igc_set_rx_mode(struct net_device *netdev);
+static void igc_setup_mrqc(struct igc_adapter *adapter);
 static irqreturn_t igc_msix_ring(int irq, void *data);
+static irqreturn_t igc_intr_msi(int irq, void *data);
+static irqreturn_t igc_intr(int irq, void *data);
 static void igc_write_itr(struct igc_q_vector *q_vector);
 static int igc_request_msix(struct igc_adapter *adapter);
 static void igc_assign_vector(struct igc_q_vector *q_vector, int msix_vector);
@@ -125,6 +135,526 @@ static void igc_get_hw_control(struct igc_adapter *adapter)
 }
 
 /**
+ *  igc_free_tx_resources - Free Tx Resources per Queue
+ *  @tx_ring: Tx descriptor ring for a specific queue
+ *
+ *  Free all transmit software resources
+ **/
+void igc_free_tx_resources(struct igc_ring *tx_ring)
+{
+	igc_clean_tx_ring(tx_ring);
+
+	vfree(tx_ring->tx_buffer_info);
+	tx_ring->tx_buffer_info = NULL;
+
+	/* if not set, then don't free */
+	if (!tx_ring->desc)
+		return;
+
+	dma_free_coherent(tx_ring->dev, tx_ring->size,
+			  tx_ring->desc, tx_ring->dma);
+
+	tx_ring->desc = NULL;
+}
+
+/**
+ *  igc_free_all_tx_resources - Free Tx Resources for All Queues
+ *  @adapter: board private structure
+ *
+ *  Free all transmit software resources
+ **/
+static void igc_free_all_tx_resources(struct igc_adapter *adapter)
+{
+	int i;
+
+	for (i = 0; i < adapter->num_tx_queues; i++)
+		igc_free_tx_resources(adapter->tx_ring[i]);
+}
+
+void igc_unmap_and_free_tx_resource(struct igc_ring *ring,
+				    struct igc_tx_buffer *tx_buffer)
+{
+	if (tx_buffer->skb) {
+		dev_kfree_skb_any(tx_buffer->skb);
+		if (dma_unmap_len(tx_buffer, len))
+			dma_unmap_single(ring->dev,
+					 dma_unmap_addr(tx_buffer, dma),
+					 dma_unmap_len(tx_buffer, len),
+					 DMA_TO_DEVICE);
+	} else if (dma_unmap_len(tx_buffer, len)) {
+		dma_unmap_page(ring->dev,
+			       dma_unmap_addr(tx_buffer, dma),
+			       dma_unmap_len(tx_buffer, len),
+			       DMA_TO_DEVICE);
+	}
+	tx_buffer->next_to_watch = NULL;
+	tx_buffer->skb = NULL;
+	dma_unmap_len_set(tx_buffer, len, 0);
+	/* buffer_info must be completely set up in the transmit path */
+}
+
+/**
+ *  igc_clean_tx_ring - Free Tx Buffers
+ *  @tx_ring: ring to be cleaned
+ **/
+static void igc_clean_tx_ring(struct igc_ring *tx_ring)
+{
+	struct igc_tx_buffer *buffer_info;
+	unsigned long size;
+	u16 i;
+
+	if (!tx_ring->tx_buffer_info)
+		return;
+
+	/* Free all the Tx ring sk_buffs */
+	for (i = 0; i < tx_ring->count; i++) {
+		buffer_info = &tx_ring->tx_buffer_info[i];
+		igc_unmap_and_free_tx_resource(tx_ring, buffer_info);
+	}
+
+	netdev_tx_reset_queue(txring_txq(tx_ring));
+
+	size = sizeof(struct igc_tx_buffer) * tx_ring->count;
+	memset(tx_ring->tx_buffer_info, 0, size);
+
+	/* Zero out the descriptor ring */
+	memset(tx_ring->desc, 0, tx_ring->size);
+
+	tx_ring->next_to_use = 0;
+	tx_ring->next_to_clean = 0;
+}
+
+/**
+ *  igc_setup_tx_resources - allocate Tx resources (Descriptors)
+ *  @tx_ring: tx descriptor ring (for a specific queue) to setup
+ *
+ *  Return 0 on success, negative on failure
+ **/
+int igc_setup_tx_resources(struct igc_ring *tx_ring)
+{
+	struct device *dev = tx_ring->dev;
+	int size = 0;
+
+	size = sizeof(struct igc_tx_buffer) * tx_ring->count;
+	tx_ring->tx_buffer_info = vzalloc(size);
+	if (!tx_ring->tx_buffer_info)
+		goto err;
+
+	/* round up to nearest 4K */
+	tx_ring->size = tx_ring->count * sizeof(union e1000_adv_tx_desc);
+	tx_ring->size = ALIGN(tx_ring->size, 4096);
+
+	tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
+					   &tx_ring->dma, GFP_KERNEL);
+
+	if (!tx_ring->desc)
+		goto err;
+
+	tx_ring->next_to_use = 0;
+	tx_ring->next_to_clean = 0;
+
+	return 0;
+
+err:
+	vfree(tx_ring->tx_buffer_info);
+	dev_err(dev,
+		"Unable to allocate memory for the transmit descriptor ring\n");
+	return -ENOMEM;
+}
+
+/**
+ *  igc_setup_all_tx_resources - wrapper to allocate Tx resources
+ *                                (Descriptors) for all queues
+ *  @adapter: board private structure
+ *
+ *  Return 0 on success, negative on failure
+ **/
+static int igc_setup_all_tx_resources(struct igc_adapter *adapter)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	int i, err = 0;
+
+	for (i = 0; i < adapter->num_tx_queues; i++) {
+		err = igc_setup_tx_resources(adapter->tx_ring[i]);
+		if (err) {
+			dev_err(&pdev->dev,
+				"Allocation for Tx Queue %u failed\n", i);
+			for (i--; i >= 0; i--)
+				igc_free_tx_resources(adapter->tx_ring[i]);
+			break;
+		}
+	}
+
+	return err;
+}
+
+/**
+ *  igc_clean_rx_ring - Free Rx Buffers per Queue
+ *  @rx_ring: ring to free buffers from
+ **/
+void igc_clean_rx_ring(struct igc_ring *rx_ring)
+{
+	u16 i = rx_ring->next_to_clean;
+
+	if (rx_ring->skb)
+		dev_kfree_skb(rx_ring->skb);
+	rx_ring->skb = NULL;
+
+	/* Free all the Rx ring sk_buffs */
+	while (i != rx_ring->next_to_alloc) {
+		struct igc_rx_buffer *buffer_info = &rx_ring->rx_buffer_info[i];
+
+		/* Invalidate cache lines that may have been written to by
+		 * device so that we avoid corrupting memory.
+		 */
+		dma_sync_single_range_for_cpu(rx_ring->dev,
+					      buffer_info->dma,
+					      buffer_info->page_offset,
+					      igc_rx_bufsz(rx_ring),
+					      DMA_FROM_DEVICE);
+
+		/* free resources associated with mapping */
+		dma_unmap_page_attrs(rx_ring->dev,
+				     buffer_info->dma,
+				     igc_rx_pg_size(rx_ring),
+				     DMA_FROM_DEVICE,
+				     IGC_RX_DMA_ATTR);
+		__page_frag_cache_drain(buffer_info->page,
+					buffer_info->pagecnt_bias);
+
+		i++;
+		if (i == rx_ring->count)
+			i = 0;
+	}
+
+	rx_ring->next_to_alloc = 0;
+	rx_ring->next_to_clean = 0;
+	rx_ring->next_to_use = 0;
+}
+
+/**
+ *  igc_free_rx_resources - Free Rx Resources
+ *  @rx_ring: ring to clean the resources from
+ *
+ *  Free all receive software resources
+ **/
+void igc_free_rx_resources(struct igc_ring *rx_ring)
+{
+	igc_clean_rx_ring(rx_ring);
+
+	vfree(rx_ring->rx_buffer_info);
+	rx_ring->rx_buffer_info = NULL;
+
+	/* if not set, then don't free */
+	if (!rx_ring->desc)
+		return;
+
+	dma_free_coherent(rx_ring->dev, rx_ring->size,
+			  rx_ring->desc, rx_ring->dma);
+
+	rx_ring->desc = NULL;
+}
+
+/**
+ *  igc_free_all_rx_resources - Free Rx Resources for All Queues
+ *  @adapter: board private structure
+ *
+ *  Free all receive software resources
+ **/
+static void igc_free_all_rx_resources(struct igc_adapter *adapter)
+{
+	int i;
+
+	for (i = 0; i < adapter->num_rx_queues; i++)
+		igc_free_rx_resources(adapter->rx_ring[i]);
+}
+
+/**
+ *  igc_setup_rx_resources - allocate Rx resources (Descriptors)
+ *  @rx_ring:    rx descriptor ring (for a specific queue) to setup
+ *
+ *  Returns 0 on success, negative on failure
+ **/
+int igc_setup_rx_resources(struct igc_ring *rx_ring)
+{
+	struct device *dev = rx_ring->dev;
+	int size, desc_len;
+
+	size = sizeof(struct igc_rx_buffer) * rx_ring->count;
+	rx_ring->rx_buffer_info = vzalloc(size);
+	if (!rx_ring->rx_buffer_info)
+		goto err;
+
+	desc_len = sizeof(union e1000_adv_rx_desc);
+
+	/* Round up to nearest 4K */
+	rx_ring->size = rx_ring->count * desc_len;
+	rx_ring->size = ALIGN(rx_ring->size, 4096);
+
+	rx_ring->desc = dma_alloc_coherent(dev, rx_ring->size,
+					   &rx_ring->dma, GFP_KERNEL);
+
+	if (!rx_ring->desc)
+		goto err;
+
+	rx_ring->next_to_alloc = 0;
+	rx_ring->next_to_clean = 0;
+	rx_ring->next_to_use = 0;
+
+	return 0;
+
+err:
+	vfree(rx_ring->rx_buffer_info);
+	rx_ring->rx_buffer_info = NULL;
+	dev_err(dev,
+		"Unable to allocate memory for the receive descriptor ring\n");
+	return -ENOMEM;
+}
+
+/**
+ *  igc_setup_all_rx_resources - wrapper to allocate Rx resources
+ *                                (Descriptors) for all queues
+ *  @adapter: board private structure
+ *
+ *  Return 0 on success, negative on failure
+ **/
+static int igc_setup_all_rx_resources(struct igc_adapter *adapter)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	int i, err = 0;
+
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		err = igc_setup_rx_resources(adapter->rx_ring[i]);
+		if (err) {
+			dev_err(&pdev->dev,
+				"Allocation for Rx Queue %u failed\n", i);
+			for (i--; i >= 0; i--)
+				igc_free_rx_resources(adapter->rx_ring[i]);
+			break;
+		}
+	}
+
+	return err;
+}
+
+static u32 igc_tx_wthresh(struct igc_adapter *adapter)
+{
+	return 16;
+}
+
+/**
+ *  igc_configure_rx_ring - Configure a receive ring after Reset
+ *  @adapter: board private structure
+ *  @ring: receive ring to be configured
+ *
+ *  Configure the Rx unit of the MAC after a reset.
+ **/
+void igc_configure_rx_ring(struct igc_adapter *adapter,
+			   struct igc_ring *ring)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	union e1000_adv_rx_desc *rx_desc;
+	u64 rdba = ring->dma;
+	int reg_idx = ring->reg_idx;
+	u32 srrctl = 0, rxdctl = 0;
+
+	/* disable the queue */
+	wr32(E1000_RXDCTL(reg_idx), 0);
+
+	/* Set DMA base address registers */
+	wr32(E1000_RDBAL(reg_idx),
+	     rdba & 0x00000000ffffffffULL);
+	wr32(E1000_RDBAH(reg_idx), rdba >> 32);
+	wr32(E1000_RDLEN(reg_idx),
+	     ring->count * sizeof(union e1000_adv_rx_desc));
+
+	/* initialize head and tail */
+	ring->tail = adapter->io_addr + E1000_RDT(reg_idx);
+	wr32(E1000_RDH(reg_idx), 0);
+	writel(0, ring->tail);
+
+	/* reset next-to- use/clean to place SW in sync with hardwdare */
+	ring->next_to_clean = 0;
+	ring->next_to_use = 0;
+
+	/* set descriptor configuration */
+	srrctl = IGC_RX_HDR_LEN << E1000_SRRCTL_BSIZEHDRSIZE_SHIFT;
+	if (ring_uses_large_buffer(ring))
+		srrctl |= IGC_RXBUFFER_3072 >> E1000_SRRCTL_BSIZEPKT_SHIFT;
+	else
+		srrctl |= IGC_RXBUFFER_2048 >> E1000_SRRCTL_BSIZEPKT_SHIFT;
+	srrctl |= E1000_SRRCTL_DESCTYPE_ADV_ONEBUF;
+
+	wr32(E1000_SRRCTL(reg_idx), srrctl);
+
+	rxdctl |= IGC_RX_PTHRESH;
+	rxdctl |= IGC_RX_HTHRESH << 8;
+	rxdctl |= IGC_RX_WTHRESH << 16;
+
+	/* initialize rx_buffer_info */
+	memset(ring->rx_buffer_info, 0,
+	       sizeof(struct igc_rx_buffer) * ring->count);
+
+	/* initialize Rx descriptor 0 */
+	rx_desc = IGC_RX_DESC(ring, 0);
+	rx_desc->wb.upper.length = 0;
+
+	/* enable receive descriptor fetching */
+	rxdctl |= E1000_RXDCTL_QUEUE_ENABLE;
+
+	wr32(E1000_RXDCTL(reg_idx), rxdctl);
+}
+
+/**
+ *  igc_configure_rx - Configure receive Unit after Reset
+ *  @adapter: board private structure
+ *
+ *  Configure the Rx unit of the MAC after a reset.
+ **/
+static void igc_configure_rx(struct igc_adapter *adapter)
+{
+	int i;
+
+	/* Setup the HW Rx Head and Tail Descriptor Pointers and
+	 * the Base and Length of the Rx Descriptor Ring
+	 */
+	for (i = 0; i < adapter->num_rx_queues; i++)
+		igc_configure_rx_ring(adapter, adapter->rx_ring[i]);
+}
+
+/**
+ *  igc_configure_tx_ring - Configure transmit ring after Reset
+ *  @adapter: board private structure
+ *  @ring: tx ring to configure
+ *
+ *  Configure a transmit ring after a reset.
+ **/
+void igc_configure_tx_ring(struct igc_adapter *adapter,
+			   struct igc_ring *ring)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	u32 txdctl = 0;
+	u64 tdba = ring->dma;
+	int reg_idx = ring->reg_idx;
+
+	/* disable the queue */
+	wr32(E1000_TXDCTL(reg_idx), 0);
+	wrfl();
+	mdelay(10);
+
+	wr32(E1000_TDLEN(reg_idx),
+	     ring->count * sizeof(union e1000_adv_tx_desc));
+	wr32(E1000_TDBAL(reg_idx),
+	     tdba & 0x00000000ffffffffULL);
+	wr32(E1000_TDBAH(reg_idx), tdba >> 32);
+
+	ring->tail = adapter->io_addr + E1000_TDT(reg_idx);
+	wr32(E1000_TDH(reg_idx), 0);
+	writel(0, ring->tail);
+
+	txdctl |= IGC_TX_PTHRESH;
+	txdctl |= IGC_TX_HTHRESH << 8;
+	txdctl |= igc_tx_wthresh(adapter) << 16;
+
+	txdctl |= E1000_TXDCTL_QUEUE_ENABLE;
+	wr32(E1000_TXDCTL(reg_idx), txdctl);
+}
+
+/**
+ *  igc_configure_tx - Configure transmit Unit after Reset
+ *  @adapter: board private structure
+ *
+ *  Configure the Tx unit of the MAC after a reset.
+ **/
+static void igc_configure_tx(struct igc_adapter *adapter)
+{
+	int i;
+
+	for (i = 0; i < adapter->num_tx_queues; i++)
+		igc_configure_tx_ring(adapter, adapter->tx_ring[i]);
+}
+
+/**
+ *  igc_setup_mrqc - configure the multiple receive queue control registers
+ *  @adapter: Board private structure
+ **/
+static void igc_setup_mrqc(struct igc_adapter *adapter)
+{
+}
+
+/**
+ *  igc_setup_rctl - configure the receive control registers
+ *  @adapter: Board private structure
+ **/
+void igc_setup_rctl(struct igc_adapter *adapter)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	u32 rctl;
+
+	rctl = rd32(E1000_RCTL);
+
+	rctl &= ~(3 << E1000_RCTL_MO_SHIFT);
+	rctl &= ~(E1000_RCTL_LBM_TCVR | E1000_RCTL_LBM_MAC);
+
+	rctl |= E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_RDMTS_HALF |
+		(hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT);
+
+	/* enable stripping of CRC. It's unlikely this will break BMC
+	 * redirection as it did with e1000. Newer features require
+	 * that the HW strips the CRC.
+	 */
+	rctl |= E1000_RCTL_SECRC;
+
+	/* disable store bad packets and clear size bits. */
+	rctl &= ~(E1000_RCTL_SBP | E1000_RCTL_SZ_256);
+
+	/* enable LPE to allow for reception of jumbo frames */
+	rctl |= E1000_RCTL_LPE;
+
+	/* disable queue 0 to prevent tail write w/o re-config */
+	wr32(E1000_RXDCTL(0), 0);
+
+	/* This is useful for sniffing bad packets. */
+	if (adapter->netdev->features & NETIF_F_RXALL) {
+		/* UPE and MPE will be handled by normal PROMISC logic
+		 * in e1000e_set_rx_mode
+		 */
+		rctl |= (E1000_RCTL_SBP | /* Receive bad packets */
+			 E1000_RCTL_BAM | /* RX All Bcast Pkts */
+			 E1000_RCTL_PMCF); /* RX All MAC Ctrl Pkts */
+
+		rctl &= ~(E1000_RCTL_DPF | /* Allow filtered pause */
+			  E1000_RCTL_CFIEN); /* Disable VLAN CFIEN Filter */
+	}
+
+	wr32(E1000_RCTL, rctl);
+}
+
+/**
+ *  igc_setup_tctl - configure the transmit control registers
+ *  @adapter: Board private structure
+ **/
+void igc_setup_tctl(struct igc_adapter *adapter)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	u32 tctl;
+
+	/* disable queue 0 which icould be enabled by default */
+	wr32(E1000_TXDCTL(0), 0);
+
+	/* Program the Transmit Control Register */
+	tctl = rd32(E1000_TCTL);
+	tctl &= ~E1000_TCTL_CT;
+	tctl |= E1000_TCTL_PSP | E1000_TCTL_RTLC |
+		(E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
+
+	/* Enable transmits */
+	tctl |= E1000_TCTL_EN;
+
+	wr32(E1000_TCTL, tctl);
+}
+
+/**
  *  igc_set_mac - Change the Ethernet Address of the NIC
  *  @netdev: network interface device structure
  *  @p: pointer to an address structure
@@ -154,6 +684,121 @@ static netdev_tx_t igc_xmit_frame(struct sk_buff *skb,
 {
 	dev_kfree_skb_any(skb);
 	return NETDEV_TX_OK;
+}
+
+static inline unsigned int igc_rx_offset(struct igc_ring *rx_ring)
+{
+	return ring_uses_build_skb(rx_ring) ? IGC_SKB_PAD : 0;
+}
+
+static bool igc_alloc_mapped_page(struct igc_ring *rx_ring,
+				  struct igc_rx_buffer *bi)
+{
+	struct page *page = bi->page;
+	dma_addr_t dma;
+
+	/* since we are recycling buffers we should seldom need to alloc */
+	if (likely(page))
+		return true;
+
+	/* alloc new page for storage */
+	page = dev_alloc_pages(igc_rx_pg_order(rx_ring));
+	if (unlikely(!page)) {
+		rx_ring->rx_stats.alloc_failed++;
+		return false;
+	}
+
+	/* map page for use */
+	dma = dma_map_page_attrs(rx_ring->dev, page, 0,
+				 igc_rx_pg_size(rx_ring),
+				 DMA_FROM_DEVICE,
+				 IGC_RX_DMA_ATTR);
+
+	/* if mapping failed free memory back to system since
+	 * there isn't much point in holding memory we can't use
+	 */
+	if (dma_mapping_error(rx_ring->dev, dma)) {
+		__free_page(page);
+
+		rx_ring->rx_stats.alloc_failed++;
+		return false;
+	}
+
+	bi->dma = dma;
+	bi->page = page;
+	bi->page_offset = igc_rx_offset(rx_ring);
+	bi->pagecnt_bias = 1;
+
+	return true;
+}
+
+/**
+ *  igc_alloc_rx_buffers - Replace used receive buffers; packet split
+ *  @adapter: address of board private structure
+ **/
+void igc_alloc_rx_buffers(struct igc_ring *rx_ring, u16 cleaned_count)
+{
+	union e1000_adv_rx_desc *rx_desc;
+	struct igc_rx_buffer *bi;
+	u16 i = rx_ring->next_to_use;
+	u16 bufsz;
+
+	/* nothing to do */
+	if (!cleaned_count)
+		return;
+
+	rx_desc = IGC_RX_DESC(rx_ring, i);
+	bi = &rx_ring->rx_buffer_info[i];
+	i -= rx_ring->count;
+
+	bufsz = igc_rx_bufsz(rx_ring);
+
+	do {
+		if (!igc_alloc_mapped_page(rx_ring, bi))
+			break;
+
+		/* sync the buffer for use by the device */
+		dma_sync_single_range_for_device(rx_ring->dev, bi->dma,
+						 bi->page_offset, bufsz,
+						 DMA_FROM_DEVICE);
+
+		/* Refresh the desc even if buffer_addrs didn't change
+		 * because each write-back erases this info.
+		 */
+		rx_desc->read.pkt_addr = cpu_to_le64(bi->dma + bi->page_offset);
+
+		rx_desc++;
+		bi++;
+		i++;
+		if (unlikely(!i)) {
+			rx_desc = IGC_RX_DESC(rx_ring, 0);
+			bi = rx_ring->rx_buffer_info;
+			i -= rx_ring->count;
+		}
+
+		/* clear the length for the next_to_use descriptor */
+		rx_desc->wb.upper.length = 0;
+
+		cleaned_count--;
+	} while (cleaned_count);
+
+	i += rx_ring->count;
+
+	if (rx_ring->next_to_use != i) {
+		/* record the next descriptor to use */
+		rx_ring->next_to_use = i;
+
+		/* update next to alloc since we have filled the ring */
+		rx_ring->next_to_alloc = i;
+
+		/* Force memory writes to complete before letting h/w
+		 * know there are new descriptors to fetch.  (Only
+		 * applicable for weak-ordered memory model archs,
+		 * such as IA-64).
+		 */
+		wmb();
+		writel(i, rx_ring->tail);
+	}
 }
 
 /**
@@ -195,6 +840,12 @@ int igc_up(struct igc_adapter *adapter)
 	/* Clear any pending interrupts. */
 	rd32(E1000_ICR);
 	igc_irq_enable(adapter);
+
+	netif_tx_start_all_queues(adapter->netdev);
+
+	/* start the watchdog. */
+	hw->mac.get_link_status = 1;
+	schedule_work(&adapter->watchdog_task);
 
 	return 0;
 }
@@ -295,7 +946,30 @@ static struct net_device_stats *igc_get_stats(struct net_device *netdev)
  **/
 static void igc_configure(struct igc_adapter *adapter)
 {
+	struct net_device *netdev = adapter->netdev;
+	int i = 0;
+
 	igc_get_hw_control(adapter);
+	igc_set_rx_mode(netdev);
+
+	igc_setup_tctl(adapter);
+	igc_setup_mrqc(adapter);
+	igc_setup_rctl(adapter);
+
+	igc_configure_tx(adapter);
+	igc_configure_rx(adapter);
+
+	igc_rx_fifo_flush_base(&adapter->hw);
+
+	/* call igc_desc_unused which always leaves
+	 * at least 1 descriptor unused to make sure
+	 * next_to_use != next_to_clean
+	 */
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		struct igc_ring *ring = adapter->rx_ring[i];
+
+		igc_alloc_rx_buffers(ring, igc_desc_unused(ring));
+	}
 }
 
 /**
@@ -341,6 +1015,19 @@ static void igc_set_default_mac_filter(struct igc_adapter *adapter)
 	mac_table->state = IGC_MAC_STATE_DEFAULT | IGC_MAC_STATE_IN_USE;
 
 	igc_rar_set_index(adapter, 0);
+}
+
+/**
+ *  igc_set_rx_mode - Secondary Unicast, Multicast and Promiscuous mode set
+ *  @netdev: network interface device structure
+ *
+ *  The set_rx_mode entry point is called whenever the unicast or multicast
+ *  address lists or the network interface flags are updated.  This routine is
+ *  responsible for configuring the hardware for proper unicast, multicast,
+ *  promiscuous mode, and all-multi behavior.
+ **/
+static void igc_set_rx_mode(struct net_device *netdev)
+{
 }
 
 static irqreturn_t igc_msix_other(int irq, void *data)
@@ -781,6 +1468,83 @@ static void igc_update_itr(struct igc_q_vector *q_vector,
 	ring_container->itr = itrval;
 }
 
+/**
+ *  igc_intr_msi - Interrupt Handler
+ *  @irq: interrupt number
+ *  @data: pointer to a network interface device structure
+ **/
+static irqreturn_t igc_intr_msi(int irq, void *data)
+{
+	struct igc_adapter *adapter = data;
+	struct igc_q_vector *q_vector = adapter->q_vector[0];
+	struct e1000_hw *hw = &adapter->hw;
+	/* read ICR disables interrupts using IAM */
+	u32 icr = rd32(E1000_ICR);
+
+	igc_write_itr(q_vector);
+
+	if (icr & E1000_ICR_DRSTA)
+		schedule_work(&adapter->reset_task);
+
+	if (icr & E1000_ICR_DOUTSYNC) {
+		/* HW is reporting DMA is out of sync */
+		adapter->stats.doosync++;
+	}
+
+	if (icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
+		hw->mac.get_link_status = 1;
+		if (!test_bit(__IGC_DOWN, &adapter->state))
+			mod_timer(&adapter->watchdog_timer, jiffies + 1);
+	}
+
+	 napi_schedule(&q_vector->napi);
+
+	return IRQ_HANDLED;
+}
+
+/**
+ *  igc_intr - Legacy Interrupt Handler
+ *  @irq: interrupt number
+ *  @data: pointer to a network interface device structure
+ **/
+static irqreturn_t igc_intr(int irq, void *data)
+{
+	struct igc_adapter *adapter = data;
+	struct igc_q_vector *q_vector = adapter->q_vector[0];
+	struct e1000_hw *hw = &adapter->hw;
+	/* Interrupt Auto-Mask...upon reading ICR, interrupts are masked.  No
+	 * need for the IMC write
+	 */
+	u32 icr = rd32(E1000_ICR);
+
+	/* IMS will not auto-mask if INT_ASSERTED is not set, and if it is
+	 * not set, then the adapter didn't send an interrupt
+	 */
+	if (!(icr & E1000_ICR_INT_ASSERTED))
+		return IRQ_NONE;
+
+	igc_write_itr(q_vector);
+
+	if (icr & E1000_ICR_DRSTA)
+		schedule_work(&adapter->reset_task);
+
+	if (icr & E1000_ICR_DOUTSYNC) {
+		/* HW is reporting DMA is out of sync */
+		adapter->stats.doosync++;
+	}
+
+	if (icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
+		hw->mac.get_link_status = 1;
+		/* guard against interrupt when we're going down */
+		if (!test_bit(__IGC_DOWN, &adapter->state))
+			mod_timer(&adapter->watchdog_timer, jiffies + 1);
+	}
+
+	napi_schedule(&q_vector->napi);
+
+	return IRQ_HANDLED;
+}
+
 static void igc_ring_irq_enable(struct igc_q_vector *q_vector)
 {
 	struct igc_adapter *adapter = q_vector->adapter;
@@ -1148,6 +1912,29 @@ err_out:
 }
 
 /**
+ *  igc_cache_ring_register - Descriptor ring to register mapping
+ *  @adapter: board private structure to initialize
+ *
+ *  Once we know the feature-set enabled for the device, we'll cache
+ *  the register offset the descriptor ring is assigned to.
+ **/
+static void igc_cache_ring_register(struct igc_adapter *adapter)
+{
+	int i = 0, j = 0;
+
+	switch (adapter->hw.mac.type) {
+	case e1000_i225:
+	/* Fall through */
+	default:
+		for (; i < adapter->num_rx_queues; i++)
+			adapter->rx_ring[i]->reg_idx = i;
+		for (; j < adapter->num_tx_queues; j++)
+			adapter->tx_ring[j]->reg_idx = j;
+		break;
+	}
+}
+
+/**
  *  igc_init_interrupt_scheme - initialize interrupts, allocate queues/vectors
  *  @adapter: Pointer to adapter structure
  *
@@ -1166,7 +1953,7 @@ static int igc_init_interrupt_scheme(struct igc_adapter *adapter, bool msix)
 		goto err_alloc_q_vectors;
 	}
 
-	/* TODO complete igc_cache_ring_register */
+	igc_cache_ring_register(adapter);
 
 	return 0;
 
@@ -1255,6 +2042,8 @@ static void igc_irq_enable(struct igc_adapter *adapter)
  **/
 static int igc_request_irq(struct igc_adapter *adapter)
 {
+	struct net_device *netdev = adapter->netdev;
+	struct pci_dev *pdev = adapter->pdev;
 	int err = 0;
 
 	if (adapter->flags & IGC_FLAG_HAS_MSIX) {
@@ -1262,15 +2051,37 @@ static int igc_request_irq(struct igc_adapter *adapter)
 		if (!err)
 			goto request_done;
 		/* fall back to MSI */
-		/* TODO complete free tx/rx resources */
+		igc_free_all_tx_resources(adapter);
+		igc_free_all_rx_resources(adapter);
 
 		igc_clear_interrupt_scheme(adapter);
 		err = igc_init_interrupt_scheme(adapter, false);
 		if (err)
 			goto request_done;
-		/* TODO complete setup tx/rx resources */
+		igc_setup_all_tx_resources(adapter);
+		igc_setup_all_rx_resources(adapter);
 		igc_configure(adapter);
 	}
+
+	igc_assign_vector(adapter->q_vector[0], 0);
+
+	if (adapter->flags & IGC_FLAG_HAS_MSI) {
+		err = request_irq(pdev->irq, &igc_intr_msi, 0,
+				  netdev->name, adapter);
+		if (!err)
+			goto request_done;
+
+		/* fall back to legacy interrupts */
+		igc_reset_interrupt_capability(adapter);
+		adapter->flags &= ~IGC_FLAG_HAS_MSI;
+	}
+
+	err = request_irq(pdev->irq, &igc_intr, IRQF_SHARED,
+			  netdev->name, adapter);
+
+	if (err)
+		dev_err(&pdev->dev, "Error %d getting interrupt\n",
+			err);
 
 request_done:
 	return err;
@@ -1332,6 +2143,16 @@ static int __igc_open(struct net_device *netdev, bool resuming)
 
 	netif_carrier_off(netdev);
 
+	/* allocate transmit descriptors */
+	err = igc_setup_all_tx_resources(adapter);
+	if (err)
+		goto err_setup_tx;
+
+	/* allocate receive descriptors */
+	err = igc_setup_all_rx_resources(adapter);
+	if (err)
+		goto err_setup_rx;
+
 	igc_power_up_link(adapter);
 
 	igc_configure(adapter);
@@ -1357,6 +2178,8 @@ static int __igc_open(struct net_device *netdev, bool resuming)
 	rd32(E1000_ICR);
 	igc_irq_enable(adapter);
 
+	netif_tx_start_all_queues(netdev);
+
 	/* start the watchdog. */
 	hw->mac.get_link_status = 1;
 	schedule_work(&adapter->watchdog_task);
@@ -1368,7 +2191,11 @@ err_set_queues:
 err_req_irq:
 	igc_release_hw_control(adapter);
 	igc_power_down_link(adapter);
-	/* TODO complete free_all_rx_resources */
+	igc_free_all_rx_resources(adapter);
+err_setup_rx:
+	igc_free_all_tx_resources(adapter);
+err_setup_tx:
+	igc_reset(adapter);
 
 	return err;
 }
@@ -1401,6 +2228,9 @@ static int __igc_close(struct net_device *netdev, bool suspending)
 
 	igc_free_irq(adapter);
 
+	igc_free_all_tx_resources(adapter);
+	igc_free_all_rx_resources(adapter);
+
 	return 0;
 }
 
@@ -1415,6 +2245,7 @@ static const struct net_device_ops igc_netdev_ops = {
 	.ndo_open               = igc_open,
 	.ndo_stop               = igc_close,
 	.ndo_start_xmit         = igc_xmit_frame,
+	.ndo_set_rx_mode        = igc_set_rx_mode,
 	.ndo_set_mac_address    = igc_set_mac,
 	.ndo_change_mtu         = igc_change_mtu,
 	.ndo_get_stats          = igc_get_stats,

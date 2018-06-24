@@ -10,6 +10,7 @@
 #include "e1000_defines.h"
 #include "e1000_mac.h"
 #include "e1000_i225.h"
+#include "e1000_base.h"
 
 #define E1000_DEV_ID_I225_LM			0x15F2
 #define E1000_DEV_ID_I225_V			0x15F3
