@@ -55,6 +55,8 @@
  */
 #define E1000_RAH_AV		0x80000000 /* Receive descriptor valid */
 #define E1000_RAH_POOL_1	0x00040000
+#define E1000_RAL_MAC_ADDR_LEN	4
+#define E1000_RAH_MAC_ADDR_LEN	2
 
 /* Error Codes */
 #define E1000_SUCCESS				0
@@ -77,12 +79,83 @@
 #define E1000_SWSM_SMBI		0x00000001 /* Driver Semaphore bit */
 #define E1000_SWSM_SWESMBI	0x00000002 /* FW Semaphore bit */
 
+/* SWFW_SYNC Definitions */
+#define E1000_SWFW_EEP_SM	0x1
+#define E1000_SWFW_PHY0_SM	0x2
+#define E1000_SWFW_PHY1_SM	0x4
+#define E1000_SWFW_PHY2_SM	0x20
+#define E1000_SWFW_PHY3_SM	0x40
+
 /* NVM Control */
+#define E1000_EECD_SK		0x00000001 /* NVM Clock */
+#define E1000_EECD_CS		0x00000002 /* NVM Chip Select */
+#define E1000_EECD_DI		0x00000004 /* NVM Data In */
+#define E1000_EECD_DO		0x00000008 /* NVM Data Out */
+#define E1000_EECD_REQ		0x00000040 /* NVM Access Request */
+#define E1000_EECD_GNT		0x00000080 /* NVM Access Grant */
 #define E1000_EECD_PRES		0x00000100 /* NVM Present */
+/* NVM Addressing bits based on type 0=small, 1=large */
+#define E1000_EECD_ADDR_BITS		0x00000400
+#define E1000_NVM_GRANT_ATTEMPTS	1000 /* NVM # attempts to gain grant */
+#define E1000_EECD_AUTO_RD		0x00000200  /* NVM Auto Read done */
+#define E1000_EECD_SIZE_EX_MASK		0x00007800  /* NVM Size */
+#define E1000_EECD_SIZE_EX_SHIFT	11
+#define E1000_EECD_FLUPD_I225		0x00800000 /* Update FLASH */
+#define E1000_EECD_FLUDONE_I225		0x04000000 /* Update FLASH done*/
+#define E1000_EECD_FLASH_DETECTED_I225	0x00080000 /* FLASH detected */
+#define E1000_FLUDONE_ATTEMPTS		20000
+#define E1000_EERD_EEWR_MAX_COUNT	512 /* buffered EEPROM words rw */
 
 /* Number of milliseconds for NVM auto read done after MAC reset. */
 #define AUTO_READ_DONE_TIMEOUT		10
 #define E1000_EECD_AUTO_RD	0x00000200  /* NVM Auto Read done */
+
+/* Offset to data in NVM read/write registers */
+#define E1000_NVM_RW_REG_DATA	16
+#define E1000_NVM_RW_REG_DONE	2    /* Offset to READ/WRITE done bit */
+#define E1000_NVM_RW_REG_START	1    /* Start operation */
+#define E1000_NVM_RW_ADDR_SHIFT	2    /* Shift to the address bits */
+#define E1000_NVM_POLL_READ	0    /* Flag for polling for read complete */
+
+/* NVM Word Offsets */
+#define NVM_COMPAT			0x0003
+#define NVM_ID_LED_SETTINGS		0x0004 /* SERDES output amplitude */
+#define NVM_VERSION			0x0005
+#define NVM_INIT_CONTROL2_REG		0x000F
+#define NVM_INIT_CONTROL3_PORT_B	0x0014
+#define NVM_INIT_CONTROL3_PORT_A	0x0024
+#define NVM_ALT_MAC_ADDR_PTR		0x0037
+#define NVM_CHECKSUM_REG		0x003F
+#define NVM_COMPATIBILITY_REG_3		0x0003
+#define NVM_COMPATIBILITY_BIT_MASK	0x8000
+#define NVM_MAC_ADDR			0x0000
+#define NVM_SUB_DEV_ID			0x000B
+#define NVM_SUB_VEN_ID			0x000C
+#define NVM_DEV_ID			0x000D
+#define NVM_VEN_ID			0x000E
+#define NVM_INIT_CTRL_2			0x000F
+#define NVM_INIT_CTRL_4			0x0013
+#define NVM_LED_1_CFG			0x001C
+#define NVM_LED_0_2_CFG			0x001F
+#define NVM_ETRACK_WORD			0x0042
+#define NVM_ETRACK_HIWORD		0x0043
+#define NVM_COMB_VER_OFF		0x0083
+#define NVM_COMB_VER_PTR		0x003d
+
+/* For checksumming, the sum of all words in the NVM should equal 0xBABA. */
+#define NVM_SUM				0xBABA
+
+#define NVM_PBA_OFFSET_0		8
+#define NVM_PBA_OFFSET_1		9
+#define NVM_RESERVED_WORD		0xFFFF
+#define NVM_PBA_PTR_GUARD		0xFAFA
+#define NVM_WORD_SIZE_BASE_SHIFT	6
+
+/* Collision related configuration parameters */
+#define E1000_COLLISION_THRESHOLD	15
+#define E1000_CT_SHIFT			4
+#define E1000_COLLISION_DISTANCE	63
+#define E1000_COLD_SHIFT		12
 
 /* Device Status */
 #define E1000_STATUS_FD		0x00000001      /* Full duplex.0=half,1=full */
@@ -93,6 +166,14 @@
 #define E1000_STATUS_TXOFF	0x00000010      /* transmission paused */
 #define E1000_STATUS_SPEED_100	0x00000040      /* Speed 100Mb/s */
 #define E1000_STATUS_SPEED_1000	0x00000080      /* Speed 1000Mb/s */
+#define E1000_STATUS_SPEED_2500	0x00400000	/* Speed 2.5Gb/s */
+
+#define SPEED_10		10
+#define SPEED_100		100
+#define SPEED_1000		1000
+#define SPEED_2500		2500
+#define HALF_DUPLEX		1
+#define FULL_DUPLEX		2
 
 /* Interrupt Cause Read */
 #define E1000_ICR_TXDW		0x00000001 /* Transmit desc written back */

@@ -19,9 +19,13 @@ static const char igc_driver_string[] = DRV_SUMMARY;
 static const char igc_copyright[] =
 	"Copyright(c) 2018 Intel Corporation.";
 
+static const struct e1000_info *igc_info_tbl[] = {
+	[board_base] = &e1000_base_info,
+};
+
 static const struct pci_device_id igc_pci_tbl[] = {
-	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I225_LM) },
-	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I225_V) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I225_LM), board_base },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I225_V), board_base },
 	/* required last entry */
 	{0, }
 };
@@ -3334,6 +3338,7 @@ static int igc_probe(struct pci_dev *pdev,
 	struct net_device *netdev;
 	struct igc_adapter *adapter;
 	struct e1000_hw *hw;
+	const struct e1000_info *ei = igc_info_tbl[ent->driver_data];
 	int err, pci_using_dac;
 
 	err = pci_enable_device_mem(pdev);
@@ -3417,6 +3422,14 @@ static int igc_probe(struct pci_dev *pdev,
 	hw->subsystem_vendor_id = pdev->subsystem_vendor;
 	hw->subsystem_device_id = pdev->subsystem_device;
 
+	/* Copy the default MAC and PHY function pointers */
+	memcpy(&hw->mac.ops, ei->mac_ops, sizeof(hw->mac.ops));
+
+	/* Initialize skew-specific constants */
+	err = ei->get_invariants(hw);
+	if (err)
+		goto err_sw_init;
+
 	/* setup the private structure */
 	err = igc_sw_init(adapter);
 	if (err)
@@ -3451,6 +3464,9 @@ static int igc_probe(struct pci_dev *pdev,
 
 	 /* carrier off reporting is important to ethtool even BEFORE open */
 	netif_carrier_off(netdev);
+
+	/* Check if Media Autosense is enabled */
+	adapter->ei = *ei;
 
 	dev_info(&pdev->dev, "@SUMMARY@");
 	/* print bus type/speed/width info */

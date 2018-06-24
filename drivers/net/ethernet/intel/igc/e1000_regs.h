@@ -259,6 +259,9 @@
 /* Management registers */
 #define E1000_MANC	0x05820  /* Management Control - RW */
 
+/* Shadow Ram Write Register - RW */
+#define E1000_SRWR	0x12018
+
 /* forward declaration */
 struct e1000_hw;
 u32 igc_rd32(struct e1000_hw *hw, u32 reg);

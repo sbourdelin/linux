@@ -11,6 +11,7 @@
 #include "e1000_regs.h"
 #include "e1000_defines.h"
 #include "e1000_mac.h"
+#include "e1000_nvm.h"
 #include "e1000_i225.h"
 #include "e1000_base.h"
 
@@ -81,6 +82,8 @@ struct e1000_info {
 	struct e1000_nvm_operations *nvm_ops;
 };
 
+extern const struct e1000_info e1000_base_info;
+
 struct e1000_mac_info {
 	struct e1000_mac_operations ops;
 
@@ -118,7 +121,7 @@ struct e1000_mac_info {
 
 struct e1000_nvm_operations {
 	s32 (*acquire)(struct e1000_hw *hw);
-	s32 (*read)(struct e1000_hw *hw, u16 offset, u16 i, u16 *data);
+	s32 (*read)(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
 	void (*release)(struct e1000_hw *hw);
 	s32 (*write)(struct e1000_hw *hw, u16 offset, u16 i, u16 *data);
 	s32 (*update)(struct e1000_hw *hw);

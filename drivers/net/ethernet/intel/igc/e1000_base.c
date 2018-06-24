@@ -11,9 +11,49 @@
 
 /* forward declaration */
 static s32 igc_get_invariants_base(struct e1000_hw *);
+static s32 igc_check_for_link_base(struct e1000_hw *);
 static s32 igc_init_hw_base(struct e1000_hw *);
 static s32 igc_reset_hw_base(struct e1000_hw *);
 static s32 igc_set_pcie_completion_timeout(struct e1000_hw *hw);
+static s32 igc_read_mac_addr_base(struct e1000_hw *hw);
+
+/**
+ *  igc_init_nvm_params_base - Init NVM func ptrs.
+ *  @hw: pointer to the HW structure
+ **/
+static s32 igc_init_nvm_params_base(struct e1000_hw *hw)
+{
+	struct e1000_nvm_info *nvm = &hw->nvm;
+	u32 eecd = rd32(E1000_EECD);
+	u16 size;
+
+	size = (u16)((eecd & E1000_EECD_SIZE_EX_MASK) >>
+		     E1000_EECD_SIZE_EX_SHIFT);
+
+	/* Added to a constant, "size" becomes the left-shift value
+	 * for setting word_size.
+	 */
+	size += NVM_WORD_SIZE_BASE_SHIFT;
+
+	/* Just in case size is out of range, cap it to the largest
+	 * EEPROM size supported
+	 */
+	if (size > 15)
+		size = 15;
+
+	nvm->word_size = BIT(size);
+	nvm->opcode_bits = 8;
+	nvm->delay_usec = 1;
+
+	nvm->page_size = eecd & E1000_EECD_ADDR_BITS ? 32 : 8;
+	nvm->address_bits = eecd & E1000_EECD_ADDR_BITS ?
+			    16 : 8;
+
+	if (nvm->word_size == BIT(15))
+		nvm->page_size = 128;
+
+	return 0;
+}
 
 /**
  *  igc_init_mac_params_base - Init MAC func ptrs.
@@ -22,6 +62,7 @@ static s32 igc_set_pcie_completion_timeout(struct e1000_hw *hw);
 static s32 igc_init_mac_params_base(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
+	struct e1000_dev_spec_base *dev_spec = &hw->dev_spec._base;
 
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
@@ -32,6 +73,10 @@ static s32 igc_init_mac_params_base(struct e1000_hw *hw)
 
 	mac->ops.acquire_swfw_sync = igc_acquire_swfw_sync_i225;
 	mac->ops.release_swfw_sync = igc_release_swfw_sync_i225;
+
+	/* Allow a single clear of the SW semaphore on I225 */
+	if (mac->type == e1000_i225)
+		dev_spec->clear_semaphore_once = true;
 
 	return 0;
 }
@@ -50,7 +95,56 @@ static s32 igc_get_invariants_base(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
+	/* NVM initialization */
+	ret_val = igc_init_nvm_params_base(hw);
+	switch (hw->mac.type) {
+	case e1000_i225:
+		ret_val = igc_init_nvm_params_i225(hw);
+		break;
+	default:
+		break;
+	}
+
+	if (ret_val)
+		goto out;
+
 out:
+	return ret_val;
+}
+
+/**
+ *  igc_get_link_up_info_base - Get link speed/duplex info
+ *  @hw: pointer to the HW structure
+ *  @speed: stores the current speed
+ *  @duplex: stores the current duplex
+ *
+ *  This is a wrapper function, if using the serial gigabit media independent
+ *  interface, use PCS to retrieve the link speed and duplex information.
+ *  Otherwise, use the generic function to get the link speed and duplex info.
+ **/
+static s32 igc_get_link_up_info_base(struct e1000_hw *hw, u16 *speed,
+				     u16 *duplex)
+{
+	s32 ret_val;
+
+	ret_val = igc_get_speed_and_duplex_copper(hw, speed, duplex);
+
+	return ret_val;
+}
+
+/**
+ *  igc_check_for_link_base - Check for link
+ *  @hw: pointer to the HW structure
+ *
+ *  If sgmii is enabled, then use the pcs register to determine link, otherwise
+ *  use the generic interface for determining link.
+ **/
+static s32 igc_check_for_link_base(struct e1000_hw *hw)
+{
+	s32 ret_val = 0;
+
+	ret_val = igc_check_for_copper_link(hw);
+
 	return ret_val;
 }
 
@@ -88,6 +182,19 @@ static s32 igc_init_hw_base(struct e1000_hw *hw)
 	 * is no link.
 	 */
 	igc_clear_hw_cntrs_base(hw);
+
+	return ret_val;
+}
+
+/**
+ *  igc_read_mac_addr_base - Read device MAC address
+ *  @hw: pointer to the HW structure
+ **/
+static s32 igc_read_mac_addr_base(struct e1000_hw *hw)
+{
+	s32 ret_val = 0;
+
+	ret_val = igc_read_mac_addr(hw);
 
 	return ret_val;
 }
@@ -169,12 +276,17 @@ void igc_rx_fifo_flush_base(struct e1000_hw *hw)
 }
 
 static struct e1000_mac_operations e1000_mac_ops_base = {
-	.init_hw	= igc_init_hw_base,
+	.init_hw		= igc_init_hw_base,
+	.check_for_link		= igc_check_for_link_base,
+	.rar_set		= igc_rar_set,
+	.read_mac_addr		=  igc_read_mac_addr_base,
+	.get_speed_and_duplex	= igc_get_link_up_info_base,
 };
 
 const struct e1000_info e1000_base_info = {
-	.get_invariants = igc_get_invariants_base,
-	.mac_ops = &e1000_mac_ops_base,
+	.get_invariants	= igc_get_invariants_base,
+	.mac_ops	= &e1000_mac_ops_base,
+	/* TODO phy_ops */
 };
 
 /**
