@@ -836,6 +836,23 @@ done:
 	return ndoms;
 }
 
+#ifdef CONFIG_DEBUG_KERNEL
+static inline void debug_print_domains(cpumask_var_t *doms, int ndoms)
+{
+	int i;
+	char buf[200];
+	char *ptr, *end = buf + sizeof(buf) - 1;
+
+	for (i = 0, ptr = buf, *end = '\0'; i < ndoms; i++)
+		ptr += snprintf(ptr, end - ptr, "dom%d=%*pbl ", i,
+				cpumask_pr_args(doms[i]));
+
+	pr_debug("Generated %d domains: %s\n", ndoms, buf);
+}
+#else
+static inline void debug_print_domains(cpumask_var_t *doms, int ndoms) { }
+#endif
+
 /*
  * Rebuild scheduler domains.
  *
@@ -871,6 +888,7 @@ static void rebuild_sched_domains_locked(void)
 
 	/* Generate domain masks and attrs */
 	ndoms = generate_sched_domains(&doms, &attr);
+	debug_print_domains(doms, ndoms);
 
 	/* Have scheduler rebuild the domains */
 	partition_sched_domains(ndoms, doms, attr);
