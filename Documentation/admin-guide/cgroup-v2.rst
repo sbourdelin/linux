@@ -1584,6 +1584,39 @@ Cpuset Interface Files
 
 	Its value will be affected by memory nodes hotplug events.
 
+  cpuset.sched.partition
+	A read-write single value file which exists on non-root
+	cpuset-enabled cgroups.  It is a binary value flag that accepts
+	either "0" (off) or "1" (on).  This flag is set and owned by the
+        parent cgroup.
+
+	If set, it indicates that the current cgroup is the root of a
+	new partition or scheduling domain that comprises itself and
+	all its descendants except those that are separate partition
+        roots themselves and their descendants.  The root cgroup is
+	always a partition root.
+
+	There are constraints on where this flag can be set.  It can
+	only be set in a cgroup if all the following conditions are true.
+
+	1) The "cpuset.cpus" is not empty and the list of CPUs are
+	   exclusive, i.e. they are not shared by any of its siblings.
+	2) The "cpuset.cpus" is also a proper subset of the parent's
+	   "cpuset.cpus.effective".
+	3) The parent cgroup is a partition root.
+	4) There is no child cgroups with cpuset enabled.  This is for
+	   eliminating corner cases that have to be handled if such a
+	   condition is allowed.
+
+	Setting this flag will take the CPUs away from the effective
+	CPUs of the parent cgroup.  That is why this flag has to be set
+        and owned by the parent.  Once it is set, this flag cannot be
+	cleared if there are any child cgroups with cpuset enabled.
+
+	A parent partition root cgroup cannot distribute all its CPUs to
+        its child partition root cgroups.  There must be at least one cpu
+        left in the parent partition root cgroup.
+
 
 Device controller
 -----------------
