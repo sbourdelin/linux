@@ -229,6 +229,8 @@ struct e1000_dev_spec_base {
 	bool clear_semaphore_once;
 	bool module_plugged;
 	u8 media_port;
+	bool media_changed;
+	bool mas_capable;
 };
 
 struct e1000_hw {
