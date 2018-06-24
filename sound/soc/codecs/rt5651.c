@@ -19,6 +19,7 @@
 #include <linux/platform_device.h>
 #include <linux/spi/spi.h>
 #include <linux/acpi.h>
+#include <linux/gpio/consumer.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -717,6 +718,26 @@ static int rt5651_amp_power_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static int rt5651_ext_amp_power_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
+	struct rt5651_priv *rt5651 = snd_soc_component_get_drvdata(component);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		gpiod_set_value_cansleep(rt5651->ext_amp_gpio, 1);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		gpiod_set_value_cansleep(rt5651->ext_amp_gpio, 0);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static int rt5651_hp_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -1057,6 +1078,9 @@ static const struct snd_soc_dapm_widget rt5651_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY("Amp Power", RT5651_PWR_ANLG1,
 			    RT5651_PWR_HA_BIT, 0, rt5651_amp_power_event,
 			    SND_SOC_DAPM_POST_PMU),
+	SND_SOC_DAPM_SUPPLY("Ext Amp Power", SND_SOC_NOPM, 0, 0,
+			    rt5651_ext_amp_power_event,
+			    SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_PGA_S("HP Amp", 1, SND_SOC_NOPM, 0, 0, rt5651_hp_event,
 			   SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_SWITCH("HPO L Playback", SND_SOC_NOPM, 0, 0,
@@ -1272,8 +1296,10 @@ static const struct snd_soc_dapm_route rt5651_dapm_routes[] = {
 	{"LOUT R Playback", "Switch", "LOUT MIX"},
 	{"LOUTL", NULL, "LOUT L Playback"},
 	{"LOUTL", NULL, "Amp Power"},
+	{"LOUTL", NULL, "Ext Amp Power"},
 	{"LOUTR", NULL, "LOUT R Playback"},
 	{"LOUTR", NULL, "Amp Power"},
+	{"LOUTR", NULL, "Ext Amp Power"},
 
 	{"PDML", NULL, "PDM L Mux"},
 	{"PDMR", NULL, "PDM R Mux"},
@@ -1856,6 +1882,23 @@ static int rt5651_probe(struct snd_soc_component *component)
 	snd_soc_component_force_bias_level(component, SND_SOC_BIAS_OFF);
 
 	rt5651_apply_properties(component);
+
+	/*
+	 * Needs to be done from component-probe() and not i2c-probe(), so that
+	 * the platform driver can add GPIO mappings if necessary.
+	 */
+	rt5651->ext_amp_gpio = devm_gpiod_get_optional(component->dev,
+						       "ext-amp-enable",
+						       GPIOD_OUT_LOW);
+	if (IS_ERR(rt5651->ext_amp_gpio)) {
+		int err = PTR_ERR(rt5651->ext_amp_gpio);
+
+		if (err != -EPROBE_DEFER)
+			dev_err(component->dev, "Failed to get ext-amp GPIO: %d\n",
+				err);
+
+		return err;
+	}
 
 	return 0;
 }

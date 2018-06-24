@@ -12,6 +12,7 @@
 #ifndef __RT5651_H__
 #define __RT5651_H__
 
+#include <linux/gpio/consumer.h>
 #include <dt-bindings/sound/rt5651.h>
 
 /* Info */
@@ -2071,6 +2072,7 @@ struct rt5651_pll_code {
 struct rt5651_priv {
 	struct snd_soc_component *component;
 	struct regmap *regmap;
+	struct gpio_desc *ext_amp_gpio;
 	struct snd_soc_jack *hp_jack;
 	struct work_struct jack_detect_work;
 	unsigned int jd_src;
