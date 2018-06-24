@@ -26,8 +26,10 @@
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/dmi.h>
+#include <linux/gpio/machine.h>
 #include <linux/slab.h>
 #include <asm/cpu_device_id.h>
+#include <asm/intel-family.h>
 #include <asm/platform_sst_audio.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -414,6 +416,18 @@ static const struct dmi_system_id byt_rt5651_quirk_table[] = {
 	{}
 };
 
+static const struct x86_cpu_id cherrytrail_cpu_ids[] = {
+	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ATOM_AIRMONT }, /* Braswell, CHT */
+	{}
+};
+
+static const struct acpi_gpio_params ext_amp_enable_gpios = { 0, 0, false };
+
+static const struct acpi_gpio_mapping byt_rt5651_gpios[] = {
+	{ "ext-amp-enable-gpios", &ext_amp_enable_gpios, 1 },
+	{ },
+};
+
 /*
  * Note this MUST be called before snd_soc_register_card(), so that the props
  * are in place before the codec component driver's probe function parses them.
@@ -441,8 +455,15 @@ static int byt_rt5651_add_codec_device_props(const char *i2c_dev_name)
 		props[cnt++] = PROPERTY_ENTRY_BOOL("realtek,dmic-en");
 
 	ret = device_add_properties(i2c_dev, props);
-	put_device(i2c_dev);
+	if (ret)
+		goto out;
 
+	/* Cherry Trail devices use an external amplifier enable gpio */
+	if (x86_match_cpu(cherrytrail_cpu_ids))
+		ret = devm_acpi_dev_add_driver_gpios(i2c_dev, byt_rt5651_gpios);
+
+	put_device(i2c_dev);
+out:
 	return ret;
 }
 
