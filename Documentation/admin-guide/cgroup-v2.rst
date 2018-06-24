@@ -1626,6 +1626,16 @@ Cpuset Interface Files
 	2) No CPU that has been distributed to child partition roots is
 	   is deleted.
 
+	When all the CPUs allocated to a partition are offlined, the
+	partition will be temporaily gone and all the tasks in it will
+	be migrated to another one that belongs to the parent of the
+	partition root.  This is a destructive operation and all the
+	existing CPU affinity that is narrower than the cpuset itself
+	will be lost.
+
+	When any of those offlined CPUs is onlined again, a new partition
+	will be re-created and the tasks will be migrated back.
+
 
 Device controller
 -----------------
