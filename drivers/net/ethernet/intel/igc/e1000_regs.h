@@ -70,8 +70,8 @@
 #define E1000_IAM		0x01510  /* Intr Ack Auto Mask- RW */
 /* Intr Throttle - RW */
 #define E1000_EITR(_n)		(0x01680 + (0x4 * (_n)))
-/* Interrupt Vector Allocation (array) - RW */
-#define E1000_IVAR(_n)		(0x01700 + (0x4 * (_n)))
+/* Interrupt Vector Allocation - RW */
+#define E1000_IVAR0		0x01700
 #define E1000_IVAR_MISC		0x01740   /* IVAR for "other" causes - RW */
 #define E1000_GPIE		0x01514  /* General Purpose Intr Enable - RW */
 

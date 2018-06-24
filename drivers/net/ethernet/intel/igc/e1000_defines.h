@@ -62,4 +62,39 @@
 #define E1000_STATUS_SPEED_100	0x00000040      /* Speed 100Mb/s */
 #define E1000_STATUS_SPEED_1000	0x00000080      /* Speed 1000Mb/s */
 
+/* Interrupt Cause Read */
+#define E1000_ICR_TXDW		0x00000001 /* Transmit desc written back */
+#define E1000_ICR_TXQE		0x00000002 /* Transmit Queue empty */
+#define E1000_ICR_LSC		0x00000004 /* Link Status Change */
+#define E1000_ICR_RXSEQ		0x00000008 /* Rx sequence error */
+#define E1000_ICR_RXDMT0	0x00000010 /* Rx desc min. threshold (0) */
+#define E1000_ICR_RXO		0x00000040 /* Rx overrun */
+#define E1000_ICR_RXT0		0x00000080 /* Rx timer intr (ring 0) */
+#define E1000_ICR_DRSTA		0x40000000 /* Device Reset Asserted */
+#define E1000_ICS_RXT0		E1000_ICR_RXT0      /* Rx timer intr */
+
+#define IMS_ENABLE_MASK ( \
+	E1000_IMS_RXT0   |    \
+	E1000_IMS_TXDW   |    \
+	E1000_IMS_RXDMT0 |    \
+	E1000_IMS_RXSEQ  |    \
+	E1000_IMS_LSC)
+
+/* Interrupt Mask Set */
+#define E1000_IMS_TXDW		E1000_ICR_TXDW    /* Tx desc written back */
+#define E1000_IMS_RXSEQ		E1000_ICR_RXSEQ   /* Rx sequence error */
+#define E1000_IMS_LSC		E1000_ICR_LSC	/* Link Status Change */
+#define E1000_IMS_DOUTSYNC	E1000_ICR_DOUTSYNC /* NIC DMA out of sync */
+#define E1000_IMS_DRSTA		E1000_ICR_DRSTA   /* Device Reset Asserted */
+#define E1000_IMS_RXT0		E1000_ICR_RXT0    /* Rx timer intr */
+#define E1000_IMS_RXDMT0	E1000_ICR_RXDMT0  /* Rx desc min. threshold */
+
+#define E1000_ICR_DOUTSYNC	0x10000000 /* NIC DMA out of sync */
+#define E1000_EITR_CNT_IGNR	0x80000000 /* Don't reset counters on write */
+#define E1000_IVAR_VALID	0x80
+#define E1000_GPIE_NSICR	0x00000001
+#define E1000_GPIE_MSIX_MODE	0x00000010
+#define E1000_GPIE_EIAME	0x40000000
+#define E1000_GPIE_PBA		0x80000000
+
 #endif /* _E1000_DEFINES_H_ */
