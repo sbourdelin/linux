@@ -87,6 +87,7 @@ struct e1000_mac_info {
 
 	bool autoneg;
 	bool autoneg_failed;
+	bool get_link_status;
 };
 
 struct e1000_bus_info {
