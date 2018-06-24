@@ -17,6 +17,7 @@ static void igc_release_phy_base(struct e1000_hw *);
 static s32 igc_get_phy_id_base(struct e1000_hw *);
 static s32 igc_init_hw_base(struct e1000_hw *);
 static s32 igc_reset_hw_base(struct e1000_hw *);
+static s32 igc_setup_copper_link_base(struct e1000_hw *);
 static s32 igc_set_pcie_completion_timeout(struct e1000_hw *hw);
 static s32 igc_read_mac_addr_base(struct e1000_hw *hw);
 
@@ -97,6 +98,9 @@ static s32 igc_init_mac_params_base(struct e1000_hw *hw)
 	if (mac->type == e1000_i225)
 		dev_spec->clear_semaphore_once = true;
 
+	/* physical interface link setup */
+	mac->ops.setup_physical_interface = igc_setup_copper_link_base;
+
 	return 0;
 }
 
@@ -139,6 +143,8 @@ static s32 igc_init_phy_params_base(struct e1000_hw *hw)
 	if (ret_val)
 		return ret_val;
 
+	igc_check_for_link_base(hw);
+
 	/* Verify phy id and set remaining function pointers */
 	switch (phy->id) {
 	case I225_I_PHY_ID:
@@ -155,9 +161,21 @@ out:
 
 static s32 igc_get_invariants_base(struct e1000_hw *hw)
 {
+	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val = 0;
 	u32 ctrl_ext = 0;
 	u32 link_mode = 0;
+
+	switch (hw->device_id) {
+	case E1000_DEV_ID_I225_LM:
+	case E1000_DEV_ID_I225_V:
+		mac->type = e1000_i225;
+		break;
+	default:
+		return -E1000_ERR_MAC_INIT;
+	}
+
+	hw->phy.media_type = e1000_media_type_copper;
 
 	ctrl_ext = rd32(E1000_CTRL_EXT);
 	link_mode = ctrl_ext & E1000_CTRL_EXT_LINK_MODE_MASK;
@@ -284,6 +302,29 @@ static s32 igc_init_hw_base(struct e1000_hw *hw)
 	 * is no link.
 	 */
 	igc_clear_hw_cntrs_base(hw);
+
+	return ret_val;
+}
+
+/**
+ *  igc_setup_copper_link_base - Configure copper link settings
+ *  @hw: pointer to the HW structure
+ *
+ *  Configures the link for auto-neg or forced speed and duplex.  Then we check
+ *  for link, once link is established calls to configure collision distance
+ *  and flow control are called.
+ **/
+static s32 igc_setup_copper_link_base(struct e1000_hw *hw)
+{
+	s32  ret_val = 0;
+	u32 ctrl;
+
+	ctrl = rd32(E1000_CTRL);
+	ctrl |= E1000_CTRL_SLU;
+	ctrl &= ~(E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
+	wr32(E1000_CTRL, ctrl);
+
+	ret_val = igc_setup_copper_link(hw);
 
 	return ret_val;
 }

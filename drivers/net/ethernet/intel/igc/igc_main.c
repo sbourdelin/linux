@@ -3194,7 +3194,6 @@ static int __igc_open(struct net_device *netdev, bool resuming)
 
 	/* start the watchdog. */
 	hw->mac.get_link_status = 1;
-	schedule_work(&adapter->watchdog_task);
 
 	return E1000_SUCCESS;
 
@@ -3452,6 +3451,25 @@ static int igc_probe(struct pci_dev *pdev,
 	netdev->min_mtu = ETH_MIN_MTU;
 	netdev->max_mtu = MAX_STD_JUMBO_FRAME_SIZE;
 
+	/* before reading the NVM, reset the controller to put the device in a
+	 * known good starting state
+	 */
+	hw->mac.ops.reset_hw(hw);
+
+	if (eth_platform_get_mac_address(&pdev->dev, hw->mac.addr)) {
+		/* copy the MAC address out of the NVM */
+		if (hw->mac.ops.read_mac_addr(hw))
+			dev_err(&pdev->dev, "NVM Read Error\n");
+	}
+
+	memcpy(netdev->dev_addr, hw->mac.addr, netdev->addr_len);
+
+	if (!is_valid_ether_addr(netdev->dev_addr)) {
+		dev_err(&pdev->dev, "Invalid MAC Address\n");
+		err = -EIO;
+		goto err_eeprom;
+	}
+
 	/* configure RXPBSIZE and TXPBSIZE */
 	wr32(E1000_RXPBS, I225_RXPBSIZE_DEFAULT);
 	wr32(E1000_TXPBS, I225_TXPBSIZE_DEFAULT);
@@ -3459,6 +3477,14 @@ static int igc_probe(struct pci_dev *pdev,
 	timer_setup(&adapter->watchdog_timer, igc_watchdog, 0);
 
 	INIT_WORK(&adapter->reset_task, igc_reset_task);
+
+	/* Initialize link properties that are user-changeable */
+	adapter->fc_autoneg = true;
+	hw->mac.autoneg = true;
+	hw->phy.autoneg_advertised = 0x2f;
+
+	hw->fc.requested_mode = e1000_fc_default;
+	hw->fc.current_mode = e1000_fc_default;
 
 	/* reset the hardware with the new settings */
 	igc_reset(adapter);
@@ -3496,6 +3522,12 @@ static int igc_probe(struct pci_dev *pdev,
 
 err_register:
 	igc_release_hw_control(adapter);
+err_eeprom:
+	if (!igc_check_reset_block(hw))
+		igc_reset_phy(hw);
+
+	if (hw->flash_address)
+		iounmap(hw->flash_address);
 err_sw_init:
 	igc_clear_interrupt_scheme(adapter);
 	iounmap(adapter->io_addr);
@@ -3530,7 +3562,6 @@ static void igc_remove(struct pci_dev *pdev)
 	del_timer_sync(&adapter->watchdog_timer);
 
 	cancel_work_sync(&adapter->reset_task);
-	cancel_work_sync(&adapter->watchdog_task);
 
 	/* Release control of h/w to f/w.  If f/w is AMT enabled, this
 	 * would have already happened in close and is redundant.
