@@ -214,7 +214,7 @@ struct sock_common {
 		struct hlist_node	skc_node;
 		struct hlist_nulls_node skc_nulls_node;
 	};
-	int			skc_tx_queue_mapping;
+	unsigned short		skc_tx_queue_mapping;
 	union {
 		int		skc_incoming_cpu;
 		u32		skc_rcv_wnd;
@@ -1681,17 +1681,19 @@ static inline int sk_receive_skb(struct sock *sk, struct sk_buff *skb,
 
 static inline void sk_tx_queue_set(struct sock *sk, int tx_queue)
 {
-	sk->sk_tx_queue_mapping = tx_queue;
+	/* sk_tx_queue_mapping accept only upto a 16-bit value */
+	WARN_ON((unsigned short)tx_queue > USHRT_MAX);
+	sk->sk_tx_queue_mapping = tx_queue + 1;
 }
 
 static inline void sk_tx_queue_clear(struct sock *sk)
 {
-	sk->sk_tx_queue_mapping = -1;
+	sk->sk_tx_queue_mapping = 0;
 }
 
 static inline int sk_tx_queue_get(const struct sock *sk)
 {
-	return sk ? sk->sk_tx_queue_mapping : -1;
+	return sk ? sk->sk_tx_queue_mapping - 1 : -1;
 }
 
 static inline void sk_set_socket(struct sock *sk, struct socket *sock)
