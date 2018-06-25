@@ -37,9 +37,12 @@
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
 #include <linux/uaccess.h>
+#include <linux/nvmem-provider.h>
 #include <linux/usb.h>
 #include <linux/serial.h>
 #include <linux/usb/serial.h>
+#include <asm/unaligned.h>
+
 #include "ftdi_sio.h"
 #include "ftdi_sio_ids.h"
 
@@ -72,6 +75,8 @@ struct ftdi_private {
 	unsigned int latency;		/* latency setting in use */
 	unsigned short max_packet_size;
 	struct mutex cfg_lock; /* Avoid mess by parallel calls of config ioctl() and change_speed() */
+
+	struct nvmem_device *eeprom;
 };
 
 /* struct ftdi_sio_quirk is used by devices requiring special attention. */
@@ -1528,6 +1533,112 @@ static int get_lsr_info(struct usb_serial_port *port,
 	return 0;
 }
 
+#ifdef CONFIG_USB_SERIAL_FTDI_SIO_NVMEM
+
+static int ftdi_write_eeprom(void *priv, unsigned int off, void *val,
+			     size_t bytes)
+{
+	struct usb_serial_port *port = priv;
+	struct usb_device *udev = port->serial->dev;
+	unsigned char *buf = val;
+
+	if (bytes % 2) /* 16-bit eeprom */
+		return -EINVAL;
+
+	while (bytes) {
+		int rv;
+
+		rv = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
+				     FTDI_SIO_WRITE_EEPROM_REQUEST,
+				     FTDI_SIO_WRITE_EEPROM_REQUEST_TYPE,
+				     get_unaligned_le16(buf), off / 2, NULL,
+				     0, WDR_TIMEOUT);
+		if (rv < 0)
+			return rv;
+
+		off += 2;
+		buf += 2;
+		bytes -= 2;
+	}
+
+	return 0;
+}
+
+static int ftdi_read_eeprom(void *priv, unsigned int off, void *val,
+			    size_t bytes)
+{
+	struct usb_serial_port *port = priv;
+	struct usb_device *udev = port->serial->dev;
+	unsigned char *buf = val;
+
+	if (bytes % 2) /* 16-bit eeprom */
+		return -EINVAL;
+
+	while (bytes) {
+		int rv;
+
+		rv = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+				     FTDI_SIO_READ_EEPROM_REQUEST,
+				     FTDI_SIO_READ_EEPROM_REQUEST_TYPE,
+				     0, off / 2, buf, 2, WDR_TIMEOUT);
+		if (rv < 0)
+			return rv;
+
+		off += 2;
+		buf += 2;
+		bytes -= 2;
+	}
+
+	return 0;
+}
+
+static int ftdi_register_eeprom(struct usb_serial_port *port)
+{
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	struct usb_device *udev = port->serial->dev;
+	struct nvmem_config nvmconf = {};
+
+	switch (priv->chip_type) {
+	case FTX:
+		nvmconf.size = SZ_2K;
+		break;
+	case FT232RL:
+		nvmconf.size = SZ_128;
+		break;
+	default:
+		return 0;
+	}
+
+	nvmconf.word_size = 2;
+	nvmconf.stride = 2;
+	nvmconf.read_only = false;
+	nvmconf.priv = port;
+	nvmconf.dev = &udev->dev;
+	nvmconf.reg_read = ftdi_read_eeprom;
+	nvmconf.reg_write = ftdi_write_eeprom;
+	nvmconf.owner = THIS_MODULE;
+
+	priv->eeprom = nvmem_register(&nvmconf);
+	if (IS_ERR(priv->eeprom)) {
+		dev_err(&udev->dev, "Unable to register FTDI EEPROM\n");
+		priv->eeprom = NULL;
+		return -ENOMEM;
+	}
+
+	dev_info(&udev->dev, "Registered %d-byte FTDI EEPROM\n", nvmconf.size);
+
+	return 0;
+}
+
+static void ftdi_unregister_eeprom(struct usb_serial_port *port)
+{
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+
+	if (priv->eeprom)
+		nvmem_unregister(priv->eeprom);
+}
+
+#endif /* CONFIG_USB_SERIAL_FTDI_SIO_NVMEM */
 
 /* Determine type of FTDI chip based on USB config and descriptor. */
 static void ftdi_determine_type(struct usb_serial_port *port)
@@ -1813,6 +1924,10 @@ static int ftdi_sio_port_probe(struct usb_serial_port *port)
 		priv->latency = 16;
 	write_latency_timer(port);
 	create_sysfs_attrs(port);
+#ifdef CONFIG_USB_SERIAL_FTDI_SIO_NVMEM
+	ftdi_register_eeprom(port);
+#endif
+
 	return 0;
 }
 
@@ -1930,6 +2045,9 @@ static int ftdi_sio_port_remove(struct usb_serial_port *port)
 {
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 
+#ifdef CONFIG_USB_SERIAL_FTDI_SIO_NVMEM
+	ftdi_unregister_eeprom(port);
+#endif
 	remove_sysfs_attrs(port);
 
 	kfree(priv);
