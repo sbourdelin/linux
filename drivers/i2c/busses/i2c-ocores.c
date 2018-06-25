@@ -139,10 +139,9 @@ static inline u8 oc_getreg(struct ocores_i2c *i2c, int reg)
 	return i2c->getreg(i2c, reg);
 }
 
-static void ocores_process(struct ocores_i2c *i2c)
+static void ocores_process(struct ocores_i2c *i2c, u8 stat)
 {
 	struct i2c_msg *msg = i2c->msg;
-	u8 stat = oc_getreg(i2c, OCI2C_STATUS);
 
 	if ((i2c->state == STATE_DONE) || (i2c->state == STATE_ERROR)) {
 		/* stop has been sent */
@@ -209,8 +208,12 @@ static void ocores_process(struct ocores_i2c *i2c)
 static irqreturn_t ocores_isr(int irq, void *dev_id)
 {
 	struct ocores_i2c *i2c = dev_id;
+	u8 stat = oc_getreg(i2c, OCI2C_STATUS);
 	unsigned long flags;
 	int ret;
+
+	if (!(stat & OCI2C_STAT_IF))
+		return IRQ_NONE;
 
 	/*
 	 * We need to protect i2c against a timeout event (see ocores_xfer())
@@ -222,7 +225,7 @@ static irqreturn_t ocores_isr(int irq, void *dev_id)
 	if (!ret)
 		return IRQ_HANDLED;
 
-	ocores_process(i2c);
+	ocores_process(i2c, stat);
 
 	spin_unlock_irqrestore(&i2c->xfer_lock, flags);
 
