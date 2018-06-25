@@ -5042,6 +5042,88 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 
 	show_swap_cache_info();
 }
+/**
+ * max_free_page_blocks - estimate the max number of free page blocks
+ * @order: the order of the free page blocks to estimate
+ *
+ * This function gives a rough estimation of the possible maximum number of
+ * free page blocks a free list may have. The estimation works on an assumption
+ * that all the system pages are on that list.
+ *
+ * Context: Any context.
+ *
+ * Return: The largest number of free page blocks that the free list can have.
+ */
+uint32_t max_free_page_blocks(int order)
+{
+	return totalram_pages / (1 << order);
+}
+EXPORT_SYMBOL_GPL(max_free_page_blocks);
+
+/**
+ * get_from_free_page_list - get hints of free pages from a free page list
+ * @order: the order of the free page list to check
+ * @num: the number of arrays
+ * @bufs: the arrays to store the physical addresses of the free page blocks
+ * @size: the number of entries each array has
+ *
+ * This function offers hints about free pages. The addresses of free page
+ * blocks are stored to the arrays passed from the caller. There is no
+ * guarantee that the obtained free pages are still on the free page list
+ * after the function returns. pfn_to_page on the obtained free pages is
+ * strongly discouraged and if there is an absolute need for that, make sure
+ * to contact MM people to discuss potential problems.
+ *
+ * The addresses are currently stored to an array in little endian. This
+ * avoids the overhead of converting endianness by the caller who needs data
+ * in the little endian format. Big endian support can be added on demand in
+ * the future. The maximum number of free page blocks that can be obtained is
+ * limited to the size of arrays.
+ *
+ * Context: Process context.
+ *
+ * Return: The number of free page blocks obtained from the free page list.
+ */
+uint32_t get_from_free_page_list(int order, uint32_t num, __le64 *bufs[],
+				 uint32_t size)
+{
+	struct zone *zone;
+	enum migratetype mt;
+	struct page *page;
+	struct list_head *list;
+	unsigned long addr;
+	uint32_t array_index = 0, entry_index = 0;
+	__le64 *array = bufs[array_index];
+
+	/* Validity check */
+	if (order < 0 || order >= MAX_ORDER)
+		return 0;
+
+	for_each_populated_zone(zone) {
+		spin_lock_irq(&zone->lock);
+		for (mt = 0; mt < MIGRATE_TYPES; mt++) {
+			list = &zone->free_area[order].free_list[mt];
+			list_for_each_entry(page, list, lru) {
+				addr = page_to_pfn(page) << PAGE_SHIFT;
+				/* This array is full, so use the next one */
+				if (entry_index == size) {
+					/* All the arrays are consumed */
+					if (++array_index == num) {
+						spin_unlock_irq(&zone->lock);
+						return array_index * size;
+					}
+					array = bufs[array_index];
+					entry_index = 0;
+				}
+				array[entry_index++] = cpu_to_le64(addr);
+			}
+		}
+		spin_unlock_irq(&zone->lock);
+	}
+
+	return array_index * size + entry_index;
+}
+EXPORT_SYMBOL_GPL(get_from_free_page_list);
 
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
