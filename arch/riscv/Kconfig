@@ -106,6 +106,7 @@ config ARCH_RV32I
 	select GENERIC_ASHLDI3
 	select GENERIC_ASHRDI3
 	select GENERIC_LSHRDI3
+	select GENERIC_UCMPDI2
 
 config ARCH_RV64I
 	bool "RV64I"
