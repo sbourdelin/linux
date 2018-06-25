@@ -1053,7 +1053,8 @@ void i915_request_add(struct i915_request *request)
 	local_bh_disable();
 	rcu_read_lock(); /* RCU serialisation for set-wedged protection */
 	if (engine->schedule) {
-		struct i915_sched_attr attr = request->gem_context->sched;
+		struct i915_gem_context *ctx = request->gem_context;
+		struct i915_sched_attr attr = ctx->sched;
 
 		/*
 		 * Boost priorities to new clients (new request flows).
@@ -1063,6 +1064,9 @@ void i915_request_add(struct i915_request *request)
 		 */
 		if (!prev || i915_request_completed(prev))
 			attr.priority |= I915_PRIORITY_NEWCLIENT;
+
+		if (intel_engine_queue_is_empty(engine))
+			attr.priority |= I915_PRIORITY_STALL;
 
 		engine->schedule(request, &attr);
 	}
