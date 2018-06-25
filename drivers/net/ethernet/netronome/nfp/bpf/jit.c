@@ -1498,8 +1498,9 @@ static int wrp_div_imm(struct nfp_prog *nfp_prog, u8 dst, u64 imm)
 {
 	swreg tmp_both = imm_both(nfp_prog), dst_both = reg_both(dst);
 	swreg dst_a = reg_a(dst), dst_b = reg_a(dst);
-	struct reciprocal_value rvalue;
+	struct reciprocal_value_adv rvalue;
 	swreg tmp_b = imm_b(nfp_prog);
+	u8 pre_shift, exp;
 	swreg magic;
 
 	if (imm > U32_MAX) {
@@ -1507,15 +1508,34 @@ static int wrp_div_imm(struct nfp_prog *nfp_prog, u8 dst, u64 imm)
 		return 0;
 	}
 
-	rvalue = reciprocal_value(imm);
+	rvalue = reciprocal_value_adv(imm, 32);
+	exp = rvalue.exp;
+	if (rvalue.is_wide_m && !(imm & 1)) {
+		pre_shift = fls(imm & -imm) - 1;
+		rvalue = reciprocal_value_adv(imm >> pre_shift, 32 - pre_shift);
+	} else {
+		pre_shift = 0;
+	}
 	magic = re_load_imm_any(nfp_prog, rvalue.m, imm_b(nfp_prog));
-	wrp_mul_u32(nfp_prog, tmp_both, tmp_both, dst_a, magic, true);
-	emit_alu(nfp_prog, dst_both, dst_a, ALU_OP_SUB, tmp_b);
-	emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE, dst_b,
-		 SHF_SC_R_SHF, rvalue.sh1);
-	emit_alu(nfp_prog, dst_both, dst_a, ALU_OP_ADD, tmp_b);
-	emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE, dst_b,
-		 SHF_SC_R_SHF, rvalue.sh2);
+	if (imm == 1 << exp) {
+		emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE, dst_b,
+			 SHF_SC_R_SHF, exp);
+	} else if (rvalue.is_wide_m) {
+		wrp_mul_u32(nfp_prog, tmp_both, tmp_both, dst_a, magic, true);
+		emit_alu(nfp_prog, dst_both, dst_a, ALU_OP_SUB, tmp_b);
+		emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE, dst_b,
+			 SHF_SC_R_SHF, 1);
+		emit_alu(nfp_prog, dst_both, dst_a, ALU_OP_ADD, tmp_b);
+		emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE, dst_b,
+			 SHF_SC_R_SHF, rvalue.sh - 1);
+	} else {
+		if (pre_shift)
+			emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE,
+				 dst_b, SHF_SC_R_SHF, pre_shift);
+		wrp_mul_u32(nfp_prog, dst_both, dst_both, dst_a, magic, true);
+		emit_shf(nfp_prog, dst_both, reg_none(), SHF_OP_NONE,
+			 dst_b, SHF_SC_R_SHF, rvalue.sh);
+	}
 
 	return 0;
 }

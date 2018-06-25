@@ -561,12 +561,22 @@ nfp_bpf_check_alu(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta,
 	/* NFP doesn't have divide instructions, we support divide by constant
 	 * through reciprocal multiplication. Given NFP support multiplication
 	 * no bigger than u32, we'd require divisor and dividend no bigger than
-	 * that as well.
+	 * that as well. There is a further range requirement on dividend,
+	 * please see the NOTE below.
 	 *
 	 * Also eBPF doesn't support signed divide and has enforced this on C
 	 * language level by failing compilation. However LLVM assembler hasn't
 	 * enforced this, so it is possible for negative constant to leak in as
 	 * a BPF_K operand through assembly code, we reject such cases as well.
+	 *
+	 * NOTE: because we are using "reciprocal_value_adv" which doesn't
+	 * support dividend with MSB set, so we need to JIT separate NFP
+	 * sequence to handle such case. It could be a simple sequence if there
+	 * is conditional move, however there isn't for NFP. So, we don't bother
+	 * generating compare-if-set-branch sequence by rejecting the program
+	 * straight away when the u32 dividend has MSB set. Divide by such a
+	 * large constant would be rare in practice. Also, the programmer could
+	 * simply rewrite it as "result = divisor >= the_const".
 	 */
 	if (is_mbpf_div(meta)) {
 		if (meta->umax_dst > U32_MAX) {
@@ -578,8 +588,8 @@ nfp_bpf_check_alu(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta,
 				pr_vlog(env, "dividend is not constant\n");
 				return -EINVAL;
 			}
-			if (meta->umax_src > U32_MAX) {
-				pr_vlog(env, "dividend is not within u32 value range\n");
+			if (meta->umax_src > U32_MAX / 2) {
+				pr_vlog(env, "dividend is bigger than U32_MAX/2\n");
 				return -EINVAL;
 			}
 		}
