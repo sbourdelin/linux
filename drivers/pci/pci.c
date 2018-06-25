@@ -5213,6 +5213,7 @@ enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev)
 
 	return PCI_SPEED_UNKNOWN;
 }
+EXPORT_SYMBOL(pcie_get_speed_cap);
 
 /**
  * pcie_get_width_cap - query for the PCI device's link width capability
@@ -5231,6 +5232,7 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 
 	return PCIE_LNK_WIDTH_UNKNOWN;
 }
+EXPORT_SYMBOL(pcie_get_width_cap);
 
 /**
  * pcie_bandwidth_capable - calculate a PCI device's link bandwidth capability
