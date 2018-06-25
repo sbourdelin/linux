@@ -331,8 +331,20 @@ static void __init setup_boot_command_line(void)
 	append_to_cmdline(append_ipl_scpdata);
 }
 
+static void __init check_image_bootable(void)
+{
+	if (!memcmp(EP_STRING, (void *)EP_OFFSET, strlen(EP_STRING)))
+		return;
+
+	sclp_early_printk("The linux kernel boot failure: the image is corrupted or not bootable.\n");
+	sclp_early_printk("Please check that you are using bootable kernel image \"bzImage\".\n");
+	sclp_early_printk("(or alternatively \"arch/s390/boot/compressed/vmlinux\" image for qemu)\n");
+	disabled_wait(0xbadb007);
+}
+
 void __init startup_init(void)
 {
+	check_image_bootable();
 	time_early_init();
 	init_kernel_storage_key();
 	lockdep_off();
