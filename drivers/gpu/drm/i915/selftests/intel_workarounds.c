@@ -5,6 +5,7 @@
  */
 
 #include "../i915_selftest.h"
+#include "../i915_reset.h"
 
 #include "mock_context.h"
 

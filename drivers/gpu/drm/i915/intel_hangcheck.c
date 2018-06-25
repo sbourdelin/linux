@@ -23,6 +23,7 @@
  */
 
 #include "i915_drv.h"
+#include "i915_reset.h"
 
 static bool
 ipehr_is_semaphore_wait(struct intel_engine_cs *engine, u32 ipehr)
