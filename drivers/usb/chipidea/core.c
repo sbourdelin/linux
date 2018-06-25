@@ -611,6 +611,16 @@ static int ci_get_platdata(struct device *dev,
 	if (!platdata->phy_mode)
 		platdata->phy_mode = of_usb_get_phy_mode(dev->of_node);
 
+	if (platdata->phy_mode == USBPHY_INTERFACE_MODE_ULPI) {
+		/*
+		 * CONFIG_USB_CHIPIDEA_ULPI needs to be selected
+		 * for proper usage of the ULPI mode
+		 */
+		WARN_ONCE(!IS_ENABLED(CONFIG_USB_CHIPIDEA_ULPI),
+		"Select CONFIG_USB_CHIPIDEA_ULPI in order to use ULPI mode\n");
+		return -EINVAL;
+	}
+
 	if (!platdata->dr_mode)
 		platdata->dr_mode = usb_get_dr_mode(dev);
 
