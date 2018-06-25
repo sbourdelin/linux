@@ -1096,16 +1096,17 @@ static uint32_t i915_error_generate_code(struct drm_i915_private *dev_priv,
 static void gem_record_fences(struct i915_gpu_state *error)
 {
 	struct drm_i915_private *dev_priv = error->i915;
+	const struct i915_ggtt *ggtt = &error->i915->ggtt;
 	int i;
 
 	if (INTEL_GEN(dev_priv) >= 6) {
-		for (i = 0; i < dev_priv->num_fence_regs; i++)
+		for (i = 0; i < ggtt->num_fence_regs; i++)
 			error->fence[i] = I915_READ64(FENCE_REG_GEN6_LO(i));
 	} else if (INTEL_GEN(dev_priv) >= 4) {
-		for (i = 0; i < dev_priv->num_fence_regs; i++)
+		for (i = 0; i < ggtt->num_fence_regs; i++)
 			error->fence[i] = I915_READ64(FENCE_REG_965_LO(i));
 	} else {
-		for (i = 0; i < dev_priv->num_fence_regs; i++)
+		for (i = 0; i < ggtt->num_fence_regs; i++)
 			error->fence[i] = I915_READ(FENCE_REG(i));
 	}
 	error->nfence = i;
