@@ -344,50 +344,6 @@ static void free_capture_list(struct i915_request *request)
 	}
 }
 
-static void __retire_engine_request(struct intel_engine_cs *engine,
-				    struct i915_request *rq)
-{
-	GEM_TRACE("%s(%s) fence %llx:%d, global=%d, current %d\n",
-		  __func__, engine->name,
-		  rq->fence.context, rq->fence.seqno,
-		  rq->global_seqno,
-		  intel_engine_get_seqno(engine));
-
-	GEM_BUG_ON(!i915_request_completed(rq));
-
-	local_irq_disable();
-
-	spin_lock(&engine->timeline.lock);
-	GEM_BUG_ON(!list_is_first(&rq->link, &engine->timeline.requests));
-	list_del_init(&rq->link);
-	spin_unlock(&engine->timeline.lock);
-
-	spin_lock(&rq->lock);
-	if (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &rq->fence.flags))
-		dma_fence_signal_locked(&rq->fence);
-	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &rq->fence.flags))
-		intel_engine_cancel_signaling(rq);
-	if (rq->waitboost) {
-		GEM_BUG_ON(!atomic_read(&rq->i915->gt_pm.rps.num_waiters));
-		atomic_dec(&rq->i915->gt_pm.rps.num_waiters);
-	}
-	spin_unlock(&rq->lock);
-
-	local_irq_enable();
-
-	/*
-	 * The backing object for the context is done after switching to the
-	 * *next* context. Therefore we cannot retire the previous context until
-	 * the next context has already started running. However, since we
-	 * cannot take the required locks at i915_request_submit() we
-	 * defer the unpinning of the active context to now, retirement of
-	 * the subsequent request.
-	 */
-	if (engine->last_retired_context)
-		intel_context_unpin(engine->last_retired_context);
-	engine->last_retired_context = rq->hw_context;
-}
-
 static void __retire_engine_upto(struct intel_engine_cs *engine,
 				 struct i915_request *rq)
 {
@@ -400,8 +356,7 @@ static void __retire_engine_upto(struct intel_engine_cs *engine,
 		tmp = list_first_entry(&engine->timeline.requests,
 				       typeof(*tmp), link);
 
-		GEM_BUG_ON(tmp->engine != engine);
-		__retire_engine_request(engine, tmp);
+		intel_engine_retire_request(engine, tmp);
 	} while (tmp != rq);
 }
 
