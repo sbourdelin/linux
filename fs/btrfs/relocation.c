@@ -598,6 +598,12 @@ int find_inline_backref(struct extent_buffer *leaf, int slot,
 	btrfs_item_key_to_cpu(leaf, &key, slot);
 
 	item_size = btrfs_item_size_nr(leaf, slot);
+	if (item_size < sizeof(*ei)) {
+		btrfs_err(leaf->fs_info,
+	"Unsupported V0 extent filesystem detected. Aborting. Please re-create your filesystem with a newer kernel");
+		btrfs_handle_fs_error(leaf->fs_info, -EINVAL, NULL);
+		return 1;
+	}
 	ei = btrfs_item_ptr(leaf, slot, struct btrfs_extent_item);
 	WARN_ON(!(btrfs_extent_flags(leaf, ei) &
 		  BTRFS_EXTENT_FLAG_TREE_BLOCK));
@@ -782,8 +788,14 @@ again:
 			goto next;
 		}
 
-		ASSERT(key.type != BTRFS_EXTENT_REF_V0_KEY);
-		if (key.type == BTRFS_SHARED_BLOCK_REF_KEY) {
+		if (key.type == BTRFS_EXTENT_REF_V0_KEY) {
+			err = -EINVAL;
+			btrfs_err(rc->extent_root->fs_info,
+			"Unsupported V0 extent detected! Please recreate the filesystem on newer kernel\n");
+			btrfs_handle_fs_error(rc->extent_root->fs_info, err,
+					      NULL);
+			goto out;
+		} else if (key.type == BTRFS_SHARED_BLOCK_REF_KEY) {
 			if (key.objectid == key.offset) {
 				/*
 				 * only root blocks of reloc trees use
@@ -3315,6 +3327,11 @@ static int add_tree_block(struct reloc_control *rc,
 			level = (int)extent_key->offset;
 		}
 		generation = btrfs_extent_generation(eb, ei);
+	} else if (item_size == sizeof(struct btrfs_extent_item_v0)) {
+		btrfs_err(eb->fs_info,
+		"Unsupported V0 extent detected! Please recreate the filesystem on newer kernel\n");
+		btrfs_handle_fs_error(eb->fs_info, -EINVAL, NULL);
+		return -EINVAL;
 	} else {
 		BUG();
 	}
@@ -3720,8 +3737,12 @@ int add_data_references(struct reloc_control *rc,
 		if (key.objectid != extent_key->objectid)
 			break;
 
-		BUG_ON(key.type == BTRFS_EXTENT_REF_V0_KEY);
-		if (key.type == BTRFS_SHARED_DATA_REF_KEY) {
+		if (key.type == BTRFS_EXTENT_REF_V0_KEY) {
+			btrfs_err(eb->fs_info,
+			"Unsupported V0 extent detected! Please recreate the filesystem on newer kernel\n");
+			btrfs_handle_fs_error(eb->fs_info, -EINVAL, NULL);
+			ret = -EINVAL;
+		} else if (key.type == BTRFS_SHARED_DATA_REF_KEY) {
 			ret = __add_tree_block(rc, key.offset, blocksize,
 					       blocks);
 		} else if (key.type == BTRFS_EXTENT_DATA_REF_KEY) {
@@ -3967,7 +3988,12 @@ restart:
 			flags = btrfs_extent_flags(path->nodes[0], ei);
 			ret = check_extent_flags(flags);
 			BUG_ON(ret);
-
+		} else if (item_size == sizeof(struct btrfs_extent_item_v0)) {
+			err = -EINVAL;
+		btrfs_err(trans->fs_info,
+		"Unsupported V0 extent detected! Please recreate the filesystem on newer kernel\n");
+			btrfs_abort_transaction(trans, err);
+			break;
 		} else {
 			BUG();
 		}
