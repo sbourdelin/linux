@@ -1350,12 +1350,14 @@ static int syslog_print(char __user *buf, int size)
 
 static int syslog_print_all(char __user *buf, int size, bool clear)
 {
-	char *text;
+	char *text = NULL;
 	int len = 0;
 
-	text = kmalloc(LOG_LINE_MAX + PREFIX_MAX, GFP_KERNEL);
-	if (!text)
-		return -ENOMEM;
+	if (buf) {
+		text = kmalloc(LOG_LINE_MAX + PREFIX_MAX, GFP_KERNEL);
+		if (!text)
+			return -ENOMEM;
+	}
 
 	logbuf_lock_irq();
 	if (buf) {
@@ -1426,7 +1428,8 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 	}
 	logbuf_unlock_irq();
 
-	kfree(text);
+	if (text)
+		kfree(text);
 	return len;
 }
 
