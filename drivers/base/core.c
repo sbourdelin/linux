@@ -123,6 +123,15 @@ static int device_is_dependent(struct device *dev, void *target)
 	return ret;
 }
 
+/* a temporary place holder to mark out the root cause of the bug.
+ * The proposal algorithm will come in next patch
+ */
+int device_reorder_consumer(struct device *dev)
+{
+	devices_kset_move_last(dev);
+	return 0;
+}
+
 static int device_reorder_to_tail(struct device *dev, void *not_used)
 {
 	struct device_link *link;
