@@ -123,12 +123,138 @@ static int device_is_dependent(struct device *dev, void *target)
 	return ret;
 }
 
-/* a temporary place holder to mark out the root cause of the bug.
- * The proposal algorithm will come in next patch
+struct pos_info {
+	struct device *pos;
+	struct device *tail;
+};
+
+/* caller takes the devices_kset->list_lock */
+static int descendants_reorder_after_pos(struct device *dev,
+	void *data)
+{
+	struct device *pos;
+	struct pos_info *p = data;
+
+	pos = p->pos;
+	pr_debug("devices_kset: Moving %s after %s\n",
+		 dev_name(dev), dev_name(pos));
+	device_for_each_child(dev, p, descendants_reorder_after_pos);
+	/* children at the tail */
+	list_move(&dev->kobj.entry, &pos->kobj.entry);
+	/* record the right boundary of the section */
+	if (p->tail == NULL)
+		p->tail = dev;
+	return 0;
+}
+
+/* iterate over an open section */
+#define list_opensect_for_each_reverse(cur, left, right)	\
+	for (cur = right->prev; cur == left; cur = cur->prev)
+
+static bool is_consumer(struct device *query, struct device *supplier)
+{
+	struct device_link *link;
+	/* todo, lock protection */
+	list_for_each_entry(link, &supplier->links.consumers, s_node)
+		if (link->consumer == query)
+			return true;
+	return false;
+}
+
+/* recursively move the potential consumers in open section (left, right)
+ * after the barrier
+ */
+static int __device_reorder_consumer(struct device *consumer,
+	struct list_head *left, struct list_head *right,
+	struct pos_info *p)
+{
+	struct list_head *iter;
+	struct device *c_dev, *s_dev, *tail_dev;
+
+	descendants_reorder_after_pos(consumer, p);
+	tail_dev = p->tail;
+	/* (left, right) may contain consumers, hence checking if any moved
+	 * child serving as supplier. The reversing order help us to meet
+	 * the last supplier of a consumer.
+	 */
+	list_opensect_for_each_reverse(iter, left, right) {
+		struct list_head *l_iter, *moved_left, *moved_right;
+
+		moved_left = (&consumer->kobj.entry)->prev;
+		moved_right = tail_dev->kobj.entry.next;
+		/* the moved section may contain potential suppliers */
+		list_opensect_for_each_reverse(l_iter, moved_left,
+			moved_right) {
+			s_dev = list_entry(l_iter, struct device, kobj.entry);
+			c_dev = list_entry(iter, struct device, kobj.entry);
+			/* to fix: this poses extra effort for locking */
+			if (is_consumer(c_dev, s_dev)) {
+				p->tail = NULL;
+				/* to fix: lock issue */
+				p->pos =  s_dev;
+				/* reorder after the last supplier */
+				__device_reorder_consumer(c_dev,
+					l_iter, right, p);
+			}
+		}
+	}
+	return 0;
+}
+
+static int find_last_supplier(struct device *dev, struct device *supplier)
+{
+	struct device_link *link;
+
+	list_for_each_entry_reverse(link, &dev->links.suppliers, c_node) {
+		if (link->supplier == supplier)
+			return 1;
+	}
+	if (dev == supplier)
+		return -1;
+	return 0;
+}
+
+/* When reodering, take care of the range of (old_pos(dev), new_pos(dev)),
+ * there may be requirement to recursively move item.
  */
 int device_reorder_consumer(struct device *dev)
 {
-	devices_kset_move_last(dev);
+	struct list_head *iter, *left, *right;
+	struct device *cur_dev;
+	struct pos_info info;
+	int ret, idx;
+
+	idx = device_links_read_lock();
+	if (list_empty(&dev->links.suppliers)) {
+		device_links_read_unlock(idx);
+		return 0;
+	}
+	spin_lock(&devices_kset->list_lock);
+	list_for_each_prev(iter, &devices_kset->list) {
+		cur_dev = list_entry(iter, struct device, kobj.entry);
+		ret = find_last_supplier(dev, cur_dev);
+		switch (ret) {
+		case -1:
+			goto unlock;
+		case 1:
+			break;
+		case 0:
+			continue;
+		}
+	}
+	BUG_ON(!ret);
+
+	/* record the affected open section */
+	left = dev->kobj.entry.prev;
+	right = iter;
+	info.pos = list_entry(iter, struct device, kobj.entry);
+	info.tail = NULL;
+	/* dry out the consumers in (left,right) */
+	__device_reorder_consumer(dev, left, right, &info);
+
+unlock:
+	spin_unlock(&devices_kset->list_lock);
+	device_links_read_unlock(idx);
 	return 0;
 }
 
