@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Oracle.  All rights reserved.
+ * Copyright (c) 2006, 2017 Oracle and/or its affiliates. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -33,6 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/in.h>
+#include <linux/ipv6.h>
 
 #include "rds_single_path.h"
 #include "rds.h"
@@ -75,11 +76,11 @@ static int rds_loop_xmit(struct rds_connection *conn, struct rds_message *rm,
 
 	BUG_ON(hdr_off || sg || off);
 
-	rds_inc_init(&rm->m_inc, conn, conn->c_laddr);
+	rds_inc_init(&rm->m_inc, conn, &conn->c_laddr);
 	/* For the embedded inc. Matching put is in loop_inc_free() */
 	rds_message_addref(rm);
 
-	rds_recv_incoming(conn, conn->c_laddr, conn->c_faddr, &rm->m_inc,
+	rds_recv_incoming(conn, &conn->c_laddr, &conn->c_faddr, &rm->m_inc,
 			  GFP_KERNEL);
 
 	rds_send_drop_acked(conn, be64_to_cpu(rm->m_inc.i_hdr.h_sequence),
