@@ -693,6 +693,8 @@ static struct platform_driver etnaviv_platform_driver = {
 	},
 };
 
+static struct platform_device *etnaviv_drm;
+
 static int __init etnaviv_init(void)
 {
 	int ret;
@@ -706,7 +708,7 @@ static int __init etnaviv_init(void)
 
 	ret = platform_driver_register(&etnaviv_platform_driver);
 	if (ret != 0)
-		platform_driver_unregister(&etnaviv_gpu_driver);
+		goto unregister_gpu_driver;
 
 	/*
 	 * If the DT contains at least one available GPU device, instantiate
@@ -715,12 +717,22 @@ static int __init etnaviv_init(void)
 	for_each_compatible_node(np, NULL, "vivante,gc") {
 		if (!of_device_is_available(np))
 			continue;
-
-		platform_device_register_simple("etnaviv", -1, NULL, 0);
+		etnaviv_drm = platform_device_register_simple("etnaviv", -1,
+							      NULL, 0);
+		if (IS_ERR(etnaviv_drm)) {
+			ret = PTR_ERR(etnaviv_drm);
+			goto unregister_platform_driver;
+		}
 		of_node_put(np);
 		break;
 	}
 
+	return 0;
+
+unregister_platform_driver:
+	platform_driver_unregister(&etnaviv_platform_driver);
+unregister_gpu_driver:
+	platform_driver_unregister(&etnaviv_gpu_driver);
 	return ret;
 }
 module_init(etnaviv_init);
