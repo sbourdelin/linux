@@ -806,8 +806,7 @@ static void guc_submission_tasklet(unsigned long data)
 		guc_dequeue(engine);
 }
 
-static struct i915_request *
-guc_reset_prepare(struct intel_engine_cs *engine)
+static void guc_reset_prepare(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
 
@@ -833,8 +832,6 @@ guc_reset_prepare(struct intel_engine_cs *engine)
 	 */
 	if (engine->i915->guc.preempt_wq)
 		flush_workqueue(engine->i915->guc.preempt_wq);
-
-	return i915_gem_find_active_request(engine);
 }
 
 /*

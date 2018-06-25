@@ -137,6 +137,7 @@
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_gem_render_state.h"
+#include "i915_reset.h"
 #include "i915_vgpu.h"
 #include "intel_lrc_reg.h"
 #include "intel_mocs.h"
@@ -361,9 +362,10 @@ static void unwind_wa_tail(struct i915_request *rq)
 	assert_ring_tail_valid(rq->ring, rq->tail);
 }
 
-static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
+static struct i915_request *
+__unwind_incomplete_requests(struct intel_engine_cs *engine)
 {
-	struct i915_request *rq, *rn;
+	struct i915_request *rq, *rn, *active = NULL;
 	struct list_head *uninitialized_var(pl);
 	int last_prio = I915_PRIORITY_INVALID;
 
@@ -373,7 +375,7 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 					 &engine->timeline.requests,
 					 link) {
 		if (i915_request_completed(rq))
-			return;
+			break;
 
 		__i915_request_unsubmit(rq);
 		unwind_wa_tail(rq);
@@ -385,7 +387,11 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 		}
 
 		list_add(&rq->sched.link, pl);
+
+		active = rq;
 	}
+
+	return active;
 }
 
 void
@@ -896,6 +902,21 @@ static void reset_irq(struct intel_engine_cs *engine)
 	clear_gtiir(engine);
 }
 
+static void reset_csb_pointers(struct intel_engine_execlists *execlists)
+{
+	/*
+	 * After a reset, the HW starts writing into CSB entry [0]. We
+	 * therefore have to set our HEAD pointer back one entry so that
+	 * the *first* entry we check is entry 0. To complicate this further,
+	 * as we don't wait for the first interrupt after reset, we have to
+	 * fake the HW write to point back to the last entry so that our
+	 * inline comparison of our cached head position against the last HW
+	 * write works even before the first interrupt.
+	 */
+	execlists->csb_head = GEN8_CSB_ENTRIES - 1;
+	WRITE_ONCE(*execlists->csb_write, (GEN8_CSB_ENTRIES - 1) | 0xff << 16);
+}
+
 static void execlists_cancel_requests(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
@@ -920,15 +941,12 @@ static void execlists_cancel_requests(struct intel_engine_cs *engine)
 	 * submission's irq state, we also wish to remind ourselves that
 	 * it is irq state.)
 	 */
-	local_irq_save(flags);
+	synchronize_hardirq(engine->i915->drm.irq);
+	spin_lock_irqsave(&engine->timeline.lock, flags);
 
 	/* Cancel the requests on the HW and clear the ELSP tracker. */
 	execlists_cancel_port_requests(execlists);
-
-	synchronize_hardirq(engine->i915->drm.irq);
 	reset_irq(engine);
-
-	spin_lock(&engine->timeline.lock);
 
 	/* Mark all executing requests as skipped. */
 	list_for_each_entry(rq, &engine->timeline.requests, link) {
@@ -960,9 +978,7 @@ static void execlists_cancel_requests(struct intel_engine_cs *engine)
 	execlists->queue = RB_ROOT_CACHED;
 	GEM_BUG_ON(port_isset(execlists->port));
 
-	spin_unlock(&engine->timeline.lock);
-
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&engine->timeline.lock, flags);
 }
 
 static inline bool
@@ -1899,14 +1915,13 @@ static int gen9_init_render_ring(struct intel_engine_cs *engine)
 	return 0;
 }
 
-static struct i915_request *
-execlists_reset_prepare(struct intel_engine_cs *engine)
+static void execlists_reset_prepare(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
-	struct i915_request *request, *active;
 	unsigned long flags;
 
-	GEM_TRACE("%s\n", engine->name);
+	GEM_TRACE("%s, tasklet disabled?=%d\n",
+		  engine->name, atomic_read(&execlists->tasklet.count));
 
 	/*
 	 * Prevent request submission to the hardware until we have
@@ -1918,73 +1933,19 @@ execlists_reset_prepare(struct intel_engine_cs *engine)
 	 * prevents the race.
 	 */
 	__tasklet_disable_sync_once(&execlists->tasklet);
+	GEM_BUG_ON(!reset_in_progress(execlists));
 
-	/*
-	 * We want to flush the pending context switches, having disabled
-	 * the tasklet above, we can assume exclusive access to the execlists.
-	 * For this allows us to catch up with an inflight preemption event,
-	 * and avoid blaming an innocent request if the stall was due to the
-	 * preemption itself.
-	 */
+	/* And flush any current direct submission. */
 	spin_lock_irqsave(&engine->timeline.lock, flags);
-
-	process_csb(engine);
-
-	/*
-	 * The last active request can then be no later than the last request
-	 * now in ELSP[0]. So search backwards from there, so that if the GPU
-	 * has advanced beyond the last CSB update, it will be pardoned.
-	 */
-	active = NULL;
-	request = port_request(execlists->port);
-	if (request) {
-		/*
-		 * Prevent the breadcrumb from advancing before we decide
-		 * which request is currently active.
-		 */
-		intel_engine_stop_cs(engine);
-
-		list_for_each_entry_from_reverse(request,
-						 &engine->timeline.requests,
-						 link) {
-			if (__i915_request_completed(request,
-						     request->global_seqno))
-				break;
-
-			active = request;
-		}
-	}
-
 	spin_unlock_irqrestore(&engine->timeline.lock, flags);
-
-	return active;
 }
 
-static void reset_csb_pointers(struct intel_engine_execlists *execlists)
-{
-	/*
-	 * After a reset, the HW starts writing into CSB entry [0]. We
-	 * therefore have to set our HEAD pointer back one entry so that
-	 * the *first* entry we check is entry 0. To complicate this further,
-	 * as we don't wait for the first interrupt after reset, we have to
-	 * fake the HW write to point back to the last entry so that our
-	 * inline comparison of our cached head position against the last HW
-	 * write works even before the first interrupt.
-	 */
-	execlists->csb_head = GEN8_CSB_ENTRIES - 1;
-	WRITE_ONCE(*execlists->csb_write, (GEN8_CSB_ENTRIES - 1) | 0xff << 16);
-}
-
-static void execlists_reset(struct intel_engine_cs *engine,
-			    struct i915_request *request)
+static void execlists_reset(struct intel_engine_cs *engine, bool stalled)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
+	struct i915_request *rq;
 	unsigned long flags;
 	u32 *regs;
-
-	GEM_TRACE("%s request global=%x, current=%d\n",
-		  engine->name, request ? request->global_seqno : 0,
-		  intel_engine_get_seqno(engine));
 
 	synchronize_hardirq(engine->i915->drm.irq);
 	spin_lock_irqsave(&engine->timeline.lock, flags);
@@ -2002,12 +1963,16 @@ static void execlists_reset(struct intel_engine_cs *engine,
 	reset_irq(engine);
 
 	/* Push back any incomplete requests for replay after the reset. */
-	__unwind_incomplete_requests(engine);
+	rq = __unwind_incomplete_requests(engine);
 
 	/* Following the reset, we need to reload the CSB read/write pointers */
 	reset_csb_pointers(&engine->execlists);
 
-	spin_unlock_irqrestore(&engine->timeline.lock, flags);
+	GEM_TRACE("%s request global=%x, current=%d\n",
+		  engine->name, rq ? rq->global_seqno : 0,
+		  intel_engine_get_seqno(engine));
+	if (!rq)
+		goto out_unlock;
 
 	/*
 	 * If the request was innocent, we leave the request in the ELSP
@@ -2020,8 +1985,9 @@ static void execlists_reset(struct intel_engine_cs *engine,
 	 * and have to at least restore the RING register in the context
 	 * image back to the expected values to skip over the guilty request.
 	 */
-	if (!request || request->fence.error != -EIO)
-		return;
+	i915_reset_request(rq, stalled);
+	if (!stalled)
+		goto out_unlock;
 
 	/*
 	 * We want a simple context + ring to execute the breadcrumb update.
@@ -2031,25 +1997,23 @@ static void execlists_reset(struct intel_engine_cs *engine,
 	 * future request will be after userspace has had the opportunity
 	 * to recreate its own state.
 	 */
-	regs = request->hw_context->lrc_reg_state;
+	regs = rq->hw_context->lrc_reg_state;
 	if (engine->pinned_default_state) {
 		memcpy(regs, /* skip restoring the vanilla PPHWSP */
 		       engine->pinned_default_state + LRC_STATE_PN * PAGE_SIZE,
 		       engine->context_size - PAGE_SIZE);
 	}
-	execlists_init_reg_state(regs,
-				 request->gem_context, engine, request->ring);
+	execlists_init_reg_state(regs, rq->gem_context, engine, rq->ring);
 
 	/* Move the RING_HEAD onto the breadcrumb, past the hanging batch */
-	regs[CTX_RING_BUFFER_START + 1] = i915_ggtt_offset(request->ring->vma);
+	regs[CTX_RING_BUFFER_START + 1] = i915_ggtt_offset(rq->ring->vma);
 
-	request->ring->head = intel_ring_wrap(request->ring, request->postfix);
-	regs[CTX_RING_HEAD + 1] = request->ring->head;
+	rq->ring->head = intel_ring_wrap(rq->ring, rq->postfix);
+	regs[CTX_RING_HEAD + 1] = rq->ring->head;
+	intel_ring_update_space(rq->ring);
 
-	intel_ring_update_space(request->ring);
-
-	/* Reset WaIdleLiteRestore:bdw,skl as well */
-	unwind_wa_tail(request);
+out_unlock:
+	spin_unlock_irqrestore(&engine->timeline.lock, flags);
 }
 
 static void execlists_reset_finish(struct intel_engine_cs *engine)
@@ -2069,6 +2033,7 @@ static void execlists_reset_finish(struct intel_engine_cs *engine)
 	 * serialising multiple attempts to reset so that we know that we
 	 * are the only one manipulating tasklet state.
 	 */
+	GEM_BUG_ON(!reset_in_progress(execlists));
 	__tasklet_enable_sync_once(&execlists->tasklet);
 
 	GEM_TRACE("%s\n", engine->name);
