@@ -37,6 +37,7 @@
 #include <linux/usb/usbnet.h>
 #include <linux/slab.h>
 #include <linux/if_vlan.h>
+#include <linux/of_net.h>
 
 #define DRIVER_VERSION "22-Dec-2011"
 #define DRIVER_NAME "asix"
