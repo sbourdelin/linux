@@ -714,6 +714,28 @@ struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm)
 EXPORT_SYMBOL(get_mem_cgroup_from_mm);
 
 /**
+ * get_mem_cgroup_from_page: Obtain a reference on given page's memcg.
+ * @page: page from which memcg should be extracted.
+ *
+ * Obtain a reference on page->memcg and returns it if successful. Otherwise
+ * NULL is returned.
+ */
+struct mem_cgroup *get_mem_cgroup_from_page(struct page *page)
+{
+	struct mem_cgroup *memcg = page->mem_cgroup;
+
+	if (mem_cgroup_disabled() || !memcg)
+		return NULL;
+
+	rcu_read_lock();
+	if (!css_tryget_online(&memcg->css))
+		memcg = NULL;
+	rcu_read_unlock();
+	return memcg;
+}
+EXPORT_SYMBOL(get_mem_cgroup_from_page);
+
+/**
  * First try to obtain reference on current->active_memcg. On failure, try to
  * obtain reference on current->mm->memcg. On further failure root_mem_cgroup
  * is returned.
