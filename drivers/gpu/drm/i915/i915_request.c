@@ -694,12 +694,6 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 	if (ret)
 		goto err_unreserve;
 
-	/* Move our oldest request to the slab-cache (if not in use!) */
-	rq = list_first_entry(&ce->ring->request_list, typeof(*rq), ring_link);
-	if (!list_is_last(&rq->ring_link, &ce->ring->request_list) &&
-	    i915_request_completed(rq))
-		i915_request_retire(rq);
-
 	/*
 	 * Beware: Dragons be flying overhead.
 	 *
@@ -1110,6 +1104,8 @@ void i915_request_add(struct i915_request *request)
 	local_bh_enable(); /* Kick the execlists tasklet if just scheduled */
 
 	/*
+	 * Move our oldest requests to the slab-cache (if not in use!)
+	 *
 	 * In typical scenarios, we do not expect the previous request on
 	 * the timeline to be still tracked by timeline->last_request if it
 	 * has been completed. If the completed request is still here, that
@@ -1126,8 +1122,22 @@ void i915_request_add(struct i915_request *request)
 	 * work on behalf of others -- but instead we should benefit from
 	 * improved resource management. (Well, that's the theory at least.)
 	 */
-	if (prev && i915_request_completed(prev))
-		i915_request_retire_upto(prev);
+	do {
+		prev = list_first_entry(&ring->request_list,
+					typeof(*prev), ring_link);
+
+		/*
+		 * Keep the current request, the caller may not be
+		 * expecting it to be retired (and freed!) immediately,
+		 * and preserving one request from the client allows us to
+		 * carry forward frequently reused state onto the next
+		 * submission.
+		 */
+		if (prev == request || !i915_request_completed(prev))
+			break;
+
+		i915_request_retire(prev);
+	} while (1);
 }
 
 static unsigned long local_clock_us(unsigned int *cpu)
