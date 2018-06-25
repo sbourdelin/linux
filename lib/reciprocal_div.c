@@ -26,3 +26,40 @@ struct reciprocal_value reciprocal_value(u32 d)
 	return R;
 }
 EXPORT_SYMBOL(reciprocal_value);
+
+struct reciprocal_value_adv reciprocal_value_adv(u32 d, u8 prec)
+{
+	struct reciprocal_value_adv R;
+	u32 l, post_shift;
+	u64 mhigh, mlow;
+
+	l = fls(d - 1);
+	post_shift = l;
+	/* NOTE: mlow/mhigh could overflow u64 when l == 32 which means d has
+	 * MSB set. This case needs to be handled before calling
+	 * "reciprocal_value_adv", please see the comment at
+	 * include/linux/reciprocal_div.h.
+	 */
+	mlow = 1ULL << (32 + l);
+	do_div(mlow, d);
+	mhigh = (1ULL << (32 + l)) + (1ULL << (32 + l - prec));
+	do_div(mhigh, d);
+
+	for (; post_shift > 0; post_shift--) {
+		u64 lo = mlow >> 1, hi = mhigh >> 1;
+
+		if (lo >= hi)
+			break;
+
+		mlow = lo;
+		mhigh = hi;
+	}
+
+	R.m = (u32)mhigh;
+	R.sh = post_shift;
+	R.exp = l;
+	R.is_wide_m = mhigh > U32_MAX;
+
+	return R;
+}
+EXPORT_SYMBOL(reciprocal_value_adv);
