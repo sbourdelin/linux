@@ -1036,13 +1036,16 @@ static void capture_bo(struct drm_i915_error_buffer *err,
 
 static u32 capture_error_bo(struct drm_i915_error_buffer *err,
 			    int count, struct list_head *head,
-			    bool pinned_only)
+			    bool active_only, bool pinned_only)
 {
 	struct i915_vma *vma;
 	int i = 0;
 
 	list_for_each_entry(vma, head, vm_link) {
 		if (!vma->obj)
+			continue;
+
+		if (active_only && !i915_vma_is_active(vma))
 			continue;
 
 		if (pinned_only && !i915_vma_is_pinned(vma))
@@ -1516,14 +1519,16 @@ static void gem_capture_vm(struct i915_gpu_state *error,
 	int count;
 
 	count = 0;
-	list_for_each_entry(vma, &vm->active_list, vm_link)
-		count++;
+	list_for_each_entry(vma, &vm->bound_list, vm_link)
+		if (i915_vma_is_active(vma))
+			count++;
 
 	active_bo = NULL;
 	if (count)
 		active_bo = kcalloc(count, sizeof(*active_bo), GFP_ATOMIC);
 	if (active_bo)
-		count = capture_error_bo(active_bo, count, &vm->active_list, false);
+		count = capture_error_bo(active_bo, count, &vm->bound_list,
+					 true, false);
 	else
 		count = 0;
 
@@ -1561,28 +1566,20 @@ static void capture_pinned_buffers(struct i915_gpu_state *error)
 	struct i915_address_space *vm = &error->i915->ggtt.vm;
 	struct drm_i915_error_buffer *bo;
 	struct i915_vma *vma;
-	int count_inactive, count_active;
+	int count;
 
-	count_inactive = 0;
-	list_for_each_entry(vma, &vm->inactive_list, vm_link)
-		count_inactive++;
-
-	count_active = 0;
-	list_for_each_entry(vma, &vm->active_list, vm_link)
-		count_active++;
+	count = 0;
+	list_for_each_entry(vma, &vm->bound_list, vm_link)
+		count++;
 
 	bo = NULL;
-	if (count_inactive + count_active)
-		bo = kcalloc(count_inactive + count_active,
-			     sizeof(*bo), GFP_ATOMIC);
+	if (count)
+		bo = kcalloc(count, sizeof(*bo), GFP_ATOMIC);
 	if (!bo)
 		return;
 
-	count_inactive = capture_error_bo(bo, count_inactive,
-					  &vm->active_list, true);
-	count_active = capture_error_bo(bo + count_inactive, count_active,
-					&vm->inactive_list, true);
-	error->pinned_bo_count = count_inactive + count_active;
+	error->pinned_bo_count =
+		capture_error_bo(bo, count, &vm->bound_list, false, true);
 	error->pinned_bo = bo;
 }
 

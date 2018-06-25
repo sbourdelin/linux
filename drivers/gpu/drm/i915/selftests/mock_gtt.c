@@ -70,8 +70,7 @@ mock_ppgtt(struct drm_i915_private *i915,
 	ppgtt->vm.total = round_down(U64_MAX, PAGE_SIZE);
 	ppgtt->vm.file = ERR_PTR(-ENODEV);
 
-	INIT_LIST_HEAD(&ppgtt->vm.active_list);
-	INIT_LIST_HEAD(&ppgtt->vm.inactive_list);
+	INIT_LIST_HEAD(&ppgtt->vm.bound_list);
 	INIT_LIST_HEAD(&ppgtt->vm.unbound_list);
 
 	INIT_LIST_HEAD(&ppgtt->vm.global_link);

@@ -57,7 +57,7 @@ static int populate_ggtt(struct drm_i915_private *i915)
 		return -EINVAL;
 	}
 
-	if (list_empty(&i915->ggtt.vm.inactive_list)) {
+	if (list_empty(&i915->ggtt.vm.bound_list)) {
 		pr_err("No objects on the GGTT inactive list!\n");
 		return -EINVAL;
 	}
@@ -69,7 +69,7 @@ static void unpin_ggtt(struct drm_i915_private *i915)
 {
 	struct i915_vma *vma;
 
-	list_for_each_entry(vma, &i915->ggtt.vm.inactive_list, vm_link)
+	list_for_each_entry(vma, &i915->ggtt.vm.bound_list, vm_link)
 		i915_vma_unpin(vma);
 }
 
