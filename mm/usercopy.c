@@ -279,3 +279,31 @@ void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 	check_kernel_text_object((const unsigned long)ptr, n, to_user);
 }
 EXPORT_SYMBOL(__check_object_size);
+
+DEFINE_STATIC_KEY_FALSE(bypass_usercopy_checks);
+EXPORT_SYMBOL(bypass_usercopy_checks);
+
+#ifdef CONFIG_HUC_DEFAULT_OFF
+#define HUC_DEFAULT false
+#else
+#define HUC_DEFAULT true
+#endif
+
+static bool enable_huc_atboot = HUC_DEFAULT;
+
+static int __init parse_enable_usercopy(char *str)
+{
+	enable_huc_atboot = true;
+	return 1;
+}
+
+static int __init set_enable_usercopy(void)
+{
+	if (enable_huc_atboot == false)
+		static_branch_enable(&bypass_usercopy_checks);
+	return 1;
+}
+
+__setup("enable_hardened_usercopy", parse_enable_usercopy);
+
+late_initcall(set_enable_usercopy);

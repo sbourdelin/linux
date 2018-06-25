@@ -189,6 +189,16 @@ config HARDENED_USERCOPY_PAGESPAN
 	  been removed. This config is intended to be used only while
 	  trying to find such users.
 
+config HUC_DEFAULT_OFF
+	bool "allow CONFIG_HARDENED_USERCOPY to be configured but disabled"
+	depends on HARDENED_USERCOPY
+	help
+	  When CONFIG_HARDENED_USERCOPY is enabled, disable its
+	  functionality unless it is enabled via at boot time
+	  via the "enable_hardened_usercopy" boot parameter. This allows
+	  the functionality of hardened usercopy to be present but not
+	  impact performance unless it is needed.
+
 config FORTIFY_SOURCE
 	bool "Harden common str/mem functions against buffer overflows"
 	depends on ARCH_HAS_FORTIFY_SOURCE

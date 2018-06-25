@@ -109,12 +109,19 @@ static inline int arch_within_stack_frames(const void * const stack,
 #endif
 
 #ifdef CONFIG_HARDENED_USERCOPY
+#include <linux/jump_label.h>
+
+DECLARE_STATIC_KEY_FALSE(bypass_usercopy_checks);
+
 extern void __check_object_size(const void *ptr, unsigned long n,
 					bool to_user);
 
 static __always_inline void check_object_size(const void *ptr, unsigned long n,
 					      bool to_user)
 {
+	if (static_branch_likely(&bypass_usercopy_checks))
+		return;
+
 	if (!__builtin_constant_p(n))
 		__check_object_size(ptr, n, to_user);
 }
