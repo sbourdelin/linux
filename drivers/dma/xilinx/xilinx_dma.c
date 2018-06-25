@@ -1793,6 +1793,16 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 			 */
 			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
 				     XILINX_DMA_MAX_TRANS_LEN);
+
+			if ((copy + sg_used < sg_dma_len(sg)) &&
+			    chan->xdev->common.copy_align) {
+				/*
+				 * If this is not the last descriptor, make sure
+				 * the next one will be properly aligned
+				 */
+				copy = rounddown(copy,
+					(1 << chan->xdev->common.copy_align));
+			}
 			hw = &segment->hw;
 
 			/* Fill in the descriptor */
@@ -1898,6 +1908,16 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
 			 */
 			copy = min_t(size_t, period_len - sg_used,
 				     XILINX_DMA_MAX_TRANS_LEN);
+
+			if ((copy + sg_used < period_len) &&
+			    chan->xdev->common.copy_align) {
+				/*
+				 * If this is not the last descriptor, make sure
+				 * the next one will be properly aligned
+				 */
+				copy = rounddown(copy,
+					(1 << chan->xdev->common.copy_align));
+			}
 			hw = &segment->hw;
 			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
 					  period_len * i);
