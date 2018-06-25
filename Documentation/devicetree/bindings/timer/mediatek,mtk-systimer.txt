@@ -1,0 +1,18 @@
+Mediatek System Timers
+----------------------
+
+Required properties:
+- compatible: should contain
+	"mediatek,sys_timer" for those platforms which support system timer.
+- reg: Mandatory. The location and length for system timer registers.
+- clock-frequency: Optional. If not assigned specifically, default
+	value 13000000 (means 13 MHz) would be applied.
+
+Examples:
+
+	sys_timer@10017000 {
+		compatible = "mediatek,sys_timer";
+		reg = <0 0x10017000 0 0x1000>;
+		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
+		clock-frequency = <13000000>;
+	};
