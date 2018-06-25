@@ -51,8 +51,8 @@ const char vlan_version[] = DRV_VERSION;
 
 /* End of global variables definitions. */
 
-static int vlan_group_prealloc_vid(struct vlan_group *vg,
-				   __be16 vlan_proto, u16 vlan_id)
+int vlan_group_prealloc_vid(struct vlan_group *vg,
+			    __be16 vlan_proto, u16 vlan_id)
 {
 	struct net_device **array;
 	unsigned int pidx, vidx;

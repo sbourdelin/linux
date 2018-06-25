@@ -116,6 +116,8 @@ int register_vlan_dev(struct net_device *dev, struct netlink_ext_ack *extack);
 void unregister_vlan_dev(struct net_device *dev, struct list_head *head);
 bool vlan_dev_inherit_address(struct net_device *dev,
 			      struct net_device *real_dev);
+int vlan_group_prealloc_vid(struct vlan_group *vg,
+			    __be16 vlan_proto, u16 vlan_id);
 
 static inline u32 vlan_get_ingress_priority(struct net_device *dev,
 					    u16 vlan_tci)
