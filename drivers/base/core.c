@@ -123,6 +123,44 @@ static int device_is_dependent(struct device *dev, void *target)
 	return ret;
 }
 
+struct pos_info {
+	struct device *pos;
+	struct device *tail;
+};
+
+/* caller takes the devices_kset->list_lock */
+static int descendants_reorder_after_pos(struct device *dev,
+	void *data)
+{
+	struct device *pos;
+	struct pos_info *p = data;
+
+	pos = p->pos;
+	pr_debug("devices_kset: Moving %s after %s\n",
+		 dev_name(dev), dev_name(pos));
+	device_for_each_child(dev, p, descendants_reorder_after_pos);
+	/* children at the tail */
+	list_move(&dev->kobj.entry, &pos->kobj.entry);
+	/* record the right boundary of the section */
+	if (p->tail == NULL)
+		p->tail = dev;
+	return 0;
+}
+
+/* iterate over an open section */
+#define list_opensect_for_each_reverse(cur, left, right)	\
+	for (cur = right->prev; cur == left; cur = cur->prev)
+
+static bool is_consumer(struct device *query, struct device *supplier)
+{
+	struct device_link *link;
+	/* todo, lock protection */
+	list_for_each_entry(link, &supplier->links.consumers, s_node)
+		if (link->consumer == query)
+			return true;
+	return false;
+}
+
 static int device_reorder_to_tail(struct device *dev, void *not_used)
 {
 	struct device_link *link;
