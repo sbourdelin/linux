@@ -151,6 +151,7 @@ static ssize_t queue_state_write(void *data, const char __user *buf,
 {
 	struct request_queue *q = data;
 	char opbuf[16] = { }, *op;
+	int res;
 
 	/*
 	 * The "state" attribute is removed after blk_cleanup_queue() has called
@@ -169,9 +170,17 @@ static ssize_t queue_state_write(void *data, const char __user *buf,
 		return -EFAULT;
 	op = strstrip(opbuf);
 	if (strcmp(op, "run") == 0) {
+		res = mutex_lock_interruptible(&q->sysfs_lock);
+		if (res)
+			goto out;
 		blk_mq_run_hw_queues(q, true);
+		mutex_unlock(&q->sysfs_lock);
 	} else if (strcmp(op, "start") == 0) {
+		res = mutex_lock_interruptible(&q->sysfs_lock);
+		if (res)
+			goto out;
 		blk_mq_start_stopped_hw_queues(q, true);
+		mutex_unlock(&q->sysfs_lock);
 	} else if (strcmp(op, "kick") == 0) {
 		blk_mq_kick_requeue_list(q);
 	} else {
@@ -180,6 +189,7 @@ inval:
 		pr_err("%s: use 'run', 'start' or 'kick'\n", __func__);
 		return -EINVAL;
 	}
+out:
 	return count;
 }
 
