@@ -1710,6 +1710,10 @@ static inline void sk_rx_queue_set(struct sock *sk, const struct sk_buff *skb)
 #endif
 }
 
+static inline int sk_rx_queue_get(const struct sock *sk)
+{
+	return sk ? sk->sk_rx_queue_mapping - 1 : -1;
+}
 static inline void sk_set_socket(struct sock *sk, struct socket *sock)
 {
 	sk_tx_queue_clear(sk);
