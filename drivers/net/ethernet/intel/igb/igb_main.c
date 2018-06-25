@@ -37,6 +37,7 @@
 #include <linux/dca.h>
 #endif
 #include <linux/i2c.h>
+#include <linux/of_net.h>
 #include "igb.h"
 
 #define MAJ 5
@@ -2931,6 +2932,7 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	const struct e1000_info *ei = igb_info_tbl[ent->driver_data];
 	int err, pci_using_dac;
 	u8 part_str[E1000_PBANUM_LENGTH];
+	const void *iap;
 
 	/* Catch broken hardware that put the wrong VF device ID in
 	 * the PCIe SR-IOV capability.
@@ -3122,7 +3124,11 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		break;
 	}
 
-	if (eth_platform_get_mac_address(&pdev->dev, hw->mac.addr)) {
+	/* try to get the MAC address from device tree data */
+	iap = of_get_mac_address(pdev->dev.of_node);
+	if (iap)
+		memcpy(hw->mac.addr, iap, ETH_ALEN);
+	else if (eth_platform_get_mac_address(&pdev->dev, hw->mac.addr)) {
 		/* copy the MAC address out of the NVM */
 		if (hw->mac.ops.read_mac_addr(hw))
 			dev_err(&pdev->dev, "NVM Read Error\n");
