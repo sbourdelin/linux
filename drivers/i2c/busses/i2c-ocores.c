@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <linux/log2.h>
+#include <linux/spinlock.h>
 
 struct ocores_i2c {
 	void __iomem *base;
@@ -36,6 +37,7 @@ struct ocores_i2c {
 	int pos;
 	int nmsgs;
 	int state; /* see STATE_ */
+	spinlock_t xfer_lock;
 	struct clk *clk;
 	int ip_clock_khz;
 	int bus_clock_khz;
@@ -207,8 +209,22 @@ static void ocores_process(struct ocores_i2c *i2c)
 static irqreturn_t ocores_isr(int irq, void *dev_id)
 {
 	struct ocores_i2c *i2c = dev_id;
+	unsigned long flags;
+	int ret;
+
+	/*
+	 * We need to protect i2c against a timeout event (see ocores_xfer())
+	 * If we cannot take this lock, it means that we are already in
+	 * timeout, so it's pointless to handle this interrupt because we
+	 * are going to abort the current transfer.
+	 */
+	ret = spin_trylock_irqsave(&i2c->xfer_lock, flags);
+	if (!ret)
+		return IRQ_HANDLED;
 
 	ocores_process(i2c);
+
+	spin_unlock_irqrestore(&i2c->xfer_lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -216,6 +232,7 @@ static irqreturn_t ocores_isr(int irq, void *dev_id)
 static int ocores_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct ocores_i2c *i2c = i2c_get_adapdata(adap);
+	unsigned long flags;
 
 	i2c->msg = msgs;
 	i2c->pos = 0;
@@ -226,10 +243,15 @@ static int ocores_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	oc_setreg(i2c, OCI2C_CMD, OCI2C_CMD_START);
 
 	if (wait_event_timeout(i2c->wait, (i2c->state == STATE_ERROR) ||
-			       (i2c->state == STATE_DONE), HZ))
+			       (i2c->state == STATE_DONE), HZ)) {
 		return (i2c->state == STATE_DONE) ? num : -EIO;
-	else
+	} else {
+		spin_lock_irqsave(&i2c->xfer_lock, flags);
+		i2c->state = STATE_ERROR;
+		oc_setreg(i2c, OCI2C_CMD, OCI2C_CMD_STOP);
+		spin_unlock_irqrestore(&i2c->xfer_lock, flags);
 		return -ETIMEDOUT;
+	}
 }
 
 static int ocores_init(struct device *dev, struct ocores_i2c *i2c)
@@ -421,6 +443,8 @@ static int ocores_i2c_probe(struct platform_device *pdev)
 	i2c = devm_kzalloc(&pdev->dev, sizeof(*i2c), GFP_KERNEL);
 	if (!i2c)
 		return -ENOMEM;
+
+	spin_lock_init(&i2c->xfer_lock);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	i2c->base = devm_ioremap_resource(&pdev->dev, res);
