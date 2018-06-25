@@ -679,7 +679,6 @@ DEFINE_EVENT(i915_request, i915_request_add,
 	    TP_ARGS(rq)
 );
 
-#if defined(CONFIG_DRM_I915_LOW_LEVEL_TRACEPOINTS)
 DEFINE_EVENT(i915_request, i915_request_submit,
 	     TP_PROTO(struct i915_request *rq),
 	     TP_ARGS(rq)
@@ -750,25 +749,6 @@ TRACE_EVENT(i915_request_out,
 			      __entry->hw_id, __entry->ctx, __entry->seqno,
 			      __entry->global_seqno, __entry->completed)
 );
-
-#else
-#if !defined(TRACE_HEADER_MULTI_READ)
-static inline void
-trace_i915_request_submit(struct i915_request *rq)
-{
-}
-
-static inline void
-trace_i915_request_in(struct i915_request *rq, unsigned int port)
-{
-}
-
-static inline void
-trace_i915_request_out(struct i915_request *rq)
-{
-}
-#endif
-#endif
 
 TRACE_EVENT(intel_engine_notify,
 	    TP_PROTO(struct intel_engine_cs *engine, bool waiters),
