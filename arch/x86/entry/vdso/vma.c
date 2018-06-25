@@ -39,7 +39,7 @@ void __init init_vdso_image(const struct vdso_image *image)
 
 struct linux_binprm;
 
-static int vdso_fault(const struct vm_special_mapping *sm,
+static vm_fault_t vdso_fault(const struct vm_special_mapping *sm,
 		      struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	const struct vdso_image *image = vma->vm_mm->context.vdso_image;
@@ -84,15 +84,15 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
 	return 0;
 }
 
-static int vvar_fault(const struct vm_special_mapping *sm,
+static vm_fault_t vvar_fault(const struct vm_special_mapping *sm,
 		      struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	const struct vdso_image *image = vma->vm_mm->context.vdso_image;
 	long sym_offset;
-	int ret = -EFAULT;
+	vm_fault_t ret = VM_FAULT_SIGBUS;
 
 	if (!image)
-		return VM_FAULT_SIGBUS;
+		return ret;
 
 	sym_offset = (long)(vmf->pgoff << PAGE_SHIFT) +
 		image->sym_vvar_start;
@@ -105,10 +105,10 @@ static int vvar_fault(const struct vm_special_mapping *sm,
 	 * the page past the end of the vvar mapping.
 	 */
 	if (sym_offset == 0)
-		return VM_FAULT_SIGBUS;
+		return ret;
 
 	if (sym_offset == image->sym_vvar_page) {
-		ret = vm_insert_pfn(vma, vmf->address,
+		ret = vmf_insert_pfn(vma, vmf->address,
 				    __pa_symbol(&__vvar_page) >> PAGE_SHIFT);
 	} else if (sym_offset == image->sym_pvclock_page) {
 		struct pvclock_vsyscall_time_info *pvti =
@@ -124,14 +124,11 @@ static int vvar_fault(const struct vm_special_mapping *sm,
 		struct ms_hyperv_tsc_page *tsc_pg = hv_get_tsc_page();
 
 		if (tsc_pg && vclock_was_used(VCLOCK_HVCLOCK))
-			ret = vm_insert_pfn(vma, vmf->address,
+			ret = vmf_insert_pfn(vma, vmf->address,
 					    vmalloc_to_pfn(tsc_pg));
 	}
 
-	if (ret == 0 || ret == -EBUSY)
-		return VM_FAULT_NOPAGE;
-
-	return VM_FAULT_SIGBUS;
+	return ret;
 }
 
 static const struct vm_special_mapping vdso_mapping = {
