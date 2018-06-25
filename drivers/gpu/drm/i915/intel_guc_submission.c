@@ -669,8 +669,7 @@ static void guc_submit(struct intel_engine_cs *engine)
 static void port_assign(struct execlist_port *port, struct i915_request *rq)
 {
 	GEM_BUG_ON(port_isset(port));
-
-	port_set(port, i915_request_get(rq));
+	port_set(port, rq);
 }
 
 static inline int rq_prio(const struct i915_request *rq)
@@ -793,7 +792,6 @@ static void guc_submission_tasklet(unsigned long data)
 	rq = port_request(port);
 	while (rq && i915_request_completed(rq)) {
 		trace_i915_request_out(rq);
-		i915_request_put(rq);
 
 		port = execlists_port_complete(execlists, port);
 		if (port_isset(port)) {
