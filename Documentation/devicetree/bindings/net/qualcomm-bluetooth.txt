@@ -10,12 +10,23 @@ device the slave device is attached to.
 Required properties:
  - compatible: should contain one of the following:
    * "qcom,qca6174-bt"
+   * "qcom,wcn3990-bt"
 
-Optional properties:
+Optional properties for compatible string qcom,qca6174-bt:
+
  - enable-gpios: gpio specifier used to enable chip
  - clocks: clock provided to the controller (SUSCLK_32KHZ)
 
-Example:
+Optional properties for compatible string qcom,wcn3990-bt:
+
+ - vddio-supply: Bluetooth VDD IO regulator handle.
+ - vddxtal-supply: Bluetooth VDD XTAL regulator handle.
+ - vddpa-supply: Bluetooth VDD PA regulator handle.
+ - vddldo-supply: Bluetooth VDD LDO regulator handle.
+ - vddcore-supply: Bluetooth VDD CORE regulator handle.
+ - max-speed: Maximum operating speed of the chip.
+
+Examples:
 
 serial@7570000 {
 	label = "BT-UART";
@@ -26,5 +37,20 @@ serial@7570000 {
 
 		enable-gpios = <&pm8994_gpios 19 GPIO_ACTIVE_HIGH>;
 		clocks = <&divclk4>;
+	};
+};
+
+serial@898000 {
+	label = "BT-UART";
+	status = "okay";
+
+	bluetooth {
+		compatible = "qcom,wcn3990-bt";
+		vddio-supply = <&pm8998_s3>;
+		vddxtal-supply = <&pm8998_s5>;
+		vddcore-supply = <&pm8998_l7>;
+		vddpa-supply = <&pm8998_l17>;
+		vddldo-supply = <&pm8998_l25>;
+		max-speed = <3200000>;
 	};
 };
