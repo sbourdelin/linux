@@ -541,8 +541,6 @@ void __i915_request_submit(struct i915_request *request)
 	/* Transfer from per-context onto the global per-engine timeline */
 	move_to_timeline(request, &engine->timeline);
 
-	trace_i915_request_execute(request);
-
 	wake_up_all(&request->execute);
 }
 

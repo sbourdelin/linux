@@ -685,11 +685,6 @@ DEFINE_EVENT(i915_request, i915_request_submit,
 	     TP_ARGS(rq)
 );
 
-DEFINE_EVENT(i915_request, i915_request_execute,
-	     TP_PROTO(struct i915_request *rq),
-	     TP_ARGS(rq)
-);
-
 TRACE_EVENT(i915_request_in,
 	    TP_PROTO(struct i915_request *rq, unsigned int port),
 	    TP_ARGS(rq, port),
@@ -760,11 +755,6 @@ TRACE_EVENT(i915_request_out,
 #if !defined(TRACE_HEADER_MULTI_READ)
 static inline void
 trace_i915_request_submit(struct i915_request *rq)
-{
-}
-
-static inline void
-trace_i915_request_execute(struct i915_request *rq)
 {
 }
 
