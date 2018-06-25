@@ -152,6 +152,7 @@ void mempool_exit(mempool_t *pool)
 {
 	while (pool->curr_nr) {
 		void *element = remove_element(pool, GFP_KERNEL);
+
 		pool->free(element, pool->pool_data);
 	}
 	kfree(pool->elements);
@@ -248,7 +249,7 @@ EXPORT_SYMBOL(mempool_init);
 mempool_t *mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 				mempool_free_t *free_fn, void *pool_data)
 {
-	return mempool_create_node(min_nr,alloc_fn,free_fn, pool_data,
+	return mempool_create_node(min_nr, alloc_fn, free_fn, pool_data,
 				   GFP_KERNEL, NUMA_NO_NODE);
 }
 EXPORT_SYMBOL(mempool_create);
@@ -500,6 +501,7 @@ EXPORT_SYMBOL(mempool_free);
 void *mempool_alloc_slab(gfp_t gfp_mask, void *pool_data)
 {
 	struct kmem_cache *mem = pool_data;
+
 	VM_BUG_ON(mem->ctor);
 	return kmem_cache_alloc(mem, gfp_mask);
 }
@@ -508,6 +510,7 @@ EXPORT_SYMBOL(mempool_alloc_slab);
 void mempool_free_slab(void *element, void *pool_data)
 {
 	struct kmem_cache *mem = pool_data;
+
 	kmem_cache_free(mem, element);
 }
 EXPORT_SYMBOL(mempool_free_slab);
@@ -519,6 +522,7 @@ EXPORT_SYMBOL(mempool_free_slab);
 void *mempool_kmalloc(gfp_t gfp_mask, void *pool_data)
 {
 	size_t size = (size_t)pool_data;
+
 	return kmalloc(size, gfp_mask);
 }
 EXPORT_SYMBOL(mempool_kmalloc);
@@ -536,6 +540,7 @@ EXPORT_SYMBOL(mempool_kfree);
 void *mempool_alloc_pages(gfp_t gfp_mask, void *pool_data)
 {
 	int order = (int)(long)pool_data;
+
 	return alloc_pages(gfp_mask, order);
 }
 EXPORT_SYMBOL(mempool_alloc_pages);
@@ -543,6 +548,7 @@ EXPORT_SYMBOL(mempool_alloc_pages);
 void mempool_free_pages(void *element, void *pool_data)
 {
 	int order = (int)(long)pool_data;
+
 	__free_pages(element, order);
 }
 EXPORT_SYMBOL(mempool_free_pages);
