@@ -570,6 +570,8 @@ static void ip_sublist_rcv(struct sk_buff_head *list, struct net_device *dev,
 {
 	struct sk_buff_head sublist;
 
+	if (skb_queue_empty(list))
+		return;
 	NF_HOOK_LIST(NFPROTO_IPV4, NF_INET_PRE_ROUTING, net, NULL,
 		     list, &sublist, dev, NULL, ip_rcv_finish);
 	ip_list_rcv_finish(net, NULL, &sublist);
