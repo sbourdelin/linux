@@ -816,6 +816,9 @@
 	disable=	[IPV6]
 			See Documentation/networking/ipv6.txt.
 
+	disable_hardened_usercopy [HUC]
+			Disable hardened usercopy checks
+
 	disable_radix	[PPC]
 			Disable RADIX MMU mode on POWER9
 

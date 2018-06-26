@@ -100,6 +100,7 @@ parameter is applicable::
 	FB	The frame buffer device is enabled.
 	FTRACE	Function tracing enabled.
 	GCOV	GCOV profiling is enabled.
+	HUC	Hardened usercopy is enabled
 	HW	Appropriate hardware is enabled.
 	IA-64	IA-64 architecture is enabled.
 	IMA     Integrity measurement architecture is enabled.

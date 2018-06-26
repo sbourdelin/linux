@@ -20,6 +20,8 @@
 #include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
 #include <linux/thread_info.h>
+#include <linux/atomic.h>
+#include <linux/jump_label.h>
 #include <asm/sections.h>
 
 /*
@@ -248,6 +250,9 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
  */
 void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 {
+	if (static_branch_likely(&bypass_usercopy_checks))
+		return;
+
 	/* Skip all tests if size is zero. */
 	if (!n)
 		return;
@@ -279,3 +284,25 @@ void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 	check_kernel_text_object((const unsigned long)ptr, n, to_user);
 }
 EXPORT_SYMBOL(__check_object_size);
+
+DEFINE_STATIC_KEY_FALSE(bypass_usercopy_checks);
+EXPORT_SYMBOL(bypass_usercopy_checks);
+
+static bool disable_huc_atboot = false;
+
+static int __init parse_disable_usercopy(char *str)
+{
+	disable_huc_atboot = true;
+	return 1;
+}
+
+static int __init set_disable_usercopy(void)
+{
+	if (disable_huc_atboot == true)
+		static_branch_enable(&bypass_usercopy_checks);
+	return 1;
+}
+
+__setup("disable_hardened_usercopy", parse_disable_usercopy);
+
+late_initcall(set_disable_usercopy);
