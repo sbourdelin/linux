@@ -366,14 +366,11 @@ find_encoder(struct drm_connector *connector, int type)
 	struct drm_device *dev = connector->dev;
 	struct nouveau_encoder *nv_encoder;
 	struct drm_encoder *enc;
-	int i, id;
+	u32 encoder_id;
+	int i;
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		id = connector->encoder_ids[i];
-		if (!id)
-			break;
-
-		enc = drm_encoder_find(dev, NULL, id);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		enc = drm_encoder_find(dev, NULL, encoder_id);
 		if (!enc)
 			continue;
 		nv_encoder = nouveau_encoder(enc);
@@ -423,6 +420,7 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 	struct nouveau_encoder *nv_encoder;
 	struct drm_encoder *encoder;
 	int i, panel = -ENODEV;
+	u32 encoder_id;
 
 	/* eDP panels need powering on by us (if the VBIOS doesn't default it
 	 * to on) before doing any AUX channel transactions.  LVDS panel power
@@ -436,12 +434,8 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 		}
 	}
 
-	for (i = 0; nv_encoder = NULL, i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		int id = connector->encoder_ids[i];
-		if (id == 0)
-			break;
-
-		encoder = drm_encoder_find(dev, NULL, id);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 		nv_encoder = nouveau_encoder(encoder);
