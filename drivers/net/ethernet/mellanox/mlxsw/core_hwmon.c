@@ -44,6 +44,7 @@
 #define MLXSW_HWMON_TEMP_SENSOR_MAX_COUNT 127
 #define MLXSW_HWMON_ATTR_COUNT (MLXSW_HWMON_TEMP_SENSOR_MAX_COUNT * 4 + \
 				MLXSW_MFCR_TACHOS_MAX + MLXSW_MFCR_PWMS_MAX)
+#define MLXSW_HWMON_SPEED_MAX 50000	/* RPM */
 
 struct mlxsw_hwmon_attr {
 	struct device_attribute dev_attr;
@@ -61,6 +62,7 @@ struct mlxsw_hwmon {
 	struct attribute *attrs[MLXSW_HWMON_ATTR_COUNT + 1];
 	struct mlxsw_hwmon_attr hwmon_attrs[MLXSW_HWMON_ATTR_COUNT];
 	unsigned int attrs_count;
+	u16 tach_min;
 };
 
 static ssize_t mlxsw_hwmon_temp_show(struct device *dev,
@@ -152,6 +154,28 @@ static ssize_t mlxsw_hwmon_fan_rpm_show(struct device *dev,
 	return sprintf(buf, "%u\n", mlxsw_reg_mfsm_rpm_get(mfsm_pl));
 }
 
+static ssize_t mlxsw_hwmon_fan_fault_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	struct mlxsw_hwmon_attr *mlwsw_hwmon_attr =
+			container_of(attr, struct mlxsw_hwmon_attr, dev_attr);
+	struct mlxsw_hwmon *mlxsw_hwmon = mlwsw_hwmon_attr->hwmon;
+	char mfsm_pl[MLXSW_REG_MFSM_LEN];
+	u16 tach;
+	int err;
+
+	mlxsw_reg_mfsm_pack(mfsm_pl, mlwsw_hwmon_attr->type_index);
+	err = mlxsw_reg_query(mlxsw_hwmon->core, MLXSW_REG(mfsm), mfsm_pl);
+	if (err) {
+		dev_err(mlxsw_hwmon->bus_info->dev, "Failed to query fan\n");
+		return err;
+	}
+	tach = mlxsw_reg_mfsm_rpm_get(mfsm_pl);
+
+	return sprintf(buf, "%u\n", (tach < mlxsw_hwmon->tach_min) ? 1 : 0);
+}
+
 static ssize_t mlxsw_hwmon_pwm_show(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
@@ -203,6 +227,7 @@ enum mlxsw_hwmon_attr_type {
 	MLXSW_HWMON_ATTR_TYPE_TEMP_MAX,
 	MLXSW_HWMON_ATTR_TYPE_TEMP_RST,
 	MLXSW_HWMON_ATTR_TYPE_FAN_RPM,
+	MLXSW_HWMON_ATTR_TYPE_FAN_FAULT,
 	MLXSW_HWMON_ATTR_TYPE_PWM,
 };
 
@@ -239,6 +264,12 @@ static void mlxsw_hwmon_attr_add(struct mlxsw_hwmon *mlxsw_hwmon,
 		mlxsw_hwmon_attr->dev_attr.attr.mode = 0444;
 		snprintf(mlxsw_hwmon_attr->name, sizeof(mlxsw_hwmon_attr->name),
 			 "fan%u_input", num + 1);
+		break;
+	case MLXSW_HWMON_ATTR_TYPE_FAN_FAULT:
+		mlxsw_hwmon_attr->dev_attr.show = mlxsw_hwmon_fan_fault_show;
+		mlxsw_hwmon_attr->dev_attr.attr.mode = 0444;
+		snprintf(mlxsw_hwmon_attr->name, sizeof(mlxsw_hwmon_attr->name),
+			 "fan%u_fault", num + 1);
 		break;
 	case MLXSW_HWMON_ATTR_TYPE_PWM:
 		mlxsw_hwmon_attr->dev_attr.show = mlxsw_hwmon_pwm_show;
@@ -297,9 +328,9 @@ static int mlxsw_hwmon_fans_init(struct mlxsw_hwmon *mlxsw_hwmon)
 {
 	char mfcr_pl[MLXSW_REG_MFCR_LEN] = {0};
 	enum mlxsw_reg_mfcr_pwm_frequency freq;
+	u16 tacho_active, tach_min;
 	unsigned int type_index;
 	unsigned int num;
-	u16 tacho_active;
 	u8 pwm_active;
 	int err;
 
@@ -310,11 +341,38 @@ static int mlxsw_hwmon_fans_init(struct mlxsw_hwmon *mlxsw_hwmon)
 	}
 	mlxsw_reg_mfcr_unpack(mfcr_pl, &freq, &tacho_active, &pwm_active);
 	num = 0;
+	/* Set tachometer to maximum value as the initial seed. */
+	mlxsw_hwmon->tach_min = MLXSW_HWMON_SPEED_MAX;
 	for (type_index = 0; type_index < MLXSW_MFCR_TACHOS_MAX; type_index++) {
-		if (tacho_active & BIT(type_index))
+		if (tacho_active & BIT(type_index)) {
+			char mfsl_pl[MLXSW_REG_MFSL_LEN] = {0};
+
 			mlxsw_hwmon_attr_add(mlxsw_hwmon,
 					     MLXSW_HWMON_ATTR_TYPE_FAN_RPM,
+					     type_index, num);
+			mlxsw_hwmon_attr_add(mlxsw_hwmon,
+					     MLXSW_HWMON_ATTR_TYPE_FAN_FAULT,
 					     type_index, num++);
+			/* Get tachometer minimum value. */
+			mlxsw_reg_mfsl_pack(mfsl_pl, type_index, 0, 0);
+			err = mlxsw_reg_query(mlxsw_hwmon->core,
+					      MLXSW_REG(mfsl), mfsl_pl);
+			if (err) {
+				dev_err(mlxsw_hwmon->bus_info->dev, "Failed to query tachometer %d\n",
+					type_index);
+				return err;
+			}
+
+			tach_min = mlxsw_reg_mfsl_tach_min_get(mfsl_pl);
+			/* Store absolute minimal value of all tachometers for
+			 * alarm indication, because forward FANs could be
+			 * replaced with reversed and wise versa and in such
+			 * case the minimum values could be flipped.
+			 */
+			mlxsw_hwmon->tach_min = min_t(u16,
+						      mlxsw_hwmon->tach_min,
+						      tach_min);
+		}
 	}
 	num = 0;
 	for (type_index = 0; type_index < MLXSW_MFCR_PWMS_MAX; type_index++) {
