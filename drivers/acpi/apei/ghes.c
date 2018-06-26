@@ -266,7 +266,7 @@ static inline int ghes_severity(int severity)
 	}
 }
 
-static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+static void ghes_copy_tofrom_phys(void *buffer, phys_addr_t paddr, u32 len,
 				  int from_phys, int fixmap_idx)
 {
 	void __iomem *vaddr;
@@ -291,14 +291,13 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
 
 static int ghes_read_estatus(struct ghes *ghes,
 			     struct acpi_hest_generic_status *estatus,
-			     int fixmap_idx)
+			     phys_addr_t *buf_paddr, int fixmap_idx)
 {
 	struct acpi_hest_generic *g = ghes->generic;
-	u64 buf_paddr;
 	u32 len;
 	int rc;
 
-	rc = apei_read(&buf_paddr, &g->error_status_address);
+	rc = apei_read(buf_paddr, &g->error_status_address);
 	if (rc) {
 		if (printk_ratelimit())
 			pr_warning(FW_WARN GHES_PFX
@@ -306,15 +305,14 @@ static int ghes_read_estatus(struct ghes *ghes,
 				   g->header.source_id);
 		return -EIO;
 	}
-	if (!buf_paddr)
+	if (!*buf_paddr)
 		return -ENOENT;
 
-	ghes_copy_tofrom_phys(estatus, buf_paddr,
+	ghes_copy_tofrom_phys(estatus, *buf_paddr,
 			      sizeof(*estatus), 1, fixmap_idx);
 	if (!estatus->block_status)
 		return -ENOENT;
 
-	ghes->buffer_paddr = buf_paddr;
 	ghes->flags |= GHES_TO_CLEAR;
 
 	rc = -EIO;
@@ -326,7 +324,7 @@ static int ghes_read_estatus(struct ghes *ghes,
 	if (cper_estatus_check_header(estatus))
 		goto err_read_block;
 	ghes_copy_tofrom_phys(estatus + 1,
-			      buf_paddr + sizeof(*estatus),
+			      *buf_paddr + sizeof(*estatus),
 			      len - sizeof(*estatus), 1, fixmap_idx);
 	if (cper_estatus_check(estatus))
 		goto err_read_block;
@@ -341,12 +339,12 @@ err_read_block:
 
 static void ghes_clear_estatus(struct ghes *ghes,
 			       struct acpi_hest_generic_status *estatus,
-			       int fixmap_idx)
+			       phys_addr_t buf_paddr, int fixmap_idx)
 {
 	estatus->block_status = 0;
 	if (!(ghes->flags & GHES_TO_CLEAR))
 		return;
-	ghes_copy_tofrom_phys(estatus, ghes->buffer_paddr,
+	ghes_copy_tofrom_phys(estatus, buf_paddr,
 			      sizeof(estatus->block_status), 0, fixmap_idx);
 	ghes->flags &= ~GHES_TO_CLEAR;
 }
@@ -718,10 +716,11 @@ static void __process_error(struct ghes *ghes,
 static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
 {
 	int sev;
+	phys_addr_t buf_paddr;
 	struct acpi_hest_generic_status *estatus = ghes->estatus;
 
-	if (ghes_read_estatus(ghes, estatus, fixmap_idx)) {
-		ghes_clear_estatus(ghes, estatus, fixmap_idx);
+	if (ghes_read_estatus(ghes, estatus, &buf_paddr, fixmap_idx)) {
+		ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
 		return -ENOENT;
 	}
 
@@ -735,7 +734,7 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
 		return 0;
 
 	__process_error(ghes, estatus);
-	ghes_clear_estatus(ghes, estatus, fixmap_idx);
+	ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
 
 	return 0;
 }
@@ -853,11 +852,12 @@ static int ghes_proc(struct ghes *ghes)
 {
 	int rc;
 	unsigned long flags;
+	phys_addr_t buf_paddr;
 	struct acpi_hest_generic_status *estatus = ghes->estatus;
 
 	spin_lock_irqsave(&ghes_notify_lock_irq, flags);
 
-	rc = ghes_read_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
+	rc = ghes_read_estatus(ghes, estatus, &buf_paddr, FIX_APEI_GHES_IRQ);
 	if (rc)
 		goto out;
 
@@ -871,7 +871,7 @@ static int ghes_proc(struct ghes *ghes)
 	ghes_do_proc(ghes, estatus);
 
 out:
-	ghes_clear_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
+	ghes_clear_estatus(ghes, estatus, buf_paddr, FIX_APEI_GHES_IRQ);
 
 	if (rc == -ENOENT)
 		goto unlock;
