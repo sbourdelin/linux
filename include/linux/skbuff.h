@@ -1627,6 +1627,22 @@ static inline struct sk_buff *skb_peek_tail(const struct sk_buff_head *list_)
 }
 
 /**
+ *	skb_queue_for_each - iterate over an skb queue
+ *	@pos:        the &struct sk_buff to use as a loop cursor.
+ *	@head:       the &struct sk_buff_head for your list.
+ *
+ *	The reference count is not incremented and the reference is therefore
+ *	volatile; the list lock is not taken either. Use with caution.
+ *
+ *	The list must not be modified (though the individual skbs can be)
+ *	within the loop body.
+ *
+ *	After loop completion, @pos will be %NULL.
+ */
+#define skb_queue_for_each(pos, head) \
+	for (pos = skb_peek(head); pos != NULL; pos = skb_peek_next(pos, head))
+
+/**
  *	skb_queue_len	- get queue length
  *	@list_: list to measure
  *

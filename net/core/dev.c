@@ -4807,8 +4807,10 @@ void netif_receive_skb_list(struct sk_buff_head *list)
 {
 	struct sk_buff *skb;
 
+	skb_queue_for_each(skb, list)
+		trace_netif_receive_skb_list_entry(skb);
 	while ((skb = __skb_dequeue(list)) != NULL)
-		netif_receive_skb(skb);
+		netif_receive_skb_internal(skb);
 }
 EXPORT_SYMBOL(netif_receive_skb_list);
 
