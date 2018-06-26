@@ -384,6 +384,32 @@ sub find_ignore_git {
 read_all_maintainer_files();
 
 sub read_all_maintainer_files {
+	my $conf = which_conf(".get_maintainer.MAINTAINERS");
+	if ( -f $conf) {
+	    my @conf_args;
+	    my $add = 0;
+	    open(my $conffile, '<', "$conf")
+		or warn "$P: Can't find a readable .get_maintainer.MAINTAINERS file $!\n";
+	    while (<$conffile>) {
+		my $line = $_;
+		if ($line =~ m/^\+/ ) {
+		    $add = 1;
+		}
+		next if ($line =~ m/^\s*#/);
+		$line =~ s/^\+//g;
+		$line =~ s/^\-//g;
+		$line =~ s/\s*\n?$//;
+		push(@mfiles, $line);
+	    }
+	    close($conffile);
+	    if ($add eq 0) {
+		foreach my $file (@mfiles) {
+		     read_maintainer_file("$file");
+		}
+		return;
+	    }
+	}
+
     if (-d "${lk_path}MAINTAINERS") {
         opendir(DIR, "${lk_path}MAINTAINERS") or die $!;
         my @files = readdir(DIR);
@@ -1068,6 +1094,14 @@ Notes:
       Entries in this file can be any command line argument.
       This file is prepended to any additional command line arguments.
       Multiple lines and # comments are allowed.
+  File ".get_maintainer.ignore", if it exists in the linux kernel source root
+      directory, can contain a list of email addresses to ignore.  Multiple
+      lines and # comments are allowed.
+  File ".get_maintainer.MAINTAINERS", if it exists in the linux kernel source
+      root directory, can change the location of the MAINTAINERS file.
+      Entries beginning with a '+' are added to the default list, and
+      entries beginning with a '-' override the existing MAINTAINERS list
+      lookup.  Multiple lines and # comments are allowed.
   Most options have both positive and negative forms.
       The negative forms for --<foo> are --no<foo> and --no-<foo>.
 
