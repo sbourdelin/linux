@@ -11,6 +11,7 @@
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
+#include <net/netfilter/nf_conntrack_acct.h>
 
 struct flow_offload_entry {
 	struct flow_offload	flow;
@@ -150,6 +151,23 @@ void flow_offload_free(struct flow_offload *flow)
 	kfree_rcu(e, rcu_head);
 }
 EXPORT_SYMBOL_GPL(flow_offload_free);
+
+void nf_flow_offload_acct(struct flow_offload *flow, struct sk_buff *skb,
+			  int dir)
+{
+	struct flow_offload_entry *entry;
+	struct nf_conn_acct *acct;
+
+	entry = container_of(flow, struct flow_offload_entry, flow);
+	acct = nf_conn_acct_find(entry->ct);
+	if (acct) {
+		struct nf_conn_counter *counter = acct->counter;
+
+		atomic64_inc(&counter[dir].packets);
+		atomic64_add(skb->len, &counter[dir].bytes);
+	}
+}
+EXPORT_SYMBOL_GPL(nf_flow_table_acct);
 
 static u32 flow_offload_hash(const void *data, u32 len, u32 seed)
 {
