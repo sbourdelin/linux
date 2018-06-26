@@ -408,10 +408,9 @@ drop_error:
 /*
  * 	Main IP Receive routine.
  */
-int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
+static struct sk_buff *ip_rcv_core(struct sk_buff *skb, struct net *net)
 {
 	const struct iphdr *iph;
-	struct net *net;
 	u32 len;
 
 	/* When the interface is in promisc. mode, drop all the crap
@@ -421,7 +420,6 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 		goto drop;
 
 
-	net = dev_net(dev);
 	__IP_UPD_PO_STATS(net, IPSTATS_MIB_IN, skb->len);
 
 	skb = skb_share_check(skb, GFP_ATOMIC);
@@ -489,9 +487,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	/* Must drop socket now because of tproxy. */
 	skb_orphan(skb);
 
-	return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
-		       net, NULL, skb, dev, NULL,
-		       ip_rcv_finish);
+	return skb;
 
 csum_error:
 	__IP_INC_STATS(net, IPSTATS_MIB_CSUMERRORS);
@@ -500,5 +496,70 @@ inhdr_error:
 drop:
 	kfree_skb(skb);
 out:
-	return NET_RX_DROP;
+	return NULL;
+}
+
+/*
+ * IP receive entry point
+ */
+int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt,
+	   struct net_device *orig_dev)
+{
+	struct net *net = dev_net(dev);
+
+	skb = ip_rcv_core(skb, net);
+	if (skb == NULL)
+		return NET_RX_DROP;
+	return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
+		       net, NULL, skb, dev, NULL,
+		       ip_rcv_finish);
+}
+
+static void ip_sublist_rcv(struct sk_buff_head *list, struct net_device *dev,
+			   struct net *net)
+{
+	struct sk_buff_head sublist;
+	struct sk_buff *skb;
+
+	NF_HOOK_LIST(NFPROTO_IPV4, NF_INET_PRE_ROUTING, net, NULL,
+		     list, &sublist, dev, NULL, ip_rcv_finish);
+	while ((skb = __skb_dequeue(&sublist)) != NULL)
+		ip_rcv_finish(net, NULL, skb);
+}
+
+/* Receive a list of IP packets */
+void ip_list_rcv(struct sk_buff_head *list, struct packet_type *pt,
+		 struct net_device *orig_dev)
+{
+	struct net_device *curr_dev = NULL;
+	struct net *curr_net = NULL;
+	struct sk_buff_head sublist;
+	struct sk_buff *skb;
+
+	__skb_queue_head_init(&sublist);
+
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		struct net_device *dev = skb->dev;
+		struct net *net = dev_net(dev);
+
+		skb = ip_rcv_core(skb, net);
+		if (skb == NULL)
+			continue;
+
+		if (skb_queue_empty(&sublist)) {
+			curr_dev = dev;
+			curr_net = net;
+		} else if (curr_dev != dev || curr_net != net) {
+			/* dispatch old sublist */
+			ip_sublist_rcv(&sublist, dev, net);
+			/* start new sublist */
+			__skb_queue_head_init(&sublist);
+			curr_dev = dev;
+			curr_net = net;
+		}
+		/* add to current sublist */
+		__skb_queue_tail(&sublist, skb);
+	}
+	/* dispatch final sublist */
+	ip_sublist_rcv(&sublist, curr_dev, curr_net);
 }

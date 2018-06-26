@@ -288,6 +288,22 @@ NF_HOOK(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk, struct 
 	return ret;
 }
 
+static inline void
+NF_HOOK_LIST(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
+	     struct sk_buff_head *list, struct sk_buff_head *sublist,
+	     struct net_device *in, struct net_device *out,
+	     int (*okfn)(struct net *, struct sock *, struct sk_buff *))
+{
+	struct sk_buff *skb;
+
+	__skb_queue_head_init(sublist); /* list of synchronously ACCEPTed skbs */
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		int ret = nf_hook(pf, hook, net, sk, skb, in, out, okfn);
+		if (ret == 1)
+			__skb_queue_tail(sublist, skb);
+	}
+}
+
 /* Call setsockopt() */
 int nf_setsockopt(struct sock *sk, u_int8_t pf, int optval, char __user *opt,
 		  unsigned int len);
@@ -367,6 +383,17 @@ NF_HOOK(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
 	int (*okfn)(struct net *, struct sock *, struct sk_buff *))
 {
 	return okfn(net, sk, skb);
+}
+
+static inline void
+NF_HOOK_LIST(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
+	     struct sk_buff_head *list, struct sk_buff_head *sublist,
+	     struct net_device *in, struct net_device *out,
+	     int (*okfn)(struct net *, struct sock *, struct sk_buff *))
+{
+	__skb_queue_head_init(sublist);
+	/* Move everything to the sublist */
+	skb_queue_splice_init(list, sublist);
 }
 
 static inline int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,

@@ -4684,8 +4684,15 @@ static inline void __netif_receive_skb_list_ptype(struct sk_buff_head *list,
 {
 	struct sk_buff *skb;
 
-	while ((skb = __skb_dequeue(list)) != NULL)
-		pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+	if (!pt_prev)
+		return;
+	if (skb_queue_empty(list))
+		return;
+	if (pt_prev->list_func != NULL)
+		pt_prev->list_func(list, pt_prev, orig_dev);
+	else
+		while ((skb = __skb_dequeue(list)) != NULL)
+			pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 }
 
 static void __netif_receive_skb_list_core(struct sk_buff_head *list, bool pfmemalloc)
