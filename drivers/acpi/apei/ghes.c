@@ -58,10 +58,6 @@
 
 #define GHES_PFX	"GHES: "
 
-#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA)
-#define WANT_NMI_ESTATUS_QUEUE	1
-#endif
-
 #define GHES_ESTATUS_MAX_SIZE		65536
 #define GHES_ESOURCE_PREALLOC_MAX_SIZE	65536
 
@@ -685,7 +681,7 @@ static void ghes_estatus_cache_add(
 	rcu_read_unlock();
 }
 
-#ifdef WANT_NMI_ESTATUS_QUEUE
+#ifdef CONFIG_ACPI_APEI_GHES_ESTATUS_QUEUE
 /*
  * Handlers for CPER records may not be NMI safe. For example,
  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
@@ -727,7 +723,6 @@ static void ghes_print_queued_estatus(void)
 /* Save estatus for further processing in IRQ context */
 static void __process_error(struct ghes *ghes)
 {
-#ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
 	u32 len, node_len;
 	struct ghes_estatus_node *estatus_node;
 	struct acpi_hest_generic_status *estatus;
@@ -747,7 +742,6 @@ static void __process_error(struct ghes *ghes)
 	estatus = GHES_ESTATUS_FROM_NODE(estatus_node);
 	memcpy(estatus, ghes->estatus, len);
 	llist_add(&estatus_node->llnode, &ghes_estatus_llist);
-#endif
 }
 
 static int _in_nmi_notify_one(struct ghes *ghes)
@@ -786,7 +780,7 @@ static int ghes_estatus_queue_notified(struct list_head *rcu_list)
 	}
 	rcu_read_unlock();
 
-	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && !ret)
+	if (!ret)
 		irq_work_queue(&ghes_proc_irq_work);
 
 	return ret;
@@ -865,7 +859,7 @@ static void ghes_nmi_init_cxt(void)
 
 #else
 static inline void ghes_nmi_init_cxt(void) { }
-#endif /* WANT_NMI_ESTATUS_QUEUE */
+#endif /* CONFIG_ACPI_APEI_GHES_ESTATUS_QUEUE */
 
 static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
 {
