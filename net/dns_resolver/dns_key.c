@@ -97,7 +97,7 @@ dns_resolver_preparse(struct key_preparsed_payload *prep)
 				return -EINVAL;
 			}
 
-			eq = memchr(opt, '=', opt_len) ?: end;
+			eq = memchr(opt, '=', opt_len) ?: next_opt;
 			opt_nlen = eq - opt;
 			eq++;
 			opt_vlen = next_opt - eq; /* will be -1 if no value */
