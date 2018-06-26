@@ -757,7 +757,28 @@ void intel_psr_disable(struct intel_dp *intel_dp,
 	cancel_work_sync(&dev_priv->psr.work);
 }
 
-static bool psr_wait_for_idle(struct drm_i915_private *dev_priv)
+int intel_psr_wait_for_idle(struct drm_i915_private *dev_priv)
+{
+	i915_reg_t reg;
+	u32 mask;
+
+	if (dev_priv->psr.psr2_enabled) {
+		reg = EDP_PSR2_STATUS;
+		mask = EDP_PSR2_STATUS_STATE_MASK;
+	} else {
+		reg = EDP_PSR_STATUS;
+		mask = EDP_PSR_STATUS_STATE_MASK;
+	}
+
+	/*
+	 * The  25 msec timeout accounts for a frame @ 60Hz refresh rate,
+	 * exit training an aux handshake time.
+	 */
+	return intel_wait_for_register(dev_priv, reg, mask,
+				       EDP_PSR_STATUS_STATE_IDLE, 25);
+}
+
+static bool __psr_wait_for_idle_locked(struct drm_i915_private *dev_priv)
 {
 	struct intel_dp *intel_dp;
 	i915_reg_t reg;
@@ -803,7 +824,7 @@ static void intel_psr_work(struct work_struct *work)
 	 * PSR might take some time to get fully disabled
 	 * and be ready for re-enable.
 	 */
-	if (!psr_wait_for_idle(dev_priv))
+	if (!__psr_wait_for_idle_locked(dev_priv))
 		goto unlock;
 
 	/*
