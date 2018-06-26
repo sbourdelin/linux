@@ -195,6 +195,9 @@ int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map)
 
 	efi_memmap_unmap();
 
+	/* Free the memory allocated to the existing memory map */
+	efi_memmap_free(efi.memmap.phys_map, efi.memmap.nr_map, efi.memmap.late);
+
 	data.phys_map = addr;
 	data.size = efi.memmap.desc_size * nr_map;
 	data.desc_version = efi.memmap.desc_version;
