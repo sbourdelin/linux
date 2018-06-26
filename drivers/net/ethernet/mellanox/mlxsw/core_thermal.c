@@ -39,16 +39,18 @@
 #include <linux/err.h>
 
 #include "core.h"
+#include "core_env.h"
 
-#define MLXSW_THERMAL_POLL_INT	1000	/* ms */
+#define MLXSW_THERMAL_POLL_INT		1000	/* ms */
 #define MLXSW_THERMAL_SLOW_POLL_INT	20000	/* ms */
-#define MLXSW_THERMAL_MAX_TEMP	110000	/* 110C */
-#define MLXSW_THERMAL_MAX_STATE	10
-#define MLXSW_THERMAL_MAX_DUTY	255
+#define MLXSW_THERMAL_HYSTERESIS_TEMP	5000	/* 5C */
+#define MLXSW_THERMAL_MAX_STATE		10
+#define MLXSW_THERMAL_MAX_DUTY		255
 
 struct mlxsw_thermal_trip {
 	int	type;
 	int	temp;
+	int	hyst;
 	int	min_state;
 	int	max_state;
 };
@@ -56,32 +58,29 @@ struct mlxsw_thermal_trip {
 static const struct mlxsw_thermal_trip default_thermal_trips[] = {
 	{	/* In range - 0-40% PWM */
 		.type		= THERMAL_TRIP_ACTIVE,
-		.temp		= 75000,
+		.temp		= MLXSW_ENV_TEMP_NORM,
+		.hyst		= MLXSW_THERMAL_HYSTERESIS_TEMP,
 		.min_state	= 0,
 		.max_state	= (4 * MLXSW_THERMAL_MAX_STATE) / 10,
 	},
-	{	/* High - 40-100% PWM */
-		.type		= THERMAL_TRIP_ACTIVE,
-		.temp		= 80000,
-		.min_state	= (4 * MLXSW_THERMAL_MAX_STATE) / 10,
-		.max_state	= MLXSW_THERMAL_MAX_STATE,
-	},
 	{
-		/* Very high - 100% PWM */
+		/* In range - 40-100% PWM */
 		.type		= THERMAL_TRIP_ACTIVE,
-		.temp		= 85000,
-		.min_state	= MLXSW_THERMAL_MAX_STATE,
+		.temp		= MLXSW_ENV_TEMP_HIGH,
+		.hyst		= MLXSW_THERMAL_HYSTERESIS_TEMP,
+		.min_state	= (4 * MLXSW_THERMAL_MAX_STATE) / 10,
 		.max_state	= MLXSW_THERMAL_MAX_STATE,
 	},
 	{	/* Warning */
 		.type		= THERMAL_TRIP_HOT,
-		.temp		= 105000,
+		.temp		= MLXSW_ENV_TEMP_HOT,
+		.hyst		= MLXSW_THERMAL_HYSTERESIS_TEMP,
 		.min_state	= MLXSW_THERMAL_MAX_STATE,
 		.max_state	= MLXSW_THERMAL_MAX_STATE,
 	},
 	{	/* Critical - soft poweroff */
 		.type		= THERMAL_TRIP_CRITICAL,
-		.temp		= MLXSW_THERMAL_MAX_TEMP,
+		.temp		= MLXSW_ENV_TEMP_CRIT,
 		.min_state	= MLXSW_THERMAL_MAX_STATE,
 		.max_state	= MLXSW_THERMAL_MAX_STATE,
 	}
@@ -257,22 +256,42 @@ static int mlxsw_thermal_set_trip_temp(struct thermal_zone_device *tzdev,
 	struct mlxsw_thermal *thermal = tzdev->devdata;
 
 	if (trip < 0 || trip >= MLXSW_THERMAL_NUM_TRIPS ||
-	    temp > MLXSW_THERMAL_MAX_TEMP)
+	    temp > MLXSW_ENV_TEMP_CRIT)
 		return -EINVAL;
 
 	thermal->trips[trip].temp = temp;
 	return 0;
 }
 
+static int mlxsw_thermal_get_trip_hyst(struct thermal_zone_device *tzdev,
+				       int trip, int *p_hyst)
+{
+	struct mlxsw_thermal *thermal = tzdev->devdata;
+
+	*p_hyst = thermal->trips[trip].hyst;
+	return 0;
+}
+
+static int mlxsw_thermal_set_trip_hyst(struct thermal_zone_device *tzdev,
+				       int trip, int hyst)
+{
+	struct mlxsw_thermal *thermal = tzdev->devdata;
+
+	thermal->trips[trip].hyst = hyst;
+	return 0;
+}
+
 static struct thermal_zone_device_ops mlxsw_thermal_ops = {
-	.bind = mlxsw_thermal_bind,
-	.unbind = mlxsw_thermal_unbind,
-	.get_mode = mlxsw_thermal_get_mode,
-	.set_mode = mlxsw_thermal_set_mode,
-	.get_temp = mlxsw_thermal_get_temp,
+	.bind		= mlxsw_thermal_bind,
+	.unbind		= mlxsw_thermal_unbind,
+	.get_mode	= mlxsw_thermal_get_mode,
+	.set_mode	= mlxsw_thermal_set_mode,
+	.get_temp	= mlxsw_thermal_get_temp,
 	.get_trip_type	= mlxsw_thermal_get_trip_type,
 	.get_trip_temp	= mlxsw_thermal_get_trip_temp,
 	.set_trip_temp	= mlxsw_thermal_set_trip_temp,
+	.get_trip_hyst	= mlxsw_thermal_get_trip_hyst,
+	.set_trip_hyst	= mlxsw_thermal_set_trip_hyst,
 };
 
 static int mlxsw_thermal_get_max_state(struct thermal_cooling_device *cdev,
