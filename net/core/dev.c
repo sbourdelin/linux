@@ -4015,15 +4015,14 @@ static struct netdev_rx_queue *netif_get_rxqueue(struct sk_buff *skb)
 	return rxqueue;
 }
 
-static u32 netif_receive_generic_xdp(struct sk_buff *skb,
-				     struct xdp_buff *xdp,
-				     struct bpf_prog *xdp_prog)
+static u32 netif_receive_generic_xdp_prepare(struct sk_buff *skb,
+					     struct xdp_buff *xdp,
+					     void **orig_data,
+					     void **orig_data_end,
+					     u32 *mac_len)
 {
 	struct netdev_rx_queue *rxqueue;
-	void *orig_data, *orig_data_end;
-	u32 metalen, act = XDP_DROP;
-	int hlen, off;
-	u32 mac_len;
+	int hlen;
 
 	/* Reinjected packets coming from act_mirred or similar should
 	 * not get XDP generic processing.
@@ -4054,19 +4053,35 @@ static u32 netif_receive_generic_xdp(struct sk_buff *skb,
 	/* The XDP program wants to see the packet starting at the MAC
 	 * header.
 	 */
-	mac_len = skb->data - skb_mac_header(skb);
-	hlen = skb_headlen(skb) + mac_len;
-	xdp->data = skb->data - mac_len;
+	*mac_len = skb->data - skb_mac_header(skb);
+	hlen = skb_headlen(skb) + *mac_len;
+	xdp->data = skb->data - *mac_len;
 	xdp->data_meta = xdp->data;
 	xdp->data_end = xdp->data + hlen;
 	xdp->data_hard_start = skb->data - skb_headroom(skb);
-	orig_data_end = xdp->data_end;
-	orig_data = xdp->data;
+	*orig_data_end = xdp->data_end;
+	*orig_data = xdp->data;
 
 	rxqueue = netif_get_rxqueue(skb);
 	xdp->rxq = &rxqueue->xdp_rxq;
+	/* is actually XDP_ABORTED, but here we use it to mean "go ahead and
+	 * run the xdp program"
+	 */
+	return 0;
+do_drop:
+	kfree_skb(skb);
+	return XDP_DROP;
+}
 
-	act = bpf_prog_run_xdp(xdp_prog, xdp);
+static u32 netif_receive_generic_xdp_finish(struct sk_buff *skb,
+					    struct xdp_buff *xdp,
+					    struct bpf_prog *xdp_prog,
+					    void *orig_data,
+					    void *orig_data_end,
+					    u32 act, u32 mac_len)
+{
+	u32 metalen;
+	int off;
 
 	off = xdp->data - orig_data;
 	if (off > 0)
@@ -4082,7 +4097,6 @@ static u32 netif_receive_generic_xdp(struct sk_buff *skb,
 	if (off != 0) {
 		skb_set_tail_pointer(skb, xdp->data_end - xdp->data);
 		skb->len -= off;
-
 	}
 
 	switch (act) {
@@ -4102,12 +4116,28 @@ static u32 netif_receive_generic_xdp(struct sk_buff *skb,
 		trace_xdp_exception(skb->dev, xdp_prog, act);
 		/* fall through */
 	case XDP_DROP:
-	do_drop:
 		kfree_skb(skb);
 		break;
 	}
 
 	return act;
+}
+
+static u32 netif_receive_generic_xdp(struct sk_buff *skb,
+				     struct xdp_buff *xdp,
+				     struct bpf_prog *xdp_prog)
+{
+	void *orig_data, *orig_data_end;
+	u32 act, mac_len;
+
+	act = netif_receive_generic_xdp_prepare(skb, xdp, &orig_data,
+						&orig_data_end, &mac_len);
+	if (act)
+		return act;
+	act = bpf_prog_run_xdp(xdp_prog, xdp);
+	return netif_receive_generic_xdp_finish(skb, xdp, xdp_prog,
+						orig_data, orig_data_end, act,
+						mac_len);
 }
 
 /* When doing generic XDP we have to bypass the qdisc layer and the
@@ -4167,6 +4197,93 @@ out_redir:
 	return XDP_DROP;
 }
 EXPORT_SYMBOL_GPL(do_xdp_generic);
+
+struct bpf_work {
+	struct list_head list;
+	void *ctx;
+	struct redirect_info ri;
+	unsigned long ret;
+};
+
+struct xdp_work {
+	struct bpf_work w;
+	struct xdp_buff xdp;
+	struct sk_buff *skb;
+	void *orig_data;
+	void *orig_data_end;
+	u32 mac_len;
+};
+
+/* Storage area for per-packet Generic XDP metadata */
+static DEFINE_PER_CPU(struct xdp_work[NAPI_POLL_WEIGHT], xdp_work);
+
+static void do_xdp_list_generic(struct bpf_prog *xdp_prog,
+				struct sk_buff_head *list,
+				struct sk_buff_head *pass_list)
+{
+	struct xdp_work (*xwa)[NAPI_POLL_WEIGHT], *xw;
+	struct bpf_work *bw;
+	struct sk_buff *skb;
+	LIST_HEAD(xdp_list);
+	int n = 0, i, err;
+	u32 act;
+
+	if (!xdp_prog) {
+		/* PASS everything */
+		skb_queue_splice_init(list, pass_list);
+		return;
+	}
+
+	xwa = this_cpu_ptr(&xdp_work);
+
+	skb_queue_for_each(skb, list) {
+		if (WARN_ON(n > NAPI_POLL_WEIGHT))
+			 /* checked in caller, can't happen */
+			 return;
+		xw = (*xwa) + n++;
+		memset(xw, 0, sizeof(*xw));
+		xw->skb = skb;
+		xw->w.ctx = &xw->xdp;
+		act = netif_receive_generic_xdp_prepare(skb, &xw->xdp,
+							&xw->orig_data,
+							&xw->orig_data_end,
+							&xw->mac_len);
+		if (act)
+			xw->w.ret = act;
+		else
+			list_add_tail(&xw->w.list, &xdp_list);
+	}
+
+	list_for_each_entry(bw, &xdp_list, list) {
+		bw->ret = bpf_prog_run_xdp(xdp_prog, bw->ctx);
+		bw->ri = *this_cpu_ptr(&redirect_info);
+	}
+
+	for (i = 0; i < n; i++) {
+		xw = (*xwa) + i;
+		act = netif_receive_generic_xdp_finish(xw->skb, &xw->xdp,
+						       xdp_prog, xw->orig_data,
+						       xw->orig_data_end,
+						       xw->w.ret, xw->mac_len);
+		if (act != XDP_PASS) {
+			switch (act) {
+			case XDP_REDIRECT:
+				*this_cpu_ptr(&redirect_info) = xw->w.ri;
+				err = xdp_do_generic_redirect(xw->skb->dev,
+							      xw->skb, &xw->xdp,
+							      xdp_prog);
+				if (err) /* free and drop */
+					kfree_skb(xw->skb);
+				break;
+			case XDP_TX:
+				generic_xdp_tx(xw->skb, xdp_prog);
+				break;
+			}
+		} else {
+			__skb_queue_tail(pass_list, xw->skb);
+		}
+	}
+}
 
 static int netif_rx_internal(struct sk_buff *skb)
 {
@@ -4878,7 +4995,7 @@ static void netif_receive_skb_list_internal(struct sk_buff_head *list)
 {
 	/* Two sublists so we can go back and forth between them */
 	struct sk_buff_head sublist, sublist2;
-	struct bpf_prog *xdp_prog = NULL;
+	struct bpf_prog *xdp_prog = NULL, *curr_prog = NULL;
 	struct sk_buff *skb;
 
 	__skb_queue_head_init(&sublist);
@@ -4893,15 +5010,23 @@ static void netif_receive_skb_list_internal(struct sk_buff_head *list)
 
 	__skb_queue_head_init(&sublist2);
 	if (static_branch_unlikely(&generic_xdp_needed_key)) {
+		struct sk_buff_head sublist3;
+		int n = 0;
+
+		__skb_queue_head_init(&sublist3);
 		preempt_disable();
 		rcu_read_lock();
 		while ((skb = __skb_dequeue(&sublist)) != NULL) {
 			xdp_prog = rcu_dereference(skb->dev->xdp_prog);
-			if (do_xdp_generic(xdp_prog, skb) != XDP_PASS)
-				/* Dropped, don't add to sublist */
-				continue;
-			__skb_queue_tail(&sublist2, skb);
+			if (++n >= NAPI_POLL_WEIGHT || xdp_prog != curr_prog) {
+				do_xdp_list_generic(curr_prog, &sublist3, &sublist2);
+				__skb_queue_head_init(&sublist3);
+				n = 0;
+				curr_prog = xdp_prog;
+			}
+			__skb_queue_tail(&sublist3, skb);
 		}
+		do_xdp_list_generic(curr_prog, &sublist3, &sublist2);
 		rcu_read_unlock();
 		preempt_enable();
 		/* Move all packets onto first sublist */

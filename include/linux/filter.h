@@ -820,6 +820,16 @@ static inline int __xdp_generic_ok_fwd_dev(struct sk_buff *skb,
 	return 0;
 }
 
+struct redirect_info {
+	u32 ifindex;
+	u32 flags;
+	struct bpf_map *map;
+	struct bpf_map *map_to_flush;
+	unsigned long   map_owner;
+};
+
+DECLARE_PER_CPU(struct redirect_info, redirect_info);
+
 /* The pair of xdp_do_redirect and xdp_do_flush_map MUST be called in the
  * same cpu context. Further for best results no more than a single map
  * for the do_redirect/do_flush pair should be used. This limitation is
