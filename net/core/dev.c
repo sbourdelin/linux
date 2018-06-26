@@ -4198,13 +4198,6 @@ out_redir:
 }
 EXPORT_SYMBOL_GPL(do_xdp_generic);
 
-struct bpf_work {
-	struct list_head list;
-	void *ctx;
-	struct redirect_info ri;
-	unsigned long ret;
-};
-
 struct xdp_work {
 	struct bpf_work w;
 	struct xdp_buff xdp;
@@ -4254,10 +4247,14 @@ static void do_xdp_list_generic(struct bpf_prog *xdp_prog,
 			list_add_tail(&xw->w.list, &xdp_list);
 	}
 
-	list_for_each_entry(bw, &xdp_list, list) {
-		bw->ret = bpf_prog_run_xdp(xdp_prog, bw->ctx);
-		bw->ri = *this_cpu_ptr(&redirect_info);
-	}
+	if (xdp_prog->list_func && (xdp_prog->jited_list ||
+				    !xdp_prog->jited))
+		bpf_list_prog_run_xdp(xdp_prog, &xdp_list);
+	else
+		list_for_each_entry(bw, &xdp_list, list) {
+			bw->ret = bpf_prog_run_xdp(xdp_prog, bw->ctx);
+			bw->ri = *this_cpu_ptr(&redirect_info);
+		}
 
 	for (i = 0; i < n; i++) {
 		xw = (*xwa) + i;

@@ -477,6 +477,21 @@ struct bpf_binary_header {
 	u8 image[] __aligned(4);
 };
 
+struct redirect_info {
+	u32 ifindex;
+	u32 flags;
+	struct bpf_map *map;
+	struct bpf_map *map_to_flush;
+	unsigned long   map_owner;
+};
+
+struct bpf_work {
+	struct list_head list;
+	void *ctx;
+	struct redirect_info ri;
+	unsigned long ret;
+};
+
 struct bpf_prog {
 	u16			pages;		/* Number of allocated pages */
 	u16			jited:1,	/* Is our filter JIT'ed? */
@@ -488,7 +503,9 @@ struct bpf_prog {
 				blinded:1,	/* Was blinded */
 				is_func:1,	/* program is a bpf function */
 				kprobe_override:1, /* Do we override a kprobe? */
-				has_callchain_buf:1; /* callchain buffer allocated? */
+				has_callchain_buf:1, /* callchain buffer allocated? */
+				jited_list:1;	/* Is list func JIT'ed? */
+				/* 5 bits left */
 	enum bpf_prog_type	type;		/* Type of BPF program */
 	enum bpf_attach_type	expected_attach_type; /* For some prog types */
 	u32			len;		/* Number of filter blocks */
@@ -498,6 +515,9 @@ struct bpf_prog {
 	struct sock_fprog_kern	*orig_prog;	/* Original BPF program */
 	unsigned int		(*bpf_func)(const void *ctx,
 					    const struct bpf_insn *insn);
+	/* Takes a list of struct bpf_work */
+	void			(*list_func)(struct list_head *list,
+					     const struct bpf_insn *insn);
 	/* Instructions for interpreter */
 	union {
 		struct sock_filter	insns[0];
@@ -512,6 +532,7 @@ struct sk_filter {
 };
 
 #define BPF_PROG_RUN(filter, ctx)  (*(filter)->bpf_func)(ctx, (filter)->insnsi)
+#define BPF_LIST_PROG_RUN(filter, list) (*(filter)->list_func)(list, (filter)->insnsi)
 
 #define BPF_SKB_CB_LEN QDISC_CB_PRIV_LEN
 
@@ -614,6 +635,13 @@ static __always_inline u32 bpf_prog_run_xdp(const struct bpf_prog *prog,
 	 * it's not necessary here anymore.
 	 */
 	return BPF_PROG_RUN(prog, xdp);
+}
+
+static __always_inline void bpf_list_prog_run_xdp(const struct bpf_prog *prog,
+						  struct list_head *list)
+{
+	/* Caller must hold rcu_read_lock(), as per bpf_prog_run_xdp(). */
+	BPF_LIST_PROG_RUN(prog, list);
 }
 
 static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
@@ -819,14 +847,6 @@ static inline int __xdp_generic_ok_fwd_dev(struct sk_buff *skb,
 
 	return 0;
 }
-
-struct redirect_info {
-	u32 ifindex;
-	u32 flags;
-	struct bpf_map *map;
-	struct bpf_map *map_to_flush;
-	unsigned long   map_owner;
-};
 
 DECLARE_PER_CPU(struct redirect_info, redirect_info);
 
