@@ -683,6 +683,16 @@ struct drm_crtc_funcs {
 	 * 0 on success or a negative error code on failure.
 	 */
 	int (*pre_crc_read)(struct drm_crtc *crtc);
+	/**
+	 * @get_crc_sources:
+	 *
+	 * prints a list of available valid sources for CRC generation on
+	 * seq_file
+	 *
+	 * This callback is optional if the driver does not support exporting of
+	 * possible CRC sources list
+	 */
+	void (*get_crc_sources)(struct seq_file *m, struct drm_crtc *crtc);
 
 	/**
 	 * @atomic_print_state:

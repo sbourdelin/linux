@@ -68,6 +68,9 @@ static int crc_control_show(struct seq_file *m, void *data)
 {
 	struct drm_crtc *crtc = m->private;
 
+	if (crtc->funcs->get_crc_sources)
+		crtc->funcs->get_crc_sources(m, crtc);
+
 	seq_printf(m, "%s\n", crtc->crc.source);
 
 	return 0;
