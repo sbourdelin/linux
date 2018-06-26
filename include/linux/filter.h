@@ -517,7 +517,8 @@ struct bpf_prog {
 					    const struct bpf_insn *insn);
 	/* Takes a list of struct bpf_work */
 	void			(*list_func)(struct list_head *list,
-					     const struct bpf_insn *insn);
+					     const struct bpf_insn *insn,
+					     const struct redirect_info *percpu_ri);
 	/* Instructions for interpreter */
 	union {
 		struct sock_filter	insns[0];
@@ -532,7 +533,7 @@ struct sk_filter {
 };
 
 #define BPF_PROG_RUN(filter, ctx)  (*(filter)->bpf_func)(ctx, (filter)->insnsi)
-#define BPF_LIST_PROG_RUN(filter, list) (*(filter)->list_func)(list, (filter)->insnsi)
+#define BPF_LIST_PROG_RUN(filter, list, percpu) (*(filter)->list_func)(list, (filter)->insnsi, percpu)
 
 #define BPF_SKB_CB_LEN QDISC_CB_PRIV_LEN
 
@@ -638,10 +639,11 @@ static __always_inline u32 bpf_prog_run_xdp(const struct bpf_prog *prog,
 }
 
 static __always_inline void bpf_list_prog_run_xdp(const struct bpf_prog *prog,
-						  struct list_head *list)
+						  struct list_head *list,
+						  const struct redirect_info *percpu_ri)
 {
 	/* Caller must hold rcu_read_lock(), as per bpf_prog_run_xdp(). */
-	BPF_LIST_PROG_RUN(prog, list);
+	BPF_LIST_PROG_RUN(prog, list, percpu_ri);
 }
 
 static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
@@ -751,6 +753,15 @@ static inline struct bpf_binary_header *
 bpf_jit_binary_hdr(const struct bpf_prog *fp)
 {
 	unsigned long real_start = (unsigned long)fp->bpf_func;
+	unsigned long addr = real_start & PAGE_MASK;
+
+	return (void *)addr;
+}
+
+static inline struct bpf_binary_header *
+bpf_list_jit_binary_hdr(const struct bpf_prog *fp)
+{
+	unsigned long real_start = (unsigned long)fp->list_func;
 	unsigned long addr = real_start & PAGE_MASK;
 
 	return (void *)addr;

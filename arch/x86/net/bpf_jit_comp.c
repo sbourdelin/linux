@@ -1060,6 +1060,169 @@ struct x64_jit_data {
 	struct jit_context ctx;
 };
 
+static void try_do_jit_list(struct bpf_prog *bpf_prog,
+			    unsigned int (*bpf_func)(const void *ctx,
+						     const struct bpf_insn *insn))
+{
+	/* list_func takes three arguments:
+	 * struct list_head *list [RDI]
+	 * const struct bpf_insn *insn [RSI]
+	 * const struct redirect_info *percpu_ri [RDX]
+	 *
+	 * Layout of struct bpf_work on x86_64:
+	 * struct list_head {
+	 *	struct list_head *next; // 0x0
+	 *	struct list_head *prev; // 0x8
+	 * } list; // 0x0
+	 * void *ctx; 0x10
+	 * struct redirect_info {
+	 *	u32 ifindex; // 0x18
+	 *	u32 flags; // 0x1c
+	 *	struct bpf_map *map; // 0x20
+	 *	struct bpf_map *map_to_flush; // 0x28
+	 *	unsigned long   map_owner; // 0x30
+	 * } ri; // 0x18
+	 * unsigned long ret; // 0x38
+	 * (total size 0x40 bytes)
+	 *
+	 * Desired function body:
+	 * struct redirect_info *ri = percpu_ri; [R12]
+	 * struct bpf_work *work; [RBP]
+	 *
+	 * list_for_each_entry(work, list, list) {
+	 *	work->ret = (*bpf_func)(work->ctx, insn);
+	 *	work->ri = *ri;
+	 * }
+	 *
+	 * Assembly to emit:
+	 * ; save CSRs
+	 *	push %rbx
+	 *	push %rbp
+	 *	push %r12
+	 * ; stash pointer to redirect_info
+	 *	mov %rdx,%r12	; ri = percpu_ri
+	 * ; start list
+	 *	mov %rdi,%rbp	; head = list
+	 * next:		; while (true) {
+	 *	mov (%rbp),%rbx	; rbx = head->next
+	 *	cmp %rbx,%rdi	; if (rbx == list)
+	 *	je out		;	break
+	 *	mov %rbx,%rbp	; head = rbx
+	 *	push %rdi	; save list
+	 *	push %rsi	; save insn (is still arg2)
+	 * ; struct bpf_work *work = head (container_of, but list is first member)
+	 *	mov 0x10(%rbp),%rdi; arg1 = work->ctx
+	 *	callq bpf_func  ; rax = (*bpf_func)(work->ctx, insn)
+	 *	mov %rax,0x38(%rbp); work->ret = rax
+	 * ; work->ri = *ri
+	 *	mov (%r12),%rdx
+	 *	mov %rdx,0x18(%rbp)
+	 *	mov 0x8(%r12),%rdx
+	 *	mov %rdx,0x20(%rbp)
+	 *	mov 0x10(%r12),%rdx
+	 *	mov %rdx,0x28(%rbp)
+	 *	mov 0x18(%r12),%rdx
+	 *	mov %rdx,0x30(%rbp)
+	 *	pop %rsi	; restore insn
+	 *	pop %rdi	; restore list
+	 *	jmp next	; }
+	 * out:
+	 * ; restore CSRs and return
+	 *	pop %r12
+	 *	pop %rbp
+	 *	pop %rbx
+	 *	retq
+	 */
+	u8 *image, *prog, *from_to_out, *next;
+	struct bpf_binary_header *header;
+	int off, cnt = 0;
+	s64 jmp_offset;
+
+	/* Prog should be 81 bytes; let's round up to 128 */
+	header = bpf_jit_binary_alloc(128, &image, 1, jit_fill_hole);
+	prog = image;
+
+	/* push rbx */
+	EMIT1(0x53);
+	/* push rbp */
+	EMIT1(0x55);
+	/* push %r12 */
+	EMIT2(0x41, 0x54);
+	/* mov %rdx,%r12 */
+	EMIT3(0x49, 0x89, 0xd4);
+	/* mov %rdi,%rbp */
+	EMIT3(0x48, 0x89, 0xfd);
+	next = prog;
+	/* mov 0x0(%rbp),%rbx */
+	EMIT4(0x48, 0x8b, 0x5d, 0x00);
+	/* cmp %rbx,%rdi */
+	EMIT3(0x48, 0x39, 0xdf);
+	/* je out */
+	EMIT2(X86_JE, 0);
+	from_to_out = prog; /* record . to patch this jump later */
+	/* mov %rbx,%rbp */
+	EMIT3(0x48, 0x89, 0xdd);
+	/* push %rdi */
+	EMIT1(0x57);
+	/* push %rsi */
+	EMIT1(0x56);
+	/* mov 0x10(%rbp),%rdi */
+	EMIT4(0x48, 0x8b, 0x7d, 0x10);
+	/* e8 callq bpf_func */
+	jmp_offset = (u8 *)bpf_func - (prog + 5);
+	if (!is_simm32(jmp_offset)) {
+		pr_err("call out of range to BPF func %p from list image %p\n",
+		       bpf_func, image);
+		goto fail;
+	}
+	EMIT1_off32(0xE8, jmp_offset);
+	/* mov %rax,0x38(%rbp) */
+	EMIT4(0x48, 0x89, 0x45, 0x38);
+	/* mov (%r12),%rdx */
+	EMIT4(0x49, 0x8b, 0x14, 0x24);
+	/* mov %rdx,0x18(%rbp) */
+	EMIT4(0x48, 0x89, 0x55, 0x18);
+	for (off = 0x8; off < 0x20; off += 0x8) {
+		/* mov off(%r12),%rdx */
+		EMIT4(0x49, 0x8b, 0x54, 0x24);
+		EMIT1(off);
+		/* mov %rdx,0x18+off(%rbp) */
+		EMIT4(0x48, 0x89, 0x55, 0x18 + off);
+	}
+	/* pop %rsi */
+	EMIT1(0x5e);
+	/* pop %rdi */
+	EMIT1(0x5f);
+	/* jmp next */
+	jmp_offset = next - (prog + 2);
+	if (WARN_ON(!is_imm8(jmp_offset))) /* can't happen */
+		goto fail;
+	EMIT2(0xeb, jmp_offset);
+	/* out: */
+	jmp_offset = prog - from_to_out;
+	if (WARN_ON(!is_imm8(jmp_offset))) /* can't happen */
+		goto fail;
+	from_to_out[-1] = jmp_offset;
+	/* pop %r12 */
+	EMIT2(0x41, 0x5c);
+	/* pop %rbp */
+	EMIT1(0x5d);
+	/* pop %rbx */
+	EMIT1(0x5b);
+	/* retq */
+	EMIT1(0xc3);
+	/* If we were wrong about how much space we needed, scream and shout */
+	WARN_ON(cnt != 81);
+	if (bpf_jit_enable > 1)
+		bpf_jit_dump(0, cnt, 0, image);
+	bpf_jit_binary_lock_ro(header);
+	bpf_prog->list_func = (void *)image;
+	bpf_prog->jited_list = 1;
+	return;
+fail:
+	bpf_jit_binary_free(header);
+}
+
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 {
 	struct bpf_binary_header *header = NULL;
@@ -1176,6 +1339,7 @@ out_image:
 		prog->bpf_func = (void *)image;
 		prog->jited = 1;
 		prog->jited_len = proglen;
+		try_do_jit_list(prog, prog->bpf_func);
 	} else {
 		prog = orig_prog;
 	}

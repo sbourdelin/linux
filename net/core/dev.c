@@ -4214,6 +4214,7 @@ static void do_xdp_list_generic(struct bpf_prog *xdp_prog,
 				struct sk_buff_head *list,
 				struct sk_buff_head *pass_list)
 {
+	const struct redirect_info *percpu_ri = this_cpu_ptr(&redirect_info);
 	struct xdp_work (*xwa)[NAPI_POLL_WEIGHT], *xw;
 	struct bpf_work *bw;
 	struct sk_buff *skb;
@@ -4249,11 +4250,11 @@ static void do_xdp_list_generic(struct bpf_prog *xdp_prog,
 
 	if (xdp_prog->list_func && (xdp_prog->jited_list ||
 				    !xdp_prog->jited))
-		bpf_list_prog_run_xdp(xdp_prog, &xdp_list);
+		bpf_list_prog_run_xdp(xdp_prog, &xdp_list, percpu_ri);
 	else
 		list_for_each_entry(bw, &xdp_list, list) {
 			bw->ret = bpf_prog_run_xdp(xdp_prog, bw->ctx);
-			bw->ri = *this_cpu_ptr(&redirect_info);
+			bw->ri = *percpu_ri;
 		}
 
 	for (i = 0; i < n; i++) {

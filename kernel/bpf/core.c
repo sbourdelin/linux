@@ -621,13 +621,20 @@ void bpf_jit_binary_free(struct bpf_binary_header *hdr)
  */
 void __weak bpf_jit_free(struct bpf_prog *fp)
 {
-	if (fp->jited) {
-		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
+	struct bpf_binary_header *hdr;
 
+	if (fp->jited) {
+		hdr = bpf_jit_binary_hdr(fp);
 		bpf_jit_binary_unlock_ro(hdr);
 		bpf_jit_binary_free(hdr);
 
 		WARN_ON_ONCE(!bpf_prog_kallsyms_verify_off(fp));
+	}
+
+	if (fp->jited_list) {
+		hdr = bpf_list_jit_binary_hdr(fp);
+		bpf_jit_binary_unlock_ro(hdr);
+		bpf_jit_binary_free(hdr);
 	}
 
 	bpf_prog_unlock_free(fp);
@@ -1358,13 +1365,13 @@ static u64 PROG_NAME_ARGS(stack_size)(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5, \
 
 #define LIST_PROG_NAME(stack_size) __bpf_list_prog_run##stack_size
 #define DEFINE_BPF_LIST_PROG_RUN(stack_size) \
-static void LIST_PROG_NAME(stack_size)(struct list_head *list, const struct bpf_insn *insn) \
+static void LIST_PROG_NAME(stack_size)(struct list_head *list, const struct bpf_insn *insn, const struct redirect_info *percpu_ri) \
 { \
 	struct bpf_work *work; \
 \
 	list_for_each_entry(work, list, list) { \
 		work->ret = PROG_NAME(stack_size)(work->ctx, insn); \
-		work->ri = *this_cpu_ptr(&redirect_info); \
+		work->ri = *percpu_ri; \
 	} \
 }
 
@@ -1398,7 +1405,8 @@ EVAL4(PROG_NAME_LIST, 416, 448, 480, 512)
 #undef PROG_NAME_LIST
 #define PROG_NAME_LIST(stack_size) LIST_PROG_NAME(stack_size),
 static void (*list_interpreters[])(struct list_head *list,
-				   const struct bpf_insn *insn) = {
+				   const struct bpf_insn *insn,
+				   const struct redirect_info *percpu_ri) = {
 EVAL6(PROG_NAME_LIST, 32, 64, 96, 128, 160, 192)
 EVAL6(PROG_NAME_LIST, 224, 256, 288, 320, 352, 384)
 EVAL4(PROG_NAME_LIST, 416, 448, 480, 512)
