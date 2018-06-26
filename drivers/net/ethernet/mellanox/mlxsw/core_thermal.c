@@ -109,6 +109,8 @@ struct mlxsw_thermal {
 	u8 cooling_levels[MLXSW_THERMAL_MAX_STATE + 1];
 	struct mlxsw_thermal_trip trips[MLXSW_THERMAL_NUM_TRIPS];
 	enum thermal_device_mode mode;
+	int count;
+	int *ports_temp_cache;
 };
 
 static inline u8 mlxsw_state_to_duty(int state)
@@ -213,10 +215,11 @@ static int mlxsw_thermal_set_mode(struct thermal_zone_device *tzdev,
 	return 0;
 }
 
-static int mlxsw_thermal_get_temp(struct thermal_zone_device *tzdev,
-				  int *p_temp)
+static int mlxsw_thermal_init_temp(struct mlxsw_thermal *thermal,
+				   struct mlxsw_env_temp_thresh *delta,
+				   struct mlxsw_env_temp_multi *multi,
+				   int *p_temp, bool *p_crit)
 {
-	struct mlxsw_thermal *thermal = tzdev->devdata;
 	struct device *dev = thermal->bus_info->dev;
 	char mtmp_pl[MLXSW_REG_MTMP_LEN];
 	unsigned int temp;
@@ -231,8 +234,56 @@ static int mlxsw_thermal_get_temp(struct thermal_zone_device *tzdev,
 	}
 	mlxsw_reg_mtmp_unpack(mtmp_pl, &temp, NULL, NULL);
 
-	*p_temp = (int) temp;
+	if (temp >= MLXSW_ENV_TEMP_CRIT) {
+		*p_crit = true;
+	} else if (temp < MLXSW_ENV_TEMP_NORM) {
+		multi->thresh.normal = temp;
+		delta->normal = MLXSW_ENV_TEMP_NORM - temp;
+	} else if (temp >= MLXSW_ENV_TEMP_HOT) {
+		multi->thresh.crit = temp;
+		delta->crit = temp - MLXSW_ENV_TEMP_HOT;
+		multi->mask |= MLXSW_ENV_CRIT_MASK;
+	} else {
+		multi->thresh.hot = temp;
+		delta->hot = temp - MLXSW_ENV_TEMP_NORM;
+		multi->mask |= MLXSW_ENV_HOT_MASK;
+	}
+	*p_temp = temp;
+
 	return 0;
+}
+
+static int mlxsw_thermal_get_temp(struct thermal_zone_device *tzdev,
+				  int *p_temp)
+{
+	struct mlxsw_thermal *thermal = tzdev->devdata;
+	struct device *dev = thermal->bus_info->dev;
+	struct mlxsw_env_temp_multi multi;
+	struct mlxsw_env_temp_thresh delta;
+	bool crit = false;
+	int err;
+
+	memset(&multi, 0, sizeof(struct mlxsw_env_temp_multi));
+	memset(&delta, 0, sizeof(struct mlxsw_env_temp_thresh));
+	/* Read ASIC temperature */
+	err = mlxsw_thermal_init_temp(thermal, &delta, &multi,
+				      p_temp, &crit);
+	if (err) {
+		dev_err(dev, "Failed to query ASIC temp sensor\n");
+		return err;
+	}
+
+	/* No need to proceed ports temperature reading, since ASIC temperature
+	 * should be resulted in system shutdown.
+	 */
+	if (crit)
+		return 0;
+
+	/* Collect ports temperature */
+	return mlxsw_env_collect_port_temp(thermal->core,
+					   thermal->ports_temp_cache,
+					   thermal->count, &multi, &delta,
+					   NULL, p_temp);
 }
 
 static int mlxsw_thermal_get_trip_type(struct thermal_zone_device *tzdev,
@@ -436,6 +487,7 @@ int mlxsw_thermal_init(struct mlxsw_core *core,
 		       const struct mlxsw_bus_info *bus_info,
 		       struct mlxsw_thermal **p_thermal)
 {
+	unsigned int max_ports = mlxsw_core_max_ports(core);
 	char mfcr_pl[MLXSW_REG_MFCR_LEN] = { 0 };
 	enum mlxsw_reg_mfcr_pwm_frequency freq;
 	struct device *dev = bus_info->dev;
@@ -452,6 +504,12 @@ int mlxsw_thermal_init(struct mlxsw_core *core,
 	thermal->core = core;
 	thermal->bus_info = bus_info;
 	memcpy(thermal->trips, default_thermal_trips, sizeof(thermal->trips));
+	thermal->ports_temp_cache = devm_kmalloc_array(dev, max_ports,
+						       sizeof(int),
+						       GFP_KERNEL);
+	if (!thermal->ports_temp_cache)
+		return -ENOMEM;
+	thermal->count = max_ports;
 
 	err = mlxsw_reg_query(thermal->core, MLXSW_REG(mfcr), mfcr_pl);
 	if (err) {
