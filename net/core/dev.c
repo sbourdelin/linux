@@ -4792,6 +4792,26 @@ int netif_receive_skb(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_receive_skb);
 
+/**
+ *	netif_receive_skb_list - process many receive buffers from network
+ *	@list: list of skbs to process.  Must not be shareable (e.g. it may
+ *	be on the stack)
+ *
+ *	For now, just calls netif_receive_skb() in a loop, ignoring the
+ *	return value.
+ *
+ *	This function may only be called from softirq context and interrupts
+ *	should be enabled.
+ */
+void netif_receive_skb_list(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(list)) != NULL)
+		netif_receive_skb(skb);
+}
+EXPORT_SYMBOL(netif_receive_skb_list);
+
 DEFINE_PER_CPU(struct work_struct, flush_works);
 
 /* Network device is going away, flush any packets still pending */
