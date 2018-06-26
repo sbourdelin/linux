@@ -734,7 +734,7 @@ static u32 qcom_smem_get_item_count(struct qcom_smem *smem)
  */
 static struct smem_partition_header *
 qcom_smem_partition_header(struct qcom_smem *smem,
-		struct smem_ptable_entry *entry)
+		struct smem_ptable_entry *entry, u16 host0, u16 host1)
 {
 	struct smem_partition_header *header;
 	u32 size;
@@ -745,6 +745,17 @@ qcom_smem_partition_header(struct qcom_smem *smem,
 		dev_err(smem->dev, "bad partition magic %02x %02x %02x %02x\n",
 			header->magic[0], header->magic[1],
 			header->magic[2], header->magic[3]);
+		return NULL;
+	}
+
+	if (host0 != le16_to_cpu(header->host0)) {
+		dev_err(smem->dev, "bad host0 (%hu != %hu)\n",
+				host0, le16_to_cpu(header->host0));
+		return NULL;
+	}
+	if (host1 != le16_to_cpu(header->host1)) {
+		dev_err(smem->dev, "bad host1 (%hu != %hu)\n",
+				host1, le16_to_cpu(header->host1));
 		return NULL;
 	}
 
@@ -769,7 +780,6 @@ static int qcom_smem_set_global_partition(struct qcom_smem *smem)
 	struct smem_partition_header *header;
 	struct smem_ptable_entry *entry;
 	struct smem_ptable *ptable;
-	u32 host0, host1;
 	bool found = false;
 	int i;
 
@@ -798,17 +808,10 @@ static int qcom_smem_set_global_partition(struct qcom_smem *smem)
 		return -EINVAL;
 	}
 
-	header = qcom_smem_partition_header(smem, entry);
+	header = qcom_smem_partition_header(smem, entry,
+				SMEM_GLOBAL_HOST, SMEM_GLOBAL_HOST);
 	if (!header)
 		return -EINVAL;
-
-	host0 = le16_to_cpu(header->host0);
-	host1 = le16_to_cpu(header->host1);
-
-	if (host0 != SMEM_GLOBAL_HOST || host1 != SMEM_GLOBAL_HOST) {
-		dev_err(smem->dev, "Global partition hosts are invalid\n");
-		return -EINVAL;
-	}
 
 	smem->global_partition = header;
 	smem->global_cacheline = le32_to_cpu(entry->cacheline);
@@ -860,18 +863,9 @@ static int qcom_smem_enumerate_partitions(struct qcom_smem *smem,
 			return -EINVAL;
 		}
 
-		header = qcom_smem_partition_header(smem, entry);
+		header = qcom_smem_partition_header(smem, entry, host0, host1);
 		if (!header)
 			return -EINVAL;
-
-		host0 = le16_to_cpu(header->host0);
-		host1 = le16_to_cpu(header->host1);
-
-		if (host0 != host0 || host1 != host1) {
-			dev_err(smem->dev,
-				"Partition %d hosts don't match\n", i);
-			return -EINVAL;
-		}
 
 		smem->partitions[remote_host] = header;
 		smem->cacheline[remote_host] = le32_to_cpu(entry->cacheline);
