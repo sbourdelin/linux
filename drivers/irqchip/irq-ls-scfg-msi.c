@@ -122,6 +122,7 @@ static int ls_scfg_msi_set_affinity(struct irq_data *irq_data,
 	}
 
 	cpumask_copy(irq_data->common->affinity, mask);
+	irq_data_update_effective_affinity(irq_data, mask);
 
 	return IRQ_SET_MASK_OK;
 }
