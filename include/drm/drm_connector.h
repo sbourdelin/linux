@@ -1163,4 +1163,15 @@ void drm_connector_list_iter_end(struct drm_connector_list_iter *iter);
 #define drm_for_each_connector_iter(connector, iter) \
 	while ((connector = drm_connector_list_iter_next(iter)))
 
+/**
+ * drm_for_each_connector_encoder_ids - iterate connector encoder_ids[]
+ * @connector: &struct drm_connector pointer used as cursor
+ * @encoder_id: the encoder ID
+ * @__i: int iteration cursor, for macro-internal use
+ */
+#define drm_for_each_connector_encoder_ids(connector, encoder_id, __i) \
+	for ((__i) = 0; (__i) < ARRAY_SIZE((connector)->encoder_ids) && \
+		     (connector)->encoder_ids[(__i)] != 0; (__i)++) \
+		for_each_if((encoder_id) = (connector)->encoder_ids[(__i)])
+
 #endif

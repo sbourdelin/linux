@@ -2325,12 +2325,12 @@ retry:
 static bool connector_crtc_ok(struct drm_connector *connector,
 			      struct drm_crtc *crtc)
 {
+	u32 encoder_id;
 	int i;
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
 		struct drm_encoder *encoder =
-			drm_encoder_find(connector->dev, NULL,
-					 connector->encoder_ids[i]);
+			drm_encoder_find(connector->dev, NULL, encoder_id);
 
 		if (encoder->possible_crtcs & drm_crtc_mask(crtc))
 			return true;
