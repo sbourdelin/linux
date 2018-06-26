@@ -3671,7 +3671,16 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 			OCTEON_CN2350_25GB_SUBSYS_ID ||
 		    octeon_dev->subsystem_id ==
 			OCTEON_CN2360_25GB_SUBSYS_ID) {
-			liquidio_get_speed(lio);
+			/* speed control unsupported in f/w older than 1.7.2 */
+			if (strcmp(octeon_dev->fw_info.liquidio_firmware_version
+			   , "1.7.2") < 0) {
+				dev_info(&octeon_dev->pci_dev->dev,
+					 "speed setting not supported by f/w.");
+				octeon_dev->speed_setting = 25;
+				octeon_dev->no_speed_setting = 1;
+			} else {
+				liquidio_get_speed(lio);
+			}
 
 			if (octeon_dev->speed_setting == 0) {
 				octeon_dev->speed_setting = 25;
