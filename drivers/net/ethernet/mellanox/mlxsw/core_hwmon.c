@@ -40,6 +40,7 @@
 #include <linux/err.h>
 
 #include "core.h"
+#include "core_env.h"
 
 #define MLXSW_HWMON_TEMP_SENSOR_MAX_COUNT 127
 #define MLXSW_HWMON_ATTR_COUNT (MLXSW_HWMON_TEMP_SENSOR_MAX_COUNT * 4 + \
@@ -63,6 +64,9 @@ struct mlxsw_hwmon {
 	struct mlxsw_hwmon_attr hwmon_attrs[MLXSW_HWMON_ATTR_COUNT];
 	unsigned int attrs_count;
 	u16 tach_min;
+	int *ports_temp_cache;
+	int count;
+	bool untrusted_sensor;
 };
 
 static ssize_t mlxsw_hwmon_temp_show(struct device *dev,
@@ -222,6 +226,47 @@ static ssize_t mlxsw_hwmon_pwm_store(struct device *dev,
 	return len;
 }
 
+static ssize_t mlxsw_hwmon_port_temp_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	struct mlxsw_hwmon_attr *mlwsw_hwmon_attr =
+			container_of(attr, struct mlxsw_hwmon_attr, dev_attr);
+	struct mlxsw_hwmon *mlxsw_hwmon = mlwsw_hwmon_attr->hwmon;
+	struct mlxsw_env_temp_multi multi;
+	struct mlxsw_env_temp_thresh delta;
+	int temp;
+	int err;
+
+	memset(&multi, 0, sizeof(struct mlxsw_env_temp_multi));
+	memset(&delta, 0, sizeof(struct mlxsw_env_temp_thresh));
+	/* Set initial value for normal temperature to unreachable value. */
+	delta.normal = MLXSW_ENV_TEMP_UNREACHABLE;
+	/* Collect ports temperature */
+	err = mlxsw_env_collect_port_temp(mlxsw_hwmon->core,
+					  mlxsw_hwmon->ports_temp_cache,
+					  mlxsw_hwmon->count, &multi, &delta,
+					  &mlxsw_hwmon->untrusted_sensor,
+					  &temp);
+	if (err) {
+		dev_err(mlxsw_hwmon->bus_info->dev, "Failed to query port temp\n");
+		return err;
+	}
+
+	return sprintf(buf, "%u\n", temp);
+}
+
+static ssize_t mlxsw_hwmon_port_temp_fault_show(struct device *dev,
+						struct device_attribute *attr,
+						char *buf)
+{
+	struct mlxsw_hwmon_attr *mlwsw_hwmon_attr =
+			container_of(attr, struct mlxsw_hwmon_attr, dev_attr);
+	struct mlxsw_hwmon *mlxsw_hwmon = mlwsw_hwmon_attr->hwmon;
+
+	return sprintf(buf, "%u\n", mlxsw_hwmon->untrusted_sensor ? 1 : 0);
+}
+
 enum mlxsw_hwmon_attr_type {
 	MLXSW_HWMON_ATTR_TYPE_TEMP,
 	MLXSW_HWMON_ATTR_TYPE_TEMP_MAX,
@@ -229,6 +274,8 @@ enum mlxsw_hwmon_attr_type {
 	MLXSW_HWMON_ATTR_TYPE_FAN_RPM,
 	MLXSW_HWMON_ATTR_TYPE_FAN_FAULT,
 	MLXSW_HWMON_ATTR_TYPE_PWM,
+	MLXSW_HWMON_ATTR_TYPE_TEMP_PORT,
+	MLXSW_HWMON_ATTR_TYPE_TEMP_PORT_FAULT,
 };
 
 static void mlxsw_hwmon_attr_add(struct mlxsw_hwmon *mlxsw_hwmon,
@@ -277,6 +324,19 @@ static void mlxsw_hwmon_attr_add(struct mlxsw_hwmon *mlxsw_hwmon,
 		mlxsw_hwmon_attr->dev_attr.attr.mode = 0644;
 		snprintf(mlxsw_hwmon_attr->name, sizeof(mlxsw_hwmon_attr->name),
 			 "pwm%u", num + 1);
+		break;
+	case MLXSW_HWMON_ATTR_TYPE_TEMP_PORT:
+		mlxsw_hwmon_attr->dev_attr.show = mlxsw_hwmon_port_temp_show;
+		mlxsw_hwmon_attr->dev_attr.attr.mode = 0444;
+		snprintf(mlxsw_hwmon_attr->name, sizeof(mlxsw_hwmon_attr->name),
+			 "temp%u_input", num + 1);
+		break;
+	case MLXSW_HWMON_ATTR_TYPE_TEMP_PORT_FAULT:
+		mlxsw_hwmon_attr->dev_attr.show =
+					mlxsw_hwmon_port_temp_fault_show;
+		mlxsw_hwmon_attr->dev_attr.attr.mode = 0444;
+		snprintf(mlxsw_hwmon_attr->name, sizeof(mlxsw_hwmon_attr->name),
+			 "temp%u_fault", num + 1);
 		break;
 	default:
 		WARN_ON(1);
@@ -384,6 +444,43 @@ static int mlxsw_hwmon_fans_init(struct mlxsw_hwmon *mlxsw_hwmon)
 	return 0;
 }
 
+static int mlxsw_hwmon_port_init(struct mlxsw_hwmon *mlxsw_hwmon)
+{
+	unsigned int max_ports = mlxsw_core_max_ports(mlxsw_hwmon->core);
+	struct device *dev = mlxsw_hwmon->bus_info->dev;
+	char mtcap_pl[MLXSW_REG_MTCAP_LEN] = {0};
+	u8 sensor_count;
+	int err;
+
+	mlxsw_hwmon->ports_temp_cache = devm_kmalloc_array(dev, max_ports,
+							   sizeof(int),
+							   GFP_KERNEL);
+	if (!mlxsw_hwmon->ports_temp_cache)
+		return -ENOMEM;
+	mlxsw_hwmon->count = max_ports;
+
+	err = mlxsw_reg_query(mlxsw_hwmon->core, MLXSW_REG(mtcap), mtcap_pl);
+	if (err) {
+		dev_err(mlxsw_hwmon->bus_info->dev, "Failed to get number of temp sensors\n");
+		return err;
+	}
+	/* Add extra attributes for port temperature - one attribute for the
+	 * cumulative temperature measurement and one attribute for the
+	 * cumulative temperature fault status. Sensor index will be assigned
+	 * to sensor_count value, while all indexed before sensor_count are
+	 * already utilized by the sensors connected through mtmp register by
+	 * mlxsw_hwmon_temp_init().
+	 */
+	sensor_count = mlxsw_reg_mtcap_sensor_count_get(mtcap_pl);
+	mlxsw_hwmon_attr_add(mlxsw_hwmon, MLXSW_HWMON_ATTR_TYPE_TEMP_PORT,
+			     sensor_count, sensor_count);
+	mlxsw_hwmon_attr_add(mlxsw_hwmon,
+			     MLXSW_HWMON_ATTR_TYPE_TEMP_PORT_FAULT,
+			     sensor_count, sensor_count);
+
+	return 0;
+}
+
 int mlxsw_hwmon_init(struct mlxsw_core *mlxsw_core,
 		     const struct mlxsw_bus_info *mlxsw_bus_info,
 		     struct mlxsw_hwmon **p_hwmon)
@@ -407,6 +504,10 @@ int mlxsw_hwmon_init(struct mlxsw_core *mlxsw_core,
 	if (err)
 		goto err_fans_init;
 
+	err = mlxsw_hwmon_port_init(mlxsw_hwmon);
+	if (err)
+		goto err_temp_port_init;
+
 	mlxsw_hwmon->groups[0] = &mlxsw_hwmon->group;
 	mlxsw_hwmon->group.attrs = mlxsw_hwmon->attrs;
 
@@ -424,6 +525,7 @@ int mlxsw_hwmon_init(struct mlxsw_core *mlxsw_core,
 	return 0;
 
 err_hwmon_register:
+err_temp_port_init:
 err_fans_init:
 err_temp_init:
 	return err;
