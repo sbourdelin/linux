@@ -281,6 +281,32 @@ static int mlxsw_thermal_set_trip_hyst(struct thermal_zone_device *tzdev,
 	return 0;
 }
 
+static int mlxsw_thermal_get_trend(struct thermal_zone_device *tzdev,
+				   int trip, enum thermal_trend *trend)
+{
+	int delta;
+
+	if (trip < 0 || trip >= MLXSW_THERMAL_NUM_TRIPS)
+		return -EINVAL;
+
+	delta = tzdev->last_temperature - tzdev->temperature;
+	if (delta > MLXSW_ENV_TEMP_WINDOW) {
+		/* Notify user about fast temperature decreasing by sending
+		 * hwmon uevent. Decreasing could happen in case one or few
+		 * very hot port cables have been removed. In this situation
+		 * temperature trend could go down once, and then could stay
+		 * in a stable state, while PWM state will be decreased only
+		 * once. As a side effect PWM could be not at optimal speed.
+		 * Notification will allow user to handle such case, if user
+		 * supposes to optimize PWM state.
+		 */
+		kobject_uevent(&tzdev->device.kobj, KOBJ_CHANGE);
+	}
+
+	/* Return non-zero value to pass control to get_tz_trend() routine. */
+	return 1;
+}
+
 static struct thermal_zone_device_ops mlxsw_thermal_ops = {
 	.bind		= mlxsw_thermal_bind,
 	.unbind		= mlxsw_thermal_unbind,
@@ -292,6 +318,7 @@ static struct thermal_zone_device_ops mlxsw_thermal_ops = {
 	.set_trip_temp	= mlxsw_thermal_set_trip_temp,
 	.get_trip_hyst	= mlxsw_thermal_get_trip_hyst,
 	.set_trip_hyst	= mlxsw_thermal_set_trip_hyst,
+	.get_trend	= mlxsw_thermal_get_trend,
 };
 
 static int mlxsw_thermal_get_max_state(struct thermal_cooling_device *cdev,
