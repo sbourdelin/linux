@@ -4670,6 +4670,14 @@ int netif_receive_skb_core(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_receive_skb_core);
 
+static void __netif_receive_skb_list_core(struct sk_buff_head *list, bool pfmemalloc)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(list)) != NULL)
+		__netif_receive_skb_core(skb, pfmemalloc);
+}
+
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	int ret;
@@ -4693,6 +4701,36 @@ static int __netif_receive_skb(struct sk_buff *skb)
 		ret = __netif_receive_skb_core(skb, false);
 
 	return ret;
+}
+
+static void __netif_receive_skb_list(struct sk_buff_head *list)
+{
+	unsigned long noreclaim_flag = 0;
+	struct sk_buff_head sublist;
+	bool pfmemalloc = false; /* Is current sublist PF_MEMALLOC? */
+	struct sk_buff *skb;
+
+	__skb_queue_head_init(&sublist);
+
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		if ((sk_memalloc_socks() && skb_pfmemalloc(skb)) != pfmemalloc) {
+			/* Handle the previous sublist */
+			__netif_receive_skb_list_core(&sublist, pfmemalloc);
+			pfmemalloc = !pfmemalloc;
+			/* See comments in __netif_receive_skb */
+			if (pfmemalloc)
+				noreclaim_flag = memalloc_noreclaim_save();
+			else
+				memalloc_noreclaim_restore(noreclaim_flag);
+			__skb_queue_head_init(&sublist);
+		}
+		__skb_queue_tail(&sublist, skb);
+	}
+	/* Handle the last sublist */
+	__netif_receive_skb_list_core(&sublist, pfmemalloc);
+	/* Restore pflags */
+	if (pfmemalloc)
+		memalloc_noreclaim_restore(noreclaim_flag);
 }
 
 static int generic_xdp_install(struct net_device *dev, struct netdev_bpf *xdp)
@@ -4727,14 +4765,6 @@ static int generic_xdp_install(struct net_device *dev, struct netdev_bpf *xdp)
 	}
 
 	return ret;
-}
-
-static void __netif_receive_skb_list(struct sk_buff_head *list)
-{
-	struct sk_buff *skb;
-
-	while ((skb = __skb_dequeue(list)) != NULL)
-		__netif_receive_skb(skb);
 }
 
 static int netif_receive_skb_internal(struct sk_buff *skb)
