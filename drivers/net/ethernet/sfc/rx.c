@@ -634,7 +634,12 @@ static void efx_rx_deliver(struct efx_channel *channel, u8 *eh,
 			return;
 
 	/* Pass the packet up */
-	netif_receive_skb(skb);
+	if (channel->rx_list != NULL)
+		/* Add to list, will pass up later */
+		__skb_queue_tail(channel->rx_list, skb);
+	else
+		/* No list, so pass it up now */
+		netif_receive_skb(skb);
 }
 
 /* Handle a received packet.  Second half: Touches packet payload. */
