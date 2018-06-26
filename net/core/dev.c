@@ -4729,6 +4729,14 @@ static int generic_xdp_install(struct net_device *dev, struct netdev_bpf *xdp)
 	return ret;
 }
 
+static void __netif_receive_skb_list(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(list)) != NULL)
+		__netif_receive_skb(skb);
+}
+
 static int netif_receive_skb_internal(struct sk_buff *skb)
 {
 	int ret;
@@ -4769,6 +4777,64 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
 	return ret;
 }
 
+static void netif_receive_skb_list_internal(struct sk_buff_head *list)
+{
+	/* Two sublists so we can go back and forth between them */
+	struct sk_buff_head sublist, sublist2;
+	struct bpf_prog *xdp_prog = NULL;
+	struct sk_buff *skb;
+
+	__skb_queue_head_init(&sublist);
+
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		net_timestamp_check(netdev_tstamp_prequeue, skb);
+		if (skb_defer_rx_timestamp(skb))
+			/* Handled, don't add to sublist */
+			continue;
+		__skb_queue_tail(&sublist, skb);
+	}
+
+	__skb_queue_head_init(&sublist2);
+	if (static_branch_unlikely(&generic_xdp_needed_key)) {
+		preempt_disable();
+		rcu_read_lock();
+		while ((skb = __skb_dequeue(&sublist)) != NULL) {
+			xdp_prog = rcu_dereference(skb->dev->xdp_prog);
+			if (do_xdp_generic(xdp_prog, skb) != XDP_PASS)
+				/* Dropped, don't add to sublist */
+				continue;
+			__skb_queue_tail(&sublist2, skb);
+		}
+		rcu_read_unlock();
+		preempt_enable();
+		/* Move all packets onto first sublist */
+		skb_queue_splice_init(&sublist2, &sublist);
+	}
+
+	rcu_read_lock();
+#ifdef CONFIG_RPS
+	if (static_key_false(&rps_needed)) {
+		while ((skb = __skb_dequeue(&sublist)) != NULL) {
+			struct rps_dev_flow voidflow, *rflow = &voidflow;
+			int cpu = get_rps_cpu(skb->dev, skb, &rflow);
+
+			if (cpu >= 0) {
+				enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
+				/* Handled, don't add to sublist */
+				continue;
+			}
+
+			__skb_queue_tail(&sublist2, skb);
+		}
+
+		/* Move all packets onto first sublist */
+		skb_queue_splice_init(&sublist2, &sublist);
+	}
+#endif
+	__netif_receive_skb_list(&sublist);
+	rcu_read_unlock();
+}
+
 /**
  *	netif_receive_skb - process receive buffer from network
  *	@skb: buffer to process
@@ -4797,8 +4863,8 @@ EXPORT_SYMBOL(netif_receive_skb);
  *	@list: list of skbs to process.  Must not be shareable (e.g. it may
  *	be on the stack)
  *
- *	For now, just calls netif_receive_skb() in a loop, ignoring the
- *	return value.
+ *	Since return value of netif_receive_skb() is normally ignored, and
+ *	wouldn't be meaningful for a list, this function returns void.
  *
  *	This function may only be called from softirq context and interrupts
  *	should be enabled.
@@ -4809,8 +4875,7 @@ void netif_receive_skb_list(struct sk_buff_head *list)
 
 	skb_queue_for_each(skb, list)
 		trace_netif_receive_skb_list_entry(skb);
-	while ((skb = __skb_dequeue(list)) != NULL)
-		netif_receive_skb_internal(skb);
+	netif_receive_skb_list_internal(list);
 }
 EXPORT_SYMBOL(netif_receive_skb_list);
 
