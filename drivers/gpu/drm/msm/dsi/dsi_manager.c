@@ -751,10 +751,11 @@ struct drm_connector *msm_dsi_manager_ext_bridge_init(u8 id)
 	connector_list = &dev->mode_config.connector_list;
 
 	list_for_each_entry(connector, connector_list, head) {
+		u32 encoder_id;
 		int i;
 
-		for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-			if (connector->encoder_ids[i] == encoder->base.id)
+		drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+			if (encoder_id == encoder->base.id)
 				return connector;
 		}
 	}
