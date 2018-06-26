@@ -3430,6 +3430,13 @@ static inline void assfail(char *expr, char *file, int line)
 	BUG();
 }
 
+__cold
+static inline void btrfs_print_v0_err(struct btrfs_fs_info *fs_info)
+{
+	btrfs_err(fs_info,
+	"Unsupported V0 extent filesystem detected. Aborting... Please re-create your filesystem with a newer kernel");
+}
+
 #define ASSERT(expr)	\
 	(likely(expr) ? (void)0 : assfail(#expr, __FILE__, __LINE__))
 #else
