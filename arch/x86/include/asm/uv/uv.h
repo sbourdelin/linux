@@ -17,7 +17,7 @@ extern int is_uv_hubless(void);
 extern void uv_cpu_init(void);
 extern void uv_nmi_init(void);
 extern void uv_system_init(void);
-extern const struct cpumask *uv_flush_tlb_others(const struct cpumask *cpumask,
+extern struct cpumask *uv_flush_tlb_others(struct cpumask *cpumask,
 						 const struct flush_tlb_info *info);
 
 #else	/* X86_UV */
@@ -27,8 +27,8 @@ static inline int is_uv_system(void)	{ return 0; }
 static inline int is_uv_hubless(void)	{ return 0; }
 static inline void uv_cpu_init(void)	{ }
 static inline void uv_system_init(void)	{ }
-static inline const struct cpumask *
-uv_flush_tlb_others(const struct cpumask *cpumask,
+static inline struct cpumask *
+uv_flush_tlb_others(struct cpumask *cpumask,
 		    const struct flush_tlb_info *info)
 { return cpumask; }
 

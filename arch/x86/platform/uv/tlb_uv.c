@@ -1102,7 +1102,7 @@ static int set_distrib_bits(struct cpumask *flush_mask, struct bau_control *bcp,
  * Returns pointer to cpumask if some remote flushing remains to be
  * done.  The returned pointer is valid till preemption is re-enabled.
  */
-const struct cpumask *uv_flush_tlb_others(const struct cpumask *cpumask,
+struct cpumask *uv_flush_tlb_others(struct cpumask *cpumask,
 					  const struct flush_tlb_info *info)
 {
 	unsigned int cpu = smp_processor_id();

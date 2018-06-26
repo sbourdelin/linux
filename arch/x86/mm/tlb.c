@@ -7,6 +7,7 @@
 #include <linux/export.h>
 #include <linux/cpu.h>
 #include <linux/debugfs.h>
+#include <linux/gfp.h>
 
 #include <asm/tlbflush.h>
 #include <asm/mmu_context.h>
@@ -185,8 +186,11 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 {
 	struct mm_struct *real_prev = this_cpu_read(cpu_tlbstate.loaded_mm);
 	u16 prev_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
+	bool was_lazy = this_cpu_read(cpu_tlbstate.is_lazy);
 	unsigned cpu = smp_processor_id();
 	u64 next_tlb_gen;
+	bool need_flush;
+	u16 new_asid;
 
 	/*
 	 * NB: The scheduler will call us with prev == next when switching
@@ -250,10 +254,20 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 				 !cpumask_test_cpu(cpu, mm_cpumask(next))))
 			cpumask_set_cpu(cpu, mm_cpumask(next));
 
-		return;
+		/*
+		 * Switching straight from one thread in a process to another
+		 * thread in the same process requires no TLB flush at all.
+		 */
+		if (!was_lazy)
+			return;
+
+		/*
+		 * The code below checks whether there was a TLB flush while
+		 * this CPU was in lazy TLB mode. The barrier ensures ordering
+		 * with the TLB invalidation code advancing .tlb_gen.
+		 */
+		smp_rmb();
 	} else {
-		u16 new_asid;
-		bool need_flush;
 		u64 last_ctx_id = this_cpu_read(cpu_tlbstate.last_ctx_id);
 
 		/*
@@ -290,47 +304,46 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 				real_prev != &init_mm);
 		cpumask_clear_cpu(cpu, mm_cpumask(real_prev));
 
-		/*
-		 * Start remote flushes and then read tlb_gen.
-		 */
+		/* Start remote flushes. */
 		cpumask_set_cpu(cpu, mm_cpumask(next));
-		next_tlb_gen = atomic64_read(&next->context.tlb_gen);
+	}
 
-		choose_new_asid(next, next_tlb_gen, &new_asid, &need_flush);
+	/* Read the tlb_gen to check whether a flush is needed. */
+	next_tlb_gen = atomic64_read(&next->context.tlb_gen);
+	choose_new_asid(next, next_tlb_gen, &new_asid, &need_flush);
 
-		if (need_flush) {
-			this_cpu_write(cpu_tlbstate.ctxs[new_asid].ctx_id, next->context.ctx_id);
-			this_cpu_write(cpu_tlbstate.ctxs[new_asid].tlb_gen, next_tlb_gen);
-			load_new_mm_cr3(next->pgd, new_asid, true);
-
-			/*
-			 * NB: This gets called via leave_mm() in the idle path
-			 * where RCU functions differently.  Tracing normally
-			 * uses RCU, so we need to use the _rcuidle variant.
-			 *
-			 * (There is no good reason for this.  The idle code should
-			 *  be rearranged to call this before rcu_idle_enter().)
-			 */
-			trace_tlb_flush_rcuidle(TLB_FLUSH_ON_TASK_SWITCH, TLB_FLUSH_ALL);
-		} else {
-			/* The new ASID is already up to date. */
-			load_new_mm_cr3(next->pgd, new_asid, false);
-
-			/* See above wrt _rcuidle. */
-			trace_tlb_flush_rcuidle(TLB_FLUSH_ON_TASK_SWITCH, 0);
-		}
+	if (need_flush) {
+		this_cpu_write(cpu_tlbstate.ctxs[new_asid].ctx_id, next->context.ctx_id);
+		this_cpu_write(cpu_tlbstate.ctxs[new_asid].tlb_gen, next_tlb_gen);
+		load_new_mm_cr3(next->pgd, new_asid, true);
 
 		/*
-		 * Record last user mm's context id, so we can avoid
-		 * flushing branch buffer with IBPB if we switch back
-		 * to the same user.
+		 * NB: This gets called via leave_mm() in the idle path
+		 * where RCU functions differently.  Tracing normally
+		 * uses RCU, so we need to use the _rcuidle variant.
+		 *
+		 * (There is no good reason for this.  The idle code should
+		 *  be rearranged to call this before rcu_idle_enter().)
 		 */
-		if (next != &init_mm)
-			this_cpu_write(cpu_tlbstate.last_ctx_id, next->context.ctx_id);
+		trace_tlb_flush_rcuidle(TLB_FLUSH_ON_TASK_SWITCH, TLB_FLUSH_ALL);
+	} else {
+		/* The new ASID is already up to date. */
+		load_new_mm_cr3(next->pgd, new_asid, false);
 
-		this_cpu_write(cpu_tlbstate.loaded_mm, next);
-		this_cpu_write(cpu_tlbstate.loaded_mm_asid, new_asid);
+		/* See above wrt _rcuidle. */
+		trace_tlb_flush_rcuidle(TLB_FLUSH_ON_TASK_SWITCH, 0);
 	}
+
+	/*
+	 * Record last user mm's context id, so we can avoid
+	 * flushing branch buffer with IBPB if we switch back
+	 * to the same user.
+	 */
+	if (next != &init_mm)
+		this_cpu_write(cpu_tlbstate.last_ctx_id, next->context.ctx_id);
+
+	this_cpu_write(cpu_tlbstate.loaded_mm, next);
+	this_cpu_write(cpu_tlbstate.loaded_mm_asid, new_asid);
 
 	load_mm_cr4(next);
 	switch_ldt(real_prev, next);
@@ -454,6 +467,9 @@ static void flush_tlb_func_common(const struct flush_tlb_info *f,
 		 * paging-structure cache to avoid speculatively reading
 		 * garbage into our TLB.  Since switching to init_mm is barely
 		 * slower than a minimal flush, just switch to init_mm.
+		 *
+		 * This should be rare, with native_flush_tlb_others skipping
+		 * IPIs to lazy TLB mode CPUs.
 		 */
 		switch_mm_irqs_off(NULL, &init_mm, NULL);
 		return;
@@ -560,6 +576,22 @@ static void flush_tlb_func_remote(void *info)
 void native_flush_tlb_others(const struct cpumask *cpumask,
 			     const struct flush_tlb_info *info)
 {
+	cpumask_t *mask = (struct cpumask *)cpumask;
+	cpumask_var_t varmask;
+	bool can_lazy_flush = false;
+	unsigned int cpu;
+
+	/*
+	 * A temporary cpumask allows the kernel to skip sending IPIs
+	 * to CPUs in lazy TLB state, without also removing them from
+	 * mm_cpumask(mm).
+	 */
+	if (alloc_cpumask_var(&varmask, GFP_ATOMIC)) {
+		cpumask_copy(varmask, cpumask);
+		mask = varmask;
+		can_lazy_flush = true;
+	}
+
 	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH);
 	if (info->end == TLB_FLUSH_ALL)
 		trace_tlb_flush(TLB_REMOTE_SEND_IPI, TLB_FLUSH_ALL);
@@ -583,17 +615,30 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 		 * that UV should be updated so that smp_call_function_many(),
 		 * etc, are optimal on UV.
 		 */
-		unsigned int cpu;
-
 		cpu = smp_processor_id();
-		cpumask = uv_flush_tlb_others(cpumask, info);
-		if (cpumask)
-			smp_call_function_many(cpumask, flush_tlb_func_remote,
+		mask = uv_flush_tlb_others(mask, info);
+		if (mask)
+			smp_call_function_many(mask, flush_tlb_func_remote,
 					       (void *)info, 1);
-		return;
+		goto out;
 	}
-	smp_call_function_many(cpumask, flush_tlb_func_remote,
+
+	/*
+	 * Instead of sending IPIs to CPUs in lazy TLB mode, move that
+	 * CPU's TLB state to TLBSTATE_FLUSH, causing the TLB to be flushed
+	 * at the next context switch, or at page table free time.
+	 */
+	if (can_lazy_flush) {
+		for_each_cpu(cpu, mask) {
+			if (per_cpu(cpu_tlbstate.is_lazy, cpu))
+				cpumask_clear_cpu(cpu, mask);
+		}
+	}
+
+	smp_call_function_many(mask, flush_tlb_func_remote,
 			       (void *)info, 1);
+ out:
+	free_cpumask_var(varmask);
 }
 
 /*
