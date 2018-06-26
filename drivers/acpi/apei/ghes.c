@@ -289,11 +289,12 @@ static void ghes_copy_tofrom_phys(void *buffer, phys_addr_t paddr, u32 len,
 	}
 }
 
-static int ghes_read_estatus(struct ghes *ghes,
-			     struct acpi_hest_generic_status *estatus,
-			     phys_addr_t *buf_paddr, int fixmap_idx)
+/* read the CPER block returning its address and size */
+static int ghes_peek_estatus(struct ghes *ghes, int fixmap_idx,
+			     phys_addr_t *buf_paddr, u32 *buf_len)
 {
 	struct acpi_hest_generic *g = ghes->generic;
+	struct acpi_hest_generic_status estatus;
 	u32 len;
 	int rc;
 
@@ -308,26 +309,23 @@ static int ghes_read_estatus(struct ghes *ghes,
 	if (!*buf_paddr)
 		return -ENOENT;
 
-	ghes_copy_tofrom_phys(estatus, *buf_paddr,
-			      sizeof(*estatus), 1, fixmap_idx);
-	if (!estatus->block_status) {
+	ghes_copy_tofrom_phys(&estatus, *buf_paddr,
+			      sizeof(estatus), 1, fixmap_idx);
+	if (!estatus.block_status) {
 		*buf_paddr = 0;
 		return -ENOENT;
 	}
 
 	rc = -EIO;
-	len = cper_estatus_len(estatus);
-	if (len < sizeof(*estatus))
+	len = cper_estatus_len(&estatus);
+	if (len < sizeof(estatus))
 		goto err_read_block;
 	if (len > ghes->generic->error_block_length)
 		goto err_read_block;
-	if (cper_estatus_check_header(estatus))
+	if (cper_estatus_check_header(&estatus))
 		goto err_read_block;
-	ghes_copy_tofrom_phys(estatus + 1,
-			      *buf_paddr + sizeof(*estatus),
-			      len - sizeof(*estatus), 1, fixmap_idx);
-	if (cper_estatus_check(estatus))
-		goto err_read_block;
+	*buf_len = len;
+
 	rc = 0;
 
 err_read_block:
@@ -335,6 +333,35 @@ err_read_block:
 		pr_warning(FW_WARN GHES_PFX
 			   "Failed to read error status block!\n");
 	return rc;
+}
+
+static int __ghes_read_estatus(struct acpi_hest_generic_status *estatus,
+			       phys_addr_t buf_paddr, size_t buf_len,
+			       int fixmap_idx)
+{
+	ghes_copy_tofrom_phys(estatus, buf_paddr, buf_len, 1, fixmap_idx);
+	if (cper_estatus_check(estatus)) {
+		if (printk_ratelimit())
+			pr_warning(FW_WARN GHES_PFX
+				   "Failed to read error status block!\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int ghes_read_estatus(struct ghes *ghes,
+			     struct acpi_hest_generic_status *estatus,
+			     phys_addr_t *buf_paddr, int fixmap_idx)
+{
+	int rc;
+	u32 buf_len;
+
+	rc = ghes_peek_estatus(ghes, fixmap_idx, buf_paddr, &buf_len);
+	if (rc)
+		return rc;
+
+	return __ghes_read_estatus(estatus, *buf_paddr, buf_len, fixmap_idx);
 }
 
 static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
