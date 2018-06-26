@@ -410,7 +410,7 @@ struct srpt_device {
 	struct mutex		sdev_mutex;
 	bool			use_srq;
 	struct srpt_recv_ioctx	**ioctx_ring;
-	struct srpt_port	port[2];
+	struct srpt_port	*port;
 	struct ib_event_handler	event_handler;
 	struct list_head	list;
 };
