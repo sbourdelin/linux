@@ -6703,6 +6703,74 @@ static inline void mlxsw_reg_mtmp_unpack(char *payload, unsigned int *p_temp,
 		mlxsw_reg_mtmp_sensor_name_memcpy_from(payload, sensor_name);
 }
 
+/* MTBR - Management Temperature Bulk Register
+ * -------------------------------------------
+ * This register is used for bulk temperature reading.
+ */
+#define MLXSW_REG_MTBR_ID		0x900F
+#define MLXSW_REG_MTBR_LEN		0xCC
+#define MLXSW_REG_MTBR_REC_MAX_COUNT	47
+
+MLXSW_REG_DEFINE(mtbr, MLXSW_REG_MTBR_ID, MLXSW_REG_MTBR_LEN);
+
+/* reg_mtbr_base_sensor_index
+ * Base sensors index to access (0 - ASIC sensor, 1-63 - ambient sensors,
+ * 64-127 are mapped to the SFP+/QSFP modules sequentially).
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, mtbr, base_sensor_index, 0x00, 0, 7);
+
+/* reg_mtbr_num_rec
+ * Request: Number of records to read
+ * Response: Number of records read
+ * See above description for more details.
+ * Ranges 0..64
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, mtbr, num_rec, 0x04, 0, 8);
+
+/* reg_mtbr_temp
+ * Temperature reading from the sensor. Reading is in 0.125 Celsius
+ * degrees units.
+ * Access: RO
+ */
+MLXSW_ITEM32_INDEXED(reg, mtbr, temp, 0x10, 0, 16, 0x04, 0x00, false);
+
+/* reg_mtbr_max_temp
+ * The highest measured temperature from the sensor.
+ * When the bit mte is cleared, the field max_temperature is reserved.
+ * Access: RO
+ */
+MLXSW_ITEM32_INDEXED(reg, mtbr, max_temp, 0x10, 16, 16, 0x04, 0x00, false);
+
+static inline void mlxsw_reg_mtbr_pack(char *payload, u8 base_sensor_index,
+				       u8 num_rec)
+{
+	MLXSW_REG_ZERO(mtbr, payload);
+	mlxsw_reg_mtbr_base_sensor_index_set(payload, base_sensor_index);
+	mlxsw_reg_mtbr_num_rec_set(payload, num_rec);
+}
+
+/* Error codes from temperatute reading */
+enum mlxsw_reg_mtbr_temp_status {
+	MLXSW_REG_MTBR_NO_CONN		= 0x8000,
+	MLXSW_REG_MTBR_NO_TEMP_SENS	= 0x8001,
+	MLXSW_REG_MTBR_INDEX_NA		= 0x8002,
+	MLXSW_REG_MTBR_BAD_SENS_INFO	= 0x8003,
+};
+
+/* Base index for reading ports temperature */
+#define MLXSW_REG_MTBR_BASE_PORT_INDEX		64
+
+static inline void mlxsw_reg_mtbr_temp_unpack(char *payload, int rec_index,
+					      u16 *p_temp, u16 *p_max_temp)
+{
+	if (p_temp)
+		*p_temp = mlxsw_reg_mtbr_temp_get(payload, rec_index);
+	if (p_max_temp)
+		*p_max_temp = mlxsw_reg_mtbr_max_temp_get(payload, rec_index);
+}
+
 /* MCIA - Management Cable Info Access
  * -----------------------------------
  * MCIA register is used to access the SFP+ and QSFP connector's EPROM.
@@ -7945,6 +8013,7 @@ static const struct mlxsw_reg_info *mlxsw_reg_infos[] = {
 	MLXSW_REG(mfsc),
 	MLXSW_REG(mfsm),
 	MLXSW_REG(mfsl),
+	MLXSW_REG(mtbr),
 	MLXSW_REG(mtcap),
 	MLXSW_REG(mtmp),
 	MLXSW_REG(mcia),
