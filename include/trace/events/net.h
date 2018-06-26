@@ -131,6 +131,13 @@ DEFINE_EVENT(net_dev_template, netif_receive_skb,
 	TP_ARGS(skb)
 );
 
+DEFINE_EVENT(net_dev_template, netif_receive_skb_list,
+
+	TP_PROTO(struct sk_buff *skb),
+
+	TP_ARGS(skb)
+);
+
 DEFINE_EVENT(net_dev_template, netif_rx,
 
 	TP_PROTO(struct sk_buff *skb),

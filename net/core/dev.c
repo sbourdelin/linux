@@ -4494,12 +4494,13 @@ static inline int nf_ingress(struct sk_buff *skb, struct packet_type **pt_prev,
 	return 0;
 }
 
-static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
+static int __netif_receive_skb_taps(struct sk_buff *skb, bool pfmemalloc,
+				    struct packet_type **pt_prev)
 {
-	struct packet_type *ptype, *pt_prev;
 	rx_handler_func_t *rx_handler;
 	struct net_device *orig_dev;
 	bool deliver_exact = false;
+	struct packet_type *ptype;
 	int ret = NET_RX_DROP;
 	__be16 type;
 
@@ -4514,7 +4515,7 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 		skb_reset_transport_header(skb);
 	skb_reset_mac_len(skb);
 
-	pt_prev = NULL;
+	*pt_prev = NULL;
 
 another_round:
 	skb->skb_iif = skb->dev->ifindex;
@@ -4535,25 +4536,25 @@ another_round:
 		goto skip_taps;
 
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
-		if (pt_prev)
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-		pt_prev = ptype;
+		if (*pt_prev)
+			ret = deliver_skb(skb, *pt_prev, orig_dev);
+		*pt_prev = ptype;
 	}
 
 	list_for_each_entry_rcu(ptype, &skb->dev->ptype_all, list) {
-		if (pt_prev)
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-		pt_prev = ptype;
+		if (*pt_prev)
+			ret = deliver_skb(skb, *pt_prev, orig_dev);
+		*pt_prev = ptype;
 	}
 
 skip_taps:
 #ifdef CONFIG_NET_INGRESS
 	if (static_branch_unlikely(&ingress_needed_key)) {
-		skb = sch_handle_ingress(skb, &pt_prev, &ret, orig_dev);
+		skb = sch_handle_ingress(skb, pt_prev, &ret, orig_dev);
 		if (!skb)
 			goto out;
 
-		if (nf_ingress(skb, &pt_prev, &ret, orig_dev) < 0)
+		if (nf_ingress(skb, pt_prev, &ret, orig_dev) < 0)
 			goto out;
 	}
 #endif
@@ -4563,9 +4564,9 @@ skip_classify:
 		goto drop;
 
 	if (skb_vlan_tag_present(skb)) {
-		if (pt_prev) {
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-			pt_prev = NULL;
+		if (*pt_prev) {
+			ret = deliver_skb(skb, *pt_prev, orig_dev);
+			*pt_prev = NULL;
 		}
 		if (vlan_do_receive(&skb))
 			goto another_round;
@@ -4575,9 +4576,9 @@ skip_classify:
 
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
 	if (rx_handler) {
-		if (pt_prev) {
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-			pt_prev = NULL;
+		if (*pt_prev) {
+			ret = deliver_skb(skb, *pt_prev, orig_dev);
+			*pt_prev = NULL;
 		}
 		switch (rx_handler(&skb)) {
 		case RX_HANDLER_CONSUMED:
@@ -4608,38 +4609,45 @@ skip_classify:
 
 	/* deliver only exact match when indicated */
 	if (likely(!deliver_exact)) {
-		deliver_ptype_list_skb(skb, &pt_prev, orig_dev, type,
+		deliver_ptype_list_skb(skb, pt_prev, orig_dev, type,
 				       &ptype_base[ntohs(type) &
 						   PTYPE_HASH_MASK]);
 	}
 
-	deliver_ptype_list_skb(skb, &pt_prev, orig_dev, type,
+	deliver_ptype_list_skb(skb, pt_prev, orig_dev, type,
 			       &orig_dev->ptype_specific);
 
 	if (unlikely(skb->dev != orig_dev)) {
-		deliver_ptype_list_skb(skb, &pt_prev, orig_dev, type,
+		deliver_ptype_list_skb(skb, pt_prev, orig_dev, type,
 				       &skb->dev->ptype_specific);
 	}
-
-	if (pt_prev) {
-		if (unlikely(skb_orphan_frags_rx(skb, GFP_ATOMIC)))
-			goto drop;
-		else
-			ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
-	} else {
+	if (*pt_prev && unlikely(skb_orphan_frags_rx(skb, GFP_ATOMIC)))
+		goto drop;
+	return ret;
 drop:
-		if (!deliver_exact)
-			atomic_long_inc(&skb->dev->rx_dropped);
-		else
-			atomic_long_inc(&skb->dev->rx_nohandler);
-		kfree_skb(skb);
-		/* Jamal, now you will not able to escape explaining
-		 * me how you were going to use this. :-)
-		 */
-		ret = NET_RX_DROP;
-	}
-
+	if (!deliver_exact)
+		atomic_long_inc(&skb->dev->rx_dropped);
+	else
+		atomic_long_inc(&skb->dev->rx_nohandler);
+	kfree_skb(skb);
+	/* Jamal, now you will not able to escape explaining
+	 * me how you were going to use this. :-)
+	 */
+	ret = NET_RX_DROP;
 out:
+	*pt_prev = NULL;
+	return ret;
+}
+
+static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
+{
+	struct net_device *orig_dev = skb->dev;
+	struct packet_type *pt_prev;
+	int ret;
+
+	ret = __netif_receive_skb_taps(skb, pfmemalloc, &pt_prev);
+	if (pt_prev)
+		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	return ret;
 }
 
@@ -4670,12 +4678,62 @@ int netif_receive_skb_core(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_receive_skb_core);
 
-static void __netif_receive_skb_list_core(struct sk_buff_head *list, bool pfmemalloc)
+static inline void __netif_receive_skb_list_ptype(struct sk_buff_head *list,
+						  struct packet_type *pt_prev,
+						  struct net_device *orig_dev)
 {
 	struct sk_buff *skb;
 
 	while ((skb = __skb_dequeue(list)) != NULL)
-		__netif_receive_skb_core(skb, pfmemalloc);
+		pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+}
+
+static void __netif_receive_skb_list_core(struct sk_buff_head *list, bool pfmemalloc)
+{
+	/* Fast-path assumptions:
+	 * - There is no RX handler.
+	 * - Only one packet_type matches.
+	 * If either of these fails, we will end up doing some per-packet
+	 * processing in-line, then handling the 'last ptype' for the whole
+	 * sublist.  This can't cause out-of-order delivery to any single ptype,
+	 * because the 'last ptype' must be constant across the sublist, and all
+	 * other ptypes are handled per-packet.
+	 */
+	/* Current (common) ptype of sublist */
+	struct packet_type *pt_curr = NULL;
+	/* Current (common) orig_dev of sublist */
+	struct net_device *od_curr = NULL;
+	struct sk_buff_head sublist;
+	struct sk_buff *skb;
+
+	__skb_queue_head_init(&sublist);
+
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		struct packet_type *pt_prev;
+		struct net_device *orig_dev = skb->dev;
+
+		__netif_receive_skb_taps(skb, pfmemalloc, &pt_prev);
+		if (pt_prev) {
+			if (skb_queue_empty(&sublist)) {
+				pt_curr = pt_prev;
+				od_curr = orig_dev;
+			} else if (!(pt_curr == pt_prev &&
+				     od_curr == orig_dev)) {
+				/* dispatch old sublist */
+				__netif_receive_skb_list_ptype(&sublist,
+							       pt_curr,
+							       od_curr);
+				/* start new sublist */
+				__skb_queue_head_init(&sublist);
+				pt_curr = pt_prev;
+				od_curr = orig_dev;
+			}
+			__skb_queue_tail(&sublist, skb);
+		}
+	}
+
+	/* dispatch final sublist */
+	__netif_receive_skb_list_ptype(&sublist, pt_curr, od_curr);
 }
 
 static int __netif_receive_skb(struct sk_buff *skb)
