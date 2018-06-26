@@ -12,6 +12,7 @@
 #include <linux/blkdev.h>
 #include <linux/device.h>
 #include <linux/pm_runtime.h>
+#include <linux/task_work.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
@@ -718,14 +719,53 @@ store_rescan_field (struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field);
 
+struct remove_dev_work {
+	struct callback_head	head;
+	struct scsi_device	*sdev;
+};
+
+static void delete_sdev(struct callback_head *head)
+{
+	struct remove_dev_work *work = container_of(head, typeof(*work), head);
+	struct scsi_device *sdev = work->sdev;
+
+	scsi_remove_device(sdev);
+	kfree(work);
+	scsi_device_put(sdev);
+}
+
 static ssize_t
 sdev_store_delete(struct device *dev, struct device_attribute *attr,
 		  const char *buf, size_t count)
 {
-	if (device_remove_file_self(dev, attr))
-		scsi_remove_device(to_scsi_device(dev));
-	return count;
-};
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct remove_dev_work *work;
+	int ret;
+
+	ret = scsi_device_get(sdev);
+	if (ret < 0)
+		goto out;
+	ret = -ENOMEM;
+	work = kmalloc(sizeof(*work), GFP_KERNEL);
+	if (!work)
+		goto put;
+	work->head.func = delete_sdev;
+	work->sdev = sdev;
+	ret = task_work_add(current, &work->head, false);
+	if (ret < 0)
+		goto free;
+	ret = count;
+
+out:
+	return ret;
+
+free:
+	kfree(work);
+
+put:
+	scsi_device_put(sdev);
+	goto out;
+}
 static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
 
 static ssize_t
