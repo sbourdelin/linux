@@ -216,16 +216,13 @@ amdgpu_connector_update_scratch_regs(struct drm_connector *connector,
 	struct drm_encoder *encoder = NULL;
 	const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
 	bool connected;
+	u32 encoder_id;
 	int i;
 
 	best_encoder = connector_funcs->best_encoder(connector);
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		if (connector->encoder_ids[i] == 0)
-			break;
-
-		encoder = drm_encoder_find(connector->dev, NULL,
-					connector->encoder_ids[i]);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 
@@ -244,13 +241,11 @@ amdgpu_connector_find_encoder(struct drm_connector *connector,
 			       int encoder_type)
 {
 	struct drm_encoder *encoder;
+	u32 encoder_id;
 	int i;
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		if (connector->encoder_ids[i] == 0)
-			break;
-		encoder = drm_encoder_find(connector->dev, NULL,
-					connector->encoder_ids[i]);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 
@@ -987,7 +982,7 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct drm_encoder *encoder = NULL;
 	const struct drm_encoder_helper_funcs *encoder_funcs;
-	int i, r;
+	int r;
 	enum drm_connector_status ret = connector_status_disconnected;
 	bool dret = false, broken_edid = false;
 
@@ -1077,11 +1072,11 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 
 	/* find analog encoder */
 	if (amdgpu_connector->dac_load_detect) {
-		for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-			if (connector->encoder_ids[i] == 0)
-				break;
+		u32 encoder_id;
+		int i;
 
-			encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
+		drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+			encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 			if (!encoder)
 				continue;
 
@@ -1135,12 +1130,11 @@ amdgpu_connector_dvi_encoder(struct drm_connector *connector)
 	int enc_id = connector->encoder_ids[0];
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct drm_encoder *encoder;
+	u32 encoder_id;
 	int i;
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		if (connector->encoder_ids[i] == 0)
-			break;
 
-		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 
@@ -1294,14 +1288,11 @@ u16 amdgpu_connector_encoder_get_dp_bridge_encoder_id(struct drm_connector *conn
 {
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
+	u32 encoder_id;
 	int i;
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		if (connector->encoder_ids[i] == 0)
-			break;
-
-		encoder = drm_encoder_find(connector->dev, NULL,
-					connector->encoder_ids[i]);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 
@@ -1323,14 +1314,12 @@ static bool amdgpu_connector_encoder_is_hbr2(struct drm_connector *connector)
 {
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
+	u32 encoder_id;
 	int i;
 	bool found = false;
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		if (connector->encoder_ids[i] == 0)
-			break;
-		encoder = drm_encoder_find(connector->dev, NULL,
-					connector->encoder_ids[i]);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 

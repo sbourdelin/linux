@@ -271,15 +271,12 @@ static int dce_virtual_early_init(void *handle)
 static struct drm_encoder *
 dce_virtual_encoder(struct drm_connector *connector)
 {
-	int enc_id = connector->encoder_ids[0];
 	struct drm_encoder *encoder;
+	u32 encoder_id;
 	int i;
 
-	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		if (connector->encoder_ids[i] == 0)
-			break;
-
-		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
+	drm_for_each_connector_encoder_ids(connector, encoder_id, i) {
+		encoder = drm_encoder_find(connector->dev, NULL, encoder_id);
 		if (!encoder)
 			continue;
 
@@ -288,8 +285,10 @@ dce_virtual_encoder(struct drm_connector *connector)
 	}
 
 	/* pick the first one */
-	if (enc_id)
-		return drm_encoder_find(connector->dev, NULL, enc_id);
+	encoder_id = connector->encoder_ids[0];
+	if (encoder_id)
+		return drm_encoder_find(connector->dev, NULL, encoder_id);
+
 	return NULL;
 }
 
