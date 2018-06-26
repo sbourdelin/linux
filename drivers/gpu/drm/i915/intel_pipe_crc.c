@@ -1001,6 +1001,18 @@ intel_is_valid_crc_source(struct drm_i915_private *dev_priv,
 		return ivb_crc_source_valid(dev_priv, source);
 }
 
+void intel_crtc_get_crc_sources(struct seq_file *m, struct drm_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
+	enum intel_pipe_crc_source source;
+
+	seq_puts(m, "[");
+	for (source = 0; source < INTEL_PIPE_CRC_SOURCE_MAX; source++)
+		if (intel_is_valid_crc_source(dev_priv, source) == 0)
+			seq_printf(m, "%s,", pipe_crc_source_name(source));
+	seq_puts(m, "auto] ");
+}
+
 int intel_crtc_verify_crc_source(struct drm_crtc *crtc, const char *source_name,
 				 size_t *values_cnt)
 {
