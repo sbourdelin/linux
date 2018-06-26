@@ -212,7 +212,7 @@ getname(const char __user * filename)
 }
 
 struct filename *
-getname_kernel(const char * filename)
+getname_kernel_flags(const char * filename, int flags)
 {
 	struct filename *result;
 	int len = strlen(filename) + 1;
@@ -221,7 +221,12 @@ getname_kernel(const char * filename)
 	if (unlikely(!result))
 		return ERR_PTR(-ENOMEM);
 
-	if (len <= EMBEDDED_NAME_MAX) {
+	if (unlikely(len == 1)) {
+		if (!(flags & LOOKUP_EMPTY)) {
+			__putname(result);
+			return ERR_PTR(-ENOENT);
+		}
+	} else if (len <= EMBEDDED_NAME_MAX) {
 		result->name = (char *)result->iname;
 	} else if (len <= PATH_MAX) {
 		const size_t size = offsetof(struct filename, iname[1]);
@@ -245,6 +250,12 @@ getname_kernel(const char * filename)
 	audit_getname(result);
 
 	return result;
+}
+
+struct filename *
+getname_kernel(const char * filename)
+{
+	return getname_kernel_flags(filename, 0);
 }
 
 void putname(struct filename *name)
@@ -3594,7 +3605,7 @@ struct file *do_file_open_root(struct dentry *dentry, struct vfsmount *mnt,
 	if (d_is_symlink(dentry) && op->intent & LOOKUP_OPEN)
 		return ERR_PTR(-ELOOP);
 
-	filename = getname_kernel(name);
+	filename = getname_kernel_flags(name, op->lookup_flags);
 	if (IS_ERR(filename))
 		return ERR_CAST(filename);
 

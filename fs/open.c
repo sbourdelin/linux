@@ -939,9 +939,9 @@ struct file *dentry_open(const struct path *path, int flags,
 }
 EXPORT_SYMBOL(dentry_open);
 
-static inline int build_open_flags(int flags, umode_t mode, struct open_flags *op)
+static inline int build_open_flags(int flags, umode_t mode, int lookup_flags,
+				   struct open_flags *op)
 {
-	int lookup_flags = 0;
 	int acc_mode = ACC_MODE(flags);
 
 	/*
@@ -1024,7 +1024,7 @@ static inline int build_open_flags(int flags, umode_t mode, struct open_flags *o
 struct file *file_open_name(struct filename *name, int flags, umode_t mode)
 {
 	struct open_flags op;
-	int err = build_open_flags(flags, mode, &op);
+	int err = build_open_flags(flags, mode, 0, &op);
 	return err ? ERR_PTR(err) : do_filp_open(AT_FDCWD, name, &op);
 }
 
@@ -1053,10 +1053,11 @@ struct file *filp_open(const char *filename, int flags, umode_t mode)
 EXPORT_SYMBOL(filp_open);
 
 struct file *file_open_root(struct dentry *dentry, struct vfsmount *mnt,
-			    const char *filename, int flags, umode_t mode)
+			    const char *filename, int flags, umode_t mode,
+			    int lookup_flags)
 {
 	struct open_flags op;
-	int err = build_open_flags(flags, mode, &op);
+	int err = build_open_flags(flags, mode, lookup_flags, &op);
 	if (err)
 		return ERR_PTR(err);
 	return do_file_open_root(dentry, mnt, filename, &op);
@@ -1086,7 +1087,7 @@ EXPORT_SYMBOL(filp_clone_open);
 long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 {
 	struct open_flags op;
-	int fd = build_open_flags(flags, mode, &op);
+	int fd = build_open_flags(flags, mode, 0, &op);
 	struct filename *tmp;
 
 	if (fd)

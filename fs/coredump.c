@@ -711,7 +711,7 @@ void do_coredump(const siginfo_t *siginfo)
 			get_fs_root(init_task.fs, &root);
 			task_unlock(&init_task);
 			cprm.file = file_open_root(root.dentry, root.mnt,
-				cn.corename, open_flags, 0600);
+				cn.corename, open_flags, 0600, 0);
 			path_put(&root);
 		} else {
 			cprm.file = filp_open(cn.corename, open_flags, 0600);

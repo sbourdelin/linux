@@ -229,7 +229,8 @@ static long do_handle_open(int mountdirfd, struct file_handle __user *ufh,
 		path_put(&path);
 		return fd;
 	}
-	file = file_open_root(path.dentry, path.mnt, "", open_flag, 0);
+	file = file_open_root(path.dentry, path.mnt, "", open_flag, 0,
+			      LOOKUP_EMPTY);
 	if (IS_ERR(file)) {
 		put_unused_fd(fd);
 		retval =  PTR_ERR(file);
