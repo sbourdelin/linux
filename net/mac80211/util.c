@@ -273,6 +273,62 @@ void ieee80211_propagate_queue_wake(struct ieee80211_local *local, int queue)
 	}
 }
 
+static void ieee80211_wake_txqs(struct ieee80211_local *local)
+{
+	struct ieee80211_sub_if_data *sdata;
+	struct sta_info *sta;
+	struct txq_info *txqi;
+	int i;
+
+	if (!local->ops->wake_tx_queue)
+		return;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(sta, &local->sta_list, list) {
+		if (!atomic_read(&sta->txqs_paused))
+			continue;
+
+		atomic_set(&sta->txqs_paused, 0);
+
+		for (i = 0; i < ARRAY_SIZE(sta->sta.txq); i++) {
+			txqi = to_txq_info(sta->sta.txq[i]);
+
+			if (!test_and_clear_bit(IEEE80211_TXQ_PAUSED,
+						&txqi->flags))
+				continue;
+
+			drv_wake_tx_queue(local, txqi);
+		}
+	}
+
+	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
+		struct ieee80211_vif *vif = &sdata->vif;
+		struct ps_data *ps = NULL;
+
+		/* Software interfaces like AP_VLAN, monitor do not have
+		 * vif specific queues.
+		 */
+		if (!sdata->dev || !vif->txq)
+			continue;
+
+		txqi = to_txq_info(vif->txq);
+
+		if (!test_and_clear_bit(IEEE80211_TXQ_PAUSED, &txqi->flags))
+			continue;
+
+		if (sdata->vif.type == NL80211_IFTYPE_AP)
+			ps = &sdata->bss->ps;
+
+		if (ps && atomic_read(&ps->num_sta_ps))
+			continue;
+
+		drv_wake_tx_queue(local, txqi);
+	}
+
+	rcu_read_unlock();
+}
+
 static void __ieee80211_wake_queue(struct ieee80211_hw *hw, int queue,
 				   enum queue_stop_reason reason,
 				   bool refcounted)
@@ -298,9 +354,14 @@ static void __ieee80211_wake_queue(struct ieee80211_hw *hw, int queue,
 	if (local->q_stop_reasons[queue][reason] == 0)
 		__clear_bit(reason, &local->queue_stop_reasons[queue]);
 
+	if (local->ops->wake_tx_queue)
+		__clear_bit(reason, &local->txqs_stopped);
+
 	if (local->queue_stop_reasons[queue] != 0)
 		/* someone still has this queue stopped */
 		return;
+
+	ieee80211_wake_txqs(local);
 
 	if (skb_queue_empty(&local->pending[queue])) {
 		rcu_read_lock();
@@ -351,8 +412,10 @@ static void __ieee80211_stop_queue(struct ieee80211_hw *hw, int queue,
 	if (__test_and_set_bit(reason, &local->queue_stop_reasons[queue]))
 		return;
 
-	if (local->ops->wake_tx_queue)
+	if (local->ops->wake_tx_queue) {
+		__set_bit(reason, &local->txqs_stopped);
 		return;
+	}
 
 	if (local->hw.queues < IEEE80211_NUM_ACS)
 		n_acs = 1;

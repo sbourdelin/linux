@@ -582,6 +582,7 @@ struct sta_info {
 	u8 reserved_tid;
 
 	struct cfg80211_chan_def tdls_chandef;
+	atomic_t txqs_paused;
 
 	/* keep last! */
 	struct ieee80211_sta sta;

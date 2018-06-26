@@ -818,6 +818,7 @@ enum txq_info_flags {
 	IEEE80211_TXQ_STOP,
 	IEEE80211_TXQ_AMPDU,
 	IEEE80211_TXQ_NO_AMSDU,
+	IEEE80211_TXQ_PAUSED,
 };
 
 /**
@@ -1138,6 +1139,11 @@ struct ieee80211_local {
 	int q_stop_reasons[IEEE80211_MAX_QUEUES][IEEE80211_QUEUE_STOP_REASONS];
 	/* also used to protect ampdu_ac_queue and amdpu_ac_stop_refcnt */
 	spinlock_t queue_stop_reason_lock;
+
+	/* pause/resume logic for intermediate software queues,
+	 * applicable when wake_tx_queue is defined.
+	 */
+	unsigned long txqs_stopped;
 
 	int open_count;
 	int monitors, cooked_mntrs;

@@ -3467,11 +3467,22 @@ struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
 	struct ieee80211_tx_data tx;
 	ieee80211_tx_result r;
 	struct ieee80211_vif *vif;
+	struct sta_info *sta;
 
 	spin_lock_bh(&fq->lock);
 
-	if (test_bit(IEEE80211_TXQ_STOP, &txqi->flags))
+	if (test_bit(IEEE80211_TXQ_STOP, &txqi->flags) ||
+	    test_bit(IEEE80211_TXQ_PAUSED, &txqi->flags))
 		goto out;
+
+	if (local->txqs_stopped) {
+		set_bit(IEEE80211_TXQ_PAUSED, &txqi->flags);
+		if (txq->sta) {
+			sta = container_of(txq->sta, struct sta_info, sta);
+			atomic_set(&sta->txqs_paused, 1);
+		}
+		goto out;
+	}
 
 	/* Make sure fragments stay together. */
 	skb = __skb_dequeue(&txqi->frags);
