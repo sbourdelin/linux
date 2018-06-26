@@ -310,10 +310,10 @@ static int ghes_read_estatus(struct ghes *ghes,
 
 	ghes_copy_tofrom_phys(estatus, *buf_paddr,
 			      sizeof(*estatus), 1, fixmap_idx);
-	if (!estatus->block_status)
+	if (!estatus->block_status) {
+		*buf_paddr = 0;
 		return -ENOENT;
-
-	ghes->flags |= GHES_TO_CLEAR;
+	}
 
 	rc = -EIO;
 	len = cper_estatus_len(estatus);
@@ -337,16 +337,14 @@ err_read_block:
 	return rc;
 }
 
-static void ghes_clear_estatus(struct ghes *ghes,
-			       struct acpi_hest_generic_status *estatus,
+static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
 			       phys_addr_t buf_paddr, int fixmap_idx)
 {
 	estatus->block_status = 0;
-	if (!(ghes->flags & GHES_TO_CLEAR))
-		return;
-	ghes_copy_tofrom_phys(estatus, buf_paddr,
-			      sizeof(estatus->block_status), 0, fixmap_idx);
-	ghes->flags &= ~GHES_TO_CLEAR;
+	if (buf_paddr)
+		ghes_copy_tofrom_phys(estatus, buf_paddr,
+				      sizeof(estatus->block_status), 0,
+				      fixmap_idx);
 }
 
 static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int sev)
@@ -720,7 +718,7 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
 	struct acpi_hest_generic_status *estatus = ghes->estatus;
 
 	if (ghes_read_estatus(ghes, estatus, &buf_paddr, fixmap_idx)) {
-		ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
+		ghes_clear_estatus(estatus, buf_paddr, fixmap_idx);
 		return -ENOENT;
 	}
 
@@ -730,11 +728,11 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
 		__ghes_panic(ghes, estatus);
 	}
 
-	if (!(ghes->flags & GHES_TO_CLEAR))
+	if (!buf_paddr)
 		return 0;
 
 	__process_error(ghes, estatus);
-	ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
+	ghes_clear_estatus(estatus, buf_paddr, fixmap_idx);
 
 	return 0;
 }
@@ -871,7 +869,7 @@ static int ghes_proc(struct ghes *ghes)
 	ghes_do_proc(ghes, estatus);
 
 out:
-	ghes_clear_estatus(ghes, estatus, buf_paddr, FIX_APEI_GHES_IRQ);
+	ghes_clear_estatus(estatus, buf_paddr, FIX_APEI_GHES_IRQ);
 
 	if (rc == -ENOENT)
 		goto unlock;
