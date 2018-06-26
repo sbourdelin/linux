@@ -1317,9 +1317,9 @@ static void i915_oa_stream_destroy(struct i915_perf_stream *stream)
 
 	put_oa_config(dev_priv, stream->oa_config);
 
-	if (dev_priv->perf.oa.spurious_report_rs.missed) {
+	if (atomic_read(&dev_priv->perf.oa.spurious_report_rs.missed)) {
 		DRM_NOTE("%d spurious OA report notices suppressed due to ratelimiting\n",
-			 dev_priv->perf.oa.spurious_report_rs.missed);
+			 atomic_read(&dev_priv->perf.oa.spurious_report_rs.missed));
 	}
 }
 

@@ -936,24 +936,20 @@ static void crng_reseed(struct crng_state *crng, struct entropy_store *r)
 	crng->init_time = jiffies;
 	spin_unlock_irqrestore(&crng->lock, flags);
 	if (crng == &primary_crng && crng_init < 2) {
+		int unseeded_miss, urandom_miss;
+
 		invalidate_batched_entropy();
 		numa_crng_init();
 		crng_init = 2;
 		process_random_ready_list();
 		wake_up_interruptible(&crng_init_wait);
 		pr_notice("random: crng init done\n");
-		if (unseeded_warning.missed) {
+		if ((unseeded_miss = atomic_xchg(&unseeded_warning.missed, 0)))
 			pr_notice("random: %d get_random_xx warning(s) missed "
-				  "due to ratelimiting\n",
-				  unseeded_warning.missed);
-			unseeded_warning.missed = 0;
-		}
-		if (urandom_warning.missed) {
+				  "due to ratelimiting\n", unseeded_miss);
+		if ((urandom_miss = atomic_xchg(&urandom_warning.missed, 0)))
 			pr_notice("random: %d urandom warning(s) missed "
-				  "due to ratelimiting\n",
-				  urandom_warning.missed);
-			urandom_warning.missed = 0;
-		}
+				  "due to ratelimiting\n", urandom_miss);
 	}
 }
 
