@@ -113,12 +113,13 @@ static DEFINE_MUTEX(ghes_list_mutex);
  * from BIOS to Linux can be determined only in NMI, IRQ or timer
  * handler, but general ioremap can not be used in atomic context, so
  * the fixmap is used instead.
- *
- * These 2 spinlocks are used to prevent the fixmap entries from being used
- * simultaneously.
  */
-static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
-static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
+
+/*
+ * Used by ghes_proc() to prevent non-NMI notifications from interacting.
+ * This also protects the FIX_APEI_GHES_IRQ fixmap slot.
+ */
+static DEFINE_SPINLOCK(ghes_notify_lock_irq);
 
 static struct gen_pool *ghes_estatus_pool;
 static unsigned long ghes_estatus_pool_size_request;
@@ -291,7 +292,6 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
 				  int from_phys)
 {
 	void __iomem *vaddr;
-	unsigned long flags = 0;
 	int in_nmi = in_nmi();
 	u64 offset;
 	u32 trunk;
@@ -299,10 +299,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
 	while (len > 0) {
 		offset = paddr - (paddr & PAGE_MASK);
 		if (in_nmi) {
-			raw_spin_lock(&ghes_ioremap_lock_nmi);
 			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
 		} else {
-			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
 			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
 		}
 		trunk = PAGE_SIZE - offset;
@@ -316,10 +314,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
 		buffer += trunk;
 		if (in_nmi) {
 			ghes_iounmap_nmi();
-			raw_spin_unlock(&ghes_ioremap_lock_nmi);
 		} else {
 			ghes_iounmap_irq();
-			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
 		}
 	}
 }
@@ -879,6 +875,9 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
 static int ghes_proc(struct ghes *ghes)
 {
 	int rc;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ghes_notify_lock_irq, flags);
 
 	rc = ghes_read_estatus(ghes, 0);
 	if (rc)
@@ -898,14 +897,17 @@ out:
 	ghes_clear_estatus(ghes);
 
 	if (rc == -ENOENT)
-		return rc;
+		goto unlock;
 
 	/*
 	 * GHESv2 type HEST entries introduce support for error acknowledgment,
 	 * so only acknowledge the error if this support is present.
 	 */
 	if (is_hest_type_generic_v2(ghes))
-		return ghes_ack_error(ghes->generic_v2);
+		rc = ghes_ack_error(ghes->generic_v2);
+
+unlock:
+	spin_unlock_irqrestore(&ghes_notify_lock_irq, flags);
 
 	return rc;
 }
@@ -968,6 +970,7 @@ static struct notifier_block ghes_notifier_hed = {
 
 #ifdef CONFIG_ACPI_APEI_SEA
 static LIST_HEAD(ghes_sea);
+static DEFINE_RAW_SPINLOCK(ghes_notify_lock_sea);
 
 /*
  * Return 0 only if one of the SEA error sources successfully reported an error
@@ -975,7 +978,13 @@ static LIST_HEAD(ghes_sea);
  */
 int ghes_notify_sea(void)
 {
-	return ghes_estatus_queue_notified(&ghes_sea);
+	int rv;
+
+	raw_spin_lock(&ghes_notify_lock_sea);
+	rv = ghes_estatus_queue_notified(&ghes_sea);
+	raw_spin_unlock(&ghes_notify_lock_sea);
+
+	return rv;
 }
 
 static void ghes_sea_add(struct ghes *ghes)
@@ -1009,6 +1018,7 @@ static inline void ghes_sea_remove(struct ghes *ghes) { }
 static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
 
 static LIST_HEAD(ghes_nmi);
+static DEFINE_RAW_SPINLOCK(ghes_notify_lock_nmi);
 
 static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
 {
@@ -1017,8 +1027,10 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
 	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
 		return ret;
 
+	raw_spin_lock(&ghes_notify_lock_nmi);
 	if (!ghes_estatus_queue_notified(&ghes_nmi))
 		ret = NMI_HANDLED;
+	raw_spin_unlock(&ghes_notify_lock_nmi);
 
 	atomic_dec(&ghes_in_nmi);
 	return ret;
