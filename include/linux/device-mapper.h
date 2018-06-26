@@ -462,6 +462,11 @@ void dm_table_add_target_callbacks(struct dm_table *t, struct dm_target_callback
 void dm_table_set_type(struct dm_table *t, enum dm_queue_mode type);
 
 /*
+ * Check to see if this target type and all table devices support DAX.
+ */
+bool dm_table_supports_dax(struct dm_table *t);
+
+/*
  * Finally call this to make the table ready for use.
  */
 int dm_table_complete(struct dm_table *t);

@@ -885,12 +885,10 @@ EXPORT_SYMBOL_GPL(dm_table_set_type);
 static int device_supports_dax(struct dm_target *ti, struct dm_dev *dev,
 			       sector_t start, sector_t len, void *data)
 {
-	struct request_queue *q = bdev_get_queue(dev->bdev);
-
-	return q && blk_queue_dax(q);
+	return bdev_dax_supported(dev->bdev, PAGE_SIZE);
 }
 
-static bool dm_table_supports_dax(struct dm_table *t)
+bool dm_table_supports_dax(struct dm_table *t)
 {
 	struct dm_target *ti;
 	unsigned i;
@@ -909,6 +907,7 @@ static bool dm_table_supports_dax(struct dm_table *t)
 
 	return true;
 }
+EXPORT_SYMBOL_GPL(dm_table_supports_dax);
 
 static bool dm_table_does_not_support_partial_completion(struct dm_table *t);
 

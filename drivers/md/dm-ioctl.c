@@ -1350,6 +1350,11 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 		goto err_unlock_md_type;
 	}
 
+	if (dm_table_supports_dax(t))
+		blk_queue_flag_set(QUEUE_FLAG_DAX, md->queue);
+	else
+		blk_queue_flag_clear(QUEUE_FLAG_DAX, md->queue);
+
 	dm_unlock_md_type(md);
 
 	/* stage inactive table */
