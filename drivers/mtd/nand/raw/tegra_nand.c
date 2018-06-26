@@ -1002,14 +1002,14 @@ static int tegra_nand_chips_init(struct device *dev,
 	}
 
 	if (chip->ecc.algo == NAND_ECC_BCH && mtd->writesize < 2048) {
-		dev_err(dev, "BCH supportes 2K or 4K page size only\n");
+		dev_err(dev, "BCH supports 2K or 4K page size only\n");
 		return -EINVAL;
 	}
 
 	if (!chip->ecc.strength) {
 		ret = tegra_nand_select_strength(chip, mtd->oobsize);
 		if (ret < 0) {
-			dev_err(dev, "No valid strenght found, minimum %d\n",
+			dev_err(dev, "No valid strength found, minimum %d\n",
 				chip->ecc_strength_ds);
 			return ret;
 		}
