@@ -315,7 +315,7 @@ static int decode_instructions(struct objtool_file *file)
 			}
 
 			func_for_each_insn(file, func, insn)
-				if (!insn->func)
+				if (!insn->func || insn->func == func->pfunc)
 					insn->func = func;
 		}
 	}
