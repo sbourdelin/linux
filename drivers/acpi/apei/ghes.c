@@ -25,6 +25,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/arm_sdei.h>
 #include <linux/kernel.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -763,8 +764,8 @@ no_work:
 	return rc;
 }
 
-static int ghes_estatus_queue_notified(struct list_head *rcu_list,
-				       int fixmap_idx)
+static int __maybe_unused
+ghes_estatus_queue_notified(struct list_head *rcu_list, int fixmap_idx)
 {
 	int ret = -ENOENT;
 	struct ghes *ghes;
@@ -1069,6 +1070,75 @@ static inline void ghes_nmi_add(struct ghes *ghes) { }
 static inline void ghes_nmi_remove(struct ghes *ghes) { }
 #endif /* CONFIG_HAVE_ACPI_APEI_NMI */
 
+#ifdef CONFIG_ACPI_APEI_SDEI
+static int __ghes_sdei_callback(struct ghes *ghes, int fixmap_idx)
+{
+	if (!_in_nmi_notify_one(ghes, fixmap_idx)) {
+		irq_work_queue(&ghes_proc_irq_work);
+
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+static DEFINE_RAW_SPINLOCK(ghes_notify_lock_sdei_normal);
+static DEFINE_RAW_SPINLOCK(ghes_notify_lock_sdei_critical);
+
+static int ghes_sdei_normal_callback(u32 event_num, struct pt_regs *regs,
+				      void *arg)
+{
+	int err = -ENOENT;
+	struct ghes *ghes = arg;
+
+	raw_spin_lock(&ghes_notify_lock_sdei_normal);
+	err = __ghes_sdei_callback(ghes, FIX_APEI_GHES_SDEI_NORMAL);
+	raw_spin_unlock(&ghes_notify_lock_sdei_normal);
+
+	return err;
+}
+
+static int ghes_sdei_critical_callback(u32 event_num, struct pt_regs *regs,
+				       void *arg)
+{
+	int err = -ENOENT;
+	struct ghes *ghes = arg;
+
+	raw_spin_lock(&ghes_notify_lock_sdei_critical);
+	err = __ghes_sdei_callback(ghes, FIX_APEI_GHES_SDEI_CRITICAL);
+	raw_spin_unlock(&ghes_notify_lock_sdei_critical);
+
+	return err;
+}
+
+static int apei_sdei_register_ghes(struct ghes *ghes)
+{
+	int err;
+
+	ghes_estatus_queue_grow_pool(ghes);
+
+	err = sdei_register_ghes(ghes, ghes_sdei_normal_callback,
+				 ghes_sdei_critical_callback);
+	if (err)
+		ghes_estatus_queue_shrink_pool(ghes);
+
+	return err;
+}
+
+static int apei_sdei_unregister_ghes(struct ghes *ghes)
+{
+	int err = sdei_unregister_ghes(ghes);
+
+	if (!err)
+		ghes_estatus_queue_shrink_pool(ghes);
+
+	return err;
+}
+#else
+static int apei_sdei_register_ghes(struct ghes *ghes) { return -EINVAL; }
+static int apei_sdei_unregister_ghes(struct ghes *ghes) { return -EINVAL; }
+#endif /* CONFIG_ACPI_APEI_SDEI */
+
 static int ghes_probe(struct platform_device *ghes_dev)
 {
 	struct acpi_hest_generic *generic;
@@ -1099,6 +1169,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
 	case ACPI_HEST_NOTIFY_NMI:
 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+				generic->header.source_id);
+			goto err;
+		}
+		break;
+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SDEI)) {
+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SDE Interface is not supported!\n",
 				generic->header.source_id);
 			goto err;
 		}
@@ -1166,6 +1243,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
 	case ACPI_HEST_NOTIFY_NMI:
 		ghes_nmi_add(ghes);
 		break;
+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
+		rc = apei_sdei_register_ghes(ghes);
+		if (rc)
+			goto err;
+		break;
 	default:
 		BUG();
 	}
@@ -1189,6 +1271,7 @@ err:
 
 static int ghes_remove(struct platform_device *ghes_dev)
 {
+	int rc;
 	struct ghes *ghes;
 	struct acpi_hest_generic *generic;
 
@@ -1220,6 +1303,11 @@ static int ghes_remove(struct platform_device *ghes_dev)
 		break;
 	case ACPI_HEST_NOTIFY_NMI:
 		ghes_nmi_remove(ghes);
+		break;
+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
+		rc = apei_sdei_unregister_ghes(ghes);
+		if (rc)
+			return rc;
 		break;
 	default:
 		BUG();

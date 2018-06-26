@@ -61,6 +61,11 @@ config ACPI_APEI_SEA
 	  option allows the OS to look for such hardware error record, and
 	  take appropriate action.
 
+config ACPI_APEI_SDEI
+	bool
+	depends on ACPI_APEI_GHES && ARM_SDE_INTERFACE
+	select ACPI_APEI_GHES_ESTATUS_QUEUE
+
 config ACPI_APEI_MEMORY_FAILURE
 	bool "APEI memory error recovering support"
 	depends on ACPI_APEI && MEMORY_FAILURE

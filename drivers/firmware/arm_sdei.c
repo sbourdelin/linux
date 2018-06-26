@@ -890,7 +890,7 @@ static void sdei_smccc_hvc(unsigned long function_id,
 	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
 }
 
-#ifdef CONFIG_ACPI_APEI_GHES
+#ifdef CONFIG_ACPI_APEI_SDEI
 int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *normal_cb,
 		       sdei_event_callback *critical_cb)
 {
@@ -951,7 +951,7 @@ int sdei_unregister_ghes(struct ghes *ghes)
 
 	return err;
 }
-#endif /* CONFIG_ACPI_APEI_GHES */
+#endif /* CONFIG_ACPI_APEI_SDEI */
 
 static int sdei_get_conduit(struct platform_device *pdev)
 {
