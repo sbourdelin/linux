@@ -15049,6 +15049,51 @@ static void intel_update_fdi_pll_freq(struct drm_i915_private *dev_priv)
 	DRM_DEBUG_DRIVER("FDI PLL freq=%d\n", dev_priv->fdi_pll_freq);
 }
 
+static void intel_initial_commit(struct drm_device *dev,
+				 struct intel_crtc *intel_crtc)
+{
+	struct drm_atomic_state *state = NULL;
+	struct drm_crtc *crtc = &intel_crtc->base;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_crtc_state *crtc_state;
+	int ret;
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		goto unlock;
+
+	state->acquire_ctx = &ctx;
+
+	crtc_state = drm_atomic_get_crtc_state(state, crtc);
+	if (IS_ERR(crtc_state))
+		goto out;
+
+	if (!crtc_state->active)
+		goto out;
+
+	ret = drm_atomic_add_affected_planes(state, crtc);
+	if (ret)
+		goto out;
+
+	ret = drm_atomic_commit(state);
+	if (ret == -EDEADLK) {
+		drm_atomic_state_clear(state);
+		drm_modeset_backoff(&ctx);
+	}
+
+out:
+	if (state) {
+		drm_atomic_state_put(state);
+		state = NULL;
+	}
+
+unlock:
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+}
+
 int intel_modeset_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
@@ -15177,6 +15222,10 @@ int intel_modeset_init(struct drm_device *dev)
 		 */
 		intel_find_initial_plane_obj(crtc, &plane_config);
 	}
+
+	/* Force all active planes to recompute their states */
+	for_each_intel_crtc(dev, crtc)
+		intel_initial_commit(dev, crtc);
 
 	/*
 	 * Make sure hardware watermarks really match the state we read out.
