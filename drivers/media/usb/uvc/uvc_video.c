@@ -391,35 +391,14 @@ static inline ktime_t uvc_video_get_time(void)
 
 static void
 uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
-		       const u8 *data, int len)
+		       const u8 *data, int len, unsigned int header_size,
+		       bool has_pts, bool has_scr)
 {
 	struct uvc_clock_sample *sample;
-	unsigned int header_size;
-	bool has_pts = false;
-	bool has_scr = false;
 	unsigned long flags;
 	ktime_t time;
 	u16 host_sof;
 	u16 dev_sof;
-
-	switch (data[1] & (UVC_STREAM_PTS | UVC_STREAM_SCR)) {
-	case UVC_STREAM_PTS | UVC_STREAM_SCR:
-		header_size = 12;
-		has_pts = true;
-		has_scr = true;
-		break;
-	case UVC_STREAM_PTS:
-		header_size = 6;
-		has_pts = true;
-		break;
-	case UVC_STREAM_SCR:
-		header_size = 8;
-		has_scr = true;
-		break;
-	default:
-		header_size = 2;
-		break;
-	}
 
 	/* Check for invalid headers. */
 	if (len < header_size)
@@ -717,11 +696,10 @@ done:
  */
 
 static void uvc_video_stats_decode(struct uvc_streaming *stream,
-		const u8 *data, int len)
+				   const u8 *data, int len,
+				   unsigned int header_size, bool has_pts,
+				   bool has_scr)
 {
-	unsigned int header_size;
-	bool has_pts = false;
-	bool has_scr = false;
 	u16 uninitialized_var(scr_sof);
 	u32 uninitialized_var(scr_stc);
 	u32 uninitialized_var(pts);
@@ -729,25 +707,6 @@ static void uvc_video_stats_decode(struct uvc_streaming *stream,
 	if (stream->stats.stream.nb_frames == 0 &&
 	    stream->stats.frame.nb_packets == 0)
 		stream->stats.stream.start_ts = ktime_get();
-
-	switch (data[1] & (UVC_STREAM_PTS | UVC_STREAM_SCR)) {
-	case UVC_STREAM_PTS | UVC_STREAM_SCR:
-		header_size = 12;
-		has_pts = true;
-		has_scr = true;
-		break;
-	case UVC_STREAM_PTS:
-		header_size = 6;
-		has_pts = true;
-		break;
-	case UVC_STREAM_SCR:
-		header_size = 8;
-		has_scr = true;
-		break;
-	default:
-		header_size = 2;
-		break;
-	}
 
 	/* Check for invalid headers. */
 	if (len < header_size || data[0] < header_size) {
@@ -957,10 +916,41 @@ static void uvc_video_stats_stop(struct uvc_streaming *stream)
  * to be called with a NULL buf parameter. uvc_video_decode_data and
  * uvc_video_decode_end will never be called with a NULL buffer.
  */
+static void uvc_video_decode_header_size(const u8 *data, int *header_size,
+					 bool *has_pts, bool *has_scr)
+{
+	switch (data[1] & (UVC_STREAM_PTS | UVC_STREAM_SCR)) {
+	case UVC_STREAM_PTS | UVC_STREAM_SCR:
+		*header_size = 12;
+		*has_pts = true;
+		*has_scr = true;
+		break;
+	case UVC_STREAM_PTS:
+		*header_size = 6;
+		*has_pts = true;
+		break;
+	case UVC_STREAM_SCR:
+		*header_size = 8;
+		*has_scr = true;
+		break;
+	default:
+		*header_size = 2;
+	}
+}
+
 static int uvc_video_decode_start(struct uvc_streaming *stream,
-		struct uvc_buffer *buf, const u8 *data, int len)
+				  struct uvc_buffer *buf, const u8 *urb_data,
+				  int len)
 {
 	u8 fid;
+	u8 data[12];
+	unsigned int header_size;
+	bool has_pts = false, has_scr = false;
+
+	/* Cache the header since urb_data is uncached memory. The size of
+	 * header is at most 12 bytes.
+	 */
+	memcpy(data, urb_data, min(len, 12));
 
 	/* Sanity checks:
 	 * - packet must be at least 2 bytes long
@@ -983,8 +973,12 @@ static int uvc_video_decode_start(struct uvc_streaming *stream,
 			uvc_video_stats_update(stream);
 	}
 
-	uvc_video_clock_decode(stream, buf, data, len);
-	uvc_video_stats_decode(stream, data, len);
+	uvc_video_decode_header_size(data, &header_size, &has_pts, &has_scr);
+
+	uvc_video_clock_decode(stream, buf, data, len, header_size, has_pts,
+			       has_scr);
+	uvc_video_stats_decode(stream, data, len, header_size, has_pts,
+			       has_scr);
 
 	/* Store the payload FID bit and return immediately when the buffer is
 	 * NULL.
