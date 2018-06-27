@@ -40,7 +40,6 @@
 #include "rds_single_path.h"
 #include "rds.h"
 #include "ib.h"
-#include "tcp.h"
 
 /*
  * Set the selected protocol version
@@ -679,7 +678,7 @@ static u32 rds_ib_protocol_compatible(struct rdma_cm_event *event, bool isv6)
 	return version;
 }
 
-/* Given an IPv6 address, find the IB net_device which hosts that address and
+/* Given an IPv6 address, find the net_device which hosts that address and
  * return its index.  This is used by the rds_ib_cm_handle_connect() code to
  * find the interface index of where an incoming request comes from when
  * the request is using a link local address.
@@ -696,8 +695,7 @@ static u32 __rds_find_ifindex(struct net *net, const struct in6_addr *addr)
 
 	rcu_read_lock();
 	for_each_netdev_rcu(net, dev) {
-		if (dev->type == ARPHRD_INFINIBAND &&
-		    ipv6_chk_addr(net, addr, dev, 0)) {
+		if (ipv6_chk_addr(net, addr, dev, 0)) {
 			idx = dev->ifindex;
 			break;
 		}
@@ -887,7 +885,10 @@ int rds_ib_conn_path_connect(struct rds_conn_path *cp)
 
 	/* XXX I wonder what affect the port space has */
 	/* delegate cm event handler to rdma_transport */
-	handler = rds_rdma_cm_event_handler;
+	if (conn->c_isv6)
+		handler = rds6_rdma_cm_event_handler;
+	else
+		handler = rds_rdma_cm_event_handler;
 	ic->i_cm_id = rdma_create_id(&init_net, handler, conn,
 				     RDMA_PS_TCP, IB_QPT_RC);
 	if (IS_ERR(ic->i_cm_id)) {
@@ -923,7 +924,7 @@ int rds_ib_conn_path_connect(struct rds_conn_path *cp)
 		sin6 = (struct sockaddr_in6 *)&dest;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_addr = conn->c_faddr;
-		sin6->sin6_port = htons(RDS_TCP_PORT);
+		sin6->sin6_port = htons(RDS_CM_PORT);
 		sin6->sin6_scope_id = conn->c_dev_if;
 	}
 

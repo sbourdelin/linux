@@ -1105,8 +1105,28 @@ int rds_sendmsg(struct socket *sock, struct msghdr *msg, size_t payload_len)
 			break;
 
 		case sizeof(*sin6): {
-			ret = -EPROTONOSUPPORT;
-			goto out;
+			int addr_type;
+
+			if (sin6->sin6_family != AF_INET6) {
+				ret = -EINVAL;
+				goto out;
+			}
+			addr_type = ipv6_addr_type(&sin6->sin6_addr);
+			if (!(addr_type & IPV6_ADDR_UNICAST)) {
+				ret = -EINVAL;
+				goto out;
+			}
+			if (addr_type & IPV6_ADDR_LINKLOCAL) {
+				if (sin6->sin6_scope_id == 0) {
+					ret = -EINVAL;
+					goto out;
+				}
+				scope_id = sin6->sin6_scope_id;
+			}
+
+			daddr = sin6->sin6_addr;
+			dport = sin6->sin6_port;
+			break;
 		}
 
 		default:
@@ -1136,6 +1156,14 @@ int rds_sendmsg(struct socket *sock, struct msghdr *msg, size_t payload_len)
 		    ipv6_addr_v4mapped(&rs->rs_bound_addr)) {
 			release_sock(sk);
 			ret = -EOPNOTSUPP;
+			goto out;
+		}
+		/* If the socket is already bound to a link local address,
+		 * it can only send to peers on the same link.
+		 */
+		if (scope_id != rs->rs_bound_scope_id) {
+			release_sock(sk);
+			ret = -EINVAL;
 			goto out;
 		}
 	}

@@ -484,7 +484,9 @@ static int rds_connect(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 	struct rds_sock *rs = rds_sk_to_rs(sk);
+	int addr_type;
 	int ret = 0;
 
 	lock_sock(sk);
@@ -510,7 +512,31 @@ static int rds_connect(struct socket *sock, struct sockaddr *uaddr,
 		break;
 
 	case sizeof(struct sockaddr_in6):
-		ret = -EPROTONOSUPPORT;
+		sin6 = (struct sockaddr_in6 *)uaddr;
+		if (sin6->sin6_family != AF_INET6) {
+			ret = -EAFNOSUPPORT;
+			break;
+		}
+		addr_type = ipv6_addr_type(&sin6->sin6_addr);
+		if (!(addr_type & IPV6_ADDR_UNICAST)) {
+			ret = -EPROTOTYPE;
+			break;
+		}
+		if (addr_type & IPV6_ADDR_LINKLOCAL) {
+			if (sin6->sin6_scope_id == 0 ||
+			    (!ipv6_addr_any(&rs->rs_bound_addr) &&
+			     sin6->sin6_scope_id != rs->rs_bound_scope_id)) {
+				ret = -EINVAL;
+				break;
+			}
+			/* Remember the connected address scope ID.  It will
+			 * be checked against the binding local address when
+			 * the socket is bound.
+			 */
+			rs->rs_bound_scope_id = sin6->sin6_scope_id;
+		}
+		rs->rs_conn_addr = sin6->sin6_addr;
+		rs->rs_conn_port = sin6->sin6_port;
 		break;
 
 	default:
