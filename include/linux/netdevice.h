@@ -838,6 +838,7 @@ struct netdev_bpf {
 			u32 flags;
 			struct bpf_prog *prog;
 			struct netlink_ext_ack *extack;
+			xdp_md_info_arr md_info;
 		};
 		/* XDP_QUERY_PROG */
 		struct {
