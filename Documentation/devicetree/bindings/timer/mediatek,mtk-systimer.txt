@@ -1,0 +1,18 @@
+Mediatek System Timers
+----------------------
+
+Required properties:
+- compatible: Should contain
+	"mediatek,sys_timer" for those platforms which support system timer.
+- reg: Should contain the location and length for system timer registers.
+- clocks: System timer is drived by system clock.
+
+Examples:
+
+	sys_timer@10017000 {
+		compatible = "mediatek,sys_timer";
+		reg = <0 0x10017000 0 0x1000>;
+		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&sys_clk>;
+	};
+
