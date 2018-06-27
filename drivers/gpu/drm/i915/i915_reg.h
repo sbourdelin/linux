@@ -65,9 +65,10 @@
  * but do note that the macros may be needed to read as well as write the
  * register contents.
  *
- * Define bits using ``(1 << N)`` instead of ``BIT(N)``. We may change this in
- * the future, but this is the prevailing style. Do **not** add ``_BIT`` suffix
- * to the name.
+ * Define bits using ``BIT(N)`` instead of ``(1 << N)``. Do **not** add ``_BIT``
+ * suffix to the name. Exception to ``BIT()`` usage: Value 1 for a bit field
+ * should be defined using ``(1 << N)`` to be in line with other values such as
+ * ``(2 << N)`` for the same field.
  *
  * Group the register and its contents together without blank lines, separate
  * from other registers and their contents with one blank line.
@@ -105,7 +106,7 @@
  *  #define _FOO_A                      0xf000
  *  #define _FOO_B                      0xf001
  *  #define FOO(pipe)                   _MMIO_PIPE(pipe, _FOO_A, _FOO_B)
- *  #define   FOO_ENABLE                (1 << 31)
+ *  #define   FOO_ENABLE                BIT(31)
  *  #define   FOO_MODE_MASK             (0xf << 16)
  *  #define   FOO_MODE_SHIFT            16
  *  #define   FOO_MODE_BAR              (0 << 16)
