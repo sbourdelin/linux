@@ -891,7 +891,7 @@ int drm_atomic_helper_check(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	if (state->legacy_cursor_update)
+	if (state->async_update || state->legacy_cursor_update)
 		state->async_update = !drm_atomic_helper_async_check(dev, state);
 
 	return ret;
@@ -1526,13 +1526,16 @@ int drm_atomic_helper_async_check(struct drm_device *dev,
 	if (new_plane_state->fence)
 		return -EINVAL;
 
+	/* Only do an async update if there is a pending commit. */
+	if (!old_plane_state->commit)
+		return -EINVAL;
+
 	/*
 	 * Don't do an async update if there is an outstanding commit modifying
 	 * the plane.  This prevents our async update's changes from getting
 	 * overridden by a previous synchronous update's state.
 	 */
-	if (old_plane_state->commit &&
-	    !try_wait_for_completion(&old_plane_state->commit->hw_done))
+	if (!try_wait_for_completion(&old_plane_state->commit->hw_done))
 		return -EBUSY;
 
 	return funcs->atomic_async_check(plane, new_plane_state);
