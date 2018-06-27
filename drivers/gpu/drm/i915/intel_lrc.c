@@ -875,14 +875,6 @@ static void reset_irq(struct intel_engine_cs *engine)
 	smp_store_mb(engine->execlists.active, 0);
 
 	clear_gtiir(engine);
-
-	/*
-	 * The port is checked prior to scheduling a tasklet, but
-	 * just in case we have suspended the tasklet to do the
-	 * wedging make sure that when it wakes, it decides there
-	 * is no work to do by clearing the irq_posted bit.
-	 */
-	clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
 }
 
 static void reset_csb_pointers(struct intel_engine_execlists *execlists)
@@ -972,10 +964,6 @@ static void process_csb(struct intel_engine_cs *engine)
 	struct execlist_port *port = execlists->port;
 	const u32 * const buf = execlists->csb_status;
 	u8 head, tail;
-
-	/* Clear before reading to catch new interrupts */
-	clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
-	smp_mb__after_atomic();
 
 	/* Note that csb_write, csb_status may be either in HWSP or mmio */
 	head = execlists->csb_head;
@@ -1112,11 +1100,10 @@ static void execlists_submission_tasklet(unsigned long data)
 {
 	struct intel_engine_cs * const engine = (struct intel_engine_cs *)data;
 
-	GEM_TRACE("%s awake?=%d, active=%x, irq-posted?=%d\n",
+	GEM_TRACE("%s awake?=%d, active=%x\n",
 		  engine->name,
 		  engine->i915->gt.awake,
-		  engine->execlists.active,
-		  test_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted));
+		  engine->execlists.active);
 
 	/*
 	 * We can skip acquiring intel_runtime_pm_get() here as it was taken
@@ -1128,14 +1115,7 @@ static void execlists_submission_tasklet(unsigned long data)
 	 */
 	GEM_BUG_ON(!engine->i915->gt.awake);
 
-	/*
-	 * Prefer doing test_and_clear_bit() as a two stage operation to avoid
-	 * imposing the cost of a locked atomic transaction when submitting a
-	 * new request (outside of the context-switch interrupt).
-	 */
-	if (test_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted))
-		process_csb(engine);
-
+	process_csb(engine);
 	if (!execlists_is_active(&engine->execlists, EXECLISTS_ACTIVE_PREEMPT))
 		execlists_dequeue(engine);
 }
@@ -1882,6 +1862,7 @@ execlists_reset_prepare(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
 	struct i915_request *request, *active;
+	unsigned long flags;
 
 	GEM_TRACE("%s\n", engine->name);
 
@@ -1903,8 +1884,9 @@ execlists_reset_prepare(struct intel_engine_cs *engine)
 	 * and avoid blaming an innocent request if the stall was due to the
 	 * preemption itself.
 	 */
-	if (test_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted))
-		process_csb(engine);
+	spin_lock_irqsave(&engine->timeline.lock, flags);
+
+	process_csb(engine);
 
 	/*
 	 * The last active request can then be no later than the last request
@@ -1914,15 +1896,12 @@ execlists_reset_prepare(struct intel_engine_cs *engine)
 	active = NULL;
 	request = port_request(execlists->port);
 	if (request) {
-		unsigned long flags;
-
 		/*
 		 * Prevent the breadcrumb from advancing before we decide
 		 * which request is currently active.
 		 */
 		intel_engine_stop_cs(engine);
 
-		spin_lock_irqsave(&engine->timeline.lock, flags);
 		list_for_each_entry_from_reverse(request,
 						 &engine->timeline.requests,
 						 link) {
@@ -1932,8 +1911,9 @@ execlists_reset_prepare(struct intel_engine_cs *engine)
 
 			active = request;
 		}
-		spin_unlock_irqrestore(&engine->timeline.lock, flags);
 	}
+
+	spin_unlock_irqrestore(&engine->timeline.lock, flags);
 
 	return active;
 }
