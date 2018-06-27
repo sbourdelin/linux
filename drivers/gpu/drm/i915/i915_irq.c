@@ -1469,15 +1469,10 @@ static void snb_gt_irq_handler(struct drm_i915_private *dev_priv,
 static void
 gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 {
-	struct intel_engine_execlists * const execlists = &engine->execlists;
 	bool tasklet = false;
 
-	if (iir & GT_CONTEXT_SWITCH_INTERRUPT) {
-		if (READ_ONCE(engine->execlists.active)) {
-			set_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
-			tasklet = true;
-		}
-	}
+	if (iir & GT_CONTEXT_SWITCH_INTERRUPT)
+		tasklet = true;
 
 	if (iir & GT_RENDER_USER_INTERRUPT) {
 		notify_ring(engine);
@@ -1485,7 +1480,7 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 	}
 
 	if (tasklet)
-		tasklet_hi_schedule(&execlists->tasklet);
+		tasklet_hi_schedule(&engine->execlists.tasklet);
 }
 
 static void gen8_gt_irq_ack(struct drm_i915_private *i915,
@@ -2217,7 +2212,6 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 
 		I915_WRITE(VLV_IER, ier);
 		I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
-		POSTING_READ(GEN8_MASTER_IRQ);
 
 		gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
