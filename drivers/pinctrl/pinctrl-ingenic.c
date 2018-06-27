@@ -543,12 +543,25 @@ static int ingenic_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int ingenic_pinmux_gpio_get_direction(struct pinctrl_dev *pctldev,
+		struct pinctrl_gpio_range *range,
+		unsigned int pin)
+{
+	struct ingenic_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
+
+	if (jzpc->version >= ID_JZ4770)
+		return ingenic_get_pin_config(jzpc, pin, JZ4770_GPIO_PAT1);
+	else
+		return !ingenic_get_pin_config(jzpc, pin, JZ4740_GPIO_DIR);
+}
+
 static const struct pinmux_ops ingenic_pmxops = {
 	.get_functions_count = pinmux_generic_get_function_count,
 	.get_function_name = pinmux_generic_get_function_name,
 	.get_function_groups = pinmux_generic_get_function_groups,
 	.set_mux = ingenic_pinmux_set_mux,
 	.gpio_set_direction = ingenic_pinmux_gpio_set_direction,
+	.gpio_get_direction = ingenic_pinmux_gpio_get_direction,
 };
 
 static int ingenic_pinconf_get(struct pinctrl_dev *pctldev,
