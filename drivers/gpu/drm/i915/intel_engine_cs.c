@@ -1646,6 +1646,7 @@ int intel_enable_engine_stats(struct intel_engine_cs *engine)
 unlock:
 	write_sequnlock_irqrestore(&engine->stats.lock, flags);
 	tasklet_enable(&execlists->tasklet);
+	tasklet_hi_schedule(&execlists->tasklet);
 
 	return err;
 }
