@@ -225,7 +225,7 @@ struct qedi_work_map {
 
 struct qedi_boot_target {
 	char ip_addr[64];
-	char iscsi_name[255];
+	char iscsi_name[256];
 	u32 ipv6_en;
 };
 
