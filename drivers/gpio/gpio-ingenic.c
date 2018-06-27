@@ -274,6 +274,12 @@ static int ingenic_gpio_direction_output(struct gpio_chip *gc,
 	return pinctrl_gpio_direction_output(gc->base + offset);
 }
 
+static int ingenic_gpio_get_direction(struct gpio_chip *gc,
+		unsigned int offset)
+{
+	return pinctrl_gpio_get_direction(gc->base + offset);
+}
+
 static const struct of_device_id ingenic_gpio_of_match[] = {
 	{ .compatible = "ingenic,jz4740-gpio", .data = (void *)ID_JZ4740 },
 	{ .compatible = "ingenic,jz4770-gpio", .data = (void *)ID_JZ4770 },
@@ -325,6 +331,7 @@ static int ingenic_gpio_probe(struct platform_device *pdev)
 
 	jzgc->gc.set = ingenic_gpio_set;
 	jzgc->gc.get = ingenic_gpio_get;
+	jzgc->gc.get_direction = ingenic_gpio_get_direction;
 	jzgc->gc.direction_input = ingenic_gpio_direction_input;
 	jzgc->gc.direction_output = ingenic_gpio_direction_output;
 
