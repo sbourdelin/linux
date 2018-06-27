@@ -442,12 +442,21 @@ config SYS_SUPPORTS_SH_CMT
         bool
 
 config MTK_TIMER
-	bool "Mediatek timer driver" if COMPILE_TEST
+	bool "Mediatek general purpose timer driver" if COMPILE_TEST
 	depends on HAS_IOMEM
 	select TIMER_OF
 	select CLKSRC_MMIO
 	help
-	  Support for Mediatek timer driver.
+	  Support for Mediatek General Purpose Timer (GPT) driver.
+
+config MTK_TIMER_SYSTIMER
+	bool "Mediatek system timer driver" if COMPILE_TEST
+	depends on HAS_IOMEM
+	select TIMER_OF
+	select CLKSRC_MMIO
+	help
+	  Support for Mediatek System Timer (sys_timer) driver used as
+	  a clock event supporting oneshot events.
 
 config SPRD_TIMER
 	bool "Spreadtrum timer driver" if EXPERT
