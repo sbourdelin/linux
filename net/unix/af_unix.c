@@ -742,6 +742,7 @@ static struct proto unix_proto = {
 	.name			= "UNIX",
 	.owner			= THIS_MODULE,
 	.obj_size		= sizeof(struct unix_sock),
+	.slab_flags		= SLAB_ACCOUNT,
 };
 
 static struct sock *unix_create1(struct net *net, struct socket *sock, int kern)

@@ -2657,6 +2657,7 @@ struct proto udp_prot = {
 	.sysctl_wmem_offset	= offsetof(struct net, ipv4.sysctl_udp_wmem_min),
 	.sysctl_rmem_offset	= offsetof(struct net, ipv4.sysctl_udp_rmem_min),
 	.obj_size		= sizeof(struct udp_sock),
+	.slab_flags		= SLAB_ACCOUNT,
 	.h.udp_table		= &udp_table,
 #ifdef CONFIG_COMPAT
 	.compat_setsockopt	= compat_udp_setsockopt,
