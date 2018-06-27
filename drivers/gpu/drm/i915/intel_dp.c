@@ -4484,7 +4484,7 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST)
 			intel_dp_handle_test_request(intel_dp);
 		if (sink_irq_vector & DP_CP_IRQ)
-			intel_hdcp_check_link(intel_dp->attached_connector);
+			intel_hdcp_handle_cp_irq(intel_dp->attached_connector);
 		if (sink_irq_vector & DP_SINK_SPECIFIC_IRQ)
 			DRM_DEBUG_DRIVER("Sink specific irq unhandled\n");
 	}
