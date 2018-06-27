@@ -415,6 +415,7 @@ struct intel_hdcp {
 
 	/* HDCP2.2 related definitions */
 	bool hdcp2_supported;
+	bool hdcp2_in_use;
 
 	/*
 	 * Content Stream Type defined by content owner. TYPE0(0x0) content can
