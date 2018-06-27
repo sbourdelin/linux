@@ -81,6 +81,20 @@ struct drm_device {
 	 */
 	struct list_head filelist_internal;
 
+	/**
+	 * @clientlist_mutex:
+	 *
+	 * Protects @clientlist access.
+	 */
+	struct mutex clientlist_mutex;
+
+	/**
+	 * @clientlist:
+	 *
+	 * List of in-kernel clients. Protected by @clientlist_mutex.
+	 */
+	struct list_head clientlist;
+
 	/** \name Memory management */
 	/*@{ */
 	struct list_head maplist;	/**< Linked list of regions */

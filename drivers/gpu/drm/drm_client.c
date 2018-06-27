@@ -4,6 +4,7 @@
  */
 
 #include <linux/list.h>
+#include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
@@ -66,6 +67,7 @@ EXPORT_SYMBOL(drm_client_close);
  * @dev: DRM device
  * @client: DRM client
  * @name: Client name
+ * @funcs: DRM client functions (optional)
  *
  * Use drm_client_put() to free the client.
  *
@@ -73,24 +75,47 @@ EXPORT_SYMBOL(drm_client_close);
  * Zero on success or negative error code on failure.
  */
 int drm_client_new(struct drm_device *dev, struct drm_client_dev *client,
-		   const char *name)
+		   const char *name, const struct drm_client_funcs *funcs)
 {
+	bool registered;
 	int ret;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET) ||
 	    !dev->driver->dumb_create || !dev->driver->gem_prime_vmap)
 		return -ENOTSUPP;
 
+	if (funcs && !try_module_get(funcs->owner))
+		return -ENODEV;
+
 	client->dev = dev;
 	client->name = name;
+	client->funcs = funcs;
 
 	ret = drm_client_open(client);
 	if (ret)
-		return ret;
+		goto err_put_module;
+
+	mutex_lock(&dev->clientlist_mutex);
+	registered = dev->registered;
+	if (registered)
+		list_add(&client->list, &dev->clientlist);
+	mutex_unlock(&dev->clientlist_mutex);
+	if (!registered) {
+		ret = -ENODEV;
+		goto err_close;
+	}
 
 	drm_dev_get(dev);
 
 	return 0;
+
+err_close:
+	drm_client_close(client);
+err_put_module:
+	if (funcs)
+		module_put(funcs->owner);
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_client_new);
 
@@ -116,8 +141,71 @@ void drm_client_release(struct drm_client_dev *client)
 
 	drm_client_close(client);
 	drm_dev_put(dev);
+	if (client->funcs)
+		module_put(client->funcs->owner);
 }
 EXPORT_SYMBOL(drm_client_release);
+
+void drm_client_dev_unregister(struct drm_device *dev)
+{
+	struct drm_client_dev *client, *tmp;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return;
+
+	mutex_lock(&dev->clientlist_mutex);
+	list_for_each_entry_safe(client, tmp, &dev->clientlist, list) {
+		list_del(&client->list);
+		if (client->funcs && client->funcs->unregister) {
+			client->funcs->unregister(client);
+		} else {
+			drm_client_release(client);
+			kfree(client);
+		}
+	}
+	mutex_unlock(&dev->clientlist_mutex);
+}
+
+void drm_client_dev_hotplug(struct drm_device *dev)
+{
+	struct drm_client_dev *client;
+	int ret;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return;
+
+	mutex_lock(&dev->clientlist_mutex);
+	list_for_each_entry(client, &dev->clientlist, list) {
+		if (!client->funcs || !client->funcs->hotplug)
+			continue;
+
+		ret = client->funcs->hotplug(client);
+		DRM_DEV_DEBUG_KMS(dev->dev, "%s: ret=%d\n", client->name, ret);
+	}
+	mutex_unlock(&dev->clientlist_mutex);
+}
+EXPORT_SYMBOL(drm_client_dev_hotplug);
+
+void drm_client_dev_restore(struct drm_device *dev)
+{
+	struct drm_client_dev *client;
+	int ret;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return;
+
+	mutex_lock(&dev->clientlist_mutex);
+	list_for_each_entry(client, &dev->clientlist, list) {
+		if (!client->funcs || !client->funcs->restore)
+			continue;
+
+		ret = client->funcs->restore(client);
+		DRM_DEV_DEBUG_KMS(dev->dev, "%s: ret=%d\n", client->name, ret);
+		if (!ret) /* The first one to return zero gets the privilege to restore */
+			break;
+	}
+	mutex_unlock(&dev->clientlist_mutex);
+}
 
 static void drm_client_buffer_delete(struct drm_client_buffer *buffer)
 {

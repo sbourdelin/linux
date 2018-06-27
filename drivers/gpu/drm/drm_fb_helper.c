@@ -2989,8 +2989,15 @@ static void drm_fbdev_fb_destroy(struct fb_info *info)
 	}
 
 	drm_client_framebuffer_delete(fb_helper->buffer);
-	drm_client_release(&fb_helper->client);
-	kfree(fb_helper);
+	/*
+	 * FIXME:
+	 * Remove conditional when all CMA drivers have been moved over to using
+	 * drm_fbdev_generic_setup().
+	 */
+	if (fb_helper->client.funcs) {
+		drm_client_release(&fb_helper->client);
+		kfree(fb_helper);
+	}
 }
 
 static int drm_fbdev_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
