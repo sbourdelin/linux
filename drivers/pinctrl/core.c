@@ -848,6 +848,37 @@ int pinctrl_gpio_direction_output(unsigned gpio)
 EXPORT_SYMBOL_GPL(pinctrl_gpio_direction_output);
 
 /**
+ * pinctrl_gpio_get_direction() - Get the direction (input/output) of a GPIO pin
+ * @gpio: the GPIO pin number from the GPIO subsystem number space
+ *
+ * This function should *ONLY* be used from gpiolib-based GPIO drivers,
+ * as part of their gpio_get_direction() semantics, platforms and individual
+ * drivers shall *NOT* touch pin control GPIO calls.
+ */
+int pinctrl_gpio_get_direction(unsigned int gpio)
+{
+	struct pinctrl_dev *pctldev;
+	struct pinctrl_gpio_range *range;
+	int ret;
+	int pin;
+
+	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
+	if (ret)
+		return ret;
+
+	mutex_lock(&pctldev->mutex);
+
+	/* Convert to the pin controllers number space */
+	pin = gpio_to_pin(range, gpio);
+	ret = pinmux_gpio_get_direction(pctldev, range, pin);
+
+	mutex_unlock(&pctldev->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(pinctrl_gpio_get_direction);
+
+/**
  * pinctrl_gpio_set_config() - Apply config to given GPIO pin
  * @gpio: the GPIO pin number from the GPIO subsystem number space
  * @config: the configuration to apply to the GPIO
