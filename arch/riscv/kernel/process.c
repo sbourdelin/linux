@@ -76,7 +76,12 @@ void show_regs(struct pt_regs *regs)
 void start_thread(struct pt_regs *regs, unsigned long pc,
 	unsigned long sp)
 {
-	regs->sstatus = SR_SPIE /* User mode, irqs on */ | SR_FS_INITIAL;
+	/* User mode, irqs on */
+#ifdef CONFIG_FPU
+	regs->sstatus = SR_SPIE | SR_FS_INITIAL;
+#else
+	regs->sstatus = SR_SPIE | SR_FS_OFF;
+#endif
 	regs->sepc = pc;
 	regs->sp = sp;
 	set_fs(USER_DS);

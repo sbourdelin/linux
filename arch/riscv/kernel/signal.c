@@ -37,8 +37,9 @@ struct rt_sigframe {
 	struct ucontext uc;
 };
 
-static long restore_d_state(struct pt_regs *regs,
-	struct __riscv_d_ext_state __user *state)
+#ifdef CONFIG_FPU
+static inline long __restore_d_state(struct pt_regs *regs,
+				     struct __riscv_d_ext_state __user *state)
 {
 	long err;
 	err = __copy_from_user(&current->thread.fstate, state, sizeof(*state));
@@ -47,35 +48,75 @@ static long restore_d_state(struct pt_regs *regs,
 	return err;
 }
 
-static long save_d_state(struct pt_regs *regs,
-	struct __riscv_d_ext_state __user *state)
+static inline long __save_d_state(struct pt_regs *regs,
+				  struct __riscv_d_ext_state __user *state)
 {
 	fstate_save(current, regs);
 	return __copy_to_user(state, &current->thread.fstate, sizeof(*state));
 }
 
-static long restore_sigcontext(struct pt_regs *regs,
-	struct sigcontext __user *sc)
+static long restore_d_state(struct pt_regs *regs,
+			    union __riscv_fp_state *sc_fpregs)
 {
 	long err;
 	size_t i;
-	/* sc_regs is structured the same as the start of pt_regs */
-	err = __copy_from_user(regs, &sc->sc_regs, sizeof(sc->sc_regs));
-	if (unlikely(err))
-		return err;
+
 	/* Restore the floating-point state. */
-	err = restore_d_state(regs, &sc->sc_fpregs.d);
+	err = __restore_d_state(regs, &sc_fpregs->d);
 	if (unlikely(err))
 		return err;
 	/* We support no other extension state at this time. */
-	for (i = 0; i < ARRAY_SIZE(sc->sc_fpregs.q.reserved); i++) {
+	for (i = 0; i < ARRAY_SIZE(sc_fpregs->q.reserved); i++) {
 		u32 value;
-		err = __get_user(value, &sc->sc_fpregs.q.reserved[i]);
+		err = __get_user(value, &sc_fpregs->q.reserved[i]);
 		if (unlikely(err))
 			break;
 		if (value != 0)
 			return -EINVAL;
 	}
+
+	return 0;
+}
+
+static long save_d_state(struct pt_regs *regs,
+			 union __riscv_fp_state *sc_fpregs)
+{
+	long err;
+	size_t i;
+
+	/* Save the floating-point state. */
+	err = __save_d_state(regs, &sc_fpregs->d);
+	/* We support no other extension state at this time. */
+	for (i = 0; i < ARRAY_SIZE(sc_fpregs->q.reserved); i++)
+		err |= __put_user(0, &sc_fpregs->q.reserved[i]);
+
+	return err;
+}
+#else
+static long restore_d_state(struct pt_regs *regs,
+			    union __riscv_fp_state *sc_fpregs)
+{
+	return 0;
+}
+
+static long save_d_state(struct pt_regs *regs,
+			 union __riscv_fp_state *sc_fpregs)
+{
+	return 0;
+}
+#endif
+
+static long restore_sigcontext(struct pt_regs *regs,
+			       struct sigcontext __user *sc)
+{
+	long err;
+	/* sc_regs is structured the same as the start of pt_regs */
+	err = __copy_from_user(regs, &sc->sc_regs, sizeof(sc->sc_regs));
+	if (unlikely(err))
+		return err;
+	/* Restore the floating-point state. */
+	err = restore_d_state(regs, &sc->sc_fpregs);
+
 	return err;
 }
 
@@ -120,23 +161,18 @@ badframe:
 }
 
 static long setup_sigcontext(struct rt_sigframe __user *frame,
-	struct pt_regs *regs)
+			     struct pt_regs *regs)
 {
 	struct sigcontext __user *sc = &frame->uc.uc_mcontext;
 	long err;
-	size_t i;
 	/* sc_regs is structured the same as the start of pt_regs */
 	err = __copy_to_user(&sc->sc_regs, regs, sizeof(sc->sc_regs));
-	/* Save the floating-point state. */
-	err |= save_d_state(regs, &sc->sc_fpregs.d);
-	/* We support no other extension state at this time. */
-	for (i = 0; i < ARRAY_SIZE(sc->sc_fpregs.q.reserved); i++)
-		err |= __put_user(0, &sc->sc_fpregs.q.reserved[i]);
+	err |= save_d_state(regs, &sc->sc_fpregs);
 	return err;
 }
 
 static inline void __user *get_sigframe(struct ksignal *ksig,
-	struct pt_regs *regs, size_t framesize)
+					struct pt_regs *regs, size_t framesize)
 {
 	unsigned long sp;
 	/* Default to using normal stack */
@@ -160,7 +196,7 @@ static inline void __user *get_sigframe(struct ksignal *ksig,
 
 
 static int setup_rt_frame(struct ksignal *ksig, sigset_t *set,
-	struct pt_regs *regs)
+			  struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
 	long err = 0;
@@ -279,7 +315,7 @@ static void do_signal(struct pt_regs *regs)
  * - triggered by the _TIF_WORK_MASK flags
  */
 asmlinkage void do_notify_resume(struct pt_regs *regs,
-	unsigned long thread_info_flags)
+				 unsigned long thread_info_flags)
 {
 	/* Handle pending signal delivery */
 	if (thread_info_flags & _TIF_SIGPENDING)
