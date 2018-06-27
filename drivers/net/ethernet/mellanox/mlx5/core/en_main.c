@@ -4189,6 +4189,9 @@ static u32 mlx5e_xdp_query(struct net_device *dev)
 	return prog_id;
 }
 
+#define MLX5E_SUPPORTED_XDP_META_FLAGS  \
+             (XDP_FLAGS_META_HASH  | XDP_FLAGS_META_VLAN)
+
 static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 {
 	struct mlx5e_xdp_info xdp_info;
@@ -4203,6 +4206,9 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	case XDP_QUERY_PROG:
 		xdp->prog_id = mlx5e_xdp_query(dev);
 		xdp->prog_attached = !!xdp->prog_id;
+		return 0;
+	case XDP_QUERY_META_FLAGS:
+		xdp->meta_flags = MLX5E_SUPPORTED_XDP_META_FLAGS;
 		return 0;
 	default:
 		return -EINVAL;
