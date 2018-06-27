@@ -97,22 +97,24 @@ void show_opcodes(u8 *rip, const char *loglvl)
 	u8 opcodes[OPCODE_BUFSIZE];
 	u8 *ip;
 	int i;
+	char tmpbuf[(2 + 6) + (3 * OPCODE_BUFSIZE + 2) + 2];
+	DEFINE_PRINTK_BUFFER(buf, sizeof(tmpbuf), tmpbuf);
 
-	printk("%sCode: ", loglvl);
+	buffered_printk(&buf, "%sCode: ", loglvl);
 
 	ip = (u8 *)rip - code_prologue;
 	if (probe_kernel_read(opcodes, ip, OPCODE_BUFSIZE)) {
-		pr_cont("Bad RIP value.\n");
+		buffered_printk(&buf, "Bad RIP value.\n");
 		return;
 	}
 
 	for (i = 0; i < OPCODE_BUFSIZE; i++, ip++) {
 		if (ip == rip)
-			pr_cont("<%02x> ", opcodes[i]);
+			buffered_printk(&buf, "<%02x> ", opcodes[i]);
 		else
-			pr_cont("%02x ", opcodes[i]);
+			buffered_printk(&buf, "%02x ", opcodes[i]);
 	}
-	pr_cont("\n");
+	buffered_printk(&buf, "\n");
 }
 
 void show_ip(struct pt_regs *regs, const char *loglvl)

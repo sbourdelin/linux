@@ -1985,6 +1985,92 @@ asmlinkage __visible int printk(const char *fmt, ...)
 }
 EXPORT_SYMBOL(printk);
 
+static void __flush_printk_buffer(struct printk_buffer *ptr, bool all)
+{
+	while (1) {
+		char *text = ptr->buf;
+		unsigned int text_len = ptr->used;
+		char *cp = memchr(text, '\n', text_len);
+		char c;
+
+		if (cp++)
+			text_len = cp - text;
+		else if (all)
+			cp = text + text_len;
+		else
+			break;
+		c = *cp;
+		*cp = '\0';
+		printk("%s", text);
+		ptr->used -= text_len;
+		if (!ptr->used)
+			break;
+		*cp = c;
+		memmove(text, text + text_len, ptr->used);
+	}
+}
+
+/*
+ * buffered_printk - Try to print multiple printk() calls as line oriented.
+ *
+ * This is a utility function for avoiding KERN_CONT and pr_cont() usage.
+ *
+ * Before:
+ *
+ *   pr_info("INFO:");
+ *   for (i = 0; i < 5; i++)
+ *     pr_cont(" %s=%s", name[i], value[i]);
+ *   pr_cont("\n");
+ *
+ * After:
+ *
+ *   char buffer[256];
+ *   DEFINE_PRINTK_BUFFER(buf, sizeof(buffer), buffer);
+ *   buffered_printk(&buf, KERN_INFO "INFO:");
+ *   for (i = 0; i < 5; i++)
+ *     buffered_printk(&buf, " %s=%s", name[i], value[i]);
+ *   buffered_printk(&buf, "\n");
+ *
+ * If the caller is not sure that the last buffered_printk() call ends with
+ * "\n", the caller can use flush_buffered_printk() in order to make sure that
+ * all data is passed to printk().
+ *
+ * If the buffer is not large enough to hold one line, buffered_printk() will
+ * fall back to regular printk() instead of truncating the data. But be careful
+ * with LOG_LINE_MAX limit anyway.
+ */
+asmlinkage __visible int buffered_printk(struct printk_buffer *ptr,
+					 const char *fmt, ...)
+{
+	va_list args;
+	int r;
+	const unsigned int pos = ptr->used;
+
+	/* Try to store to printk_buffer first. */
+	va_start(args, fmt);
+	r = vsnprintf(ptr->buf + pos, ptr->size - pos, fmt, args);
+	va_end(args);
+	/* If it succeeds, process printk_buffer up to last '\n' and return. */
+	if (r + pos < ptr->size) {
+		ptr->used += r;
+		__flush_printk_buffer(ptr, false);
+		return r;
+	}
+	/* Otherwise, flush printk_buffer and use unbuffered printk(). */
+	__flush_printk_buffer(ptr, true);
+	va_start(args, fmt);
+	r = vprintk_func(fmt, args);
+	va_end(args);
+	return r;
+}
+EXPORT_SYMBOL(buffered_printk);
+
+void flush_buffered_printk(struct printk_buffer *ptr)
+{
+	__flush_printk_buffer(ptr, true);
+}
+EXPORT_SYMBOL(flush_buffered_printk);
+
 #else /* CONFIG_PRINTK */
 
 #define LOG_LINE_MAX		0

@@ -153,6 +153,23 @@ static inline void printk_nmi_enter(void) { }
 static inline void printk_nmi_exit(void) { }
 #endif /* PRINTK_NMI */
 
+struct printk_buffer {
+	unsigned short int size;
+	unsigned short int used;
+	char *buf;
+};
+
+#define DEFINE_PRINTK_BUFFER(name, size, buf)		\
+	struct printk_buffer name = { size, 0, buf }
+
+static inline void INIT_PRINTK_BUFFER(struct printk_buffer *ptr,
+				      unsigned short int size, char *buf)
+{
+	ptr->size = size;
+	ptr->used = 0;
+	ptr->buf = buf;
+}
+
 #ifdef CONFIG_PRINTK
 asmlinkage __printf(5, 0)
 int vprintk_emit(int facility, int level,
@@ -169,6 +186,9 @@ int printk_emit(int facility, int level,
 
 asmlinkage __printf(1, 2) __cold
 int printk(const char *fmt, ...);
+asmlinkage __printf(2, 3) __cold
+int buffered_printk(struct printk_buffer *ptr, const char *fmt, ...);
+void flush_buffered_printk(struct printk_buffer *ptr);
 
 /*
  * Special printk facility for scheduler/timekeeping use only, _DO_NOT_USE_ !
@@ -215,6 +235,14 @@ static inline __printf(1, 2) __cold
 int printk(const char *s, ...)
 {
 	return 0;
+}
+static inline __printf(2, 3) __cold
+int buffered_printk(struct printk_buffer *ptr, const char *fmt, ...)
+{
+	return 0;
+}
+static inline void flush_buffered_printk(struct printk_buffer *ptr)
+{
 }
 static inline __printf(1, 2) __cold
 int printk_deferred(const char *s, ...)
