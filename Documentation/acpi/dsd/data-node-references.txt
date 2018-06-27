@@ -16,3 +16,5 @@ entries of the hierarchical data nodes shall be unique directly under the parent
 of the node, i.e. there may not be two hierarchical data extensions that have
 the same first package entry under any node (device or hierarchical data
 extension).
+
+Please see a graph example in graph.txt .
