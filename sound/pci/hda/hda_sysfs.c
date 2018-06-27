@@ -130,7 +130,9 @@ static int reconfig_codec(struct hda_codec *codec)
 {
 	int err;
 
-	snd_hda_power_up(codec);
+	err = snd_hda_power_up(codec);
+	if (err < 0)
+		return err;
 	codec_info(codec, "hda-codec: reconfiguring\n");
 	err = snd_hda_codec_reset(codec);
 	if (err < 0) {

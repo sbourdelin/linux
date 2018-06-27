@@ -26,7 +26,8 @@ static void generate_tone(struct hda_beep *beep, int tone)
 	struct hda_codec *codec = beep->codec;
 
 	if (tone && !beep->playing) {
-		snd_hda_power_up(codec);
+		if (snd_hda_power_up(codec) < 0)
+			return;
 		if (beep->power_hook)
 			beep->power_hook(beep, true);
 		beep->playing = 1;
