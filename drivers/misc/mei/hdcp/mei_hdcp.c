@@ -624,6 +624,60 @@ static int mei_verify_mprime(struct mei_cl_device *cldev,
 	return 0;
 }
 
+/*
+ * mei_enable_hdcp_authentication:
+ *	Function to request ME FW to mark a port as authenticated.
+ *
+ * cldev		: Pointer for mei client device
+ * data		: Intel HW specific Data
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+static int mei_enable_hdcp_authentication(struct mei_cl_device *cldev,
+					  struct mei_hdcp_data *data)
+{
+	struct wired_cmd_enable_auth_in enable_auth_in = { { 0 } };
+	struct wired_cmd_enable_auth_out enable_auth_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	enable_auth_in.header.api_version = HDCP_API_VERSION;
+	enable_auth_in.header.command_id = WIRED_ENABLE_AUTH;
+	enable_auth_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	enable_auth_in.header.buffer_len = WIRED_CMD_BUF_LEN_ENABLE_AUTH_IN;
+
+	enable_auth_in.port.integrated_port_type = data->port_type;
+	enable_auth_in.port.physical_port = data->port;
+	enable_auth_in.stream_type = data->streams[0].stream_type;
+
+	byte = mei_cldev_send(cldev, (u8 *)&enable_auth_in,
+			      sizeof(enable_auth_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&enable_auth_out,
+			      sizeof(enable_auth_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (enable_auth_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X failed. status: 0x%X\n",
+			WIRED_ENABLE_AUTH, enable_auth_out.header.status);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 struct i915_hdcp_component_ops mei_hdcp_component_ops = {
 	.owner					= THIS_MODULE,
 	.initiate_hdcp2_session			= mei_initiate_hdcp2_session,
@@ -637,7 +691,8 @@ struct i915_hdcp_component_ops mei_hdcp_component_ops = {
 	.repeater_check_flow_prepare_ack	=
 					mei_repeater_check_flow_prepare_ack,
 	.verify_mprime				= mei_verify_mprime,
-	.enable_hdcp_authentication		= NULL,
+	.enable_hdcp_authentication		=
+					mei_enable_hdcp_authentication,
 	.close_hdcp_session			= NULL,
 };
 
