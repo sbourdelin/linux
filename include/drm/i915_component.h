@@ -24,6 +24,10 @@
 #ifndef _I915_COMPONENT_H_
 #define _I915_COMPONENT_H_
 
+#include <linux/mei_cl_bus.h>
+#include <linux/mei_hdcp.h>
+#include <drm/drm_hdcp.h>
+
 /* MAX_PORT is the number of port
  * It must be sync with I915_MAX_PORTS defined i915_drv.h
  */
@@ -119,6 +123,90 @@ struct i915_audio_component {
 	 * @audio_ops: Ops implemented by hda driver, called by i915 driver
 	 */
 	const struct i915_audio_component_audio_ops *audio_ops;
+};
+
+struct i915_hdcp_component_ops {
+	/**
+	 * @owner: mei_hdcp module
+	 */
+	struct module *owner;
+	int (*initiate_hdcp2_session)(struct mei_cl_device *cldev,
+				      struct mei_hdcp_data *data,
+				      struct hdcp2_ake_init *ake_data);
+	int
+	(*verify_receiver_cert_prepare_km)(struct mei_cl_device *cldev,
+					   struct mei_hdcp_data *data,
+					   struct hdcp2_ake_send_cert *rx_cert,
+					   bool *km_stored,
+					   struct hdcp2_ake_no_stored_km
+								*ek_pub_km,
+					   size_t *msg_sz);
+	int (*verify_hprime)(struct mei_cl_device *cldev,
+			     struct mei_hdcp_data *data,
+			     struct hdcp2_ake_send_hprime *rx_hprime);
+	int (*store_pairing_info)(struct mei_cl_device *cldev,
+				  struct mei_hdcp_data *data,
+				  struct hdcp2_ake_send_pairing_info
+								*pairing_info);
+	int (*initiate_locality_check)(struct mei_cl_device *cldev,
+				       struct mei_hdcp_data *data,
+				       struct hdcp2_lc_init *lc_init_data);
+	int (*verify_lprime)(struct mei_cl_device *cldev,
+			     struct mei_hdcp_data *data,
+			     struct hdcp2_lc_send_lprime *rx_lprime);
+	int (*get_session_key)(struct mei_cl_device *cldev,
+			       struct mei_hdcp_data *data,
+			       struct hdcp2_ske_send_eks *ske_data);
+	int
+	(*repeater_check_flow_prepare_ack)(struct mei_cl_device *cldev,
+					   struct mei_hdcp_data *data,
+					   struct hdcp2_rep_send_receiverid_list
+								*rep_topology,
+					   struct hdcp2_rep_send_ack
+								*rep_send_ack);
+	int (*verify_mprime)(struct mei_cl_device *cldev,
+			     struct mei_hdcp_data *data,
+			     struct hdcp2_rep_stream_ready *stream_ready);
+	int (*enable_hdcp_authentication)(struct mei_cl_device *cldev,
+					  struct mei_hdcp_data *data);
+	int (*close_hdcp_session)(struct mei_cl_device *cldev,
+				  struct mei_hdcp_data *data);
+};
+
+struct i915_hdcp_component_master_ops {
+	void (*pull_down_interface)(struct device *dev);
+};
+
+/**
+ * struct i915_mei_hdcp_component - Used for direct communication between i915
+ * and mei_hdcp drivers
+ */
+struct i915_hdcp_component {
+	/**
+	 * @dev: Kdev of Slave Component. Passed to bind calls.
+	 */
+	struct device *dev;
+	/**
+	 * @i915_kdev: Kdev of I915. Used from the client component for
+	 * removing the reference to mei_cldev.
+	 */
+	struct device *i915_kdev;
+	/**
+	 * @mei_cldev: mei client device, used as parameter for ops
+	 */
+	struct mei_cl_device *mei_cldev;
+	/**
+	 * @mutex: Mutex to protect the state of mei_cldev
+	 */
+	struct mutex mutex;
+	/**
+	 * @ops: Ops implemented by mei_hdcp driver, used by i915 driver.
+	 */
+	const struct i915_hdcp_component_ops *ops;
+	/**
+	 * @master_ops: Ops implemented by I915 driver, used by mei_hdcp driver.
+	 */
+	const struct i915_hdcp_component_master_ops *master_ops;
 };
 
 #endif /* _I915_COMPONENT_H_ */

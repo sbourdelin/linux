@@ -442,9 +442,7 @@ struct intel_hdcp {
 	uint32_t seq_num_m;
 
 	/* mei interface related information */
-	struct mei_cl_device *cldev;
 	struct mei_hdcp_data mei_data;
-
 	struct delayed_work hdcp2_check_work;
 };
 
@@ -1962,7 +1960,8 @@ void intel_hdcp_atomic_check(struct drm_connector *connector,
 			     struct drm_connector_state *old_state,
 			     struct drm_connector_state *new_state);
 int intel_hdcp_init(struct intel_connector *connector,
-		    const struct intel_hdcp_shim *hdcp_shim);
+		    const struct intel_hdcp_shim *hdcp_shim,
+		    bool hdcp2_supported);
 int intel_hdcp_enable(struct intel_connector *connector);
 int intel_hdcp_disable(struct intel_connector *connector);
 int intel_hdcp_check_link(struct intel_connector *connector);
