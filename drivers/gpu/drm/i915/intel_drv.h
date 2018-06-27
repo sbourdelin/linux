@@ -445,6 +445,13 @@ struct intel_hdcp {
 	/* mei interface related information */
 	struct mei_hdcp_data mei_data;
 	struct delayed_work hdcp2_check_work;
+
+	/*
+	 * Work queue to signal the CP_IRQ. Used for the waiters to read the
+	 * available information from HDCP DP sink.
+	 */
+	wait_queue_head_t cp_irq_queue;
+	atomic_t cp_irq_recved;
 };
 
 struct intel_connector {
