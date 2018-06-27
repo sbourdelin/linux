@@ -875,6 +875,10 @@ int rds_notify_queue_get(struct rds_sock *rs, struct msghdr *msg);
 void rds_inc_info_copy(struct rds_incoming *inc,
 		       struct rds_info_iterator *iter,
 		       __be32 saddr, __be32 daddr, int flip);
+void rds6_inc_info_copy(struct rds_incoming *inc,
+			struct rds_info_iterator *iter,
+			struct in6_addr *saddr, struct in6_addr *daddr,
+			int flip);
 
 /* send.c */
 int rds_sendmsg(struct socket *sock, struct msghdr *msg, size_t payload_len);
