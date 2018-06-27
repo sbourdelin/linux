@@ -87,6 +87,8 @@ static ssize_t crc_control_write(struct file *file, const char __user *ubuf,
 	struct drm_crtc *crtc = m->private;
 	struct drm_crtc_crc *crc = &crtc->crc;
 	char *source;
+	size_t values_cnt;
+	int ret = 0;
 
 	if (len == 0)
 		return 0;
@@ -103,6 +105,12 @@ static ssize_t crc_control_write(struct file *file, const char __user *ubuf,
 
 	if (source[len] == '\n')
 		source[len] = '\0';
+
+	if (crtc->funcs->verify_crc_source) {
+		ret = crtc->funcs->verify_crc_source(crtc, source, &values_cnt);
+		if (ret)
+			return ret;
+	}
 
 	spin_lock_irq(&crc->lock);
 
@@ -163,6 +171,13 @@ static int crtc_crc_open(struct inode *inode, struct file *filep)
 			ret = -EIO;
 		drm_modeset_unlock(&crtc->mutex);
 
+		if (ret)
+			return ret;
+	}
+
+	if (crtc->funcs->verify_crc_source) {
+		ret = crtc->funcs->verify_crc_source(crtc, crc->source,
+						     &values_cnt);
 		if (ret)
 			return ret;
 	}
