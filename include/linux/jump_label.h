@@ -121,6 +121,32 @@ struct static_key {
 #include <asm/jump_label.h>
 
 #ifndef __ASSEMBLY__
+#ifdef CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE
+
+struct jump_entry {
+	int code;
+	int target;
+	int key;
+};
+
+static inline unsigned long jump_entry_code(const struct jump_entry *entry)
+{
+	return (unsigned long)&entry->code + entry->code;
+}
+
+static inline unsigned long jump_entry_target(const struct jump_entry *entry)
+{
+	return (unsigned long)&entry->target + entry->target;
+}
+
+static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
+{
+	unsigned long key = (unsigned long)&entry->key + entry->key;
+
+	return (struct static_key *)(key & ~1UL);
+}
+
+#else
 
 struct jump_entry; /* defined by the architecture */
 
@@ -138,6 +164,8 @@ static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
 {
 	return (struct static_key *)((unsigned long)entry->key & ~1UL);
 }
+
+#endif
 
 static inline bool jump_entry_is_branch(const struct jump_entry *entry)
 {
