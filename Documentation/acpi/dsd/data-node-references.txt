@@ -1,0 +1,18 @@
+Referencing hierarchical data nodes
+-----------------------------------
+
+ACPI in general allows referring to device objects in the tree only.
+Hierarchical data extension nodes may not be referred to directly, hence this
+document defines a scheme to implement such references.
+
+The references consist of the device node followed by the first package entries
+of the hierarchical data node extensions from the first child node of the device
+node until the referred data extension node.
+
+The first package list entry in the hierarchical data node shall consist of the
+name of the node, "@" character and the number of the node. If the node has no
+numerical value, then the number shall be omitted. The first package list
+entries of the hierarchical data nodes shall be unique directly under the parent
+of the node, i.e. there may not be two hierarchical data extensions that have
+the same first package entry under any node (device or hierarchical data
+extension).
