@@ -994,14 +994,117 @@ out:
 	return ret;
 }
 
+static int hdcp2_close_mei_session(struct intel_connector *connector)
+{
+	struct mei_hdcp_data *data = &connector->hdcp.mei_data;
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	struct i915_hdcp_component *comp = dev_priv->hdcp_comp;
+	int ret;
+
+	if (!comp)
+		return -EINVAL;
+
+	mutex_lock(&comp->mutex);
+	if (!comp->ops || !comp->mei_cldev || data->port == INVALID_PORT) {
+		mutex_unlock(&comp->mutex);
+		return -EINVAL;
+	}
+	ret = comp->ops->close_hdcp_session(comp->mei_cldev, data);
+	mutex_unlock(&comp->mutex);
+
+	return ret;
+}
+
+static int hdcp2_deauthenticate_port(struct intel_connector *connector)
+{
+	return hdcp2_close_mei_session(connector);
+}
+
+static int hdcp2_authenticate_sink(struct intel_connector *connector)
+{
+	return 0;
+}
+
+static int hdcp2_enable_encryption(struct intel_connector *connector)
+{
+	return 0;
+}
+
+static int hdcp2_disable_encryption(struct intel_connector *connector)
+{
+	return 0;
+}
+
+static int hdcp2_authenticate_and_encrypt(struct intel_connector *connector)
+{
+	int ret, i, tries = 3;
+
+	for (i = 0; i < tries; i++) {
+		ret = hdcp2_authenticate_sink(connector);
+		if (!ret)
+			break;
+
+		/* Clearing the mei hdcp session */
+		hdcp2_deauthenticate_port(connector);
+		DRM_DEBUG_KMS("HDCP2.2 Auth %d of %d Failed.(%d)\n",
+			      i + 1, tries, ret);
+	}
+
+	if (i != tries) {
+		/*
+		 * Ensuring the required 200mSec min time interval between
+		 * Session Key Exchange and encryption.
+		 */
+		msleep(HDCP_2_2_DELAY_BEFORE_ENCRYPTION_EN);
+		ret = hdcp2_enable_encryption(connector);
+		if (ret < 0) {
+			DRM_DEBUG_KMS("Encryption Enable Failed.(%d)\n", ret);
+			hdcp2_deauthenticate_port(connector);
+		}
+	}
+
+	return ret;
+}
+
 static int _intel_hdcp2_enable(struct intel_connector *connector)
 {
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	int ret;
+
+	DRM_DEBUG_KMS("[%s:%d] HDCP2.2 is being enabled. Type: %d\n",
+		      connector->base.name, connector->base.base.id,
+		      hdcp->content_type);
+
+	ret = hdcp2_authenticate_and_encrypt(connector);
+	if (ret) {
+		DRM_ERROR("HDCP2 Type%d  Enabling Failed. (%d)\n",
+			  hdcp->content_type, ret);
+		return ret;
+	}
+
+	DRM_DEBUG_KMS("[%s:%d] HDCP2.2 is enabled. Type %d\n",
+		      connector->base.name, connector->base.base.id,
+		      hdcp->content_type);
+
+	hdcp->hdcp2_in_use = true;
+	hdcp->hdcp_value = DRM_MODE_CONTENT_PROTECTION_ENABLED;
+	schedule_work(&hdcp->hdcp_prop_work);
 	return 0;
 }
 
 static int _intel_hdcp2_disable(struct intel_connector *connector)
 {
-	return 0;
+	int ret;
+
+	DRM_DEBUG_KMS("[%s:%d] HDCP2.2 is being Disabled\n",
+		      connector->base.name, connector->base.base.id);
+
+	ret = hdcp2_disable_encryption(connector);
+
+	hdcp2_deauthenticate_port(connector);
+	connector->hdcp.hdcp2_in_use = false;
+
+	return ret;
 }
 
 static int i915_hdcp_component_master_bind(struct device *dev)
