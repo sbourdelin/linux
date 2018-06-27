@@ -290,6 +290,23 @@ int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
 	return ret;
 }
 
+int pinmux_gpio_get_direction(struct pinctrl_dev *pctldev,
+			      struct pinctrl_gpio_range *range,
+			      unsigned int pin)
+{
+	const struct pinmux_ops *ops;
+	int ret;
+
+	ops = pctldev->desc->pmxops;
+
+	if (ops->gpio_get_direction)
+		ret = ops->gpio_get_direction(pctldev, range, pin);
+	else
+		ret = -ENXIO;
+
+	return ret;
+}
+
 static int pinmux_func_name_to_selector(struct pinctrl_dev *pctldev,
 					const char *function)
 {

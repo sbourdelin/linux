@@ -24,6 +24,9 @@ void pinmux_free_gpio(struct pinctrl_dev *pctldev, unsigned pin,
 int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
 			  struct pinctrl_gpio_range *range,
 			  unsigned pin, bool input);
+int pinmux_gpio_get_direction(struct pinctrl_dev *pctldev,
+			  struct pinctrl_gpio_range *range,
+			  unsigned pin);
 
 int pinmux_map_to_setting(const struct pinctrl_map *map,
 			  struct pinctrl_setting *setting);
