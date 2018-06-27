@@ -3648,7 +3648,8 @@ static void alc269_fixup_mic_mute_hook(void *private_data, int enabled)
 	pinval |= enabled ? AC_PINCTL_VREF_HIZ : AC_PINCTL_VREF_80;
 	if (spec->mute_led_nid) {
 		/* temporarily power up/down for setting VREF */
-		snd_hda_power_up_pm(codec);
+		if (snd_hda_power_up_pm(codec) < 0)
+			return;
 		snd_hda_set_pin_ctl_cache(codec, spec->mute_led_nid, pinval);
 		snd_hda_power_down_pm(codec);
 	}

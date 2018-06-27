@@ -65,7 +65,9 @@ static int codec_exec_verb(struct hdac_device *dev, unsigned int cmd,
 		return -1;
 
  again:
-	snd_hda_power_up_pm(codec);
+	err = snd_hda_power_up_pm(codec);
+	if (err < 0)
+		return err;
 	mutex_lock(&bus->core.cmd_mutex);
 	if (flags & HDA_RW_NO_RESPONSE_FALLBACK)
 		bus->no_response_fallback = 1;
