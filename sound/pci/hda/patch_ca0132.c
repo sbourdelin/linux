@@ -3575,12 +3575,15 @@ static int tuning_ctl_set(struct hda_codec *codec, hda_nid_t nid,
 			  unsigned int *lookup, int idx)
 {
 	int i = 0;
+	int err;
 
 	for (i = 0; i < TUNING_CTLS_COUNT; i++)
 		if (nid == ca0132_tuning_ctls[i].nid)
 			break;
 
-	snd_hda_power_up(codec);
+	err = snd_hda_power_up(codec);
+	if (err < 0)
+		return err;
 	dspio_set_param(codec, ca0132_tuning_ctls[i].mid, 0x20,
 			ca0132_tuning_ctls[i].req,
 			&(lookup[idx]), sizeof(unsigned int));
@@ -3801,7 +3804,9 @@ static int ca0132_select_out(struct hda_codec *codec)
 
 	codec_dbg(codec, "ca0132_select_out\n");
 
-	snd_hda_power_up_pm(codec);
+	err = snd_hda_power_up_pm(codec);
+	if (err < 0)
+		return err;
 
 	auto_jack = spec->vnode_lswitch[VNID_HP_ASEL - VNODE_START_NID];
 
@@ -3914,7 +3919,9 @@ static int ca0132_alt_select_out(struct hda_codec *codec)
 
 	codec_dbg(codec, "%s\n", __func__);
 
-	snd_hda_power_up_pm(codec);
+	err = snd_hda_power_up_pm(codec);
+	if (err < 0)
+		return err;
 
 	auto_jack = spec->vnode_lswitch[VNID_HP_ASEL - VNODE_START_NID];
 
@@ -4225,10 +4232,13 @@ static int ca0132_select_mic(struct hda_codec *codec)
 	struct ca0132_spec *spec = codec->spec;
 	int jack_present;
 	int auto_jack;
+	int err;
 
 	codec_dbg(codec, "ca0132_select_mic\n");
 
-	snd_hda_power_up_pm(codec);
+	err = snd_hda_power_up_pm(codec);
+	if (err < 0)
+		return err;
 
 	auto_jack = spec->vnode_lswitch[VNID_AMIC1_ASEL - VNODE_START_NID];
 
@@ -4276,10 +4286,13 @@ static int ca0132_alt_select_in(struct hda_codec *codec)
 {
 	struct ca0132_spec *spec = codec->spec;
 	unsigned int tmp;
+	int err;
 
 	codec_dbg(codec, "%s\n", __func__);
 
-	snd_hda_power_up_pm(codec);
+	err = snd_hda_power_up_pm(codec);
+	if (err < 0)
+		return err;
 
 	chipio_set_stream_control(codec, 0x03, 0);
 	chipio_set_stream_control(codec, 0x04, 0);
@@ -4701,6 +4714,8 @@ static int ca0132_alt_slider_ctl_set(struct hda_codec *codec, hda_nid_t nid,
 {
 	int i = 0;
 	unsigned int y;
+	int err;
+
 	/*
 	 * For X_BASS, req 2 is actually crossover freq instead of
 	 * effect level
@@ -4710,7 +4725,9 @@ static int ca0132_alt_slider_ctl_set(struct hda_codec *codec, hda_nid_t nid,
 	else
 		y = 1;
 
-	snd_hda_power_up(codec);
+	err = snd_hda_power_up(codec);
+	if (err < 0)
+		return err;
 	if (nid == XBASS_XOVER) {
 		for (i = 0; i < OUT_EFFECTS_COUNT; i++)
 			if (ca0132_effects[i].nid == X_BASS)
@@ -5221,11 +5238,14 @@ static int ca0132_switch_put(struct snd_kcontrol *kcontrol,
 	int ch = get_amp_channels(kcontrol);
 	long *valp = ucontrol->value.integer.value;
 	int changed = 1;
+	int err;
 
 	codec_dbg(codec, "ca0132_switch_put: nid=0x%x, val=%ld\n",
 		    nid, *valp);
 
-	snd_hda_power_up(codec);
+	err = snd_hda_power_up(codec);
+	if (err < 0)
+		return err;
 	/* vnode */
 	if ((nid >= VNODE_START_NID) && (nid < VNODE_END_NID)) {
 		if (ch & 1) {
@@ -5390,6 +5410,7 @@ static int ca0132_volume_put(struct snd_kcontrol *kcontrol,
 	hda_nid_t shared_nid = 0;
 	bool effective;
 	int changed = 1;
+	int err;
 
 	/* store the left and right volume */
 	if (ch & 1) {
@@ -5407,7 +5428,9 @@ static int ca0132_volume_put(struct snd_kcontrol *kcontrol,
 		int dir = get_amp_direction(kcontrol);
 		unsigned long pval;
 
-		snd_hda_power_up(codec);
+		err = snd_hda_power_up(codec);
+		if (err < 0)
+			return err;
 		mutex_lock(&codec->control_mutex);
 		pval = kcontrol->private_value;
 		kcontrol->private_value = HDA_COMPOSE_AMP_VAL(shared_nid, ch,
@@ -5436,6 +5459,7 @@ static int ca0132_alt_volume_put(struct snd_kcontrol *kcontrol,
 	long *valp = ucontrol->value.integer.value;
 	hda_nid_t vnid = 0;
 	int changed = 1;
+	int err;
 
 	switch (nid) {
 	case 0x02:
@@ -5456,7 +5480,9 @@ static int ca0132_alt_volume_put(struct snd_kcontrol *kcontrol,
 		valp++;
 	}
 
-	snd_hda_power_up(codec);
+	err = snd_hda_power_up(codec);
+	if (err < 0)
+		return err;
 	ca0132_alt_dsp_volume_put(codec, vnid);
 	mutex_lock(&codec->control_mutex);
 	changed = snd_hda_mixer_amp_volume_put(kcontrol, ucontrol);
@@ -5665,7 +5691,7 @@ static const char * const ca0132_alt_slave_pfxs[] = {
  * I think this has to do with the pin for rear surround being 0x11,
  * and the center/lfe being 0x10. Usually the pin order is the opposite.
  */
-const struct snd_pcm_chmap_elem ca0132_alt_chmaps[] = {
+static const struct snd_pcm_chmap_elem ca0132_alt_chmaps[] = {
 	{ .channels = 2,
 	  .map = { SNDRV_CHMAP_FL, SNDRV_CHMAP_FR } },
 	{ .channels = 4,
@@ -7190,6 +7216,7 @@ static int ca0132_init(struct hda_codec *codec)
 	struct auto_pin_cfg *cfg = &spec->autocfg;
 	int i;
 	bool dsp_loaded;
+	int err;
 
 	/*
 	 * If the DSP is already downloaded, and init has been entered again,
@@ -7220,7 +7247,9 @@ static int ca0132_init(struct hda_codec *codec)
 	if (spec->quirk == QUIRK_SBZ)
 		sbz_region2_startup(codec);
 
-	snd_hda_power_up_pm(codec);
+	err = snd_hda_power_up_pm(codec);
+	if (err < 0)
+		return err;
 
 	ca0132_init_unsol(codec);
 	ca0132_init_params(codec);
@@ -7310,7 +7339,8 @@ static void ca0132_free(struct hda_codec *codec)
 	struct ca0132_spec *spec = codec->spec;
 
 	cancel_delayed_work_sync(&spec->unsol_hp_work);
-	snd_hda_power_up(codec);
+	if (snd_hda_power_up(codec) < 0)
+		goto skip_shutdown;
 	switch (spec->quirk) {
 	case QUIRK_SBZ:
 		sbz_exit_chip(codec);
@@ -7326,6 +7356,7 @@ static void ca0132_free(struct hda_codec *codec)
 		break;
 	}
 	snd_hda_power_down(codec);
+ skip_shutdown:
 	if (spec->mem_base)
 		iounmap(spec->mem_base);
 	kfree(spec->spec_init_verbs);

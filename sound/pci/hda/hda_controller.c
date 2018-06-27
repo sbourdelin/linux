@@ -645,7 +645,9 @@ static int azx_pcm_open(struct snd_pcm_substream *substream)
 				   buff_step);
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
 				   buff_step);
-	snd_hda_power_up(apcm->codec);
+	err = snd_hda_power_up(apcm->codec);
+	if (err < 0)
+		return err;
 	if (hinfo->ops.open)
 		err = hinfo->ops.open(hinfo, apcm->codec, substream);
 	else
