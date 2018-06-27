@@ -7256,9 +7256,17 @@ enum {
 #define  BDW_DPRS_MASK_VBLANK_SRD	(1 << 0)
 #define CHICKEN_PIPESL_1(pipe) _MMIO_PIPE(pipe, _CHICKEN_PIPESL_1_A, _CHICKEN_PIPESL_1_B)
 
-#define CHICKEN_TRANS_A         0x420c0
-#define CHICKEN_TRANS_B         0x420c4
-#define CHICKEN_TRANS(trans) _MMIO_TRANS(trans, CHICKEN_TRANS_A, CHICKEN_TRANS_B)
+#define _CHICKEN_TRANS_A         0x420c0
+#define _CHICKEN_TRANS_B         0x420c4
+#define _CHICKEN_TRANS_C         0x420c8
+#define _CHICKEN_TRANS_D         0x420d8
+#define _CHICKEN_TRANS_EDP       0x420cc
+#define CHICKEN_TRANS(trans) _MMIO(_PICK(trans, \
+				   _CHICKEN_TRANS_A, \
+				   _CHICKEN_TRANS_B, \
+				   _CHICKEN_TRANS_C, \
+				   _CHICKEN_TRANS_D, \
+				   _CHICKEN_TRANS_EDP))
 #define  VSC_DATA_SEL_SOFTWARE_CONTROL	(1 << 25) /* GLK and CNL+ */
 #define  DDI_TRAINING_OVERRIDE_ENABLE	(1 << 19)
 #define  DDI_TRAINING_OVERRIDE_VALUE	(1 << 18)
