@@ -121,22 +121,22 @@ do {								\
  *
  *   - it must ensure the critical section is RCsc.
  *
- * The latter is important for cases where we observe values written by other
- * CPUs in spin-loops, without barriers, while being subject to scheduling.
+ * The latter requirement guarantees that stores from two critical sections
+ * in different CPUs are ordered even outside the critical sections.  As an
+ * example illustrating this property, consider the following snippet:
  *
- * CPU0			CPU1			CPU2
+ * CPU0			CPU1				CPU2
  *
- *			for (;;) {
- *			  if (READ_ONCE(X))
- *			    break;
- *			}
- * X=1
- *			<sched-out>
- *						<sched-in>
- *						r = X;
+ * spin_lock(s);	spin_lock(s);			r2 = READ_ONCE(Y);
+ * WRITE_ONCE(X, 1);	smp_mb__after_spinlock();	smp_rmb();
+ * spin_unlock(s);	r1 = READ_ONCE(X);		r3 = READ_ONCE(X);
+ *			WRITE_ONCE(Y, 1);
+ *			spin_unlock(s);
  *
- * without transitivity it could be that CPU1 observes X!=0 breaks the loop,
- * we get migrated and CPU2 sees X==0.
+ * Without RCsc transitivity, it is allowed that CPU0's critical section
+ * precedes CPU1's critical section (r1=1) and that CPU2 observes CPU1's
+ * store to Y (r2=1) while it does not observe CPU0's store to X (r3=0),
+ * despite the presence of the smp_rmb().
  *
  * Since most load-store architectures implement ACQUIRE with an smp_mb() after
  * the LL/SC loop, they need no further barriers. Similarly all our TSO
