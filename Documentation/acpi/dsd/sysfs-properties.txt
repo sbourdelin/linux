@@ -1,0 +1,45 @@
+ACPI device properties are exported via sysfs under
+<device>/firmware_node/properties/*.  This is a logical extension of
+the changes that expose _ADR, _STR, _HID, etc... in the same
+directory.
+
+Integer properties are represented by a file containing a single hex
+number (printf format 0x%llx).
+
+String properties are represented by a file containing a single
+string.
+
+Arrays of integers properties are represented by a file containing a
+space delimited string of hex numbers (printf format 0x%llx).
+
+Example:
+  0x1 0x2 0x3
+
+Arrays of strings properties are represented by a file containing a
+newline delimited string of escaped strings (printf format %*pE).
+
+Example:
+  foo
+  bar
+  has\nnewline
+
+Device reference properties are represented by a symlink to the
+referenced device plus a <property>_args node containing an integer
+array of reference arguments.  In the case of multiple local
+references, the references at index 1..N are represented the same way
+using the naming convention <property><N>, <property><N>_args.
+
+Examples:
+  (a property containing a single reference)
+
+  phy-handle -> ../../../device:00
+  phy-handle_args: 0x0
+
+  (a property containing three references)
+
+  ref -> ../device:01
+  ref_args: 0x1 0x2
+  ref1 -> ../device:02
+  ref1_args: 0x3 0x4
+  ref2 -> ../device:03
+  ref2_args: 0x5 0x6
