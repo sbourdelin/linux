@@ -2477,7 +2477,7 @@ void tcp_cwnd_reduction(struct sock *sk, int newly_acked_sacked, int flag)
 	}
 	/* Force a fast retransmit upon entering fast recovery */
 	sndcnt = max(sndcnt, (tp->prr_out ? 0 : 1));
-	tp->snd_cwnd = tcp_packets_in_flight(tp) + sndcnt;
+	tp->snd_cwnd = max((int)tcp_packets_in_flight(tp) + sndcnt, 2);
 }
 
 static inline void tcp_end_cwnd_reduction(struct sock *sk)
