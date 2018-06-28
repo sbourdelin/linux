@@ -270,7 +270,17 @@ nf_ct_get_tuple(const struct sk_buff *skb,
 	tuple->dst.protonum = protonum;
 	tuple->dst.dir = IP_CT_DIR_ORIGINAL;
 
-	return l4proto->pkt_to_tuple(skb, dataoff, net, tuple);
+	if (unlikely(l4proto->pkt_to_tuple))
+		return l4proto->pkt_to_tuple(skb, dataoff, net, tuple);
+
+	/* Actually only need first 4 bytes to get ports. */
+	ap = skb_header_pointer(skb, dataoff, sizeof(*ap), &_addrs);
+	if (ap == NULL)
+		return false;
+
+	tuple->src.u.udp.port = (__be16)*ap;
+	tuple->dst.u.udp.port = (__be16)(*ap >> 16);
+	return true;
 }
 
 static int ipv4_get_l4proto(const struct sk_buff *skb, unsigned int nhoff,
