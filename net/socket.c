@@ -1171,7 +1171,10 @@ static __poll_t sock_poll(struct file *file, poll_table *wait)
 		mask = sock->ops->poll_mask(sock, events);
 	}
 
-	return mask | sock_poll_busy_flag(sock);
+	/* this socket can poll_ll so tell the system call */
+	if (sk_can_busy_loop(sock->sk))
+		mask |= POLL_BUSY_LOOP;
+	return mask;
 }
 
 static int sock_mmap(struct file *file, struct vm_area_struct *vma)
