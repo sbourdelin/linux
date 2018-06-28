@@ -17,6 +17,7 @@
 
 struct nvmem_device;
 struct nvmem_cell_info;
+struct nvmem_cell_lookup;
 typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
 				void *val, size_t bytes);
 typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
@@ -72,6 +73,9 @@ struct nvmem_config {
 struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
 int nvmem_unregister(struct nvmem_device *nvmem);
 
+void nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries);
+void nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries);
+
 struct nvmem_device *devm_nvmem_register(struct device *dev,
 					 const struct nvmem_config *cfg);
 
@@ -91,6 +95,12 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
 {
 	return -ENOSYS;
 }
+
+static inline void
+nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries) {}
+
+static inline void
+nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries) {}
 
 static inline struct nvmem_device *
 devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
