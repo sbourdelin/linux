@@ -17,6 +17,7 @@
 #include <linux/mutex.h>
 #include <linux/idr.h>
 #include <linux/gfp.h>
+#include <linux/of.h>
 
 #include <linux/w1.h>
 
@@ -157,6 +158,13 @@ static void w1_ds2760_remove_slave(struct w1_slave *sl)
 	platform_device_unregister(pdev);
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id w1_ds2760_of_ids[] = {
+	{ .compatible = "maxim,ds2760" },
+	{}
+};
+#endif
+
 static struct w1_family_ops w1_ds2760_fops = {
 	.add_slave    = w1_ds2760_add_slave,
 	.remove_slave = w1_ds2760_remove_slave,
@@ -166,6 +174,7 @@ static struct w1_family_ops w1_ds2760_fops = {
 static struct w1_family w1_ds2760_family = {
 	.fid = W1_FAMILY_DS2760,
 	.fops = &w1_ds2760_fops,
+	.of_match_table = of_match_ptr(w1_ds2760_of_ids),
 };
 module_w1_family(w1_ds2760_family);
 
