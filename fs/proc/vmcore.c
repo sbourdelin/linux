@@ -26,6 +26,8 @@
 #include <linux/uaccess.h>
 #include <asm/io.h>
 #include "internal.h"
+#include <linux/mem_encrypt.h>
+#include <asm/pgtable.h>
 
 /* List representing chunks of contiguous memory areas and their offsets in
  * vmcore file.
@@ -98,7 +100,8 @@ static int pfn_is_ram(unsigned long pfn)
 
 /* Reads a page from the oldmem device from given offset. */
 static ssize_t read_from_oldmem(char *buf, size_t count,
-				u64 *ppos, int userbuf)
+				u64 *ppos, int userbuf,
+				bool encrypted)
 {
 	unsigned long pfn, offset;
 	size_t nr_bytes;
@@ -120,8 +123,11 @@ static ssize_t read_from_oldmem(char *buf, size_t count,
 		if (pfn_is_ram(pfn) == 0)
 			memset(buf, 0, nr_bytes);
 		else {
-			tmp = copy_oldmem_page(pfn, buf, nr_bytes,
-						offset, userbuf);
+			tmp = encrypted ? copy_oldmem_page_encrypted(pfn,
+					    buf, nr_bytes, offset, userbuf)
+					: copy_oldmem_page(pfn, buf, nr_bytes,
+							   offset, userbuf);
+
 			if (tmp < 0)
 				return tmp;
 		}
@@ -151,11 +157,34 @@ void __weak elfcorehdr_free(unsigned long long addr)
 {}
 
 /*
- * Architectures may override this function to read from ELF header
+ * Architectures may override this function to read from ELF header.
+ * The kexec-tools will allocated the memory and build the elf header
+ * in the first kernel, subsequently, we will copy the data in the
+ * memory to the reserved crash memory. In kdump mode, we will read the
+ * elf header from the reserved crash memory, from this point of view,
+ * which is not an old memory, the original function called may mislead
+ * and do unnecessary things.
+ * For SME, it copies the elf header from the memory encrypted(user space)
+ * to the memory unencrypted(kernel space) when SME is activated in the
+ * first kernel, this operation just leads to decryption.
  */
 ssize_t __weak elfcorehdr_read(char *buf, size_t count, u64 *ppos)
 {
-	return read_from_oldmem(buf, count, ppos, 0);
+	char *kbuf;
+	resource_size_t offset;
+
+	if (!count)
+		return 0;
+
+	offset = (resource_size_t)*ppos;
+	kbuf = memremap(offset, count, MEMREMAP_WB);
+	if (!kbuf)
+		return 0;
+
+	memcpy(buf, kbuf, count);
+	memunmap(kbuf);
+
+	return count;
 }
 
 /*
@@ -163,7 +192,7 @@ ssize_t __weak elfcorehdr_read(char *buf, size_t count, u64 *ppos)
  */
 ssize_t __weak elfcorehdr_read_notes(char *buf, size_t count, u64 *ppos)
 {
-	return read_from_oldmem(buf, count, ppos, 0);
+	return read_from_oldmem(buf, count, ppos, 0, sme_active());
 }
 
 /*
@@ -173,6 +202,7 @@ int __weak remap_oldmem_pfn_range(struct vm_area_struct *vma,
 				  unsigned long from, unsigned long pfn,
 				  unsigned long size, pgprot_t prot)
 {
+	prot = pgprot_encrypted(prot);
 	return remap_pfn_range(vma, from, pfn, size, prot);
 }
 
@@ -349,7 +379,8 @@ static ssize_t __read_vmcore(char *buffer, size_t buflen, loff_t *fpos,
 					    m->offset + m->size - *fpos,
 					    buflen);
 			start = m->paddr + *fpos - m->offset;
-			tmp = read_from_oldmem(buffer, tsz, &start, userbuf);
+			tmp = read_from_oldmem(buffer, tsz, &start, userbuf,
+						sme_active());
 			if (tmp < 0)
 				return tmp;
 			buflen -= tsz;
