@@ -227,14 +227,6 @@ static int timerfd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 	
-static struct wait_queue_head *timerfd_get_poll_head(struct file *file,
-		__poll_t eventmask)
-{
-	struct timerfd_ctx *ctx = file->private_data;
-
-	return &ctx->wqh;
-}
-
 static __poll_t timerfd_poll_mask(struct file *file, __poll_t eventmask)
 {
 	struct timerfd_ctx *ctx = file->private_data;
@@ -363,7 +355,6 @@ static long timerfd_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 
 static const struct file_operations timerfd_fops = {
 	.release	= timerfd_release,
-	.get_poll_head	= timerfd_get_poll_head,
 	.poll_mask	= timerfd_poll_mask,
 	.read		= timerfd_read,
 	.llseek		= noop_llseek,
@@ -386,8 +377,9 @@ static int timerfd_fget(int fd, struct fd *p)
 
 SYSCALL_DEFINE2(timerfd_create, int, clockid, int, flags)
 {
-	int ufd;
+	int ufd, error;
 	struct timerfd_ctx *ctx;
+	struct file *file;
 
 	/* Check the TFD_* constants for consistency.  */
 	BUILD_BUG_ON(TFD_CLOEXEC != O_CLOEXEC);
@@ -424,12 +416,25 @@ SYSCALL_DEFINE2(timerfd_create, int, clockid, int, flags)
 
 	ctx->moffs = ktime_mono_to_real(0);
 
-	ufd = anon_inode_getfd("[timerfd]", &timerfd_fops, ctx,
+	error = get_unused_fd_flags(O_RDWR | (flags & TFD_SHARED_FCNTL_FLAGS));
+	if (error < 0)
+		goto out_free_ctx;
+	ufd = error;
+
+	file = anon_inode_getfile("[timerfd]", &timerfd_fops, ctx,
 			       O_RDWR | (flags & TFD_SHARED_FCNTL_FLAGS));
-	if (ufd < 0)
-		kfree(ctx);
+	if (IS_ERR(file)) {
+		error = PTR_ERR(file);
+		goto err_put_unused_fd;
+	}
+	file->f_poll_head = &ctx->wqh;
+	fd_install(ufd, file);
 
 	return ufd;
+err_put_unused_fd:
+	put_unused_fd(ufd);
+out_free_ctx:
+	return error;
 }
 
 static int do_timerfd_settime(int ufd, int flags, 

@@ -168,7 +168,6 @@ struct fsync_iocb {
 struct poll_iocb {
 	struct file		*file;
 	__poll_t		events;
-	struct wait_queue_head	*head;
 
 	union {
 		struct wait_queue_entry	wait;
@@ -1632,7 +1631,7 @@ static int aio_poll_cancel(struct kiocb *iocb)
 {
 	struct aio_kiocb *aiocb = container_of(iocb, struct aio_kiocb, rw);
 	struct poll_iocb *req = &aiocb->poll;
-	struct wait_queue_head *head = req->head;
+	struct wait_queue_head *head = req->file->f_poll_head;
 	bool found = false;
 
 	spin_lock(&head->lock);
@@ -1655,7 +1654,7 @@ static int aio_poll_wake(struct wait_queue_entry *wait, unsigned mode, int sync,
 	struct file *file = req->file;
 	__poll_t mask = key_to_poll(key);
 
-	assert_spin_locked(&req->head->lock);
+	assert_spin_locked(&file->f_poll_head->lock);
 
 	/* for instances that support it check for an event match first: */
 	if (mask && !(mask & req->events))
@@ -1703,30 +1702,21 @@ static ssize_t aio_poll(struct aio_kiocb *aiocb, struct iocb *iocb)
 	req->file = fget(iocb->aio_fildes);
 	if (unlikely(!req->file))
 		return -EBADF;
-	if (!file_has_poll_mask(req->file))
+	if (!req->file->f_poll_head)
 		goto out_fail;
-
-	req->head = req->file->f_op->get_poll_head(req->file, req->events);
-	if (!req->head)
-		goto out_fail;
-	if (IS_ERR(req->head)) {
-		mask = EPOLLERR;
-		goto done;
-	}
 
 	init_waitqueue_func_entry(&req->wait, aio_poll_wake);
 	aiocb->ki_cancel = aio_poll_cancel;
 
 	spin_lock_irq(&ctx->ctx_lock);
-	spin_lock(&req->head->lock);
+	spin_lock(&req->file->f_poll_head->lock);
 	mask = req->file->f_op->poll_mask(req->file, req->events) & req->events;
 	if (!mask) {
-		__add_wait_queue(req->head, &req->wait);
+		__add_wait_queue(req->file->f_poll_head, &req->wait);
 		list_add_tail(&aiocb->ki_list, &ctx->active_reqs);
 	}
-	spin_unlock(&req->head->lock);
+	spin_unlock(&req->file->f_poll_head->lock);
 	spin_unlock_irq(&ctx->ctx_lock);
-done:
 	if (mask)
 		__aio_poll_complete(aiocb, mask);
 	return 0;

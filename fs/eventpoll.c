@@ -922,13 +922,6 @@ static __poll_t ep_read_events_proc(struct eventpoll *ep, struct list_head *head
 	return 0;
 }
 
-static struct wait_queue_head *ep_eventpoll_get_poll_head(struct file *file,
-		__poll_t eventmask)
-{
-	struct eventpoll *ep = file->private_data;
-	return &ep->poll_wait;
-}
-
 static __poll_t ep_eventpoll_poll_mask(struct file *file, __poll_t eventmask)
 {
 	struct eventpoll *ep = file->private_data;
@@ -972,7 +965,6 @@ static const struct file_operations eventpoll_fops = {
 	.show_fdinfo	= ep_show_fdinfo,
 #endif
 	.release	= ep_eventpoll_release,
-	.get_poll_head	= ep_eventpoll_get_poll_head,
 	.poll_mask	= ep_eventpoll_poll_mask,
 	.llseek		= noop_llseek,
 };
@@ -1973,6 +1965,7 @@ static int do_epoll_create(int flags)
 		goto out_free_fd;
 	}
 	ep->file = file;
+	file->f_poll_head = &ep->poll_wait;
 	fd_install(fd, file);
 	return fd;
 

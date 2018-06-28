@@ -1875,10 +1875,10 @@ urandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 	return ret;
 }
 
-static struct wait_queue_head *
-random_get_poll_head(struct file *file, __poll_t events)
+static int random_open(struct inode *inode, struct file *file)
 {
-	return &random_wait;
+	file->f_poll_head = &random_wait;
+	return 0;
 }
 
 static __poll_t
@@ -1990,9 +1990,9 @@ static int random_fasync(int fd, struct file *filp, int on)
 }
 
 const struct file_operations random_fops = {
+	.open = random_open,
 	.read  = random_read,
 	.write = random_write,
-	.get_poll_head  = random_get_poll_head,
 	.poll_mask  = random_poll_mask,
 	.unlocked_ioctl = random_ioctl,
 	.fasync = random_fasync,

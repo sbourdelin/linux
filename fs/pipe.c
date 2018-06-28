@@ -509,14 +509,6 @@ static long pipe_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 }
 
-static struct wait_queue_head *
-pipe_get_poll_head(struct file *filp, __poll_t events)
-{
-	struct pipe_inode_info *pipe = filp->private_data;
-
-	return &pipe->wait;
-}
-
 /* No kernel lock held - fine */
 static __poll_t pipe_poll_mask(struct file *filp, __poll_t events)
 {
@@ -768,6 +760,7 @@ int create_pipe_files(struct file **res, int flags)
 
 	f->f_flags = O_WRONLY | (flags & (O_NONBLOCK | O_DIRECT));
 	f->private_data = inode->i_pipe;
+	f->f_poll_head = &inode->i_pipe->wait;
 
 	res[0] = alloc_file(&path, FMODE_READ, &pipefifo_fops);
 	if (IS_ERR(res[0])) {
@@ -778,6 +771,7 @@ int create_pipe_files(struct file **res, int flags)
 	path_get(&path);
 	res[0]->private_data = inode->i_pipe;
 	res[0]->f_flags = O_RDONLY | (flags & O_NONBLOCK);
+	res[0]->f_poll_head = &inode->i_pipe->wait;
 	res[1] = f;
 	return 0;
 
@@ -930,6 +924,7 @@ static int fifo_open(struct inode *inode, struct file *filp)
 
 	/* We can only do regular read/write on fifos */
 	filp->f_mode &= (FMODE_READ | FMODE_WRITE);
+	filp->f_poll_head = &pipe->wait;
 
 	switch (filp->f_mode) {
 	case FMODE_READ:
@@ -1023,7 +1018,6 @@ const struct file_operations pipefifo_fops = {
 	.llseek		= no_llseek,
 	.read_iter	= pipe_read,
 	.write_iter	= pipe_write,
-	.get_poll_head	= pipe_get_poll_head,
 	.poll_mask	= pipe_poll_mask,
 	.unlocked_ioctl	= pipe_ioctl,
 	.release	= pipe_release,

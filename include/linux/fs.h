@@ -878,6 +878,7 @@ struct file {
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
 	const struct cred	*f_cred;
+	struct wait_queue_head	*f_poll_head;
 	struct file_ra_state	f_ra;
 
 	u64			f_version;
@@ -1720,7 +1721,6 @@ struct file_operations {
 	int (*iterate) (struct file *, struct dir_context *);
 	int (*iterate_shared) (struct file *, struct dir_context *);
 	__poll_t (*poll) (struct file *, struct poll_table_struct *);
-	struct wait_queue_head * (*get_poll_head)(struct file *, __poll_t);
 	__poll_t (*poll_mask) (struct file *, __poll_t);
 	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
 	long (*compat_ioctl) (struct file *, unsigned int, unsigned long);

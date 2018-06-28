@@ -117,8 +117,6 @@ static ssize_t sock_write_iter(struct kiocb *iocb, struct iov_iter *from);
 static int sock_mmap(struct file *file, struct vm_area_struct *vma);
 
 static int sock_close(struct inode *inode, struct file *file);
-static struct wait_queue_head *sock_get_poll_head(struct file *file,
-		__poll_t events);
 static __poll_t sock_poll_mask(struct file *file, __poll_t);
 static __poll_t sock_poll(struct file *file, struct poll_table_struct *wait);
 static long sock_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
@@ -143,7 +141,6 @@ static const struct file_operations socket_file_ops = {
 	.llseek =	no_llseek,
 	.read_iter =	sock_read_iter,
 	.write_iter =	sock_write_iter,
-	.get_poll_head = sock_get_poll_head,
 	.poll_mask =	sock_poll_mask,
 	.poll =		sock_poll,
 	.unlocked_ioctl = sock_ioctl,
@@ -422,6 +419,8 @@ struct file *sock_alloc_file(struct socket *sock, int flags, const char *dname)
 
 	sock->file = file;
 	file->f_flags = O_RDWR | (flags & O_NONBLOCK);
+	if (sock->ops->poll_mask)
+		file->f_poll_head = &sock->wq->wait;
 	file->private_data = sock;
 	return file;
 }
@@ -1128,16 +1127,6 @@ out_release:
 }
 EXPORT_SYMBOL(sock_create_lite);
 
-static struct wait_queue_head *sock_get_poll_head(struct file *file,
-		__poll_t events)
-{
-	struct socket *sock = file->private_data;
-
-	if (!sock->ops->poll_mask)
-		return NULL;
-	return &sock->wq->wait;
-}
-
 static __poll_t sock_poll_mask(struct file *file, __poll_t events)
 {
 	struct socket *sock = file->private_data;
@@ -1167,7 +1156,7 @@ static __poll_t sock_poll(struct file *file, poll_table *wait)
 	if (sock->ops->poll) {
 		mask = sock->ops->poll(file, sock, wait);
 	} else if (sock->ops->poll_mask) {
-		sock_poll_wait(file, sock_get_poll_head(file, events), wait);
+		sock_poll_wait(file, &sock->wq->wait, wait);
 		mask = sock->ops->poll_mask(sock, events);
 	}
 

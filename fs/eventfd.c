@@ -101,14 +101,6 @@ static int eventfd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static struct wait_queue_head *
-eventfd_get_poll_head(struct file *file, __poll_t events)
-{
-	struct eventfd_ctx *ctx = file->private_data;
-
-	return &ctx->wqh;
-}
-
 static __poll_t eventfd_poll_mask(struct file *file, __poll_t eventmask)
 {
 	struct eventfd_ctx *ctx = file->private_data;
@@ -311,7 +303,6 @@ static const struct file_operations eventfd_fops = {
 	.show_fdinfo	= eventfd_show_fdinfo,
 #endif
 	.release	= eventfd_release,
-	.get_poll_head	= eventfd_get_poll_head,
 	.poll_mask	= eventfd_poll_mask,
 	.read		= eventfd_read,
 	.write		= eventfd_write,
@@ -390,7 +381,8 @@ EXPORT_SYMBOL_GPL(eventfd_ctx_fileget);
 static int do_eventfd(unsigned int count, int flags)
 {
 	struct eventfd_ctx *ctx;
-	int fd;
+	struct file *file;
+	int fd, error;
 
 	/* Check the EFD_* constants for consistency.  */
 	BUILD_BUG_ON(EFD_CLOEXEC != O_CLOEXEC);
@@ -408,12 +400,27 @@ static int do_eventfd(unsigned int count, int flags)
 	ctx->count = count;
 	ctx->flags = flags;
 
-	fd = anon_inode_getfd("[eventfd]", &eventfd_fops, ctx,
+	error = get_unused_fd_flags(O_RDWR | (flags & EFD_SHARED_FCNTL_FLAGS));
+	if (error < 0)
+		goto err_free_ctx;
+	fd = error;
+
+	file = anon_inode_getfile("[eventfd]", &eventfd_fops, ctx,
 			      O_RDWR | (flags & EFD_SHARED_FCNTL_FLAGS));
-	if (fd < 0)
-		eventfd_free_ctx(ctx);
+	if (IS_ERR(file)) {
+		error = PTR_ERR(file);
+		goto err_put_unused_fd;
+	}
+	file->f_poll_head = &ctx->wqh;
+	fd_install(fd, file);
 
 	return fd;
+
+err_put_unused_fd:
+	put_unused_fd(fd);
+err_free_ctx:
+	eventfd_free_ctx(ctx);
+	return error;
 }
 
 SYSCALL_DEFINE2(eventfd2, unsigned int, count, int, flags)
