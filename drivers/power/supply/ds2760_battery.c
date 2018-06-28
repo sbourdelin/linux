@@ -510,6 +510,10 @@ static int ds2760_battery_probe(struct platform_device *pdev)
 	char status;
 	int retval = 0;
 	struct ds2760_device_info *di;
+	struct device *w1_dev;
+
+	w1_dev = pdev->dev.parent;
+	psy_cfg.of_node = w1_dev->of_node;
 
 	di = devm_kzalloc(&pdev->dev, sizeof(*di), GFP_KERNEL);
 	if (!di) {
@@ -520,7 +524,7 @@ static int ds2760_battery_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, di);
 
 	di->dev				= &pdev->dev;
-	di->w1_dev			= pdev->dev.parent;
+	di->w1_dev			= w1_dev;
 	di->bat_desc.name		= dev_name(&pdev->dev);
 	di->bat_desc.type		= POWER_SUPPLY_TYPE_BATTERY;
 	di->bat_desc.properties		= ds2760_battery_props;
