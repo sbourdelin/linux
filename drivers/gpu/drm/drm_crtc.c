@@ -468,6 +468,8 @@ static int __drm_mode_set_config_internal(struct drm_mode_set *set,
 	struct drm_crtc *tmp;
 	int ret;
 
+	WARN_ON(crtc->state);
+
 	/*
 	 * NOTE: ->set_config can also disable other crtcs (if we steal all
 	 * connectors from it), hence we need to refcount the fbs across all
@@ -485,10 +487,8 @@ static int __drm_mode_set_config_internal(struct drm_mode_set *set,
 	if (ret == 0) {
 		struct drm_plane *plane = crtc->primary;
 
-		if (!plane->state) {
-			plane->crtc = fb ? crtc : NULL;
-			plane->fb = fb;
-		}
+		plane->crtc = fb ? crtc : NULL;
+		plane->fb = fb;
 	}
 
 	drm_for_each_crtc(tmp, crtc->dev) {
@@ -503,6 +503,7 @@ static int __drm_mode_set_config_internal(struct drm_mode_set *set,
 
 	return ret;
 }
+
 /**
  * drm_mode_set_config_internal - helper to call &drm_mode_config_funcs.set_config
  * @set: modeset config to set
@@ -747,7 +748,11 @@ retry:
 	set.connectors = connector_set;
 	set.num_connectors = crtc_req->count_connectors;
 	set.fb = fb;
-	ret = __drm_mode_set_config_internal(&set, &ctx);
+
+	if (crtc->state)
+		ret = crtc->funcs->set_config(&set, &ctx);
+	else
+		ret = __drm_mode_set_config_internal(&set, &ctx);
 
 out:
 	if (fb)
