@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/actions,s700-cmu.h>
 
 / {
 	compatible = "actions,s700";
@@ -42,6 +43,12 @@
 			reg = <0x0 0x3>;
 			enable-method = "psci";
 		};
+	};
+
+	clock: clock-controller@e0168000 {
+		compatible = "actions,s700-cmu";
+		reg = <0 0xe0168000 0 0x1000>;
+		#clock-cells = <1>;
 	};
 
 	reserved-memory {
@@ -129,6 +136,7 @@
 			compatible = "actions,s900-uart", "actions,owl-uart";
 			reg = <0x0 0xe0126000 0x0 0x2000>;
 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clock CLK_UART3>;
 			status = "disabled";
 		};
 
