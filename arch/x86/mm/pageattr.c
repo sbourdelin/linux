@@ -510,16 +510,20 @@ static int
 try_preserve_large_page(pte_t *kpte, unsigned long address,
 			struct cpa_data *cpa)
 {
+	static unsigned long address_cache;
+	static unsigned long do_split_cache = 1;
 	unsigned long nextpage_addr, numpages, pmask, psize, addr, pfn, old_pfn;
 	pte_t new_pte, old_pte, *tmp;
 	pgprot_t old_prot, new_prot, req_prot;
 	int i, do_split = 1;
 	enum pg_level level;
 
-	if (cpa->force_split)
-		return 1;
-
 	spin_lock(&pgd_lock);
+	if (cpa->force_split) {
+		do_split_cache = 1;
+		return 1;
+	}
+
 	/*
 	 * Check for races, another CPU might have split this page
 	 * up already:
@@ -594,13 +598,25 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 
 	new_prot = static_protections(req_prot, address, pfn);
 
+	addr = address & pmask;
+	pfn = old_pfn;
+	/*
+	 * If an address in same range had been checked just now, re-use the
+	 * cache value without full range check. In the worst case, it needs to
+	 * check every 4K page in 1G range, which causes cpu stuck for long
+	 * time.
+	 */
+	if (!do_split_cache &&
+	    address_cache >= addr && address_cache < nextpage_addr &&
+	    pgprot_val(new_prot) == pgprot_val(old_prot)) {
+		do_split = do_split_cache;
+		goto out_unlock;
+	}
 	/*
 	 * We need to check the full range, whether
 	 * static_protection() requires a different pgprot for one of
 	 * the pages in the range we try to preserve:
 	 */
-	addr = address & pmask;
-	pfn = old_pfn;
 	for (i = 0; i < (psize >> PAGE_SHIFT); i++, addr += PAGE_SIZE, pfn++) {
 		pgprot_t chk_prot = static_protections(req_prot, addr, pfn);
 
@@ -637,6 +653,8 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	}
 
 out_unlock:
+	address_cache = address;
+	do_split_cache = do_split;
 	spin_unlock(&pgd_lock);
 
 	return do_split;
