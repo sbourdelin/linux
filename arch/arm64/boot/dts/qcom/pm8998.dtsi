@@ -3,6 +3,7 @@
 
 #include <dt-bindings/spmi/spmi.h>
 #include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/thermal/thermal.h>
 
 &spmi_bus {
 	pm8998_lsid0: pmic@0 {
@@ -57,5 +58,32 @@
 		reg = <0x1 SPMI_USID>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+	};
+};
+
+&thermal_zones {
+	pm8998 {
+		polling-delay-passive = <250>;
+		polling-delay = <1000>;
+
+		thermal-sensors = <&pm8998_temp>;
+
+		trips {
+			passive {
+				temperature = <1050000>;
+				hysteresis = <2000>;
+				type = "passive";
+			};
+			alert {
+				temperature = <125000>;
+				hysteresis = <2000>;
+				type = "hot";
+			};
+			crit {
+				temperature = <145000>;
+				hysteresis = <2000>;
+				type = "critical";
+			};
+		};
 	};
 };
