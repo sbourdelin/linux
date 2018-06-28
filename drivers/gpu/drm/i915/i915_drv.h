@@ -1278,8 +1278,7 @@ enum intel_pipe_crc_source {
 
 #define INTEL_PIPE_CRC_ENTRIES_NR	128
 struct intel_pipe_crc {
-	spinlock_t lock;
-	int skipped;
+	atomic_t skipped;
 	enum intel_pipe_crc_source source;
 };
 
@@ -3335,12 +3334,10 @@ u32 i915_gem_fence_alignment(struct drm_i915_private *dev_priv, u32 size,
 #ifdef CONFIG_DEBUG_FS
 int i915_debugfs_register(struct drm_i915_private *dev_priv);
 int i915_debugfs_connector_add(struct drm_connector *connector);
-void intel_display_crc_init(struct drm_i915_private *dev_priv);
 #else
 static inline int i915_debugfs_register(struct drm_i915_private *dev_priv) {return 0;}
 static inline int i915_debugfs_connector_add(struct drm_connector *connector)
 { return 0; }
-static inline void intel_display_crc_init(struct drm_i915_private *dev_priv) {}
 #endif
 
 const char *i915_cache_level_str(struct drm_i915_private *i915, int type);

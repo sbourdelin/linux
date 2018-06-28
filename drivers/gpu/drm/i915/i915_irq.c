@@ -1742,8 +1742,8 @@ static void display_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
 	struct intel_pipe_crc *pipe_crc = &dev_priv->pipe_crc[pipe];
 	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 	uint32_t crcs[5];
+	int to_skip;
 
-	spin_lock(&pipe_crc->lock);
 	/*
 	 * For some not yet identified reason, the first CRC is
 	 * bonkers. So let's just wait for the next vblank and read
@@ -1752,13 +1752,14 @@ static void display_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
 	 * On GEN8+ sometimes the second CRC is bonkers as well, so
 	 * don't trust that one either.
 	 */
-	if (pipe_crc->skipped <= 0 ||
-	    (INTEL_GEN(dev_priv) >= 8 && pipe_crc->skipped == 1)) {
-		pipe_crc->skipped++;
-		spin_unlock(&pipe_crc->lock);
+
+	if (INTEL_GEN(dev_priv) >= 8)
+		to_skip = 2;
+	else
+		to_skip = 1;
+
+	if (atomic_add_unless(&pipe_crc->skipped, 1, to_skip))
 		return;
-	}
-	spin_unlock(&pipe_crc->lock);
 
 	crcs[0] = crc0;
 	crcs[1] = crc1;

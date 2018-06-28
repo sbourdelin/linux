@@ -457,17 +457,6 @@ display_crc_ctl_parse_source(const char *buf, enum intel_pipe_crc_source *s)
 	return 0;
 }
 
-void intel_display_crc_init(struct drm_i915_private *dev_priv)
-{
-	enum pipe pipe;
-
-	for_each_pipe(dev_priv, pipe) {
-		struct intel_pipe_crc *pipe_crc = &dev_priv->pipe_crc[pipe];
-
-		spin_lock_init(&pipe_crc->lock);
-	}
-}
-
 int intel_crtc_set_crc_source(struct drm_crtc *crtc, const char *source_name,
 			      size_t *values_cnt)
 {
@@ -507,7 +496,7 @@ int intel_crtc_set_crc_source(struct drm_crtc *crtc, const char *source_name,
 			hsw_pipe_A_crc_wa(dev_priv, false);
 	}
 
-	pipe_crc->skipped = 0;
+	atomic_set(&pipe_crc->skipped, 0);
 	*values_cnt = 5;
 
 out:
@@ -529,8 +518,7 @@ void intel_crtc_enable_pipe_crc(struct intel_crtc *intel_crtc)
 	if (get_new_crc_ctl_reg(dev_priv, crtc->index, &pipe_crc->source, &val, false) < 0)
 		return;
 
-	/* Don't need pipe_crc->lock here, IRQs are not generated. */
-	pipe_crc->skipped = 0;
+	atomic_set(&pipe_crc->skipped, 0);
 
 	I915_WRITE(PIPE_CRC_CTL(crtc->index), val);
 	POSTING_READ(PIPE_CRC_CTL(crtc->index));
@@ -543,9 +531,7 @@ void intel_crtc_disable_pipe_crc(struct intel_crtc *intel_crtc)
 	struct intel_pipe_crc *pipe_crc = &dev_priv->pipe_crc[crtc->index];
 
 	/* Swallow crc's until we stop generating them. */
-	spin_lock_irq(&pipe_crc->lock);
-	pipe_crc->skipped = INT_MIN;
-	spin_unlock_irq(&pipe_crc->lock);
+	atomic_set(&pipe_crc->skipped, INT_MIN);
 
 	I915_WRITE(PIPE_CRC_CTL(crtc->index), 0);
 	POSTING_READ(PIPE_CRC_CTL(crtc->index));
