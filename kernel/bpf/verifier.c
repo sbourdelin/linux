@@ -5140,6 +5140,14 @@ static int replace_map_fd_with_map_ptr(struct bpf_verifier_env *env)
 				return -E2BIG;
 			}
 
+			if (map->map_type == BPF_MAP_TYPE_CGROUP_STORAGE &&
+			    bpf_cgroup_storage_assign(env->prog, map)) {
+				verbose(env,
+					"only one cgroup storage is allowed\n");
+				fdput(f);
+				return -EBUSY;
+			}
+
 			/* hold the map. If the program is rejected by verifier,
 			 * the map will be released by release_maps() or it
 			 * will be used by the valid program until it's unloaded
@@ -5148,6 +5156,10 @@ static int replace_map_fd_with_map_ptr(struct bpf_verifier_env *env)
 			map = bpf_map_inc(map, false);
 			if (IS_ERR(map)) {
 				fdput(f);
+				if (map->map_type ==
+				    BPF_MAP_TYPE_CGROUP_STORAGE)
+					bpf_cgroup_storage_release(env->prog,
+								   map);
 				return PTR_ERR(map);
 			}
 			env->used_maps[env->used_map_cnt++] = map;
