@@ -316,6 +316,10 @@ static void __init reset_cpu_topology(void)
 }
 
 #ifdef CONFIG_ACPI
+
+#define acpi_topology_mktag(x)	(-((x) + 1))
+#define acpi_topology_istag(x)	((x) < 0)
+
 /*
  * Propagate the topology information of the processor_topology_node tree to the
  * cpu_topology array.
@@ -323,27 +327,31 @@ static void __init reset_cpu_topology(void)
 static int __init parse_acpi_topology(void)
 {
 	bool is_threaded;
-	int cpu, topology_id;
+	int package_id = 0;
+	int cpu, ret;
 
 	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+
+	/*
+	 * Loop through all PEs twice. In the first loop store parent
+	 * tags into the IDs. In the second loop we reset the IDs as
+	 * 0..N-1 per parent tag.
+	 */
 
 	for_each_possible_cpu(cpu) {
 		int i, cache_id;
 
-		topology_id = find_acpi_cpu_topology(cpu, 0);
-		if (topology_id < 0)
-			return topology_id;
+		ret = find_acpi_cpu_topology(cpu, 0);
+		if (ret < 0)
+			return ret;
 
-		if (is_threaded) {
-			cpu_topology[cpu].thread_id = topology_id;
-			topology_id = find_acpi_cpu_topology(cpu, 1);
-			cpu_topology[cpu].core_id   = topology_id;
-		} else {
-			cpu_topology[cpu].thread_id  = -1;
-			cpu_topology[cpu].core_id    = topology_id;
-		}
-		topology_id = find_acpi_cpu_topology_package(cpu);
-		cpu_topology[cpu].package_id = topology_id;
+		if (is_threaded)
+			ret = find_acpi_cpu_topology(cpu, 1);
+		else
+			cpu_topology[cpu].thread_id = -1;
+		cpu_topology[cpu].core_id = acpi_topology_mktag(ret);
+		ret = find_acpi_cpu_topology_package(cpu);
+		cpu_topology[cpu].package_id = acpi_topology_mktag(ret);
 
 		i = acpi_find_last_cache_level(cpu);
 
@@ -356,6 +364,38 @@ static int __init parse_acpi_topology(void)
 			if (cache_id > 0)
 				cpu_topology[cpu].llc_id = cache_id;
 		}
+	}
+
+	for_each_possible_cpu(cpu) {
+		int package_tag = cpu_topology[cpu].package_id;
+		int core_id = 0, cpu2;
+
+		if (!acpi_topology_istag(package_tag))
+			continue;
+
+		for_each_possible_cpu(cpu2) {
+			if (cpu_topology[cpu2].package_id != package_tag)
+				continue;
+
+			if (is_threaded) {
+				int core_tag = cpu_topology[cpu2].core_id;
+				int thread_id = 0, cpu3;
+
+				for_each_possible_cpu(cpu3) {
+					if (cpu_topology[cpu3].core_id != core_tag)
+						continue;
+
+					cpu_topology[cpu3].thread_id = thread_id++;
+					cpu_topology[cpu3].core_id = core_id;
+					cpu_topology[cpu3].package_id = package_id;
+				}
+				++core_id;
+			} else {
+				cpu_topology[cpu2].core_id = core_id++;
+				cpu_topology[cpu2].package_id = package_id;
+			}
+		}
+		++package_id;
 	}
 
 	return 0;
