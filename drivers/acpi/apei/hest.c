@@ -23,6 +23,8 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/efi.h>
+#include <linux/dmi.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -212,6 +214,40 @@ err:
 	goto out;
 }
 
+static int __init quirk_hpe_moonshot_m400(const struct dmi_system_id *d)
+{
+	/* Only 'EFI v2.60 by HPE' is known to be affected */
+	unsigned int affected_version = (2<<16) | 60;
+
+	if (!IS_ENABLED(CONFIG_EFI))
+		return 0;
+
+	if (efi_get_runtime_version() == affected_version) {
+		pr_info(HEST_PFX "disabled due to firmware quirk\n");
+		hest_disable = HEST_DISABLED;
+	}
+
+	return 0;
+}
+
+static const struct dmi_system_id hest_quirk_dmi_table[]  __initconst = {
+	{
+		.callback = quirk_hpe_moonshot_m400,
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR,	"HPE"),
+			DMI_MATCH(DMI_PRODUCT_NAME,	"ProLiant m400 Server"),
+			DMI_MATCH(DMI_BOARD_NAME,	"ProLiant m400 Server"),
+			DMI_MATCH(DMI_BIOS_VERSION,	"U02"),
+		},
+	},
+	{},
+};
+
+static void __init acpi_hest_quirks(void)
+{
+	dmi_check_system(hest_quirk_dmi_table);
+}
+
 static int __init setup_hest_disable(char *str)
 {
 	hest_disable = HEST_DISABLED;
@@ -225,6 +261,8 @@ void __init acpi_hest_init(void)
 	acpi_status status;
 	int rc = -ENODEV;
 	unsigned int ghes_count = 0;
+
+	acpi_hest_quirks();
 
 	if (hest_disable) {
 		pr_info(HEST_PFX "Table parsing disabled.\n");
