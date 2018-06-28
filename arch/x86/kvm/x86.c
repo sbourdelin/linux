@@ -2146,6 +2146,30 @@ static void kvmclock_sync_fn(struct work_struct *work)
 					KVMCLOCK_SYNC_PERIOD);
 }
 
+/*
+ * On AMD, HWCR[McStatusWrEn] controls whether setting MCi_STATUS results in #GP.
+ */
+static bool __set_mci_status(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
+{
+	if (guest_cpuid_is_amd(vcpu)) {
+		struct msr_data tmp;
+
+		tmp.index = MSR_K7_HWCR;
+
+		if (kvm_x86_ops->get_msr(vcpu, &tmp))
+			return false;
+
+		/* McStatusWrEn enabled? */
+		if (tmp.data & BIT_ULL(18))
+			return true;
+	}
+
+	if (msr_info->data != 0)
+		return false;
+
+	return true;
+}
+
 static int set_msr_mce(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 {
 	u64 mcg_cap = vcpu->arch.mcg_cap;
@@ -2176,9 +2200,13 @@ static int set_msr_mce(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			if ((offset & 0x3) == 0 &&
 			    data != 0 && (data | (1 << 10)) != ~(u64)0)
 				return -1;
-			if (!msr_info->host_initiated &&
-				(offset & 0x3) == 1 && data != 0)
-				return -1;
+
+			/* MCi_STATUS */
+			if ((offset & 0x3) == 1 && !msr_info->host_initiated) {
+				if (!__set_mci_status(vcpu, msr_info))
+						return -1;
+			}
+
 			vcpu->arch.mce_banks[offset] = data;
 			break;
 		}
