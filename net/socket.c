@@ -1136,7 +1136,7 @@ static struct wait_queue_head *sock_get_poll_head(struct file *file,
 	if (!sock->ops->poll_mask)
 		return NULL;
 	sock_poll_busy_loop(sock, events);
-	return sk_sleep(sock->sk);
+	return &sock->wq->wait;
 }
 
 static __poll_t sock_poll_mask(struct file *file, __poll_t events)
