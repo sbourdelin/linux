@@ -699,8 +699,12 @@ static int pvrdma_del_gid(const struct ib_gid_attr *attr, void **context)
 }
 
 static void pvrdma_netdevice_event_handle(struct pvrdma_dev *dev,
+					  struct net_device *ndev,
 					  unsigned long event)
 {
+	struct pci_dev *pdev_net;
+
+
 	switch (event) {
 	case NETDEV_REBOOT:
 	case NETDEV_DOWN:
@@ -718,6 +722,21 @@ static void pvrdma_netdevice_event_handle(struct pvrdma_dev *dev,
 		else
 			pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ACTIVE);
 		break;
+	case NETDEV_UNREGISTER:
+		dev_put(dev->netdev);
+		dev->netdev = NULL;
+		break;
+	case NETDEV_REGISTER:
+		/* Paired vmxnet3 will have same bus, slot. But func will be 0 */
+		pdev_net = pci_get_slot(dev->pdev->bus, PCI_DEVFN(PCI_SLOT(dev->pdev->devfn), 0));
+		if ((dev->netdev == NULL) && (pci_get_drvdata(pdev_net) == ndev)) {
+			/* this is our netdev */
+			dev->netdev = ndev;
+			dev_hold(ndev);
+		}
+		pci_dev_put(pdev_net);
+		break;
+
 	default:
 		dev_dbg(&dev->pdev->dev, "ignore netdevice event %ld on %s\n",
 			event, dev->ib_dev.name);
@@ -734,8 +753,9 @@ static void pvrdma_netdevice_event_work(struct work_struct *work)
 
 	mutex_lock(&pvrdma_device_list_lock);
 	list_for_each_entry(dev, &pvrdma_device_list, device_link) {
-		if (dev->netdev == netdev_work->event_netdev) {
-			pvrdma_netdevice_event_handle(dev, netdev_work->event);
+		if ((netdev_work->event == NETDEV_REGISTER) ||
+		    (dev->netdev == netdev_work->event_netdev)) {
+			pvrdma_netdevice_event_handle(dev, netdev_work->event_netdev, netdev_work->event);
 			break;
 		}
 	}
@@ -962,6 +982,7 @@ static int pvrdma_pci_probe(struct pci_dev *pdev,
 	}
 
 	dev->netdev = pci_get_drvdata(pdev_net);
+	dev_hold(dev->netdev);
 	pci_dev_put(pdev_net);
 	if (!dev->netdev) {
 		dev_err(&pdev->dev, "failed to get vmxnet3 device\n");
