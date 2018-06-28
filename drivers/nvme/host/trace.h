@@ -75,10 +75,15 @@ const char *nvme_trace_parse_nvm_cmd(struct trace_seq *p, u8 opcode,
 #define __parse_nvme_cmd(opcode, cdw10) \
 	nvme_trace_parse_nvm_cmd(p, opcode, cdw10)
 
+const char *nvme_trace_disk_name(struct trace_seq *p, char *name);
+#define __print_nvme_disk_name(name) \
+	nvme_trace_disk_name(p, name)
+
 TRACE_EVENT(nvme_setup_nvm_cmd,
 	    TP_PROTO(struct request *req, struct nvme_command *cmd),
 	    TP_ARGS(req, cmd),
 	    TP_STRUCT__entry(
+		    __array(char, disk, DISK_NAME_LEN)
 		    __field(int, ctrl_id)
 		    __field(int, qid)
 		    __field(u8, opcode)
@@ -98,10 +103,14 @@ TRACE_EVENT(nvme_setup_nvm_cmd,
 		    __entry->metadata = le64_to_cpu(cmd->common.metadata);
 		    memcpy(__entry->cdw10, cmd->common.cdw10,
 			   sizeof(__entry->cdw10));
+		    req->rq_disk ?
+			memcpy(__entry->disk, req->rq_disk->disk_name, DISK_NAME_LEN) :
+			memset(__entry->disk, 0, DISK_NAME_LEN);
 	    ),
-	    TP_printk("nvme%d: qid=%d, cmdid=%u, nsid=%u, flags=0x%x, meta=0x%llx, cmd=(%s %s)",
-		      __entry->ctrl_id, __entry->qid, __entry->nsid,
-		      __entry->cid, __entry->flags, __entry->metadata,
+	    TP_printk("nvme%d: %sqid=%d, cmdid=%u, nsid=%u, flags=0x%x, meta=0x%llx, cmd=(%s %s)",
+		      __entry->ctrl_id, __print_nvme_disk_name(__entry->disk),
+		      __entry->qid, __entry->nsid, __entry->cid,
+		      __entry->flags, __entry->metadata,
 		      __entry->qid ?
 				show_opcode_name(__entry->opcode) :
 				show_admin_opcode_name(__entry->opcode),
@@ -114,6 +123,7 @@ TRACE_EVENT(nvme_complete_rq,
 	    TP_PROTO(struct request *req),
 	    TP_ARGS(req),
 	    TP_STRUCT__entry(
+		    __array(char, disk, DISK_NAME_LEN)
 		    __field(int, ctrl_id)
 		    __field(int, qid)
 		    __field(int, cid)
@@ -130,11 +140,14 @@ TRACE_EVENT(nvme_complete_rq,
 		    __entry->retries = nvme_req(req)->retries;
 		    __entry->flags = nvme_req(req)->flags;
 		    __entry->status = nvme_req(req)->status;
+		    req->rq_disk ?
+			memcpy(__entry->disk, req->rq_disk->disk_name, DISK_NAME_LEN) :
+			memset(__entry->disk, 0, DISK_NAME_LEN);
 	    ),
-	    TP_printk("nvme%d: qid=%d, cmdid=%u, res=%llu, retries=%u, flags=0x%x, status=%u",
-		      __entry->ctrl_id,  __entry->qid, __entry->cid,
-		      __entry->result, __entry->retries, __entry->flags,
-		      __entry->status)
+	    TP_printk("nvme%d: %sqid=%d, cmdid=%u, res=%llu, retries=%u, flags=0x%x, status=%u",
+		      __entry->ctrl_id,  __print_nvme_disk_name(__entry->disk),
+		      __entry->qid, __entry->cid, __entry->result,
+		      __entry->retries, __entry->flags, __entry->status)
 
 );
 
