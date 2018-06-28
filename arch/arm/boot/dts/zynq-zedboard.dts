@@ -8,7 +8,7 @@
 
 / {
 	model = "Avnet ZedBoard board";
-	compatible = "avnet,zynq-zed", "xlnx,zynq-7000";
+	compatible = "avnet,zynq-zedboard", "xlnx,zynq-7000";
 
 	aliases {
 		ethernet0 = &gem0;

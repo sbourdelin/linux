@@ -30,7 +30,7 @@ Additional compatible strings:
   "xlnx,zynq-zc770-xm013"
 
 - Avnet ZedBoard board
-  "avnet,zynq-zed"
+  "avnet,zynq-zedboard"
 
 - Digilent Zybo board
   "digilent,zynq-zybo"
