@@ -320,11 +320,59 @@ static void __init reset_cpu_topology(void)
  * Propagate the topology information of the processor_topology_node tree to the
  * cpu_topology array.
  */
+
+struct package_id_map {
+	int topology_id;
+	int package_id;
+	struct list_head list;
+};
+
+static int map_package_id(int topology_id, int *max_package_id,
+			  struct list_head *head)
+{
+	struct list_head *pos;
+	struct package_id_map *entry;
+
+	list_for_each(pos, head) {
+		entry = container_of(pos, struct package_id_map, list);
+		if (entry->topology_id == topology_id)
+			goto done;
+	}
+
+	/* topology_id not found in the list */
+	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+	if (!entry)
+		return topology_id;
+
+	entry->topology_id = topology_id;
+	entry->package_id = *max_package_id;
+	list_add(&entry->list, head);
+	*max_package_id = *max_package_id + 1;
+
+done:
+	return entry->package_id;
+}
+
+static void destroy_map(struct list_head *head)
+{
+	struct package_id_map *entry;
+	struct list_head *pos, *q;
+
+	list_for_each_safe(pos, q, head) {
+		entry = container_of(pos, struct package_id_map, list);
+		list_del(pos);
+		kfree(entry);
+	}
+}
+
 static int __init parse_acpi_topology(void)
 {
 	bool is_threaded;
 	int cpu, topology_id;
+	struct list_head package_id_list;
+	int max_package_id = 0;
 
+	INIT_LIST_HEAD(&package_id_list);
 	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
 
 	for_each_possible_cpu(cpu) {
@@ -343,7 +391,9 @@ static int __init parse_acpi_topology(void)
 			cpu_topology[cpu].core_id    = topology_id;
 		}
 		topology_id = find_acpi_cpu_topology_package(cpu);
-		cpu_topology[cpu].package_id = topology_id;
+		cpu_topology[cpu].package_id = map_package_id(topology_id,
+							&max_package_id,
+							&package_id_list);
 
 		i = acpi_find_last_cache_level(cpu);
 
@@ -358,6 +408,7 @@ static int __init parse_acpi_topology(void)
 		}
 	}
 
+	destroy_map(&package_id_list);
 	return 0;
 }
 
