@@ -299,6 +299,24 @@ static int pciehp_resume(struct pcie_device *dev)
 }
 #endif /* PM */
 
+static pci_ers_result_t pciehp_reset_link(struct pci_dev *pdev)
+{
+	struct pcie_device *pciedev;
+	struct controller *ctrl;
+	struct device *devhp;
+	struct slot *slot;
+	int rc;
+
+	devhp = pcie_port_find_device(pdev, PCIE_PORT_SERVICE_HP);
+	pciedev = to_pcie_device(devhp);
+	ctrl = get_service_data(pciedev);
+	slot = ctrl->slot;
+
+	rc = reset_slot(slot->hotplug_slot, 0);
+
+	return !rc ? PCI_ERS_RESULT_RECOVERED : PCI_ERS_RESULT_DISCONNECT;
+}
+
 static struct pcie_port_service_driver hpdriver_portdrv = {
 	.name		= PCIE_MODULE_NAME,
 	.port_type	= PCIE_ANY_PORT,
@@ -311,6 +329,8 @@ static struct pcie_port_service_driver hpdriver_portdrv = {
 	.suspend	= pciehp_suspend,
 	.resume		= pciehp_resume,
 #endif	/* PM */
+
+	.reset_link	= pciehp_reset_link,
 };
 
 static int __init pcied_init(void)

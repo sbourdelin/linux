@@ -308,6 +308,11 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
 		pci_dev_put(pdev);
 	}
 
+	/* handle link reset via hotplug driver if supported */
+	if (dev->is_hotplug_bridge &&
+		pcie_port_find_device(dev, PCIE_PORT_SERVICE_HP))
+		service = PCIE_PORT_SERVICE_HP;
+
 	result = reset_link(udev, service);
 
 	if ((service == PCIE_PORT_SERVICE_AER) &&
