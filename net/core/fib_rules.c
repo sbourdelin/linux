@@ -444,6 +444,9 @@ static struct fib_rule *rule_find(struct fib_rules_ops *ops,
 		if (rule->ip_proto && r->ip_proto != rule->ip_proto)
 			continue;
 
+		if (rule->proto && r->proto != rule->proto)
+			continue;
+
 		if (fib_rule_port_range_set(&rule->sport_range) &&
 		    !fib_rule_port_range_compare(&r->sport_range,
 						 &rule->sport_range))
