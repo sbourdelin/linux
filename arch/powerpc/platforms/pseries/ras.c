@@ -516,6 +516,10 @@ static void pseries_print_mce_info(struct pt_regs *regs,
 		break;
 	}
 
+	/* Display faulty slb contents for SLB errors. */
+	if (error_type == PSERIES_MC_ERROR_TYPE_SLB)
+		slb_dump_contents(local_paca->mce_faulty_slbs);
+
 	printk("%s%s Machine check interrupt [%s]\n", level, sevstr,
 		disposition == RTAS_DISP_FULLY_RECOVERED ?
 		"Recovered" : "Not recovered");
@@ -576,7 +580,11 @@ static int mce_handle_error(struct rtas_error_log *errp)
 
 	if ((disposition == RTAS_DISP_NOT_RECOVERED) &&
 			(error_type == PSERIES_MC_ERROR_TYPE_SLB)) {
-		/* Store the old slb content someplace. */
+		/*
+		 * Store the old slb content in paca before flushing. Print
+		 * this when we go to virtual mode.
+		 */
+		slb_save_contents(local_paca->mce_faulty_slbs);
 		slb_flush_and_rebolt_realmode();
 		disposition = RTAS_DISP_FULLY_RECOVERED;
 		rtas_set_disposition_recovered(errp);

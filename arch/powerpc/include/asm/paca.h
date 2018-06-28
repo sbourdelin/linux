@@ -254,6 +254,7 @@ struct paca_struct {
 #endif
 #ifdef CONFIG_PPC_PSERIES
 	u8 *mce_data_buf;		/* buffer to hold per cpu rtas errlog */
+	struct slb_entry *mce_faulty_slbs;
 #endif /* CONFIG_PPC_PSERIES */
 } ____cacheline_aligned;
 
