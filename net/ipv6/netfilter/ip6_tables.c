@@ -1875,12 +1875,14 @@ static struct xt_target ip6t_builtin_tg[] __read_mostly = {
 		.compat_from_user = compat_standard_from_user,
 		.compat_to_user   = compat_standard_to_user,
 #endif
+		.me		  = THIS_MODULE,
 	},
 	{
 		.name             = XT_ERROR_TARGET,
 		.target           = ip6t_error,
 		.targetsize       = XT_FUNCTION_MAXNAMELEN,
 		.family           = NFPROTO_IPV6,
+		.me		  = THIS_MODULE,
 	},
 };
 
@@ -1909,6 +1911,7 @@ static struct xt_match ip6t_builtin_mt[] __read_mostly = {
 		.checkentry = icmp6_checkentry,
 		.proto      = IPPROTO_ICMPV6,
 		.family     = NFPROTO_IPV6,
+		.me	    = THIS_MODULE,
 	},
 };
 

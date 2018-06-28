@@ -1864,12 +1864,14 @@ static struct xt_target ipt_builtin_tg[] __read_mostly = {
 		.compat_from_user = compat_standard_from_user,
 		.compat_to_user   = compat_standard_to_user,
 #endif
+		.me		  = THIS_MODULE,
 	},
 	{
 		.name             = XT_ERROR_TARGET,
 		.target           = ipt_error,
 		.targetsize       = XT_FUNCTION_MAXNAMELEN,
 		.family           = NFPROTO_IPV4,
+		.me		  = THIS_MODULE,
 	},
 };
 
@@ -1898,6 +1900,7 @@ static struct xt_match ipt_builtin_mt[] __read_mostly = {
 		.checkentry = icmp_checkentry,
 		.proto      = IPPROTO_ICMP,
 		.family     = NFPROTO_IPV4,
+		.me	    = THIS_MODULE,
 	},
 };
 

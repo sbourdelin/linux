@@ -82,6 +82,7 @@ static struct xt_target ebt_standard_target = {
 	.compat_from_user = ebt_standard_compat_from_user,
 	.compat_to_user =  ebt_standard_compat_to_user,
 #endif
+	.me = THIS_MODULE,
 };
 
 static inline int
