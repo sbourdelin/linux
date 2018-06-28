@@ -747,6 +747,16 @@ struct kvm_apic_map {
 	struct kvm_lapic *phys_map[];
 };
 
+/* Mapping from VP number to vCPU idx */
+struct vp_idx_map {
+	struct rcu_head rcu;
+	int len;
+	struct {
+		u32 vp_idx;
+		u32 vcpu_idx;
+	} vp_idx_elem[];
+};
+
 /* Hyper-V emulation context */
 struct kvm_hv {
 	struct mutex hv_lock;
@@ -765,6 +775,8 @@ struct kvm_hv {
 	u64 hv_reenlightenment_control;
 	u64 hv_tsc_emulation_control;
 	u64 hv_tsc_emulation_status;
+
+	struct vp_idx_map *vp_idx_map;
 };
 
 enum kvm_irqchip_mode {
