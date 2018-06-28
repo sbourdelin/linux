@@ -488,9 +488,21 @@ long machine_check_early(struct pt_regs *regs)
 {
 	long handled = 0;
 
-	__this_cpu_inc(irq_stat.mce_exceptions);
+	/*
+	 * For pSeries we count mce when we go into virtual mode machine
+	 * check handler. Hence skip it. Also, We can't access per cpu
+	 * variables in real mode for LPAR.
+	 */
+	if (early_cpu_has_feature(CPU_FTR_HVMODE))
+		__this_cpu_inc(irq_stat.mce_exceptions);
 
-	if (cur_cpu_spec && cur_cpu_spec->machine_check_early)
+	/*
+	 * See if platform is capable of handling machine check.
+	 * Otherwise fallthrough and allow CPU to handle this machine check.
+	 */
+	if (ppc_md.machine_check_early)
+		handled = ppc_md.machine_check_early(regs);
+	else if (cur_cpu_spec && cur_cpu_spec->machine_check_early)
 		handled = cur_cpu_spec->machine_check_early(regs);
 	return handled;
 }
