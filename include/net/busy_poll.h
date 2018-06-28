@@ -121,15 +121,6 @@ static inline void sk_busy_loop(struct sock *sk, int nonblock)
 #endif
 }
 
-static inline void sock_poll_busy_loop(struct socket *sock, __poll_t events)
-{
-	if (sk_can_busy_loop(sock->sk) &&
-	    events && (events & POLL_BUSY_LOOP)) {
-		/* once, only if requested by syscall */
-		sk_busy_loop(sock->sk, 1);
-	}
-}
-
 /* used in the NIC receive handler to mark the skb */
 static inline void skb_mark_napi_id(struct sk_buff *skb,
 				    struct napi_struct *napi)

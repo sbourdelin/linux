@@ -1160,7 +1160,9 @@ static __poll_t sock_poll(struct file *file, poll_table *wait)
 	struct socket *sock = file->private_data;
 	__poll_t events = poll_requested_events(wait), mask = 0;
 
-	sock_poll_busy_loop(sock, events);
+	/* poll once if requested by the syscall */
+	if ((events & POLL_BUSY_LOOP) && sk_can_busy_loop(sock->sk))
+		sk_busy_loop(sock->sk, 1);
 
 	if (sock->ops->poll) {
 		mask = sock->ops->poll(file, sock, wait);
