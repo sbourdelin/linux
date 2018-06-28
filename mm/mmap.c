@@ -1440,6 +1440,16 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 
 		if (!file_mmap_ok(file, inode, pgoff, len))
 			return -EOVERFLOW;
+		/*
+		 * MAP_SHARED_VALIDATE is indistinguishable from
+		 * (MAP_SHARED|MAP_PRIVATE) which must return -EINVAL.
+		 * If the flags contain MAP_SHARED_VALIDATE and none of the
+		 * non-legacy flags, the user gets EINVAL.
+		 */
+		if (((flags & MAP_SHARED_VALIDATE) == MAP_SHARED_VALIDATE) &&
+		    !(flags & ~LEGACY_MAP_MASK)) {
+			return -EINVAL;
+		}
 
 		flags_mask = LEGACY_MAP_MASK | file->f_op->mmap_supported_flags;
 
