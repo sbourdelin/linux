@@ -6526,6 +6526,49 @@ static void btrfs_report_missing_device(struct btrfs_fs_info *fs_info,
 			      devid, uuid);
 }
 
+static int verify_devices_generation(struct btrfs_fs_info *fs_info,
+				     struct btrfs_device *dev)
+{
+	struct btrfs_fs_devices *fs_devices = dev->fs_devices;
+	struct btrfs_device *cur;
+	bool warn_only = false;
+	int ret = 0;
+
+	if (!fs_devices || fs_devices->seeding || !dev->generation)
+		return 0;
+
+	/*
+	 * If we're not replaying log, we're completely safe to allow
+	 * generation mismatch as it won't write anything to disks, nor
+	 * remount to rw.
+	 */
+	if (btrfs_test_opt(fs_info, NOLOGREPLAY))
+		warn_only = true;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(cur, &fs_devices->devices, dev_list) {
+		if (cur->generation && cur->generation != dev->generation) {
+			if (warn_only) {
+				btrfs_warn_rl_in_rcu(fs_info,
+	"devid %llu has unexpected generation, has %llu expected %llu",
+						     dev->devid,
+						     dev->generation,
+						     cur->generation);
+			} else {
+				btrfs_err_rl_in_rcu(fs_info,
+	"devid %llu has unexpected generation, has %llu expected %llu",
+						     dev->devid,
+						     dev->generation,
+						     cur->generation);
+				ret = -EINVAL;
+				break;
+			}
+		}
+	}
+	rcu_read_unlock();
+	return ret;
+}
+
 static int read_one_chunk(struct btrfs_fs_info *fs_info, struct btrfs_key *key,
 			  struct extent_buffer *leaf,
 			  struct btrfs_chunk *chunk)
@@ -6611,6 +6654,13 @@ static int read_one_chunk(struct btrfs_fs_info *fs_info, struct btrfs_key *key,
 				return PTR_ERR(map->stripes[i].dev);
 			}
 			btrfs_report_missing_device(fs_info, devid, uuid, false);
+		} else {
+			ret = verify_devices_generation(fs_info,
+							map->stripes[i].dev);
+			if (ret < 0) {
+				free_extent_map(em);
+				return ret;
+			}
 		}
 		set_bit(BTRFS_DEV_STATE_IN_FS_METADATA,
 				&(map->stripes[i].dev->dev_state));
