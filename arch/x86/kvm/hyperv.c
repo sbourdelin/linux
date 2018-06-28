@@ -1395,20 +1395,6 @@ int kvm_hv_get_msr_common(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 		return kvm_hv_get_msr(vcpu, msr, pdata);
 }
 
-static __always_inline int get_sparse_bank_no(u64 valid_bank_mask, int bank_no)
-{
-	int i = 0, j;
-
-	if (!(valid_bank_mask & BIT_ULL(bank_no)))
-		return -1;
-
-	for (j = 0; j < bank_no; j++)
-		if (valid_bank_mask & BIT_ULL(j))
-			i++;
-
-	return i;
-}
-
 static u64 kvm_hv_flush_tlb(struct kvm_vcpu *current_vcpu, u64 ingpa,
 			    u16 rep_cnt, bool ex)
 {
@@ -1416,11 +1402,10 @@ static u64 kvm_hv_flush_tlb(struct kvm_vcpu *current_vcpu, u64 ingpa,
 	struct kvm_vcpu_hv *hv_current = &current_vcpu->arch.hyperv;
 	struct hv_tlb_flush_ex flush_ex;
 	struct hv_tlb_flush flush;
-	struct kvm_vcpu *vcpu;
 	unsigned long vcpu_bitmap[BITS_TO_LONGS(KVM_MAX_VCPUS)] = {0};
-	unsigned long valid_bank_mask = 0;
+	unsigned long valid_bank_mask;
 	u64 sparse_banks[64];
-	int sparse_banks_len, i;
+	int sparse_banks_len, bank, i;
 	bool all_cpus;
 
 	if (!ex) {
@@ -1430,6 +1415,7 @@ static u64 kvm_hv_flush_tlb(struct kvm_vcpu *current_vcpu, u64 ingpa,
 		trace_kvm_hv_flush_tlb(flush.processor_mask,
 				       flush.address_space, flush.flags);
 
+		valid_bank_mask = BIT_ULL(0);
 		sparse_banks[0] = flush.processor_mask;
 		all_cpus = flush.flags & HV_FLUSH_ALL_PROCESSORS;
 	} else {
@@ -1470,38 +1456,25 @@ static u64 kvm_hv_flush_tlb(struct kvm_vcpu *current_vcpu, u64 ingpa,
 		goto ret_success;
 	}
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
-		struct kvm_vcpu_hv *hv = &vcpu->arch.hyperv;
-		int bank = hv->vp_index / 64, sbank = 0;
+	for_each_set_bit(bank, (unsigned long *)&valid_bank_mask,
+			 BITS_PER_LONG) {
 
-		/* Banks >64 can't be represented */
-		if (bank >= 64)
-			continue;
+		for_each_set_bit(i, (unsigned long *)&sparse_banks[bank],
+				 BITS_PER_LONG) {
+			u32 vp_index = bank * 64 + i;
+			u32 vcpu_idx = vp_idx_to_vcpu_idx(kvm, vp_index);
 
-		/* Non-ex hypercalls can only address first 64 vCPUs */
-		if (!ex && bank)
-			continue;
+			/* A non-existent vCPU was specified */
+			if (vcpu_idx >= atomic_read(&kvm->online_vcpus))
+				return HV_STATUS_INVALID_HYPERCALL_INPUT;
 
-		if (ex) {
 			/*
-			 * Check is the bank of this vCPU is in sparse
-			 * set and get the sparse bank number.
+			 * vcpu->arch.cr3 may not be up-to-date for running
+			 * vCPUs so we can't analyze it here, flush TLB
+			 * regardless of the specified address space.
 			 */
-			sbank = get_sparse_bank_no(valid_bank_mask, bank);
-
-			if (sbank < 0)
-				continue;
+			__set_bit(vcpu_idx, vcpu_bitmap);
 		}
-
-		if (!(sparse_banks[sbank] & BIT_ULL(hv->vp_index % 64)))
-			continue;
-
-		/*
-		 * vcpu->arch.cr3 may not be up-to-date for running vCPUs so we
-		 * can't analyze it here, flush TLB regardless of the specified
-		 * address space.
-		 */
-		__set_bit(i, vcpu_bitmap);
 	}
 
 	kvm_make_vcpus_request_mask(kvm,
