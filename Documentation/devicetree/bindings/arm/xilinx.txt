@@ -9,34 +9,34 @@ Required root node properties:
 Additional compatible strings:
 
 - Xilinx CC108 board
-  "xlnx,zynq-cc108"
+  "xlnx,cc108"
 
 - Avnet MicroZed board
-  "avnet,zynq-microzed"
+  "avnet,microzed"
 
 - Adapteva Parallella board
   "adapteva,parallella"
 
 - Xilinx ZC702 board
-  "xlnx,zynq-zc702"
+  "xlnx,zc702"
 
 - Xilinx ZC706 board
-  "xlnx,zynq-zc706"
+  "xlnx,zc706"
 
 - Xilinx ZC770 board, with different FMC cards
-  "xlnx,zynq-zc770-xm010"
-  "xlnx,zynq-zc770-xm011"
-  "xlnx,zynq-zc770-xm012"
-  "xlnx,zynq-zc770-xm013"
+  "xlnx,zc770-xm010"
+  "xlnx,zc770-xm011"
+  "xlnx,zc770-xm012"
+  "xlnx,zc770-xm013"
 
 - Avnet ZedBoard board
-  "avnet,zynq-zedboard"
+  "avnet,zedboard"
 
 - Digilent Zybo board
-  "digilent,zynq-zybo"
+  "digilent,zybo"
 
 - Digilent Zybo Z7 board
-  "digilent,zynq-zybo-z7"
+  "digilent,zybo-z7"
 
 ---------------------------------------------------------------
 

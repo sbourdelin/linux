@@ -4,7 +4,7 @@
 
 / {
 	model = "Digilent Zybo Z7 board";
-	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";
+	compatible = "digilent,zybo-z7", "xlnx,zynq-7000";
 
 	aliases {
 		ethernet0 = &gem0;

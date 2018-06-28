@@ -8,7 +8,7 @@
 
 / {
 	model = "Xilinx ZC706 board";
-	compatible = "xlnx,zynq-zc706", "xlnx,zynq-7000";
+	compatible = "xlnx,zc706", "xlnx,zynq-7000";
 
 	aliases {
 		ethernet0 = &gem0;

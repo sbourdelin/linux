@@ -8,7 +8,7 @@
 
 / {
 	model = "Avnet MicroZed board";
-	compatible = "avnet,zynq-microzed", "xlnx,zynq-7000";
+	compatible = "avnet,microzed", "xlnx,zynq-7000";
 
 	aliases {
 		ethernet0 = &gem0;

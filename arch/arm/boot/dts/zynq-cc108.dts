@@ -13,7 +13,7 @@
 
 / {
 	model = "Xilinx CC108 board";
-	compatible = "xlnx,zynq-cc108", "xlnx,zynq-7000";
+	compatible = "xlnx,cc108", "xlnx,zynq-7000";
 
 	aliases {
 		ethernet0 = &gem0;

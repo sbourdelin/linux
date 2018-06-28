@@ -9,7 +9,7 @@
 
 / {
 	model = "Xilinx ZC770 XM011 board";
-	compatible = "xlnx,zynq-zc770-xm011", "xlnx,zynq-7000";
+	compatible = "xlnx,zc770-xm011", "xlnx,zynq-7000";
 
 	aliases {
 		i2c0 = &i2c1;
