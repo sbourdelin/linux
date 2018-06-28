@@ -966,6 +966,11 @@ extern struct efi {
 	unsigned long flags;
 } efi;
 
+static inline unsigned int efi_get_runtime_version(void)
+{
+	return efi.runtime_version;
+}
+
 extern struct mm_struct efi_mm;
 
 static inline int
