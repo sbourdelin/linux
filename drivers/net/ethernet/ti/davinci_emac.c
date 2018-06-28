@@ -67,7 +67,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_net.h>
 #include <linux/mfd/syscon.h>
-
+#include <linux/mtd/mtd.h>
 #include <asm/irq.h>
 #include <asm/page.h>
 
@@ -1772,7 +1772,10 @@ static int davinci_emac_probe(struct platform_device *pdev)
 	struct cpdma_params dma_params;
 	struct clk *emac_clk;
 	unsigned long emac_bus_frequency;
-
+#ifdef CONFIG_MTD
+	size_t mac_addr_len;
+	struct mtd_info *mtd;
+#endif /* CONFIG_MTD */
 
 	/* obtain emac clock from kernel */
 	emac_clk = devm_clk_get(&pdev->dev, NULL);
@@ -1803,6 +1806,18 @@ static int davinci_emac_probe(struct platform_device *pdev)
 		rc = -ENODEV;
 		goto err_free_netdev;
 	}
+
+#ifdef CONFIG_MTD
+	mtd = get_mtd_device_nm("MAC-Address");
+	if (!IS_ERR(mtd)) {
+		rc = mtd_read(mtd, 0, ETH_ALEN,
+			      &mac_addr_len, priv->mac_addr);
+		if (rc == 0)
+			dev_info(&pdev->dev,
+				 "Read MAC addr from SPI Flash: %pM\n",
+				 priv->mac_addr);
+	}
+#endif /* CONFIG_MTD */
 
 	/* MAC addr and PHY mask , RMII enable info from platform_data */
 	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
