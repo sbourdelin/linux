@@ -30,6 +30,48 @@
 #include <drm/drmP.h>
 #include <drm/drm_print.h>
 
+void __drm_puts_coredump(struct drm_printer *p, const char *str)
+{
+	struct drm_print_iterator *iterator = p->arg;
+
+	ssize_t len;
+
+	if (!iterator->remain)
+		return;
+
+	if (iterator->offset < iterator->start) {
+		ssize_t copy;
+
+		len = strlen(str);
+
+		if (iterator->offset + len <= iterator->start) {
+			iterator->offset += len;
+			return;
+		}
+
+		copy = len - (iterator->start - iterator->offset);
+
+		if (copy > iterator->remain)
+			copy = iterator->remain;
+
+		/* Copy out the bit of the string that we need */
+		memcpy(iterator->data,
+			str + (iterator->start - iterator->offset), copy);
+
+		iterator->offset = iterator->start + copy;
+		iterator->remain -= copy;
+	} else {
+		ssize_t pos = iterator->offset - iterator->start;
+
+		len = min_t(ssize_t, strlen(str), iterator->remain);
+
+		memcpy(iterator->data + pos, str, len);
+
+		iterator->offset += len;
+		iterator->remain -= len;
+	}
+}
+
 void __drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf)
 {
 	struct drm_print_iterator *iterator = p->arg;
