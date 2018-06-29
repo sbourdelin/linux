@@ -17,7 +17,9 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/kernel.h>
 #include <linux/pm_opp.h>
+#include <linux/slab.h>
 #include "adreno_gpu.h"
 #include "msm_gem.h"
 #include "msm_mmu.h"
@@ -70,10 +72,12 @@ adreno_request_fw(struct adreno_gpu *adreno_gpu, const char *fwname)
 {
 	struct drm_device *drm = adreno_gpu->base.dev;
 	const struct firmware *fw = NULL;
-	char newname[strlen("qcom/") + strlen(fwname) + 1];
+	char *newname;
 	int ret;
 
-	sprintf(newname, "qcom/%s", fwname);
+	newname = kasprintf(GFP_KERNEL, "qcom/%s", fwname);
+	if (!newname)
+		return ERR_PTR(-ENOMEM);
 
 	/*
 	 * Try first to load from qcom/$fwfile using a direct load (to avoid
@@ -87,11 +91,12 @@ adreno_request_fw(struct adreno_gpu *adreno_gpu, const char *fwname)
 			dev_info(drm->dev, "loaded %s from new location\n",
 				newname);
 			adreno_gpu->fwloc = FW_LOCATION_NEW;
-			return fw;
+			goto out;
 		} else if (adreno_gpu->fwloc != FW_LOCATION_UNKNOWN) {
 			dev_err(drm->dev, "failed to load %s: %d\n",
 				newname, ret);
-			return ERR_PTR(ret);
+			fw = ERR_PTR(ret);
+			goto out;
 		}
 	}
 
@@ -106,11 +111,12 @@ adreno_request_fw(struct adreno_gpu *adreno_gpu, const char *fwname)
 			dev_info(drm->dev, "loaded %s from legacy location\n",
 				newname);
 			adreno_gpu->fwloc = FW_LOCATION_LEGACY;
-			return fw;
+			goto out;
 		} else if (adreno_gpu->fwloc != FW_LOCATION_UNKNOWN) {
 			dev_err(drm->dev, "failed to load %s: %d\n",
 				fwname, ret);
-			return ERR_PTR(ret);
+			fw = ERR_PTR(ret);
+			goto out;
 		}
 	}
 
@@ -126,16 +132,20 @@ adreno_request_fw(struct adreno_gpu *adreno_gpu, const char *fwname)
 			dev_info(drm->dev, "loaded %s with helper\n",
 				newname);
 			adreno_gpu->fwloc = FW_LOCATION_HELPER;
-			return fw;
+			goto out;
 		} else if (adreno_gpu->fwloc != FW_LOCATION_UNKNOWN) {
 			dev_err(drm->dev, "failed to load %s: %d\n",
 				newname, ret);
-			return ERR_PTR(ret);
+			fw = ERR_PTR(ret);
+			goto out;
 		}
 	}
 
 	dev_err(drm->dev, "failed to load %s\n", fwname);
-	return ERR_PTR(-ENOENT);
+	fw = ERR_PTR(-ENOENT);
+out:
+	kfree(newname);
+	return fw;
 }
 
 static int adreno_load_fw(struct adreno_gpu *adreno_gpu)
