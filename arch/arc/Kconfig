@@ -558,14 +558,14 @@ menu "Executable file formats"
 source "fs/Kconfig.binfmt"
 endmenu
 
-endmenu	 # "ARC Architecture Configuration"
-
 source "mm/Kconfig"
 
 config FORCE_MAX_ZONEORDER
 	int "Maximum zone order"
 	default "12" if ARC_HUGEPAGE_16M
 	default "11"
+
+endmenu	 # "ARC Architecture Configuration"
 
 source "net/Kconfig"
 source "drivers/Kconfig"
