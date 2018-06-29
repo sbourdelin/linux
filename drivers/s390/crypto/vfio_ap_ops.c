@@ -1161,7 +1161,7 @@ static int vfio_ap_mdev_get_device_info(unsigned long arg)
 		return -EINVAL;
 	}
 
-	info.flags = VFIO_DEVICE_FLAGS_AP;
+	info.flags = VFIO_DEVICE_FLAGS_AP | VFIO_DEVICE_FLAGS_RESET;
 	info.num_regions = 0;
 	info.num_irqs = 0;
 
@@ -1176,6 +1176,9 @@ static ssize_t vfio_ap_mdev_ioctl(struct mdev_device *mdev,
 	switch (cmd) {
 	case VFIO_DEVICE_GET_INFO:
 		ret = vfio_ap_mdev_get_device_info(arg);
+		break;
+	case VFIO_DEVICE_RESET:
+		ret = vfio_ap_mdev_reset_queues(mdev, true);
 		break;
 	default:
 		pr_err("%s: ioctl command %d is not a supported command",
