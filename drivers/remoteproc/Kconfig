@@ -100,6 +100,24 @@ config QCOM_ADSP_PIL
 	  Say y here to support the TrustZone based Peripherial Image Loader
 	  for the Qualcomm ADSP remote processors.
 
+config QCOM_NON_PAS_ADSP_PIL
+	tristate "Qualcomm Technology Inc Non PAS ADSP Peripheral Image Loader"
+	depends on OF && ARCH_QCOM
+	depends on QCOM_SMEM
+	depends on RPMSG_QCOM_SMD || RPMSG_QCOM_SMD=n
+	depends on RPMSG_QCOM_GLINK_SMEM || RPMSG_QCOM_GLINK_SMEM=n
+	depends on QCOM_SYSMON || QCOM_SYSMON=n
+	select MFD_SYSCON
+	select QCOM_MDT_LOADER
+	select QCOM_Q6V5_COMMON
+	select QCOM_RPROC_COMMON
+	help
+	  Say y here to support the Non PAS Peripherial Image Loader
+	  for the Qualcomm Technology Inc. ADSP remote processors.
+
+	  It's safe to say N here if you're not interested in Non-PAS
+	  ADSP PIL.
+
 config QCOM_RPROC_COMMON
 	tristate
 
