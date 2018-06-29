@@ -70,7 +70,6 @@
 
 #include "i915_gem.h"
 #include "i915_gem_context.h"
-#include "i915_gem_fence_reg.h"
 #include "i915_gem_object.h"
 #include "i915_gem_gtt.h"
 #include "i915_gpu_error.h"
@@ -3204,20 +3203,6 @@ i915_vm_to_ppgtt(struct i915_address_space *vm)
 {
 	return container_of(vm, struct i915_hw_ppgtt, vm);
 }
-
-/* i915_gem_fence_reg.c */
-struct drm_i915_fence_reg *
-i915_reserve_fence(struct drm_i915_private *dev_priv);
-void i915_unreserve_fence(struct drm_i915_fence_reg *fence);
-
-void i915_gem_revoke_fences(struct drm_i915_private *dev_priv);
-void i915_gem_restore_fences(struct drm_i915_private *dev_priv);
-
-void i915_gem_detect_bit_6_swizzle(struct drm_i915_private *dev_priv);
-void i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj,
-				       struct sg_table *pages);
-void i915_gem_object_save_bit_17_swizzle(struct drm_i915_gem_object *obj,
-					 struct sg_table *pages);
 
 static inline struct i915_gem_context *
 __i915_gem_context_lookup_rcu(struct drm_i915_file_private *file_priv, u32 id)
