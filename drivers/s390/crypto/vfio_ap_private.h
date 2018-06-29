@@ -12,6 +12,7 @@
 #include <linux/types.h>
 #include <linux/device.h>
 #include <linux/mdev.h>
+#include <linux/delay.h>
 
 #include "ap_bus.h"
 
@@ -67,5 +68,30 @@ static struct ap_matrix_dev *to_ap_matrix_dev(struct device *dev)
 
 extern int vfio_ap_mdev_register(struct ap_matrix_dev *matrix_dev);
 extern void vfio_ap_mdev_unregister(struct ap_matrix_dev *matrix_dev);
+
+static inline int vfio_ap_reset_queue(unsigned long apid, unsigned long apqi)
+{
+	int count = 50;
+	struct ap_queue_status status;
+
+	while (count--) {
+		status = ap_zapq(AP_MKQID(apid, apqi));
+		switch (status.response_code) {
+		case AP_RESPONSE_NORMAL:
+			return 0;
+		case AP_RESPONSE_RESET_IN_PROGRESS:
+		case AP_RESPONSE_BUSY:
+			msleep(20);
+			break;
+		default:
+			pr_err("%s: error zeroizing %02lx.%04lx: response code %d ",
+			       VFIO_AP_MODULE_NAME, apid, apqi,
+			       status.response_code);
+			return -EIO;
+		}
+	};
+
+	return -EBUSY;
+}
 
 #endif /* _VFIO_AP_PRIVATE_H_ */

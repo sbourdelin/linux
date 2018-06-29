@@ -53,7 +53,17 @@ static int vfio_ap_queue_dev_probe(struct ap_device *apdev)
 
 static void vfio_ap_queue_dev_remove(struct ap_device *apdev)
 {
-	/* Nothing to do yet */
+	struct ap_queue *ap_queue = to_ap_queue(&apdev->device);
+
+	vfio_ap_reset_queue(AP_QID_CARD(ap_queue->qid),
+			    AP_QID_QUEUE(ap_queue->qid));
+
+	/*
+	 * TODO: Ensure that no guest is using the queue and handle it
+	 * accordingly. The domain or possibly the adapter may have to
+	 * be removed from the guest's configuration which would require
+	 * hot unplug support which is forthcoming.
+	 */
 }
 
 static void vfio_ap_matrix_dev_release(struct device *dev)
