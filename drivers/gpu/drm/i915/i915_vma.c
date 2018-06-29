@@ -866,7 +866,7 @@ void i915_vma_revoke_mmap(struct i915_vma *vma)
 	struct drm_vma_offset_node *node = &vma->obj->base.vma_node;
 	u64 vma_offset;
 
-	lockdep_assert_held(&vma->vm->i915->drm.struct_mutex);
+	lockdep_assert_held(&vma->vm->mutex);
 
 	if (!i915_vma_has_userfault(vma))
 		return;
@@ -1070,6 +1070,8 @@ unpin:
 		return 0;
 
 	if (i915_vma_is_map_and_fenceable(vma)) {
+		mutex_lock(&vma->vm->mutex);
+
 		/*
 		 * Check that we have flushed all writes through the GGTT
 		 * before the unbind, other due to non-strict nature of those
@@ -1079,16 +1081,14 @@ unpin:
 		i915_vma_flush_writes(vma);
 		GEM_BUG_ON(i915_vma_has_ggtt_write(vma));
 
-		/* release the fence reg _after_ flushing */
-		ret = i915_vma_put_fence(vma);
-		if (ret)
-			return ret;
-
 		/* Force a pagefault for domain tracking on next user access */
 		i915_vma_revoke_mmap(vma);
+		i915_vma_revoke_fence(vma);
 
 		__i915_vma_iounmap(vma);
 		vma->flags &= ~I915_VMA_CAN_FENCE;
+
+		mutex_unlock(&vma->vm->mutex);
 	}
 	GEM_BUG_ON(vma->fence);
 	GEM_BUG_ON(i915_vma_has_userfault(vma));
