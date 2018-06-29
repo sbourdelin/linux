@@ -179,10 +179,6 @@ static int gpu_fill(struct drm_i915_gem_object *obj,
 	i915_vma_move_to_active(vma, rq, 0);
 	i915_vma_unpin(vma);
 
-	reservation_object_lock(obj->resv, NULL);
-	reservation_object_add_excl_fence(obj->resv, &rq->fence);
-	reservation_object_unlock(obj->resv);
-
 	i915_request_add(rq);
 
 	return 0;
