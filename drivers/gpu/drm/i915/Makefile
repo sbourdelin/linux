@@ -141,13 +141,13 @@ i915-y += dvo_ch7017.o \
 	  intel_dp_link_training.o \
 	  intel_dp_mst.o \
 	  intel_dp.o \
-	  intel_dsi.o \
 	  intel_dsi_dcs_backlight.o \
-	  intel_dsi_pll.o \
 	  intel_dsi_vbt.o \
 	  intel_dvo.o \
 	  intel_hdmi.o \
 	  intel_i2c.o \
+	  intel_legacy_dsi.o \
+	  intel_legacy_dsi_pll.o \
 	  intel_lspcon.o \
 	  intel_lvds.o \
 	  intel_panel.o \
