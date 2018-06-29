@@ -572,9 +572,6 @@ static void __v4l2_async_notifier_cleanup(struct v4l2_async_notifier *notifier)
 		return;
 
 	if (notifier->subdevs) {
-		if (!notifier->max_subdevs)
-			return;
-
 		for (i = 0; i < notifier->num_subdevs; i++) {
 			asd = notifier->subdevs[i];
 
@@ -589,7 +586,6 @@ static void __v4l2_async_notifier_cleanup(struct v4l2_async_notifier *notifier)
 			kfree(asd);
 		}
 
-		notifier->max_subdevs = 0;
 		kvfree(notifier->subdevs);
 		notifier->subdevs = NULL;
 	} else if (notifier->lists_initialized) {
