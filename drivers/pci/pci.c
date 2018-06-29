@@ -3675,6 +3675,7 @@ static void __pci_set_master(struct pci_dev *dev, bool enable)
 			enable ? "enabling" : "disabling");
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
+
 	dev->is_busmaster = enable;
 }
 
