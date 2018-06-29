@@ -20,6 +20,17 @@
 DEFINE_SPINLOCK(mdev_list_lock);
 LIST_HEAD(mdev_list);
 
+static void vfio_ap_matrix_init(struct ap_matrix *matrix)
+{
+	/* Test if PQAP(QCI) instruction is available */
+	if (test_facility(12))
+		ap_qci(&matrix->info);
+
+	matrix->apm_max = matrix->info.apxa ? matrix->info.Na : 63;
+	matrix->aqm_max = matrix->info.apxa ? matrix->info.Nd : 15;
+	matrix->adm_max = matrix->info.apxa ? matrix->info.Nd : 15;
+}
+
 static int vfio_ap_mdev_create(struct kobject *kobj, struct mdev_device *mdev)
 {
 	struct ap_matrix_dev *matrix_dev =
@@ -31,6 +42,7 @@ static int vfio_ap_mdev_create(struct kobject *kobj, struct mdev_device *mdev)
 		return -ENOMEM;
 
 	matrix_mdev->name = dev_name(mdev_dev(mdev));
+	vfio_ap_matrix_init(&matrix_mdev->matrix);
 	mdev_set_drvdata(mdev, matrix_mdev);
 
 	if (atomic_dec_if_positive(&matrix_dev->available_instances) < 0) {

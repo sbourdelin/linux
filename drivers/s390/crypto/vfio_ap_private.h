@@ -29,9 +29,33 @@ struct ap_matrix_dev {
 	atomic_t available_instances;
 };
 
+/**
+ * The AP matrix is comprised of three bit masks identifying the adapters,
+ * queues (domains) and control domains that belong to an AP matrix. The bits i
+ * each mask, from least significant to most significant bit, correspond to IDs
+ * 0 to 255. When a bit is set, the corresponding ID belongs to the matrix.
+ *
+ * @apm identifies the AP adapters in the matrix
+ * @apm_max: max adapter number in @apm
+ * @aqm identifies the AP queues (domains) in the matrix
+ * @aqm_max: max domain number in @aqm
+ * @adm identifies the AP control domains in the matrix
+ * @adm_max: max domain number in @adm
+ */
+struct ap_matrix {
+	unsigned long apm_max;
+	DECLARE_BITMAP(apm, 256);
+	unsigned long aqm_max;
+	DECLARE_BITMAP(aqm, 256);
+	unsigned long adm_max;
+	DECLARE_BITMAP(adm, 256);
+	struct ap_config_info info;
+};
+
 struct ap_matrix_mdev {
 	const char *name;
 	struct list_head list;
+	struct ap_matrix matrix;
 };
 
 static struct ap_matrix_dev *to_ap_matrix_dev(struct device *dev)
