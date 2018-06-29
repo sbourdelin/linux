@@ -40,6 +40,7 @@
 #include <linux/mm.h>
 #include <linux/kexec.h>
 #include <linux/crash_dump.h>
+#include <linux/early_pfn.h>
 
 #include <asm/boot.h>
 #include <asm/fixmap.h>

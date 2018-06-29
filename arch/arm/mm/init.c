@@ -25,6 +25,7 @@
 #include <linux/dma-contiguous.h>
 #include <linux/sizes.h>
 #include <linux/stop_machine.h>
+#include <linux/early_pfn.h>
 
 #include <asm/cp15.h>
 #include <asm/mach-types.h>
