@@ -29,6 +29,7 @@
 #include <drm/drm_edid.h>
 #include <drm/i915_drm.h>
 #include <drm/drm_mipi_dsi.h>
+#include <linux/acpi.h>
 #include <linux/slab.h>
 #include <linux/gpio/consumer.h>
 #include "i915_drv.h"
@@ -1713,6 +1714,13 @@ static void intel_dsi_add_properties(struct intel_connector *connector)
 	}
 }
 
+static const struct acpi_gpio_params panel_gpio = { 0, 0, false };
+
+static const struct acpi_gpio_mapping panel_gpios[] = {
+	{ "panel", &panel_gpio, 1 },
+	{ },
+};
+
 void intel_dsi_init(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
@@ -1811,6 +1819,7 @@ void intel_dsi_init(struct drm_i915_private *dev_priv)
 	 */
 	if ((IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) &&
 	    (dev_priv->vbt.dsi.config->pwm_blc == PPS_BLC_PMIC)) {
+		devm_acpi_dev_add_driver_gpios(dev->dev, panel_gpios);
 		intel_dsi->gpio_panel =
 			gpiod_get(dev->dev, "panel", GPIOD_OUT_HIGH);
 
