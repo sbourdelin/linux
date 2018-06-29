@@ -553,6 +553,15 @@ static bool can_merge_ctx(const struct intel_context *prev,
 	return true;
 }
 
+static bool can_merge_rq(const struct i915_request *prev,
+			 const struct i915_request *next)
+{
+	if (!can_merge_ctx(prev->hw_context, next->hw_context))
+		return false;
+
+	return true;
+}
+
 static void port_assign(struct execlist_port *port, struct i915_request *rq)
 {
 	GEM_BUG_ON(rq == port_request(port));
@@ -714,8 +723,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			 * second request, and so we never need to tell the
 			 * hardware about the first.
 			 */
-			if (last &&
-			    !can_merge_ctx(rq->hw_context, last->hw_context)) {
+			if (last && !can_merge_rq(rq, last)) {
 				/*
 				 * If we are on the second port and cannot
 				 * combine this request with the last, then we
