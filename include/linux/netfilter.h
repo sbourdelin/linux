@@ -288,6 +288,20 @@ NF_HOOK(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk, struct 
 	return ret;
 }
 
+static inline void
+NF_HOOK_LIST(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
+	     struct list_head *head, struct net_device *in, struct net_device *out,
+	     int (*okfn)(struct net *, struct sock *, struct sk_buff *))
+{
+	struct sk_buff *skb, *next;
+
+	list_for_each_entry_safe(skb, next, head, list) {
+		int ret = nf_hook(pf, hook, net, sk, skb, in, out, okfn);
+		if (ret != 1)
+			list_del(&skb->list);
+	}
+}
+
 /* Call setsockopt() */
 int nf_setsockopt(struct sock *sk, u_int8_t pf, int optval, char __user *opt,
 		  unsigned int len);
@@ -367,6 +381,17 @@ NF_HOOK(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
 	int (*okfn)(struct net *, struct sock *, struct sk_buff *))
 {
 	return okfn(net, sk, skb);
+}
+
+static inline void
+NF_HOOK_LIST(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
+	     struct list_head *head, struct list_head *sublist,
+	     struct net_device *in, struct net_device *out,
+	     int (*okfn)(struct net *, struct sock *, struct sk_buff *))
+{
+	INIT_LIST_HEAD(sublist);
+	/* Move everything to the sublist */
+	list_splice_init(head, sublist);
 }
 
 static inline int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,
