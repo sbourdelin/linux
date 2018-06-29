@@ -127,11 +127,20 @@ int __init vfio_ap_init(void)
 		return ret;
 	}
 
+	ret = vfio_ap_mdev_register(matrix_dev);
+	if (ret) {
+		ap_driver_unregister(&vfio_ap_drv);
+		vfio_ap_matrix_dev_destroy(matrix_dev);
+
+		return ret;
+	}
+
 	return 0;
 }
 
 void __exit vfio_ap_exit(void)
 {
+	vfio_ap_mdev_unregister(matrix_dev);
 	ap_driver_unregister(&vfio_ap_drv);
 	vfio_ap_matrix_dev_destroy(matrix_dev);
 }
