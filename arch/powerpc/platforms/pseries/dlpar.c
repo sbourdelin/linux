@@ -16,6 +16,7 @@
 #include <linux/notifier.h>
 #include <linux/spinlock.h>
 #include <linux/cpu.h>
+#include <linux/cpuset.h>
 #include <linux/slab.h>
 #include <linux/of.h>
 
@@ -450,6 +451,9 @@ static int dlpar_pmt(struct pseries_hp_errorlog *work)
 
 		ssleep(10);
 	}
+
+	ssleep(5);
+	rebuild_sched_domains();
 
 	return 0;
 }
