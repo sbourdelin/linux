@@ -504,8 +504,11 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 		rq = port_unpack(&port[n], &count);
 		if (rq) {
 			GEM_BUG_ON(count > !n);
-			if (!count++)
+			if (!count++) {
+				GEM_BUG_ON(rq->hw_context->active);
 				execlists_context_schedule_in(rq);
+				rq->hw_context->active = engine;
+			}
 			port_set(&port[n], port_pack(rq, count));
 			desc = execlists_update_context(rq);
 			GEM_DEBUG_EXEC(port[n].context_id = upper_32_bits(desc));
@@ -812,6 +815,8 @@ execlists_cancel_port_requests(struct intel_engine_execlists * const execlists)
 			  intel_engine_get_seqno(rq->engine));
 
 		GEM_BUG_ON(!execlists->active);
+
+		rq->hw_context->active = NULL;
 		execlists_context_schedule_out(rq,
 					       i915_request_completed(rq) ?
 					       INTEL_CONTEXT_SCHEDULE_OUT :
@@ -1106,6 +1111,7 @@ static void process_csb(struct intel_engine_cs *engine)
 			 */
 			GEM_BUG_ON(!i915_request_completed(rq));
 
+			rq->hw_context->active = NULL;
 			execlists_context_schedule_out(rq,
 						       INTEL_CONTEXT_SCHEDULE_OUT);
 			GEM_TRACE("%s completed ctx=%d\n",
@@ -1363,6 +1369,23 @@ static void execlists_context_destroy(struct intel_context *ce)
 
 static void execlists_context_unpin(struct intel_context *ce)
 {
+	struct intel_engine_cs *engine;
+
+	/*
+	 * The tasklet may still be using a pointer to our state, via an
+	 * old request. However, since we know we only unpin the context
+	 * on retirement of the following request, we know that the last
+	 * request referencing us will have had a completion CS interrupt.
+	 * If we see that it is still active, it means that the tasklet hasn't
+	 * had the chance to run yet; let it run before we teardown the
+	 * reference it may use.
+	 */
+	engine = READ_ONCE(ce->active);
+	if (unlikely(engine)) {
+		tasklet_kill(&engine->execlists.tasklet);
+		GEM_BUG_ON(READ_ONCE(ce->active));
+	}
+
 	intel_ring_unpin(ce->ring);
 
 	ce->state->obj->pin_global--;
