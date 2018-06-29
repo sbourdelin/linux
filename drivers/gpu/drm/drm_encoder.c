@@ -114,6 +114,10 @@ int drm_encoder_init(struct drm_device *dev,
 	if (WARN_ON(dev->mode_config.num_encoder >= 32))
 		return -EINVAL;
 
+	/* Make sure that the requested encoder type is in the list */
+	if (WARN_ON(encoder_type >= ARRAY_SIZE(drm_encoder_enum_list)))
+		return -EINVAL;
+
 	ret = drm_mode_object_add(dev, &encoder->base, DRM_MODE_OBJECT_ENCODER);
 	if (ret)
 		return ret;
