@@ -14,7 +14,6 @@
 #include <asm/facility.h>
 
 #include "ap_bus.h"
-#include "ap_asm.h"
 
 /**
  * ap_queue_irq_ctrl(): Control interruption on a AP queue.
