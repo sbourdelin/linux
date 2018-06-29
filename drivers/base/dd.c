@@ -82,10 +82,8 @@ static void deferred_probe_debug(struct device *dev)
 	       dev_name(dev), duration);
 }
 
-/*
- * deferred_probe_work_func() - Retry probing devices in the active list.
- */
-static void deferred_probe_work_func(struct work_struct *work)
+
+void process_deferred_probe(struct list_head *list)
 {
 	struct device *dev;
 	struct device_private *private;
@@ -102,8 +100,8 @@ static void deferred_probe_work_func(struct work_struct *work)
 	 * from under our feet.
 	 */
 	mutex_lock(&deferred_probe_mutex);
-	while (!list_empty(&deferred_probe_active_list)) {
-		private = list_first_entry(&deferred_probe_active_list,
+	while (!list_empty(list)) {
+		private = list_first_entry(list,
 					typeof(*dev->p), deferred_probe);
 		dev = private->device;
 		list_del_init(&private->deferred_probe);
@@ -136,6 +134,15 @@ static void deferred_probe_work_func(struct work_struct *work)
 	}
 	mutex_unlock(&deferred_probe_mutex);
 }
+
+/*
+ * deferred_probe_work_func() - Retry probing devices in the active list.
+ */
+static void deferred_probe_work_func(struct work_struct *work)
+{
+	process_deferred_probe(&deferred_probe_active_list);
+}
+
 static DECLARE_WORK(deferred_probe_work, deferred_probe_work_func);
 
 static void driver_deferred_probe_add(struct device *dev)
@@ -143,7 +150,10 @@ static void driver_deferred_probe_add(struct device *dev)
 	mutex_lock(&deferred_probe_mutex);
 	if (list_empty(&dev->p->deferred_probe)) {
 		dev_dbg(dev, "Added to deferred list\n");
-		list_add_tail(&dev->p->deferred_probe, &deferred_probe_pending_list);
+		if (dev->bus->manage_deferred)
+			list_add_tail(&dev->p->deferred_probe, &dev->bus->deferred_probe_pending_list);
+		else
+			list_add_tail(&dev->p->deferred_probe, &deferred_probe_pending_list);
 	}
 	mutex_unlock(&deferred_probe_mutex);
 }

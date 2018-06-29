@@ -898,7 +898,8 @@ int bus_register(struct bus_type *bus)
 	retval = bus_add_groups(bus, bus->bus_groups);
 	if (retval)
 		goto bus_groups_fail;
-
+	if (bus->manage_deferred)
+		INIT_LIST_HEAD(&bus->deferred_probe_pending_list);
 	pr_debug("bus: '%s': registered\n", bus->name);
 	return 0;
 

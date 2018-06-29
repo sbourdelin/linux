@@ -143,6 +143,9 @@ struct bus_type {
 	struct lock_class_key lock_key;
 
 	bool need_parent_lock;
+
+	bool manage_deferred;
+	struct list_head deferred_probe_pending_list;
 };
 
 extern int __must_check bus_register(struct bus_type *bus);
@@ -150,6 +153,8 @@ extern int __must_check bus_register(struct bus_type *bus);
 extern void bus_unregister(struct bus_type *bus);
 
 extern int __must_check bus_rescan_devices(struct bus_type *bus);
+
+extern void process_deferred_probe(struct list_head *list);
 
 /* iterator helpers for buses */
 struct subsys_dev_iter {
