@@ -11,6 +11,10 @@
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/ctype.h>
+#include <linux/bitops.h>
+#include <linux/kvm_host.h>
+#include <linux/module.h>
+#include <asm/kvm.h>
 
 #include "vfio_ap_private.h"
 
@@ -748,12 +752,136 @@ static const struct attribute_group *vfio_ap_mdev_attr_groups[] = {
 	NULL
 };
 
+/**
+ * Verify that the AP instructions are available on the guest and are to be
+ * interpreted by the firmware. The former is indicated via the
+ * KVM_S390_VM_CPU_FEAT_AP CPU model feature and the latter by apie crypto
+ * flag.
+ */
+static int kvm_ap_validate_crypto_setup(struct kvm *kvm)
+{
+	if (test_bit_inv(KVM_S390_VM_CPU_FEAT_AP, kvm->arch.cpu_feat) &&
+	    kvm->arch.crypto.apie)
+		return 0;
+
+	pr_err("%s: interpretation of AP instructions not available",
+	       VFIO_AP_MODULE_NAME);
+
+	return -EOPNOTSUPP;
+}
+
+static int vfio_ap_mdev_group_notifier(struct notifier_block *nb,
+				       unsigned long action, void *data)
+{
+	struct ap_matrix_mdev *matrix_mdev;
+
+	if (action == VFIO_GROUP_NOTIFY_SET_KVM) {
+		matrix_mdev = container_of(nb, struct ap_matrix_mdev,
+					   group_notifier);
+		matrix_mdev->kvm = data;
+	}
+
+	return NOTIFY_OK;
+}
+
+/**
+ * vfio_ap_mdev_open_once
+ *
+ * @matrix_mdev: a mediated matrix device
+ *
+ * Return 0 if no other mediated matrix device has been opened for the
+ * KVM guest assigned to @matrix_mdev; otherwise, returns an error.
+ */
+static int vfio_ap_mdev_open_once(struct ap_matrix_mdev *matrix_mdev)
+{
+	int ret = 0;
+	struct ap_matrix_mdev *lstdev;
+
+	spin_lock_bh(&mdev_list_lock);
+
+	list_for_each_entry(lstdev, &mdev_list, list) {
+		if ((lstdev->kvm == matrix_mdev->kvm) &&
+		    (lstdev != matrix_mdev)) {
+			ret = -EPERM;
+			break;
+		}
+	}
+
+	if (ret) {
+		pr_err("%s: mdev %s open failed for guest %s",
+		       VFIO_AP_MODULE_NAME, matrix_mdev->name,
+		       matrix_mdev->kvm->arch.dbf->name);
+		pr_err("%s: mdev %s already opened for guest %s",
+		       VFIO_AP_MODULE_NAME, lstdev->name,
+		       lstdev->kvm->arch.dbf->name);
+	}
+
+	spin_unlock_bh(&mdev_list_lock);
+	return ret;
+}
+
+static int vfio_ap_mdev_open(struct mdev_device *mdev)
+{
+	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
+	struct ap_matrix_dev *matrix_dev =
+		to_ap_matrix_dev(mdev_parent_dev(mdev));
+	unsigned long events;
+	int ret;
+
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	ret = vfio_ap_verify_queues_reserved(matrix_dev, matrix_mdev->name,
+					     &matrix_mdev->matrix);
+	if (ret)
+		goto out_err;
+
+	matrix_mdev->group_notifier.notifier_call = vfio_ap_mdev_group_notifier;
+	events = VFIO_GROUP_NOTIFY_SET_KVM;
+
+	ret = vfio_register_notifier(mdev_dev(mdev), VFIO_GROUP_NOTIFY,
+				     &events, &matrix_mdev->group_notifier);
+	if (ret)
+		goto out_err;
+
+	ret = kvm_ap_validate_crypto_setup(matrix_mdev->kvm);
+	if (ret)
+		goto out_kvm_err;
+
+	ret = vfio_ap_mdev_open_once(matrix_mdev);
+	if (ret)
+		goto out_kvm_err;
+
+	return 0;
+
+out_kvm_err:
+	vfio_unregister_notifier(mdev_dev(mdev), VFIO_GROUP_NOTIFY,
+				 &matrix_mdev->group_notifier);
+	matrix_mdev->kvm = NULL;
+out_err:
+	module_put(THIS_MODULE);
+
+	return ret;
+}
+
+static void vfio_ap_mdev_release(struct mdev_device *mdev)
+{
+	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
+
+	vfio_unregister_notifier(mdev_dev(mdev), VFIO_GROUP_NOTIFY,
+				 &matrix_mdev->group_notifier);
+	matrix_mdev->kvm = NULL;
+	module_put(THIS_MODULE);
+}
+
 static const struct mdev_parent_ops vfio_ap_matrix_ops = {
 	.owner			= THIS_MODULE,
 	.supported_type_groups	= vfio_ap_mdev_type_groups,
 	.mdev_attr_groups	= vfio_ap_mdev_attr_groups,
 	.create			= vfio_ap_mdev_create,
 	.remove			= vfio_ap_mdev_remove,
+	.open			= vfio_ap_mdev_open,
+	.release		= vfio_ap_mdev_release,
 };
 
 int vfio_ap_mdev_register(struct ap_matrix_dev *matrix_dev)

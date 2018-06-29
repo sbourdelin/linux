@@ -56,6 +56,8 @@ struct ap_matrix_mdev {
 	const char *name;
 	struct list_head list;
 	struct ap_matrix matrix;
+	struct notifier_block group_notifier;
+	struct kvm *kvm;
 };
 
 static struct ap_matrix_dev *to_ap_matrix_dev(struct device *dev)
