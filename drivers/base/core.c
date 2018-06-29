@@ -22,6 +22,7 @@
 #include <linux/genhd.h>
 #include <linux/mutex.h>
 #include <linux/pm_runtime.h>
+#include <linux/kthread.h>
 #include <linux/netdevice.h>
 #include <linux/sched/signal.h>
 #include <linux/sysfs.h>
@@ -2887,19 +2888,39 @@ static void device_shutdown_one(struct device *dev)
 /*
  * Passed as an argument to device_shutdown_child_task().
  * child_next_index	the next available child index.
+ * tasks_running	number of tasks still running. Each tasks decrements it
+ *			when job is finished and the last task signals that the
+ *			job is complete.
+ * complete		Used to signal job competition.
  * parent		Parent device.
  */
 struct device_shutdown_task_data {
 	atomic_t		child_next_index;
+	atomic_t		tasks_running;
+	struct completion	complete;
 	struct device		*parent;
 };
 
 static int device_shutdown_child_task(void *data);
+static bool device_shutdown_serial;
+
+/*
+ * These globals are used by tasks that are started for root devices.
+ * device_root_tasks_finished	Number of root devices finished shutting down.
+ * device_root_tasks_started	Total number of root devices tasks started.
+ * device_root_tasks_done	The completion signal to the main thread.
+ */
+static atomic_t			device_root_tasks_finished;
+static atomic_t			device_root_tasks_started;
+static struct completion	device_root_tasks_done;
 
 /*
  * Shutdown device tree with root started in dev. If dev has no children
  * simply shutdown only this device. If dev has children recursively shutdown
  * children first, and only then the parent.
+ * For performance reasons children are shutdown in parallel using kernel
+ * threads. because we lock dev its children cannot be removed while this
+ * functions is running.
  */
 static void device_shutdown_tree(struct device *dev)
 {
@@ -2913,11 +2934,20 @@ static void device_shutdown_tree(struct device *dev)
 		int i;
 
 		atomic_set(&tdata.child_next_index, 0);
+		atomic_set(&tdata.tasks_running, children_count);
+		init_completion(&tdata.complete);
 		tdata.parent = dev;
 
 		for (i = 0; i < children_count; i++) {
-			device_shutdown_child_task(&tdata);
+			if (device_shutdown_serial) {
+				device_shutdown_child_task(&tdata);
+			} else {
+				kthread_run(device_shutdown_child_task,
+					    &tdata, "device_shutdown.%s",
+					    dev_name(dev));
+			}
 		}
+		wait_for_completion(&tdata.complete);
 	}
 	device_shutdown_one(dev);
 	device_unlock(dev);
@@ -2937,6 +2967,10 @@ static int device_shutdown_child_task(void *data)
 	/* ref. counter is going to be decremented in device_shutdown_one() */
 	get_device(dev);
 	device_shutdown_tree(dev);
+
+	/* If we are the last to exit, signal the completion */
+	if (atomic_dec_return(&tdata->tasks_running) == 0)
+		complete(&tdata->complete);
 	return 0;
 }
 
@@ -2947,9 +2981,14 @@ static int device_shutdown_child_task(void *data)
 static int device_shutdown_root_task(void *data)
 {
 	struct device *dev = (struct device *)data;
+	int root_devices;
 
 	device_shutdown_tree(dev);
 
+	/* If we are the last to exit, signal the completion */
+	root_devices = atomic_inc_return(&device_root_tasks_finished);
+	if (root_devices == atomic_read(&device_root_tasks_started))
+		complete(&device_root_tasks_done);
 	return 0;
 }
 
@@ -2958,10 +2997,17 @@ static int device_shutdown_root_task(void *data)
  */
 void device_shutdown(void)
 {
+	int root_devices = 0;
 	struct device *dev;
+
+	atomic_set(&device_root_tasks_finished, 0);
+	atomic_set(&device_root_tasks_started, 0);
+	init_completion(&device_root_tasks_done);
 
 	/* Shutdown the root devices. The children are going to be
 	 * shutdown first in device_shutdown_tree().
+	 * We shutdown root devices in parallel by starting thread
+	 * for each root device.
 	 */
 	spin_lock(&devices_kset->list_lock);
 	while (!list_empty(&devices_kset->list)) {
@@ -2992,12 +3038,32 @@ void device_shutdown(void)
 			 */
 			spin_unlock(&devices_kset->list_lock);
 
-			device_shutdown_root_task(dev);
+			root_devices++;
+			if (device_shutdown_serial) {
+				device_shutdown_root_task(dev);
+			} else {
+				kthread_run(device_shutdown_root_task,
+					    dev, "device_root_shutdown.%s",
+					    dev_name(dev));
+			}
 			spin_lock(&devices_kset->list_lock);
 		}
 	}
 	spin_unlock(&devices_kset->list_lock);
+
+	/* Set number of root tasks started, and waits for completion */
+	atomic_set(&device_root_tasks_started, root_devices);
+	if (root_devices != atomic_read(&device_root_tasks_finished))
+		wait_for_completion(&device_root_tasks_done);
 }
+
+static int __init _device_shutdown_serial(char *arg)
+{
+	device_shutdown_serial = true;
+	return 0;
+}
+
+early_param("device_shutdown_serial", _device_shutdown_serial);
 
 /*
  * Device logging functions
