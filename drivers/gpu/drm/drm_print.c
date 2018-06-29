@@ -122,6 +122,15 @@ void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 
+void drm_puts(struct drm_printer *p, const char *str)
+{
+	if (p->puts)
+		p->puts(p, str);
+	else
+		drm_printf(p, "%s", str);
+}
+EXPORT_SYMBOL(drm_puts);
+
 /**
  * drm_printf - print to a &drm_printer stream
  * @p: the &drm_printer
