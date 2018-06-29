@@ -51,6 +51,9 @@ struct goldfish_audio {
 	char *read_buffer;		/* read buffer virtual address */
 	int buffer_status;
 	int read_supported;	/* true if we have audio input support */
+
+	int open_count;
+	struct mutex mutex;	/* protects open/read/write/release calls */
 };
 
 /*
@@ -62,12 +65,6 @@ struct goldfish_audio {
 #define WRITE_BUFFER_SIZE	16384
 #define COMBINED_BUFFER_SIZE	((2 * READ_BUFFER_SIZE) + \
 					(2 * WRITE_BUFFER_SIZE))
-
-/*
- *  temporary variable used between goldfish_audio_probe() and
- *  goldfish_audio_open()
- */
-static struct goldfish_audio *audio_data;
 
 enum {
 	/* audio status register */
@@ -107,8 +104,6 @@ enum {
 					  AUDIO_INT_READ_BUFFER_FULL,
 };
 
-static atomic_t open_count = ATOMIC_INIT(0);
-
 static unsigned int audio_read(const struct goldfish_audio *data, int addr)
 {
 	return readl(data->reg_base + addr);
@@ -131,29 +126,32 @@ static void audio_write64(const struct goldfish_audio *data,
 static ssize_t goldfish_audio_read(struct file *fp, char __user *buf,
 				   size_t count, loff_t *pos)
 {
-	struct goldfish_audio *data = fp->private_data;
+	struct goldfish_audio *audio = fp->private_data;
 	unsigned long irq_flags;
-	int length;
-	int result = 0;
+	ssize_t result = 0;
 
-	if (!data->read_supported)
+	if (!audio)
+		return -ENODEV;
+
+	if (!audio->read_supported)
 		return -ENODEV;
 
 	while (count > 0) {
-		length = (count > READ_BUFFER_SIZE ? READ_BUFFER_SIZE : count);
-		audio_write(data, AUDIO_START_READ, length);
+		unsigned int length = min_t(size_t, count, READ_BUFFER_SIZE);
 
-		wait_event_interruptible(data->wait, data->buffer_status &
-					 AUDIO_INT_READ_BUFFER_FULL);
+		audio_write(audio, AUDIO_START_READ, length);
+		wait_event_interruptible(audio->wait,
+					 audio->buffer_status &
+						AUDIO_INT_READ_BUFFER_FULL);
 
-		spin_lock_irqsave(&data->lock, irq_flags);
-		data->buffer_status &= ~AUDIO_INT_READ_BUFFER_FULL;
-		spin_unlock_irqrestore(&data->lock, irq_flags);
+		spin_lock_irqsave(&audio->lock, irq_flags);
+		audio->buffer_status &= ~AUDIO_INT_READ_BUFFER_FULL;
+		spin_unlock_irqrestore(&audio->lock, irq_flags);
 
-		length = audio_read(data, AUDIO_READ_BUFFER_AVAILABLE);
+		length = audio_read(audio, AUDIO_READ_BUFFER_AVAILABLE);
 
 		/* copy data to user space */
-		if (copy_to_user(buf, data->read_buffer, length))
+		if (copy_to_user(buf, audio->read_buffer, length))
 			return -EFAULT;
 
 		result += length;
@@ -166,108 +164,124 @@ static ssize_t goldfish_audio_read(struct file *fp, char __user *buf,
 static ssize_t goldfish_audio_write(struct file *fp, const char __user *buf,
 				    size_t count, loff_t *pos)
 {
-	struct goldfish_audio *data = fp->private_data;
+	struct goldfish_audio *audio = fp->private_data;
 	unsigned long irq_flags;
 	ssize_t result = 0;
 	char *kbuf;
 
+	if (!audio)
+		return -ENODEV;
+
 	while (count > 0) {
-		ssize_t copy = count;
+		unsigned int length = min_t(size_t, count, WRITE_BUFFER_SIZE);
 
-		if (copy > WRITE_BUFFER_SIZE)
-			copy = WRITE_BUFFER_SIZE;
-		wait_event_interruptible(data->wait, data->buffer_status &
-					(AUDIO_INT_WRITE_BUFFER_1_EMPTY |
-					AUDIO_INT_WRITE_BUFFER_2_EMPTY));
+		wait_event_interruptible(audio->wait,
+					 audio->buffer_status &
+					 (AUDIO_INT_WRITE_BUFFER_1_EMPTY |
+					  AUDIO_INT_WRITE_BUFFER_2_EMPTY));
 
-		if ((data->buffer_status & AUDIO_INT_WRITE_BUFFER_1_EMPTY) != 0)
-			kbuf = data->write_buffer1;
+		if ((audio->buffer_status & AUDIO_INT_WRITE_BUFFER_1_EMPTY) != 0)
+			kbuf = audio->write_buffer1;
 		else
-			kbuf = data->write_buffer2;
+			kbuf = audio->write_buffer2;
 
 		/* copy from user space to the appropriate buffer */
-		if (copy_from_user(kbuf, buf, copy)) {
+		if (copy_from_user(kbuf, buf, length)) {
 			result = -EFAULT;
 			break;
 		}
 
-		spin_lock_irqsave(&data->lock, irq_flags);
+		spin_lock_irqsave(&audio->lock, irq_flags);
 		/*
 		 *  clear the buffer empty flag, and signal the emulator
 		 *  to start writing the buffer
 		 */
-		if (kbuf == data->write_buffer1) {
-			data->buffer_status &= ~AUDIO_INT_WRITE_BUFFER_1_EMPTY;
-			audio_write(data, AUDIO_WRITE_BUFFER_1, copy);
+		if (kbuf == audio->write_buffer1) {
+			audio->buffer_status &= ~AUDIO_INT_WRITE_BUFFER_1_EMPTY;
+			audio_write(audio, AUDIO_WRITE_BUFFER_1, length);
 		} else {
-			data->buffer_status &= ~AUDIO_INT_WRITE_BUFFER_2_EMPTY;
-			audio_write(data, AUDIO_WRITE_BUFFER_2, copy);
+			audio->buffer_status &= ~AUDIO_INT_WRITE_BUFFER_2_EMPTY;
+			audio_write(audio, AUDIO_WRITE_BUFFER_2, length);
 		}
-		spin_unlock_irqrestore(&data->lock, irq_flags);
+		spin_unlock_irqrestore(&audio->lock, irq_flags);
 
-		buf += copy;
-		result += copy;
-		count -= copy;
+		buf += length;
+		result += length;
+		count -= length;
 	}
 	return result;
 }
 
 static int goldfish_audio_open(struct inode *ip, struct file *fp)
 {
-	if (!audio_data)
+	struct goldfish_audio *audio = fp->private_data;
+	int status;
+
+	if (!audio)
 		return -ENODEV;
 
-	if (atomic_inc_return(&open_count) == 1) {
-		fp->private_data = audio_data;
-		audio_data->buffer_status = (AUDIO_INT_WRITE_BUFFER_1_EMPTY |
-					     AUDIO_INT_WRITE_BUFFER_2_EMPTY);
-		audio_write(audio_data, AUDIO_INT_ENABLE, AUDIO_INT_MASK);
-		return 0;
+	status = mutex_lock_interruptible(&audio->mutex);
+	if (status)
+		return status;
+
+	if (audio->open_count) {
+		status = -EBUSY;
+		goto done;
 	}
 
-	atomic_dec(&open_count);
-	return -EBUSY;
+	++audio->open_count;
+	audio->buffer_status = (AUDIO_INT_WRITE_BUFFER_1_EMPTY |
+				AUDIO_INT_WRITE_BUFFER_2_EMPTY);
+	audio_write(audio, AUDIO_INT_ENABLE, AUDIO_INT_MASK);
+	fp->private_data = audio;
+
+done:
+	mutex_unlock(&audio->mutex);
+	return status;
 }
 
 static int goldfish_audio_release(struct inode *ip, struct file *fp)
 {
-	atomic_dec(&open_count);
-	/* FIXME: surely this is wrong for the multi-opened case */
-	audio_write(audio_data, AUDIO_INT_ENABLE, 0);
-	return 0;
-}
+	struct goldfish_audio *audio = fp->private_data;
+	int status;
 
-static long goldfish_audio_ioctl(struct file *fp, unsigned int cmd,
-				 unsigned long arg)
-{
-	/* temporary workaround, until we switch to the ALSA API */
-	if (cmd == 315)
-		return -1;
+	if (!audio)
+		return -ENODEV;
 
+	status = mutex_lock_interruptible(&audio->mutex);
+	if (status)
+		return status;
+
+	--audio->open_count;
+	if (!audio->open_count)
+		audio_write(audio, AUDIO_INT_ENABLE, 0);
+
+	mutex_unlock(&audio->mutex);
 	return 0;
 }
 
 static irqreturn_t goldfish_audio_interrupt(int irq, void *dev_id)
 {
 	unsigned long irq_flags;
-	struct goldfish_audio	*data = dev_id;
+	struct goldfish_audio *audio = dev_id;
 	u32 status;
 
-	spin_lock_irqsave(&data->lock, irq_flags);
+	spin_lock_irqsave(&audio->lock, irq_flags);
 
 	/* read buffer status flags */
-	status = audio_read(data, AUDIO_INT_STATUS);
+	status = audio_read(audio, AUDIO_INT_STATUS);
 	status &= AUDIO_INT_MASK;
+
 	/*
 	 *  if buffers are newly empty, wake up blocked
 	 *  goldfish_audio_write() call
 	 */
 	if (status) {
-		data->buffer_status = status;
-		wake_up(&data->wait);
+		audio->buffer_status = status;
+		wake_up(&audio->wait);
 	}
 
-	spin_unlock_irqrestore(&data->lock, irq_flags);
+	spin_unlock_irqrestore(&audio->lock, irq_flags);
 	return status ? IRQ_HANDLED : IRQ_NONE;
 }
 
@@ -278,7 +292,6 @@ static const struct file_operations goldfish_audio_fops = {
 	.write = goldfish_audio_write,
 	.open = goldfish_audio_open,
 	.release = goldfish_audio_release,
-	.unlocked_ioctl = goldfish_audio_ioctl,
 };
 
 static struct miscdevice goldfish_audio_device = {
@@ -291,44 +304,46 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct resource *r;
-	struct goldfish_audio *data;
+	struct goldfish_audio *audio;
 	dma_addr_t buf_addr;
 
-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-	if (!data)
+	audio = devm_kzalloc(&pdev->dev, sizeof(*audio), GFP_KERNEL);
+	if (!audio)
 		return -ENOMEM;
-	spin_lock_init(&data->lock);
-	init_waitqueue_head(&data->wait);
-	platform_set_drvdata(pdev, data);
+
+	spin_lock_init(&audio->lock);
+	mutex_init(&audio->mutex);
+	init_waitqueue_head(&audio->wait);
+	platform_set_drvdata(pdev, audio);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!r) {
 		dev_err(&pdev->dev, "platform_get_resource failed\n");
 		return -ENODEV;
 	}
-	data->reg_base = devm_ioremap(&pdev->dev, r->start, PAGE_SIZE);
-	if (!data->reg_base)
+	audio->reg_base = devm_ioremap(&pdev->dev, r->start, PAGE_SIZE);
+	if (!audio->reg_base)
 		return -ENOMEM;
 
-	data->irq = platform_get_irq(pdev, 0);
-	if (data->irq < 0) {
+	audio->irq = platform_get_irq(pdev, 0);
+	if (audio->irq < 0) {
 		dev_err(&pdev->dev, "platform_get_irq failed\n");
 		return -ENODEV;
 	}
-	data->buffer_virt = dmam_alloc_coherent(&pdev->dev,
-						COMBINED_BUFFER_SIZE,
-						&buf_addr, GFP_KERNEL);
-	if (!data->buffer_virt) {
+	audio->buffer_virt = dmam_alloc_coherent(&pdev->dev,
+						 COMBINED_BUFFER_SIZE,
+						 &buf_addr, GFP_KERNEL);
+	if (!audio->buffer_virt) {
 		dev_err(&pdev->dev, "allocate buffer failed\n");
 		return -ENOMEM;
 	}
-	data->buffer_phys = buf_addr;
-	data->write_buffer1 = data->buffer_virt;
-	data->write_buffer2 = data->buffer_virt + WRITE_BUFFER_SIZE;
-	data->read_buffer = data->buffer_virt + 2 * WRITE_BUFFER_SIZE;
+	audio->buffer_phys = buf_addr;
+	audio->write_buffer1 = audio->buffer_virt;
+	audio->write_buffer2 = audio->buffer_virt + WRITE_BUFFER_SIZE;
+	audio->read_buffer = audio->buffer_virt + 2 * WRITE_BUFFER_SIZE;
 
-	ret = devm_request_irq(&pdev->dev, data->irq, goldfish_audio_interrupt,
-			       IRQF_SHARED, pdev->name, data);
+	ret = devm_request_irq(&pdev->dev, audio->irq, goldfish_audio_interrupt,
+			       IRQF_SHARED, pdev->name, audio);
 	if (ret) {
 		dev_err(&pdev->dev, "request_irq failed\n");
 		return ret;
@@ -342,28 +357,26 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	audio_write64(data, AUDIO_SET_WRITE_BUFFER_1,
+	audio_write64(audio, AUDIO_SET_WRITE_BUFFER_1,
 		      AUDIO_SET_WRITE_BUFFER_1_HIGH, buf_addr);
 	buf_addr += WRITE_BUFFER_SIZE;
 
-	audio_write64(data, AUDIO_SET_WRITE_BUFFER_2,
+	audio_write64(audio, AUDIO_SET_WRITE_BUFFER_2,
 		      AUDIO_SET_WRITE_BUFFER_2_HIGH, buf_addr);
 
 	buf_addr += WRITE_BUFFER_SIZE;
 
-	data->read_supported = audio_read(data, AUDIO_READ_SUPPORTED);
-	if (data->read_supported)
-		audio_write64(data, AUDIO_SET_READ_BUFFER,
+	audio->read_supported = audio_read(audio, AUDIO_READ_SUPPORTED);
+	if (audio->read_supported)
+		audio_write64(audio, AUDIO_SET_READ_BUFFER,
 			      AUDIO_SET_READ_BUFFER_HIGH, buf_addr);
 
-	audio_data = data;
 	return 0;
 }
 
 static int goldfish_audio_remove(struct platform_device *pdev)
 {
 	misc_deregister(&goldfish_audio_device);
-	audio_data = NULL;
 	return 0;
 }
 
