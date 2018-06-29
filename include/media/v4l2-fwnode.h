@@ -259,11 +259,10 @@ typedef int (*parse_endpoint_func)(struct device *dev,
  * This function may not be called on a registered notifier and may be called on
  * a notifier only once.
  *
- * Do not allocate the notifier's subdevs array, or change the notifier's
- * num_subdevs field. This is because this function uses
- * @v4l2_async_notifier_add_subdev to populate the notifier's asd_list,
- * which is in-place-of the subdevs array which must remain unallocated
- * and unused.
+ * Do not change the notifier's num_subdevs field. This is because this
+ * function uses @v4l2_async_notifier_add_subdev to populate the notifier's
+ * asd_list, which increments num_subdevs field to enforce an upper limit on
+ * the number of asd's that can be added to a notifier.
  *
  * The &struct v4l2_fwnode_endpoint passed to the callback function
  * @parse_endpoint is released once the function is finished. If there is a need
@@ -316,11 +315,10 @@ int v4l2_async_notifier_parse_fwnode_endpoints(
  * This function may not be called on a registered notifier and may be called on
  * a notifier only once per port.
  *
- * Do not allocate the notifier's subdevs array, or change the notifier's
- * num_subdevs field. This is because this function uses
- * @v4l2_async_notifier_add_subdev to populate the notifier's asd_list,
- * which is in-place-of the subdevs array which must remain unallocated
- * and unused.
+ * Do not change the notifier's num_subdevs field. This is because this
+ * function uses @v4l2_async_notifier_add_subdev to populate the notifier's
+ * asd_list, which increments num_subdevs field to enforce an upper limit on
+ * the number of asd's that can be added to a notifier.
  *
  * The &struct v4l2_fwnode_endpoint passed to the callback function
  * @parse_endpoint is released once the function is finished. If there is a need
