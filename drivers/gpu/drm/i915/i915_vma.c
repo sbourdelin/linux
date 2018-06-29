@@ -121,6 +121,12 @@ i915_vma_retire(struct i915_gem_active *base, struct i915_request *rq)
 	__i915_vma_retire(vma, rq);
 }
 
+static void
+i915_vma_last_retire(struct i915_gem_active *base, struct i915_request *rq)
+{
+	__i915_vma_retire(container_of(base, struct i915_vma, last_active), rq);
+}
+
 static struct i915_vma *
 vma_create(struct drm_i915_gem_object *obj,
 	   struct i915_address_space *vm,
@@ -138,6 +144,7 @@ vma_create(struct drm_i915_gem_object *obj,
 
 	INIT_RADIX_TREE(&vma->active_rt, GFP_KERNEL);
 
+	init_request_active(&vma->last_active, i915_vma_last_retire);
 	init_request_active(&vma->last_fence, NULL);
 	vma->vm = vm;
 	vma->ops = &vm->vma_ops;
@@ -903,7 +910,13 @@ static void export_fence(struct i915_vma *vma,
 static struct i915_gem_active *lookup_active(struct i915_vma *vma, u64 idx)
 {
 	struct i915_vma_active *active;
+	struct i915_request *old;
 	int err;
+
+	old = i915_gem_active_raw(&vma->last_active,
+				  &vma->vm->i915->drm.struct_mutex);
+	if (!old || old->fence.context == idx)
+		goto out;
 
 	/*
 	 * XXX Note that the radix_tree uses unsigned longs for it indices,
@@ -912,13 +925,9 @@ static struct i915_gem_active *lookup_active(struct i915_vma *vma, u64 idx)
 	 * and further reduced by that both timelines must be active
 	 * simultaneously to confuse us.
 	 */
-	active = radix_tree_lookup(&vma->active_rt, idx);
-	if (likely(active)) {
-		GEM_BUG_ON(i915_gem_active_isset(&active->base) &&
-			   idx != i915_gem_active_peek(&active->base,
-						       &vma->vm->i915->drm.struct_mutex)->fence.context);
-		return &active->base;
-	}
+	active = radix_tree_lookup(&vma->active_rt, old->fence.context);
+	if (likely(active))
+		goto replace;
 
 	active = kmalloc(sizeof(*active), GFP_KERNEL);
 	if (unlikely(!active))
@@ -927,13 +936,27 @@ static struct i915_gem_active *lookup_active(struct i915_vma *vma, u64 idx)
 	init_request_active(&active->base, i915_vma_retire);
 	active->vma = vma;
 
-	err = radix_tree_insert(&vma->active_rt, idx, active);
+	err = radix_tree_insert(&vma->active_rt, old->fence.context, active);
 	if (unlikely(err)) {
 		kfree(active);
 		return ERR_PTR(err);
 	}
 
-	return &active->base;
+replace:
+	if (i915_gem_active_isset(&active->base)) {
+		GEM_BUG_ON(old->fence.context !=
+			   i915_gem_active_raw(&active->base,
+					       &vma->vm->i915->drm.struct_mutex)->fence.context);
+		__list_del_entry(&active->base.link);
+		vma->active_count--;
+		GEM_BUG_ON(!vma->active_count);
+	}
+	GEM_BUG_ON(list_empty(&vma->last_active.link));
+	list_replace_init(&vma->last_active.link, &active->base.link);
+	active->base.request = fetch_and_zero(&vma->last_active.request);
+
+out:
+	return &vma->last_active;
 }
 
 int i915_vma_move_to_active(struct i915_vma *vma,
@@ -1013,6 +1036,11 @@ int i915_vma_unbind(struct i915_vma *vma)
 		 * before we are finished).
 		 */
 		__i915_vma_pin(vma);
+
+		ret = i915_gem_active_retire(&vma->last_active,
+					     &vma->vm->i915->drm.struct_mutex);
+		if (ret)
+			goto unpin;
 
 		rcu_read_lock();
 		radix_tree_for_each_slot(slot, &vma->active_rt, &iter, 0) {

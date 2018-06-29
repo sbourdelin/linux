@@ -97,6 +97,7 @@ struct i915_vma {
 
 	unsigned int active_count;
 	struct radix_tree_root active_rt;
+	struct i915_gem_active last_active;
 	struct i915_gem_active last_fence;
 
 	/**
