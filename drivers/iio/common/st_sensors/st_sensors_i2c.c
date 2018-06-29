@@ -87,10 +87,9 @@ int st_sensors_match_acpi_device(struct device *dev)
 
 	if (ACPI_HANDLE(dev)) {
 		acpi_id = acpi_match_device(dev->driver->acpi_match_table, dev);
-		if (!acpi_id) {
-			dev_err(dev, "No driver data\n");
+		if (!acpi_id)
 			return -EINVAL;
-		}
+
 		driver_data = acpi_id->driver_data;
 	}
 	return driver_data;
