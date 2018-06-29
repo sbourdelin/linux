@@ -126,14 +126,10 @@ i915_gem_evict_something(struct i915_address_space *vm,
 	struct drm_i915_private *dev_priv = vm->i915;
 	struct drm_mm_scan scan;
 	struct list_head eviction_list;
-	struct list_head *phases[] = {
-		&vm->inactive_list,
-		&vm->active_list,
-		NULL,
-	}, **phase;
 	struct i915_vma *vma, *next;
 	struct drm_mm_node *node;
 	enum drm_mm_insert_mode mode;
+	struct i915_vma *active;
 	int ret;
 
 	lockdep_assert_held(&vm->i915->drm.struct_mutex);
@@ -169,17 +165,31 @@ i915_gem_evict_something(struct i915_address_space *vm,
 	 */
 	if (!(flags & PIN_NONBLOCK))
 		i915_retire_requests(dev_priv);
-	else
-		phases[1] = NULL;
 
 search_again:
+	active = NULL;
 	INIT_LIST_HEAD(&eviction_list);
-	phase = phases;
-	do {
-		list_for_each_entry(vma, *phase, vm_link)
-			if (mark_free(&scan, vma, flags, &eviction_list))
-				goto found;
-	} while (*++phase);
+	list_for_each_entry_safe(vma, next, &vm->bound_list, vm_link) {
+		if (i915_vma_is_active(vma)) {
+			if (vma == active) {
+				if (flags & PIN_NONBLOCK)
+					break;
+
+				active = ERR_PTR(-EAGAIN);
+			}
+
+			if (active != ERR_PTR(-EAGAIN)) {
+				if (!active)
+					active = vma;
+
+				list_move_tail(&vma->vm_link, &vm->bound_list);
+				continue;
+			}
+		}
+
+		if (mark_free(&scan, vma, flags, &eviction_list))
+			goto found;
+	}
 
 	/* Nothing found, clean up and bail out! */
 	list_for_each_entry_safe(vma, next, &eviction_list, evict_link) {
@@ -388,11 +398,6 @@ int i915_gem_evict_for_node(struct i915_address_space *vm,
  */
 int i915_gem_evict_vm(struct i915_address_space *vm)
 {
-	struct list_head *phases[] = {
-		&vm->inactive_list,
-		&vm->active_list,
-		NULL
-	}, **phase;
 	struct list_head eviction_list;
 	struct i915_vma *vma, *next;
 	int ret;
@@ -412,16 +417,13 @@ int i915_gem_evict_vm(struct i915_address_space *vm)
 	}
 
 	INIT_LIST_HEAD(&eviction_list);
-	phase = phases;
-	do {
-		list_for_each_entry(vma, *phase, vm_link) {
-			if (i915_vma_is_pinned(vma))
-				continue;
+	list_for_each_entry(vma, &vm->bound_list, vm_link) {
+		if (i915_vma_is_pinned(vma))
+			continue;
 
-			__i915_vma_pin(vma);
-			list_add(&vma->evict_link, &eviction_list);
-		}
-	} while (*++phase);
+		__i915_vma_pin(vma);
+		list_add(&vma->evict_link, &eviction_list);
+	}
 
 	ret = 0;
 	list_for_each_entry_safe(vma, next, &eviction_list, evict_link) {
