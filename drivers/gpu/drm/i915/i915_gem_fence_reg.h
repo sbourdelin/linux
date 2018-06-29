@@ -56,8 +56,6 @@ struct drm_i915_fence_reg {
 	bool dirty;
 };
 
-void i915_ggtt_init_fences(struct i915_ggtt *ggtt);
-
 struct drm_i915_fence_reg *
 i915_reserve_fence(struct drm_i915_private *i915);
 void i915_unreserve_fence(struct drm_i915_fence_reg *fence);

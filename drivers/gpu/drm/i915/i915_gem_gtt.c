@@ -37,6 +37,7 @@
 #include <drm/i915_drm.h>
 
 #include "i915_drv.h"
+#include "i915_gem_fence_reg.h"
 #include "i915_vgpu.h"
 #include "i915_trace.h"
 #include "intel_drv.h"
@@ -2871,6 +2872,51 @@ void i915_gem_fini_aliasing_ppgtt(struct drm_i915_private *i915)
 	ggtt->vm.vma_ops.unbind_vma = ggtt_unbind_vma;
 }
 
+static int i915_ggtt_init_fences(struct i915_ggtt *ggtt)
+{
+	struct drm_i915_private *dev_priv = ggtt->vm.i915;
+	int i;
+
+	if (INTEL_GEN(dev_priv) >= 7 &&
+	    !(IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)))
+		ggtt->num_fence_regs = 32;
+	else if (INTEL_GEN(dev_priv) >= 4 ||
+		 IS_I945G(dev_priv) || IS_I945GM(dev_priv) ||
+		 IS_G33(dev_priv) || IS_PINEVIEW(dev_priv))
+		ggtt->num_fence_regs = 16;
+	else
+		ggtt->num_fence_regs = 8;
+
+	if (intel_vgpu_active(dev_priv))
+		ggtt->num_fence_regs = I915_READ(vgtif_reg(avail_rs.fence_num));
+
+	ggtt->fence_regs = kcalloc(ggtt->num_fence_regs,
+				   sizeof(*ggtt->fence_regs),
+				   GFP_KERNEL);
+	if (!ggtt->fence_regs)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&ggtt->fence_list);
+
+	/* Initialize fence registers to zero */
+	for (i = 0; i < ggtt->num_fence_regs; i++) {
+		struct drm_i915_fence_reg *fence = &ggtt->fence_regs[i];
+
+		fence->ggtt = ggtt;
+		fence->id = i;
+		list_add_tail(&fence->link, &ggtt->fence_list);
+	}
+	i915_gem_restore_fences(dev_priv);
+
+	i915_gem_detect_bit_6_swizzle(dev_priv);
+	return 0;
+}
+
+static void i915_ggtt_cleanup_fences(struct i915_ggtt *ggtt)
+{
+	kfree(ggtt->fence_regs);
+}
+
 int i915_gem_init_ggtt(struct drm_i915_private *dev_priv)
 {
 	/* Let GEM Manage all of the aperture.
@@ -2958,6 +3004,8 @@ void i915_ggtt_cleanup_hw(struct drm_i915_private *dev_priv)
 	}
 
 	mutex_unlock(&dev_priv->drm.struct_mutex);
+
+	i915_ggtt_cleanup_fences(ggtt);
 
 	arch_phys_wc_del(ggtt->mtrr);
 	io_mapping_fini(&ggtt->iomap);
@@ -3568,13 +3616,15 @@ int i915_ggtt_init_hw(struct drm_i915_private *dev_priv)
 		ggtt->vm.mm.color_adjust = i915_gtt_color_adjust;
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
-	i915_ggtt_init_fences(ggtt);
+	ret = i915_ggtt_init_fences(ggtt);
+	if (ret)
+		goto err_fini;
 
 	if (!io_mapping_init_wc(&ggtt->iomap,
 				ggtt->gmadr.start,
 				ggtt->mappable_end)) {
 		ret = -EIO;
-		goto out_gtt_cleanup;
+		goto err_fences;
 	}
 
 	ggtt->mtrr = arch_phys_wc_add(ggtt->gmadr.start, ggtt->mappable_end);
@@ -3585,12 +3635,18 @@ int i915_ggtt_init_hw(struct drm_i915_private *dev_priv)
 	 */
 	ret = i915_gem_init_stolen(dev_priv);
 	if (ret)
-		goto out_gtt_cleanup;
+		goto err_io;
 
 	return 0;
 
-out_gtt_cleanup:
+err_io:
+	arch_phys_wc_del(ggtt->mtrr);
+	io_mapping_fini(&ggtt->iomap);
+err_fences:
+	i915_ggtt_cleanup_fences(ggtt);
+err_fini:
 	ggtt->vm.cleanup(&ggtt->vm);
+	i915_address_space_fini(&ggtt->vm);
 	return ret;
 }
 

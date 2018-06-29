@@ -5646,39 +5646,6 @@ i915_gem_cleanup_engines(struct drm_i915_private *dev_priv)
 		dev_priv->gt.cleanup_engine(engine);
 }
 
-void i915_ggtt_init_fences(struct i915_ggtt *ggtt)
-{
-	struct drm_i915_private *dev_priv = ggtt->vm.i915;
-	int i;
-
-	if (INTEL_GEN(dev_priv) >= 7 && !IS_VALLEYVIEW(dev_priv) &&
-	    !IS_CHERRYVIEW(dev_priv))
-		ggtt->num_fence_regs = 32;
-	else if (INTEL_GEN(dev_priv) >= 4 ||
-		 IS_I945G(dev_priv) || IS_I945GM(dev_priv) ||
-		 IS_G33(dev_priv) || IS_PINEVIEW(dev_priv))
-		ggtt->num_fence_regs = 16;
-	else
-		ggtt->num_fence_regs = 8;
-
-	if (intel_vgpu_active(dev_priv))
-		ggtt->num_fence_regs = I915_READ(vgtif_reg(avail_rs.fence_num));
-
-	INIT_LIST_HEAD(&ggtt->fence_list);
-
-	/* Initialize fence registers to zero */
-	for (i = 0; i < ggtt->num_fence_regs; i++) {
-		struct drm_i915_fence_reg *fence = &ggtt->fence_regs[i];
-
-		fence->ggtt = ggtt;
-		fence->id = i;
-		list_add_tail(&fence->link, &ggtt->fence_list);
-	}
-	i915_gem_restore_fences(dev_priv);
-
-	i915_gem_detect_bit_6_swizzle(dev_priv);
-}
-
 static void i915_gem_init__mm(struct drm_i915_private *i915)
 {
 	spin_lock_init(&i915->mm.object_stat_lock);
