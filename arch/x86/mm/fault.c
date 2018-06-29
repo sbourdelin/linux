@@ -1357,6 +1357,10 @@ retry:
 		bad_area(regs, error_code, address);
 		return;
 	}
+	if (unlikely(vma->vm_flags & VM_DEAD)) {
+		bad_area(regs, error_code, address);
+		return;
+	}
 	if (error_code & X86_PF_USER) {
 		/*
 		 * Accessing the stack below %sp is always a bug.
