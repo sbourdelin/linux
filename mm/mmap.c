@@ -2763,6 +2763,128 @@ static int munmap_lookup_vma(struct mm_struct *mm, struct vm_area_struct **vma,
 	return 1;
 }
 
+/* Consider PUD size or 1GB mapping as large mapping */
+#ifdef HPAGE_PUD_SIZE
+#define LARGE_MAP_THRESH	HPAGE_PUD_SIZE
+#else
+#define LARGE_MAP_THRESH	(1 * 1024 * 1024 * 1024)
+#endif
+
+/* Unmap large mapping early with acquiring read mmap_sem */
+static int do_munmap_zap_early(struct mm_struct *mm, unsigned long start,
+			       size_t len, struct list_head *uf)
+{
+	unsigned long end = 0;
+	struct vm_area_struct *vma = NULL, *prev, *tmp;
+	bool success = false;
+	int ret = 0;
+
+	if (!munmap_addr_sanity(start, len))
+		return -EINVAL;
+
+	len = PAGE_ALIGN(len);
+
+	end = start + len;
+
+	/* Just deal with uf in regular path */
+	if (unlikely(uf))
+		goto regular_path;
+
+	if (len >= LARGE_MAP_THRESH) {
+		/*
+		 * need write mmap_sem to split vma and set VM_DEAD flag
+		 * splitting vma up-front to save PITA to clean if it is failed
+		 */
+		down_write(&mm->mmap_sem);
+		ret = munmap_lookup_vma(mm, &vma, &prev, start, end);
+		if (ret != 1) {
+			up_write(&mm->mmap_sem);
+			return ret;
+		}
+		/* This ret value might be returned, so reset it */
+		ret = 0;
+
+		/*
+		 * Unmapping vmas, which has VM_LOCKED|VM_HUGETLB|VM_PFNMAP
+		 * flag set or has uprobes set, need acquire write map_sem,
+		 * so skip them in early zap. Just deal with such mapping in
+		 * regular path.
+		 * Borrow can_madv_dontneed_vma() to check the conditions.
+		 */
+		tmp = vma;
+		while (tmp && tmp->vm_start < end) {
+			if (!can_madv_dontneed_vma(tmp) ||
+			    vma_has_uprobes(tmp, start, end)) {
+				up_write(&mm->mmap_sem);
+				goto regular_path;
+			}
+			tmp = tmp->vm_next;
+		}
+		/*
+		 * set VM_DEAD flag before tear down them.
+		 * page fault on VM_DEAD vma will trigger SIGSEGV.
+		 */
+		tmp = vma;
+		for ( ; tmp && tmp->vm_start < end; tmp = tmp->vm_next)
+			tmp->vm_flags |= VM_DEAD;
+		up_write(&mm->mmap_sem);
+
+		/* zap mappings with read mmap_sem */
+		down_read(&mm->mmap_sem);
+		zap_page_range(vma, start, len);
+		/* indicates early zap is success */
+		success = true;
+		up_read(&mm->mmap_sem);
+	}
+
+regular_path:
+	/* hold write mmap_sem for vma manipulation or regular path */
+	if (down_write_killable(&mm->mmap_sem))
+		return -EINTR;
+	if (success) {
+		/* vmas have been zapped, here clean up pgtable and vmas */
+		struct vm_area_struct *next = prev ? prev->vm_next : mm->mmap;
+		struct mmu_gather tlb;
+		tlb_gather_mmu(&tlb, mm, start, end);
+		free_pgtables(&tlb, vma, prev ? prev->vm_end : FIRST_USER_ADDRESS,
+			      next ? next->vm_start : USER_PGTABLES_CEILING);
+		tlb_finish_mmu(&tlb, start, end);
+
+		detach_vmas_to_be_unmapped(mm, vma, prev, end);
+		arch_unmap(mm, vma, start, end);
+		remove_vma_list(mm, vma);
+	} else {
+		/* vma is VM_LOCKED|VM_HUGETLB|VM_PFNMAP or has uprobe */
+		if (vma) {
+			if (unlikely(uf)) {
+				int ret = userfaultfd_unmap_prep(vma, start,
+								 end, uf);
+				if (ret)
+					goto out;
+			}
+			if (mm->locked_vm) {
+				tmp = vma;
+				while (tmp && tmp->vm_start < end) {
+					if (tmp->vm_flags & VM_LOCKED) {
+						mm->locked_vm -= vma_pages(tmp);
+						munlock_vma_pages_all(tmp);
+					}
+					tmp = tmp->vm_next;
+				}
+			}
+			detach_vmas_to_be_unmapped(mm, vma, prev, end);
+			unmap_region(mm, vma, prev, start, end);
+			remove_vma_list(mm, vma);
+		} else
+			/* When mapping size < LARGE_MAP_THRESH */
+			ret = do_munmap(mm, start, len, uf);
+	}
+
+out:
+	up_write(&mm->mmap_sem);
+	return ret;
+}
+
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
@@ -2829,6 +2951,17 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 	return 0;
 }
 
+static int vm_munmap_zap_early(unsigned long start, size_t len)
+{
+	int ret;
+	struct mm_struct *mm = current->mm;
+	LIST_HEAD(uf);
+
+	ret = do_munmap_zap_early(mm, start, len, &uf);
+	userfaultfd_unmap_complete(mm, &uf);
+	return ret;
+}
+
 int vm_munmap(unsigned long start, size_t len)
 {
 	int ret;
@@ -2848,9 +2981,8 @@ EXPORT_SYMBOL(vm_munmap);
 SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
 {
 	profile_munmap(addr);
-	return vm_munmap(addr, len);
+	return vm_munmap_zap_early(addr, len);
 }
-
 
 /*
  * Emulation of deprecated remap_file_pages() syscall.
