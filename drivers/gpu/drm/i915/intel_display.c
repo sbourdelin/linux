@@ -14090,7 +14090,7 @@ static void intel_setup_outputs(struct drm_i915_private *dev_priv)
 		intel_ddi_init(dev_priv, PORT_B);
 		intel_ddi_init(dev_priv, PORT_C);
 
-		intel_dsi_init(dev_priv);
+		intel_legacy_dsi_init(dev_priv);
 	} else if (HAS_DDI(dev_priv)) {
 		int found;
 
@@ -14196,7 +14196,7 @@ static void intel_setup_outputs(struct drm_i915_private *dev_priv)
 				intel_hdmi_init(dev_priv, CHV_HDMID, PORT_D);
 		}
 
-		intel_dsi_init(dev_priv);
+		intel_legacy_dsi_init(dev_priv);
 	} else if (!IS_GEN2(dev_priv) && !IS_PINEVIEW(dev_priv)) {
 		bool found = false;
 

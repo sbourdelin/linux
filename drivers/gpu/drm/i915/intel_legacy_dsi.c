@@ -1713,7 +1713,7 @@ static void intel_dsi_add_properties(struct intel_connector *connector)
 	}
 }
 
-void intel_dsi_init(struct drm_i915_private *dev_priv)
+void intel_legacy_dsi_init(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_dsi *intel_dsi;
