@@ -1994,12 +1994,22 @@ static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
 };
 
 static struct intel_engine_cs *
-eb_select_engine(struct drm_i915_private *dev_priv,
+eb_select_engine(struct i915_execbuffer *eb,
 		 struct drm_file *file,
 		 struct drm_i915_gem_execbuffer2 *args)
 {
 	unsigned int user_ring_id = args->flags & I915_EXEC_RING_MASK;
 	struct intel_engine_cs *engine;
+
+	if (eb->ctx->engines) {
+		if (user_ring_id >= eb->ctx->nengine) {
+			DRM_DEBUG("execbuf with unknown ring: %u\n",
+				  user_ring_id);
+			return NULL;
+		}
+
+		return eb->ctx->engines[user_ring_id];
+	}
 
 	if (user_ring_id > I915_USER_RINGS) {
 		DRM_DEBUG("execbuf with unknown ring: %u\n", user_ring_id);
@@ -2013,11 +2023,11 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 		return NULL;
 	}
 
-	if (user_ring_id == I915_EXEC_BSD && HAS_BSD2(dev_priv)) {
+	if (user_ring_id == I915_EXEC_BSD && HAS_BSD2(eb->i915)) {
 		unsigned int bsd_idx = args->flags & I915_EXEC_BSD_MASK;
 
 		if (bsd_idx == I915_EXEC_BSD_DEFAULT) {
-			bsd_idx = gen8_dispatch_bsd_engine(dev_priv, file);
+			bsd_idx = gen8_dispatch_bsd_engine(eb->i915, file);
 		} else if (bsd_idx >= I915_EXEC_BSD_RING1 &&
 			   bsd_idx <= I915_EXEC_BSD_RING2) {
 			bsd_idx >>= I915_EXEC_BSD_SHIFT;
@@ -2028,9 +2038,9 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 			return NULL;
 		}
 
-		engine = dev_priv->engine[_VCS(bsd_idx)];
+		engine = eb->i915->engine[_VCS(bsd_idx)];
 	} else {
-		engine = dev_priv->engine[user_ring_map[user_ring_id]];
+		engine = eb->i915->engine[user_ring_map[user_ring_id]];
 	}
 
 	if (!engine) {
@@ -2241,7 +2251,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	if (unlikely(err))
 		goto err_destroy;
 
-	eb.engine = eb_select_engine(eb.i915, file, args);
+	eb.engine = eb_select_engine(&eb, file, args);
 	if (!eb.engine) {
 		err = -EINVAL;
 		goto err_engine;

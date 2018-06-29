@@ -1486,7 +1486,34 @@ struct drm_i915_gem_context_param {
 #define   I915_CONTEXT_MAX_USER_PRIORITY	1023 /* inclusive */
 #define   I915_CONTEXT_DEFAULT_PRIORITY		0
 #define   I915_CONTEXT_MIN_USER_PRIORITY	-1023 /* inclusive */
+
+/*
+ * I915_CONTEXT_PARAM_ENGINES:
+ *
+ * Bind this context to operate on this subset of available engines. Henceforth,
+ * the I915_EXEC_RING selector for DRM_IOCTL_I915_GEM_EXECBUFFER2 operates as
+ * an index into this array of engines; I915_EXEC_DEFAULT selecting engine[0]
+ * and upwards. The array created is offset by 1, such that by default
+ * I915_EXEC_DEFAULT is left empty, to be filled in as directed. Slots 1...N
+ * are then filled in using the specified (class, instance).
+ *
+ * Setting the number of engines bound to the context will revert back to
+ * default settings.
+ *
+ * See struct i915_context_param_engines.
+ */
+#define I915_CONTEXT_PARAM_ENGINES	0x7
+
 	__u64 value;
+};
+
+struct i915_context_param_engines {
+	__u64 extensions;
+
+	struct {
+		__u32 class; /* see enum drm_i915_gem_engine_class */
+		__u32 instance;
+	} class_instance[0];
 };
 
 enum drm_i915_oa_format {

@@ -67,6 +67,8 @@ struct i915_gem_context {
 	/** file_priv: owning file descriptor */
 	struct drm_i915_file_private *file_priv;
 
+	struct intel_engine_cs **engines;
+
 	struct i915_timeline *timeline;
 
 	/**
@@ -129,6 +131,8 @@ struct i915_gem_context {
 #define CONTEXT_BANNABLE		3
 #define CONTEXT_BANNED			4
 #define CONTEXT_FORCE_SINGLE_SUBMISSION	5
+
+	unsigned int nengine;
 
 	/**
 	 * @hw_id: - unique identifier for the context

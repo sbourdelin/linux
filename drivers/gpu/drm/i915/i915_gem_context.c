@@ -90,6 +90,7 @@
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_trace.h"
+#include "i915_user_extensions.h"
 #include "intel_workarounds.h"
 
 #define ALL_L3_SLICES(dev) (1 << NUM_L3_SLICES(dev)) - 1
@@ -132,6 +133,8 @@ static void i915_gem_context_free(struct i915_gem_context *ctx)
 		if (ce->ops)
 			ce->ops->destroy(ce);
 	}
+
+	kfree(ctx->engines);
 
 	if (ctx->timeline)
 		i915_timeline_put(ctx->timeline);
@@ -885,6 +888,87 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	return ret;
 }
 
+struct set_engines {
+	struct i915_gem_context *ctx;
+	struct intel_engine_cs **engines;
+	unsigned int nengine;
+};
+
+static const i915_user_extension_fn set_engines__extensions[] = {
+};
+
+static int set_engines(struct i915_gem_context *ctx,
+		       struct drm_i915_gem_context_param *args)
+{
+	struct i915_context_param_engines __user *user;
+	struct set_engines set = {
+		.ctx = ctx,
+		.engines = NULL,
+		.nengine = -1,
+	};
+	unsigned int n;
+	u64 size, extensions;
+	int err;
+
+	user = u64_to_user_ptr(args->value);
+	size = args->size;
+	if (!size)
+		goto out;
+
+	if (size < sizeof(struct i915_context_param_engines))
+		return -EINVAL;
+
+	size -= sizeof(struct i915_context_param_engines);
+	if (size % sizeof(*user->class_instance))
+		return -EINVAL;
+
+	set.nengine = size / sizeof(*user->class_instance);
+	if (set.nengine == 0 || set.nengine >= I915_EXEC_RING_MASK)
+		return -EINVAL;
+
+	set.engines = kmalloc_array(set.nengine + 1,
+				    sizeof(*set.engines),
+				    GFP_KERNEL);
+	if (!set.engines)
+		return -ENOMEM;
+
+	set.engines[0] = NULL;
+	for (n = 0; n < set.nengine; n++) {
+		u32 class, instance;
+
+		if (get_user(class, &user->class_instance[n].class) ||
+		    get_user(instance, &user->class_instance[n].instance)) {
+			kfree(set.engines);
+			return -EFAULT;
+		}
+
+		set.engines[n + 1] =
+			intel_engine_lookup_user(ctx->i915, class, instance);
+		if (!set.engines[n + 1]) {
+			kfree(set.engines);
+			return -ENOENT;
+		}
+	}
+
+	err = -EFAULT;
+	if (!get_user(extensions, &user->extensions))
+		err = i915_user_extensions(u64_to_user_ptr(extensions),
+					   set_engines__extensions,
+					   ARRAY_SIZE(set_engines__extensions),
+					   &set);
+	if (err) {
+		kfree(set.engines);
+		return err;
+	}
+
+out:
+	kfree(ctx->engines);
+	ctx->engines = set.engines;
+	ctx->nengine = set.nengine + 1;
+
+	return 0;
+}
+
 int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file)
 {
@@ -950,6 +1034,10 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				ctx->sched.priority =
 					I915_USER_PRIORITY(priority);
 		}
+		break;
+
+	case I915_CONTEXT_PARAM_ENGINES:
+		ret = set_engines(ctx, args);
 		break;
 
 	default:
