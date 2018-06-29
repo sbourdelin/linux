@@ -2117,6 +2117,7 @@ static void i915_address_space_init(struct i915_address_space *vm,
 				    struct drm_i915_private *dev_priv,
 				    const char *name)
 {
+	mutex_init(&vm->mutex);
 	drm_mm_init(&vm->mm, 0, vm->total);
 	vm->mm.head_node.color = I915_COLOR_UNEVICTABLE;
 
@@ -2125,6 +2126,13 @@ static void i915_address_space_init(struct i915_address_space *vm,
 
 	list_add_tail(&vm->global_link, &dev_priv->vm_list);
 	pagevec_init(&vm->free_pages);
+
+	/*
+	 * The vm->mutex must be reclaim safe (for use in the shrinker).
+	 * Do a dummy acquire now under fs_reclaim so that any allocation
+	 * attempt holding the lock is immediately reported by lockdep.
+	 */
+	i915_gem_shrinker_taints_mutex(&vm->mutex);
 }
 
 static void i915_address_space_fini(struct i915_address_space *vm)
@@ -2134,6 +2142,8 @@ static void i915_address_space_fini(struct i915_address_space *vm)
 
 	drm_mm_takedown(&vm->mm);
 	list_del(&vm->global_link);
+
+	mutex_destroy(&vm->mutex);
 }
 
 static void gtt_write_workarounds(struct drm_i915_private *dev_priv)
