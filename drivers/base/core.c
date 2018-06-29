@@ -1436,6 +1436,13 @@ struct kobject *virtual_device_parent(struct device *dev)
 struct class_dir {
 	struct kobject kobj;
 	struct class *class;
+
+	/*
+	 * This counts the number of children of the gluedir in
+	 * order to "cleanly" kobject_del() it when it becomes
+	 * empty. It is protected by the gdb_mutex
+	 */
+	unsigned int child_count;
 };
 
 #define to_class_dir(obj) container_of(obj, struct class_dir, kobj)
@@ -1470,6 +1477,7 @@ class_dir_create_and_add(struct class *class, struct kobject *parent_kobj)
 		return NULL;
 
 	dir->class = class;
+	dir->child_count = 1;
 	kobject_init(&dir->kobj, &class_dir_ktype);
 
 	dir->kobj.kset = &class->p->glue_dirs;
@@ -1526,6 +1534,8 @@ static struct kobject *get_device_parent(struct device *dev,
 		}
 		spin_unlock(&dev->class->p->glue_dirs.list_lock);
 		if (kobj) {
+			struct class_dir *class_dir = to_class_dir(kobj);
+			class_dir->child_count++;
 			mutex_unlock(&gdp_mutex);
 			return kobj;
 		}
@@ -1567,11 +1577,18 @@ static inline struct kobject *get_glue_dir(struct device *dev)
  */
 static void cleanup_glue_dir(struct device *dev, struct kobject *glue_dir)
 {
+	struct class_dir *class_dir = to_class_dir(glue_dir);
+
 	/* see if we live in a "glue" directory */
 	if (!live_in_glue_dir(glue_dir, dev))
 		return;
 
 	mutex_lock(&gdp_mutex);
+	if (WARN_ON(class_dir->child_count == 0))
+		goto bail;
+	if (--class_dir->child_count == 0)
+		kobject_del(glue_dir);
+ bail:
 	kobject_put(glue_dir);
 	mutex_unlock(&gdp_mutex);
 }
