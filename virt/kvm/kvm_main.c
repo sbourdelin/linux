@@ -218,7 +218,7 @@ bool kvm_make_vcpus_request_mask(struct kvm *kvm, unsigned int req,
 	me = get_cpu();
 
 	kvm_for_each_vcpu(i, vcpu, kvm) {
-		if (vcpu_bitmap && !test_bit(i, vcpu_bitmap))
+		if (vcpu_bitmap && !test_bit(vcpu->vcpu_id, vcpu_bitmap))
 			continue;
 
 		kvm_make_request(req, vcpu);
