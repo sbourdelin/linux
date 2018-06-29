@@ -473,7 +473,7 @@ void i915_unreserve_fence(struct drm_i915_fence_reg *fence)
 }
 
 /**
- * i915_gem_revoke_fences - revoke fence state
+ * __i915_gem_revoke_fences - revoke fence state
  * @i915: i915 device private
  *
  * Removes all GTT mmappings via the fence registers. This forces any user
@@ -482,12 +482,13 @@ void i915_unreserve_fence(struct drm_i915_fence_reg *fence)
  * revoke concurrent userspace access via GTT mmaps until the hardware has been
  * reset and the fence registers have been restored.
  */
-void i915_gem_revoke_fences(struct drm_i915_private *i915)
+void __i915_gem_revoke_fences(struct drm_i915_private *i915)
 {
 	struct i915_ggtt *ggtt = &i915->ggtt;
 	int i;
 
-	mutex_lock(&ggtt->vm.mutex);
+	lockdep_assert_held(&ggtt->vm.mutex);
+
 	for (i = 0; i < ggtt->num_fence_regs; i++) {
 		struct drm_i915_fence_reg *fence = &ggtt->fence_regs[i];
 
@@ -496,23 +497,15 @@ void i915_gem_revoke_fences(struct drm_i915_private *i915)
 		if (fence->vma)
 			i915_vma_revoke_mmap(fence->vma);
 	}
-	mutex_unlock(&ggtt->vm.mutex);
 }
 
-/**
- * i915_gem_restore_fences - restore fence state
- * @i915: i915 device private
- *
- * Restore the hw fence state to match the software tracking again, to be called
- * after a gpu reset and on resume. Note that on runtime suspend we only cancel
- * the fences, to be reacquired by the user later.
- */
-void i915_gem_restore_fences(struct drm_i915_private *i915)
+void __i915_gem_restore_fences(struct drm_i915_private *i915)
 {
 	struct i915_ggtt *ggtt = &i915->ggtt;
 	int i;
 
-	mutex_lock(&ggtt->vm.mutex);
+	lockdep_assert_held(&ggtt->vm.mutex);
+
 	for (i = 0; i < ggtt->num_fence_regs; i++) {
 		struct drm_i915_fence_reg *reg = &ggtt->fence_regs[i];
 		struct i915_vma *vma = reg->vma;
@@ -535,6 +528,24 @@ void i915_gem_restore_fences(struct drm_i915_private *i915)
 		fence_write(reg, vma);
 		reg->vma = vma;
 	}
+}
+
+/**
+ * i915_gem_restore_fences - restore fence state
+ * @i915: i915 device private
+ *
+ * Restore the hw fence state to match the software tracking again, to be called
+ * after a gpu reset and on resume. Note that on runtime suspend we only cancel
+ * the fences, to be reacquired by the user later.
+ */
+void i915_gem_restore_fences(struct drm_i915_private *i915)
+{
+	struct i915_ggtt *ggtt = &i915->ggtt;
+
+	mutex_lock(&ggtt->vm.mutex);
+
+	__i915_gem_restore_fences(i915);
+
 	mutex_unlock(&ggtt->vm.mutex);
 }
 

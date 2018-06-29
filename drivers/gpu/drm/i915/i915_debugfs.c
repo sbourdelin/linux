@@ -1319,8 +1319,6 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 		seq_puts(m, "Wedged\n");
 	if (test_bit(I915_RESET_BACKOFF, &dev_priv->gpu_error.flags))
 		seq_puts(m, "Reset in progress: struct_mutex backoff\n");
-	if (test_bit(I915_RESET_HANDOFF, &dev_priv->gpu_error.flags))
-		seq_puts(m, "Reset in progress: reset handoff to waiter\n");
 	if (waitqueue_active(&dev_priv->gpu_error.wait_queue))
 		seq_puts(m, "Waiter holding struct mutex\n");
 	if (waitqueue_active(&dev_priv->gpu_error.reset_queue))
@@ -4058,11 +4056,6 @@ i915_wedged_set(void *data, u64 val)
 
 	i915_handle_error(i915, val, I915_ERROR_CAPTURE,
 			  "Manually set wedged engine mask = %llx", val);
-
-	wait_on_bit(&i915->gpu_error.flags,
-		    I915_RESET_HANDOFF,
-		    TASK_UNINTERRUPTIBLE);
-
 	return 0;
 }
 

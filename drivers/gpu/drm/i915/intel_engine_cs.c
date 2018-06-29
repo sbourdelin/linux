@@ -1087,10 +1087,8 @@ void intel_engines_sanitize(struct drm_i915_private *i915)
 
 	GEM_TRACE("\n");
 
-	for_each_engine(engine, i915, id) {
-		if (engine->reset.reset)
-			engine->reset.reset(engine, NULL);
-	}
+	for_each_engine(engine, i915, id)
+		intel_engine_reset(engine, false);
 }
 
 /**
