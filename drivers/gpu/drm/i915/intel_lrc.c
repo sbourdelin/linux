@@ -518,11 +518,7 @@ static bool can_merge_ctx(const struct intel_context *prev,
 static void port_assign(struct execlist_port *port, struct i915_request *rq)
 {
 	GEM_BUG_ON(rq == port_request(port));
-
-	if (port_isset(port))
-		i915_request_put(port_request(port));
-
-	port_set(port, port_pack(i915_request_get(rq), port_count(port)));
+	port_set(port, port_pack(rq, port_count(port)));
 }
 
 static void inject_preempt_context(struct intel_engine_cs *engine)
@@ -792,8 +788,6 @@ execlists_cancel_port_requests(struct intel_engine_execlists * const execlists)
 					       i915_request_completed(rq) ?
 					       INTEL_CONTEXT_SCHEDULE_OUT :
 					       INTEL_CONTEXT_SCHEDULE_PREEMPTED);
-
-		i915_request_put(rq);
 
 		memset(port, 0, sizeof(*port));
 		port++;
@@ -1089,8 +1083,6 @@ static void process_csb(struct intel_engine_cs *engine)
 
 			execlists_context_schedule_out(rq,
 						       INTEL_CONTEXT_SCHEDULE_OUT);
-			i915_request_put(rq);
-
 			GEM_TRACE("%s completed ctx=%d\n",
 				  engine->name, port->context_id);
 

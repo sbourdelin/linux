@@ -347,17 +347,15 @@ static void free_capture_list(struct i915_request *request)
 static void __retire_engine_upto(struct intel_engine_cs *engine,
 				 struct i915_request *rq)
 {
+	struct list_head * const requests = &engine->timeline.requests;
 	struct i915_request *tmp;
 
 	if (list_empty(&rq->link))
 		return;
 
-	do {
-		tmp = list_first_entry(&engine->timeline.requests,
-				       typeof(*tmp), link);
-
-		intel_engine_retire_request(engine, tmp);
-	} while (tmp != rq);
+	do
+		tmp = list_first_entry(requests, typeof(*tmp), link);
+	while (intel_engine_retire_request(engine, tmp) && tmp != rq);
 }
 
 static void i915_request_retire(struct i915_request *request)
@@ -375,6 +373,8 @@ static void i915_request_retire(struct i915_request *request)
 	GEM_BUG_ON(!i915_request_completed(request));
 
 	trace_i915_request_retire(request);
+
+	__retire_engine_upto(request->engine, request);
 
 	advance_ring(request);
 	free_capture_list(request);
@@ -413,8 +413,6 @@ static void i915_request_retire(struct i915_request *request)
 	/* Retirement decays the ban score as it is a sign of ctx progress */
 	atomic_dec_if_positive(&request->gem_context->ban_score);
 	intel_context_unpin(request->hw_context);
-
-	__retire_engine_upto(request->engine, request);
 
 	unreserve_gt(request->i915);
 
@@ -722,8 +720,10 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 		       rq->timeline->fence_context,
 		       timeline_get_seqno(rq->timeline));
 
-	/* We bump the ref for the fence chain */
-	i915_sw_fence_init(&i915_request_get(rq)->submit, submit_notify);
+	/* We bump the ref for the fence chain and for the submit backend. */
+	refcount_set(&rq->fence.refcount.refcount, 3);
+
+	i915_sw_fence_init(&rq->submit, submit_notify);
 	init_waitqueue_head(&rq->execute);
 
 	i915_sched_node_init(&rq->sched);

@@ -650,7 +650,7 @@ static bool engine_has_kernel_context_barrier(struct intel_engine_cs *engine)
 		return true;
 
 	/* The engine is idle; check that it is idling in the kernel context. */
-	return engine->last_retired_context == ce;
+	return intel_engine_has_kernel_context(engine);
 }
 
 int i915_gem_switch_to_kernel_context(struct drm_i915_private *i915)

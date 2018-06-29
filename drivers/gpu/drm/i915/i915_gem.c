@@ -3789,15 +3789,42 @@ static int wait_for_timeline(struct i915_timeline *tl, unsigned int flags)
 
 static int wait_for_engines(struct drm_i915_private *i915)
 {
-	if (wait_for(intel_engines_are_idle(i915), I915_IDLE_ENGINES_TIMEOUT)) {
-		dev_err(i915->drm.dev,
-			"Failed to idle engines, declaring wedged!\n");
-		GEM_TRACE_DUMP();
-		i915_gem_set_wedged(i915);
-		return -EIO;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	for_each_engine(engine, i915, id) {
+		struct i915_request *rq, *rn;
+
+		if (wait_for(intel_engine_is_idle(engine),
+			     I915_IDLE_ENGINES_TIMEOUT)) {
+			dev_err(i915->drm.dev,
+				"Failed to idle %s engine, declaring wedged!\n",
+				engine->name);
+			goto set_wedged;
+		}
+
+		/*
+		 * Now that we know the engine is definitely idle; explicitly
+		 * retire all residual requests as they may have been skipped
+		 * by earlier calls to i915_retire_requests().
+		 */
+		list_for_each_entry_safe(rq, rn,
+					 &engine->timeline.requests, link) {
+			if (!intel_engine_retire_request(engine, rq)) {
+				dev_err(i915->drm.dev,
+					"Failed to retire %s engine, declaring wedged!\n",
+					engine->name);
+				goto set_wedged;
+			}
+		}
 	}
 
 	return 0;
+
+set_wedged:
+	GEM_TRACE_DUMP();
+	i915_gem_set_wedged(i915);
+	return -EIO;
 }
 
 int i915_gem_wait_for_idle(struct drm_i915_private *i915, unsigned int flags)

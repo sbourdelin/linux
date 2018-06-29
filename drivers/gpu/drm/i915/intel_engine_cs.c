@@ -1038,11 +1038,11 @@ bool intel_engines_are_idle(struct drm_i915_private *dev_priv)
  * executed if the engine is already idle, is the kernel context
  * (#i915.kernel_context).
  */
-bool intel_engine_has_kernel_context(const struct intel_engine_cs *engine)
+bool intel_engine_has_kernel_context(struct intel_engine_cs *engine)
 {
 	const struct intel_context *kernel_context =
 		to_intel_context(engine->i915->kernel_context, engine);
-	struct i915_request *rq;
+	const struct intel_context *last;
 
 	lockdep_assert_held(&engine->i915->drm.struct_mutex);
 
@@ -1051,11 +1051,15 @@ bool intel_engine_has_kernel_context(const struct intel_engine_cs *engine)
 	 * the last request that remains in the timeline. When idle, it is
 	 * the last executed context as tracked by retirement.
 	 */
-	rq = __i915_gem_active_peek(&engine->timeline.last_request);
-	if (rq)
-		return rq->hw_context == kernel_context;
-	else
-		return engine->last_retired_context == kernel_context;
+	last = engine->last_retired_context;
+
+	spin_lock_irq(&engine->timeline.lock);
+	if (!list_empty(&engine->timeline.requests))
+		last = list_last_entry(&engine->timeline.requests,
+				       struct i915_request, link)->hw_context;
+	spin_unlock_irq(&engine->timeline.lock);
+
+	return last == kernel_context;
 }
 
 void intel_engines_reset_default_submission(struct drm_i915_private *i915)
@@ -1096,19 +1100,24 @@ void intel_engines_sanitize(struct drm_i915_private *i915)
  *
  * This request has been completed and is part of the chain being retired by
  * the caller, so drop any reference to it from the engine.
+ *
+ * Returns: true if the reference was dropped, false if it was still busy.
  */
-void intel_engine_retire_request(struct intel_engine_cs *engine,
+bool intel_engine_retire_request(struct intel_engine_cs *engine,
 				 struct i915_request *rq)
 {
-	GEM_TRACE("%s(%s) fence %llx:%d, global=%d, current %d\n",
-		  __func__, engine->name,
-		  rq->fence.context, rq->fence.seqno,
-		  rq->global_seqno,
-		  intel_engine_get_seqno(engine));
+	GEM_TRACE("%s: fence %llx:%d, global=%d, current %d, active?=%s\n",
+		  engine->name, rq->fence.context, rq->fence.seqno,
+		  rq->global_seqno, intel_engine_get_seqno(engine),
+		  yesno(port_request(engine->execlists.port) == rq));
 
 	lockdep_assert_held(&engine->i915->drm.struct_mutex);
 	GEM_BUG_ON(rq->engine != engine);
 	GEM_BUG_ON(!i915_request_completed(rq));
+
+	/* Don't drop the final ref until after the backend has finished */
+	if (port_request(engine->execlists.port) == rq)
+		return false;
 
 	local_irq_disable();
 
@@ -1141,6 +1150,19 @@ void intel_engine_retire_request(struct intel_engine_cs *engine,
 	if (engine->last_retired_context)
 		intel_context_unpin(engine->last_retired_context);
 	engine->last_retired_context = rq->hw_context;
+
+	i915_request_put(rq);
+	return true;
+}
+
+static void engine_retire_requests(struct intel_engine_cs *engine)
+{
+	struct i915_request *rq, *next;
+
+	list_for_each_entry_safe(rq, next, &engine->timeline.requests, link) {
+		if (WARN_ON(!intel_engine_retire_request(engine, rq)))
+			break;
+	}
 }
 
 /**
@@ -1173,6 +1195,7 @@ void intel_engines_park(struct drm_i915_private *i915)
 				"%s is not idle before parking\n",
 				engine->name);
 			intel_engine_dump(engine, &p, NULL);
+			engine->cancel_requests(engine);
 		}
 
 		/* Must be reset upon idling, or we may miss the busy wakeup. */
@@ -1180,6 +1203,8 @@ void intel_engines_park(struct drm_i915_private *i915)
 
 		if (engine->park)
 			engine->park(engine);
+
+		engine_retire_requests(engine);
 
 		if (engine->pinned_default_state) {
 			i915_gem_object_unpin_map(engine->default_state);

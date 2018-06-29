@@ -900,7 +900,7 @@ int intel_init_bsd_ring_buffer(struct intel_engine_cs *engine);
 int intel_init_blt_ring_buffer(struct intel_engine_cs *engine);
 int intel_init_vebox_ring_buffer(struct intel_engine_cs *engine);
 
-void intel_engine_retire_request(struct intel_engine_cs *engine,
+bool intel_engine_retire_request(struct intel_engine_cs *engine,
 				 struct i915_request *rq);
 int intel_engine_stop_cs(struct intel_engine_cs *engine);
 
@@ -1077,7 +1077,7 @@ void intel_engines_sanitize(struct drm_i915_private *i915);
 bool intel_engine_is_idle(struct intel_engine_cs *engine);
 bool intel_engines_are_idle(struct drm_i915_private *dev_priv);
 
-bool intel_engine_has_kernel_context(const struct intel_engine_cs *engine);
+bool intel_engine_has_kernel_context(struct intel_engine_cs *engine);
 void intel_engine_lost_context(struct intel_engine_cs *engine);
 
 void intel_engines_park(struct drm_i915_private *i915);
