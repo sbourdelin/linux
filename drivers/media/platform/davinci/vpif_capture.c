@@ -1553,7 +1553,7 @@ vpif_capture_get_pdata(struct platform_device *pdev)
 					    sizeof(*chan->inputs),
 					    GFP_KERNEL);
 		if (!chan->inputs)
-			return NULL;
+			goto err_cleanup;
 
 		chan->input_count++;
 		chan->inputs[i].input.type = V4L2_INPUT_TYPE_CAMERA;
@@ -1587,28 +1587,30 @@ vpif_capture_get_pdata(struct platform_device *pdev)
 			rem->name, rem);
 		sdinfo->name = rem->full_name;
 
-		pdata->asd[i] = devm_kzalloc(&pdev->dev,
-					     sizeof(struct v4l2_async_subdev),
-					     GFP_KERNEL);
-		if (!pdata->asd[i]) {
+		pdata->asd[i] = v4l2_async_notifier_add_fwnode_subdev(
+			&vpif_obj.notifier, of_fwnode_handle(rem),
+			sizeof(struct v4l2_async_subdev));
+		if (IS_ERR(pdata->asd[i])) {
 			of_node_put(rem);
-			pdata = NULL;
-			goto done;
+			goto err_cleanup;
 		}
 
-		pdata->asd[i]->match_type = V4L2_ASYNC_MATCH_FWNODE;
-		pdata->asd[i]->match.fwnode = of_fwnode_handle(rem);
-		of_node_put(rem);
+		of_node_put(endpoint);
 	}
 
 done:
-	if (pdata) {
-		pdata->asd_sizes[0] = i;
-		pdata->subdev_count = i;
-		pdata->card_name = "DA850/OMAP-L138 Video Capture";
-	}
+	of_node_put(endpoint);
+	pdata->asd_sizes[0] = i;
+	pdata->subdev_count = i;
+	pdata->card_name = "DA850/OMAP-L138 Video Capture";
 
 	return pdata;
+
+err_cleanup:
+	v4l2_async_notifier_cleanup(&vpif_obj.notifier);
+	of_node_put(endpoint);
+
+	return NULL;
 }
 
 /**
@@ -1633,23 +1635,18 @@ static __init int vpif_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (!pdev->dev.platform_data) {
-		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
-		return -EINVAL;
-	}
-
 	vpif_dev = &pdev->dev;
 
 	err = initialize_vpif();
 	if (err) {
 		v4l2_err(vpif_dev->driver, "Error initializing vpif\n");
-		return err;
+		goto cleanup;
 	}
 
 	err = v4l2_device_register(vpif_dev, &vpif_obj.v4l2_dev);
 	if (err) {
 		v4l2_err(vpif_dev->driver, "Error registering v4l2 device\n");
-		return err;
+		goto cleanup;
 	}
 
 	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, res_idx))) {
@@ -1698,8 +1695,6 @@ static __init int vpif_probe(struct platform_device *pdev)
 		}
 		vpif_probe_complete();
 	} else {
-		vpif_obj.notifier.subdevs = vpif_obj.config->asd;
-		vpif_obj.notifier.num_subdevs = vpif_obj.config->asd_sizes[0];
 		vpif_obj.notifier.ops = &vpif_async_ops;
 		err = v4l2_async_notifier_register(&vpif_obj.v4l2_dev,
 						   &vpif_obj.notifier);
@@ -1717,6 +1712,8 @@ probe_subdev_out:
 	kfree(vpif_obj.sd);
 vpif_unregister:
 	v4l2_device_unregister(&vpif_obj.v4l2_dev);
+cleanup:
+	v4l2_async_notifier_cleanup(&vpif_obj.notifier);
 
 	return err;
 }
@@ -1732,6 +1729,8 @@ static int vpif_remove(struct platform_device *device)
 	struct channel_obj *ch;
 	int i;
 
+	v4l2_async_notifier_unregister(&vpif_obj.notifier);
+	v4l2_async_notifier_cleanup(&vpif_obj.notifier);
 	v4l2_device_unregister(&vpif_obj.v4l2_dev);
 
 	kfree(vpif_obj.sd);

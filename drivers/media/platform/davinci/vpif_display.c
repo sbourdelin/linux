@@ -1255,11 +1255,6 @@ static __init int vpif_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (!pdev->dev.platform_data) {
-		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
-		return -EINVAL;
-	}
-
 	vpif_dev = &pdev->dev;
 	err = initialize_vpif();
 
@@ -1316,20 +1311,27 @@ static __init int vpif_probe(struct platform_device *pdev)
 		}
 		vpif_probe_complete();
 	} else {
-		vpif_obj.notifier.subdevs = vpif_obj.config->asd;
-		vpif_obj.notifier.num_subdevs = vpif_obj.config->asd_sizes[0];
+		for (i = 0; i < vpif_obj.config->asd_sizes[0]; i++) {
+			err = v4l2_async_notifier_add_subdev(
+				&vpif_obj.notifier, vpif_obj.config->asd[i]);
+			if (err)
+				goto probe_cleanup;
+		}
+
 		vpif_obj.notifier.ops = &vpif_async_ops;
 		err = v4l2_async_notifier_register(&vpif_obj.v4l2_dev,
 						   &vpif_obj.notifier);
 		if (err) {
 			vpif_err("Error registering async notifier\n");
 			err = -EINVAL;
-			goto probe_subdev_out;
+			goto probe_cleanup;
 		}
 	}
 
 	return 0;
 
+probe_cleanup:
+	v4l2_async_notifier_cleanup(&vpif_obj.notifier);
 probe_subdev_out:
 	kfree(vpif_obj.sd);
 vpif_unregister:
@@ -1345,6 +1347,11 @@ static int vpif_remove(struct platform_device *device)
 {
 	struct channel_obj *ch;
 	int i;
+
+	if (vpif_obj.config->asd_sizes) {
+		v4l2_async_notifier_unregister(&vpif_obj.notifier);
+		v4l2_async_notifier_cleanup(&vpif_obj.notifier);
+	}
 
 	v4l2_device_unregister(&vpif_obj.v4l2_dev);
 
