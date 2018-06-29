@@ -6689,6 +6689,27 @@ static void kvm_pv_kick_cpu_op(struct kvm *kvm, unsigned long flags, int apicid)
 	kvm_irq_delivery_to_apic(kvm, NULL, &lapic_irq, NULL);
 }
 
+static void kvm_pv_send_ipi(struct kvm *kvm, unsigned long ipi_bitmap, u8 vector)
+{
+	struct kvm_apic_map *map;
+	struct kvm_vcpu *vcpu;
+	struct kvm_lapic_irq lapic_irq = {0};
+	int i;
+
+	lapic_irq.delivery_mode = APIC_DM_FIXED;
+	lapic_irq.vector = vector;
+
+	rcu_read_lock();
+	map = rcu_dereference(kvm->arch.apic_map);
+
+	for_each_set_bit(i, &ipi_bitmap, sizeof(unsigned long)) {
+		vcpu = map->phys_map[i]->vcpu;
+		kvm_apic_set_irq(vcpu, &lapic_irq, NULL);
+	}
+
+	rcu_read_unlock();
+}
+
 void kvm_vcpu_deactivate_apicv(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.apicv_active = false;
@@ -6738,6 +6759,10 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_pv_clock_pairing(vcpu, a0, a1);
 		break;
 #endif
+	case KVM_HC_SEND_IPI:
+		kvm_pv_send_ipi(vcpu->kvm, a0, a1);
+		ret = 0;
+		break;
 	default:
 		ret = -KVM_ENOSYS;
 		break;
