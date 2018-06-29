@@ -1,0 +1,46 @@
+# drm/msm GPU crash dump format
+#
+# This is a description of the format of the drm/msm GPU crash dump format that
+# can be read from /sys/kernel/dri/X/show or from devcoredump following a GPU
+# hang or fault
+
+---
+kernel:		# [string] The kernel version as printed by UTS_RELEASE
+module:		# [string] The module that generated the crash dump
+time:		# [seconds.microseconds] The kernel time at crash
+comm:		# [string] comm string for the binary that generated the fault
+		# (if known)
+cmdline:	# [string] the cmdline for the binary that generated the fault
+		# (if known)
+revision:	# [ id core.major.minor.patchlevel] The GPU id followed by the
+		# individual components of the id separated by dots
+rbbm-status:	# [hex] The current value of RBBM_STATUS which shows what GPU
+		# components were in use at the time of the crash
+ringbuffer:	# Ringbuffer data. There will be a sequence for each ringbuffer
+  -id:			# [decimal] Ringbuffer identifier (0 based index)
+   last-fence:		# [decimal] The last fence issued on the ring
+   retired-fence:	# [decimal] THe last fence retired on the ring
+   rptr:		# [decimal] The current read pointer (rptr) for the ring
+   wptr:		# [decimal] The current write pointer (wptr) for the
+			# ring
+   size:		# [decimal] The maximum size of the ring programmed in
+			# the hardware
+   data:		# [ascii85] The contents of the ring encoded as ascii85.
+			# Only the unused portions of the ring will be printed
+			# (up to a maximum of 'size' bytes)
+bos:		# List of buffers from the hanging submission (if known)
+  -iova:		# [hex] GPU address of the buffer
+   size:		# [decimal] Size of the buffer (in bytes)
+   data:		# [ascii85] The contents of the buffer encoded as
+			# ascii85. Only the contents of buffers marked as
+			# readable are dumped. Trailing zeros at the end of the
+			# buffer won't be dumped.
+registers:	# Sets of register values. This section can be used multiple
+		# times for different ranges of registers. Each register will be
+		# on its own line.
+  - [offset, value]	# offset: [hex] byte offset of the register
+			# value: [hex] value of the register
+
+registers-hlsq: # (5xx only) Same format as registers. Register data that
+		# only accessible from the HLSQ aperture captured by the
+		# HW based crashdumper
