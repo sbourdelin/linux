@@ -4,6 +4,8 @@
  * Copyright © 2018 Intel Corporation
  */
 
+#include <linux/prime_numbers.h>
+
 #include "../i915_selftest.h"
 #include "igt_flush_test.h"
 
@@ -453,12 +455,187 @@ err_wedged:
 	goto err_ctx_lo;
 }
 
+struct live_test {
+	struct drm_i915_private *i915;
+	const char *func;
+	const char *name;
+
+	unsigned int reset_count;
+	bool wedge;
+};
+
+static int begin_live_test(struct live_test *t,
+			   struct drm_i915_private *i915,
+			   const char *func,
+			   const char *name)
+{
+	t->i915 = i915;
+	t->func = func;
+	t->name = name;
+
+	if (igt_flush_test(i915, I915_WAIT_LOCKED))
+		return -EIO;
+
+	i915->gpu_error.missed_irq_rings = 0;
+	t->reset_count = i915_reset_count(&i915->gpu_error);
+
+	return 0;
+}
+
+static int end_live_test(struct live_test *t)
+{
+	struct drm_i915_private *i915 = t->i915;
+
+	if (igt_flush_test(i915, I915_WAIT_LOCKED))
+		return -EIO;
+
+	if (t->reset_count != i915_reset_count(&i915->gpu_error)) {
+		pr_err("%s(%s): GPU was reset %d times!\n",
+		       t->func, t->name,
+		       i915_reset_count(&i915->gpu_error) - t->reset_count);
+		return -EIO;
+	}
+
+	if (i915->gpu_error.missed_irq_rings) {
+		pr_err("%s(%s): Missed interrupts on engines %lx\n",
+		       t->func, t->name, i915->gpu_error.missed_irq_rings);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int nop_virtual_engine(struct drm_i915_private *i915,
+			      struct intel_engine_cs **siblings,
+			      unsigned int nsibling,
+			      unsigned int nctx)
+{
+	IGT_TIMEOUT(end_time);
+	struct i915_request *request[16];
+	struct i915_gem_context *ctx[16];
+	struct intel_engine_cs *ve[16];
+	unsigned long n, prime, nc;
+	ktime_t times[2] = {};
+	struct live_test t;
+	int err;
+
+	GEM_BUG_ON(!nctx || nctx > ARRAY_SIZE(ctx));
+
+	for (n = 0; n < nctx; n++) {
+		ctx[n] = kernel_context(i915);
+		if (!ctx[n])
+			return -ENOMEM;
+
+		ve[n] = intel_execlists_create_virtual(ctx[n],
+						       siblings, nsibling);
+		if (IS_ERR(ve[n]))
+			return PTR_ERR(ve[n]);
+	}
+
+	err = begin_live_test(&t, i915, __func__, ve[0]->name);
+	if (err)
+		goto out;
+
+	for_each_prime_number_from(prime, 1, 8192) {
+		times[1] = ktime_get_raw();
+
+		for (nc = 0; nc < nctx; nc++) {
+			for (n = 0; n < prime; n++) {
+				request[nc] =
+					i915_request_alloc(ve[nc], ctx[nc]);
+				if (IS_ERR(request[nc])) {
+					err = PTR_ERR(request[nc]);
+					goto out;
+				}
+
+				i915_request_add(request[nc]);
+			}
+		}
+
+		for (nc = 0; nc < nctx; nc++)
+			i915_request_wait(request[nc],
+					  I915_WAIT_LOCKED,
+					  MAX_SCHEDULE_TIMEOUT);
+
+		times[1] = ktime_sub(ktime_get_raw(), times[1]);
+		if (prime == 1)
+			times[0] = times[1];
+
+		if (__igt_timeout(end_time, NULL))
+			break;
+	}
+
+	err = end_live_test(&t);
+	if (err)
+		goto out;
+
+	pr_info("Requestx%d latencies on %s: 1 = %lluns, %lu = %lluns\n",
+		nctx, ve[0]->name, ktime_to_ns(times[0]),
+		prime, div64_u64(ktime_to_ns(times[1]), prime));
+
+out:
+	if (igt_flush_test(i915, I915_WAIT_LOCKED))
+		err = -EIO;
+
+	for (nc = 0; nc < nctx; nc++) {
+		intel_virtual_engine_put(ve[nc]);
+		kernel_context_close(ctx[nc]);
+	}
+	return err;
+}
+
+static int live_virtual_engine(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct intel_engine_cs *siblings[MAX_ENGINE_INSTANCE + 1];
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	unsigned int class, inst;
+	int err = -ENODEV;
+
+	mutex_lock(&i915->drm.struct_mutex);
+
+	for_each_engine(engine, i915, id) {
+		err = nop_virtual_engine(i915, &engine, 1, 1);
+		if (err) {
+			pr_err("Failed to wrap engine %s: err=%d\n",
+			       engine->name, err);
+			goto out_unlock;
+		}
+	}
+
+	for (class = 0; class <= MAX_ENGINE_CLASS; class++) {
+		int nsibling, n;
+
+		nsibling = 0;
+		for (inst = 0; inst <= MAX_ENGINE_INSTANCE; inst++) {
+			if (!i915->engine_class[class][inst])
+				break;
+
+			siblings[nsibling++] = i915->engine_class[class][inst];
+		}
+		if (nsibling < 2)
+			continue;
+
+		for (n = 1; n <= nsibling + 1; n++) {
+			err = nop_virtual_engine(i915, siblings, nsibling, n);
+			if (err)
+				goto out_unlock;
+		}
+	}
+
+out_unlock:
+	mutex_unlock(&i915->drm.struct_mutex);
+	return err;
+}
+
 int intel_execlists_live_selftests(struct drm_i915_private *i915)
 {
 	static const struct i915_subtest tests[] = {
 		SUBTEST(live_sanitycheck),
 		SUBTEST(live_preempt),
 		SUBTEST(live_late_preempt),
+		SUBTEST(live_virtual_engine),
 	};
 
 	if (!HAS_EXECLISTS(i915))

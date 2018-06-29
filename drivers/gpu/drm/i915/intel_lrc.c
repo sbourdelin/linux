@@ -164,6 +164,29 @@
 #define WA_TAIL_DWORDS 2
 #define WA_TAIL_BYTES (sizeof(u32) * WA_TAIL_DWORDS)
 
+struct virtual_engine {
+	struct intel_engine_cs base;
+
+	struct intel_context context;
+	struct kref kref;
+
+	struct intel_engine_cs *bound;
+
+	struct i915_request *request;
+	struct ve_node {
+		struct rb_node node;
+		int prio;
+	} nodes[I915_NUM_ENGINES];
+
+	unsigned int count;
+	struct intel_engine_cs *siblings[0];
+};
+
+static struct virtual_engine *to_virtual_engine(struct intel_engine_cs *engine)
+{
+	return container_of(engine, struct virtual_engine, base);
+}
+
 static int execlists_context_deferred_alloc(struct i915_gem_context *ctx,
 					    struct intel_engine_cs *engine,
 					    struct intel_context *ce);
@@ -372,19 +395,26 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 	list_for_each_entry_safe_reverse(rq, rn,
 					 &engine->timeline.requests,
 					 link) {
+		struct intel_engine_cs *owner;
+
 		if (i915_request_completed(rq))
 			return;
 
 		__i915_request_unsubmit(rq);
 		unwind_wa_tail(rq);
 
-		GEM_BUG_ON(rq_prio(rq) == I915_PRIORITY_INVALID);
-		if (rq_prio(rq) != last_prio) {
-			last_prio = rq_prio(rq);
-			pl = lookup_priolist(engine, last_prio);
-		}
+		owner = rq->hw_context->owner;
+		if (likely(owner == engine)) {
+			GEM_BUG_ON(rq_prio(rq) == I915_PRIORITY_INVALID);
+			if (rq_prio(rq) != last_prio) {
+				last_prio = rq_prio(rq);
+				pl = lookup_priolist(engine, last_prio);
+			}
 
-		list_add(&rq->sched.link, pl);
+			list_add(&rq->sched.link, pl);
+		} else {
+			owner->submit_request(rq);
+		}
 	}
 }
 
@@ -613,6 +643,50 @@ static void complete_preempt_context(struct intel_engine_execlists *execlists)
 	execlists_clear_active(execlists, EXECLISTS_ACTIVE_PREEMPT);
 }
 
+static void virtual_update_register_offsets(u32 *regs,
+					    struct intel_engine_cs *engine)
+{
+	u32 base = engine->mmio_base;
+
+	regs[CTX_CONTEXT_CONTROL] =
+		i915_mmio_reg_offset(RING_CONTEXT_CONTROL(engine));
+	regs[CTX_RING_HEAD] = i915_mmio_reg_offset(RING_HEAD(base));
+	regs[CTX_RING_TAIL] = i915_mmio_reg_offset(RING_TAIL(base));
+	regs[CTX_RING_BUFFER_START] = i915_mmio_reg_offset(RING_START(base));
+	regs[CTX_RING_BUFFER_CONTROL] = i915_mmio_reg_offset(RING_CTL(base));
+
+	regs[CTX_BB_HEAD_U] = i915_mmio_reg_offset(RING_BBADDR_UDW(base));
+	regs[CTX_BB_HEAD_L] = i915_mmio_reg_offset(RING_BBADDR(base));
+	regs[CTX_BB_STATE] = i915_mmio_reg_offset(RING_BBSTATE(base));
+	regs[CTX_SECOND_BB_HEAD_U] =
+		i915_mmio_reg_offset(RING_SBBADDR_UDW(base));
+	regs[CTX_SECOND_BB_HEAD_L] = i915_mmio_reg_offset(RING_SBBADDR(base));
+	regs[CTX_SECOND_BB_STATE] = i915_mmio_reg_offset(RING_SBBSTATE(base));
+
+	regs[CTX_CTX_TIMESTAMP] =
+		i915_mmio_reg_offset(RING_CTX_TIMESTAMP(base));
+	regs[CTX_PDP3_UDW] = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(engine, 3));
+	regs[CTX_PDP3_LDW] = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, 3));
+	regs[CTX_PDP2_UDW] = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(engine, 2));
+	regs[CTX_PDP2_LDW] = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, 2));
+	regs[CTX_PDP1_UDW] = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(engine, 1));
+	regs[CTX_PDP1_LDW] = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, 1));
+	regs[CTX_PDP0_UDW] = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(engine, 0));
+	regs[CTX_PDP0_LDW] = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, 0));
+
+	if (engine->class == RENDER_CLASS) {
+		regs[CTX_RCS_INDIRECT_CTX] =
+			i915_mmio_reg_offset(RING_INDIRECT_CTX(base));
+		regs[CTX_RCS_INDIRECT_CTX_OFFSET] =
+			i915_mmio_reg_offset(RING_INDIRECT_CTX_OFFSET(base));
+		regs[CTX_BB_PER_CTX_PTR] =
+			i915_mmio_reg_offset(RING_BB_PER_CTX_PTR(base));
+
+		regs[CTX_R_PWR_CLK_STATE] =
+			i915_mmio_reg_offset(GEN8_R_PWR_CLK_STATE);
+	}
+}
+
 static void execlists_dequeue(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
@@ -622,6 +696,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 	struct i915_request *last = port_request(port);
 	struct rb_node *rb;
 	bool submit = false;
+	int prio;
 
 	/*
 	 * Hardware submission is through 2 ports. Conceptually each port
@@ -645,6 +720,31 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 	 * and context switches) submission.
 	 */
 
+restart_virtual_engine:
+	prio = execlists->queue_priority;
+	for (rb = rb_first_cached(&execlists->virtual); rb; ) {
+		struct virtual_engine *ve =
+			rb_entry(rb, typeof(*ve), nodes[engine->id].node);
+		struct i915_request *rq = READ_ONCE(ve->request);
+		struct intel_engine_cs *active;
+
+		if (!rq) {
+			rb_erase_cached(rb, &execlists->virtual);
+			RB_CLEAR_NODE(rb);
+			rb = rb_first_cached(&execlists->virtual);
+			continue;
+		}
+
+		active = READ_ONCE(ve->context.active);
+		if (active && active != engine) {
+			rb = rb_next(rb);
+			continue;
+		}
+
+		prio = max(prio, rq_prio(rq));
+		break;
+	}
+
 	if (last) {
 		/*
 		 * Don't resubmit or switch until all outstanding
@@ -666,7 +766,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		if (!execlists_is_active(execlists, EXECLISTS_ACTIVE_HWACK))
 			return;
 
-		if (need_preempt(engine, last, execlists->queue_priority)) {
+		if (need_preempt(engine, last, prio)) {
 			inject_preempt_context(engine);
 			return;
 		}
@@ -704,6 +804,65 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		 * end of the request.
 		 */
 		last->tail = last->wa_tail;
+	}
+
+	if (rb) { /* XXX virtual is always taking precedence */
+		struct virtual_engine *ve =
+			rb_entry(rb, typeof(*ve), nodes[engine->id].node);
+		struct i915_request *rq;
+
+		spin_lock(&ve->base.timeline.lock);
+
+		rq = ve->request;
+		if (unlikely(!rq)) { /* lost the race to a sibling */
+			spin_unlock(&ve->base.timeline.lock);
+			goto restart_virtual_engine;
+		}
+
+		if (rq_prio(rq) >= prio) {
+			if (last && !can_merge_rq(rq, last)) {
+				spin_unlock(&ve->base.timeline.lock);
+				return;
+			}
+
+			GEM_BUG_ON(rq->engine != &ve->base);
+			GEM_BUG_ON(rq->hw_context != &ve->context);
+			rq->engine = engine;
+
+			if (engine != ve->bound) {
+				u32 *regs = ve->context.lrc_reg_state;
+				unsigned int n;
+
+				virtual_update_register_offsets(regs, engine);
+				ve->bound = engine;
+
+				/*
+				 * Move the bound engine to the top of the list
+				 * for future execution. We then kick this
+				 * tasklet first before checking others, so that
+				 * we preferentially reuse this set of bound
+				 * registers.
+				 */
+				for (n = 1; n < ve->count; n++) {
+					if (ve->siblings[n] == engine) {
+						swap(ve->siblings[n],
+						     ve->siblings[0]);
+						break;
+					}
+				}
+			}
+
+			__i915_request_submit(rq);
+			trace_i915_request_in(rq, port_index(port, execlists));
+			submit = true;
+			last = rq;
+
+			ve->request = NULL;
+			rb_erase_cached(rb, &execlists->virtual);
+			RB_CLEAR_NODE(rb);
+		}
+
+		spin_unlock(&ve->base.timeline.lock);
 	}
 
 	while ((rb = rb_first_cached(&execlists->queue))) {
@@ -2942,6 +3101,245 @@ void intel_lr_context_resume(struct drm_i915_private *dev_priv)
 			intel_ring_reset(ce->ring, 0);
 		}
 	}
+}
+
+static void virtual_engine_free(struct kref *kref)
+{
+	struct virtual_engine *ve = container_of(kref, typeof(*ve), kref);
+	unsigned int n;
+
+	GEM_BUG_ON(ve->request);
+	GEM_BUG_ON(ve->context.active);
+
+	for (n = 0; n < ve->count; n++) {
+		struct intel_engine_cs *sibling = ve->siblings[n];
+		struct rb_node *node = &ve->nodes[sibling->id].node;
+
+		if (RB_EMPTY_NODE(node))
+			continue;
+
+		spin_lock_irq(&sibling->timeline.lock);
+
+		if (!RB_EMPTY_NODE(node))
+			rb_erase_cached(node, &sibling->execlists.virtual);
+
+		spin_unlock_irq(&sibling->timeline.lock);
+
+		tasklet_kill(&ve->siblings[n]->execlists.tasklet);
+	}
+	GEM_BUG_ON(__tasklet_is_scheduled(&ve->base.execlists.tasklet));
+
+	if (ve->context.state)
+		execlists_context_destroy(&ve->context);
+
+	intel_engine_cleanup_scratch(&ve->base);
+	i915_timeline_fini(&ve->base.timeline);
+	kfree(ve);
+}
+
+static void virtual_context_unpin(struct intel_context *ce)
+{
+	struct virtual_engine *ve = container_of(ce, typeof(*ve), context);
+
+	execlists_context_unpin(ce);
+
+	kref_put(&ve->kref, virtual_engine_free);
+}
+
+static const struct intel_context_ops virtual_context_ops = {
+	.unpin = virtual_context_unpin,
+};
+
+static struct intel_context *
+virtual_context_pin(struct intel_engine_cs *engine,
+		    struct i915_gem_context *ctx)
+{
+	struct virtual_engine *ve = to_virtual_engine(engine);
+	struct intel_context *ce = &ve->context;
+
+	lockdep_assert_held(&ctx->i915->drm.struct_mutex);
+
+	if (likely(ce->pin_count++))
+		return ce;
+	GEM_BUG_ON(!ce->pin_count); /* no overflow please! */
+
+	kref_get(&ve->kref);
+	ce->ops = &virtual_context_ops;
+
+	if (!ve->bound)
+		ve->bound = ve->siblings[0];
+
+	return __execlists_context_pin(ve->bound, ctx, ce);
+}
+
+static void virtual_submission_tasklet(unsigned long data)
+{
+	struct virtual_engine * const ve = (struct virtual_engine *)data;
+	unsigned int n;
+	int prio;
+
+	local_irq_disable();
+
+	prio = I915_PRIORITY_INVALID;
+	spin_lock(&ve->base.timeline.lock);
+	if (ve->request)
+		prio = rq_prio(ve->request);
+	spin_unlock(&ve->base.timeline.lock);
+	if (prio == I915_PRIORITY_INVALID)
+		goto out;
+
+	for (n = 0; READ_ONCE(ve->request) && n < ve->count; n++) {
+		struct intel_engine_cs *sibling = ve->siblings[n];
+		struct rb_node * const node = &ve->nodes[sibling->id].node;
+		struct rb_node **parent, *rb;
+		bool first;
+
+		spin_lock(&sibling->timeline.lock);
+
+		if (!RB_EMPTY_NODE(node)) {
+			if (prio == ve->nodes[sibling->id].prio) {
+				first = rb_first_cached(&sibling->execlists.virtual) == node;
+				goto submit_engine;
+			}
+
+			rb_erase_cached(node, &sibling->execlists.virtual);
+		}
+
+		rb = NULL;
+		first = true;
+		parent = &sibling->execlists.virtual.rb_root.rb_node;
+		while (*parent) {
+			struct ve_node *other;
+
+			rb = *parent;
+			other = rb_entry(rb, typeof(*other), node);
+			if (prio > other->prio) {
+				parent = &rb->rb_left;
+			} else {
+				parent = &rb->rb_right;
+				first = false;
+			}
+		}
+
+		rb_link_node(node, rb, parent);
+		rb_insert_color_cached(node,
+				       &sibling->execlists.virtual,
+				       first);
+
+		ve->nodes[sibling->id].prio = prio;
+
+submit_engine:
+		GEM_BUG_ON(RB_EMPTY_NODE(node));
+		if (first && prio > sibling->execlists.queue_priority)
+			tasklet_hi_schedule(&sibling->execlists.tasklet);
+
+		spin_unlock(&sibling->timeline.lock);
+	}
+
+out:
+	local_irq_enable();
+}
+
+static void virtual_submit_request(struct i915_request *request)
+{
+	struct virtual_engine *ve = to_virtual_engine(request->engine);
+
+	GEM_BUG_ON(ve->request);
+	ve->request = request;
+
+	tasklet_schedule(&ve->base.execlists.tasklet);
+}
+
+struct intel_engine_cs *
+intel_execlists_create_virtual(struct i915_gem_context *ctx,
+			       struct intel_engine_cs **siblings,
+			       unsigned int count)
+{
+	struct virtual_engine *ve;
+	unsigned int n;
+	int err;
+
+	if (!count)
+		return ERR_PTR(-EINVAL);
+
+	ve = kzalloc(sizeof(*ve) + count * sizeof(*ve->siblings), GFP_KERNEL);
+	if (!ve)
+		return ERR_PTR(-ENOMEM);
+
+	kref_init(&ve->kref);
+	ve->base.i915 = ctx->i915;
+	ve->base.id = -1;
+	ve->base.class = OTHER_CLASS;
+	ve->base.flags = I915_ENGINE_IS_VIRTUAL;
+
+	snprintf(ve->base.name, sizeof(ve->base.name), "virtual");
+	i915_timeline_init(ctx->i915, &ve->base.timeline, ve->base.name);
+	lockdep_set_subclass(&ve->base.timeline.lock, TIMELINE_VIRTUAL);
+
+	err = intel_engine_create_scratch(&ve->base, 4096);
+	if (err)
+		goto err_put;
+
+	ve->context.gem_context = ctx;
+	ve->context.owner = &ve->base;
+
+	ve->base.context_pin = virtual_context_pin;
+	ve->base.request_alloc = execlists_request_alloc;
+
+	ve->base.schedule = execlists_schedule;
+	ve->base.submit_request = virtual_submit_request;
+
+	tasklet_init(&ve->base.execlists.tasklet,
+		     virtual_submission_tasklet,
+		     (unsigned long)ve);
+
+	ve->count = count;
+	for (n = 0; n < count; n++) {
+		struct intel_engine_cs *sibling = siblings[n];
+
+		ve->siblings[n] = sibling;
+
+		if (RB_EMPTY_NODE(&ve->nodes[sibling->id].node)) {
+			err = -EINVAL;
+			ve->count = n;
+			goto err_put;
+		}
+
+		RB_CLEAR_NODE(&ve->nodes[sibling->id].node);
+
+		if (ve->base.class != OTHER_CLASS) {
+			if (ve->base.class != sibling->class) {
+				err = -EINVAL;
+				ve->count = n;
+				goto err_put;
+			}
+			continue;
+		}
+
+		ve->base.class = sibling->class;
+		snprintf(ve->base.name, sizeof(ve->base.name),
+			 "v%dx%d", ve->base.class, count);
+		ve->base.context_size = sibling->context_size;
+
+		ve->base.emit_bb_start = sibling->emit_bb_start;
+		ve->base.emit_flush = sibling->emit_flush;
+		ve->base.emit_breadcrumb = sibling->emit_breadcrumb;
+		ve->base.emit_breadcrumb_sz = sibling->emit_breadcrumb_sz;
+	}
+
+	return &ve->base;
+
+err_put:
+	virtual_engine_free(&ve->kref);
+	return ERR_PTR(err);
+}
+
+void intel_virtual_engine_put(struct intel_engine_cs *engine)
+{
+	if (!engine)
+		return;
+
+	kref_put(&to_virtual_engine(engine)->kref, virtual_engine_free);
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)

@@ -104,4 +104,10 @@ struct i915_gem_context;
 
 void intel_lr_context_resume(struct drm_i915_private *dev_priv);
 
+struct intel_engine_cs *
+intel_execlists_create_virtual(struct i915_gem_context *ctx,
+			       struct intel_engine_cs **siblings,
+			       unsigned int count);
+void intel_virtual_engine_put(struct intel_engine_cs *engine);
+
 #endif /* _INTEL_LRC_H_ */

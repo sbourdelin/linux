@@ -1501,14 +1501,41 @@ struct drm_i915_gem_context_param {
  * default settings.
  *
  * See struct i915_context_param_engines.
+ *
+ * Extensions:
+ *   i915_context_engines_load_balance (I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE)
  */
 #define I915_CONTEXT_PARAM_ENGINES	0x7
 
 	__u64 value;
 };
 
+/*
+ * i915_context_engines_load_balance:
+ *
+ * Enable load balancing across this set of engines.
+ *
+ * Into the I915_EXEC_DEFAULT slot, a virtual engine is created that when
+ * used will proxy the execbuffer request onto one of the set of engines
+ * in such a way as to distribute the load evenly across the set.
+ *
+ * The set of engines must be compatible (e.g. the same HW class) as they
+ * will share the same logical GPU context and ring.
+ *
+ * The context must be defined to use a single timeline for all engines.
+ */
+struct i915_context_engines_load_balance {
+	struct i915_user_extension base;
+
+	__u64 flags; /* all undefined flags must be zero */
+	__u64 engines_mask;
+
+	__u64 mbz[4]; /* reserved for future use; must be zero */
+};
+
 struct i915_context_param_engines {
 	__u64 extensions;
+#define I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE 0
 
 	struct {
 		__u32 class; /* see enum drm_i915_gem_engine_class */

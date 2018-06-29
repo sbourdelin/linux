@@ -1112,6 +1112,7 @@ bool intel_engine_retire_request(struct intel_engine_cs *engine,
 		  yesno(port_request(engine->execlists.port) == rq));
 
 	lockdep_assert_held(&engine->i915->drm.struct_mutex);
+	GEM_BUG_ON(intel_engine_is_virtual(engine));
 	GEM_BUG_ON(rq->engine != engine);
 	GEM_BUG_ON(!i915_request_completed(rq));
 

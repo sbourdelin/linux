@@ -91,6 +91,7 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 #include "i915_user_extensions.h"
+#include "intel_lrc.h"
 #include "intel_workarounds.h"
 
 #define ALL_L3_SLICES(dev) (1 << NUM_L3_SLICES(dev)) - 1
@@ -134,7 +135,10 @@ static void i915_gem_context_free(struct i915_gem_context *ctx)
 			ce->ops->destroy(ce);
 	}
 
-	kfree(ctx->engines);
+	if (ctx->engines) {
+		intel_virtual_engine_put(ctx->engines[0]);
+		kfree(ctx->engines);
+	}
 
 	if (ctx->timeline)
 		i915_timeline_put(ctx->timeline);
@@ -299,6 +303,7 @@ __create_hw_context(struct drm_i915_private *dev_priv,
 		struct intel_context *ce = &ctx->__engine[n];
 
 		ce->gem_context = ctx;
+		ce->owner = dev_priv->engine[n];
 	}
 
 	INIT_RADIX_TREE(&ctx->handles_vma, GFP_KERNEL);
@@ -616,7 +621,8 @@ last_request_on_engine(struct i915_timeline *timeline,
 
 	rq = i915_gem_active_raw(&timeline->last_request,
 				 &engine->i915->drm.struct_mutex);
-	if (rq && rq->engine == engine) {
+	if (rq &&
+	    (rq->engine == engine || intel_engine_is_virtual(rq->engine))) {
 		GEM_TRACE("last request for %s on engine %s: %llx:%d\n",
 			  timeline->name, engine->name,
 			  rq->fence.context, rq->fence.seqno);
@@ -888,13 +894,79 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	return ret;
 }
 
+static int check_user_mbz64(u64 __user *user)
+{
+	u64 mbz;
+
+	if (get_user(mbz, user))
+		return -EFAULT;
+
+	return mbz ? -EINVAL : 0;
+}
+
 struct set_engines {
 	struct i915_gem_context *ctx;
 	struct intel_engine_cs **engines;
 	unsigned int nengine;
 };
 
+static int set_engines__load_balance(struct i915_user_extension __user *base,
+				     void *data)
+
+{
+	struct i915_context_engines_load_balance __user *ext =
+		container_of(base, typeof(*ext) __user, base);
+	const struct set_engines *set = data;
+	struct intel_engine_cs *ve;
+	unsigned int n;
+	u64 mask;
+	int err;
+
+	if (set->engines[0])
+		return -EEXIST;
+
+	if (!HAS_EXECLISTS(set->ctx->i915))
+		return -ENODEV;
+
+	if (!set->ctx->timeline)
+		return -EINVAL;
+
+	err = check_user_mbz64(&ext->flags);
+	if (err)
+		return err;
+
+	for (n = 0; n < ARRAY_SIZE(ext->mbz); n++) {
+		err = check_user_mbz64(&ext->mbz[n]);
+		if (err)
+			return err;
+	}
+
+	if (get_user(mask, &ext->engines_mask))
+		return -EFAULT;
+
+	if (mask == ~0ull) {
+		ve = intel_execlists_create_virtual(set->ctx,
+						    set->engines + 1,
+						    set->nengine);
+	} else {
+		struct intel_engine_cs *stack[64];
+		int bit;
+
+		n = 0;
+		for_each_set_bit(bit, (unsigned long *)&mask, set->nengine)
+			stack[n++] = set->engines[bit + 1];
+
+		ve = intel_execlists_create_virtual(set->ctx, stack, n);
+	}
+	if (IS_ERR(ve))
+		return PTR_ERR(ve);
+
+	set->engines[0] = ve;
+	return 0;
+}
+
 static const i915_user_extension_fn set_engines__extensions[] = {
+	[I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE] = set_engines__load_balance,
 };
 
 static int set_engines(struct i915_gem_context *ctx,
@@ -957,12 +1029,16 @@ static int set_engines(struct i915_gem_context *ctx,
 					   ARRAY_SIZE(set_engines__extensions),
 					   &set);
 	if (err) {
+		intel_virtual_engine_put(set.engines[0]);
 		kfree(set.engines);
 		return err;
 	}
 
 out:
-	kfree(ctx->engines);
+	if (ctx->engines) {
+		intel_virtual_engine_put(ctx->engines[0]);
+		kfree(ctx->engines);
+	}
 	ctx->engines = set.engines;
 	ctx->nengine = set.nengine + 1;
 

@@ -304,6 +304,7 @@ struct intel_engine_execlists {
 	 * @queue: queue of requests, in priority lists
 	 */
 	struct rb_root_cached queue;
+	struct rb_root_cached virtual;
 
 	/**
 	 * @csb_read: control register for Context Switch buffer
@@ -591,6 +592,7 @@ struct intel_engine_cs {
 #define I915_ENGINE_NEEDS_CMD_PARSER BIT(0)
 #define I915_ENGINE_SUPPORTS_STATS   BIT(1)
 #define I915_ENGINE_HAS_PREEMPTION   BIT(2)
+#define I915_ENGINE_IS_VIRTUAL       BIT(3)
 	unsigned int flags;
 
 	/*
@@ -671,6 +673,12 @@ intel_engine_has_preemption(const struct intel_engine_cs *engine)
 static inline bool __execlists_need_preempt(int prio, int last)
 {
 	return prio > max(0, last);
+}
+
+static inline bool
+intel_engine_is_virtual(const struct intel_engine_cs *engine)
+{
+	return engine->flags & I915_ENGINE_IS_VIRTUAL;
 }
 
 static inline void

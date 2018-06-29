@@ -1037,7 +1037,7 @@ void i915_request_add(struct i915_request *request)
 	prev = i915_gem_active_raw(&timeline->last_request,
 				   &request->i915->drm.struct_mutex);
 	if (prev && !i915_request_completed(prev)) {
-		if (prev->engine == engine)
+		if (prev->engine == engine && !intel_engine_is_virtual(engine))
 			i915_sw_fence_await_sw_fence(&request->submit,
 						     &prev->submit,
 						     &request->submitq);
