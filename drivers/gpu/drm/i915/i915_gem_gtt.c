@@ -2216,6 +2216,8 @@ i915_ppgtt_create(struct drm_i915_private *i915,
 		return ppgtt;
 
 	kref_init(&ppgtt->ref);
+	ppgtt->open_count = 1;
+
 	i915_address_space_init(&ppgtt->vm, i915, name);
 	ppgtt->vm.file = fpriv;
 
@@ -2224,10 +2226,21 @@ i915_ppgtt_create(struct drm_i915_private *i915,
 	return ppgtt;
 }
 
-void i915_ppgtt_close(struct i915_address_space *vm)
+void i915_ppgtt_open(struct i915_hw_ppgtt *ppgtt)
 {
-	GEM_BUG_ON(vm->closed);
-	vm->closed = true;
+	GEM_BUG_ON(ppgtt->vm.closed);
+
+	ppgtt->open_count++;
+}
+
+void i915_ppgtt_close(struct i915_hw_ppgtt *ppgtt)
+{
+	GEM_BUG_ON(!ppgtt->open_count);
+	if (--ppgtt->open_count)
+		return;
+
+	GEM_BUG_ON(ppgtt->vm.closed);
+	ppgtt->vm.closed = true;
 }
 
 static void ppgtt_destroy_vma(struct i915_address_space *vm)

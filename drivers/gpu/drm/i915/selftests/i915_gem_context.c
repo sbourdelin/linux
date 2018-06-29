@@ -130,10 +130,6 @@ static int gpu_fill(struct drm_i915_gem_object *obj,
 	if (IS_ERR(vma))
 		return PTR_ERR(vma);
 
-	err = i915_gem_object_set_to_gtt_domain(obj, false);
-	if (err)
-		return err;
-
 	err = i915_vma_pin(vma, 0, 0, PIN_HIGH | PIN_USER);
 	if (err)
 		return err;
@@ -227,7 +223,8 @@ static int cpu_fill(struct drm_i915_gem_object *obj, u32 value)
 	return 0;
 }
 
-static int cpu_check(struct drm_i915_gem_object *obj, unsigned int max)
+static noinline int cpu_check(struct drm_i915_gem_object *obj,
+			      unsigned int idx, unsigned int max)
 {
 	unsigned int n, m, needs_flush;
 	int err;
@@ -245,8 +242,8 @@ static int cpu_check(struct drm_i915_gem_object *obj, unsigned int max)
 
 		for (m = 0; m < max; m++) {
 			if (map[m] != m) {
-				pr_err("Invalid value at page %d, offset %d: found %x expected %x\n",
-				       n, m, map[m], m);
+				pr_err("%pS: Invalid value at object %d page %d, offset %d: found %x expected %x\n",
+				       __builtin_return_address(0), idx, n, m, map[m], m);
 				err = -EINVAL;
 				goto out_unmap;
 			}
@@ -254,8 +251,9 @@ static int cpu_check(struct drm_i915_gem_object *obj, unsigned int max)
 
 		for (; m < DW_PER_PAGE; m++) {
 			if (map[m] != STACK_MAGIC) {
-				pr_err("Invalid value at page %d, offset %d: found %x expected %x\n",
-				       n, m, map[m], STACK_MAGIC);
+				pr_err("%pS: Invalid value at object %d page %d, offset %d: found %x expected %x\n",
+				       __builtin_return_address(0), idx, n, m,
+				       map[m], STACK_MAGIC);
 				err = -EINVAL;
 				goto out_unmap;
 			}
@@ -318,6 +316,10 @@ create_test_object(struct i915_gem_context *ctx,
 		return ERR_PTR(err);
 	}
 
+	err = i915_gem_object_set_to_gtt_domain(obj, false);
+	if (err)
+		return ERR_PTR(err);
+
 	list_add_tail(&obj->st_link, objects);
 	return obj;
 }
@@ -333,12 +335,8 @@ static unsigned long max_dwords(struct drm_i915_gem_object *obj)
 static int igt_ctx_exec(void *arg)
 {
 	struct drm_i915_private *i915 = arg;
-	struct drm_i915_gem_object *obj = NULL;
-	struct drm_file *file;
-	IGT_TIMEOUT(end_time);
-	LIST_HEAD(objects);
-	unsigned long ncontexts, ndwords, dw;
-	bool first_shared_gtt = true;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int err = -ENODEV;
 
 	/* Create a few different contexts (with different mm) and write
@@ -346,34 +344,41 @@ static int igt_ctx_exec(void *arg)
 	 * up in the expected pages of our obj.
 	 */
 
-	file = mock_file(i915);
-	if (IS_ERR(file))
-		return PTR_ERR(file);
+	for_each_engine(engine, i915, id) {
+		struct drm_i915_gem_object *obj = NULL;
+		struct drm_file *file;
+		IGT_TIMEOUT(end_time);
+		LIST_HEAD(objects);
+		unsigned long ncontexts, ndwords, dw;
+		bool first_shared_gtt = true;
 
-	mutex_lock(&i915->drm.struct_mutex);
+		if (!intel_engine_can_store_dword(engine))
+			continue;
 
-	ncontexts = 0;
-	ndwords = 0;
-	dw = 0;
-	while (!time_after(jiffies, end_time)) {
-		struct intel_engine_cs *engine;
-		struct i915_gem_context *ctx;
-		unsigned int id;
+		file = mock_file(i915);
+		if (IS_ERR(file))
+			return PTR_ERR(file);
 
-		if (first_shared_gtt) {
-			ctx = __create_hw_context(i915, file->driver_priv);
-			first_shared_gtt = false;
-		} else {
-			ctx = i915_gem_create_context(i915, file->driver_priv);
-		}
-		if (IS_ERR(ctx)) {
-			err = PTR_ERR(ctx);
-			goto out_unlock;
-		}
+		mutex_lock(&i915->drm.struct_mutex);
 
-		for_each_engine(engine, i915, id) {
-			if (!intel_engine_can_store_dword(engine))
-				continue;
+		ncontexts = 0;
+		ndwords = 0;
+		dw = 0;
+		while (!time_after(jiffies, end_time)) {
+			struct i915_gem_context *ctx;
+
+			if (first_shared_gtt) {
+				ctx = __create_hw_context(i915, file->driver_priv);
+				first_shared_gtt = false;
+			} else {
+				ctx = i915_gem_create_context(i915,
+							      file->driver_priv,
+							      CREATE_VM);
+			}
+			if (IS_ERR(ctx)) {
+				err = PTR_ERR(ctx);
+				goto out_unlock;
+			}
 
 			if (!obj) {
 				obj = create_test_object(ctx, file, &objects);
@@ -398,32 +403,152 @@ static int igt_ctx_exec(void *arg)
 				obj = NULL;
 				dw = 0;
 			}
+
 			ndwords++;
+			ncontexts++;
 		}
-		ncontexts++;
-	}
-	pr_info("Submitted %lu contexts (across %u engines), filling %lu dwords\n",
-		ncontexts, INTEL_INFO(i915)->num_rings, ndwords);
 
-	dw = 0;
-	list_for_each_entry(obj, &objects, st_link) {
-		unsigned int rem =
-			min_t(unsigned int, ndwords - dw, max_dwords(obj));
+		pr_info("Submitted %lu contexts to %s, filling %lu dwords\n",
+			ncontexts, engine->name, ndwords);
 
-		err = cpu_check(obj, rem);
-		if (err)
-			break;
+		ncontexts = dw = 0;
+		list_for_each_entry(obj, &objects, st_link) {
+			unsigned int rem =
+				min_t(unsigned int, ndwords - dw, max_dwords(obj));
 
-		dw += rem;
-	}
+			err = cpu_check(obj, ncontexts++, rem);
+			if (err)
+				break;
+
+			dw += rem;
+		}
 
 out_unlock:
-	if (igt_flush_test(i915, I915_WAIT_LOCKED))
-		err = -EIO;
-	mutex_unlock(&i915->drm.struct_mutex);
+		i915_gem_wait_for_idle(i915, I915_WAIT_LOCKED);
+		mutex_unlock(&i915->drm.struct_mutex);
 
-	mock_file_free(i915, file);
-	return err;
+		mock_file_free(i915, file);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static int igt_shared_ctx_exec(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	int err = -ENODEV;
+
+	/*
+	 * Create a few different contexts with the same mm and write
+	 * through each ctx using the GPU making sure those writes end
+	 * up in the expected pages of our obj.
+	 */
+
+	for_each_engine(engine, i915, id) {
+		IGT_TIMEOUT(end_time);
+		LIST_HEAD(objects);
+		unsigned long ncontexts, ndwords, dw;
+		struct drm_i915_gem_object *obj = NULL;
+		struct drm_file *file;
+		struct i915_gem_context *parent;
+
+		if (!intel_engine_can_store_dword(engine))
+			continue;
+
+		file = mock_file(i915);
+		if (IS_ERR(file))
+			return PTR_ERR(file);
+
+		mutex_lock(&i915->drm.struct_mutex);
+
+		parent = i915_gem_create_context(i915, file->driver_priv,
+						 CREATE_VM);
+		if (IS_ERR(parent)) {
+			err = PTR_ERR(parent);
+			goto out_unlock;
+		}
+
+		if (!parent->ppgtt) {
+			err = 0;
+			goto out_unlock;
+		}
+
+
+		ncontexts = 0;
+		ndwords = 0;
+		dw = 0;
+		while (!time_after(jiffies, end_time)) {
+			struct i915_gem_context *ctx;
+
+			ctx = i915_gem_create_context(i915,
+						      file->driver_priv,
+						      0);
+			if (IS_ERR(ctx)) {
+				err = PTR_ERR(ctx);
+				goto out_unlock;
+			}
+
+			i915_ppgtt_open(parent->ppgtt);
+			ctx->ppgtt = i915_ppgtt_get(parent->ppgtt);
+			ctx->desc_template = parent->desc_template;
+
+			if (!obj) {
+				obj = create_test_object(parent, file, &objects);
+				if (IS_ERR(obj)) {
+					err = PTR_ERR(obj);
+					goto out_unlock;
+				}
+			}
+
+			intel_runtime_pm_get(i915);
+			err = gpu_fill(obj, ctx, engine, dw);
+			intel_runtime_pm_put(i915);
+			if (err) {
+				pr_err("Failed to fill dword %lu [%lu/%lu] with gpu (%s) in ctx %u [full-ppgtt? %s], err=%d\n",
+				       ndwords, dw, max_dwords(obj),
+				       engine->name, ctx->hw_id,
+				       yesno(!!ctx->ppgtt), err);
+				goto out_unlock;
+			}
+
+			if (++dw == max_dwords(obj)) {
+				obj = NULL;
+				dw = 0;
+			}
+
+			ndwords++;
+			ncontexts++;
+		}
+		pr_info("Submitted %lu contexts to %s, filling %lu dwords\n",
+			ncontexts, engine->name, ndwords);
+
+		ncontexts = dw = 0;
+		list_for_each_entry(obj, &objects, st_link) {
+			unsigned int rem =
+				min_t(unsigned int, ndwords - dw, max_dwords(obj));
+
+			err = cpu_check(obj, ncontexts++, rem);
+			if (err)
+				break;
+
+			dw += rem;
+		}
+
+out_unlock:
+		if (igt_flush_test(i915, I915_WAIT_LOCKED))
+			err = -EIO;
+		mutex_unlock(&i915->drm.struct_mutex);
+
+		mock_file_free(i915, file);
+		if (err)
+			return err;
+	}
+
+	return 0;
 }
 
 static int igt_ctx_readonly(void *arg)
@@ -451,7 +576,7 @@ static int igt_ctx_readonly(void *arg)
 
 	mutex_lock(&i915->drm.struct_mutex);
 
-	ctx = i915_gem_create_context(i915, file->driver_priv);
+	ctx = i915_gem_create_context(i915, file->driver_priv, 0);
 	if (IS_ERR(ctx)) {
 		err = PTR_ERR(ctx);
 		goto out_unlock;
@@ -515,7 +640,7 @@ static int igt_ctx_readonly(void *arg)
 		if (i915_gem_object_is_readonly(obj))
 			num_writes = 0;
 
-		err = cpu_check(obj, num_writes);
+		err = cpu_check(obj, 0, num_writes);
 		if (err)
 			break;
 
@@ -706,6 +831,7 @@ int i915_gem_context_live_selftests(struct drm_i915_private *dev_priv)
 		SUBTEST(igt_switch_to_kernel_context),
 		SUBTEST(igt_ctx_exec),
 		SUBTEST(igt_ctx_readonly),
+		SUBTEST(igt_shared_ctx_exec),
 	};
 	bool fake_alias = false;
 	int err;

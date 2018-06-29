@@ -383,6 +383,8 @@ struct i915_hw_ppgtt {
 	struct kref ref;
 
 	unsigned long pd_dirty_rings;
+	unsigned int open_count;
+
 	union {
 		struct i915_pml4 pml4;		/* GEN8+ & 48b PPGTT */
 		struct i915_page_directory_pointer pdp;	/* GEN8+ */
@@ -602,12 +604,16 @@ void i915_ppgtt_release(struct kref *kref);
 struct i915_hw_ppgtt *i915_ppgtt_create(struct drm_i915_private *dev_priv,
 					struct drm_i915_file_private *fpriv,
 					const char *name);
-void i915_ppgtt_close(struct i915_address_space *vm);
-static inline void i915_ppgtt_get(struct i915_hw_ppgtt *ppgtt)
+
+void i915_ppgtt_open(struct i915_hw_ppgtt *ppgtt);
+void i915_ppgtt_close(struct i915_hw_ppgtt *ppgtt);
+
+static inline struct i915_hw_ppgtt *i915_ppgtt_get(struct i915_hw_ppgtt *ppgtt)
 {
-	if (ppgtt)
-		kref_get(&ppgtt->ref);
+	kref_get(&ppgtt->ref);
+	return ppgtt;
 }
+
 static inline void i915_ppgtt_put(struct i915_hw_ppgtt *ppgtt)
 {
 	if (ppgtt)
