@@ -7,9 +7,16 @@
  * Author:
  *	Fenghua Yu <fenghua.yu@intel.com>
  */
+
+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+
 #include <linux/printk.h>
 #include <linux/cpufeature.h>
+#include <linux/cpu.h>
 #include <asm/msr.h>
+
+/* By default, #AC for split lock is enabled. */
+static bool enable_ac_split_lock = true;
 
 /* Detect feature of #AC for split lock by probing bit 29 in MSR_TEST_CTL. */
 void detect_ac_split_lock(void)
@@ -43,4 +50,38 @@ void detect_ac_split_lock(void)
 	 * before leaving.
 	 */
 	wrmsrl(MSR_TEST_CTL, orig_val);
+}
+
+/*
+ * #AC handler for split lock is called by generic #AC handler.
+ *
+ * On split lock in kernel, warn and disable #AC for split lock on current CPU.
+ *
+ * On split lock in user process, send SIGBUS in the generic #AC handler.
+ */
+bool do_ac_split_lock(struct pt_regs *regs)
+{
+	/* Generic #AC handler will handle split lock in user. */
+	if (user_mode(regs))
+		return false;
+
+	/* Clear the split lock bit to disable the feature on local CPU. */
+	msr_clear_bit(MSR_TEST_CTL, MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK_SHIFT);
+
+	WARN_ONCE(1, "A split lock issue is detected. Please FIX it\n");
+
+	return true;
+}
+
+void setup_ac_split_lock(void)
+{
+	if (enable_ac_split_lock) {
+		msr_set_bit(MSR_TEST_CTL,
+			    MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK_SHIFT);
+		pr_info_once("#AC for split lock is enabled\n");
+	} else {
+		msr_clear_bit(MSR_TEST_CTL,
+			      MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK_SHIFT);
+		pr_info_once("#AC for split lock is disabled\n");
+	}
 }
