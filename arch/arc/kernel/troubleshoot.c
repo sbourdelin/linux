@@ -168,14 +168,9 @@ static void show_ecr_verbose(struct pt_regs *regs)
 	}
 }
 
-/************************************************************************
- *  API called by rest of kernel
- ***********************************************************************/
-
-void show_regs(struct pt_regs *regs)
+void show_exception_regs(struct pt_regs *regs)
 {
 	struct task_struct *tsk = current;
-	struct callee_regs *cregs;
 	char *buf;
 
 	buf = (char *)__get_free_page(GFP_KERNEL);
@@ -188,11 +183,27 @@ void show_regs(struct pt_regs *regs)
 	show_ecr_verbose(regs);
 
 	pr_info("[EFA   ]: 0x%08lx\n[BLINK ]: %pS\n[ERET  ]: %pS\n",
-		current->thread.fault_address,
+		tsk->thread.fault_address,
 		(void *)regs->blink, (void *)regs->ret);
 
 	if (user_mode(regs))
 		show_faulting_vma(regs->ret, buf); /* faulting code, not data */
+
+	free_page((unsigned long)buf);
+}
+
+/************************************************************************
+ *  API called by rest of kernel
+ ***********************************************************************/
+
+void show_regs(struct pt_regs *regs)
+{
+	struct callee_regs *cregs;
+	char *buf;
+
+	buf = (char *)__get_free_page(GFP_KERNEL);
+	if (!buf)
+		return;
 
 	pr_info("[STAT32]: 0x%08lx", regs->status32);
 
@@ -235,6 +246,8 @@ void show_kernel_fault_diag(const char *str, struct pt_regs *regs,
 
 	/* Show fault description */
 	pr_info("\n%s\n", str);
+
+	show_exception_regs(regs);
 
 	/* Caller and Callee regs */
 	show_regs(regs);

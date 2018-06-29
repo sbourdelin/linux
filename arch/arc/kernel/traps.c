@@ -50,6 +50,7 @@ unhandled_exception(const char *str, struct pt_regs *regs, siginfo_t *info)
 		tsk->thread.fault_address = (__force unsigned int)info->si_addr;
 
 		force_sig_info(info->si_signo, info, tsk);
+		show_exception_regs(regs);
 
 	} else {
 		/* If not due to copy_(to|from)_user, we are doomed */

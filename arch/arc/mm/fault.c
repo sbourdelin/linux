@@ -200,6 +200,7 @@ bad_area_nosemaphore:
 		/* info.si_code has been set above */
 		info.si_addr = (void __user *)address;
 		force_sig_info(SIGSEGV, &info, tsk);
+		show_exception_regs(regs);
 		return;
 	}
 
@@ -239,4 +240,5 @@ do_sigbus:
 	info.si_code = BUS_ADRERR;
 	info.si_addr = (void __user *)address;
 	force_sig_info(SIGBUS, &info, tsk);
+	show_exception_regs(regs);
 }
