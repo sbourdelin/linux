@@ -4086,6 +4086,10 @@
 	spia_pedr=
 	spia_peddr=
 
+	ac_split_lock_off [X86]
+			Disable #AC exception for split locked accesses.
+			By default, this feature is enabled in kernel.
+
 	srcutree.counter_wrap_check [KNL]
 			Specifies how frequently to check for
 			grace-period sequence counter wrap for the

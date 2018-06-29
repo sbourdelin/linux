@@ -85,3 +85,12 @@ void setup_ac_split_lock(void)
 		pr_info_once("#AC for split lock is disabled\n");
 	}
 }
+
+static __init int ac_split_lock_off(char *str)
+{
+	enable_ac_split_lock = false;
+
+	return 0;
+}
+
+early_param("ac_split_lock_off", ac_split_lock_off);
