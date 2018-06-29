@@ -730,6 +730,44 @@ static ssize_t matrix_show(struct device *dev, struct device_attribute *attr,
 }
 DEVICE_ATTR_RO(matrix);
 
+static unsigned long *kvm_ap_get_crycb_apm(struct ap_matrix_mdev *matrix_mdev);
+
+static unsigned long *kvm_ap_get_crycb_aqm(struct ap_matrix_mdev *matrix_mdev);
+
+static ssize_t guest_matrix_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct mdev_device *mdev = mdev_from_dev(dev);
+	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
+	char *bufpos = buf;
+	unsigned long apid;
+	unsigned long apqi;
+	unsigned long *apm, *aqm;
+	unsigned long napm = matrix_mdev->matrix.apm_max + 1;
+	unsigned long naqm = matrix_mdev->matrix.aqm_max + 1;
+	int nchars = 0;
+	int n;
+
+	if (!matrix_mdev->kvm)
+		return nchars;
+
+	apm = kvm_ap_get_crycb_apm(matrix_mdev);
+	for_each_set_bit_inv(apid, apm, napm) {
+		n = sprintf(bufpos, "%02lx\n", apid);
+		bufpos += n;
+		nchars += n;
+
+		aqm = kvm_ap_get_crycb_aqm(matrix_mdev);
+		for_each_set_bit_inv(apqi, aqm, naqm) {
+			n = sprintf(bufpos, "%02lx.%04lx\n", apid, apqi);
+			bufpos += n;
+			nchars += n;
+		}
+	}
+
+	return nchars;
+}
+DEVICE_ATTR_RO(guest_matrix);
 
 static struct attribute *vfio_ap_mdev_attrs[] = {
 	&dev_attr_assign_adapter.attr,
@@ -740,6 +778,7 @@ static struct attribute *vfio_ap_mdev_attrs[] = {
 	&dev_attr_unassign_control_domain.attr,
 	&dev_attr_control_domains.attr,
 	&dev_attr_matrix.attr,
+	&dev_attr_guest_matrix.attr,
 	NULL,
 };
 
