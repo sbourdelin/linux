@@ -26,6 +26,7 @@
 #include <linux/sched.h>	/* for idle_task_exit */
 #include <linux/sched/hotplug.h>
 #include <linux/cpu.h>
+#include <linux/cpuset.h>
 #include <linux/of.h>
 #include <linux/slab.h>
 #include <asm/prom.h>
@@ -685,9 +686,15 @@ static int dlpar_cpu_readd_by_index(u32 drc_index)
 
 	pr_info("Attempting to re-add CPU, drc index %x\n", drc_index);
 
+	arch_update_cpu_topology_suspend();
 	rc = dlpar_cpu_remove_by_index(drc_index, false);
-	if (!rc)
+	arch_update_cpu_topology_resume();
+
+	if (!rc) {
+		arch_update_cpu_topology_suspend();
 		rc = dlpar_cpu_add(drc_index, false);
+		arch_update_cpu_topology_resume();
+	}
 
 	if (rc)
 		pr_info("Failed to update cpu at drc_index %lx\n",
