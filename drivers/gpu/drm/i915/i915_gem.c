@@ -2207,8 +2207,9 @@ out:
 	intel_runtime_pm_put(i915);
 }
 
-void i915_gem_runtime_suspend(struct drm_i915_private *dev_priv)
+void i915_gem_runtime_suspend(struct drm_i915_private *i915)
 {
+	struct i915_ggtt *ggtt = &i915->ggtt;
 	struct drm_i915_gem_object *obj, *on;
 	int i;
 
@@ -2220,15 +2221,15 @@ void i915_gem_runtime_suspend(struct drm_i915_private *dev_priv)
 	 */
 
 	list_for_each_entry_safe(obj, on,
-				 &dev_priv->mm.userfault_list, userfault_link)
+				 &i915->mm.userfault_list, userfault_link)
 		__i915_gem_object_release_mmap(obj);
 
 	/* The fence will be lost when the device powers down. If any were
 	 * in use by hardware (i.e. they are pinned), we should not be powering
 	 * down! All other fences will be reacquired by the user upon waking.
 	 */
-	for (i = 0; i < dev_priv->num_fence_regs; i++) {
-		struct drm_i915_fence_reg *reg = &dev_priv->fence_regs[i];
+	for (i = 0; i < ggtt->num_fence_regs; i++) {
+		struct drm_i915_fence_reg *reg = &ggtt->fence_regs[i];
 
 		/* Ideally we want to assert that the fence register is not
 		 * live at this point (i.e. that no piece of code will be
@@ -5636,32 +5637,33 @@ i915_gem_cleanup_engines(struct drm_i915_private *dev_priv)
 		dev_priv->gt.cleanup_engine(engine);
 }
 
-void
-i915_gem_load_init_fences(struct drm_i915_private *dev_priv)
+void i915_ggtt_init_fences(struct i915_ggtt *ggtt)
 {
+	struct drm_i915_private *dev_priv = ggtt->vm.i915;
 	int i;
 
 	if (INTEL_GEN(dev_priv) >= 7 && !IS_VALLEYVIEW(dev_priv) &&
 	    !IS_CHERRYVIEW(dev_priv))
-		dev_priv->num_fence_regs = 32;
+		ggtt->num_fence_regs = 32;
 	else if (INTEL_GEN(dev_priv) >= 4 ||
 		 IS_I945G(dev_priv) || IS_I945GM(dev_priv) ||
 		 IS_G33(dev_priv) || IS_PINEVIEW(dev_priv))
-		dev_priv->num_fence_regs = 16;
+		ggtt->num_fence_regs = 16;
 	else
-		dev_priv->num_fence_regs = 8;
+		ggtt->num_fence_regs = 8;
 
 	if (intel_vgpu_active(dev_priv))
-		dev_priv->num_fence_regs =
-				I915_READ(vgtif_reg(avail_rs.fence_num));
+		ggtt->num_fence_regs = I915_READ(vgtif_reg(avail_rs.fence_num));
+
+	INIT_LIST_HEAD(&ggtt->fence_list);
 
 	/* Initialize fence registers to zero */
-	for (i = 0; i < dev_priv->num_fence_regs; i++) {
-		struct drm_i915_fence_reg *fence = &dev_priv->fence_regs[i];
+	for (i = 0; i < ggtt->num_fence_regs; i++) {
+		struct drm_i915_fence_reg *fence = &ggtt->fence_regs[i];
 
-		fence->i915 = dev_priv;
+		fence->ggtt = ggtt;
 		fence->id = i;
-		list_add_tail(&fence->link, &dev_priv->mm.fence_list);
+		list_add_tail(&fence->link, &ggtt->fence_list);
 	}
 	i915_gem_restore_fences(dev_priv);
 
@@ -5678,7 +5680,6 @@ static void i915_gem_init__mm(struct drm_i915_private *i915)
 
 	INIT_LIST_HEAD(&i915->mm.unbound_list);
 	INIT_LIST_HEAD(&i915->mm.bound_list);
-	INIT_LIST_HEAD(&i915->mm.fence_list);
 	INIT_LIST_HEAD(&i915->mm.userfault_list);
 
 	INIT_WORK(&i915->mm.free_work, __i915_gem_free_work);

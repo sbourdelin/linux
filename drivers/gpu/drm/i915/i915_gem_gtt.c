@@ -3568,9 +3568,11 @@ int i915_ggtt_init_hw(struct drm_i915_private *dev_priv)
 		ggtt->vm.mm.color_adjust = i915_gtt_color_adjust;
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
-	if (!io_mapping_init_wc(&dev_priv->ggtt.iomap,
-				dev_priv->ggtt.gmadr.start,
-				dev_priv->ggtt.mappable_end)) {
+	i915_ggtt_init_fences(ggtt);
+
+	if (!io_mapping_init_wc(&ggtt->iomap,
+				ggtt->gmadr.start,
+				ggtt->mappable_end)) {
 		ret = -EIO;
 		goto out_gtt_cleanup;
 	}

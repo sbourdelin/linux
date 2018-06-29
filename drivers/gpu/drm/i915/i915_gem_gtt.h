@@ -38,6 +38,7 @@
 #include <linux/mm.h>
 #include <linux/pagevec.h>
 
+#include "i915_gem_fence_reg.h"
 #include "i915_request.h"
 #include "i915_selftest.h"
 #include "i915_timeline.h"
@@ -57,7 +58,6 @@
 #define I915_MAX_NUM_FENCE_BITS 6
 
 struct drm_i915_file_private;
-struct drm_i915_fence_reg;
 struct i915_vma;
 
 typedef u32 gen6_pte_t;
@@ -376,6 +376,11 @@ struct i915_ggtt {
 	bool do_idle_maps;
 
 	int mtrr;
+
+	/** LRU list of objects with fence regs on them. */
+	struct list_head fence_list;
+	struct drm_i915_fence_reg fence_regs[I915_MAX_NUM_FENCES];
+	int num_fence_regs;
 
 	struct drm_mm_node error_capture;
 };

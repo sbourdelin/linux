@@ -966,9 +966,6 @@ struct i915_gem_mm {
 	struct notifier_block vmap_notifier;
 	struct shrinker shrinker;
 
-	/** LRU list of objects with fence regs on them. */
-	struct list_head fence_list;
-
 	/**
 	 * Workqueue to fault in userptr pages, flushed by the execbuf
 	 * when required but otherwise left to userspace to try again
@@ -1686,9 +1683,6 @@ struct drm_i915_private {
 
 	/* protects panel power sequencer state */
 	struct mutex pps_mutex;
-
-	struct drm_i915_fence_reg fence_regs[I915_MAX_NUM_FENCES]; /* assume 965 */
-	int num_fence_regs; /* 8 on pre-965, 16 otherwise */
 
 	unsigned int fsb_freq, mem_freq, is_ddr3;
 	unsigned int skl_preferred_vco_freq;
@@ -2898,7 +2892,6 @@ int i915_gem_wait_ioctl(struct drm_device *dev, void *data,
 void i915_gem_sanitize(struct drm_i915_private *i915);
 int i915_gem_init_early(struct drm_i915_private *dev_priv);
 void i915_gem_cleanup_early(struct drm_i915_private *dev_priv);
-void i915_gem_load_init_fences(struct drm_i915_private *dev_priv);
 int i915_gem_freeze(struct drm_i915_private *dev_priv);
 int i915_gem_freeze_late(struct drm_i915_private *dev_priv);
 

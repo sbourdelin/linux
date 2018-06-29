@@ -28,16 +28,20 @@
 #include <linux/list.h>
 
 struct drm_i915_private;
+struct i915_ggtt;
 struct i915_vma;
 
 #define I965_FENCE_PAGE 4096UL
 
 struct drm_i915_fence_reg {
 	struct list_head link;
-	struct drm_i915_private *i915;
+
+	struct i915_ggtt *ggtt;
 	struct i915_vma *vma;
+
 	int pin_count;
 	int id;
+
 	/**
 	 * Whether the tiling parameters for the currently
 	 * associated fence register have changed. Note that
@@ -49,5 +53,6 @@ struct drm_i915_fence_reg {
 	bool dirty;
 };
 
-#endif
+void i915_ggtt_init_fences(struct i915_ggtt *ggtt);
 
+#endif

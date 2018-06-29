@@ -318,7 +318,7 @@ static int i915_getparam_ioctl(struct drm_device *dev, void *data,
 		value = pdev->revision;
 		break;
 	case I915_PARAM_NUM_FENCES_AVAIL:
-		value = dev_priv->num_fence_regs;
+		value = dev_priv->ggtt.num_fence_regs;
 		break;
 	case I915_PARAM_HAS_OVERLAY:
 		value = dev_priv->overlay ? 1 : 0;
@@ -1150,8 +1150,6 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 	intel_uncore_sanitize(dev_priv);
 
 	intel_opregion_setup(dev_priv);
-
-	i915_gem_load_init_fences(dev_priv);
 
 	/* On the 945G/GM, the chipset reports the MSI capability on the
 	 * integrated graphics even though the support isn't actually there
