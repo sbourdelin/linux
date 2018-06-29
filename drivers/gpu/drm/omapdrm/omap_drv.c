@@ -16,11 +16,7 @@
  */
 
 #include <linux/sys_soc.h>
-
-#include <drm/drm_atomic.h>
-#include <drm/drm_atomic_helper.h>
-#include <drm/drm_crtc_helper.h>
-#include <drm/drm_fb_helper.h>
+#include <linux/sort.h>
 
 #include "omap_dmm_tiler.h"
 #include "omap_drv.h"
@@ -113,7 +109,98 @@ static void omap_atomic_commit_tail(struct drm_atomic_state *old_state)
 
 	drm_atomic_helper_cleanup_planes(dev, old_state);
 
+	omap_overlay_disable_unassigned(old_state);
+
 	priv->dispc_ops->runtime_put(priv->dispc);
+}
+
+static int drm_atomic_state_normalized_zpos_cmp(const void *a, const void *b)
+{
+	const struct drm_plane_state *sa = *(struct drm_plane_state **)a;
+	const struct drm_plane_state *sb = *(struct drm_plane_state **)b;
+
+	if (sa->normalized_zpos != sb->normalized_zpos)
+		return sa->normalized_zpos - sb->normalized_zpos;
+	else
+		return sa->plane->base.id - sb->plane->base.id;
+}
+
+static int omap_atomic_update_normalize_zpos(struct drm_device *dev,
+					     struct drm_atomic_state *state)
+{
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *old_state, *new_state;
+	struct drm_plane *plane;
+	int i, n, inc;
+	int total_planes = dev->mode_config.num_total_plane;
+	struct drm_plane_state **states;
+	int ret = 0;
+
+	states = kmalloc_array(total_planes, sizeof(*states), GFP_KERNEL);
+	if (!states)
+		return -ENOMEM;
+
+	for_each_oldnew_crtc_in_state(state, crtc, old_state, new_state, i) {
+		if (old_state->plane_mask == new_state->plane_mask &&
+		    !new_state->zpos_changed)
+			continue;
+
+		/* Reset plane increment and index value for every crtc */
+		n = 0;
+
+		/*
+		 * Normalization process might create new states for planes
+		 * which normalized_zpos has to be recalculated.
+		 */
+		drm_for_each_plane_mask(plane, dev, new_state->plane_mask) {
+			struct drm_plane_state *plane_state =
+				drm_atomic_get_plane_state(new_state->state,
+							   plane);
+			if (IS_ERR(plane_state)) {
+				ret = PTR_ERR(plane_state);
+				goto done;
+			}
+			states[n++] = plane_state;
+		}
+
+		sort(states, n, sizeof(*states),
+		     drm_atomic_state_normalized_zpos_cmp, NULL);
+
+		for (i = 0, inc = 0; i < n; i++) {
+			plane = states[i]->plane;
+
+			states[i]->normalized_zpos = i + inc;
+			DRM_DEBUG_ATOMIC("[PLANE:%d:%s] updated normalized zpos value %d\n",
+					 plane->base.id, plane->name,
+					 states[i]->normalized_zpos);
+
+			if (is_omap_plane_dual_overlay(states[i]))
+				inc++;
+		}
+		new_state->zpos_changed = true;
+	}
+
+done:
+	kfree(states);
+	return ret;
+}
+
+static int omap_atomic_check(struct drm_device *dev,
+			     struct drm_atomic_state *state)
+{
+	int ret;
+
+	ret = drm_atomic_helper_check(dev, state);
+	if (ret)
+		return ret;
+
+	if (dev->mode_config.normalize_zpos) {
+		ret = omap_atomic_update_normalize_zpos(dev, state);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static const struct drm_mode_config_helper_funcs omap_mode_config_helper_funcs = {
@@ -123,7 +210,7 @@ static const struct drm_mode_config_helper_funcs omap_mode_config_helper_funcs =
 static const struct drm_mode_config_funcs omap_mode_config_funcs = {
 	.fb_create = omap_framebuffer_create,
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
-	.atomic_check = drm_atomic_helper_check,
+	.atomic_check = omap_atomic_check,
 	.atomic_commit = drm_atomic_helper_commit,
 };
 
@@ -296,7 +383,7 @@ static int omap_modeset_init(struct drm_device *dev)
 			return -EINVAL;
 
 		plane = omap_plane_init(dev, plane_idx, DRM_PLANE_TYPE_OVERLAY,
-			plane_crtc_mask);
+					plane_crtc_mask);
 		if (IS_ERR(plane))
 			return PTR_ERR(plane);
 
@@ -560,10 +647,18 @@ static int omapdrm_init(struct omap_drm_private *priv, struct device *dev)
 
 	omap_gem_init(ddev);
 
+	ret = omap_global_obj_init(priv);
+	if (ret)
+		goto err_free_drm_dev;
+
+	ret = omap_hwoverlays_init(priv);
+	if (ret)
+		goto err_free_priv_obj;
+
 	ret = omap_modeset_init(ddev);
 	if (ret) {
 		dev_err(priv->dev, "omap_modeset_init failed: ret=%d\n", ret);
-		goto err_free_drm_dev;
+		goto err_free_overlays;
 	}
 
 	/* Initialize vblank handling, start with all CRTCs disabled. */
@@ -577,7 +672,6 @@ static int omapdrm_init(struct omap_drm_private *priv, struct device *dev)
 		drm_crtc_vblank_off(priv->crtcs[i]);
 
 	omap_fbdev_init(ddev);
-
 	drm_kms_helper_poll_init(ddev);
 	omap_modeset_enable_external_hpd();
 
@@ -599,6 +693,10 @@ err_cleanup_helpers:
 err_cleanup_modeset:
 	drm_mode_config_cleanup(ddev);
 	omap_drm_irq_uninstall(ddev);
+err_free_overlays:
+	omap_hwoverlays_destroy(priv);
+err_free_priv_obj:
+	omap_global_obj_fini(priv);
 err_free_drm_dev:
 	omap_gem_deinit(ddev);
 	drm_dev_unref(ddev);
@@ -631,6 +729,9 @@ static void omapdrm_cleanup(struct omap_drm_private *priv)
 	omap_gem_deinit(ddev);
 
 	drm_dev_unref(ddev);
+
+	omap_hwoverlays_destroy(priv);
+	omap_global_obj_fini(priv);
 
 	destroy_workqueue(priv->wq);
 

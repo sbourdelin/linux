@@ -153,7 +153,9 @@ static u32 drm_rotation_to_tiler(unsigned int drm_rot)
 /* update ovl info for scanout, handles cases of multi-planar fb's, etc.
  */
 void omap_framebuffer_update_scanout(struct drm_framebuffer *fb,
-		struct drm_plane_state *state, struct omap_overlay_info *info)
+		struct drm_plane_state *state,
+		struct omap_overlay_info *info,
+		struct omap_overlay_info *r_info)
 {
 	struct omap_framebuffer *omap_fb = to_omap_framebuffer(fb);
 	const struct drm_format_info *format = omap_fb->format;
@@ -206,7 +208,8 @@ void omap_framebuffer_update_scanout(struct drm_framebuffer *fb,
 		info->rotation_type = OMAP_DSS_ROT_TILER;
 		info->rotation = state->rotation ?: DRM_MODE_ROTATE_0;
 		/* Note: stride in TILER units, not pixels */
-		info->screen_width  = omap_gem_tiled_stride(plane->bo, orient);
+		info->screen_width  =
+				omap_gem_tiled_stride(plane->bo, orient);
 	} else {
 		switch (state->rotation & DRM_MODE_ROTATE_MASK) {
 		case 0:
@@ -221,10 +224,10 @@ void omap_framebuffer_update_scanout(struct drm_framebuffer *fb,
 			break;
 		}
 
-		info->paddr         = get_linear_addr(plane, format, 0, x, y);
+		info->paddr = get_linear_addr(plane, format, 0, x, y);
 		info->rotation_type = OMAP_DSS_ROT_NONE;
-		info->rotation      = DRM_MODE_ROTATE_0;
-		info->screen_width  = plane->pitch;
+		info->rotation = DRM_MODE_ROTATE_0;
+		info->screen_width = plane->pitch;
 	}
 
 	/* convert to pixels: */
@@ -238,10 +241,28 @@ void omap_framebuffer_update_scanout(struct drm_framebuffer *fb,
 			omap_gem_rotated_dma_addr(plane->bo, orient, x/2, y/2,
 						  &info->p_uv_addr);
 		} else {
-			info->p_uv_addr = get_linear_addr(plane, format, 1, x, y);
+			info->p_uv_addr =
+				get_linear_addr(plane, format, 1, x, y);
 		}
 	} else {
 		info->p_uv_addr = 0;
+	}
+
+	if (r_info) {
+		info->width /= 2;
+		info->out_width /= 2;
+
+		*r_info = *info;
+
+		r_info->pos_x = info->pos_x + info->out_width;
+
+		r_info->paddr =	get_linear_addr(&omap_fb->planes[0], format, 0,
+						x + info->width, y);
+		if (fb->format->format == DRM_FORMAT_NV12) {
+			r_info->p_uv_addr =
+				get_linear_addr(&omap_fb->planes[1], format, 1,
+						x + info->width, y);
+		}
 	}
 }
 
