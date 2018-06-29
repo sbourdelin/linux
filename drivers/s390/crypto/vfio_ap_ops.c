@@ -16,6 +16,7 @@
 
 #define VFOP_AP_MDEV_TYPE_HWVIRT "passthrough"
 #define VFIO_AP_MDEV_NAME_HWVIRT "VFIO AP Passthrough Device"
+#define KVM_AP_MASK_BYTES(n) DIV_ROUND_UP(n, BITS_PER_BYTE)
 
 DEFINE_SPINLOCK(mdev_list_lock);
 LIST_HEAD(mdev_list);
@@ -116,9 +117,325 @@ static struct attribute_group *vfio_ap_mdev_type_groups[] = {
 	NULL,
 };
 
+struct vfio_ap_qid_reserved {
+	ap_qid_t qid;
+	bool reserved;
+};
+
+struct vfio_id_reserved {
+	unsigned long id;
+	bool reserved;
+};
+
+/**
+ * vfio_ap_qid_reserved
+ *
+ * @dev: an AP queue device
+ * @data: a queue ID
+ *
+ * Flags whether any AP queue device has a particular qid
+ *
+ * Returns 0 to indicate the function succeeded
+ */
+static int vfio_ap_queue_has_qid(struct device *dev, void *data)
+{
+	struct vfio_ap_qid_reserved *qid_res = data;
+	struct ap_queue *ap_queue = to_ap_queue(dev);
+
+	if (qid_res->qid == ap_queue->qid)
+		qid_res->reserved = true;
+
+	return 0;
+}
+
+/**
+ * vfio_ap_queue_has_apid
+ *
+ * @dev: an AP queue device
+ * @data: an AP adapter ID
+ *
+ * Flags whether any AP queue device has a particular AP adapter ID
+ *
+ * Returns 0 to indicate the function succeeded
+ */
+static int vfio_ap_queue_has_apid(struct device *dev, void *data)
+{
+	struct vfio_id_reserved *id_res = data;
+	struct ap_queue *ap_queue = to_ap_queue(dev);
+
+	if (id_res->id == AP_QID_CARD(ap_queue->qid))
+		id_res->reserved = true;
+
+	return 0;
+}
+
+/**
+ * vfio_ap_verify_qid_reserved
+ *
+ * @matrix_dev: a mediated matrix device
+ * @qid: a qid (i.e., APQN)
+ *
+ * Verifies that the AP queue with @qid is reserved by the VFIO AP device
+ * driver.
+ *
+ * Returns 0 if the AP queue with @qid is reserved; otherwise, returns -ENODEV.
+ */
+static int vfio_ap_verify_qid_reserved(struct ap_matrix_dev *matrix_dev,
+				       ap_qid_t qid)
+{
+	int ret;
+	struct vfio_ap_qid_reserved qid_res;
+
+	qid_res.qid = qid;
+	qid_res.reserved = false;
+
+	ret = driver_for_each_device(matrix_dev->device.driver, NULL, &qid_res,
+				     vfio_ap_queue_has_qid);
+	if (ret)
+		return ret;
+
+	if (qid_res.reserved)
+		return 0;
+
+	return -EPERM;
+}
+
+/**
+ * vfio_ap_verify_apid_reserved
+ *
+ * @matrix_dev: a mediated matrix device
+ * @apid: an AP adapter ID
+ *
+ * Verifies that an AP queue with @apid is reserved by the VFIO AP device
+ * driver.
+ *
+ * Returns 0 if an AP queue with @apid is reserved; otherwise, returns -ENODEV.
+ */
+static int vfio_ap_verify_apid_reserved(struct ap_matrix_dev *matrix_dev,
+					const char *mdev_name,
+					unsigned long apid)
+{
+	int ret;
+	struct vfio_id_reserved id_res;
+
+	id_res.id = apid;
+	id_res.reserved = false;
+
+	ret = driver_for_each_device(matrix_dev->device.driver, NULL, &id_res,
+				     vfio_ap_queue_has_apid);
+	if (ret)
+		return ret;
+
+	if (id_res.reserved)
+		return 0;
+
+	pr_err("%s: mdev %s using adapter %02lx not reserved by %s driver",
+					VFIO_AP_MODULE_NAME, mdev_name, apid,
+					VFIO_AP_DRV_NAME);
+
+	return -EPERM;
+}
+
+static int vfio_ap_verify_queues_reserved(struct ap_matrix_dev *matrix_dev,
+					  const char *mdev_name,
+					  struct ap_matrix *matrix)
+{
+	unsigned long apid, apqi;
+	int ret;
+	int rc = 0;
+
+	for_each_set_bit_inv(apid, matrix->apm, matrix->apm_max + 1) {
+		for_each_set_bit_inv(apqi, matrix->aqm, matrix->aqm_max + 1) {
+			ret = vfio_ap_verify_qid_reserved(matrix_dev,
+							  AP_MKQID(apid, apqi));
+			if (ret == 0)
+				continue;
+
+			/*
+			 * We want to log every APQN that is not reserved by
+			 * the driver, so record the return code, log a message
+			 * and allow the loop to continue
+			 */
+			rc = ret;
+			pr_err("%s: mdev %s using queue %02lx.%04lx not reserved by %s driver",
+				VFIO_AP_MODULE_NAME, mdev_name, apid,
+				apqi, VFIO_AP_DRV_NAME);
+		}
+	}
+
+	return rc;
+}
+
+/**
+ * vfio_ap_validate_apid
+ *
+ * @mdev: the mediated device
+ * @matrix_mdev: the mediated matrix device
+ * @apid: the APID to validate
+ *
+ * Validates the value of @apid:
+ *	* If there are no AP domains assigned, then there must be at least
+ *	  one AP queue device reserved by the VFIO AP device driver with an
+ *	  APQN containing @apid.
+ *
+ *	* Else each APQN that can be derived from the intersection of @apid and
+ *	  the IDs of the AP domains already assigned must identify an AP queue
+ *	  that has been reserved by the VFIO AP device driver.
+ *
+ * Returns 0 if the value of @apid is valid; otherwise, returns an error.
+ */
+static int vfio_ap_validate_apid(struct mdev_device *mdev,
+				 struct ap_matrix_mdev *matrix_mdev,
+				 unsigned long apid)
+{
+	int ret;
+	unsigned long aqmsz = matrix_mdev->matrix.aqm_max + 1;
+	struct device *dev = mdev_parent_dev(mdev);
+	struct ap_matrix_dev *matrix_dev = to_ap_matrix_dev(dev);
+	struct ap_matrix matrix = matrix_mdev->matrix;
+
+	/* If there are any queues assigned to the mediated device */
+	if (find_first_bit_inv(matrix.aqm, aqmsz) < aqmsz) {
+		matrix.apm_max = matrix_mdev->matrix.apm_max;
+		memset(matrix.apm, 0,
+		       ARRAY_SIZE(matrix.apm) * sizeof(matrix.apm[0]));
+		set_bit_inv(apid, matrix.apm);
+		matrix.aqm_max = matrix_mdev->matrix.aqm_max;
+		memcpy(matrix.aqm, matrix_mdev->matrix.aqm,
+		       ARRAY_SIZE(matrix.aqm) * sizeof(matrix.aqm[0]));
+		ret = vfio_ap_verify_queues_reserved(matrix_dev,
+						     matrix_mdev->name,
+						     &matrix);
+	} else {
+		ret = vfio_ap_verify_apid_reserved(matrix_dev,
+						   matrix_mdev->name, apid);
+	}
+
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+/**
+ * assign_adapter_store
+ *
+ * @dev: the matrix device
+ * @attr: a mediated matrix device attribute
+ * @buf: a buffer containing the adapter ID (APID) to be assigned
+ * @count: the number of bytes in @buf
+ *
+ * Parses the APID from @buf and assigns it to the mediated matrix device. The
+ * APID must be a valid value:
+ *	* The APID value must not exceed the maximum allowable AP adapter ID
+ *
+ *	* If there are no AP domains assigned, then there must be at least
+ *	  one AP queue device reserved by the VFIO AP device driver with an
+ *	  APQN containing @apid.
+ *
+ *	* Else each APQN that can be derived from the intersection of @apid and
+ *	  the IDs of the AP domains already assigned must identify an AP queue
+ *	  that has been reserved by the VFIO AP device driver.
+ *
+ * Returns the number of bytes processed if the APID is valid; otherwise returns
+ * an error.
+ */
+static ssize_t assign_adapter_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	int ret;
+	unsigned long apid;
+	struct mdev_device *mdev = mdev_from_dev(dev);
+	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
+	unsigned long max_apid = matrix_mdev->matrix.apm_max;
+
+	ret = kstrtoul(buf, 0, &apid);
+	if (ret || (apid > max_apid)) {
+		pr_err("%s: %s: adapter id '%s' not a value from 0 to %02lu(%#04lx)",
+		       VFIO_AP_MODULE_NAME, __func__, buf, max_apid, max_apid);
+
+		return ret ? ret : -EINVAL;
+	}
+
+	ret = vfio_ap_validate_apid(mdev, matrix_mdev, apid);
+	if (ret)
+		return ret;
+
+	/* Set the bit in the AP mask (APM) corresponding to the AP adapter
+	 * number (APID). The bits in the mask, from most significant to least
+	 * significant bit, correspond to APIDs 0-255.
+	 */
+	set_bit_inv(apid, matrix_mdev->matrix.apm);
+
+	return count;
+}
+static DEVICE_ATTR_WO(assign_adapter);
+
+/**
+ * unassign_adapter_store
+ *
+ * @dev: the matrix device
+ * @attr: a mediated matrix device attribute
+ * @buf: a buffer containing the adapter ID (APID) to be assigned
+ * @count: the number of bytes in @buf
+ *
+ * Parses the APID from @buf and unassigns it from the mediated matrix device.
+ * The APID must be a valid value
+ *
+ * Returns the number of bytes processed if the APID is valid; otherwise returns
+ * an error.
+ */
+static ssize_t unassign_adapter_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	int ret;
+	unsigned long apid;
+	struct mdev_device *mdev = mdev_from_dev(dev);
+	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
+	unsigned long max_apid = matrix_mdev->matrix.apm_max;
+
+	ret = kstrtoul(buf, 0, &apid);
+	if (ret || (apid > max_apid)) {
+		pr_err("%s: %s: adapter id '%s' must be a value from 0 to %02lu(%#04lx)",
+		       VFIO_AP_MODULE_NAME, __func__, buf, max_apid, max_apid);
+
+		return ret ? ret : -EINVAL;
+	}
+
+	if (!test_bit_inv(apid, matrix_mdev->matrix.apm)) {
+		pr_err("%s: %s: adapter id %02lu(%#04lx) not assigned",
+		       VFIO_AP_MODULE_NAME, __func__, apid, apid);
+
+		return -ENODEV;
+	}
+
+	clear_bit_inv((unsigned long)apid, matrix_mdev->matrix.apm);
+
+	return count;
+}
+DEVICE_ATTR_WO(unassign_adapter);
+
+static struct attribute *vfio_ap_mdev_attrs[] = {
+	&dev_attr_assign_adapter.attr,
+	&dev_attr_unassign_adapter.attr,
+	NULL
+};
+
+static struct attribute_group vfio_ap_mdev_attr_group = {
+	.attrs = vfio_ap_mdev_attrs
+};
+
+static const struct attribute_group *vfio_ap_mdev_attr_groups[] = {
+	&vfio_ap_mdev_attr_group,
+	NULL
+};
+
 static const struct mdev_parent_ops vfio_ap_matrix_ops = {
 	.owner			= THIS_MODULE,
 	.supported_type_groups	= vfio_ap_mdev_type_groups,
+	.mdev_attr_groups	= vfio_ap_mdev_attr_groups,
 	.create			= vfio_ap_mdev_create,
 	.remove			= vfio_ap_mdev_remove,
 };
