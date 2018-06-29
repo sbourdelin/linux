@@ -21,6 +21,8 @@
 #define MBOX_DATA28(msg)		((msg) & ~0xf)
 #define MBOX_CHAN_PROPERTY		8
 
+#define MAX_RPI_FW_PROP_BUF_SIZE	32
+
 static struct platform_device *rpi_hwmon;
 
 struct rpi_firmware {
@@ -145,10 +147,14 @@ int rpi_firmware_property(struct rpi_firmware *fw,
 	/* Single tags are very small (generally 8 bytes), so the
 	 * stack should be safe.
 	 */
-	u8 data[buf_size + sizeof(struct rpi_firmware_property_tag_header)];
+	u8 data[sizeof(struct rpi_firmware_property_tag_header) +
+		MAX_RPI_FW_PROP_BUF_SIZE];
 	struct rpi_firmware_property_tag_header *header =
 		(struct rpi_firmware_property_tag_header *)data;
 	int ret;
+
+	if (WARN_ON(buf_size > sizeof(data) - sizeof(*header)))
+		return -EINVAL;
 
 	header->tag = tag;
 	header->buf_size = buf_size;
