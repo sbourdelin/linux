@@ -149,6 +149,8 @@ extern bool arch_uretprobe_is_alive(struct return_instance *ret, enum rp_check c
 extern bool arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
 extern void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
 					 void *src, unsigned long len);
+extern bool vma_has_uprobes(struct vm_area_struct *vma, unsigned long start,
+			    unsigned long end);
 #else /* !CONFIG_UPROBES */
 struct uprobes_state {
 };
@@ -202,6 +204,11 @@ static inline void uprobe_copy_process(struct task_struct *t, unsigned long flag
 }
 static inline void uprobe_clear_state(struct mm_struct *mm)
 {
+}
+static inline bool vma_has_uprobes(struct vm_area_struct *vma, unsigned long,
+				   unsigned long end)
+{
+	return false;
 }
 #endif /* !CONFIG_UPROBES */
 #endif	/* _LINUX_UPROBES_H */
