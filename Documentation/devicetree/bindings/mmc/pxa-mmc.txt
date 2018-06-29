@@ -8,7 +8,6 @@ Required properties:
 
 Optional properties:
 - marvell,detect-delay-ms: sets the detection delay timeout in ms.
-- marvell,gpio-power: GPIO spec for the card power enable pin
 
 This file documents differences between the core properties in mmc.txt
 and the properties used by the pxa-mmc driver.
