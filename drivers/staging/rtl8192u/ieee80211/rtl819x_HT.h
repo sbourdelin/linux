@@ -10,17 +10,17 @@
 //
 // Operation mode value
 //
-#define HT_OPMODE_NO_PROTECT		0
-#define HT_OPMODE_OPTIONAL		1
-#define HT_OPMODE_40MHZ_PROTECT	2
-#define HT_OPMODE_MIXED			3
+//#define HT_OPMODE_NO_PROTECT		0
+//#define HT_OPMODE_OPTIONAL		1
+//#define HT_OPMODE_40MHZ_PROTECT	2
+//#define HT_OPMODE_MIXED			3
 
 //
 // MIMO Power Save Settings
 //
 #define MIMO_PS_STATIC				0
-#define MIMO_PS_DYNAMIC			1
-#define MIMO_PS_NOLIMIT			3
+//#define MIMO_PS_DYNAMIC			1
+//#define MIMO_PS_NOLIMIT			3
 
 
 //
@@ -35,26 +35,25 @@
 #define HT_SUPPORTED_MCS_2SS_BITMAP					0x0000ff00
 #define HT_SUPPORTED_MCS_1SS_2SS_BITMAP			HT_MCS_1SS_BITMAP|HT_MCS_1SS_2SS_BITMAP
 
-
-typedef enum _HT_MCS_RATE {
-	HT_MCS0   = 0x00000001,
-	HT_MCS1   = 0x00000002,
-	HT_MCS2   = 0x00000004,
-	HT_MCS3   = 0x00000008,
-	HT_MCS4   = 0x00000010,
-	HT_MCS5   = 0x00000020,
-	HT_MCS6   = 0x00000040,
-	HT_MCS7   = 0x00000080,
-	HT_MCS8   = 0x00000100,
-	HT_MCS9   = 0x00000200,
-	HT_MCS10 = 0x00000400,
-	HT_MCS11 = 0x00000800,
-	HT_MCS12 = 0x00001000,
-	HT_MCS13 = 0x00002000,
-	HT_MCS14 = 0x00004000,
-	HT_MCS15 = 0x00008000,
-	// Do not define MCS32 here although 8190 support MCS32
-} HT_MCS_RATE, *PHT_MCS_RATE;
+//typedef enum _HT_MCS_RATE {
+//	HT_MCS0   = 0x00000001,
+//	HT_MCS1   = 0x00000002,
+//	HT_MCS2   = 0x00000004,
+//	HT_MCS3   = 0x00000008,
+//	HT_MCS4   = 0x00000010,
+//	HT_MCS5   = 0x00000020,
+//	HT_MCS6   = 0x00000040,
+//	HT_MCS7   = 0x00000080,
+//	HT_MCS8   = 0x00000100,
+//	HT_MCS9   = 0x00000200,
+//	HT_MCS10 = 0x00000400,
+//	HT_MCS11 = 0x00000800,
+//	HT_MCS12 = 0x00001000,
+//	HT_MCS13 = 0x00002000,
+//	HT_MCS14 = 0x00004000,
+//	HT_MCS15 = 0x00008000,
+//	// Do not define MCS32 here although 8190 support MCS32
+//} HT_MCS_RATE, *PHT_MCS_RATE;
 
 //
 // Represent Channel Width in HT Capabilities
@@ -120,27 +119,26 @@ typedef	union _HT_CAPABILITY_MACPARA{
 }HT_CAPABILITY_MACPARA, *PHT_CAPABILITY_MACPARA;
 */
 
-typedef enum _HT_ACTION {
-	ACT_RECOMMAND_WIDTH		= 0,
-	ACT_MIMO_PWR_SAVE		= 1,
-	ACT_PSMP					= 2,
-	ACT_SET_PCO_PHASE		= 3,
-	ACT_MIMO_CHL_MEASURE	= 4,
-	ACT_RECIPROCITY_CORRECT	= 5,
-	ACT_MIMO_CSI_MATRICS		= 6,
-	ACT_MIMO_NOCOMPR_STEER	= 7,
-	ACT_MIMO_COMPR_STEER		= 8,
-	ACT_ANTENNA_SELECT		= 9,
-} HT_ACTION, *PHT_ACTION;
-
+//typedef enum _HT_ACTION {
+//	ACT_RECOMMAND_WIDTH		= 0,
+//	ACT_MIMO_PWR_SAVE		= 1,
+//	ACT_PSMP					= 2,
+//	ACT_SET_PCO_PHASE		= 3,
+//	ACT_MIMO_CHL_MEASURE	= 4,
+//	ACT_RECIPROCITY_CORRECT	= 5,
+//	ACT_MIMO_CSI_MATRICS		= 6,
+//	ACT_MIMO_NOCOMPR_STEER	= 7,
+//	ACT_MIMO_COMPR_STEER		= 8,
+//	ACT_ANTENNA_SELECT		= 9,
+//} HT_ACTION, *PHT_ACTION;
 
 /* 2007/06/07 MH Define sub-carrier mode for 40MHZ. */
-typedef enum _HT_Bandwidth_40MHZ_Sub_Carrier {
-	SC_MODE_DUPLICATE = 0,
-	SC_MODE_LOWER = 1,
-	SC_MODE_UPPER = 2,
-	SC_MODE_FULL40MHZ = 3,
-}HT_BW40_SC_E;
+//typedef enum _HT_Bandwidth_40MHZ_Sub_Carrier {
+//	SC_MODE_DUPLICATE = 0,
+//	SC_MODE_LOWER = 1,
+//	SC_MODE_UPPER = 2,
+//	SC_MODE_FULL40MHZ = 3,
+//}HT_BW40_SC_E;
 
 typedef	struct _HT_CAPABILITY_ELE {
 
@@ -216,11 +214,11 @@ typedef struct _HT_INFORMATION_ELE {
 // MIMO Power Save control field.
 // This is appear in MIMO Power Save Action Frame
 //
-typedef struct _MIMOPS_CTRL {
-	u8	MimoPsEnable:1;
-	u8	MimoPsMode:1;
-	u8	Reserved:6;
-} MIMOPS_CTRL, *PMIMOPS_CTRL;
+//typedef struct _MIMOPS_CTRL {
+//	u8	MimoPsEnable:1;
+//	u8	MimoPsMode:1;
+//	u8	Reserved:6;
+//} MIMOPS_CTRL, *PMIMOPS_CTRL;
 
 typedef enum _HT_SPEC_VER {
 	HT_SPEC_VER_IEEE = 0,
@@ -348,26 +346,26 @@ typedef struct _RT_HIGH_THROUGHPUT {
 // when card is configured as "AP mode"
 //------------------------------------------------------------
 
-typedef struct _RT_HTINFO_STA_ENTRY {
-	u8			bEnableHT;
-
-	u8			bSupportCck;
-
-	u16			AMSDU_MaxSize;
-
-	u8			AMPDU_Factor;
-	u8			MPDU_Density;
-
-	u8			HTHighestOperaRate;
-
-	u8			bBw40MHz;
-
-	u8			MimoPs;
-
-	u8			McsRateSet[16];
-
-
-}RT_HTINFO_STA_ENTRY, *PRT_HTINFO_STA_ENTRY;
+//typedef struct _RT_HTINFO_STA_ENTRY {
+//	u8			bEnableHT;
+//
+//	u8			bSupportCck;
+//
+//	u16			AMSDU_MaxSize;
+//
+//	u8			AMPDU_Factor;
+//	u8			MPDU_Density;
+//
+//	u8			HTHighestOperaRate;
+//
+//	u8			bBw40MHz;
+//
+//	u8			MimoPs;
+//
+//	u8			McsRateSet[16];
+//
+//
+//}RT_HTINFO_STA_ENTRY, *PRT_HTINFO_STA_ENTRY;
 
 
 
@@ -396,26 +394,26 @@ typedef struct _BSS_HT {
 	u8					bdRT2RTLongSlotTime;
 } __attribute__ ((packed)) BSS_HT, *PBSS_HT;
 
-typedef struct _MIMO_RSSI {
-	u32	EnableAntenna;
-	u32	AntennaA;
-	u32	AntennaB;
-	u32	AntennaC;
-	u32	AntennaD;
-	u32	Average;
-}MIMO_RSSI, *PMIMO_RSSI;
+//typedef struct _MIMO_RSSI {
+//	u32	EnableAntenna;
+//	u32	AntennaA;
+//	u32	AntennaB;
+//	u32	AntennaC;
+//	u32	AntennaD;
+//	u32	Average;
+//}MIMO_RSSI, *PMIMO_RSSI;
 
-typedef struct _MIMO_EVM {
-	u32	EVM1;
-	u32    EVM2;
-}MIMO_EVM, *PMIMO_EVM;
+//typedef struct _MIMO_EVM {
+//	u32	EVM1;
+//	u32    EVM2;
+//}MIMO_EVM, *PMIMO_EVM;
 
-typedef struct _FALSE_ALARM_STATISTICS {
-	u32	Cnt_Parity_Fail;
-	u32    Cnt_Rate_Illegal;
-	u32	Cnt_Crc8_fail;
-	u32	Cnt_all;
-}FALSE_ALARM_STATISTICS, *PFALSE_ALARM_STATISTICS;
+//typedef struct _FALSE_ALARM_STATISTICS {
+//	u32	Cnt_Parity_Fail;
+//	u32    Cnt_Rate_Illegal;
+//	u32	Cnt_Crc8_fail;
+//	u32	Cnt_all;
+//}FALSE_ALARM_STATISTICS, *PFALSE_ALARM_STATISTICS;
 
 
 extern u8 MCS_FILTER_ALL[16];
@@ -424,16 +422,14 @@ extern u8 MCS_FILTER_1SS[16];
 /* 2007/07/11 MH Modify the macro. Becaus STA may link with a N-AP. If we set
    STA in A/B/G mode and AP is still in N mode. The macro will be wrong. We have
    to add a macro to judge wireless mode. */
-#define PICK_RATE(_nLegacyRate, _nMcsRate)	\
-		(_nMcsRate==0)?(_nLegacyRate&0x7f):(_nMcsRate)
+#define PICK_RATE(_nLegacyRate, _nMcsRate)     \
+               (_nMcsRate==0)?(_nLegacyRate&0x7f):(_nMcsRate)
 /* 2007/07/12 MH We only define legacy and HT wireless mode now. */
 #define	LEGACY_WIRELESS_MODE	IEEE_MODE_MASK
-
-#define CURRENT_RATE(WirelessMode, LegacyRate, HTRate)	\
-					((WirelessMode & (LEGACY_WIRELESS_MODE))!=0)?\
-						(LegacyRate):\
-						(PICK_RATE(LegacyRate, HTRate))
-
+#define CURRENT_RATE(WirelessMode, LegacyRate, HTRate)		\
+					((WirelessMode & (LEGACY_WIRELESS_MODE))!=0)? \
+					(LegacyRate):			\
+					(PICK_RATE(LegacyRate, HTRate))
 
 
 // MCS Bw 40 {1~7, 12~15,32}
@@ -441,7 +437,7 @@ extern u8 MCS_FILTER_1SS[16];
 #define	RATE_ADPT_2SS_MASK		0xF0 //Skip MCS8~11 because mcs7 > mcs6, 9, 10, 11. 2007.01.16 by Emily
 #define	RATE_ADPT_MCS32_MASK		0x01
 
-#define		IS_11N_MCS_RATE(rate)		(rate&0x80)
+//#define		IS_11N_MCS_RATE(rate)		(rate&0x80)
 
 typedef enum _HT_AGGRE_SIZE {
 	HT_AGG_SIZE_8K = 0,
