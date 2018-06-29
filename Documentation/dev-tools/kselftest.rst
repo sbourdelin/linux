@@ -156,6 +156,9 @@ Contributing new tests (details)
    installed by the distro on the system should be the primary focus to be able
    to find regressions.
 
+ * If a new test needs specific kernel options, they should be enabled in
+   then config file in the same directory where the test is added.
+
 Test Harness
 ============
 
