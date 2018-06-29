@@ -254,7 +254,7 @@ static void cache_rbio_pages(struct btrfs_raid_bio *rbio)
 		s = kmap(rbio->bio_pages[i]);
 		d = kmap(rbio->stripe_pages[i]);
 
-		memcpy(d, s, PAGE_SIZE);
+		copy_page(d, s);
 
 		kunmap(rbio->bio_pages[i]);
 		kunmap(rbio->stripe_pages[i]);
@@ -1257,7 +1257,7 @@ static noinline void finish_rmw(struct btrfs_raid_bio *rbio)
 						pointers);
 		} else {
 			/* raid5 */
-			memcpy(pointers[nr_data], pointers[0], PAGE_SIZE);
+			copy_page(pointers[nr_data], pointers[0]);
 			run_xor(pointers + 1, nr_data - 1, PAGE_SIZE);
 		}
 
@@ -1923,9 +1923,7 @@ static void __raid_recover_end_io(struct btrfs_raid_bio *rbio)
 			BUG_ON(failb != -1);
 pstripe:
 			/* Copy parity block into failed block to start with */
-			memcpy(pointers[faila],
-			       pointers[rbio->nr_data],
-			       PAGE_SIZE);
+			copy_page(pointers[faila], pointers[rbio->nr_data]);
 
 			/* rearrange the pointer array */
 			p = pointers[faila];
@@ -2430,7 +2428,7 @@ static noinline void finish_parity_scrub(struct btrfs_raid_bio *rbio,
 						pointers);
 		} else {
 			/* raid5 */
-			memcpy(pointers[nr_data], pointers[0], PAGE_SIZE);
+			copy_page(pointers[nr_data], pointers[0]);
 			run_xor(pointers + 1, nr_data - 1, PAGE_SIZE);
 		}
 
@@ -2438,7 +2436,7 @@ static noinline void finish_parity_scrub(struct btrfs_raid_bio *rbio,
 		p = rbio_stripe_page(rbio, rbio->scrubp, pagenr);
 		parity = kmap(p);
 		if (memcmp(parity, pointers[rbio->scrubp], PAGE_SIZE))
-			memcpy(parity, pointers[rbio->scrubp], PAGE_SIZE);
+			copy_page(parity, pointers[rbio->scrubp]);
 		else
 			/* Parity is right, needn't writeback */
 			bitmap_clear(rbio->dbitmap, pagenr, 1);
