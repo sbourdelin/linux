@@ -1411,7 +1411,8 @@ struct drm_i915_gem_context_create_v2 {
 	/*  output: id of new context*/
 	__u32 ctx_id;
 	__u32 flags;
-#define I915_GEM_CONTEXT_SHARE_GTT 0x1
+#define I915_GEM_CONTEXT_SHARE_GTT		0x1
+#define I915_GEM_CONTEXT_SINGLE_TIMELINE	0x2
 	__u32 share_ctx;
 	__u32 pad;
 };

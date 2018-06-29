@@ -1037,8 +1037,14 @@ void i915_request_add(struct i915_request *request)
 	prev = i915_gem_active_raw(&timeline->last_request,
 				   &request->i915->drm.struct_mutex);
 	if (prev && !i915_request_completed(prev)) {
-		i915_sw_fence_await_sw_fence(&request->submit, &prev->submit,
-					     &request->submitq);
+		if (prev->engine == engine)
+			i915_sw_fence_await_sw_fence(&request->submit,
+						     &prev->submit,
+						     &request->submitq);
+		else
+			__i915_sw_fence_await_dma_fence(&request->submit,
+							&prev->fence,
+							&request->dmaq);
 		if (engine->schedule)
 			__i915_sched_node_add_dependency(&request->sched,
 							 &prev->sched,

@@ -41,6 +41,7 @@ struct drm_i915_private;
 struct drm_i915_file_private;
 struct i915_hw_ppgtt;
 struct i915_request;
+struct i915_timeline;
 struct i915_vma;
 struct intel_ring;
 
@@ -65,6 +66,8 @@ struct i915_gem_context {
 
 	/** file_priv: owning file descriptor */
 	struct drm_i915_file_private *file_priv;
+
+	struct i915_timeline *timeline;
 
 	/**
 	 * @ppgtt: unique address space (GTT)

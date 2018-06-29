@@ -133,6 +133,9 @@ static void i915_gem_context_free(struct i915_gem_context *ctx)
 			ce->ops->destroy(ce);
 	}
 
+	if (ctx->timeline)
+		i915_timeline_put(ctx->timeline);
+
 	kfree(ctx->name);
 	put_pid(ctx->pid);
 
@@ -359,6 +362,7 @@ static void __destroy_hw_context(struct i915_gem_context *ctx,
 }
 
 #define CREATE_VM BIT(0)
+#define CREATE_TIMELINE BIT(1)
 
 static struct i915_gem_context *
 i915_gem_create_context(struct drm_i915_private *dev_priv,
@@ -368,6 +372,9 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 	struct i915_gem_context *ctx;
 
 	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
+	if (flags & CREATE_TIMELINE && !HAS_EXECLISTS(dev_priv))
+		return ERR_PTR(-EINVAL);
 
 	/* Reap the most stale context */
 	contexts_free_first(dev_priv);
@@ -389,6 +396,18 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 
 		ctx->ppgtt = ppgtt;
 		ctx->desc_template = default_desc_template(dev_priv, ppgtt);
+	}
+
+	if (flags & CREATE_TIMELINE) {
+		struct i915_timeline *timeline;
+
+		timeline = i915_timeline_create(dev_priv, ctx->name);
+		if (IS_ERR(timeline)) {
+			__destroy_hw_context(ctx, file_priv);
+			return ERR_CAST(timeline);
+		}
+
+		ctx->timeline = timeline;
 	}
 
 	trace_i915_context_create(ctx);
@@ -733,7 +752,9 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 	if (args->pad != 0)
 		return -EINVAL;
 
-	if (args->flags & ~I915_GEM_CONTEXT_SHARE_GTT)
+	if (args->flags &
+	    ~(I915_GEM_CONTEXT_SHARE_GTT |
+	      I915_GEM_CONTEXT_SINGLE_TIMELINE))
 		return -EINVAL;
 
 	if (client_is_banned(file_priv)) {
@@ -756,6 +777,9 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 
 		flags &= ~CREATE_VM;
 	}
+
+	if (args->flags & I915_GEM_CONTEXT_SINGLE_TIMELINE)
+		flags |= CREATE_TIMELINE;
 
 	err = i915_mutex_lock_interruptible(dev);
 	if (err)

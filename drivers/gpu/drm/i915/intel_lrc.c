@@ -2837,7 +2837,10 @@ static int execlists_context_deferred_alloc(struct i915_gem_context *ctx,
 		goto error_deref_obj;
 	}
 
-	timeline = i915_timeline_create(ctx->i915, ctx->name);
+	if (ctx->timeline)
+		timeline = i915_timeline_get(ctx->timeline);
+	else
+		timeline = i915_timeline_create(ctx->i915, ctx->name);
 	if (IS_ERR(timeline)) {
 		ret = PTR_ERR(timeline);
 		goto error_deref_obj;
