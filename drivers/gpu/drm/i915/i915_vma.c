@@ -63,18 +63,18 @@ static void vma_print_allocator(struct i915_vma *vma, const char *reason)
 
 #endif
 
+struct i915_vma_active {
+	struct i915_gem_active base;
+	struct i915_vma *vma;
+};
+
 static void
-i915_vma_retire(struct i915_gem_active *active, struct i915_request *rq)
+__i915_vma_retire(struct i915_vma *vma, struct i915_request *rq)
 {
-	const unsigned int idx = rq->engine->id;
-	struct i915_vma *vma =
-		container_of(active, struct i915_vma, last_read[idx]);
 	struct drm_i915_gem_object *obj = vma->obj;
 
-	GEM_BUG_ON(!i915_vma_has_active_engine(vma, idx));
-
-	i915_vma_clear_active(vma, idx);
-	if (i915_vma_is_active(vma))
+	GEM_BUG_ON(!i915_vma_is_active(vma));
+	if (--vma->active_count)
 		return;
 
 	GEM_BUG_ON(!drm_mm_node_allocated(&vma->node));
@@ -108,6 +108,19 @@ i915_vma_retire(struct i915_gem_active *active, struct i915_request *rq)
 	}
 }
 
+static void
+i915_vma_retire(struct i915_gem_active *base, struct i915_request *rq)
+{
+	struct i915_vma_active *active =
+		container_of(base, typeof(*active), base);
+	struct i915_vma *vma = active->vma;
+
+	GEM_BUG_ON(base != radix_tree_lookup(&vma->active_rt,
+					     rq->fence.context));
+
+	__i915_vma_retire(vma, rq);
+}
+
 static struct i915_vma *
 vma_create(struct drm_i915_gem_object *obj,
 	   struct i915_address_space *vm,
@@ -115,7 +128,6 @@ vma_create(struct drm_i915_gem_object *obj,
 {
 	struct i915_vma *vma;
 	struct rb_node *rb, **p;
-	int i;
 
 	/* The aliasing_ppgtt should never be used directly! */
 	GEM_BUG_ON(vm == &vm->i915->mm.aliasing_ppgtt->vm);
@@ -124,8 +136,8 @@ vma_create(struct drm_i915_gem_object *obj,
 	if (vma == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	for (i = 0; i < ARRAY_SIZE(vma->last_read); i++)
-		init_request_active(&vma->last_read[i], i915_vma_retire);
+	INIT_RADIX_TREE(&vma->active_rt, GFP_KERNEL);
+
 	init_request_active(&vma->last_fence, NULL);
 	vma->vm = vm;
 	vma->ops = &vm->vma_ops;
@@ -778,13 +790,12 @@ void i915_vma_reopen(struct i915_vma *vma)
 static void __i915_vma_destroy(struct i915_vma *vma)
 {
 	struct drm_i915_private *i915 = vma->vm->i915;
-	int i;
+	struct radix_tree_iter iter;
+	void __rcu **slot;
 
 	GEM_BUG_ON(vma->node.allocated);
 	GEM_BUG_ON(vma->fence);
 
-	for (i = 0; i < ARRAY_SIZE(vma->last_read); i++)
-		GEM_BUG_ON(i915_gem_active_isset(&vma->last_read[i]));
 	GEM_BUG_ON(i915_gem_active_isset(&vma->last_fence));
 
 	list_del(&vma->obj_link);
@@ -794,6 +805,17 @@ static void __i915_vma_destroy(struct i915_vma *vma)
 
 	if (!i915_vma_is_ggtt(vma))
 		i915_ppgtt_put(i915_vm_to_ppgtt(vma->vm));
+
+	rcu_read_lock();
+	radix_tree_for_each_slot(slot, &vma->active_rt, &iter, 0) {
+		struct i915_vma_active *active = rcu_dereference_raw(*slot);
+
+		GEM_BUG_ON(i915_gem_active_isset(&active->base));
+		kfree(active);
+
+		radix_tree_delete(&vma->active_rt, iter.index);
+	}
+	rcu_read_unlock();
 
 	kmem_cache_free(i915->vmas, vma);
 }
@@ -859,9 +881,111 @@ void i915_vma_revoke_mmap(struct i915_vma *vma)
 		list_del(&vma->obj->userfault_link);
 }
 
+static void export_fence(struct i915_vma *vma,
+			 struct i915_request *rq,
+			 unsigned int flags)
+{
+	struct reservation_object *resv = vma->resv;
+
+	/*
+	 * Ignore errors from failing to allocate the new fence, we can't
+	 * handle an error right now. Worst case should be missed
+	 * synchronisation leading to rendering corruption.
+	 */
+	reservation_object_lock(resv, NULL);
+	if (flags & EXEC_OBJECT_WRITE)
+		reservation_object_add_excl_fence(resv, &rq->fence);
+	else if (reservation_object_reserve_shared(resv) == 0)
+		reservation_object_add_shared_fence(resv, &rq->fence);
+	reservation_object_unlock(resv);
+}
+
+static struct i915_gem_active *lookup_active(struct i915_vma *vma, u64 idx)
+{
+	struct i915_vma_active *active;
+	int err;
+
+	/*
+	 * XXX Note that the radix_tree uses unsigned longs for it indices,
+	 * a problem for us on i386 with 32bit longs. However, the likelihood
+	 * of 2 timelines being used on the same VMA aliasing is minimal,
+	 * and further reduced by that both timelines must be active
+	 * simultaneously to confuse us.
+	 */
+	active = radix_tree_lookup(&vma->active_rt, idx);
+	if (likely(active)) {
+		GEM_BUG_ON(i915_gem_active_isset(&active->base) &&
+			   idx != i915_gem_active_peek(&active->base,
+						       &vma->vm->i915->drm.struct_mutex)->fence.context);
+		return &active->base;
+	}
+
+	active = kmalloc(sizeof(*active), GFP_KERNEL);
+	if (unlikely(!active))
+		return ERR_PTR(-ENOMEM);
+
+	init_request_active(&active->base, i915_vma_retire);
+	active->vma = vma;
+
+	err = radix_tree_insert(&vma->active_rt, idx, active);
+	if (unlikely(err)) {
+		kfree(active);
+		return ERR_PTR(err);
+	}
+
+	return &active->base;
+}
+
+int i915_vma_move_to_active(struct i915_vma *vma,
+			    struct i915_request *rq,
+			    unsigned int flags)
+{
+	struct drm_i915_gem_object *obj = vma->obj;
+	struct i915_gem_active *active;
+
+	lockdep_assert_held(&rq->i915->drm.struct_mutex);
+	GEM_BUG_ON(!drm_mm_node_allocated(&vma->node));
+
+	active = lookup_active(vma, rq->fence.context);
+	if (IS_ERR(active))
+		return PTR_ERR(active);
+
+	/*
+	 * Add a reference if we're newly entering the active list.
+	 * The order in which we add operations to the retirement queue is
+	 * vital here: mark_active adds to the start of the callback list,
+	 * such that subsequent callbacks are called first. Therefore we
+	 * add the active reference first and queue for it to be dropped
+	 * *last*.
+	 */
+	if (!i915_gem_active_isset(active) && !vma->active_count++) {
+		list_move_tail(&vma->vm_link, &vma->vm->active_list);
+		obj->active_count++;
+	}
+	i915_gem_active_set(active, rq);
+	GEM_BUG_ON(!i915_vma_is_active(vma));
+	GEM_BUG_ON(!obj->active_count);
+
+	obj->write_domain = 0;
+	if (flags & EXEC_OBJECT_WRITE) {
+		obj->write_domain = I915_GEM_DOMAIN_RENDER;
+
+		if (intel_fb_obj_invalidate(obj, ORIGIN_CS))
+			i915_gem_active_set(&obj->frontbuffer_write, rq);
+
+		obj->read_domains = 0;
+	}
+	obj->read_domains |= I915_GEM_GPU_DOMAINS;
+
+	if (flags & EXEC_OBJECT_NEEDS_FENCE)
+		i915_gem_active_set(&vma->last_fence, rq);
+
+	export_fence(vma, rq, flags);
+	return 0;
+}
+
 int i915_vma_unbind(struct i915_vma *vma)
 {
-	unsigned long active;
 	int ret;
 
 	lockdep_assert_held(&vma->vm->i915->drm.struct_mutex);
@@ -871,9 +995,9 @@ int i915_vma_unbind(struct i915_vma *vma)
 	 * have side-effects such as unpinning or even unbinding this vma.
 	 */
 	might_sleep();
-	active = i915_vma_get_active(vma);
-	if (active) {
-		int idx;
+	if (i915_vma_is_active(vma)) {
+		struct radix_tree_iter iter;
+		void __rcu **slot;
 
 		/*
 		 * When a closed VMA is retired, it is unbound - eek.
@@ -890,18 +1014,24 @@ int i915_vma_unbind(struct i915_vma *vma)
 		 */
 		__i915_vma_pin(vma);
 
-		for_each_active(active, idx) {
-			ret = i915_gem_active_retire(&vma->last_read[idx],
+		rcu_read_lock();
+		radix_tree_for_each_slot(slot, &vma->active_rt, &iter, 0) {
+			struct i915_vma_active *active =
+				rcu_dereference_raw(*slot);
+			rcu_read_unlock();
+
+			ret = i915_gem_active_retire(&active->base,
 						     &vma->vm->i915->drm.struct_mutex);
 			if (ret)
-				break;
-		}
+				goto unpin;
 
-		if (!ret) {
-			ret = i915_gem_active_retire(&vma->last_fence,
-						     &vma->vm->i915->drm.struct_mutex);
+			rcu_read_lock();
 		}
+		rcu_read_unlock();
 
+		ret = i915_gem_active_retire(&vma->last_fence,
+					     &vma->vm->i915->drm.struct_mutex);
+unpin:
 		__i915_vma_unpin(vma);
 		if (ret)
 			return ret;
