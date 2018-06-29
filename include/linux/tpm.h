@@ -50,8 +50,7 @@ struct tpm_class_ops {
 	void (*clk_enable)(struct tpm_chip *chip, bool value);
 };
 
-#if defined(CONFIG_TCG_TPM) || defined(CONFIG_TCG_TPM_MODULE)
-
+#if defined(CONFIG_TCG_TPM)
 extern int tpm_is_tpm2(struct tpm_chip *chip);
 extern int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
 extern int tpm_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash);
