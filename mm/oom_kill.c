@@ -424,12 +424,14 @@ static void dump_header(struct oom_control *oc, struct task_struct *p)
 	dump_stack();
 
 	/* one line summary of the oom killer context. */
-	pr_info("oom-kill:constraint=%s,nodemask=%*pbl,task=%s,pid=%5d,uid=%5d",
+	pr_info("oom-kill:constraint=%s,nodemask=%*pbl",
 			oom_constraint_text[oc->constraint],
-			nodemask_pr_args(oc->nodemask),
-			p->comm, p->pid, from_kuid(&init_user_ns, task_uid(p)));
+			nodemask_pr_args(oc->nodemask));
+	mem_cgroup_print_oom_context(oc->memcg, p);
+	pr_cont(",task=%s,pid=%5d,uid=%5d\n", p->comm, p->pid,
+			from_kuid(&init_user_ns, task_uid(p)));
 	if (is_memcg_oom(oc))
-		mem_cgroup_print_oom_info(oc->memcg, p);
+		mem_cgroup_print_oom_meminfo(oc->memcg);
 	else {
 		show_mem(SHOW_MEM_FILTER_NODES, oc->nodemask);
 		if (is_dump_unreclaim_slabs())
