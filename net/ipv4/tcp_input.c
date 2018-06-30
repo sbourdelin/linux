@@ -98,6 +98,8 @@ int sysctl_tcp_max_orphans __read_mostly = NR_FILE;
 #define FLAG_UPDATE_TS_RECENT	0x4000 /* tcp_replace_ts_recent() */
 #define FLAG_NO_CHALLENGE_ACK	0x8000 /* do not call tcp_send_challenge_ack()	*/
 #define FLAG_ACK_MAYBE_DELAYED	0x10000 /* Likely a delayed ACK */
+#define FLAG_OFO_POSSIBLE	0x20000 /* Possible OFO */
+#define FLAG_CWR		0x40000 /* CWR in this ACK */
 
 #define FLAG_ACKED		(FLAG_DATA_ACKED|FLAG_SYN_ACKED)
 #define FLAG_NOT_DUP		(FLAG_DATA|FLAG_WIN_UPDATE|FLAG_ACKED)
@@ -5091,7 +5093,7 @@ static inline void tcp_data_snd_check(struct sock *sk)
 /*
  * Check if sending an ack is needed.
  */
-static void __tcp_ack_snd_check(struct sock *sk, int ofo_possible)
+static void __tcp_ack_snd_check(struct sock *sk, int flags)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned long rtt, delay;
@@ -5106,13 +5108,16 @@ static void __tcp_ack_snd_check(struct sock *sk, int ofo_possible)
 	    (tp->rcv_nxt - tp->copied_seq < sk->sk_rcvlowat ||
 	     __tcp_select_window(sk) >= tp->rcv_wnd)) ||
 	    /* We ACK each frame or... */
-	    tcp_in_quickack_mode(sk)) {
+	    tcp_in_quickack_mode(sk) ||
+	    /* We received CWR */
+	    flags & FLAG_CWR) {
 send_now:
 		tcp_send_ack(sk);
 		return;
 	}
 
-	if (!ofo_possible || RB_EMPTY_ROOT(&tp->out_of_order_queue)) {
+	if (!(flags & FLAG_OFO_POSSIBLE) ||
+	    RB_EMPTY_ROOT(&tp->out_of_order_queue)) {
 		tcp_send_delayed_ack(sk);
 		return;
 	}
@@ -5138,13 +5143,13 @@ send_now:
 		      HRTIMER_MODE_REL_PINNED_SOFT);
 }
 
-static inline void tcp_ack_snd_check(struct sock *sk)
+static inline void tcp_ack_snd_check(struct sock *sk, int flags)
 {
 	if (!inet_csk_ack_scheduled(sk)) {
 		/* We sent a data segment already. */
 		return;
 	}
-	__tcp_ack_snd_check(sk, 1);
+	__tcp_ack_snd_check(sk, flags | FLAG_OFO_POSSIBLE);
 }
 
 /*
@@ -5493,6 +5498,7 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 				goto discard;
 			}
 		} else {
+			int flags;
 			int eaten = 0;
 			bool fragstolen = false;
 
@@ -5529,7 +5535,9 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 					goto no_ack;
 			}
 
-			__tcp_ack_snd_check(sk, 0);
+			flags = (tcp_flag_word(th) & TCP_FLAG_CWR) ?
+				FLAG_CWR : 0;
+			__tcp_ack_snd_check(sk, flags);
 no_ack:
 			if (eaten)
 				kfree_skb_partial(skb, fragstolen);
@@ -5565,7 +5573,8 @@ step5:
 	tcp_data_queue(sk, skb);
 
 	tcp_data_snd_check(sk);
-	tcp_ack_snd_check(sk);
+	tcp_ack_snd_check(sk, (tcp_flag_word(th) & TCP_FLAG_CWR) ?
+			  FLAG_CWR : 0);
 	return;
 
 csum_error:
@@ -6154,7 +6163,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 	/* tcp_data could move socket to TIME-WAIT */
 	if (sk->sk_state != TCP_CLOSE) {
 		tcp_data_snd_check(sk);
-		tcp_ack_snd_check(sk);
+		tcp_ack_snd_check(sk, 0);
 	}
 
 	if (!queued) {
