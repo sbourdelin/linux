@@ -5929,7 +5929,8 @@ void mem_cgroup_sk_free(struct sock *sk)
  * Charges @nr_pages to @memcg. Returns %true if the charge fit within
  * @memcg's configured limit, %false if the charge had to be forced.
  */
-bool mem_cgroup_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages)
+bool mem_cgroup_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages,
+			     bool force)
 {
 	gfp_t gfp_mask = GFP_KERNEL;
 
@@ -5940,7 +5941,10 @@ bool mem_cgroup_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages)
 			memcg->tcpmem_pressure = 0;
 			return true;
 		}
-		page_counter_charge(&memcg->tcpmem, nr_pages);
+
+		if (force)
+			page_counter_charge(&memcg->tcpmem, nr_pages);
+
 		memcg->tcpmem_pressure = 1;
 		return false;
 	}
@@ -5954,7 +5958,9 @@ bool mem_cgroup_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages)
 	if (try_charge(memcg, gfp_mask, nr_pages) == 0)
 		return true;
 
-	try_charge(memcg, gfp_mask|__GFP_NOFAIL, nr_pages);
+	if (force)
+		try_charge(memcg, gfp_mask|__GFP_NOFAIL, nr_pages);
+
 	return false;
 }
 
