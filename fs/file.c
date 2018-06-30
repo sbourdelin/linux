@@ -727,42 +727,44 @@ EXPORT_SYMBOL(fget_raw);
  * The fput_needed flag returned by fget_light should be passed to the
  * corresponding fput_light.
  */
-static unsigned long __fget_light(unsigned int fd, fmode_t mask)
+static fdtagptr_t __fget_light(unsigned int fd, fmode_t mask)
 {
+	const fdtagptr_t nil = tagptr_init(fdtagptr_t, NULL);
 	struct files_struct *files = current->files;
 	struct file *file;
 
 	if (atomic_read(&files->count) == 1) {
 		file = __fcheck_files(files, fd);
 		if (!file || unlikely(file->f_mode & mask))
-			return 0;
-		return (unsigned long)file;
+			return nil;
+		return tagptr_fold(fdtagptr_t, file, 0);
 	} else {
 		file = __fget(fd, mask);
 		if (!file)
-			return 0;
-		return FDPUT_FPUT | (unsigned long)file;
+			return nil;
+		return tagptr_fold(fdtagptr_t, file, FDPUT_FPUT);
 	}
 }
-unsigned long __fdget(unsigned int fd)
+
+fdtagptr_t __fdget(unsigned int fd)
 {
 	return __fget_light(fd, FMODE_PATH);
 }
 EXPORT_SYMBOL(__fdget);
 
-unsigned long __fdget_raw(unsigned int fd)
+fdtagptr_t __fdget_raw(unsigned int fd)
 {
 	return __fget_light(fd, 0);
 }
 
-unsigned long __fdget_pos(unsigned int fd)
+fdtagptr_t __fdget_pos(unsigned int fd)
 {
-	unsigned long v = __fdget(fd);
-	struct file *file = (struct file *)(v & ~3);
+	fdtagptr_t v = __fdget(fd);
+	struct file *file = tagptr_unfold_ptr(v);
 
 	if (file && (file->f_mode & FMODE_ATOMIC_POS)) {
 		if (file_count(file) > 1) {
-			v |= FDPUT_POS_UNLOCK;
+			tagptr_set_tags(&v, FDPUT_POS_UNLOCK);
 			mutex_lock(&file->f_pos_lock);
 		}
 	}
