@@ -560,12 +560,14 @@ endmenu
 
 endmenu	 # "ARC Architecture Configuration"
 
+menu "Memory Management"
 source "mm/Kconfig"
 
 config FORCE_MAX_ZONEORDER
 	int "Maximum zone order"
 	default "12" if ARC_HUGEPAGE_16M
 	default "11"
+endmenu # "Memory Management"
 
 source "net/Kconfig"
 source "drivers/Kconfig"
