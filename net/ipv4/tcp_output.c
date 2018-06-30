@@ -172,6 +172,8 @@ static inline void tcp_event_ack_sent(struct sock *sk, unsigned int pkts)
 			__sock_put(sk);
 	}
 	tcp_dec_quickack_mode(sk, pkts);
+	if (inet_csk_ack_scheduled(sk))
+		tcp_ca_event(sk, CA_EVENT_NON_DELAYED_ACK);
 	inet_csk_clear_xmit_timer(sk, ICSK_TIME_DACK);
 }
 
