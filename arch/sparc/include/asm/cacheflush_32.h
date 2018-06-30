@@ -4,6 +4,8 @@
 
 #include <asm/cachetlb_32.h>
 
+struct page;
+
 #define flush_cache_all() \
 	sparc32_cachetlb_ops->cache_all()
 #define flush_cache_mm(mm) \
