@@ -603,6 +603,45 @@ TRACE_EVENT(drv_set_key,
 	)
 );
 
+TRACE_EVENT(drv_replace_key,
+	TP_PROTO(struct ieee80211_local *local,
+		 struct ieee80211_sub_if_data *sdata,
+		 struct ieee80211_sta *sta,
+		 struct ieee80211_key_conf *old_key,
+		 struct ieee80211_key_conf *new_key),
+
+	TP_ARGS(local, sdata, sta, old_key, new_key),
+
+	TP_STRUCT__entry(
+		LOCAL_ENTRY
+		VIF_ENTRY
+		STA_ENTRY
+		KEY_ENTRY
+		__field(u32, cipher2)
+		__field(u8, hw_key_idx2)
+		__field(u8, flags2)
+		__field(s8, keyidx2)
+	),
+
+	TP_fast_assign(
+		LOCAL_ASSIGN;
+		VIF_ASSIGN;
+		STA_ASSIGN;
+		KEY_ASSIGN(old_key);
+		__entry->cipher2 = new_key->cipher;
+		__entry->flags2 = new_key->flags;
+		__entry->keyidx2 = new_key->keyidx;
+		__entry->hw_key_idx2 = new_key->hw_key_idx;
+	),
+
+	TP_printk(
+		LOCAL_PR_FMT  VIF_PR_FMT  STA_PR_FMT KEY_PR_FMT
+		" cipher2:0x%x, flags2=%#x, keyidx2=%d, hw_key_idx2=%d",
+		LOCAL_PR_ARG, VIF_PR_ARG, STA_PR_ARG, KEY_PR_ARG,
+		__entry->cipher2, __entry->flags2, __entry->keyidx2, __entry->hw_key_idx2
+	)
+);
+
 TRACE_EVENT(drv_update_tkip_key,
 	TP_PROTO(struct ieee80211_local *local,
 		 struct ieee80211_sub_if_data *sdata,

@@ -3137,6 +3137,14 @@ enum ieee80211_reconfig_type {
  *	Returns a negative error code if the key can't be added.
  *	The callback can sleep.
  *
+ * @replace_key: Replace a PTK key in the HW for a running association with a
+ *      new one.
+ *      Implementing this callback confirms that the driver/card supports
+ *      replacing the key without leaking cleartext packets, will no longer hand
+ *      over packets decrypted with the old key and not send out any packet
+ *      queued prior to this call with the new key after the callback has
+ *      returned.
+ *
  * @update_tkip_key: See the section "Hardware crypto acceleration"
  * 	This callback will be called in the context of Rx. Called for drivers
  * 	which set IEEE80211_KEY_FLAG_TKIP_REQ_RX_P1_KEY.
@@ -3585,6 +3593,10 @@ struct ieee80211_ops {
 	int (*set_key)(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		       struct ieee80211_key_conf *key);
+	int (*replace_key)(struct ieee80211_hw *hw,
+		       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+		       struct ieee80211_key_conf *old,
+		       struct ieee80211_key_conf *new);
 	void (*update_tkip_key)(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif,
 				struct ieee80211_key_conf *conf,
