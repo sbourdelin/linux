@@ -300,23 +300,26 @@ static void gmac_speed_set(struct net_device *netdev)
 		status.bits.speed = GMAC_SPEED_1000;
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII)
 			status.bits.mii_rmii = GMAC_PHY_RGMII_1000;
-		netdev_info(netdev, "connect to RGMII @ 1Gbit\n");
+		netdev_info(netdev, "connect %s to RGMII @ 1Gbit\n",
+			    phydev_name(phydev));
 		break;
 	case 100:
 		status.bits.speed = GMAC_SPEED_100;
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII)
 			status.bits.mii_rmii = GMAC_PHY_RGMII_100_10;
-		netdev_info(netdev, "connect to RGMII @ 100 Mbit\n");
+		netdev_info(netdev, "connect %s to RGMII @ 100 Mbit\n",
+			    phydev_name(phydev));
 		break;
 	case 10:
 		status.bits.speed = GMAC_SPEED_10;
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII)
 			status.bits.mii_rmii = GMAC_PHY_RGMII_100_10;
-		netdev_info(netdev, "connect to RGMII @ 10 Mbit\n");
+		netdev_info(netdev, "connect %s to RGMII @ 10 Mbit\n",
+			    phydev_name(phydev));
 		break;
 	default:
-		netdev_warn(netdev, "Not supported PHY speed (%d)\n",
-			    phydev->speed);
+		netdev_warn(netdev, "Unsupported PHY speed (%d) on %s\n",
+			    phydev->speed, phydev_name(phydev));
 	}
 
 	if (phydev->duplex == DUPLEX_FULL) {
