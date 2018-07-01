@@ -696,6 +696,15 @@ static void mt_complete_slot(struct mt_device *td, struct input_dev *input)
 	    td->num_received >= td->num_expected)
 		return;
 
+	/* drop invalid values after counting them */
+	if (td->curdata.x == 0xffff &&
+			td->curdata.y == 0xffff &&
+			td->curdata.w == 0xffff &&
+			td->curdata.h == 0xffff) {
+		td->num_received++;
+		return;
+	}
+
 	if (td->curvalid || (td->mtclass.quirks & MT_QUIRK_ALWAYS_VALID)) {
 		int active;
 		int slotnum = mt_compute_slot(td, input);
