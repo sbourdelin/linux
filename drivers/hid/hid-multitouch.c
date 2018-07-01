@@ -207,8 +207,8 @@ static int cypress_compute_slot(struct mt_device *td)
 {
 	if (td->curdata.contactid != 0 || td->num_received == 0)
 		return td->curdata.contactid;
-	else
-		return -1;
+
+	return -1;
 }
 
 static struct mt_class mt_classes[] = {
@@ -805,8 +805,8 @@ static int mt_compute_timestamp(struct mt_device *td, struct hid_field *field,
 	if (jdelta > MAX_TIMESTAMP_INTERVAL)
 		/* No data received for a while, resync the timestamp. */
 		return 0;
-	else
-		return td->timestamp + delta;
+
+	return td->timestamp + delta;
 }
 
 static int mt_touch_event(struct hid_device *hid, struct hid_field *field,
@@ -1112,7 +1112,8 @@ static int mt_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	 */
 	if (field->physical == HID_DG_STYLUS)
 		return 0;
-	else if ((field->physical == 0) &&
+
+	if ((field->physical == 0) &&
 		 (field->report->id != td->mt_report_id) &&
 		 (td->mt_report_id != -1))
 		return 0;
