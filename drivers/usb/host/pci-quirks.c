@@ -784,7 +784,7 @@ static void quirk_usb_handoff_ohci(struct pci_dev *pdev)
 	writel((u32) ~0, base + OHCI_INTRDISABLE);
 
 	/* Reset the USB bus, if the controller isn't already in RESET */
-	if (control & OHCI_HCFS) {
+	if ((pdev->vendor == PCI_VENDOR_ID_NVIDIA) && (control & OHCI_HCFS)) {
 		/* Go into RESET, preserving RWC (and possibly IR) */
 		writel(control & OHCI_CTRL_MASK, base + OHCI_CONTROL);
 		readl(base + OHCI_CONTROL);
