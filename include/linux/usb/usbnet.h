@@ -286,4 +286,5 @@ extern void usbnet_update_max_qlen(struct usbnet *dev);
 extern void usbnet_get_stats64(struct net_device *dev,
 			       struct rtnl_link_stats64 *stats);
 
+extern void usbnet_cdc_update_filter(struct usbnet *);
 #endif /* __LINUX_USB_USBNET_H */
