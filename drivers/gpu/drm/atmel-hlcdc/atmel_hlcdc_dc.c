@@ -762,7 +762,7 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
 
 	ret = atmel_hlcdc_dc_load(ddev);
 	if (ret)
-		goto err_unref;
+		goto err_put;
 
 	ret = drm_dev_register(ddev, 0);
 	if (ret)
@@ -773,8 +773,8 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
 err_unload:
 	atmel_hlcdc_dc_unload(ddev);
 
-err_unref:
-	drm_dev_unref(ddev);
+err_put:
+	drm_dev_put(ddev);
 
 	return ret;
 }
@@ -785,7 +785,7 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
 
 	drm_dev_unregister(ddev);
 	atmel_hlcdc_dc_unload(ddev);
-	drm_dev_unref(ddev);
+	drm_dev_put(ddev);
 
 	return 0;
 }
