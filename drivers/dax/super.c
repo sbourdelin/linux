@@ -177,6 +177,7 @@ enum dax_device_flags {
  * @host: optional name for lookups where the device path is not available
  * @private: dax driver private data
  * @flags: state and boolean properties
+ * @ops: function pointers for direct_access and fs-dax
  */
 struct dax_device {
 	struct hlist_node list;
