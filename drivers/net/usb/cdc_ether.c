@@ -77,9 +77,7 @@ static const u8 mbm_guid[16] = {
 
 static void usbnet_cdc_update_filter(struct usbnet *dev)
 {
-	struct cdc_state	*info = (void *) &dev->data;
-	struct usb_interface	*intf = info->control;
-	struct net_device	*net = dev->net;
+	struct net_device *net = dev->net;
 
 	u16 cdc_filter = USB_CDC_PACKET_TYPE_DIRECTED
 			| USB_CDC_PACKET_TYPE_BROADCAST;
@@ -93,16 +91,13 @@ static void usbnet_cdc_update_filter(struct usbnet *dev)
 	if (!netdev_mc_empty(net) || (net->flags & IFF_ALLMULTI))
 		cdc_filter |= USB_CDC_PACKET_TYPE_ALL_MULTICAST;
 
-	usb_control_msg(dev->udev,
-			usb_sndctrlpipe(dev->udev, 0),
+	usbnet_write_cmd(dev,
 			USB_CDC_SET_ETHERNET_PACKET_FILTER,
-			USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			USB_TYPE_CLASS | USB_DIR_OUT | USB_RECIP_INTERFACE,
 			cdc_filter,
-			intf->cur_altsetting->desc.bInterfaceNumber,
+			dev->intf->cur_altsetting->desc.bInterfaceNumber,
 			NULL,
-			0,
-			USB_CTRL_SET_TIMEOUT
-		);
+			0);
 }
 
 /* probes control interface, claims data interface, collects the bulk
