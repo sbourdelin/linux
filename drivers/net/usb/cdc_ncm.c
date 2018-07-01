@@ -750,16 +750,7 @@ int cdc_ncm_change_mtu(struct net_device *net, int new_mtu)
 }
 EXPORT_SYMBOL_GPL(cdc_ncm_change_mtu);
 
-static const struct net_device_ops cdc_ncm_netdev_ops = {
-	.ndo_open	     = usbnet_open,
-	.ndo_stop	     = usbnet_stop,
-	.ndo_start_xmit	     = usbnet_start_xmit,
-	.ndo_tx_timeout	     = usbnet_tx_timeout,
-	.ndo_get_stats64     = usbnet_get_stats64,
-	.ndo_change_mtu	     = cdc_ncm_change_mtu,
-	.ndo_set_mac_address = eth_mac_addr,
-	.ndo_validate_addr   = eth_validate_addr,
-};
+static struct net_device_ops cdc_ncm_netdev_ops;
 
 int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_altsetting, int drvflags)
 {
@@ -939,6 +930,8 @@ int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_
 	dev->net->sysfs_groups[0] = &cdc_ncm_sysfs_attr_group;
 
 	/* must handle MTU changes */
+	cdc_ncm_netdev_ops = *dev->net->netdev_ops;
+	cdc_ncm_netdev_ops.ndo_change_mtu = cdc_ncm_change_mtu;
 	dev->net->netdev_ops = &cdc_ncm_netdev_ops;
 	dev->net->max_mtu = cdc_ncm_max_dgram_size(dev) - cdc_ncm_eth_hlen(dev);
 
