@@ -922,6 +922,7 @@ int intel_crtc_set_crc_source(struct drm_crtc *crtc, const char *source_name,
 	enum intel_pipe_crc_source source;
 	u32 val = 0; /* shut up gcc */
 	int ret = 0;
+	bool dc_off = false;
 
 	if (display_crc_ctl_parse_source(source_name, &source) < 0) {
 		DRM_DEBUG_DRIVER("unknown source %s\n", source_name);
@@ -938,11 +939,19 @@ int intel_crtc_set_crc_source(struct drm_crtc *crtc, const char *source_name,
 	if (ret != 0)
 		goto out;
 
+	dc_off = dev_priv->csr.dmc_payload && power_domain == POWER_DOMAIN_PIPE_A;
+	if (dc_off && source)
+		intel_display_power_get(dev_priv, POWER_DOMAIN_PIPE_A_CRC);
+
 	pipe_crc->source = source;
 	I915_WRITE(PIPE_CRC_CTL(crtc->index), val);
 	POSTING_READ(PIPE_CRC_CTL(crtc->index));
 
 	if (!source) {
+		if (dc_off)
+			intel_display_power_put(dev_priv,
+						POWER_DOMAIN_PIPE_A_CRC);
+
 		if (IS_G4X(dev_priv))
 			g4x_undo_pipe_scramble_reset(dev_priv, crtc->index);
 		else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
