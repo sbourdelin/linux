@@ -535,7 +535,6 @@ config MEM_SOFT_DIRTY
 config ZSWAP
 	bool "Compressed cache for swap pages (EXPERIMENTAL)"
 	depends on FRONTSWAP && CRYPTO=y
-	select CRYPTO_LZO
 	select ZPOOL
 	default n
 	help
@@ -551,6 +550,40 @@ config ZSWAP
 	  interactions don't cause any known issues on simple memory setups,
 	  they have not be fully explored on the large set of potential
 	  configurations and workloads that exist.
+
+choice
+	prompt "Compressed cache cryptographic compression algorithm"
+	default ZSWAP_COMPRESSOR_DEFAULT_LZO
+	depends on ZSWAP
+	help
+	  The default cyptrographic compression algorithm to use for
+	  compressed swap pages.
+
+config ZSWAP_COMPRESSOR_DEFAULT_LZO
+	bool "lzo"
+	select CRYPTO_LZO
+	help
+	  This option sets the default zswap compression algorithm to LZO,
+	  the Lempel-Ziv-Oberhumer algorithm. This algorthm focuses on
+	  decompression speed, but has a lower compression ratio.
+
+config ZSWAP_COMPRESSOR_DEFAULT_DEFLATE
+	bool "deflate"
+	select CRYPTO_DEFLATE
+	help
+	  This option sets the default zswap compression algorithm to DEFLATE.
+	  This algorithm balances compression and decompression speed to
+	  compresstion ratio.
+
+config ZSWAP_COMPRESSOR_DEFAULT_LZ4
+	bool "lz4"
+	select CRYPTO_LZ4
+	help
+	  This option sets the default zswap compression algorithm to LZ4.
+	  This algorithm focuses on high compression speed, but has a lower
+	  compression ratio and decompression speed.
+
+endchoice
 
 config ZPOOL
 	tristate "Common API for compressed memory storage"
