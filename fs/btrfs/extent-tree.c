@@ -10062,6 +10062,31 @@ btrfs_create_block_group_cache(struct btrfs_fs_info *fs_info,
 	return cache;
 }
 
+static int verify_chunk_block_group_mapping(struct btrfs_fs_info *fs_info,
+					    u64 start, u64 len)
+{
+	struct btrfs_mapping_tree *map_tree = &fs_info->mapping_tree;
+	struct extent_map *em;
+	int ret;
+
+	read_lock(&map_tree->map_tree.lock);
+	em = lookup_extent_mapping(&map_tree->map_tree, start, len);
+	read_unlock(&map_tree->map_tree.lock);
+
+	if (!em) {
+		ret = -ENOENT;
+		goto out;
+	}
+	if (em->start != start || em->len != len) {
+		ret = -ENOENT;
+		goto out;
+	}
+	ret = 0;
+out:
+	free_extent_map(em);
+	return ret;
+}
+
 int btrfs_read_block_groups(struct btrfs_fs_info *info)
 {
 	struct btrfs_path *path;
@@ -10103,6 +10128,19 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 
 		leaf = path->nodes[0];
 		btrfs_item_key_to_cpu(leaf, &found_key, path->slots[0]);
+
+		/*
+		 * Since block group and chunks are 1:1 mapped and are core
+		 * infrastructure of btrfs, we need to do extra verification.
+		 */
+		ret = verify_chunk_block_group_mapping(info,
+					found_key.objectid, found_key.offset);
+		if (ret < 0) {
+			btrfs_err_rl(info,
+		"block group start=%llu len=%llu doesn't have matched chunk",
+				     found_key.objectid, found_key.offset);
+			goto error;
+		}
 
 		cache = btrfs_create_block_group_cache(info, found_key.objectid,
 						       found_key.offset);
