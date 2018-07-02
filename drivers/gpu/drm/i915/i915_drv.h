@@ -2993,6 +2993,8 @@ i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
 {
 	might_lock(&obj->mm.lock);
 
+	track_i915_gem_object_pin_pages(obj);
+
 	if (atomic_inc_not_zero(&obj->mm.pages_pin_count))
 		return 0;
 
