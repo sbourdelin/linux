@@ -149,8 +149,7 @@
 
 #include "net-sysfs.h"
 
-/* Instead of increasing this, you should create a hash table. */
-#define MAX_GRO_SKBS 8
+#define MAX_GRO_SKBS 64
 
 /* This should be increased if a protocol with a bigger head is added. */
 #define GRO_MAX_HEAD (MAX_HEADER + 128)
