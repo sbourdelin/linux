@@ -414,15 +414,8 @@ static int powernv_add_idle_states(void)
 		else
 			target_residency = 0;
 
-		if (has_stop_states) {
-			int err = validate_psscr_val_mask(&psscr_val[i],
-							  &psscr_mask[i],
-							  flags[i]);
-			if (err) {
-				report_invalid_psscr_val(psscr_val[i], err);
-				continue;
-			}
-		}
+		if (has_stop_states && !(state->valid))
+			continue;
 
 		if (flags[i] & OPAL_PM_TIMEBASE_STOP)
 			stops_timebase = true;
