@@ -12,7 +12,7 @@ virtual report
 @r1 exists@
 identifier a, x;
 position p1, p2;
-identifier fname =~ ".*free.*";
+identifier fname =~ "free";
 identifier fname2 =~ ".*destroy.*";
 identifier fname3 =~ ".*del.*";
 identifier fname4 =~ ".*queue_work.*";
@@ -60,8 +60,7 @@ coccilib.report.print_report(p1[0], msg % (p2[0].line))
 @r4 exists@
 identifier a, x, y;
 position p1, p2;
-identifier fname =~ ".*free.*";
-
+identifier fname =~ "free";
 @@
 
 (
