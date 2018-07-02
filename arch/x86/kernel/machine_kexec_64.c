@@ -496,6 +496,10 @@ int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
 			value -= (u64)address;
 			*(u32 *)location = value;
 			break;
+		case R_X86_64_PC64:
+			value -= (u64)address;
+			*(u64 *)location = value;
+			break;
 		default:
 			pr_err("Unknown rela relocation: %llu\n",
 			       ELF64_R_TYPE(rel[i].r_info));
