@@ -506,6 +506,7 @@ int drm_dev_init(struct drm_device *dev,
 	dev->driver = driver;
 
 	INIT_LIST_HEAD(&dev->filelist);
+	INIT_LIST_HEAD(&dev->filelist_internal);
 	INIT_LIST_HEAD(&dev->ctxlist);
 	INIT_LIST_HEAD(&dev->vmalist);
 	INIT_LIST_HEAD(&dev->maplist);

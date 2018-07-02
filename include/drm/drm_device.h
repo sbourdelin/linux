@@ -74,6 +74,13 @@ struct drm_device {
 	struct mutex filelist_mutex;
 	struct list_head filelist;
 
+	/**
+	 * @filelist_internal:
+	 *
+	 * List of open DRM files for in-kernel clients. Protected by @filelist_mutex.
+	 */
+	struct list_head filelist_internal;
+
 	/** \name Memory management */
 	/*@{ */
 	struct list_head maplist;	/**< Linked list of regions */
