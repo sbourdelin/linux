@@ -6361,12 +6361,40 @@ perf_callchain(struct perf_event *event, struct pt_regs *regs)
 	return callchain ?: &__empty_callchain;
 }
 
+static struct pt_regs *perf_get_sample_regs(struct perf_event *event,
+					    struct pt_regs *regs)
+{
+	/*
+	 * Due to interrupt latency (AKA "skid"), we may enter the kernel
+	 * before taking an overflow, even if the PMU is only counting user
+	 * events.
+	 *
+	 * If we're not counting kernel events, always use the user regs when
+	 * sampling.
+	 *
+	 * TODO: what do we do about sampling a guest's registers? The IP is
+	 * special-cased, but for the rest of the regs they'll get the
+	 * user/kernel regs depending on whether exclude_kernel is set, which
+	 * is nonsensical.
+	 *
+	 * We can't get at the full set of regs in all cases (e.g. Xen's PV PMU
+	 * can't provide the GPRs), so should we just zero the GPRs when in a
+	 * guest? Or skip outputting the regs in perf_output_sample?
+	 */
+	if (event->attr.exclude_kernel && !user_mode(regs))
+		return task_pt_regs(current);
+
+	return regs;
+}
+
 void perf_prepare_sample(struct perf_event_header *header,
 			 struct perf_sample_data *data,
 			 struct perf_event *event,
 			 struct pt_regs *regs)
 {
 	u64 sample_type = event->attr.sample_type;
+
+	regs = perf_get_sample_regs(event, regs);
 
 	header->type = PERF_RECORD_SAMPLE;
 	header->size = sizeof(*header) + event->header_size;
