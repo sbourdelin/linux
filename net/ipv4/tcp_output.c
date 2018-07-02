@@ -172,6 +172,8 @@ static inline void tcp_event_ack_sent(struct sock *sk, unsigned int pkts)
 			__sock_put(sk);
 	}
 	tcp_dec_quickack_mode(sk, pkts);
+	if (inet_csk_ack_scheduled(sk))
+		tcp_ca_event(sk, CA_EVENT_NON_DELAYED_ACK);
 	inet_csk_clear_xmit_timer(sk, ICSK_TIME_DACK);
 }
 
@@ -3566,8 +3568,6 @@ void tcp_send_ack(struct sock *sk)
 	/* If we have been reset, we may not send again. */
 	if (sk->sk_state == TCP_CLOSE)
 		return;
-
-	tcp_ca_event(sk, CA_EVENT_NON_DELAYED_ACK);
 
 	/* We are not putting this on the write queue, so
 	 * tcp_transmit_skb() will set the ownership to this
