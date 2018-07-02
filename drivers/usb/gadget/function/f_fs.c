@@ -338,11 +338,6 @@ static ssize_t ffs_ep0_write(struct file *file, const char __user *buf,
 	case FFS_READ_DESCRIPTORS:
 	case FFS_READ_STRINGS:
 		/* Copy data */
-		if (unlikely(len < 16)) {
-			ret = -EINVAL;
-			break;
-		}
-
 		data = ffs_prepare_buffer(buf, len);
 		if (IS_ERR(data)) {
 			ret = PTR_ERR(data);
@@ -2365,8 +2360,17 @@ static int __ffs_data_got_descs(struct ffs_data *ffs,
 			      FUNCTIONFS_VIRTUAL_ADDR |
 			      FUNCTIONFS_EVENTFD |
 			      FUNCTIONFS_ALL_CTRL_RECIP |
-			      FUNCTIONFS_CONFIG0_SETUP)) {
+			      FUNCTIONFS_CONFIG0_SETUP |
+			      FUNCTIONFS_CONTROL_ONLY)) {
 			ret = -ENOSYS;
+			goto error;
+		}
+		if ((bool) (flags & (FUNCTIONFS_HAS_FS_DESC |
+			      FUNCTIONFS_HAS_HS_DESC |
+			      FUNCTIONFS_HAS_SS_DESC)) ==
+		    (bool) (flags & FUNCTIONFS_CONTROL_ONLY)) {
+			pr_err("Must have at least one speed descriptor "
+					"or CONTROL_ONLY (but not both)\n");
 			goto error;
 		}
 		data += 12;
@@ -2448,7 +2452,7 @@ static int __ffs_data_got_descs(struct ffs_data *ffs,
 		len -= ret;
 	}
 
-	if (raw_descs == data || len) {
+	if (len) {
 		ret = -EINVAL;
 		goto error;
 	}
@@ -3001,10 +3005,6 @@ static int _ffs_func_bind(struct usb_configuration *c,
 	char *vlabuf;
 
 	ENTER();
-
-	/* Has descriptors only for speeds gadget does not support */
-	if (unlikely(!(full | high | super)))
-		return -ENOTSUPP;
 
 	/* Allocate a single chunk, less management later on */
 	vlabuf = kzalloc(vla_group_size(d), GFP_KERNEL);
