@@ -178,6 +178,12 @@ struct hw_perf_event {
 	/* Last sync'ed generation of filters */
 	unsigned long			addr_filters_gen;
 
+	/* PMU driver configuration */
+	void				*drv_config;
+
+	/* Last sync'ed generation of driver config */
+	unsigned long			drv_config_gen;
+
 /*
  * hw_perf_event::state flags; used to track the PERF_EF_* state.
  */
@@ -447,6 +453,26 @@ struct pmu {
 	 * Filter events for PMU-specific reasons.
 	 */
 	int (*filter_match)		(struct perf_event *event); /* optional */
+
+	/*
+	 * Valiate complex PMU configuration that don't fit in the
+	 * perf_event_attr struct.  Returns a PMU specific pointer or an error
+	 * value < 0.
+	 *
+	 * As with addr_filters_validate(), runs in the context of the ioctl()
+	 * process and is not serialized with the rest of the PMU callbacks.
+	 */
+	void *(*drv_config_validate)	(struct perf_event *event,
+					 char *config_str);
+
+	/* Synchronize PMU driver configuration */
+	void (*drv_config_sync)		(struct perf_event *event);
+
+	/*
+	 * Release PMU specific configuration acquired by
+	 * drv_config_validate()
+	 */
+	void (*drv_config_free)		(void *drv_data);
 };
 
 enum perf_addr_filter_action_t {
@@ -487,6 +513,11 @@ struct perf_addr_filters_head {
 	struct list_head	list;
 	raw_spinlock_t		lock;
 	unsigned int		nr_file_filters;
+};
+
+struct perf_drv_config {
+	void		*drv_config;
+	raw_spinlock_t	lock;
 };
 
 /**
@@ -667,6 +698,10 @@ struct perf_event {
 	/* vma address array for file-based filders */
 	unsigned long			*addr_filters_offs;
 	unsigned long			addr_filters_gen;
+
+	/* PMU driver specific configuration */
+	struct perf_drv_config		drv_config;
+	unsigned long			drv_config_gen;
 
 	void (*destroy)(struct perf_event *);
 	struct rcu_head			rcu_head;
@@ -1234,6 +1269,13 @@ static inline bool has_addr_filter(struct perf_event *event)
 	return event->pmu->nr_addr_filters;
 }
 
+static inline bool has_drv_config(struct perf_event *event)
+{
+	return event->pmu->drv_config_validate &&
+	       event->pmu->drv_config_sync &&
+	       event->pmu->drv_config_free;
+}
+
 /*
  * An inherited event uses parent's filters
  */
@@ -1248,7 +1290,19 @@ perf_event_addr_filters(struct perf_event *event)
 	return ifh;
 }
 
+static inline struct perf_drv_config *
+perf_event_get_drv_config(struct perf_event *event)
+{
+	struct perf_drv_config *cfg = &event->drv_config;
+
+	if (event->parent)
+		cfg = &event->parent->drv_config;
+
+	return cfg;
+}
+
 extern void perf_event_addr_filters_sync(struct perf_event *event);
+extern void perf_event_drv_config_sync(struct perf_event *event);
 
 extern int perf_output_begin(struct perf_output_handle *handle,
 			     struct perf_event *event, unsigned int size);

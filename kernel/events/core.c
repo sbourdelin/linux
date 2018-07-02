@@ -2829,6 +2829,29 @@ void perf_event_addr_filters_sync(struct perf_event *event)
 }
 EXPORT_SYMBOL_GPL(perf_event_addr_filters_sync);
 
+/*
+ * PMU driver configuration works the same way as filter management above,
+ * but without the need to deal with memory mapping.  Driver configuration
+ * arrives through the SET_DRV_CONFIG ioctl() where it is validated and applied
+ * to the event.  When the PMU is ready it calls perf_event_drv_config_sync() to
+ * bring the configuration information within reach of the PMU.
+ */
+void perf_event_drv_config_sync(struct perf_event *event)
+{
+	struct perf_drv_config *drv_config = perf_event_get_drv_config(event);
+
+	if (!has_drv_config(event))
+		return;
+
+	raw_spin_lock(&drv_config->lock);
+	if (event->drv_config_gen != event->hw.drv_config_gen) {
+		event->pmu->drv_config_sync(event);
+		event->hw.drv_config_gen = event->drv_config_gen;
+	}
+	raw_spin_unlock(&drv_config->lock);
+}
+EXPORT_SYMBOL_GPL(perf_event_drv_config_sync);
+
 static int _perf_event_refresh(struct perf_event *event, int refresh)
 {
 	/*
@@ -4410,6 +4433,7 @@ static bool exclusive_event_installable(struct perf_event *event,
 
 static void perf_addr_filters_splice(struct perf_event *event,
 				       struct list_head *head);
+static void perf_drv_config_splice(struct perf_event *event, void *drv_data);
 
 static void _free_event(struct perf_event *event)
 {
@@ -4440,6 +4464,7 @@ static void _free_event(struct perf_event *event)
 	perf_event_free_bpf_prog(event);
 	perf_addr_filters_splice(event, NULL);
 	kfree(event->addr_filters_offs);
+	perf_drv_config_splice(event, NULL);
 
 	if (event->destroy)
 		event->destroy(event);
@@ -5002,6 +5027,8 @@ static inline int perf_fget_light(int fd, struct fd *p)
 static int perf_event_set_output(struct perf_event *event,
 				 struct perf_event *output_event);
 static int perf_event_set_filter(struct perf_event *event, void __user *arg);
+static int perf_event_set_drv_config(struct perf_event *event,
+				     void __user *arg);
 static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
 static int perf_copy_attr(struct perf_event_attr __user *uattr,
 			  struct perf_event_attr *attr);
@@ -5088,6 +5115,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
 
 		return perf_event_modify_attr(event,  &new_attr);
 	}
+
+	case PERF_EVENT_IOC_SET_DRV_CONFIG:
+		return perf_event_set_drv_config(event, (void __user *)arg);
+
 	default:
 		return -ENOTTY;
 	}
@@ -9083,6 +9114,85 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
 		ret = perf_event_set_addr_filter(event, filter_str);
 
 	kfree(filter_str);
+	return ret;
+}
+
+static void perf_drv_config_splice(struct perf_event *event, void *drv_data)
+{
+	unsigned long flags;
+	void *old_drv_data;
+
+	if (!has_drv_config(event))
+		return;
+
+	/* Children take their configuration from their parent */
+	if (event->parent)
+		return;
+
+	raw_spin_lock_irqsave(&event->drv_config.lock, flags);
+
+	old_drv_data = event->drv_config.drv_config;
+	event->drv_config.drv_config = drv_data;
+
+	raw_spin_unlock_irqrestore(&event->drv_config.lock, flags);
+
+	event->pmu->drv_config_free(old_drv_data);
+}
+
+static void perf_event_drv_config_apply(struct perf_event *event)
+{
+	unsigned long flags;
+	struct perf_drv_config *drv_config = perf_event_get_drv_config(event);
+
+	/* Notify event that a new configuration is available */
+	raw_spin_lock_irqsave(&drv_config->lock, flags);
+	event->drv_config_gen++;
+	raw_spin_unlock_irqrestore(&drv_config->lock, flags);
+}
+
+static int
+perf_event_process_drv_config(struct perf_event *event, char *config_str)
+{
+	int ret = -EINVAL;
+	void *drv_data;
+
+	/* Make sure ctx.mutex it held */
+	lockdep_assert_held(&event->ctx->mutex);
+
+	/* Children take their configuration from their parent */
+	if (WARN_ON_ONCE(event->parent))
+		goto out;
+
+	drv_data = event->pmu->drv_config_validate(event, config_str);
+	if (!drv_data)
+		goto out;
+	if (IS_ERR(drv_data)) {
+		ret = PTR_ERR(drv_data);
+		goto out;
+	}
+
+	perf_drv_config_splice(event, drv_data);
+
+	perf_event_for_each_child(event, perf_event_drv_config_apply);
+
+	ret = 0;
+out:
+	return ret;
+}
+
+static int perf_event_set_drv_config(struct perf_event *event, void __user *arg)
+{
+	int ret = -EINVAL;
+	char *config_str;
+
+	config_str = strndup_user(arg, PAGE_SIZE);
+	if (IS_ERR(config_str))
+		return PTR_ERR(config_str);
+
+	if (has_drv_config(event))
+		ret = perf_event_process_drv_config(event, config_str);
+
+	kfree(config_str);
 	return ret;
 }
 
