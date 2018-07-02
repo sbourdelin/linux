@@ -531,6 +531,33 @@ static int venc_g_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	return 0;
 }
 
+static int venc_s_ext_ctrls(struct file *file, void *fh,
+				struct v4l2_ext_controls *ctrl)
+{
+	struct venus_inst *inst = to_inst(file);
+	struct v4l2_ext_control *control;
+	u32 ptype, i, ret;
+	struct hfi_enable en = { .enable = 1 };
+	void *pdata = NULL;
+
+	control = ctrl->controls;
+	for (i = 0; i < ctrl->count; i++) {
+		switch (control[i].id) {
+		case V4L2_CID_MPEG_VIDEO_FRAME_RC_ENABLE:
+			ptype = HFI_PROPERTY_PARAM_VENC_DISABLE_RC_TIMESTAMP;
+			en.enable = control[i].value;
+			pdata = &en;
+			break;
+		default:
+			return -EINVAL;
+		}
+	}
+	ret = hfi_session_set_property(inst, ptype, pdata);
+	if (ret)
+		return ret;
+	return 0;
+}
+
 static int venc_enum_framesizes(struct file *file, void *fh,
 				struct v4l2_frmsizeenum *fsize)
 {
@@ -623,6 +650,7 @@ static const struct v4l2_ioctl_ops venc_ioctl_ops = {
 	.vidioc_streamoff = v4l2_m2m_ioctl_streamoff,
 	.vidioc_s_parm = venc_s_parm,
 	.vidioc_g_parm = venc_g_parm,
+	.vidioc_s_ext_ctrl = venc_s_ext_ctrls,
 	.vidioc_enum_framesizes = venc_enum_framesizes,
 	.vidioc_enum_frameintervals = venc_enum_frameintervals,
 	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
