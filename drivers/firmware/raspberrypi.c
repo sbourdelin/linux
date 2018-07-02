@@ -154,7 +154,7 @@ int rpi_firmware_property(struct rpi_firmware *fw,
 	memcpy(data + sizeof(struct rpi_firmware_property_tag_header),
 	       tag_data, buf_size);
 
-	ret = rpi_firmware_property_list(fw, &data, sizeof(data));
+	ret = rpi_firmware_property_list(fw, &data, buf_size + sizeof(*header));
 	memcpy(tag_data,
 	       data + sizeof(struct rpi_firmware_property_tag_header),
 	       buf_size);
