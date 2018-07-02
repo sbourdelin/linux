@@ -107,10 +107,56 @@ static int vlan_changelink(struct net_device *dev, struct nlattr *tb[],
 			   struct nlattr *data[],
 			   struct netlink_ext_ack *extack)
 {
+	struct vlan_dev_priv *vlan = vlan_dev_priv(dev);
 	struct ifla_vlan_flags *flags;
 	struct ifla_vlan_qos_mapping *m;
 	struct nlattr *attr;
 	int rem;
+	int err = 0;
+	__be16 vlan_proto = vlan->vlan_proto;
+	u16 vlan_id = vlan->vlan_id;
+
+	if (data[IFLA_VLAN_ID])
+		vlan_id = nla_get_u16(data[IFLA_VLAN_ID]);
+
+	if (data[IFLA_VLAN_PROTOCOL])
+		vlan_proto = nla_get_be16(data[IFLA_VLAN_PROTOCOL]);
+
+	if (vlan->vlan_id != vlan_id || vlan->vlan_proto != vlan_proto) {
+		struct net_device *real_dev = vlan->real_dev;
+		struct vlan_info *vlan_info;
+		struct vlan_group *grp;
+		__be16 old_vlan_proto = vlan->vlan_proto;
+		u16 old_vlan_id = vlan->vlan_id;
+
+		err = vlan_vid_add(real_dev, vlan_proto, vlan_id);
+		if (err)
+			goto out;
+		vlan_info = rtnl_dereference(real_dev->vlan_info);
+		grp = &vlan_info->grp;
+		err = vlan_group_prealloc_vid(grp, vlan_proto, vlan_id);
+		if (err < 0) {
+			vlan_vid_del(real_dev, vlan_proto, vlan_id);
+			return err;
+		}
+		vlan_group_set_device(grp, vlan_proto, vlan_id, dev);
+		vlan->vlan_proto = vlan_proto;
+		vlan->vlan_id = vlan_id;
+
+		err = call_netdevice_notifiers(NETDEV_CHANGEVLAN, dev);
+		err = notifier_to_errno(err);
+		if (err) {
+			/* rollback */
+			vlan_group_set_device(grp, vlan_proto, vlan_id, NULL);
+			vlan_vid_del(real_dev, vlan_proto, vlan_id);
+			vlan->vlan_proto = old_vlan_proto;
+			vlan->vlan_id = old_vlan_id;
+		} else {
+			vlan_group_set_device(grp, old_vlan_proto,
+					      old_vlan_id, NULL);
+			vlan_vid_del(real_dev, old_vlan_proto, old_vlan_id);
+		}
+	}
 
 	if (data[IFLA_VLAN_FLAGS]) {
 		flags = nla_data(data[IFLA_VLAN_FLAGS]);
@@ -128,7 +174,8 @@ static int vlan_changelink(struct net_device *dev, struct nlattr *tb[],
 			vlan_dev_set_egress_priority(dev, m->from, m->to);
 		}
 	}
-	return 0;
+out:
+	return err;
 }
 
 static int vlan_newlink(struct net *src_net, struct net_device *dev,
