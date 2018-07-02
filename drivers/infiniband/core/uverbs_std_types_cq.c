@@ -53,6 +53,7 @@ static int uverbs_free_cq(struct ib_uobject *uobject,
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_INFINIBAND_EXP_LEGACY_VERBS_NEW_UAPI)
 static int UVERBS_HANDLER(UVERBS_METHOD_CQ_CREATE)(struct ib_device *ib_dev,
 						   struct ib_uverbs_file *file,
 						   struct uverbs_attr_bundle *attrs)
@@ -199,13 +200,18 @@ static DECLARE_UVERBS_NAMED_METHOD(UVERBS_METHOD_CQ_DESTROY,
 	&UVERBS_ATTR_PTR_OUT(UVERBS_ATTR_DESTROY_CQ_RESP,
 			     UVERBS_ATTR_TYPE(struct ib_uverbs_destroy_cq_resp),
 			     UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
+#endif
 
+#if IS_ENABLED(CONFIG_INFINIBAND_EXP_LEGACY_VERBS_NEW_UAPI)
 DECLARE_UVERBS_NAMED_OBJECT(UVERBS_OBJECT_CQ,
 			    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_ucq_object), 0,
 						      uverbs_free_cq),
-#if IS_ENABLED(CONFIG_INFINIBAND_EXP_LEGACY_VERBS_NEW_UAPI)
 			    &UVERBS_METHOD(UVERBS_METHOD_CQ_CREATE),
 			    &UVERBS_METHOD(UVERBS_METHOD_CQ_DESTROY)
-#endif
 			   );
-
+#else
+DECLARE_UVERBS_NAMED_OBJECT(UVERBS_OBJECT_CQ,
+			    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_ucq_object), 0,
+						      uverbs_free_cq),
+			   );
+#endif
