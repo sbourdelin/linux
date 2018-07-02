@@ -701,6 +701,21 @@ config ARM64_PA_BITS
 	default 48 if ARM64_PA_BITS_48
 	default 52 if ARM64_PA_BITS_52
 
+choice
+	prompt "Section size"
+	default ARM64_SEC_BITS_30
+	help
+	  Choose the maximum amount of memory in a section.
+
+config ARM64_SEC_BITS_30
+	bool "30-bit"
+
+endchoice
+
+config ARM64_SEC_BITS
+	int
+	default 30 if ARM64_SEC_BITS_30
+
 config CPU_BIG_ENDIAN
        bool "Build big-endian kernel"
        help
