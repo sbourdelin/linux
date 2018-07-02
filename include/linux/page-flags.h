@@ -420,6 +420,56 @@ static __always_inline int __PageMovable(struct page *page)
 				PAGE_MAPPING_MOVABLE;
 }
 
+/*
+ * page->dma_pinned_flags is protected by the zone_gup_lock, plus the
+ * page->dma_pinned_count field as well.
+ *
+ * Because page->dma_pinned_flags is unioned with page->lru, any page that
+ * uses these flags must NOT be on an LRU. That's partly enforced by
+ * ClearPageDmaPinned, which gives the page back to LRU.
+ *
+ * Because PageDmaPinned also corresponds to PageTail (the lowest bit in
+ * the first union of struct page), and this flag is checked without knowing
+ * whether it is a tail page or a PageDmaPinned page, start the flags at
+ * bit 1 (0x2), rather than bit 0.
+ */
+#define PAGE_DMA_PINNED		0x2
+#define PAGE_DMA_PINNED_FLAGS	(PAGE_DMA_PINNED)
+
+/*
+ * Because these flags are read outside of a lock, ensure visibility between
+ * different threads, by using READ|WRITE_ONCE.
+ */
+static __always_inline int PageDmaPinnedFlags(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	return (READ_ONCE(page->dma_pinned_flags) & PAGE_DMA_PINNED_FLAGS) != 0;
+}
+
+static __always_inline int PageDmaPinned(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	return (READ_ONCE(page->dma_pinned_flags) & PAGE_DMA_PINNED) != 0;
+}
+
+static __always_inline void SetPageDmaPinned(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	WRITE_ONCE(page->dma_pinned_flags, PAGE_DMA_PINNED);
+}
+
+static __always_inline void ClearPageDmaPinned(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	VM_BUG_ON_PAGE(!PageDmaPinnedFlags(page), page);
+
+	/* This does a WRITE_ONCE to the lru.next, which is also the
+	 * page->dma_pinned_flags field. So in addition to restoring page->lru,
+	 * this provides visibility to other threads.
+	 */
+	INIT_LIST_HEAD(&page->lru);
+}
+
 #ifdef CONFIG_KSM
 /*
  * A KSM page is one of those write-protected "shared pages" or "merged pages"
