@@ -10,7 +10,8 @@
 virtual report
 
 @r1 exists@
-identifier a, x;
+expression a;
+identifier x;
 position p1, p2;
 identifier fname =~ "free";
 identifier fname2 =~ "(?:call_rcu|de(?:l|stroy)|(?:queue|schedule)_work)";
@@ -45,7 +46,8 @@ msg = "atomic_dec_and_test variation before object free at line %s."
 coccilib.report.print_report(p1[0], msg % (p2[0].line))
 
 @r4 exists@
-identifier a, x, y;
+expression a;
+identifier x, y;
 position p1, p2;
 identifier fname =~ "free";
 @@
@@ -77,7 +79,8 @@ msg = "atomic_dec_and_test variation before object free at line %s."
 coccilib.report.print_report(p1[0], msg % (p2[0].line))
 
 @r2 exists@
-identifier a, x;
+expression a;
+identifier x;
 position p1;
 @@
 
