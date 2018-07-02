@@ -649,7 +649,7 @@ static int mdp5_crtc_atomic_check(struct drm_crtc *crtc,
 
 	/* bail out early if there aren't any planes */
 	if (!cnt)
-		return 0;
+		return drm_atomic_set_mode_for_crtc(state, NULL);
 
 	hw_cfg = mdp5_cfg_get_hw_config(mdp5_kms->cfg);
 
