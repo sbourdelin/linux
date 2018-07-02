@@ -849,7 +849,7 @@ static int writeout(struct address_space *mapping, struct page *page)
 		/* No write method for the address space */
 		return -EINVAL;
 
-	if (!clear_page_dirty_for_io(page))
+	if (!clear_page_dirty_for_io(page, wbc.sync_mode))
 		/* Someone else already triggered a write */
 		return -EAGAIN;
 

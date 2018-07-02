@@ -668,7 +668,7 @@ static pageout_t pageout(struct page *page, struct address_space *mapping,
 	if (!may_write_to_inode(mapping->host, sc))
 		return PAGE_KEEP;
 
-	if (clear_page_dirty_for_io(page)) {
+	if (clear_page_dirty_for_io(page, WB_SYNC_ALL)) {
 		int res;
 		struct writeback_control wbc = {
 			.sync_mode = WB_SYNC_NONE,

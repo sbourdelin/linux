@@ -1532,7 +1532,12 @@ static inline void cancel_dirty_page(struct page *page)
 	if (PageDirty(page))
 		__cancel_dirty_page(page);
 }
-int clear_page_dirty_for_io(struct page *page);
+
+/* The sync_mode argument expects enum writeback_sync_modes (see
+ * include/linux/writeback.h), but is declared as an int here, to avoid
+ * even more header file dependencies in mm.h.
+ */
+int clear_page_dirty_for_io(struct page *page, int sync_mode);
 
 int get_cmdline(struct task_struct *task, char *buffer, int buflen);
 

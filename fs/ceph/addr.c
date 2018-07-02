@@ -937,7 +937,7 @@ get_more_pages:
 				wait_on_page_writeback(page);
 			}
 
-			if (!clear_page_dirty_for_io(page)) {
+			if (!clear_page_dirty_for_io(page, wbc->sync_mode)) {
 				dout("%p !clear_page_dirty_for_io\n", page);
 				unlock_page(page);
 				continue;
@@ -1277,7 +1277,7 @@ retry_locked:
 		/* yay, writeable, do it now (without dropping page lock) */
 		dout(" page %p snapc %p not current, but oldest\n",
 		     page, snapc);
-		if (!clear_page_dirty_for_io(page))
+		if (!clear_page_dirty_for_io(page, WB_SYNC_ALL))
 			goto retry_locked;
 		r = writepage_nounlock(page, NULL);
 		if (r < 0)

@@ -496,7 +496,7 @@ xfs_start_page_writeback(
 	 * write this page in this writeback sweep will be made.
 	 */
 	if (clear_dirty) {
-		clear_page_dirty_for_io(page);
+		clear_page_dirty_for_io(page, WB_SYNC_ALL);
 		set_page_writeback(page);
 	} else
 		set_page_writeback_keepwrite(page);

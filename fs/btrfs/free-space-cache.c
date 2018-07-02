@@ -387,7 +387,7 @@ static int io_ctl_prepare_pages(struct btrfs_io_ctl *io_ctl, struct inode *inode
 	}
 
 	for (i = 0; i < io_ctl->num_pages; i++) {
-		clear_page_dirty_for_io(io_ctl->pages[i]);
+		clear_page_dirty_for_io(io_ctl->pages[i], WB_SYNC_ALL);
 		set_page_extent_mapped(io_ctl->pages[i]);
 	}
 

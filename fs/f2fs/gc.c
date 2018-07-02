@@ -693,7 +693,7 @@ static void move_data_block(struct inode *inode, block_t bidx,
 
 	set_page_dirty(fio.encrypted_page);
 	f2fs_wait_on_page_writeback(fio.encrypted_page, DATA, true);
-	if (clear_page_dirty_for_io(fio.encrypted_page))
+	if (clear_page_dirty_for_io(fio.encrypted_page, fio.io_wbc->sync_mode))
 		dec_page_count(fio.sbi, F2FS_DIRTY_META);
 
 	set_page_writeback(fio.encrypted_page);
@@ -780,7 +780,7 @@ static void move_data_page(struct inode *inode, block_t bidx, int gc_type,
 retry:
 		set_page_dirty(page);
 		f2fs_wait_on_page_writeback(page, DATA, true);
-		if (clear_page_dirty_for_io(page)) {
+		if (clear_page_dirty_for_io(page, fio.io_wbc->sync_mode)) {
 			inode_dec_dirty_pages(inode);
 			f2fs_remove_dirty_inode(inode);
 		}

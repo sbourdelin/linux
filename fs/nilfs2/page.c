@@ -480,7 +480,7 @@ int __nilfs_clear_page_dirty(struct page *page)
 					     page_index(page),
 					     PAGECACHE_TAG_DIRTY);
 			xa_unlock_irq(&mapping->i_pages);
-			return clear_page_dirty_for_io(page);
+			return clear_page_dirty_for_io(page, WB_SYNC_ALL);
 		}
 		xa_unlock_irq(&mapping->i_pages);
 		return 0;

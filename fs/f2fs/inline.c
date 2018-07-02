@@ -136,7 +136,7 @@ int f2fs_convert_inline_page(struct dnode_of_data *dn, struct page *page)
 	set_page_dirty(page);
 
 	/* clear dirty state */
-	dirty = clear_page_dirty_for_io(page);
+	dirty = clear_page_dirty_for_io(page, fio.io_wbc->sync_mode);
 
 	/* write data page to try to make data consistent */
 	set_page_writeback(page);

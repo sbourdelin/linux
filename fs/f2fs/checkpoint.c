@@ -354,7 +354,7 @@ continue_unlock:
 			f2fs_wait_on_page_writeback(page, META, true);
 
 			BUG_ON(PageWriteback(page));
-			if (!clear_page_dirty_for_io(page))
+			if (!clear_page_dirty_for_io(page, wbc.sync_mode))
 				goto continue_unlock;
 
 			if (__f2fs_write_meta_page(page, &wbc, io_type)) {
@@ -1197,7 +1197,7 @@ static void commit_checkpoint(struct f2fs_sb_info *sbi,
 
 	f2fs_wait_on_page_writeback(page, META, true);
 	f2fs_bug_on(sbi, PageWriteback(page));
-	if (unlikely(!clear_page_dirty_for_io(page)))
+	if (unlikely(!clear_page_dirty_for_io(page, wbc->sync_mode)))
 		f2fs_bug_on(sbi, 1);
 
 	/* writeout cp pack 2 page */

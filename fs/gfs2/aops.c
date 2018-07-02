@@ -304,7 +304,7 @@ continue_unlock:
 		}
 
 		BUG_ON(PageWriteback(page));
-		if (!clear_page_dirty_for_io(page))
+		if (!clear_page_dirty_for_io(page, wbc->sync_mode))
 			goto continue_unlock;
 
 		trace_wbc_writepage(wbc, inode_to_bdi(inode));

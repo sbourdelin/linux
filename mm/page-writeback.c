@@ -2233,7 +2233,7 @@ continue_unlock:
 			}
 
 			BUG_ON(PageWriteback(page));
-			if (!clear_page_dirty_for_io(page))
+			if (!clear_page_dirty_for_io(page, wbc->sync_mode))
 				goto continue_unlock;
 
 			trace_wbc_writepage(wbc, inode_to_bdi(mapping->host));
@@ -2371,7 +2371,7 @@ int write_one_page(struct page *page)
 
 	wait_on_page_writeback(page);
 
-	if (clear_page_dirty_for_io(page)) {
+	if (clear_page_dirty_for_io(page, wbc.sync_mode)) {
 		get_page(page);
 		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0)
@@ -2643,8 +2643,13 @@ EXPORT_SYMBOL(__cancel_dirty_page);
  *
  * This incoherency between the page's dirty flag and radix-tree tag is
  * unfortunate, but it only exists while the page is locked.
+ *
+ * The sync_mode argument expects enum writeback_sync_modes (see
+ * include/linux/writeback.h), but is declared as an int here, to avoid
+ * even more header file dependencies in mm.h.
  */
-int clear_page_dirty_for_io(struct page *page)
+
+int clear_page_dirty_for_io(struct page *page, int sync_mode)
 {
 	struct address_space *mapping = page_mapping(page);
 	int ret = 0;

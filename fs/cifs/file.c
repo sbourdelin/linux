@@ -2019,7 +2019,8 @@ wdata_prepare_pages(struct cifs_writedata *wdata, unsigned int found_pages,
 			wait_on_page_writeback(page);
 
 		if (PageWriteback(page) ||
-				!clear_page_dirty_for_io(page)) {
+				!clear_page_dirty_for_io(page,
+							 wbc->sync_mode)) {
 			unlock_page(page);
 			break;
 		}
@@ -4089,7 +4090,7 @@ static int cifs_launder_page(struct page *page)
 
 	cifs_dbg(FYI, "Launder page: %p\n", page);
 
-	if (clear_page_dirty_for_io(page))
+	if (clear_page_dirty_for_io(page, wbc.sync_mode))
 		rc = cifs_writepage_locked(page, &wbc);
 
 	cifs_fscache_invalidate_page(page, page->mapping->host);

@@ -1364,7 +1364,7 @@ void extent_range_clear_dirty_for_io(struct inode *inode, u64 start, u64 end)
 	while (index <= end_index) {
 		page = find_get_page(inode->i_mapping, index);
 		BUG_ON(!page); /* Pages should be in the extent_io_tree */
-		clear_page_dirty_for_io(page);
+		clear_page_dirty_for_io(page, WB_SYNC_ALL);
 		put_page(page);
 		index++;
 	}
@@ -1707,7 +1707,7 @@ static int __process_pages_contig(struct address_space *mapping,
 				continue;
 			}
 			if (page_ops & PAGE_CLEAR_DIRTY)
-				clear_page_dirty_for_io(pages[i]);
+				clear_page_dirty_for_io(pages[i], WB_SYNC_ALL);
 			if (page_ops & PAGE_SET_WRITEBACK)
 				set_page_writeback(pages[i]);
 			if (page_ops & PAGE_SET_ERROR)
@@ -3740,7 +3740,7 @@ static noinline_for_stack int write_one_eb(struct extent_buffer *eb,
 	for (i = 0; i < num_pages; i++) {
 		struct page *p = eb->pages[i];
 
-		clear_page_dirty_for_io(p);
+		clear_page_dirty_for_io(p, wbc->sync_mode);
 		set_page_writeback(p);
 		ret = submit_extent_page(REQ_OP_WRITE | write_flags, tree, wbc,
 					 p, offset, PAGE_SIZE, 0, bdev,
@@ -3764,7 +3764,7 @@ static noinline_for_stack int write_one_eb(struct extent_buffer *eb,
 	if (unlikely(ret)) {
 		for (; i < num_pages; i++) {
 			struct page *p = eb->pages[i];
-			clear_page_dirty_for_io(p);
+			clear_page_dirty_for_io(p, wbc->sync_mode);
 			unlock_page(p);
 		}
 	}
@@ -3984,7 +3984,7 @@ retry:
 			}
 
 			if (PageWriteback(page) ||
-			    !clear_page_dirty_for_io(page)) {
+			    !clear_page_dirty_for_io(page, wbc->sync_mode)) {
 				unlock_page(page);
 				continue;
 			}
@@ -4089,7 +4089,7 @@ int extent_write_locked_range(struct inode *inode, u64 start, u64 end,
 
 	while (start <= end) {
 		page = find_get_page(mapping, start >> PAGE_SHIFT);
-		if (clear_page_dirty_for_io(page))
+		if (clear_page_dirty_for_io(page, wbc_writepages.sync_mode))
 			ret = __extent_writepage(page, &wbc_writepages, &epd);
 		else {
 			if (tree->ops && tree->ops->writepage_end_io_hook)
@@ -5170,7 +5170,7 @@ void clear_extent_buffer_dirty(struct extent_buffer *eb)
 		lock_page(page);
 		WARN_ON(!PagePrivate(page));
 
-		clear_page_dirty_for_io(page);
+		clear_page_dirty_for_io(page, WB_SYNC_ALL);
 		xa_lock_irq(&page->mapping->i_pages);
 		if (!PageDirty(page)) {
 			radix_tree_tag_clear(&page->mapping->i_pages,

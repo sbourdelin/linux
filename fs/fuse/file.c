@@ -2015,7 +2015,7 @@ unlock:
 static int fuse_launder_page(struct page *page)
 {
 	int err = 0;
-	if (clear_page_dirty_for_io(page)) {
+	if (clear_page_dirty_for_io(page, WB_SYNC_NONE)) {
 		struct inode *inode = page->mapping->host;
 		err = fuse_writepage_locked(page);
 		if (!err)

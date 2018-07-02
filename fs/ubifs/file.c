@@ -1169,7 +1169,7 @@ static int do_truncation(struct ubifs_info *c, struct inode *inode,
 				 */
 				ubifs_assert(PagePrivate(page));
 
-				clear_page_dirty_for_io(page);
+				clear_page_dirty_for_io(page, WB_SYNC_ALL);
 				if (UBIFS_BLOCKS_PER_PAGE_SHIFT)
 					offset = new_size &
 						 (PAGE_SIZE - 1);

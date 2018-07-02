@@ -1741,7 +1741,8 @@ static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 			BUG_ON(PageWriteback(page));
 			if (invalidate) {
 				if (page_mapped(page))
-					clear_page_dirty_for_io(page);
+					clear_page_dirty_for_io(page,
+								WB_SYNC_ALL);
 				block_invalidatepage(page, 0, PAGE_SIZE);
 				ClearPageUptodate(page);
 			}
@@ -2187,7 +2188,7 @@ static int mpage_submit_page(struct mpage_da_data *mpd, struct page *page)
 	int err;
 
 	BUG_ON(page->index != mpd->first_page);
-	clear_page_dirty_for_io(page);
+	clear_page_dirty_for_io(page, WB_SYNC_ALL);
 	/*
 	 * We have to be very careful here!  Nothing protects writeback path
 	 * against i_size changes and the page can be writeably mapped into

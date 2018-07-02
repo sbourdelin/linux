@@ -1337,7 +1337,7 @@ again:
 			     page_start, page_end - 1, &cached_state);
 
 	for (i = 0; i < i_done; i++) {
-		clear_page_dirty_for_io(pages[i]);
+		clear_page_dirty_for_io(pages[i], WB_SYNC_ALL);
 		ClearPageChecked(pages[i]);
 		set_page_extent_mapped(pages[i]);
 		set_page_dirty(pages[i]);

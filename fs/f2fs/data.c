@@ -2018,7 +2018,7 @@ continue_unlock:
 			}
 
 			BUG_ON(PageWriteback(page));
-			if (!clear_page_dirty_for_io(page))
+			if (!clear_page_dirty_for_io(page), wbc->sync_mode)
 				goto continue_unlock;
 
 			ret = __write_data_page(page, &submitted, wbc, io_type);

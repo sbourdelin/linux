@@ -1999,7 +1999,8 @@ cifs_writev_requeue(struct cifs_writedata *wdata)
 		for (j = 0; j < nr_pages; j++) {
 			wdata2->pages[j] = wdata->pages[i + j];
 			lock_page(wdata2->pages[j]);
-			clear_page_dirty_for_io(wdata2->pages[j]);
+			clear_page_dirty_for_io(wdata2->pages[j],
+						wdata->sync_mode);
 		}
 
 		wdata2->sync_mode = wdata->sync_mode;

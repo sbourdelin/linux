@@ -472,7 +472,7 @@ static int afs_write_back_from_locked_page(struct address_space *mapping,
 			trace_afs_page_dirty(vnode, tracepoint_string("store+"),
 					     page->index, priv);
 
-			if (!clear_page_dirty_for_io(page))
+			if (!clear_page_dirty_for_io(page, wbc->sync_mode))
 				BUG();
 			if (test_set_page_writeback(page))
 				BUG();
@@ -612,7 +612,7 @@ static int afs_writepages_region(struct address_space *mapping,
 			continue;
 		}
 
-		if (!clear_page_dirty_for_io(page))
+		if (!clear_page_dirty_for_io(page, wbc->sync_mode))
 			BUG();
 		ret = afs_write_back_from_locked_page(mapping, wbc, page, end);
 		put_page(page);
@@ -838,7 +838,7 @@ int afs_launder_page(struct page *page)
 	_enter("{%lx}", page->index);
 
 	priv = page_private(page);
-	if (clear_page_dirty_for_io(page)) {
+	if (clear_page_dirty_for_io(page, WB_SYNC_NONE)) {
 		f = 0;
 		t = PAGE_SIZE;
 		if (PagePrivate(page)) {

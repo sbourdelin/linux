@@ -2037,7 +2037,7 @@ int nfs_wb_page(struct inode *inode, struct page *page)
 
 	for (;;) {
 		wait_on_page_writeback(page);
-		if (clear_page_dirty_for_io(page)) {
+		if (clear_page_dirty_for_io(page, wbc.sync_mode)) {
 			ret = nfs_writepage_locked(page, &wbc);
 			if (ret < 0)
 				goto out_error;

@@ -104,7 +104,7 @@ static void clear_node_page_dirty(struct page *page)
 {
 	if (PageDirty(page)) {
 		f2fs_clear_radix_tree_dirty_tag(page);
-		clear_page_dirty_for_io(page);
+		clear_page_dirty_for_io(page, WB_SYNC_ALL);
 		dec_page_count(F2FS_P_SB(page), F2FS_DIRTY_NODES);
 	}
 	ClearPageUptodate(page);
@@ -1276,7 +1276,7 @@ static void flush_inline_data(struct f2fs_sb_info *sbi, nid_t ino)
 	if (!PageDirty(page))
 		goto page_out;
 
-	if (!clear_page_dirty_for_io(page))
+	if (!clear_page_dirty_for_io(page, WB_SYNC_ALL))
 		goto page_out;
 
 	ret = f2fs_write_inline_data(inode, page);
@@ -1444,7 +1444,7 @@ void f2fs_move_node_page(struct page *node_page, int gc_type)
 		f2fs_wait_on_page_writeback(node_page, NODE, true);
 
 		f2fs_bug_on(F2FS_P_SB(node_page), PageWriteback(node_page));
-		if (!clear_page_dirty_for_io(node_page))
+		if (!clear_page_dirty_for_io(node_page, wbc.sync_mode))
 			goto out_page;
 
 		if (__write_node_page(node_page, false, NULL,
@@ -1544,7 +1544,7 @@ continue_unlock:
 					set_page_dirty(page);
 			}
 
-			if (!clear_page_dirty_for_io(page))
+			if (!clear_page_dirty_for_io(page, WB_SYNC_ALL))
 				goto continue_unlock;
 
 			ret = __write_node_page(page, atomic &&
@@ -1658,7 +1658,7 @@ continue_unlock:
 			f2fs_wait_on_page_writeback(page, NODE, true);
 
 			BUG_ON(PageWriteback(page));
-			if (!clear_page_dirty_for_io(page))
+			if (!clear_page_dirty_for_io(page, wbc->sync_mode))
 				goto continue_unlock;
 
 			set_fsync_mark(page, 0);
