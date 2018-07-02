@@ -1103,7 +1103,7 @@ static struct drm_connector *vop_get_edp_connector(struct vop *vop)
 }
 
 static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-				   const char *source_name, size_t *values_cnt)
+				   const char *source_name)
 {
 	struct vop *vop = to_vop(crtc);
 	struct drm_connector *connector;
@@ -1112,8 +1112,6 @@ static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
 	connector = vop_get_edp_connector(vop);
 	if (!connector)
 		return -EINVAL;
-
-	*values_cnt = 3;
 
 	if (source_name && strcmp(source_name, "auto") == 0)
 		ret = analogix_dp_start_crc(connector);
@@ -1138,7 +1136,7 @@ vop_crtc_verify_crc_source(struct drm_crtc *crtc, const char *source_name,
 
 #else
 static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-				   const char *source_name, size_t *values_cnt)
+				   const char *source_name)
 {
 	return -ENODEV;
 }
