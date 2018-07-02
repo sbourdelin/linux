@@ -132,6 +132,13 @@ struct uart_8250_port {
 	/* 8250 specific callbacks */
 	int			(*dl_read)(struct uart_8250_port *);
 	void			(*dl_write)(struct uart_8250_port *, int);
+	unsigned int		(*get_divisor)(struct uart_8250_port *up,
+					       unsigned int baud,
+					       unsigned int *frac);
+	void			(*set_divisor)(struct uart_8250_port *up,
+					       unsigned int baud,
+					       unsigned int quot,
+					       unsigned int quot_frac);
 
 	struct uart_8250_em485 *em485;
 };

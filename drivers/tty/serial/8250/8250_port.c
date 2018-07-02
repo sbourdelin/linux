@@ -2505,6 +2505,9 @@ static unsigned int serial8250_get_divisor(struct uart_8250_port *up,
 	struct uart_port *port = &up->port;
 	unsigned int quot;
 
+	if (up->get_divisor)
+		return up->get_divisor(up, baud, frac);
+
 	/*
 	 * Handle magic divisors for baud rates above baud_base on
 	 * SMSC SuperIO chips.
@@ -2574,6 +2577,11 @@ static void serial8250_set_divisor(struct uart_port *port, unsigned int baud,
 			    unsigned int quot, unsigned int quot_frac)
 {
 	struct uart_8250_port *up = up_to_u8250p(port);
+
+	if (up->set_divisor) {
+		up->set_divisor(up, baud, quot, quot_frac);
+		return;
+	}
 
 	/* Workaround to enable 115200 baud on OMAP1510 internal ports */
 	if (is_omap1510_8250(up)) {

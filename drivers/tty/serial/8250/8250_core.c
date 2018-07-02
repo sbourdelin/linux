@@ -1035,6 +1035,10 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 			uart->dl_read = up->dl_read;
 		if (up->dl_write)
 			uart->dl_write = up->dl_write;
+		if (up->get_divisor)
+			uart->get_divisor = up->get_divisor;
+		if (up->set_divisor)
+			uart->set_divisor = up->set_divisor;
 
 		if (uart->port.type != PORT_8250_CIR) {
 			if (serial8250_isa_config != NULL)
