@@ -1213,6 +1213,7 @@ asmlinkage __visible void __init xen_start_kernel(void)
 	pv_info = xen_info;
 	pv_init_ops.patch = paravirt_patch_default;
 	pv_cpu_ops = xen_cpu_ops;
+	xen_init_irq_ops();
 
 	x86_platform.get_nmi_reason = xen_get_nmi_reason;
 
@@ -1248,8 +1249,6 @@ asmlinkage __visible void __init xen_start_kernel(void)
 	/* Work out if we support NX */
 	get_cpu_cap(&boot_cpu_data);
 	x86_configure_nx();
-
-	xen_init_irq_ops();
 
 	/* Let's presume PV guests always boot on vCPU with id 0. */
 	per_cpu(xen_vcpu_id, 0) = 0;
