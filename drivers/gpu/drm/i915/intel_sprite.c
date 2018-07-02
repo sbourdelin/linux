@@ -1405,6 +1405,11 @@ static bool skl_plane_format_mod_supported(struct drm_plane *_plane,
 	}
 
 	switch (format) {
+	case DRM_FORMAT_AYUV:
+		if (modifier == DRM_FORMAT_MOD_LINEAR ||
+		    modifier == I915_FORMAT_MOD_X_TILED ||
+		    modifier == I915_FORMAT_MOD_Y_TILED)
+			return true;
 	case DRM_FORMAT_XRGB8888:
 	case DRM_FORMAT_XBGR8888:
 	case DRM_FORMAT_ARGB8888:
