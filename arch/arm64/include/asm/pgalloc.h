@@ -29,6 +29,23 @@
 #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
 #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
 
+static inline int in_swapper_dir(void *addr)
+{
+	if ((unsigned long)addr >= (unsigned long)swapper_pg_dir &&
+		(unsigned long)addr < (unsigned long)swapper_pg_end) {
+		return 1;
+	}
+	return 0;
+}
+
+static inline void *swapper_mirror_addr(void *start, void *addr)
+{
+	unsigned long offset;
+
+	offset = (unsigned long)addr - (unsigned long)swapper_pg_dir;
+	return start + offset;
+}
+
 #if CONFIG_PGTABLE_LEVELS > 2
 
 static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
@@ -49,6 +66,17 @@ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
 
 static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
 {
+#ifdef __PAGETABLE_PUD_FOLDED
+	if ((mm == &init_mm) && in_swapper_dir(pudp)) {
+		pud_t *pud;
+
+		pud = pud_set_fixmap(__pa_symbol(swapper_pg_dir));
+		pud = (pud_t *)swapper_mirror_addr(pud, pudp);
+		__pud_populate(pud, __pa(pmdp), PMD_TYPE_TABLE);
+		pud_clear_fixmap();
+		return;
+	}
+#endif
 	__pud_populate(pudp, __pa(pmdp), PMD_TYPE_TABLE);
 }
 #else
@@ -78,6 +106,15 @@ static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pudp, pgdval_t prot)
 
 static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgdp, pud_t *pudp)
 {
+	if ((mm == &init_mm) && in_swapper_dir(pgdp)) {
+		pgd_t *pgd;
+
+		pgd = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
+		pgd = (pgd_t *)swapper_mirror_addr(pgd, pgdp);
+		__pgd_populate(pgd, __pa(pudp), PUD_TYPE_TABLE);
+		pgd_clear_fixmap();
+		return;
+	}
 	__pgd_populate(pgdp, __pa(pudp), PUD_TYPE_TABLE);
 }
 #else
@@ -139,6 +176,17 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t ptep,
 static inline void
 pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 {
+#ifdef __PAGETABLE_PMD_FOLDED
+	if (in_swapper_dir(pmdp)) {
+		pmd_t *pmd;
+
+		pmd = pmd_set_fixmap(__pa_symbol(swapper_pg_dir));
+		pmd = (pmd_t *)swapper_mirror_addr(pmd, pmdp);
+		__pmd_populate(pmd, __pa(ptep), PMD_TYPE_TABLE);
+		pmd_clear_fixmap();
+		return;
+	}
+#endif
 	/*
 	 * The pmd must be loaded with the physical address of the PTE table
 	 */

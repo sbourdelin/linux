@@ -475,6 +475,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
  */
 #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
 
+#define pmd_set_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
+#define pmd_clear_fixmap()		clear_fixmap(FIX_PMD)
+
 #if CONFIG_PGTABLE_LEVELS > 2
 
 #define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd_val(pmd))
@@ -506,11 +509,11 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 #define pmd_offset_phys(dir, addr)	(pud_page_paddr(READ_ONCE(*(dir))) + pmd_index(addr) * sizeof(pmd_t))
 #define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
 
-#define pmd_set_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
 #define pmd_set_fixmap_offset(pud, addr)	pmd_set_fixmap(pmd_offset_phys(pud, addr))
-#define pmd_clear_fixmap()		clear_fixmap(FIX_PMD)
 
 #define pud_page(pud)		pfn_to_page(__phys_to_pfn(__pud_to_phys(pud)))
+#define pud_set_fixmap(addr)		((pud_t *)set_fixmap_offset(FIX_PUD, addr))
+#define pud_clear_fixmap()		clear_fixmap(FIX_PUD)
 
 /* use ONLY for statically allocated translation tables */
 #define pmd_offset_kimg(dir,addr)	((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
@@ -518,11 +521,11 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 #else
 
 #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
+#define pud_set_fixmap(addr)		NULL
+#define pud_clear_fixmap()
 
 /* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
-#define pmd_set_fixmap(addr)		NULL
 #define pmd_set_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
-#define pmd_clear_fixmap()
 
 #define pmd_offset_kimg(dir,addr)	((pmd_t *)dir)
 
@@ -558,9 +561,7 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
 #define pud_offset_phys(dir, addr)	(pgd_page_paddr(READ_ONCE(*(dir))) + pud_index(addr) * sizeof(pud_t))
 #define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
 
-#define pud_set_fixmap(addr)		((pud_t *)set_fixmap_offset(FIX_PUD, addr))
 #define pud_set_fixmap_offset(pgd, addr)	pud_set_fixmap(pud_offset_phys(pgd, addr))
-#define pud_clear_fixmap()		clear_fixmap(FIX_PUD)
 
 #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(__pgd_to_phys(pgd)))
 
@@ -572,9 +573,7 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
 #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
 
 /* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
-#define pud_set_fixmap(addr)		NULL
 #define pud_set_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
-#define pud_clear_fixmap()
 
 #define pud_offset_kimg(dir,addr)	((pud_t *)dir)
 
