@@ -4457,47 +4457,6 @@ static bool rtl_wol_pll_power_down(struct rtl8169_private *tp)
 	return true;
 }
 
-static void r8168_phy_power_up(struct rtl8169_private *tp)
-{
-	rtl_writephy(tp, 0x1f, 0x0000);
-	switch (tp->mac_version) {
-	case RTL_GIGA_MAC_VER_11:
-	case RTL_GIGA_MAC_VER_12:
-	case RTL_GIGA_MAC_VER_17 ... RTL_GIGA_MAC_VER_28:
-	case RTL_GIGA_MAC_VER_31:
-		rtl_writephy(tp, 0x0e, 0x0000);
-		break;
-	default:
-		break;
-	}
-	rtl_writephy(tp, MII_BMCR, BMCR_ANENABLE);
-
-	/* give MAC/PHY some time to resume */
-	msleep(20);
-}
-
-static void r8168_phy_power_down(struct rtl8169_private *tp)
-{
-	rtl_writephy(tp, 0x1f, 0x0000);
-	switch (tp->mac_version) {
-	case RTL_GIGA_MAC_VER_32:
-	case RTL_GIGA_MAC_VER_33:
-	case RTL_GIGA_MAC_VER_40:
-	case RTL_GIGA_MAC_VER_41:
-		rtl_writephy(tp, MII_BMCR, BMCR_ANENABLE | BMCR_PDOWN);
-		break;
-
-	case RTL_GIGA_MAC_VER_11:
-	case RTL_GIGA_MAC_VER_12:
-	case RTL_GIGA_MAC_VER_17 ... RTL_GIGA_MAC_VER_28:
-	case RTL_GIGA_MAC_VER_31:
-		rtl_writephy(tp, 0x0e, 0x0200);
-	default:
-		rtl_writephy(tp, MII_BMCR, BMCR_PDOWN);
-		break;
-	}
-}
-
 static void r8168_pll_power_down(struct rtl8169_private *tp)
 {
 	if (r8168_check_dash(tp))
@@ -4510,7 +4469,8 @@ static void r8168_pll_power_down(struct rtl8169_private *tp)
 	if (rtl_wol_pll_power_down(tp))
 		return;
 
-	r8168_phy_power_down(tp);
+	/* cover the case that PHY isn't connected */
+	phy_suspend(mdiobus_get_phy(tp->mii_bus, 0));
 
 	switch (tp->mac_version) {
 	case RTL_GIGA_MAC_VER_25 ... RTL_GIGA_MAC_VER_33:
@@ -4563,7 +4523,9 @@ static void r8168_pll_power_up(struct rtl8169_private *tp)
 		break;
 	}
 
-	r8168_phy_power_up(tp);
+	phy_resume(tp->dev->phydev);
+	/* give MAC/PHY some time to resume */
+	msleep(20);
 }
 
 static void rtl_pll_power_down(struct rtl8169_private *tp)
