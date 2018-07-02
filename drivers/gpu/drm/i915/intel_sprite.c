@@ -1452,6 +1452,8 @@ static bool skl_mod_supported(uint32_t format, uint64_t modifier)
 	case DRM_FORMAT_NV12:
 		if (modifier == I915_FORMAT_MOD_Yf_TILED)
 			return true;
+	case DRM_FORMAT_AYUV:
+		return true;
 		/* fall through */
 	case DRM_FORMAT_C8:
 		if (modifier == DRM_FORMAT_MOD_LINEAR ||

@@ -86,6 +86,7 @@ static const uint32_t skl_primary_formats[] = {
 	DRM_FORMAT_YVYU,
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
+	DRM_FORMAT_AYUV,
 };
 
 static const uint32_t skl_pri_planar_formats[] = {
@@ -102,6 +103,7 @@ static const uint32_t skl_pri_planar_formats[] = {
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
 	DRM_FORMAT_NV12,
+	DRM_FORMAT_AYUV,
 };
 
 static const uint64_t skl_format_modifiers_noccs[] = {
@@ -3498,6 +3500,8 @@ static u32 skl_plane_ctl_format(uint32_t pixel_format)
 		return PLANE_CTL_FORMAT_XRGB_2101010;
 	case DRM_FORMAT_XBGR2101010:
 		return PLANE_CTL_ORDER_RGBX | PLANE_CTL_FORMAT_XRGB_2101010;
+	case DRM_FORMAT_AYUV:
+		return PLANE_CTL_FORMAT_AYUV;
 	case DRM_FORMAT_YUYV:
 		return PLANE_CTL_FORMAT_YUV422 | PLANE_CTL_YUV422_YUYV;
 	case DRM_FORMAT_YVYU:
@@ -13361,6 +13365,8 @@ static bool skl_mod_supported(uint32_t format, uint64_t modifier)
 		    modifier == I915_FORMAT_MOD_Y_TILED)
 			return true;
 		/* fall through */
+	case DRM_FORMAT_AYUV:
+		return true;
 	default:
 		return false;
 	}
@@ -14467,6 +14473,7 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 			goto err;
 		}
 		break;
+	case DRM_FORMAT_AYUV:
 	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_YVYU:
