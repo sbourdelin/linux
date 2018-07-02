@@ -144,6 +144,7 @@ static const char *sdebug_version_date = "20180128";
 #define DEF_SUBMIT_QUEUES 1
 #define DEF_UUID_CTL 0
 #define JDELAY_OVERRIDDEN -9999
+#define DEF_USE_BLK_MQ  0
 
 #define SDEBUG_LUN_0_VAL 0
 
@@ -671,6 +672,7 @@ static bool sdebug_verbose;
 static bool have_dif_prot;
 static bool write_since_sync;
 static bool sdebug_statistics = DEF_STATISTICS;
+static bool sdebug_use_blk_mq = DEF_USE_BLK_MQ;
 
 static unsigned int sdebug_store_sectors;
 static sector_t sdebug_capacity;	/* in sectors */
@@ -4537,6 +4539,7 @@ module_param_named(vpd_use_hostno, sdebug_vpd_use_hostno, int,
 		   S_IRUGO | S_IWUSR);
 module_param_named(write_same_length, sdebug_write_same_length, int,
 		   S_IRUGO | S_IWUSR);
+module_param_named(use_blk_mq, sdebug_use_blk_mq, bool, S_IRUGO | S_IWUSR);
 
 MODULE_AUTHOR("Eric Youngdale + Douglas Gilbert");
 MODULE_DESCRIPTION("SCSI debug adapter driver");
@@ -5849,6 +5852,8 @@ static int sdebug_driver_probe(struct device *dev)
 	sdebug_driver_template.can_queue = sdebug_max_queue;
 	if (sdebug_clustering)
 		sdebug_driver_template.use_clustering = ENABLE_CLUSTERING;
+	if (sdebug_use_blk_mq)
+		sdebug_driver_template.force_blk_mq = 1;
 	hpnt = scsi_host_alloc(&sdebug_driver_template, sizeof(sdbg_host));
 	if (NULL == hpnt) {
 		pr_err("scsi_host_alloc failed\n");
