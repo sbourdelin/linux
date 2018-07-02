@@ -44,12 +44,22 @@ int check_user_usb_string(const char *name,
 
 static const struct usb_descriptor_header *otg_desc[2];
 
+struct config_usb_cfg {
+	struct config_group group;
+	struct config_group strings_group;
+	struct list_head string_list;
+	struct usb_configuration c;
+	struct list_head func_list;
+	struct usb_gadget_strings *gstrings[MAX_USB_STRING_LANGS + 1];
+};
+
 struct gadget_info {
 	struct config_group group;
 	struct config_group functions_group;
 	struct config_group configs_group;
 	struct config_group strings_group;
 	struct config_group os_desc_group;
+	struct config_usb_cfg control_config;
 
 	struct mutex lock;
 	struct usb_gadget_strings *gstrings[MAX_USB_STRING_LANGS + 1];
@@ -67,15 +77,6 @@ static inline struct gadget_info *to_gadget_info(struct config_item *item)
 {
 	 return container_of(to_config_group(item), struct gadget_info, group);
 }
-
-struct config_usb_cfg {
-	struct config_group group;
-	struct config_group strings_group;
-	struct list_head string_list;
-	struct usb_configuration c;
-	struct list_head func_list;
-	struct usb_gadget_strings *gstrings[MAX_USB_STRING_LANGS + 1];
-};
 
 static inline struct config_usb_cfg *to_config_usb_cfg(struct config_item *item)
 {
@@ -509,6 +510,16 @@ static struct configfs_attribute *gadget_config_attrs[] = {
 static const struct config_item_type gadget_config_type = {
 	.ct_item_ops	= &gadget_config_item_ops,
 	.ct_attrs	= gadget_config_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+static struct configfs_item_operations control_config_item_ops = {
+	.allow_link             = config_usb_cfg_link,
+	.drop_link              = config_usb_cfg_unlink,
+};
+
+static const struct config_item_type control_config_type = {
+	.ct_item_ops	= &control_config_item_ops,
 	.ct_owner	= THIS_MODULE,
 };
 
@@ -1205,11 +1216,10 @@ int composite_os_desc_req_prepare(struct usb_composite_dev *cdev,
 static void purge_configs_funcs(struct gadget_info *gi)
 {
 	struct usb_configuration	*c;
+	struct usb_function *f, *tmp;
+	struct config_usb_cfg *cfg;
 
 	list_for_each_entry(c, &gi->cdev.configs, list) {
-		struct usb_function *f, *tmp;
-		struct config_usb_cfg *cfg;
-
 		cfg = container_of(c, struct config_usb_cfg, c);
 
 		list_for_each_entry_safe(f, tmp, &c->functions, list) {
@@ -1229,6 +1239,14 @@ static void purge_configs_funcs(struct gadget_info *gi)
 		c->highspeed = 0;
 		c->fullspeed = 0;
 	}
+
+	cfg = &gi->control_config;
+	c = &cfg->c;
+	list_for_each_entry_safe(f, tmp, &c->functions, list) {
+		list_move_tail(&f->list, &cfg->func_list);
+		if (f->unbind)
+			f->unbind(c, f);
+	}
 }
 
 static int configfs_composite_bind(struct usb_gadget *gadget,
@@ -1242,6 +1260,9 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 	struct usb_string		*s;
 	unsigned			i;
 	int				ret;
+	struct config_usb_cfg *cfg;
+	struct usb_function *f;
+	struct usb_function *tmp;
 
 	/* the gi->lock is hold by the caller */
 	cdev->gadget = gadget;
@@ -1260,8 +1281,6 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 
 
 	list_for_each_entry(c, &gi->cdev.configs, list) {
-		struct config_usb_cfg *cfg;
-
 		cfg = container_of(c, struct config_usb_cfg, c);
 		if (list_empty(&cfg->func_list)) {
 			pr_err("Config %s/%d of %s needs at least one function.\n",
@@ -1320,9 +1339,6 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 
 	/* Go through all configs, attach all functions */
 	list_for_each_entry(c, &gi->cdev.configs, list) {
-		struct config_usb_cfg *cfg;
-		struct usb_function *f;
-		struct usb_function *tmp;
 		struct gadget_config_name *cn;
 
 		if (gadget_is_otg(gadget))
@@ -1349,6 +1365,12 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 		list_for_each_entry_safe(f, tmp, &cfg->func_list, list) {
 			list_del(&f->list);
 			ret = usb_add_function(c, f);
+			if (!(f->fs_descriptors || f->hs_descriptors
+			   || f->ss_descriptors || f->ssp_descriptors)) {
+				pr_err("%s can't be used in a config since it "
+					"has no descriptors\n", f->name);
+				ret = ret < 0 ? ret : -EINVAL;
+			}
 			if (ret) {
 				list_add(&f->list, &cfg->func_list);
 				goto err_purge_funcs;
@@ -1360,6 +1382,27 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 		ret = composite_os_desc_req_prepare(cdev, gadget->ep0);
 		if (ret)
 			goto err_purge_funcs;
+	}
+
+	cfg = &gi->control_config;
+	c = &cfg->c;
+	list_for_each_entry_safe(f, tmp, &cfg->func_list, list) {
+		if (!f->req_match || !f->setup) {
+			ret = -EINVAL;
+			goto err_purge_funcs;
+		}
+		list_del(&f->list);
+		ret = usb_add_function(&cfg->c, f);
+		if (f->fs_descriptors || f->hs_descriptors
+				|| f->ss_descriptors || f->ssp_descriptors) {
+			pr_err("Only functions with no descriptors "
+				"can be used in control_config\n");
+			ret = ret < 0 ? ret : -EINVAL;
+		}
+		if (ret) {
+			list_add(&f->list, &cfg->func_list);
+			goto err_purge_funcs;
+		}
 	}
 
 	usb_ep_autoconfig_reset(cdev->gadget);
@@ -1391,11 +1434,34 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
 	set_gadget_data(gadget, NULL);
 }
 
+static int configfs_composite_setup(struct usb_gadget *gadget,
+			const struct usb_ctrlrequest *c)
+{
+	struct usb_composite_dev *cdev = get_gadget_data(gadget);
+	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
+
+	struct config_usb_cfg *cfg = &gi->control_config;
+	struct usb_function *f;
+	int value;
+
+	value = composite_setup(gadget, c);
+	if (value >= 0)
+		return value;
+
+	list_for_each_entry(f, &cfg->c.functions, list) {
+		if (f->req_match(f, c, false)) {
+			value = f->setup(f, c);
+			break;
+		}
+	}
+	return value;
+}
+
 static const struct usb_gadget_driver configfs_driver_template = {
 	.bind           = configfs_composite_bind,
 	.unbind         = configfs_composite_unbind,
 
-	.setup          = composite_setup,
+	.setup          = configfs_composite_setup,
 	.reset          = composite_disconnect,
 	.disconnect     = composite_disconnect,
 
@@ -1460,6 +1526,18 @@ static struct config_group *gadgets_make(
 
 	if (!gi->composite.gadget_driver.function)
 		goto err;
+
+	gi->control_config.c.label = "control_config";
+	/* composite requires some value, but it doesn't matter */
+	gi->control_config.c.bConfigurationValue = 42;
+	INIT_LIST_HEAD(&gi->control_config.func_list);
+	config_group_init_type_name(&gi->control_config.group,
+			"control_config", &control_config_type);
+	configfs_add_default_group(&gi->control_config.group, &gi->group);
+
+	if (usb_add_config_only(&gi->cdev, &gi->control_config.c))
+		goto err;
+	list_del(&gi->control_config.c.list);
 
 	return &gi->group;
 err:
