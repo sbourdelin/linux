@@ -14,6 +14,8 @@
  * the dcache entry is deleted or garbage collected.
  */
 
+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+
 #include <linux/ratelimit.h>
 #include <linux/string.h>
 #include <linux/mm.h>
@@ -117,9 +119,37 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
+/*
+ * There is a system-wide soft limit to the number of negative dentries
+ * allowed in the super blocks' LRU lists, if enabled. The default limit
+ * is 2% of the total system memory. On a 64-bit system with 1G memory,
+ * that translated to about 100k dentries which is quite a lot. The limit
+ * can be changed by using the "neg_dentry_pc" kernel parameter.
+ *
+ * To avoid performance problem with a global counter on an SMP system,
+ * the tracking is done mostly on a per-cpu basis. The total limit is
+ * distributed in a 80/20 ratio to per-cpu counters and a global free pool.
+ *
+ * If a per-cpu counter runs out of negative dentries, it can borrow extra
+ * ones from the global free pool. If it has more than its percpu limit,
+ * the extra ones will be returned back to the global pool.
+ */
+#define NEG_DENTRY_PC_DEFAULT	2
+#define NEG_DENTRY_BATCH	(1 << 8)
+
+#ifdef CONFIG_DCACHE_TRACK_NEG_ENTRY
+static int neg_dentry_pc __read_mostly = NEG_DENTRY_PC_DEFAULT;
+static long neg_dentry_percpu_limit __read_mostly;
+static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
+static struct {
+	raw_spinlock_t nfree_lock;
+	long nfree;			/* Negative dentry free pool */
+} ndblk ____cacheline_aligned_in_smp;
+static DEFINE_PER_CPU(long, nr_dentry_neg);
+#endif
+
 static DEFINE_PER_CPU(long, nr_dentry);
 static DEFINE_PER_CPU(long, nr_dentry_unused);
-static DEFINE_PER_CPU(long, nr_dentry_neg);
 
 #if defined(CONFIG_SYSCTL) && defined(CONFIG_PROC_FS)
 
@@ -153,6 +183,7 @@ static long get_nr_dentry_unused(void)
 	return sum < 0 ? 0 : sum;
 }
 
+#ifdef CONFIG_DCACHE_TRACK_NEG_ENTRY
 static long get_nr_dentry_neg(void)
 {
 	int i;
@@ -160,8 +191,12 @@ static long get_nr_dentry_neg(void)
 
 	for_each_possible_cpu(i)
 		sum += per_cpu(nr_dentry_neg, i);
+	sum += neg_dentry_nfree_init - ndblk.nfree;
 	return sum < 0 ? 0 : sum;
 }
+#else
+static long get_nr_dentry_neg(void)	{ return 0L; }
+#endif
 
 int proc_nr_dentry(struct ctl_table *table, int write, void __user *buffer,
 		   size_t *lenp, loff_t *ppos)
@@ -226,9 +261,23 @@ static inline int dentry_string_cmp(const unsigned char *cs, const unsigned char
 
 #endif
 
-static inline void __neg_dentry_dec(struct dentry *dentry)
+#ifdef CONFIG_DCACHE_TRACK_NEG_ENTRY
+/*
+ * Decrement negative dentry count if applicable.
+ */
+static void __neg_dentry_dec(struct dentry *dentry)
 {
-	this_cpu_dec(nr_dentry_neg);
+	if (unlikely((this_cpu_dec_return(nr_dentry_neg) < 0) &&
+	    neg_dentry_pc)) {
+		long *pcnt = get_cpu_ptr(&nr_dentry_neg);
+
+		if ((*pcnt < 0) && raw_spin_trylock(&ndblk.nfree_lock)) {
+			WRITE_ONCE(ndblk.nfree, ndblk.nfree + NEG_DENTRY_BATCH);
+			*pcnt += NEG_DENTRY_BATCH;
+			raw_spin_unlock(&ndblk.nfree_lock);
+		}
+		put_cpu_ptr(&nr_dentry_neg);
+	}
 }
 
 static inline void neg_dentry_dec(struct dentry *dentry)
@@ -237,9 +286,50 @@ static inline void neg_dentry_dec(struct dentry *dentry)
 		__neg_dentry_dec(dentry);
 }
 
-static inline void __neg_dentry_inc(struct dentry *dentry)
+/*
+ * Try to decrement the negative dentry free pool by NEG_DENTRY_BATCH.
+ * The actual decrement returned by the function may be smaller.
+ */
+static long __neg_dentry_nfree_dec(void)
 {
-	this_cpu_inc(nr_dentry_neg);
+	long cnt = NEG_DENTRY_BATCH;
+
+	raw_spin_lock(&ndblk.nfree_lock);
+	if (ndblk.nfree < cnt)
+		cnt = ndblk.nfree;
+	WRITE_ONCE(ndblk.nfree, ndblk.nfree - cnt);
+	raw_spin_unlock(&ndblk.nfree_lock);
+	return cnt;
+}
+
+/*
+ * Increment negative dentry count if applicable.
+ */
+static void __neg_dentry_inc(struct dentry *dentry)
+{
+	long cnt = 0, *pcnt;
+
+	if (likely((this_cpu_inc_return(nr_dentry_neg) <=
+		    neg_dentry_percpu_limit) || !neg_dentry_pc))
+		return;
+
+	/*
+	 * Try to move some negative dentry quota from the global free
+	 * pool to the percpu count to allow more negative dentries to
+	 * be added to the LRU.
+	 */
+	pcnt = get_cpu_ptr(&nr_dentry_neg);
+	if (READ_ONCE(ndblk.nfree) && (*pcnt > neg_dentry_percpu_limit)) {
+		cnt = __neg_dentry_nfree_dec();
+		*pcnt -= cnt;
+	}
+	put_cpu_ptr(&nr_dentry_neg);
+
+	/*
+	 * Put out a warning if there are too many negative dentries.
+	 */
+	if (!cnt)
+		pr_warn_once("Too many negative dentries.");
 }
 
 static inline void neg_dentry_inc(struct dentry *dentry)
@@ -247,6 +337,26 @@ static inline void neg_dentry_inc(struct dentry *dentry)
 	if (unlikely(d_is_negative(dentry)))
 		__neg_dentry_inc(dentry);
 }
+
+#else /* CONFIG_DCACHE_TRACK_NEG_ENTRY */
+
+static inline void __neg_dentry_dec(struct dentry *dentry)
+{
+}
+
+static inline void neg_dentry_dec(struct dentry *dentry)
+{
+}
+
+static inline void __neg_dentry_inc(struct dentry *dentry)
+{
+}
+
+static inline void neg_dentry_inc(struct dentry *dentry)
+{
+}
+
+#endif /* CONFIG_DCACHE_TRACK_NEG_ENTRY */
 
 static inline int dentry_cmp(const struct dentry *dentry, const unsigned char *ct, unsigned tcount)
 {
@@ -3149,6 +3259,54 @@ void d_tmpfile(struct dentry *dentry, struct inode *inode)
 }
 EXPORT_SYMBOL(d_tmpfile);
 
+#ifdef CONFIG_DCACHE_TRACK_NEG_ENTRY
+static void __init neg_dentry_init(void)
+{
+	/* Rough estimate of # of dentries allocated per page */
+	unsigned int nr_dentry_page = PAGE_SIZE/sizeof(struct dentry) - 1;
+	unsigned long cnt;
+
+	raw_spin_lock_init(&ndblk.nfree_lock);
+
+	/* 20% in global pool & 80% in percpu free */
+	ndblk.nfree = neg_dentry_nfree_init
+		    = totalram_pages * nr_dentry_page * neg_dentry_pc / 500;
+	cnt = ndblk.nfree * 4 / num_possible_cpus();
+	if (unlikely((cnt < 2 * NEG_DENTRY_BATCH) && neg_dentry_pc))
+		cnt = 2 * NEG_DENTRY_BATCH;
+	neg_dentry_percpu_limit = cnt;
+
+	pr_info("Negative dentry: percpu limit = %ld, free pool = %ld\n",
+		neg_dentry_percpu_limit, ndblk.nfree);
+}
+
+static int __init set_neg_dentry_pc(char *str)
+{
+	int err = -EINVAL;
+	unsigned long pc;
+
+	if (str) {
+		err = kstrtoul(str, 0, &pc);
+		if (err)
+			return err;
+
+		/*
+		 * Valid negative dentry percentage: 0-10%
+		 */
+		if ((pc >= 0) && (pc <= 10)) {
+			neg_dentry_pc = pc;
+			return 0;
+		}
+		err = -ERANGE;
+	}
+	return err;
+}
+early_param("neg_dentry_pc", set_neg_dentry_pc);
+#else
+static inline void neg_dentry_init(void) { }
+#endif
+
+
 static __initdata unsigned long dhash_entries;
 static int __init set_dhash_entries(char *str)
 {
@@ -3190,6 +3348,8 @@ static void __init dcache_init(void)
 	dentry_cache = KMEM_CACHE_USERCOPY(dentry,
 		SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|SLAB_MEM_SPREAD|SLAB_ACCOUNT,
 		d_iname);
+
+	neg_dentry_init();
 
 	/* Hash may have been set up in dcache_init_early */
 	if (!hashdist)

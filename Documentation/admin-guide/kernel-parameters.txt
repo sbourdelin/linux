@@ -2462,6 +2462,15 @@
 
 	n2=		[NET] SDL Inc. RISCom/N2 synchronous serial card
 
+	neg_dentry_pc=
+			With "CONFIG_DCACHE_TRACK_NEG_ENTRY=y", specify
+			the limit for the number negative dentries
+			allowable in a system as a percentage of the
+			total system memory. The default is 2% and the
+			valid range is 0-10 where 0 means no limit.
+
+			Format: <pc>
+
 	netdev=		[NET] Network devices parameters
 			Format: <irq>,<io>,<mem_start>,<mem_end>,<name>
 			Note that mem_start is often overloaded to mean

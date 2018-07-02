@@ -113,6 +113,16 @@ source "fs/autofs/Kconfig"
 source "fs/fuse/Kconfig"
 source "fs/overlayfs/Kconfig"
 
+#
+# Track and limit the number of negative dentries allowed in the system.
+#
+config DCACHE_TRACK_NEG_ENTRY
+	bool "Track & limit negative dcache entries"
+	default n
+	help
+	  This option enables the tracking and limiting of the total
+	  number of negative dcache entries in the filesystem.
+
 menu "Caches"
 
 source "fs/fscache/Kconfig"
