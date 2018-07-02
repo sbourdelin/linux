@@ -143,6 +143,7 @@ struct dvb_usb_adapter_fe_properties {
 #define DVB_USB_ADAP_NEED_PID_FILTERING           0x04
 #define DVB_USB_ADAP_RECEIVES_204_BYTE_TS         0x08
 #define DVB_USB_ADAP_RECEIVES_RAW_PAYLOAD         0x10
+#define DVB_USB_ADAP_STREAMING_CTRL_NO_URB        0x20
 	int caps;
 	int pid_filter_count;
 
@@ -234,6 +235,11 @@ enum dvb_usb_mode {
  *
  * @size_of_priv: how many bytes shall be allocated for the private field
  *  of struct dvb_usb_device.
+ * @priv_init: optional callback to initialize the variable that private field
+ * of struct dvb_usb_device has pointer to just after it had been allocated and
+ * zeroed.
+ * @priv_destroy: just like priv_init, only called before deallocating
+ * the memory pointed by private field of struct dvb_usb_device.
  *
  * @power_ctrl: called to enable/disable power of the device.
  * @read_mac_address: called to read the MAC address of the device.
@@ -275,6 +281,8 @@ struct dvb_usb_device_properties {
 	int        no_reconnect;
 
 	int size_of_priv;
+	int (*priv_init)(struct dvb_usb_device *);
+	void (*priv_destroy)(struct dvb_usb_device *);
 
 	int num_adapters;
 	struct dvb_usb_adapter_properties adapter[MAX_NO_OF_ADAPTER_PER_DEVICE];
