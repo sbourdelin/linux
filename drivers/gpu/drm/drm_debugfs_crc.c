@@ -272,6 +272,14 @@ static ssize_t crtc_crc_read(struct file *filep, char __user *user_buf,
 		return 0;
 	}
 
+	if (crtc->funcs->pre_crc_read) {
+		ret = crtc->funcs->pre_crc_read(crtc);
+		if (ret) {
+			spin_unlock_irq(&crc->lock);
+			return ret;
+		}
+	}
+
 	/* Nothing to read? */
 	while (crtc_crc_data_count(crc) == 0) {
 		if (filep->f_flags & O_NONBLOCK) {
