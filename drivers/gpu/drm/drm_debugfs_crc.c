@@ -67,9 +67,27 @@
 static int crc_control_show(struct seq_file *m, void *data)
 {
 	struct drm_crtc *crtc = m->private;
+	size_t count;
 
+	if (crtc->funcs->get_crc_sources) {
+		const char *const *sources = crtc->funcs->get_crc_sources(crtc,
+									&count);
+		size_t values_cnt;
+		int i;
+
+		if (count <= 0 || !sources)
+			goto out;
+
+		seq_puts(m, "[");
+		for (i = 0; i < count; i++)
+			if (!crtc->funcs->verify_crc_source(crtc, sources[i],
+							    &values_cnt))
+				seq_printf(m, "%s ", sources[i]);
+		seq_puts(m, "] ");
+	}
+
+out:
 	seq_printf(m, "%s\n", crtc->crc.source);
-
 	return 0;
 }
 
