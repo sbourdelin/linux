@@ -1980,8 +1980,20 @@ static void __wakeup_flusher_threads_bdi(struct backing_dev_info *bdi,
 	if (!bdi_has_dirty_io(bdi))
 		return;
 
-	list_for_each_entry_rcu(wb, &bdi->wb_list, bdi_node)
-		wb_start_writeback(wb, reason);
+	list_for_each_entry_rcu(wb, &bdi->wb_list, bdi_node) {
+#ifdef CONFIG_CGROUP_WRITEBACK
+		if (reason == WB_REASON_VMSCAN) {
+			struct cgroup_subsys_state *memcg_css;
+
+			memcg_css = task_css(current, memory_cgrp_id);
+			if (!memcg_css->parent || memcg_css == wb->memcg_css)
+				wb_start_writeback(wb, reason);
+		}
+		else
+#endif
+			wb_start_writeback(wb, reason);
+
+	}
 }
 
 void wakeup_flusher_threads_bdi(struct backing_dev_info *bdi,
