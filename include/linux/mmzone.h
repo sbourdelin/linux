@@ -662,6 +662,8 @@ typedef struct pglist_data {
 
 	int kswapd_failures;		/* Number of 'reclaimed == 0' runs */
 
+	spinlock_t pinned_dma_lock;
+
 #ifdef CONFIG_COMPACTION
 	int kcompactd_max_order;
 	enum zone_type kcompactd_classzone_idx;
@@ -738,6 +740,11 @@ typedef struct pglist_data {
 static inline spinlock_t *zone_lru_lock(struct zone *zone)
 {
 	return &zone->zone_pgdat->lru_lock;
+}
+
+static inline spinlock_t *zone_gup_lock(struct zone *zone)
+{
+	return &zone->zone_pgdat->pinned_dma_lock;
 }
 
 static inline struct lruvec *node_lruvec(struct pglist_data *pgdat)
