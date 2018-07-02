@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	heap_type = -1UL;
 	heap_size = 0;
 	flags = 0;
 
@@ -80,6 +81,12 @@ int main(int argc, char *argv[])
 			exit(1);
 			break;
 		}
+	}
+
+	if (heap_type == -1UL) {
+		printf("heap_type is invalid\n");
+		print_usage(argc, argv);
+		exit(1);
 	}
 
 	if (heap_size <= 0) {
