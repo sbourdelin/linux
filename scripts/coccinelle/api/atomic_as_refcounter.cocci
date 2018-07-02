@@ -80,17 +80,11 @@ coccilib.report.print_report(p1[0], msg % (p2[0].line))
 
 @r2 exists@
 expression a;
-identifier x;
+identifier F =~ "^atomic(?:64|_long)?_add_unless$", x;
 position p1;
 @@
 
-(
-atomic_add_unless(&(a)->x,-1,1)@p1
-|
-atomic_long_add_unless(&(a)->x,-1,1)@p1
-|
-atomic64_add_unless(&(a)->x,-1,1)@p1
-)
+ F(&(a)->x, -1, 1)@p1
 
 @script:python depends on report@
 p1 << r2.p1;
@@ -99,17 +93,12 @@ msg = "atomic_add_unless"
 coccilib.report.print_report(p1[0], msg)
 
 @r3 exists@
-identifier x;
+expression E;
+identifier F =~ "^atomic(?:64|_long)?_add_return$";
 position p1;
 @@
 
-(
-x = atomic_add_return@p1(-1, ...);
-|
-x = atomic_long_add_return@p1(-1, ...);
-|
-x = atomic64_add_return@p1(-1, ...);
-)
+ E = F@p1(-1, ...);
 
 @script:python depends on report@
 p1 << r3.p1;
