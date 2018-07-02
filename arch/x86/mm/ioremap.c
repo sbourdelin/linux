@@ -689,8 +689,17 @@ pgprot_t __init early_memremap_pgprot_adjust(resource_size_t phys_addr,
 	encrypted_prot = true;
 
 	if (sme_active()) {
+		/*
+		 * In kdump mode, the acpi table and dmi table will need to
+		 * be remapped in unencrypted ways during early init when
+		 * SME is enabled. They have just a simple wrapper around
+		 * early_memremap(), but the early_memremap() remaps the
+		 * memory in encrypted ways by default when SME is enabled,
+		 * so we must adjust it.
+		 */
 		if (early_memremap_is_setup_data(phys_addr, size) ||
-		    memremap_is_efi_data(phys_addr, size))
+		    memremap_is_efi_data(phys_addr, size) ||
+		    is_kdump_kernel())
 			encrypted_prot = false;
 	}
 
