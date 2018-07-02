@@ -40,8 +40,9 @@ identifier fname2 =~ "(?:call_rcu|de(?:l|stroy)|(?:queue|schedule)_work)";
 p1 << r1.p1;
 p2 << r1.p2;
 @@
-msg = "atomic_dec_and_test variation before object free at line %s."
-coccilib.report.print_report(p1[0], msg % (p2[0].line))
+coccilib.report.print_report(p1[0],
+                             "atomic_dec_and_test variation before object free at line %s."
+                             % (p2[0].line))
 
 @r4 exists@
 expression a;
@@ -71,8 +72,9 @@ fname@p2(y, ...);
 p1 << r4.p1;
 p2 << r4.p2;
 @@
-msg = "atomic_dec_and_test variation before object free at line %s."
-coccilib.report.print_report(p1[0], msg % (p2[0].line))
+coccilib.report.print_report(p1[0],
+                             "atomic_dec_and_test variation before object free at line %s."
+                             % (p2[0].line))
 
 @r2 exists@
 expression a;
@@ -85,8 +87,7 @@ position p1;
 @script:python depends on report@
 p1 << r2.p1;
 @@
-msg = "atomic_add_unless"
-coccilib.report.print_report(p1[0], msg)
+coccilib.report.print_report(p1[0], "atomic_add_unless")
 
 @r3 exists@
 expression E;
@@ -99,5 +100,4 @@ position p1;
 @script:python depends on report@
 p1 << r3.p1;
 @@
-msg = "x = atomic_add_return(-1, ...)"
-coccilib.report.print_report(p1[0], msg)
+coccilib.report.print_report(p1[0], "x = atomic_add_return(-1, ...)")
