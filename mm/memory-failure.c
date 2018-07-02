@@ -931,6 +931,7 @@ static bool hwpoison_user_mappings(struct page *p, unsigned long pfn,
 	int kill = 1, forcekill;
 	struct page *hpage = *hpagep;
 	bool mlocked = PageMlocked(hpage);
+	bool skip_pinned_pages = false;
 
 	/*
 	 * Here we are interested only in user-mapped pages, so skip any
@@ -968,7 +969,7 @@ static bool hwpoison_user_mappings(struct page *p, unsigned long pfn,
 	mapping = page_mapping(hpage);
 	if (!(flags & MF_MUST_KILL) && !PageDirty(hpage) && mapping &&
 	    mapping_cap_writeback_dirty(mapping)) {
-		if (page_mkclean(hpage)) {
+		if (page_mkclean(hpage, skip_pinned_pages)) {
 			SetPageDirty(hpage);
 		} else {
 			kill = 0;

@@ -852,6 +852,7 @@ void pagecache_isize_extended(struct inode *inode, loff_t from, loff_t to)
 	loff_t rounded_from;
 	struct page *page;
 	pgoff_t index;
+	bool skip_pinned_pages = false;
 
 	WARN_ON(to > inode->i_size);
 
@@ -871,7 +872,7 @@ void pagecache_isize_extended(struct inode *inode, loff_t from, loff_t to)
 	 * See clear_page_dirty_for_io() for details why set_page_dirty()
 	 * is needed.
 	 */
-	if (page_mkclean(page))
+	if (page_mkclean(page, skip_pinned_pages))
 		set_page_dirty(page);
 	unlock_page(page);
 	put_page(page);

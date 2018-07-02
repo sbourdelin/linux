@@ -879,6 +879,26 @@ int page_referenced(struct page *page,
 	return pra.referenced;
 }
 
+/* Must be called with pinned_dma_lock held. */
+static void wait_for_dma_pinned_to_clear(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+
+	while (PageDmaPinnedFlags(page)) {
+		spin_unlock(zone_gup_lock(zone));
+
+		schedule();
+
+		spin_lock(zone_gup_lock(zone));
+	}
+}
+
+struct page_mkclean_info {
+	int cleaned;
+	int skipped;
+	bool skip_pinned_pages;
+};
+
 static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 			    unsigned long address, void *arg)
 {
@@ -889,7 +909,24 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 		.flags = PVMW_SYNC,
 	};
 	unsigned long start = address, end;
-	int *cleaned = arg;
+	struct page_mkclean_info *mki = (struct page_mkclean_info *)arg;
+	bool is_dma_pinned;
+	struct zone *zone = page_zone(page);
+
+	/* Serialize with get_user_pages: */
+	spin_lock(zone_gup_lock(zone));
+	is_dma_pinned = PageDmaPinned(page);
+
+	if (is_dma_pinned) {
+		if (mki->skip_pinned_pages) {
+			spin_unlock(zone_gup_lock(zone));
+			mki->skipped++;
+			return false;
+		}
+	}
+
+	/* Unlock while doing mmu notifier callbacks */
+	spin_unlock(zone_gup_lock(zone));
 
 	/*
 	 * We have to assume the worse case ie pmd for invalidation. Note that
@@ -897,6 +934,10 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 	 */
 	end = min(vma->vm_end, start + (PAGE_SIZE << compound_order(page)));
 	mmu_notifier_invalidate_range_start(vma->vm_mm, start, end);
+
+	spin_lock(zone_gup_lock(zone));
+
+	wait_for_dma_pinned_to_clear(page);
 
 	while (page_vma_mapped_walk(&pvmw)) {
 		unsigned long cstart;
@@ -945,8 +986,10 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 		 * See Documentation/vm/mmu_notifier.rst
 		 */
 		if (ret)
-			(*cleaned)++;
+			(mki->cleaned)++;
 	}
+
+	spin_unlock(zone_gup_lock(zone));
 
 	mmu_notifier_invalidate_range_end(vma->vm_mm, start, end);
 
@@ -961,12 +1004,17 @@ static bool invalid_mkclean_vma(struct vm_area_struct *vma, void *arg)
 	return true;
 }
 
-int page_mkclean(struct page *page)
+int page_mkclean(struct page *page, bool skip_pinned_pages)
 {
-	int cleaned = 0;
+	struct page_mkclean_info mki = {
+		.cleaned = 0,
+		.skipped = 0,
+		.skip_pinned_pages = skip_pinned_pages
+	};
+
 	struct address_space *mapping;
 	struct rmap_walk_control rwc = {
-		.arg = (void *)&cleaned,
+		.arg = (void *)&mki,
 		.rmap_one = page_mkclean_one,
 		.invalid_vma = invalid_mkclean_vma,
 	};
@@ -982,7 +1030,7 @@ int page_mkclean(struct page *page)
 
 	rmap_walk(page, &rwc);
 
-	return cleaned;
+	return mki.cleaned && !mki.skipped;
 }
 EXPORT_SYMBOL_GPL(page_mkclean);
 
@@ -1346,6 +1394,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 	bool ret = true;
 	unsigned long start = address, end;
 	enum ttu_flags flags = (enum ttu_flags)arg;
+	struct zone *zone = page_zone(page);
 
 	/* munlock has nothing to gain from examining un-locked vmas */
 	if ((flags & TTU_MUNLOCK) && !(vma->vm_flags & VM_LOCKED))
@@ -1359,6 +1408,16 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		split_huge_pmd_address(vma, address,
 				flags & TTU_SPLIT_FREEZE, page);
 	}
+
+	/* Serialize with get_user_pages: */
+	spin_lock(zone_gup_lock(zone));
+
+	if (PageDmaPinned(page)) {
+		spin_unlock(zone_gup_lock(zone));
+		return false;
+	}
+
+	spin_unlock(zone_gup_lock(zone));
 
 	/*
 	 * We have to assume the worse case ie pmd for invalidation. Note that

@@ -181,12 +181,13 @@ static void fb_deferred_io_work(struct work_struct *work)
 	struct list_head *node, *next;
 	struct page *cur;
 	struct fb_deferred_io *fbdefio = info->fbdefio;
+	bool skip_pinned_pages = false;
 
 	/* here we mkclean the pages, then do all deferred IO */
 	mutex_lock(&fbdefio->lock);
 	list_for_each_entry(cur, &fbdefio->pagelist, lru) {
 		lock_page(cur);
-		page_mkclean(cur);
+		page_mkclean(cur, skip_pinned_pages);
 		unlock_page(cur);
 	}
 

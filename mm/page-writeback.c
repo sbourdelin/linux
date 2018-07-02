@@ -2660,6 +2660,7 @@ int clear_page_dirty_for_io(struct page *page, int sync_mode)
 		struct inode *inode = mapping->host;
 		struct bdi_writeback *wb;
 		struct wb_lock_cookie cookie = {};
+		bool skip_pinned_pages = (sync_mode != WB_SYNC_ALL);
 
 		/*
 		 * Yes, Virginia, this is indeed insane.
@@ -2686,7 +2687,7 @@ int clear_page_dirty_for_io(struct page *page, int sync_mode)
 		 * as a serialization point for all the different
 		 * threads doing their things.
 		 */
-		if (page_mkclean(page))
+		if (page_mkclean(page, skip_pinned_pages))
 			set_page_dirty(page);
 		/*
 		 * We carefully synchronise fault handlers against

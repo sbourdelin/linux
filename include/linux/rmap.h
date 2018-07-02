@@ -233,7 +233,7 @@ unsigned long page_address_in_vma(struct page *, struct vm_area_struct *);
  *
  * returns the number of cleaned PTEs.
  */
-int page_mkclean(struct page *);
+int page_mkclean(struct page *page, bool skip_pinned_pages);
 
 /*
  * called in munlock()/munmap() path to check for other vmas holding
@@ -291,7 +291,7 @@ static inline int page_referenced(struct page *page, int is_locked,
 
 #define try_to_unmap(page, refs) false
 
-static inline int page_mkclean(struct page *page)
+static inline int page_mkclean(struct page *page, bool skip_pinned_pages)
 {
 	return 0;
 }
