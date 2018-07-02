@@ -25,6 +25,115 @@
 #include "i915_drv.h"
 #include "i915_gem_object.h"
 
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG_GEM)
+
+#include <linux/sort.h>
+
+#define STACKDEPTH 12
+
+void track_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+{
+	unsigned long entries[STACKDEPTH];
+	struct stack_trace trace = {
+		.entries = entries,
+		.max_entries = ARRAY_SIZE(entries),
+		.skip = 1
+	};
+	unsigned long flags;
+	depot_stack_handle_t stack, *stacks;
+
+	save_stack_trace(&trace);
+	if (trace.nr_entries &&
+	    trace.entries[trace.nr_entries - 1] == ULONG_MAX)
+		trace.nr_entries--;
+
+	stack = depot_save_stack(&trace, GFP_NOWAIT);
+	if (!stack)
+		return;
+
+	spin_lock_irqsave(&obj->mm.debug_lock, flags);
+	stacks = krealloc(obj->mm.debug_owners,
+			  (obj->mm.debug_count + 1) * sizeof(*stacks),
+			  GFP_NOWAIT);
+	if (stacks) {
+		stacks[obj->mm.debug_count++] = stack;
+		obj->mm.debug_owners = stacks;
+	}
+	spin_unlock_irqrestore(&obj->mm.debug_lock, flags);
+}
+
+void untrack_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+{
+	depot_stack_handle_t *stacks;
+	unsigned long flags;
+
+	spin_lock_irqsave(&obj->mm.debug_lock, flags);
+	stacks = fetch_and_zero(&obj->mm.debug_owners);
+	obj->mm.debug_count = 0;
+	spin_unlock_irqrestore(&obj->mm.debug_lock, flags);
+
+	kfree(stacks);
+}
+
+static int cmphandle(const void *_a, const void *_b)
+{
+	const depot_stack_handle_t * const a = _a, * const b = _b;
+
+	if (*a < *b)
+		return -1;
+	else if (*a > *b)
+		return 1;
+	else
+		return 0;
+}
+
+void show_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+{
+	unsigned long entries[STACKDEPTH];
+	depot_stack_handle_t *stacks;
+	unsigned long flags, count, i;
+	char *buf;
+
+	spin_lock_irqsave(&obj->mm.debug_lock, flags);
+	stacks = fetch_and_zero(&obj->mm.debug_owners);
+	count = fetch_and_zero(&obj->mm.debug_count);
+	spin_unlock_irqrestore(&obj->mm.debug_lock, flags);
+	if (!count)
+		return;
+
+	DRM_DEBUG_DRIVER("obj %p leaked pages, pinned %lu\n", obj, count);
+
+	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!buf)
+		goto out_stacks;
+
+	sort(stacks, count, sizeof(*stacks), cmphandle, NULL);
+
+	for (i = 0; i < count; i++) {
+		struct stack_trace trace = {
+			.entries = entries,
+			.max_entries = ARRAY_SIZE(entries),
+		};
+		depot_stack_handle_t stack = stacks[i];
+		unsigned long rep;
+
+		rep = 1;
+		while (i + 1 < count && stacks[i + 1] == stack)
+			rep++, i++;
+
+		depot_fetch_stack(stack, &trace);
+		snprint_stack_trace(buf, PAGE_SIZE, &trace, 0);
+		DRM_DEBUG_DRIVER("obj %p pages pinned x%lu at\n%s",
+				 obj, rep, buf);
+	}
+
+	kfree(buf);
+out_stacks:
+	kfree(stacks);
+}
+
+#endif
+
 /**
  * Mark up the object's coherency levels for a given cache_level
  * @obj: #drm_i915_gem_object
