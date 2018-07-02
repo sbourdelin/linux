@@ -283,13 +283,14 @@ static int aer_hest_parse(struct acpi_hest_header *hest_hdr, void *data)
 
 static void aer_set_firmware_first(struct pci_dev *pci_dev)
 {
-	int rc;
+	int rc = 0;
 	struct aer_hest_parse_info info = {
 		.pci_dev	= pci_dev,
 		.firmware_first	= 0,
 	};
 
-	rc = apei_hest_parse(aer_hest_parse, &info);
+	if (!pcie_ports_native)
+		rc = apei_hest_parse(aer_hest_parse, &info);
 
 	if (rc)
 		pci_dev->__aer_firmware_first = 0;
@@ -324,7 +325,9 @@ bool aer_acpi_firmware_first(void)
 	};
 
 	if (!parsed) {
-		apei_hest_parse(aer_hest_parse, &info);
+		if (!pcie_ports_native)
+			apei_hest_parse(aer_hest_parse, &info);
+
 		aer_firmware_first = info.firmware_first;
 		parsed = true;
 	}
