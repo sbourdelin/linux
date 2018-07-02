@@ -146,7 +146,9 @@ struct dentry_stat_t dentry_stat = {
 	unlikely(!(sb)->s_root || !((sb)->s_flags & MS_ACTIVE))
 
 #ifdef CONFIG_DCACHE_TRACK_NEG_ENTRY
-static int enforce_neg_dentry_limit __read_mostly;
+int enforce_neg_dentry_limit __read_mostly;
+EXPORT_SYMBOL_GPL(enforce_neg_dentry_limit);
+
 static int neg_dentry_pc __read_mostly = NEG_DENTRY_PC_DEFAULT;
 static long neg_dentry_percpu_limit __read_mostly;
 static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */

@@ -24,6 +24,7 @@ Currently, these files are in /proc/sys/fs:
 - dentry-state
 - dquot-max
 - dquot-nr
+- enforce-neg-dentry-limit
 - file-max
 - file-nr
 - inode-max
@@ -94,6 +95,16 @@ entries and the number of free disk quota entries.
 If the number of free cached disk quotas is very low and
 you have some awesome number of simultaneous system users,
 you might want to raise the limit.
+
+==============================================================
+
+enforce-neg-dentry-limit:
+
+The file enforce-neg-dentry-limit, if present, contains a boolean
+flag (0 or 1) indicating if the negative dentries limit set by
+the "neg_dentry_pc" kernel parameter should be enforced or not.
+If enforced, excess negative dentries over the limit will be killed
+immediately after use.
 
 ==============================================================
 
