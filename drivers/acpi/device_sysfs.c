@@ -26,6 +26,25 @@
 
 #include "internal.h"
 
+static LIST_HEAD(acpi_deferred_property_list);
+struct acpi_deferred_property_link {
+	struct acpi_device *adev;
+	char *propname;
+	struct list_head list;
+};
+
+struct acpi_property_attribute {
+	struct attribute attr;
+	char *name;
+	int ref_idx;
+	ssize_t (*show)(struct kobject *kobj, struct device_attribute *attr,
+			char *buf);
+};
+
+#define to_acpi_property_attr(x) \
+	container_of(x, struct acpi_property_attribute, attr)
+
+
 static ssize_t acpi_object_path(acpi_handle handle, char *buf)
 {
 	struct acpi_buffer path = {ACPI_ALLOCATE_BUFFER, NULL};
@@ -508,6 +527,360 @@ static ssize_t status_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(status);
 
+static inline
+int __acpi_dev_get_property_reference(const struct acpi_device *adev,
+				      const char *propname, int index,
+				      struct acpi_reference_args *args)
+{
+	return acpi_node_get_property_reference(&adev->fwnode,
+						propname,
+						index,
+						args);
+}
+
+static ssize_t __acpi_property_show_ref_args(struct acpi_device *adev,
+					     char *name, int idx, char *buf)
+{
+	struct acpi_reference_args args;
+	char *out;
+	int err;
+	int arg;
+
+	err = __acpi_dev_get_property_reference(adev, name, idx, &args);
+	if (err)
+		return err;
+
+	out = buf;
+	for (arg = 0; arg < args.nargs; arg++) {
+		err = sprintf(out, "0x%llx ", args.args[arg]);
+		if (err < 0)
+			return err;
+
+		out += err;
+	}
+
+	*(out - 1) = '\n';
+	return out - buf;
+}
+
+static ssize_t __acpi_property_print_scalar(char *buf,
+					    const union acpi_object *obj,
+					    size_t size)
+{
+	switch (obj->type) {
+	case ACPI_TYPE_INTEGER:
+		return snprintf(buf, size, "0x%llx ", obj->integer.value);
+	case ACPI_TYPE_STRING:
+		return snprintf(buf, size, "%*pE\n",
+				(int)strlen(obj->string.pointer),
+				obj->string.pointer);
+	default:
+		return -EPROTO;
+	}
+}
+
+static ssize_t __acpi_property_show(struct acpi_device *adev, char *propname,
+				    char *buf)
+{
+	static const int max = PAGE_SIZE - 2;
+	const union acpi_object *obj;
+	char *out;
+	int err;
+
+	err = acpi_dev_get_property(adev, propname, ACPI_TYPE_ANY, &obj);
+	if (err)
+		return err;
+
+	out = buf;
+	if (obj->type == ACPI_TYPE_PACKAGE) {
+		int element;
+
+		for (element = 0; element < obj->package.count; element++) {
+			err = __acpi_property_print_scalar(out,
+				&obj->package.elements[element],
+				max - (out - buf));
+			if (err < 0)
+				return err;
+			out += err;
+		}
+	} else {
+		err = __acpi_property_print_scalar(out, obj, max);
+		if (err < 0)
+			return err;
+
+		out += err;
+	}
+
+	*(out - 1) = '\n';
+	return out - buf;
+}
+
+static ssize_t acpi_property_show(struct kobject *kobj,
+				  struct attribute *attr,
+				  char *buf)
+{
+	struct device *dev = kobj_to_dev(kobj->parent);
+	struct acpi_device *adev = to_acpi_device(dev);
+	struct acpi_property_attribute *prop_attr = to_acpi_property_attr(attr);
+
+	if (prop_attr->ref_idx >= 0)
+		return __acpi_property_show_ref_args(adev, prop_attr->name,
+						     prop_attr->ref_idx, buf);
+	else
+		return __acpi_property_show(adev, prop_attr->name, buf);
+}
+
+static const struct sysfs_ops acpi_property_sysfs_ops = {
+	.show	= acpi_property_show,
+};
+
+static struct kobj_type acpi_property_ktype = {
+	.sysfs_ops = &acpi_property_sysfs_ops,
+};
+
+static int acpi_property_create_file(struct acpi_device *adev,
+				     char *propname, char *filename,
+				     int ref_idx)
+{
+	struct acpi_property_attribute *prop_attr;
+	int err;
+
+	prop_attr = devm_kzalloc(&adev->dev, sizeof(*prop_attr), GFP_KERNEL);
+	if (!prop_attr)
+		return -ENOMEM;
+
+	prop_attr->name = propname;
+	prop_attr->ref_idx = ref_idx;
+	sysfs_attr_init(&prop_attr->attr);
+	prop_attr->attr.name = filename;
+	prop_attr->attr.mode = 0444;
+
+	err = sysfs_create_file(&adev->data.kobj, &prop_attr->attr);
+	if (err) {
+		dev_err(&adev->dev, "failed to create property file: %s\n",
+			filename);
+		devm_kfree(&adev->dev, prop_attr);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+int acpi_property_add_deferred(void)
+{
+	struct acpi_deferred_property_link *link, *tmp;
+	int idx;
+	int resolved = 0;
+	int scanned = 0;
+
+	if (list_empty(&acpi_deferred_property_list))
+		return 0;
+
+	list_for_each_entry_safe(link, tmp, &acpi_deferred_property_list,
+				 list) {
+		struct acpi_reference_args args;
+		int err;
+
+		scanned++;
+
+		idx = 0;
+		while (true) {
+			char *sysfs_name;
+
+			err = __acpi_dev_get_property_reference(link->adev,
+								link->propname,
+								idx,
+								&args);
+			if (err)
+				break;
+
+			if (idx == 0)
+				sysfs_name = devm_kasprintf(&link->adev->dev,
+							    GFP_KERNEL, "%s",
+							    link->propname);
+			else
+				sysfs_name = devm_kasprintf(&link->adev->dev,
+							    GFP_KERNEL, "%s%u",
+							    link->propname,
+							    idx);
+			if (!sysfs_name)
+				return -ENOMEM;
+
+			err = sysfs_create_link(&link->adev->data.kobj,
+						&args.adev->dev.kobj,
+						sysfs_name);
+			if (err)
+				return err;
+
+			dev_dbg(&link->adev->dev,
+				"created deferred property link: %s\n",
+				sysfs_name);
+
+			if (args.nargs > 0) {
+				char *args_name;
+
+				args_name = devm_kasprintf(&link->adev->dev,
+							   GFP_KERNEL,
+							   "%s_args",
+							   sysfs_name);
+				if (!args_name)
+					return -ENOMEM;
+
+				err = acpi_property_create_file(link->adev,
+								link->propname,
+								args_name,
+								idx);
+				if (err)
+					return err;
+
+				dev_dbg(&link->adev->dev,
+					"created deferred property args: %s\n",
+					args_name);
+			}
+
+			idx++;
+		}
+		list_del(&link->list);
+		devm_kfree(&link->adev->dev, link);
+		resolved++;
+	}
+
+	pr_debug("acpi: resolved %d of %d deferred property links\n",
+		 resolved, scanned);
+
+	return resolved;
+}
+
+static int acpi_property_defer(struct acpi_device *adev,
+			       const union acpi_object *property)
+{
+	char *propname;
+	struct acpi_deferred_property_link *link;
+
+	propname = property->package.elements[0].string.pointer;
+
+	dev_dbg(&adev->dev,
+		"deferring property add for ref %s\n", propname);
+
+	link = devm_kmalloc(&adev->dev, sizeof(*link), GFP_KERNEL);
+	if (!link)
+		return -ENOMEM;
+
+	link->adev = adev;
+	link->propname = propname;
+	list_add_tail(&link->list,
+		      &acpi_deferred_property_list);
+
+	return 0;
+}
+
+static int acpi_property_add(struct acpi_device *adev,
+			     const union acpi_object *property)
+{
+	char *propname;
+
+	propname = property->package.elements[0].string.pointer;
+
+	if ((property->package.elements[1].type == ACPI_TYPE_PACKAGE) ||
+	    (property->package.elements[1].type == ACPI_TYPE_LOCAL_REFERENCE))
+		return acpi_property_defer(adev, property);
+	else
+		return acpi_property_create_file(adev, propname, propname, -1);
+}
+
+static void acpi_property_remove_attr(struct acpi_device *adev,
+				      const char *property)
+{
+	struct attribute attr = { 0 };
+	const union acpi_object *obj;
+	struct acpi_reference_args args;
+	char *sysfs_name;
+	int idx;
+	int err;
+
+	err = acpi_dev_get_property(adev, property, ACPI_TYPE_ANY, &obj);
+	if (err)
+		return;
+
+	attr.name = property;
+	sysfs_remove_file(&adev->data.kobj, &attr);
+
+	idx = 0;
+	while (__acpi_dev_get_property_reference(adev, property, idx,
+						 &args) == 0) {
+		if (idx == 0)
+			sysfs_name = kasprintf(GFP_KERNEL, "%s", property);
+		else
+			sysfs_name = kasprintf(GFP_KERNEL, "%s%u", property,
+					       idx);
+		if (!sysfs_name)
+			continue;
+
+		sysfs_remove_link(&adev->data.kobj, sysfs_name);
+
+		if (args.nargs > 0) {
+			attr.name = kasprintf(GFP_KERNEL, "%s_args",
+					      sysfs_name);
+			if (attr.name) {
+				sysfs_remove_file(&adev->data.kobj, &attr);
+				kfree(attr.name);
+			}
+		}
+		kfree(sysfs_name);
+
+		idx++;
+	}
+}
+
+static int acpi_add_properties(struct acpi_device *adev)
+{
+	const union acpi_object *properties;
+	int err;
+	int i;
+
+	if (!adev->data.pointer || !adev->data.properties)
+		return -EINVAL;
+
+	properties = adev->data.properties;
+	err = kobject_init_and_add(&adev->data.kobj, &acpi_property_ktype,
+				   &adev->dev.kobj, "properties");
+	if (err)
+		return err;
+
+	for (i = 0; i < properties->package.count; i++) {
+		const union acpi_object *property;
+
+		property = &properties->package.elements[i];
+		err = acpi_property_add(adev, property);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static void acpi_remove_properties(struct acpi_device *adev)
+{
+	const union acpi_object *properties;
+	int i;
+
+	if (!adev->data.pointer || !adev->data.properties)
+		return;
+
+	properties = adev->data.properties;
+	for (i = 0; i < properties->package.count; i++) {
+		const union acpi_object *property;
+		const union acpi_object *propname;
+
+		property = &properties->package.elements[i];
+		propname = &property->package.elements[0];
+
+		acpi_property_remove_attr(adev, propname->string.pointer);
+	}
+
+	kobject_put(&adev->data.kobj);
+}
+
 /**
  * acpi_device_setup_files - Create sysfs attributes of an ACPI device.
  * @dev: ACPI device object.
@@ -596,6 +969,9 @@ int acpi_device_setup_files(struct acpi_device *dev)
 
 	acpi_expose_nondev_subnodes(&dev->dev.kobj, &dev->data);
 
+	if (dev->data.of_compatible)
+		acpi_add_properties(dev);
+
 end:
 	return result;
 }
@@ -607,6 +983,9 @@ end:
 void acpi_device_remove_files(struct acpi_device *dev)
 {
 	acpi_hide_nondev_subnodes(&dev->data);
+
+	if (dev->data.of_compatible)
+		acpi_remove_properties(dev);
 
 	if (dev->flags.power_manageable) {
 		device_remove_file(&dev->dev, &dev_attr_power_state);
