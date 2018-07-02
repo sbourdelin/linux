@@ -285,6 +285,40 @@ e.g.:
 
 $ rmdir g1
 
+8. Handling control requests
+--------------
+
+A composite gadget with changing configurations may still want to handle
+vendor control requests in a centralized location. In particular, functionfs
+instances can pass control requests to user-space, but there is no
+guarantee that a functionfs is in the current config.
+
+To handle this there is a special config in the root of the gadget
+called control_config. Functions linked here do not appear in the
+configuration, but will receive control requests. To use it:
+
+Create a special instance of functionfs.
+
+$ mkdir functions/ffs.ctrl
+
+Mount the functionfs instance and write descriptors.
+
+mount functionfs ctrl /dev/ffs-ctrl
+# Write functionfs descriptors to /dev/ffs-ctrl/ep0
+# Descriptor header must include ALL_CTRL_RECIP AND CONTROL_ONLY
+# and must *not* include any speed descriptors.
+
+Link the function into control config.
+
+$ ln -s functions/ffs.ctrl control_config/f1
+
+Link normal functions into the appropriate config, and enable the gadget.
+
+$ echo <udc name> > UDC
+
+Handle control requests in /dev/ffs-ctrl/ep0. 
+See functionfs documentation on how to do this.
+
 
 
 
