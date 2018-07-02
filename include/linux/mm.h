@@ -895,6 +895,9 @@ static inline bool is_device_public_page(const struct page *page)
 }
 #endif /* CONFIG_DEV_PAGEMAP_OPS */
 
+void __put_page_for_pinned_dma(struct page *page);
+void __get_page_for_pinned_dma(struct page *page);
+
 static inline void get_page(struct page *page)
 {
 	page = compound_head(page);
@@ -904,11 +907,23 @@ static inline void get_page(struct page *page)
 	 */
 	VM_BUG_ON_PAGE(page_ref_count(page) <= 0, page);
 	page_ref_inc(page);
+
+	if (unlikely(PageDmaPinned(page)))
+		__get_page_for_pinned_dma(page);
 }
 
 static inline void put_page(struct page *page)
 {
 	page = compound_head(page);
+
+	/* Because the page->dma_pinned_* fields are unioned with
+	 * page->lru, there is no way to do classical refcount-style
+	 * decrement-and-test-for-zero. Instead, PageDmaPinned(page) must
+	 * be checked, in order to safely check if we are allowed to decrement
+	 * page->dma_pinned_count at all.
+	 */
+	if (unlikely(PageDmaPinned(page)))
+		__put_page_for_pinned_dma(page);
 
 	/*
 	 * For devmap managed pages we need to catch refcount transition from

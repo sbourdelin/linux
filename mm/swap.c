@@ -52,6 +52,43 @@ static DEFINE_PER_CPU(struct pagevec, lru_lazyfree_pvecs);
 static DEFINE_PER_CPU(struct pagevec, activate_page_pvecs);
 #endif
 
+void __get_page_for_pinned_dma(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+
+	spin_lock(zone_gup_lock(zone));
+
+	if (PageDmaPinned(page))
+		atomic_inc(&page->dma_pinned_count);
+
+	spin_unlock(zone_gup_lock(zone));
+}
+EXPORT_SYMBOL(__get_page_for_pinned_dma);
+
+void __put_page_for_pinned_dma(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+
+	if (atomic_dec_and_test(&page->dma_pinned_count)) {
+		spin_lock(zone_gup_lock(zone));
+
+		VM_BUG_ON_PAGE(PageLRU(page), page);
+
+		/* Re-check while holding the lock, because
+		 * pin_page_for_dma() or get_page() may have snuck in right
+		 * after the atomic_dec_and_test, and raised the count
+		 * above zero again. If so, just leave the flag set. And
+		 * because the atomic_dec_and_test above already got the
+		 * accounting correct, no other action is required.
+		 */
+		if (atomic_read(&page->dma_pinned_count) == 0)
+			ClearPageDmaPinned(page);
+
+		spin_unlock(zone_gup_lock(zone));
+	}
+}
+EXPORT_SYMBOL(__put_page_for_pinned_dma);
+
 /*
  * This path almost never happens for VM activity - pages are normally
  * freed via pagevecs.  But it gets used by networking.
@@ -824,6 +861,11 @@ void lru_add_page_tail(struct page *page, struct page *page_tail,
 	VM_BUG_ON_PAGE(!PageHead(page), page);
 	VM_BUG_ON_PAGE(PageCompound(page_tail), page);
 	VM_BUG_ON_PAGE(PageLRU(page_tail), page);
+
+	/* LRU and PageDmaPinned are mutually exclusive: they use the
+	 * same fields in struct page, but for different purposes.
+	 */
+	VM_BUG_ON_PAGE(PageDmaPinned(page_tail), page);
 	VM_BUG_ON(NR_CPUS != 1 &&
 		  !spin_is_locked(&lruvec_pgdat(lruvec)->lru_lock));
 
@@ -862,6 +904,12 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 	int was_unevictable = TestClearPageUnevictable(page);
 
 	VM_BUG_ON_PAGE(PageLRU(page), page);
+
+	/* LRU and PageDmaPinned are mutually exclusive: they use the
+	 * same fields in struct page, but for different purposes.
+	 */
+	if (PageDmaPinned(page))
+		return;
 
 	SetPageLRU(page);
 	/*
