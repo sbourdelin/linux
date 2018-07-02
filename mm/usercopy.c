@@ -20,6 +20,10 @@
 #include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
 #include <linux/thread_info.h>
+#ifndef CONFIG_BROKEN_ON_SMP
+#include <linux/atomic.h>
+#include <linux/jump_label.h>
+#endif
 #include <asm/sections.h>
 
 /*
@@ -240,6 +244,10 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 	}
 }
 
+#ifndef CONFIG_BROKEN_ON_SMP
+static DEFINE_STATIC_KEY_FALSE_RO(bypass_usercopy_checks);
+#endif
+
 /*
  * Validates that the given object is:
  * - not bogus address
@@ -248,6 +256,11 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
  */
 void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 {
+#ifndef CONFIG_BROKEN_ON_SMP
+	if (static_branch_unlikely(&bypass_usercopy_checks))
+		return;
+#endif
+
 	/* Skip all tests if size is zero. */
 	if (!n)
 		return;
@@ -279,3 +292,25 @@ void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 	check_kernel_text_object((const unsigned long)ptr, n, to_user);
 }
 EXPORT_SYMBOL(__check_object_size);
+
+#ifndef CONFIG_BROKEN_ON_SMP
+EXPORT_SYMBOL(bypass_usercopy_checks);
+
+static bool enable_checks __initdata = true;
+
+static int __init parse_hardened_usercopy(char *str)
+{
+	return strtobool(str, &enable_checks);
+}
+
+__setup("hardened_usercopy=", parse_hardened_usercopy);
+
+static int __init set_hardened_usercopy(void)
+{
+	if (enable_checks == false)
+		static_branch_enable(&bypass_usercopy_checks);
+	return 1;
+}
+
+late_initcall(set_hardened_usercopy);
+#endif
