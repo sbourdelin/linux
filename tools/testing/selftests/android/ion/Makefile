@@ -4,7 +4,10 @@ CFLAGS := $(CFLAGS) $(INCLUDEDIR) -Wall -O2 -g
 
 TEST_GEN_FILES := ionapp_export ionapp_import ionmap_test
 
-all: $(TEST_GEN_FILES)
+all: ../../../../../usr/include/linux/dma-buf.h $(TEST_GEN_FILES)
+
+../../../../../usr/include/linux/dma-buf.h:
+	make -C ../../../../../ headers_install INSTALL_HDR_PATH=$(shell pwd)/../../../../../usr
 
 $(TEST_GEN_FILES): ipcsocket.c ionutils.c
 
