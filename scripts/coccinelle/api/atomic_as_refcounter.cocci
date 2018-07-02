@@ -18,17 +18,15 @@ identifier fname2 =~ "(?:call_rcu|de(?:l|stroy)|(?:queue|schedule)_work)";
 @@
 
 (
- atomic_dec_and_test@p1(&(a)->x)
+(atomic_dec_and_test@p1
+|atomic_long_dec_and_test@p1
+|atomic64_dec_and_test@p1
+|local_dec_and_test@p1
+)                           (&(a)->x)
 |
- atomic_dec_and_lock@p1(&(a)->x, ...)
-|
- atomic_long_dec_and_lock@p1(&(a)->x, ...)
-|
- atomic_long_dec_and_test@p1(&(a)->x)
-|
- atomic64_dec_and_test@p1(&(a)->x)
-|
- local_dec_and_test@p1(&(a)->x)
+(atomic_dec_and_lock@p1
+|atomic_long_dec_and_lock@p1
+)                           (&(a)->x, ...)
 )
 ...
 (
@@ -53,17 +51,15 @@ identifier fname =~ "free";
 @@
 
 (
- atomic_dec_and_test@p1(&(a)->x)
+(atomic_dec_and_test@p1
+|atomic_long_dec_and_test@p1
+|atomic64_dec_and_test@p1
+|local_dec_and_test@p1
+)                           (&(a)->x)
 |
- atomic_dec_and_lock@p1(&(a)->x, ...)
-|
- atomic_long_dec_and_lock@p1(&(a)->x, ...)
-|
- atomic_long_dec_and_test@p1(&(a)->x)
-|
- atomic64_dec_and_test@p1(&(a)->x)
-|
- local_dec_and_test@p1(&(a)->x)
+(atomic_dec_and_lock@p1
+|atomic_long_dec_and_lock@p1
+)                           (&(a)->x, ...)
 )
 ...
 y=a
