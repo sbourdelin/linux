@@ -128,6 +128,15 @@ static int rtl8211f_config_intr(struct phy_device *phydev)
 	return phy_write_paged(phydev, 0xa42, RTL821x_INER, val);
 }
 
+static int rtl8211c_config_init(struct phy_device *phydev)
+{
+	/* RTL8211C has an issue when operating in Gigabit slave mode */
+	phy_set_bits(phydev, MII_CTRL1000,
+		     CTL1000_ENABLE_MASTER | CTL1000_AS_MASTER);
+
+	return genphy_config_init(phydev);
+}
+
 static int rtl8211f_config_init(struct phy_device *phydev)
 {
 	int ret;
@@ -190,6 +199,14 @@ static struct phy_driver realtek_drvs[] = {
 		.write_mmd	= &genphy_write_mmd_unsupported,
 		.suspend	= rtl8211b_suspend,
 		.resume		= rtl8211b_resume,
+	}, {
+		.phy_id		= 0x001cc913,
+		.name		= "RTL8211C Gigabit Ethernet",
+		.phy_id_mask	= 0x001fffff,
+		.features	= PHY_GBIT_FEATURES,
+		.config_init	= rtl8211c_config_init,
+		.read_mmd	= &genphy_read_mmd_unsupported,
+		.write_mmd	= &genphy_write_mmd_unsupported,
 	}, {
 		.phy_id		= 0x001cc914,
 		.name		= "RTL8211DN Gigabit Ethernet",
