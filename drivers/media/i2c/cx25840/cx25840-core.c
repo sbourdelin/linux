@@ -21,6 +21,9 @@
  * CX23888 DIF support for the HVR1850
  * Copyright (C) 2011 Steven Toth <stoth@kernellabs.com>
  *
+ * CX2584x pin to pad mapping and output format configuration support are
+ * Copyright (C) 2011 Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -316,6 +319,260 @@ static int cx23885_s_io_pin_config(struct v4l2_subdev *sd, size_t n,
 	return 0;
 }
 
+static u8 cx25840_function_to_pad(struct i2c_client *client, u8 function)
+{
+	switch (function) {
+	case CX25840_PAD_ACTIVE:
+		return 1;
+
+	case CX25840_PAD_VACTIVE:
+		return 2;
+
+	case CX25840_PAD_CBFLAG:
+		return 3;
+
+	case CX25840_PAD_VID_DATA_EXT0:
+		return 4;
+
+	case CX25840_PAD_VID_DATA_EXT1:
+		return 5;
+
+	case CX25840_PAD_GPO0:
+		return 6;
+
+	case CX25840_PAD_GPO1:
+		return 7;
+
+	case CX25840_PAD_GPO2:
+		return 8;
+
+	case CX25840_PAD_GPO3:
+		return 9;
+
+	case CX25840_PAD_IRQ_N:
+		return 10;
+
+	case CX25840_PAD_AC_SYNC:
+		return 11;
+
+	case CX25840_PAD_AC_SDOUT:
+		return 12;
+
+	case CX25840_PAD_PLL_CLK:
+		return 13;
+
+	case CX25840_PAD_VRESET:
+		return 14;
+
+	default:
+		if (function != CX25840_PAD_DEFAULT)
+			v4l_err(client,
+				"invalid function %u, assuming default\n",
+				(unsigned int)function);
+		return 0;
+	}
+}
+
+static void cx25840_set_invert(u8 *pinctrl3, u8 *voutctrl4, u8 function,
+			       u8 pin, bool invert)
+{
+	switch (function) {
+	case CX25840_PAD_IRQ_N:
+		if (invert)
+			*pinctrl3 &= ~2;
+		else
+			*pinctrl3 |= 2;
+		break;
+
+	case CX25840_PAD_ACTIVE:
+		if (invert)
+			*voutctrl4 |= BIT(2);
+		else
+			*voutctrl4 &= ~BIT(2);
+		break;
+
+	case CX25840_PAD_VACTIVE:
+		if (invert)
+			*voutctrl4 |= BIT(5);
+		else
+			*voutctrl4 &= ~BIT(5);
+		break;
+
+	case CX25840_PAD_CBFLAG:
+		if (invert)
+			*voutctrl4 |= BIT(4);
+		else
+			*voutctrl4 &= ~BIT(4);
+		break;
+
+	case CX25840_PAD_VRESET:
+		if (invert)
+			*voutctrl4 |= BIT(0);
+		else
+			*voutctrl4 &= ~BIT(0);
+		break;
+	}
+
+	if (function != CX25840_PAD_DEFAULT)
+		return;
+
+	switch (pin) {
+	case CX25840_PIN_DVALID_PRGM0:
+		if (invert)
+			*voutctrl4 |= BIT(6);
+		else
+			*voutctrl4 &= ~BIT(6);
+		break;
+
+	case CX25840_PIN_HRESET_PRGM2:
+		if (invert)
+			*voutctrl4 |= BIT(1);
+		else
+			*voutctrl4 &= ~BIT(1);
+		break;
+	}
+}
+
+static int cx25840_s_io_pin_config(struct v4l2_subdev *sd, size_t n,
+				   struct v4l2_subdev_io_pin_config *p)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	unsigned int i;
+	u8 pinctrl[6], pinconf[10], voutctrl4;
+
+	for (i = 0; i < 6; i++)
+		pinctrl[i] = cx25840_read(client, 0x114 + i);
+
+	for (i = 0; i < 10; i++)
+		pinconf[i] = cx25840_read(client, 0x11c + i);
+
+	voutctrl4 = cx25840_read(client, 0x407);
+
+	for (i = 0; i < n; i++) {
+		u8 strength = p[i].strength;
+
+		if (strength != CX25840_PIN_DRIVE_SLOW &&
+		    strength != CX25840_PIN_DRIVE_MEDIUM &&
+		    strength != CX25840_PIN_DRIVE_FAST) {
+
+			v4l_err(client,
+				"invalid drive speed for pin %u (%u), assuming fast\n",
+				(unsigned int)p[i].pin,
+				(unsigned int)strength);
+
+			strength = CX25840_PIN_DRIVE_FAST;
+		}
+
+		switch (p[i].pin) {
+		case CX25840_PIN_DVALID_PRGM0:
+			if (p[i].flags & BIT(V4L2_SUBDEV_IO_PIN_DISABLE))
+				pinctrl[0] &= ~BIT(6);
+			else
+				pinctrl[0] |= BIT(6);
+
+			pinconf[3] &= 0xf0;
+			pinconf[3] |= cx25840_function_to_pad(client,
+							      p[i].function);
+
+			cx25840_set_invert(&pinctrl[3], &voutctrl4,
+					   p[i].function,
+					   CX25840_PIN_DVALID_PRGM0,
+					   p[i].flags &
+					   BIT(V4L2_SUBDEV_IO_PIN_ACTIVE_LOW));
+
+			pinctrl[4] &= ~(3 << 2); /* CX25840_PIN_DRIVE_MEDIUM */
+			switch (strength) {
+			case CX25840_PIN_DRIVE_SLOW:
+				pinctrl[4] |= 1 << 2;
+				break;
+
+			case CX25840_PIN_DRIVE_FAST:
+				pinctrl[4] |= 2 << 2;
+				break;
+			}
+
+			break;
+
+		case CX25840_PIN_HRESET_PRGM2:
+			if (p[i].flags & BIT(V4L2_SUBDEV_IO_PIN_DISABLE))
+				pinctrl[1] &= ~BIT(0);
+			else
+				pinctrl[1] |= BIT(0);
+
+			pinconf[4] &= 0xf0;
+			pinconf[4] |= cx25840_function_to_pad(client,
+							      p[i].function);
+
+			cx25840_set_invert(&pinctrl[3], &voutctrl4,
+					   p[i].function,
+					   CX25840_PIN_HRESET_PRGM2,
+					   p[i].flags &
+					   BIT(V4L2_SUBDEV_IO_PIN_ACTIVE_LOW));
+
+			pinctrl[4] &= ~(3 << 2); /* CX25840_PIN_DRIVE_MEDIUM */
+			switch (strength) {
+			case CX25840_PIN_DRIVE_SLOW:
+				pinctrl[4] |= 1 << 2;
+				break;
+
+			case CX25840_PIN_DRIVE_FAST:
+				pinctrl[4] |= 2 << 2;
+				break;
+			}
+
+			break;
+
+		case CX25840_PIN_PLL_CLK_PRGM7:
+			if (p[i].flags & BIT(V4L2_SUBDEV_IO_PIN_DISABLE))
+				pinctrl[2] &= ~BIT(2);
+			else
+				pinctrl[2] |= BIT(2);
+
+			switch (p[i].function) {
+			case CX25840_PAD_XTI_X5_DLL:
+				pinconf[6] = 0;
+				break;
+
+			case CX25840_PAD_AUX_PLL:
+				pinconf[6] = 1;
+				break;
+
+			case CX25840_PAD_VID_PLL:
+				pinconf[6] = 5;
+				break;
+
+			case CX25840_PAD_XTI:
+				pinconf[6] = 2;
+				break;
+
+			default:
+				pinconf[6] = 3;
+				pinconf[6] |=
+					cx25840_function_to_pad(client,
+								p[i].function)
+					<< 4;
+			}
+
+			break;
+
+		default:
+			v4l_err(client, "invalid or unsupported pin %u\n",
+				(unsigned int)p[i].pin);
+			break;
+		}
+	}
+
+	cx25840_write(client, 0x407, voutctrl4);
+
+	for (i = 0; i < 6; i++)
+		cx25840_write(client, 0x114 + i, pinctrl[i]);
+
+	for (i = 0; i < 10; i++)
+		cx25840_write(client, 0x11c + i, pinconf[i]);
+
+	return 0;
+}
+
 static int common_s_io_pin_config(struct v4l2_subdev *sd, size_t n,
 				      struct v4l2_subdev_io_pin_config *pincfg)
 {
@@ -323,6 +580,8 @@ static int common_s_io_pin_config(struct v4l2_subdev *sd, size_t n,
 
 	if (is_cx2388x(state))
 		return cx23885_s_io_pin_config(sd, n, pincfg);
+	else if (is_cx2584x(state))
+		return cx25840_s_io_pin_config(sd, n, pincfg);
 	return 0;
 }
 
@@ -454,6 +713,22 @@ static void cx25840_initialize(struct i2c_client *client)
 
 	/* (re)set input */
 	set_input(client, state->vid_input, state->aud_input);
+
+	if (state->generic_mode) {
+		/* set datasheet video output defaults */
+		cx25840_vconfig(client, CX25840_VCONFIG_FMT_BT656 |
+				CX25840_VCONFIG_RES_8BIT |
+				CX25840_VCONFIG_VBIRAW_DISABLED |
+				CX25840_VCONFIG_ANCDATA_ENABLED |
+				CX25840_VCONFIG_TASKBIT_ONE |
+				CX25840_VCONFIG_ACTIVE_HORIZONTAL |
+				CX25840_VCONFIG_VALID_NORMAL |
+				CX25840_VCONFIG_HRESETW_NORMAL |
+				CX25840_VCONFIG_CLKGATE_NONE |
+				CX25840_VCONFIG_DCMODE_DWORDS |
+				CX25840_VCONFIG_IDID0S_NORMAL |
+				CX25840_VCONFIG_VIPCLAMP_DISABLED);
+	}
 
 	/* start microcontroller */
 	cx25840_and_or(client, 0x803, ~0x10, 0x10);
@@ -1403,7 +1678,9 @@ static int cx25840_set_fmt(struct v4l2_subdev *sd,
 		Hsrc |= (cx25840_read(client, 0x471) & 0xf0) >> 4;
 	}
 
-	Vlines = fmt->height + (is_50Hz ? 4 : 7);
+	Vlines = fmt->height;
+	if (!state->generic_mode)
+		Vlines += is_50Hz ? 4 : 7;
 
 	/*
 	 * We keep 1 margin for the Vsrc < Vlines check since the
@@ -1647,6 +1924,119 @@ static void log_audio_status(struct i2c_client *client)
 	}
 }
 
+#define CX25840_VCONFIG_OPTION(state, cfg_in, opt_msk)			\
+	do {								\
+		if ((cfg_in) & (opt_msk)) {				\
+			(state)->vid_config &= ~(opt_msk);		\
+			(state)->vid_config |= (cfg_in) & (opt_msk);	\
+		}							\
+	} while (0)
+
+#define CX25840_VCONFIG_SET_BIT(state, opt_msk, voc, idx, bit, oneval)	\
+	do {								\
+		if ((state)->vid_config & (opt_msk)) {			\
+			if (((state)->vid_config & (opt_msk)) ==	\
+			    (oneval))					\
+				(voc)[idx] |= BIT(bit);		\
+			else						\
+				(voc)[idx] &= ~BIT(bit);		\
+		}							\
+	} while (0)
+
+int cx25840_vconfig(struct i2c_client *client, u32 cfg_in)
+{
+	struct cx25840_state *state = to_state(i2c_get_clientdata(client));
+	u8 voutctrl[3];
+	unsigned int i;
+
+	/* apply incoming options to the current state */
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_FMT_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_RES_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_VBIRAW_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_ANCDATA_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_TASKBIT_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_ACTIVE_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_VALID_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_HRESETW_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_CLKGATE_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_DCMODE_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_IDID0S_MASK);
+	CX25840_VCONFIG_OPTION(state, cfg_in, CX25840_VCONFIG_VIPCLAMP_MASK);
+
+	for (i = 0; i < 3; i++)
+		voutctrl[i] = cx25840_read(client, 0x404 + i);
+
+	/* apply state to hardware regs */
+	if (state->vid_config & CX25840_VCONFIG_FMT_MASK)
+		voutctrl[0] &= ~3;
+	switch (state->vid_config & CX25840_VCONFIG_FMT_MASK) {
+	case CX25840_VCONFIG_FMT_BT656:
+		voutctrl[0] |= 1;
+		break;
+
+	case CX25840_VCONFIG_FMT_VIP11:
+		voutctrl[0] |= 2;
+		break;
+
+	case CX25840_VCONFIG_FMT_VIP2:
+		voutctrl[0] |= 3;
+		break;
+
+	case CX25840_VCONFIG_FMT_BT601:
+		/* zero */
+	default:
+		break;
+	}
+
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_RES_MASK, voutctrl,
+				0, 2, CX25840_VCONFIG_RES_10BIT);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_VBIRAW_MASK, voutctrl,
+				0, 3, CX25840_VCONFIG_VBIRAW_ENABLED);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_ANCDATA_MASK, voutctrl,
+				0, 4, CX25840_VCONFIG_ANCDATA_ENABLED);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_TASKBIT_MASK, voutctrl,
+				0, 5, CX25840_VCONFIG_TASKBIT_ONE);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_ACTIVE_MASK, voutctrl,
+				1, 2, CX25840_VCONFIG_ACTIVE_HORIZONTAL);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_VALID_MASK, voutctrl,
+				1, 3, CX25840_VCONFIG_VALID_ANDACTIVE);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_HRESETW_MASK, voutctrl,
+				1, 4, CX25840_VCONFIG_HRESETW_PIXCLK);
+
+	if (state->vid_config & CX25840_VCONFIG_CLKGATE_MASK)
+		voutctrl[1] &= ~(3 << 6);
+	switch (state->vid_config & CX25840_VCONFIG_CLKGATE_MASK) {
+	case CX25840_VCONFIG_CLKGATE_VALID:
+		voutctrl[1] |= 2;
+		break;
+
+	case CX25840_VCONFIG_CLKGATE_VALIDACTIVE:
+		voutctrl[1] |= 3;
+		break;
+
+	case CX25840_VCONFIG_CLKGATE_NONE:
+		/* zero */
+	default:
+		break;
+	}
+
+
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_DCMODE_MASK, voutctrl,
+				2, 0, CX25840_VCONFIG_DCMODE_BYTES);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_IDID0S_MASK, voutctrl,
+				2, 1, CX25840_VCONFIG_IDID0S_LINECNT);
+	CX25840_VCONFIG_SET_BIT(state, CX25840_VCONFIG_VIPCLAMP_MASK, voutctrl,
+				2, 4, CX25840_VCONFIG_VIPCLAMP_ENABLED);
+
+	for (i = 0; i < 3; i++)
+		cx25840_write(client, 0x404 + i, voutctrl[i]);
+
+	return 0;
+}
+
+#undef CX25840_VCONFIG_SET_BIT
+#undef CX25840_VCONFIG_OPTION
+
 /* ----------------------------------------------------------------------- */
 
 /* This load_fw operation must be called to load the driver's firmware.
@@ -1835,6 +2225,9 @@ static int cx25840_s_video_routing(struct v4l2_subdev *sd,
 
 	if (is_cx23888(state))
 		cx23888_std_setup(client);
+
+	if (is_cx2584x(state) && state->generic_mode)
+		cx25840_vconfig(client, config);
 
 	return set_input(client, input, state->aud_input);
 }
@@ -5335,6 +5728,7 @@ static int cx25840_probe(struct i2c_client *client,
 		struct cx25840_platform_data *pdata = client->dev.platform_data;
 
 		state->pvr150_workaround = pdata->pvr150_workaround;
+		state->generic_mode = pdata->generic_mode;
 	}
 
 	cx25840_ir_probe(sd);
