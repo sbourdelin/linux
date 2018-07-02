@@ -1601,8 +1601,8 @@ static void aux_buffer_free(void *data)
  *
  * Return the private AUX buffer structure if success or NULL if fails.
  */
-static void *aux_buffer_setup(int cpu, void **pages, int nr_pages,
-			      bool snapshot)
+static void *aux_buffer_setup(struct perf_event *event, void **pages,
+			      int nr_pages, bool snapshot);
 {
 	struct sf_buffer *sfb;
 	struct aux_buffer *aux;
