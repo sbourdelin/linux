@@ -42,6 +42,16 @@ struct etm_filters {
 	bool			ssstatus;
 };
 
+enum etm_config_elem_type {
+	ETM_CFG_NONE = -1,
+	ETM_CFG_SINK,
+};
+
+struct etm_config_elem {
+	struct list_head		entry;
+	enum etm_config_elem_type	type;
+	void				*config;
+};
 
 #ifdef CONFIG_CORESIGHT
 int etm_perf_symlink(struct coresight_device *csdev, bool link);
