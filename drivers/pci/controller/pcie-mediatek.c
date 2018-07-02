@@ -337,10 +337,25 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
 {
 	struct mtk_pcie *pcie = bus->sysdata;
 	struct mtk_pcie_port *port;
+	struct pci_dev *dev;
+	struct pci_bus *pbus;
 
-	list_for_each_entry(port, &pcie->ports, list)
-		if (port->slot == PCI_SLOT(devfn))
+	list_for_each_entry(port, &pcie->ports, list) {
+		if (!bus->number && port->slot == PCI_SLOT(devfn))
 			return port;
+
+		if (bus->number) {
+			pbus = bus;
+
+			while (pbus->number) {
+				dev = pbus->self;
+				pbus = dev->bus;
+			}
+
+			if (port->slot == PCI_SLOT(dev->devfn))
+				return port;
+		}
+	}
 
 	return NULL;
 }
