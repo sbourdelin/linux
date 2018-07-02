@@ -353,6 +353,95 @@ static int check_dir_item(struct btrfs_fs_info *fs_info,
 	return 0;
 }
 
+__printf(4, 5)
+__cold
+static void block_group_err(const struct btrfs_fs_info *fs_info,
+			    const struct extent_buffer *eb, int slot,
+			    const char *fmt, ...)
+{
+	struct btrfs_key key;
+	struct va_format vaf;
+	va_list args;
+
+	btrfs_item_key_to_cpu(eb, &key, slot);
+	va_start(args, fmt);
+
+	vaf.fmt = fmt;
+	vaf.va = &args;
+
+	btrfs_crit(fs_info,
+	"corrupt %s: root=%llu block=%llu slot=%d bg_start=%llu bg_len=%llu, %pV",
+		btrfs_header_level(eb) == 0 ? "leaf" : "node",
+		btrfs_header_owner(eb), btrfs_header_bytenr(eb), slot,
+		key.objectid, key.offset, &vaf);
+	va_end(args);
+}
+
+static int check_block_group_item(struct btrfs_fs_info *fs_info,
+				  struct extent_buffer *leaf,
+				  struct btrfs_key *key, int slot)
+{
+	struct btrfs_block_group_item bgi;
+	u32 item_size = btrfs_item_size_nr(leaf, slot);
+	u64 flags;
+
+	/*
+	 * Here we don't really care about unalignment since extent allocator
+	 * can handle it.
+	 * We care more about the size, as if one block group is larger than
+	 * maximum size, it's must be some obvious corruption
+	 */
+	if (key->offset > 10ULL * SZ_1G) {
+		block_group_err(fs_info, leaf, slot,
+			"invalid block group size, have %llu expect (0, %llu)",
+				key->offset, 10ULL * SZ_1G);
+		return -EUCLEAN;
+	}
+
+	if (item_size != sizeof(bgi)) {
+		block_group_err(fs_info, leaf, slot,
+			"invalid item size, have %u expect %lu",
+				item_size, sizeof(bgi));
+		return -EUCLEAN;
+	}
+
+	read_extent_buffer(leaf, &bgi, btrfs_item_ptr_offset(leaf, slot),
+			   sizeof(bgi));
+	if (btrfs_block_group_chunk_objectid(&bgi) !=
+	    BTRFS_FIRST_CHUNK_TREE_OBJECTID) {
+		block_group_err(fs_info, leaf, slot,
+		"invalid block group chunk objectid, have %llu expect %llu",
+				btrfs_block_group_chunk_objectid(&bgi),
+				BTRFS_FIRST_CHUNK_TREE_OBJECTID);
+		return -EUCLEAN;
+	}
+
+	if (btrfs_block_group_used(&bgi) > key->offset) {
+		block_group_err(fs_info, leaf, slot,
+			"invalid block group used, have %llu expect [0, %llu)",
+				btrfs_block_group_used(&bgi), key->offset);
+		return -EUCLEAN;
+	}
+
+	flags = btrfs_block_group_flags(&bgi);
+	if (hweight64(flags & BTRFS_BLOCK_GROUP_PROFILE_MASK) > 1) {
+		block_group_err(fs_info, leaf, slot,
+"invalid profile flags, have 0x%llx (%lu bits set) expect no more than 1 bit set",
+			flags & BTRFS_BLOCK_GROUP_PROFILE_MASK,
+			hweight64(flags & BTRFS_BLOCK_GROUP_PROFILE_MASK));
+		return -EUCLEAN;
+	}
+
+	if (hweight64(flags & BTRFS_BLOCK_GROUP_TYPE_MASK) != 1) {
+		block_group_err(fs_info, leaf, slot,
+"invalid type flags, have 0x%llx (%lu bits set) expect exactly 1 bit set",
+			flags & BTRFS_BLOCK_GROUP_TYPE_MASK,
+			hweight64(flags & BTRFS_BLOCK_GROUP_TYPE_MASK));
+		return -EUCLEAN;
+	}
+	return 0;
+}
+
 /*
  * Common point to switch the item-specific validation.
  */
@@ -373,6 +462,9 @@ static int check_leaf_item(struct btrfs_fs_info *fs_info,
 	case BTRFS_DIR_INDEX_KEY:
 	case BTRFS_XATTR_ITEM_KEY:
 		ret = check_dir_item(fs_info, leaf, key, slot);
+		break;
+	case BTRFS_BLOCK_GROUP_ITEM_KEY:
+		ret = check_block_group_item(fs_info, leaf, key, slot);
 		break;
 	}
 	return ret;
