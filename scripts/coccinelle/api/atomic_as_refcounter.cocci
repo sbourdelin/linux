@@ -13,12 +13,7 @@ virtual report
 identifier a, x;
 position p1, p2;
 identifier fname =~ "free";
-identifier fname2 =~ ".*destroy.*";
-identifier fname3 =~ ".*del.*";
-identifier fname4 =~ ".*queue_work.*";
-identifier fname5 =~ ".*schedule_work.*";
-identifier fname6 =~ ".*call_rcu.*";
-
+identifier fname2 =~ "(?:call_rcu|de(?:l|stroy)|(?:queue|schedule)_work)";
 @@
 
 (
@@ -39,14 +34,6 @@ identifier fname6 =~ ".*call_rcu.*";
  fname@p2(a, ...);
 |
  fname2@p2(...);
-|
- fname3@p2(...);
-|
- fname4@p2(...);
-|
- fname5@p2(...);
-|
- fname6@p2(...);
 )
 
 
