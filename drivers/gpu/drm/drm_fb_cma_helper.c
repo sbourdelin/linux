@@ -181,7 +181,7 @@ struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
 
 	fb_helper = &fbdev_cma->fb_helper;
 
-	ret = drm_client_new(dev, &fb_helper->client, "fbdev");
+	ret = drm_client_new(dev, &fb_helper->client, "fbdev", NULL);
 	if (ret)
 		goto err_free;
 
