@@ -7,6 +7,9 @@
 #include <linux/regmap.h>
 #include "tsens.h"
 
+#define TRDY_OFFSET            0xe4
+#define TRDY_READY_BIT         BIT(0)
+
 #define STATUS_OFFSET		0xa0
 #define LAST_TEMP_MASK		0xfff
 #define STATUS_VALID_BIT	BIT(21)
@@ -18,6 +21,12 @@ static int get_temp_tsens_v2(struct tsens_device *tmdev, int id, int *temp)
 	u32 code;
 	unsigned int sensor_addr;
 	int last_temp = 0, last_temp2 = 0, last_temp3 = 0, ret;
+
+	ret = regmap_read(tmdev->map, TRDY_OFFSET, &code);
+	if (ret)
+		return ret;
+	if (code & TRDY_READY_BIT)
+		return -ENODATA;
 
 	sensor_addr = STATUS_OFFSET + s->hw_id * 4;
 	ret = regmap_read(tmdev->map, sensor_addr, &code);
