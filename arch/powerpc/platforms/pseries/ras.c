@@ -427,6 +427,35 @@ int pSeries_system_reset_exception(struct pt_regs *regs)
 	return 0; /* need to perform reset */
 }
 
+static int mce_handle_error(struct rtas_error_log *errp)
+{
+	struct pseries_errorlog *pseries_log;
+	struct pseries_mc_errorlog *mce_log;
+	int disposition = rtas_error_disposition(errp);
+	uint8_t error_type;
+
+	if (!rtas_error_extended(errp))
+		goto out;
+
+	pseries_log = get_pseries_errorlog(errp, PSERIES_ELOG_SECT_ID_MCE);
+	if (pseries_log == NULL)
+		goto out;
+
+	mce_log = (struct pseries_mc_errorlog *)pseries_log->data;
+	error_type = rtas_mc_error_type(mce_log);
+
+	if ((disposition == RTAS_DISP_NOT_RECOVERED) &&
+			(error_type == PSERIES_MC_ERROR_TYPE_SLB)) {
+		/* Store the old slb content someplace. */
+		slb_flush_and_rebolt_realmode();
+		disposition = RTAS_DISP_FULLY_RECOVERED;
+		rtas_set_disposition_recovered(errp);
+	}
+
+out:
+	return disposition;
+}
+
 /*
  * Process MCE rtas errlog event.
  */
@@ -503,9 +532,29 @@ int pSeries_machine_check_exception(struct pt_regs *regs)
 	struct rtas_error_log *errp;
 
 	if (fwnmi_active) {
-		errp = fwnmi_get_errinfo(regs);
 		fwnmi_release_errinfo();
+		errp = fwnmi_get_errlog();
 		if (errp && recover_mce(regs, errp))
+			return 1;
+	}
+
+	return 0;
+}
+
+int pSeries_machine_check_realmode(struct pt_regs *regs)
+{
+	struct rtas_error_log *errp;
+	int disposition;
+
+	if (fwnmi_active) {
+		errp = fwnmi_get_errinfo(regs);
+		/*
+		 * Call to fwnmi_release_errinfo() in real mode causes kernel
+		 * to panic. Hence we will call it as soon as we go into
+		 * virtual mode.
+		 */
+		disposition = mce_handle_error(errp);
+		if (disposition == RTAS_DISP_FULLY_RECOVERED)
 			return 1;
 	}
 
