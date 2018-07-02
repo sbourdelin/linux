@@ -2468,8 +2468,11 @@
 			allowable in a system as a percentage of the
 			total system memory. The default is 2% and the
 			valid range is 0-10 where 0 means no limit.
+			The optional "enforce" option can be added to
+			enforce the limit by killing excessive negative
+			dentries.
 
-			Format: <pc>
+			Format: <pc>[,enforce]
 
 	netdev=		[NET] Network devices parameters
 			Format: <irq>,<io>,<mem_start>,<mem_end>,<name>
