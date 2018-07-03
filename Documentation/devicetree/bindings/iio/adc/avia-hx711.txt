@@ -8,11 +8,18 @@ Required properties:
 		See Documentation/devicetree/bindings/gpio/gpio.txt
  - avdd-supply:	Definition of the regulator used as analog supply
 
+Optional properties:
+ - avia,data-ready-delay-ns:	additional delay in nanoseconds between
+				rising of PD_SCK until DOUT is ready
+				should be less then maximum PD_SCK high
+				time which is 50000 in the datasheet
+
 Example:
 weight@0 {
 	compatible = "avia,hx711";
 	sck-gpios = <&gpio3 10 GPIO_ACTIVE_HIGH>;
 	dout-gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
 	avdd-suppy = <&avdd>;
+	avia,data-ready-delay-ns = <1000>;
 };
 
