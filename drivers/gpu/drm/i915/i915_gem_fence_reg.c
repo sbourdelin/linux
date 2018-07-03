@@ -95,11 +95,15 @@ static void i965_write_fence_reg(struct drm_i915_fence_reg *fence,
 
 	if (INTEL_GEN(fence->i915) >= 6) {
 		/* Use the 64-bit RW to read/write fence reg on SNB+ */
-		I915_WRITE64_FW(fence_reg_lo, 0);
-		I915_READ64(fence_reg_lo);
+		if (intel_vgpu_active(i915))
+			I915_WRITE64_FW(fence_reg_lo, val);
+		else {
+			I915_WRITE64_FW(fence_reg_lo, 0);
+			I915_READ64(fence_reg_lo);
 
-		I915_WRITE64_FW(fence_reg_lo, val);
-		I915_READ64(fence_reg_lo);
+			I915_WRITE64_FW(fence_reg_lo, val);
+			I915_READ64(fence_reg_lo);
+		}
 	} else {
 		/* To w/a incoherency with non-atomic 64-bit register updates,
 		 * we split the 64-bit update into two 32-bit writes. In order
