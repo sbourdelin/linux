@@ -34,16 +34,6 @@ static int __init default_appraise_setup(char *str)
 __setup("ima_appraise=", default_appraise_setup);
 
 /*
- * is_ima_appraise_enabled - return appraise status
- *
- * Only return enabled, if not in ima_appraise="fix" or "log" modes.
- */
-bool is_ima_appraise_enabled(void)
-{
-	return ima_appraise & IMA_APPRAISE_ENFORCE;
-}
-
-/*
  * ima_must_appraise - set appraise flag
  *
  * Return 1 to appraise or hash
