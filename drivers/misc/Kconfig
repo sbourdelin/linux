@@ -513,6 +513,14 @@ config MISC_RTSX
 	tristate
 	default MISC_RTSX_PCI || MISC_RTSX_USB
 
+config BMC_MISC_CTRL
+	tristate "Miscellaneous BMC Control Interfaces"
+	depends on REGMAP && MFD_SYSCON
+	help
+	  Say yes to expose scratch registers used to communicate between the
+	  host and BMC along with other miscellaneous control interfaces
+	  provided by BMC SoCs
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
