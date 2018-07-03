@@ -149,18 +149,24 @@ void drm_dp_set_adjust_request_pre_emphasis(u8 link_status[DP_LINK_STATUS_SIZE],
 EXPORT_SYMBOL(drm_dp_set_adjust_request_pre_emphasis);
 
 void drm_dp_link_train_clock_recovery_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE]) {
-	if (dpcd[DP_TRAINING_AUX_RD_INTERVAL] == 0)
+	unsigned int training_interval = dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
+		DP_TRAINING_AUX_RD_INTERVAL_MASK;
+
+	if (training_interval == 0)
 		udelay(100);
 	else
-		mdelay(dpcd[DP_TRAINING_AUX_RD_INTERVAL] * 4);
+		mdelay(training_interval * 4);
 }
 EXPORT_SYMBOL(drm_dp_link_train_clock_recovery_delay);
 
 void drm_dp_link_train_channel_eq_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE]) {
-	if (dpcd[DP_TRAINING_AUX_RD_INTERVAL] == 0)
+	unsigned int training_interval = dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
+		DP_TRAINING_AUX_RD_INTERVAL_MASK;
+
+	if (training_interval == 0)
 		udelay(400);
 	else
-		mdelay(dpcd[DP_TRAINING_AUX_RD_INTERVAL] * 4);
+		mdelay(training_interval * 4);
 }
 EXPORT_SYMBOL(drm_dp_link_train_channel_eq_delay);
 
