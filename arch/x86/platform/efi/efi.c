@@ -196,7 +196,7 @@ int __init efi_memblock_x86_reserve_range(void)
 	data.desc_size		= e->efi_memdesc_size;
 	data.desc_version	= e->efi_memdesc_version;
 
-	rv = efi_memmap_init_early(&data);
+	rv = efi_memmap_init_early(&data, EFI_STUB);
 	if (rv)
 		return rv;
 
@@ -272,7 +272,7 @@ static void __init efi_clean_memmap(void)
 		u64 size = efi.memmap.nr_map - n_removal;
 
 		pr_warn("Removing %d invalid memory map entries.\n", n_removal);
-		efi_memmap_install(efi.memmap.phys_map, size);
+		efi_memmap_install(efi.memmap.phys_map, size, EFI_STUB);
 	}
 }
 

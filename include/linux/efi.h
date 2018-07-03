@@ -778,7 +778,7 @@ struct efi_memory_map {
 	int nr_map;
 	unsigned long desc_version;
 	unsigned long desc_size;
-	bool late;
+	enum efi_memmap_type alloc_type;
 };
 
 struct efi_mem_range {
@@ -1015,10 +1015,12 @@ extern void __iomem *efi_lookup_mapped_addr(u64 phys_addr);
 
 extern phys_addr_t __init efi_memmap_alloc(unsigned int num_entries,
 					   enum efi_memmap_type *alloc_type);
-extern int __init efi_memmap_init_early(struct efi_memory_map_data *data);
+extern int __init efi_memmap_init_early(struct efi_memory_map_data *data,
+					enum efi_memmap_type alloc_type);
 extern int __init efi_memmap_init_late(phys_addr_t addr, unsigned long size);
 extern void __init efi_memmap_unmap(void);
-extern int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map);
+extern int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map,
+				     enum efi_memmap_type alloc_type);
 extern int __init efi_memmap_split_count(efi_memory_desc_t *md,
 					 struct range *range);
 extern void __init efi_memmap_insert(struct efi_memory_map *old_memmap,

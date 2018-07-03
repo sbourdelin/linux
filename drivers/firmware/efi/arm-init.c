@@ -239,7 +239,7 @@ void __init efi_init(void)
 	data.size = params.mmap_size;
 	data.phys_map = params.mmap;
 
-	if (efi_memmap_init_early(&data) < 0) {
+	if (efi_memmap_init_early(&data, EFI_STUB) < 0) {
 		/*
 		* If we are booting via UEFI, the UEFI memory map is the only
 		* description of memory we have, so there is little point in

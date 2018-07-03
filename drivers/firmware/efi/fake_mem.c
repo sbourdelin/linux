@@ -90,7 +90,7 @@ void __init efi_fake_memmap(void)
 	/* swap into new EFI memmap */
 	early_memunmap(new_memmap, efi.memmap.desc_size * new_nr_map);
 
-	efi_memmap_install(new_memmap_phy, new_nr_map);
+	efi_memmap_install(new_memmap_phy, new_nr_map, alloc_type);
 
 	/* print new EFI memmap */
 	efi_print_memmap();

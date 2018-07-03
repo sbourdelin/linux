@@ -88,7 +88,7 @@ void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries,
 /**
  * __efi_memmap_init - Common code for mapping the EFI memory map
  * @data: EFI memory map data
- * @late: Use early or late mapping function?
+ * @alloc_type: Use early or late mapping function?
  *
  * This function takes care of figuring out which function to use to
  * map the EFI memory map in efi.memmap based on how far into the boot
@@ -101,8 +101,8 @@ void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries,
  *
  * Returns zero on success, a negative error code on failure.
  */
-static int __init
-__efi_memmap_init(struct efi_memory_map_data *data, bool late)
+static int __init __efi_memmap_init(struct efi_memory_map_data *data,
+				    enum efi_memmap_type alloc_type)
 {
 	struct efi_memory_map map;
 	phys_addr_t phys_map;
@@ -112,7 +112,7 @@ __efi_memmap_init(struct efi_memory_map_data *data, bool late)
 
 	phys_map = data->phys_map;
 
-	if (late)
+	if (alloc_type == BUDDY_ALLOCATOR)
 		map.map = memremap(phys_map, data->size, MEMREMAP_WB);
 	else
 		map.map = early_memremap(phys_map, data->size);
@@ -128,7 +128,7 @@ __efi_memmap_init(struct efi_memory_map_data *data, bool late)
 
 	map.desc_version = data->desc_version;
 	map.desc_size = data->desc_size;
-	map.late = late;
+	map.alloc_type = alloc_type;
 
 	set_bit(EFI_MEMMAP, &efi.flags);
 
@@ -140,27 +140,29 @@ __efi_memmap_init(struct efi_memory_map_data *data, bool late)
 /**
  * efi_memmap_init_early - Map the EFI memory map data structure
  * @data: EFI memory map data
+ * @alloc_type: Type of allocated memory map (EFI_STUB or MEMBLOCK)?
  *
  * Use early_memremap() to map the passed in EFI memory map and assign
  * it to efi.memmap.
  */
-int __init efi_memmap_init_early(struct efi_memory_map_data *data)
+int __init efi_memmap_init_early(struct efi_memory_map_data *data,
+				 enum efi_memmap_type alloc_type)
 {
 	/* Cannot go backwards */
-	WARN_ON(efi.memmap.late);
+	WARN_ON(efi.memmap.alloc_type == BUDDY_ALLOCATOR);
 
-	return __efi_memmap_init(data, false);
+	return __efi_memmap_init(data, alloc_type);
 }
 
 void __init efi_memmap_unmap(void)
 {
-	if (!efi.memmap.late) {
+	if (efi.memmap.alloc_type == BUDDY_ALLOCATOR) {
+		memunmap(efi.memmap.map);
+	} else {
 		unsigned long size;
 
 		size = efi.memmap.desc_size * efi.memmap.nr_map;
 		early_memunmap(efi.memmap.map, size);
-	} else {
-		memunmap(efi.memmap.map);
 	}
 
 	efi.memmap.map = NULL;
@@ -201,7 +203,7 @@ int __init efi_memmap_init_late(phys_addr_t addr, unsigned long size)
 	WARN_ON(efi.memmap.map);
 
 	/* Were we already called? */
-	WARN_ON(efi.memmap.late);
+	WARN_ON(efi.memmap.alloc_type == BUDDY_ALLOCATOR);
 
 	/*
 	 * It makes no sense to allow callers to register different
@@ -211,13 +213,14 @@ int __init efi_memmap_init_late(phys_addr_t addr, unsigned long size)
 	data.desc_version = efi.memmap.desc_version;
 	data.desc_size = efi.memmap.desc_size;
 
-	return __efi_memmap_init(&data, true);
+	return __efi_memmap_init(&data, BUDDY_ALLOCATOR);
 }
 
 /**
  * efi_memmap_install - Install a new EFI memory map in efi.memmap
  * @addr: Physical address of the memory map
  * @nr_map: Number of entries in the memory map
+ * @alloc_type: Type of allocation performed to get @addr.
  *
  * Unlike efi_memmap_init_*(), this function does not allow the caller
  * to switch from early to late mappings. It simply uses the existing
@@ -225,7 +228,8 @@ int __init efi_memmap_init_late(phys_addr_t addr, unsigned long size)
  *
  * Returns zero on success, a negative error code on failure.
  */
-int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map)
+int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map,
+			      enum efi_memmap_type alloc_type)
 {
 	struct efi_memory_map_data data;
 
@@ -236,7 +240,7 @@ int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map)
 	data.desc_version = efi.memmap.desc_version;
 	data.desc_size = efi.memmap.desc_size;
 
-	return __efi_memmap_init(&data, efi.memmap.late);
+	return __efi_memmap_init(&data, alloc_type);
 }
 
 /**
