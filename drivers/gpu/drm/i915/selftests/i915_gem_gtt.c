@@ -32,6 +32,14 @@
 #include "mock_drm.h"
 #include "mock_gem_device.h"
 
+static void schedule_locked(struct drm_i915_private *i915)
+{
+	/* Let anyone else who wants the context take it */
+	mutex_unlock(&i915->drm.struct_mutex);
+	cond_resched();
+	mutex_lock(&i915->drm.struct_mutex);
+}
+
 static void fake_free_pages(struct drm_i915_gem_object *obj,
 			    struct sg_table *pages)
 {
@@ -132,18 +140,18 @@ err:
 
 static int igt_ppgtt_alloc(void *arg)
 {
-	struct drm_i915_private *dev_priv = arg;
+	struct drm_i915_private *i915 = arg;
 	struct i915_hw_ppgtt *ppgtt;
 	u64 size, last;
 	int err = 0;
 
 	/* Allocate a ppggt and try to fill the entire range */
 
-	if (!USES_PPGTT(dev_priv))
+	if (!USES_PPGTT(i915))
 		return 0;
 
-	mutex_lock(&dev_priv->drm.struct_mutex);
-	ppgtt = __hw_ppgtt_create(dev_priv);
+	mutex_lock(&i915->drm.struct_mutex);
+	ppgtt = __hw_ppgtt_create(i915);
 	if (IS_ERR(ppgtt)) {
 		err = PTR_ERR(ppgtt);
 		goto err_unlock;
@@ -169,6 +177,8 @@ static int igt_ppgtt_alloc(void *arg)
 		ppgtt->vm.clear_range(&ppgtt->vm, 0, size);
 	}
 
+	schedule_locked(i915);
+
 	/* Check we can incrementally allocate the entire range */
 	for (last = 0, size = 4096;
 	     size <= ppgtt->vm.total;
@@ -189,7 +199,7 @@ err_ppgtt_cleanup:
 	ppgtt->vm.cleanup(&ppgtt->vm);
 	kfree(ppgtt);
 err_unlock:
-	mutex_unlock(&dev_priv->drm.struct_mutex);
+	mutex_unlock(&i915->drm.struct_mutex);
 	return err;
 }
 
@@ -291,6 +301,8 @@ static int lowlevel_hole(struct drm_i915_private *i915,
 		i915_gem_object_put(obj);
 
 		kfree(order);
+
+		schedule_locked(i915);
 	}
 
 	return 0;
@@ -519,6 +531,7 @@ static int fill_hole(struct drm_i915_private *i915,
 		}
 
 		close_object_list(&objects, vm);
+		schedule_locked(i915);
 	}
 
 	return 0;
@@ -605,6 +618,8 @@ err_put:
 		i915_gem_object_put(obj);
 		if (err)
 			return err;
+
+		schedule_locked(i915);
 	}
 
 	return 0;
@@ -676,6 +691,8 @@ static int pot_hole(struct drm_i915_private *i915,
 			err = -EINTR;
 			goto err;
 		}
+
+		schedule_locked(i915);
 	}
 
 err:
@@ -789,6 +806,8 @@ err_obj:
 		kfree(order);
 		if (err)
 			return err;
+
+		schedule_locked(i915);
 	}
 
 	return 0;
@@ -854,6 +873,8 @@ static int __shrink_hole(struct drm_i915_private *i915,
 			err = -EINTR;
 			break;
 		}
+
+		schedule_locked(i915);
 	}
 
 	close_object_list(&objects, vm);
@@ -949,6 +970,7 @@ static int shrink_boom(struct drm_i915_private *i915,
 		i915_gem_object_put(explode);
 
 		memset(&vm->fault_attr, 0, sizeof(vm->fault_attr));
+		schedule_locked(i915);
 	}
 
 	return 0;
@@ -961,7 +983,7 @@ err_purge:
 	return err;
 }
 
-static int exercise_ppgtt(struct drm_i915_private *dev_priv,
+static int exercise_ppgtt(struct drm_i915_private *i915,
 			  int (*func)(struct drm_i915_private *i915,
 				      struct i915_address_space *vm,
 				      u64 hole_start, u64 hole_end,
@@ -972,15 +994,15 @@ static int exercise_ppgtt(struct drm_i915_private *dev_priv,
 	IGT_TIMEOUT(end_time);
 	int err;
 
-	if (!USES_FULL_PPGTT(dev_priv))
+	if (!USES_FULL_PPGTT(i915))
 		return 0;
 
-	file = mock_file(dev_priv);
+	file = mock_file(i915);
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
-	mutex_lock(&dev_priv->drm.struct_mutex);
-	ppgtt = i915_ppgtt_create(dev_priv, file->driver_priv, "mock");
+	mutex_lock(&i915->drm.struct_mutex);
+	ppgtt = i915_ppgtt_create(i915, file->driver_priv, "mock");
 	if (IS_ERR(ppgtt)) {
 		err = PTR_ERR(ppgtt);
 		goto out_unlock;
@@ -988,14 +1010,14 @@ static int exercise_ppgtt(struct drm_i915_private *dev_priv,
 	GEM_BUG_ON(offset_in_page(ppgtt->vm.total));
 	GEM_BUG_ON(ppgtt->vm.closed);
 
-	err = func(dev_priv, &ppgtt->vm, 0, ppgtt->vm.total, end_time);
+	err = func(i915, &ppgtt->vm, 0, ppgtt->vm.total, end_time);
 
 	i915_ppgtt_close(&ppgtt->vm);
 	i915_ppgtt_put(ppgtt);
 out_unlock:
-	mutex_unlock(&dev_priv->drm.struct_mutex);
+	mutex_unlock(&i915->drm.struct_mutex);
 
-	mock_file_free(dev_priv, file);
+	mock_file_free(i915, file);
 	return err;
 }
 
@@ -1315,6 +1337,8 @@ static int igt_gtt_reserve(void *arg)
 		}
 	}
 
+	schedule_locked(i915);
+
 	/* Now we start forcing evictions */
 	for (total = I915_GTT_PAGE_SIZE;
 	     total + 2*I915_GTT_PAGE_SIZE <= i915->ggtt.vm.total;
@@ -1363,6 +1387,8 @@ static int igt_gtt_reserve(void *arg)
 			goto out;
 		}
 	}
+
+	schedule_locked(i915);
 
 	/* And then try at random */
 	list_for_each_entry_safe(obj, on, &objects, st_link) {
@@ -1517,6 +1543,8 @@ static int igt_gtt_insert(void *arg)
 		GEM_BUG_ON(!drm_mm_node_allocated(&vma->node));
 	}
 
+	schedule_locked(i915);
+
 	list_for_each_entry(obj, &objects, st_link) {
 		struct i915_vma *vma;
 
@@ -1534,6 +1562,8 @@ static int igt_gtt_insert(void *arg)
 
 		__i915_vma_unpin(vma);
 	}
+
+	schedule_locked(i915);
 
 	/* If we then reinsert, we should find the same hole */
 	list_for_each_entry_safe(obj, on, &objects, st_link) {
@@ -1574,6 +1604,8 @@ static int igt_gtt_insert(void *arg)
 			goto out;
 		}
 	}
+
+	schedule_locked(i915);
 
 	/* And then force evictions */
 	for (total = 0;
