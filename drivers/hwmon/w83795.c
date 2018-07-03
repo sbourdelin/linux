@@ -2234,7 +2234,8 @@ static int w83795_probe(struct i2c_client *client,
 	if (data->chip_type == w83795g)
 		w83795_check_dynamic_in_limits(client);
 
-	data->hwmon_dev = hwmon_device_register(dev);
+	data->hwmon_dev = hwmon_device_register_with_info(dev, client->name,
+							  data, NULL, NULL);
 	if (IS_ERR(data->hwmon_dev)) {
 		err = PTR_ERR(data->hwmon_dev);
 		goto exit_remove;
