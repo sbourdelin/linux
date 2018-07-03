@@ -35,6 +35,7 @@
 #include <linux/buffer_head.h>
 #include <linux/bio.h>
 #include <linux/iversion.h>
+#include <linux/nls.h>
 #include "ext4.h"
 #include "ext4_jbd2.h"
 
@@ -1251,15 +1252,26 @@ static void dx_insert_block(struct dx_frame *frame, u32 hash, ext4_lblk_t block)
 	dx_set_count(entries, count + 1);
 }
 
+static inline bool ext4_charset_match_name(struct nls_table *charset,
+					      const struct fscrypt_name *fname,
+					      const u8 *de_name,
+					      u32 de_name_len)
+{
+	return !nls_strncmp(charset, (char *) de_name, de_name_len,
+			    fname->disk_name.name, fname->disk_name.len);
+}
+
 /*
  * Test whether a directory entry matches the filename being searched for.
  *
  * Return: %true if the directory entry matches, otherwise %false.
  */
-static inline bool ext4_match(const struct ext4_filename *fname,
+static inline bool ext4_match(const struct inode *parent,
+			      const struct ext4_filename *fname,
 			      const struct ext4_dir_entry_2 *de)
 {
 	struct fscrypt_name f;
+	const struct ext4_sb_info *sbi = EXT4_SB(parent->i_sb);
 
 	if (!de->inode)
 		return false;
@@ -1269,6 +1281,11 @@ static inline bool ext4_match(const struct ext4_filename *fname,
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 	f.crypto_buf = fname->crypto_buf;
 #endif
+
+	if (sbi->encoding)
+		return ext4_charset_match_name(sbi->encoding, &f,
+					       de->name, de->name_len);
+
 	return fscrypt_match_name(&f, de->name, de->name_len);
 }
 
@@ -1289,7 +1306,7 @@ int ext4_search_dir(struct buffer_head *bh, char *search_buf, int buf_size,
 		/* this code is executed quadratically often */
 		/* do minimal checking `by hand' */
 		if ((char *) de + de->name_len <= dlimit &&
-		    ext4_match(fname, de)) {
+		    ext4_match(dir, fname, de)) {
 			/* found a match - just to be sure, do
 			 * a full check */
 			if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
@@ -1345,6 +1362,7 @@ static struct buffer_head * ext4_find_entry (struct inode *dir,
 	struct buffer_head *bh_use[NAMEI_RA_SIZE];
 	struct buffer_head *bh, *ret = NULL;
 	ext4_lblk_t start, block;
+	struct ext4_sb_info *sbi = EXT4_SB(dir->i_sb);
 	const u8 *name = d_name->name;
 	size_t ra_max = 0;	/* Number of bh's in the readahead
 				   buffer, bh_use[] */
@@ -1393,9 +1411,16 @@ static struct buffer_head * ext4_find_entry (struct inode *dir,
 		 * On success, or if the error was file not found,
 		 * return.  Otherwise, fall back to doing a search the
 		 * old fashioned way.
+		 *
+		 * Even if we are doing encodings, an exact-match lookup
+		 * could still benefit from DX, so we don't skip it
+		 * entirely.  Only if it fails to find a match, we
+		 * fallback to linear search.
 		 */
-		if (!IS_ERR(ret) || PTR_ERR(ret) != ERR_BAD_DX_DIR)
+		if ((ret && (!IS_ERR(ret) || PTR_ERR(ret) != ERR_BAD_DX_DIR))
+		    || (!ret && !sbi->encoding))
 			goto cleanup_and_exit;
+
 		dxtrace(printk(KERN_DEBUG "ext4_find_entry: dx failed, "
 			       "falling back\n"));
 	}
@@ -1544,6 +1569,7 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, unsi
 	struct inode *inode;
 	struct ext4_dir_entry_2 *de;
 	struct buffer_head *bh;
+	struct ext4_sb_info *sbi = EXT4_SB(dir->i_sb);
 	int err;
 
 	err = fscrypt_prepare_lookup(dir, dentry, flags);
@@ -1585,6 +1611,32 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, unsi
 			iput(inode);
 			return ERR_PTR(-EPERM);
 		}
+
+		if (sbi->encoding) {
+			struct dentry *new;
+			struct qstr ciname;
+			char *name;
+
+			name = kmalloc((sizeof(char) * de->name_len) + 1,
+				       GFP_NOFS);
+			if (!name)
+				return ERR_PTR(-ENOMEM);
+
+			memcpy(name, de->name, de->name_len);
+			name[de->name_len] = '\0';
+			ciname.len = de->name_len;
+			ciname.name = name;
+			new = d_add_ci(dentry, inode, &ciname);
+			kfree(name);
+			return new;
+		}
+	} else if (sbi->encoding) {
+		/* Eventually we want to call d_add_ci(dentry, NULL) for
+		 * negative dentries in the encoding case as well.  For
+		 * now, prevent the negative dentry from being
+		 * cached.
+		 */
+		return NULL;
 	}
 	return d_splice_alias(inode, dentry);
 }
@@ -1796,7 +1848,7 @@ int ext4_find_dest_de(struct inode *dir, struct inode *inode,
 		if (ext4_check_dir_entry(dir, NULL, de, bh,
 					 buf, buf_size, offset))
 			return -EFSCORRUPTED;
-		if (ext4_match(fname, de))
+		if (ext4_match(dir, fname, de))
 			return -EEXIST;
 		nlen = EXT4_DIR_REC_LEN(de->name_len);
 		rlen = ext4_rec_len_from_disk(de->rec_len, buf_size);
