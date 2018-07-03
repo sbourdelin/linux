@@ -152,6 +152,11 @@ void drm_dp_link_train_clock_recovery_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
 	unsigned int training_interval = dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
 		DP_TRAINING_AUX_RD_INTERVAL_MASK;
 
+	if (dpcd[DP_DPCD_REV] == 0x14) {
+		udelay(100);
+		return;
+	}
+
 	if (training_interval == 0)
 		udelay(100);
 	else
