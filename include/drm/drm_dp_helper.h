@@ -609,6 +609,8 @@
 #define DP_TEST_MISC1                       0x233
 # define DP_TEST_REFRESH_DENOMINATOR        (1 << 0)
 # define DP_TEST_INTERLACED                 (1 << 1)
+# define DP_TEST_VSC_SDP		    (1 << 6) /* 1.3+ */
+# define DP_TEST_COLOR_FORMAT_RAW_Y_ONLY    (1 << 7)
 
 #define DP_TEST_REFRESH_RATE_NUMERATOR      0x234
 
