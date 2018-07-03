@@ -952,6 +952,9 @@ static void __init __efi_enter_virtual_mode(void)
 	 * firmware via SetVirtualAddressMap().
 	 */
 	efi_memmap_unmap();
+	/* Free existing memory map before installing new memory map */
+	efi_memmap_free(efi.memmap.phys_map, efi.memmap.nr_map,
+			efi.memmap.alloc_type);
 
 	if (efi_memmap_init_late(pa, efi.memmap.desc_size * count)) {
 		pr_err("Failed to remap late EFI memory map\n");

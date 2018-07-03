@@ -292,6 +292,9 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 	efi_memmap_insert(&efi.memmap, new, &mr);
 	early_memunmap(new, new_size);
 
+	/* Free existing memory map before installing new memory map */
+	efi_memmap_free(efi.memmap.phys_map, efi.memmap.nr_map,
+			efi.memmap.alloc_type);
 	efi_memmap_install(new_phys, num_entries, alloc_type);
 }
 
@@ -452,6 +455,9 @@ void __init efi_free_boot_services(void)
 
 	memunmap(new);
 
+	/* Free existing memory map before installing new memory map */
+	efi_memmap_free(efi.memmap.phys_map, efi.memmap.nr_map,
+			efi.memmap.alloc_type);
 	if (efi_memmap_install(new_phys, num_entries, alloc_type)) {
 		pr_err("Could not install new EFI memmap\n");
 		return;

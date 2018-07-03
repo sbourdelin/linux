@@ -90,6 +90,9 @@ void __init efi_fake_memmap(void)
 	/* swap into new EFI memmap */
 	early_memunmap(new_memmap, efi.memmap.desc_size * new_nr_map);
 
+	/* Free existing memory map before installing new memory map */
+	efi_memmap_free(efi.memmap.phys_map, efi.memmap.nr_map,
+			efi.memmap.alloc_type);
 	efi_memmap_install(new_memmap_phy, new_nr_map, alloc_type);
 
 	/* print new EFI memmap */
