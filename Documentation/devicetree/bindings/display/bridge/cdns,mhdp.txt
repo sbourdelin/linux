@@ -1,0 +1,39 @@
+Cadence MHDP bridge
+==========================
+
+The Cadence MHDP bridge is a DPI to DP bridge.
+
+Required properties:
+ - compatible: should be "cdns,mhdp",
+ - reg: physical base address and length of the controller's registers,
+ - clocks: DP bridge clock, it's used by the IP to know how to translate
+	   a number of clock cycles into a time (which is used to comply
+	   with DP standard timings and delays),
+ - clock-names: must be "clk",
+
+Required subnodes:
+ - ports: Ports as described in Documentation/devictree/bindings/graph.txt
+   Currently contains a single input port at address 0 representing the DPI
+   input.
+   Port 0 should be connected to a DPI encoder output.
+
+Example:
+
+	mhdp: mhdp@0xf0fb000000 {
+		compatible = "cdns,mhdp";
+		reg = <0xf0 0xfb000000 0x0 0x1000000>;
+		clocks = <&mhdp_clock>;
+		clock-names = "clk";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				mhdp0_dpi_input: endpoint {
+					remote-endpoint = <&xxx_dpi_output>;
+				};
+			};
+		};
+	};
