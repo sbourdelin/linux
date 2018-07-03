@@ -12,6 +12,7 @@
 #include <linux/string.h>
 #include <linux/nls.h>
 #include <linux/errno.h>
+#include <linux/slab.h>
 
 static const wchar_t charset2uni[256] = {
 	/* 0x00*/
@@ -152,11 +153,43 @@ static unsigned char charset_toupper(const struct nls_table *table,
 	return charset2upper[c];
 }
 
+/* Ascii casefold can be defined as either to lower or to upper. As long
+ * as it is stable. */
+static int ascii_casefold(const struct nls_table *charset,
+			  const unsigned char *str, size_t len,
+			  unsigned char *dest, size_t dlen)
+{
+	unsigned int i;
+
+	if (dlen < len)
+		return -EINVAL;
+
+	for (i = 0; i < len; i++)
+		dest[i] = charset_tolower(charset, str[i]);
+
+	return 0;
+}
+
+/* Ascii normalization is identity. */
+static int ascii_normalize(const struct nls_table *charset,
+			   const unsigned char *str, size_t len,
+			   unsigned char *dest, size_t dlen)
+{
+	if (dlen < len)
+		return -EINVAL;
+
+	memcpy(dest, str, len);
+
+	return 0;
+}
+
 static const struct nls_ops charset_ops = {
 	.lowercase = charset_toupper,
 	.uppercase = charset_tolower,
 	.uni2char = uni2char,
 	.char2uni = char2uni,
+	.casefold = ascii_casefold,
+	.normalize = ascii_normalize,
 };
 
 static struct nls_charset nls_charset;
