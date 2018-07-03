@@ -401,7 +401,7 @@ cifs_show_nls(struct seq_file *s, struct nls_table *cur)
 	/* Display iocharset= option if it's not default charset */
 	def = load_nls_default();
 	if (def != cur)
-		seq_printf(s, ",iocharset=%s", cur->charset);
+		seq_printf(s, ",iocharset=%s", nls_charset_name(cur));
 	unload_nls(def);
 }
 

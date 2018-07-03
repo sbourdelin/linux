@@ -3154,7 +3154,7 @@ compare_mount_options(struct super_block *sb, struct cifs_mnt_data *mnt_data)
 	    old->mnt_dir_mode != new->mnt_dir_mode)
 		return 0;
 
-	if (strcmp(old->local_nls->charset, new->local_nls->charset))
+	if (strcmp(nls_charset_name(old->local_nls), nls_charset_name(new->local_nls)))
 		return 0;
 
 	if (old->actimeo != new->actimeo)

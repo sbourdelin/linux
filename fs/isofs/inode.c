@@ -519,8 +519,9 @@ static int isofs_show_options(struct seq_file *m, struct dentry *root)
 
 #ifdef CONFIG_JOLIET
 	if (sbi->s_nls_iocharset &&
-	    strcmp(sbi->s_nls_iocharset->charset, CONFIG_NLS_DEFAULT) != 0)
-		seq_printf(m, ",iocharset=%s", sbi->s_nls_iocharset->charset);
+	    strcmp(nls_charset_name(sbi->s_nls_iocharset), CONFIG_NLS_DEFAULT) != 0)
+		seq_printf(m, ",iocharset=%s",
+			   nls_charset_name(sbi->s_nls_iocharset));
 #endif
 	return 0;
 }

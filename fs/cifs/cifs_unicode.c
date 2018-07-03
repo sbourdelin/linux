@@ -156,7 +156,7 @@ cifs_mapchar(char *target, const __u16 *from, const struct nls_table *cp,
 
 surrogate_pair:
 	/* convert SURROGATE_PAIR and IVS */
-	if (strcmp(cp->charset, "utf8"))
+	if (strcmp(nls_charset_name(cp), "utf8"))
 		goto unknown;
 	len = utf16s_to_utf8s(from, 3, UTF16_LITTLE_ENDIAN, target, 6);
 	if (len <= 0)
@@ -271,7 +271,7 @@ cifs_strtoUTF16(__le16 *to, const char *from, int len,
 	wchar_t wchar_to; /* needed to quiet sparse */
 
 	/* special case for utf8 to handle no plane0 chars */
-	if (!strcmp(codepage->charset, "utf8")) {
+	if (!strcmp(nls_charset_name(codepage), "utf8")) {
 		/*
 		 * convert utf8 -> utf16, we assume we have enough space
 		 * as caller should have assumed conversion does not overflow
@@ -530,7 +530,7 @@ cifsConvertToUTF16(__le16 *target, const char *source, int srclen,
 				goto ctoUTF16;
 
 			/* convert SURROGATE_PAIR */
-			if (strcmp(cp->charset, "utf8") || !wchar_to)
+			if (strcmp(nls_charset_name(cp), "utf8") || !wchar_to)
 				goto unknown;
 			if (*(source + i) & 0x80) {
 				charlen = utf8_to_utf32(source + i, 6, &u);

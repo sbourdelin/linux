@@ -230,7 +230,7 @@ int hfsplus_show_options(struct seq_file *seq, struct dentry *root)
 	if (sbi->session >= 0)
 		seq_printf(seq, ",session=%u", sbi->session);
 	if (sbi->nls)
-		seq_printf(seq, ",nls=%s", sbi->nls->charset);
+		seq_printf(seq, ",nls=%s", nls_charset_name(sbi->nls));
 	if (test_bit(HFSPLUS_SB_NODECOMPOSE, &sbi->flags))
 		seq_puts(seq, ",nodecompose");
 	if (test_bit(HFSPLUS_SB_NOBARRIER, &sbi->flags))

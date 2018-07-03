@@ -72,6 +72,11 @@ static inline int nls_char2uni(const struct nls_table *table,
 	return table->char2uni(rawstring, boundlen, uni);
 }
 
+static inline const char *nls_charset_name(const struct nls_table *table)
+{
+	return table->charset;
+}
+
 static inline unsigned char nls_tolower(struct nls_table *t, unsigned char c)
 {
 	unsigned char nc = t->charset2lower[c];

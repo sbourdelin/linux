@@ -948,10 +948,12 @@ static int fat_show_options(struct seq_file *m, struct dentry *root)
 		seq_printf(m, ",allow_utime=%04o", opts->allow_utime);
 	if (sbi->nls_disk)
 		/* strip "cp" prefix from displayed option */
-		seq_printf(m, ",codepage=%s", &sbi->nls_disk->charset[2]);
+		seq_printf(m, ",codepage=%s",
+			   &nls_charset_name(sbi->nls_disk)[2]);
 	if (isvfat) {
 		if (sbi->nls_io)
-			seq_printf(m, ",iocharset=%s", sbi->nls_io->charset);
+			seq_printf(m, ",iocharset=%s",
+				   nls_charset_name(sbi->nls_io));
 
 		switch (opts->shortname) {
 		case VFAT_SFN_DISPLAY_WIN95 | VFAT_SFN_CREATE_WIN95:

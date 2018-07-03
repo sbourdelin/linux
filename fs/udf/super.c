@@ -365,7 +365,8 @@ static int udf_show_options(struct seq_file *seq, struct dentry *root)
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_UTF8))
 		seq_puts(seq, ",utf8");
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_NLS_MAP) && sbi->s_nls_map)
-		seq_printf(seq, ",iocharset=%s", sbi->s_nls_map->charset);
+		seq_printf(seq, ",iocharset=%s",
+			   nls_charset_name(sbi->s_nls_map));
 
 	return 0;
 }
