@@ -286,6 +286,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 	new = early_memremap(new_phys, new_size);
 	if (!new) {
 		pr_err("Failed to map new boot services memmap\n");
+		efi_memmap_free(new_phys, num_entries, alloc_type);
 		return;
 	}
 
@@ -434,7 +435,7 @@ void __init efi_free_boot_services(void)
 	new = memremap(new_phys, new_size, MEMREMAP_WB);
 	if (!new) {
 		pr_err("Failed to map new EFI memmap\n");
-		return;
+		goto free_mem;
 	}
 
 	/*
@@ -460,8 +461,13 @@ void __init efi_free_boot_services(void)
 			efi.memmap.alloc_type);
 	if (efi_memmap_install(new_phys, num_entries, alloc_type)) {
 		pr_err("Could not install new EFI memmap\n");
-		return;
+		goto free_mem;
 	}
+
+	return;
+
+free_mem:
+	efi_memmap_free(new_phys, num_entries, alloc_type);
 }
 
 /*
