@@ -44,8 +44,6 @@ struct oom_control {
 	unsigned long chosen_points;
 };
 
-extern struct mutex oom_lock;
-
 static inline void set_current_oom_origin(void)
 {
 	current->signal->oom_flag_origin = true;

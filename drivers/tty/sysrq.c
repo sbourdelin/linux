@@ -376,10 +376,8 @@ static void moom_callback(struct work_struct *ignored)
 		.order = -1,
 	};
 
-	mutex_lock(&oom_lock);
 	if (!out_of_memory(&oc))
 		pr_info("OOM request ignored. No task eligible\n");
-	mutex_unlock(&oom_lock);
 }
 
 static DECLARE_WORK(moom_work, moom_callback);

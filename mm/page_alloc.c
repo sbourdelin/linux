@@ -3500,32 +3500,17 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	};
 	struct page *page;
 
-	*did_some_progress = 0;
-
 	/* Try to reclaim via OOM notifier callback. */
-	if (oomkill)
-		*did_some_progress = try_oom_notifier();
-
-	/*
-	 * Acquire the oom lock.  If that fails, somebody else is
-	 * making progress for us.
-	 */
-	if (!mutex_trylock(&oom_lock)) {
-		*did_some_progress = 1;
-		return NULL;
-	}
+	*did_some_progress = oomkill ? try_oom_notifier() : 0;
 
 	/*
 	 * Go through the zonelist yet one more time, keep very high watermark
 	 * here, this is only to catch a parallel oom killing, we must fail if
-	 * we're still under heavy pressure. But make sure that this reclaim
-	 * attempt shall not depend on __GFP_DIRECT_RECLAIM && !__GFP_NORETRY
-	 * allocation which will never fail due to oom_lock already held.
+	 * we're still under heavy pressure.
 	 */
-	page = get_page_from_freelist((gfp_mask | __GFP_HARDWALL) &
-				      ~__GFP_DIRECT_RECLAIM, order,
+	page = get_page_from_freelist(gfp_mask | __GFP_HARDWALL, order,
 				      ALLOC_WMARK_HIGH|ALLOC_CPUSET, ac);
-	if (page)
+	if (page || *did_some_progress)
 		goto out;
 
 	if (!oomkill)
@@ -3544,7 +3529,6 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 					ALLOC_NO_WATERMARKS, ac);
 	}
 out:
-	mutex_unlock(&oom_lock);
 	return page;
 }
 

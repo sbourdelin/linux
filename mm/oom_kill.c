@@ -59,7 +59,7 @@ int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
 
-DEFINE_MUTEX(oom_lock);
+static DEFINE_MUTEX(oom_lock);
 
 #ifdef CONFIG_NUMA
 /**
@@ -965,10 +965,9 @@ static bool oom_has_pending_victims(struct oom_control *oc)
  * OR try to be smart about which process to kill. Note that we
  * don't have to be perfect here, we just have to be good.
  */
-bool out_of_memory(struct oom_control *oc)
+static bool __out_of_memory(struct oom_control *oc,
+			    enum oom_constraint constraint)
 {
-	enum oom_constraint constraint = CONSTRAINT_NONE;
-
 	if (oom_killer_disabled)
 		return false;
 
@@ -991,17 +990,7 @@ bool out_of_memory(struct oom_control *oc)
 	if (oc->gfp_mask && !(oc->gfp_mask & __GFP_FS))
 		return true;
 
-	/*
-	 * Check if there were limitations on the allocation (only relevant for
-	 * NUMA and memcg) that may require different handling.
-	 */
-	constraint = constrained_alloc(oc);
-	if (constraint != CONSTRAINT_MEMORY_POLICY)
-		oc->nodemask = NULL;
 	check_panic_on_oom(oc, constraint);
-
-	if (oom_has_pending_victims(oc))
-		return true;
 
 	if (!is_memcg_oom(oc) && sysctl_oom_kill_allocating_task &&
 	    oom_badness(current, NULL, oc->nodemask, oc->totalpages) > 0) {
@@ -1024,10 +1013,33 @@ bool out_of_memory(struct oom_control *oc)
 	return true;
 }
 
+bool out_of_memory(struct oom_control *oc)
+{
+	enum oom_constraint constraint;
+	bool ret;
+	/*
+	 * Check if there were limitations on the allocation (only relevant for
+	 * NUMA and memcg) that may require different handling.
+	 */
+	constraint = constrained_alloc(oc);
+	if (constraint != CONSTRAINT_MEMORY_POLICY)
+		oc->nodemask = NULL;
+	/*
+	 * If there are OOM victims which current thread can select,
+	 * wait for them to reach __mmput().
+	 */
+	mutex_lock(&oom_lock);
+	if (oom_has_pending_victims(oc))
+		ret = true;
+	else
+		ret = __out_of_memory(oc, constraint);
+	mutex_unlock(&oom_lock);
+	return ret;
+}
+
 /*
  * The pagefault handler calls here because it is out of memory, so kill a
- * memory-hogging task. If oom_lock is held by somebody else, a parallel oom
- * killing is already in progress so do nothing.
+ * memory-hogging task.
  */
 void pagefault_out_of_memory(void)
 {
@@ -1042,9 +1054,6 @@ void pagefault_out_of_memory(void)
 	if (mem_cgroup_oom_synchronize(true))
 		return;
 
-	if (!mutex_trylock(&oom_lock))
-		return;
 	out_of_memory(&oc);
-	mutex_unlock(&oom_lock);
 	schedule_timeout_killable(1);
 }
