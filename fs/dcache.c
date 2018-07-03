@@ -2059,6 +2059,20 @@ struct dentry *d_obtain_root(struct inode *inode)
 }
 EXPORT_SYMBOL(d_obtain_root);
 
+static inline bool d_same_name(const struct dentry *dentry,
+				const struct dentry *parent,
+				const struct qstr *name)
+{
+	if (likely(!(parent->d_flags & DCACHE_OP_COMPARE))) {
+		if (dentry->d_name.len != name->len)
+			return false;
+		return dentry_cmp(dentry, name->name, name->len) == 0;
+	}
+	return parent->d_op->d_compare(dentry,
+				       dentry->d_name.len, dentry->d_name.name,
+				       name) == 0;
+}
+
 /**
  * d_add_ci - lookup or allocate new dentry with case-exact name
  * @inode:  the inode case-insensitive lookup has found
@@ -2079,6 +2093,10 @@ struct dentry *d_add_ci(struct dentry *dentry, struct inode *inode,
 			struct qstr *name)
 {
 	struct dentry *found, *res;
+
+	/* Trivial case: CI search is exact match.  */
+	if (d_same_name(dentry, dentry->d_parent, name))
+		return d_splice_alias(inode, dentry);
 
 	/*
 	 * First check if a dentry matching the name already exists,
@@ -2111,21 +2129,6 @@ struct dentry *d_add_ci(struct dentry *dentry, struct inode *inode,
 	return found;
 }
 EXPORT_SYMBOL(d_add_ci);
-
-
-static inline bool d_same_name(const struct dentry *dentry,
-				const struct dentry *parent,
-				const struct qstr *name)
-{
-	if (likely(!(parent->d_flags & DCACHE_OP_COMPARE))) {
-		if (dentry->d_name.len != name->len)
-			return false;
-		return dentry_cmp(dentry, name->name, name->len) == 0;
-	}
-	return parent->d_op->d_compare(dentry,
-				       dentry->d_name.len, dentry->d_name.name,
-				       name) == 0;
-}
 
 /**
  * __d_lookup_rcu - search for a dentry (racy, store-free)
