@@ -524,8 +524,6 @@ static void __init mm_init(void)
 	ioremap_huge_init();
 	/* Should be run before the first non-init thread is created */
 	init_espfix_bsp();
-	/* Should be run after espfix64 is set up. */
-	pti_init();
 }
 
 asmlinkage __visible void __init start_kernel(void)
@@ -1065,6 +1063,12 @@ static int __ref kernel_init(void *unused)
 	jump_label_invalidate_initmem();
 	free_initmem();
 	mark_readonly();
+	/*
+	 * Kernel text/rodata/data sections have the right protections
+	 * now. If necessary, init PTI and clone the relevant pieces
+	 * to the user-space page-table.
+	 */
+	pti_init();
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
