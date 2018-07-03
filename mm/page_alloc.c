@@ -3862,21 +3862,6 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 	return alloc_flags;
 }
 
-static bool oom_reserves_allowed(struct task_struct *tsk)
-{
-	if (!tsk_is_oom_victim(tsk))
-		return false;
-
-	/*
-	 * !MMU doesn't have oom reaper so give access to memory reserves
-	 * only to the thread with TIF_MEMDIE set
-	 */
-	if (!IS_ENABLED(CONFIG_MMU) && !test_thread_flag(TIF_MEMDIE))
-		return false;
-
-	return true;
-}
-
 /*
  * Distinguish requests which really need access to full memory
  * reserves from oom victims which can live with a portion of it
@@ -3892,7 +3877,7 @@ static inline int __gfp_pfmemalloc_flags(gfp_t gfp_mask)
 	if (!in_interrupt()) {
 		if (current->flags & PF_MEMALLOC)
 			return ALLOC_NO_WATERMARKS;
-		else if (oom_reserves_allowed(current))
+		else if (tsk_is_oom_victim(current))
 			return ALLOC_OOM;
 	}
 
