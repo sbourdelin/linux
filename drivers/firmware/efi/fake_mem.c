@@ -57,6 +57,7 @@ void __init efi_fake_memmap(void)
 	phys_addr_t new_memmap_phy;
 	void *new_memmap;
 	int i;
+	enum efi_memmap_type alloc_type;
 
 	if (!nr_fake_mem)
 		return;
@@ -71,7 +72,7 @@ void __init efi_fake_memmap(void)
 	}
 
 	/* allocate memory for new EFI memmap */
-	new_memmap_phy = efi_memmap_alloc(new_nr_map);
+	new_memmap_phy = efi_memmap_alloc(new_nr_map, &alloc_type);
 	if (!new_memmap_phy)
 		return;
 

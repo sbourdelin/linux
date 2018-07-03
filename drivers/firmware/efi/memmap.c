@@ -33,6 +33,7 @@ static phys_addr_t __init __efi_memmap_alloc_late(unsigned long size)
 /**
  * efi_memmap_alloc - Allocate memory for the EFI memory map
  * @num_entries: Number of entries in the allocated map.
+ * @alloc_type: Type of allocation performed (memblock or normal)?
  *
  * Depending on whether mm_init() has already been invoked or not,
  * either memblock or "normal" page allocation is used.
@@ -40,13 +41,20 @@ static phys_addr_t __init __efi_memmap_alloc_late(unsigned long size)
  * Returns the physical address of the allocated memory map on
  * success, zero on failure.
  */
-phys_addr_t __init efi_memmap_alloc(unsigned int num_entries)
+phys_addr_t __init efi_memmap_alloc(unsigned int num_entries,
+				    enum efi_memmap_type *alloc_type)
 {
 	unsigned long size = num_entries * efi.memmap.desc_size;
 
-	if (slab_is_available())
-		return __efi_memmap_alloc_late(size);
+	if (!alloc_type)
+		return 0;
 
+	if (slab_is_available()) {
+		*alloc_type = BUDDY_ALLOCATOR;
+		return __efi_memmap_alloc_late(size);
+	}
+
+	*alloc_type = MEMBLOCK;
 	return __efi_memmap_alloc_early(size);
 }
 

@@ -248,6 +248,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 	efi_memory_desc_t md;
 	int num_entries;
 	void *new;
+	enum efi_memmap_type alloc_type;
 
 	if (efi_mem_desc_lookup(addr, &md)) {
 		pr_err("Failed to lookup EFI memory descriptor for %pa\n", &addr);
@@ -276,7 +277,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 
 	new_size = efi.memmap.desc_size * num_entries;
 
-	new_phys = efi_memmap_alloc(num_entries);
+	new_phys = efi_memmap_alloc(num_entries, &alloc_type);
 	if (!new_phys) {
 		pr_err("Could not allocate boot services memmap\n");
 		return;
@@ -375,6 +376,7 @@ void __init efi_free_boot_services(void)
 	efi_memory_desc_t *md;
 	int num_entries = 0;
 	void *new, *new_md;
+	enum efi_memmap_type alloc_type;
 
 	for_each_efi_memory_desc(md) {
 		unsigned long long start = md->phys_addr;
@@ -420,7 +422,7 @@ void __init efi_free_boot_services(void)
 		return;
 
 	new_size = efi.memmap.desc_size * num_entries;
-	new_phys = efi_memmap_alloc(num_entries);
+	new_phys = efi_memmap_alloc(num_entries, &alloc_type);
 	if (!new_phys) {
 		pr_err("Failed to allocate new EFI memmap\n");
 		return;
