@@ -293,6 +293,9 @@ void __init hyperv_init(void)
 	if (!hv_vp_index)
 		return;
 
+	for (i = 0; i < num_possible_cpus(); i++)
+		hv_vp_index[i] = -1;
+
 	hv_vp_assist_page = kcalloc(num_possible_cpus(),
 				    sizeof(*hv_vp_assist_page), GFP_KERNEL);
 	if (!hv_vp_assist_page) {
