@@ -10034,7 +10034,9 @@ static int nl80211_tx_mgmt(struct sk_buff *skb, struct genl_info *info)
 		return -EINVAL;
 
 	wdev_lock(wdev);
-	if (params.offchan && !cfg80211_off_channel_oper_allowed(wdev)) {
+	if (params.offchan &&
+	    !cfg80211_chandef_identical(&chandef, &wdev->chandef) &&
+	    !cfg80211_off_channel_oper_allowed(wdev)) {
 		wdev_unlock(wdev);
 		return -EBUSY;
 	}
