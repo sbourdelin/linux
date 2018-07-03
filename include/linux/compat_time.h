@@ -59,8 +59,8 @@ extern int get_compat_itimerspec64(struct itimerspec64 *its,
 			const struct compat_itimerspec __user *uits);
 extern int put_compat_itimerspec64(const struct itimerspec64 *its,
 			struct compat_itimerspec __user *uits);
-struct timex;
-int compat_get_timex(struct timex *, const struct compat_timex __user *);
-int compat_put_timex(struct compat_timex __user *, const struct timex *);
+struct __kernel_timex;
+int compat_get_timex(struct __kernel_timex *, const struct compat_timex __user *);
+int compat_put_timex(struct compat_timex __user *, const struct __kernel_timex *);
 
 #endif /* _LINUX_COMPAT_TIME_H */
