@@ -388,6 +388,10 @@
 #define LANE_MAPPING_NORMAL			0x1b
 #define LANE_MAPPING_FLIPPED			0xe4
 #define ENHANCED				1
+#define LANE_1					BIT(0)
+#define LANE_2					BIT(1)
+#define LANE_4					BIT(2)
+#define SSC					BIT(3)
 #define SCRAMBLER_EN				BIT(4)
 
 #define	FULL_LT_STARTED				BIT(0)

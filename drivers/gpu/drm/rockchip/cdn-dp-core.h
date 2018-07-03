@@ -69,6 +69,25 @@ struct cdn_dp_port {
 	u8 id;
 };
 
+struct cdn_mhdp_host {
+	unsigned int	link_rate;
+	u8	lanes_cnt;
+	u8	volt_swing;
+	u8	pre_emphasis;
+	u8	pattern_supp;
+	u8	fast_link;
+	u8	lane_mapping;
+	u8	enhanced;
+};
+
+struct cdn_mhdp_sink {
+	unsigned int	link_rate;
+	u8	lanes_cnt;
+	u8	pattern_supp;
+	u8	fast_link;
+	u8	enhanced;
+};
+
 struct cdn_dp_device {
 	struct device *dev;
 	struct drm_device *drm_dev;
@@ -108,5 +127,11 @@ struct cdn_dp_device {
 
 	u8 dpcd[DP_RECEIVER_CAP_SIZE];
 	bool sink_has_audio;
+	bool mhdp_ip;
+
+	struct cdn_mhdp_host host;
+	struct cdn_mhdp_sink sink;
+	struct drm_bridge bridge;
+	struct drm_dp_aux aux;
 };
 #endif  /* _CDN_DP_CORE_H */

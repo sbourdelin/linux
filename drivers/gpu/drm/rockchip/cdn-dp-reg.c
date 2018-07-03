@@ -1060,7 +1060,7 @@ int cdn_dp_register_write(struct cdn_dp_device *dp, u32 addr, u32 value)
 }
 
 int cdn_dp_register_write_field(struct cdn_dp_device *dp, u32 addr,
-		u8 index, u8 nbits, u32 value)
+				u8 index, u8 nbits, u32 value)
 {
 	u8 msg[10];
 	int ret;
