@@ -59,6 +59,19 @@ extern int utf8s_to_utf16s(const u8 *s, int len,
 extern int utf16s_to_utf8s(const wchar_t *pwcs, int len,
 		enum utf16_endian endian, u8 *s, int maxlen);
 
+static inline int nls_uni2char(const struct nls_table *table, wchar_t uni,
+			       unsigned char *out, int boundlen)
+{
+	return table->uni2char(uni, out, boundlen);
+}
+
+static inline int nls_char2uni(const struct nls_table *table,
+			       const unsigned char *rawstring,
+			       int boundlen, wchar_t *uni)
+{
+	return table->char2uni(rawstring, boundlen, uni);
+}
+
 static inline unsigned char nls_tolower(struct nls_table *t, unsigned char c)
 {
 	unsigned char nc = t->charset2lower[c];

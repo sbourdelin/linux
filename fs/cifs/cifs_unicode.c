@@ -148,7 +148,7 @@ cifs_mapchar(char *target, const __u16 *from, const struct nls_table *cp,
 		return len;
 
 	/* if character not one of seven in special remap set */
-	len = cp->uni2char(src_char, target, NLS_MAX_CHARSET_SIZE);
+	len = nls_uni2char(cp, src_char, target, NLS_MAX_CHARSET_SIZE);
 	if (len <= 0)
 		goto surrogate_pair;
 
@@ -292,7 +292,7 @@ cifs_strtoUTF16(__le16 *to, const char *from, int len,
 	}
 
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
-		charlen = codepage->char2uni(from, len, &wchar_to);
+		charlen = nls_char2uni(codepage, from, len, &wchar_to);
 		if (charlen < 1) {
 			cifs_dbg(VFS, "strtoUTF16: char2uni of 0x%x returned %d\n",
 				 *from, charlen);
@@ -518,7 +518,8 @@ cifsConvertToUTF16(__le16 *target, const char *source, int srclen,
 		 * as they use backslash as separator.
 		 */
 		if (dst_char == 0) {
-			charlen = cp->char2uni(source + i, srclen - i, &tmp);
+			charlen = nls_char2uni(cp, source + i, srclen - i,
+					       &tmp);
 			dst_char = cpu_to_le16(tmp);
 
 			/*
@@ -608,7 +609,7 @@ cifs_local_to_utf16_bytes(const char *from, int len,
 	wchar_t wchar_to;
 
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
-		charlen = codepage->char2uni(from, len, &wchar_to);
+		charlen = nls_char2uni(codepage, from, len, &wchar_to);
 		/* Failed conversion defaults to a question mark */
 		if (charlen < 1)
 			charlen = 1;
