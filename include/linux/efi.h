@@ -765,6 +765,12 @@ struct efi_memory_map_data {
 	unsigned long desc_size;
 };
 
+enum efi_memmap_type {
+	EFI_STUB,
+	MEMBLOCK,
+	BUDDY_ALLOCATOR,
+};
+
 struct efi_memory_map {
 	phys_addr_t phys_map;
 	void *map;
@@ -1016,6 +1022,8 @@ extern int __init efi_memmap_split_count(efi_memory_desc_t *md,
 					 struct range *range);
 extern void __init efi_memmap_insert(struct efi_memory_map *old_memmap,
 				     void *buf, struct efi_mem_range *mem);
+extern void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries,
+				   enum efi_memmap_type alloc_type);
 
 extern int efi_config_init(efi_config_table_type_t *arch_tables);
 #ifdef CONFIG_EFI_ESRT

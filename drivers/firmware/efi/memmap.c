@@ -12,6 +12,7 @@
 #include <asm/early_ioremap.h>
 #include <linux/memblock.h>
 #include <linux/slab.h>
+#include <linux/bootmem.h>
 
 static phys_addr_t __init __efi_memmap_alloc_early(unsigned long size)
 {
@@ -47,6 +48,33 @@ phys_addr_t __init efi_memmap_alloc(unsigned int num_entries)
 		return __efi_memmap_alloc_late(size);
 
 	return __efi_memmap_alloc_early(size);
+}
+
+/**
+ * efi_memmap_free - Free memory allocated by efi_memmap_alloc()
+ * @mem: Physical address allocated by efi_memmap_alloc().
+ * @num_entries: Number of entries in the allocated map.
+ * @alloc_type: What type of allocation did efi_memmap_alloc() perform?
+ *
+ * Use this function to free memory allocated by efi_memmap_alloc().
+ * efi_memmap_alloc() allocates memory depending on whether mm_init()
+ * has already been invoked or not. It uses either memblock or "normal"
+ * page allocation, similarly, we free it in two different ways. Also
+ * note that there is a third type of memory used by memmap which is
+ * memblock_reserved() and is passed by EFI stub to kernel.
+ */
+void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries,
+			    enum efi_memmap_type alloc_type)
+{
+	unsigned long size = num_entries * efi.memmap.desc_size;
+	unsigned int order = get_order(size);
+
+	if (alloc_type == BUDDY_ALLOCATOR)
+		__free_pages(pfn_to_page(PHYS_PFN(mem)), order);
+	else if (alloc_type == MEMBLOCK)
+		memblock_free(mem, size);
+	else
+		free_bootmem(mem, size);
 }
 
 /**
