@@ -1,0 +1,29 @@
+config USB_USBSSP
+	tristate "Cadence USBSSP DRD Controller"
+	depends on (USB || USB_GADGET) && HAS_DMA
+	select USB_USBSSP_GADGET
+	help
+	  Say Y here if your system has a cadence USBSSP dual-role controller.
+	  It supports: dual-role switch Host-only, and Peripheral-only.
+
+	  If you choose to build this driver is a dynamically linked
+	  module, the module will be called usbssp.ko.
+
+if USB_USBSSP
+
+config USB_USBSSP_GADGET
+	bool "Gadget only mode"
+	depends on USB_GADGET=y || USB_GADGET=USB_USBSSP
+	help
+	  Select this when you want to use USBSSP in gadget mode only,
+
+config USB_USBSSP_PCI
+	tristate "PCIe-based Platforms"
+	depends on USB_PCI && ACPI
+	default USB_USBSSP
+	help
+	  If you're using the USBSSP Core IP with a PCIe, please say
+	  'Y' or 'M' here.
+
+endif
+
