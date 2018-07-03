@@ -26,6 +26,7 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/iversion.h>
+#include <linux/nls.h>
 #include "ext4.h"
 #include "xattr.h"
 
@@ -663,4 +664,33 @@ const struct file_operations ext4_dir_operations = {
 	.fsync		= ext4_sync_file,
 	.open		= ext4_dir_open,
 	.release	= ext4_release_dir,
+};
+
+static int ext4_d_compare(const struct dentry *dentry, unsigned int len,
+			  const char *str, const struct qstr *name)
+{
+	struct nls_table *charset = EXT4_SB(dentry->d_sb)->encoding;
+	size_t nlen = strlen(name->name);
+
+	return nls_strncmp(charset, str, len, name->name, nlen);
+}
+
+static int ext4_d_hash(const struct dentry *dentry, struct qstr *q)
+{
+	const struct nls_table *charset = EXT4_SB(dentry->d_sb)->encoding;
+	unsigned char norm[PATH_MAX];
+	int len;
+
+	len = nls_normalize(charset, q->name, q->len, norm, PATH_MAX);
+	if (len < 0)
+		return -EINVAL;
+
+	q->hash = full_name_hash(dentry, norm, len);
+
+	return 0;
+}
+
+const struct dentry_operations ext4_dentry_ops = {
+	.d_hash = ext4_d_hash,
+	.d_compare = ext4_d_compare,
 };

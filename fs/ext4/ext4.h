@@ -2953,6 +2953,7 @@ static inline void ext4_unlock_group(struct super_block *sb,
 
 /* dir.c */
 extern const struct file_operations ext4_dir_operations;
+extern const struct dentry_operations ext4_dentry_ops;
 
 /* file.c */
 extern const struct inode_operations ext4_file_inode_operations;
