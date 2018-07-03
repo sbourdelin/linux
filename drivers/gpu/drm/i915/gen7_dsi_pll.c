@@ -357,8 +357,8 @@ static u32 bxt_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
 	return pclk;
 }
 
-u32 intel_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
-		       struct intel_crtc_state *config)
+u32 gen7_dsi_get_pclk(struct intel_encoder *encoder, int pipe_bpp,
+		      struct intel_crtc_state *config)
 {
 	if (IS_GEN9_LP(to_i915(encoder->base.dev)))
 		return bxt_dsi_get_pclk(encoder, pipe_bpp, config);
@@ -568,7 +568,7 @@ static void gen9lp_enable_dsi_pll(struct intel_encoder *encoder,
 	DRM_DEBUG_KMS("DSI PLL locked\n");
 }
 
-bool intel_dsi_pll_is_enabled(struct drm_i915_private *dev_priv)
+bool gen7_dsi_pll_is_enabled(struct drm_i915_private *dev_priv)
 {
 	if (IS_GEN9_LP(dev_priv))
 		return bxt_dsi_pll_is_enabled(dev_priv);
@@ -578,8 +578,8 @@ bool intel_dsi_pll_is_enabled(struct drm_i915_private *dev_priv)
 	return false;
 }
 
-int intel_compute_dsi_pll(struct intel_encoder *encoder,
-			  struct intel_crtc_state *config)
+int gen7_dsi_pll_compute(struct intel_encoder *encoder,
+			 struct intel_crtc_state *config)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 
@@ -591,8 +591,8 @@ int intel_compute_dsi_pll(struct intel_encoder *encoder,
 	return -ENODEV;
 }
 
-void intel_enable_dsi_pll(struct intel_encoder *encoder,
-			  const struct intel_crtc_state *config)
+void gen7_dsi_pll_enable(struct intel_encoder *encoder,
+			 const struct intel_crtc_state *config)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 
@@ -602,7 +602,7 @@ void intel_enable_dsi_pll(struct intel_encoder *encoder,
 		gen9lp_enable_dsi_pll(encoder, config);
 }
 
-void intel_disable_dsi_pll(struct intel_encoder *encoder)
+void gen7_dsi_pll_disable(struct intel_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 
@@ -639,7 +639,7 @@ static void gen9lp_dsi_reset_clocks(struct intel_encoder *encoder,
 	I915_WRITE(MIPI_EOT_DISABLE(port), CLOCKSTOP);
 }
 
-void intel_dsi_reset_clocks(struct intel_encoder *encoder, enum port port)
+void gen7_dsi_reset_clocks(struct intel_encoder *encoder, enum port port)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 

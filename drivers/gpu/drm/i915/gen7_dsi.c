@@ -69,7 +69,7 @@ enum mipi_dsi_pixel_format pixel_format_from_register_bits(u32 fmt)
 	}
 }
 
-void wait_for_dsi_fifo_empty(struct intel_dsi *intel_dsi, enum port port)
+void gen7_dsi_wait_for_fifo_empty(struct intel_dsi *intel_dsi, enum port port)
 {
 	struct drm_encoder *encoder = &intel_dsi->base.base;
 	struct drm_device *dev = encoder->dev;
@@ -344,7 +344,7 @@ static bool intel_dsi_compute_config(struct intel_encoder *encoder,
 			pipe_config->cpu_transcoder = TRANSCODER_DSI_A;
 	}
 
-	ret = intel_compute_dsi_pll(encoder, pipe_config);
+	ret = gen7_dsi_pll_compute(encoder, pipe_config);
 	if (ret)
 		return false;
 
@@ -810,8 +810,8 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 	 * The BIOS may leave the PLL in a wonky state where it doesn't
 	 * lock. It needs to be fully powered down to fix it.
 	 */
-	intel_disable_dsi_pll(encoder);
-	intel_enable_dsi_pll(encoder, pipe_config);
+	gen7_dsi_pll_disable(encoder);
+	gen7_dsi_pll_enable(encoder, pipe_config);
 
 	if (IS_BROXTON(dev_priv)) {
 		/* Add MIPI IO reset programming for modeset */
@@ -949,7 +949,7 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 
 	if (is_vid_mode(intel_dsi)) {
 		for_each_dsi_port(port, intel_dsi->ports)
-			wait_for_dsi_fifo_empty(intel_dsi, port);
+			gen7_dsi_wait_for_fifo_empty(intel_dsi, port);
 
 		intel_dsi_port_disable(encoder);
 		usleep_range(2000, 5000);
@@ -979,7 +979,7 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 				val & ~MIPIO_RST_CTRL);
 	}
 
-	intel_disable_dsi_pll(encoder);
+	gen7_dsi_pll_disable(encoder);
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		u32 val;
@@ -1024,7 +1024,7 @@ static bool intel_dsi_get_hw_state(struct intel_encoder *encoder,
 	 * configuration, otherwise accessing DSI registers will hang the
 	 * machine. See BSpec North Display Engine registers/MIPI[BXT].
 	 */
-	if (IS_GEN9_LP(dev_priv) && !intel_dsi_pll_is_enabled(dev_priv))
+	if (IS_GEN9_LP(dev_priv) && !gen7_dsi_pll_is_enabled(dev_priv))
 		goto out_put_power;
 
 	/* XXX: this only works for one DSI output */
@@ -1250,8 +1250,7 @@ static void intel_dsi_get_config(struct intel_encoder *encoder,
 	if (IS_GEN9_LP(dev_priv))
 		bxt_dsi_get_pipe_config(encoder, pipe_config);
 
-	pclk = intel_dsi_get_pclk(encoder, pipe_config->pipe_bpp,
-				  pipe_config);
+	pclk = gen7_dsi_get_pclk(encoder, pipe_config->pipe_bpp, pipe_config);
 	if (!pclk)
 		return;
 
@@ -1590,7 +1589,7 @@ static void intel_dsi_unprepare(struct intel_encoder *encoder)
 			/* Panel commands can be sent when clock is in LP11 */
 			I915_WRITE(MIPI_DEVICE_READY(port), 0x0);
 
-			intel_dsi_reset_clocks(encoder, port);
+			gen7_dsi_reset_clocks(encoder, port);
 			I915_WRITE(MIPI_EOT_DISABLE(port), CLOCKSTOP);
 
 			val = I915_READ(MIPI_DSI_FUNC_PRG(port));
@@ -1713,7 +1712,7 @@ static void intel_dsi_add_properties(struct intel_connector *connector)
 	}
 }
 
-void intel_dsi_init(struct drm_i915_private *dev_priv)
+void gen7_dsi_init(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_dsi *intel_dsi;
