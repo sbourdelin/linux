@@ -49,6 +49,12 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/oom.h>
 
+static inline unsigned long oom_victim_mm_score(struct mm_struct *mm)
+{
+	return get_mm_rss(mm) + get_mm_counter(mm, MM_SWAPENTS) +
+		mm_pgtables_bytes(mm) / PAGE_SIZE;
+}
+
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
@@ -198,6 +204,9 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 	long points;
 	long adj;
 
+	if (tsk_is_oom_victim(p))
+		return 0;
+
 	if (oom_unkillable_task(p, memcg, nodemask))
 		return 0;
 
@@ -207,13 +216,10 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 
 	/*
 	 * Do not even consider tasks which are explicitly marked oom
-	 * unkillable or have been already oom reaped or the are in
-	 * the middle of vfork
+	 * unkillable or are in the middle of vfork
 	 */
 	adj = (long)p->signal->oom_score_adj;
-	if (adj == OOM_SCORE_ADJ_MIN ||
-			test_bit(MMF_OOM_SKIP, &p->mm->flags) ||
-			in_vfork(p)) {
+	if (adj == OOM_SCORE_ADJ_MIN || in_vfork(p)) {
 		task_unlock(p);
 		return 0;
 	}
@@ -222,8 +228,7 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 	 * The baseline for the badness score is the proportion of RAM that each
 	 * task's rss, pagetable and swap space use.
 	 */
-	points = get_mm_rss(p->mm) + get_mm_counter(p->mm, MM_SWAPENTS) +
-		mm_pgtables_bytes(p->mm) / PAGE_SIZE;
+	points = oom_victim_mm_score(p->mm);
 	task_unlock(p);
 
 	/* Normalize to oom_score_adj units */
@@ -431,6 +436,29 @@ static bool oom_killer_disabled __read_mostly;
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 
+static bool victim_mm_stalling(struct task_struct *p, struct mm_struct *mm)
+{
+	unsigned long score;
+
+	if (time_before(jiffies, p->last_oom_compared + HZ / 10))
+		return false;
+	score = oom_victim_mm_score(mm);
+	if (score < p->last_oom_score)
+		p->oom_reap_stall_count = 0;
+	else
+		p->oom_reap_stall_count++;
+	p->last_oom_score = oom_victim_mm_score(mm);
+	p->last_oom_compared = jiffies;
+	if (p->oom_reap_stall_count < 30)
+		return false;
+	pr_info("Gave up waiting for process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
+		task_pid_nr(p), p->comm, K(mm->total_vm),
+		K(get_mm_counter(mm, MM_ANONPAGES)),
+		K(get_mm_counter(mm, MM_FILEPAGES)),
+		K(get_mm_counter(mm, MM_SHMEMPAGES)));
+	return true;
+}
+
 /*
  * task->mm can be NULL if the task is the exited group leader.  So to
  * determine whether the task is using a particular mm, we examine all the
@@ -449,32 +477,10 @@ bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
 	return false;
 }
 
-#ifdef CONFIG_MMU
-/*
- * OOM Reaper kernel thread which tries to reap the memory used by the OOM
- * victim (if that is possible) to help the OOM killer to move on.
- */
-static struct task_struct *oom_reaper_th;
-static DECLARE_WAIT_QUEUE_HEAD(oom_reaper_wait);
 static LIST_HEAD(oom_victim_list);
-static DEFINE_SPINLOCK(oom_reaper_lock);
 
-/*
- * We have to make sure not to cause premature new oom victim selection.
- *
- * __alloc_pages_may_oom()     oom_reap_task_mm()/exit_mmap()
- *   mutex_trylock(&oom_lock)
- *   get_page_from_freelist(ALLOC_WMARK_HIGH) # fails
- *                               unmap_page_range() # frees some memory
- *                               set_bit(MMF_OOM_SKIP)
- *   out_of_memory()
- *     oom_has_pending_victims()
- *       test_bit(MMF_OOM_SKIP) # selects new oom victim
- *   mutex_unlock(&oom_lock)
- *
- * Therefore, the callers hold oom_lock when calling this function.
- */
-void __oom_reap_task_mm(struct mm_struct *mm)
+#ifdef CONFIG_MMU
+void oom_reap_mm(struct mm_struct *mm)
 {
 	struct vm_area_struct *vma;
 
@@ -513,137 +519,7 @@ void __oom_reap_task_mm(struct mm_struct *mm)
 		}
 	}
 }
-
-static bool oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
-{
-	bool ret = true;
-
-	mutex_lock(&oom_lock);
-
-	if (!down_read_trylock(&mm->mmap_sem)) {
-		ret = false;
-		trace_skip_task_reaping(tsk->pid);
-		goto unlock_oom;
-	}
-
-	/*
-	 * If the mm has invalidate_{start,end}() notifiers that could block,
-	 * sleep to give the oom victim some more time.
-	 * TODO: we really want to get rid of this ugly hack and make sure that
-	 * notifiers cannot block for unbounded amount of time
-	 */
-	if (mm_has_blockable_invalidate_notifiers(mm)) {
-		up_read(&mm->mmap_sem);
-		schedule_timeout_idle(HZ);
-		goto unlock_oom;
-	}
-
-	/*
-	 * MMF_OOM_SKIP is set by exit_mmap when the OOM reaper can't
-	 * work on the mm anymore. The check for MMF_OOM_SKIP must run
-	 * under mmap_sem for reading because it serializes against the
-	 * down_write();up_write() cycle in exit_mmap().
-	 */
-	if (test_bit(MMF_OOM_SKIP, &mm->flags)) {
-		up_read(&mm->mmap_sem);
-		trace_skip_task_reaping(tsk->pid);
-		goto unlock_oom;
-	}
-
-	trace_start_task_reaping(tsk->pid);
-
-	__oom_reap_task_mm(mm);
-
-	pr_info("oom_reaper: reaped process %d (%s), now anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
-			task_pid_nr(tsk), tsk->comm,
-			K(get_mm_counter(mm, MM_ANONPAGES)),
-			K(get_mm_counter(mm, MM_FILEPAGES)),
-			K(get_mm_counter(mm, MM_SHMEMPAGES)));
-	up_read(&mm->mmap_sem);
-
-	trace_finish_task_reaping(tsk->pid);
-unlock_oom:
-	mutex_unlock(&oom_lock);
-	return ret;
-}
-
-#define MAX_OOM_REAP_RETRIES 10
-static void oom_reap_task(struct task_struct *tsk)
-{
-	int attempts = 0;
-	struct mm_struct *mm = tsk->signal->oom_mm;
-
-	/* Retry the down_read_trylock(mmap_sem) a few times */
-	while (attempts++ < MAX_OOM_REAP_RETRIES && !oom_reap_task_mm(tsk, mm))
-		schedule_timeout_idle(HZ/10);
-
-	if (attempts <= MAX_OOM_REAP_RETRIES ||
-	    test_bit(MMF_OOM_SKIP, &mm->flags))
-		goto done;
-
-	pr_info("oom_reaper: unable to reap pid:%d (%s)\n",
-		task_pid_nr(tsk), tsk->comm);
-	debug_show_all_locks();
-
-done:
-	/*
-	 * Hide this mm from OOM killer because it has been either reaped or
-	 * somebody can't call up_write(mmap_sem).
-	 */
-	set_bit(MMF_OOM_SKIP, &mm->flags);
-
-	spin_lock(&oom_reaper_lock);
-	list_del(&tsk->oom_victim_list);
-	spin_unlock(&oom_reaper_lock);
-
-	/* Drop a reference taken by wake_oom_reaper */
-	put_task_struct(tsk);
-}
-
-static int oom_reaper(void *unused)
-{
-	while (true) {
-		struct task_struct *tsk = NULL;
-
-		wait_event_freezable(oom_reaper_wait,
-				     !list_empty(&oom_victim_list));
-		spin_lock(&oom_reaper_lock);
-		if (!list_empty(&oom_victim_list))
-			tsk = list_first_entry(&oom_victim_list,
-					       struct task_struct,
-					       oom_victim_list);
-		spin_unlock(&oom_reaper_lock);
-
-		if (tsk)
-			oom_reap_task(tsk);
-	}
-
-	return 0;
-}
-
-static void wake_oom_reaper(struct task_struct *tsk)
-{
-	if (tsk->oom_victim_list.next)
-		return;
-	get_task_struct(tsk);
-	spin_lock(&oom_reaper_lock);
-	list_add_tail(&tsk->oom_victim_list, &oom_victim_list);
-	spin_unlock(&oom_reaper_lock);
-	trace_wake_reaper(tsk->pid);
-	wake_up(&oom_reaper_wait);
-}
-
-static int __init oom_init(void)
-{
-	oom_reaper_th = kthread_run(oom_reaper, NULL, "oom_reaper");
-	return 0;
-}
-subsys_initcall(oom_init)
-#else
-static inline void wake_oom_reaper(struct task_struct *tsk)
-{
-}
-#endif /* CONFIG_MMU */
+#endif
 
 /**
  * mark_oom_victim - mark the given task as OOM victim
@@ -668,6 +544,13 @@ static void mark_oom_victim(struct task_struct *tsk)
 	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm)) {
 		mmgrab(tsk->signal->oom_mm);
 		set_bit(MMF_OOM_VICTIM, &mm->flags);
+		/* Save current values for victim_mm_stalling() test. */
+		tsk->oom_reap_stall_count = 0;
+		tsk->last_oom_score = oom_victim_mm_score(mm);
+		tsk->last_oom_compared = jiffies;
+		get_task_struct(tsk);
+		lockdep_assert_held(&oom_lock);
+		list_add_tail(&tsk->oom_victim_list, &oom_victim_list);
 	}
 
 	/*
@@ -786,10 +669,11 @@ static bool task_will_free_mem(struct task_struct *task)
 		return false;
 
 	/*
-	 * This task has already been drained by the oom reaper so there are
-	 * only small chances it will free some more
+	 * If memory reserves granted to this task was not sufficient, allow
+	 * killing more processes after oom_has_pending_victims() completed
+	 * reaping this mm.
 	 */
-	if (test_bit(MMF_OOM_SKIP, &mm->flags))
+	if (tsk_is_oom_victim(task))
 		return false;
 
 	if (atomic_read(&mm->mm_users) <= 1)
@@ -826,7 +710,6 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 	unsigned int victim_points = 0;
 	static DEFINE_RATELIMIT_STATE(oom_rs, DEFAULT_RATELIMIT_INTERVAL,
 					      DEFAULT_RATELIMIT_BURST);
-	bool can_oom_reap = true;
 
 	/*
 	 * If the task is already exiting, don't alarm the sysadmin or kill
@@ -836,7 +719,6 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 	task_lock(p);
 	if (task_will_free_mem(p)) {
 		mark_oom_victim(p);
-		wake_oom_reaper(p);
 		task_unlock(p);
 		put_task_struct(p);
 		return;
@@ -925,8 +807,11 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 		if (same_thread_group(p, victim))
 			continue;
 		if (is_global_init(p)) {
-			can_oom_reap = false;
 			set_bit(MMF_OOM_SKIP, &mm->flags);
+			/*
+			 * Since oom_lock is held, unlike exit_mmap(), there is
+			 * no need to take mm->mmap_sem for write here.
+			 */
 			pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
 					task_pid_nr(victim), victim->comm,
 					task_pid_nr(p), p->comm);
@@ -941,9 +826,6 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, p, true);
 	}
 	rcu_read_unlock();
-
-	if (can_oom_reap)
-		wake_oom_reaper(victim);
 
 	mmdrop(mm);
 	put_task_struct(victim);
@@ -989,32 +871,59 @@ int unregister_oom_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(unregister_oom_notifier);
 
+void exit_oom_mm(struct mm_struct *mm)
+{
+	struct task_struct *p, *tmp;
+
+	mutex_lock(&oom_lock);
+	list_for_each_entry_safe(p, tmp, &oom_victim_list, oom_victim_list) {
+		if (mm != p->signal->oom_mm)
+			continue;
+		list_del(&p->oom_victim_list);
+		/* Drop a reference taken by mark_oom_victim(). */
+		put_task_struct(p);
+	}
+	mutex_unlock(&oom_lock);
+}
+
 static bool oom_has_pending_victims(struct oom_control *oc)
 {
-#ifdef CONFIG_MMU
-	struct task_struct *p;
+	struct task_struct *p, *tmp;
+	bool ret = false;
+	bool gaveup = false;
 
-	if (is_sysrq_oom(oc))
-		return false;
-	/*
-	 * Since oom_reap_task_mm()/exit_mmap() will set MMF_OOM_SKIP, let's
-	 * wait for pending victims until MMF_OOM_SKIP is set.
-	 */
-	spin_lock(&oom_reaper_lock);
-	list_for_each_entry(p, &oom_victim_list, oom_victim_list)
-		if (!oom_unkillable_task(p, oc->memcg, oc->nodemask) &&
-		    !test_bit(MMF_OOM_SKIP, &p->signal->oom_mm->flags))
-			break;
-	spin_unlock(&oom_reaper_lock);
-	return p != NULL;
-#else
-	/*
-	 * Since nobody except oom_kill_process() sets MMF_OOM_SKIP, waiting
-	 * for pending victims until MMF_OOM_SKIP is set is useless. Therefore,
-	 * simply let the OOM killer select pending victims again.
-	 */
-	return false;
+	lockdep_assert_held(&oom_lock);
+	list_for_each_entry_safe(p, tmp, &oom_victim_list, oom_victim_list) {
+		struct mm_struct *mm = p->signal->oom_mm;
+
+		/* Skip OOM victims which current thread cannot select. */
+		if (oom_unkillable_task(p, oc->memcg, oc->nodemask))
+			continue;
+		ret = true;
+#ifdef CONFIG_MMU
+		/*
+		 * We need to hold mmap_sem for read, in order to safely test
+		 * MMF_UNSTABLE flag and blockable invalidate notifiers.
+		 */
+		if (down_read_trylock(&mm->mmap_sem)) {
+			if (!test_bit(MMF_OOM_SKIP, &mm->flags) &&
+			    !mm_has_blockable_invalidate_notifiers(mm))
+				oom_reap_mm(mm);
+			up_read(&mm->mmap_sem);
+		}
 #endif
+		/* Forget if this mm didn't complete __mmput() for too long. */
+		if (!victim_mm_stalling(p, mm))
+			continue;
+		gaveup = true;
+		list_del(&p->oom_victim_list);
+		/* Drop a reference taken by mark_oom_victim(). */
+		put_task_struct(p);
+	}
+	if (gaveup)
+		debug_show_all_locks();
+
+	return ret && !is_sysrq_oom(oc);
 }
 
 /**
@@ -1048,7 +957,6 @@ bool out_of_memory(struct oom_control *oc)
 	 */
 	if (task_will_free_mem(current)) {
 		mark_oom_victim(current);
-		wake_oom_reaper(current);
 		return true;
 	}
 
@@ -1074,8 +982,7 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 
 	if (!is_memcg_oom(oc) && sysctl_oom_kill_allocating_task &&
-	    current->mm && !oom_unkillable_task(current, NULL, oc->nodemask) &&
-	    current->signal->oom_score_adj != OOM_SCORE_ADJ_MIN) {
+	    oom_badness(current, NULL, oc->nodemask, oc->totalpages) > 0) {
 		get_task_struct(current);
 		oc->chosen = current;
 		oom_kill_process(oc, "Out of memory (oom_kill_allocating_task)");
