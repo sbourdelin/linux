@@ -459,7 +459,7 @@ static void __init sev_map_percpu_data(void)
 #ifdef CONFIG_X86_64
 static int __send_ipi_mask(const struct cpumask *mask, int vector)
 {
-	unsigned long flags, ipi_bitmap_low = 0, ipi_bitmap_high = 0;
+	unsigned long flags, ipi_bitmap_low = 0, ipi_bitmap_high = 0, icr = 0;
 	int cpu, apic_id, ret = 0;
 
 	if (cpumask_empty(mask))
@@ -479,7 +479,16 @@ static int __send_ipi_mask(const struct cpumask *mask, int vector)
 		}
 	}
 
-	ret = kvm_hypercall3(KVM_HC_SEND_IPI, ipi_bitmap_low, ipi_bitmap_high, vector);
+	switch (vector) {
+	default:
+		icr = APIC_DM_FIXED | vector;
+		break;
+	case NMI_VECTOR:
+		icr = APIC_DM_NMI;
+		break;
+	}
+
+	ret = kvm_hypercall3(KVM_HC_SEND_IPI, ipi_bitmap_low, ipi_bitmap_high, icr);
 
 irq_restore_exit:
 	local_irq_restore(flags);

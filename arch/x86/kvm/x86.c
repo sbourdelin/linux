@@ -6693,15 +6693,21 @@ static void kvm_pv_kick_cpu_op(struct kvm *kvm, unsigned long flags, int apicid)
  * Return 0 if successfully added and 1 if discarded.
  */
 static int kvm_pv_send_ipi(struct kvm *kvm, unsigned long ipi_bitmap_low,
-			unsigned long ipi_bitmap_high, int vector)
+			unsigned long ipi_bitmap_high, unsigned long icr)
 {
 	int i;
 	struct kvm_apic_map *map;
 	struct kvm_vcpu *vcpu;
-	struct kvm_lapic_irq irq = {
-		.delivery_mode = APIC_DM_FIXED,
-		.vector = vector,
-	};
+	struct kvm_lapic_irq irq = {0};
+
+	switch (icr & APIC_VECTOR_MASK) {
+	default:
+		irq.vector = icr & APIC_VECTOR_MASK;
+		break;
+	case NMI_VECTOR:
+		break;
+	}
+	irq.delivery_mode = icr & APIC_MODE_MASK;
 
 	rcu_read_lock();
 	map = rcu_dereference(kvm->arch.apic_map);
