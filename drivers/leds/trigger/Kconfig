@@ -129,4 +129,14 @@ config LEDS_TRIGGER_NETDEV
 	  This allows LEDs to be controlled by network device activity.
 	  If unsure, say Y.
 
+config LEDS_TRIGGER_MORSE
+	tristate "LED Morse Trigger"
+	depends on LEDS_TRIGGERS
+	help
+	  This allows to send a morse code through LEDs.
+	  It is useful especially in embedded systems when there is only
+	  little interface to tell the user error or status codes. Sending
+	  a morse code can be an alternative here.
+	  If unsure, say Y.
+
 endif # LEDS_TRIGGERS

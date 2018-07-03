@@ -1,0 +1,16 @@
+What:		/sys/class/leds/<led>/morse_string
+Date:		Jul 2018
+KernelVersion:	4.19
+Contact:	linux-leds@vger.kernel.org
+Description:
+		A string containing alphanumeric characters written to this
+		file is send out as morse code through a LED
+
+What:		/sys/class/leds/<led>/dot_unit
+Date:		Jul 2018
+KernelVersion:	4.19
+Contact:	linux-leds@vger.kernel.org
+Description:
+		Specifies the smallest amount of time in milliseconds of
+		the morse code sent out.
+		Default is 500 ms
