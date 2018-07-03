@@ -3,6 +3,7 @@
 #define _LINUX_NLS_H
 
 #include <linux/init.h>
+#include <linux/string.h>
 
 /* Unicode has changed over the years.  Unicode code points no longer
  * fit into 16 bits; as of Unicode 5 valid code points range from 0
@@ -21,11 +22,18 @@ typedef u16 wchar_t;
 
 /* Arbitrary Unicode character */
 typedef u32 unicode_t;
+struct nls_table;
 
 struct nls_ops {
 	int (*uni2char) (wchar_t uni, unsigned char *out, int boundlen);
 	int (*char2uni) (const unsigned char *rawstring, int boundlen,
 			 wchar_t *uni);
+	int (*strncmp)(const struct nls_table *charset,
+		       const unsigned char *str1, size_t len1,
+		       const unsigned char *str2, size_t len2);
+	int (*strncasecmp)(const struct nls_table *charset,
+			   const unsigned char *str1, size_t len1,
+			   const unsigned char *str2, size_t len2);
 };
 
 struct nls_table {
@@ -106,15 +114,43 @@ static inline unsigned char nls_toupper(struct nls_table *t, unsigned char c)
 	return nc ? nc : c;
 }
 
-static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
-		const unsigned char *s2, int len)
+static inline int nls_strncasecmp(struct nls_table *t,
+				  const unsigned char *s1, size_t len1,
+				  const unsigned char *s2, size_t len2)
 {
-	while (len--) {
+	if (t->ops->strncasecmp)
+		return t->ops->strncasecmp(t, s1, len1, s2, len2);
+
+	if (len1 != len2)
+		return 1;
+
+	while (len1--) {
 		if (nls_tolower(t, *s1++) != nls_tolower(t, *s2++))
 			return 1;
 	}
 
 	return 0;
+}
+
+static inline int nls_strncmp(struct nls_table *t,
+			      const unsigned char *s1, size_t len1,
+			      const unsigned char *s2, size_t len2)
+{
+	if (t->ops->strncmp)
+		return t->ops->strncmp(t, s1, len1, s2, len2);
+
+	if (len1 != len2)
+		return 1;
+
+	/* strnicmp did not return negative values. So let's keep the
+	 * abi for now */
+	return !!memcmp(s1, s2, len1);
+}
+
+static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
+		const unsigned char *s2, int len)
+{
+	return nls_strncasecmp(t, s1, len, s2, len);
 }
 
 /*
