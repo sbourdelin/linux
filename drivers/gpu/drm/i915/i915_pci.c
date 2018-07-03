@@ -770,6 +770,12 @@ static void __exit i915_exit(void)
 module_init(i915_init);
 module_exit(i915_exit);
 
+#if IS_ENABLED(CONFIG_DRM_I915_GVT_KVMGT)
+MODULE_SOFTDEP("pre: kvmgt");
+#elif IS_ENABLED(CONFIG_DRM_I915_GVT_XENGT)
+MODULE_SOFTDEP("pre: xengt");
+#endif
+
 MODULE_AUTHOR("Tungsten Graphics, Inc.");
 MODULE_AUTHOR("Intel Corporation");
 
