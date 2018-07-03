@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: GPL-2.0
+
+/*
+ * USBSSP device controller driver
+ *
+ * Copyright (C) 2018 Cadence.
+ *
+ * Author: Pawel Laszczak
+ * Some code borrowed from the Linux XHCI driver.
+ */
+
+#ifndef __LINUX_USBSSP_DEBUGFS_H
+#define __LINUX_USBSSP_DEBUGFS_H
+
+#include <linux/debugfs.h>
+
+#define DEBUGFS_NAMELEN 32
+
+#define REG_CAPLENGTH		0x00
+#define REG_HCSPARAMS1		0x04
+#define REG_HCSPARAMS2		0x08
+#define REG_HCSPARAMS3		0x0c
+#define REG_HCCPARAMS1		0x10
+#define REG_DOORBELLOFF		0x14
+#define REG_RUNTIMEOFF		0x18
+#define REG_HCCPARAMS2		0x1c
+
+#define	REG_USBCMD		0x00
+#define REG_USBSTS		0x04
+#define REG_PAGESIZE		0x08
+#define REG_DNCTRL		0x14
+#define REG_CRCR		0x18
+#define REG_DCBAAP_LOW		0x30
+#define REG_DCBAAP_HIGH		0x34
+#define REG_CONFIG		0x38
+
+#define REG_MFINDEX		0x00
+#define REG_IR0_IMAN		0x20
+#define REG_IR0_IMOD		0x24
+#define REG_IR0_ERSTSZ		0x28
+#define REG_IR0_ERSTBA_LOW	0x30
+#define REG_IR0_ERSTBA_HIGH	0x34
+#define REG_IR0_ERDP_LOW	0x38
+#define REG_IR0_ERDP_HIGH	0x3c
+
+#define REG_EXTCAP_USBLEGSUP	0x00
+#define REG_EXTCAP_USBLEGCTLSTS	0x04
+
+#define REG_EXTCAP_REVISION	0x00
+#define REG_EXTCAP_NAME		0x04
+#define REG_EXTCAP_PORTINFO	0x08
+#define REG_EXTCAP_PORTTYPE	0x0c
+#define REG_EXTCAP_MANTISSA1	0x10
+#define REG_EXTCAP_MANTISSA2	0x14
+#define REG_EXTCAP_MANTISSA3	0x18
+#define REG_EXTCAP_MANTISSA4	0x1c
+#define REG_EXTCAP_MANTISSA5	0x20
+#define REG_EXTCAP_MANTISSA6	0x24
+
+#define REG_EXTCAP_DBC_CAPABILITY	0x00
+#define REG_EXTCAP_DBC_DOORBELL		0x04
+#define REG_EXTCAP_DBC_ERSTSIZE		0x08
+#define REG_EXTCAP_DBC_ERST_LOW		0x10
+#define REG_EXTCAP_DBC_ERST_HIGH	0x14
+#define REG_EXTCAP_DBC_ERDP_LOW		0x18
+#define REG_EXTCAP_DBC_ERDP_HIGH	0x1c
+#define REG_EXTCAP_DBC_CONTROL		0x20
+#define REG_EXTCAP_DBC_STATUS		0x24
+#define REG_EXTCAP_DBC_PORTSC		0x28
+#define REG_EXTCAP_DBC_CONT_LOW		0x30
+#define REG_EXTCAP_DBC_CONT_HIGH	0x34
+#define REG_EXTCAP_DBC_DEVINFO1		0x38
+#define REG_EXTCAP_DBC_DEVINFO2		0x3c
+
+#define dump_register(nm)		\
+{					\
+	.name	= __stringify(nm),	\
+	.offset	= REG_ ##nm,		\
+}
+
+struct usbssp_regset {
+	char			name[DEBUGFS_NAMELEN];
+	struct debugfs_regset32	regset;
+	size_t			nregs;
+	struct dentry		*parent;
+	struct list_head	list;
+};
+
+struct usbssp_file_map {
+	const char		*name;
+	int			(*show)(struct seq_file *s, void *unused);
+};
+
+struct usbssp_ep_priv {
+	char			name[DEBUGFS_NAMELEN];
+	struct dentry		*root;
+};
+
+struct usbssp_slot_priv {
+	char			name[DEBUGFS_NAMELEN];
+	struct dentry		*root;
+	struct usbssp_ep_priv	*eps[31];
+	struct usbssp_device	*dev;
+};
+
+#ifdef CONFIG_DEBUG_FS
+void usbssp_debugfs_init(struct usbssp_udc *usbssp_data);
+void usbssp_debugfs_exit(struct usbssp_udc *usbssp_data);
+void __init usbssp_debugfs_create_root(void);
+void __exit usbssp_debugfs_remove_root(void);
+void usbssp_debugfs_create_slot(struct usbssp_udc *usbssp_data, int slot_id);
+void usbssp_debugfs_remove_slot(struct usbssp_udc *usbssp_data, int slot_id);
+void usbssp_debugfs_create_endpoint(struct usbssp_udc *usbssp_data,
+				    struct usbssp_device *dev_priv,
+				    int ep_index);
+void usbssp_debugfs_remove_endpoint(struct usbssp_udc *usbssp_data,
+				    struct usbssp_device *dev_priv,
+				    int ep_index);
+#else
+static inline void usbssp_debugfs_init(struct usbssp_udc *usbssp_data) { }
+static inline void usbssp_debugfs_exit(struct usbssp_udc *usbssp_data) { }
+static inline void __init usbssp_debugfs_create_root(void) { }
+static inline void __exit usbssp_debugfs_remove_root(void) { }
+static inline void usbssp_debugfs_create_slot(struct usbssp_udc *usbssp_data,
+					      int s) { }
+static inline void usbssp_debugfs_remove_slot(struct usbssp_udc *xusbssp_data,
+					      int s) { }
+static inline void
+usbssp_debugfs_create_endpoint(struct usbssp_udc *usbssp_data,
+			       struct usbssp_device *dev_priv,
+			       int ep_index) { }
+static inline void
+usbssp_debugfs_remove_endpoint(struct usbssp_udc *usbssp_data,
+			       struct usbssp_device *dev_priv,
+			       int ep_index) { }
+#endif /* CONFIG_DEBUG_FS */
+#endif /*__LINUX_USBSSP_DEBUGFS_H*/
