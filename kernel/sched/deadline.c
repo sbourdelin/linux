@@ -2085,6 +2085,8 @@ retry:
 		goto retry;
 	}
 
+	update_rq_clock(later_rq);
+
 	deactivate_task(rq, next_task, 0);
 	sub_running_bw(&next_task->dl, &rq->dl);
 	sub_rq_bw(&next_task->dl, &rq->dl);
