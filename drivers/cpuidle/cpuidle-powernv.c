@@ -156,6 +156,7 @@ static struct cpuidle_state powernv_states[CPUIDLE_STATE_MAX] = {
 	{ /* Snooze */
 		.name = "snooze",
 		.desc = "snooze",
+		.flags = CPUIDLE_FLAG_POLLING,
 		.exit_latency = 0,
 		.target_residency = 0,
 		.enter = snooze_loop },
