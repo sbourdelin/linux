@@ -6197,6 +6197,12 @@ sub process {
 			     "switch default: should use break\n" . $herectx);
 		}
 
+# check for return codes on error paths
+		if ($line =~ /\breturn\s+-\d+/) {
+			CHK("NO_ERROR_CODE",
+			      "invalid return value, please return -<APPROPRIATE_ERRNO>\n" . $herecurr);
+		}
+
 # check for gcc specific __FUNCTION__
 		if ($line =~ /\b__FUNCTION__\b/) {
 			if (WARN("USE_FUNC",
