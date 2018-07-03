@@ -832,13 +832,18 @@ EXPORT_SYMBOL_GPL(acpi_match_device);
 
 const void *acpi_device_get_match_data(const struct device *dev)
 {
-	const struct acpi_device_id *match;
+	const struct acpi_device_id *acpi_id = NULL;
+	const struct of_device_id *of_id = NULL;
+	const struct device_driver *drv = dev->driver;
 
-	match = acpi_match_device(dev->driver->acpi_match_table, dev);
-	if (!match)
+	__acpi_match_device(acpi_companion_match(dev), drv->acpi_match_table,
+			    drv->of_match_table, &acpi_id, &of_id);
+	if (acpi_id)
+		return (const void*)acpi_id->driver_data;
+	else if (of_id)
+		return (const void*)of_id->data;
+	else
 		return NULL;
-
-	return (const void *)match->driver_data;
 }
 EXPORT_SYMBOL_GPL(acpi_device_get_match_data);
 
