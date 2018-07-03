@@ -234,7 +234,7 @@ static pmd_t *pti_user_pagetable_walk_pmd(unsigned long address)
  *
  * Returns a pointer to a PTE on success, or NULL on failure.
  */
-static __init pte_t *pti_user_pagetable_walk_pte(unsigned long address)
+static pte_t *pti_user_pagetable_walk_pte(unsigned long address)
 {
 	gfp_t gfp = (GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO);
 	pmd_t *pmd = pti_user_pagetable_walk_pmd(address);
@@ -262,7 +262,7 @@ static __init pte_t *pti_user_pagetable_walk_pte(unsigned long address)
 	return pte;
 }
 
-static void __init pti_setup_vsyscall(void)
+static void pti_setup_vsyscall(void)
 {
 	pte_t *pte, *target_pte;
 	unsigned int level;
@@ -279,7 +279,7 @@ static void __init pti_setup_vsyscall(void)
 	set_vsyscall_pgtable_user_bits(kernel_to_user_pgdp(swapper_pg_dir));
 }
 #else
-static void __init pti_setup_vsyscall(void) { }
+static void pti_setup_vsyscall(void) { }
 #endif
 
 static void
@@ -348,7 +348,7 @@ pti_clone_pmds(unsigned long start, unsigned long end, pmdval_t clear)
  * Clone a single p4d (i.e. a top-level entry on 4-level systems and a
  * next-level entry on 5-level systems.
  */
-static void __init pti_clone_p4d(unsigned long addr)
+static void pti_clone_p4d(unsigned long addr)
 {
 	p4d_t *kernel_p4d, *user_p4d;
 	pgd_t *kernel_pgd;
@@ -362,7 +362,7 @@ static void __init pti_clone_p4d(unsigned long addr)
 /*
  * Clone the CPU_ENTRY_AREA into the user space visible page table.
  */
-static void __init pti_clone_user_shared(void)
+static void pti_clone_user_shared(void)
 {
 	pti_clone_p4d(CPU_ENTRY_AREA_BASE);
 }
@@ -370,7 +370,7 @@ static void __init pti_clone_user_shared(void)
 /*
  * Clone the ESPFIX P4D into the user space visible page table
  */
-static void __init pti_setup_espfix64(void)
+static void pti_setup_espfix64(void)
 {
 #ifdef CONFIG_X86_ESPFIX64
 	pti_clone_p4d(ESPFIX_BASE_ADDR);
@@ -380,7 +380,7 @@ static void __init pti_setup_espfix64(void)
 /*
  * Clone the populated PMDs of the entry and irqentry text and force it RO.
  */
-static void __init pti_clone_entry_text(void)
+static void pti_clone_entry_text(void)
 {
 	pti_clone_pmds((unsigned long) __entry_text_start,
 			(unsigned long) __irqentry_text_end,
@@ -486,7 +486,7 @@ void pti_set_kernel_image_nonglobal(void)
 /*
  * Initialize kernel page table isolation
  */
-void __init pti_init(void)
+void pti_init(void)
 {
 	if (!static_cpu_has(X86_FEATURE_PTI))
 		return;

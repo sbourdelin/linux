@@ -340,7 +340,7 @@ int in_gate_area_no_mm(unsigned long addr)
  * vsyscalls but leave the page not present.  If so, we skip calling
  * this.
  */
-void __init set_vsyscall_pgtable_user_bits(pgd_t *root)
+void set_vsyscall_pgtable_user_bits(pgd_t *root)
 {
 	pgd_t *pgd;
 	p4d_t *p4d;
