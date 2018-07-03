@@ -1446,6 +1446,7 @@ void device_initialize(struct device *dev)
 	INIT_LIST_HEAD(&dev->links.consumers);
 	INIT_LIST_HEAD(&dev->links.suppliers);
 	dev->links.status = DL_DEV_NO_DRIVER;
+	dev->shutdown = false;
 }
 EXPORT_SYMBOL_GPL(device_initialize);
 
@@ -2811,7 +2812,6 @@ static void __device_shutdown(struct device *dev)
 	 * lock is to be held
 	 */
 	parent = get_device(dev->parent);
-	get_device(dev);
 	/*
 	 * Make sure the device is off the kset list, in the
 	 * event that dev->*->shutdown() doesn't remove it.
@@ -2842,14 +2842,49 @@ static void __device_shutdown(struct device *dev)
 			dev_info(dev, "shutdown\n");
 		dev->driver->shutdown(dev);
 	}
-
+	dev->shutdown = true;
 	device_unlock(dev);
 	if (parent)
 		device_unlock(parent);
 
-	put_device(dev);
 	put_device(parent);
 	spin_lock(&devices_kset->list_lock);
+}
+
+/* shutdown dev's children and consumer firstly, then itself */
+static int device_for_each_child_shutdown(struct device *dev)
+{
+	struct klist_iter i;
+	struct device *child;
+	struct device_link *link;
+
+	/* already shutdown, then skip this sub tree */
+	if (dev->shutdown)
+		return 0;
+
+	if (!dev->p)
+		goto check_consumers;
+
+	/* there is breakage of lock in __device_shutdown(), and the redundant
+	 * ref++ on srcu protected consumer is harmless since shutdown is not
+	 * hot path.
+	 */
+	get_device(dev);
+
+	klist_iter_init(&dev->p->klist_children, &i);
+	while ((child = next_device(&i)))
+		device_for_each_child_shutdown(child);
+	klist_iter_exit(&i);
+
+check_consumers:
+	list_for_each_entry_rcu(link, &dev->links.consumers, s_node) {
+		if (!link->consumer->shutdown)
+			device_for_each_child_shutdown(link->consumer);
+	}
+
+	__device_shutdown(dev);
+	put_device(dev);
+	return 0;
 }
 
 /**
@@ -2858,7 +2893,9 @@ static void __device_shutdown(struct device *dev)
 void device_shutdown(void)
 {
 	struct device *dev;
+	int idx;
 
+	idx = device_links_read_lock();
 	spin_lock(&devices_kset->list_lock);
 	/*
 	 * Walk the devices list backward, shutting down each in turn.
@@ -2866,11 +2903,12 @@ void device_shutdown(void)
 	 * devices offline, even as the system is shutting down.
 	 */
 	while (!list_empty(&devices_kset->list)) {
-		dev = list_entry(devices_kset->list.prev, struct device,
+		dev = list_entry(devices_kset->list.next, struct device,
 				kobj.entry);
-		__device_shutdown(dev);
+		device_for_each_child_shutdown(dev);
 	}
 	spin_unlock(&devices_kset->list_lock);
+	device_links_read_unlock(idx);
 }
 
 /*

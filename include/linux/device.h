@@ -1003,6 +1003,7 @@ struct device {
 	bool			offline:1;
 	bool			of_node_reused:1;
 	bool			dma_32bit_limit:1;
+	bool			shutdown:1; /* one direction: false->true */
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)
