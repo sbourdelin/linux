@@ -537,6 +537,56 @@ int get_cpu_thread_group_start(int cpu, struct thread_groups *tg)
 	return -1;
 }
 
+/*
+ * check_interleaved_big_core - Checks if the thread group tg
+ * corresponds to a big-core whose threads are interleavings of the
+ * threads of the component small cores.
+ *
+ * @tg: A thread-group struct for the core.
+ *
+ * Returns true if the core is a interleaved big-core.
+ * Returns false otherwise.
+ */
+static inline bool check_interleaved_big_core(struct thread_groups *tg)
+{
+	int nr_groups;
+	int threads_per_group;
+	int cur_cpu, next_cpu, i, j;
+
+	nr_groups = tg->nr_groups;
+	threads_per_group = tg->threads_per_group;
+
+	if (tg->property != 1)
+		return false;
+
+	if (nr_groups < 2 || threads_per_group < 2)
+		return false;
+
+	/*
+	 * In case of an interleaved big-core, the thread-ids of the
+	 * big-core can be obtained by interleaving the the thread-ids
+	 * of the component small
+	 *
+	 * Eg: On a 8-thread big-core with two SMT4 small cores, the
+	 * threads of the two component small cores will be
+	 * {0, 2, 4, 6} and {1, 3, 5, 7}.
+	 */
+	for (i = 0; i < nr_groups; i++) {
+		int group_start = i * threads_per_group;
+
+		for (j = 0; j < threads_per_group - 1; j++) {
+			int cur_idx = group_start + j;
+
+			cur_cpu = tg->thread_list[cur_idx];
+			next_cpu = tg->thread_list[cur_idx + 1];
+			if (next_cpu != cur_cpu + nr_groups)
+				return false;
+		}
+	}
+
+	return true;
+}
+
 /**
  * setup_cpu_maps - initialize the following cpu maps:
  *                  cpu_possible_mask
@@ -560,6 +610,7 @@ void __init smp_setup_cpu_maps(void)
 	struct device_node *dn;
 	int cpu = 0;
 	int nthreads = 1;
+	bool has_interleaved_big_core = true;
 
 	DBG("smp_setup_cpu_maps()\n");
 
@@ -613,6 +664,12 @@ void __init smp_setup_cpu_maps(void)
 		if (parse_thread_groups(dn, &tg) ||
 		    tg.nr_groups < 1 || tg.property != 1) {
 			has_big_cores = false;
+			has_interleaved_big_core = false;
+		}
+
+		if (has_interleaved_big_core) {
+			has_interleaved_big_core =
+				check_interleaved_big_core(&tg);
 		}
 
 		if (cpu >= nr_cpu_ids) {
@@ -669,7 +726,15 @@ void __init smp_setup_cpu_maps(void)
 	vdso_data->processorCount = num_present_cpus();
 #endif /* CONFIG_PPC64 */
 
-        /* Initialize CPU <=> thread mapping/
+	if (has_interleaved_big_core) {
+		int key = __builtin_ctzl(CPU_FTR_ASYM_SMT);
+
+		cur_cpu_spec->cpu_features |= CPU_FTR_ASYM_SMT;
+		static_branch_enable(&cpu_feature_keys[key]);
+		pr_info("Detected interleaved big-cores\n");
+	}
+
+	/* Initialize CPU <=> thread mapping/
 	 *
 	 * WARNING: We assume that the number of threads is the same for
 	 * every CPU in the system. If that is not the case, then some code
