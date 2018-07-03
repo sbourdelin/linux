@@ -184,6 +184,9 @@ static int imx_pgc_power_domain_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	int ret;
 
+	if (!device_is_bound(dev->parent))
+		return -EPROBE_DEFER;
+
 	/* if this PD is associated with a DT node try to parse it */
 	if (dev->of_node) {
 		ret = imx_pgc_parse_dt(dev, domain);
@@ -477,6 +480,15 @@ static int imx_gpc_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int __imx_gpc_unregister_child(struct device *dev, void *data)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+
+	platform_device_unregister(pdev);
+
+	return 0;
+}
+
 static int imx_gpc_remove(struct platform_device *pdev)
 {
 	struct device_node *pgc_node;
@@ -504,6 +516,9 @@ static int imx_gpc_remove(struct platform_device *pdev)
 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
 		if (ret)
 			return ret;
+	} else {
+		device_for_each_child(&pdev->dev, NULL,
+				__imx_gpc_unregister_child);
 	}
 
 	return 0;
