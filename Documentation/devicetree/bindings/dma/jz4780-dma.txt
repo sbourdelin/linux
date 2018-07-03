@@ -2,7 +2,9 @@
 
 Required properties:
 
-- compatible: Should be "ingenic,jz4780-dma"
+- compatible: Should be one of:
+  * ingenic,jz4780-dma
+  * ingenic,jz4770-dma
 - reg: Should contain the DMA channel registers location and length, followed
   by the DMA controller registers location and length.
 - interrupts: Should contain the interrupt specifier of the DMA controller.
