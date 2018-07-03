@@ -18,6 +18,7 @@
 #include <asm/smp.h>
 #include <asm/pmc.h>
 #include <asm/firmware.h>
+#include <asm/cputhreads.h>
 
 #include "cacheinfo.h"
 #include "setup.h"
@@ -1025,6 +1026,33 @@ static ssize_t show_physical_id(struct device *dev,
 }
 static DEVICE_ATTR(physical_id, 0444, show_physical_id, NULL);
 
+static ssize_t show_small_core_siblings(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, dev);
+	struct device_node *dn = of_get_cpu_node(cpu->dev.id, NULL);
+	struct thread_groups tg;
+	int i, j;
+	ssize_t ret = 0;
+
+	if (parse_thread_groups(dn, &tg))
+		return -ENODATA;
+
+	i = get_cpu_thread_group_start(cpu->dev.id, &tg);
+
+	if (i == -1)
+		return -ENODATA;
+
+	for (j = 0; j < tg.threads_per_group - 1; j++)
+		ret += sprintf(buf + ret, "%d,", tg.thread_list[i + j]);
+
+	ret += sprintf(buf + ret, "%d\n", tg.thread_list[i + j]);
+
+	return ret;
+}
+static DEVICE_ATTR(small_core_siblings, 0444, show_small_core_siblings, NULL);
+
 static int __init topology_init(void)
 {
 	int cpu, r;
@@ -1048,6 +1076,13 @@ static int __init topology_init(void)
 			register_cpu(c, cpu);
 
 			device_create_file(&c->dev, &dev_attr_physical_id);
+
+			if (has_big_cores) {
+				const struct device_attribute *attr =
+				       &dev_attr_small_core_siblings;
+
+			       device_create_file(&c->dev, attr);
+			}
 		}
 	}
 	r = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "powerpc/topology:online",
