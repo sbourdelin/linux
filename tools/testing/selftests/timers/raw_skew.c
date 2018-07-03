@@ -94,6 +94,7 @@ int main(int argv, char **argc)
 	struct timespec mon, raw, start, end;
 	long long delta1, delta2, interval, eppm, ppm;
 	struct timex tx1, tx2;
+	int adj_offset_bad = 0;
 
 	setbuf(stdout, NULL);
 
@@ -108,8 +109,10 @@ int main(int argv, char **argc)
 	start = mon;
 	delta1 = diff_timespec(mon, raw);
 
-	if (tx1.offset)
+	if (tx1.offset) {
 		printf("WARNING: ADJ_OFFSET in progress, this will cause inaccurate results\n");
+		adj_offset_bad = 1;
+	}
 
 	printf("Estimating clock drift: ");
 	sleep(120);
@@ -134,6 +137,10 @@ int main(int argv, char **argc)
 	printf(" %lld.%i(act)", ppm/1000, abs((int)(ppm%1000)));
 
 	if (llabs(eppm - ppm) > 1000) {
+		if (adj_offset_bad) {
+			printf("	[SKIP]\n");
+			return ksft_exit_skip("ADJ_OFFSET in progress. Shutdown NTPd or other time steering daemons\n");
+		}
 		printf("	[FAILED]\n");
 		return ksft_exit_fail();
 	}
