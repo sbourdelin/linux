@@ -54,19 +54,20 @@ struct list_lru {
 	bool			lock_irq;
 #ifdef CONFIG_MEMCG_KMEM
 	struct list_head	list;
+	int			shrinker_id;
 #endif
 };
 
 void list_lru_destroy(struct list_lru *lru);
 int __list_lru_init(struct list_lru *lru, bool memcg_aware, bool lock_irq,
-		    struct lock_class_key *key);
+		    struct lock_class_key *key, struct shrinker *shrinker);
 
-#define list_lru_init(lru)		__list_lru_init((lru), false, false, \
-							NULL)
-#define list_lru_init_key(lru, key)	__list_lru_init((lru), false, false, \
-							(key))
-#define list_lru_init_memcg(lru)	__list_lru_init((lru), true, false, \
-							NULL)
+#define list_lru_init(lru)				\
+	__list_lru_init((lru), false, false, NULL, NULL)
+#define list_lru_init_key(lru, key)			\
+	__list_lru_init((lru), false, false, (key), NULL)
+#define list_lru_init_memcg(lru, shrinker)		\
+	__list_lru_init((lru), true, false, NULL, shrinker)
 
 int memcg_update_all_list_lrus(int num_memcgs);
 void memcg_drain_all_list_lrus(int src_idx, int dst_idx);
