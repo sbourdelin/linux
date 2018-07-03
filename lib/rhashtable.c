@@ -1151,6 +1151,7 @@ void rhashtable_free_and_destroy(struct rhashtable *ht,
 	mutex_lock(&ht->mutex);
 	tbl = rht_dereference(ht->tbl, ht);
 	if (free_fn) {
+restart:
 		for (i = 0; i < tbl->size; i++) {
 			struct rhash_head *pos, *next;
 
@@ -1164,9 +1165,11 @@ void rhashtable_free_and_destroy(struct rhashtable *ht,
 					rht_dereference(pos->next, ht) : NULL)
 				rhashtable_free_one(ht, pos, free_fn, arg);
 		}
+		tbl = rht_dereference(tbl->future_tbl, ht);
+		if (tbl)
+			goto restart;
 	}
-
-	bucket_table_free(tbl);
+	bucket_table_free(rht_dereference(ht->tbl, ht));
 	mutex_unlock(&ht->mutex);
 }
 EXPORT_SYMBOL_GPL(rhashtable_free_and_destroy);
