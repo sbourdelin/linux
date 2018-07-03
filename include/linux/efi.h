@@ -1023,8 +1023,8 @@ extern int __init efi_memmap_install(phys_addr_t addr, unsigned int nr_map,
 				     enum efi_memmap_type alloc_type);
 extern int __init efi_memmap_split_count(efi_memory_desc_t *md,
 					 struct range *range);
-extern void __init efi_memmap_insert(struct efi_memory_map *old_memmap,
-				     void *buf, struct efi_mem_range *mem);
+extern int __init efi_memmap_insert(struct efi_memory_map *old_memmap,
+				    void *buf, struct efi_mem_range *mem);
 extern void __init efi_memmap_free(phys_addr_t mem, unsigned int num_entries,
 				   enum efi_memmap_type alloc_type);
 

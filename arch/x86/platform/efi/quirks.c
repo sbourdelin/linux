@@ -290,7 +290,13 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 		return;
 	}
 
-	efi_memmap_insert(&efi.memmap, new, &mr);
+	if (efi_memmap_insert(&efi.memmap, new, &mr)) {
+		pr_err("Failed to reserve EFI memory region\n");
+		early_memunmap(new, new_size);
+		efi_memmap_free(new_phys, num_entries, alloc_type);
+		return;
+	}
+
 	early_memunmap(new, new_size);
 
 	/* Free existing memory map before installing new memory map */

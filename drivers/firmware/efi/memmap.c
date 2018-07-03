@@ -290,9 +290,11 @@ int __init efi_memmap_split_count(efi_memory_desc_t *md, struct range *range)
  *
  * It is suggested that you call efi_memmap_split_count() first
  * to see how large @buf needs to be.
+ *
+ * Returns zero on success, a negative error code on failure.
  */
-void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
-			      struct efi_mem_range *mem)
+int __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
+			     struct efi_mem_range *mem)
 {
 	u64 m_start, m_end, m_attr;
 	efi_memory_desc_t *md;
@@ -311,8 +313,9 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 	 */
 	if (!IS_ALIGNED(m_start, EFI_PAGE_SIZE) ||
 	    !IS_ALIGNED(m_end + 1, EFI_PAGE_SIZE)) {
-		WARN_ON(1);
-		return;
+		WARN(1, "Address 0x%llx - 0x%llx is not EFI_PAGE_SIZE aligned",
+		     m_start, m_end);
+		return -EINVAL;
 	}
 
 	for (old = old_memmap->map, new = buf;
@@ -379,4 +382,5 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 			md->attribute |= m_attr;
 		}
 	}
+	return 0;
 }

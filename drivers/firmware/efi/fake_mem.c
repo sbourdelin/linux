@@ -84,8 +84,15 @@ void __init efi_fake_memmap(void)
 		return;
 	}
 
-	for (i = 0; i < nr_fake_mem; i++)
-		efi_memmap_insert(&efi.memmap, new_memmap, &fake_mems[i]);
+	for (i = 0; i < nr_fake_mem; i++) {
+		if (efi_memmap_insert(&efi.memmap, new_memmap, &fake_mems[i])) {
+			pr_err("efi_fake_mem: Failed to create fake memmap\n");
+			early_memunmap(new_memmap,
+				       efi.memmap.desc_size * new_nr_map);
+			efi_memmap_free(new_memmap_phy, new_nr_map, alloc_type);
+			return;
+		}
+	}
 
 	/* swap into new EFI memmap */
 	early_memunmap(new_memmap, efi.memmap.desc_size * new_nr_map);
