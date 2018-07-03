@@ -4,6 +4,7 @@
 
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/errno.h>
 
 /* Unicode has changed over the years.  Unicode code points no longer
  * fit into 16 bits; as of Unicode 5 valid code points range from 0
@@ -38,7 +39,12 @@ struct nls_ops {
 				   unsigned int c);
 	unsigned char (*uppercase)(const struct nls_table *charset,
 				   unsigned int c);
-
+	int (*casefold)(const struct nls_table *charset,
+			const unsigned char *str, size_t len,
+			unsigned char *dest, size_t dlen);
+	int (*normalize)(const struct nls_table *charset,
+			 const unsigned char *str, size_t len,
+			 unsigned char *dest, size_t dlen);
 };
 
 struct nls_table {
@@ -155,6 +161,26 @@ static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
 		const unsigned char *s2, int len)
 {
 	return nls_strncasecmp(t, s1, len, s2, len);
+}
+
+static inline int nls_casefold(const struct nls_table *charset,
+			       const unsigned char *str, size_t len,
+			       unsigned char *dest, size_t dlen)
+{
+	if (charset->ops->casefold)
+		return charset->ops->casefold(charset, str, len, dest, dlen);
+
+	return -ENOTSUPP;
+}
+
+static inline int nls_normalize(const struct nls_table *charset,
+				const unsigned char *str, size_t len,
+				unsigned char *dest, size_t dlen)
+{
+	if (charset->ops->normalize)
+		return charset->ops->normalize(charset, str, len, dest, dlen);
+
+	return -ENOTSUPP;
 }
 
 /*
