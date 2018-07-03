@@ -4205,7 +4205,8 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		break;
 	case MSR_IA32_RTIT_CTL:
 		if ((pt_mode != PT_MODE_HOST_GUEST) ||
-			vmx_rtit_ctl_check(vcpu, data))
+			vmx_rtit_ctl_check(vcpu, data) ||
+			vmx->nested.vmxon)
 			return 1;
 		vmcs_write64(GUEST_IA32_RTIT_CTL, data);
 		pt_set_intercept_for_msr(vmx, !(data & RTIT_CTL_TRACEEN));
@@ -8309,6 +8310,11 @@ static int handle_vmon(struct kvm_vcpu *vcpu)
 	ret = enter_vmx_operation(vcpu);
 	if (ret)
 		return ret;
+
+	if (pt_mode == PT_MODE_HOST_GUEST) {
+		vmx->pt_desc.guest.ctl = 0;
+		pt_set_intercept_for_msr(vmx, 1);
+	}
 
 	nested_vmx_succeed(vcpu);
 	return kvm_skip_emulated_instruction(vcpu);
