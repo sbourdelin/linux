@@ -624,4 +624,9 @@ config NLS_UTF8_NORMALIZATION
 	help
 	  Say Y here to enable utf8 normalization support.
 
+config NLS_UTF8_NORMALIZATION_SELFTEST
+	tristate "Test UTF-8 normalization support"
+	default n
+	depends on NLS_UTF8_NORMALIZATION
+
 endif # NLS
