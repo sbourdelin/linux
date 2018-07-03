@@ -871,6 +871,36 @@ int unregister_oom_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(unregister_oom_notifier);
 
+/**
+ * try_oom_notifier - Try to reclaim memory from OOM notifier list.
+ *
+ * Returns non-zero if notifier callbacks released something, zero otherwise.
+ */
+unsigned long try_oom_notifier(void)
+{
+	static DEFINE_MUTEX(oom_notifier_lock);
+	unsigned long freed = 0;
+
+	/*
+	 * In order to protect OOM notifiers which are not thread safe and to
+	 * avoid excessively releasing memory from OOM notifiers which release
+	 * memory every time, this lock serializes/excludes concurrent calls to
+	 * OOM notifiers.
+	 */
+	if (!mutex_trylock(&oom_notifier_lock))
+		return 1;
+	/*
+	 * But teach the lockdep that mutex_trylock() above acts like
+	 * mutex_lock(), for we are not allowed to depend on
+	 * __GFP_DIRECT_RECLAIM && !__GFP_NORETRY allocation here.
+	 */
+	mutex_release(&oom_notifier_lock.dep_map, 1, _THIS_IP_);
+	mutex_acquire(&oom_notifier_lock.dep_map, 0, 0, _THIS_IP_);
+	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
+	mutex_unlock(&oom_notifier_lock);
+	return freed;
+}
+
 void exit_oom_mm(struct mm_struct *mm)
 {
 	struct task_struct *p, *tmp;
@@ -937,18 +967,10 @@ static bool oom_has_pending_victims(struct oom_control *oc)
  */
 bool out_of_memory(struct oom_control *oc)
 {
-	unsigned long freed = 0;
 	enum oom_constraint constraint = CONSTRAINT_NONE;
 
 	if (oom_killer_disabled)
 		return false;
-
-	if (!is_memcg_oom(oc)) {
-		blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
-		if (freed > 0)
-			/* Got some memory back in the last second. */
-			return true;
-	}
 
 	/*
 	 * If current has a pending SIGKILL or is exiting, then automatically

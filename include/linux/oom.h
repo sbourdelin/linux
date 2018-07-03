@@ -101,6 +101,7 @@ extern unsigned long oom_badness(struct task_struct *p,
 		struct mem_cgroup *memcg, const nodemask_t *nodemask,
 		unsigned long totalpages);
 
+extern unsigned long try_oom_notifier(void);
 extern bool out_of_memory(struct oom_control *oc);
 
 extern void exit_oom_victim(void);
