@@ -454,6 +454,71 @@ static void __init sev_map_percpu_data(void)
 }
 
 #ifdef CONFIG_SMP
+
+#ifdef CONFIG_X86_64
+static void __send_ipi_mask(const struct cpumask *mask, int vector)
+{
+	unsigned long flags, ipi_bitmap_low = 0, ipi_bitmap_high = 0;
+	int cpu, apic_id;
+
+	if (cpumask_empty(mask))
+		return;
+
+	local_irq_save(flags);
+
+	for_each_cpu(cpu, mask) {
+		apic_id = per_cpu(x86_cpu_to_apicid, cpu);
+		if (apic_id < BITS_PER_LONG)
+			__set_bit(apic_id, &ipi_bitmap_low);
+		else if (apic_id < 2 * BITS_PER_LONG)
+			__set_bit(apic_id - BITS_PER_LONG, &ipi_bitmap_high);
+	}
+
+	kvm_hypercall3(KVM_HC_SEND_IPI, ipi_bitmap_low, ipi_bitmap_high, vector);
+
+	local_irq_restore(flags);
+}
+
+static void kvm_send_ipi_mask(const struct cpumask *mask, int vector)
+{
+	__send_ipi_mask(mask, vector);
+}
+
+static void kvm_send_ipi_mask_allbutself(const struct cpumask *mask, int vector)
+{
+	unsigned int this_cpu = smp_processor_id();
+	struct cpumask new_mask;
+	const struct cpumask *local_mask;
+
+	cpumask_copy(&new_mask, mask);
+	cpumask_clear_cpu(this_cpu, &new_mask);
+	local_mask = &new_mask;
+	__send_ipi_mask(local_mask, vector);
+}
+
+static void kvm_send_ipi_allbutself(int vector)
+{
+	kvm_send_ipi_mask_allbutself(cpu_online_mask, vector);
+}
+
+static void kvm_send_ipi_all(int vector)
+{
+	__send_ipi_mask(cpu_online_mask, vector);
+}
+
+/*
+ * Set the IPI entry points
+ */
+static void kvm_setup_pv_ipi(void)
+{
+	apic->send_IPI_mask = kvm_send_ipi_mask;
+	apic->send_IPI_mask_allbutself = kvm_send_ipi_mask_allbutself;
+	apic->send_IPI_allbutself = kvm_send_ipi_allbutself;
+	apic->send_IPI_all = kvm_send_ipi_all;
+	pr_info("KVM setup pv IPIs\n");
+}
+#endif
+
 static void __init kvm_smp_prepare_cpus(unsigned int max_cpus)
 {
 	native_smp_prepare_cpus(max_cpus);
@@ -626,6 +691,11 @@ static uint32_t __init kvm_detect(void)
 
 static void __init kvm_apic_init(void)
 {
+#if defined(CONFIG_SMP) && defined(CONFIG_X86_64)
+	if (kvm_para_has_feature(KVM_FEATURE_PV_SEND_IPI) &&
+		num_possible_cpus() <= 2 * BITS_PER_LONG)
+		kvm_setup_pv_ipi();
+#endif
 }
 
 static void __init kvm_init_platform(void)
