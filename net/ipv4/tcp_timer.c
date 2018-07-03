@@ -407,6 +407,7 @@ void tcp_retransmit_timer(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct net *net = sock_net(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	__u32 time_remaining = 0;
 
 	if (tp->fastopen_rsk) {
 		WARN_ON_ONCE(sk->sk_state != TCP_SYN_RECV &&
@@ -534,6 +535,12 @@ out_reset_timer:
 	} else {
 		/* Use normal (exponential) backoff */
 		icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
+	}
+	if (icsk->icsk_user_timeout) {
+		time_remaining = jiffies_to_msecs(icsk->icsk_user_timeout) -
+			       (tcp_time_stamp(tcp_sk(sk)) - tcp_sk(sk)->retrans_stamp);
+		if (time_remaining < icsk->icsk_rto)
+			icsk->icsk_rto = time_remaining;
 	}
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
 	if (retransmits_timed_out(sk, net->ipv4.sysctl_tcp_retries1 + 1, 0))
