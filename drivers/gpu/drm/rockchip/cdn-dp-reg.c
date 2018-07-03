@@ -410,7 +410,10 @@ int cdn_dp_event_config(struct cdn_dp_device *dp)
 
 u32 cdn_dp_get_event(struct cdn_dp_device *dp)
 {
-	return readl(dp->regs + SW_EVENTS0);
+	return readl(dp->regs + SW_EVENTS0)
+		| (readl(dp->regs + SW_EVENTS1) << 8)
+		| (readl(dp->regs + SW_EVENTS2) << 16)
+		| (readl(dp->regs + SW_EVENTS3) << 24);
 }
 
 int cdn_dp_get_hpd_status(struct cdn_dp_device *dp)
@@ -981,3 +984,165 @@ err_audio_config:
 		DRM_DEV_ERROR(dp->dev, "audio config failed: %d\n", ret);
 	return ret;
 }
+
+int cdn_dp_register_read(struct cdn_dp_device *dp, u32 addr, u32 *value)
+{
+	u8 msg[4], resp[8];
+	int ret;
+
+	if (addr == 0) {
+		ret = -EINVAL;
+		goto err_register_read;
+	}
+
+	msg[0] = (u8)(addr >> 24);
+	msg[1] = (u8)(addr >> 16);
+	msg[2] = (u8)(addr >> 8);
+	msg[3] = (u8)addr;
+
+	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_GENERAL,
+				  GENERAL_REGISTER_READ,
+				  sizeof(msg), msg);
+	if (ret)
+		goto err_register_read;
+
+	ret = cdn_dp_mailbox_validate_receive(dp, MB_MODULE_ID_GENERAL,
+					      GENERAL_REGISTER_READ,
+					      sizeof(resp));
+	if (ret)
+		goto err_register_read;
+
+	ret = cdn_dp_mailbox_read_receive(dp, resp, sizeof(resp));
+	if (ret)
+		goto err_register_read;
+
+	/* Returned address value should be the same as requested */
+	if (memcmp(msg, resp, sizeof(msg))) {
+		ret = -EINVAL;
+		goto err_register_read;
+	}
+
+	*value = (resp[4] << 24) | (resp[5] << 16) | (resp[6] << 8) | resp[7];
+
+err_register_read:
+	if (ret) {
+		DRM_DEV_ERROR(dp->dev, "Failed to read register.\n");
+		*value = 0;
+	}
+
+	return ret;
+}
+
+int cdn_dp_register_write(struct cdn_dp_device *dp, u32 addr, u32 value)
+{
+	u8 msg[8];
+	int ret;
+
+	if (addr == 0)
+		return -EINVAL;
+
+	msg[0] = (u8)(addr >> 24);
+	msg[1] = (u8)(addr >> 16);
+	msg[2] = (u8)(addr >> 8);
+	msg[3] = (u8)addr;
+	msg[4] = (u8)(value >> 24);
+	msg[5] = (u8)(value >> 16);
+	msg[6] = (u8)(value >> 8);
+	msg[7] = (u8)value;
+
+	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_GENERAL,
+				  GENERAL_REGISTER_WRITE,
+				  sizeof(msg), msg);
+	if (ret)
+		DRM_DEV_ERROR(dp->dev, "Failed to write register.\n");
+
+	return ret;
+}
+
+int cdn_dp_register_write_field(struct cdn_dp_device *dp, u32 addr,
+		u8 index, u8 nbits, u32 value)
+{
+	u8 msg[10];
+	int ret;
+
+	if (addr == 0)
+		return -EINVAL;
+
+	msg[0] = (u8)(addr >> 24);
+	msg[1] = (u8)(addr >> 16);
+	msg[2] = (u8)(addr >> 8);
+	msg[3] = (u8)addr;
+	msg[4] = index;
+	msg[5] = nbits;
+	msg[6] = (u8)(value >> 24);
+	msg[7] = (u8)(value >> 16);
+	msg[8] = (u8)(value >> 8);
+	msg[9] = (u8)value;
+
+	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_GENERAL,
+				  GENERAL_REGISTER_WRITE_FIELD,
+				  sizeof(msg), msg);
+	if (ret)
+		DRM_DEV_ERROR(dp->dev, "Failed to write register field.\n");
+
+	return ret;
+}
+/* rep should be a pointer already allocated with .regs of size 6 */
+int cdn_dp_adjust_lt(struct cdn_dp_device *dp, u8 nlanes,
+		     u16 udelay, u8 *lanes_data,
+		     u8 *dpcd)
+{
+	u8 payload[10];
+	u8 hdr[5]; /* For DPCD read response header */
+	u32 addr;
+	u8 const nregs = 6; /* Registers 0x202-0x207 */
+	int ret;
+
+	if (nlanes != 4 && nlanes != 2 && nlanes != 1) {
+		DRM_DEV_ERROR(dp->dev, "invalid number of lanes: %d\n", nlanes);
+		ret = -EINVAL;
+		goto err_adjust_lt;
+	}
+
+	payload[0] = nlanes;
+	payload[1] = (u8)(udelay >> 8);
+	payload[2] = (u8)udelay;
+
+	payload[3] = lanes_data[0];
+	if (nlanes > 1)
+		payload[4] = lanes_data[1];
+	if (nlanes > 2) {
+		payload[5] = lanes_data[2];
+		payload[6] = lanes_data[3];
+	}
+
+	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_DP_TX,
+				  DPTX_ADJUST_LT,
+				  sizeof(payload), payload);
+	if (ret)
+		goto err_adjust_lt;
+
+	/* Yes, read the DPCD read command response */
+	ret = cdn_dp_mailbox_validate_receive(dp, MB_MODULE_ID_DP_TX,
+					      DPTX_READ_DPCD,
+					      sizeof(hdr) + nregs);
+	if (ret)
+		goto err_adjust_lt;
+
+	ret = cdn_dp_mailbox_read_receive(dp, hdr, sizeof(hdr));
+	if (ret)
+		goto err_adjust_lt;
+
+	addr = (hdr[2] << 24) | (hdr[3] << 8) | hdr[4];
+	if (addr != DP_LANE0_1_STATUS)
+		goto err_adjust_lt;
+
+	ret = cdn_dp_mailbox_read_receive(dp, dpcd, nregs);
+
+err_adjust_lt:
+	if (ret)
+		DRM_DEV_ERROR(dp->dev, "Failed to adjust Link Training.\n");
+
+	return ret;
+}
+
