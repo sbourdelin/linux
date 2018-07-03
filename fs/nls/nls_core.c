@@ -19,10 +19,27 @@
 extern struct nls_charset default_charset;
 static struct nls_charset *charsets = &default_charset;
 static DEFINE_SPINLOCK(nls_lock);
-static struct nls_table *nls_load_table(struct nls_charset *charset)
+
+static struct nls_table *nls_load_table(struct nls_charset *charset,
+					const char *version)
 {
-	/* For now, return the default table, which is the first one found. */
-	return charset->tables;
+	struct nls_table *tbl;
+
+	if (!charset->load_table) {
+		/* If there is no table_create, only 1 table is
+		 * supported and it must have been loaded
+		 * statically.
+		 */
+		return charset->tables;
+	}
+
+	tbl = charset->load_table(version);
+	if (!tbl) {
+		/* Invalid version */
+		return ERR_PTR(-EINVAL);
+	}
+
+	return tbl;
 }
 
 int __register_nls(struct nls_charset *nls, struct module *owner)
@@ -85,21 +102,35 @@ static struct nls_charset *find_nls(const char *charset)
 	return nls;
 }
 
-struct nls_table *load_nls(char *charset)
+struct nls_table *load_nls_version(const char *charset, const char *version)
 {
 	struct nls_charset *nls_charset;
 
 	nls_charset = try_then_request_module(find_nls(charset),
 					      "nls_%s", charset);
-	if (!IS_ERR(nls_charset))
+	if (IS_ERR(nls_charset))
+		return ERR_PTR(-EINVAL);
+
+	return nls_load_table(nls_charset, version);
+}
+EXPORT_SYMBOL(load_nls_version);
+
+struct nls_table *load_nls(char *charset)
+{
+	struct nls_table *table = load_nls_version(charset, NULL);
+
+	/* Pre-versioned load_nls() didn't return error pointers. Let's
+	 * keep the abi for now to prevent breakage.
+	 */
+	if (IS_ERR(table))
 		return NULL;
 
-	return nls_load_table(nls_charset);
+	return table;
 }
 
 void unload_nls(struct nls_table *nls)
 {
-	if (nls)
+	if (!IS_ERR_OR_NULL(nls))
 		module_put(nls->charset->owner);
 }
 
