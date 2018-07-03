@@ -97,6 +97,13 @@ struct hx711_data {
 	 * 2x32-bit channel + 64-bit timestamp
 	 */
 	u32			buffer[4];
+	/*
+	 * delay after a rising edge on SCK until the data is ready DOUT
+	 * this is dependent on the hx711 where the datasheet tells a
+	 * maximum value of 100 ns
+	 * but also on potential parasitic capacities on the wiring
+	 */
+	u32			data_ready_delay_ns;
 };
 
 static int hx711_cycle(struct hx711_data *hx711_data)
@@ -110,6 +117,14 @@ static int hx711_cycle(struct hx711_data *hx711_data)
 	 */
 	preempt_disable();
 	gpiod_set_value(hx711_data->gpiod_pd_sck, 1);
+
+	/*
+	 * wait until DOUT is ready
+	 * it turned out that parasitic capacities are extending the time
+	 * until DOUT has reached it's value
+	 */
+	ndelay(hx711_data->data_ready_delay_ns);
+
 	val = gpiod_get_value(hx711_data->gpiod_dout);
 	/*
 	 * here we are not waiting for 0.2 us as suggested by the datasheet,
@@ -458,6 +473,7 @@ static const struct iio_chan_spec hx711_chan_spec[] = {
 static int hx711_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
 	struct hx711_data *hx711_data;
 	struct iio_dev *indio_dev;
 	int ret;
@@ -529,6 +545,13 @@ static int hx711_probe(struct platform_device *pdev)
 
 	hx711_data->gain_set = 128;
 	hx711_data->gain_chan_a = 128;
+
+	ret = of_property_read_u32(np, "avia,data-ready-delay-ns",
+					&hx711_data->data_ready_delay_ns);
+	if (ret < 0) {
+		dev_warn(dev, "avia,data-ready-delay-ns not set - assuming 0 ns\n");
+		hx711_data->data_ready_delay_ns = 0;
+	}
 
 	platform_set_drvdata(pdev, indio_dev);
 
