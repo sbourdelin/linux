@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/actions,s700-cmu.h>
 
 / {
 	compatible = "actions,s700";
@@ -42,6 +43,13 @@
 			reg = <0x0 0x3>;
 			enable-method = "psci";
 		};
+	};
+
+	clock: clock-controller@e0168000 {
+		compatible = "actions,s700-cmu";
+		reg = <0 0xe0168000 0 0x1000>;
+		clocks = <&hosc>, <&losc>;
+		#clock-cells = <1>;
 	};
 
 	reserved-memory {
@@ -84,6 +92,12 @@
 	hosc: hosc {
 		compatible = "fixed-clock";
 		clock-frequency = <24000000>;
+		#clock-cells = <0>;
+	};
+
+	losc: losc {
+		compatible = "fixed-clock";
+		clock-frequency = <32768>;
 		#clock-cells = <0>;
 	};
 
