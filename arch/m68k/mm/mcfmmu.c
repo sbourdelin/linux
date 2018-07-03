@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/bootmem.h>
+#include <linux/memblock.h>
 
 #include <asm/setup.h>
 #include <asm/page.h>
@@ -160,6 +161,8 @@ void __init cf_bootmem_alloc(void)
 	m68k_memory[0].addr = _rambase;
 	m68k_memory[0].size = _ramend - _rambase;
 
+	memblock_add(m68k_memory[0].addr, m68k_memory[0].size);
+
 	/* compute total pages in system */
 	num_pages = PFN_DOWN(_ramend - _rambase);
 
@@ -170,14 +173,14 @@ void __init cf_bootmem_alloc(void)
 	max_pfn = max_low_pfn = PFN_DOWN(_ramend);
 	high_memory = (void *)_ramend;
 
+	/* Reserve kernel text/data/bss */
+	memblock_reserve(memstart, _ramend - memstart);
+
 	m68k_virt_to_node_shift = fls(_ramend - 1) - 6;
 	module_fixup(NULL, __start_fixup, __stop_fixup);
 
-	/* setup bootmem data */
+	/* setup node data */
 	m68k_setup_node(0);
-	memstart += init_bootmem_node(NODE_DATA(0), start_pfn,
-		min_low_pfn, max_low_pfn);
-	free_bootmem_node(NODE_DATA(0), memstart, _ramend - memstart);
 }
 
 /*
