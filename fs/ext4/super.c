@@ -42,6 +42,7 @@
 #include <linux/cleancache.h>
 #include <linux/uaccess.h>
 #include <linux/iversion.h>
+#include <linux/nls.h>
 
 #include <linux/kthread.h>
 #include <linux/freezer.h>
@@ -985,6 +986,7 @@ static void ext4_put_super(struct super_block *sb)
 		crypto_free_shash(sbi->s_chksum_driver);
 	kfree(sbi->s_blockgroup_lock);
 	fs_put_dax(sbi->s_daxdev);
+	unload_nls(sbi->encoding);
 	kfree(sbi);
 }
 
@@ -1378,6 +1380,7 @@ enum {
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 	Opt_max_dir_size_kb, Opt_nojournal_checksum, Opt_nombcache,
+	Opt_encoding,
 };
 
 static const match_table_t tokens = {
@@ -1460,6 +1463,7 @@ static const match_table_t tokens = {
 	{Opt_noinit_itable, "noinit_itable"},
 	{Opt_max_dir_size_kb, "max_dir_size_kb=%u"},
 	{Opt_test_dummy_encryption, "test_dummy_encryption"},
+	{Opt_encoding, "encoding=%s"},
 	{Opt_nombcache, "nombcache"},
 	{Opt_nombcache, "no_mbcache"},	/* for backward compatibility */
 	{Opt_removed, "check=none"},	/* mount option from ext2/3 */
@@ -1670,8 +1674,57 @@ static const struct mount_opts {
 	{Opt_max_dir_size_kb, 0, MOPT_GTE0},
 	{Opt_test_dummy_encryption, 0, MOPT_GTE0},
 	{Opt_nombcache, EXT4_MOUNT_NO_MBCACHE, MOPT_SET},
+	{Opt_encoding, 0, MOPT_EXT4_ONLY | MOPT_STRING},
 	{Opt_err, 0, 0}
 };
+
+static const struct ext4_sb_encodings {
+	char *name;
+	char *version;
+} ext4_sb_encoding_map[] = {
+	/* 0x0 */	{"ascii", NULL},
+	/* 0x1 */	{"utf8n", "10.0.0"},
+};
+
+static const struct ext4_sb_encodings *
+ext4_sb_read_encoding(struct ext4_super_block *es)
+{
+	unsigned int magic = le32_to_cpu(es->s_ioencoding);
+
+	if (magic >= ARRAY_SIZE(ext4_sb_encoding_map))
+		return NULL;
+
+	return &ext4_sb_encoding_map[magic];
+}
+
+static const struct ext4_sb_encodings *ext4_parse_encoding_opt(const char *arg)
+{
+	int i, nlen;
+	const struct ext4_sb_encodings *e = NULL;
+	const char version_separator = '-';
+
+	for (i = 0; i < ARRAY_SIZE(ext4_sb_encoding_map); i++) {
+		e = &ext4_sb_encoding_map[i];
+		nlen = strlen(e->name);
+
+		if (strncmp(arg, e->name, nlen))
+			continue;
+
+		/* Encoding doesn't require version */
+		if (!e->version && !arg[nlen])
+			return e;
+
+		if (arg[nlen] != version_separator)
+			continue;
+
+		/* Eat out the separator */
+		nlen += 1;
+
+		if (!strcmp(&arg[nlen], e->version))
+			return e;
+	}
+	return NULL;
+}
 
 static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 			    substring_t *args, unsigned long *journal_devnum,
@@ -1905,6 +1958,40 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 		sbi->s_mount_opt |= m->mount_opt;
 	} else if (token == Opt_data_err_ignore) {
 		sbi->s_mount_opt &= ~m->mount_opt;
+	} else if (token == Opt_encoding) {
+		const struct ext4_sb_encodings *encoding_info;
+		char *encoding = match_strdup(&args[0]);
+
+		if (!encoding)
+			return -ENOMEM;
+
+		if (ext4_has_feature_encrypt(sb)) {
+			ext4_msg(sb, KERN_ERR,
+				 "Can't mount with both encoding and encryption");
+			goto encoding_fail;
+		}
+
+		encoding_info = ext4_parse_encoding_opt(encoding);
+		if (!encoding_info) {
+			ext4_msg(sb, KERN_ERR,
+				 "Encoding %s not supported by ext4", encoding);
+			goto encoding_fail;
+		}
+
+		sbi->encoding = load_nls_version(encoding_info->name,
+						 encoding_info->version);
+		if (IS_ERR(sbi->encoding)) {
+			ext4_msg(sb, KERN_ERR, "Cannot load encoding: %s",
+				 encoding);
+			goto encoding_fail;
+		}
+
+		kfree(encoding);
+		return 0;
+encoding_fail:
+		sbi->encoding = NULL;
+		kfree(encoding);
+		return -1;
 	} else {
 		if (!args->from)
 			arg = 1;
@@ -3453,6 +3540,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	int err = 0;
 	unsigned int journal_ioprio = DEFAULT_JOURNAL_IOPRIO;
 	ext4_group_t first_not_zeroed;
+	struct nls_table *encoding;
+	const struct ext4_sb_encodings *encoding_info;
 
 	if ((data && !orig_data) || !sbi)
 		goto out_free_base;
@@ -3624,6 +3713,35 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (!parse_options((char *) data, sb, &journal_devnum,
 			   &journal_ioprio, 0))
 		goto failed_mount;
+
+	if (ext4_has_feature_ioencoding(sb) && !sbi->encoding) {
+		if (ext4_has_feature_encrypt(sb)) {
+			ext4_msg(sb, KERN_ERR,
+				 "Can't mount with both encoding and encryption");
+			goto failed_mount;
+		}
+
+		encoding_info = ext4_sb_read_encoding(es);
+		if (!encoding_info) {
+			ext4_msg(sb, KERN_ERR,
+				 "Encoding requested by superblock is unknown");
+			goto failed_mount;
+		}
+
+		encoding = load_nls_version(encoding_info->name,
+					    encoding_info->version);
+		if (IS_ERR(encoding)) {
+			ext4_msg(sb, KERN_ERR, "can't mount with superblock charset:"
+				 "%s-%s not supported by the kernel",
+				 encoding_info->name, encoding_info->version);
+			goto failed_mount;
+		}
+		ext4_msg(sb, KERN_INFO,
+			 "Using encoding defined by superblock: %s %s",
+			 encoding_info->name, encoding_info->version);
+
+		sbi->encoding = encoding;
+	}
 
 	if (test_opt(sb, DATA_FLAGS) == EXT4_MOUNT_JOURNAL_DATA) {
 		printk_once(KERN_WARNING "EXT4-fs: Warning: mounting "
@@ -4442,6 +4560,7 @@ failed_mount2:
 		brelse(sbi->s_group_desc[i]);
 	kvfree(sbi->s_group_desc);
 failed_mount:
+	unload_nls(sbi->encoding);
 	if (sbi->s_chksum_driver)
 		crypto_free_shash(sbi->s_chksum_driver);
 #ifdef CONFIG_QUOTA
