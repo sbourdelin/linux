@@ -175,7 +175,7 @@ static int mcf_edma_probe(struct platform_device *pdev)
 
 	pdata = dev_get_platdata(&pdev->dev);
 	if (!pdata)
-		return PTR_ERR(pdata);
+		return -EINVAL;
 
 	chans = pdata->dma_channels;
 	len = sizeof(*mcf_edma) + sizeof(*mcf_chan) * chans;
