@@ -159,9 +159,9 @@ static int spinand_init_cfg_cache(struct spinand_device *spinand)
 	unsigned int target;
 	int ret;
 
-	spinand->cfg_cache = devm_kzalloc(dev,
-					  sizeof(*spinand->cfg_cache) *
+	spinand->cfg_cache = devm_kcalloc(dev,
 					  nand->memorg.ntargets,
+					  sizeof(*spinand->cfg_cache),
 					  GFP_KERNEL);
 	if (!spinand->cfg_cache)
 		return -ENOMEM;
