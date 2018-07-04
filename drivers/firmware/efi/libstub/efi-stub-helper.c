@@ -35,6 +35,9 @@ static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
 static int __section(.data) __nokaslr;
 static int __section(.data) __quiet;
 
+static const efi_guid_t linux_args_guid = LINUX_EFI_EXTRA_ARGS_GUID;
+static const efi_char16_t linux_args_name[] = L"LinuxExtraArgs";
+
 int __pure nokaslr(void)
 {
 	return __nokaslr;
@@ -786,6 +789,33 @@ static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
 #define MAX_CMDLINE_ADDRESS	ULONG_MAX
 #endif
 
+static u16 *get_extra_args(efi_system_table_t *sys_table_arg,
+			   unsigned long *extra_args_size)
+{
+	u16 *extra_args;
+	efi_status_t status;
+
+	*extra_args_size = 0;
+	status = efi_call_runtime(get_variable, (efi_char16_t *)linux_args_name,
+				  (efi_guid_t *)&linux_args_guid, NULL,
+				  extra_args_size, NULL);
+	if (status != EFI_BUFFER_TOO_SMALL)
+		return NULL;
+
+	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+				*extra_args_size, (void **)&extra_args);
+	if (status != EFI_SUCCESS)
+		return NULL;
+
+	status = efi_call_runtime(get_variable, (efi_char16_t *)linux_args_name,
+				  (efi_guid_t *)&linux_args_guid, NULL,
+				  extra_args_size, extra_args);
+	if (status != EFI_SUCCESS)
+		return NULL;
+
+	return extra_args;
+}
+
 /*
  * Convert the unicode UEFI command line to ASCII to pass to kernel.
  * Size of memory allocated return in *cmd_line_len.
@@ -799,9 +829,12 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
 	unsigned long cmdline_addr = 0;
 	int load_options_chars = image->load_options_size / 2; /* UTF-16 */
 	const u16 *options = image->load_options;
+	u16 *extra_args;
 	int cmd_line_bytes = 0;  /* UTF-8 bytes */
 	int options_chars = 0;  /* UTF-16 chars */
+	int extra_args_chars = 0;  /* UTF-16 chars */
 	efi_status_t status;
+	unsigned long extra_args_size;
 	u16 zero = 0;
 
 	if (options)
@@ -813,6 +846,19 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
 		options = &zero;
 	}
 
+	extra_args = get_extra_args(sys_table_arg, &extra_args_size);
+	if (extra_args) {
+		cmd_line_bytes += 1 + count_utf8_bytes(extra_args,
+						       extra_args_size / 2,
+						       &extra_args_chars);
+
+		pr_efi(sys_table_arg,
+		       "Appending contents of 'LinuxExtraArgs' UEFI variable to kernel command line.\n");
+	} else if (extra_args_size > 0) {
+		pr_efi_err(sys_table_arg,
+			   "Failed to read 'LinuxExtraArgs' UEFI variable\n");
+	}
+
 	cmd_line_bytes++;	/* NUL termination */
 
 	status = efi_high_alloc(sys_table_arg, cmd_line_bytes, 0,
@@ -821,6 +867,11 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
 		return NULL;
 
 	s1 = efi_utf16_to_utf8((u8 *)cmdline_addr, options, options_chars);
+	if (extra_args) {
+		*s1++ = ' ';
+		s1 = efi_utf16_to_utf8(s1, extra_args, extra_args_chars);
+		efi_call_early(free_pool, extra_args);
+	}
 	*s1 = '\0';
 
 	*cmd_line_len = cmd_line_bytes;
