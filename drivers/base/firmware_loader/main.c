@@ -774,7 +774,7 @@ static void request_firmware_work_func(struct work_struct *work)
 	_request_firmware(&fw, fw_work->name, fw_work->device, NULL, 0,
 			  fw_work->opt_flags);
 	fw_work->cont(fw, fw_work->context);
-	put_device(fw_work->device); /* taken in request_firmware_nowait() */
+	put_device(fw_work->device); /* taken in __request_firmware_nowait() */
 
 	module_put(fw_work->module);
 	kfree_const(fw_work->name);
@@ -782,8 +782,9 @@ static void request_firmware_work_func(struct work_struct *work)
 }
 
 /**
- * request_firmware_nowait() - asynchronous version of request_firmware
+ * __request_firmware_nowait() - asynchronous version of request_firmware
  * @module: module requesting the firmware
+ * @opt_flags: flags that control firmware loading process, see FW_OPT_*
  * @uevent: sends uevent to copy the firmware image if this flag
  *	is non-zero else the firmware copy must be done manually.
  * @name: name of firmware file
@@ -804,13 +805,14 @@ static void request_firmware_work_func(struct work_struct *work)
  *
  *		- can't sleep at all if @gfp is GFP_ATOMIC.
  **/
-int
-request_firmware_nowait(
-	struct module *module, bool uevent,
+static int
+__request_firmware_nowait(
+	struct module *module, unsigned int opt_flags,
 	const char *name, struct device *device, gfp_t gfp, void *context,
 	void (*cont)(const struct firmware *fw, void *context))
 {
 	struct firmware_work *fw_work;
+	bool uevent = !!(opt_flags & FW_OPT_UEVENT);
 
 	fw_work = kzalloc(sizeof(struct firmware_work), gfp);
 	if (!fw_work)
@@ -825,8 +827,7 @@ request_firmware_nowait(
 	fw_work->device = device;
 	fw_work->context = context;
 	fw_work->cont = cont;
-	fw_work->opt_flags = FW_OPT_NOWAIT |
-		(uevent ? FW_OPT_UEVENT : FW_OPT_USERHELPER);
+	fw_work->opt_flags = FW_OPT_NOWAIT | opt_flags;
 
 	if (!uevent && fw_cache_is_setup(device, name)) {
 		kfree_const(fw_work->name);
@@ -845,7 +846,32 @@ request_firmware_nowait(
 	schedule_work(&fw_work->work);
 	return 0;
 }
+
+int request_firmware_nowait(struct module *module, bool uevent,
+			    const char *name, struct device *device, gfp_t gfp,
+			    void *context,
+			    void (*cont)(const struct firmware *fw, void *context))
+{
+	unsigned int opt_flags = (uevent ? FW_OPT_UEVENT : FW_OPT_USERHELPER);
+
+	return __request_firmware_nowait(module, opt_flags, name, device, gfp,
+					 context, cont);
+}
 EXPORT_SYMBOL(request_firmware_nowait);
+
+int request_firmware_nowait_nowarn(struct module *module, bool uevent,
+				   const char *name, struct device *dev,
+				   gfp_t gfp, void *context,
+				   void (*cont)(const struct firmware *fw,
+						void *context))
+{
+	unsigned int opt_flags = (uevent ? FW_OPT_UEVENT : FW_OPT_USERHELPER);
+	opt_flags |= FW_OPT_NO_WARN;
+
+	return __request_firmware_nowait(module, opt_flags, name, dev, gfp,
+					 context, cont);
+}
+EXPORT_SYMBOL(request_firmware_nowait_nowarn);
 
 #ifdef CONFIG_PM_SLEEP
 static ASYNC_DOMAIN_EXCLUSIVE(fw_cache_domain);
