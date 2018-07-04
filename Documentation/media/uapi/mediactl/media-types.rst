@@ -188,6 +188,16 @@ Types and flags used to represent the media graph elements
 	  received on its sink pad and outputs the statistics data on
 	  its source pad.
 
+
+    *  -  ``MEDIA_ENT_F_PROC_VIDEO_ENCODER``
+       -  Video (MPEG, HEVC, VPx, etc.) encoder. An entity capable of
+          compressing video frames must have one sink pad and one source pad.
+
+    *  -  ``MEDIA_ENT_F_PROC_VIDEO_DECODER``
+       -  Video (MPEG, HEVC, VPx, etc.) decoder. An entity capable of
+          decompressing a compressed video stream into uncompressed video
+	  frames must have one sink pad and one source pad.
+
     *  -  ``MEDIA_ENT_F_VID_MUX``
        - Video multiplexer. An entity capable of multiplexing must have at
          least two sink pads and one source pad, and must pass the video
