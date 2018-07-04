@@ -807,6 +807,13 @@ struct drm_mode_config {
 	 */
 	struct drm_property *writeback_out_fence_ptr_property;
 
+	/**
+	 * @broadcast_rgb_property: Optional connector property indicating
+	 * whether the output RGB should be automatically selected, limited
+	 * range (16-235) or full range (0-255).
+	 */
+	struct drm_property *broadcast_rgb_property;
+
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;
 

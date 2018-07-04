@@ -3630,8 +3630,10 @@ void
 __drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)
 {
-	if (conn_state)
+	if (conn_state) {
 		conn_state->connector = connector;
+		conn_state->broadcast_rgb = DRM_BROADCAST_RGB_AUTO;
+	}
 
 	connector->state = conn_state;
 }

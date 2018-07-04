@@ -1415,6 +1415,8 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
 
 		return set_out_fence_for_connector(state->state, connector,
 						   fence_ptr);
+	} else if (property == config->broadcast_rgb_property) {
+		state->broadcast_rgb = val;
 	} else if (connector->funcs->atomic_set_property) {
 		return connector->funcs->atomic_set_property(connector,
 				state, property, val);
@@ -1435,6 +1437,8 @@ static void drm_atomic_connector_print_state(struct drm_printer *p,
 
 	drm_printf(p, "connector[%u]: %s\n", connector->base.id, connector->name);
 	drm_printf(p, "\tcrtc=%s\n", state->crtc ? state->crtc->name : "(null)");
+	drm_printf(p, "\tbroadcast_rgb=%s\n",
+		   drm_get_broadcast_rgb_name(state->broadcast_rgb));
 
 	if (connector->funcs->atomic_print_state)
 		connector->funcs->atomic_print_state(p, state);
@@ -1506,6 +1510,8 @@ drm_atomic_connector_get_property(struct drm_connector *connector,
 		*val = 0;
 	} else if (property == config->writeback_out_fence_ptr_property) {
 		*val = 0;
+	} else if (property == config->broadcast_rgb_property) {
+		*val = state->broadcast_rgb;
 	} else if (connector->funcs->atomic_get_property) {
 		return connector->funcs->atomic_get_property(connector,
 				state, property, val);

@@ -206,6 +206,23 @@ enum drm_panel_orientation {
 };
 
 /**
+ * enum drm_broadcast_rgb_mode - broadcast (output) rgb range
+ *
+ * For digital outputs, this enum describes the quantization range of RGB
+ * values to be supplied to the connected sink.
+ *
+ * DRM_BROADCAST_RGB_AUTO:    Automatically select, according to the display
+ *			      mode, limited or full quantization range.
+ * DRM_BROADCAST_RGB_FULL:    Full (eg, 0 to 255) quantization range RGB.
+ * DRM_BROADCAST_RGB_LIMITED: Limited (eg, 16 to 235) quantization range RGB.
+ */
+enum drm_broadcast_rgb_mode {
+	DRM_BROADCAST_RGB_AUTO,
+	DRM_BROADCAST_RGB_FULL,
+	DRM_BROADCAST_RGB_LIMITED,
+};
+
+/**
  * struct drm_display_info - runtime data about the connected sink
  *
  * Describes a given display (e.g. CRT or flat panel) and its limitations. For
@@ -450,6 +467,12 @@ struct drm_connector_state {
 	 * drm_writeback_signal_completion()
 	 */
 	struct drm_writeback_job *writeback_job;
+
+	/**
+	 * @broadcast_rgb: Connector property to control the RGB
+	 * quantization range.
+	 */
+	enum drm_broadcast_rgb_mode broadcast_rgb;
 };
 
 /**
@@ -1114,6 +1137,8 @@ const char *drm_get_dvi_i_select_name(int val);
 const char *drm_get_tv_subconnector_name(int val);
 const char *drm_get_tv_select_name(int val);
 const char *drm_get_content_protection_name(int val);
+const char *drm_get_broadcast_rgb_name(enum drm_broadcast_rgb_mode mode);
+
 
 int drm_mode_create_dvi_i_properties(struct drm_device *dev);
 int drm_mode_create_tv_properties(struct drm_device *dev,
@@ -1131,6 +1156,8 @@ void drm_hdmi_avi_infoframe_content_type(struct hdmi_avi_infoframe *frame,
 					 const struct drm_connector_state *conn_state);
 
 int drm_mode_create_suggested_offset_properties(struct drm_device *dev);
+int drm_connector_create_broadcast_rgb_property(struct drm_connector *connector,
+					enum drm_broadcast_rgb_mode mode);
 
 int drm_mode_connector_set_path_property(struct drm_connector *connector,
 					 const char *path);

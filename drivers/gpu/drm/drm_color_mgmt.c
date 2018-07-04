@@ -102,6 +102,14 @@
  * 	Optional plane enum property to support different non RGB
  * 	color parameter ranges. The driver can provide a subset of
  * 	standard enum values supported by the DRM plane.
+ *
+ * Support for output RGB color range is controlled through the
+ * &drm_connector specific "Broadcast RGB" property.  This is created
+ * and setup by calling drm_connector_create_broadcast_rgb_property().
+ *
+ * "Broadcast RGB"
+ *	Optional connector property to support different RGB output
+ *	ranges.
  */
 
 /**
@@ -472,3 +480,57 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 	return 0;
 }
 EXPORT_SYMBOL(drm_plane_create_color_properties);
+
+static const struct drm_prop_enum_list broadcast_rgb_names[] = {
+	{ DRM_BROADCAST_RGB_AUTO, "Automatic" },
+	{ DRM_BROADCAST_RGB_FULL, "Full" },
+	{ DRM_BROADCAST_RGB_LIMITED, "Limited 16:235" },
+};
+
+/**
+ * drm_get_broadcast_rgb_name - return a string for the broadcast rgb property
+ * @mode: broadcast rgb mode
+ *
+ * Return a const pointer to a string defining the RGB quantization range.
+ */
+const char *drm_get_broadcast_rgb_name(enum drm_broadcast_rgb_mode mode)
+{
+	if (WARN_ON(mode >= ARRAY_SIZE(broadcast_rgb_names)))
+		return "unknown";
+	return broadcast_rgb_names[mode].name;
+}
+
+/**
+ * drm_connector_create_broadcast_rgb_property - add RGB range property
+ * @connector: connector object to attach RGB range property to
+ * @mode: default mode for the RGB output range
+ *
+ * Create if necessary the "Broadcast RGB" property and attach it to
+ * @connector.
+ */
+int drm_connector_create_broadcast_rgb_property(struct drm_connector *connector,
+				enum drm_broadcast_rgb_mode mode)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	if (!dev->mode_config.broadcast_rgb_property) {
+		prop = drm_property_create_enum(dev, DRM_MODE_PROP_ENUM,
+					"Broadcast RGB", broadcast_rgb_names,
+					ARRAY_SIZE(broadcast_rgb_names));
+		if (!prop)
+			return -ENOMEM;
+
+		dev->mode_config.broadcast_rgb_property = prop;
+	}
+
+	drm_object_attach_property(&connector->base,
+				   dev->mode_config.broadcast_rgb_property,
+				   mode);
+
+	if (connector->state)
+		connector->state->broadcast_rgb = mode;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_connector_create_broadcast_rgb_property);
