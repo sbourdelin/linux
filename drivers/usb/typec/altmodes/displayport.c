@@ -349,8 +349,10 @@ configuration_store(struct device *dev, struct device_attribute *attr,
 	cap = DP_CAP_CAPABILITY(dp->alt->vdo);
 
 	if ((con == DP_CONF_DFP_D && !(cap & DP_CAP_DFP_D)) ||
-	    (con == DP_CONF_UFP_D && !(cap & DP_CAP_UFP_D)))
-		return -EINVAL;
+	    (con == DP_CONF_UFP_D && !(cap & DP_CAP_UFP_D))) {
+		ret = -EINVAL;
+		goto err_unlock;
+	}
 
 	conf = dp->data.conf & ~DP_CONF_DUAL_D;
 	conf |= con;
@@ -362,6 +364,7 @@ configuration_store(struct device *dev, struct device_attribute *attr,
 	}
 
 	dp->data.conf = conf;
+	ret = 0;
 
 err_unlock:
 	mutex_unlock(&dp->lock);
