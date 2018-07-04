@@ -228,6 +228,32 @@ out_return:
 	return err;
 }
 
+static void ubifs_hash_nodes(struct ubifs_info *c, void *node,
+			     int len, struct shash_desc *hash)
+{
+	int auth_node_size = ubifs_auth_node_sz(c);
+
+	while (1) {
+		const struct ubifs_ch *ch = node;
+		int nodelen = le32_to_cpu(ch->len);
+
+		ubifs_assert(len >= auth_node_size);
+
+		if (len == auth_node_size)
+			break;
+
+		ubifs_assert(len > nodelen);
+		ubifs_assert(ch->magic == cpu_to_le32(UBIFS_NODE_MAGIC));
+
+		ubifs_shash_update(c, hash, (void *)node, nodelen);
+
+		node += ALIGN(nodelen, 8);
+		len -= ALIGN(nodelen, 8);
+	}
+
+	ubifs_prepare_auth_node(c, node, hash);
+}
+
 /**
  * write_head - write data to a journal head.
  * @c: UBIFS file-system description object
@@ -254,6 +280,9 @@ static int write_head(struct ubifs_info *c, int jhead, void *buf, int len,
 	*offs = c->jheads[jhead].wbuf.offs + c->jheads[jhead].wbuf.used;
 	dbg_jnl("jhead %s, LEB %d:%d, len %d",
 		dbg_jhead(jhead), *lnum, *offs, len);
+
+	if (ubifs_authenticated(c))
+		ubifs_hash_nodes(c, buf, len, c->jheads[jhead].log_hash);
 
 	err = ubifs_wbuf_write_nolock(wbuf, buf, len);
 	if (err)
@@ -542,7 +571,9 @@ int ubifs_jnl_update(struct ubifs_info *c, const struct inode *dir,
 
 	len = aligned_dlen + aligned_ilen + UBIFS_INO_NODE_SZ;
 	/* Make sure to also account for extended attributes */
-	len += host_ui->data_len;
+	len += ALIGN(host_ui->data_len, 8);
+
+	len += ubifs_auth_node_sz(c);
 
 	dent = kzalloc(len, GFP_NOFS);
 	if (!dent)
@@ -603,6 +634,7 @@ int ubifs_jnl_update(struct ubifs_info *c, const struct inode *dir,
 	}
 	release_head(c, BASEHD);
 	kfree(dent);
+	ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 
 	if (deletion) {
 		if (nm->hash)
@@ -677,8 +709,9 @@ int ubifs_jnl_write_data(struct ubifs_info *c, const struct inode *inode,
 			 const union ubifs_key *key, const void *buf, int len)
 {
 	struct ubifs_data_node *data;
-	int err, lnum, offs, compr_type, out_len, compr_len;
+	int err, lnum, offs, compr_type, out_len, compr_len, auth_len;
 	int dlen = COMPRESSED_DATA_NODE_BUF_SZ, allocated = 1;
+	int aligned_dlen;
 	struct ubifs_inode *ui = ubifs_inode(inode);
 	bool encrypted = ubifs_crypt_is_encrypted(inode);
 	u8 hash[UBIFS_MAX_HASH_LEN];
@@ -690,7 +723,9 @@ int ubifs_jnl_write_data(struct ubifs_info *c, const struct inode *inode,
 	if (encrypted)
 		dlen += UBIFS_CIPHER_BLOCK_SIZE;
 
-	data = kmalloc(dlen, GFP_NOFS | __GFP_NOWARN);
+	auth_len = ubifs_auth_node_sz(c);
+
+	data = kmalloc(dlen + auth_len, GFP_NOFS | __GFP_NOWARN);
 	if (!data) {
 		/*
 		 * Fall-back to the write reserve buffer. Note, we might be
@@ -729,15 +764,16 @@ int ubifs_jnl_write_data(struct ubifs_info *c, const struct inode *inode,
 	}
 
 	dlen = UBIFS_DATA_NODE_SZ + out_len;
+	aligned_dlen = ALIGN(dlen, 8);
 	data->compr_type = cpu_to_le16(compr_type);
 
 	/* Make reservation before allocating sequence numbers */
-	err = make_reservation(c, DATAHD, dlen);
+	err = make_reservation(c, DATAHD, aligned_dlen + auth_len);
 	if (err)
 		goto out_free;
 
 	ubifs_prepare_node(c, data, dlen, 0);
-	err = write_head(c, DATAHD, data, dlen, &lnum, &offs, 0);
+	err = write_head(c, DATAHD, data, aligned_dlen + auth_len, &lnum, &offs, 0);
 	if (err)
 		goto out_release;
 
@@ -745,6 +781,7 @@ int ubifs_jnl_write_data(struct ubifs_info *c, const struct inode *inode,
 
 	ubifs_wbuf_add_ino_nolock(&c->jheads[DATAHD].wbuf, key_inum(c, key));
 	release_head(c, DATAHD);
+	ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 
 	err = ubifs_tnc_add(c, key, lnum, offs, dlen, hash);
 	if (err)
@@ -784,7 +821,8 @@ int ubifs_jnl_write_inode(struct ubifs_info *c, const struct inode *inode)
 	int err, lnum, offs;
 	struct ubifs_ino_node *ino;
 	struct ubifs_inode *ui = ubifs_inode(inode);
-	int sync = 0, len = UBIFS_INO_NODE_SZ, last_reference = !inode->i_nlink;
+	int sync = 0, len, ilen = UBIFS_INO_NODE_SZ, last_reference = !inode->i_nlink;
+	int aligned_ilen;
 	u8 hash[UBIFS_MAX_HASH_LEN];
 
 	dbg_jnl("ino %lu, nlink %u", inode->i_ino, inode->i_nlink);
@@ -794,9 +832,14 @@ int ubifs_jnl_write_inode(struct ubifs_info *c, const struct inode *inode)
 	 * need to synchronize the write-buffer either.
 	 */
 	if (!last_reference) {
-		len += ui->data_len;
+		ilen += ui->data_len;
 		sync = IS_SYNC(inode);
 	}
+
+	aligned_ilen = ALIGN(ilen, 8);
+
+	len = aligned_ilen + ubifs_auth_node_sz(c);
+
 	ino = kmalloc(len, GFP_NOFS);
 	if (!ino)
 		return -ENOMEM;
@@ -816,17 +859,20 @@ int ubifs_jnl_write_inode(struct ubifs_info *c, const struct inode *inode)
 					  inode->i_ino);
 	release_head(c, BASEHD);
 
+	if (ubifs_authenticated(c))
+		ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
+
 	if (last_reference) {
 		err = ubifs_tnc_remove_ino(c, inode->i_ino);
 		if (err)
 			goto out_ro;
 		ubifs_delete_orphan(c, inode->i_ino);
-		err = ubifs_add_dirt(c, lnum, len);
+		err = ubifs_add_dirt(c, lnum, ilen);
 	} else {
 		union ubifs_key key;
 
 		ino_key_init(c, &key, inode->i_ino);
-		err = ubifs_tnc_add(c, &key, lnum, offs, len, hash);
+		err = ubifs_tnc_add(c, &key, lnum, offs, ilen, hash);
 	}
 	if (err)
 		goto out_ro;
@@ -955,6 +1001,8 @@ int ubifs_jnl_xrename(struct ubifs_info *c, const struct inode *fst_dir,
 	if (twoparents)
 		len += plen;
 
+	len += ubifs_auth_node_sz(c);
+
 	dent1 = kzalloc(len, GFP_NOFS);
 	if (!dent1)
 		return -ENOMEM;
@@ -1013,6 +1061,9 @@ int ubifs_jnl_xrename(struct ubifs_info *c, const struct inode *fst_dir,
 		ubifs_wbuf_add_ino_nolock(wbuf, snd_dir->i_ino);
 	}
 	release_head(c, BASEHD);
+
+	if (ubifs_authenticated(c))
+		ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 
 	dent_key_init(c, &key, snd_dir->i_ino, snd_nm);
 	err = ubifs_tnc_add_nm(c, &key, lnum, offs, dlen1, hash_dent1, snd_nm);
@@ -1115,6 +1166,9 @@ int ubifs_jnl_rename(struct ubifs_info *c, const struct inode *old_dir,
 	len = aligned_dlen1 + aligned_dlen2 + ALIGN(ilen, 8) + ALIGN(plen, 8);
 	if (move)
 		len += plen;
+
+	len += ubifs_auth_node_sz(c);
+
 	dent = kzalloc(len, GFP_NOFS);
 	if (!dent)
 		return -ENOMEM;
@@ -1197,6 +1251,9 @@ int ubifs_jnl_rename(struct ubifs_info *c, const struct inode *old_dir,
 						  new_inode->i_ino);
 	}
 	release_head(c, BASEHD);
+
+	if (ubifs_authenticated(c))
+		ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 
 	dent_key_init(c, &key, new_dir->i_ino, new_nm);
 	err = ubifs_tnc_add_nm(c, &key, lnum, offs, dlen1, hash_dent1, new_nm);
@@ -1356,6 +1413,7 @@ int ubifs_jnl_truncate(struct ubifs_info *c, const struct inode *inode,
 	struct ubifs_trun_node *trun;
 	struct ubifs_data_node *uninitialized_var(dn);
 	int err, dlen, len, lnum, offs, bit, sz, sync = IS_SYNC(inode);
+	int aligned_dlen;
 	struct ubifs_inode *ui = ubifs_inode(inode);
 	ino_t inum = inode->i_ino;
 	unsigned int blk;
@@ -1370,6 +1428,9 @@ int ubifs_jnl_truncate(struct ubifs_info *c, const struct inode *inode,
 
 	sz = UBIFS_TRUN_NODE_SZ + UBIFS_INO_NODE_SZ +
 	     UBIFS_MAX_DATA_NODE_SZ * WORST_COMPR_FACTOR;
+
+	sz += ubifs_auth_node_sz(c);
+
 	ino = kmalloc(sz, GFP_NOFS);
 	if (!ino)
 		return -ENOMEM;
@@ -1404,10 +1465,15 @@ int ubifs_jnl_truncate(struct ubifs_info *c, const struct inode *inode,
 		}
 	}
 
+	aligned_dlen = ALIGN(dlen, 8);
+
 	/* Must make reservation before allocating sequence numbers */
 	len = UBIFS_TRUN_NODE_SZ + UBIFS_INO_NODE_SZ;
 	if (dlen)
-		len += dlen;
+		len += aligned_dlen;
+
+	len += ubifs_auth_node_sz(c);
+
 	err = make_reservation(c, BASEHD, len);
 	if (err)
 		goto out_free;
@@ -1427,6 +1493,9 @@ int ubifs_jnl_truncate(struct ubifs_info *c, const struct inode *inode,
 	if (!sync)
 		ubifs_wbuf_add_ino_nolock(&c->jheads[BASEHD].wbuf, inum);
 	release_head(c, BASEHD);
+
+	if (ubifs_authenticated(c))
+		ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 
 	if (dlen) {
 		sz = offs + UBIFS_INO_NODE_SZ + UBIFS_TRUN_NODE_SZ;
@@ -1491,7 +1560,7 @@ int ubifs_jnl_delete_xattr(struct ubifs_info *c, const struct inode *host,
 			   const struct inode *inode,
 			   const struct fscrypt_name *nm)
 {
-	int err, xlen, hlen, len, lnum, xent_offs, aligned_xlen;
+	int err, xlen, hlen, len, lnum, xent_offs, aligned_xlen, tlen;
 	struct ubifs_dent_node *xent;
 	struct ubifs_ino_node *ino;
 	union ubifs_key xent_key, key1, key2;
@@ -1511,12 +1580,14 @@ int ubifs_jnl_delete_xattr(struct ubifs_info *c, const struct inode *host,
 	hlen = host_ui->data_len + UBIFS_INO_NODE_SZ;
 	len = aligned_xlen + UBIFS_INO_NODE_SZ + ALIGN(hlen, 8);
 
-	xent = kzalloc(len, GFP_NOFS);
+	tlen = len + ubifs_auth_node_sz(c);
+
+	xent = kzalloc(tlen, GFP_NOFS);
 	if (!xent)
 		return -ENOMEM;
 
 	/* Make reservation before allocating sequence numbers */
-	err = make_reservation(c, BASEHD, len);
+	err = make_reservation(c, BASEHD, tlen);
 	if (err) {
 		kfree(xent);
 		return err;
@@ -1539,10 +1610,13 @@ int ubifs_jnl_delete_xattr(struct ubifs_info *c, const struct inode *host,
 	pack_inode(c, ino, host, 1);
 	ubifs_node_calc_hash(c, ino, hash);
 
-	err = write_head(c, BASEHD, xent, len, &lnum, &xent_offs, sync);
+	err = write_head(c, BASEHD, xent, tlen, &lnum, &xent_offs, sync);
 	if (!sync && !err)
 		ubifs_wbuf_add_ino_nolock(&c->jheads[BASEHD].wbuf, host->i_ino);
 	release_head(c, BASEHD);
+
+	if (ubifs_authenticated(c))
+		ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 	kfree(xent);
 	if (err)
 		goto out_ro;
@@ -1605,6 +1679,7 @@ int ubifs_jnl_change_xattr(struct ubifs_info *c, const struct inode *inode,
 {
 	int err, len1, len2, aligned_len, aligned_len1, lnum, offs;
 	struct ubifs_inode *host_ui = ubifs_inode(host);
+	struct ubifs_inode *ui = ubifs_inode(inode);
 	struct ubifs_ino_node *ino;
 	union ubifs_key key;
 	int sync = IS_DIRSYNC(host);
@@ -1617,9 +1692,11 @@ int ubifs_jnl_change_xattr(struct ubifs_info *c, const struct inode *inode,
 	ubifs_assert(mutex_is_locked(&host_ui->ui_mutex));
 
 	len1 = UBIFS_INO_NODE_SZ + host_ui->data_len;
-	len2 = UBIFS_INO_NODE_SZ + ubifs_inode(inode)->data_len;
+	len2 = UBIFS_INO_NODE_SZ + ui->data_len;
 	aligned_len1 = ALIGN(len1, 8);
 	aligned_len = aligned_len1 + ALIGN(len2, 8);
+
+	aligned_len += ubifs_auth_node_sz(c);
 
 	ino = kzalloc(aligned_len, GFP_NOFS);
 	if (!ino)
@@ -1645,6 +1722,9 @@ int ubifs_jnl_change_xattr(struct ubifs_info *c, const struct inode *inode,
 	release_head(c, BASEHD);
 	if (err)
 		goto out_ro;
+
+	if (ubifs_authenticated(c))
+		ubifs_add_dirt(c, lnum, ubifs_auth_node_sz(c));
 
 	ino_key_init(c, &key, host->i_ino);
 	err = ubifs_tnc_add(c, &key, lnum, offs, len1, hash_host);
