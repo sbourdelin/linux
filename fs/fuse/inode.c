@@ -22,6 +22,7 @@
 #include <linux/exportfs.h>
 #include <linux/posix_acl.h>
 #include <linux/pid_namespace.h>
+#include <linux/pipe_fs_i.h>
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
 MODULE_DESCRIPTION("Filesystem in Userspace");
@@ -71,6 +72,7 @@ struct fuse_mount_data {
 	unsigned default_permissions:1;
 	unsigned allow_other:1;
 	unsigned max_read;
+	unsigned max_pages;
 	unsigned blksize;
 };
 
@@ -450,6 +452,7 @@ enum {
 	OPT_DEFAULT_PERMISSIONS,
 	OPT_ALLOW_OTHER,
 	OPT_MAX_READ,
+	OPT_MAX_PAGES,
 	OPT_BLKSIZE,
 	OPT_ERR
 };
@@ -462,6 +465,7 @@ static const match_table_t tokens = {
 	{OPT_DEFAULT_PERMISSIONS,	"default_permissions"},
 	{OPT_ALLOW_OTHER,		"allow_other"},
 	{OPT_MAX_READ,			"max_read=%u"},
+	{OPT_MAX_PAGES,                 "max_pages=%u"},
 	{OPT_BLKSIZE,			"blksize=%u"},
 	{OPT_ERR,			NULL}
 };
@@ -543,6 +547,12 @@ static int parse_fuse_opt(char *opt, struct fuse_mount_data *d, int is_bdev,
 			d->max_read = value;
 			break;
 
+		case OPT_MAX_PAGES:
+			if (match_int(&args[0], &value))
+				return 0;
+			d->max_pages = value;
+			break;
+
 		case OPT_BLKSIZE:
 			if (!is_bdev || match_int(&args[0], &value))
 				return 0;
@@ -574,6 +584,8 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
 		seq_puts(m, ",allow_other");
 	if (fc->max_read != ~0)
 		seq_printf(m, ",max_read=%u", fc->max_read);
+	if (fc->max_pages != FUSE_DEFAULT_MAX_PAGES_PER_REQ)
+		seq_printf(m, ",max_pages=%u", fc->max_pages);
 	if (sb->s_bdev && sb->s_blocksize != FUSE_DEFAULT_BLKSIZE)
 		seq_printf(m, ",blksize=%lu", sb->s_blocksize);
 	return 0;
@@ -1138,6 +1150,9 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
 	fc->user_id = d.user_id;
 	fc->group_id = d.group_id;
 	fc->max_read = max_t(unsigned, 4096, d.max_read);
+	fc->max_pages = min_t(unsigned, pipe_max_size >> PAGE_SHIFT,
+			      max_t(unsigned, FUSE_DEFAULT_MAX_PAGES_PER_REQ,
+				    d.max_pages));
 
 	/* Used by get_root_inode() */
 	sb->s_fs_info = fc;
