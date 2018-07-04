@@ -408,6 +408,8 @@ static struct resource eisa_root_res = {
 	.start = 0,
 	.end   = 0xffffffff,
 	.flags = IORESOURCE_IO,
+	.sibling = LIST_HEAD_INIT(eisa_root_res.sibling),
+	.child  = LIST_HEAD_INIT(eisa_root_res.child),
 };
 
 static int eisa_bus_count;

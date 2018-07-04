@@ -59,6 +59,8 @@ static struct resource *get_pci_domain_busn_res(int domain_nr)
 	r->res.start = 0;
 	r->res.end = 0xff;
 	r->res.flags = IORESOURCE_BUS | IORESOURCE_PCI_FIXED;
+	INIT_LIST_HEAD(&r->res.child);
+	INIT_LIST_HEAD(&r->res.sibling);
 
 	list_add_tail(&r->list, &pci_domain_busn_res_list);
 

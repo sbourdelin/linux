@@ -565,7 +565,7 @@ out_err:
 int psb_gtt_restore(struct drm_device *dev)
 {
 	struct drm_psb_private *dev_priv = dev->dev_private;
-	struct resource *r = dev_priv->gtt_mem->child;
+	struct resource *r;
 	struct gtt_range *range;
 	unsigned int restored = 0, total = 0, size = 0;
 
@@ -573,14 +573,13 @@ int psb_gtt_restore(struct drm_device *dev)
 	mutex_lock(&dev_priv->gtt_mutex);
 	psb_gtt_init(dev, 1);
 
-	while (r != NULL) {
+	list_for_each_entry(r, &dev_priv->gtt_mem->child, sibling) {
 		range = container_of(r, struct gtt_range, resource);
 		if (range->pages) {
 			psb_gtt_insert(dev, range, 1);
 			size += range->resource.end - range->resource.start;
 			restored++;
 		}
-		r = r->sibling;
 		total++;
 	}
 	mutex_unlock(&dev_priv->gtt_mutex);

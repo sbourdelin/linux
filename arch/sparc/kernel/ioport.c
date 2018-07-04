@@ -669,7 +669,7 @@ static int sparc_io_proc_show(struct seq_file *m, void *v)
 	struct resource *root = m->private, *r;
 	const char *nm;
 
-	for (r = root->child; r != NULL; r = r->sibling) {
+	list_for_each_entry(r, &root->child, sibling) {
 		if ((nm = r->name) == NULL) nm = "???";
 		seq_printf(m, "%016llx-%016llx: %s\n",
 				(unsigned long long)r->start,

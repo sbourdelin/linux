@@ -102,11 +102,10 @@ unsigned sizeof_namespace_label(struct nvdimm_drvdata *ndd);
 		(unsigned long long) (res ? res->start : 0), ##arg)
 
 #define for_each_dpa_resource(ndd, res) \
-	for (res = (ndd)->dpa.child; res; res = res->sibling)
+	list_for_each_entry(res, &(ndd)->dpa.child, sibling)
 
 #define for_each_dpa_resource_safe(ndd, res, next) \
-	for (res = (ndd)->dpa.child, next = res ? res->sibling : NULL; \
-			res; res = next, next = next ? next->sibling : NULL)
+	list_for_each_entry_safe(res, next, &(ndd)->dpa.child, sibling)
 
 struct nd_percpu_lane {
 	int count;

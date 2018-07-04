@@ -542,14 +542,14 @@ static struct pci_ops vmd_ops = {
 
 static void vmd_attach_resources(struct vmd_dev *vmd)
 {
-	vmd->dev->resource[VMD_MEMBAR1].child = &vmd->resources[1];
-	vmd->dev->resource[VMD_MEMBAR2].child = &vmd->resources[2];
+	list_add(&vmd->resources[1].sibling, &vmd->dev->resource[VMD_MEMBAR1].child);
+	list_add(&vmd->resources[2].sibling, &vmd->dev->resource[VMD_MEMBAR2].child);
 }
 
 static void vmd_detach_resources(struct vmd_dev *vmd)
 {
-	vmd->dev->resource[VMD_MEMBAR1].child = NULL;
-	vmd->dev->resource[VMD_MEMBAR2].child = NULL;
+	INIT_LIST_HEAD(&vmd->dev->resource[VMD_MEMBAR1].child);
+	INIT_LIST_HEAD(&vmd->dev->resource[VMD_MEMBAR2].child);
 }
 
 /*

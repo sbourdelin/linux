@@ -170,8 +170,8 @@ lba_dump_res(struct resource *r, int d)
 	for (i = d; i ; --i) printk(" ");
 	printk(KERN_DEBUG "%p [%lx,%lx]/%lx\n", r,
 		(long)r->start, (long)r->end, r->flags);
-	lba_dump_res(r->child, d+2);
-	lba_dump_res(r->sibling, d);
+	lba_dump_res(resource_first_child(&r->child), d+2);
+	lba_dump_res(resource_sibling(r), d);
 }
 
 

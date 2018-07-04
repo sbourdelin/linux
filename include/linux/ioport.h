@@ -12,6 +12,7 @@
 #ifndef __ASSEMBLY__
 #include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/list.h>
 /*
  * Resources are tree-like, allowing
  * nesting etc..
@@ -22,7 +23,8 @@ struct resource {
 	const char *name;
 	unsigned long flags;
 	unsigned long desc;
-	struct resource *parent, *sibling, *child;
+	struct list_head child, sibling;
+	struct resource *parent;
 };
 
 /*
@@ -216,7 +218,6 @@ static inline bool resource_contains(struct resource *r1, struct resource *r2)
 	return r1->start <= r2->start && r1->end >= r2->end;
 }
 
-
 /* Convenience shorthand with allocation */
 #define request_region(start,n,name)		__request_region(&ioport_resource, (start), (n), (name), 0)
 #define request_muxed_region(start,n,name)	__request_region(&ioport_resource, (start), (n), (name), IORESOURCE_MUXED)
@@ -285,6 +286,18 @@ walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start, u64 end,
 static inline bool resource_overlaps(struct resource *r1, struct resource *r2)
 {
        return (r1->start <= r2->end && r1->end >= r2->start);
+}
+
+static inline struct resource *resource_sibling(struct resource *res)
+{
+	if (res->parent && !list_is_last(&res->sibling, &res->parent->child))
+		return list_next_entry(res, sibling);
+	return NULL;
+}
+
+static inline struct resource *resource_first_child(struct list_head *head)
+{
+	return list_first_entry_or_null(head, struct resource, sibling);
 }
 
 

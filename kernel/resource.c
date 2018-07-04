@@ -31,6 +31,8 @@ struct resource ioport_resource = {
 	.start	= 0,
 	.end	= IO_SPACE_LIMIT,
 	.flags	= IORESOURCE_IO,
+	.sibling = LIST_HEAD_INIT(ioport_resource.sibling),
+	.child  = LIST_HEAD_INIT(ioport_resource.child),
 };
 EXPORT_SYMBOL(ioport_resource);
 
@@ -39,6 +41,8 @@ struct resource iomem_resource = {
 	.start	= 0,
 	.end	= -1,
 	.flags	= IORESOURCE_MEM,
+	.sibling = LIST_HEAD_INIT(iomem_resource.sibling),
+	.child  = LIST_HEAD_INIT(iomem_resource.child),
 };
 EXPORT_SYMBOL(iomem_resource);
 
@@ -57,20 +61,20 @@ static DEFINE_RWLOCK(resource_lock);
  * by boot mem after the system is up. So for reusing the resource entry
  * we need to remember the resource.
  */
-static struct resource *bootmem_resource_free;
+static struct list_head bootmem_resource_free = LIST_HEAD_INIT(bootmem_resource_free);
 static DEFINE_SPINLOCK(bootmem_resource_lock);
 
 static struct resource *next_resource(struct resource *p, bool sibling_only)
 {
 	/* Caller wants to traverse through siblings only */
 	if (sibling_only)
-		return p->sibling;
+		return resource_sibling(p);
 
-	if (p->child)
-		return p->child;
-	while (!p->sibling && p->parent)
+	if (!list_empty(&p->child))
+		return resource_first_child(&p->child);
+	while (!resource_sibling(p) && p->parent)
 		p = p->parent;
-	return p->sibling;
+	return resource_sibling(p);
 }
 
 static void *r_next(struct seq_file *m, void *v, loff_t *pos)
@@ -90,7 +94,7 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 	struct resource *p = PDE_DATA(file_inode(m->file));
 	loff_t l = 0;
 	read_lock(&resource_lock);
-	for (p = p->child; p && l < *pos; p = r_next(m, p, &l))
+	for (p = resource_first_child(&p->child); p && l < *pos; p = r_next(m, p, &l))
 		;
 	return p;
 }
@@ -153,8 +157,7 @@ static void free_resource(struct resource *res)
 
 	if (!PageSlab(virt_to_head_page(res))) {
 		spin_lock(&bootmem_resource_lock);
-		res->sibling = bootmem_resource_free;
-		bootmem_resource_free = res;
+		list_add(&res->sibling, &bootmem_resource_free);
 		spin_unlock(&bootmem_resource_lock);
 	} else {
 		kfree(res);
@@ -166,10 +169,9 @@ static struct resource *alloc_resource(gfp_t flags)
 	struct resource *res = NULL;
 
 	spin_lock(&bootmem_resource_lock);
-	if (bootmem_resource_free) {
-		res = bootmem_resource_free;
-		bootmem_resource_free = res->sibling;
-	}
+	res = resource_first_child(&bootmem_resource_free);
+	if (res)
+		list_del(&res->sibling);
 	spin_unlock(&bootmem_resource_lock);
 
 	if (res)
@@ -177,6 +179,8 @@ static struct resource *alloc_resource(gfp_t flags)
 	else
 		res = kzalloc(sizeof(struct resource), flags);
 
+	INIT_LIST_HEAD(&res->child);
+	INIT_LIST_HEAD(&res->sibling);
 	return res;
 }
 
@@ -185,7 +189,7 @@ static struct resource * __request_resource(struct resource *root, struct resour
 {
 	resource_size_t start = new->start;
 	resource_size_t end = new->end;
-	struct resource *tmp, **p;
+	struct resource *tmp;
 
 	if (end < start)
 		return root;
@@ -193,64 +197,62 @@ static struct resource * __request_resource(struct resource *root, struct resour
 		return root;
 	if (end > root->end)
 		return root;
-	p = &root->child;
-	for (;;) {
-		tmp = *p;
-		if (!tmp || tmp->start > end) {
-			new->sibling = tmp;
-			*p = new;
+
+	if (list_empty(&root->child)) {
+		list_add(&new->sibling, &root->child);
+		new->parent = root;
+		INIT_LIST_HEAD(&new->child);
+		return NULL;
+	}
+
+	list_for_each_entry(tmp, &root->child, sibling) {
+		if (tmp->start > end) {
+			list_add(&new->sibling, tmp->sibling.prev);
 			new->parent = root;
+			INIT_LIST_HEAD(&new->child);
 			return NULL;
 		}
-		p = &tmp->sibling;
 		if (tmp->end < start)
 			continue;
 		return tmp;
 	}
+
+	list_add_tail(&new->sibling, &root->child);
+	new->parent = root;
+	INIT_LIST_HEAD(&new->child);
+	return NULL;
 }
 
 static int __release_resource(struct resource *old, bool release_child)
 {
-	struct resource *tmp, **p, *chd;
+	struct resource *tmp, *next, *chd;
 
-	p = &old->parent->child;
-	for (;;) {
-		tmp = *p;
-		if (!tmp)
-			break;
+	list_for_each_entry_safe(tmp, next, &old->parent->child, sibling) {
 		if (tmp == old) {
-			if (release_child || !(tmp->child)) {
-				*p = tmp->sibling;
+			if (release_child || list_empty(&tmp->child)) {
+				list_del(&tmp->sibling);
 			} else {
-				for (chd = tmp->child;; chd = chd->sibling) {
+				list_for_each_entry(chd, &tmp->child, sibling)
 					chd->parent = tmp->parent;
-					if (!(chd->sibling))
-						break;
-				}
-				*p = tmp->child;
-				chd->sibling = tmp->sibling;
+				list_splice(&tmp->child, tmp->sibling.prev);
+				list_del(&tmp->sibling);
 			}
+
 			old->parent = NULL;
 			return 0;
 		}
-		p = &tmp->sibling;
 	}
 	return -EINVAL;
 }
 
 static void __release_child_resources(struct resource *r)
 {
-	struct resource *tmp, *p;
+	struct resource *tmp, *next;
 	resource_size_t size;
 
-	p = r->child;
-	r->child = NULL;
-	while (p) {
-		tmp = p;
-		p = p->sibling;
-
+	list_for_each_entry_safe(tmp, next, &r->child, sibling) {
 		tmp->parent = NULL;
-		tmp->sibling = NULL;
+		list_del_init(&tmp->sibling);
 		__release_child_resources(tmp);
 
 		printk(KERN_DEBUG "release child resource %pR\n", tmp);
@@ -259,6 +261,8 @@ static void __release_child_resources(struct resource *r)
 		tmp->start = 0;
 		tmp->end = size - 1;
 	}
+
+	INIT_LIST_HEAD(&tmp->child);
 }
 
 void release_child_resources(struct resource *r)
@@ -343,7 +347,8 @@ static int find_next_iomem_res(struct resource *res, unsigned long desc,
 
 	read_lock(&resource_lock);
 
-	for (p = iomem_resource.child; p; p = next_resource(p, sibling_only)) {
+	for (p = resource_first_child(&iomem_resource.child); p;
+			p = next_resource(p, sibling_only)) {
 		if ((p->flags & res->flags) != res->flags)
 			continue;
 		if ((desc != IORES_DESC_NONE) && (desc != p->desc))
@@ -532,7 +537,7 @@ int region_intersects(resource_size_t start, size_t size, unsigned long flags,
 	struct resource *p;
 
 	read_lock(&resource_lock);
-	for (p = iomem_resource.child; p ; p = p->sibling) {
+	list_for_each_entry(p, &iomem_resource.child, sibling) {
 		bool is_type = (((p->flags & flags) == flags) &&
 				((desc == IORES_DESC_NONE) ||
 				 (desc == p->desc)));
@@ -586,7 +591,7 @@ static int __find_resource(struct resource *root, struct resource *old,
 			 resource_size_t  size,
 			 struct resource_constraint *constraint)
 {
-	struct resource *this = root->child;
+	struct resource *this = resource_first_child(&root->child);
 	struct resource tmp = *new, avail, alloc;
 
 	tmp.start = root->start;
@@ -596,7 +601,7 @@ static int __find_resource(struct resource *root, struct resource *old,
 	 */
 	if (this && this->start == root->start) {
 		tmp.start = (this == old) ? old->start : this->end + 1;
-		this = this->sibling;
+		this = resource_sibling(this);
 	}
 	for(;;) {
 		if (this)
@@ -632,7 +637,7 @@ next:		if (!this || this->end == root->end)
 
 		if (this != old)
 			tmp.start = this->end + 1;
-		this = this->sibling;
+		this = resource_sibling(this);
 	}
 	return -EBUSY;
 }
@@ -676,7 +681,7 @@ static int reallocate_resource(struct resource *root, struct resource *old,
 		goto out;
 	}
 
-	if (old->child) {
+	if (!list_empty(&old->child)) {
 		err = -EBUSY;
 		goto out;
 	}
@@ -757,7 +762,7 @@ struct resource *lookup_resource(struct resource *root, resource_size_t start)
 	struct resource *res;
 
 	read_lock(&resource_lock);
-	for (res = root->child; res; res = res->sibling) {
+	list_for_each_entry(res, &root->child, sibling) {
 		if (res->start == start)
 			break;
 	}
@@ -790,32 +795,27 @@ static struct resource * __insert_resource(struct resource *parent, struct resou
 			break;
 	}
 
-	for (next = first; ; next = next->sibling) {
+	for (next = first; ; next = resource_sibling(next)) {
 		/* Partial overlap? Bad, and unfixable */
 		if (next->start < new->start || next->end > new->end)
 			return next;
-		if (!next->sibling)
+		if (!resource_sibling(next))
 			break;
-		if (next->sibling->start > new->end)
+		if (resource_sibling(next)->start > new->end)
 			break;
 	}
-
 	new->parent = parent;
-	new->sibling = next->sibling;
-	new->child = first;
+	list_add(&new->sibling, &next->sibling);
+	INIT_LIST_HEAD(&new->child);
 
-	next->sibling = NULL;
-	for (next = first; next; next = next->sibling)
+	/*
+	 * From first to next, they all fall into new's region, so change them
+	 * as new's children.
+	 */
+	list_cut_position(&new->child, first->sibling.prev, &next->sibling);
+	list_for_each_entry(next, &new->child, sibling)
 		next->parent = new;
 
-	if (parent->child == first) {
-		parent->child = new;
-	} else {
-		next = parent->child;
-		while (next->sibling != first)
-			next = next->sibling;
-		next->sibling = new;
-	}
 	return NULL;
 }
 
@@ -937,19 +937,17 @@ static int __adjust_resource(struct resource *res, resource_size_t start,
 	if ((start < parent->start) || (end > parent->end))
 		goto out;
 
-	if (res->sibling && (res->sibling->start <= end))
+	if (resource_sibling(res) && (resource_sibling(res)->start <= end))
 		goto out;
 
-	tmp = parent->child;
-	if (tmp != res) {
-		while (tmp->sibling != res)
-			tmp = tmp->sibling;
+	if (res->sibling.prev != &parent->child) {
+		tmp = list_prev_entry(res, sibling);
 		if (start <= tmp->end)
 			goto out;
 	}
 
 skip:
-	for (tmp = res->child; tmp; tmp = tmp->sibling)
+	list_for_each_entry(tmp, &res->child, sibling)
 		if ((tmp->start < start) || (tmp->end > end))
 			goto out;
 
@@ -993,28 +991,31 @@ EXPORT_SYMBOL(adjust_resource);
  */
 int reparent_resources(struct resource *parent, struct resource *res)
 {
-	struct resource *p, **pp;
-	struct resource **firstpp = NULL;
+	struct resource *p, *first = NULL;
 
-	for (pp = &parent->child; (p = *pp) != NULL; pp = &p->sibling) {
+	list_for_each_entry(p, &parent->child, sibling) {
 		if (p->end < res->start)
 			continue;
 		if (res->end < p->start)
 			break;
 		if (p->start < res->start || p->end > res->end)
 			return -ENOTSUPP;	/* not completely contained */
-		if (firstpp == NULL)
-			firstpp = pp;
+		if (first == NULL)
+			first = p;
 	}
-	if (firstpp == NULL)
+	if (first == NULL)
 		return -ECANCELED; /* didn't find any conflicting entries? */
 	res->parent = parent;
-	res->child = *firstpp;
-	res->sibling = *pp;
-	*firstpp = res;
-	*pp = NULL;
-	for (p = res->child; p != NULL; p = p->sibling) {
-		p->parent = res;
+	list_add(&res->sibling, p->sibling.prev);
+	INIT_LIST_HEAD(&res->child);
+
+	/*
+	 * From first to p's previous sibling, they all fall into
+	 * res's region, change them as res's children.
+	 */
+	list_cut_position(&res->child, first->sibling.prev, res->sibling.prev);
+	list_for_each_entry(p, &res->child, sibling) {
+                p->parent = res;
 		pr_debug("PCI: Reparented %s %pR under %s\n",
 			 p->name, p, res->name);
 	}
@@ -1213,34 +1214,32 @@ EXPORT_SYMBOL(__request_region);
 void __release_region(struct resource *parent, resource_size_t start,
 			resource_size_t n)
 {
-	struct resource **p;
+	struct resource *res;
 	resource_size_t end;
 
-	p = &parent->child;
+	res = resource_first_child(&parent->child);
 	end = start + n - 1;
 
 	write_lock(&resource_lock);
 
 	for (;;) {
-		struct resource *res = *p;
-
 		if (!res)
 			break;
 		if (res->start <= start && res->end >= end) {
 			if (!(res->flags & IORESOURCE_BUSY)) {
-				p = &res->child;
+				res = resource_first_child(&res->child);
 				continue;
 			}
 			if (res->start != start || res->end != end)
 				break;
-			*p = res->sibling;
+			list_del(&res->sibling);
 			write_unlock(&resource_lock);
 			if (res->flags & IORESOURCE_MUXED)
 				wake_up(&muxed_resource_wait);
 			free_resource(res);
 			return;
 		}
-		p = &res->sibling;
+		res = resource_sibling(res);
 	}
 
 	write_unlock(&resource_lock);
@@ -1275,9 +1274,7 @@ EXPORT_SYMBOL(__release_region);
 int release_mem_region_adjustable(struct resource *parent,
 			resource_size_t start, resource_size_t size)
 {
-	struct resource **p;
-	struct resource *res;
-	struct resource *new_res;
+	struct resource *res, *new_res;
 	resource_size_t end;
 	int ret = -EINVAL;
 
@@ -1288,16 +1285,16 @@ int release_mem_region_adjustable(struct resource *parent,
 	/* The alloc_resource() result gets checked later */
 	new_res = alloc_resource(GFP_KERNEL);
 
-	p = &parent->child;
+	res = resource_first_child(&parent->child);
 	write_lock(&resource_lock);
 
-	while ((res = *p)) {
+	while ((res)) {
 		if (res->start >= end)
 			break;
 
 		/* look for the next resource if it does not fit into */
 		if (res->start > start || res->end < end) {
-			p = &res->sibling;
+			res = resource_sibling(res);
 			continue;
 		}
 
@@ -1305,14 +1302,14 @@ int release_mem_region_adjustable(struct resource *parent,
 			break;
 
 		if (!(res->flags & IORESOURCE_BUSY)) {
-			p = &res->child;
+			res = resource_first_child(&res->child);
 			continue;
 		}
 
 		/* found the target resource; let's adjust accordingly */
 		if (res->start == start && res->end == end) {
 			/* free the whole entry */
-			*p = res->sibling;
+			list_del(&res->sibling);
 			free_resource(res);
 			ret = 0;
 		} else if (res->start == start && res->end != end) {
@@ -1335,14 +1332,13 @@ int release_mem_region_adjustable(struct resource *parent,
 			new_res->flags = res->flags;
 			new_res->desc = res->desc;
 			new_res->parent = res->parent;
-			new_res->sibling = res->sibling;
-			new_res->child = NULL;
+			INIT_LIST_HEAD(&new_res->child);
 
 			ret = __adjust_resource(res, res->start,
 						start - res->start);
 			if (ret)
 				break;
-			res->sibling = new_res;
+			list_add(&new_res->sibling, &res->sibling);
 			new_res = NULL;
 		}
 
@@ -1523,7 +1519,7 @@ static int __init reserve_setup(char *str)
 			res->end = io_start + io_num - 1;
 			res->flags |= IORESOURCE_BUSY;
 			res->desc = IORES_DESC_NONE;
-			res->child = NULL;
+			INIT_LIST_HEAD(&res->child);
 			if (request_resource(parent, res) == 0)
 				reserved = x+1;
 		}
@@ -1543,7 +1539,7 @@ int iomem_map_sanity_check(resource_size_t addr, unsigned long size)
 	loff_t l;
 
 	read_lock(&resource_lock);
-	for (p = p->child; p ; p = r_next(NULL, p, &l)) {
+	for (p = resource_first_child(&p->child); p; p = r_next(NULL, p, &l)) {
 		/*
 		 * We can probably skip the resources without
 		 * IORESOURCE_IO attribute?
@@ -1599,7 +1595,7 @@ bool iomem_is_exclusive(u64 addr)
 	addr = addr & PAGE_MASK;
 
 	read_lock(&resource_lock);
-	for (p = p->child; p ; p = r_next(NULL, p, &l)) {
+	for (p = resource_first_child(&p->child); p; p = r_next(NULL, p, &l)) {
 		/*
 		 * We can probably skip the resources without
 		 * IORESOURCE_IO attribute?

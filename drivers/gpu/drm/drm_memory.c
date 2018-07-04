@@ -155,9 +155,8 @@ u64 drm_get_max_iomem(void)
 	struct resource *tmp;
 	resource_size_t max_iomem = 0;
 
-	for (tmp = iomem_resource.child; tmp; tmp = tmp->sibling) {
+	list_for_each_entry(tmp, &iomem_resource.child, sibling)
 		max_iomem = max(max_iomem,  tmp->end);
-	}
 
 	return max_iomem;
 }

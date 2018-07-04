@@ -637,7 +637,7 @@ static resource_size_t scan_allocate(struct nd_region *nd_region,
  retry:
 	first = 0;
 	for_each_dpa_resource(ndd, res) {
-		struct resource *next = res->sibling, *new_res = NULL;
+		struct resource *next = resource_sibling(res), *new_res = NULL;
 		resource_size_t allocate, available = 0;
 		enum alloc_loc loc = ALLOC_ERR;
 		const char *action;
@@ -763,7 +763,7 @@ static resource_size_t scan_allocate(struct nd_region *nd_region,
 	 * an initial "pmem-reserve pass".  Only do an initial BLK allocation
 	 * when none of the DPA space is reserved.
 	 */
-	if ((is_pmem || !ndd->dpa.child) && n == to_allocate)
+	if ((is_pmem || list_empty(&ndd->dpa.child)) && n == to_allocate)
 		return init_dpa_allocation(label_id, nd_region, nd_mapping, n);
 	return n;
 }
@@ -779,7 +779,7 @@ static int merge_dpa(struct nd_region *nd_region,
  retry:
 	for_each_dpa_resource(ndd, res) {
 		int rc;
-		struct resource *next = res->sibling;
+		struct resource *next = resource_sibling(res);
 		resource_size_t end = res->start + resource_size(res);
 
 		if (!next || strcmp(res->name, label_id->id) != 0
