@@ -2942,6 +2942,12 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_X2APIC_API:
 		r = KVM_X2APIC_API_VALID_FLAGS;
 		break;
+	case KVM_CAP_X86_SPLIT_LOCK_AC:
+		if (boot_cpu_has(X86_FEATURE_AC_SPLIT_LOCK))
+			r = 1;
+		else
+			r = 0;
+		break;
 	default:
 		break;
 	}
@@ -4258,6 +4264,10 @@ split_irqchip_unlock:
 			kvm->arch.hlt_in_guest = true;
 		if (cap->args[0] & KVM_X86_DISABLE_EXITS_PAUSE)
 			kvm->arch.pause_in_guest = true;
+		r = 0;
+		break;
+	case KVM_CAP_X86_SPLIT_LOCK_AC:
+		kvm->arch.split_lock_ac_in_guest = true;
 		r = 0;
 		break;
 	default:

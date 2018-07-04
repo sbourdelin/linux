@@ -326,6 +326,11 @@ static inline bool kvm_pause_in_guest(struct kvm *kvm)
 	return kvm->arch.pause_in_guest;
 }
 
+static inline bool kvm_split_lock_ac_in_guest(struct kvm *kvm)
+{
+	return kvm->arch.split_lock_ac_in_guest;
+}
+
 DECLARE_PER_CPU(struct kvm_vcpu *, current_vcpu);
 
 static inline void kvm_before_interrupt(struct kvm_vcpu *vcpu)

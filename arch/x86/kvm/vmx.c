@@ -58,6 +58,9 @@
 #include "pmu.h"
 #include "vmx_evmcs.h"
 
+static u64 x86_split_lock_ctrl_base;
+static u64 x86_split_lock_ctrl_mask;
+
 #define __ex(x) __kvm_handle_fault_on_reboot(x)
 #define __ex_clear(x, reg) \
 	____kvm_handle_fault_on_reboot(x, "xor " reg " , " reg)
@@ -776,6 +779,7 @@ struct vcpu_vmx {
 
 	u64 		      arch_capabilities;
 	u64 		      spec_ctrl;
+	u64		      split_lock_ctrl;
 
 	u32 vm_entry_controls_shadow;
 	u32 vm_exit_controls_shadow;
@@ -3750,6 +3754,12 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 #endif
 	case MSR_EFER:
 		return kvm_get_msr_common(vcpu, msr_info);
+	case MSR_TEST_CTL:
+		if (!msr_info->host_initiated &&
+		    !kvm_split_lock_ac_in_guest(vcpu->kvm))
+			return 1;
+		msr_info->data = to_vmx(vcpu)->split_lock_ctrl;
+		break;
 	case MSR_IA32_SPEC_CTRL:
 		if (!msr_info->host_initiated &&
 		    !guest_cpuid_has(vcpu, X86_FEATURE_SPEC_CTRL))
@@ -3867,6 +3877,19 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		    (data & MSR_IA32_BNDCFGS_RSVD))
 			return 1;
 		vmcs_write64(GUEST_BNDCFGS, data);
+		break;
+	case MSR_TEST_CTL:
+		if (!msr_info->host_initiated &&
+		    !kvm_split_lock_ac_in_guest(vcpu->kvm))
+			return 1;
+
+		vmx->split_lock_ctrl = data;
+
+		if (!data)
+			break;
+		vmx_disable_intercept_for_msr(vmx->vmcs01.msr_bitmap,
+					      MSR_TEST_CTL,
+					      MSR_TYPE_RW);
 		break;
 	case MSR_IA32_SPEC_CTRL:
 		if (!msr_info->host_initiated &&
@@ -6293,6 +6316,8 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 		vmcs_write64(PML_ADDRESS, page_to_phys(vmx->pml_pg));
 		vmcs_write16(GUEST_PML_INDEX, PML_ENTITY_NUM - 1);
 	}
+
+	vmx->split_lock_ctrl = 0;
 }
 
 static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
@@ -6303,6 +6328,7 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 
 	vmx->rmode.vm86_active = 0;
 	vmx->spec_ctrl = 0;
+	vmx->split_lock_ctrl = 0;
 
 	vcpu->arch.microcode_version = 0x100000000ULL;
 	vmx->vcpu.arch.regs[VCPU_REGS_RDX] = get_rdx_init_val();
@@ -9947,6 +9973,38 @@ static void vmx_arm_hv_timer(struct kvm_vcpu *vcpu)
 	vmcs_write32(VMX_PREEMPTION_TIMER_VALUE, delta_tsc);
 }
 
+static void x86_split_lock_ctrl_init(void)
+{
+	/*
+	 * Read the MSR_TEST_CTL MSR to account for reserved bits which may
+	 * have unknown values.
+	 */
+	if (boot_cpu_has(X86_FEATURE_AC_SPLIT_LOCK)) {
+		rdmsrl(MSR_TEST_CTL, x86_split_lock_ctrl_base);
+		x86_split_lock_ctrl_mask = MSR_TEST_CTL_ENABLE_AC_SPLIT_LOCK;
+	}
+}
+
+static void x86_set_split_lock_ctrl(struct kvm_vcpu *vcpu,
+				    u64 guest_split_lock_ctrl, bool setguest)
+{
+	/*
+	 * Check if the feature of #AC exception
+	 * for split locked access is supported.
+	 */
+	if (boot_cpu_has(X86_FEATURE_AC_SPLIT_LOCK)) {
+		u64 msrval, guestval;
+		u64 hostval = x86_split_lock_ctrl_base;
+
+		guestval = hostval & ~x86_split_lock_ctrl_mask;
+		guestval |= guest_split_lock_ctrl & x86_split_lock_ctrl_mask;
+		if (hostval != guestval) {
+			msrval = setguest ? guestval : hostval;
+			wrmsrl(MSR_TEST_CTL, msrval);
+		}
+	}
+}
+
 static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -10013,6 +10071,12 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	 * being speculatively taken.
 	 */
 	x86_spec_ctrl_set_guest(vmx->spec_ctrl, 0);
+
+	/*
+	 * Restore the guest's value of TEST_CTL MSR
+	 * if it's different with the host's value.
+	 */
+	x86_set_split_lock_ctrl(vcpu, vmx->split_lock_ctrl, true);
 
 	vmx->__launched = vmx->loaded_vmcs->launched;
 
@@ -10161,6 +10225,17 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		vmx->spec_ctrl = native_read_msr(MSR_IA32_SPEC_CTRL);
 
 	x86_spec_ctrl_restore_host(vmx->spec_ctrl, 0);
+
+	if (kvm_split_lock_ac_in_guest(vcpu->kvm) &&
+	    !msr_write_intercepted(vcpu, MSR_TEST_CTL)) {
+		vmx->split_lock_ctrl = native_read_msr(MSR_TEST_CTL);
+	}
+
+	/*
+	 * Restore the host's value of TEST_CTL MSR
+	 * if it's different with the guest's value.
+	 */
+	x86_set_split_lock_ctrl(vcpu, vmx->split_lock_ctrl, false);
 
 	/* Eliminate branch target predictions from guest mode */
 	vmexit_fill_RSB();
@@ -13119,6 +13194,8 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 static int __init vmx_init(void)
 {
 	int r;
+
+	x86_split_lock_ctrl_init();
 
 #if IS_ENABLED(CONFIG_HYPERV)
 	/*
