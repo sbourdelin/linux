@@ -7,3 +7,4 @@ ubifs-y += budget.o find.o tnc_commit.o compress.o lpt.o lprops.o
 ubifs-y += recovery.o ioctl.o lpt_commit.o tnc_misc.o xattr.o debug.o
 ubifs-y += misc.o
 ubifs-$(CONFIG_UBIFS_FS_ENCRYPTION) += crypto.o
+ubifs-$(CONFIG_UBIFS_FS_AUTHENTICATION) += auth.o
