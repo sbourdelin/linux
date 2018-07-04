@@ -1599,13 +1599,9 @@ out:
 static int sdma_get_firmware(struct sdma_engine *sdma,
 		const char *fw_name)
 {
-	int ret;
-
-	ret = request_firmware_nowait(THIS_MODULE,
-			FW_ACTION_HOTPLUG, fw_name, sdma->dev,
-			GFP_KERNEL, sdma, sdma_load_firmware);
-
-	return ret;
+	return request_firmware_nowait_nowarn(THIS_MODULE, FW_ACTION_HOTPLUG,
+					      fw_name, sdma->dev, GFP_KERNEL,
+					      sdma, sdma_load_firmware);
 }
 
 static int sdma_init(struct sdma_engine *sdma)
