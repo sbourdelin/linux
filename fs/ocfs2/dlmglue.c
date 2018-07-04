@@ -96,7 +96,7 @@ struct ocfs2_unblock_ctl {
 };
 
 /* Lockdep class keys */
-static struct lock_class_key lockdep_keys[OCFS2_NUM_LOCK_TYPES];
+static struct lock_class_key __maybe_unused lockdep_keys[OCFS2_NUM_LOCK_TYPES];
 
 static int ocfs2_check_meta_downconvert(struct ocfs2_lock_res *lockres,
 					int new_level);
