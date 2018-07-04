@@ -145,10 +145,23 @@ __weak void kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
 {
 }
 
+static bool kvm_is_nd_pfn(kvm_pfn_t pfn)
+{
+	struct page *page = pfn_to_page(pfn);
+
+	return is_zone_device_page(page) &&
+		((page->pgmap->type == MEMORY_DEVICE_FS_DAX) ||
+		 (page->pgmap->type == MEMORY_DEVICE_DEV_DAX));
+}
+
 bool kvm_is_reserved_pfn(kvm_pfn_t pfn)
 {
-	if (pfn_valid(pfn))
-		return PageReserved(pfn_to_page(pfn));
+	struct page *page;
+
+	if (pfn_valid(pfn)) {
+		page = pfn_to_page(pfn);
+		return kvm_is_nd_pfn(pfn) ? false : PageReserved(page);
+	}
 
 	return true;
 }
