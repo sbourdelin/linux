@@ -107,9 +107,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
 		dev->archdata.dma_offset = off;
 }
 
-#define HAVE_ARCH_DMA_SET_MASK 1
-extern int dma_set_mask(struct device *dev, u64 dma_mask);
-
 extern u64 __dma_get_required_mask(struct device *dev);
 
 #define ARCH_HAS_DMA_MMAP_COHERENT
