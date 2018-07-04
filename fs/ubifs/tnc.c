@@ -2259,13 +2259,14 @@ do_split:
  * @lnum: LEB number of node
  * @offs: node offset
  * @len: node length
+ * @hash: The hash over the node
  *
  * This function adds a node with key @key to TNC. The node may be new or it may
  * obsolete some existing one. Returns %0 on success or negative error code on
  * failure.
  */
 int ubifs_tnc_add(struct ubifs_info *c, const union ubifs_key *key, int lnum,
-		  int offs, int len)
+		  int offs, int len, const u8 *hash)
 {
 	int found, n, err = 0;
 	struct ubifs_znode *znode;
@@ -2280,6 +2281,7 @@ int ubifs_tnc_add(struct ubifs_info *c, const union ubifs_key *key, int lnum,
 		zbr.lnum = lnum;
 		zbr.offs = offs;
 		zbr.len = len;
+		ubifs_copy_hash(c, hash, zbr.hash);
 		key_copy(c, key, &zbr.key);
 		err = tnc_insert(c, znode, &zbr, n + 1);
 	} else if (found == 1) {
@@ -2290,6 +2292,7 @@ int ubifs_tnc_add(struct ubifs_info *c, const union ubifs_key *key, int lnum,
 		zbr->lnum = lnum;
 		zbr->offs = offs;
 		zbr->len = len;
+		ubifs_copy_hash(c, hash, zbr->hash);
 	} else
 		err = found;
 	if (!err)
@@ -2391,13 +2394,14 @@ out_unlock:
  * @lnum: LEB number of node
  * @offs: node offset
  * @len: node length
+ * @hash: The hash over the node
  * @nm: node name
  *
  * This is the same as 'ubifs_tnc_add()' but it should be used with keys which
  * may have collisions, like directory entry keys.
  */
 int ubifs_tnc_add_nm(struct ubifs_info *c, const union ubifs_key *key,
-		     int lnum, int offs, int len,
+		     int lnum, int offs, int len, const u8 *hash,
 		     const struct fscrypt_name *nm)
 {
 	int found, n, err = 0;
@@ -2440,6 +2444,7 @@ int ubifs_tnc_add_nm(struct ubifs_info *c, const union ubifs_key *key,
 			zbr->lnum = lnum;
 			zbr->offs = offs;
 			zbr->len = len;
+			ubifs_copy_hash(c, hash, zbr->hash);
 			goto out_unlock;
 		}
 	}
@@ -2451,6 +2456,7 @@ int ubifs_tnc_add_nm(struct ubifs_info *c, const union ubifs_key *key,
 		zbr.lnum = lnum;
 		zbr.offs = offs;
 		zbr.len = len;
+		ubifs_copy_hash(c, hash, zbr.hash);
 		key_copy(c, key, &zbr.key);
 		err = tnc_insert(c, znode, &zbr, n + 1);
 		if (err)
