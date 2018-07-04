@@ -513,7 +513,13 @@ int ubifs_garbage_collect_leb(struct ubifs_info *c, struct ubifs_lprops *lp)
 	if (IS_ERR(sleb))
 		return PTR_ERR(sleb);
 
-	ubifs_assert(!list_empty(&sleb->nodes));
+	if (list_empty(&sleb->nodes)) {
+		ubifs_err(c, "Bad accouting information, LEB %i is marked as used but no nodes found!",
+			  lnum);
+		dump_stack();
+		return -EUCLEAN;
+	}
+
 	snod = list_entry(sleb->nodes.next, struct ubifs_scan_node, list);
 
 	if (snod->type == UBIFS_IDX_NODE) {
