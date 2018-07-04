@@ -184,6 +184,11 @@ vrm		Voltage Regulator Module version number.
 		Affects the way the driver calculates the CPU core reference
 		voltage from the vid pins.
 
+in[0-*]_enable	Enable or disable the sensor
+		1 : Enable
+		0 : Disable
+		RW
+
 Also see the Alarms section for status flags associated with voltages.
 
 
@@ -409,6 +414,12 @@ temp_reset_history
 		Reset temp_lowest and temp_highest for all sensors
 		WO
 
+temp[1-*]_enable
+		Enable or disable the sensor
+		1 : Enable
+		0 : Disable
+		RW
+
 Some chips measure temperature using external thermistors and an ADC, and
 report the temperature measurement as a voltage. Converting this voltage
 back to a temperature (or the other way around for limits) requires
@@ -467,6 +478,12 @@ curr[1-*]_reset_history
 curr_reset_history
 		Reset currX_lowest and currX_highest for all sensors
 		WO
+
+curr[1-*]_enable
+		Enable or disable the sensor
+		1 : Enable
+		0 : Disable
+		RW
 
 Also see the Alarms section for status flags associated with currents.
 
@@ -564,6 +581,11 @@ power[1-*]_crit			Critical maximum power.
 				power consumption, such as a system shutdown or
 				a forced powerdown of some devices.
 				Unit: microWatt
+				RW
+
+power[1-*]_enable		Enable or disable the sensor
+				1 : Enable
+				0 : Disable
 				RW
 
 Also see the Alarms section for status flags associated with power readings.
