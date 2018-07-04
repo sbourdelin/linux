@@ -214,6 +214,7 @@ struct bpf_map {
 	int fd;
 	char *name;
 	size_t offset;
+	bool fd_preset;
 	int map_ifindex;
 	struct bpf_map_def def;
 	uint32_t btf_key_type_id;
@@ -1081,6 +1082,34 @@ static int bpf_map_find_btf_info(struct bpf_map *map, const struct btf *btf)
 	return 0;
 }
 
+int bpf_map__reuse_fd(struct bpf_map *map, int fd)
+{
+	struct bpf_map_info info = {};
+	__u32 len = sizeof(info);
+	int err;
+
+	err = bpf_obj_get_info_by_fd(fd, &info, &len);
+	if (err)
+		return err;
+
+	map->fd = dup(fd);
+	if (map->fd < 0)
+		return map->fd;
+	map->fd_preset = true;
+
+	free(map->name);
+	map->name = strdup(info.name);
+	map->def.type = info.type;
+	map->def.key_size = info.key_size;
+	map->def.value_size = info.value_size;
+	map->def.max_entries = info.max_entries;
+	map->def.map_flags = info.map_flags;
+	map->btf_key_type_id = info.btf_key_type_id;
+	map->btf_value_type_id = info.btf_value_type_id;
+
+	return 0;
+}
+
 static int
 bpf_object__create_maps(struct bpf_object *obj)
 {
@@ -1092,6 +1121,12 @@ bpf_object__create_maps(struct bpf_object *obj)
 		struct bpf_map *map = &obj->maps[i];
 		struct bpf_map_def *def = &map->def;
 		int *pfd = &map->fd;
+
+		if (map->fd_preset) {
+			pr_debug("skip map create (preset) %s: fd=%d\n",
+				 map->name, map->fd);
+			continue;
+		}
 
 		create_attr.name = map->name;
 		create_attr.map_ifindex = map->map_ifindex;
