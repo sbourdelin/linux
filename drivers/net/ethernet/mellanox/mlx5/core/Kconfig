@@ -93,6 +93,7 @@ config MLX5_EN_TLS
 	depends on TLS_DEVICE
 	depends on TLS=y || MLX5_CORE=m
 	depends on MLX5_ACCEL
+	depends on !MLX5_EN_IPSEC
 	default n
 	---help---
 	  Build support for TLS cryptography-offload accelaration in the NIC.
