@@ -27,6 +27,7 @@ struct mm_iommu_table_group_mem_t {
 	struct rcu_head rcu;
 	unsigned long used;
 	atomic64_t mapped;
+	unsigned int pageshift;
 	u64 ua;			/* userspace address */
 	u64 entries;		/* number of entries in hpas[] */
 	u64 *hpas;		/* vmalloc'ed */
@@ -125,7 +126,8 @@ long mm_iommu_get(struct mm_struct *mm, unsigned long ua, unsigned long entries,
 {
 	struct mm_iommu_table_group_mem_t *mem;
 	long i, j, ret = 0, locked_entries = 0;
-	struct page *page = NULL;
+	unsigned int pageshift;
+	struct page *page = NULL, *head = NULL;
 
 	mutex_lock(&mem_list_mutex);
 
@@ -159,6 +161,7 @@ long mm_iommu_get(struct mm_struct *mm, unsigned long ua, unsigned long entries,
 		goto unlock_exit;
 	}
 
+	mem->pageshift = 64;
 	mem->hpas = vzalloc(array_size(entries, sizeof(mem->hpas[0])));
 	if (!mem->hpas) {
 		kfree(mem);
@@ -199,8 +202,34 @@ long mm_iommu_get(struct mm_struct *mm, unsigned long ua, unsigned long entries,
 			}
 		}
 populate:
+		pageshift = PAGE_SHIFT;
+		if (PageCompound(page)) {
+			/* Make sure huge page is contained completely */
+			struct page *tmphead = compound_head(page);
+			unsigned int n = compound_order(tmphead);
+
+			if (!head) {
+				/* Is it a head of a huge page? */
+				if (page == tmphead) {
+					head = tmphead;
+					pageshift += n;
+				}
+			} else if (head == tmphead) {
+				/* Still same huge page, good */
+				pageshift += n;
+
+				/* End of the huge page */
+				if (page - head == (1UL << n) - 1)
+					head = NULL;
+			}
+		}
+		mem->pageshift = min(mem->pageshift, pageshift);
 		mem->hpas[i] = page_to_pfn(page) << PAGE_SHIFT;
 	}
+
+	/* We have an incomplete huge page, default to PAGE_SHIFT */
+	if (head)
+		mem->pageshift = PAGE_SHIFT;
 
 	atomic64_set(&mem->mapped, 1);
 	mem->used = 1;
@@ -349,12 +378,15 @@ struct mm_iommu_table_group_mem_t *mm_iommu_find(struct mm_struct *mm,
 EXPORT_SYMBOL_GPL(mm_iommu_find);
 
 long mm_iommu_ua_to_hpa(struct mm_iommu_table_group_mem_t *mem,
-		unsigned long ua, unsigned long *hpa)
+		unsigned long ua, unsigned int pageshift, unsigned long *hpa)
 {
 	const long entry = (ua - mem->ua) >> PAGE_SHIFT;
 	u64 *va = &mem->hpas[entry];
 
 	if (entry >= mem->entries)
+		return -EFAULT;
+
+	if (pageshift > mem->pageshift)
 		return -EFAULT;
 
 	*hpa = *va | (ua & ~PAGE_MASK);
@@ -364,13 +396,16 @@ long mm_iommu_ua_to_hpa(struct mm_iommu_table_group_mem_t *mem,
 EXPORT_SYMBOL_GPL(mm_iommu_ua_to_hpa);
 
 long mm_iommu_ua_to_hpa_rm(struct mm_iommu_table_group_mem_t *mem,
-		unsigned long ua, unsigned long *hpa)
+		unsigned long ua, unsigned int pageshift, unsigned long *hpa)
 {
 	const long entry = (ua - mem->ua) >> PAGE_SHIFT;
 	void *va = &mem->hpas[entry];
 	unsigned long *pa;
 
 	if (entry >= mem->entries)
+		return -EFAULT;
+
+	if (pageshift > mem->pageshift)
 		return -EFAULT;
 
 	pa = (void *) vmalloc_to_phys(va);
