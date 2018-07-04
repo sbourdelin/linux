@@ -6798,8 +6798,10 @@ static int __dev_set_promiscuity(struct net_device *dev, int inc, bool notify)
 
 		dev_change_rx_flags(dev, IFF_PROMISC);
 	}
+
 	if (notify)
-		__dev_notify_flags(dev, old_flags, IFF_PROMISC);
+		return __dev_notify_flags(dev, old_flags, IFF_PROMISC);
+
 	return 0;
 }
 
@@ -6854,8 +6856,8 @@ static int __dev_set_allmulti(struct net_device *dev, int inc, bool notify)
 		dev_change_rx_flags(dev, IFF_ALLMULTI);
 		dev_set_rx_mode(dev);
 		if (notify)
-			__dev_notify_flags(dev, old_flags,
-					   dev->gflags ^ old_gflags);
+			return  __dev_notify_flags(dev, old_flags,
+						   dev->gflags ^ old_gflags);
 	}
 	return 0;
 }
@@ -7016,20 +7018,25 @@ int __dev_change_flags(struct net_device *dev, unsigned int flags)
 	return ret;
 }
 
-void __dev_notify_flags(struct net_device *dev, unsigned int old_flags,
-			unsigned int gchanges)
+int __dev_notify_flags(struct net_device *dev, unsigned int old_flags,
+		       unsigned int gchanges)
 {
 	unsigned int changes = dev->flags ^ old_flags;
+	int err = 0;
 
 	if (gchanges)
 		rtmsg_ifinfo(RTM_NEWLINK, dev, gchanges, GFP_ATOMIC);
 
 	if (changes & IFF_UP) {
 		if (dev->flags & IFF_UP)
-			call_netdevice_notifiers(NETDEV_UP, dev);
+			err = call_netdevice_notifiers(NETDEV_UP, dev);
 		else
-			call_netdevice_notifiers(NETDEV_DOWN, dev);
+			err = call_netdevice_notifiers(NETDEV_DOWN, dev);
 	}
+
+	err = notifier_to_errno(err);
+	if (err)
+		goto out;
 
 	if (dev->flags & IFF_UP &&
 	    (changes & ~(IFF_UP | IFF_PROMISC | IFF_ALLMULTI | IFF_VOLATILE))) {
@@ -7040,8 +7047,12 @@ void __dev_notify_flags(struct net_device *dev, unsigned int old_flags,
 			.flags_changed = changes,
 		};
 
-		call_netdevice_notifiers_info(NETDEV_CHANGE, &change_info.info);
+		err = call_netdevice_notifiers_info(NETDEV_CHANGE, &change_info.info);
+		err = notifier_to_errno(err);
 	}
+
+out:
+	return err;
 }
 
 /**
@@ -7062,8 +7073,7 @@ int dev_change_flags(struct net_device *dev, unsigned int flags)
 		return ret;
 
 	changes = (old_flags ^ dev->flags) | (old_gflags ^ dev->gflags);
-	__dev_notify_flags(dev, old_flags, changes);
-	return ret;
+	return __dev_notify_flags(dev, old_flags, changes);
 }
 EXPORT_SYMBOL(dev_change_flags);
 
