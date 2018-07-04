@@ -6351,7 +6351,25 @@ struct wmi_10_2_peer_assoc_complete_cmd {
 	__le32 info0; /* WMI_PEER_ASSOC_INFO0_ */
 } __packed;
 
-#define PEER_BW_RXNSS_OVERRIDE_OFFSET  31
+#define BW_NSS_FWCONF_MAP_ENABLE             BIT(31)
+#define BW_NSS_FWCONF_MAP_160MHZ_S           (0)
+#define BW_NSS_FWCONF_MAP_160MHZ_M           (0x00000007)
+#define BW_NSS_FWCONF_MAP_80_80MHZ_S         (3)
+#define BW_NSS_FWCONF_MAP_80_80MHZ_M         (0x00000038)
+#define BW_NSS_FWCONF_MAP_M                  (0x0000003F)
+
+#define GET_BW_NSS_FWCONF_160(x)	((((x) & BW_NSS_FWCONF_MAP_160MHZ_M) \
+					>> BW_NSS_FWCONF_MAP_160MHZ_S) + 1)
+#define GET_BW_NSS_FWCONF_80_80(x)	((((x) & BW_NSS_FWCONF_MAP_80_80MHZ_M) \
+					>> BW_NSS_FWCONF_MAP_80_80MHZ_S) + 1)
+
+/* Values defined to set 160 MHz Bandwidth NSS Mapping into FW*/
+#define BW_NSS_FWCONF_160(x)		(BW_NSS_FWCONF_MAP_ENABLE | \
+					(((x - 1) << BW_NSS_FWCONF_MAP_160MHZ_S) \
+					& BW_NSS_FWCONF_MAP_160MHZ_M))
+#define BW_NSS_FWCONF_80_80(x)		(BW_NSS_FWCONF_MAP_ENABLE | \
+					(((x - 1) << BW_NSS_FWCONF_MAP_80_80MHZ_S) \
+					& BW_NSS_FWCONF_MAP_80_80MHZ_M))
 
 struct wmi_10_4_peer_assoc_complete_cmd {
 	struct wmi_10_2_peer_assoc_complete_cmd cmd;
