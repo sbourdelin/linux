@@ -453,7 +453,7 @@ int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
 	int ret = -1;
 
 	/* create a list */
-	rams = vmalloc(sizeof(struct resource) * rams_size);
+	rams = vmalloc(array_size(rams_size, sizeof(struct resource)));
 	if (!rams)
 		return ret;
 
@@ -469,8 +469,8 @@ int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
 			int rams_new_size;
 
 			rams_new_size = rams_size + 16;
-			rams_new = vmalloc(sizeof(struct resource)
-							* rams_new_size);
+			rams_new = vmalloc(array_size(rams_new_size,
+						      sizeof(struct resource)));
 			if (!rams_new)
 				goto out;
 
