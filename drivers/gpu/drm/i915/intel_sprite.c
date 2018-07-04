@@ -1436,6 +1436,7 @@ static bool skl_plane_format_mod_supported(struct drm_plane *_plane,
 		if (modifier == I915_FORMAT_MOD_Yf_TILED)
 			return true;
 		/* fall through */
+	case DRM_FORMAT_AYUV:
 	case DRM_FORMAT_C8:
 		if (modifier == DRM_FORMAT_MOD_LINEAR ||
 		    modifier == I915_FORMAT_MOD_X_TILED ||
