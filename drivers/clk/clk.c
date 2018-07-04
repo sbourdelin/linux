@@ -2739,7 +2739,7 @@ static const struct {
 	unsigned long flag;
 	const char *name;
 } clk_flags[] = {
-#define ENTRY(f) { f, __stringify(f) }
+#define ENTRY(f) { f, #f }
 	ENTRY(CLK_SET_RATE_GATE),
 	ENTRY(CLK_SET_PARENT_GATE),
 	ENTRY(CLK_SET_RATE_PARENT),
