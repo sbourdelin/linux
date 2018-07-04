@@ -26,6 +26,9 @@
 #define __I915_GEM_OBJECT_H__
 
 #include <linux/reservation.h>
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG_GEM)
+#include <linux/stackdepot.h>
+#endif
 
 #include <drm/drm_vma_manager.h>
 #include <drm/drm_gem.h>
@@ -245,6 +248,12 @@ struct drm_i915_gem_object {
 		 * swizzling.
 		 */
 		bool quirked:1;
+
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG_GEM)
+		spinlock_t debug_lock;
+		unsigned long debug_count;
+		depot_stack_handle_t *debug_owners;
+#endif
 	} mm;
 
 	/** Breadcrumb of last rendering to the buffer.
@@ -450,6 +459,31 @@ i915_gem_object_get_tile_row_size(struct drm_i915_gem_object *obj)
 
 int i915_gem_object_set_tiling(struct drm_i915_gem_object *obj,
 			       unsigned int tiling, unsigned int stride);
+
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG_GEM)
+
+void track_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj);
+void untrack_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj);
+void show_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj);
+
+#else
+
+static inline void
+track_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+{
+}
+
+static inline void
+untrack_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+{
+}
+
+static inline void
+show_i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+{
+}
+
+#endif
 
 static inline struct intel_engine_cs *
 i915_gem_object_last_write_engine(struct drm_i915_gem_object *obj)

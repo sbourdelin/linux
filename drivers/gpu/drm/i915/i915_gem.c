@@ -2465,6 +2465,7 @@ void __i915_gem_object_put_pages(struct drm_i915_gem_object *obj,
 	if (!IS_ERR(pages))
 		obj->ops->put_pages(obj, pages);
 
+	untrack_i915_gem_object_pin_pages(obj);
 unlock:
 	mutex_unlock(&obj->mm.lock);
 }
@@ -4681,6 +4682,7 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 			  const struct drm_i915_gem_object_ops *ops)
 {
 	mutex_init(&obj->mm.lock);
+	spin_lock_init(&obj->mm.debug_lock);
 
 	INIT_LIST_HEAD(&obj->vma_list);
 	INIT_LIST_HEAD(&obj->lut_list);
@@ -4876,8 +4878,10 @@ static void __i915_gem_free_objects(struct drm_i915_private *i915,
 		if (obj->ops->release)
 			obj->ops->release(obj);
 
-		if (WARN_ON(i915_gem_object_has_pinned_pages(obj)))
+		if (WARN_ON(i915_gem_object_has_pinned_pages(obj))) {
+			show_i915_gem_object_pin_pages(obj);
 			atomic_set(&obj->mm.pages_pin_count, 0);
+		}
 		__i915_gem_object_put_pages(obj, I915_MM_NORMAL);
 		GEM_BUG_ON(i915_gem_object_has_pages(obj));
 
