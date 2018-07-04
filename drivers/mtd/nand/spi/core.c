@@ -985,8 +985,10 @@ static int spinand_init(struct spinand_device *spinand)
 	spinand->databuf = kzalloc(nanddev_page_size(nand) +
 			       nanddev_per_page_oobsize(nand),
 			       GFP_KERNEL);
-	if (!spinand->databuf)
+	if (!spinand->databuf) {
+		ret = -ENOMEM;
 		goto err_free_bufs;
+	}
 
 	spinand->oobbuf = spinand->databuf + nanddev_page_size(nand);
 
