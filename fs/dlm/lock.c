@@ -1876,7 +1876,7 @@ void dlm_scan_timeout(struct dlm_ls *ls)
 				do_cancel = 1;
 
 			if ((lkb->lkb_flags & DLM_IFL_WATCH_TIMEWARN) &&
-			    wait_us >= dlm_config.ci_timewarn_cs * 10000)
+			    wait_us >= dlm_config.ci_timewarn_cs * 10000LL)
 				do_warn = 1;
 
 			if (!do_cancel && !do_warn)
