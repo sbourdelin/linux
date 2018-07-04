@@ -87,6 +87,7 @@ static int create_default_filesystem(struct ubifs_info *c)
 	__le64 tmp_le64;
 	__le32 tmp_le32;
 	struct timespec ts;
+	u8 hash[UBIFS_MAX_HASH_LEN];
 	u8 hash_lpt[UBIFS_MAX_HASH_LEN];
 
 	/* Some functions called from here depend on the @c->key_len filed */
@@ -177,6 +178,14 @@ static int create_default_filesystem(struct ubifs_info *c)
 		sup_flags |= UBIFS_FLG_BIGLPT;
 	sup_flags |= UBIFS_FLG_DOUBLE_HASH;
 
+	if (ubifs_authenticated(c)) {
+		sup_flags |= UBIFS_FLG_AUTHENTICATION;
+		sup->hash_algo = cpu_to_le16(c->auth_hash_algo);
+		ubifs_hmac_wkm(c, sup->hmac_wkm);
+	} else {
+		sup->hash_algo = 0xffff;
+	}
+
 	sup->ch.node_type  = UBIFS_SB_NODE;
 	sup->key_hash      = UBIFS_KEY_HASH_R5;
 	sup->flags         = cpu_to_le32(sup_flags);
@@ -235,6 +244,7 @@ static int create_default_filesystem(struct ubifs_info *c)
 	mst->empty_lebs   = cpu_to_le32(main_lebs - 2);
 	mst->idx_lebs     = cpu_to_le32(1);
 	mst->leb_cnt      = cpu_to_le32(c->leb_cnt);
+	ubifs_copy_hash(c, hash_lpt, mst->hash_lpt);
 
 	/* Calculate lprops statistics */
 	tmp64 = main_bytes;
@@ -307,25 +317,33 @@ static int create_default_filesystem(struct ubifs_info *c)
 
 	cs->ch.node_type = UBIFS_CS_NODE;
 
-	err = ubifs_write_node(c, sup, UBIFS_SB_NODE_SZ, 0, 0);
-	if (err)
-		goto out;
-
-	err = ubifs_write_node(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM, 0);
-	if (err)
-		goto out;
-
-	err = ubifs_write_node(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM + 1,
-			       0);
-	if (err)
-		goto out;
-
-	err = ubifs_write_node(c, idx, idx_node_size, main_first + DEFAULT_IDX_LEB, 0);
+	err = ubifs_write_node_hmac(c, sup, UBIFS_SB_NODE_SZ, 0, 0,
+				    offsetof(struct ubifs_sb_node, hmac));
 	if (err)
 		goto out;
 
 	err = ubifs_write_node(c, ino, UBIFS_INO_NODE_SZ,
 			       main_first + DEFAULT_DATA_LEB, 0);
+	if (err)
+		goto out;
+
+	ubifs_node_calc_hash(c, ino, hash);
+	ubifs_copy_hash(c, hash, ubifs_branch_hash(c, br));
+
+	err = ubifs_write_node(c, idx, idx_node_size, main_first + DEFAULT_IDX_LEB, 0);
+	if (err)
+		goto out;
+
+	ubifs_node_calc_hash(c, idx, hash);
+	ubifs_copy_hash(c, hash, mst->hash_root_idx);
+
+	err = ubifs_write_node_hmac(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM, 0,
+		offsetof(struct ubifs_mst_node, hmac));
+	if (err)
+		goto out;
+
+	err = ubifs_write_node_hmac(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM + 1,
+			       0, offsetof(struct ubifs_mst_node, hmac));
 	if (err)
 		goto out;
 
