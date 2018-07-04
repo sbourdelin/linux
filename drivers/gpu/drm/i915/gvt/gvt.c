@@ -468,3 +468,10 @@ out_clean_idr:
 	kfree(gvt);
 	return ret;
 }
+
+#if IS_ENABLED(CONFIG_DRM_I915_GVT_KVMGT)
+MODULE_SOFTDEP("pre: kvmgt");
+#elif IS_ENABLED(CONFIG_DRM_I915_GVT_XENGT)
+MODULE_SOFTDEP("pre: xengt");
+#endif
+
