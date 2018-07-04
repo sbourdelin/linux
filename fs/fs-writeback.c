@@ -2005,6 +2005,28 @@ void wakeup_flusher_threads(enum wb_reason reason)
 	if (blk_needs_flush_plug(current))
 		blk_schedule_flush_plug(current);
 
+#ifdef CONFIG_CGROUP_WRITEBACK
+	if (reason == WB_REASON_VMSCAN) {
+		int flush = 0;
+
+		rcu_read_lock();
+		list_for_each_entry_rcu(bdi, &bdi_list, bdi_list) {
+			struct bdi_writeback *wb = wb_find_current(bdi);
+
+			if (wb && wb != &bdi->wb) {
+				if (wb_has_dirty_io(wb)) {
+					wb_start_writeback(wb, reason);
+					flush++;
+				}
+			}
+		}
+		rcu_read_unlock();
+
+		if (flush)
+			return;
+	}
+#endif
+
 	rcu_read_lock();
 	list_for_each_entry_rcu(bdi, &bdi_list, bdi_list)
 		__wakeup_flusher_threads_bdi(bdi, reason);
