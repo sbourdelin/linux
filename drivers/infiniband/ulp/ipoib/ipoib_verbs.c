@@ -168,7 +168,7 @@ int ipoib_transport_dev_init(struct net_device *dev, struct ib_device *ca)
 		else
 			size += ipoib_recvq_size * ipoib_max_conn_qp;
 	} else
-		if (ret != -ENOSYS)
+		if (ret != -EOPNOTSUPP)
 			return -ENODEV;
 
 	req_vec = (priv->port - 1) * 2;
