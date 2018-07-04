@@ -377,25 +377,28 @@ static gen6_pte_t iris_pte_encode(dma_addr_t addr,
 
 static struct page *vm_alloc_page(struct i915_address_space *vm, gfp_t gfp)
 {
-	struct pagevec *pvec = &vm->free_pages;
-	struct pagevec stash;
+	struct pagevec *stash = &vm->free_pages;
+	struct pagevec *pvec;
+	struct page *page;
 
 	if (I915_SELFTEST_ONLY(should_fail(&vm->fault_attr, 1)))
 		i915_gem_shrink_all(vm->i915);
 
-	if (likely(pvec->nr))
-		return pvec->pages[--pvec->nr];
+	if (likely(stash->nr))
+		return stash->pages[--stash->nr];
 
 	if (!vm->pt_kmap_wc)
 		return alloc_page(gfp);
 
-	/* A placeholder for a specific mutex to guard the WC stash */
-	lockdep_assert_held(&vm->i915->drm.struct_mutex);
-
 	/* Look in our global stash of WC pages... */
 	pvec = &vm->i915->mm.wc_stash;
+	page = NULL;
+	spin_lock(&vm->i915->mm.wc_lock);
 	if (likely(pvec->nr))
-		return pvec->pages[--pvec->nr];
+		page = pvec->pages[--pvec->nr];
+	spin_unlock(&vm->i915->mm.wc_lock);
+	if (page)
+		return page;
 
 	/*
 	 * Otherwise batch allocate pages to amoritize cost of set_pages_wc.
@@ -405,7 +408,6 @@ static struct page *vm_alloc_page(struct i915_address_space *vm, gfp_t gfp)
 	 * So we add our WB pages into a temporary pvec on the stack and merge
 	 * them into the WC stash after all the allocations are complete.
 	 */
-	pagevec_init(&stash);
 	do {
 		struct page *page;
 
@@ -413,28 +415,30 @@ static struct page *vm_alloc_page(struct i915_address_space *vm, gfp_t gfp)
 		if (unlikely(!page))
 			break;
 
-		stash.pages[stash.nr++] = page;
-	} while (stash.nr < pagevec_space(pvec));
+		stash->pages[stash->nr++] = page;
+	} while (pagevec_space(stash));
 
-	if (stash.nr) {
-		int nr = min_t(int, stash.nr, pagevec_space(pvec));
-		struct page **pages = stash.pages + stash.nr - nr;
+	if (stash->nr && !set_pages_array_wc(stash->pages, stash->nr)) {
+		int nr;
 
-		if (nr && !set_pages_array_wc(pages, nr)) {
-			memcpy(pvec->pages + pvec->nr,
-			       pages, sizeof(pages[0]) * nr);
-			pvec->nr += nr;
-			stash.nr -= nr;
-		}
+		/* Merge spare WC pages to the global stash */
+		spin_lock(&vm->i915->mm.wc_lock);
+		nr = min_t(int, stash->nr - 1, pagevec_space(pvec));
+		memcpy(pvec->pages + pvec->nr,
+		       stash->pages + stash->nr - nr,
+		       sizeof(stash->pages[0]) * nr);
+		pvec->nr += nr;
+		spin_unlock(&vm->i915->mm.wc_lock);
 
-		pagevec_release(&stash);
+		stash->nr -= nr;
+		page = stash->pages[--stash->nr];
 	}
 
-	return likely(pvec->nr) ? pvec->pages[--pvec->nr] : NULL;
+	return page;
 }
 
 static void vm_free_pages_release(struct i915_address_space *vm,
-				  bool immediate)
+				  unsigned int immediate)
 {
 	struct pagevec *pvec = &vm->free_pages;
 
@@ -442,28 +446,32 @@ static void vm_free_pages_release(struct i915_address_space *vm,
 
 	if (vm->pt_kmap_wc) {
 		struct pagevec *stash = &vm->i915->mm.wc_stash;
+		spinlock_t *lock = &vm->i915->mm.wc_lock;
 
-		/* When we use WC, first fill up the global stash and then
+		/*
+		 * When we use WC, first fill up the global stash and then
 		 * only if full immediately free the overflow.
 		 */
 
-		lockdep_assert_held(&vm->i915->drm.struct_mutex);
+		spin_lock(lock);
 		if (pagevec_space(stash)) {
 			do {
 				stash->pages[stash->nr++] =
 					pvec->pages[--pvec->nr];
 				if (!pvec->nr)
-					return;
+					break;
 			} while (pagevec_space(stash));
-
-			/* As we have made some room in the VM's free_pages,
-			 * we can wait for it to fill again. Unless we are
-			 * inside i915_address_space_fini() and must
-			 * immediately release the pages!
-			 */
-			if (!immediate)
-				return;
 		}
+		spin_unlock(lock);
+
+		/*
+		 * As we have made some room in the VM's free_pages,
+		 * we can wait for it to fill again. Unless we are
+		 * inside i915_address_space_fini() and must
+		 * immediately release the pages!
+		 */
+		if (pvec->nr <= immediate)
+			return;
 
 		set_pages_array_wb(pvec->pages, pvec->nr);
 	}
@@ -482,7 +490,7 @@ static void vm_free_page(struct i915_address_space *vm, struct page *page)
 	 */
 	might_sleep();
 	if (!pagevec_add(&vm->free_pages, page))
-		vm_free_pages_release(vm, false);
+		vm_free_pages_release(vm, PAGEVEC_SIZE - 1);
 }
 
 static int __setup_page_dma(struct i915_address_space *vm,
@@ -2147,7 +2155,7 @@ static void i915_address_space_init(struct i915_address_space *vm,
 static void i915_address_space_fini(struct i915_address_space *vm)
 {
 	if (pagevec_count(&vm->free_pages))
-		vm_free_pages_release(vm, true);
+		vm_free_pages_release(vm, 0);
 
 	drm_mm_takedown(&vm->mm);
 	list_del(&vm->global_link);
@@ -3542,6 +3550,9 @@ int i915_ggtt_init_hw(struct drm_i915_private *dev_priv)
 {
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	int ret;
+
+	spin_lock_init(&dev_priv->mm.wc_lock);
+	pagevec_init(&dev_priv->mm.wc_stash);
 
 	INIT_LIST_HEAD(&dev_priv->vm_list);
 

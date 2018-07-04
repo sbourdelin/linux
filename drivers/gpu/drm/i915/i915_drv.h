@@ -957,6 +957,11 @@ struct i915_gem_mm {
 	struct pagevec wc_stash;
 
 	/**
+	 * Lock for the small stash of WC pages.
+	 */
+	spinlock_t wc_lock;
+
+	/**
 	 * tmpfs instance used for shmem backed objects
 	 */
 	struct vfsmount *gemfs;
