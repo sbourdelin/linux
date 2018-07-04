@@ -85,6 +85,9 @@ int ci_ulpi_init(struct ci_hdrc *ci)
 
 void ci_ulpi_exit(struct ci_hdrc *ci)
 {
+	if (ci->platdata->phy_mode != USBPHY_INTERFACE_MODE_ULPI)
+		return;
+
 	if (ci->ulpi) {
 		ulpi_unregister_interface(ci->ulpi);
 		ci->ulpi = NULL;
@@ -94,6 +97,9 @@ void ci_ulpi_exit(struct ci_hdrc *ci)
 int ci_ulpi_resume(struct ci_hdrc *ci)
 {
 	int cnt = 100000;
+
+	if (ci->platdata->phy_mode != USBPHY_INTERFACE_MODE_ULPI)
+		return 0;
 
 	while (cnt-- > 0) {
 		if (hw_read(ci, OP_ULPI_VIEWPORT, ULPI_SYNC_STATE))
