@@ -580,6 +580,8 @@ static int init_constants_early(struct ubifs_info *c)
 	c->ranges[UBIFS_AUTH_NODE].min_len = UBIFS_AUTH_NODE_SZ;
 	c->ranges[UBIFS_AUTH_NODE].max_len = UBIFS_AUTH_NODE_SZ +
 				UBIFS_MAX_HMAC_LEN;
+	c->ranges[UBIFS_SIG_NODE].min_len = UBIFS_SIG_NODE_SZ;
+	c->ranges[UBIFS_SIG_NODE].max_len = c->leb_size - UBIFS_SB_NODE_SZ;
 
 	c->ranges[UBIFS_INO_NODE].min_len  = UBIFS_INO_NODE_SZ;
 	c->ranges[UBIFS_INO_NODE].max_len  = UBIFS_MAX_INO_NODE_SZ;
@@ -1349,6 +1351,19 @@ static int mount_ubifs(struct ubifs_info *c)
 		err = ubifs_write_master(c);
 		if (err)
 			goto out_lpt;
+
+		/*
+		 * Handle offline signed images: Now that the master node is
+		 * written and its validation no longer depends on the hash
+		 * in the superblock, we can update the offline signed
+		 * superblock with a HMAC version,
+		 */
+		if (ubifs_authenticated(c) &&
+		    ubifs_hmac_zero(c, c->superblock->hmac)) {
+			err = ubifs_write_sb_node(c, c->superblock);
+			if (err)
+				goto out_lpt;
+		}
 	}
 
 	err = dbg_check_idx_size(c, c->bi.old_idx_sz);

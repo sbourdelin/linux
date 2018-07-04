@@ -10,10 +10,12 @@
  */
 
 #include <linux/crypto.h>
+#include <linux/verification.h>
 #include <crypto/hash.h>
 #include <crypto/sha.h>
 #include <crypto/algapi.h>
 #include <keys/user-type.h>
+#include <keys/asymmetric-type.h>
 
 #include "ubifs.h"
 
@@ -155,6 +157,61 @@ int __ubifs_node_check_hash(const struct ubifs_info *c, void *node,
 		return -EPERM;
 
 	return 0;
+}
+
+/**
+ * ubifs_sb_verify_signature - verify the signature of a superblock
+ * @c: UBIFS file-system description object
+ * @sup: The superblock node
+ *
+ * To support offline signed images the superblock can be signed with a
+ * PKCS#7 signature. The signature is placed directly behind the superblock
+ * node in an ubifs_sig_node.
+ *
+ * Returns 0 when the signature can be successfully verified or a negative
+ * error code if not.
+ */
+int ubifs_sb_verify_signature(struct ubifs_info *c,
+			      const struct ubifs_sb_node *sup)
+{
+	int err;
+	struct ubifs_scan_leb *sleb;
+	struct ubifs_scan_node *snod;
+	const struct ubifs_sig_node *signode;
+
+	err = ubifs_leb_read(c, UBIFS_SB_LNUM, c->sbuf, 0, c->leb_size, 1);
+
+	sleb = ubifs_scan(c, UBIFS_SB_LNUM, UBIFS_SB_NODE_SZ, c->sbuf, 0);
+	if (IS_ERR(sleb)) {
+		err = PTR_ERR(sleb);
+		return err;
+	}
+
+	if (sleb->nodes_cnt == 0) {
+		ubifs_err(c, "Unable to find signature node");
+		err = -EINVAL;
+		goto out_destroy;
+	}
+
+	snod = list_entry(sleb->nodes.next, struct ubifs_scan_node, list);
+
+	if (snod->type != UBIFS_SIG_NODE) {
+		ubifs_err(c, "Signature node is of wrong type");
+		err = -EINVAL;
+		goto out_destroy;
+	}
+
+	signode = snod->node;
+
+	err = verify_pkcs7_signature(sup, sizeof(struct ubifs_sb_node),
+				     signode->sig, signode->len,
+				     NULL, VERIFYING_UNSPECIFIED_SIGNATURE,
+				     NULL, NULL);
+
+out_destroy:
+	ubifs_scan_destroy(sleb);
+
+	return err;
 }
 
 /**
@@ -410,4 +467,23 @@ void ubifs_hmac_wkm(struct ubifs_info *c, u8 *hmac)
 			    sizeof(well_known_message) - 1);
 
 	crypto_shash_final(shash, hmac);
+}
+
+/*
+ * ubifs_hmac_zero - test if a HMAC is zero
+ * @c: UBIFS file-system description object
+ * @hmac: the HMAC to test
+ *
+ * This function tests if a HMAC is zero and returns true if it is
+ * and false otherwise.
+ */
+bool ubifs_hmac_zero(struct ubifs_info *c, const u8 *hmac)
+{
+	int i;
+
+	for (i = 0; i < c->hmac_desc_len; i++)
+		if (hmac[i] != 0)
+			return false;
+
+	return true;
 }

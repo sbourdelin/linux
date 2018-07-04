@@ -114,9 +114,14 @@ static int scan_for_master(struct ubifs_info *c)
 	if (!ubifs_authenticated(c))
 		return 0;
 
-	err = ubifs_node_verify_hmac(c, c->mst_node,
-				     sizeof(struct ubifs_mst_node),
-				     offsetof(struct ubifs_mst_node, hmac));
+	if (ubifs_hmac_zero(c, c->mst_node->hmac))
+		err = ubifs_node_check_hash(c, c->mst_node,
+					    c->superblock->hash_mst);
+	else
+		err = ubifs_node_verify_hmac(c, c->mst_node,
+					sizeof(struct ubifs_mst_node),
+					offsetof(struct ubifs_mst_node, hmac));
+
 	if (err) {
 		ubifs_err(c, "Failed to verify master node HMAC");
 		return -EPERM;
