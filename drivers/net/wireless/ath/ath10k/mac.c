@@ -2467,7 +2467,7 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 	const u16 *vht_mcs_mask;
 	u8 ampdu_factor;
 	u8 max_nss, vht_mcs;
-	int i;
+	int i, nss160;
 
 	if (WARN_ON(ath10k_mac_vif_chan(vif, &def)))
 		return;
@@ -2527,23 +2527,45 @@ static void ath10k_peer_assoc_h_vht(struct ath10k *ar,
 		__le16_to_cpu(vht_cap->vht_mcs.tx_highest);
 	arg->peer_vht_rates.tx_mcs_set = ath10k_peer_assoc_h_vht_limit(
 		__le16_to_cpu(vht_cap->vht_mcs.tx_mcs_map), vht_mcs_mask);
+	arg->peer_bw_rxnss_override = 0;
+	nss160 = 1; /* 1x1 default config for VHT160 */
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %pM max_mpdu %d flags 0x%x\n",
-		   sta->addr, arg->peer_max_mpdu, arg->peer_flags);
+	/* only local 4x4 configuration do support 2x2 for VHT160,
+	 * everything else must use 1x1 
+	 */
 
-	if (arg->peer_vht_rates.rx_max_rate &&
-	    (sta->vht_cap.cap & IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_MASK)) {
-		switch (arg->peer_vht_rates.rx_max_rate) {
-		case 1560:
-			/* Must be 2x2 at 160Mhz is all it can do. */
-			arg->peer_bw_rxnss_override = 2;
-			break;
-		case 780:
-			/* Can only do 1x1 at 160Mhz (Long Guard Interval) */
-			arg->peer_bw_rxnss_override = 1;
-			break;
-		}
+	if (ar->cfg_rx_chainmask == 15)
+		nss160 = arg->peer_num_spatial_streams <= 2 ? 1 : 2;
+
+	/* if peer provides 1x1 nss160 information using max rate
+	 * vht information, we reduce local nss160 to 1x1.
+	 * consider that it has been observed that some client
+	 * devices provide zero here, no matter which transmission
+	 * rate is possible. in that case the local nss configuration 
+	 * will be used at maxmimum configuration possible. (see above)
+	 */
+
+	if (arg->peer_vht_rates.rx_max_rate == 780)
+		nss160 = 1;
+
+	/* in case if peer is connected with vht160 or vht80+80,
+         * we need to properly adjust rxnss parameters otherwise 
+	 * firmware will raise a assert 
+	 */
+	switch (arg->peer_phymode) {
+	case MODE_11AC_VHT80_80:
+		arg->peer_bw_rxnss_override = BW_NSS_FWCONF_80_80(nss160);
+	/* fall through */
+	case MODE_11AC_VHT160:
+		arg->peer_bw_rxnss_override |= BW_NSS_FWCONF_160(nss160);
+		break;
+	default:
+		break;
 	}
+
+	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vht peer %pM max_mpdu %d flags 0x%x peer_bw_rxnss_override 0x%x\n",
+		   sta->addr, arg->peer_max_mpdu, arg->peer_flags, 
+		   arg->peer_bw_rxnss_override);
 }
 
 static void ath10k_peer_assoc_h_qos(struct ath10k *ar,
@@ -2695,9 +2717,9 @@ static int ath10k_peer_assoc_prepare(struct ath10k *ar,
 	ath10k_peer_assoc_h_crypto(ar, vif, sta, arg);
 	ath10k_peer_assoc_h_rates(ar, vif, sta, arg);
 	ath10k_peer_assoc_h_ht(ar, vif, sta, arg);
+	ath10k_peer_assoc_h_phymode(ar, vif, sta, arg);
 	ath10k_peer_assoc_h_vht(ar, vif, sta, arg);
 	ath10k_peer_assoc_h_qos(ar, vif, sta, arg);
-	ath10k_peer_assoc_h_phymode(ar, vif, sta, arg);
 
 	return 0;
 }
