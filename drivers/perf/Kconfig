@@ -87,6 +87,16 @@ config QCOM_L3_PMU
 	   Adds the L3 cache PMU into the perf events subsystem for
 	   monitoring L3 cache events.
 
+config QCOM_BANDWIDTH_PMU
+	bool "Qualcomm Technologies Memory Bandwidth PMU"
+	depends on ARCH_QCOM && ARM64 && ACPI
+	select QCOM_IRQ_COMBINER
+	help
+	   Provides support for the memory bandwidth performance monitor unit (PMU)
+	   in Qualcomm Technologies processors.
+	   Adds the Memory Bandwidth PMU into the perf events subsystem for
+	   monitoring memory bandwidth events.
+
 config XGENE_PMU
         depends on ARCH_XGENE
         bool "APM X-Gene SoC PMU"
