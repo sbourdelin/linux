@@ -270,6 +270,11 @@ struct i915_vma_ops {
 	void (*clear_pages)(struct i915_vma *vma);
 };
 
+struct pagestash {
+	spinlock_t lock;
+	struct pagevec pvec;
+};
+
 struct i915_address_space {
 	struct drm_mm mm;
 	struct drm_i915_private *i915;
@@ -324,7 +329,7 @@ struct i915_address_space {
 	 */
 	struct list_head unbound_list;
 
-	struct pagevec free_pages;
+	struct pagestash free_pages;
 	bool pt_kmap_wc;
 
 	/* FIXME: Need a more generic return type */
