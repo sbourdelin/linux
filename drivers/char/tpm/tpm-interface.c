@@ -438,6 +438,14 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 	unsigned long stop;
 	bool need_locality;
 
+	/* chip->ops is made NULL in tpm_class_shutdown()
+	 * This case is hit when tpm_chip_unregister() is called post
+	 * tpm_class_shutdown(), hence exit early and return
+	 * transmit operation not permitted
+	 */
+	if (!chip->ops)
+		return -EPERM;
+
 	rc = tpm_validate_command(chip, space, buf, bufsiz);
 	if (rc == -EINVAL)
 		return rc;
