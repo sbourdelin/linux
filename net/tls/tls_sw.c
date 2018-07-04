@@ -665,9 +665,16 @@ static int decrypt_skb_update(struct sock *sk, struct sk_buff *skb,
 	struct strp_msg *rxm = strp_msg(skb);
 	int err;
 
-	err = decrypt_skb(sk, skb, sgout);
+#ifdef CONFIG_TLS_DEVICE
+	err = tls_device_decrypted(sk, skb);
 	if (err < 0)
 		return err;
+#endif
+	if (!ctx->decrypted) {
+		err = decrypt_skb(sk, skb, sgout);
+		if (err < 0)
+			return err;
+	}
 
 	rxm->offset += tls_ctx->rx.prepend_size;
 	rxm->full_len -= tls_ctx->rx.overhead_size;
@@ -993,6 +1000,10 @@ static int tls_read_size(struct strparser *strp, struct sk_buff *skb)
 		goto read_failure;
 	}
 
+#ifdef CONFIG_TLS_DEVICE
+	handle_device_resync(strp->sk, TCP_SKB_CB(skb)->seq + rxm->offset,
+			     (u64)tls_ctx->rx.rec_seq);
+#endif
 	return data_len + TLS_HEADER_SIZE;
 
 read_failure:
