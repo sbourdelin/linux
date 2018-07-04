@@ -369,7 +369,7 @@ int ubifs_log_start_commit(struct ubifs_info *c, int *ltail_lnum)
 
 	max_len = UBIFS_CS_NODE_SZ + c->jhead_cnt * UBIFS_REF_NODE_SZ;
 	max_len = ALIGN(max_len, c->min_io_size);
-	buf = cs = kmalloc(max_len, GFP_NOFS);
+	buf = cs = kzalloc(max_len, GFP_NOFS);
 	if (!buf)
 		return -ENOMEM;
 
