@@ -759,6 +759,7 @@ struct sdw_stream_runtime *sdw_alloc_stream(char *stream_name)
 	stream->name = stream_name;
 	INIT_LIST_HEAD(&stream->master_list);
 	stream->state = SDW_STREAM_ALLOCATED;
+	stream->m_rt_count = 0;
 
 	return stream;
 }
@@ -968,6 +969,7 @@ int sdw_stream_remove_master(struct sdw_bus *bus,
 	if (list_empty(&stream->master_list))
 		stream->state = SDW_STREAM_RELEASED;
 
+	stream->m_rt_count--;
 	mutex_unlock(&bus->bus_lock);
 
 	return 0;
@@ -1165,6 +1167,8 @@ int sdw_stream_add_master(struct sdw_bus *bus,
 	ret = sdw_master_port_config(bus, m_rt, port_config, num_ports);
 	if (ret)
 		goto stream_error;
+
+	stream->m_rt_count++;
 
 	goto unlock;
 
