@@ -22,6 +22,7 @@
 #include <linux/math64.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
+#include <linux/of.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -65,6 +66,7 @@ struct sp805_wdt {
 	spinlock_t			lock;
 	void __iomem			*base;
 	struct clk			*clk;
+	u64				rate;
 	struct amba_device		*adev;
 	unsigned int			load_val;
 };
@@ -80,7 +82,10 @@ static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
 	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
 	u64 load, rate;
 
-	rate = clk_get_rate(wdt->clk);
+	if (wdt->rate)
+		rate = wdt->rate;
+	else
+		rate = clk_get_rate(wdt->clk);
 
 	/*
 	 * sp805 runs counter with given value twice, after the end of first
@@ -108,7 +113,10 @@ static unsigned int wdt_timeleft(struct watchdog_device *wdd)
 	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
 	u64 load, rate;
 
-	rate = clk_get_rate(wdt->clk);
+	if (wdt->rate)
+		rate = wdt->rate;
+	else
+		rate = clk_get_rate(wdt->clk);
 
 	spin_lock(&wdt->lock);
 	load = readl_relaxed(wdt->base + WDTVALUE);
@@ -230,10 +238,21 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
 
 	wdt->clk = devm_clk_get(&adev->dev, NULL);
 	if (IS_ERR(wdt->clk)) {
-		dev_warn(&adev->dev, "Clock not found\n");
-		ret = PTR_ERR(wdt->clk);
-		goto err;
+		dev_warn(&adev->dev, "Clock device not found\n");
+		wdt->clk = NULL;
+		/*
+		 * When Driver probe with ACPI device, clock devices
+		 * are not available, so watchdog rate get from
+		 * clock-frequency property given in _DSD object.
+		 */
+		device_property_read_u64(&adev->dev, "clock-frequency",
+					 &wdt->rate);
+		if (!wdt->rate) {
+			ret = -ENODEV;
+			goto err;
+		}
 	}
+
 
 	wdt->adev = adev;
 	wdt->wdd.info = &wdt_info;
