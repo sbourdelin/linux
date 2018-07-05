@@ -311,6 +311,26 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 EXPORT_SYMBOL_GPL(spi_mem_exec_op);
 
 /**
+ * spi_mem_get_name() - Let drivers using the SPI mem interface specify a
+ *			custom name for the memory to avoid compatibility
+ *			issues with ported drivers.
+ * @mem: the SPI memory
+ *
+ * When porting (Q)SPI controller drivers from the MTD layer to the SPI
+ * layer, the naming scheme for the memory devices changes. To be able to
+ * keep compatibility with the old drivers naming scheme, this function can
+ * be used to get a custom name from the controller driver.
+ * If no custom name is available, the name of the SPI device is returned.
+ *
+ * Return: a char array that contains the name for the flash memory
+ */
+const char *spi_mem_get_name(struct spi_mem *mem)
+{
+	return mem->name;
+}
+EXPORT_SYMBOL_GPL(spi_mem_get_name);
+
+/**
  * spi_mem_adjust_op_size() - Adjust the data size of a SPI mem operation to
  *			      match controller limitations
  * @mem: the SPI memory
@@ -344,6 +364,7 @@ static inline struct spi_mem_driver *to_spi_mem_drv(struct device_driver *drv)
 static int spi_mem_probe(struct spi_device *spi)
 {
 	struct spi_mem_driver *memdrv = to_spi_mem_drv(spi->dev.driver);
+	struct spi_controller *ctlr = spi->controller;
 	struct spi_mem *mem;
 
 	mem = devm_kzalloc(&spi->dev, sizeof(*mem), GFP_KERNEL);
@@ -351,6 +372,15 @@ static int spi_mem_probe(struct spi_device *spi)
 		return -ENOMEM;
 
 	mem->spi = spi;
+
+	if (ctlr->mem_ops && ctlr->mem_ops->get_name)
+		mem->name = ctlr->mem_ops->get_name(mem);
+	else
+		mem->name = dev_name(&spi->dev);
+
+	if (IS_ERR_OR_NULL(mem->name))
+		return PTR_ERR(mem->name);
+
 	spi_set_drvdata(spi, mem);
 
 	return memdrv->probe(mem);
