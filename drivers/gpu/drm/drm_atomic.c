@@ -1768,15 +1768,43 @@ EXPORT_SYMBOL(drm_atomic_commit);
 int drm_atomic_nonblocking_commit(struct drm_atomic_state *state)
 {
 	struct drm_mode_config *config = &state->dev->mode_config;
-	int ret;
+	unsigned requested_crtc = 0;
+	unsigned affected_crtc = 0;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+	bool nonblocking = true;
+	int ret, i;
+
+	/*
+	 * For commits that allow modesets drivers can add other CRTCs to the
+	 * atomic commit, e.g. when they need to reallocate global resources.
+	 *
+	 * But when userspace also requests a nonblocking commit then userspace
+	 * cannot know that the commit affects other CRTCs, which can result in
+	 * spurious EBUSY failures. Until we have better uapi plug this by
+	 * demoting such commits to blocking mode.
+	 */
+	for_each_new_crtc_in_state(state, crtc, crtc_state, i)
+		requested_crtc |= drm_crtc_mask(crtc);
 
 	ret = drm_atomic_check_only(state);
 	if (ret)
 		return ret;
 
-	DRM_DEBUG_ATOMIC("committing %p nonblocking\n", state);
+	for_each_new_crtc_in_state(state, crtc, crtc_state, i)
+		affected_crtc |= drm_crtc_mask(crtc);
 
-	return config->funcs->atomic_commit(state->dev, state, true);
+	if (affected_crtc != requested_crtc) {
+		/* adding other CRTC is only allowed for modeset commits */
+		WARN_ON(!state->allow_modeset);
+
+		DRM_DEBUG_ATOMIC("demoting %p to blocking mode to avoid EBUSY\n", state);
+		nonblocking = false;
+	} else {
+		DRM_DEBUG_ATOMIC("committing %p nonblocking\n", state);
+	}
+
+	return config->funcs->atomic_commit(state->dev, state, nonblocking);
 }
 EXPORT_SYMBOL(drm_atomic_nonblocking_commit);
 
