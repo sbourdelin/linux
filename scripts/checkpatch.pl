@@ -5372,6 +5372,12 @@ sub process {
 			     "Avoid line continuations in quoted strings\n" . $herecurr);
 		}
 
+# dsb is too ARMish, and should usually be mb.
+        if ($line =~ /[^-_>*\.]\bdsb\b[^-_\.;]/) {
+            WARN("ARM_BARRIER",
+                 "Use of dsb is discouranged: prefer mb.\n" .
+                 $herecurr);
+		}
 # warn about #if 0
 		if ($line =~ /^.\s*\#\s*if\s+0\b/) {
 			CHK("REDUNDANT_CODE",
