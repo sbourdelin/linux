@@ -220,6 +220,26 @@ static int arm_pmu_acpi_cpu_starting(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * Check if the given child device of the CPU device matches a PMU variant
+ * device declared with ACPI_DECLARE_PMU_VARIANT, if so, pass the arm_pmu
+ * structure and the matching device for further initialization.
+ */
+static int arm_pmu_variant_init(struct device *dev, void *data)
+{
+	extern struct acpi_device_id ACPI_PROBE_TABLE(pmu);
+	unsigned int cpu = *((unsigned int *)data);
+	const struct acpi_device_id *id;
+
+	id = acpi_match_device(&ACPI_PROBE_TABLE(pmu), dev);
+	if (id) {
+		armpmu_acpi_init_fn fn = (armpmu_acpi_init_fn)id->driver_data;
+
+		return fn(per_cpu(probed_pmus, cpu), dev);
+	}
+	return 0;
+}
+
 int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
 {
 	int pmu_idx = 0;
@@ -240,6 +260,7 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
 	 */
 	for_each_possible_cpu(cpu) {
 		struct arm_pmu *pmu = per_cpu(probed_pmus, cpu);
+		struct device *dev = get_cpu_device(cpu);
 		char *base_name;
 
 		if (!pmu || pmu->name)
@@ -253,6 +274,10 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
 			pr_warn("Unable to initialise PMU for CPU%d\n", cpu);
 			return ret;
 		}
+
+		ret = device_for_each_child(dev, &cpu, arm_pmu_variant_init);
+		if (ret == -ENODEV)
+			pr_warn("Failed PMU re-init, fallback to plain PMUv3");
 
 		base_name = pmu->name;
 		pmu->name = kasprintf(GFP_KERNEL, "%s_%d", base_name, pmu_idx++);
@@ -290,3 +315,5 @@ static int arm_pmu_acpi_init(void)
 	return ret;
 }
 subsys_initcall(arm_pmu_acpi_init)
+
+ACPI_DECLARE_PMU_SENTINEL();
