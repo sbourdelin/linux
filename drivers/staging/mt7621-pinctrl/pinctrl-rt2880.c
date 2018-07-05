@@ -54,7 +54,7 @@ static int rt2880_get_group_count(struct pinctrl_dev *pctrldev)
 }
 
 static const char *rt2880_get_group_name(struct pinctrl_dev *pctrldev,
-					 unsigned group)
+					 unsigned int group)
 {
 	struct rt2880_priv *p = pinctrl_dev_get_drvdata(pctrldev);
 
@@ -65,9 +65,9 @@ static const char *rt2880_get_group_name(struct pinctrl_dev *pctrldev,
 }
 
 static int rt2880_get_group_pins(struct pinctrl_dev *pctrldev,
-				 unsigned group,
-				 const unsigned **pins,
-				 unsigned *num_pins)
+				 unsigned int group,
+				 const unsigned int **pins,
+				 unsigned int *num_pins)
 {
 	struct rt2880_priv *p = pinctrl_dev_get_drvdata(pctrldev);
 
@@ -81,7 +81,8 @@ static int rt2880_get_group_pins(struct pinctrl_dev *pctrldev,
 }
 
 static void rt2880_pinctrl_dt_free_map(struct pinctrl_dev *pctrldev,
-				    struct pinctrl_map *map, unsigned num_maps)
+				    struct pinctrl_map *map,
+				    unsigned int num_maps)
 {
 	int i;
 
@@ -94,7 +95,7 @@ static void rt2880_pinctrl_dt_free_map(struct pinctrl_dev *pctrldev,
 
 static void rt2880_pinctrl_pin_dbg_show(struct pinctrl_dev *pctrldev,
 					struct seq_file *s,
-					unsigned offset)
+					unsigned int offset)
 {
 	seq_printf(s, "ralink pio");
 }
@@ -127,7 +128,7 @@ static void rt2880_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctrldev,
 static int rt2880_pinctrl_dt_node_to_map(struct pinctrl_dev *pctrldev,
 				struct device_node *np_config,
 				struct pinctrl_map **map,
-				unsigned *num_maps)
+				unsigned int *num_maps)
 {
 	int max_maps = 0;
 	struct pinctrl_map *tmp;
@@ -173,7 +174,7 @@ static int rt2880_pmx_func_count(struct pinctrl_dev *pctrldev)
 }
 
 static const char *rt2880_pmx_func_name(struct pinctrl_dev *pctrldev,
-					 unsigned func)
+					 unsigned int func)
 {
 	struct rt2880_priv *p = pinctrl_dev_get_drvdata(pctrldev);
 
@@ -181,9 +182,9 @@ static const char *rt2880_pmx_func_name(struct pinctrl_dev *pctrldev,
 }
 
 static int rt2880_pmx_group_get_groups(struct pinctrl_dev *pctrldev,
-				unsigned func,
+				unsigned int func,
 				const char * const **groups,
-				unsigned * const num_groups)
+				unsigned int * const num_groups)
 {
 	struct rt2880_priv *p = pinctrl_dev_get_drvdata(pctrldev);
 
@@ -198,8 +199,8 @@ static int rt2880_pmx_group_get_groups(struct pinctrl_dev *pctrldev,
 }
 
 static int rt2880_pmx_group_enable(struct pinctrl_dev *pctrldev,
-				unsigned func,
-				unsigned group)
+				unsigned int func,
+				unsigned int group)
 {
 	struct rt2880_priv *p = pinctrl_dev_get_drvdata(pctrldev);
         u32 mode = 0;
@@ -243,7 +244,7 @@ static int rt2880_pmx_group_enable(struct pinctrl_dev *pctrldev,
 
 static int rt2880_pmx_group_gpio_request_enable(struct pinctrl_dev *pctrldev,
 				struct pinctrl_gpio_range *range,
-				unsigned pin)
+				unsigned int pin)
 {
 	struct rt2880_priv *p = pinctrl_dev_get_drvdata(pctrldev);
 
