@@ -255,8 +255,6 @@ static struct ib_ah *rxe_create_ah(struct ib_pd *ibpd,
 	rxe_init_av(rxe, attr, &ah->av);
 	return &ah->ibah;
 
-	rxe_drop_ref(pd);
-	rxe_drop_ref(ah);
 err1:
 	return ERR_PTR(err);
 }
