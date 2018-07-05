@@ -1606,6 +1606,7 @@ out_unlock:
  */
 static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
 {
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	kvm_pfn_t pfn;
@@ -1615,7 +1616,18 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
 
 	spin_lock(&vcpu->kvm->mmu_lock);
 
-	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
+	pud = stage2_get_pud(vcpu->kvm, NULL, fault_ipa);
+	if (!pud || pud_none(*pud))
+		goto out;		/* Nothing there */
+
+	if (pud_huge(*pud)) {		/* HugeTLB */
+		*pud = kvm_s2pud_mkyoung(*pud);
+		pfn = kvm_pud_pfn(*pud);
+		pfn_valid = true;
+		goto out;
+	}
+
+	pmd = stage2_pmd_offset(pud, fault_ipa);
 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
 		goto out;
 
