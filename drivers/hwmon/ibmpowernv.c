@@ -73,6 +73,10 @@ static struct sensor_group {
 	struct attribute_group group;
 	u32 attr_count;
 	u32 hwmon_index;
+	struct mutex mutex;
+	u32 *gid;
+	u32 nr_gid;
+	bool enable;
 } sensor_groups[] = {
 	{ "fan"   },
 	{ "temp"  },
@@ -105,6 +109,9 @@ static ssize_t show_sensor(struct device *dev, struct device_attribute *devattr,
 	ssize_t ret;
 	u64 x;
 
+	if (!sensor_groups[sdata->type].enable)
+		return -ENODATA;
+
 	ret =  opal_get_sensor_data_u64(sdata->id, &x);
 
 	if (ret)
@@ -118,6 +125,46 @@ static ssize_t show_sensor(struct device *dev, struct device_attribute *devattr,
 		x *= 1000000;
 
 	return sprintf(buf, "%llu\n", x);
+}
+
+static ssize_t show_enable(struct device *dev,
+			   struct device_attribute *devattr, char *buf)
+{
+	struct sensor_data *sdata = container_of(devattr, struct sensor_data,
+						 dev_attr);
+
+	return sprintf(buf, "%u\n", sensor_groups[sdata->type].enable);
+}
+
+static ssize_t store_enable(struct device *dev,
+			    struct device_attribute *devattr,
+			    const char *buf, size_t count)
+{
+	struct sensor_data *sdata = container_of(devattr, struct sensor_data,
+						 dev_attr);
+	struct sensor_group *sg = &sensor_groups[sdata->type];
+	int ret, i;
+	bool data;
+
+	ret = kstrtobool(buf, &data);
+	if (ret)
+		return ret;
+
+	ret = mutex_lock_interruptible(&sg->mutex);
+	if (ret)
+		return ret;
+
+	if (data != sg->enable)
+		for (i = 0; i < sg->nr_gid && !ret; i++)
+			ret =  sensor_group_enable(sg->gid[i], data);
+
+	if (!ret) {
+		sg->enable = data;
+		ret = count;
+	}
+
+	mutex_unlock(&sg->mutex);
+	return ret;
 }
 
 static ssize_t show_label(struct device *dev, struct device_attribute *devattr,
@@ -292,12 +339,67 @@ static u32 get_sensor_hwmon_index(struct sensor_data *sdata,
 	return ++sensor_groups[sdata->type].hwmon_index;
 }
 
+static int init_sensor_group_data(struct platform_device *pdev)
+{
+	struct device_node *groups, *sg;
+	enum sensors type;
+	int ret = 0, i;
+
+	for (i = 0; i < MAX_SENSOR_TYPE; i++) {
+		sensor_groups[i].nr_gid = 0;
+		sensor_groups[i].enable = true;
+	}
+
+	groups = of_find_node_by_path("/ibm,opal/sensor-groups");
+	if (!groups)
+		return ret;
+
+	for (i = 0; i < MAX_SENSOR_TYPE; i++) {
+		u32 gid[256];
+		u32 id, size;
+
+		for_each_child_of_node(groups, sg) {
+			type = get_sensor_type(sg);
+			if (type != i)
+				continue;
+
+			if (of_property_read_u32(sg, "sensor-group-id", &id))
+				continue;
+
+			gid[sensor_groups[i].nr_gid++] = id;
+		}
+
+		if (!sensor_groups[i].nr_gid)
+			continue;
+
+		size = sensor_groups[i].nr_gid * sizeof(u32);
+		sensor_groups[i].gid = devm_kzalloc(&pdev->dev, size,
+						    GFP_KERNEL);
+		if (!sensor_groups[i].gid) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		memcpy(sensor_groups[i].gid, gid, size);
+		sensor_groups[i].enable = false;
+		mutex_init(&sensor_groups[i].mutex);
+	}
+
+	of_node_put(groups);
+	return ret;
+}
+
 static int populate_attr_groups(struct platform_device *pdev)
 {
 	struct platform_data *pdata = platform_get_drvdata(pdev);
 	const struct attribute_group **pgroups = pdata->attr_groups;
 	struct device_node *opal, *np;
+	int ret;
 	enum sensors type;
+
+	ret = init_sensor_group_data(pdev);
+	if (ret)
+		return ret;
 
 	opal = of_find_node_by_path("/ibm,opal/sensors");
 	for_each_child_of_node(opal, np) {
@@ -313,13 +415,15 @@ static int populate_attr_groups(struct platform_device *pdev)
 		sensor_groups[type].attr_count++;
 
 		/*
-		 * add attributes for labels, min and max
+		 * add attributes for labels, min, max and enable
 		 */
 		if (!of_property_read_string(np, "label", &label))
 			sensor_groups[type].attr_count++;
 		if (of_find_property(np, "sensor-data-min", NULL))
 			sensor_groups[type].attr_count++;
 		if (of_find_property(np, "sensor-data-max", NULL))
+			sensor_groups[type].attr_count++;
+		if (sensor_groups[type].nr_gid)
 			sensor_groups[type].attr_count++;
 	}
 
@@ -344,7 +448,10 @@ static int populate_attr_groups(struct platform_device *pdev)
 static void create_hwmon_attr(struct sensor_data *sdata, const char *attr_name,
 			      ssize_t (*show)(struct device *dev,
 					      struct device_attribute *attr,
-					      char *buf))
+					      char *buf),
+			    ssize_t (*store)(struct device *dev,
+					     struct device_attribute *attr,
+					     const char *buf, size_t count))
 {
 	snprintf(sdata->name, MAX_ATTR_LEN, "%s%d_%s",
 		 sensor_groups[sdata->type].name, sdata->hwmon_index,
@@ -352,8 +459,13 @@ static void create_hwmon_attr(struct sensor_data *sdata, const char *attr_name,
 
 	sysfs_attr_init(&sdata->dev_attr.attr);
 	sdata->dev_attr.attr.name = sdata->name;
-	sdata->dev_attr.attr.mode = S_IRUGO;
 	sdata->dev_attr.show = show;
+	if (store) {
+		sdata->dev_attr.store = store;
+		sdata->dev_attr.attr.mode = 0664;
+	} else {
+		sdata->dev_attr.attr.mode = 0444;
+	}
 }
 
 static void populate_sensor(struct sensor_data *sdata, int od, int hd, int sid,
@@ -361,13 +473,16 @@ static void populate_sensor(struct sensor_data *sdata, int od, int hd, int sid,
 			    const struct attribute_group *pgroup,
 			    ssize_t (*show)(struct device *dev,
 					    struct device_attribute *attr,
-					    char *buf))
+					    char *buf),
+			    ssize_t (*store)(struct device *dev,
+					     struct device_attribute *attr,
+					     const char *buf, size_t count))
 {
 	sdata->id = sid;
 	sdata->type = type;
 	sdata->opal_index = od;
 	sdata->hwmon_index = hd;
-	create_hwmon_attr(sdata, attr_name, show);
+	create_hwmon_attr(sdata, attr_name, show, store);
 	pgroup->attrs[sensor_groups[type].attr_count++] = &sdata->dev_attr.attr;
 }
 
@@ -408,18 +523,16 @@ static int create_device_attrs(struct platform_device *pdev)
 	u32 count = 0;
 	int err = 0;
 
-	opal = of_find_node_by_path("/ibm,opal/sensors");
 	sdata = devm_kcalloc(&pdev->dev,
 			     pdata->sensors_count, sizeof(*sdata),
 			     GFP_KERNEL);
-	if (!sdata) {
-		err = -ENOMEM;
-		goto exit_put_node;
-	}
+	if (!sdata)
+		return -ENOMEM;
 
+	opal = of_find_node_by_path("/ibm,opal/sensors");
 	for_each_child_of_node(opal, np) {
 		const char *attr_name;
-		u32 opal_index;
+		u32 opal_index, hw_id;
 		const char *label;
 
 		if (np->name == NULL)
@@ -456,14 +569,11 @@ static int create_device_attrs(struct platform_device *pdev)
 			opal_index = INVALID_INDEX;
 		}
 
-		sdata[count].opal_index = opal_index;
-		sdata[count].hwmon_index =
-			get_sensor_hwmon_index(&sdata[count], sdata, count);
-
-		create_hwmon_attr(&sdata[count], attr_name, show_sensor);
-
-		pgroups[type]->attrs[sensor_groups[type].attr_count++] =
-				&sdata[count++].dev_attr.attr;
+		hw_id = get_sensor_hwmon_index(&sdata[count], sdata, count);
+		populate_sensor(&sdata[count], opal_index, hw_id, sensor_id,
+				attr_name, type, pgroups[type], show_sensor,
+				NULL);
+		count++;
 
 		if (!of_property_read_string(np, "label", &label)) {
 			/*
@@ -474,33 +584,49 @@ static int create_device_attrs(struct platform_device *pdev)
 			 */
 
 			make_sensor_label(np, &sdata[count], label);
-			populate_sensor(&sdata[count], opal_index,
-					sdata[count - 1].hwmon_index,
+			populate_sensor(&sdata[count], opal_index, hw_id,
 					sensor_id, "label", type, pgroups[type],
-					show_label);
+					show_label, NULL);
 			count++;
 		}
 
 		if (!of_property_read_u32(np, "sensor-data-max", &sensor_id)) {
 			attr_name = get_max_attr(type);
-			populate_sensor(&sdata[count], opal_index,
-					sdata[count - 1].hwmon_index,
+			populate_sensor(&sdata[count], opal_index, hw_id,
 					sensor_id, attr_name, type,
-					pgroups[type], show_sensor);
+					pgroups[type], show_sensor, NULL);
 			count++;
 		}
 
 		if (!of_property_read_u32(np, "sensor-data-min", &sensor_id)) {
 			attr_name = get_min_attr(type);
-			populate_sensor(&sdata[count], opal_index,
-					sdata[count - 1].hwmon_index,
+			populate_sensor(&sdata[count], opal_index, hw_id,
 					sensor_id, attr_name, type,
-					pgroups[type], show_sensor);
+					pgroups[type], show_sensor, NULL);
 			count++;
 		}
+
+		if (sensor_groups[type].nr_gid) {
+			ssize_t (*store)(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t count);
+
+			if (!sensor_groups[type].enable) {
+				sensor_groups[type].enable = true;
+				store = store_enable;
+			} else {
+				store = NULL;
+			}
+
+			sensor_groups[type].enable = true;
+			populate_sensor(&sdata[count], opal_index, hw_id,
+					sensor_id, "enable", type,
+					pgroups[type], show_enable, store);
+			count++;
+		}
+
 	}
 
-exit_put_node:
 	of_node_put(opal);
 	return err;
 }
