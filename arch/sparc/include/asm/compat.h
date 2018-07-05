@@ -5,6 +5,8 @@
  * Architecture specific compatibility types
  */
 #include <linux/types.h>
+#include <linux/thread_info.h>
+#include <asm/thread_info.h>
 
 #define COMPAT_USER_HZ		100
 #define COMPAT_UTS_MACHINE	"sparc\0\0"
