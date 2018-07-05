@@ -9675,6 +9675,7 @@ static bool nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 {
 	int this_cpu = this_rq->cpu;
 	unsigned int flags;
+	struct rq_flags rf;
 
 	if (!(atomic_read(nohz_flags(this_cpu)) & NOHZ_KICK_MASK))
 		return false;
@@ -9690,6 +9691,16 @@ static bool nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 	flags = atomic_fetch_andnot(NOHZ_KICK_MASK, nohz_flags(this_cpu));
 	if (!(flags & NOHZ_KICK_MASK))
 		return false;
+
+	/*
+	 * Ensure this_rq's clock and load are up-to-date before we
+	 * rebalance since it's possible that they haven't been
+	 * updated for multiple schedule periods, i.e. many seconds.
+	 */
+	rq_lock_irqsave(this_rq, &rf);
+	update_rq_clock(this_rq);
+	cpu_load_update_idle(this_rq);
+	rq_unlock_irqrestore(this_rq, &rf);
 
 	_nohz_idle_balance(this_rq, flags, idle);
 
