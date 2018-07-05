@@ -385,6 +385,19 @@ static int renesas_sdhi_select_tuning(struct tmio_mmc_host *host)
 	sd_scc_write32(host, priv, SH_MOBILE_SDHI_SCC_RVSREQ, 0);
 
 	/*
+	 * When tuning CMD19 is issued twice for each tap, merge the
+	 * result requiring the tap to be good in both runs before
+	 * consider it for tuning selection.
+	 */
+	for (i = 0; i < host->tap_num * 2; i++) {
+		if (!test_bit(i, host->taps)) {
+			clear_bit(i % host->tap_num, host->taps);
+			clear_bit((i % host->tap_num) + host->tap_num,
+				  host->taps);
+		}
+	}
+
+	/*
 	 * Find the longest consecutive run of successful probes.  If that
 	 * is more than SH_MOBILE_SDHI_MAX_TAP probes long then use the
 	 * center index as the tap.
