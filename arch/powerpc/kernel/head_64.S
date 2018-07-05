@@ -25,6 +25,7 @@
 #include <linux/threads.h>
 #include <linux/init.h>
 #include <asm/reg.h>
+#include <asm/reg-ftr.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>

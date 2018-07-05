@@ -15,6 +15,7 @@
  */
 
 #include <asm/reg.h>
+#include <asm/reg-ftr.h>
 #include <asm/ppc_asm.h>
 #include <asm/asm-offsets.h>
 #include <asm/export.h>

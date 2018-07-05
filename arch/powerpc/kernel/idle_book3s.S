@@ -25,6 +25,7 @@
 #include <asm/mmu.h>
 #include <asm/asm-compat.h>
 #include <asm/feature-fixups.h>
+#include <asm/reg-ftr.h>
 
 #undef DEBUG
 

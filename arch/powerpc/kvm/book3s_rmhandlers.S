@@ -20,6 +20,7 @@
 #include <asm/ppc_asm.h>
 #include <asm/kvm_asm.h>
 #include <asm/reg.h>
+#include <asm/reg-ftr.h>
 #include <asm/mmu.h>
 #include <asm/page.h>
 #include <asm/asm-offsets.h>

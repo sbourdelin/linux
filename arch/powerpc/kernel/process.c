@@ -65,6 +65,7 @@
 #include <asm/livepatch.h>
 #include <asm/cpu_has_feature.h>
 #include <asm/asm-prototypes.h>
+#include <asm/reg-ftr.h>
 
 #include <linux/kprobes.h>
 #include <linux/kdebug.h>

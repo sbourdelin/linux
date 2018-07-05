@@ -45,6 +45,7 @@
 #include <asm/exception-64e.h>
 #endif
 #include <asm/feature-fixups.h>
+#include <asm/reg-ftr.h>
 
 /*
  * System calls.

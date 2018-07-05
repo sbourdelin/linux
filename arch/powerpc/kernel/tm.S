@@ -11,6 +11,7 @@
 #include <asm/ppc-opcode.h>
 #include <asm/ptrace.h>
 #include <asm/reg.h>
+#include <asm/reg-ftr.h>
 #include <asm/bug.h>
 #include <asm/export.h>
 #include <asm/feature-fixups.h>

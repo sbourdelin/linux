@@ -14,7 +14,6 @@
 #include <linux/stringify.h>
 #include <asm/cputable.h>
 #include <asm/asm-const.h>
-#include <asm/feature-fixups.h>
 
 /* Pickup Book E specific registers. */
 #if defined(CONFIG_BOOKE) || defined(CONFIG_40x)
@@ -1105,38 +1104,6 @@
 #define SPRN_SPRG_VDSO_READ	SPRN_USPRG3
 #define SPRN_SPRG_VDSO_WRITE	SPRN_SPRG3
 
-#define GET_PACA(rX)					\
-	BEGIN_FTR_SECTION_NESTED(66);			\
-	mfspr	rX,SPRN_SPRG_PACA;			\
-	FTR_SECTION_ELSE_NESTED(66);			\
-	mfspr	rX,SPRN_SPRG_HPACA;			\
-	ALT_FTR_SECTION_END_NESTED_IFCLR(CPU_FTR_HVMODE, 66)
-
-#define SET_PACA(rX)					\
-	BEGIN_FTR_SECTION_NESTED(66);			\
-	mtspr	SPRN_SPRG_PACA,rX;			\
-	FTR_SECTION_ELSE_NESTED(66);			\
-	mtspr	SPRN_SPRG_HPACA,rX;			\
-	ALT_FTR_SECTION_END_NESTED_IFCLR(CPU_FTR_HVMODE, 66)
-
-#define GET_SCRATCH0(rX)				\
-	BEGIN_FTR_SECTION_NESTED(66);			\
-	mfspr	rX,SPRN_SPRG_SCRATCH0;			\
-	FTR_SECTION_ELSE_NESTED(66);			\
-	mfspr	rX,SPRN_SPRG_HSCRATCH0;			\
-	ALT_FTR_SECTION_END_NESTED_IFCLR(CPU_FTR_HVMODE, 66)
-
-#define SET_SCRATCH0(rX)				\
-	BEGIN_FTR_SECTION_NESTED(66);			\
-	mtspr	SPRN_SPRG_SCRATCH0,rX;			\
-	FTR_SECTION_ELSE_NESTED(66);			\
-	mtspr	SPRN_SPRG_HSCRATCH0,rX;			\
-	ALT_FTR_SECTION_END_NESTED_IFCLR(CPU_FTR_HVMODE, 66)
-
-#else /* CONFIG_PPC_BOOK3S_64 */
-#define GET_SCRATCH0(rX)	mfspr	rX,SPRN_SPRG_SCRATCH0
-#define SET_SCRATCH0(rX)	mtspr	SPRN_SPRG_SCRATCH0,rX
-
 #endif
 
 #ifdef CONFIG_PPC_BOOK3E_64
@@ -1149,9 +1116,6 @@
 #define SPRN_SPRG_GDBELL_SCRATCH SPRN_SPRG_GEN_SCRATCH
 #define SPRN_SPRG_VDSO_READ	SPRN_USPRG7
 #define SPRN_SPRG_VDSO_WRITE	SPRN_SPRG7
-
-#define SET_PACA(rX)	mtspr	SPRN_SPRG_PACA,rX
-#define GET_PACA(rX)	mfspr	rX,SPRN_SPRG_PACA
 
 #endif
 
@@ -1337,12 +1301,6 @@
 				     : "memory")
 #define __MTMSR		"mtmsr"
 #endif
-
-static inline void mtmsr_isync(unsigned long val)
-{
-	asm volatile(__MTMSR " %0; " ASM_FTR_IFCLR("isync", "nop", %1) : :
-			"r" (val), "i" (CPU_FTR_ARCH_206) : "memory");
-}
 
 #define mfspr(rn)	({unsigned long rval; \
 			asm volatile("mfspr %0," __stringify(rn) \

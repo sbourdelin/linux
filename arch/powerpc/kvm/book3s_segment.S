@@ -21,6 +21,7 @@
 
 #include <asm/asm-compat.h>
 #include <asm/feature-fixups.h>
+#include <asm/reg-ftr.h>
 
 #if defined(CONFIG_PPC_BOOK3S_64)
 
