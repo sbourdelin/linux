@@ -1284,7 +1284,8 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
 {
 	struct resource cpuif_res;
 
-	of_address_to_resource(node, 1, &cpuif_res);
+	if (of_address_to_resource(node, 1, &cpuif_res))
+		return false;
 
 	if (!is_hyp_mode_available())
 		return false;
