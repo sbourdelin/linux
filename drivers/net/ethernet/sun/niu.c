@@ -1225,17 +1225,13 @@ static int link_status_1g_rgmii(struct niu *np, int *link_up_p)
 
 	bmsr = err;
 	if (bmsr & BMSR_LSTATUS) {
-		u16 adv, lpa;
-
 		err = mii_read(np, np->phy_addr, MII_ADVERTISE);
 		if (err < 0)
 			goto out;
-		adv = err;
 
 		err = mii_read(np, np->phy_addr, MII_LPA);
 		if (err < 0)
 			goto out;
-		lpa = err;
 
 		err = mii_read(np, np->phy_addr, MII_ESTATUS);
 		if (err < 0)
