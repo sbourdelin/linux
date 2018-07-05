@@ -334,7 +334,7 @@ static int igt_ctx_exec(void *arg)
 	LIST_HEAD(objects);
 	unsigned long ncontexts, ndwords, dw;
 	bool first_shared_gtt = true;
-	int err = -ENODEV;
+	int err = 0;
 
 	/* Create a few different contexts (with different mm) and write
 	 * through each ctx/mm using the GPU making sure those writes end
@@ -363,7 +363,9 @@ static int igt_ctx_exec(void *arg)
 		}
 		if (IS_ERR(ctx)) {
 			err = PTR_ERR(ctx);
-			goto out_unlock;
+			if (err == -ENODEV) /* no logical ctx support */
+				err = 0;
+			break;
 		}
 
 		for_each_engine(engine, i915, id) {
