@@ -4427,6 +4427,7 @@ sony_pic_read_possible_resource(struct acpi_resource *resource, void *context)
 	default:
 		dprintk("Resource %d isn't an IRQ nor an IO port\n",
 			resource->type);
+		/* fall through */
 
 	case ACPI_RESOURCE_TYPE_END_TAG:
 		return AE_OK;
