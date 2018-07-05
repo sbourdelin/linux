@@ -38,6 +38,7 @@
 #include "thermal.h"
 #include "wow.h"
 #include "swap.h"
+#include "vendor.h"
 
 #define MS(_v, _f) (((_v) & _f##_MASK) >> _f##_LSB)
 #define SM(_v, _f) (((_v) << _f##_LSB) & _f##_MASK)
@@ -1131,6 +1132,8 @@ struct ath10k {
 	enum ath10k_radar_confirmation_state radar_conf_state;
 	struct ath10k_radar_found_info last_radar_info;
 	struct work_struct radar_confirmation_work;
+
+	struct ath10k_vendor vendor;
 
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
