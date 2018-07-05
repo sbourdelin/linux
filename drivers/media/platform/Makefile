@@ -66,6 +66,7 @@ obj-$(CONFIG_VIDEO_RENESAS_JPU)		+= rcar_jpu.o
 obj-$(CONFIG_VIDEO_RENESAS_VSP1)	+= vsp1/
 
 obj-$(CONFIG_VIDEO_ROCKCHIP_RGA)	+= rockchip/rga/
+obj-$(CONFIG_VIDEO_ROCKCHIP_VPU)        += rockchip/vpu/
 
 obj-y	+= omap/
 
