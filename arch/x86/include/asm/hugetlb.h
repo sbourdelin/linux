@@ -3,7 +3,6 @@
 #define _ASM_X86_HUGETLB_H
 
 #include <asm/page.h>
-#include <asm-generic/hugetlb.h>
 
 #define hugepages_supported() boot_cpu_has(X86_FEATURE_PSE)
 
@@ -26,14 +25,6 @@ static inline int prepare_hugepage_range(struct file *file,
 	if (addr & ~huge_page_mask(h))
 		return -EINVAL;
 	return 0;
-}
-
-static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
-					  unsigned long addr, unsigned long end,
-					  unsigned long floor,
-					  unsigned long ceiling)
-{
-	free_pgd_range(tlb, addr, end, floor, ceiling);
 }
 
 static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
@@ -89,5 +80,7 @@ static inline void arch_clear_hugepage_flags(struct page *page)
 #ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
 static inline bool gigantic_page_supported(void) { return true; }
 #endif
+
+#include <asm-generic/hugetlb.h>
 
 #endif /* _ASM_X86_HUGETLB_H */

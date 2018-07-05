@@ -4,7 +4,6 @@
 
 #ifdef CONFIG_HUGETLB_PAGE
 #include <asm/page.h>
-#include <asm-generic/hugetlb.h>
 
 extern struct kmem_cache *hugepte_cache;
 
@@ -113,6 +112,7 @@ static inline void flush_hugetlb_page(struct vm_area_struct *vma,
 void flush_hugetlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
 #endif
 
+#define __HAVE_ARCH_HUGETLB_FREE_PGD_RANGE
 void hugetlb_free_pgd_range(struct mmu_gather *tlb, unsigned long addr,
 			    unsigned long end, unsigned long floor,
 			    unsigned long ceiling);
@@ -192,5 +192,7 @@ static inline pte_t *hugepte_offset(hugepd_t hpd, unsigned long addr,
 	return NULL;
 }
 #endif /* CONFIG_HUGETLB_PAGE */
+
+#include <asm-generic/hugetlb.h>
 
 #endif /* _ASM_POWERPC_HUGETLB_H */
