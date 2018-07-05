@@ -804,6 +804,18 @@ config REGULATOR_TI_ABB
 	  on TI SoCs may be unstable without enabling this as it provides
 	  device specific optimized bias to allow/optimize functionality.
 
+config REGULATOR_STPMU1
+	tristate "ST Microelectronics STPMU1 PMIC Regulators"
+	depends on MFD_STPMU1
+	help
+	  This driver supports ST Microelectronics STPMU1 PMIC voltage
+	  regulators and switches. The STPMU1 regulators supply power to
+	  an application processor as well as to external system
+	  peripherals such as DDR, Flash memories and system devices.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called stpmu1_regulator.
+
 config REGULATOR_STW481X_VMMC
 	bool "ST Microelectronics STW481X VMMC regulator"
 	depends on MFD_STW481X || COMPILE_TEST
