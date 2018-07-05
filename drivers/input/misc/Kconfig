@@ -841,4 +841,15 @@ config INPUT_RAVE_SP_PWRBUTTON
 	  To compile this driver as a module, choose M here: the
 	  module will be called rave-sp-pwrbutton.
 
+config INPUT_STPMU1_ONKEY
+	tristate "STPMU1 PMIC Onkey support"
+	depends on MFD_STPMU1
+	help
+	  Say Y to enable support of onkey embedded into STPMU1 PMIC. onkey
+	  can be used to wakeup from low power modes and force a shut-down on
+	  long press.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called stpmu1_onkey.
+
 endif
