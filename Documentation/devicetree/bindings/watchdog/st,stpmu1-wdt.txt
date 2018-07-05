@@ -1,0 +1,11 @@
+STMicroelectronics STPMU1 Watchdog
+
+Required properties:
+
+- compatible : should be "st,stpmu1-wdt"
+
+Example:
+
+watchdog {
+	compatible = "st,stpmu1-wdt";
+};
