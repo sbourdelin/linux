@@ -7331,6 +7331,7 @@ void migrate_disable(void)
 #endif
 
 	p->migrate_disable++;
+	preempt_disable();
 }
 EXPORT_SYMBOL(migrate_disable);
 
@@ -7354,6 +7355,7 @@ void migrate_enable(void)
 
 	WARN_ON_ONCE(p->migrate_disable <= 0);
 	p->migrate_disable--;
+	preempt_enable();
 }
 EXPORT_SYMBOL(migrate_enable);
 #endif
