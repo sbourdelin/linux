@@ -16,21 +16,14 @@
 #ifndef __ASM_COMPAT_H
 #define __ASM_COMPAT_H
 #ifdef __KERNEL__
-#ifdef CONFIG_COMPAT
 
-/*
- * Architecture specific compatibility types
- */
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/sched/task_stack.h>
 
-#define COMPAT_USER_HZ		100
-#ifdef __AARCH64EB__
-#define COMPAT_UTS_MACHINE	"armv8b\0\0"
-#else
-#define COMPAT_UTS_MACHINE	"armv8l\0\0"
-#endif
+/*
+ * Architecture specific compatibility types
+ */
 
 typedef u32		compat_size_t;
 typedef s32		compat_ssize_t;
@@ -64,6 +57,15 @@ typedef u32		compat_uint_t;
 typedef u32		compat_ulong_t;
 typedef u64		compat_u64;
 typedef u32		compat_uptr_t;
+
+#ifdef CONFIG_COMPAT
+
+#define COMPAT_USER_HZ		100
+#ifdef __AARCH64EB__
+#define COMPAT_UTS_MACHINE	"armv8b\0\0"
+#else
+#define COMPAT_UTS_MACHINE	"armv8l\0\0"
+#endif
 
 struct compat_stat {
 #ifdef __AARCH64EB__
