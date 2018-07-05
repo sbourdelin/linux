@@ -677,8 +677,10 @@ struct perf_event {
 	u64				(*clock)(void);
 	perf_overflow_handler_t		overflow_handler;
 	void				*overflow_handler_context;
-#ifdef CONFIG_BPF_SYSCALL
+#if defined(CONFIG_BPF_SYSCALL) || defined(CONFIG_ARM_PMU_ACPI)
 	perf_overflow_handler_t		orig_overflow_handler;
+#endif
+#ifdef CONFIG_BPF_SYSCALL
 	struct bpf_prog			*prog;
 #endif
 

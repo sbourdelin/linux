@@ -24,6 +24,24 @@
 #define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
 
 /*
+ * Perf Events' indices
+ */
+#define	ARMV8_IDX_CYCLE_COUNTER	0
+#define	ARMV8_IDX_COUNTER0	1
+#define	ARMV8_IDX_COUNTER_LAST(cpu_pmu) \
+	(ARMV8_IDX_CYCLE_COUNTER + cpu_pmu->num_events - 1)
+
+/*
+ * ARMv8 low level PMU access
+ */
+
+/*
+ * Perf Event to low level counters mapping
+ */
+#define	ARMV8_IDX_TO_COUNTER(x)	\
+	(((x) - ARMV8_IDX_COUNTER0) & ARMV8_PMU_COUNTER_MASK)
+
+/*
  * Per-CPU PMCR: config reg
  */
 #define ARMV8_PMU_PMCR_E	(1 << 0) /* Enable all counters */
