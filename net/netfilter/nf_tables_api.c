@@ -82,6 +82,10 @@ static void nft_ctx_init(struct nft_ctx *ctx,
 	ctx->portid	= NETLINK_CB(skb).portid;
 	ctx->report	= nlmsg_report(nlh);
 	ctx->seq	= nlh->nlmsg_seq;
+
+#if IS_ENABLED(CONFIG_NF_CT_NETLINK_TIMEOUT)
+	INIT_LIST_HEAD(&ctx->net->nfct_timeout_list);
+#endif
 }
 
 static struct nft_trans *nft_trans_alloc_gfp(const struct nft_ctx *ctx,
