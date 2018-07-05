@@ -1,0 +1,22 @@
+Qualcomm LPASS Clock Controller Binding
+-----------------------------------------------
+
+Required properties :
+- compatible	: shall contain "qcom,sdm845-lpasscc"
+- #clock-cells	: from common clock binding, shall contain 1.
+- reg		: shall contain base register address and size.
+- reg-names	: shall contain the register names of LPASS domain
+			"lpass_gcc", "lpass_cc", "lpass_qdsp6ss".
+
+Example:
+
+The below node has to be defined in the cases where the LPASS peripheral loader
+would bring the subsystem out of reset.
+
+	lpasscc: clock-controller {
+		compatible = "qcom,sdm845-lpasscc";
+		reg = <0x00147000 0x20>, <0x17014000 0x1f004>,
+			<0x17300020 0x20>;
+		reg-names = "lpass_gcc", "lpass_cc", "lpass_qdsp6ss";
+		#clock-cells = <1>;
+	};
