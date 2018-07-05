@@ -1,0 +1,31 @@
+STMicroelectronics STPMU1 Onkey
+
+Required properties:
+
+- compatible = "st,stpmu1-onkey";
+- interrupt-parent: phandle to the parent interrupt controller
+- interrupts: interrupt line to use
+- interrupt-names = "onkey-falling", "onkey-rising"
+	onkey-falling: happens when onkey is pressed; IT_PONKEY_F of pmic
+	onkey-rising: happens when onkey is released; IT_PONKEY_R of pmic
+
+Optional properties:
+
+- st,onkey-pwroff-enabled: power off on long key-press
+- st,onkey-long-press-seconds: long key-press duration from 1 to 16s
+  (default 16s)
+- st,onkey-clear-cc-flag: onkey is able power on after an
+  over-current shutdown event.
+- st,onkey-pu-inactive: onkey pull up is not active
+
+Example:
+
+onkey {
+	compatible = "st,stpmu1-onkey";
+	interrupt-parent = <&pmic>;
+	interrupts = <7 0>,<6 1>;
+	interrupt-names = "onkey-falling", "onkey-rising";
+	status = "okay";
+	st,onkey-pwroff-enabled;
+	st,onkey-long-press-seconds = <10>;
+};
