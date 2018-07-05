@@ -175,10 +175,10 @@ static int hns_roce_v1_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				       UD_SEND_WQE_U32_36_FLOW_LABEL_M,
 				       UD_SEND_WQE_U32_36_FLOW_LABEL_S, 0);
 			roce_set_field(ud_sq_wqe->u32_36,
-				       UD_SEND_WQE_U32_36_PRIORITY_M,
-				       UD_SEND_WQE_U32_36_PRIORITY_S,
-				       ah->av.sl_tclass_flowlabel >>
-				       HNS_ROCE_SL_SHIFT);
+				      UD_SEND_WQE_U32_36_PRIORITY_M,
+				      UD_SEND_WQE_U32_36_PRIORITY_S,
+				      le32_to_cpu(ah->av.sl_tclass_flowlabel) >>
+				      HNS_ROCE_SL_SHIFT);
 			roce_set_field(ud_sq_wqe->u32_36,
 				       UD_SEND_WQE_U32_36_SGID_INDEX_M,
 				       UD_SEND_WQE_U32_36_SGID_INDEX_S,
@@ -333,7 +333,7 @@ out:
 		doorbell[0] = le32_to_cpu(sq_db.u32_4);
 		doorbell[1] = le32_to_cpu(sq_db.u32_8);
 
-		hns_roce_write64_k(doorbell, qp->sq.db_reg_l);
+		hns_roce_write64_k((__le32 *)doorbell, qp->sq.db_reg_l);
 		qp->sq_next_wqe = ind;
 	}
 
@@ -349,7 +349,7 @@ static int hns_roce_v1_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
 	int nreq = 0;
 	int ind = 0;
 	int i = 0;
-	u32 reg_val = 0;
+	u32 reg_val;
 	unsigned long flags = 0;
 	struct hns_roce_rq_wqe_ctrl *ctrl = NULL;
 	struct hns_roce_wqe_data_seg *scat = NULL;
@@ -402,14 +402,18 @@ out:
 		wmb();
 
 		if (ibqp->qp_type == IB_QPT_GSI) {
+			__le32 tmp;
+
 			/* SW update GSI rq header */
 			reg_val = roce_read(to_hr_dev(ibqp->device),
 					    ROCEE_QP1C_CFG3_0_REG +
 					    QP1C_CFGN_OFFSET * hr_qp->phy_port);
-			roce_set_field(reg_val,
+			tmp = cpu_to_le32(reg_val);
+			roce_set_field(tmp,
 				       ROCEE_QP1C_CFG3_0_ROCEE_QP1C_RQ_HEAD_M,
 				       ROCEE_QP1C_CFG3_0_ROCEE_QP1C_RQ_HEAD_S,
 				       hr_qp->rq.head);
+			reg_val = le32_to_cpu(tmp);
 			roce_write(to_hr_dev(ibqp->device),
 				   ROCEE_QP1C_CFG3_0_REG +
 				   QP1C_CFGN_OFFSET * hr_qp->phy_port, reg_val);
@@ -430,7 +434,8 @@ out:
 			doorbell[0] = le32_to_cpu(rq_db.u32_4);
 			doorbell[1] = le32_to_cpu(rq_db.u32_8);
 
-			hns_roce_write64_k(doorbell, hr_qp->rq.db_reg_l);
+			hns_roce_write64_k((__le32 *)doorbell,
+					   hr_qp->rq.db_reg_l);
 		}
 	}
 	spin_unlock_irqrestore(&hr_qp->rq.lock, flags);
@@ -441,51 +446,63 @@ out:
 static void hns_roce_set_db_event_mode(struct hns_roce_dev *hr_dev,
 				       int sdb_mode, int odb_mode)
 {
+	__le32 tmp;
 	u32 val;
 
 	val = roce_read(hr_dev, ROCEE_GLB_CFG_REG);
-	roce_set_bit(val, ROCEE_GLB_CFG_ROCEE_DB_SQ_MODE_S, sdb_mode);
-	roce_set_bit(val, ROCEE_GLB_CFG_ROCEE_DB_OTH_MODE_S, odb_mode);
+	tmp = cpu_to_le32(val);
+	roce_set_bit(tmp, ROCEE_GLB_CFG_ROCEE_DB_SQ_MODE_S, sdb_mode);
+	roce_set_bit(tmp, ROCEE_GLB_CFG_ROCEE_DB_OTH_MODE_S, odb_mode);
+	val = le32_to_cpu(tmp);
 	roce_write(hr_dev, ROCEE_GLB_CFG_REG, val);
 }
 
 static void hns_roce_set_db_ext_mode(struct hns_roce_dev *hr_dev, u32 sdb_mode,
 				     u32 odb_mode)
 {
+	__le32 tmp;
 	u32 val;
 
 	/* Configure SDB/ODB extend mode */
 	val = roce_read(hr_dev, ROCEE_GLB_CFG_REG);
-	roce_set_bit(val, ROCEE_GLB_CFG_SQ_EXT_DB_MODE_S, sdb_mode);
-	roce_set_bit(val, ROCEE_GLB_CFG_OTH_EXT_DB_MODE_S, odb_mode);
+	tmp = cpu_to_le32(val);
+	roce_set_bit(tmp, ROCEE_GLB_CFG_SQ_EXT_DB_MODE_S, sdb_mode);
+	roce_set_bit(tmp, ROCEE_GLB_CFG_OTH_EXT_DB_MODE_S, odb_mode);
+	val = le32_to_cpu(tmp);
 	roce_write(hr_dev, ROCEE_GLB_CFG_REG, val);
 }
 
 static void hns_roce_set_sdb(struct hns_roce_dev *hr_dev, u32 sdb_alept,
 			     u32 sdb_alful)
 {
+	__le32 tmp;
 	u32 val;
 
 	/* Configure SDB */
 	val = roce_read(hr_dev, ROCEE_DB_SQ_WL_REG);
-	roce_set_field(val, ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_M,
+	tmp = cpu_to_le32(val);
+	roce_set_field(tmp, ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_M,
 		       ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_S, sdb_alful);
-	roce_set_field(val, ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_EMPTY_M,
+	roce_set_field(tmp, ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_EMPTY_M,
 		       ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_EMPTY_S, sdb_alept);
+	val = le32_to_cpu(tmp);
 	roce_write(hr_dev, ROCEE_DB_SQ_WL_REG, val);
 }
 
 static void hns_roce_set_odb(struct hns_roce_dev *hr_dev, u32 odb_alept,
 			     u32 odb_alful)
 {
+	__le32 tmp;
 	u32 val;
 
 	/* Configure ODB */
 	val = roce_read(hr_dev, ROCEE_DB_OTHERS_WL_REG);
-	roce_set_field(val, ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_M,
+	tmp = cpu_to_le32(val);
+	roce_set_field(tmp, ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_M,
 		       ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_S, odb_alful);
-	roce_set_field(val, ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_EMPTY_M,
+	roce_set_field(tmp, ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_EMPTY_M,
 		       ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_EMPTY_S, odb_alept);
+	val = le32_to_cpu(tmp);
 	roce_write(hr_dev, ROCEE_DB_OTHERS_WL_REG, val);
 }
 
@@ -496,6 +513,7 @@ static void hns_roce_set_sdb_ext(struct hns_roce_dev *hr_dev, u32 ext_sdb_alept,
 	struct hns_roce_v1_priv *priv;
 	struct hns_roce_db_table *db;
 	dma_addr_t sdb_dma_addr;
+	__le32 tmp;
 	u32 val;
 
 	priv = (struct hns_roce_v1_priv *)hr_dev->priv;
@@ -511,7 +529,8 @@ static void hns_roce_set_sdb_ext(struct hns_roce_dev *hr_dev, u32 ext_sdb_alept,
 
 	/* Configure extend SDB depth */
 	val = roce_read(hr_dev, ROCEE_EXT_DB_SQ_H_REG);
-	roce_set_field(val, ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_SHIFT_M,
+	tmp = cpu_to_le32(val);
+	roce_set_field(tmp, ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_SHIFT_M,
 		       ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_SHIFT_S,
 		       db->ext_db->esdb_dep);
 	/*
@@ -519,8 +538,9 @@ static void hns_roce_set_sdb_ext(struct hns_roce_dev *hr_dev, u32 ext_sdb_alept,
 	 * using 4K page, and shift more 32 because of
 	 * caculating the high 32 bit value evaluated to hardware.
 	 */
-	roce_set_field(val, ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_BA_H_M,
+	roce_set_field(tmp, ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_BA_H_M,
 		       ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_BA_H_S, sdb_dma_addr >> 44);
+	val = le32_to_cpu(tmp);
 	roce_write(hr_dev, ROCEE_EXT_DB_SQ_H_REG, val);
 
 	dev_dbg(dev, "ext SDB depth: 0x%x\n", db->ext_db->esdb_dep);
@@ -535,6 +555,7 @@ static void hns_roce_set_odb_ext(struct hns_roce_dev *hr_dev, u32 ext_odb_alept,
 	struct hns_roce_v1_priv *priv;
 	struct hns_roce_db_table *db;
 	dma_addr_t odb_dma_addr;
+	__le32 tmp;
 	u32 val;
 
 	priv = (struct hns_roce_v1_priv *)hr_dev->priv;
@@ -550,12 +571,14 @@ static void hns_roce_set_odb_ext(struct hns_roce_dev *hr_dev, u32 ext_odb_alept,
 
 	/* Configure extend ODB depth */
 	val = roce_read(hr_dev, ROCEE_EXT_DB_OTH_H_REG);
-	roce_set_field(val, ROCEE_EXT_DB_OTH_H_EXT_DB_OTH_SHIFT_M,
+	tmp = cpu_to_le32(val);
+	roce_set_field(tmp, ROCEE_EXT_DB_OTH_H_EXT_DB_OTH_SHIFT_M,
 		       ROCEE_EXT_DB_OTH_H_EXT_DB_OTH_SHIFT_S,
 		       db->ext_db->eodb_dep);
-	roce_set_field(val, ROCEE_EXT_DB_SQ_H_EXT_DB_OTH_BA_H_M,
+	roce_set_field(tmp, ROCEE_EXT_DB_SQ_H_EXT_DB_OTH_BA_H_M,
 		       ROCEE_EXT_DB_SQ_H_EXT_DB_OTH_BA_H_S,
 		       db->ext_db->eodb_dep);
+	val = le32_to_cpu(tmp);
 	roce_write(hr_dev, ROCEE_EXT_DB_OTH_H_REG, val);
 
 	dev_dbg(dev, "ext ODB depth: 0x%x\n", db->ext_db->eodb_dep);
