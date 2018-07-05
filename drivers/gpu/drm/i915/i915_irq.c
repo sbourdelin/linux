@@ -1713,6 +1713,8 @@ static void intel_get_hpd_pins(struct drm_i915_private *dev_priv,
 {
 	enum hpd_pin pin;
 
+	BUILD_BUG_ON(HPD_NUM_PINS > 32);
+
 	for_each_hpd_pin(pin) {
 		if ((hpd[pin] & hotplug_trigger) == 0)
 			continue;
