@@ -1038,10 +1038,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
 
 static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
 {
+	pud_t *pudp;
 	pmd_t *pmdp;
 	pte_t *ptep;
 
-	pmdp = stage2_get_pmd(kvm, NULL, addr);
+	pudp = stage2_get_pud(kvm, NULL, addr);
+	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
+		return false;
+
+	if (pud_huge(*pudp))
+		return kvm_s2pud_exec(pudp);
+
+	pmdp = stage2_pmd_offset(pudp, addr);
 	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
 		return false;
 

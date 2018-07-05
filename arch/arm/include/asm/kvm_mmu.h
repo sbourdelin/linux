@@ -96,6 +96,12 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
 }
 
 
+static inline bool kvm_s2pud_exec(pud_t *pud)
+{
+	BUG();
+	return false;
+}
+
 static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
 {
 	*pmd = new_pmd;
