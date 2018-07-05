@@ -4,6 +4,7 @@
 
 #ifdef __KERNEL__
 #include <linux/compiler.h>
+#include <asm/synch-ftr.h>
 #include <asm/synch.h>
 #include <linux/bug.h>
 #include <asm/asm-405.h>

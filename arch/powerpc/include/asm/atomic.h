@@ -11,6 +11,7 @@
 #include <asm/cmpxchg.h>
 #include <asm/barrier.h>
 #include <asm/asm-405.h>
+#include <asm/synch-ftr.h>
 
 #define ATOMIC_INIT(i)		{ (i) }
 

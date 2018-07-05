@@ -44,6 +44,7 @@
 
 #include <linux/compiler.h>
 #include <asm/asm-compat.h>
+#include <asm/synch-ftr.h>
 #include <asm/synch.h>
 #include <asm/asm-405.h>
 

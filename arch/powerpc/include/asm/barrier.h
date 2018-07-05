@@ -6,6 +6,7 @@
 #define _ASM_POWERPC_BARRIER_H
 
 #include <asm/asm-const.h>
+#include <asm/synch-ftr.h>
 
 /*
  * Memory barrier.
