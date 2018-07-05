@@ -228,7 +228,8 @@
 	. = ALIGN(8);							\
 	__##name##_acpi_probe_table = .;				\
 	KEEP(*(__##name##_acpi_probe_table))				\
-	__##name##_acpi_probe_table_end = .;
+	__##name##_acpi_probe_table_end = .;				\
+	KEEP(*(__##name##_acpi_probe_table_end))
 #else
 #define ACPI_PROBE_TABLE(name)
 #endif
