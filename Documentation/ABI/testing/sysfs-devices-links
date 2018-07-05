@@ -1,0 +1,13 @@
+What:		/sys/devices/.../consumers
+Date:		July 2018
+Contact:	Ioana Ciornei <ioana.ciornei@nxp.com>
+Description:
+		Read-only attribute that lists the devices that have a device
+		link which denodes a consumer relationship to this device.
+
+What:		/sys/devices/.../suppliers
+Date:		July 2018
+Contact:	Ioana Ciornei <ioana.ciornei@nxp.com>
+Description:
+		Read-only attribute that lists the devices that have a device
+		link which denodes a supplier relationship to this device.
