@@ -66,6 +66,8 @@ enum {
 	IPSET_ATTR_LINENO,	/* 9: Restore lineno */
 	IPSET_ATTR_PROTOCOL_MIN, /* 10: Minimal supported version number */
 	IPSET_ATTR_REVISION_MIN	= IPSET_ATTR_PROTOCOL_MIN, /* type rev min */
+	/* attributes not sent by default (see IPSET_FLAG_EXTRA_DATA) */
+	IPSET_ATTR_INDEX,   /* 11: Index of the set */
 	__IPSET_ATTR_CMD_MAX,
 };
 #define IPSET_ATTR_CMD_MAX	(__IPSET_ATTR_CMD_MAX - 1)
@@ -182,6 +184,8 @@ enum ipset_cmd_flags {
 	IPSET_FLAG_MAP_SKBPRIO = (1 << IPSET_FLAG_BIT_MAP_SKBPRIO),
 	IPSET_FLAG_BIT_MAP_SKBQUEUE = 10,
 	IPSET_FLAG_MAP_SKBQUEUE = (1 << IPSET_FLAG_BIT_MAP_SKBQUEUE),
+	IPSET_FLAG_BIT_EXTRA_DATA = 11,
+	IPSET_FLAG_EXTRA_DATA = (1 << IPSET_FLAG_BIT_EXTRA_DATA),
 	IPSET_FLAG_CMD_MAX = 15,
 };
 

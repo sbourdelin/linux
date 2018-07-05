@@ -1409,6 +1409,11 @@ dump_last:
 				goto release_refcount;
 			if (dump_flags & IPSET_FLAG_LIST_HEADER)
 				goto next_set;
+			if (dump_flags & IPSET_FLAG_EXTRA_DATA) {
+				if (nla_put_u16(skb, IPSET_ATTR_INDEX,
+						index))
+					goto nla_put_failure;
+			}
 			if (set->variant->uref)
 				set->variant->uref(set, cb, true);
 			/* fall through */
@@ -1695,6 +1700,7 @@ static int ip_set_header(struct net *net, struct sock *ctnl,
 			 const struct nlattr * const attr[],
 			 struct netlink_ext_ack *extack)
 {
+	ip_set_id_t index;
 	struct ip_set_net *inst = ip_set_pernet(net);
 	const struct ip_set *set;
 	struct sk_buff *skb2;
@@ -1705,7 +1711,7 @@ static int ip_set_header(struct net *net, struct sock *ctnl,
 		     !attr[IPSET_ATTR_SETNAME]))
 		return -IPSET_ERR_PROTOCOL;
 
-	set = find_set(inst, nla_data(attr[IPSET_ATTR_SETNAME]));
+	set = find_set_and_id(inst, nla_data(attr[IPSET_ATTR_SETNAME]), &index);
 	if (!set)
 		return -ENOENT;
 
@@ -1723,6 +1729,16 @@ static int ip_set_header(struct net *net, struct sock *ctnl,
 	    nla_put_u8(skb2, IPSET_ATTR_FAMILY, set->family) ||
 	    nla_put_u8(skb2, IPSET_ATTR_REVISION, set->revision))
 		goto nla_put_failure;
+
+	if (attr[IPSET_ATTR_FLAGS]) {
+		u32 flags = ip_set_get_h32(attr[IPSET_ATTR_FLAGS]);
+
+		if (flags & IPSET_FLAG_EXTRA_DATA) {
+			if (nla_put_u16(skb2, IPSET_ATTR_INDEX, index))
+				goto nla_put_failure;
+		}
+	}
+
 	nlmsg_end(skb2, nlh2);
 
 	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
