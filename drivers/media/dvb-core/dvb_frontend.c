@@ -897,8 +897,24 @@ static void dvb_frontend_get_frequency_limits(struct dvb_frontend *fe,
 					      u32 *freq_min, u32 *freq_max)
 {
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
-	__u32 tuner_min = fe->ops.tuner_ops.info.frequency_min_hz;
-	__u32 tuner_max = fe->ops.tuner_ops.info.frequency_max_hz;
+	u32 tuner_min = fe->ops.tuner_ops.info.frequency_min_hz;
+	u32 tuner_max = fe->ops.tuner_ops.info.frequency_max_hz;
+	u32 frontend_min = fe->ops.info.frequency_min_hz;
+	u32 frontend_max = fe->ops.info.frequency_max_hz;
+
+	*freq_min = max(frontend_min, tuner_min);
+
+	if (frontend_max == 0)
+		*freq_max = tuner_max;
+	else if (tuner_max == 0)
+		*freq_max = frontend_max;
+	else
+		*freq_max = min(frontend_max, tuner_max);
+
+	if (*freq_min == 0 || *freq_max == 0)
+		dev_warn(fe->dvb->device,
+			 "DVB: adapter %i frontend %u frequency limits undefined - fix the driver\n",
+			 fe->dvb->num, fe->id);
 
 	/* If the standard is for satellite, convert frequencies to kHz */
 	switch (c->delivery_system) {
@@ -906,26 +922,12 @@ static void dvb_frontend_get_frequency_limits(struct dvb_frontend *fe,
 	case SYS_DVBS2:
 	case SYS_TURBO:
 	case SYS_ISDBS:
-		tuner_max /= kHz;
-		tuner_min /= kHz;
+		*freq_min /= kHz;
+		*freq_max /= kHz;
 		break;
 	default:
 		break;
 	}
-
-	*freq_min = max(fe->ops.info.frequency_min, tuner_min);
-
-	if (fe->ops.info.frequency_max == 0)
-		*freq_max = tuner_max;
-	else if (tuner_max == 0)
-		*freq_max = fe->ops.info.frequency_max;
-	else
-		*freq_max = min(fe->ops.info.frequency_max, tuner_max);
-
-	if (*freq_min == 0 || *freq_max == 0)
-		dev_warn(fe->dvb->device,
-			 "DVB: adapter %i frontend %u frequency limits undefined - fix the driver\n",
-			 fe->dvb->num, fe->id);
 }
 
 static int dvb_frontend_check_parameters(struct dvb_frontend *fe)
@@ -2261,8 +2263,8 @@ static int dtv_set_frontend(struct dvb_frontend *fe)
 		case SYS_ISDBT:
 		case SYS_DTMB:
 			fepriv->min_delay = HZ / 20;
-			fepriv->step_size = fe->ops.info.frequency_stepsize * 2;
-			fepriv->max_drift = (fe->ops.info.frequency_stepsize * 2) + 1;
+			fepriv->step_size = fe->ops.info.frequency_stepsize_hz * 2;
+			fepriv->max_drift = (fe->ops.info.frequency_stepsize_hz * 2) + 1;
 			break;
 		default:
 			/*
@@ -2391,9 +2393,31 @@ static int dvb_frontend_handle_ioctl(struct file *file,
 
 	case FE_GET_INFO: {
 		struct dvb_frontend_info *info = parg;
+		memset(info, 0, sizeof(info));
 
-		memcpy(info, &fe->ops.info, sizeof(struct dvb_frontend_info));
 		dvb_frontend_get_frequency_limits(fe, &info->frequency_min, &info->frequency_max);
+		strcpy(info->name, fe->ops.info.name);
+		info->frequency_stepsize = fe->ops.info.frequency_stepsize_hz;
+		info->frequency_tolerance = fe->ops.info.frequency_tolerance_hz;
+		info->symbol_rate_min = fe->ops.info.symbol_rate_min;
+		info->symbol_rate_max = fe->ops.info.symbol_rate_max;
+		info->symbol_rate_tolerance = fe->ops.info.symbol_rate_tolerance;
+		info->caps = fe->ops.info.caps;
+
+		/* If the standard is for satellite, convert frequencies to kHz */
+		switch (c->delivery_system) {
+		case SYS_DVBS:
+		case SYS_DVBS2:
+		case SYS_TURBO:
+		case SYS_ISDBS:
+			info->frequency_stepsize = fe->ops.info.frequency_stepsize_hz / kHz;
+			info->frequency_tolerance = fe->ops.info.frequency_tolerance_hz / kHz;
+			break;
+		default:
+			info->frequency_stepsize = fe->ops.info.frequency_stepsize_hz;
+			info->frequency_tolerance = fe->ops.info.frequency_tolerance_hz;
+			break;
+		}
 
 		/*
 		 * Associate the 4 delivery systems supported by DVBv3
@@ -2423,10 +2447,10 @@ static int dvb_frontend_handle_ioctl(struct file *file,
 			dev_err(fe->dvb->device,
 				"%s: doesn't know how to handle a DVBv3 call to delivery system %i\n",
 				__func__, c->delivery_system);
-			fe->ops.info.type = FE_OFDM;
+			info->type = FE_OFDM;
 		}
 		dev_dbg(fe->dvb->device, "%s: current delivery system on cache: %d, V3 type: %d\n",
-			__func__, c->delivery_system, fe->ops.info.type);
+			__func__, c->delivery_system, info->type);
 
 		/* Set CAN_INVERSION_AUTO bit on in other than oneshot mode */
 		if (!(fepriv->tune_mode_flags & FE_TUNE_MODE_ONESHOT))
