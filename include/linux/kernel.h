@@ -811,13 +811,19 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 #define __typecheck(x, y) \
 		(!!(sizeof((typeof(x) *)1 == (typeof(y) *)1)))
 
+#ifndef __CHECKER__
 /*
  * This returns a constant expression while determining if an argument is
  * a constant expression, most importantly without evaluating the argument.
- * Glory to Martin Uecker <Martin.Uecker@med.uni-goettingen.de>
+ * Glory to Martin Uecker <Martin.Uecker@med.uni-goettingen.de>. However, this
+ * macro causes sparse to report the warning "expression using sizeof(void)".
+ * Hence use __builtin_constant_p() instead when using sparse.
  */
 #define __is_constexpr(x) \
 	(sizeof(int) == sizeof(*(8 ? ((void *)((long)(x) * 0l)) : (int *)8)))
+#else
+#define __is_constexpr(x) __builtin_constant_p((x))
+#endif
 
 #define __no_side_effects(x, y) \
 		(__is_constexpr(x) && __is_constexpr(y))
