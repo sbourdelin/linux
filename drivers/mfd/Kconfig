@@ -1812,6 +1812,20 @@ config MFD_STM32_TIMERS
 	  for PWM and IIO Timer. This driver allow to share the
 	  registers between the others drivers.
 
+config MFD_STPMU1
+	tristate "Support for STPMU1 PMIC"
+	depends on (I2C=y && OF)
+	select REGMAP_I2C
+	select REGMAP_IRQ
+	select MFD_CORE
+	help
+	  Support for ST Microelectronics STPMU1 PMIC. Stpmu1 mfd driver is
+	  the core driver for stpmu1 component that mainly handles interrupts.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called stpmu1.
+
+
 menu "Multimedia Capabilities Port drivers"
 	depends on ARCH_SA1100
 
