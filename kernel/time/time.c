@@ -265,24 +265,24 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, struct compat_timeval __user *, tv,
 
 SYSCALL_DEFINE1(adjtimex, struct timex __user *, txc_p)
 {
-	struct timex txc;		/* Local copy of parameter */
+	struct __kernel_timex txc;		/* Local copy of parameter */
 	int ret;
 
 	/* Copy the user data space into the kernel copy
 	 * structure. But bear in mind that the structures
 	 * may change
 	 */
-	if (copy_from_user(&txc, txc_p, sizeof(struct timex)))
+	if (copy_from_user(&txc, txc_p, sizeof(struct __kernel_timex)))
 		return -EFAULT;
 	ret = do_adjtimex(&txc);
-	return copy_to_user(txc_p, &txc, sizeof(struct timex)) ? -EFAULT : ret;
+	return copy_to_user(txc_p, &txc, sizeof(struct __kernel_timex)) ? -EFAULT : ret;
 }
 
 #ifdef CONFIG_COMPAT
 
 COMPAT_SYSCALL_DEFINE1(adjtimex, struct compat_timex __user *, utp)
 {
-	struct timex txc;
+	struct __kernel_timex txc;
 	int err, ret;
 
 	err = compat_get_timex(&txc, utp);
@@ -979,11 +979,11 @@ int put_compat_itimerspec64(const struct itimerspec64 *its,
 }
 EXPORT_SYMBOL_GPL(put_compat_itimerspec64);
 
-int compat_get_timex(struct timex *txc, const struct compat_timex __user *utp)
+int compat_get_timex(struct __kernel_timex *txc, const struct compat_timex __user *utp)
 {
 	struct compat_timex tx32;
 
-	memset(txc, 0, sizeof(struct timex));
+	memset(txc, 0, sizeof(struct __kernel_timex));
 	if (copy_from_user(&tx32, utp, sizeof(struct compat_timex)))
 		return -EFAULT;
 
@@ -1011,7 +1011,7 @@ int compat_get_timex(struct timex *txc, const struct compat_timex __user *utp)
 	return 0;
 }
 
-int compat_put_timex(struct compat_timex __user *utp, const struct timex *txc)
+int compat_put_timex(struct compat_timex __user *utp, const struct __kernel_timex *txc)
 {
 	struct compat_timex tx32;
 
