@@ -33,9 +33,40 @@ fanX_input		Measured RPM value.
 fanX_min		Threshold RPM for alert generation.
 fanX_fault		0: No fail condition
 			1: Failing fan
+
 tempX_input		Measured ambient temperature.
 tempX_max		Threshold ambient temperature for alert generation.
-inX_input		Measured power supply voltage
+tempX_highest		Historical maximum temperature
+tempX_lowest		Historical minimum temperature
+temp1_enable		Enable/disable all temperature sensors
+			1: Enable
+			0: Disable
+temp[2-N]_enable	State of the sensor (enabled/disabled)
+
+inX_input		Measured power supply voltage (millivolt)
 inX_fault		0: No fail condition.
 			1: Failing power supply.
-power1_input		System power consumption (microWatt)
+inX_highest		Historical maximum voltage
+inX_lowest		Historical minimum voltage
+in1_enable		Enable/disable all voltage sensors
+			1: Enable
+			0: Disable
+in[2-N]_enable		State of the sensor (enabled/disabled)
+
+powerX_input		Power consumption (microWatt)
+powerX_input_highest	Historical maximum power
+powerX_input_lowest	Historical minimum power
+power1_enable		Enable/disable all power sensors
+			1: Enable
+			0: Disable
+power[2-N]_enable	State of the sensor (enabled/disabled)
+
+currX_input		Measured current (milliampere)
+currX_highest		Historical maximum current
+currX_lowest		Historical minimum current
+curr1_enable		Enable/disable all current sensors
+			1: Enable
+			0: Disable
+curr[2-N]_enable	State of the sensor (enabled/disabled)
+
+energyX_input		Cumulative energy (microJoule)
