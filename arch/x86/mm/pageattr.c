@@ -292,17 +292,27 @@ static void cpa_flush_array(unsigned long *start, int numpages, int cache,
  * checks and fixes these known static required protection bits.
  */
 static inline pgprot_t static_protections(pgprot_t prot, unsigned long address,
-				   unsigned long pfn)
+				   unsigned long pfn, unsigned long *page_num)
 {
 	pgprot_t forbidden = __pgprot(0);
+	unsigned long tmp;
+	unsigned long num = PUD_PAGE_SIZE >> PAGE_SHIFT;
 
 	/*
 	 * The BIOS area between 640k and 1Mb needs to be executable for
 	 * PCI BIOS based config access (CONFIG_PCI_GOBIOS) support.
 	 */
 #ifdef CONFIG_PCI_BIOS
-	if (pcibios_enabled && within(pfn, BIOS_BEGIN >> PAGE_SHIFT, BIOS_END >> PAGE_SHIFT))
-		pgprot_val(forbidden) |= _PAGE_NX;
+	if (pcibios_enabled) {
+		tmp = (BIOS_BEGIN >> PAGE_SHIFT) > pfn ?
+			(BIOS_BEGIN >> PAGE_SHIFT) - pfn : ULONG_MAX;
+		if (within(pfn, BIOS_BEGIN >> PAGE_SHIFT,
+		    BIOS_END >> PAGE_SHIFT)) {
+			pgprot_val(forbidden) |= _PAGE_NX;
+			tmp = (BIOS_END >> PAGE_SHIFT) - pfn;
+		}
+		num = num > tmp ? tmp : num;
+	}
 #endif
 
 	/*
@@ -310,18 +320,30 @@ static inline pgprot_t static_protections(pgprot_t prot, unsigned long address,
 	 * Does not cover __inittext since that is gone later on. On
 	 * 64bit we do not enforce !NX on the low mapping
 	 */
-	if (within(address, (unsigned long)_text, (unsigned long)_etext))
+	tmp = (unsigned long)_text > address ?
+		((unsigned long)_text - address) >> PAGE_SHIFT : ULONG_MAX;
+	if (within(address, (unsigned long)_text, (unsigned long)_etext)) {
 		pgprot_val(forbidden) |= _PAGE_NX;
+		tmp = ((unsigned long)_etext - address) >> PAGE_SHIFT;
+	}
+	num = num > tmp ? tmp : num;
 
 	/*
 	 * The .rodata section needs to be read-only. Using the pfn
 	 * catches all aliases.  This also includes __ro_after_init,
 	 * so do not enforce until kernel_set_to_readonly is true.
 	 */
-	if (kernel_set_to_readonly &&
-	    within(pfn, __pa_symbol(__start_rodata) >> PAGE_SHIFT,
-		   __pa_symbol(__end_rodata) >> PAGE_SHIFT))
-		pgprot_val(forbidden) |= _PAGE_RW;
+	if (kernel_set_to_readonly) {
+		tmp = (__pa_symbol(__start_rodata) >> PAGE_SHIFT) > pfn ?
+			(__pa_symbol(__start_rodata) >> PAGE_SHIFT) - pfn :
+			ULONG_MAX;
+		if (within(pfn, __pa_symbol(__start_rodata) >> PAGE_SHIFT,
+		    __pa_symbol(__end_rodata) >> PAGE_SHIFT)) {
+			pgprot_val(forbidden) |= _PAGE_RW;
+			tmp = (__pa_symbol(__end_rodata) >> PAGE_SHIFT) - pfn;
+		}
+		num = num > tmp ? tmp : num;
+	}
 
 #if defined(CONFIG_X86_64)
 	/*
@@ -333,11 +355,15 @@ static inline pgprot_t static_protections(pgprot_t prot, unsigned long address,
 	 * This will preserve the large page mappings for kernel text/data
 	 * at no extra cost.
 	 */
+	tmp = kernel_set_to_readonly && (unsigned long)_text > address ?
+		((unsigned long)_text - address) >> PAGE_SHIFT : ULONG_MAX;
 	if (kernel_set_to_readonly &&
 	    within(address, (unsigned long)_text,
 		   (unsigned long)__end_rodata_hpage_align)) {
 		unsigned int level;
 
+		tmp = ((unsigned long)__end_rodata_hpage_align
+				- address) >> PAGE_SHIFT;
 		/*
 		 * Don't enforce the !RW mapping for the kernel text mapping,
 		 * if the current mapping is already using small page mapping.
@@ -355,12 +381,27 @@ static inline pgprot_t static_protections(pgprot_t prot, unsigned long address,
 		 * text mapping logic will help Linux Xen parvirt guest boot
 		 * as well.
 		 */
-		if (lookup_address(address, &level) && (level != PG_LEVEL_4K))
+		if (lookup_address(address, &level) && (level != PG_LEVEL_4K)) {
+			unsigned long psize = page_level_size(level);
+			unsigned long pmask = page_level_mask(level);
+			unsigned long nextpage_addr =
+				(address + psize) & pmask;
+			unsigned long numpages =
+				(nextpage_addr - address) >> PAGE_SHIFT;
+
 			pgprot_val(forbidden) |= _PAGE_RW;
+			tmp = tmp > numpages ? numpages : tmp;
+		}
 	}
+	num = kernel_set_to_readonly && num > tmp ? tmp : num;
 #endif
 
 	prot = __pgprot(pgprot_val(prot) & ~pgprot_val(forbidden));
+
+	if (num == 0)
+		num = 1;
+	if (page_num)
+		*page_num = num;
 
 	return prot;
 }
@@ -552,7 +593,8 @@ static int
 try_preserve_large_page(pte_t *kpte, unsigned long address,
 			struct cpa_data *cpa)
 {
-	unsigned long nextpage_addr, numpages, pmask, psize, addr, pfn, old_pfn;
+	unsigned long nextpage_addr, numpages, pmask, psize, pnum,
+		      addr, pfn, old_pfn;
 	pte_t new_pte, old_pte, *tmp;
 	pgprot_t old_prot, new_prot, req_prot;
 	int i, do_split = 1;
@@ -625,7 +667,7 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	pfn = old_pfn + ((address & (psize - 1)) >> PAGE_SHIFT);
 	cpa->pfn = pfn;
 
-	new_prot = static_protections(req_prot, address, pfn);
+	new_prot = static_protections(req_prot, address, pfn, NULL);
 
 	/*
 	 * We need to check the full range, whether
@@ -634,8 +676,10 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	 */
 	addr = address & pmask;
 	pfn = old_pfn;
-	for (i = 0; i < (psize >> PAGE_SHIFT); i++, addr += PAGE_SIZE, pfn++) {
-		pgprot_t chk_prot = static_protections(req_prot, addr, pfn);
+	for (i = 0; i < (psize >> PAGE_SHIFT);
+	    i += pnum, addr += PAGE_SIZE * pnum, pfn += pnum) {
+		pgprot_t chk_prot =
+			static_protections(req_prot, addr, pfn, &pnum);
 
 		if (pgprot_val(chk_prot) != pgprot_val(new_prot))
 			goto out_unlock;
@@ -1246,7 +1290,7 @@ repeat:
 		pgprot_val(new_prot) &= ~pgprot_val(cpa->mask_clr);
 		pgprot_val(new_prot) |= pgprot_val(cpa->mask_set);
 
-		new_prot = static_protections(new_prot, address, pfn);
+		new_prot = static_protections(new_prot, address, pfn, NULL);
 
 		new_prot = pgprot_clear_protnone_bits(new_prot);
 
