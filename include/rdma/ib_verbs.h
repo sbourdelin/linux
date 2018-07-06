@@ -1373,7 +1373,7 @@ struct ib_rdma_wr {
 	u32			rkey;
 };
 
-static inline struct ib_rdma_wr *rdma_wr(struct ib_send_wr *wr)
+static inline const struct ib_rdma_wr *rdma_wr(const struct ib_send_wr *wr)
 {
 	return container_of(wr, struct ib_rdma_wr, wr);
 }
@@ -1388,7 +1388,7 @@ struct ib_atomic_wr {
 	u32			rkey;
 };
 
-static inline struct ib_atomic_wr *atomic_wr(struct ib_send_wr *wr)
+static inline const struct ib_atomic_wr *atomic_wr(const struct ib_send_wr *wr)
 {
 	return container_of(wr, struct ib_atomic_wr, wr);
 }
@@ -1405,7 +1405,7 @@ struct ib_ud_wr {
 	u8			port_num;   /* valid for DR SMPs on switch only */
 };
 
-static inline struct ib_ud_wr *ud_wr(struct ib_send_wr *wr)
+static inline const struct ib_ud_wr *ud_wr(const struct ib_send_wr *wr)
 {
 	return container_of(wr, struct ib_ud_wr, wr);
 }
@@ -1417,7 +1417,7 @@ struct ib_reg_wr {
 	int			access;
 };
 
-static inline struct ib_reg_wr *reg_wr(struct ib_send_wr *wr)
+static inline const struct ib_reg_wr *reg_wr(const struct ib_send_wr *wr)
 {
 	return container_of(wr, struct ib_reg_wr, wr);
 }
@@ -1430,7 +1430,8 @@ struct ib_sig_handover_wr {
 	struct ib_sge	       *prot;
 };
 
-static inline struct ib_sig_handover_wr *sig_handover_wr(struct ib_send_wr *wr)
+static inline const struct ib_sig_handover_wr *
+sig_handover_wr(const struct ib_send_wr *wr)
 {
 	return container_of(wr, struct ib_sig_handover_wr, wr);
 }
