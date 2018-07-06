@@ -172,7 +172,7 @@ static int stm32_iwdg_probe(struct platform_device *pdev)
 
 	ret = clk_prepare_enable(clk);
 	if (ret) {
-		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
+		dev_err(&pdev->dev, "Unable to prepare clock %pK\n", clk);
 		return ret;
 	}
 
