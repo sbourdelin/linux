@@ -464,7 +464,8 @@ destroy_kernel_context(struct i915_gem_context **ctxp)
 
 static bool needs_preempt_context(struct drm_i915_private *i915)
 {
-	return HAS_LOGICAL_RING_PREEMPTION(i915);
+	return HAS_LOGICAL_RING_PREEMPTION(i915) &&
+	       !HAS_HW_PREEMPT_TO_IDLE(i915);
 }
 
 int i915_gem_contexts_init(struct drm_i915_private *dev_priv)
