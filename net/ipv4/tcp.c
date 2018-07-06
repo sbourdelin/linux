@@ -1275,9 +1275,7 @@ restart:
 			int linear;
 
 new_segment:
-			/* Allocate new segment. If the interface is SG,
-			 * allocate skb fitting to single page.
-			 */
+			/* Allocate new segment. */
 			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
 
