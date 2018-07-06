@@ -2183,8 +2183,8 @@ i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 	 * requirement that operations to the GGTT be made holding the RPM
 	 * wakeref.
 	 */
-	lockdep_assert_held(&i915->drm.struct_mutex);
 	intel_runtime_pm_get(i915);
+	mutex_lock(&i915->ggtt.vm.mutex);
 
 	if (!obj->userfault_count)
 		goto out;
@@ -2201,6 +2201,7 @@ i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 	wmb();
 
 out:
+	mutex_unlock(&i915->ggtt.vm.mutex);
 	intel_runtime_pm_put(i915);
 }
 
@@ -2213,9 +2214,11 @@ void i915_gem_runtime_suspend(struct drm_i915_private *i915)
 	/*
 	 * Only called during RPM suspend. All users of the userfault_list
 	 * must be holding an RPM wakeref to ensure that this can not
-	 * run concurrently with themselves (and use the struct_mutex for
+	 * run concurrently with themselves (and use the ggtt->mutex for
 	 * protection between themselves).
 	 */
+
+	mutex_lock(&i915->ggtt.vm.mutex);
 
 	list_for_each_entry_safe(obj, on,
 				 &i915->mm.userfault_list, userfault_link)
@@ -2245,6 +2248,8 @@ void i915_gem_runtime_suspend(struct drm_i915_private *i915)
 		GEM_BUG_ON(i915_vma_has_userfault(reg->vma));
 		reg->dirty = true;
 	}
+
+	mutex_unlock(&i915->ggtt.vm.mutex);
 }
 
 static int i915_gem_object_create_mmap_offset(struct drm_i915_gem_object *obj)
@@ -4846,7 +4851,7 @@ static void __i915_gem_free_objects(struct drm_i915_private *i915,
 		mutex_unlock(&i915->drm.struct_mutex);
 
 		GEM_BUG_ON(obj->bind_count);
-		GEM_BUG_ON(obj->userfault_count);
+		GEM_BUG_ON(READ_ONCE(obj->userfault_count));
 		GEM_BUG_ON(atomic_read(&obj->frontbuffer_bits));
 		GEM_BUG_ON(!list_empty(&obj->lut_list));
 

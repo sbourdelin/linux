@@ -80,7 +80,7 @@ static char get_tiling_flag(struct drm_i915_gem_object *obj)
 
 static char get_global_flag(struct drm_i915_gem_object *obj)
 {
-	return obj->userfault_count ? 'g' : ' ';
+	return READ_ONCE(obj->userfault_count) ? 'g' : ' ';
 }
 
 static char get_pin_mapped_flag(struct drm_i915_gem_object *obj)
@@ -914,11 +914,10 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 
 static int i915_gem_fence_regs_info(struct seq_file *m, void *data)
 {
-	struct drm_i915_private *i915 = node_to_i915(m->private);
-	const struct i915_ggtt *ggtt = &i915->ggtt;
+	struct i915_ggtt *ggtt = &node_to_i915(m->private)->ggtt;
 	int i, ret;
 
-	ret = mutex_lock_interruptible(&i915->drm.struct_mutex);
+	ret = mutex_lock_interruptible(&ggtt->vm.mutex);
 	if (ret)
 		return ret;
 
@@ -935,7 +934,7 @@ static int i915_gem_fence_regs_info(struct seq_file *m, void *data)
 		seq_putc(m, '\n');
 	}
 
-	mutex_unlock(&i915->drm.struct_mutex);
+	mutex_unlock(&ggtt->vm.mutex);
 	return 0;
 }
 
