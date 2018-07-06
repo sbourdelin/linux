@@ -1882,7 +1882,13 @@ int ipmi_si_add_smi(struct si_sm_io *io)
 	mutex_lock(&smi_infos_lock);
 	dup = find_dup_si(new_smi);
 	if (dup) {
-		if (new_smi->io.addr_source == SI_ACPI &&
+		if (new_smi->io.addr_source == SI_HARDCODED) {
+			/* Assume the user knew what they wanted when they hardcoded */
+			dev_info(dup->io.dev,
+				"Removing discovered %s state machine in favor of hardcoded\n",
+				si_to_str[new_smi->io.si_type]);
+			cleanup_one_si(dup);
+		} else if (new_smi->io.addr_source == SI_ACPI &&
 		    dup->io.addr_source == SI_SMBIOS) {
 			/* We prefer ACPI over SMBIOS. */
 			dev_info(dup->io.dev,
@@ -2106,11 +2112,12 @@ static int init_ipmi_si(void)
 
 	pr_info("IPMI System Interface driver.\n");
 
+	/* Always platform since hardcoded entries rely on it. */
+	ipmi_si_platform_init();
+
 	/* If the user gave us a device, they presumably want us to use it */
 	if (!ipmi_si_hardcode_find_bmc())
 		goto do_scan;
-
-	ipmi_si_platform_init();
 
 	ipmi_si_pci_init();
 
