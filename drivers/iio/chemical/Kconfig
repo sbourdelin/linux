@@ -21,6 +21,8 @@ config ATLAS_PH_SENSOR
 	 To compile this driver as module, choose M here: the
 	 module will be called atlas-ph-sensor.
 
+source "drivers/iio/chemical/bme680/Kconfig"
+
 config CCS811
 	tristate "AMS CCS811 VOC sensor"
 	depends on I2C
