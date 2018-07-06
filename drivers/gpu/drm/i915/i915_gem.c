@@ -655,11 +655,6 @@ i915_gem_object_wait(struct drm_i915_gem_object *obj,
 		     struct intel_rps_client *rps_client)
 {
 	might_sleep();
-#if IS_ENABLED(CONFIG_LOCKDEP)
-	GEM_BUG_ON(debug_locks &&
-		   !!lockdep_is_held(&obj->base.dev->struct_mutex) !=
-		   !!(flags & I915_WAIT_LOCKED));
-#endif
 	GEM_BUG_ON(timeout < 0);
 
 	timeout = i915_gem_object_wait_reservation(obj->resv,
@@ -4544,8 +4539,6 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 
 	GEM_TRACE("\n");
 
-	mutex_lock(&i915->drm.struct_mutex);
-
 	intel_runtime_pm_get(i915);
 	intel_uncore_forcewake_get(i915, FORCEWAKE_ALL);
 
@@ -4575,6 +4568,7 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 	intel_uncore_forcewake_put(i915, FORCEWAKE_ALL);
 	intel_runtime_pm_put(i915);
 
+	mutex_lock(&i915->drm.struct_mutex);
 	i915_gem_contexts_lost(i915);
 	mutex_unlock(&i915->drm.struct_mutex);
 }
@@ -4587,6 +4581,8 @@ int i915_gem_suspend(struct drm_i915_private *i915)
 
 	intel_runtime_pm_get(i915);
 	intel_suspend_gt_powersave(i915);
+
+	flush_workqueue(i915->wq);
 
 	mutex_lock(&i915->drm.struct_mutex);
 
@@ -4614,17 +4610,17 @@ int i915_gem_suspend(struct drm_i915_private *i915)
 		assert_kernel_context_is_current(i915);
 	}
 	mutex_unlock(&i915->drm.struct_mutex);
+	i915_reset_flush(i915);
 
-	intel_uc_suspend(i915);
-
-	cancel_delayed_work_sync(&i915->gpu_error.hangcheck_work);
-	cancel_delayed_work_sync(&i915->gt.retire_work);
+	drain_delayed_work(&i915->gt.retire_work);
 
 	/*
 	 * As the idle_work is rearming if it detects a race, play safe and
 	 * repeat the flush until it is definitely idle.
 	 */
 	drain_delayed_work(&i915->gt.idle_work);
+
+	intel_uc_suspend(i915);
 
 	/*
 	 * Assert that we successfully flushed all the work and
