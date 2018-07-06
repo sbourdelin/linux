@@ -502,8 +502,8 @@ int i915_gem_contexts_init(struct drm_i915_private *dev_priv)
 	}
 
 	DRM_DEBUG_DRIVER("%s context support initialized\n",
-			 dev_priv->engine[RCS]->context_size ? "logical" :
-			 "fake");
+			 DRIVER_CAPS(dev_priv)->has_logical_contexts ?
+			 "logical" : "fake");
 	return 0;
 }
 
@@ -664,7 +664,7 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 	struct i915_gem_context *ctx;
 	int ret;
 
-	if (!dev_priv->engine[RCS]->context_size)
+	if (!DRIVER_CAPS(dev_priv)->has_logical_contexts)
 		return -ENODEV;
 
 	if (args->pad != 0)
