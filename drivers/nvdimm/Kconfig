@@ -115,4 +115,17 @@ config OF_PMEM
 config PMEM_PLATFORM_DEVICE
        bool
 
+config MEMBLOCK_PMEM
+	bool "pmemmap= parameter support"
+	default y
+	depends on HAVE_MEMBLOCK
+	select PMEM_PLATFORM_DEVICE
+	help
+	  Add support for the pmemmap= kernel command line parameter. This is similar
+	  to the memmap= parameter available on ACPI platforms, but it uses generic
+	  kernel facilities (the memblock allocator) to reserve memory rather than adding
+	  to the e820 table.
+
+	  Select Y if unsure.
+
 endif
