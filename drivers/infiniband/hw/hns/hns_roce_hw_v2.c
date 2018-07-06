@@ -164,7 +164,8 @@ static int set_rwqe_data_seg(struct ib_qp *ibqp, struct ib_send_wr *wr,
 	return 0;
 }
 
-static int hns_roce_v2_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+static int hns_roce_v2_post_send(struct ib_qp *ibqp,
+				 struct ib_send_wr *wr,
 				 struct ib_send_wr **bad_wr)
 {
 	struct hns_roce_dev *hr_dev = to_hr_dev(ibqp->device);
