@@ -645,6 +645,21 @@ static inline void list_splice_tail_init(struct list_head *list,
 #define list_safe_reset_next(pos, n, member)				\
 	n = list_next_entry(pos, member)
 
+/**
+ * list_for_each_entry_dequeue - iterate over list by removing entries
+ * @pos:	the type * to use as a loop cursor.
+ * @head:	the head for your list.
+ * @member:	the name of the list_head within the struct.
+ *
+ * Iterate over list of given type, removing each entry from the list before
+ * running the loop body.  The loop will run until the list is empty, so
+ * adding an entry back onto the list in the loop body will requeue it.
+ */
+#define list_for_each_entry_dequeue(pos, head, member)			\
+	while (!list_empty(head) &&					\
+	       (pos = list_first_entry(head, typeof(*pos), member)) &&	\
+	       (list_del(&pos->member), true))
+
 /*
  * Double linked lists with a single pointer list head.
  * Mostly useful for hash tables where the two pointer list head is

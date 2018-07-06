@@ -4985,9 +4985,8 @@ static void netif_receive_skb_list_internal(struct list_head *head)
 	struct list_head sublist;
 
 	INIT_LIST_HEAD(&sublist);
-	list_for_each_entry_safe(skb, next, head, list) {
+	list_for_each_entry_dequeue(skb, head, list) {
 		net_timestamp_check(netdev_tstamp_prequeue, skb);
-		list_del(&skb->list);
 		if (!skb_defer_rx_timestamp(skb))
 			list_add_tail(&skb->list, &sublist);
 	}
@@ -4996,9 +4995,8 @@ static void netif_receive_skb_list_internal(struct list_head *head)
 	if (static_branch_unlikely(&generic_xdp_needed_key)) {
 		preempt_disable();
 		rcu_read_lock();
-		list_for_each_entry_safe(skb, next, head, list) {
+		list_for_each_entry_dequeue(skb, head, list) {
 			xdp_prog = rcu_dereference(skb->dev->xdp_prog);
-			list_del(&skb->list);
 			if (do_xdp_generic(xdp_prog, skb) == XDP_PASS)
 				list_add_tail(&skb->list, &sublist);
 		}

@@ -293,15 +293,13 @@ NF_HOOK_LIST(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
 	     struct list_head *head, struct net_device *in, struct net_device *out,
 	     int (*okfn)(struct net *, struct sock *, struct sk_buff *))
 {
-	struct sk_buff *skb, *next;
 	struct list_head sublist;
+	struct sk_buff *skb;
 
 	INIT_LIST_HEAD(&sublist);
-	list_for_each_entry_safe(skb, next, head, list) {
-		list_del(&skb->list);
+	list_for_each_entry_dequeue(skb, head, list)
 		if (nf_hook(pf, hook, net, sk, skb, in, out, okfn) == 1)
 			list_add_tail(&skb->list, &sublist);
-	}
 	/* Put passed packets back on main list */
 	list_splice(&sublist, head);
 }
