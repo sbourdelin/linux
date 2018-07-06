@@ -825,7 +825,7 @@ int inet_ehash_locks_alloc(struct inet_hashinfo *hashinfo)
 	if (locksz != 0) {
 		/* allocate 2 cache lines or at least one spinlock per cpu */
 		nblocks = max(2U * L1_CACHE_BYTES / locksz, 1U);
-		nblocks = roundup_pow_of_two(nblocks * num_possible_cpus());
+		nblocks = roundup_pow_of_two(nblocks * nr_cpu_ids);
 
 		/* no more locks than number of hash buckets */
 		nblocks = min(nblocks, hashinfo->ehash_mask + 1);

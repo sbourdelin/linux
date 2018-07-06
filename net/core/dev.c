@@ -2189,7 +2189,7 @@ static void netif_reset_xps_queues(struct net_device *dev, u16 offset,
 	if (!dev_maps)
 		goto out_no_maps;
 
-	if (num_possible_cpus() > 1)
+	if (nr_cpu_ids > 1)
 		possible_mask = cpumask_bits(cpu_possible_mask);
 	nr_ids = nr_cpu_ids;
 	clean_xps_maps(dev, possible_mask, dev_maps, nr_ids, offset, count,
@@ -2273,7 +2273,7 @@ int __netif_set_xps_queue(struct net_device *dev, const unsigned long *mask,
 		nr_ids = dev->num_rx_queues;
 	} else {
 		maps_sz = XPS_CPU_DEV_MAPS_SIZE(num_tc);
-		if (num_possible_cpus() > 1) {
+		if (nr_cpu_ids > 1) {
 			online_mask = cpumask_bits(cpu_online_mask);
 			possible_mask = cpumask_bits(cpu_possible_mask);
 		}
