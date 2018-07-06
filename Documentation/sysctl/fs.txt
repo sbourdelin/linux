@@ -32,6 +32,7 @@ Currently, these files are in /proc/sys/fs:
 - nr_open
 - overflowuid
 - overflowgid
+- neg-dentry-enforce
 - neg-dentry-pc
 - pipe-user-pages-hard
 - pipe-user-pages-soft
@@ -166,6 +167,15 @@ to a fixed value before being written to disk.
 
 These sysctls allow you to change the value of the fixed UID and GID.
 The default is 65534.
+
+==============================================================
+
+neg-dentry-enforce:
+
+The file neg-dentry-enforce, if present, contains a boolean flag (0 or
+1) indicating if the negative dentries limit set by the "neg_dentry_pc"
+sysctl parameter should be enforced or not.  If enforced, excess negative
+dentries over the limit will be killed immediately after use.
 
 ==============================================================
 

@@ -1861,6 +1861,15 @@ static struct ctl_table fs_table[] = {
 		.extra1		= &zero,
 		.extra2		= &ten,
 	},
+	{
+		.procname	= "neg-dentry-enforce",
+		.data		= &neg_dentry_enforce,
+		.maxlen		= sizeof(neg_dentry_enforce),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 	{ }
 };
 

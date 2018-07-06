@@ -219,6 +219,7 @@ struct dentry_operations {
 
 #define DCACHE_PAR_LOOKUP		0x10000000 /* being looked up (with parent locked shared) */
 #define DCACHE_DENTRY_CURSOR		0x20000000
+#define DCACHE_KILL_NEGATIVE		0x40000000 /* Kill negative dentry */
 
 extern seqlock_t rename_lock;
 
@@ -615,5 +616,6 @@ void release_dentry_name_snapshot(struct name_snapshot *);
  * Negative dentry related declarations.
  */
 extern int neg_dentry_pc;
+extern int neg_dentry_enforce;
 
 #endif	/* __LINUX_DCACHE_H */

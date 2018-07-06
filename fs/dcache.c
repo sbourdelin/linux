@@ -147,6 +147,8 @@ static struct static_key limit_neg_key = STATIC_KEY_INIT_FALSE;
 static int neg_dentry_pc_old;
 int neg_dentry_pc;
 EXPORT_SYMBOL_GPL(neg_dentry_pc);
+int neg_dentry_enforce;	/* Enforce the negative dentry limit */
+EXPORT_SYMBOL_GPL(neg_dentry_enforce);
 
 static long neg_dentry_percpu_limit __read_mostly;
 static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
@@ -161,6 +163,7 @@ static struct {
 } ndblk ____cacheline_aligned_in_smp;
 proc_handler proc_neg_dentry_pc;
 
+static void d_lru_del(struct dentry *dentry);
 static void prune_negative_dentry(struct work_struct *work);
 static DECLARE_DELAYED_WORK(prune_neg_dentry_work, prune_negative_dentry);
 
@@ -319,8 +322,12 @@ static long __neg_dentry_nfree_dec(long cnt)
 
 /*
  * Increment negative dentry count if applicable.
+ *
+ * The retain flag will only be set when calling from
+ * __d_clear_type_and_inode() so as to retain the entry even
+ * if the negative dentry limit has been exceeded.
  */
-static void __neg_dentry_inc(struct dentry *dentry)
+static void __neg_dentry_inc(struct dentry *dentry, bool retain)
 {
 	long cnt = 0, *pcnt;
 
@@ -347,10 +354,25 @@ static void __neg_dentry_inc(struct dentry *dentry)
 	put_cpu_ptr(&nr_dentry_neg);
 
 	/*
-	 * Put out a warning if there are too many negative dentries.
+	 * Put out a warning if there are too many negative dentries or
+	 * kill it by removing it from the LRU and set the
+	 * DCACHE_KILL_NEGATIVE flag if the enforce option is on.
 	 */
-	if (!cnt)
+	if (!cnt) {
+		if (neg_dentry_enforce && !retain) {
+			dentry->d_flags |= DCACHE_KILL_NEGATIVE;
+			d_lru_del(dentry);
+			/*
+			 * When the dentry is no longer in LRU, we
+			 * need to keep the reference count to 1 to
+			 * avoid problem when killing it.
+			 */
+			WARN_ON_ONCE(dentry->d_lockref.count);
+			dentry->d_lockref.count = 1;
+			return; /* Kill the dentry now */
+		}
 		pr_warn_once("Too many negative dentries.");
+	}
 
 	/*
 	 * Initiate negative dentry pruning if free pool has less than
@@ -376,7 +398,7 @@ static void __neg_dentry_inc(struct dentry *dentry)
 static inline void neg_dentry_inc(struct dentry *dentry)
 {
 	if (unlikely(d_is_negative(dentry)))
-		__neg_dentry_inc(dentry);
+		__neg_dentry_inc(dentry, false);
 }
 
 /*
@@ -551,7 +573,7 @@ static inline void __d_clear_type_and_inode(struct dentry *dentry)
 	WRITE_ONCE(dentry->d_flags, flags);
 	dentry->d_inode = NULL;
 	if (dentry->d_flags & DCACHE_LRU_LIST)
-		__neg_dentry_inc(dentry);
+		__neg_dentry_inc(dentry, true);	/* Always retain it */
 }
 
 static void dentry_free(struct dentry *dentry)
@@ -871,16 +893,22 @@ static inline bool retain_dentry(struct dentry *dentry)
 	if (unlikely(dentry->d_flags & DCACHE_DISCONNECTED))
 		return false;
 
+	if (unlikely(dentry->d_flags & DCACHE_KILL_NEGATIVE))
+		return false;
+
 	if (unlikely(dentry->d_flags & DCACHE_OP_DELETE)) {
 		if (dentry->d_op->d_delete(dentry))
 			return false;
 	}
 	/* retain; LRU fodder */
 	dentry->d_lockref.count--;
-	if (unlikely(!(dentry->d_flags & DCACHE_LRU_LIST)))
+	if (unlikely(!(dentry->d_flags & DCACHE_LRU_LIST))) {
 		d_lru_add(dentry);
-	else if (unlikely(!(dentry->d_flags & DCACHE_REFERENCED)))
+		if (unlikely(dentry->d_flags & DCACHE_KILL_NEGATIVE))
+			return false;
+	} else if (unlikely(!(dentry->d_flags & DCACHE_REFERENCED))) {
 		dentry->d_flags |= DCACHE_REFERENCED;
+	}
 	return true;
 }
 
