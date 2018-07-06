@@ -887,8 +887,8 @@ static int i915_driver_init_early(struct drm_i915_private *dev_priv,
 	device_info->device_id = dev_priv->drm.pdev->device;
 
 	BUILD_BUG_ON(INTEL_MAX_PLATFORMS >
-		     sizeof(device_info->platform_mask) * BITS_PER_BYTE);
-	BUG_ON(device_info->gen > sizeof(device_info->gen_mask) * BITS_PER_BYTE);
+		     BITS_PER_TYPE(device_info->platform_mask));
+	BUG_ON(device_info->gen > BITS_PER_TYPE(device_info->gen_mask));
 	spin_lock_init(&dev_priv->irq_lock);
 	spin_lock_init(&dev_priv->gpu_error.lock);
 	mutex_init(&dev_priv->backlight_lock);

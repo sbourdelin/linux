@@ -28,6 +28,7 @@
 
 #include "i915_gem.h" /* GEM_BUG_ON() */
 #include "i915_selftest.h"
+#include "i915_utils.h" /* BITS_PER_TYPE() */
 
 #define SHIFT ilog2(KSYNCMAP)
 #define MASK (KSYNCMAP - 1)
@@ -92,7 +93,7 @@ void i915_syncmap_init(struct i915_syncmap **root)
 {
 	BUILD_BUG_ON_NOT_POWER_OF_2(KSYNCMAP);
 	BUILD_BUG_ON_NOT_POWER_OF_2(SHIFT);
-	BUILD_BUG_ON(KSYNCMAP > BITS_PER_BYTE * sizeof((*root)->bitmap));
+	BUILD_BUG_ON(KSYNCMAP > BITS_PER_TYPE((*root)->bitmap));
 	*root = NULL;
 }
 
