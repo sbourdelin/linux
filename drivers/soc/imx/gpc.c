@@ -56,14 +56,11 @@ to_imx_pm_domain(struct generic_pm_domain *genpd)
 	return container_of(genpd, struct imx_pm_domain, base);
 }
 
-static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
 {
 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
 	int iso, iso2sw;
 	u32 val;
-
-	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-		return -EBUSY;
 
 	/* Read ISO and ISO2SW power down delays */
 	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
@@ -80,6 +77,16 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
 
 	/* Wait ISO + ISO2SW IPG clock cycles */
 	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
+}
+
+static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+{
+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+
+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+		return -EBUSY;
+
+	_imx6_pm_domain_power_off(genpd);
 
 	if (pd->supply)
 		regulator_disable(pd->supply);
@@ -87,20 +94,11 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
 	return 0;
 }
 
-static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
 {
 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-	int i, ret, sw, sw2iso;
+	int i, sw, sw2iso;
 	u32 val;
-
-	if (pd->supply) {
-		ret = regulator_enable(pd->supply);
-		if (ret) {
-			pr_err("%s: failed to enable regulator: %d\n",
-			       __func__, ret);
-			return ret;
-		}
-	}
 
 	/* Enable reset clocks for all devices in the domain */
 	for (i = 0; i < pd->num_clks; i++)
@@ -125,6 +123,35 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
 	/* Disable reset clocks for all devices in the domain */
 	for (i = 0; i < pd->num_clks; i++)
 		clk_disable_unprepare(pd->clk[i]);
+}
+
+static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+{
+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+	int ret;
+
+	if (pd->supply) {
+		ret = regulator_enable(pd->supply);
+		if (ret) {
+			pr_err("%s: failed to enable regulator: %d\n",
+			       __func__, ret);
+			return ret;
+		}
+	}
+
+	_imx6_pm_domain_power_on(genpd);
+
+	return 0;
+}
+
+static int imx6_pm_domain_attach_dev(
+               struct generic_pm_domain *genpd,
+               struct device *dev)
+{
+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+
+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+		device_link_add(dev, genpd->dev.parent, DL_FLAG_AUTOREMOVE);
 
 	return 0;
 }
@@ -200,6 +227,7 @@ static int imx_pgc_power_domain_probe(struct platform_device *pdev)
 		ret = of_genpd_add_provider_simple(dev->of_node, &domain->base);
 		if (ret)
 			goto genpd_err;
+		domain->base.dev.parent = dev;
 	}
 
 	device_link_add(dev, dev->parent, DL_FLAG_AUTOREMOVE);
@@ -226,6 +254,32 @@ static int imx_pgc_power_domain_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int imx_pgc_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct imx_pm_domain *pd = pdev->dev.platform_data;
+
+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+		_imx6_pm_domain_power_off(&pd->base);
+
+	return 0;
+}
+
+static int imx_pgc_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct imx_pm_domain *pd = pdev->dev.platform_data;
+
+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+		_imx6_pm_domain_power_on(&pd->base);
+
+	return 0;
+}
+
+static const struct dev_pm_ops imx_pgc_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(imx_pgc_suspend, imx_pgc_resume)
+};
+
 static const struct platform_device_id imx_pgc_power_domain_id[] = {
 	{ "imx-pgc-power-domain"},
 	{ },
@@ -234,6 +288,7 @@ static const struct platform_device_id imx_pgc_power_domain_id[] = {
 static struct platform_driver imx_pgc_power_domain_driver = {
 	.driver = {
 		.name = "imx-pgc-pd",
+		.pm = &imx_pgc_pm_ops,
 	},
 	.probe = imx_pgc_power_domain_probe,
 	.remove = imx_pgc_power_domain_remove,
@@ -261,6 +316,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
 			.name = "PU",
 			.power_off = imx6_pm_domain_power_off,
 			.power_on = imx6_pm_domain_power_on,
+			.attach_dev = imx6_pm_domain_attach_dev,
 			.states = &imx6_pm_domain_pu_state,
 			.state_count = 1,
 		},
@@ -271,6 +327,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
 			.name = "DISPLAY",
 			.power_off = imx6_pm_domain_power_off,
 			.power_on = imx6_pm_domain_power_on,
+			.attach_dev = imx6_pm_domain_attach_dev,
 		},
 		.reg_offs = 0x240,
 		.cntr_pdn_bit = 4,
@@ -279,6 +336,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
 			.name = "PCI",
 			.power_off = imx6_pm_domain_power_off,
 			.power_on = imx6_pm_domain_power_on,
+			.attach_dev = imx6_pm_domain_attach_dev,
 		},
 		.reg_offs = 0x200,
 		.cntr_pdn_bit = 6,
