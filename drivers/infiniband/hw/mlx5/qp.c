@@ -4316,10 +4316,10 @@ static void dump_wqe(struct mlx5_ib_qp *qp, int idx, int size_16)
 	}
 }
 
-static int begin_wqe(struct mlx5_ib_qp *qp, void **seg,
+static int __begin_wqe(struct mlx5_ib_qp *qp, void **seg,
 		     struct mlx5_wqe_ctrl_seg **ctrl,
 		     const struct ib_send_wr *wr, unsigned *idx,
-		     int *size, int nreq)
+		     int *size, int nreq, bool send_signaled, bool solicited)
 {
 	if (unlikely(mlx5_wq_overflow(&qp->sq, nreq, qp->ibqp.send_cq)))
 		return -ENOMEM;
@@ -4330,15 +4330,23 @@ static int begin_wqe(struct mlx5_ib_qp *qp, void **seg,
 	*(uint32_t *)(*seg + 8) = 0;
 	(*ctrl)->imm = send_ieth(wr);
 	(*ctrl)->fm_ce_se = qp->sq_signal_bits |
-		(wr->send_flags & IB_SEND_SIGNALED ?
-		 MLX5_WQE_CTRL_CQ_UPDATE : 0) |
-		(wr->send_flags & IB_SEND_SOLICITED ?
-		 MLX5_WQE_CTRL_SOLICITED : 0);
+		(send_signaled ? MLX5_WQE_CTRL_CQ_UPDATE : 0) |
+		(solicited ? MLX5_WQE_CTRL_SOLICITED : 0);
 
 	*seg += sizeof(**ctrl);
 	*size = sizeof(**ctrl) / 16;
 
 	return 0;
+}
+
+static int begin_wqe(struct mlx5_ib_qp *qp, void **seg,
+		     struct mlx5_wqe_ctrl_seg **ctrl,
+		     const struct ib_send_wr *wr, unsigned *idx,
+		     int *size, int nreq)
+{
+	return __begin_wqe(qp, seg, ctrl, wr, idx, size, nreq,
+			   wr->send_flags & IB_SEND_SIGNALED,
+			   wr->send_flags & IB_SEND_SOLICITED);
 }
 
 static void finish_wqe(struct mlx5_ib_qp *qp,
@@ -4499,10 +4507,8 @@ static int _mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				 * SET_PSV WQEs are not signaled and solicited
 				 * on error
 				 */
-				wr->send_flags &= ~IB_SEND_SIGNALED;
-				wr->send_flags |= IB_SEND_SOLICITED;
-				err = begin_wqe(qp, &seg, &ctrl, wr,
-						&idx, &size, nreq);
+				err = __begin_wqe(qp, &seg, &ctrl, wr, &idx,
+						  &size, nreq, 0, 1);
 				if (err) {
 					mlx5_ib_warn(dev, "\n");
 					err = -ENOMEM;
