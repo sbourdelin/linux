@@ -948,6 +948,36 @@ void *rhashtable_walk_peek(struct rhashtable_iter *iter)
 EXPORT_SYMBOL_GPL(rhashtable_walk_peek);
 
 /**
+ * rhashtable_walk_last_seen - Return the previously returned object, if available
+ * @iter:	Hash table iterator
+ *
+ * If rhashtable_walk_next() has previously been called and the object
+ * it returned is still in the hash table, that object is returned again,
+ * otherwise %NULL is returned.
+ *
+ * If the recent rhashtable_walk_next() call was since the most recent
+ * rhashtable_walk_start() call then the returned object may not, strictly
+ * speaking, still be in the table.  It will be safe to dereference.
+ *
+ * Note that the iterator is not changed.
+ */
+void *rhashtable_walk_last_seen(struct rhashtable_iter *iter)
+{
+	struct rhashtable *ht = iter->ht;
+	struct rhash_head *p = iter->p;
+
+	if (!p)
+		return NULL;
+	if (!iter->p_is_unsafe || ht->rhlist)
+		return p;
+	rht_for_each_rcu(p, iter->walker.tbl, iter->slot)
+		if (p == iter->p)
+			return p;
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(rhashtable_walk_last_seen);
+
+/**
  * rhashtable_walk_stop - Finish a hash table walk
  * @iter:	Hash table iterator
  *
