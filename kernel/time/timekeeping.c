@@ -1510,8 +1510,20 @@ void __weak read_boot_clock64(struct timespec64 *ts)
 	ts->tv_nsec = 0;
 }
 
-/* Flag for if timekeeping_resume() has injected sleeptime */
-static bool sleeptime_injected;
+/*
+ * Flag reflecting whether timekeeping_resume() has injected sleeptime.
+ *
+ * The flag starts of true and is only cleared when a suspend reaches
+ * timekeeping_suspend(), timekeeping_resume() sets it when the timekeeper
+ * clocksource is not stopping across suspend and has been used to update
+ * sleep time. If the timekeeper clocksource has stopped then the flag
+ * stays false and is used by the RTC resume code to decide whether sleep
+ * time must be injected and if so the flag gets set then.
+ *
+ * If a suspend fails before reaching timekeeping_resume() then the flag
+ * stays true and prevents erroneous sleeptime injection.
+ */
+static bool sleeptime_injected = true;
 
 /* Flag for if there is a persistent clock on this platform */
 static bool persistent_clock_exists;
@@ -1646,6 +1658,8 @@ void timekeeping_inject_sleeptime64(struct timespec64 *delta)
 	raw_spin_lock_irqsave(&timekeeper_lock, flags);
 	write_seqcount_begin(&tk_core.seq);
 
+	sleeptime_injected = true;
+
 	timekeeping_forward_now(tk);
 
 	__timekeeping_inject_sleeptime(tk, delta);
@@ -1671,7 +1685,6 @@ void timekeeping_resume(void)
 	struct timespec64 ts_new, ts_delta;
 	u64 cycle_now;
 
-	sleeptime_injected = false;
 	read_persistent_clock64(&ts_new);
 
 	clockevents_resume();
@@ -1742,6 +1755,8 @@ int timekeeping_suspend(void)
 	 */
 	if (timekeeping_suspend_time.tv_sec || timekeeping_suspend_time.tv_nsec)
 		persistent_clock_exists = true;
+
+	sleeptime_injected = false;
 
 	raw_spin_lock_irqsave(&timekeeper_lock, flags);
 	write_seqcount_begin(&tk_core.seq);
