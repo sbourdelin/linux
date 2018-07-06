@@ -49,6 +49,7 @@ config NETFILTER_NETLINK_LOG
 config NF_CONNTRACK
 	tristate "Netfilter connection tracking support"
 	default m if NETFILTER_ADVANCED=n
+	depends on IPV6 || !IPV6
 	select NF_DEFRAG_IPV4
 	select NF_DEFRAG_IPV6 if IPV6
 	help
