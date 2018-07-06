@@ -1474,8 +1474,10 @@ int xa_alloc(struct xarray *xa, u32 *id, void *entry, gfp_t gfp)
 		xas.xa_index = 0;
 		xas_lock(&xas);
 		xas_find_tagged(&xas, UINT_MAX, XA_FREE_TAG);
-		if (xas.xa_node == XAS_BOUNDS && xas.xa_index == UINT_MAX + 1)
+		if (xas.xa_node == XAS_BOUNDS && xas.xa_index == UINT_MAX + 1) {
+			xas_unlock(&xas);
 			return -ENOSPC;
+		}
 		*id = xas.xa_index;
 		xas_store(&xas, entry);
 		xas_clear_tag(&xas, XA_FREE_TAG);
