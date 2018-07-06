@@ -1895,7 +1895,7 @@ out:
 /* Routine for sending QP1 packets for RoCE V1 an V2
  */
 static int bnxt_re_build_qp1_send_v2(struct bnxt_re_qp *qp,
-				     struct ib_send_wr *wr,
+				     const struct ib_send_wr *wr,
 				     struct bnxt_qplib_swqe *wqe,
 				     int payload_size)
 {
@@ -2125,7 +2125,7 @@ static int is_ud_qp(struct bnxt_re_qp *qp)
 }
 
 static int bnxt_re_build_send_wqe(struct bnxt_re_qp *qp,
-				  struct ib_send_wr *wr,
+				  const struct ib_send_wr *wr,
 				  struct bnxt_qplib_swqe *wqe)
 {
 	struct bnxt_re_ah *ah = NULL;
@@ -2163,7 +2163,7 @@ static int bnxt_re_build_send_wqe(struct bnxt_re_qp *qp,
 	return 0;
 }
 
-static int bnxt_re_build_rdma_wqe(struct ib_send_wr *wr,
+static int bnxt_re_build_rdma_wqe(const struct ib_send_wr *wr,
 				  struct bnxt_qplib_swqe *wqe)
 {
 	switch (wr->opcode) {
@@ -2195,7 +2195,7 @@ static int bnxt_re_build_rdma_wqe(struct ib_send_wr *wr,
 	return 0;
 }
 
-static int bnxt_re_build_atomic_wqe(struct ib_send_wr *wr,
+static int bnxt_re_build_atomic_wqe(const struct ib_send_wr *wr,
 				    struct bnxt_qplib_swqe *wqe)
 {
 	switch (wr->opcode) {
@@ -2222,7 +2222,7 @@ static int bnxt_re_build_atomic_wqe(struct ib_send_wr *wr,
 	return 0;
 }
 
-static int bnxt_re_build_inv_wqe(struct ib_send_wr *wr,
+static int bnxt_re_build_inv_wqe(const struct ib_send_wr *wr,
 				 struct bnxt_qplib_swqe *wqe)
 {
 	wqe->type = BNXT_QPLIB_SWQE_TYPE_LOCAL_INV;
@@ -2283,7 +2283,7 @@ static int bnxt_re_build_reg_wqe(const struct ib_reg_wr *wr,
 }
 
 static int bnxt_re_copy_inline_data(struct bnxt_re_dev *rdev,
-				    struct ib_send_wr *wr,
+				    const struct ib_send_wr *wr,
 				    struct bnxt_qplib_swqe *wqe)
 {
 	/*  Copy the inline data to the data  field */
@@ -2313,7 +2313,7 @@ static int bnxt_re_copy_inline_data(struct bnxt_re_dev *rdev,
 }
 
 static int bnxt_re_copy_wr_payload(struct bnxt_re_dev *rdev,
-				   struct ib_send_wr *wr,
+				   const struct ib_send_wr *wr,
 				   struct bnxt_qplib_swqe *wqe)
 {
 	int payload_sz = 0;
