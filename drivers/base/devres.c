@@ -25,7 +25,7 @@ struct devres_node {
 struct devres {
 	struct devres_node		node;
 	/* -- 3 pointers */
-	unsigned long long		data[];	/* guarantee ull alignment */
+	unsigned long long		data[] __aligned(sizeof(unsigned long long));
 };
 
 struct devres_group {
