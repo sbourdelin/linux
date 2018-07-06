@@ -914,40 +914,6 @@ void *rhashtable_walk_next(struct rhashtable_iter *iter)
 EXPORT_SYMBOL_GPL(rhashtable_walk_next);
 
 /**
- * rhashtable_walk_peek - Return the next object but don't advance the iterator
- * @iter:	Hash table iterator
- *
- * Returns the next object or NULL when the end of the table is reached.
- *
- * Returns -EAGAIN if resize event occurred.  Note that the iterator
- * will rewind back to the beginning and you may continue to use it.
- */
-void *rhashtable_walk_peek(struct rhashtable_iter *iter)
-{
-	struct rhlist_head *list = iter->list;
-	struct rhashtable *ht = iter->ht;
-	struct rhash_head *p = iter->p;
-
-	if (p)
-		return rht_obj(ht, ht->rhlist ? &list->rhead : p);
-
-	/* No object found in current iter, find next one in the table. */
-
-	if (iter->skip) {
-		/* A nonzero skip value points to the next entry in the table
-		 * beyond that last one that was found. Decrement skip so
-		 * we find the current value. __rhashtable_walk_find_next
-		 * will restore the original value of skip assuming that
-		 * the table hasn't changed.
-		 */
-		iter->skip--;
-	}
-
-	return __rhashtable_walk_find_next(iter);
-}
-EXPORT_SYMBOL_GPL(rhashtable_walk_peek);
-
-/**
  * rhashtable_walk_last_seen - Return the previously returned object, if available
  * @iter:	Hash table iterator
  *

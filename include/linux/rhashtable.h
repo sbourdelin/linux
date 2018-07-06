@@ -245,9 +245,36 @@ static inline void rhashtable_walk_start(struct rhashtable_iter *iter)
 }
 
 void *rhashtable_walk_next(struct rhashtable_iter *iter);
-void *rhashtable_walk_peek(struct rhashtable_iter *iter);
 void *rhashtable_walk_last_seen(struct rhashtable_iter *iter);
 void rhashtable_walk_stop(struct rhashtable_iter *iter) __releases(RCU);
+
+/**
+ * rhashtable_walk_peek - Return the next object to use in an interrupted walk
+ * @iter:	Hash table iterator
+ *
+ * Returns the "current" object or NULL when the end of the table is reached.
+ * When an rhashtable_walk is interrupted with rhashtable_walk_stop(),
+ * it is often because an object was found that could not be processed
+ * immediately, possible because there is no more space to encode details
+ * of the object (e.g. when producing a seq_file from the table).
+ * When the walk is restarted, the same object needs to be processed again,
+ * if possible.  The object might have been removed from the table while
+ * the walk was paused, so it might not be available.  In that case, the
+ * normal "next" object should be treated as "current".
+ *
+ * To support this common case, rhashtable_walk_peek() returns the
+ * appropriate object to process after an interrupted walk, either the
+ * one that was most recently returned, or if that doesn't exist - the
+ * next one.
+ *
+ * Returns -EAGAIN if resize event occurred.  In that case the iterator
+ * will rewind back to the beginning and you may continue to use it.
+ */
+static inline void *rhashtable_walk_peek(struct rhashtable_iter *iter)
+{
+	return rhashtable_walk_last_seen(iter) ?:
+		rhashtable_walk_next(iter);
+}
 
 void rhashtable_free_and_destroy(struct rhashtable *ht,
 				 void (*free_fn)(void *ptr, void *arg),
