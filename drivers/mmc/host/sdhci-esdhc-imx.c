@@ -1,15 +1,11 @@
-/*
- * Freescale eSDHC i.MX controller driver for the platform bus.
- *
- * derived from the OF-version.
- *
- * Copyright (c) 2010 Pengutronix e.K.
- *   Author: Wolfram Sang <kernel@pengutronix.de>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License.
- */
+// SPDX-License-Identifier: GPL-2.0
+//
+// Freescale eSDHC i.MX controller driver for the platform bus.
+//
+// derived from the OF-version.
+//
+// Copyright (c) 2010 Pengutronix e.K.
+//   Author: Wolfram Sang <kernel@pengutronix.de>
 
 #include <linux/io.h>
 #include <linux/delay.h>
