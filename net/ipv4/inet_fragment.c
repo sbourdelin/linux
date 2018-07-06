@@ -89,10 +89,76 @@ static void inet_frags_free_cb(void *ptr, void *arg)
 	inet_frag_put(fq);
 }
 
+static void inet_frag_schedule_worker(struct netns_frags *nf)
+{
+	if (unlikely(!work_pending(&nf->frags_work)))
+		schedule_work(&nf->frags_work);
+}
+
+#define INETFRAGS_EVICT_MAX	64
+static void inet_frag_worker(struct work_struct *work)
+{
+	struct netns_frags *nf;
+	bool reschedule;
+	int evicted = 0;
+
+	nf = container_of(work, struct netns_frags, frags_work);
+
+	rhashtable_walk_start(&nf->iter);
+
+	while ((reschedule = (frag_mem_limit(nf) > nf->low_thresh))) {
+		struct inet_frag_queue *fq = rhashtable_walk_next(&nf->iter);
+
+		if (IS_ERR(fq) && PTR_ERR(fq) == -EAGAIN)
+			continue;
+		if (!fq) {
+			/* end of table, restart the walk */
+			rhashtable_walk_stop(&nf->iter);
+			rhashtable_walk_exit(&nf->iter);
+			rhashtable_walk_enter(&nf->rhashtable, &nf->iter);
+			rhashtable_walk_start(&nf->iter);
+			continue;
+		}
+		if (!refcount_inc_not_zero(&fq->refcnt))
+			continue;
+
+		spin_lock_bh(&fq->lock);
+		inet_frag_kill(fq);
+		spin_unlock_bh(&fq->lock);
+		inet_frag_put(fq);
+
+		/* limit the amount of work we can do before a reschedule,
+		 * to avoid starving others queued works
+		 */
+		if (++evicted > INETFRAGS_EVICT_MAX)
+			break;
+	}
+
+	rhashtable_walk_stop(&nf->iter);
+
+	if (reschedule)
+		inet_frag_schedule_worker(nf);
+}
+
+int inet_frags_init_net(struct netns_frags *nf)
+{
+	int ret;
+
+	atomic_long_set(&nf->mem, 0);
+	INIT_WORK(&nf->frags_work, inet_frag_worker);
+	ret = rhashtable_init(&nf->rhashtable, &nf->f->rhash_params);
+	if (ret)
+		return ret;
+	rhashtable_walk_enter(&nf->rhashtable, &nf->iter);
+	return ret;
+}
+EXPORT_SYMBOL(inet_frags_init_net);
+
 void inet_frags_exit_net(struct netns_frags *nf)
 {
 	nf->low_thresh = 0; /* prevent creation of new frags */
-
+	cancel_work_sync(&nf->frags_work);
+	rhashtable_walk_exit(&nf->iter);
 	rhashtable_free_and_destroy(&nf->rhashtable, inet_frags_free_cb, NULL);
 }
 EXPORT_SYMBOL(inet_frags_exit_net);
@@ -158,8 +224,10 @@ static struct inet_frag_queue *inet_frag_alloc(struct netns_frags *nf,
 {
 	struct inet_frag_queue *q;
 
-	if (!nf->high_thresh || frag_mem_limit(nf) > nf->high_thresh)
+	if (!nf->high_thresh || frag_mem_limit(nf) > nf->high_thresh) {
+		inet_frag_schedule_worker(nf);
 		return NULL;
+	}
 
 	q = kmem_cache_zalloc(f->frags_cachep, GFP_ATOMIC);
 	if (!q)

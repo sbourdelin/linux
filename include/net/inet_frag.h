@@ -11,6 +11,8 @@ struct netns_frags {
 	int			timeout;
 	int			max_dist;
 	struct inet_frags	*f;
+	struct work_struct	frags_work;
+	struct rhashtable_iter	iter;
 
 	struct rhashtable       rhashtable ____cacheline_aligned_in_smp;
 
@@ -101,11 +103,7 @@ struct inet_frags {
 int inet_frags_init(struct inet_frags *);
 void inet_frags_fini(struct inet_frags *);
 
-static inline int inet_frags_init_net(struct netns_frags *nf)
-{
-	atomic_long_set(&nf->mem, 0);
-	return rhashtable_init(&nf->rhashtable, &nf->f->rhash_params);
-}
+int inet_frags_init_net(struct netns_frags *nf);
 void inet_frags_exit_net(struct netns_frags *nf);
 
 void inet_frag_kill(struct inet_frag_queue *q);
