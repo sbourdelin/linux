@@ -143,6 +143,7 @@ struct dentry_stat_t dentry_stat = {
 #define NEG_IS_SB_UMOUNTING(sb)	\
 	unlikely(!(sb)->s_root || !((sb)->s_flags & MS_ACTIVE))
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 static struct static_key limit_neg_key = STATIC_KEY_INIT_FALSE;
 static int neg_dentry_pc_old;
 int neg_dentry_pc;
@@ -166,10 +167,11 @@ proc_handler proc_neg_dentry_pc;
 static void d_lru_del(struct dentry *dentry);
 static void prune_negative_dentry(struct work_struct *work);
 static DECLARE_DELAYED_WORK(prune_neg_dentry_work, prune_negative_dentry);
+static DEFINE_PER_CPU(long, nr_dentry_neg);
+#endif /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
 
 static DEFINE_PER_CPU(long, nr_dentry);
 static DEFINE_PER_CPU(long, nr_dentry_unused);
-static DEFINE_PER_CPU(long, nr_dentry_neg);
 
 #if defined(CONFIG_SYSCTL) && defined(CONFIG_PROC_FS)
 
@@ -203,6 +205,7 @@ static long get_nr_dentry_unused(void)
 	return sum < 0 ? 0 : sum;
 }
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 static long get_nr_dentry_neg(void)
 {
 	int i;
@@ -213,6 +216,9 @@ static long get_nr_dentry_neg(void)
 	sum += neg_dentry_nfree_init - ndblk.nfree;
 	return sum < 0 ? 0 : sum;
 }
+#else
+static long get_nr_dentry_neg(void)	{ return 0; }
+#endif
 
 int proc_nr_dentry(struct ctl_table *table, int write, void __user *buffer,
 		   size_t *lenp, loff_t *ppos)
@@ -277,6 +283,7 @@ static inline int dentry_string_cmp(const unsigned char *cs, const unsigned char
 
 #endif
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 /*
  * Decrement negative dentry count if applicable.
  */
@@ -455,6 +462,26 @@ out:
 	return 0;
 }
 EXPORT_SYMBOL_GPL(proc_neg_dentry_pc);
+#else /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
+
+static inline void __neg_dentry_dec(struct dentry *dentry)
+{
+}
+
+static inline void neg_dentry_dec(struct dentry *dentry)
+{
+}
+
+static inline void __neg_dentry_inc(struct dentry *dentry, bool retain)
+{
+}
+
+static inline void neg_dentry_inc(struct dentry *dentry)
+{
+}
+
+#endif /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
+
 
 static inline int dentry_cmp(const struct dentry *dentry, const unsigned char *ct, unsigned tcount)
 {
@@ -1485,6 +1512,7 @@ void shrink_dcache_sb(struct super_block *sb)
 }
 EXPORT_SYMBOL(shrink_dcache_sb);
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 /*
  * A modified version that attempts to remove a limited number of negative
  * dentries as well as some other non-negative dentries at the front.
@@ -1639,6 +1667,7 @@ stop_pruning:
 	deactivate_super(sb);
 	WRITE_ONCE(ndblk.prune_sb, NULL);
 }
+#endif /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
 
 /**
  * enum d_walk_ret - action to talke during tree walk
@@ -3576,7 +3605,9 @@ static void __init dcache_init(void)
 		SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|SLAB_MEM_SPREAD|SLAB_ACCOUNT,
 		d_iname);
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 	raw_spin_lock_init(&ndblk.nfree_lock);
+#endif
 
 	/* Hash may have been set up in dcache_init_early */
 	if (!hashdist)

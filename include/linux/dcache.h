@@ -612,10 +612,12 @@ struct name_snapshot {
 void take_dentry_name_snapshot(struct name_snapshot *, struct dentry *);
 void release_dentry_name_snapshot(struct name_snapshot *);
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 /*
  * Negative dentry related declarations.
  */
 extern int neg_dentry_pc;
 extern int neg_dentry_enforce;
+#endif
 
 #endif	/* __LINUX_DCACHE_H */
