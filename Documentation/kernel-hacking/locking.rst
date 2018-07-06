@@ -177,7 +177,7 @@ perfect world).
 
 Note that you can also use :c:func:`spin_lock_irq()` or
 :c:func:`spin_lock_irqsave()` here, which stop hardware interrupts
-as well: see `Hard IRQ Context <#hardirq-context>`__.
+as well: see :ref:`Hard IRQ Context <hardirq-context>`.
 
 This works perfectly for UP as well: the spin lock vanishes, and this
 macro simply becomes :c:func:`local_bh_disable()`
@@ -228,7 +228,7 @@ The Same Softirq
 ~~~~~~~~~~~~~~~~
 
 The same softirq can run on the other CPUs: you can use a per-CPU array
-(see `Per-CPU Data <#per-cpu>`__) for better performance. If you're
+(see :ref:`Per-CPU Data <per-cpu>`) for better performance. If you're
 going so far as to use a softirq, you probably care about scalable
 performance enough to justify the extra complexity.
 
@@ -242,6 +242,8 @@ You'll need to use :c:func:`spin_lock()` and
 :c:func:`spin_unlock()` for shared data, whether it be a timer,
 tasklet, different softirq or the same or another softirq: any of them
 could be running on a different CPU.
+
+.. _`hardirq-context`:
 
 Hard IRQ Context
 ================
@@ -875,6 +877,8 @@ Alan Cox says, “Lock data, not code”.
 Common Problems
 ===============
 
+.. _`deadlock`:
+
 Deadlock: Simple and Advanced
 -----------------------------
 
@@ -1247,6 +1251,8 @@ The benefit here is that the reference count is not written to: the
 object is not altered in any way, which is much faster on SMP machines
 due to caching.
 
+.. _`per-cpu`:
+
 Per-CPU Data
 ------------
 
@@ -1293,6 +1299,8 @@ The spinlock prevents any other accesses happening at the same time.
 Naturally, this is slower than just a :c:func:`spin_lock_irq()`
 call, so it only makes sense if this type of access happens extremely
 rarely.
+
+.. _`sleeping-things`:
 
 What Functions Are Safe To Call From Interrupts?
 ================================================
