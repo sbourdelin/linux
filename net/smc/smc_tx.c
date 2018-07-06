@@ -274,7 +274,7 @@ static int smc_tx_rdma_write(struct smc_connection *conn, int peer_rmbe_offset,
 			     int num_sges, struct ib_sge sges[])
 {
 	struct smc_link_group *lgr = conn->lgr;
-	struct ib_send_wr *failed_wr = NULL;
+	const struct ib_send_wr *failed_wr = NULL;
 	struct ib_rdma_wr rdma_wr;
 	struct smc_link *link;
 	int rc;

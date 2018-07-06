@@ -1516,7 +1516,8 @@ void
 rpcrdma_post_recvs(struct rpcrdma_xprt *r_xprt, bool temp)
 {
 	struct rpcrdma_buffer *buf = &r_xprt->rx_buf;
-	struct ib_recv_wr *wr, *bad_wr;
+	struct ib_recv_wr *wr;
+	const struct ib_recv_wr *bad_wr;
 	int needed, count, rc;
 
 	needed = buf->rb_credits + (buf->rb_bc_srv_max_requests << 1);

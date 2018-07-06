@@ -816,7 +816,8 @@ static int srpt_post_recv(struct srpt_device *sdev, struct srpt_rdma_ch *ch,
 			  struct srpt_recv_ioctx *ioctx)
 {
 	struct ib_sge list;
-	struct ib_recv_wr wr, *bad_wr;
+	struct ib_recv_wr wr;
+	const struct ib_recv_wr *bad_wr;
 
 	BUG_ON(!sdev);
 	list.addr = ioctx->ioctx.dma;
@@ -846,7 +847,7 @@ static int srpt_post_recv(struct srpt_device *sdev, struct srpt_rdma_ch *ch,
  */
 static int srpt_zerolength_write(struct srpt_rdma_ch *ch)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_rdma_wr wr = {
 		.wr = {
 			.next		= NULL,
@@ -2610,7 +2611,8 @@ static int srpt_write_pending(struct se_cmd *se_cmd)
 	struct srpt_send_ioctx *ioctx =
 		container_of(se_cmd, struct srpt_send_ioctx, cmd);
 	struct srpt_rdma_ch *ch = ioctx->ch;
-	struct ib_send_wr *first_wr = NULL, *bad_wr;
+	struct ib_send_wr *first_wr = NULL;
+	const struct ib_send_wr *bad_wr;
 	struct ib_cqe *cqe = &ioctx->rdma_cqe;
 	enum srpt_command_state new_state;
 	int ret, i;
@@ -2672,7 +2674,8 @@ static void srpt_queue_response(struct se_cmd *cmd)
 		container_of(cmd, struct srpt_send_ioctx, cmd);
 	struct srpt_rdma_ch *ch = ioctx->ch;
 	struct srpt_device *sdev = ch->sport->sdev;
-	struct ib_send_wr send_wr, *first_wr = &send_wr, *bad_wr;
+	struct ib_send_wr send_wr, *first_wr = &send_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_sge sge;
 	enum srpt_command_state state;
 	int resp_len, ret, i;

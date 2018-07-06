@@ -810,7 +810,8 @@ isert_cma_handler(struct rdma_cm_id *cma_id, struct rdma_cm_event *event)
 static int
 isert_post_recvm(struct isert_conn *isert_conn, u32 count)
 {
-	struct ib_recv_wr *rx_wr, *rx_wr_failed;
+	struct ib_recv_wr *rx_wr;
+	const struct ib_recv_wr *rx_wr_failed;
 	int i, ret;
 	struct iser_rx_desc *rx_desc;
 
@@ -837,7 +838,8 @@ isert_post_recvm(struct isert_conn *isert_conn, u32 count)
 static int
 isert_post_recv(struct isert_conn *isert_conn, struct iser_rx_desc *rx_desc)
 {
-	struct ib_recv_wr *rx_wr_failed, rx_wr;
+	const struct ib_recv_wr *rx_wr_failed;
+	struct ib_recv_wr rx_wr;
 	int ret;
 
 	if (!rx_desc->in_use) {
@@ -865,7 +867,8 @@ static int
 isert_login_post_send(struct isert_conn *isert_conn, struct iser_tx_desc *tx_desc)
 {
 	struct ib_device *ib_dev = isert_conn->cm_id->device;
-	struct ib_send_wr send_wr, *send_wr_failed;
+	struct ib_send_wr send_wr;
+	const struct ib_send_wr *send_wr_failed;
 	int ret;
 
 	ib_dma_sync_single_for_device(ib_dev, tx_desc->dma_addr,
@@ -968,7 +971,8 @@ isert_init_send_wr(struct isert_conn *isert_conn, struct isert_cmd *isert_cmd,
 static int
 isert_login_post_recv(struct isert_conn *isert_conn)
 {
-	struct ib_recv_wr rx_wr, *rx_wr_fail;
+	struct ib_recv_wr rx_wr;
+	const struct ib_recv_wr *rx_wr_fail;
 	struct ib_sge sge;
 	int ret;
 
@@ -1830,7 +1834,7 @@ isert_send_done(struct ib_cq *cq, struct ib_wc *wc)
 static int
 isert_post_response(struct isert_conn *isert_conn, struct isert_cmd *isert_cmd)
 {
-	struct ib_send_wr *wr_failed;
+	const struct ib_send_wr *wr_failed;
 	int ret;
 
 	ret = isert_post_recv(isert_conn, isert_cmd->rx_desc);

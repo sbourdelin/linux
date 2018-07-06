@@ -802,7 +802,8 @@ out1:
  */
 static int smbd_post_send_negotiate_req(struct smbd_connection *info)
 {
-	struct ib_send_wr send_wr, *send_wr_fail;
+	struct ib_send_wr send_wr;
+	const struct ib_send_wr *send_wr_fail;
 	int rc = -ENOMEM;
 	struct smbd_request *request;
 	struct smbd_negotiate_req *packet;
@@ -1024,7 +1025,8 @@ static void smbd_destroy_header(struct smbd_connection *info,
 static int smbd_post_send(struct smbd_connection *info,
 		struct smbd_request *request, bool has_payload)
 {
-	struct ib_send_wr send_wr, *send_wr_fail;
+	struct ib_send_wr send_wr;
+	const struct ib_send_wr *send_wr_fail;
 	int rc, i;
 
 	for (i = 0; i < request->num_sge; i++) {
@@ -1184,7 +1186,8 @@ static int smbd_post_send_data(
 static int smbd_post_recv(
 		struct smbd_connection *info, struct smbd_response *response)
 {
-	struct ib_recv_wr recv_wr, *recv_wr_fail = NULL;
+	struct ib_recv_wr recv_wr;
+	const struct ib_recv_wr *recv_wr_fail = NULL;
 	int rc = -EIO;
 
 	response->sge.addr = ib_dma_map_single(
@@ -2480,7 +2483,7 @@ struct smbd_mr *smbd_register_mr(
 	int rc, i;
 	enum dma_data_direction dir;
 	struct ib_reg_wr *reg_wr;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 
 	if (num_pages > info->max_frmr_depth) {
 		log_rdma_mr(ERR, "num_pages=%d max_frmr_depth=%d\n",
@@ -2599,7 +2602,8 @@ static void local_inv_done(struct ib_cq *cq, struct ib_wc *wc)
  */
 int smbd_deregister_mr(struct smbd_mr *smbdirect_mr)
 {
-	struct ib_send_wr *wr, *bad_wr;
+	struct ib_send_wr *wr;
+	const struct ib_send_wr *bad_wr;
 	struct smbd_connection *info = smbdirect_mr->conn;
 	int rc = 0;
 

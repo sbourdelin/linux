@@ -4370,8 +4370,8 @@ static void finish_wqe(struct mlx5_ib_qp *qp,
 	qp->sq.w_list[idx].next = qp->sq.cur_post;
 }
 
-static int _mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
-		      struct ib_send_wr **bad_wr, bool drain)
+static int _mlx5_ib_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+			      const struct ib_send_wr **bad_wr, bool drain)
 {
 	struct mlx5_wqe_ctrl_seg *ctrl = NULL;  /* compiler warning */
 	struct mlx5_ib_dev *dev = to_mdev(ibqp->device);
@@ -4697,8 +4697,8 @@ out:
 	return err;
 }
 
-int mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
-		      struct ib_send_wr **bad_wr)
+int mlx5_ib_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+		      const struct ib_send_wr **bad_wr)
 {
 	return _mlx5_ib_post_send(ibqp, wr, bad_wr, false);
 }
@@ -4708,8 +4708,8 @@ static void set_sig_seg(struct mlx5_rwqe_sig *sig, int size)
 	sig->signature = calc_sig(sig, size);
 }
 
-static int _mlx5_ib_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
-		      struct ib_recv_wr **bad_wr, bool drain)
+static int _mlx5_ib_post_recv(struct ib_qp *ibqp, const struct ib_recv_wr *wr,
+		      const struct ib_recv_wr **bad_wr, bool drain)
 {
 	struct mlx5_ib_qp *qp = to_mqp(ibqp);
 	struct mlx5_wqe_data_seg *scat;
@@ -4789,8 +4789,8 @@ out:
 	return err;
 }
 
-int mlx5_ib_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
-		      struct ib_recv_wr **bad_wr)
+int mlx5_ib_post_recv(struct ib_qp *ibqp, const struct ib_recv_wr *wr,
+		      const struct ib_recv_wr **bad_wr)
 {
 	return _mlx5_ib_post_recv(ibqp, wr, bad_wr, false);
 }
@@ -5786,7 +5786,7 @@ void mlx5_ib_drain_sq(struct ib_qp *qp)
 	struct ib_cq *cq = qp->send_cq;
 	struct ib_qp_attr attr = { .qp_state = IB_QPS_ERR };
 	struct mlx5_ib_drain_cqe sdrain;
-	struct ib_send_wr *bad_swr;
+	const struct ib_send_wr *bad_swr;
 	struct ib_rdma_wr swr = {
 		.wr = {
 			.next = NULL,
@@ -5821,7 +5821,8 @@ void mlx5_ib_drain_rq(struct ib_qp *qp)
 	struct ib_cq *cq = qp->recv_cq;
 	struct ib_qp_attr attr = { .qp_state = IB_QPS_ERR };
 	struct mlx5_ib_drain_cqe rdrain;
-	struct ib_recv_wr rwr = {}, *bad_rwr;
+	struct ib_recv_wr rwr = {};
+	const struct ib_recv_wr *bad_rwr;
 	int ret;
 	struct mlx5_ib_dev *dev = to_mdev(qp->device);
 	struct mlx5_core_dev *mdev = dev->mdev;

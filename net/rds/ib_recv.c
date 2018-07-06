@@ -383,7 +383,7 @@ void rds_ib_recv_refill(struct rds_connection *conn, int prefill, gfp_t gfp)
 {
 	struct rds_ib_connection *ic = conn->c_transport_data;
 	struct rds_ib_recv_work *recv;
-	struct ib_recv_wr *failed_wr;
+	const struct ib_recv_wr *failed_wr;
 	unsigned int posted = 0;
 	int ret = 0;
 	bool can_wait = !!(gfp & __GFP_DIRECT_RECLAIM);
@@ -650,7 +650,7 @@ static u64 rds_ib_get_ack(struct rds_ib_connection *ic)
 static void rds_ib_send_ack(struct rds_ib_connection *ic, unsigned int adv_credits)
 {
 	struct rds_header *hdr = ic->i_ack;
-	struct ib_send_wr *failed_wr;
+	const struct ib_send_wr *failed_wr;
 	u64 seq;
 	int ret;
 

@@ -63,7 +63,7 @@ static inline void smc_wr_tx_set_wr_id(atomic_long_t *wr_tx_id, long val)
 /* post a new receive work request to fill a completed old work request entry */
 static inline int smc_wr_rx_post(struct smc_link *link)
 {
-	struct ib_recv_wr *bad_recv_wr = NULL;
+	const struct ib_recv_wr *bad_recv_wr = NULL;
 	int rc;
 	u64 wr_id, temp_wr_id;
 	u32 index;

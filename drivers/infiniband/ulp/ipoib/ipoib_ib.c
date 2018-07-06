@@ -101,7 +101,7 @@ static void ipoib_ud_dma_unmap_rx(struct ipoib_dev_priv *priv,
 static int ipoib_ib_post_receive(struct net_device *dev, int id)
 {
 	struct ipoib_dev_priv *priv = ipoib_priv(dev);
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	int ret;
 
 	priv->rx_wr.wr_id   = id | IPOIB_OP_RECV;
@@ -542,7 +542,7 @@ static inline int post_send(struct ipoib_dev_priv *priv,
 			    struct ipoib_tx_buf *tx_req,
 			    void *head, int hlen)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct sk_buff *skb = tx_req->skb;
 
 	ipoib_build_sge(priv, tx_req);

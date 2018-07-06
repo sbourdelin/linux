@@ -240,7 +240,7 @@ int smc_wr_tx_put_slot(struct smc_link *link,
  */
 int smc_wr_tx_send(struct smc_link *link, struct smc_wr_tx_pend_priv *priv)
 {
-	struct ib_send_wr *failed_wr = NULL;
+	const struct ib_send_wr *failed_wr = NULL;
 	struct smc_wr_tx_pend *pend;
 	int rc;
 
@@ -263,7 +263,7 @@ int smc_wr_tx_send(struct smc_link *link, struct smc_wr_tx_pend_priv *priv)
 /* Register a memory region and wait for result. */
 int smc_wr_reg_send(struct smc_link *link, struct ib_mr *mr)
 {
-	struct ib_send_wr *failed_wr = NULL;
+	const struct ib_send_wr *failed_wr = NULL;
 	int rc;
 
 	ib_req_notify_cq(link->smcibdev->roce_cq_send,

@@ -94,7 +94,7 @@ static void ipoib_cm_dma_unmap_rx(struct ipoib_dev_priv *priv, int frags,
 static int ipoib_cm_post_receive_srq(struct net_device *dev, int id)
 {
 	struct ipoib_dev_priv *priv = ipoib_priv(dev);
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	int i, ret;
 
 	priv->cm.rx_wr.wr_id = id | IPOIB_OP_CM | IPOIB_OP_RECV;
@@ -120,7 +120,7 @@ static int ipoib_cm_post_receive_nonsrq(struct net_device *dev,
 					struct ib_sge *sge, int id)
 {
 	struct ipoib_dev_priv *priv = ipoib_priv(dev);
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	int i, ret;
 
 	wr->wr_id = id | IPOIB_OP_CM | IPOIB_OP_RECV;
@@ -212,7 +212,7 @@ static void ipoib_cm_free_rx_ring(struct net_device *dev,
 
 static void ipoib_cm_start_rx_drain(struct ipoib_dev_priv *priv)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ipoib_cm_rx *p;
 
 	/* We only reserved 1 extra slot in CQ for drain WRs, so
@@ -328,8 +328,7 @@ static int ipoib_cm_modify_rx_qp(struct net_device *dev,
 	return 0;
 }
 
-static void ipoib_cm_init_rx_wr(struct net_device *dev,
-				struct ib_recv_wr *wr,
+static void ipoib_cm_init_rx_wr(struct net_device *dev, struct ib_recv_wr *wr,
 				struct ib_sge *sge)
 {
 	struct ipoib_dev_priv *priv = ipoib_priv(dev);
@@ -698,7 +697,7 @@ static inline int post_send(struct ipoib_dev_priv *priv,
 			    unsigned int wr_id,
 			    struct ipoib_tx_buf *tx_req)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 
 	ipoib_build_sge(priv, tx_req);
 

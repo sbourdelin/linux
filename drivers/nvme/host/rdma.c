@@ -1040,7 +1040,7 @@ static void nvme_rdma_inv_rkey_done(struct ib_cq *cq, struct ib_wc *wc)
 static int nvme_rdma_inv_rkey(struct nvme_rdma_queue *queue,
 		struct nvme_rdma_request *req)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_send_wr wr = {
 		.opcode		    = IB_WR_LOCAL_INV,
 		.next		    = NULL,
@@ -1246,7 +1246,8 @@ static int nvme_rdma_post_send(struct nvme_rdma_queue *queue,
 		struct nvme_rdma_qe *qe, struct ib_sge *sge, u32 num_sge,
 		struct ib_send_wr *first)
 {
-	struct ib_send_wr wr, *bad_wr;
+	struct ib_send_wr wr;
+	const struct ib_send_wr *bad_wr;
 	int ret;
 
 	sge->addr   = qe->dma;
@@ -1276,7 +1277,8 @@ static int nvme_rdma_post_send(struct nvme_rdma_queue *queue,
 static int nvme_rdma_post_recv(struct nvme_rdma_queue *queue,
 		struct nvme_rdma_qe *qe)
 {
-	struct ib_recv_wr wr, *bad_wr;
+	struct ib_recv_wr wr;
+	const struct ib_recv_wr *bad_wr;
 	struct ib_sge list;
 	int ret;
 

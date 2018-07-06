@@ -229,7 +229,7 @@ void svc_rdma_recv_ctxt_put(struct svcxprt_rdma *rdma,
 static int __svc_rdma_post_recv(struct svcxprt_rdma *rdma,
 				struct svc_rdma_recv_ctxt *ctxt)
 {
-	struct ib_recv_wr *bad_recv_wr;
+	const struct ib_recv_wr *bad_recv_wr;
 	int ret;
 
 	svc_xprt_get(&rdma->sc_xprt);

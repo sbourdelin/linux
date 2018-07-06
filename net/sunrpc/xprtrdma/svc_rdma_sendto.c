@@ -291,7 +291,7 @@ static void svc_rdma_wc_send(struct ib_cq *cq, struct ib_wc *wc)
  */
 int svc_rdma_send(struct svcxprt_rdma *rdma, struct ib_send_wr *wr)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	int ret;
 
 	might_sleep();

@@ -102,7 +102,7 @@ static void rds_ib_free_frmr(struct rds_ib_mr *ibmr, bool drop)
 static int rds_ib_post_reg_frmr(struct rds_ib_mr *ibmr)
 {
 	struct rds_ib_frmr *frmr = &ibmr->u.frmr;
-	struct ib_send_wr *failed_wr;
+	const struct ib_send_wr *failed_wr;
 	struct ib_reg_wr reg_wr;
 	int ret, off = 0;
 
@@ -230,7 +230,8 @@ out_unmap:
 
 static int rds_ib_post_inv(struct rds_ib_mr *ibmr)
 {
-	struct ib_send_wr *s_wr, *failed_wr;
+	struct ib_send_wr *s_wr;
+	const struct ib_send_wr *failed_wr;
 	struct rds_ib_frmr *frmr = &ibmr->u.frmr;
 	struct rdma_cm_id *i_cm_id = ibmr->ic->i_cm_id;
 	int ret = -EINVAL;

@@ -1208,7 +1208,7 @@ static void srp_inv_rkey_err_done(struct ib_cq *cq, struct ib_wc *wc)
 static int srp_inv_rkey(struct srp_request *req, struct srp_rdma_ch *ch,
 		u32 rkey)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_send_wr wr = {
 		.opcode		    = IB_WR_LOCAL_INV,
 		.next		    = NULL,
@@ -1500,7 +1500,7 @@ static int srp_map_finish_fr(struct srp_map_state *state,
 {
 	struct srp_target_port *target = ch->target;
 	struct srp_device *dev = target->srp_host->srp_dev;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_reg_wr wr;
 	struct srp_fr_desc *desc;
 	u32 rkey;
@@ -2015,7 +2015,8 @@ static int srp_post_send(struct srp_rdma_ch *ch, struct srp_iu *iu, int len)
 {
 	struct srp_target_port *target = ch->target;
 	struct ib_sge list;
-	struct ib_send_wr wr, *bad_wr;
+	struct ib_send_wr wr;
+	const struct ib_send_wr *bad_wr;
 
 	list.addr   = iu->dma;
 	list.length = len;
@@ -2036,7 +2037,8 @@ static int srp_post_send(struct srp_rdma_ch *ch, struct srp_iu *iu, int len)
 static int srp_post_recv(struct srp_rdma_ch *ch, struct srp_iu *iu)
 {
 	struct srp_target_port *target = ch->target;
-	struct ib_recv_wr wr, *bad_wr;
+	struct ib_recv_wr wr;
+	const struct ib_recv_wr *bad_wr;
 	struct ib_sge list;
 
 	list.addr   = iu->dma;
