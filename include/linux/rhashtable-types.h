@@ -126,6 +126,7 @@ struct rhashtable_iter {
 	struct rhashtable_walker walker;
 	unsigned int slot;
 	unsigned int skip;
+	bool p_is_unsafe;
 	bool end_of_table;
 };
 

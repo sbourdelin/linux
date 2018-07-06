@@ -617,7 +617,12 @@ slow_path:
 		    (params.obj_cmpfn ?
 		     params.obj_cmpfn(&arg, rht_obj(ht, head)) :
 		     rhashtable_compare(&arg, rht_obj(ht, head)))) {
-			pprev = &head->next;
+			if (rhlist) {
+				pprev = &head->next;
+			} else {
+				if (head < obj)
+					headp = &head->next;
+			}
 			continue;
 		}
 
@@ -1113,7 +1118,8 @@ static inline int rhashtable_walk_init(struct rhashtable *ht,
  * Note that if you restart a walk after rhashtable_walk_stop you
  * may see the same object twice.  Also, you may miss objects if
  * there are removals in between rhashtable_walk_stop and the next
- * call to rhashtable_walk_start.
+ * call to rhashtable_walk_start.  Note that this is different to
+ * rhashtable_walk_enter() which misses objects.
  *
  * For a completely stable walk you should construct your own data
  * structure outside the hash table.

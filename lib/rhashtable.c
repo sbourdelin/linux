@@ -228,6 +228,7 @@ static int rhashtable_rehash_one(struct rhashtable *ht, unsigned int old_hash)
 	struct bucket_table *old_tbl = rht_dereference(ht->tbl, ht);
 	struct bucket_table *new_tbl = rhashtable_last_table(ht, old_tbl);
 	struct rhash_head __rcu **pprev = rht_bucket_var(old_tbl, old_hash);
+	struct rhash_head __rcu **inspos;
 	int err = -EAGAIN;
 	struct rhash_head *head, *next, *entry;
 	spinlock_t *new_bucket_lock;
@@ -256,12 +257,15 @@ static int rhashtable_rehash_one(struct rhashtable *ht, unsigned int old_hash)
 	new_bucket_lock = rht_bucket_lock(new_tbl, new_hash);
 
 	spin_lock_nested(new_bucket_lock, SINGLE_DEPTH_NESTING);
-	head = rht_dereference_bucket(new_tbl->buckets[new_hash],
-				      new_tbl, new_hash);
-
+	inspos = &new_tbl->buckets[new_hash];
+	head = rht_dereference_bucket(*inspos, new_tbl, new_hash);
+	while (!rht_is_a_nulls(head) && head < entry) {
+		inspos = &head->next;
+		head = rht_dereference_bucket(*inspos, new_tbl, new_hash);
+	}
 	RCU_INIT_POINTER(entry->next, head);
 
-	rcu_assign_pointer(new_tbl->buckets[new_hash], entry);
+	rcu_assign_pointer(*inspos, entry);
 	spin_unlock(new_bucket_lock);
 
 	rcu_assign_pointer(*pprev, next);
@@ -557,6 +561,10 @@ static struct bucket_table *rhashtable_insert_one(struct rhashtable *ht,
 		return ERR_PTR(-ENOMEM);
 
 	head = rht_dereference_bucket(*pprev, tbl, hash);
+	while (!ht->rhlist && !rht_is_a_nulls(head) && head < obj) {
+		pprev = &head->next;
+		head = rht_dereference_bucket(*pprev, tbl, hash);
+	}
 
 	RCU_INIT_POINTER(obj->next, head);
 	if (ht->rhlist) {
@@ -651,10 +659,10 @@ EXPORT_SYMBOL_GPL(rhashtable_insert_slow);
  *
  * This function prepares a hash table walk.
  *
- * Note that if you restart a walk after rhashtable_walk_stop you
- * may see the same object twice.  Also, you may miss objects if
- * there are removals in between rhashtable_walk_stop and the next
- * call to rhashtable_walk_start.
+ * A walk is guaranteed to return every object that was in
+ * the table before this call, and is still in the table when
+ * rhashtable_walk_next() returns NULL.  Duplicates can be
+ * seen, but only if there is a rehash event during the walk.
  *
  * For a completely stable walk you should construct your own data
  * structure outside the hash table.
@@ -738,19 +746,10 @@ int rhashtable_walk_start_check(struct rhashtable_iter *iter)
 
 	if (iter->p && !rhlist) {
 		/*
-		 * We need to validate that 'p' is still in the table, and
-		 * if so, update 'skip'
+		 * 'p' will be revalidated when rhashtable_walk_next()
+		 * is called.
 		 */
-		struct rhash_head *p;
-		int skip = 0;
-		rht_for_each_rcu(p, iter->walker.tbl, iter->slot) {
-			skip++;
-			if (p == iter->p) {
-				iter->skip = skip;
-				goto found;
-			}
-		}
-		iter->p = NULL;
+		iter->p_is_unsafe = true;
 	} else if (iter->p && rhlist) {
 		/* Need to validate that 'list' is still in the table, and
 		 * if so, update 'skip' and 'p'.
@@ -867,15 +866,39 @@ void *rhashtable_walk_next(struct rhashtable_iter *iter)
 	bool rhlist = ht->rhlist;
 
 	if (p) {
-		if (!rhlist || !(list = rcu_dereference(list->next))) {
-			p = rcu_dereference(p->next);
-			list = container_of(p, struct rhlist_head, rhead);
-		}
-		if (!rht_is_a_nulls(p)) {
-			iter->skip++;
-			iter->p = p;
-			iter->list = list;
-			return rht_obj(ht, rhlist ? &list->rhead : p);
+		if (!rhlist && iter->p_is_unsafe) {
+			/*
+			 * First time next() was called after start().
+			 * Need to find location of 'p' in the list.
+			 */
+			struct rhash_head *p;
+
+			iter->skip = 0;
+			rht_for_each_rcu(p, iter->walker.tbl, iter->slot) {
+				iter->skip++;
+				if (p <= iter->p)
+					continue;
+
+				/* p is the next object after iter->p */
+				iter->p = p;
+				iter->p_is_unsafe = false;
+				return rht_obj(ht, p);
+			}
+			/* There is no "next" object in the list, move
+			 * to next hash chain.
+			 */
+		} else {
+			if (!rhlist || !(list = rcu_dereference(list->next))) {
+				p = rcu_dereference(p->next);
+				list = container_of(p, struct rhlist_head,
+						    rhead);
+			}
+			if (!rht_is_a_nulls(p)) {
+				iter->skip++;
+				iter->p = p;
+				iter->list = list;
+				return rht_obj(ht, rhlist ? &list->rhead : p);
+			}
 		}
 
 		/* At the end of this slot, switch to next one and then find
@@ -885,6 +908,7 @@ void *rhashtable_walk_next(struct rhashtable_iter *iter)
 		iter->slot++;
 	}
 
+	iter->p_is_unsafe = false;
 	return __rhashtable_walk_find_next(iter);
 }
 EXPORT_SYMBOL_GPL(rhashtable_walk_next);
