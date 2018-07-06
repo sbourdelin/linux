@@ -60,7 +60,7 @@ config DRM_SUN8I_DW_HDMI
 	  selected the module will be called sun8i_dw_hdmi.
 
 config DRM_SUN8I_MIXER
-	tristate "Support for Allwinner Display Engine 2.0 Mixer"
+	bool "Support for Allwinner Display Engine 2.0 Mixer"
 	default MACH_SUN8I
 	help
 	  Choose this option if you have an Allwinner SoC with the
