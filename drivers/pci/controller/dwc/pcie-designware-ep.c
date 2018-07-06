@@ -585,6 +585,7 @@ int dw_pcie_ep_init(struct dw_pcie_ep *ep)
 	ep->msix_cap = dw_pcie_ep_find_capability(pci, PCI_CAP_ID_MSIX);
 
 	epc->features = EPC_FEATURE_NO_LINKUP_NOTIFIER;
+	epc->features |= EPC_FEATURE_MSIX_AVAILABLE;
 	EPC_FEATURE_SET_BAR(epc->features, BAR_0);
 
 	ep->epc = epc;
