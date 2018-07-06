@@ -617,6 +617,126 @@ static int read_config_info(struct sock *sk, struct hci_dev *hdev,
 				 &rp, sizeof(rp));
 }
 
+static u32 get_supported_phys(struct hci_dev *hdev)
+{
+	u32 supported_phys = 0;
+
+	if (lmp_bredr_capable(hdev)) {
+		supported_phys |= MGMT_PHY_BR_1M_1SLOT;
+
+		if (hdev->features[0][0] & LMP_3SLOT)
+			supported_phys |= MGMT_PHY_BR_1M_3SLOT;
+
+		if (hdev->features[0][0] & LMP_5SLOT)
+			supported_phys |= MGMT_PHY_BR_1M_5SLOT;
+
+		if (lmp_edr_2m_capable(hdev)) {
+			supported_phys |= MGMT_PHY_EDR_2M_1SLOT;
+
+			if (lmp_edr_3slot_capable(hdev))
+				supported_phys |= MGMT_PHY_EDR_2M_3SLOT;
+
+			if (lmp_edr_5slot_capable(hdev))
+				supported_phys |= MGMT_PHY_EDR_2M_5SLOT;
+
+			if (lmp_edr_3m_capable(hdev)) {
+				supported_phys |= MGMT_PHY_EDR_3M_1SLOT;
+
+				if (lmp_edr_3slot_capable(hdev))
+					supported_phys |= MGMT_PHY_EDR_3M_3SLOT;
+
+				if (lmp_edr_5slot_capable(hdev))
+					supported_phys |= MGMT_PHY_EDR_3M_5SLOT;
+			}
+		}
+	}
+
+	if (lmp_le_capable(hdev)) {
+		supported_phys |= MGMT_PHY_LE_1M_TX;
+		supported_phys |= MGMT_PHY_LE_1M_RX;
+
+		if (hdev->le_features[1] & HCI_LE_PHY_2M) {
+			supported_phys |= MGMT_PHY_LE_2M_TX;
+			supported_phys |= MGMT_PHY_LE_2M_RX;
+		}
+		if (hdev->le_features[1] & HCI_LE_PHY_CODED) {
+			supported_phys |= MGMT_PHY_LE_CODED_TX;
+			supported_phys |= MGMT_PHY_LE_CODED_RX;
+		}
+	}
+
+	return supported_phys;
+}
+
+static u32 get_selected_phys(struct hci_dev *hdev)
+{
+	u32 selected_phys = 0;
+
+	if (lmp_bredr_capable(hdev)) {
+		selected_phys |= MGMT_PHY_BR_1M_1SLOT;
+
+		if (hdev->pkt_type & (HCI_DM3 | HCI_DH3))
+			selected_phys |= MGMT_PHY_BR_1M_3SLOT;
+
+		if (hdev->pkt_type & (HCI_DM5 | HCI_DH5))
+			selected_phys |= MGMT_PHY_BR_1M_5SLOT;
+
+		if (lmp_edr_2m_capable(hdev)) {
+			if (!(hdev->pkt_type & HCI_2DH1))
+				selected_phys |= MGMT_PHY_EDR_2M_1SLOT;
+
+			if (lmp_edr_3slot_capable(hdev) &&
+				!(hdev->pkt_type & HCI_2DH3))
+				selected_phys |= MGMT_PHY_EDR_2M_3SLOT;
+
+			if (lmp_edr_5slot_capable(hdev) &&
+				!(hdev->pkt_type & HCI_2DH5))
+				selected_phys |= MGMT_PHY_EDR_2M_5SLOT;
+
+			if (lmp_edr_3m_capable(hdev)) {
+				if (!(hdev->pkt_type & HCI_3DH1))
+					selected_phys |= MGMT_PHY_EDR_3M_1SLOT;
+
+				if (lmp_edr_3slot_capable(hdev) &&
+					!(hdev->pkt_type & HCI_3DH3))
+					selected_phys |= MGMT_PHY_EDR_3M_3SLOT;
+
+				if (lmp_edr_5slot_capable(hdev) &&
+					!(hdev->pkt_type & HCI_3DH5))
+					selected_phys |= MGMT_PHY_EDR_3M_5SLOT;
+			}
+		}
+	}
+
+	if (lmp_le_capable(hdev)) {
+		if (hci_dev_test_flag(hdev, HCI_LE_PHY_1M_TX))
+			selected_phys |= MGMT_PHY_LE_1M_TX;
+
+		if (hci_dev_test_flag(hdev, HCI_LE_PHY_1M_RX))
+			selected_phys |= MGMT_PHY_LE_1M_RX;
+
+		if (hci_dev_test_flag(hdev, HCI_LE_PHY_2M_TX))
+			selected_phys |= MGMT_PHY_LE_2M_TX;
+
+		if (hci_dev_test_flag(hdev, HCI_LE_PHY_2M_RX))
+			selected_phys |= MGMT_PHY_LE_2M_RX;
+
+		if (hci_dev_test_flag(hdev, HCI_LE_PHY_CODED_TX))
+			selected_phys |= MGMT_PHY_LE_CODED_TX;
+
+		if (hci_dev_test_flag(hdev, HCI_LE_PHY_CODED_RX))
+			selected_phys |= MGMT_PHY_LE_CODED_RX;
+	}
+
+	return selected_phys;
+}
+
+static u32 get_configurable_phys(struct hci_dev *hdev)
+{
+	return (get_supported_phys(hdev) & ~MGMT_PHY_BR_1M_1SLOT &
+			~MGMT_PHY_LE_1M_TX & ~MGMT_PHY_LE_1M_RX);
+}
+
 static u32 get_supported_settings(struct hci_dev *hdev)
 {
 	u32 settings = 0;
@@ -653,6 +773,10 @@ static u32 get_supported_settings(struct hci_dev *hdev)
 	if (test_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks) ||
 	    hdev->set_bdaddr)
 		settings |= MGMT_SETTING_CONFIGURATION;
+
+	if (get_supported_phys(hdev) & ~(MGMT_PHY_BR_1M_1SLOT | MGMT_PHY_LE_1M_TX |
+					MGMT_PHY_LE_1M_RX))
+		settings |= MGMT_SETTING_PHY_CONFIGURATION;
 
 	return settings;
 }
@@ -721,6 +845,9 @@ static u32 get_current_settings(struct hci_dev *hdev)
 		if (bacmp(&hdev->static_addr, BDADDR_ANY))
 			settings |= MGMT_SETTING_STATIC_ADDRESS;
 	}
+
+	if (phys_configured(hdev))
+		settings |= MGMT_SETTING_PHY_CONFIGURATION;
 
 	return settings;
 }
@@ -3182,6 +3309,27 @@ static int set_appearance(struct sock *sk, struct hci_dev *hdev, void *data,
 	hci_dev_unlock(hdev);
 
 	return err;
+}
+
+static int get_phy_configuration(struct sock *sk, struct hci_dev *hdev,
+				 void *data, u16 len)
+{
+	struct mgmt_rp_get_phy_confguration rp;
+
+	BT_DBG("sock %p %s", sk, hdev->name);
+
+	hci_dev_lock(hdev);
+
+	memset(&rp, 0, sizeof(rp));
+
+	rp.supported_phys = cpu_to_le32(get_supported_phys(hdev));
+	rp.selected_phys = cpu_to_le32(get_selected_phys(hdev));
+	rp.configurable_phys = cpu_to_le32(get_configurable_phys(hdev));
+
+	hci_dev_unlock(hdev);
+
+	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_GET_PHY_CONFIGURATION, 0,
+				 &rp, sizeof(rp));
 }
 
 static void read_local_oob_data_complete(struct hci_dev *hdev, u8 status,
@@ -6544,6 +6692,7 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ read_ext_controller_info,MGMT_READ_EXT_INFO_SIZE,
 						HCI_MGMT_UNTRUSTED },
 	{ set_appearance,	   MGMT_SET_APPEARANCE_SIZE },
+	{ get_phy_configuration,   MGMT_GET_PHY_CONFIGURATION_SIZE },
 };
 
 void mgmt_index_added(struct hci_dev *hdev)
