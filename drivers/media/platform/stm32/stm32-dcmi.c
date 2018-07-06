@@ -1753,7 +1753,7 @@ static int dcmi_probe(struct platform_device *pdev)
 
 	ret = clk_prepare(mclk);
 	if (ret) {
-		dev_err(&pdev->dev, "Unable to prepare mclk %p\n", mclk);
+		dev_err(&pdev->dev, "Unable to prepare mclk %pK\n", mclk);
 		goto err_dma_release;
 	}
 
