@@ -461,10 +461,8 @@ struct mlx5_umr_wr {
 	u32				mkey;
 };
 
-static inline struct mlx5_umr_wr *umr_wr(struct ib_send_wr *wr)
-{
-	return container_of(wr, struct mlx5_umr_wr, wr);
-}
+#define umr_wr(send_wr)					\
+	container_of(send_wr, struct mlx5_umr_wr, wr)
 
 struct mlx5_shared_mr_info {
 	int mr_id;
