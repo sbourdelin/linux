@@ -87,6 +87,23 @@ void memcg_drain_all_list_lrus(int src_idx, int dst_idx);
 bool list_lru_add(struct list_lru *lru, struct list_head *item);
 
 /**
+ * list_lru_add_head: add an element to the lru list's head
+ * @list_lru: the lru pointer
+ * @item: the item to be added.
+ *
+ * This is similar to list_lru_add(). The only difference is the location
+ * where the new item will be added. The list_lru_add() function will add
+ * the new item to the tail as it is the most recently used one. The
+ * list_lru_add_head() will add the new item into the head so that it
+ * will the first to go if a shrinker is running. So this function should
+ * only be used for less important item that can be the first to go if
+ * the system is under memory pressure.
+ *
+ * Return value: true if the list was updated, false otherwise
+ */
+bool list_lru_add_head(struct list_lru *lru, struct list_head *item);
+
+/**
  * list_lru_del: delete an element to the lru list
  * @list_lru: the lru pointer
  * @item: the item to be deleted.

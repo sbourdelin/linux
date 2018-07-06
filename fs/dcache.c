@@ -615,10 +615,23 @@ static void dentry_unlink_inode(struct dentry * dentry)
 #define D_FLAG_VERIFY(dentry,x) WARN_ON_ONCE(((dentry)->d_flags & (DCACHE_LRU_LIST | DCACHE_SHRINK_LIST)) != (x))
 static void d_lru_add(struct dentry *dentry)
 {
+	int ret;
+
 	D_FLAG_VERIFY(dentry, 0);
 	dentry->d_flags |= DCACHE_LRU_LIST;
 	this_cpu_inc(nr_dentry_unused);
-	WARN_ON_ONCE(!list_lru_add(&dentry->d_sb->s_dentry_lru, &dentry->d_lru));
+	if (unlikely(dentry->d_flags & DCACHE_LRU_HEAD)) {
+		/*
+		 * Add to the head once, it will be added to the tail
+		 * next time.
+		 */
+		ret = list_lru_add_head(&dentry->d_sb->s_dentry_lru,
+					&dentry->d_lru);
+		dentry->d_flags &= ~DCACHE_LRU_HEAD;
+	} else {
+		ret = list_lru_add(&dentry->d_sb->s_dentry_lru, &dentry->d_lru);
+	}
+	WARN_ON_ONCE(!ret);
 	neg_dentry_inc(dentry);
 }
 
@@ -2988,6 +3001,9 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 		__d_set_inode_and_type(dentry, inode, add_flags);
 		raw_write_seqcount_end(&dentry->d_seq);
 		fsnotify_update_flags(dentry);
+	} else {
+		/* It is a negative dentry, add it to LRU head initially. */
+		dentry->d_flags |= DCACHE_LRU_HEAD;
 	}
 	__d_rehash(dentry);
 	if (dir)
