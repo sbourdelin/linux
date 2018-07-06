@@ -321,6 +321,8 @@ static inline int sbitmap_test_bit(struct sbitmap *sb, unsigned int bitnr)
 
 unsigned int sbitmap_weight(const struct sbitmap *sb);
 
+struct seq_file;
+
 /**
  * sbitmap_show() - Dump &struct sbitmap information to a &struct seq_file.
  * @sb: Bitmap to show.
