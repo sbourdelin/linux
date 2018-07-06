@@ -1137,10 +1137,10 @@ static void replace_slot(void __rcu **slot, void *item,
 
 static bool node_tag_get(const struct radix_tree_root *root,
 				const struct radix_tree_node *node,
-				unsigned int tag, unsigned int offset)
+				unsigned int tag, void __rcu **slot)
 {
 	if (node)
-		return tag_get(node, tag, offset);
+		return tag_get(node, tag, get_slot_offset(node, slot));
 	return root_tag_get(root, tag);
 }
 
@@ -1156,8 +1156,7 @@ static int calculate_count(struct radix_tree_root *root,
 				void *item, void *old)
 {
 	if (is_idr(root)) {
-		unsigned offset = get_slot_offset(node, slot);
-		bool free = node_tag_get(root, node, IDR_FREE, offset);
+		bool free = node_tag_get(root, node, IDR_FREE, slot);
 		if (!free)
 			return 0;
 		if (!old)
@@ -2041,7 +2040,7 @@ void *radix_tree_delete_item(struct radix_tree_root *root,
 	if (!slot)
 		return NULL;
 	if (!entry && (!is_idr(root) || node_tag_get(root, node, IDR_FREE,
-						get_slot_offset(node, slot))))
+						     slot)))
 		return NULL;
 
 	if (item && entry != item)
