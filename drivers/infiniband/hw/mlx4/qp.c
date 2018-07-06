@@ -3561,7 +3561,7 @@ static int build_lso_seg(struct mlx4_wqe_lso_seg *wqe,
 	return 0;
 }
 
-static __be32 send_ieth(struct ib_send_wr *wr)
+static __be32 send_ieth(const struct ib_send_wr *wr)
 {
 	switch (wr->opcode) {
 	case IB_WR_SEND_WITH_IMM:
