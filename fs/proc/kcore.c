@@ -59,8 +59,8 @@ struct memelfnote
 };
 
 static LIST_HEAD(kclist_head);
-static DEFINE_RWLOCK(kclist_lock);
-static int kcore_need_update = 1;
+static DECLARE_RWSEM(kclist_lock);
+static atomic_t kcore_need_update = ATOMIC_INIT(1);
 
 /* This doesn't grab kclist_lock, so it should only be used at init time. */
 void
@@ -117,8 +117,8 @@ static void __kcore_update_ram(struct list_head *list)
 	struct kcore_list *tmp, *pos;
 	LIST_HEAD(garbage);
 
-	write_lock(&kclist_lock);
-	if (kcore_need_update) {
+	down_write(&kclist_lock);
+	if (atomic_cmpxchg(&kcore_need_update, 1, 0)) {
 		list_for_each_entry_safe(pos, tmp, &kclist_head, list) {
 			if (pos->type == KCORE_RAM
 				|| pos->type == KCORE_VMEMMAP)
@@ -127,9 +127,8 @@ static void __kcore_update_ram(struct list_head *list)
 		list_splice_tail(list, &kclist_head);
 	} else
 		list_splice(list, &garbage);
-	kcore_need_update = 0;
 	proc_root_kcore->size = get_kcore_size(&nphdr, &size);
-	write_unlock(&kclist_lock);
+	up_write(&kclist_lock);
 
 	free_kclist_ents(&garbage);
 }
@@ -450,11 +449,11 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	int nphdr;
 	unsigned long start;
 
-	read_lock(&kclist_lock);
+	down_read(&kclist_lock);
 	size = get_kcore_size(&nphdr, &elf_buflen);
 
 	if (buflen == 0 || *fpos >= size) {
-		read_unlock(&kclist_lock);
+		up_read(&kclist_lock);
 		return 0;
 	}
 
@@ -471,11 +470,11 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 			tsz = buflen;
 		elf_buf = kzalloc(elf_buflen, GFP_ATOMIC);
 		if (!elf_buf) {
-			read_unlock(&kclist_lock);
+			up_read(&kclist_lock);
 			return -ENOMEM;
 		}
 		elf_kcore_store_hdr(elf_buf, nphdr, elf_buflen);
-		read_unlock(&kclist_lock);
+		up_read(&kclist_lock);
 		if (copy_to_user(buffer, elf_buf + *fpos, tsz)) {
 			kfree(elf_buf);
 			return -EFAULT;
@@ -490,7 +489,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 		if (buflen == 0)
 			return acc;
 	} else
-		read_unlock(&kclist_lock);
+		up_read(&kclist_lock);
 
 	/*
 	 * Check to see if our file offset matches with any of
@@ -503,12 +502,12 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	while (buflen) {
 		struct kcore_list *m;
 
-		read_lock(&kclist_lock);
+		down_read(&kclist_lock);
 		list_for_each_entry(m, &kclist_head, list) {
 			if (start >= m->addr && start < (m->addr+m->size))
 				break;
 		}
-		read_unlock(&kclist_lock);
+		up_read(&kclist_lock);
 
 		if (&m->list == &kclist_head) {
 			if (clear_user(buffer, tsz))
@@ -561,7 +560,7 @@ static int open_kcore(struct inode *inode, struct file *filp)
 	if (!filp->private_data)
 		return -ENOMEM;
 
-	if (kcore_need_update)
+	if (atomic_read(&kcore_need_update))
 		kcore_update_ram();
 	if (i_size_read(inode) != proc_root_kcore->size) {
 		inode_lock(inode);
@@ -591,9 +590,8 @@ static int __meminit kcore_callback(struct notifier_block *self,
 	switch (action) {
 	case MEM_ONLINE:
 	case MEM_OFFLINE:
-		write_lock(&kclist_lock);
-		kcore_need_update = 1;
-		write_unlock(&kclist_lock);
+		atomic_set(&kcore_need_update, 1);
+		break;
 	}
 	return NOTIFY_OK;
 }
