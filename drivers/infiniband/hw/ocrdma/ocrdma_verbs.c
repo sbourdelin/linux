@@ -2105,7 +2105,7 @@ static int get_encoded_page_size(int pg_sz)
 
 static int ocrdma_build_reg(struct ocrdma_qp *qp,
 			    struct ocrdma_hdr_wqe *hdr,
-			    struct ib_reg_wr *wr)
+			    const struct ib_reg_wr *wr)
 {
 	u64 fbo;
 	struct ocrdma_ewqe_fr *fast_reg = (struct ocrdma_ewqe_fr *)(hdr + 1);

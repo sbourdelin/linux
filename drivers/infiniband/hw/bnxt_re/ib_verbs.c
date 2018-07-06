@@ -2241,7 +2241,7 @@ static int bnxt_re_build_inv_wqe(struct ib_send_wr *wr,
 	return 0;
 }
 
-static int bnxt_re_build_reg_wqe(struct ib_reg_wr *wr,
+static int bnxt_re_build_reg_wqe(const struct ib_reg_wr *wr,
 				 struct bnxt_qplib_swqe *wqe)
 {
 	struct bnxt_re_mr *mr = container_of(wr->mr, struct bnxt_re_mr, ib_mr);

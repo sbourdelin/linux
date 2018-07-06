@@ -146,8 +146,8 @@ static int build_rdma_read(union t3_wr *wqe, struct ib_send_wr *wr,
 	return 0;
 }
 
-static int build_memreg(union t3_wr *wqe, struct ib_reg_wr *wr,
-			  u8 *flit_cnt, int *wr_cnt, struct t3_wq *wq)
+static int build_memreg(union t3_wr *wqe, const struct ib_reg_wr *wr,
+			u8 *flit_cnt, int *wr_cnt, struct t3_wq *wq)
 {
 	struct iwch_mr *mhp = to_iwch_mr(wr->mr);
 	int i;

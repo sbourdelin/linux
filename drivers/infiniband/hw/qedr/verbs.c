@@ -2854,7 +2854,7 @@ static u32 qedr_prepare_sq_send_data(struct qedr_dev *dev,
 
 static int qedr_prepare_reg(struct qedr_qp *qp,
 			    struct rdma_sq_fmr_wqe_1st *fwqe1,
-			    struct ib_reg_wr *wr)
+			    const struct ib_reg_wr *wr)
 {
 	struct qedr_mr *mr = get_qedr_mr(wr->mr);
 	struct rdma_sq_fmr_wqe_2nd *fwqe2;

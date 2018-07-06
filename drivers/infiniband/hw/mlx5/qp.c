@@ -4243,7 +4243,7 @@ static int set_psv_wr(struct ib_sig_domain *domain,
 }
 
 static int set_reg_wr(struct mlx5_ib_qp *qp,
-		      struct ib_reg_wr *wr,
+		      const struct ib_reg_wr *wr,
 		      void **seg, int *size)
 {
 	struct mlx5_ib_mr *mr = to_mmr(wr->mr);
