@@ -162,16 +162,16 @@ hostprogs-y := conf
 targets		+= zconf.lex.c
 
 # generated files seem to need this to find local include files
-HOSTCFLAGS_zconf.lex.o	:= -I$(src)
-HOSTCFLAGS_zconf.tab.o	:= -I$(src)
+KBUILD_HOSTCFLAGS_zconf.lex.o	:= -I$(src)
+KBUILD_HOSTCFLAGS_zconf.tab.o	:= -I$(src)
 
 # nconf: Used for the nconfig target based on ncurses
 hostprogs-y	+= nconf
 nconf-objs	:= nconf.o zconf.tab.o nconf.gui.o
 
 HOSTLOADLIBES_nconf	= $(shell . $(obj)/.nconf-cfg && echo $$libs)
-HOSTCFLAGS_nconf.o	= $(shell . $(obj)/.nconf-cfg && echo $$cflags)
-HOSTCFLAGS_nconf.gui.o	= $(shell . $(obj)/.nconf-cfg && echo $$cflags)
+KBUILD_HOSTCFLAGS_nconf.o	= $(shell . $(obj)/.nconf-cfg && echo $$cflags)
+KBUILD_HOSTCFLAGS_nconf.gui.o	= $(shell . $(obj)/.nconf-cfg && echo $$cflags)
 
 $(obj)/nconf.o: $(obj)/.nconf-cfg
 
@@ -182,7 +182,7 @@ mconf-objs	:= mconf.o zconf.tab.o $(addprefix lxdialog/, $(lxdialog))
 
 HOSTLOADLIBES_mconf = $(shell . $(obj)/.mconf-cfg && echo $$libs)
 $(foreach f, mconf.o $(lxdialog), \
-  $(eval HOSTCFLAGS_$f = $$(shell . $(obj)/.mconf-cfg && echo $$$$cflags)))
+  $(eval KBUILD_HOSTCFLAGS_$f = $$(shell . $(obj)/.mconf-cfg && echo $$$$cflags)))
 
 $(addprefix $(obj)/, mconf.o $(lxdialog)): $(obj)/.mconf-cfg
 
@@ -207,7 +207,7 @@ hostprogs-y	+= gconf
 gconf-objs	:= gconf.o zconf.tab.o
 
 HOSTLOADLIBES_gconf = $(shell . $(obj)/.gconf-cfg && echo $$libs)
-HOSTCFLAGS_gconf.o  = $(shell . $(obj)/.gconf-cfg && echo $$cflags)
+KBUILD_HOSTCFLAGS_gconf.o  = $(shell . $(obj)/.gconf-cfg && echo $$cflags)
 
 $(obj)/gconf.o: $(obj)/.gconf-cfg
 

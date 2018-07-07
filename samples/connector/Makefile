@@ -9,7 +9,7 @@ endif
 # Tell kbuild to always build the programs
 always := $(hostprogs-y)
 
-HOSTCFLAGS_ucon.o += -I$(objtree)/usr/include
+KBUILD_HOSTCFLAGS_ucon.o += -I$(objtree)/usr/include
 
 all: modules
 

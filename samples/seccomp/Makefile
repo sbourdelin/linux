@@ -2,18 +2,18 @@
 ifndef CROSS_COMPILE
 hostprogs-$(CONFIG_SAMPLE_SECCOMP) := bpf-fancy dropper bpf-direct
 
-HOSTCFLAGS_bpf-fancy.o += -I$(objtree)/usr/include
-HOSTCFLAGS_bpf-fancy.o += -idirafter $(objtree)/include
-HOSTCFLAGS_bpf-helper.o += -I$(objtree)/usr/include
-HOSTCFLAGS_bpf-helper.o += -idirafter $(objtree)/include
+KBUILD_HOSTCFLAGS_bpf-fancy.o += -I$(objtree)/usr/include
+KBUILD_HOSTCFLAGS_bpf-fancy.o += -idirafter $(objtree)/include
+KBUILD_HOSTCFLAGS_bpf-helper.o += -I$(objtree)/usr/include
+KBUILD_HOSTCFLAGS_bpf-helper.o += -idirafter $(objtree)/include
 bpf-fancy-objs := bpf-fancy.o bpf-helper.o
 
-HOSTCFLAGS_dropper.o += -I$(objtree)/usr/include
-HOSTCFLAGS_dropper.o += -idirafter $(objtree)/include
+KBUILD_HOSTCFLAGS_dropper.o += -I$(objtree)/usr/include
+KBUILD_HOSTCFLAGS_dropper.o += -idirafter $(objtree)/include
 dropper-objs := dropper.o
 
-HOSTCFLAGS_bpf-direct.o += -I$(objtree)/usr/include
-HOSTCFLAGS_bpf-direct.o += -idirafter $(objtree)/include
+KBUILD_HOSTCFLAGS_bpf-direct.o += -I$(objtree)/usr/include
+KBUILD_HOSTCFLAGS_bpf-direct.o += -idirafter $(objtree)/include
 bpf-direct-objs := bpf-direct.o
 
 # Try to match the kernel target.
@@ -26,10 +26,10 @@ else
 MFLAG = -m31
 endif
 
-HOSTCFLAGS_bpf-direct.o += $(MFLAG)
-HOSTCFLAGS_dropper.o += $(MFLAG)
-HOSTCFLAGS_bpf-helper.o += $(MFLAG)
-HOSTCFLAGS_bpf-fancy.o += $(MFLAG)
+KBUILD_HOSTCFLAGS_bpf-direct.o += $(MFLAG)
+KBUILD_HOSTCFLAGS_dropper.o += $(MFLAG)
+KBUILD_HOSTCFLAGS_bpf-helper.o += $(MFLAG)
+KBUILD_HOSTCFLAGS_bpf-fancy.o += $(MFLAG)
 HOSTLOADLIBES_bpf-direct += $(MFLAG)
 HOSTLOADLIBES_bpf-fancy += $(MFLAG)
 HOSTLOADLIBES_dropper += $(MFLAG)

@@ -14,8 +14,8 @@ kapi:	$(kapi-hdrs-y)
 hostprogs-y		    += gen_facilities
 hostprogs-y		    += gen_opcode_table
 
-HOSTCFLAGS_gen_facilities.o += -Wall $(LINUXINCLUDE)
-HOSTCFLAGS_gen_opcode_table.o += -Wall $(LINUXINCLUDE)
+KBUILD_HOSTCFLAGS_gen_facilities.o += -Wall $(LINUXINCLUDE)
+KBUILD_HOSTCFLAGS_gen_opcode_table.o += -Wall $(LINUXINCLUDE)
 
 # Ensure output directory exists
 _dummy := $(shell [ -d '$(kapi)' ] || mkdir -p '$(kapi)')
