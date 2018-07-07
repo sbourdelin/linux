@@ -2272,6 +2272,20 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 	if (sysctl_unprivileged_bpf_disabled && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
+	if (cmd == BPF_SYNCHRONIZE) {
+		if (uattr != NULL || size != 0)
+			return -EINVAL;
+		err = security_bpf(cmd, NULL, 0);
+		if (err < 0)
+			return err;
+		/* BPF programs are run with preempt disabled, so
+		 * synchronize_sched is sufficient even with
+		 * RCU_PREEMPT.
+		 */
+		synchronize_sched();
+		return 0;
+	}
+
 	err = bpf_check_uarg_tail_zero(uattr, sizeof(attr), size);
 	if (err)
 		return err;
