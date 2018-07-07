@@ -354,6 +354,9 @@ static struct usb_serial_driver * const serial_drivers[] = {
 #define CP210X_PARTNUM_CP2104	0x04
 #define CP210X_PARTNUM_CP2105	0x05
 #define CP210X_PARTNUM_CP2108	0x08
+#define CP210X_PARTNUM_CP2102N_QFN28	0x20
+#define CP210X_PARTNUM_CP2102N_QFN24	0x21
+#define CP210X_PARTNUM_CP2102N_QFN20	0x22
 #define CP210X_PARTNUM_UNKNOWN	0xFF
 
 /* CP210X_GET_COMM_STATUS returns these 0x13 bytes */
@@ -452,6 +455,19 @@ struct cp210x_gpio_write {
 	u8	mask;
 	u8	state;
 } __packed;
+
+/*
+ * Helper to determine if a specific serial device belongs to the cp2102n
+ * family of devices.
+ */
+static bool cp210x_is_cp2102n(struct usb_serial *serial)
+{
+	struct cp210x_serial_private *priv = usb_get_serial_data(serial);
+
+	return  (priv->partnum == CP210X_PARTNUM_CP2102N_QFN28) ||
+		(priv->partnum == CP210X_PARTNUM_CP2102N_QFN24) ||
+		(priv->partnum == CP210X_PARTNUM_CP2102N_QFN20);
+}
 
 /*
  * Helper to get interface number when we only have struct usb_serial.
@@ -754,43 +770,59 @@ static int cp210x_get_line_ctl(struct usb_serial_port *port, u16 *ctl)
 
 /*
  * cp210x_quantise_baudrate
- * Quantises the baud rate as per AN205 Table 1
+ * Determine a valid baudrate nearest to the requested one.
  */
-static unsigned int cp210x_quantise_baudrate(unsigned int baud)
+static unsigned int cp210x_quantise_baudrate(struct usb_serial *serial,
+					     unsigned int baud)
 {
-	if (baud <= 300)
-		baud = 300;
-	else if (baud <= 600)      baud = 600;
-	else if (baud <= 1200)     baud = 1200;
-	else if (baud <= 1800)     baud = 1800;
-	else if (baud <= 2400)     baud = 2400;
-	else if (baud <= 4000)     baud = 4000;
-	else if (baud <= 4803)     baud = 4800;
-	else if (baud <= 7207)     baud = 7200;
-	else if (baud <= 9612)     baud = 9600;
-	else if (baud <= 14428)    baud = 14400;
-	else if (baud <= 16062)    baud = 16000;
-	else if (baud <= 19250)    baud = 19200;
-	else if (baud <= 28912)    baud = 28800;
-	else if (baud <= 38601)    baud = 38400;
-	else if (baud <= 51558)    baud = 51200;
-	else if (baud <= 56280)    baud = 56000;
-	else if (baud <= 58053)    baud = 57600;
-	else if (baud <= 64111)    baud = 64000;
-	else if (baud <= 77608)    baud = 76800;
-	else if (baud <= 117028)   baud = 115200;
-	else if (baud <= 129347)   baud = 128000;
-	else if (baud <= 156868)   baud = 153600;
-	else if (baud <= 237832)   baud = 230400;
-	else if (baud <= 254234)   baud = 250000;
-	else if (baud <= 273066)   baud = 256000;
-	else if (baud <= 491520)   baud = 460800;
-	else if (baud <= 567138)   baud = 500000;
-	else if (baud <= 670254)   baud = 576000;
-	else if (baud < 1000000)
-		baud = 921600;
-	else if (baud > 2000000)
-		baud = 2000000;
+	if (cp210x_is_cp2102n(serial)) {
+		int clk_div;
+		int prescaler;
+
+		/*
+		 * Limit to valid range, then
+		 * calculate actual baudrate as per cp2102n datasheet.
+		 */
+		baud = clamp(baud, 300u, 3000000u);
+		prescaler = baud <= 365 ? 4 : 1;
+		clk_div = DIV_ROUND_CLOSEST(48000000, 2 * prescaler * baud);
+		baud = 48000000 / (2 * prescaler * clk_div);
+	} else {
+		/* Quantise baudrate as per AN205 Table 1 */
+		if (baud <= 300)
+			baud = 300;
+		else if (baud <= 600)      baud = 600;
+		else if (baud <= 1200)     baud = 1200;
+		else if (baud <= 1800)     baud = 1800;
+		else if (baud <= 2400)     baud = 2400;
+		else if (baud <= 4000)     baud = 4000;
+		else if (baud <= 4803)     baud = 4800;
+		else if (baud <= 7207)     baud = 7200;
+		else if (baud <= 9612)     baud = 9600;
+		else if (baud <= 14428)    baud = 14400;
+		else if (baud <= 16062)    baud = 16000;
+		else if (baud <= 19250)    baud = 19200;
+		else if (baud <= 28912)    baud = 28800;
+		else if (baud <= 38601)    baud = 38400;
+		else if (baud <= 51558)    baud = 51200;
+		else if (baud <= 56280)    baud = 56000;
+		else if (baud <= 58053)    baud = 57600;
+		else if (baud <= 64111)    baud = 64000;
+		else if (baud <= 77608)    baud = 76800;
+		else if (baud <= 117028)   baud = 115200;
+		else if (baud <= 129347)   baud = 128000;
+		else if (baud <= 156868)   baud = 153600;
+		else if (baud <= 237832)   baud = 230400;
+		else if (baud <= 254234)   baud = 250000;
+		else if (baud <= 273066)   baud = 256000;
+		else if (baud <= 491520)   baud = 460800;
+		else if (baud <= 567138)   baud = 500000;
+		else if (baud <= 670254)   baud = 576000;
+		else if (baud < 1000000)
+			baud = 921600;
+		else if (baud > 2000000)
+			baud = 2000000;
+	}
 	return baud;
 }
 
@@ -1051,7 +1083,7 @@ static void cp210x_change_speed(struct tty_struct *tty,
 	 *
 	 * NOTE: B0 is not implemented.
 	 */
-	baud = cp210x_quantise_baudrate(baud);
+	baud = cp210x_quantise_baudrate(port->serial, baud);
 
 	dev_dbg(&port->dev, "%s - setting baud rate to %u\n", __func__, baud);
 	if (cp210x_write_u32_reg(port, CP210X_SET_BAUDRATE, baud)) {
