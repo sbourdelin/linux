@@ -167,11 +167,12 @@ always += xdp_fwd_kern.o
 always += task_fd_query_kern.o
 always += xdp_sample_pkts_kern.o
 
-HOSTCFLAGS += -I$(objtree)/usr/include
+HOSTCFLAGS += -D__EXPORTED_HEADERS__ $(USERINCLUDE)
 HOSTCFLAGS += -I$(srctree)/tools/lib/
 HOSTCFLAGS += -I$(srctree)/tools/testing/selftests/bpf/
-HOSTCFLAGS += -I$(srctree)/tools/lib/ -I$(srctree)/tools/include
+HOSTCFLAGS += -I$(srctree)/tools/include
 HOSTCFLAGS += -I$(srctree)/tools/perf
+HOSTCFLAGS += -I./include # for generated/autoconf.h from USERINCLUDE
 
 HOSTCFLAGS_bpf_load.o += -I$(objtree)/usr/include -Wno-unused-variable
 HOSTCFLAGS_trace_helpers.o += -I$(srctree)/tools/lib/bpf/

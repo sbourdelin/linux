@@ -15,6 +15,9 @@
 
 #include "perf-sys.h"
 #include "trace_helpers.h"
+#ifndef __packed
+#define __packed __attribute__((packed))
+#endif
 
 #define MAX_CPUS 128
 static int pmu_fds[MAX_CPUS], if_idx;
