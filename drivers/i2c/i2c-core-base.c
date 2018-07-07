@@ -2288,6 +2288,20 @@ void i2c_release_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf)
 }
 EXPORT_SYMBOL_GPL(i2c_release_dma_safe_msg_buf);
 
+/**
+ * i2c_free_dma_safe_msg_buf - free DMA safe buffer
+ * @msg: the message related to DMA safe buffer
+ * @buf: the buffer obtained from i2c_get_dma_safe_msg_buf(). May be NULL.
+ */
+void i2c_free_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf)
+{
+	if (!buf || buf == msg->buf)
+		return;
+
+	kfree(buf);
+}
+EXPORT_SYMBOL_GPL(i2c_free_dma_safe_msg_buf);
+
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus main module");
 MODULE_LICENSE("GPL");
