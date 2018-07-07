@@ -94,25 +94,27 @@ static void printk_stack_address(unsigned long address, int reliable,
 void show_opcodes(u8 *rip, const char *loglvl)
 {
 	unsigned int code_prologue = OPCODE_BUFSIZE * 2 / 3;
-	u8 opcodes[OPCODE_BUFSIZE];
 	u8 *ip;
 	int i;
-
-	printk("%sCode: ", loglvl);
+	int pos = 0;
+	char buf[(3 * OPCODE_BUFSIZE + 2) + 1];
+	u8 *opcodes = (u8 *) buf + sizeof(buf) - OPCODE_BUFSIZE;
 
 	ip = (u8 *)rip - code_prologue;
 	if (probe_kernel_read(opcodes, ip, OPCODE_BUFSIZE)) {
-		pr_cont("Bad RIP value.\n");
+		printk("%sCode: Bad RIP value.\n", loglvl);
 		return;
 	}
 
 	for (i = 0; i < OPCODE_BUFSIZE; i++, ip++) {
 		if (ip == rip)
-			pr_cont("<%02x> ", opcodes[i]);
+			pos += snprintf(buf + pos, sizeof(buf) - pos,
+					"<%02x> ", opcodes[i]);
 		else
-			pr_cont("%02x ", opcodes[i]);
+			pos += snprintf(buf + pos, sizeof(buf) - pos,
+					"%02x ", opcodes[i]);
 	}
-	pr_cont("\n");
+	printk("%sCode: %s\n", loglvl, buf);
 }
 
 void show_ip(struct pt_regs *regs, const char *loglvl)
