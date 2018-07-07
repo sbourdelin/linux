@@ -180,7 +180,7 @@ KBUILD_HOSTCFLAGS_trace_event_user.o += -I$(srctree)/tools/lib/bpf/
 KBUILD_HOSTCFLAGS_sampleip_user.o += -I$(srctree)/tools/lib/bpf/
 KBUILD_HOSTCFLAGS_task_fd_query_user.o += -I$(srctree)/tools/lib/bpf/
 
-HOST_LOADLIBES		+= $(LIBBPF) -lelf
+KBUILD_HOSTLDLIBS		+= $(LIBBPF) -lelf
 HOSTLOADLIBES_tracex4		+= -lrt
 HOSTLOADLIBES_trace_output	+= -lrt
 HOSTLOADLIBES_map_perf_test	+= -lrt
