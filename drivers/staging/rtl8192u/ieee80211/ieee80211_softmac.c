@@ -2354,10 +2354,10 @@ void ieee80211_disassociate(struct ieee80211_device *ieee)
 {
 	netif_carrier_off(ieee->dev);
 	if (ieee->softmac_features & IEEE_SOFTMAC_TX_QUEUE)
-			ieee80211_reset_queue(ieee);
+		ieee80211_reset_queue(ieee);
 
 	if (ieee->data_hard_stop)
-			ieee->data_hard_stop(ieee->dev);
+		ieee->data_hard_stop(ieee->dev);
 	if (IS_DOT11D_ENABLE(ieee))
 		Dot11d_Reset(ieee);
 	ieee->state = IEEE80211_NOLINK;
@@ -2508,9 +2508,9 @@ void ieee80211_start_protocol(struct ieee80211_device *ieee)
 //	ieee->set_chan(ieee->dev,ieee->current_network.channel);
 
 	for (i = 0; i < 17; i++) {
-	  ieee->last_rxseq_num[i] = -1;
-	  ieee->last_rxfrag_num[i] = -1;
-	  ieee->last_packet_time[i] = 0;
+		ieee->last_rxseq_num[i] = -1;
+		ieee->last_rxfrag_num[i] = -1;
+		ieee->last_packet_time[i] = 0;
 	}
 
 	ieee->init_wmmparam_flag = 0;//reinitialize AC_xx_PARAM registers.
@@ -2968,14 +2968,14 @@ SendDisassociation(struct ieee80211_device *ieee,
 		   u8			    asRsn
 )
 {
-		struct ieee80211_network *beacon = &ieee->current_network;
-		struct sk_buff *skb;
+	struct ieee80211_network *beacon = &ieee->current_network;
+	struct sk_buff *skb;
 
-		skb = ieee80211_disassociate_skb(beacon, ieee, asRsn);
-		if (skb) {
-				softmac_mgmt_xmit(skb, ieee);
-				//dev_kfree_skb_any(skb);//edit by thomas
-		}
+	skb = ieee80211_disassociate_skb(beacon, ieee, asRsn);
+	if (skb) {
+		softmac_mgmt_xmit(skb, ieee);
+		//dev_kfree_skb_any(skb);//edit by thomas
+	}
 }
 EXPORT_SYMBOL(SendDisassociation);
 
