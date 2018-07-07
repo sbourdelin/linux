@@ -77,6 +77,93 @@ static unsigned long int get_module_load_offset(void)
 }
 #endif
 
+static unsigned long get_module_area_base(void)
+{
+	return MODULES_VADDR + get_module_load_offset();
+}
+
+#if defined(CONFIG_X86_64) && defined(CONFIG_RANDOMIZE_BASE)
+static unsigned long get_module_vmalloc_start(void)
+{
+	if (kaslr_enabled())
+		return MODULES_VADDR + MODULES_RAND_LEN
+						+ get_module_load_offset();
+	else
+		return get_module_area_base();
+}
+
+static void *try_module_alloc(unsigned long addr, unsigned long size,
+					int try_purge)
+{
+	return __vmalloc_node_try_addr(addr, size, GFP_KERNEL,
+						PAGE_KERNEL_EXEC, 0,
+						NUMA_NO_NODE, try_purge,
+						__builtin_return_address(0));
+}
+
+/*
+ * Try to allocate in the random area. First 5000 times without purging, then
+ * 5000 times with purging. If these fail, return NULL.
+ */
+static void *try_module_randomize_each(unsigned long size)
+{
+	void *p = NULL;
+	unsigned int i;
+	unsigned long offset;
+	unsigned long addr;
+	unsigned long end;
+	unsigned long last_lazy_free_blocked = 0;
+	const unsigned long nr_mod_positions = MODULES_RAND_LEN / MODULE_ALIGN;
+	const unsigned long nr_try_purge = 5000;
+	const unsigned long nr_no_purge = 5000;
+
+	if (!kaslr_enabled())
+		return NULL;
+
+	for (i = 0; i < nr_try_purge + nr_no_purge; i++) {
+		offset = (get_random_long() % nr_mod_positions) * MODULE_ALIGN;
+		addr = (unsigned long)MODULES_VADDR + offset;
+		end = addr + size;
+
+		if (end > addr && end < MODULES_END) {
+			if (i < nr_no_purge) {
+				/* First try to avoid having to purge */
+				p = try_module_alloc(addr, size, 0);
+
+				/*
+				 * Save the last value that was blocked by a
+				 * lazy purge area
+				 */
+				if (IS_ERR(p) && PTR_ERR(p) == -EBUSY)
+					last_lazy_free_blocked = addr;
+				else if (p && !IS_ERR(p))
+					return p;
+			} else {
+				/* Give up and allow for purges */
+				if (i == nr_try_purge && last_lazy_free_blocked)
+					addr = last_lazy_free_blocked;
+
+				p = try_module_alloc(addr, size, 1);
+
+				if (p)
+					return p;
+			}
+		}
+	}
+	return NULL;
+}
+#else
+static unsigned long get_module_vmalloc_start(void)
+{
+	return get_module_area_base();
+}
+
+static void *try_module_randomize_each(unsigned long size)
+{
+	return NULL;
+}
+#endif
+
 void *module_alloc(unsigned long size)
 {
 	void *p;
@@ -84,16 +171,20 @@ void *module_alloc(unsigned long size)
 	if (PAGE_ALIGN(size) > MODULES_LEN)
 		return NULL;
 
-	p = __vmalloc_node_range(size, MODULE_ALIGN,
-				    MODULES_VADDR + get_module_load_offset(),
-				    MODULES_END, GFP_KERNEL,
-				    PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
-				    __builtin_return_address(0));
+	p = try_module_randomize_each(size);
+
+	if (!p)
+		p = __vmalloc_node_range(size, MODULE_ALIGN,
+						get_module_vmalloc_start(),
+						MODULES_END, GFP_KERNEL,
+						PAGE_KERNEL_EXEC, 0,
+						NUMA_NO_NODE,
+						__builtin_return_address(0));
+
 	if (p && (kasan_module_alloc(p, size) < 0)) {
 		vfree(p);
 		return NULL;
 	}
-
 	return p;
 }
 
