@@ -364,7 +364,7 @@ config FRAME_POINTER
 config STACK_VALIDATION
 	bool "Compile-time stack metadata validation"
 	depends on HAVE_STACK_VALIDATION
-	default n
+	depends on $(success,echo "int main() {}" | $(HOSTCC) -xc -o /dev/null -lelf -)
 	help
 	  Add compile-time checks to validate stack metadata, including frame
 	  pointers (if CONFIG_FRAME_POINTER is enabled).  This helps ensure
