@@ -468,6 +468,18 @@ static void mt7621_pci_enable(u8 controller)
 	printk("PCIE%d enabled\n", controller);
 }
 
+static void mt7621_pci_configure(u8 controller)
+{
+	u32 val;
+
+	val = read_config(controller, 0x4);
+	write_config(controller, 0x4, (val | 0x4));
+	val = read_config(controller, 0x70c);
+	val &= ~(0xff) << 8;
+	val |= 0x50 << 8;
+	write_config(controller, 0x70c, val);
+}
+
 static int mt7621_pci_probe(struct platform_device *pdev)
 {
 	int i;
@@ -568,28 +580,15 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 
 	switch (pcie_link_status) {
 	case 7:
-		val = read_config(2, 0x4);
-		write_config(2, 0x4, (val | 0x4));
-		val = read_config(2, 0x70c);
-		val &= ~(0xff)<<8;
-		val |= 0x50<<8;
-		write_config(2, 0x70c, val);
+		mt7621_pci_configure(2);
+		break;
 	case 3:
 	case 5:
 	case 6:
-		val = read_config(1, 0x4);
-		write_config(1, 0x4, (val | 0x4));
-		val = read_config(1, 0x70c);
-		val &= ~(0xff)<<8;
-		val |= 0x50<<8;
-		write_config(1, 0x70c, val);
+		mt7621_pci_configure(1);
+		break;
 	default:
-		val = read_config(0, 0x4);
-		write_config(0, 0x4, (val | 0x4)); //bus master enable
-		val = read_config(0, 0x70c);
-		val &= ~(0xff)<<8;
-		val |= 0x50<<8;
-		write_config(0, 0x70c, val);
+		mt7621_pci_configure(0);
 	}
 
 	pci_load_of_ranges(&mt7621_controller, pdev->dev.of_node);
