@@ -3230,7 +3230,6 @@ EXPORT_SYMBOL_GPL(kern_mount);
 SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags, unsigned int, ms_flags)
 {
 	struct fs_context *fc;
-	struct inode *inode;
 	struct file *file;
 	struct path newmount;
 	struct fd f;
@@ -3289,7 +3288,6 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags, unsigned int, ms_flags
 		goto err_fsfd;
 	}
 
-	inode = file_inode(f.file);
 	ret = mutex_lock_interruptible(&fc->uapi_mutex);
 	if (ret < 0)
 		goto err_fsfd;
