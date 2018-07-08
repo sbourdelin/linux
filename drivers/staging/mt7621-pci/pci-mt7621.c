@@ -93,27 +93,12 @@ static u16 pcie_controller_offsets[] = {
 #define RALINK_PCI_DERR(dev)		(pcie_controller_offsets[(dev)] + 0x0060)
 #define RALINK_PCI_ECRC(dev)		(pcie_controller_offsets[(dev)] + 0x0064)
 
-
 #define RALINK_PCIEPHY_P0P1_CTL_OFFSET	0x9000
 #define RALINK_PCIEPHY_P2_CTL_OFFSET	0xA000
 
 #define RALINK_PCI_MM_MAP_BASE		0x60000000
 #define RALINK_PCI_IO_MAP_BASE		0x1e160000
 
-#define ASSERT_SYSRST_PCIE(val)		\
-	do {								\
-		if (rt_sysc_r32(SYSC_REG_CHIP_REV) == 0x00030101)	\
-			rt_sysc_m32(0, val, RALINK_RSTCTRL);		\
-		else							\
-			rt_sysc_m32(val, 0, RALINK_RSTCTRL);		\
-	} while (0)
-#define DEASSERT_SYSRST_PCIE(val)	\
-	do {								\
-		if (rt_sysc_r32(SYSC_REG_CHIP_REV) == 0x00030101)	\
-			rt_sysc_m32(val, 0, RALINK_RSTCTRL);		\
-		else							\
-			rt_sysc_m32(0, val, RALINK_RSTCTRL);		\
-	} while (0)
 #define RALINK_CLKCFG1			0x30
 #define RALINK_RSTCTRL			0x34
 #define RALINK_GPIOMODE			0x60
@@ -141,6 +126,22 @@ static u16 pcie_controller_offsets[] = {
 static int pcie_link_status = 0;
 
 static void __iomem *mt7621_pci_base;
+
+static inline void mt7621_pcie_assert_sysrst(u32 val)
+{
+	if (rt_sysc_r32(SYSC_REG_CHIP_REV) == 0x00030101)
+		rt_sysc_m32(0, val, RALINK_RSTCTRL);
+	else
+		rt_sysc_m32(val, 0, RALINK_RSTCTRL);
+}
+
+static inline void mt7621_pcie_deassert_sysrst(u32 val)
+{
+	if (rt_sysc_r32(SYSC_REG_CHIP_REV) == 0x00030101)
+		rt_sysc_m32(val, 0, RALINK_RSTCTRL);
+	else
+		rt_sysc_m32(0, val, RALINK_RSTCTRL);
+}
 
 static u32 mt7621_pci_reg_read(u32 reg)
 {
@@ -424,7 +425,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	val |= RALINK_PCIE1_RST;
 	val |= RALINK_PCIE2_RST;
 
-	ASSERT_SYSRST_PCIE(RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
+	mt7621_pcie_assert_sysrst(RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
 
 	*(unsigned int *)(0xbe000060) &= ~(0x3<<10 | 0x3<<3);
 	*(unsigned int *)(0xbe000060) |= 0x1<<10 | 0x1<<3;
@@ -439,7 +440,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	val |= RALINK_PCIE1_RST;
 	val |= RALINK_PCIE2_RST;
 
-	DEASSERT_SYSRST_PCIE(val);
+	mt7621_pcie_deassert_sysrst(val);
 
 	if ((*(unsigned int *)(0xbe00000c)&0xFFFF) == 0x0101) // MT7621 E2
 		bypass_pipe_rst();
@@ -470,7 +471,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 
 	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(0)) & 0x1) == 0) {
 		printk("PCIE0 no card, disable it(RST&CLK)\n");
-		ASSERT_SYSRST_PCIE(RALINK_PCIE0_RST);
+		mt7621_pcie_assert_sysrst(RALINK_PCIE0_RST);
 		rt_sysc_m32(RALINK_PCIE0_CLK_EN, 0, RALINK_CLKCFG1);
 		pcie_link_status &= ~(1<<0);
 	} else {
@@ -482,7 +483,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 
 	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(1)) & 0x1) == 0) {
 		printk("PCIE1 no card, disable it(RST&CLK)\n");
-		ASSERT_SYSRST_PCIE(RALINK_PCIE1_RST);
+		mt7621_pcie_assert_sysrst(RALINK_PCIE1_RST);
 		rt_sysc_m32(RALINK_PCIE1_CLK_EN, 0, RALINK_CLKCFG1);
 		pcie_link_status &= ~(1<<1);
 	} else {
@@ -494,7 +495,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 
 	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(2)) & 0x1) == 0) {
 		printk("PCIE2 no card, disable it(RST&CLK)\n");
-		ASSERT_SYSRST_PCIE(RALINK_PCIE2_RST);
+		mt7621_pcie_assert_sysrst(RALINK_PCIE2_RST);
 		rt_sysc_m32(RALINK_PCIE2_CLK_EN, 0, RALINK_CLKCFG1);
 		pcie_link_status &= ~(1<<2);
 	} else {
