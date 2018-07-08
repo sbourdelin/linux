@@ -98,7 +98,6 @@ static ssize_t fscontext_write(struct file *file,
 		ret = vfs_set_fs_source(fc, data, len - 2);
 		if (ret < 0)
 			goto err_unlock;
-		data = NULL;
 		break;
 
 	case 'o':
