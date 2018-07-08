@@ -161,20 +161,18 @@ static ssize_t fscontext_read(struct file *file,
 	if (ret < 0)
 		return ret;
 
-	ret = -ENODATA;
-	if (log->head != log->tail) {
-		index = log->tail & (logsize - 1);
-		p = log->buffer[index];
-		need_free = log->need_free & (1 << index);
-		log->buffer[index] = NULL;
-		log->need_free &= ~(1 << index);
-		log->tail++;
-		ret = 0;
+	if (log->head == log->tail) {
+		mutex_unlock(&fc->uapi_mutex);
+		return -ENODATA;
 	}
 
+	index = log->tail & (logsize - 1);
+	p = log->buffer[index];
+	need_free = log->need_free & (1 << index);
+	log->buffer[index] = NULL;
+	log->need_free &= ~(1 << index);
+	log->tail++;
 	mutex_unlock(&fc->uapi_mutex);
-	if (ret < 0)
-		return ret;
 
 	ret = -EMSGSIZE;
 	n = strlen(p);
