@@ -3333,8 +3333,10 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags, unsigned int, ms_flags
 	 * it, not just simply put it.
 	 */
 	file = dentry_open(&newmount, O_PATH, fc->cred);
-	if (IS_ERR(file))
+	if (IS_ERR(file)) {
+		ret = PTR_ERR(file);
 		goto err_path;
+	}
 	file->f_mode |= FMODE_NEED_UNMOUNT;
 
 	ret = get_unused_fd_flags(flags & FSMOUNT_CLOEXEC);
