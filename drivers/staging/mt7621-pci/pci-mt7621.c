@@ -168,8 +168,8 @@ static void mt7621_pci_reg_write(u32 val, u32 reg)
 static inline u32 mt7621_pci_get_cfgaddr(unsigned int bus, unsigned int slot,
 					 unsigned int func, unsigned int where)
 {
-	return ((bus << 16) | (slot << 11) | (func << 8) | (where & 0xfc) |
-		0x80000000);
+	return ((((where & 0xF00) >> 8) << 24) | (bus << 16) | (slot << 11) |
+		(func << 8) | (where & 0xfc) | 0x80000000);
 }
 
 static int
@@ -182,9 +182,8 @@ pci_config_read(struct pci_bus *bus, unsigned int devfn,
 	address_reg = RALINK_PCI_CONFIG_ADDR;
 	data_reg = RALINK_PCI_CONFIG_DATA;
 
-	address = (((where & 0xF00) >> 8) << 24) |
-		   mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
-					  PCI_FUNC(devfn), where);
+	address = mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
+					 PCI_FUNC(devfn), where);
 
 	writel(address, mt7621_pci_base + address_reg);
 
@@ -213,9 +212,8 @@ pci_config_write(struct pci_bus *bus, unsigned int devfn,
 	address_reg = RALINK_PCI_CONFIG_ADDR;
 	data_reg = RALINK_PCI_CONFIG_DATA;
 
-	address = (((where & 0xF00) >> 8) << 24) |
-		   mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
-					  PCI_FUNC(devfn), where);
+	address = mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
+					 PCI_FUNC(devfn), where);
 
 	writel(address, mt7621_pci_base + address_reg);
 
@@ -254,8 +252,7 @@ read_config(unsigned int dev, u32 reg)
 
 	address_reg = RALINK_PCI_CONFIG_ADDR;
 	data_reg = RALINK_PCI_CONFIG_DATA;
-	address = (((reg & 0xF00) >> 8) << 24) |
-		   mt7621_pci_get_cfgaddr(0, dev, 0, reg);
+	address = mt7621_pci_get_cfgaddr(0, dev, 0, reg);
 	writel(address, mt7621_pci_base + address_reg);
 	return readl(mt7621_pci_base + data_reg);
 }
@@ -267,8 +264,7 @@ write_config(unsigned int dev, u32 reg, u32 val)
 
 	address_reg = RALINK_PCI_CONFIG_ADDR;
 	data_reg = RALINK_PCI_CONFIG_DATA;
-	address = (((reg & 0xF00) >> 8) << 24) |
-		   mt7621_pci_get_cfgaddr(0, dev, 0, reg);
+	address = mt7621_pci_get_cfgaddr(0, dev, 0, reg);
 	writel(address, mt7621_pci_base + address_reg);
 	writel(val, mt7621_pci_base + data_reg);
 }
