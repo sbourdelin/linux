@@ -68,14 +68,14 @@
 
 #define RALINK_PCI_CONFIG_ADDR		0x20
 #define RALINK_PCI_CONFIG_DATA_VIRTUAL_REG	0x24
-#define RALINK_PCI_MEMBASE		*(volatile u32 *)(RALINK_PCI_BASE + 0x0028)
-#define RALINK_PCI_IOBASE		*(volatile u32 *)(RALINK_PCI_BASE + 0x002C)
+#define RALINK_PCI_MEMBASE		0x0028
+#define RALINK_PCI_IOBASE		0x002C
 #define RALINK_PCIE0_RST		(1<<24)
 #define RALINK_PCIE1_RST		(1<<25)
 #define RALINK_PCIE2_RST		(1<<26)
 
-#define RALINK_PCI_PCICFG_ADDR		*(volatile u32 *)(RALINK_PCI_BASE + 0x0000)
-#define RALINK_PCI_PCIMSK_ADDR		*(volatile u32 *)(RALINK_PCI_BASE + 0x000C)
+#define RALINK_PCI_PCICFG_ADDR		0x0000
+#define RALINK_PCI_PCIMSK_ADDR		0x000C
 #define RALINK_PCI_BASE	0xBE140000
 
 #define RALINK_PCIEPHY_P0P1_CTL_OFFSET	(RALINK_PCI_BASE + 0x9000)
@@ -408,6 +408,7 @@ void setup_cm_memory_region(struct resource *mem_resource)
 
 static int mt7621_pci_probe(struct platform_device *pdev)
 {
+	u32 mask;
 	unsigned long val = 0;
 
 	mt7621_pci_base = (void __iomem *)RALINK_PCI_BASE;
@@ -471,7 +472,9 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 		pcie_link_status &= ~(1<<0);
 	} else {
 		pcie_link_status |= 1<<0;
-		RALINK_PCI_PCIMSK_ADDR |= (1<<20); // enable pcie1 interrupt
+		mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
+		mask |= (1<<20); // enable pcie1 interrupt
+		mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
 	}
 
 	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(1)) & 0x1) == 0) {
@@ -481,7 +484,9 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 		pcie_link_status &= ~(1<<1);
 	} else {
 		pcie_link_status |= 1<<1;
-		RALINK_PCI_PCIMSK_ADDR |= (1<<21); // enable pcie1 interrupt
+		mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
+		mask |= (1<<21); // enable pcie1 interrupt
+		mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
 	}
 
 	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(2)) & 0x1) == 0) {
@@ -491,7 +496,9 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 		pcie_link_status &= ~(1<<2);
 	} else {
 		pcie_link_status |= 1<<2;
-		RALINK_PCI_PCIMSK_ADDR |= (1<<22); // enable pcie2 interrupt
+		mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
+		mask |= (1<<22); // enable pcie2 interrupt
+		mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
 	}
 
 	if (pcie_link_status == 0)
@@ -508,39 +515,23 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 3'b110			1		0		x
 3'b111			2		1		0
 */
-	switch (pcie_link_status) {
-	case 2:
-		RALINK_PCI_PCICFG_ADDR &= ~0x00ff0000;
-		RALINK_PCI_PCICFG_ADDR |= 0x1 << 16;	//port0
-		RALINK_PCI_PCICFG_ADDR |= 0x0 << 20;	//port1
-		break;
-	case 4:
-		RALINK_PCI_PCICFG_ADDR &= ~0x0fff0000;
-		RALINK_PCI_PCICFG_ADDR |= 0x1 << 16;	//port0
-		RALINK_PCI_PCICFG_ADDR |= 0x2 << 20;	//port1
-		RALINK_PCI_PCICFG_ADDR |= 0x0 << 24;	//port2
-		break;
-	case 5:
-		RALINK_PCI_PCICFG_ADDR &= ~0x0fff0000;
-		RALINK_PCI_PCICFG_ADDR |= 0x0 << 16;	//port0
-		RALINK_PCI_PCICFG_ADDR |= 0x2 << 20;	//port1
-		RALINK_PCI_PCICFG_ADDR |= 0x1 << 24;	//port2
-		break;
-	case 6:
-		RALINK_PCI_PCICFG_ADDR &= ~0x0fff0000;
-		RALINK_PCI_PCICFG_ADDR |= 0x2 << 16;	//port0
-		RALINK_PCI_PCICFG_ADDR |= 0x0 << 20;	//port1
-		RALINK_PCI_PCICFG_ADDR |= 0x1 << 24;	//port2
-		break;
-	}
+	mask = mt7621_pci_reg_read(RALINK_PCI_PCICFG_ADDR);
+	mask &= ~0x00ff0000;
+	mask |= (0x1 << 16); // port0
+	mask |= (0x0 << 20); // port1
+
+	if (pcie_link_status != 2)
+		mask |= (0x1 << 24); // port2
+
+	mt7621_pci_reg_write(mask, RALINK_PCI_PCICFG_ADDR);
 
 /*
 	ioport_resource.start = mt7621_res_pci_io1.start;
 	ioport_resource.end = mt7621_res_pci_io1.end;
 */
 
-	RALINK_PCI_MEMBASE = 0xffffffff; //RALINK_PCI_MM_MAP_BASE;
-	RALINK_PCI_IOBASE = RALINK_PCI_IO_MAP_BASE;
+	mt7621_pci_reg_write(0xffffffff, RALINK_PCI_MEMBASE); //RALINK_PCI_MM_MAP_BASE;
+	mt7621_pci_reg_write(RALINK_PCI_IO_MAP_BASE, RALINK_PCI_IOBASE);
 
 	//PCIe0
 	if ((pcie_link_status & 0x1) != 0) {
