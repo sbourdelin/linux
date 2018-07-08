@@ -116,10 +116,7 @@ static struct pcie_controller_data pcie_controllers[] = {
 #define RALINK_PCI_IMBASEBAR0_ADDR(dev)	(pcie_controllers[(dev)].offset + 0x0018)
 #define RALINK_PCI_ID(dev)		(pcie_controllers[(dev)].offset + 0x0030)
 #define RALINK_PCI_CLASS(dev)		(pcie_controllers[(dev)].offset + 0x0034)
-#define RALINK_PCI_SUBID(dev)		(pcie_controllers[(dev)].offset + 0x0038)
 #define RALINK_PCI_STATUS(dev)		(pcie_controllers[(dev)].offset + 0x0050)
-#define RALINK_PCI_DERR(dev)		(pcie_controllers[(dev)].offset + 0x0060)
-#define RALINK_PCI_ECRC(dev)		(pcie_controllers[(dev)].offset + 0x0064)
 
 #define RALINK_PCIEPHY_P0P1_CTL_OFFSET	0x9000
 #define RALINK_PCIEPHY_P2_CTL_OFFSET	0xA000
@@ -132,25 +129,12 @@ static struct pcie_controller_data pcie_controllers[] = {
 #define RALINK_GPIOMODE			0x60
 #define RALINK_PCIE_CLK_GEN		0x7c
 #define RALINK_PCIE_CLK_GEN1		0x80
-#define PPLL_CFG1			0x9c
-#define PPLL_DRV			0xa0
-/* SYSC_REG_SYSTEM_CONFIG1 bits */
-#define RALINK_PCI_HOST_MODE_EN		BIT(7)
-#define RALINK_PCIE_RC_MODE_EN		BIT(8)
+
 //RALINK_RSTCTRL bit
 #define RALINK_PCIE_RST			BIT(23)
-#define RALINK_PCI_RST			BIT(24)
-//RALINK_CLKCFG1 bit
-#define RALINK_PCI_CLK_EN		BIT(19)
-#define RALINK_PCIE_CLK_EN		BIT(21)
-//RALINK_GPIOMODE bit
-#define PCI_SLOTx2			BIT(11)
-#define PCI_SLOTx1			(2<<11)
-//MTK PCIE PLL bit
-#define PDRV_SW_SET			BIT(31)
-#define LC_CKDRVPD_			BIT(19)
 
 #define MEMORY_BASE 0x0
+
 static int pcie_link_status = 0;
 
 static void __iomem *mt7621_pci_base;
