@@ -23,12 +23,11 @@
  * here.  For the moment, we assume a single option or command per write.  Each
  * line written is of the form
  *
- *	<option_type><space><stuff...>
+ *	<command_type><space><stuff...>
  *
- *	d /dev/sda1				-- Device name
+ *	s /dev/sda1				-- Source device
  *	o noatime				-- Option without value
  *	o cell=grand.central.org		-- Option with value
- *	r /					-- Dir within device to mount
  *	x create				-- Create a superblock
  *	x reconfigure				-- Reconfigure a superblock
  */
