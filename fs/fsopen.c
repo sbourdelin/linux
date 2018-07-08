@@ -50,10 +50,10 @@ static ssize_t fscontext_write(struct file *file,
 	case 'x':
 		break;
 	default:
-		goto err_bad_cmd;
+		return -EINVAL;
 	}
 	if (opt[1] != ' ')
-		goto err_bad_cmd;
+		return -EINVAL;
 
 	data = memdup_user_nul(_buf + 2, len - 2);
 	if (IS_ERR(data))
@@ -136,8 +136,7 @@ err_unlock:
 err_free:
 	kfree(data);
 	return ret;
-err_bad_cmd:
-	return -EINVAL;
+
 wrong_phase:
 	ret = -EBUSY;
 	goto err_unlock;
