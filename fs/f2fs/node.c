@@ -112,25 +112,26 @@ static void clear_node_page_dirty(struct page *page)
 
 static struct page *get_current_nat_page(struct f2fs_sb_info *sbi, nid_t nid)
 {
-	pgoff_t index = current_nat_addr(sbi, nid);
-	return f2fs_get_meta_page(sbi, index);
+	struct page *page;
+
+	page = f2fs_get_meta_page(sbi, current_nat_addr(sbi, nid));
+	BUG_ON(IS_ERR(page));
+	return page;
 }
 
 static struct page *get_next_nat_page(struct f2fs_sb_info *sbi, nid_t nid)
 {
 	struct page *src_page;
 	struct page *dst_page;
-	pgoff_t src_off;
 	pgoff_t dst_off;
 	void *src_addr;
 	void *dst_addr;
 	struct f2fs_nm_info *nm_i = NM_I(sbi);
 
-	src_off = current_nat_addr(sbi, nid);
-	dst_off = next_nat_addr(sbi, src_off);
+	dst_off = next_nat_addr(sbi, current_nat_addr(sbi, nid));
 
 	/* get current nat block page with lock */
-	src_page = f2fs_get_meta_page(sbi, src_off);
+	src_page = get_current_nat_page(sbi, nid);
 	dst_page = f2fs_grab_meta_page(sbi, dst_off);
 	f2fs_bug_on(sbi, PageDirty(src_page));
 
@@ -2412,7 +2413,7 @@ retry:
 	return 0;
 }
 
-void f2fs_restore_node_summary(struct f2fs_sb_info *sbi,
+int f2fs_restore_node_summary(struct f2fs_sb_info *sbi,
 			unsigned int segno, struct f2fs_summary_block *sum)
 {
 	struct f2fs_node *rn;
@@ -2434,6 +2435,9 @@ void f2fs_restore_node_summary(struct f2fs_sb_info *sbi,
 		for (idx = addr; idx < addr + nrpages; idx++) {
 			struct page *page = f2fs_get_tmp_page(sbi, idx);
 
+			if (IS_ERR(page))
+				return PTR_ERR(page);
+
 			rn = F2FS_NODE(page);
 			sum_entry->nid = rn->footer.nid;
 			sum_entry->version = 0;
@@ -2445,6 +2449,7 @@ void f2fs_restore_node_summary(struct f2fs_sb_info *sbi,
 		invalidate_mapping_pages(META_MAPPING(sbi), addr,
 							addr + nrpages);
 	}
+	return 0;
 }
 
 static void remove_nats_in_journal(struct f2fs_sb_info *sbi)
@@ -2681,7 +2686,13 @@ static int __get_nat_bitmaps(struct f2fs_sb_info *sbi)
 	nat_bits_addr = __start_cp_addr(sbi) + sbi->blocks_per_seg -
 						nm_i->nat_bits_blocks;
 	for (i = 0; i < nm_i->nat_bits_blocks; i++) {
-		struct page *page = f2fs_get_meta_page(sbi, nat_bits_addr++);
+		struct page *page;
+
+		page = f2fs_get_meta_page(sbi, nat_bits_addr++);
+		if (IS_ERR(page)) {
+			disable_nat_bits(sbi, true);
+			return PTR_ERR(page);
+		}
 
 		memcpy(nm_i->nat_bits + (i << F2FS_BLKSIZE_BITS),
 					page_address(page), F2FS_BLKSIZE);
