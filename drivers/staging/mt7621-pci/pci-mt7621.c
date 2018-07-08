@@ -462,6 +462,26 @@ static void mt7621_pci_configure(u8 controller)
 	write_config(controller, 0x70c, val);
 }
 
+static void mt7621_pci_init_gpios(void)
+{
+	u32 val = readl((u32 *)0xbe000060);
+
+	val &= ~(0x3 << 10 | 0x3 << 3);
+	val |= (0x1 << 10 | 0x1 << 3);
+	writel(val, (u32 *)0xbe000060);
+	mdelay(100);
+	val = readl((u32 *)0xbe000600);
+	/* use GPIO19/GPIO8/GPIO7 (PERST_N/UART_RXD3/UART_TXD3) */
+	val |= (0x1 << 19 | 0x1 << 8 | 0x1 << 7);
+	writel(val, (u32 *)0xbe000600);
+	mdelay(100);
+	val = readl((u32 *)0xbe000620);
+	/* clear DATA */
+	val &= ~(0x1 << 19 | 0x1 << 8 | 0x1 << 7);
+	writel(val, (u32 *)0xbe000620);
+	mdelay(100);
+}
+
 static int mt7621_pci_probe(struct platform_device *pdev)
 {
 	int i;
@@ -477,14 +497,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	val = (RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
 	mt7621_pcie_assert_sysrst(val);
 
-	*(unsigned int *)(0xbe000060) &= ~(0x3<<10 | 0x3<<3);
-	*(unsigned int *)(0xbe000060) |= 0x1<<10 | 0x1<<3;
-	mdelay(100);
-	*(unsigned int *)(0xbe000600) |= 0x1<<19 | 0x1<<8 | 0x1<<7; // use GPIO19/GPIO8/GPIO7 (PERST_N/UART_RXD3/UART_TXD3)
-	mdelay(100);
-	*(unsigned int *)(0xbe000620) &= ~(0x1<<19 | 0x1<<8 | 0x1<<7);		// clear DATA
-
-	mdelay(100);
+	mt7621_pci_init_gpios();
 
 	val = (RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
 	mt7621_pcie_deassert_sysrst(val);
@@ -509,9 +522,11 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	rt_sysc_m32(RALINK_PCIE_RST, 0, RALINK_RSTCTRL);
 
 	/* Use GPIO control instead of PERST_N */
-	*(unsigned int *)(0xbe000620) |= 0x1<<19 | 0x1<<8 | 0x1<<7;		// set DATA
+	val = readl((u32 *)0xbe000620);
+	/* set DATA */
+	val |= (0x1 << 19 | 0x1 << 8 | 0x1 << 7);
+	writel(val, (u32 *)0xbe000620);
 	mdelay(1000);
-
 
 	for (i = 0; i < PCI_MAX_CONTROLLERS; i++)
 		mt7621_pci_enable_irqs(i);
