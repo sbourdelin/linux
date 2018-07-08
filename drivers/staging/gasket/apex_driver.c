@@ -329,9 +329,17 @@ static int allow_hw_clock_gating = 1;
 static int bypass_top_level;
 
 module_param(allow_power_save, int, 0644);
+MODULE_PARM_DESC(allow_power_save,
+		 "Allows device to enter power save upon driver close()");
+
 module_param(allow_sw_clock_gating, int, 0644);
+MODULE_PARM_DESC(allow_sw_clock_gating, "Allows SW based clock gating");
+
 module_param(allow_hw_clock_gating, int, 0644);
+MODULE_PARM_DESC(allow_hw_clock_gating, "Allows HW based clock gating");
+
 module_param(bypass_top_level, int, 0644);
+MODULE_PARM_DESC(bypass_top_level, "Act as if only GCB is instantiated");
 
 static int __init apex_init(void)
 {
