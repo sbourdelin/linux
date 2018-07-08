@@ -130,7 +130,6 @@ static struct pcie_controller_data pcie_controllers[] = {
 #define RALINK_PCIE_CLK_GEN		0x7c
 #define RALINK_PCIE_CLK_GEN1		0x80
 
-//RALINK_RSTCTRL bit
 #define RALINK_PCIE_RST			BIT(23)
 
 #define MEMORY_BASE 0x0
@@ -282,8 +281,8 @@ pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 		printk("BAR0 at slot %d = %x\n", slot, val);
 	}
 
-	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 0x14);  //configure cache line size 0x14
-	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 0xFF);  //configure latency timer 0x10
+	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 0x14);
+	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 0xFF);
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	cmd = cmd | PCI_COMMAND_MASTER | PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
 	pci_write_config_word(dev, PCI_COMMAND, cmd);
@@ -404,9 +403,11 @@ void setup_cm_memory_region(struct resource *mem_resource)
 	resource_size_t mask;
 
 	if (mips_cps_numiocu(0)) {
-		/* FIXME: hardware doesn't accept mask values with 1s after
+		/*
+	 	 * FIXME: hardware doesn't accept mask values with 1s after
 		 * 0s (e.g. 0xffef), so it would be great to warn if that's
-		 * about to happen */
+		 * about to happen
+		 */
 		mask = ~(mem_resource->end - mem_resource->start);
 
 		write_gcr_reg1_base(mem_resource->start);
