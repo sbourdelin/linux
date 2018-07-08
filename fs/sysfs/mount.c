@@ -27,6 +27,9 @@ static int sysfs_get_tree(struct fs_context *fc)
 	int ret;
 
 	ret = kernfs_get_tree(fc);
+	if (ret)
+		return ret;
+
 	if (kfc->new_sb_created)
 		fc->root->d_sb->s_iflags |= SB_I_USERNS_VISIBLE;
 	return 0;
