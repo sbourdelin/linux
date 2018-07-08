@@ -459,6 +459,15 @@ static void mt7621_pci_enable_irqs(u8 controller)
 	mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
 }
 
+static void mt7621_pci_enable(u8 controller)
+{
+	/* open 7FFF:2G; ENABLE */
+	mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(controller));
+	mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(controller));
+	mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(controller));
+	printk("PCIE%d enabled\n", controller);
+}
+
 static int mt7621_pci_probe(struct platform_device *pdev)
 {
 	int i;
@@ -546,31 +555,16 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	mt7621_pci_reg_write(RALINK_PCI_IO_MAP_BASE, RALINK_PCI_IOBASE);
 
 	//PCIe0
-	if ((pcie_link_status & 0x1) != 0) {
-		/* open 7FFF:2G; ENABLE */
-		mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(0));
-		mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(0));
-		mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(0));
-		printk("PCIE0 enabled\n");
-	}
+	if ((pcie_link_status & 0x1) != 0)
+		mt7621_pci_enable(0);
 
 	//PCIe1
-	if ((pcie_link_status & 0x2) != 0) {
-		/* open 7FFF:2G; ENABLE */
-		mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(1));
-		mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(1));
-		mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(1));
-		printk("PCIE1 enabled\n");
-	}
+	if ((pcie_link_status & 0x2) != 0)
+		mt7621_pci_enable(1);
 
 	//PCIe2
-	if ((pcie_link_status & 0x4) != 0) {
-		/* open 7FFF:2G; ENABLE */
-		mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(2));
-		mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(2));
-		mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(2));
-		printk("PCIE2 enabled\n");
-	}
+	if ((pcie_link_status & 0x4) != 0)
+		mt7621_pci_enable(2);
 
 	switch (pcie_link_status) {
 	case 7:
