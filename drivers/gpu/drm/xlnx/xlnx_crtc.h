@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Xilinx DRM crtc header
+ *
+ *  Copyright (C) 2017 - 2018 Xilinx, Inc.
+ *
+ *  Author: Hyun Woo Kwon <hyun.kwon@xilinx.com>
+ */
+
+#ifndef _XLNX_CRTC_H_
+#define _XLNX_CRTC_H_
+
+#include <drm/drm_crtc.h>
+#include <linux/list.h>
+#include <linux/mutex.h>
+
+struct drm_device;
+struct xlnx_crtc;
+
+/**
+ * struct xlnx_crtc_ops - Xilinx CRTC operations
+ * @get_align: Get the alignment requirement of CRTC device
+ * @get_dma_mask: Get the dma mask of CRTC device
+ * @get_max_width: Get the maximum supported width
+ * @get_max_height: Get the maximum supported height
+ * @get_format: Get the current format of CRTC device
+ */
+struct xlnx_crtc_ops {
+	unsigned int (*get_align)(struct xlnx_crtc *crtc);
+	u64 (*get_dma_mask)(struct xlnx_crtc *crtc);
+	int (*get_max_width)(struct xlnx_crtc *crtc);
+	int (*get_max_height)(struct xlnx_crtc *crtc);
+	u32 (*get_format)(struct xlnx_crtc *crtc);
+};
+
+/**
+ * struct xlnx_crtc - Xilinx CRTC device
+ * @crtc: DRM CRTC device
+ * @list: list node for Xilinx CRTC device list
+ * @ops: Xilinx CRTC ops
+ */
+struct xlnx_crtc {
+	struct drm_crtc crtc;
+	struct list_head list;
+	const struct xlnx_crtc_ops *ops;
+};
+
+static inline struct xlnx_crtc *to_xlnx_crtc(struct drm_crtc *crtc)
+{
+	return container_of(crtc, struct xlnx_crtc, crtc);
+}
+
+/*
+ * Helper functions: used within Xlnx DRM
+ */
+
+/**
+ * struct xlnx_crtc_helper - Xilinx CRTC helper
+ * @xlnx_crtcs: list of Xilinx CRTC devices
+ * @lock: lock to protect @xlnx_crtcs
+ */
+struct xlnx_crtc_helper {
+	struct list_head xlnx_crtcs;
+	struct mutex lock; /* lock for @xlnx_crtcs */
+};
+
+unsigned int xlnx_crtc_helper_get_align(struct xlnx_crtc_helper *helper);
+u64 xlnx_crtc_helper_get_dma_mask(struct xlnx_crtc_helper *helper);
+int xlnx_crtc_helper_get_max_width(struct xlnx_crtc_helper *helper);
+int xlnx_crtc_helper_get_max_height(struct xlnx_crtc_helper *helper);
+u32 xlnx_crtc_helper_get_format(struct xlnx_crtc_helper *helper);
+
+void xlnx_crtc_helper_init(struct xlnx_crtc_helper *helper);
+void xlnx_crtc_helper_fini(struct xlnx_crtc_helper *helper);
+
+/*
+ * CRTC registration: used by other sub-driver modules
+ */
+
+void xlnx_crtc_register(struct drm_device *drm, struct xlnx_crtc *crtc);
+void xlnx_crtc_unregister(struct drm_device *drm, struct xlnx_crtc *crtc);
+
+#endif /* _XLNX_CRTC_H_ */
