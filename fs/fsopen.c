@@ -223,6 +223,16 @@ static int fsopen_create_fd(struct fs_context *fc, unsigned int o_flags)
 	return fd;
 }
 
+static int fscontext_alloc_log(struct fs_context *fc)
+{
+	fc->log = kzalloc(sizeof(*fc->log), GFP_KERNEL);
+	if (!fc->log)
+		return -ENOMEM;
+	refcount_set(&fc->log->usage, 1);
+	fc->log->owner = fc->fs_type->owner;
+	return 0;
+}
+
 /*
  * Open a filesystem by name so that it can be configured for mounting.
  *
@@ -257,14 +267,12 @@ SYSCALL_DEFINE2(fsopen, const char __user *, _fs_name, unsigned int, flags)
 	if (IS_ERR(fc))
 		return PTR_ERR(fc);
 
-	ret = -ENOMEM;
-	fc->log = kzalloc(sizeof(*fc->log), GFP_KERNEL);
-	if (!fc->log)
-		goto err_fc;
-	refcount_set(&fc->log->usage, 1);
-	fc->log->owner = fs_type->owner;
-
 	fc->phase = FS_CONTEXT_CREATE_PARAMS;
+
+	ret = fscontext_alloc_log(fc);
+	if (ret < 0)
+		goto err_fc;
+
 	return fsopen_create_fd(fc, flags & FSOPEN_CLOEXEC ? O_CLOEXEC : 0);
 
 err_fc:
@@ -315,12 +323,9 @@ SYSCALL_DEFINE3(fspick, int, dfd, const char __user *, path, unsigned int, flags
 
 	fc->phase = FS_CONTEXT_RECONF_PARAMS;
 
-	ret = -ENOMEM;
-	fc->log = kzalloc(sizeof(*fc->log), GFP_KERNEL);
-	if (!fc->log)
+	ret = fscontext_alloc_log(fc);
+	if (ret < 0)
 		goto err_fc;
-	refcount_set(&fc->log->usage, 1);
-	fc->log->owner = fc->fs_type->owner;
 
 	path_put(&target);
 	return fsopen_create_fd(fc, flags & FSPICK_CLOEXEC ? O_CLOEXEC : 0);
