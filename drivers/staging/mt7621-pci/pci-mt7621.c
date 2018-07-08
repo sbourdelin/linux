@@ -63,6 +63,8 @@
  * devices.
  */
 
+#define PCI_MAX_CONTROLLERS		3
+
 #define RALINK_PCIE0_CLK_EN		BIT(24)
 #define RALINK_PCIE1_CLK_EN		BIT(25)
 #define RALINK_PCIE2_CLK_EN		BIT(26)
@@ -74,24 +76,50 @@
 #define RALINK_PCIE0_RST		BIT(24)
 #define RALINK_PCIE1_RST		BIT(25)
 #define RALINK_PCIE2_RST		BIT(26)
+#define RALINK_PCIE0_IRQ		BIT(20)
+#define RALINK_PCIE1_IRQ		BIT(21)
+#define RALINK_PCIE2_IRQ		BIT(22)
 
 #define RALINK_PCI_PCICFG_ADDR		0x0000
 #define RALINK_PCI_PCIMSK_ADDR		0x000C
 #define RALINK_PCI_BASE	0xBE140000
 
-
-static u16 pcie_controller_offsets[] = {
-	0x2000, 0x3000, 0x4000,
+struct pcie_controller_data {
+	u32 offset;
+	u32 clk_en;
+	u32 rst;
+	u32 irq;
 };
 
-#define RALINK_PCI_BAR0SETUP_ADDR(dev)	(pcie_controller_offsets[(dev)] + 0x0010)
-#define RALINK_PCI_IMBASEBAR0_ADDR(dev)	(pcie_controller_offsets[(dev)] + 0x0018)
-#define RALINK_PCI_ID(dev)		(pcie_controller_offsets[(dev)] + 0x0030)
-#define RALINK_PCI_CLASS(dev)		(pcie_controller_offsets[(dev)] + 0x0034)
-#define RALINK_PCI_SUBID(dev)		(pcie_controller_offsets[(dev)] + 0x0038)
-#define RALINK_PCI_STATUS(dev)		(pcie_controller_offsets[(dev)] + 0x0050)
-#define RALINK_PCI_DERR(dev)		(pcie_controller_offsets[(dev)] + 0x0060)
-#define RALINK_PCI_ECRC(dev)		(pcie_controller_offsets[(dev)] + 0x0064)
+static struct pcie_controller_data pcie_controllers[] = {
+	{
+		.offset = 0x2000,
+		.clk_en = RALINK_PCIE0_CLK_EN,
+		.rst = RALINK_PCIE0_RST,
+		.irq = RALINK_PCIE0_IRQ,
+	},
+	{
+		.offset = 0x3000,
+		.clk_en = RALINK_PCIE1_CLK_EN,
+		.rst = RALINK_PCIE1_RST,
+		.irq = RALINK_PCIE1_IRQ,
+	},
+	{
+		.offset = 0x4000,
+		.clk_en = RALINK_PCIE2_CLK_EN,
+		.rst = RALINK_PCIE2_RST,
+		.irq = RALINK_PCIE2_IRQ,
+	},
+};
+
+#define RALINK_PCI_BAR0SETUP_ADDR(dev)	(pcie_controllers[(dev)].offset + 0x0010)
+#define RALINK_PCI_IMBASEBAR0_ADDR(dev)	(pcie_controllers[(dev)].offset + 0x0018)
+#define RALINK_PCI_ID(dev)		(pcie_controllers[(dev)].offset + 0x0030)
+#define RALINK_PCI_CLASS(dev)		(pcie_controllers[(dev)].offset + 0x0034)
+#define RALINK_PCI_SUBID(dev)		(pcie_controllers[(dev)].offset + 0x0038)
+#define RALINK_PCI_STATUS(dev)		(pcie_controllers[(dev)].offset + 0x0050)
+#define RALINK_PCI_DERR(dev)		(pcie_controllers[(dev)].offset + 0x0060)
+#define RALINK_PCI_ECRC(dev)		(pcie_controllers[(dev)].offset + 0x0064)
 
 #define RALINK_PCIEPHY_P0P1_CTL_OFFSET	0x9000
 #define RALINK_PCIEPHY_P2_CTL_OFFSET	0xA000
@@ -408,8 +436,32 @@ void setup_cm_memory_region(struct resource *mem_resource)
 	}
 }
 
+static void mt7621_pci_disable(u8 controller)
+{
+	mt7621_pcie_assert_sysrst(pcie_controllers[controller].rst);
+	rt_sysc_m32(pcie_controllers[controller].clk_en, 0, RALINK_CLKCFG1);
+	pcie_link_status &= ~(1 << controller);
+}
+
+static void mt7621_pci_enable_irqs(u8 controller)
+{
+	u32 mask;
+
+	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(controller)) & 0x1) == 0) {
+		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		mt7621_pci_disable(controller);
+		return;
+	}
+
+	pcie_link_status |= (1 << controller);
+	mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
+	mask |= pcie_controllers[controller].irq;
+	mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
+}
+
 static int mt7621_pci_probe(struct platform_device *pdev)
 {
+	int i;
 	u32 mask;
 	u32 val;
 
@@ -419,11 +471,8 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	ioport_resource.start = 0;
 	ioport_resource.end = ~0;
 
-	val = RALINK_PCIE0_RST;
-	val |= RALINK_PCIE1_RST;
-	val |= RALINK_PCIE2_RST;
-
-	mt7621_pcie_assert_sysrst(RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
+	val = (RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
+	mt7621_pcie_assert_sysrst(val);
 
 	*(unsigned int *)(0xbe000060) &= ~(0x3<<10 | 0x3<<3);
 	*(unsigned int *)(0xbe000060) |= 0x1<<10 | 0x1<<3;
@@ -434,10 +483,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 
 	mdelay(100);
 
-	val = RALINK_PCIE0_RST;
-	val |= RALINK_PCIE1_RST;
-	val |= RALINK_PCIE2_RST;
-
+	val = (RALINK_PCIE0_RST | RALINK_PCIE1_RST | RALINK_PCIE2_RST);
 	mt7621_pcie_deassert_sysrst(val);
 
 	if ((*(unsigned int *)(0xbe00000c)&0xFFFF) == 0x0101) // MT7621 E2
@@ -467,41 +513,9 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	*(unsigned int *)(0xbe000620) |= 0x1<<19 | 0x1<<8 | 0x1<<7;		// set DATA
 	mdelay(1000);
 
-	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(0)) & 0x1) == 0) {
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
-		mt7621_pcie_assert_sysrst(RALINK_PCIE0_RST);
-		rt_sysc_m32(RALINK_PCIE0_CLK_EN, 0, RALINK_CLKCFG1);
-		pcie_link_status &= ~(1<<0);
-	} else {
-		pcie_link_status |= 1<<0;
-		mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
-		mask |= (1<<20); // enable pcie1 interrupt
-		mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
-	}
 
-	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(1)) & 0x1) == 0) {
-		printk("PCIE1 no card, disable it(RST&CLK)\n");
-		mt7621_pcie_assert_sysrst(RALINK_PCIE1_RST);
-		rt_sysc_m32(RALINK_PCIE1_CLK_EN, 0, RALINK_CLKCFG1);
-		pcie_link_status &= ~(1<<1);
-	} else {
-		pcie_link_status |= 1<<1;
-		mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
-		mask |= (1<<21); // enable pcie1 interrupt
-		mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
-	}
-
-	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(2)) & 0x1) == 0) {
-		printk("PCIE2 no card, disable it(RST&CLK)\n");
-		mt7621_pcie_assert_sysrst(RALINK_PCIE2_RST);
-		rt_sysc_m32(RALINK_PCIE2_CLK_EN, 0, RALINK_CLKCFG1);
-		pcie_link_status &= ~(1<<2);
-	} else {
-		pcie_link_status |= 1<<2;
-		mask = mt7621_pci_reg_read(RALINK_PCI_PCIMSK_ADDR);
-		mask |= (1<<22); // enable pcie2 interrupt
-		mt7621_pci_reg_write(mask, RALINK_PCI_PCIMSK_ADDR);
-	}
+	for (i = 0; i < PCI_MAX_CONTROLLERS; i++)
+		mt7621_pci_enable_irqs(i);
 
 	if (pcie_link_status == 0)
 		return 0;
