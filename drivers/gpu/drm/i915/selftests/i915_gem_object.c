@@ -548,6 +548,14 @@ static int igt_mmap_offset_exhaustion(void *arg)
 
 	i915_gem_object_put(obj);
 
+	/* Disable background reaper */
+	mutex_lock(&i915->drm.struct_mutex);
+	i915_gem_unpark(i915);
+	mutex_unlock(&i915->drm.struct_mutex);
+	cancel_delayed_work_sync(i915->gt.retire_work);
+	cancel_delayed_work_sync(i915->gt.idle_work);
+	GEM_BUG_ON(!i915->gt.awake);
+
 	/* Now fill with busy dead objects that we expect to reap */
 	for (loop = 0; loop < 3; loop++) {
 		if (i915_terminally_wedged(&i915->gpu_error))
@@ -580,6 +588,7 @@ static int igt_mmap_offset_exhaustion(void *arg)
 
 out:
 	drm_mm_remove_node(&resv);
+	queue_delayed_work(i915->wq, &i915->gt.retire_work, 0);
 	return err;
 err_obj:
 	i915_gem_object_put(obj);
