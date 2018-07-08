@@ -418,7 +418,9 @@ const_string:
 	freeable = 0;
 store_string:
 	index = log->head & (logsize - 1);
-	if ((int)log->head - (int)log->tail == 8) {
+	BUILD_BUG_ON(sizeof(log->head) != sizeof(u8) ||
+		     sizeof(log->tail) != sizeof(u8));
+	if ((u8)(log->head - log->tail) == logsize) {
 		/* The buffer is full, discard the oldest message */
 		if (log->need_free & (1 << index))
 			kfree(log->buffer[index]);
