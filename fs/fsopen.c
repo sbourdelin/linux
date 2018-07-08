@@ -301,7 +301,7 @@ SYSCALL_DEFINE3(fspick, int, dfd, const char __user *, path, unsigned int, flags
 
 	ret = -EOPNOTSUPP;
 	if (!target.dentry->d_sb->s_op->reconfigure)
-		goto err;
+		goto err_path;
 
 	fc = vfs_new_fs_context(target.dentry->d_sb->s_type, target.dentry,
 				0, FS_CONTEXT_FOR_RECONFIGURE);
