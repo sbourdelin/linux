@@ -70,7 +70,7 @@
 #define RALINK_PCIE2_CLK_EN		BIT(26)
 
 #define RALINK_PCI_CONFIG_ADDR		0x20
-#define RALINK_PCI_CONFIG_DATA_VIRTUAL_REG	0x24
+#define RALINK_PCI_CONFIG_DATA		0x24
 #define RALINK_PCI_MEMBASE		0x0028
 #define RALINK_PCI_IOBASE		0x002C
 #define RALINK_PCIE0_RST		BIT(24)
@@ -180,7 +180,7 @@ pci_config_read(struct pci_bus *bus, unsigned int devfn,
 	u32 address;
 
 	address_reg = RALINK_PCI_CONFIG_ADDR;
-	data_reg = RALINK_PCI_CONFIG_DATA_VIRTUAL_REG;
+	data_reg = RALINK_PCI_CONFIG_DATA;
 
 	address = (((where & 0xF00) >> 8) << 24) |
 		   mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
@@ -211,7 +211,7 @@ pci_config_write(struct pci_bus *bus, unsigned int devfn,
 	u32 address;
 
 	address_reg = RALINK_PCI_CONFIG_ADDR;
-	data_reg = RALINK_PCI_CONFIG_DATA_VIRTUAL_REG;
+	data_reg = RALINK_PCI_CONFIG_DATA;
 
 	address = (((where & 0xF00) >> 8) << 24) |
 		   mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
@@ -253,7 +253,7 @@ read_config(unsigned int dev, u32 reg)
 	u32 address_reg, data_reg, address;
 
 	address_reg = RALINK_PCI_CONFIG_ADDR;
-	data_reg = RALINK_PCI_CONFIG_DATA_VIRTUAL_REG;
+	data_reg = RALINK_PCI_CONFIG_DATA;
 	address = (((reg & 0xF00) >> 8) << 24) |
 		   mt7621_pci_get_cfgaddr(0, dev, 0, reg);
 	writel(address, mt7621_pci_base + address_reg);
@@ -266,7 +266,7 @@ write_config(unsigned int dev, u32 reg, u32 val)
 	u32 address_reg, data_reg, address;
 
 	address_reg = RALINK_PCI_CONFIG_ADDR;
-	data_reg = RALINK_PCI_CONFIG_DATA_VIRTUAL_REG;
+	data_reg = RALINK_PCI_CONFIG_DATA;
 	address = (((reg & 0xF00) >> 8) << 24) |
 		   mt7621_pci_get_cfgaddr(0, dev, 0, reg);
 	writel(address, mt7621_pci_base + address_reg);
