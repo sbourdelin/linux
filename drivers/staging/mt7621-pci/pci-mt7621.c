@@ -39,6 +39,7 @@
  **************************************************************************
  */
 
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -62,17 +63,17 @@
  * devices.
  */
 
-#define RALINK_PCIE0_CLK_EN		(1<<24)
-#define RALINK_PCIE1_CLK_EN		(1<<25)
-#define RALINK_PCIE2_CLK_EN		(1<<26)
+#define RALINK_PCIE0_CLK_EN		BIT(24)
+#define RALINK_PCIE1_CLK_EN		BIT(25)
+#define RALINK_PCIE2_CLK_EN		BIT(26)
 
 #define RALINK_PCI_CONFIG_ADDR		0x20
 #define RALINK_PCI_CONFIG_DATA_VIRTUAL_REG	0x24
 #define RALINK_PCI_MEMBASE		0x0028
 #define RALINK_PCI_IOBASE		0x002C
-#define RALINK_PCIE0_RST		(1<<24)
-#define RALINK_PCIE1_RST		(1<<25)
-#define RALINK_PCIE2_RST		(1<<26)
+#define RALINK_PCIE0_RST		BIT(24)
+#define RALINK_PCIE1_RST		BIT(25)
+#define RALINK_PCIE2_RST		BIT(26)
 
 #define RALINK_PCI_PCICFG_ADDR		0x0000
 #define RALINK_PCI_PCIMSK_ADDR		0x000C
@@ -122,20 +123,20 @@ static u16 pcie_controller_offsets[] = {
 #define PPLL_CFG1			0x9c
 #define PPLL_DRV			0xa0
 /* SYSC_REG_SYSTEM_CONFIG1 bits */
-#define RALINK_PCI_HOST_MODE_EN		(1<<7)
-#define RALINK_PCIE_RC_MODE_EN		(1<<8)
+#define RALINK_PCI_HOST_MODE_EN		BIT(7)
+#define RALINK_PCIE_RC_MODE_EN		BIT(8)
 //RALINK_RSTCTRL bit
-#define RALINK_PCIE_RST			(1<<23)
-#define RALINK_PCI_RST			(1<<24)
+#define RALINK_PCIE_RST			BIT(23)
+#define RALINK_PCI_RST			BIT(24)
 //RALINK_CLKCFG1 bit
-#define RALINK_PCI_CLK_EN		(1<<19)
-#define RALINK_PCIE_CLK_EN		(1<<21)
+#define RALINK_PCI_CLK_EN		BIT(19)
+#define RALINK_PCIE_CLK_EN		BIT(21)
 //RALINK_GPIOMODE bit
-#define PCI_SLOTx2			(1<<11)
+#define PCI_SLOTx2			BIT(11)
 #define PCI_SLOTx1			(2<<11)
 //MTK PCIE PLL bit
-#define PDRV_SW_SET			(1<<31)
-#define LC_CKDRVPD_			(1<<19)
+#define PDRV_SW_SET			BIT(31)
+#define LC_CKDRVPD_			BIT(19)
 
 #define MEMORY_BASE 0x0
 static int pcie_link_status = 0;
