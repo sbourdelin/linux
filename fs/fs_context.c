@@ -504,6 +504,9 @@ static void legacy_fs_context_free(struct fs_context *fc)
 		kfree(ctx->legacy_data);
 		break;
 	}
+	/* This doesn't use fs_private, so need to manually zero for fsmount */
+	BUILD_BUG_ON(offsetof(struct legacy_fs_context, fc) != 0);
+	memset(fc + 1, 0, sizeof(*ctx) - sizeof(*fc));
 }
 
 /*
