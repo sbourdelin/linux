@@ -490,14 +490,10 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 		bypass_pipe_rst();
 	set_phy_for_ssc();
 
-	val = read_config(0, 0x70c);
-	printk("Port 0 N_FTS = %x\n", val);
-
-	val= read_config(1, 0x70c);
-	printk("Port 1 N_FTS = %x\n", val);
-
-	val = read_config(2, 0x70c);
-	printk("Port 2 N_FTS = %x\n", val);
+	for (i = 0; i < PCI_MAX_CONTROLLERS; i++) {
+		val = read_config(0, 0x70c);
+		printk("Port %d N_FTS = %x\n", i, val);
+	}
 
 	rt_sysc_m32(0, RALINK_PCIE_RST, RALINK_RSTCTRL);
 	rt_sysc_m32(0x30, 2 << 4, SYSC_REG_SYSTEM_CONFIG1);
