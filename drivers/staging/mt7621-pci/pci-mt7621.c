@@ -79,36 +79,20 @@
 #define RALINK_PCI_BASE	0xBE140000
 
 #define RALINK_PCIEPHY_P0P1_CTL_OFFSET	(RALINK_PCI_BASE + 0x9000)
-#define RT6855_PCIE0_OFFSET		0x2000
-#define RT6855_PCIE1_OFFSET		0x3000
-#define RT6855_PCIE2_OFFSET		0x4000
 
-#define RALINK_PCI0_BAR0SETUP_ADDR	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0010)
-#define RALINK_PCI0_IMBASEBAR0_ADDR	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0018)
-#define RALINK_PCI0_ID			*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0030)
-#define RALINK_PCI0_CLASS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0034)
-#define RALINK_PCI0_SUBID		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0038)
-#define RALINK_PCI0_STATUS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0050)
-#define RALINK_PCI0_DERR		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0060)
-#define RALINK_PCI0_ECRC		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0064)
+static u16 pcie_controller_offsets[] = {
+	0x2000, 0x3000, 0x4000,
+};
 
-#define RALINK_PCI1_BAR0SETUP_ADDR	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0010)
-#define RALINK_PCI1_IMBASEBAR0_ADDR	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0018)
-#define RALINK_PCI1_ID			*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0030)
-#define RALINK_PCI1_CLASS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0034)
-#define RALINK_PCI1_SUBID		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0038)
-#define RALINK_PCI1_STATUS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0050)
-#define RALINK_PCI1_DERR		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0060)
-#define RALINK_PCI1_ECRC		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0064)
+#define RALINK_PCI_BAR0SETUP_ADDR(dev)	(pcie_controller_offsets[(dev)] + 0x0010)
+#define RALINK_PCI_IMBASEBAR0_ADDR(dev)	(pcie_controller_offsets[(dev)] + 0x0018)
+#define RALINK_PCI_ID(dev)		(pcie_controller_offsets[(dev)] + 0x0030)
+#define RALINK_PCI_CLASS(dev)		(pcie_controller_offsets[(dev)] + 0x0034)
+#define RALINK_PCI_SUBID(dev)		(pcie_controller_offsets[(dev)] + 0x0038)
+#define RALINK_PCI_STATUS(dev)		(pcie_controller_offsets[(dev)] + 0x0050)
+#define RALINK_PCI_DERR(dev)		(pcie_controller_offsets[(dev)] + 0x0060)
+#define RALINK_PCI_ECRC(dev)		(pcie_controller_offsets[(dev)] + 0x0064)
 
-#define RALINK_PCI2_BAR0SETUP_ADDR	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0010)
-#define RALINK_PCI2_IMBASEBAR0_ADDR	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0018)
-#define RALINK_PCI2_ID			*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0030)
-#define RALINK_PCI2_CLASS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0034)
-#define RALINK_PCI2_SUBID		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0038)
-#define RALINK_PCI2_STATUS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0050)
-#define RALINK_PCI2_DERR		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0060)
-#define RALINK_PCI2_ECRC		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE2_OFFSET + 0x0064)
 
 #define RALINK_PCIEPHY_P0P1_CTL_OFFSET	(RALINK_PCI_BASE + 0x9000)
 #define RALINK_PCIEPHY_P2_CTL_OFFSET	(RALINK_PCI_BASE + 0xA000)
@@ -157,6 +141,16 @@
 static int pcie_link_status = 0;
 
 static void __iomem *mt7621_pci_base;
+
+static u32 mt7621_pci_reg_read(u32 reg)
+{
+	return readl(mt7621_pci_base + reg);
+}
+
+static void mt7621_pci_reg_write(u32 val, u32 reg)
+{
+	writel(val, mt7621_pci_base + reg);
+}
 
 static inline u32 mt7621_pci_get_cfgaddr(unsigned int bus, unsigned int slot,
 					 unsigned int func, unsigned int where)
@@ -470,7 +464,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	*(unsigned int *)(0xbe000620) |= 0x1<<19 | 0x1<<8 | 0x1<<7;		// set DATA
 	mdelay(1000);
 
-	if ((RALINK_PCI0_STATUS & 0x1) == 0) {
+	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(0)) & 0x1) == 0) {
 		printk("PCIE0 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE0_RST);
 		rt_sysc_m32(RALINK_PCIE0_CLK_EN, 0, RALINK_CLKCFG1);
@@ -480,7 +474,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 		RALINK_PCI_PCIMSK_ADDR |= (1<<20); // enable pcie1 interrupt
 	}
 
-	if ((RALINK_PCI1_STATUS & 0x1) == 0) {
+	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(1)) & 0x1) == 0) {
 		printk("PCIE1 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE1_RST);
 		rt_sysc_m32(RALINK_PCIE1_CLK_EN, 0, RALINK_CLKCFG1);
@@ -490,7 +484,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 		RALINK_PCI_PCIMSK_ADDR |= (1<<21); // enable pcie1 interrupt
 	}
 
-	if ((RALINK_PCI2_STATUS & 0x1) == 0) {
+	if ((mt7621_pci_reg_read(RALINK_PCI_STATUS(2)) & 0x1) == 0) {
 		printk("PCIE2 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE2_RST);
 		rt_sysc_m32(RALINK_PCIE2_CLK_EN, 0, RALINK_CLKCFG1);
@@ -550,25 +544,28 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 
 	//PCIe0
 	if ((pcie_link_status & 0x1) != 0) {
-		RALINK_PCI0_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
-		RALINK_PCI0_IMBASEBAR0_ADDR = MEMORY_BASE;
-		RALINK_PCI0_CLASS = 0x06040001;
+		/* open 7FFF:2G; ENABLE */
+		mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(0));
+		mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(0));
+		mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(0));
 		printk("PCIE0 enabled\n");
 	}
 
 	//PCIe1
 	if ((pcie_link_status & 0x2) != 0) {
-		RALINK_PCI1_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
-		RALINK_PCI1_IMBASEBAR0_ADDR = MEMORY_BASE;
-		RALINK_PCI1_CLASS = 0x06040001;
+		/* open 7FFF:2G; ENABLE */
+		mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(1));
+		mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(1));
+		mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(1));
 		printk("PCIE1 enabled\n");
 	}
 
 	//PCIe2
 	if ((pcie_link_status & 0x4) != 0) {
-		RALINK_PCI2_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
-		RALINK_PCI2_IMBASEBAR0_ADDR = MEMORY_BASE;
-		RALINK_PCI2_CLASS = 0x06040001;
+		/* open 7FFF:2G; ENABLE */
+		mt7621_pci_reg_write(0x7FFF0001, RALINK_PCI_BAR0SETUP_ADDR(2));
+		mt7621_pci_reg_write(MEMORY_BASE, RALINK_PCI_IMBASEBAR0_ADDR(2));
+		mt7621_pci_reg_write(0x06040001, RALINK_PCI_CLASS(2));
 		printk("PCIE2 enabled\n");
 	}
 
