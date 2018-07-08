@@ -3237,6 +3237,9 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags, unsigned int, ms_flags
 	unsigned int mnt_flags = 0;
 	long ret;
 
+	if (!may_mount())
+		return -EPERM;
+
 	if ((flags & ~(FSMOUNT_CLOEXEC)) != 0)
 		return -EINVAL;
 
@@ -3275,11 +3278,6 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags, unsigned int, ms_flags
 
 	fc = f.file->private_data;
 
-	ret = -EPERM;
-	if (!may_mount() ||
-	    ((fc->sb_flags & SB_MANDLOCK) && !may_mandlock()))
-		goto err_fsfd;
-
 	/* There must be a valid superblock or we can't mount it */
 	ret = -EINVAL;
 	if (!fc->root)
@@ -3298,6 +3296,10 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags, unsigned int, ms_flags
 
 	ret = -EBUSY;
 	if (fc->phase != FS_CONTEXT_AWAITING_MOUNT)
+		goto err_unlock;
+
+	ret = -EPERM;
+	if ((fc->sb_flags & SB_MANDLOCK) && !may_mandlock())
 		goto err_unlock;
 
 	newmount.mnt = vfs_create_mount(fc, mnt_flags);
