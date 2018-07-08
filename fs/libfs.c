@@ -588,8 +588,10 @@ int simple_pin_fs(struct file_system_type *type, struct vfsmount **mount, int *c
 			return PTR_ERR(fc);
 
 		ret = vfs_get_tree(fc);
-		if (ret < 0)
+		if (ret < 0) {
+			put_fs_context(fc);
 			return ret;
+		}
 
 		mnt = vfs_create_mount(fc, 0);
 		put_fs_context(fc);
