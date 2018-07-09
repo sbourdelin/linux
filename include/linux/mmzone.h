@@ -940,9 +940,7 @@ extern struct zone *next_zone(struct zone *zone);
 	for (zone = (first_online_pgdat())->node_zones; \
 	     zone;					\
 	     zone = next_zone(zone))			\
-		if (!populated_zone(zone))		\
-			; /* do nothing */		\
-		else
+		for_each_if (populated_zone(zone))
 
 static inline struct zone *zonelist_zone(struct zoneref *zoneref)
 {
