@@ -287,9 +287,7 @@ void css_task_iter_end(struct css_task_iter *it);
 	for ((leader) = cgroup_taskset_first((tset), &(dst_css));	\
 	     (leader);							\
 	     (leader) = cgroup_taskset_next((tset), &(dst_css)))	\
-		if ((leader) != (leader)->group_leader)			\
-			;						\
-		else
+		for_each_if ((leader) == (leader)->group_leader)
 
 /*
  * Inline functions.
