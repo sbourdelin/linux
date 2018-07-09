@@ -85,15 +85,15 @@ extern struct list_head dmar_drhd_units;
 
 #define for_each_active_drhd_unit(drhd)					\
 	list_for_each_entry_rcu(drhd, &dmar_drhd_units, list)		\
-		if (drhd->ignored) {} else
+		for_each_if (!drhd->ignored)
 
 #define for_each_active_iommu(i, drhd)					\
 	list_for_each_entry_rcu(drhd, &dmar_drhd_units, list)		\
-		if (i=drhd->iommu, drhd->ignored) {} else
+		for_each_if ((i=drhd->iommu, !drhd->ignored))
 
 #define for_each_iommu(i, drhd)						\
 	list_for_each_entry_rcu(drhd, &dmar_drhd_units, list)		\
-		if (i=drhd->iommu, 0) {} else 
+		for_each_if ((i=drhd->iommu, true))
 
 static inline bool dmar_rcu_check(void)
 {
@@ -108,7 +108,8 @@ static inline bool dmar_rcu_check(void)
 			NULL, (p) < (c)); (p)++)
 
 #define	for_each_active_dev_scope(a, c, p, d)	\
-	for_each_dev_scope((a), (c), (p), (d))	if (!(d)) { continue; } else
+	for_each_dev_scope((a), (c), (p), (d))	\
+		for_each_if (d)
 
 extern int dmar_table_init(void);
 extern int dmar_dev_scope_init(void);
