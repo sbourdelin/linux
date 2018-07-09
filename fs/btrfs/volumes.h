@@ -342,6 +342,7 @@ struct map_lookup {
 	u64 stripe_len;
 	int num_stripes;
 	int sub_stripes;
+	int verified_stripes; /* For mount time dev extent verification */
 	struct btrfs_bio_stripe stripes[];
 };
 
@@ -561,5 +562,6 @@ void btrfs_set_fs_info_ptr(struct btrfs_fs_info *fs_info);
 void btrfs_reset_fs_info_ptr(struct btrfs_fs_info *fs_info);
 bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info,
 					struct btrfs_device *failing_dev);
+int btrfs_verify_dev_extents(struct btrfs_fs_info *fs_info);
 
 #endif
