@@ -107,6 +107,8 @@ struct mipi_dsi_host {
 int mipi_dsi_host_register(struct mipi_dsi_host *host);
 void mipi_dsi_host_unregister(struct mipi_dsi_host *host);
 struct mipi_dsi_host *of_find_mipi_dsi_host_by_node(struct device_node *node);
+struct device_node *of_mipi_dsi_find_second_host(struct device_node *first_np,
+						 int port, int endpoint);
 
 /* DSI mode flags */
 

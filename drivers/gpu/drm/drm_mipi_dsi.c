@@ -30,6 +30,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of_graph.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 
@@ -281,6 +282,61 @@ struct mipi_dsi_host *of_find_mipi_dsi_host_by_node(struct device_node *node)
 	return NULL;
 }
 EXPORT_SYMBOL(of_find_mipi_dsi_host_by_node);
+
+struct device_node *of_mipi_dsi_find_second_host(struct device_node *first_np,
+						 int port, int endpoint)
+{
+	struct mipi_dsi_host *first, *host;
+	struct device_node *remote, *np, *second_np = NULL;
+	int num = 0;
+
+	first = of_find_mipi_dsi_host_by_node(first_np);
+	if (!first) {
+		pr_err("no dsi-host for node %s\n", first_np->full_name);
+		return ERR_PTR(-ENODEV);
+	}
+
+	/* output-node of the known dsi-host */
+	remote = of_graph_get_remote_node(first_np, port, endpoint);
+	if (!remote) {
+		dev_err(first->dev, "no output node found\n");
+		return ERR_PTR(-ENODEV);
+	}
+
+	mutex_lock(&host_lock);
+
+	list_for_each_entry(host, &host_list, list) {
+		np = of_graph_get_remote_node(host->dev->of_node,
+					      port, endpoint);
+
+		/* found a host connected to this panel */
+		if (np == remote)
+			num++;
+
+		/* found one second host */
+		if (host->dev->of_node != first_np)
+			second_np = host->dev->of_node;
+
+		of_node_put(np);
+	}
+
+	/* of_node_get the node under host_lock */
+	if (num == 2)
+		of_node_get(second_np);
+
+	mutex_unlock(&host_lock);
+
+	of_node_put(remote);
+
+	if (num > 2) {
+		dev_err(first->dev,
+			      "too many DSI links for output: %d links\n", num);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return second_np;
+}
+EXPORT_SYMBOL(of_mipi_dsi_find_second_host);
 
 int mipi_dsi_host_register(struct mipi_dsi_host *host)
 {
