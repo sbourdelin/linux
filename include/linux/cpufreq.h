@@ -649,9 +649,7 @@ static inline void dev_pm_opp_free_cpufreq_table(struct device *dev,
 
 #define cpufreq_for_each_valid_entry(pos, table)			\
 	for (pos = table; pos->frequency != CPUFREQ_TABLE_END; pos++)	\
-		if (pos->frequency == CPUFREQ_ENTRY_INVALID)		\
-			continue;					\
-		else
+		for_each_if (pos->frequency != CPUFREQ_ENTRY_INVALID)
 
 /*
  * cpufreq_for_each_valid_entry_idx -     iterate with index over a cpufreq
@@ -663,9 +661,7 @@ static inline void dev_pm_opp_free_cpufreq_table(struct device *dev,
 
 #define cpufreq_for_each_valid_entry_idx(pos, table, idx)		\
 	cpufreq_for_each_entry_idx(pos, table, idx)			\
-		if (pos->frequency == CPUFREQ_ENTRY_INVALID)		\
-			continue;					\
-		else
+		for_each_if (pos->frequency == CPUFREQ_ENTRY_INVALID)
 
 
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
