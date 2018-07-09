@@ -601,7 +601,7 @@ static inline bool pci_is_bridge(struct pci_dev *dev)
 
 #define for_each_pci_bridge(dev, bus)				\
 	list_for_each_entry(dev, &bus->devices, bus_list)	\
-		if (!pci_is_bridge(dev)) {} else
+		for_each_if (pci_is_bridge(dev))
 
 static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 {
