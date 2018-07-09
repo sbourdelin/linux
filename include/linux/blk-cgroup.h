@@ -382,7 +382,7 @@ static inline void blkg_put(struct blkcg_gq *blkg)
  */
 #define blkg_for_each_descendant_pre(d_blkg, pos_css, p_blkg)		\
 	css_for_each_descendant_pre((pos_css), &(p_blkg)->blkcg->css)	\
-		if (((d_blkg) = __blkg_lookup(css_to_blkcg(pos_css),	\
+		for_each_if (((d_blkg) = __blkg_lookup(css_to_blkcg(pos_css), \
 					      (p_blkg)->q, false)))
 
 /**
@@ -397,7 +397,7 @@ static inline void blkg_put(struct blkcg_gq *blkg)
  */
 #define blkg_for_each_descendant_post(d_blkg, pos_css, p_blkg)		\
 	css_for_each_descendant_post((pos_css), &(p_blkg)->blkcg->css)	\
-		if (((d_blkg) = __blkg_lookup(css_to_blkcg(pos_css),	\
+		for_each_if (((d_blkg) = __blkg_lookup(css_to_blkcg(pos_css), \
 					      (p_blkg)->q, false)))
 
 /**
