@@ -24,8 +24,12 @@ struct devres_node {
 
 struct devres {
 	struct devres_node		node;
-	/* -- 3 pointers */
-	unsigned long long		data[];	/* guarantee ull alignment */
+	/*
+	 * data[] must be 64 bit aligned even on 32 bit architectures
+	 * because it might be accessed by instructions that require
+	 * aligned memory arguments such as atomic64_t.
+	 */
+	u8 __aligned(8)			data[];
 };
 
 struct devres_group {
