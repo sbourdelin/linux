@@ -24,8 +24,12 @@ struct devres_node {
 
 struct devres {
 	struct devres_node		node;
-	/* -- 3 pointers */
-	unsigned long long		data[];	/* guarantee ull alignment */
+	/*
+	 * Depending on ABI "long long" type of a particular 32-bit CPU
+	 * might be aligned by either word (32-bits) or double word (64-bits).
+	 * Make sure "data" is really 64-bit aligned for any 32-bit CPU.
+	 */
+	unsigned long long		data[] __aligned(sizeof(unsigned long long));
 };
 
 struct devres_group {
