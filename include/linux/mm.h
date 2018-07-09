@@ -923,6 +923,20 @@ static inline void put_page(struct page *page)
 		__put_page(page);
 }
 
+/* Placeholder version, until all get_user_pages*() callers are updated. */
+static inline void put_user_page(struct page *page)
+{
+	put_page(page);
+}
+
+/* A drop-in replacement for release_pages(): */
+static inline void release_user_pages(struct page **pages,
+				      unsigned long npages)
+{
+	while (npages)
+		put_user_page(pages[--npages]);
+}
+
 #if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
 #define SECTION_IN_PAGE_FLAGS
 #endif
