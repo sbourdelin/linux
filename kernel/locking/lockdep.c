@@ -878,6 +878,11 @@ static int add_lock_to_list(struct lock_class *this, struct list_head *head,
 	entry->class = this;
 	entry->distance = distance;
 	entry->trace = *trace;
+	entry->cpu = smp_processor_id();
+	entry->pid = current->pid;
+	entry->ts = local_clock();
+	strlcpy(entry->comm, current->comm, sizeof(entry->comm));
+
 	/*
 	 * Both allocation and removal are done under the graph lock; but
 	 * iteration is under RCU-sched; see look_up_lock_class() and
@@ -1093,6 +1098,20 @@ print_circular_bug_entry(struct lock_list *target, int depth)
 		return 0;
 	printk("\n-> #%u", depth);
 	print_lock_name(target->class);
+
+	if (get_lock_parent(target)) {
+		u64 us = do_div(target->ts, 1000000000UL) / 1000;
+
+		pr_cont("%s/%d/CPU%d)(%llu.%06llu)", target->comm,
+			target->pid, target->cpu, target->ts, us);
+	} else {
+		u64 sec = local_clock();
+		u64 us = do_div(sec, 1000000000UL) / 1000;
+
+		pr_cont("%s/%d/CPU%d)(%llu.%06llu)", current->comm,
+			current->pid, smp_processor_id(), sec, us);
+	}
+
 	printk(KERN_CONT ":\n");
 	print_stack_trace(&target->trace, 6);
 

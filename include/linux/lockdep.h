@@ -186,6 +186,10 @@ struct lock_list {
 	struct list_head		entry;
 	struct lock_class		*class;
 	struct stack_trace		trace;
+	unsigned long long		ts;
+	char				comm[16];
+	pid_t				pid;
+	int				cpu;
 	int				distance;
 
 	/*
