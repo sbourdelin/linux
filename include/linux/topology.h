@@ -40,7 +40,7 @@
 
 #define for_each_node_with_cpus(node)			\
 	for_each_online_node(node)			\
-		if (nr_cpus_node(node))
+		for_each_if (nr_cpus_node(node))
 
 int arch_update_cpu_topology(void);
 
