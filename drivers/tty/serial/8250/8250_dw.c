@@ -31,6 +31,7 @@
 
 /* Offsets for the DesignWare specific registers */
 #define DW_UART_USR	0x1f /* UART Status Register */
+#define DW_UART_DLF	0xc0 /* Divisor Latch Fraction Register */
 #define DW_UART_CPR	0xf4 /* Component Parameter Register */
 #define DW_UART_UCV	0xf8 /* UART Component Version */
 
@@ -55,6 +56,7 @@
 
 struct dw8250_data {
 	u8			usr_reg;
+	u8			dlf_size;
 	int			line;
 	int			msr_mask_on;
 	int			msr_mask_off;
@@ -366,6 +368,37 @@ static bool dw8250_idma_filter(struct dma_chan *chan, void *param)
 	return param == chan->device->dev->parent;
 }
 
+/*
+ * divisor = clk / (16 * baud) = div(I) + div(F)
+ * "I" means integer, "F" means fractional
+ *
+ * 2^dlf_size * clk / (16 * baud) = 2^dlf_size * (div(I) + div(F))
+ * so, (clk << (dlf_siz - 4)) / baud = (div(I) + div(F)) << dlf_size
+ *
+ * let quot = DIV_ROUND_CLOSEST(clk << (dlf_size - 4), baud), we get
+ * div(I) = quot >> dlf_size
+ * div(F) = quot & dlf_mask, where dlf_mask = GENMASK(dlf_size - 1, 0)
+ */
+static unsigned int dw8250_get_divisor(struct uart_port *p,
+				       unsigned int baud,
+				       unsigned int *frac)
+{
+	unsigned int quot;
+	struct dw8250_data *d = p->private_data;
+
+	quot = DIV_ROUND_CLOSEST(p->uartclk << (d->dlf_size - 4), baud);
+	*frac = quot & GENMASK(d->dlf_size - 1, 0);
+
+	return quot >> d->dlf_size;
+}
+
+static void dw8250_set_divisor(struct uart_port *p, unsigned int baud,
+			       unsigned int quot, unsigned int quot_frac)
+{
+	dw8250_writel_ext(p, DW_UART_DLF, quot_frac);
+	serial8250_do_set_divisor(p, baud, quot, quot_frac);
+}
+
 static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
 {
 	if (p->dev->of_node) {
@@ -425,6 +458,18 @@ static void dw8250_setup_port(struct uart_port *p)
 
 	dev_dbg(p->dev, "Designware UART version %c.%c%c\n",
 		(reg >> 24) & 0xff, (reg >> 16) & 0xff, (reg >> 8) & 0xff);
+
+	dw8250_writel_ext(p, DW_UART_DLF, ~0U);
+	reg = dw8250_readl_ext(p, DW_UART_DLF);
+	dw8250_writel_ext(p, DW_UART_DLF, 0);
+
+	if (reg) {
+		struct dw8250_data *d = p->private_data;
+
+		d->dlf_size = fls(reg);
+		p->get_divisor = dw8250_get_divisor;
+		p->set_divisor = dw8250_set_divisor;
+	}
 
 	reg = dw8250_readl_ext(p, DW_UART_CPR);
 	if (!reg)
