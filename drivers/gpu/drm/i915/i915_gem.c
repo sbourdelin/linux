@@ -5361,11 +5361,10 @@ static int __intel_engines_record_defaults(struct drm_i915_private *i915)
 	if (err)
 		goto err_active;
 
-	err = i915_gem_wait_for_idle(i915,
-				     I915_WAIT_LOCKED,
-				     MAX_SCHEDULE_TIMEOUT);
-	if (err)
+	if (i915_gem_wait_for_idle(i915, I915_WAIT_LOCKED, HZ / 5)) {
+		err = -EIO; /* Caller will declare us wedged */
 		goto err_active;
+	}
 
 	assert_kernel_context_is_current(i915);
 
