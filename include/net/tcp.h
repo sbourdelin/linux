@@ -545,6 +545,7 @@ void tcp_send_loss_probe(struct sock *sk);
 bool tcp_schedule_loss_probe(struct sock *sk, bool advancing_rto);
 void tcp_skb_collapse_tstamp(struct sk_buff *skb,
 			     const struct sk_buff *next_skb);
+void tcp_ca_dst_init(struct sock *sk, const struct dst_entry *dst);
 
 /* tcp_input.c */
 void tcp_rearm_rto(struct sock *sk);

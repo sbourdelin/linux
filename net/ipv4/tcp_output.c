@@ -3256,7 +3256,7 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 }
 EXPORT_SYMBOL(tcp_make_synack);
 
-static void tcp_ca_dst_init(struct sock *sk, const struct dst_entry *dst)
+void tcp_ca_dst_init(struct sock *sk, const struct dst_entry *dst)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	const struct tcp_congestion_ops *ca;

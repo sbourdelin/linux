@@ -6401,6 +6401,8 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 		isn = af_ops->init_seq(skb);
 	}
 
+	tcp_ca_dst_init(sk, dst);
+
 	tcp_ecn_create_request(req, skb, sk, dst);
 
 	if (want_cookie) {
