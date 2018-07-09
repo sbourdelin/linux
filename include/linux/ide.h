@@ -1601,7 +1601,7 @@ static inline void ide_set_drivedata(ide_drive_t *drive, void *data)
 
 #define ide_port_for_each_present_dev(i, dev, port) \
 	for ((i) = 0; ((dev) = (port)->devices[i]) || (i) < MAX_DRIVES; (i)++) \
-		if ((dev)->dev_flags & IDE_DFLAG_PRESENT)
+		for_each_if ((dev)->dev_flags & IDE_DFLAG_PRESENT)
 
 #define ide_host_for_each_port(i, port, host) \
 	for ((i) = 0; ((port) = (host)->ports[i]) || (i) < MAX_HOST_PORTS; (i)++)
