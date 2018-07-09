@@ -1740,7 +1740,8 @@ struct regulator *_regulator_get(struct device *dev, const char *id,
 			rdev->use_count = 0;
 	}
 
-	device_link_add(dev, &rdev->dev, DL_FLAG_STATELESS);
+	if (dev != &rdev->dev)
+		device_link_add(dev, &rdev->dev, DL_FLAG_STATELESS);
 
 	return regulator;
 }
@@ -1839,7 +1840,7 @@ static void _regulator_put(struct regulator *regulator)
 			if (r->dev == regulator->dev)
 				count++;
 
-		if (count == 1)
+		if (count == 1 && regulator->dev != &rdev->dev)
 			device_link_remove(regulator->dev, &rdev->dev);
 
 		/* remove any sysfs entries */
