@@ -3321,6 +3321,17 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
 
 EXPORT_SYMBOL_GPL(sdhci_alloc_host);
 
+/*
+ * Vendor's Host Controller which supports v4 mode can call
+ * this function to enable v4 mode before calling
+ * __sdhci_add_host().
+ */
+void sdhci_enable_v4_mode(struct sdhci_host *host)
+{
+	host->v4_mode = true;
+}
+EXPORT_SYMBOL_GPL(sdhci_enable_v4_mode);
+
 static int sdhci_set_dma_mask(struct sdhci_host *host)
 {
 	struct mmc_host *mmc = host->mmc;
