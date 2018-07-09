@@ -127,7 +127,7 @@ struct nubus_rsrc *nubus_next_rsrc_or_null(struct nubus_rsrc *from);
 	for (f = nubus_first_rsrc_or_null(); f; f = nubus_next_rsrc_or_null(f))
 
 #define for_each_board_func_rsrc(b, f) \
-	for_each_func_rsrc(f) if (f->board != b) {} else
+	for_each_func_rsrc(f) for_each_if (f->board == b)
 
 /* These are somewhat more NuBus-specific.  They all return 0 for
    success and -1 for failure, as you'd expect. */
