@@ -583,7 +583,8 @@ static void __ieee80211_key_destroy(struct ieee80211_key *key,
 
 		ieee80211_debugfs_key_remove(key);
 
-		if (delay_tailroom) {
+		if (delay_tailroom &&
+		    sdata->vif.type == NL80211_IFTYPE_STATION) {
 			/* see ieee80211_delayed_tailroom_dec */
 			sdata->crypto_tx_tailroom_pending_dec++;
 			schedule_delayed_work(&sdata->dec_tailroom_needed_wk,
