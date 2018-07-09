@@ -31,6 +31,7 @@ struct dw_mipi_dsi_plat_data {
 	void *priv_data;
 };
 
+bool dw_mipi_dsi_device_attached(struct dw_mipi_dsi *dsi);
 struct dw_mipi_dsi *dw_mipi_dsi_probe(struct platform_device *pdev,
 				      const struct dw_mipi_dsi_plat_data
 				      *plat_data);

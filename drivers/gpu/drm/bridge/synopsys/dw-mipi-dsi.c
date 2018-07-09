@@ -12,6 +12,7 @@
 #include <linux/component.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
@@ -219,6 +220,7 @@ struct dw_mipi_dsi {
 	struct drm_bridge bridge;
 	struct mipi_dsi_host dsi_host;
 	struct drm_bridge *panel_bridge;
+	struct mutex panel_mutex;
 	struct device *dev;
 	void __iomem *base;
 
@@ -296,9 +298,13 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
 			return PTR_ERR(bridge);
 	}
 
+	mutex_lock(&dsi->panel_mutex);
+
 	dsi->panel_bridge = bridge;
 
 	drm_bridge_add(&dsi->bridge);
+
+	mutex_unlock(&dsi->panel_mutex);
 
 	return 0;
 }
@@ -308,12 +314,29 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
 {
 	struct dw_mipi_dsi *dsi = host_to_dsi(host);
 
+	mutex_lock(&dsi->panel_mutex);
+
+	dsi->panel_bridge = NULL;
 	drm_of_panel_bridge_remove(host->dev->of_node, 1, 0);
 
 	drm_bridge_remove(&dsi->bridge);
 
+	mutex_unlock(&dsi->panel_mutex);
+
 	return 0;
 }
+
+bool dw_mipi_dsi_device_attached(struct dw_mipi_dsi *dsi)
+{
+	bool output;
+
+	mutex_lock(&dsi->panel_mutex);
+	output = !!dsi->panel_bridge;
+	mutex_unlock(&dsi->panel_mutex);
+
+	return output;
+}
+EXPORT_SYMBOL_GPL(dw_mipi_dsi_device_attached);
 
 static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
 				   const struct mipi_dsi_msg *msg)
@@ -866,6 +889,8 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
 
 	dsi->dev = dev;
 	dsi->plat_data = plat_data;
+
+	mutex_init(&dsi->panel_mutex);
 
 	if (!plat_data->phy_ops->init || !plat_data->phy_ops->get_lane_mbps) {
 		DRM_ERROR("Phy not properly configured\n");
