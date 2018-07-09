@@ -71,6 +71,9 @@
  */
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
 
+/* helper for handling conditionals in various for_each macros */
+#define for_each_if(condition) if (!(condition)) {} else
+
 #define u64_to_user_ptr(x) (		\
 {					\
 	typecheck(u64, x);		\
