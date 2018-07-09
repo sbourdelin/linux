@@ -161,7 +161,7 @@ module_param_call(stop_on_user_error, binder_set_stop_on_user_error,
 #define binder_debug(mask, x...) \
 	do { \
 		if (binder_debug_mask & mask) \
-			pr_info(x); \
+			pr_info_ratelimited(x); \
 	} while (0)
 
 #define binder_user_error(x...) \
@@ -3016,7 +3016,7 @@ static void binder_transaction(struct binder_proc *proc,
 	sg_bufp = (u8 *)(PTR_ALIGN(off_end, sizeof(void *)));
 	sg_buf_end = sg_bufp + extra_buffers_size;
 	off_min = 0;
-	for (; offp < off_end; offp++) {
+	for (; offp < off_end; cond_resched(), offp++) {
 		struct binder_object_header *hdr;
 		size_t object_size = binder_validate_object(t->buffer, *offp);
 
@@ -3307,6 +3307,7 @@ static int binder_thread_write(struct binder_proc *proc,
 
 		if (get_user(cmd, (uint32_t __user *)ptr))
 			return -EFAULT;
+		cond_resched();
 		ptr += sizeof(uint32_t);
 		trace_binder_command(cmd);
 		if (_IOC_NR(cmd) < ARRAY_SIZE(binder_stats.bc)) {
@@ -4193,6 +4194,7 @@ static void binder_release_work(struct binder_proc *proc,
 	struct binder_work *w;
 
 	while (1) {
+		cond_resched();
 		w = binder_dequeue_work_head(proc, list);
 		if (!w)
 			return;
