@@ -214,7 +214,12 @@ struct wmi_ops {
 	struct sk_buff *(*gen_echo)(struct ath10k *ar, u32 value);
 	struct sk_buff *(*gen_pdev_get_tpc_table_cmdid)(struct ath10k *ar,
 							u32 param);
-
+	struct sk_buff *(*gen_vdev_set_neighbor_rx_param)(struct ath10k *ar,
+							  u32 vdev_id,
+							  const u8 *addr,
+							  u32 idx,
+							  u32 action,
+							  u32 type);
 };
 
 int ath10k_wmi_cmd_send(struct ath10k *ar, struct sk_buff *skb, u32 cmd_id);
@@ -1543,4 +1548,25 @@ ath10k_wmi_report_radar_found(struct ath10k *ar,
 				   ar->wmi.cmd->radar_found_cmdid);
 }
 
+static inline int
+ath10k_wmi_set_neighbor_rx_param(struct ath10k *ar, u32 vdev_id,
+				 const u8 *addr, u32 idx,
+				 u32 action, u32 type)
+{
+	struct sk_buff *skb;
+	u32 cmdid;
+
+	if (!ar->wmi.ops->gen_vdev_set_neighbor_rx_param)
+		return -EOPNOTSUPP;
+
+	cmdid = ar->wmi.cmd->vdev_filter_neighbor_rx_packets_cmdid;
+	skb = ar->wmi.ops->gen_vdev_set_neighbor_rx_param(ar,
+							  vdev_id, addr,
+							  idx, action, type);
+
+	if (IS_ERR(skb))
+		return PTR_ERR(skb);
+
+	return ath10k_wmi_cmd_send(ar, skb, cmdid);
+}
 #endif

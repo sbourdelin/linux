@@ -203,6 +203,13 @@ enum wmi_service {
 	WMI_SERVICE_TPC_STATS_FINAL,
 	WMI_SERVICE_RESET_CHIP,
 	WMI_SERVICE_SPOOF_MAC_SUPPORT,
+	WMI_SERVICE_CFR_CAPTURE_SUPPORT,
+	WMI_SERVICE_TX_DATA_ACK_RSSI,
+	WMI_SERVICE_CFR_CAPTURE_IND_MSG_TYPE_LAGACY,
+	WMI_SERVICE_PER_PACKET_SW_ENCRYPT,
+	WMI_SERVICE_PEER_TID_CONFIGS_SUPPORT,
+	WMI_SERVICE_VDEV_BCN_RATE_CONTROL,
+	WMI_SERVICE_VDEV_FILTER_NEIGHBOR,
 
 	/* keep last */
 	WMI_SERVICE_MAX,
@@ -350,6 +357,13 @@ enum wmi_10_4_service {
 	WMI_10_4_SERVICE_HTT_MGMT_TX_COMP_VALID_FLAGS,
 	WMI_10_4_SERVICE_HOST_DFS_CHECK_SUPPORT,
 	WMI_10_4_SERVICE_TPC_STATS_FINAL,
+	WMI_10_4_SERVICE_CFR_CAPTURE_SUPPORT,
+	WMI_10_4_SERVICE_TX_DATA_ACK_RSSI,
+	WMI_10_4_SERVICE_CFR_CAPTURE_IND_MSG_TYPE_LAGACY,
+	WMI_10_4_SERVICE_PER_PACKET_SW_ENCRYPT,
+	WMI_10_4_SERVICE_PEER_TID_CONFIGS_SUPPORT,
+	WMI_10_4_SERVICE_VDEV_BCN_RATE_CONTROL,
+	WMI_10_4_SERVICE_VDEV_FILTER_NEIGHBOR,
 };
 
 static inline char *wmi_service_name(int service_id)
@@ -462,6 +476,15 @@ static inline char *wmi_service_name(int service_id)
 	SVCSTR(WMI_SERVICE_HTT_MGMT_TX_COMP_VALID_FLAGS);
 	SVCSTR(WMI_SERVICE_HOST_DFS_CHECK_SUPPORT);
 	SVCSTR(WMI_SERVICE_TPC_STATS_FINAL);
+	SVCSTR(WMI_SERVICE_RESET_CHIP);
+	SVCSTR(WMI_SERVICE_CFR_CAPTURE_SUPPORT);
+	SVCSTR(WMI_SERVICE_TX_DATA_ACK_RSSI);
+	SVCSTR(WMI_SERVICE_CFR_CAPTURE_IND_MSG_TYPE_LAGACY);
+	SVCSTR(WMI_SERVICE_PER_PACKET_SW_ENCRYPT);
+	SVCSTR(WMI_SERVICE_PEER_TID_CONFIGS_SUPPORT);
+	SVCSTR(WMI_SERVICE_VDEV_BCN_RATE_CONTROL);
+	SVCSTR(WMI_SERVICE_VDEV_FILTER_NEIGHBOR);
+
 	default:
 		return NULL;
 	}
@@ -770,6 +793,20 @@ static inline void wmi_10_4_svc_map(const __le32 *in, unsigned long *out,
 	       WMI_SERVICE_HOST_DFS_CHECK_SUPPORT, len);
 	SVCMAP(WMI_10_4_SERVICE_TPC_STATS_FINAL,
 	       WMI_SERVICE_TPC_STATS_FINAL, len);
+	SVCMAP(WMI_10_4_SERVICE_CFR_CAPTURE_SUPPORT,
+	       WMI_SERVICE_CFR_CAPTURE_SUPPORT, len);
+	SVCMAP(WMI_10_4_SERVICE_TX_DATA_ACK_RSSI,
+	       WMI_SERVICE_TX_DATA_ACK_RSSI, len);
+	SVCMAP(WMI_10_4_SERVICE_CFR_CAPTURE_IND_MSG_TYPE_LAGACY,
+	       WMI_SERVICE_CFR_CAPTURE_IND_MSG_TYPE_LAGACY, len);
+	SVCMAP(WMI_10_4_SERVICE_PER_PACKET_SW_ENCRYPT,
+	       WMI_SERVICE_PER_PACKET_SW_ENCRYPT, len);
+	SVCMAP(WMI_10_4_SERVICE_PEER_TID_CONFIGS_SUPPORT,
+	       WMI_SERVICE_PEER_TID_CONFIGS_SUPPORT, len);
+	SVCMAP(WMI_10_4_SERVICE_VDEV_BCN_RATE_CONTROL,
+	       WMI_SERVICE_VDEV_BCN_RATE_CONTROL, len);
+	SVCMAP(WMI_10_4_SERVICE_VDEV_FILTER_NEIGHBOR,
+	       WMI_SERVICE_VDEV_FILTER_NEIGHBOR, len);
 }
 
 #undef SVCMAP
@@ -7025,6 +7062,45 @@ enum wmi_bss_survey_req_type {
 struct wmi_pdev_chan_info_req_cmd {
 	__le32 type;
 	__le32 reserved;
+} __packed;
+
+/* enum wmi_neighbor_rx_action - Neighbor Rx Packets add/remove filter */
+enum wmi_neighbor_rx_action {
+	WMI_NEIGHBOR_RX_ACTION_ADD = 1,
+	WMI_NEIGHBOR_RX_ACTION_DEL,
+};
+
+/* enum wmi_neighbor_rx_type - Neighbor Rx Packets ap/client addr */
+enum wmi_neighbor_rx_type {
+	WMI_NEIGHBOR_RX_TYPE_BSSID = 1,
+	WMI_NEIGHBOR_RX_TYPE_CLIENT,
+};
+
+/* enum wmi_neighbor_rx_capture_flag - Neighbor Rx Packets flags */
+enum wmi_neighbor_rx_capture_flag {
+	WMI_NEIGHBOR_RX_CAPTURE_ONLY_RX_PKT = 1,
+	WMI_NEIGHBOR_RX_CAPTURE_ONLY_TX_PKT,
+	WMI_NEIGHBOR_RX_CAPTURE_BOTH_TXRX_PKT
+};
+
+/* Filter for Neighbor Rx Packets  */
+struct wmi_set_vdev_filter_nrp_10_4_cmd {
+	__le32 vdev_id;
+
+	/* AP Bssid or Client Mac-addr */
+	struct wmi_mac_addr macaddr;
+
+	/* see enum wmi_neighbor_rx_action */
+	__le32 action;
+
+	/* see enum wmi_neighbor_rx_type */
+	__le32 type;
+
+	/* enum wmi_neighbor_rx_capture_flag */
+	__le32 flag;
+
+	/* BSSID index - index of the BSSID register */
+	__le32 idx;
 } __packed;
 
 struct ath10k;

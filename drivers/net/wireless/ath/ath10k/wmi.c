@@ -8662,6 +8662,37 @@ ath10k_wmi_barrier(struct ath10k *ar)
 	return 0;
 }
 
+static struct sk_buff *
+ath10k_wmi_10_4_op_gen_vdev_set_neighbor_rx_param(struct ath10k *ar,
+						  u32 vdev_id,
+						  const u8 *addr,
+						  u32 idx, u32 action,
+						  u32 type)
+{
+	struct wmi_set_vdev_filter_nrp_10_4_cmd *cmd;
+	struct sk_buff *skb;
+
+	skb = ath10k_wmi_alloc_skb(ar, sizeof(*cmd));
+	if (!skb)
+		return ERR_PTR(-ENOMEM);
+
+	cmd = (struct wmi_set_vdev_filter_nrp_10_4_cmd *)skb->data;
+
+	cmd->vdev_id = __cpu_to_le32(vdev_id);
+	cmd->action = __cpu_to_le32(action);
+	cmd->type = __cpu_to_le32(type);
+	cmd->idx = __cpu_to_le32(idx);
+
+	ether_addr_copy(cmd->macaddr.addr, addr);
+
+	ath10k_dbg(ar, ATH10K_DBG_WMI,
+		   "vdev id:0x%x Macaddr[0x%x]:[0x%x] idx:0x%x action:0x%x type:0x%x flag:0x%x\n",
+		   cmd->vdev_id, cmd->macaddr.addr[0], cmd->macaddr.addr[5],
+		   cmd->idx, cmd->action, cmd->type, cmd->flag);
+
+	return skb;
+}
+
 static const struct wmi_ops wmi_ops = {
 	.rx = ath10k_wmi_op_rx,
 	.map_svc = wmi_main_svc_map,
@@ -9014,6 +9045,8 @@ static const struct wmi_ops wmi_10_4_ops = {
 	.gen_pdev_bss_chan_info_req = ath10k_wmi_10_2_op_gen_pdev_bss_chan_info,
 	.gen_echo = ath10k_wmi_op_gen_echo,
 	.gen_pdev_get_tpc_config = ath10k_wmi_10_2_4_op_gen_pdev_get_tpc_config,
+	.gen_vdev_set_neighbor_rx_param =
+		ath10k_wmi_10_4_op_gen_vdev_set_neighbor_rx_param,
 };
 
 int ath10k_wmi_attach(struct ath10k *ar)
