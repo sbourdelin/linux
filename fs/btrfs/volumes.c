@@ -1215,14 +1215,14 @@ static int btrfs_read_disk_super(struct block_device *bdev, u64 bytenr,
  * and we are not allowed to call set_blocksize during the scan. The superblock
  * is read via pagecache
  */
-int btrfs_scan_one_device(const char *path, fmode_t flags, void *holder,
-			  struct btrfs_fs_devices **fs_devices_ret)
+struct btrfs_fs_devices *btrfs_scan_one_device(const char *path, fmode_t flags,
+		void *holder)
 {
 	struct btrfs_super_block *disk_super;
 	struct btrfs_device *device;
 	struct block_device *bdev;
 	struct page *page;
-	int ret = 0;
+	struct btrfs_fs_devices *ret = NULL;
 	u64 bytenr;
 
 	/*
@@ -1236,19 +1236,19 @@ int btrfs_scan_one_device(const char *path, fmode_t flags, void *holder,
 
 	bdev = blkdev_get_by_path(path, flags, holder);
 	if (IS_ERR(bdev))
-		return PTR_ERR(bdev);
+		return ERR_CAST(bdev);
 
 	if (btrfs_read_disk_super(bdev, bytenr, &page, &disk_super)) {
-		ret = -EINVAL;
+		ret = ERR_PTR(-EINVAL);
 		goto error_bdev_put;
 	}
 
 	mutex_lock(&uuid_mutex);
 	device = device_list_add(path, disk_super);
 	if (IS_ERR(device))
-		ret = PTR_ERR(device);
+		ret = ERR_CAST(device);
 	else
-		*fs_devices_ret = device->fs_devices;
+		ret = device->fs_devices;
 	mutex_unlock(&uuid_mutex);
 
 	btrfs_release_disk_super(page);
