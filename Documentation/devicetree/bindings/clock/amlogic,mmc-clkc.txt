@@ -1,0 +1,31 @@
+* Amlogic MMC Sub Clock Controller Driver
+
+The Amlogic MMC clock controller generates and supplies clock to support
+MMC and NAND controller
+
+Required Properties:
+
+- compatible: should be:
+		"amlogic,meson-gx-mmc-clkc"
+		"amlogic,meson-axg-mmc-clkc"
+
+- #clock-cells: should be 1.
+- clocks: phandles to clocks corresponding to the clock-names property
+- clock-names: list of parent clock names
+	- "clkin0", "clkin1"
+
+Parent node should have the following properties :
+- compatible: "syscon", "simple-mfd, and "amlogic,meson-axg-mmc-clkc"
+- reg: base address and size of the MMC control register space.
+
+Example: Clock controller node:
+
+sd_mmc_c_clkc: clock-controller@7000 {
+	compatible = "amlogic,mmc-clkc", "syscon", "simple-mfd";
+	reg = <0x0 0x7000 0x0 0x4>;
+	#clock-cells = <1>;
+
+	clock-names = "clkin0", "clkin1";
+	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
+			<&clkc CLKID_FCLK_DIV2>;
+};
