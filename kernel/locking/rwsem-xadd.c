@@ -233,8 +233,22 @@ __rwsem_down_read_failed_common(struct rw_semaphore *sem, int state)
 	waiter.type = RWSEM_WAITING_FOR_READ;
 
 	raw_spin_lock_irq(&sem->wait_lock);
-	if (list_empty(&sem->wait_list))
+	if (list_empty(&sem->wait_list)) {
+		/*
+		 * In the unlikely event that the task is the only one in
+		 * the wait queue and a writer isn't present, it can have
+		 * the lock and return immediately without going through
+		 * the remaining slowpath code.
+		 *
+		 * Count won't be 0, but allowing it will probably generate
+		 * better code.
+		 */
+		if (unlikely(atomic_long_read(&sem->count) >= 0)) {
+			raw_spin_unlock_irq(&sem->wait_lock);
+			return sem;
+		}
 		adjustment += RWSEM_WAITING_BIAS;
+	}
 	list_add_tail(&waiter.list, &sem->wait_list);
 
 	/* we're now waiting on the lock, but no longer actively locking */
