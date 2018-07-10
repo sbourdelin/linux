@@ -317,3 +317,42 @@ const struct attribute_group **rtc_get_dev_attribute_groups(void)
 {
 	return rtc_attr_groups;
 }
+
+static size_t rtc_group_count(struct rtc_device *rtc)
+{
+	const struct attribute_group **groups = rtc->dev.groups;
+	size_t cnt = 0;
+
+	if (groups)
+		for (; *groups; groups++)
+			cnt++;
+
+	return cnt;
+}
+
+static inline int
+__rtc_add_group(struct rtc_device *rtc, const struct attribute_group *grp)
+{
+	size_t cnt = rtc_group_count(rtc);
+	const struct attribute_group **groups, **old;
+
+	groups = devm_kzalloc(&rtc->dev, (cnt+2)*sizeof(*groups), GFP_KERNEL);
+	if (IS_ERR_OR_NULL(groups))
+		return PTR_ERR(groups);
+	memcpy(groups, rtc->dev.groups, cnt*sizeof(*groups));
+	groups[cnt] = grp;
+
+	old = rtc->dev.groups;
+	rtc->dev.groups = groups;
+	if (old != rtc_attr_groups)
+		devm_kfree(&rtc->dev, old);
+
+	return 0;
+}
+
+int rtc_add_group(struct rtc_device *rtc, const struct attribute_group *grp)
+{
+	return rtc->dev.kobj.state_in_sysfs ?
+		devm_device_add_group(&rtc->dev, grp) :
+		__rtc_add_group(rtc, grp);
+}
