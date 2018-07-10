@@ -5313,6 +5313,8 @@ static void ath10k_remove_interface(struct ieee80211_hw *hw,
 
 	mutex_lock(&ar->conf_mutex);
 
+	ath10k_vendor_bss_filter_cleanup(arvif);
+
 	spin_lock_bh(&ar->data_lock);
 	ath10k_mac_vif_beacon_cleanup(arvif);
 	spin_unlock_bh(&ar->data_lock);
@@ -8506,10 +8508,16 @@ int ath10k_mac_register(struct ath10k *ar)
 
 	wiphy_ext_feature_set(ar->hw->wiphy, NL80211_EXT_FEATURE_CQM_RSSI_LIST);
 
+	ret = ath10k_vendor_register(ar);
+	if (ret) {
+		ath10k_err(ar, "failed to register vendor: %d\n", ret);
+		goto err_dfs_detector_exit;
+	}
+
 	ret = ieee80211_register_hw(ar->hw);
 	if (ret) {
 		ath10k_err(ar, "failed to register ieee80211: %d\n", ret);
-		goto err_dfs_detector_exit;
+		goto err_vendor_unregister;
 	}
 
 	if (!ath_is_world_regd(&ar->ath_common.regulatory)) {
@@ -8523,6 +8531,9 @@ int ath10k_mac_register(struct ath10k *ar)
 
 err_unregister:
 	ieee80211_unregister_hw(ar->hw);
+
+err_vendor_unregister:
+	ath10k_vendor_unregister(ar);
 
 err_dfs_detector_exit:
 	if (IS_ENABLED(CONFIG_ATH10K_DFS_CERTIFIED) && ar->dfs_detector)
@@ -8539,6 +8550,8 @@ err_free:
 void ath10k_mac_unregister(struct ath10k *ar)
 {
 	ieee80211_unregister_hw(ar->hw);
+
+	ath10k_vendor_unregister(ar);
 
 	if (IS_ENABLED(CONFIG_ATH10K_DFS_CERTIFIED) && ar->dfs_detector)
 		ar->dfs_detector->exit(ar->dfs_detector);

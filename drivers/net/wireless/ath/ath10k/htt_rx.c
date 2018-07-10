@@ -23,6 +23,7 @@
 #include "debug.h"
 #include "trace.h"
 #include "mac.h"
+#include "vendor.h"
 
 #include <linux/log2.h>
 #include <linux/bitfield.h>
@@ -1772,6 +1773,10 @@ static bool ath10k_htt_rx_amsdu_allowed(struct ath10k *ar,
 		ath10k_dbg(ar, ATH10K_DBG_HTT, "htt rx cac running\n");
 		return false;
 	}
+
+	/* Do the Neighbor BSSID filter if configured */
+	if (ath10k_vendor_rx_h_bssid_filter(&ar->vendor, amsdu, rx_status))
+		return false;
 
 	return true;
 }
