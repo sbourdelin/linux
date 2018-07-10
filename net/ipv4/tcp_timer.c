@@ -22,6 +22,38 @@
 #include <linux/gfp.h>
 #include <net/tcp.h>
 
+u32 tcp_retransmit_stamp(struct sock *sk)
+{
+	u32 start_ts = tcp_sk(sk)->retrans_stamp;
+
+	if (unlikely(!start_ts)) {
+		struct sk_buff *head = tcp_rtx_queue_head(sk);
+
+		if (!head)
+			return 0;
+		start_ts = tcp_skb_timestamp(head);
+	}
+	return start_ts;
+}
+
+static __u32 tcp_clamp_rto_to_user_timeout(struct sock *sk)
+{
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	__u32 elapsed, user_timeout;
+	u32 start_ts;
+
+	start_ts = tcp_retransmit_stamp(sk);
+	if (!icsk->icsk_user_timeout || !start_ts)
+		return icsk->icsk_rto;
+	elapsed = tcp_time_stamp(tcp_sk(sk)) - start_ts;
+	user_timeout = jiffies_to_msecs(icsk->icsk_user_timeout);
+	if (elapsed >= user_timeout)
+		return 1; /* user timeout has passed; fire ASAP */
+	else
+		return (icsk->icsk_rto < msecs_to_jiffies(user_timeout - elapsed)) ?
+			icsk->icsk_rto : msecs_to_jiffies(user_timeout - elapsed);
+}
+
 /**
  *  tcp_write_err() - close socket and save error info
  *  @sk:  The socket the error has appeared on.
@@ -161,19 +193,15 @@ static bool retransmits_timed_out(struct sock *sk,
 				  unsigned int timeout)
 {
 	const unsigned int rto_base = TCP_RTO_MIN;
-	unsigned int linear_backoff_thresh, start_ts;
+	unsigned int linear_backoff_thresh;
+	u32 start_ts;
 
 	if (!inet_csk(sk)->icsk_retransmits)
 		return false;
 
-	start_ts = tcp_sk(sk)->retrans_stamp;
-	if (unlikely(!start_ts)) {
-		struct sk_buff *head = tcp_rtx_queue_head(sk);
-
-		if (!head)
-			return false;
-		start_ts = tcp_skb_timestamp(head);
-	}
+	start_ts = tcp_retransmit_stamp(sk);
+	if (!start_ts)
+		return false;
 
 	if (likely(timeout == 0)) {
 		linear_backoff_thresh = ilog2(TCP_RTO_MAX/rto_base);
@@ -535,7 +563,8 @@ out_reset_timer:
 		/* Use normal (exponential) backoff */
 		icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
 	}
-	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
+	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
+				  tcp_clamp_rto_to_user_timeout(sk), TCP_RTO_MAX);
 	if (retransmits_timed_out(sk, net->ipv4.sysctl_tcp_retries1 + 1, 0))
 		__sk_dst_reset(sk);
 
