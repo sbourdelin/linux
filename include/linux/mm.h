@@ -2007,6 +2007,9 @@ extern void free_area_init(unsigned long * zones_size);
 extern void free_area_init_node(int nid, unsigned long * zones_size,
 		unsigned long zone_start_pfn, unsigned long *zholes_size);
 extern void free_initmem(void);
+unsigned long max_free_page_blocks(int order);
+int get_from_free_page_list(int order, struct list_head *pages,
+			    unsigned int size, unsigned long *loaded_num);
 
 /*
  * Free reserved pages within range [PAGE_ALIGN(start), end & PAGE_MASK)
