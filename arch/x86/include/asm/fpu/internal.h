@@ -45,7 +45,6 @@ extern void fpu__init_cpu_xstate(void);
 extern void fpu__init_system(struct cpuinfo_x86 *c);
 extern void fpu__init_check_bugs(void);
 extern void fpu__resume_cpu(void);
-extern u64 fpu__get_supported_xfeatures_mask(void);
 
 /*
  * Debugging facility:
@@ -94,7 +93,7 @@ static inline void fpstate_init_xstate(struct xregs_state *xsave)
 	 * trigger #GP:
 	 */
 	xsave->header.xcomp_bv = XCOMP_BV_COMPACTED_FORMAT |
-			xfeatures_mask_user;
+			xfeatures_mask_all;
 }
 
 static inline void fpstate_init_fxstate(struct fxregs_state *fx)
