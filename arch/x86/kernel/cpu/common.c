@@ -413,7 +413,8 @@ __setup("nopku", setup_disable_pku);
 
 static __always_inline void setup_cet(struct cpuinfo_x86 *c)
 {
-	if (cpu_feature_enabled(X86_FEATURE_SHSTK))
+	if (cpu_feature_enabled(X86_FEATURE_SHSTK) ||
+	    cpu_feature_enabled(X86_FEATURE_IBT))
 		cr4_set_bits(X86_CR4_CET);
 }
 
@@ -432,6 +433,23 @@ static __init int setup_disable_shstk(char *s)
 	return 1;
 }
 __setup("no_cet_shstk", setup_disable_shstk);
+#endif
+
+#ifdef CONFIG_X86_INTEL_BRANCH_TRACKING_USER
+static __init int setup_disable_ibt(char *s)
+{
+	/* require an exact match without trailing characters */
+	if (strlen(s))
+		return 0;
+
+	if (!boot_cpu_has(X86_FEATURE_IBT))
+		return 1;
+
+	setup_clear_cpu_cap(X86_FEATURE_IBT);
+	pr_info("x86: 'no_cet_ibt' specified, disabling Branch Tracking\n");
+	return 1;
+}
+__setup("no_cet_ibt", setup_disable_ibt);
 #endif
 
 /*

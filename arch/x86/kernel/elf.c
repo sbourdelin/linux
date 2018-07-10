@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/string.h>
+#include <linux/compat.h>
 
 /*
  * The .note.gnu.property layout:
@@ -222,7 +223,8 @@ int arch_setup_features(void *ehdr_p, void *phdr_p,
 
 	struct elf64_hdr *ehdr64 = ehdr_p;
 
-	if (!cpu_feature_enabled(X86_FEATURE_SHSTK))
+	if (!cpu_feature_enabled(X86_FEATURE_SHSTK) &&
+	    !cpu_feature_enabled(X86_FEATURE_IBT))
 		return 0;
 
 	if (ehdr64->e_ident[EI_CLASS] == ELFCLASS64) {
@@ -250,6 +252,9 @@ int arch_setup_features(void *ehdr_p, void *phdr_p,
 	current->thread.cet.shstk_enabled = 0;
 	current->thread.cet.shstk_base = 0;
 	current->thread.cet.shstk_size = 0;
+	current->thread.cet.ibt_enabled = 0;
+	current->thread.cet.ibt_bitmap_addr = 0;
+	current->thread.cet.ibt_bitmap_size = 0;
 	if (cpu_feature_enabled(X86_FEATURE_SHSTK)) {
 		if (shstk) {
 			err = cet_setup_shstk();
@@ -257,6 +262,15 @@ int arch_setup_features(void *ehdr_p, void *phdr_p,
 				goto out;
 		}
 	}
+
+	if (cpu_feature_enabled(X86_FEATURE_IBT)) {
+		if (ibt) {
+			err = cet_setup_ibt();
+			if (err < 0)
+				goto out;
+		}
+	}
+
 out:
 	return err;
 }
