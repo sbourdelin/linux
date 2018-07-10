@@ -78,6 +78,7 @@
 #define ARM_INST_EOR_I		0x02200000
 
 #define ARM_INST_LDST__U	0x00800000
+#define ARM_INST_LDST__IMM12	0x00000fff
 #define ARM_INST_LDRB_I		0x05500000
 #define ARM_INST_LDRB_R		0x07d00000
 #define ARM_INST_LDRH_I		0x015000b0
@@ -153,6 +154,8 @@
  * Thumb: 1101 1110 xxxx xxxx				ARMv7-M, section A5.2.6
  */
 #define ARM_INST_UDF		0xe7fddef1
+
+#define ARM_ALU_IMM		0xff
 
 /* register */
 #define _AL3_R(op, rd, rn, rm)	((op ## _R) | (rd) << 12 | (rn) << 16 | (rm))

@@ -256,7 +256,7 @@ static u32 arm_bpf_ldst_imm12(u32 op, u8 rt, u8 rn, s16 imm12)
 		op |= ARM_INST_LDST__U;
 	else
 		imm12 = -imm12;
-	return op | (imm12 & 0xfff);
+	return op | (imm12 & ARM_INST_LDST__IMM12);
 }
 
 static u32 arm_bpf_ldst_imm8(u32 op, u8 rt, u8 rn, s16 imm8)
@@ -1012,11 +1012,12 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	/* if (index >= array->map.max_entries)
 	 *	goto out;
 	 */
+	BUILD_BUG_ON(offsetof(struct bpf_array, map.max_entries) >
+		     ARM_INST_LDST__IMM12);
 	off = offsetof(struct bpf_array, map.max_entries);
 	/* array->map.max_entries */
-	emit_a32_mov_i(tmp[1], off, ctx);
 	r_array = arm_bpf_get_reg32(r2[1], tmp2[1], ctx);
-	emit(ARM_LDR_R(tmp[1], r_array, tmp[1]), ctx);
+	emit(ARM_LDR_I(tmp[1], r_array, off), ctx);
 	/* index is 32-bit for arrays */
 	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
 	/* index >= array->map.max_entries */
@@ -1041,10 +1042,10 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	 * if (prog == NULL)
 	 *	goto out;
 	 */
+	BUILD_BUG_ON(offsetof(struct bpf_array, ptrs) > ARM_ALU_IMM);
 	off = offsetof(struct bpf_array, ptrs);
-	emit_a32_mov_i(tmp[1], off, ctx);
 	r_array = arm_bpf_get_reg32(r2[1], tmp2[1], ctx);
-	emit(ARM_ADD_R(tmp[1], r_array, tmp[1]), ctx);
+	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
 	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
 	emit(ARM_MOV_SI(tmp[0], r_index, SRTYPE_ASL, 2), ctx);
 	emit(ARM_LDR_R(tmp[1], tmp[1], tmp[0]), ctx);
@@ -1052,9 +1053,10 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
 
 	/* goto *(prog->bpf_func + prologue_size); */
+	BUILD_BUG_ON(offsetof(struct bpf_prog, bpf_func) >
+		     ARM_INST_LDST__IMM12);
 	off = offsetof(struct bpf_prog, bpf_func);
-	emit_a32_mov_i(tmp2[1], off, ctx);
-	emit(ARM_LDR_R(tmp[1], tmp[1], tmp2[1]), ctx);
+	emit(ARM_LDR_I(tmp[1], tmp[1], off), ctx);
 	emit(ARM_ADD_I(tmp[1], tmp[1], ctx->prologue_bytes), ctx);
 	emit_bx_r(tmp[1], ctx);
 
