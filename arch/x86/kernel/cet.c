@@ -132,6 +132,32 @@ static unsigned long shstk_mmap(unsigned long addr, unsigned long len)
 	return addr;
 }
 
+int cet_alloc_shstk(unsigned long *arg)
+{
+	unsigned long len = *arg;
+	unsigned long addr;
+	unsigned long token;
+	unsigned long ssp;
+
+	addr = shstk_mmap(0, len);
+	if (addr >= TASK_SIZE_MAX)
+		return -ENOMEM;
+
+	/* Restore token is 8 bytes and aligned to 8 bytes */
+	ssp = addr + len;
+	token = ssp;
+
+	if (!in_ia32_syscall())
+		token |= 1;
+	ssp -=8;
+
+	if (write_user_shstk_64(ssp, token))
+		return -EINVAL;
+
+	*arg = addr;
+	return 0;
+}
+
 int cet_setup_shstk(void)
 {
 	unsigned long addr, size;

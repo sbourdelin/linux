@@ -8,7 +8,10 @@
 
 #include <asm/cet.h>
 #include <asm/elf_property.h>
+#include <asm/prctl.h>
+#include <asm/processor.h>
 #include <uapi/linux/elf-em.h>
+#include <uapi/linux/prctl.h>
 #include <linux/binfmts.h>
 #include <linux/elf.h>
 #include <linux/slab.h>
@@ -255,6 +258,7 @@ int arch_setup_features(void *ehdr_p, void *phdr_p,
 	current->thread.cet.ibt_enabled = 0;
 	current->thread.cet.ibt_bitmap_addr = 0;
 	current->thread.cet.ibt_bitmap_size = 0;
+	current->thread.cet.locked = 0;
 	if (cpu_feature_enabled(X86_FEATURE_SHSTK)) {
 		if (shstk) {
 			err = cet_setup_shstk();
