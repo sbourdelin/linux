@@ -268,7 +268,7 @@ bsg_map_hdr(struct request_queue *q, struct sg_io_v4 *hdr, fmode_t mode)
 		ret = blk_rq_map_user(q, rq, NULL, uptr64(hdr->din_xferp),
 				hdr->din_xfer_len, GFP_KERNEL);
 	} else {
-		ret = blk_rq_map_user(q, rq, NULL, NULL, 0, GFP_KERNEL);
+		ret = 0;
 	}
 
 	if (ret)
