@@ -92,7 +92,9 @@ returned during the enumeration process.
 
     *  -  __u16
        -  ``index``
-       -  0-based pad index.
+       -  Pad index, starts at 0. Pad indices are stable. So if new pads are added
+	  for an entity in the future, then the indices of the existing pads will
+	  never be renumbered, they will remain the same.
 
     *  -  __u32
        -  ``flags``
