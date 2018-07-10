@@ -227,7 +227,7 @@ void *jvmti_open(void)
 {
 	char dump_path[PATH_MAX];
 	struct jitheader header;
-	int fd;
+	int retlen, fd;
 	FILE *fp;
 
 	init_arch_timestamp();
@@ -249,7 +249,10 @@ void *jvmti_open(void)
 	/*
 	 * jitdump file name
 	 */
-	snprintf(dump_path, PATH_MAX, "%s/jit-%i.dump", jit_path, getpid());
+	retlen = snprintf(dump_path, PATH_MAX, "%s/jit-%i.dump",
+			  jit_path, getpid());
+	if (retlen <= 0 || ((int) sizeof(dump_path)) <= retlen)
+		return NULL;
 
 	fd = open(dump_path, O_CREAT|O_TRUNC|O_RDWR, 0666);
 	if (fd == -1)
