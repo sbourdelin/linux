@@ -53,11 +53,20 @@ struct vmem_altmap {
  * wakeup event whenever a page is unpinned and becomes idle. This
  * wakeup is used to coordinate physical address space management (ex:
  * fs truncate/hole punch) vs pinned pages (ex: device dma).
+ *
+ * MEMORY_DEVICE_DEV_DAX:
+ * DAX driver hotplug the device memory and move it to memory zone, these
+ * pages will be marked reserved flag. However, some other kernel componet
+ * will misconceive these pages are reserved mmio (ex: we map these dev_dax
+ * or fs_dax pages to kvm for DIMM/NVDIMM backend). Together with the type
+ * MEMORY_DEVICE_FS_DAX, we can differentiate the pages on NVDIMM with the
+ * normal reserved pages.
  */
 enum memory_type {
 	MEMORY_DEVICE_PRIVATE = 1,
 	MEMORY_DEVICE_PUBLIC,
 	MEMORY_DEVICE_FS_DAX,
+	MEMORY_DEVICE_DEV_DAX,
 };
 
 /*
