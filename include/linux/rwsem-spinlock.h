@@ -22,7 +22,7 @@
  * - if wait_list is not empty, then there are processes waiting for the semaphore
  */
 struct rw_semaphore {
-	__s32			count;
+	atomic_long_t		count;
 	raw_spinlock_t		wait_lock;
 	struct list_head	wait_list;
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
