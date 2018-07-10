@@ -34,3 +34,87 @@ Board DTS:
 	pmc@c360000 {
 		nvidia,invert-interrupt;
 	};
+
+== Pad Control Nodes ==
+
+The PMC can be used to set pad power state and voltage configuration.
+The pad configuration is done via the pinctrl framework. The driver
+implements power-source, low-power-enable, and low-power-disable pinconf
+pin configuration node properties. Each pinctrl pin corresponds to a
+single Tegra PMC pad. Thus, in the following sections of this document
+pin refers to the pinctrl frameworks notion of a Tegra PMC pad.
+
+The pad configuration state nodes are placed under the pmc node and they
+are referred to by the pinctrl client device properties. For more
+information see the examples presented later and
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt.
+
+The values accepted by power-source property are
+TEGRA_IO_PAD_VOLTAGE_1V8 and TEGRA_IO_PAD_VOLTAGE_3V3, which are defined
+in dt-bindings/pinctrl/pinctrl-tegra-io-pad.h.
+
+Following pinctrl pin name strings are present on Tegra186:
+csia		csib		dsi		mipi-bias
+pex-clk-bias	pex-clk3	pex-clk2	pex-clk1
+usb0		usb1		usb2		usb-bias
+uart		audio		hsic		dbg
+hdmi-dp0	hdmi-dp1	pex-cntrl	sdmmc2-hv
+sdmmc4		cam		dsib		dsic
+dsid		csic		csid		csie
+dsif		spi		ufs		dmic-hv
+edp		sdmmc1-hv	sdmmc3-hv	conn
+audio-hv
+
+All of the listed Tegra186 pins support the low-power-enable and
+low-power-disable properties. The power-source property is supported
+following Tegra210 pins: sdmmc2-hv, dmic-hv, sdmmc1-hv, sdmmc3-hv, and
+audio-hv.
+
+Pad configuration state example:
+	pmc: pmc@7000e400 {
+		compatible = "nvidia,tegra186-pmc";
+		reg = <0 0x0c360000 0 0x10000>,
+		      <0 0x0c370000 0 0x10000>,
+		      <0 0x0c380000 0 0x10000>,
+		      <0 0x0c390000 0 0x10000>;
+		reg-names = "pmc", "wake", "aotag", "scratch";
+
+		...
+
+		sdmmc1_3v3: sdmmc1-3v3 {
+			pins = "sdmmc1-hv";
+			power-source = <TEGRA_IO_PAD_VOLTAGE_3V3>;
+		};
+
+		sdmmc1_1v8: sdmmc1-1v8 {
+			pins = "sdmmc1-hv";
+			power-source = <TEGRA_IO_PAD_VOLTAGE_1V8>;
+		};
+
+		hdmi_off: hdmi-off {
+			pins = "hdmi";
+			low-power-enable;
+		}
+
+		hdmi_on: hdmi-on {
+			pins = "hdmi";
+			low-power-disable;
+		}
+	};
+
+Pinctrl client example:
+	sdmmc1: sdhci@3400000 {
+		...
+		pinctrl-names = "sdmmc-3v3", "sdmmc-1v8";
+		pinctrl-0 = <&sdmmc1_3v3>;
+		pinctrl-1 = <&sdmmc1_1v8>;
+	};
+
+	...
+
+	sor0: sor@15540000 {
+		...
+		pinctrl-0 = <&hdmi_off>;
+		pinctrl-1 = <&hdmi_on>;
+		pinctrl-names = "hdmi-on", "hdmi-off";
+	};

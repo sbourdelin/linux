@@ -195,3 +195,98 @@ Example:
 		power-domains = <&pd_audio>;
 		...
 	};
+
+== Pad Control Nodes ==
+
+The PMC can be used to set pad power state and voltage configuration.
+This functionality is present on SoCs from Tegra124 onwards. The pad
+configuration is done via the pinctrl framework. The driver implements
+power-source, low-power-enable, and low-power-disable pinconf pin
+configuration node properties. Each pinctrl pin corresponds to a single
+Tegra PMC pad. Thus, in the following sections of this document pin
+refers to the pinctrl frameworks notion of a Tegra PMC pad.
+
+The pad configuration state nodes are placed under the pmc node and they
+are referred to by the pinctrl client device properties. For more
+information see the examples presented later and
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt.
+
+The values accepted by power-source property are
+TEGRA_IO_PAD_VOLTAGE_1V8 and TEGRA_IO_PAD_VOLTAGE_3V3, which are defined
+in dt-bindings/pinctrl/pinctrl-tegra-io-pad.h.
+
+Following pinctrl pin name strings are present on Tegra124 and Tegra132:
+audio		bb		cam		comp
+csia		csb		cse		dsi
+dsib		dsic		dsid		hdmi
+hsic		hv		lvds		mipi-bias
+nand		pex-bias	pex-clk1	pex-clk2
+pex-cntrl	sdmmc1		sdmmc3		sdmmc4
+sys_ddc		uart		usb0		usb1
+usb2		usb_bias
+
+All of the listed Tegra124 and Tegra132 pins support the
+low-power-enable and low-power-disable properties. None of the pins
+support the power-source property.
+
+Following pinctrl pin name strings are present on Tegra210:
+audio		audio-hv	cam		csia
+csib		csic		csid		csie
+csif		dbg		debug-nonao	dmic
+dp		dsi		dsib		dsic
+dsid		emmc		emmc2		gpio
+hdmi		hsic		lvds		mipi-bias
+pex-bias	pex-clk1	pex-clk2	pex-cntrl
+sdmmc1		sdmmc3		spi		spi-hv
+uart		usb0		usb1		usb2
+usb3		usb-bias
+
+All of the listed Tegra210 pins except pex-cntrl support the
+low-power-enable and low-power-disable properties. The power-source
+property is supported following Tegra210 pins: audio, audio-hv, cam,
+dbg, dmic, gpio, pex-cntrl, sdmmc1, sdmmc3, spi, spi-hv, and uart.
+
+Pad configuration state example:
+	pmc: pmc@7000e400 {
+		compatible = "nvidia,tegra210-pmc";
+		reg = <0x0 0x7000e400 0x0 0x400>;
+		clocks = <&tegra_car TEGRA210_CLK_PCLK>, <&clk32k_in>;
+		clock-names = "pclk", "clk32k_in";
+
+		...
+
+		sdmmc1_3v3: sdmmc1-3v3 {
+			pins = "sdmmc1";
+			power-source = <TEGRA_IO_PAD_VOLTAGE_3V3>;
+		};
+
+		sdmmc1_1v8: sdmmc1-1v8 {
+			pins = "sdmmc1";
+			power-source = <TEGRA_IO_PAD_VOLTAGE_1V8>;
+		};
+
+		hdmi_off: hdmi-off {
+			pins = "hdmi";
+			low-power-enable;
+		}
+
+		hdmi_on: hdmi-on {
+			pins = "hdmi";
+			low-power-disable;
+		}
+	};
+
+Pinctrl client example:
+	sdmmc1: sdhci@700b0000 {
+		...
+		pinctrl-names = "sdmmc-3v3", "sdmmc-1v8";
+		pinctrl-0 = <&sdmmc1_3v3>;
+		pinctrl-1 = <&sdmmc1_1v8>;
+	};
+	...
+	sor@54540000 {
+		...
+		pinctrl-0 = <&hdmi_off>;
+		pinctrl-1 = <&hdmi_on>;
+		pinctrl-names = "hdmi-on", "hdmi-off";
+	};
