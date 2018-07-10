@@ -172,6 +172,12 @@
 			clocks = <&clks IMX6SX_CLK_OCRAM>;
 		};
 
+		ocram_s: sram@8f8000 {
+			compatible = "mmio-sram";
+			reg = <0x008f8000 0x4000>;
+			clocks = <&clks IMX6SX_CLK_OCRAM_S>;
+		};
+
 		L2: l2-cache@a02000 {
 			compatible = "arm,pl310-cache";
 			reg = <0x00a02000 0x1000>;
