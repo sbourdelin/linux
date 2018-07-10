@@ -237,6 +237,51 @@ static inline void clwb(volatile void *__p)
 		: [pax] "a" (p));
 }
 
+#ifdef CONFIG_X86_INTEL_CET
+
+#if defined(CONFIG_IA32_EMULATION) || defined(CONFIG_X86_X32)
+static inline int write_user_shstk_32(unsigned long addr, unsigned int val)
+{
+	int err;
+
+	asm volatile("1: wrussd %[val], (%[addr])\n"
+		     "xor %[err], %[err]\n"
+		     "2:\n"
+		     ".section .fixup,\"ax\"\n"
+		     "3: mov $-1, %[err]; jmp 2b\n"
+		     ".previous\n"
+		     _ASM_EXTABLE(1b, 3b)
+		     : [err] "=a" (err)
+		     : [val] "S" (val), [addr] "D" (addr));
+
+	return err;
+}
+#else
+static inline int write_user_shstk_32(unsigned long addr, unsigned int val)
+{
+	BUG();
+	return 0;
+}
+#endif
+
+static inline int write_user_shstk_64(unsigned long addr, unsigned long val)
+{
+	int err = 0;
+
+	asm volatile("1: wrussq %[val], (%[addr])\n"
+		     "xor %[err], %[err]\n"
+		     "2:\n"
+		     ".section .fixup,\"ax\"\n"
+		     "3: mov $-1, %[err]; jmp 2b\n"
+		     ".previous\n"
+		     _ASM_EXTABLE(1b, 3b)
+		     : [err] "=a" (err)
+		     : [val] "S" (val), [addr] "D" (addr));
+
+	return err;
+}
+#endif /* CONFIG_X86_INTEL_CET */
+
 #define nop() asm volatile ("nop")
 
 

@@ -641,6 +641,17 @@ static int is_f00f_bug(struct pt_regs *regs, unsigned long address)
 	return 0;
 }
 
+/*
+ * WRUSS is a kernel instrcution and but writes to user
+ * shadow stack memory.  When a fault occurs, both
+ * X86_PF_USER and X86_PF_SHSTK are set.
+ */
+static int is_wruss(struct pt_regs *regs, unsigned long error_code)
+{
+	return (((error_code & (X86_PF_USER | X86_PF_SHSTK)) ==
+		(X86_PF_USER | X86_PF_SHSTK)) && !user_mode(regs));
+}
+
 static void
 show_fault_oops(struct pt_regs *regs, unsigned long error_code,
 		unsigned long address)
@@ -848,7 +859,7 @@ __bad_area_nosemaphore(struct pt_regs *regs, unsigned long error_code,
 	struct task_struct *tsk = current;
 
 	/* User mode accesses just cause a SIGSEGV */
-	if (error_code & X86_PF_USER) {
+	if ((error_code & X86_PF_USER) && !is_wruss(regs, error_code)) {
 		/*
 		 * It's possible to have interrupts off here:
 		 */
