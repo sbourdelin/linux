@@ -277,7 +277,9 @@ static const struct reg_value ov5640_init_setting_30fps_VGA[] = {
 	{0x3815, 0x31, 0, 0}, {0x3800, 0x00, 0, 0}, {0x3801, 0x00, 0, 0},
 	{0x3802, 0x00, 0, 0}, {0x3803, 0x04, 0, 0}, {0x3804, 0x0a, 0, 0},
 	{0x3805, 0x3f, 0, 0}, {0x3806, 0x07, 0, 0}, {0x3807, 0x9b, 0, 0},
-	{0x3810, 0x00, 0, 0},
+	{0x3808, 0x02, 0, 0}, {0x3809, 0x80, 0, 0}, {0x380a, 0x01, 0, 0},
+	{0x380b, 0xe0, 0, 0}, {0x380c, 0x07, 0, 0}, {0x380d, 0x68, 0, 0},
+	{0x380e, 0x03, 0, 0}, {0x380f, 0xd8, 0, 0}, {0x3810, 0x00, 0, 0},
 	{0x3811, 0x10, 0, 0}, {0x3812, 0x00, 0, 0}, {0x3813, 0x06, 0, 0},
 	{0x3618, 0x00, 0, 0}, {0x3612, 0x29, 0, 0}, {0x3708, 0x64, 0, 0},
 	{0x3709, 0x52, 0, 0}, {0x370c, 0x03, 0, 0}, {0x3a02, 0x03, 0, 0},
@@ -1484,6 +1486,10 @@ static int ov5640_set_mode_exposure_calc(struct ov5640_dev *sensor,
 	if (ret < 0)
 		return ret;
 
+	ret = ov5640_set_timings(sensor, mode);
+	if (ret < 0)
+		return ret;
+
 	/* read capture VTS */
 	ret = ov5640_get_vts(sensor);
 	if (ret < 0)
@@ -1611,6 +1617,10 @@ static int ov5640_set_mode_direct(struct ov5640_dev *sensor,
 	if (ret < 0)
 		return ret;
 
+	ret = ov5640_set_timings(sensor, mode);
+	if (ret < 0)
+		return ret;
+
 	/* turn auto gain/exposure back on for direct mode */
 	ret = __v4l2_ctrl_s_ctrl(sensor->ctrls.auto_gain, 1);
 	if (ret)
@@ -1655,10 +1665,6 @@ static int ov5640_set_mode(struct ov5640_dev *sensor,
 		ret = ov5640_set_mode_direct(sensor, mode, exposure);
 	}
 
-	if (ret < 0)
-		return ret;
-
-	ret = ov5640_set_timings(sensor, mode);
 	if (ret < 0)
 		return ret;
 
