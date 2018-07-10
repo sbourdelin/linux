@@ -1030,6 +1030,7 @@ enum {
 	SNBEP_PCI_QPI_PORT0_FILTER,
 	SNBEP_PCI_QPI_PORT1_FILTER,
 	HSWEP_PCI_PCU_3,
+	BDX_PCI_PCU_3,
 };
 
 static int snbep_qpi_hw_config(struct intel_uncore_box *box, struct perf_event *event)
@@ -3070,11 +3071,11 @@ void bdx_uncore_cpu_init(void)
 	if (boot_cpu_data.x86_model == 86) {
 		uncore_msr_uncores[BDX_MSR_UNCORE_SBOX] = NULL;
 	/* Detect systems with no SBOXes */
-	} else if (uncore_extra_pci_dev[pkg].dev[HSWEP_PCI_PCU_3]) {
+	} else if (uncore_extra_pci_dev[pkg].dev[BDX_PCI_PCU_3]) {
 		struct pci_dev *pdev;
 		u32 capid4;
 
-		pdev = uncore_extra_pci_dev[pkg].dev[HSWEP_PCI_PCU_3];
+		pdev = uncore_extra_pci_dev[pkg].dev[BDX_PCI_PCU_3];
 		pci_read_config_dword(pdev, 0x94, &capid4);
 		if (((capid4 >> 6) & 0x3) == 0)
 			bdx_msr_uncores[BDX_MSR_UNCORE_SBOX] = NULL;
@@ -3299,7 +3300,7 @@ static const struct pci_device_id bdx_uncore_pci_ids[] = {
 	{ /* PCU.3 (for Capability registers) */
 		PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x6fc0),
 		.driver_data = UNCORE_PCI_DEV_DATA(UNCORE_EXTRA_PCI_DEV,
-						   HSWEP_PCI_PCU_3),
+						   BDX_PCI_PCU_3),
 	},
 	{ /* end: all zeroes */ }
 };
