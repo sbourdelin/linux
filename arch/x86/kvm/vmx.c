@@ -10635,9 +10635,9 @@ static void vmx_inject_page_fault_nested(struct kvm_vcpu *vcpu,
 static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 						 struct vmcs12 *vmcs12);
 
-static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu,
-					struct vmcs12 *vmcs12)
+static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu)
 {
+	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	struct page *page;
 	u64 hpa;
@@ -11772,7 +11772,6 @@ static int enter_vmx_non_root_mode(struct kvm_vcpu *vcpu)
 	if (prepare_vmcs02(vcpu, vmcs12, &exit_qual))
 		goto fail;
 
-	nested_get_vmcs12_pages(vcpu, vmcs12);
 
 	r = EXIT_REASON_MSR_LOAD_FAIL;
 	msr_entry_idx = nested_vmx_load_msr(vcpu,
@@ -11877,6 +11876,8 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 		vmx->nested.nested_run_pending = 0;
 		return ret;
 	}
+
+	nested_get_vmcs12_pages(vcpu);
 
 	/*
 	 * If we're entering a halted L2 vcpu and the L2 vcpu won't be woken
@@ -12976,6 +12977,197 @@ static int enable_smi_window(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static int get_vmcs_cache(struct kvm_vcpu *vcpu,
+			  struct kvm_nested_state __user *user_kvm_nested_state)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
+
+	/*
+	 * When running L2, the authoritative vmcs12 state is in the
+	 * vmcs02. When running L1, the authoritative vmcs12 state is
+	 * in the shadow vmcs linked to vmcs01, unless
+	 * sync_shadow_vmcs is set, in which case, the authoritative
+	 * vmcs12 state is in the vmcs12 already.
+	 */
+	if (is_guest_mode(vcpu))
+		sync_vmcs12(vcpu, vmcs12);
+	else if (enable_shadow_vmcs && !vmx->nested.sync_shadow_vmcs)
+		copy_shadow_to_vmcs12(vmx);
+
+	if (copy_to_user(user_kvm_nested_state->data, vmcs12, sizeof(*vmcs12)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int vmx_get_nested_state(struct kvm_vcpu *vcpu,
+				struct kvm_nested_state __user *user_kvm_nested_state)
+{
+	u32 user_data_size;
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct kvm_nested_state kvm_state = {
+		.flags = 0,
+		.format = 0,
+		.size = sizeof(kvm_state),
+		.vmx.vmxon_pa = -1ull,
+		.vmx.vmcs_pa = -1ull,
+	};
+
+	if (copy_from_user(&user_data_size, &user_kvm_nested_state->size,
+			   sizeof(user_data_size)))
+		return -EFAULT;
+
+	if (nested_vmx_allowed(vcpu) &&
+	    (vmx->nested.vmxon || vmx->nested.smm.vmxon)) {
+		kvm_state.vmx.vmxon_pa = vmx->nested.vmxon_ptr;
+		kvm_state.vmx.vmcs_pa = vmx->nested.current_vmptr;
+
+		if (vmx->nested.current_vmptr != -1ull)
+			kvm_state.size += VMCS12_SIZE;
+
+		if (vmx->nested.smm.vmxon)
+			kvm_state.vmx.smm.flags |= KVM_STATE_NESTED_SMM_VMXON;
+
+		if (vmx->nested.smm.guest_mode)
+			kvm_state.vmx.smm.flags |= KVM_STATE_NESTED_SMM_GUEST_MODE;
+
+		if (is_guest_mode(vcpu)) {
+			kvm_state.flags |= KVM_STATE_NESTED_GUEST_MODE;
+
+			if (vmx->nested.nested_run_pending)
+				kvm_state.flags |= KVM_STATE_NESTED_RUN_PENDING;
+		}
+	}
+
+	if (user_data_size < kvm_state.size) {
+		if (copy_to_user(&user_kvm_nested_state->size, &kvm_state.size,
+				 sizeof(kvm_state.size)))
+			return -EFAULT;
+		return -E2BIG;
+	}
+
+	if (copy_to_user(user_kvm_nested_state, &kvm_state, sizeof(kvm_state)))
+		return -EFAULT;
+
+	if (vmx->nested.current_vmptr == -1ull)
+		return 0;
+
+	return get_vmcs_cache(vcpu, user_kvm_nested_state);
+}
+
+static int set_vmcs_cache(struct kvm_vcpu *vcpu,
+			  struct kvm_nested_state __user *user_kvm_nested_state,
+			  struct kvm_nested_state *kvm_state)
+
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
+	u32 exit_qual;
+	int ret;
+
+	if ((kvm_state->size < (sizeof(*vmcs12) + sizeof(*kvm_state))) ||
+	    kvm_state->vmx.vmcs_pa == kvm_state->vmx.vmxon_pa ||
+	    !page_address_valid(vcpu, kvm_state->vmx.vmcs_pa))
+		return -EINVAL;
+
+	if (copy_from_user(vmcs12, user_kvm_nested_state->data, sizeof(*vmcs12)))
+		return -EFAULT;
+
+	if (vmcs12->revision_id != VMCS12_REVISION)
+		return -EINVAL;
+
+	set_current_vmptr(vmx, kvm_state->vmx.vmcs_pa);
+
+	if ((kvm_state->vmx.smm.flags & KVM_STATE_NESTED_SMM_GUEST_MODE) &&
+	    (kvm_state->flags & KVM_STATE_NESTED_GUEST_MODE))
+		return -EINVAL;
+
+	if (vmx->nested.vmxon &&
+	    (kvm_state->vmx.smm.flags & KVM_STATE_NESTED_SMM_VMXON))
+		return -EINVAL;
+
+	if (kvm_state->vmx.smm.flags & KVM_STATE_NESTED_SMM_GUEST_MODE)
+		vmx->nested.smm.guest_mode = true;
+
+	if (kvm_state->vmx.smm.flags & KVM_STATE_NESTED_SMM_VMXON) {
+		vmx->nested.smm.vmxon = true;
+		vmx->nested.vmxon = false;
+	}
+
+	if (!(kvm_state->flags & KVM_STATE_NESTED_GUEST_MODE))
+		return 0;
+
+	if (kvm_state->flags & KVM_STATE_NESTED_RUN_PENDING)
+		vmx->nested.nested_run_pending = 1;
+
+	if (check_vmentry_prereqs(vcpu, vmcs12) ||
+	    check_vmentry_postreqs(vcpu, vmcs12, &exit_qual))
+		return -EINVAL;
+
+	ret = enter_vmx_non_root_mode(vcpu);
+	if (ret)
+		return ret;
+
+	/*
+	 * The MMU is not initialized to point at the right entities yet and
+	 * "get pages" would need to read data from the guest (i.e. we will
+	 * need to perform gpa to hpa translation). So, This request will
+	 * result in a call to nested_get_vmcs12_pages before the next
+	 * VM-entry.
+	 */
+	kvm_make_request(KVM_REQ_GET_VMCS12_PAGES, vcpu);
+
+	vmx->nested.nested_run_pending = 1;
+
+	return 0;
+}
+
+static int vmx_set_nested_state(struct kvm_vcpu *vcpu,
+				struct kvm_nested_state __user *user_kvm_nested_state)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct kvm_nested_state kvm_state;
+	int ret;
+
+	if (copy_from_user(&kvm_state, user_kvm_nested_state, sizeof(kvm_state)))
+		return -EFAULT;
+
+	if (kvm_state.size < sizeof(kvm_state))
+		return -EINVAL;
+
+	if (kvm_state.format != 0)
+		return -EINVAL;
+
+	if (kvm_state.flags &
+	    ~(KVM_STATE_NESTED_RUN_PENDING | KVM_STATE_NESTED_GUEST_MODE))
+		return -EINVAL;
+
+	if (!nested_vmx_allowed(vcpu))
+		return kvm_state.vmx.vmxon_pa == -1ull ? 0 : -EINVAL;
+
+	vmx_leave_nested(vcpu);
+
+	vmx->nested.nested_run_pending =
+		!!(kvm_state.flags & KVM_STATE_NESTED_RUN_PENDING);
+
+	if (kvm_state.vmx.vmxon_pa == -1ull)
+		return 0;
+
+	if (!page_address_valid(vcpu, kvm_state.vmx.vmxon_pa))
+		return -EINVAL;
+
+	vmx->nested.vmxon_ptr = kvm_state.vmx.vmxon_pa;
+	ret = enter_vmx_operation(vcpu);
+	if (ret)
+		return ret;
+
+	if (kvm_state.vmx.vmcs_pa == -1ull)
+		return 0;
+
+	return set_vmcs_cache(vcpu, user_kvm_nested_state, &kvm_state);
+}
+
 static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -13109,6 +13301,10 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 #endif
 
 	.setup_mce = vmx_setup_mce,
+
+	.get_nested_state = vmx_get_nested_state,
+	.set_nested_state = vmx_set_nested_state,
+	.get_vmcs12_pages = nested_get_vmcs12_pages,
 
 	.smi_allowed = vmx_smi_allowed,
 	.pre_enter_smm = vmx_pre_enter_smm,

@@ -2942,6 +2942,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_X2APIC_API:
 		r = KVM_X2APIC_API_VALID_FLAGS;
 		break;
+	case KVM_CAP_STATE:
+		r = !!kvm_x86_ops->get_nested_state;
+		break;
 	default:
 		break;
 	}
@@ -3956,6 +3959,22 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		if (copy_from_user(&cap, argp, sizeof(cap)))
 			goto out;
 		r = kvm_vcpu_ioctl_enable_cap(vcpu, &cap);
+		break;
+	}
+	case KVM_GET_NESTED_STATE: {
+		struct kvm_nested_state __user *user_kvm_nested_state = argp;
+
+		r = -EINVAL;
+		if (kvm_x86_ops->get_nested_state)
+			r = kvm_x86_ops->get_nested_state(vcpu, user_kvm_nested_state);
+		break;
+	}
+	case KVM_SET_NESTED_STATE: {
+		struct kvm_nested_state __user *user_kvm_nested_state = argp;
+
+		r = -EINVAL;
+		if (kvm_x86_ops->set_nested_state)
+			r = kvm_x86_ops->set_nested_state(vcpu, user_kvm_nested_state);
 		break;
 	}
 	default:
@@ -7255,6 +7274,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	bool req_immediate_exit = false;
 
 	if (kvm_request_pending(vcpu)) {
+		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu))
+			kvm_x86_ops->get_vmcs12_pages(vcpu);
 		if (kvm_check_request(KVM_REQ_MMU_RELOAD, vcpu))
 			kvm_mmu_unload(vcpu);
 		if (kvm_check_request(KVM_REQ_MIGRATE_TIMER, vcpu))
