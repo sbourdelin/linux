@@ -2101,7 +2101,7 @@ int __alloc_bootmem_huge_page(struct hstate *h)
 	for_each_node_mask_to_alloc(h, nr_nodes, node, &node_states[N_MEMORY]) {
 		void *addr;
 
-		addr = memblock_virt_alloc_try_nid_nopanic(
+		addr = memblock_virt_alloc_try_nid_raw(
 				huge_page_size(h), huge_page_size(h),
 				0, BOOTMEM_ALLOC_ACCESSIBLE, node);
 		if (addr) {
@@ -2109,7 +2109,12 @@ int __alloc_bootmem_huge_page(struct hstate *h)
 			 * Use the beginning of the huge page to store the
 			 * huge_bootmem_page struct (until gather_bootmem
 			 * puts them into the mem_map).
+			 *
+			 * memblock_virt_alloc_try_nid_raw returns non-zero'd
+			 * memory so zero out just enough for this struct, the
+			 * rest will be zero'd on page fault.
 			 */
+			memset(addr, 0, sizeof(struct huge_bootmem_page));
 			m = addr;
 			goto found;
 		}
