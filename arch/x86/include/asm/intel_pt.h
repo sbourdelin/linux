@@ -10,6 +10,14 @@
 
 #define RTIT_ADDR_RANGE		4
 
+#define MSR_IA32_RTIT_STATUS_MASK (~(RTIT_STATUS_FILTEREN | \
+		RTIT_STATUS_CONTEXTEN | RTIT_STATUS_TRIGGEREN | \
+		RTIT_STATUS_ERROR | RTIT_STATUS_STOPPED | \
+		RTIT_STATUS_BYTECNT))
+
+#define MSR_IA32_RTIT_OUTPUT_BASE_MASK \
+		(~((1UL << cpuid_query_maxphyaddr(vcpu)) - 1) | 0x7f)
+
 enum pt_capabilities {
 	PT_CAP_max_subleaf = 0,
 	PT_CAP_cr3_filtering,
