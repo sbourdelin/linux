@@ -870,6 +870,13 @@ static inline bool is_device_public_page(const struct page *page)
 		page->pgmap->type == MEMORY_DEVICE_PUBLIC;
 }
 
+static inline bool is_dax_page(const struct page *page)
+{
+	return is_zone_device_page(page) &&
+		(page->pgmap->type == MEMORY_DEVICE_FS_DAX ||
+		page->pgmap->type == MEMORY_DEVICE_DEV_DAX);
+}
+
 #else /* CONFIG_DEV_PAGEMAP_OPS */
 static inline void dev_pagemap_get_ops(void)
 {
@@ -890,6 +897,11 @@ static inline bool is_device_private_page(const struct page *page)
 }
 
 static inline bool is_device_public_page(const struct page *page)
+{
+	return false;
+}
+
+static inline bool is_dax_page(const struct page *page)
 {
 	return false;
 }
