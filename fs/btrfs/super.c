@@ -886,11 +886,12 @@ out:
  * only when we need to allocate a new super block.
  */
 static int btrfs_parse_early_options(const char *options, fmode_t flags,
-		void *holder, struct btrfs_fs_devices **fs_devices)
+		void *holder)
 {
 	substring_t args[MAX_OPT_ARGS];
 	char *device_name, *opts, *orig, *p;
 	int error = 0;
+	struct btrfs_fs_devices *fs_devices = NULL;
 
 	if (!options)
 		return 0;
@@ -918,7 +919,7 @@ static int btrfs_parse_early_options(const char *options, fmode_t flags,
 				goto out;
 			}
 			error = btrfs_scan_one_device(device_name,
-					flags, holder, fs_devices);
+					flags, holder, &fs_devices);
 			kfree(device_name);
 			if (error)
 				goto out;
@@ -1526,8 +1527,7 @@ static struct dentry *btrfs_mount_root(struct file_system_type *fs_type,
 	if (!(flags & SB_RDONLY))
 		mode |= FMODE_WRITE;
 
-	error = btrfs_parse_early_options(data, mode, fs_type,
-					  &fs_devices);
+	error = btrfs_parse_early_options(data, mode, fs_type);
 	if (error) {
 		return ERR_PTR(error);
 	}
