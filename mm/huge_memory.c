@@ -1389,10 +1389,13 @@ out_unlock:
  * FOLL_FORCE can write to even unwritable pmd's, but only
  * after we've gone through a COW cycle and they are dirty.
  */
-static inline bool can_follow_write_pmd(pmd_t pmd, unsigned int flags)
+static inline bool can_follow_write_pmd(pmd_t pmd, unsigned int flags,
+					bool shstk)
 {
+	bool pmd_cowed = shstk ? is_shstk_pmd(pmd):pmd_dirty(pmd);
+
 	return pmd_write(pmd) ||
-	       ((flags & FOLL_FORCE) && (flags & FOLL_COW) && pmd_dirty(pmd));
+	       ((flags & FOLL_FORCE) && (flags & FOLL_COW) && pmd_cowed);
 }
 
 struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
@@ -1402,10 +1405,11 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page *page = NULL;
+	bool shstk = is_shstk_mapping(vma->vm_flags);
 
 	assert_spin_locked(pmd_lockptr(mm, pmd));
 
-	if (flags & FOLL_WRITE && !can_follow_write_pmd(*pmd, flags))
+	if (flags & FOLL_WRITE && !can_follow_write_pmd(*pmd, flags, shstk))
 		goto out;
 
 	/* Avoid dumping huge zero page */
