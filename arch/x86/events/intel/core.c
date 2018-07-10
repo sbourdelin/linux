@@ -3878,6 +3878,7 @@ __init int intel_pmu_init(void)
 	unsigned int unused;
 	struct extra_reg *er;
 	int version, i;
+	u64 debugctl;
 	char *name;
 
 	if (!cpu_has(&boot_cpu_data, X86_FEATURE_ARCH_PERFMON)) {
@@ -4382,6 +4383,14 @@ __init int intel_pmu_init(void)
 	}
 
 	/*
+	 * LBR bit may be set on some machines.
+	 * Disable LBR while checking LBR related MSRs.
+	 */
+	debugctl = get_debugctlmsr();
+	if (debugctl & DEBUGCTLMSR_LBR)
+		update_debugctlmsr(debugctl & ~DEBUGCTLMSR_LBR);
+
+	/*
 	 * Access LBR MSR may cause #GP under certain circumstances.
 	 * E.g. KVM doesn't support LBR MSR
 	 * Check all LBT MSR here.
@@ -4394,6 +4403,10 @@ __init int intel_pmu_init(void)
 		      check_msr(x86_pmu.lbr_to + i, 0xffffUL)))
 			x86_pmu.lbr_nr = 0;
 	}
+
+	/* Restore the old value if changed */
+	if (debugctl & DEBUGCTLMSR_LBR)
+		update_debugctlmsr(debugctl);
 
 	x86_pmu.caps_attrs = intel_pmu_caps_attrs;
 
