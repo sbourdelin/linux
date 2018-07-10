@@ -1097,4 +1097,25 @@ static inline void init_espfix_bsp(void) { }
 #endif
 #endif
 
+#ifndef CONFIG_ARCH_HAS_SHSTK
+static inline pte_t pte_mkdirty_shstk(pte_t pte)
+{
+	return pte;
+}
+static inline bool is_shstk_pte(pte_t pte)
+{
+	return false;
+}
+
+static inline pmd_t pmd_mkdirty_shstk(pmd_t pmd)
+{
+	return pmd;
+}
+
+static inline bool is_shstk_pmd(pmd_t pmd)
+{
+	return false;
+}
+#endif
+
 #endif /* _ASM_GENERIC_PGTABLE_H */
