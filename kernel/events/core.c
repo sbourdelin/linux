@@ -8155,6 +8155,7 @@ struct static_key perf_swevent_enabled[PERF_COUNT_SW_MAX];
 static void sw_perf_event_destroy(struct perf_event *event)
 {
 	u64 event_id = event->attr.config;
+	event_id = array_index_nospec(event_id, PERF_COUNT_SW_MAX);
 
 	WARN_ON(event->parent);
 
@@ -8186,6 +8187,7 @@ static int perf_swevent_init(struct perf_event *event)
 
 	if (event_id >= PERF_COUNT_SW_MAX)
 		return -ENOENT;
+	event_id = array_index_nospec(event_id, PERF_COUNT_SW_MAX);
 
 	if (!event->parent) {
 		int err;
