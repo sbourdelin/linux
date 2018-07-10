@@ -4108,7 +4108,13 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
 				return do_huge_pmd_numa_page(&vmf, orig_pmd);
 
-			if (dirty && !pmd_write(orig_pmd)) {
+			/*
+			 * Shadow stack trans huge PMDs are copy-on-access,
+			 * so wp_huge_pmd() on them no mater if we have a
+			 * write fault or not.
+			 */
+			if (is_shstk_mapping(vma->vm_flags) ||
+			    (dirty && !pmd_write(orig_pmd))) {
 				ret = wp_huge_pmd(&vmf, orig_pmd);
 				if (!(ret & VM_FAULT_FALLBACK))
 					return ret;
