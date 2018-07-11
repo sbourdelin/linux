@@ -67,8 +67,13 @@ static void *image_load(struct kimage *image,
 
 	/* Load the kernel */
 	kbuf.image = image;
-	kbuf.buf_min = 0;
-	kbuf.buf_max = ULONG_MAX;
+	if (image->type == KEXEC_TYPE_CRASH) {
+		kbuf.buf_min = crashk_res.start;
+		kbuf.buf_max = crashk_res.end + 1;
+	} else {
+		kbuf.buf_min = 0;
+		kbuf.buf_max = ULONG_MAX;
+	}
 	kbuf.top_down = false;
 
 	kbuf.buffer = kernel;
