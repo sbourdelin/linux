@@ -338,7 +338,6 @@ struct nandc_regs {
  * @dev:			parent device
  * @base:			MMIO base
  * @base_phys:			physical base address of controller registers
- * @base_dma:			dma base address of controller registers
  * @core_clk:			controller clock
  * @aon_clk:			another controller clock
  *
@@ -372,7 +371,6 @@ struct qcom_nand_controller {
 
 	void __iomem *base;
 	phys_addr_t base_phys;
-	dma_addr_t base_dma;
 
 	struct clk *core_clk;
 	struct clk *aon_clk;
@@ -935,11 +933,11 @@ static int prep_adm_dma_desc(struct qcom_nand_controller *nandc, bool read,
 	slave_conf.device_fc = flow_control;
 	if (read) {
 		slave_conf.src_maxburst = 16;
-		slave_conf.src_addr = nandc->base_dma + reg_off;
+		slave_conf.src_addr = (dma_addr_t)nandc->base_phys + reg_off;
 		slave_conf.slave_id = nandc->data_crci;
 	} else {
 		slave_conf.dst_maxburst = 16;
-		slave_conf.dst_addr = nandc->base_dma + reg_off;
+		slave_conf.dst_addr = (dma_addr_t)nandc->base_phys + reg_off;
 		slave_conf.slave_id = nandc->cmd_crci;
 	}
 
@@ -2963,7 +2961,6 @@ static int qcom_nandc_probe(struct platform_device *pdev)
 		return PTR_ERR(nandc->base);
 
 	nandc->base_phys = res->start;
-	nandc->base_dma = phys_to_dma(dev, (phys_addr_t)res->start);
 
 	nandc->core_clk = devm_clk_get(dev, "core");
 	if (IS_ERR(nandc->core_clk))
