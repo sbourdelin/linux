@@ -422,6 +422,7 @@ struct btrfs_space_info {
 	 * time the transaction commits.
 	 */
 	struct percpu_counter total_bytes_pinned;
+	s32 total_bytes_pinned_batch;
 
 	struct list_head list;
 	/* Protected by the spinlock 'lock'. */
