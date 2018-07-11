@@ -1456,6 +1456,7 @@ static int copy_signal(unsigned long clone_flags, struct task_struct *tsk)
 	init_waitqueue_head(&sig->wait_chldexit);
 	sig->curr_target = tsk;
 	init_sigpending(&sig->shared_pending);
+	seqcount_init(&sig->multi_process_seq);
 	seqlock_init(&sig->stats_lock);
 	prev_cputime_init(&sig->prev_cputime);
 
@@ -1602,6 +1603,20 @@ static __latent_entropy struct task_struct *copy_process(
 {
 	int retval;
 	struct task_struct *p;
+	unsigned seq;
+
+	/*
+	 * Signals that are delivered to multiple processes need to be
+	 * delivered to just the parent before the fork or both the
+	 * parent and the child after the fork.  Cache the multiple
+	 * process signal sequence number so we can detect any of
+	 * these signals that happen during the fork.  In the unlikely
+	 * event a signal comes in while fork is starting and restart
+	 * fork to handle the signal.
+	 */
+	seq = read_seqcount_begin(&current->signal->multi_process_seq);
+	if (signal_pending(current))
+		return ERR_PTR(-ERESTARTNOINTR);
 
 	/*
 	 * Don't allow sharing the root directory with processes in a different
@@ -1930,8 +1945,8 @@ static __latent_entropy struct task_struct *copy_process(
 	 * A fatal signal pending means that current will exit, so the new
 	 * thread can't slip out of an OOM kill (or normal SIGKILL).
 	*/
-	recalc_sigpending();
-	if (signal_pending(current)) {
+	if (read_seqcount_retry(&current->signal->multi_process_seq, seq) ||
+	    fatal_signal_pending(current)) {
 		retval = -ERESTARTNOINTR;
 		goto bad_fork_cancel_cgroup;
 	}

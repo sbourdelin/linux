@@ -89,6 +89,7 @@ struct signal_struct {
 
 	/* shared signal handling: */
 	struct sigpending	shared_pending;
+	seqcount_t		multi_process_seq;
 
 	/* thread group exit support */
 	int			group_exit_code;

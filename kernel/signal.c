@@ -1096,6 +1096,8 @@ static int __send_signal(int sig, struct siginfo *info, struct task_struct *t,
 out_set:
 	signalfd_notify(t, sig);
 	sigaddset(&pending->signal, sig);
+	if (type > PIDTYPE_TGID)
+		write_seqcount_invalidate(&t->signal->multi_process_seq);
 	complete_signal(sig, t, type);
 ret:
 	trace_signal_generate(sig, info, t, type, result);
