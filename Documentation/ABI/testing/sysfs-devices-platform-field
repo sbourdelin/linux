@@ -1,0 +1,95 @@
+This document defines the sysfs attributes provided by the bmc-misc-ctrl
+driver. See Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt for
+exhaustive list of field definitions.
+
+What:		/sys/devices/platform/.../<field>/<label>/label
+Date:		July, 2018
+KernelVersion:	v4.19
+Contact:	openbmc@lists.ozlabs.org
+Description:
+		An RO attribute providing the name of the field of interest.
+		Corresponds to the value of <label> in the path
+Users:		openbmc@lists.ozlabs.org
+
+What:		/sys/devices/platform/.../<field>/<label>/type
+Date:		July, 2018
+KernelVersion:	v4.19
+Contact:	openbmc@lists.ozlabs.org
+Description:
+		An RO attribute describing the type of the field. The type
+		takes one of three values:
+
+		'ro':	The field is read-only. The 'value' attribute will be
+			read-only and neither 'set' nor 'clear' attributes will
+			be present.
+		'rw':	The field is read-write. The 'value' attribute will be
+			both readable and writable and neither 'set' nor
+			'clear' attributes will be present. Values written to
+			the 'value' attribute will be atomically updated.
+		'w1sc':	The field uses write-1-{set,clear} semantics. The
+			'value' attribute will be read-only, and both 'set' and
+			'clear' attributes will be present to manipulate
+			'value'. 'set' and 'clear' will both be write-only.
+Users:		openbmc@lists.ozlabs.org
+
+What:		/sys/devices/platform/.../<field>/<label>/mask
+Date:		July, 2018
+KernelVersion:	v4.19
+Contact:	openbmc@lists.ozlabs.org
+Description:
+		An RO attribute providing the mask applied to the value
+		read/written from the 'value' attribute.
+Users:		openbmc@lists.ozlabs.org
+
+What:		/sys/devices/platform/.../<field>/<label>/value
+Date:		July, 2018
+KernelVersion:	v4.19
+Contact:	openbmc@lists.ozlabs.org
+Description:
+		The value of the field of interest.
+
+		If the field is exposed from a read-modify-write register this
+		attribute will be RW, where writes will set the field to the
+		value written. Writing values that exceed the width of the
+		field will return an error.
+
+		If the field is exposed from a write-1-set/write-1-clear
+		register this attribute will be RO, and the attributes 'set'
+		and 'clear' will be present as write-only.
+Users:		openbmc@lists.ozlabs.org
+
+What:		/sys/devices/platform/.../<field>/<label>/set
+Users:		openbmc@lists.ozlabs.org
+Date:		July, 2018
+KernelVersion:	v4.19
+Contact:	openbmc@lists.ozlabs.org
+Description:
+		A WO attribute that when written will set bits in the backing
+		register corresponding to set bits in the value written.
+		Register bits corresponding to cleared bits in the written
+		value will remain unchanged.
+
+		This attribute is exposed when the field is identified as being
+		composed of write-1-set and write-1-clear registers.
+
+		Writing values that exceed the width of the mask value will
+		return an error.
+Users:		openbmc@lists.ozlabs.org
+
+What:		/sys/devices/platform/.../<field>/<label>/clear
+Users:		openbmc@lists.ozlabs.org
+Date:		July, 2018
+KernelVersion:	v4.19
+Contact:	openbmc@lists.ozlabs.org
+Description:
+		A WO attribute that when written will clear bits in the backing
+		register corresponding to set bits in the value written.
+		Register bits corresponding to cleared bits in the written
+		value will remain unchanged.
+
+		This attribute is exposed when the field is identified as being
+		composed of write-1-set and write-1-clear registers.
+
+		Writing values that exceed the width of the mask value will
+		return an error.
+Users:		openbmc@lists.ozlabs.org
