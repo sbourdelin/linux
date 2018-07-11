@@ -39,7 +39,7 @@ enum {
  * @sig: signal number
  * @info: pointer to struct siginfo
  * @task: pointer to struct task_struct
- * @group: shared or private
+ * @type: kind of signal generated
  * @result: TRACE_SIGNAL_*
  *
  * Current process sends a 'sig' signal to 'task' process with
@@ -51,9 +51,9 @@ enum {
 TRACE_EVENT(signal_generate,
 
 	TP_PROTO(int sig, struct siginfo *info, struct task_struct *task,
-			int group, int result),
+			enum pid_type type, int result),
 
-	TP_ARGS(sig, info, task, group, result),
+	TP_ARGS(sig, info, task, type, result),
 
 	TP_STRUCT__entry(
 		__field(	int,	sig			)
@@ -61,7 +61,7 @@ TRACE_EVENT(signal_generate,
 		__field(	int,	code			)
 		__array(	char,	comm,	TASK_COMM_LEN	)
 		__field(	pid_t,	pid			)
-		__field(	int,	group			)
+		__field(	enum pid_type,	type		)
 		__field(	int,	result			)
 	),
 
@@ -70,13 +70,13 @@ TRACE_EVENT(signal_generate,
 		TP_STORE_SIGINFO(__entry, info);
 		memcpy(__entry->comm, task->comm, TASK_COMM_LEN);
 		__entry->pid	= task->pid;
-		__entry->group	= group;
+		__entry->type	= type;
 		__entry->result	= result;
 	),
 
 	TP_printk("sig=%d errno=%d code=%d comm=%s pid=%d grp=%d res=%d",
 		  __entry->sig, __entry->errno, __entry->code,
-		  __entry->comm, __entry->pid, __entry->group,
+		  __entry->comm, __entry->pid, __entry->type != PIDTYPE_PID,
 		  __entry->result)
 );
 
