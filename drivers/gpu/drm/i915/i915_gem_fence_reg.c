@@ -188,6 +188,8 @@ static void i830_write_fence_reg(struct drm_i915_fence_reg *fence,
 static void fence_write(struct drm_i915_fence_reg *fence,
 			struct i915_vma *vma)
 {
+	lockdep_assert_held(&fence->ggtt->vm.mutex);
+
 	/* Previous access through the fence register is marshalled by
 	 * the mb() inside the fault handlers (i915_gem_release_mmaps)
 	 * and explicitly managed for internal users.
@@ -212,6 +214,8 @@ static int fence_update(struct drm_i915_fence_reg *fence,
 {
 	struct i915_ggtt *ggtt = fence->ggtt;
 	int ret;
+
+	lockdep_assert_held(&ggtt->vm.mutex);
 
 	if (vma) {
 		if (!i915_vma_is_map_and_fenceable(vma))
@@ -289,14 +293,39 @@ static int fence_update(struct drm_i915_fence_reg *fence,
 int i915_vma_put_fence(struct i915_vma *vma)
 {
 	struct drm_i915_fence_reg *fence = vma->fence;
+	int err;
 
 	if (!fence)
 		return 0;
 
-	if (fence->pin_count)
-		return -EBUSY;
+	mutex_lock(&vma->vm->mutex);
+	if (!fence->pin_count)
+		err = fence_update(fence, NULL);
+	else
+		err = -EBUSY;
+	mutex_unlock(&vma->vm->mutex);
 
-	return fence_update(fence, NULL);
+	return err;
+}
+
+void i915_vma_revoke_fence(struct i915_vma *vma)
+{
+	struct drm_i915_fence_reg *fence;
+
+	GEM_BUG_ON(!i915_vma_is_ggtt(vma));
+	lockdep_assert_held(&vma->vm->mutex);
+
+	fence = vma->fence;
+	if (!fence)
+		return;
+
+	GEM_BUG_ON(fence->pin_count);
+
+	list_move(&fence->link, &i915_vm_to_ggtt(vma->vm)->fence_list);
+	vma->fence = NULL;
+
+	fence_write(fence, NULL);
+	fence->vma = NULL;
 }
 
 static struct drm_i915_fence_reg *fence_find(struct i915_ggtt *ggtt)
@@ -337,8 +366,7 @@ static struct drm_i915_fence_reg *fence_find(struct i915_ggtt *ggtt)
  *
  * 0 on success, negative error code on failure.
  */
-int
-i915_vma_pin_fence(struct i915_vma *vma)
+int __i915_vma_pin_fence(struct i915_vma *vma)
 {
 	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vma->vm);
 	struct i915_vma *set = i915_gem_object_is_tiled(vma->obj) ? vma : NULL;
@@ -349,6 +377,7 @@ i915_vma_pin_fence(struct i915_vma *vma)
 	 * must keep the device awake whilst using the fence.
 	 */
 	assert_rpm_wakelock_held(ggtt->vm.i915);
+	lockdep_assert_held(&ggtt->vm.mutex);
 
 	/* Just update our place in the LRU if our fence is getting reused. */
 	if (vma->fence) {
@@ -399,27 +428,34 @@ i915_reserve_fence(struct drm_i915_private *i915)
 	int count;
 	int ret;
 
-	lockdep_assert_held(&i915->drm.struct_mutex);
+	mutex_lock(&i915->ggtt.vm.mutex);
 
 	/* Keep at least one fence available for the display engine. */
 	count = 0;
 	list_for_each_entry(fence, &ggtt->fence_list, link)
 		count += !fence->pin_count;
-	if (count <= 1)
-		return ERR_PTR(-ENOSPC);
+	if (count <= 1) {
+		fence = ERR_PTR(-ENOSPC);
+		goto out_unlock;
+	}
 
 	fence = fence_find(ggtt);
 	if (IS_ERR(fence))
-		return fence;
+		goto out_unlock;
 
 	if (fence->vma) {
 		/* Force-remove fence from VMA */
 		ret = fence_update(fence, NULL);
-		if (ret)
-			return ERR_PTR(ret);
+		if (ret) {
+			fence = ERR_PTR(ret);
+			goto out_unlock;
+		}
 	}
 
 	list_del(&fence->link);
+
+out_unlock:
+	mutex_unlock(&i915->ggtt.vm.mutex);
 	return fence;
 }
 
@@ -431,9 +467,9 @@ i915_reserve_fence(struct drm_i915_private *i915)
  */
 void i915_unreserve_fence(struct drm_i915_fence_reg *fence)
 {
-	lockdep_assert_held(&fence->ggtt->vm.i915->drm.struct_mutex);
-
+	mutex_lock(&fence->ggtt->vm.mutex);
 	list_add(&fence->link, &fence->ggtt->fence_list);
+	mutex_unlock(&fence->ggtt->vm.mutex);
 }
 
 /**
@@ -451,8 +487,7 @@ void i915_gem_revoke_fences(struct drm_i915_private *i915)
 	struct i915_ggtt *ggtt = &i915->ggtt;
 	int i;
 
-	lockdep_assert_held(&i915->drm.struct_mutex);
-
+	mutex_lock(&ggtt->vm.mutex);
 	for (i = 0; i < ggtt->num_fence_regs; i++) {
 		struct drm_i915_fence_reg *fence = &ggtt->fence_regs[i];
 
@@ -461,6 +496,7 @@ void i915_gem_revoke_fences(struct drm_i915_private *i915)
 		if (fence->vma)
 			i915_vma_revoke_mmap(fence->vma);
 	}
+	mutex_unlock(&ggtt->vm.mutex);
 }
 
 /**
@@ -476,6 +512,7 @@ void i915_gem_restore_fences(struct drm_i915_private *i915)
 	struct i915_ggtt *ggtt = &i915->ggtt;
 	int i;
 
+	mutex_lock(&ggtt->vm.mutex);
 	for (i = 0; i < ggtt->num_fence_regs; i++) {
 		struct drm_i915_fence_reg *reg = &ggtt->fence_regs[i];
 		struct i915_vma *vma = reg->vma;
@@ -498,6 +535,7 @@ void i915_gem_restore_fences(struct drm_i915_private *i915)
 		fence_write(reg, vma);
 		reg->vma = vma;
 	}
+	mutex_unlock(&ggtt->vm.mutex);
 }
 
 /**
