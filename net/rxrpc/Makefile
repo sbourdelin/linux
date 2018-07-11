@@ -32,4 +32,5 @@ rxrpc-y := \
 
 rxrpc-$(CONFIG_PROC_FS) += proc.o
 rxrpc-$(CONFIG_RXKAD) += rxkad.o
+CFLAGS_rxkad.o += $(FRAME_WARN_BUMP_FLAG)
 rxrpc-$(CONFIG_SYSCTL) += sysctl.o
