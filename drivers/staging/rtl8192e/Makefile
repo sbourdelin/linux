@@ -15,6 +15,7 @@ obj-$(CONFIG_RTLLIB) += rtllib.o
 
 obj-$(CONFIG_RTLLIB_CRYPTO_CCMP) += rtllib_crypt_ccmp.o
 obj-$(CONFIG_RTLLIB_CRYPTO_TKIP) += rtllib_crypt_tkip.o
+CFLAGS_rtllib_crypt_tkip.o += $(FRAME_WARN_BUMP_FLAG)
 obj-$(CONFIG_RTLLIB_CRYPTO_WEP) += rtllib_crypt_wep.o
 
 obj-$(CONFIG_RTL8192E) += rtl8192e/

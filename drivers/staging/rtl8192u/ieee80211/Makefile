@@ -17,6 +17,7 @@ ieee80211-rsl-objs := ieee80211_rx.o \
 
 ieee80211_crypt-rsl-objs := ieee80211_crypt.o
 ieee80211_crypt_tkip-rsl-objs := ieee80211_crypt_tkip.o
+CFLAGS_ieee80211_crypt_tkip.o += $(FRAME_WARN_BUMP_FLAG)
 ieee80211_crypt_ccmp-rsl-objs := ieee80211_crypt_ccmp.o
 ieee80211_crypt_wep-rsl-objs := ieee80211_crypt_wep.o
 

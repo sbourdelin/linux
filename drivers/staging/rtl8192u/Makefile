@@ -26,5 +26,6 @@ r8192u_usb-y := r8192U_core.o r8180_93cx6.o r8192U_wx.o		\
 		  ieee80211/rtl819x_TSProc.o				\
 		  ieee80211/rtl819x_BAProc.o				\
 		  ieee80211/dot11d.o
+CFLAGS_ieee80211_crypt_tkip.o += $(FRAME_WARN_BUMP_FLAG)
 
 obj-$(CONFIG_RTL8192U) += r8192u_usb.o
