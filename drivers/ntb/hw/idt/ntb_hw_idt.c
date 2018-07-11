@@ -1311,6 +1311,7 @@ static int idt_ntb_peer_mw_set_trans(struct ntb_dev *ntb, int pidx, int widx,
 	/* DIR and LUT based translations are initialized differently */
 	if (mw_cfg->type == IDT_MW_DIR) {
 		const struct idt_ntb_bar *bar = &ntdata_tbl.bars[mw_cfg->bar];
+		struct pci_bus_region region;
 		u64 limit;
 		/* Set destination partition of translation */
 		data = idt_nt_read(ndev, bar->setup);
@@ -1320,7 +1321,9 @@ static int idt_ntb_peer_mw_set_trans(struct ntb_dev *ntb, int pidx, int widx,
 		idt_nt_write(ndev, bar->ltbase, (u32)addr);
 		idt_nt_write(ndev, bar->utbase, (u32)(addr >> 32));
 		/* Set the custom BAR aperture limit */
-		limit = pci_resource_start(ntb->pdev, mw_cfg->bar) + size;
+		pcibios_resource_to_bus(ntb->pdev->bus, &region,
+					&ntb->pdev->resource[mw_cfg->bar]);
+		limit = region.start + size;
 		idt_nt_write(ndev, bar->limit, (u32)limit);
 		if (IS_FLD_SET(BARSETUP_TYPE, data, 64))
 			idt_nt_write(ndev, (bar + 1)->limit, (limit >> 32));
