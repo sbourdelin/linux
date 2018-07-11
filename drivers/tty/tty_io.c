@@ -2121,8 +2121,8 @@ static int __tty_fasync(int fd, struct file *filp, int on)
 			pid = tty->pgrp;
 			type = PIDTYPE_PGID;
 		} else {
-			pid = task_pid(current);
-			type = PIDTYPE_PID;
+			pid = task_tgid(current);
+			type = PIDTYPE_TGID;
 		}
 		get_pid(pid);
 		spin_unlock_irqrestore(&tty->ctrl_lock, flags);
