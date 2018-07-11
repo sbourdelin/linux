@@ -83,6 +83,7 @@ struct hdac_hdmi_pin {
 	struct list_head head;
 	hda_nid_t nid;
 	bool mst_capable;
+	int conn_index;
 	struct hdac_hdmi_port *ports;
 	int num_ports;
 	struct hdac_ext_device *edev;
@@ -141,6 +142,9 @@ struct hdac_hdmi_priv {
 
 #define hdev_to_hdmi_priv(_hdev) ((to_ehdac_device(_hdev))->private_data)
 
+static int hdac_hdmi_port_select_set(struct hdac_ext_device *edev,
+					struct hdac_hdmi_port *port);
+
 static struct hdac_hdmi_pcm *
 hdac_hdmi_get_pcm_from_cvt(struct hdac_hdmi_priv *hdmi,
 			   struct hdac_hdmi_cvt *cvt)
@@ -166,6 +170,30 @@ static void hdac_hdmi_jack_report(struct hdac_hdmi_pcm *pcm,
 		snd_soc_dapm_disable_pin(port->dapm, port->jack_pin);
 
 	if (is_connect) {
+		/*
+		 * Increment the usage count to ensure that the device
+		 * is runtime active to send verb across.
+		 */
+		pm_runtime_get_sync(&edev->hdev.dev);
+
+		/* set the device if pin is mst_capable */
+		if (hdac_hdmi_port_select_set(edev, port) < 0) {
+			dev_err(&edev->hdev.dev,
+				"port %d device select fail\n", port->id);
+			return;
+		}
+
+		/*
+		 * Restore the connection selection index of the
+		 * respective pin.
+		 */
+		if (port->pin->conn_index > 0)
+			snd_hdac_codec_write(&edev->hdev, port->pin->nid,
+						0, AC_VERB_SET_CONNECT_SEL,
+						port->pin->conn_index - 1);
+
+		pm_runtime_put_sync(&edev->hdev.dev);
+
 		/*
 		 * Report Jack connect event when a device is connected
 		 * for the first time where same PCM is attached to multiple
@@ -902,6 +930,9 @@ static int hdac_hdmi_set_pin_port_mux(struct snd_kcontrol *kcontrol,
 			}
 		}
 	}
+
+	if (ucontrol->value.enumerated.item[0] > 0)
+		port->pin->conn_index =	ucontrol->value.enumerated.item[0];
 
 	/*
 	 * Jack status is not reported during device probe as the
