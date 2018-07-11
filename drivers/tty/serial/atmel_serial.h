@@ -124,7 +124,8 @@
 #define ATMEL_US_TTGR		0x28	/* Transmitter Timeguard Register */
 #define	ATMEL_US_TG		GENMASK(7, 0)	/* Timeguard Value */
 
-#define ATMEL_US_FIDI		0x40	/* FI DI Ratio Register */
+#define ATMEL_US_FIDIR		0x40	/* FI DI Ratio Register */
+#define ATMEL_US_FIDI		GENMASK(15, 0)	/* FIDI ratio */
 #define ATMEL_US_NER		0x44	/* Number of Errors Register */
 #define ATMEL_US_IF		0x4c	/* IrDA Filter Register */
 
