@@ -391,7 +391,7 @@ int intel_gvt_load_firmware(struct intel_gvt *gvt);
 #define gvt_hidden_gmadr_end(gvt) (gvt_hidden_gmadr_base(gvt) \
 				   + gvt_hidden_sz(gvt) - 1)
 
-#define gvt_fence_sz(gvt) (gvt->dev_priv->num_fence_regs)
+#define gvt_fence_sz(gvt) ((gvt)->dev_priv->ggtt.num_fence_regs)
 
 /* Aperture/GM space definitions for vGPU */
 #define vgpu_aperture_offset(vgpu)	((vgpu)->gm.low_gm_node.start)

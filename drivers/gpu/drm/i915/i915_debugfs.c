@@ -914,20 +914,20 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 
 static int i915_gem_fence_regs_info(struct seq_file *m, void *data)
 {
-	struct drm_i915_private *dev_priv = node_to_i915(m->private);
-	struct drm_device *dev = &dev_priv->drm;
+	struct drm_i915_private *i915 = node_to_i915(m->private);
+	const struct i915_ggtt *ggtt = &i915->ggtt;
 	int i, ret;
 
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
+	ret = mutex_lock_interruptible(&i915->drm.struct_mutex);
 	if (ret)
 		return ret;
 
-	seq_printf(m, "Total fences = %d\n", dev_priv->num_fence_regs);
-	for (i = 0; i < dev_priv->num_fence_regs; i++) {
-		struct i915_vma *vma = dev_priv->fence_regs[i].vma;
+	seq_printf(m, "Total fences = %d\n", ggtt->num_fence_regs);
+	for (i = 0; i < ggtt->num_fence_regs; i++) {
+		struct i915_vma *vma = ggtt->fence_regs[i].vma;
 
 		seq_printf(m, "Fence %d, pin count = %d, object = ",
-			   i, dev_priv->fence_regs[i].pin_count);
+			   i, ggtt->fence_regs[i].pin_count);
 		if (!vma)
 			seq_puts(m, "unused");
 		else
@@ -935,7 +935,7 @@ static int i915_gem_fence_regs_info(struct seq_file *m, void *data)
 		seq_putc(m, '\n');
 	}
 
-	mutex_unlock(&dev->struct_mutex);
+	mutex_unlock(&i915->drm.struct_mutex);
 	return 0;
 }
 
