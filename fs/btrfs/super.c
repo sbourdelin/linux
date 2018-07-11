@@ -918,11 +918,13 @@ static int btrfs_parse_early_options(const char *options, fmode_t flags,
 				error = -ENOMEM;
 				goto out;
 			}
-			error = btrfs_scan_one_device(device_name,
-					flags, holder, &fs_devices);
+			fs_devices = btrfs_scan_one_device(device_name,
+					flags, holder);
 			kfree(device_name);
-			if (error)
+			if (IS_ERR(fs_devices)) {
+				error = PTR_ERR(fs_devices);
 				goto out;
+			}
 		}
 	}
 
@@ -1539,9 +1541,11 @@ static struct dentry *btrfs_mount_root(struct file_system_type *fs_type,
 			return ERR_PTR(error);
 	}
 
-	error = btrfs_scan_one_device(device_name, mode, fs_type, &fs_devices);
-	if (error)
+	fs_devices = btrfs_scan_one_device(device_name, mode, fs_type);
+	if (IS_ERR(fs_devices)) {
+		error = PTR_ERR(fs_devices);
 		goto error_sec_opts;
+	}
 
 	/*
 	 * Setup a dummy root and fs_info for test/set super.  This is because
@@ -2222,7 +2226,7 @@ static long btrfs_control_ioctl(struct file *file, unsigned int cmd,
 				unsigned long arg)
 {
 	struct btrfs_ioctl_vol_args *vol;
-	struct btrfs_fs_devices *fs_devices;
+	struct btrfs_fs_devices *fs_devices = NULL;
 	int ret = -ENOTTY;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -2234,14 +2238,17 @@ static long btrfs_control_ioctl(struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case BTRFS_IOC_SCAN_DEV:
-		ret = btrfs_scan_one_device(vol->name, FMODE_READ,
-					    &btrfs_root_fs_type, &fs_devices);
+		fs_devices = btrfs_scan_one_device(vol->name, FMODE_READ,
+					    &btrfs_root_fs_type);
+		ret = PTR_ERR_OR_ZERO(fs_devices);
 		break;
 	case BTRFS_IOC_DEVICES_READY:
-		ret = btrfs_scan_one_device(vol->name, FMODE_READ,
-					    &btrfs_root_fs_type, &fs_devices);
-		if (ret)
+		fs_devices = btrfs_scan_one_device(vol->name, FMODE_READ,
+					    &btrfs_root_fs_type);
+		if (IS_ERR(fs_devices)) {
+			ret = PTR_ERR(fs_devices);
 			break;
+		}
 		ret = !(fs_devices->num_devices == fs_devices->total_devices);
 		break;
 	case BTRFS_IOC_GET_SUPPORTED_FEATURES:
