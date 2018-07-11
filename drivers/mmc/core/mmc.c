@@ -1021,8 +1021,11 @@ static int mmc_select_bus_width(struct mmc_card *card)
 				 EXT_CSD_BUS_WIDTH,
 				 ext_csd_bits[idx],
 				 card->ext_csd.generic_cmd6_time);
-		if (err)
+		if (err) {
+			if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400ES)
+				return err;
 			continue;
+		}
 
 		bus_width = bus_widths[idx];
 		mmc_set_bus_width(host, bus_width);
