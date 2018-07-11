@@ -6678,6 +6678,8 @@ restart:
 			unsigned long size_pages;
 
 			start_pfn = max(start_pfn, zone_movable_pfn[nid]);
+			/* KASLR may put kernel after 'start_pfn', start after kernel */
+			start_pfn = max(start_pfn, PAGE_ALIGN(_etext));
 			if (start_pfn >= end_pfn)
 				continue;
 
