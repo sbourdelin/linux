@@ -31,12 +31,12 @@
 #include <drm/drm_mm.h>
 
 #include "i915_gem_gtt.h"
-#include "i915_gem_fence_reg.h"
 #include "i915_gem_object.h"
 
 #include "i915_request.h"
 
 enum i915_cache_level;
+struct drm_i915_fence_reg;
 
 /**
  * A VMA represents a GEM BO that is bound into an address space. Therefore, a
