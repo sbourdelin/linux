@@ -1315,7 +1315,7 @@ int kill_pid_info(int sig, struct siginfo *info, struct pid *pid)
 
 	for (;;) {
 		rcu_read_lock();
-		p = pid_task(pid, PIDTYPE_PID);
+		p = pid_task(pid, PIDTYPE_TGID);
 		if (p)
 			error = group_send_sig_info(sig, info, p);
 		rcu_read_unlock();
@@ -1361,7 +1361,7 @@ int kill_pid_info_as_cred(int sig, struct siginfo *info, struct pid *pid,
 		return ret;
 
 	rcu_read_lock();
-	p = pid_task(pid, PIDTYPE_PID);
+	p = pid_task(pid, PIDTYPE_TGID);
 	if (!p) {
 		ret = -ESRCH;
 		goto out_unlock;

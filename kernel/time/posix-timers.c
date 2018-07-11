@@ -347,12 +347,11 @@ int posix_timer_event(struct k_itimer *timr, int si_private)
 	 */
 	timr->sigq->info.si_sys_private = si_private;
 
+	shared = !(timr->it_sigev_notify & SIGEV_THREAD_ID);
 	rcu_read_lock();
-	task = pid_task(timr->it_pid, PIDTYPE_PID);
-	if (task) {
-		shared = !(timr->it_sigev_notify & SIGEV_THREAD_ID);
+	task = pid_task(timr->it_pid, shared ? PIDTYPE_TGID : PIDTYPE_PID);
+	if (task)
 		ret = send_sigqueue(timr->sigq, task, shared);
-	}
 	rcu_read_unlock();
 	/* If we failed to send the signal the timer stops. */
 	return ret > 0;
