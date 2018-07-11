@@ -684,7 +684,13 @@ endif
 
 ifneq ($(CONFIG_FRAME_WARN),0)
 KBUILD_CFLAGS += $(call cc-option,-Wframe-larger-than=${CONFIG_FRAME_WARN})
+# Small code (mostly exposed by VLA removal) needs some additional
+# headroom, especially for a FRAME_WARN of 1024. This adds 20% which
+# can be used by the CFLAG_FRAME_WARN_BUMP option.
+FRAME_WARN_BUMP_SIZE := $(shell expr $(CONFIG_FRAME_WARN) / 5 + $(CONFIG_FRAME_WARN))
+FRAME_WARN_BUMP_FLAG := $(call cc-option,-Wframe-larger-than=$(FRAME_WARN_BUMP_SIZE))
 endif
+export FRAME_WARN_BUMP_FLAG
 
 stackp-flags-$(CONFIG_CC_HAS_STACKPROTECTOR_NONE) := -fno-stack-protector
 stackp-flags-$(CONFIG_STACKPROTECTOR)             := -fstack-protector
