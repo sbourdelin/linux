@@ -212,6 +212,13 @@ do { \
 #endif
 
 /*
+ * These are currently identical to the _idle_ versions but let's
+ * explicitly have separate copies to keep Paul honest in future.
+ */
+static inline void rcu_kvm_enter(void) { rcu_idle_enter(); }
+static inline void rcu_kvm_exit(void) { rcu_idle_exit(); }
+
+/*
  * The init_rcu_head_on_stack() and destroy_rcu_head_on_stack() calls
  * are needed for dynamic initialization and destruction of rcu_head
  * on the stack, and init_rcu_head()/destroy_rcu_head() are needed for
