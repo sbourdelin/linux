@@ -42,6 +42,9 @@ static struct console early_console_dev = {
 
 static int __init setup_early_printk(char *buf)
 {
+	if (buf && strstr(buf, "keep"))
+		early_console_dev.flags &= ~CON_BOOT;
+
 	early_console = &early_console_dev;
 	register_console(&early_console_dev);
 	return 0;
