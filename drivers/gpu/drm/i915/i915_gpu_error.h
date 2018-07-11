@@ -193,6 +193,8 @@ struct i915_gpu_state {
 	struct i915_address_space *active_vm[I915_NUM_ENGINES];
 };
 
+struct i915_gpu_restart;
+
 struct i915_gpu_error {
 	/* For hangcheck timer */
 #define DRM_I915_HANGCHECK_PERIOD 1500 /* in ms */
@@ -243,15 +245,6 @@ struct i915_gpu_error {
 	 * i915_mutex_lock_interruptible()?). I915_RESET_BACKOFF serves a
 	 * secondary role in preventing two concurrent global reset attempts.
 	 *
-	 * #I915_RESET_HANDOFF - To perform the actual GPU reset, we need the
-	 * struct_mutex. We try to acquire the struct_mutex in the reset worker,
-	 * but it may be held by some long running waiter (that we cannot
-	 * interrupt without causing trouble). Once we are ready to do the GPU
-	 * reset, we set the I915_RESET_HANDOFF bit and wakeup any waiters. If
-	 * they already hold the struct_mutex and want to participate they can
-	 * inspect the bit and do the reset directly, otherwise the worker
-	 * waits for the struct_mutex.
-	 *
 	 * #I915_RESET_ENGINE[num_engines] - Since the driver doesn't need to
 	 * acquire the struct_mutex to reset an engine, we need an explicit
 	 * flag to prevent two concurrent reset attempts in the same engine.
@@ -265,19 +258,12 @@ struct i915_gpu_error {
 	 */
 	unsigned long flags;
 #define I915_RESET_BACKOFF	0
-#define I915_RESET_HANDOFF	1
-#define I915_RESET_MODESET	2
+#define I915_RESET_MODESET	1
 #define I915_WEDGED		(BITS_PER_LONG - 1)
 #define I915_RESET_ENGINE	(I915_WEDGED - I915_NUM_ENGINES)
 
 	/** Number of times an engine has been reset */
 	u32 reset_engine_count[I915_NUM_ENGINES];
-
-	/** Set of stalled engines with guilty requests, in the current reset */
-	u32 stalled_mask;
-
-	/** Reason for the current *global* reset */
-	const char *reason;
 
 	/**
 	 * Waitqueue to signal when a hang is detected. Used to for waiters
@@ -293,6 +279,8 @@ struct i915_gpu_error {
 
 	/* For missed irq/seqno simulation. */
 	unsigned long test_irq_rings;
+
+	struct i915_gpu_restart *restart;
 };
 
 struct drm_i915_error_state_buf {
