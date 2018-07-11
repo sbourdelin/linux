@@ -258,6 +258,8 @@ static int vexpress_syscfg_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&syscfg->funcs);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res)
+		return -EINVAL;
 	if (!devm_request_mem_region(&pdev->dev, res->start,
 			resource_size(res), pdev->name))
 		return -EBUSY;
