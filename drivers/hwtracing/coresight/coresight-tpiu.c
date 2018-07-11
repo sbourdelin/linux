@@ -73,7 +73,7 @@ static int tpiu_enable(struct coresight_device *csdev, u32 mode)
 
 	tpiu_enable_hw(drvdata);
 
-	dev_info(drvdata->dev, "TPIU enabled\n");
+	dev_dbg(drvdata->dev, "TPIU enabled\n");
 	return 0;
 }
 
@@ -99,7 +99,7 @@ static void tpiu_disable(struct coresight_device *csdev)
 
 	tpiu_disable_hw(drvdata);
 
-	dev_info(drvdata->dev, "TPIU disabled\n");
+	dev_dbg(drvdata->dev, "TPIU disabled\n");
 }
 
 static const struct coresight_ops_sink tpiu_sink_ops = {
