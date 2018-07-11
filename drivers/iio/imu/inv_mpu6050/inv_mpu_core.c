@@ -23,6 +23,7 @@
 #include <linux/iio/iio.h>
 #include <linux/acpi.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include "inv_mpu_iio.h"
 
 /*
@@ -926,6 +927,19 @@ error_power_off:
 	return result;
 }
 
+static int inv_mpu_core_enable_regulator(struct inv_mpu6050_state *st)
+{
+	int result;
+
+	result = regulator_enable(st->vddio_supply);
+	if (result == 0) {
+		/* Give the device a little bit of time to start up. */
+		usleep_range(35000, 70000);
+	}
+
+	return result;
+}
+
 int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		int (*inv_mpu_bus_setup)(struct iio_dev *), int chip_type)
 {
@@ -990,15 +1004,28 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		return -EINVAL;
 	}
 
+	st->vddio_supply = devm_regulator_get_optional(dev, "vddio");
+	if (IS_ERR(st->vddio_supply)) {
+		if (PTR_ERR(st->vddio_supply) != -EPROBE_DEFER)
+			dev_err(dev, "Failed to get vddio regulator %d\n",
+				(int)PTR_ERR(st->vddio_supply));
+
+		return PTR_ERR(st->vddio_supply);
+	}
+
+	result = inv_mpu_core_enable_regulator(st);
+	if (result)
+		return result;
+
 	/* power is turned on inside check chip type*/
 	result = inv_check_and_setup_chip(st);
 	if (result)
-		return result;
+		goto out_disable_regulator;
 
 	result = inv_mpu6050_init_config(indio_dev);
 	if (result) {
 		dev_err(dev, "Could not initialize device.\n");
-		return result;
+		goto out_disable_regulator;
 	}
 
 	if (inv_mpu_bus_setup)
@@ -1023,23 +1050,33 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 						 NULL);
 	if (result) {
 		dev_err(dev, "configure buffer fail %d\n", result);
-		return result;
+		goto out_disable_regulator;
 	}
 	result = inv_mpu6050_probe_trigger(indio_dev, irq_type);
 	if (result) {
 		dev_err(dev, "trigger probe fail %d\n", result);
-		return result;
+		goto out_disable_regulator;
 	}
 
 	result = devm_iio_device_register(dev, indio_dev);
 	if (result) {
 		dev_err(dev, "IIO register fail %d\n", result);
-		return result;
+		goto out_disable_regulator;
 	}
 
 	return 0;
+
+out_disable_regulator:
+	regulator_disable(st->vddio_supply);
+	return result;
+
 }
 EXPORT_SYMBOL_GPL(inv_mpu_core_probe);
+
+int inv_mpu_core_remove(struct inv_mpu6050_state *st)
+{
+	return regulator_disable(st->vddio_supply);
+}
 
 #ifdef CONFIG_PM_SLEEP
 
@@ -1050,6 +1087,11 @@ static int inv_mpu_resume(struct device *dev)
 
 	mutex_lock(&st->lock);
 	result = inv_mpu6050_set_power_itg(st, true);
+	if (result)
+		goto out_unlock;
+
+	result = inv_mpu_core_enable_regulator(st);
+out_unlock:
 	mutex_unlock(&st->lock);
 
 	return result;
@@ -1062,6 +1104,11 @@ static int inv_mpu_suspend(struct device *dev)
 
 	mutex_lock(&st->lock);
 	result = inv_mpu6050_set_power_itg(st, false);
+	if (result)
+		goto out_unlock;
+
+	result = regulator_disable(st->vddio_supply);
+out_unlock:
 	mutex_unlock(&st->lock);
 
 	return result;

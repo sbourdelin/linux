@@ -129,6 +129,7 @@ struct inv_mpu6050_hw {
  *  @chip_period:	chip internal period estimation (~1kHz).
  *  @it_timestamp:	timestamp from previous interrupt.
  *  @data_timestamp:	timestamp for next data sample.
+ *  @vddio_supply	voltage regulator for the chip.
  */
 struct inv_mpu6050_state {
 	struct mutex lock;
@@ -149,6 +150,7 @@ struct inv_mpu6050_state {
 	s64 chip_period;
 	s64 it_timestamp;
 	s64 data_timestamp;
+	struct regulator *vddio_supply;
 };
 
 /*register and associated bit definition*/
@@ -321,4 +323,5 @@ int inv_mpu_acpi_create_mux_client(struct i2c_client *client);
 void inv_mpu_acpi_delete_mux_client(struct i2c_client *client);
 int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		int (*inv_mpu_bus_setup)(struct iio_dev *), int chip_type);
+int inv_mpu_core_remove(struct inv_mpu6050_state *st);
 extern const struct dev_pm_ops inv_mpu_pmops;

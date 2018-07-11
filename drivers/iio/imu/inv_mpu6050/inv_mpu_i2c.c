@@ -164,7 +164,7 @@ static int inv_mpu_remove(struct i2c_client *client)
 		i2c_mux_del_adapters(st->muxc);
 	}
 
-	return 0;
+	return inv_mpu_core_remove(st);
 }
 
 /*
