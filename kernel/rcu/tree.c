@@ -1009,6 +1009,22 @@ void rcu_irq_enter_irqson(void)
 	local_irq_restore(flags);
 }
 
+/*
+ * These are currently identical to the _idle_ versions but let's
+ * explicitly have separate copies to keep Paul honest in future.
+ */
+void rcu_kvm_enter(void)
+{
+	rcu_idle_enter();
+}
+EXPORT_SYMBOL_GPL(rcu_kvm_enter);
+
+void rcu_kvm_exit(void)
+{
+	rcu_idle_exit();
+}
+EXPORT_SYMBOL_GPL(rcu_kvm_exit);
+
 /**
  * rcu_is_watching - see if RCU thinks that the current CPU is idle
  *
