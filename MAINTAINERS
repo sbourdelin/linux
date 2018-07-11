@@ -2742,6 +2742,7 @@ L:	openbmc@lists.ozlabs.org (moderated for non-subscribers)
 S:	Supported
 F:	Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
 F:	Documentation/ABI/testing/sysfs-devices-platform-field
+F:	drivers/misc/bmc-misc-ctrl.c
 
 BPF (Safe dynamic programs and tools)
 M:	Alexei Starovoitov <ast@kernel.org>
