@@ -288,8 +288,8 @@ static int mips_dma_map_sg(struct device *dev, struct scatterlist *sglist,
 #ifdef CONFIG_NEED_SG_DMA_LENGTH
 		sg->dma_length = sg->length;
 #endif
-		sg->dma_address = plat_map_dma_mem_page(dev, sg_page(sg)) +
-				  sg->offset;
+		sg->dma_address = plat_map_dma_mem(dev, sg_virt(sg),
+						   sg->length);
 	}
 
 	return nents;
