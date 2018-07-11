@@ -4618,3 +4618,10 @@ This capability indicates that KVM supports paravirtualized Hyper-V TLB Flush
 hypercalls:
 HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
 HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
+
+8.19 KVM_CAP_COALESCED_PIO
+
+Architectures: x86, s390, ppc, arm64
+
+This Capability indicates that kvm supports writing to a coalesced-pio region
+is not reported to userspace until the next non-coalesced pio is issued.

@@ -1,0 +1,17 @@
+----
+Coalesced MMIO and coalesced PIO can be used to optimize writes to
+simple device registers. Writes to a coalesced-I/O region are not
+reported to userspace until the next non-coalesced I/O is issued,
+in a similar fashion to write combining hardware.  In KVM, coalesced
+writes are handled in the kernel without exits to userspace, and
+are thus several times faster.
+
+Examples of devices that can benefit from coalesced I/O include:
+
+- devices whose memory is accessed with many consecutive writes, for
+  example the EGA/VGA video RAM.
+
+- windows I/O, such as the real-time clock. The address register (port
+  0x70 in the RTC case) can use coalesced I/O, cutting the number of
+  userspace exits by half when reading or writing the RTC.
+----
