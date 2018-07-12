@@ -107,7 +107,8 @@ list_lru_from_kmem(struct list_lru_node *nlru, void *ptr)
 }
 #endif /* CONFIG_MEMCG && !CONFIG_SLOB */
 
-bool list_lru_add(struct list_lru *lru, struct list_head *item)
+static inline bool __list_lru_add(struct list_lru *lru, struct list_head *item,
+				  const bool add_tail)
 {
 	int nid = page_to_nid(virt_to_page(item));
 	struct list_lru_node *nlru = &lru->node[nid];
@@ -116,7 +117,10 @@ bool list_lru_add(struct list_lru *lru, struct list_head *item)
 	spin_lock(&nlru->lock);
 	if (list_empty(item)) {
 		l = list_lru_from_kmem(nlru, item);
-		list_add_tail(item, &l->list);
+		if (add_tail)
+			list_add_tail(item, &l->list);
+		else
+			list_add(item, &l->list);
 		l->nr_items++;
 		nlru->nr_items++;
 		spin_unlock(&nlru->lock);
@@ -125,7 +129,18 @@ bool list_lru_add(struct list_lru *lru, struct list_head *item)
 	spin_unlock(&nlru->lock);
 	return false;
 }
+
+bool list_lru_add(struct list_lru *lru, struct list_head *item)
+{
+	return __list_lru_add(lru, item, true);
+}
 EXPORT_SYMBOL_GPL(list_lru_add);
+
+bool list_lru_add_head(struct list_lru *lru, struct list_head *item)
+{
+	return __list_lru_add(lru, item, false);
+}
+EXPORT_SYMBOL_GPL(list_lru_add_head);
 
 bool list_lru_del(struct list_lru *lru, struct list_head *item)
 {
