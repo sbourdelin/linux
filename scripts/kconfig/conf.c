@@ -201,15 +201,33 @@ static int conf_sym(struct menu *menu)
 			continue;
 		case 'm':
 		case 'M':
-			newval = mod;
-			if (!line[1])
+			if (!strcmp(line, "m or y") ||
+			    !strcmp(line, "M or Y")) {
+				if (sym_tristate_within_range(sym, mod))
+					newval = mod;
+				else
+					newval = yes;
 				break;
+			} else {
+				newval = mod;
+				if (!line[1])
+					break;
+			}
 			continue;
 		case 'y':
 		case 'Y':
-			newval = yes;
-			if (!line[1] || !strcmp(&line[1], "es"))
+			if (!strcmp(line, "y or m") ||
+			    !strcmp(line, "Y or M")) {
+				if (sym_tristate_within_range(sym, yes))
+					newval = yes;
+				else
+					newval = mod;
 				break;
+			} else {
+				newval = yes;
+				if (!line[1] || !strcmp(&line[1], "es"))
+					break;
+			}
 			continue;
 		case 0:
 			newval = oldval;
