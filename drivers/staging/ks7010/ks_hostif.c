@@ -1226,7 +1226,7 @@ static inline void hostif_mib_set_request_int(struct ks_wlan_private *priv,
 
 static inline void hostif_mib_set_request_bool(struct ks_wlan_private *priv,
 					       enum mib_attribute attr,
-					       bool val)
+					       int val)
 {
 	__le32 v = cpu_to_le32(val);
 	size_t size = sizeof(v);
