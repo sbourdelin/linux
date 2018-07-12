@@ -139,6 +139,7 @@ struct dentry_stat_t dentry_stat = {
  * the extra ones will be returned back to the global pool.
  */
 #define NEG_DENTRY_BATCH	(1 << 8)
+#define NEG_WARN_PERIOD 	(60 * HZ)	/* Print a warning every min */
 
 static struct static_key limit_neg_key = STATIC_KEY_INIT_FALSE;
 static int neg_dentry_limit_old;
@@ -150,6 +151,7 @@ static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
 static struct {
 	raw_spinlock_t nfree_lock;
 	long nfree;			/* Negative dentry free pool */
+	unsigned long warn_jiffies;	/* Time when last warning is printed */
 } ndblk ____cacheline_aligned_in_smp;
 proc_handler proc_neg_dentry_limit;
 
@@ -309,6 +311,7 @@ static long __neg_dentry_nfree_dec(long cnt)
 static noinline void neg_dentry_inc_slowpath(struct dentry *dentry)
 {
 	long cnt = 0, *pcnt;
+	unsigned long current_time;
 
 	/*
 	 * Try to move some negative dentry quota from the global free
@@ -323,12 +326,38 @@ static noinline void neg_dentry_inc_slowpath(struct dentry *dentry)
 	}
 	put_cpu_ptr(&nr_dentry_neg);
 
-	/*
-	 * Put out a warning if there are too many negative dentries.
-	 */
-	if (!cnt)
-		pr_warn_once("There are too many negative dentries.");
+	if (cnt)
+		goto out;
 
+	/*
+	 * Put out a warning every minute or so if there are just too many
+	 * negative dentries.
+	 */
+	current_time = jiffies;
+
+	if (current_time < ndblk.warn_jiffies + NEG_WARN_PERIOD)
+		goto out;
+	/*
+	 * Update the time in ndblk.warn_jiffies and print a warning
+	 * if time update is successful.
+	 */
+	raw_spin_lock(&ndblk.nfree_lock);
+	if (current_time < ndblk.warn_jiffies + NEG_WARN_PERIOD) {
+		raw_spin_unlock(&ndblk.nfree_lock);
+		goto out;
+	}
+	ndblk.warn_jiffies = current_time;
+	raw_spin_unlock(&ndblk.nfree_lock);
+
+	/*
+	 * Get the current negative dentry count & print a warning.
+	 */
+	cnt = get_nr_dentry_neg();
+	pr_warn("Warning: Too many negative dentries (%ld). "
+		"This warning can be disabled by writing 0 to \"fs/neg-dentry-limit\" or increasing the limit.\n",
+		cnt);
+out:
+	return;
 }
 
 /*
