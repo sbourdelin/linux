@@ -213,7 +213,7 @@ e.g. crash dump output as shown by Dave Miller::
             .text
             .globl foo
      foo:
-            .byte  .... /* bytes from Code: part of OOPS dump */
+            .byte  0x44,0x24,0x04,... /* bytes from Code: part of OOPS dump */
 
      Compile it with "gcc -c -o foo.o foo.s" then look at the output of
      "objdump --disassemble foo.o".
