@@ -9,6 +9,8 @@
 #define NFT_OBJ_MAXNAMELEN	NFT_NAME_MAXLEN
 #define NFT_USERDATA_MAXLEN	256
 
+#define OSF_GENRE_SIZE		32
+
 /**
  * enum nft_registers - nf_tables registers
  *
@@ -122,6 +124,8 @@ enum nf_tables_msg_types {
 	NFT_MSG_NEWFLOWTABLE,
 	NFT_MSG_GETFLOWTABLE,
 	NFT_MSG_DELFLOWTABLE,
+	NFT_MSG_NEWOSF,
+	NFT_MSG_DELOSF,
 	NFT_MSG_MAX,
 };
 
@@ -1460,6 +1464,16 @@ enum nft_flowtable_hook_attributes {
 	__NFTA_FLOWTABLE_HOOK_MAX
 };
 #define NFTA_FLOWTABLE_HOOK_MAX	(__NFTA_FLOWTABLE_HOOK_MAX - 1)
+
+enum nft_osf_attributes {
+	NFTA_OSF_UNSPEC,
+	NFTA_OSF_GENRE,
+	NFTA_OSF_FLAGS,
+	NFTA_OSF_LOGLEVEL,
+	NFTA_OSF_TTL,
+	__NFTA_OSF_MAX,
+};
+#define NFTA_OSF_MAX (__NFTA_OSF_MAX - 1)
 
 /**
  * enum nft_device_attributes - nf_tables device netlink attributes

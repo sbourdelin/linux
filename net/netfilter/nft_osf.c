@@ -54,6 +54,7 @@ static int nft_osf_init(const struct nft_ctx *ctx,
 		return -EINVAL;
 	priv->ttl	= ntohl(nla_get_be32(tb[NFTA_OSF_TTL]));
 	priv->len = strlen(priv->genre);
+
 	return 0;
 }
 

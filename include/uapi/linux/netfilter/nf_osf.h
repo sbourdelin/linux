@@ -2,6 +2,8 @@
 #define _NF_OSF_H
 
 #include <linux/types.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
 
 #define MAXGENRELEN	32
 
@@ -88,6 +90,12 @@ enum iana_options {
 
 	/* Others are not used in the current OSF */
 	OSFOPT_EMPTY = 255,
+};
+
+enum nf_osf_attr_type {
+	OSF_ATTR_UNSPEC,
+	OSF_ATTR_FINGER,
+	OSF_ATTR_MAX,
 };
 
 #endif /* _NF_OSF_H */

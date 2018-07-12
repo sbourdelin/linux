@@ -18,6 +18,7 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
+#include <linux/netfilter/nf_osf.h>
 #include <net/netfilter/nf_flow_table.h>
 #include <net/netfilter/nf_tables_core.h>
 #include <net/netfilter/nf_tables.h>
@@ -27,6 +28,7 @@
 static LIST_HEAD(nf_tables_expressions);
 static LIST_HEAD(nf_tables_objects);
 static LIST_HEAD(nf_tables_flowtables);
+
 static u64 table_handle;
 
 enum {
@@ -5858,6 +5860,8 @@ static int nf_tables_flowtable_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+
+
 static struct notifier_block nf_tables_flowtable_notifier = {
 	.notifier_call	= nf_tables_flowtable_event,
 };
@@ -5914,6 +5918,102 @@ err:
 	kfree_skb(skb2);
 	return err;
 }
+
+struct list_head nft_osf_fingers[2];
+EXPORT_SYMBOL_GPL(nft_osf_fingers);
+
+static int nf_tables_newosf(struct net *net, struct sock *ctnl,
+			    struct sk_buff *skb, const struct nlmsghdr *nlh,
+			    const struct nlattr * const osf_attrs[],
+			    struct netlink_ext_ack *extack)
+{
+	struct nf_osf_user_finger *f;
+	struct nf_osf_finger *kf = NULL, *sf;
+	int err = 0;
+	int i = 0;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (!osf_attrs[OSF_ATTR_FINGER])
+		return -EINVAL;
+
+	if (!(nlh->nlmsg_flags & NLM_F_CREATE))
+		return -EINVAL;
+
+	f = nla_data(osf_attrs[OSF_ATTR_FINGER]);
+
+	kf = kmalloc(sizeof(struct nf_osf_finger), GFP_KERNEL);
+	if (!kf)
+		return -ENOMEM;
+
+	for (i = 0; i < ARRAY_SIZE(nft_osf_fingers); ++i)
+		INIT_LIST_HEAD(&nft_osf_fingers[i]);
+
+	memcpy(&kf->finger, f, sizeof(struct nf_osf_user_finger));
+
+	list_for_each_entry(sf, &nft_osf_fingers[!!f->df], finger_entry) {
+		if (memcmp(&sf->finger, f, sizeof(struct nf_osf_user_finger)))
+			continue;
+
+		kfree(kf);
+		kf = NULL;
+
+		if (nlh->nlmsg_flags & NLM_F_EXCL)
+			err = -EEXIST;
+		break;
+	}
+
+	/*
+	 * We are protected by nfnl mutex.
+	 */
+	if (kf)
+		list_add_tail_rcu(&kf->finger_entry, &nft_osf_fingers[!!f->df]);
+
+	return err;
+}
+
+static int nf_tables_delosf(struct net *net, struct sock *ctnl,
+			    struct sk_buff *skb,
+			    const struct nlmsghdr *nlh,
+			    const struct nlattr * const osf_attrs[],
+			    struct netlink_ext_ack *extack)
+{
+	struct nf_osf_user_finger *f;
+	struct nf_osf_finger *sf;
+	int err = -ENOENT;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (!osf_attrs[OSF_ATTR_FINGER])
+		return -EINVAL;
+
+	f = nla_data(osf_attrs[OSF_ATTR_FINGER]);
+
+	list_for_each_entry(sf, &nft_osf_fingers[!!f->df], finger_entry) {
+		if (memcmp(&sf->finger, f, sizeof(struct nf_osf_user_finger)))
+			continue;
+
+		/*
+		 * We are protected by nfnl mutex.
+		 */
+		list_del_rcu(&sf->finger_entry);
+		kfree_rcu(sf, rcu_head);
+
+		err = 0;
+		break;
+	}
+
+	return err;
+}
+
+static const struct nla_policy nft_osf_policy[NFTA_OSF_MAX + 1] = {
+	[NFTA_OSF_GENRE]	= { .type = NLA_STRING, .len = OSF_GENRE_SIZE },
+	[NFTA_OSF_FLAGS]	= { .type = NLA_U32 },
+	[NFTA_OSF_LOGLEVEL]	= { .type = NLA_U32 },
+	[NFTA_OSF_TTL]		= { .type = NLA_U32 },
+};
 
 static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 	[NFT_MSG_NEWTABLE] = {
@@ -6028,6 +6128,16 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.call_batch	= nf_tables_delflowtable,
 		.attr_count	= NFTA_FLOWTABLE_MAX,
 		.policy		= nft_flowtable_policy,
+	},
+	[NFT_MSG_NEWOSF] = {
+		.call_batch	= nf_tables_newosf,
+		.attr_count	= NFTA_OSF_MAX,
+		.policy		= nft_osf_policy,
+	},
+	[NFT_MSG_DELOSF] = {
+		.call_batch	= nf_tables_delosf,
+		.attr_count	= NFTA_OSF_MAX,
+		.policy		= nft_osf_policy,
 	},
 };
 

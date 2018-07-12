@@ -51,6 +51,7 @@
 #define xt_osf_finger		nf_osf_finger
 #define xt_osf_nlmsg		nf_osf_nlmsg
 
+#define xt_osf_attr_type	nf_osf_attr_type
 /*
  * Add/remove fingerprint from the kernel.
  */
@@ -58,12 +59,6 @@ enum xt_osf_msg_types {
 	OSF_MSG_ADD,
 	OSF_MSG_REMOVE,
 	OSF_MSG_MAX,
-};
-
-enum xt_osf_attr_type {
-	OSF_ATTR_UNSPEC,
-	OSF_ATTR_FINGER,
-	OSF_ATTR_MAX,
 };
 
 #endif				/* _XT_OSF_H */
