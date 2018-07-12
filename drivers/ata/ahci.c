@@ -1604,6 +1604,19 @@ static int ahci_init_msi(struct pci_dev *pdev, unsigned int n_ports,
 	return pci_alloc_irq_vectors(pdev, 1, 1, PCI_IRQ_MSIX);
 }
 
+static void ahci_update_mobile_policy(struct ahci_host_priv *hpriv)
+{
+#ifdef CONFIG_ACPI
+	if (mobile_lpm_policy > ATA_LPM_MED_POWER &&
+	    (acpi_gbl_FADT.flags & ACPI_FADT_LOW_POWER_S0)) {
+		if (hpriv->cap & HOST_CAP_PART)
+			mobile_lpm_policy = ATA_LPM_MIN_POWER_WITH_ASP;
+		else if (hpriv->cap & HOST_CAP_SSC)
+			mobile_lpm_policy = ATA_LPM_MIN_POWER;
+	}
+#endif
+}
+
 static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	unsigned int board_id = ent->driver_data;
@@ -1795,6 +1808,8 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (pi.flags & ATA_FLAG_EM)
 		ahci_reset_em(host);
+
+	ahci_update_mobile_policy(hpriv);
 
 	for (i = 0; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
