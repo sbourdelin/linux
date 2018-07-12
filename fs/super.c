@@ -1509,6 +1509,7 @@ int freeze_super(struct super_block *sb)
 		return 0;
 	}
 
+	WARN_ONCE(1, "Freezing superblock. Watch out for hung task.\n");
 	sb->s_writers.frozen = SB_FREEZE_WRITE;
 	/* Release s_umount to preserve sb_start_write -> s_umount ordering */
 	up_write(&sb->s_umount);
