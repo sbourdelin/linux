@@ -12,6 +12,7 @@ struct comm_str {
 	char *str;
 	struct rb_node rb_node;
 	refcount_t refcnt;
+	bool removed;
 };
 
 /* Should perhaps be moved to struct machine */
@@ -28,9 +29,6 @@ static struct comm_str *comm_str__get(struct comm_str *cs)
 static void comm_str__put(struct comm_str *cs)
 {
 	if (cs && refcount_dec_and_test(&cs->refcnt)) {
-		down_write(&comm_str_lock);
-		rb_erase(&cs->rb_node, &comm_str_root);
-		up_write(&comm_str_lock);
 		zfree(&cs->str);
 		free(cs);
 	}
@@ -117,6 +115,28 @@ struct comm *comm__new(const char *str, u64 timestamp, bool exec)
 	return comm;
 }
 
+static void __comm_str__remove(struct comm_str *cs)
+{
+	down_write(&comm_str_lock);
+	if (!cs->removed) {
+		rb_erase(&cs->rb_node, &comm_str_root);
+		cs->removed = true;
+	}
+	up_write(&comm_str_lock);
+}
+
+static void comm_str__remove(struct comm_str *cs)
+{
+	if (!cs->removed)
+		__comm_str__remove(cs);
+}
+
+static void comm_str__exit(struct comm_str *cs)
+{
+	comm_str__remove(cs);
+	comm_str__put(cs);
+}
+
 int comm__override(struct comm *comm, const char *str, u64 timestamp, bool exec)
 {
 	struct comm_str *new, *old = comm->comm_str;
@@ -125,7 +145,7 @@ int comm__override(struct comm *comm, const char *str, u64 timestamp, bool exec)
 	if (!new)
 		return -ENOMEM;
 
-	comm_str__put(old);
+	comm_str__exit(old);
 	comm->comm_str = new;
 	comm->start = timestamp;
 	if (exec)
@@ -136,7 +156,7 @@ int comm__override(struct comm *comm, const char *str, u64 timestamp, bool exec)
 
 void comm__free(struct comm *comm)
 {
-	comm_str__put(comm->comm_str);
+	comm_str__exit(comm->comm_str);
 	free(comm);
 }
 
