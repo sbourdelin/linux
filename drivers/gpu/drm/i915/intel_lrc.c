@@ -2342,9 +2342,6 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 		WARN_ON((I915_READ_MODE(engine) & MODE_IDLE) == 0);
 	}
 
-	if (engine->cleanup)
-		engine->cleanup(engine);
-
 	intel_engine_cleanup_common(engine);
 
 	lrc_destroy_wa_ctx(engine);

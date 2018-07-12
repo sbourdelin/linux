@@ -503,7 +503,6 @@ struct intel_engine_cs {
 	 * monotonic, even if not coherent.
 	 */
 	void		(*irq_seqno_barrier)(struct intel_engine_cs *engine);
-	void		(*cleanup)(struct intel_engine_cs *engine);
 
 	/* GEN8 signal/wait table - never trust comments!
 	 *	  signal to	signal to    signal to   signal to      signal to

@@ -1449,9 +1449,6 @@ void intel_engine_cleanup(struct intel_engine_cs *engine)
 	intel_ring_unpin(engine->buffer);
 	intel_ring_free(engine->buffer);
 
-	if (engine->cleanup)
-		engine->cleanup(engine);
-
 	intel_engine_cleanup_common(engine);
 
 	dev_priv->engine[engine->id] = NULL;
