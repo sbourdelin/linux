@@ -808,8 +808,7 @@ out:
 }
 
 static int rcar_du_crtc_set_crc_source(struct drm_crtc *crtc,
-				       const char *source_name,
-				       size_t *values_cnt)
+				       const char *source_name)
 {
 	struct drm_modeset_acquire_ctx ctx;
 	struct drm_crtc_state *crtc_state;
@@ -836,8 +835,6 @@ static int rcar_du_crtc_set_crc_source(struct drm_crtc *crtc,
 	} else {
 		return -EINVAL;
 	}
-
-	*values_cnt = 1;
 
 	/* Perform an atomic commit to set the CRC source. */
 	drm_modeset_acquire_init(&ctx, 0);
