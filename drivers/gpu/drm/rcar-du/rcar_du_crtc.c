@@ -756,17 +756,66 @@ static void rcar_du_crtc_disable_vblank(struct drm_crtc *crtc)
 	rcrtc->vblank_enable = false;
 }
 
+static int rcar_du_get_plane_index(struct drm_crtc *crtc,
+				   const char *source_name,
+				   unsigned int *index)
+{
+	struct rcar_du_crtc *rcrtc = to_rcar_crtc(crtc);
+	unsigned int i;
+	int ret = 0;
+
+	ret = kstrtouint(source_name + strlen("plane"), 10, index);
+	if (ret < 0)
+		return ret;
+
+	for (i = 0; i < rcrtc->vsp->num_planes; ++i) {
+		if (*index == rcrtc->vsp->planes[i].plane.base.id) {
+			*index = i;
+			break;
+		}
+	}
+
+	if (i >= rcrtc->vsp->num_planes)
+		return -EINVAL;
+
+	return ret;
+}
+
+static int rcar_du_crtc_verify_crc_source(struct drm_crtc *crtc,
+					  const char *source_name,
+					  size_t *values_cnt)
+{
+	int ret;
+	unsigned int index;
+	/*
+	 * Parse the source name. Supported values are "plane%u" to compute the
+	 * CRC on an input plane (%u is the plane ID), and "auto" to compute the
+	 * CRC on the composer (VSP) output.
+	 */
+	if (!source_name || !strcmp(source_name, "auto")) {
+		goto out;
+	} else if (strstarts(source_name, "plane")) {
+		ret = rcar_du_get_plane_index(crtc, source_name, &index);
+		if (ret < 0)
+			return ret;
+	} else {
+		return -EINVAL;
+	}
+
+out:
+	*values_cnt = 1;
+	return 0;
+}
+
 static int rcar_du_crtc_set_crc_source(struct drm_crtc *crtc,
 				       const char *source_name,
 				       size_t *values_cnt)
 {
-	struct rcar_du_crtc *rcrtc = to_rcar_crtc(crtc);
 	struct drm_modeset_acquire_ctx ctx;
 	struct drm_crtc_state *crtc_state;
 	struct drm_atomic_state *state;
 	enum vsp1_du_crc_source source;
 	unsigned int index = 0;
-	unsigned int i;
 	int ret;
 
 	/*
@@ -781,19 +830,9 @@ static int rcar_du_crtc_set_crc_source(struct drm_crtc *crtc,
 	} else if (strstarts(source_name, "plane")) {
 		source = VSP1_DU_CRC_PLANE;
 
-		ret = kstrtouint(source_name + strlen("plane"), 10, &index);
+		ret = rcar_du_get_plane_index(crtc, source_name, &index);
 		if (ret < 0)
 			return ret;
-
-		for (i = 0; i < rcrtc->vsp->num_planes; ++i) {
-			if (index == rcrtc->vsp->planes[i].plane.base.id) {
-				index = i;
-				break;
-			}
-		}
-
-		if (i >= rcrtc->vsp->num_planes)
-			return -EINVAL;
 	} else {
 		return -EINVAL;
 	}
@@ -861,6 +900,7 @@ static const struct drm_crtc_funcs crtc_funcs_gen3 = {
 	.enable_vblank = rcar_du_crtc_enable_vblank,
 	.disable_vblank = rcar_du_crtc_disable_vblank,
 	.set_crc_source = rcar_du_crtc_set_crc_source,
+	.verify_crc_source = rcar_du_crtc_verify_crc_source,
 };
 
 /* -----------------------------------------------------------------------------
