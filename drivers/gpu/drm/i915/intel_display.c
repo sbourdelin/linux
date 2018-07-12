@@ -13105,6 +13105,19 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		add_rps_boost_after_vblank(new_state->crtc, new_state->fence);
 	}
 
+	/*
+	 * We declare pageflips to be interactive and so merit a small bias
+	 * towards upclocking to deliver the frame on time. By only changing
+	 * the RPS thresholds to sample more regularly and aim for higher
+	 * clocks we can hopefully deliver low power workloads (like kodi)
+	 * that are not quite steady state without resorting to forcing
+	 * maximum clocks following a vblank miss (see do_rps_boost()).
+	 */
+	if (!intel_state->rps_override) {
+		intel_rps_set_power(dev_priv, HIGH_POWER);
+		intel_state->rps_override = true;
+	}
+
 	return 0;
 }
 
@@ -13121,7 +13134,14 @@ void
 intel_cleanup_plane_fb(struct drm_plane *plane,
 		       struct drm_plane_state *old_state)
 {
+	struct intel_atomic_state *intel_state =
+		to_intel_atomic_state(old_state->state);
 	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+
+	if (intel_state->rps_override) {
+		intel_rps_set_power(dev_priv, AUTO_POWER);
+		intel_state->rps_override = false;
+	}
 
 	/* Should only be called after a successful intel_prepare_plane_fb()! */
 	mutex_lock(&dev_priv->drm.struct_mutex);
