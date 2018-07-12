@@ -733,10 +733,20 @@ static int __init i915_init(void)
 {
 	bool use_kms = true;
 	int err;
+	struct i915_params *backup_modparams;
+
+	backup_modparams = kmalloc(sizeof(*backup_modparams), GFP_KERNEL);
+	if (!backup_modparams)
+		return -ENOMEM;
+	memcpy(backup_modparams, &i915_modparams, sizeof(*backup_modparams));
 
 	err = i915_mock_selftests();
 	if (err)
 		return err > 0 ? 0 : err;
+
+	/* Revert any modparams modifications made inside mock selftests */
+	memcpy(&i915_modparams, backup_modparams, sizeof(*backup_modparams));
+	kfree(backup_modparams);
 
 	/*
 	 * Enable KMS by default, unless explicitly overriden by

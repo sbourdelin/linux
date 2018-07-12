@@ -703,6 +703,12 @@ int i915_gem_context_mock_selftests(void)
 	if (!i915)
 		return -ENOMEM;
 
+	/*
+	 * Platform defaults have not been resolved yet, so we need to prevent
+	 * assertion failure on an unresolved enable_guc.
+	 */
+	i915_modparams.enable_guc = 0;
+
 	err = i915_subtests(tests, i915);
 
 	drm_dev_put(&i915->drm);
