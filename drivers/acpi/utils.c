@@ -738,7 +738,6 @@ bool acpi_dev_found(const char *hid)
 EXPORT_SYMBOL(acpi_dev_found);
 
 struct acpi_dev_match_info {
-	const char *dev_name;
 	struct acpi_device_id hid[2];
 	const char *uid;
 	s64 hrv;
@@ -758,8 +757,6 @@ static int acpi_dev_match_cb(struct device *dev, void *data)
 	    strcmp(adev->pnp.unique_id, match->uid)))
 		return 0;
 
-	match->dev_name = acpi_dev_name(adev);
-
 	if (match->hrv == -1)
 		return 1;
 
@@ -771,18 +768,18 @@ static int acpi_dev_match_cb(struct device *dev, void *data)
 }
 
 /**
- * acpi_dev_present - Detect that a given ACPI device is present
+ * acpi_dev_get_first_match - Return a first match of ACPI device if present
  * @hid: Hardware ID of the device.
  * @uid: Unique ID of the device, pass NULL to not check _UID
  * @hrv: Hardware Revision of the device, pass -1 to not check _HRV
  *
- * Return %true if a matching device was present at the moment of invocation.
- * Note that if the device is pluggable, it may since have disappeared.
+ * Return a pointer to the first matching ACPI device.
+ * Caller must put device back to balance reference counting.
  *
  * Note that unlike acpi_dev_found() this function checks the status
- * of the device. So for devices which are present in the dsdt, but
+ * of the device. So for devices which are present in the DSDT, but
  * which are disabled (their _STA callback returns 0) this function
- * will return false.
+ * will return NULL.
  *
  * For this function to work, acpi_bus_scan() must have been executed
  * which happens in the subsys_initcall() subsection. Hence, do not
@@ -790,7 +787,8 @@ static int acpi_dev_match_cb(struct device *dev, void *data)
  * instead). Calling from module_init() is fine (which is synonymous
  * with device_initcall()).
  */
-bool acpi_dev_present(const char *hid, const char *uid, s64 hrv)
+struct acpi_device *
+acpi_dev_get_first_match(const char *hid, const char *uid, s64 hrv)
 {
 	struct acpi_dev_match_info match = {};
 	struct device *dev;
@@ -800,7 +798,25 @@ bool acpi_dev_present(const char *hid, const char *uid, s64 hrv)
 	match.hrv = hrv;
 
 	dev = bus_find_device(&acpi_bus_type, NULL, &match, acpi_dev_match_cb);
-	return !!dev;
+	return dev ? to_acpi_device(dev) : NULL;
+}
+EXPORT_SYMBOL(acpi_dev_get_first_match);
+
+/**
+ * acpi_dev_present - Detect that a given ACPI device is present
+ * @hid: Hardware ID of the device.
+ * @uid: Unique ID of the device, pass NULL to not check _UID
+ * @hrv: Hardware Revision of the device, pass -1 to not check _HRV
+ *
+ * DEPRECATED, use acpi_dev_get_first_match() directly!
+ *
+ * Return %true if a matching device is present.
+ */
+bool acpi_dev_present(const char *hid, const char *uid, s64 hrv)
+{
+	struct acpi_device *adev = acpi_dev_get_first_match(hid, uid, hrv);
+
+	return !!adev;
 }
 EXPORT_SYMBOL(acpi_dev_present);
 
@@ -810,23 +826,17 @@ EXPORT_SYMBOL(acpi_dev_present);
  * @uid: Unique ID of the device, pass NULL to not check _UID
  * @hrv: Hardware Revision of the device, pass -1 to not check _HRV
  *
+ * DEPRECATED, use acpi_dev_get_first_match() directly!
+ *
  * Return device name if a matching device was present
  * at the moment of invocation, or NULL otherwise.
- *
- * See additional information in acpi_dev_present() as well.
  */
 const char *
 acpi_dev_get_first_match_name(const char *hid, const char *uid, s64 hrv)
 {
-	struct acpi_dev_match_info match = {};
-	struct device *dev;
+	struct acpi_device *adev = acpi_dev_get_first_match(hid, uid, hrv);
 
-	strlcpy(match.hid[0].id, hid, sizeof(match.hid[0].id));
-	match.uid = uid;
-	match.hrv = hrv;
-
-	dev = bus_find_device(&acpi_bus_type, NULL, &match, acpi_dev_match_cb);
-	return dev ? match.dev_name : NULL;
+	return adev ? acpi_dev_name(adev) : NULL;
 }
 EXPORT_SYMBOL(acpi_dev_get_first_match_name);
 
