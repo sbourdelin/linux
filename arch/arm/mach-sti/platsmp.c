@@ -109,6 +109,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
 
 	if (np) {
 		scu_base = of_iomap(np, 0);
+		WARN_ON(!scu_base);
 		scu_enable(scu_base);
 		of_node_put(np);
 	}
