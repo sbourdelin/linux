@@ -35,6 +35,11 @@ bos:		# List of buffers from the hanging submission (if known)
 			# ascii85. Only the contents of buffers marked as
 			# readable are dumped. Trailing zeros at the end of the
 			# buffer won't be dumped.
+   size:		# [decimal] The maximum size of the ring programmed in
+			# the hardware
+   data:		# [ascii85] The contents of the ring encoded as ascii85.
+			# Only the unused portions of the ring will be printed
+			# (up to a maximum of 'size' bytes)
 registers:	# Sets of register values. This section can be used multiple
 		# times for different ranges of registers. Each register will be
 		# on its own line.
