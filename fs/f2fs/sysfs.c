@@ -271,6 +271,10 @@ out:
 		return count;
 	}
 
+	if (!strcmp(a->attr.name, "max_small_discards") &&
+		test_opt(sbi, LFS))
+		return -EINVAL;
+
 	*ui = t;
 
 	if (!strcmp(a->attr.name, "iostat_enable") && *ui == 0)
