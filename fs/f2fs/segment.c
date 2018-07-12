@@ -1684,8 +1684,23 @@ next:
 		start = start_segno + sbi->segs_per_sec;
 		if (start < end)
 			goto next;
-		else
-			end = start - 1;
+		else {
+			start_segno = start;
+
+			while (1) {
+				start = find_next_bit(prefree_map, start_segno,
+									end + 1);
+				if (start >= start_segno)
+					break;
+				end = find_next_zero_bit(prefree_map, start_segno,
+										start + 1);
+				for (i = start; i < end; i++)
+					clear_bit(i, prefree_map);
+				dirty_i->nr_dirty[PRE] -= end - start;
+			}
+
+			end = start_segno - 1;
+		}
 	}
 	mutex_unlock(&dirty_i->seglist_lock);
 
