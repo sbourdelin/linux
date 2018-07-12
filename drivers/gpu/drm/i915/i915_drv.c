@@ -2603,6 +2603,7 @@ static int intel_runtime_suspend(struct device *kdev)
 	DRM_DEBUG_KMS("Suspending device\n");
 
 	disable_rpm_wakeref_asserts(dev_priv);
+	lock_map_acquire(&dev_priv->runtime_pm.lock);
 
 	/*
 	 * We are safe here against re-faults, since the fault handler takes
@@ -2637,11 +2638,13 @@ static int intel_runtime_suspend(struct device *kdev)
 		i915_gem_init_swizzling(dev_priv);
 		i915_gem_restore_fences(dev_priv);
 
+		lock_map_release(&dev_priv->runtime_pm.lock);
 		enable_rpm_wakeref_asserts(dev_priv);
 
 		return ret;
 	}
 
+	lock_map_release(&dev_priv->runtime_pm.lock);
 	enable_rpm_wakeref_asserts(dev_priv);
 	WARN_ON_ONCE(atomic_read(&dev_priv->runtime_pm.wakeref_count));
 
@@ -2696,6 +2699,7 @@ static int intel_runtime_resume(struct device *kdev)
 
 	WARN_ON_ONCE(atomic_read(&dev_priv->runtime_pm.wakeref_count));
 	disable_rpm_wakeref_asserts(dev_priv);
+	lock_map_acquire(&dev_priv->runtime_pm.lock);
 
 	intel_opregion_notify_adapter(dev_priv, PCI_D0);
 	dev_priv->runtime_pm.suspended = false;
@@ -2737,6 +2741,7 @@ static int intel_runtime_resume(struct device *kdev)
 
 	intel_enable_ipc(dev_priv);
 
+	lock_map_release(&dev_priv->runtime_pm.lock);
 	enable_rpm_wakeref_asserts(dev_priv);
 
 	if (ret)
