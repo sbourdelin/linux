@@ -37,8 +37,12 @@
 
 #define XT_OSF_TTL_TRUE		NF_OSF_TTL_TRUE
 #define XT_OSF_TTL_NOCHECK	NF_OSF_TTL_NOCHECK
+#define XT_OSF_TTL_LESS		NF_OSF_TTL_LESS
 
-#define XT_OSF_TTL_LESS	1	/* Check if ip TTL is less than fingerprint one */
+#define XT_OSF_FLAGMASK		(XT_OSF_GENRE | \
+				XT_OSF_TTL | \
+				XT_OSF_LOG | \
+				XT_OSF_INVERT)
 
 #define xt_osf_wc		nf_osf_wc
 #define xt_osf_opt		nf_osf_opt
