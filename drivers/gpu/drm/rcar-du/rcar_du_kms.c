@@ -421,6 +421,70 @@ static int rcar_du_properties_init(struct rcar_du_device *rcdu)
 	return 0;
 }
 
+static void rcar_du_crc_sources_list_init(struct rcar_du_device *rcdu)
+{
+	struct drm_device *dev = rcdu->ddev;
+	struct drm_plane *plane;
+	char **sources;
+	size_t count;
+	int i = 0;
+
+	/* reserve 1 for "auto" source */
+	count = 1;
+
+	drm_for_each_plane(plane, dev)
+		count++;
+
+	sources = kmalloc_array(count, sizeof(char *), GFP_KERNEL);
+	if (!sources)
+		goto fail;
+
+	sources[i] = kstrdup("auto", GFP_KERNEL);
+	if (!sources[i])
+		goto fail_no_mem;
+
+	i++;
+	drm_for_each_plane(plane, dev) {
+		char name[16];
+
+		sprintf(name, "plane%d", plane->base.id);
+		sources[i] = kstrdup(name, GFP_KERNEL);
+		if (!sources[i])
+			goto fail_no_mem;
+		i++;
+	}
+
+	rcdu->sources = sources;
+	rcdu->sources_count = count;
+	return;
+
+fail_no_mem:
+	while (i > 0) {
+		i--;
+		kfree(sources[i]);
+	}
+	kfree(sources);
+fail:
+	rcdu->sources = NULL;
+	rcdu->sources_count = 0;
+}
+
+void rcar_du_crc_sources_list_uninit(struct rcar_du_device *rcdu)
+{
+	int i = rcdu->sources_count;
+
+	if (!rcdu->sources)
+		return;
+
+	while (i > 0) {
+		i--;
+		kfree(rcdu->sources[i]);
+	}
+	kfree(rcdu->sources);
+	rcdu->sources = NULL;
+	rcdu->sources_count = 0;
+}
+
 static int rcar_du_vsps_init(struct rcar_du_device *rcdu)
 {
 	const struct device_node *np = rcdu->dev->of_node;
@@ -590,6 +654,9 @@ int rcar_du_modeset_init(struct rcar_du_device *rcdu)
 		if (ret < 0)
 			return ret;
 	}
+
+	/* Initialize CRC-sources list */
+	rcar_du_crc_sources_list_init(rcdu);
 
 	/* Initialize the encoders. */
 	ret = rcar_du_encoders_init(rcdu);

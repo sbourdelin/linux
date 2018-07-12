@@ -92,6 +92,8 @@ struct rcar_du_device {
 
 	unsigned int dpad0_source;
 	unsigned int vspd1_sink;
+	char **sources;
+	size_t sources_count;
 };
 
 static inline bool rcar_du_has(struct rcar_du_device *rcdu,

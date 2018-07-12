@@ -401,6 +401,8 @@ static int rcar_du_remove(struct platform_device *pdev)
 
 	drm_dev_unregister(ddev);
 
+	rcar_du_crc_sources_list_uninit(rcdu);
+
 	if (rcdu->fbdev)
 		drm_fbdev_cma_fini(rcdu->fbdev);
 

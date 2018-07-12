@@ -807,6 +807,16 @@ out:
 	return 0;
 }
 
+const char *const *rcar_du_crtc_get_crc_sources(struct drm_crtc *crtc,
+						size_t *count)
+{
+	struct rcar_du_crtc *rcrtc = to_rcar_crtc(crtc);
+	struct rcar_du_device *rcdu = rcrtc->group->dev;
+
+	*count = rcdu->sources_count;
+	return (const char * const*)rcdu->sources;
+}
+
 static int rcar_du_crtc_set_crc_source(struct drm_crtc *crtc,
 				       const char *source_name)
 {
@@ -898,6 +908,7 @@ static const struct drm_crtc_funcs crtc_funcs_gen3 = {
 	.disable_vblank = rcar_du_crtc_disable_vblank,
 	.set_crc_source = rcar_du_crtc_set_crc_source,
 	.verify_crc_source = rcar_du_crtc_verify_crc_source,
+	.get_crc_sources = rcar_du_crtc_get_crc_sources,
 };
 
 /* -----------------------------------------------------------------------------
