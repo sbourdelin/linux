@@ -6547,7 +6547,7 @@ static unsigned long __init early_calculate_totalpages(void)
 static void __init find_zone_movable_pfns_for_nodes(void)
 {
 	int i, nid;
-	unsigned long usable_startpfn;
+	unsigned long usable_startpfn, kernel_endpfn, arch_startpfn;
 	unsigned long kernelcore_node, kernelcore_remaining;
 	/* save the state before borrow the nodemask */
 	nodemask_t saved_node_state = node_states[N_MEMORY];
@@ -6649,14 +6649,25 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	if (!required_kernelcore || required_kernelcore >= totalpages)
 		goto out;
 
+	kernel_endpfn = PFN_UP(__pa_symbol(_end));
 	/* usable_startpfn is the lowest possible pfn ZONE_MOVABLE can be at */
-	usable_startpfn = arch_zone_lowest_possible_pfn[movable_zone];
+	arch_startpfn = arch_zone_lowest_possible_pfn[movable_zone];
 
 restart:
 	/* Spread kernelcore memory as evenly as possible throughout nodes */
 	kernelcore_node = required_kernelcore / usable_nodes;
 	for_each_node_state(nid, N_MEMORY) {
 		unsigned long start_pfn, end_pfn;
+
+		/*
+		 * KASLR may put kernel near tail of node memory,
+		 * start after kernel on that node to find PFN
+		 * at which zone begins.
+		 */
+		if (pfn_to_nid(kernel_endpfn) == nid)
+		        usable_startpfn = max(arch_startpfn, kernel_endpfn);
+		else
+		        usable_startpfn = arch_startpfn;
 
 		/*
 		 * Recalculate kernelcore_node if the division per node
