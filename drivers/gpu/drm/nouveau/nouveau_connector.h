@@ -35,6 +35,7 @@
 #include "nouveau_crtc.h"
 
 struct nvkm_i2c_port;
+struct dcb_output;
 
 struct nouveau_connector {
 	struct drm_connector base;
@@ -76,7 +77,7 @@ nouveau_crtc_connector_get(struct nouveau_crtc *nv_crtc)
 }
 
 struct drm_connector *
-nouveau_connector_create(struct drm_device *, int index);
+nouveau_connector_create(struct drm_device *, const struct dcb_output *);
 
 extern int nouveau_tv_disable;
 extern int nouveau_ignorelid;
