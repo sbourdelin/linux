@@ -420,6 +420,17 @@ static inline u64 spi_nor_region_end(const struct spi_nor_erase_region *region)
 	return (region->offset & ~SNOR_ERASE_FLAGS_MASK) + region->size;
 }
 
+static inline void spi_nor_region_mark_end(struct spi_nor_erase_region *region)
+{
+	region->offset |= SNOR_LAST_REGION;
+}
+
+static inline void
+spi_nor_region_mark_overlay(struct spi_nor_erase_region *region)
+{
+	region->offset |= SNOR_OVERLAID_REGION;
+}
+
 static inline bool spi_nor_has_uniform_erase(const struct spi_nor *nor)
 {
 	return !!nor->erase_map.uniform_erase_type;
