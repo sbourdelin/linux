@@ -11778,8 +11778,10 @@ static int enter_vmx_non_root_mode(struct kvm_vcpu *vcpu)
 	msr_entry_idx = nested_vmx_load_msr(vcpu,
 					    vmcs12->vm_entry_msr_load_addr,
 					    vmcs12->vm_entry_msr_load_count);
-	if (msr_entry_idx)
+	if (msr_entry_idx) {
+		exit_qual = msr_entry_idx;
 		goto fail;
+	}
 
 	/*
 	 * Note no nested_vmx_succeed or nested_vmx_fail here. At this point
