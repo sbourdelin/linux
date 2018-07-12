@@ -381,10 +381,18 @@ static void mrfld_irq_init_hw(struct mrfld_gpio *priv)
 	}
 }
 
-static const char *mrfld_gpio_get_pinctrl_dev_name(void)
+static const char *mrfld_gpio_get_pinctrl_dev_name(struct mrfld_gpio *priv)
 {
-	const char *dev_name = acpi_dev_get_first_match_name("INTC1002", NULL, -1);
-	return dev_name ? dev_name : "pinctrl-merrifield";
+	struct acpi_device *adev;
+	const char *dev_name;
+
+	adev = acpi_dev_get_first_match("INTC1002", NULL, -1);
+	if (!adev)
+		return "pinctrl-merrifield";
+
+	dev_name = devm_kstrdup(priv->dev, acpi_dev_name(adev), GFP_KERNEL);
+	put_device(&adev->dev);
+	return dev_name;
 }
 
 static int mrfld_gpio_probe(struct pci_dev *pdev, const struct pci_device_id *id)
@@ -445,7 +453,7 @@ static int mrfld_gpio_probe(struct pci_dev *pdev, const struct pci_device_id *id
 		return retval;
 	}
 
-	pinctrl_dev_name = mrfld_gpio_get_pinctrl_dev_name();
+	pinctrl_dev_name = mrfld_gpio_get_pinctrl_dev_name(priv);
 	for (i = 0; i < ARRAY_SIZE(mrfld_gpio_ranges); i++) {
 		range = &mrfld_gpio_ranges[i];
 		retval = gpiochip_add_pin_range(&priv->chip,
