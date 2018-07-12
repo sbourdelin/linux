@@ -141,6 +141,7 @@ struct dentry_stat_t dentry_stat = {
 #define NEG_DENTRY_BATCH	(1 << 8)
 #define NEG_WARN_PERIOD 	(60 * HZ)	/* Print a warning every min */
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 static struct static_key limit_neg_key = STATIC_KEY_INIT_FALSE;
 static int neg_dentry_limit_old;
 int neg_dentry_limit;
@@ -156,6 +157,7 @@ static struct {
 	unsigned long warn_jiffies;	/* Time when last warning is printed */
 } ndblk ____cacheline_aligned_in_smp;
 proc_handler proc_neg_dentry_limit;
+#endif /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
 
 static DEFINE_PER_CPU(long, nr_dentry);
 static DEFINE_PER_CPU(long, nr_dentry_unused);
@@ -200,7 +202,9 @@ static long get_nr_dentry_neg(void)
 
 	for_each_possible_cpu(i)
 		sum += per_cpu(nr_dentry_neg, i);
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 	sum += neg_dentry_nfree_init - ndblk.nfree;
+#endif
 	return sum < 0 ? 0 : sum;
 }
 
@@ -267,6 +271,7 @@ static inline int dentry_string_cmp(const unsigned char *cs, const unsigned char
 
 #endif
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 /*
  * Decrement negative dentry count if applicable.
  */
@@ -287,12 +292,6 @@ static void __neg_dentry_dec(struct dentry *dentry)
 		}
 		put_cpu_ptr(&nr_dentry_neg);
 	}
-}
-
-static inline void neg_dentry_dec(struct dentry *dentry)
-{
-	if (unlikely(d_is_negative(dentry)))
-		__neg_dentry_dec(dentry);
 }
 
 /*
@@ -454,6 +453,20 @@ out:
 	return 0;
 }
 EXPORT_SYMBOL_GPL(proc_neg_dentry_limit);
+#else /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
+
+static inline void __neg_dentry_dec(struct dentry *dentry)
+{
+	 this_cpu_dec(nr_dentry_neg);
+}
+
+#endif /* CONFIG_DCACHE_LIMIT_NEG_ENTRY */
+
+static inline void neg_dentry_dec(struct dentry *dentry)
+{
+	if (unlikely(d_is_negative(dentry)))
+		__neg_dentry_dec(dentry);
+}
 
 static inline int dentry_cmp(const struct dentry *dentry, const unsigned char *ct, unsigned tcount)
 {
@@ -642,6 +655,7 @@ static void d_lru_add(struct dentry *dentry)
 	dentry->d_flags |= DCACHE_LRU_LIST;
 	this_cpu_inc(nr_dentry_unused);
 	if (d_is_negative(dentry)) {
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 		if (dentry->d_flags & DCACHE_NEW_NEGATIVE) {
 			dentry->d_flags &= ~DCACHE_NEW_NEGATIVE;
 			if (unlikely(neg_dentry_inc(dentry) < 0)) {
@@ -658,6 +672,7 @@ static void d_lru_add(struct dentry *dentry)
 				&dentry->d_sb->s_dentry_lru, &dentry->d_lru));
 			return;
 		}
+#endif
 		/*
 		 * We don't do limit check for existing negative
 		 * dentries.
@@ -3431,7 +3446,9 @@ static void __init dcache_init(void)
 		SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|SLAB_MEM_SPREAD|SLAB_ACCOUNT,
 		d_iname);
 
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 	raw_spin_lock_init(&ndblk.nfree_lock);
+#endif
 
 	/* Hash may have been set up in dcache_init_early */
 	if (!hashdist)

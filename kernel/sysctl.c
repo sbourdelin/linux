@@ -1851,6 +1851,7 @@ static struct ctl_table fs_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &one,
 	},
+#ifdef CONFIG_DCACHE_LIMIT_NEG_ENTRY
 	{
 		.procname	= "neg-dentry-limit",
 		.data		= &neg_dentry_limit,
@@ -1869,6 +1870,7 @@ static struct ctl_table fs_table[] = {
 		.extra1		= &zero,
 		.extra2		= &one,
 	},
+#endif
 	{ }
 };
 
