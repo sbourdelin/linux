@@ -3796,9 +3796,12 @@ void intel_runtime_pm_put(struct drm_i915_private *dev_priv)
  */
 void intel_runtime_pm_enable(struct drm_i915_private *dev_priv)
 {
+	static struct lock_class_key lock_key;
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
 
+	lockdep_init_map(&dev_priv->runtime_pm.lock,
+			 "i915->runtime_pm", &lock_key, 0);
 	pm_runtime_set_autosuspend_delay(kdev, 10000); /* 10s */
 	pm_runtime_mark_last_busy(kdev);
 
