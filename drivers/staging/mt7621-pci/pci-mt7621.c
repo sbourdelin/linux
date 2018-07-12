@@ -52,6 +52,9 @@
 #include <linux/delay.h>
 #include <linux/of.h>
 #include <linux/of_pci.h>
+#include <linux/of_platform.h>
+#include <linux/of_address.h>
+#include <linux/of_irq.h>
 #include <linux/platform_device.h>
 
 #include <ralink_regs.h>
@@ -177,6 +180,32 @@ static int pcie_link_status = 0;
 #define PCI_ACCESS_WRITE_2 4
 #define PCI_ACCESS_WRITE_4 5
 
+/**
+ * struct mt7621_pcie_port - PCIe port information
+ * @base: IO mapped register base
+ * @list: port list
+ * @pcie: pointer to PCIe host info
+ * @reset: pointer to port reset control
+ */
+struct mt7621_pcie_port {
+	void __iomem *base;
+	struct list_head list;
+	struct mt7621_pcie *pcie;
+	struct reset_control *reset;
+};
+
+/**
+ * struct mt7621_pcie - PCIe host information
+ * @base: IO Mapped Register Base
+ * @dev: Pointer to PCIe device
+ * @ports: pointer to PCIe port information
+ */
+struct mt7621_pcie {
+	void __iomem *base;
+	struct device *dev;
+	struct list_head ports;
+};
+
 static inline u32 mt7621_pci_get_cfgaddr(unsigned int bus, unsigned int slot,
 					 unsigned int func, unsigned int where)
 {
@@ -296,15 +325,27 @@ pci_config_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u
 	}
 }
 
+static void __iomem *mt7621_pcie_map_bus(struct pci_bus *bus,
+					 unsigned int devfn, int where)
+{
+	struct mt7621_pcie *pcie = bus->sysdata;
+	u32 address = mt7621_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
+					     PCI_FUNC(devfn), where);
+
+	writel(address, pcie->base + RALINK_PCI_CONFIG_ADDR);
+
+	return pcie->base + RALINK_PCI_CONFIG_DATA_VIRTUAL_REG + (where & 3);
+}
+
 struct pci_ops mt7621_pci_ops = {
-	.read		= pci_config_read,
-	.write		= pci_config_write,
+	.map_bus	= mt7621_pcie_map_bus,
+	.read		= pci_generic_config_read,
+	.write		= pci_generic_config_write,
 };
 
 static struct resource mt7621_res_pci_mem1;
 static struct resource mt7621_res_pci_io1;
 static struct pci_controller mt7621_controller = {
-	.pci_ops	= &mt7621_pci_ops,
 	.mem_resource	= &mt7621_res_pci_mem1,
 	.io_resource	= &mt7621_res_pci_io1,
 };
@@ -479,9 +520,60 @@ void setup_cm_memory_region(struct resource *mem_resource)
 	}
 }
 
+static int mt7621_pcie_parse_dt(struct mt7621_pcie *pcie)
+{
+	struct device *dev = pcie->dev;
+	struct device_node *node = dev->of_node;
+	struct resource regs;
+	const char *type;
+	int err;
+
+	type = of_get_property(node, "device_type", NULL);
+	if (!type || strcmp(type, "pci") != 0) {
+		dev_err(dev, "invalid \"device_type\" %s\n", type);
+		return -EINVAL;
+	}
+
+	err = of_address_to_resource(node, 0, &regs);
+	if (err) {
+		dev_err(dev, "missing \"reg\" property\n");
+		return err;
+	}
+
+	pcie->base = devm_pci_remap_cfg_resource(dev, &regs);
+	if (IS_ERR(pcie->base))
+		return PTR_ERR(pcie->base);
+
+	return 0;
+}
+
 static int mt7621_pci_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
+	struct mt7621_pcie *pcie;
+	struct pci_host_bridge *bridge;
+	int err;
 	unsigned long val = 0;
+
+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
+	if (!bridge)
+		return -ENODEV;
+
+	pcie = pci_host_bridge_priv(bridge);
+	pcie->dev = dev;
+	INIT_LIST_HEAD(&pcie->ports);
+
+	err = mt7621_pcie_parse_dt(pcie);
+	if (err) {
+		dev_err(dev, "Parsing DT failed\n");
+		return err;
+	}
+
+	bridge->dev.parent = dev;
+	bridge->sysdata = pcie;
+	bridge->ops = &mt7621_pci_ops;
+	mt7621_controller.bus = bridge->bus;
+	mt7621_controller.bus->ops = bridge->ops;
 
 	iomem_resource.start = 0;
 	iomem_resource.end = ~0;
@@ -668,7 +760,6 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	setup_cm_memory_region(mt7621_controller.mem_resource);
 	register_pci_controller(&mt7621_controller);
 	return 0;
-
 }
 
 int pcibios_plat_dev_init(struct pci_dev *dev)
