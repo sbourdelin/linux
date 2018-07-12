@@ -116,11 +116,11 @@ What has to be filled in?
 
 Depending on the type of transaction, there are some inline functions
 defined in ``linux/usb.h`` to simplify the initialization, such as
-:c:func:`usb_fill_control_urb`, :c:func:`usb_fill_bulk_urb` and
-:c:func:`usb_fill_int_urb`.  In general, they need the usb device pointer,
-the pipe (usual format from usb.h), the transfer buffer, the desired transfer
-length, the completion handler, and its context. Take a look at the some
-existing drivers to see how they're used.
+:c:func:`usb_fill_control_urb`, :c:func:`usb_fill_bulk_urb`,
+:c:func:`usb_fill_int_urb` and :c:func:`usb_fill_iso_urb`.  In general, they
+need the usb device pointer, the pipe (usual format from usb.h), the transfer
+buffer, the desired transfer length, the completion handler, and its context.
+Take a look at the some existing drivers to see how they're used.
 
 Flags:
 
@@ -243,7 +243,7 @@ Besides the fields present on a bulk transfer, for ISO, you also
 also have to set ``urb->interval`` to say how often to make transfers; it's
 often one per frame (which is once every microframe for highspeed devices).
 The actual interval used will be a power of two that's no bigger than what
-you specify. You can use the :c:func:`usb_fill_int_urb` macro to fill
+you specify. You can use the :c:func:`usb_fill_iso_urb` macro to fill
 most ISO transfer fields.
 
 For ISO transfers you also have to fill a :c:type:`usb_iso_packet_descriptor`
