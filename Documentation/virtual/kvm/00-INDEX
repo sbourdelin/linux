@@ -9,6 +9,8 @@ arm
 	- internal ABI between the kernel and HYP (for arm/arm64)
 cpuid.txt
 	- KVM-specific cpuid leaves (x86).
+coalesced-io.txt
+	- Coalesced MMIO and coalesced PIO.
 devices/
 	- KVM_CAP_DEVICE_CTRL userspace API.
 halt-polling.txt
