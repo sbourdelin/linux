@@ -4,6 +4,14 @@ Required properties:
 - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000", "fsl,pfuze3001"
 - reg: I2C slave address
 
+Optional properties:
+- pfuze-disable-sw: Disable all unused switch regulators to save power
+  consumption. Attention, some platforms are using the switch regulators as DDR
+  ref or supply voltage. Mark these regulators as "regulator-always-on" to skip
+  disabling these regulators. If not specified, the driver simualtes the
+  disabling. This means the state of the regulator is set to 'disabled' but the
+  driver don't disable the regulator.
+
 Required child node:
 - regulators: This is the list of child nodes that specify the regulator
   initialization data for defined regulators. Please refer to below doc
