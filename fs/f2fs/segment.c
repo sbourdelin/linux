@@ -893,7 +893,19 @@ static void __remove_discard_cmd(struct f2fs_sb_info *sbi,
 static void f2fs_submit_discard_endio(struct bio *bio)
 {
 	struct discard_cmd *dc = (struct discard_cmd *)bio->bi_private;
+	struct f2fs_sb_info *sbi = F2FS_SB(dc->bdev->bd_super);
 
+	if (test_opt(sbi, LFS)) {
+		unsigned int segno = GET_SEGNO(sbi, dc->lstart);
+		unsigned int secno = GET_SEC_FROM_SEG(sbi, segno);
+		int cnt = (dc->len >> sbi->log_blocks_per_seg) /
+				sbi->segs_per_sec;
+
+		while (cnt--) {
+			set_bit(secno, FREE_I(sbi)->discard_secmap);
+			secno++;
+		}
+	}
 	dc->error = blk_status_to_errno(bio->bi_status);
 	dc->state = D_DONE;
 	complete_all(&dc->wait);
@@ -1349,8 +1361,15 @@ static void f2fs_wait_discard_bio(struct f2fs_sb_info *sbi, block_t blkaddr)
 	dc = (struct discard_cmd *)f2fs_lookup_rb_tree(&dcc->root,
 							NULL, blkaddr);
 	if (dc) {
-		if (dc->state == D_PREP) {
+		if (dc->state == D_PREP && !test_opt(sbi, LFS))
 			__punch_discard_cmd(sbi, dc, blkaddr);
+		else if (dc->state == D_PREP && test_opt(sbi, LFS)) {
+			struct discard_policy dpolicy;
+
+			__init_discard_policy(sbi, &dpolicy, DPOLICY_FORCE, 1);
+			__submit_discard_cmd(sbi, &dpolicy, dc);
+			dc->ref++;
+			need_wait = true;
 		} else {
 			dc->ref++;
 			need_wait = true;
@@ -2071,9 +2090,10 @@ static void get_new_segment(struct f2fs_sb_info *sbi,
 	unsigned int hint = GET_SEC_FROM_SEG(sbi, *newseg);
 	unsigned int old_zoneno = GET_ZONE_FROM_SEG(sbi, *newseg);
 	unsigned int left_start = hint;
-	bool init = true;
+	bool init = true, check_discard = test_opt(sbi, LFS) ? true : false;
 	int go_left = 0;
 	int i;
+	unsigned long *free_secmap;
 
 	spin_lock(&free_i->segmap_lock);
 
@@ -2084,11 +2104,25 @@ static void get_new_segment(struct f2fs_sb_info *sbi,
 			goto got_it;
 	}
 find_other_zone:
-	secno = find_next_zero_bit(free_i->free_secmap, MAIN_SECS(sbi), hint);
+	if (check_discard) {
+		int entries = f2fs_bitmap_size(MAIN_SECS(sbi)) / sizeof(unsigned long);
+
+		free_secmap = free_i->tmp_secmap;
+		for (i = 0; i < entries; i++)
+			free_secmap[i] = (!(free_i->free_secmap[i] ^
+				free_i->discard_secmap[i])) | free_i->free_secmap[i];
+	} else
+		free_secmap = free_i->free_secmap;
+
+	secno = find_next_zero_bit(free_secmap, MAIN_SECS(sbi), hint);
 	if (secno >= MAIN_SECS(sbi)) {
 		if (dir == ALLOC_RIGHT) {
-			secno = find_next_zero_bit(free_i->free_secmap,
+			secno = find_next_zero_bit(free_secmap,
 							MAIN_SECS(sbi), 0);
+			if (secno >= MAIN_SECS(sbi) && check_discard) {
+				check_discard = false;
+				goto find_other_zone;
+			}
 			f2fs_bug_on(sbi, secno >= MAIN_SECS(sbi));
 		} else {
 			go_left = 1;
@@ -2098,13 +2132,17 @@ find_other_zone:
 	if (go_left == 0)
 		goto skip_left;
 
-	while (test_bit(left_start, free_i->free_secmap)) {
+	while (test_bit(left_start, free_secmap)) {
 		if (left_start > 0) {
 			left_start--;
 			continue;
 		}
-		left_start = find_next_zero_bit(free_i->free_secmap,
+		left_start = find_next_zero_bit(free_secmap,
 							MAIN_SECS(sbi), 0);
+		if (left_start >= MAIN_SECS(sbi) && check_discard) {
+			check_discard = false;
+			goto find_other_zone;
+		}
 		f2fs_bug_on(sbi, left_start >= MAIN_SECS(sbi));
 		break;
 	}
@@ -2719,7 +2757,18 @@ void f2fs_allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 
 	*new_blkaddr = NEXT_FREE_BLKADDR(sbi, curseg);
 
-	f2fs_wait_discard_bio(sbi, *new_blkaddr);
+	if (test_opt(sbi, LFS)) {
+		unsigned int start_segno, secno;
+
+		secno = GET_SEC_FROM_SEG(sbi, curseg->segno);
+		start_segno = secno * sbi->segs_per_sec;
+		if (*new_blkaddr == START_BLOCK(sbi, start_segno) &&
+				!test_bit(secno, FREE_I(sbi)->discard_secmap))
+			f2fs_wait_discard_bio(sbi, *new_blkaddr);
+		f2fs_bug_on(sbi, !test_bit(secno, FREE_I(sbi)->discard_secmap));
+	}
+	else
+		f2fs_wait_discard_bio(sbi, *new_blkaddr);
 
 	/*
 	 * __add_sum_entry should be resided under the curseg_mutex
@@ -3648,9 +3697,20 @@ static int build_free_segmap(struct f2fs_sb_info *sbi)
 	if (!free_i->free_secmap)
 		return -ENOMEM;
 
+	free_i->discard_secmap = f2fs_kvmalloc(sbi, sec_bitmap_size, GFP_KERNEL);
+	if (!free_i->discard_secmap)
+		return -ENOMEM;
+
+	free_i->tmp_secmap = f2fs_kvmalloc(sbi, sec_bitmap_size, GFP_KERNEL);
+	if (!free_i->tmp_secmap)
+		return -ENOMEM;
+
 	/* set all segments as dirty temporarily */
 	memset(free_i->free_segmap, 0xff, bitmap_size);
 	memset(free_i->free_secmap, 0xff, sec_bitmap_size);
+
+	/* set all sections as discarded temporarily */
+	memset(free_i->discard_secmap, 0xff, sec_bitmap_size);
 
 	/* init free segmap information */
 	free_i->start_segno = GET_SEGNO_FROM_SEG0(sbi, MAIN_BLKADDR(sbi));
@@ -4047,6 +4107,8 @@ static void destroy_free_segmap(struct f2fs_sb_info *sbi)
 	SM_I(sbi)->free_info = NULL;
 	kvfree(free_i->free_segmap);
 	kvfree(free_i->free_secmap);
+	kvfree(free_i->discard_secmap);
+	kvfree(free_i->tmp_secmap);
 	kfree(free_i);
 }
 

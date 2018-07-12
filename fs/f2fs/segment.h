@@ -259,6 +259,8 @@ struct free_segmap_info {
 	spinlock_t segmap_lock;		/* free segmap lock */
 	unsigned long *free_segmap;	/* free segment bitmap */
 	unsigned long *free_secmap;	/* free section bitmap */
+	unsigned long *discard_secmap;	/* discard section bitmap */
+	unsigned long *tmp_secmap;	/* bitmap for temporal use */
 };
 
 /* Notice: The order of dirty type is same with CURSEG_XXX in f2fs.h */
@@ -453,8 +455,11 @@ static inline void __set_test_and_free(struct f2fs_sb_info *sbi,
 		next = find_next_bit(free_i->free_segmap,
 				start_segno + sbi->segs_per_sec, start_segno);
 		if (next >= start_segno + sbi->segs_per_sec) {
-			if (test_and_clear_bit(secno, free_i->free_secmap))
+			if (test_and_clear_bit(secno, free_i->free_secmap)) {
 				free_i->free_sections++;
+				if (test_opt(sbi, LFS))
+					clear_bit(secno, free_i->discard_secmap);
+			}
 		}
 	}
 skip_free:
