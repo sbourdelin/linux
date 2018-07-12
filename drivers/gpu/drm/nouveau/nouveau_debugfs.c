@@ -32,18 +32,60 @@
 #include <nvif/class.h>
 #include <nvif/if0001.h>
 #include "nouveau_debugfs.h"
+#include "nouveau_encoder.h"
 #include "nouveau_drv.h"
+#include "dispnv50/disp.h"
+
+static inline struct nouveau_drm *node_to_nouveau(struct drm_info_node *node)
+{
+	return nouveau_drm(node->minor->dev);
+}
 
 static int
 nouveau_debugfs_vbios_image(struct seq_file *m, void *data)
 {
-	struct drm_info_node *node = (struct drm_info_node *) m->private;
-	struct nouveau_drm *drm = nouveau_drm(node->minor->dev);
+	struct nouveau_drm *drm = node_to_nouveau(m->private);
 	int i;
 
 	for (i = 0; i < drm->vbios.length; i++)
 		seq_printf(m, "%c", drm->vbios.data[i]);
 	return 0;
+}
+
+static int
+nouveau_debugfs_dp_mst_info(struct seq_file *m, void *unused)
+{
+	struct nouveau_drm *drm = node_to_nouveau(m->private);
+	struct drm_device *dev = drm->dev;
+	struct drm_encoder *encoder;
+	struct nv50_mstm *mstm;
+	int ret;
+
+	ret = pm_runtime_get_sync(dev->dev);
+	if (ret < 0 && ret != -EACCES)
+		return ret;
+
+	ret = drm_modeset_lock_single_interruptible(&dev->mode_config.connection_mutex);
+	if (ret)
+		goto out;
+
+	drm_for_each_encoder(encoder, dev) {
+		if (encoder->encoder_type != DRM_MODE_ENCODER_TMDS)
+			continue;
+
+		mstm = nouveau_encoder(encoder)->dp.mstm;
+		if (!mstm)
+			continue;
+
+		seq_printf(m, "MST encoder source %s\n", encoder->name);
+		drm_dp_mst_dump_topology(m, &mstm->mgr);
+	}
+
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+out:
+	pm_runtime_mark_last_busy(dev->dev);
+	pm_runtime_put_autosuspend(dev->dev);
+	return ret;
 }
 
 static int
@@ -182,6 +224,7 @@ static const struct file_operations nouveau_pstate_fops = {
 
 static struct drm_info_list nouveau_debugfs_list[] = {
 	{ "vbios.rom", nouveau_debugfs_vbios_image, 0, NULL },
+	{ "dp_mst_info", nouveau_debugfs_dp_mst_info, 0, NULL },
 };
 #define NOUVEAU_DEBUGFS_ENTRIES ARRAY_SIZE(nouveau_debugfs_list)
 
