@@ -3189,12 +3189,18 @@ void ath10k_wmi_event_vdev_start_resp(struct ath10k *ar, struct sk_buff *skb)
 	ret = ath10k_wmi_pull_vdev_start(ar, skb, &arg);
 	if (ret) {
 		ath10k_warn(ar, "failed to parse vdev start event: %d\n", ret);
-		return;
+		goto out;
 	}
 
-	if (WARN_ON(__le32_to_cpu(arg.status)))
-		return;
+	if (WARN_ON_ONCE(__le32_to_cpu(arg.status))) {
+		ath10k_warn(ar, "vdev-start-response reports status error: %d\n",
+			    __le32_to_cpu(arg.status));
+		/* Setup is done one way or another though, so we should still
+		 * do the completion, so don't return here.
+		 */
+	}
 
+out:
 	complete(&ar->vdev_setup_done);
 }
 
