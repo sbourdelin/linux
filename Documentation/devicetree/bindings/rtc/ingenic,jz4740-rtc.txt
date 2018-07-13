@@ -4,6 +4,9 @@ Required properties:
 
 - compatible: One of:
   - "ingenic,jz4740-rtc" - for use with the JZ4740 SoC
+  - "ingenic,jz4725b-rtc" - for use with the JZ4725B SoC
+  - "ingenic,jz4760-rtc" - for use with the JZ4760 SoC
+  - "ingenic,jz4770-rtc" - for use with the JZ4770 SoC
   - "ingenic,jz4780-rtc" - for use with the JZ4780 SoC
 - reg: Address range of rtc register set
 - interrupts: IRQ number for the alarm interrupt
