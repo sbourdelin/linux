@@ -236,6 +236,7 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags,
 	s->s_flags = flags;
 	if (s->s_user_ns != &init_user_ns)
 		s->s_iflags |= SB_I_NODEV;
+	INIT_LIST_HEAD(&s->s_list);
 	INIT_HLIST_NODE(&s->s_instances);
 	INIT_HLIST_BL_HEAD(&s->s_roots);
 	mutex_init(&s->s_sync_lock);
@@ -527,8 +528,6 @@ retry:
 	}
 	s->s_type = type;
 	strlcpy(s->s_id, type->name, sizeof(s->s_id));
-	list_add_tail(&s->s_list, &super_blocks);
-	hlist_add_head(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
 	register_shrinker_prepared(&s->s_shrink);
@@ -1305,6 +1304,12 @@ mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 	WARN((sb->s_maxbytes < 0), "%s set sb->s_maxbytes to "
 		"negative value (%lld)\n", type->name, sb->s_maxbytes);
 
+	if (list_empty(&sb->s_list)) {
+		spin_lock(&sb_lock);
+		list_add_tail(&sb->s_list, &super_blocks);
+		hlist_add_head(&sb->s_instances, &type->fs_supers);
+		spin_unlock(&sb_lock);
+	}
 	up_write(&sb->s_umount);
 	free_secdata(secdata);
 	return root;
