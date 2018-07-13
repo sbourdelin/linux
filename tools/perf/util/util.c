@@ -459,8 +459,7 @@ fetch_kernel_version(unsigned int *puint, char *str,
 		return -1;
 
 	if (str && str_size) {
-		strncpy(str, utsname.release, str_size);
-		str[str_size - 1] = '\0';
+		strlcpy(str, utsname.release, str_size);
 	}
 
 	if (!puint || int_ver_ready)

@@ -143,10 +143,9 @@ __bpf_strerror(char *buf, size_t size)
 {
 	if (!size)
 		return 0;
-	strncpy(buf,
+	strlcpy(buf,
 		"ERROR: eBPF object loading is disabled during compiling.\n",
 		size);
-	buf[size - 1] = '\0';
 	return 0;
 }
 
