@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/property.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/gpio/consumer.h>
 #include <linux/property.h>
@@ -198,6 +199,7 @@ enum t100_type {
 #define MXT_RESET_INVALID_CHG	100	/* msec */
 #define MXT_RESET_TIME		200	/* msec */
 #define MXT_RESET_TIMEOUT	3000	/* msec */
+#define MXT_REGULATOR_DELAY	150	/* msec */
 #define MXT_CRC_TIMEOUT		1000	/* msec */
 #define MXT_FW_RESET_TIME	3000	/* msec */
 #define MXT_FW_CHG_TIMEOUT	300	/* msec */
@@ -310,6 +312,8 @@ struct mxt_data {
 	struct t7_config t7_cfg;
 	struct mxt_dbg dbg;
 	struct gpio_desc *reset_gpio;
+	struct regulator *vdd_reg;
+	struct regulator *avdd_reg;
 
 	/* Cached parameters from object table */
 	u16 T5_address;
@@ -3076,6 +3080,40 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return error;
 	}
 
+	data->vdd_reg = devm_regulator_get_optional(&client->dev, "vdd");
+	if (IS_ERR(data->vdd_reg)) {
+		error = PTR_ERR(data->vdd_reg);
+		dev_err(&client->dev, "Failed to get vdd regulator: %d\n",
+			error);
+		return error;
+	}
+
+	if (data->vdd_reg) {
+		error = regulator_enable(data->vdd_reg);
+		if (error) {
+			dev_err(&client->dev, "Failed to enable vdd regulator: %d\n",
+				error);
+			return error;
+		}
+	}
+
+	data->avdd_reg = devm_regulator_get_optional(&client->dev, "avdd");
+	if (IS_ERR(data->avdd_reg)) {
+		error = PTR_ERR(data->avdd_reg);
+		dev_err(&client->dev, "Failed to get avdd regulator: %d\n",
+			error);
+		return error;
+	}
+
+	if (data->avdd_reg) {
+		error = regulator_enable(data->avdd_reg);
+		if (error) {
+			dev_err(&client->dev, "Failed to enable avdd regulator: %d\n",
+				error);
+			return error;
+		}
+	}
+
 	error = devm_request_threaded_irq(&client->dev, client->irq,
 					  NULL, mxt_interrupt, IRQF_ONESHOT,
 					  client->name, data);
@@ -3085,6 +3123,9 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	disable_irq(client->irq);
+
+	if (!IS_ERR(data->vdd_reg) || !IS_ERR(data->avdd_reg))
+		msleep(MXT_REGULATOR_DELAY);
 
 	if (data->reset_gpio) {
 		msleep(MXT_RESET_GPIO_TIME);
@@ -3116,6 +3157,10 @@ static int mxt_remove(struct i2c_client *client)
 	struct mxt_data *data = i2c_get_clientdata(client);
 
 	disable_irq(data->irq);
+	if (!IS_ERR(data->avdd_reg))
+		regulator_disable(data->avdd_reg);
+	if (!IS_ERR(data->vdd_reg))
+		regulator_disable(data->vdd_reg);
 	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
 	mxt_free_input_device(data);
 	mxt_free_object_table(data);
