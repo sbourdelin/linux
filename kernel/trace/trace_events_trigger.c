@@ -1079,11 +1079,13 @@ register_snapshot_trigger(char *glob, struct event_trigger_ops *ops,
 			  struct event_trigger_data *data,
 			  struct trace_event_file *file)
 {
-	int ret = register_trigger(glob, ops, data, file);
+	int free_if_fail = !file->tr->allocated_snapshot;
+	int ret = 0;
 
-	if (ret > 0 && tracing_alloc_snapshot_instance(file->tr) != 0) {
-		unregister_trigger(glob, ops, data, file);
-		ret = 0;
+	if (!tracing_alloc_snapshot_instance(file->tr)) {
+		ret = register_trigger(glob, ops, data, file);
+		if (ret == 0 && free_if_fail)
+			tracing_free_snapshot_instance(file->tr);
 	}
 
 	return ret;

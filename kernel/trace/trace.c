@@ -980,6 +980,11 @@ static void free_snapshot(struct trace_array *tr)
 	tr->allocated_snapshot = false;
 }
 
+void tracing_free_snapshot_instance(struct trace_array *tr)
+{
+	free_snapshot(tr);
+}
+
 /**
  * tracing_alloc_snapshot - allocate snapshot buffer.
  *
