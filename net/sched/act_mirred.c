@@ -175,6 +175,7 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	struct net_device *dev;
 	struct sk_buff *skb2;
 	int retval, err = 0;
+	bool want_ingress;
 	int m_eaction;
 	int mac_len;
 
@@ -185,6 +186,17 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	m_eaction = READ_ONCE(m->tcfm_eaction);
 	retval = READ_ONCE(m->tcf_action);
 	dev = rcu_dereference_bh(m->tcfm_dev);
+	want_ingress = tcf_mirred_act_wants_ingress(m_eaction);
+	if (skb_at_tc_ingress(skb) && tcf_mirred_is_act_redirect(m_eaction)) {
+		skb->tc_redirected = 1;
+		skb->tc_from_ingress = 1;
+
+		/* the core redirect code will check dev and its status */
+		TCF_RESULT_SET_REDIRECT(res, dev, want_ingress);
+		res->qstats = this_cpu_ptr(m->common.cpu_qstats);
+		return TC_ACT_REDIRECT;
+	}
+
 	if (unlikely(!dev)) {
 		pr_notice_once("tc mirred: target device is gone\n");
 		goto out;
@@ -204,8 +216,7 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	 * and devices expect a mac header on xmit, then mac push/pull is
 	 * needed.
 	 */
-	if (skb_at_tc_ingress(skb) != tcf_mirred_act_wants_ingress(m_eaction) &&
-	    m_mac_header_xmit) {
+	if (skb_at_tc_ingress(skb) != want_ingress && m_mac_header_xmit) {
 		if (!skb_at_tc_ingress(skb)) {
 			/* caught at egress, act ingress: pull mac */
 			mac_len = skb_network_header(skb) - skb_mac_header(skb);
