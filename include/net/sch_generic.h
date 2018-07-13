@@ -235,8 +235,21 @@ struct tcf_result {
 			u32		classid;
 		};
 		const struct tcf_proto *goto_tp;
+
+		/* used by the TC_ACT_REDIRECT action */
+		struct {
+			/* device and direction, or 0 bpf redirect */
+			long		dev_ingress;
+			struct gnet_stats_queue *qstats;
+		};
 	};
 };
+
+#define TCF_RESULT_REDIR_DEV(res) \
+	((struct net_device *)((res)->dev_ingress & ~1))
+#define TCF_RESULT_REDIR_INGRESS(res) ((res)->dev_ingress & 1)
+#define TCF_RESULT_SET_REDIRECT(res, dev, ingress) \
+	((res)->dev_ingress = (long)(dev) | (!!(ingress)))
 
 struct tcf_proto_ops {
 	struct list_head	head;
@@ -543,7 +556,7 @@ struct Qdisc *qdisc_create_dflt(struct netdev_queue *dev_queue,
 				struct netlink_ext_ack *extack);
 void __qdisc_calculate_pkt_len(struct sk_buff *skb,
 			       const struct qdisc_size_table *stab);
-int skb_do_redirect(struct sk_buff *);
+int skb_do_redirect(struct sk_buff *skb, struct tcf_result *res);
 
 static inline void skb_reset_tc(struct sk_buff *skb)
 {

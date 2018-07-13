@@ -65,7 +65,10 @@ static int run_lwt_bpf(struct sk_buff *skb, struct bpf_lwt_prog *lwt,
 				     lwt->name ? : "<unknown>");
 			ret = BPF_OK;
 		} else {
-			ret = skb_do_redirect(skb);
+			struct tcf_result res;
+
+			res.dev_ingress = 0;
+			ret = skb_do_redirect(skb, &res);
 			if (ret == 0)
 				ret = BPF_REDIRECT;
 		}

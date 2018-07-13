@@ -2062,19 +2062,36 @@ BPF_CALL_2(bpf_redirect, u32, ifindex, u64, flags)
 	return TC_ACT_REDIRECT;
 }
 
-int skb_do_redirect(struct sk_buff *skb)
+int skb_do_redirect(struct sk_buff *skb, struct tcf_result *res)
 {
-	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+	struct gnet_stats_queue *stats;
 	struct net_device *dev;
+	int ret, flags;
 
-	dev = dev_get_by_index_rcu(dev_net(skb->dev), ri->ifindex);
-	ri->ifindex = 0;
+	if (!res->dev_ingress) {
+		struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+
+		dev = dev_get_by_index_rcu(dev_net(skb->dev), ri->ifindex);
+		flags = ri->flags;
+		ri->ifindex = 0;
+		stats = NULL;
+	} else {
+		dev = TCF_RESULT_REDIR_DEV(res);
+		flags = TCF_RESULT_REDIR_INGRESS(res) ? BPF_F_INGRESS : 0;
+		stats = res->qstats;
+	}
 	if (unlikely(!dev)) {
 		kfree_skb(skb);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
-	return __bpf_redirect(skb, dev, ri->flags);
+	ret = __bpf_redirect(skb, dev, flags);
+
+out:
+	if (ret && stats)
+		qstats_overlimit_inc(res->qstats);
+	return ret;
 }
 
 static const struct bpf_func_proto bpf_redirect_proto = {

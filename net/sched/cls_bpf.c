@@ -65,14 +65,16 @@ static const struct nla_policy bpf_policy[TCA_BPF_MAX + 1] = {
 				    .len = sizeof(struct sock_filter) * BPF_MAXINSNS },
 };
 
-static int cls_bpf_exec_opcode(int code)
+static int cls_bpf_exec_opcode(int code, struct tcf_result *res)
 {
 	switch (code) {
+	case TC_ACT_REDIRECT:
+		res->dev_ingress = 0;
+		/* fall-through */
 	case TC_ACT_OK:
 	case TC_ACT_SHOT:
 	case TC_ACT_STOLEN:
 	case TC_ACT_TRAP:
-	case TC_ACT_REDIRECT:
 	case TC_ACT_UNSPEC:
 		return code;
 	default:
@@ -113,7 +115,7 @@ static int cls_bpf_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 			res->classid = TC_H_MAJ(prog->res.classid) |
 				       qdisc_skb_cb(skb)->tc_classid;
 
-			ret = cls_bpf_exec_opcode(filter_res);
+			ret = cls_bpf_exec_opcode(filter_res, res);
 			if (ret == TC_ACT_UNSPEC)
 				continue;
 			break;

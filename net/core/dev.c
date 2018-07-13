@@ -3538,7 +3538,7 @@ sch_handle_egress(struct sk_buff *skb, int *ret, struct net_device *dev)
 		return NULL;
 	case TC_ACT_REDIRECT:
 		/* No need to push/pop skb's mac_header here on egress! */
-		skb_do_redirect(skb);
+		skb_do_redirect(skb, &cl_res);
 		*ret = NET_XMIT_SUCCESS;
 		return NULL;
 	default:
@@ -4600,7 +4600,7 @@ sch_handle_ingress(struct sk_buff *skb, struct packet_type **pt_prev, int *ret,
 		 * redirecting to another netdev
 		 */
 		__skb_push(skb, skb->mac_len);
-		skb_do_redirect(skb);
+		skb_do_redirect(skb, &cl_res);
 		return NULL;
 	default:
 		break;
