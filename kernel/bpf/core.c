@@ -1634,11 +1634,12 @@ void bpf_prog_array_delete_safe(struct bpf_prog_array __rcu *progs,
 		}
 }
 
-int bpf_prog_array_copy(struct bpf_prog_array __rcu *old_array,
+int bpf_prog_array_copy(struct bpf_prog_array __rcu *__old_array,
 			struct bpf_prog *exclude_prog,
 			struct bpf_prog *include_prog,
 			struct bpf_prog_array **new_array)
 {
+	struct bpf_prog_array *old_array = rcu_dereference(__old_array);
 	int new_prog_cnt, carry_prog_cnt = 0;
 	struct bpf_prog **existing_prog;
 	struct bpf_prog_array *array;
