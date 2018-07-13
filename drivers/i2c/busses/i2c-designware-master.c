@@ -674,7 +674,7 @@ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
 	}
 	rinfo->scl_gpiod = gpio;
 
-	gpio = devm_gpiod_get_optional(dev->dev, "sda", GPIOD_IN);
+	gpio = devm_gpiod_get_optional(dev->dev, "sda", GPIOD_OUT_HIGH_OPEN_DRAIN);
 	if (IS_ERR(gpio))
 		return PTR_ERR(gpio);
 	rinfo->sda_gpiod = gpio;
