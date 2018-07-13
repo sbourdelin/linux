@@ -22,7 +22,7 @@ struct TS_COMMON_INFO {
 	u8				addr[6];
 	TSPEC_BODY			t_spec;
 	QOS_TCLAS			t_class[TCLAS_NUM];
-	u8				TClasProc;
+	u8				t_clas_proc;
 	u8				TClasNum;
 };
 
