@@ -800,7 +800,6 @@ int tls_sw_recvmsg(struct sock *sk,
 				struct scatterlist sgin[MAX_SKB_FRAGS + 1];
 				int pages = 0;
 
-				zc = true;
 				sg_init_table(sgin, MAX_SKB_FRAGS + 1);
 				sg_set_buf(&sgin[0], ctx->rx_aad_plaintext,
 					   TLS_AAD_SPACE_SIZE);
@@ -811,6 +810,8 @@ int tls_sw_recvmsg(struct sock *sk,
 							 MAX_SKB_FRAGS,	false);
 				if (err < 0)
 					goto fallback_to_reg_recv;
+				else
+					zc = true;
 
 				err = decrypt_skb(sk, skb, sgin);
 				for (; pages > 0; pages--)
