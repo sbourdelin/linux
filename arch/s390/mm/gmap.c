@@ -912,6 +912,38 @@ static inline void gmap_pmd_op_end(struct gmap *gmap, pmd_t *pmdp)
 }
 
 /*
+ * gmap_protect_pmd - remove access rights to memory and set pmd notification bits
+ * @pmdp: pointer to the pmd to be protected
+ * @prot: indicates access rights: PROT_NONE, PROT_READ or PROT_WRITE
+ * @bits: notification bits to set
+ *
+ * Returns 0 if successfully protected, -ENOMEM if out of memory and
+ * -EAGAIN if a fixup is needed.
+ *
+ * Expected to be called with sg->mm->mmap_sem in read and
+ * guest_table_lock held.
+ */
+static int gmap_protect_pmd(struct gmap *gmap, unsigned long gaddr,
+			    pmd_t *pmdp, int prot, unsigned long bits)
+{
+	int pmd_i = pmd_val(*pmdp) & _SEGMENT_ENTRY_INVALID;
+	int pmd_p = pmd_val(*pmdp) & _SEGMENT_ENTRY_PROTECT;
+
+	/* Fixup needed */
+	if ((pmd_i && (prot != PROT_NONE)) || (pmd_p && (prot == PROT_WRITE)))
+		return -EAGAIN;
+
+	if (bits & GMAP_NOTIFY_MPROT)
+		pmd_val(*pmdp) |= _SEGMENT_ENTRY_GMAP_IN;
+
+	/* Shadow GMAP protection needs split PMDs */
+	if (bits & GMAP_NOTIFY_SHADOW)
+		return -EINVAL;
+
+	return 0;
+}
+
+/*
  * gmap_protect_pte - remove access rights to memory and set pgste bits
  * @gmap: pointer to guest mapping meta data structure
  * @gaddr: virtual address in the guest address space
@@ -963,7 +995,7 @@ static int gmap_protect_pte(struct gmap *gmap, unsigned long gaddr,
 static int gmap_protect_range(struct gmap *gmap, unsigned long gaddr,
 			      unsigned long len, int prot, unsigned long bits)
 {
-	unsigned long vmaddr;
+	unsigned long vmaddr, dist;
 	pmd_t *pmdp;
 	int rc;
 
@@ -972,15 +1004,29 @@ static int gmap_protect_range(struct gmap *gmap, unsigned long gaddr,
 		rc = -EAGAIN;
 		pmdp = gmap_pmd_op_walk(gmap, gaddr);
 		if (pmdp) {
-			rc = gmap_protect_pte(gmap, gaddr, pmdp, prot,
-					      bits);
-			if (!rc) {
-				len -= PAGE_SIZE;
-				gaddr += PAGE_SIZE;
+			if (!pmd_large(*pmdp)) {
+				rc = gmap_protect_pte(gmap, gaddr, pmdp, prot,
+						      bits);
+				if (!rc) {
+					len -= PAGE_SIZE;
+					gaddr += PAGE_SIZE;
+				}
+			} else {
+				rc = gmap_protect_pmd(gmap, gaddr, pmdp, prot,
+						      bits);
+				if (!rc) {
+					dist = HPAGE_SIZE - (gaddr & ~HPAGE_MASK);
+					len = len < dist ? 0 : len - dist;
+					gaddr = (gaddr & HPAGE_MASK) + HPAGE_SIZE;
+				}
 			}
 			gmap_pmd_op_end(gmap, pmdp);
 		}
 		if (rc) {
+			if (rc == -EINVAL)
+				return rc;
+
+			/* -EAGAIN, fixup of userspace mm and gmap */
 			vmaddr = __gmap_translate(gmap, gaddr);
 			if (IS_ERR_VALUE(vmaddr))
 				return vmaddr;
@@ -2172,6 +2218,36 @@ void ptep_notify(struct mm_struct *mm, unsigned long vmaddr,
 	rcu_read_unlock();
 }
 EXPORT_SYMBOL_GPL(ptep_notify);
+
+/**
+ * pmdp_notify - call all invalidation callbacks for a specific pmd
+ * @mm: pointer to the process mm_struct
+ * @vmaddr: virtual address in the process address space
+ *
+ * This function is expected to be called with mmap_sem held in read.
+ */
+void pmdp_notify(struct mm_struct *mm, unsigned long vmaddr)
+{
+	unsigned long *table, gaddr;
+	struct gmap *gmap;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(gmap, &mm->context.gmap_list, list) {
+		spin_lock(&gmap->guest_table_lock);
+		table = radix_tree_lookup(&gmap->host_to_guest,
+					  vmaddr >> PMD_SHIFT);
+		if (!table || !(*table & _SEGMENT_ENTRY_GMAP_IN)) {
+			spin_unlock(&gmap->guest_table_lock);
+			continue;
+		}
+		*table &= ~_SEGMENT_ENTRY_GMAP_IN;
+		gaddr = __gmap_segment_gaddr(table);
+		gmap_call_notifier(gmap, gaddr, gaddr + HPAGE_SIZE - 1);
+		spin_unlock(&gmap->guest_table_lock);
+	}
+	rcu_read_unlock();
+}
+EXPORT_SYMBOL_GPL(pmdp_notify);
 
 static inline void thp_split_mm(struct mm_struct *mm)
 {
