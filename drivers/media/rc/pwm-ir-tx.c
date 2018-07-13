@@ -30,6 +30,7 @@ struct pwm_ir {
 };
 
 static const struct of_device_id pwm_ir_of_match[] = {
+	{ .compatible = "nokia,n900-ir" },
 	{ .compatible = "pwm-ir-tx", },
 	{ },
 };
