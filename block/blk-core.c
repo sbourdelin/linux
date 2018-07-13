@@ -3746,6 +3746,50 @@ void blk_finish_plug(struct blk_plug *plug)
 EXPORT_SYMBOL(blk_finish_plug);
 
 #ifdef CONFIG_PM
+static int __blk_pre_runtime_suspend(struct request_queue *q, bool active)
+{
+	int ret;
+
+	if (active) {
+		ret = -EBUSY;
+		pm_runtime_mark_last_busy(q->dev);
+	} else {
+		ret = 0;
+		q->rpm_status = RPM_SUSPENDING;
+	}
+
+	return ret;
+}
+
+static void __blk_post_runtime_suspend(struct request_queue *q, int err)
+{
+	if (!err) {
+		q->rpm_status = RPM_SUSPENDED;
+	} else {
+		q->rpm_status = RPM_ACTIVE;
+		pm_runtime_mark_last_busy(q->dev);
+	}
+}
+
+static void __blk_post_runtime_resume(struct request_queue *q, int err)
+{
+	if (!err) {
+		q->rpm_status = RPM_ACTIVE;
+		__blk_run_queue(q);
+		pm_runtime_mark_last_busy(q->dev);
+		pm_request_autosuspend(q->dev);
+	} else {
+		q->rpm_status = RPM_SUSPENDED;
+	}
+}
+
+static void __blk_set_runtime_active(struct request_queue *q)
+{
+	q->rpm_status = RPM_ACTIVE;
+	pm_runtime_mark_last_busy(q->dev);
+	pm_request_autosuspend(q->dev);
+}
+
 /**
  * blk_pm_runtime_init - Block layer runtime PM initialization routine
  * @q: the queue of the device
@@ -3809,12 +3853,7 @@ int blk_pre_runtime_suspend(struct request_queue *q)
 		return ret;
 
 	spin_lock_irq(q->queue_lock);
-	if (q->nr_pending) {
-		ret = -EBUSY;
-		pm_runtime_mark_last_busy(q->dev);
-	} else {
-		q->rpm_status = RPM_SUSPENDING;
-	}
+	ret = __blk_pre_runtime_suspend(q, q->nr_pending);
 	spin_unlock_irq(q->queue_lock);
 	return ret;
 }
@@ -3839,12 +3878,7 @@ void blk_post_runtime_suspend(struct request_queue *q, int err)
 		return;
 
 	spin_lock_irq(q->queue_lock);
-	if (!err) {
-		q->rpm_status = RPM_SUSPENDED;
-	} else {
-		q->rpm_status = RPM_ACTIVE;
-		pm_runtime_mark_last_busy(q->dev);
-	}
+	__blk_post_runtime_suspend(q, err);
 	spin_unlock_irq(q->queue_lock);
 }
 EXPORT_SYMBOL(blk_post_runtime_suspend);
@@ -3891,14 +3925,7 @@ void blk_post_runtime_resume(struct request_queue *q, int err)
 		return;
 
 	spin_lock_irq(q->queue_lock);
-	if (!err) {
-		q->rpm_status = RPM_ACTIVE;
-		__blk_run_queue(q);
-		pm_runtime_mark_last_busy(q->dev);
-		pm_request_autosuspend(q->dev);
-	} else {
-		q->rpm_status = RPM_SUSPENDED;
-	}
+	__blk_post_runtime_resume(q, err);
 	spin_unlock_irq(q->queue_lock);
 }
 EXPORT_SYMBOL(blk_post_runtime_resume);
@@ -3920,9 +3947,7 @@ EXPORT_SYMBOL(blk_post_runtime_resume);
 void blk_set_runtime_active(struct request_queue *q)
 {
 	spin_lock_irq(q->queue_lock);
-	q->rpm_status = RPM_ACTIVE;
-	pm_runtime_mark_last_busy(q->dev);
-	pm_request_autosuspend(q->dev);
+	__blk_set_runtime_active(q);
 	spin_unlock_irq(q->queue_lock);
 }
 EXPORT_SYMBOL(blk_set_runtime_active);
