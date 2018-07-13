@@ -1963,6 +1963,7 @@ static void execlists_reset(struct intel_engine_cs *engine,
 	GEM_TRACE("%s request global=%x, current=%d\n",
 		  engine->name, request ? request->global_seqno : 0,
 		  intel_engine_get_seqno(engine));
+	GEM_BUG_ON(!reset_in_progress(execlists));
 
 	spin_lock_irqsave(&engine->timeline.lock, flags);
 
