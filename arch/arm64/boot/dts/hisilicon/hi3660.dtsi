@@ -1050,7 +1050,6 @@
 			reset-names = "reset";
 			card-detect-delay = <200>;
 			supports-highspeed;
-			keep-power-in-suspend;
 			pinctrl-names = "default";
 			pinctrl-0 = <&sdio_pmx_func
 				     &sdio_clk_cfg_func
