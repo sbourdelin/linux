@@ -386,8 +386,12 @@ static inline int clobbering_unread_rtas_event(void) { return 0; }
 
 #ifdef CONFIG_PPC_RTAS_DAEMON
 extern void rtas_cancel_event_scan(void);
+extern void rtas_event_scan_disable(void);
+extern void rtas_event_scan_enable(void);
 #else
 static inline void rtas_cancel_event_scan(void) { }
+static inline void rtas_event_scan_disable(void) { }
+static inline void rtas_event_scan_enable(void) { }
 #endif
 
 /* Error types logged.  */
