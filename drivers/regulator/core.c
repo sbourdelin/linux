@@ -2311,6 +2311,8 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
 		ret = rdev->desc->ops->disable(rdev);
 		if (ret != 0)
 			return ret;
+	} else {
+		return -EINVAL;
 	}
 
 	/* cares about last_off_jiffy only if off_on_delay is required by
