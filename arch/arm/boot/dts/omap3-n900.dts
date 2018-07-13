@@ -154,7 +154,7 @@
 	};
 
 	ir: n900-ir {
-		compatible = "nokia,n900-ir";
+		compatible = "nokia,n900-ir", "pwm-ir-tx";
 		pwms = <&pwm9 0 26316 0>; /* 38000 Hz */
 	};
 
