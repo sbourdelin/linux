@@ -1068,6 +1068,109 @@ static void intel_sanitize_options(struct drm_i915_private *dev_priv)
 	intel_gvt_sanitize_options(dev_priv);
 }
 
+static enum memdev_rank
+skl_memdev_get_channel_rank(struct memdev_info *memdev_info, u32 val)
+{
+	u8 l_rank, s_rank;
+	u8 l_size, s_size;
+	u8 l_width, s_width;
+	enum memdev_rank rank;
+
+	if (!val)
+		return I915_DRAM_RANK_INVALID;
+
+	l_size = (val >> SKL_DRAM_SIZE_L_SHIFT) & SKL_DRAM_SIZE_MASK;
+	s_size = (val >> SKL_DRAM_SIZE_S_SHIFT) & SKL_DRAM_SIZE_MASK;
+	l_width = (val >> SKL_DRAM_WIDTH_L_SHIFT) & SKL_DRAM_WIDTH_MASK;
+	s_width = (val >> SKL_DRAM_WIDTH_S_SHIFT) & SKL_DRAM_WIDTH_MASK;
+	l_rank = (val >> SKL_DRAM_RANK_L_SHIFT) & SKL_DRAM_RANK_MASK;
+	s_rank = (val >> SKL_DRAM_RANK_S_SHIFT) & SKL_DRAM_RANK_MASK;
+
+	if (l_size == 0 && s_size == 0)
+		return I915_DRAM_RANK_INVALID;
+
+	DRM_DEBUG_KMS("(size:width:rank) L(%dGB:X%d:%s) S(%dGB:X%d:%s)\n",
+		      l_size, (1 << l_width) * 8, l_rank ? "dual" : "single",
+		      s_size, (1 << s_width) * 8, s_rank ? "dual" : "single");
+
+	if (l_rank == SKL_DRAM_RANK_DUAL || s_rank == SKL_DRAM_RANK_DUAL)
+		rank = I915_DRAM_RANK_DUAL;
+	else if ((l_size && l_rank == SKL_DRAM_RANK_SINGLE) &&
+		 (s_size && s_rank == SKL_DRAM_RANK_SINGLE))
+		rank = I915_DRAM_RANK_DUAL;
+	else
+		rank = I915_DRAM_RANK_SINGLE;
+
+	return rank;
+}
+
+static int
+skl_get_mem_dimm_info(struct drm_i915_private *dev_priv)
+{
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	enum memdev_rank ch0_rank, ch1_rank;
+	u32 val;
+
+	val = I915_READ(SKL_MAD_DIMM_CH0_0_0_0_MCHBAR_MCMAIN);
+	ch0_rank = skl_memdev_get_channel_rank(memdev_info, val);
+	if (ch0_rank != I915_DRAM_RANK_INVALID)
+		memdev_info->num_channels++;
+
+	val = I915_READ(SKL_MAD_DIMM_CH1_0_0_0_MCHBAR_MCMAIN);
+	ch1_rank = skl_memdev_get_channel_rank(memdev_info, val);
+	if (ch1_rank != I915_DRAM_RANK_INVALID)
+		memdev_info->num_channels++;
+
+	if (memdev_info->num_channels == 0) {
+		DRM_INFO("Number of memory channels is zero\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * If any of the channel is single rank channel, worst case output
+	 * will be same as if single rank memory, so consider single rank
+	 * memory.
+	 */
+	if (ch0_rank == I915_DRAM_RANK_SINGLE ||
+	    ch1_rank == I915_DRAM_RANK_SINGLE)
+		memdev_info->rank = I915_DRAM_RANK_SINGLE;
+	else
+		memdev_info->rank = max(ch0_rank, ch1_rank);
+
+	if (memdev_info->rank == I915_DRAM_RANK_INVALID) {
+		DRM_INFO("couldn't get memory rank information\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int
+skl_get_memdev_info(struct drm_i915_private *dev_priv)
+{
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	u32 mem_freq_khz, val;
+	int ret;
+
+	ret = skl_get_mem_dimm_info(dev_priv);
+	if (ret)
+		return ret;
+
+	val = I915_READ(SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU);
+	mem_freq_khz = DIV_ROUND_UP((val & SKL_REQ_DATA_MASK) *
+				    SKL_MEMORY_FREQ_MULTIPLIER_HZ, 1000);
+
+	memdev_info->bandwidth_kbps = memdev_info->num_channels *
+							mem_freq_khz * 8;
+
+	if (memdev_info->bandwidth_kbps == 0) {
+		DRM_INFO("Couldn't get system memory bandwidth\n");
+		return -EINVAL;
+	}
+
+	memdev_info->valid = true;
+	return 0;
+}
+
 static int
 bxt_get_memdev_info(struct drm_i915_private *dev_priv)
 {
@@ -1157,6 +1260,7 @@ static void
 intel_get_memdev_info(struct drm_i915_private *dev_priv)
 {
 	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	char bandwidth_str[32];
 	int ret;
 
 	memdev_info->valid = false;
@@ -1164,15 +1268,25 @@ intel_get_memdev_info(struct drm_i915_private *dev_priv)
 	memdev_info->bandwidth_kbps = 0;
 	memdev_info->num_channels = 0;
 
-	if (!IS_BROXTON(dev_priv))
+	if (INTEL_GEN(dev_priv) < 9)
 		return;
 
-	ret = bxt_get_memdev_info(dev_priv);
+	/* Need to calculate bandwidth only for Gen9 */
+	if (IS_BROXTON(dev_priv))
+		ret = bxt_get_memdev_info(dev_priv);
+	else if (INTEL_GEN(dev_priv) == 9)
+		ret = skl_get_memdev_info(dev_priv);
+	else
+		ret = skl_get_mem_dimm_info(dev_priv);
 	if (ret)
 		return;
 
-	DRM_DEBUG_KMS("DRAM bandwidth:%d KBps, total-channels: %u\n",
-		      memdev_info->bandwidth_kbps, memdev_info->num_channels);
+	if (memdev_info->bandwidth_kbps)
+		sprintf(bandwidth_str, "%d KBps", memdev_info->bandwidth_kbps);
+	else
+		sprintf(bandwidth_str, "unknown");
+	DRM_DEBUG_KMS("DRAM bandwidth:%s, total-channels: %u\n",
+		      bandwidth_str, memdev_info->num_channels);
 	DRM_DEBUG_KMS("DRAM rank: %s rank\n",
 		      (memdev_info->rank == I915_DRAM_RANK_DUAL) ?
 		      "dual" : "single");
