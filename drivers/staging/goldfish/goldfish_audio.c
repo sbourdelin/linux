@@ -36,6 +36,8 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0");
 
 struct goldfish_audio {
+	struct miscdevice miscdevice;
+
 	char __iomem *reg_base;
 	int irq;
 
@@ -281,10 +283,12 @@ static const struct file_operations goldfish_audio_fops = {
 	.unlocked_ioctl = goldfish_audio_ioctl,
 };
 
-static struct miscdevice goldfish_audio_device = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "eac",
-	.fops = &goldfish_audio_fops,
+/* init miscdevice initial state to use with misc_register */
+static void init_miscdevice(struct miscdevice *misc)
+{
+	misc->minor = MISC_DYNAMIC_MINOR;
+	misc->name = "eac";
+	misc->fops = &goldfish_audio_fops;
 };
 
 static int goldfish_audio_probe(struct platform_device *pdev)
@@ -334,7 +338,8 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = misc_register(&goldfish_audio_device);
+	init_miscdevice(&data->miscdevice);
+	ret = misc_register(&data->miscdevice);
 	if (ret) {
 		dev_err(&pdev->dev,
 			"misc_register returned %d in goldfish_audio_init\n",
@@ -362,7 +367,9 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 
 static int goldfish_audio_remove(struct platform_device *pdev)
 {
-	misc_deregister(&goldfish_audio_device);
+	struct goldfish_audio *data = platform_get_drvdata(pdev);
+
+	misc_deregister(&data->miscdevice);
 	audio_data = NULL;
 	return 0;
 }
