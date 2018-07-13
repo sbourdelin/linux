@@ -1912,6 +1912,17 @@ struct drm_i915_private {
 		bool distrust_bios_wm;
 	} wm;
 
+	struct memdev_info {
+		bool valid;
+		u8 num_channels;
+		enum memdev_rank {
+			I915_DRAM_RANK_INVALID = 0,
+			I915_DRAM_RANK_SINGLE,
+			I915_DRAM_RANK_DUAL
+		} rank;
+		u32 bandwidth_kbps;
+	} memdev_info;
+
 	struct i915_runtime_pm runtime_pm;
 
 	struct {
