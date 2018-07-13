@@ -665,7 +665,7 @@ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
 	struct gpio_desc *gpio;
 	int r;
 
-	gpio = devm_gpiod_get(dev->dev, "scl", GPIOD_OUT_HIGH);
+	gpio = devm_gpiod_get(dev->dev, "scl", GPIOD_OUT_HIGH_OPEN_DRAIN);
 	if (IS_ERR(gpio)) {
 		r = PTR_ERR(gpio);
 		if (r == -ENOENT || r == -ENOSYS)
