@@ -314,8 +314,7 @@ int main(int argc, char *argv[])
 				err(1, "Invalid rcv buf size\n");
 			break;
 		case 'm':
-			strncpy(cpumask, optarg, sizeof(cpumask));
-			cpumask[sizeof(cpumask) - 1] = '\0';
+			strlcpy(cpumask, optarg, sizeof(cpumask));
 			maskset = 1;
 			printf("cpumask %s maskset %d\n", cpumask, maskset);
 			break;
