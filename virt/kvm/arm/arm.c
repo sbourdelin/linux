@@ -1044,7 +1044,6 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
 	return ret;
 }
 
-#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
 static int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
 				   struct kvm_vcpu_events *events)
 {
@@ -1070,7 +1069,6 @@ static int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
 
 	return __kvm_arm_vcpu_set_events(vcpu, events);
 }
-#endif /* __KVM_HAVE_VCPU_EVENTS */
 
 long kvm_arch_vcpu_ioctl(struct file *filp,
 			 unsigned int ioctl, unsigned long arg)
@@ -1152,7 +1150,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		r = kvm_arm_vcpu_has_attr(vcpu, &attr);
 		break;
 	}
-#ifdef __KVM_HAVE_VCPU_EVENTS
 	case KVM_GET_VCPU_EVENTS: {
 		struct kvm_vcpu_events events;
 
@@ -1172,7 +1169,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 
 		return kvm_arm_vcpu_set_events(vcpu, &events);
 	}
-#endif
 	default:
 		r = -EINVAL;
 	}
