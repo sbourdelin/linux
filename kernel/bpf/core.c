@@ -1625,7 +1625,7 @@ int bpf_prog_array_copy_to_user(struct bpf_prog_array __rcu *progs,
 void bpf_prog_array_delete_safe(struct bpf_prog_array __rcu *progs,
 				struct bpf_prog *old_prog)
 {
-	struct bpf_prog **prog = progs->progs;
+	struct bpf_prog **prog = rcu_dereference(progs)->progs;
 
 	for (; *prog; prog++)
 		if (*prog == old_prog) {
