@@ -132,7 +132,8 @@
 		else							\
 			rt_sysc_m32(val, 0, RALINK_RSTCTRL);		\
 	} while (0)
-#define DEASSERT_SYSRST_PCIE(val)	\
+
+#define DEASSERT_SYSRST_PCIE(val)					\
 	do {								\
 		if (rt_sysc_r32(SYSC_REG_CHIP_REV) == 0x00030101)	\
 			rt_sysc_m32(val, 0, RALINK_RSTCTRL);		\
