@@ -2084,19 +2084,14 @@ int gasket_wait_sync(
 	u64 timeout_ns)
 {
 	u64 reg;
-	struct timespec start_time, cur_time;
-	u64 diff_nanosec;
+	u64 start_time, diff_nanosec;
 	int count = 0;
 
 	reg = gasket_dev_read_64(gasket_dev, bar, offset);
-	start_time = current_kernel_time();
+	start_time = ktime_get_ns();
 	while ((reg & mask) != val) {
 		count++;
-		cur_time = current_kernel_time();
-		diff_nanosec = (u64)(cur_time.tv_sec - start_time.tv_sec) *
-				       1000000000LL +
-			       (u64)(cur_time.tv_nsec) -
-			       (u64)(start_time.tv_nsec);
+		diff_nanosec = ktime_get_ns() - start_time;
 		if (diff_nanosec > timeout_ns) {
 			gasket_log_error(
 				gasket_dev,
