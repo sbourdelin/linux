@@ -78,10 +78,6 @@ static int tls_do_decryption(struct sock *sk,
 	rxm->full_len -= tls_ctx->rx.overhead_size;
 	tls_advance_record_sn(sk, &tls_ctx->rx);
 
-	ctx->decrypted = true;
-
-	ctx->saved_data_ready(sk);
-
 out:
 	aead_request_free(aead_req);
 	return ret;
