@@ -221,6 +221,7 @@ err_free_urb:
 	usb_free_urb(pxrc->urb);
 
 error:
+	usb_put_dev(pxrc->udev);
 	return retval;
 }
 
@@ -229,6 +230,7 @@ static void pxrc_disconnect(struct usb_interface *intf)
 	struct pxrc *pxrc = usb_get_intfdata(intf);
 
 	usb_free_urb(pxrc->urb);
+	usb_put_dev(pxrc->udev);
 	usb_set_intfdata(intf, NULL);
 }
 
