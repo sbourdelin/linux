@@ -37,7 +37,8 @@ void cgroup_bpf_put(struct cgroup *cgrp)
 			kfree(pl);
 			static_branch_dec(&cgroup_bpf_enabled_key);
 		}
-		bpf_prog_array_free(cgrp->bpf.effective[type]);
+		bpf_prog_array_free(rcu_access_pointer(
+					    cgrp->bpf.effective[type]));
 	}
 }
 
@@ -139,7 +140,7 @@ static void activate_effective_progs(struct cgroup *cgrp,
 	/* free prog array after grace period, since __cgroup_bpf_run_*()
 	 * might be still walking the array
 	 */
-	bpf_prog_array_free(old_array);
+	bpf_prog_array_free(rcu_access_pointer(old_array));
 }
 
 /**
@@ -168,7 +169,7 @@ int cgroup_bpf_inherit(struct cgroup *cgrp)
 	return 0;
 cleanup:
 	for (i = 0; i < NR; i++)
-		bpf_prog_array_free(arrays[i]);
+		bpf_prog_array_free(rcu_access_pointer(arrays[i]));
 	return -ENOMEM;
 }
 
@@ -270,7 +271,7 @@ cleanup:
 	css_for_each_descendant_pre(css, &cgrp->self) {
 		struct cgroup *desc = container_of(css, struct cgroup, self);
 
-		bpf_prog_array_free(desc->bpf.inactive);
+		bpf_prog_array_free(rcu_access_pointer(desc->bpf.inactive));
 		desc->bpf.inactive = NULL;
 	}
 
@@ -372,7 +373,7 @@ cleanup:
 	css_for_each_descendant_pre(css, &cgrp->self) {
 		struct cgroup *desc = container_of(css, struct cgroup, self);
 
-		bpf_prog_array_free(desc->bpf.inactive);
+		bpf_prog_array_free(rcu_access_pointer(desc->bpf.inactive));
 		desc->bpf.inactive = NULL;
 	}
 

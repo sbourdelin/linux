@@ -135,7 +135,7 @@ static int lirc_bpf_attach(struct rc_dev *rcdev, struct bpf_prog *prog)
 		goto unlock;
 
 	rcu_assign_pointer(raw->progs, new_array);
-	bpf_prog_array_free(old_array);
+	bpf_prog_array_free(rcu_access_pointer(old_array));
 
 unlock:
 	mutex_unlock(&ir_raw_handler_lock);
@@ -173,7 +173,7 @@ static int lirc_bpf_detach(struct rc_dev *rcdev, struct bpf_prog *prog)
 		goto unlock;
 
 	rcu_assign_pointer(raw->progs, new_array);
-	bpf_prog_array_free(old_array);
+	bpf_prog_array_free(rcu_access_pointer(old_array));
 unlock:
 	mutex_unlock(&ir_raw_handler_lock);
 	return ret;
@@ -204,7 +204,7 @@ void lirc_bpf_free(struct rc_dev *rcdev)
 	while (*progs)
 		bpf_prog_put(*progs++);
 
-	bpf_prog_array_free(rcdev->raw->progs);
+	bpf_prog_array_free(rcu_access_pointer(rcdev->raw->progs));
 }
 
 int lirc_prog_attach(const union bpf_attr *attr, struct bpf_prog *prog)
