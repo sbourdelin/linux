@@ -42,6 +42,11 @@
 
 #include "tls.h"
 
+/*
+ * find_regset() goes through regsets sequentially.
+ * Do not create empty slots in x86_64_regsets[] or
+ * x86_32_regsets[] below.
+ */
 enum x86_regset {
 	REGSET_GENERAL,
 	REGSET_FP,
