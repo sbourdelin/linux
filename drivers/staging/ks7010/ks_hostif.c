@@ -1840,8 +1840,8 @@ void hostif_sme_multicast_set(struct ks_wlan_private *priv)
 	memset(set_address, 0, NIC_MAX_MCAST_LIST * ETH_ALEN);
 
 	if (dev->flags & IFF_PROMISC) {
-		hostif_mib_set_request_bool(priv, LOCAL_MULTICAST_FILTER,
-					    MCAST_FILTER_PROMISC);
+		hostif_mib_set_request_int(priv, LOCAL_MULTICAST_FILTER,
+					   MCAST_FILTER_PROMISC);
 		goto spin_unlock;
 	}
 
