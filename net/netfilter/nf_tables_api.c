@@ -7152,6 +7152,10 @@ static int __net_init nf_tables_init_net(struct net *net)
 {
 	INIT_LIST_HEAD(&net->nft.tables);
 	INIT_LIST_HEAD(&net->nft.commit_list);
+
+#if IS_ENABLED(CONFIG_NF_CT_NETLINK_TIMEOUT)
+	INIT_LIST_HEAD(&net->nfct_timeout_list);
+#endif
 	net->nft.base_seq = 1;
 	net->nft.validate_state = NFT_VALIDATE_SKIP;
 
