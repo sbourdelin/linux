@@ -1015,12 +1015,10 @@ static long gpio_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		memset(&chipinfo, 0, sizeof(chipinfo));
 
-		strncpy(chipinfo.name, dev_name(&gdev->dev),
+		strlcpy(chipinfo.name, dev_name(&gdev->dev),
 			sizeof(chipinfo.name));
-		chipinfo.name[sizeof(chipinfo.name)-1] = '\0';
-		strncpy(chipinfo.label, gdev->label,
+		strlcpy(chipinfo.label, gdev->label,
 			sizeof(chipinfo.label));
-		chipinfo.label[sizeof(chipinfo.label)-1] = '\0';
 		chipinfo.lines = gdev->ngpio;
 		if (copy_to_user(ip, &chipinfo, sizeof(chipinfo)))
 			return -EFAULT;
@@ -1036,16 +1034,14 @@ static long gpio_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		desc = &gdev->descs[lineinfo.line_offset];
 		if (desc->name) {
-			strncpy(lineinfo.name, desc->name,
+			strlcpy(lineinfo.name, desc->name,
 				sizeof(lineinfo.name));
-			lineinfo.name[sizeof(lineinfo.name)-1] = '\0';
 		} else {
 			lineinfo.name[0] = '\0';
 		}
 		if (desc->label) {
-			strncpy(lineinfo.consumer, desc->label,
+			strlcpy(lineinfo.consumer, desc->label,
 				sizeof(lineinfo.consumer));
-			lineinfo.consumer[sizeof(lineinfo.consumer)-1] = '\0';
 		} else {
 			lineinfo.consumer[0] = '\0';
 		}
