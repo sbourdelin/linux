@@ -17,6 +17,7 @@
 #include <linux/console.h>
 #include <linux/memblock.h>
 #include <linux/export.h>
+#include <linux/kasan.h>
 
 #include <asm/io.h>
 #include <asm/prom.h>
@@ -74,13 +75,15 @@ notrace void __init machine_init(u64 dt_ptr)
 	unsigned int *addr = &memset_nocache_branch;
 	unsigned long insn;
 
+	kasan_early_init();
+
 	/* Configure static keys first, now that we're relocated. */
 	setup_feature_keys();
 
 	/* Enable early debugging if any specified (see udbg.h) */
 	udbg_early_init();
 
-	patch_instruction((unsigned int *)&memcpy, PPC_INST_NOP);
+	patch_instruction((unsigned int *)&__memcpy, PPC_INST_NOP);
 
 	insn = create_cond_branch(addr, branch_target(addr), 0x820000);
 	patch_instruction(addr, insn);	/* replace b by bne cr0 */
