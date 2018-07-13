@@ -119,8 +119,7 @@ int kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 		 * What was Rusty smoking when he wrote that code?
 		 */
 		if (symtab->sym_name != knt1) {
-			strncpy(knt1, symtab->sym_name, knt1_size);
-			knt1[knt1_size-1] = '\0';
+			strlcpy(knt1, symtab->sym_name, knt1_size);
 		}
 		for (i = 0; i < ARRAY_SIZE(kdb_name_table); ++i) {
 			if (kdb_name_table[i] &&
