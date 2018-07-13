@@ -874,7 +874,8 @@ static int davinci_i2c_probe(struct platform_device *pdev)
 			r = PTR_ERR(rinfo->scl_gpiod);
 			goto err_unuse_clocks;
 		}
-		rinfo->sda_gpiod = devm_gpiod_get(&pdev->dev, "sda", GPIOD_IN);
+		rinfo->sda_gpiod = devm_gpiod_get(&pdev->dev, "sda",
+						  GPIOD_OUT_HIGH_OPEN_DRAIN);
 		if (IS_ERR(rinfo->sda_gpiod)) {
 			r = PTR_ERR(rinfo->sda_gpiod);
 			goto err_unuse_clocks;
