@@ -47,8 +47,22 @@ static inline void __local_lock(struct local_irq_lock *lv)
 	lv->nestcnt++;
 }
 
+static inline void __local_lock_bh(struct local_irq_lock *lv)
+{
+	if (lv->owner != current) {
+		spin_lock_bh(&lv->lock);
+		LL_WARN(lv->owner);
+		LL_WARN(lv->nestcnt);
+		lv->owner = current;
+	}
+	lv->nestcnt++;
+}
+
 #define local_lock(lvar)					\
 	do { __local_lock(&get_local_var(lvar)); } while (0)
+
+#define local_lock_bh(lvar)					\
+	do { __local_lock_bh(&get_local_var(lvar)); } while (0)
 
 #define local_lock_on(lvar, cpu)				\
 	do { __local_lock(&per_cpu(lvar, cpu)); } while (0)
@@ -88,9 +102,26 @@ static inline void __local_unlock(struct local_irq_lock *lv)
 	spin_unlock(&lv->lock);
 }
 
+static inline void __local_unlock_bh(struct local_irq_lock *lv)
+{
+	LL_WARN(lv->nestcnt == 0);
+	LL_WARN(lv->owner != current);
+	if (--lv->nestcnt)
+		return;
+
+	lv->owner = NULL;
+	spin_unlock_bh(&lv->lock);
+}
+
 #define local_unlock(lvar)					\
 	do {							\
 		__local_unlock(this_cpu_ptr(&lvar));		\
+		put_local_var(lvar);				\
+	} while (0)
+
+#define local_unlock_bh(lvar)					\
+	do {							\
+		__local_unlock_bh(this_cpu_ptr(&lvar));		\
 		put_local_var(lvar);				\
 	} while (0)
 
@@ -253,6 +284,8 @@ static inline void local_irq_lock_init(int lvar) { }
 
 #define local_lock(lvar)			preempt_disable()
 #define local_unlock(lvar)			preempt_enable()
+#define local_lock_bh(lvar)			local_bh_disable()
+#define local_unlock_bh(lvar)			local_bh_enable()
 #define local_lock_irq(lvar)			local_irq_disable()
 #define local_lock_irq_on(lvar, cpu)		local_irq_disable()
 #define local_unlock_irq(lvar)			local_irq_enable()
