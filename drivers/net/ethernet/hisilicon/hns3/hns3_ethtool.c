@@ -493,13 +493,10 @@ static void hns3_get_drvinfo(struct net_device *netdev,
 	struct hns3_nic_priv *priv = netdev_priv(netdev);
 	struct hnae3_handle *h = priv->ae_handle;
 
-	strncpy(drvinfo->version, hns3_driver_version,
+	strlcpy(drvinfo->version, hns3_driver_version,
 		sizeof(drvinfo->version));
-	drvinfo->version[sizeof(drvinfo->version) - 1] = '\0';
-
-	strncpy(drvinfo->driver, h->pdev->driver->name,
+	strlcpy(drvinfo->driver, h->pdev->driver->name,
 		sizeof(drvinfo->driver));
-	drvinfo->driver[sizeof(drvinfo->driver) - 1] = '\0';
 
 	strncpy(drvinfo->bus_info, pci_name(h->pdev),
 		sizeof(drvinfo->bus_info));
