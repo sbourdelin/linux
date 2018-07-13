@@ -1914,6 +1914,8 @@ struct drm_i915_private {
 
 	struct memdev_info {
 		bool valid;
+		bool valid_dimm;
+		bool is_16gb_dimm;
 		u8 num_channels;
 		enum memdev_rank {
 			I915_DRAM_RANK_INVALID = 0,
