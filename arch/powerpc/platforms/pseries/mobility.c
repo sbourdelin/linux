@@ -242,6 +242,7 @@ static int add_dt_node(__be32 parent_phandle, __be32 drc_index)
 static void prrn_update_node(__be32 phandle)
 {
 	struct pseries_hp_errorlog *hp_elog;
+	struct completion hotplug_done;
 	struct device_node *dn;
 
 	/*
@@ -263,7 +264,9 @@ static void prrn_update_node(__be32 phandle)
 	hp_elog->id_type = PSERIES_HP_ELOG_ID_DRC_INDEX;
 	hp_elog->_drc_u.drc_index = phandle;
 
-	queue_hotplug_event(hp_elog, NULL, NULL);
+	init_completion(&hotplug_done);
+	queue_hotplug_event(hp_elog, &hotplug_done, NULL);
+	wait_for_completion(&hotplug_done);
 
 	kfree(hp_elog);
 }
