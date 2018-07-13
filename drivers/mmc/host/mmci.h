@@ -273,6 +273,7 @@ struct variant_data {
 
 /* mmci variant callbacks */
 struct mmci_host_ops {
+	void (*setup_dma)(struct mmci_host *host);
 };
 
 struct mmci_host_next {
