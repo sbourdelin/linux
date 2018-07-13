@@ -3,6 +3,7 @@
 Required properties:
 - compatible : One of:
   - "ingenic,jz4740-uart",
+  - "ingenic,jz4725b-uart",
   - "ingenic,jz4760-uart",
   - "ingenic,jz4770-uart",
   - "ingenic,jz4775-uart",
