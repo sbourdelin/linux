@@ -3775,7 +3775,10 @@ static void __blk_post_runtime_resume(struct request_queue *q, int err)
 {
 	if (!err) {
 		q->rpm_status = RPM_ACTIVE;
-		__blk_run_queue(q);
+		if (!q->mq_ops)
+			__blk_run_queue(q);
+		else
+			blk_mq_run_hw_queues(q, true);
 		pm_runtime_mark_last_busy(q->dev);
 		pm_request_autosuspend(q->dev);
 	} else {
@@ -3788,6 +3791,69 @@ static void __blk_set_runtime_active(struct request_queue *q)
 	q->rpm_status = RPM_ACTIVE;
 	pm_runtime_mark_last_busy(q->dev);
 	pm_request_autosuspend(q->dev);
+}
+
+static bool blk_mq_support_runtime_pm(struct request_queue *q)
+{
+	if (!q->tag_set || !(q->tag_set->flags & BLK_MQ_F_SUPPORT_RPM))
+		return false;
+	return true;
+}
+
+static int blk_mq_pre_runtime_suspend(struct request_queue *q)
+{
+	bool active;
+	int ret = 0;
+
+	if (!blk_mq_support_runtime_pm(q))
+		return ret;
+
+	write_seqlock_irq(&q->rpm_lock);
+	active = blk_mq_pm_queue_idle(q);
+	ret = __blk_pre_runtime_suspend(q, active);
+	write_sequnlock_irq(&q->rpm_lock);
+
+	return ret;
+}
+
+static void blk_mq_post_runtime_suspend(struct request_queue *q, int err)
+{
+	if (!blk_mq_support_runtime_pm(q))
+		return;
+
+	write_seqlock_irq(&q->rpm_lock);
+	__blk_post_runtime_suspend(q, err);
+	write_sequnlock_irq(&q->rpm_lock);
+}
+
+static void blk_mq_pre_runtime_resume(struct request_queue *q)
+{
+	if (!blk_mq_support_runtime_pm(q))
+		return;
+
+	write_seqlock_irq(&q->rpm_lock);
+	q->rpm_status = RPM_RESUMING;
+	write_sequnlock_irq(&q->rpm_lock);
+}
+
+static void blk_mq_post_runtime_resume(struct request_queue *q, int err)
+{
+	if (!blk_mq_support_runtime_pm(q))
+		return;
+
+	write_seqlock_irq(&q->rpm_lock);
+	__blk_post_runtime_resume(q, err);
+	write_sequnlock_irq(&q->rpm_lock);
+}
+
+static void blk_mq_set_runtime_active(struct request_queue *q)
+{
+	if (!blk_mq_support_runtime_pm(q))
+		return;
+
+	write_seqlock_irq(&q->rpm_lock);
+	__blk_set_runtime_active(q);
+	write_sequnlock_irq(&q->rpm_lock);
 }
 
 /**
@@ -3813,8 +3879,7 @@ static void __blk_set_runtime_active(struct request_queue *q)
  */
 void blk_pm_runtime_init(struct request_queue *q, struct device *dev)
 {
-	/* not support for RQF_PM and ->rpm_status in blk-mq yet */
-	if (q->mq_ops)
+	if (q->mq_ops && !blk_mq_support_runtime_pm(q))
 		return;
 
 	q->dev = dev;
@@ -3852,9 +3917,13 @@ int blk_pre_runtime_suspend(struct request_queue *q)
 	if (!q->dev)
 		return ret;
 
-	spin_lock_irq(q->queue_lock);
-	ret = __blk_pre_runtime_suspend(q, q->nr_pending);
-	spin_unlock_irq(q->queue_lock);
+	if (q->mq_ops)
+		ret = blk_mq_pre_runtime_suspend(q);
+	else {
+		spin_lock_irq(q->queue_lock);
+		ret = __blk_pre_runtime_suspend(q, q->nr_pending);
+		spin_unlock_irq(q->queue_lock);
+	}
 	return ret;
 }
 EXPORT_SYMBOL(blk_pre_runtime_suspend);
@@ -3877,9 +3946,13 @@ void blk_post_runtime_suspend(struct request_queue *q, int err)
 	if (!q->dev)
 		return;
 
-	spin_lock_irq(q->queue_lock);
-	__blk_post_runtime_suspend(q, err);
-	spin_unlock_irq(q->queue_lock);
+	if (q->mq_ops)
+		blk_mq_post_runtime_suspend(q, err);
+	else {
+		spin_lock_irq(q->queue_lock);
+		__blk_post_runtime_suspend(q, err);
+		spin_unlock_irq(q->queue_lock);
+	}
 }
 EXPORT_SYMBOL(blk_post_runtime_suspend);
 
@@ -3899,9 +3972,13 @@ void blk_pre_runtime_resume(struct request_queue *q)
 	if (!q->dev)
 		return;
 
-	spin_lock_irq(q->queue_lock);
-	q->rpm_status = RPM_RESUMING;
-	spin_unlock_irq(q->queue_lock);
+	if (q->mq_ops)
+		blk_mq_pre_runtime_resume(q);
+	else {
+		spin_lock_irq(q->queue_lock);
+		q->rpm_status = RPM_RESUMING;
+		spin_unlock_irq(q->queue_lock);
+	}
 }
 EXPORT_SYMBOL(blk_pre_runtime_resume);
 
@@ -3924,9 +4001,13 @@ void blk_post_runtime_resume(struct request_queue *q, int err)
 	if (!q->dev)
 		return;
 
-	spin_lock_irq(q->queue_lock);
-	__blk_post_runtime_resume(q, err);
-	spin_unlock_irq(q->queue_lock);
+	if (q->mq_ops)
+		blk_mq_post_runtime_resume(q, err);
+	else {
+		spin_lock_irq(q->queue_lock);
+		__blk_post_runtime_resume(q, err);
+		spin_unlock_irq(q->queue_lock);
+	}
 }
 EXPORT_SYMBOL(blk_post_runtime_resume);
 
@@ -3946,9 +4027,13 @@ EXPORT_SYMBOL(blk_post_runtime_resume);
  */
 void blk_set_runtime_active(struct request_queue *q)
 {
-	spin_lock_irq(q->queue_lock);
-	__blk_set_runtime_active(q);
-	spin_unlock_irq(q->queue_lock);
+	if (q->mq_ops)
+		blk_mq_set_runtime_active(q);
+	else {
+		spin_lock_irq(q->queue_lock);
+		__blk_set_runtime_active(q);
+		spin_unlock_irq(q->queue_lock);
+	}
 }
 EXPORT_SYMBOL(blk_set_runtime_active);
 #endif

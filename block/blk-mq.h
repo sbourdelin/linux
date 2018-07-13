@@ -88,6 +88,16 @@ extern void blk_mq_hctx_kobj_init(struct blk_mq_hw_ctx *hctx);
 
 void blk_mq_release(struct request_queue *q);
 
+/* blk-mq pm helpers */
+#ifdef CONFIG_PM
+extern bool blk_mq_pm_queue_idle(struct request_queue *q);
+#else
+static inline bool blk_mq_pm_queue_idle(struct request_queue *q)
+{
+	return false;
+}
+#endif
+
 /**
  * blk_mq_rq_state() - read the current MQ_RQ_* state of a request
  * @rq: target request.

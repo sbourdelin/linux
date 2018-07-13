@@ -25,6 +25,8 @@
 #include <linux/delay.h>
 #include <linux/crash_dump.h>
 #include <linux/prefetch.h>
+#include <linux/pm_runtime.h>
+#include <linux/seqlock.h>
 
 #include <trace/events/block.h>
 
@@ -57,6 +59,66 @@ static int blk_mq_poll_stats_bkt(const struct request *rq)
 
 	return bucket;
 }
+
+#ifdef CONFIG_PM
+static void blk_mq_pm_check_idle(struct blk_mq_hw_ctx *hctx,
+		struct request *rq, void *priv, bool reserved)
+{
+	unsigned long *cnt = priv;
+
+	if (!(rq->rq_flags & RQF_PM))
+		(*cnt)++;
+}
+
+bool blk_mq_pm_queue_idle(struct request_queue *q)
+{
+	unsigned long idle_cnt;
+
+	if (!q->tag_set || !(q->tag_set->flags & BLK_MQ_F_SUPPORT_RPM))
+		return false;
+
+	idle_cnt = 0;
+	blk_mq_queue_tag_busy_iter(q, blk_mq_pm_check_idle, &idle_cnt);
+
+	return idle_cnt == 0;
+}
+
+static void blk_mq_pm_init(struct request_queue *q)
+{
+	seqlock_init(&q->rpm_lock);
+}
+
+static void blk_mq_pm_add_request(struct request_queue *q, struct request *rq)
+{
+	unsigned int seq;
+	bool need_resume;
+
+	do {
+		seq = read_seqbegin(&q->rpm_lock);
+		need_resume = q->dev && !(rq->rq_flags & RQF_PM) &&
+			(q->rpm_status == RPM_SUSPENDED ||
+			 q->rpm_status == RPM_SUSPENDING);
+	} while (read_seqretry(&q->rpm_lock, seq));
+
+	if (need_resume)
+		pm_runtime_resume(q->dev);
+}
+
+static void blk_mq_pm_put_request(struct request_queue *q, struct request *rq)
+{
+	if (q->dev && !(rq->rq_flags & RQF_PM))
+		pm_runtime_mark_last_busy(q->dev);
+}
+#else
+static void blk_mq_pm_init(struct request_queue *q)
+{}
+
+static void blk_mq_pm_add_request(struct request_queue *q, struct request *rq)
+{}
+
+static void blk_mq_pm_put_request(struct request_queue *q, struct request *rq)
+{}
+#endif
 
 /*
  * Check if any of the ctx's have pending work in this hardware queue
@@ -391,6 +453,10 @@ static struct request *blk_mq_get_request(struct request_queue *q,
 		}
 	}
 	data->hctx->queued++;
+
+	if (data->hctx->flags & BLK_MQ_F_SUPPORT_RPM)
+		blk_mq_pm_add_request(q, rq);
+
 	return rq;
 }
 
@@ -508,6 +574,9 @@ void blk_mq_free_request(struct request *rq)
 
 	if (blk_rq_rl(rq))
 		blk_put_rl(blk_rq_rl(rq));
+
+	if (hctx->flags & BLK_MQ_F_SUPPORT_RPM)
+		blk_mq_pm_put_request(q, rq);
 
 	WRITE_ONCE(rq->state, MQ_RQ_IDLE);
 	if (refcount_dec_and_test(&rq->ref))
@@ -2618,6 +2687,8 @@ struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 		if (ret)
 			return ERR_PTR(ret);
 	}
+
+	blk_mq_pm_init(q);
 
 	return q;
 

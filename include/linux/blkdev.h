@@ -542,6 +542,7 @@ struct request_queue {
 
 #ifdef CONFIG_PM
 	struct device		*dev;
+	seqlock_t		rpm_lock;
 	int			rpm_status;
 	unsigned int		nr_pending;
 #endif
