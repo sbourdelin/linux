@@ -895,6 +895,11 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 		}
 	}
 
+	if (a->tcfa_action == TC_ACT_REDIRECT) {
+		net_warn_ratelimited("TC_ACT_REDIRECT can't be used directly");
+		a->tcfa_action = TC_ACT_LAST + 1;
+	}
+
 	return a;
 
 err_mod:

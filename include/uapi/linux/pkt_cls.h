@@ -45,6 +45,7 @@ enum {
 				   * the skb and act like everything
 				   * is alright.
 				   */
+#define TC_ACT_LAST		TC_ACT_TRAP
 
 /* There is a special kind of actions called "extended actions",
  * which need a value parameter. These have a local opcode located in
