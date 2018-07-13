@@ -35,6 +35,8 @@
 
 static DEFINE_SPINLOCK(rtasd_log_lock);
 
+static DEFINE_MUTEX(prrn_lock);
+
 static DECLARE_WAIT_QUEUE_HEAD(rtas_log_wait);
 
 static char *rtas_log_buf;
@@ -290,9 +292,12 @@ static DECLARE_WORK(prrn_work, prrn_work_fn);
 
 static void prrn_schedule_update(u32 scope)
 {
-	flush_work(&prrn_work);
-	prrn_update_scope = scope;
-	schedule_work(&prrn_work);
+	if (mutex_trylock(&prrn_lock)) {
+		flush_work(&prrn_work);
+		prrn_update_scope = scope;
+		schedule_work(&prrn_work);
+		mutex_unlock(&prrn_lock);
+	}
 }
 
 static void handle_rtas_event(const struct rtas_error_log *log)
