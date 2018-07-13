@@ -31,3 +31,6 @@ bool nf_osf_match(const struct sk_buff *skb, u_int8_t family,
 		  int hooknum, struct net_device *in, struct net_device *out,
 		  const struct nf_osf_info *info, struct net *net,
 		  const struct list_head *nf_osf_fingers);
+
+const char *nf_osf_find(const struct sk_buff *skb,
+                        const struct list_head *nf_osf_fingers);
