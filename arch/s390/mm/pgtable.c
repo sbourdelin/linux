@@ -410,14 +410,34 @@ static inline pmd_t pmdp_flush_lazy(struct mm_struct *mm,
 	return old;
 }
 
+static void pmdp_clear_skeys(struct mm_struct *mm, pmd_t *pmdp, pmd_t new)
+{
+	unsigned long paddr = pmd_val(new) & HPAGE_MASK;
+
+	/*
+	 * After a guest has used the first storage key instruction,
+	 * we must ensure, that each newly mapped huge pmd has all
+	 * skeys cleared before mapping it.
+	 */
+	if (!mm_uses_skeys(mm) ||
+	    !pmd_none(*pmdp) ||
+	    !pmd_large(new) ||
+	    (pmd_val(new) & _SEGMENT_ENTRY_INVALID))
+		return;
+
+	__storage_key_init_range(paddr, paddr + HPAGE_SIZE - 1);
+}
+
 pmd_t pmdp_xchg_direct(struct mm_struct *mm, unsigned long addr,
 		       pmd_t *pmdp, pmd_t new)
 {
 	pmd_t old;
 
 	preempt_disable();
-	if (mm_has_pgste(mm))
+	if (mm_has_pgste(mm)) {
+		pmdp_clear_skeys(mm, pmdp, new);
 		pmdp_notify(mm, addr);
+	}
 	old = pmdp_flush_direct(mm, addr, pmdp);
 	*pmdp = new;
 	preempt_enable();
@@ -431,8 +451,10 @@ pmd_t pmdp_xchg_lazy(struct mm_struct *mm, unsigned long addr,
 	pmd_t old;
 
 	preempt_disable();
-	if (mm_has_pgste(mm))
+	if (mm_has_pgste(mm)) {
+		pmdp_clear_skeys(mm, pmdp, new);
 		pmdp_notify(mm, addr);
+	}
 	old = pmdp_flush_lazy(mm, addr, pmdp);
 	*pmdp = new;
 	preempt_enable();
