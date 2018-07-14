@@ -1461,6 +1461,16 @@ enum nft_flowtable_hook_attributes {
 };
 #define NFTA_FLOWTABLE_HOOK_MAX	(__NFTA_FLOWTABLE_HOOK_MAX - 1)
 
+enum nft_osf_attributes {
+	NFTA_OSF_UNSPEC,
+	NFTA_OSF_DREG,
+	NFTA_OSF_FLAGS,
+	NFTA_OSF_LOGLEVEL,
+	NFTA_OSF_TTL,
+	__NFTA_OSF_MAX,
+};
+#define NFTA_OSF_MAX (__NFTA_OSF_MAX - 1)
+
 /**
  * enum nft_device_attributes - nf_tables device netlink attributes
  *
