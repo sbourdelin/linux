@@ -333,6 +333,8 @@ struct intel_engine_execlists {
 	 * @csb_head: context status buffer head
 	 */
 	u8 csb_head;
+
+	I915_SELFTEST_DECLARE(bool preempt_hang;)
 };
 
 #define INTEL_ENGINE_CS_MAX_NAME 8
