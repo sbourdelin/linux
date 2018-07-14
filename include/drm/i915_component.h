@@ -121,4 +121,20 @@ struct i915_audio_component {
 	const struct i915_audio_component_audio_ops *audio_ops;
 };
 
+/**
+ * struct i915_component_master - Used for communication between i915
+ * and any other drivers for the services of different feature.
+ */
+struct i915_component_master {
+	/**
+	 * @i915_kdev: Kdev of I915. Used from the client component for
+	 * removing the reference to mei_cldev.
+	 */
+	struct device *i915_kdev;
+
+	/*
+	 * Add here the interface details between I915 and interested modules.
+	 */
+};
+
 #endif /* _I915_COMPONENT_H_ */
