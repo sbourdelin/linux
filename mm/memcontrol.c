@@ -1923,6 +1923,9 @@ retry:
 		goto retry;
 	}
 
+	if (in_softirq())
+		goto nomem;
+
 	/*
 	 * Unlike in global OOM situations, memcg is not in a physical
 	 * memory shortage.  Allow dying and OOM-killed tasks to
