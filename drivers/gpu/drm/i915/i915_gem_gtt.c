@@ -531,8 +531,7 @@ static void vm_free_page(struct i915_address_space *vm, struct page *page)
 	spin_unlock(&vm->free_pages.lock);
 }
 
-static void i915_address_space_init(struct i915_address_space *vm,
-				    struct drm_i915_private *dev_priv)
+static void i915_address_space_init(struct i915_address_space *vm, int subclass)
 {
 	/*
 	 * The vm->mutex must be reclaim safe (for use in the shrinker).
@@ -540,6 +539,7 @@ static void i915_address_space_init(struct i915_address_space *vm,
 	 * attempt holding the lock is immediately reported by lockdep.
 	 */
 	mutex_init(&vm->mutex);
+	lockdep_set_subclass(&vm->mutex, subclass);
 	i915_gem_shrinker_taints_mutex(&vm->mutex);
 
 	GEM_BUG_ON(!vm->total);
@@ -1669,7 +1669,7 @@ static struct i915_hw_ppgtt *gen8_ppgtt_create(struct drm_i915_private *i915)
 	 */
 	ppgtt->vm.has_read_only = !intel_vgpu_active(i915);
 
-	i915_address_space_init(&ppgtt->vm, i915);
+	i915_address_space_init(&ppgtt->vm, VM_CLASS_PPGTT);
 
 	/* There are only few exceptions for gen >=6. chv and bxt.
 	 * And we are not sure about the latter so play safe for now.
@@ -2176,7 +2176,7 @@ static struct i915_hw_ppgtt *gen6_ppgtt_create(struct drm_i915_private *i915)
 
 	ppgtt->base.vm.total = I915_PDES * GEN6_PTES * PAGE_SIZE;
 
-	i915_address_space_init(&ppgtt->base.vm, i915);
+	i915_address_space_init(&ppgtt->base.vm, VM_CLASS_PPGTT);
 
 	ppgtt->base.vm.allocate_va_range = gen6_alloc_va_range;
 	ppgtt->base.vm.clear_range = gen6_ppgtt_clear_range;
@@ -3610,7 +3610,7 @@ int i915_ggtt_init_hw(struct drm_i915_private *dev_priv)
 	 * and beyond the end of the GTT if we do not provide a guard.
 	 */
 	mutex_lock(&dev_priv->drm.struct_mutex);
-	i915_address_space_init(&ggtt->vm, dev_priv);
+	i915_address_space_init(&ggtt->vm, VM_CLASS_GGTT);
 
 	/* Only VLV supports read-only GGTT mappings */
 	ggtt->vm.has_read_only = IS_VALLEYVIEW(dev_priv);
