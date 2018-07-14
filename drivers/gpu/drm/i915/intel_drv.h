@@ -382,6 +382,10 @@ struct intel_hdcp_shim {
 
 	/* Detects the HDCP protocol(DP/HDMI) required on the port */
 	enum hdcp_protocol (*hdcp_protocol)(void);
+
+	/* Detects whether Panel is HDCP2.2 capable */
+	int (*hdcp_2_2_capable)(struct intel_digital_port *intel_dig_port,
+				bool *capable);
 };
 
 struct intel_hdcp {
@@ -395,6 +399,7 @@ struct intel_hdcp {
 	/* HDCP2.2 related definitions */
 	/* Flag indicates whether this connector supports HDCP2.2 or not. */
 	bool hdcp2_supported;
+	bool hdcp2_in_use;
 
 	/*
 	 * Content Stream Type defined by content owner. TYPE0(0x0) content can
