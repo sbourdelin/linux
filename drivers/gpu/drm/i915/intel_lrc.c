@@ -563,8 +563,6 @@ static void complete_preempt_context(struct intel_engine_execlists *execlists)
 	__unwind_incomplete_requests(container_of(execlists,
 						  struct intel_engine_cs,
 						  execlists));
-
-	execlists_clear_active(execlists, EXECLISTS_ACTIVE_PREEMPT);
 }
 
 static void execlists_dequeue(struct intel_engine_cs *engine)
@@ -792,8 +790,7 @@ execlists_cancel_port_requests(struct intel_engine_execlists * const execlists)
 		port++;
 	}
 
-	execlists_clear_active(execlists, EXECLISTS_ACTIVE_USER);
-	execlists_user_end(execlists);
+	execlists->active = 0;
 }
 
 static void reset_csb_pointers(struct intel_engine_execlists *execlists)
