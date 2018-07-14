@@ -873,7 +873,6 @@ static struct aa_label *build_change_hat(struct aa_profile *profile,
 					 const char *name, bool sibling)
 {
 	struct aa_profile *root, *hat = NULL;
-	const char *info = NULL;
 	int error = 0;
 
 	if (sibling && PROFILE_IS_HAT(profile)) {
@@ -881,7 +880,6 @@ static struct aa_label *build_change_hat(struct aa_profile *profile,
 	} else if (!sibling && !PROFILE_IS_HAT(profile)) {
 		root = aa_get_profile(profile);
 	} else {
-		info = "conflicting target types";
 		error = -EPERM;
 		goto audit;
 	}
@@ -892,10 +890,8 @@ static struct aa_label *build_change_hat(struct aa_profile *profile,
 		if (COMPLAIN_MODE(profile)) {
 			hat = aa_new_null_profile(profile, true, name,
 						  GFP_KERNEL);
-			if (!hat) {
-				info = "failed null profile create";
+			if (!hat)
 				error = -ENOMEM;
-			}
 		}
 	}
 	aa_put_profile(root);
