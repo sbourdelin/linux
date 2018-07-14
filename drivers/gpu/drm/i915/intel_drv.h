@@ -29,6 +29,7 @@
 #include <linux/i2c.h>
 #include <linux/hdmi.h>
 #include <linux/sched/clock.h>
+#include <linux/mei_hdcp.h>
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include <drm/drm_crtc.h>
@@ -378,6 +379,9 @@ struct intel_hdcp_shim {
 	/* Detects panel's hdcp capability. This is optional for HDMI. */
 	int (*hdcp_capable)(struct intel_digital_port *intel_dig_port,
 			    bool *hdcp_capable);
+
+	/* Detects the HDCP protocol(DP/HDMI) required on the port */
+	enum hdcp_protocol (*hdcp_protocol)(void);
 };
 
 struct intel_hdcp {
@@ -387,6 +391,20 @@ struct intel_hdcp {
 	uint64_t value;
 	struct delayed_work check_work;
 	struct work_struct prop_work;
+
+	/* HDCP2.2 related definitions */
+	/* Flag indicates whether this connector supports HDCP2.2 or not. */
+	bool hdcp2_supported;
+
+	/*
+	 * Content Stream Type defined by content owner. TYPE0(0x0) content can
+	 * flow in the link protected by HDCP2.2 or HDCP1.4, where as TYPE1(0x1)
+	 * content can flow only through a link protected by HDCP2.2.
+	 */
+	u8 content_type;
+
+	/* mei interface related information */
+	struct mei_hdcp_data mei_data;
 };
 
 struct intel_connector {
@@ -1920,11 +1938,14 @@ void intel_hdcp_atomic_check(struct drm_connector *connector,
 			     struct drm_connector_state *old_state,
 			     struct drm_connector_state *new_state);
 int intel_hdcp_init(struct intel_connector *connector,
-		    const struct intel_hdcp_shim *hdcp_shim);
+		    const struct intel_hdcp_shim *hdcp_shim,
+		    bool hdcp2_supported);
 int intel_hdcp_enable(struct intel_connector *connector);
 int intel_hdcp_disable(struct intel_connector *connector);
 int intel_hdcp_check_link(struct intel_connector *connector);
 bool is_hdcp_supported(struct drm_i915_private *dev_priv, enum port port);
+int intel_hdcp_component_init(struct drm_i915_private *dev_priv);
+bool is_hdcp2_supported(struct drm_i915_private *dev_priv);
 
 /* intel_psr.c */
 #define CAN_PSR(dev_priv) (HAS_PSR(dev_priv) && dev_priv->psr.sink_support)

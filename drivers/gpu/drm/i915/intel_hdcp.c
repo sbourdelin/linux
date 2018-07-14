@@ -8,13 +8,19 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_hdcp.h>
+#include <drm/i915_component.h>
 #include <linux/i2c.h>
 #include <linux/random.h>
+#include <linux/component.h>
 
 #include "intel_drv.h"
 #include "i915_reg.h"
 
 #define KEY_LOAD_TRIES	5
+#define GET_MEI_DDI_INDEX(port)		(((port) == PORT_A) ? DDI_A : \
+					 (enum hdcp_physical_port)(port))
+
+static int intel_hdcp2_init(struct intel_connector *connector);
 
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
 				    const struct intel_hdcp_shim *shim)
@@ -744,10 +750,14 @@ bool is_hdcp_supported(struct drm_i915_private *dev_priv, enum port port)
 }
 
 int intel_hdcp_init(struct intel_connector *connector,
-		    const struct intel_hdcp_shim *shim)
+		    const struct intel_hdcp_shim *shim,
+		    bool hdcp2_supported)
 {
 	struct intel_hdcp *hdcp = &connector->hdcp;
 	int ret;
+
+	if (!shim)
+		return -EINVAL;
 
 	ret = drm_connector_attach_content_protection_property(
 			&connector->base);
@@ -758,6 +768,10 @@ int intel_hdcp_init(struct intel_connector *connector,
 	mutex_init(&hdcp->mutex);
 	INIT_DELAYED_WORK(&hdcp->check_work, intel_hdcp_check_work);
 	INIT_WORK(&hdcp->prop_work, intel_hdcp_prop_work);
+
+	if (hdcp2_supported)
+		intel_hdcp2_init(connector);
+
 	return 0;
 }
 
@@ -893,5 +907,66 @@ int intel_hdcp_check_link(struct intel_connector *connector)
 
 out:
 	mutex_unlock(&hdcp->mutex);
+	return ret;
+}
+
+static int i915_hdcp_component_match(struct device *dev, void *data)
+{
+	return !strcmp(dev->driver->name, "mei_hdcp");
+}
+
+static int initialize_mei_hdcp_data(struct intel_connector *connector)
+{
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	struct mei_hdcp_data *data = &hdcp->mei_data;
+	enum port port;
+
+	if (connector->encoder) {
+		port = connector->encoder->port;
+		data->port = GET_MEI_DDI_INDEX(port);
+	}
+
+	data->port_type = INTEGRATED;
+	data->protocol = hdcp->shim->hdcp_protocol();
+
+	data->k = 1;
+	if (!data->streams)
+		data->streams = kcalloc(data->k,
+					sizeof(struct hdcp2_streamid_type),
+					GFP_KERNEL);
+	if (!data->streams) {
+		DRM_ERROR("Out of Memory\n");
+		return -ENOMEM;
+	}
+
+	data->streams[0].stream_id = 0;
+	data->streams[0].stream_type = hdcp->content_type;
+
+	return 0;
+}
+
+bool is_hdcp2_supported(struct drm_i915_private *dev_priv)
+{
+	return ((INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv) ||
+		 IS_KABYLAKE(dev_priv)) && IS_ENABLED(CONFIG_INTEL_MEI_HDCP));
+}
+
+static int intel_hdcp2_init(struct intel_connector *connector)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	struct intel_hdcp *hdcp = &connector->hdcp;
+	int ret;
+
+	WARN_ON(!is_hdcp2_supported(dev_priv));
+	ret = initialize_mei_hdcp_data(connector);
+	if (ret)
+		goto exit;
+
+	component_match_add(dev_priv->drm.dev, &dev_priv->master_match,
+			    i915_hdcp_component_match, dev_priv);
+
+	hdcp->hdcp2_supported = true;
+
+exit:
 	return ret;
 }
