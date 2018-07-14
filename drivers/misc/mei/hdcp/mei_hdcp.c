@@ -363,6 +363,66 @@ static int mei_initiate_locality_check(struct mei_cl_device *cldev,
 	return 0;
 }
 
+/*
+ * mei_verify_lprime:
+ *	Function to verify lprime.
+ *
+ * cldev		: Pointer for mei client device
+ * data			: Intel HW specific Data
+ * rx_lprime		: Pointer for LC_Send_L_prime
+ *
+ * Returns 0 on Success, <0 on Failure
+ */
+static int mei_verify_lprime(struct mei_cl_device *cldev,
+			     struct mei_hdcp_data *data,
+			     struct hdcp2_lc_send_lprime *rx_lprime)
+{
+	struct wired_cmd_validate_locality_in verify_lprime_in = { { 0 } };
+	struct wired_cmd_validate_locality_out verify_lprime_out = { { 0 } };
+	struct device *dev;
+	ssize_t byte;
+
+	if (!data || !rx_lprime)
+		return -EINVAL;
+
+	dev = &cldev->dev;
+
+	verify_lprime_in.header.api_version = HDCP_API_VERSION;
+	verify_lprime_in.header.command_id = WIRED_VALIDATE_LOCALITY;
+	verify_lprime_in.header.status = ME_HDCP_STATUS_SUCCESS;
+	verify_lprime_in.header.buffer_len =
+					WIRED_CMD_BUF_LEN_VALIDATE_LOCALITY_IN;
+
+	verify_lprime_in.port.integrated_port_type = data->port_type;
+	verify_lprime_in.port.physical_port = data->port;
+
+	memcpy(verify_lprime_in.l_prime, rx_lprime->l_prime,
+	       sizeof(rx_lprime->l_prime));
+
+	byte = mei_cldev_send(cldev, (u8 *)&verify_lprime_in,
+			      sizeof(verify_lprime_in));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_send failed. %zd\n", byte);
+		return byte;
+	}
+
+	byte = mei_cldev_recv(cldev, (u8 *)&verify_lprime_out,
+			      sizeof(verify_lprime_out));
+	if (byte < 0) {
+		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", byte);
+		return byte;
+	}
+
+	if (verify_lprime_out.header.status != ME_HDCP_STATUS_SUCCESS) {
+		dev_dbg(dev, "ME cmd 0x%08X failed. status: 0x%X\n",
+			WIRED_VALIDATE_LOCALITY,
+			verify_lprime_out.header.status);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 struct i915_hdcp_component_ops mei_hdcp_component_ops = {
 	.owner					= THIS_MODULE,
 	.initiate_hdcp2_session			= mei_initiate_hdcp2_session,
@@ -371,7 +431,7 @@ struct i915_hdcp_component_ops mei_hdcp_component_ops = {
 	.verify_hprime				= mei_verify_hprime,
 	.store_pairing_info			= mei_store_pairing_info,
 	.initiate_locality_check		= mei_initiate_locality_check,
-	.verify_lprime				= NULL,
+	.verify_lprime				= mei_verify_lprime,
 	.get_session_key			= NULL,
 	.repeater_check_flow_prepare_ack	= NULL,
 	.verify_mprime				= NULL,
@@ -381,6 +441,7 @@ struct i915_hdcp_component_ops mei_hdcp_component_ops = {
 
 static int mei_hdcp_component_bind(struct device *mei_kdev,
 				   struct device *i915_kdev, void *data)
+
 {
 	struct i915_component_master *comp = data;
 
