@@ -228,13 +228,13 @@ static int clkgen_pll_enable(struct clk_hw *hw)
 	unsigned long flags = 0;
 	int ret = 0;
 
-	if (pll->lock)
+	if (pll->lock) {
+		/* stih418 and stih407 */
 		spin_lock_irqsave(pll->lock, flags);
-
-	ret = __clkgen_pll_enable(hw);
-
-	if (pll->lock)
+		ret = __clkgen_pll_enable(hw);
 		spin_unlock_irqrestore(pll->lock, flags);
+	} else
+		ret = __clkgen_pll_enable(hw);
 
 	return ret;
 }
@@ -259,13 +259,13 @@ static void clkgen_pll_disable(struct clk_hw *hw)
 	struct clkgen_pll *pll = to_clkgen_pll(hw);
 	unsigned long flags = 0;
 
-	if (pll->lock)
+	if (pll->lock) {
+		/* stih418 and stih407 */
 		spin_lock_irqsave(pll->lock, flags);
-
-	__clkgen_pll_disable(hw);
-
-	if (pll->lock)
+		__clkgen_pll_disable(hw);
 		spin_unlock_irqrestore(pll->lock, flags);
+	} else
+		__clkgen_pll_disable(hw);
 }
 
 static int clk_pll3200c32_get_params(unsigned long input, unsigned long output,
@@ -400,15 +400,18 @@ static int set_rate_stm_pll3200c32(struct clk_hw *hw, unsigned long rate,
 
 	__clkgen_pll_disable(hw);
 
-	if (pll->lock)
+	if (pll->lock) {
+		/* stih407 and stih418 */
 		spin_lock_irqsave(pll->lock, flags);
-
-	CLKGEN_WRITE(pll, ndiv, pll->ndiv);
-	CLKGEN_WRITE(pll, idf, pll->idf);
-	CLKGEN_WRITE(pll, cp, pll->cp);
-
-	if (pll->lock)
+		CLKGEN_WRITE(pll, ndiv, pll->ndiv);
+		CLKGEN_WRITE(pll, idf, pll->idf);
+		CLKGEN_WRITE(pll, cp, pll->cp);
 		spin_unlock_irqrestore(pll->lock, flags);
+	} else {
+		CLKGEN_WRITE(pll, ndiv, pll->ndiv);
+		CLKGEN_WRITE(pll, idf, pll->idf);
+		CLKGEN_WRITE(pll, cp, pll->cp);
+	}
 
 	__clkgen_pll_enable(hw);
 
@@ -558,14 +561,16 @@ static int set_rate_stm_pll4600c28(struct clk_hw *hw, unsigned long rate,
 
 	__clkgen_pll_disable(hw);
 
-	if (pll->lock)
+	if (pll->lock) {
+		/* stih407 and stih418 */
 		spin_lock_irqsave(pll->lock, flags);
-
-	CLKGEN_WRITE(pll, ndiv, pll->ndiv);
-	CLKGEN_WRITE(pll, idf, pll->idf);
-
-	if (pll->lock)
+		CLKGEN_WRITE(pll, ndiv, pll->ndiv);
+		CLKGEN_WRITE(pll, idf, pll->idf);
 		spin_unlock_irqrestore(pll->lock, flags);
+	} else {
+		CLKGEN_WRITE(pll, ndiv, pll->ndiv);
+		CLKGEN_WRITE(pll, idf, pll->idf);
+	}
 
 	__clkgen_pll_enable(hw);
 
