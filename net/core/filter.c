@@ -5820,6 +5820,15 @@ static u32 bpf_convert_ctx_access(enum bpf_access_type type,
 				      bpf_target_off(struct sock_common,
 						     skc_num, 2, target_size));
 		break;
+
+	case offsetof(struct __sk_buff, gso_segs):
+		BUILD_BUG_ON(FIELD_SIZEOF(struct skb_shared_info, gso_segs) !=
+					  sizeof(unsigned short));
+		off = offsetof(struct sk_buff, end);
+		off += offsetof(struct skb_shared_info, gso_segs);
+		*insn++ = BPF_LDX_MEM(BPF_SIZEOF(unsigned short), si->dst_reg,
+						 si->src_reg, off);
+		break;
 	}
 
 	return insn - insn_buf;
