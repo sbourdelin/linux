@@ -1233,7 +1233,7 @@ static void gasket_perform_unmapping(
 				dma_unmap_page(pg_tbl->device, ptes[i].dma_addr,
 					       PAGE_SIZE, DMA_FROM_DEVICE);
 			}
-			if (gasket_release_page(ptes[i].page))
+			if (ptes[i].page && gasket_release_page(ptes[i].page))
 				--pg_tbl->num_active_pages;
 		}
 		ptes[i].status = PTE_FREE;
