@@ -647,6 +647,7 @@ static void __iomem * __init clkgen_get_register_base(
 		return NULL;
 
 	reg = of_iomap(pnode, 0);
+	WARN_ON(!reg);
 
 	of_node_put(pnode);
 	return reg;
