@@ -58,6 +58,7 @@
 	(((val) >> (dec)) & ((1 << (bits)) - 1))
 
 struct ti_ads7950_state {
+	struct iio_dev		*indio_dev;
 	struct spi_device	*spi;
 	struct spi_transfer	ring_xfer[TI_ADS7950_MAX_CHAN + 2];
 	struct spi_transfer	scan_single_xfer[3];
@@ -68,6 +69,8 @@ struct ti_ads7950_state {
 	unsigned int		vref_mv;
 
 	unsigned int		settings;
+	__be16			single_tx;
+	__be16			single_rx;
 
 	/*
 	 * DMA (thus cache coherency maintenance) requires the
@@ -299,14 +302,21 @@ static int ti_ads7950_scan_direct(struct ti_ads7950_state *st, unsigned int ch)
 {
 	int ret, cmd;
 
+	mutex_lock(&st->indio_dev->mlock);
+
 	cmd = TI_ADS7950_CR_WRITE | TI_ADS7950_CR_CHAN(ch) | st->settings;
-	st->tx_buf[0] = cpu_to_be16(cmd);
+	st->single_tx = cpu_to_be16(cmd);
 
 	ret = spi_sync(st->spi, &st->scan_single_msg);
 	if (ret)
-		return ret;
+		goto out;
 
-	return be16_to_cpu(st->rx_buf[0]);
+	ret = be16_to_cpu(st->single_rx);
+
+out:
+	mutex_unlock(&st->indio_dev->mlock);
+
+		return ret;
 }
 
 static int ti_ads7950_get_range(struct ti_ads7950_state *st)
@@ -338,13 +348,7 @@ static int ti_ads7950_read_raw(struct iio_dev *indio_dev,
 
 	switch (m) {
 	case IIO_CHAN_INFO_RAW:
-
-		ret = iio_device_claim_direct_mode(indio_dev);
-		if (ret < 0)
-			return ret;
-
 		ret = ti_ads7950_scan_direct(st, chan->address);
-		iio_device_release_direct_mode(indio_dev);
 		if (ret < 0)
 			return ret;
 
@@ -389,6 +393,7 @@ static int ti_ads7950_probe(struct spi_device *spi)
 
 	spi_set_drvdata(spi, indio_dev);
 
+	st->indio_dev = indio_dev;
 	st->spi = spi;
 	st->settings = TI_ADS7950_CR_MANUAL | TI_ADS7950_CR_RANGE_5V;
 
@@ -410,13 +415,13 @@ static int ti_ads7950_probe(struct spi_device *spi)
 	 * was read at the end of the first transfer.
 	 */
 
-	st->scan_single_xfer[0].tx_buf = &st->tx_buf[0];
+	st->scan_single_xfer[0].tx_buf = &st->single_tx;
 	st->scan_single_xfer[0].len = 2;
 	st->scan_single_xfer[0].cs_change = 1;
-	st->scan_single_xfer[1].tx_buf = &st->tx_buf[0];
+	st->scan_single_xfer[1].tx_buf = &st->single_tx;
 	st->scan_single_xfer[1].len = 2;
 	st->scan_single_xfer[1].cs_change = 1;
-	st->scan_single_xfer[2].rx_buf = &st->rx_buf[0];
+	st->scan_single_xfer[2].rx_buf = &st->single_rx;
 	st->scan_single_xfer[2].len = 2;
 
 	spi_message_init_with_transfers(&st->scan_single_msg,
