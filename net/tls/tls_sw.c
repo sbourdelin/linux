@@ -656,7 +656,7 @@ static struct sk_buff *tls_wait_data(struct sock *sk, int flags,
 }
 
 static int decrypt_skb_update(struct sock *sk, struct sk_buff *skb,
-			      struct scatterlist *sgout, bool *zc)
+			      struct scatterlist *sgout)
 {
 	struct tls_context *tls_ctx = tls_get_ctx(sk);
 	struct tls_sw_context_rx *ctx = tls_sw_ctx_rx(tls_ctx);
@@ -668,13 +668,9 @@ static int decrypt_skb_update(struct sock *sk, struct sk_buff *skb,
 	if (err < 0)
 		return err;
 #endif
-	if (!ctx->decrypted) {
-		err = decrypt_skb(sk, skb, sgout);
-		if (err < 0)
-			return err;
-	} else {
-		*zc = false;
-	}
+	err = decrypt_skb(sk, skb, sgout);
+	if (err < 0)
+		return err;
 
 	rxm->offset += tls_ctx->rx.prepend_size;
 	rxm->full_len -= tls_ctx->rx.overhead_size;
@@ -819,7 +815,6 @@ int tls_sw_recvmsg(struct sock *sk,
 				struct scatterlist sgin[MAX_SKB_FRAGS + 1];
 				int pages = 0;
 
-				zc = true;
 				sg_init_table(sgin, MAX_SKB_FRAGS + 1);
 				sg_set_buf(&sgin[0], ctx->rx_aad_plaintext,
 					   TLS_AAD_SPACE_SIZE);
@@ -830,8 +825,10 @@ int tls_sw_recvmsg(struct sock *sk,
 							 MAX_SKB_FRAGS,	false, true);
 				if (err < 0)
 					goto fallback_to_reg_recv;
+				else
+					zc = true;
 
-				err = decrypt_skb_update(sk, skb, sgin, &zc);
+				err = decrypt_skb_update(sk, skb, sgin);
 				for (; pages > 0; pages--)
 					put_page(sg_page(&sgin[pages]));
 				if (err < 0) {
@@ -840,7 +837,7 @@ int tls_sw_recvmsg(struct sock *sk,
 				}
 			} else {
 fallback_to_reg_recv:
-				err = decrypt_skb_update(sk, skb, NULL, &zc);
+				err = decrypt_skb_update(sk, skb, NULL);
 				if (err < 0) {
 					tls_err_abort(sk, EBADMSG);
 					goto recv_end;
@@ -895,7 +892,6 @@ ssize_t tls_sw_splice_read(struct socket *sock,  loff_t *ppos,
 	int err = 0;
 	long timeo;
 	int chunk;
-	bool zc;
 
 	lock_sock(sk);
 
@@ -912,7 +908,7 @@ ssize_t tls_sw_splice_read(struct socket *sock,  loff_t *ppos,
 	}
 
 	if (!ctx->decrypted) {
-		err = decrypt_skb_update(sk, skb, NULL, &zc);
+		err = decrypt_skb_update(sk, skb, NULL);
 
 		if (err < 0) {
 			tls_err_abort(sk, EBADMSG);
