@@ -825,18 +825,16 @@ int tls_sw_recvmsg(struct sock *sk,
 				err = decrypt_skb_update(sk, skb, sgin);
 				for (; pages > 0; pages--)
 					put_page(sg_page(&sgin[pages]));
-				if (err < 0) {
-					tls_err_abort(sk, EBADMSG);
-					goto recv_end;
-				}
 			} else {
 fallback_to_reg_recv:
 				err = decrypt_skb_update(sk, skb, NULL);
-				if (err < 0) {
-					tls_err_abort(sk, EBADMSG);
-					goto recv_end;
-				}
 			}
+
+			if (err < 0) {
+				tls_err_abort(sk, EBADMSG);
+				goto recv_end;
+			}
+
 			ctx->decrypted = true;
 		}
 
