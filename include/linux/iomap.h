@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef LINUX_IOMAP_H
-#define LINUX_IOMAP_H 1
+#define LINUX_IOMAP_H
 
 #include <linux/types.h>
 
