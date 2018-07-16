@@ -700,7 +700,6 @@ int decrypt_skb(struct sock *sk, struct sk_buff *skb,
 	memcpy(iv, tls_ctx->rx.iv, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
 	if (!sgout) {
 		nsg = skb_cow_data(skb, 0, &unused) + 1;
-		sgin = kmalloc_array(nsg, sizeof(*sgin), sk->sk_allocation);
 		sgout = sgin;
 	}
 
@@ -720,9 +719,6 @@ int decrypt_skb(struct sock *sk, struct sk_buff *skb,
 	ret = tls_do_decryption(sk, sgin, sgout, iv,
 				rxm->full_len - tls_ctx->rx.overhead_size,
 				skb, sk->sk_allocation);
-
-	if (sgin != &sgin_arr[0])
-		kfree(sgin);
 
 	return ret;
 }
