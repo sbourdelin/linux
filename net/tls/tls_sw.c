@@ -675,8 +675,6 @@ static int decrypt_skb_update(struct sock *sk, struct sk_buff *skb,
 	rxm->offset += tls_ctx->rx.prepend_size;
 	rxm->full_len -= tls_ctx->rx.overhead_size;
 	tls_advance_record_sn(sk, &tls_ctx->rx);
-	ctx->decrypted = true;
-	ctx->saved_data_ready(sk);
 
 	return err;
 }
