@@ -123,15 +123,6 @@
 	*(volatile u32 *)(RALINK_PCI_BASE+(ofs)) = cpu_to_le32(data)
 #define MV_READ(ofs, data)	\
 	*(data) = le32_to_cpu(*(volatile u32 *)(RALINK_PCI_BASE+(ofs)))
-#define MV_WRITE_16(ofs, data)	\
-	*(volatile u16 *)(RALINK_PCI_BASE+(ofs)) = cpu_to_le16(data)
-#define MV_READ_16(ofs, data)	\
-	*(data) = le16_to_cpu(*(volatile u16 *)(RALINK_PCI_BASE+(ofs)))
-
-#define MV_WRITE_8(ofs, data)	\
-	*(volatile u8 *)(RALINK_PCI_BASE+(ofs)) = data
-#define MV_READ_8(ofs, data)	\
-	*(data) = *(volatile u8 *)(RALINK_PCI_BASE+(ofs))
 
 #define RALINK_PCI_MM_MAP_BASE		0x60000000
 #define RALINK_PCI_IO_MAP_BASE		0x1e160000
@@ -176,13 +167,6 @@
 #define MEMORY_BASE 0x0
 static int pcie_link_status = 0;
 
-#define PCI_ACCESS_READ_1  0
-#define PCI_ACCESS_READ_2  1
-#define PCI_ACCESS_READ_4  2
-#define PCI_ACCESS_WRITE_1 3
-#define PCI_ACCESS_WRITE_2 4
-#define PCI_ACCESS_WRITE_4 5
-
 /**
  * struct mt7621_pcie_port - PCIe port information
  * @base: IO mapped register base
@@ -216,118 +200,6 @@ static inline u32 mt7621_pci_get_cfgaddr(unsigned int bus, unsigned int slot,
 		(func << 8) | (where & 0xfc) | 0x80000000;
 }
 
-static int config_access(unsigned char access_type, struct pci_bus *bus,
-			unsigned int devfn, unsigned int where, u32 *data)
-{
-	unsigned int slot = PCI_SLOT(devfn);
-	u8 func = PCI_FUNC(devfn);
-	u32 address_reg, data_reg;
-	unsigned int address;
-
-	address_reg = RALINK_PCI_CONFIG_ADDR;
-	data_reg = RALINK_PCI_CONFIG_DATA_VIRTUAL_REG;
-
-	address = mt7621_pci_get_cfgaddr(bus->number, slot, func, where);
-
-	MV_WRITE(address_reg, address);
-
-	switch (access_type) {
-	case PCI_ACCESS_WRITE_1:
-		MV_WRITE_8(data_reg+(where&0x3), *data);
-		break;
-	case PCI_ACCESS_WRITE_2:
-		MV_WRITE_16(data_reg+(where&0x3), *data);
-		break;
-	case PCI_ACCESS_WRITE_4:
-		MV_WRITE(data_reg, *data);
-		break;
-	case PCI_ACCESS_READ_1:
-		MV_READ_8(data_reg+(where&0x3), data);
-		break;
-	case PCI_ACCESS_READ_2:
-		MV_READ_16(data_reg+(where&0x3), data);
-		break;
-	case PCI_ACCESS_READ_4:
-		MV_READ(data_reg, data);
-		break;
-	default:
-		printk("no specify access type\n");
-		break;
-	}
-	return 0;
-}
-
-static int
-read_config_byte(struct pci_bus *bus, unsigned int devfn, int where, u8 *val)
-{
-	return config_access(PCI_ACCESS_READ_1, bus, devfn, (unsigned int)where, (u32 *)val);
-}
-
-static int
-read_config_word(struct pci_bus *bus, unsigned int devfn, int where, u16 *val)
-{
-	return config_access(PCI_ACCESS_READ_2, bus, devfn, (unsigned int)where, (u32 *)val);
-}
-
-static int
-read_config_dword(struct pci_bus *bus, unsigned int devfn, int where, u32 *val)
-{
-	return config_access(PCI_ACCESS_READ_4, bus, devfn, (unsigned int)where, (u32 *)val);
-}
-
-static int
-write_config_byte(struct pci_bus *bus, unsigned int devfn, int where, u8 val)
-{
-	if (config_access(PCI_ACCESS_WRITE_1, bus, devfn, (unsigned int)where, (u32 *)&val))
-		return -1;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-write_config_word(struct pci_bus *bus, unsigned int devfn, int where, u16 val)
-{
-	if (config_access(PCI_ACCESS_WRITE_2, bus, devfn, where, (u32 *)&val))
-		return -1;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-write_config_dword(struct pci_bus *bus, unsigned int devfn, int where, u32 val)
-{
-	if (config_access(PCI_ACCESS_WRITE_4, bus, devfn, where, &val))
-		return -1;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-pci_config_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val)
-{
-	switch (size) {
-	case 1:
-		return read_config_byte(bus, devfn, where, (u8 *) val);
-	case 2:
-		return read_config_word(bus, devfn, where, (u16 *) val);
-	default:
-		return read_config_dword(bus, devfn, where, val);
-	}
-}
-
-static int
-pci_config_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val)
-{
-	switch (size) {
-	case 1:
-		return write_config_byte(bus, devfn, where, (u8) val);
-	case 2:
-		return write_config_word(bus, devfn, where, (u16) val);
-	default:
-		return write_config_dword(bus, devfn, where, val);
-	}
-}
-
 static void __iomem *mt7621_pcie_map_bus(struct pci_bus *bus,
 					 unsigned int devfn, int where)
 {
@@ -344,13 +216,6 @@ struct pci_ops mt7621_pci_ops = {
 	.map_bus	= mt7621_pcie_map_bus,
 	.read		= pci_generic_config_read,
 	.write		= pci_generic_config_write,
-};
-
-static struct resource mt7621_res_pci_mem1;
-static struct resource mt7621_res_pci_io1;
-static struct pci_controller mt7621_controller = {
-	.mem_resource	= &mt7621_res_pci_mem1,
-	.io_resource	= &mt7621_res_pci_io1,
 };
 
 static void
@@ -506,23 +371,6 @@ set_phy_for_ssc(void)
 	set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x000),  4, 1, 0x00);	// rg_pe1_frc_phy_en	//Force Port 0 disable control
 }
 
-void setup_cm_memory_region(struct resource *mem_resource)
-{
-	resource_size_t mask;
-	if (mips_cps_numiocu(0)) {
-		/* FIXME: hardware doesn't accept mask values with 1s after
-		 * 0s (e.g. 0xffef), so it would be great to warn if that's
-		 * about to happen */
-		mask = ~(mem_resource->end - mem_resource->start);
-
-		write_gcr_reg1_base(mem_resource->start);
-		write_gcr_reg1_mask(mask | CM_GCR_REGn_MASK_CMTGT_IOCU0);
-		printk("PCI coherence region base: 0x%08llx, mask/settings: 0x%08llx\n",
-			(unsigned long long)read_gcr_reg1_base(),
-			(unsigned long long)read_gcr_reg1_mask());
-	}
-}
-
 static int mt7621_pcie_parse_dt(struct mt7621_pcie *pcie)
 {
 	struct device *dev = pcie->dev;
@@ -588,14 +436,6 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	err = devm_request_pci_bus_resources(dev, &res);
 	if (err)
 		return err;
-
-
-	/*
-	iomem_resource.start = 0;
-	iomem_resource.end = ~0;
-	ioport_resource.start = 0;
-	ioport_resource.end = ~0;
-	*/
 
 	val = RALINK_PCIE0_RST;
 	val |= RALINK_PCIE1_RST;
@@ -715,14 +555,6 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		break;
 	}
 
-/*
-	ioport_resource.start = mt7621_res_pci_io1.start;
-	ioport_resource.end = mt7621_res_pci_io1.end;
-*/
-
-	//RALINK_PCI_MEMBASE = 0xffffffff; //RALINK_PCI_MM_MAP_BASE;
-	//RALINK_PCI_IOBASE = RALINK_PCI_IO_MAP_BASE;
-
 	//PCIe0
 	if ((pcie_link_status & 0x1) != 0) {
 		RALINK_PCI0_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
@@ -791,9 +623,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		pcie_bus_configure_settings(child);
 
 	pci_bus_add_devices(bus);
-	//pci_load_of_ranges(&mt7621_controller, pdev->dev.of_node);
-	//setup_cm_memory_region(mt7621_controller.mem_resource);
-	//register_pci_controller(&mt7621_controller);
+
 	return 0;
 }
 
