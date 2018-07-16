@@ -2069,6 +2069,69 @@ static const struct panel_desc winstar_wf35ltiacd = {
 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
+static const struct drm_display_mode video_graphics_array_modes[] = {
+	{
+		/*
+		 * This is the most standardized "vanilla" VGA mode there is:
+		 * 640x480 @ 60 Hz
+		 */
+		.clock = 27175,
+		.hdisplay = 640,
+		.hsync_start = 640 + 16,
+		.hsync_end = 640 + 16 + 96,
+		.htotal = 640 + 16 + 96 + 48,
+		.vdisplay = 480,
+		.vsync_start = 480 + 10,
+		.vsync_end = 480 + 10 + 2,
+		.vtotal = 480 + 10 + 2 + 33,
+		.vrefresh = 60,
+		.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+	},
+	{
+		/* SVGA 800x600 @60 Hz */
+		.clock = 40000,
+		.hdisplay = 800,
+		.hsync_start = 800 + 40,
+		.hsync_end = 800 + 40 + 128,
+		.htotal = 800 + 40 + 128 + 88,
+		.vdisplay = 600,
+		.vsync_start = 600 + 1,
+		.vsync_end = 600 + 1 + 4,
+		.vtotal = 600 + 1 + 4 + 23,
+		.vrefresh = 60,
+		.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+	},
+	{
+		/* XGA 1024x768 @60 Hz */
+		.clock = 65000,
+		.hdisplay = 1024,
+		.hsync_start = 1024 + 24,
+		.hsync_end = 1024 + 24 + 136,
+		.htotal = 1024 + 24 + 136 + 160,
+		.vdisplay = 768,
+		.vsync_start = 768 + 3,
+		.vsync_end = 768 + 3 + 6,
+		.vtotal = 768 + 3 + 6 + 29,
+		.vrefresh = 60,
+		.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+	},
+};
+
+static const struct panel_desc video_graphics_array = {
+	.modes = video_graphics_array_modes,
+	.num_modes = ARRAY_SIZE(video_graphics_array_modes),
+	.bpc = 8,
+	/*
+	 * Some typical 4:3 aspect ratio VGA monitor surely has these dimensions
+	 * of 40x30 mm.
+	 */
+	.size = {
+		.width = 400,
+		.height = 300,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+};
+
 static const struct of_device_id platform_of_match[] = {
 	{
 		.compatible = "ampire,am-480272h3tmqw-t01h",
@@ -2286,6 +2349,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "winstar,wf35ltiacd",
 		.data = &winstar_wf35ltiacd,
+	}, {
+		.compatible = "video-graphics-array",
+		.data = &video_graphics_array,
 	}, {
 		/* sentinel */
 	}

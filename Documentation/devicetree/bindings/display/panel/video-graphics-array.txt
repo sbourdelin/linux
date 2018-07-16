@@ -1,0 +1,21 @@
+Video Graphics Array
+
+This binding is for simple panels using the standardized VGA resolutions
+defined by de facto standards beginning with the IBM PS/2 in 1987.
+
+Required properties:
+- compatible: should be "video-graphics-array"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
+
+Example:
+
+panel {
+	compatible = "video-graphics-array";
+	port {
+		vga_panel_in: endpoint {
+			remote-endpoint = <&foo>;
+		};
+	};
+};
