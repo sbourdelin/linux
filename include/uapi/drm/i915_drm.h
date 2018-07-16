@@ -1456,6 +1456,13 @@ struct drm_i915_gem_context_param {
 #define   I915_CONTEXT_MAX_USER_PRIORITY	1023 /* inclusive */
 #define   I915_CONTEXT_DEFAULT_PRIORITY		0
 #define   I915_CONTEXT_MIN_USER_PRIORITY	-1023 /* inclusive */
+/*
+ * When data port level coherency is enabled, the GPU will update memory
+ * buffers shared with CPU, by forcing internal cache units to send memory
+ * writes to higher level caches faster. Enabling data port coherency has
+ * a performance cost.
+ */
+#define I915_CONTEXT_PARAM_DATA_PORT_COHERENCY	0x7
 	__u64 value;
 };
 

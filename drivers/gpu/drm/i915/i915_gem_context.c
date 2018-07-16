@@ -784,6 +784,7 @@ out:
 int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file)
 {
+	struct drm_i915_private *i915 = to_i915(dev);
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct drm_i915_gem_context_param *args = data;
 	struct i915_gem_context *ctx;
@@ -804,10 +805,10 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_CONTEXT_PARAM_GTT_SIZE:
 		if (ctx->ppgtt)
 			args->value = ctx->ppgtt->vm.total;
-		else if (to_i915(dev)->mm.aliasing_ppgtt)
-			args->value = to_i915(dev)->mm.aliasing_ppgtt->vm.total;
+		else if (i915->mm.aliasing_ppgtt)
+			args->value = i915->mm.aliasing_ppgtt->vm.total;
 		else
-			args->value = to_i915(dev)->ggtt.vm.total;
+			args->value = i915->ggtt.vm.total;
 		break;
 	case I915_CONTEXT_PARAM_NO_ERROR_CAPTURE:
 		args->value = i915_gem_context_no_error_capture(ctx);
@@ -817,6 +818,12 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 		break;
 	case I915_CONTEXT_PARAM_PRIORITY:
 		args->value = ctx->sched.priority;
+		break;
+	case I915_CONTEXT_PARAM_DATA_PORT_COHERENCY:
+		if (!HAS_DATA_PORT_COHERENCY(i915))
+			ret = -ENODEV;
+		else
+			args->value = i915_gem_context_is_data_port_coherent(ctx);
 		break;
 	default:
 		ret = -EINVAL;
@@ -830,6 +837,7 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file)
 {
+	struct drm_i915_private *i915 = to_i915(dev);
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct drm_i915_gem_context_param *args = data;
 	struct i915_gem_context *ctx;
@@ -880,7 +888,7 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 
 			if (args->size)
 				ret = -EINVAL;
-			else if (!(to_i915(dev)->caps.scheduler & I915_SCHEDULER_CAP_PRIORITY))
+			else if (!(i915->caps.scheduler & I915_SCHEDULER_CAP_PRIORITY))
 				ret = -ENODEV;
 			else if (priority > I915_CONTEXT_MAX_USER_PRIORITY ||
 				 priority < I915_CONTEXT_MIN_USER_PRIORITY)
@@ -891,6 +899,19 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 			else
 				ctx->sched.priority = priority;
 		}
+		break;
+
+	case I915_CONTEXT_PARAM_DATA_PORT_COHERENCY:
+		if (args->size)
+			ret = -EINVAL;
+		else if (!HAS_DATA_PORT_COHERENCY(i915))
+			ret = -ENODEV;
+		else if (args->value == 1)
+			i915_gem_context_set_data_port_coherent(ctx);
+		else if (args->value == 0)
+			i915_gem_context_clear_data_port_coherent(ctx);
+		else
+			ret = -EINVAL;
 		break;
 
 	default:

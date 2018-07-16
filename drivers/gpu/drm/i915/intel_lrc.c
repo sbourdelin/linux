@@ -259,6 +259,63 @@ intel_lr_context_descriptor_update(struct i915_gem_context *ctx,
 	ce->lrc_desc = desc;
 }
 
+static int emit_set_data_port_coherency(struct i915_request *rq, bool enable)
+{
+	u32 *cs;
+	i915_reg_t reg;
+
+	GEM_BUG_ON(rq->engine->class != RENDER_CLASS);
+	GEM_BUG_ON(INTEL_GEN(rq->i915) < 9);
+
+	cs = intel_ring_begin(rq, 4);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	if (INTEL_GEN(rq->i915) >= 11)
+		reg = ICL_HDC_MODE;
+	else if (INTEL_GEN(rq->i915) >= 10)
+		reg = CNL_HDC_CHICKEN0;
+	else
+		reg = HDC_CHICKEN0;
+
+	*cs++ = MI_LOAD_REGISTER_IMM(1);
+	*cs++ = i915_mmio_reg_offset(reg);
+	/* Enabling coherency means disabling the bit which forces it off */
+	if (enable)
+		*cs++ = _MASKED_BIT_DISABLE(HDC_FORCE_NON_COHERENT);
+	else
+		*cs++ = _MASKED_BIT_ENABLE(HDC_FORCE_NON_COHERENT);
+	*cs++ = MI_NOOP;
+
+	intel_ring_advance(rq, cs);
+
+	return 0;
+}
+
+static int
+intel_lr_context_update_data_port_coherency(struct i915_request *rq)
+{
+	struct i915_gem_context *ctx = rq->gem_context;
+	bool enable = test_bit(CONTEXT_DATA_PORT_COHERENT_REQUESTED, &ctx->flags);
+	int ret;
+
+	lockdep_assert_held(&rq->i915->drm.struct_mutex);
+
+	if (test_bit(CONTEXT_DATA_PORT_COHERENT_ACTIVE, &ctx->flags) == enable)
+		return 0;
+
+	ret = emit_set_data_port_coherency(rq, enable);
+
+	if (!ret) {
+		if (enable)
+			__set_bit(CONTEXT_DATA_PORT_COHERENT_ACTIVE, &ctx->flags);
+		else
+			__clear_bit(CONTEXT_DATA_PORT_COHERENT_ACTIVE, &ctx->flags);
+	}
+
+	return ret;
+}
+
 static struct i915_priolist *
 lookup_priolist(struct intel_engine_cs *engine, int prio)
 {
@@ -2135,7 +2192,7 @@ static int gen8_emit_flush_render(struct i915_request *request,
 		i915_ggtt_offset(engine->scratch) + 2 * CACHELINE_BYTES;
 	bool vf_flush_wa = false, dc_flush_wa = false;
 	u32 *cs, flags = 0;
-	int len;
+	int err, len;
 
 	flags |= PIPE_CONTROL_CS_STALL;
 
@@ -2166,6 +2223,13 @@ static int gen8_emit_flush_render(struct i915_request *request,
 		/* WaForGAMHang:kbl */
 		if (IS_KBL_REVID(request->i915, 0, KBL_REVID_B0))
 			dc_flush_wa = true;
+
+		/* Emit the switch of data port coherency state if needed */
+		err = intel_lr_context_update_data_port_coherency(request);
+		if (GEM_WARN_ON(err)) {
+			DRM_DEBUG("Data Port Coherency toggle failed.\n");
+			return err;
+		}
 	}
 
 	len = 6;
