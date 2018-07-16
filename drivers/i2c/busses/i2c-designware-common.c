@@ -262,13 +262,25 @@ unsigned long i2c_dw_clk_rate(struct dw_i2c_dev *dev)
 
 int i2c_dw_prepare_clk(struct dw_i2c_dev *dev, bool prepare)
 {
+	int ret;
+
 	if (IS_ERR(dev->clk))
 		return PTR_ERR(dev->clk);
 
-	if (prepare)
+	if (prepare) {
+		/* Optional bus clock */
+		if (!IS_ERR(dev->busclk)) {
+			ret = clk_prepare_enable(dev->busclk);
+			if (ret)
+				return ret;
+		}
+
 		return clk_prepare_enable(dev->clk);
+	}
 
 	clk_disable_unprepare(dev->clk);
+	clk_disable_unprepare(dev->busclk);
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(i2c_dw_prepare_clk);
