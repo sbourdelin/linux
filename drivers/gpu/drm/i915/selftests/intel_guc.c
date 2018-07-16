@@ -206,7 +206,6 @@ static int igt_guc_clients(void *args)
 
 	if (!available_dbs(guc, guc->execbuf_client->priority)) {
 		pr_err("doorbell not available when it should\n");
-		err = -EIO;
 		goto out_db;
 	}
 
