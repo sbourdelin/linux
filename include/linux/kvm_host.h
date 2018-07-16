@@ -7,6 +7,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/hashtable.h>
 #include <linux/hardirq.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
@@ -297,6 +298,9 @@ static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
 struct kvm_memory_slot {
 	gfn_t base_gfn;
 	unsigned long npages;
+#ifdef CONFIG_KVM_MROE
+	unsigned long *mroe_bitmap;
+#endif
 	unsigned long *dirty_bitmap;
 	struct kvm_arch_memory_slot arch;
 	unsigned long userspace_addr;
@@ -387,6 +391,13 @@ struct kvm_memslots {
 	int used_slots;
 };
 
+#ifdef CONFIG_KVM_MROE
+struct roe_page {
+	void *page_start;
+	struct hlist_node hash_list;
+};
+#endif
+
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
@@ -439,6 +450,12 @@ struct kvm {
 	struct mmu_notifier mmu_notifier;
 	unsigned long mmu_notifier_seq;
 	long mmu_notifier_count;
+#endif
+
+#ifdef CONFIG_KVM_MROE
+	//TODO tune hash size;
+	#define KVM_MROE_HASH_SIZE 8
+	DECLARE_HASHTABLE(roe_pages, KVM_MROE_HASH_SIZE);
 #endif
 	long tlbs_dirty;
 	struct list_head devices;

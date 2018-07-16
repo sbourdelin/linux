@@ -55,7 +55,7 @@
 #include <linux/irqbypass.h>
 #include <linux/sched/stat.h>
 #include <linux/mem_encrypt.h>
-
+#include <linux/mempolicy.h>
 #include <trace/events/kvm.h>
 
 #include <asm/debugreg.h>
@@ -4177,7 +4177,7 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 
 	/*
 	 * All the TLBs can be flushed out of mmu lock, see the comments in
-	 * kvm_mmu_slot_remove_write_access().
+	 * kvm_mmu_slot_apply_write_access().
 	 */
 	lockdep_assert_held(&kvm->slots_lock);
 	if (is_dirty)
@@ -6669,7 +6669,74 @@ static int kvm_pv_clock_pairing(struct kvm_vcpu *vcpu, gpa_t paddr,
 	return ret;
 }
 #endif
+#ifdef CONFIG_KVM_MROE
+static int roe_protect_frame(struct kvm *kvm, gpa_t gpa)
+{
+	struct kvm_memory_slot *slot;
+	gfn_t gfn = gpa >> PAGE_SHIFT;
 
+	slot = gfn_to_memslot(kvm, gfn);
+	//XXX do some error checking dude.
+	if (gfn > slot->base_gfn + slot->npages) {
+		//XXX use a better language
+		pr_err("You have an overflow\n");
+		return -1;
+	}
+	pr_info("Setting page number %lld in slot number %d\n",
+		gfn - slot->base_gfn, slot->id);
+	// something is wrong with the locking here
+	// you should lock the area before writing the bit
+	set_bit(gfn - slot->base_gfn, slot->mroe_bitmap);
+	kvm_mmu_slot_apply_write_access(kvm, slot);
+	return 0;
+}
+void debug_cpu_mode(struct kvm_vcpu *vcpu)
+{
+	char *mode = "Unknown";
+
+	if (vcpu->mode == OUTSIDE_GUEST_MODE)
+		mode = "OUTSIDE_GUEST_MODE";
+	else if (vcpu->mode == IN_GUEST_MODE)
+		mode = "IN_GUEST_MODE";
+	else if (vcpu->mode == EXITING_GUEST_MODE)
+		mode = "EXITING_GUEST_MODE";
+	else if (vcpu->mode == READING_SHADOW_PAGE_TABLES)
+		mode = "READING_SHADOW_PAGE_TABLES";
+	pr_info("kvm_mroe: cpu mode = %s\n", mode);
+}
+static int kvm_mroe(struct kvm_vcpu *vcpu, u64 gva)
+{
+	struct kvm *kvm = vcpu->kvm;
+	gpa_t gpa;
+	u64 hva;
+	int ret;
+
+	//XXX check that the hypercall is done from kernel mode
+	if (gva & ~PAGE_MASK)
+		return -EINVAL;
+	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
+	hva = gfn_to_hva(kvm, gpa >> PAGE_SHIFT);
+	//XXX This doesn't work but it will be ok to check that we can access
+	// the address and make sure that the mapping makes sense
+	if (!access_ok(VERIFY_WRITE, hva, PAGE_SIZE)) {
+		pr_info("Duplicate request\n");
+		return -KVM_EROEDUPLICATR;
+	}
+	pr_info("%s: flush state = %s\n", __func__,
+			kvm_check_request(KVM_REQ_TLB_FLUSH, vcpu) ? "Waiting" :
+								     "Done");
+	debug_cpu_mode(vcpu);
+	ret = roe_protect_frame(vcpu->kvm, gpa);
+	debug_cpu_mode(vcpu);
+	kvm_vcpu_kick(vcpu);
+	debug_cpu_mode(vcpu);
+	pr_info("%s: flush state = %s\n", __func__,
+			kvm_check_request(KVM_REQ_TLB_FLUSH, vcpu) ? "Waiting" :
+								     "Done");
+
+	return ret;
+}
+#endif
 /*
  * kvm_pv_kick_cpu_op:  Kick a vcpu.
  *
@@ -6736,6 +6803,12 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 #ifdef CONFIG_X86_64
 	case KVM_HC_CLOCK_PAIRING:
 		ret = kvm_pv_clock_pairing(vcpu, a0, a1);
+		break;
+#endif
+#ifdef CONFIG_KVM_MROE
+	case KVM_HC_HMROE:
+		pr_info("Hypercall received, page address 0x%lx\n", a0);
+		ret = kvm_mroe(vcpu, a0);
 		break;
 #endif
 	default:
@@ -8971,8 +9044,10 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 				     struct kvm_memory_slot *new)
 {
 	/* Still write protect RO slot */
+	pr_info("%s: visited\n", __func__);
+	kvm_mmu_slot_apply_write_access(kvm, new);
+	return;
 	if (new->flags & KVM_MEM_READONLY) {
-		kvm_mmu_slot_remove_write_access(kvm, new);
 		return;
 	}
 
@@ -9010,7 +9085,7 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 		if (kvm_x86_ops->slot_enable_log_dirty)
 			kvm_x86_ops->slot_enable_log_dirty(kvm, new);
 		else
-			kvm_mmu_slot_remove_write_access(kvm, new);
+			kvm_mmu_slot_apply_write_access(kvm, new);
 	} else {
 		if (kvm_x86_ops->slot_disable_log_dirty)
 			kvm_x86_ops->slot_disable_log_dirty(kvm, new);
