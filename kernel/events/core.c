@@ -3555,7 +3555,8 @@ do {					\
 static DEFINE_PER_CPU(int, perf_throttled_count);
 static DEFINE_PER_CPU(u64, perf_throttled_seq);
 
-static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count, bool disable)
+static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count,
+			       bool disable, bool nowait)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	s64 period, sample_period;
@@ -3574,8 +3575,13 @@ static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count, bo
 	hwc->sample_period = sample_period;
 
 	if (local64_read(&hwc->period_left) > 8*sample_period) {
-		if (disable)
-			event->pmu->stop(event, PERF_EF_UPDATE);
+		if (disable) {
+			int flags = PERF_EF_UPDATE;
+
+			if (nowait)
+				flags |= PERF_EF_NO_WAIT;
+			event->pmu->stop(event, flags);
+		}
 
 		local64_set(&hwc->period_left, 0);
 
@@ -3645,7 +3651,7 @@ static void perf_adjust_freq_unthr_context(struct perf_event_context *ctx,
 		 * twice.
 		 */
 		if (delta > 0)
-			perf_adjust_period(event, period, delta, false);
+			perf_adjust_period(event, period, delta, false, false);
 
 		event->pmu->start(event, delta > 0 ? PERF_EF_RELOAD : 0);
 	next:
@@ -7681,7 +7687,8 @@ static void perf_log_itrace_start(struct perf_event *event)
 }
 
 static int
-__perf_event_account_interrupt(struct perf_event *event, int throttle)
+__perf_event_account_interrupt(struct perf_event *event, int throttle,
+			       bool nowait)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	int ret = 0;
@@ -7710,7 +7717,8 @@ __perf_event_account_interrupt(struct perf_event *event, int throttle)
 		hwc->freq_time_stamp = now;
 
 		if (delta > 0 && delta < 2*TICK_NSEC)
-			perf_adjust_period(event, delta, hwc->last_period, true);
+			perf_adjust_period(event, delta, hwc->last_period, true,
+					   nowait);
 	}
 
 	return ret;
@@ -7718,7 +7726,7 @@ __perf_event_account_interrupt(struct perf_event *event, int throttle)
 
 int perf_event_account_interrupt(struct perf_event *event)
 {
-	return __perf_event_account_interrupt(event, 1);
+	return __perf_event_account_interrupt(event, 1, false);
 }
 
 /*
@@ -7727,7 +7735,7 @@ int perf_event_account_interrupt(struct perf_event *event)
 
 static int __perf_event_overflow(struct perf_event *event,
 				   int throttle, struct perf_sample_data *data,
-				   struct pt_regs *regs)
+				   struct pt_regs *regs, bool nowait)
 {
 	int events = atomic_read(&event->event_limit);
 	int ret = 0;
@@ -7739,7 +7747,7 @@ static int __perf_event_overflow(struct perf_event *event,
 	if (unlikely(!is_sampling_event(event)))
 		return 0;
 
-	ret = __perf_event_account_interrupt(event, throttle);
+	ret = __perf_event_account_interrupt(event, throttle, nowait);
 
 	/*
 	 * XXX event_limit might not quite work as expected on inherited
@@ -7768,7 +7776,7 @@ int perf_event_overflow(struct perf_event *event,
 			  struct perf_sample_data *data,
 			  struct pt_regs *regs)
 {
-	return __perf_event_overflow(event, 1, data, regs);
+	return __perf_event_overflow(event, 1, data, regs, true);
 }
 
 /*
@@ -7831,7 +7839,7 @@ static void perf_swevent_overflow(struct perf_event *event, u64 overflow,
 
 	for (; overflow; overflow--) {
 		if (__perf_event_overflow(event, throttle,
-					    data, regs)) {
+					    data, regs, false)) {
 			/*
 			 * We inhibit the overflow from happening when
 			 * hwc->interrupts == MAX_INTERRUPTS.
@@ -9110,7 +9118,7 @@ static enum hrtimer_restart perf_swevent_hrtimer(struct hrtimer *hrtimer)
 
 	if (regs && !perf_exclude_event(event, regs)) {
 		if (!(event->attr.exclude_idle && is_idle_task(current)))
-			if (__perf_event_overflow(event, 1, &data, regs))
+			if (__perf_event_overflow(event, 1, &data, regs, true))
 				ret = HRTIMER_NORESTART;
 	}
 
@@ -9141,7 +9149,7 @@ static void perf_swevent_start_hrtimer(struct perf_event *event)
 		      HRTIMER_MODE_REL_PINNED);
 }
 
-static void perf_swevent_cancel_hrtimer(struct perf_event *event)
+static void perf_swevent_cancel_hrtimer(struct perf_event *event, bool sync)
 {
 	struct hw_perf_event *hwc = &event->hw;
 
@@ -9149,7 +9157,10 @@ static void perf_swevent_cancel_hrtimer(struct perf_event *event)
 		ktime_t remaining = hrtimer_get_remaining(&hwc->hrtimer);
 		local64_set(&hwc->period_left, ktime_to_ns(remaining));
 
-		hrtimer_cancel(&hwc->hrtimer);
+		if (sync)
+			hrtimer_cancel(&hwc->hrtimer);
+		else
+			hrtimer_try_to_cancel(&hwc->hrtimer);
 	}
 }
 
@@ -9200,7 +9211,7 @@ static void cpu_clock_event_start(struct perf_event *event, int flags)
 
 static void cpu_clock_event_stop(struct perf_event *event, int flags)
 {
-	perf_swevent_cancel_hrtimer(event);
+	perf_swevent_cancel_hrtimer(event, flags & PERF_EF_NO_WAIT);
 	cpu_clock_event_update(event);
 }
 
@@ -9277,7 +9288,7 @@ static void task_clock_event_start(struct perf_event *event, int flags)
 
 static void task_clock_event_stop(struct perf_event *event, int flags)
 {
-	perf_swevent_cancel_hrtimer(event);
+	perf_swevent_cancel_hrtimer(event, flags & PERF_EF_NO_WAIT);
 	task_clock_event_update(event, event->ctx->time);
 }
 
