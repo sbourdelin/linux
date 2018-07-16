@@ -129,7 +129,7 @@ static bool
 intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 {
 	uint8_t voltage;
-	int voltage_tries, max_vswing_tries;
+	int voltage_tries, max_vswing_tries, cr_tries;
 	uint8_t link_config[2];
 	uint8_t link_bw, rate_select;
 
@@ -172,7 +172,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 
 	voltage_tries = 1;
 	max_vswing_tries = 0;
-	for (;;) {
+	for (cr_tries = 0; cr_tries < DP_DP14_MAX_CR_TRIES; ++cr_tries) {
 		uint8_t link_status[DP_LINK_STATUS_SIZE];
 
 		drm_dp_link_train_clock_recovery_delay(intel_dp->dpcd);
@@ -216,6 +216,9 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 			++max_vswing_tries;
 
 	}
+	DRM_ERROR("Failed clock recovery %d times, giving up!\n",
+		  DP_DP14_MAX_CR_TRIES);
+	return false;
 }
 
 /*
