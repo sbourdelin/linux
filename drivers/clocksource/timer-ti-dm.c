@@ -150,7 +150,7 @@ static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
 	if (!timer->fclk)
 		return -ENODEV;
 
-	parent = clk_get(&timer->pdev->dev, NULL);
+	parent = clk_get(&timer->pdev->dev, "src");
 	if (IS_ERR(parent))
 		return -ENODEV;
 
