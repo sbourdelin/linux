@@ -192,6 +192,13 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev);
  */
 static bool vfio_pci_nointx(struct pci_dev *pdev)
 {
+	/*
+	 * Per PCI, no VF's should have INTx
+	 * Simply disable it here
+	 */
+	if (pdev->is_virtfn)
+		return true;
+
 	switch (pdev->vendor) {
 	case PCI_VENDOR_ID_INTEL:
 		switch (pdev->device) {
