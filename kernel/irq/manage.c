@@ -1564,7 +1564,7 @@ EXPORT_SYMBOL_GPL(setup_irq);
  */
 static struct irqaction *__free_irq(struct irq_desc *desc, void *dev_id)
 {
-	unsigned irq = desc->irq_data.irq;
+	unsigned int irq;
 	struct irqaction *action, **action_ptr;
 	unsigned long flags;
 
@@ -1573,6 +1573,7 @@ static struct irqaction *__free_irq(struct irq_desc *desc, void *dev_id)
 	if (!desc)
 		return NULL;
 
+	irq = desc->irq_data.irq;
 	mutex_lock(&desc->request_mutex);
 	chip_bus_lock(desc);
 	raw_spin_lock_irqsave(&desc->lock, flags);
