@@ -481,4 +481,6 @@
 #define __NR_pwritev2			521
 #define __NR_statx			522
 
+#define __NR_syscalls                   523
+
 #endif /* _UAPI_ALPHA_UNISTD_H */
