@@ -1729,6 +1729,15 @@ void f2fs_clear_prefree_segments(struct f2fs_sb_info *sbi,
 		if (!test_opt(sbi, DISCARD))
 			continue;
 
+		if (test_opt(sbi, LFS) && sbi->segs_per_sec > 1) {
+			start = rounddown(start, sbi->segs_per_sec);
+			i = end;
+			end = roundup(end, sbi->segs_per_sec);
+			while (++i < end)
+				if (test_and_clear_bit(i, prefree_map))
+					dirty_i->nr_dirty[PRE]--;
+		}
+
 		if (force && start >= cpc->trim_start &&
 					(end - 1) <= cpc->trim_end)
 				continue;
