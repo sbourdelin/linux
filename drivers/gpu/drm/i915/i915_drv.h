@@ -3422,6 +3422,7 @@ mkwrite_device_info(struct drm_i915_private *dev_priv)
 /* modesetting */
 extern void intel_modeset_init_hw(struct drm_device *dev);
 extern int intel_modeset_init(struct drm_device *dev);
+extern void intel_modeset_cleanup_prepare(struct drm_device *dev);
 extern void intel_modeset_cleanup(struct drm_device *dev);
 extern int intel_connector_register(struct drm_connector *);
 extern void intel_connector_unregister(struct drm_connector *);

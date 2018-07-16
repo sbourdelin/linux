@@ -665,13 +665,7 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	/* must happen before intel_power_domains_init_hw() on VLV/CHV */
 	intel_update_rawclk(dev_priv);
 
-	intel_power_domains_init_hw(dev_priv, false);
-
 	intel_csr_ucode_init(dev_priv);
-
-	ret = intel_irq_install(dev_priv);
-	if (ret)
-		goto cleanup_csr;
 
 	intel_setup_gmbus(dev_priv);
 
@@ -679,11 +673,7 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	 * working irqs for e.g. gmbus and dp aux transfers. */
 	ret = intel_modeset_init(dev);
 	if (ret)
-		goto cleanup_irq;
-
-	ret = i915_gem_init(dev_priv);
-	if (ret)
-		goto cleanup_modeset;
+		goto cleanup_gmbus;
 
 	intel_setup_overlay(dev_priv);
 
@@ -692,23 +682,17 @@ static int i915_load_modeset_init(struct drm_device *dev)
 
 	ret = intel_fbdev_init(dev);
 	if (ret)
-		goto cleanup_gem;
+		goto cleanup_modeset;
 
 	/* Only enable hotplug handling once the fbdev is fully set up. */
 	intel_hpd_init(dev_priv);
 
 	return 0;
 
-cleanup_gem:
-	if (i915_gem_suspend(dev_priv))
-		DRM_ERROR("failed to idle hardware; continuing to unload!\n");
-	i915_gem_fini(dev_priv);
 cleanup_modeset:
 	intel_modeset_cleanup(dev);
-cleanup_irq:
-	drm_irq_uninstall(dev);
+cleanup_gmbus:
 	intel_teardown_gmbus(dev_priv);
-cleanup_csr:
 	intel_csr_ucode_fini(dev_priv);
 	intel_power_domains_fini(dev_priv);
 	vga_switcheroo_unregister_client(pdev);
@@ -1395,9 +1379,22 @@ int i915_driver_load(struct pci_dev *pdev, const struct pci_device_id *ent)
 			goto out_cleanup_hw;
 	}
 
+	ret = intel_irq_install(dev_priv);
+	if (ret)
+		goto out_cleanup_hw;
+
+	/* i915_gem_init() call chain will call
+	 * intel_display_power_put(i915, POWER_DOMAIN_GT_IRQ);
+	 */
+	intel_power_domains_init_hw(dev_priv, false);
+
+	ret = i915_gem_init(dev_priv);
+	if (ret)
+		goto cleanup_irq;
+
 	ret = i915_load_modeset_init(&dev_priv->drm);
 	if (ret < 0)
-		goto out_cleanup_hw;
+		goto cleanup_gem;
 
 	i915_driver_register(dev_priv);
 
@@ -1411,6 +1408,12 @@ int i915_driver_load(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	return 0;
 
+cleanup_gem:
+	if (i915_gem_suspend(dev_priv))
+		DRM_ERROR("failed to idle hardware; continuing to unload!\n");
+	i915_gem_fini(dev_priv);
+cleanup_irq:
+	drm_irq_uninstall(&dev_priv->drm);
 out_cleanup_hw:
 	i915_driver_cleanup_hw(dev_priv);
 out_cleanup_mmio:
@@ -1445,7 +1448,20 @@ void i915_driver_unload(struct drm_device *dev)
 
 	intel_gvt_cleanup(dev_priv);
 
+	intel_modeset_cleanup_prepare(dev);
+
+	intel_disable_gt_powersave(dev_priv);
+
+	/*
+	 * Interrupts and polling as the first thing to avoid creating havoc.
+	 * Too much stuff here (turning of connectors, ...) would
+	 * experience fancy races otherwise.
+	 */
+	intel_irq_uninstall(dev_priv);
+
 	intel_modeset_cleanup(dev);
+
+	intel_cleanup_gt_powersave(dev_priv);
 
 	intel_bios_cleanup(dev_priv);
 

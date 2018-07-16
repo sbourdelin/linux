@@ -15862,7 +15862,7 @@ static void intel_hpd_poll_fini(struct drm_device *dev)
 	drm_connector_list_iter_end(&conn_iter);
 }
 
-void intel_modeset_cleanup(struct drm_device *dev)
+void intel_modeset_cleanup_prepare(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
@@ -15870,15 +15870,11 @@ void intel_modeset_cleanup(struct drm_device *dev)
 
 	flush_work(&dev_priv->atomic_helper.free_work);
 	WARN_ON(!llist_empty(&dev_priv->atomic_helper.free_list));
+}
 
-	intel_disable_gt_powersave(dev_priv);
-
-	/*
-	 * Interrupts and polling as the first thing to avoid creating havoc.
-	 * Too much stuff here (turning of connectors, ...) would
-	 * experience fancy races otherwise.
-	 */
-	intel_irq_uninstall(dev_priv);
+void intel_modeset_cleanup(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	/*
 	 * Due to the hpd irq storm handling the hotplug work can re-arm the
@@ -15899,8 +15895,6 @@ void intel_modeset_cleanup(struct drm_device *dev)
 	drm_mode_config_cleanup(dev);
 
 	intel_cleanup_overlay(dev_priv);
-
-	intel_cleanup_gt_powersave(dev_priv);
 
 	intel_teardown_gmbus(dev_priv);
 
