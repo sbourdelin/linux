@@ -15094,9 +15094,6 @@ int intel_modeset_init(struct drm_device *dev)
 
 	intel_init_pm(dev_priv);
 
-	if (INTEL_INFO(dev_priv)->num_pipes == 0)
-		return 0;
-
 	/*
 	 * There may be no VBT; and if the BIOS enabled SSC we can
 	 * just keep using it to avoid unnecessary flicker.  Whereas if the

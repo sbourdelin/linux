@@ -643,12 +643,9 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	if (i915_inject_load_failure())
 		return -ENODEV;
 
-	if (INTEL_INFO(dev_priv)->num_pipes == 0) {
-		ret = drm_vblank_init(&dev_priv->drm,
-				      INTEL_INFO(dev_priv)->num_pipes);
-		if (ret)
-			goto out;
-	}
+	ret = drm_vblank_init(&dev_priv->drm, INTEL_INFO(dev_priv)->num_pipes);
+	if (ret)
+		goto out;
 
 	intel_bios_init(dev_priv);
 
@@ -683,9 +680,6 @@ static int i915_load_modeset_init(struct drm_device *dev)
 		goto cleanup_gmbus;
 
 	intel_setup_overlay(dev_priv);
-
-	if (INTEL_INFO(dev_priv)->num_pipes == 0)
-		return 0;
 
 	ret = intel_fbdev_init(dev);
 	if (ret)
