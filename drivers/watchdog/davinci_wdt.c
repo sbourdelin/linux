@@ -54,6 +54,10 @@
 #define WDKEY_SEQ0		(0xa5c6 << 16)
 #define WDKEY_SEQ1		(0xda7e << 16)
 
+static unsigned int init_timeout;
+module_param(init_timeout, uint, 0);
+MODULE_PARM_DESC(init_timeout, "initial watchdog timeout (in seconds)");
+
 static int heartbeat;
 
 /*
@@ -223,8 +227,10 @@ static int davinci_wdt_probe(struct platform_device *pdev)
 	wdd->ops		= &davinci_wdt_ops;
 	wdd->min_timeout	= 1;
 	wdd->max_timeout	= MAX_HEARTBEAT;
-	wdd->timeout		= DEFAULT_HEARTBEAT;
-	wdd->parent		= &pdev->dev;
+	if ((init_timeout >= 1) && (init_timeout <= MAX_HEARTBEAT))
+		wdd->timeout = init_timeout;
+	else
+		wdd->timeout = DEFAULT_HEARTBEAT;
 
 	watchdog_init_timeout(wdd, heartbeat, dev);
 
