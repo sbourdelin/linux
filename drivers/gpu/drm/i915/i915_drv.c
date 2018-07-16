@@ -287,7 +287,8 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 	 * Use PCH_NOP (PCH but no South Display) for PCH platforms without
 	 * display.
 	 */
-	if (pch && INTEL_INFO(dev_priv)->num_pipes == 0) {
+	if (pch && ((INTEL_INFO(dev_priv)->num_pipes == 0) ||
+	    i915_modparams.disable_display)) {
 		DRM_DEBUG_KMS("Display disabled, reverting to NOP PCH\n");
 		dev_priv->pch_type = PCH_NOP;
 		dev_priv->pch_id = 0;
