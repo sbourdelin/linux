@@ -1498,6 +1498,8 @@ struct hci_rp_le_read_resolv_list_size {
 	__u8	size;
 } __packed;
 
+#define HCI_OP_LE_SET_ADDR_RESOLUTION_ENABLE 0x202d
+
 #define HCI_OP_LE_READ_MAX_DATA_LEN	0x202f
 struct hci_rp_le_read_max_data_len {
 	__u8	status;
