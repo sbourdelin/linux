@@ -202,32 +202,6 @@ write_config(struct mt7621_pcie *pcie, unsigned int dev, u32 reg, u32 val)
 	pcie_write(pcie, val, RALINK_PCI_CONFIG_DATA);
 }
 
-int
-pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-{
-	struct mt7621_pcie *pcie = dev->bus->sysdata;
-	u16 cmd;
-	u32 val;
-	int irq;
-
-	if (dev->bus->number == 0) {
-		write_config(pcie, slot, PCI_BASE_ADDRESS_0, MEMORY_BASE);
-		val = read_config(pcie, slot, PCI_BASE_ADDRESS_0);
-		printk("BAR0 at slot %d = %x\n", slot, val);
-	}
-
-	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 0x14);  //configure cache line size 0x14
-	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 0xFF);  //configure latency timer 0x10
-	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-	cmd = cmd | PCI_COMMAND_MASTER | PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
-	pci_write_config_word(dev, PCI_COMMAND, cmd);
-
-	irq = of_irq_parse_and_map_pci(dev, slot, pin);
-
-	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-	return irq;
-}
-
 void
 set_pcie_phy(struct mt7621_pcie *pcie, u32 offset,
 	     int start_b, int bits, int val)
@@ -613,11 +587,6 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 
 	pci_bus_add_devices(bus);
 
-	return 0;
-}
-
-int pcibios_plat_dev_init(struct pci_dev *dev)
-{
 	return 0;
 }
 
