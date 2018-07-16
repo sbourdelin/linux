@@ -529,8 +529,6 @@ static void unix_release_sock(struct sock *sk, int embrion)
 	sk->sk_state = TCP_CLOSE;
 	unix_state_unlock(sk);
 
-	wake_up_interruptible_all(&u->peer_wait);
-
 	skpair = unix_peer(sk);
 
 	if (skpair != NULL) {
@@ -559,6 +557,9 @@ static void unix_release_sock(struct sock *sk, int embrion)
 		UNIXCB(skb).consumed = skb->len;
 		kfree_skb(skb);
 	}
+
+	/* after freeing skbs to make sure POLLOUT triggers */
+	wake_up_interruptible_all(&u->peer_wait);
 
 	if (path.dentry)
 		path_put(&path);
