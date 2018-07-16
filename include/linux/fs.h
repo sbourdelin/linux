@@ -1680,6 +1680,9 @@ struct dir_context {
 	loff_t pos;
 };
 
+bool bogus_dirent_name(int *errp, const char *name, int namlen,
+		       const char *caller);
+
 struct block_device_operations;
 
 /* These macros are for out of kernel modules to test that
