@@ -17,7 +17,7 @@
 #include <linux/static_key.h>
 
 static struct crypto_shash *crct10dif_tfm;
-static struct static_key crct10dif_fallback __read_mostly;
+static DEFINE_STATIC_KEY_FALSE(crct10dif_fallback_key);
 
 __u16 crc_t10dif_update(__u16 crc, const unsigned char *buffer, size_t len)
 {
@@ -27,7 +27,7 @@ __u16 crc_t10dif_update(__u16 crc, const unsigned char *buffer, size_t len)
 	} desc;
 	int err;
 
-	if (static_key_false(&crct10dif_fallback))
+	if (static_branch_unlikely(&crct10dif_fallback_key))
 		return crc_t10dif_generic(crc, buffer, len);
 
 	desc.shash.tfm = crct10dif_tfm;
@@ -51,7 +51,7 @@ static int __init crc_t10dif_mod_init(void)
 {
 	crct10dif_tfm = crypto_alloc_shash("crct10dif", 0, 0);
 	if (IS_ERR(crct10dif_tfm)) {
-		static_key_slow_inc(&crct10dif_fallback);
+		static_branch_inc(&crct10dif_fallback_key);
 		crct10dif_tfm = NULL;
 	}
 	return 0;
