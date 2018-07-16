@@ -192,9 +192,18 @@ void ghes_edac_report_mem_error(struct ghes *ghes, int sev,
 	strcpy(e->label, "unknown label");
 	e->msg = pvt->msg;
 	e->other_detail = pvt->other_detail;
-	e->top_layer = -1;
-	e->mid_layer = -1;
-	e->low_layer = -1;
+	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
+	    && (mem_err->validation_bits & CPER_MEM_VALID_CARD)
+	    && (mem_err->validation_bits & CPER_MEM_VALID_MODULE)) {
+		e->top_layer = mem_err->card;
+		e->mid_layer = mem_err->module;
+		e->low_layer = -1;
+		e->enable_per_layer_report = true;
+	} else {
+		e->top_layer = -1;
+		e->mid_layer = -1;
+		e->low_layer = -1;
+	}
 	*pvt->other_detail = '\0';
 	*pvt->msg = '\0';
 
