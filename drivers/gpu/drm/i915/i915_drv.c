@@ -1248,23 +1248,26 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
 	if (IS_GEN5(dev_priv))
 		intel_gpu_ips_init(dev_priv);
 
-	intel_audio_init(dev_priv);
+	if (INTEL_INFO(dev_priv)->num_pipes) {
+		intel_audio_init(dev_priv);
 
-	/*
-	 * Some ports require correctly set-up hpd registers for detection to
-	 * work properly (leading to ghost connected connector status), e.g. VGA
-	 * on gm45.  Hence we can only set up the initial fbdev config after hpd
-	 * irqs are fully enabled. We do it last so that the async config
-	 * cannot run before the connectors are registered.
-	 */
-	intel_fbdev_initial_config_async(dev);
+		/*
+		 * Some ports require correctly set-up hpd registers for
+		 * detection to work properly (leading to ghost connected
+		 * connector status), e.g. VGA on gm45.  Hence we can only set
+		 * up the initial fbdev config after hpd irqs are fully enabled.
+		 * We do it last so that the async config cannot run before the
+		 * connectors are registered.
+		 */
+		intel_fbdev_initial_config_async(dev);
 
-	/*
-	 * We need to coordinate the hotplugs with the asynchronous fbdev
-	 * configuration, for which we use the fbdev->async_cookie.
-	 */
-	if (INTEL_INFO(dev_priv)->num_pipes)
+		/*
+		 * We need to coordinate the hotplugs with the asynchronous
+		 * fbdev configuration, for which we use the
+		 * fbdev->async_cookie.
+		 */
 		drm_kms_helper_poll_init(dev);
+	}
 }
 
 /**
@@ -1273,15 +1276,17 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
  */
 static void i915_driver_unregister(struct drm_i915_private *dev_priv)
 {
-	intel_fbdev_unregister(dev_priv);
-	intel_audio_deinit(dev_priv);
+	if (INTEL_INFO(dev_priv)->num_pipes) {
+		intel_fbdev_unregister(dev_priv);
+		intel_audio_deinit(dev_priv);
 
-	/*
-	 * After flushing the fbdev (incl. a late async config which will
-	 * have delayed queuing of a hotplug event), then flush the hotplug
-	 * events.
-	 */
-	drm_kms_helper_poll_fini(&dev_priv->drm);
+		/*
+		 * After flushing the fbdev (incl. a late async config which
+		 * will have delayed queuing of a hotplug event), then flush the
+		 * hotplug events.
+		 */
+		drm_kms_helper_poll_fini(&dev_priv->drm);
+	}
 
 	intel_gpu_ips_teardown();
 	acpi_video_unregister();
@@ -1332,6 +1337,9 @@ int i915_driver_load(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* Enable nuclear pageflip on ILK+ */
 	if (!i915_modparams.nuclear_pageflip && match_info->gen < 5)
 		driver.driver_features &= ~DRIVER_ATOMIC;
+
+	if (i915_modparams.disable_display)
+		driver.driver_features &= ~(DRIVER_MODESET | DRIVER_ATOMIC);
 
 	ret = -ENOMEM;
 	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
@@ -1387,9 +1395,11 @@ int i915_driver_load(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (ret)
 		goto cleanup_irq;
 
-	ret = i915_load_modeset_init(&dev_priv->drm);
-	if (ret < 0)
-		goto cleanup_gem;
+	if (INTEL_INFO(dev_priv)->num_pipes) {
+		ret = i915_load_modeset_init(&dev_priv->drm);
+		if (ret < 0)
+			goto cleanup_gem;
+	}
 
 	i915_driver_register(dev_priv);
 
@@ -1439,11 +1449,13 @@ void i915_driver_unload(struct drm_device *dev)
 
 	intel_display_power_get(dev_priv, POWER_DOMAIN_INIT);
 
-	drm_atomic_helper_shutdown(dev);
+	if (INTEL_INFO(dev_priv)->num_pipes)
+		drm_atomic_helper_shutdown(dev);
 
 	intel_gvt_cleanup(dev_priv);
 
-	intel_modeset_cleanup_prepare(dev);
+	if (INTEL_INFO(dev_priv)->num_pipes)
+		intel_modeset_cleanup_prepare(dev);
 
 	intel_disable_gt_powersave(dev_priv);
 
@@ -1454,7 +1466,8 @@ void i915_driver_unload(struct drm_device *dev)
 	 */
 	intel_irq_uninstall(dev_priv);
 
-	intel_modeset_cleanup(dev);
+	if (INTEL_INFO(dev_priv)->num_pipes)
+		intel_modeset_cleanup(dev);
 
 	intel_cleanup_gt_powersave(dev_priv);
 
