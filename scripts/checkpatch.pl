@@ -2911,6 +2911,14 @@ sub process {
 			     "Use of $flag is deprecated, please use \`$replacement->{$flag} instead.\n" . $herecurr) if ($replacement->{$flag});
 		}
 
+		# Check for multiple calls of if_changed within a target in Makefiles
+		if (($realfile =~ /Makefile.*/ || $realfile =~ /Kbuild.*/) &&
+		    ($prevline =~ /^[ +]\t\$\(call if_changed,/) &&
+		    ($line =~ /^[ +]\t\$\(call if_changed,/)) {
+				ERROR("MULTIPLE_IF_CHANGED",
+				      "Multiple calls of if_changed within a target.\n" . $herecurr);
+		}
+
 # check for DT compatible documentation
 		if (defined $root &&
 			(($realfile =~ /\.dtsi?$/ && $line =~ /^\+\s*compatible\s*=\s*\"/) ||
