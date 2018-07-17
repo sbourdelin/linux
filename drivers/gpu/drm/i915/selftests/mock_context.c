@@ -103,7 +103,14 @@ live_context(struct drm_i915_private *i915, struct drm_file *file)
 struct i915_gem_context *
 kernel_context(struct drm_i915_private *i915)
 {
-	return i915_gem_context_create_kernel(i915, I915_PRIORITY_NORMAL);
+	struct i915_gem_context *ctx;
+
+	ctx = i915_gem_context_create_kernel(i915, I915_PRIORITY_NORMAL);
+	if (IS_ERR(ctx))
+		return ctx;
+
+	ctx->file_priv = ERR_PTR(-EPERM); /* !i915_is_ggtt() */
+	return ctx;
 }
 
 void kernel_context_close(struct i915_gem_context *ctx)
