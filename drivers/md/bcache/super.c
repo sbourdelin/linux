@@ -549,7 +549,7 @@ void bch_prio_write(struct cache *ca)
 
 		p->next_bucket	= ca->prio_buckets[i + 1];
 		p->magic	= pset_magic(&ca->sb);
-		p->csum		= bch_crc64(&p->magic, bucket_bytes(ca) - 8);
+		p->csum		= crc64_bch(&p->magic, bucket_bytes(ca) - 8);
 
 		bucket = bch_bucket_alloc(ca, RESERVE_PRIO, true);
 		BUG_ON(bucket == -1);
@@ -599,7 +599,8 @@ static void prio_read(struct cache *ca, uint64_t bucket)
 
 			prio_io(ca, bucket, REQ_OP_READ, 0);
 
-			if (p->csum != bch_crc64(&p->magic, bucket_bytes(ca) - 8))
+			if (p->csum != crc64_bch(&p->magic,
+						   bucket_bytes(ca) - 8))
 				pr_warn("bad csum reading priorities");
 
 			if (p->magic != pset_magic(&ca->sb))

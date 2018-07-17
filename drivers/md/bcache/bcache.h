@@ -189,6 +189,7 @@
 #include <linux/types.h>
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
+#include <linux/crc64.h>
 
 #include "bset.h"
 #include "util.h"
@@ -803,9 +804,9 @@ static inline bool ptr_available(struct cache_set *c, const struct bkey *k,
  * jset: The checksum is _always_ the first 8 bytes of these structs
  */
 #define csum_set(i)							\
-	bch_crc64(((void *) (i)) + sizeof(uint64_t),			\
-		  ((void *) bset_bkey_last(i)) -			\
-		  (((void *) (i)) + sizeof(uint64_t)))
+	crc64_bch(((void *) (i)) + sizeof(uint64_t),			\
+		   ((void *) bset_bkey_last(i)) -			\
+		   (((void *) (i)) + sizeof(uint64_t)))
 
 /* Error handling macros */
 
