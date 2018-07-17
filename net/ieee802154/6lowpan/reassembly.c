@@ -103,23 +103,14 @@ static int lowpan_frag_queue(struct lowpan_frag_queue *fq,
 	offset = lowpan_802154_cb(skb)->d_offset << 3;
 	end = lowpan_802154_cb(skb)->d_size;
 
+	if (fq->q.len == 0)
+		fq->q.len = end;
+	if (fq->q.len != end)
+		goto err;
+
 	/* Is this the final fragment? */
 	if (offset + skb->len == end) {
-		/* If we already have some bits beyond end
-		 * or have different end, the segment is corrupted.
-		 */
-		if (end < fq->q.len ||
-		    ((fq->q.flags & INET_FRAG_LAST_IN) && end != fq->q.len))
-			goto err;
 		fq->q.flags |= INET_FRAG_LAST_IN;
-		fq->q.len = end;
-	} else {
-		if (end > fq->q.len) {
-			/* Some bits beyond end -> corruption. */
-			if (fq->q.flags & INET_FRAG_LAST_IN)
-				goto err;
-			fq->q.len = end;
-		}
 	}
 
 	/* Find out which fragments are in front and at the back of us
