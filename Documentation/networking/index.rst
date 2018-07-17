@@ -20,7 +20,7 @@ Contents:
 
 .. only::  subproject
 
-   Indices
-   =======
+Indices
+=======
 
    * :ref:`genindex`
