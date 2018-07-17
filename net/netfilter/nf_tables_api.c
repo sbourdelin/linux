@@ -5320,8 +5320,6 @@ static int nf_tables_flowtable_parse_hook(const struct nft_ctx *ctx,
 		flowtable->ops[i].priv		= &flowtable->data;
 		flowtable->ops[i].hook		= flowtable->data.type->hook;
 		flowtable->ops[i].dev		= dev_array[i];
-		flowtable->dev_name[i]		= kstrdup(dev_array[i]->name,
-							  GFP_KERNEL);
 	}
 
 	return err;
@@ -5479,10 +5477,8 @@ static int nf_tables_newflowtable(struct net *net, struct sock *nlsk,
 err6:
 	i = flowtable->ops_len;
 err5:
-	for (k = i - 1; k >= 0; k--) {
-		kfree(flowtable->dev_name[k]);
+	for (k = i - 1; k >= 0; k--)
 		nf_unregister_net_hook(net, &flowtable->ops[k]);
-	}
 
 	kfree(flowtable->ops);
 err4:
@@ -5581,9 +5577,10 @@ static int nf_tables_fill_flowtable_info(struct sk_buff *skb, struct net *net,
 		goto nla_put_failure;
 
 	for (i = 0; i < flowtable->ops_len; i++) {
-		if (flowtable->dev_name[i][0] &&
-		    nla_put_string(skb, NFTA_DEVICE_NAME,
-				   flowtable->dev_name[i]))
+		const struct net_device *dev = READ_ONCE(flowtable->ops[i].dev);
+
+		if (dev &&
+		    nla_put_string(skb, NFTA_DEVICE_NAME, dev->name))
 			goto nla_put_failure;
 	}
 	nla_nest_end(skb, nest_devs);
@@ -5825,7 +5822,6 @@ static void nft_flowtable_event(unsigned long event, struct net_device *dev,
 			continue;
 
 		nf_unregister_net_hook(dev_net(dev), &flowtable->ops[i]);
-		flowtable->dev_name[i][0] = '\0';
 		flowtable->ops[i].dev = NULL;
 		break;
 	}
