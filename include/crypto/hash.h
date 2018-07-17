@@ -67,9 +67,17 @@ struct ahash_request {
 #define AHASH_MAX_DIGESTSIZE	512
 #define AHASH_MAX_STATESIZE	512
 
+/*
+ * HASH_REQUEST_ON_STACK must only be used when wrapping shash (i.e.
+ * allocated with a CRYPTO_ALG_ASYNC mask), and is generally discouraged
+ * (just use shash directly). This is really only ever needed when using
+ * scatter/gather input sources.
+ */
+#define AHASH_MAX_REQSIZE	(sizeof(struct shash_desc) + \
+				 SHASH_MAX_DESCSIZE)
 #define AHASH_REQUEST_ON_STACK(name, ahash) \
 	char __##name##_desc[sizeof(struct ahash_request) + \
-		crypto_ahash_reqsize(ahash)] CRYPTO_MINALIGN_ATTR; \
+		AHASH_MAX_REQSIZE] CRYPTO_MINALIGN_ATTR; \
 	struct ahash_request *name = (void *)__##name##_desc
 
 /**

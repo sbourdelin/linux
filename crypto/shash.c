@@ -355,6 +355,7 @@ int crypto_init_shash_ops_async(struct crypto_tfm *tfm)
 	struct crypto_ahash *crt = __crypto_ahash_cast(tfm);
 	struct crypto_shash **ctx = crypto_tfm_ctx(tfm);
 	struct crypto_shash *shash;
+	size_t reqsize;
 
 	if (!crypto_mod_get(calg))
 		return -EAGAIN;
@@ -363,6 +364,12 @@ int crypto_init_shash_ops_async(struct crypto_tfm *tfm)
 	if (IS_ERR(shash)) {
 		crypto_mod_put(calg);
 		return PTR_ERR(shash);
+	}
+
+	reqsize = sizeof(struct shash_desc) + crypto_shash_descsize(shash);
+	if (WARN_ON(reqsize > AHASH_MAX_REQSIZE)) {
+		crypto_mod_put(calg);
+		return -EINVAL;
 	}
 
 	*ctx = shash;
@@ -383,7 +390,7 @@ int crypto_init_shash_ops_async(struct crypto_tfm *tfm)
 	if (alg->import)
 		crt->import = shash_async_import;
 
-	crt->reqsize = sizeof(struct shash_desc) + crypto_shash_descsize(shash);
+	crt->reqsize = reqsize;
 
 	return 0;
 }
