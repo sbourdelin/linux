@@ -249,6 +249,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
 	init_mm.brk	   = (unsigned long) _end;
+	init_mm.pgd	   = init_pg_dir;
 
 	*cmdline_p = boot_command_line;
 
