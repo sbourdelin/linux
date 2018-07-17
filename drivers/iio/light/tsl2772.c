@@ -119,7 +119,8 @@ enum {
 	tsl2672,
 	tmd2672,
 	tsl2772,
-	tmd2772
+	tmd2772,
+	apds9930,
 };
 
 enum {
@@ -201,6 +202,12 @@ static const struct tsl2772_lux tmd2x72_lux_table[TSL2772_DEF_LUX_TABLE_SZ] = {
 	{     0,      0 },
 };
 
+static const struct tsl2772_lux apds9930_lux_table[TSL2772_DEF_LUX_TABLE_SZ] = {
+	{ 52000,  96824 },
+	{ 38792,  67132 },
+	{     0,      0 },
+};
+
 static const struct tsl2772_lux *tsl2772_default_lux_table_group[] = {
 	[tsl2571] = tsl2x71_lux_table,
 	[tsl2671] = tsl2x71_lux_table,
@@ -212,6 +219,7 @@ static const struct tsl2772_lux *tsl2772_default_lux_table_group[] = {
 	[tmd2672] = tmd2x72_lux_table,
 	[tsl2772] = tsl2x72_lux_table,
 	[tmd2772] = tmd2x72_lux_table,
+	[apds9930] = apds9930_lux_table,
 };
 
 static const struct tsl2772_settings tsl2772_default_settings = {
@@ -262,6 +270,7 @@ static const int tsl2772_int_time_avail[][6] = {
 	[tmd2672] = { 0, 2730, 0, 2730, 0, 699000 },
 	[tsl2772] = { 0, 2730, 0, 2730, 0, 699000 },
 	[tmd2772] = { 0, 2730, 0, 2730, 0, 699000 },
+	[apds9930] = { 0, 2730, 0, 2730, 0, 699000 },
 };
 
 static int tsl2772_int_calibscale_avail[] = { 1, 8, 16, 120 };
@@ -287,7 +296,8 @@ static const u8 device_channel_config[] = {
 	[tsl2672] = PRX2,
 	[tmd2672] = PRX2,
 	[tsl2772] = ALSPRX2,
-	[tmd2772] = ALSPRX2
+	[tmd2772] = ALSPRX2,
+	[apds9930] = ALSPRX2,
 };
 
 static int tsl2772_read_status(struct tsl2772_chip *chip)
@@ -501,6 +511,7 @@ static int tsl2772_get_prox(struct iio_dev *indio_dev)
 	case tmd2672:
 	case tsl2772:
 	case tmd2772:
+	case apds9930:
 		if (!(ret & TSL2772_STA_PRX_VALID)) {
 			ret = -EINVAL;
 			goto prox_poll_err;
@@ -1325,6 +1336,7 @@ static int tsl2772_device_id_verif(int id, int target)
 	case tmd2672:
 	case tsl2772:
 	case tmd2772:
+	case apds9930:
 		return (id & 0xf0) == SWORDFISH_ID;
 	}
 
@@ -1852,6 +1864,7 @@ static const struct i2c_device_id tsl2772_idtable[] = {
 	{ "tmd2672", tmd2672 },
 	{ "tsl2772", tsl2772 },
 	{ "tmd2772", tmd2772 },
+	{ "apds9930", apds9930},
 	{}
 };
 
@@ -1868,6 +1881,7 @@ static const struct of_device_id tsl2772_of_match[] = {
 	{ .compatible = "amstaos,tmd2672" },
 	{ .compatible = "amstaos,tsl2772" },
 	{ .compatible = "amstaos,tmd2772" },
+	{ .compatible = "avago,apds9930" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, tsl2772_of_match);
