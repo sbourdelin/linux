@@ -18,6 +18,7 @@
 #include <linux/sysctl.h>
 #include <linux/ksm.h>
 #include <linux/mman.h>
+#include <linux/hugetlb.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -756,12 +757,35 @@ EXPORT_SYMBOL_GPL(test_and_clear_uc);
 int set_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 			  unsigned char key, bool nq)
 {
-	unsigned long keyul;
+	unsigned long keyul, paddr;
 	spinlock_t *ptl;
 	pgste_t old, new;
+	pmd_t *pmdp;
 	pte_t *ptep;
 
-	ptep = get_locked_pte(mm, addr, &ptl);
+	pmdp = (pmd_t *)huge_pte_offset(mm, addr, HPAGE_SIZE);
+	if (!pmdp)
+		return -EFAULT;
+
+	ptl = pmd_lock(mm, pmdp);
+	if (!pmd_present(*pmdp)) {
+		spin_unlock(ptl);
+		return -EFAULT;
+	}
+	if (pmd_large(*pmdp)) {
+		paddr = pmd_val(*pmdp) & HPAGE_MASK;
+		paddr |= addr & ~HPAGE_MASK;
+		/*
+		 * Huge pmds need quiescing operations, they are
+		 * always mapped.
+		 */
+		page_set_storage_key(paddr, key, 1);
+		spin_unlock(ptl);
+		return 0;
+	}
+	spin_unlock(ptl);
+
+	ptep = pte_alloc_map_lock(mm, pmdp, addr, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
 
@@ -772,14 +796,14 @@ int set_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 	pgste_val(new) |= (keyul & (_PAGE_CHANGED | _PAGE_REFERENCED)) << 48;
 	pgste_val(new) |= (keyul & (_PAGE_ACC_BITS | _PAGE_FP_BIT)) << 56;
 	if (!(pte_val(*ptep) & _PAGE_INVALID)) {
-		unsigned long address, bits, skey;
+		unsigned long bits, skey;
 
-		address = pte_val(*ptep) & PAGE_MASK;
-		skey = (unsigned long) page_get_storage_key(address);
+		paddr = pte_val(*ptep) & PAGE_MASK;
+		skey = (unsigned long) page_get_storage_key(paddr);
 		bits = skey & (_PAGE_CHANGED | _PAGE_REFERENCED);
 		skey = key & (_PAGE_ACC_BITS | _PAGE_FP_BIT);
 		/* Set storage key ACC and FP */
-		page_set_storage_key(address, skey, !nq);
+		page_set_storage_key(paddr, skey, !nq);
 		/* Merge host changed & referenced into pgste  */
 		pgste_val(new) |= bits << 52;
 	}
@@ -835,20 +859,40 @@ EXPORT_SYMBOL(cond_set_guest_storage_key);
 int reset_guest_reference_bit(struct mm_struct *mm, unsigned long addr)
 {
 	spinlock_t *ptl;
+	unsigned long paddr;
 	pgste_t old, new;
+	pmd_t *pmdp;
 	pte_t *ptep;
 	int cc = 0;
 
-	ptep = get_locked_pte(mm, addr, &ptl);
-	if (unlikely(!ptep))
+	pmdp = (pmd_t *)huge_pte_offset(mm, addr, HPAGE_SIZE);
+	if (!pmdp)
 		return -EFAULT;
 
+	ptl = pmd_lock(mm, pmdp);
+	if (!pmd_present(*pmdp)) {
+		spin_unlock(ptl);
+		return -EFAULT;
+	}
+	if (pmd_large(*pmdp)) {
+		paddr = pmd_val(*pmdp) & HPAGE_MASK;
+		paddr |= addr & ~HPAGE_MASK;
+		cc = page_reset_referenced(paddr);
+		spin_unlock(ptl);
+		return cc;
+	}
+	spin_unlock(ptl);
+
+	ptep = pte_alloc_map_lock(mm, pmdp, addr, &ptl);
+	if (unlikely(!ptep))
+		return -EFAULT;
 	new = old = pgste_get_lock(ptep);
 	/* Reset guest reference bit only */
 	pgste_val(new) &= ~PGSTE_GR_BIT;
 
 	if (!(pte_val(*ptep) & _PAGE_INVALID)) {
-		cc = page_reset_referenced(pte_val(*ptep) & PAGE_MASK);
+		paddr = pte_val(*ptep) & PAGE_MASK;
+		cc = page_reset_referenced(paddr);
 		/* Merge real referenced bit into host-set */
 		pgste_val(new) |= ((unsigned long) cc << 53) & PGSTE_HR_BIT;
 	}
@@ -867,18 +911,39 @@ EXPORT_SYMBOL(reset_guest_reference_bit);
 int get_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 			  unsigned char *key)
 {
+	unsigned long paddr;
 	spinlock_t *ptl;
 	pgste_t pgste;
+	pmd_t *pmdp;
 	pte_t *ptep;
 
-	ptep = get_locked_pte(mm, addr, &ptl);
+	pmdp = (pmd_t *)huge_pte_offset(mm, addr, HPAGE_SIZE);
+	if (!pmdp)
+		return -EFAULT;
+
+	ptl = pmd_lock(mm, pmdp);
+	if (!pmd_present(*pmdp)) {
+		spin_unlock(ptl);
+		return -EFAULT;
+	}
+	if (pmd_large(*pmdp)) {
+		paddr = pmd_val(*pmdp) & HPAGE_MASK;
+		paddr |= addr & ~HPAGE_MASK;
+		*key = page_get_storage_key(paddr);
+		spin_unlock(ptl);
+		return 0;
+	}
+	spin_unlock(ptl);
+
+	ptep = pte_alloc_map_lock(mm, pmdp, addr, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
 
 	pgste = pgste_get_lock(ptep);
 	*key = (pgste_val(pgste) & (PGSTE_ACC_BITS | PGSTE_FP_BIT)) >> 56;
+	paddr = pte_val(*ptep) & PAGE_MASK;
 	if (!(pte_val(*ptep) & _PAGE_INVALID))
-		*key = page_get_storage_key(pte_val(*ptep) & PAGE_MASK);
+		*key = page_get_storage_key(paddr);
 	/* Reflect guest's logical view, not physical */
 	*key |= (pgste_val(pgste) & (PGSTE_GR_BIT | PGSTE_GC_BIT)) >> 48;
 	pgste_set_unlock(ptep, pgste);
