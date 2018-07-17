@@ -27,8 +27,6 @@
 #include "intel_guc_submission.h"
 #include "i915_drv.h"
 
-static void guc_init_ggtt_pin_bias(struct intel_guc *guc);
-
 static void gen8_guc_raise_irq(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
@@ -141,8 +139,6 @@ int intel_guc_init_misc(struct intel_guc *guc)
 {
 	struct drm_i915_private *i915 = guc_to_i915(guc);
 	int ret;
-
-	guc_init_ggtt_pin_bias(guc);
 
 	ret = guc_init_wq(guc);
 	if (ret)
@@ -612,23 +608,6 @@ int intel_guc_resume(struct intel_guc *guc)
  * to DRAM. The value of the GuC ggtt_pin_bias is determined by WOPCM size and
  * actual GuC WOPCM size.
  */
-
-/**
- * guc_init_ggtt_pin_bias() - Initialize the GuC ggtt_pin_bias value.
- * @guc: intel_guc structure.
- *
- * This function will calculate and initialize the ggtt_pin_bias value based on
- * overall WOPCM size and GuC WOPCM size.
- */
-static void guc_init_ggtt_pin_bias(struct intel_guc *guc)
-{
-	struct drm_i915_private *i915 = guc_to_i915(guc);
-
-	GEM_BUG_ON(!i915->wopcm.size);
-	GEM_BUG_ON(i915->wopcm.size < i915->wopcm.guc.base);
-
-	guc->ggtt_pin_bias = i915->wopcm.size - i915->wopcm.guc.base;
-}
 
 /**
  * intel_guc_allocate_vma() - Allocate a GGTT VMA for GuC usage

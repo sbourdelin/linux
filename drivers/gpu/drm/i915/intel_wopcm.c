@@ -141,6 +141,23 @@ static inline int check_hw_restriction(struct drm_i915_private *i915,
 }
 
 /**
+ * wopcm_init_guc_ggtt_pin_bias() - Initialize the GuC ggtt_pin_bias value.
+ * @wopcm: pointer to intel_wopcm.
+ *
+ * This function will calculate and initialize the GuC ggtt_pin_bias value based
+ * on overall WOPCM size and GuC WOPCM size.
+ */
+static void wopcm_init_guc_ggtt_pin_bias(struct intel_wopcm *wopcm)
+{
+	struct drm_i915_private *i915 = wopcm_to_i915(wopcm);
+
+	GEM_BUG_ON(!wopcm->size);
+	GEM_BUG_ON(wopcm->size < wopcm->guc.base);
+
+	i915->guc.ggtt_pin_bias = wopcm->size - wopcm->guc.base;
+}
+
+/**
  * intel_wopcm_init() - Initialize the WOPCM structure.
  * @wopcm: pointer to intel_wopcm.
  *
@@ -206,6 +223,8 @@ int intel_wopcm_init(struct intel_wopcm *wopcm)
 
 	wopcm->guc.base = guc_wopcm_base;
 	wopcm->guc.size = guc_wopcm_size;
+
+	wopcm_init_guc_ggtt_pin_bias(wopcm);
 
 	return 0;
 }
