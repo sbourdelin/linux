@@ -120,6 +120,9 @@ power9_save_additional_sprs:
 	mfspr	r4, SPRN_MMCR2
 	std	r3, STOP_MMCR1(r13)
 	std	r4, STOP_MMCR2(r13)
+
+	mfspr	r3, SPRN_SPRG3
+	std	r3, STOP_SPRG3(r13)
 	blr
 
 power9_restore_additional_sprs:
@@ -144,7 +147,9 @@ power9_restore_additional_sprs:
 	mtspr	SPRN_MMCR1, r4
 
 	ld	r3, STOP_MMCR2(r13)
+	ld	r4, STOP_SPRG3(r13)
 	mtspr	SPRN_MMCR2, r3
+	mtspr	SPRN_SPRG3, r4
 	blr
 
 /*

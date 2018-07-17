@@ -77,6 +77,7 @@ struct stop_sprs {
 	u64 mmcr1;
 	u64 mmcr2;
 	u64 mmcra;
+	u64 sprg3;
 };
 
 extern u32 pnv_fastsleep_workaround_at_entry[];
