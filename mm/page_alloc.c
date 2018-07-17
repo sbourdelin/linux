@@ -6899,6 +6899,8 @@ static int __init cmdline_parse_kernelcore(char *p)
 		return 0;
 	}
 
+	pr_warn("Only kernelcore=mirror supported, "
+		"usage of kernelcore=nn[KMGTPE]|nn%% is deprecated.\n");
 	return cmdline_parse_core(p, &required_kernelcore,
 				  &required_kernelcore_percent);
 }
@@ -6909,6 +6911,7 @@ static int __init cmdline_parse_kernelcore(char *p)
  */
 static int __init cmdline_parse_movablecore(char *p)
 {
+	pr_warn("Option movablecore= is deprecated.\n");
 	return cmdline_parse_core(p, &required_movablecore,
 				  &required_movablecore_percent);
 }
