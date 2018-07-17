@@ -1723,7 +1723,8 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
 				 const struct user_regset_view *view,
 				 long signr, size_t *total)
 {
-	unsigned int i;
+	unsigned int i; /* index to regsets */
+	unsigned int j; /* index to notes */
 	unsigned int regset0_size = regset_size(t->task, &view->regsets[0]);
 
 	/*
@@ -1744,9 +1745,9 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
 
 	/*
 	 * Each other regset might generate a note too.  For each regset
-	 * that has no core_note_type or is inactive, we leave t->notes[i]
-	 * all zero and we'll know to skip writing it later.
+	 * that has no core_note_type or is inactive, we skip it.
 	 */
+	j = 1;
 	for (i = 1; i < view->n; ++i) {
 		const struct user_regset *regset = &view->regsets[i];
 		do_thread_regset_writeback(t->task, regset);
@@ -1763,17 +1764,18 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
 				kfree(data);
 			else {
 				if (regset->core_note_type != NT_PRFPREG)
-					fill_note(&t->notes[i], "LINUX",
+					fill_note(&t->notes[j], "LINUX",
 						  regset->core_note_type,
 						  size, data);
 				else {
 					SET_PR_FPVALID(&t->prstatus,
 							1, regset0_size);
-					fill_note(&t->notes[i], "CORE",
+					fill_note(&t->notes[j], "CORE",
 						  NT_PRFPREG, size, data);
 				}
-				*total += notesize(&t->notes[i]);
+				*total += notesize(&t->notes[j]);
 			}
+			j++;
 		}
 	}
 
