@@ -27,6 +27,7 @@ struct mod_arch_specific
 #endif
 #define ELF_R_TYPE(X)	ELF64_R_TYPE(X)
 #define ELF_R_SYM(X)	ELF64_R_SYM(X)
+#define ELF_ADDR_PREFIX "ll"
 
 #else /* CONFIG_64BIT */
 
@@ -44,6 +45,14 @@ struct mod_arch_specific
 #endif
 #define ELF_R_TYPE(X)	ELF32_R_TYPE(X)
 #define ELF_R_SYM(X)	ELF32_R_SYM(X)
+#define ELF_ADDR_PREFIX
 #endif
+
+#define PRIdEA	ELF_ADDR_PREFIX "d" /* signed decimal */
+#define PRIiEA	ELF_ADDR_PREFIX "i" /* signed decimal */
+#define PRIuEA	ELF_ADDR_PREFIX "u" /* unsigned decimal */
+#define PRIoEA	ELF_ADDR_PREFIX "o" /* unsigned octal */
+#define PRIxEA	ELF_ADDR_PREFIX "x" /* unsigned lowercase hexadecimal */
+#define PRIXEA	ELF_ADDR_PREFIX "X" /* unsigned uppercase hexadecimal */
 
 #endif /* __ASM_GENERIC_MODULE_H */
