@@ -630,13 +630,10 @@ static bool is_gcb_in_reset(struct gasket_dev *gasket_dev)
 static uint apex_ioctl_check_permissions(struct file *filp, uint cmd)
 {
 	struct gasket_dev *gasket_dev = filp->private_data;
-	int root = capable(CAP_SYS_ADMIN);
-	int is_owner = gasket_dev->dev_info.ownership.is_owned &&
-		       current->tgid == gasket_dev->dev_info.ownership.owner;
+	fmode_t write;
 
-	if (root || is_owner)
-		return 1;
-	return 0;
+	write = filp->f_mode & FMODE_WRITE;
+	return write;
 }
 
 /*
