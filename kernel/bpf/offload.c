@@ -32,11 +32,17 @@
  */
 static DECLARE_RWSEM(bpf_devs_lock);
 
+struct bpf_offload_dev {
+	struct list_head netdevs;
+};
+
 struct bpf_offload_netdev {
 	struct rhash_head l;
 	struct net_device *netdev;
+	struct bpf_offload_dev *offdev;
 	struct list_head progs;
 	struct list_head maps;
+	struct list_head offdev_netdevs;
 };
 
 static const struct rhashtable_params offdevs_params = {
@@ -505,46 +511,67 @@ int bpf_map_offload_info_fill(struct bpf_map_info *info, struct bpf_map *map)
 	return 0;
 }
 
-bool bpf_offload_dev_match(struct bpf_prog *prog, struct bpf_map *map)
+static bool __bpf_offload_dev_match(struct bpf_prog *prog,
+				    struct net_device *netdev)
 {
-	struct bpf_offloaded_map *offmap;
+	struct bpf_offload_netdev *ondev1, *ondev2;
 	struct bpf_prog_offload *offload;
-	bool ret;
 
 	if (!bpf_prog_is_dev_bound(prog->aux))
 		return false;
-	if (!bpf_map_is_dev_bound(map))
-		return bpf_map_offload_neutral(map);
+
+	offload = prog->aux->offload;
+	if (!offload)
+		return false;
+	if (offload->netdev == netdev)
+		return true;
+
+	ondev1 = bpf_offload_find_netdev(offload->netdev);
+	ondev2 = bpf_offload_find_netdev(netdev);
+
+	return ondev1 && ondev2 && ondev1->offdev == ondev2->offdev;
+}
+
+bool bpf_offload_dev_match(struct bpf_prog *prog, struct net_device *netdev)
+{
+	bool ret;
 
 	down_read(&bpf_devs_lock);
-	offload = prog->aux->offload;
+	ret = __bpf_offload_dev_match(prog, netdev);
+	up_read(&bpf_devs_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(bpf_offload_dev_match);
+
+bool bpf_offload_match(struct bpf_prog *prog, struct bpf_map *map)
+{
+	struct bpf_offloaded_map *offmap;
+	bool ret;
+
+	if (!bpf_map_is_dev_bound(map))
+		return bpf_map_offload_neutral(map);
 	offmap = map_to_offmap(map);
 
-	ret = offload && offload->netdev == offmap->netdev;
+	down_read(&bpf_devs_lock);
+	ret = __bpf_offload_dev_match(prog, offmap->netdev);
 	up_read(&bpf_devs_lock);
 
 	return ret;
 }
 
-int bpf_offload_dev_netdev_register(struct net_device *netdev)
+int bpf_offload_dev_netdev_register(struct bpf_offload_dev *offdev,
+				    struct net_device *netdev)
 {
 	struct bpf_offload_netdev *ondev;
 	int err;
-
-	down_write(&bpf_devs_lock);
-	if (!offdevs_inited) {
-		err = rhashtable_init(&offdevs, &offdevs_params);
-		if (err)
-			return err;
-		offdevs_inited = true;
-	}
-	up_write(&bpf_devs_lock);
 
 	ondev = kzalloc(sizeof(*ondev), GFP_KERNEL);
 	if (!ondev)
 		return -ENOMEM;
 
 	ondev->netdev = netdev;
+	ondev->offdev = offdev;
 	INIT_LIST_HEAD(&ondev->progs);
 	INIT_LIST_HEAD(&ondev->maps);
 
@@ -555,6 +582,7 @@ int bpf_offload_dev_netdev_register(struct net_device *netdev)
 		goto err_unlock_free;
 	}
 
+	list_add(&ondev->offdev_netdevs, &offdev->netdevs);
 	up_write(&bpf_devs_lock);
 	return 0;
 
@@ -565,11 +593,12 @@ err_unlock_free:
 }
 EXPORT_SYMBOL_GPL(bpf_offload_dev_netdev_register);
 
-void bpf_offload_dev_netdev_unregister(struct net_device *netdev)
+void bpf_offload_dev_netdev_unregister(struct bpf_offload_dev *offdev,
+				       struct net_device *netdev)
 {
+	struct bpf_offload_netdev *ondev, *altdev;
 	struct bpf_offloaded_map *offmap, *mtmp;
 	struct bpf_prog_offload *offload, *ptmp;
-	struct bpf_offload_netdev *ondev;
 
 	ASSERT_RTNL();
 
@@ -579,11 +608,26 @@ void bpf_offload_dev_netdev_unregister(struct net_device *netdev)
 		goto unlock;
 
 	WARN_ON(rhashtable_remove_fast(&offdevs, &ondev->l, offdevs_params));
+	list_del(&ondev->offdev_netdevs);
 
-	list_for_each_entry_safe(offload, ptmp, &ondev->progs, offloads)
-		__bpf_prog_offload_destroy(offload->prog);
-	list_for_each_entry_safe(offmap, mtmp, &ondev->maps, offloads)
-		__bpf_map_offload_destroy(offmap);
+	/* Try to move the objects to another netdev of the device */
+	altdev = list_first_entry_or_null(&offdev->netdevs,
+					  struct bpf_offload_netdev,
+					  offdev_netdevs);
+	if (altdev) {
+		list_for_each_entry(offload, &ondev->progs, offloads)
+			offload->netdev = altdev->netdev;
+		list_splice_init(&ondev->progs, &altdev->progs);
+
+		list_for_each_entry(offmap, &ondev->maps, offloads)
+			offmap->netdev = altdev->netdev;
+		list_splice_init(&ondev->maps, &altdev->maps);
+	} else {
+		list_for_each_entry_safe(offload, ptmp, &ondev->progs, offloads)
+			__bpf_prog_offload_destroy(offload->prog);
+		list_for_each_entry_safe(offmap, mtmp, &ondev->maps, offloads)
+			__bpf_map_offload_destroy(offmap);
+	}
 
 	WARN_ON(!list_empty(&ondev->progs));
 	WARN_ON(!list_empty(&ondev->maps));
@@ -592,3 +636,34 @@ unlock:
 	up_write(&bpf_devs_lock);
 }
 EXPORT_SYMBOL_GPL(bpf_offload_dev_netdev_unregister);
+
+struct bpf_offload_dev *bpf_offload_dev_create(void)
+{
+	struct bpf_offload_dev *offdev;
+	int err;
+
+	down_write(&bpf_devs_lock);
+	if (!offdevs_inited) {
+		err = rhashtable_init(&offdevs, &offdevs_params);
+		if (err)
+			return ERR_PTR(err);
+		offdevs_inited = true;
+	}
+	up_write(&bpf_devs_lock);
+
+	offdev = kzalloc(sizeof(*offdev), GFP_KERNEL);
+	if (!offdev)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD(&offdev->netdevs);
+
+	return offdev;
+}
+EXPORT_SYMBOL_GPL(bpf_offload_dev_create);
+
+void bpf_offload_dev_destroy(struct bpf_offload_dev *offdev)
+{
+	WARN_ON(!list_empty(&offdev->netdevs));
+	kfree(offdev);
+}
+EXPORT_SYMBOL_GPL(bpf_offload_dev_destroy);
