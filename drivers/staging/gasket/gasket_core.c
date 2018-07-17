@@ -2097,7 +2097,7 @@ int gasket_wait_with_reschedule(
 	while (retries < max_retries) {
 		tmp = gasket_dev_read_64(gasket_dev, bar, offset);
 		if ((tmp & mask) == val)
-			break;
+			return 0;
 		msleep(delay_ms);
 		retries++;
 	}
