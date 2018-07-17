@@ -1407,7 +1407,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto error_free_dma;
 
-	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
+	dev_info(&pdev->dev, "irq:%u\n", host->irq);
 	return 0;
 
 error_free_dma:
