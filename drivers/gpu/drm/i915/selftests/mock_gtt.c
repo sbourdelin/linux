@@ -117,6 +117,8 @@ void mock_init_ggtt(struct drm_i915_private *i915)
 	ggtt->vm.vma_ops.set_pages   = ggtt_set_pages;
 	ggtt->vm.vma_ops.clear_pages = clear_pages;
 
+	ggtt->pin_bias = I915_GTT_PAGE_SIZE;
+
 	i915_address_space_init(&ggtt->vm, i915);
 }
 

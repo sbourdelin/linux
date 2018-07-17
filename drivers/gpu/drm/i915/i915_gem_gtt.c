@@ -2937,6 +2937,12 @@ int i915_gem_init_ggtt(struct drm_i915_private *dev_priv)
 	struct drm_mm_node *entry;
 	int ret;
 
+	/*
+	 * We need a small bias as ring wraparound at offset 0
+	 * sometimes hangs. No idea why.
+	 */
+	ggtt->pin_bias = I915_GTT_PAGE_SIZE;
+
 	ret = intel_vgt_balloon(dev_priv);
 	if (ret)
 		return ret;

@@ -610,6 +610,31 @@ int intel_guc_resume(struct intel_guc *guc)
  */
 
 /**
+ * intel_guc_ggtt_offset() - Get and validate the GGTT offset of @vma
+ * @guc: intel_guc structure.
+ * @vma: i915 graphics virtual memory area.
+ *
+ * GuC does not allow any gfx GGTT address that falls into range
+ * [0, ggtt.pin_bias), which is reserved for Boot ROM, SRAM and WOPCM.
+ * Currently, in order to exclude [0, ggtt.pin_bias) address space from
+ * GGTT, all gfx objects used by GuC are allocated with intel_guc_allocate_vma()
+ * and pinned with PIN_OFFSET_BIAS along with the value of ggtt.pin_bias.
+ *
+ * Return: GGTT offset of the @vma.
+ */
+u32 intel_guc_ggtt_offset(struct intel_guc *guc, struct i915_vma *vma)
+{
+	struct drm_i915_private *i915 = guc_to_i915(guc);
+
+	u32 offset = i915_ggtt_offset(vma);
+
+	GEM_BUG_ON(offset < i915->ggtt.pin_bias);
+	GEM_BUG_ON(range_overflows_t(u64, offset, vma->size, GUC_GGTT_TOP));
+
+	return offset;
+}
+
+/**
  * intel_guc_allocate_vma() - Allocate a GGTT VMA for GuC usage
  * @guc:	the guc
  * @size:	size of area to allocate (both virtual space and memory)
@@ -624,21 +649,21 @@ int intel_guc_resume(struct intel_guc *guc)
  */
 struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size)
 {
-	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	struct drm_i915_private *i915 = guc_to_i915(guc);
 	struct drm_i915_gem_object *obj;
 	struct i915_vma *vma;
 	int ret;
 
-	obj = i915_gem_object_create(dev_priv, size);
+	obj = i915_gem_object_create(i915, size);
 	if (IS_ERR(obj))
 		return ERR_CAST(obj);
 
-	vma = i915_vma_instance(obj, &dev_priv->ggtt.vm, NULL);
+	vma = i915_vma_instance(obj, &i915->ggtt.vm, NULL);
 	if (IS_ERR(vma))
 		goto err;
 
 	ret = i915_vma_pin(vma, 0, PAGE_SIZE,
-			   PIN_GLOBAL | PIN_OFFSET_BIAS | guc->ggtt_pin_bias);
+			   PIN_GLOBAL | PIN_OFFSET_BIAS | i915->ggtt.pin_bias);
 	if (ret) {
 		vma = ERR_PTR(ret);
 		goto err;

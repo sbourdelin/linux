@@ -5481,10 +5481,6 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 	if (ret)
 		return ret;
 
-	ret = intel_wopcm_init(&dev_priv->wopcm);
-	if (ret)
-		goto err_uc_misc;
-
 	/* This is just a security blanket to placate dragons.
 	 * On some systems, we very sporadically observe that the first TLBs
 	 * used by the CS may be stale, despite us poking the TLB reset. If
@@ -5499,6 +5495,10 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 		GEM_BUG_ON(ret == -EIO);
 		goto err_unlock;
 	}
+
+	ret = intel_wopcm_init(&dev_priv->wopcm);
+	if (ret)
+		goto err_uc_misc;
 
 	ret = i915_gem_contexts_init(dev_priv);
 	if (ret) {
