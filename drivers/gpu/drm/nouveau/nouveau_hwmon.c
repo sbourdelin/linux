@@ -655,7 +655,7 @@ nouveau_read_string(struct device *dev, enum hwmon_sensor_types type, u32 attr,
 
 static int
 nouveau_read(struct device *dev, enum hwmon_sensor_types type, u32 attr,
-							int channel, long *val)
+	     int channel, long *val)
 {
 	switch (type) {
 	case hwmon_chip:
@@ -677,7 +677,7 @@ nouveau_read(struct device *dev, enum hwmon_sensor_types type, u32 attr,
 
 static int
 nouveau_write(struct device *dev, enum hwmon_sensor_types type, u32 attr,
-							int channel, long val)
+	      int channel, long val)
 {
 	switch (type) {
 	case hwmon_temp:
