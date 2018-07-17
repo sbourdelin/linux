@@ -1598,8 +1598,20 @@ static int soft_offline_huge_page(struct page *page, int flags)
 		if (ret > 0)
 			ret = -EIO;
 	} else {
-		if (PageHuge(page))
-			dissolve_free_huge_page(page);
+		/*
+		 * We set PG_hwpoison only when the migration source hugepage
+		 * was successfully dissolved, because otherwise hwpoisoned
+		 * hugepage remains on free hugepage list. The allocator ignores
+		 * such a hwpoisoned page so it's never allocated, but it could
+		 * kill a process because of no-memory rather than hwpoison.
+		 * Soft-offline never impacts the userspace, so this is
+		 * undesired.
+		 */
+		ret = dissolve_free_huge_page(page);
+		if (!ret) {
+			if (!TestSetPageHWPoison(page))
+				num_poisoned_pages_inc();
+		}
 	}
 	return ret;
 }
@@ -1715,13 +1727,13 @@ static int soft_offline_in_use_page(struct page *page, int flags)
 
 static void soft_offline_free_page(struct page *page)
 {
+	int rc = 0;
 	struct page *head = compound_head(page);
 
-	if (!TestSetPageHWPoison(head)) {
+	if (PageHuge(head))
+		rc = dissolve_free_huge_page(page);
+	if (!rc && !TestSetPageHWPoison(page))
 		num_poisoned_pages_inc();
-		if (PageHuge(head))
-			dissolve_free_huge_page(page);
-	}
 }
 
 /**
