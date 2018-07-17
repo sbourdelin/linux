@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
  *
@@ -20,6 +21,7 @@
 #include <linux/pm_domain.h>
 #include <linux/regulator/consumer.h>
 #include <linux/soc/mediatek/infracfg.h>
+#include <linux/soc/mediatek/scpsys-ext.h>
 
 #include <dt-bindings/power/mt2701-power.h>
 #include <dt-bindings/power/mt2712-power.h>
@@ -117,6 +119,15 @@ static const char * const clk_names[] = {
 
 #define MAX_CLKS	3
 
+/**
+ * struct scp_domain_data - scp domain data for power on/off flow
+ * @name: The domain name.
+ * @sta_mask: The mask for power on/off status bit.
+ * @ctl_offs: The offset for main power control register.
+ * @sram_pdn_bits: The mask for sram power control bits.
+ * @sram_pdn_ack_bits The mask for sram power control acked bits.
+ * @caps: The flag for active wake-up action.
+ */
 struct scp_domain_data {
 	const char *name;
 	u32 sta_mask;
@@ -150,7 +161,7 @@ struct scp {
 	void __iomem *base;
 	struct regmap *infracfg;
 	struct scp_ctrl_reg ctrl_reg;
-	bool bus_prot_reg_update;
+	struct scpsys_ext_data *ext_data;
 };
 
 struct scp_subdomain {
@@ -164,7 +175,6 @@ struct scp_soc_data {
 	const struct scp_subdomain *subdomains;
 	int num_subdomains;
 	const struct scp_ctrl_reg regs;
-	bool bus_prot_reg_update;
 };
 
 static int scpsys_domain_is_on(struct scp_domain *scpd)
@@ -236,6 +246,31 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 	val |= PWR_RST_B_BIT;
 	writel(val, ctl_addr);
 
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->cg_ops) {
+			ret = attr->cg_ops->enable(attr);
+			if (ret)
+				goto err_ext_clk;
+		}
+	}
+
+	val &= ~scpd->data->sram_pdn_bits;
+	writel(val, ctl_addr);
+
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->cg_ops) {
+			ret = attr->cg_ops->enable(attr);
+			if (ret)
+				goto err_ext_clk;
+		}
+	}
+
 	val &= ~scpd->data->sram_pdn_bits;
 	writel(val, ctl_addr);
 
@@ -247,25 +282,65 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 		 * applied here.
 		 */
 		usleep_range(12000, 12100);
-
 	} else {
 		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
 					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 		if (ret < 0)
-			goto err_pwr_ack;
+			goto err_sram;
 	}
 
 	if (scpd->data->bus_prot_mask) {
 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-				scpd->data->bus_prot_mask,
-				scp->bus_prot_reg_update);
+				scpd->data->bus_prot_mask);
 		if (ret)
-			goto err_pwr_ack;
+			goto err_sram;
+	}
+
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->bus_ops) {
+			ret = attr->bus_ops->disable(attr);
+			if (ret)
+				goto err_sram;
+		}
+	}
+
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->cg_ops) {
+			ret = attr->cg_ops->disable(attr);
+			if (ret)
+				goto err_sram;
+		}
 	}
 
 	return 0;
 
+err_sram:
+	val = readl(ctl_addr);
+	val |= scpd->data->sram_pdn_bits;
+	writel(val, ctl_addr);
+err_ext_clk:
+	val = readl(ctl_addr);
+	val |= PWR_ISO_BIT;
+	writel(val, ctl_addr);
+
+	val &= ~PWR_RST_B_BIT;
+	writel(val, ctl_addr);
+
+	val |= PWR_CLK_DIS_BIT;
+	writel(val, ctl_addr);
 err_pwr_ack:
+	val &= ~PWR_ON_BIT;
+	writel(val, ctl_addr);
+
+	val &= ~PWR_ON_2ND_BIT;
+	writel(val, ctl_addr);
+
 	for (i = MAX_CLKS - 1; i >= 0; i--) {
 		if (scpd->clk[i])
 			clk_disable_unprepare(scpd->clk[i]);
@@ -273,8 +348,6 @@ err_pwr_ack:
 err_clk:
 	if (scpd->supply)
 		regulator_disable(scpd->supply);
-
-	dev_err(scp->dev, "Failed to power on domain %s\n", genpd->name);
 
 	return ret;
 }
@@ -289,12 +362,33 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 	int ret, tmp;
 	int i;
 
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->cg_ops) {
+			ret = attr->cg_ops->enable(attr);
+			if (ret)
+				goto out;
+		}
+	}
+
 	if (scpd->data->bus_prot_mask) {
 		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
-				scpd->data->bus_prot_mask,
-				scp->bus_prot_reg_update);
+				scpd->data->bus_prot_mask);
 		if (ret)
 			goto out;
+	}
+
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->bus_ops) {
+			ret = attr->bus_ops->enable(attr);
+			if (ret)
+				goto out;
+		}
 	}
 
 	val = readl(ctl_addr);
@@ -306,6 +400,17 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto out;
+
+	if (!IS_ERR(scp->ext_data)) {
+		struct scpsys_ext_attr *attr;
+
+		attr = scp->ext_data->get_attr(scpd->data->name);
+		if (!IS_ERR(attr) && attr->cg_ops) {
+			ret = attr->cg_ops->disable(attr);
+			if (ret)
+				goto out;
+		}
+	}
 
 	val |= PWR_ISO_BIT;
 	writel(val, ctl_addr);
@@ -337,8 +442,6 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 	return 0;
 
 out:
-	dev_err(scp->dev, "Failed to power off domain %s\n", genpd->name);
-
 	return ret;
 }
 
@@ -352,8 +455,7 @@ static void init_clks(struct platform_device *pdev, struct clk **clk)
 
 static struct scp *init_scp(struct platform_device *pdev,
 			const struct scp_domain_data *scp_domain_data, int num,
-			const struct scp_ctrl_reg *scp_ctrl_reg,
-			bool bus_prot_reg_update)
+			const struct scp_ctrl_reg *scp_ctrl_reg)
 {
 	struct genpd_onecell_data *pd_data;
 	struct resource *res;
@@ -367,10 +469,9 @@ static struct scp *init_scp(struct platform_device *pdev,
 
 	scp->ctrl_reg.pwr_sta_offs = scp_ctrl_reg->pwr_sta_offs;
 	scp->ctrl_reg.pwr_sta2nd_offs = scp_ctrl_reg->pwr_sta2nd_offs;
-
-	scp->bus_prot_reg_update = bus_prot_reg_update;
-
 	scp->dev = &pdev->dev;
+
+	scp->ext_data = scpsys_ext_init(pdev);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	scp->base = devm_ioremap_resource(&pdev->dev, res);
@@ -1021,7 +1122,6 @@ static const struct scp_soc_data mt2701_data = {
 		.pwr_sta_offs = SPM_PWR_STATUS,
 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
 	},
-	.bus_prot_reg_update = true,
 };
 
 static const struct scp_soc_data mt2712_data = {
@@ -1033,7 +1133,6 @@ static const struct scp_soc_data mt2712_data = {
 		.pwr_sta_offs = SPM_PWR_STATUS,
 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
 	},
-	.bus_prot_reg_update = false,
 };
 
 static const struct scp_soc_data mt6765_data = {
@@ -1056,7 +1155,6 @@ static const struct scp_soc_data mt6797_data = {
 		.pwr_sta_offs = SPM_PWR_STATUS_MT6797,
 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND_MT6797
 	},
-	.bus_prot_reg_update = true,
 };
 
 static const struct scp_soc_data mt7622_data = {
@@ -1066,7 +1164,6 @@ static const struct scp_soc_data mt7622_data = {
 		.pwr_sta_offs = SPM_PWR_STATUS,
 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
 	},
-	.bus_prot_reg_update = true,
 };
 
 static const struct scp_soc_data mt7623a_data = {
@@ -1076,7 +1173,6 @@ static const struct scp_soc_data mt7623a_data = {
 		.pwr_sta_offs = SPM_PWR_STATUS,
 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
 	},
-	.bus_prot_reg_update = true,
 };
 
 static const struct scp_soc_data mt8173_data = {
@@ -1088,7 +1184,6 @@ static const struct scp_soc_data mt8173_data = {
 		.pwr_sta_offs = SPM_PWR_STATUS,
 		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
 	},
-	.bus_prot_reg_update = true,
 };
 
 /*
@@ -1132,8 +1227,8 @@ static int scpsys_probe(struct platform_device *pdev)
 
 	soc = of_device_get_match_data(&pdev->dev);
 
-	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
-			soc->bus_prot_reg_update);
+	scp = init_scp(pdev, soc->domains, soc->num_domains,
+		       &soc->regs);
 	if (IS_ERR(scp))
 		return PTR_ERR(scp);
 
