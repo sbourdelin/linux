@@ -11,6 +11,7 @@
 #include <linux/ratelimit.h>
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
+#include <linux/crc64.h>
 
 #include "closure.h"
 
@@ -561,8 +562,4 @@ static inline sector_t bdev_sectors(struct block_device *bdev)
 {
 	return bdev->bd_inode->i_size >> 9;
 }
-
-uint64_t bch_crc64_update(uint64_t, const void *, size_t);
-uint64_t bch_crc64(const void *, size_t);
-
 #endif /* _BCACHE_UTIL_H */
