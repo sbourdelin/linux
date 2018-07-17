@@ -805,9 +805,6 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	 * It is not yet because we do not want to have a 16 bit hole
 	 */
 	new->queue_mapping = old->queue_mapping;
-#ifdef CONFIG_TLS_DEVICE
-	new->decrypted = old->decrypted;
-#endif
 
 	memcpy(&new->headers_start, &old->headers_start,
 	       offsetof(struct sk_buff, headers_end) -
@@ -835,6 +832,9 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 #ifdef CONFIG_XPS
 	CHECK_SKB_FIELD(sender_cpu);
+#endif
+#ifdef CONFIG_TLS_DEVICE
+	CHECK_SKB_FIELD(decrypted);
 #endif
 #ifdef CONFIG_NET_SCHED
 	CHECK_SKB_FIELD(tc_index);
@@ -868,9 +868,6 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	C(head_frag);
 	C(data);
 	C(truesize);
-#ifdef CONFIG_TLS_DEVICE
-	C(decrypted);
-#endif
 	refcount_set(&n->users, 1);
 
 	atomic_inc(&(skb_shinfo(skb)->dataref));
