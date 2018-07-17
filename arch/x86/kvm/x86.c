@@ -3163,6 +3163,9 @@ static int kvm_vcpu_ioctl_set_lapic(struct kvm_vcpu *vcpu,
 {
 	int r;
 
+	if (vcpu->arch.apicv_active)
+		kvm_x86_ops->sync_pir_to_irr(vcpu);
+
 	r = kvm_apic_set_state(vcpu, s);
 	if (r)
 		return r;
