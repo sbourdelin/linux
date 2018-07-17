@@ -129,6 +129,7 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 	unsigned int n_obj, n_bomap_pages;
 	size_t file_size, mmu_size;
 	__le64 *bomap, *bomap_start;
+	bool bos = true;
 
 	/* Only catch the first event, or when manually re-armed */
 	if (!etnaviv_dump_core)
@@ -137,6 +138,7 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 
 	mmu_size = etnaviv_iommu_dump_size(gpu->mmu);
 
+again:
 	/* We always dump registers, mmu, ring and end marker */
 	n_obj = 4;
 	n_bomap_pages = 0;
@@ -159,9 +161,12 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 			continue;
 
 		obj = vram->object;
-		file_size += obj->base.size;
 		n_bomap_pages += obj->base.size >> PAGE_SHIFT;
-		n_obj++;
+
+		if (bos) {
+			file_size += obj->base.size;
+			n_obj++;
+		}
 	}
 
 	/* If we have any buffer objects, add a bomap object */
@@ -177,6 +182,11 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 	iter.start = __vmalloc(file_size, GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY,
 			       PAGE_KERNEL);
 	if (!iter.start) {
+		if (bos) {
+			dev_warn(gpu->dev, "devcoredump too big, trying without bos\n");
+			bos = false;
+			goto again;
+		}
 		dev_warn(gpu->dev, "failed to allocate devcoredump file\n");
 		return;
 	}
@@ -234,14 +244,18 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 				*bomap++ = cpu_to_le64(page_to_phys(*pages++));
 		}
 
-		iter.hdr->iova = cpu_to_le64(vram->iova);
+		if (bos) {
+			iter.hdr->iova = cpu_to_le64(vram->iova);
 
-		vaddr = etnaviv_gem_vmap(&obj->base);
-		if (vaddr)
-			memcpy(iter.data, vaddr, obj->base.size);
+			vaddr = etnaviv_gem_vmap(&obj->base);
+			dev_crit(gpu->dev, "Copying object %p ops %pS vaddr %p to %p size %zu\n",
+				obj, obj->ops, vaddr, iter.data, obj->base.size);
+			if (vaddr)
+				memcpy(iter.data, vaddr, obj->base.size);
 
-		etnaviv_core_dump_header(&iter, ETDUMP_BUF_BO, iter.data +
-					 obj->base.size);
+			etnaviv_core_dump_header(&iter, ETDUMP_BUF_BO, iter.data +
+						 obj->base.size);
+		}
 	}
 
 	etnaviv_core_dump_header(&iter, ETDUMP_BUF_END, iter.data);
