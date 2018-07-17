@@ -198,12 +198,12 @@ static int tve200_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->pclk)) {
 		dev_err(dev, "unable to get PCLK\n");
 		ret = PTR_ERR(priv->pclk);
-		goto dev_unref;
+		goto dev_put;
 	}
 	ret = clk_prepare_enable(priv->pclk);
 	if (ret) {
 		dev_err(dev, "failed to enable PCLK\n");
-		goto dev_unref;
+		goto dev_put;
 	}
 
 	/* This clock is for the pixels (27MHz) */
@@ -249,8 +249,8 @@ static int tve200_probe(struct platform_device *pdev)
 
 clk_disable:
 	clk_disable_unprepare(priv->pclk);
-dev_unref:
-	drm_dev_unref(drm);
+dev_put:
+	drm_dev_put(drm);
 	return ret;
 }
 
@@ -265,7 +265,7 @@ static int tve200_remove(struct platform_device *pdev)
 		drm_panel_bridge_remove(priv->bridge);
 	drm_mode_config_cleanup(drm);
 	clk_disable_unprepare(priv->pclk);
-	drm_dev_unref(drm);
+	drm_dev_put(drm);
 
 	return 0;
 }
