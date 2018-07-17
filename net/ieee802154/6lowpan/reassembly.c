@@ -133,6 +133,13 @@ static int lowpan_frag_queue(struct lowpan_frag_queue *fq,
 	}
 
 found:
+	/* Current fragment overlaps with previous fragment? */
+	if (prev && (lowpan_802154_cb(prev)->d_offset << 3) + prev->len > offset)
+		goto err;
+	/* Current fragment overlaps with next fragment? */
+	if (next && offset + skb->len > lowpan_802154_cb(next)->d_offset << 3)
+		goto err;
+
 	/* Insert this fragment in the chain of fragments. */
 	skb->next = next;
 	if (!next)
