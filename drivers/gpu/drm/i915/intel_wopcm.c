@@ -71,6 +71,12 @@
  */
 void intel_wopcm_init_early(struct intel_wopcm *wopcm)
 {
+	struct drm_i915_private *i915 = wopcm_to_i915(wopcm);
+
+	if (!HAS_GUC(i915))
+		return;
+
+	/* FIXME use the size we actually probed from the hardware */
 	wopcm->size = GEN9_WOPCM_SIZE;
 
 	DRM_DEBUG_DRIVER("WOPCM size: %uKiB\n", wopcm->size / 1024);
@@ -163,7 +169,8 @@ int intel_wopcm_init(struct intel_wopcm *wopcm)
 	u32 guc_wopcm_rsvd;
 	int err;
 
-	GEM_BUG_ON(!wopcm->size);
+	if (!wopcm->size)
+		return 0;
 
 	if (guc_fw_size >= wopcm->size) {
 		DRM_ERROR("GuC FW (%uKiB) is too big to fit in WOPCM.",
