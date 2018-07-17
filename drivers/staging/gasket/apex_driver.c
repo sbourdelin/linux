@@ -5,6 +5,7 @@
  * Copyright (C) 2018 Google, Inc.
  */
 
+#include <linux/compiler.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -142,9 +143,9 @@ static int apex_get_status(struct gasket_dev *gasket_dev);
 
 static uint apex_ioctl_check_permissions(struct file *file, uint cmd);
 
-static long apex_ioctl(struct file *file, uint cmd, ulong arg);
+static long apex_ioctl(struct file *file, uint cmd, void __user *arg);
 
-static long apex_clock_gating(struct gasket_dev *gasket_dev, ulong arg);
+static long apex_clock_gating(struct gasket_dev *gasket_dev, void __user *arg);
 
 static int apex_enter_reset(struct gasket_dev *gasket_dev, uint type);
 
@@ -629,7 +630,6 @@ static bool is_gcb_in_reset(struct gasket_dev *gasket_dev)
  */
 static uint apex_ioctl_check_permissions(struct file *filp, uint cmd)
 {
-	struct gasket_dev *gasket_dev = filp->private_data;
 	fmode_t write;
 
 	write = filp->f_mode & FMODE_WRITE;
@@ -639,7 +639,7 @@ static uint apex_ioctl_check_permissions(struct file *filp, uint cmd)
 /*
  * Apex-specific ioctl handler.
  */
-static long apex_ioctl(struct file *filp, uint cmd, ulong arg)
+static long apex_ioctl(struct file *filp, uint cmd, void __user *arg)
 {
 	struct gasket_dev *gasket_dev = filp->private_data;
 
@@ -659,7 +659,7 @@ static long apex_ioctl(struct file *filp, uint cmd, ulong arg)
  * @gasket_dev: Gasket device pointer.
  * @arg: User ioctl arg, in this case to a apex_gate_clock_ioctl struct.
  */
-static long apex_clock_gating(struct gasket_dev *gasket_dev, ulong arg)
+static long apex_clock_gating(struct gasket_dev *gasket_dev, void __user *arg)
 {
 	struct apex_gate_clock_ioctl ibuf;
 
@@ -667,7 +667,7 @@ static long apex_clock_gating(struct gasket_dev *gasket_dev, ulong arg)
 		return 0;
 
 	if (allow_sw_clock_gating) {
-		if (copy_from_user(&ibuf, (void __user *)arg, sizeof(ibuf)))
+		if (copy_from_user(&ibuf, arg, sizeof(ibuf)))
 			return -EFAULT;
 
 		gasket_log_error(

@@ -14,6 +14,7 @@
 #include "gasket_page_table.h"
 #include "gasket_sysfs.h"
 
+#include <linux/compiler.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -1823,14 +1824,15 @@ static long gasket_ioctl(struct file *filp, uint cmd, ulong arg)
 		 * check_and_invoke_callback.
 		 */
 		if (driver_desc->ioctl_handler_cb)
-			return driver_desc->ioctl_handler_cb(filp, cmd, arg);
+			return driver_desc->ioctl_handler_cb(
+			    filp, cmd, (void __user *)arg);
 
 		gasket_log_error(
 			gasket_dev, "Received unknown ioctl 0x%x", cmd);
 		return -EINVAL;
 	}
 
-	return gasket_handle_ioctl(filp, cmd, arg);
+	return gasket_handle_ioctl(filp, cmd, (void __user *)arg);
 }
 
 int gasket_reset(struct gasket_dev *gasket_dev, uint reset_type)

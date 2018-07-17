@@ -7,6 +7,7 @@
 #include "gasket_interrupt.h"
 #include "gasket_logging.h"
 #include "gasket_page_table.h"
+#include <linux/compiler.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 
@@ -23,17 +24,18 @@
 #endif
 
 static uint gasket_ioctl_check_permissions(struct file *filp, uint cmd);
-static int gasket_set_event_fd(struct gasket_dev *dev, ulong arg);
+static int gasket_set_event_fd(struct gasket_dev *dev, void __user *arg);
 static int gasket_read_page_table_size(
-	struct gasket_dev *gasket_dev, ulong arg);
+	struct gasket_dev *gasket_dev, void __user *arg);
 static int gasket_read_simple_page_table_size(
-	struct gasket_dev *gasket_dev, ulong arg);
+	struct gasket_dev *gasket_dev, void __user *arg);
 static int gasket_partition_page_table(
-	struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg);
+	struct gasket_dev *gasket_dev, void __user *arg);
+static int gasket_map_buffers(struct gasket_dev *gasket_dev, void __user *arg);
+static int gasket_unmap_buffers(struct gasket_dev *gasket_dev,
+				void __user *arg);
 static int gasket_config_coherent_allocator(
-	struct gasket_dev *gasket_dev, ulong arg);
+	struct gasket_dev *gasket_dev, void __user *arg);
 
 /*
  * standard ioctl dispatch function.
@@ -43,9 +45,10 @@ static int gasket_config_coherent_allocator(
  *
  * Standard ioctl dispatcher; forwards operations to individual handlers.
  */
-long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
+long gasket_handle_ioctl(struct file *filp, uint cmd, void __user *arg)
 {
 	struct gasket_dev *gasket_dev;
+	ulong intarg = (ulong)arg;
 	int retval;
 
 	gasket_dev = (struct gasket_dev *)filp->private_data;
@@ -74,16 +77,16 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
 	 */
 	switch (cmd) {
 	case GASKET_IOCTL_RESET:
-		trace_gasket_ioctl_integer_data(arg);
-		retval = gasket_reset(gasket_dev, arg);
+		trace_gasket_ioctl_integer_data(intarg);
+		retval = gasket_reset(gasket_dev, intarg);
 		break;
 	case GASKET_IOCTL_SET_EVENTFD:
 		retval = gasket_set_event_fd(gasket_dev, arg);
 		break;
 	case GASKET_IOCTL_CLEAR_EVENTFD:
-		trace_gasket_ioctl_integer_data(arg);
+		trace_gasket_ioctl_integer_data(intarg);
 		retval = gasket_interrupt_clear_eventfd(
-			gasket_dev->interrupt_data, (int)arg);
+			gasket_dev->interrupt_data, (int)intarg);
 		break;
 	case GASKET_IOCTL_PARTITION_PAGE_TABLE:
 		trace_gasket_ioctl_integer_data(arg);
@@ -91,7 +94,7 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
 		break;
 	case GASKET_IOCTL_NUMBER_PAGE_TABLES:
 		trace_gasket_ioctl_integer_data(gasket_dev->num_page_tables);
-		if (copy_to_user((void __user *)arg,
+		if (copy_to_user(arg,
 				 &gasket_dev->num_page_tables,
 				 sizeof(uint64_t)))
 			retval = -EFAULT;
@@ -217,11 +220,11 @@ static uint gasket_ioctl_check_permissions(struct file *filp, uint cmd)
  * @gasket_dev: Pointer to the current gasket_dev we're using.
  * @arg: Pointer to gasket_interrupt_eventfd struct in userspace.
  */
-static int gasket_set_event_fd(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_set_event_fd(struct gasket_dev *gasket_dev, void __user *arg)
 {
 	struct gasket_interrupt_eventfd die;
 
-	if (copy_from_user(&die, (void __user *)arg,
+	if (copy_from_user(&die, arg,
 			   sizeof(struct gasket_interrupt_eventfd))) {
 		return -EFAULT;
 	}
@@ -237,13 +240,13 @@ static int gasket_set_event_fd(struct gasket_dev *gasket_dev, ulong arg)
  * @gasket_dev: Pointer to the current gasket_dev we're using.
  * @arg: Pointer to gasket_page_table_ioctl struct in userspace.
  */
-static int gasket_read_page_table_size(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_read_page_table_size(struct gasket_dev *gasket_dev,
+				       void __user *arg)
 {
 	int ret = 0;
 	struct gasket_page_table_ioctl ibuf;
 
-	if (copy_from_user(&ibuf, (void __user *)arg,
-			   sizeof(struct gasket_page_table_ioctl)))
+	if (copy_from_user(&ibuf, arg, sizeof(struct gasket_page_table_ioctl)))
 		return -EFAULT;
 
 	if (ibuf.page_table_index >= gasket_dev->num_page_tables)
@@ -256,7 +259,7 @@ static int gasket_read_page_table_size(struct gasket_dev *gasket_dev, ulong arg)
 		ibuf.page_table_index, ibuf.size, ibuf.host_address,
 		ibuf.device_address);
 
-	if (copy_to_user((void __user *)arg, &ibuf, sizeof(ibuf)))
+	if (copy_to_user(arg, &ibuf, sizeof(ibuf)))
 		return -EFAULT;
 
 	return ret;
@@ -268,13 +271,12 @@ static int gasket_read_page_table_size(struct gasket_dev *gasket_dev, ulong arg)
  * @arg: Pointer to gasket_page_table_ioctl struct in userspace.
  */
 static int gasket_read_simple_page_table_size(
-	struct gasket_dev *gasket_dev, ulong arg)
+	struct gasket_dev *gasket_dev, void __user *arg)
 {
 	int ret = 0;
 	struct gasket_page_table_ioctl ibuf;
 
-	if (copy_from_user(&ibuf, (void __user *)arg,
-			   sizeof(struct gasket_page_table_ioctl)))
+	if (copy_from_user(&ibuf, arg, sizeof(struct gasket_page_table_ioctl)))
 		return -EFAULT;
 
 	if (ibuf.page_table_index >= gasket_dev->num_page_tables)
@@ -287,7 +289,7 @@ static int gasket_read_simple_page_table_size(
 		ibuf.page_table_index, ibuf.size, ibuf.host_address,
 		ibuf.device_address);
 
-	if (copy_to_user((void __user *)arg, &ibuf, sizeof(ibuf)))
+	if (copy_to_user(arg, &ibuf, sizeof(ibuf)))
 		return -EFAULT;
 
 	return ret;
@@ -298,14 +300,14 @@ static int gasket_read_simple_page_table_size(
  * @gasket_dev: Pointer to the current gasket_dev we're using.
  * @arg: Pointer to gasket_page_table_ioctl struct in userspace.
  */
-static int gasket_partition_page_table(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_partition_page_table(struct gasket_dev *gasket_dev,
+				       void __user *arg)
 {
 	int ret;
 	struct gasket_page_table_ioctl ibuf;
 	uint max_page_table_size;
 
-	if (copy_from_user(&ibuf, (void __user *)arg,
-			   sizeof(struct gasket_page_table_ioctl)))
+	if (copy_from_user(&ibuf, arg, sizeof(struct gasket_page_table_ioctl)))
 		return -EFAULT;
 
 	trace_gasket_ioctl_page_table_data(
@@ -339,12 +341,12 @@ static int gasket_partition_page_table(struct gasket_dev *gasket_dev, ulong arg)
  * @gasket_dev: Pointer to the current gasket_dev we're using.
  * @arg: Pointer to a gasket_page_table_ioctl struct in userspace.
  */
-static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_map_buffers(struct gasket_dev *gasket_dev,
+			      void __user *arg)
 {
 	struct gasket_page_table_ioctl ibuf;
 
-	if (copy_from_user(&ibuf, (void __user *)arg,
-			   sizeof(struct gasket_page_table_ioctl)))
+	if (copy_from_user(&ibuf, arg, sizeof(struct gasket_page_table_ioctl)))
 		return -EFAULT;
 
 	trace_gasket_ioctl_page_table_data(
@@ -369,12 +371,12 @@ static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
  * @gasket_dev: Pointer to the current gasket_dev we're using.
  * @arg: Pointer to a gasket_page_table_ioctl struct in userspace.
  */
-static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_unmap_buffers(struct gasket_dev *gasket_dev,
+				void __user *arg)
 {
 	struct gasket_page_table_ioctl ibuf;
 
-	if (copy_from_user(&ibuf, (void __user *)arg,
-			   sizeof(struct gasket_page_table_ioctl)))
+	if (copy_from_user(&ibuf, arg, sizeof(struct gasket_page_table_ioctl)))
 		return -EFAULT;
 
 	trace_gasket_ioctl_page_table_data(
@@ -402,12 +404,12 @@ static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
  * @arg: Pointer to a gasket_coherent_alloc_config_ioctl struct in userspace.
  */
 static int gasket_config_coherent_allocator(
-	struct gasket_dev *gasket_dev, ulong arg)
+	struct gasket_dev *gasket_dev, void __user *arg)
 {
 	int ret;
 	struct gasket_coherent_alloc_config_ioctl ibuf;
 
-	if (copy_from_user(&ibuf, (void __user *)arg,
+	if (copy_from_user(&ibuf, arg,
 			   sizeof(struct gasket_coherent_alloc_config_ioctl)))
 		return -EFAULT;
 
@@ -431,7 +433,7 @@ static int gasket_config_coherent_allocator(
 			gasket_dev, ibuf.size, &ibuf.dma_address,
 			ibuf.page_table_index);
 	}
-	if (copy_to_user((void __user *)arg, &ibuf, sizeof(ibuf)))
+	if (copy_to_user(arg, &ibuf, sizeof(ibuf)))
 		return -EFAULT;
 
 	return ret;
