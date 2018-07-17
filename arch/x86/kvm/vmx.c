@@ -7269,6 +7269,7 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	unsigned long exit_qualification;
 	gpa_t gpa;
 	u64 error_code;
+	int r;
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 
@@ -7305,7 +7306,21 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	       PFERR_GUEST_FINAL_MASK : PFERR_GUEST_PAGE_MASK;
 
 	vcpu->arch.exit_qualification = exit_qualification;
-	return kvm_mmu_page_fault(vcpu, gpa, error_code, NULL, 0);
+
+	r = kvm_mmu_page_fault(vcpu, gpa, error_code, NULL, 0);
+
+	if (r == -EFAULT) {
+		unsigned long hva;
+
+		hva = kvm_vcpu_gfn_to_hva(vcpu, gpa >> PAGE_SHIFT);
+
+		vcpu->run->exit_reason = KVM_EXIT_FAIL_MEM_ACCESS;
+		vcpu->run->hw.hardware_exit_reason = EXIT_REASON_EPT_VIOLATION;
+		vcpu->run->fail_mem_access.hva = hva | (gpa & (PAGE_SIZE-1));
+		r = 0;
+	}
+
+	return r;
 }
 
 static int handle_ept_misconfig(struct kvm_vcpu *vcpu)
