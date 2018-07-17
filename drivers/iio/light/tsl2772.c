@@ -515,6 +515,18 @@ prox_poll_err:
 	return ret;
 }
 
+#ifdef CONFIG_OF
+static void tsl2772_parse_dt(struct tsl2772_chip *chip)
+{
+	struct device_node *of_node = chip->client->dev.of_node;
+
+	of_property_read_u32(of_node, "amstaos,prox_diode",
+			     &chip->settings.prox_diode);
+	of_property_read_u32(of_node, "amstaos,prox_power",
+			     &chip->settings.prox_power);
+}
+#endif
+
 /**
  * tsl2772_defaults() - Populates the device nominal operating parameters
  *                      with those provided by a 'platform' data struct or
@@ -541,6 +553,10 @@ static void tsl2772_defaults(struct tsl2772_chip *chip)
 		memcpy(chip->tsl2772_device_lux,
 		       tsl2772_default_lux_table_group[chip->id],
 		       TSL2772_DEFAULT_TABLE_BYTES);
+
+#ifdef CONFIG_OF
+	tsl2772_parse_dt(chip);
+#endif
 }
 
 /**
