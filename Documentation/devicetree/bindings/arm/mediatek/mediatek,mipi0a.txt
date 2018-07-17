@@ -1,0 +1,23 @@
+Mediatek mipi_rx_ana_csi0a controller
+============================
+
+The Mediatek mipi_rx_ana_csi0a controller provides various clocks
+to the system.
+
+Required Properties:
+
+- compatible: Should be one of:
+	- "mediatek,mt6765-mipi_rx_ana_csi0a", "syscon"
+- #clock-cells: Must be 1
+
+The vencsys controller uses the common clk binding from
+Documentation/devicetree/bindings/clock/clock-bindings.txt
+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+
+Example:
+
+mipi_rx_ana_csi0a: mipi_rx_ana_csi0a@11c10000 {
+	compatible = "mediatek,mt6765-mipi_rx_ana_csi0a", "syscon";
+	reg = <0 0x11c10000 0 0x1000>;
+	#clock-cells = <1>;
+};

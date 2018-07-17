@@ -1,14 +1,12 @@
-MediaTek AUDSYS controller
+MediaTek CAMSYS controller
 ============================
 
-The MediaTek AUDSYS controller provides various clocks to the system.
+The MediaTek CAMSYS controller provides various clocks to the system.
 
 Required Properties:
 
 - compatible: Should be one of:
-	- "mediatek,mt2701-audsys", "syscon"
-	- "mediatek,mt6765-audsys", "syscon"
-	- "mediatek,mt7622-audsys", "syscon"
+	- "mediatek,mt6765-camsys", "syscon"
 - #clock-cells: Must be 1
 
 The AUDSYS controller uses the common clk binding from
@@ -22,12 +20,8 @@ For common binding part and usage, refer to
 
 Example:
 
-	audsys: clock-controller@11220000 {
-		compatible = "mediatek,mt7622-audsys", "syscon";
-		reg = <0 0x11220000 0 0x2000>;
-		#clock-cells = <1>;
-
-		afe: audio-controller {
-			...
-		};
-	};
+camsys: camsys@1a000000  {
+	compatible = "mediatek,mt6765-camsys", "syscon";
+	reg = <0 0x1a000000  0 0x1000>;
+	#clock-cells = <1>;
+};
