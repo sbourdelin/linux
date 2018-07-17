@@ -589,6 +589,14 @@ static int __init pcc_cpufreq_init(void)
 		return ret;
 	}
 
+	if (num_present_cpus() > 4) {
+		pcc_cpufreq_driver.flags |= CPUFREQ_NO_AUTO_DYNAMIC_SWITCHING;
+		pr_err("%s: Unsuitable system, dynamic performance scaling disabled\n",
+		       __func__);
+		pr_err("%s: Change BIOS settings and complain to the hardware vendor\n",
+		       __func__);
+	}
+
 	ret = cpufreq_register_driver(&pcc_cpufreq_driver);
 
 	return ret;
