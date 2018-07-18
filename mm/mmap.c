@@ -73,7 +73,7 @@ core_param(ignore_rlimit_data, ignore_rlimit_data, bool, 0644);
 
 static void unmap_region(struct mm_struct *mm,
 		struct vm_area_struct *vma, struct vm_area_struct *prev,
-		unsigned long start, unsigned long end);
+		unsigned long start, unsigned long end, bool skip_flags);
 
 /* description of effects of mapping type and prot in current implementation.
  * this is due to the limited x86 page protection hardware.  The expected
@@ -1824,7 +1824,7 @@ unmap_and_free_vma:
 	fput(file);
 
 	/* Undo any partial mapping done by a device driver. */
-	unmap_region(mm, vma, prev, vma->vm_start, vma->vm_end);
+	unmap_region(mm, vma, prev, vma->vm_start, vma->vm_end, false);
 	charged = 0;
 	if (vm_flags & VM_SHARED)
 		mapping_unmap_writable(file->f_mapping);
@@ -2559,7 +2559,7 @@ static void remove_vma_list(struct mm_struct *mm, struct vm_area_struct *vma)
  */
 static void unmap_region(struct mm_struct *mm,
 		struct vm_area_struct *vma, struct vm_area_struct *prev,
-		unsigned long start, unsigned long end)
+		unsigned long start, unsigned long end, bool skip_flags)
 {
 	struct vm_area_struct *next = prev ? prev->vm_next : mm->mmap;
 	struct mmu_gather tlb;
@@ -2567,7 +2567,7 @@ static void unmap_region(struct mm_struct *mm,
 	lru_add_drain();
 	tlb_gather_mmu(&tlb, mm, start, end);
 	update_hiwater_rss(mm);
-	unmap_vmas(&tlb, vma, start, end);
+	unmap_vmas(&tlb, vma, start, end, skip_flags);
 	free_pgtables(&tlb, vma, prev ? prev->vm_end : FIRST_USER_ADDRESS,
 				 next ? next->vm_start : USER_PGTABLES_CEILING);
 	tlb_finish_mmu(&tlb, start, end);
@@ -2778,6 +2778,79 @@ static inline void munmap_mlock_vma(struct vm_area_struct *vma,
 	}
 }
 
+/*
+ * Zap pages with read mmap_sem held
+ *
+ * uf is the list for userfaultfd
+ */
+static int do_munmap_zap_rlock(struct mm_struct *mm, unsigned long start,
+			       size_t len, struct list_head *uf)
+{
+	unsigned long end = 0;
+	struct vm_area_struct *start_vma = NULL, *prev, *vma;
+	int ret = 0;
+
+	if (!munmap_addr_sanity(start, len))
+		return -EINVAL;
+
+	len = PAGE_ALIGN(len);
+
+	end = start + len;
+
+	/*
+	 * need write mmap_sem to split vmas and detach vmas
+	 * splitting vma up-front to save PITA to clean if it is failed
+	 */
+	if (down_write_killable(&mm->mmap_sem))
+		return -EINTR;
+
+	ret = munmap_lookup_vma(mm, &start_vma, &prev, start, end);
+	if (ret != 1)
+		goto out;
+
+	if (unlikely(uf)) {
+		ret = userfaultfd_unmap_prep(start_vma, start, end, uf);
+		if (ret)
+			goto out;
+	}
+
+	/* Handle mlocked vmas */
+	if (mm->locked_vm)
+		munmap_mlock_vma(start_vma, end);
+
+	/* Detach vmas from rbtree */
+	detach_vmas_to_be_unmapped(mm, start_vma, prev, end);
+
+	/*
+	 * Clear uprobe, VM_PFNMAP and hugetlb mapping in advance since they
+	 * need update vm_flags with write mmap_sem
+	 */
+	vma = start_vma;
+	for ( ; vma && vma->vm_start < end; vma = vma->vm_next) {
+		if (vma->vm_file)
+			uprobe_munmap(vma, vma->vm_start, vma->vm_end);
+		if (unlikely(vma->vm_flags & VM_PFNMAP))
+			untrack_pfn(vma, 0, 0);
+		if (is_vm_hugetlb_page(vma))
+			vma->vm_flags &= ~VM_MAYSHARE;
+	}
+
+	downgrade_write(&mm->mmap_sem);
+
+	/* zap mappings with read mmap_sem */
+	unmap_region(mm, start_vma, prev, start, end, true);
+
+	arch_unmap(mm, start_vma, start, end);
+	remove_vma_list(mm, start_vma);
+	up_read(&mm->mmap_sem);
+
+	return 0;
+
+out:
+	up_write(&mm->mmap_sem);
+	return ret;
+}
+
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
@@ -2826,7 +2899,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 	 * Remove the vma's, and unmap the actual pages
 	 */
 	detach_vmas_to_be_unmapped(mm, vma, prev, end);
-	unmap_region(mm, vma, prev, start, end);
+	unmap_region(mm, vma, prev, start, end, false);
 
 	arch_unmap(mm, vma, start, end);
 
@@ -2834,6 +2907,17 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 	remove_vma_list(mm, vma);
 
 	return 0;
+}
+
+static int vm_munmap_zap_rlock(unsigned long start, size_t len)
+{
+	int ret;
+	struct mm_struct *mm = current->mm;
+	LIST_HEAD(uf);
+
+	ret = do_munmap_zap_rlock(mm, start, len, &uf);
+	userfaultfd_unmap_complete(mm, &uf);
+	return ret;
 }
 
 int vm_munmap(unsigned long start, size_t len)
@@ -2855,9 +2939,8 @@ EXPORT_SYMBOL(vm_munmap);
 SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
 {
 	profile_munmap(addr);
-	return vm_munmap(addr, len);
+	return vm_munmap_zap_rlock(addr, len);
 }
-
 
 /*
  * Emulation of deprecated remap_file_pages() syscall.
@@ -3141,7 +3224,7 @@ void exit_mmap(struct mm_struct *mm)
 	tlb_gather_mmu(&tlb, mm, 0, -1);
 	/* update_hiwater_rss(mm) here? but nobody should be looking */
 	/* Use -1 here to ensure all VMAs in the mm are unmapped */
-	unmap_vmas(&tlb, vma, 0, -1);
+	unmap_vmas(&tlb, vma, 0, -1, false);
 	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, USER_PGTABLES_CEILING);
 	tlb_finish_mmu(&tlb, 0, -1);
 

@@ -1514,7 +1514,7 @@ void unmap_page_range(struct mmu_gather *tlb,
 static void unmap_single_vma(struct mmu_gather *tlb,
 		struct vm_area_struct *vma, unsigned long start_addr,
 		unsigned long end_addr,
-		struct zap_details *details)
+		struct zap_details *details, bool skip_flags)
 {
 	unsigned long start = max(vma->vm_start, start_addr);
 	unsigned long end;
@@ -1525,11 +1525,13 @@ static void unmap_single_vma(struct mmu_gather *tlb,
 	if (end <= vma->vm_start)
 		return;
 
-	if (vma->vm_file)
-		uprobe_munmap(vma, start, end);
+	if (!skip_flags) {
+		if (vma->vm_file)
+			uprobe_munmap(vma, start, end);
 
-	if (unlikely(vma->vm_flags & VM_PFNMAP))
-		untrack_pfn(vma, 0, 0);
+		if (unlikely(vma->vm_flags & VM_PFNMAP))
+			untrack_pfn(vma, 0, 0);
+	}
 
 	if (start != end) {
 		if (unlikely(is_vm_hugetlb_page(vma))) {
@@ -1546,7 +1548,19 @@ static void unmap_single_vma(struct mmu_gather *tlb,
 			 */
 			if (vma->vm_file) {
 				i_mmap_lock_write(vma->vm_file->f_mapping);
-				__unmap_hugepage_range_final(tlb, vma, start, end, NULL);
+				if (!skip_flags)
+					/*
+					 * The vma is being unmapped with read
+					 * mmap_sem.
+					 * Can't update vm_flags, it will be
+					 * updated later with exclusive lock
+					 * held
+					 */
+					__unmap_hugepage_range(tlb, vma, start,
+							end, NULL);
+				else
+					__unmap_hugepage_range_final(tlb, vma,
+							start, end, NULL);
 				i_mmap_unlock_write(vma->vm_file->f_mapping);
 			}
 		} else
@@ -1574,13 +1588,14 @@ static void unmap_single_vma(struct mmu_gather *tlb,
  */
 void unmap_vmas(struct mmu_gather *tlb,
 		struct vm_area_struct *vma, unsigned long start_addr,
-		unsigned long end_addr)
+		unsigned long end_addr, bool skip_flags)
 {
 	struct mm_struct *mm = vma->vm_mm;
 
 	mmu_notifier_invalidate_range_start(mm, start_addr, end_addr);
 	for ( ; vma && vma->vm_start < end_addr; vma = vma->vm_next)
-		unmap_single_vma(tlb, vma, start_addr, end_addr, NULL);
+		unmap_single_vma(tlb, vma, start_addr, end_addr, NULL,
+				 skip_flags);
 	mmu_notifier_invalidate_range_end(mm, start_addr, end_addr);
 }
 
@@ -1604,7 +1619,7 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long start,
 	update_hiwater_rss(mm);
 	mmu_notifier_invalidate_range_start(mm, start, end);
 	for ( ; vma && vma->vm_start < end; vma = vma->vm_next) {
-		unmap_single_vma(&tlb, vma, start, end, NULL);
+		unmap_single_vma(&tlb, vma, start, end, NULL, false);
 
 		/*
 		 * zap_page_range does not specify whether mmap_sem should be
@@ -1641,7 +1656,7 @@ static void zap_page_range_single(struct vm_area_struct *vma, unsigned long addr
 	tlb_gather_mmu(&tlb, mm, address, end);
 	update_hiwater_rss(mm);
 	mmu_notifier_invalidate_range_start(mm, address, end);
-	unmap_single_vma(&tlb, vma, address, end, details);
+	unmap_single_vma(&tlb, vma, address, end, details, false);
 	mmu_notifier_invalidate_range_end(mm, address, end);
 	tlb_finish_mmu(&tlb, address, end);
 }
