@@ -111,6 +111,17 @@ void kvm_arch_check_processor_compat(void *rtn)
 	*(int *)rtn = 0;
 }
 
+static int kvm_arch_config_vm(struct kvm *kvm, unsigned long type)
+{
+	u32 ipa_shift = KVM_VM_TYPE_ARM_PHYS_SHIFT(type);
+
+	if (!ipa_shift)
+		ipa_shift = KVM_PHYS_SHIFT;
+	if (ipa_shift > kvm_ipa_limit)
+		return -E2BIG;
+	return kvm_arm_config_vm(kvm, ipa_shift);
+}
+
 /**
  * kvm_arch_init_vm - initializes a VM data structure
  * @kvm:	pointer to the KVM struct
@@ -119,10 +130,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	int ret, cpu;
 
-	if (type)
-		return -EINVAL;
-
-	ret = kvm_arm_config_vm(kvm, KVM_PHYS_SHIFT);
+	ret = kvm_arch_config_vm(kvm, type);
 	if (ret)
 		return ret;
 

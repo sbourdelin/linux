@@ -475,9 +475,6 @@ int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift)
 	u64 parange;
 	u8 lvls = stage2_pgtable_levels(ipa_shift);
 
-	if (ipa_shift != KVM_PHYS_SHIFT)
-		return -EINVAL;
-
 	/*
 	 * Use a minimum 2 level page table to prevent splitting
 	 * host PMD huge pages at stage2.

@@ -122,6 +122,10 @@ the default trap & emulate implementation (which changes the virtual
 memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
 flag KVM_VM_MIPS_VZ.
 
+On arm64, bits[7-0] of the machine type has been reserved for specifying
+the maximum physical address size for the VM. For backward compatibility,
+value 0 implies the default limit of 40bits.
+
 
 4.3 KVM_GET_MSR_INDEX_LIST, KVM_GET_MSR_FEATURE_INDEX_LIST
 
