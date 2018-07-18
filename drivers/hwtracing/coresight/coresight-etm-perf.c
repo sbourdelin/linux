@@ -108,26 +108,32 @@ out:
 static void free_event_data(struct work_struct *work)
 {
 	int cpu;
+	void *snk_config;
 	cpumask_t *mask;
 	struct etm_event_data *event_data;
 	struct coresight_device *sink;
 
 	event_data = container_of(work, struct etm_event_data, work);
 	mask = &event_data->mask;
-	/*
-	 * First deal with the sink configuration.  See comment in
-	 * etm_setup_aux() about why we take the first available path.
-	 */
-	if (event_data->snk_config) {
-		cpu = cpumask_first(mask);
-		sink = coresight_get_sink(event_data->path[cpu]);
-		if (sink_ops(sink)->free_buffer)
-			sink_ops(sink)->free_buffer(event_data->snk_config);
-	}
+	snk_config = event_data->snk_config;
 
 	for_each_cpu(cpu, mask) {
-		if (!(IS_ERR_OR_NULL(event_data->path[cpu])))
-			coresight_release_path(event_data->path[cpu]);
+		if (IS_ERR_OR_NULL(event_data->path[cpu]))
+			continue;
+
+		/*
+		 * Free sink configuration - there can only be one sink
+		 * per event.
+		 */
+		if (snk_config) {
+			sink = coresight_get_sink(event_data->path[cpu]);
+			if (sink_ops(sink)->free_buffer) {
+				sink_ops(sink)->free_buffer(snk_config);
+				snk_config = NULL;
+			}
+		}
+
+		coresight_release_path(event_data->path[cpu]);
 	}
 
 	kfree(event_data->path);
@@ -145,16 +151,13 @@ static void *alloc_event_data(int cpu)
 	if (!event_data)
 		return NULL;
 
-	/* Make sure nothing disappears under us */
-	get_online_cpus();
-	size = num_online_cpus();
-
 	mask = &event_data->mask;
+	size = num_present_cpus();
+
 	if (cpu != -1)
 		cpumask_set_cpu(cpu, mask);
 	else
-		cpumask_copy(mask, cpu_online_mask);
-	put_online_cpus();
+		cpumask_copy(mask, cpu_present_mask);
 
 	/*
 	 * Each CPU has a single path between source and destination.  As such
