@@ -151,7 +151,7 @@ int phy_aneg_done(struct phy_device *phydev)
 	 * implement Clause 22 registers
 	 */
 	if (phydev->is_c45 && !(phydev->c45_ids.devices_in_package & BIT(0)))
-		return -EINVAL;
+		return genphy_c45_aneg_done(phydev);
 
 	return genphy_aneg_done(phydev);
 }
