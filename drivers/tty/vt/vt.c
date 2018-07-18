@@ -433,20 +433,22 @@ static void vc_uniscr_scroll(struct vc_data *vc, unsigned int t, unsigned int b,
 
 	if (uniscr) {
 		unsigned int s, d, rescue, clear;
-		char32_t *save[nr];
 
 		s = clear = t;
-		d = t + nr;
-		rescue = b - nr;
+		d = t + 1;
+		rescue = b - 1;
 		if (dir == SM_UP) {
 			swap(s, d);
 			swap(clear, rescue);
 		}
-		memcpy(save, uniscr->lines + rescue, nr * sizeof(*save));
-		memmove(uniscr->lines + d, uniscr->lines + s,
-			(b - t - nr) * sizeof(*uniscr->lines));
-		memcpy(uniscr->lines + clear, save, nr * sizeof(*save));
-		vc_uniscr_clear_lines(vc, clear, nr);
+		while (nr--) {
+			char32_t *tmp;
+			tmp = uniscr->lines[rescue];
+			memmove(uniscr->lines + d, uniscr->lines + s,
+				(b - t - 1) * sizeof(*uniscr->lines));
+			uniscr->lines[clear] = tmp;
+			vc_uniscr_clear_lines(vc, clear, 1);
+		}
 	}
 }
 
