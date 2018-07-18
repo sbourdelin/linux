@@ -1143,6 +1143,12 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
 	if (device_may_wakeup(dev))
 		enable_irq_wake(client->irq);
 
+	if (tsdata->wake_gpio)
+		gpiod_set_value(tsdata->wake_gpio, 0);
+
+	if (tsdata->reset_gpio)
+		gpiod_set_value(tsdata->reset_gpio, 1);
+
 	regulator_disable(tsdata->vcc);
 
 	return 0;
@@ -1156,6 +1162,12 @@ static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
 
 	if (device_may_wakeup(dev))
 		disable_irq_wake(client->irq);
+
+	if (tsdata->wake_gpio)
+		gpiod_set_value(tsdata->wake_gpio, 1);
+
+	if (tsdata->reset_gpio)
+		gpiod_set_value(tsdata->reset_gpio, 0);
 
 	ret = regulator_enable(tsdata->vcc);
 	if (ret < 0) {
