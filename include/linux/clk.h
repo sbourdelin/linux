@@ -291,6 +291,14 @@ static inline void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
 struct clk *clk_get(struct device *dev, const char *id);
 
 /**
+ * clk_get_optional - lookup and obtain a reference to optional clock producer.
+ *
+ * Behaves the same as clk_get except where there is no clock producer. In this
+ * case, instead of returning -ENOENT, the function returns NULL.
+ */
+struct clk *clk_get_optional(struct device *dev, const char *id);
+
+/**
  * clk_bulk_get - lookup and obtain a number of references to clock producer.
  * @dev: device for clock "consumer"
  * @num_clks: the number of clk_bulk_data
@@ -347,6 +355,14 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
  * from the bus.
  */
 struct clk *devm_clk_get(struct device *dev, const char *id);
+
+/**
+ * devm_clk_get_optional - lookup and obtain a managed reference to an optional
+ *			   clock producer.
+ * Behaves the same as devm_clk_get except where there is no clock producer. In
+ * this case, instead of returning -ENOENT, the function returns NULL.
+ */
+struct clk *devm_clk_get_optional(struct device *dev, const char *id);
 
 /**
  * devm_get_clk_from_child - lookup and obtain a managed reference to a
@@ -636,6 +652,11 @@ static inline struct clk *clk_get(struct device *dev, const char *id)
 	return NULL;
 }
 
+static inline struct clk *clk_get_optional(struct device *dev, const char *id)
+{
+	return NULL;
+}
+
 static inline int __must_check clk_bulk_get(struct device *dev, int num_clks,
 					    struct clk_bulk_data *clks)
 {
@@ -643,6 +664,12 @@ static inline int __must_check clk_bulk_get(struct device *dev, int num_clks,
 }
 
 static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+{
+	return NULL;
+}
+
+static inline struct clk *devm_clk_get_optional(struct device *dev,
+						const char *id)
 {
 	return NULL;
 }
