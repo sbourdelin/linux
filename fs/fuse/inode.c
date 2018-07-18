@@ -874,7 +874,8 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
 {
 	struct fuse_init_out *arg = &req->misc.init_out;
 
-	if (req->out.h.error || arg->major != FUSE_KERNEL_VERSION)
+	down_read(&fc->killsb);
+	if (req->out.h.error || arg->major != FUSE_KERNEL_VERSION || !fc->sb)
 		fc->conn_error = 1;
 	else {
 		unsigned long ra_pages;
@@ -944,6 +945,7 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
 	}
 	fuse_set_initialized(fc);
 	wake_up_all(&fc->blocked_waitq);
+	up_read(&fc->killsb);
 }
 
 static void fuse_send_init(struct fuse_conn *fc, struct fuse_req *req)
