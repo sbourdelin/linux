@@ -92,8 +92,7 @@ struct usnic_fwd_dev *usnic_fwd_dev_alloc(struct pci_dev *pdev)
 	ufdev->pdev = pdev;
 	ufdev->netdev = pci_get_drvdata(pdev);
 	spin_lock_init(&ufdev->lock);
-	strncpy(ufdev->name, netdev_name(ufdev->netdev),
-			sizeof(ufdev->name) - 1);
+	strlcpy(ufdev->name, netdev_name(ufdev->netdev), sizeof(ufdev->name));
 
 	return ufdev;
 }
