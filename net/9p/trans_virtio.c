@@ -53,8 +53,8 @@
 
 #define VIRTQUEUE_NUM	128
 
-/* a single mutex to manage channel initialization and attachment */
-static DEFINE_MUTEX(virtio_9p_lock);
+/* a single spinlock to manage channel initialization and attachment */
+static DEFINE_SPINLOCK(virtio_9p_lock);
 static DECLARE_WAIT_QUEUE_HEAD(vp_wq);
 static atomic_t vp_pinned = ATOMIC_INIT(0);
 
@@ -121,10 +121,10 @@ static void p9_virtio_close(struct p9_client *client)
 {
 	struct virtio_chan *chan = client->trans;
 
-	mutex_lock(&virtio_9p_lock);
+	spin_lock(&virtio_9p_lock);
 	if (chan)
 		chan->inuse = false;
-	mutex_unlock(&virtio_9p_lock);
+	spin_unlock(&virtio_9p_lock);
 }
 
 /**
@@ -607,9 +607,9 @@ static int p9_virtio_probe(struct virtio_device *vdev)
 
 	virtio_device_ready(vdev);
 
-	mutex_lock(&virtio_9p_lock);
+	spin_lock(&virtio_9p_lock);
 	list_add_tail(&chan->chan_list, &virtio_chan_list);
-	mutex_unlock(&virtio_9p_lock);
+	spin_unlock(&virtio_9p_lock);
 
 	/* Let udev rules use the new mount_tag attribute. */
 	kobject_uevent(&(vdev->dev.kobj), KOBJ_CHANGE);
@@ -647,7 +647,7 @@ p9_virtio_create(struct p9_client *client, const char *devname, char *args)
 	int ret = -ENOENT;
 	int found = 0;
 
-	mutex_lock(&virtio_9p_lock);
+	spin_lock(&virtio_9p_lock);
 	list_for_each_entry(chan, &virtio_chan_list, chan_list) {
 		if (!strncmp(devname, chan->tag, chan->tag_len) &&
 		    strlen(devname) == chan->tag_len) {
@@ -659,7 +659,7 @@ p9_virtio_create(struct p9_client *client, const char *devname, char *args)
 			ret = -EBUSY;
 		}
 	}
-	mutex_unlock(&virtio_9p_lock);
+	spin_unlock(&virtio_9p_lock);
 
 	if (!found) {
 		pr_err("no channels available for device %s\n", devname);
@@ -684,7 +684,7 @@ static void p9_virtio_remove(struct virtio_device *vdev)
 	struct virtio_chan *chan = vdev->priv;
 	unsigned long warning_time;
 
-	mutex_lock(&virtio_9p_lock);
+	spin_lock(&virtio_9p_lock);
 
 	/* Remove self from list so we don't get new users. */
 	list_del(&chan->chan_list);
@@ -692,17 +692,17 @@ static void p9_virtio_remove(struct virtio_device *vdev)
 
 	/* Wait for existing users to close. */
 	while (chan->inuse) {
-		mutex_unlock(&virtio_9p_lock);
+		spin_unlock(&virtio_9p_lock);
 		msleep(250);
 		if (time_after(jiffies, warning_time + 10 * HZ)) {
 			dev_emerg(&vdev->dev,
 				  "p9_virtio_remove: waiting for device in use.\n");
 			warning_time = jiffies;
 		}
-		mutex_lock(&virtio_9p_lock);
+		spin_lock(&virtio_9p_lock);
 	}
 
-	mutex_unlock(&virtio_9p_lock);
+	spin_unlock(&virtio_9p_lock);
 
 	vdev->config->reset(vdev);
 	vdev->config->del_vqs(vdev);
