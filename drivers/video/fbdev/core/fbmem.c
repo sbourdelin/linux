@@ -1639,6 +1639,7 @@ static int do_register_framebuffer(struct fb_info *fb_info)
 	int i, ret;
 	struct fb_event event;
 	struct fb_videomode mode;
+	bool saved_ignore_console_lock_warning = ignore_console_lock_warning;
 
 	if (fb_check_foreignness(fb_info))
 		return -ENOSYS;
@@ -1703,6 +1704,8 @@ static int do_register_framebuffer(struct fb_info *fb_info)
 	event.info = fb_info;
 	if (!lockless_register_fb)
 		console_lock();
+	else
+		ignore_console_lock_warning = true;
 	if (!lock_fb_info(fb_info)) {
 		if (!lockless_register_fb)
 			console_unlock();
@@ -1713,6 +1716,9 @@ static int do_register_framebuffer(struct fb_info *fb_info)
 	unlock_fb_info(fb_info);
 	if (!lockless_register_fb)
 		console_unlock();
+	else
+		ignore_console_lock_warning =
+			saved_ignore_console_lock_warning;
 	return 0;
 }
 
