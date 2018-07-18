@@ -877,17 +877,18 @@ static const struct of_device_id r9a06g032_match[] = {
 	{ }
 };
 
-static struct platform_driver r9a06g032_clock_driver = {
+static struct platform_driver r9a06g032_clock_driver __refdata = {
 	.driver		= {
 		.name	= "renesas,r9a06g032-sysctrl",
 		.of_match_table = r9a06g032_match,
 	},
+	.probe = r9a06g032_clocks_probe,
 };
 
 static int __init r9a06g032_clocks_init(void)
 {
-	return platform_driver_probe(&r9a06g032_clock_driver,
-			r9a06g032_clocks_probe);
+	platform_driver_register(&r9a06g032_clock_driver);
+	return 0;
 }
 
-subsys_initcall(r9a06g032_clocks_init);
+core_initcall(r9a06g032_clocks_init);
