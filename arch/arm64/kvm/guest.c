@@ -473,9 +473,17 @@ int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift)
 {
 	u64 vtcr = VTCR_EL2_FLAGS;
 	u64 parange;
+	u8 lvls = stage2_pgtable_levels(ipa_shift);
 
 	if (ipa_shift != KVM_PHYS_SHIFT)
 		return -EINVAL;
+
+	/*
+	 * Use a minimum 2 level page table to prevent splitting
+	 * host PMD huge pages at stage2.
+	 */
+	if (lvls < 2)
+		lvls = 2;
 
 	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
@@ -494,7 +502,7 @@ int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift)
 		VTCR_EL2_VS_16BIT :
 		VTCR_EL2_VS_8BIT;
 
-	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(ipa_shift));
+	vtcr |= VTCR_EL2_LVLS_TO_SL0(lvls);
 	vtcr |= VTCR_EL2_T0SZ(ipa_shift);
 
 	kvm->arch.vtcr = vtcr;
