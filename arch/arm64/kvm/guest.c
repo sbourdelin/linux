@@ -491,6 +491,8 @@ int kvm_arm_config_vm(struct kvm *kvm)
 	vtcr |= (kvm_get_vmid_bits() == 16) ?
 		VTCR_EL2_VS_16BIT :
 		VTCR_EL2_VS_8BIT;
+
+	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
 	kvm->arch.vtcr = vtcr;
 	return 0;
 }
