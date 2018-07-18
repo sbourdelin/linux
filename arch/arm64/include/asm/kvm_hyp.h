@@ -158,6 +158,7 @@ void __noreturn __hyp_do_panic(unsigned long, ...);
 /* Must be called from hyp code running at EL2 */
 static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
 {
+	write_sysreg(kvm->arch.vtcr, vtcr_el2);
 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
 }
 

@@ -61,12 +61,13 @@ struct kvm_arch {
 	u64    vmid_gen;
 	u32    vmid;
 
-	/* 1-level 2nd stage table and lock */
-	spinlock_t pgd_lock;
+	/* stage2 entry level table */
 	pgd_t *pgd;
 
 	/* VTTBR value associated with above pgd and vmid */
 	u64    vttbr;
+	/* VTCR_EL2 value for this VM */
+	u64    vtcr;
 
 	/* The last vcpu id that ran on each physical CPU */
 	int __percpu *last_vcpu_ran;
@@ -442,10 +443,12 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
 
 static inline void __cpu_init_stage2(void)
 {
-	u32 parange = kvm_call_hyp(__init_stage2_translation);
+	u32 ps;
 
-	WARN_ONCE(parange < 40,
-		  "PARange is %d bits, unsupported configuration!", parange);
+	/* Sanity check for minimum IPA size support */
+	ps = id_aa64mmfr0_parange_to_phys_shift(read_sysreg(id_aa64mmfr0_el1) & 0x7);
+	WARN_ONCE(ps < 40,
+		  "PARange is %d bits, unsupported configuration!", ps);
 }
 
 /* Guest/host FPSIMD coordination helpers */
@@ -512,5 +515,7 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
 #define __KVM_HAVE_ARCH_VM_ALLOC
 struct kvm *kvm_arch_alloc_vm(void);
 void kvm_arch_free_vm(struct kvm *kvm);
+
+int kvm_arm_config_vm(struct kvm *kvm);
 
 #endif /* __ARM64_KVM_HOST_H__ */
