@@ -23,6 +23,7 @@ crypto_blkcipher-y += skcipher.o
 obj-$(CONFIG_CRYPTO_BLKCIPHER2) += crypto_blkcipher.o
 obj-$(CONFIG_CRYPTO_SEQIV) += seqiv.o
 obj-$(CONFIG_CRYPTO_ECHAINIV) += echainiv.o
+obj-$(CONFIG_CRYPTO_GENIV) += geniv.o
 
 crypto_hash-y += ahash.o
 crypto_hash-y += shash.o

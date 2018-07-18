@@ -257,6 +257,13 @@ config CRYPTO_GLUE_HELPER_X86
 config CRYPTO_ENGINE
 	tristate
 
+config CRYPTO_GENIV
+	tristate "IV Generator Template"
+	select CRYPTO_AEAD
+	select CRYPTO_BLKCIPHER
+	help
+	  Support for IV generator template, so that dm-crypt can rely on it.
+
 comment "Authenticated Encryption with Associated Data"
 
 config CRYPTO_CCM
