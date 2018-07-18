@@ -469,11 +469,13 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
  * all CPUs, as it is safe to run with or without the feature and
  * the bit is RES0 on CPUs that don't support it.
  */
-int kvm_arm_config_vm(struct kvm *kvm)
+int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift)
 {
 	u64 vtcr = VTCR_EL2_FLAGS;
 	u64 parange;
 
+	if (ipa_shift != KVM_PHYS_SHIFT)
+		return -EINVAL;
 
 	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
@@ -492,7 +494,9 @@ int kvm_arm_config_vm(struct kvm *kvm)
 		VTCR_EL2_VS_16BIT :
 		VTCR_EL2_VS_8BIT;
 
-	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
+	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(ipa_shift));
+	vtcr |= VTCR_EL2_T0SZ(ipa_shift);
+
 	kvm->arch.vtcr = vtcr;
 	return 0;
 }

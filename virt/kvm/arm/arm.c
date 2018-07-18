@@ -110,7 +110,6 @@ void kvm_arch_check_processor_compat(void *rtn)
 	*(int *)rtn = 0;
 }
 
-
 /**
  * kvm_arch_init_vm - initializes a VM data structure
  * @kvm:	pointer to the KVM struct
@@ -122,7 +121,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	if (type)
 		return -EINVAL;
 
-	ret = kvm_arm_config_vm(kvm);
+	ret = kvm_arm_config_vm(kvm, KVM_PHYS_SHIFT);
 	if (ret)
 		return ret;
 
