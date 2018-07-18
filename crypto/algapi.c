@@ -485,6 +485,24 @@ out:
 }
 EXPORT_SYMBOL_GPL(crypto_register_template);
 
+int crypto_register_template_array(struct crypto_template *tmpl, int num)
+{
+	int i, err;
+
+	for (i = 0; i < num; i++) {
+		err = crypto_register_template(&tmpl[i]);
+		if (err)
+			goto out;
+	}
+	return 0;
+
+out:
+	for (i -= 1; i >= 0; i--)
+		crypto_unregister_template(&tmpl[i]);
+	return err;
+}
+EXPORT_SYMBOL_GPL(crypto_register_template_array);
+
 void crypto_unregister_template(struct crypto_template *tmpl)
 {
 	struct crypto_instance *inst;
@@ -513,6 +531,15 @@ void crypto_unregister_template(struct crypto_template *tmpl)
 	crypto_remove_final(&users);
 }
 EXPORT_SYMBOL_GPL(crypto_unregister_template);
+
+void crypto_unregister_template_array(struct crypto_template *tmpl, int num)
+{
+	int i;
+
+	for (i = 0; i < num; i++)
+		crypto_unregister_template(&tmpl[i]);
+}
+EXPORT_SYMBOL_GPL(crypto_unregister_template_array);
 
 static struct crypto_template *__crypto_lookup_template(const char *name)
 {
