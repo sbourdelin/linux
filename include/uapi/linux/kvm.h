@@ -949,6 +949,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_GET_MSR_FEATURES 153
 #define KVM_CAP_HYPERV_EVENTFD 154
 #define KVM_CAP_HYPERV_TLBFLUSH 155
+#define KVM_CAP_ARM_VM_MAX_PHYS_SHIFT 156 /* returns max IPA shift for a VM */
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
