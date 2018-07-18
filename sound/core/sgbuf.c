@@ -68,7 +68,8 @@ void *snd_malloc_sgbuf_pages(struct device *device,
 			     size_t *res_size)
 {
 	struct snd_sg_buf *sgbuf;
-	unsigned int i, pages, chunk, maxpages;
+	unsigned int i, chunk, maxpages;
+	int pages;
 	struct snd_dma_buffer tmpb;
 	struct snd_sg_page *table;
 	struct page **pgtable;
