@@ -688,6 +688,13 @@ config SPI_TXX9
 	help
 	  SPI driver for Toshiba TXx9 MIPS SoCs
 
+config SPI_UNIPHIER
+	tristate "Socionext UniPhier SPI Controller"
+	depends on (ARCH_UNIPHIER || COMPILE_TEST) && OF
+	help
+	  This driver supports the SPI controller on Socionext
+	  UniPhier SoCs.
+
 config SPI_XCOMM
 	tristate "Analog Devices AD-FMCOMMS1-EBZ SPI-I2C-bridge driver"
 	depends on I2C
