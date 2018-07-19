@@ -62,3 +62,7 @@
 &apps_smmu {
 	status = "okay";
 };
+
+&gpu_smmu {
+	status = "okay";
+};
