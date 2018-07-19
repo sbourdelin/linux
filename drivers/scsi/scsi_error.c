@@ -286,6 +286,9 @@ enum blk_eh_timer_return scsi_times_out(struct request *req)
 	enum blk_eh_timer_return rtn = BLK_EH_DONE;
 	struct Scsi_Host *host = scmd->device->host;
 
+	if (req->q->mq_ops && blk_mq_mark_complete(req))
+		return rtn;
+
 	trace_scsi_dispatch_cmd_timeout(scmd);
 	scsi_log_completion(scmd, TIMEOUT_ERROR);
 
@@ -300,7 +303,8 @@ enum blk_eh_timer_return scsi_times_out(struct request *req)
 			set_host_byte(scmd, DID_TIME_OUT);
 			scsi_eh_scmd_add(scmd);
 		}
-	}
+	} else if (req->q->mq_ops)
+		WRITE_ONCE(req->state, MQ_RQ_IN_FLIGHT);
 
 	return rtn;
 }
