@@ -58,3 +58,7 @@
 		bias-pull-up;
 	};
 };
+
+&apps_smmu {
+	status = "okay";
+};
