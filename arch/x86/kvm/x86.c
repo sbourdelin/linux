@@ -4177,7 +4177,7 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 
 	/*
 	 * All the TLBs can be flushed out of mmu lock, see the comments in
-	 * kvm_mmu_slot_remove_write_access().
+	 * kvm_mmu_slot_apply_write_access().
 	 */
 	lockdep_assert_held(&kvm->slots_lock);
 	if (is_dirty)
@@ -6670,7 +6670,76 @@ static int kvm_pv_clock_pairing(struct kvm_vcpu *vcpu, gpa_t paddr,
 }
 #endif
 
-/*
+#ifdef CONFIG_KVM_MROE
+static int __roe_protect_frame(struct kvm *kvm, gpa_t gpa)
+{
+	struct kvm_memory_slot *slot;
+	gfn_t gfn = gpa >> PAGE_SHIFT;
+
+	slot = gfn_to_memslot(kvm, gfn);
+	if (!slot || gfn > slot->base_gfn + slot->npages)
+		return -EINVAL;
+	set_bit(gfn - slot->base_gfn, slot->mroe_bitmap);
+	kvm_mmu_slot_apply_write_access(kvm, slot);
+	kvm_arch_flush_shadow_memslot(kvm, slot);
+
+	return 0;
+}
+
+static int roe_protect_frame(struct kvm *kvm, gpa_t gpa)
+{
+	int r;
+
+	mutex_lock(&kvm->slots_lock);
+	r = __roe_protect_frame(kvm, gpa);
+	mutex_unlock(&kvm->slots_lock);
+	return r;
+}
+
+static bool kvm_mroe_userspace(struct kvm_vcpu *vcpu)
+{
+	u64 rflags;
+	u64 cr0 = kvm_read_cr0(vcpu);
+	u64 iopl;
+
+	// first checking we are not in protected mode
+	if ((cr0 & 1) == 0)
+		return false;
+	/*
+	 * we don't need to worry about comments in __get_regs
+	 * because we are sure that this function will only be
+	 * triggered at the end of a hypercall
+	 */
+	 rflags = kvm_get_rflags(vcpu);
+	iopl = (rflags >> 12) & 3;
+	if (iopl != 3)
+		return false;
+	return true;
+}
+
+static int kvm_mroe(struct kvm_vcpu *vcpu, u64 gva)
+{
+	struct kvm *kvm = vcpu->kvm;
+	gpa_t gpa;
+	u64 hva;
+
+	/*
+	 * First we need to maek sure that we are running from something that
+	 * isn't usermode
+	 */
+	if (kvm_mroe_userspace(vcpu))
+		return -1;//I don't really know what to return
+	if (gva & ~PAGE_MASK)
+		return -EINVAL;
+	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
+	hva = gfn_to_hva(kvm, gpa >> PAGE_SHIFT);
+	if (!access_ok(VERIFY_WRITE, hva, PAGE_SIZE))
+		return -EINVAL;
+	return roe_protect_frame(vcpu->kvm, gpa);
+}
+#endif
+
+ /*
  * kvm_pv_kick_cpu_op:  Kick a vcpu.
  *
  * @apicid - apicid of vcpu to be kicked.
@@ -6736,6 +6805,11 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 #ifdef CONFIG_X86_64
 	case KVM_HC_CLOCK_PAIRING:
 		ret = kvm_pv_clock_pairing(vcpu, a0, a1);
+		break;
+#endif
+#ifdef CONFIG_KVM_MROE
+	case KVM_HC_HMROE:
+		ret = kvm_mroe(vcpu, a0);
 		break;
 #endif
 	default:
@@ -8971,8 +9045,8 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 				     struct kvm_memory_slot *new)
 {
 	/* Still write protect RO slot */
+	kvm_mmu_slot_apply_write_access(kvm, new);
 	if (new->flags & KVM_MEM_READONLY) {
-		kvm_mmu_slot_remove_write_access(kvm, new);
 		return;
 	}
 
@@ -9010,7 +9084,7 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 		if (kvm_x86_ops->slot_enable_log_dirty)
 			kvm_x86_ops->slot_enable_log_dirty(kvm, new);
 		else
-			kvm_mmu_slot_remove_write_access(kvm, new);
+			kvm_mmu_slot_apply_write_access(kvm, new);
 	} else {
 		if (kvm_x86_ops->slot_disable_log_dirty)
 			kvm_x86_ops->slot_disable_log_dirty(kvm, new);
