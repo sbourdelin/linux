@@ -288,6 +288,15 @@ void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues);
 void blk_mq_quiesce_queue_nowait(struct request_queue *q);
 
 /*
+ * Returns true if request was not in flight.
+ */
+static inline bool blk_mq_mark_complete(struct request *rq)
+{
+	return (cmpxchg(&rq->state, MQ_RQ_IN_FLIGHT, MQ_RQ_COMPLETE) !=
+			MQ_RQ_IN_FLIGHT);
+}
+
+/*
  * Driver command data is immediately after the request. So subtract request
  * size to get back to the original request, add request size to get the PDU.
  */
