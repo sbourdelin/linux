@@ -1,3 +1,4 @@
 *.d
 bpftool
+bpftool*.8
 FEATURE-DUMP.bpftool
