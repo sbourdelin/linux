@@ -55,6 +55,7 @@
 #include <linux/of_net.h>
 #include <linux/pci.h>
 #include <linux/nvmem-consumer.h>
+#include <linux/mtd/mtd.h>
 #include <net/dst.h>
 #include <net/arp.h>
 #include <net/sock.h>
@@ -593,6 +594,36 @@ put_nvmem:
 	return rv;
 }
 
+#ifdef CONFIG_MTD
+static int mac_address_from_mtd(u8 *mac_addr)
+{
+	struct mtd_info *mtd;
+	size_t alen;
+	int rv = 0;
+
+	mtd = get_mtd_device_nm("MAC-Address");
+	if (IS_ERR(mtd))
+		return PTR_ERR(mtd);
+
+	rv = mtd_read(mtd, 0, ETH_ALEN, &alen, mac_addr);
+	if (rv)
+		goto put_mtd;
+
+	if (alen != ETH_ALEN || !is_valid_ether_addr(mac_addr))
+		rv = -ENODEV;
+
+put_mtd:
+	put_mtd_device(mtd);
+
+	return rv;
+}
+#else /* CONFIG_MTD */
+static int mac_address_from_mtd(u8 *mac_addr)
+{
+	return -ENODEV;
+}
+#endif /* CONFIG_MTD */
+
 int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
 {
 	int rv;
@@ -609,6 +640,6 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
 	if (!rv)
 		return 0;
 
-	return -ENODEV;
+	return mac_address_from_mtd(mac_addr);
 }
 EXPORT_SYMBOL(eth_platform_get_mac_address);
