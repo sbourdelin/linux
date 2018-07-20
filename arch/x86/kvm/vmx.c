@@ -4707,7 +4707,7 @@ static void enter_rmode(struct kvm_vcpu *vcpu)
 	fix_rmode_seg(VCPU_SREG_GS, &vmx->rmode.segs[VCPU_SREG_GS]);
 	fix_rmode_seg(VCPU_SREG_FS, &vmx->rmode.segs[VCPU_SREG_FS]);
 
-	kvm_mmu_reset_context(vcpu);
+	kvm_mmu_reset_context(vcpu, false);
 }
 
 static void vmx_set_efer(struct kvm_vcpu *vcpu, u64 efer)
@@ -11134,6 +11134,8 @@ static bool nested_cr3_valid(struct kvm_vcpu *vcpu, unsigned long val)
 static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool nested_ept,
 			       u32 *entry_failure_code)
 {
+	bool mmu_reset_force = false;
+
 	if (cr3 != kvm_read_cr3(vcpu) || (!nested_ept && pdptrs_changed(vcpu))) {
 		if (!nested_cr3_valid(vcpu, cr3)) {
 			*entry_failure_code = ENTRY_FAIL_DEFAULT;
@@ -11146,6 +11148,7 @@ static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool ne
 		 */
 		if (!is_long_mode(vcpu) && is_pae(vcpu) && is_paging(vcpu) &&
 		    !nested_ept) {
+			mmu_reset_force = true;
 			if (!load_pdptrs(vcpu, vcpu->arch.walk_mmu, cr3)) {
 				*entry_failure_code = ENTRY_FAIL_PDPTE;
 				return 1;
@@ -11156,7 +11159,7 @@ static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool ne
 		__set_bit(VCPU_EXREG_CR3, (ulong *)&vcpu->arch.regs_avail);
 	}
 
-	kvm_mmu_reset_context(vcpu);
+	kvm_mmu_reset_context(vcpu, !mmu_reset_force);
 	return 0;
 }
 

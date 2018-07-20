@@ -327,15 +327,22 @@ struct rsvd_bits_validate {
 
 /* Source data used to setup MMU */
 struct kvm_mmu_sdata_cache {
+	unsigned long cr3;
+
 	unsigned int valid:1;
+	unsigned int smm:1;
 	unsigned int ept_ad:1;
 	unsigned int execonly:1;
+	unsigned int cr0_pg:1;
 	unsigned int cr0_wp:1;
 	unsigned int cr4_pae:1;
 	unsigned int cr4_pse:1;
 	unsigned int cr4_pke:1;
 	unsigned int cr4_smap:1;
 	unsigned int cr4_smep:1;
+	unsigned int cr4_la57:1;
+	unsigned int efer_lma:1;
+	unsigned int efer_nx:1;
 };
 
 /*
@@ -1149,7 +1156,8 @@ void kvm_mmu_set_mask_ptes(u64 user_mask, u64 accessed_mask,
 		u64 dirty_mask, u64 nx_mask, u64 x_mask, u64 p_mask,
 		u64 acc_track_mask, u64 me_mask);
 
-void kvm_mmu_reset_context(struct kvm_vcpu *vcpu);
+void kvm_mmu_reset_context(struct kvm_vcpu *vcpu, bool check_if_unchanged);
+
 void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 				      struct kvm_memory_slot *memslot);
 void kvm_mmu_zap_collapsible_sptes(struct kvm *kvm,

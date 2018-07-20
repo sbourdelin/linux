@@ -4470,10 +4470,8 @@ static void paging32E_init_context(struct kvm_vcpu *vcpu,
 	paging64_init_context_common(vcpu, context, PT32E_ROOT_LEVEL);
 }
 
-static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
+static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu, struct kvm_mmu *context)
 {
-	struct kvm_mmu *context = vcpu->arch.mmu;
-
 	context->base_role.word = 0;
 	context->base_role.guest_mode = is_guest_mode(vcpu);
 	context->base_role.smm = is_smm(vcpu);
@@ -4548,20 +4546,29 @@ void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_init_shadow_mmu);
 
-static inline bool shadow_ept_mmu_update_needed(struct kvm_vcpu *vcpu,
-					bool execonly, bool accessed_dirty)
+static inline bool mmu_update_needed(struct kvm_vcpu *vcpu,
+				     struct kvm_mmu *context,
+				     bool execonly, bool accessed_dirty)
 {
-	struct kvm_mmu *context = vcpu->arch.mmu;
 	bool cr4_smep = kvm_read_cr4_bits(vcpu, X86_CR4_SMEP) != 0;
 	bool cr4_smap = kvm_read_cr4_bits(vcpu, X86_CR4_SMAP) != 0;
 	bool cr4_pke = kvm_read_cr4_bits(vcpu, X86_CR4_PKE) != 0;
-	bool cr0_wp = is_write_protection(vcpu);
+	bool cr4_la57 = kvm_read_cr4_bits(vcpu, X86_CR4_LA57) != 0;
 	bool cr4_pse = is_pse(vcpu);
+	bool cr0_wp = is_write_protection(vcpu);
+	bool cr0_pg = is_paging(vcpu);
+	bool efer_nx = is_nx(vcpu);
+	bool efer_lma = is_long_mode(vcpu);
+	bool smm = is_smm(vcpu);
 	bool res = false;
 
 	if (!context->scache.valid) {
 		res = true;
 		context->scache.valid = 1;
+	}
+	if (context->scache.smm != smm) {
+		context->scache.smm = smm;
+		res = true;
 	}
 	if (context->scache.ept_ad != accessed_dirty) {
 		context->scache.ept_ad = accessed_dirty;
@@ -4587,9 +4594,25 @@ static inline bool shadow_ept_mmu_update_needed(struct kvm_vcpu *vcpu,
 		res = true;
 		context->scache.cr4_pke = cr4_pke;
 	}
+	if (context->scache.cr4_la57 != cr4_la57) {
+		res = true;
+		context->scache.cr4_la57 = cr4_la57;
+	}
 	if (context->scache.cr0_wp != cr0_wp) {
 		res = true;
 		context->scache.cr0_wp = cr0_wp;
+	}
+	if (context->scache.cr0_pg != cr0_pg) {
+		res = true;
+		context->scache.cr0_pg = cr0_pg;
+	}
+	if (context->scache.efer_nx != efer_nx) {
+		res = true;
+		context->scache.efer_nx = efer_nx;
+	}
+	if (context->scache.efer_lma != efer_lma) {
+		res = true;
+		context->scache.efer_lma = efer_lma;
 	}
 
 	return res;
@@ -4600,7 +4623,7 @@ void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
 {
 	struct kvm_mmu *context = vcpu->arch.mmu;
 
-	if (!shadow_ept_mmu_update_needed(vcpu, execonly, accessed_dirty))
+	if (!mmu_update_needed(vcpu, context, execonly, accessed_dirty))
 		return;
 
 	context->shadow_root_level = PT64_ROOT_4LEVEL;
@@ -4627,10 +4650,8 @@ void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
 }
 EXPORT_SYMBOL_GPL(kvm_init_shadow_ept_mmu);
 
-static void init_kvm_softmmu(struct kvm_vcpu *vcpu)
+static void init_kvm_softmmu(struct kvm_vcpu *vcpu, struct kvm_mmu *context)
 {
-	struct kvm_mmu *context = vcpu->arch.mmu;
-
 	kvm_init_shadow_mmu(vcpu);
 	context->set_cr3           = kvm_x86_ops->set_cr3;
 	context->get_cr3           = get_cr3;
@@ -4638,10 +4659,9 @@ static void init_kvm_softmmu(struct kvm_vcpu *vcpu)
 	context->inject_page_fault = kvm_inject_page_fault;
 }
 
-static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu)
+static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu,
+				struct kvm_mmu *g_context)
 {
-	struct kvm_mmu *g_context = &vcpu->arch.nested_mmu;
-
 	g_context->get_cr3           = get_cr3;
 	g_context->get_pdptr         = kvm_pdptr_read;
 	g_context->inject_page_fault = kvm_inject_page_fault;
@@ -4681,16 +4701,34 @@ static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu)
 	update_last_nonleaf_level(vcpu, g_context);
 }
 
-void kvm_mmu_reset_context(struct kvm_vcpu *vcpu)
+void kvm_mmu_reset_context(struct kvm_vcpu *vcpu, bool check_if_unchanged)
 {
+	struct kvm_mmu *context = mmu_is_nested(vcpu) ?
+		&vcpu->arch.nested_mmu : vcpu->arch.mmu;
+
+	if (check_if_unchanged && !mmu_update_needed(vcpu, context, 0, 0) &&
+	    context->scache.cr3 == vcpu->arch.mmu->get_cr3(vcpu)) {
+		/*
+		 * Nothing changed but TLB should always be flushed, e.g. when
+		 * we switch between L1 and L2.
+		 */
+		kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
+		return;
+	} else if (!check_if_unchanged) {
+		context->scache.valid = 0;
+	}
+
 	kvm_mmu_unload(vcpu);
 
 	if (mmu_is_nested(vcpu))
-		init_kvm_nested_mmu(vcpu);
+		init_kvm_nested_mmu(vcpu, context);
 	else if (tdp_enabled)
-		init_kvm_tdp_mmu(vcpu);
+		init_kvm_tdp_mmu(vcpu, context);
 	else
-		init_kvm_softmmu(vcpu);
+		init_kvm_softmmu(vcpu, context);
+
+	if (check_if_unchanged)
+		context->scache.cr3 = vcpu->arch.mmu->get_cr3(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_reset_context);
 

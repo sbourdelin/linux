@@ -695,7 +695,7 @@ int kvm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 	}
 
 	if ((cr0 ^ old_cr0) & update_bits)
-		kvm_mmu_reset_context(vcpu);
+		kvm_mmu_reset_context(vcpu, false);
 
 	if (((cr0 ^ old_cr0) & X86_CR0_CD) &&
 	    kvm_arch_has_noncoherent_dma(vcpu->kvm) &&
@@ -836,7 +836,7 @@ int kvm_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4)
 
 	if (((cr4 ^ old_cr4) & pdptr_bits) ||
 	    (!(cr4 & X86_CR4_PCIDE) && (old_cr4 & X86_CR4_PCIDE)))
-		kvm_mmu_reset_context(vcpu);
+		kvm_mmu_reset_context(vcpu, false);
 
 	if ((cr4 ^ old_cr4) & (X86_CR4_OSXSAVE | X86_CR4_PKE))
 		kvm_update_cpuid(vcpu);
@@ -1162,7 +1162,7 @@ static int set_efer(struct kvm_vcpu *vcpu, u64 efer)
 
 	/* Update reserved bits */
 	if ((efer ^ old_efer) & EFER_NX)
-		kvm_mmu_reset_context(vcpu);
+		kvm_mmu_reset_context(vcpu, false);
 
 	return 0;
 }
@@ -5898,7 +5898,7 @@ static void kvm_smm_changed(struct kvm_vcpu *vcpu)
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
 	}
 
-	kvm_mmu_reset_context(vcpu);
+	kvm_mmu_reset_context(vcpu, false);
 }
 
 static void kvm_set_hflags(struct kvm_vcpu *vcpu, unsigned emul_flags)
@@ -7156,7 +7156,7 @@ static void enter_smm(struct kvm_vcpu *vcpu)
 		kvm_x86_ops->set_efer(vcpu, 0);
 
 	kvm_update_cpuid(vcpu);
-	kvm_mmu_reset_context(vcpu);
+	kvm_mmu_reset_context(vcpu, false);
 }
 
 static void process_smi(struct kvm_vcpu *vcpu)
@@ -8058,7 +8058,7 @@ static int __set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 	srcu_read_unlock(&vcpu->kvm->srcu, idx);
 
 	if (mmu_reset_needed)
-		kvm_mmu_reset_context(vcpu);
+		kvm_mmu_reset_context(vcpu, false);
 
 	max_bits = KVM_NR_INTERRUPTS;
 	pending_vec = find_first_bit(
@@ -8333,7 +8333,7 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 	kvm_vcpu_mtrr_init(vcpu);
 	vcpu_load(vcpu);
 	kvm_vcpu_reset(vcpu, false);
-	kvm_mmu_reset_context(vcpu);
+	kvm_mmu_reset_context(vcpu, false);
 	vcpu_put(vcpu);
 	return 0;
 }

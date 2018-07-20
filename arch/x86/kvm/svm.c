@@ -1574,7 +1574,7 @@ static void init_vmcb(struct vcpu_svm *svm)
 	 * It also updates the guest-visible cr0 value.
 	 */
 	svm_set_cr0(&svm->vcpu, X86_CR0_NW | X86_CR0_CD | X86_CR0_ET);
-	kvm_mmu_reset_context(&svm->vcpu);
+	kvm_mmu_reset_context(&svm->vcpu, false);
 
 	save->cr4 = X86_CR4_PAE;
 	/* rdx = ?? */
@@ -3380,7 +3380,7 @@ static int nested_svm_vmexit(struct vcpu_svm *svm)
 	nested_svm_unmap(page);
 
 	nested_svm_uninit_mmu_context(&svm->vcpu);
-	kvm_mmu_reset_context(&svm->vcpu);
+	kvm_mmu_reset_context(&svm->vcpu, false);
 	kvm_mmu_load(&svm->vcpu);
 
 	return 0;
@@ -3466,7 +3466,7 @@ static void enter_svm_guest_mode(struct vcpu_svm *svm, u64 vmcb_gpa,
 		(void)kvm_set_cr3(&svm->vcpu, nested_vmcb->save.cr3);
 
 	/* Guest paging mode is active - reset mmu */
-	kvm_mmu_reset_context(&svm->vcpu);
+	kvm_mmu_reset_context(&svm->vcpu, false);
 
 	svm->vmcb->save.cr2 = svm->vcpu.arch.cr2 = nested_vmcb->save.cr2;
 	kvm_register_write(&svm->vcpu, VCPU_REGS_RAX, nested_vmcb->save.rax);
