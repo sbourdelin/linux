@@ -148,13 +148,6 @@ madvise
 never
 	should be self-explanatory.
 
-By default kernel tries to use huge zero page on read page fault to
-anonymous mapping. It's possible to disable huge zero page by writing 0
-or enable it back by writing 1::
-
-	echo 0 >/sys/kernel/mm/transparent_hugepage/use_zero_page
-	echo 1 >/sys/kernel/mm/transparent_hugepage/use_zero_page
-
 Some userspace (such as a test program, or an optimized memory allocation
 library) may want to know the size (in bytes) of a transparent hugepage::
 
