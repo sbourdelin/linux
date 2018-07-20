@@ -164,29 +164,29 @@ static const char *sdebug_version_date = "20180128";
 #define SDEBUG_OPT_RESET_NOISE		0x2000
 #define SDEBUG_OPT_NO_CDB_NOISE		0x4000
 #define SDEBUG_OPT_HOST_BUSY		0x8000
+#define SDEBUG_OPT_CMD_ABORT		0x10000
 #define SDEBUG_OPT_ALL_NOISE (SDEBUG_OPT_NOISE | SDEBUG_OPT_Q_NOISE | \
 			      SDEBUG_OPT_RESET_NOISE)
 #define SDEBUG_OPT_ALL_INJECTING (SDEBUG_OPT_RECOVERED_ERR | \
 				  SDEBUG_OPT_TRANSPORT_ERR | \
 				  SDEBUG_OPT_DIF_ERR | SDEBUG_OPT_DIX_ERR | \
 				  SDEBUG_OPT_SHORT_TRANSFER | \
-				  SDEBUG_OPT_HOST_BUSY)
+				  SDEBUG_OPT_HOST_BUSY | \
+				  SDEBUG_OPT_CMD_ABORT)
 /* When "every_nth" > 0 then modulo "every_nth" commands:
  *   - a missing response is simulated if SDEBUG_OPT_TIMEOUT is set
  *   - a RECOVERED_ERROR is simulated on successful read and write
  *     commands if SDEBUG_OPT_RECOVERED_ERR is set.
  *   - a TRANSPORT_ERROR is simulated on successful read and write
  *     commands if SDEBUG_OPT_TRANSPORT_ERR is set.
+ *   - similarly for DIF_ERR, DIX_ERR, SHORT_TRANSFER, HOST_BUSY and
+ *     CMD_ABORT
  *
- * When "every_nth" < 0 then after "- every_nth" commands:
- *   - a missing response is simulated if SDEBUG_OPT_TIMEOUT is set
- *   - a RECOVERED_ERROR is simulated on successful read and write
- *     commands if SDEBUG_OPT_RECOVERED_ERR is set.
- *   - a TRANSPORT_ERROR is simulated on successful read and write
- *     commands if _DEBUG_OPT_TRANSPORT_ERR is set.
- * This will continue on every subsequent command until some other action
- * occurs (e.g. the user * writing a new value (other than -1 or 1) to
- * every_nth via sysfs).
+ * When "every_nth" < 0 then after "- every_nth" commands the selected
+ * error will be injected. The error will be injected on every subsequent
+ * command until some other action occurs; for example, the user writing
+ * a new value (other than -1 or 1) to every_nth:
+ *      echo 0 > /sys/bus/pseudo/drivers/scsi_debug/every_nth
  */
 
 /* As indicated in SAM-5 and SPC-4 Unit Attentions (UAs) are returned in
@@ -296,6 +296,7 @@ struct sdebug_queued_cmd {
 	unsigned int inj_dix:1;
 	unsigned int inj_short:1;
 	unsigned int inj_host_busy:1;
+	unsigned int inj_cmd_abort:1;
 };
 
 struct sdebug_queue {
@@ -4312,7 +4313,8 @@ static void setup_inject(struct sdebug_queue *sqp,
 		if (sdebug_every_nth > 0)
 			sqcp->inj_recovered = sqcp->inj_transport
 				= sqcp->inj_dif
-				= sqcp->inj_dix = sqcp->inj_short = 0;
+				= sqcp->inj_dix = sqcp->inj_short
+				= sqcp->inj_host_busy = sqcp->inj_cmd_abort = 0;
 		return;
 	}
 	sqcp->inj_recovered = !!(SDEBUG_OPT_RECOVERED_ERR & sdebug_opts);
@@ -4321,6 +4323,7 @@ static void setup_inject(struct sdebug_queue *sqp,
 	sqcp->inj_dix = !!(SDEBUG_OPT_DIX_ERR & sdebug_opts);
 	sqcp->inj_short = !!(SDEBUG_OPT_SHORT_TRANSFER & sdebug_opts);
 	sqcp->inj_host_busy = !!(SDEBUG_OPT_HOST_BUSY & sdebug_opts);
+	sqcp->inj_cmd_abort = !!(SDEBUG_OPT_CMD_ABORT & sdebug_opts);
 }
 
 /* Complete the processing of the thread that queued a SCSI command to this
@@ -4459,6 +4462,11 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 			sd_dp->issuing_cpu = raw_smp_processor_id();
 		sd_dp->defer_t = SDEB_DEFER_WQ;
 		schedule_work(&sd_dp->ew.work);
+		if (unlikely(sqcp->inj_cmd_abort)) {
+			blk_abort_request(cmnd->request);
+			sdev_printk(KERN_INFO, sdp, "abort request tag %d\n",
+				    cmnd->request->tag);
+		}
 	}
 	if (unlikely((SDEBUG_OPT_Q_NOISE & sdebug_opts) &&
 		     (scsi_result == device_qfull_result)))
