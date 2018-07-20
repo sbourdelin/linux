@@ -47,6 +47,7 @@
 #include <asm/hypervisor.h>
 #include <asm/kvm_guest.h>
 
+static struct apic orig_apic;
 static int kvmapf = 1;
 
 static int __init parse_no_kvmapf(char *arg)
@@ -454,10 +455,10 @@ static void __init sev_map_percpu_data(void)
 }
 
 #ifdef CONFIG_SMP
-static void __send_ipi_mask(const struct cpumask *mask, int vector)
+static int __send_ipi_mask(const struct cpumask *mask, int vector)
 {
 	unsigned long flags;
-	int cpu, apic_id, min = 0, max = 0;
+	int cpu, apic_id, min = 0, max = 0, ret = 0;
 #ifdef CONFIG_X86_64
 	__uint128_t ipi_bitmap = 0;
 	int cluster_size = 128;
@@ -467,7 +468,7 @@ static void __send_ipi_mask(const struct cpumask *mask, int vector)
 #endif
 
 	if (cpumask_empty(mask))
-		return;
+		return 0;
 
 	local_irq_save(flags);
 
@@ -481,7 +482,7 @@ static void __send_ipi_mask(const struct cpumask *mask, int vector)
 		} else if (apic_id < min + cluster_size) {
 			max = apic_id < max ? max : apic_id;
 		} else {
-			kvm_hypercall4(KVM_HC_SEND_IPI, (unsigned long)ipi_bitmap,
+			ret = kvm_hypercall4(KVM_HC_SEND_IPI, (unsigned long)ipi_bitmap,
 				(unsigned long)(ipi_bitmap >> BITS_PER_LONG), min, vector);
 			min = max = apic_id;
 			ipi_bitmap = 0;
@@ -490,11 +491,12 @@ static void __send_ipi_mask(const struct cpumask *mask, int vector)
 	}
 
 	if (ipi_bitmap) {
-		kvm_hypercall4(KVM_HC_SEND_IPI, (unsigned long)ipi_bitmap,
+		ret = kvm_hypercall4(KVM_HC_SEND_IPI, (unsigned long)ipi_bitmap,
 			(unsigned long)(ipi_bitmap >> BITS_PER_LONG), min, vector);
 	}
 
 	local_irq_restore(flags);
+	return ret;
 }
 
 static void kvm_send_ipi_mask(const struct cpumask *mask, int vector)
@@ -511,7 +513,8 @@ static void kvm_send_ipi_mask_allbutself(const struct cpumask *mask, int vector)
 	cpumask_copy(&new_mask, mask);
 	cpumask_clear_cpu(this_cpu, &new_mask);
 	local_mask = &new_mask;
-	__send_ipi_mask(local_mask, vector);
+	if (__send_ipi_mask(local_mask, vector))
+		orig_apic.send_IPI_mask_allbutself(mask, vector);
 }
 
 static void kvm_send_ipi_allbutself(int vector)
@@ -521,7 +524,8 @@ static void kvm_send_ipi_allbutself(int vector)
 
 static void kvm_send_ipi_all(int vector)
 {
-	__send_ipi_mask(cpu_online_mask, vector);
+	if (__send_ipi_mask(cpu_online_mask, vector))
+		orig_apic.send_IPI_all(vector);
 }
 
 /*
@@ -529,6 +533,8 @@ static void kvm_send_ipi_all(int vector)
  */
 static void kvm_setup_pv_ipi(void)
 {
+	orig_apic = *apic;
+
 	apic->send_IPI_mask = kvm_send_ipi_mask;
 	apic->send_IPI_mask_allbutself = kvm_send_ipi_mask_allbutself;
 	apic->send_IPI_allbutself = kvm_send_ipi_allbutself;
