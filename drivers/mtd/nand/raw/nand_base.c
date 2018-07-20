@@ -5926,7 +5926,7 @@ static int nand_dt_init(struct nand_chip *chip)
 /**
  * nand_scan_ident - [NAND Interface] Scan for the NAND device
  * @mtd: MTD device structure
- * @maxchips: number of chips to scan for
+ * @maxchips: number of chips to scan for, returns immediately if 0
  * @table: alternative NAND ID table
  *
  * This is the first phase of the normal nand_scan() function. It reads the
@@ -5939,6 +5939,14 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	int i, nand_maf_id, nand_dev_id;
 	struct nand_chip *chip = mtd_to_nand(mtd);
 	int ret;
+
+	/*
+	 * If the number of chips to scan for is null, just return silently.
+	 * This is for specific drivers that must handle this part of the
+	 * probe process themselves (e.g docg4).
+	 */
+	if (!maxchips)
+		return 0;
 
 	/* Enforce the right timings for reset/detection */
 	onfi_fill_data_interface(chip, NAND_SDR_IFACE, 0);
