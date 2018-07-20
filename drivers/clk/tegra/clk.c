@@ -146,6 +146,19 @@ static const struct tegra_clk_periph_regs periph_regs[] = {
 
 static void __iomem *clk_base;
 
+static int tegra_clk_rst_status(struct reset_controller_dev *rcdev,
+				unsigned long id)
+{
+	void __iomem *reg;
+
+	if (id < periph_banks * 32) {
+		reg = clk_base + periph_regs[id / 32].rst_reg;
+		return readl_relaxed(reg) & BIT(id % 32) ? 1 : 0;
+	}
+
+	return -EINVAL;
+}
+
 static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
 		unsigned long id)
 {
@@ -288,6 +301,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 }
 
 static const struct reset_control_ops rst_ops = {
+	.status = tegra_clk_rst_status,
 	.assert = tegra_clk_rst_assert,
 	.deassert = tegra_clk_rst_deassert,
 	.reset = tegra_clk_rst_reset,
