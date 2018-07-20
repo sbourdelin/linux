@@ -168,6 +168,12 @@ EXPORT_SYMBOL_GPL(virtio_add_status);
 
 const struct dma_map_ops virtio_direct_dma_ops;
 
+#ifndef platform_override_dma_ops
+static inline void platform_override_dma_ops(struct virtio_device *vdev)
+{
+}
+#endif
+
 int virtio_finalize_features(struct virtio_device *dev)
 {
 	int ret = dev->config->finalize_features(dev);
@@ -179,6 +185,7 @@ int virtio_finalize_features(struct virtio_device *dev)
 	if (virtio_has_iommu_quirk(dev))
 		set_dma_ops(dev->dev.parent, &virtio_direct_dma_ops);
 
+	platform_override_dma_ops(dev);
 	if (!virtio_has_feature(dev, VIRTIO_F_VERSION_1))
 		return 0;
 

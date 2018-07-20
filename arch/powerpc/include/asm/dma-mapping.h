@@ -116,3 +116,9 @@ extern u64 __dma_get_required_mask(struct device *dev);
 
 #endif /* __KERNEL__ */
 #endif	/* _ASM_DMA_MAPPING_H */
+
+#define platform_override_dma_ops platform_override_dma_ops
+
+struct virtio_device;
+
+extern void platform_override_dma_ops(struct virtio_device *vdev);
