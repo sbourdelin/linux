@@ -4570,6 +4570,8 @@ void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
 	context->direct_map = false;
 	context->base_role.ad_disabled = !accessed_dirty;
 	context->base_role.guest_mode = 1;
+	context->get_pdptr = kvm_pdptr_read;
+
 	update_permission_bitmask(vcpu, context, true);
 	update_pkru_bitmask(vcpu, context, true);
 	update_last_nonleaf_level(vcpu, context);
