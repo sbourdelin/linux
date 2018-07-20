@@ -458,7 +458,7 @@ static void __init sev_map_percpu_data(void)
 static int __send_ipi_mask(const struct cpumask *mask, int vector)
 {
 	unsigned long flags;
-	int cpu, apic_id, min = 0, max = 0, ret = 0;
+	int cpu, apic_id, min = 0, max = 0, ret = 0, icr = 0;
 #ifdef CONFIG_X86_64
 	__uint128_t ipi_bitmap = 0;
 	int cluster_size = 128;
@@ -472,6 +472,15 @@ static int __send_ipi_mask(const struct cpumask *mask, int vector)
 
 	local_irq_save(flags);
 
+	switch (vector) {
+	default:
+		icr = APIC_DM_FIXED | vector;
+		break;
+	case NMI_VECTOR:
+		icr = APIC_DM_NMI;
+		break;
+	}
+
 	for_each_cpu(cpu, mask) {
 		apic_id = per_cpu(x86_cpu_to_apicid, cpu);
 		if (!ipi_bitmap) {
@@ -483,7 +492,7 @@ static int __send_ipi_mask(const struct cpumask *mask, int vector)
 			max = apic_id < max ? max : apic_id;
 		} else {
 			ret = kvm_hypercall4(KVM_HC_SEND_IPI, (unsigned long)ipi_bitmap,
-				(unsigned long)(ipi_bitmap >> BITS_PER_LONG), min, vector);
+				(unsigned long)(ipi_bitmap >> BITS_PER_LONG), min, icr);
 			min = max = apic_id;
 			ipi_bitmap = 0;
 		}
@@ -492,7 +501,7 @@ static int __send_ipi_mask(const struct cpumask *mask, int vector)
 
 	if (ipi_bitmap) {
 		ret = kvm_hypercall4(KVM_HC_SEND_IPI, (unsigned long)ipi_bitmap,
-			(unsigned long)(ipi_bitmap >> BITS_PER_LONG), min, vector);
+			(unsigned long)(ipi_bitmap >> BITS_PER_LONG), min, icr);
 	}
 
 	local_irq_restore(flags);
