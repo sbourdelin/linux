@@ -100,6 +100,15 @@ struct nd_region;
 struct nvdimm_drvdata;
 struct nd_mapping;
 void nd_mapping_free_labels(struct nd_mapping *nd_mapping);
+
+int reserve_free_pmem(struct nvdimm_bus *nvdimm_bus,
+		      struct nd_mapping *nd_mapping);
+void release_free_pmem(struct nvdimm_bus *nvdimm_bus,
+		       struct nd_mapping *nd_mapping);
+
+resource_size_t nd_pmem_max_contiguous_dpa(struct nd_region *nd_region,
+					   struct nd_mapping *nd_mapping);
+resource_size_t nd_region_allocatable_dpa(struct nd_region *nd_region);
 resource_size_t nd_pmem_available_dpa(struct nd_region *nd_region,
 		struct nd_mapping *nd_mapping, resource_size_t *overlap);
 resource_size_t nd_blk_available_dpa(struct nd_region *nd_region);
