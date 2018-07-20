@@ -920,6 +920,7 @@ static int i915_driver_init_early(struct drm_i915_private *dev_priv,
 	/* This must be called before any calls to HAS_PCH_* */
 	intel_detect_pch(dev_priv);
 
+	intel_runtime_pm_init_early(dev_priv);
 	intel_wopcm_init_early(&dev_priv->wopcm);
 	intel_uc_init_early(dev_priv);
 	intel_pm_setup(dev_priv);
@@ -2597,6 +2598,7 @@ static int intel_runtime_suspend(struct device *kdev)
 	DRM_DEBUG_KMS("Suspending device\n");
 
 	disable_rpm_wakeref_asserts(dev_priv);
+	lock_map_acquire(&dev_priv->runtime_pm.lock);
 
 	/*
 	 * We are safe here against re-faults, since the fault handler takes
@@ -2631,11 +2633,23 @@ static int intel_runtime_suspend(struct device *kdev)
 		i915_gem_init_swizzling(dev_priv);
 		i915_gem_restore_fences(dev_priv);
 
+		lock_map_release(&dev_priv->runtime_pm.lock);
 		enable_rpm_wakeref_asserts(dev_priv);
 
 		return ret;
 	}
 
+	/*
+	 * XXX We want to keep the runtime_pm.lock held across suspend.
+	 *
+	 * We want to treat the whole runtime sleep period as a locked state
+	 * and catch any lock ordering problems that may arise from trying
+	 * to access the device without first acquiring the runtime reference.
+	 * However, this will need lockdep cross-release support as the lock
+	 * will no longer be tied to a process. Once we have that working, we
+	 * should endeavour on moving this lockdep_map to the PM core.
+	 */
+	lock_map_release(&dev_priv->runtime_pm.lock);
 	enable_rpm_wakeref_asserts(dev_priv);
 	WARN_ON_ONCE(atomic_read(&dev_priv->runtime_pm.wakeref_count));
 
@@ -2690,6 +2704,7 @@ static int intel_runtime_resume(struct device *kdev)
 
 	WARN_ON_ONCE(atomic_read(&dev_priv->runtime_pm.wakeref_count));
 	disable_rpm_wakeref_asserts(dev_priv);
+	lock_map_acquire(&dev_priv->runtime_pm.lock);
 
 	intel_opregion_notify_adapter(dev_priv, PCI_D0);
 	dev_priv->runtime_pm.suspended = false;
@@ -2731,6 +2746,7 @@ static int intel_runtime_resume(struct device *kdev)
 
 	intel_enable_ipc(dev_priv);
 
+	lock_map_release(&dev_priv->runtime_pm.lock);
 	enable_rpm_wakeref_asserts(dev_priv);
 
 	if (ret)

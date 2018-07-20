@@ -1245,6 +1245,7 @@ struct skl_wm_params {
  * For more, read the Documentation/power/runtime_pm.txt.
  */
 struct i915_runtime_pm {
+	struct lockdep_map lock;
 	atomic_t wakeref_count;
 	bool suspended;
 	bool irqs_enabled;

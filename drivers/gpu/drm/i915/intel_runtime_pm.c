@@ -3697,6 +3697,8 @@ void intel_runtime_pm_get(struct drm_i915_private *dev_priv)
 	ret = pm_runtime_get_sync(kdev);
 	WARN_ONCE(ret < 0, "pm_runtime_get_sync() failed: %d\n", ret);
 
+	lock_map_acquire_read(&dev_priv->runtime_pm.lock);
+
 	atomic_inc(&dev_priv->runtime_pm.wakeref_count);
 	assert_rpm_wakelock_held(dev_priv);
 }
@@ -3730,6 +3732,8 @@ bool intel_runtime_pm_get_if_in_use(struct drm_i915_private *dev_priv)
 			return false;
 	}
 
+	lock_map_acquire_read(&dev_priv->runtime_pm.lock);
+
 	atomic_inc(&dev_priv->runtime_pm.wakeref_count);
 	assert_rpm_wakelock_held(dev_priv);
 
@@ -3758,8 +3762,14 @@ void intel_runtime_pm_get_noresume(struct drm_i915_private *dev_priv)
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
 
+#if IS_ENABLED(CONFIG_LOCKDEP)
+	WARN_ON_ONCE(!lock_is_held_type(&dev_priv->runtime_pm.lock, 1));
+#endif
+
 	assert_rpm_wakelock_held(dev_priv);
 	pm_runtime_get_noresume(kdev);
+
+	lock_map_acquire_read(&dev_priv->runtime_pm.lock);
 
 	atomic_inc(&dev_priv->runtime_pm.wakeref_count);
 }
@@ -3779,6 +3789,8 @@ void intel_runtime_pm_put(struct drm_i915_private *dev_priv)
 
 	assert_rpm_wakelock_held(dev_priv);
 	atomic_dec(&dev_priv->runtime_pm.wakeref_count);
+
+	lock_map_release(&dev_priv->runtime_pm.lock);
 
 	pm_runtime_mark_last_busy(kdev);
 	pm_runtime_put_autosuspend(kdev);
@@ -3824,4 +3836,12 @@ void intel_runtime_pm_enable(struct drm_i915_private *dev_priv)
 	 * intel_power_domains_fini().
 	 */
 	pm_runtime_put_autosuspend(kdev);
+}
+
+void intel_runtime_pm_init_early(struct drm_i915_private *dev_priv)
+{
+	static struct lock_class_key lock_key;
+
+	lockdep_init_map(&dev_priv->runtime_pm.lock,
+			 "i915->runtime_pm", &lock_key, 0);
 }
