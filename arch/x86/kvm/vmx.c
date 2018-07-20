@@ -10588,12 +10588,13 @@ static unsigned long nested_ept_get_cr3(struct kvm_vcpu *vcpu)
 
 static int nested_ept_init_mmu_context(struct kvm_vcpu *vcpu)
 {
+	unsigned long cr3 = nested_ept_get_cr3(vcpu);
+
 	WARN_ON(mmu_is_nested(vcpu));
-	if (!valid_ept_address(vcpu, nested_ept_get_cr3(vcpu)))
+	if (!valid_ept_address(vcpu, cr3))
 		return 1;
 
 	vcpu->arch.mmu = &vcpu->arch.guest_mmu;
-	kvm_mmu_free_roots(vcpu, &vcpu->arch.guest_mmu);
 
 	kvm_init_shadow_ept_mmu(vcpu,
 			to_vmx(vcpu)->nested.msrs.ept_caps &

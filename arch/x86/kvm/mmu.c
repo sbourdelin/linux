@@ -4548,12 +4548,60 @@ void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_init_shadow_mmu);
 
+static inline bool shadow_ept_mmu_update_needed(struct kvm_vcpu *vcpu,
+					bool execonly, bool accessed_dirty)
+{
+	struct kvm_mmu *context = vcpu->arch.mmu;
+	bool cr4_smep = kvm_read_cr4_bits(vcpu, X86_CR4_SMEP) != 0;
+	bool cr4_smap = kvm_read_cr4_bits(vcpu, X86_CR4_SMAP) != 0;
+	bool cr4_pke = kvm_read_cr4_bits(vcpu, X86_CR4_PKE) != 0;
+	bool cr0_wp = is_write_protection(vcpu);
+	bool cr4_pse = is_pse(vcpu);
+	bool res = false;
+
+	if (!context->scache.valid) {
+		res = true;
+		context->scache.valid = 1;
+	}
+	if (context->scache.ept_ad != accessed_dirty) {
+		context->scache.ept_ad = accessed_dirty;
+		res = true;
+	}
+	if (context->scache.execonly != execonly) {
+		res = true;
+		context->scache.execonly = execonly;
+	}
+	if (context->scache.cr4_smap != cr4_smap) {
+		res = true;
+		context->scache.cr4_smap = cr4_smap;
+	}
+	if (context->scache.cr4_smep != cr4_smep) {
+		res = true;
+		context->scache.cr4_smep = cr4_smep;
+	}
+	if (context->scache.cr4_pse != cr4_pse) {
+		res = true;
+		context->scache.cr4_pse = cr4_pse;
+	}
+	if (context->scache.cr4_pke != cr4_pke) {
+		res = true;
+		context->scache.cr4_pke = cr4_pke;
+	}
+	if (context->scache.cr0_wp != cr0_wp) {
+		res = true;
+		context->scache.cr0_wp = cr0_wp;
+	}
+
+	return res;
+}
+
 void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
 			     bool accessed_dirty)
 {
 	struct kvm_mmu *context = vcpu->arch.mmu;
 
-	MMU_WARN_ON(VALID_PAGE(context->root_hpa));
+	if (!shadow_ept_mmu_update_needed(vcpu, execonly, accessed_dirty))
+		return;
 
 	context->shadow_root_level = PT64_ROOT_4LEVEL;
 

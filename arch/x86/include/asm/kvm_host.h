@@ -325,6 +325,19 @@ struct rsvd_bits_validate {
 	u64 bad_mt_xwr;
 };
 
+/* Source data used to setup MMU */
+struct kvm_mmu_sdata_cache {
+	unsigned int valid:1;
+	unsigned int ept_ad:1;
+	unsigned int execonly:1;
+	unsigned int cr0_wp:1;
+	unsigned int cr4_pae:1;
+	unsigned int cr4_pse:1;
+	unsigned int cr4_pke:1;
+	unsigned int cr4_smap:1;
+	unsigned int cr4_smep:1;
+};
+
 /*
  * x86 supports 4 paging modes (5-level 64-bit, 4-level 64-bit, 3-level 32-bit,
  * and 2-level 32-bit).  The kvm_mmu structure abstracts the details of the
@@ -387,6 +400,8 @@ struct kvm_mmu {
 	bool nx;
 
 	u64 pdptrs[4]; /* pae */
+
+	struct kvm_mmu_sdata_cache scache;
 };
 
 enum pmc_type {
