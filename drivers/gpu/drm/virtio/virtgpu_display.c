@@ -390,5 +390,6 @@ int virtio_gpu_modeset_init(struct virtio_gpu_device *vgdev)
 
 void virtio_gpu_modeset_fini(struct virtio_gpu_device *vgdev)
 {
+	drm_atomic_helper_shutdown(vgdev->ddev);
 	drm_mode_config_cleanup(vgdev->ddev);
 }
