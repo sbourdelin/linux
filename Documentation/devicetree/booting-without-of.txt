@@ -1403,8 +1403,15 @@ In addition, each DMA master device on the DMA bus may or may not support
 coherent DMA operations. The "dma-coherent" property is intended to be used
 for identifying devices supported coherent DMA operations in DT.
 
+Some devices will also perform DMA through another bus than their parent
+control bus. In such a case, the "dma-parent" property is intended to express
+that relationship to another device in DT that will be the DMA parent bus.
+
 * DMA Bus master
 Optional property:
+- #dma-parent-cells: <integer>
+	The #dma-parent-cells property defines the width of the cells used to
+	represent the DMA parent.
 - dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
 	(child-bus-address, parent-bus-address, length). Each triplet specified
 	describes a contiguous DMA address range.
@@ -1420,6 +1427,9 @@ Optional property:
 - dma-ranges: <empty> value. if present - It means that DMA addresses
 	translation has to be enabled for this device.
 - dma-coherent: Present if dma operations are coherent
+- dma-parent: List of phandles and their optional arguments according to the
+	#dma-parent-cells from the provider. Expresses the routing of DMA if it
+	doesn't go through the parent node, but some other node in the device tree.
 
 Example:
 soc {
