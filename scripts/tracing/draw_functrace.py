@@ -20,6 +20,7 @@ Usage:
 	$ scripts/draw_functrace.py < raw_trace_func > draw_functrace
 	Then you have your drawn trace in draw_functrace
 """
+from __future__ import print_function
 
 
 import sys, re
@@ -123,7 +124,7 @@ def main():
 		tree = tree.getParent(caller)
 		tree = tree.calls(callee, calltime)
 
-	print CallTree.ROOT
+	print(CallTree.ROOT)
 
 if __name__ == "__main__":
 	main()
