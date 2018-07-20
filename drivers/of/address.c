@@ -680,10 +680,18 @@ EXPORT_SYMBOL(of_translate_address);
 
 u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
 {
+	struct of_phandle_args args;
+	struct device_node *parent = NULL;
 	struct device_node *host;
 	u64 ret;
 
-	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
+	ret = of_parse_phandle_with_args(dev, "dma-parent",
+					 "#dma-parent-cells",
+					 0, &args);
+	if (!ret)
+		parent = args.np;
+
+	ret = __of_translate_address(dev, parent, in_addr, "dma-ranges", &host);
 
 	if (host) {
 		of_node_put(host);
@@ -909,11 +917,21 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
 		return -EINVAL;
 
 	while (1) {
+		struct of_phandle_args args;
+
 		naddr = of_n_addr_cells(node);
 		nsize = of_n_size_cells(node);
-		node = of_get_next_parent(node);
-		if (!node)
-			break;
+
+		ret = of_parse_phandle_with_args(node, "dma-parent",
+						 "#dma-parent-cells",
+						 0, &args);
+		if (!ret) {
+			node = args.np;
+		} else {
+			node = of_get_next_parent(node);
+			if (!node)
+				break;
+		}
 
 		ranges = of_get_property(node, "dma-ranges", &len);
 
