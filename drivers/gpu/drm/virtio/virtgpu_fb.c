@@ -305,10 +305,13 @@ static int virtio_gpu_fbdev_destroy(struct drm_device *dev,
 
 	drm_fb_helper_unregister_fbi(&vgfbdev->helper);
 
-	if (vgfb->obj)
-		vgfb->obj = NULL;
 	drm_fb_helper_fini(&vgfbdev->helper);
 	drm_framebuffer_cleanup(&vgfb->base);
+
+	if (vgfb->obj) {
+		virtio_gpu_gem_free_object(vgfb->obj);
+		vgfb->obj = NULL;
+	}
 
 	return 0;
 }
