@@ -3779,6 +3779,9 @@ static int ice_vsi_manage_vlan_stripping(struct ice_vsi *vsi, bool ena)
 		ctxt.info.port_vlan_flags = ICE_AQ_VSI_PVLAN_EMOD_NOTHING;
 	}
 
+	/* Allow all packets untagged/tagged */
+	ctxt.info.port_vlan_flags |= ICE_AQ_VSI_PVLAN_MODE_ALL;
+
 	ctxt.info.valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_VLAN_VALID);
 	ctxt.vsi_num = vsi->vsi_num;
 
