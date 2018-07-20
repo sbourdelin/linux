@@ -4633,20 +4633,16 @@ static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu)
 	update_last_nonleaf_level(vcpu, g_context);
 }
 
-static void init_kvm_mmu(struct kvm_vcpu *vcpu)
+void kvm_mmu_reset_context(struct kvm_vcpu *vcpu)
 {
+	kvm_mmu_unload(vcpu);
+
 	if (mmu_is_nested(vcpu))
 		init_kvm_nested_mmu(vcpu);
 	else if (tdp_enabled)
 		init_kvm_tdp_mmu(vcpu);
 	else
 		init_kvm_softmmu(vcpu);
-}
-
-void kvm_mmu_reset_context(struct kvm_vcpu *vcpu)
-{
-	kvm_mmu_unload(vcpu);
-	init_kvm_mmu(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_reset_context);
 
@@ -5060,13 +5056,6 @@ int kvm_mmu_create(struct kvm_vcpu *vcpu)
 	vcpu->arch.nested_mmu.translate_gpa = translate_nested_gpa;
 
 	return alloc_mmu_pages(vcpu);
-}
-
-void kvm_mmu_setup(struct kvm_vcpu *vcpu)
-{
-	MMU_WARN_ON(VALID_PAGE(vcpu->arch.mmu->root_hpa));
-
-	init_kvm_mmu(vcpu);
 }
 
 static void kvm_mmu_invalidate_zap_pages_in_memslot(struct kvm *kvm,
