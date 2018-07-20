@@ -109,7 +109,7 @@ static const struct regmap_config wm9705_regmap_config = {
 };
 
 static struct mfd_cell wm9705_cells[] = {
-	{ .name = "wm9705-codec", },
+	{ .name = "wm9705-component", },
 	{ .name = "wm97xx-ts", },
 };
 
@@ -177,7 +177,7 @@ static const struct regmap_config wm9712_regmap_config = {
 };
 
 static struct mfd_cell wm9712_cells[] = {
-	{ .name = "wm9712-codec", },
+	{ .name = "wm9712-component", },
 	{ .name = "wm97xx-ts", },
 };
 
@@ -248,7 +248,7 @@ static const struct regmap_config wm9713_regmap_config = {
 };
 
 static struct mfd_cell wm9713_cells[] = {
-	{ .name = "wm9713-codec", },
+	{ .name = "wm9713-component", },
 	{ .name = "wm97xx-ts", },
 };
 

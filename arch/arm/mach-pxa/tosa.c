@@ -848,7 +848,7 @@ static struct platform_device sharpsl_rom_device = {
 };
 
 static struct platform_device wm9712_device = {
-	.name	= "wm9712-codec",
+	.name	= "wm9712-component",
 	.id	= -1,
 };
 

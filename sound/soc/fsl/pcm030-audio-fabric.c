@@ -33,14 +33,14 @@ static struct snd_soc_dai_link pcm030_fabric_dai[] = {
 	.stream_name = "AC97 Analog",
 	.codec_dai_name = "wm9712-hifi",
 	.cpu_dai_name = "mpc5200-psc-ac97.0",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 },
 {
 	.name = "AC97.1",
 	.stream_name = "AC97 IEC958",
 	.codec_dai_name = "wm9712-aux",
 	.cpu_dai_name = "mpc5200-psc-ac97.1",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 },
 };
 
@@ -85,7 +85,7 @@ static int pcm030_fabric_probe(struct platform_device *op)
 	if (ret)
 		dev_err(&op->dev, "request_module returned: %d\n", ret);
 
-	pdata->codec_device = platform_device_alloc("wm9712-codec", -1);
+	pdata->codec_device = platform_device_alloc("wm9712-component", -1);
 	if (!pdata->codec_device)
 		dev_err(&op->dev, "platform_device_alloc() failed\n");
 

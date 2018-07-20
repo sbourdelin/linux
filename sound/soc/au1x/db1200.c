@@ -52,7 +52,7 @@ static struct snd_soc_dai_link db1200_ac97_dai = {
 	.codec_dai_name	= "ac97-hifi",
 	.cpu_dai_name	= "au1xpsc_ac97.1",
 	.platform_name	= "au1xpsc-pcm.1",
-	.codec_name	= "ac97-codec.1",
+	.codec_name	= "ac97-component.1",
 };
 
 static struct snd_soc_card db1200_ac97_machine = {
@@ -68,7 +68,7 @@ static struct snd_soc_dai_link db1300_ac97_dai = {
 	.codec_dai_name	= "wm9712-hifi",
 	.cpu_dai_name	= "au1xpsc_ac97.1",
 	.platform_name	= "au1xpsc-pcm.1",
-	.codec_name	= "wm9712-codec.1",
+	.codec_name	= "wm9712-component.1",
 };
 
 static struct snd_soc_card db1300_ac97_machine = {

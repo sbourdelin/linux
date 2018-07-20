@@ -93,7 +93,7 @@ static struct snd_soc_dai_link palm27x_dai[] = {
 	.stream_name = "AC97 HiFi",
 	.cpu_dai_name = "pxa2xx-ac97",
 	.codec_dai_name =  "wm9712-hifi",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 	.platform_name = "pxa-pcm-audio",
 	.init = palm27x_ac97_init,
 },
@@ -102,7 +102,7 @@ static struct snd_soc_dai_link palm27x_dai[] = {
 	.stream_name = "AC97 Aux",
 	.cpu_dai_name = "pxa2xx-ac97-aux",
 	.codec_dai_name = "wm9712-aux",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 	.platform_name = "pxa-pcm-audio",
 },
 };

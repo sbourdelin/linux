@@ -30,8 +30,8 @@ static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
 	{
 		.name		= "HiFi",
 		.stream_name	= "HiFi",
-		.codec_dai_name		= "wm9712-hifi",
-		.codec_name	= "wm9712-codec",
+		.codec_dai_name	= "wm9712-hifi",
+		.codec_name	= "wm9712-component",
 		.cpu_dai_name	= "imx-ssi.0",
 		.platform_name	= "imx-ssi.0",
 		.ops		= &imx_phycore_hifi_ops,
@@ -88,7 +88,7 @@ static int __init imx_phycore_init(void)
 	if (ret)
 		goto fail1;
 
-	imx_phycore_snd_device = platform_device_alloc("wm9712-codec", -1);
+	imx_phycore_snd_device = platform_device_alloc("wm9712-component", -1);
 	if (!imx_phycore_snd_device) {
 		ret = -ENOMEM;
 		goto fail2;

@@ -638,7 +638,7 @@ static struct platform_device db1300_sd0_dev = {
 /**********************************************************************/
 
 static struct platform_device db1300_wm9715_dev = {
-	.name		= "wm9712-codec",
+	.name		= "wm9712-component",
 	.id		= 1,	/* ID of PSC for AC97 audio, see asoc glue! */
 };
 

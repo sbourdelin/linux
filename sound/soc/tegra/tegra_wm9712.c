@@ -53,7 +53,7 @@ static struct snd_soc_dai_link tegra_wm9712_dai = {
 	.name = "AC97 HiFi",
 	.stream_name = "AC97 HiFi",
 	.codec_dai_name = "wm9712-hifi",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 	.init = tegra_wm9712_init,
 };
 
@@ -83,7 +83,7 @@ static int tegra_wm9712_driver_probe(struct platform_device *pdev)
 	card->dev = &pdev->dev;
 	snd_soc_card_set_drvdata(card, machine);
 
-	machine->codec = platform_device_alloc("wm9712-codec", -1);
+	machine->codec = platform_device_alloc("wm9712-component", -1);
 	if (!machine->codec) {
 		dev_err(&pdev->dev, "Can't allocate wm9712 platform device\n");
 		return -ENOMEM;

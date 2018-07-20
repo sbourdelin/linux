@@ -189,7 +189,7 @@ static struct snd_soc_dai_link tosa_dai[] = {
 	.cpu_dai_name = "pxa2xx-ac97",
 	.codec_dai_name = "wm9712-hifi",
 	.platform_name = "pxa-pcm-audio",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 	.ops = &tosa_ops,
 },
 {
@@ -198,7 +198,7 @@ static struct snd_soc_dai_link tosa_dai[] = {
 	.cpu_dai_name = "pxa2xx-ac97-aux",
 	.codec_dai_name = "wm9712-aux",
 	.platform_name = "pxa-pcm-audio",
-	.codec_name = "wm9712-codec",
+	.codec_name = "wm9712-component",
 	.ops = &tosa_ops,
 },
 };
