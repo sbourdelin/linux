@@ -407,11 +407,11 @@ static const struct snd_kcontrol_new rt5640_snd_controls[] = {
 			RT5640_L_VOL_SFT, RT5640_R_VOL_SFT,
 			175, 0, dac_vol_tlv),
 	/* IN1/IN2/IN3 Control */
-	SOC_SINGLE_TLV("IN1 Boost", RT5640_IN1_IN2,
+	SOC_SINGLE_TLV("IN1 Boost Volume", RT5640_IN1_IN2,
 		RT5640_BST_SFT1, 8, 0, bst_tlv),
-	SOC_SINGLE_TLV("IN2 Boost", RT5640_IN3_IN4,
+	SOC_SINGLE_TLV("IN2 Boost Volume", RT5640_IN3_IN4,
 		RT5640_BST_SFT2, 8, 0, bst_tlv),
-	SOC_SINGLE_TLV("IN3 Boost", RT5640_IN1_IN2,
+	SOC_SINGLE_TLV("IN3 Boost Volume", RT5640_IN1_IN2,
 		RT5640_BST_SFT2, 8, 0, bst_tlv),
 
 	/* INL/INR Volume Control */
