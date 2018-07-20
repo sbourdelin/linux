@@ -569,10 +569,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
  * relative to that node.
  */
 static u64 __of_translate_address(struct device_node *dev,
+				  struct device_node *parent,
 				  const __be32 *in_addr, const char *rprop,
 				  struct device_node **host)
 {
-	struct device_node *parent = NULL;
 	struct of_bus *bus, *pbus;
 	__be32 addr[OF_MAX_ADDR_CELLS];
 	int na, ns, pna, pns;
@@ -583,11 +583,14 @@ static u64 __of_translate_address(struct device_node *dev,
 	/* Increase refcount at current level */
 	of_node_get(dev);
 
-	*host = NULL;
-	/* Get parent & match bus type */
-	parent = of_get_parent(dev);
-	if (parent == NULL)
-		goto bail;
+	if (!parent) {
+		*host = NULL;
+		/* Get parent & match bus type */
+		parent = of_get_parent(dev);
+		if (parent == NULL)
+			goto bail;
+	}
+
 	bus = of_match_bus(parent);
 
 	/* Count address cells & copy address locally */
@@ -665,7 +668,7 @@ u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
 	struct device_node *host;
 	u64 ret;
 
-	ret = __of_translate_address(dev, in_addr, "ranges", &host);
+	ret = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
 	if (host) {
 		of_node_put(host);
 		return OF_BAD_ADDR;
@@ -680,7 +683,7 @@ u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
 	struct device_node *host;
 	u64 ret;
 
-	ret = __of_translate_address(dev, in_addr, "dma-ranges", &host);
+	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
 
 	if (host) {
 		of_node_put(host);
