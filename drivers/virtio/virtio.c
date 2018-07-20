@@ -3,6 +3,7 @@
 #include <linux/virtio_config.h>
 #include <linux/module.h>
 #include <linux/idr.h>
+#include <linux/dma-mapping.h>
 #include <uapi/linux/virtio_ids.h>
 
 /* Unique numbering for virtio devices. */
@@ -442,3 +443,62 @@ core_initcall(virtio_init);
 module_exit(virtio_exit);
 
 MODULE_LICENSE("GPL");
+
+/*
+ * Virtio direct mapping DMA API operations structure
+ *
+ * This defines DMA API structure for all virtio devices which would not
+ * either bring in their own DMA OPS from architecture or they would not
+ * like to use architecture specific IOMMU based DMA OPS because QEMU
+ * expects GPA instead of an IOVA in absence of VIRTIO_F_IOMMU_PLATFORM.
+ */
+dma_addr_t virtio_direct_map_page(struct device *dev, struct page *page,
+			    unsigned long offset, size_t size,
+			    enum dma_data_direction dir,
+			    unsigned long attrs)
+{
+	return page_to_phys(page) + offset;
+}
+
+void virtio_direct_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+			size_t size, enum dma_data_direction dir,
+			unsigned long attrs)
+{
+}
+
+int virtio_direct_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
+{
+	return 0;
+}
+
+void *virtio_direct_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+		gfp_t gfp, unsigned long attrs)
+{
+	void *queue = alloc_pages_exact(PAGE_ALIGN(size), gfp);
+
+	if (queue) {
+		phys_addr_t phys_addr = virt_to_phys(queue);
+		*dma_handle = (dma_addr_t)phys_addr;
+
+		if (WARN_ON_ONCE(*dma_handle != phys_addr)) {
+			free_pages_exact(queue, PAGE_ALIGN(size));
+			return NULL;
+		}
+	}
+	return queue;
+}
+
+void virtio_direct_free(struct device *dev, size_t size, void *vaddr,
+		dma_addr_t dma_addr, unsigned long attrs)
+{
+	free_pages_exact(vaddr, PAGE_ALIGN(size));
+}
+
+const struct dma_map_ops virtio_direct_dma_ops = {
+	.alloc			= virtio_direct_alloc,
+	.free			= virtio_direct_free,
+	.map_page		= virtio_direct_map_page,
+	.unmap_page		= virtio_direct_unmap_page,
+	.mapping_error		= virtio_direct_mapping_error,
+};
+EXPORT_SYMBOL(virtio_direct_dma_ops);

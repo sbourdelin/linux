@@ -31,6 +31,9 @@
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
 
+extern struct dma_map_ops virtio_direct_dma_ops;
+
+
 struct virtio_pci_vq_info {
 	/* the actual virtqueue */
 	struct virtqueue *vq;
