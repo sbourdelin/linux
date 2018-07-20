@@ -280,7 +280,7 @@ static DEFINE_SPINLOCK(sor0_lock);
 
 #define MUX_I2S_SPDIF(_id)						\
 static const char *mux_pllaout0_##_id##_2x_pllp_clkm[] = { "pll_a_out0", \
-							   #_id, "pll_p",\
+							   #_id"_2x", "pll_p",\
 							   "clk_m"};
 MUX_I2S_SPDIF(audio0)
 MUX_I2S_SPDIF(audio1)
