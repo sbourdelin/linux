@@ -217,7 +217,9 @@ static void p9_conn_cancel(struct p9_conn *m, int err)
 
 	list_for_each_entry_safe(req, rtmp, &cancel_list, req_list) {
 		p9_debug(P9_DEBUG_ERROR, "call back req %p\n", req);
-		list_del(&req->req_list);
+		spin_lock_irqsave(&m->client->lock, flags);
+		list_del_init(&req->req_list);
+		spin_unlock_irqrestore(&m->client->lock, flags);
 		if (!req->t_err)
 			req->t_err = err;
 		p9_client_cb(m->client, req, REQ_STATUS_ERROR);
@@ -376,7 +378,7 @@ static void p9_read_work(struct work_struct *work)
 		spin_lock(&m->client->lock);
 		if (m->req->status != REQ_STATUS_ERROR)
 			status = REQ_STATUS_RCVD;
-		list_del(&m->req->req_list);
+		list_del_init(&m->req->req_list);
 		spin_unlock(&m->client->lock);
 		p9_client_cb(m->client, m->req, status);
 		m->rc.sdata = NULL;
@@ -697,7 +699,7 @@ static int p9_fd_cancel(struct p9_client *client, struct p9_req_t *req)
 	spin_lock(&client->lock);
 
 	if (req->status == REQ_STATUS_UNSENT) {
-		list_del(&req->req_list);
+		list_del_init(&req->req_list);
 		req->status = REQ_STATUS_FLSHD;
 		ret = 0;
 	}
@@ -714,7 +716,7 @@ static int p9_fd_cancelled(struct p9_client *client, struct p9_req_t *req)
 	 * remove it from the list.
 	 */
 	spin_lock(&client->lock);
-	list_del(&req->req_list);
+	list_del_init(&req->req_list);
 	spin_unlock(&client->lock);
 
 	return 0;
