@@ -258,6 +258,11 @@ void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
 	}
 }
 
+static void tegra_clk_init_error(struct tegra_clk_init_table *tbl)
+{
+	pr_err("ERROR: Failed to initialise clock id %d\n", tbl->clk_id);
+}
+
 void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 				  struct clk *clks[], int clk_max)
 {
@@ -268,8 +273,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 		if (IS_ERR_OR_NULL(clk)) {
 			pr_err("%s: invalid entry %ld in clks array for id %d\n",
 			       __func__, PTR_ERR(clk), tbl->clk_id);
-			WARN_ON(1);
-
+			tegra_clk_init_error(tbl);
 			continue;
 		}
 
@@ -279,7 +283,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 				pr_err("%s: Failed to set parent %s of %s\n",
 				       __func__, __clk_get_name(parent),
 				       __clk_get_name(clk));
-				WARN_ON(1);
+				tegra_clk_init_error(tbl);
 			}
 		}
 
@@ -288,14 +292,14 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 				pr_err("%s: Failed to set rate %lu of %s\n",
 				       __func__, tbl->rate,
 				       __clk_get_name(clk));
-				WARN_ON(1);
+				tegra_clk_init_error(tbl);
 			}
 
 		if (tbl->state)
 			if (clk_prepare_enable(clk)) {
 				pr_err("%s: Failed to enable %s\n", __func__,
 				       __clk_get_name(clk));
-				WARN_ON(1);
+				tegra_clk_init_error(tbl);
 			}
 	}
 }
