@@ -390,6 +390,5 @@ int virtio_gpu_modeset_init(struct virtio_gpu_device *vgdev)
 
 void virtio_gpu_modeset_fini(struct virtio_gpu_device *vgdev)
 {
-	virtio_gpu_fbdev_fini(vgdev);
 	drm_mode_config_cleanup(vgdev->ddev);
 }
