@@ -4670,8 +4670,10 @@ EXPORT_SYMBOL_GPL(kvm_mmu_load);
 
 void kvm_mmu_unload(struct kvm_vcpu *vcpu)
 {
-	kvm_mmu_free_roots(vcpu, vcpu->arch.mmu);
-	WARN_ON(VALID_PAGE(vcpu->arch.mmu->root_hpa));
+	kvm_mmu_free_roots(vcpu, &vcpu->arch.root_mmu);
+	WARN_ON(VALID_PAGE(vcpu->arch.root_mmu.root_hpa));
+	kvm_mmu_free_roots(vcpu, &vcpu->arch.guest_mmu);
+	WARN_ON(VALID_PAGE(vcpu->arch.guest_mmu.root_hpa));
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_unload);
 
@@ -5051,8 +5053,10 @@ int kvm_mmu_create(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.mmu = &vcpu->arch.root_mmu;
 	vcpu->arch.walk_mmu = &vcpu->arch.root_mmu;
-	vcpu->arch.mmu->root_hpa = INVALID_PAGE;
-	vcpu->arch.mmu->translate_gpa = translate_gpa;
+	vcpu->arch.root_mmu.root_hpa = INVALID_PAGE;
+	vcpu->arch.root_mmu.translate_gpa = translate_gpa;
+	vcpu->arch.guest_mmu.root_hpa = INVALID_PAGE;
+	vcpu->arch.guest_mmu.translate_gpa = translate_gpa;
 	vcpu->arch.nested_mmu.translate_gpa = translate_nested_gpa;
 
 	return alloc_mmu_pages(vcpu);
