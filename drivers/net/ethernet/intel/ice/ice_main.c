@@ -2058,15 +2058,17 @@ static int ice_req_irq_msix_misc(struct ice_pf *pf)
 skip_req_irq:
 	ice_ena_misc_vector(pf);
 
-	val = (pf->oicr_idx & PFINT_OICR_CTL_MSIX_INDX_M) |
-	      (ICE_RX_ITR & PFINT_OICR_CTL_ITR_INDX_M) |
-	      PFINT_OICR_CTL_CAUSE_ENA_M;
+	val = ((pf->oicr_idx & PFINT_OICR_CTL_MSIX_INDX_M) |
+	       ((ICE_RX_ITR << PFINT_OICR_CTL_ITR_INDX_S) &
+		PFINT_OICR_CTL_ITR_INDX_M) |
+	       PFINT_OICR_CTL_CAUSE_ENA_M);
 	wr32(hw, PFINT_OICR_CTL, val);
 
 	/* This enables Admin queue Interrupt causes */
-	val = (pf->oicr_idx & PFINT_FW_CTL_MSIX_INDX_M) |
-	      (ICE_RX_ITR & PFINT_FW_CTL_ITR_INDX_M) |
-	      PFINT_FW_CTL_CAUSE_ENA_M;
+	val = ((pf->oicr_idx & PFINT_FW_CTL_MSIX_INDX_M) |
+	       ((ICE_RX_ITR << PFINT_FW_CTL_ITR_INDX_S) &
+		PFINT_FW_CTL_ITR_INDX_M) |
+	       PFINT_FW_CTL_CAUSE_ENA_M);
 	wr32(hw, PFINT_FW_CTL, val);
 
 	itr_gran = hw->itr_gran_200;
