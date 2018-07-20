@@ -24,9 +24,10 @@ struct seq_file {
 	u64 version;
 	struct mutex lock;
 	const struct seq_operations *op;
-	int poll_event;
+	int (*single_show_op)(struct seq_file *, void *);
 	const struct file *file;
 	void *private;
+	int poll_event;
 };
 
 struct seq_operations {
@@ -140,7 +141,7 @@ int seq_path_root(struct seq_file *m, const struct path *path,
 
 int single_open(struct file *, int (*)(struct seq_file *, void *), void *);
 int single_open_size(struct file *, int (*)(struct seq_file *, void *), void *, size_t);
-int single_release(struct inode *, struct file *);
+#define single_release	seq_release
 void *__seq_open_private(struct file *, const struct seq_operations *, int);
 int seq_open_private(struct file *, const struct seq_operations *, int);
 int seq_release_private(struct inode *, struct file *);

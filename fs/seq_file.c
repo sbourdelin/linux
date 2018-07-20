@@ -563,22 +563,27 @@ static void single_stop(struct seq_file *p, void *v)
 {
 }
 
+static int single_show(struct seq_file *p, void *v)
+{
+	return p->single_show_op(p, v);
+}
+
+static const struct seq_operations single_seq_op = {
+	.start	= single_start,
+	.next	= single_next,
+	.stop	= single_stop,
+	.show	= single_show
+};
+
 int single_open(struct file *file, int (*show)(struct seq_file *, void *),
 		void *data)
 {
-	struct seq_operations *op = kmalloc(sizeof(*op), GFP_KERNEL_ACCOUNT);
-	int res = -ENOMEM;
+	int res;
 
-	if (op) {
-		op->start = single_start;
-		op->next = single_next;
-		op->stop = single_stop;
-		op->show = show;
-		res = seq_open(file, op);
-		if (!res)
-			((struct seq_file *)file->private_data)->private = data;
-		else
-			kfree(op);
+	res = seq_open(file, &single_seq_op);
+	if (!res) {
+		((struct seq_file *)file->private_data)->private = data;
+		((struct seq_file *)file->private_data)->single_show_op = show;
 	}
 	return res;
 }
@@ -601,15 +606,6 @@ int single_open_size(struct file *file, int (*show)(struct seq_file *, void *),
 	return 0;
 }
 EXPORT_SYMBOL(single_open_size);
-
-int single_release(struct inode *inode, struct file *file)
-{
-	const struct seq_operations *op = ((struct seq_file *)file->private_data)->op;
-	int res = seq_release(inode, file);
-	kfree(op);
-	return res;
-}
-EXPORT_SYMBOL(single_release);
 
 int seq_release_private(struct inode *inode, struct file *file)
 {
