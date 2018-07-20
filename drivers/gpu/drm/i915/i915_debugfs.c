@@ -4846,8 +4846,8 @@ static int i915_dpcd_show(struct seq_file *m, void *data)
 
 		err = drm_dp_dpcd_read(&intel_dp->aux, b->offset, buf, size);
 		if (err <= 0) {
-			DRM_ERROR("dpcd read (%zu bytes at %u) failed (%zd)\n",
-				  size, b->offset, err);
+			seq_printf(m, "dpcd read (%zu bytes at %u) failed (%zd)\n",
+				   size, b->offset, err);
 			continue;
 		}
 
