@@ -209,9 +209,7 @@ int kvm_s390_skey_check_enable(struct kvm_vcpu *vcpu)
 
 	trace_kvm_s390_skey_related_inst(vcpu);
 	/* Already enabled? */
-	if (vcpu->kvm->arch.use_skf &&
-	    !(sie_block->ictl & (ICTL_ISKE | ICTL_SSKE | ICTL_RRBE)) &&
-	    !kvm_s390_test_cpuflags(vcpu, CPUSTAT_KSS))
+	if (vcpu->arch.skey_enabled)
 		return 0;
 
 	rc = s390_enable_skey();
@@ -225,6 +223,7 @@ int kvm_s390_skey_check_enable(struct kvm_vcpu *vcpu)
 		sie_block->ictl |= ICTL_ISKE | ICTL_SSKE | ICTL_RRBE;
 	else
 		sie_block->ictl &= ~(ICTL_ISKE | ICTL_SSKE | ICTL_RRBE);
+	vcpu->arch.skey_enabled = true;
 	return 0;
 }
 
