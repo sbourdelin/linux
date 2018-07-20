@@ -3358,11 +3358,10 @@ static void mmu_free_root_page(struct kvm *kvm, hpa_t *root_hpa,
 	*root_hpa = INVALID_PAGE;
 }
 
-void kvm_mmu_free_roots(struct kvm_vcpu *vcpu)
+void kvm_mmu_free_roots(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu)
 {
 	int i;
 	LIST_HEAD(invalid_list);
-	struct kvm_mmu *mmu = vcpu->arch.mmu;
 
 	if (!VALID_PAGE(mmu->root_hpa))
 		return;
@@ -3954,7 +3953,7 @@ static void nonpaging_init_context(struct kvm_vcpu *vcpu,
 
 void kvm_mmu_new_cr3(struct kvm_vcpu *vcpu)
 {
-	kvm_mmu_free_roots(vcpu);
+	kvm_mmu_free_roots(vcpu, vcpu->arch.mmu);
 }
 
 static unsigned long get_cr3(struct kvm_vcpu *vcpu)
@@ -4671,7 +4670,7 @@ EXPORT_SYMBOL_GPL(kvm_mmu_load);
 
 void kvm_mmu_unload(struct kvm_vcpu *vcpu)
 {
-	kvm_mmu_free_roots(vcpu);
+	kvm_mmu_free_roots(vcpu, vcpu->arch.mmu);
 	WARN_ON(VALID_PAGE(vcpu->arch.mmu->root_hpa));
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_unload);
