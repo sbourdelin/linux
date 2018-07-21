@@ -1218,6 +1218,14 @@ config INTEL_CHTDC_TI_PWRBTN
 	  To compile this driver as a module, choose M here: the module
 	  will be called intel_chtdc_ti_pwrbtn.
 
+config CZC_TABLET
+        tristate "CZC Tablet Extras"
+        help
+          This driver adds support for buttons on a CZC ODEON TPC-10 ("P10T")
+          and ViewSonic ViewPad 10 tablet computers.
+
+	  If you have an 10" CZC or ViewSonic tablet, say Y or M here.
+
 endif # X86_PLATFORM_DEVICES
 
 config PMC_ATOM
