@@ -1634,6 +1634,9 @@ static struct da7219_pdata *da7219_fw_to_pdata(struct snd_soc_component *compone
 	else
 		pdata->mic_amp_in_sel = DA7219_MIC_AMP_IN_SEL_DIFF;
 
+	if (!device_property_read_string(dev, "dlg,vddio", &of_val32))
+		pdata->vddio = of_val32;
+
 	return pdata;
 }
 
@@ -1717,8 +1720,12 @@ static int da7219_handle_supplies(struct snd_soc_component *component)
 	/* Determine VDDIO voltage provided */
 	vddio = da7219->supplies[DA7219_SUPPLY_VDDIO].consumer;
 	ret = regulator_get_voltage(vddio);
+	/* If regulator_get_voltage() fails, try to use vddio from pdata. */
+	if (ret < 0 && da7219->pdata)
+		ret = da7219->pdata->vddio;
 	if (ret < 1200000)
-		dev_warn(component->dev, "Invalid VDDIO voltage\n");
+		dev_warn(component->dev, "Invalid VDDIO voltage: %d mV\n",
+			 ret);
 	else if (ret < 2800000)
 		io_voltage_lvl = DA7219_IO_VOLTAGE_LEVEL_1_2V_2_8V;
 
@@ -1872,6 +1879,11 @@ static int da7219_probe(struct snd_soc_component *component)
 	mutex_init(&da7219->ctrl_lock);
 	mutex_init(&da7219->pll_lock);
 
+	/* Handle DT/ACPI/Platform data */
+	da7219->pdata = dev_get_platdata(component->dev);
+	if (!da7219->pdata)
+		da7219->pdata = da7219_fw_to_pdata(component);
+
 	/* Regulator configuration */
 	ret = da7219_handle_supplies(component);
 	if (ret)
@@ -1896,11 +1908,6 @@ static int da7219_probe(struct snd_soc_component *component)
 	default:
 		break;
 	}
-
-	/* Handle DT/ACPI/Platform data */
-	da7219->pdata = dev_get_platdata(component->dev);
-	if (!da7219->pdata)
-		da7219->pdata = da7219_fw_to_pdata(component);
 
 	da7219_handle_pdata(component);
 
