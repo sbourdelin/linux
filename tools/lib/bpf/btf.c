@@ -288,6 +288,14 @@ __s32 btf__find_by_name(const struct btf *btf, const char *type_name)
 	return -ENOENT;
 }
 
+const struct btf_type *btf__type_by_id(const struct btf *btf, __u32 id)
+{
+	if (!id || id > btf->nr_types)
+		return ERR_PTR(-EINVAL);
+
+	return btf->types[id];
+}
+
 void btf__free(struct btf *btf)
 {
 	if (!btf)
