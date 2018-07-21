@@ -918,7 +918,7 @@ init_page_buffers(struct page *page, struct block_device *bdev,
  */
 static int
 grow_dev_page(struct block_device *bdev, sector_t block,
-	      pgoff_t index, int size, int sizebits, gfp_t gfp)
+	      pgoff_t index, int size, gfp_t gfp)
 {
 	struct inode *inode = bdev->bd_inode;
 	struct page *page;
@@ -945,7 +945,7 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 		bh = page_buffers(page);
 		if (bh->b_size == size) {
 			end_block = init_page_buffers(page, bdev,
-						(sector_t)index << sizebits,
+						(sector_t)index << (PAGE_SHIFT - inode->i_blkbits),
 						size);
 			goto done;
 		}
@@ -965,7 +965,8 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	 */
 	spin_lock(&inode->i_mapping->private_lock);
 	link_dev_buffers(page, bh);
-	end_block = init_page_buffers(page, bdev, (sector_t)index << sizebits,
+	end_block = init_page_buffers(page, bdev,
+			(sector_t)index << (PAGE_SHIFT - inode->i_blkbits),
 			size);
 	spin_unlock(&inode->i_mapping->private_lock);
 done:
@@ -984,20 +985,13 @@ static int
 grow_buffers(struct block_device *bdev, sector_t block, int size, gfp_t gfp)
 {
 	pgoff_t index;
-	int sizebits;
-
-	sizebits = -1;
-	do {
-		sizebits++;
-	} while ((size << sizebits) < PAGE_SIZE);
-
-	index = block >> sizebits;
+	index = block >> (PAGE_SHIFT - bdev->bd_inode->i_blkbits);
 
 	/*
 	 * Check for a block which wants to lie outside our maximum possible
 	 * pagecache index.  (this comparison is done using sector_t types).
 	 */
-	if (unlikely(index != block >> sizebits)) {
+	if (unlikely(index != block >> (PAGE_SHIFT - bdev->bd_inode->i_blkbits))) {
 		printk(KERN_ERR "%s: requested out-of-range block %llu for "
 			"device %pg\n",
 			__func__, (unsigned long long)block,
@@ -1006,7 +1000,7 @@ grow_buffers(struct block_device *bdev, sector_t block, int size, gfp_t gfp)
 	}
 
 	/* Create a page with the proper size buffers.. */
-	return grow_dev_page(bdev, block, index, size, sizebits, gfp);
+	return grow_dev_page(bdev, block, index, size, gfp);
 }
 
 static struct buffer_head *
