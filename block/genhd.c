@@ -577,7 +577,9 @@ static void register_disk(struct device *parent, struct gendisk *disk)
 
 	ddev->parent = parent;
 
-	dev_set_name(ddev, "%s", disk->disk_name);
+	err = dev_set_name(ddev, "%s", disk->disk_name);
+	if (err)
+		pr_warn("%s: cannot set disk name: %d", __func__, err);
 
 	/* delay uevents, until we scanned partition table */
 	dev_set_uevent_suppress(ddev, 1);
