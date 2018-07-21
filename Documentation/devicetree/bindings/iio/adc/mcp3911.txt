@@ -1,0 +1,33 @@
+* Microchip MCP3911 Dual channel analog front end (ADC)
+
+Required properties:
+ - compatible: Should be "microchip,mcp3911"
+ - reg: SPI chip select number for the device
+
+Recommended properties:
+ - spi-max-frequency: Definition as per
+	 Documentation/devicetree/bindings/spi/spi-bus.txt.
+	 Max frequency for this chip is 20MHz.
+
+Optional properties:
+ - device-addr: Device address when multiple MCP3911 chips are present on the
+	same SPI bus. Valid values are 0-3. Defaults to 0.
+ - external-clock: Use external clock instead of crystal oscillator.
+ - external-vref: Use external voltage reference
+ - vref-supply:	Phandle to the external reference voltage supply. (only valid in combination with `external-vref`)
+ - ch0-width: width for channel0. Valid widths are 16 and 24bits.
+ - ch1-width: width for channel1. Valid widths are 16 and 24bits.
+
+
+Example:
+adc@0 {
+	compatible = "microchip,mcp3911";
+	reg = <0>;
+	spi-max-frequency = <20000000>;
+	device-addr = <0>;
+	ch0-width = <16>;
+	ch1-width = <24>;
+	external-clock;
+	external-vref;
+	vref-supply = <&vref_reg>;
+};
