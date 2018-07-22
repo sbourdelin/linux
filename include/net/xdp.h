@@ -41,6 +41,9 @@ enum xdp_mem_type {
 	MEM_TYPE_MAX,
 };
 
+/* XDP flags for xdp_mem_info */
+#define XDP_MEM_RF_NO_DIRECT	BIT(0)	/* don't use napi_direct */
+
 /* XDP flags for ndo_xdp_xmit */
 #define XDP_XMIT_FLUSH		(1U << 0)	/* doorbell signal consumer */
 #define XDP_XMIT_FLAGS_MASK	XDP_XMIT_FLUSH
@@ -48,6 +51,7 @@ enum xdp_mem_type {
 struct xdp_mem_info {
 	u32 type; /* enum xdp_mem_type, but known size type */
 	u32 id;
+	u32 flags;
 };
 
 struct page_pool;
