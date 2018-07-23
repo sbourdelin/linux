@@ -192,7 +192,7 @@ static inline void __init init_ohci1394_wait_for_busresets(struct ohci *ohci)
 	int i, events;
 
 	for (i = 0; i < 9; i++) {
-		mdelay(200);
+		msleep(200);
 		events = reg_read(ohci, OHCI1394_IntEventSet);
 		if (events & OHCI1394_busReset)
 			reg_write(ohci, OHCI1394_IntEventClear,
@@ -228,7 +228,7 @@ static inline void __init init_ohci1394_reset_and_init_dma(struct ohci *ohci)
 	reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
 	reg_write(ohci, OHCI1394_IntMaskClear, 0xffffffff);
 
-	mdelay(50); /* Wait 50msec to make sure we have full link enabled */
+	msleep(50); /* Wait 50msec to make sure we have full link enabled */
 
 	init_ohci1394_initialize(ohci);
 	/*
