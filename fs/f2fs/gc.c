@@ -394,7 +394,8 @@ got_it:
 				set_bit(secno, dirty_i->victim_secmap);
 				sbi->cur_bg_victim_sec = secno;
 			}
-		}
+		} else
+			clear_bit(secno, dirty_i->victim_secmap);
 		*result = (p.min_segno / p.ofs_unit) * p.ofs_unit;
 
 		trace_f2fs_get_victim(sbi->sb, type, gc_type, &p,
