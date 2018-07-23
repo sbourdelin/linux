@@ -642,6 +642,10 @@
 			status = "disabled";
 		};
 
+		sid: eeprom@1c14000 {
+			reg = <0x1c14000 0x400>;
+		};
+
 		uart0: serial@1c28000 {
 			compatible = "snps,dw-apb-uart";
 			reg = <0x01c28000 0x400>;
