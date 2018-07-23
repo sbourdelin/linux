@@ -1279,10 +1279,12 @@ int migrate_swap(struct task_struct *cur, struct task_struct *p)
 	if (!cpu_active(arg.src_cpu) || !cpu_active(arg.dst_cpu))
 		goto out;
 
-	if (!cpumask_test_cpu(arg.dst_cpu, &arg.src_task->cpus_allowed))
+	if ((!cpumask_test_cpu(arg.dst_cpu, &arg.src_task->cpus_allowed))
+            || cpumask_test_cpu(arg.dst_cpu, cpu_isolated_map))
 		goto out;
 
-	if (!cpumask_test_cpu(arg.src_cpu, &arg.dst_task->cpus_allowed))
+	if ((!cpumask_test_cpu(arg.src_cpu, &arg.dst_task->cpus_allowed))
+            || cpumask_test_cpu(arg.src_cpu, cpu_isolated_map))
 		goto out;
 
 	trace_sched_swap_numa(cur, arg.src_cpu, p, arg.dst_cpu);
@@ -5480,7 +5482,8 @@ int migrate_task_to(struct task_struct *p, int target_cpu)
 	if (curr_cpu == target_cpu)
 		return 0;
 
-	if (!cpumask_test_cpu(target_cpu, &p->cpus_allowed))
+	if ((!cpumask_test_cpu(target_cpu, &p->cpus_allowed))
+            || cpumask_test_cpu(target_cpu, cpu_isolated_map))
 		return -EINVAL;
 
 	/* TODO: This is not properly updating schedstats */

@@ -1722,7 +1722,8 @@ static void task_numa_find_cpu(struct task_numa_env *env,
 
 	for_each_cpu(cpu, cpumask_of_node(env->dst_nid)) {
 		/* Skip this CPU if the source task cannot migrate */
-		if (!cpumask_test_cpu(cpu, &env->p->cpus_allowed))
+		if ((!cpumask_test_cpu(cpu, &env->p->cpus_allowed))
+                    || cpumask_test_cpu(cpu, cpu_isolated_map))
 			continue;
 
 		env->dst_cpu = cpu;
