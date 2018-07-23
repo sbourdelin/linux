@@ -468,7 +468,7 @@ static int read_from_bdev_async(struct zram *zram, struct bio_vec *bvec,
 {
 	struct bio *bio;
 
-	bio = bio_alloc(GFP_ATOMIC, 1);
+	bio = bio_alloc(GFP_KERNEL, 1);
 	if (!bio)
 		return -ENOMEM;
 
@@ -556,7 +556,7 @@ static int write_to_bdev(struct zram *zram, struct bio_vec *bvec,
 	struct bio *bio;
 	unsigned long entry;
 
-	bio = bio_alloc(GFP_ATOMIC, 1);
+	bio = bio_alloc(GFP_KERNEL, 1);
 	if (!bio)
 		return -ENOMEM;
 
