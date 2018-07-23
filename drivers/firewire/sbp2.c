@@ -1463,7 +1463,7 @@ static int sbp2_scsi_queuecommand(struct Scsi_Host *shost,
 	struct sbp2_command_orb *orb;
 	int generation, retval = SCSI_MLQUEUE_HOST_BUSY;
 
-	orb = kzalloc(sizeof(*orb), GFP_ATOMIC);
+	orb = kzalloc(sizeof(*orb), GFP_KERNEL);
 	if (orb == NULL)
 		return SCSI_MLQUEUE_HOST_BUSY;
 
