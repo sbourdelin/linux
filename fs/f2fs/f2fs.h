@@ -1220,6 +1220,8 @@ struct f2fs_sb_info {
 	unsigned int cur_fg_victim_sec;		/* current FG_GC victim section num */
 	unsigned int cur_bg_victim_sec;		/* current BG_GC victim section num */
 	unsigned int gc_mode;			/* current GC state */
+	/* threshold for selecting bg victims */
+	u64 bggc_threshold;
 	/* for skip statistic */
 	unsigned long long skipped_atomic_files[2];	/* FG_GC and BG_GC */
 
