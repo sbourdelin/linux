@@ -787,7 +787,7 @@ int tls_sw_recvmsg(struct sock *sk,
 	target = sock_rcvlowat(sk, flags & MSG_WAITALL, len);
 	timeo = sock_rcvtimeo(sk, flags & MSG_DONTWAIT);
 	do {
-		bool zc = false;
+		bool zc;
 		int chunk = 0;
 
 		skb = tls_wait_data(sk, flags, timeo, &err);
@@ -824,7 +824,6 @@ int tls_sw_recvmsg(struct sock *sk,
 				struct scatterlist sgin[MAX_SKB_FRAGS + 1];
 				int pages = 0;
 
-				zc = true;
 				sg_init_table(sgin, MAX_SKB_FRAGS + 1);
 				sg_set_buf(&sgin[0], ctx->rx_aad_plaintext,
 					   TLS_AAD_SPACE_SIZE);
@@ -836,6 +835,7 @@ int tls_sw_recvmsg(struct sock *sk,
 				if (err < 0)
 					goto fallback_to_reg_recv;
 
+				zc = true;
 				err = decrypt_skb_update(sk, skb, sgin, &zc);
 				for (; pages > 0; pages--)
 					put_page(sg_page(&sgin[pages]));
@@ -845,6 +845,7 @@ int tls_sw_recvmsg(struct sock *sk,
 				}
 			} else {
 fallback_to_reg_recv:
+				zc = false;
 				err = decrypt_skb_update(sk, skb, NULL, &zc);
 				if (err < 0) {
 					tls_err_abort(sk, EBADMSG);
