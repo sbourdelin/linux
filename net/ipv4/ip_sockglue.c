@@ -152,7 +152,7 @@ static void ip_cmsg_recv_dstaddr(struct msghdr *msg, struct sk_buff *skb)
 	const struct iphdr *iph = ip_hdr(skb);
 	__be16 *ports = (__be16 *)skb_transport_header(skb);
 
-	if (skb_transport_offset(skb) + 4 > (int)skb->len)
+	if (skb_transport_offset(skb) + 4 > (int)skb_headlen(skb))
 		return;
 
 	/* All current transport protocols have the port numbers in the
