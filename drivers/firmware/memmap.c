@@ -297,7 +297,7 @@ int __meminit firmware_map_add_hotplug(u64 start, u64 end, const char *type)
 
 	entry = firmware_map_find_entry_bootmem(start, end - 1, type);
 	if (!entry) {
-		entry = kzalloc(sizeof(struct firmware_map_entry), GFP_ATOMIC);
+		entry = kzalloc(sizeof(struct firmware_map_entry), GFP_KERNEL);
 		if (!entry)
 			return -ENOMEM;
 	} else {
