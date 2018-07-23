@@ -6264,41 +6264,14 @@ static u32 intel_rps_limits(struct drm_i915_private *dev_priv, u8 val)
 	return limits;
 }
 
-static void gen6_set_rps_thresholds(struct drm_i915_private *dev_priv, u8 val)
+static void rps_set_power(struct drm_i915_private *dev_priv, int new_power)
 {
 	struct intel_rps *rps = &dev_priv->gt_pm.rps;
-	int new_power;
 	u32 threshold_up = 0, threshold_down = 0; /* in % */
 	u32 ei_up = 0, ei_down = 0;
 
-	new_power = rps->power;
-	switch (rps->power) {
-	case LOW_POWER:
-		if (val > rps->efficient_freq + 1 &&
-		    val > rps->cur_freq)
-			new_power = BETWEEN;
-		break;
+	lockdep_assert_held(&rps->power_lock);
 
-	case BETWEEN:
-		if (val <= rps->efficient_freq &&
-		    val < rps->cur_freq)
-			new_power = LOW_POWER;
-		else if (val >= rps->rp0_freq &&
-			 val > rps->cur_freq)
-			new_power = HIGH_POWER;
-		break;
-
-	case HIGH_POWER:
-		if (val < (rps->rp1_freq + rps->rp0_freq) >> 1 &&
-		    val < rps->cur_freq)
-			new_power = BETWEEN;
-		break;
-	}
-	/* Max/min bins are special */
-	if (val <= rps->min_freq_softlimit)
-		new_power = LOW_POWER;
-	if (val >= rps->max_freq_softlimit)
-		new_power = HIGH_POWER;
 	if (new_power == rps->power)
 		return;
 
@@ -6365,7 +6338,66 @@ skip_hw_write:
 	rps->power = new_power;
 	rps->up_threshold = threshold_up;
 	rps->down_threshold = threshold_down;
+}
+
+static void gen6_set_rps_thresholds(struct drm_i915_private *dev_priv, u8 val)
+{
+	struct intel_rps *rps = &dev_priv->gt_pm.rps;
+	int new_power;
+
+	new_power = rps->power;
+	switch (rps->power) {
+	case LOW_POWER:
+		if (val > rps->efficient_freq + 1 &&
+		    val > rps->cur_freq)
+			new_power = BETWEEN;
+		break;
+
+	case BETWEEN:
+		if (val <= rps->efficient_freq &&
+		    val < rps->cur_freq)
+			new_power = LOW_POWER;
+		else if (val >= rps->rp0_freq &&
+			 val > rps->cur_freq)
+			new_power = HIGH_POWER;
+		break;
+
+	case HIGH_POWER:
+		if (val < (rps->rp1_freq + rps->rp0_freq) >> 1 &&
+		    val < rps->cur_freq)
+			new_power = BETWEEN;
+		break;
+	}
+	/* Max/min bins are special */
+	if (val <= rps->min_freq_softlimit)
+		new_power = LOW_POWER;
+	if (val >= rps->max_freq_softlimit)
+		new_power = HIGH_POWER;
+
+	mutex_lock(&rps->power_lock);
+	if (rps->interactive)
+		new_power = HIGH_POWER;
+	rps_set_power(dev_priv, new_power);
+	mutex_unlock(&rps->power_lock);
 	rps->last_adj = 0;
+}
+
+void intel_rps_mark_interactive(struct drm_i915_private *i915, bool interactive)
+{
+	struct intel_rps *rps = &i915->gt_pm.rps;
+
+	if (INTEL_GEN(i915) < 6)
+		return;
+
+	mutex_lock(&rps->power_lock);
+	if (interactive) {
+		if (!rps->interactive++ && READ_ONCE(i915->gt.awake))
+			rps_set_power(i915, HIGH_POWER);
+	} else {
+		GEM_BUG_ON(!rps->interactive);
+		rps->interactive--;
+	}
+	mutex_unlock(&rps->power_lock);
 }
 
 static u32 gen6_rps_pm_mask(struct drm_i915_private *dev_priv, u8 val)
@@ -9604,6 +9636,7 @@ int intel_freq_opcode(struct drm_i915_private *dev_priv, int val)
 void intel_pm_setup(struct drm_i915_private *dev_priv)
 {
 	mutex_init(&dev_priv->pcu_lock);
+	mutex_init(&dev_priv->gt_pm.rps.power_lock);
 
 	atomic_set(&dev_priv->gt_pm.rps.num_waiters, 0);
 
