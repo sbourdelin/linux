@@ -206,6 +206,9 @@ static u32 vfe_src_pad_code(struct vfe_line *line, u32 sink_code,
 		{
 			u32 src_code[] = {
 				MEDIA_BUS_FMT_YUYV8_2X8,
+				MEDIA_BUS_FMT_YVYU8_2X8,
+				MEDIA_BUS_FMT_UYVY8_2X8,
+				MEDIA_BUS_FMT_VYUY8_2X8,
 				MEDIA_BUS_FMT_YUYV8_1_5X8,
 			};
 
@@ -216,6 +219,9 @@ static u32 vfe_src_pad_code(struct vfe_line *line, u32 sink_code,
 		{
 			u32 src_code[] = {
 				MEDIA_BUS_FMT_YVYU8_2X8,
+				MEDIA_BUS_FMT_YUYV8_2X8,
+				MEDIA_BUS_FMT_UYVY8_2X8,
+				MEDIA_BUS_FMT_VYUY8_2X8,
 				MEDIA_BUS_FMT_YVYU8_1_5X8,
 			};
 
@@ -226,6 +232,9 @@ static u32 vfe_src_pad_code(struct vfe_line *line, u32 sink_code,
 		{
 			u32 src_code[] = {
 				MEDIA_BUS_FMT_UYVY8_2X8,
+				MEDIA_BUS_FMT_YUYV8_2X8,
+				MEDIA_BUS_FMT_YVYU8_2X8,
+				MEDIA_BUS_FMT_VYUY8_2X8,
 				MEDIA_BUS_FMT_UYVY8_1_5X8,
 			};
 
@@ -236,6 +245,9 @@ static u32 vfe_src_pad_code(struct vfe_line *line, u32 sink_code,
 		{
 			u32 src_code[] = {
 				MEDIA_BUS_FMT_VYUY8_2X8,
+				MEDIA_BUS_FMT_YUYV8_2X8,
+				MEDIA_BUS_FMT_YVYU8_2X8,
+				MEDIA_BUS_FMT_UYVY8_2X8,
 				MEDIA_BUS_FMT_VYUY8_1_5X8,
 			};
 
@@ -311,10 +323,6 @@ static void vfe_init_outputs(struct vfe_device *vfe)
 		output->buf[0] = NULL;
 		output->buf[1] = NULL;
 		INIT_LIST_HEAD(&output->pending_bufs);
-
-		output->wm_num = 1;
-		if (vfe->line[i].id == VFE_LINE_PIX)
-			output->wm_num = 2;
 	}
 }
 
@@ -570,6 +578,7 @@ static int vfe_get_output(struct vfe_line *line)
 {
 	struct vfe_device *vfe = to_vfe(line);
 	struct vfe_output *output;
+	struct v4l2_format *f = &line->video_out.active_fmt;
 	unsigned long flags;
 	int i;
 	int wm_idx;
@@ -584,6 +593,18 @@ static int vfe_get_output(struct vfe_line *line)
 	output->state = VFE_OUTPUT_RESERVED;
 
 	output->active_buf = 0;
+
+	switch (f->fmt.pix_mp.pixelformat) {
+	case V4L2_PIX_FMT_NV12:
+	case V4L2_PIX_FMT_NV21:
+	case V4L2_PIX_FMT_NV16:
+	case V4L2_PIX_FMT_NV61:
+		output->wm_num = 2;
+		break;
+	default:
+		output->wm_num = 1;
+		break;
+	}
 
 	for (i = 0; i < output->wm_num; i++) {
 		wm_idx = vfe_reserve_wm(vfe, line->id);
@@ -715,6 +736,7 @@ static int vfe_enable_output(struct vfe_line *line)
 		ops->enable_irq_pix_line(vfe, 0, line->id, 1);
 		ops->set_module_cfg(vfe, 1);
 		ops->set_camif_cfg(vfe, line);
+		ops->set_realign_cfg(vfe, line, 1);
 		ops->set_xbar_cfg(vfe, output, 1);
 		ops->set_demux_cfg(vfe, line);
 		ops->set_scale_cfg(vfe, line);
@@ -779,6 +801,7 @@ static int vfe_disable_output(struct vfe_line *line)
 
 		ops->enable_irq_pix_line(vfe, 0, line->id, 0);
 		ops->set_module_cfg(vfe, 0);
+		ops->set_realign_cfg(vfe, line, 0);
 		ops->set_xbar_cfg(vfe, output, 0);
 
 		ops->set_camif_cmd(vfe, 0);
