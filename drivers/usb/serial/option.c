@@ -1987,6 +1987,12 @@ static int option_probe(struct usb_serial *serial,
 	if (iface_desc->bInterfaceClass == USB_CLASS_MASS_STORAGE)
 		return -ENODEV;
 
+	/* Do not bind Android Debug Bridge interfaces */
+	if (iface_desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC &&
+		iface_desc->bInterfaceSubClass == 0x42 &&
+		iface_desc->bInterfaceProtocol == 1)
+		return -ENODEV;
+
 	/*
 	 * Don't bind reserved interfaces (like network ones) which often have
 	 * the same class/subclass/protocol as the serial interfaces.  Look at
