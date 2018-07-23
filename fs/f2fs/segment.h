@@ -787,7 +787,8 @@ static inline block_t sum_blk_addr(struct f2fs_sb_info *sbi, int base, int type)
 
 static inline bool sec_usage_check(struct f2fs_sb_info *sbi, unsigned int secno)
 {
-	if (IS_CURSEC(sbi, secno) || (sbi->cur_victim_sec == secno))
+	if (IS_CURSEC(sbi, secno) || (sbi->cur_fg_victim_sec == secno) ||
+		(sbi->cur_bg_victim_sec == secno))
 		return true;
 	return false;
 }

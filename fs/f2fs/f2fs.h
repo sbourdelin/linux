@@ -1217,7 +1217,8 @@ struct f2fs_sb_info {
 	/* for cleaning operations */
 	struct mutex gc_mutex;			/* mutex for GC */
 	struct f2fs_gc_kthread	*gc_thread;	/* GC thread */
-	unsigned int cur_victim_sec;		/* current victim section num */
+	unsigned int cur_fg_victim_sec;		/* current FG_GC victim section num */
+	unsigned int cur_bg_victim_sec;		/* current BG_GC victim section num */
 	unsigned int gc_mode;			/* current GC state */
 	/* for skip statistic */
 	unsigned long long skipped_atomic_files[2];	/* FG_GC and BG_GC */

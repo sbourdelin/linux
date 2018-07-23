@@ -693,10 +693,12 @@ TRACE_EVENT(f2fs_gc_end,
 TRACE_EVENT(f2fs_get_victim,
 
 	TP_PROTO(struct super_block *sb, int type, int gc_type,
-			struct victim_sel_policy *p, unsigned int pre_victim,
+			struct victim_sel_policy *p, unsigned int pre_fg_victim,
+			unsigned int pre_bg_victim,
 			unsigned int prefree, unsigned int free),
 
-	TP_ARGS(sb, type, gc_type, p, pre_victim, prefree, free),
+	TP_ARGS(sb, type, gc_type, p, pre_fg_victim, pre_bg_victim,
+		prefree, free),
 
 	TP_STRUCT__entry(
 		__field(dev_t,	dev)
@@ -707,7 +709,8 @@ TRACE_EVENT(f2fs_get_victim,
 		__field(unsigned int,	victim)
 		__field(unsigned int,	cost)
 		__field(unsigned int,	ofs_unit)
-		__field(unsigned int,	pre_victim)
+		__field(unsigned int,	pre_fg_victim)
+		__field(unsigned int,	pre_bg_victim)
 		__field(unsigned int,	prefree)
 		__field(unsigned int,	free)
 	),
@@ -721,14 +724,16 @@ TRACE_EVENT(f2fs_get_victim,
 		__entry->victim		= p->min_segno;
 		__entry->cost		= p->min_cost;
 		__entry->ofs_unit	= p->ofs_unit;
-		__entry->pre_victim	= pre_victim;
+		__entry->pre_fg_victim	= pre_fg_victim;
+		__entry->pre_bg_victim	= pre_bg_victim;
 		__entry->prefree	= prefree;
 		__entry->free		= free;
 	),
 
 	TP_printk("dev = (%d,%d), type = %s, policy = (%s, %s, %s), "
 		"victim = %u, cost = %u, ofs_unit = %u, "
-		"pre_victim_secno = %d, prefree = %u, free = %u",
+		"pre_fg_victim_secno = %d, pre_bg_victim_secno = %d, "
+		"prefree = %u, free = %u",
 		show_dev(__entry->dev),
 		show_data_type(__entry->type),
 		show_gc_type(__entry->gc_type),
@@ -737,7 +742,8 @@ TRACE_EVENT(f2fs_get_victim,
 		__entry->victim,
 		__entry->cost,
 		__entry->ofs_unit,
-		(int)__entry->pre_victim,
+		(int)__entry->pre_fg_victim,
+		(int)__entry->pre_bg_victim,
 		__entry->prefree,
 		__entry->free)
 );

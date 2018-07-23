@@ -367,8 +367,6 @@ static int get_victim_by_default(struct f2fs_sb_info *sbi,
 
 		if (sec_usage_check(sbi, secno))
 			goto next;
-		if (gc_type == BG_GC && test_bit(secno, dirty_i->victim_secmap))
-			goto next;
 
 		cost = get_gc_cost(sbi, segno, &p);
 
@@ -391,14 +389,17 @@ got_it:
 		if (p.alloc_mode == LFS) {
 			secno = GET_SEC_FROM_SEG(sbi, p.min_segno);
 			if (gc_type == FG_GC)
-				sbi->cur_victim_sec = secno;
-			else
+				sbi->cur_fg_victim_sec = secno;
+			else {
 				set_bit(secno, dirty_i->victim_secmap);
+				sbi->cur_bg_victim_sec = secno;
+			}
 		}
 		*result = (p.min_segno / p.ofs_unit) * p.ofs_unit;
 
 		trace_f2fs_get_victim(sbi->sb, type, gc_type, &p,
-				sbi->cur_victim_sec,
+				sbi->cur_fg_victim_sec,
+				sbi->cur_bg_victim_sec,
 				prefree_segments(sbi), free_segments(sbi));
 	}
 out:
@@ -1098,7 +1099,9 @@ gc_more:
 	}
 
 	if (gc_type == FG_GC)
-		sbi->cur_victim_sec = NULL_SEGNO;
+		sbi->cur_fg_victim_sec = NULL_SEGNO;
+	else
+		sbi->cur_bg_victim_sec = NULL_SEGNO;
 
 	if (!sync) {
 		if (has_not_enough_free_secs(sbi, sec_freed, 0)) {
