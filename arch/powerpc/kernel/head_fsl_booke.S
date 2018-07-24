@@ -801,12 +801,28 @@ END_MMU_FTR_SECTION_IFSET(MMU_FTR_BIG_PHYS)
 	/* Round robin TLB1 entries assignment */
 	mfspr	r12, SPRN_MAS0
 
+	/* Get first free tlbcam entry */
+	lis	r11, tlbcam_index@ha
+	lwz	r11, tlbcam_index@l(r11)
+
+	/* Extract MAS0(NV) */
+	andi.	r13, r12, 0xfff
+	cmpw	0, r13, r11
+	blt	0, 5f
+	b	6f
+5:
+	/* When NV is less than first free tlbcam entry, use first free
+	 * tlbcam entry for ESEL and set NV */
+	rlwimi	r12, r11, 16, 4, 15
+	addi	r11, r11, 1
+	rlwimi	r12, r11, 0, 20, 31
+	b	7f
+6:
 	/* Extract TLB1CFG(NENTRY) */
 	mfspr	r11, SPRN_TLB1CFG
 	andi.	r11, r11, 0xfff
 
-	/* Extract MAS0(NV) */
-	andi.	r13, r12, 0xfff
+	/* Set MAS0(NV) for next TLB miss exception */
 	addi	r13, r13, 1
 	cmpw	0, r13, r11
 	addi	r12, r12, 1
