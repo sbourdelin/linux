@@ -1272,8 +1272,12 @@ static void show_special(struct audit_context *context, int *call_panic)
 		break;
 	case AUDIT_KERN_MODULE:
 		audit_log_format(ab, "name=");
-		audit_log_untrustedstring(ab, context->module.name);
-		kfree(context->module.name);
+		if (context->module.name) {
+			audit_log_untrustedstring(ab, context->module.name);
+			kfree(context->module.name);
+		} else
+			audit_log_format(ab, "(null)");
+
 		break;
 	}
 	audit_log_end(ab);
@@ -2407,7 +2411,8 @@ void __audit_log_kern_module(char *name)
 	struct audit_context *context = current->audit_context;
 
 	context->module.name = kmalloc(strlen(name) + 1, GFP_KERNEL);
-	strcpy(context->module.name, name);
+	if (context->module.name)
+		strcpy(context->module.name, name);
 	context->type = AUDIT_KERN_MODULE;
 }
 
