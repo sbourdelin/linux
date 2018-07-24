@@ -954,12 +954,9 @@ static int bnxt_vf_validate_set_mac(struct bnxt *bp, struct bnxt_vf_info *vf)
 		if (ether_addr_equal((const u8 *)req->l2_addr, vf->mac_addr))
 			mac_ok = true;
 	} else if (is_valid_ether_addr(vf->vf_mac_addr)) {
-		if (ether_addr_equal((const u8 *)req->l2_addr, vf->vf_mac_addr))
+		if (ether_addr_equal((const u8 *)req->l2_addr, vf->vf_mac_addr) &&
+		    bp->hwrm_spec_code >= 0x10202)
 			mac_ok = true;
-	} else if (bp->hwrm_spec_code < 0x10202) {
-		mac_ok = true;
-	} else {
-		mac_ok = true;
 	}
 	if (mac_ok)
 		return bnxt_hwrm_exec_fwd_resp(bp, vf, msg_size);
