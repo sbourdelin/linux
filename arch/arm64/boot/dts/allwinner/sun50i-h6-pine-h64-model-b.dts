@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: (GPL-2.0+ or MIT)
+/*
+ * Copyright (c) 2017 Icenowy Zheng <icenowy@aosc.io>
+ */
+
+#include "sun50i-h6-pine-h64.dts"
+
+/ {
+	model = "Pine H64 Model B";
+	compatible = "pine64,pine-h64-model-b", "pine64,pine-h64",
+		     "allwinner,sun50i-h6";
+
+	leds {
+		/delete-node/ heartbeat;
+
+		status {
+			label = "pine-h64:red:status";
+		};
+	};
+};

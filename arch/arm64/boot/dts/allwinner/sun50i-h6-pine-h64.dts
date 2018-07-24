@@ -10,8 +10,9 @@
 #include <dt-bindings/gpio/gpio.h>
 
 / {
-	model = "Pine H64";
-	compatible = "pine64,pine-h64", "allwinner,sun50i-h6";
+	model = "Pine H64 Model A";
+	compatible = "pine64,pine-h64-model-a", "pine64,pine-h64",
+		     "allwinner,sun50i-h6";
 
 	aliases {
 		serial0 = &uart0;
