@@ -18,3 +18,11 @@
 		};
 	};
 };
+
+&mmc1 {
+	status = "okay";
+};
+
+&wifi_pwrseq {
+	status = "okay";
+};
