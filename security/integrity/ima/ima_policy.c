@@ -573,8 +573,11 @@ void __init ima_init_policy(void)
 	 * (Highest priority)
 	 */
 	arch_policy_entries = ima_init_arch_policy();
-	if (arch_policy_entries > 0)
+	if (arch_policy_entries > 0) {
 		pr_info("Adding %d architecture policy rules.\n", arch_policy_entries);
+		set_ima_appraise("enforce");
+	}
+
 	for (i = 0; i < arch_policy_entries; i++) {
 		struct ima_rule_entry *entry;
 

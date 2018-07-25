@@ -248,6 +248,7 @@ enum hash_algo ima_get_hash_algo(struct evm_ima_xattr_data *xattr_value,
 				 int xattr_len);
 int ima_read_xattr(struct dentry *dentry,
 		   struct evm_ima_xattr_data **xattr_value);
+void set_ima_appraise(char *str);
 
 #else
 static inline int ima_appraise_measurement(enum ima_hooks func,
@@ -288,6 +289,10 @@ static inline int ima_read_xattr(struct dentry *dentry,
 				 struct evm_ima_xattr_data **xattr_value)
 {
 	return 0;
+}
+
+static inline void set_ima_appraise(char *str)
+{
 }
 
 #endif /* CONFIG_IMA_APPRAISE */
