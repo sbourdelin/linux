@@ -1062,12 +1062,12 @@ static void rpmsg_remove(struct virtio_device *vdev)
 
 	vdev->config->reset(vdev);
 
+	if (vrp->ns_ept)
+		__rpmsg_destroy_ept(vrp, vrp->ns_ept);
+
 	ret = device_for_each_child(&vdev->dev, NULL, rpmsg_remove_device);
 	if (ret)
 		dev_warn(&vdev->dev, "can't remove rpmsg device: %d\n", ret);
-
-	if (vrp->ns_ept)
-		__rpmsg_destroy_ept(vrp, vrp->ns_ept);
 
 	idr_destroy(&vrp->endpoints);
 
