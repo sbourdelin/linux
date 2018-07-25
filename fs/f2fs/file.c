@@ -1754,6 +1754,8 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 	if (ret)
 		return ret;
 
+	f2fs_balance_fs(F2FS_I_SB(inode), true);
+
 	inode_lock(inode);
 
 	down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
