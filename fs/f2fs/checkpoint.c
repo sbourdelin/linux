@@ -1407,6 +1407,8 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 
 	f2fs_release_ino_entry(sbi, false);
 
+	f2fs_reset_fsync_node_info(sbi);
+
 	clear_sbi_flag(sbi, SBI_IS_DIRTY);
 	clear_sbi_flag(sbi, SBI_NEED_CP);
 	__set_cp_next_pack(sbi);

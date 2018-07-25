@@ -1023,6 +1023,8 @@ static void f2fs_put_super(struct super_block *sb)
 	 */
 	f2fs_release_ino_entry(sbi, true);
 
+	f2fs_bug_on(sbi, sbi->fsync_node_num);
+
 	f2fs_leave_shrinker(sbi);
 	mutex_unlock(&sbi->umount_mutex);
 
@@ -2904,6 +2906,8 @@ try_onemore:
 	f2fs_init_extent_cache_info(sbi);
 
 	f2fs_init_ino_entry_info(sbi);
+
+	f2fs_init_fsync_node_info(sbi);
 
 	/* setup f2fs internal modules */
 	err = f2fs_build_segment_manager(sbi);
