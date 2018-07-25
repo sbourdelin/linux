@@ -93,46 +93,6 @@ static struct notifier_block ibdev_lsm_nb = {
 	.notifier_call = ib_security_change,
 };
 
-static int ib_device_check_mandatory(struct ib_device *device)
-{
-#define IB_MANDATORY_FUNC(x) { offsetof(struct ib_device, x), #x }
-	static const struct {
-		size_t offset;
-		char  *name;
-	} mandatory_table[] = {
-		IB_MANDATORY_FUNC(query_device),
-		IB_MANDATORY_FUNC(query_port),
-		IB_MANDATORY_FUNC(query_pkey),
-		IB_MANDATORY_FUNC(alloc_pd),
-		IB_MANDATORY_FUNC(dealloc_pd),
-		IB_MANDATORY_FUNC(create_ah),
-		IB_MANDATORY_FUNC(destroy_ah),
-		IB_MANDATORY_FUNC(create_qp),
-		IB_MANDATORY_FUNC(modify_qp),
-		IB_MANDATORY_FUNC(destroy_qp),
-		IB_MANDATORY_FUNC(post_send),
-		IB_MANDATORY_FUNC(post_recv),
-		IB_MANDATORY_FUNC(create_cq),
-		IB_MANDATORY_FUNC(destroy_cq),
-		IB_MANDATORY_FUNC(poll_cq),
-		IB_MANDATORY_FUNC(req_notify_cq),
-		IB_MANDATORY_FUNC(get_dma_mr),
-		IB_MANDATORY_FUNC(dereg_mr),
-		IB_MANDATORY_FUNC(get_port_immutable)
-	};
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(mandatory_table); ++i) {
-		if (!*(void **) ((void *) device + mandatory_table[i].offset)) {
-			pr_warn("Device %s is missing mandatory function %s\n",
-				device->name, mandatory_table[i].name);
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
 static struct ib_device *__ib_device_get_by_index(u32 index)
 {
 	struct ib_device *device;
@@ -500,11 +460,6 @@ int ib_register_device(struct ib_device *device,
 		ret = alloc_name(device->name);
 		if (ret)
 			goto out;
-	}
-
-	if (ib_device_check_mandatory(device)) {
-		ret = -EINVAL;
-		goto out;
 	}
 
 	ret = read_port_immutable(device);
