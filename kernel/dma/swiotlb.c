@@ -608,8 +608,11 @@ __swiotlb_map_page(struct device *dev, phys_addr_t phys, size_t size,
 
 	switch (swiotlb_force) {
 	case SWIOTLB_NO_FORCE:
-		dev_warn_ratelimited(dev,
-			"swiotlb: force disabled for address %pa\n", &phys);
+		if (!(attrs & DMA_ATTR_NO_WARN)) {
+			dev_warn_ratelimited(dev,
+				"swiotlb: force disabled for address %pa\n",
+				&phys);
+		}
 		return -EOPNOTSUPP;
 	case SWIOTLB_NORMAL:
 		/* can we address the memory directly? */
@@ -629,10 +632,12 @@ __swiotlb_map_page(struct device *dev, phys_addr_t phys, size_t size,
 	/* Ensure that the address returned is DMA'ble */
 	*dma_addr = __phys_to_dma(dev, map_addr);
 	if (unlikely(!dma_capable(dev, *dma_addr, size))) {
-		dev_err_ratelimited(dev,
-			"DMA: swiotlb buffer not addressable.\n");
+		if (!(attrs & DMA_ATTR_NO_WARN)) {
+			dev_err_ratelimited(dev,
+				"DMA: swiotlb buffer not addressable.\n");
+		}
 		swiotlb_tbl_unmap_single(dev, map_addr, size, dir,
-			attrs | DMA_ATTR_SKIP_CPU_SYNC);
+				attrs | DMA_ATTR_SKIP_CPU_SYNC);
 		return -EINVAL;
 	}
 	return 0;
