@@ -372,3 +372,7 @@ config QCOM_PDC
 	  IRQs for Qualcomm Technologies Inc (QTI) mobile chips.
 
 endmenu
+
+config RISCV_INTC
+	def_bool y
+	depends on RISCV
