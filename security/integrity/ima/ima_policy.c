@@ -475,6 +475,8 @@ static int ima_appraise_flag(enum ima_hooks func)
 		return IMA_APPRAISE_POLICY;
 	else if (func == KEXEC_KERNEL_CHECK)
 		return IMA_APPRAISE_KEXEC;
+	else if (func == KEXEC_ORIG_KERNEL_CHECK)
+		return IMA_APPRAISE_ORIG_KEXEC;
 	return 0;
 }
 
@@ -879,6 +881,9 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 			else if (strcmp(args[0].from, "KEXEC_KERNEL_CHECK") ==
 				 0)
 				entry->func = KEXEC_KERNEL_CHECK;
+			else if (strcmp(args[0].from,
+				 "KEXEC_ORIG_KERNEL_CHECK") == 0)
+				entry->func = KEXEC_ORIG_KERNEL_CHECK;
 			else if (strcmp(args[0].from, "KEXEC_INITRAMFS_CHECK")
 				 == 0)
 				entry->func = KEXEC_INITRAMFS_CHECK;

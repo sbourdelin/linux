@@ -181,6 +181,7 @@ static inline unsigned long ima_hash_key(u8 *digest)
 	hook(MODULE_CHECK)		\
 	hook(FIRMWARE_CHECK)		\
 	hook(KEXEC_KERNEL_CHECK)	\
+	hook(KEXEC_ORIG_KERNEL_CHECK)	\
 	hook(KEXEC_INITRAMFS_CHECK)	\
 	hook(POLICY_CHECK)		\
 	hook(MAX_CHECK)
@@ -233,6 +234,7 @@ int ima_policy_show(struct seq_file *m, void *v);
 #define IMA_APPRAISE_FIRMWARE	0x10
 #define IMA_APPRAISE_POLICY	0x20
 #define IMA_APPRAISE_KEXEC	0x40
+#define IMA_APPRAISE_ORIG_KEXEC	0x80
 
 #ifdef CONFIG_IMA_APPRAISE
 int ima_appraise_measurement(enum ima_hooks func,
