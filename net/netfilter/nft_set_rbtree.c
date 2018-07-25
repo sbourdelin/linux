@@ -409,8 +409,8 @@ out:
 			   nft_set_gc_interval(set));
 }
 
-static unsigned int nft_rbtree_privsize(const struct nlattr * const nla[],
-					const struct nft_set_desc *desc)
+static u64 nft_rbtree_privsize(const struct nlattr * const nla[],
+			       const struct nft_set_desc *desc)
 {
 	return sizeof(struct nft_rbtree);
 }

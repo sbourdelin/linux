@@ -272,7 +272,7 @@ enum nft_set_class {
  *	@space: memory class
  */
 struct nft_set_estimate {
-	unsigned int		size;
+	u64			size;
 	enum nft_set_class	lookup;
 	enum nft_set_class	space;
 };
@@ -334,7 +334,7 @@ struct nft_set_ops {
 					       const struct nft_set_elem *elem,
 					       unsigned int flags);
 
-	unsigned int			(*privsize)(const struct nlattr * const nla[],
+	u64				(*privsize)(const struct nlattr * const nla[],
 						    const struct nft_set_desc *desc);
 	bool				(*estimate)(const struct nft_set_desc *desc,
 						    u32 features,
