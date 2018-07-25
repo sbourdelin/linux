@@ -30,10 +30,14 @@ extern void ima_post_path_mknod(struct dentry *dentry);
 extern void ima_add_kexec_buffer(struct kimage *image);
 #endif
 
+#if defined(CONFIG_IMA_ARCH_POLICY) && defined(CONFIG_X86)
+extern const char * const *arch_get_ima_policy(void);
+#else
 static inline const char * const *arch_get_ima_policy(void)
 {
 	return NULL;
 }
+#endif
 
 #else
 static inline int ima_bprm_check(struct linux_binprm *bprm)
@@ -77,6 +81,10 @@ static inline void ima_post_path_mknod(struct dentry *dentry)
 	return;
 }
 
+static inline const char * const *arch_get_ima_policy(void)
+{
+	return NULL;
+}
 #endif /* CONFIG_IMA */
 
 #ifndef CONFIG_IMA_KEXEC
