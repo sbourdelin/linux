@@ -44,8 +44,17 @@ void arch_send_call_function_single_ipi(int cpu);
  */
 #define raw_smp_processor_id() (*((int*)((char*)get_current() + TASK_TI_CPU)))
 
-/* Interprocessor interrupt handler */
-irqreturn_t handle_ipi(void);
+/* Software interrupt handler */
+void riscv_software_interrupt(void);
+
+#else /* CONFIG_SMP */
+
+/*
+ * We currently only use software interrupts to pass inter-processor
+ * interrupts, so if a non-SMP system gets a software interrupt then we
+ * don't know what to do.
+ */
+#define riscv_software_interrupt()	WARN_ON()
 
 #endif /* CONFIG_SMP */
 
