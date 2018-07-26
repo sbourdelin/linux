@@ -227,9 +227,11 @@ int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
 	return -EINVAL;
 }
 
-static unsigned long ftrace_update_func;
+unsigned long ftrace_update_func;
+unsigned long ftrace_update_func_dest;
 
-static int update_ftrace_func(unsigned long ip, void *new)
+static int update_ftrace_func(unsigned long ip, void *new,
+			      unsigned long func)
 {
 	unsigned char old[MCOUNT_INSN_SIZE];
 	int ret;
@@ -237,6 +239,8 @@ static int update_ftrace_func(unsigned long ip, void *new)
 	memcpy(old, (void *)ip, MCOUNT_INSN_SIZE);
 
 	ftrace_update_func = ip;
+	ftrace_update_func_dest = func;
+
 	/* Make sure the breakpoints see the ftrace_update_func update */
 	smp_wmb();
 
@@ -257,13 +261,13 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
 	int ret;
 
 	new = ftrace_call_replace(ip, (unsigned long)func);
-	ret = update_ftrace_func(ip, new);
+	ret = update_ftrace_func(ip, new, (unsigned long)func);
 
 	/* Also update the regs callback function */
 	if (!ret) {
 		ip = (unsigned long)(&ftrace_regs_call);
 		new = ftrace_call_replace(ip, (unsigned long)func);
-		ret = update_ftrace_func(ip, new);
+		ret = update_ftrace_func(ip, new, (unsigned long)func);
 	}
 
 	return ret;
@@ -277,6 +281,10 @@ static int is_ftrace_caller(unsigned long ip)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_X86_64)
+extern char ftrace_int3_call_trampoline[];
+#endif
+
 /*
  * A breakpoint was added to the code address we are about to
  * modify, and this is the handle that will just skip over it.
@@ -287,6 +295,7 @@ static int is_ftrace_caller(unsigned long ip)
 int ftrace_int3_handler(struct pt_regs *regs)
 {
 	unsigned long ip;
+	unsigned long __maybe_unused eflags_if;
 
 	if (WARN_ON_ONCE(!regs))
 		return 0;
@@ -295,8 +304,33 @@ int ftrace_int3_handler(struct pt_regs *regs)
 	if (!ftrace_location(ip) && !is_ftrace_caller(ip))
 		return 0;
 
-	regs->ip += MCOUNT_INSN_SIZE - 1;
+#if IS_ENABLED(CONFIG_X86_64)
+	if (is_ftrace_caller(ip) && !ftrace_update_func_dest) {
+		/*
+		 * There's an update on ftrace_graph_call pending.
+		 * Just skip over it.
+		 */
+		regs->ip += MCOUNT_INSN_SIZE - 1;
+		return 1;
+	}
 
+	/*
+	 * Return to ftrace_int3_call_trampoline with interrupts
+	 * disabled in order to block ftrace's run_sync() IPIs
+	 * and keep ftrace_update_func_dest valid.
+	 */
+	eflags_if = regs->flags & X86_EFLAGS_IF;
+	regs->flags ^= eflags_if;
+	/*
+	 * The MSB of ip, which is a kernel address, is always one.
+	 * Abuse it to store EFLAGS.IF there.
+	 */
+	ip &= eflags_if << (BITS_PER_LONG - 1 - X86_EFLAGS_IF_BIT);
+	regs->r11 = ip;
+	regs->ip = (unsigned long)ftrace_int3_call_trampoline;
+#else /* !IS_ENABLED(CONFIG_X86_64) */
+	regs->ip += MCOUNT_INSN_SIZE - 1;
+#endif
 	return 1;
 }
 
@@ -870,7 +904,7 @@ void arch_ftrace_update_trampoline(struct ftrace_ops *ops)
 
 	/* Do a safe modify in case the trampoline is executing */
 	new = ftrace_call_replace(ip, (unsigned long)func);
-	ret = update_ftrace_func(ip, new);
+	ret = update_ftrace_func(ip, new, (unsigned long)func);
 	set_memory_ro(ops->trampoline, npages);
 
 	/* The update should never fail */
@@ -966,7 +1000,7 @@ static int ftrace_mod_jmp(unsigned long ip, void *func)
 
 	new = ftrace_jmp_replace(ip, (unsigned long)func);
 
-	return update_ftrace_func(ip, new);
+	return update_ftrace_func(ip, new, 0);
 }
 
 int ftrace_enable_ftrace_graph_caller(void)

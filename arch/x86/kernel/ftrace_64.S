@@ -9,6 +9,7 @@
 #include <asm/export.h>
 #include <asm/nospec-branch.h>
 #include <asm/unwind_hints.h>
+#include <asm/irqflags.h>
 
 	.code64
 	.section .entry.text, "ax"
@@ -260,6 +261,61 @@ GLOBAL(ftrace_regs_caller_end)
 	jmp ftrace_epilogue
 
 ENDPROC(ftrace_regs_caller)
+
+
+ENTRY(ftrace_int3_call_trampoline)
+	/*
+	 * A breakpoint was hit on what either had been or will become
+	 * a call insn. Mimic the function call here: push the desired
+	 * return address on the stack and jmp to the target function.
+	 * The inverted value of EFLAGS.IF is stored in %r11's high bit.
+	 * The remaining bits of %r11 store the break point address
+	 * (whose MSB is known to always be set, because it's a kernel
+	 * address).
+	 */
+	UNWIND_HINT_EMPTY
+	subq $8, %rsp
+	pushq %rax
+	movq $1, %rax
+	shlq $63, %rax
+	orq %r11, %rax   /* ip is in %rax now */
+
+	/* Prepare the on-stack return address. */
+	pushq %rax
+	addq $5, %rax    /* ip + MCOUNT_INSN_SIZE */
+	movq %rax, 16(%rsp)
+	popq %rax
+
+	/*
+	 * Determine where to redirect control flow to. There are
+	 * two cases:
+	 * 1.) The breakpoint is at either of ftrace_call,
+	 *     ftrace_regs_call or the callsite within a fops' trampoline.
+	 * 2.) The breakpoint is at an mcount callsite.
+	 *
+	 * For the first case, update_ftrace_func has setup
+	 * ftrace_update_func_dest to the target address.
+	 * For the second case, just branch to the most generic
+	 * ftrace_regs_caller which will then do the right thing.
+	 */
+	cmpq %rax, ftrace_update_func(%rip)
+	jne 1f
+	movq ftrace_update_func_dest(%rip), %rax
+	jmp 2f
+1:
+	leaq ftrace_regs_caller(%rip), %rax
+2:
+	/* Restore EFLAGS.IF */
+	btq $63, %r11
+	jnc 3f
+	sti
+	TRACE_IRQS_ON
+3:
+	mov %rax, %r11
+	popq %rax
+
+	JMP_NOSPEC %r11
+END(ftrace_int3_call_trampoline)
 
 
 #else /* ! CONFIG_DYNAMIC_FTRACE */
