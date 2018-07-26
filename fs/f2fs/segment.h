@@ -342,6 +342,12 @@ static inline unsigned int get_valid_blocks(struct f2fs_sb_info *sbi,
 		return get_seg_entry(sbi, segno)->valid_blocks;
 }
 
+static inline unsigned int get_ckpt_valid_blocks(struct f2fs_sb_info *sbi,
+				unsigned int segno)
+{
+	return get_seg_entry(sbi, segno)->ckpt_valid_blocks;
+}
+
 static inline void seg_info_from_raw_sit(struct seg_entry *se,
 					struct f2fs_sit_entry *rs)
 {
@@ -522,6 +528,26 @@ static inline unsigned int dirty_segments(struct f2fs_sb_info *sbi)
 		DIRTY_I(sbi)->nr_dirty[DIRTY_HOT_NODE] +
 		DIRTY_I(sbi)->nr_dirty[DIRTY_WARM_NODE] +
 		DIRTY_I(sbi)->nr_dirty[DIRTY_COLD_NODE];
+}
+
+void __locate_dirty_segment(struct f2fs_sb_info *sbi,
+		unsigned int segno, enum dirty_type dirty_type);
+
+void __remove_dirty_segment(struct f2fs_sb_info *sbi,
+		unsigned int segno, enum dirty_type dirty_type);
+
+/* This moves currently empty dirty blocks to prefree. Must hold seglist_lock */
+static inline void dirty_to_prefree(struct f2fs_sb_info *sbi)
+{
+	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
+	unsigned int segno;
+
+	for_each_set_bit(segno, dirty_i->dirty_segmap[DIRTY], MAIN_SEGS(sbi)) {
+		if (!get_valid_blocks(sbi, segno, false)) {
+			__locate_dirty_segment(sbi, segno, PRE);
+			__remove_dirty_segment(sbi, segno, DIRTY);
+		}
+	}
 }
 
 static inline int overprovision_segments(struct f2fs_sb_info *sbi)
