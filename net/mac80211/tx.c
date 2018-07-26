@@ -3601,7 +3601,7 @@ void __ieee80211_subif_start_xmit(struct sk_buff *skb,
 		 * second, so 8 is ~4ms of queued data. Only affects local TCP
 		 * sockets.
 		 */
-		sk_pacing_shift_update(skb->sk, 8);
+		sk_pacing_shift_update(skb->sk, sdata->local->hw.tx_sk_pacing_shift);
 
 		fast_tx = rcu_dereference(sta->fast_tx);
 
