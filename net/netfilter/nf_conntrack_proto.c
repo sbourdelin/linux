@@ -474,6 +474,10 @@ static void __nf_ct_l4proto_unregister_one(const struct nf_conntrack_l4proto *l4
 			) != l4proto);
 	rcu_assign_pointer(nf_ct_protos[l4proto->l3proto][l4proto->l4proto],
 			   &nf_conntrack_l4proto_generic);
+
+	synchronize_net();
+	/* Remove all contrack entries for this protocol */
+	nf_ct_iterate_destroy(kill_l4proto, (void *)l4proto);
 }
 
 void nf_ct_l4proto_unregister_one(const struct nf_conntrack_l4proto *l4proto)
@@ -481,8 +485,6 @@ void nf_ct_l4proto_unregister_one(const struct nf_conntrack_l4proto *l4proto)
 	mutex_lock(&nf_ct_proto_mutex);
 	__nf_ct_l4proto_unregister_one(l4proto);
 	mutex_unlock(&nf_ct_proto_mutex);
-
-	synchronize_rcu();
 }
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_unregister_one);
 
@@ -549,10 +551,6 @@ void nf_ct_l4proto_unregister(const struct nf_conntrack_l4proto * const l4proto[
 	while (num_proto-- != 0)
 		__nf_ct_l4proto_unregister_one(l4proto[num_proto]);
 	mutex_unlock(&nf_ct_proto_mutex);
-
-	synchronize_net();
-	/* Remove all contrack entries for this protocol */
-	nf_ct_iterate_destroy(kill_l4proto, (void *)l4proto);
 }
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_unregister);
 
