@@ -2274,6 +2274,19 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 	if (sysctl_unprivileged_bpf_disabled && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
+	if (cmd == BPF_SYNCHRONIZE_MAPS) {
+		if (uattr != NULL || size != 0)
+			return -EINVAL;
+		err = security_bpf(cmd, NULL, 0);
+		if (err < 0)
+			return err;
+		/* BPF programs always enter a critical section while
+		 * they have a map reference outstanding.
+		 */
+		synchronize_rcu();
+		return 0;
+	}
+
 	err = bpf_check_uarg_tail_zero(uattr, sizeof(attr), size);
 	if (err)
 		return err;

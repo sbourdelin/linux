@@ -75,6 +75,14 @@ struct bpf_lpm_trie_key {
 	__u8	data[0];	/* Arbitrary size */
 };
 
+/* BPF_SYNCHRONIZE_MAPS waits for the release of any references to a
+ * BPF map made by a BPF program that is running at the time the
+ * BPF_SYNCHRONIZE_MAPS command is issued. The purpose of this command
+ * is to provide a means for userspace to replace a BPF map with
+ * another, newer version, then ensure that no component is still
+ * using the "old" map before manipulating the "old" map in some way.
+ */
+
 /* BPF syscall commands, see bpf(2) man-page for details. */
 enum bpf_cmd {
 	BPF_MAP_CREATE,
@@ -98,6 +106,7 @@ enum bpf_cmd {
 	BPF_BTF_LOAD,
 	BPF_BTF_GET_FD_BY_ID,
 	BPF_TASK_FD_QUERY,
+	BPF_SYNCHRONIZE_MAPS,
 };
 
 enum bpf_map_type {
