@@ -155,6 +155,21 @@ static u32 mpic_infos[][MPIC_IDX_END] = {
 
 #endif /* CONFIG_MPIC_WEIRD */
 
+static void mpic_show_irq_ranges(struct mpic *mpic)
+{
+	int i;
+
+	pr_info("mpic: Initializing for %d sources\n", mpic->num_sources);
+
+	if (mpic->num_ranges) {
+		pr_info(" Supported source of interrupt ranges\n");
+		for (i = 0; i < mpic->num_ranges; i++)
+			pr_info("  > %d - %d\n", mpic->irq_ranges[i].start_irq,
+				mpic->irq_ranges[i].end_irq);
+
+	}
+}
+
 static int mpic_irq_source_invalid(struct mpic *mpic, unsigned int irq)
 {
 	int i;
@@ -1646,8 +1661,7 @@ void __init mpic_init(struct mpic *mpic)
 	int num_timers = 4;
 
 	BUG_ON(mpic->num_sources == 0);
-
-	printk(KERN_INFO "mpic: Initializing for %d sources\n", mpic->num_sources);
+	mpic_show_irq_ranges(mpic);
 
 	/* Set current processor priority to max */
 	mpic_cpu_write(MPIC_INFO(CPU_CURRENT_TASK_PRI), 0xf);
