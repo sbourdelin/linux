@@ -2518,11 +2518,35 @@ static bool pgdat_memcg_congested(pg_data_t *pgdat, struct mem_cgroup *memcg)
 		(memcg && memcg_congested(pgdat, memcg));
 }
 
+bool direct_reclaim_reach_sflimit(pg_data_t *pgdat, unsigned long nr_reclaimed,
+		unsigned long nr_scanned, gfp_t gfp_mask,
+		int order)
+{
+	struct scan_control sc = {
+		.gfp_mask = gfp_mask,
+		.order = order,
+		.priority = DEF_PRIORITY,
+		.nr_reclaimed = nr_reclaimed,
+		.nr_scanned = nr_scanned,
+	};
+	if (!current_is_kswapd() && !should_continue_reclaim(pgdat,
+				sc.nr_reclaimed, sc.nr_scanned, &sc))
+		return true;
+	return false;
+}
+EXPORT_SYMBOL(direct_reclaim_reach_sflimit);
+
 static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 {
 	struct reclaim_state *reclaim_state = current->reclaim_state;
 	unsigned long nr_reclaimed, nr_scanned;
 	bool reclaimable = false;
+
+	if (!current_is_kswapd() && !should_continue_reclaim(pgdat,
+		sc->nr_reclaimed, sc->nr_scanned, sc)) {
+
+		return !!sc->nr_reclaimed;
+	}
 
 	do {
 		struct mem_cgroup *root = sc->target_mem_cgroup;

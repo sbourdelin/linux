@@ -2570,6 +2570,9 @@ unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 			(next_mz == NULL ||
 			loop > MEM_CGROUP_MAX_SOFT_LIMIT_RECLAIM_LOOPS))
 			break;
+		if (direct_reclaim_reach_sflimit(pgdat, nr_reclaimed,
+					*total_scanned, gfp_mask, order))
+			break;
 	} while (!nr_reclaimed);
 	if (next_mz)
 		css_put(&next_mz->memcg->css);

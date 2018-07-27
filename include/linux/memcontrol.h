@@ -298,7 +298,8 @@ void mem_cgroup_uncharge(struct page *page);
 void mem_cgroup_uncharge_list(struct list_head *page_list);
 
 void mem_cgroup_migrate(struct page *oldpage, struct page *newpage);
-
+bool direct_reclaim_reach_sflimit(pg_data_t *pgdat, unsigned long nr_reclaimed,
+			unsigned long nr_scanned, gfp_t gfp_mask, int order);
 static struct mem_cgroup_per_node *
 mem_cgroup_nodeinfo(struct mem_cgroup *memcg, int nid)
 {
