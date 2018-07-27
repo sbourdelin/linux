@@ -1217,25 +1217,32 @@ static int mpic_get_last_irq_source(struct mpic *mpic,
 	u32 last_irq;
 	u32 greg_feature;
 
+	/* Current priority order for getting last irq:
+	 *  1) irq_count from platform
+	 *  2) "last-interrupt-source" from device tree
+	 *  3) isu_size from platform
+	 *  4) MPIC h/w GREG_FEATURE_0 register
+	 */
+
+	if (irq_count)
+		return (irq_count - 1);
+
+	if (!of_property_read_u32(mpic->node, "last-interrupt-source",
+				  &last_irq)) {
+		return last_irq;
+	}
+
+	if (isu_size)
+		return (isu_size  * MPIC_MAX_ISU - 1);
+
 	/*
-	 * Read feature register.  For non-ISU MPICs, num sources as well. On
+	 * Read feature register. For non-ISU MPICs, num sources as well. On
 	 * ISU MPICs, sources are counted as ISUs are added
 	 */
 	greg_feature = mpic_read(mpic->gregs, MPIC_INFO(GREG_FEATURE_0));
 
-	/*
-	 * By default, the last source number comes from the MPIC, but the
-	 * device-tree and board support code can override it on buggy hw.
-	 * If we get passed an isu_size (multi-isu MPIC) then we use that
-	 * as a default instead of the value read from the HW.
-	 */
 	last_irq = (greg_feature & MPIC_GREG_FEATURE_LAST_SRC_MASK)
 				>> MPIC_GREG_FEATURE_LAST_SRC_SHIFT;
-	if (isu_size)
-		last_irq = isu_size  * MPIC_MAX_ISU - 1;
-	of_property_read_u32(mpic->node, "last-interrupt-source", &last_irq);
-	if (irq_count)
-		last_irq = irq_count - 1;
 
 	return last_irq;
 }
