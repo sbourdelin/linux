@@ -57,6 +57,11 @@ void __init mpc85xx_rdb_pic_init(void)
 			MPIC_BIG_ENDIAN |
 			MPIC_SINGLE_DEST_CPU,
 			0, 256, " OpenPIC  ");
+	} else if (of_machine_is_compatible("fsl,P2020RDB-PC")) {
+		mpic = mpic_alloc(NULL, 0,
+		  MPIC_BIG_ENDIAN |
+		  MPIC_SINGLE_DEST_CPU,
+		  0, 0, " OpenPIC  ");
 	} else {
 		mpic = mpic_alloc(NULL, 0,
 		  MPIC_BIG_ENDIAN |

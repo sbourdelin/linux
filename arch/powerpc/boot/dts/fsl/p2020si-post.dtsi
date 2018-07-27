@@ -192,6 +192,9 @@
 /include/ "pq3-sec3.1-0.dtsi"
 /include/ "pq3-mpic.dtsi"
 /include/ "pq3-mpic-timer-B.dtsi"
+	pic@40000 {
+		supported-irq-ranges = <0 11 16 79 176 183 224 231>;
+	};
 
 	global-utilities@e0000 {
 		compatible = "fsl,p2020-guts";
