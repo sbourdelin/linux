@@ -276,7 +276,7 @@ void aio_port_reset(struct uniphier_aio_sub *sub)
  *
  * Return: Zero if successful, otherwise a negative value on error.
  */
-int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate)
+static int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate)
 {
 	struct regmap *r = sub->aio->chip->regmap;
 	struct device *dev = &sub->aio->chip->pdev->dev;
@@ -395,7 +395,7 @@ int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate)
  *
  * Return: Zero if successful, otherwise a negative value on error.
  */
-int aio_port_set_fmt(struct uniphier_aio_sub *sub)
+static int aio_port_set_fmt(struct uniphier_aio_sub *sub)
 {
 	struct regmap *r = sub->aio->chip->regmap;
 	struct device *dev = &sub->aio->chip->pdev->dev;
@@ -460,7 +460,7 @@ int aio_port_set_fmt(struct uniphier_aio_sub *sub)
  *
  * Return: Zero if successful, otherwise a negative value on error.
  */
-int aio_port_set_clk(struct uniphier_aio_sub *sub)
+static int aio_port_set_clk(struct uniphier_aio_sub *sub)
 {
 	struct uniphier_aio_chip *chip = sub->aio->chip;
 	struct device *dev = &sub->aio->chip->pdev->dev;
