@@ -4691,10 +4691,13 @@ static int ath10k_start(struct ieee80211_hw *hw)
 	}
 
 	param = ar->wmi.pdev_param->idle_ps_config;
-	ret = ath10k_wmi_pdev_set_param(ar, param, 1);
-	if (ret && ret != -EOPNOTSUPP) {
-		ath10k_warn(ar, "failed to enable idle_ps_config: %d\n", ret);
-		goto err_core_stop;
+	if (param != WMI_PDEV_PARAM_UNSUPPORTED) {
+		ret = ath10k_wmi_pdev_set_param(ar, param, 1);
+		if (ret) {
+			ath10k_warn(ar, "failed to enable idle_ps_config: %d\n",
+				    ret);
+			goto err_core_stop;
+		}
 	}
 
 	__ath10k_set_antenna(ar, ar->cfg_tx_chainmask, ar->cfg_rx_chainmask);
@@ -6810,7 +6813,8 @@ ath10k_mac_update_bss_chan_survey(struct ath10k *ar,
 
 	ret = ath10k_wmi_pdev_bss_chan_info_request(ar, type);
 	if (ret) {
-		ath10k_warn(ar, "failed to send pdev bss chan info request\n");
+		ath10k_warn(ar, "failed to send pdev bss chan info request: %d\n",
+			    ret);
 		return;
 	}
 
