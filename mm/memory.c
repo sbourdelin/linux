@@ -2943,7 +2943,8 @@ int do_swap_page(struct vm_fault *vmf)
 				__SetPageSwapBacked(page);
 				set_page_private(page, entry.val);
 				lru_cache_add_anon(page);
-				swap_readpage(page, true);
+				if (swap_readpage(page, true))
+					goto out_page;
 			}
 		} else {
 			page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE,
