@@ -21,6 +21,7 @@
 #error "Incorrect ctop.h include"
 #endif
 
+#include <asm-generic/types.h>
 #include <soc/nps/common.h>
 
 /* core auxiliary registers */
