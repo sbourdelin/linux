@@ -1625,6 +1625,10 @@ static ssize_t f2fs_quota_write(struct super_block *sb, int type,
 	int tocopy;
 
 	while (towrite > 0) {
+
+		if (unlikely(f2fs_cp_error(F2FS_I_SB(inode))))
+			return len;
+
 		tocopy = min_t(unsigned long, sb->s_blocksize - offset,
 								towrite);
 retry:
