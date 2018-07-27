@@ -2359,6 +2359,8 @@ bpf_perf_event_read_simple(void *mem, unsigned long size,
 
 	begin = base + data_tail % size;
 	end = base + data_head % size;
+	if (begin == end)
+		return LIBBPF_PERF_EVENT_ERROR;
 
 	while (begin != end) {
 		struct perf_event_header *ehdr;
