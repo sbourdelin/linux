@@ -77,6 +77,14 @@ PROPERTIES
           in the global feature registers.  If specified, this field will
           override the value read from MPIC_GREG_FEATURE_LAST_SRC.
 
+ - supported-irq-ranges
+      Usage: optional
+      Value type: <prop-encoded-array>
+      Definition: This encodes arbitrary number of start-irq and end-irq
+          pairs, both including. Interrupt source supported by an MPIC
+          may not be contigous, in that case this property will be used
+          to pass supported source of interrupt ranges.
+
 INTERRUPT SPECIFIER DEFINITION
 
   Interrupt specifiers consists of 4 cells encoded as

@@ -155,6 +155,23 @@ static u32 mpic_infos[][MPIC_IDX_END] = {
 
 #endif /* CONFIG_MPIC_WEIRD */
 
+static int mpic_irq_source_invalid(struct mpic *mpic, unsigned int irq)
+{
+	int i;
+
+	for (i = 0; i < mpic->num_ranges; i++) {
+		if ((irq >= mpic->irq_ranges[i].start_irq) &&
+			(irq <= mpic->irq_ranges[i].end_irq))
+			return 0;
+	}
+
+	/* if not supported irq-ranges then check for num_sources */
+	if (!mpic->num_ranges && irq < mpic->num_sources)
+		return 0;
+
+	return -EINVAL;
+}
+
 static inline unsigned int mpic_processor_id(struct mpic *mpic)
 {
 	unsigned int cpu = 0;
@@ -873,8 +890,10 @@ int mpic_set_irq_type(struct irq_data *d, unsigned int flow_type)
 	DBG("mpic: set_irq_type(mpic:@%p,virq:%d,src:0x%x,type:0x%x)\n",
 	    mpic, d->irq, src, flow_type);
 
-	if (src >= mpic->num_sources)
+	if (mpic_irq_source_invalid(mpic, src)) {
+		WARN(1, "mpic: Reserved IRQ source %d\n", src);
 		return -EINVAL;
+	}
 
 	vold = mpic_irq_read(src, MPIC_INFO(IRQ_VECTOR_PRI));
 
@@ -933,8 +952,10 @@ void mpic_set_vector(unsigned int virq, unsigned int vector)
 	DBG("mpic: set_vector(mpic:@%p,virq:%d,src:%d,vector:0x%x)\n",
 	    mpic, virq, src, vector);
 
-	if (src >= mpic->num_sources)
+	if (mpic_irq_source_invalid(mpic, src)) {
+		WARN(1, "mpic: Reserved IRQ source %d\n", src);
 		return;
+	}
 
 	vecpri = mpic_irq_read(src, MPIC_INFO(IRQ_VECTOR_PRI));
 	vecpri = vecpri & ~MPIC_INFO(VECPRI_VECTOR_MASK);
@@ -950,8 +971,10 @@ static void mpic_set_destination(unsigned int virq, unsigned int cpuid)
 	DBG("mpic: set_destination(mpic:@%p,virq:%d,src:%d,cpuid:0x%x)\n",
 	    mpic, virq, src, cpuid);
 
-	if (src >= mpic->num_sources)
+	if (mpic_irq_source_invalid(mpic, src)) {
+		WARN(1, "mpic: Reserved IRQ source %d\n", src);
 		return;
+	}
 
 	mpic_irq_write(src, MPIC_INFO(IRQ_DESTINATION), 1 << cpuid);
 }
@@ -1038,7 +1061,7 @@ static int mpic_host_map(struct irq_domain *h, unsigned int virq,
 	if (mpic_map_error_int(mpic, virq, hw))
 		return 0;
 
-	if (hw >= mpic->num_sources) {
+	if (mpic_irq_source_invalid(mpic, hw)) {
 		pr_warn("mpic: Mapping of source 0x%x failed, source out of range !\n",
 			(unsigned int)hw);
 		return -EINVAL;
@@ -1210,6 +1233,52 @@ u32 fsl_mpic_primary_get_version(void)
 	return 0;
 }
 
+static u32 mpic_last_irq_from_ranges(struct mpic *mpic)
+{
+	int i;
+	u32 last_irq = 0;
+
+	for (i = 0; i < mpic->num_ranges; i++)
+		if (last_irq < mpic->irq_ranges[i].end_irq)
+			last_irq = mpic->irq_ranges[i].end_irq;
+
+	return last_irq;
+}
+
+static int __init mpic_init_irq_ranges(struct mpic *mpic)
+{
+	const u32 *irq_ranges;
+	u32 len, count;
+	int i;
+
+	irq_ranges = of_get_property(mpic->node, "supported-irq-ranges", &len);
+	if (irq_ranges == NULL) {
+		pr_info("%s : supported-irq-ranges not found in mpic(%p)\n",
+			__func__, mpic->node);
+		return -1;
+	}
+
+	if (len % (2 * sizeof(u32)) != 0) {
+		pr_info("%s : incorrect irq ranges in mpic(%p)\n",
+			__func__, mpic->node);
+		return -1;
+	}
+
+	count = len / (2 * sizeof(u32));
+	mpic->irq_ranges = kcalloc(count, sizeof(struct mpic_irq_range),
+				   GFP_KERNEL);
+	if (mpic->irq_ranges == NULL)
+		return -1;
+
+	mpic->num_ranges = count;
+	for (i = 0; i < count; i++) {
+		mpic->irq_ranges[i].start_irq = *irq_ranges++;
+		mpic->irq_ranges[i].end_irq = *irq_ranges++;
+	}
+
+	return 0;
+}
+
 static int mpic_get_last_irq_source(struct mpic *mpic,
 				    unsigned int irq_count,
 				    unsigned int isu_size)
@@ -1219,13 +1288,17 @@ static int mpic_get_last_irq_source(struct mpic *mpic,
 
 	/* Current priority order for getting last irq:
 	 *  1) irq_count from platform
-	 *  2) "last-interrupt-source" from device tree
-	 *  3) isu_size from platform
-	 *  4) MPIC h/w GREG_FEATURE_0 register
+	 *  2) "supported-irq-ranges" from device tree
+	 *  3) "last-interrupt-source" from device tree
+	 *  4) isu_size from platform
+	 *  5) MPIC h/w GREG_FEATURE_0 register
 	 */
 
 	if (irq_count)
 		return (irq_count - 1);
+
+	if (!mpic_init_irq_ranges(mpic))
+		return mpic_last_irq_from_ranges(mpic);
 
 	if (!of_property_read_u32(mpic->node, "last-interrupt-source",
 				  &last_irq)) {
@@ -1632,6 +1705,10 @@ void __init mpic_init(struct mpic *mpic)
 			u32 vecpri = MPIC_VECPRI_MASK | i |
 				(8 << MPIC_VECPRI_PRIORITY_SHIFT);
 
+			/* Skip if source irq not valid */
+			if (mpic_irq_source_invalid(mpic, i))
+				continue;
+
 			/* check if protected */
 			if (mpic->protected && test_bit(i, mpic->protected))
 				continue;
@@ -1732,9 +1809,14 @@ void mpic_setup_this_cpu(void)
 	 * values of irq_desc[].affinity in irq.c.
  	 */
 	if (distribute_irqs && !(mpic->flags & MPIC_SINGLE_DEST_CPU)) {
-	 	for (i = 0; i < mpic->num_sources ; i++)
+		for (i = 0; i < mpic->num_sources ; i++) {
+			/* Skip if irq source is not valid */
+			if (mpic_irq_source_invalid(mpic, i))
+				continue;
+
 			mpic_irq_write(i, MPIC_INFO(IRQ_DESTINATION),
 				mpic_irq_read(i, MPIC_INFO(IRQ_DESTINATION)) | msk);
+		}
 	}
 
 	/* Set current processor priority to 0 */
@@ -1772,9 +1854,14 @@ void mpic_teardown_this_cpu(int secondary)
 	raw_spin_lock_irqsave(&mpic_lock, flags);
 
 	/* let the mpic know we don't want intrs.  */
-	for (i = 0; i < mpic->num_sources ; i++)
+	for (i = 0; i < mpic->num_sources ; i++) {
+		/* Skip if irq not valid */
+		if (mpic_irq_source_invalid(mpic, i))
+			continue;
+
 		mpic_irq_write(i, MPIC_INFO(IRQ_DESTINATION),
 			mpic_irq_read(i, MPIC_INFO(IRQ_DESTINATION)) & ~msk);
+	}
 
 	/* Set current processor priority to max */
 	mpic_cpu_write(MPIC_INFO(CPU_CURRENT_TASK_PRI), 0xf);
@@ -1958,6 +2045,10 @@ static void mpic_suspend_one(struct mpic *mpic)
 	int i;
 
 	for (i = 0; i < mpic->num_sources; i++) {
+		/* Skip if irq source not valid */
+		if (mpic_irq_source_invalid(mpic, i))
+			continue;
+
 		mpic->save_data[i].vecprio =
 			mpic_irq_read(i, MPIC_INFO(IRQ_VECTOR_PRI));
 		mpic->save_data[i].dest =
@@ -1982,6 +2073,10 @@ static void mpic_resume_one(struct mpic *mpic)
 	int i;
 
 	for (i = 0; i < mpic->num_sources; i++) {
+		/* Skip if irq source not valid */
+		if (mpic_irq_source_invalid(mpic, i))
+			continue;
+
 		mpic_irq_write(i, MPIC_INFO(IRQ_VECTOR_PRI),
 			       mpic->save_data[i].vecprio);
 		mpic_irq_write(i, MPIC_INFO(IRQ_DESTINATION),

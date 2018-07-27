@@ -252,6 +252,11 @@ struct mpic_irq_save {
 #endif
 };
 
+struct mpic_irq_range {
+	u32	start_irq;
+	u32	end_irq;
+};
+
 /* The instance data of a given MPIC */
 struct mpic
 {
@@ -280,6 +285,10 @@ struct mpic
 	unsigned int		isu_mask;
 	/* Number of sources */
 	unsigned int		num_sources;
+
+	/* Supported source ranges */
+	unsigned int num_ranges;
+	struct mpic_irq_range	*irq_ranges;
 
 	/* vector numbers used for internal sources (ipi/timers) */
 	unsigned int		ipi_vecs[4];
