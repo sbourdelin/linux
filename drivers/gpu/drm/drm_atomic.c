@@ -905,7 +905,6 @@ plane_switching_crtc(struct drm_atomic_state *state,
 static int drm_atomic_plane_check(struct drm_plane *plane,
 		struct drm_plane_state *state)
 {
-	unsigned int fb_width, fb_height;
 	int ret;
 
 	/* either *both* CRTC and FB must be set, or neither */
@@ -950,24 +949,11 @@ static int drm_atomic_plane_check(struct drm_plane *plane,
 		return -ERANGE;
 	}
 
-	fb_width = state->fb->width << 16;
-	fb_height = state->fb->height << 16;
-
 	/* Make sure source coordinates are inside the fb. */
-	if (state->src_w > fb_width ||
-	    state->src_x > fb_width - state->src_w ||
-	    state->src_h > fb_height ||
-	    state->src_y > fb_height - state->src_h) {
-		DRM_DEBUG_ATOMIC("Invalid source coordinates "
-				 "%u.%06ux%u.%06u+%u.%06u+%u.%06u (fb %ux%u)\n",
-				 state->src_w >> 16, ((state->src_w & 0xffff) * 15625) >> 10,
-				 state->src_h >> 16, ((state->src_h & 0xffff) * 15625) >> 10,
-				 state->src_x >> 16, ((state->src_x & 0xffff) * 15625) >> 10,
-				 state->src_y >> 16, ((state->src_y & 0xffff) * 15625) >> 10,
-				 state->fb->width, state->fb->height);
-		return -ENOSPC;
-	}
-
+	ret = drm_framebuffer_check_src_coords(state->src_x, state->src_y,
+		state->src_w, state->src_h, state->fb);
+	if (ret)
+		return ret;
 	if (plane_switching_crtc(state->state, plane, state)) {
 		DRM_DEBUG_ATOMIC("[PLANE:%d:%s] switching CRTC directly\n",
 				 plane->base.id, plane->name);
