@@ -7,6 +7,10 @@
  * for Clang compiler
  */
 
+#define CLANG_VERSION (__clang_major__ * 10000	\
+		       + __clang_minor__ * 100	\
+		       + __clang_patchlevel__)
+
 #ifdef uninitialized_var
 #undef uninitialized_var
 #define uninitialized_var(x) x = *(&(x))
@@ -45,4 +49,19 @@
     __has_builtin(__builtin_add_overflow) && \
     __has_builtin(__builtin_sub_overflow)
 #define COMPILER_HAS_GENERIC_BUILTIN_OVERFLOW 1
+#endif
+
+#define __diag_str1(s) #s
+#define __diag_str(s) __diag_str1(s)
+#define __diag(s) _Pragma(__diag_str(clang diagnostic s))
+#define __diag_CLANG_ignore ignored
+#define __diag_CLANG_warn warning
+#define __diag_CLANG_error error
+#define __diag_CLANG(version, severity, s) \
+	__diag_CLANG_ ## version(__diag_CLANG_ ## severity s)
+
+#if CLANG_VERSION >= 70000
+#define __diag_CLANG_7(s) __diag(s)
+#else
+#define __diag_CLANG_7(s)
 #endif
