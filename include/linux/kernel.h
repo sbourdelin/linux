@@ -168,7 +168,15 @@
 
 
 #define _RET_IP_		(unsigned long)__builtin_return_address(0)
-#define _THIS_IP_  ({ __label__ __here; __here: (unsigned long)&&__here; })
+#define _THIS_IP_  (							\
+{									\
+	__label__ __here;						\
+	__diag_push()							\
+	__diag_ignore(CLANG, 7, "-Wreturn-stack-address", "")		\
+__here: (unsigned long)&&__here;					\
+	__diag_pop()							\
+}									\
+)
 
 #ifdef CONFIG_LBDAF
 # include <asm/div64.h>
