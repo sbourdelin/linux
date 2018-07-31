@@ -3254,6 +3254,9 @@ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 		enable_irq(data->oob_wake_irq);
 	}
 
+	if (!PMSG_IS_AUTO(message) && pm_suspend_via_firmware())
+		interface_to_usbdev(intf)->quirks |= USB_QUIRK_DISCONNECT_SUSPEND;
+
 	return 0;
 }
 
@@ -3297,6 +3300,9 @@ static int btusb_resume(struct usb_interface *intf)
 
 	if (--data->suspend_count)
 		return 0;
+
+	if (pm_resume_via_firmware())
+		interface_to_usbdev(intf)->quirks &= ~USB_QUIRK_DISCONNECT_SUSPEND;
 
 	/* Disable only if not already disabled (keep it balanced) */
 	if (test_and_clear_bit(BTUSB_OOB_WAKE_ENABLED, &data->flags)) {
