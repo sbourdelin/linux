@@ -156,6 +156,38 @@ struct media_link {
 };
 
 /**
+ * struct media_pad_signal_type - type of the signal inside a media pad
+ *
+ * @PAD_SIGNAL_DEFAULT
+ *	Default signal. Use this when all inputs or all outputs are
+ *	uniquely identified by just its number and all carries the same
+ *	signal type
+ * @PAD_SIGNAL_RF
+ *	The pad contains a Radio Frequency, Intermediate Frequency or
+ *	baseband signal.
+ *	All Tuner sinks should use it.
+ *	On tuner sources, this is used for digital TV demodulators and for
+ *	IF-PLL demodulator like tda9887.
+ * @PAD_SIGNAL_CARRIERS
+ *	The pad contains analog signals carrying either a digital or an analog
+ *	modulated (or baseband) signal. This is provided by tuner source
+ *	pads and used by analog TV standard decoders and by digital tv demods.
+ * @PAD_SIGNAL_ATV_VIDEO
+ *	Contains a bitstream of samples from an analog TV video source, with
+ *	usually contains the VBI data on it.
+ * @PAD_SIGNAL_AUDIO
+ *	Contains an Intermediate Frequency analog signal from an audio
+ *	sub-carrier or an audio bitstream. Provided by tuners and consumed by audio AM/FM decoders.
+ */
+enum media_pad_signal_type {
+	PAD_SIGNAL_DEFAULT = 0,
+	PAD_SIGNAL_RF,
+	PAD_SIGNAL_CARRIERS,
+	PAD_SIGNAL_ATV_VIDEO,
+	PAD_SIGNAL_AUDIO,
+};
+
+/**
  * struct media_pad - A media pad graph object.
  *
  * @graph_obj:	Embedded structure containing the media object common data
@@ -169,6 +201,7 @@ struct media_pad {
 	struct media_gobj graph_obj;	/* must be first field in struct */
 	struct media_entity *entity;
 	u16 index;
+	enum media_pad_signal_type sig_type;
 	unsigned long flags;
 };
 

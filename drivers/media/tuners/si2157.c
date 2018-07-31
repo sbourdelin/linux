@@ -469,8 +469,11 @@ static int si2157_probe(struct i2c_client *client,
 		dev->ent.function = MEDIA_ENT_F_TUNER;
 
 		dev->pad[TUNER_PAD_RF_INPUT].flags = MEDIA_PAD_FL_SINK;
+		dev->pad[TUNER_PAD_RF_INPUT].sig_type = PAD_SIGNAL_RF;
 		dev->pad[TUNER_PAD_OUTPUT].flags = MEDIA_PAD_FL_SOURCE;
+		dev->pad[TUNER_PAD_OUTPUT].sig_type = PAD_SIGNAL_CARRIERS;
 		dev->pad[TUNER_PAD_AUD_OUT].flags = MEDIA_PAD_FL_SOURCE;
+		dev->pad[TUNER_PAD_AUD_OUT].sig_type = PAD_SIGNAL_AUDIO;
 
 		ret = media_entity_pads_init(&dev->ent, TUNER_NUM_PADS,
 					     &dev->pad[0]);
