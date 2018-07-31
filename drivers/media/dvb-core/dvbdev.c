@@ -610,6 +610,28 @@ static int dvb_create_io_intf_links(struct dvb_adapter *adap,
 	return 0;
 }
 
+static int get_pad_index(struct media_entity *entity, bool is_sink,
+			 enum media_pad_signal_type sig_type)
+{
+	int i;
+	bool pad_is_sink;
+
+	for (i = 0; i < entity->num_pads; i++) {
+		if (entity->pads[i].flags == MEDIA_PAD_FL_SINK)
+			pad_is_sink = true;
+		else if (entity->pads[i].flags == MEDIA_PAD_FL_SOURCE)
+			pad_is_sink = false;
+		else
+			continue;	/* This is an error! */
+
+		if (pad_is_sink != is_sink)
+			continue;
+		if (entity->pads[i].sig_type == sig_type)
+			return i;
+	}
+	return -EINVAL;
+}
+
 int dvb_create_media_graph(struct dvb_adapter *adap,
 			   bool create_rf_connector)
 {
@@ -621,7 +643,7 @@ int dvb_create_media_graph(struct dvb_adapter *adap,
 	unsigned demux_pad = 0;
 	unsigned dvr_pad = 0;
 	unsigned ntuner = 0, ndemod = 0;
-	int ret;
+	int ret, pad_source, pad_sink;
 	static const char *connector_name = "Television";
 
 	if (!mdev)
@@ -681,7 +703,7 @@ int dvb_create_media_graph(struct dvb_adapter *adap,
 		if (ret)
 			return ret;
 
-		if (!ntuner)
+		if (!ntuner) {
 			ret = media_create_pad_links(mdev,
 						     MEDIA_ENT_F_CONN_RF,
 						     conn, 0,
@@ -689,19 +711,26 @@ int dvb_create_media_graph(struct dvb_adapter *adap,
 						     demod, 0,
 						     MEDIA_LNK_FL_ENABLED,
 						     false);
-		else
+		} else {
+			pad_sink = get_pad_index(tuner, true, PAD_SIGNAL_RF);
+			if (pad_sink < 0)
+				return -EINVAL;
 			ret = media_create_pad_links(mdev,
 						     MEDIA_ENT_F_CONN_RF,
 						     conn, 0,
 						     MEDIA_ENT_F_TUNER,
-						     tuner, TUNER_PAD_RF_INPUT,
+						     tuner, pad_sink,
 						     MEDIA_LNK_FL_ENABLED,
 						     false);
+		}
 		if (ret)
 			return ret;
 	}
 
 	if (ntuner && ndemod) {
+		pad_source = get_pad_index(tuner, true, PAD_SIGNAL_RF);
+		if (pad_source)
+			return -EINVAL;
 		ret = media_create_pad_links(mdev,
 					     MEDIA_ENT_F_TUNER,
 					     tuner, TUNER_PAD_OUTPUT,
