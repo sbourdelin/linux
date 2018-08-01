@@ -109,5 +109,25 @@
 		wifi@a800000 {
 			status = "ok";
 		};
+
+		usb3_ss_phy: usb-phy@9a000 {
+			status = "ok";
+		};
+
+		usb3_hs_phy: usb-phy@a6000 {
+			status = "ok";
+		};
+
+		usb3: usb3@8af8800 {
+			status = "ok";
+		};
+
+		usb2_hs_phy: usb-phy@a8000 {
+			status = "ok";
+		};
+
+		usb2: usb2@60f8800 {
+			status = "ok";
+		};
 	};
 };
