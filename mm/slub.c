@@ -2519,6 +2519,8 @@ redo:
 		if (unlikely(!node_match(page, searchnode))) {
 			stat(s, ALLOC_NODE_MISMATCH);
 			deactivate_slab(s, page, c->freelist, c);
+			if (!node_online(searchnode))
+				node = NUMA_NO_NODE;
 			goto new_slab;
 		}
 	}
