@@ -124,6 +124,7 @@ struct intel_engine_hangcheck {
 	struct i915_request *active_request;
 	bool stalled:1;
 	bool wedged:1;
+	bool try_preempt:1;
 };
 
 struct intel_ring {

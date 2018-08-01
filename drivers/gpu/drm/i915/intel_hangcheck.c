@@ -398,6 +398,28 @@ static void hangcheck_declare_hang(struct drm_i915_private *i915,
 	return i915_handle_error(i915, hung, I915_ERROR_CAPTURE, "%s", msg);
 }
 
+static bool hangcheck_preempt_workload(struct intel_engine_cs *engine)
+{
+	struct i915_request *active_request;
+	int workload_priority;
+
+	/* We have already tried preempting, but the hardware did not react */
+	if (engine->hangcheck.try_preempt)
+		return false;
+
+	active_request = i915_gem_find_active_request(engine);
+	workload_priority = active_request->gem_context->sched.priority;
+
+	if (workload_priority == I915_CONTEXT_MIN_USER_PRIORITY) {
+		engine->hangcheck.try_preempt = true;
+		engine->hangcheck.active_request = active_request;
+		intel_lr_inject_preempt_context(engine);
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * This is called when the chip hasn't reported back with completed
  * batchbuffers in a long time. We keep track per ring seqno progress and
@@ -440,6 +462,13 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 		hangcheck_store_sample(engine, &hc);
 
 		if (engine->hangcheck.stalled) {
+			/*
+			 * Try preempting the current workload before
+			 * declaring the engine hung.
+			 */
+			if (hangcheck_preempt_workload(engine))
+				continue;
+
 			hung |= intel_engine_flag(engine);
 			if (hc.action != ENGINE_DEAD)
 				stuck |= intel_engine_flag(engine);

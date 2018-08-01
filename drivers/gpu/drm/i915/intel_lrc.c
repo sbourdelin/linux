@@ -326,15 +326,39 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 {
 	struct i915_request *rq, *rn;
 	struct i915_priolist *uninitialized_var(p);
+	struct i915_gem_context *active_context = NULL;
+	bool skip_seqno = false;
+	u32 new_seqno = 0;
 	int last_prio = I915_PRIORITY_INVALID;
 
 	lockdep_assert_held(&engine->timeline.lock);
+
+	if (engine->hangcheck.try_preempt) {
+		rq = engine->hangcheck.active_request;
+		GEM_BUG_ON(!rq);
+
+		active_context = rq->gem_context;
+		GEM_BUG_ON(!active_context);
+
+		/*
+		 * If the workload is preemptible but its context was closed
+		 * we force the engine to skip its execution instead.
+		 */
+		if (i915_gem_context_is_closed(active_context))
+			skip_seqno = true;
+	}
 
 	list_for_each_entry_safe_reverse(rq, rn,
 					 &engine->timeline.requests,
 					 link) {
 		if (i915_request_completed(rq))
-			return;
+			break;
+
+		if (skip_seqno && rq->gem_context == active_context) {
+			new_seqno = max(new_seqno,
+					i915_request_global_seqno(rq));
+			continue;
+		}
 
 		__i915_request_unsubmit(rq);
 		unwind_wa_tail(rq);
@@ -347,6 +371,11 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 
 		GEM_BUG_ON(p->priority != rq_prio(rq));
 		list_add(&rq->sched.link, &p->requests);
+	}
+
+	if (skip_seqno) {
+		intel_write_status_page(engine, I915_GEM_HWS_INDEX, new_seqno);
+		engine->timeline.seqno = new_seqno;
 	}
 }
 
@@ -532,7 +561,7 @@ static void port_assign(struct execlist_port *port, struct i915_request *rq)
 	port_set(port, port_pack(i915_request_get(rq), port_count(port)));
 }
 
-static void inject_preempt_context(struct intel_engine_cs *engine)
+void intel_lr_inject_preempt_context(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists *execlists = &engine->execlists;
 	struct intel_context *ce =
@@ -632,7 +661,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			return;
 
 		if (need_preempt(engine, last, execlists->queue_priority)) {
-			inject_preempt_context(engine);
+			intel_lr_inject_preempt_context(engine);
 			return;
 		}
 
@@ -981,6 +1010,8 @@ static void process_csb(struct intel_engine_cs *engine)
 		    buf[2*head + 1] == execlists->preempt_complete_status) {
 			GEM_TRACE("%s preempt-idle\n", engine->name);
 			complete_preempt_context(execlists);
+			/* We tried and succeeded in preempting the engine */
+			engine->hangcheck.try_preempt = false;
 			continue;
 		}
 
