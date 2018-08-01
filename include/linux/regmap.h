@@ -946,6 +946,8 @@ int regmap_raw_write_async(struct regmap *map, unsigned int reg,
 int regmap_read(struct regmap *map, unsigned int reg, unsigned int *val);
 int regmap_raw_read(struct regmap *map, unsigned int reg,
 		    void *val, size_t val_len);
+int regmap_pipe_read(struct regmap *map, unsigned int reg,
+		     void *val, size_t val_len);
 int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
 		     size_t val_count);
 int regmap_update_bits_base(struct regmap *map, unsigned int reg,
@@ -1191,6 +1193,13 @@ static inline int regmap_read(struct regmap *map, unsigned int reg,
 
 static inline int regmap_raw_read(struct regmap *map, unsigned int reg,
 				  void *val, size_t val_len)
+{
+	WARN_ONCE(1, "regmap API is disabled");
+	return -EINVAL;
+}
+
+static inline int regmap_pipe_read(struct regmap *map, unsigned int reg,
+				   void *val, size_t val_len)
 {
 	WARN_ONCE(1, "regmap API is disabled");
 	return -EINVAL;
