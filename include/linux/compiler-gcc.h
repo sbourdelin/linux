@@ -343,6 +343,20 @@
 #define __designated_init __attribute__((designated_init))
 #endif
 
+#if GCC_VERSION >= 80000
+/*
+ * The nonstring variable attribute specifies that an object or member
+ * declaration with type array of char or pointer to char is intended
+ * to store character arrays that do not necessarily contain a terminating
+ * NUL character. This is useful in detecting uses of such arrays or pointers
+ * with functions that expect NUL-terminated strings, and to avoid warnings
+ * when such an array or pointer is used as an argument to a bounded string
+ * manipulation function such as strncpy.
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html
+ */
+#define __nonstring __attribute__((nonstring))
+#endif
+
 #endif	/* gcc version >= 40000 specific checks */
 
 #if !defined(__noclone)
