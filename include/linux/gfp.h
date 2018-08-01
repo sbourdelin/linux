@@ -436,6 +436,8 @@ static inline int gfp_zonelist(gfp_t flags)
  */
 static inline struct zonelist *node_zonelist(int nid, gfp_t flags)
 {
+	if (unlikely(!NODE_DATA(nid))) //VM_WARN_ON?
+		return NULL;
 	return NODE_DATA(nid)->node_zonelists + gfp_zonelist(flags);
 }
 
