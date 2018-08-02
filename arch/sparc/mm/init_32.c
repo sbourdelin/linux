@@ -161,6 +161,8 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 		    high_pages >> (20 - PAGE_SHIFT));
 	}
 
+	*pages_avail = (memblock_phys_mem_size() >> PAGE_SHIFT) - high_pages;
+
 #ifdef CONFIG_BLK_DEV_INITRD
 	/*
 	 * Now have to check initial ramdisk, so that it won't pass
@@ -176,21 +178,15 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 		                 	 "(0x%016lx > 0x%016lx)\ndisabling initrd\n",
 			       initrd_end, end_of_phys_memory);
 			initrd_start = 0;
+		} else {
+			/* Reserve the initrd image area. */
+			size = initrd_end - initrd_start;
+			memblock_reserve(initrd_start, size);
+			*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+			initrd_start = (initrd_start - phys_base) + PAGE_OFFSET;
+			initrd_end = (initrd_end - phys_base) + PAGE_OFFSET;
 		}
-	}
-#endif
-
-	*pages_avail = (memblock_phys_mem_size() >> PAGE_SHIFT) - high_pages;
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (initrd_start) {
-		/* Reserve the initrd image area. */
-		size = initrd_end - initrd_start;
-		memblock_reserve(initrd_start, size);
-		*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
-
-		initrd_start = (initrd_start - phys_base) + PAGE_OFFSET;
-		initrd_end = (initrd_end - phys_base) + PAGE_OFFSET;
 	}
 #endif
 	/* Reserve the kernel text/data/bss. */
