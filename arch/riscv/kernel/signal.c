@@ -37,6 +37,7 @@ struct rt_sigframe {
 	struct ucontext uc;
 };
 
+#ifdef CONFIG_FPU
 static long restore_fp_state(struct pt_regs *regs,
 	union __riscv_fp_state *sc_fpregs)
 {
@@ -85,6 +86,7 @@ static long save_fp_state(struct pt_regs *regs,
 
 	return err;
 }
+#endif
 
 static long restore_sigcontext(struct pt_regs *regs,
 	struct sigcontext __user *sc)
