@@ -110,7 +110,7 @@ static int __init vkms_init(void)
 	ret = drm_vblank_init(&vkms_device->drm, 1);
 	if (ret) {
 		DRM_ERROR("Failed to vblank\n");
-		goto out_fini;
+		goto out_unregister;
 	}
 
 	ret = vkms_modeset_init(vkms_device);
