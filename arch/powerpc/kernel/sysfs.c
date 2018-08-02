@@ -27,7 +27,7 @@
 #include <asm/lppaca.h>
 #endif
 
-static DEFINE_PER_CPU(struct cpu, cpu_devices);
+DEFINE_PER_CPU(struct cpu, cpu_devices);
 
 /*
  * SMT snooze delay stuff, 64-bit only for now
@@ -1025,6 +1025,35 @@ static ssize_t show_physical_id(struct device *dev,
 }
 static DEVICE_ATTR(physical_id, 0444, show_physical_id, NULL);
 
+/* unplugged cpu is true */
+bool cpudev_is_dummy(int cpu)
+{
+	struct cpu *c = &per_cpu(cpu_devices, cpu);
+
+	return !kref_read(&c->dev.kobj.kref);
+}
+
+/* create all files in sysfs, which can not be postponed till cpu online
+ * callbacks
+ */
+int register_ppc_cpu(int cpu)
+{
+	struct cpu *c = &per_cpu(cpu_devices, cpu);
+
+	register_cpu(c, cpu);
+	device_create_file(&c->dev, &dev_attr_physical_id);
+	return 0;
+}
+
+int unregister_ppc_cpu(int cpu)
+{
+	device_remove_file(&per_cpu(cpu_devices, cpu).dev,
+		&dev_attr_physical_id);
+	unregister_cpu(container_of(get_cpu_device(cpu),
+		struct cpu, dev));
+	return 0;
+}
+
 static int __init topology_init(void)
 {
 	int cpu, r;
@@ -1044,11 +1073,8 @@ static int __init topology_init(void)
 		if (ppc_md.cpu_die)
 			c->hotpluggable = 1;
 
-		if (cpu_online(cpu) || c->hotpluggable) {
-			register_cpu(c, cpu);
-
-			device_create_file(&c->dev, &dev_attr_physical_id);
-		}
+		if (cpu_online(cpu) || c->hotpluggable)
+			register_ppc_cpu(cpu);
 	}
 	r = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "powerpc/topology:online",
 			      register_cpu_online, unregister_cpu_online);

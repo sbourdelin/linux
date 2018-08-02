@@ -37,6 +37,7 @@
 #include <asm/xive.h>
 #include <asm/plpar_wrappers.h>
 #include <asm/topology.h>
+#include <asm/setup.h>
 
 #include "pseries.h"
 #include "offline_states.h"
@@ -367,6 +368,11 @@ static int dlpar_online_cpu(struct device_node *dn)
 			cpu_maps_update_done();
 			timed_topology_update(1);
 			find_and_online_cpu_nid(cpu);
+			/* protect against the offline's failure,
+			 * then re-online
+			 */
+			if (cpudev_is_dummy(cpu))
+				register_ppc_cpu(cpu);
 			rc = device_online(get_cpu_device(cpu));
 			if (rc)
 				goto out;
@@ -530,8 +536,12 @@ static int dlpar_offline_cpu(struct device_node *dn)
 			if (get_hard_smp_processor_id(cpu) != thread)
 				continue;
 
-			if (get_cpu_current_state(cpu) == CPU_STATE_OFFLINE)
+			if (get_cpu_current_state(cpu) == CPU_STATE_OFFLINE) {
+				cpu_maps_update_done();
+				unregister_ppc_cpu(cpu);
+				cpu_maps_update_begin();
 				break;
+			}
 
 			if (get_cpu_current_state(cpu) == CPU_STATE_ONLINE) {
 				set_preferred_offline_state(cpu,
@@ -541,6 +551,7 @@ static int dlpar_offline_cpu(struct device_node *dn)
 				rc = device_offline(get_cpu_device(cpu));
 				if (rc)
 					goto out;
+				unregister_ppc_cpu(cpu);
 				cpu_maps_update_begin();
 				break;
 
@@ -554,6 +565,9 @@ static int dlpar_offline_cpu(struct device_node *dn)
 			BUG_ON(plpar_hcall_norets(H_PROD, thread)
 								!= H_SUCCESS);
 			__cpu_die(cpu);
+			cpu_maps_update_done();
+			unregister_ppc_cpu(cpu);
+			cpu_maps_update_begin();
 			break;
 		}
 		if (cpu == num_possible_cpus())

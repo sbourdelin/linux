@@ -36,6 +36,7 @@ extern u32 *cpu_to_phys_id;
 extern void cpu_die(void);
 extern int cpu_to_chip_id(int cpu);
 
+DECLARE_PER_CPU(struct cpu, cpu_devices);
 #ifdef CONFIG_SMP
 
 struct smp_ops_t {

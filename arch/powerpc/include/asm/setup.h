@@ -40,6 +40,10 @@ static inline void pseries_big_endian_exceptions(void) {}
 static inline void pseries_little_endian_exceptions(void) {}
 #endif /* CONFIG_PPC_PSERIES */
 
+extern bool cpudev_is_dummy(int cpu);
+extern int register_ppc_cpu(int cpu);
+extern int unregister_ppc_cpu(int cpu);
+
 void rfi_flush_enable(bool enable);
 
 /* These are bit flags */
