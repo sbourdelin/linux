@@ -546,7 +546,7 @@ int __nd_driver_register(struct nd_device_driver *nd_drv, struct module *owner,
 {
 	struct device_driver *drv = &nd_drv->drv;
 
-	if (!nd_drv->type) {
+	if (!(nd_drv->type & ND_DRIVER_FLAGS_MASK)) {
 		pr_debug("driver type bitmask not set (%pf)\n",
 				__builtin_return_address(0));
 		return -EINVAL;
