@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2010 Google, Inc
- * Copyright (c) 2014 NVIDIA Corporation
+ * Copyright (c) 2014-2018 NVIDIA Corporation
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -160,11 +160,10 @@ int tegra_powergate_remove_clamping(unsigned int id);
 int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 				      struct reset_control *rst);
 
-int tegra_io_pad_power_enable(enum tegra_io_pad id);
-int tegra_io_pad_power_disable(enum tegra_io_pad id);
-int tegra_io_pad_set_voltage(enum tegra_io_pad id,
-			     enum tegra_io_pad_voltage voltage);
-int tegra_io_pad_get_voltage(enum tegra_io_pad id);
+int tegra_pmc_io_pad_low_power_enable(const char *pad_name);
+int tegra_pmc_io_pad_low_power_disable(const char *pad_name);
+int tegra_pmc_io_pad_set_voltage(const char *pad_name, unsigned int pad_uv);
+int tegra_pmc_io_pad_get_voltage(const char *pad_name);
 
 /* deprecated, use tegra_io_pad_power_{enable,disable}() instead */
 int tegra_io_rail_power_on(unsigned int id);
@@ -202,23 +201,23 @@ static inline int tegra_powergate_sequence_power_up(unsigned int id,
 	return -ENOSYS;
 }
 
-static inline int tegra_io_pad_power_enable(enum tegra_io_pad id)
+static inline int tegra_pmc_io_pad_low_power_enable(const char *pad_name)
 {
 	return -ENOSYS;
 }
 
-static inline int tegra_io_pad_power_disable(enum tegra_io_pad id)
+static inline int tegra_pmc_io_pad_low_power_disable(const char *pad_name)
 {
 	return -ENOSYS;
 }
 
-static inline int tegra_io_pad_set_voltage(enum tegra_io_pad id,
-					   enum tegra_io_pad_voltage voltage)
+static inline int tegra_pmc_io_pad_set_voltage(const char *pad_name,
+					       unsigned int pad_uv)
 {
 	return -ENOSYS;
 }
 
-static inline int tegra_io_pad_get_voltage(enum tegra_io_pad id)
+static inline int tegra_pmc_io_pad_get_voltage(const char *pad_name)
 {
 	return -ENOSYS;
 }
