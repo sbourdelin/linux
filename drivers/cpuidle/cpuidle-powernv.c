@@ -166,6 +166,7 @@ static int powernv_cpuidle_cpu_online(unsigned int cpu)
 	struct cpuidle_device *dev = per_cpu(cpuidle_devices, cpu);
 
 	if (dev && cpuidle_get_driver()) {
+		cpuidle_register_device(dev);
 		cpuidle_pause_and_lock();
 		cpuidle_enable_device(dev);
 		cpuidle_resume_and_unlock();
@@ -181,6 +182,7 @@ static int powernv_cpuidle_cpu_dead(unsigned int cpu)
 		cpuidle_pause_and_lock();
 		cpuidle_disable_device(dev);
 		cpuidle_resume_and_unlock();
+		cpuidle_unregister_device(dev);
 	}
 	return 0;
 }
