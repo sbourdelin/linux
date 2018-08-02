@@ -1298,7 +1298,13 @@ static void gen6_pm_rps_work(struct work_struct *work)
 
 	mutex_lock(&dev_priv->pcu_lock);
 
-	pm_iir |= vlv_wa_c0_ei(dev_priv, pm_iir);
+	dev_priv->pm_rps_events &=
+		~(GEN6_PM_RP_DOWN_EI_EXPIRED | GEN6_PM_RP_UP_EI_EXPIRED);
+
+	if (IS_VALLEYVIEW(dev_priv)) {
+		dev_priv->pm_rps_events |= GEN6_PM_RP_UP_EI_EXPIRED;
+		pm_iir |= vlv_wa_c0_ei(dev_priv, pm_iir);
+	}
 
 	adj = rps->last_adj;
 	new_delay = rps->cur_freq;
@@ -1310,10 +1316,12 @@ static void gen6_pm_rps_work(struct work_struct *work)
 		new_delay = rps->boost_freq;
 		adj = 0;
 	} else if (pm_iir & GEN6_PM_RP_UP_THRESHOLD) {
-		if (adj > 0)
+		if (adj > 0) {
+			dev_priv->pm_rps_events |= GEN6_PM_RP_UP_EI_EXPIRED;
 			adj *= 2;
-		else /* CHV needs even encode values */
+		} else { /* CHV needs even encode values */
 			adj = IS_CHERRYVIEW(dev_priv) ? 2 : 1;
+		}
 
 		if (new_delay >= rps->max_freq_softlimit)
 			adj = 0;
@@ -1326,15 +1334,21 @@ static void gen6_pm_rps_work(struct work_struct *work)
 			new_delay = rps->min_freq_softlimit;
 		adj = 0;
 	} else if (pm_iir & GEN6_PM_RP_DOWN_THRESHOLD) {
-		if (adj < 0)
+		if (adj < 0) {
+			dev_priv->pm_rps_events |= GEN6_PM_RP_DOWN_EI_EXPIRED;
 			adj *= 2;
-		else /* CHV needs even encode values */
+		} else { /* CHV needs even encode values */
 			adj = IS_CHERRYVIEW(dev_priv) ? -2 : -1;
+		}
 
 		if (new_delay <= rps->min_freq_softlimit)
 			adj = 0;
-	} else { /* unknown event */
+	} else if (pm_iir & GEN6_PM_RP_UP_THRESHOLD && adj > 0) {
 		adj = 0;
+	} else if (pm_iir & GEN6_PM_RP_DOWN_THRESHOLD && adj < 0) {
+		adj = 0;
+	} else {
+		/* unknown event */
 	}
 
 	rps->last_adj = adj;
