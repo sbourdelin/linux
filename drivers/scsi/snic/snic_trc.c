@@ -125,8 +125,8 @@ snic_trc_init(void)
 	void *tbuf = NULL;
 	int tbuf_sz = 0, ret;
 
-	tbuf_sz = (snic_trace_max_pages * PAGE_SIZE);
-	tbuf = vmalloc(tbuf_sz);
+	tbuf_sz = snic_trace_max_pages * PAGE_SIZE;
+	tbuf = kvcalloc(snic_trace_max_pages, PAGE_SIZE, GFP_KERNEL);
 	if (!tbuf) {
 		SNIC_ERR("Failed to Allocate Trace Buffer Size. %d\n", tbuf_sz);
 		SNIC_ERR("Trace Facility not enabled.\n");
@@ -135,7 +135,6 @@ snic_trc_init(void)
 		return ret;
 	}
 
-	memset(tbuf, 0, tbuf_sz);
 	trc->buf = (struct snic_trc_data *) tbuf;
 	spin_lock_init(&trc->lock);
 
@@ -173,7 +172,7 @@ snic_trc_free(void)
 	snic_trc_debugfs_term();
 
 	if (trc->buf) {
-		vfree(trc->buf);
+		kvfree(trc->buf);
 		trc->buf = NULL;
 	}
 
