@@ -468,14 +468,13 @@ int fnic_trace_buf_init(void)
 	fnic_max_trace_entries = (trace_max_pages * PAGE_SIZE)/
 					  FNIC_ENTRY_SIZE_BYTES;
 
-	fnic_trace_buf_p = (unsigned long)vmalloc((trace_max_pages * PAGE_SIZE));
+	fnic_trace_buf_p = (unsigned long)kvcalloc(trace_max_pages, PAGE_SIZE, GFP_KERNEL);
 	if (!fnic_trace_buf_p) {
 		printk(KERN_ERR PFX "Failed to allocate memory "
 				  "for fnic_trace_buf_p\n");
 		err = -ENOMEM;
 		goto err_fnic_trace_buf_init;
 	}
-	memset((void *)fnic_trace_buf_p, 0, (trace_max_pages * PAGE_SIZE));
 
 	fnic_trace_entries.page_offset =
 		vmalloc(array_size(fnic_max_trace_entries,
@@ -484,7 +483,7 @@ int fnic_trace_buf_init(void)
 		printk(KERN_ERR PFX "Failed to allocate memory for"
 				  " page_offset\n");
 		if (fnic_trace_buf_p) {
-			vfree((void *)fnic_trace_buf_p);
+			kvfree((void *)fnic_trace_buf_p);
 			fnic_trace_buf_p = 0;
 		}
 		err = -ENOMEM;
@@ -529,7 +528,7 @@ void fnic_trace_free(void)
 		fnic_trace_entries.page_offset = NULL;
 	}
 	if (fnic_trace_buf_p) {
-		vfree((void *)fnic_trace_buf_p);
+		kvfree((void *)fnic_trace_buf_p);
 		fnic_trace_buf_p = 0;
 	}
 	printk(KERN_INFO PFX "Successfully Freed Trace Buffer\n");
