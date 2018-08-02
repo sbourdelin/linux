@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 NVIDIA Corporation
+ * Copyright (C) 2013-2018, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -342,7 +342,6 @@ struct tegra_sor {
 	struct drm_info_list *debugfs_files;
 
 	const struct tegra_sor_ops *ops;
-	enum tegra_io_pad pad;
 
 	/* for HDMI 2.0 */
 	struct tegra_sor_hdmi_settings *settings;
@@ -1547,7 +1546,7 @@ static void tegra_sor_edp_disable(struct drm_encoder *encoder)
 			dev_err(sor->dev, "failed to disable DP: %d\n", err);
 	}
 
-	err = tegra_io_pad_power_disable(sor->pad);
+	err = tegra_io_rail_power_off(TEGRA_IO_RAIL_LVDS);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power off I/O pad: %d\n", err);
 
@@ -1707,7 +1706,7 @@ static void tegra_sor_edp_enable(struct drm_encoder *encoder)
 	tegra_sor_writel(sor, value, sor->soc->regs->dp_padctl0);
 
 	/* step 2 */
-	err = tegra_io_pad_power_enable(sor->pad);
+	err = tegra_io_rail_power_on(TEGRA_IO_RAIL_LVDS);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power on I/O pad: %d\n", err);
 
@@ -2189,7 +2188,7 @@ static void tegra_sor_hdmi_disable(struct drm_encoder *encoder)
 	if (err < 0)
 		dev_err(sor->dev, "failed to power down SOR: %d\n", err);
 
-	err = tegra_io_pad_power_disable(sor->pad);
+	err = tegra_io_rail_power_off(TEGRA_IO_RAIL_HDMI);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power off I/O pad: %d\n", err);
 
@@ -2225,7 +2224,7 @@ static void tegra_sor_hdmi_enable(struct drm_encoder *encoder)
 
 	div = clk_get_rate(sor->clk) / 1000000 * 4;
 
-	err = tegra_io_pad_power_enable(sor->pad);
+	err = tegra_io_rail_power_on(TEGRA_IO_RAIL_HDMI);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power on I/O pad: %d\n", err);
 
@@ -2921,7 +2920,6 @@ static int tegra_sor_parse_dt(struct tegra_sor *sor)
 		 * override the default that we already set for Tegra210 and
 		 * earlier
 		 */
-		sor->pad = TEGRA_IO_PAD_HDMI_DP0 + sor->index;
 	}
 
 	return 0;
@@ -2962,7 +2960,6 @@ static int tegra_sor_probe(struct platform_device *pdev)
 	if (!sor->aux) {
 		if (sor->soc->supports_hdmi) {
 			sor->ops = &tegra_sor_hdmi_ops;
-			sor->pad = TEGRA_IO_PAD_HDMI;
 		} else if (sor->soc->supports_lvds) {
 			dev_err(&pdev->dev, "LVDS not supported yet\n");
 			return -ENODEV;
@@ -2973,7 +2970,6 @@ static int tegra_sor_probe(struct platform_device *pdev)
 	} else {
 		if (sor->soc->supports_edp) {
 			sor->ops = &tegra_sor_edp_ops;
-			sor->pad = TEGRA_IO_PAD_LVDS;
 		} else if (sor->soc->supports_dp) {
 			dev_err(&pdev->dev, "DisplayPort not supported yet\n");
 			return -ENODEV;
