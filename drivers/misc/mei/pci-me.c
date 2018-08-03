@@ -336,9 +336,6 @@ static int mei_me_pci_suspend(struct device *device)
 
 	mei_disable_interrupts(dev);
 
-	free_irq(pdev->irq, dev);
-	pci_disable_msi(pdev);
-
 	return 0;
 }
 
@@ -346,28 +343,11 @@ static int mei_me_pci_resume(struct device *device)
 {
 	struct pci_dev *pdev = to_pci_dev(device);
 	struct mei_device *dev;
-	unsigned int irqflags;
 	int err;
 
 	dev = pci_get_drvdata(pdev);
 	if (!dev)
 		return -ENODEV;
-
-	pci_enable_msi(pdev);
-
-	irqflags = pci_dev_msi_enabled(pdev) ? IRQF_ONESHOT : IRQF_SHARED;
-
-	/* request and enable interrupt */
-	err = request_threaded_irq(pdev->irq,
-			mei_me_irq_quick_handler,
-			mei_me_irq_thread_handler,
-			irqflags, KBUILD_MODNAME, dev);
-
-	if (err) {
-		dev_err(&pdev->dev, "request_threaded_irq failed: irq = %d.\n",
-				pdev->irq);
-		return err;
-	}
 
 	err = mei_restart(dev);
 	if (err)
