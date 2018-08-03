@@ -852,6 +852,16 @@ static int uffdio_zeropage(int ufd, unsigned long offset)
 	return __uffdio_zeropage(ufd, offset, false);
 }
 
+/* Tells whether the kernel doesn't support ZEROPAGE on shared memory VMAs. */
+static bool shmem_without_zeropage_support(unsigned long expected_ioctls,
+					   unsigned long supported_ioctls)
+{
+	/* Turn off ZEROPAGE bit from expected_ioctls. */
+	expected_ioctls &= ~(1 << _UFFDIO_ZEROPAGE);
+
+	return test_type == TEST_SHMEM && supported_ioctls == expected_ioctls;
+}
+
 /* exercise UFFDIO_ZEROPAGE */
 static int userfaultfd_zeropage_test(void)
 {
@@ -877,10 +887,20 @@ static int userfaultfd_zeropage_test(void)
 
 	expected_ioctls = uffd_test_ops->expected_ioctls;
 	if ((uffdio_register.ioctls & expected_ioctls) !=
-	    expected_ioctls)
+	    expected_ioctls) {
+		close(uffd);
+
+		if (shmem_without_zeropage_support(expected_ioctls,
+						   uffdio_register.ioctls)) {
+			fprintf(stderr,
+				"UFFDIO_ZEROPAGE unsupported in shmem VMAs\n");
+			return KSFT_SKIP;
+		}
+
 		fprintf(stderr,
-			"unexpected missing ioctl for anon memory\n"),
-			exit(1);
+			"unexpected missing ioctl for anon memory\n");
+		return 1;
+	}
 
 	if (uffdio_zeropage(uffd, 0)) {
 		if (my_bcmp(area_dst, zeropage, page_size))
@@ -924,7 +944,10 @@ static int userfaultfd_events_test(void)
 
 	expected_ioctls = uffd_test_ops->expected_ioctls;
 	if ((uffdio_register.ioctls & expected_ioctls) !=
-	    expected_ioctls)
+	    expected_ioctls &&
+	    /* No need for zeropage support in this test, so ignore it. */
+	    !shmem_without_zeropage_support(expected_ioctls,
+					    uffdio_register.ioctls))
 		fprintf(stderr,
 			"unexpected missing ioctl for anon memory\n"),
 			exit(1);
@@ -1117,7 +1140,10 @@ static int userfaultfd_stress(void)
 		}
 		expected_ioctls = uffd_test_ops->expected_ioctls;
 		if ((uffdio_register.ioctls & expected_ioctls) !=
-		    expected_ioctls) {
+		    expected_ioctls &&
+		    /* No need for zeropage support in this test, so ignore it. */
+		    !shmem_without_zeropage_support(expected_ioctls,
+						    uffdio_register.ioctls)) {
 			fprintf(stderr,
 				"unexpected missing ioctl for anon memory\n");
 			return 1;
