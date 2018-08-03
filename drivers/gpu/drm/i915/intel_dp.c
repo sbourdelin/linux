@@ -4160,18 +4160,6 @@ intel_dp_needs_link_retrain(struct intel_dp *intel_dp)
 	return !drm_dp_channel_eq_ok(link_status, intel_dp->lane_count);
 }
 
-/*
- * If display is now connected check links status,
- * there has been known issues of link loss triggering
- * long pulse.
- *
- * Some sinks (eg. ASUS PB287Q) seem to perform some
- * weird HPD ping pong during modesets. So we can apparently
- * end up with HPD going low during a modeset, and then
- * going back up soon after. And once that happens we must
- * retrain the link to get a picture. That's in case no
- * userspace component reacted to intermittent HPD dip.
- */
 int intel_dp_retrain_link(struct intel_encoder *encoder,
 			  struct drm_modeset_acquire_ctx *ctx)
 {
@@ -4188,10 +4176,12 @@ int intel_dp_retrain_link(struct intel_encoder *encoder,
 	if (!connector || connector->base.status != connector_status_connected)
 		return 0;
 
-	ret = drm_modeset_lock(&dev_priv->drm.mode_config.connection_mutex,
-			       ctx);
-	if (ret)
-		return ret;
+	if (ctx) {
+		ret = drm_modeset_lock(
+			&dev_priv->drm.mode_config.connection_mutex, ctx);
+		if (ret)
+			return ret;
+	}
 
 	conn_state = connector->base.state;
 
@@ -4199,9 +4189,11 @@ int intel_dp_retrain_link(struct intel_encoder *encoder,
 	if (!crtc)
 		return 0;
 
-	ret = drm_modeset_lock(&crtc->base.mutex, ctx);
-	if (ret)
-		return ret;
+	if (ctx) {
+		ret = drm_modeset_lock(&crtc->base.mutex, ctx);
+		if (ret)
+			return ret;
+	}
 
 	crtc_state = to_intel_crtc_state(crtc->base.state);
 
@@ -4720,6 +4712,22 @@ intel_dp_long_pulse(struct intel_connector *connector)
 		 */
 		status = connector_status_disconnected;
 		goto out;
+	} else {
+		/*
+		 * If display is now connected check links status,
+		 * there has been known issues of link loss triggering
+		 * long pulse.
+		 *
+		 * Some sinks (eg. ASUS PB287Q) seem to perform some
+		 * weird HPD ping pong during modesets. So we can apparently
+		 * end up with HPD going low during a modeset, and then
+		 * going back up soon after. And once that happens we must
+		 * retrain the link to get a picture. That's in case no
+		 * userspace component reacted to intermittent HPD dip.
+		 */
+		struct intel_encoder *encoder = &dp_to_dig_port(intel_dp)->base;
+
+		intel_dp_retrain_link(encoder, NULL);
 	}
 
 	/*
