@@ -1,0 +1,17 @@
+Intel MIPS SoC device tree bindings
+
+1, SoCs
+
+Each device tree must specify a compatible value for the Intel SoC
+it uses in the compatible property of the root node. The compatible
+value must be one of the following values:
+
+  intel,xrx500
+
+2, Boards
+
+Each device tree must specify a compatible value for the Intel Board
+it uses in the compatible property of the root node. The compatible
+value must be one of the following values:
+
+  intel,easy350-anywan
