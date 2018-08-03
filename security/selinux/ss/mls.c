@@ -344,7 +344,7 @@ int mls_context_to_sid(struct policydb *pol,
 					break;
 			}
 		}
-		if (delim == '-') {
+		if (delim == '-' && l == 0) {
 			/* Extract high sensitivity. */
 			scontextp = p;
 			while (*p && *p != ':')
