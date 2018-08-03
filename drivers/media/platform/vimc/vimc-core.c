@@ -309,12 +309,12 @@ static int vimc_probe(struct platform_device *pdev)
 	if (!vimc->subdevs)
 		return -ENOMEM;
 
+	/* Link the media device within the v4l2_device */
+	vimc->v4l2_dev.mdev = &vimc->mdev;
+
 	match = vimc_add_subdevs(vimc);
 	if (IS_ERR(match))
 		return PTR_ERR(match);
-
-	/* Link the media device within the v4l2_device */
-	vimc->v4l2_dev.mdev = &vimc->mdev;
 
 	/* Initialize media device */
 	strlcpy(vimc->mdev.model, VIMC_MDEV_MODEL_NAME,
