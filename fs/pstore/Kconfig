@@ -124,6 +124,18 @@ config PSTORE_PMSG
 
 	  If unsure, say N.
 
+config PSTORE_RTB
+	bool "Log register operations like read/write"
+	depends on PSTORE && PSTORE!=m
+	depends on RTB
+	help
+	  When this option is enabled, rtb driver will log all register
+	  reads/writes into a persistent ram buffer that can be decoded
+	  and dumped after reboot through pstore filesystem. It can be used
+	  to debug readl/writel access.
+
+	  If unsure, say N.
+
 config PSTORE_FTRACE
 	bool "Persistent function tracer"
 	depends on PSTORE

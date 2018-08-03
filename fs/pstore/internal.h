@@ -25,6 +25,14 @@ static inline void pstore_register_pmsg(void) {}
 static inline void pstore_unregister_pmsg(void) {}
 #endif
 
+#ifdef CONFIG_PSTORE_RTB
+extern void pstore_register_rtb(void);
+extern void pstore_unregister_rtb(void);
+#else
+static inline void pstore_register_rtb(void) {}
+static inline void pstore_unregister_rtb(void) {}
+#endif
+
 extern struct pstore_info *psinfo;
 
 extern void	pstore_set_kmsg_bytes(int);

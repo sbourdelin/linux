@@ -33,6 +33,7 @@
 #include <linux/sched.h>
 #include <linux/magic.h>
 #include <linux/pstore.h>
+#include <linux/rtb.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
@@ -57,6 +58,7 @@ struct pstore_ftrace_seq_data {
 };
 
 #define REC_SIZE sizeof(struct pstore_ftrace_record)
+#define REC_SIZE_RTB sizeof(struct rtb_layout)
 
 static void free_pstore_private(struct pstore_private *private)
 {
@@ -131,13 +133,73 @@ static const struct seq_operations pstore_ftrace_seq_ops = {
 	.show	= pstore_ftrace_seq_show,
 };
 
+static void *pstore_rtb_seq_start(struct seq_file *s, loff_t *pos)
+{
+	struct pstore_private *ps = s->private;
+	struct pstore_ftrace_seq_data *rdata;
+
+	rdata = kzalloc(sizeof(*rdata), GFP_KERNEL);
+	if (!rdata)
+		return NULL;
+
+	rdata->off = ps->total_size % REC_SIZE_RTB;
+	rdata->off += *pos * REC_SIZE_RTB;
+	if (rdata->off + REC_SIZE_RTB > ps->total_size) {
+		kfree(rdata);
+		return NULL;
+	}
+
+	return rdata;
+}
+
+static void pstore_rtb_seq_stop(struct seq_file *s, void *v)
+{
+	kfree(v);
+}
+
+static void *pstore_rtb_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	struct pstore_private *ps = s->private;
+	struct pstore_ftrace_seq_data *rdata = v;
+
+	rdata->off += REC_SIZE_RTB;
+	if (rdata->off + REC_SIZE_RTB > ps->total_size)
+		return NULL;
+
+	(*pos)++;
+	return rdata;
+}
+
+static int pstore_rtb_seq_show(struct seq_file *s, void *v)
+{
+	struct pstore_private *ps = s->private;
+	struct pstore_ftrace_seq_data *rdata = v;
+	struct rtb_layout *rec;
+
+	rec = (struct rtb_layout *)(ps->record->buf + rdata->off);
+
+	seq_printf(s, "[%-12s] ts:%llu  data:%llx  <%llx>  %pS\n",
+		   rec->log_type, rec->timestamp, rec->data,
+		   rec->caller, (void *)rec->caller);
+
+	return 0;
+}
+
+static const struct seq_operations pstore_rtb_seq_ops = {
+	.start	= pstore_rtb_seq_start,
+	.next	= pstore_rtb_seq_next,
+	.stop	= pstore_rtb_seq_stop,
+	.show	= pstore_rtb_seq_show,
+};
+
 static ssize_t pstore_file_read(struct file *file, char __user *userbuf,
 						size_t count, loff_t *ppos)
 {
 	struct seq_file *sf = file->private_data;
 	struct pstore_private *ps = sf->private;
 
-	if (ps->record->type == PSTORE_TYPE_FTRACE)
+	if (ps->record->type == PSTORE_TYPE_FTRACE ||
+			ps->record->type == PSTORE_TYPE_RTB)
 		return seq_read(file, userbuf, count, ppos);
 	return simple_read_from_buffer(userbuf, count, ppos,
 				       ps->record->buf, ps->total_size);
@@ -152,6 +214,9 @@ static int pstore_file_open(struct inode *inode, struct file *file)
 
 	if (ps->record->type == PSTORE_TYPE_FTRACE)
 		sops = &pstore_ftrace_seq_ops;
+
+	if (ps->record->type == PSTORE_TYPE_RTB)
+		sops = &pstore_rtb_seq_ops;
 
 	err = seq_open(file, sops);
 	if (err < 0)
@@ -371,6 +436,10 @@ int pstore_mkfile(struct dentry *root, struct pstore_record *record)
 		break;
 	case PSTORE_TYPE_PPC_OPAL:
 		scnprintf(name, sizeof(name), "powerpc-opal-%s-%llu",
+			  record->psi->name, record->id);
+		break;
+	case PSTORE_TYPE_RTB:
+		scnprintf(name, sizeof(name), "rtb-%s-%llu",
 			  record->psi->name, record->id);
 		break;
 	case PSTORE_TYPE_UNKNOWN:

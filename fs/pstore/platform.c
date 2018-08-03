@@ -589,6 +589,8 @@ int pstore_register(struct pstore_info *psi)
 		pstore_register_ftrace();
 	if (psi->flags & PSTORE_FLAGS_PMSG)
 		pstore_register_pmsg();
+	if (psi->flags & PSTORE_FLAGS_RTB)
+		pstore_register_rtb();
 
 	/* Start watching for new records, if desired. */
 	if (pstore_update_ms >= 0) {
@@ -618,6 +620,8 @@ void pstore_unregister(struct pstore_info *psi)
 	del_timer_sync(&pstore_timer);
 	flush_work(&pstore_work);
 
+	if (psi->flags & PSTORE_FLAGS_RTB)
+		pstore_unregister_rtb();
 	if (psi->flags & PSTORE_FLAGS_PMSG)
 		pstore_unregister_pmsg();
 	if (psi->flags & PSTORE_FLAGS_FTRACE)
