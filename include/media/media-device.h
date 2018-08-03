@@ -78,6 +78,7 @@ struct media_device_ops {
  * @interfaces:	List of registered interfaces
  * @pads:	List of registered pads
  * @links:	List of registered links
+ * @props:	List of registered properties
  * @entity_notify: List of registered entity_notify callbacks
  * @graph_mutex: Protects access to struct media_device data
  * @pm_count_walk: Graph walk for power state walk. Access serialised using
@@ -144,6 +145,7 @@ struct media_device {
 	struct list_head interfaces;
 	struct list_head pads;
 	struct list_head links;
+	struct list_head props;
 
 	/* notify callback list invoked when a new entity is registered */
 	struct list_head entity_notify;
@@ -381,6 +383,10 @@ void media_device_unregister_entity_notify(struct media_device *mdev,
 /* Iterate over all links. */
 #define media_device_for_each_link(link, mdev)			\
 	list_for_each_entry(link, &(mdev)->links, graph_obj.list)
+
+/* Iterate over all props. */
+#define media_device_for_each_prop(prop, mdev)			\
+	list_for_each_entry(prop, &(mdev)->props, graph_obj.list)
 
 /**
  * media_device_pci_init() - create and initialize a

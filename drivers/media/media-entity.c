@@ -34,6 +34,8 @@ static inline const char *gobj_type(enum media_gobj_type type)
 		return "link";
 	case MEDIA_GRAPH_INTF_DEVNODE:
 		return "intf-devnode";
+	case MEDIA_GRAPH_PROP:
+		return "prop";
 	default:
 		return "unknown";
 	}
@@ -147,6 +149,16 @@ static void dev_dbg_obj(const char *event_name,  struct media_gobj *gobj)
 			devnode->major, devnode->minor);
 		break;
 	}
+	case MEDIA_GRAPH_PROP:
+	{
+		struct media_prop *prop = gobj_to_prop(gobj);
+
+		dev_dbg(gobj->mdev->dev,
+			"%s id %u: prop '%s':%u[%u]\n",
+			event_name, media_id(gobj),
+			prop->name, media_id(prop->owner), prop->index);
+		break;
+	}
 	}
 #endif
 }
@@ -174,6 +186,9 @@ void media_gobj_create(struct media_device *mdev,
 		break;
 	case MEDIA_GRAPH_INTF_DEVNODE:
 		list_add_tail(&gobj->list, &mdev->interfaces);
+		break;
+	case MEDIA_GRAPH_PROP:
+		list_add_tail(&gobj->list, &mdev->props);
 		break;
 	}
 
@@ -212,6 +227,7 @@ int media_entity_pads_init(struct media_entity *entity, u16 num_pads,
 	if (num_pads >= MEDIA_ENTITY_MAX_PADS)
 		return -E2BIG;
 
+	INIT_LIST_HEAD(&entity->props);
 	entity->num_pads = num_pads;
 	entity->pads = pads;
 
@@ -221,6 +237,7 @@ int media_entity_pads_init(struct media_entity *entity, u16 num_pads,
 	for (i = 0; i < num_pads; i++) {
 		pads[i].entity = entity;
 		pads[i].index = i;
+		INIT_LIST_HEAD(&pads[i].props);
 		if (mdev)
 			media_gobj_create(mdev, MEDIA_GRAPH_PAD,
 					&entity->pads[i].graph_obj);
@@ -232,6 +249,54 @@ int media_entity_pads_init(struct media_entity *entity, u16 num_pads,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(media_entity_pads_init);
+
+static struct media_prop *media_create_prop(struct media_gobj *owner, u32 type,
+		const char *name, u64 val, const void *ptr, u32 payload_size)
+{
+	struct media_prop *prop = kzalloc(sizeof(*prop) + payload_size,
+					  GFP_KERNEL);
+
+	if (!prop)
+		return NULL;
+	prop->type = type;
+	strlcpy(prop->name, name, sizeof(prop->name));
+	media_gobj_create(owner->mdev, MEDIA_GRAPH_PROP, &prop->graph_obj);
+	prop->owner = owner;
+	if (payload_size) {
+		prop->string = (char *)&prop[1];
+		memcpy(prop->string, ptr, payload_size);
+		prop->payload_size = payload_size;
+	} else {
+		prop->uval = val;
+	}
+	return prop;
+}
+
+int media_entity_add_prop(struct media_entity *ent, u32 type,
+		const char *name, u64 val, const void *ptr, u32 payload_size)
+{
+	struct media_prop *prop = media_create_prop(&ent->graph_obj, type,
+						name, val, ptr, payload_size);
+
+	if (!prop)
+		return -ENOMEM;
+	list_add_tail(&prop->list, &ent->props);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(media_entity_add_prop);
+
+int media_pad_add_prop(struct media_pad *pad, u32 type,
+		const char *name, u64 val, const void *ptr, u32 payload_size)
+{
+	struct media_prop *prop = media_create_prop(&pad->graph_obj, type,
+						name, val, ptr, payload_size);
+
+	if (!prop)
+		return -ENOMEM;
+	list_add_tail(&prop->list, &pad->props);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(media_pad_add_prop);
 
 /* -----------------------------------------------------------------------------
  * Graph traversal
