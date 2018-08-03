@@ -495,13 +495,8 @@ int snd_soc_suspend(struct device *dev)
 		if (rtd->dai_link->ignore_suspend)
 			continue;
 
-		snd_soc_dapm_stream_event(rtd,
-					  SNDRV_PCM_STREAM_PLAYBACK,
-					  SND_SOC_DAPM_STREAM_SUSPEND);
-
-		snd_soc_dapm_stream_event(rtd,
-					  SNDRV_PCM_STREAM_CAPTURE,
-					  SND_SOC_DAPM_STREAM_SUSPEND);
+		snd_soc_dapm_stream_suspend(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		snd_soc_dapm_stream_suspend(rtd, SNDRV_PCM_STREAM_CAPTURE);
 	}
 
 	/* Recheck all endpoints too, their state is affected by suspend */
@@ -614,13 +609,8 @@ static void soc_resume_deferred(struct work_struct *work)
 		if (rtd->dai_link->ignore_suspend)
 			continue;
 
-		snd_soc_dapm_stream_event(rtd,
-					  SNDRV_PCM_STREAM_PLAYBACK,
-					  SND_SOC_DAPM_STREAM_RESUME);
-
-		snd_soc_dapm_stream_event(rtd,
-					  SNDRV_PCM_STREAM_CAPTURE,
-					  SND_SOC_DAPM_STREAM_RESUME);
+		snd_soc_dapm_stream_resume(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		snd_soc_dapm_stream_resume(rtd, SNDRV_PCM_STREAM_CAPTURE);
 	}
 
 	/* unmute any active DACs */

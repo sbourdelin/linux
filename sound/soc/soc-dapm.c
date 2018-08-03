@@ -4201,7 +4201,7 @@ void snd_soc_dapm_connect_dai_link_widgets(struct snd_soc_card *card)
 }
 
 static void soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
-	int event)
+	int event, bool power_widgets)
 {
 	int i;
 
@@ -4209,7 +4209,8 @@ static void soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 	for (i = 0; i < rtd->num_codecs; i++)
 		soc_dapm_dai_stream_event(rtd->codec_dais[i], stream, event);
 
-	dapm_power_widgets(rtd->card, event);
+	if (power_widgets)
+		dapm_power_widgets(rtd->card, event);
 }
 
 /**
@@ -4229,7 +4230,43 @@ void snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 	struct snd_soc_card *card = rtd->card;
 
 	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
-	soc_dapm_stream_event(rtd, stream, event);
+	soc_dapm_stream_event(rtd, stream, event, true);
+	mutex_unlock(&card->dapm_mutex);
+}
+
+/**
+ * snd_soc_dapm_stream_suspend - send a suspend stream event to the dapm core
+ * @rtd: PCM runtime data
+ * @stream: stream name
+ *
+ * Sends a suspend stream event to the dapm core.
+ *
+ * Returns 0 for success else error.
+ */
+void snd_soc_dapm_stream_suspend(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	struct snd_soc_card *card = rtd->card;
+
+	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
+	soc_dapm_stream_event(rtd, stream, SND_SOC_DAPM_STREAM_SUSPEND, false);
+	mutex_unlock(&card->dapm_mutex);
+}
+
+/**
+ * snd_soc_dapm_stream_resume - send a resume stream event to the dapm core
+ * @rtd: PCM runtime data
+ * @stream: stream name
+ *
+ * Sends a resume stream event to the dapm core.
+ *
+ * Returns 0 for success else error.
+ */
+void snd_soc_dapm_stream_resume(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	struct snd_soc_card *card = rtd->card;
+
+	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
+	soc_dapm_stream_event(rtd, stream, SND_SOC_DAPM_STREAM_RESUME, false);
 	mutex_unlock(&card->dapm_mutex);
 }
 
