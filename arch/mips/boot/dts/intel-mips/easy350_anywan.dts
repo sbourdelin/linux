@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/mips-gic.h>
+#include <dt-bindings/clock/intel,grx500-clk.h>
+
+#include "xrx500.dtsi"
+
+/ {
+	model = "EASY350 ANYWAN (GRX350) Main model";
+	compatible = "intel,easy350-anywan";
+
+	aliases {
+		serial0 = &asc0;
+	};
+
+	chosen {
+		bootargs = "earlycon=lantiq,0x16600000 clk_ignore_unused";
+		stdout-path = "serial0";
+	};
+
+	memory@20000000 {
+		device_type = "memory";
+		reg = <0x20000000 0x0e000000>;
+	};
+};
