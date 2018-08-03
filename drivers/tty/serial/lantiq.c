@@ -26,7 +26,9 @@
 #include <linux/clk.h>
 #include <linux/gpio.h>
 
+#ifdef CONFIG_LANTIQ
 #include <lantiq_soc.h>
+#endif
 
 #define PORT_LTQ_ASC		111
 #define MAXPORTS		2
@@ -744,14 +746,23 @@ lqasc_probe(struct platform_device *pdev)
 	port->irq	= irqres[0].start;
 	port->mapbase	= mmres->start;
 
+#if (IS_ENABLED(CONFIG_LANTIQ) && !IS_ENABLED(CONFIG_COMMON_CLK))
 	ltq_port->freqclk = clk_get_fpi();
+#else
+	ltq_port->freqclk = devm_clk_get(&pdev->dev, "freq");
+#endif
+
 	if (IS_ERR(ltq_port->freqclk)) {
 		pr_err("failed to get fpi clk\n");
 		return -ENOENT;
 	}
 
 	/* not all asc ports have clock gates, lets ignore the return code */
+#if (IS_ENABLED(CONFIG_LANTIQ) && !IS_ENABLED(CONFIG_COMMON_CLK))
 	ltq_port->clk = clk_get(&pdev->dev, NULL);
+#else
+	ltq_port->clk = devm_clk_get(&pdev->dev, "asc");
+#endif
 
 	ltq_port->tx_irq = irqres[0].start;
 	ltq_port->rx_irq = irqres[1].start;
