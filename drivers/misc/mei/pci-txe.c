@@ -120,11 +120,9 @@ static int mei_txe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto end;
 	}
 
-	if (mei_start(dev)) {
-		dev_err(&pdev->dev, "init hw failure.\n");
-		err = -ENODEV;
+	err = mei_start(dev);
+	if (err)
 		goto release_irq;
-	}
 
 	pm_runtime_set_autosuspend_delay(&pdev->dev, MEI_TXI_RPM_TIMEOUT);
 	pm_runtime_use_autosuspend(&pdev->dev);
