@@ -559,12 +559,10 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 	struct drm_mode_config *config = &dev->mode_config;
 	struct drm_mode_crtc *crtc_req = data;
 	struct drm_crtc *crtc;
-	struct drm_plane *plane;
-	struct drm_connector **connector_set = NULL, *connector;
+	struct drm_connector **connector_set = NULL;
 	struct drm_framebuffer *fb = NULL;
 	struct drm_display_mode *mode = NULL;
 	struct drm_mode_set set;
-	uint32_t __user *set_connectors_ptr;
 	struct drm_modeset_acquire_ctx ctx;
 	int ret;
 	int i;
@@ -586,7 +584,6 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 	}
 	DRM_DEBUG_KMS("[CRTC:%d:%s]\n", crtc->base.id, crtc->name);
 
-	plane = crtc->primary;
 
 	mutex_lock(&crtc->dev->mode_config.mutex);
 	drm_modeset_acquire_init(&ctx, DRM_MODESET_ACQUIRE_INTERRUPTIBLE);
@@ -596,6 +593,8 @@ retry:
 		goto out;
 
 	if (crtc_req->mode_valid) {
+		struct drm_plane *plane = crtc->primary;
+		/* Handle framebuffer and mode here*/
 		/* If we have a mode we need a framebuffer. */
 		/* If we pass -1, set the mode with the currently bound fb */
 		if (crtc_req->fb_id == -1) {
@@ -636,8 +635,6 @@ retry:
 			ret = -EINVAL;
 			goto out;
 		}
-
-
 		ret = drm_mode_convert_umode(dev, mode, &crtc_req->mode);
 		if (ret) {
 			DRM_DEBUG_KMS("Invalid mode\n");
@@ -669,31 +666,22 @@ retry:
 					      mode, fb);
 		if (ret)
 			goto out;
-
-	}
-
-	if (crtc_req->count_connectors == 0 && mode) {
-		DRM_DEBUG_KMS("Count connectors is 0 but mode set\n");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (crtc_req->count_connectors > 0 && (!mode || !fb)) {
-		DRM_DEBUG_KMS("Count connectors is %d but no mode or fb set\n",
-			  crtc_req->count_connectors);
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (crtc_req->count_connectors > 0) {
-		u32 out_id;
-
+		/* Handle connector here
+		 * crtc_req->mode_valid is set at this point
+		 * and we have mode and fb non-NULL.
+		 * We have already checked mode_valid
+		 * hence, we don't check mode and fb here.
+		 */
+		if (!crtc_req->count_connectors) {
+			DRM_DEBUG_KMS("Mode_valid flag is set but connectors' count is 0\n");
+			ret = -EINVAL;
+			goto out;
+		}
 		/* Avoid unbounded kernel memory allocation */
 		if (crtc_req->count_connectors > config->num_connector) {
 			ret = -EINVAL;
 			goto out;
 		}
-
 		connector_set = kmalloc_array(crtc_req->count_connectors,
 					      sizeof(struct drm_connector *),
 					      GFP_KERNEL);
@@ -703,6 +691,9 @@ retry:
 		}
 
 		for (i = 0; i < crtc_req->count_connectors; i++) {
+			struct drm_connector *connector;
+			uint32_t __user *set_connectors_ptr;
+			u32 out_id;
 			connector_set[i] = NULL;
 			set_connectors_ptr = (uint32_t __user *)(unsigned long)crtc_req->set_connectors_ptr;
 			if (get_user(out_id, &set_connectors_ptr[i])) {
@@ -722,6 +713,18 @@ retry:
 					connector->name);
 
 			connector_set[i] = connector;
+		}
+
+	} else {
+		/* crtc_req->mode_valid is clear at this point
+		 * if mode_valid is clear, mode and fb will be NULL
+		 * hence, we don't check mode and fb here.
+		 */
+		if (crtc_req->count_connectors) {
+			DRM_DEBUG_KMS("Connectors's count is %u but mode_valid flag is clear\n",
+			crtc_req->count_connectors);
+			ret = -EINVAL;
+			goto out;
 		}
 	}
 
@@ -743,8 +746,8 @@ out:
 			if (connector_set[i])
 				drm_connector_put(connector_set[i]);
 		}
+		kfree(connector_set);
 	}
-	kfree(connector_set);
 	drm_mode_destroy(dev, mode);
 	if (ret == -EDEADLK) {
 		ret = drm_modeset_backoff(&ctx);
