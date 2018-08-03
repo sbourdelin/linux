@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0
+config INTEL_CGU_CLK
+	depends on COMMON_CLK
+	depends on INTEL_MIPS || COMPILE_TEST
+	select MFD_SYSCON
+	bool "Intel clock controller support"
+	help
+	  This driver support Intel CGU (Clock Generation Unit).
+
+choice
+	prompt "SoC platform selection"
+	depends on INTEL_CGU_CLK
+	default INTEL_GRX500_CGU_CLK
+
+config INTEL_GRX500_CGU_CLK
+	bool "GRX500 CLK"
+	help
+	  Clock driver of GRX500 platform.
+
+endchoice
