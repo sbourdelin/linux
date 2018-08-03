@@ -149,7 +149,6 @@ static int mei_me_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	const struct mei_cfg *cfg;
 	struct mei_device *dev;
 	struct mei_me_hw *hw;
-	unsigned int irqflags;
 	int err;
 
 	cfg = mei_me_get_cfg(ent->driver_data);
@@ -196,18 +195,16 @@ static int mei_me_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw = to_me_hw(dev);
 	hw->mem_addr = pcim_iomap_table(pdev)[0];
 
-	pci_enable_msi(pdev);
+	err = pci_alloc_irq_vectors(pdev, 1, 1, PCI_IRQ_ALL_TYPES);
+	if (err < 0)
+		goto end;
 
-	 /* request and enable interrupt */
-	irqflags = pci_dev_msi_enabled(pdev) ? IRQF_ONESHOT : IRQF_SHARED;
-
-	err = request_threaded_irq(pdev->irq,
-			mei_me_irq_quick_handler,
-			mei_me_irq_thread_handler,
-			irqflags, KBUILD_MODNAME, dev);
+	/* request and enable interrupt */
+	err = pci_request_irq(pdev, 0, mei_me_irq_quick_handler,
+			      mei_me_irq_thread_handler, dev, KBUILD_MODNAME);
 	if (err) {
-		dev_err(&pdev->dev, "request_threaded_irq failure. irq = %d\n",
-		       pdev->irq);
+		pci_err(pdev, "pci_request_irq failure. irq = %d\n",
+			pci_irq_vector(pdev, 0));
 		goto end;
 	}
 
@@ -258,7 +255,7 @@ stop:
 release_irq:
 	mei_cancel_work(dev);
 	mei_disable_interrupts(dev);
-	free_irq(pdev->irq, dev);
+	pci_free_irq(pdev, 0, dev);
 end:
 	dev_err(&pdev->dev, "initialization failed.\n");
 	return err;
@@ -287,7 +284,7 @@ static void mei_me_shutdown(struct pci_dev *pdev)
 	mei_me_unset_pm_domain(dev);
 
 	mei_disable_interrupts(dev);
-	free_irq(pdev->irq, dev);
+	pci_free_irq(pdev, 0, dev);
 }
 
 /**
@@ -316,7 +313,7 @@ static void mei_me_remove(struct pci_dev *pdev)
 
 	mei_disable_interrupts(dev);
 
-	free_irq(pdev->irq, dev);
+	pci_free_irq(pdev, 0, dev);
 
 	mei_deregister(dev);
 }
