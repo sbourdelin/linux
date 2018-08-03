@@ -1646,7 +1646,7 @@ static __latent_entropy struct task_struct *copy_process(
 	 * from creating siblings.
 	 */
 	if ((clone_flags & CLONE_PARENT) &&
-				current->signal->flags & SIGNAL_UNKILLABLE)
+				is_child_reaper(task_tgid(current)))
 		return ERR_PTR(-EINVAL);
 
 	/*
