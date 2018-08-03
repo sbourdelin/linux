@@ -12,6 +12,7 @@ platforms += cobalt
 platforms += dec
 platforms += emma
 platforms += generic
+platforms += intel-mips
 platforms += jazz
 platforms += jz4740
 platforms += lantiq

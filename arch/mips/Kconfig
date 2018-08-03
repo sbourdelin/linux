@@ -409,6 +409,34 @@ config LANTIQ
 	select ARCH_HAS_RESET_CONTROLLER
 	select RESET_CONTROLLER
 
+config INTEL_MIPS
+	bool "Intel MIPS interAptiv SoC based platforms"
+	select BOOT_RAW
+	select CEVT_R4K
+	select COMMON_CLK
+	select CPU_MIPS32_3_5_EVA
+	select CPU_MIPS32_3_5_FEATURES
+	select CPU_MIPSR2_IRQ_EI
+	select CPU_MIPSR2_IRQ_VI
+	select CSRC_R4K
+	select DMA_NONCOHERENT
+	select GENERIC_ISA_DMA
+	select IRQ_MIPS_CPU
+	select MFD_CORE
+	select MFD_SYSCON
+	select MIPS_CPU_SCACHE
+	select MIPS_GIC
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_HAS_CPU_MIPS32_R3_5
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select SYS_SUPPORTS_MIPS_CPS
+	select SYS_SUPPORTS_MULTITHREADING
+	select SYS_SUPPORTS_ZBOOT
+	select TIMER_OF
+	select USE_OF
+
 config LASAT
 	bool "LASAT Networks platforms"
 	select CEVT_R4K
@@ -1016,6 +1044,7 @@ source "arch/mips/bcm47xx/Kconfig"
 source "arch/mips/bcm63xx/Kconfig"
 source "arch/mips/bmips/Kconfig"
 source "arch/mips/generic/Kconfig"
+source "arch/mips/intel-mips/Kconfig"
 source "arch/mips/jazz/Kconfig"
 source "arch/mips/jz4740/Kconfig"
 source "arch/mips/lantiq/Kconfig"

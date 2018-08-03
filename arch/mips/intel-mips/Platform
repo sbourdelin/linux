@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# MIPS SoC platform
+#
+
+platform-$(CONFIG_INTEL_MIPS)			+= intel-mips/
+cflags-$(CONFIG_INTEL_MIPS)			+= -I$(srctree)/arch/mips/include/asm/mach-intel-mips
+ifdef CONFIG_EVA
+	load-$(CONFIG_INTEL_MIPS)		= 0xffffffff60020000
+else
+	load-$(CONFIG_INTEL_MIPS)		= 0xffffffff80020000
+endif
