@@ -744,11 +744,12 @@ static struct p9_trans_module p9_virtio_trans = {
 	.cancel = p9_virtio_cancel,
 	/*
 	 * We leave one entry for input and one entry for response
-	 * headers. We also skip one more entry to accomodate, address
-	 * that are not at page boundary, that can result in an extra
-	 * page in zero copy.
+	 * headers. We also skip three more entrys to accomodate
+	 * (input + response headers + data pages), address
+	 * that are not at page boundary, that can result in
+	 * an extra page in zero copy.
 	 */
-	.maxsize = PAGE_SIZE * (VIRTQUEUE_NUM - 3),
+	.maxsize = PAGE_SIZE * (VIRTQUEUE_NUM - 5),
 	.def = 1,
 	.owner = THIS_MODULE,
 };
