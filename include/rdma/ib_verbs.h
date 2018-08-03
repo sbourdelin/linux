@@ -3389,6 +3389,8 @@ static inline int ib_post_send(struct ib_qp *qp,
 {
 	const struct ib_send_wr *dummy;
 
+	if (bad_send_wr)
+		*bad_send_wr = NULL;
 	return qp->device->post_send(qp, send_wr, bad_send_wr ? : &dummy);
 }
 
