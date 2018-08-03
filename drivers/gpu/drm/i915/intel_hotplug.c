@@ -507,6 +507,84 @@ void intel_hpd_init(struct drm_i915_private *dev_priv)
 	}
 }
 
+/**
+ * intel_hpd_irq_event - hotplug processing
+ * @dev: drm_device
+ *
+ * Drivers can use this function to run a detect cycle on all connectors which
+ * have the DRM_CONNECTOR_POLL_HPD flag set in their &polled member. All other
+ * connectors are ignored, which is useful to avoid reprobing fixed panels.
+ *
+ * This function is useful for drivers which can't or don't track hotplug interrupts
+ * for each connector. This function is based on drm_helper_hpd_irq_event() helper
+ * function and besides it adds edid check routine when a connector status still
+ * remains as "connector_status_connected".
+ *
+ * Following scenario requires detection of changing of edid.
+ *  1) plug display device to a connector
+ *  2) system suspend
+ *  3) unplug 1)'s display device and plug the other display device to a connector
+ *  4) system resume
+
+ * This function must be called from process context with no mode
+ * setting locks held.
+ *
+ * Note that a connector can be both polled and probed from the hotplug handler,
+ * in case the hotplug interrupt is known to be unreliable.
+ */
+static bool intel_hpd_irq_event(struct drm_device *dev)
+{
+	struct drm_connector *connector;
+	struct drm_connector_list_iter conn_iter;
+	enum drm_connector_status old_status, cur_status;
+	struct edid *old_edid;
+	bool changed = false;
+
+	if (!dev->mode_config.poll_enabled)
+		return false;
+
+	mutex_lock(&dev->mode_config.mutex);
+	drm_connector_list_iter_begin(dev, &conn_iter);
+	drm_for_each_connector_iter(connector, &conn_iter) {
+		/* Only handle HPD capable connectors. */
+		if (!(connector->polled & DRM_CONNECTOR_POLL_HPD))
+			continue;
+
+		old_status = connector->status;
+		old_edid = to_intel_connector(connector)->detect_edid;
+
+		cur_status = drm_helper_probe_detect(connector, NULL, false);
+		DRM_DEBUG_KMS("[CONNECTOR:%d:%s] status updated from %s to %s\n",
+			      connector->base.id, connector->name,
+			      drm_get_connector_status_name(old_status),
+			      drm_get_connector_status_name(cur_status));
+
+		if (old_status != cur_status)
+			changed = true;
+
+		/* Check changing of edid when a connector status still remains
+		 * as "connector_status_connected". */
+		if (old_status == cur_status &&
+		    cur_status == connector_status_connected) {
+			struct edid *cur_edid = to_intel_connector(connector)->detect_edid;
+
+			if (memcmp(old_edid, cur_edid, sizeof(*cur_edid)) != 0) {
+				changed = true;
+				DRM_DEBUG_KMS("[CONNECTOR:%d:%s] edid updated\n",
+					      connector->base.id,
+					      connector->name);
+			}
+		}
+	}
+	drm_connector_list_iter_end(&conn_iter);
+	mutex_unlock(&dev->mode_config.mutex);
+
+	if (changed)
+		drm_kms_helper_hotplug_event(dev);
+
+	return changed;
+}
+
 static void i915_hpd_poll_init_work(struct work_struct *work)
 {
 	struct drm_i915_private *dev_priv =
@@ -552,7 +630,7 @@ static void i915_hpd_poll_init_work(struct work_struct *work)
 	 * in the middle of disabling polling
 	 */
 	if (!enabled)
-		drm_helper_hpd_irq_event(dev);
+		intel_hpd_irq_event(dev);
 }
 
 /**
