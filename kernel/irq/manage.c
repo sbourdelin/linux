@@ -1156,6 +1156,16 @@ setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 	return 0;
 }
 
+static bool irq_data_oneshot_safe(struct irq_data *data)
+{
+#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+	/* check topmost irq_chip only */
+	while (data->parent_data)
+		data = data->parent_data;
+#endif
+	return !!(data->chip->flags & IRQCHIP_ONESHOT_SAFE);
+}
+
 /*
  * Internal function to register an irqaction - typically used to
  * allocate special interrupts that are part of the architecture.
@@ -1243,7 +1253,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	 * chip flags, so we can avoid the unmask dance at the end of
 	 * the threaded handler for those.
 	 */
-	if (desc->irq_data.chip->flags & IRQCHIP_ONESHOT_SAFE)
+	if (irq_data_oneshot_safe(&desc->irq_data))
 		new->flags &= ~IRQF_ONESHOT;
 
 	/*
