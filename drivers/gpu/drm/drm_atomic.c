@@ -1559,7 +1559,6 @@ drm_atomic_set_crtc_for_connector(struct drm_connector_state *conn_state,
 			~(1 << drm_connector_index(conn_state->connector));
 
 		drm_connector_put(conn_state->connector);
-		conn_state->crtc = NULL;
 	}
 
 	if (crtc) {
@@ -1571,7 +1570,6 @@ drm_atomic_set_crtc_for_connector(struct drm_connector_state *conn_state,
 			1 << drm_connector_index(conn_state->connector);
 
 		drm_connector_get(conn_state->connector);
-		conn_state->crtc = crtc;
 
 		DRM_DEBUG_ATOMIC("Link connector state %p to [CRTC:%d:%s]\n",
 				 conn_state, crtc->base.id, crtc->name);
@@ -1579,6 +1577,7 @@ drm_atomic_set_crtc_for_connector(struct drm_connector_state *conn_state,
 		DRM_DEBUG_ATOMIC("Link connector state %p to [NOCRTC]\n",
 				 conn_state);
 	}
+	conn_state->crtc = crtc;
 
 	return 0;
 }
