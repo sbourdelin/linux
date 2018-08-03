@@ -155,6 +155,16 @@ do {								\
 			       buf, len, ascii);		\
 } while (0)
 
+#if defined(CONFIG_RTB)
+#define dynamic_rtb(log_type, data)				\
+do {								\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor,		\
+		__builtin_constant_p(log_type) ? log_type : "rtb");\
+	if (DYNAMIC_DEBUG_BRANCH(descriptor))			\
+		uncached_logk(log_type, data);			\
+} while (0)
+#endif
+
 #else
 
 #include <linux/string.h>
