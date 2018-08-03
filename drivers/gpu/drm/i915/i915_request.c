@@ -1258,6 +1258,58 @@ static bool __i915_wait_request_check_and_reset(struct i915_request *request)
 	return true;
 }
 
+struct wait_dma_qos {
+	struct pm_qos_request req;
+	struct work_struct add, del;
+};
+
+static void __wait_dma_qos_add(struct work_struct *work)
+{
+	struct wait_dma_qos *qos = container_of(work, typeof(*qos), add);
+
+	pm_qos_add_request(&qos->req, PM_QOS_CPU_DMA_LATENCY, 50);
+}
+
+static void __wait_dma_qos_del(struct work_struct *work)
+{
+	struct wait_dma_qos *qos = container_of(work, typeof(*qos), del);
+
+	if (!cancel_work_sync(&qos->add))
+		pm_qos_remove_request(&qos->req);
+
+	kfree(qos);
+}
+
+static struct wait_dma_qos *wait_dma_qos_add(void)
+{
+	struct wait_dma_qos *qos;
+
+	/* Called under TASK_INTERRUPTIBLE, so not allowed to sleep/block. */
+	qos = kzalloc(sizeof(*qos), GFP_NOWAIT | __GFP_NOWARN);
+	if (!qos)
+		return NULL;
+
+	INIT_WORK(&qos->add, __wait_dma_qos_add);
+	INIT_WORK(&qos->del, __wait_dma_qos_del);
+
+	/*
+	 * Schedule the enabling work on the local cpu so that it should only
+	 * take effect if we actually sleep. If schedule() short circuits due to
+	 * our request already being completed, we should then be able to cancel
+	 * the work before it is even run.
+	 */
+	queue_work_on(raw_smp_processor_id(), system_highpri_wq, &qos->add);
+
+	return qos;
+}
+
+static void wait_dma_qos_del(struct wait_dma_qos *qos)
+{
+	/* Defer to worker so not incur extra latency for our woken client. */
+	if (qos)
+		queue_work(system_highpri_wq, &qos->del);
+}
+
 /**
  * i915_request_wait - wait until execution of request has finished
  * @rq: the request to wait upon
@@ -1286,6 +1338,7 @@ long i915_request_wait(struct i915_request *rq,
 	wait_queue_head_t *errq = &rq->i915->gpu_error.wait_queue;
 	DEFINE_WAIT_FUNC(reset, default_wake_function);
 	DEFINE_WAIT_FUNC(exec, default_wake_function);
+	struct wait_dma_qos *qos = NULL;
 	struct intel_wait wait;
 
 	might_sleep();
@@ -1363,6 +1416,11 @@ restart:
 			break;
 		}
 
+		if (!qos &&
+		    i915_seqno_passed(intel_engine_get_seqno(rq->engine),
+				      wait.seqno - 1))
+			qos = wait_dma_qos_add();
+
 		timeout = io_schedule_timeout(timeout);
 
 		if (intel_wait_complete(&wait) &&
@@ -1412,6 +1470,7 @@ complete:
 	if (flags & I915_WAIT_LOCKED)
 		remove_wait_queue(errq, &reset);
 	remove_wait_queue(&rq->execute, &exec);
+	wait_dma_qos_del(qos);
 	trace_i915_request_wait_end(rq);
 
 	return timeout;
