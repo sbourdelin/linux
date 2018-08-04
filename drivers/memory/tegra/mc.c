@@ -72,6 +72,8 @@ static const struct of_device_id tegra_mc_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra_mc_of_match);
 
+static struct tegra_mc_gart_handle *gart_handle;
+
 static int terga_mc_block_dma_common(struct tegra_mc *mc,
 				     const struct tegra_mc_reset *rst)
 {
@@ -543,6 +545,11 @@ static irqreturn_t tegra_mc_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+void tegra_mc_register_gart(struct tegra_mc_gart_handle *handle)
+{
+	WRITE_ONCE(gart_handle, handle);
+}
+
 static __maybe_unused irqreturn_t tegra20_mc_irq(int irq, void *data)
 {
 	struct tegra_mc *mc = data;
@@ -565,6 +572,7 @@ static __maybe_unused irqreturn_t tegra20_mc_irq(int irq, void *data)
 		switch (BIT(bit)) {
 		case MC_INT_DECERR_EMEM:
 			reg = MC_DECERR_EMEM_OTHERS_STATUS;
+			addr = mc_readl(mc, reg + sizeof(u32));
 			value = mc_readl(mc, reg);
 
 			id = value & mc->soc->client_id_mask;
@@ -575,11 +583,24 @@ static __maybe_unused irqreturn_t tegra20_mc_irq(int irq, void *data)
 			break;
 
 		case MC_INT_INVALID_GART_PAGE:
-			dev_err_ratelimited(mc->dev, "%s\n", error);
-			continue;
+			if (gart_handle == NULL) {
+				dev_err_ratelimited(mc->dev, "%s\n", error);
+				continue;
+			}
+
+			addr = gart_handle->error_addr(gart_handle);
+			value = gart_handle->error_req(gart_handle);
+
+			id = (value >> 1) & mc->soc->client_id_mask;
+			desc = error_names[2];
+
+			if (value & BIT(0))
+				direction = "write";
+			break;
 
 		case MC_INT_SECURITY_VIOLATION:
 			reg = MC_SECURITY_VIOLATION_STATUS;
+			addr = mc_readl(mc, reg + sizeof(u32));
 			value = mc_readl(mc, reg);
 
 			id = value & mc->soc->client_id_mask;
@@ -596,7 +617,6 @@ static __maybe_unused irqreturn_t tegra20_mc_irq(int irq, void *data)
 		}
 
 		client = mc->soc->clients[id].name;
-		addr = mc_readl(mc, reg + sizeof(u32));
 
 		dev_err_ratelimited(mc->dev, "%s: %s%s @%pa: %s (%s)\n",
 				    client, secure, direction, &addr, error,

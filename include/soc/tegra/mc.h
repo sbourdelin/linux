@@ -162,4 +162,17 @@ struct tegra_mc {
 void tegra_mc_write_emem_configuration(struct tegra_mc *mc, unsigned long rate);
 unsigned int tegra_mc_get_emem_device_count(struct tegra_mc *mc);
 
+struct tegra_mc_gart_handle {
+	u32 (*error_addr)(struct tegra_mc_gart_handle *handle);
+	u32 (*error_req)(struct tegra_mc_gart_handle *handle);
+};
+
+#ifdef CONFIG_TEGRA_MC
+void tegra_mc_register_gart(struct tegra_mc_gart_handle *handle);
+#else
+static inline void tegra_mc_register_gart(struct tegra_mc_gart_handle *handle)
+{
+}
+#endif
+
 #endif /* __SOC_TEGRA_MC_H__ */
