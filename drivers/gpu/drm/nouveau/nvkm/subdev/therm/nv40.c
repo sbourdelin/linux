@@ -59,11 +59,11 @@ nv40_sensor_setup(struct nvkm_therm *therm)
 	if (style == NEW_STYLE) {
 		nvkm_mask(device, 0x15b8, 0x80000000, 0);
 		nvkm_wr32(device, 0x15b0, 0x80003fff);
-		mdelay(20); /* wait for the temperature to stabilize */
+		msleep(20); /* wait for the temperature to stabilize */
 		return nvkm_rd32(device, 0x15b4) & 0x3fff;
 	} else if (style == OLD_STYLE) {
 		nvkm_wr32(device, 0x15b0, 0xff);
-		mdelay(20); /* wait for the temperature to stabilize */
+		msleep(20); /* wait for the temperature to stabilize */
 		return nvkm_rd32(device, 0x15b4) & 0xff;
 	} else
 		return -ENODEV;
