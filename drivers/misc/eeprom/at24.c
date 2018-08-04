@@ -112,16 +112,26 @@ MODULE_PARM_DESC(at24_write_timeout, "Time (in ms) to try writes (default 25)");
  * write to work while making sure that at least one iteration is run before
  * checking the break condition.
  *
+ * By recording current time at the beginning of one iteration, the timeout
+ * is actually checked against the time in previous iteration. It makes sure,
+ * even the timeout is reached, there is still one more chance to try I2C
+ * transfer in case EEPROM is ready.
+ *
  * It takes two parameters: a variable in which the future timeout in jiffies
  * will be stored and a temporary variable holding the time of the last
  * iteration of processing the request. Both should be unsigned integers
  * holding at least 32 bits.
  */
-#define at24_loop_until_timeout(tout, op_time)				\
-	for (tout = jiffies + msecs_to_jiffies(at24_write_timeout),	\
-	     op_time = 0;						\
-	     op_time ? time_before(op_time, tout) : true;		\
-	     usleep_range(1000, 1500), op_time = jiffies)
+#define at24_loop_until_timeout_begin(tout, op_time)		\
+	tout = jiffies + msecs_to_jiffies(at24_write_timeout);	\
+	while (true) {						\
+		op_time = jiffies;
+
+#define at24_loop_until_timeout_end(tout, op_time)		\
+		if (time_before(tout, op_time))			\
+			break;					\
+		usleep_range(1000, 1500);			\
+	}
 
 struct at24_chip_data {
 	/*
@@ -308,13 +318,14 @@ static ssize_t at24_regmap_read(struct at24_data *at24, char *buf,
 	/* adjust offset for mac and serial read ops */
 	offset += at24->offset_adj;
 
-	at24_loop_until_timeout(timeout, read_time) {
+	at24_loop_until_timeout_begin(timeout, read_time) {
 		ret = regmap_bulk_read(regmap, offset, buf, count);
 		dev_dbg(&client->dev, "read %zu@%d --> %d (%ld)\n",
 			count, offset, ret, jiffies);
 		if (!ret)
 			return count;
 	}
+	at24_loop_until_timeout_end(timeout, read_time)
 
 	return -ETIMEDOUT;
 }
@@ -359,13 +370,14 @@ static ssize_t at24_regmap_write(struct at24_data *at24, const char *buf,
 	client = at24_client->client;
 	count = at24_adjust_write_count(at24, offset, count);
 
-	at24_loop_until_timeout(timeout, write_time) {
+	at24_loop_until_timeout_begin(timeout, write_time) {
 		ret = regmap_bulk_write(regmap, offset, buf, count);
 		dev_dbg(&client->dev, "write %zu@%d --> %d (%ld)\n",
 			count, offset, ret, jiffies);
 		if (!ret)
 			return count;
 	}
+	at24_loop_until_timeout_end(timeout, write_time)
 
 	return -ETIMEDOUT;
 }
