@@ -1705,7 +1705,7 @@ static void r600_gpu_soft_reset(struct radeon_device *rdev, u32 reset_mask)
 		WREG32(DMA_RB_CNTL, tmp);
 	}
 
-	mdelay(50);
+	msleep(50);
 
 	rv515_mc_stop(rdev, &save);
 	if (r600_mc_wait_for_idle(rdev)) {
@@ -1782,7 +1782,7 @@ static void r600_gpu_soft_reset(struct radeon_device *rdev, u32 reset_mask)
 		WREG32(R_008020_GRBM_SOFT_RESET, tmp);
 		tmp = RREG32(R_008020_GRBM_SOFT_RESET);
 
-		udelay(50);
+		usleep_range(50, 100);
 
 		tmp &= ~grbm_soft_reset;
 		WREG32(R_008020_GRBM_SOFT_RESET, tmp);
@@ -1796,7 +1796,7 @@ static void r600_gpu_soft_reset(struct radeon_device *rdev, u32 reset_mask)
 		WREG32(SRBM_SOFT_RESET, tmp);
 		tmp = RREG32(SRBM_SOFT_RESET);
 
-		udelay(50);
+		usleep_range(50, 100);
 
 		tmp &= ~srbm_soft_reset;
 		WREG32(SRBM_SOFT_RESET, tmp);
@@ -1804,10 +1804,10 @@ static void r600_gpu_soft_reset(struct radeon_device *rdev, u32 reset_mask)
 	}
 
 	/* Wait a little for things to settle down */
-	mdelay(1);
+	usleep_range(1000, 2000);
 
 	rv515_mc_resume(rdev, &save);
-	udelay(50);
+	usleep_range(50, 100);
 
 	r600_print_gpu_status_regs(rdev);
 }
@@ -1835,7 +1835,7 @@ static void r600_gpu_pci_config_reset(struct radeon_device *rdev)
 	tmp &= ~DMA_RB_ENABLE;
 	WREG32(DMA_RB_CNTL, tmp);
 
-	mdelay(50);
+	msleep(50);
 
 	/* set mclk/sclk to bypass */
 	if (rdev->family >= CHIP_RV770)
@@ -1857,12 +1857,12 @@ static void r600_gpu_pci_config_reset(struct radeon_device *rdev)
 
 	/* reset */
 	radeon_pci_config_reset(rdev);
-	mdelay(1);
+	usleep_range(1000, 2000);
 
 	/* BIF reset workaround.  Not sure if this is needed on 6xx */
 	tmp = SOFT_RESET_BIF;
 	WREG32(SRBM_SOFT_RESET, tmp);
-	mdelay(1);
+	usleep_range(1000, 2000);
 	WREG32(SRBM_SOFT_RESET, 0);
 
 	/* wait for asic to come out of reset */
