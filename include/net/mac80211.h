@@ -3137,6 +3137,17 @@ enum ieee80211_reconfig_type {
  *	Returns a negative error code if the key can't be added.
  *	The callback can sleep.
  *
+ * @replace_key: Replace an exiting in use key with a new one while guaranteeing
+ * 	to not leak clear text packets. Implementing this callback will enable
+ * 	mac80211 to announce NL80211_EXT_FEATURE_ATOMIC_KEY_REPLACE.
+ * 	Packets already queued must not be send out encrypted with the new key
+ * 	and packets decoded with the old key must not be handed over to mac80211
+ * 	when the driver is not checking IV/ICV itself once the callback has been
+ * 	completed.
+ * 	Mac80211 will log an error when asked to use replace a PTK key
+ * 	without replace_key but will still perform the then potentially
+ * 	insecure action via set_key for backward compatibility for now.
+ *
  * @update_tkip_key: See the section "Hardware crypto acceleration"
  * 	This callback will be called in the context of Rx. Called for drivers
  * 	which set IEEE80211_KEY_FLAG_TKIP_REQ_RX_P1_KEY.
@@ -3585,6 +3596,10 @@ struct ieee80211_ops {
 	int (*set_key)(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		       struct ieee80211_key_conf *key);
+	int (*replace_key)(struct ieee80211_hw *hw,
+		       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+		       struct ieee80211_key_conf *old,
+		       struct ieee80211_key_conf *new);
 	void (*update_tkip_key)(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif,
 				struct ieee80211_key_conf *conf,
