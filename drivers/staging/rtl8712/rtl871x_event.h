@@ -90,13 +90,13 @@ struct event_node {
 	unsigned char *node;
 	unsigned char evt_code;
 	unsigned short evt_sz;
-	/*volatile*/ int *caller_ff_tail;
+	int *caller_ff_tail;
 	int	caller_ff_sz;
 };
 
 struct c2hevent_queue {
-	/*volatile*/ int	head;
-	/*volatile*/ int	tail;
+	int	head;
+	int	tail;
 	struct	event_node	nodes[C2HEVENT_SZ];
 	unsigned char	seq;
 };
@@ -104,8 +104,8 @@ struct c2hevent_queue {
 #define NETWORK_QUEUE_SZ	4
 
 struct network_queue {
-	/*volatile*/ int	head;
-	/*volatile*/ int	tail;
+	int	head;
+	int	tail;
 	struct wlan_bssid_ex networks[NETWORK_QUEUE_SZ];
 };
 

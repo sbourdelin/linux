@@ -89,14 +89,14 @@ struct reportpwrstate_parm {
 
 struct	pwrctrl_priv {
 	struct mutex mutex_lock;
-	/*volatile*/ u8 rpwm; /* requested power state for fw */
+	u8 rpwm; /* requested power state for fw */
 	/* fw current power state. updated when 1. read from HCPWM or
 	 * 2. driver lowers power level
 	 */
-	/*volatile*/ u8 cpwm;
-	/*volatile*/ u8 tog; /* toggling */
-	/*volatile*/ u8 cpwm_tog; /* toggling */
-	/*volatile*/ u8 tgt_rpwm; /* wanted power state */
+	u8 cpwm;
+	u8 tog; /* toggling */
+	u8 cpwm_tog; /* toggling */
+	u8 tgt_rpwm; /* wanted power state */
 	uint pwr_mode;
 	uint smart_ps;
 	uint alives;

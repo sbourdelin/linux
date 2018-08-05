@@ -113,7 +113,7 @@ struct	_io_ops {
 struct io_req {
 	struct list_head list;
 	u32	addr;
-	/*volatile*/ u32	val;
+	u32	val;
 	u32	command;
 	u32	status;
 	u8	*pbuf;
