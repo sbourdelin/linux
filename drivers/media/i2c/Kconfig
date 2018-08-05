@@ -876,7 +876,7 @@ config VIDEO_MT9V032
 config VIDEO_MT9V111
 	tristate "Aptina MT9V111 sensor support"
 	depends on I2C && VIDEO_V4L2
-	depends on MEDIA_CAMERA_SUPPORT
+	depends on MEDIA_CAMERA_SUPPORT && VIDEO_V4L2_SUBDEV_API
 	help
 	  This is a Video4Linux2 sensor driver for the Aptina/Micron
 	  MT9V111 sensor.
