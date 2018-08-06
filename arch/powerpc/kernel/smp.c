@@ -76,10 +76,12 @@ static DEFINE_PER_CPU(int, cpu_state) = { 0 };
 struct thread_info *secondary_ti;
 
 DEFINE_PER_CPU(cpumask_var_t, cpu_sibling_map);
+DEFINE_PER_CPU(cpumask_var_t, cpu_smallcore_sibling_map);
 DEFINE_PER_CPU(cpumask_var_t, cpu_l2_cache_map);
 DEFINE_PER_CPU(cpumask_var_t, cpu_core_map);
 
 EXPORT_PER_CPU_SYMBOL(cpu_sibling_map);
+EXPORT_PER_CPU_SYMBOL(cpu_smallcore_sibling_map);
 EXPORT_PER_CPU_SYMBOL(cpu_l2_cache_map);
 EXPORT_PER_CPU_SYMBOL(cpu_core_map);
 
@@ -693,6 +695,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	for_each_possible_cpu(cpu) {
 		zalloc_cpumask_var_node(&per_cpu(cpu_sibling_map, cpu),
 					GFP_KERNEL, cpu_to_node(cpu));
+		zalloc_cpumask_var_node(&per_cpu(cpu_smallcore_sibling_map,
+						 cpu),
+					GFP_KERNEL, cpu_to_node(cpu));
 		zalloc_cpumask_var_node(&per_cpu(cpu_l2_cache_map, cpu),
 					GFP_KERNEL, cpu_to_node(cpu));
 		zalloc_cpumask_var_node(&per_cpu(cpu_core_map, cpu),
@@ -711,6 +716,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	cpumask_set_cpu(boot_cpuid, cpu_sibling_mask(boot_cpuid));
 	cpumask_set_cpu(boot_cpuid, cpu_l2_cache_mask(boot_cpuid));
 	cpumask_set_cpu(boot_cpuid, cpu_core_mask(boot_cpuid));
+	if (has_big_cores) {
+		cpumask_set_cpu(boot_cpuid,
+				cpu_smallcore_sibling_mask(boot_cpuid));
+	}
 
 	if (smp_ops && smp_ops->probe)
 		smp_ops->probe();
@@ -995,6 +1004,10 @@ static void remove_cpu_from_masks(int cpu)
 		set_cpus_unrelated(cpu, i, cpu_core_mask);
 		set_cpus_unrelated(cpu, i, cpu_l2_cache_mask);
 		set_cpus_unrelated(cpu, i, cpu_sibling_mask);
+		if (has_big_cores) {
+			set_cpus_unrelated(cpu, i,
+					   cpu_smallcore_sibling_mask);
+		}
 	}
 }
 #endif
@@ -1003,7 +1016,17 @@ static void add_cpu_to_masks(int cpu)
 {
 	int first_thread = cpu_first_thread_sibling(cpu);
 	int chipid = cpu_to_chip_id(cpu);
-	int i;
+
+	struct thread_groups tg;
+	int i, cpu_group_start = -1;
+
+	if (has_big_cores) {
+		struct device_node *dn = of_get_cpu_node(cpu, NULL);
+
+		parse_thread_groups(dn, &tg);
+		cpu_group_start = get_cpu_thread_group_start(cpu, &tg);
+		cpumask_set_cpu(cpu, cpu_smallcore_sibling_mask(cpu));
+	}
 
 	/*
 	 * This CPU will not be in the online mask yet so we need to manually
@@ -1011,9 +1034,21 @@ static void add_cpu_to_masks(int cpu)
 	 */
 	cpumask_set_cpu(cpu, cpu_sibling_mask(cpu));
 
-	for (i = first_thread; i < first_thread + threads_per_core; i++)
-		if (cpu_online(i))
-			set_cpus_related(i, cpu, cpu_sibling_mask);
+	for (i = first_thread; i < first_thread + threads_per_core; i++) {
+		int i_group_start;
+
+		if (!cpu_online(i))
+			continue;
+
+		set_cpus_related(i, cpu, cpu_sibling_mask);
+
+		if (!has_big_cores)
+			continue;
+
+		i_group_start = get_cpu_thread_group_start(i, &tg);
+		if (i_group_start == cpu_group_start)
+			set_cpus_related(i, cpu, cpu_smallcore_sibling_mask);
+	}
 
 	/*
 	 * Copy the thread sibling mask into the cache sibling mask
@@ -1140,6 +1175,11 @@ static const struct cpumask *shared_cache_mask(int cpu)
 	return cpu_l2_cache_mask(cpu);
 }
 
+static const struct cpumask *smallcore_smt_mask(int cpu)
+{
+	return cpu_smallcore_sibling_mask(cpu);
+}
+
 static struct sched_domain_topology_level power9_topology[] = {
 #ifdef CONFIG_SCHED_SMT
 	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
@@ -1162,6 +1202,13 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	dump_numa_cpu_topology();
 
+#ifdef CONFIG_SCHED_SMT
+	if (has_big_cores) {
+		pr_info("Using small cores at SMT level\n");
+		power9_topology[0].mask = smallcore_smt_mask;
+		powerpc_topology[0].mask = smallcore_smt_mask;
+	}
+#endif
 	/*
 	 * If any CPU detects that it's sharing a cache with another CPU then
 	 * use the deeper topology that is aware of this sharing.

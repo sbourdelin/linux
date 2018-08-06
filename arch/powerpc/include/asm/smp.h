@@ -98,12 +98,18 @@ static inline void set_hard_smp_processor_id(int cpu, int phys)
 #endif
 
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_map);
+DECLARE_PER_CPU(cpumask_var_t, cpu_smallcore_sibling_map);
 DECLARE_PER_CPU(cpumask_var_t, cpu_l2_cache_map);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_map);
 
 static inline struct cpumask *cpu_sibling_mask(int cpu)
 {
 	return per_cpu(cpu_sibling_map, cpu);
+}
+
+static inline struct cpumask *cpu_smallcore_sibling_mask(int cpu)
+{
+	return per_cpu(cpu_smallcore_sibling_map, cpu);
 }
 
 static inline struct cpumask *cpu_core_mask(int cpu)
