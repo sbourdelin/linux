@@ -132,7 +132,7 @@
 /* NFC_IRQ_STATUS Field */
 #define IDLE_IRQ_BIT				BIT(29)
 #define IDLE_EN_BIT				BIT(20)
-#define CMD_DONE_CLEAR_BIT			BIT(18)
+#define DONE_CLEAR_BIT				BIT(18)
 #define IDLE_CLEAR_BIT				BIT(17)
 
 /*
@@ -290,7 +290,7 @@ static inline void vf610_nfc_clear_status(struct vf610_nfc *nfc)
 {
 	u32 tmp = vf610_nfc_read(nfc, NFC_IRQ_STATUS);
 
-	tmp |= CMD_DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
+	tmp |= DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
 	vf610_nfc_write(nfc, NFC_IRQ_STATUS, tmp);
 }
 
