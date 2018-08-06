@@ -290,15 +290,6 @@ static inline void vf610_nfc_wr_to_sram(void __iomem *dst, const void *src,
 	}
 }
 
-/* Clear flags for upcoming command */
-static inline void vf610_nfc_clear_status(struct vf610_nfc *nfc)
-{
-	u32 tmp = vf610_nfc_read(nfc, NFC_IRQ_STATUS);
-
-	tmp |= DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
-	vf610_nfc_write(nfc, NFC_IRQ_STATUS, tmp);
-}
-
 static void vf610_nfc_done(struct vf610_nfc *nfc)
 {
 	unsigned long timeout = msecs_to_jiffies(100);
@@ -310,24 +301,29 @@ static void vf610_nfc_done(struct vf610_nfc *nfc)
 	 * vf610_nfc_set implicates such a barrier by using writel
 	 * to write to the register.
 	 */
-	vf610_nfc_set(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
 	vf610_nfc_set(nfc, NFC_FLASH_CMD2, START_BIT);
 
 	if (!wait_for_completion_timeout(&nfc->cmd_done, timeout))
 		dev_warn(nfc->dev, "Timeout while waiting for BUSY.\n");
-
-	vf610_nfc_clear_status(nfc);
 }
 
 static irqreturn_t vf610_nfc_irq(int irq, void *data)
 {
 	struct mtd_info *mtd = data;
 	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+	u32 status;
 
-	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
-	complete(&nfc->cmd_done);
+	status = vf610_nfc_read(nfc, NFC_IRQ_STATUS);
 
-	return IRQ_HANDLED;
+	if (status & IDLE_IRQ_BIT) {
+		status |= IDLE_CLEAR_BIT;
+		vf610_nfc_write(nfc, NFC_IRQ_STATUS, status);
+		complete(&nfc->cmd_done);
+
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_NONE;
 }
 
 static inline void vf610_nfc_ecc_mode(struct vf610_nfc *nfc, int ecc_mode)
@@ -889,7 +885,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
 
 	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, WERR_EN_BIT);
 	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, DONE_EN_BIT);
-	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
+
+	vf610_nfc_set(nfc, NFC_IRQ_STATUS, IDLE_CLEAR_BIT);
+	vf610_nfc_set(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
 
 	err = devm_request_irq(nfc->dev, irq, vf610_nfc_irq, 0, DRV_NAME, mtd);
 	if (err) {
