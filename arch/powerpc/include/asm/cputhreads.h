@@ -23,11 +23,13 @@
 extern int threads_per_core;
 extern int threads_per_subcore;
 extern int threads_shift;
+extern bool has_big_cores;
 extern cpumask_t threads_core_mask;
 #else
 #define threads_per_core	1
 #define threads_per_subcore	1
 #define threads_shift		0
+#define has_big_cores		0
 #define threads_core_mask	(*get_cpu_mask(0))
 #endif
 
@@ -69,12 +71,32 @@ static inline cpumask_t cpu_online_cores_map(void)
 	return cpu_thread_mask_to_cores(cpu_online_mask);
 }
 
+#define MAX_THREAD_LIST_SIZE	8
+struct thread_groups {
+	unsigned int property;
+	unsigned int nr_groups;
+	unsigned int threads_per_group;
+	unsigned int thread_list[MAX_THREAD_LIST_SIZE];
+};
+
 #ifdef CONFIG_SMP
 int cpu_core_index_of_thread(int cpu);
 int cpu_first_thread_of_core(int core);
+int parse_thread_groups(struct device_node *dn, struct thread_groups *tg);
+int get_cpu_thread_group_start(int cpu, struct thread_groups *tg);
 #else
 static inline int cpu_core_index_of_thread(int cpu) { return cpu; }
 static inline int cpu_first_thread_of_core(int core) { return core; }
+static inline int parse_thread_groups(struct device_node *dn,
+				      struct thread_groups *tg)
+{
+	return -ENODATA;
+}
+
+static inline int get_cpu_thread_group_start(int cpu, struct thread_groups *tg)
+{
+	return -1;
+}
 #endif
 
 static inline int cpu_thread_in_core(int cpu)

@@ -402,10 +402,12 @@ void __init check_for_initrd(void)
 #ifdef CONFIG_SMP
 
 int threads_per_core, threads_per_subcore, threads_shift;
+bool has_big_cores;
 cpumask_t threads_core_mask;
 EXPORT_SYMBOL_GPL(threads_per_core);
 EXPORT_SYMBOL_GPL(threads_per_subcore);
 EXPORT_SYMBOL_GPL(threads_shift);
+EXPORT_SYMBOL_GPL(has_big_cores);
 EXPORT_SYMBOL_GPL(threads_core_mask);
 
 static void __init cpu_init_thread_core_maps(int tpc)
@@ -433,6 +435,152 @@ static void __init cpu_init_thread_core_maps(int tpc)
 
 u32 *cpu_to_phys_id = NULL;
 
+/*
+ * parse_thread_groups: Parses the "ibm,thread-groups" device tree
+ *                      property for the CPU device node @dn and stores
+ *                      the parsed output in the thread_groups
+ *                      structure @tg.
+ *
+ * @dn: The device node of the CPU device.
+ * @tg: Pointer to a thread group structure into which the parsed
+ *     output of "ibm,thread-groups" is stored.
+ *
+ * ibm,thread-groups[0..N-1] array defines which group of threads in
+ * the CPU-device node can be grouped together based on the property.
+ *
+ * ibm,thread-groups[0] tells us the property based on which the
+ * threads are being grouped together. If this value is 1, it implies
+ * that the threads in the same group share L1, translation cache.
+ *
+ * ibm,thread-groups[1] tells us how many such thread groups exist.
+ *
+ * ibm,thread-groups[2] tells us the number of threads in each such
+ * group.
+ *
+ * ibm,thread-groups[3..N-1] is the list of threads identified by
+ * "ibm,ppc-interrupt-server#s" arranged as per their membership in
+ * the grouping.
+ *
+ * Example: If ibm,thread-groups = [1,2,4,5,6,7,8,9,10,11,12] it
+ * implies that there are 2 groups of 4 threads each, where each group
+ * of threads share L1, translation cache.
+ *
+ * The "ibm,ppc-interrupt-server#s" of the first group is {5,6,7,8}
+ * and the "ibm,ppc-interrupt-server#s" of the second group is {9, 10,
+ * 11, 12} structure
+ *
+ * Returns 0 on success, -EINVAL if the property does not exist,
+ * -ENODATA if property does not have a value, and -EOVERFLOW if the
+ * property data isn't large enough.
+ */
+int parse_thread_groups(struct device_node *dn,
+			struct thread_groups *tg)
+{
+	unsigned int nr_groups, threads_per_group, property;
+	int i;
+	u32 thread_group_array[3 + MAX_THREAD_LIST_SIZE];
+	u32 *thread_list;
+	size_t total_threads;
+	int ret;
+
+	ret = of_property_read_u32_array(dn, "ibm,thread-groups",
+					 thread_group_array, 3);
+
+	if (ret)
+		goto out_err;
+
+	property = thread_group_array[0];
+	nr_groups = thread_group_array[1];
+	threads_per_group = thread_group_array[2];
+	total_threads = nr_groups * threads_per_group;
+
+	ret = of_property_read_u32_array(dn, "ibm,thread-groups",
+					 thread_group_array,
+					 3 + total_threads);
+	if (ret)
+		goto out_err;
+
+	thread_list = &thread_group_array[3];
+
+	for (i = 0 ; i < total_threads; i++)
+		tg->thread_list[i] = thread_list[i];
+
+	tg->property = property;
+	tg->nr_groups = nr_groups;
+	tg->threads_per_group = threads_per_group;
+
+	return 0;
+out_err:
+	tg->property = 0;
+	tg->nr_groups = 0;
+	tg->threads_per_group = 0;
+	return ret;
+}
+
+/*
+ * dt_has_big_core : Parses the device tree property
+ *		    "ibm,thread-groups" for device node pointed by @dn
+ *		    and stores the parsed output in the structure
+ *		    pointed to by @tg.  Then checks if the output in
+ *		    @tg corresponds to a big-core.
+ *
+ * @dn: Device node pointer of the CPU node being checked for a
+ *      big-core.
+ * @tg: Pointer to thread_groups struct in which parsed output of
+ *      "ibm,thread-groups" is recorded.
+ *
+ * Returns true if the @dn points to a big-core.
+ * Returns false if there is an error in parsing "ibm,thread-groups"
+ * or the parsed output doesn't correspond to a big-core.
+ */
+static inline bool dt_has_big_core(struct device_node *dn,
+				   struct thread_groups *tg)
+{
+	if (parse_thread_groups(dn, tg))
+		return false;
+
+	if (tg->property != 1)
+		return false;
+
+	if (tg->nr_groups < 1)
+		return false;
+
+	return true;
+}
+
+/*
+ * get_cpu_thread_group_start : Searches the thread group in tg->thread_list
+ *                              that @cpu belongs to.
+ *
+ * @cpu : The logical CPU whose thread group is being searched.
+ * @tg : The thread-group structure of the CPU node which @cpu belongs
+ *       to.
+ *
+ * Returns the index to tg->thread_list that points to the the start
+ * of the thread_group that @cpu belongs to.
+ *
+ * Returns -1 if cpu doesn't belong to any of the groups pointed to by
+ * tg->thread_list.
+ */
+int get_cpu_thread_group_start(int cpu, struct thread_groups *tg)
+{
+	int hw_cpu_id = get_hard_smp_processor_id(cpu);
+	int i, j;
+
+	for (i = 0; i < tg->nr_groups; i++) {
+		int group_start = i * tg->threads_per_group;
+
+		for (j = 0; j < tg->threads_per_group; j++) {
+			int idx = group_start + j;
+
+			if (tg->thread_list[idx] == hw_cpu_id)
+				return group_start;
+		}
+	}
+
+	return -1;
+}
+
 /**
  * setup_cpu_maps - initialize the following cpu maps:
  *                  cpu_possible_mask
@@ -457,6 +605,7 @@ void __init smp_setup_cpu_maps(void)
 	int cpu = 0;
 	int nthreads = 1;
 
+	has_big_cores = true;
 	DBG("smp_setup_cpu_maps()\n");
 
 	cpu_to_phys_id = __va(memblock_alloc(nr_cpu_ids * sizeof(u32),
@@ -467,6 +616,7 @@ void __init smp_setup_cpu_maps(void)
 		const __be32 *intserv;
 		__be32 cpu_be;
 		int j, len;
+		struct thread_groups tg;
 
 		DBG("  * %pOF...\n", dn);
 
@@ -503,6 +653,10 @@ void __init smp_setup_cpu_maps(void)
 			set_cpu_possible(cpu, true);
 			cpu_to_phys_id[cpu] = be32_to_cpu(intserv[j]);
 			cpu++;
+		}
+
+		if (has_big_cores && !dt_has_big_core(dn, &tg)) {
+			has_big_cores = false;
 		}
 
 		if (cpu >= nr_cpu_ids) {
