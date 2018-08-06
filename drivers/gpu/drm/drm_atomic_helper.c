@@ -902,7 +902,7 @@ int drm_atomic_helper_check(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	if (state->legacy_cursor_update)
+	if (state->async_update || state->legacy_cursor_update)
 		state->async_update = !drm_atomic_helper_async_check(dev, state);
 
 	return ret;
@@ -1537,6 +1537,14 @@ int drm_atomic_helper_async_check(struct drm_device *dev,
 		return -EINVAL;
 
 	if (new_plane_state->fence)
+		return -EINVAL;
+
+	/* Only allow async update for cursor type planes. */
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		return -EINVAL;
+
+	/* Don't do an async update if there isn't a pending commit. */
+	if (!old_plane_state->commit)
 		return -EINVAL;
 
 	/*
