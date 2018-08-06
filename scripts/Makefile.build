@@ -70,6 +70,10 @@ $(warning kbuild: Makefile.build is included improperly)
 endif
 
 # ===========================================================================
+# Allow to specify alternate source directory of target's implicit prerequisite
+# e.g. 'SRCDIR_cmdline.o := lib'
+.SECONDEXPANSION:
+srcdir := $$(if $$(SRCDIR_$$(@F)),$$(SRCDIR_$$(@F)),$(src))
 
 ifneq ($(strip $(lib-y) $(lib-m) $(lib-)),)
 lib-target := $(obj)/lib.a
@@ -134,13 +138,13 @@ $(obj-m)             : quiet_modtag := [M]
 quiet_cmd_cc_s_c = CC $(quiet_modtag)  $@
 cmd_cc_s_c       = $(CC) $(c_flags) $(DISABLE_LTO) -fverbose-asm -S -o $@ $<
 
-$(obj)/%.s: $(src)/%.c FORCE
+$(obj)/%.s: $(srcdir)/%.c FORCE
 	$(call if_changed_dep,cc_s_c)
 
 quiet_cmd_cpp_i_c = CPP $(quiet_modtag) $@
 cmd_cpp_i_c       = $(CPP) $(c_flags) -o $@ $<
 
-$(obj)/%.i: $(src)/%.c FORCE
+$(obj)/%.i: $(srcdir)/%.c FORCE
 	$(call if_changed_dep,cpp_i_c)
 
 # These mirror gensymtypes_S and co below, keep them in synch.
@@ -157,7 +161,7 @@ cmd_cc_symtypes_c =                                                         \
     $(call cmd_gensymtypes_c,true,$@) >/dev/null;                           \
     test -s $@ || rm -f $@
 
-$(obj)/%.symtypes : $(src)/%.c FORCE
+$(obj)/%.symtypes : $(srcdir)/%.c FORCE
 	$(call cmd,cc_symtypes_c)
 
 # LLVM assembly
@@ -165,7 +169,7 @@ $(obj)/%.symtypes : $(src)/%.c FORCE
 quiet_cmd_cc_ll_c = CC $(quiet_modtag)  $@
       cmd_cc_ll_c = $(CC) $(c_flags) -emit-llvm -S -o $@ $<
 
-$(obj)/%.ll: $(src)/%.c FORCE
+$(obj)/%.ll: $(srcdir)/%.c FORCE
 	$(call if_changed_dep,cc_ll_c)
 
 # C (.c) files
@@ -313,7 +317,7 @@ cmd_undef_syms = echo
 endif
 
 # Built-in and composite module parts
-$(obj)/%.o: $(src)/%.c $(recordmcount_source) $(objtool_dep) FORCE
+$(obj)/%.o: $(srcdir)/%.c $(recordmcount_source) $(objtool_dep) FORCE
 	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 
@@ -330,7 +334,7 @@ quiet_cmd_cc_lst_c = MKLST   $@
 		     $(CONFIG_SHELL) $(srctree)/scripts/makelst $*.o \
 				     System.map $(OBJDUMP) > $@
 
-$(obj)/%.lst: $(src)/%.c FORCE
+$(obj)/%.lst: $(srcdir)/%.c FORCE
 	$(call if_changed_dep,cc_lst_c)
 
 # Compile assembler sources (.S)
@@ -370,14 +374,14 @@ cmd_cc_symtypes_S =                                                         \
     $(call cmd_gensymtypes_S,true,$@) >/dev/null;                           \
     test -s $@ || rm -f $@
 
-$(obj)/%.symtypes : $(src)/%.S FORCE
+$(obj)/%.symtypes : $(srcdir)/%.S FORCE
 	$(call cmd,cc_symtypes_S)
 
 
 quiet_cmd_cpp_s_S = CPP $(quiet_modtag) $@
 cmd_cpp_s_S       = $(CPP) $(a_flags) -o $@ $<
 
-$(obj)/%.s: $(src)/%.S FORCE
+$(obj)/%.s: $(srcdir)/%.S FORCE
 	$(call if_changed_dep,cpp_s_S)
 
 quiet_cmd_as_o_S = AS $(quiet_modtag)  $@
@@ -413,7 +417,7 @@ cmd_modversions_S =								\
 endif
 endif
 
-$(obj)/%.o: $(src)/%.S $(objtool_dep) FORCE
+$(obj)/%.o: $(srcdir)/%.S $(objtool_dep) FORCE
 	$(call if_changed_rule,as_o_S)
 
 targets += $(filter-out $(subdir-obj-y), $(real-obj-y)) $(real-obj-m) $(lib-y)
@@ -425,7 +429,7 @@ quiet_cmd_cpp_lds_S = LDS     $@
       cmd_cpp_lds_S = $(CPP) $(cpp_flags) -P -U$(ARCH) \
 	                     -D__ASSEMBLY__ -DLINKER_SCRIPT -o $@ $<
 
-$(obj)/%.lds: $(src)/%.lds.S FORCE
+$(obj)/%.lds: $(srcdir)/%.lds.S FORCE
 	$(call if_changed_dep,cpp_lds_S)
 
 # ASN.1 grammar
@@ -434,7 +438,7 @@ quiet_cmd_asn1_compiler = ASN.1   $@
       cmd_asn1_compiler = $(objtree)/scripts/asn1_compiler $< \
 				$(subst .h,.c,$@) $(subst .c,.h,$@)
 
-$(obj)/%.asn1.c $(obj)/%.asn1.h: $(src)/%.asn1 $(objtree)/scripts/asn1_compiler
+$(obj)/%.asn1.c $(obj)/%.asn1.h: $(srcdir)/%.asn1 $(objtree)/scripts/asn1_compiler
 	$(call cmd,asn1_compiler)
 
 # Build the compiled-in targets
