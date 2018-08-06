@@ -495,6 +495,34 @@ config CRYPTO_KEYWRAP
 	  Support for key wrapping (NIST SP800-38F / RFC3394) without
 	  padding.
 
+config CRYPTO_HPOLYC
+	tristate "HPolyC support"
+	select CRYPTO_CHACHA20
+	select CRYPTO_POLY1305
+	help
+	  HPolyC is a tweakable, length-preserving encryption
+	  construction that encrypts each message using XChaCha
+	  sandwiched between two passes of Poly1305, and one invocation
+	  of a block cipher such as AES on a single 128-bit block.
+
+	  Unlike bare stream ciphers such as ChaCha and
+	  ciphertext-expanding modes (e.g. AEADs), HPolyC is suitable for
+	  disk and file contents encryption, e.g. with dm-crypt or
+	  fscrypt, where normally only block ciphers in the XTS, LRW, or
+	  CBC-ESSIV modes of operation are suitable.  HPolyC was designed
+	  primarily for this use case on low-end processors that lack AES
+	  instructions, resulting in traditional modes being too slow
+	  unless used with certain "lightweight" block ciphers such as
+	  Speck, but where XChaCha and Poly1305 are reasonably fast.
+
+	  HPolyC's security is proven reducible to that of the underlying
+	  XChaCha variant and block cipher, subject to a security bound.
+	  Unlike XTS, HPolyC is a true wide-block encryption mode, so it
+	  actually provides an even stronger notion of security than XTS,
+	  subject to the security bound.
+
+	  If unsure, say N.
+
 comment "Hash modes"
 
 config CRYPTO_CMAC

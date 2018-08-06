@@ -3185,6 +3185,18 @@ static const struct alg_test_desc alg_test_descs[] = {
 			.hash = __VECS(hmac_sha512_tv_template)
 		}
 	}, {
+		.alg = "hpolyc(xchacha12,aes)",
+		.test = alg_test_skcipher,
+		.suite = {
+			.cipher = __VECS(hpolyc_xchacha12_aes_tv_template)
+		},
+	}, {
+		.alg = "hpolyc(xchacha20,aes)",
+		.test = alg_test_skcipher,
+		.suite = {
+			.cipher = __VECS(hpolyc_xchacha20_aes_tv_template)
+		},
+	}, {
 		.alg = "jitterentropy_rng",
 		.fips_allowed = 1,
 		.test = alg_test_null,
