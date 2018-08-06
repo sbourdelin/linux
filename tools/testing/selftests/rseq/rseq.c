@@ -64,6 +64,24 @@ static int sys_rseq(volatile struct rseq *rseq_abi, uint32_t rseq_len,
 	return syscall(__NR_rseq, rseq_abi, rseq_len, flags, sig);
 }
 
+/*
+ * rseq syscall might fail on some platforms due to wrong alignment of TLS
+ * variables:
+ * https://sourceware.org/bugzilla/show_bug.cgi?id=23403
+ *
+ * check if glibc bug is present and skip the test in this case
+ */
+static void assert_rseq_abi_aligned(void)
+{
+	if ((unsigned long)&__rseq_abi & (__alignof__(__rseq_abi) - 1)) {
+		fputs("__rseq_abi is not properly aligned, which is a known\n"
+		      "glibc nptl bug (https://sourceware.org/bugzilla/show_bug.cgi?id=23403).\n"
+		      "You need a fixed version of glibc to run this test.\n",
+		      stderr);
+		exit(4); /* skip this test */
+	}
+}
+
 int rseq_register_current_thread(void)
 {
 	int rc, ret = 0;
@@ -72,6 +90,7 @@ int rseq_register_current_thread(void)
 	signal_off_save(&oldset);
 	if (refcount++)
 		goto end;
+	assert_rseq_abi_aligned();
 	rc = sys_rseq(&__rseq_abi, sizeof(struct rseq), 0, RSEQ_SIG);
 	if (!rc) {
 		assert(rseq_current_cpu_raw() >= 0);
@@ -94,6 +113,7 @@ int rseq_unregister_current_thread(void)
 	signal_off_save(&oldset);
 	if (--refcount)
 		goto end;
+	assert_rseq_abi_aligned();
 	rc = sys_rseq(&__rseq_abi, sizeof(struct rseq),
 		      RSEQ_FLAG_UNREGISTER, RSEQ_SIG);
 	if (!rc)
