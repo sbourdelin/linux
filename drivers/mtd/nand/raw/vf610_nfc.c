@@ -130,8 +130,13 @@
 #define CONFIG_PAGE_CNT_SHIFT			0
 
 /* NFC_IRQ_STATUS Field */
+#define WERR_IRQ_BIT				BIT(31)
+#define DONE_IRQ_BIT				BIT(30)
 #define IDLE_IRQ_BIT				BIT(29)
+#define WERR_EN_BIT				BIT(22)
+#define DONE_EN_BIT				BIT(21)
 #define IDLE_EN_BIT				BIT(20)
+#define WERR_CLEAR_BIT				BIT(19)
 #define DONE_CLEAR_BIT				BIT(18)
 #define IDLE_CLEAR_BIT				BIT(17)
 
@@ -881,6 +886,10 @@ static int vf610_nfc_probe(struct platform_device *pdev)
 	chip->options |= NAND_NO_SUBPAGE_WRITE;
 
 	init_completion(&nfc->cmd_done);
+
+	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, WERR_EN_BIT);
+	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, DONE_EN_BIT);
+	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
 
 	err = devm_request_irq(nfc->dev, irq, vf610_nfc_irq, 0, DRV_NAME, mtd);
 	if (err) {
