@@ -1624,6 +1624,11 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
 
+	if (domain->type == IOMMU_DOMAIN_DMA) {
+		domain->non_strict = 1;
+		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+	}
+
 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
 	if (!pgtbl_ops)
 		return -ENOMEM;
@@ -1784,7 +1789,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
 {
 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
 
-	if (smmu)
+	if (smmu && !domain->non_strict)
 		__arm_smmu_tlb_sync(smmu);
 }
 
