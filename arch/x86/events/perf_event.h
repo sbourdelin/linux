@@ -243,6 +243,11 @@ struct cpu_hw_events {
 	int excl_thread_id; /* 0 or 1 */
 
 	/*
+	 * Counter freezing state.
+	 */
+	int				frozen_enabled;
+
+	/*
 	 * AMD specific bits
 	 */
 	struct amd_nb			*amd_nb;
@@ -561,6 +566,7 @@ struct x86_pmu {
 	struct x86_pmu_quirk *quirks;
 	int		perfctr_second_write;
 	bool		late_ack;
+	bool		counter_freezing;
 	u64		(*limit_period)(struct perf_event *event, u64 l);
 
 	/*
