@@ -10,6 +10,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
 obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
 obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
 obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha-neon.o
+obj-$(CONFIG_CRYPTO_POLY1305_NEON) += poly1305-neon.o
 obj-$(CONFIG_CRYPTO_SPECK_NEON) += speck-neon.o
 
 ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
@@ -54,6 +55,7 @@ ghash-arm-ce-y	:= ghash-ce-core.o ghash-ce-glue.o
 crct10dif-arm-ce-y	:= crct10dif-ce-core.o crct10dif-ce-glue.o
 crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
 chacha-neon-y := chacha-neon-core.o chacha-neon-glue.o
+poly1305-neon-y := poly1305-neon-core.o poly1305-neon-glue.o
 speck-neon-y := speck-neon-core.o speck-neon-glue.o
 
 ifdef REGENERATE_ARM_CRYPTO
