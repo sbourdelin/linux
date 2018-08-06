@@ -3847,6 +3847,58 @@ static __init void intel_nehalem_quirk(void)
 	}
 }
 
+static bool intel_glk_counter_freezing_broken(int cpu)
+{
+	u32 rev = UINT_MAX; /* default to broken for unknown stepping */
+
+	switch (cpu_data(cpu).x86_stepping) {
+	case 1:
+		rev = 0x28;
+		break;
+	case 8:
+		rev = 0x6;
+		break;
+	}
+
+	return (cpu_data(cpu).microcode < rev);
+}
+
+static void intel_glk_check_microcode(void)
+{
+	bool counter_freezing_broken = false;
+	int cpu;
+
+	if (disable_counter_freezing)
+		return;
+
+	for_each_online_cpu(cpu) {
+		counter_freezing_broken = intel_glk_counter_freezing_broken(cpu);
+		if (counter_freezing_broken)
+			break;
+	}
+
+	if (counter_freezing_broken == !x86_pmu.counter_freezing)
+		return;
+
+	if (x86_pmu.counter_freezing) {
+		pr_info("PMU counter freezing disabled due to CPU errata, please upgrade microcode\n");
+		x86_pmu.counter_freezing = false;
+		x86_pmu.handle_irq = intel_pmu_handle_irq;
+	} else {
+		pr_info("PMU counter freezing enabled due to microcode update\n");
+		x86_pmu.counter_freezing = true;
+		x86_pmu.handle_irq = intel_pmu_handle_irq_v4;
+	}
+}
+
+static __init void intel_counter_freezing_quirk(void)
+{
+	x86_pmu.check_microcode = intel_glk_check_microcode;
+	cpus_read_lock();
+	intel_glk_check_microcode();
+	cpus_read_unlock();
+}
+
 /*
  * enable software workaround for errata:
  * SNB: BJ122
@@ -4191,6 +4243,7 @@ __init int intel_pmu_init(void)
 		break;
 
 	case INTEL_FAM6_ATOM_GEMINI_LAKE:
+		x86_add_quirk(intel_counter_freezing_quirk);
 		memcpy(hw_cache_event_ids, glp_hw_cache_event_ids,
 		       sizeof(hw_cache_event_ids));
 		memcpy(hw_cache_extra_regs, glp_hw_cache_extra_regs,
@@ -4207,6 +4260,8 @@ __init int intel_pmu_init(void)
 		x86_pmu.pebs_aliases = NULL;
 		x86_pmu.pebs_prec_dist = true;
 		x86_pmu.lbr_pt_coexist = true;
+		x86_pmu.counter_freezing = disable_counter_freezing ?
+					   false : true;
 		x86_pmu.flags |= PMU_FL_HAS_RSP_1;
 		x86_pmu.flags |= PMU_FL_PEBS_ALL;
 		x86_pmu.get_event_constraints = glp_get_event_constraints;
