@@ -44,6 +44,7 @@
 *.xz
 Module.symvers
 modules.builtin
+vmlinux.map
 
 #
 # Top-level generic files

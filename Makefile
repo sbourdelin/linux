@@ -176,6 +176,14 @@ ifndef KBUILD_CHECKSRC
   KBUILD_CHECKSRC = 0
 endif
 
+# Use 'make Map=1' to enable saving linker map file(s):
+# vmlinux.map for vmlinux,
+# (arch/*/boot/compressed/vmlinux.map for arch/*/boot/compressed/vmlinux)
+
+ifeq ("$(origin Map)", "command line")
+	export KBUILD_SAVE_LINK_MAP := $(Map)
+endif
+
 # Use make M=dir to specify directory of external module to build
 # Old syntax make ... SUBDIRS=$PWD is still supported
 # Setting the environment variable KBUILD_EXTMOD take precedence
@@ -838,6 +846,11 @@ ifeq ($(CONFIG_STRIP_ASM_SYMS),y)
 LDFLAGS_vmlinux	+= $(call ld-option, -X,)
 endif
 
+ifdef KBUILD_SAVE_LINK_MAP
+LDFLAGS_vmlinux	+= -Map=vmlinux.map
+CLEAN_FILES	+= vmlinux.map
+endif
+
 # insure the checker run with the right endianness
 CHECKFLAGS += $(if $(CONFIG_CPU_BIG_ENDIAN),-mbig-endian,-mlittle-endian)
 
@@ -1434,6 +1447,7 @@ help:
 	@echo  '		2: warnings which occur quite often but may still be relevant'
 	@echo  '		3: more obscure warnings, can most likely be ignored'
 	@echo  '		Multiple levels can be combined with W=12 or W=123'
+	@echo  '  make Map=1 [targets] Save vmlinux linker map file(s)'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info see the ./README file'
