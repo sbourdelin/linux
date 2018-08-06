@@ -1721,6 +1721,15 @@
 		nobypass	[PPC/POWERNV]
 			Disable IOMMU bypass, using IOMMU for PCI devices.
 
+	arm_iommu=	[ARM64]
+		non-strict	[Default Off]
+			Put off TLBs invalidation and release memory first.
+			It's good for scatter-gather performance but lacks full
+			isolation, an untrusted device can access the reused
+			memory because the TLBs may still valid. Please take
+			full consideration before choosing this mode.
+			Note that, VFIO will always use strict mode.
+
 	iommu.passthrough=
 			[ARM64] Configure DMA to bypass the IOMMU by default.
 			Format: { "0" | "1" }
