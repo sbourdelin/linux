@@ -7780,6 +7780,12 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 	/* Adjust by relative CPU capacity of the group */
 	sgs->group_capacity = group->sgc->capacity;
 	sgs->avg_load = (sgs->group_load*SCHED_CAPACITY_SCALE) / sgs->group_capacity;
+	/*
+	 * Prevent division rounding to make the computation of imbalance
+	 * slightly less than original value and to prevent the rq to be then
+	 * selected as busiest queue
+	 */
+	sgs->avg_load += 1;
 
 	if (sgs->sum_nr_running)
 		sgs->load_per_task = sgs->sum_weighted_load / sgs->sum_nr_running;
