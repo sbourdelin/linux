@@ -66,9 +66,9 @@ static union perf_event *__dup_event(struct ordered_events *oe,
 	union perf_event *new_event = NULL;
 
 	if (oe->cur_alloc_size < oe->max_alloc_size) {
-		new_event = memdup(event, event->header.size);
+		new_event = memdup(event, sizeof(*event));
 		if (new_event)
-			oe->cur_alloc_size += event->header.size;
+			oe->cur_alloc_size += sizeof(*event);
 	}
 
 	return new_event;
