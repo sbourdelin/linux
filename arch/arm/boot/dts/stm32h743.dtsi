@@ -40,13 +40,15 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "skeleton.dtsi"
 #include "armv7-m.dtsi"
 #include <dt-bindings/clock/stm32h7-clks.h>
 #include <dt-bindings/mfd/stm32h7-rcc.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 
 / {
+	#address-cells = <1>;
+	#size-cells = <1>;
+
 	clocks {
 		clk_hse: clk-hse {
 			#clock-cells = <0>;
@@ -60,7 +62,7 @@
 			clock-frequency = <32768>;
 		};
 
-		clk_i2s: i2s_ckin {
+		clk_i2s: i2s-ckin {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <0>;
@@ -422,7 +424,6 @@
 		};
 
 		lptimer4: timer@58002c00 {
-			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "st,stm32-lptimer";
 			reg = <0x58002c00 0x400>;
@@ -438,7 +439,6 @@
 		};
 
 		lptimer5: timer@58003000 {
-			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "st,stm32-lptimer";
 			reg = <0x58003000 0x400>;
