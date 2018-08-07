@@ -1692,6 +1692,19 @@ bool f2fs_should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 
 	if (test_opt(sbi, LFS))
 		return true;
+	if (test_opt(sbi, DISABLE_CHECKPOINT)) {
+		struct seg_entry *se;
+		unsigned int segno, offset;
+
+		if (!fio || fio->old_blkaddr == NULL_ADDR ||
+				fio->old_blkaddr == NEW_ADDR)
+			return true;
+		segno = GET_SEGNO(sbi, fio->old_blkaddr);
+		se = get_seg_entry(sbi, segno);
+		offset = GET_BLKOFF_FROM_SEG0(sbi, fio->old_blkaddr);
+		if (f2fs_test_bit(offset, se->ckpt_valid_map))
+			return true;
+	}
 	if (S_ISDIR(inode->i_mode))
 		return true;
 	if (f2fs_is_atomic_file(inode))
@@ -1719,10 +1732,13 @@ int f2fs_do_write_data_page(struct f2fs_io_info *fio)
 {
 	struct page *page = fio->page;
 	struct inode *inode = page->mapping->host;
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct dnode_of_data dn;
 	struct extent_info ei = {0,0,0};
 	struct node_info ni;
 	bool ipu_force = false;
+	bool need_tmp_grab = test_opt(sbi, DISABLE_CHECKPOINT);
+	blkcnt_t tmp_block = 1;
 	int err = 0;
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
@@ -1800,6 +1816,11 @@ got_it:
 	if (err)
 		goto out_writepage;
 
+	if (need_tmp_grab) {
+		err = inc_valid_block_count(sbi, dn.inode, &tmp_block);
+		if (err)
+			goto out_writepage;
+	}
 	set_page_writeback(page);
 	ClearPageError(page);
 
@@ -1809,6 +1830,8 @@ got_it:
 	set_inode_flag(inode, FI_APPEND_WRITE);
 	if (page->index == 0)
 		set_inode_flag(inode, FI_FIRST_BLOCK_WRITTEN);
+	if (need_tmp_grab)
+		dec_valid_block_count(sbi, dn.inode, tmp_block);
 out_writepage:
 	f2fs_put_dnode(&dn);
 out:
