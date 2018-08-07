@@ -60,7 +60,7 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	memory {
+	memory@0 {
 		reg = <0x00000000 0x1000000>;
 	};
 
@@ -68,7 +68,7 @@
 		serial0 = &usart3;
 	};
 
-	mmc_vcard: mmc_vcard {
+	mmc_vcard: mmc-vcard {
 		compatible = "regulator-fixed";
 		regulator-name = "mmc_vcard";
 		regulator-min-microvolt = <3300000>;
@@ -96,12 +96,11 @@
 		};
 	};
 
-	gpio_keys {
+	gpio-keys {
 		compatible = "gpio-keys";
-		#address-cells = <1>;
 		#size-cells = <0>;
 		autorepeat;
-		button@0 {
+		button-0 {
 			label = "User";
 			linux,code = <KEY_WAKEUP>;
 			gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
@@ -169,7 +168,7 @@
 	status = "okay";
 
 	port {
-		ltdc_out_dsi: endpoint@0 {
+		ltdc_out_dsi: endpoint {
 			remote-endpoint = <&dsi_in>;
 		};
 	};
