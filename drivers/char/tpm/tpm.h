@@ -604,4 +604,5 @@ int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
 
 int tpm_bios_log_setup(struct tpm_chip *chip);
 void tpm_bios_log_teardown(struct tpm_chip *chip);
+void tpm_dev_common_exit(void);
 #endif

@@ -23,14 +23,22 @@ static int tpmrm_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 
 	rc = tpm2_init_space(&priv->space);
-	if (rc) {
-		kfree(priv);
-		return -ENOMEM;
-	}
+	if (rc)
+		goto out_free;
 
-	tpm_common_open(file, chip, &priv->priv, &priv->space);
+	rc = tpm_common_open(file, chip, &priv->priv, &priv->space);
+	if (rc)
+		goto out_del_space;
 
 	return 0;
+
+out_del_space:
+	tpm2_del_space(chip, &priv->space);
+
+out_free:
+	kfree(priv);
+
+	return rc;
 }
 
 static int tpmrm_release(struct inode *inode, struct file *file)
@@ -51,5 +59,6 @@ const struct file_operations tpmrm_fops = {
 	.open = tpmrm_open,
 	.read = tpm_common_read,
 	.write = tpm_common_write,
+	.poll = tpm_common_poll,
 	.release = tpmrm_release,
 };

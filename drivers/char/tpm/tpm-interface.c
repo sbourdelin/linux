@@ -1428,6 +1428,7 @@ static void __exit tpm_exit(void)
 	class_destroy(tpm_class);
 	class_destroy(tpmrm_class);
 	unregister_chrdev_region(tpm_devt, 2*TPM_NUM_DEVICES);
+	tpm_dev_common_exit();
 }
 
 subsys_initcall(tpm_init);
