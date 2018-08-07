@@ -49,6 +49,8 @@ static struct drm_mode_config_helper_funcs sun4i_de_mode_config_helpers = {
 
 int sun4i_framebuffer_init(struct drm_device *drm)
 {
+	int ret;
+
 	drm_mode_config_reset(drm);
 
 	drm->mode_config.max_width = 8192;
@@ -57,7 +59,13 @@ int sun4i_framebuffer_init(struct drm_device *drm)
 	drm->mode_config.funcs = &sun4i_de_mode_config_funcs;
 	drm->mode_config.helper_private = &sun4i_de_mode_config_helpers;
 
-	return drm_fb_cma_fbdev_init(drm, 32, 0);
+	if (drm->mode_config.num_connector > 0) {
+		ret = drm_fb_cma_fbdev_init(drm, 32, 0);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 void sun4i_framebuffer_free(struct drm_device *drm)
