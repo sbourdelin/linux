@@ -68,8 +68,8 @@
 #define INTEL_FAM6_ATOM_MERRIFIELD	0x4A /* Tangier */
 #define INTEL_FAM6_ATOM_MOOREFIELD	0x5A /* Anniedale */
 #define INTEL_FAM6_ATOM_GOLDMONT	0x5C
-#define INTEL_FAM6_ATOM_DENVERTON	0x5F /* Goldmont Microserver */
-#define INTEL_FAM6_ATOM_GEMINI_LAKE	0x7A
+#define INTEL_FAM6_ATOM_GOLDMONT2	0x5F /* Goldmont Microserver */
+#define INTEL_FAM6_ATOM_GOLDMONT_PLUS	0x7A
 
 /* Xeon Phi */
 
