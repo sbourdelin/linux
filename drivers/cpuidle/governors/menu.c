@@ -292,6 +292,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	unsigned int expected_interval;
 	unsigned long nr_iowaiters, cpu_load;
 	ktime_t delta_next;
+	unsigned int stop_tick_point;
 
 	if (data->needs_update) {
 		menu_update(drv, dev);
@@ -400,11 +401,47 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		idx = 0; /* No states enabled. Must use 0. */
 
 	/*
+	 * Decide the time point for tick stopping, if the prediction is before
+	 * this time point it's better to keep the tick enabled and after the
+	 * time point it means the CPU can stay in idle state for enough long
+	 * time so should stop the tick.  This point needs to consider two
+	 * factors: the first one is tick period and the another factor is the
+	 * maximum target residency.
+	 *
+	 * We can divide into below cases:
+	 *
+	 * The first case is the prediction is shorter than the maximum target
+	 * residency and also shorter than tick period, this means the
+	 * prediction isn't to use deepest idle state and it's suppose the CPU
+	 * will be waken up within tick period, for this case we should keep
+	 * the tick to be enabled;
+	 *
+	 * The second case is the prediction is shorter than the maximum target
+	 * residency and longer than tick period, for this case the idle state
+	 * selection has already based on the prediction for shallow state and
+	 * we will expect some events can arrive later than tick to wake up the
+	 * CPU; another thinking for this case is the CPU is likely to stay in
+	 * the expected idle state for long while (which should be longer than
+	 * tick period), so it's reasonable to stop the tick.
+	 *
+	 * The third case is the prediction is longer than the maximum target
+	 * residency, but weather it's longer or shorter than tick period; for
+	 * this case we have selected the deepest idle state so it's pointless
+	 * to enable tick to wake up CPU from deepest state.
+	 *
+	 * To summary upper cases, we use the value of min(TICK_USEC,
+	 * maximum_target_residency) as the critical point to decide if need to
+	 * stop tick.
+	 */
+	stop_tick_point = min_t(unsigned int, TICK_USEC,
+			drv->states[drv->state_count-1].target_residency);
+
+	/*
 	 * Don't stop the tick if the selected state is a polling one or if the
-	 * expected idle duration is shorter than the tick period length.
+	 * expected idle duration is shorter than the estimated stop tick point.
 	 */
 	if ((drv->states[idx].flags & CPUIDLE_FLAG_POLLING) ||
-	    expected_interval < TICK_USEC) {
+	    expected_interval < stop_tick_point) {
 		unsigned int delta_next_us = ktime_to_us(delta_next);
 
 		*stop_tick = false;
