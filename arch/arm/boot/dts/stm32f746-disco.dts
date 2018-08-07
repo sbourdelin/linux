@@ -55,8 +55,8 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	memory {
-		reg = <0xC0000000 0x800000>;
+	memory@c0000000 {
+		reg = <0xc0000000 0x800000>;
 	};
 
 	aliases {
@@ -78,7 +78,7 @@
 		regulator-always-on;
 	};
 
-	mmc_vcard: mmc_vcard {
+	mmc_vcard: mmc-vcard {
 		compatible = "regulator-fixed";
 		regulator-name = "mmc_vcard";
 		regulator-min-microvolt = <3300000>;
