@@ -92,16 +92,18 @@ DECLARE_EVENT_CLASS(snd_soc_dapm_widget,
 
 	TP_STRUCT__entry(
 		__string(	name,	w->name		)
+		__field(	int,	id		)
 		__field(	int,	val		)
 	),
 
 	TP_fast_assign(
 		__assign_str(name, w->name);
+		__entry->id = w->id;
 		__entry->val = val;
 	),
 
-	TP_printk("widget=%s val=%d", __get_str(name),
-		  (int)__entry->val)
+	TP_printk("widget=%s dapm_id=%d val=%d", __get_str(name),
+		  (int)__entry->id, (int)__entry->val)
 );
 
 DEFINE_EVENT(snd_soc_dapm_widget, snd_soc_dapm_widget_power,
