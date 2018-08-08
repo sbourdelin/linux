@@ -708,7 +708,8 @@ static void p9_virtio_remove(struct virtio_device *vdev)
 	vdev->config->del_vqs(vdev);
 
 	sysfs_remove_file(&(vdev->dev.kobj), &dev_attr_mount_tag.attr);
-	kobject_uevent(&(vdev->dev.kobj), KOBJ_CHANGE);
+	kobject_uevent(&(vdev->dev.kobj), KOBJ_REMOVE);
+	kobject_put(&(vdev->dev.kobj));
 	kfree(chan->tag);
 	kfree(chan->vc_wq);
 	kfree(chan);
