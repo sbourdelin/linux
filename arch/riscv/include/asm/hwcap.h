@@ -33,5 +33,8 @@ enum {
 };
 
 extern unsigned long elf_hwcap;
+#ifdef CONFIG_FPU
+extern bool no_fpu;
+#endif
 #endif
 #endif

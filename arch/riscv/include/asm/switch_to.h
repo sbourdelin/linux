@@ -17,6 +17,7 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/csr.h>
+#include <asm/hwcap.h>
 
 #ifdef CONFIG_FPU
 extern void __fstate_save(struct task_struct *save_to);
@@ -30,6 +31,9 @@ static inline void __fstate_clean(struct pt_regs *regs)
 static inline void fstate_save(struct task_struct *task,
 			       struct pt_regs *regs)
 {
+	if (unlikely(no_fpu))
+		return;
+
 	if ((regs->sstatus & SR_FS) == SR_FS_DIRTY) {
 		__fstate_save(task);
 		__fstate_clean(regs);
@@ -39,6 +43,9 @@ static inline void fstate_save(struct task_struct *task,
 static inline void fstate_restore(struct task_struct *task,
 				  struct pt_regs *regs)
 {
+	if (unlikely(no_fpu))
+		return;
+
 	if ((regs->sstatus & SR_FS) != SR_FS_OFF) {
 		__fstate_restore(task);
 		__fstate_clean(regs);
@@ -50,13 +57,17 @@ static inline void __switch_to_aux(struct task_struct *prev,
 {
 	struct pt_regs *regs;
 
+	if (unlikely(no_fpu))
+		return;
+
 	regs = task_pt_regs(prev);
 	if (unlikely(regs->sstatus & SR_SD))
 		fstate_save(prev, regs);
 	fstate_restore(next, task_pt_regs(next));
 }
 
-#define DEFAULT_SSTATUS (SR_SPIE | SR_FS_INITIAL)
+#define DEFAULT_SSTATUS \
+	((unlikely(no_fpu)) ? (SR_SPIE | SR_FS_OFF) : (SR_SPIE | SR_FS_INITIAL))
 
 #else
 #define fstate_save(task, regs) do { } while (0)

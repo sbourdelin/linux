@@ -45,6 +45,9 @@ static long restore_fp_state(struct pt_regs *regs,
 	struct __riscv_d_ext_state __user *state = &sc_fpregs->d;
 	size_t i;
 
+	if (unlikely(no_fpu))
+		return 0;
+
 	err = __copy_from_user(&current->thread.fstate, state, sizeof(*state));
 	if (unlikely(err))
 		return err;
@@ -71,6 +74,9 @@ static long save_fp_state(struct pt_regs *regs,
 	long err;
 	struct __riscv_d_ext_state __user *state = &sc_fpregs->d;
 	size_t i;
+
+	if (unlikely(no_fpu))
+		return 0;
 
 	fstate_save(current, regs);
 	err = __copy_to_user(state, &current->thread.fstate, sizeof(*state));
