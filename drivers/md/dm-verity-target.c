@@ -1107,7 +1107,7 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	v->hash_blocks = hash_position;
 
 	v->bufio = dm_bufio_client_create(v->hash_dev->bdev,
-		1 << v->hash_dev_block_bits, 1, sizeof(struct buffer_aux),
+		1 << v->hash_dev_block_bits, 2, sizeof(struct buffer_aux),
 		dm_bufio_alloc_callback, NULL);
 	if (IS_ERR(v->bufio)) {
 		ti->error = "Cannot initialize dm-bufio";

@@ -841,7 +841,7 @@ static struct dm_buffer *__alloc_buffer_wait_no_callback(struct dm_bufio_client 
 			tried_noio_alloc = true;
 		}
 
-		if (!list_empty(&c->reserved_buffers)) {
+		if (!c->need_reserved_buffers) {
 			b = list_entry(c->reserved_buffers.next,
 				       struct dm_buffer, lru_list);
 			list_del(&b->lru_list);
@@ -1701,7 +1701,7 @@ struct dm_bufio_client *dm_bufio_client_create(struct block_device *bdev, unsign
 		goto bad;
 	}
 
-	while (c->need_reserved_buffers) {
+	if (list_empty(&c->reserved_buffers)) {
 		struct dm_buffer *b = alloc_buffer(c, GFP_KERNEL);
 
 		if (!b) {
