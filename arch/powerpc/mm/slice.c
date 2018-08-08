@@ -329,7 +329,7 @@ static unsigned long slice_find_area_bottomup(struct mm_struct *mm,
 	info.align_mask = PAGE_MASK & ((1ul << pshift) - 1);
 	info.align_offset = 0;
 
-	addr = TASK_UNMAPPED_BASE;
+	addr = mm->mmap_base;
 	/*
 	 * Check till the allow max value for this mmap request
 	 */
