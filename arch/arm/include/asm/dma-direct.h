@@ -19,18 +19,18 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 	u64 limit, mask;
 
 	if (!dev->dma_mask)
-		return 0;
+		return false;
 
 	mask = *dev->dma_mask;
 
 	limit = (mask + 1) & ~mask;
 	if (limit && size > limit)
-		return 0;
+		return false;
 
 	if ((addr | (addr + size - 1)) & ~mask)
-		return 0;
+		return false;
 
-	return 1;
+	return true;
 }
 
 #endif /* ASM_ARM_DMA_DIRECT_H */
