@@ -3448,7 +3448,7 @@ __alloc_pages_cpuset_fallback(gfp_t gfp_mask, unsigned int order,
 }
 
 static inline struct page *
-__alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
+__alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order, bool reserve_tried,
 	const struct alloc_context *ac, unsigned long *did_some_progress)
 {
 	struct oom_control oc = {
@@ -3457,6 +3457,7 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 		.memcg = NULL,
 		.gfp_mask = gfp_mask,
 		.order = order,
+		.reserve_tried = reserve_tried,
 	};
 	struct page *page;
 
@@ -4231,7 +4232,9 @@ retry:
 		goto retry_cpuset;
 
 	/* Reclaim has failed us, start killing things */
-	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
+	page = __alloc_pages_may_oom(gfp_mask, order, alloc_flags == ALLOC_OOM
+				     || (gfp_mask & __GFP_NOMEMALLOC), ac,
+				     &did_some_progress);
 	if (page)
 		goto got_pg;
 

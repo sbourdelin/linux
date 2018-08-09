@@ -38,6 +38,9 @@ struct oom_control {
 	 */
 	const int order;
 
+	/* Did we already try ALLOC_OOM allocation? i*/
+	const bool reserve_tried;
+
 	/* Used by oom implementation, do not set */
 	unsigned long totalpages;
 	struct task_struct *chosen;
