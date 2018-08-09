@@ -78,7 +78,7 @@
 #define IGC_IMS_DOUTSYNC	IGC_ICR_DOUTSYNC /* NIC DMA out of sync */
 #define IGC_IMS_DRSTA		IGC_ICR_DRSTA   /* Device Reset Asserted */
 #define IGC_IMS_RXT0		IGC_ICR_RXT0    /* Rx timer intr */
-#define IGC_IMS_RXDMT0	IGC_ICR_RXDMT0		/* Rx desc min. threshold */
+#define IGC_IMS_RXDMT0		IGC_ICR_RXDMT0  /* Rx desc min. threshold */
 
 #define IGC_QVECTOR_MASK	0x7FFC		/* Q-vector mask */
 #define IGC_ITR_VAL_MASK	0x04		/* ITR value mask */
@@ -90,6 +90,29 @@
 #define IGC_GPIE_MSIX_MODE	0x00000010
 #define IGC_GPIE_EIAME		0x40000000
 #define IGC_GPIE_PBA		0x80000000
+
+/* Transmit Descriptor bit definitions */
+#define IGC_TXD_DTYP_D		0x00100000 /* Data Descriptor */
+#define IGC_TXD_DTYP_C		0x00000000 /* Context Descriptor */
+#define IGC_TXD_POPTS_IXSM	0x01       /* Insert IP checksum */
+#define IGC_TXD_POPTS_TXSM	0x02       /* Insert TCP/UDP checksum */
+#define IGC_TXD_CMD_EOP		0x01000000 /* End of Packet */
+#define IGC_TXD_CMD_IFCS	0x02000000 /* Insert FCS (Ethernet CRC) */
+#define IGC_TXD_CMD_IC		0x04000000 /* Insert Checksum */
+#define IGC_TXD_CMD_RS		0x08000000 /* Report Status */
+#define IGC_TXD_CMD_RPS		0x10000000 /* Report Packet Sent */
+#define IGC_TXD_CMD_DEXT	0x20000000 /* Desc extension (0 = legacy) */
+#define IGC_TXD_CMD_VLE		0x40000000 /* Add VLAN tag */
+#define IGC_TXD_CMD_IDE		0x80000000 /* Enable Tidv register */
+#define IGC_TXD_STAT_DD		0x00000001 /* Descriptor Done */
+#define IGC_TXD_STAT_EC		0x00000002 /* Excess Collisions */
+#define IGC_TXD_STAT_LC		0x00000004 /* Late Collisions */
+#define IGC_TXD_STAT_TU		0x00000008 /* Transmit underrun */
+#define IGC_TXD_CMD_TCP		0x01000000 /* TCP packet */
+#define IGC_TXD_CMD_IP		0x02000000 /* IP packet */
+#define IGC_TXD_CMD_TSE		0x04000000 /* TCP Seg enable */
+#define IGC_TXD_STAT_TC		0x00000004 /* Tx Underrun */
+#define IGC_TXD_EXTCMD_TSTAMP	0x00000010 /* IEEE1588 Timestamp packet */
 
 /* Transmit Control */
 #define IGC_TCTL_EN		0x00000002 /* enable Tx */
@@ -120,6 +143,31 @@
 #define IGC_RCTL_RDMTS_HALF	0x00000000 /* Rx desc min thresh size */
 #define IGC_RCTL_BAM		0x00008000 /* broadcast enable */
 
+/* Receive Descriptor bit definitions */
+#define IGC_RXD_STAT_DD		0x01    /* Descriptor Done */
+#define IGC_RXD_STAT_EOP	0x02    /* End of Packet */
+#define IGC_RXD_STAT_IXSM	0x04    /* Ignore checksum */
+#define IGC_RXD_STAT_VP		0x08    /* IEEE VLAN Packet */
+#define IGC_RXD_STAT_UDPCS	0x10    /* UDP xsum calculated */
+#define IGC_RXD_STAT_TCPCS	0x20    /* TCP xsum calculated */
+#define IGC_RXD_STAT_TS		0x10000 /* Pkt was time stamped */
+
+#define IGC_RXDEXT_STATERR_CE		0x01000000
+#define IGC_RXDEXT_STATERR_SE		0x02000000
+#define IGC_RXDEXT_STATERR_SEQ		0x04000000
+#define IGC_RXDEXT_STATERR_CXE		0x10000000
+#define IGC_RXDEXT_STATERR_TCPE		0x20000000
+#define IGC_RXDEXT_STATERR_IPE		0x40000000
+#define IGC_RXDEXT_STATERR_RXE		0x80000000
+
+/* Same mask, but for extended and packet split descriptors */
+#define IGC_RXDEXT_ERR_FRAME_ERR_MASK ( \
+	IGC_RXDEXT_STATERR_CE  |            \
+	IGC_RXDEXT_STATERR_SE  |            \
+	IGC_RXDEXT_STATERR_SEQ |            \
+	IGC_RXDEXT_STATERR_CXE |            \
+	IGC_RXDEXT_STATERR_RXE)
+
 /* Header split receive */
 #define IGC_RFCTL_IPV6_EX_DIS	0x00010000
 #define IGC_RFCTL_LEF		0x00040000
@@ -139,6 +187,9 @@
 #define IGC_RCTL_DPF		0x00400000 /* discard pause frames */
 #define IGC_RCTL_PMCF		0x00800000 /* pass MAC control frames */
 #define IGC_RCTL_SECRC		0x04000000 /* Strip Ethernet CRC */
+
+#define I225_RXPBSIZE_DEFAULT	0x000000A2 /* RXPBSIZE default */
+#define I225_TXPBSIZE_DEFAULT	0x04000014 /* TXPBSIZE default */
 
 #define IGC_N0_QUEUE -1
 
