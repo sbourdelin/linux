@@ -1604,14 +1604,16 @@ static int xennet_init_queue(struct netfront_queue *queue)
 {
 	unsigned short i;
 	int err = 0;
+	int devid = 0;
 
 	spin_lock_init(&queue->tx_lock);
 	spin_lock_init(&queue->rx_lock);
 
 	timer_setup(&queue->rx_refill_timer, rx_refill_timeout, 0);
 
-	snprintf(queue->name, sizeof(queue->name), "%s-q%u",
-		 queue->info->xbdev->nodename, queue->id);
+	kstrtoint(strrchr(queue->info->xbdev->nodename,'/')+1, 10, &devid);
+	snprintf(queue->name, sizeof(queue->name), "vif%d-q%u",
+		 devid, queue->id);
 
 	/* Initialise tx_skbs as a free chain containing every entry. */
 	queue->tx_skb_freelist = 0;
