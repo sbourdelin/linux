@@ -155,6 +155,35 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
 
 #define KASAN_SHADOW_INIT 0xFF
 
+void khwasan_init(void);
+
+void *khwasan_reset_tag(const void *addr);
+
+void *khwasan_preset_slub_tag(struct kmem_cache *cache, const void *addr);
+void *khwasan_preset_slab_tag(struct kmem_cache *cache, unsigned int idx,
+					const void *addr);
+
+#else /* CONFIG_KASAN_HW */
+
+static inline void khwasan_init(void) { }
+
+static inline void *khwasan_reset_tag(const void *addr)
+{
+	return (void *)addr;
+}
+
+static inline void *khwasan_preset_slub_tag(struct kmem_cache *cache,
+						const void *addr)
+{
+	return (void *)addr;
+}
+
+static inline void *khwasan_preset_slab_tag(struct kmem_cache *cache,
+					unsigned int idx, const void *addr)
+{
+	return (void *)addr;
+}
+
 #endif /* CONFIG_KASAN_HW */
 
 #endif /* LINUX_KASAN_H */
