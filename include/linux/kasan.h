@@ -163,6 +163,9 @@ void *khwasan_preset_slub_tag(struct kmem_cache *cache, const void *addr);
 void *khwasan_preset_slab_tag(struct kmem_cache *cache, unsigned int idx,
 					const void *addr);
 
+void kasan_report(unsigned long addr, size_t size,
+			bool write, unsigned long ip);
+
 #else /* CONFIG_KASAN_HW */
 
 static inline void khwasan_init(void) { }
