@@ -13695,6 +13695,7 @@ static int i40e_init_recovery_mode(struct i40e_pf *pf, struct i40e_hw *hw)
 	err = register_netdev(vsi->netdev);
 	if (err)
 		goto err_switch_setup;
+	vsi->netdev_registered = true;
 	i40e_dbg_pf_init(pf);
 
 	err = i40e_setup_misc_vector_for_recovery_mode(pf);
