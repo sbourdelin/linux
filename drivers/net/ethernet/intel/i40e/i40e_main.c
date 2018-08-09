@@ -13641,6 +13641,7 @@ static int i40e_init_recovery_mode(struct i40e_pf *pf, struct i40e_hw *hw)
 	v_idx = i40e_vsi_mem_alloc(pf, I40E_VSI_MAIN);
 	if (v_idx < 0)
 		goto err_switch_setup;
+	pf->lan_vsi = v_idx;
 	vsi = pf->vsi[v_idx];
 	if (!vsi)
 		goto err_switch_setup;
