@@ -30,3 +30,5 @@ generic-y += trace_clock.h
 generic-y += vga.h
 generic-y += word-at-a-time.h
 generic-y += xor.h
+
+generated-y += syscall_table.h
