@@ -132,6 +132,7 @@ static int coreboot_table_probe(struct platform_device *pdev)
 	struct coreboot_table_header *header;
 	struct resource *res;
 	struct device *dev = &pdev->dev;
+	const char *name;
 	void *ptr;
 	int ret;
 
@@ -153,10 +154,17 @@ static int coreboot_table_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	ptr = devm_memremap(dev, res->start,
-			    header->header_bytes + header->table_bytes,
-			    MEMREMAP_WB);
+	len = header->header_bytes + header->table_bytes;
+	res->end = res->start + len - 1;
+	name = res->name ?: dev_name(dev);
 	memunmap(header);
+
+	if (!devm_request_mem_region(dev, res->start, len, name)) {
+		dev_err(dev, "can't request region for resource %pR\n", res);
+		return -EBUSY;
+	}
+
+	ptr = devm_memremap(dev, res->start, len, MEMREMAP_WB);
 	if (!ptr)
 		return -ENOMEM;
 
