@@ -13560,12 +13560,14 @@ static bool i40e_check_recovery_mode(struct i40e_pf *pf)
 	u32 val = rd32(&pf->hw, I40E_GL_FWSTS);
 
 	if (val & I40E_GL_FWSTS_FWS1B_MASK) {
-		dev_info(&pf->pdev->dev, "transition FW detected, running in recovery mode\n");
+		dev_notice(&pf->pdev->dev, "Firmware recovery mode detected. Limiting functionality.\n");
+		dev_notice(&pf->pdev->dev, "Refer to the Intel(R) Ethernet Adapters and Devices User Guide for details on firmware recovery mode.\n");
 		set_bit(__I40E_RECOVERY_MODE, pf->state);
 
 		return true;
 	}
-	clear_bit(__I40E_RECOVERY_MODE, pf->state);
+	if (test_and_clear_bit(__I40E_RECOVERY_MODE, pf->state))
+		dev_info(&pf->pdev->dev, "Reinitializing in normal mode with full functionality.\n");
 
 	return false;
 }
