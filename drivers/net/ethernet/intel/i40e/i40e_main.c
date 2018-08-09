@@ -13592,21 +13592,6 @@ static int i40e_init_recovery_mode(struct i40e_pf *pf, struct i40e_hw *hw)
 		goto err_sw_init;
 	}
 
-	/* allow a platform config to override the HW addr */
-	i40e_get_platform_mac_addr(pf->pdev, pf);
-
-	if (!is_valid_ether_addr(hw->mac.addr)) {
-		/* normally we would return -EIO here */
-		dev_info(&pf->pdev->dev, "invalid MAC address %pM\n",
-			 hw->mac.addr);
-	} else {
-		dev_info(&pf->pdev->dev, "MAC address: %pM\n", hw->mac.addr);
-	}
-	ether_addr_copy(hw->mac.perm_addr, hw->mac.addr);
-	i40e_get_port_mac_addr(hw, hw->mac.port_addr);
-	if (is_valid_ether_addr(hw->mac.port_addr))
-		pf->hw_features |= I40E_HW_PORT_ID_VALID;
-
 	pci_save_state(pf->pdev);
 
 	/* set up periodic task facility */
