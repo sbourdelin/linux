@@ -138,6 +138,9 @@ int coreboot_table_init(struct device *dev, void __iomem *ptr)
 		ptr_entry += entry.size;
 	}
 
+	if (ret)
+		iounmap(ptr);
+
 	return ret;
 }
 EXPORT_SYMBOL(coreboot_table_init);
