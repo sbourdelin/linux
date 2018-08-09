@@ -523,8 +523,10 @@ int modify_user_hw_breakpoint(struct perf_event *bp, struct perf_event_attr *att
 		perf_event_disable(bp);
 
 	err = modify_user_hw_breakpoint_check(bp, attr, false);
-	if (err)
+	if (err) {
+		bp->attr.disabled = 1;
 		return err;
+	}
 
 	if (!attr->disabled)
 		perf_event_enable(bp);
