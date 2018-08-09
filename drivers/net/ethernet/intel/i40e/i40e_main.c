@@ -9394,6 +9394,8 @@ static void i40e_rebuild(struct i40e_pf *pf, bool reinit, bool lock_acquired)
 			if (i40e_setup_misc_vector_for_recovery_mode(pf))
 				goto end_unlock;
 		} else {
+			if (!lock_acquired)
+				rtnl_lock();
 			/* we're going out of recovery mode so we'll free
 			 * the IRQ allocated specifically for recovery mode
 			 * and restore the interrupt scheme
