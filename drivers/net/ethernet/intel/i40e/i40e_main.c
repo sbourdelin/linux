@@ -14338,6 +14338,7 @@ static void i40e_remove(struct pci_dev *pdev)
 		 */
 		unregister_netdev(vsi->netdev);
 		free_netdev(vsi->netdev);
+		vsi->netdev = NULL;
 
 		goto unmap;
 	}
