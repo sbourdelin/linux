@@ -1,3 +1,7 @@
+.. SPDX-License-Identifier: GPL-2.0+
+
+.. _seccomp-filter:
+
 ===========================================
 Seccomp BPF (SECure COMPuting with filters)
 ===========================================
@@ -39,6 +43,13 @@ choosing.  Expressive, dynamic filters provide further options down this
 path (avoiding pathological sizes or selecting which of the multiplexed
 system calls in socketcall() is allowed, for instance) which could be
 construed, incorrectly, as a more complete sandboxing solution.
+
+For more information on BPF please see:
+
+- Linux Socket Filters -
+  :ref:`Documentation/userspace-api/socket_filter.rst <socket-filter>`
+- Classic BPF (cBPF) - :ref:`Documentation/userspace-api/cBPF.rst <cbpf>`
+- Internal BPF (eBPF) - :ref:`Documentation/userspace-api/eBPF.rst <ebpf>`
 
 Usage
 =====
