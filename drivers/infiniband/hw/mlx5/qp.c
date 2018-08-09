@@ -779,14 +779,13 @@ static int adjust_bfregn(struct mlx5_ib_dev *dev,
 
 static int create_user_qp(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 			  struct mlx5_ib_qp *qp, struct ib_udata *udata,
-			  struct ib_qp_init_attr *attr,
-			  u32 **in,
-			  struct mlx5_ib_create_qp_resp *resp, int *inlen,
+			  struct ib_qp_init_attr *attr, u32 **in, int *inlen,
 			  struct mlx5_ib_qp_base *base)
 {
 	struct mlx5_ib_ucontext *context;
 	struct mlx5_ib_create_qp ucmd;
 	struct mlx5_ib_ubuffer *ubuffer = &base->ubuffer;
+	struct mlx5_ib_create_qp_resp resp = {};
 	int page_shift = 0;
 	int uar_index = 0;
 	int npages;
@@ -880,9 +879,9 @@ static int create_user_qp(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 
 	MLX5_SET(qpc, qpc, uar_page, uar_index);
 	if (bfregn != MLX5_IB_INVALID_BFREG)
-		resp->bfreg_index = adjust_bfregn(dev, &context->bfregi, bfregn);
+		resp.bfreg_index = adjust_bfregn(dev, &context->bfregi, bfregn);
 	else
-		resp->bfreg_index = MLX5_IB_INVALID_BFREG;
+		resp.bfreg_index = MLX5_IB_INVALID_BFREG;
 	qp->bfregn = bfregn;
 
 	err = mlx5_ib_db_map_user(context, ucmd.db_addr, &qp->db);
@@ -891,7 +890,7 @@ static int create_user_qp(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 		goto err_free;
 	}
 
-	err = ib_copy_to_udata(udata, resp, min(udata->outlen, sizeof(*resp)));
+	err = ib_copy_to_udata(udata, &resp, min(udata->outlen, sizeof(resp)));
 	if (err) {
 		mlx5_ib_dbg(dev, "copy failed\n");
 		goto err_unmap;
@@ -1626,7 +1625,6 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 	struct mlx5_ib_resources *devr = &dev->devr;
 	int inlen = MLX5_ST_SZ_BYTES(create_qp_in);
 	struct mlx5_core_dev *mdev = dev->mdev;
-	struct mlx5_ib_create_qp_resp resp;
 	struct mlx5_ib_cq *send_cq;
 	struct mlx5_ib_cq *recv_cq;
 	unsigned long flags;
@@ -1782,7 +1780,7 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 				return -EINVAL;
 			}
 			err = create_user_qp(dev, pd, qp, udata, init_attr, &in,
-					     &resp, &inlen, base);
+					     &inlen, base);
 			if (err)
 				mlx5_ib_dbg(dev, "err %d\n", err);
 		} else {
