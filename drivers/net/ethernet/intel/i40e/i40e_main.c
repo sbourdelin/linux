@@ -14371,13 +14371,6 @@ static void i40e_remove(struct pci_dev *pdev)
 	}
 
 unmap:
-	/* shutdown the adminq */
-	i40e_shutdown_adminq(hw);
-
-	/* destroy the locks only once, here */
-	mutex_destroy(&hw->aq.arq_mutex);
-	mutex_destroy(&hw->aq.asq_mutex);
-
 	/* Free MSI/legacy interrupt 0 when in recovery mode.
 	 * This is normally done in i40e_vsi_free_irq on
 	 * VSI close but since recovery mode doesn't allow to up
@@ -14398,6 +14391,13 @@ unmap:
 			pf->vsi[i] = NULL;
 		}
 	}
+
+	/* shutdown the adminq */
+	i40e_shutdown_adminq(hw);
+
+	/* destroy the locks only once, here */
+	mutex_destroy(&hw->aq.arq_mutex);
+	mutex_destroy(&hw->aq.asq_mutex);
 
 	for (i = 0; i < I40E_MAX_VEB; i++) {
 		kfree(pf->veb[i]);
