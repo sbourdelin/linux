@@ -32,7 +32,7 @@ DECLARE_EVENT_CLASS(snd_soc_card,
 		__entry->val = val;
 	),
 
-	TP_printk("card=%s val=%d", __get_str(name), (int)__entry->val)
+	TP_printk("card=%s val=%d", __get_str(name), __entry->val)
 );
 
 DEFINE_EVENT(snd_soc_card, snd_soc_bias_level_start,
@@ -101,7 +101,7 @@ DECLARE_EVENT_CLASS(snd_soc_dapm_widget,
 	),
 
 	TP_printk("widget=%s val=%d", __get_str(name),
-		  (int)__entry->val)
+		__entry->val)
 );
 
 DEFINE_EVENT(snd_soc_dapm_widget, snd_soc_dapm_widget_power,
@@ -149,8 +149,8 @@ TRACE_EVENT(snd_soc_dapm_walk_done,
 	),
 
 	TP_printk("%s: checks %d power, %d path, %d neighbour",
-		  __get_str(name), (int)__entry->power_checks,
-		  (int)__entry->path_checks, (int)__entry->neighbour_checks)
+		__get_str(name), __entry->power_checks,
+		__entry->path_checks, __entry->neighbour_checks)
 );
 
 TRACE_EVENT(snd_soc_dapm_path,
@@ -180,8 +180,7 @@ TRACE_EVENT(snd_soc_dapm_path,
 	),
 
 	TP_printk("%c%s %s %s %s %s",
-		(int) __entry->path_node &&
-		(int) __entry->path_connect ? '*' : ' ',
+		__entry->path_node && __entry->path_connect ? '*' : ' ',
 		__get_str(wname), DAPM_ARROW(__entry->path_dir),
 		__get_str(pname), DAPM_ARROW(__entry->path_dir),
 		__get_str(pnname))
@@ -242,8 +241,8 @@ TRACE_EVENT(snd_soc_jack_report,
 		__entry->val = val;
 	),
 
-	TP_printk("jack=%s %x/%x", __get_str(name), (int)__entry->val,
-		  (int)__entry->mask)
+	TP_printk("jack=%s %x/%x", __get_str(name), __entry->val,
+		__entry->mask)
 );
 
 TRACE_EVENT(snd_soc_jack_notify,
@@ -262,7 +261,7 @@ TRACE_EVENT(snd_soc_jack_notify,
 		__entry->val = val;
 	),
 
-	TP_printk("jack=%s %x", __get_str(name), (int)__entry->val)
+	TP_printk("jack=%s %x", __get_str(name), __entry->val)
 );
 
 #endif /* _TRACE_ASOC_H */
