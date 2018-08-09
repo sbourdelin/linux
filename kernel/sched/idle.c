@@ -190,10 +190,18 @@ static void cpuidle_idle_call(void)
 		 */
 		next_state = cpuidle_select(drv, dev, &stop_tick);
 
-		if (stop_tick)
+		if (stop_tick) {
 			tick_nohz_idle_stop_tick();
-		else
+		} else {
+			/*
+			 * The cpuidle framework says to not stop tick but
+			 * the tick has been stopped yet, so restart it.
+			 */
+			if (tick_nohz_tick_stopped())
+				tick_nohz_idle_restart_tick();
+
 			tick_nohz_idle_retain_tick();
+		}
 
 		rcu_idle_enter();
 
