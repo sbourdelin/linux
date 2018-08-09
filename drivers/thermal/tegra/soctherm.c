@@ -980,7 +980,6 @@ static void soctherm_init_hw_throt_cdev(struct platform_device *pdev)
 		tcd = thermal_of_cooling_device_register(np_stcc,
 							 (char *)name, ts,
 							 &throt_cooling_ops);
-		of_node_put(np_stcc);
 		if (IS_ERR_OR_NULL(tcd)) {
 			dev_err(dev,
 				"throttle-cfg: %s: failed to register cooling device\n",
