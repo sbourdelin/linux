@@ -516,15 +516,13 @@ static void menu_update(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	 * assume the state was never reached and the exit latency is 0.
 	 */
 
-	if (data->tick_wakeup && data->next_timer_us > TICK_USEC) {
+	if (data->tick_wakeup) {
 		/*
-		 * The nohz code said that there wouldn't be any events within
-		 * the tick boundary (if the tick was stopped), but the idle
-		 * duration predictor had a differing opinion.  Since the CPU
-		 * was woken up by a tick (that wasn't stopped after all), the
-		 * predictor was not quite right, so assume that the CPU could
-		 * have been idle long (but not forever) to help the idle
-		 * duration predictor do a better job next time.
+		 * Since the CPU was woken up by a tick (that wasn't stopped
+		 * after all), the predictor was not quite right, so assume
+		 * that the CPU could have been idle long (but not forever)
+		 * to help the idle duration predictor do a better job next
+		 * time.
 		 */
 		measured_us = 9 * MAX_INTERESTING / 10;
 	} else {
