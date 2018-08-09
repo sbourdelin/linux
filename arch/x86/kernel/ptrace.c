@@ -693,9 +693,14 @@ static int ptrace_set_breakpoint_addr(struct task_struct *tsk, int nr,
 			t->ptrace_bps[nr] = bp;
 	} else {
 		struct perf_event_attr attr = bp->attr;
+		bool disabled = attr.disabled;
 
 		attr.bp_addr = addr;
 		err = modify_user_hw_breakpoint(bp, &attr);
+		if (err && !disabled) {
+			bp->attr.disabled = false;
+			WARN_ON(modify_user_hw_breakpoint(bp, &bp->attr));
+		}
 	}
 
 	return err;
