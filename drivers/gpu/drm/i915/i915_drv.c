@@ -1272,6 +1272,9 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
 	 */
 	if (INTEL_INFO(dev_priv)->num_pipes)
 		drm_kms_helper_poll_init(dev);
+
+	/* Notify our tracepoints driver has been registered. */
+	i915_tracing_register(dev_priv);
 }
 
 /**
@@ -1282,6 +1285,8 @@ static void i915_driver_unregister(struct drm_i915_private *dev_priv)
 {
 	intel_fbdev_unregister(dev_priv);
 	intel_audio_deinit(dev_priv);
+
+	i915_tracing_unregister(dev_priv);
 
 	/*
 	 * After flushing the fbdev (incl. a late async config which will

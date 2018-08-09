@@ -1157,10 +1157,10 @@ static void notify_ring(struct intel_engine_cs *engine)
 	const u32 seqno = intel_engine_get_seqno(engine);
 	struct i915_request *rq = NULL;
 	struct task_struct *tsk = NULL;
-	struct intel_wait *wait;
+	struct intel_wait *wait = NULL;
 
 	if (unlikely(!engine->breadcrumbs.irq_armed))
-		return;
+		goto out;
 
 	rcu_read_lock();
 
@@ -1219,6 +1219,7 @@ static void notify_ring(struct intel_engine_cs *engine)
 
 	rcu_read_unlock();
 
+out:
 	trace_intel_engine_notify(engine, wait);
 }
 

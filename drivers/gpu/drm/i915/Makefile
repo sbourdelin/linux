@@ -182,6 +182,9 @@ i915-y += i915_perf.o \
 	  i915_oa_cnl.o \
 	  i915_oa_icl.o
 
+# tracing
+i915-$(CONFIG_TRACEPOINTS) += i915_tracing.o
+
 ifeq ($(CONFIG_DRM_I915_GVT),y)
 i915-y += intel_gvt.o
 include $(src)/gvt/Makefile
