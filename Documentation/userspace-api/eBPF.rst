@@ -155,7 +155,7 @@ to in-kernel function.  If R1 - R5 registers are mapped to CPU registers
 that are used for argument passing on given architecture, the JIT
 compiler doesn't need to emit extra moves.  Function arguments will be
 in the correct registers and BPF_CALL instruction will be JITed as
-single 'call' HW instruction.  This calling convention was picked to
+single ``call`` HW instruction.  This calling convention was picked to
 cover common call situations without performance penalty.
 
 After an in-kernel function call, R1 - R5 are reset to unreadable and R0
@@ -268,7 +268,7 @@ Which is in this example equivalent in C to::
 
 In-kernel functions foo() and bar() with prototype: u64 (*)(u64 arg1,
 u64 arg2, u64 arg3, u64 arg4, u64 arg5); will receive arguments in
-proper registers and place their return value into '%rax' which is R0 in
+proper registers and place their return value into ``%rax`` which is R0 in
 eBPF.  Prologue and epilogue are emitted by JIT and are implicit in the
 interpreter.  R0-R5 are scratch registers, so eBPF program needs to
 preserve them across the calls as defined by calling convention.
@@ -425,7 +425,7 @@ exactly the same operations as BPF_ALU, but with 64-bit wide operands
 instead.  So BPF_ADD | BPF_X | BPF_ALU64 means 64-bit addition i.e.
 dst_reg = dst_reg + src_reg
 
-Classic BPF wastes the whole BPF_RET class to represent a single 'ret'
+Classic BPF wastes the whole BPF_RET class to represent a single ``ret``
 operation.  Classic BPF_RET | BPF_K means copy imm32 into return
 register and perform function exit.  eBPF is modeled to match CPU, so
 BPF_JMP | BPF_EXIT in eBPF means function exit only.  The eBPF program
@@ -469,7 +469,7 @@ eBPF has two non-generic instructions: (BPF_ABS | <size> | BPF_LD) and
 
 They had to be carried over from classic to have strong performance of
 socket filters running in eBPF interpreter.  These instructions can only
-be used when interpreter context is a pointer to 'struct sk_buff' and
+be used when interpreter context is a pointer to ``struct sk_buff`` and
 have seven implicit operands.  Register R6 is an implicit input that
 must contain pointer to sk_buff.  Register R0 is an implicit output
 which contains the data fetched from the packet.  Registers R1-R5 are
@@ -502,7 +502,7 @@ Where size is one of: BPF_B or BPF_H or BPF_W or BPF_DW.  Note that 1
 and 2 byte atomic increments are not supported.
 
 eBPF has one 16-byte instruction: BPF_LD | BPF_DW | BPF_IMM which
-consists of two consecutive 'struct bpf_insn' 8-byte blocks and is
+consists of two consecutive ``struct bpf_insn`` 8-byte blocks and is
 interpreted as single instruction that loads 64-bit immediate value into
 a dst_reg.
 
@@ -565,8 +565,8 @@ alignment checked.  For example::
 will be rejected, since R1 doesn't have a valid pointer type at the time
 of execution of instruction bpf_xadd.
 
-At the start R1 type is PTR_TO_CTX (a pointer to generic 'struct
-bpf_context').  A callback is used to customize verifier to restrict
+At the start R1 type is PTR_TO_CTX (a pointer to generic ``struct
+bpf_context``).  A callback is used to customize verifier to restrict
 eBPF program access to only certain fields within ctx structure with
 specified size and alignment.
 
@@ -628,7 +628,7 @@ Register value tracking
 
 In order to determine the safety of an eBPF program, the verifier must
 track the range of possible values in each register and also in each
-stack slot.  This is done with 'struct bpf_reg_state', defined in
+stack slot.  This is done with ``struct bpf_reg_state``, defined in
 include/linux/bpf_verifier.h, which unifies tracking of scalar and
 pointer values.  Each register state has a type, which is either
 NOT_INIT (the register has not been written to), SCALAR_VALUE (some
@@ -715,7 +715,7 @@ data via skb->data and skb->data_end pointers, e.g.::
   6:  r0 = *(u16 *)(r3 +12) /* access 12 and 13 bytes of the packet */
 
 this 2byte load from the packet is safe to do, since the program author
-did check 'if (skb->data + 14 > skb->data_end) goto err' at insn #5
+did check ``if (skb->data + 14 > skb->data_end) goto err`` at insn #5
 which means that in the fall-through case the register R3 (which points
 to skb->data) has at least 14 directly accessible bytes.  The verifier
 marks it as R3=pkt(id=0,off=0,r=14).  id=0 means that no additional
@@ -723,8 +723,8 @@ variables were added to the register.  off=0 means that no additional
 constants were added.  r=14 is the range of safe access which means that
 bytes [R3, R3 + 14) are ok.  Note that R5 is marked as
 R5=pkt(id=0,off=14,r=14).  It also points to the packet data, but
-constant 14 was added to the register, so it now points to 'skb->data +
-14' and accessible range is [R5, R5 + 14 - 14) which is zero bytes.
+constant 14 was added to the register, so it now points to ``skb->data +
+14`` and accessible range is [R5, R5 + 14 - 14) which is zero bytes.
 
 More complex packet access may look like::
 
@@ -745,30 +745,29 @@ More complex packet access may look like::
   R0=inv(id=0,umax_value=255,var_off=(0x0; 0xff)) R1=pkt_end R2=pkt(id=2,off=8,r=8) R3=pkt(id=2,off=0,r=8) R4=inv(id=0,umax_value=3570,var_off=(0x0; 0xfffe)) R5=pkt(id=0,off=14,r=14) R10=fp
   19:  r1 = *(u8 *)(r3 +4)
 
-The state of the register R3 is R3=pkt(id=2,off=0,r=8) id=2 means that
-two 'r3 += rX' instructions were seen, so r3 points to some offset
-within a packet and since the program author did 'if (r3 + 8 > r1) goto
-err' at insn #18, the safe range is [R3, R3 + 8).  The verifier only
-allows 'add'/'sub' operations on packet registers.  Any other operation
-will set the register state to 'SCALAR_VALUE' and it won't be available
-for direct packet access.  Operation 'r3 += rX' may overflow and become
-less than original skb->data, therefore the verifier has to prevent
-that.  So when it sees 'r3 += rX' instruction and rX is more than 16-bit
-value, any subsequent bounds-check of r3 against skb->data_end will not
-give us 'range' information, so attempts to read through the pointer
-will give "invalid access to packet" error.  Ex. after insn 'r4 = *(u8
-*)(r3 +12)' (insn #7 above) the state of r4 is
-R4=inv(id=0,umax_value=255,var_off=(0x0; 0xff)) which means that upper
-56 bits of the register are guaranteed to be zero, and nothing is known
-about the lower 8 bits.  After insn 'r4 *= 14' the state becomes
-R4=inv(id=0,umax_value=3570,var_off=(0x0; 0xfffe)), since multiplying an
-8-bit value by constant 14 will keep upper 52 bits as zero, also the
-least significant bit will be zero as 14 is even.  Similarly 'r2 >>= 48'
-will make R2=inv(id=0,umax_value=65535,var_off=(0x0; 0xffff)), since the
-shift is not sign extending.  This logic is implemented in
-adjust_reg_min_max_vals() function, which calls
-adjust_ptr_min_max_vals() for adding pointer to scalar (or vice versa)
-and adjust_scalar_min_max_vals() for operations on two scalars.
+The state of the register R3 is ``R3=pkt(id=2,off=0,r=8)`` id=2 means that
+two ``r3 += rX`` instructions were seen, so r3 points to some offset within
+a packet and since the program author did ``if (r3 + 8 > r1) goto err`` at
+insn #18, the safe range is [R3, R3 + 8).  The verifier only allows
+'add'/'sub' operations on packet registers.  Any other operation will set
+the register state to 'SCALAR_VALUE' and it won't be available for direct
+packet access.  Operation ``r3 += rX`` may overflow and become less than
+original skb->data, therefore the verifier has to prevent that.  So when it
+sees ``r3 += rX`` instruction and rX is more than 16-bit value, any
+subsequent bounds-check of r3 against skb->data_end will not give us
+'range' information, so attempts to read through the pointer will give
+"invalid access to packet" error.  Ex. after insn ``r4 = *(u8 *)(r3 +12)``
+(insn #7 above) the state of r4 is R4=inv(id=0,umax_value=255,var_off=(0x0;
+0xff)) which means that upper 56 bits of the register are guaranteed to be
+zero, and nothing is known about the lower 8 bits.  After insn ``r4 *= 14``
+the state becomes R4=inv(id=0,umax_value=3570,var_off=(0x0; 0xfffe)), since
+multiplying an 8-bit value by constant 14 will keep upper 52 bits as zero,
+also the least significant bit will be zero as 14 is even.  Similarly ``r2
+>>= 48`` will make R2=inv(id=0,umax_value=65535,var_off=(0x0; 0xffff)),
+since the shift is not sign extending.  This logic is implemented in
+adjust_reg_min_max_vals() function, which calls adjust_ptr_min_max_vals()
+for adding pointer to scalar (or vice versa) and
+adjust_scalar_min_max_vals() for operations on two scalars.
 
 The end result is that bpf program author can access packet directly
 using normal C code as::
