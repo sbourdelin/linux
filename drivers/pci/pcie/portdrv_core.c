@@ -166,6 +166,19 @@ static int pcie_init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
 		irqs[i] = -1;
 
 	/*
+	 * Some platforms have dedicated interrupt line from root complex to
+	 * interrupt controller for PCIe services like AER/PME etc., check
+	 * if platform registered with any such IRQ.
+	 */
+	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT) {
+		int plat_mask;
+
+		plat_mask = pci_check_platform_service_irqs(dev, irqs, mask);
+		if (plat_mask > 0)
+			mask = mask & plat_mask;
+	}
+
+	/*
 	 * If we support PME but can't use MSI/MSI-X for it, we have to
 	 * fall back to INTx or other interrupts, e.g., a system shared
 	 * interrupt.
@@ -183,8 +196,10 @@ legacy_irq:
 	if (ret < 0)
 		return -ENODEV;
 
-	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-		irqs[i] = pci_irq_vector(dev, 0);
+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
+		if (mask & (1 << i))
+			irqs[i] = pci_irq_vector(dev, 0);
+	}
 
 	return 0;
 }
