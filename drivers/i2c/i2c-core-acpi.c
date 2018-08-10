@@ -595,6 +595,8 @@ i2c_acpi_space_handler(u32 function, acpi_physical_address command,
 		} else {
 			status = acpi_gsb_i2c_write_bytes(client, command,
 					gsb->data, info->access_length);
+			if (status > 0)
+				status = 0;
 		}
 		break;
 
