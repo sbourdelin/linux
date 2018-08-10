@@ -33,6 +33,9 @@
 
 #define TB_SHIFT 40
 
+#define MAX_PADDING_L4 63
+#define MAX_PADDING_L5 32767
+
 /*
  * The end address could depend on more configuration options to make the
  * highest amount of space for randomization available, but that's too hard
@@ -40,6 +43,7 @@
  */
 static const unsigned long vaddr_end = CPU_ENTRY_AREA_BASE;
 
+static int __initdata rand_mem_physical_padding = CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
 /*
  * Memory regions randomized by KASLR (except modules that use a separate logic
  * earlier during boot). The list is ordered based on virtual addresses. This
@@ -68,6 +72,20 @@ static inline bool kaslr_memory_enabled(void)
 {
 	return kaslr_enabled() && !IS_ENABLED(CONFIG_KASAN);
 }
+
+static int __init rand_mem_physical_padding_setup(char *str)
+{
+	int max_padding = pgtable_l5_enabled() ? MAX_PADDING_L5 : MAX_PADDING_L4;
+
+	get_option(&str, &rand_mem_physical_padding);
+	if (rand_mem_physical_padding < 0)
+		rand_mem_physical_padding = 0;
+	else if (rand_mem_physical_padding > max_padding)
+		rand_mem_physical_padding = max_padding;
+
+	return 0;
+}
+early_param("rand_mem_physical_padding", rand_mem_physical_padding_setup);
 
 /* Initialize base and padding for each memory region randomized with KASLR */
 void __init kernel_randomize_memory(void)
@@ -102,7 +120,7 @@ void __init kernel_randomize_memory(void)
 	 */
 	BUG_ON(kaslr_regions[0].base != &page_offset_base);
 	memory_tb = DIV_ROUND_UP(max_pfn << PAGE_SHIFT, 1UL << TB_SHIFT) +
-		CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
+		rand_mem_physical_padding;
 
 	/* Adapt phyiscal memory region size based on available memory */
 	if (memory_tb < kaslr_regions[0].size_tb)
