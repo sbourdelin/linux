@@ -273,7 +273,7 @@ static int i82443bxgx_edacmc_probe1(struct pci_dev *pdev, int dev_idx)
 		break;
 	default:
 		edac_dbg(0, "Unknown/reserved DRAM type value in DRAMC register!\n");
-		mtype = -MEM_UNKNOWN;
+		mtype = MEM_UNKNOWN;
 	}
 
 	if ((mtype == MEM_SDR) || (mtype == MEM_RDR))
