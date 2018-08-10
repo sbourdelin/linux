@@ -181,10 +181,9 @@ enum {
 
 #define MAX_DISCARD_BLOCKS(sbi)		BLKS_PER_SEC(sbi)
 #define DEF_MAX_DISCARD_REQUEST		8	/* issue 8 discards per round */
-#define DEF_MIN_DISCARD_ISSUE_TIME	50	/* 50 ms, if exists */
-#define DEF_MID_DISCARD_ISSUE_TIME	500	/* 500 ms, if device busy */
-#define DEF_MAX_DISCARD_ISSUE_TIME	60000	/* 60 s, if no candidates */
-#define DEF_DISCARD_URGENT_UTIL		80	/* do more discard over 80% */
+#define DEF_MIN_DISCARD_ISSUE_TIME	100	/* 100 ms, if exists */
+#define DEF_MID_DISCARD_ISSUE_TIME	1000	/* 1000 ms, if device busy */
+#define DEF_MAX_DISCARD_ISSUE_TIME	10000	/* 10000 ms, if no candidates */
 #define DEF_CP_INTERVAL			60	/* 60 secs */
 #define DEF_IDLE_INTERVAL		5	/* 5 secs */
 
@@ -244,7 +243,8 @@ struct discard_entry {
 };
 
 /* default discard granularity of inner discard thread, unit: block count */
-#define DEFAULT_DISCARD_GRANULARITY		1
+#define MID_DISCARD_GRANULARITY			16
+#define MIN_DISCARD_GRANULARITY			1
 
 /* max discard pend list number */
 #define MAX_PLIST_NUM		512
@@ -326,6 +326,7 @@ struct discard_cmd_control {
 	atomic_t discard_cmd_cnt;		/* # of cached cmd count */
 	struct rb_root root;			/* root of discard rb-tree */
 	bool rbtree_check;			/* config for consistence check */
+	bool io_interrupted;			/* last state of io interrupted */
 };
 
 /* for the list of fsync inodes, used only during recovery */

@@ -957,6 +957,44 @@ static void __check_sit_bitmap(struct f2fs_sb_info *sbi,
 #endif
 }
 
+static void __adjust_discard_speed(unsigned int *interval,
+				unsigned int def_interval, int dev_util)
+{
+	unsigned int base_interval, total_interval;
+
+	base_interval = def_interval / 10;
+	total_interval = def_interval - base_interval;
+
+	/*
+	 * if def_interval = 100, adjusted interval should be in range of
+	 * [10, 100].
+	 */
+	*interval = base_interval + total_interval * (100 - dev_util) / 100;
+}
+
+static void __tune_discard_policy(struct f2fs_sb_info *sbi,
+					struct discard_policy *dpolicy)
+{
+	struct discard_cmd_control *dcc = SM_I(sbi)->dcc_info;
+	int dev_util;
+
+	if (dcc->io_interrupted) {
+		dpolicy->min_interval = DEF_MIN_DISCARD_ISSUE_TIME;
+		dpolicy->mid_interval = DEF_MID_DISCARD_ISSUE_TIME;
+		dpolicy->max_interval = DEF_MAX_DISCARD_ISSUE_TIME;
+		return;
+	}
+
+	dev_util = dev_utilization(sbi);
+
+	__adjust_discard_speed(&dpolicy->min_interval,
+				DEF_MIN_DISCARD_ISSUE_TIME, dev_util);
+	__adjust_discard_speed(&dpolicy->mid_interval,
+				DEF_MID_DISCARD_ISSUE_TIME, dev_util);
+	__adjust_discard_speed(&dpolicy->max_interval,
+				DEF_MAX_DISCARD_ISSUE_TIME, dev_util);
+}
+
 static void __init_discard_policy(struct f2fs_sb_info *sbi,
 				struct discard_policy *dpolicy,
 				int discard_type, unsigned int granularity)
@@ -971,20 +1009,11 @@ static void __init_discard_policy(struct f2fs_sb_info *sbi,
 	dpolicy->io_aware_gran = MAX_PLIST_NUM;
 
 	if (discard_type == DPOLICY_BG) {
-		dpolicy->min_interval = DEF_MIN_DISCARD_ISSUE_TIME;
-		dpolicy->mid_interval = DEF_MID_DISCARD_ISSUE_TIME;
-		dpolicy->max_interval = DEF_MAX_DISCARD_ISSUE_TIME;
 		dpolicy->io_aware = true;
 		dpolicy->sync = false;
 		dpolicy->ordered = true;
-		if (utilization(sbi) > DEF_DISCARD_URGENT_UTIL) {
-			dpolicy->granularity = 1;
-			dpolicy->max_interval = DEF_MIN_DISCARD_ISSUE_TIME;
-		}
+		__tune_discard_policy(sbi, dpolicy);
 	} else if (discard_type == DPOLICY_FORCE) {
-		dpolicy->min_interval = DEF_MIN_DISCARD_ISSUE_TIME;
-		dpolicy->mid_interval = DEF_MID_DISCARD_ISSUE_TIME;
-		dpolicy->max_interval = DEF_MAX_DISCARD_ISSUE_TIME;
 		dpolicy->io_aware = false;
 	} else if (discard_type == DPOLICY_FSTRIM) {
 		dpolicy->io_aware = false;
@@ -1342,6 +1371,8 @@ next:
 	if (!issued && io_interrupted)
 		issued = -1;
 
+	dcc->io_interrupted = io_interrupted;
+
 	return issued;
 }
 
@@ -1359,7 +1390,7 @@ static int __issue_discard_cmd(struct f2fs_sb_info *sbi,
 		if (i + 1 < dpolicy->granularity)
 			break;
 
-		if (i < DEFAULT_DISCARD_GRANULARITY && dpolicy->ordered)
+		if (i < MID_DISCARD_GRANULARITY && dpolicy->ordered)
 			return __issue_discard_cmd_orderly(sbi, dpolicy);
 
 		pend_list = &dcc->pend_list[i];
@@ -1395,6 +1426,8 @@ next:
 
 	if (!issued && io_interrupted)
 		issued = -1;
+
+	dcc->io_interrupted = io_interrupted;
 
 	return issued;
 }
@@ -1565,7 +1598,11 @@ static int issue_discard_thread(void *data)
 	struct f2fs_sb_info *sbi = data;
 	struct discard_cmd_control *dcc = SM_I(sbi)->dcc_info;
 	wait_queue_head_t *q = &dcc->discard_wait_queue;
-	struct discard_policy dpolicy;
+	struct discard_policy dpolicy = {
+		.min_interval = DEF_MIN_DISCARD_ISSUE_TIME,
+		.mid_interval = DEF_MID_DISCARD_ISSUE_TIME,
+		.max_interval = DEF_MAX_DISCARD_ISSUE_TIME,
+	};
 	unsigned int wait_ms = DEF_MIN_DISCARD_ISSUE_TIME;
 	int issued;
 
@@ -1918,7 +1955,7 @@ static int create_discard_cmd_control(struct f2fs_sb_info *sbi)
 	if (!dcc)
 		return -ENOMEM;
 
-	dcc->discard_granularity = DEFAULT_DISCARD_GRANULARITY;
+	dcc->discard_granularity = MIN_DISCARD_GRANULARITY;
 	INIT_LIST_HEAD(&dcc->entry_list);
 	for (i = 0; i < MAX_PLIST_NUM; i++)
 		INIT_LIST_HEAD(&dcc->pend_list[i]);
@@ -1934,6 +1971,7 @@ static int create_discard_cmd_control(struct f2fs_sb_info *sbi)
 	dcc->next_pos = 0;
 	dcc->root = RB_ROOT;
 	dcc->rbtree_check = false;
+	dcc->io_interrupted = false;
 
 	init_waitqueue_head(&dcc->discard_wait_queue);
 	SM_I(sbi)->dcc_info = dcc;

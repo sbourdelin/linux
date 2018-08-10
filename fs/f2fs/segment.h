@@ -590,6 +590,15 @@ static inline int utilization(struct f2fs_sb_info *sbi)
 					sbi->user_block_count);
 }
 
+static inline int dev_utilization(struct f2fs_sb_info *sbi)
+{
+	unsigned int dev_blks;
+
+	dev_blks = valid_user_blocks(sbi) + SM_I(sbi)->dcc_info->undiscard_blks;
+	return div_u64((u64)dev_blks * 100,
+			MAIN_SEGS(sbi) << sbi->log_blocks_per_seg);
+}
+
 /*
  * Sometimes f2fs may be better to drop out-of-place update policy.
  * And, users can control the policy through sysfs entries.
