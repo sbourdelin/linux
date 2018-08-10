@@ -2256,6 +2256,30 @@ static inline bool pci_ari_enabled(struct pci_bus *bus)
 }
 
 /**
+ * pci_check_platform_service_irqs - check platform service irq's
+ * @pdev: PCI Express device to check
+ * @irqs: Array of irqs to populate
+ * @mask: Bitmask of capabilities
+ *
+ * Return value: Bitmask after clearing platform supported service
+ * bits
+ */
+static inline int pci_check_platform_service_irqs(struct pci_dev *dev,
+						  int *irqs, int mask)
+{
+	struct pci_host_bridge *bridge;
+
+	if (pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT)
+		return -EINVAL;
+
+	bridge = pci_find_host_bridge(dev->bus);
+	if (bridge && bridge->setup_platform_service_irq)
+		return bridge->setup_platform_service_irq(bridge, irqs, mask);
+	else
+		return -EINVAL;
+}
+
+/**
  * pci_is_thunderbolt_attached - whether device is on a Thunderbolt daisy chain
  * @pdev: PCI device to check
  *
