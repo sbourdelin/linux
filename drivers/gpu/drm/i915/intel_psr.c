@@ -722,37 +722,26 @@ int intel_psr_wait_for_idle(const struct intel_crtc_state *new_crtc_state,
 {
 	struct intel_crtc *crtc = to_intel_crtc(new_crtc_state->base.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
-	i915_reg_t reg;
-	u32 mask;
 
-	if (!new_crtc_state->has_psr)
+	/*
+	 * The sole user right now is intel_pipe_update_start(), which won't
+	 * race with psr_enable/disable where psr2_enabled is written to. So, we
+	 * don't need to acquire the psr.lock. More importantly, we want the
+	 * latency inside intel_pipe_update_start() to be as low as possible, so
+	 * no need to acquire psr.lock when it is not needed and will induce
+	 * latencies in the atomic update path.
+	 */
+	if (!new_crtc_state->has_psr || READ_ONCE(dev_priv->psr.psr2_enabled))
 		return 0;
 
 	/*
-	 * The sole user right now is intel_pipe_update_start(),
-	 * which won't race with psr_enable/disable, which is
-	 * where psr2_enabled is written to. So, we don't need
-	 * to acquire the psr.lock. More importantly, we want the
-	 * latency inside intel_pipe_update_start() to be as low
-	 * as possible, so no need to acquire psr.lock when it is
-	 * not needed and will induce latencies in the atomic
-	 * update path.
+	 * From Bspec Panel Self Refresh (BDW+):
+	 * Max. time for PSR to idle = inverse of the refresh rate + 6 ms of
+	 * exit training time + 1.5 ms of aux channel handshake. 50 ms is
+	 * defensive enough to cover everything.
 	 */
-	if (dev_priv->psr.psr2_enabled) {
-		reg = EDP_PSR2_STATUS;
-		mask = EDP_PSR2_STATUS_STATE_MASK;
-	} else {
-		reg = EDP_PSR_STATUS;
-		mask = EDP_PSR_STATUS_STATE_MASK;
-	}
-
-	/*
-	 * Max time for PSR to idle = Inverse of the refresh rate +
-	 * 6 ms of exit training time + 1.5 ms of aux channel
-	 * handshake. 50 msec is defesive enough to cover everything.
-	 */
-
-	return __intel_wait_for_register(dev_priv, reg, mask,
+	return __intel_wait_for_register(dev_priv, EDP_PSR_STATUS,
+					 EDP_PSR_STATUS_STATE_MASK,
 					 EDP_PSR_STATUS_STATE_IDLE, 2, 50,
 					 out_value);
 }
