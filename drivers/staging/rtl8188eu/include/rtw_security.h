@@ -9,6 +9,7 @@
 
 #include <osdep_service.h>
 #include <drv_types.h>
+#include <net/lib80211.h>
 
 #define _NO_PRIVACY_			0x0
 #define _WEP40_				0x1
@@ -18,6 +19,39 @@
 #define _WEP104_			0x5
 #define _WEP_WPA_MIXED_			0x07  /*  WEP + WPA */
 #define _SMS4_				0x06
+
+struct crypto_algorithm {
+	u32 id;
+	struct lib80211_crypto_ops *ops;
+};
+
+inline static struct crypto_algorithm create_crypto_algorithm(int algo_id)
+{
+	struct crypto_algorithm algo = {
+		.id = algo_id
+	};
+
+	switch (algo_id) {
+	case _WEP40_:
+	case _WEP104_:
+		algo.ops = try_then_request_module(lib80211_get_crypto_ops("WEP"), "lib80211_crypt_wep");
+		break;
+	case _TKIP_:
+		algo.ops = try_then_request_module(lib80211_get_crypto_ops("TKIP"), "lib80211_crypt_tkip");
+		break;
+	case _AES_:
+		algo.ops = try_then_request_module(lib80211_get_crypto_ops("CCMP"), "lib80211_crypt_ccmp");
+		break;
+	case _NO_PRIVACY_:
+		algo.ops = NULL;
+		break;
+	default:
+		algo.ops = NULL;
+		break;
+	}
+
+	return algo;
+}
 
 #define is_wep_enc(alg) (((alg) == _WEP40_) || ((alg) == _WEP104_))
 
@@ -94,18 +128,18 @@ struct security_priv {
 	u32	  dot11AuthAlgrthm;	/*  802.11 auth, could be open,
 					 * shared, 8021x and authswitch
 					 */
-	u32	  dot11PrivacyAlgrthm;	/*  This specify the privacy for
-					 * shared auth. algorithm.
-					 */
+
+	/* This specify the privacy for shared auth. algorithm. */
+	struct crypto_algorithm dot11PrivacyAlgrthm;
+
 	/* WEP */
 	u32	  dot11PrivacyKeyIndex;	/*  this is only valid for legendary
 					 * wep, 0~3 for key id.(tx key index)
 					 */
 	union Keytype dot11DefKey[4];	/*  this is only valid for def. key */
 	u32	dot11DefKeylen[4];
-	u32 dot118021XGrpPrivacy;	/*  This specify the privacy algthm.
-					 * used for Grp key
-					 */
+	/* This specify the privacy algthm. used for Grp key */
+	struct crypto_algorithm dot118021XGrpPrivacy;
 	u32	dot118021XGrpKeyid;	/*  key id used for Grp Key
 					 * ( tx key index)
 					 */
@@ -168,16 +202,16 @@ do {									\
 	case dot11AuthAlgrthm_Open:					\
 	case dot11AuthAlgrthm_Shared:					\
 	case dot11AuthAlgrthm_Auto:					\
-		encry_algo = (u8)psecuritypriv->dot11PrivacyAlgrthm;	\
+		encry_algo = (u8)psecuritypriv->dot11PrivacyAlgrthm.id;	\
 		break;							\
 	case dot11AuthAlgrthm_8021X:					\
 		if (bmcst)						\
-			encry_algo = (u8)psecuritypriv->dot118021XGrpPrivacy;\
+			encry_algo = (u8)psecuritypriv->dot118021XGrpPrivacy.id;\
 		else							\
-			encry_algo = (u8)psta->dot118021XPrivacy;	\
+			encry_algo = (u8)psta->dot118021XPrivacy.id;	\
 		break;							\
 	case dot11AuthAlgrthm_WAPI:					\
-		encry_algo = (u8)psecuritypriv->dot11PrivacyAlgrthm;	\
+		encry_algo = (u8)psecuritypriv->dot11PrivacyAlgrthm.id;	\
 		break;							\
 	}								\
 } while (0)

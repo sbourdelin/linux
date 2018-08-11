@@ -97,7 +97,7 @@ static void Update_ODM_ComInfo_88E(struct adapter *Adapter)
 	dm_odm->pNumRxBytesUnicast = &Adapter->recvpriv.rx_bytes;
 	dm_odm->pWirelessMode = &pmlmeext->cur_wireless_mode;
 	dm_odm->pSecChOffset = &hal_data->nCur40MhzPrimeSC;
-	dm_odm->pSecurity = (u8 *)&Adapter->securitypriv.dot11PrivacyAlgrthm;
+	dm_odm->pSecurity = (u8 *)&Adapter->securitypriv.dot11PrivacyAlgrthm.id;
 	dm_odm->pBandWidth = (u8 *)&hal_data->CurrentChannelBW;
 	dm_odm->pChannel = &hal_data->CurrentChannel;
 	dm_odm->pbNet_closed = (bool *)&Adapter->net_closed;

@@ -380,9 +380,9 @@ static u8 rtw_init_default_value(struct adapter *padapter)
 	/* security_priv */
 	psecuritypriv->binstallGrpkey = _FAIL;
 	psecuritypriv->dot11AuthAlgrthm = dot11AuthAlgrthm_Open;
-	psecuritypriv->dot11PrivacyAlgrthm = _NO_PRIVACY_;
+	psecuritypriv->dot11PrivacyAlgrthm = create_crypto_algorithm(_NO_PRIVACY_);
 	psecuritypriv->dot11PrivacyKeyIndex = 0;
-	psecuritypriv->dot118021XGrpPrivacy = _NO_PRIVACY_;
+	psecuritypriv->dot118021XGrpPrivacy = create_crypto_algorithm(_NO_PRIVACY_);
 	psecuritypriv->dot118021XGrpKeyid = 1;
 	psecuritypriv->ndisauthtype = Ndis802_11AuthModeOpen;
 	psecuritypriv->ndisencryptstatus = Ndis802_11WEPDisabled;

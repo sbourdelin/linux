@@ -10,7 +10,6 @@
 #include <drv_types.h>
 #include <wifi.h>
 #include <osdep_intf.h>
-#include <net/lib80211.h>
 
 /* WEP related ===== */
 

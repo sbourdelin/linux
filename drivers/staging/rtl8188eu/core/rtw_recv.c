@@ -1973,7 +1973,7 @@ static int recv_func(struct adapter *padapter, struct recv_frame *rframe)
 		if (check_fwstate(mlmepriv, WIFI_STATION_STATE) &&
 		    !IS_MCAST(prxattrib->ra) && prxattrib->encrypt > 0 &&
 		    prxattrib->bdecrypted == 0 &&
-		    !is_wep_enc(psecuritypriv->dot11PrivacyAlgrthm) &&
+		    !is_wep_enc(psecuritypriv->dot11PrivacyAlgrthm.id) &&
 		    !psecuritypriv->busetkipkey) {
 			rtw_enqueue_recvframe(rframe, &padapter->recvpriv.uc_swdec_pending_queue);
 			DBG_88E("%s: no key, enqueue uc_swdec_pending_queue\n", __func__);

@@ -642,8 +642,8 @@ static void start_bss_network(struct adapter *padapter, u8 *pbuf)
 		/* WEP Key will be set before this function, do not
 		 * clear CAM.
 		 */
-		if ((psecuritypriv->dot11PrivacyAlgrthm != _WEP40_) &&
-		    (psecuritypriv->dot11PrivacyAlgrthm != _WEP104_))
+		if ((psecuritypriv->dot11PrivacyAlgrthm.id != _WEP40_) &&
+		    (psecuritypriv->dot11PrivacyAlgrthm.id != _WEP104_))
 			flush_all_cam_entry(padapter);	/* clear CAM */
 	}
 

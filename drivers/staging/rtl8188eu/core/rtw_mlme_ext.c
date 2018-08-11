@@ -2686,8 +2686,8 @@ static unsigned int OnAuth(struct adapter *padapter,
 
 	DBG_88E("auth alg=%x, seq=%X\n", algorithm, seq);
 
-	if (auth_mode == 2 && psecuritypriv->dot11PrivacyAlgrthm != _WEP40_ &&
-	    psecuritypriv->dot11PrivacyAlgrthm != _WEP104_)
+	if (auth_mode == 2 && psecuritypriv->dot11PrivacyAlgrthm.id != _WEP40_ &&
+	    psecuritypriv->dot11PrivacyAlgrthm.id != _WEP104_)
 		auth_mode = 0;
 
 	if ((algorithm > 0 && auth_mode == 0) ||	/*  rx a shared-key auth but shared not enabled */

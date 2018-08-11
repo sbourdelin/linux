@@ -1560,7 +1560,7 @@ void rtw_hal_set_hwreg(struct adapter *Adapter, u8 variable, u8 *val)
 
 			MinSpacingToSet = *((u8 *)val);
 			if (MinSpacingToSet <= 7) {
-				switch (Adapter->securitypriv.dot11PrivacyAlgrthm) {
+				switch (Adapter->securitypriv.dot11PrivacyAlgrthm.id) {
 				case _NO_PRIVACY_:
 				case _AES_:
 					SecMinSpace = 0;

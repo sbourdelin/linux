@@ -286,10 +286,10 @@ int rtw_is_same_ibss(struct adapter *adapter, struct wlan_network *pnetwork)
 	int ret = true;
 	struct security_priv *psecuritypriv = &adapter->securitypriv;
 
-	if ((psecuritypriv->dot11PrivacyAlgrthm != _NO_PRIVACY_) &&
+	if ((psecuritypriv->dot11PrivacyAlgrthm.id != _NO_PRIVACY_) &&
 	    (pnetwork->network.Privacy == 0))
 		ret = false;
-	else if ((psecuritypriv->dot11PrivacyAlgrthm == _NO_PRIVACY_) &&
+	else if ((psecuritypriv->dot11PrivacyAlgrthm.id == _NO_PRIVACY_) &&
 		 (pnetwork->network.Privacy == 1))
 		ret = false;
 	else
@@ -1591,12 +1591,12 @@ int rtw_set_key(struct adapter *adapter, struct security_priv *psecuritypriv, in
 	}
 
 	if (psecuritypriv->dot11AuthAlgrthm == dot11AuthAlgrthm_8021X) {
-		psetkeyparm->algorithm = (unsigned char)psecuritypriv->dot118021XGrpPrivacy;
+		psetkeyparm->algorithm = (unsigned char)psecuritypriv->dot118021XGrpPrivacy.id;
 		RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_,
 			 ("\n rtw_set_key: psetkeyparm->algorithm=(unsigned char)psecuritypriv->dot118021XGrpPrivacy=%d\n",
 			 psetkeyparm->algorithm));
 	} else {
-		psetkeyparm->algorithm = (u8)psecuritypriv->dot11PrivacyAlgrthm;
+		psetkeyparm->algorithm = (u8)psecuritypriv->dot11PrivacyAlgrthm.id;
 		RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_,
 			 ("\n rtw_set_key: psetkeyparm->algorithm=(u8)psecuritypriv->dot11PrivacyAlgrthm=%d\n",
 			 psetkeyparm->algorithm));
@@ -1632,7 +1632,7 @@ int rtw_set_key(struct adapter *adapter, struct security_priv *psecuritypriv, in
 	default:
 		RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_,
 			 ("\n rtw_set_key:psecuritypriv->dot11PrivacyAlgrthm=%x (must be 1 or 2 or 4 or 5)\n",
-			 psecuritypriv->dot11PrivacyAlgrthm));
+			 psecuritypriv->dot11PrivacyAlgrthm.id));
 		res = _FAIL;
 		goto err_free_parm;
 	}
@@ -1804,7 +1804,7 @@ void rtw_update_registrypriv_dev_network(struct adapter *adapter)
 	struct	security_priv *psecuritypriv = &adapter->securitypriv;
 	struct	wlan_network	*cur_network = &adapter->mlmepriv.cur_network;
 
-	pdev_network->Privacy = psecuritypriv->dot11PrivacyAlgrthm > 0 ? 1 : 0; /*  adhoc no 802.1x */
+	pdev_network->Privacy = psecuritypriv->dot11PrivacyAlgrthm.id > 0 ? 1 : 0; /*  adhoc no 802.1x */
 
 	pdev_network->Rssi = 0;
 
@@ -1935,7 +1935,7 @@ unsigned int rtw_restructure_ht_ie(struct adapter *padapter, u8 *in_ie, u8 *out_
 		rtw_hal_get_def_var(padapter, HW_VAR_MAX_RX_AMPDU_FACTOR, &max_rx_ampdu_factor);
 		ht_cap.ampdu_params_info = max_rx_ampdu_factor & 0x03;
 
-		if (padapter->securitypriv.dot11PrivacyAlgrthm == _AES_)
+		if (padapter->securitypriv.dot11PrivacyAlgrthm.id == _AES_)
 			ht_cap.ampdu_params_info |= IEEE80211_HT_CAP_AMPDU_DENSITY & (0x07 << 2);
 		else
 			ht_cap.ampdu_params_info |= IEEE80211_HT_CAP_AMPDU_DENSITY & 0x00;

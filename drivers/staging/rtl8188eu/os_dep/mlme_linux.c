@@ -65,9 +65,9 @@ void rtw_reset_securitypriv(struct adapter *adapter)
 		struct security_priv *psec_priv = &adapter->securitypriv;
 
 		psec_priv->dot11AuthAlgrthm = dot11AuthAlgrthm_Open;
-		psec_priv->dot11PrivacyAlgrthm = _NO_PRIVACY_;
+		psec_priv->dot11PrivacyAlgrthm = create_crypto_algorithm(_NO_PRIVACY_);
 		psec_priv->dot11PrivacyKeyIndex = 0;
-		psec_priv->dot118021XGrpPrivacy = _NO_PRIVACY_;
+		psec_priv->dot118021XGrpPrivacy = create_crypto_algorithm(_NO_PRIVACY_);
 		psec_priv->dot118021XGrpKeyid = 1;
 		psec_priv->ndisauthtype = Ndis802_11AuthModeOpen;
 		psec_priv->ndisencryptstatus = Ndis802_11WEPDisabled;
