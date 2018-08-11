@@ -1205,7 +1205,7 @@ __rt_mutex_slowlock(struct rt_mutex *lock, int state,
 }
 
 static void rt_mutex_handle_deadlock(int res, int detect_deadlock,
-				     struct rt_mutex_waiter *w)
+				     struct rt_mutex_waiter *w, struct rt_mutex *lock)
 {
 	/*
 	 * If the result is not -EDEADLOCK or the caller requested
@@ -1219,8 +1219,10 @@ static void rt_mutex_handle_deadlock(int res, int detect_deadlock,
 	 */
 	rt_mutex_print_deadlock(w);
 	while (1) {
+		raw_spin_unlock_irq(&lock->wait_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
+		raw_spin_lock_irq(&lock->wait_lock);
 	}
 }
 
@@ -1269,7 +1271,7 @@ rt_mutex_slowlock(struct rt_mutex *lock, int state,
 	if (unlikely(ret)) {
 		__set_current_state(TASK_RUNNING);
 		remove_waiter(lock, &waiter);
-		rt_mutex_handle_deadlock(ret, chwalk, &waiter);
+		rt_mutex_handle_deadlock(ret, chwalk, &waiter, lock);
 	}
 
 	/*
