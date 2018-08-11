@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright (c) 2018, Craig Tatlor. */
+
+&tlmm {
+	blsp1_uart1_default: blsp1_uart1_default {
+		pinmux {
+			pins = "gpio0", "gpio1", "gpio2", "gpio3";
+			function = "gpio";
+		};
+
+		pinconf {
+			pins = "gpio0", "gpio1", "gpio2", "gpio3";
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
+};
