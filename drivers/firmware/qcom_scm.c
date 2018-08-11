@@ -603,6 +603,9 @@ static const struct of_device_id qcom_scm_dt_match[] = {
 	{ .compatible = "qcom,scm-msm8996",
 	  .data = NULL, /* no clocks */
 	},
+	{ .compatible = "qcom,scm-sdm660",
+	  .data = NULL, /* no clocks */
+	},
 	{ .compatible = "qcom,scm-ipq4019",
 	  .data = NULL, /* no clocks */
 	},
