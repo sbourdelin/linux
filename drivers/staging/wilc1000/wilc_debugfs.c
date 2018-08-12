@@ -65,7 +65,7 @@ ssize_t wilc_debug_level_write(struct file *filp, const char __user *buf,
 int wilc_debugfs_init(const struct file_operations *fops)
 {
 	wilc_dir = debugfs_create_dir("wilc_wifi", NULL);
-	debugfs_create_file("wilc_debug_level", 0666, wilc_dir, NULL, fops);
+	debugfs_create_file("wilc_debug_level", 0600, wilc_dir, NULL, fops);
 
 	return 0;
 }
