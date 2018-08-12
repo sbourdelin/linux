@@ -1,0 +1,40 @@
+Atmel LCD Controller (LCDC) Display Controller
+
+Required properties:
+ - compatible: value should be one of the following:
+   "atmel,lcdc-display-controller"
+
+Optional properties:
+- lcd-supply: phandle to a regulator that supply the display
+
+Required children nodes:
+ One child node that references the panel connected.
+ (See ../graph.txt)
+ At least one port node is required.
+
+
+Example:
+	lcdc0: lcdc@700000 {
+		compatible = "atmel,at91sam9263-lcdc-mfd";
+		reg = <0x700000 0x1000>;
+		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
+		clocks = <&lcd_clk>, <&lcd_clk>;
+		clock-names = "lcdc_clk", "hclk";
+
+		lcdc-display-controller {
+			compatible = "atmel,lcdc-display-controller";
+			lcd-supply = <&lcdc_reg>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				lcdc_panel_output: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&panel_input>;
+				};
+			};
+		};
+	};
