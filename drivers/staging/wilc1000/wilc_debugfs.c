@@ -78,29 +78,21 @@ struct wilc_debugfs_info_t {
 	const struct file_operations fops;
 };
 
-static struct wilc_debugfs_info_t debugfs_info[] = {
-	{
-		"wilc_debug_level",
-		0666,
-		(DEBUG | ERR),
-		FOPS(NULL, wilc_debug_level_read, wilc_debug_level_write, NULL),
-	},
+static struct wilc_debugfs_info_t debugfs_info = {
+	"wilc_debug_level",
+	0666,
+	(DEBUG | ERR),
+	FOPS(NULL, wilc_debug_level_read, wilc_debug_level_write, NULL),
 };
 
 int wilc_debugfs_init(void)
 {
-	int i;
-	struct wilc_debugfs_info_t *info;
+	struct wilc_debugfs_info_t *info = &debugfs_info;
 
 	wilc_dir = debugfs_create_dir("wilc_wifi", NULL);
-	for (i = 0; i < ARRAY_SIZE(debugfs_info); i++) {
-		info = &debugfs_info[i];
-		debugfs_create_file(info->name,
-				    info->perm,
-				    wilc_dir,
-				    &info->data,
-				    &info->fops);
-	}
+	debugfs_create_file(info->name, info->perm, wilc_dir, &info->data,
+			    &info->fops);
+
 	return 0;
 }
 
