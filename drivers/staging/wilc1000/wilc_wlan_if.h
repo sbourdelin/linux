@@ -831,6 +831,11 @@ struct wilc;
 int wilc_wlan_init(struct net_device *dev);
 u32 wilc_get_chipid(struct wilc *wilc, bool update);
 
-int wilc_debugfs_init(void);
+int wilc_debugfs_init(const struct file_operations *fops);
 void wilc_debugfs_remove(void);
+ssize_t wilc_debug_level_read(struct file *file, char __user *userbuf,
+			      size_t count, loff_t *ppos);
+ssize_t wilc_debug_level_write(struct file *filp, const char __user *buf,
+			       size_t count, loff_t *ppos);
+
 #endif

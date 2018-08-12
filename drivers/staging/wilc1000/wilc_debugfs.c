@@ -20,8 +20,8 @@ static struct dentry *wilc_dir;
 #define DBG_LEVEL_ALL	(DEBUG | INFO | WRN | ERR)
 static atomic_t WILC_DEBUG_LEVEL = ATOMIC_INIT(ERR);
 
-static ssize_t wilc_debug_level_read(struct file *file, char __user *userbuf,
-				     size_t count, loff_t *ppos)
+ssize_t wilc_debug_level_read(struct file *file, char __user *userbuf,
+			      size_t count, loff_t *ppos)
 {
 	char buf[128];
 	int res = 0;
@@ -36,9 +36,8 @@ static ssize_t wilc_debug_level_read(struct file *file, char __user *userbuf,
 	return simple_read_from_buffer(userbuf, count, ppos, buf, res);
 }
 
-static ssize_t wilc_debug_level_write(struct file *filp,
-				      const char __user *buf, size_t count,
-				      loff_t *ppos)
+ssize_t wilc_debug_level_write(struct file *filp, const char __user *buf,
+			       size_t count, loff_t *ppos)
 {
 	int flag = 0;
 	int ret;
@@ -63,35 +62,25 @@ static ssize_t wilc_debug_level_write(struct file *filp,
 	return count;
 }
 
-#define FOPS(_open, _read, _write, _poll) { \
-		.owner	= THIS_MODULE, \
-		.open	= (_open), \
-		.read	= (_read), \
-		.write	= (_write), \
-		.poll		= (_poll), \
-}
-
 struct wilc_debugfs_info_t {
 	const char *name;
 	int perm;
 	unsigned int data;
-	const struct file_operations fops;
 };
 
 static struct wilc_debugfs_info_t debugfs_info = {
 	"wilc_debug_level",
 	0666,
 	(DEBUG | ERR),
-	FOPS(NULL, wilc_debug_level_read, wilc_debug_level_write, NULL),
 };
 
-int wilc_debugfs_init(void)
+int wilc_debugfs_init(const struct file_operations *fops)
 {
 	struct wilc_debugfs_info_t *info = &debugfs_info;
 
 	wilc_dir = debugfs_create_dir("wilc_wifi", NULL);
 	debugfs_create_file(info->name, info->perm, wilc_dir, &info->data,
-			    &info->fops);
+			    fops);
 
 	return 0;
 }

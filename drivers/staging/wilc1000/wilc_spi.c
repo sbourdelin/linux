@@ -102,6 +102,12 @@ static u8 crc7(u8 crc, const u8 *buffer, u32 len)
 
 #define USE_SPI_DMA				0
 
+static const struct file_operations spi_debug_fops = {
+	.owner		= THIS_MODULE,
+	.read		= wilc_debug_level_read,
+	.write		= wilc_debug_level_write,
+};
+
 static int wilc_bus_probe(struct spi_device *spi)
 {
 	int ret;
@@ -120,6 +126,7 @@ static int wilc_bus_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
+	wilc_debugfs_init(&spi_debug_fops);
 	spi_set_drvdata(spi, wilc);
 	wilc->dev = &spi->dev;
 	wilc->gpio_irq = gpio;

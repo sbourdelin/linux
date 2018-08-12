@@ -103,6 +103,12 @@ static int wilc_sdio_cmd53(struct wilc *wilc, struct sdio_cmd53 *cmd)
 	return ret;
 }
 
+static const struct file_operations sdio_debug_fops = {
+	.owner		= THIS_MODULE,
+	.read		= wilc_debug_level_read,
+	.write		= wilc_debug_level_write,
+};
+
 static int linux_sdio_probe(struct sdio_func *func,
 			    const struct sdio_device_id *id)
 {
@@ -126,6 +132,7 @@ static int linux_sdio_probe(struct sdio_func *func,
 		dev_err(&func->dev, "Couldn't initialize netdev\n");
 		return ret;
 	}
+	wilc_debugfs_init(&sdio_debug_fops);
 	sdio_set_drvdata(func, wilc);
 	wilc->dev = &func->dev;
 	wilc->gpio_irq = gpio;
