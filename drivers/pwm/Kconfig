@@ -62,6 +62,19 @@ config PWM_ATMEL_HLCDC_PWM
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-atmel-hlcdc.
 
+config PWM_ATMEL_LCDC_PWM
+	tristate "Atmel LCDC PWM support"
+	depends on MFD_ATMEL_LCDC
+	depends on HAVE_CLK
+	help
+	  Generic PWM framework driver for the PWM output of the LCDC
+	  (Atmel LCD Controller). This PWM output is mainly used
+	  to control the LCD backlight.
+	  The Atmel LCD Controller is found in the at91sam9x family.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-atmel-lcdc.
+
 config PWM_ATMEL_TCB
 	tristate "Atmel TC Block PWM support"
 	depends on ATMEL_TCLIB && OF
