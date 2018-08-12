@@ -153,6 +153,15 @@
 			status = "disabled";
 		};
 
+		sirq: interrupt-controller@e01b0000 {
+			compatible = "actions,owl-sirq";
+			reg = <0 0xe01b0000 0 0x1000>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			actions,sirq-shared-reg;
+			actions,sirq-offset = <0x200 0x200 0x200>;
+		};
+
 		sps: power-controller@e01b0100 {
 			compatible = "actions,s700-sps";
 			reg = <0x0 0xe01b0100 0x0 0x100>;
