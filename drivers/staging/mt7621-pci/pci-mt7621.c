@@ -406,8 +406,10 @@ static void mt7621_enable_phy(struct mt7621_pcie_port *port)
 	set_phy_for_ssc(port);
 }
 
-static void setup_cm_memory_region(struct resource *mem_resource)
+static void setup_cm_memory_region(struct mt7621_pcie *pcie)
 {
+	struct resource *mem_resource = &pcie->mem;
+	struct device *dev = pcie->dev;
 	resource_size_t mask;
 
 	if (mips_cps_numiocu(0)) {
@@ -420,7 +422,7 @@ static void setup_cm_memory_region(struct resource *mem_resource)
 
 		write_gcr_reg1_base(mem_resource->start);
 		write_gcr_reg1_mask(mask | CM_GCR_REGn_MASK_CMTGT_IOCU0);
-		printk("PCI coherence region base: 0x%08llx, mask/settings: 0x%08llx\n",
+		dev_info(dev, "PCI coherence region base: 0x%08llx, mask/settings: 0x%08llx\n",
 			(unsigned long long)read_gcr_reg1_base(),
 			(unsigned long long)read_gcr_reg1_mask());
 	}
@@ -780,7 +782,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 			   RT6855_PCIE0_OFFSET + RALINK_PCI_IMBASEBAR0_ADDR);
 		pcie_write(pcie, 0x06040001,
 			   RT6855_PCIE0_OFFSET + RALINK_PCI_CLASS);
-		printk("PCIE0 enabled\n");
+		dev_info(dev, "PCIE0 enabled\n");
 	}
 
 	//PCIe1
@@ -792,7 +794,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 			   RT6855_PCIE1_OFFSET + RALINK_PCI_IMBASEBAR0_ADDR);
 		pcie_write(pcie, 0x06040001,
 			   RT6855_PCIE1_OFFSET + RALINK_PCI_CLASS);
-		printk("PCIE1 enabled\n");
+		dev_info(dev, "PCIE1 enabled\n");
 	}
 
 	//PCIe2
@@ -804,7 +806,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 			   RT6855_PCIE2_OFFSET + RALINK_PCI_IMBASEBAR0_ADDR);
 		pcie_write(pcie, 0x06040001,
 			   RT6855_PCIE2_OFFSET + RALINK_PCI_CLASS);
-		printk("PCIE2 enabled\n");
+		dev_info(dev, "PCIE2 enabled\n");
 	}
 
 	switch (pcie_link_status) {
@@ -839,7 +841,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		return err;
 	}
 
-	setup_cm_memory_region(&pcie->mem);
+	setup_cm_memory_region(pcie);
 
 	err = mt7621_pcie_request_resources(pcie, &res);
 	if (err) {
