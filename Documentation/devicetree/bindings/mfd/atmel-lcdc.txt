@@ -1,0 +1,75 @@
+Device-Tree bindings for Atmel's LCDC (LCD Controller) MFD driver
+
+Required properties:
+ - compatible: value should be one of the following:
+   "atmel,at91sam9261-lcdc-mfd"
+   "atmel,at91sam9263-lcdc-mfd"
+   "atmel,at91sam9g10-lcdc-mfd"
+   "atmel,at91sam9g45-lcdc-mfd"
+   "atmel,at91sam9g46-lcdc-mfd"
+   "atmel,at91sam9m10-lcdc-mfd"
+   "atmel,at91sam9m11-lcdc-mfd"
+   "atmel,at91sam9rl-lcdc-mfd"
+ - reg: base address and size of the LCDC device registers.
+ - clock-names: the name of the 2 clocks requested by the LCDC device.
+   Should contain "lcdc_clk", and "hclk".
+ - clocks: should contain the 2 clocks requested by the LCDC device.
+	   May specify the same clock twice is there is no need to enable
+	   "hclk" to use the display.
+ - interrupts: should contain the description of the LCDC interrupt line
+
+The LCDC IP exposes two subdevices:
+ - a PWM chip: see ../pwm/atmel-lcdc-pwm.txt
+ - a Display Controller: see ../display/atmel/lcdc-display-controller.txt
+
+Example:
+	lcdc0: lcdc@700000 {
+		compatible = "atmel,at91sam9263-lcdc-mfd";
+		reg = <0x700000 0x1000>;
+		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
+		clocks = <&lcd_clk>, <&lcd_clk>;
+		clock-names = "lcdc_clk", "hclk";
+
+		lcdc-display-controller {
+			compatible = "atmel,lcdc-display-controller";
+			lcd-supply = <&lcdc_reg>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				lcdc_panel_output: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&panel_input>;
+				};
+			};
+		};
+
+		lcdc_pwm: lcdc-pwm {
+			compatible = "atmel,lcdc-pwm";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_lcdc_pwm>;
+			#pwm-cells = <3>;
+		};
+
+	};
+
+	panel: panel {
+		compatible = "logictechnologies,lttd800480070-l2rt", "simple-panel";
+		backlight = <&backlight>;
+		power-supply = <&panel_reg>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			panel_input: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&lcdc_panel_output>;
+			};
+		};
+	};
