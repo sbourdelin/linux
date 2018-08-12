@@ -560,7 +560,7 @@ static void mt7621_pcie_port_free(struct mt7621_pcie_port *port)
 	devm_kfree(dev, port);
 }
 
-static void mt7621_pcie_enable_port(struct mt7621_pcie_port *port)
+static void mt7621_pcie_init_port(struct mt7621_pcie_port *port)
 {
 	struct mt7621_pcie *pcie = port->pcie;
 	struct device *dev = pcie->dev;
@@ -674,7 +674,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	mdelay(100);
 
 	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
-		mt7621_pcie_enable_port(port);
+		mt7621_pcie_init_port(port);
 
 	rt_sysc_m32(0, RALINK_PCIE_RST, RALINK_RSTCTRL);
 	rt_sysc_m32(0x30, 2 << 4, SYSC_REG_SYSTEM_CONFIG1);
