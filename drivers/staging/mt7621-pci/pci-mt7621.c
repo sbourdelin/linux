@@ -592,6 +592,9 @@ static void mt7621_pcie_enable_port(struct mt7621_pcie_port *port)
 	}
 
 	mt7621_enable_phy(port);
+
+	val = read_config(pcie, slot, 0x70c);
+	dev_info(dev, "Port %d N_FTS = %x\n", (unsigned int)val, slot);
 }
 
 static int mt7621_pcie_request_resources(struct mt7621_pcie *pcie,
@@ -670,13 +673,8 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 
 	mdelay(100);
 
-	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-		u32 slot = port->slot;
-
+	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
 		mt7621_pcie_enable_port(port);
-		val = read_config(pcie, slot, 0x70c);
-		dev_info(dev, "Port %d N_FTS = %x\n", (unsigned int)val, slot);
-	}
 
 	rt_sysc_m32(0, RALINK_PCIE_RST, RALINK_RSTCTRL);
 	rt_sysc_m32(0x30, 2 << 4, SYSC_REG_SYSTEM_CONFIG1);
