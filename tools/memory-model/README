@@ -89,7 +89,7 @@ The corresponding output includes:
   Observation SB+fencembonceonces Never 0 2000000
   Time SB+fencembonceonces 0.16
 
-The "Positive: 0 Negative: 2000000" and the "Never 0 2000000" indicate
+The "Positive: 0, Negative: 2000000" and the "Never 0 2000000" indicate
 that during two million trials, the state specified in this litmus
 test's "exists" clause was not reached.
 
