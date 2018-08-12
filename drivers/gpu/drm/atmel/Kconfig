@@ -1,6 +1,12 @@
+config DRM_ATMEL
+	bool
+	help
+	  Enable Atmel DRM support
+
 config DRM_ATMEL_HLCDC
 	tristate "DRM Support for ATMEL HLCDC Display Controller"
 	depends on DRM && OF && COMMON_CLK && MFD_ATMEL_HLCDC && ARM
+	select DRM_ATMEL
 	select DRM_GEM_CMA_HELPER
 	select DRM_KMS_HELPER
 	select DRM_KMS_CMA_HELPER

@@ -4677,7 +4677,7 @@ DRM DRIVERS FOR ATMEL HLCDC
 M:	Boris Brezillon <boris.brezillon@bootlin.com>
 L:	dri-devel@lists.freedesktop.org
 S:	Supported
-F:	drivers/gpu/drm/atmel-hlcdc/
+F:	drivers/gpu/drm/atmel/atmel-hlcdc*
 F:	Documentation/devicetree/bindings/display/atmel/
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 
