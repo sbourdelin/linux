@@ -4681,6 +4681,13 @@ F:	drivers/gpu/drm/atmel/atmel-hlcdc*
 F:	Documentation/devicetree/bindings/display/atmel/
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 
+DRM DRIVERS FOR ATMEL LCDC
+M:	Sam Ravnborg <sam@ravnborg.org>
+L:	dri-devel@lists.freedesktop.org
+S:	Maintained
+F:	drivers/gpu/drm/atmel/atmel-lcdc*
+F:	Documentation/devicetree/bindings/display/atmel/
+
 DRM DRIVERS FOR BRIDGE CHIPS
 M:	Archit Taneja <architt@codeaurora.org>
 M:	Andrzej Hajda <a.hajda@samsung.com>

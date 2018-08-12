@@ -14,3 +14,15 @@ config DRM_ATMEL_HLCDC
 	help
 	  Choose this option if you have an ATMEL SoC with an HLCDC display
 	  controller (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family).
+
+config DRM_ATMEL_LCDC
+	tristate "DRM Support for ATMEL LCDC Display Controller"
+	depends on DRM && OF && COMMON_CLK && MFD_ATMEL_LCDC && ARM
+	select DRM_ATMEL
+	select DRM_GEM_CMA_HELPER
+	select DRM_KMS_HELPER
+	select DRM_KMS_CMA_HELPER
+	select DRM_PANEL
+	help
+	  Choose this option if you have an ATMEL SoC with an LCDC display
+	  controller (only at91sam9263 or at91sam9rl).
