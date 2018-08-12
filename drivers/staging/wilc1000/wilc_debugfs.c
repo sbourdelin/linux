@@ -62,25 +62,10 @@ ssize_t wilc_debug_level_write(struct file *filp, const char __user *buf,
 	return count;
 }
 
-struct wilc_debugfs_info_t {
-	const char *name;
-	int perm;
-	unsigned int data;
-};
-
-static struct wilc_debugfs_info_t debugfs_info = {
-	"wilc_debug_level",
-	0666,
-	(DEBUG | ERR),
-};
-
 int wilc_debugfs_init(const struct file_operations *fops)
 {
-	struct wilc_debugfs_info_t *info = &debugfs_info;
-
 	wilc_dir = debugfs_create_dir("wilc_wifi", NULL);
-	debugfs_create_file(info->name, info->perm, wilc_dir, &info->data,
-			    fops);
+	debugfs_create_file("wilc_debug_level", 0666, wilc_dir, NULL, fops);
 
 	return 0;
 }
