@@ -26,6 +26,7 @@
 #include <linux/usb.h>
 #include <linux/usb/quirks.h>
 #include <linux/firmware.h>
+#include <linux/iopoll.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/suspend.h>
@@ -36,6 +37,7 @@
 
 #include "btintel.h"
 #include "btbcm.h"
+#include "btmtk.h"
 #include "btrtl.h"
 
 #define VERSION "0.8"
@@ -69,6 +71,7 @@ static struct usb_driver btusb_driver;
 #define BTUSB_BCM2045		0x40000
 #define BTUSB_IFNUM_2		0x80000
 #define BTUSB_CW6622		0x100000
+#define BTUSB_MEDIATEK		0x200000
 
 static const struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -355,6 +358,10 @@ static const struct usb_device_id blacklist_table[] = {
 	/* Realtek Bluetooth devices */
 	{ USB_VENDOR_AND_INTERFACE_INFO(0x0bda, 0xe0, 0x01, 0x01),
 	  .driver_info = BTUSB_REALTEK },
+
+	/* MediaTek Bluetooth devices */
+	{ USB_VENDOR_AND_INTERFACE_INFO(0x0e8d, 0xe0, 0x01, 0x01),
+	  .driver_info = BTUSB_MEDIATEK },
 
 	/* Additional Realtek 8723AE Bluetooth devices */
 	{ USB_DEVICE(0x0930, 0x021d), .driver_info = BTUSB_REALTEK },
@@ -2367,6 +2374,164 @@ static int btusb_shutdown_intel(struct hci_dev *hdev)
 	return 0;
 }
 
+#ifdef CONFIG_BT_HCIBTUSB_MTK
+
+struct btusb_mtk_poll {
+	struct btusb_data *udata;
+	void *buf;
+	size_t len;
+	size_t actual_len;
+};
+
+struct btusb_mtk_wmt_poll {
+	struct btusb_data *udata;
+	struct work_struct work;
+};
+
+static int btusb_mtk_reg_read(struct btusb_data *data, u32 reg, u32 *val)
+{
+	int pipe, err, size = sizeof(u32);
+	void *buf;
+
+	buf = kzalloc(size, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	pipe = usb_rcvctrlpipe(data->udev, 0);
+	err = usb_control_msg(data->udev, pipe, 0x63,
+			      USB_TYPE_VENDOR | USB_DIR_IN,
+			      reg >> 16, reg & 0xffff,
+			      buf, size, USB_CTRL_SET_TIMEOUT);
+	if (err < 0)
+		goto err_free_buf;
+
+	*val = get_unaligned_le32(buf);
+
+err_free_buf:
+	kfree(buf);
+
+	return err;
+}
+
+static int btusb_mtk_id_get(struct btusb_data *data, u32 *id)
+{
+	return btusb_mtk_reg_read(data, 0x80000008, id);
+}
+
+static int btusb_mtk_wmt_event_poll(struct btusb_mtk_poll *p)
+{
+	int pipe, actual_len;
+
+	pipe = usb_rcvctrlpipe(p->udata->udev, 0);
+
+	actual_len = usb_control_msg(p->udata->udev, pipe, 1,
+				     USB_TYPE_VENDOR | USB_DIR_IN, 0x30, 0,
+				     p->buf, p->len, USB_CTRL_SET_TIMEOUT);
+
+	p->actual_len = actual_len;
+
+	return actual_len;
+}
+
+static void btusb_mtk_wmt_event_polls(struct work_struct *work)
+{
+	struct btusb_mtk_wmt_poll *wmt_event_polling;
+	struct btusb_mtk_poll p;
+	int polled_dlen, err;
+	const int len = 64;
+	void *buf;
+	char *evt;
+
+	wmt_event_polling = container_of(work, typeof(*wmt_event_polling),
+					 work);
+	buf = kzalloc(len, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	p.udata = wmt_event_polling->udata;
+	p.buf = buf;
+	p.len = len;
+	p.actual_len = 0;
+
+	/* Polling WMT event via control endpoint until the event returns or
+	 * the timeout happens.
+	 */
+	err = readx_poll_timeout(btusb_mtk_wmt_event_poll, &p, polled_dlen,
+				 polled_dlen > 0, 200, 1000000);
+	if (err < 0)
+		goto err_free_buf;
+
+	evt = p.buf;
+
+	/* Fix up the vendor event id with 0xff for vendor specific instead
+	 * of 0xe4 so that event send via monitoring socket can be parsed
+	 * properly.
+	 */
+	if (*evt == 0xe4)
+		*evt = 0xff;
+
+	/* The WMT event is actually a HCI event so that the WMT event should go
+	 * to the code flow a HCI event should go to.
+	 */
+	btusb_recv_intr(p.udata, p.buf, p.actual_len);
+
+err_free_buf:
+	kfree(buf);
+}
+
+static int btusb_mtk_hci_wmt_sync(struct hci_dev *hdev,
+				  struct btmtk_hci_wmt_params *wmt_params)
+{
+	struct btusb_mtk_wmt_poll wmt_event_polling;
+	int err;
+
+	/* MediaTek WMT HCI vendor event is coming through the control endpoint,
+	 * not through the interrupt endpoint so that we have to schedule a
+	 * work to poll the event.
+	 */
+	INIT_WORK_ONSTACK(&wmt_event_polling.work, btusb_mtk_wmt_event_polls);
+	wmt_event_polling.udata = hci_get_drvdata(hdev);
+	schedule_work(&wmt_event_polling.work);
+
+	err = btmtk_hci_wmt_sync(hdev, wmt_params);
+
+	cancel_work_sync(&wmt_event_polling.work);
+
+	return err;
+}
+
+static int btusb_mtk_setup(struct hci_dev *hdev)
+{
+	struct btusb_data *data = hci_get_drvdata(hdev);
+	const char *fwname;
+	int err = 0;
+	u32 dev_id;
+
+	err = btusb_mtk_id_get(data, &dev_id);
+	if (err < 0) {
+		bt_dev_err(hdev, "Failed to get device id (%d)", err);
+		return err;
+	}
+
+	switch (dev_id) {
+	case 0x7668:
+		fwname = FIRMWARE_MT7668;
+		break;
+	default:
+		bt_dev_err(hdev, "Unsupported support hardware variant (%08x)",
+			   dev_id);
+		return -ENODEV;
+	}
+
+	return btmtk_enable(hdev, fwname, btusb_mtk_hci_wmt_sync);
+}
+
+static int btusb_mtk_shutdown(struct hci_dev *hdev)
+{
+	return btmtk_disable(hdev, btusb_mtk_hci_wmt_sync);
+}
+#endif
+
 #ifdef CONFIG_PM
 /* Configure an out-of-band gpio as wake-up pin, if specified in device tree */
 static int marvell_config_oob_wake(struct hci_dev *hdev)
@@ -3053,6 +3218,15 @@ static int btusb_probe(struct usb_interface *intf,
 
 	if (id->driver_info & BTUSB_MARVELL)
 		hdev->set_bdaddr = btusb_set_bdaddr_marvell;
+
+#ifdef CONFIG_BT_HCIBTUSB_MTK
+	if (id->driver_info & BTUSB_MEDIATEK) {
+		hdev->setup = btusb_mtk_setup;
+		hdev->shutdown = btusb_mtk_shutdown;
+		hdev->manufacturer = 70;
+		set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
+	}
+#endif
 
 	if (id->driver_info & BTUSB_SWAVE) {
 		set_bit(HCI_QUIRK_FIXUP_INQUIRY_MODE, &hdev->quirks);
