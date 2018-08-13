@@ -60,6 +60,9 @@ static const struct snd_kcontrol_new adau17x1_controls[] = {
 	SOC_ENUM("Mic Bias Mode", adau17x1_mic_bias_mode_enum),
 };
 
+static int adau17x1_setup_firmware(struct snd_soc_component *component,
+	unsigned int rate);
+
 static int adau17x1_pll_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -313,7 +316,7 @@ static const struct snd_soc_dapm_route adau17x1_no_dsp_dapm_routes[] = {
 	{ "Capture", NULL, "Right Decimator" },
 };
 
-bool adau17x1_has_dsp(struct adau *adau)
+static bool adau17x1_has_dsp(struct adau *adau)
 {
 	switch (adau->type) {
 	case ADAU1761:
@@ -324,7 +327,6 @@ bool adau17x1_has_dsp(struct adau *adau)
 		return false;
 	}
 }
-EXPORT_SYMBOL_GPL(adau17x1_has_dsp);
 
 static int adau17x1_set_dai_pll(struct snd_soc_dai *dai, int pll_id,
 	int source, unsigned int freq_in, unsigned int freq_out)
@@ -836,7 +838,7 @@ bool adau17x1_volatile_register(struct device *dev, unsigned int reg)
 }
 EXPORT_SYMBOL_GPL(adau17x1_volatile_register);
 
-int adau17x1_setup_firmware(struct snd_soc_component *component,
+static int adau17x1_setup_firmware(struct snd_soc_component *component,
 	unsigned int rate)
 {
 	int ret;
@@ -880,7 +882,6 @@ err:
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(adau17x1_setup_firmware);
 
 int adau17x1_add_widgets(struct snd_soc_component *component)
 {
