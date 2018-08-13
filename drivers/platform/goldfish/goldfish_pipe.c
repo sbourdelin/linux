@@ -384,6 +384,7 @@ static ssize_t goldfish_pipe_read_write(struct file *filp,
 	int count = 0, ret = -EINVAL;
 	unsigned long address, address_end, last_page;
 	unsigned int last_page_size;
+	struct device *pdev_dev;
 
 	/* If the emulator already closed the pipe, no need to go further */
 	if (unlikely(test_bit(BIT_CLOSED_ON_HOST, &pipe->flags)))
@@ -400,6 +401,8 @@ static ssize_t goldfish_pipe_read_write(struct file *filp,
 	address_end = address + bufflen;
 	last_page = (address_end - 1) & PAGE_MASK;
 	last_page_size = ((address_end - 1) & ~PAGE_MASK) + 1;
+
+	pdev_dev = pipe->dev->pdev_dev;
 
 	while (address < address_end) {
 		s32 consumed_size;
@@ -433,7 +436,8 @@ static ssize_t goldfish_pipe_read_write(struct file *filp,
 			 * err.
 			 */
 			if (status != PIPE_ERROR_AGAIN)
-				pr_info_ratelimited("goldfish_pipe: backend error %d on %s\n",
+				dev_err_ratelimited(pdev_dev,
+					"goldfish_pipe: backend error %d on %s\n",
 					status, is_write ? "write" : "read");
 			break;
 		}
