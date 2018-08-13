@@ -173,7 +173,8 @@ int v4l2_device_register_subdev(struct v4l2_device *v4l2_dev,
 	sd->owner_v4l2_dev = v4l2_dev->dev && v4l2_dev->dev->driver &&
 		sd->owner == v4l2_dev->dev->driver->owner;
 
-	if (!sd->owner_v4l2_dev && !try_module_get(sd->owner))
+	if (!sd->owner_v4l2_dev &&
+		!try_module_get(v4l2_dev->dev->driver->owner))
 		return -ENODEV;
 
 	sd->v4l2_dev = v4l2_dev;
@@ -209,7 +210,7 @@ error_unregister:
 #endif
 error_module:
 	if (!sd->owner_v4l2_dev)
-		module_put(sd->owner);
+		module_put(v4l2_dev->dev->driver->owner);
 	sd->v4l2_dev = NULL;
 	return err;
 }
@@ -318,6 +319,6 @@ void v4l2_device_unregister_subdev(struct v4l2_subdev *sd)
 #endif
 	video_unregister_device(sd->devnode);
 	if (!sd->owner_v4l2_dev)
-		module_put(sd->owner);
+		module_put(v4l2_dev->dev->driver->owner);
 }
 EXPORT_SYMBOL_GPL(v4l2_device_unregister_subdev);
