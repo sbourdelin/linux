@@ -301,7 +301,7 @@ static inline __u8 *uac_mixer_unit_bmControls(struct uac_mixer_unit_descriptor *
 	case UAC_VERSION_3:
 		return &desc->baSourceID[desc->bNrInPins + 2];
 	default:
-		return NULL;
+		return 0;
 	}
 }
 
