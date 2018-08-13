@@ -4639,6 +4639,12 @@ bool netdev_is_rx_handler_busy(struct net_device *dev)
 }
 EXPORT_SYMBOL_GPL(netdev_is_rx_handler_busy);
 
+static bool netdev_is_rx_xdp_handler_busy(struct net_device *dev)
+{
+	ASSERT_RTNL();
+	return dev && rtnl_dereference(dev->rx_xdp_handler);
+}
+
 /**
  *	netdev_rx_handler_register - register receive handler
  *	@dev: device to register a handler for
@@ -4671,6 +4677,22 @@ int netdev_rx_handler_register(struct net_device *dev,
 }
 EXPORT_SYMBOL_GPL(netdev_rx_handler_register);
 
+int netdev_rx_xdp_handler_register(struct net_device *dev,
+				   rx_xdp_handler_func_t *rx_xdp_handler)
+{
+	if (netdev_is_rx_xdp_handler_busy(dev))
+		return -EBUSY;
+
+	if (dev->priv_flags & IFF_NO_RX_HANDLER)
+		return -EINVAL;
+
+	rcu_assign_pointer(dev->rx_xdp_handler, rx_xdp_handler);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(netdev_rx_xdp_handler_register);
+
+
 /**
  *	netdev_rx_handler_unregister - unregister receive handler
  *	@dev: device to unregister a handler from
@@ -4692,6 +4714,13 @@ void netdev_rx_handler_unregister(struct net_device *dev)
 	RCU_INIT_POINTER(dev->rx_handler_data, NULL);
 }
 EXPORT_SYMBOL_GPL(netdev_rx_handler_unregister);
+
+void netdev_rx_xdp_handler_unregister(struct net_device *dev)
+{
+	ASSERT_RTNL();
+	RCU_INIT_POINTER(dev->rx_xdp_handler, NULL);
+}
+EXPORT_SYMBOL_GPL(netdev_rx_xdp_handler_unregister);
 
 /*
  * Limit the use of PFMEMALLOC reserves to those protocols that implement
