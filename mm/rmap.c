@@ -1409,6 +1409,27 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		subpage = page - page_to_pfn(page) + pte_pfn(*pvmw.pte);
 		address = pvmw.address;
 
+		/*
+		 * PMDs for hugetlbfs pages could be shared.  In this case,
+		 * pages with shared PMDs will have a mapcount of 1 no matter
+		 * how many times it is actually mapped.  Map counting for
+		 * PMD sharing is mostly done via the reference count on the
+		 * PMD page itself.  If the page we are trying to unmap is a
+		 * hugetlbfs page, attempt to 'unshare' at the PMD level.
+		 * huge_pmd_unshare takes care of clearing the PUD and
+		 * reference counting on the PMD page which effectively unmaps
+		 * the page.  Take care of flushing cache and TLB for page in
+		 * this specific mapping here.
+		 */
+		if (PageHuge(page) &&
+		    huge_pmd_unshare(mm, &address, pvmw.pte)) {
+			unsigned long end_add = address + vma_mmu_pagesize(vma);
+
+			flush_cache_range(vma, address, end_add);
+			flush_tlb_range(vma, address, end_add);
+			mmu_notifier_invalidate_range(mm, address, end_add);
+			continue;
+		}
 
 		if (IS_ENABLED(CONFIG_MIGRATION) &&
 		    (flags & TTU_MIGRATION) &&
