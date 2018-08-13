@@ -26,6 +26,10 @@
 #include "adau17x1.h"
 #include "adau-utils.h"
 
+#define ADAU17X1_SAFELOAD_TARGET_ADDRESS 0x0006
+#define ADAU17X1_SAFELOAD_TRIGGER 0x0007
+#define ADAU17X1_SAFELOAD_DATA(i) (0x0001 + (i))
+
 static const char * const adau17x1_capture_mixer_boost_text[] = {
 	"Normal operation", "Boost Level 1", "Boost Level 2", "Boost Level 3",
 };
@@ -321,6 +325,17 @@ static bool adau17x1_has_dsp(struct adau *adau)
 	switch (adau->type) {
 	case ADAU1761:
 	case ADAU1381:
+	case ADAU1781:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool adau17x1_has_safeload(struct adau *adau)
+{
+	switch (adau->type) {
+	case ADAU1761:
 	case ADAU1781:
 		return true;
 	default:
@@ -958,6 +973,50 @@ int adau17x1_resume(struct snd_soc_component *component)
 }
 EXPORT_SYMBOL_GPL(adau17x1_resume);
 
+static int adau17x1_safeload(struct sigmadsp *sigmadsp, unsigned int addr,
+	const uint8_t bytes[], size_t len)
+{
+	uint8_t buf[4];
+	unsigned int i;
+	int ret;
+
+	/* target address is offset by 1 */
+	unsigned int addr_offset = addr - 1;
+
+	/* write safeload addresses */
+	for (i = 0; i < len / 4; i++) {
+		memcpy(buf, bytes + i * 4, 4);
+		ret = regmap_raw_write(sigmadsp->control_data,
+			ADAU17X1_SAFELOAD_DATA(i), buf, 4);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* write target address */
+	buf[0] = (addr_offset >> 24) & 0xff;
+	buf[1] = (addr_offset >> 16) & 0xff;
+	buf[2] = (addr_offset >> 8) & 0xff;
+	buf[3] = (addr_offset) & 0xff;
+	ret = regmap_raw_write(sigmadsp->control_data,
+		ADAU17X1_SAFELOAD_TARGET_ADDRESS, buf, 4);
+	if (ret < 0)
+		return ret;
+
+	/* write nbr of words to trigger address */
+	buf[0] = 0x00;
+	buf[1] = 0x00;
+	buf[2] = 0x00;
+	buf[3] = i & 0xff;
+	ret = regmap_raw_write(sigmadsp->control_data,
+		ADAU17X1_SAFELOAD_TRIGGER, buf, 4);
+
+	return ret;
+}
+
+static const struct sigmadsp_ops adau17x1_sigmadsp_ops = {
+	.safeload = adau17x1_safeload,
+};
+
 int adau17x1_probe(struct device *dev, struct regmap *regmap,
 	enum adau17x1_type type, void (*switch_mode)(struct device *dev),
 	const char *firmware_name)
@@ -1003,8 +1062,13 @@ int adau17x1_probe(struct device *dev, struct regmap *regmap,
 	dev_set_drvdata(dev, adau);
 
 	if (firmware_name) {
-		adau->sigmadsp = devm_sigmadsp_init_regmap(dev, regmap, NULL,
-			firmware_name);
+		if (adau17x1_has_safeload(adau)) {
+			adau->sigmadsp = devm_sigmadsp_init_regmap(dev, regmap,
+				&adau17x1_sigmadsp_ops, firmware_name);
+		} else {
+			adau->sigmadsp = devm_sigmadsp_init_regmap(dev, regmap,
+				NULL, firmware_name);
+		}
 		if (IS_ERR(adau->sigmadsp)) {
 			dev_warn(dev, "Could not find firmware file: %ld\n",
 				PTR_ERR(adau->sigmadsp));
