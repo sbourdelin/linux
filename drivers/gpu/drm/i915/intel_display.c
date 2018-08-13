@@ -12613,6 +12613,9 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 			 */
 			intel_crtc_disable_pipe_crc(intel_crtc);
 
+			/* Wait a vblank for planes to actually be turned off */
+			intel_wait_for_vblank(dev_priv, intel_crtc->pipe);
+
 			dev_priv->display.crtc_disable(to_intel_crtc_state(old_crtc_state), state);
 			intel_crtc->active = false;
 			intel_fbc_disable(intel_crtc);
