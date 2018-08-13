@@ -154,6 +154,11 @@ static inline unsigned int cpumask_next_and(int n,
 	return n+1;
 }
 
+static inline int cpumask_next_wrap(int n, const struct cpumask *mask, int start, bool wrap)
+{
+	return n;
+}
+
 /* cpu must be a valid cpu, ie 0, so there's no other choice. */
 static inline unsigned int cpumask_any_but(const struct cpumask *mask,
 					   unsigned int cpu)
