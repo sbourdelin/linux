@@ -4345,6 +4345,17 @@ static void mem_cgroup_css_reset(struct cgroup_subsys_state *css)
 	memcg_wb_domain_size_changed(memcg);
 }
 
+static void mem_cgroup_css_dump(struct cgroup_subsys_state *css,
+				struct seq_file *m)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	seq_printf(m, "mem_id=%u memory=%lu swap=%lu",
+		   mem_cgroup_id(memcg),
+		   page_counter_read(&memcg->memory),
+		   page_counter_read(&memcg->swap));
+}
+
 #ifdef CONFIG_MMU
 /* Handlers for move charge at task migration. */
 static int mem_cgroup_do_precharge(unsigned long count)
@@ -5386,6 +5397,7 @@ struct cgroup_subsys memory_cgrp_subsys = {
 	.css_released = mem_cgroup_css_released,
 	.css_free = mem_cgroup_css_free,
 	.css_reset = mem_cgroup_css_reset,
+	.css_dump = mem_cgroup_css_dump,
 	.can_attach = mem_cgroup_can_attach,
 	.cancel_attach = mem_cgroup_cancel_attach,
 	.post_attach = mem_cgroup_move_task,
