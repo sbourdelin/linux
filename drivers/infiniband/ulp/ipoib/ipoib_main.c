@@ -2252,7 +2252,6 @@ static struct net_device *ipoib_add_port(const char *format,
 	}
 
 	SET_NETDEV_DEV(priv->dev, hca->dev.parent);
-	priv->dev->dev_id = port - 1;
 	priv->dev->dev_port = port - 1;
 
 	result = ib_query_port(hca, port, &attr);
