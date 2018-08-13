@@ -1038,7 +1038,6 @@ void wilc_netdev_cleanup(struct wilc *wilc)
 	}
 
 	kfree(wilc);
-	wilc_debugfs_remove();
 }
 
 static const struct net_device_ops wilc_netdev_ops = {
@@ -1062,7 +1061,6 @@ int wilc_netdev_init(struct wilc **wilc, struct device *dev, int io_type,
 	if (!wl)
 		return -ENOMEM;
 
-	wilc_debugfs_init();
 	*wilc = wl;
 	wl->io_type = io_type;
 	wl->hif_func = ops;
