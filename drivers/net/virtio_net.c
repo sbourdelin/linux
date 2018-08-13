@@ -778,6 +778,7 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(rq->xdp_prog);
 	if (xdp_prog) {
+		rx_xdp_handler_result_t ret;
 		struct xdp_frame *xdpf;
 		struct page *xdp_page;
 		struct xdp_buff xdp;
@@ -826,6 +827,15 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 
 		switch (act) {
 		case XDP_PASS:
+			ret = xdp_do_pass(&xdp);
+			if (ret == RX_XDP_HANDLER_DROP)
+				goto drop;
+			if (ret != RX_XDP_HANDLER_FALLBACK) {
+				if (unlikely(xdp_page != page))
+					put_page(page);
+				rcu_read_unlock();
+				goto xdp_xmit;
+			}
 			/* recalculate offset to account for any header
 			 * adjustments. Note other cases do not build an
 			 * skb and avoid using offset
@@ -882,6 +892,7 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 		case XDP_ABORTED:
 			trace_xdp_exception(vi->dev, xdp_prog, act);
 			/* fall through */
+drop:
 		case XDP_DROP:
 			if (unlikely(xdp_page != page))
 				__free_pages(xdp_page, 0);
