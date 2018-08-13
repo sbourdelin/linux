@@ -242,10 +242,24 @@ setup_regex()
 	done
 }
 
+changed_files=
+filter_changed_files()
+{
+	if [ -z "$changed_files" ]; then
+		xargs echo
+	fi
+
+	while read data; do
+		if [[ $changed_files = *"$data"* ]]; then
+			printf "%s\n" "$data"
+		fi
+	done
+}
+
 exuberant()
 {
 	setup_regex exuberant asm c
-	all_target_sources | xargs $1 -a                        \
+	all_target_sources | filter_changed_files | xargs $1 -a	\
 	-I __initdata,__exitdata,__initconst,__ro_after_init	\
 	-I __initdata_memblock					\
 	-I __refdata,__attribute,__maybe_unused,__always_unused \
@@ -259,11 +273,11 @@ exuberant()
 	-I DEFINE_TRACE,EXPORT_TRACEPOINT_SYMBOL,EXPORT_TRACEPOINT_SYMBOL_GPL \
 	-I static,const						\
 	--extra=+fq --c-kinds=+px --fields=+iaS --langmap=c:+.h \
-	"${regex[@]}"
+	"." "${regex[@]}"
 
 	setup_regex exuberant kconfig
-	all_kconfigs | xargs $1 -a                              \
-	--langdef=kconfig --language-force=kconfig "${regex[@]}"
+	all_kconfigs | filter_changed_files | xargs $1 -a	\
+	--langdef=kconfig --language-force=kconfig "." "${regex[@]}"
 
 }
 
@@ -283,7 +297,7 @@ xtags()
 	elif $1 --version 2>&1 | grep -iq emacs; then
 		emacs $1
 	else
-		all_target_sources | xargs $1 -a
+		all_target_sources | filter_changed_files | xargs $1 -a "."
 	fi
 }
 
@@ -328,6 +342,23 @@ elif [ "${SRCARCH}" = "arm" -a "${SUBARCH}" != "" ]; then
 	done
 fi
 
+update_head_commit_tag()
+{
+	head_commit=`git log -1 --oneline --no-abbrev-commit HEAD |  awk '{print $1}'`
+	if [ "x$head_commit" == "x" -o "$head_commit" == "$2" ]; then
+		return
+	fi
+
+	if [ "$3" -eq "1" ]; then
+		# Replace tag hash in the place (fast path)
+		sed -i -r "1,10s/\!_TAG_GIT_HEAD_COMMIT\t(\w)+/\!_TAG_GIT_HEAD_COMMIT\t${head_commit}/" tags
+	else
+		# Create empty tag file if it's needed
+		test -f tags || $1 .
+		echo -e '!_TAG_GIT_HEAD_COMMIT\t'"${head_commit}" | sort -o tags -m - tags
+	fi
+}
+
 remove_structs=
 case "$1" in
 	"cscope")
@@ -339,9 +370,39 @@ case "$1" in
 		;;
 
 	"tags")
-		rm -f tags
-		xtags ctags
-		remove_structs=y
+		prev_head_commit=`head -10 tags 2>/dev/null | grep "\!_TAG_GIT_HEAD_COMMIT" | awk '{print $2}'`
+		[ -z "$prev_head_commit" ] ; has_prev_head_commit=$?
+
+		if [ -n "$prev_head_commit" ]; then
+			git show -1 --oneline --no-abbrev-commit $prev_head_commit > /dev/null 2>&1 || prev_head_commit=""
+		fi
+		if [ -z "$prev_head_commit" ]; then
+			test -f tags && echo "Removing stale tags file"
+			rm -f tags
+		else
+			echo "Updating existing tags file"
+			changed_files=`git diff --name-status $prev_head_commit..HEAD | sed -e 's/^\w*\t*//g; s/\t/\ /g' | sort | uniq`
+		fi
+
+		# Write current HEAD tag firstly as it's on top of tag file
+		update_head_commit_tag ctags "$prev_head_commit" $has_prev_head_commit
+
+		if [ "x$prev_head_commit" != "x" -a "x$changed_files" == "x" ]; then
+			echo "Nothing changed: $prev_head_commit..HEAD"
+		else
+			# Remove tags related to changed files
+			max_arg=`getconf ARG_MAX`
+			max_arg_strlen=$((`getconf PAGE_SIZE` * 32)) #MAX_ARG_STRLEN
+			max_arg=$(($(($max_arg<$max_arg_strlen?$max_arg:$max_arg_strlen)) - 50))
+			for files in `echo $changed_files | sed 's/\//\\\\\//g; s/\./\\\\\./g' | \
+				fold -s -w $max_arg | sed 's/\ $//g; s/\ /\|/g;'`;
+			do
+				sed -i -r "/^([a-zA-Z0-9_:.\,]|\-)+\t($files)\t.*/d" tags
+			done
+			xtags ctags
+			remove_structs=y
+		fi
+
 		;;
 
 	"TAGS")
