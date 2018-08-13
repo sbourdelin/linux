@@ -173,6 +173,7 @@ static pid_t		opt_pid;	/* process to walk */
 const char		*opt_file;	/* file or directory path */
 static uint64_t		opt_cgroup;	/* cgroup inode */
 static int		opt_list_cgroup;/* list page cgroup */
+static int		opt_real_cgroup;/* real offline cgroup */
 static const char	*opt_kpageflags;/* kpageflags file to parse */
 
 #define MAX_ADDR_RANGES	1024
@@ -789,6 +790,7 @@ static void usage(void)
 "            -l|--list                  Show page details in ranges\n"
 "            -L|--list-each             Show page details one by one\n"
 "            -C|--list-cgroup           Show cgroup inode for pages\n"
+"            -R|--real-cgroup           Show real offline cgroups\n"
 "            -N|--no-summary            Don't show summary info\n"
 "            -X|--hwpoison              hwpoison pages\n"
 "            -x|--unpoison              unpoison pages\n"
@@ -1193,6 +1195,7 @@ static const struct option opts[] = {
 	{ "list"      , 0, NULL, 'l' },
 	{ "list-each" , 0, NULL, 'L' },
 	{ "list-cgroup", 0, NULL, 'C' },
+	{ "real-cgroup", 0, NULL, 'R' },
 	{ "no-summary", 0, NULL, 'N' },
 	{ "hwpoison"  , 0, NULL, 'X' },
 	{ "unpoison"  , 0, NULL, 'x' },
@@ -1208,7 +1211,7 @@ int main(int argc, char *argv[])
 	page_size = getpagesize();
 
 	while ((c = getopt_long(argc, argv,
-				"rp:f:a:b:d:c:ClLNXxF:h", opts, NULL)) != -1) {
+				"rp:f:a:b:d:c:CRlLNXxF:h", opts, NULL)) != -1) {
 		switch (c) {
 		case 'r':
 			opt_raw = 1;
@@ -1230,6 +1233,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'C':
 			opt_list_cgroup = 1;
+			break;
+		case 'R':
+			opt_real_cgroup = 1;
 			break;
 		case 'd':
 			describe_flags(optarg);
@@ -1266,7 +1272,15 @@ int main(int argc, char *argv[])
 	if (!opt_kpageflags)
 		opt_kpageflags = PROC_KPAGEFLAGS;
 
-	if (opt_cgroup || opt_list_cgroup)
+	if (opt_real_cgroup) {
+		uint64_t flags = 1;
+
+		kpagecgroup_fd = checked_open(PROC_KPAGECGROUP, O_RDWR);
+		if (write(kpagecgroup_fd, &flags, sizeof(flags)) < 0) {
+			perror(PROC_KPAGECGROUP);
+			exit(EXIT_FAILURE);
+		}
+	} else if (opt_cgroup || opt_list_cgroup)
 		kpagecgroup_fd = checked_open(PROC_KPAGECGROUP, O_RDONLY);
 
 	if (opt_list && opt_pid)
