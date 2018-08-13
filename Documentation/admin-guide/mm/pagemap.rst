@@ -80,6 +80,9 @@ There are four components to pagemap:
    memory cgroup each page is charged to, indexed by PFN. Only available when
    CONFIG_MEMCG is set.
 
+   For offline (removed) cgroup this returnes inode number of closest online
+   ancestor. Write 64-bit flag 1 into opened file for getting real owners.
+
 Short descriptions to the page flags
 ====================================
 

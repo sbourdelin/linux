@@ -248,6 +248,7 @@ static const struct file_operations proc_kpageflags_operations = {
 static ssize_t kpagecgroup_read(struct file *file, char __user *buf,
 				size_t count, loff_t *ppos)
 {
+	unsigned long flags = (unsigned long)file->private_data;
 	u64 __user *out = (u64 __user *)buf;
 	struct page *ppage;
 	unsigned long src = *ppos;
@@ -267,7 +268,7 @@ static ssize_t kpagecgroup_read(struct file *file, char __user *buf,
 			ppage = NULL;
 
 		if (ppage)
-			ino = page_cgroup_ino(ppage);
+			ino = page_cgroup_ino(ppage, !(flags & 1));
 		else
 			ino = 0;
 
@@ -289,9 +290,28 @@ static ssize_t kpagecgroup_read(struct file *file, char __user *buf,
 	return ret;
 }
 
+static ssize_t kpagecgroup_write(struct file *file, const char __user *buf,
+				 size_t count, loff_t *ppos)
+{
+	u64 flags;
+
+	if (count != 8)
+		return -EINVAL;
+
+	if (get_user(flags, buf))
+		return -EFAULT;
+
+	if (flags > 1)
+		return -EINVAL;
+
+	file->private_data = (void *)(unsigned long)flags;
+	return count;
+}
+
 static const struct file_operations proc_kpagecgroup_operations = {
 	.llseek = mem_lseek,
 	.read = kpagecgroup_read,
+	.write = kpagecgroup_write,
 };
 #endif /* CONFIG_MEMCG */
 
@@ -300,7 +320,7 @@ static int __init proc_page_init(void)
 	proc_create("kpagecount", S_IRUSR, NULL, &proc_kpagecount_operations);
 	proc_create("kpageflags", S_IRUSR, NULL, &proc_kpageflags_operations);
 #ifdef CONFIG_MEMCG
-	proc_create("kpagecgroup", S_IRUSR, NULL, &proc_kpagecgroup_operations);
+	proc_create("kpagecgroup", 0600, NULL, &proc_kpagecgroup_operations);
 #endif
 	return 0;
 }
