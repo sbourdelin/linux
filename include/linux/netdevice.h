@@ -421,6 +421,14 @@ enum rx_handler_result {
 typedef enum rx_handler_result rx_handler_result_t;
 typedef rx_handler_result_t rx_handler_func_t(struct sk_buff **pskb);
 
+enum rx_xdp_handler_result {
+	RX_XDP_HANDLER_CONSUMED,
+	RX_XDP_HANDLER_DROP,
+	RX_XDP_HANDLER_FALLBACK,
+};
+typedef enum rx_xdp_handler_result rx_xdp_handler_result_t;
+typedef rx_xdp_handler_result_t rx_xdp_handler_func_t(struct net_device *dev,
+						      struct xdp_buff *xdp);
 void __napi_schedule(struct napi_struct *n);
 void __napi_schedule_irqoff(struct napi_struct *n);
 
@@ -1898,6 +1906,7 @@ struct net_device {
 	struct bpf_prog __rcu	*xdp_prog;
 	unsigned long		gro_flush_timeout;
 	rx_handler_func_t __rcu	*rx_handler;
+	rx_xdp_handler_func_t __rcu *rx_xdp_handler;
 	void __rcu		*rx_handler_data;
 
 #ifdef CONFIG_NET_CLS_ACT
@@ -3537,7 +3546,10 @@ bool netdev_is_rx_handler_busy(struct net_device *dev);
 int netdev_rx_handler_register(struct net_device *dev,
 			       rx_handler_func_t *rx_handler,
 			       void *rx_handler_data);
+int netdev_rx_xdp_handler_register(struct net_device *dev,
+				   rx_xdp_handler_func_t *rx_xdp_handler);
 void netdev_rx_handler_unregister(struct net_device *dev);
+void netdev_rx_xdp_handler_unregister(struct net_device *dev);
 
 bool dev_valid_name(const char *name);
 int dev_ioctl(struct net *net, unsigned int cmd, struct ifreq *ifr,

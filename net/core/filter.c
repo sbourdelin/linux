@@ -3312,6 +3312,34 @@ err:
 }
 EXPORT_SYMBOL_GPL(xdp_do_redirect);
 
+rx_handler_result_t xdp_do_pass(struct xdp_buff *xdp)
+{
+	rx_xdp_handler_result_t ret;
+	rx_xdp_handler_func_t *rx_xdp_handler;
+	struct net_device *dev = xdp->rxq->dev;
+
+	ret = RX_XDP_HANDLER_FALLBACK;
+	rx_xdp_handler = rcu_dereference(dev->rx_xdp_handler);
+
+	if (rx_xdp_handler) {
+		ret = rx_xdp_handler(dev, xdp);
+		switch (ret) {
+		case RX_XDP_HANDLER_CONSUMED:
+			/* Fall through */
+		case RX_XDP_HANDLER_DROP:
+			/* Fall through */
+		case RX_XDP_HANDLER_FALLBACK:
+			break;
+		default:
+			BUG();
+			break;
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(xdp_do_pass);
+
 static int xdp_do_generic_redirect_map(struct net_device *dev,
 				       struct sk_buff *skb,
 				       struct xdp_buff *xdp,
