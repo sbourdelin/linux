@@ -4402,13 +4402,9 @@ out_redir:
 }
 EXPORT_SYMBOL_GPL(do_xdp_generic);
 
-static int netif_rx_internal(struct sk_buff *skb)
+static int netif_do_generic_xdp(struct sk_buff *skb)
 {
-	int ret;
-
-	net_timestamp_check(netdev_tstamp_prequeue, skb);
-
-	trace_netif_rx(skb);
+	int ret = XDP_PASS;
 
 	if (static_branch_unlikely(&generic_xdp_needed_key)) {
 		int ret;
@@ -4418,14 +4414,27 @@ static int netif_rx_internal(struct sk_buff *skb)
 		ret = do_xdp_generic(rcu_dereference(skb->dev->xdp_prog), skb);
 		rcu_read_unlock();
 		preempt_enable();
-
-		/* Consider XDP consuming the packet a success from
-		 * the netdev point of view we do not want to count
-		 * this as an error.
-		 */
-		if (ret != XDP_PASS)
-			return NET_RX_SUCCESS;
 	}
+
+	return ret;
+}
+
+static int netif_rx_internal(struct sk_buff *skb)
+{
+	int ret;
+
+	net_timestamp_check(netdev_tstamp_prequeue, skb);
+
+	trace_netif_rx(skb);
+
+	ret = netif_do_generic_xdp(skb);
+
+	/* Consider XDP consuming the packet a success from
+	 * the netdev point of view we do not want to count
+	 * this as an error.
+	 */
+	if (ret != XDP_PASS)
+		return NET_RX_SUCCESS;
 
 #ifdef CONFIG_RPS
 	if (static_key_false(&rps_needed)) {
