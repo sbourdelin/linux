@@ -678,6 +678,13 @@ struct i2c_adapter {
 	const struct i2c_algorithm *algo; /* the algorithm to access the bus */
 	void *algo_data;
 
+	/*
+	 * implementations in i2c_algorithm like 'master_xfer' are safe to be
+	 * use in IRQ disabled contexts. A driver should set the flag with
+	 * i2c_adapter_irq_safe() in it's probe function.
+	 */
+	bool irq_safe;
+
 	/* data fields that are valid for all devices	*/
 	const struct i2c_lock_operations *lock_ops;
 	struct rt_mutex bus_lock;
@@ -722,6 +729,15 @@ i2c_parent_is_i2c_adapter(const struct i2c_adapter *adapter)
 	else
 #endif
 		return NULL;
+}
+
+/**
+ * i2c_adapter_irq_safe - driver is safe to be used in IRQ disabled context
+ * @adapter: Target I2C bus segment
+ */
+static inline void i2c_adapter_irq_safe(struct i2c_adapter *adapter)
+{
+	adapter->irq_safe = true;
 }
 
 int i2c_for_each_dev(void *data, int (*fn)(struct device *, void *));

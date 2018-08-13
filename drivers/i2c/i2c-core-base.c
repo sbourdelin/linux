@@ -1879,6 +1879,14 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
 		return -EOPNOTSUPP;
 
+	if (in_atomic() || irqs_disabled()) {
+		if (!adap->irq_safe) {
+			dev_err(&adap->dev,
+				"IRQ disabled transfers not supported by the driver\n");
+			return -EOPNOTSUPP;
+		}
+	}
+
 	/*
 	 * i2c_trace_msg_key gets enabled when tracepoint i2c_transfer gets
 	 * enabled.  This is an efficient way of keeping the for-loop from
