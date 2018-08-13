@@ -4823,6 +4823,11 @@ skip_classify:
 			ret = NET_RX_SUCCESS;
 			goto out;
 		case RX_HANDLER_ANOTHER:
+			ret = netif_do_generic_xdp(skb);
+			if (ret != XDP_PASS) {
+				ret = NET_RX_SUCCESS;
+				goto out;
+			}
 			goto another_round;
 		case RX_HANDLER_EXACT:
 			deliver_exact = true;
