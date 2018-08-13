@@ -81,7 +81,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	if (radix_enabled())
 		return radix__pgd_alloc(mm);
 
-	pgd = kmem_cache_alloc(PGT_CACHE(PGD_INDEX_SIZE),
+	pgd = kmem_cache_zalloc(PGT_CACHE(PGD_INDEX_SIZE),
 			       pgtable_gfp_flags(mm, GFP_KERNEL));
 	/*
 	 * Don't scan the PGD for pointers, it contains references to PUDs but
@@ -120,7 +120,7 @@ static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
 	pud_t *pud;
 
-	pud = kmem_cache_alloc(PGT_CACHE(PUD_CACHE_INDEX),
+	pud = kmem_cache_zalloc(PGT_CACHE(PUD_CACHE_INDEX),
 			       pgtable_gfp_flags(mm, GFP_KERNEL));
 	/*
 	 * Tell kmemleak to ignore the PUD, that means don't scan it for
