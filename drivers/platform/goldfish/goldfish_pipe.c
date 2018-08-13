@@ -157,6 +157,7 @@ struct goldfish_pipe {
 
 	/* A wake queue for sleeping until host signals an event */
 	wait_queue_head_t wake_queue;
+
 	/* Pointer to the parent goldfish_pipe_dev instance */
 	struct goldfish_pipe_dev *dev;
 };
