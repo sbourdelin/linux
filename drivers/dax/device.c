@@ -177,6 +177,33 @@ static const struct attribute_group *dax_attribute_groups[] = {
 	NULL,
 };
 
+static int check_vma_range(struct dev_dax *dev_dax, struct vm_area_struct *vma,
+		const char *func)
+{
+	struct device *dev = &dev_dax->dev;
+	struct resource *res;
+	unsigned long size;
+	int ret, i;
+
+	if (!dax_alive(dev_dax->dax_dev))
+		return -ENXIO;
+
+	size = vma->vm_end - vma->vm_start + (vma->vm_pgoff << PAGE_SHIFT);
+	ret = -EINVAL;
+	for (i = 0; i < dev_dax->num_resources; i++) {
+		res = &dev_dax->res[i];
+		if (size > resource_size(res)) {
+			dev_info_ratelimited(dev,
+				"%s: %s: fail, vma range overflow\n",
+				current->comm, func);
+			ret = -EINVAL;
+			continue;
+		} else
+			return 0;
+	}
+	return ret;
+}
+
 static int check_vma(struct dev_dax *dev_dax, struct vm_area_struct *vma,
 		const char *func)
 {
@@ -469,6 +496,8 @@ static int dax_mmap(struct file *filp, struct vm_area_struct *vma)
 	 */
 	id = dax_read_lock();
 	rc = check_vma(dev_dax, vma, __func__);
+	if (!rc)
+		rc = check_vma_range(dev_dax, vma, __func__);
 	dax_read_unlock(id);
 	if (rc)
 		return rc;
