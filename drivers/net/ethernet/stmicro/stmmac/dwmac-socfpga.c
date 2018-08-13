@@ -23,6 +23,9 @@
 #include <linux/regmap.h>
 #include <linux/reset.h>
 #include <linux/stmmac.h>
+#ifdef CONFIG_HAVE_ARM_SMCCC
+#include <linux/stratix10-smc.h>
+#endif
 
 #include "stmmac.h"
 #include "stmmac_platform.h"
@@ -52,6 +55,7 @@ struct socfpga_dwmac {
 	int	interface;
 	u32	reg_offset;
 	u32	reg_shift;
+	u32	sysmgr_reg;
 	struct	device *dev;
 	struct regmap *sys_mgr_base_addr;
 	struct reset_control *stmmac_rst;
@@ -60,6 +64,48 @@ struct socfpga_dwmac {
 	bool f2h_ptp_ref_clk;
 	struct tse_pcs pcs;
 };
+
+#ifdef CONFIG_HAVE_ARM_SMCCC
+/**************** Stratix 10 EMAC Memory Controller Functions ************/
+
+/* s10_protected_reg_write
+ * Write to a protected SMC register.
+ * @reg: Address of register
+ * @value: Value to write
+ * Return: INTEL_SIP_SMC_STATUS_OK (0) on success
+ *         INTEL_SIP_SMC_REG_ERROR on error
+ *         INTEL_SIP_SMC_RETURN_UNKNOWN_FUNCTION if not supported
+ */
+static int s10_protected_reg_write(unsigned int reg, unsigned int val)
+{
+	struct arm_smccc_res result;
+
+	arm_smccc_smc(INTEL_SIP_SMC_REG_WRITE, reg, val, 0, 0,
+		      0, 0, 0, &result);
+
+	return (int)result.a0;
+}
+
+/* s10_protected_reg_read
+ * Read the status of a protected SMC register
+ * @reg: Address of register
+ * @value: Value read.
+ * Return: INTEL_SIP_SMC_STATUS_OK (0) on success
+ *         INTEL_SIP_SMC_REG_ERROR on error
+ *         INTEL_SIP_SMC_RETURN_UNKNOWN_FUNCTION if not supported
+ */
+static int s10_protected_reg_read(unsigned int reg, unsigned int *val)
+{
+	struct arm_smccc_res result;
+
+	arm_smccc_smc(INTEL_SIP_SMC_REG_READ, reg, 0, 0, 0,
+		      0, 0, 0, &result);
+
+	*val = (unsigned int)result.a1;
+
+	return (int)result.a0;
+}
+#endif
 
 static void socfpga_dwmac_fix_mac_speed(void *priv, unsigned int speed)
 {
@@ -104,10 +150,11 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
 {
 	struct device_node *np = dev->of_node;
 	struct regmap *sys_mgr_base_addr;
-	u32 reg_offset, reg_shift;
+	u32 reg_offset, reg_shift, sysmgr_reg;
 	int ret, index;
 	struct device_node *np_splitter = NULL;
 	struct device_node *np_sgmii_adapter = NULL;
+	struct device_node *np_sysmgr = NULL;
 	struct resource res_splitter;
 	struct resource res_tse_pcs;
 	struct resource res_sgmii_adapter;
@@ -130,6 +177,16 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
 	if (ret) {
 		dev_info(dev, "Could not read reg_shift from sysmgr-syscon!\n");
 		return -EINVAL;
+	}
+
+	np_sysmgr = of_parse_phandle(np, "altr,sysmgr-syscon", 0);
+	if (np_sysmgr) {
+		ret = of_property_read_u32_index(np_sysmgr, "reg", 0,
+						 &sysmgr_reg);
+		if (ret) {
+			dev_info(dev, "Could not read sysmgr register address\n");
+			return -EINVAL;
+		}
 	}
 
 	dwmac->f2h_ptp_ref_clk = of_property_read_bool(np, "altr,f2h_ptp_ref_clk");
@@ -221,6 +278,7 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
 	}
 	dwmac->reg_offset = reg_offset;
 	dwmac->reg_shift = reg_shift;
+	dwmac->sysmgr_reg = sysmgr_reg;
 	dwmac->sys_mgr_base_addr = sys_mgr_base_addr;
 	dwmac->dev = dev;
 	of_node_put(np_sgmii_adapter);
@@ -238,7 +296,9 @@ static int socfpga_dwmac_set_phy_mode(struct socfpga_dwmac *dwmac)
 	int phymode = dwmac->interface;
 	u32 reg_offset = dwmac->reg_offset;
 	u32 reg_shift = dwmac->reg_shift;
+	u32 sysmgr_reg = dwmac->sysmgr_reg;
 	u32 ctrl, val, module;
+	int ret = 0;
 
 	switch (phymode) {
 	case PHY_INTERFACE_MODE_RGMII:
@@ -266,7 +326,13 @@ static int socfpga_dwmac_set_phy_mode(struct socfpga_dwmac *dwmac)
 	reset_control_assert(dwmac->stmmac_ocp_rst);
 	reset_control_assert(dwmac->stmmac_rst);
 
+#ifdef CONFIG_HAVE_ARM_SMCCC
+	ret = s10_protected_reg_read(sysmgr_reg + reg_offset, &ctrl);
+	if (ret)
+		dev_err(dwmac->dev, "error reading Sys Mgr %d\n", ret);
+#else
 	regmap_read(sys_mgr_base_addr, reg_offset, &ctrl);
+#endif
 	ctrl &= ~(SYSMGR_EMACGRP_CTRL_PHYSEL_MASK << reg_shift);
 	ctrl |= val << reg_shift;
 
@@ -284,7 +350,13 @@ static int socfpga_dwmac_set_phy_mode(struct socfpga_dwmac *dwmac)
 		ctrl &= ~(SYSMGR_EMACGRP_CTRL_PTP_REF_CLK_MASK << (reg_shift / 2));
 	}
 
+#ifdef CONFIG_HAVE_ARM_SMCCC
+	ret = s10_protected_reg_write(sysmgr_reg + reg_offset, ctrl);
+	if (ret)
+		dev_err(dwmac->dev, "error writing Sys Mgr %d\n", ret);
+#else
 	regmap_write(sys_mgr_base_addr, reg_offset, ctrl);
+#endif
 
 	/* Deassert reset for the phy configuration to be sampled by
 	 * the enet controller, and operation to start in requested mode
