@@ -108,7 +108,10 @@ Mount options
 
   With this option the maximum size of read operations can be set.
   The default is infinite.  Note that the size of read requests is
-  limited anyway to 32 pages (which is 128kbyte on i386).
+  limited anyway to max_pages (which by default is 32 or 128KB on x86).
+
+'max_pages=N'
+   Maximal number of pages per request. The default is 32 or 128KB on x86.
 
 'blksize=N'
 
