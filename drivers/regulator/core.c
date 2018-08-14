@@ -732,6 +732,7 @@ static int drms_uA_update(struct regulator_dev *rdev)
 	struct regulator *sibling;
 	int current_uA = 0, output_uV, input_uV, err;
 	unsigned int mode;
+	bool any_unset = false;
 
 	lockdep_assert_held_once(&rdev->mutex);
 
@@ -751,10 +752,16 @@ static int drms_uA_update(struct regulator_dev *rdev)
 		return -EINVAL;
 
 	/* calc total requested load */
-	list_for_each_entry(sibling, &rdev->consumer_list, list)
+	list_for_each_entry(sibling, &rdev->consumer_list, list) {
 		current_uA += sibling->uA_load;
+		if (!sibling->uA_load_set)
+			any_unset = true;
+	}
 
 	current_uA += rdev->constraints->system_load;
+
+	if (any_unset)
+		current_uA = INT_MAX;
 
 	if (rdev->desc->ops->set_load) {
 		/* set the optimum mode for our new total regulator load */
@@ -3631,6 +3638,7 @@ int regulator_set_load(struct regulator *regulator, int uA_load)
 
 	regulator_lock(rdev);
 	regulator->uA_load = uA_load;
+	regulator->uA_load_set = true;
 	ret = drms_uA_update(rdev);
 	regulator_unlock(rdev);
 

@@ -41,6 +41,7 @@ struct regulator {
 	struct list_head list;
 	unsigned int always_on:1;
 	unsigned int bypass:1;
+	bool uA_load_set;
 	int uA_load;
 	struct regulator_voltage voltage[REGULATOR_STATES_NUM];
 	const char *supply_name;
