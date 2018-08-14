@@ -1629,7 +1629,7 @@ static void edge_interrupt_callback(struct urb *urb)
 	struct device *dev;
 	unsigned char *data = urb->transfer_buffer;
 	int length = urb->actual_length;
-	int port_number;
+	unsigned int port_number;
 	int function;
 	int retval;
 	__u8 lsr;
