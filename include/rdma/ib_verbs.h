@@ -1295,37 +1295,6 @@ struct ib_qp_attr {
 	u32			rate_limit;
 };
 
-enum ib_wr_opcode {
-	IB_WR_RDMA_WRITE,
-	IB_WR_RDMA_WRITE_WITH_IMM,
-	IB_WR_SEND,
-	IB_WR_SEND_WITH_IMM,
-	IB_WR_RDMA_READ,
-	IB_WR_ATOMIC_CMP_AND_SWP,
-	IB_WR_ATOMIC_FETCH_AND_ADD,
-	IB_WR_LSO,
-	IB_WR_SEND_WITH_INV,
-	IB_WR_RDMA_READ_WITH_INV,
-	IB_WR_LOCAL_INV,
-	IB_WR_REG_MR,
-	IB_WR_MASKED_ATOMIC_CMP_AND_SWP,
-	IB_WR_MASKED_ATOMIC_FETCH_AND_ADD,
-	IB_WR_REG_SIG_MR,
-	/* reserve values for low level drivers' internal use.
-	 * These values will not be used at all in the ib core layer.
-	 */
-	IB_WR_RESERVED1 = 0xf0,
-	IB_WR_RESERVED2,
-	IB_WR_RESERVED3,
-	IB_WR_RESERVED4,
-	IB_WR_RESERVED5,
-	IB_WR_RESERVED6,
-	IB_WR_RESERVED7,
-	IB_WR_RESERVED8,
-	IB_WR_RESERVED9,
-	IB_WR_RESERVED10,
-};
-
 enum ib_send_flags {
 	IB_SEND_FENCE		= 1,
 	IB_SEND_SIGNALED	= (1<<1),
