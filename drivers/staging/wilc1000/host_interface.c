@@ -720,7 +720,7 @@ static void handle_scan(struct work_struct *work)
 		goto error;
 	}
 
-	if (vif->obtaining_ip || wilc_connecting) {
+	if (vif->obtaining_ip || vif->connecting) {
 		netdev_err(vif->ndev, "Don't do obss scan\n");
 		result = -EBUSY;
 		goto error;
@@ -2326,7 +2326,7 @@ static int handle_remain_on_chan(struct wilc_vif *vif,
 		goto error;
 	}
 
-	if (vif->obtaining_ip || wilc_connecting) {
+	if (vif->obtaining_ip || vif->connecting) {
 		result = -EBUSY;
 		goto error;
 	}
