@@ -120,6 +120,7 @@ struct wilc_vif {
 	u8 ifc_id;
 	struct timer_list during_ip_timer;
 	bool obtaining_ip;
+	u8 mc_mac_addr_list[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
 };
 
 struct wilc {
