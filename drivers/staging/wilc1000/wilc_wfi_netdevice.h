@@ -123,7 +123,7 @@ struct wilc_vif {
 	u8 mc_mac_addr_list[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
 	bool is_termination_progress;
 	struct timer_list periodic_rssi;
-	struct rf_info dummy_statistics;
+	struct rf_info periodic_stat;
 };
 
 struct wilc {
