@@ -645,6 +645,18 @@ submit_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 	return NOTIFY_DONE;
 }
 
+static int add_global_barrier(struct i915_request *rq)
+{
+	struct i915_request *barrier;
+
+	barrier = i915_gem_active_raw(&rq->i915->gt.global_barrier,
+				      &rq->i915->drm.struct_mutex);
+	if (barrier)
+		return i915_request_await_dma_fence(rq, &barrier->fence);
+
+	return 0;
+}
+
 /**
  * i915_request_alloc - allocate a request structure
  *
@@ -806,6 +818,10 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 	 * position of the head.
 	 */
 	rq->head = rq->ring->emit;
+
+	ret = add_global_barrier(rq);
+	if (ret)
+		goto err_unwind;
 
 	/* Unconditionally invalidate GPU caches and TLBs. */
 	ret = engine->emit_flush(rq, EMIT_INVALIDATE);
