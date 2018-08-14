@@ -1693,14 +1693,22 @@ static int tegra_hdmi_probe(struct platform_device *pdev)
 
 	hdmi->hdmi = devm_regulator_get(&pdev->dev, "hdmi");
 	if (IS_ERR(hdmi->hdmi)) {
-		dev_err(&pdev->dev, "failed to get HDMI regulator\n");
-		return PTR_ERR(hdmi->hdmi);
+		err = PTR_ERR(hdmi->hdmi);
+		if (err != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "failed to get HDMI regulator: %d\n",
+				err);
+
+		return err;
 	}
 
 	hdmi->pll = devm_regulator_get(&pdev->dev, "pll");
 	if (IS_ERR(hdmi->pll)) {
-		dev_err(&pdev->dev, "failed to get PLL regulator\n");
-		return PTR_ERR(hdmi->pll);
+		err = PTR_ERR(hdmi->pll);
+		if (err != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "failed to get PLL regulator: %d\n",
+				err);
+
+		return err;
 	}
 
 	hdmi->vdd = devm_regulator_get(&pdev->dev, "vdd");
