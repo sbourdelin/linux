@@ -122,6 +122,8 @@ struct wilc_vif {
 	bool obtaining_ip;
 	u8 mc_mac_addr_list[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
 	bool is_termination_progress;
+	struct timer_list periodic_rssi;
+	struct rf_info dummy_statistics;
 };
 
 struct wilc {
@@ -171,7 +173,6 @@ struct wilc {
 	struct device *dev;
 	bool suspend_event;
 
-	struct rf_info dummy_statistics;
 	bool enable_ps;
 	int clients_count;
 	struct workqueue_struct *hif_workqueue;
