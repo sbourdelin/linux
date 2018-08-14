@@ -4651,7 +4651,6 @@ static pfm_cmd_desc_t pfm_cmd_tab[]={
 /* 32 */PFM_CMD(pfm_write_ibrs, PFM_CMD_PCLRWS, PFM_CMD_ARG_MANY, pfarg_dbreg_t, NULL),
 /* 33 */PFM_CMD(pfm_write_dbrs, PFM_CMD_PCLRWS, PFM_CMD_ARG_MANY, pfarg_dbreg_t, NULL)
 };
-#define PFM_CMD_COUNT	(sizeof(pfm_cmd_tab)/sizeof(pfm_cmd_desc_t))
 
 static int
 pfm_check_task_state(pfm_context_t *ctx, int cmd, unsigned long flags)
@@ -4776,7 +4775,7 @@ sys_perfmonctl (int fd, int cmd, void __user *arg, int count)
 	 */
 	if (unlikely(pmu_conf == NULL)) return -ENOSYS;
 
-	if (unlikely(cmd < 0 || cmd >= PFM_CMD_COUNT)) {
+	if (unlikely(cmd < 0 || cmd >= ARRAY_SIZE(pfm_cmd_tab))) {
 		DPRINT(("invalid cmd=%d\n", cmd));
 		return -EINVAL;
 	}
