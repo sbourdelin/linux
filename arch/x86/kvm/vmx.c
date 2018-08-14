@@ -3967,6 +3967,28 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 
 static void vmx_leave_nested(struct kvm_vcpu *vcpu);
 
+static bool valid_msr_setting(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
+{
+	bool valid;
+
+	switch (msr_info->index) {
+	case MSR_IA32_PRED_CMD:
+		valid = (msr_info->host_initiated ||
+			 guest_cpuid_has(vcpu, X86_FEATURE_SPEC_CTRL)) &&
+			!(msr_info->data & ~PRED_CMD_IBPB);
+		break;
+	case MSR_IA32_FLUSH_CMD:
+		valid = (msr_info->host_initiated ||
+			 guest_cpuid_has(vcpu, X86_FEATURE_FLUSH_L1D)) &&
+			!(msr_info->data & ~L1D_FLUSH);
+		break;
+	default:
+		valid = false;
+		break;
+	}
+	return valid;
+}
+
 /*
  * Writes msr value into into the appropriate "register".
  * Returns 0 on success, non-0 otherwise.
@@ -4047,17 +4069,14 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 					      MSR_TYPE_RW);
 		break;
 	case MSR_IA32_PRED_CMD:
-		if (!msr_info->host_initiated &&
-		    !guest_cpuid_has(vcpu, X86_FEATURE_SPEC_CTRL))
-			return 1;
-
-		if (data & ~PRED_CMD_IBPB)
+	case MSR_IA32_FLUSH_CMD:
+		if (!valid_msr_setting(vcpu, msr_info))
 			return 1;
 
 		if (!data)
 			break;
 
-		wrmsrl(MSR_IA32_PRED_CMD, PRED_CMD_IBPB);
+		wrmsrl(msr_index, data);
 
 		/*
 		 * For non-nested:
@@ -4070,7 +4089,7 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		 * vmcs02.msr_bitmap here since it gets completely overwritten
 		 * in the merging.
 		 */
-		vmx_disable_intercept_for_msr(vmx->vmcs01.msr_bitmap, MSR_IA32_PRED_CMD,
+		vmx_disable_intercept_for_msr(vmx->vmcs01.msr_bitmap, msr_index,
 					      MSR_TYPE_W);
 		break;
 	case MSR_IA32_ARCH_CAPABILITIES:
@@ -11196,7 +11215,7 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 	unsigned long *msr_bitmap_l1;
 	unsigned long *msr_bitmap_l0 = to_vmx(vcpu)->nested.vmcs02.msr_bitmap;
 	/*
-	 * pred_cmd & spec_ctrl are trying to verify two things:
+	 * pred_cmd, flush_cmd & spec_ctrl are trying to verify two things:
 	 *
 	 * 1. L0 gave a permission to L1 to actually passthrough the MSR. This
 	 *    ensures that we do not accidentally generate an L02 MSR bitmap
@@ -11209,6 +11228,7 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 	 *    the MSR.
 	 */
 	bool pred_cmd = !msr_write_intercepted_l01(vcpu, MSR_IA32_PRED_CMD);
+	bool flush_cmd = !msr_write_intercepted_l01(vcpu, MSR_IA32_FLUSH_CMD);
 	bool spec_ctrl = !msr_write_intercepted_l01(vcpu, MSR_IA32_SPEC_CTRL);
 
 	/* Nothing to do if the MSR bitmap is not in use.  */
@@ -11217,7 +11237,7 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 		return false;
 
 	if (!nested_cpu_has_virt_x2apic_mode(vmcs12) &&
-	    !pred_cmd && !spec_ctrl)
+	    !pred_cmd && !flush_cmd && !spec_ctrl)
 		return false;
 
 	page = kvm_vcpu_gpa_to_page(vcpu, vmcs12->msr_bitmap);
@@ -11270,6 +11290,12 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 		nested_vmx_disable_intercept_for_msr(
 					msr_bitmap_l1, msr_bitmap_l0,
 					MSR_IA32_PRED_CMD,
+					MSR_TYPE_W);
+
+	if (flush_cmd)
+		nested_vmx_disable_intercept_for_msr(
+					msr_bitmap_l1, msr_bitmap_l0,
+					MSR_IA32_FLUSH_CMD,
 					MSR_TYPE_W);
 
 	kunmap(page);
