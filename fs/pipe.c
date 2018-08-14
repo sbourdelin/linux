@@ -34,6 +34,7 @@
  * be set by root in /proc/sys/fs/pipe-max-size
  */
 unsigned int pipe_max_size = 1048576;
+EXPORT_SYMBOL(pipe_max_size);
 
 /* Maximum allocatable pages per user. Hard limit is unset by default, soft
  * matches default values.
