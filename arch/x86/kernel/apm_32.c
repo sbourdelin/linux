@@ -1632,7 +1632,7 @@ static int do_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int proc_apm_show(struct seq_file *m, void *v)
+static int __maybe_unused proc_apm_show(struct seq_file *m, void *v)
 {
 	unsigned short	bx;
 	unsigned short	cx;
