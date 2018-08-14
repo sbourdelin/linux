@@ -322,9 +322,10 @@ static void unwind_wa_tail(struct i915_request *rq)
 	assert_ring_tail_valid(rq->ring, rq->tail);
 }
 
-static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
+static struct i915_request *
+__unwind_incomplete_requests(struct intel_engine_cs *engine)
 {
-	struct i915_request *rq, *rn;
+	struct i915_request *rq, *rn, *active = NULL;
 	struct i915_priolist *uninitialized_var(p);
 	int last_prio = I915_PRIORITY_INVALID;
 
@@ -334,7 +335,7 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 					 &engine->timeline.requests,
 					 link) {
 		if (i915_request_completed(rq))
-			return;
+			break;
 
 		__i915_request_unsubmit(rq);
 		unwind_wa_tail(rq);
@@ -347,7 +348,11 @@ static void __unwind_incomplete_requests(struct intel_engine_cs *engine)
 
 		GEM_BUG_ON(p->priority != rq_prio(rq));
 		list_add(&rq->sched.link, &p->requests);
+
+		active = rq;
 	}
+
+	return active;
 }
 
 void
@@ -1917,7 +1922,7 @@ static void execlists_reset(struct intel_engine_cs *engine,
 	execlists_cancel_port_requests(execlists);
 
 	/* Push back any incomplete requests for replay after the reset. */
-	__unwind_incomplete_requests(engine);
+	request = __unwind_incomplete_requests(engine);
 
 	/* Following the reset, we need to reload the CSB read/write pointers */
 	reset_csb_pointers(&engine->execlists);
