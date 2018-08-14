@@ -351,18 +351,31 @@ static int tegra20_ac97_platform_probe(struct platform_device *pdev)
 		ret = devm_gpio_request_one(&pdev->dev, ac97->reset_gpio,
 					    GPIOF_OUT_INIT_HIGH, "codec-reset");
 		if (ret) {
-			dev_err(&pdev->dev, "could not get codec-reset GPIO\n");
+			if (ret != -EPROBE_DEFER)
+				dev_err(&pdev->dev,
+					"could not get codec-reset GPIO: %d\n",
+					ret);
+
 			goto err_clk_put;
 		}
 	} else {
-		dev_err(&pdev->dev, "no codec-reset GPIO supplied\n");
+		ret = ac97->reset_gpio;
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev,
+				"no codec-reset GPIO supplied: %d\n",
+				ret);
+
 		goto err_clk_put;
 	}
 
 	ac97->sync_gpio = of_get_named_gpio(pdev->dev.of_node,
 					    "nvidia,codec-sync-gpio", 0);
 	if (!gpio_is_valid(ac97->sync_gpio)) {
-		dev_err(&pdev->dev, "no codec-sync GPIO supplied\n");
+		ret = ac97->sync_gpio;
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "no codec-sync GPIO supplied: %d\n",
+				ret);
+
 		goto err_clk_put;
 	}
 
