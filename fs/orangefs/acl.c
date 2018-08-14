@@ -175,6 +175,9 @@ int orangefs_init_acl(struct inode *inode, struct inode *dir)
 		posix_acl_release(acl);
 	}
 
+	if (!default_acl && !acl)
+		cache_no_acl(inode);
+
 	/* If mode of the inode was changed, then do a forcible ->setattr */
 	if (mode != inode->i_mode) {
 		memset(&iattr, 0, sizeof iattr);
