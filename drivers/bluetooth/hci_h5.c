@@ -852,7 +852,9 @@ static int h5_btrtl_setup(struct h5 *h5)
 	bool flow_control;
 	int err;
 
-	btrtl_dev = btrtl_initialize(h5->hu->hdev, h5->id);
+	btrtl_dev = strcmp("OBDA8723", h5->id) ?
+		btrtl_initialize(h5->hu->hdev, h5->id) :
+			btrtl_initialize(h5->hu->hdev, NULL);
 	if (IS_ERR(btrtl_dev))
 		return PTR_ERR(btrtl_dev);
 
