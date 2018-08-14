@@ -646,7 +646,7 @@ static int ecard_prints(struct seq_file *m, ecard_t *ec)
 	return 0;
 }
 
-static int ecard_devices_proc_show(struct seq_file *m, void *v)
+static int __maybe_unused ecard_devices_proc_show(struct seq_file *m, void *v)
 {
 	ecard_t *ec = cards;
 
