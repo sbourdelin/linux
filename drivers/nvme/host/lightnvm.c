@@ -1270,39 +1270,20 @@ static const struct attribute_group nvm_dev_attr_group_20 = {
 	.attrs		= nvm_dev_attrs_20,
 };
 
-int nvme_nvm_register_sysfs(struct nvme_ns *ns)
+void nvme_nvm_register_sysfs(struct nvme_ns *ns)
 {
 	struct nvm_dev *ndev = ns->ndev;
 	struct nvm_geo *geo = &ndev->geo;
 
 	if (!ndev)
-		return -EINVAL;
+		return;
 
 	switch (geo->major_ver_id) {
 	case 1:
-		return sysfs_create_group(&disk_to_dev(ns->disk)->kobj,
-					&nvm_dev_attr_group_12);
-	case 2:
-		return sysfs_create_group(&disk_to_dev(ns->disk)->kobj,
-					&nvm_dev_attr_group_20);
-	}
-
-	return -EINVAL;
-}
-
-void nvme_nvm_unregister_sysfs(struct nvme_ns *ns)
-{
-	struct nvm_dev *ndev = ns->ndev;
-	struct nvm_geo *geo = &ndev->geo;
-
-	switch (geo->major_ver_id) {
-	case 1:
-		sysfs_remove_group(&disk_to_dev(ns->disk)->kobj,
-					&nvm_dev_attr_group_12);
+		nvme_ns_id_attr_groups[1] = &nvm_dev_attr_group_12;
 		break;
 	case 2:
-		sysfs_remove_group(&disk_to_dev(ns->disk)->kobj,
-					&nvm_dev_attr_group_20);
+		nvme_ns_id_attr_groups[1] = &nvm_dev_attr_group_20;
 		break;
 	}
 }
