@@ -206,6 +206,8 @@ struct wilc {
 	/* deinitialization lock */
 	struct mutex hif_deinit_lock;
 	struct completion hif_driver_comp;
+
+	enum chip_ps_states chip_ps_state;
 };
 
 struct wilc_wfi_mon_priv {
