@@ -9535,6 +9535,7 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 		}
 	}
 
+	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
 	power_domain = POWER_DOMAIN_PIPE_PANEL_FITTER(crtc->pipe);
 	if (intel_display_power_get_if_enabled(dev_priv, power_domain)) {
 		power_domain_mask |= BIT_ULL(power_domain);
@@ -10882,6 +10883,18 @@ static void snprintf_output_types(char *buf, size_t len,
 	WARN_ON_ONCE(output_types != 0);
 }
 
+static const char * const output_format_str[] = {
+	[INTEL_OUTPUT_FORMAT_INVALID] = "Invalid",
+	[INTEL_OUTPUT_FORMAT_RGB] = "RGB",
+};
+
+static const char *output_formats(enum intel_output_format format)
+{
+	if (format != INTEL_OUTPUT_FORMAT_RGB)
+		format = INTEL_OUTPUT_FORMAT_INVALID;
+	return output_format_str[format];
+}
+
 static void intel_dump_pipe_config(struct intel_crtc *crtc,
 				   struct intel_crtc_state *pipe_config,
 				   const char *context)
@@ -10900,6 +10913,9 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 	snprintf_output_types(buf, sizeof(buf), pipe_config->output_types);
 	DRM_DEBUG_KMS("output_types: %s (0x%x)\n",
 		      buf, pipe_config->output_types);
+
+	DRM_DEBUG_KMS("output format: %s\n",
+		      output_formats(pipe_config->output_format));
 
 	DRM_DEBUG_KMS("cpu_transcoder: %s, pipe bpp: %i, dithering: %i\n",
 		      transcoder_name(pipe_config->cpu_transcoder),
@@ -11490,6 +11506,7 @@ intel_pipe_config_compare(struct drm_i915_private *dev_priv,
 	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_vsync_end);
 
 	PIPE_CONF_CHECK_I(pixel_multiplier);
+	PIPE_CONF_CHECK_I(output_format);
 	PIPE_CONF_CHECK_BOOL(has_hdmi_sink);
 	if ((INTEL_GEN(dev_priv) < 8 && !IS_HASWELL(dev_priv)) ||
 	    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
