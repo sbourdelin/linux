@@ -473,6 +473,7 @@ static void veth_dellink(struct net_device *dev, struct list_head *head)
 	struct veth_priv *priv;
 	struct net_device *peer;
 
+	veth_free_queues(dev);
 	priv = netdev_priv(dev);
 	peer = rtnl_dereference(priv->peer);
 
