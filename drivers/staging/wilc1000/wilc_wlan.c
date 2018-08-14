@@ -137,6 +137,11 @@ static inline int add_tcp_pending_ack(struct wilc_vif *vif, u32 ack,
 	return 0;
 }
 
+static inline void clear_tcp_session_txq(struct wilc_vif *vif, int index)
+{
+	vif->ack_filter.pending_acks_info[index].txqe = NULL;
+}
+
 static inline void tcp_process(struct net_device *dev, struct txq_entry_t *tqe)
 {
 	void *buffer = tqe->buffer;
@@ -670,7 +675,7 @@ int wilc_wlan_handle_txq(struct net_device *dev, u32 *txq_count)
 			tqe->tx_complete_func(tqe->priv, tqe->status);
 		if (tqe->tcp_pending_ack_idx != NOT_TCP_ACK &&
 		    tqe->tcp_pending_ack_idx < MAX_PENDING_ACKS)
-			vif->ack_filter.pending_acks_info[tqe->tcp_pending_ack_idx].txqe = NULL;
+			clear_tcp_session_txq(vif, tqe->tcp_pending_ack_idx);
 		kfree(tqe);
 	} while (--entries);
 
