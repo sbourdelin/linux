@@ -2239,6 +2239,60 @@ static void gen8_emit_breadcrumb_rcs(struct i915_request *request, u32 *cs)
 }
 static const int gen8_emit_breadcrumb_rcs_sz = 8 + WA_TAIL_DWORDS;
 
+static int gen8_emit_rpcs_config(struct i915_request *rq,
+				 struct i915_gem_context *ctx,
+				 struct intel_sseu sseu)
+{
+	struct drm_i915_private *i915 = rq->i915;
+	struct intel_context *ce = to_intel_context(ctx, i915->engine[RCS]);
+	struct i915_vma *vma;
+	u64 offset;
+	u32 *cs;
+	int err;
+
+	/* Let the deferred state allocation take care of this. */
+	if (!ce->state)
+		return 0;
+
+	vma = i915_vma_instance(ce->state->obj,
+				&i915->kernel_context->ppgtt->vm,
+				NULL);
+	if (IS_ERR(vma))
+		return PTR_ERR(vma);
+
+	err = i915_vma_pin(vma, 0, 0, PIN_USER);
+	if (err) {
+		i915_vma_close(vma);
+		return err;
+	}
+
+	err = i915_vma_move_to_active(vma, rq, EXEC_OBJECT_WRITE);
+	if (unlikely(err)) {
+		i915_vma_close(vma);
+		return err;
+	}
+
+	i915_vma_unpin(vma);
+
+	cs = intel_ring_begin(rq, 4);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	offset = vma->node.start +
+		LRC_STATE_PN * PAGE_SIZE +
+		(CTX_R_PWR_CLK_STATE + 1) * 4;
+
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
+	*cs++ = lower_32_bits(offset);
+	*cs++ = upper_32_bits(offset);
+	*cs++ = gen8_make_rpcs(&INTEL_INFO(i915)->sseu,
+			       intel_engine_prepare_sseu(rq->engine, sseu));
+
+	intel_ring_advance(rq, cs);
+
+	return 0;
+}
+
 static int gen8_init_rcs_context(struct i915_request *rq)
 {
 	int ret;
@@ -2331,6 +2385,7 @@ logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 	engine->emit_flush = gen8_emit_flush;
 	engine->emit_breadcrumb = gen8_emit_breadcrumb;
 	engine->emit_breadcrumb_sz = gen8_emit_breadcrumb_sz;
+	engine->emit_rpcs_config = gen8_emit_rpcs_config;
 
 	engine->set_default_submission = intel_execlists_set_default_submission;
 
