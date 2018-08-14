@@ -262,5 +262,8 @@ ext2_init_acl(struct inode *inode, struct inode *dir)
 			error = __ext2_set_acl(inode, acl, ACL_TYPE_ACCESS);
 		posix_acl_release(acl);
 	}
+	if (!default_acl && !acl)
+		cache_no_acl(inode);
+
 	return error;
 }
