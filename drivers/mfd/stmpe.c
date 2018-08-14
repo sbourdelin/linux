@@ -1331,6 +1331,8 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
 		return -ENOMEM;
 
 	stmpe_of_probe(pdata, np);
+	if (-EPROBE_DEFER == pdata->irq_gpio)
+		return -EPROBE_DEFER;
 
 	if (of_find_property(np, "interrupts", NULL) == NULL)
 		ci->irq = -1;
