@@ -255,6 +255,26 @@ static inline int drv_set_key(struct ieee80211_local *local,
 	return ret;
 }
 
+static inline int drv_replace_key(struct ieee80211_local *local,
+			      struct ieee80211_sub_if_data *sdata,
+			      struct ieee80211_sta *sta,
+			      struct ieee80211_key_conf *old_key,
+			      struct ieee80211_key_conf *new_key)
+{
+	int ret;
+
+	might_sleep();
+
+	sdata = get_bss_sdata(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return -EIO;
+
+	trace_drv_replace_key(local, sdata, sta, old_key, new_key);
+	ret = local->ops->replace_key(&local->hw, &sdata->vif, sta, old_key, new_key);
+	trace_drv_return_int(local, ret);
+	return ret;
+}
+
 static inline void drv_update_tkip_key(struct ieee80211_local *local,
 				       struct ieee80211_sub_if_data *sdata,
 				       struct ieee80211_key_conf *conf,
