@@ -391,21 +391,31 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
 	clear_bit(idx, map);
 }
 
-/* Wait for any pending TLB invalidations to complete */
-static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
-				void __iomem *sync, void __iomem *status)
+static int __arm_smmu_tlb_sync_wait(void __iomem *status)
 {
 	unsigned int spin_cnt, delay;
 
-	writel_relaxed(0, sync);
 	for (delay = 1; delay < TLB_LOOP_TIMEOUT; delay *= 2) {
 		for (spin_cnt = TLB_SPIN_COUNT; spin_cnt > 0; spin_cnt--) {
 			if (!(readl_relaxed(status) & sTLBGSTATUS_GSACTIVE))
-				return;
+				return 0;
 			cpu_relax();
 		}
 		udelay(delay);
 	}
+
+	return -EBUSY;
+}
+
+/* Wait for any pending TLB invalidations to complete */
+static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+				void __iomem *sync, void __iomem *status)
+{
+	writel_relaxed(0, sync);
+
+	if (!__arm_smmu_tlb_sync_wait(status))
+		return;
+
 	dev_err_ratelimited(smmu->dev,
 			    "TLB sync timed out -- SMMU may be deadlocked\n");
 }
@@ -461,8 +471,9 @@ static void arm_smmu_tlb_inv_context_s2(void *cookie)
 	arm_smmu_tlb_sync_global(smmu);
 }
 
-static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-					  size_t granule, bool leaf, void *cookie)
+static void __arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+					    size_t granule, bool leaf,
+					    void *cookie)
 {
 	struct arm_smmu_domain *smmu_domain = cookie;
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
@@ -496,6 +507,13 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
 			iova += granule >> 12;
 		} while (size -= granule);
 	}
+}
+
+static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+					  size_t granule, bool leaf,
+					  void *cookie)
+{
+	__arm_smmu_tlb_inv_range_nosync(iova, size, granule, leaf, cookie);
 }
 
 /*
