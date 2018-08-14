@@ -1096,7 +1096,7 @@ static int convert_extent_item_v0(struct btrfs_trans_handle *trans,
 
 	new_size -= sizeof(*ei0);
 	ret = btrfs_search_slot(trans, root, &key, path,
-				new_size + extra_size, 1);
+				new_size + extra_size + sizeof(struct btrfs_item), 1);
 	if (ret < 0)
 		return ret;
 	BUG_ON(ret); /* Corruption */
@@ -1646,7 +1646,8 @@ int lookup_inline_extent_backref(struct btrfs_trans_handle *trans,
 	}
 
 again:
-	ret = btrfs_search_slot(trans, root, &key, path, extra_size, 1);
+	ret = btrfs_search_slot(trans, root, &key, path,
+			    extra_size + sizeof(struct btrfs_item), 1);
 	if (ret < 0) {
 		err = ret;
 		goto out;
