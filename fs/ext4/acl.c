@@ -291,5 +291,8 @@ ext4_init_acl(handle_t *handle, struct inode *inode, struct inode *dir)
 					       acl, XATTR_CREATE);
 		posix_acl_release(acl);
 	}
+	if (!default_acl && !acl)
+		cache_no_acl(inode);
+
 	return error;
 }
