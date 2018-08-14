@@ -4307,7 +4307,6 @@ int btrfs_unlink_subvol(struct btrfs_trans_handle *trans,
 		btrfs_release_path(path);
 		index = key.offset;
 	}
-	btrfs_release_path(path);
 
 	ret = btrfs_delete_delayed_dir_index(trans, fs_info, BTRFS_I(dir), index);
 	if (ret) {
