@@ -94,6 +94,7 @@
  *  but I don't think the added complexity is worth it)
  */
 
+#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -105,9 +106,10 @@
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: fixdep [-e] [-r] <depfile> <target> <cmdline>\n");
+	fprintf(stderr, "Usage: fixdep [-e] [-r] [-o <output>] <depfile> <target> <cmdline>\n");
 	fprintf(stderr, " -e  insert extra dependencies given on stdin\n");
 	fprintf(stderr, " -r  remove <depfile> after processing\n");
+	fprintf(stderr, " -o  write to <output> instead of stdout\n");
 	exit(1);
 }
 
@@ -380,15 +382,17 @@ static void parse_dep_file(char *m, const char *target, int insert_extra_deps)
 int main(int argc, char *argv[])
 {
 	const char *depfile, *target, *cmdline;
+	char *outfile = NULL, *tmpfile;
 	int insert_extra_deps = 0;
 	int remove_depfile = 0;
 	void *buf;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "er")) != -1) {
+	while ((opt = getopt(argc, argv, "ero:")) != -1) {
 		switch (opt) {
 		case 'e': insert_extra_deps = 1; break;
 		case 'r': remove_depfile = 1; break;
+		case 'o': outfile = optarg; break;
 		default: usage();
 		}
 	}
@@ -402,11 +406,34 @@ int main(int argc, char *argv[])
 	target = argv[1];
 	cmdline = argv[2];
 
+	if (outfile) {
+		if (asprintf(&tmpfile, "%s.tmp", outfile) < 0) {
+			perror("fixdep:asprintf");
+			exit(1);
+		}
+		if (freopen(tmpfile, "w", stdout) == NULL) {
+			perror("fixdep:freopen");
+			exit(1);
+		}
+	}
+
 	printf("cmd_%s := %s\n\n", target, cmdline);
 
 	buf = read_file(depfile);
 	parse_dep_file(buf, target, insert_extra_deps);
 	free(buf);
+
+	if (fclose(stdout)) {
+		perror("fixdep:fclose");
+		exit(1);
+	}
+	if (outfile) {
+		if (rename(tmpfile, outfile) < 0) {
+			perror("fixdep:rename");
+			exit(1);
+		}
+		free(tmpfile);
+	}
 
 	if (remove_depfile)
 		unlink(depfile);
