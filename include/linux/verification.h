@@ -12,6 +12,10 @@
 #ifndef _LINUX_VERIFICATION_H
 #define _LINUX_VERIFICATION_H
 
+// Allow both builtin trusted keys and secondary trusted keys
+#ifndef TRUST_SECONDARY_KEYRING
+#define TRUST_SECONDARY_KEYRING ((struct key *)1UL)
+
 /*
  * The use to which an asymmetric key is being put.
  */
