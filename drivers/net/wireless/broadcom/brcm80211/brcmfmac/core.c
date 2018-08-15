@@ -40,6 +40,7 @@
 #include "common.h"
 
 #define MAX_WAIT_FOR_8021X_TX			msecs_to_jiffies(950)
+#define BRCMF_FW_WATCHDOG_POLL			msecs_to_jiffies(3000)
 
 #define BRCMF_BSSIDX_INVALID			-1
 
@@ -1025,6 +1026,20 @@ static int brcmf_revinfo_read(struct seq_file *s, void *data)
 	return 0;
 }
 
+static void brcmf_fw_watchdog(struct work_struct *work)
+{
+	struct brcmf_pub *pub = container_of(work, struct brcmf_pub, fw_watchdog.work);
+	struct brcmf_if *ifp = pub->iflist[0];
+	s32 ver;
+	int err;
+
+	err = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_VERSION, &ver);
+	if (err)
+		brcmf_err("Firmware didn't respond: %d (firmware crash?)\n", err);
+
+	schedule_delayed_work(&pub->fw_watchdog, BRCMF_FW_WATCHDOG_POLL);
+}
+
 static int brcmf_bus_started(struct brcmf_pub *drvr, struct cfg80211_ops *ops)
 {
 	int ret = -1;
@@ -1095,6 +1110,9 @@ static int brcmf_bus_started(struct brcmf_pub *drvr, struct cfg80211_ops *ops)
 	}
 #endif
 #endif /* CONFIG_INET */
+
+	INIT_DELAYED_WORK(&drvr->fw_watchdog, brcmf_fw_watchdog);
+	schedule_delayed_work(&drvr->fw_watchdog, BRCMF_FW_WATCHDOG_POLL);
 
 	/* populate debugfs */
 	brcmf_debugfs_add_entry(drvr, "revinfo", brcmf_revinfo_read);
@@ -1223,6 +1241,9 @@ void brcmf_detach(struct device *dev)
 
 	if (drvr == NULL)
 		return;
+
+	cancel_delayed_work(&drvr->fw_watchdog);
+	flush_scheduled_work();
 
 #ifdef CONFIG_INET
 	unregister_inetaddr_notifier(&drvr->inetaddr_notifier);

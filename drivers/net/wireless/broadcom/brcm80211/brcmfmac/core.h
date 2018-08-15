@@ -143,6 +143,8 @@ struct brcmf_pub {
 	struct notifier_block inet6addr_notifier;
 	struct brcmf_mp_device *settings;
 
+	struct delayed_work fw_watchdog;
+
 	u8 clmver[BRCMF_DCMD_SMLEN];
 };
 
