@@ -964,6 +964,10 @@ static int ieee80211_start_ap(struct wiphy *wiphy, struct net_device *dev,
 		sdata->vif.bss_conf.p2p_noa_attr.oppps_ctwindow |=
 					IEEE80211_P2P_OPPPS_ENABLE_BIT;
 
+	sdata->vif.bss_conf.ftm_responder = params->ftm_responder;
+	if (params->ftm_responder >= 0)
+		changed |= BSS_CHANGED_FTM_RESPONDER;
+
 	err = ieee80211_assign_beacon(sdata, &params->beacon, NULL);
 	if (err < 0) {
 		ieee80211_vif_release_channel(sdata);
