@@ -1538,25 +1538,9 @@ static void kdb_md_line(const char *fmtstr, unsigned long addr,
 			wc.word = word;
 #define printable_char(c) \
 	({unsigned char __c = c; isascii(__c) && isprint(__c) ? __c : '.'; })
-			switch (bytesperword) {
-			case 8:
+			for (i = 0; i < bytesperword; i++)
 				*c++ = printable_char(*cp++);
-				*c++ = printable_char(*cp++);
-				*c++ = printable_char(*cp++);
-				*c++ = printable_char(*cp++);
-				addr += 4;
-			case 4:
-				*c++ = printable_char(*cp++);
-				*c++ = printable_char(*cp++);
-				addr += 2;
-			case 2:
-				*c++ = printable_char(*cp++);
-				addr++;
-			case 1:
-				*c++ = printable_char(*cp++);
-				addr++;
-				break;
-			}
+			addr += bytesperword;
 #undef printable_char
 		}
 	}
