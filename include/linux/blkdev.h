@@ -662,6 +662,7 @@ struct request_queue {
 #endif
 
 	bool			mq_sysfs_init_done;
+	bool			mq_realloc_hw_ctxs;
 
 	size_t			cmd_size;
 	void			*rq_alloc_data;

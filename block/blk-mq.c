@@ -2515,6 +2515,8 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 
 	blk_mq_sysfs_unregister(q);
 
+	WRITE_ONCE(q->mq_realloc_hw_ctxs, true);
+	synchronize_rcu();
 	/* protect against switching io scheduler  */
 	mutex_lock(&q->sysfs_lock);
 	for (i = 0; i < set->nr_hw_queues; i++) {
@@ -2562,6 +2564,7 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 	}
 	q->nr_hw_queues = i;
 	mutex_unlock(&q->sysfs_lock);
+	WRITE_ONCE(q->mq_realloc_hw_ctxs, false);
 	blk_mq_sysfs_register(q);
 }
 

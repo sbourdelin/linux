@@ -69,7 +69,10 @@ void part_in_flight(struct request_queue *q, struct hd_struct *part,
 		    unsigned int inflight[2])
 {
 	if (q->mq_ops) {
-		blk_mq_in_flight(q, part, inflight);
+		rcu_read_lock();
+		if (!q->mq_realloc_hw_ctxs)
+			blk_mq_in_flight(q, part, inflight);
+		rcu_read_unlock();
 		return;
 	}
 
@@ -86,7 +89,10 @@ void part_in_flight_rw(struct request_queue *q, struct hd_struct *part,
 		       unsigned int inflight[2])
 {
 	if (q->mq_ops) {
-		blk_mq_in_flight_rw(q, part, inflight);
+		rcu_read_lock();
+		if (!q->mq_realloc_hw_ctxs)
+			blk_mq_in_flight_rw(q, part, inflight);
+		rcu_read_unlock();
 		return;
 	}
 
