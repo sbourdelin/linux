@@ -1976,7 +1976,7 @@ static void execlists_reset_finish(struct intel_engine_cs *engine)
 
 	/* After a GPU reset, we may have requests to replay */
 	if (!RB_EMPTY_ROOT(&execlists->queue.rb_root))
-		tasklet_schedule(&execlists->tasklet);
+		execlists_submission_tasklet(execlists->tasklet.data);
 
 	/*
 	 * Flush the tasklet while we still have the forcewake to be sure
