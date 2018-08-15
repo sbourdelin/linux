@@ -23,6 +23,7 @@ Optional properties:
 		 register files". When set driver will request its
 		 phandle as one companion-grf for some special SoCs
 		 (e.g RV1108).
+ - extcon : phandle to the extcon device for the otg phy.
 
 Required nodes : a sub-node is required for each port the phy provides.
 		 The sub-node name is used to identify host or otg port,
@@ -45,6 +46,8 @@ Required properties (port (child) node):
 Optional properties:
  - phy-supply : phandle to a regulator that provides power to VBUS.
 		See ./phy-bindings.txt for details.
+ - rockchip,utmi-avalid : boolean, use the avalid register to get vbus status.
+			  Otherwise, use the bvalid register.
 
 Example:
 
