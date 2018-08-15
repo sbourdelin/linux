@@ -805,6 +805,7 @@ execlists_cancel_port_requests(struct intel_engine_execlists * const execlists)
 	}
 
 	execlists_clear_all_active(execlists);
+	execlists->queue_priority = INT_MIN;
 }
 
 static void reset_csb_pointers(struct intel_engine_execlists *execlists)
