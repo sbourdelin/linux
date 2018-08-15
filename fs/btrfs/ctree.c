@@ -2607,8 +2607,8 @@ int btrfs_find_item(struct btrfs_root *fs_root, struct btrfs_path *path,
  * @p:		Holds all btree nodes along the search path
  * @root:	The root node of the tree
  * @key:	The key we are looking for
- * @ins_len:	Indicates purpose of search, for inserts it is 1, for
- *		deletions it's -1. 0 for plain searches
+ * @ins_len:	Indicates purpose of search, for inserts it is item size
+ *		including btrfs_item, for deletions it's -1. 0 for plain searches
  * @cow:	boolean should CoW operations be performed. Must always be 1
  *		when modifying the tree.
  *
@@ -2866,6 +2866,17 @@ cow_done:
 			}
 		} else {
 			p->slots[level] = slot;
+			/*
+			 * item key collision happens. In this case, if we are allow
+			 * to insert the item(for example, in dir_item case, item key
+			 * collision is allowed), it will be merged with the original
+			 * item. Only the item size grows, no new btrfs item will be
+			 * added. Since the ins_len already accounts the size btrfs_item,
+			 * this value is counted twice. Duduct this value here so the
+			 * leaf space check will be correct.
+			 */
+			if (ret == 0 && ins_len > 0)
+				ins_len -= sizeof(struct btrfs_item);
 			if (ins_len > 0 &&
 			    btrfs_leaf_free_space(fs_info, b) < ins_len) {
 				if (write_lock_level < 1) {

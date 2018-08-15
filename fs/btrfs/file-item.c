@@ -804,7 +804,7 @@ again:
 	 */
 	btrfs_release_path(path);
 	ret = btrfs_search_slot(trans, root, &file_key, path,
-				csum_size, 1);
+				csum_size + sizeof(struct btrfs_item), 1);
 	if (ret < 0)
 		goto fail_unlock;
 
