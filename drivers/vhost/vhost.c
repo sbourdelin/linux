@@ -807,8 +807,7 @@ out:
 }
 
 static void __user *__vhost_get_user_slow(struct vhost_virtqueue *vq,
-					  void __user *addr, unsigned int size,
-					  int type)
+					  void __user *addr, unsigned int size)
 {
 	int ret;
 
@@ -846,7 +845,7 @@ static inline void __user *__vhost_get_user(struct vhost_virtqueue *vq,
 	if (uaddr)
 		return uaddr;
 
-	return __vhost_get_user_slow(vq, addr, size, type);
+	return __vhost_get_user_slow(vq, addr, size);
 }
 
 #define vhost_put_user(vq, x, ptr)		\
