@@ -1205,6 +1205,7 @@ static void veth_dellink(struct net_device *dev, struct list_head *head)
 	struct veth_priv *priv;
 	struct net_device *peer;
 
+	veth_free_queues(dev);
 	priv = netdev_priv(dev);
 	peer = rtnl_dereference(priv->peer);
 
@@ -1216,6 +1217,7 @@ static void veth_dellink(struct net_device *dev, struct list_head *head)
 	unregister_netdevice_queue(dev, head);
 
 	if (peer) {
+		veth_free_queues(peer);
 		priv = netdev_priv(peer);
 		RCU_INIT_POINTER(priv->peer, NULL);
 		unregister_netdevice_queue(peer, head);
