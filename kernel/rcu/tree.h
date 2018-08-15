@@ -368,7 +368,7 @@ struct rcu_state {
 	char abbr;				/* Abbreviated name. */
 	struct list_head flavors;		/* List of RCU flavors. */
 
-	spinlock_t ofl_lock ____cacheline_internodealigned_in_smp;
+	raw_spinlock_t ofl_lock ____cacheline_internodealigned_in_smp;
 						/* Synchronize offline with */
 						/*  GP pre-initialization. */
 };
