@@ -816,7 +816,8 @@ guc_reset_prepare(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists * const execlists = &engine->execlists;
 
-	GEM_TRACE("%s\n", engine->name);
+	GEM_TRACE("%s: depth<-%d\n", engine->name,
+		  atomic_read(&execlists->tasklet.count));
 
 	/*
 	 * Prevent request submission to the hardware until we have
