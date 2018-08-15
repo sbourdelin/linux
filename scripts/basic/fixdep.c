@@ -381,16 +381,23 @@ int main(int argc, char *argv[])
 	const char *depfile, *target, *cmdline;
 	int insert_extra_deps = 0;
 	void *buf;
+	int opt;
 
-	if (argc == 5 && !strcmp(argv[1], "-e")) {
-		insert_extra_deps = 1;
-		argv++;
-	} else if (argc != 4)
+	while ((opt = getopt(argc, argv, "e")) != -1) {
+		switch (opt) {
+		case 'e': insert_extra_deps = 1; break;
+		default: usage();
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 3)
 		usage();
 
-	depfile = argv[1];
-	target = argv[2];
-	cmdline = argv[3];
+	depfile = argv[0];
+	target = argv[1];
+	cmdline = argv[2];
 
 	printf("cmd_%s := %s\n\n", target, cmdline);
 
