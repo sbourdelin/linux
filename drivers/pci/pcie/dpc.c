@@ -44,6 +44,18 @@ static const char * const rp_pio_error_string[] = {
 	"Memory Request Completion Timeout",		 /* Bit Position 18 */
 };
 
+static int pcie_dpc_disable;
+
+void pci_no_dpc(void)
+{
+	pcie_dpc_disable = 1;
+}
+
+bool pci_dpc_available(void)
+{
+	return !pcie_dpc_disable && pci_aer_available() && pci_msi_enabled();
+}
+
 static int dpc_wait_rp_inactive(struct dpc_dev *dpc)
 {
 	unsigned long timeout = jiffies + HZ;
@@ -209,6 +221,17 @@ static irqreturn_t dpc_irq(int irq, void *context)
 	return IRQ_HANDLED;
 }
 
+static void dpc_disable(struct pci_dev *pdev)
+{
+	u16 cap_pos, ctl;
+
+	cap_pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_DPC);
+	pci_read_config_word(pdev, cap_pos + PCI_EXP_DPC_CTL, &ctl);
+	ctl &= ~(PCI_EXP_DPC_CTL_EN_FATAL | PCI_EXP_DPC_CTL_EN_NONFATAL |
+		 PCI_EXP_DPC_CTL_INT_EN);
+	pci_write_config_word(pdev, cap_pos + PCI_EXP_DPC_CTL, ctl);
+}
+
 #define FLAG(x, y) (((x) & (y)) ? '+' : '-')
 static int dpc_probe(struct pcie_device *dev)
 {
@@ -221,9 +244,16 @@ static int dpc_probe(struct pcie_device *dev)
 	if (pcie_aer_get_firmware_first(pdev))
 		return -ENOTSUPP;
 
+	if (!pci_dpc_available()) {
+		status = -ENOTSUPP;
+		goto disable_dpc;
+	}
+
 	dpc = devm_kzalloc(device, sizeof(*dpc), GFP_KERNEL);
-	if (!dpc)
-		return -ENOMEM;
+	if (!dpc) {
+		status = -ENOMEM;
+		goto disable_dpc;
+	}
 
 	dpc->cap_pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_DPC);
 	dpc->dev = dev;
@@ -235,7 +265,7 @@ static int dpc_probe(struct pcie_device *dev)
 	if (status) {
 		dev_warn(device, "request IRQ%d failed: %d\n", dev->irq,
 			 status);
-		return status;
+		goto disable_dpc;
 	}
 
 	pci_read_config_word(pdev, dpc->cap_pos + PCI_EXP_DPC_CAP, &cap);
@@ -260,17 +290,15 @@ static int dpc_probe(struct pcie_device *dev)
 		FLAG(cap, PCI_EXP_DPC_CAP_SW_TRIGGER), dpc->rp_log_size,
 		FLAG(cap, PCI_EXP_DPC_CAP_DL_ACTIVE));
 	return status;
+
+disable_dpc:
+	dpc_disable(pdev);
+	return status;
 }
 
 static void dpc_remove(struct pcie_device *dev)
 {
-	struct dpc_dev *dpc = get_service_data(dev);
-	struct pci_dev *pdev = dev->port;
-	u16 ctl;
-
-	pci_read_config_word(pdev, dpc->cap_pos + PCI_EXP_DPC_CTL, &ctl);
-	ctl &= ~(PCI_EXP_DPC_CTL_EN_FATAL | PCI_EXP_DPC_CTL_INT_EN);
-	pci_write_config_word(pdev, dpc->cap_pos + PCI_EXP_DPC_CTL, ctl);
+	dpc_disable(dev->port);
 }
 
 static struct pcie_port_service_driver dpcdriver = {

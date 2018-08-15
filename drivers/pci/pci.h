@@ -536,4 +536,10 @@ static inline void pci_aer_clear_fatal_status(struct pci_dev *dev) { }
 static inline void pci_aer_clear_device_status(struct pci_dev *dev) { }
 #endif
 
+#ifdef CONFIG_PCIE_DPC
+void pci_no_dpc(void);
+#else
+static inline void pci_no_dpc(void) { }
+#endif
+
 #endif /* DRIVERS_PCI_H */
