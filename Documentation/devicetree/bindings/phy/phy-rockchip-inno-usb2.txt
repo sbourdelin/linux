@@ -48,6 +48,11 @@ Optional properties:
 		See ./phy-bindings.txt for details.
  - rockchip,utmi-avalid : boolean, use the avalid register to get vbus status.
 			  Otherwise, use the bvalid register.
+ - rockchip,force-bvalid : boolean, set this to force the B-Device Session
+			  Valid bit when the usb port is in device mode. This
+			  is used when the otg-id pin is not connected.
+			  Only supported in case of compatible being:
+			  * "rockchip,rk3399-usb2phy"
 
 Example:
 
