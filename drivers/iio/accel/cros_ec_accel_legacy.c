@@ -385,8 +385,10 @@ static int cros_ec_accel_legacy_probe(struct platform_device *pdev)
 		switch (i) {
 		case X:
 			ec_accel_channels[X].scan_index = Y;
+			/* fall through */
 		case Y:
 			ec_accel_channels[Y].scan_index = X;
+			/* fall through */
 		case Z:
 			ec_accel_channels[Z].scan_index = Z;
 		}
