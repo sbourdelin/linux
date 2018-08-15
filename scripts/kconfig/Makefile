@@ -33,6 +33,14 @@ config: $(obj)/conf
 nconfig: $(obj)/nconf
 	$< $(silent) $(Kconfig)
 
+build_menuconfig: $(obj)/mconf
+
+build_nconfig: $(obj)/nconf
+
+build_gconfig: $(obj)/gconf
+
+build_xconfig: $(obj)/qconf
+
 localyesconfig localmodconfig: $(obj)/conf
 	$(Q)perl $(srctree)/$(src)/streamline_config.pl --$@ $(srctree) $(Kconfig) > .tmp.config
 	$(Q)if [ -f .config ]; then 					\
