@@ -430,6 +430,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_TXQ_QUANTUM] = { .type = NLA_U32 },
 	[NL80211_ATTR_HE_CAPABILITY] = { .type = NLA_BINARY,
 					 .len = NL80211_HE_MAX_CAPABILITY_LEN },
+	[NL80211_ATTR_FTM_RESPONDER] = { .type = NLA_U32},
 };
 
 /* policy for the key attributes */
@@ -4337,6 +4338,24 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 		params.acl = parse_acl_data(&rdev->wiphy, info);
 		if (IS_ERR(params.acl))
 			return PTR_ERR(params.acl);
+	}
+
+	params.ftm_responder = -1;
+	if (info->attrs[NL80211_ATTR_FTM_RESPONDER]) {
+		if (!wiphy_ext_feature_isset(
+			    &rdev->wiphy,
+			    NL80211_EXT_FEATURE_SET_FTM_RESPONDER)) {
+			GENL_SET_ERR_MSG(info,
+					 "FTM Responder config not supported\n");
+			return -EOPNOTSUPP;
+		}
+
+		params.ftm_responder =
+			nla_get_u32(info->attrs[NL80211_ATTR_FTM_RESPONDER]);
+
+		if (params.ftm_responder != NL80211_FTM_RESP_DISABLED &&
+		    params.ftm_responder != NL80211_FTM_RESP_ENABLED)
+			return -EINVAL;
 	}
 
 	nl80211_calculate_ap_params(&params);

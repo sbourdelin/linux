@@ -851,6 +851,7 @@ struct cfg80211_bitrate_mask {
  * @vht_cap: VHT capabilities (or %NULL if VHT isn't enabled)
  * @ht_required: stations must support HT
  * @vht_required: stations must support VHT
+ * @ftm_responder: enable or disable FTM responder functionality
  */
 struct cfg80211_ap_settings {
 	struct cfg80211_chan_def chandef;
@@ -875,6 +876,7 @@ struct cfg80211_ap_settings {
 	const struct ieee80211_ht_cap *ht_cap;
 	const struct ieee80211_vht_cap *vht_cap;
 	bool ht_required, vht_required;
+	int ftm_responder;
 };
 
 /**

@@ -2241,6 +2241,11 @@ enum nl80211_commands {
  *	association request when used with NL80211_CMD_NEW_STATION). Can be set
  *	only if %NL80211_STA_FLAG_WME is set.
  *
+ * @NL80211_ATTR_FTM_RESPONDER: attribute which user-space can include in
+ *	%NL80211_CMD_START_AP to enable(1) or disable(0) fine timing measurement
+ *	(FTM) responder functionality.  If not set, it means don't care and
+ *	the device will decide what to use.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2681,6 +2686,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_TXQ_QUANTUM,
 
 	NL80211_ATTR_HE_CAPABILITY,
+
+	NL80211_ATTR_FTM_RESPONDER,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -5223,6 +5230,8 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_SCAN_MIN_PREQ_CONTENT: Driver/device can omit all data
  *	except for supported rates from the probe request content if requested
  *	by the %NL80211_SCAN_FLAG_MIN_PREQ_CONTENT flag.
+ * @NL80211_EXT_FEATURE_SET_FTM_RESPONDER: Driver supports enabling and
+ *	disabling fine timing measurement responder role.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -5259,6 +5268,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_TXQS,
 	NL80211_EXT_FEATURE_SCAN_RANDOM_SN,
 	NL80211_EXT_FEATURE_SCAN_MIN_PREQ_CONTENT,
+	NL80211_EXT_FEATURE_SET_FTM_RESPONDER,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
@@ -5796,6 +5806,16 @@ enum nl80211_nan_match_attributes {
 enum nl80211_external_auth_action {
 	NL80211_EXTERNAL_AUTH_START,
 	NL80211_EXTERNAL_AUTH_ABORT,
+};
+
+/**
+ * enum nl80211_ftm_responder_state - fine timing measurement responder state
+ * @NL80211_FTM_RESP_DISABLED: FTM responder is disabled
+ * @NL80211_FTM_RESP_ENABLED: FTM responder is enabled
+ */
+enum nl80211_ftm_responder_state {
+	NL80211_FTM_RESP_DISABLED,
+	NL80211_FTM_RESP_ENABLED,
 };
 
 #endif /* __LINUX_NL80211_H */
