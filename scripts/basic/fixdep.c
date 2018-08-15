@@ -105,8 +105,9 @@
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: fixdep [-e] <depfile> <target> <cmdline>\n");
+	fprintf(stderr, "Usage: fixdep [-e] [-r] <depfile> <target> <cmdline>\n");
 	fprintf(stderr, " -e  insert extra dependencies given on stdin\n");
+	fprintf(stderr, " -r  remove <depfile> after processing\n");
 	exit(1);
 }
 
@@ -380,12 +381,14 @@ int main(int argc, char *argv[])
 {
 	const char *depfile, *target, *cmdline;
 	int insert_extra_deps = 0;
+	int remove_depfile = 0;
 	void *buf;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "e")) != -1) {
+	while ((opt = getopt(argc, argv, "er")) != -1) {
 		switch (opt) {
 		case 'e': insert_extra_deps = 1; break;
+		case 'r': remove_depfile = 1; break;
 		default: usage();
 		}
 	}
@@ -404,6 +407,9 @@ int main(int argc, char *argv[])
 	buf = read_file(depfile);
 	parse_dep_file(buf, target, insert_extra_deps);
 	free(buf);
+
+	if (remove_depfile)
+		unlink(depfile);
 
 	return 0;
 }
