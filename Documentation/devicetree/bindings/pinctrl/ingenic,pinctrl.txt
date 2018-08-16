@@ -20,6 +20,7 @@ Required properties:
 
  - compatible: One of:
     - "ingenic,jz4740-pinctrl"
+    - "ingenic,jz4725b-pinctrl"
     - "ingenic,jz4770-pinctrl"
     - "ingenic,jz4780-pinctrl"
  - reg: Address range of the pinctrl registers.
@@ -30,6 +31,7 @@ Required properties for sub-nodes (GPIO chips):
 
  - compatible: Must contain one of:
     - "ingenic,jz4740-gpio"
+    - "ingenic,jz4725b-gpio"
     - "ingenic,jz4770-gpio"
     - "ingenic,jz4780-gpio"
  - reg: The GPIO bank number.
