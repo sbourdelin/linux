@@ -1160,7 +1160,7 @@ void intel_engines_unpark(struct drm_i915_private *i915)
 		map = NULL;
 		if (engine->default_state)
 			map = i915_gem_object_pin_map(engine->default_state,
-						      I915_MAP_WB);
+						      I915_MAP_FORCE_WB);
 		if (!IS_ERR_OR_NULL(map))
 			engine->pinned_default_state = map;
 

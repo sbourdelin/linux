@@ -1286,7 +1286,7 @@ alloc_context_vma(struct intel_engine_cs *engine)
 		}
 
 		defaults = i915_gem_object_pin_map(engine->default_state,
-						   I915_MAP_WB);
+						   I915_MAP_FORCE_WB);
 		if (IS_ERR(defaults)) {
 			err = PTR_ERR(defaults);
 			goto err_map;

@@ -1851,7 +1851,8 @@ static int gen8_configure_all_contexts(struct drm_i915_private *dev_priv,
 		if (!ce->state)
 			continue;
 
-		regs = i915_gem_object_pin_map(ce->state->obj, I915_MAP_WB);
+		regs = i915_gem_object_pin_map(ce->state->obj,
+					      i915_coherent_map_type(dev_priv));
 		if (IS_ERR(regs)) {
 			ret = PTR_ERR(regs);
 			goto out;
