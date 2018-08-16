@@ -25,6 +25,7 @@
  *
  **************************************************************************/
 #include <linux/sync_file.h>
+#include <linux/nospec.h>
 
 #include "vmwgfx_drv.h"
 #include "vmwgfx_reg.h"
@@ -4520,8 +4521,10 @@ int vmw_execbuf_ioctl(struct drm_device *dev, unsigned long data,
 		return -EINVAL;
 	}
 
-	if (arg.version > 1 &&
-	    copy_from_user(&arg.context_handle,
+	if (arg.version >= ARRAY_SIZE(copy_offset))
+		return -EFAULT;
+	arg.version = array_index_nospec(arg.version, ARRAY_SIZE(copy_offset));
+	if (copy_from_user(&arg.context_handle,
 			   (void __user *) (data + copy_offset[0]),
 			   copy_offset[arg.version - 1] -
 			   copy_offset[0]) != 0)
