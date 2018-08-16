@@ -115,7 +115,8 @@ do {    \
 #define ERR_MSG(fmt, args...) \
 do { \
 	printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d> PID<%s><0x%x>\n", \
-	       host->id,  ##args, __FUNCTION__, __LINE__, current->comm, current->pid); \
+	       host->id,  ##args, __func__, __LINE__, current->comm, \
+	       current->pid); \
 } while (0);
 
 #if 1
@@ -126,14 +127,15 @@ do { \
 #define INIT_MSG(fmt, args...) \
 do { \
 	printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d> PID<%s><0x%x>\n", \
-	       host->id,  ##args, __FUNCTION__, __LINE__, current->comm, current->pid); \
+	       host->id,  ##args, __func__, __LINE__, current->comm, \
+	       current->pid); \
 } while (0);
 
 /* PID in ISR in not corrent */
 #define IRQ_MSG(fmt, args...) \
 do { \
 	printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d>\n",	\
-	       host->id,  ##args, __FUNCTION__, __LINE__);	\
+	       host->id,  ##args, __func__, __LINE__);	\
 } while (0);
 #endif
 
