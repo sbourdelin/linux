@@ -397,21 +397,9 @@ static int fscache_objlist_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-/*
- * clean up on close
- */
-static int fscache_objlist_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *m = file->private_data;
-
-	kfree(m->private);
-	m->private = NULL;
-	return seq_release(inode, file);
-}
-
 const struct file_operations fscache_objlist_fops = {
 	.open		= fscache_objlist_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= fscache_objlist_release,
+	.release	= seq_release_private,
 };
