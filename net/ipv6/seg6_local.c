@@ -68,7 +68,7 @@ static struct seg6_local_lwt *seg6_local_lwtunnel(struct lwtunnel_state *lwt)
 	return (struct seg6_local_lwt *)lwt->data;
 }
 
-static struct ipv6_sr_hdr *get_srh(struct sk_buff *skb)
+struct ipv6_sr_hdr *seg6_get_srh(struct sk_buff *skb)
 {
 	struct ipv6_sr_hdr *srh;
 	int len, srhoff = 0;
@@ -91,12 +91,13 @@ static struct ipv6_sr_hdr *get_srh(struct sk_buff *skb)
 
 	return srh;
 }
+EXPORT_SYMBOL_GPL(seg6_get_srh);
 
 static struct ipv6_sr_hdr *get_and_validate_srh(struct sk_buff *skb)
 {
 	struct ipv6_sr_hdr *srh;
 
-	srh = get_srh(skb);
+	srh = seg6_get_srh(skb);
 	if (!srh)
 		return NULL;
 
@@ -116,7 +117,7 @@ static bool decap_and_validate(struct sk_buff *skb, int proto)
 	struct ipv6_sr_hdr *srh;
 	unsigned int off = 0;
 
-	srh = get_srh(skb);
+	srh = seg6_get_srh(skb);
 	if (srh && srh->segments_left > 0)
 		return false;
 
@@ -140,7 +141,7 @@ static bool decap_and_validate(struct sk_buff *skb, int proto)
 	return true;
 }
 
-static void advance_nextseg(struct ipv6_sr_hdr *srh, struct in6_addr *daddr)
+void seg6_advance_nextseg(struct ipv6_sr_hdr *srh, struct in6_addr *daddr)
 {
 	struct in6_addr *addr;
 
@@ -148,6 +149,7 @@ static void advance_nextseg(struct ipv6_sr_hdr *srh, struct in6_addr *daddr)
 	addr = srh->segments + srh->segments_left;
 	*daddr = *addr;
 }
+EXPORT_SYMBOL_GPL(seg6_advance_nextseg);
 
 int seg6_lookup_nexthop(struct sk_buff *skb, struct in6_addr *nhaddr,
 			u32 tbl_id)
@@ -198,6 +200,7 @@ out:
 	skb_dst_set(skb, dst);
 	return dst->error;
 }
+EXPORT_SYMBOL_GPL(seg6_lookup_nexthop);
 
 /* regular endpoint function */
 static int input_action_end(struct sk_buff *skb, struct seg6_local_lwt *slwt)
@@ -208,7 +211,7 @@ static int input_action_end(struct sk_buff *skb, struct seg6_local_lwt *slwt)
 	if (!srh)
 		goto drop;
 
-	advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
+	seg6_advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
 
 	seg6_lookup_nexthop(skb, NULL, 0);
 
@@ -228,7 +231,7 @@ static int input_action_end_x(struct sk_buff *skb, struct seg6_local_lwt *slwt)
 	if (!srh)
 		goto drop;
 
-	advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
+	seg6_advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
 
 	seg6_lookup_nexthop(skb, &slwt->nh6, 0);
 
@@ -247,7 +250,7 @@ static int input_action_end_t(struct sk_buff *skb, struct seg6_local_lwt *slwt)
 	if (!srh)
 		goto drop;
 
-	advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
+	seg6_advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
 
 	seg6_lookup_nexthop(skb, NULL, slwt->table);
 
@@ -436,7 +439,7 @@ static int input_action_end_b6_encap(struct sk_buff *skb,
 	if (!srh)
 		goto drop;
 
-	advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
+	seg6_advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
 
 	skb_reset_inner_headers(skb);
 	skb->encapsulation = 1;
@@ -495,7 +498,7 @@ static int input_action_end_bpf(struct sk_buff *skb,
 		kfree_skb(skb);
 		return -EINVAL;
 	}
-	advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
+	seg6_advance_nextseg(srh, &ipv6_hdr(skb)->daddr);
 
 	/* preempt_disable is needed to protect the per-CPU buffer srh_state,
 	 * which is also accessed by the bpf_lwt_seg6_* helpers
