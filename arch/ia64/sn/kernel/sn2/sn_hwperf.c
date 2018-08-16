@@ -946,8 +946,12 @@ int sn_topology_open(struct inode *inode, struct file *file)
 
 	if ((e = sn_hwperf_enum_objects(&nobj, &objbuf)) == 0) {
 		e = seq_open(file, &sn_topology_seq_ops);
-		seq = file->private_data;
-		seq->private = objbuf;
+		if (e) {
+			vfree(objbuf);
+		} else {
+			seq = file->private_data;
+			seq->private = objbuf;
+		}
 	}
 
 	return e;
