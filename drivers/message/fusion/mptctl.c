@@ -59,6 +59,7 @@
 
 #include <asm/io.h>
 #include <linux/uaccess.h>
+#include <linux/nospec.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -1306,7 +1307,7 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 		kfree(karg);
 		return -EINVAL;
 	}
-	port = karg->hdr.port;
+	port = array_index_nospec(karg->hdr.port, 1 + 1);
 
 	karg->port = port;
 	pdev = (struct pci_dev *) ioc->pcidev;
