@@ -599,6 +599,14 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 	return kvmalloc_array(n, size, flags | __GFP_ZERO);
 }
 
+static inline struct page *kvvirt_to_page(const void *addr)
+{
+	if (!is_vmalloc_addr(addr))
+		return virt_to_page(addr);
+	else
+		return vmalloc_to_page(addr);
+}
+
 extern void kvfree(const void *addr);
 
 static inline atomic_t *compound_mapcount_ptr(struct page *page)
