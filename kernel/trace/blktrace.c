@@ -1602,11 +1602,11 @@ static int blk_trace_remove_queue(struct request_queue *q)
 	struct blk_trace *bt;
 
 	bt = xchg(&q->blk_trace, NULL);
-	if (bt == NULL)
-		return -EINVAL;
+	if (bt != NULL) {
+		put_probe_ref();
+		blk_trace_free(bt);
+	}
 
-	put_probe_ref();
-	blk_trace_free(bt);
 	return 0;
 }
 
@@ -1618,6 +1618,9 @@ static int blk_trace_setup_queue(struct request_queue *q,
 {
 	struct blk_trace *bt = NULL;
 	int ret = -ENOMEM;
+
+	if (q->blk_trace)
+		return 0;
 
 	bt = kzalloc(sizeof(*bt), GFP_KERNEL);
 	if (!bt)
