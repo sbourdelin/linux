@@ -893,6 +893,11 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 	struct memory_notify arg;
 	struct memory_block *mem;
 
+	if (!IS_ALIGNED(pfn, PAGES_PER_SECTION))
+		return -EINVAL;
+	if (!IS_ALIGNED(nr_pages, PAGES_PER_SECTION))
+		return -EINVAL;
+
 	/*
 	 * We can't use pfn_to_nid() because nid might be stored in struct page
 	 * which is not yet initialized. Instead, we find nid from memory block.
@@ -1608,10 +1613,9 @@ int offline_pages(unsigned long start_pfn, unsigned long nr_pages)
 	struct zone *zone;
 	struct memory_notify arg;
 
-	/* at least, alignment against pageblock is necessary */
-	if (!IS_ALIGNED(start_pfn, pageblock_nr_pages))
+	if (!IS_ALIGNED(start_pfn, PAGES_PER_SECTION))
 		return -EINVAL;
-	if (!IS_ALIGNED(end_pfn, pageblock_nr_pages))
+	if (!IS_ALIGNED(nr_pages, PAGES_PER_SECTION))
 		return -EINVAL;
 	/* This makes hotplug much easier...and readable.
 	   we assume this for now. .*/
