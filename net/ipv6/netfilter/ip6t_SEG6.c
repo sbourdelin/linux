@@ -25,6 +25,14 @@
 #include <net/seg6.h>
 #include <net/ip6_route.h>
 
+static int seg6_bsid(struct sk_buff *skb, struct in6_addr bsid,
+		     u32 tbl)
+{
+	seg6_lookup_nexthop(skb, &bsid, tbl);
+	dst_input(skb);
+	return NF_STOLEN;
+}
+
 static int seg6_go_next(struct sk_buff *skb, struct ipv6_sr_hdr *srh)
 {
 	if (srh->segments_left == 0)
@@ -62,6 +70,10 @@ seg6_tg6(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	struct ipv6_sr_hdr *srh;
 	const struct ip6t_seg6_info *seg6 = par->targinfo;
+
+	/* bind-sid action doesn't require packets with SRH */
+	if (seg6->action == IP6T_SEG6_BSID)
+		return seg6_bsid(skb, seg6->bsid, seg6->tbl);
 
 	srh = seg6_get_srh(skb);
 	if (!srh)
