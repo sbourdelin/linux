@@ -962,9 +962,11 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 	return 0;
 
 failed_addition:
+#ifdef CONFIG_DEBUG_VM
 	pr_debug("online_pages [mem %#010llx-%#010llx] failed\n",
 		 (unsigned long long) pfn << PAGE_SHIFT,
 		 (((unsigned long long) pfn + nr_pages) << PAGE_SHIFT) - 1);
+#endif
 	memory_notify(MEM_CANCEL_ONLINE, &arg);
 	return ret;
 }
@@ -1668,7 +1670,9 @@ repeat:
 	offlined_pages = check_pages_isolated(start_pfn, end_pfn);
 	if (offlined_pages < 0)
 		goto repeat;
+#ifdef CONFIG_DEBUG_VM
 	pr_info("Offlined Pages %ld\n", offlined_pages);
+#endif
 	/* Ok, all of our target is isolated.
 	   We cannot do rollback at this point. */
 	offline_isolated_pages(start_pfn, end_pfn);
@@ -1703,9 +1707,11 @@ repeat:
 	return 0;
 
 failed_removal:
+#ifdef CONFIG_DEBUG_VM
 	pr_debug("memory offlining [mem %#010llx-%#010llx] failed\n",
 		 (unsigned long long) start_pfn << PAGE_SHIFT,
 		 ((unsigned long long) end_pfn << PAGE_SHIFT) - 1);
+#endif
 	memory_notify(MEM_CANCEL_OFFLINE, &arg);
 	/* pushback to free area */
 	undo_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
