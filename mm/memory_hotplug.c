@@ -929,13 +929,8 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 		setup_zone_pageset(zone);
 	}
 
-	ret = walk_system_ram_range(pfn, nr_pages, &onlined_pages,
-		online_pages_range);
-	if (ret) {
-		if (need_zonelists_rebuild)
-			zone_pcp_reset(zone);
-		goto failed_addition;
-	}
+	walk_system_ram_range(pfn, nr_pages, &onlined_pages,
+			      online_pages_range);
 
 	zone->present_pages += onlined_pages;
 
