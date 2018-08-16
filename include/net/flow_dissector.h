@@ -270,6 +270,22 @@ __be32 flow_get_u32_dst(const struct flow_keys *flow);
 extern struct flow_dissector flow_keys_dissector;
 extern struct flow_dissector flow_keys_basic_dissector;
 
+/* struct bpf_flow_dissect_cb:
+ *
+ * This struct is used to pass parameters to BPF programs of type
+ * BPF_PROG_TYPE_FLOW_DISSECTOR. Before such a program is run, the caller sets
+ * the control block of the skb to be a struct of this type. The first field is
+ * used to communicate the next header offset between the BPF programs and the
+ * first value of it is passed from the kernel. The last two fields are used for
+ * writing out flow keys.
+ */
+struct bpf_flow_dissect_cb {
+	u16 nhoff;
+	u16 unused;
+	void *target_container;
+	struct flow_dissector *flow_dissector;
+};
+
 /* struct flow_keys_digest:
  *
  * This structure is used to hold a digest of the full flow keys. This is a

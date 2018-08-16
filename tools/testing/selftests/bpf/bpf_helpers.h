@@ -143,6 +143,9 @@ static unsigned long long (*bpf_skb_cgroup_id)(void *ctx) =
 	(void *) BPF_FUNC_skb_cgroup_id;
 static unsigned long long (*bpf_skb_ancestor_cgroup_id)(void *ctx, int level) =
 	(void *) BPF_FUNC_skb_ancestor_cgroup_id;
+static int (*bpf_flow_dissector_write_keys)(void *ctx, void *src, int len,
+					    int key) =
+	(void *) BPF_FUNC_flow_dissector_write_keys;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

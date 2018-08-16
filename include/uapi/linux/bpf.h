@@ -152,6 +152,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_LWT_SEG6LOCAL,
 	BPF_PROG_TYPE_LIRC_MODE2,
 	BPF_PROG_TYPE_SK_REUSEPORT,
+	BPF_PROG_TYPE_FLOW_DISSECTOR,
 };
 
 enum bpf_attach_type {
@@ -172,6 +173,7 @@ enum bpf_attach_type {
 	BPF_CGROUP_UDP4_SENDMSG,
 	BPF_CGROUP_UDP6_SENDMSG,
 	BPF_LIRC_MODE2,
+	BPF_FLOW_DISSECTOR,
 	__MAX_BPF_ATTACH_TYPE
 };
 
@@ -2141,6 +2143,15 @@ union bpf_attr {
  *		request in the skb.
  *	Return
  *		0 on success, or a negative error in case of failure.
+ *
+ * int bpf_flow_dissector_write_keys(const struct sk_buff *skb, const void *from, u32 len, enum flow_dissector_key_id key_id)
+ *	Description
+ *		Try to write *len* bytes from the source pointer into the offset
+ *		of the key with id *key_id*. If *len* is different from the
+ *		size of the key, an error is returned. If the key is not used,
+ *		this function exits with no effect and code 0.
+ *	Return
+ *		0 on success, negative error in case of failure.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -2226,7 +2237,8 @@ union bpf_attr {
 	FN(get_current_cgroup_id),	\
 	FN(get_local_storage),		\
 	FN(sk_select_reuseport),	\
-	FN(skb_ancestor_cgroup_id),
+	FN(skb_ancestor_cgroup_id),	\
+	FN(flow_dissector_write_keys),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call

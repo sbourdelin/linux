@@ -4820,6 +4820,111 @@ bool bpf_helper_changes_pkt_data(void *func)
 	return false;
 }
 
+BPF_CALL_4(bpf_flow_dissector_write_keys, const struct sk_buff *, skb,
+	   const void *, from, u32, len, enum flow_dissector_key_id, key_id)
+{
+	struct bpf_flow_dissect_cb *cb;
+	void *dest;
+
+	cb = (struct bpf_flow_dissect_cb *)bpf_skb_cb(skb);
+
+	/* Make sure the dissector actually uses the key. It is not an error if
+	 * it does not, but we should not continue past this point in that case
+	 */
+	if (!dissector_uses_key(cb->flow_dissector, key_id))
+		return 0;
+
+	/* Make sure the length is correct */
+	switch (key_id) {
+	case FLOW_DISSECTOR_KEY_CONTROL:
+	case FLOW_DISSECTOR_KEY_ENC_CONTROL:
+		if (len != sizeof(struct flow_dissector_key_control))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_BASIC:
+		if (len != sizeof(struct flow_dissector_key_basic))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
+	case FLOW_DISSECTOR_KEY_ENC_IPV4_ADDRS:
+		if (len != sizeof(struct flow_dissector_key_ipv4_addrs))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_IPV6_ADDRS:
+	case FLOW_DISSECTOR_KEY_ENC_IPV6_ADDRS:
+		if (len != sizeof(struct flow_dissector_key_ipv6_addrs))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_ICMP:
+		if (len != sizeof(struct flow_dissector_key_icmp))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_PORTS:
+	case FLOW_DISSECTOR_KEY_ENC_PORTS:
+		if (len != sizeof(struct flow_dissector_key_ports))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_ETH_ADDRS:
+		if (len != sizeof(struct flow_dissector_key_eth_addrs))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_TIPC:
+		if (len != sizeof(struct flow_dissector_key_tipc))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_ARP:
+		if (len != sizeof(struct flow_dissector_key_arp))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_VLAN:
+	case FLOW_DISSECTOR_KEY_CVLAN:
+		if (len != sizeof(struct flow_dissector_key_vlan))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_FLOW_LABEL:
+		if (len != sizeof(struct flow_dissector_key_tags))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_GRE_KEYID:
+	case FLOW_DISSECTOR_KEY_ENC_KEYID:
+	case FLOW_DISSECTOR_KEY_MPLS_ENTROPY:
+		if (len != sizeof(struct flow_dissector_key_keyid))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_MPLS:
+		if (len != sizeof(struct flow_dissector_key_mpls))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_TCP:
+		if (len != sizeof(struct flow_dissector_key_tcp))
+			return -EINVAL;
+		break;
+	case FLOW_DISSECTOR_KEY_IP:
+	case FLOW_DISSECTOR_KEY_ENC_IP:
+		if (len != sizeof(struct flow_dissector_key_ip))
+			return -EINVAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	dest = skb_flow_dissector_target(cb->flow_dissector, key_id,
+					 cb->target_container);
+
+	memcpy(dest, from, len);
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_flow_dissector_write_keys_proto = {
+	.func		= bpf_flow_dissector_write_keys,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_PTR_TO_MEM,
+	.arg3_type	= ARG_CONST_SIZE,
+	.arg4_type	= ARG_ANYTHING,
+};
+
 static const struct bpf_func_proto *
 bpf_base_func_proto(enum bpf_func_id func_id)
 {
@@ -5095,6 +5200,19 @@ sk_skb_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_sk_redirect_hash_proto;
 	case BPF_FUNC_get_local_storage:
 		return &bpf_get_local_storage_proto;
+	default:
+		return bpf_base_func_proto(func_id);
+	}
+}
+
+static const struct bpf_func_proto *
+flow_dissector_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
+{
+	switch (func_id) {
+	case BPF_FUNC_skb_load_bytes:
+		return &bpf_skb_load_bytes_proto;
+	case BPF_FUNC_flow_dissector_write_keys:
+		return &bpf_flow_dissector_write_keys_proto;
 	default:
 		return bpf_base_func_proto(func_id);
 	}
@@ -5736,6 +5854,35 @@ static bool sk_msg_is_valid_access(int off, int size,
 		return false;
 
 	return true;
+}
+
+static bool flow_dissector_is_valid_access(int off, int size,
+					   enum bpf_access_type type,
+					   const struct bpf_prog *prog,
+					   struct bpf_insn_access_aux *info)
+{
+	if (type == BPF_WRITE) {
+		switch (off) {
+		case bpf_ctx_range(struct __sk_buff, cb[0]):
+			break;
+		default:
+			return false;
+		}
+	}
+
+	switch (off) {
+	case bpf_ctx_range(struct __sk_buff, data):
+		info->reg_type = PTR_TO_PACKET;
+		break;
+	case bpf_ctx_range(struct __sk_buff, data_end):
+		info->reg_type = PTR_TO_PACKET_END;
+		break;
+	case bpf_ctx_range_till(struct __sk_buff, family, local_port):
+	case bpf_ctx_range_till(struct __sk_buff, cb[1], cb[4]):
+		return false;
+	}
+
+	return bpf_skb_is_valid_access(off, size, type, prog, info);
 }
 
 static u32 bpf_convert_ctx_access(enum bpf_access_type type,
@@ -6993,6 +7140,16 @@ const struct bpf_verifier_ops sk_msg_verifier_ops = {
 };
 
 const struct bpf_prog_ops sk_msg_prog_ops = {
+};
+
+const struct bpf_verifier_ops flow_dissector_verifier_ops = {
+	.get_func_proto		= flow_dissector_func_proto,
+	.is_valid_access	= flow_dissector_is_valid_access,
+	.convert_ctx_access	= bpf_convert_ctx_access,
+	.gen_ld_abs		= bpf_gen_ld_abs,
+};
+
+const struct bpf_prog_ops flow_dissector_prog_ops = {
 };
 
 int sk_detach_filter(struct sock *sk)
