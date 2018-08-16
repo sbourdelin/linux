@@ -1221,6 +1221,8 @@ static inline int online_section_nr(unsigned long nr)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
+bool mem_sections_online(unsigned long pfn, unsigned long end_pfn);
+bool mem_sections_offline(unsigned long pfn, unsigned long end_pfn);
 void online_mem_sections(unsigned long start_pfn, unsigned long end_pfn);
 #ifdef CONFIG_MEMORY_HOTREMOVE
 void offline_mem_sections(unsigned long start_pfn, unsigned long end_pfn);

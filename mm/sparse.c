@@ -602,6 +602,34 @@ void __init sparse_init(void)
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 
+/* check if all mem sections are online */
+bool mem_sections_online(unsigned long pfn, unsigned long end_pfn)
+{
+	for (; pfn < end_pfn; pfn += PAGES_PER_SECTION) {
+		unsigned long section_nr = pfn_to_section_nr(pfn);
+
+		if (WARN_ON(!valid_section_nr(section_nr)))
+			continue;
+		if (!online_section_nr(section_nr))
+			return false;
+	}
+	return true;
+}
+
+/* check if all mem sections are offline */
+bool mem_sections_offline(unsigned long pfn, unsigned long end_pfn)
+{
+	for (; pfn < end_pfn; pfn += PAGES_PER_SECTION) {
+		unsigned long section_nr = pfn_to_section_nr(pfn);
+
+		if (WARN_ON(!valid_section_nr(section_nr)))
+			continue;
+		if (online_section_nr(section_nr))
+			return false;
+	}
+	return true;
+}
+
 /* Mark all memory sections within the pfn range as online */
 void online_mem_sections(unsigned long start_pfn, unsigned long end_pfn)
 {

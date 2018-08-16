@@ -897,6 +897,8 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 		return -EINVAL;
 	if (!IS_ALIGNED(nr_pages, PAGES_PER_SECTION))
 		return -EINVAL;
+	if (!mem_sections_offline(pfn, pfn + nr_pages))
+		return -EINVAL;
 
 	/*
 	 * We can't use pfn_to_nid() because nid might be stored in struct page
@@ -1617,6 +1619,9 @@ int offline_pages(unsigned long start_pfn, unsigned long nr_pages)
 		return -EINVAL;
 	if (!IS_ALIGNED(nr_pages, PAGES_PER_SECTION))
 		return -EINVAL;
+	if (!mem_sections_online(start_pfn, end_pfn))
+		return -EINVAL;
+
 	/* This makes hotplug much easier...and readable.
 	   we assume this for now. .*/
 	if (!test_pages_in_a_zone(start_pfn, end_pfn, &valid_start, &valid_end))
