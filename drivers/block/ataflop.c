@@ -1355,7 +1355,7 @@ static int floppy_revalidate(struct gendisk *disk)
 
 	if (test_bit(drive, &changed_floppies) ||
 	    test_bit(drive, &fake_change) ||
-	    p->disktype == 0) {
+	    p->disktype == NULL) {
 		if (UD.flags & FTD_MSG)
 			printk(KERN_ERR "floppy: clear format %p!\n", UDT);
 		BufferDrive = -1;
