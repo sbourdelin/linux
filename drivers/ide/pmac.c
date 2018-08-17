@@ -1682,7 +1682,7 @@ static int pmac_ide_init_dma(ide_hwif_t *hwif, const struct ide_port_info *d)
 	/* We won't need pci_dev if we switch to generic consistent
 	 * DMA routines ...
 	 */
-	if (dev == NULL || pmif->dma_regs == 0)
+	if (dev == NULL || pmif->dma_regs == NULL)
 		return -ENODEV;
 	/*
 	 * Allocate space for the DBDMA commands.
