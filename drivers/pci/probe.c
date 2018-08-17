@@ -762,6 +762,22 @@ static void pci_set_bus_msi_domain(struct pci_bus *bus)
 	dev_set_msi_domain(&bus->dev, d);
 }
 
+/**
+ * pcibios_root_bridge_prepare - Platform-specific host bridge setup
+ * @bridge: Host bridge to set up
+ *
+ * Host bridge drivers can do some last minute fixups on the bridge
+ * here. Usually this should be done before calling pci_register_host_bridge
+ * though, so this hook can be removed.
+ */
+static int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+{
+	if (bridge->prepare)
+		return bridge->prepare(bridge);
+
+	return 0;
+}
+
 /*
  * pci_register_host_bridge() - Register a host bridge without scanning
  *
@@ -2888,18 +2904,6 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 	return pci_scan_child_bus_extend(bus, 0);
 }
 EXPORT_SYMBOL_GPL(pci_scan_child_bus);
-
-/**
- * pcibios_root_bridge_prepare - Platform-specific host bridge setup
- * @bridge: Host bridge to set up
- *
- * Default empty implementation.  Replace with an architecture-specific setup
- * routine, if necessary.
- */
-int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-{
-	return 0;
-}
 
 void __weak pcibios_add_bus(struct pci_bus *bus)
 {

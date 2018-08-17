@@ -71,19 +71,17 @@ int acpi_pci_bus_find_domain_nr(struct pci_bus *bus)
 	return root->segment;
 }
 
-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+int acpi_pci_root_bridge_prepare(struct pci_host_bridge *bridge)
 {
-	if (!acpi_disabled) {
-		struct pci_config_window *cfg = bridge->bus->sysdata;
-		struct acpi_device *adev = to_acpi_device(cfg->parent);
-		struct device *bus_dev = &bridge->bus->dev;
+	struct pci_config_window *cfg = bridge->bus->sysdata;
+	struct acpi_device *adev = to_acpi_device(cfg->parent);
+	struct device *bus_dev = &bridge->bus->dev;
 
-		ACPI_COMPANION_SET(&bridge->dev, adev);
-		set_dev_node(bus_dev, acpi_get_node(acpi_device_handle(adev)));
+	ACPI_COMPANION_SET(&bridge->dev, adev);
+	set_dev_node(bus_dev, acpi_get_node(acpi_device_handle(adev)));
 
-		/* Try to assign the IRQ number when probing a new device */
-		bridge->alloc_irq = acpi_pci_irq_enable;
-	}
+	/* Try to assign the IRQ number when probing a new device */
+	bridge->alloc_irq = acpi_pci_irq_enable;
 
 	return 0;
 }

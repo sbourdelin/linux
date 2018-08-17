@@ -336,12 +336,14 @@ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
 void acpi_unregister_gsi (u32 gsi);
 
 struct pci_dev;
+struct pci_host_bridge;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
 void acpi_penalize_isa_irq(int irq, int active);
 bool acpi_isa_irq_available(int irq);
 void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
 void acpi_pci_irq_disable (struct pci_dev *dev);
+int acpi_pci_root_bridge_prepare(struct pci_host_bridge *bridge);
 
 extern int ec_read(u8 addr, u8 *val);
 extern int ec_write(u8 addr, u8 val);

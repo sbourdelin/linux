@@ -774,14 +774,6 @@ int pci_proc_domain(struct pci_bus *bus)
 	return 1;
 }
 
-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-{
-	if (ppc_md.pcibios_root_bridge_prepare)
-		return ppc_md.pcibios_root_bridge_prepare(bridge);
-
-	return 0;
-}
-
 /* This header fixup will do the resource fixup for all devices as they are
  * probed, but not for bridge ranges
  */
@@ -1615,6 +1607,7 @@ void pcibios_scan_phb(struct pci_controller *hose)
 	pci_add_resource(&bridge->windows, &hose->busn);
 
 	bridge->bus_add_device = ppc_md->pcibios_bus_add_device;
+	bridge->prepare = ppc_md->pcibios_root_bridge_prepare;
 	bridge->dev.parent = hose->parent;
 	bridge->sysdata = hose;
 	bridge->busnr = hose->first_busno;

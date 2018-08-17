@@ -308,18 +308,11 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 				    &info->common, &info->controller);
 }
 
-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+int acpi_pci_root_bridge_prepare(struct pci_host_bridge *bridge)
 {
-	/*
-	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
-	 * here, pci_create_root_bus() has been called by someone else and
-	 * sysdata is likely to be different from what we expect.  Let it go in
-	 * that case.
-	 */
-	if (!bridge->dev.parent) {
-		struct pci_controller *controller = bridge->bus->sysdata;
-		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
-	}
+	struct pci_controller *controller = bridge->bus->sysdata;
+	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+
 	return 0;
 }
 
