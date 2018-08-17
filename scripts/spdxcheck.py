@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# SPDX-License-Identifier: GPL-2.0
+# SPDX-License-Identifier: GPL-2.0-only
 # Copyright Thomas Gleixner <tglx@linutronix.de>
 
 from argparse import ArgumentParser
@@ -200,6 +200,8 @@ def scan_git_tree(tree):
         if el.path.find("license-rules.rst") >= 0:
             continue
         if el.path == 'scripts/checkpatch.pl':
+            continue
+        if el.path == 'scripts/update_spdx_v2_licenses.sh':
             continue
         if not os.path.isfile(el.path):
             continue
