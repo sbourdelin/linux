@@ -23,13 +23,6 @@
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
 
-static struct resource busn_resource = {
-	.name	= "PCI busn",
-	.start	= 0,
-	.end	= 255,
-	.flags	= IORESOURCE_BUS,
-};
-
 /* Ugh.  Need to stop exporting this to modules. */
 LIST_HEAD(pci_root_buses);
 EXPORT_SYMBOL(pci_root_buses);
@@ -3060,53 +3053,64 @@ EXPORT_SYMBOL(pci_scan_root_bus_bridge);
 struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
 {
-	struct resource_entry *window;
-	bool found = false;
-	struct pci_bus *b;
-	int max;
+	struct pci_host_bridge *bridge;
+	int error;
 
-	resource_list_for_each_entry(window, resources)
-		if (window->res->flags & IORESOURCE_BUS) {
-			found = true;
-			break;
-		}
-
-	b = pci_create_root_bus(parent, bus, ops, sysdata, resources);
-	if (!b)
+	bridge = pci_alloc_host_bridge(0);
+	if (!bridge)
 		return NULL;
 
-	if (!found) {
-		dev_info(&b->dev,
-		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-			bus);
-		pci_bus_insert_busn_res(b, bus, 255);
-	}
+	list_splice_init(resources, &bridge->windows);
+	bridge->dev.parent = parent;
+	bridge->sysdata = sysdata;
+	bridge->busnr = bus;
+	bridge->ops = ops;
 
-	max = pci_scan_child_bus(b);
+	error = pci_scan_root_bus_bridge(bridge);
+	if (error < 0)
+		goto err_out;
 
-	if (!found)
-		pci_bus_update_busn_res_end(b, max);
+	return bridge->bus;
 
-	return b;
+err_out:
+	kfree(bridge);
+	return NULL;
 }
 EXPORT_SYMBOL(pci_scan_root_bus);
+
+static struct resource busn_resource = {
+	.name	= "PCI busn",
+	.start	= 0,
+	.end	= 255,
+	.flags	= IORESOURCE_BUS,
+};
 
 struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
 					void *sysdata)
 {
-	LIST_HEAD(resources);
-	struct pci_bus *b;
+	struct pci_host_bridge *bridge;
+	int error;
 
-	pci_add_resource(&resources, &ioport_resource);
-	pci_add_resource(&resources, &iomem_resource);
-	pci_add_resource(&resources, &busn_resource);
-	b = pci_create_root_bus(NULL, bus, ops, sysdata, &resources);
-	if (b) {
-		pci_scan_child_bus(b);
-	} else {
-		pci_free_resource_list(&resources);
-	}
-	return b;
+	bridge = pci_alloc_host_bridge(0);
+	if (!bridge)
+		goto err;
+
+	pci_add_resource(&bridge->windows, &ioport_resource);
+	pci_add_resource(&bridge->windows, &iomem_resource);
+	pci_add_resource(&bridge->windows, &busn_resource);
+	bridge->sysdata = sysdata;
+	bridge->busnr = bus;
+	bridge->ops = ops;
+
+	error = pci_scan_root_bus_bridge(bridge);
+	if (error < 0)
+		goto err;
+
+	return bridge->bus;
+
+err:
+	pci_free_host_bridge(bridge);
+	return NULL;
 }
 EXPORT_SYMBOL(pci_scan_bus);
 
