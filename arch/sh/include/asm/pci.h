@@ -35,6 +35,8 @@ struct pci_channel {
 	/* Optional error handling */
 	struct timer_list	err_timer, serr_timer;
 	unsigned int		err_irq, serr_irq;
+
+	void (*bus_add_device)(struct pci_dev *pdev);
 };
 
 /* arch/sh/drivers/pci/pci.c */

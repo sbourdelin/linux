@@ -270,12 +270,6 @@ int pcibios_sriov_disable(struct pci_dev *pdev)
 
 #endif /* CONFIG_PCI_IOV */
 
-void pcibios_bus_add_device(struct pci_dev *pdev)
-{
-	if (ppc_md.pcibios_bus_add_device)
-		ppc_md.pcibios_bus_add_device(pdev);
-}
-
 static resource_size_t pcibios_io_size(const struct pci_controller *hose)
 {
 #ifdef CONFIG_PPC64
@@ -1620,6 +1614,7 @@ void pcibios_scan_phb(struct pci_controller *hose)
 	hose->busn.flags = IORESOURCE_BUS;
 	pci_add_resource(&bridge->windows, &hose->busn);
 
+	bridge->bus_add_device = ppc_md->pcibios_bus_add_device;
 	bridge->dev.parent = hose->parent;
 	bridge->sysdata = hose;
 	bridge->busnr = hose->first_busno;

@@ -299,7 +299,13 @@ bool pci_bus_clip_resource(struct pci_dev *dev, int idx)
 
 void __weak pcibios_resource_survey_bus(struct pci_bus *bus) { }
 
-void __weak pcibios_bus_add_device(struct pci_dev *pdev) { }
+static void pcibios_bus_add_device(struct pci_dev *pdev)
+{
+	struct pci_host_bridge *bridge = pci_find_host_bridge(pdev->bus);
+
+	if (bridge->bus_add_device)
+		bridge->bus_add_device(pdev);
+}
 
 /**
  * pci_bus_add_device - start driver for a single device

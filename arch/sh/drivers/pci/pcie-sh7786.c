@@ -122,6 +122,7 @@ extern struct pci_ops sh7786_pci_ops;
 	.reg_base	= start,					\
 	.mem_offset	= 0,						\
 	.io_offset	= 0,						\
+	.bus_add_device = sh7786_pci_bus_add_device,			\
 }
 
 static struct pci_channel sh7786_pci_channels[] = {
@@ -488,7 +489,7 @@ int pcibios_map_platform_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
         return evt2irq(0xae0);
 }
 
-void pcibios_bus_add_device(struct pci_dev *pdev)
+static void sh7786_pci_bus_add_device(struct pci_dev *pdev)
 {
 	pdev->dev.dma_pfn_offset = dma_pfn_offset;
 }

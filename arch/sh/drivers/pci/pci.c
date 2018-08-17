@@ -65,6 +65,7 @@ static void pcibios_scanbus(struct pci_channel *hose)
 	bridge->ops = hose->pci_ops;
 	bridge->swizzle_irq = pci_common_swizzle;
 	bridge->map_irq = pcibios_map_platform_irq;
+	bridge->bus_add_device = hose->bus_add_device;
 
 	ret = pci_scan_root_bus_bridge(bridge);
 	if (ret) {
