@@ -1073,16 +1073,23 @@ static void blkcg_css_offline(struct cgroup_subsys_state *css)
 	spin_lock_irq(&blkcg->lock);
 
 	hlist_for_each_entry(blkg, &blkcg->blkg_list, blkcg_node) {
+		bool retry;
 		struct request_queue *q = blkg->q;
 
+again:
 		if (spin_trylock(q->queue_lock)) {
 			blkg_pd_offline(blkg);
 			spin_unlock(q->queue_lock);
+			retry = false;
 		} else {
 			spin_unlock_irq(&blkcg->lock);
 			cpu_relax();
 			spin_lock_irq(&blkcg->lock);
+			retry = true;
 		}
+
+		if (retry)
+			goto again;
 	}
 
 	spin_unlock_irq(&blkcg->lock);
