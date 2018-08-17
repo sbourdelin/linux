@@ -51,10 +51,12 @@
 #define INFO1_CLEAR		0
 #define INFO1_DTRANEND1		BIT(17)
 #define INFO1_DTRANEND0		BIT(16)
+#define INFO1_RESERVED_BITS	GENMASK_ULL(32, 0)
 
 /* DM_CM_INFO2 and DM_CM_INFO2_MASK */
 #define INFO2_DTRANERR1		BIT(17)
 #define INFO2_DTRANERR0		BIT(16)
+#define INFO2_RESERVED_BITS	GENMASK_ULL(32, 0)
 
 /*
  * Specification of this driver:
@@ -251,6 +253,15 @@ renesas_sdhi_internal_dmac_request_dma(struct tmio_mmc_host *host,
 				       struct tmio_mmc_data *pdata)
 {
 	struct renesas_sdhi *priv = host_to_priv(host);
+
+	/*
+	 * We don't use the DMA interrupts,  but they might have been enabled
+	 * by a bootloader,  so mask them to avoid an interrupt storm...
+	 */
+	renesas_sdhi_internal_dmac_dm_write(host, DM_CM_INFO1_MASK,
+					    INFO1_RESERVED_BITS);
+	renesas_sdhi_internal_dmac_dm_write(host, DM_CM_INFO2_MASK,
+					    INFO2_RESERVED_BITS);
 
 	/* Each value is set to non-zero to assume "enabling" each DMA */
 	host->chan_rx = host->chan_tx = (void *)0xdeadbeaf;
