@@ -1090,6 +1090,21 @@ unlock:
 	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
+static bool defer_neigh_skb(struct sk_buff *skb,
+			    struct net_device *dev,
+			    struct ipoib_neigh *neigh,
+			    struct ipoib_pseudo_header *phdr)
+{
+	if (skb_queue_len(&neigh->queue) < IPOIB_MAX_PATH_REC_QUEUE) {
+		push_pseudo_header(skb, phdr->hwaddr);
+		__skb_queue_tail(&neigh->queue, skb);
+		return true;
+	}
+
+	return false;
+}
+
+
 static netdev_tx_t ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = ipoib_priv(dev);
@@ -1098,6 +1113,7 @@ static netdev_tx_t ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct ipoib_pseudo_header *phdr;
 	struct ipoib_header *header;
 	unsigned long flags;
+	bool deferred_pkt = true;
 
 	phdr = (struct ipoib_pseudo_header *) skb->data;
 	skb_pull(skb, sizeof(*phdr));
@@ -1157,6 +1173,23 @@ send_using_neigh:
 			ipoib_cm_send(dev, skb, ipoib_cm_get(neigh));
 			goto unref;
 		}
+		/*
+		 * Re-check ipoib_cm_up with priv->lock held to avoid
+		 * race condition between start_xmit and skb_dequeue in
+		 * cm_rep_handler. Since odds are the conn should be up
+		 * most of the time, we don't hold the lock for the
+		 * first check above
+		 */
+		spin_lock_irqsave(&priv->lock, flags);
+		if (ipoib_cm_up(neigh)) {
+			spin_unlock_irqrestore(&priv->lock, flags);
+			ipoib_cm_send(dev, skb, ipoib_cm_get(neigh));
+		} else {
+			deferred_pkt = defer_neigh_skb(skb, dev, neigh, phdr);
+			spin_unlock_irqrestore(&priv->lock, flags);
+		}
+
+		goto unref;
 	} else if (neigh->ah && neigh->ah->valid) {
 		neigh->ah->last_send = rn->send(dev, skb, neigh->ah->ah,
 						IPOIB_QPN(phdr->hwaddr));
@@ -1165,17 +1198,16 @@ send_using_neigh:
 		neigh_refresh_path(neigh, phdr->hwaddr, dev);
 	}
 
-	if (skb_queue_len(&neigh->queue) < IPOIB_MAX_PATH_REC_QUEUE) {
-		push_pseudo_header(skb, phdr->hwaddr);
-		spin_lock_irqsave(&priv->lock, flags);
-		__skb_queue_tail(&neigh->queue, skb);
-		spin_unlock_irqrestore(&priv->lock, flags);
-	} else {
+	spin_lock_irqsave(&priv->lock, flags);
+	deferred_pkt = defer_neigh_skb(skb, dev, neigh, phdr);
+	spin_unlock_irqrestore(&priv->lock, flags);
+
+unref:
+	if (!deferred_pkt) {
 		++dev->stats.tx_dropped;
 		dev_kfree_skb_any(skb);
 	}
 
-unref:
 	ipoib_neigh_put(neigh);
 
 	return NETDEV_TX_OK;
