@@ -642,6 +642,20 @@ int intel_color_check(struct drm_crtc *crtc,
 	return -EINVAL;
 }
 
+void intel_plane_color_init(struct drm_plane *plane)
+{
+	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+
+	drm_plane_color_create_prop(plane->dev, plane);
+
+	/* Enable color management support when we have degamma & gamma LUTs. */
+	if (INTEL_INFO(dev_priv)->plane_color.plane_degamma_lut_size != 0 &&
+	    INTEL_INFO(dev_priv)->plane_color.plane_gamma_lut_size != 0)
+		drm_plane_enable_color_mgmt(plane,
+		INTEL_INFO(dev_priv)->plane_color.plane_degamma_lut_size,
+		true, INTEL_INFO(dev_priv)->plane_color.plane_gamma_lut_size);
+}
+
 void intel_color_init(struct drm_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
