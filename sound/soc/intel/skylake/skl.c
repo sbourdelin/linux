@@ -474,6 +474,7 @@ static struct skl_ssp_clk skl_ssp_clks[] = {
 						{.name = "ssp5_sclkfs"},
 };
 
+#if IS_ENABLED(CONFIG_SND_SOC_INTEL_SKYLAKE_HDA_DSP)
 static struct snd_soc_acpi_mach *skl_find_hda_machine(struct skl *skl,
 					struct snd_soc_acpi_mach *machines)
 {
@@ -492,6 +493,13 @@ static struct snd_soc_acpi_mach *skl_find_hda_machine(struct skl *skl,
 
 	return mach;
 }
+#else
+static struct snd_soc_acpi_mach *skl_find_hda_machine(struct skl *skl,
+					struct snd_soc_acpi_mach *machines)
+{
+	return NULL;
+}
+#endif
 
 static int skl_find_machine(struct skl *skl, void *driver_data)
 {
