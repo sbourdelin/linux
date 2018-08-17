@@ -30,30 +30,35 @@ static int get_first_sibling(unsigned int cpu)
 	return cpu;
 }
 
-int blk_mq_map_queues(struct blk_mq_tag_set *set)
+void blk_mq_map_queue_cpu(struct blk_mq_tag_set *set, unsigned int cpu)
 {
 	unsigned int *map = set->mq_map;
 	unsigned int nr_queues = set->nr_hw_queues;
-	unsigned int cpu, first_sibling;
+	unsigned int first_sibling;
 
-	for_each_possible_cpu(cpu) {
-		/*
-		 * First do sequential mapping between CPUs and queues.
-		 * In case we still have CPUs to map, and we have some number of
-		 * threads per cores then map sibling threads to the same queue for
-		 * performace optimizations.
-		 */
-		if (cpu < nr_queues) {
+	/*
+	 * First do sequential mapping between CPUs and queues.
+	 * In case we still have CPUs to map, and we have some number of
+	 * threads per cores then map sibling threads to the same queue for
+	 * performace optimizations.
+	 */
+	if (cpu < nr_queues) {
+		map[cpu] = cpu_to_queue_index(nr_queues, cpu);
+	} else {
+		first_sibling = get_first_sibling(cpu);
+		if (first_sibling == cpu)
 			map[cpu] = cpu_to_queue_index(nr_queues, cpu);
-		} else {
-			first_sibling = get_first_sibling(cpu);
-			if (first_sibling == cpu)
-				map[cpu] = cpu_to_queue_index(nr_queues, cpu);
-			else
-				map[cpu] = map[first_sibling];
-		}
+		else
+			map[cpu] = map[first_sibling];
 	}
+}
 
+int blk_mq_map_queues(struct blk_mq_tag_set *set)
+{
+	unsigned int cpu;
+
+	for_each_possible_cpu(cpu)
+		blk_mq_map_queue_cpu(set, cpu);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(blk_mq_map_queues);
