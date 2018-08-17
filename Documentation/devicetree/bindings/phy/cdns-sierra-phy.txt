@@ -1,0 +1,29 @@
+Cadence Sierra PHY
+-----------------------
+
+Required properties:
+ - compatible: cdns,sierra-phy
+ - clocks: Must contain an entry in clock-names.
+	See ../clocks/clock-bindings.txt for details.
+ - clock-names: Must be "phy_clk"
+ - resets: Must contain an entry for each in reset-names.
+	See ../reset/reset.txt for details.
+ - reset-names: Must include "sierra_reset" and "sierra_apb"
+	"sierra_reset" must control the reset line to the PHY
+   	"sierra_apb" must control the reset line to the APB PHY interface
+ - #phy-cells: must be 2
+ - reg : register range for the PHY
+ - reg-names: Must be "reg"
+
+
+Example:
+	pcie_phy4: pcie-phy4@fd240000 {
+		compatible = "cdns,sierra-phy";
+		reg = <0x0 0xfd240000 0x0 0x40000>;
+		reg-names = "reg";
+		#phy-cells = <2>;
+		resets = <&dummyrst2 0>, <&dummyrst3 0>;
+		reset-names = "sierra_reset","sierra_apb";
+		clocks = <&phyclock>;
+		clock-names = "phy_clk";
+	};
