@@ -112,7 +112,22 @@ void blk_mq_in_flight(struct request_queue *q, struct hd_struct *part,
 	struct mq_inflight mi = { .part = part, .inflight = inflight, };
 
 	inflight[0] = inflight[1] = 0;
+
+	/*
+	 * __blk_mq_update_nr_hw_queues will update the nr_hw_queues and
+	 * queue_hw_ctx after freeze the queue. So we could use q_usage_counter
+	 * to avoid race with it. __blk_mq_update_nr_hw_queues will use
+	 * synchronize_rcu to ensure all of the users of blk_mq_in_flight
+	 * go out of the critical section and see zeroed q_usage_counter.
+	 */
+	rcu_read_lock();
+	if (percpu_ref_is_zero(&q->q_usage_counter)) {
+		rcu_read_unlock();
+		return;
+	}
+
 	blk_mq_queue_tag_busy_iter(q, blk_mq_check_inflight, &mi);
+	rcu_read_unlock();
 }
 
 static void blk_mq_check_inflight_rw(struct blk_mq_hw_ctx *hctx,
@@ -131,7 +146,18 @@ void blk_mq_in_flight_rw(struct request_queue *q, struct hd_struct *part,
 	struct mq_inflight mi = { .part = part, .inflight = inflight, };
 
 	inflight[0] = inflight[1] = 0;
+
+	/*
+	 * See comment of blk_mq_in_flight.
+	 */
+	rcu_read_lock();
+	if (percpu_ref_is_zero(&q->q_usage_counter)) {
+		rcu_read_unlock();
+		return;
+	}
+
 	blk_mq_queue_tag_busy_iter(q, blk_mq_check_inflight_rw, &mi);
+	rcu_read_unlock();
 }
 
 void blk_freeze_queue_start(struct request_queue *q)
@@ -2903,7 +2929,10 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 
 	list_for_each_entry(q, &set->tag_list, tag_set_list)
 		blk_mq_freeze_queue(q);
-
+	/*
+	 * Sync with blk_mq_in_flight and blk_mq_in_flight_rw
+	 */
+	synchronize_rcu();
 	/*
 	 * switch io scheduler to NULL to clean up the data in it.
 	 * will get it back after update mapping between cpu and hw queues.
