@@ -304,7 +304,22 @@ void *memcpy(void *dest, const void *src, size_t len)
 
 	return __memcpy(dest, src, len);
 }
+#undef strcmp
+int strcmp(const char *cs, const char *ct)
+{
+	check_memory_region((unsigned long)cs, 1, false, _RET_IP_);
+	check_memory_region((unsigned long)ct, 1, false, _RET_IP_);
 
+	return __strcmp(cs, ct);
+}
+#undef strncmp
+int strncmp(const char *cs, const char *ct, size_t len)
+{
+	check_memory_region((unsigned long)cs, len, false, _RET_IP_);
+	check_memory_region((unsigned long)ct, len, false, _RET_IP_);
+
+	return __strncmp(cs, ct, len);
+}
 void kasan_alloc_pages(struct page *page, unsigned int order)
 {
 	if (likely(!PageHighMem(page)))
