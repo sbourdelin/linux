@@ -51,8 +51,11 @@ struct pci_controller_ops {
 
 /*
  * Structure of a PCI controller (host bridge)
+ * Some members here are duplicated in struct pci_host_bridge
+ * and should be moved there.
  */
 struct pci_controller {
+	struct pci_host_bridge *bridge;
 	struct pci_bus *bus;
 	char is_dynamic;
 #ifdef CONFIG_PPC64
