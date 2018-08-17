@@ -293,18 +293,11 @@ struct pci_sriov {
 	bool		drivers_autoprobe; /* Auto probing of VFs by driver */
 };
 
-/* pci_dev priv_flags */
-#define PCI_DEV_DISCONNECTED 0
-
 static inline int pci_dev_set_disconnected(struct pci_dev *dev, void *unused)
 {
-	set_bit(PCI_DEV_DISCONNECTED, &dev->priv_flags);
-	return 0;
-}
+	dev->error_state = pci_channel_io_perm_failure;
 
-static inline bool pci_dev_is_disconnected(const struct pci_dev *dev)
-{
-	return test_bit(PCI_DEV_DISCONNECTED, &dev->priv_flags);
+	return 0;
 }
 
 #ifdef CONFIG_PCIEAER

@@ -440,8 +440,6 @@ struct pci_dev {
 	phys_addr_t	rom;		/* Physical address if not from BAR */
 	size_t		romlen;		/* Length if not from BAR */
 	char		*driver_override; /* Driver name to force a match */
-
-	unsigned long	priv_flags;	/* Private flags for the PCI driver */
 };
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
