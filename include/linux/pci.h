@@ -33,6 +33,7 @@
 #include <linux/io.h>
 #include <linux/resource_ext.h>
 #include <uapi/linux/pci.h>
+#include <linux/mutex.h>
 
 #include <linux/pci_ids.h>
 
@@ -440,7 +441,23 @@ struct pci_dev {
 	phys_addr_t	rom;		/* Physical address if not from BAR */
 	size_t		romlen;		/* Length if not from BAR */
 	char		*driver_override; /* Driver name to force a match */
+
+	unsigned long	priv_flags;	/* Private flags for the PCI driver */
+
+	struct mutex	state_lock;	/* Protect local state bits */
+
+	/* --- Fields below this line are protected by the state_lock mutex */
 };
+
+static inline void pci_dev_state_lock(struct pci_dev *dev)
+{
+	mutex_lock(&dev->state_lock);
+}
+
+static inline void pci_dev_state_unlock(struct pci_dev *dev)
+{
+	mutex_unlock(&dev->state_lock);
+}
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
 {
