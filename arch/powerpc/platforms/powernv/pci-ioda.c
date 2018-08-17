@@ -46,7 +46,6 @@
 
 #include "powernv.h"
 #include "pci.h"
-#include "../../../../drivers/pci/pci.h"
 
 #define PNV_IODA1_M64_NUM	16	/* Number of M64 BARs	*/
 #define PNV_IODA1_M64_SEGS	8	/* Segments per M64 BAR	*/
@@ -3139,7 +3138,7 @@ static void pnv_pci_ioda_fixup_iov_resources(struct pci_dev *pdev)
 	struct pci_dn *pdn;
 	int mul, total_vfs;
 
-	if (!pdev->is_physfn || pci_dev_is_added(pdev))
+	if (!pdev->is_physfn || pdev->is_added)
 		return;
 
 	pdn = pci_get_pdn(pdev);
