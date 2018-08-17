@@ -22,6 +22,7 @@
 #include <linux/spi/spi.h>
 #include <linux/pm_runtime.h>
 #include <sysdev/fsl_soc.h>
+#include <linux/spi/spi-mem.h>
 
 /* eSPI Controller registers */
 #define ESPI_SPMODE	0x00	/* eSPI mode register */
@@ -662,6 +663,29 @@ static void fsl_espi_init_regs(struct device *dev, bool initial)
 	fsl_espi_write_reg(espi, ESPI_SPMODE, SPMODE_INIT_VAL | SPMODE_ENABLE);
 }
 
+static int fsl_espi_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
+{
+	if (!mem || !op)
+		return -EINVAL;
+	op->data.nbytes = min3((unsigned long)op->data.nbytes,
+			spi_max_transfer_size(mem->spi),
+			spi_max_message_size(mem->spi) -
+			sizeof(op->cmd.opcode) -
+			op->addr.nbytes -
+			op->dummy.nbytes);
+	return 0;
+}
+
+static int fsl_espi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
+{
+	return -ENOTSUPP;
+}
+
+static const struct spi_controller_mem_ops fsl_espi_mem_ops = {
+	.adjust_op_size = fsl_espi_adjust_op_size,
+	.exec_op = fsl_espi_exec_op,
+};
+
 static int fsl_espi_probe(struct device *dev, struct resource *mem,
 			  unsigned int irq, unsigned int num_cs)
 {
@@ -685,6 +709,7 @@ static int fsl_espi_probe(struct device *dev, struct resource *mem,
 	master->auto_runtime_pm = true;
 	master->max_message_size = fsl_espi_max_message_size;
 	master->num_chipselect = num_cs;
+	master->mem_ops = &fsl_espi_mem_ops;
 
 	espi = spi_master_get_devdata(master);
 	spin_lock_init(&espi->lock);
