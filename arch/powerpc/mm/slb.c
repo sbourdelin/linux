@@ -101,9 +101,12 @@ void __slb_restore_bolted_realmode(void)
 
 	 /* No isync needed because realmode. */
 	for (index = 0; index < SLB_NUM_BOLTED; index++) {
+		unsigned long rb = be64_to_cpu(p->save_area[index].esid);
+
+		rb = (rb & ~0xFFFul) | index;
 		asm volatile("slbmte  %0,%1" :
 		     : "r" (be64_to_cpu(p->save_area[index].vsid)),
-		       "r" (be64_to_cpu(p->save_area[index].esid)));
+		       "r" (rb));
 	}
 }
 
