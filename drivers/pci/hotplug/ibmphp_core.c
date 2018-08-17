@@ -717,6 +717,41 @@ static void ibm_unconfigure_device(struct pci_func *func)
 	pci_unlock_rescan_remove();
 }
 
+static struct resource busn_resource = {
+	.name	= "pci busn",
+	.start	= 0,
+	.end	= 255,
+	.flags	= IORESOURCE_BUS,
+};
+
+static struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
+					void *sysdata)
+{
+	struct pci_host_bridge *bridge;
+	int error;
+
+	bridge = pci_alloc_host_bridge(0);
+	if (!bridge)
+		return NULL;
+
+	pci_add_resource(&bridge->windows, &ioport_resource);
+	pci_add_resource(&bridge->windows, &iomem_resource);
+	pci_add_resource(&bridge->windows, &busn_resource);
+	bridge->sysdata = sysdata;
+	bridge->busnr = bus;
+	bridge->ops = ops;
+
+	error = pci_scan_root_bus_bridge(bridge);
+	if (error < 0)
+		goto err;
+
+	return bridge->bus;
+
+err:
+	pci_free_host_bridge(bridge);
+	return NULL;
+}
+
 /*
  * The following function is to fix kernel bug regarding
  * getting bus entries, here we manually add those primary
