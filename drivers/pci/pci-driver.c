@@ -387,13 +387,22 @@ static int __pci_device_probe(struct pci_driver *drv, struct pci_dev *pci_dev)
 	return error;
 }
 
-int __weak pcibios_alloc_irq(struct pci_dev *dev)
+int pcibios_alloc_irq(struct pci_dev *dev)
 {
+	struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
+
+	if (bridge->alloc_irq)
+		return bridge->alloc_irq(dev);
+
 	return 0;
 }
 
-void __weak pcibios_free_irq(struct pci_dev *dev)
+void pcibios_free_irq(struct pci_dev *dev)
 {
+	struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
+
+	if (bridge->free_irq)
+		bridge->free_irq(dev);
 }
 
 #ifdef CONFIG_PCI_IOV

@@ -473,6 +473,8 @@ struct pci_host_bridge {
 	int (*map_irq)(const struct pci_dev *, u8, u8);
 	void (*release_fn)(struct pci_host_bridge *);
 	void (*bus_add_device)(struct pci_dev *pdev);
+	int (*alloc_irq)(struct pci_dev *);
+	int (*free_irq)(struct pci_dev *);
 	void		*release_data;
 	struct msi_controller *msi;
 	unsigned int	ignore_reset_delay:1;	/* For entire hierarchy */

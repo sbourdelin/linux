@@ -22,19 +22,6 @@
 #include <linux/pci-ecam.h>
 #include <linux/slab.h>
 
-#ifdef CONFIG_ACPI
-/*
- * Try to assign the IRQ number when probing a new device
- */
-int pcibios_alloc_irq(struct pci_dev *dev)
-{
-	if (!acpi_disabled)
-		acpi_pci_irq_enable(dev);
-
-	return 0;
-}
-#endif
-
 /*
  * raw_pci_read/write - Platform-specific PCI config space access.
  */
@@ -93,6 +80,9 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 
 		ACPI_COMPANION_SET(&bridge->dev, adev);
 		set_dev_node(bus_dev, acpi_get_node(acpi_device_handle(adev)));
+
+		/* Try to assign the IRQ number when probing a new device */
+		bridge->alloc_irq = acpi_pci_irq_enable;
 	}
 
 	return 0;
