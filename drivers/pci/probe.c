@@ -2905,12 +2905,20 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 }
 EXPORT_SYMBOL_GPL(pci_scan_child_bus);
 
-void __weak pcibios_add_bus(struct pci_bus *bus)
+void pcibios_add_bus(struct pci_bus *bus)
 {
+	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
+
+	if (bridge->add_bus)
+		bridge->add_bus(bus);
 }
 
-void __weak pcibios_remove_bus(struct pci_bus *bus)
+void pcibios_remove_bus(struct pci_bus *bus)
 {
+	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
+
+	if (bridge->remove_bus)
+		bridge->remove_bus(bus);
 }
 
 int pci_host_probe(struct pci_host_bridge *bridge)

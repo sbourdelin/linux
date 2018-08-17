@@ -768,7 +768,7 @@ static void zpci_free_domain(struct zpci_dev *zdev)
 	spin_unlock(&zpci_domain_lock);
 }
 
-void pcibios_remove_bus(struct pci_bus *bus)
+static void zpci_remove_bus(struct pci_bus *bus)
 {
 	struct zpci_dev *zdev = get_zdev_by_bus(bus);
 
@@ -800,6 +800,7 @@ static struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
 	bridge->sysdata = sysdata;
 	bridge->busnr = bus;
 	bridge->ops = ops;
+	bridge->remove_bus = zpci_remove_bus;
 
 	error = pci_scan_root_bus_bridge(bridge);
 	if (error < 0)

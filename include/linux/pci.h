@@ -476,6 +476,8 @@ struct pci_host_bridge {
 	void (*bus_add_device)(struct pci_dev *pdev);
 	int (*alloc_irq)(struct pci_dev *);
 	int (*free_irq)(struct pci_dev *);
+	void (*add_bus)(struct pci_bus *);
+	void (*remove_bus)(struct pci_bus *);
 	void		*release_data;
 	struct msi_controller *msi;
 	unsigned int	ignore_reset_delay:1;	/* For entire hierarchy */
