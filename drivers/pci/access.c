@@ -588,3 +588,64 @@ int pci_write_config_dword(const struct pci_dev *dev, int where,
 	return pci_bus_write_config_dword(dev->bus, dev->devfn, where, val);
 }
 EXPORT_SYMBOL(pci_write_config_dword);
+
+#define PCI_OP_MODIFY(size, type, len) \
+int pci_bus_modify_config_##size \
+	(struct pci_bus *bus, unsigned int devfn, int pos, 		\
+	 type rval, type wval)						\
+{									\
+	int res;							\
+	unsigned long flags;						\
+	u32 rdata = 0;							\
+	u32 wdata = 0;							\
+	u32 temp_data = 0;						\
+	if (PCI_##size##_BAD) return PCIBIOS_BAD_REGISTER_NUMBER;	\
+	pci_lock_config(flags);						\
+	if (bus->ops->modify) {						\
+		res = bus->ops->modify(bus, devfn, pos, len,		\
+				       rval, wval);			\
+	} else {							\
+		temp_data = rval ^ wval;				\
+		res = bus->ops->read(bus, devfn, pos, len, &rdata);	\
+		wdata = rdata ^ temp_data;				\
+		res = bus->ops->write(bus, devfn, pos, len, wdata);	\
+	}								\
+	pci_unlock_config(flags);					\
+	return res;							\
+}
+
+PCI_OP_MODIFY(byte, u8, 1)
+PCI_OP_MODIFY(word, u16, 2)
+PCI_OP_MODIFY(dword, u32, 4)
+int pci_modify_config_byte(const struct pci_dev *dev, int where,
+			   u8 rval, u8 wval)
+{
+	if (pci_dev_is_disconnected(dev)) {
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	return pci_bus_modify_config_byte(dev->bus, dev->devfn, where,
+					  rval, wval);
+}
+EXPORT_SYMBOL(pci_modify_config_byte);
+
+int pci_modify_config_word(const struct pci_dev *dev, int where,
+			   u16 rval, u16 wval)
+{
+	if (pci_dev_is_disconnected(dev)) {
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	return pci_bus_modify_config_word(dev->bus, dev->devfn, where,
+					  rval, wval);
+}
+EXPORT_SYMBOL(pci_modify_config_word);
+
+int pci_modify_config_dword(const struct pci_dev *dev, int where,
+			    u32 rval, u32 wval)
+{
+	if (pci_dev_is_disconnected(dev)) {
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	return pci_bus_modify_config_dword(dev->bus, dev->devfn, where,
+					   rval, wval);
+}
+EXPORT_SYMBOL(pci_modify_config_dword);

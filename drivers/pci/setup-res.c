@@ -493,7 +493,7 @@ int pci_enable_resources(struct pci_dev *dev, int mask)
 
 	if (cmd != old_cmd) {
 		pci_info(dev, "enabling device (%04x -> %04x)\n", old_cmd, cmd);
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
+		pci_modify_config_word(dev, PCI_COMMAND, old_cmd, cmd);
 	}
 	return 0;
 }
