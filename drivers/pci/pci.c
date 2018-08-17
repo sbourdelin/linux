@@ -4052,11 +4052,18 @@ void __weak pcibios_set_master(struct pci_dev *dev)
  *
  * Enables bus-mastering on the device and calls pcibios_set_master()
  * to do the needed arch specific settings.
+ *
+ * Note: This must not check dev->is_busmaster because the power management
+ *       code will call this in order to restore the config space to the
+ *       state of is_busmaster, thus is_busmaster might be set but the
+ *       config space bit cleared.
  */
 void pci_set_master(struct pci_dev *dev)
 {
+	pci_dev_state_lock(dev);
 	__pci_set_master(dev, true);
 	pcibios_set_master(dev);
+	pci_dev_state_unlock(dev);
 }
 EXPORT_SYMBOL(pci_set_master);
 
@@ -4066,7 +4073,9 @@ EXPORT_SYMBOL(pci_set_master);
  */
 void pci_clear_master(struct pci_dev *dev)
 {
+	pci_dev_state_lock(dev);
 	__pci_set_master(dev, false);
+	pci_dev_state_unlock(dev);
 }
 EXPORT_SYMBOL(pci_clear_master);
 

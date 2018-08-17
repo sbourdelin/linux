@@ -372,7 +372,6 @@ struct pci_dev {
 	unsigned int	multifunction:1;	/* Multi-function device */
 
 	unsigned int	is_added:1;
-	unsigned int	is_busmaster:1;		/* Is busmaster */
 	unsigned int	no_msi:1;		/* May not use MSI */
 	unsigned int	no_64bit_msi:1; 	/* May only use 32-bit MSIs */
 	unsigned int	block_cfg_access:1;	/* Config space access blocked */
@@ -447,6 +446,7 @@ struct pci_dev {
 	struct mutex	state_lock;	/* Protect local state bits */
 
 	/* --- Fields below this line are protected by the state_lock mutex */
+	unsigned int	is_busmaster:1;		/* Is busmaster */
 };
 
 static inline void pci_dev_state_lock(struct pci_dev *dev)
