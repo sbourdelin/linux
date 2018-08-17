@@ -125,7 +125,7 @@ static struct tap_dev *tap_dev_get_rcu(const struct net_device *dev)
 
 /*
  * RCU usage:
- * The tap_queue and the macvlan_dev are loosely coupled, the
+ * The tap_queue and the tap_dev are loosely coupled, the
  * pointers from one to the other can only be read while rcu_read_lock
  * or rtnl is held.
  *
@@ -720,8 +720,6 @@ static ssize_t tap_get_user(struct tap_queue *q, struct msghdr *m,
 	    __vlan_get_protocol(skb, skb->protocol, &depth) != 0)
 		skb_set_network_header(skb, depth);
 
-	rcu_read_lock();
-	tap = rcu_dereference(q->tap);
 	/* copy skb_ubuf_info for callback when skb has no error */
 	if (zerocopy) {
 		skb_shinfo(skb)->destructor_arg = m->msg_control;
@@ -732,6 +730,8 @@ static ssize_t tap_get_user(struct tap_queue *q, struct msghdr *m,
 		uarg->callback(uarg, false);
 	}
 
+	rcu_read_lock();
+	tap = rcu_dereference(q->tap);
 	if (tap) {
 		skb->dev = tap->dev;
 		dev_queue_xmit(skb);
