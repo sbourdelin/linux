@@ -666,6 +666,14 @@ void intel_color_load_luts(struct drm_crtc_state *crtc_state)
 	dev_priv->display.load_luts(crtc_state);
 }
 
+void intel_color_load_plane_luts(const struct drm_plane_state *plane_state)
+{
+	struct drm_device *dev = plane_state->plane->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	dev_priv->display.load_plane_luts(plane_state);
+}
+
 int intel_color_check(struct drm_crtc *crtc,
 		      struct drm_crtc_state *crtc_state)
 {
