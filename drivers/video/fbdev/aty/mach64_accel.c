@@ -291,7 +291,8 @@ void atyfb_imageblit(struct fb_info *info, const struct fb_image *image)
 	if (!image->width || !image->height)
 		return;
 	if (!par->accel_flags ||
-	    (image->depth != 1 && info->var.bits_per_pixel != image->depth)) {
+	    (image->depth != 1 && info->var.bits_per_pixel != image->depth) ||
+	    (image->depth == 1 && info->var.bits_per_pixel == 24)) {
 		cfb_imageblit(info, image);
 		return;
 	}
