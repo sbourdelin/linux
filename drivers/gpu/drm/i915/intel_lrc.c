@@ -716,6 +716,24 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 
 				GEM_BUG_ON(last->hw_context == rq->hw_context);
 
+				/*
+				 * Avoid reloading the previous context if we
+				 * know it has just completed and we want
+				 * to switch over to a new context. The CS
+				 * interrupt is likely waiting for us to
+				 * release the local irq lock and so we will
+				 * proceed with the submission momentarily,
+				 * which is quicker than reloading the context
+				 * on the gpu.
+				 */
+				if (!submit &&
+				    intel_engine_signaled(engine,
+							  last->global_seqno)) {
+					GEM_BUG_ON(!list_is_first(&rq->sched.link,
+								  &p->requests));
+					return;
+				}
+
 				if (submit)
 					port_assign(port, last);
 				port++;
