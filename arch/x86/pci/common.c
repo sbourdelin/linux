@@ -453,54 +453,35 @@ void __init dmi_check_pciprobe(void)
 	dmi_check_system(pciprobe_dmi_table);
 }
 
-static struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+void pcibios_scan_root(int busnum)
 {
+	struct pci_sysdata *sd;
 	struct pci_host_bridge *bridge;
 	int error;
 
-	bridge = pci_alloc_host_bridge(0);
-	if (!bridge)
-		return NULL;
+	bridge = pci_alloc_host_bridge(sizeof(sd));
+	if (!bridge) {
+		printk(KERN_ERR "PCI: OOM, skipping PCI bus %02x\n", busnum);
+		return;
+	}
+	sd = pci_host_bridge_priv(bridge);
 
-	list_splice_init(resources, &bridge->windows);
-	bridge->dev.parent = parent;
-	bridge->sysdata = sysdata;
-	bridge->busnr = bus;
-	bridge->ops = ops;
+	sd->node = x86_pci_root_bus_node(busnum);
+	x86_pci_root_bus_resources(busnum, &bridge->windows);
+	bridge->sysdata = sd;
+	bridge->busnr = busnum;
+	bridge->ops = &pci_root_ops;
 
+	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
 	error = pci_scan_root_bus_bridge(bridge);
 	if (error < 0)
 		goto err_out;
 
-	return bridge->bus;
+	pci_bus_add_devices(bridge->bus);
+	return;
 
 err_out:
-	kfree(bridge);
-	return NULL;
-}
-
-void pcibios_scan_root(int busnum)
-{
-	struct pci_bus *bus;
-	struct pci_sysdata *sd;
-	LIST_HEAD(resources);
-
-	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
-	if (!sd) {
-		printk(KERN_ERR "PCI: OOM, skipping PCI bus %02x\n", busnum);
-		return;
-	}
-	sd->node = x86_pci_root_bus_node(busnum);
-	x86_pci_root_bus_resources(busnum, &resources);
-	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
-	bus = pci_scan_root_bus(NULL, busnum, &pci_root_ops, sd, &resources);
-	if (!bus) {
-		pci_free_resource_list(&resources);
-		kfree(sd);
-		return;
-	}
-	pci_bus_add_devices(bus);
+	pci_free_host_bridge(bridge);
 }
 
 void __init pcibios_set_cache_line_size(void)
