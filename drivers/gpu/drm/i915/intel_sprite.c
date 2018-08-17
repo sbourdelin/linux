@@ -1650,6 +1650,10 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 					  DRM_COLOR_YCBCR_BT709,
 					  DRM_COLOR_YCBCR_LIMITED_RANGE);
 
+	/* Add Plane Color properties */
+	if (IS_BROADWELL(dev_priv) || INTEL_GEN(dev_priv) >= 9)
+		intel_plane_color_init(&intel_plane->base);
+
 	drm_plane_helper_add(&intel_plane->base, &intel_plane_helper_funcs);
 
 	return intel_plane;
