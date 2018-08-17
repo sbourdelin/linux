@@ -873,34 +873,6 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
 	__acpi_pci_root_release_info(bridge->release_data);
 }
 
-static struct pci_bus *acpi_pci_create_root_bus(struct device *parent, int bus,
-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-{
-	int error;
-	struct pci_host_bridge *bridge;
-
-	bridge = pci_alloc_host_bridge(0);
-	if (!bridge)
-		return NULL;
-
-	bridge->dev.parent = parent;
-
-	list_splice_init(resources, &bridge->windows);
-	bridge->sysdata = sysdata;
-	bridge->busnr = bus;
-	bridge->ops = ops;
-
-	error = pci_register_host_bridge(bridge);
-	if (error < 0)
-		goto err_out;
-
-	return bridge->bus;
-
-err_out:
-	kfree(bridge);
-	return NULL;
-}
-
 struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
 				     struct acpi_pci_root_ops *ops,
 				     struct acpi_pci_root_info *info,
@@ -909,8 +881,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
 	int ret, busnum = root->secondary.start;
 	struct acpi_device *device = root->device;
 	int node = acpi_get_node(device->handle);
-	struct pci_bus *bus;
-	struct pci_host_bridge *host_bridge;
+	struct pci_host_bridge *bridge;
 
 	info->root = root;
 	info->bridge = device;
@@ -930,30 +901,39 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
 
 	pci_acpi_root_add_resources(info);
 	pci_add_resource(&info->resources, &root->secondary);
-	bus = acpi_pci_create_root_bus(NULL, busnum, ops->pci_ops,
-				  sysdata, &info->resources);
-	if (!bus)
+
+	bridge = pci_alloc_host_bridge(0);
+	if (!bridge)
 		goto out_release_info;
 
-	host_bridge = to_pci_host_bridge(bus->bridge);
-	if (!(root->osc_control_set & OSC_PCI_EXPRESS_NATIVE_HP_CONTROL))
-		host_bridge->native_pcie_hotplug = 0;
-	if (!(root->osc_control_set & OSC_PCI_SHPC_NATIVE_HP_CONTROL))
-		host_bridge->native_shpc_hotplug = 0;
-	if (!(root->osc_control_set & OSC_PCI_EXPRESS_AER_CONTROL))
-		host_bridge->native_aer = 0;
-	if (!(root->osc_control_set & OSC_PCI_EXPRESS_PME_CONTROL))
-		host_bridge->native_pme = 0;
-	if (!(root->osc_control_set & OSC_PCI_EXPRESS_LTR_CONTROL))
-		host_bridge->native_ltr = 0;
-
-	pci_scan_child_bus(bus);
-	pci_set_host_bridge_release(host_bridge, acpi_pci_root_release_info,
+	list_splice_init(&info->resources, &bridge->windows);
+	bridge->sysdata = sysdata;
+	bridge->busnr = busnum;
+	bridge->ops = ops->pci_ops;
+	pci_set_host_bridge_release(bridge, acpi_pci_root_release_info,
 				    info);
-	if (node != NUMA_NO_NODE)
-		dev_printk(KERN_DEBUG, &bus->dev, "on NUMA node %d\n", node);
-	return bus;
 
+	if (!(root->osc_control_set & OSC_PCI_EXPRESS_NATIVE_HP_CONTROL))
+		bridge->native_pcie_hotplug = 0;
+	if (!(root->osc_control_set & OSC_PCI_SHPC_NATIVE_HP_CONTROL))
+		bridge->native_shpc_hotplug = 0;
+	if (!(root->osc_control_set & OSC_PCI_EXPRESS_AER_CONTROL))
+		bridge->native_aer = 0;
+	if (!(root->osc_control_set & OSC_PCI_EXPRESS_PME_CONTROL))
+		bridge->native_pme = 0;
+	if (!(root->osc_control_set & OSC_PCI_EXPRESS_LTR_CONTROL))
+		bridge->native_ltr = 0;
+
+	ret = pci_scan_root_bus_bridge(bridge);
+	if (ret < 0)
+		goto out_release_bridge;
+
+	if (node != NUMA_NO_NODE)
+		dev_printk(KERN_DEBUG, &bridge->bus->dev, "on NUMA node %d\n", node);
+	return bridge->bus;
+
+out_release_bridge:
+	pci_free_host_bridge(bridge);
 out_release_info:
 	__acpi_pci_root_release_info(info);
 	return NULL;
