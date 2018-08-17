@@ -762,7 +762,29 @@ static void pci_set_bus_msi_domain(struct pci_bus *bus)
 	dev_set_msi_domain(&bus->dev, d);
 }
 
-static int pci_register_host_bridge(struct pci_host_bridge *bridge)
+/*
+ * pci_register_host_bridge() - Register a host bridge without scanning
+ *
+ * @bridge: a newly allocated host bridge structure
+ *
+ * This is the core part of bringing up a new PCI host bridge,
+ * before we scan for attached devices and register them as
+ * pci_dev.
+ *
+ * For the most part, this is an implementation detail of the
+ * pci_host_probe() interface, which brings up the entire bus,
+ * bus some older platforms still call it directly and manually
+ * scan for devices.
+ *
+ * If your driver uses this, try to convert it to using
+ * pci_host_probe() instead.
+ *
+ * Return: zero on suggess, or a negative error code.
+ * Note: after pci_register_host_bridge() successfully returns,
+ * the pci_host_bridge device is alive in driver core, and must
+ * not be freed directly.
+ */
+int pci_register_host_bridge(struct pci_host_bridge *bridge)
 {
 	struct device *parent = bridge->dev.parent;
 	struct resource_entry *window, *n;
@@ -877,6 +899,7 @@ free:
 	kfree(bus);
 	return err;
 }
+EXPORT_SYMBOL_GPL(pci_register_host_bridge);
 
 static bool pci_bridge_child_ext_cfg_accessible(struct pci_dev *bridge)
 {
