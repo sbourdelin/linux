@@ -90,7 +90,6 @@ static struct snd_soc_dai_link e740_dai[] = {
 		.stream_name = "AC97 HiFi",
 		.cpu_dai_name = "pxa2xx-ac97",
 		.codec_dai_name = "wm9705-hifi",
-		.platform_name = "pxa-pcm-audio",
 		.codec_name = "wm9705-codec",
 	},
 	{
@@ -98,7 +97,6 @@ static struct snd_soc_dai_link e740_dai[] = {
 		.stream_name = "AC97 Aux",
 		.cpu_dai_name = "pxa2xx-ac97-aux",
 		.codec_dai_name = "wm9705-aux",
-		.platform_name = "pxa-pcm-audio",
 		.codec_name = "wm9705-codec",
 	},
 };

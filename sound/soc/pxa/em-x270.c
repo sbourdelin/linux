@@ -36,7 +36,6 @@ static struct snd_soc_dai_link em_x270_dai[] = {
 		.stream_name = "AC97 HiFi",
 		.cpu_dai_name = "pxa2xx-ac97",
 		.codec_dai_name = "wm9712-hifi",
-		.platform_name = "pxa-pcm-audio",
 		.codec_name = "wm9712-codec",
 	},
 	{
@@ -44,7 +43,6 @@ static struct snd_soc_dai_link em_x270_dai[] = {
 		.stream_name = "AC97 Aux",
 		.cpu_dai_name = "pxa2xx-ac97-aux",
 		.codec_dai_name = "wm9712-aux",
-		.platform_name = "pxa-pcm-audio",
 		.codec_name = "wm9712-codec",
 	},
 };

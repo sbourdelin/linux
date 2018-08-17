@@ -262,7 +262,6 @@ static struct snd_soc_dai_link spitz_dai = {
 	.stream_name = "WM8750",
 	.cpu_dai_name = "pxa2xx-i2s",
 	.codec_dai_name = "wm8750-hifi",
-	.platform_name = "pxa-pcm-audio",
 	.codec_name = "wm8750.0-001b",
 	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 		   SND_SOC_DAIFMT_CBS_CFS,

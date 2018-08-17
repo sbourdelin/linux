@@ -65,7 +65,7 @@ struct snd_soc_dai_link is used to set up each DAI in your machine. e.g.
 	.stream_name = "WM8731",
 	.cpu_dai_name = "pxa-is2-dai",
 	.codec_dai_name = "wm8731-hifi",
-	.platform_name = "pxa-pcm-audio",
+	.platform_name = "snd-soc-dummy",
 	.codec_name = "wm8713-codec.0-001a",
 	.init = corgi_wm8731_init,
 	.ops = &corgi_ops,

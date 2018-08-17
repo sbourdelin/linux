@@ -205,7 +205,6 @@ static struct snd_soc_ops raumfeld_ak4104_ops = {
 	.name		= "CS4270",			\
 	.stream_name	= "CS4270",			\
 	.cpu_dai_name	= "pxa-ssp-dai.0",		\
-	.platform_name	= "pxa-pcm-audio",		\
 	.codec_dai_name	= "cs4270-hifi",		\
 	.codec_name	= "cs4270.0-0048",	\
 	.dai_fmt	= SND_SOC_DAIFMT_I2S |		\
@@ -220,7 +219,6 @@ static struct snd_soc_ops raumfeld_ak4104_ops = {
 	.stream_name	= "Playback",			\
 	.cpu_dai_name	= "pxa-ssp-dai.1",		\
 	.codec_dai_name	= "ak4104-hifi",		\
-	.platform_name	= "pxa-pcm-audio",		\
 	.dai_fmt	= SND_SOC_DAIFMT_I2S |		\
 			  SND_SOC_DAIFMT_NB_NF |	\
 			  SND_SOC_DAIFMT_CBS_CFS,       \

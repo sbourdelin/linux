@@ -1,12 +1,3 @@
-config SND_PXA2XX_SOC
-	tristate "SoC Audio for the Intel PXA2xx chip"
-	depends on ARCH_PXA || COMPILE_TEST
-	select SND_PXA2XX_LIB
-	help
-	  Say Y or M if you want to add support for codecs attached to
-	  the PXA2xx AC97, I2S or SSP interface. You will also need
-	  to select the audio interfaces to support below.
-
 config SND_MMP_SOC
 	bool "Soc Audio for Marvell MMP chips"
 	depends on ARCH_MMP
@@ -43,7 +34,7 @@ config SND_MMP_SOC_SSPA
 
 config SND_PXA2XX_SOC_CORGI
 	tristate "SoC Audio support for Sharp Zaurus SL-C7x0"
-	depends on SND_PXA2XX_SOC && PXA_SHARP_C7xx && I2C
+	depends on PXA_SHARP_C7xx && I2C
 	select SND_PXA2XX_SOC_I2S
 	select SND_SOC_WM8731
 	help
@@ -52,7 +43,7 @@ config SND_PXA2XX_SOC_CORGI
 
 config SND_PXA2XX_SOC_SPITZ
 	tristate "SoC Audio support for Sharp Zaurus SL-Cxx00"
-	depends on SND_PXA2XX_SOC && PXA_SHARP_Cxx00 && I2C
+	depends on PXA_SHARP_Cxx00 && I2C
 	select SND_PXA2XX_SOC_I2S
 	select SND_SOC_WM8750
 	help
@@ -61,7 +52,7 @@ config SND_PXA2XX_SOC_SPITZ
 
 config SND_PXA2XX_SOC_Z2
 	tristate "SoC Audio support for Zipit Z2"
-	depends on SND_PXA2XX_SOC && MACH_ZIPIT2 && I2C
+	depends on MACH_ZIPIT2 && I2C
 	select SND_PXA2XX_SOC_I2S
 	select SND_SOC_WM8750
 	help
@@ -69,7 +60,7 @@ config SND_PXA2XX_SOC_Z2
 
 config SND_PXA2XX_SOC_POODLE
 	tristate "SoC Audio support for Poodle"
-	depends on SND_PXA2XX_SOC && MACH_POODLE && I2C
+	depends on MACH_POODLE && I2C
 	select SND_PXA2XX_SOC_I2S
 	select SND_SOC_WM8731
 	help
@@ -78,7 +69,7 @@ config SND_PXA2XX_SOC_POODLE
 
 config SND_PXA2XX_SOC_TOSA
 	tristate "SoC AC97 Audio support for Tosa"
-	depends on SND_PXA2XX_SOC && MACH_TOSA
+	depends on MACH_TOSA
 	depends on MFD_TC6393XB
 	select SND_PXA2XX_SOC_AC97
 	select SND_SOC_WM9712
@@ -88,7 +79,7 @@ config SND_PXA2XX_SOC_TOSA
 
 config SND_PXA2XX_SOC_E740
 	tristate "SoC AC97 Audio support for e740"
-	depends on SND_PXA2XX_SOC && MACH_E740
+	depends on MACH_E740
 	select SND_SOC_WM9705
 	select SND_PXA2XX_SOC_AC97
 	help
@@ -97,7 +88,7 @@ config SND_PXA2XX_SOC_E740
 
 config SND_PXA2XX_SOC_E750
 	tristate "SoC AC97 Audio support for e750"
-	depends on SND_PXA2XX_SOC && MACH_E750
+	depends on MACH_E750
 	select SND_SOC_WM9705
 	select SND_PXA2XX_SOC_AC97
 	help
@@ -106,7 +97,7 @@ config SND_PXA2XX_SOC_E750
 
 config SND_PXA2XX_SOC_E800
 	tristate "SoC AC97 Audio support for e800"
-	depends on SND_PXA2XX_SOC && MACH_E800
+	depends on MACH_E800
 	select SND_SOC_WM9712
 	select SND_PXA2XX_SOC_AC97
 	help
@@ -115,8 +106,7 @@ config SND_PXA2XX_SOC_E800
 
 config SND_PXA2XX_SOC_EM_X270
 	tristate "SoC Audio support for CompuLab EM-x270, eXeda and CM-X300"
-	depends on SND_PXA2XX_SOC && (MACH_EM_X270 || MACH_EXEDA || \
-			MACH_CM_X300)
+	depends on MACH_EM_X270 || MACH_EXEDA || MACH_CM_X300
 	select SND_PXA2XX_SOC_AC97
 	select SND_SOC_WM9712
 	help
@@ -125,8 +115,7 @@ config SND_PXA2XX_SOC_EM_X270
 
 config SND_PXA2XX_SOC_PALM27X
 	bool "SoC Audio support for Palm T|X, T5, E2 and LifeDrive"
-	depends on SND_PXA2XX_SOC && (MACH_PALMLD || MACH_PALMTX || \
-			MACH_PALMT5 || MACH_PALMTE2)
+	depends on MACH_PALMLD || MACH_PALMTX || MACH_PALMT5 || MACH_PALMTE2
 	select SND_PXA2XX_SOC_AC97
 	select SND_SOC_WM9712
 	help
@@ -155,7 +144,7 @@ config SND_SOC_TTC_DKB
 
 config SND_SOC_ZYLONITE
 	tristate "SoC Audio support for Marvell Zylonite"
-	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
+	depends on MACH_ZYLONITE
 	select SND_PXA2XX_SOC_AC97
 	select SND_PXA_SOC_SSP
 	select SND_SOC_WM9713
@@ -165,7 +154,7 @@ config SND_SOC_ZYLONITE
 
 config SND_SOC_RAUMFELD
 	tristate "SoC Audio support Raumfeld audio adapter"
-	depends on SND_PXA2XX_SOC && (MACH_RAUMFELD_SPEAKER || MACH_RAUMFELD_CONNECTOR)
+	depends on MACH_RAUMFELD_SPEAKER || MACH_RAUMFELD_CONNECTOR
 	depends on I2C && SPI_MASTER
 	select SND_PXA_SOC_SSP
 	select SND_SOC_CS4270
@@ -175,7 +164,7 @@ config SND_SOC_RAUMFELD
 
 config SND_PXA2XX_SOC_HX4700
 	tristate "SoC Audio support for HP iPAQ hx4700"
-	depends on SND_PXA2XX_SOC && MACH_H4700 && I2C
+	depends on MACH_H4700 && I2C
 	select SND_PXA2XX_SOC_I2S
 	select SND_SOC_AK4641
 	help
@@ -184,7 +173,7 @@ config SND_PXA2XX_SOC_HX4700
 
 config SND_PXA2XX_SOC_MAGICIAN
 	tristate "SoC Audio support for HTC Magician"
-	depends on SND_PXA2XX_SOC && MACH_MAGICIAN && I2C
+	depends on MACH_MAGICIAN && I2C
 	select SND_PXA2XX_SOC_I2S
 	select SND_PXA_SOC_SSP
 	select SND_SOC_UDA1380
@@ -194,7 +183,7 @@ config SND_PXA2XX_SOC_MAGICIAN
 
 config SND_PXA2XX_SOC_MIOA701
         tristate "SoC Audio support for MIO A701"
-        depends on SND_PXA2XX_SOC && MACH_MIOA701
+        depends on MACH_MIOA701
         select SND_PXA2XX_SOC_AC97
         select SND_SOC_WM9713
         help
@@ -203,7 +192,7 @@ config SND_PXA2XX_SOC_MIOA701
 
 config SND_PXA2XX_SOC_IMOTE2
        tristate "SoC Audio support for IMote 2"
-       depends on SND_PXA2XX_SOC && MACH_INTELMOTE2 && I2C
+       depends on MACH_INTELMOTE2 && I2C
        select SND_PXA2XX_SOC_I2S
        select SND_SOC_WM8940
        help

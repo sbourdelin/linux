@@ -150,7 +150,6 @@ static struct snd_soc_dai_link mioa701_dai[] = {
 		.codec_dai_name = "wm9713-hifi",
 		.codec_name = "wm9713-codec",
 		.init = mioa701_wm9713_init,
-		.platform_name = "pxa-pcm-audio",
 		.ops = &mioa701_ops,
 	},
 	{
@@ -159,7 +158,6 @@ static struct snd_soc_dai_link mioa701_dai[] = {
 		.cpu_dai_name = "pxa2xx-ac97-aux",
 		.codec_dai_name = "wm9713-aux",
 		.codec_name = "wm9713-codec",
-		.platform_name = "pxa-pcm-audio",
 		.ops = &mioa701_ops,
 	},
 };

@@ -144,7 +144,6 @@ static struct snd_soc_dai_link hx4700_dai = {
 	.stream_name = "AK4641",
 	.cpu_dai_name = "pxa2xx-i2s",
 	.codec_dai_name = "ak4641-hifi",
-	.platform_name = "pxa-pcm-audio",
 	.codec_name = "ak4641.0-0012",
 	.init = hx4700_ak4641_init,
 	.dai_fmt = SND_SOC_DAIFMT_MSB | SND_SOC_DAIFMT_NB_NF |

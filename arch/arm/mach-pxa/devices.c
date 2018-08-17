@@ -370,7 +370,7 @@ struct platform_device pxa_device_asoc_ssp4 = {
 };
 
 struct platform_device pxa_device_asoc_platform = {
-	.name		= "pxa-pcm-audio",
+	.name		= "snd-soc-dummy",
 	.id		= -1,
 };
 

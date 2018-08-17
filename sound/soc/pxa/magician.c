@@ -296,7 +296,6 @@ static struct snd_soc_dai_link magician_dai[] = {
 	.stream_name = "UDA1380 Playback",
 	.cpu_dai_name = "pxa-ssp-dai.0",
 	.codec_dai_name = "uda1380-hifi-playback",
-	.platform_name = "pxa-pcm-audio",
 	.codec_name = "uda1380-codec.0-0018",
 	.ops = &magician_playback_ops,
 },
@@ -305,7 +304,6 @@ static struct snd_soc_dai_link magician_dai[] = {
 	.stream_name = "UDA1380 Capture",
 	.cpu_dai_name = "pxa2xx-i2s",
 	.codec_dai_name = "uda1380-hifi-capture",
-	.platform_name = "pxa-pcm-audio",
 	.codec_name = "uda1380-codec.0-0018",
 	.ops = &magician_capture_ops,
 }
