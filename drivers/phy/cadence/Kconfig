@@ -1,0 +1,9 @@
+#
+# Phy drivers for cadence devices
+#
+config CDNS_SIERRA_PHY
+	tristate "CDNS Sierra PHY Driver"
+	depends on OF && HAS_IOMEM
+	select GENERIC_PHY
+	help
+	  Enable this to support the Cadence Sierra PHY driver
