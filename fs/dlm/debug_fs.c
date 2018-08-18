@@ -608,58 +608,22 @@ static const struct file_operations format4_fops;
 
 static int table_open1(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int ret;
-
-	ret = seq_open(file, &format1_seq_ops);
-	if (ret)
-		return ret;
-
-	seq = file->private_data;
-	seq->private = inode->i_private; /* the dlm_ls */
-	return 0;
+	return seq_open_data(file, &format1_seq_ops, inode->i_private);
 }
 
 static int table_open2(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int ret;
-
-	ret = seq_open(file, &format2_seq_ops);
-	if (ret)
-		return ret;
-
-	seq = file->private_data;
-	seq->private = inode->i_private; /* the dlm_ls */
-	return 0;
+	return seq_open_data(file, &format2_seq_ops, inode->i_private);
 }
 
 static int table_open3(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int ret;
-
-	ret = seq_open(file, &format3_seq_ops);
-	if (ret)
-		return ret;
-
-	seq = file->private_data;
-	seq->private = inode->i_private; /* the dlm_ls */
-	return 0;
+	return seq_open_data(file, &format3_seq_ops, inode->i_private);
 }
 
 static int table_open4(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int ret;
-
-	ret = seq_open(file, &format4_seq_ops);
-	if (ret)
-		return ret;
-
-	seq = file->private_data;
-	seq->private = inode->i_private; /* the dlm_ls */
-	return 0;
+	return seq_open_data(file, &format4_seq_ops, inode->i_private);
 }
 
 static const struct file_operations format1_fops = {
