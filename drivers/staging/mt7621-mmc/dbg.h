@@ -104,19 +104,13 @@ do { \
 
 #define N_MSG(evt, fmt, args...)
 /*
-do {    \
-    if ((DBG_EVT_##evt) & sd_debug_zone[host->id]) { \
-        printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d> PID<%s><0x%x>\n", \
-            host->id,  ##args , __FUNCTION__, __LINE__, current->comm, current->pid);	\
-    } \
-} while(0)
-*/
+ *if ((DBG_EVT_##evt) & sd_debug_zone[host->id]) { \
+ *    dev_err(mmc_dev(host->mmc), "%d -> " fmt "\n", host->id, ##args) \
+ *}
+ */
 
 #define ERR_MSG(fmt, args...) \
-do { \
-	printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d> PID<%s><0x%x>\n", \
-	       host->id,  ##args, __FUNCTION__, __LINE__, current->comm, current->pid); \
-} while (0);
+dev_err(mmc_dev(host->mmc), "%d -> " fmt "\n", host->id, ##args)
 
 #if 1
 //defined CONFIG_MTK_MMC_CD_POLL
@@ -124,17 +118,11 @@ do { \
 #define IRQ_MSG(fmt, args...)
 #else
 #define INIT_MSG(fmt, args...) \
-do { \
-	printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d> PID<%s><0x%x>\n", \
-	       host->id,  ##args, __FUNCTION__, __LINE__, current->comm, current->pid); \
-} while (0);
+dev_err(mmc_dev(host->mmc), "%d -> " fmt "\n", host->id, ##args)
 
 /* PID in ISR in not corrent */
 #define IRQ_MSG(fmt, args...) \
-do { \
-	printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d>\n",	\
-	       host->id,  ##args, __FUNCTION__, __LINE__);	\
-} while (0);
+dev_err(mmc_dev(host->mmc), "%d -> " fmt "\n", host->id, ##args)
 #endif
 
 void msdc_debug_proc_init(void);
