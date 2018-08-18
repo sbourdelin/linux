@@ -135,12 +135,6 @@ struct ftrace_likely_data {
 #undef __must_check
 #define __must_check
 #endif
-#ifndef CONFIG_ENABLE_WARN_DEPRECATED
-#undef __deprecated
-#undef __deprecated_for_modules
-#define __deprecated
-#define __deprecated_for_modules
-#endif
 
 #ifndef __malloc
 #define __malloc
