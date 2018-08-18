@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/aer.h>
+#include <linux/delay.h>
 #include "portdrv.h"
 #include "../pci.h"
 
@@ -386,4 +387,37 @@ failed:
 
 	/* TODO: Should kernel panic here? */
 	pci_info(dev, "AER: Device recovery failed\n");
+}
+
+bool pcie_fatal_error_pending(struct pci_dev *pdev)
+{
+	u16 err_status = 0;
+	int rc;
+
+	if (!pci_is_pcie(pdev))
+		return false;
+
+	rc = pcie_capability_read_word(pdev, PCI_EXP_DEVSTA, &err_status);
+	if (rc)
+		return false;
+
+	return !!(err_status & PCI_EXP_DEVSTA_FED);
+}
+
+bool pcie_wait_fatal_error_clear(struct pci_dev *pdev)
+{
+	int timeout = 1000;
+	bool ret;
+
+	for (;;) {
+		ret = pcie_fatal_error_pending(pdev);
+		if (ret == false)
+			return true;
+		if (timeout <= 0)
+			break;
+		msleep(20);
+		timeout -= 20;
+	}
+
+	return false;
 }

@@ -222,8 +222,26 @@ void pciehp_handle_disable_request(struct slot *slot)
 void pciehp_handle_presence_or_link_change(struct slot *slot, u32 events)
 {
 	struct controller *ctrl = slot->ctrl;
+	struct pci_dev *pdev = ctrl->pcie->port;
 	bool link_active;
 	u8 present;
+
+	/* If a fatal error is pending, wait for AER or DPC to handle it. */
+	if (pcie_fatal_error_pending(pdev)) {
+		bool recovered;
+
+		recovered = pcie_wait_fatal_error_clear(pdev);
+
+		/* If the fatal error is gone and the link is up, return */
+		if (recovered && pcie_wait_for_link(pdev, true)) {
+			ctrl_info(ctrl, "Slot(%s): Ignoring Link event due to successful fatal error recovery\n",
+				  slot_name(slot));
+			return;
+		}
+
+		ctrl_info(ctrl, "Slot(%s): Fatal error recovery failed for Link event, trying hotplug reset\n",
+			  slot_name(slot));
+	}
 
 	/*
 	 * If the slot is on and presence or link has changed, turn it off.
