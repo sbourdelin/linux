@@ -570,10 +570,8 @@ int single_open(struct file *file, int (*show)(struct seq_file *, void *),
 		op->next = single_next;
 		op->stop = single_stop;
 		op->show = show;
-		res = seq_open(file, op);
-		if (!res)
-			((struct seq_file *)file->private_data)->private = data;
-		else
+		res = seq_open_data(file, op, data);
+		if (res)
 			kfree(op);
 	}
 	return res;
