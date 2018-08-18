@@ -248,7 +248,7 @@ static void parse_config_file(const char *p)
 	}
 }
 
-static void *read_file(const char *filename)
+static void *read_file(const char *filename, unsigned *size)
 {
 	struct stat st;
 	int fd;
@@ -276,6 +276,8 @@ static void *read_file(const char *filename)
 	}
 	buf[st.st_size] = '\0';
 	close(fd);
+	if (size)
+		*size += st.st_size;
 
 	return buf;
 }
@@ -300,6 +302,8 @@ static void parse_dep_file(char *m, const char *target, int insert_extra_deps)
 	int saw_any_target = 0;
 	int is_first_dep = 0;
 	void *buf;
+	unsigned nheaders = 0, c_size = 0, h_size = 0;
+	unsigned *sizevar;
 
 	while (1) {
 		/* Skip any "white space" */
@@ -321,6 +325,8 @@ static void parse_dep_file(char *m, const char *target, int insert_extra_deps)
 			/* The /next/ file is the first dependency */
 			is_first_dep = 1;
 		} else if (!is_ignored_file(m, p - m)) {
+			sizevar = NULL;
+
 			*p = '\0';
 
 			/*
@@ -343,13 +349,16 @@ static void parse_dep_file(char *m, const char *target, int insert_extra_deps)
 					printf("source_%s := %s\n\n",
 					       target, m);
 					printf("deps_%s := \\\n", target);
+					sizevar = &c_size;
 				}
 				is_first_dep = 0;
 			} else {
 				printf("  %s \\\n", m);
+				sizevar = &h_size;
+				nheaders++;
 			}
 
-			buf = read_file(m);
+			buf = read_file(m, sizevar);
 			parse_config_file(buf);
 			free(buf);
 		}
@@ -373,7 +382,8 @@ static void parse_dep_file(char *m, const char *target, int insert_extra_deps)
 		do_extra_deps();
 
 	printf("\n%s: $(deps_%s)\n\n", target, target);
-	printf("$(deps_%s):\n", target);
+	printf("$(deps_%s):\n\n", target);
+	printf("# header-stats: %u %u %u\n", nheaders, c_size, h_size);
 }
 
 int main(int argc, char *argv[])
@@ -394,7 +404,7 @@ int main(int argc, char *argv[])
 
 	printf("cmd_%s := %s\n\n", target, cmdline);
 
-	buf = read_file(depfile);
+	buf = read_file(depfile, NULL);
 	parse_dep_file(buf, target, insert_extra_deps);
 	free(buf);
 
