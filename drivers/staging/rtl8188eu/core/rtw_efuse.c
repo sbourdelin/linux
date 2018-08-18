@@ -86,12 +86,20 @@ efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
 	u16	**eFuseWord = NULL;
 	u16	efuse_utilized = 0;
 	u8 u1temp = 0;
+	int z;
+	void **a = NULL;
 
 	efuseTbl = kzalloc(EFUSE_MAP_LEN_88E, GFP_KERNEL);
 	if (!efuseTbl)
 		return;
 
-	eFuseWord = (u16 **)rtw_malloc2d(EFUSE_MAX_SECTION_88E, EFUSE_MAX_WORD_UNIT, sizeof(u16));
+	a = kzalloc(EFUSE_MAX_SECTION_88E * sizeof(void *) + EFUSE_MAX_SECTION_88E * EFUSE_MAX_WORD_UNIT * sizeof(u16), GFP_KERNEL);
+	if (!a)
+		goto out;
+	for (z = 0; z < EFUSE_MAX_SECTION_88E; z++)
+		a[z] = ((char *)(a + EFUSE_MAX_SECTION_88E)) + z * EFUSE_MAX_WORD_UNIT * sizeof(u16);
+out:
+	eFuseWord = (u16 **)a;
 	if (!eFuseWord) {
 		DBG_88E("%s: alloc eFuseWord fail!\n", __func__);
 		goto eFuseWord_failed;
