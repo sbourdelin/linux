@@ -2302,17 +2302,8 @@ static const struct seq_operations tegra_pcie_ports_seq_ops = {
 static int tegra_pcie_ports_open(struct inode *inode, struct file *file)
 {
 	struct tegra_pcie *pcie = inode->i_private;
-	struct seq_file *s;
-	int err;
 
-	err = seq_open(file, &tegra_pcie_ports_seq_ops);
-	if (err)
-		return err;
-
-	s = file->private_data;
-	s->private = pcie;
-
-	return 0;
+	return seq_open_data(file, &tegra_pcie_ports_seq_ops, pcie);
 }
 
 static const struct file_operations tegra_pcie_ports_ops = {
