@@ -135,17 +135,9 @@ static const struct file_operations transaction_ops = {
 
 static int exports_net_open(struct net *net, struct file *file)
 {
-	int err;
-	struct seq_file *seq;
 	struct nfsd_net *nn = net_generic(net, nfsd_net_id);
 
-	err = seq_open(file, &nfs_exports_op);
-	if (err)
-		return err;
-
-	seq = file->private_data;
-	seq->private = nn->svc_export_cache;
-	return 0;
+	return seq_open_data(file, &nfs_exports_op, nn->svc_export_cache);
 }
 
 static int exports_proc_open(struct inode *inode, struct file *file)
