@@ -229,6 +229,29 @@ static void pciehp_check_presence(struct controller *ctrl)
 	up_read(&ctrl->reset_lock);
 }
 
+static int pciehp_control_surprise_error(struct controller *ctrl, bool enable)
+{
+	struct pci_dev *pdev = ctrl->pcie->port;
+	u32 reg32;
+	int pos;
+
+	if (!pci_is_pcie(pdev))
+		return -ENODEV;
+
+	pos = pdev->aer_cap;
+	if (!pos)
+		return -ENODEV;
+
+	pci_read_config_dword(pdev, pos + PCI_ERR_UNCOR_MASK, &reg32);
+	if (enable)
+		reg32 &= ~PCI_ERR_UNC_SURPDN;
+	else
+		reg32 |= PCI_ERR_UNC_SURPDN;
+	pci_write_config_dword(pdev, pos + PCI_ERR_UNCOR_MASK, reg32);
+
+	return 0;
+}
+
 static int pciehp_probe(struct pcie_device *dev)
 {
 	int rc;
@@ -280,6 +303,9 @@ static int pciehp_probe(struct pcie_device *dev)
 
 	pciehp_check_presence(ctrl);
 
+	/* We want exclusive control of link down events in hotplug driver */
+	pciehp_control_surprise_error(ctrl, false);
+
 	return 0;
 
 err_out_shutdown_notification:
@@ -298,6 +324,7 @@ static void pciehp_remove(struct pcie_device *dev)
 	pci_hp_del(ctrl->slot->hotplug_slot);
 	pcie_shutdown_notification(ctrl);
 	cleanup_slot(ctrl);
+	pciehp_control_surprise_error(ctrl, true);
 	pciehp_release_ctrl(ctrl);
 }
 
