@@ -2747,7 +2747,6 @@ static int proc_id_map_open(struct inode *inode, struct file *file,
 {
 	struct user_namespace *ns = NULL;
 	struct task_struct *task;
-	struct seq_file *seq;
 	int ret = -EINVAL;
 
 	task = get_proc_task(inode);
@@ -2758,19 +2757,11 @@ static int proc_id_map_open(struct inode *inode, struct file *file,
 		put_task_struct(task);
 	}
 	if (!ns)
-		goto err;
+		return ret;
 
-	ret = seq_open(file, seq_ops);
+	ret = seq_open_data(file, seq_ops, ns);
 	if (ret)
-		goto err_put_ns;
-
-	seq = file->private_data;
-	seq->private = ns;
-
-	return 0;
-err_put_ns:
-	put_user_ns(ns);
-err:
+		put_user_ns(ns);
 	return ret;
 }
 
