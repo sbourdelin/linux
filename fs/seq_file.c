@@ -33,11 +33,12 @@ static void *seq_buf_alloc(unsigned long size)
 }
 
 /**
- *	seq_open -	initialize sequential file
+ *	seq_open_data -	initialize sequential file
  *	@file: file we initialize
  *	@op: method table describing the sequence
+ *	@data: initial value for ->private field
  *
- *	seq_open() sets @file, associating it with a sequence described
+ *	seq_open_data() sets @file, associating it with a sequence described
  *	by @op.  @op->start() sets the iterator up and returns the first
  *	element of sequence. @op->stop() shuts it down.  @op->next()
  *	returns the next element of sequence.  @op->show() prints element
@@ -45,10 +46,10 @@ static void *seq_buf_alloc(unsigned long size)
  *	ERR_PTR(error).  In the end of sequence they return %NULL. ->show()
  *	returns 0 in case of success and negative number in case of error.
  *	Returning SEQ_SKIP means "discard this element and move on".
- *	Note: seq_open() will allocate a struct seq_file and store its
+ *	Note: seq_open_data() will allocate a struct seq_file and store its
  *	pointer in @file->private_data. This pointer should not be modified.
  */
-int seq_open(struct file *file, const struct seq_operations *op)
+int seq_open_data(struct file *file, const struct seq_operations *op, void *data)
 {
 	struct seq_file *p;
 
@@ -62,6 +63,7 @@ int seq_open(struct file *file, const struct seq_operations *op)
 
 	mutex_init(&p->lock);
 	p->op = op;
+	p->private = data;
 
 	// No refcounting: the lifetime of 'p' is constrained
 	// to the lifetime of the file.
@@ -85,6 +87,12 @@ int seq_open(struct file *file, const struct seq_operations *op)
 	 */
 	file->f_mode &= ~FMODE_PWRITE;
 	return 0;
+}
+EXPORT_SYMBOL(seq_open_data);
+
+int seq_open(struct file *file, const struct seq_operations *op)
+{
+	return seq_open_data(file, op, NULL);
 }
 EXPORT_SYMBOL(seq_open);
 
