@@ -84,6 +84,7 @@ struct llcc_drv_data {
 	struct regmap *regmap;
 	struct regmap *bcast_regmap;
 	const struct llcc_slice_config *cfg;
+	struct llcc_edac_reg_data *edac_reg;
 	struct mutex lock;
 	u32 cfg_size;
 	u32 max_slices;
@@ -91,6 +92,30 @@ struct llcc_drv_data {
 	unsigned long *bitmap;
 	u32 *offsets;
 	int ecc_irq;
+};
+
+/**
+ * llcc_edac_reg_data - llcc edac registers data for each error type
+ * @err_name: name of the error
+ * @reg_cnt: number of registers
+ * @synd_reg: syndrome register address
+ * @err_status_reg: Status register address to read the error count
+ * @err_count_mask: Mask value to get the error count
+ * @err_count_shift: Shift value to get the error count
+ * @err_ways_status: Status register address to read error ways
+ * @err_ways_mask: Mask value to get the error ways
+ * @err_ways_shift: Shift value to get the error ways
+ */
+struct llcc_edac_reg_data {
+	char *err_name;
+	int reg_cnt;
+	int synd_reg;
+	int err_status_reg;
+	int err_count_mask;
+	int err_count_shift;
+	int err_ways_status;
+	int err_ways_mask;
+	int err_ways_shift;
 };
 
 #if IS_ENABLED(CONFIG_QCOM_LLCC)
