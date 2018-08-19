@@ -716,7 +716,7 @@ static void handle_tx(struct vhost_net *net)
 	struct vhost_virtqueue *vq = &nvq->vq;
 	struct socket *sock;
 
-	mutex_lock(&vq->mutex);
+	mutex_lock_nested(&vq->mutex, VHOST_NET_VQ_TX);
 	sock = vq->private_data;
 	if (!sock)
 		goto out;
@@ -781,7 +781,7 @@ static int vhost_net_rx_peek_head_len(struct vhost_net *net, struct sock *sk,
 		/* Flush batched heads first */
 		vhost_net_signal_used(rnvq);
 		/* Both tx vq and rx socket were polled here */
-		mutex_lock_nested(&tvq->mutex, 1);
+		mutex_lock_nested(&tvq->mutex, VHOST_NET_VQ_TX);
 		vhost_disable_notify(&net->dev, tvq);
 
 		preempt_disable();
@@ -923,7 +923,7 @@ static void handle_rx(struct vhost_net *net)
 	__virtio16 num_buffers;
 	int recv_pkts = 0;
 
-	mutex_lock_nested(&vq->mutex, 0);
+	mutex_lock_nested(&vq->mutex, VHOST_NET_VQ_RX);
 	sock = vq->private_data;
 	if (!sock)
 		goto out;
