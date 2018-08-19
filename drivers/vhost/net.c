@@ -491,10 +491,8 @@ static void vhost_net_busy_poll(struct vhost_net *net,
 	endtime = busy_clock() + busyloop_timeout;
 
 	while (vhost_can_busy_poll(endtime)) {
-		if (vhost_has_work(&net->dev)) {
-			*busyloop_intr = true;
+		if (vhost_has_work(&net->dev))
 			break;
-		}
 
 		if ((sock_has_rx_data(sock) &&
 		     !vhost_vq_avail_empty(&net->dev, rvq)) ||
@@ -516,6 +514,11 @@ static void vhost_net_busy_poll(struct vhost_net *net,
 	if (!poll_rx &&
 	    !vhost_has_work_pending(&net->dev, VHOST_NET_VQ_RX))
 		vhost_net_enable_vq(net, rvq);
+
+	if (vhost_has_work_pending(&net->dev,
+				   poll_rx ?
+				   VHOST_NET_VQ_RX: VHOST_NET_VQ_TX))
+		*busyloop_intr = true;
 
 	mutex_unlock(&vq->mutex);
 }
