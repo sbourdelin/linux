@@ -234,8 +234,10 @@ int nd_region_to_nstype(struct nd_region *nd_region)
 			struct nd_mapping *nd_mapping = &nd_region->mapping[i];
 			struct nvdimm *nvdimm = nd_mapping->nvdimm;
 
-			if (test_bit(NDD_ALIASING, &nvdimm->flags))
+			if (test_bit(NDD_ALIASING, &nvdimm->flags)) {
 				alias++;
+				break;
+			}
 		}
 		if (alias)
 			return ND_DEVICE_NAMESPACE_PMEM;
