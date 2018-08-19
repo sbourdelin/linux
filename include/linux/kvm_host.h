@@ -617,12 +617,15 @@ id_to_memslot(struct kvm_memslots *slots, int id)
  *
  * Since flags can be changed by some of these operations, the following
  * differentiation is the best we can do for __kvm_set_memory_region():
+ *
+ * Encode the number of slot adjustment in the lowest byte, which will
+ * be used in update_memslots().
  */
 enum kvm_mr_change {
-	KVM_MR_CREATE,
-	KVM_MR_DELETE,
-	KVM_MR_MOVE,
-	KVM_MR_FLAGS_ONLY,
+	KVM_MR_CREATE     = 0x0001,
+	KVM_MR_DELETE     = 0x00ff,
+	KVM_MR_MOVE       = 0x0000,
+	KVM_MR_FLAGS_ONLY = 0x0100,
 };
 
 int kvm_set_memory_region(struct kvm *kvm,

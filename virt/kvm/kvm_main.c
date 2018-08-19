@@ -802,21 +802,15 @@ static int kvm_create_dirty_bitmap(struct kvm_memory_slot *memslot)
  * sorted array and known changed memslot position.
  */
 static void update_memslots(struct kvm_memslots *slots,
-			    struct kvm_memory_slot *new)
+			    struct kvm_memory_slot *new,
+			    enum kvm_mr_change change)
 {
 	int id = new->id;
 	int i = slots->id_to_index[id];
 	struct kvm_memory_slot *mslots = slots->memslots;
 
 	WARN_ON(mslots[i].id != id);
-	if (!new->npages) {
-		WARN_ON(!mslots[i].npages);
-		if (mslots[i].npages)
-			slots->used_slots--;
-	} else {
-		if (!mslots[i].npages)
-			slots->used_slots++;
-	}
+	slots->used_slots += (char)change;
 
 	while (i < KVM_MEM_SLOTS_NUM - 1 &&
 	       new->base_gfn <= mslots[i + 1].base_gfn) {
@@ -1051,7 +1045,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		memset(&new.arch, 0, sizeof(new.arch));
 	}
 
-	update_memslots(slots, &new);
+	update_memslots(slots, &new, change);
 	old_memslots = install_new_memslots(kvm, as_id, slots);
 
 	kvm_arch_commit_memory_region(kvm, mem, &old, &new, change);
