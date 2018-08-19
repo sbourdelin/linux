@@ -236,6 +236,13 @@ void fsnotify_put_mark(struct fsnotify_mark *mark)
 	if (hlist_empty(&conn->list)) {
 		inode = fsnotify_detach_connector_from_object(conn);
 		free_conn = true;
+	} else if (conn->type == FSNOTIFY_OBJ_TYPE_DETACHED) {
+		/*
+		 * fsnotify_destroy_marks() detaches conn from object before
+		 * put on last mark of object list and other marks on the list
+		 * may still have elevated refcounts. We don't need to recalc
+		 * mask nor to free_conn in that case.
+		 */
 	} else {
 		__fsnotify_recalc_mask(conn);
 	}
