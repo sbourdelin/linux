@@ -186,7 +186,7 @@ EXPORT_SYMBOL_GPL(vhost_work_init);
 
 /* Init poll structure */
 void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
-		     __poll_t mask, struct vhost_dev *dev)
+		     __u8 poll_id, __poll_t mask, struct vhost_dev *dev)
 {
 	init_waitqueue_func_entry(&poll->wait, vhost_poll_wakeup);
 	init_poll_funcptr(&poll->table, vhost_poll_func);
@@ -194,6 +194,7 @@ void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
 	poll->dev = dev;
 	poll->wqh = NULL;
 
+	poll->poll_id = poll_id;
 	vhost_work_init(&poll->work, fn);
 }
 EXPORT_SYMBOL_GPL(vhost_poll_init);
@@ -276,8 +277,16 @@ bool vhost_has_work(struct vhost_dev *dev)
 }
 EXPORT_SYMBOL_GPL(vhost_has_work);
 
+bool vhost_has_work_pending(struct vhost_dev *dev, int poll_id)
+{
+	return !llist_empty(&dev->work_list) &&
+		test_bit(poll_id, dev->work_pending);
+}
+EXPORT_SYMBOL_GPL(vhost_has_work_pending);
+
 void vhost_poll_queue(struct vhost_poll *poll)
 {
+	set_bit(poll->poll_id, poll->dev->work_pending);
 	vhost_work_queue(poll->dev, &poll->work);
 }
 EXPORT_SYMBOL_GPL(vhost_poll_queue);
@@ -355,6 +364,7 @@ static int vhost_worker(void *data)
 		if (!node)
 			schedule();
 
+		bitmap_zero(dev->work_pending, VHOST_DEV_MAX_VQ);
 		node = llist_reverse_order(node);
 		/* make sure flag is seen after deletion */
 		smp_wmb();
@@ -421,6 +431,8 @@ void vhost_dev_init(struct vhost_dev *dev,
 	struct vhost_virtqueue *vq;
 	int i;
 
+	BUG_ON(nvqs > VHOST_DEV_MAX_VQ);
+
 	dev->vqs = vqs;
 	dev->nvqs = nvqs;
 	mutex_init(&dev->mutex);
@@ -429,6 +441,7 @@ void vhost_dev_init(struct vhost_dev *dev,
 	dev->iotlb = NULL;
 	dev->mm = NULL;
 	dev->worker = NULL;
+	bitmap_zero(dev->work_pending, VHOST_DEV_MAX_VQ);
 	init_llist_head(&dev->work_list);
 	init_waitqueue_head(&dev->wait);
 	INIT_LIST_HEAD(&dev->read_list);
@@ -446,7 +459,7 @@ void vhost_dev_init(struct vhost_dev *dev,
 		vhost_vq_reset(dev, vq);
 		if (vq->handle_kick)
 			vhost_poll_init(&vq->poll, vq->handle_kick,
-					EPOLLIN, dev);
+					i, EPOLLIN, dev);
 	}
 }
 EXPORT_SYMBOL_GPL(vhost_dev_init);

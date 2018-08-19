@@ -1139,8 +1139,15 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 	}
 	vhost_dev_init(dev, vqs, VHOST_NET_VQ_MAX);
 
-	vhost_poll_init(n->poll + VHOST_NET_VQ_TX, handle_tx_net, EPOLLOUT, dev);
-	vhost_poll_init(n->poll + VHOST_NET_VQ_RX, handle_rx_net, EPOLLIN, dev);
+	vhost_poll_init(n->poll + VHOST_NET_VQ_TX,
+			handle_tx_net,
+			VHOST_NET_VQ_TX,
+			EPOLLOUT, dev);
+
+	vhost_poll_init(n->poll + VHOST_NET_VQ_RX,
+			handle_rx_net,
+			VHOST_NET_VQ_RX,
+			EPOLLIN, dev);
 
 	f->private_data = n;
 

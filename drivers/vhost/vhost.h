@@ -30,6 +30,7 @@ struct vhost_poll {
 	wait_queue_head_t        *wqh;
 	wait_queue_entry_t              wait;
 	struct vhost_work	  work;
+	__u8			  poll_id;
 	__poll_t		  mask;
 	struct vhost_dev	 *dev;
 };
@@ -37,9 +38,10 @@ struct vhost_poll {
 void vhost_work_init(struct vhost_work *work, vhost_work_fn_t fn);
 void vhost_work_queue(struct vhost_dev *dev, struct vhost_work *work);
 bool vhost_has_work(struct vhost_dev *dev);
+bool vhost_has_work_pending(struct vhost_dev *dev, int poll_id);
 
 void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
-		     __poll_t mask, struct vhost_dev *dev);
+		     __u8 id, __poll_t mask, struct vhost_dev *dev);
 int vhost_poll_start(struct vhost_poll *poll, struct file *file);
 void vhost_poll_stop(struct vhost_poll *poll);
 void vhost_poll_flush(struct vhost_poll *poll);
@@ -156,6 +158,8 @@ struct vhost_msg_node {
   struct list_head node;
 };
 
+#define VHOST_DEV_MAX_VQ	128
+
 struct vhost_dev {
 	struct mm_struct *mm;
 	struct mutex mutex;
@@ -163,6 +167,7 @@ struct vhost_dev {
 	int nvqs;
 	struct eventfd_ctx *log_ctx;
 	struct llist_head work_list;
+	DECLARE_BITMAP(work_pending, VHOST_DEV_MAX_VQ);
 	struct task_struct *worker;
 	struct vhost_umem *umem;
 	struct vhost_umem *iotlb;
