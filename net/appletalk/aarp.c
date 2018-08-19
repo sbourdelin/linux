@@ -757,6 +757,10 @@ static int aarp_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (!ifa)
 		goto out1;
 
+	/* Ignore packets from myself. */
+	if (ether_addr_equal(ea->hw_src, dev->dev_addr))
+		goto out1;
+
 	if (ifa->status & ATIF_PROBE &&
 	    ifa->address.s_node == ea->pa_dst_node &&
 	    ifa->address.s_net == ea->pa_dst_net) {
