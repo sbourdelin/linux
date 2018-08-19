@@ -807,15 +807,13 @@ static void update_memslots(struct kvm_memslots *slots,
 {
 	int id = new->id;
 	int i = slots->id_to_index[id];
+	int used_slots = slots->used_slots;
 	struct kvm_memory_slot *mslots = slots->memslots;
 
 	WARN_ON(mslots[i].id != id);
 	slots->used_slots += (char)change;
 
-	while (i < KVM_MEM_SLOTS_NUM - 1 &&
-	       new->base_gfn <= mslots[i + 1].base_gfn) {
-		if (!mslots[i + 1].npages)
-			break;
+	while (i < used_slots - 1 && new->base_gfn <= mslots[i + 1].base_gfn) {
 		mslots[i] = mslots[i + 1];
 		slots->id_to_index[mslots[i].id] = i;
 		i++;
