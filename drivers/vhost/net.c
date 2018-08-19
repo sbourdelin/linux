@@ -484,6 +484,9 @@ static void vhost_net_busy_poll(struct vhost_net *net,
 	busyloop_timeout = poll_rx ? rvq->busyloop_timeout:
 				     tvq->busyloop_timeout;
 
+	if (!poll_rx)
+		vhost_net_disable_vq(net, rvq);
+
 	preempt_disable();
 	endtime = busy_clock() + busyloop_timeout;
 
@@ -509,6 +512,10 @@ static void vhost_net_busy_poll(struct vhost_net *net,
 		vhost_net_busy_poll_try_queue(net, rvq);
 	else /* On tx here, sock has no rx data. */
 		vhost_enable_notify(&net->dev, rvq);
+
+	if (!poll_rx &&
+	    !vhost_has_work_pending(&net->dev, VHOST_NET_VQ_RX))
+		vhost_net_enable_vq(net, rvq);
 
 	mutex_unlock(&vq->mutex);
 }
