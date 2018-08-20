@@ -95,10 +95,12 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_macb0_rmii &pinctrl_macb0_phy_irq>;
 
-				phy0: ethernet-phy@1 {
-					interrupt-parent = <&pioE>;
-					interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
-					reg = <1>;
+				mdio {
+					phy0: ethernet-phy@1 {
+						interrupt-parent = <&pioE>;
+						interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
+						reg = <1>;
+					};
 				};
 			};
 

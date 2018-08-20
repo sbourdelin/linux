@@ -67,12 +67,14 @@
 				pinctrl-0 = <&pinctrl_macb0_default>;
 				phy-mode = "rmii";
 
-				ethernet-phy@0 {
-					reg = <0x0>;
-					interrupt-parent = <&pioA>;
-					interrupts = <PIN_PD31 IRQ_TYPE_LEVEL_LOW>;
-					pinctrl-names = "default";
-					pinctrl-0 = <&pinctrl_macb0_phy_irq>;
+				mdio {
+					ethernet-phy@0 {
+						reg = <0x0>;
+						interrupt-parent = <&pioA>;
+						interrupts = <PIN_PD31 IRQ_TYPE_LEVEL_LOW>;
+						pinctrl-names = "default";
+						pinctrl-0 = <&pinctrl_macb0_phy_irq>;
+					};
 				};
 			};
 

@@ -49,6 +49,11 @@
 				clocks = <&macb1_clk>, <&macb1_clk>;
 				clock-names = "hclk", "pclk";
 				status = "disabled";
+
+				mdio {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
 			};
 		};
 	};

@@ -54,9 +54,11 @@
 				phy-mode = "rmii";
 				status = "okay";
 
-				phy0: ethernet-phy {
-					interrupt-parent = <&pioC>;
-					interrupts = <4 IRQ_TYPE_EDGE_BOTH>;
+				mdio {
+					phy0: ethernet-phy {
+						interrupt-parent = <&pioC>;
+						interrupts = <4 IRQ_TYPE_EDGE_BOTH>;
+					};
 				};
 			};
 

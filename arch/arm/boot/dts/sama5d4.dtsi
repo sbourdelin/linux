@@ -980,6 +980,11 @@
 				clocks = <&macb0_clk>, <&macb0_clk>;
 				clock-names = "hclk", "pclk";
 				status = "disabled";
+
+				mdio {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
 			};
 
 			i2c2: i2c@f8024000 {
@@ -1220,6 +1225,11 @@
 				clocks = <&macb1_clk>, <&macb1_clk>;
 				clock-names = "hclk", "pclk";
 				status = "disabled";
+
+				mdio {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
 			};
 
 			trng@fc030000 {

@@ -126,10 +126,12 @@
 				phy-mode = "rmii";
 				status = "okay";
 
-				ethernet-phy@1 {
-					reg = <0x1>;
-					interrupt-parent = <&pioA>;
-					interrupts = <PIN_PC9 IRQ_TYPE_LEVEL_LOW>;
+				mdio {
+					ethernet-phy@1 {
+						reg = <0x1>;
+						interrupt-parent = <&pioA>;
+						interrupts = <PIN_PC9 IRQ_TYPE_LEVEL_LOW>;
+					};
 				};
 			};
 

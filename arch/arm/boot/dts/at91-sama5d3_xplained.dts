@@ -134,8 +134,10 @@
 				#size-cells = <0>;
 				status = "okay";
 
-				ethernet-phy@7 {
-					reg = <0x7>;
+				mdio {
+					ethernet-phy@7 {
+						reg = <0x7>;
+					};
 				};
 			};
 
@@ -201,8 +203,10 @@
 				#size-cells = <0>;
 				status = "okay";
 
-				ethernet-phy@1 {
-					reg = <0x1>;
+				mdio {
+					ethernet-phy@1 {
+						reg = <0x1>;
+					};
 				};
 			};
 

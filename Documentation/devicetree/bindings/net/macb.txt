@@ -25,7 +25,8 @@ Required properties:
 	Optional elements: 'tsu_clk'
 - clocks: Phandles to input clocks.
 
-Optional properties for PHY child node:
+PHY child nodes should be grouped in a mdio container,
+they have following optional properties:
 - reset-gpios : Should specify the gpio for phy reset
 - magic-packet : If present, indicates that the hardware supports waking
   up via magic packet.
@@ -41,8 +42,12 @@ Examples:
 		local-mac-address = [3a 0e 03 04 05 06];
 		clock-names = "pclk", "hclk", "tx_clk";
 		clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
-		ethernet-phy@1 {
-			reg = <0x1>;
-			reset-gpios = <&pioE 6 1>;
+		mdio {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			ethernet-phy@1 {
+				reg = <0x1>;
+				reset-gpios = <&pioE 6 1>;
+			};
 		};
 	};
