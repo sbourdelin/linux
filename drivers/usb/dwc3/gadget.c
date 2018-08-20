@@ -1257,6 +1257,9 @@ static int __dwc3_gadget_get_frame(struct dwc3 *dwc)
 
 static int __dwc3_gadget_start_isoc(struct dwc3_ep *dep)
 {
+	u16 current_frame_number;
+	u16 frame_number;
+
 	if (list_empty(&dep->pending_list)) {
 		dev_info(dep->dwc->dev, "%s: ran out of requests\n",
 				dep->name);
@@ -1265,6 +1268,14 @@ static int __dwc3_gadget_start_isoc(struct dwc3_ep *dep)
 	}
 
 	dep->frame_number = DWC3_ALIGN_FRAME(dep);
+	current_frame_number = __dwc3_gadget_get_frame(dep->dwc);
+	frame_number = dep->frame_number & DWC3_EP_FRAME_NUMBER_MASK;
+
+	if (frame_number <= current_frame_number) {
+		dep->frame_number += current_frame_number - frame_number;
+		dep->frame_number = DWC3_ALIGN_FRAME(dep);
+	}
+
 	return __dwc3_gadget_kick_transfer(dep);
 }
 

@@ -699,6 +699,8 @@ struct dwc3_ep {
 	u8			type;
 	u8			resource_index;
 	u32			frame_number;
+#define DWC3_EP_FRAME_NUMBER_MASK 0x3fff
+
 	u32			interval;
 
 	char			name[20];
