@@ -64,7 +64,27 @@ static int fanotify_get_response(struct fsnotify_group *group,
 
 	pr_debug("%s: group=%p event=%p\n", __func__, group, event);
 
-	wait_event(group->fanotify_data.access_waitq, event->response);
+	ret = wait_event_killable(group->fanotify_data.access_waitq,
+				  event->response);
+	if (ret) {
+		/* Try to remove pending event from the queue */
+		spin_lock(&group->notification_lock);
+		if (!list_empty(&event->fae.fse.list))
+			list_del_init(&event->fae.fse.list);
+		else
+			ret = 0;
+		spin_unlock(&group->notification_lock);
+
+		if (ret)
+			return ret;
+
+		/*
+		 * We cannot return, this will destroy event while
+		 * process_access_response() fills response.
+		 * Just wait for wakeup and continue normal flow.
+		 */
+		wait_event(group->fanotify_data.access_waitq, event->response);
+	}
 
 	/* userspace responded, convert to something usable */
 	switch (event->response & ~FAN_AUDIT) {
