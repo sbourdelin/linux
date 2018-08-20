@@ -16,6 +16,7 @@
 #include <linux/stat.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/uaccess.h>
 
 /**
  * kobject_namespace - return @kobj's namespace tag
@@ -417,8 +418,11 @@ int kobject_add(struct kobject *kobj, struct kobject *parent,
 		return -EINVAL;
 
 	if (!kobj->state_initialized) {
+		char tmp;
+		int ret = probe_kernel_address(kobject_name(kobj), tmp);
+
 		pr_err("kobject '%s' (%p): tried to add an uninitialized object, something is seriously wrong.\n",
-		       kobject_name(kobj), kobj);
+			ret ? " " : kobject_name(kobj), kobj);
 		dump_stack();
 		return -EINVAL;
 	}
@@ -606,10 +610,14 @@ EXPORT_SYMBOL(kobject_del);
 struct kobject *kobject_get(struct kobject *kobj)
 {
 	if (kobj) {
-		if (!kobj->state_initialized)
+		if (!kobj->state_initialized) {
+			char tmp;
+			int ret = probe_kernel_address(kobject_name(kobj), tmp);
+
 			WARN(1, KERN_WARNING
 				"kobject: '%s' (%p): is not initialized, yet kobject_get() is being called.\n",
-			     kobject_name(kobj), kobj);
+			     ret ? " " : kobject_name(kobj), kobj);
+		}
 		kref_get(&kobj->kref);
 	}
 	return kobj;
@@ -701,10 +709,14 @@ static void kobject_release(struct kref *kref)
 void kobject_put(struct kobject *kobj)
 {
 	if (kobj) {
-		if (!kobj->state_initialized)
+		if (!kobj->state_initialized) {
+			char tmp;
+			int ret = probe_kernel_address(kobject_name(kobj), tmp);
+
 			WARN(1, KERN_WARNING
 				"kobject: '%s' (%p): is not initialized, yet kobject_put() is being called.\n",
-			     kobject_name(kobj), kobj);
+			     ret ? " " : kobject_name(kobj), kobj);
+		}
 		kref_put(&kobj->kref, kobject_release);
 	}
 }
