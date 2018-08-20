@@ -166,8 +166,8 @@ gf119_disp_core_mthd = {
 	}
 };
 
-void
-gf119_disp_core_fini(struct nv50_disp_chan *chan)
+static bool
+gf119_disp_core_deactivate(struct nv50_disp_chan *chan)
 {
 	struct nvkm_subdev *subdev = &chan->disp->base.engine.subdev;
 	struct nvkm_device *device = subdev->device;
@@ -181,7 +181,16 @@ gf119_disp_core_fini(struct nv50_disp_chan *chan)
 	) < 0) {
 		nvkm_error(subdev, "core fini: %08x\n",
 			   nvkm_rd32(device, 0x610490));
+		return false;
 	}
+
+	return true;
+}
+
+void
+gf119_disp_core_fini(struct nv50_disp_chan *chan)
+{
+	gf119_disp_core_deactivate(chan);
 }
 
 static int
@@ -189,6 +198,14 @@ gf119_disp_core_init(struct nv50_disp_chan *chan)
 {
 	struct nvkm_subdev *subdev = &chan->disp->base.engine.subdev;
 	struct nvkm_device *device = subdev->device;
+
+	/* attempt to unstick the channel from some unknown state */
+	if ((nvkm_rd32(device, 0x610490) & 0x000a0000) == 0x000a0000 &&
+	    WARN_ON(!gf119_disp_core_deactivate(chan))) {
+
+		nvkm_error(subdev, "core won't shut down, aborting\n");
+		return -EBUSY;
+	}
 
 	/* initialise channel for dma command submission */
 	nvkm_wr32(device, 0x610494, chan->push);
