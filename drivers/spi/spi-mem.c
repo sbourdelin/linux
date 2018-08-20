@@ -346,9 +346,23 @@ EXPORT_SYMBOL_GPL(spi_mem_get_name);
 int spi_mem_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
 {
 	struct spi_controller *ctlr = mem->spi->controller;
+	unsigned long opcode_addr_dummy_sum = sizeof(op->cmd.opcode) +
+					      op->addr.nbytes +
+					      op->dummy.nbytes;
 
 	if (ctlr->mem_ops && ctlr->mem_ops->adjust_op_size)
 		return ctlr->mem_ops->adjust_op_size(mem, op);
+
+	if (!ctlr->mem_ops || !ctlr->mem_ops->exec_op) {
+		if (spi_max_message_size(mem->spi) < opcode_addr_dummy_sum ||
+		    spi_max_transfer_size(mem->spi) < opcode_addr_dummy_sum)
+			return -EINVAL;
+
+		op->data.nbytes = min3((unsigned long)(op->data.nbytes),
+				       spi_max_transfer_size(mem->spi),
+				       spi_max_message_size(mem->spi) -
+				       opcode_addr_dummy_sum);
+	}
 
 	return 0;
 }
