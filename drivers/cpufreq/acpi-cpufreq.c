@@ -423,9 +423,8 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 	unsigned int next_perf_state = 0; /* Index into perf table */
 	int result = 0;
 
-	if (unlikely(!data)) {
+	if (unlikely(!data))
 		return -ENODEV;
-	}
 
 	perf = to_perf_data(data);
 	next_perf_state = policy->freq_table[index].driver_data;
@@ -521,11 +520,10 @@ acpi_cpufreq_guess_freq(struct acpi_cpufreq_data *data, unsigned int cpu)
 		}
 		perf->state = perf->state_count-1;
 		return freqn;
-	} else {
-		/* assume CPU is at P0... */
-		perf->state = 0;
-		return perf->states[0].core_frequency * 1000;
 	}
+	/* assume CPU is at P0... */
+	perf->state = 0;
+	return perf->states[0].core_frequency * 1000;
 }
 
 static void free_acpi_perf_data(void)
