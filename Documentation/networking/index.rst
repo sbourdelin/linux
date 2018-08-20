@@ -14,6 +14,7 @@ Contents:
    dpaa2/index
    e100
    e1000
+   fm10k
    ixgb
    kapi
    z8530book
