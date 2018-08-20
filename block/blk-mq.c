@@ -2145,8 +2145,6 @@ static void blk_mq_exit_hctx(struct request_queue *q,
 	if (set->ops->exit_request)
 		set->ops->exit_request(set, hctx->fq->flush_rq, hctx_idx);
 
-	blk_mq_sched_exit_hctx(q, hctx, hctx_idx);
-
 	if (set->ops->exit_hctx)
 		set->ops->exit_hctx(hctx, hctx_idx);
 
@@ -2214,12 +2212,9 @@ static int blk_mq_init_hctx(struct request_queue *q,
 	    set->ops->init_hctx(hctx, set->driver_data, hctx_idx))
 		goto free_bitmap;
 
-	if (blk_mq_sched_init_hctx(q, hctx, hctx_idx))
-		goto exit_hctx;
-
 	hctx->fq = blk_alloc_flush_queue(q, hctx->numa_node, set->cmd_size);
 	if (!hctx->fq)
-		goto sched_exit_hctx;
+		goto exit_hctx;
 
 	if (blk_mq_init_request(set, hctx->fq->flush_rq, hctx_idx, node))
 		goto free_fq;
@@ -2233,8 +2228,6 @@ static int blk_mq_init_hctx(struct request_queue *q,
 
  free_fq:
 	kfree(hctx->fq);
- sched_exit_hctx:
-	blk_mq_sched_exit_hctx(q, hctx, hctx_idx);
  exit_hctx:
 	if (set->ops->exit_hctx)
 		set->ops->exit_hctx(hctx, hctx_idx);
@@ -2911,6 +2904,29 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 	list_for_each_entry(q, &set->tag_list, tag_set_list)
 		blk_mq_freeze_queue(q);
 
+	/*
+	 * switch io scheduler to NULL to clean up the data in it.
+	 * will get it back after update mapping between cpu and hw queues.
+	 */
+	list_for_each_entry(q, &set->tag_list, tag_set_list) {
+		if (!q->elevator) {
+			q->elv_type = NULL;
+			continue;
+		}
+		q->elv_type = q->elevator->type;
+		mutex_lock(&q->sysfs_lock);
+		/*
+		 * After elevator_switch_mq, the previous elevator_queue will be
+		 * released by elevator_release. The reference of the io scheduler
+		 * module get by elevator_get will also be put. So we need to get
+		 * a reference of the io scheduler module here to prevent it to be
+		 * removed.
+		 */
+		__module_get(q->elv_type->elevator_owner);
+		elevator_switch_mq(q, NULL);
+		mutex_unlock(&q->sysfs_lock);
+	}
+
 	set->nr_hw_queues = nr_hw_queues;
 	blk_mq_update_queue_map(set);
 	list_for_each_entry(q, &set->tag_list, tag_set_list) {
@@ -2918,6 +2934,14 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 		blk_mq_queue_reinit(q);
 	}
 
+	list_for_each_entry(q, &set->tag_list, tag_set_list) {
+		if (!q->elv_type)
+			continue;
+
+		mutex_lock(&q->sysfs_lock);
+		elevator_switch_mq(q, q->elv_type);
+		mutex_unlock(&q->sysfs_lock);
+	}
 	list_for_each_entry(q, &set->tag_list, tag_set_list)
 		blk_mq_unfreeze_queue(q);
 }
