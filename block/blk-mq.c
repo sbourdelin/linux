@@ -2903,7 +2903,10 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 
 	list_for_each_entry(q, &set->tag_list, tag_set_list)
 		blk_mq_freeze_queue(q);
-
+	/*
+	 * Sync with blk_mq_in_flight and blk_mq_queue_tag_busy_iter.
+	 */
+	synchronize_rcu();
 	/*
 	 * switch io scheduler to NULL to clean up the data in it.
 	 * will get it back after update mapping between cpu and hw queues.
