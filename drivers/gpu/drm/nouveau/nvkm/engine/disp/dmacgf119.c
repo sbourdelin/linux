@@ -35,8 +35,8 @@ gf119_disp_dmac_bind(struct nv50_disp_chan *chan,
 				 chan->chid.user << 27 | 0x00000001);
 }
 
-void
-gf119_disp_dmac_fini(struct nv50_disp_chan *chan)
+static bool
+gf119_disp_dmac_deactivate(struct nv50_disp_chan *chan)
 {
 	struct nvkm_subdev *subdev = &chan->disp->base.engine.subdev;
 	struct nvkm_device *device = subdev->device;
@@ -52,7 +52,16 @@ gf119_disp_dmac_fini(struct nv50_disp_chan *chan)
 	) < 0) {
 		nvkm_error(subdev, "ch %d fini: %08x\n", user,
 			   nvkm_rd32(device, 0x610490 + (ctrl * 0x10)));
+		return false;
 	}
+
+	return true;
+}
+
+void
+gf119_disp_dmac_fini(struct nv50_disp_chan *chan)
+{
+	gf119_disp_dmac_deactivate(chan);
 }
 
 static int
@@ -62,6 +71,12 @@ gf119_disp_dmac_init(struct nv50_disp_chan *chan)
 	struct nvkm_device *device = subdev->device;
 	int ctrl = chan->chid.ctrl;
 	int user = chan->chid.user;
+
+	/* shut down the channel if it was left on, probably by the VBIOS */
+	if ((nvkm_rd32(device, 0x610490 + (ctrl * 0x10)) & 0x000a0000) == 0x000a0000 &&
+	    WARN_ON(!gf119_disp_dmac_deactivate(chan))) {
+		return -EBUSY;
+	}
 
 	/* initialise channel for dma command submission */
 	nvkm_wr32(device, 0x610494 + (ctrl * 0x0010), chan->push);
