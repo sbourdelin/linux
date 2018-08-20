@@ -1684,14 +1684,14 @@ inline void rtllib_softmac_new_net(struct rtllib_device *ieee,
 			 * essid provided by the user.
 			 */
 			if (!ssidbroad) {
-				strncpy(tmp_ssid, ieee->current_network.ssid,
+				strlcpy(tmp_ssid, ieee->current_network.ssid,
 					IW_ESSID_MAX_SIZE);
 				tmp_ssid_len = ieee->current_network.ssid_len;
 			}
 			memcpy(&ieee->current_network, net,
 			       sizeof(struct rtllib_network));
 			if (!ssidbroad) {
-				strncpy(ieee->current_network.ssid, tmp_ssid,
+				strlcpy(ieee->current_network.ssid, tmp_ssid,
 					IW_ESSID_MAX_SIZE);
 				ieee->current_network.ssid_len = tmp_ssid_len;
 			}
