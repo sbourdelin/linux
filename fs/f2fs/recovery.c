@@ -701,6 +701,9 @@ skip:
 		struct cp_control cpc = {
 			.reason = CP_RECOVERY,
 		};
+
+		sync_inodes_sb(sbi->sb);
+
 		err = f2fs_write_checkpoint(sbi, &cpc);
 	}
 
