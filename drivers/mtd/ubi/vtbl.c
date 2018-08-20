@@ -410,6 +410,10 @@ static struct ubi_vtbl_record *process_lvol(struct ubi_device *ubi,
 
 	/* Read both LEB 0 and LEB 1 into memory */
 	ubi_rb_for_each_entry(rb, aeb, &av->root, u.rb) {
+		if (aeb->lnum != 0 && aeb->lnum != 1) {
+			ubi_warn(ubi, "volume store in LEB %d", aeb->lnum);
+			continue;
+		}
 		leb[aeb->lnum] = vzalloc(ubi->vtbl_size);
 		if (!leb[aeb->lnum]) {
 			err = -ENOMEM;
