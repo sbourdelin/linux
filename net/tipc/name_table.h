@@ -135,8 +135,13 @@ struct tipc_dest {
 	struct list_head list;
 	union {
 		struct {
+#ifdef __LITTLE_ENDIAN_BITFIELD
 			u32 port;
 			u32 node;
+#else /* __BIG_ENDIAN_BITFIELD */
+			u32 node;
+			u32 port;
+#endif
 		};
 		u64 value;
 	};
