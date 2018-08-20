@@ -6,6 +6,8 @@
 
 #include <linux/types.h>
 #include <linux/if_ether.h>
+#include <linux/netdevice.h>
+
 #include "igc_regs.h"
 #include "igc_defines.h"
 #include "igc_mac.h"
@@ -20,6 +22,16 @@ struct igc_hw;
 
 /* Function pointers for the MAC. */
 struct igc_mac_operations {
+	s32 (*check_for_link)(struct igc_hw *hw);
+	s32 (*reset_hw)(struct igc_hw *hw);
+	s32 (*init_hw)(struct igc_hw *hw);
+	s32 (*setup_physical_interface)(struct igc_hw *hw);
+	void (*rar_set)(struct igc_hw *hw, u8 *address, u32 index);
+	s32 (*read_mac_addr)(struct igc_hw *hw);
+	s32 (*get_speed_and_duplex)(struct igc_hw *hw, u16 *speed,
+				    u16 *duplex);
+	s32 (*acquire_swfw_sync)(struct igc_hw *hw, u16 mask);
+	void (*release_swfw_sync)(struct igc_hw *hw, u16 mask);
 };
 
 enum igc_mac_type {
@@ -40,6 +52,12 @@ enum igc_bus_type {
 	igc_bus_type_reserved
 };
 
+enum igc_nvm_type {
+	igc_nvm_unknown = 0,
+	igc_nvm_flash_hw,
+	igc_nvm_invm,
+};
+
 enum igc_bus_speed {
 	igc_bus_speed_unknown = 0,
 	igc_bus_speed_2500,
@@ -54,6 +72,13 @@ enum igc_bus_width {
 	igc_bus_width_pcie_x4 = 4,
 	igc_bus_width_pcie_x8 = 8,
 	igc_bus_width_reserved
+};
+
+struct igc_info {
+	s32 (*get_invariants)(struct igc_hw *hw);
+	struct igc_mac_operations *mac_ops;
+	const struct igc_phy_operations *phy_ops;
+	struct igc_nvm_operations *nvm_ops;
 };
 
 struct igc_mac_info {
@@ -88,6 +113,30 @@ struct igc_mac_info {
 	bool get_link_status;
 };
 
+struct igc_nvm_operations {
+	s32 (*acquire)(struct igc_hw *hw);
+	s32 (*read)(struct igc_hw *hw, u16 offset, u16 i, u16 *data);
+	void (*release)(struct igc_hw *hw);
+	s32 (*write)(struct igc_hw *hw, u16 offset, u16 i, u16 *data);
+	s32 (*update)(struct igc_hw *hw);
+	s32 (*validate)(struct igc_hw *hw);
+	s32 (*valid_led_default)(struct igc_hw *hw, u16 *data);
+};
+
+struct igc_nvm_info {
+	struct igc_nvm_operations ops;
+	enum igc_nvm_type type;
+
+	u32 flash_bank_size;
+	u32 flash_base_addr;
+
+	u16 word_size;
+	u16 delay_usec;
+	u16 address_bits;
+	u16 opcode_bits;
+	u16 page_size;
+};
+
 struct igc_bus_info {
 	enum igc_bus_type type;
 	enum igc_bus_speed speed;
@@ -97,6 +146,32 @@ struct igc_bus_info {
 	u16 pci_cmd_word;
 };
 
+enum igc_fc_mode {
+	igc_fc_none = 0,
+	igc_fc_rx_pause,
+	igc_fc_tx_pause,
+	igc_fc_full,
+	igc_fc_default = 0xFF
+};
+
+struct igc_fc_info {
+	u32 high_water;     /* Flow control high-water mark */
+	u32 low_water;      /* Flow control low-water mark */
+	u16 pause_time;     /* Flow control pause timer */
+	bool send_xon;      /* Flow control send XON */
+	bool strict_ieee;   /* Strict IEEE mode */
+	enum igc_fc_mode current_mode; /* Type of flow control */
+	enum igc_fc_mode requested_mode;
+};
+
+struct igc_dev_spec_base {
+	bool global_device_reset;
+	bool eee_disable;
+	bool clear_semaphore_once;
+	bool module_plugged;
+	u8 media_port;
+};
+
 struct igc_hw {
 	void *back;
 
@@ -104,8 +179,14 @@ struct igc_hw {
 	unsigned long io_base;
 
 	struct igc_mac_info  mac;
+	struct igc_fc_info   fc;
+	struct igc_nvm_info  nvm;
 
 	struct igc_bus_info bus;
+
+	union {
+		struct igc_dev_spec_base	_base;
+	} dev_spec;
 
 	u16 device_id;
 	u16 subsystem_vendor_id;
@@ -198,6 +279,10 @@ struct igc_hw_stats {
 	u64 b2ospc;
 	u64 b2ogprc;
 };
+
+struct net_device *igc_get_hw_dev(struct igc_hw *hw);
+#define hw_dbg(format, arg...) \
+	netdev_dbg(igc_get_hw_dev(hw), format, ##arg)
 
 /* These functions must be implemented by drivers */
 s32  igc_read_pcie_cap_reg(struct igc_hw *hw, u32 reg, u16 *value);
