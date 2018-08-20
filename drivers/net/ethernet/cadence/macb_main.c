@@ -595,10 +595,10 @@ static int macb_mii_init(struct macb *bp)
 
 		err = mdiobus_register(bp->mii_bus);
 	} else {
+		struct device_node *node = of_get_child_by_name(np, "mdio") ?: np;
 		if (pdata)
 			bp->mii_bus->phy_mask = pdata->phy_mask;
-
-		err = of_mdiobus_register(bp->mii_bus, np);
+		err = of_mdiobus_register(bp->mii_bus, node);
 	}
 
 	if (err)
