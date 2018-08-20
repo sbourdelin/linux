@@ -76,12 +76,30 @@ static DEFINE_PER_CPU(int, cpu_state) = { 0 };
 struct thread_info *secondary_ti;
 
 DEFINE_PER_CPU(cpumask_var_t, cpu_sibling_map);
+DEFINE_PER_CPU(cpumask_var_t, cpu_smallcore_map);
 DEFINE_PER_CPU(cpumask_var_t, cpu_l2_cache_map);
 DEFINE_PER_CPU(cpumask_var_t, cpu_core_map);
 
 EXPORT_PER_CPU_SYMBOL(cpu_sibling_map);
 EXPORT_PER_CPU_SYMBOL(cpu_l2_cache_map);
 EXPORT_PER_CPU_SYMBOL(cpu_core_map);
+
+/*
+ * On big-cores system, cpu_l1_cache_map for each CPU corresponds to
+ * the set its siblings that share the l1-cache. This map is
+ * initialized the first time the CPU comes online, and subsequently
+ * remains unchanged.
+ *
+ * parse_success records if there has been an error in parsing the
+ * "ibm,thread-groups" property which tells us which set of siblings
+ * share the l1-cache with the CPU.
+ */
+struct small_core_sibling {
+	cpumask_var_t cpu_l1_cache_map;
+	bool parse_success;
+};
+
+DEFINE_PER_CPU(struct small_core_sibling, small_core);
 
 /* SMP operations for this machine */
 struct smp_ops_t *smp_ops;
@@ -90,6 +108,11 @@ struct smp_ops_t *smp_ops;
 volatile unsigned int cpu_callin_map[NR_CPUS];
 
 int smt_enabled_at_boot = 1;
+
+static inline struct cpumask *cpu_smallcore_mask(int cpu)
+{
+	return per_cpu(cpu_smallcore_map, cpu);
+}
 
 /*
  * Returns 1 if the specified cpu should be brought up during boot.
@@ -674,6 +697,18 @@ static void set_cpus_unrelated(int i, int j,
 }
 #endif
 
+static inline void alloc_small_core_data(int cpu)
+{
+	struct small_core_sibling *this_small_core;
+
+	zalloc_cpumask_var_node(&per_cpu(cpu_smallcore_map, cpu),
+				GFP_KERNEL, cpu_to_node(cpu));
+
+	this_small_core = &per_cpu(small_core, cpu);
+	zalloc_cpumask_var_node(&this_small_core->cpu_l1_cache_map,
+				GFP_KERNEL, cpu_to_node(cpu));
+}
+
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	unsigned int cpu;
@@ -705,12 +740,19 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			set_cpu_numa_mem(cpu,
 				local_memory_node(numa_cpu_lookup_table[cpu]));
 		}
+
+		if (has_big_cores)
+			alloc_small_core_data(cpu);
 	}
 
 	/* Init the cpumasks so the boot CPU is related to itself */
 	cpumask_set_cpu(boot_cpuid, cpu_sibling_mask(boot_cpuid));
 	cpumask_set_cpu(boot_cpuid, cpu_l2_cache_mask(boot_cpuid));
 	cpumask_set_cpu(boot_cpuid, cpu_core_mask(boot_cpuid));
+	if (has_big_cores) {
+		cpumask_set_cpu(boot_cpuid,
+				cpu_smallcore_mask(boot_cpuid));
+	}
 
 	if (smp_ops && smp_ops->probe)
 		smp_ops->probe();
@@ -995,9 +1037,82 @@ static void remove_cpu_from_masks(int cpu)
 		set_cpus_unrelated(cpu, i, cpu_core_mask);
 		set_cpus_unrelated(cpu, i, cpu_l2_cache_mask);
 		set_cpus_unrelated(cpu, i, cpu_sibling_mask);
+		if (has_big_cores)
+			set_cpus_unrelated(cpu, i, cpu_smallcore_mask);
 	}
 }
 #endif
+
+static inline void init_small_core_data(int cpu,
+					struct small_core_sibling *cpu_sc)
+{
+	struct device_node *dn;
+	int first_thread = cpu_first_thread_sibling(cpu);
+	int i, cpu_group_start = -1;
+	struct thread_groups tg;
+
+	cpumask_set_cpu(cpu, cpu_sc->cpu_l1_cache_map);
+
+	dn = of_get_cpu_node(cpu, NULL);
+	if (unlikely(!dn)) {
+		WARN_ON(1);
+		goto out;
+	}
+
+	if (unlikely(parse_thread_groups(dn, &tg,
+					 THREAD_GROUP_SHARE_L1))) {
+		WARN_ON(1);
+		goto out;
+	}
+
+	cpu_group_start = get_cpu_thread_group_start(cpu, &tg);
+
+	if (unlikely(cpu_group_start == -1)) {
+		WARN_ON(1);
+		goto out;
+	}
+
+	for (i = first_thread; i < first_thread + threads_per_core; i++) {
+		int i_group_start = get_cpu_thread_group_start(i, &tg);
+
+		if (unlikely(i_group_start == -1)) {
+			WARN_ON(1);
+			goto out;
+		}
+
+		if (i_group_start == cpu_group_start)
+			cpumask_set_cpu(i, cpu_sc->cpu_l1_cache_map);
+	}
+
+	cpu_sc->parse_success = true;
+out:
+	of_node_put(dn);
+}
+
+static inline void add_cpu_to_smallcore_masks(int cpu)
+{
+	struct small_core_sibling *this_small_core = &per_cpu(small_core, cpu);
+	int i, first_thread = cpu_first_thread_sibling(cpu);
+
+	if (!has_big_cores)
+		return;
+
+	if (unlikely(cpumask_empty(this_small_core->cpu_l1_cache_map)))
+		init_small_core_data(cpu, this_small_core);
+
+	cpumask_set_cpu(cpu, cpu_smallcore_mask(cpu));
+
+	for (i = first_thread; i < first_thread + threads_per_core; i++) {
+		if (unlikely(!this_small_core->parse_success)) {
+			/* Fallback to siblings of the big-core */
+			set_cpus_related(i, cpu, cpu_smallcore_mask);
+			continue;
+		}
+
+		if (cpumask_test_cpu(i, this_small_core->cpu_l1_cache_map))
+			set_cpus_related(i, cpu, cpu_smallcore_mask);
+	}
+}
 
 static void add_cpu_to_masks(int cpu)
 {
@@ -1010,11 +1125,11 @@ static void add_cpu_to_masks(int cpu)
 	 * add it to it's own thread sibling mask.
 	 */
 	cpumask_set_cpu(cpu, cpu_sibling_mask(cpu));
-
 	for (i = first_thread; i < first_thread + threads_per_core; i++)
 		if (cpu_online(i))
 			set_cpus_related(i, cpu, cpu_sibling_mask);
 
+	add_cpu_to_smallcore_masks(cpu);
 	/*
 	 * Copy the thread sibling mask into the cache sibling mask
 	 * and mark any CPUs that share an L2 with this CPU.
@@ -1044,6 +1159,7 @@ static bool shared_caches;
 void start_secondary(void *unused)
 {
 	unsigned int cpu = smp_processor_id();
+	struct cpumask *(*sibling_mask)(int) = cpu_sibling_mask;
 
 	mmgrab(&init_mm);
 	current->active_mm = &init_mm;
@@ -1069,11 +1185,13 @@ void start_secondary(void *unused)
 	/* Update topology CPU masks */
 	add_cpu_to_masks(cpu);
 
+	if (has_big_cores)
+		sibling_mask = cpu_smallcore_mask;
 	/*
 	 * Check for any shared caches. Note that this must be done on a
 	 * per-core basis because one core in the pair might be disabled.
 	 */
-	if (!cpumask_equal(cpu_l2_cache_mask(cpu), cpu_sibling_mask(cpu)))
+	if (!cpumask_equal(cpu_l2_cache_mask(cpu), sibling_mask(cpu)))
 		shared_caches = true;
 
 	set_numa_node(numa_cpu_lookup_table[cpu]);
@@ -1140,6 +1258,13 @@ static const struct cpumask *shared_cache_mask(int cpu)
 	return cpu_l2_cache_mask(cpu);
 }
 
+#ifdef CONFIG_SCHED_SMT
+static const struct cpumask *smallcore_smt_mask(int cpu)
+{
+	return cpu_smallcore_mask(cpu);
+}
+#endif
+
 static struct sched_domain_topology_level power9_topology[] = {
 #ifdef CONFIG_SCHED_SMT
 	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
@@ -1162,6 +1287,13 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	dump_numa_cpu_topology();
 
+#ifdef CONFIG_SCHED_SMT
+	if (has_big_cores) {
+		pr_info("Using small cores at SMT level\n");
+		power9_topology[0].mask = smallcore_smt_mask;
+		powerpc_topology[0].mask = smallcore_smt_mask;
+	}
+#endif
 	/*
 	 * If any CPU detects that it's sharing a cache with another CPU then
 	 * use the deeper topology that is aware of this sharing.
