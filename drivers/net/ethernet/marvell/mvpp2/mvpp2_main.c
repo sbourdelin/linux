@@ -5241,6 +5241,12 @@ static int mvpp2_probe(struct platform_device *pdev)
 	}
 
 	if (priv->hw_version == MVPP22) {
+		/* Platform code may have set dev->dma_mask to point
+		 * to dev->coherent_dma_mask, but we want to ensure
+		 * they take different values due to comment below.
+		 */
+		pdev->dev.dma_mask = &priv->dma_mask;
+
 		err = dma_set_mask(&pdev->dev, MVPP2_DESC_DMA_MASK);
 		if (err)
 			goto err_axi_clk;

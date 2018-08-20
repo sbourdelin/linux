@@ -730,6 +730,9 @@ struct mvpp2 {
 	struct clk *mg_core_clk;
 	struct clk *axi_clk;
 
+	/* DMA mask for streaming mappings */
+	u64 dma_mask;
+
 	/* List of pointers to port structures */
 	int port_count;
 	struct mvpp2_port *port_list[MVPP2_MAX_PORTS];
