@@ -2047,8 +2047,18 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 
 		if (!nmask || node_isset(hpage_node, *nmask)) {
 			mpol_cond_put(pol);
+			/*
+			 * We restricted the allocation to the
+			 * hpage_node so we must use
+			 * __GFP_ONLY_COMPACT to allow at most a
+			 * compaction attempt and not ever get into
+			 * reclaim or it'll swap heavily with
+			 * transparent_hugepage/defrag = always (or
+			 * madvise under MADV_HUGEPAGE).
+			 */
 			page = __alloc_pages_node(hpage_node,
-						gfp | __GFP_THISNODE, order);
+						  gfp | __GFP_THISNODE |
+						  __GFP_ONLY_COMPACT, order);
 			goto out;
 		}
 	}

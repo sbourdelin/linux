@@ -44,6 +44,7 @@ struct vm_area_struct;
 #else
 #define ___GFP_NOLOCKDEP	0
 #endif
+#define ___GFP_ONLY_COMPACT	0x1000000u
 /* If the above are modified, __GFP_BITS_SHIFT may need updating */
 
 /*
@@ -178,6 +179,21 @@ struct vm_area_struct;
  *   definitely preferable to use the flag rather than opencode endless
  *   loop around allocator.
  *   Using this flag for costly allocations is _highly_ discouraged.
+ *
+ * __GFP_ONLY_COMPACT: Only invoke compaction. Do not try to succeed
+ * the allocation by freeing memory. Never risk to free any
+ * "PAGE_SIZE" memory unit even if compaction failed specifically
+ * because of not enough free pages in the zone. This only makes sense
+ * only in combination with __GFP_THISNODE (enforced with a
+ * VM_WARN_ON), to restrict the THP allocation in the local node that
+ * triggered the page fault and fallback into PAGE_SIZE allocations in
+ * the same node. We don't want to invoke reclaim because there may be
+ * plenty of free memory already in the local node. More importantly
+ * there may be even plenty of free THP available in remote nodes so
+ * we should allocate those if something instead of reclaiming any
+ * memory in the local node. Implementation detail: set ___GFP_NORETRY
+ * too so that ___GFP_ONLY_COMPACT only needs to be checked in a slow
+ * path.
  */
 #define __GFP_IO	((__force gfp_t)___GFP_IO)
 #define __GFP_FS	((__force gfp_t)___GFP_FS)
@@ -187,6 +203,8 @@ struct vm_area_struct;
 #define __GFP_RETRY_MAYFAIL	((__force gfp_t)___GFP_RETRY_MAYFAIL)
 #define __GFP_NOFAIL	((__force gfp_t)___GFP_NOFAIL)
 #define __GFP_NORETRY	((__force gfp_t)___GFP_NORETRY)
+#define __GFP_ONLY_COMPACT	((__force gfp_t)(___GFP_NORETRY | \
+						 ___GFP_ONLY_COMPACT))
 
 /*
  * Action modifiers

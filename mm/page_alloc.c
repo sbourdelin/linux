@@ -4145,6 +4145,10 @@ retry_cpuset:
 			 */
 			if (compact_result == COMPACT_DEFERRED)
 				goto nopage;
+			if (gfp_mask & __GFP_ONLY_COMPACT) {
+				VM_WARN_ON(!(gfp_mask & __GFP_THISNODE));
+				goto nopage;
+			}
 
 			/*
 			 * Looks like reclaim/compaction is worth trying, but
