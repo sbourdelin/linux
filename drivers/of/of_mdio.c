@@ -229,6 +229,13 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
 
 	/* Loop over the child nodes and register a phy_device for each phy */
 	for_each_available_child_of_node(np, child) {
+		if (of_phy_is_fixed_link(np)) {
+			/* fixed-links are handled in the MAC drivers */
+			dev_warn(&mdio->dev, FW_BUG
+				"Skipping unexpected fixed-link in device tree");
+			continue;
+		}
+
 		addr = of_mdio_parse_addr(&mdio->dev, child);
 		if (addr < 0) {
 			scanphys = true;
