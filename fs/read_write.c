@@ -1768,8 +1768,17 @@ int vfs_clone_file_prep_inodes(struct inode *inode_in, loff_t pos_in,
 			return -EINVAL;
 	}
 
-	/* If we're linking to EOF, continue to the block boundary. */
-	if (pos_in + *len == isize)
+	/* Reflink allows linking to EOF, so round the length up to allow us to
+	 * shared the last block in the file. We don't care what is beyond the
+	 * EOF point in the block that gets shared, as we can't access it and
+	 * attempts to extent the file will break the sharing.
+	 *
+	 * For dedupe, sharing the EOF block is illegal because the bytes beyond
+	 * EOF are undefined (i.e. not readable) and so can't be deduped. Hence
+	 * we do not extend/align the length and instead let the alignment
+	 * checks below reject it.
+	 */
+	if (!is_dedupe && pos_in + *len == isize)
 		blen = ALIGN(isize, bs) - pos_in;
 	else
 		blen = *len;
