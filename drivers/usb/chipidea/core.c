@@ -699,6 +699,17 @@ static int ci_get_platdata(struct device *dev,
 		ext_id = extcon_get_edev_by_phandle(dev, 1);
 		if (IS_ERR(ext_id) && PTR_ERR(ext_id) != -ENODEV)
 			return PTR_ERR(ext_id);
+
+		/*
+		 * Some extcon devices like extcon-usb-gpio have only one
+		 * instance for both USB and USB-HOST cable states.
+		 */
+		if (!IS_ERR(ext_vbus) && IS_ERR(ext_id)) {
+			if (extcon_get_state(ext_vbus, EXTCON_USB) >= 0 &&
+			    extcon_get_state(ext_vbus, EXTCON_USB_HOST) >= 0) {
+				ext_id = ext_vbus;
+			}
+		}
 	}
 
 	cable = &platdata->vbus_extcon;
