@@ -269,9 +269,13 @@ config MIPS_GIC
 	select MIPS_CM
 
 config INGENIC_IRQ
-	bool
-	depends on MACH_INGENIC
-	default y
+	bool "Ingenic JZ47xx IRQ controller"
+	depends on MIPS
+	default MACH_INGENIC
+	help
+	  Support the interrupt controller present on JZ47xx SoCs from Ingenic.
+
+	  If compiling for an Ingenic JZ47xx SoC, you want to say Y here.
 
 config RENESAS_H8300H_INTC
         bool
