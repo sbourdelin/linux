@@ -31,6 +31,8 @@ static int __gup_benchmark_ioctl(unsigned int cmd,
 	nr = gup->nr_pages_per_call;
 	start_time = ktime_get();
 	for (addr = gup->addr; addr < gup->addr + gup->size; addr = next) {
+		long n;
+
 		if (nr != gup->nr_pages_per_call)
 			break;
 
@@ -40,10 +42,10 @@ static int __gup_benchmark_ioctl(unsigned int cmd,
 			nr = (next - addr) / PAGE_SIZE;
 		}
 
-		nr = get_user_pages_fast(addr, nr, gup->flags & 1, pages + i);
-		if (nr <= 0)
+		n = get_user_pages_fast(addr, nr, gup->flags & 1, pages + i);
+		if (n <= 0)
 			break;
-		i += nr;
+		i += n;
 	}
 	end_time = ktime_get();
 
