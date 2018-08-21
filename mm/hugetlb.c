@@ -4548,11 +4548,51 @@ static bool vma_shareable(struct vm_area_struct *vma, unsigned long addr)
 
 	/*
 	 * check on proper vm_flags and page table alignment
+	 *
+	 * Note that this is the same check used in huge_pmd_sharing_possible.
+	 * If you change one, consider changing both.
 	 */
 	if (vma->vm_flags & VM_MAYSHARE &&
 	    vma->vm_start <= base && end <= vma->vm_end)
 		return true;
 	return false;
+}
+
+/*
+ * Determine if start,end range within vma could be mapped by shared pmd.
+ * If yes, adjust start and end to cover range associated with possible
+ * shared pmd mappings.
+ */
+bool huge_pmd_sharing_possible(struct vm_area_struct *vma,
+				unsigned long *start, unsigned long *end)
+{
+	unsigned long check_addr = *start;
+	bool ret = false;
+
+	if (!(vma->vm_flags & VM_MAYSHARE))
+		return ret;
+
+	for (check_addr = *start; check_addr < *end; check_addr += PUD_SIZE) {
+		unsigned long a_start = check_addr & PUD_MASK;
+		unsigned long a_end = a_start + PUD_SIZE;
+
+		/*
+		 * If sharing is possible, adjust start/end if necessary.
+		 *
+		 * Note that this is the same check used in vma_shareable.  If
+		 * you change one, consider changing both.
+		 */
+		if (vma->vm_start <= a_start && a_end <= vma->vm_end) {
+			if (a_start < *start)
+				*start = a_start;
+			if (a_end > *end)
+				*end = a_end;
+
+			ret = true;
+		}
+	}
+
+	return ret;
 }
 
 /*
