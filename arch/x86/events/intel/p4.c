@@ -1346,7 +1346,7 @@ __init int p4_pmu_init(void)
 
 	rdmsr(MSR_IA32_MISC_ENABLE, low, high);
 	if (!(low & (1 << 7))) {
-		pr_cont("unsupported Netburst CPU model %d ",
+		pr_cont("unknown Netburst PMU on CPU model %d: ",
 			boot_cpu_data.x86_model);
 		return -ENODEV;
 	}

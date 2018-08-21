@@ -269,7 +269,8 @@ __init int p6_pmu_init(void)
 		break;
 
 	default:
-		pr_cont("unsupported p6 CPU model %d ", boot_cpu_data.x86_model);
+		pr_cont("unknown p6 PMU on CPU model %d: ",
+			boot_cpu_data.x86_model);
 		return -ENODEV;
 	}
 
