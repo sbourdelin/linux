@@ -129,6 +129,7 @@ struct venus_core {
 	struct device *dev;
 	struct device *dev_dec;
 	struct device *dev_enc;
+	bool no_tz;
 	struct mutex lock;
 	struct list_head instances;
 	atomic_t insts_count;
