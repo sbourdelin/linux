@@ -776,9 +776,29 @@ static const struct nf_hook_ops ipv6_conntrack_ops[] = {
 };
 #endif
 
+static int nf_ct_tcp_fixup(struct nf_conn *ct, void *_nfproto)
+{
+	u8 nfproto = (unsigned long)_nfproto;
+
+	if (nf_ct_l3num(ct) != nfproto)
+		return 0;
+
+	if (nf_ct_expires(ct) > 60 * HZ)
+		return 0;
+
+	if (nf_ct_protonum(ct) == IPPROTO_TCP &&
+	    ct->proto.tcp.state == TCP_CONNTRACK_ESTABLISHED) {
+		ct->proto.tcp.seen[0].td_maxwin = 0;
+		ct->proto.tcp.seen[1].td_maxwin = 0;
+	}
+
+	return 0;
+}
+
 static int nf_ct_netns_do_get(struct net *net, u8 nfproto)
 {
 	struct nf_conntrack_net *cnet = net_generic(net, nf_conntrack_net_id);
+	bool fixup_needed = false;
 	int err = 0;
 
 	mutex_lock(&nf_ct_proto_mutex);
@@ -798,6 +818,8 @@ static int nf_ct_netns_do_get(struct net *net, u8 nfproto)
 					    ARRAY_SIZE(ipv4_conntrack_ops));
 		if (err)
 			cnet->users4 = 0;
+		else
+			fixup_needed = true;
 		break;
 #if IS_ENABLED(CONFIG_IPV6)
 	case NFPROTO_IPV6:
@@ -814,6 +836,8 @@ static int nf_ct_netns_do_get(struct net *net, u8 nfproto)
 					    ARRAY_SIZE(ipv6_conntrack_ops));
 		if (err)
 			cnet->users6 = 0;
+		else
+			fixup_needed = true;
 		break;
 #endif
 	default:
@@ -822,30 +846,63 @@ static int nf_ct_netns_do_get(struct net *net, u8 nfproto)
 	}
  out_unlock:
 	mutex_unlock(&nf_ct_proto_mutex);
+
+	if (fixup_needed)
+		nf_ct_iterate_cleanup_net(net, nf_ct_tcp_fixup,
+					  (void *)(unsigned long)nfproto, 0, 0);
+
 	return err;
+}
+
+/* Conntrack is being disabled in this netns.
+ * Instead of removing entries right away, expedite
+ * timeout.  In case userspace re-enabled conntrack soon,
+ * entries can be re-used.
+ */
+static int nf_ct_expire(struct nf_conn *ct, void *_nfproto)
+{
+	u8 nfproto = (unsigned long)_nfproto;
+
+	if (nf_ct_l3num(ct) == nfproto) {
+		u32 timeout = nf_ct_expires(ct);
+
+		if (timeout > 60 * HZ)
+			ct->timeout = nfct_time_stamp + 60 * HZ;
+	}
+
+	return 0;
 }
 
 static void nf_ct_netns_do_put(struct net *net, u8 nfproto)
 {
 	struct nf_conntrack_net *cnet = net_generic(net, nf_conntrack_net_id);
+	bool cleanup_needed = false;
 
 	mutex_lock(&nf_ct_proto_mutex);
 	switch (nfproto) {
 	case NFPROTO_IPV4:
-		if (cnet->users4 && (--cnet->users4 == 0))
+		if (cnet->users4 && (--cnet->users4 == 0)) {
+			cleanup_needed = true;
 			nf_unregister_net_hooks(net, ipv4_conntrack_ops,
 						ARRAY_SIZE(ipv4_conntrack_ops));
+		}
 		break;
 #if IS_ENABLED(CONFIG_IPV6)
 	case NFPROTO_IPV6:
-		if (cnet->users6 && (--cnet->users6 == 0))
+		if (cnet->users6 && (--cnet->users6 == 0)) {
+			cleanup_needed = true;
 			nf_unregister_net_hooks(net, ipv6_conntrack_ops,
 						ARRAY_SIZE(ipv6_conntrack_ops));
+		}
 		break;
 #endif
 	}
 
 	mutex_unlock(&nf_ct_proto_mutex);
+
+	if (cleanup_needed)
+		nf_ct_iterate_cleanup_net(net, nf_ct_expire,
+					  (void *)(unsigned long)nfproto, 0, 0);
 }
 
 int nf_ct_netns_get(struct net *net, u8 nfproto)
