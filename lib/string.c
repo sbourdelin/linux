@@ -632,6 +632,57 @@ bool sysfs_streq(const char *s1, const char *s2)
 EXPORT_SYMBOL(sysfs_streq);
 
 /**
+ * sysfs_strncpy - Trim a length-limited C-string (wgutesoaces and a trailing
+ *                 newline symbol) and copy into a buffer
+ * @dest: Where to copy the string to
+ * @src: Where to copy the string from
+ * @count: The maximum number of bytes to copy
+ *
+ * A wrapper around strncpy().
+ *
+ */
+char *sysfs_strncpy(char *dest, const char *src, size_t count)
+{
+	char *c;
+
+	strncpy(dest, skip_spaces(src), count);
+
+	c = dest + count - 1;
+	while (c >= dest && (isspace(*c) || *c == '\n' || *c == '\0')) {
+		*c = '\0';
+		c--;
+	}
+	return dest;
+}
+EXPORT_SYMBOL(sysfs_strncpy);
+
+/**
+ * sysfs_strlcpy - Trim a C-string (whitespaces and a trailing newline symbol)
+ *                 and copy it into a sized buffer
+ * @dest: Where to copy the string to
+ * @src: Where to copy the string from
+ * @size: size of destination buffer
+ *
+ * A wrapper around strlcpy().
+ *
+ */
+size_t sysfs_strlcpy(char *dest, const char *src, size_t size)
+{
+	size_t ret;
+	char *c;
+
+	ret = strlcpy(dest, skip_spaces(src), size);
+
+	size = strlen(dest);
+	c = dest + size - 1;
+	while (c >= dest && (isspace(*c) || *c == '\n'))
+		c--;
+	*(c + 1) = '\0';
+	return ret;
+}
+EXPORT_SYMBOL(sysfs_strlcpy);
+
+/**
  * match_string - matches given string in an array
  * @array:	array of strings
  * @n:		number of strings in the array or -1 for NULL terminated arrays

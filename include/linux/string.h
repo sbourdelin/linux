@@ -175,6 +175,9 @@ extern char **argv_split(gfp_t gfp, const char *str, int *argcp);
 extern void argv_free(char **argv);
 
 extern bool sysfs_streq(const char *s1, const char *s2);
+extern char *sysfs_strncpy(char *dest, const char *src, size_t count);
+extern size_t sysfs_strlcpy(char *dest, const char *src, size_t size);
+
 extern int kstrtobool(const char *s, bool *res);
 static inline int strtobool(const char *s, bool *res)
 {
