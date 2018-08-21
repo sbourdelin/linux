@@ -201,7 +201,17 @@ static int __strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
 			strp->skb_nextp = NULL;
 			stm = _strp_msg(head);
 			memset(stm, 0, sizeof(*stm));
-			stm->strp.offset = orig_offset + eaten;
+
+			/* Can only parse if there is no offset */
+			if (unlikely(orig_offset + eaten)) {
+				if (!pskb_pull(skb, orig_offset + eaten)) {
+					STRP_STATS_INCR(strp->stats.mem_fail);
+					strp_parser_err(strp, -ENOMEM, desc);
+					break;
+				}
+				orig_len -= eaten;
+				orig_offset = eaten = 0;
+			}
 		} else {
 			/* Unclone if we are appending to an skb that we
 			 * already share a frag_list with.
@@ -253,8 +263,7 @@ static int __strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
 				STRP_STATS_INCR(strp->stats.msg_too_big);
 				strp_parser_err(strp, -EMSGSIZE, desc);
 				break;
-			} else if (len <= (ssize_t)head->len -
-					  skb->len - stm->strp.offset) {
+			} else if (len <= (ssize_t)head->len - skb->len) {
 				/* Length must be into new skb (and also
 				 * greater than zero)
 				 */
