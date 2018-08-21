@@ -145,7 +145,7 @@ struct config *prepare_default_config()
 	config->cpu = 0;
 	config->prio = SCHED_HIGH;
 	config->verbose = 0;
-	strncpy(config->governor, "ondemand", 8);
+	strcpy(config->governor, "ondemand");
 
 	config->output = stdout;
 
