@@ -239,7 +239,7 @@ static bool xive_native_match(struct device_node *node)
 static int xive_native_get_ipi(unsigned int cpu, struct xive_cpu *xc)
 {
 	struct device_node *np;
-	unsigned int chip_id;
+	unsigned int chip_id = 0;
 	s64 irq;
 
 	/* Find the chip ID */
