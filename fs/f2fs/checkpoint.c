@@ -1446,6 +1446,11 @@ int f2fs_write_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	unsigned long long ckpt_ver;
 	int err = 0;
 
+	if (unlikely(test_opt(sbi, DISABLE_CHECKPOINT))) {
+		f2fs_msg(sbi->sb, KERN_WARNING,
+				"Checkpoints disabled, but took checkpoint!");
+		WARN_ON(1);
+	}
 	mutex_lock(&sbi->cp_mutex);
 
 	if (!is_sbi_flag_set(sbi, SBI_IS_DIRTY) &&

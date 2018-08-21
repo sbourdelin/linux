@@ -100,6 +100,7 @@ extern char *f2fs_fault_name[FAULT_MAX];
 #define F2FS_MOUNT_QUOTA		0x00400000
 #define F2FS_MOUNT_INLINE_XATTR_SIZE	0x00800000
 #define F2FS_MOUNT_RESERVE_ROOT		0x01000000
+#define F2FS_MOUNT_DISABLE_CHECKPOINT	0x02000000
 
 #define F2FS_OPTION(sbi)	((sbi)->mount_opt)
 #define clear_opt(sbi, option)	(F2FS_OPTION(sbi).opt &= ~F2FS_MOUNT_##option)
@@ -178,6 +179,7 @@ enum {
 #define	CP_RECOVERY	0x00000008
 #define	CP_DISCARD	0x00000010
 #define CP_TRIMMED	0x00000020
+#define CP_PAUSE	0x00000040
 
 #define MAX_DISCARD_BLOCKS(sbi)		BLKS_PER_SEC(sbi)
 #define DEF_MAX_DISCARD_REQUEST		8	/* issue 8 discards per round */
@@ -1088,6 +1090,7 @@ enum {
 	SBI_NEED_SB_WRITE,			/* need to recover superblock */
 	SBI_NEED_CP,				/* need to checkpoint */
 	SBI_IS_SHUTDOWN,			/* shutdown by ioctl */
+	SBI_CP_DISABLED,			/* CP was disabled last mount */
 };
 
 enum {
@@ -1126,6 +1129,13 @@ enum fsync_mode {
 #else
 #define DUMMY_ENCRYPTION_ENABLED(sbi) (0)
 #endif
+
+struct cpd_tracker {
+	block_t unusable_block_count;		/* # of blocks saved by last cp */
+	block_t unusable_ssr_blocks[2];
+	block_t free_ssr_blocks[2];
+	block_t free_segments;
+};
 
 struct f2fs_sb_info {
 	struct super_block *sb;			/* pointer to VFS super block */
@@ -1218,6 +1228,9 @@ struct f2fs_sb_info {
 	block_t last_valid_block_count;		/* for recovery */
 	block_t reserved_blocks;		/* configurable reserved blocks */
 	block_t current_reserved_blocks;	/* current reserved blocks */
+
+	/* Additional tracking for no checkpoint mode */
+	struct cpd_tracker cpd;
 
 	unsigned int nquota_files;		/* # of quota sysfile */
 
@@ -1704,6 +1717,8 @@ static inline int inc_valid_block_count(struct f2fs_sb_info *sbi,
 
 	if (!__allow_reserved_blocks(sbi, inode, true))
 		avail_user_block_count -= F2FS_OPTION(sbi).root_reserved_blocks;
+	if (test_opt(sbi, DISABLE_CHECKPOINT))
+		avail_user_block_count -= sbi->cpd.unusable_block_count;
 
 	if (unlikely(sbi->total_valid_block_count > avail_user_block_count)) {
 		diff = sbi->total_valid_block_count - avail_user_block_count;
@@ -1717,6 +1732,38 @@ static inline int inc_valid_block_count(struct f2fs_sb_info *sbi,
 			goto enospc;
 		}
 	}
+	if (likely(!test_opt(sbi, DISABLE_CHECKPOINT)))
+		goto normal;
+	if (unlikely(*count > sbi->cpd.free_ssr_blocks[DATA])) {
+		/* We'll need to pull from free. */
+		blkcnt_t needed = *count - sbi->cpd.free_ssr_blocks[DATA];
+		blkcnt_t new_segs = ((needed - 1) >>
+					sbi->log_blocks_per_seg) + 1;
+
+		/* Check if we have enough free */
+		if (unlikely(new_segs > sbi->cpd.free_segments)) {
+			blkcnt_t seg_rel, seg_diff, mask;
+
+			seg_diff = new_segs - sbi->cpd.free_segments;
+			mask = sbi->blocks_per_seg - 1;
+			seg_rel = ((needed - 1) & mask) + 1;
+			seg_rel += (seg_diff - 1) << sbi->log_blocks_per_seg;
+
+			new_segs -= seg_diff;
+			*count -= seg_rel;
+			release += seg_rel;
+			if (!*count) {
+				spin_unlock(&sbi->stat_lock);
+				goto enospc;
+			}
+		}
+
+		sbi->cpd.free_segments -= new_segs;
+		sbi->cpd.free_ssr_blocks[DATA] += new_segs << sbi->log_blocks_per_seg;
+
+	}
+	sbi->cpd.free_ssr_blocks[DATA] -= *count;
+normal:
 	spin_unlock(&sbi->stat_lock);
 
 	if (unlikely(release)) {
@@ -1742,6 +1789,22 @@ static inline void dec_valid_block_count(struct f2fs_sb_info *sbi,
 	f2fs_bug_on(sbi, sbi->total_valid_block_count < (block_t) count);
 	f2fs_bug_on(sbi, inode->i_blocks < sectors);
 	sbi->total_valid_block_count -= (block_t)count;
+
+	if (test_opt(sbi, DISABLE_CHECKPOINT)) {
+		if (sbi->cpd.unusable_ssr_blocks[DATA] > count) {
+			sbi->cpd.unusable_ssr_blocks[DATA] -= count;
+			sbi->cpd.unusable_block_count += count;
+		} else if (sbi->cpd.unusable_ssr_blocks[DATA]) {
+			sbi->cpd.free_ssr_blocks[DATA] += count -
+					sbi->cpd.unusable_ssr_blocks[DATA];
+			sbi->cpd.unusable_block_count +=
+					sbi->cpd.unusable_ssr_blocks[DATA];
+			sbi->cpd.unusable_ssr_blocks[DATA] = 0;
+		} else {
+			sbi->cpd.free_ssr_blocks[DATA] += count;
+		}
+	}
+
 	if (sbi->reserved_blocks &&
 		sbi->current_reserved_blocks < sbi->reserved_blocks)
 		sbi->current_reserved_blocks = min(sbi->reserved_blocks,
@@ -1911,6 +1974,8 @@ static inline int inc_valid_node_count(struct f2fs_sb_info *sbi,
 
 	if (!__allow_reserved_blocks(sbi, inode, false))
 		valid_block_count += F2FS_OPTION(sbi).root_reserved_blocks;
+	if (test_opt(sbi, DISABLE_CHECKPOINT))
+		valid_block_count += sbi->cpd.unusable_block_count;
 
 	if (unlikely(valid_block_count > sbi->user_block_count)) {
 		spin_unlock(&sbi->stat_lock);
@@ -1921,6 +1986,18 @@ static inline int inc_valid_node_count(struct f2fs_sb_info *sbi,
 	if (unlikely(valid_node_count > sbi->total_node_count)) {
 		spin_unlock(&sbi->stat_lock);
 		goto enospc;
+	}
+
+	if (test_opt(sbi, DISABLE_CHECKPOINT)) {
+		if (unlikely(!sbi->cpd.free_ssr_blocks[NODE])) {
+			if (unlikely(!sbi->cpd.free_segments)) {
+				spin_unlock(&sbi->stat_lock);
+				goto enospc;
+			}
+			sbi->cpd.free_segments--;
+			sbi->cpd.free_ssr_blocks[NODE] += sbi->blocks_per_seg;
+		}
+		sbi->cpd.free_ssr_blocks[NODE]--;
 	}
 
 	sbi->total_valid_node_count++;
@@ -1954,6 +2031,16 @@ static inline void dec_valid_node_count(struct f2fs_sb_info *sbi,
 
 	sbi->total_valid_node_count--;
 	sbi->total_valid_block_count--;
+
+	if (test_opt(sbi, DISABLE_CHECKPOINT)) {
+		if (sbi->cpd.unusable_ssr_blocks[NODE]) {
+			sbi->cpd.unusable_ssr_blocks[NODE]--;
+			sbi->cpd.unusable_block_count++;
+		} else {
+			sbi->cpd.free_ssr_blocks[NODE]++;
+		}
+	}
+
 	if (sbi->reserved_blocks &&
 		sbi->current_reserved_blocks < sbi->reserved_blocks)
 		sbi->current_reserved_blocks++;
