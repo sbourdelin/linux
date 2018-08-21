@@ -10,7 +10,7 @@
 		     + __GNUC_MINOR__ * 100	\
 		     + __GNUC_PATCHLEVEL__)
 
-#if GCC_VERSION < 40600
+#if !defined(__clang__) && GCC_VERSION < 40600
 # error Sorry, your compiler is too old - please upgrade it.
 #endif
 
@@ -163,7 +163,16 @@
 #define __used			__attribute__((__used__))
 #define __compiler_offsetof(a, b)					\
 	__builtin_offsetof(a, b)
+#define __compiletime_object_size(obj) __builtin_object_size(obj, 0)
 
+/*
+ * GCC version specific checks
+ *
+ * Keep the version checks for 4.2.1 or newer
+ * because Clang defines GCC_VERSION as 40201
+ */
+
+#if GCC_VERSION >= 40300
 /* Mark functions as cold. gcc will assume any path leading to a call
  * to them will be unlikely.  This means a lot of manual unlikely()s
  * are unnecessary now for any paths leading to the usual suspects
@@ -182,15 +191,20 @@
 
 #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
 
+#ifndef __CHECKER__
+# define __compiletime_warning(message) __attribute__((warning(message)))
+# define __compiletime_error(message) __attribute__((error(message)))
+#endif /* __CHECKER__ */
+#endif /* GCC_VERSION >= 40300 */
+
+#if GCC_VERSION >= 40400
 #define __optimize(level)	__attribute__((__optimize__(level)))
 #define __nostackprotector	__optimize("no-stack-protector")
+#endif /* GCC_VERSION >= 40400 */
 
-#define __compiletime_object_size(obj) __builtin_object_size(obj, 0)
+#if GCC_VERSION >= 40500
 
 #ifndef __CHECKER__
-#define __compiletime_warning(message) __attribute__((warning(message)))
-#define __compiletime_error(message) __attribute__((error(message)))
-
 #ifdef LATENT_ENTROPY_PLUGIN
 #define __latent_entropy __attribute__((latent_entropy))
 #endif
@@ -232,6 +246,9 @@
 #define randomized_struct_fields_end	} __randomize_layout;
 #endif
 
+#endif /* GCC_VERSION >= 40500 */
+
+#if GCC_VERSION >= 40600
 /*
  * When used with Link Time Optimization, gcc can optimize away C functions or
  * variables which are referenced only from assembly code.  __visible tells the
@@ -240,7 +257,7 @@
  */
 #define __visible	__attribute__((externally_visible))
 
-/* gcc version specific checks */
+#endif /* GCC_VERSION >= 40600 */
 
 #if GCC_VERSION >= 40900 && !defined(__CHECKER__)
 /*
@@ -274,8 +291,10 @@
  * folding in __builtin_bswap*() (yet), so don't set these for it.
  */
 #if defined(CONFIG_ARCH_USE_BUILTIN_BSWAP) && !defined(__CHECKER__)
+#if GCC_VERSION >= 40400
 #define __HAVE_BUILTIN_BSWAP32__
 #define __HAVE_BUILTIN_BSWAP64__
+#endif
 #if GCC_VERSION >= 40800
 #define __HAVE_BUILTIN_BSWAP16__
 #endif
@@ -327,9 +346,12 @@
 #define __diag_GCC_warn		warning
 #define __diag_GCC_error	error
 
+/* Compilers before gcc-4.6 do not understand "#pragma GCC diagnostic push" */
+#if GCC_VERSION >= 40600
 #define __diag_str1(s)		#s
 #define __diag_str(s)		__diag_str1(s)
 #define __diag(s)		_Pragma(__diag_str(GCC diagnostic s))
+#endif
 
 #if GCC_VERSION >= 80000
 #define __diag_GCC_8(s)		__diag(s)
