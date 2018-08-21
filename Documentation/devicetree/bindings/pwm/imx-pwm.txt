@@ -14,6 +14,12 @@ See the clock consumer binding,
 	Documentation/devicetree/bindings/clock/clock-bindings.txt
 - interrupts: The interrupt for the pwm controller
 
+Optional properties:
+- pinctrl: For i.MX27 and newer SoCs. Add extra pinctrl to configure the PWM
+  pin to gpio function.  It allows control over the pin output level when the
+  PWM block is disabled. This is meant to be used if inverted polarity of the
+  PWM signal is required. See "Inverted PWM output" section bellow.
+
 Example:
 
 pwm1: pwm@53fb4000 {
@@ -24,4 +30,42 @@ pwm1: pwm@53fb4000 {
 		 <&clks IMX5_CLK_PWM1_HF_GATE>;
 	clock-names = "ipg", "per";
 	interrupts = <61>;
+};
+
+Inverted PWM output
+-------------------
+
+The i.MX SoC has such limitation that whenever a pad is configured as a PWM
+output, the output level is always zero volts when the PWM block is disabled.
+The zero output level is actively driven by the output stage of the PWM block
+and can not be overridden by pull-up. It also does not matter what PWM polarity
+a PWM client (e.g. backlight) requested.
+
+To gain control of the PWM output level in disabled state two pinctrl states
+can be used. The "default" state and the "pwm" state. In the default state the
+PWM output is configured as a GPIO with pull-up. In the "pwm" state the output
+is configured as a PWM output. This setup assures that the PWM output is at
+the required level that corresponds to duty cycle = 0 when PWM is disabled.
+E.g. at boot.
+
+Example:
+
+&pwm1 {
+	pinctrl-names = "default", "pwm";
+	pinctrl-0 = <&pinctrl_backlight_gpio>;
+	pinctrl-1 = <&pinctrl_backlight_pwm>;
+}
+
+pinctrl_backlight_gpio: pwm1grp-gpio {
+	fsl,pins = <
+		/* GPIO with 22kOhm pull-up */
+		MX6QDL_PAD_GPIO_9__GPIO1_IO09	0xF008
+	>;
+};
+
+pinctrl_backlight_pwm: pwm1grp-pwm {
+	fsl,pins = <
+		/* PWM output */
+		MX6QDL_PAD_GPIO_9__PWM1_OUT	0x8
+	>;
 };
