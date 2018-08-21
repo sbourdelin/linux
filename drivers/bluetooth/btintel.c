@@ -24,6 +24,9 @@
 #include <linux/module.h>
 #include <linux/firmware.h>
 #include <linux/regmap.h>
+#include <linux/acpi.h>
+#include <linux/platform_device.h>
+#include <linux/gpio/consumer.h>
 #include <asm/unaligned.h>
 
 #include <net/bluetooth/bluetooth.h>
@@ -374,6 +377,71 @@ int btintel_read_version(struct hci_dev *hdev, struct intel_version *ver)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(btintel_read_version);
+
+static struct gpio_desc *reset_gpio_handler;
+void btintel_reset_bt(struct hci_dev *hdev, unsigned char code)
+{
+	if (!reset_gpio_handler)
+		return;
+
+	gpiod_set_value(reset_gpio_handler, 0);
+	mdelay(100);
+	gpiod_set_value(reset_gpio_handler, 1);
+}
+EXPORT_SYMBOL_GPL(btintel_reset_bt);
+
+static const struct acpi_gpio_params reset_gpios = { 0, 0, false };
+static const struct acpi_gpio_mapping acpi_btintel_gpios[] = {
+	{ "reset-gpios", &reset_gpios, 1 },
+	{ },
+};
+
+static int btintel_probe(struct platform_device *pdev)
+{
+	struct device *hdev;
+
+	hdev = devm_kzalloc(&pdev->dev, sizeof(*hdev), GFP_KERNEL);
+	if (!hdev)
+		return -ENOMEM;
+
+	if (!ACPI_HANDLE(&pdev->dev))
+		return -ENODEV;
+
+	if (acpi_dev_add_driver_gpios(ACPI_COMPANION(&pdev->dev),
+				     acpi_btintel_gpios))
+		return -EINVAL;
+
+	reset_gpio_handler = devm_gpiod_get_optional(&pdev->dev,
+					"reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset_gpio_handler))
+		return PTR_ERR(reset_gpio_handler);
+
+	return 0;
+}
+
+static int btintel_remove(struct platform_device *pdev)
+{
+	acpi_dev_remove_driver_gpios(ACPI_COMPANION(&pdev->dev));
+	return 0;
+}
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id btintel_acpi_match[] = {
+	{ "INTL6205", 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, btintel_acpi_match);
+#endif
+
+static struct platform_driver btintel_driver = {
+	.probe = btintel_probe,
+	.remove = btintel_remove,
+	.driver = {
+		.name = "btintel",
+		.acpi_match_table = ACPI_PTR(btintel_acpi_match),
+	},
+};
+module_platform_driver(btintel_driver);
 
 /* ------- REGMAP IBT SUPPORT ------- */
 
