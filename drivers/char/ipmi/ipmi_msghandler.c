@@ -3395,12 +3395,12 @@ int ipmi_register_smi(const struct ipmi_smi_handlers *handlers,
 
  out:
 	if (rv) {
-		ipmi_bmc_unregister(intf);
-		list_del_rcu(&intf->link);
+		/*
+		 * ipmi_unregister_smi must be called to clean up after
+		 * failure. We unlock the mutex to allow ipmi_unregister_smi
+		 * to lock it and perform cleanup.
+		 */
 		mutex_unlock(&ipmi_interfaces_mutex);
-		synchronize_srcu(&ipmi_interfaces_srcu);
-		cleanup_srcu_struct(&intf->users_srcu);
-		kref_put(&intf->refcount, intf_free);
 	} else {
 		/*
 		 * Keep memory order straight for RCU readers.  Make
