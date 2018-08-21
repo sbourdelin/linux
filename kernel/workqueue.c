@@ -2852,6 +2852,11 @@ static bool start_flush_work(struct work_struct *work, struct wq_barrier *barr,
 
 	might_sleep();
 
+	if (!from_cancel) {
+		lock_map_acquire(&work->lockdep_map);
+		lock_map_release(&work->lockdep_map);
+	}
+
 	local_irq_disable();
 	pool = get_work_pool(work);
 	if (!pool) {
