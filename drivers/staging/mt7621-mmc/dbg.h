@@ -104,13 +104,10 @@ do { \
 
 #define N_MSG(evt, fmt, args...)
 /*
-do {    \
-    if ((DBG_EVT_##evt) & sd_debug_zone[host->id]) { \
-        printk(KERN_ERR TAG"%d -> "fmt" <- %s() : L<%d> PID<%s><0x%x>\n", \
-            host->id,  ##args , __FUNCTION__, __LINE__, current->comm, current->pid);	\
-    } \
-} while(0)
-*/
+ *if ((DBG_EVT_##evt) & sd_debug_zone[host->id]) { \
+ *    dev_err(mmc_dev(host->mmc), "%d -> " fmt "\n", host->id, ##args) \
+ *}
+ */
 
 #define ERR_MSG(fmt, args...) \
 do { \
