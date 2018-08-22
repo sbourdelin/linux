@@ -2517,9 +2517,15 @@ make_rpcs(struct drm_i915_private *dev_priv)
 	}
 
 	if (INTEL_INFO(dev_priv)->sseu.has_subslice_pg) {
+		u8 val;
+
+		val = hweight8(INTEL_INFO(dev_priv)->sseu.subslice_mask[0]);
+
+		if (IS_GEN9_LP(dev_priv))
+			val = BIT(val - 1);
+
 		rpcs |= GEN8_RPCS_SS_CNT_ENABLE;
-		rpcs |= hweight8(INTEL_INFO(dev_priv)->sseu.subslice_mask[0]) <<
-			GEN8_RPCS_SS_CNT_SHIFT;
+		rpcs |= val << GEN8_RPCS_SS_CNT_SHIFT;
 		rpcs |= GEN8_RPCS_ENABLE;
 	}
 
