@@ -5231,7 +5231,7 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 	if (unlikely(error_code & PFERR_RSVD_MASK)) {
 		r = handle_mmio_page_fault(vcpu, cr2, direct);
 		if (r == RET_PF_EMULATE) {
-			emulation_type = 0;
+			emulation_type = EMULTYPE_NO_REEXECUTE;
 			goto emulate;
 		}
 	}
@@ -5261,7 +5261,7 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 	}
 
 	if (mmio_info_in_cache(vcpu, cr2, direct))
-		emulation_type = 0;
+		emulation_type = EMULTYPE_NO_REEXECUTE;
 emulate:
 	/*
 	 * On AMD platforms, under certain conditions insn_len may be zero on #NPF.
