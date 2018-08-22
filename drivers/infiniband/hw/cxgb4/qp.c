@@ -487,7 +487,7 @@ static int build_isgl(__be64 *queue_start, __be64 *queue_end,
 static int build_rdma_send(struct t4_sq *sq, union t4_wr *wqe,
 			   const struct ib_send_wr *wr, u8 *len16)
 {
-	u32 plen;
+	u32 plen = 0;
 	int size;
 	int ret;
 
@@ -519,7 +519,6 @@ static int build_rdma_send(struct t4_sq *sq, union t4_wr *wqe,
 	wqe->send.r3 = 0;
 	wqe->send.r4 = 0;
 
-	plen = 0;
 	if (wr->num_sge) {
 		if (wr->send_flags & IB_SEND_INLINE) {
 			ret = build_immd(sq, wqe->send.u.immd_src, wr,
@@ -554,7 +553,7 @@ static int build_rdma_send(struct t4_sq *sq, union t4_wr *wqe,
 static int build_rdma_write(struct t4_sq *sq, union t4_wr *wqe,
 			    const struct ib_send_wr *wr, u8 *len16)
 {
-	u32 plen;
+	u32 plen = 0;
 	int size;
 	int ret;
 
@@ -615,7 +614,7 @@ static void build_rdma_write_cmpl(struct t4_sq *sq,
 				  struct fw_ri_rdma_write_cmpl_wr *wcwr,
 				  const struct ib_send_wr *wr, u8 *len16)
 {
-	u32 plen;
+	u32 plen = 0;
 	int size;
 
 	/*
