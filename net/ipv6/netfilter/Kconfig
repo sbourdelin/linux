@@ -344,6 +344,21 @@ config IP6_NF_TARGET_NPT
 
 endif # IP6_NF_NAT
 
+if IPV6_SEG6_LWTUNNEL
+
+config IP6_NF_TARGET_SEG6
+	tristate 'IPv6 Segment Routing "SEG6" target support'
+	depends on NETFILTER_ADVANCED
+	help
+	 SEG6 is an ip6tables target for IPv6 Segment Routing encapsualted
+	 packets. It supports a set of Segment Routing specific actions
+	 that can be applied based on SRH information. It is useful for
+	 SRv6 Service Function chaining use-cases.
+
+	 To compile it as a module, choose M here.  If unsure, say N.
+
+endif # IPV6_SEG6_LWTUNNEL
+
 endif # IP6_NF_IPTABLES
 endmenu
 
