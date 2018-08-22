@@ -816,7 +816,7 @@ static void __init param_sysfs_builtin(void)
 	char modname[MODULE_NAME_LEN];
 
 	for (kp = __start___param; kp < __stop___param; kp++) {
-		char *dot;
+		const char *dot;
 
 		if (kp->perm == 0)
 			continue;

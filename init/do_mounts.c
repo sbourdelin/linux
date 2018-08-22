@@ -112,7 +112,7 @@ static dev_t devt_from_partuuid(const char *uuid_str)
 	struct hd_struct *part;
 	int offset = 0;
 	bool clear_root_wait = false;
-	char *slash;
+	const char *slash;
 
 	cmp.uuid = uuid_str;
 

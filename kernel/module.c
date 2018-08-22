@@ -4081,7 +4081,7 @@ static unsigned long mod_find_symname(struct module *mod, const char *name)
 unsigned long module_kallsyms_lookup_name(const char *name)
 {
 	struct module *mod;
-	char *colon;
+	const char *colon;
 	unsigned long ret = 0;
 
 	/* Don't lock: we're in enough trouble already. */
