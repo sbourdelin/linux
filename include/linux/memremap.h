@@ -53,11 +53,19 @@ struct vmem_altmap {
  * wakeup event whenever a page is unpinned and becomes idle. This
  * wakeup is used to coordinate physical address space management (ex:
  * fs truncate/hole punch) vs pinned pages (ex: device dma).
+ *
+ * MEMORY_DEVICE_DEV_DAX:
+ * Device memory that support raw access to persistent memory. Without need
+ * of an intervening filesystem, it could be directed mapped via an mmap
+ * capable character device. Together with the type MEMORY_DEVICE_FS_DAX,
+ * we could distinguish the persistent memory pages from normal ZONE_DEVICE
+ * pages.
  */
 enum memory_type {
 	MEMORY_DEVICE_PRIVATE = 1,
 	MEMORY_DEVICE_PUBLIC,
 	MEMORY_DEVICE_FS_DAX,
+	MEMORY_DEVICE_DEV_DAX,
 };
 
 /*
