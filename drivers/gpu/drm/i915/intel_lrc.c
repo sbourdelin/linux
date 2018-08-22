@@ -2510,10 +2510,14 @@ make_rpcs(struct drm_i915_private *dev_priv)
 	 * enablement.
 	*/
 	if (INTEL_INFO(dev_priv)->sseu.has_slice_pg) {
-		rpcs |= GEN8_RPCS_S_CNT_ENABLE;
-		rpcs |= hweight8(INTEL_INFO(dev_priv)->sseu.slice_mask) <<
-			GEN8_RPCS_S_CNT_SHIFT;
-		rpcs |= GEN8_RPCS_ENABLE;
+		rpcs = hweight8(INTEL_INFO(dev_priv)->sseu.slice_mask);
+
+		if (INTEL_GEN(dev_priv) >= 11)
+			rpcs <<= GEN11_RPCS_S_CNT_SHIFT;
+		else
+			rpcs <<= GEN8_RPCS_S_CNT_SHIFT;
+
+		rpcs |= GEN8_RPCS_ENABLE | GEN8_RPCS_S_CNT_ENABLE;
 	}
 
 	if (INTEL_INFO(dev_priv)->sseu.has_subslice_pg) {
