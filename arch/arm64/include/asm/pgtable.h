@@ -45,6 +45,13 @@
 #include <linux/mm_types.h>
 #include <linux/sched.h>
 
+extern pgd_t init_pg_dir[PTRS_PER_PGD];
+extern pgd_t init_pg_end[];
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+extern pgd_t swapper_pg_end[];
+extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
+
 extern void __pte_error(const char *file, int line, unsigned long val);
 extern void __pmd_error(const char *file, int line, unsigned long val);
 extern void __pud_error(const char *file, int line, unsigned long val);
@@ -428,8 +435,32 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 				 PUD_TYPE_TABLE)
 #endif
 
+extern spinlock_t swapper_pgdir_lock;
+
+#define pgd_set_fixmap(addr)	((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
+#define pgd_clear_fixmap()	clear_fixmap(FIX_PGD)
+
+static inline bool in_swapper_pgdir(void *addr)
+{
+	return ((unsigned long)addr & PAGE_MASK) ==
+		((unsigned long)swapper_pg_dir & PAGE_MASK);
+}
+
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+#ifdef __PAGETABLE_PMD_FOLDED
+	if (in_swapper_pgdir(pmdp)) {
+		pmd_t *fixmap_pmdp;
+
+		spin_lock(&swapper_pgdir_lock);
+		fixmap_pmdp = (pmd_t *)pgd_set_fixmap(__pa(pmdp));
+		WRITE_ONCE(*fixmap_pmdp, pmd);
+		dsb(ishst);
+		pgd_clear_fixmap();
+		spin_unlock(&swapper_pgdir_lock);
+		return;
+	}
+#endif
 	WRITE_ONCE(*pmdp, pmd);
 	dsb(ishst);
 }
@@ -480,6 +511,19 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
 
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
+#ifdef __PAGETABLE_PUD_FOLDED
+	if (in_swapper_pgdir(pudp)) {
+		pud_t *fixmap_pudp;
+
+		spin_lock(&swapper_pgdir_lock);
+		fixmap_pudp = (pud_t *)pgd_set_fixmap(__pa(pudp));
+		WRITE_ONCE(*fixmap_pudp, pud);
+		dsb(ishst);
+		pgd_clear_fixmap();
+		spin_unlock(&swapper_pgdir_lock);
+		return;
+	}
+#endif
 	WRITE_ONCE(*pudp, pud);
 	dsb(ishst);
 }
@@ -532,8 +576,19 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 
 static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
-	WRITE_ONCE(*pgdp, pgd);
-	dsb(ishst);
+	if (in_swapper_pgdir(pgdp)) {
+		pgd_t *fixmap_pgdp;
+
+		spin_lock(&swapper_pgdir_lock);
+		fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
+		WRITE_ONCE(*fixmap_pgdp, pgd);
+		dsb(ishst);
+		pgd_clear_fixmap();
+		spin_unlock(&swapper_pgdir_lock);
+	} else {
+		WRITE_ONCE(*pgdp, pgd);
+		dsb(ishst);
+	}
 }
 
 static inline void pgd_clear(pgd_t *pgdp)
@@ -586,8 +641,6 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
-#define pgd_set_fixmap(addr)	((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
-#define pgd_clear_fixmap()	clear_fixmap(FIX_PGD)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
@@ -711,13 +764,6 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
 	return __pmd(xchg_relaxed(&pmd_val(*pmdp), pmd_val(pmd)));
 }
 #endif
-
-extern pgd_t init_pg_dir[PTRS_PER_PGD];
-extern pgd_t init_pg_end[];
-extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
-extern pgd_t swapper_pg_end[];
-extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
-extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
 
 /*
  * Encode and decode a swap entry:
