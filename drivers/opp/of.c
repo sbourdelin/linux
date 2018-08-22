@@ -399,8 +399,6 @@ static int _of_add_opp_table_v2(struct device *dev, struct device_node *opp_np)
 
 	/* We have opp-table node now, iterate over it and add OPPs */
 	for_each_available_child_of_node(opp_np, np) {
-		count++;
-
 		ret = _opp_add_static_v2(opp_table, dev, np);
 		if (ret) {
 			dev_err(dev, "%s: Failed to add OPP, %d\n", __func__,
@@ -411,14 +409,21 @@ static int _of_add_opp_table_v2(struct device *dev, struct device_node *opp_np)
 		}
 	}
 
+	/*
+	 * Iterate over the list of OPPs that were actually added, as
+	 * OPPs not supported by the hardware will be ignored by
+	 * _opp_add_static_v2 above.
+	 */
+	list_for_each_entry(opp, &opp_table->opp_list, node) {
+		count++;
+		pstate_count += !!opp->pstate;
+	}
+
 	/* There should be one of more OPP defined */
 	if (WARN_ON(!count)) {
 		ret = -ENOENT;
 		goto put_opp_table;
 	}
-
-	list_for_each_entry(opp, &opp_table->opp_list, node)
-		pstate_count += !!opp->pstate;
 
 	/* Either all or none of the nodes shall have performance state set */
 	if (pstate_count && pstate_count != count) {
