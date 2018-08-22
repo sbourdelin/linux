@@ -3,6 +3,7 @@
 #define _UAPI_LINUX_KD_H
 #include <linux/types.h>
 #include <linux/compiler.h>
+#include <linux/input.h>
 
 /* 0x4B is 'K', to avoid collision with termios and vt */
 
@@ -136,6 +137,14 @@ struct kbdiacrsuc {
 };
 #define KDGKBDIACRUC    0x4BFA  /* read kernel accent table - UCS */
 #define KDSKBDIACRUC    0x4BFB  /* write kernel accent table - UCS */
+
+struct kbientry {
+	struct input_id id;
+	struct kbentry entry;
+};
+#define KDGKBIENT 0x4B53 /* Get one entry in input's translation table */
+#define KDSKBIENT 0x4B54 /* Set one entry in input's translation table */
+#define KDSKBIRST 0x4B55 /* Set input to use global translation table */
 
 struct kbkeycode {
 	unsigned int scancode, keycode;

@@ -2180,6 +2180,132 @@ int vt_do_kdsk_ioctl(int cmd, struct kbentry __user *user_kbe, int perm,
 	return ret;
 }
 
+/*
+ * Input keymap helper functions
+ */
+struct kbd_lookup_data {
+	struct input_id *id;
+	struct kbd_handle *kh;
+};
+
+static int _kbd_get_helper(struct input_handle *handle, void *data)
+{
+	struct kbd_handle *kh = hdl_to_kbd_handle(handle);
+	struct kbd_lookup_data *d = data;
+
+	if (memcmp(d->id, &handle->dev->id, sizeof(*d->id)) != 0)
+		return 0;
+
+	d->kh = kh;
+	kref_get(&kh->ref);
+	return 1;
+}
+
+/*
+ * Get an input specific handle.
+ * The caller will hold a reference on the found kbd_handle, if it exists, and
+ * should deref it after usage (with kbd_put).
+ */
+static int kbd_get(struct kbd_handle **kh, struct input_id *id)
+{
+	struct kbd_lookup_data d = {
+		.id = id,
+	};
+	int ret;
+
+	ret = input_handler_for_each_handle(&kbd_handler, &d, _kbd_get_helper);
+	*kh = d.kh;
+
+	return (ret == 0);
+}
+
+static void kbd_put(struct kbd_handle *kh)
+{
+	kref_put(&kh->ref, kbd_destroy);
+}
+
+int vt_do_kdski_ioctl(int cmd, struct kbientry __user *user_kbie, int perm,
+		int console)
+{
+	struct kbd_struct *kb = kbd_table + console;
+	struct kbd_handle *kh;
+	struct kbientry tmp;
+	ushort val;
+	int ret = 0;
+
+	if (copy_from_user(&tmp, user_kbie, sizeof(struct kbientry))) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (!capable(CAP_SYS_TTY_CONFIG))
+		perm = 0;
+
+	ret = kbd_get(&kh, &tmp.id);
+	if (ret != 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	switch (cmd) {
+	case KDGKBIENT:
+		val = kc_getent(kb, kh->conf, &tmp.entry);
+		ret = put_user(val, &user_kbie->entry.kb_value);
+		break;
+	case KDSKBIENT:
+		if (!perm) {
+			ret = -EPERM;
+			break;
+		}
+		/* A keyconf's keymap is created only if global one is used */
+		ret = kbd_detach_conf(kh);
+		if (ret != 0)
+			break;
+
+		ret = kc_setent(kb, kh->conf, &tmp.entry);
+		break;
+	}
+
+	kbd_put(kh);
+out:
+	return ret;
+}
+
+int vt_do_kdskirst_ioctl(int cmd, struct input_id __user *user_iid, int perm,
+		int console)
+{
+	struct kbd_handle *kh;
+	struct input_id tmp;
+	unsigned long flags;
+	int ret;
+
+	if (copy_from_user(&tmp, user_iid, sizeof(struct input_id)))
+		return -EFAULT;
+
+	if (!capable(CAP_SYS_TTY_CONFIG))
+		perm = 0;
+
+	if (!perm)
+		return -EPERM;
+
+	ret = kbd_get(&kh, &tmp);
+	if (ret != 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* Restore keyboard's configuration to global one */
+	spin_lock_irqsave(&kbd_event_lock, flags);
+	kbd_destroy_conf(kh);
+	kbd_init_conf(kh);
+	spin_unlock_irqrestore(&kbd_event_lock, flags);
+
+	kbd_put(kh);
+
+out:
+	return ret;
+}
+
 /* FIXME: This one needs untangling and locking */
 int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm)
 {
