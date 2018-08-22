@@ -25,7 +25,7 @@
  */
 static int match_one(char *s, const char *p, substring_t args[])
 {
-	char *meta;
+	const char *meta;
 	int argc = 0;
 
 	if (!p)
