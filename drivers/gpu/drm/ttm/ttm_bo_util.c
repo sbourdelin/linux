@@ -29,6 +29,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#include <asm/set_memory.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
@@ -639,7 +640,11 @@ int ttm_bo_kmap(struct ttm_buffer_object *bo,
 	if (ret)
 		return ret;
 	if (!bo->mem.bus.is_iomem) {
-		return ttm_bo_kmap_ttm(bo, start_page, num_pages, map);
+		ret = ttm_bo_kmap_ttm(bo, start_page, num_pages, map);
+		if (!ret && sev_active())
+			set_memory_decrypted((unsigned long) map->virtual,
+					     num_pages);
+		return ret;
 	} else {
 		offset = start_page << PAGE_SHIFT;
 		size = num_pages << PAGE_SHIFT;
@@ -661,9 +666,14 @@ void ttm_bo_kunmap(struct ttm_bo_kmap_obj *map)
 		iounmap(map->virtual);
 		break;
 	case ttm_bo_map_vmap:
+		if (sev_active())
+			set_memory_encrypted((unsigned long) map->virtual,
+					     bo->num_pages);
 		vunmap(map->virtual);
 		break;
 	case ttm_bo_map_kmap:
+		if (sev_active())
+			set_memory_encrypted((unsigned long) map->virtual, 1);
 		kunmap(map->page);
 		break;
 	case ttm_bo_map_premapped:

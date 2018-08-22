@@ -249,10 +249,12 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Speculatively prefault a number of pages. Only error on
 	 * first page.
 	 */
+
+	/* Mark framebuffer pages decrypted */
+	cvma.vm_page_prot = pgprot_decrypted(cvma.vm_page_prot);
+
 	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT; ++i) {
 		if (bo->mem.bus.is_iomem) {
-			/* Iomem should not be marked encrypted */
-			cvma.vm_page_prot = pgprot_decrypted(cvma.vm_page_prot);
 			pfn = ttm_bo_io_mem_pfn(bo, page_offset);
 		} else {
 			page = ttm->pages[page_offset];
