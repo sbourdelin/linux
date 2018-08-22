@@ -25,6 +25,10 @@
 #include <net/netfilter/nf_conntrack_timeout.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
 
+#include <linux/netfilter/nf_conntrack_dccp.h>
+#include <uapi/linux/netfilter/nf_conntrack_sctp.h>
+#include <uapi/linux/netfilter/nf_conntrack_tcp.h>
+
 struct nft_ct {
 	enum nft_ct_keys	key:8;
 	enum ip_conntrack_dir	dir:8;
@@ -799,9 +803,36 @@ err:
 }
 
 struct nft_ct_timeout_obj {
-	struct nf_conn		*tmpl;
+	struct nf_ct_timeout    *timeout;
 	u8			l4proto;
 };
+
+static void nft_ct_timeout_update(struct nf_conn *ct,
+				  const struct nf_conn_timeout *timeout)
+{
+	const unsigned int *values = nf_ct_timeout_data(timeout);
+
+	/* adjust the timeout as per 'new' state. ct is unconfirmed,
+	 * so the current timestamp must not be added.
+	 */
+	if (!values)
+		return;
+
+	switch (nf_ct_protonum(ct)) {
+	case IPPROTO_DCCP: /* all fall through */
+	case IPPROTO_SCTP:
+	case IPPROTO_TCP:
+		ct->timeout = values[1];
+		break;
+	default:
+		ct->timeout = values[0];
+		break;
+	}
+
+	BUILD_BUG_ON(TCP_CONNTRACK_SYN_SENT != 1);
+	BUILD_BUG_ON(SCTP_CONNTRACK_CLOSED != 1);
+	BUILD_BUG_ON(CT_DCCP_REQUEST != 1);
+}
 
 static void nft_ct_timeout_obj_eval(struct nft_object *obj,
 				    struct nft_regs *regs,
@@ -809,26 +840,44 @@ static void nft_ct_timeout_obj_eval(struct nft_object *obj,
 {
 	const struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
 	struct nf_conn *ct = (struct nf_conn *)skb_nfct(pkt->skb);
-	struct sk_buff *skb = pkt->skb;
+	struct nf_conn_timeout *timeout;
 
-	if (ct ||
-	    priv->l4proto != pkt->tprot)
+	if (priv->l4proto != pkt->tprot)
 		return;
 
-	nf_ct_set(skb, priv->tmpl, IP_CT_NEW);
+	if (!ct || nf_ct_is_template(ct))
+		return;
+
+	timeout = nf_ct_timeout_find(ct);
+	if (timeout) {
+		if (rcu_access_pointer(timeout->timeout) != priv->timeout)
+			rcu_assign_pointer(timeout->timeout, priv->timeout);
+
+		if (!nf_ct_is_confirmed(ct))
+			nft_ct_timeout_update(ct, timeout);
+
+		return;
+	}
+
+	if (!nf_ct_is_confirmed(ct)) {
+		/* cannot add extension to confirmed conntrack */
+
+		timeout = nf_ct_timeout_ext_add(ct, priv->timeout, GFP_ATOMIC);
+		if (timeout)
+			nft_ct_timeout_update(ct, timeout);
+		else
+			regs->verdict.code = NF_DROP;
+	}
 }
 
 static int nft_ct_timeout_obj_init(const struct nft_ctx *ctx,
 				   const struct nlattr * const tb[],
 				   struct nft_object *obj)
 {
-	const struct nf_conntrack_zone *zone = &nf_ct_zone_dflt;
 	struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
 	const struct nf_conntrack_l4proto *l4proto;
-	struct nf_conn_timeout *timeout_ext;
 	struct nf_ct_timeout *timeout;
 	int l3num = ctx->family;
-	struct nf_conn *tmpl;
 	__u8 l4num;
 	int ret;
 
@@ -863,28 +912,14 @@ static int nft_ct_timeout_obj_init(const struct nft_ctx *ctx,
 
 	timeout->l3num = l3num;
 	timeout->l4proto = l4proto;
-	tmpl = nf_ct_tmpl_alloc(ctx->net, zone, GFP_ATOMIC);
-	if (!tmpl) {
-		ret = -ENOMEM;
-		goto err_free_timeout;
-	}
-
-	timeout_ext = nf_ct_timeout_ext_add(tmpl, timeout, GFP_ATOMIC);
-	if (!timeout_ext) {
-		ret = -ENOMEM;
-		goto err_free_tmpl;
-	}
 
 	ret = nf_ct_netns_get(ctx->net, ctx->family);
 	if (ret < 0)
-		goto err_free_tmpl;
+		goto err_free_timeout;
 
-	priv->tmpl = tmpl;
-
+	priv->timeout = timeout;
 	return 0;
 
-err_free_tmpl:
-	nf_ct_tmpl_free(tmpl);
 err_free_timeout:
 	kfree(timeout);
 err_proto_put:
@@ -896,22 +931,19 @@ static void nft_ct_timeout_obj_destroy(const struct nft_ctx *ctx,
 				       struct nft_object *obj)
 {
 	struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
-	struct nf_conn_timeout *t = nf_ct_timeout_find(priv->tmpl);
-	struct nf_ct_timeout *timeout;
+	struct nf_ct_timeout *timeout = priv->timeout;
 
-	timeout = rcu_dereference_raw(t->timeout);
 	nf_ct_untimeout(ctx->net, timeout);
 	nf_ct_l4proto_put(timeout->l4proto);
 	nf_ct_netns_put(ctx->net, ctx->family);
-	nf_ct_tmpl_free(priv->tmpl);
+	kfree(priv->timeout);
 }
 
 static int nft_ct_timeout_obj_dump(struct sk_buff *skb,
 				   struct nft_object *obj, bool reset)
 {
 	const struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
-	const struct nf_conn_timeout *t = nf_ct_timeout_find(priv->tmpl);
-	const struct nf_ct_timeout *timeout = rcu_dereference_raw(t->timeout);
+	const struct nf_ct_timeout *timeout = priv->timeout;
 	struct nlattr *nest_params;
 	int ret;
 
