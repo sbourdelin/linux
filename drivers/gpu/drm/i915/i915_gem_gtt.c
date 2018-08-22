@@ -625,6 +625,24 @@ static void fill_page_dma_32(struct i915_address_space *vm,
 	fill_page_dma(vm, p, (u64)v << 32 | v);
 }
 
+static void setup_scratch_page_guards(struct i915_address_space *vm)
+{
+	struct i915_page_dma const *p = &vm->scratch_page;
+	u32 *scratch;
+	const unsigned int size = BIT(p->order) << PAGE_SHIFT;
+	const unsigned int last_idx = size / sizeof(*scratch) - 1;
+
+	scratch = kmap_atomic(p->page);
+
+	scratch[0] = MI_BATCH_BUFFER_END;
+	scratch[1] = MI_BATCH_BUFFER_END;
+
+	scratch[last_idx - 1] = MI_BATCH_BUFFER_END;
+	scratch[last_idx] = MI_BATCH_BUFFER_END;
+
+	kunmap_atomic(scratch);
+}
+
 static int
 setup_scratch_page(struct i915_address_space *vm, gfp_t gfp)
 {
@@ -673,6 +691,9 @@ setup_scratch_page(struct i915_address_space *vm, gfp_t gfp)
 		vm->scratch_page.page = page;
 		vm->scratch_page.daddr = addr;
 		vm->scratch_page.order = order;
+
+		setup_scratch_page_guards(vm);
+
 		return 0;
 
 unmap_page:
