@@ -138,12 +138,18 @@ add_sysfs_runtime_map_entry(struct kobject *kobj, int nr,
 
 int efi_get_runtime_map_size(void)
 {
-	return efi.memmap.nr_map * efi.memmap.desc_size;
+	if (efi_enabled(EFI_RUNTIME_SERVICES))
+		return efi.memmap.nr_map * efi.memmap.desc_size;
+
+	return 0;
 }
 
 int efi_get_runtime_map_desc_size(void)
 {
-	return efi.memmap.desc_size;
+	if (efi_enabled(EFI_RUNTIME_SERVICES))
+		return efi.memmap.desc_size;
+
+	return 0;
 }
 
 int efi_runtime_map_copy(void *buf, size_t bufsz)
@@ -163,7 +169,7 @@ int __init efi_runtime_map_init(struct kobject *efi_kobj)
 	struct efi_runtime_map_entry *entry;
 	efi_memory_desc_t *md;
 
-	if (!efi_enabled(EFI_MEMMAP))
+	if (!efi_enabled(EFI_RUNTIME_SERVICES))
 		return 0;
 
 	map_entries = kcalloc(efi.memmap.nr_map, sizeof(entry), GFP_KERNEL);
