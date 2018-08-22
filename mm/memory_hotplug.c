@@ -687,46 +687,28 @@ static void node_states_check_changes_online(unsigned long nr_pages,
 	struct zone *zone, struct memory_notify *arg)
 {
 	int nid = zone_to_nid(zone);
-	enum zone_type zone_last = ZONE_NORMAL;
 
 	/*
-	 * If we have HIGHMEM or movable node, node_states[N_NORMAL_MEMORY]
-	 * contains nodes which have zones of 0...ZONE_NORMAL,
-	 * set zone_last to ZONE_NORMAL.
-	 *
-	 * If we don't have HIGHMEM nor movable node,
-	 * node_states[N_NORMAL_MEMORY] contains nodes which have zones of
-	 * 0...ZONE_MOVABLE, set zone_last to ZONE_MOVABLE.
+	 * node_states[N_NORMAL_MEMORY] contains nodes which have
+	 * zones from (0..ZONE_NORMAL]
+	 * We can start checking if the current zone is in that range
+	 * and if so, if the node needs to be set to node_states[N_NORMAL_MEMORY]
+	 * after memory is online.
 	 */
-	if (N_MEMORY == N_NORMAL_MEMORY)
-		zone_last = ZONE_MOVABLE;
-
-	/*
-	 * if the memory to be online is in a zone of 0...zone_last, and
-	 * the zones of 0...zone_last don't have memory before online, we will
-	 * need to set the node to node_states[N_NORMAL_MEMORY] after
-	 * the memory is online.
-	 */
-	if (zone_idx(zone) <= zone_last && !node_state(nid, N_NORMAL_MEMORY))
+	if (zone_idx(zone) <= ZONE_NORMAL && !node_state(nid, N_NORMAL_MEMORY))
 		arg->status_change_nid_normal = nid;
 	else
 		arg->status_change_nid_normal = -1;
 
 #ifdef CONFIG_HIGHMEM
 	/*
-	 * If we have movable node, node_states[N_HIGH_MEMORY]
-	 * contains nodes which have zones of 0...ZONE_HIGHMEM,
-	 * set zone_last to ZONE_HIGHMEM.
-	 *
-	 * If we don't have movable node, node_states[N_NORMAL_MEMORY]
-	 * contains nodes which have zones of 0...ZONE_MOVABLE,
-	 * set zone_last to ZONE_MOVABLE.
+	 * The current zone cannot be ZONE_HIGHMEM, as zone_for_pfn_range
+	 * can only return (0..ZONE_NORMAL] or ZONE_MOVABLE.
+	 * N_HIGH_MEMORY stands for regular or high memory, so if the zone
+	 * is within the range (0..ZONE_NORMAL], we have to set the node
+	 * for N_HIGH_MEMORY as well.
 	 */
-	zone_last = ZONE_HIGHMEM;
-	if (N_MEMORY == N_HIGH_MEMORY)
-		zone_last = ZONE_MOVABLE;
-
-	if (zone_idx(zone) <= zone_last && !node_state(nid, N_HIGH_MEMORY))
+	if (zone_idx(zone) < ZONE_HIGHMEM && !node_state(nid, N_HIGH_MEMORY))
 		arg->status_change_nid_high = nid;
 	else
 		arg->status_change_nid_high = -1;
@@ -739,7 +721,7 @@ static void node_states_check_changes_online(unsigned long nr_pages,
 #endif
 
 	/*
-	 * if the node don't have memory befor online, we will need to
+	 * if the node don't have memory before online, we will need to
 	 * set the node to node_states[N_MEMORY] after the memory
 	 * is online.
 	 */
