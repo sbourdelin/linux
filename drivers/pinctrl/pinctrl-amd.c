@@ -558,15 +558,14 @@ static irqreturn_t amd_gpio_irq_handler(int irq, void *dev_id)
 			irq = irq_find_mapping(gc->irq.domain, irqnr + i);
 			generic_handle_irq(irq);
 
-			/* Clear interrupt.
-			 * We must read the pin register again, in case the
+			/*
+			 * Write 1 to clear the irq/wake status bits in MSByte.
+			 * All other bits in this byte are read-only.  This
+			 * avoids modifying the lower 24-bits, in case their
 			 * value was changed while executing
 			 * generic_handle_irq() above.
 			 */
-			raw_spin_lock_irqsave(&gpio_dev->lock, flags);
-			regval = readl(regs + i);
-			writel(regval, regs + i);
-			raw_spin_unlock_irqrestore(&gpio_dev->lock, flags);
+			writeb((regval >> 24), (u8 *)(regs + i) + 3);
 			ret = IRQ_HANDLED;
 		}
 	}
