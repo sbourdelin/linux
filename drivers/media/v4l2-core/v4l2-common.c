@@ -90,7 +90,7 @@ int v4l2_ctrl_query_fill(struct v4l2_queryctrl *qctrl, s32 _min, s32 _max, s32 _
 	s64 def = _def;
 
 	v4l2_ctrl_fill(qctrl->id, &name, &qctrl->type,
-		       &min, &max, &step, &def, &qctrl->flags);
+		       &min, &max, &step, &def, NULL, &qctrl->flags);
 
 	if (name == NULL)
 		return -EINVAL;

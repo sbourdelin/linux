@@ -370,7 +370,7 @@ struct v4l2_ctrl_config {
  *    control framework this function will no longer be exported.
  */
 void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
-		    s64 *min, s64 *max, u64 *step, s64 *def, u32 *flags);
+		    s64 *min, s64 *max, u64 *step, s64 *def, u32 *dims, u32 *flags);
 
 
 /**

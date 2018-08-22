@@ -1068,7 +1068,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 EXPORT_SYMBOL(v4l2_ctrl_get_name);
 
 void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
-		    s64 *min, s64 *max, u64 *step, s64 *def, u32 *flags)
+		    s64 *min, s64 *max, u64 *step, s64 *def, u32 *dims, u32 *flags)
 {
 	*name = v4l2_ctrl_get_name(id);
 	*flags = 0;
@@ -2244,10 +2244,13 @@ struct v4l2_ctrl *v4l2_ctrl_new_custom(struct v4l2_ctrl_handler *hdl,
 	s64 max = cfg->max;
 	u64 step = cfg->step;
 	s64 def = cfg->def;
+	u32 dims[V4L2_CTRL_MAX_DIMS];
+
+	memcpy(dims, cfg->dims, sizeof(dims));
 
 	if (name == NULL)
 		v4l2_ctrl_fill(cfg->id, &name, &type, &min, &max, &step,
-								&def, &flags);
+			       &def, dims, &flags);
 
 	is_menu = (cfg->type == V4L2_CTRL_TYPE_MENU ||
 		   cfg->type == V4L2_CTRL_TYPE_INTEGER_MENU);
@@ -2266,7 +2269,7 @@ struct v4l2_ctrl *v4l2_ctrl_new_custom(struct v4l2_ctrl_handler *hdl,
 	ctrl = v4l2_ctrl_new(hdl, cfg->ops, cfg->type_ops, cfg->id, name,
 			type, min, max,
 			is_menu ? cfg->menu_skip_mask : step, def,
-			cfg->dims, cfg->elem_size,
+			dims, cfg->elem_size,
 			flags, qmenu, qmenu_int, priv);
 	if (ctrl)
 		ctrl->is_private = cfg->is_private;
@@ -2283,7 +2286,7 @@ struct v4l2_ctrl *v4l2_ctrl_new_std(struct v4l2_ctrl_handler *hdl,
 	enum v4l2_ctrl_type type;
 	u32 flags;
 
-	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, &flags);
+	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, NULL, &flags);
 	if (type == V4L2_CTRL_TYPE_MENU ||
 	    type == V4L2_CTRL_TYPE_INTEGER_MENU ||
 	    type >= V4L2_CTRL_COMPOUND_TYPES) {
@@ -2312,7 +2315,7 @@ struct v4l2_ctrl *v4l2_ctrl_new_std_menu(struct v4l2_ctrl_handler *hdl,
 	u64 step;
 	u32 flags;
 
-	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, &flags);
+	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, NULL, &flags);
 
 	if (type == V4L2_CTRL_TYPE_MENU)
 		qmenu = v4l2_ctrl_get_menu(id);
@@ -2350,7 +2353,7 @@ struct v4l2_ctrl *v4l2_ctrl_new_std_menu_items(struct v4l2_ctrl_handler *hdl,
 		return NULL;
 	}
 
-	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, &flags);
+	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, NULL, &flags);
 	if (type != V4L2_CTRL_TYPE_MENU || qmenu == NULL) {
 		handler_set_err(hdl, -EINVAL);
 		return NULL;
@@ -2375,7 +2378,7 @@ struct v4l2_ctrl *v4l2_ctrl_new_int_menu(struct v4l2_ctrl_handler *hdl,
 	s64 def = _def;
 	u32 flags;
 
-	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, &flags);
+	v4l2_ctrl_fill(id, &name, &type, &min, &max, &step, &def, NULL, &flags);
 	if (type != V4L2_CTRL_TYPE_INTEGER_MENU) {
 		handler_set_err(hdl, -EINVAL);
 		return NULL;
