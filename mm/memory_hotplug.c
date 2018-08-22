@@ -1494,51 +1494,40 @@ static void node_states_check_changes_offline(unsigned long nr_pages,
 	enum zone_type zt, zone_last = ZONE_NORMAL;
 
 	/*
-	 * If we have HIGHMEM or movable node, node_states[N_NORMAL_MEMORY]
-	 * contains nodes which have zones of 0...ZONE_NORMAL,
-	 * set zone_last to ZONE_NORMAL.
-	 *
-	 * If we don't have HIGHMEM nor movable node,
-	 * node_states[N_NORMAL_MEMORY] contains nodes which have zones of
-	 * 0...ZONE_MOVABLE, set zone_last to ZONE_MOVABLE.
+	 * If the current zone is whithin (0..ZONE_NORMAL],
+	 * check if the amount of pages that are going to be
+	 * offlined is above or equal to the sum of the present
+	 * pages of these zones.
+	 * If that happens, we need to take this node out of
+	 * node_state[N_NORMAL_MEMORY]
 	 */
-	if (N_MEMORY == N_NORMAL_MEMORY)
-		zone_last = ZONE_MOVABLE;
+	if (zone_idx(zone) <= zone_last) {
+		for (zt = 0; zt <= zone_last; zt++)
+			present_pages += pgdat->node_zones[zt].present_pages;
 
-	/*
-	 * check whether node_states[N_NORMAL_MEMORY] will be changed.
-	 * If the memory to be offline is in a zone of 0...zone_last,
-	 * and it is the last present memory, 0...zone_last will
-	 * become empty after offline , thus we can determind we will
-	 * need to clear the node from node_states[N_NORMAL_MEMORY].
-	 */
-	for (zt = 0; zt <= zone_last; zt++)
-		present_pages += pgdat->node_zones[zt].present_pages;
-	if (zone_idx(zone) <= zone_last && nr_pages >= present_pages)
-		arg->status_change_nid_normal = zone_to_nid(zone);
-	else
-		arg->status_change_nid_normal = -1;
+		if (nr_pages >= present_pages)
+			arg->status_change_nid_normal = zone_to_nid(zone);
+		else
+			arg->status_change_nid_normal = -1;
+	}
 
 #ifdef CONFIG_HIGHMEM
 	/*
-	 * If we have movable node, node_states[N_HIGH_MEMORY]
-	 * contains nodes which have zones of 0...ZONE_HIGHMEM,
-	 * set zone_last to ZONE_HIGHMEM.
-	 *
-	 * If we don't have movable node, node_states[N_NORMAL_MEMORY]
-	 * contains nodes which have zones of 0...ZONE_MOVABLE,
-	 * set zone_last to ZONE_MOVABLE.
+	 * If the current zone is whithin (0..ZONE_HIGHMEM], check if
+	 * the amount of pages that are going to be offlined is above
+	 * or equal to the sum of the present pages of these zones.
+	 * If that happens, we need to take this node out of
+	 * node_state[N_HIGH_MEMORY]
 	 */
-	zone_last = ZONE_HIGHMEM;
-	if (N_MEMORY == N_HIGH_MEMORY)
-		zone_last = ZONE_MOVABLE;
-
-	for (; zt <= zone_last; zt++)
+	if (zone_idx(zone) <= ZONE_HIGHMEM) {
+		zt = ZONE_HIGHMEM;
 		present_pages += pgdat->node_zones[zt].present_pages;
-	if (zone_idx(zone) <= zone_last && nr_pages >= present_pages)
-		arg->status_change_nid_high = zone_to_nid(zone);
-	else
-		arg->status_change_nid_high = -1;
+
+		if (nr_pages >= present_pages)
+			arg->status_change_nid_high = zone_to_nid(zone);
+		else
+			arg->status_change_nid_high = -1;
+	}
 #else
 	/*
 	 * When !CONFIG_HIGHMEM, N_HIGH_MEMORY equals N_NORMAL_MEMORY
@@ -1548,18 +1537,14 @@ static void node_states_check_changes_offline(unsigned long nr_pages,
 #endif
 
 	/*
-	 * node_states[N_HIGH_MEMORY] contains nodes which have 0...ZONE_MOVABLE
+	 * Count pages from ZONE_MOVABLE as well.
+	 * If the amount of pages that are going to be offlined is above
+	 * or equal the sum of the present pages of all zones, we need
+	 * to remove this node from node_state[N_MEMORY]
 	 */
-	zone_last = ZONE_MOVABLE;
+	zt = ZONE_MOVABLE;
+	present_pages += pgdat->node_zones[zt].present_pages;
 
-	/*
-	 * check whether node_states[N_HIGH_MEMORY] will be changed
-	 * If we try to offline the last present @nr_pages from the node,
-	 * we can determind we will need to clear the node from
-	 * node_states[N_HIGH_MEMORY].
-	 */
-	for (; zt <= zone_last; zt++)
-		present_pages += pgdat->node_zones[zt].present_pages;
 	if (nr_pages >= present_pages)
 		arg->status_change_nid = zone_to_nid(zone);
 	else
