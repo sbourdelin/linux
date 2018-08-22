@@ -765,6 +765,14 @@ static int __must_check __deliver_prog(struct kvm_vcpu *vcpu)
 		break;
 	case PGM_VECTOR_PROCESSING:
 	case PGM_DATA:
+		if (vcpu->arch.sie_block->gcr[0] & CR0_AFP_REGISTER_CONTROL) {
+			/* make sure the new fpc will be lazily loaded */
+			save_fpu_regs();
+			/* the DXC/VXC cannot make the fpc invalid */
+			current->thread.fpu.fpc &= ~0xff00u;
+			current->thread.fpu.fpc |= (pgm_info.data_exc_code << 8)
+						   & 0xff00u;
+		}
 		rc = put_guest_lc(vcpu, pgm_info.data_exc_code,
 				  (u32 *)__LC_DATA_EXC_CODE);
 		break;
