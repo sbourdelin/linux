@@ -367,7 +367,7 @@ EXPORT_SYMBOL(strncmp);
  * @s: The string to be searched
  * @c: The character to search for
  */
-char *strchr(const char *s, int c)
+char *(strchr)(const char *s, int c)
 {
 	for (; *s != (char)c; ++s)
 		if (*s == '\0')
@@ -386,7 +386,7 @@ EXPORT_SYMBOL(strchr);
  * Returns pointer to first occurrence of 'c' in s. If c is not found, then
  * return a pointer to the null byte at the end of s.
  */
-char *strchrnul(const char *s, int c)
+char *(strchrnul)(const char *s, int c)
 {
 	while (*s && *s != (char)c)
 		s++;
@@ -401,7 +401,7 @@ EXPORT_SYMBOL(strchrnul);
  * @s: The string to be searched
  * @c: The character to search for
  */
-char *strrchr(const char *s, int c)
+char *(strrchr)(const char *s, int c)
 {
 	const char *last = NULL;
 	do {
@@ -420,7 +420,7 @@ EXPORT_SYMBOL(strrchr);
  * @count: The number of characters to be searched
  * @c: The character to search for
  */
-char *strnchr(const char *s, size_t count, int c)
+char *(strnchr)(const char *s, size_t count, int c)
 {
 	for (; count-- && *s != '\0'; ++s)
 		if (*s == (char)c)
@@ -896,7 +896,7 @@ EXPORT_SYMBOL(memscan);
  * @s1: The string to be searched
  * @s2: The string to search for
  */
-char *strstr(const char *s1, const char *s2)
+char *(strstr)(const char *s1, const char *s2)
 {
 	size_t l1, l2;
 
@@ -922,7 +922,7 @@ EXPORT_SYMBOL(strstr);
  * @s2: The string to search for
  * @len: the maximum number of characters to search
  */
-char *strnstr(const char *s1, const char *s2, size_t len)
+char *(strnstr)(const char *s1, const char *s2, size_t len)
 {
 	size_t l2;
 

@@ -449,4 +449,51 @@ static inline void memcpy_and_pad(void *dest, size_t dest_len,
 		memcpy(dest, src, dest_len);
 }
 
+#ifdef __CONST_LAUNDER
+
+#ifndef __HAVE_ARCH_STRCHR
+#define strchr(s, c) (						  \
+	__builtin_choose_expr(__same_type((s) + 0, const char *), \
+			      (const char *)strchr(s, c),	  \
+			      strchr(s, c)))
+#endif
+
+#ifndef __HAVE_ARCH_STRCHRNUL
+#define strchrnul(s, c) (					  \
+	__builtin_choose_expr(__same_type((s) + 0, const char *), \
+			      (const char *)strchrnul(s, c),	  \
+			      strchrnul(s, c)))
+#endif
+
+#ifndef __HAVE_ARCH_STRNCHR
+#define strnchr(s, n, c) (					  \
+	__builtin_choose_expr(__same_type((s) + 0, const char *), \
+			      (const char *)strnchr(s, n, c),	  \
+			      strnchr(s, n, c)))
+#endif
+
+#ifndef __HAVE_ARCH_STRRCHR
+#define strrchr(s, c) (						  \
+	__builtin_choose_expr(__same_type((s) + 0, const char *), \
+			      (const char *)strrchr(s, c),	  \
+			      strrchr(s, c)))
+#endif
+
+#ifndef __HAVE_ARCH_STRSTR
+#define strstr(s, t) (						  \
+	__builtin_choose_expr(__same_type((s) + 0, const char *), \
+			      (const char *)strstr(s, t),	  \
+			      strstr(s, t)))
+#endif
+
+#ifndef __HAVE_ARCH_STRNSTR
+#define strnstr(s, t, n) (					  \
+	__builtin_choose_expr(__same_type((s) + 0, const char *), \
+			      (const char *)strnstr(s, t, n),	  \
+			      strnstr(s, t, n)))
+#endif
+
+#endif /* __CONST_LAUNDER */
+
+
 #endif /* _LINUX_STRING_H_ */
