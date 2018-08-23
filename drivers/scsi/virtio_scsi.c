@@ -833,8 +833,6 @@ out:
 	kfree(names);
 	kfree(callbacks);
 	kfree(vqs);
-	if (err)
-		virtscsi_remove_vqs(vdev);
 	return err;
 }
 
