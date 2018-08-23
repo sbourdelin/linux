@@ -119,8 +119,8 @@ static int vmbus_negotiate_version(struct vmbus_channel_msginfo *msginfo,
 	 */
 	if (version >= VERSION_WIN8_1) {
 		msg->target_vcpu =
-			hv_cpu_number_to_vp_number(smp_processor_id());
-		vmbus_connection.connect_cpu = smp_processor_id();
+			hv_cpu_number_to_vp_number(raw_smp_processor_id());
+		vmbus_connection.connect_cpu = raw_smp_processor_id();
 	} else {
 		msg->target_vcpu = 0;
 		vmbus_connection.connect_cpu = 0;
