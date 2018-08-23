@@ -834,7 +834,7 @@ static void sl_notify_v3_hw(struct hisi_hba *hisi_hba, int phy_no)
 	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
 	sl_control |= SL_CONTROL_NOTIFY_EN_MSK;
 	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);
-	msleep(1);
+	usleep_range(1000, 1100);
 	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
 	sl_control &= ~SL_CONTROL_NOTIFY_EN_MSK;
 	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);

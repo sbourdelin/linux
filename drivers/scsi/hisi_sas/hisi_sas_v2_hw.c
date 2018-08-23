@@ -1081,7 +1081,7 @@ static int reset_hw_v2_hw(struct hisi_hba *hisi_hba)
 				reset_val);
 		regmap_write(hisi_hba->ctrl, hisi_hba->ctrl_clock_ena_reg + 4,
 				reset_val);
-		msleep(1);
+		usleep_range(1000, 1100);
 		regmap_read(hisi_hba->ctrl, hisi_hba->ctrl_reset_sts_reg, &val);
 		if (reset_val != (val & reset_val)) {
 			dev_err(dev, "SAS reset fail.\n");
@@ -1093,7 +1093,7 @@ static int reset_hw_v2_hw(struct hisi_hba *hisi_hba)
 				reset_val);
 		regmap_write(hisi_hba->ctrl, hisi_hba->ctrl_clock_ena_reg,
 				reset_val);
-		msleep(1);
+		usleep_range(1000, 1100);
 		regmap_read(hisi_hba->ctrl, hisi_hba->ctrl_reset_sts_reg,
 				&val);
 		if (val & reset_val) {
@@ -1591,7 +1591,7 @@ static void sl_notify_v2_hw(struct hisi_hba *hisi_hba, int phy_no)
 	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
 	sl_control |= SL_CONTROL_NOTIFY_EN_MSK;
 	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);
-	msleep(1);
+	usleep_range(1000, 1100);
 	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
 	sl_control &= ~SL_CONTROL_NOTIFY_EN_MSK;
 	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);

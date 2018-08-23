@@ -579,7 +579,7 @@ static int reset_hw_v1_hw(struct hisi_hba *hisi_hba)
 		phy_ctrl |= PHY_CTRL_RESET_MSK;
 		hisi_sas_phy_write32(hisi_hba, i, PHY_CTRL, phy_ctrl);
 	}
-	msleep(1); /* It is safe to wait for 50us */
+	usleep_range(1000, 1100); /* It is safe to wait for 50us */
 
 	/* Ensure DMA tx & rx idle */
 	for (i = 0; i < hisi_hba->n_phy; i++) {
@@ -632,7 +632,7 @@ static int reset_hw_v1_hw(struct hisi_hba *hisi_hba)
 			     RESET_VALUE);
 		regmap_write(hisi_hba->ctrl, hisi_hba->ctrl_clock_ena_reg + 4,
 			     RESET_VALUE);
-		msleep(1);
+		usleep_range(1000, 1100);
 		regmap_read(hisi_hba->ctrl, hisi_hba->ctrl_reset_sts_reg, &val);
 		if (RESET_VALUE != (val & RESET_VALUE)) {
 			dev_err(dev, "Reset failed\n");
@@ -645,7 +645,7 @@ static int reset_hw_v1_hw(struct hisi_hba *hisi_hba)
 			     RESET_VALUE);
 		regmap_write(hisi_hba->ctrl, hisi_hba->ctrl_clock_ena_reg,
 			     RESET_VALUE);
-		msleep(1);
+		usleep_range(1000, 1100);
 		regmap_read(hisi_hba->ctrl, hisi_hba->ctrl_reset_sts_reg, &val);
 		if (val & RESET_VALUE) {
 			dev_err(dev, "De-reset failed\n");
@@ -841,7 +841,7 @@ static void sl_notify_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
 	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
 	sl_control |= SL_CONTROL_NOTIFY_EN_MSK;
 	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);
-	msleep(1);
+	usleep_range(1000, 1100);
 	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
 	sl_control &= ~SL_CONTROL_NOTIFY_EN_MSK;
 	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);
