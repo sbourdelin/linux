@@ -1045,6 +1045,64 @@ static int put_v4l2_event32(struct v4l2_event __user *p64,
 	return 0;
 }
 
+struct v4l2_subdev_routing32 {
+	compat_caddr_t routes;
+	__u32 num_routes;
+	__u32 reserved[5];
+};
+
+static int get_v4l2_subdev_routing(struct v4l2_subdev_routing __user *kp,
+				   struct v4l2_subdev_routing32 __user *up)
+{
+	struct v4l2_subdev_route __user *routes;
+	compat_caddr_t p;
+	u32 num_routes;
+
+	if (!access_ok(VERIFY_READ, up, sizeof(*up)) ||
+	    get_user(p, &up->routes) ||
+	    get_user(num_routes, &up->num_routes) ||
+	    put_user(num_routes, &kp->num_routes) ||
+	    copy_in_user(&kp->reserved, &up->reserved, sizeof(kp->reserved)) ||
+	    num_routes > U32_MAX / sizeof(*kp->routes))
+		return -EFAULT;
+
+	routes = compat_ptr(p);
+
+	if (!access_ok(VERIFY_READ, routes,
+		       num_routes * sizeof(*kp->routes)))
+		return -EFAULT;
+
+	if (put_user((__force struct v4l2_subdev_route *)routes,
+		     &kp->routes))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int put_v4l2_subdev_routing(struct v4l2_subdev_routing __user *kp,
+				   struct v4l2_subdev_routing32 __user *up)
+{
+	struct v4l2_subdev_route __user *routes;
+	compat_caddr_t p;
+	u32 num_routes;
+
+	if (!access_ok(VERIFY_WRITE, up, sizeof(*up)) ||
+	    get_user(p, &up->routes) ||
+	    get_user(num_routes, &kp->num_routes) ||
+	    put_user(num_routes, &up->num_routes) ||
+	    copy_in_user(&up->reserved, &kp->reserved, sizeof(kp->reserved)) ||
+	    num_routes > U32_MAX / sizeof(*kp->routes))
+		return -EFAULT;
+
+	routes = compat_ptr(p);
+
+	if (!access_ok(VERIFY_WRITE, routes,
+		       num_routes * sizeof(*kp->routes)))
+		return -EFAULT;
+
+	return 0;
+}
+
 struct v4l2_edid32 {
 	__u32 pad;
 	__u32 start_block;
@@ -1117,6 +1175,8 @@ static int put_v4l2_edid32(struct v4l2_edid __user *p64,
 #define VIDIOC_STREAMOFF32	_IOW ('V', 19, s32)
 #define VIDIOC_G_INPUT32	_IOR ('V', 38, s32)
 #define VIDIOC_S_INPUT32	_IOWR('V', 39, s32)
+#define VIDIOC_SUBDEV_G_ROUTING32 _IOWR('V', 38, struct v4l2_subdev_routing32)
+#define VIDIOC_SUBDEV_S_ROUTING32 _IOWR('V', 39, struct v4l2_subdev_routing32)
 #define VIDIOC_G_OUTPUT32	_IOR ('V', 46, s32)
 #define VIDIOC_S_OUTPUT32	_IOWR('V', 47, s32)
 
@@ -1195,6 +1255,8 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_STREAMOFF32: cmd = VIDIOC_STREAMOFF; break;
 	case VIDIOC_G_INPUT32: cmd = VIDIOC_G_INPUT; break;
 	case VIDIOC_S_INPUT32: cmd = VIDIOC_S_INPUT; break;
+	case VIDIOC_SUBDEV_G_ROUTING32: cmd = VIDIOC_SUBDEV_G_ROUTING; break;
+	case VIDIOC_SUBDEV_S_ROUTING32: cmd = VIDIOC_SUBDEV_S_ROUTING; break;
 	case VIDIOC_G_OUTPUT32: cmd = VIDIOC_G_OUTPUT; break;
 	case VIDIOC_S_OUTPUT32: cmd = VIDIOC_S_OUTPUT; break;
 	case VIDIOC_CREATE_BUFS32: cmd = VIDIOC_CREATE_BUFS; break;
@@ -1224,6 +1286,15 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_G_INPUT:
 	case VIDIOC_G_OUTPUT:
 		err = alloc_userspace(sizeof(unsigned int), 0, &new_p64);
+		compatible_arg = 0;
+		break;
+
+	case VIDIOC_SUBDEV_G_ROUTING:
+	case VIDIOC_SUBDEV_S_ROUTING:
+		err = alloc_userspace(sizeof(struct v4l2_subdev_routing),
+				      0, &new_p64);
+		if (!err)
+			err = get_v4l2_subdev_routing(new_p64, p32);
 		compatible_arg = 0;
 		break;
 
@@ -1367,6 +1438,10 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_S_EDID:
 		if (put_v4l2_edid32(new_p64, p32))
 			err = -EFAULT;
+		break;
+	case VIDIOC_SUBDEV_G_ROUTING:
+	case VIDIOC_SUBDEV_S_ROUTING:
+		err = put_v4l2_subdev_routing(new_p64, p32);
 		break;
 	}
 	if (err)
