@@ -21,8 +21,12 @@
 #include <linux/clk.h>
 #include <linux/can/platform/rcar_can.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 
 #define RCAR_CAN_DRV_NAME	"rcar_can"
+
+#define RCAR_SUPPORTED_CLOCKS	(BIT(CLKR_CLKP1) | BIT(CLKR_CLKP2) | \
+				 BIT(CLKR_CLKEXT))
 
 /* Mailbox configuration:
  * mailbox 60 - 63 - Rx FIFO mailboxes
@@ -745,10 +749,12 @@ static int rcar_can_probe(struct platform_device *pdev)
 	u32 clock_select = CLKR_CLKP1;
 	int err = -ENODEV;
 	int irq;
+	uintptr_t allowed_clks = RCAR_SUPPORTED_CLOCKS;
 
 	if (pdev->dev.of_node) {
 		of_property_read_u32(pdev->dev.of_node,
 				     "renesas,can-clock-select", &clock_select);
+		allowed_clks = (uintptr_t)of_device_get_match_data(&pdev->dev);
 	} else {
 		pdata = dev_get_platdata(&pdev->dev);
 		if (!pdata) {
@@ -789,7 +795,7 @@ static int rcar_can_probe(struct platform_device *pdev)
 		goto fail_clk;
 	}
 
-	if (clock_select >= ARRAY_SIZE(clock_names)) {
+	if (!(BIT(clock_select) & allowed_clks)) {
 		err = -EINVAL;
 		dev_err(&pdev->dev, "invalid CAN clock selected\n");
 		goto fail_clk;
@@ -899,13 +905,34 @@ static int __maybe_unused rcar_can_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(rcar_can_pm_ops, rcar_can_suspend, rcar_can_resume);
 
 static const struct of_device_id rcar_can_of_table[] __maybe_unused = {
-	{ .compatible = "renesas,can-r8a7778" },
-	{ .compatible = "renesas,can-r8a7779" },
-	{ .compatible = "renesas,can-r8a7790" },
-	{ .compatible = "renesas,can-r8a7791" },
-	{ .compatible = "renesas,rcar-gen1-can" },
-	{ .compatible = "renesas,rcar-gen2-can" },
-	{ .compatible = "renesas,rcar-gen3-can" },
+	{
+		.compatible = "renesas,can-r8a7778",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,can-r8a7779",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,can-r8a7790",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,can-r8a7791",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,rcar-gen1-can",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,rcar-gen2-can",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,rcar-gen3-can",
+		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, rcar_can_of_table);
