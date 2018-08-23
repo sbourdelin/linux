@@ -27,6 +27,7 @@
 
 #define RCAR_SUPPORTED_CLOCKS	(BIT(CLKR_CLKP1) | BIT(CLKR_CLKP2) | \
 				 BIT(CLKR_CLKEXT))
+#define RZG2_SUPPORTED_CLOCKS	(BIT(CLKR_CLKP1) | BIT(CLKR_CLKEXT))
 
 /* Mailbox configuration:
  * mailbox 60 - 63 - Rx FIFO mailboxes
@@ -932,6 +933,10 @@ static const struct of_device_id rcar_can_of_table[] __maybe_unused = {
 	{
 		.compatible = "renesas,rcar-gen3-can",
 		.data = (void *)RCAR_SUPPORTED_CLOCKS,
+	},
+	{
+		.compatible = "renesas,rzg-gen2-can",
+		.data = (void *)RZG2_SUPPORTED_CLOCKS,
 	},
 	{ }
 };
