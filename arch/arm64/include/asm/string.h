@@ -24,9 +24,11 @@ extern char *strchr(const char *, int c);
 
 #define __HAVE_ARCH_STRCMP
 extern int strcmp(const char *, const char *);
+extern int __strcmp(const char *, const char *);
 
 #define __HAVE_ARCH_STRNCMP
 extern int strncmp(const char *, const char *, __kernel_size_t);
+extern int __strncmp(const char *, const char *, __kernel_size_t);
 
 #define __HAVE_ARCH_STRLEN
 extern __kernel_size_t strlen(const char *);
@@ -67,6 +69,9 @@ void memcpy_flushcache(void *dst, const void *src, size_t cnt);
 #define memcpy(dst, src, len) __memcpy(dst, src, len)
 #define memmove(dst, src, len) __memmove(dst, src, len)
 #define memset(s, c, n) __memset(s, c, n)
+
+#define strcmp(cs, ct) __strcmp(cs, ct)
+#define strncmp(cs, ct, n) __strncmp(cs, ct, n)
 
 #ifndef __NO_FORTIFY
 #define __NO_FORTIFY /* FORTIFY_SOURCE uses __builtin_memcpy, etc. */
