@@ -1152,6 +1152,7 @@ nouveau_drm_pci_driver = {
 	.id_table = nouveau_drm_pci_table,
 	.probe = nouveau_drm_probe,
 	.remove = nouveau_drm_remove,
+	.shutdown = nouveau_drm_remove,
 	.driver.pm = &nouveau_pm_ops,
 };
 
