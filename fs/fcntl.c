@@ -488,7 +488,7 @@ SYSCALL_DEFINE3(fcntl64, unsigned int, fd, unsigned int, cmd,
 	err = security_file_fcntl(f.file, cmd, arg);
 	if (err)
 		goto out1;
-	
+
 	switch (cmd) {
 	case F_GETLK64:
 	case F_OFD_GETLK:
@@ -780,7 +780,7 @@ void send_sigio(struct fown_struct *fown, int fd, int band)
 	struct task_struct *p;
 	enum pid_type type;
 	struct pid *pid;
-	
+
 	read_lock(&fown->lock);
 
 	type = fown->pid_type;
@@ -818,7 +818,7 @@ int send_sigurg(struct fown_struct *fown)
 	enum pid_type type;
 	struct pid *pid;
 	int ret = 0;
-	
+
 	read_lock(&fown->lock);
 
 	type = fown->pid_type;
