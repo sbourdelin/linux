@@ -595,6 +595,9 @@ static int qca_close(struct hci_uart *hu)
 	struct qca_serdev *qcadev;
 	struct qca_data *qca = hu->priv;
 
+	if (!qca)
+		return 0;
+
 	BT_DBG("hu %p qca close", hu);
 
 	serial_clock_vote(HCI_IBS_VOTE_STATS_UPDATE, hu);
@@ -1098,6 +1101,32 @@ static int qca_set_speed(struct hci_uart *hu, enum qca_speed_type speed_type)
 	return 0;
 }
 
+static int hci_uart_open(struct hci_dev *hdev)
+{
+	struct hci_uart *hu = hci_get_drvdata(hdev);
+
+	BT_DBG("%s %p", hdev->name, hdev);
+	set_bit(HCI_UART_PROTO_READY, &hu->flags);
+
+	return qca_open(hu);
+}
+
+static int hci_uart_close(struct hci_dev *hdev)
+{
+	struct hci_uart *hu = hci_get_drvdata(hdev);
+
+	BT_DBG("%s %p", hdev->name, hdev);
+
+	/* After this step, we should not allow Tx and Rx work
+	 * function to execute. As we are freeing qca tx and rx
+	 * buffers which may cause kernel crash.
+	 */
+	clear_bit(HCI_UART_PROTO_READY, &hu->flags);
+	qca_close(hu);
+
+	return 0;
+}
+
 static int qca_wcn3990_init(struct hci_uart *hu)
 {
 	struct hci_dev *hdev = hu->hdev;
@@ -1154,6 +1183,11 @@ static int qca_setup(struct hci_uart *hu)
 
 	if (qcadev->btsoc_type == QCA_WCN3990) {
 		bt_dev_info(hdev, "setting up wcn3990");
+
+		hdev->open  = hci_uart_open;
+		hdev->close = hci_uart_close;
+		set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
+
 		ret = qca_wcn3990_init(hu);
 		if (ret)
 			return ret;
