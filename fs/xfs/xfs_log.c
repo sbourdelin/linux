@@ -3,6 +3,8 @@
  * Copyright (c) 2000-2005 Silicon Graphics, Inc.
  * All Rights Reserved.
  */
+#include <linux/sched/wake_q.h>
+
 #include "xfs.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
@@ -221,19 +223,21 @@ STATIC bool
 xlog_grant_head_wake(
 	struct xlog		*log,
 	struct xlog_grant_head	*head,
-	int			*free_bytes)
+	int			*free_bytes,
+	struct wake_q_head	*wakeq)
 {
-	struct xlog_ticket	*tic;
+	struct xlog_ticket	*tic, *next;
 	int			need_bytes;
 
-	list_for_each_entry(tic, &head->waiters, t_queue) {
+	list_for_each_entry_safe(tic, next, &head->waiters, t_queue) {
 		need_bytes = xlog_ticket_reservation(log, head, tic);
 		if (*free_bytes < need_bytes)
 			return false;
 
 		*free_bytes -= need_bytes;
 		trace_xfs_log_grant_wake_up(log, tic);
-		wake_up_process(tic->t_task);
+		wake_q_add(wakeq, tic->t_task);
+		list_del_init(&tic->t_queue);
 	}
 
 	return true;
@@ -247,13 +251,14 @@ xlog_grant_head_wait(
 	int			need_bytes) __releases(&head->lock)
 					    __acquires(&head->lock)
 {
-	list_add_tail(&tic->t_queue, &head->waiters);
-
 	do {
+		list_add_tail(&tic->t_queue, &head->waiters);
+
 		if (XLOG_FORCED_SHUTDOWN(log))
 			goto shutdown;
 		xlog_grant_push_ail(log, need_bytes);
 
+sleep:
 		__set_current_state(TASK_UNINTERRUPTIBLE);
 		spin_unlock(&head->lock);
 
@@ -264,11 +269,18 @@ xlog_grant_head_wait(
 		trace_xfs_log_grant_wake(log, tic);
 
 		spin_lock(&head->lock);
+
+		/*
+		 * The current task should have been dequeued from the
+		 * list before it is waken up.
+		 */
+		if (unlikely(!list_empty(&tic->t_queue)))
+			goto sleep;
+
 		if (XLOG_FORCED_SHUTDOWN(log))
 			goto shutdown;
 	} while (xlog_space_left(log, &head->grant) < need_bytes);
 
-	list_del_init(&tic->t_queue);
 	return 0;
 shutdown:
 	list_del_init(&tic->t_queue);
@@ -301,6 +313,7 @@ xlog_grant_head_check(
 {
 	int			free_bytes;
 	int			error = 0;
+	DEFINE_WAKE_Q(wakeq);
 
 	ASSERT(!(log->l_flags & XLOG_ACTIVE_RECOVERY));
 
@@ -313,9 +326,16 @@ xlog_grant_head_check(
 	*need_bytes = xlog_ticket_reservation(log, head, tic);
 	free_bytes = xlog_space_left(log, &head->grant);
 	if (!list_empty_careful(&head->waiters)) {
+		bool wake_all;
+
 		spin_lock(&head->lock);
-		if (!xlog_grant_head_wake(log, head, &free_bytes) ||
-		    free_bytes < *need_bytes) {
+		wake_all = xlog_grant_head_wake(log, head, &free_bytes, &wakeq);
+		if (!wake_q_empty(&wakeq)) {
+			spin_unlock(&head->lock);
+			wake_up_q(&wakeq);
+			spin_lock(&head->lock);
+		}
+		if (!wake_all || free_bytes < *need_bytes) {
 			error = xlog_grant_head_wait(log, head, tic,
 						     *need_bytes);
 		}
@@ -1068,6 +1088,7 @@ xfs_log_space_wake(
 {
 	struct xlog		*log = mp->m_log;
 	int			free_bytes;
+	DEFINE_WAKE_Q(wakeq);
 
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return;
@@ -1077,8 +1098,11 @@ xfs_log_space_wake(
 
 		spin_lock(&log->l_write_head.lock);
 		free_bytes = xlog_space_left(log, &log->l_write_head.grant);
-		xlog_grant_head_wake(log, &log->l_write_head, &free_bytes);
+		xlog_grant_head_wake(log, &log->l_write_head, &free_bytes,
+				     &wakeq);
 		spin_unlock(&log->l_write_head.lock);
+		wake_up_q(&wakeq);
+		wake_q_init(&wakeq);
 	}
 
 	if (!list_empty_careful(&log->l_reserve_head.waiters)) {
@@ -1086,8 +1110,10 @@ xfs_log_space_wake(
 
 		spin_lock(&log->l_reserve_head.lock);
 		free_bytes = xlog_space_left(log, &log->l_reserve_head.grant);
-		xlog_grant_head_wake(log, &log->l_reserve_head, &free_bytes);
+		xlog_grant_head_wake(log, &log->l_reserve_head, &free_bytes,
+				     &wakeq);
 		spin_unlock(&log->l_reserve_head.lock);
+		wake_up_q(&wakeq);
 	}
 }
 
