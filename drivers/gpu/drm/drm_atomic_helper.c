@@ -3198,8 +3198,13 @@ int drm_atomic_helper_commit_duplicated_state(struct drm_atomic_state *state,
 	for_each_new_plane_in_state(state, plane, new_plane_state, i)
 		state->planes[i].old_state = plane->state;
 
-	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i)
+	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 		state->crtcs[i].old_state = crtc->state;
+		new_crtc_state->color_mgmt_changed =
+			new_crtc_state->degamma_lut != crtc->state->degamma_lut ||
+			new_crtc_state->ctm != crtc->state->ctm ||
+			new_crtc_state->gamma_lut != crtc->state->gamma_lut;
+	}
 
 	for_each_new_connector_in_state(state, connector, new_conn_state, i)
 		state->connectors[i].old_state = connector->state;
