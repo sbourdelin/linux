@@ -447,7 +447,6 @@ static struct aa_dfa *unpack_dfa(struct aa_ext *e)
 
 	return dfa;
 
-fail:
 	aa_put_dfa(dfa);
 	return ERR_PTR(-EPROTO);
 }
