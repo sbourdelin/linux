@@ -4646,28 +4646,35 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	res_lines = div_round_up_fixed16(selected_result,
 					 wp->plane_blocks_per_line);
 
-	/* Display WA #1125: skl,bxt,kbl,glk */
-	if (level == 0 && wp->rc_surface)
-		res_blocks += fixed16_to_u32_round_up(wp->y_tile_minimum);
-
-	/* Display WA #1126: skl,bxt,kbl,glk */
-	if (level >= 1 && level <= 7) {
-		if (wp->y_tiled) {
+	if (INTEL_GEN(dev_priv) < 11) {
+		/* Display WA #1125: skl,bxt,kbl,glk */
+		if (level == 0 && wp->rc_surface)
 			res_blocks += fixed16_to_u32_round_up(
 							wp->y_tile_minimum);
-			res_lines += wp->y_min_scanlines;
-		} else {
-			res_blocks++;
-		}
 
-		/*
-		 * Make sure result blocks for higher latency levels are atleast
-		 * as high as level below the current level.
-		 * Assumption in DDB algorithm optimization for special cases.
-		 * Also covers Display WA #1125 for RC.
-		 */
+		/* Display WA #1126: skl,bxt,kbl,glk */
+		if (level >= 1 && level <= 7) {
+			if (wp->y_tiled) {
+				res_blocks += fixed16_to_u32_round_up(
+							wp->y_tile_minimum);
+				res_lines += wp->y_min_scanlines;
+			} else {
+				res_blocks++;
+			}
+		}
+	}
+
+	/*
+	 * Make sure result blocks for higher latency levels are atleast
+	 * as high as level below the current level.
+	 * Assumption in DDB algorithm optimization for special cases.
+	 * Also covers Display WA #1125 for RC.
+	 */
+	if (level >= 1 && level <= 7) {
 		if (result_prev->plane_res_b > res_blocks)
 			res_blocks = result_prev->plane_res_b;
+		if (result_prev->plane_res_l > res_lines)
+			res_lines = result_prev->plane_res_l;
 	}
 
 	if (INTEL_GEN(dev_priv) >= 11) {
