@@ -1410,27 +1410,17 @@ void clear_zone_contiguous(struct zone *zone)
 static void __init deferred_free_range(unsigned long pfn,
 				       unsigned long nr_pages)
 {
-	struct page *page;
-	unsigned long i;
+	struct page *page, *last_page;
 
 	if (!nr_pages)
 		return;
 
 	page = pfn_to_page(pfn);
+	last_page = page + nr_pages;
 
-	/* Free a large naturally-aligned chunk if possible */
-	if (nr_pages == pageblock_nr_pages &&
-	    (pfn & (pageblock_nr_pages - 1)) == 0) {
-		set_pageblock_migratetype(page, MIGRATE_MOVABLE);
-		__free_pages_boot_core(page, pageblock_order);
-		return;
-	}
-
-	for (i = 0; i < nr_pages; i++, page++, pfn++) {
-		if ((pfn & (pageblock_nr_pages - 1)) == 0)
-			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
+	do {
 		__free_pages_boot_core(page, 0);
-	}
+	} while (++page < last_page);
 }
 
 /* Completion tracking for deferred_init_memmap() threads */
@@ -1446,14 +1436,10 @@ static inline void __init pgdat_init_report_one_done(void)
 /*
  * Returns true if page needs to be initialized or freed to buddy allocator.
  *
- * First we check if pfn is valid on architectures where it is possible to have
- * holes within pageblock_nr_pages. On systems where it is not possible, this
- * function is optimized out.
+ * First we check if a current large page is valid by only checking the validity
+ * of the first pfn we have access to in the page.
  *
- * Then, we check if a current large page is valid by only checking the validity
- * of the head pfn.
- *
- * Finally, meminit_pfn_in_nid is checked on systems where pfns can interleave
+ * Then, meminit_pfn_in_nid is checked on systems where pfns can interleave
  * within a node: a pfn is between start and end of a node, but does not belong
  * to this memory node.
  */
@@ -1461,9 +1447,7 @@ static inline bool __init
 deferred_pfn_valid(int nid, unsigned long pfn,
 		   struct mminit_pfnnid_cache *nid_init_state)
 {
-	if (!pfn_valid_within(pfn))
-		return false;
-	if (!(pfn & (pageblock_nr_pages - 1)) && !pfn_valid(pfn))
+	if (!pfn_valid(pfn))
 		return false;
 	if (!meminit_pfn_in_nid(pfn, nid, nid_init_state))
 		return false;
@@ -1477,24 +1461,53 @@ deferred_pfn_valid(int nid, unsigned long pfn,
 static void __init deferred_free_pages(int nid, int zid, unsigned long pfn,
 				       unsigned long end_pfn)
 {
-	struct mminit_pfnnid_cache nid_init_state = { };
 	unsigned long nr_pgmask = pageblock_nr_pages - 1;
-	unsigned long nr_free = 0;
+	struct mminit_pfnnid_cache nid_init_state = { };
 
-	for (; pfn < end_pfn; pfn++) {
-		if (!deferred_pfn_valid(nid, pfn, &nid_init_state)) {
-			deferred_free_range(pfn - nr_free, nr_free);
-			nr_free = 0;
-		} else if (!(pfn & nr_pgmask)) {
-			deferred_free_range(pfn - nr_free, nr_free);
-			nr_free = 1;
-			touch_nmi_watchdog();
-		} else {
-			nr_free++;
+	while (pfn < end_pfn) {
+		unsigned long aligned_pfn, nr_free;
+
+		/*
+		 * Determine if our first pfn is valid, use this as a
+		 * representative value for the page block. Store the value
+		 * as either 0 or 1 to nr_free.
+		 *
+		 * If the pfn itself is valid, but this page block isn't
+		 * then we can assume the issue is the entire page block
+		 * and it can be skipped.
+		 */
+		nr_free = !!deferred_pfn_valid(nid, pfn, &nid_init_state);
+		if (!nr_free && pfn_valid_within(pfn))
+			pfn |= nr_pgmask;
+
+		/*
+		 * Move to next pfn and align the end of our next section
+		 * to process with the end of the block. If we were given
+		 * the end of a block to process we will do nothing in the
+		 * loop below.
+		 */
+		pfn++;
+		aligned_pfn = min(__ALIGN_MASK(pfn, nr_pgmask), end_pfn);
+
+		for (; pfn < aligned_pfn; pfn++) {
+			if (!pfn_valid_within(pfn)) {
+				deferred_free_range(pfn - nr_free, nr_free);
+				nr_free = 0;
+			} else {
+				nr_free++;
+			}
 		}
+
+		/* Free a large naturally-aligned chunk if possible */
+		if (nr_free == pageblock_nr_pages)
+			__free_pages_boot_core(pfn_to_page(pfn - nr_free),
+					       pageblock_order);
+		else
+			deferred_free_range(pfn - nr_free, nr_free);
+
+		/* Let the watchdog know we are still alive */
+		touch_nmi_watchdog();
 	}
-	/* Free the last block of pages to allocator */
-	deferred_free_range(pfn - nr_free, nr_free);
 }
 
 /*
@@ -1506,25 +1519,62 @@ static unsigned long  __init deferred_init_pages(int nid, int zid,
 						 unsigned long pfn,
 						 unsigned long end_pfn)
 {
-	struct mminit_pfnnid_cache nid_init_state = { };
 	unsigned long nr_pgmask = pageblock_nr_pages - 1;
+	struct mminit_pfnnid_cache nid_init_state = { };
 	unsigned long nr_pages = 0;
-	struct page *page = NULL;
 
-	for (; pfn < end_pfn; pfn++) {
-		if (!deferred_pfn_valid(nid, pfn, &nid_init_state)) {
-			page = NULL;
-			continue;
-		} else if (!page || !(pfn & nr_pgmask)) {
+	while (pfn < end_pfn) {
+		unsigned long aligned_pfn;
+		struct page *page = NULL;
+
+		/*
+		 * Determine if our first pfn is valid, use this as a
+		 * representative value for the page block.
+		 */
+		if (deferred_pfn_valid(nid, pfn, &nid_init_state)) {
 			page = pfn_to_page(pfn);
-			touch_nmi_watchdog();
-		} else {
-			page++;
+			__init_single_page(page++, pfn, zid, nid);
+			nr_pages++;
+
+			if (!(pfn & nr_pgmask))
+				set_pageblock_migratetype(page,
+							  MIGRATE_MOVABLE);
+		} else if (pfn_valid_within(pfn)) {
+			/*
+			 * If the issue is the node or is not specific to
+			 * this individual pfn we can just jump to the end
+			 * of the page block and skip the entire block.
+			 */
+			pfn |= nr_pgmask;
 		}
-		__init_single_page(page, pfn, zid, nid);
-		nr_pages++;
+
+		/*
+		 * Move to next pfn and align the end of our next section
+		 * to process with the end of the block. If we were given
+		 * the end of a block to process we will do nothing in the
+		 * loop below.
+		 */
+		pfn++;
+		aligned_pfn = min(__ALIGN_MASK(pfn, nr_pgmask), end_pfn);
+
+		for (; pfn < aligned_pfn; pfn++) {
+			if (!pfn_valid_within(pfn)) {
+				page = NULL;
+				continue;
+			}
+
+			if (!page)
+				page = pfn_to_page(pfn);
+
+			__init_single_page(page++, pfn, zid, nid);
+			nr_pages++;
+		}
+
+		/* Let the watchdog know we are still alive */
+		touch_nmi_watchdog();
 	}
-	return (nr_pages);
+
+	return nr_pages;
 }
 
 /* Initialise remaining memory on a node */
