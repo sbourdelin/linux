@@ -285,7 +285,7 @@ static int mt9m032_setup_pll(struct mt9m032 *sensor)
 	if (ret < 0)
 		return ret;
 
-	sensor->pix_clock = pdata->pix_clock;
+	sensor->pix_clock = pll.pix_clock;
 
 	ret = mt9m032_write(client, MT9M032_PLL_CONFIG1,
 			    (pll.m << MT9M032_PLL_CONFIG1_MUL_SHIFT) |
@@ -711,6 +711,7 @@ static int mt9m032_probe(struct i2c_client *client,
 	struct mt9m032_platform_data *pdata = client->dev.platform_data;
 	struct i2c_adapter *adapter = client->adapter;
 	struct mt9m032 *sensor;
+	struct v4l2_ctrl *pixel_rate_ctrl;
 	int chip_version;
 	int ret;
 
@@ -780,9 +781,10 @@ static int mt9m032_probe(struct i2c_client *client,
 			  V4L2_CID_EXPOSURE, MT9M032_SHUTTER_WIDTH_MIN,
 			  MT9M032_SHUTTER_WIDTH_MAX, 1,
 			  MT9M032_SHUTTER_WIDTH_DEF);
-	v4l2_ctrl_new_std(&sensor->ctrls, &mt9m032_ctrl_ops,
-			  V4L2_CID_PIXEL_RATE, pdata->pix_clock,
-			  pdata->pix_clock, 1, pdata->pix_clock);
+	pixel_rate_ctrl = v4l2_ctrl_new_std(&sensor->ctrls, &mt9m032_ctrl_ops,
+					    V4L2_CID_PIXEL_RATE,
+					    pdata->pix_clock, pdata->pix_clock,
+					    1, pdata->pix_clock);
 
 	if (sensor->ctrls.error) {
 		ret = sensor->ctrls.error;
@@ -810,6 +812,11 @@ static int mt9m032_probe(struct i2c_client *client,
 	if (ret < 0)
 		goto error_entity;
 	usleep_range(10000, 11000);
+
+	ret = __v4l2_ctrl_modify_range(pixel_rate_ctrl, sensor->pix_clock,
+				       sensor->pix_clock, 1, sensor->pix_clock);
+	if (ret < 0)
+		goto error_entity;
 
 	ret = v4l2_ctrl_handler_setup(&sensor->ctrls);
 	if (ret < 0)
