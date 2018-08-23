@@ -1756,8 +1756,12 @@ qla1280_load_firmware_dma(struct scsi_qla_host *ha)
 #endif
 
 	fw = qla1280_request_firmware(ha);
-	if (IS_ERR(fw))
+	if (IS_ERR(fw)) {
+#if DUMP_IT_BACK
+		pci_free_consistent(ha->pdev, 8000, tbuf, p_tbuf);
+#endif
 		return PTR_ERR(fw);
+	}
 
 	fw_data = (const __le16 *)&fw->data[0];
 	ha->fwstart = __le16_to_cpu(fw_data[2]);
