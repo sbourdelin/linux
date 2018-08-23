@@ -912,7 +912,8 @@ static int kvmppc_handle_exit_hv(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 	case BOOK3S_INTERRUPT_H_INST_STORAGE:
 		vcpu->arch.fault_dar = kvmppc_get_pc(vcpu);
-		vcpu->arch.fault_dsisr = 0;
+		vcpu->arch.fault_dsisr = kvmppc_get_msr(vcpu) &
+					 DSISR_SRR1_MATCH_64S;
 		r = RESUME_PAGE_FAULT;
 		break;
 	/*
