@@ -284,12 +284,6 @@ static int elants_i2c_sw_reset(struct i2c_client *client)
 		return error;
 	}
 
-	/*
-	 * We should wait at least 10 msec (but no more than 40) before
-	 * sending fastboot or IAP command to the device.
-	 */
-	msleep(30);
-
 	return 0;
 }
 
@@ -500,6 +494,12 @@ static int elants_i2c_fastboot(struct i2c_client *client)
 	const u8 boot_cmd[] = { 0x4D, 0x61, 0x69, 0x6E };
 	int error;
 
+	/*
+	 * We should wait at least 10 msec (but no more than 40) before sending
+	 * fastboot command to the device.
+	 */
+	usleep_range(10 * 1000, 11 * 1000);
+
 	error = elants_i2c_send(client, boot_cmd, sizeof(boot_cmd));
 	if (error) {
 		dev_err(&client->dev, "boot failed: %d\n", error);
@@ -643,6 +643,10 @@ static int elants_i2c_do_update_firmware(struct i2c_client *client,
 			dev_err(&client->dev, "Failed close idle: %d\n", error);
 		msleep(60);
 		elants_i2c_sw_reset(client);
+		/*
+		 * We should wait at least 10 msec (but no more than 40) before
+		 * sending IAP command to the device.
+		 */
 		msleep(20);
 		error = elants_i2c_send(client, enter_iap, sizeof(enter_iap));
 	}
