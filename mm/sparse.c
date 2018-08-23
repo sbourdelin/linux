@@ -78,7 +78,7 @@ static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
 	struct mem_section *section;
 
-	if (mem_section[root])
+	if (likely(mem_section[root]))
 		return -EEXIST;
 
 	section = sparse_index_alloc(nid);
