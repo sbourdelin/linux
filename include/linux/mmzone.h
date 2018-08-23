@@ -1162,9 +1162,9 @@ static inline struct mem_section *__nr_to_section(unsigned long nr)
 #ifdef CONFIG_SPARSEMEM_EXTREME
 	if (!mem_section)
 		return NULL;
-#endif
 	if (!mem_section[SECTION_NR_TO_ROOT(nr)])
 		return NULL;
+#endif
 	return &mem_section[SECTION_NR_TO_ROOT(nr)][nr & SECTION_ROOT_MASK];
 }
 extern int __section_nr(struct mem_section* ms);
