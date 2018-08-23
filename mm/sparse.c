@@ -174,6 +174,7 @@ void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
  * those loops early.
  */
 int __highest_present_section_nr;
+EXPORT_SYMBOL(__highest_present_section_nr);
 static void section_mark_present(struct mem_section *ms)
 {
 	int section_nr = __section_nr(ms);

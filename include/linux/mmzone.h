@@ -1244,7 +1244,7 @@ extern int __highest_present_section_nr;
 #ifndef CONFIG_HAVE_ARCH_PFN_VALID
 static inline int pfn_valid(unsigned long pfn)
 {
-	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+	if (pfn_to_section_nr(pfn) > __highest_present_section_nr)
 		return 0;
 	return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
 }
@@ -1252,7 +1252,7 @@ static inline int pfn_valid(unsigned long pfn)
 
 static inline int pfn_present(unsigned long pfn)
 {
-	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+	if (pfn_to_section_nr(pfn) > __highest_present_section_nr)
 		return 0;
 	return present_section(__nr_to_section(pfn_to_section_nr(pfn)));
 }
