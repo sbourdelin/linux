@@ -703,6 +703,11 @@ static void __init l1tf_select_mitigation(void)
 	half_pa = (u64)l1tf_pfn_limit() << PAGE_SHIFT;
 	if (e820__mapped_any(half_pa, ULLONG_MAX - half_pa, E820_TYPE_RAM)) {
 		pr_warn("System has more than MAX_PA/2 memory. L1TF mitigation not effective.\n");
+		pr_info("You may make it effective by booting the kernel with mem=%llu parameter.\n",
+				half_pa);
+		pr_info("However, doing so will make up to %llu bytes of RAM unusable.\n",
+				((u64) max_pfn << PAGE_SHIFT) - half_pa);
+		pr_info("Reading Documentation/admin-guide/l1tf.rst might help you decide.");
 		return;
 	}
 
