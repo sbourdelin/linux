@@ -1605,3 +1605,186 @@ error:
 
 	return err;
 }
+
+/*
+ * __es_delayed_clu - count number of clusters containing blocks that
+ *                    are both delayed and unwritten
+ *
+ * @inode - file containing block range
+ * @start - logical block defining start of range
+ * @end - logical block defining end of range
+ *
+ * Returns the number of clusters containing delayed and unwritten blocks
+ * in the range specified by @start and @end.  Any cluster or part of a
+ * cluster within the range and containing a delayed and unwritten block
+ * within the range is counted as a whole cluster.
+ */
+static unsigned int __es_delayed_clu(struct inode *inode, ext4_lblk_t start,
+				     ext4_lblk_t end)
+{
+	struct ext4_es_tree *tree = &EXT4_I(inode)->i_es_tree;
+	struct extent_status *es;
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+	struct rb_node *node;
+	ext4_lblk_t first_lclu, last_lclu;
+	unsigned long long last_counted_lclu;
+	unsigned int n = 0;
+
+	/* guaranteed to be unequal to any ext4_lblk_t value */
+	last_counted_lclu = ~0ULL;
+
+	es = __es_tree_search(&tree->root, start);
+
+	while (es && (es->es_lblk <= end)) {
+		if (ext4_es_is_delayed(es) && !ext4_es_is_unwritten(es)) {
+			if (es->es_lblk <= start)
+				first_lclu = EXT4_B2C(sbi, start);
+			else
+				first_lclu = EXT4_B2C(sbi, es->es_lblk);
+
+			if (ext4_es_end(es) >= end)
+				last_lclu = EXT4_B2C(sbi, end);
+			else
+				last_lclu = EXT4_B2C(sbi, ext4_es_end(es));
+
+			if (first_lclu == last_counted_lclu)
+				n += last_lclu - first_lclu;
+			else
+				n += last_lclu - first_lclu + 1;
+			last_counted_lclu = last_lclu;
+		}
+		node = rb_next(&es->rb_node);
+		if (!node)
+			break;
+		es = rb_entry(node, struct extent_status, rb_node);
+	}
+
+	return n;
+}
+
+/*
+ * ext4_es_delayed_clu - count number of clusters containing blocks that
+ *                       are both delayed and unwritten
+ *
+ * @inode - file containing block range
+ * @lblk - logical block defining start of range
+ * @len - number of blocks in range
+ *
+ * Locking for external use of __es_delayed_clu().
+ */
+unsigned int ext4_es_delayed_clu(struct inode *inode, ext4_lblk_t lblk,
+				 ext4_lblk_t len)
+{
+	struct ext4_inode_info *ei = EXT4_I(inode);
+	ext4_lblk_t end;
+	unsigned int n;
+
+	if (len == 0)
+		return 0;
+
+	end = lblk + len - 1;
+	WARN_ON(end < lblk);
+
+	read_lock(&ei->i_es_lock);
+
+	n = __es_delayed_clu(inode, lblk, end);
+
+	read_unlock(&ei->i_es_lock);
+
+	return n;
+}
+
+/*
+ * ext4_cancel_pending - cancels a pending cluster reservation if the cluster
+ *                       does not contain delayed and unwritten blocks outside
+ *                       a specified range
+ *
+ * @inode - file containing the range
+ * @lblk - logical block defining the start of range
+ * @len  - length of range in blocks
+ *
+ * Meant for use when a mapping request for delayed allocated blocks in the
+ * specified range is satisfied by mapping a previously allocated cluster.
+ * Requires the block range be completely contained within a single cluster.
+ */
+void ext4_cancel_pending(struct inode *inode, ext4_lblk_t lblk,
+			 ext4_lblk_t len)
+{
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+	ext4_lblk_t first, last;
+	bool du_left = false, du_right = false;
+
+	WARN_ON(EXT4_B2C(sbi, lblk) != EXT4_B2C(sbi, lblk + len - 1));
+
+	if (len == 0)
+		return;
+
+	write_lock(&EXT4_I(inode)->i_es_lock);
+
+	first = EXT4_LBLK_CMASK(sbi, lblk);
+	if (first != lblk) {
+		last = lblk - 1;
+		du_left = __es_scan_range(inode, &ext4_es_is_delunwrit,
+					  first, last);
+	}
+	if (!du_left) {
+		last = EXT4_LBLK_CMASK(sbi, lblk) + sbi->s_cluster_ratio - 1;
+		if (last != lblk + len - 1) {
+			first = lblk + len;
+			du_right = __es_scan_range(inode, &ext4_es_is_delunwrit,
+						   first, last);
+		}
+		if (!du_right)
+			__remove_pending(inode, lblk);
+	}
+
+	write_unlock(&EXT4_I(inode)->i_es_lock);
+}
+
+/*
+ * ext4_make_pending - makes pending cluster reservations if the clusters at
+ *                     the end of a specified range contain delayed and
+ *                     unwritten blocks outside that range
+ *
+ * @inode - file containing the range
+ * @lblk - logical block defining the start of range
+ * @len  - length of range in blocks
+ *
+ * Meant for use when a mapping request for delayed allocated blocks in the
+ * specified range is satisfied by mapping one or more newly allocated clusters
+ * that might be shared with delayed and unwritten blocks outside that range.
+ * Since these clusters are newly allocated, there can't be unwritten blocks
+ * mapped to them.  This allows the use of ext4_es_is_delayed alone to search
+ * for delayed and unwritten blocks on the edges of the allocated range.
+ */
+void ext4_make_pending(struct inode *inode, ext4_lblk_t lblk, ext4_lblk_t len)
+{
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+	ext4_lblk_t first, last;
+	bool done = false;
+
+	write_lock(&EXT4_I(inode)->i_es_lock);
+
+	first = EXT4_LBLK_CMASK(sbi, lblk);
+	if (first != lblk) {
+		last = lblk - 1;
+		if (__es_scan_range(inode, &ext4_es_is_delayed, first, last)) {
+			__insert_pending(inode, first);
+			if (EXT4_B2C(sbi, lblk) ==
+			    EXT4_B2C(sbi, lblk + len - 1))
+				done = true;
+		}
+	}
+	if (!done) {
+		last = EXT4_LBLK_CMASK(sbi, lblk + len - 1) +
+		       sbi->s_cluster_ratio - 1;
+		if (last != lblk + len - 1) {
+			first = lblk + len;
+			if (__es_scan_range(inode, &ext4_es_is_delayed,
+					    first, last))
+				__insert_pending(inode, first);
+		}
+	}
+
+	write_unlock(&EXT4_I(inode)->i_es_lock);
+}
