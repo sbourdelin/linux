@@ -251,5 +251,7 @@ extern void ext4_cancel_pending(struct inode *inode, ext4_lblk_t lblk,
 				ext4_lblk_t len);
 extern void ext4_make_pending(struct inode *inode, ext4_lblk_t lblk,
 			      ext4_lblk_t len);
+extern void ext4_es_remove_blks(struct inode *inode, ext4_lblk_t lblk,
+				ext4_lblk_t len);
 
 #endif /* _EXT4_EXTENTS_STATUS_H */
