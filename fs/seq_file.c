@@ -847,7 +847,8 @@ void seq_hex_dump(struct seq_file *m, const char *prefix_str, int prefix_type,
 		  bool ascii)
 {
 	const u8 *ptr = buf;
-	int i, linelen, remaining = len;
+	int i, linelen;
+	size_t remaining = len;
 	char *buffer;
 	size_t size;
 	int ret;
