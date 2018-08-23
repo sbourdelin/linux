@@ -1345,11 +1345,8 @@ __init int p4_pmu_init(void)
 	BUILD_BUG_ON(ARCH_P4_MAX_CCCR > INTEL_PMC_MAX_GENERIC);
 
 	rdmsr(MSR_IA32_MISC_ENABLE, low, high);
-	if (!(low & (1 << 7))) {
-		pr_cont("unsupported Netburst CPU model %d ",
-			boot_cpu_data.x86_model);
+	if (!(low & (1 << 7)))
 		return -ENODEV;
-	}
 
 	memcpy(hw_cache_event_ids, p4_hw_cache_event_ids,
 		sizeof(hw_cache_event_ids));

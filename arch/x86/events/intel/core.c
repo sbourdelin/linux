@@ -3889,15 +3889,22 @@ __init int intel_pmu_init(void)
 	char *name;
 
 	if (!cpu_has(&boot_cpu_data, X86_FEATURE_ARCH_PERFMON)) {
+		int ret = -ENODEV;
+
 		switch (boot_cpu_data.x86) {
 		case 0x6:
-			return p6_pmu_init();
+			ret = p6_pmu_init();
+			break;
 		case 0xb:
-			return knc_pmu_init();
+			ret = knc_pmu_init();
+			break;
 		case 0xf:
-			return p4_pmu_init();
+			ret = p4_pmu_init();
+			break;
 		}
-		return -ENODEV;
+		if (ret)
+			pr_cont("CPU does not support PMU: ");
+		return ret;
 	}
 
 	/*
