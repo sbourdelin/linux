@@ -3,7 +3,7 @@
 # Makefile for the kernel tpm device drivers.
 #
 obj-$(CONFIG_TCG_TPM) += tpm.o
-tpm-y := tpm-interface.o tpm-dev.o tpm-sysfs.o tpm-chip.o tpm2-cmd.o \
+tpm-y := tpm-interface.o tpm-dev.o tpm-sysfs.o tpm-chip.o tpm1-cmd.o tpm2-cmd.o \
 	 tpm-dev-common.o tpmrm-dev.o eventlog/common.o eventlog/tpm1.o \
 	 eventlog/tpm2.o tpm2-space.o
 tpm-$(CONFIG_ACPI) += tpm_ppi.o eventlog/acpi.o
