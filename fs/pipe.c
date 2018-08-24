@@ -509,7 +509,7 @@ static long pipe_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 }
 
-/* No kernel lock held - fine */
+/* No kernel lock held - fine, but a compiler barrier is required */
 static __poll_t
 pipe_poll(struct file *filp, poll_table *wait)
 {
@@ -519,7 +519,35 @@ pipe_poll(struct file *filp, poll_table *wait)
 
 	poll_wait(filp, &pipe->wait, wait);
 
-	/* Reading only -- no need for acquiring the semaphore.  */
+	/*
+	 * Reading only -- no need for acquiring the semaphore, but
+	 * we need a compiler barrier to ensure the compiler does
+	 * not reorder reads to pipe->nrbufs, pipe->writers,
+	 * pipe->readers, filp->f_version, pipe->w_counter, and
+	 * pipe->buffers before poll_wait to avoid missing wakeups
+	 * from compiler reordering.  In other words, we need to
+	 * prevent the following situation:
+	 *
+	 * pipe_poll                          pipe_write
+	 * -----------------                  ------------
+	 * nrbufs = pipe->nrbufs (INVALID!)
+	 *
+	 *                                    __pipe_lock
+	 *                                    pipe->nrbufs = ++bufs;
+	 *                                    __pipe_unlock
+	 *                                    wake_up_interruptible_sync_poll
+	 *                                      pipe->wait is empty, no wakeup
+	 *
+	 * lock pipe->wait.lock (in poll_wait)
+	 * __add_wait_queue
+	 * unlock pipe->wait.lock
+	 *
+	 *  // pipe->nrbufs should be read here, NOT above
+	 *
+	 * pipe_poll returns 0 (WRONG)
+	 */
+	barrier();
+
 	nrbufs = pipe->nrbufs;
 	mask = 0;
 	if (filp->f_mode & FMODE_READ) {
