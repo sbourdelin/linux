@@ -23,6 +23,16 @@ config TYPEC_UCSI
 
 if TYPEC_UCSI
 
+config UCSI_I2C_CCG
+        tristate "UCSI I2C Interface Driver for Cypress CCGx"
+	depends on I2C_GPU
+        help
+          This driver enables UCSI support on NVIDIA GPUs that expose a
+	  Cypress CCGx Type-C controller over I2C interface.
+
+          To compile the driver as a module, choose M here: the module will be
+          called ucsi_i2c_ccg.ko.
+
 config UCSI_ACPI
 	tristate "UCSI ACPI Interface Driver"
 	depends on ACPI
