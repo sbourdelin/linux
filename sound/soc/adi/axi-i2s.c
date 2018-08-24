@@ -24,6 +24,7 @@
 #define AXI_I2S_REG_CTRL	0x04
 #define AXI_I2S_REG_CLK_CTRL	0x08
 #define AXI_I2S_REG_STATUS	0x10
+#define AXI_I2S_REG_PERIOD_LEN	0x18
 
 #define AXI_I2S_REG_RX_FIFO	0x28
 #define AXI_I2S_REG_TX_FIFO	0x2C
@@ -101,6 +102,17 @@ static int axi_i2s_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int axi_i2s_prepare(struct snd_pcm_substream *substream,
+			   struct snd_soc_dai *dai)
+{
+	struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+	unsigned int period_bytes = snd_pcm_lib_period_bytes(substream);
+
+	/* adi_i2s counts 32-bit words, thus divide bytes by 4 */
+	return regmap_write(i2s->regmap, AXI_I2S_REG_PERIOD_LEN,
+			    (period_bytes / 4) - 1);
+}
+
 static int axi_i2s_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
@@ -147,6 +159,7 @@ static const struct snd_soc_dai_ops axi_i2s_dai_ops = {
 	.shutdown = axi_i2s_shutdown,
 	.trigger = axi_i2s_trigger,
 	.hw_params = axi_i2s_hw_params,
+	.prepare = axi_i2s_prepare,
 };
 
 static struct snd_soc_dai_driver axi_i2s_dai = {
@@ -175,7 +188,7 @@ static const struct regmap_config axi_i2s_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
 	.val_bits = 32,
-	.max_register = AXI_I2S_REG_STATUS,
+	.max_register = AXI_I2S_REG_PERIOD_LEN,
 };
 
 static int axi_i2s_probe(struct platform_device *pdev)
