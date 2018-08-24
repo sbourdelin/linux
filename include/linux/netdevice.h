@@ -1586,9 +1586,9 @@ enum netdev_priv_flags {
  *	@header_ops:	Includes callbacks for creating,parsing,caching,etc
  *			of Layer 2 headers.
  *
- *	@flags:		Interface flags (a la BSD)
- *	@priv_flags:	Like 'flags' but invisible to userspace,
- *			see if.h for the definitions
+ *	@flags:		Interface flags (a la BSD), see if.h for definitions
+ *	@priv_flags:	Like 'flags' but invisible to userspace, see
+ *			definitions earlier in this file
  *	@gflags:	Global flags ( kept as legacy )
  *	@padded:	How much padding added by alloc_netdev()
  *	@operstate:	RFC2863 operstate
