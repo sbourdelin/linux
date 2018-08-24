@@ -65,7 +65,7 @@ eprobe_mgr_put:
 
 static int fme_region_remove(struct platform_device *pdev)
 {
-	struct fpga_region *region = dev_get_drvdata(&pdev->dev);
+	struct fpga_region *region = platform_get_drvdata(pdev);
 
 	fpga_region_unregister(region);
 	fpga_mgr_put(region->mgr);
