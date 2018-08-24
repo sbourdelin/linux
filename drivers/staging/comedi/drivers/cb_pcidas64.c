@@ -2173,10 +2173,9 @@ static int ai_cmdtest(struct comedi_device *dev, struct comedi_subdevice *s,
 			 * allows
 			 */
 			if (cmd->scan_begin_src == TRIG_TIMER) {
-				err |= comedi_check_trigger_arg_min(
-						&cmd->scan_begin_arg,
-						cmd->convert_arg *
-						cmd->chanlist_len);
+				err |= comedi_check_trigger_arg_min
+				(&cmd->scan_begin_arg, cmd->convert_arg *
+				cmd->chanlist_len);
 			}
 		}
 	}
