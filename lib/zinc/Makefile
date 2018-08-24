@@ -52,6 +52,10 @@ endif
 
 ifeq ($(CONFIG_ZINC_BLAKE2S),y)
 zinc-y += blake2s/blake2s.o
+ifeq ($(CONFIG_X86_64),y)
+zinc-y += blake2s/blake2s-x86_64.o
+CFLAGS_blake2s.o += -include $(srctree)/$(src)/blake2s/blake2s-x86_64-glue.h
+endif
 endif
 
 zinc-y += main.o
