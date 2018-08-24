@@ -251,6 +251,9 @@ static int dac5571_read_raw(struct iio_dev *indio_dev,
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
+		if (!data->vref)
+			return -EOPNOTSUPP;
+
 		ret = regulator_get_voltage(data->vref);
 		if (ret < 0)
 			return ret;
@@ -335,13 +338,21 @@ static int dac5571_probe(struct i2c_client *client,
 	indio_dev->num_channels = spec->num_channels;
 	data->spec = spec;
 
-	data->vref = devm_regulator_get(dev, "vref");
-	if (IS_ERR(data->vref))
-		return PTR_ERR(data->vref);
+	data->vref = devm_regulator_get_optional(dev, "vref");
+	if (IS_ERR(data->vref)) {
+		if (PTR_ERR(data->vref) == -ENODEV) {
+			data->vref = NULL;
+		} else {
+			dev_err(dev, "failed to get regulator (%ld)\n",
+					PTR_ERR(data->vref));
+			return PTR_ERR(data->vref);
+		}
 
-	ret = regulator_enable(data->vref);
-	if (ret < 0)
-		return ret;
+	} else {
+		ret = regulator_enable(data->vref);
+		if (ret)
+			return ret;
+	}
 
 	mutex_init(&data->lock);
 
@@ -373,7 +384,9 @@ static int dac5571_probe(struct i2c_client *client,
 	return 0;
 
  err:
-	regulator_disable(data->vref);
+	if (data->vref)
+		regulator_disable(data->vref);
+
 	return ret;
 }
 
@@ -383,7 +396,8 @@ static int dac5571_remove(struct i2c_client *i2c)
 	struct dac5571_data *data = iio_priv(indio_dev);
 
 	iio_device_unregister(indio_dev);
-	regulator_disable(data->vref);
+	if (data->vref)
+		regulator_disable(data->vref);
 
 	return 0;
 }
