@@ -2166,11 +2166,9 @@ static inline bool bio_check_ro(struct bio *bio, struct hd_struct *part)
 	if (part->policy && (op_is_write(op) && !op_is_flush(op))) {
 		char b[BDEVNAME_SIZE];
 
-		WARN_ONCE(1,
-		       "generic_make_request: Trying to write "
-			"to read-only block-device %s (partno %d)\n",
+		/* Older lvm-tools actually triggers this. */
+		pr_warn_once("Trying to write to read-only block-device %s (partno %d)\n",
 			bio_devname(bio, b), part->partno);
-		/* Older lvm-tools actually trigger this */
 		return false;
 	}
 
