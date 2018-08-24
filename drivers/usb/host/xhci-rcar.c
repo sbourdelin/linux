@@ -78,6 +78,10 @@ MODULE_FIRMWARE(XHCI_RCAR_FIRMWARE_NAME_V3);
 
 static const struct soc_device_attribute rcar_quirks_match[]  = {
 	{
+		.soc_id = "r8a774a1",
+		.data = (void *)RCAR_XHCI_FIRMWARE_V3,
+	},
+	{
 		.soc_id = "r8a7795", .revision = "ES1.*",
 		.data = (void *)RCAR_XHCI_FIRMWARE_V2,
 	},
