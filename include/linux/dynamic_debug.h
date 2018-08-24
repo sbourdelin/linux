@@ -155,6 +155,18 @@ do {								\
 			       buf, len, ascii);		\
 } while (0)
 
+#if defined(CONFIG_RTB)
+#define dynamic_rtb(log_type, data)				\
+do {								\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor,		\
+		__builtin_constant_p(log_type) ? log_type : "rtb");\
+	if (DYNAMIC_DEBUG_BRANCH(descriptor))			\
+		uncached_logk(log_type, data);			\
+} while (0)
+#else
+#define dynamic_rtb(log_type, data)
+#endif
+
 #else
 
 #include <linux/string.h>
@@ -181,6 +193,7 @@ static inline int ddebug_dyndbg_module_param_cb(char *param, char *val,
 	do { if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); } while (0)
 #define dynamic_dev_dbg(dev, fmt, ...)					\
 	do { if (0) dev_printk(KERN_DEBUG, dev, fmt, ##__VA_ARGS__); } while (0)
+#define dynamic_rtb(log_type, data)
 #endif
 
 #endif
