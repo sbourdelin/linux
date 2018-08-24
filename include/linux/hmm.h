@@ -325,7 +325,7 @@ struct hmm_mirror_ops {
 	 * synchronous call.
 	 */
 	void (*sync_cpu_device_pagetables)(struct hmm_mirror *mirror,
-					  const struct hmm_update *update);
+					   const struct hmm_update *update);
 };
 
 /*
