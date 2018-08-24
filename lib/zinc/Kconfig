@@ -14,6 +14,12 @@ config ZINC_POLY1305
 	bool
 	select ZINC
 
+config ZINC_CHACHA20POLY1305
+	bool
+	select ZINC
+	select ZINC_CHACHA20
+	select ZINC_POLY1305
+
 config ZINC_DEBUG
 	bool "Zinc cryptography library debugging and self-tests"
 	depends on ZINC
