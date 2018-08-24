@@ -287,11 +287,13 @@ enum hmm_update_event {
  * @start: virtual start address of the range to update
  * @end: virtual end address of the range to update
  * @event: event triggering the update (what is happening)
+ * @blockable: can the callback block/sleep ?
  */
 struct hmm_update {
 	unsigned long start;
 	unsigned long end;
 	enum hmm_update_event event;
+	bool blockable;
 };
 
 /*
@@ -314,6 +316,8 @@ struct hmm_mirror_ops {
 	 *
 	 * @mirror: pointer to struct hmm_mirror
 	 * @update: update informations (see struct hmm_update)
+	 * Returns: -EAGAIN if update.blockable false and callback need to
+	 *          block, 0 otherwise.
 	 *
 	 * This callback ultimately originates from mmu_notifiers when the CPU
 	 * page table is updated. The device driver must update its page table
@@ -322,10 +326,12 @@ struct hmm_mirror_ops {
 	 *
 	 * The device driver must not return from this callback until the device
 	 * page tables are completely updated (TLBs flushed, etc); this is a
-	 * synchronous call.
+	 * synchronous call. If driver need to sleep and update->blockable is
+	 * false then you need to abort (do not do anything that would sleep or
+	 * block) and return -EAGAIN.
 	 */
-	void (*sync_cpu_device_pagetables)(struct hmm_mirror *mirror,
-					   const struct hmm_update *update);
+	int (*sync_cpu_device_pagetables)(struct hmm_mirror *mirror,
+					  const struct hmm_update *update);
 };
 
 /*

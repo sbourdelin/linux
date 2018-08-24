@@ -123,12 +123,18 @@ void hmm_mm_destroy(struct mm_struct *mm)
 	kfree(mm->hmm);
 }
 
-static void hmm_invalidate_range(struct hmm *hmm, bool device,
-				 const struct hmm_update *update)
+static int hmm_invalidate_range(struct hmm *hmm, bool device,
+				const struct hmm_update *update)
 {
 	struct hmm_mirror *mirror;
 	struct hmm_range *range;
 
+	/*
+	 * It is fine to wait on lock here even if update->blockable is false
+	 * as the hmm->lock is only held for short period of time (when adding
+	 * or walking the ranges list). We could also convert the range list
+	 * into a lru list and avoid the spinlock all together.
+	 */
 	spin_lock(&hmm->lock);
 	list_for_each_entry(range, &hmm->ranges, list) {
 		unsigned long addr, idx, npages;
@@ -145,12 +151,26 @@ static void hmm_invalidate_range(struct hmm *hmm, bool device,
 	spin_unlock(&hmm->lock);
 
 	if (!device)
-		return;
+		return 0;
 
+	/*
+	 * It is fine to wait on mirrors_sem here even if update->blockable is
+	 * false as this semaphore is only taken in write mode for short period
+	 * when adding a new mirror to the list.
+	 */
 	down_read(&hmm->mirrors_sem);
-	list_for_each_entry(mirror, &hmm->mirrors, list)
-		mirror->ops->sync_cpu_device_pagetables(mirror, update);
+	list_for_each_entry(mirror, &hmm->mirrors, list) {
+		int ret;
+
+		ret = mirror->ops->sync_cpu_device_pagetables(mirror, update);
+		if (!update->blockable && ret == -EAGAIN) {
+			up_read(&hmm->mirrors_sem);
+			return -EAGAIN;
+		}
+	}
 	up_read(&hmm->mirrors_sem);
+
+	return 0;
 }
 
 static void hmm_release(struct mmu_notifier *mn, struct mm_struct *mm)
@@ -188,17 +208,13 @@ static int hmm_invalidate_range_start(struct mmu_notifier *mn,
 	struct hmm_update update;
 	struct hmm *hmm = mm->hmm;
 
-	if (!blockable)
-		return -EAGAIN;
-
 	VM_BUG_ON(!hmm);
 
 	update.start = start;
 	update.end = end;
 	update.event = HMM_UPDATE_INVALIDATE;
-	hmm_invalidate_range(hmm, true, &update);
-
-	return 0;
+	update.blockable = blockable;
+	return hmm_invalidate_range(hmm, true, &update);
 }
 
 static void hmm_invalidate_range_end(struct mmu_notifier *mn,
@@ -214,6 +230,7 @@ static void hmm_invalidate_range_end(struct mmu_notifier *mn,
 	update.start = start;
 	update.end = end;
 	update.event = HMM_UPDATE_INVALIDATE;
+	update.blockable = true;
 	hmm_invalidate_range(hmm, false, &update);
 }
 
