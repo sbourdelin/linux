@@ -181,6 +181,7 @@ struct ssif_addr_info {
 	struct device *dev;
 	struct i2c_client *client;
 
+	bool client_registered;
 	struct mutex clients_mutex;
 	struct list_head clients;
 
@@ -1658,6 +1659,8 @@ static int ssif_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		 * the client like it should.
 		 */
 		dev_err(&client->dev, "Unable to start IPMI SSIF: %d\n", rv);
+		if (!addr_info->client_registered)
+			addr_info->client = NULL;
 		kfree(ssif_info);
 	}
 	kfree(resp);
@@ -1672,11 +1675,14 @@ out_remove_attr:
 static int ssif_adapter_handler(struct device *adev, void *opaque)
 {
 	struct ssif_addr_info *addr_info = opaque;
+	struct i2c_client *client;
 
 	if (adev->type != &i2c_adapter_type)
 		return 0;
 
-	i2c_new_device(to_i2c_adapter(adev), &addr_info->binfo);
+	client = i2c_new_device(to_i2c_adapter(adev), &addr_info->binfo);
+	if (client)
+		addr_info->client_registered = true;
 
 	if (!addr_info->adapter_name)
 		return 1; /* Only try the first I2C adapter by default. */
