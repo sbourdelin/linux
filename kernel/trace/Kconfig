@@ -722,6 +722,13 @@ config TRACING_EVENTS_GPIO
 	help
 	  Enable tracing events for gpio subsystem
 
+config RTB
+	bool "Register Trace Buffer"
+	help
+	  Add support for logging different events to a small uncached
+	  region. This is designed to aid in debugging reset cases where the
+	  caches may not be flushed before the target resets.
+
 endif # FTRACE
 
 endif # TRACING_SUPPORT
