@@ -1683,9 +1683,25 @@ ENTRY(rewind_stack_do_exit)
 	/* Prevent any naive code from trying to unwind to our caller. */
 	xorl	%ebp, %ebp
 
+	movq	%rdi, %r14
+
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rax
-	leaq	-PTREGS_SIZE(%rax), %rsp
+	leaq	-PTREGS_SIZE(%rax), %r15
+
+#ifdef CONFIG_KASAN
+	/*
+	 * Remove stack poisons left behind by our old stack.
+	 * Do this before updating RSP to avoid problems in case we get some
+	 * interrupt that is not handled on an exception stack before we're done
+	 * with the unpoisoning.
+	 */
+	movq	%r15, %rdi
+	call	kasan_unpoison_task_stack_below
+#endif
+
+	movq	%r15, %rsp
 	UNWIND_HINT_FUNC sp_offset=PTREGS_SIZE
 
+	movq	%r14, %rdi
 	call	do_exit
 END(rewind_stack_do_exit)
