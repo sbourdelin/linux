@@ -7,34 +7,36 @@
 #ifndef _ASM_SIMD_H
 #define _ASM_SIMD_H
 
-#include <asm/fpu/api.h>
-
-/*
- * may_use_simd - whether it is allowable at this time to issue SIMD
- *                instructions or access the SIMD register file
- */
 static __must_check inline bool may_use_simd(void)
 {
-	return irq_fpu_usable();
+	return !in_interrupt();
 }
+
+#ifdef CONFIG_KERNEL_MODE_NEON
+#include <asm/neon.h>
 
 static inline simd_context_t simd_get(void)
 {
-	bool have_simd = false;
-#if !defined(CONFIG_UML)
-	have_simd = may_use_simd();
+	bool have_simd = may_use_simd();
 	if (have_simd)
-		kernel_fpu_begin();
-#endif
+		kernel_neon_begin();
 	return have_simd ? HAVE_FULL_SIMD : HAVE_NO_SIMD;
 }
 
 static inline void simd_put(simd_context_t prior_context)
 {
-#if !defined(CONFIG_UML)
 	if (prior_context != HAVE_NO_SIMD)
-		kernel_fpu_end();
-#endif
+		kernel_neon_end();
 }
+#else
+static inline simd_context_t simd_get(void)
+{
+	return HAVE_NO_SIMD;
+}
+
+static inline void simd_put(simd_context_t prior_context)
+{
+}
+#endif
 
 #endif /* _ASM_SIMD_H */
