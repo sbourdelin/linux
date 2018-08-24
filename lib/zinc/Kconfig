@@ -24,6 +24,10 @@ config ZINC_BLAKE2S
 	bool
 	select ZINC
 
+config ZINC_CURVE25519
+	bool
+	select ZINC
+
 config ZINC_DEBUG
 	bool "Zinc cryptography library debugging and self-tests"
 	depends on ZINC
