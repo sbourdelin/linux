@@ -274,11 +274,24 @@ static inline uint64_t hmm_pfn_from_pfn(const struct hmm_range *range,
 struct hmm_mirror;
 
 /*
- * enum hmm_update_type - type of update
+ * enum hmm_update_event - type of update
  * @HMM_UPDATE_INVALIDATE: invalidate range (no indication as to why)
  */
-enum hmm_update_type {
+enum hmm_update_event {
 	HMM_UPDATE_INVALIDATE,
+};
+
+/*
+ * struct hmm_update - HMM update informations for callback
+ *
+ * @start: virtual start address of the range to update
+ * @end: virtual end address of the range to update
+ * @event: event triggering the update (what is happening)
+ */
+struct hmm_update {
+	unsigned long start;
+	unsigned long end;
+	enum hmm_update_event event;
 };
 
 /*
@@ -300,9 +313,7 @@ struct hmm_mirror_ops {
 	/* sync_cpu_device_pagetables() - synchronize page tables
 	 *
 	 * @mirror: pointer to struct hmm_mirror
-	 * @update_type: type of update that occurred to the CPU page table
-	 * @start: virtual start address of the range to update
-	 * @end: virtual end address of the range to update
+	 * @update: update informations (see struct hmm_update)
 	 *
 	 * This callback ultimately originates from mmu_notifiers when the CPU
 	 * page table is updated. The device driver must update its page table
@@ -314,9 +325,7 @@ struct hmm_mirror_ops {
 	 * synchronous call.
 	 */
 	void (*sync_cpu_device_pagetables)(struct hmm_mirror *mirror,
-					   enum hmm_update_type update_type,
-					   unsigned long start,
-					   unsigned long end);
+					  const struct hmm_update *update);
 };
 
 /*
