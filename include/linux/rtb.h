@@ -21,4 +21,11 @@ static inline int rtb_init(void) { return 0; }
 static inline void rtb_exit(void) { }
 #endif
 
+#if defined(CONFIG_PSTORE_RTB)
+extern void pstore_rtb_call(struct rtb_layout *start);
+#else
+static inline void pstore_rtb_call(struct rtb_layout *start)
+{ }
+#endif
+
 #endif /* _RTB_H */

@@ -51,6 +51,9 @@ static void uncached_logk_pc_idx(const char *log_type, u64 caller,
 	start->timestamp = sched_clock();
 	/* Make sure data is written */
 	mb();
+#if defined(CONFIG_PSTORE_RTB)
+	pstore_rtb_call(start);
+#endif
 }
 
 static int rtb_get_idx(void)
