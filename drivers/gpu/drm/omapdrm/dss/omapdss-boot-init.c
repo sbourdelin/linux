@@ -110,7 +110,7 @@ static void __init omapdss_omapify_node(struct device_node *node)
 	num_strs = omapdss_count_strings(prop);
 
 	new_len = prop->length + strlen(prefix) * num_strs;
-	new_compat = kmalloc(new_len, GFP_KERNEL);
+	new_compat = kmalloc(new_len, GFP_KERNEL | __GFP_NOFAIL);
 
 	omapdss_prefix_strcpy(new_compat, new_len, prop->value, prop->length);
 
