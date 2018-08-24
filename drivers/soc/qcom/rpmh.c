@@ -362,8 +362,7 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
 	if (!count)
 		return -EINVAL;
 
-	req = kzalloc(sizeof(*req) + count * sizeof(req->rpm_msgs[0]),
-		      GFP_ATOMIC);
+	req = kzalloc(struct_size(req, rpm_msgs, count), GFP_ATOMIC);
 	if (!req)
 		return -ENOMEM;
 	req->count = count;
