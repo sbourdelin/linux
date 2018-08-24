@@ -30,9 +30,10 @@ struct slabinfo {
 	int alias;
 	int refs;
 	int aliases, align, cache_dma, cpu_slabs, destroy_by_rcu;
-	int hwcache_align, object_size, objs_per_slab;
-	int sanity_checks, slab_size, store_user, trace;
+	int hwcache_align, objs_per_slab;
+	int sanity_checks, store_user, trace;
 	int order, poison, reclaim_account, red_zone;
+	unsigned int object_size, slab_size;
 	unsigned long partial, objects, slabs, objects_partial, objects_total;
 	unsigned long alloc_fastpath, alloc_slowpath;
 	unsigned long free_fastpath, free_slowpath;
