@@ -69,7 +69,12 @@ void set_pmd_at(struct mm_struct *mm, unsigned long addr,
 		pmd_t *pmdp, pmd_t pmd)
 {
 #ifdef CONFIG_DEBUG_VM
-	WARN_ON(pte_present(pmd_pte(*pmdp)) && !pte_protnone(pmd_pte(*pmdp)));
+	/*
+	 * pmd during temporary invalidate will be considered present.
+	 * So check for _PAGE_PRESENT explicitly.
+	 */
+	WARN_ON((pte_raw(pmd_pte(*pmdp)) & cpu_to_be64(_PAGE_PRESENT)) &&
+		!pte_protnone(pmd_pte(*pmdp)));
 	assert_spin_locked(pmd_lockptr(mm, pmdp));
 	WARN_ON(!(pmd_trans_huge(pmd) || pmd_devmap(pmd)));
 #endif
@@ -106,7 +111,7 @@ pmd_t pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
 {
 	unsigned long old_pmd;
 
-	old_pmd = pmd_hugepage_update(vma->vm_mm, address, pmdp, _PAGE_PRESENT, 0);
+	old_pmd = pmd_hugepage_update(vma->vm_mm, address, pmdp, _PAGE_PRESENT, _PAGE_INVALID);
 	flush_pmd_tlb_range(vma, address, address + HPAGE_PMD_SIZE);
 	/*
 	 * This ensures that generic code that rely on IRQ disabling
