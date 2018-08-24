@@ -128,6 +128,16 @@ config DRM_TI_TFP410
 	---help---
 	  Texas Instruments TFP410 DVI/HDMI Transmitter driver
 
+config DRM_VIRTUAL_DISPLAY_BRIDGE
+	tristate "Virtual Display Bridge support"
+	depends on OF
+	select DRM_KMS_HELPER
+	select VIDEOMODE_HELPERS
+	help
+	  Support for virtualized environments where the avilable
+	  resolution is controlled by software configuration in
+	  the device tree.
+
 source "drivers/gpu/drm/bridge/analogix/Kconfig"
 
 source "drivers/gpu/drm/bridge/adv7511/Kconfig"
