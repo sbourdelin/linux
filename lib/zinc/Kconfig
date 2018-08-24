@@ -1,0 +1,20 @@
+config ZINC
+	tristate
+	select CRYPTO_BLKCIPHER
+	select VFP
+	select VFPv3
+	select NEON
+	select KERNEL_MODE_NEON
+
+config ZINC_DEBUG
+	bool "Zinc cryptography library debugging and self-tests"
+	depends on ZINC
+	help
+	  This builds a series of self-tests for the Zinc crypto library, which
+	  help diagnose any cryptographic algorithm implementation issues that
+	  might be at the root cause of potential bugs. It also adds various
+	  debugging traps.
+
+	  Unless you're developing and testing cryptographic routines, or are
+	  especially paranoid about correctness on your hardware, you may say
+	  N here.
