@@ -1012,7 +1012,7 @@ xfs_iomap_swapfile_activate(
 	struct file			*swap_file,
 	sector_t			*span)
 {
-	sis->bdev = xfs_find_bdev_for_inode(file_inode(swap_file));
+	sis->bdev = xfs_find_bdev_for_inode(swap_file->f_mapping->host);
 	return iomap_swapfile_activate(sis, swap_file, span, &xfs_iomap_ops);
 }
 
