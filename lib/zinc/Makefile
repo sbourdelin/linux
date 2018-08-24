@@ -4,6 +4,10 @@ ccflags-y += -D'pr_fmt(fmt)=KBUILD_MODNAME ": " fmt'
 
 ifeq ($(CONFIG_ZINC_CHACHA20),y)
 zinc-y += chacha20/chacha20.o
+ifeq ($(CONFIG_X86_64),y)
+zinc-y += chacha20/chacha20-x86_64.o
+CFLAGS_chacha20.o += -include $(srctree)/$(src)/chacha20/chacha20-x86_64-glue.h
+endif
 ifeq ($(CONFIG_ARM),y)
 zinc-y += chacha20/chacha20-arm.o
 CFLAGS_chacha20.o += -include $(srctree)/$(src)/chacha20/chacha20-arm-glue.h
