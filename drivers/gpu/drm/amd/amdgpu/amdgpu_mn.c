@@ -180,11 +180,15 @@ void amdgpu_mn_unlock(struct amdgpu_mn *mn)
  */
 static int amdgpu_mn_read_lock(struct amdgpu_mn *amn, bool blockable)
 {
-	if (blockable)
-		mutex_lock(&amn->read_lock);
-	else if (!mutex_trylock(&amn->read_lock))
-		return -EAGAIN;
-
+	/*
+	 * We can take sleepable lock even on !blockable mode because
+	 * read_lock is only ever take from this path and the notifier
+	 * lock never really sleeps. In fact the only reason why the
+	 * later is sleepable is because the notifier itself might sleep
+	 * in amdgpu_mn_invalidate_node but blockable mode is handled
+	 * before calling into that path.
+	 */
+	mutex_lock(&amn->read_lock);
 	if (atomic_inc_return(&amn->recursion) == 1)
 		down_read_non_owner(&amn->lock);
 	mutex_unlock(&amn->read_lock);
