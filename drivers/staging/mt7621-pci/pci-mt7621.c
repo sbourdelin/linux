@@ -148,7 +148,7 @@
 #define RG_PE1_FRC_MSTCKDIV		BIT(5)
 
 
-static int pcie_link_status = 0;
+static int pcie_link_status;
 
 /**
  * struct mt7621_pcie_port - PCIe port information
