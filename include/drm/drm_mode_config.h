@@ -562,6 +562,11 @@ struct drm_mode_config {
 	 */
 	struct drm_property *link_status_property;
 	/**
+	 * @max_bpc_property: Default connector property for the max bpc to be
+	 * driven out of the connector.
+	 */
+	struct drm_property *max_bpc_property;
+	/**
 	 * @plane_type_property: Default plane property to differentiate
 	 * CURSOR, PRIMARY and OVERLAY legacy uses of planes.
 	 */
