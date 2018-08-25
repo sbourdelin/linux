@@ -1,0 +1,12 @@
+* Freescale FXAS21002C Digital Angular Rate Gyroscope
+
+Required properties:
+
+  - compatible: must be "fsl,fxas21002c"
+  - reg : the I2C address of the sensor
+
+Example:
+gyroscope@0 {
+       compatible = "fsl,fxas21002c";
+       reg = <0x20>;
+};
