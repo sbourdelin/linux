@@ -374,6 +374,8 @@ static int input_action_end_dx4(struct sk_buff *skb,
 	if (err)
 		goto drop;
 
+	((struct rtable *)skb_dst(skb))->rt_gateway = nhaddr;
+
 	return dst_input(skb);
 
 drop:
