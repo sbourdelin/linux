@@ -426,6 +426,7 @@ void wake_q_add(struct wake_q_head *head, struct task_struct *task)
 	*head->lastp = node;
 	head->lastp = &node->next;
 }
+EXPORT_SYMBOL_GPL(wake_q_add);
 
 void wake_up_q(struct wake_q_head *head)
 {
@@ -448,6 +449,7 @@ void wake_up_q(struct wake_q_head *head)
 		put_task_struct(task);
 	}
 }
+EXPORT_SYMBOL_GPL(wake_up_q);
 
 /*
  * resched_curr - mark rq's current task 'to be rescheduled now'.

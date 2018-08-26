@@ -47,6 +47,11 @@ static inline void wake_q_init(struct wake_q_head *head)
 	head->lastp = &head->first;
 }
 
+static inline bool task_in_wake_q(struct task_struct *task)
+{
+	return READ_ONCE(task->wake_q.next) != NULL;
+}
+
 extern void wake_q_add(struct wake_q_head *head,
 		       struct task_struct *task);
 extern void wake_up_q(struct wake_q_head *head);
