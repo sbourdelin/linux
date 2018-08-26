@@ -587,11 +587,16 @@ ssize_t ksys_readahead(int fd, loff_t offset, size_t count)
 	f = fdget(fd);
 	if (f.file) {
 		if (f.file->f_mode & FMODE_READ) {
-			struct address_space *mapping = f.file->f_mapping;
+			/*
+			 * XXX: We need to use file_real(), because overlayfs
+			 * stacked file/inode do not implement page io.
+			 */
+			struct file *file = file_real(f.file);
+			struct address_space *mapping = file->f_mapping;
 			pgoff_t start = offset >> PAGE_SHIFT;
 			pgoff_t end = (offset + count - 1) >> PAGE_SHIFT;
 			unsigned long len = end - start + 1;
-			ret = do_readahead(mapping, f.file, start, len);
+			ret = do_readahead(mapping, file, start, len);
 		}
 		fdput(f);
 	}
