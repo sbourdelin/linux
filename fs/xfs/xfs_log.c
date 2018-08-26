@@ -232,8 +232,16 @@ xlog_grant_head_wake(
 			return false;
 
 		*free_bytes -= need_bytes;
+
+		/*
+		 * Skip task that is being waken up already.
+		 */
+		if (tic->t_flags & XLOG_TIC_WAKING)
+			continue;
+
 		trace_xfs_log_grant_wake_up(log, tic);
 		wake_up_process(tic->t_task);
+		tic->t_flags |= XLOG_TIC_WAKING;
 	}
 
 	return true;
@@ -264,6 +272,7 @@ xlog_grant_head_wait(
 		trace_xfs_log_grant_wake(log, tic);
 
 		spin_lock(&head->lock);
+		tic->t_flags &= ~XLOG_TIC_WAKING;
 		if (XLOG_FORCED_SHUTDOWN(log))
 			goto shutdown;
 	} while (xlog_space_left(log, &head->grant) < need_bytes);
