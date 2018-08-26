@@ -112,6 +112,13 @@ static const char * const cam_mono_stereo_text[] = {
 static SOC_ENUM_SINGLE_DECL(spdif_mono_stereo_enum, CS4265_SPDIF_CTL2, 2,
 		cam_mono_stereo_text);
 
+static const char * const spdif_enable_text[] = {
+	"Enabled", "Disabled"
+};
+
+static SOC_ENUM_SINGLE_DECL(spdif_enable_enum, CS4265_SPDIF_CTL2, 5,
+		spdif_enable_text);
+
 static const char * const mono_select_text[] = {
 	"Channel A", "Channel B"
 };
@@ -151,6 +158,7 @@ static const struct snd_kcontrol_new cs4265_snd_controls[] = {
 				1, 1),
 	SOC_SINGLE("ADC Soft Ramp Switch", CS4265_ADC_CTL2, 7,
 				1, 0),
+	SOC_ENUM("SPDIF Enable", spdif_enable_enum),
 	SOC_SINGLE("E to F Buffer Disable Switch", CS4265_SPDIF_CTL1,
 				6, 1, 0),
 	SOC_ENUM("C Data Access", cam_mode_enum),
