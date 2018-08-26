@@ -237,6 +237,7 @@ static int compress_page(struct compress *c,
 			 struct drm_i915_error_object *dst)
 {
 	struct z_stream_s *zstream = &c->zstream;
+	int flush = Z_NO_FLUSH;
 
 	zstream->next_in = src;
 	if (c->tmp && i915_memcpy_from_wc(c->tmp, src, PAGE_SIZE))
@@ -257,8 +258,11 @@ static int compress_page(struct compress *c,
 			zstream->avail_out = PAGE_SIZE;
 		}
 
-		if (zlib_deflate(zstream, Z_SYNC_FLUSH) != Z_OK)
+		if (zlib_deflate(zstream, flush) != Z_OK)
 			return -EIO;
+
+		if (zstream->avail_out)
+			flush = Z_SYNC_FLUSH;
 	} while (zstream->avail_in);
 
 	/* Fallback to uncompressed if we increase size? */
@@ -268,19 +272,43 @@ static int compress_page(struct compress *c,
 	return 0;
 }
 
+static int compress_flush(struct compress *c,
+			  struct drm_i915_error_object *dst)
+{
+	struct z_stream_s *zstream = &c->zstream;
+	unsigned long page;
+
+	do {
+		switch (zlib_deflate(zstream, Z_FINISH)) {
+		case Z_OK: /* more space requested */
+			page = __get_free_page(GFP_ATOMIC | __GFP_NOWARN);
+			if (!page)
+				return -ENOMEM;
+
+			dst->pages[dst->page_count++] = (void *)page;
+			zstream->next_out = (void *)page;
+			zstream->avail_out = PAGE_SIZE;
+			break;
+		case Z_STREAM_END:
+			goto end;
+		default: /* any error */
+			return -EIO;
+		}
+	} while (1);
+
+end:
+	memset(zstream->next_out, 0, zstream->avail_out);
+	dst->unused = zstream->avail_out;
+	return 0;
+}
+
 static void compress_fini(struct compress *c,
 			  struct drm_i915_error_object *dst)
 {
 	struct z_stream_s *zstream = &c->zstream;
 
-	if (dst) {
-		zlib_deflate(zstream, Z_FINISH);
-		dst->unused = zstream->avail_out;
-	}
-
 	zlib_deflateEnd(zstream);
 	kfree(zstream->workspace);
-
 	if (c->tmp)
 		free_page((unsigned long)c->tmp);
 }
@@ -316,6 +344,12 @@ static int compress_page(struct compress *c,
 		memcpy(ptr, src, PAGE_SIZE);
 	dst->pages[dst->page_count++] = ptr;
 
+	return 0;
+}
+
+static int compress_flush(struct compress *c,
+			  struct drm_i915_error_object *dst)
+{
 	return 0;
 }
 
@@ -951,15 +985,15 @@ i915_error_object_create(struct drm_i915_private *i915,
 		if (ret)
 			goto unwind;
 	}
-	goto out;
 
+	if (compress_flush(&compress, dst)) {
 unwind:
-	while (dst->page_count--)
-		free_page((unsigned long)dst->pages[dst->page_count]);
-	kfree(dst);
-	dst = NULL;
+		while (dst->page_count--)
+			free_page((unsigned long)dst->pages[dst->page_count]);
+		kfree(dst);
+		dst = NULL;
+	}
 
-out:
 	compress_fini(&compress, dst);
 	ggtt->vm.clear_range(&ggtt->vm, slot, PAGE_SIZE);
 	return dst;
