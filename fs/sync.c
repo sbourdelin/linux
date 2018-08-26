@@ -286,6 +286,7 @@ int ksys_sync_file_range(int fd, loff_t offset, loff_t nbytes,
 {
 	int ret;
 	struct fd f;
+	struct file *file;
 	struct address_space *mapping;
 	loff_t endbyte;			/* inclusive */
 	umode_t i_mode;
@@ -330,16 +331,21 @@ int ksys_sync_file_range(int fd, loff_t offset, loff_t nbytes,
 	if (!f.file)
 		goto out;
 
-	i_mode = file_inode(f.file)->i_mode;
+	/*
+	 * XXX: We need to use file_real() for overlayfs stacked file because
+	 * page io is operating on the real underlying file/inode.
+	 */
+	file = file_real(f.file);
+	i_mode = file_inode(file)->i_mode;
 	ret = -ESPIPE;
 	if (!S_ISREG(i_mode) && !S_ISBLK(i_mode) && !S_ISDIR(i_mode) &&
 			!S_ISLNK(i_mode))
 		goto out_put;
 
-	mapping = f.file->f_mapping;
+	mapping = file->f_mapping;
 	ret = 0;
 	if (flags & SYNC_FILE_RANGE_WAIT_BEFORE) {
-		ret = file_fdatawait_range(f.file, offset, endbyte);
+		ret = file_fdatawait_range(file, offset, endbyte);
 		if (ret < 0)
 			goto out_put;
 	}
@@ -352,7 +358,7 @@ int ksys_sync_file_range(int fd, loff_t offset, loff_t nbytes,
 	}
 
 	if (flags & SYNC_FILE_RANGE_WAIT_AFTER)
-		ret = file_fdatawait_range(f.file, offset, endbyte);
+		ret = file_fdatawait_range(file, offset, endbyte);
 
 out_put:
 	fdput(f);
