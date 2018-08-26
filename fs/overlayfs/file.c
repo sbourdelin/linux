@@ -135,6 +135,7 @@ static int ovl_open(struct inode *inode, struct file *file)
 	file->f_mapping = realfile->f_mapping;
 
 	file->private_data = realfile;
+	file->f_mode |= FMODE_STACKED;
 
 	return 0;
 }

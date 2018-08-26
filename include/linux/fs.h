@@ -158,6 +158,12 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 
 /* File does not contribute to nr_files count */
 #define FMODE_NOACCOUNT	((__force fmode_t)0x20000000)
+/*
+ * File is stacked over a "real" file that is used for the actual io
+ * operations. This is set by overlayfs and tested by file_real() in VFS code.
+ * Not every "stacked" filesystem needs to set this flag.
+ */
+#define FMODE_STACKED	((__force fmode_t)0x40000000)
 
 /*
  * Flag for rw_copy_check_uvector and compat_rw_copy_check_uvector
@@ -2430,6 +2436,27 @@ static inline struct file *file_clone_open(struct file *file)
 	return dentry_open(&file->f_path, file->f_flags, file->f_cred);
 }
 extern int filp_close(struct file *, fl_owner_t id);
+
+/**
+ * file_real - Return the real file of a stacked file
+ * @file: The file to query
+ *
+ * If @file is on a union/overlay, then return the underlying, real file.
+ * Otherwise return @file.
+ */
+static inline struct file *file_real(struct file *file)
+{
+	/*
+	 * XXX: Instead of pretending we have a variaty of stacked filesystems
+	 * and implement a f_op->real() operation, just open code the simple
+	 * overlayfs implementation and if we ever need something more fancy,
+	 * we can add the f_op->real() then.
+	 */
+	if (unlikely(file->f_mode & FMODE_STACKED))
+		return (struct file *)file->private_data;
+	else
+		return file;
+}
 
 extern struct filename *getname_flags(const char __user *, int, int *);
 extern struct filename *getname(const char __user *);
