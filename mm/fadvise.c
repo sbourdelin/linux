@@ -30,6 +30,7 @@
 int ksys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 {
 	struct fd f = fdget(fd);
+	struct file *file;
 	struct inode *inode;
 	struct address_space *mapping;
 	struct backing_dev_info *bdi;
@@ -42,13 +43,18 @@ int ksys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	if (!f.file)
 		return -EBADF;
 
-	inode = file_inode(f.file);
+	/*
+	 * XXX: We need to use file_real() for overlayfs stacked file because
+	 * readahead will be operating on the real underlying file/inode.
+	 */
+	file = file_real(f.file);
+	inode = file_inode(file);
 	if (S_ISFIFO(inode->i_mode)) {
 		ret = -ESPIPE;
 		goto out;
 	}
 
-	mapping = f.file->f_mapping;
+	mapping = file->f_mapping;
 	if (!mapping || len < 0) {
 		ret = -EINVAL;
 		goto out;
@@ -81,21 +87,21 @@ int ksys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 
 	switch (advice) {
 	case POSIX_FADV_NORMAL:
-		f.file->f_ra.ra_pages = bdi->ra_pages;
-		spin_lock(&f.file->f_lock);
-		f.file->f_mode &= ~FMODE_RANDOM;
-		spin_unlock(&f.file->f_lock);
+		file->f_ra.ra_pages = bdi->ra_pages;
+		spin_lock(&file->f_lock);
+		file->f_mode &= ~FMODE_RANDOM;
+		spin_unlock(&file->f_lock);
 		break;
 	case POSIX_FADV_RANDOM:
-		spin_lock(&f.file->f_lock);
-		f.file->f_mode |= FMODE_RANDOM;
-		spin_unlock(&f.file->f_lock);
+		spin_lock(&file->f_lock);
+		file->f_mode |= FMODE_RANDOM;
+		spin_unlock(&file->f_lock);
 		break;
 	case POSIX_FADV_SEQUENTIAL:
-		f.file->f_ra.ra_pages = bdi->ra_pages * 2;
-		spin_lock(&f.file->f_lock);
-		f.file->f_mode &= ~FMODE_RANDOM;
-		spin_unlock(&f.file->f_lock);
+		file->f_ra.ra_pages = bdi->ra_pages * 2;
+		spin_lock(&file->f_lock);
+		file->f_mode &= ~FMODE_RANDOM;
+		spin_unlock(&file->f_lock);
 		break;
 	case POSIX_FADV_WILLNEED:
 		/* First and last PARTIAL page! */
@@ -111,7 +117,7 @@ int ksys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 		 * Ignore return value because fadvise() shall return
 		 * success even if filesystem can't retrieve a hint,
 		 */
-		force_page_cache_readahead(mapping, f.file, start_index,
+		force_page_cache_readahead(mapping, file, start_index,
 					   nrpages);
 		break;
 	case POSIX_FADV_NOREUSE:
