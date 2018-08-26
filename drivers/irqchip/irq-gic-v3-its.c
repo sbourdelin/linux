@@ -1624,8 +1624,11 @@ static void its_free_prop_table(struct page *prop_page)
 static int __init its_alloc_lpi_tables(void)
 {
 	phys_addr_t paddr;
+	u32 max_bits;	 /*max order limitation in alloc_page*/
 
-	lpi_id_bits = GICD_TYPER_ID_BITS(gic_rdists->gicd_typer);
+	max_bits = PAGE_SHIFT + MAX_ORDER - 1;
+	lpi_id_bits = min_t(u32, max_bits,
+			GICD_TYPER_ID_BITS(gic_rdists->gicd_typer));
 	gic_rdists->prop_page = its_allocate_prop_table(GFP_NOWAIT);
 	if (!gic_rdists->prop_page) {
 		pr_err("Failed to allocate PROPBASE\n");
