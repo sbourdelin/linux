@@ -228,16 +228,16 @@ out_no_task:
 static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 			      instantiate_t instantiate)
 {
-	struct task_struct *p = get_proc_task(file_inode(file));
+	struct task_struct *tsk = get_proc_task(file_inode(file));
 	struct files_struct *files;
 	unsigned int fd;
 
-	if (!p)
+	if (!tsk)
 		return -ENOENT;
 
 	if (!dir_emit_dots(file, ctx))
 		goto out;
-	files = get_files_struct(p);
+	files = get_files_struct(tsk);
 	if (!files)
 		goto out;
 
@@ -259,7 +259,7 @@ static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 
 		len = snprintf(name, sizeof(name), "%u", fd);
 		if (!proc_fill_cache(file, ctx,
-				     name, len, instantiate, p,
+				     name, len, instantiate, tsk,
 				     &data))
 			goto out_fd_loop;
 		cond_resched();
@@ -269,7 +269,7 @@ static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 out_fd_loop:
 	put_files_struct(files);
 out:
-	put_task_struct(p);
+	put_task_struct(tsk);
 	return 0;
 }
 
