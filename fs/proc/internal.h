@@ -127,6 +127,17 @@ void task_dump_owner(struct task_struct *task, umode_t mode,
 		     kuid_t *ruid, kgid_t *rgid);
 
 unsigned name_to_int(const struct qstr *qstr);
+
+char *_print_integer_u32(char *, u32);
+char *_print_integer_u64(char *, u64);
+static inline char *_print_integer_ul(char *p, unsigned long x)
+{
+	if (sizeof(unsigned long) == 4)
+		return _print_integer_u32(p, x);
+	else
+		return _print_integer_u64(p, x);
+}
+
 /*
  * Offset of the first process in the /proc root directory..
  */
