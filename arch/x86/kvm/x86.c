@@ -7544,7 +7544,10 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	if (req_immediate_exit) {
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
-		smp_send_reschedule(vcpu->cpu);
+		if (kvm_x86_ops->request_immediate_exit)
+			kvm_x86_ops->request_immediate_exit(vcpu);
+		else
+			smp_send_reschedule(vcpu->cpu);
 	}
 
 	trace_kvm_entry(vcpu->vcpu_id);

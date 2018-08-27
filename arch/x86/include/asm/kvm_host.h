@@ -1055,6 +1055,7 @@ struct kvm_x86_ops {
 	bool (*umip_emulated)(void);
 
 	int (*check_nested_events)(struct kvm_vcpu *vcpu, bool external_intr);
+	void (*request_immediate_exit)(struct kvm_vcpu *vcpu);
 
 	void (*sched_in)(struct kvm_vcpu *kvm, int cpu);
 
