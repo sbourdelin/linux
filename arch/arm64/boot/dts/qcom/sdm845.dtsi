@@ -198,36 +198,43 @@ gpu_opp_table: adreno-opp-table {
 		opp-710000000 {
 			opp-hz = /bits/ 64 <710000000>;
 			qcom,level = <416>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 7216000000>;
 		};
 
 		opp-675000000 {
 			opp-hz = /bits/ 64 <675000000>;
 			qcom,level = <384>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 7216000000>;
 		};
 
 		opp-596000000 {
 			opp-hz = /bits/ 64 <596000000>;
 			qcom,level = <320>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 5184000000>;
 		};
 
 		opp-520000000 {
 			opp-hz = /bits/ 64 <520000000>;
 			qcom,level = <256>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 4068000000>;
 		};
 
 		opp-414000000 {
 			opp-hz = /bits/ 64 <414000000>;
 			qcom,level = <192>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 3072000000>;
 		};
 
 		opp-342000000 {
 			opp-hz = /bits/ 64 <342000000>;
 			qcom,level = <128>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 2188000000>;
 		};
 
 		opp-257000000 {
 			opp-hz = /bits/ 64 <257000000>;
 			qcom,level = <64>;
+			opp-interconnect-bw-port0 = /bits/ 64 <0 1200000000>;
 		};
 	};
 
@@ -417,6 +424,9 @@ gpu_opp_table: adreno-opp-table {
 			iommus = <&adreno_smmu 0>;
 
 			operating-points-v2 = <&gpu_opp_table>;
+
+			interconnects = <&qnoc 26 &qnoc 512>;
+			interconnect-names = "port0";
 
 			qcom,gmu = <&gmu>;
 		};
