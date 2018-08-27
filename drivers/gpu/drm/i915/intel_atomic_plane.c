@@ -123,14 +123,17 @@ static bool intel_plane_valid_rotation(const struct drm_plane_state *plane_state
 		}
 
 		/*
-		 * 90/270 is not allowed with RGB64 16:16:16:16,
-		 * RGB 16-bit 5:6:5, and Indexed 8-bit.
+		 * 90/270 is not allowed with RGB64 16:16:16:16 and
+		 * Indexed 8-bit. RGB 16-bit. 5:6:5 is allowed gen11 onwards.
 		 * TBD: Add RGB64 case once its added in supported format
 		 * list.
 		 */
 		switch (plane_state->fb->format->format) {
-		case DRM_FORMAT_C8:
 		case DRM_FORMAT_RGB565:
+			if (INTEL_GEN(dev_priv) >= 11)
+				break;
+			/* fall through */
+		case DRM_FORMAT_C8:
 			DRM_DEBUG_KMS("Unsupported pixel format %s for 90/270!\n",
 				      drm_get_format_name(plane_state->fb->format->format,
 							  &format_name));
