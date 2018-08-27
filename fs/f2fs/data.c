@@ -1550,6 +1550,13 @@ submit_and_realloc:
 			bio = NULL;
 		}
 		if (bio == NULL) {
+			/*
+			 * If the page is under writeback, we need to wait for
+			 * its completion to see the correct decrypted data.
+			 */
+			if (unlikely(f2fs_encrypted_file(inode)))
+				f2fs_wait_on_block_writeback(F2FS_I_SB(inode), block_nr);
+
 			bio = f2fs_grab_read_bio(inode, block_nr, nr_pages,
 					is_readahead ? REQ_RAHEAD : 0);
 			if (IS_ERR(bio)) {
