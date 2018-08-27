@@ -14,6 +14,7 @@ static const char *proc_self_get_link(struct dentry *dentry,
 {
 	struct pid_namespace *ns = proc_pid_ns(inode);
 	pid_t tgid = task_tgid_nr_ns(current, ns);
+	char buf[10], *p = buf + sizeof(buf);
 	char *name;
 
 	if (!tgid)
@@ -22,7 +23,11 @@ static const char *proc_self_get_link(struct dentry *dentry,
 	name = kmalloc(10 + 1, dentry ? GFP_KERNEL : GFP_ATOMIC);
 	if (unlikely(!name))
 		return dentry ? ERR_PTR(-ENOMEM) : ERR_PTR(-ECHILD);
-	sprintf(name, "%u", tgid);
+
+	p = _print_integer_u32(p, tgid);
+	memcpy(name, p, buf + sizeof(buf) - p);
+	name[buf + sizeof(buf) - p] = '\0';
+
 	set_delayed_call(done, kfree_link, name);
 	return name;
 }
