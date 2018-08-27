@@ -3223,16 +3223,15 @@ int proc_pid_readdir(struct file *file, struct dir_context *ctx)
 	for (iter = next_tgid(ns, iter);
 	     iter.task;
 	     iter.tgid += 1, iter = next_tgid(ns, iter)) {
-		char name[10 + 1];
-		unsigned int len;
+		char name[10], *p = name + sizeof(name);
 
 		cond_resched();
 		if (!has_pid_permissions(ns, iter.task, HIDEPID_INVISIBLE))
 			continue;
 
-		len = snprintf(name, sizeof(name), "%u", iter.tgid);
+		p = _print_integer_u32(p, iter.tgid);
 		ctx->pos = iter.tgid + TGID_OFFSET;
-		if (!proc_fill_cache(file, ctx, name, len,
+		if (!proc_fill_cache(file, ctx, p, name + sizeof(name) - p,
 				     proc_pid_instantiate, iter.task, NULL)) {
 			put_task_struct(iter.task);
 			return 0;
