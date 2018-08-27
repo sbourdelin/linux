@@ -2014,12 +2014,6 @@ out:
 	return rc;
 }
 
-struct map_files_info {
-	unsigned long	start;
-	unsigned long	end;
-	fmode_t		mode;
-};
-
 /*
  * Only allow CAP_SYS_ADMIN to follow the links, due to concerns about how the
  * symlinks may be used to bypass permissions on ancestor directories in the
@@ -2119,6 +2113,12 @@ static const struct inode_operations proc_map_files_inode_operations = {
 	.setattr	= proc_setattr,
 };
 
+struct map_files_info {
+	unsigned long	start;
+	unsigned long	end;
+	fmode_t		mode;
+};
+
 static int
 proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 {
@@ -2128,7 +2128,6 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 	unsigned long nr_files, pos, i;
 	struct flex_array *fa = NULL;
 	struct map_files_info info;
-	struct map_files_info *p;
 	int ret;
 
 	ret = -ENOENT;
@@ -2196,16 +2195,17 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 	mmput(mm);
 
 	for (i = 0; i < nr_files; i++) {
+		const struct map_files_info *mfi;
 		char buf[4 * sizeof(long) + 2];	/* max: %lx-%lx\0 */
 		unsigned int len;
 
-		p = flex_array_get(fa, i);
-		len = snprintf(buf, sizeof(buf), "%lx-%lx", p->start, p->end);
+		mfi = flex_array_get(fa, i);
+		len = snprintf(buf, sizeof(buf), "%lx-%lx", mfi->start, mfi->end);
 		if (!proc_fill_cache(file, ctx,
 				      buf, len,
 				      proc_map_files_instantiate,
 				      task,
-				      (void *)(unsigned long)p->mode))
+				      (void *)(unsigned long)mfi->mode))
 			break;
 		ctx->pos++;
 	}
