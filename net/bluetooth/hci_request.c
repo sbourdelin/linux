@@ -1092,6 +1092,28 @@ void __hci_req_enable_advertising(struct hci_request *req)
 	else
 		cp.type = LE_ADV_NONCONN_IND;
 
+	/* As per core 4.1 spec, section 9.3.11.2: A peripheral device
+	 * enetering any of the following GAP modes and sending either
+	 * non-connectable advertising events or scannable undirected
+	 * advertising events should use adv_fast_interval2(100ms - 150ms)
+	 * for adv_fast_period(30s).
+	 *
+	 * 	- Non-Discoverable Mode
+	 *	- Non-Connectable Mode
+	 * 	- Limited Discoverable Mode
+	 * 	- General Discoverable Mode
+	 */
+	if ((cp.type == LE_ADV_NONCONN_IND) || (cp.type = LE_ADV_SCAN_IND)) {
+		if ((hci_dev_test_flag(hdev, HCI_DISCOVERABLE)) ||
+		(hci_dev_test_flag(hdev, HCI_LIMITED_DISCOVERABLE)) ||
+		(hdev->discovery.limited == true)) {
+			cp.min_interval =
+				cpu_to_le16(DISCOV_LE_FAST_ADV_INT_MIN);
+			cp.max_interval =
+				cpu_to_le16(DISCOV_LE_FAST_ADV_INT_MAX);
+		}
+	}
+
 	cp.own_address_type = own_addr_type;
 	cp.channel_map = hdev->le_adv_channel_map;
 
