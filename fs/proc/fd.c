@@ -247,8 +247,7 @@ static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 	     fd++, ctx->pos++) {
 		struct file *f;
 		struct fd_data data;
-		char name[10 + 1];
-		unsigned int len;
+		char name[10], *p = name + sizeof(name);
 
 		f = fcheck_files(files, fd);
 		if (!f)
@@ -257,9 +256,10 @@ static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 		rcu_read_unlock();
 		data.fd = fd;
 
-		len = snprintf(name, sizeof(name), "%u", fd);
+		p = _print_integer_u32(p, fd);
 		if (!proc_fill_cache(file, ctx,
-				     name, len, instantiate, tsk,
+				     p, name + sizeof(name) - p,
+				     instantiate, tsk,
 				     &data))
 			goto out_fd_loop;
 		cond_resched();
