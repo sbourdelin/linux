@@ -104,6 +104,24 @@ static const uint32_t skl_pri_planar_formats[] = {
 	DRM_FORMAT_NV12,
 };
 
+static const uint32_t icl_primary_formats[] = {
+	DRM_FORMAT_C8,
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_XBGR2101010,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+	DRM_FORMAT_Y210,
+	DRM_FORMAT_Y212,
+	DRM_FORMAT_Y216,
+};
+
 static const uint64_t skl_format_modifiers_noccs[] = {
 	I915_FORMAT_MOD_Yf_TILED,
 	I915_FORMAT_MOD_Y_TILED,
@@ -13713,8 +13731,11 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	if (INTEL_GEN(dev_priv) >= 9) {
 		primary->has_ccs = skl_plane_has_ccs(dev_priv, pipe,
 						     PLANE_PRIMARY);
-
-		if (skl_plane_has_planar(dev_priv, pipe, PLANE_PRIMARY)) {
+		if (INTEL_GEN(dev_priv) >= 11) {
+			intel_primary_formats = icl_primary_formats;
+			num_formats = ARRAY_SIZE(icl_primary_formats);
+		} else if (skl_plane_has_planar(dev_priv, pipe,
+						PLANE_PRIMARY)) {
 			intel_primary_formats = skl_pri_planar_formats;
 			num_formats = ARRAY_SIZE(skl_pri_planar_formats);
 		} else {
