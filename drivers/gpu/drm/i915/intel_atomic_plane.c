@@ -107,6 +107,50 @@ intel_plane_destroy_state(struct drm_plane *plane,
 	drm_atomic_helper_plane_destroy_state(plane, state);
 }
 
+static bool intel_plane_valid_rotation(const struct drm_plane_state *plane_state)
+{
+	struct intel_plane *plane = to_intel_plane(plane_state->plane);
+	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
+
+	if (plane_state->fb &&
+	    drm_rotation_90_or_270(plane_state->rotation)) {
+		struct drm_format_name_buf format_name;
+
+		if (plane_state->fb->modifier != I915_FORMAT_MOD_Y_TILED &&
+		    plane_state->fb->modifier != I915_FORMAT_MOD_Yf_TILED) {
+			DRM_DEBUG_KMS("Y/Yf tiling required for 90/270!\n");
+			return false;
+		}
+
+		/*
+		 * 90/270 is not allowed with RGB64 16:16:16:16,
+		 * RGB 16-bit 5:6:5, and Indexed 8-bit.
+		 * TBD: Add RGB64 case once its added in supported format
+		 * list.
+		 */
+		switch (plane_state->fb->format->format) {
+		case DRM_FORMAT_C8:
+		case DRM_FORMAT_RGB565:
+			DRM_DEBUG_KMS("Unsupported pixel format %s for 90/270!\n",
+				      drm_get_format_name(plane_state->fb->format->format,
+							  &format_name));
+			return false;
+		default:
+			break;
+		}
+	}
+
+	/* CHV ignores the mirror bit when the rotate bit is set :( */
+	if (IS_CHERRYVIEW(dev_priv) &&
+	    plane_state->rotation & DRM_MODE_ROTATE_180 &&
+	    plane_state->rotation & DRM_MODE_REFLECT_X) {
+		DRM_DEBUG_KMS("Cannot rotate and reflect at the same time\n");
+		return false;
+	}
+
+	return true;
+}
+
 int intel_plane_atomic_check_with_state(const struct intel_crtc_state *old_crtc_state,
 					struct intel_crtc_state *crtc_state,
 					const struct intel_plane_state *old_plane_state,
@@ -123,40 +167,8 @@ int intel_plane_atomic_check_with_state(const struct intel_crtc_state *old_crtc_
 	if (!intel_state->base.crtc && !old_plane_state->base.crtc)
 		return 0;
 
-	if (state->fb && drm_rotation_90_or_270(state->rotation)) {
-		struct drm_format_name_buf format_name;
-
-		if (state->fb->modifier != I915_FORMAT_MOD_Y_TILED &&
-		    state->fb->modifier != I915_FORMAT_MOD_Yf_TILED) {
-			DRM_DEBUG_KMS("Y/Yf tiling required for 90/270!\n");
-			return -EINVAL;
-		}
-
-		/*
-		 * 90/270 is not allowed with RGB64 16:16:16:16,
-		 * RGB 16-bit 5:6:5, and Indexed 8-bit.
-		 * TBD: Add RGB64 case once its added in supported format list.
-		 */
-		switch (state->fb->format->format) {
-		case DRM_FORMAT_C8:
-		case DRM_FORMAT_RGB565:
-			DRM_DEBUG_KMS("Unsupported pixel format %s for 90/270!\n",
-			              drm_get_format_name(state->fb->format->format,
-			                                  &format_name));
-			return -EINVAL;
-
-		default:
-			break;
-		}
-	}
-
-	/* CHV ignores the mirror bit when the rotate bit is set :( */
-	if (IS_CHERRYVIEW(dev_priv) &&
-	    state->rotation & DRM_MODE_ROTATE_180 &&
-	    state->rotation & DRM_MODE_REFLECT_X) {
-		DRM_DEBUG_KMS("Cannot rotate and reflect at the same time\n");
+	if (!intel_plane_valid_rotation(state))
 		return -EINVAL;
-	}
 
 	intel_state->base.visible = false;
 	ret = intel_plane->check_plane(intel_plane, crtc_state, intel_state);
