@@ -93,6 +93,7 @@ struct adv748x_csi2 {
 #define notifier_to_csi2(n) container_of(n, struct adv748x_csi2, notifier)
 #define adv748x_sd_to_csi2(sd) container_of(sd, struct adv748x_csi2, sd)
 #define is_tx_enabled(_tx) ((_tx)->state->endpoints[(_tx)->port] != NULL)
+#define is_txa(_tx) ((_tx) == &(_tx)->state->txa)
 
 enum adv748x_hdmi_pads {
 	ADV748X_HDMI_SINK,
@@ -400,8 +401,7 @@ void adv748x_subdev_init(struct v4l2_subdev *sd, struct adv748x_state *state,
 int adv748x_register_subdevs(struct adv748x_state *state,
 			     struct v4l2_device *v4l2_dev);
 
-int adv748x_txa_power(struct adv748x_state *state, bool on);
-int adv748x_txb_power(struct adv748x_state *state, bool on);
+int adv748x_tx_power(struct adv748x_csi2 *tx, bool on);
 
 int adv748x_afe_init(struct adv748x_afe *afe);
 void adv748x_afe_cleanup(struct adv748x_afe *afe);
