@@ -4,6 +4,7 @@
 #include <linux/clk.h>
 #include <linux/iopoll.h>
 #include <linux/pm_opp.h>
+#include <linux/interconnect.h>
 #include <soc/qcom/cmd-db.h>
 
 #include "a6xx_gpu.h"
@@ -65,8 +66,15 @@ static bool a6xx_gmu_gx_is_on(struct a6xx_gmu *gmu)
 		A6XX_GMU_SPTPRAC_PWR_CLK_STATUS_GX_HM_CLK_OFF));
 }
 
-static int a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
+static void a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
 {
+	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
+	struct msm_gpu *gpu = &adreno_gpu->base;
+	struct dev_pm_opp *opp;
+	u64 ab, ib;
+	int ret;
+
 	gmu_write(gmu, REG_A6XX_GMU_DCVS_ACK_OPTION, 0);
 
 	gmu_write(gmu, REG_A6XX_GMU_DCVS_PERF_SETTING,
@@ -82,7 +90,22 @@ static int a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
 	a6xx_gmu_set_oob(gmu, GMU_OOB_DCVS_SET);
 	a6xx_gmu_clear_oob(gmu, GMU_OOB_DCVS_SET);
 
-	return gmu_read(gmu, REG_A6XX_GMU_DCVS_RETURN);
+	ret = gmu_read(gmu, REG_A6XX_GMU_DCVS_RETURN);
+	if (ret)
+		dev_err(gmu->dev, "GMU set GPU frequency error: %d\n", ret);
+
+	/* Set the interconnect bandwidth from the CPU */
+	if (IS_ERR_OR_NULL(gpu->icc_path))
+		return;
+
+	opp = dev_pm_opp_find_freq_exact(&gpu->pdev->dev,
+		gmu->gpu_freqs[index], true);
+	if (!IS_ERR_OR_NULL(opp)) {
+		if (!dev_pm_opp_get_interconnect_bw(opp, "port0", &ab, &ib))
+			icc_set(gpu->icc_path, ab, ib);
+
+		dev_pm_opp_put(opp);
+	}
 }
 
 static bool a6xx_gmu_check_idle_level(struct a6xx_gmu *gmu)
