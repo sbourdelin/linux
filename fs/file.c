@@ -284,6 +284,7 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 	atomic_set(&newf->count, 1);
 
 	spin_lock_init(&newf->file_lock);
+	newf->thread_count = 1;
 	newf->resize_in_progress = false;
 	init_waitqueue_head(&newf->resize_wait);
 	newf->next_fd = 0;
@@ -415,6 +416,8 @@ void put_files_struct(struct files_struct *files)
 	if (atomic_dec_and_test(&files->count)) {
 		struct fdtable *fdt = close_files(files);
 
+		WARN_ON_ONCE(files->thread_count);
+
 		/* free the arrays if they are not embedded */
 		if (fdt != &files->fdtab)
 			__free_fdtable(fdt);
@@ -428,9 +431,19 @@ void reset_files_struct(struct files_struct *files)
 	struct files_struct *old;
 
 	old = tsk->files;
+
+	spin_lock(&files->file_lock);
+	++files->thread_count;
+	spin_unlock(&files->file_lock);
+
 	task_lock(tsk);
 	tsk->files = files;
 	task_unlock(tsk);
+
+	spin_lock(&old->file_lock);
+	--old->thread_count;
+	spin_unlock(&old->file_lock);
+
 	put_files_struct(old);
 }
 
@@ -442,6 +455,9 @@ void exit_files(struct task_struct *tsk)
 		task_lock(tsk);
 		tsk->files = NULL;
 		task_unlock(tsk);
+		spin_lock(&files->file_lock);
+		--files->thread_count;
+		spin_unlock(&files->file_lock);
 		put_files_struct(files);
 	}
 }
@@ -457,6 +473,7 @@ struct files_struct init_files = {
 		.full_fds_bits	= init_files.full_fds_bits_init,
 	},
 	.file_lock	= __SPIN_LOCK_UNLOCKED(init_files.file_lock),
+	.thread_count	= 1,
 };
 
 static unsigned int find_next_fd(struct fdtable *fdt, unsigned int start)

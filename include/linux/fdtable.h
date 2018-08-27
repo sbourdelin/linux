@@ -59,6 +59,7 @@ struct files_struct {
    * written part on a separate cache line in SMP
    */
 	spinlock_t file_lock ____cacheline_aligned_in_smp;
+	int thread_count;
 	unsigned int next_fd;
 	unsigned long close_on_exec_init[1];
 	unsigned long open_fds_init[1];
