@@ -2554,7 +2554,8 @@ static int do_proc_dointvec_minmax_conv(bool *negp, unsigned long *lvalp,
 	if (write) {
 		int val = *negp ? -*lvalp : *lvalp;
 		if ((param->min && *param->min > val) ||
-		    (param->max && *param->max < val))
+		    (param->max && *param->max < val) ||
+		    *lvalp >> (sizeof(int) * 8))
 			return -EINVAL;
 		*valp = val;
 	} else {
