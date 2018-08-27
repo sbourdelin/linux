@@ -623,6 +623,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns)
 	fc->blocked = 0;
 	fc->initialized = 0;
 	fc->connected = 1;
+	fc->aborting = false;
 	fc->attr_version = 1;
 	get_random_bytes(&fc->scramble_key, sizeof(fc->scramble_key));
 	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));

@@ -575,8 +575,6 @@ ssize_t fuse_simple_request(struct fuse_conn *fc, struct fuse_args *args)
 }
 
 /*
- * Called under fc->lock
- *
  * fc->connected must have been checked previously
  */
 void fuse_request_send_background_nocheck(struct fuse_conn *fc,
@@ -604,12 +602,12 @@ void fuse_request_send_background_nocheck(struct fuse_conn *fc,
 void fuse_request_send_background(struct fuse_conn *fc, struct fuse_req *req)
 {
 	BUG_ON(!req->end);
-	spin_lock(&fc->lock);
+	rcu_read_lock_sched();
 	if (fc->connected) {
 		fuse_request_send_background_nocheck(fc, req);
-		spin_unlock(&fc->lock);
+		rcu_read_unlock_sched();
 	} else {
-		spin_unlock(&fc->lock);
+		rcu_read_unlock_sched();
 		req->out.h.error = -ENOTCONN;
 		req->end(fc, req);
 		fuse_put_request(fc, req);
@@ -2107,6 +2105,13 @@ void fuse_abort_conn(struct fuse_conn *fc, bool is_abort)
 		LIST_HEAD(to_end);
 
 		fc->connected = 0;
+		fc->aborting = true;
+		spin_unlock(&fc->lock);
+
+		/* Propagate fc->connected */
+		synchronize_sched();
+
+		spin_lock(&fc->lock);
 		fc->aborted = is_abort;
 		fuse_set_initialized(fc);
 		list_for_each_entry(fud, &fc->devices, entry) {
@@ -2145,12 +2150,14 @@ void fuse_abort_conn(struct fuse_conn *fc, bool is_abort)
 		spin_unlock(&fiq->waitq.lock);
 		kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
 		end_polls(fc);
+		fc->aborting = false;
 		wake_up_all(&fc->blocked_waitq);
 		spin_unlock(&fc->lock);
 
 		end_requests(fc, &to_end);
 	} else {
 		spin_unlock(&fc->lock);
+		wait_event(fc->blocked_waitq, !fc->aborting);
 	}
 }
 EXPORT_SYMBOL_GPL(fuse_abort_conn);
