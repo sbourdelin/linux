@@ -654,6 +654,24 @@ static int adv748x_probe(struct i2c_client *client,
 		goto err_cleanup_clients;
 	}
 
+	/*
+	 * We can not use container_of to get back to the state with two TXs;
+	 * Initialize the TXs's fields unconditionally on the endpoint
+	 * presence to access them later.
+	 */
+	state->txa.state = state->txb.state = state;
+	state->txa.page = ADV748X_PAGE_TXA;
+	state->txb.page = ADV748X_PAGE_TXB;
+	state->txa.port = ADV748X_PORT_TXA;
+	state->txb.port = ADV748X_PORT_TXB;
+
+	if (!is_tx_enabled(&state->txa) &&
+	    !is_tx_enabled(&state->txb)) {
+		ret = -ENODEV;
+		adv_err(state, "No output endpoint defined\n");
+		goto err_cleanup_clients;
+	}
+
 	/* SW reset ADV748X to its default values */
 	ret = adv748x_reset(state);
 	if (ret) {
@@ -676,17 +694,21 @@ static int adv748x_probe(struct i2c_client *client,
 	}
 
 	/* Initialise TXA */
-	ret = adv748x_csi2_init(state, &state->txa);
-	if (ret) {
-		adv_err(state, "Failed to probe TXA");
-		goto err_cleanup_afe;
+	if (is_tx_enabled(&state->txa)) {
+		ret = adv748x_csi2_init(state, &state->txa);
+		if (ret) {
+			adv_err(state, "Failed to probe TXA");
+			goto err_cleanup_afe;
+		}
 	}
 
 	/* Initialise TXB */
-	ret = adv748x_csi2_init(state, &state->txb);
-	if (ret) {
-		adv_err(state, "Failed to probe TXB");
-		goto err_cleanup_txa;
+	if (is_tx_enabled(&state->txb)) {
+		ret = adv748x_csi2_init(state, &state->txb);
+		if (ret) {
+			adv_err(state, "Failed to probe TXB");
+			goto err_cleanup_txa;
+		}
 	}
 
 	return 0;
