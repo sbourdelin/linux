@@ -3022,11 +3022,11 @@ static const struct inode_operations proc_tgid_base_inode_operations = {
 static void proc_flush_task_mnt(struct vfsmount *mnt, pid_t pid, pid_t tgid)
 {
 	struct dentry *dentry, *leader, *dir;
-	char buf[10 + 1];
+	char buf[10];
 	struct qstr name;
 
-	name.name = buf;
-	name.len = snprintf(buf, sizeof(buf), "%u", pid);
+	name.name = _print_integer_u32(buf + sizeof(buf), pid);
+	name.len = buf + sizeof(buf) - (char *)name.name;
 	/* no ->d_hash() rejects on procfs */
 	dentry = d_hash_and_lookup(mnt->mnt_root, &name);
 	if (dentry) {
@@ -3037,8 +3037,8 @@ static void proc_flush_task_mnt(struct vfsmount *mnt, pid_t pid, pid_t tgid)
 	if (pid == tgid)
 		return;
 
-	name.name = buf;
-	name.len = snprintf(buf, sizeof(buf), "%u", tgid);
+	name.name = _print_integer_u32(buf + sizeof(buf), tgid);
+	name.len = buf + sizeof(buf) - (char *)name.name;
 	leader = d_hash_and_lookup(mnt->mnt_root, &name);
 	if (!leader)
 		goto out;
@@ -3049,8 +3049,8 @@ static void proc_flush_task_mnt(struct vfsmount *mnt, pid_t pid, pid_t tgid)
 	if (!dir)
 		goto out_put_leader;
 
-	name.name = buf;
-	name.len = snprintf(buf, sizeof(buf), "%u", pid);
+	name.name = _print_integer_u32(buf + sizeof(buf), pid);
+	name.len = buf + sizeof(buf) - (char *)name.name;
 	dentry = d_hash_and_lookup(dir, &name);
 	if (dentry) {
 		d_invalidate(dentry);
