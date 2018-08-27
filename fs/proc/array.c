@@ -710,9 +710,11 @@ out:
 static int children_seq_show(struct seq_file *seq, void *v)
 {
 	struct inode *inode = file_inode(seq->file);
+	char buf[10 + 1], *p = buf + sizeof(buf);
 
-	seq_printf(seq, "%d ", pid_nr_ns(v, proc_pid_ns(inode)));
-	return 0;
+	*--p = ' ';
+	p = _print_integer_u32(p, pid_nr_ns(v, proc_pid_ns(inode)));
+	return seq_write(seq, p, buf + sizeof(buf) - p);
 }
 
 static void *children_seq_start(struct seq_file *seq, loff_t *pos)
