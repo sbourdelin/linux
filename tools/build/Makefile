@@ -18,6 +18,7 @@ $(call allow-override,LD,$(CROSS_COMPILE)ld)
 HOSTCC ?= gcc
 HOSTLD ?= ld
 HOSTAR ?= ar
+RM = rm -f
 
 export HOSTCC HOSTLD HOSTAR
 
@@ -36,7 +37,7 @@ all: $(OUTPUT)fixdep
 
 clean:
 	$(call QUIET_CLEAN, fixdep)
-	$(Q)find $(if $(OUTPUT),$(OUTPUT),.) -name '*.o' -delete -o -name '\.*.cmd' -delete -o -name '\.*.d' -delete
+	$(Q)find $(if $(OUTPUT),$(OUTPUT),.) -name '*.o' -o -name '\.*.cmd' -o -name '\.*.d' | xargs $(RM)
 	$(Q)rm -f $(OUTPUT)fixdep
 
 $(OUTPUT)fixdep-in.o: FORCE
