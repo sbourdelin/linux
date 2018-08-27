@@ -390,8 +390,8 @@ static void request_end(struct fuse_conn *fc, struct fuse_req *req)
 	WARN_ON(test_bit(FR_PENDING, &req->flags));
 	WARN_ON(test_bit(FR_SENT, &req->flags));
 	if (test_bit(FR_BACKGROUND, &req->flags)) {
-		spin_lock(&fc->lock);
 		clear_bit(FR_BACKGROUND, &req->flags);
+		spin_lock(&fc->lock);
 		if (fc->num_background == fc->max_background)
 			fc->blocked = 0;
 
