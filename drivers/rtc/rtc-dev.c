@@ -13,6 +13,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/compat.h>
 #include <linux/module.h>
 #include <linux/rtc.h>
 #include <linux/sched/signal.h>
@@ -405,6 +406,52 @@ done:
 	return err;
 }
 
+#ifdef CONFIG_COMPAT
+#define RTC_IRQP_READ32		_IOR('p', 0x0b, compat_ulong_t)
+#define RTC_IRQP_SET32		_IOW('p', 0x0c, compat_ulong_t)
+#define RTC_EPOCH_READ32	_IOR('p', 0x0d, compat_ulong_t)
+#define RTC_EPOCH_SET32		_IOW('p', 0x0e, compat_ulong_t)
+
+static long rtc_dev_compat_ioctl(struct file *file, unsigned cmd, unsigned long arg)
+{
+	unsigned long __user *valp;
+	compat_ulong_t __user *argp = compat_ptr(arg);
+	unsigned long val;
+	int ret;
+
+	switch (cmd) {
+	/* pointer to 'long' needs translation. */
+	case RTC_IRQP_READ32:
+	case RTC_EPOCH_READ32: {
+		valp = compat_alloc_user_space(sizeof(*valp));
+		if (valp == NULL)
+			return -EFAULT;
+		ret = rtc_dev_ioctl(file, (cmd == RTC_IRQP_READ32) ?
+					RTC_IRQP_READ : RTC_EPOCH_READ,
+					(unsigned long)valp);
+		if (ret)
+			return ret;
+		if (get_user(val, valp) || put_user(val, argp))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* arguments are compatible, command number is not */
+	case RTC_IRQP_SET32:
+		return rtc_dev_ioctl(file, RTC_IRQP_SET, arg);
+	case RTC_EPOCH_SET32:
+		return rtc_dev_ioctl(file, RTC_EPOCH_SET, arg);
+	}
+
+	/*
+	 * all other rtc ioctls are compatible, or only
+	 * exist on architectures without compat mode
+	 */
+
+	return rtc_dev_ioctl(file, cmd, (unsigned long)argp);
+}
+#endif
+
 static int rtc_dev_fasync(int fd, struct file *file, int on)
 {
 	struct rtc_device *rtc = file->private_data;
@@ -439,6 +486,9 @@ static const struct file_operations rtc_dev_fops = {
 	.read		= rtc_dev_read,
 	.poll		= rtc_dev_poll,
 	.unlocked_ioctl	= rtc_dev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= rtc_dev_compat_ioctl,
+#endif
 	.open		= rtc_dev_open,
 	.release	= rtc_dev_release,
 	.fasync		= rtc_dev_fasync,
