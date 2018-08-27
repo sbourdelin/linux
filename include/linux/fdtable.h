@@ -51,6 +51,7 @@ struct files_struct {
    */
 	atomic_t count;
 	bool resize_in_progress;
+	bool in_exec;
 	wait_queue_head_t resize_wait;
 
 	struct fdtable __rcu *fdt;

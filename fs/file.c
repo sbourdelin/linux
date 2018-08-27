@@ -286,6 +286,7 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 	spin_lock_init(&newf->file_lock);
 	newf->thread_count = 1;
 	newf->resize_in_progress = false;
+	newf->in_exec = false;
 	init_waitqueue_head(&newf->resize_wait);
 	newf->next_fd = 0;
 	new_fdt = &newf->fdtab;

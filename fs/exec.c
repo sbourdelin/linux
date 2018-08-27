@@ -1831,8 +1831,13 @@ static int __do_execve_file(int fd, struct filename *filename,
 	kfree(pathbuf);
 	if (filename)
 		putname(filename);
-	if (displaced)
+	if (displaced) {
 		put_files_struct(displaced);
+	} else {
+		spin_lock(&current->files->file_lock);
+		current->files->in_exec = false;
+		spin_unlock(&current->files->file_lock);
+	}
 	return retval;
 
 out:
@@ -1850,8 +1855,13 @@ out_free:
 	kfree(pathbuf);
 
 out_files:
-	if (displaced)
+	if (displaced) {
 		reset_files_struct(displaced);
+	} else {
+		spin_lock(&current->files->file_lock);
+		current->files->in_exec = false;
+		spin_unlock(&current->files->file_lock);
+	}
 out_ret:
 	if (filename)
 		putname(filename);
