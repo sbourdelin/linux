@@ -1262,6 +1262,10 @@ int flush_old_exec(struct linux_binprm * bprm)
 	if (retval)
 		goto out;
 
+	retval = unshare_files(&bprm->displaced_files);
+	if (retval)
+		goto out;
+
 	/*
 	 * Must be called _before_ exec_mmap() as bprm->mm is
 	 * not visibile until then. This also enables the update
@@ -1712,8 +1716,7 @@ static int __do_execve_file(int fd, struct filename *filename,
 			    int flags, struct file *file)
 {
 	char *pathbuf = NULL;
-	struct linux_binprm *bprm;
-	struct files_struct *displaced;
+	struct linux_binprm *bprm = NULL;
 	int retval;
 
 	if (IS_ERR(filename))
@@ -1734,10 +1737,6 @@ static int __do_execve_file(int fd, struct filename *filename,
 	/* We're below the limit (still or again), so we don't want to make
 	 * further execve() calls fail. */
 	current->flags &= ~PF_NPROC_EXCEEDED;
-
-	retval = unshare_files(&displaced);
-	if (retval)
-		goto out_ret;
 
 	retval = -ENOMEM;
 	bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);
@@ -1831,8 +1830,8 @@ static int __do_execve_file(int fd, struct filename *filename,
 	kfree(pathbuf);
 	if (filename)
 		putname(filename);
-	if (displaced) {
-		put_files_struct(displaced);
+	if (bprm->displaced_files) {
+		put_files_struct(bprm->displaced_files);
 	} else {
 		spin_lock(&current->files->file_lock);
 		current->files->in_exec = false;
@@ -1855,8 +1854,8 @@ out_free:
 	kfree(pathbuf);
 
 out_files:
-	if (displaced) {
-		reset_files_struct(displaced);
+	if (bprm && bprm->displaced_files) {
+		reset_files_struct(bprm->displaced_files);
 	} else {
 		spin_lock(&current->files->file_lock);
 		current->files->in_exec = false;
