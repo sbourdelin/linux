@@ -11893,6 +11893,17 @@ static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool ne
 	return 0;
 }
 
+static u64 nested_vmx_calc_efer(struct vcpu_vmx *vmx, struct vmcs12 *vmcs12)
+{
+	if (vmx->nested.nested_run_pending &&
+	    (vmcs12->vm_entry_controls & VM_ENTRY_LOAD_IA32_EFER))
+		return vmcs12->guest_ia32_efer;
+	else if (vmcs12->vm_entry_controls & VM_ENTRY_IA32E_MODE)
+		return vmx->vcpu.arch.efer | (EFER_LMA | EFER_LME);
+	else
+		return vmx->vcpu.arch.efer & ~(EFER_LMA | EFER_LME);
+}
+
 static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -12032,6 +12043,7 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 exec_control, vmcs12_exec_ctrl;
+	u64 guest_efer;
 
 	if (vmx->nested.dirty_vmcs12) {
 		prepare_vmcs02_full(vcpu, vmcs12);
@@ -12187,13 +12199,23 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	 */
 	vm_exit_controls_init(vmx, vmcs_config.vmexit_ctrl);
 
-	/* vmcs12's VM_ENTRY_LOAD_IA32_EFER and VM_ENTRY_IA32E_MODE are
-	 * emulated by vmx_set_efer(), below.
+	/*
+	 * vmcs12's VM_{ENTRY,EXIT}_LOAD_IA32_EFER and VM_ENTRY_IA32E_MODE
+	 * are emulated by vmx_set_efer(), below, but speculate on the
+	 * related bits (if supported by the CPU) in the hope that we can
+	 * avoid VMWrites during vmx_set_efer().
 	 */
-	vm_entry_controls_init(vmx, 
-		(vmcs12->vm_entry_controls & ~VM_ENTRY_LOAD_IA32_EFER &
-			~VM_ENTRY_IA32E_MODE) |
-		(vmcs_config.vmentry_ctrl & ~VM_ENTRY_IA32E_MODE));
+	exec_control = (vmcs12->vm_entry_controls | vmcs_config.vmentry_ctrl) &
+			~VM_ENTRY_IA32E_MODE & ~VM_ENTRY_LOAD_IA32_EFER;
+
+	guest_efer = nested_vmx_calc_efer(vmx, vmcs12);
+	if (cpu_has_load_ia32_efer) {
+		if (guest_efer & EFER_LMA)
+			exec_control |= VM_ENTRY_IA32E_MODE;
+		if (guest_efer != host_efer)
+			exec_control |= VM_ENTRY_LOAD_IA32_EFER;
+	}
+	vm_entry_controls_init(vmx, exec_control);
 
 	if (vmx->nested.nested_run_pending &&
 	    (vmcs12->vm_entry_controls & VM_ENTRY_LOAD_IA32_PAT)) {
@@ -12259,14 +12281,8 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	vmx_set_cr4(vcpu, vmcs12->guest_cr4);
 	vmcs_writel(CR4_READ_SHADOW, nested_read_cr4(vmcs12));
 
-	if (vmx->nested.nested_run_pending &&
-	    (vmcs12->vm_entry_controls & VM_ENTRY_LOAD_IA32_EFER))
-		vcpu->arch.efer = vmcs12->guest_ia32_efer;
-	else if (vmcs12->vm_entry_controls & VM_ENTRY_IA32E_MODE)
-		vcpu->arch.efer |= (EFER_LMA | EFER_LME);
-	else
-		vcpu->arch.efer &= ~(EFER_LMA | EFER_LME);
-	/* Note: modifies VM_ENTRY/EXIT_CONTROLS and GUEST/HOST_IA32_EFER */
+	vcpu->arch.efer = guest_efer;
+	/* Note: may modify VM_ENTRY/EXIT_CONTROLS and GUEST/HOST_IA32_EFER */
 	vmx_set_efer(vcpu, vcpu->arch.efer);
 
 	/*
