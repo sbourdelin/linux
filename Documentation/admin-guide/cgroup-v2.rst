@@ -973,21 +973,42 @@ All time durations are in microseconds.
         A read-write single value file which exists on non-root cgroups.
         The default is "0", i.e. no bandwidth boosting.
 
-        The minimum utilization in the range [0, 1023].
+        The requested minimum utilization in the range [0, 1023].
 
         This interface allows reading and setting minimum utilization clamp
         values similar to the sched_setattr(2). This minimum utilization
         value is used to clamp the task specific minimum utilization clamp.
 
+  cpu.util.min.effective
+        A read-only single value file which exists on non-root cgroups and
+        reports minimum utilization clamp value currently enforced on a task
+        group.
+
+        The actual minimum utilization in the range [0, 1023].
+
+        This value can be lower then cpu.util.min in case a parent cgroup
+        is enforcing a more restrictive clamping on minimum utilization.
+
   cpu.util.max
         A read-write single value file which exists on non-root cgroups.
         The default is "1023". i.e. no bandwidth clamping
 
-        The maximum utilization in the range [0, 1023].
+        The requested maximum utilization in the range [0, 1023].
 
         This interface allows reading and setting maximum utilization clamp
         values similar to the sched_setattr(2). This maximum utilization
         value is used to clamp the task specific maximum utilization clamp.
+
+  cpu.util.max.effective
+        A read-only single value file which exists on non-root cgroups and
+        reports maximum utilization clamp value currently enforced on a task
+        group.
+
+        The actual maximum utilization in the range [0, 1023].
+
+        This value can be lower then cpu.util.max in case a parent cgroup
+        is enforcing a more restrictive clamping on max utilization.
+
 
 Memory
 ------

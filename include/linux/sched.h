@@ -591,6 +591,14 @@ struct sched_dl_entity {
 struct uclamp_se {
 	unsigned int value;
 	unsigned int group_id;
+	/*
+	 * Effective task (group) clamp value.
+	 * For task groups is the value (eventually) enforced by a parent task
+	 * group.
+	 */
+	struct {
+		unsigned int value;
+	} effective;
 };
 
 union rcu_special {
