@@ -96,6 +96,11 @@ typedef unsigned long long u_quad_t;
 #endif /* !KERNEL */
 #endif /* !DJGPP */
 
+/* Handle bare-metal toolchain case */
+#if defined(__KERNEL__) && !defined(__linux__) && !defined(_UQUAD_T_) && \
+!defined(__UQUAD_TYPE)
+typedef unsigned long long u_quad_t;
+#endif
 
 #if defined(__linux__)
 #include <linux/time.h>
