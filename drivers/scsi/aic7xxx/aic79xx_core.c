@@ -40,7 +40,7 @@
  * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#250 $
  */
 
-#ifdef __linux__
+#ifdef __KERNEL__
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
 #include "aicasm/aicasm_insformat.h"
@@ -6172,7 +6172,7 @@ ahd_free(struct ahd_softc *ahd)
 	case 2:
 		ahd_dma_tag_destroy(ahd, ahd->shared_data_dmat);
 	case 1:
-#ifndef __linux__
+#ifndef __KERNEL__
 		ahd_dma_tag_destroy(ahd, ahd->buffer_dmat);
 #endif
 		break;
@@ -6180,7 +6180,7 @@ ahd_free(struct ahd_softc *ahd)
 		break;
 	}
 
-#ifndef __linux__
+#ifndef __KERNEL__
 	ahd_dma_tag_destroy(ahd, ahd->parent_dmat);
 #endif
 	ahd_platform_free(ahd);
@@ -6934,7 +6934,7 @@ ahd_alloc_scbs(struct ahd_softc *ahd)
 	for (i = 0; i < newcount; i++) {
 		struct scb_platform_data *pdata;
 		u_int col_tag;
-#ifndef __linux__
+#ifndef __KERNEL__
 		int error;
 #endif
 
@@ -6970,7 +6970,7 @@ ahd_alloc_scbs(struct ahd_softc *ahd)
 			next_scb->sg_list_busaddr += sizeof(struct ahd_dma_seg);
 		next_scb->ahd_softc = ahd;
 		next_scb->flags = SCB_FLAG_NONE;
-#ifndef __linux__
+#ifndef __KERNEL__
 		error = ahd_dmamap_create(ahd, ahd->buffer_dmat, /*flags*/0,
 					  &next_scb->dmamap);
 		if (error != 0) {
@@ -7091,7 +7091,7 @@ ahd_init(struct ahd_softc *ahd)
 	if ((AHD_TMODE_ENABLE & (0x1 << ahd->unit)) == 0)
 		ahd->features &= ~AHD_TARGETMODE;
 
-#ifndef __linux__
+#ifndef __KERNEL__
 	/* DMA tag for mapping buffers into device visible space. */
 	if (ahd_dma_tag_create(ahd, ahd->parent_dmat, /*alignment*/1,
 			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,

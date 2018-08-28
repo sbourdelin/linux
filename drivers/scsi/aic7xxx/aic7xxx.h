@@ -568,7 +568,7 @@ struct scb {
 	ahc_io_ctx_t		  io_ctx;
 	struct ahc_softc	 *ahc_softc;
 	scb_flag		  flags;
-#ifndef __linux__
+#ifndef __KERNEL__
 	bus_dmamap_t		  dmamap;
 #endif
 	struct scb_platform_data *platform_data;
@@ -906,7 +906,7 @@ typedef void ahc_callback_t (void *);
 struct ahc_softc {
 	bus_space_tag_t           tag;
 	bus_space_handle_t        bsh;
-#ifndef __linux__
+#ifndef __KERNEL__
 	bus_dma_tag_t		  buffer_dmat;   /* dmat for buffer I/O */
 #endif
 	struct scb_data		 *scb_data;

@@ -40,7 +40,7 @@
  * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#155 $
  */
 
-#ifdef __linux__
+#ifdef __KERNEL__
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
 #include "aicasm/aicasm_insformat.h"
@@ -4509,7 +4509,7 @@ ahc_free(struct ahc_softc *ahc)
 	case 2:
 		ahc_dma_tag_destroy(ahc, ahc->shared_data_dmat);
 	case 1:
-#ifndef __linux__
+#ifndef __KERNEL__
 		ahc_dma_tag_destroy(ahc, ahc->buffer_dmat);
 #endif
 		break;
@@ -4517,7 +4517,7 @@ ahc_free(struct ahc_softc *ahc)
 		break;
 	}
 
-#ifndef __linux__
+#ifndef __KERNEL__
 	ahc_dma_tag_destroy(ahc, ahc->parent_dmat);
 #endif
 	ahc_platform_free(ahc);
@@ -5005,7 +5005,7 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 	newcount = min(newcount, (AHC_SCB_MAX_ALLOC - scb_data->numscbs));
 	for (i = 0; i < newcount; i++) {
 		struct scb_platform_data *pdata;
-#ifndef __linux__
+#ifndef __KERNEL__
 		int error;
 #endif
 		pdata = kmalloc(sizeof(*pdata), GFP_ATOMIC);
@@ -5021,7 +5021,7 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 		next_scb->sg_list_phys = physaddr + sizeof(struct ahc_dma_seg);
 		next_scb->ahc_softc = ahc;
 		next_scb->flags = SCB_FREE;
-#ifndef __linux__
+#ifndef __KERNEL__
 		error = ahc_dmamap_create(ahc, ahc->buffer_dmat, /*flags*/0,
 					  &next_scb->dmamap);
 		if (error != 0)
@@ -5325,7 +5325,7 @@ ahc_init(struct ahc_softc *ahc)
 	if ((AHC_TMODE_ENABLE & (0x1 << ahc->unit)) == 0)
 		ahc->features &= ~AHC_TARGETMODE;
 
-#ifndef __linux__
+#ifndef __KERNEL__
 	/* DMA tag for mapping buffers into device visible space. */
 	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
 			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,

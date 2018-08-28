@@ -41,7 +41,7 @@
  * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#92 $
  */
 
-#ifdef __linux__
+#ifdef __KERNEL__
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
 #else

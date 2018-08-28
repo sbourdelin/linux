@@ -44,7 +44,7 @@
 
 #include <sys/types.h>
 
-#ifdef __linux__
+#ifdef __KERNEL__
 #include "aicdb.h"
 #else
 #include <db.h>

@@ -64,7 +64,7 @@
  *   bit to be sent from the chip.
  */
 
-#ifdef __linux__
+#ifdef __KERNEL__
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
 #include "aic7xxx_93cx6.h"

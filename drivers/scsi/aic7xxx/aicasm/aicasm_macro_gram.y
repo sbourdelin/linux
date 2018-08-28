@@ -52,7 +52,7 @@
 #include <string.h>
 #include <sysexits.h>
 
-#ifdef __linux__
+#ifdef __KERNEL__
 #include "../queue.h"
 #else
 #include <sys/queue.h>
