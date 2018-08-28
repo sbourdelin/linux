@@ -780,7 +780,8 @@ static int ucc_hdlc_attach(struct net_device *dev, unsigned short encoding,
 
 	if (parity != PARITY_NONE &&
 	    parity != PARITY_CRC32_PR1_CCITT &&
-	    parity != PARITY_CRC16_PR1_CCITT)
+	    parity != PARITY_CRC16_PR1_CCITT && 
+	    parity != PARITY_CRC16_PR0_CCITT)
 		return -EINVAL;
 
 	priv->encoding = encoding;
