@@ -134,7 +134,7 @@ struct ucc_hdlc_private {
 
 #define HDLC_HEAD_MASK		0x0000
 #define DEFAULT_HDLC_HEAD	0xff44
-#define DEFAULT_ADDR_MASK	0x00ff
+#define DEFAULT_ADDR_MASK	0x0000
 #define DEFAULT_HDLC_ADDR	0x00ff
 
 #define BMR_GBL			0x20000000
