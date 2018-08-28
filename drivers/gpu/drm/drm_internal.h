@@ -118,6 +118,7 @@ void drm_gem_print_info(struct drm_printer *p, unsigned int indent,
 
 /* drm_debugfs.c drm_debugfs_crc.c */
 #if defined(CONFIG_DEBUG_FS)
+int drm_debugfs_alloc(struct drm_minor *minor);
 int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 		     struct dentry *root);
 int drm_debugfs_cleanup(struct drm_minor *minor);
@@ -127,6 +128,10 @@ int drm_debugfs_crtc_add(struct drm_crtc *crtc);
 void drm_debugfs_crtc_remove(struct drm_crtc *crtc);
 int drm_debugfs_crtc_crc_add(struct drm_crtc *crtc);
 #else
+static inline int drm_debugfs_alloc(struct drm_minor *minor)
+{
+	return 0;
+}
 static inline int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 				   struct dentry *root)
 {

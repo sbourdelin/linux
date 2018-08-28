@@ -74,6 +74,10 @@ struct drm_minor {
 
 	struct dentry *debugfs_root;
 
+	bool debugfs_callbacks_done;
+	struct list_head debugfs_callback_list;
+	struct mutex debugfs_callback_lock;
+
 	struct list_head debugfs_list;
 	struct mutex debugfs_lock; /* Protects debugfs_list. */
 };

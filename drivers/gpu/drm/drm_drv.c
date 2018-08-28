@@ -118,6 +118,9 @@ static int drm_minor_alloc(struct drm_device *dev, unsigned int type)
 
 	minor->type = type;
 	minor->dev = dev;
+	r = drm_debugfs_alloc(minor);
+	if (r)
+		goto err_free;
 
 	idr_preload(GFP_KERNEL);
 	spin_lock_irqsave(&drm_minor_lock, flags);
