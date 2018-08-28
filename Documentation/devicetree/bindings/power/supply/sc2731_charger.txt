@@ -1,0 +1,14 @@
+Spreadtrum SC2731 PMIC battery charger binding
+
+Required properties:
+ - compatible: Should be "sprd,sc2731-charger".
+ - reg: Address offset of charger register.
+ - phys: Contains a phandle to the USB phy.
+
+Example:
+
+	charger@0 {
+		compatible = "sprd,sc2731-charger";
+		reg = <0x0>;
+		phys = <&ssphy>;
+	};
