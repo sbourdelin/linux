@@ -1510,13 +1510,28 @@ static inline int alloc_uclamp_sched_group(struct task_group *tg,
 static inline void free_uclamp_sched_group(struct task_group *tg) { }
 #endif /* CONFIG_UCLAMP_TASK_GROUP */
 
+static bool uclamp_user_allowed __read_mostly;
+static int __init uclamp_user_allow(char *str)
+{
+	uclamp_user_allowed = true;
+
+	return 0;
+}
+early_param("uclamp_user", uclamp_user_allow);
+
 static inline int __setscheduler_uclamp(struct task_struct *p,
-					const struct sched_attr *attr)
+					const struct sched_attr *attr,
+					bool user)
 {
 	int group_id[UCLAMP_CNT] = { UCLAMP_NOT_VALID };
 	int lower_bound, upper_bound;
 	struct uclamp_se *uc_se;
 	int result = 0;
+
+	if (!capable(CAP_SYS_ADMIN) &&
+	    user && !uclamp_user_allowed) {
+		return -EPERM;
+	}
 
 	mutex_lock(&uclamp_mutex);
 
@@ -1702,7 +1717,8 @@ static inline int alloc_uclamp_sched_group(struct task_group *tg,
 	return 1;
 }
 static inline int __setscheduler_uclamp(struct task_struct *p,
-					const struct sched_attr *attr)
+					const struct sched_attr *attr,
+					bool user)
 {
 	return -EINVAL;
 }
@@ -5220,7 +5236,7 @@ recheck:
 
 	/* Configure utilization clamps for the task */
 	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP) {
-		retval = __setscheduler_uclamp(p, attr);
+		retval = __setscheduler_uclamp(p, attr, user);
 		if (retval)
 			return retval;
 	}

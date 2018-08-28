@@ -4410,6 +4410,9 @@
 			<port#>,<js1>,<js2>,<js3>,<js4>,<js5>,<js6>,<js7>
 			See also Documentation/input/devices/joystick-parport.rst
 
+	uclamp_user	[KNL] Enable task-specific utilization clamping tuning
+			also from tasks without CAP_SYS_ADMIN capability.
+
 	udbg-immortal	[PPC] When debugging early kernel crashes that
 			happen after console_init() and before a proper
 			console driver takes over, this boot options might
