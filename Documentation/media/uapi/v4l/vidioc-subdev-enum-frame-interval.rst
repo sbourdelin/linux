@@ -51,6 +51,37 @@ EINVAL error code if one of the input fields is invalid. All frame
 intervals are enumerable by beginning at index zero and incrementing by
 one until ``EINVAL`` is returned.
 
+If the sub-device can work only at the fixed set of frame intervals,
+driver must enumerate them with increasing indexes, by only filling
+the ``interval`` field.  If the sub-device can work with a continuous
+range of frame intervals, driver must only return success for index 0
+and fill ``interval`` with the minimum interval, ``max_interval`` with
+the maximum interval, and ``step_interval`` with 0 or the step between
+the possible intervals.
+
+Callers are expected to use the returned information as follows :
+
+.. code-block:: c
+
+        struct v4l2_frmivalenum * fival;
+        struct v4l2_subdev_frame_interval_enum fie;
+
+        if (fie.max_interval.numerator == 0) {
+                fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
+                fival->discrete = fie.interval;
+        } else if (fie.step_interval.numerator == 0) {
+                fival->type = V4L2_FRMIVAL_TYPE_CONTINUOUS;
+                fival->stepwise.min = fie.interval;
+                fival->stepwise.max = fie.max_interval;
+        } else {
+                fival->type = V4L2_FRMIVAL_TYPE_STEPWISE;
+                fival->stepwise.min = fie.interval;
+                fival->stepwise.max = fie.max_interval;
+                fival->stepwise.step = fie.step_interval;
+        }
+
+.. code-block:: c
+
 Available frame intervals may depend on the current 'try' formats at
 other pads of the sub-device, as well as on the current active links.
 See :ref:`VIDIOC_SUBDEV_G_FMT` for more
@@ -92,8 +123,14 @@ multiple pads of the same sub-device is not defined.
       - ``which``
       - Frame intervals to be enumerated, from enum
 	:ref:`v4l2_subdev_format_whence <v4l2-subdev-format-whence>`.
+    * - struct :c:type:`v4l2_fract`
+      - ``max_interval``
+      - Maximum period, in seconds, between consecutive video frames, or 0.
+    * - struct :c:type:`v4l2_fract`
+      - ``step_interval``
+      - Frame interval step size, in seconds, or 0.
     * - __u32
-      - ``reserved``\ [8]
+      - ``reserved``\ [4]
       - Reserved for future extensions. Applications and drivers must set
 	the array to zero.
 

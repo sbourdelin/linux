@@ -128,7 +128,9 @@ struct v4l2_subdev_frame_interval_enum {
 	__u32 height;
 	struct v4l2_fract interval;
 	__u32 which;
-	__u32 reserved[8];
+	struct v4l2_fract max_interval;
+	struct v4l2_fract step_interval;
+	__u32 reserved[4];
 };
 
 /**
