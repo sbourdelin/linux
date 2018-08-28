@@ -271,6 +271,32 @@ static int my_bcmp(char *str1, char *str2, size_t n)
 	return 0;
 }
 
+static int verify_ioctls(unsigned long supported_ioctls)
+{
+	unsigned long expected_ioctls = uffd_test_ops->expected_ioctls;
+
+	if ((supported_ioctls & expected_ioctls) == expected_ioctls)
+		return 0;
+
+	/*
+	 * For older kernels shared memory may not have UFFDIO_ZEROPAGE.
+	 * In this case we just mask it out from the
+	 * expected_ioctls. The userfaultfd_zeropage_test will then
+	 * verify that an attempt to use UFFDIO_ZEROPAGE returns
+	 * EINVAL
+	 */
+	if (test_type == TEST_SHMEM) {
+		expected_ioctls &= ~(1 << _UFFDIO_ZEROPAGE);
+		if ((supported_ioctls & expected_ioctls) == expected_ioctls) {
+			uffd_test_ops->expected_ioctls = expected_ioctls;
+			return 0;
+		}
+	}
+
+	fprintf(stderr, "unexpected missing ioctl\n");
+	return 1;
+}
+
 static void *locking_thread(void *arg)
 {
 	unsigned long cpu = (unsigned long) arg;
@@ -856,7 +882,6 @@ static int uffdio_zeropage(int ufd, unsigned long offset)
 static int userfaultfd_zeropage_test(void)
 {
 	struct uffdio_register uffdio_register;
-	unsigned long expected_ioctls;
 	int err;
 
 	printf("testing UFFDIO_ZEROPAGE: ");
@@ -875,12 +900,8 @@ static int userfaultfd_zeropage_test(void)
 	if (ioctl(uffd, UFFDIO_REGISTER, &uffdio_register))
 		fprintf(stderr, "register failure\n"), exit(1);
 
-	expected_ioctls = uffd_test_ops->expected_ioctls;
-	if ((uffdio_register.ioctls & expected_ioctls) !=
-	    expected_ioctls)
-		fprintf(stderr,
-			"unexpected missing ioctl for anon memory\n"),
-			exit(1);
+	if (verify_ioctls(uffdio_register.ioctls))
+		return 1;
 
 	if (uffdio_zeropage(uffd, 0)) {
 		if (my_bcmp(area_dst, zeropage, page_size))
@@ -895,7 +916,6 @@ static int userfaultfd_zeropage_test(void)
 static int userfaultfd_events_test(void)
 {
 	struct uffdio_register uffdio_register;
-	unsigned long expected_ioctls;
 	unsigned long userfaults;
 	pthread_t uffd_mon;
 	int err, features;
@@ -922,12 +942,8 @@ static int userfaultfd_events_test(void)
 	if (ioctl(uffd, UFFDIO_REGISTER, &uffdio_register))
 		fprintf(stderr, "register failure\n"), exit(1);
 
-	expected_ioctls = uffd_test_ops->expected_ioctls;
-	if ((uffdio_register.ioctls & expected_ioctls) !=
-	    expected_ioctls)
-		fprintf(stderr,
-			"unexpected missing ioctl for anon memory\n"),
-			exit(1);
+	if (verify_ioctls(uffdio_register.ioctls))
+		return 1;
 
 	if (pthread_create(&uffd_mon, &attr, uffd_poll_thread, NULL))
 		perror("uffd_poll_thread create"), exit(1);
@@ -957,7 +973,6 @@ static int userfaultfd_events_test(void)
 static int userfaultfd_sig_test(void)
 {
 	struct uffdio_register uffdio_register;
-	unsigned long expected_ioctls;
 	unsigned long userfaults;
 	pthread_t uffd_mon;
 	int err, features;
@@ -982,12 +997,8 @@ static int userfaultfd_sig_test(void)
 	if (ioctl(uffd, UFFDIO_REGISTER, &uffdio_register))
 		fprintf(stderr, "register failure\n"), exit(1);
 
-	expected_ioctls = uffd_test_ops->expected_ioctls;
-	if ((uffdio_register.ioctls & expected_ioctls) !=
-	    expected_ioctls)
-		fprintf(stderr,
-			"unexpected missing ioctl for anon memory\n"),
-			exit(1);
+	if (verify_ioctls(uffdio_register.ioctls))
+		return 1;
 
 	if (faulting_process(1))
 		fprintf(stderr, "faulting process failed\n"), exit(1);
@@ -1088,8 +1099,6 @@ static int userfaultfd_stress(void)
 
 	err = 0;
 	while (bounces--) {
-		unsigned long expected_ioctls;
-
 		printf("bounces: %d, mode:", bounces);
 		if (bounces & BOUNCE_RANDOM)
 			printf(" rnd");
@@ -1115,13 +1124,9 @@ static int userfaultfd_stress(void)
 			fprintf(stderr, "register failure\n");
 			return 1;
 		}
-		expected_ioctls = uffd_test_ops->expected_ioctls;
-		if ((uffdio_register.ioctls & expected_ioctls) !=
-		    expected_ioctls) {
-			fprintf(stderr,
-				"unexpected missing ioctl for anon memory\n");
+
+		if (verify_ioctls(uffdio_register.ioctls))
 			return 1;
-		}
 
 		if (area_dst_alias) {
 			uffdio_register.range.start = (unsigned long)
