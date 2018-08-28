@@ -3534,37 +3534,6 @@ static int i915_drrs_status(struct seq_file *m, void *unused)
 	return 0;
 }
 
-static int i915_dp_mst_info(struct seq_file *m, void *unused)
-{
-	struct drm_i915_private *dev_priv = node_to_i915(m->private);
-	struct drm_device *dev = &dev_priv->drm;
-	struct intel_encoder *intel_encoder;
-	struct intel_digital_port *intel_dig_port;
-	struct drm_connector *connector;
-	struct drm_connector_list_iter conn_iter;
-
-	drm_connector_list_iter_begin(dev, &conn_iter);
-	drm_for_each_connector_iter(connector, &conn_iter) {
-		if (connector->connector_type != DRM_MODE_CONNECTOR_DisplayPort)
-			continue;
-
-		intel_encoder = intel_attached_encoder(connector);
-		if (!intel_encoder || intel_encoder->type == INTEL_OUTPUT_DP_MST)
-			continue;
-
-		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
-		if (!intel_dig_port->dp.can_mst)
-			continue;
-
-		seq_printf(m, "MST Source Port %c\n",
-			   port_name(intel_dig_port->base.port));
-		drm_dp_mst_dump_topology(m, &intel_dig_port->dp.mst_mgr);
-	}
-	drm_connector_list_iter_end(&conn_iter);
-
-	return 0;
-}
-
 static ssize_t i915_displayport_test_active_write(struct file *file,
 						  const char __user *ubuf,
 						  size_t len, loff_t *offp)
@@ -4733,7 +4702,6 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_rcs_topology", i915_rcs_topology, 0},
 	{"i915_shrinker_info", i915_shrinker_info, 0},
 	{"i915_shared_dplls_info", i915_shared_dplls_info, 0},
-	{"i915_dp_mst_info", i915_dp_mst_info, 0},
 	{"i915_wa_registers", i915_wa_registers, 0},
 	{"i915_ddb_info", i915_ddb_info, 0},
 	{"i915_sseu_status", i915_sseu_status, 0},
