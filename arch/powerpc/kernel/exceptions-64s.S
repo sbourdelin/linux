@@ -136,8 +136,9 @@ TRAMP_KVM(PACA_EXNMI, 0x100)
 
 #ifdef CONFIG_PPC_P7_NAP
 EXC_COMMON_BEGIN(system_reset_idle_common)
-	mfspr	r12,SPRN_SRR1
-	b	pnv_powersave_wakeup
+	mfspr	r3,SPRN_SRR1
+	bltlr	cr3	/* no state loss, return to idle caller */
+	b	idle_return_gpr_loss
 #endif
 
 /*
@@ -416,17 +417,17 @@ EXC_COMMON_BEGIN(machine_check_idle_common)
 	 * Then decrement MCE nesting after finishing with the stack.
 	 */
 	ld	r3,_MSR(r1)
+	ld	r4,_LINK(r1)
 
 	lhz	r11,PACA_IN_MCE(r13)
 	subi	r11,r11,1
 	sth	r11,PACA_IN_MCE(r13)
 
-	/* Turn off the RI bit because SRR1 is used by idle wakeup code. */
-	/* Recoverability could be improved by reducing the use of SRR1. */
-	li	r11,0
-	mtmsrd	r11,1
-
-	b	pnv_powersave_wakeup_mce
+	mtlr	r4
+	rlwinm	r10,r3,47-31,30,31
+	cmpwi	cr3,r10,2
+	bltlr	cr3	/* no state loss, return to idle caller */
+	b	idle_return_gpr_loss
 #endif
 	/*
 	 * Handle machine check early in real mode. We come here with

@@ -34,6 +34,7 @@
 #include <asm/thread_info.h>
 #include <asm/asm-compat.h>
 #include <asm/feature-fixups.h>
+#include <asm/cpuidle.h>
 
 /* Sign-extend HDEC if not on POWER9 */
 #define EXTEND_HDEC(reg)			\
@@ -322,25 +323,17 @@ kvm_novcpu_exit:
 	b	kvmhv_switch_to_host
 
 /*
- * We come in here when wakened from nap mode.
- * Relocation is off and most register values are lost.
- * r13 points to the PACA.
+ * We come in here when wakened from Linux offline idle code.
+ * Relocation is off
  * r3 contains the SRR1 wakeup value, SRR1 is trashed.
  */
 	.globl	kvm_start_guest
 kvm_start_guest:
-	/* Set runlatch bit the minute you wake up from nap */
-	mfspr	r0, SPRN_CTRLF
-	ori 	r0, r0, 1
-	mtspr	SPRN_CTRLT, r0
-
 	/*
 	 * Could avoid this and pass it through in r3. For now,
 	 * code expects it to be in SRR1.
 	 */
 	mtspr	SPRN_SRR1,r3
-
-	ld	r2,PACATOC(r13)
 
 	li	r0,0
 	stb	r0,PACA_FTRACE_ENABLED(r13)
@@ -348,16 +341,9 @@ kvm_start_guest:
 	li	r0,KVM_HWTHREAD_IN_KVM
 	stb	r0,HSTATE_HWTHREAD_STATE(r13)
 
-	/* NV GPR values from power7_idle() will no longer be valid */
-	li	r0,1
-	stb	r0,PACA_NAPSTATELOST(r13)
-
-	/* were we napping due to cede? */
+	/* kvm cede / napping does not come through here */
 	lbz	r0,HSTATE_NAPPING(r13)
-	cmpwi	r0,NAPPING_CEDE
-	beq	kvm_end_cede
-	cmpwi	r0,NAPPING_NOVCPU
-	beq	kvm_novcpu_wakeup
+	twnei	r0,0
 
 	ld	r1,PACAEMERGSP(r13)
 	subi	r1,r1,STACK_FRAME_OVERHEAD
@@ -469,19 +455,17 @@ kvm_no_guest:
 	lbz	r3, HSTATE_HWTHREAD_REQ(r13)
 	cmpwi	r3, 0
 	bne	54f
-/*
- * We jump to pnv_wakeup_loss, which will return to the caller
- * of power7_nap in the powernv cpu offline loop.  The value we
- * put in r3 becomes the return value for power7_nap. pnv_wakeup_loss
- * requires SRR1 in r12.
- */
+
+	/*
+	 * Jump to idle_return_gpr_loss, which returns to the
+	 * idle_kvm_start_guest caller.
+	 */
 	li	r3, LPCR_PECE0
 	mfspr	r4, SPRN_LPCR
 	rlwimi	r4, r3, 0, LPCR_PECE0 | LPCR_PECE1
 	mtspr	SPRN_LPCR, r4
 	li	r3, 0
-	mfspr	r12,SPRN_SRR1
-	b	pnv_wakeup_loss
+	b	idle_return_gpr_loss
 
 53:	HMT_LOW
 	ld	r5, HSTATE_KVM_VCORE(r13)
@@ -2760,21 +2744,47 @@ BEGIN_FTR_SECTION
 	li	r4, LPCR_PECE_HVEE@higher
 	sldi	r4, r4, 32
 	or	r5, r5, r4
-END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
+FTR_SECTION_ELSE
+	li	r3, PNV_THREAD_NAP
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_ARCH_300)
 	mtspr	SPRN_LPCR,r5
 	isync
-	li	r0, 0
-	std	r0, HSTATE_SCRATCH0(r13)
-	ptesync
-	ld	r0, HSTATE_SCRATCH0(r13)
-1:	cmpd	r0, r0
-	bne	1b
+
+	mr	r0, r1
+	ld	r1, PACAEMERGSP(r13)
+	subi	r1, r1, STACK_FRAME_OVERHEAD
+	std	r0, 0(r1)
+	ld	r0, PACAR1(r13)
+	std	r0, 8(r1)
+
 BEGIN_FTR_SECTION
-	nap
+	bl	isa300_idle_stop_mayloss
 FTR_SECTION_ELSE
-	PPC_STOP
-ALT_FTR_SECTION_END_IFCLR(CPU_FTR_ARCH_300)
-	b	.
+	bl	isa206_idle_insn_mayloss
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_ARCH_300)
+
+	mfspr	r0, SPRN_CTRLF
+	ori	r0, r0, 1
+	mtspr	SPRN_CTRLT, r0
+
+	ld	r0, 8(r1)
+	std	r0, PACAR1(r13)
+	ld	r1, 0(r1)
+
+	mtspr	SPRN_SRR1, r3
+
+	li	r0, 0
+	stb	r0, PACA_FTRACE_ENABLED(r13)
+
+	li	r0, KVM_HWTHREAD_IN_KVM
+	stb	r0, HSTATE_HWTHREAD_STATE(r13)
+
+	lbz	r0, HSTATE_NAPPING(r13)
+	cmpwi	r0, NAPPING_CEDE
+	beq	kvm_end_cede
+	cmpwi	r0, NAPPING_NOVCPU
+	beq	kvm_novcpu_wakeup
+	twi	31,0,0 /* Nap state must not be zero */
 
 33:	mr	r4, r3
 	li	r3, 0
