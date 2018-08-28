@@ -26,14 +26,16 @@
 #define _I915_PCIIDS_H
 
 /*
- * A pci_device_id struct {
- *	__u32 vendor, device;
- *      __u32 subvendor, subdevice;
- *	__u32 class, class_mask;
- *	kernel_ulong_t driver_data;
+ * These macros can be used with a struct declared like this:
+ *
+ * struct pci_device_id {
+ * 	__u32 vendor, device;
+ * 	__u32 subvendor, subdevice;
+ * 	__u32 class, class_mask;
+ * 	kernel_ulong_t driver_data;
  * };
- * Don't use C99 here because "class" is reserved and we want to
- * give userspace flexibility.
+ *
+ * First two fields may be __u16 if PCI_DEVICE_ANY is not used
  */
 #define INTEL_VGA_DEVICE(id, info) {		\
 	0x8086,	id,				\
