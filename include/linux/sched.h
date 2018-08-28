@@ -279,6 +279,9 @@ struct vtime {
 	u64			gtime;
 };
 
+/* Clamp not valid, i.e. group not assigned or invalid value */
+#define UCLAMP_NOT_VALID -1
+
 enum uclamp_id {
 	UCLAMP_MIN = 0, /* Minimum utilization */
 	UCLAMP_MAX,     /* Maximum utilization */
@@ -575,6 +578,17 @@ struct sched_dl_entity {
 	struct hrtimer inactive_timer;
 };
 
+/**
+ * Utilization's clamp group
+ *
+ * A utilization clamp group maps a "clamp value" (value), i.e.
+ * util_{min,max}, to a "clamp group index" (group_id).
+ */
+struct uclamp_se {
+	unsigned int value;
+	unsigned int group_id;
+};
+
 union rcu_special {
 	struct {
 		u8			blocked;
@@ -659,7 +673,7 @@ struct task_struct {
 
 #ifdef CONFIG_UCLAMP_TASK
 	/* Utlization clamp values for this task */
-	int				uclamp[UCLAMP_CNT];
+	struct uclamp_se		uclamp[UCLAMP_CNT];
 #endif
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
