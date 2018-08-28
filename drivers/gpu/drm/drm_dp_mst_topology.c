@@ -27,6 +27,7 @@
 #include <linux/sched.h>
 #include <linux/seq_file.h>
 #include <linux/i2c.h>
+#include <linux/debugfs.h>
 #include <drm/drm_dp_mst_helper.h>
 #include <drm/drmP.h>
 
@@ -3154,6 +3155,104 @@ struct drm_dp_mst_topology_state *drm_atomic_get_mst_topology_state(struct drm_a
 }
 EXPORT_SYMBOL(drm_atomic_get_mst_topology_state);
 
+#ifdef CONFIG_DEBUG_FS
+static int drm_dp_mst_debugfs_state_show(struct seq_file *m, void *data)
+{
+	drm_dp_mst_dump_topology(m, m->private);
+	return 0;
+}
+
+static int drm_dp_mst_debugfs_state_open(struct inode *inode,
+					 struct file *file)
+{
+	struct drm_dp_mst_topology_mgr *mgr = inode->i_private;
+
+	return single_open(file, drm_dp_mst_debugfs_state_show, mgr);
+}
+
+static const struct file_operations drm_dp_mst_debugfs_state_fops = {
+	.owner = THIS_MODULE,
+	.open = drm_dp_mst_debugfs_state_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+struct drm_dp_mst_debugfs_init_data {
+	struct drm_dp_mst_topology_mgr *mgr;
+	char *connector_name;
+};
+
+static void
+drm_dp_mst_debugfs_init(void *data)
+{
+	struct drm_dp_mst_debugfs_init_data *init_data = data;
+	struct drm_dp_mst_topology_mgr *mgr = init_data->mgr;
+	struct drm_minor *minor = mgr->dev->primary;
+	struct dentry *root;
+	bool put_ref = false;
+
+	/* Create the dp_mst directory for this device if it doesn't exist
+	 * already
+	 */
+	root = debugfs_lookup("dp_mst", minor->debugfs_root);
+	if (root) {
+		put_ref = true;
+	} else {
+		root = debugfs_create_dir("dp_mst", minor->debugfs_root);
+		if (!root || IS_ERR(root))
+			return;
+	}
+
+	mgr->debugfs = debugfs_create_dir(init_data->connector_name, root);
+	if (!mgr->debugfs)
+		goto out_dput;
+
+	debugfs_create_file("state", 0444, mgr->debugfs, mgr,
+			    &drm_dp_mst_debugfs_state_fops);
+
+out_dput:
+	if (put_ref)
+		dput(root);
+}
+
+static void
+drm_dp_mst_debugfs_cleanup_cb(void *data)
+{
+	struct drm_dp_mst_debugfs_init_data *init_data = data;
+
+	init_data->mgr->debugfs_init_cb = NULL;
+	kfree(init_data->connector_name);
+	kfree(init_data);
+}
+
+static void
+drm_dp_mst_debugfs_register(struct drm_dp_mst_topology_mgr *mgr,
+			    struct drm_connector *connector)
+{
+	struct drm_dp_mst_debugfs_init_data *init_data;
+
+	if (!connector)
+		return;
+
+	init_data = kmalloc(sizeof(*init_data), GFP_KERNEL);
+	if (!init_data)
+		return;
+
+	init_data->mgr = mgr;
+	init_data->connector_name = kstrdup(connector->name, GFP_KERNEL);
+	if (!init_data->connector_name) {
+		kfree(init_data);
+		return;
+	}
+
+	drm_debugfs_register_callback(mgr->dev->primary,
+				      drm_dp_mst_debugfs_init,
+				      drm_dp_mst_debugfs_cleanup_cb,
+				      init_data, &mgr->debugfs_init_cb);
+}
+#endif
+
 /**
  * drm_dp_mst_topology_mgr_init - initialise a topology manager
  * @mgr: manager struct to initialise
@@ -3214,6 +3313,9 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 	drm_atomic_private_obj_init(&mgr->base,
 				    &mst_state->base,
 				    &mst_state_funcs);
+#ifdef CONFIG_DEBUG_FS
+	drm_dp_mst_debugfs_register(mgr, connector);
+#endif
 
 	return 0;
 }
@@ -3225,6 +3327,10 @@ EXPORT_SYMBOL(drm_dp_mst_topology_mgr_init);
  */
 void drm_dp_mst_topology_mgr_destroy(struct drm_dp_mst_topology_mgr *mgr)
 {
+#ifdef CONFIG_DEBUG_FS
+	drm_debugfs_unregister_callback(mgr->dev->primary,
+					mgr->debugfs_init_cb);
+#endif
 	flush_work(&mgr->work);
 	flush_work(&mgr->destroy_connector_work);
 	mutex_lock(&mgr->payload_lock);
