@@ -6247,7 +6247,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	    (port == PORT_B || port == PORT_C ||
 	     port == PORT_D || port == PORT_F))
 		intel_dp_mst_encoder_init(intel_dig_port,
-					  intel_connector->base.base.id);
+					  &intel_connector->base);
 
 	if (!intel_edp_init_connector(intel_dp, intel_connector)) {
 		intel_dp_aux_fini(intel_dp);

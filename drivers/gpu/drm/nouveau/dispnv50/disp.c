@@ -1195,7 +1195,7 @@ nv50_mstm_del(struct nv50_mstm **pmstm)
 
 static int
 nv50_mstm_new(struct nouveau_encoder *outp, struct drm_dp_aux *aux, int aux_max,
-	      int conn_base_id, struct nv50_mstm **pmstm)
+	      struct drm_connector *connector, struct nv50_mstm **pmstm)
 {
 	const int max_payloads = hweight8(outp->dcb->heads);
 	struct drm_device *dev = outp->base.base.dev;
@@ -1219,7 +1219,7 @@ nv50_mstm_new(struct nouveau_encoder *outp, struct drm_dp_aux *aux, int aux_max,
 	mstm->mgr.cbs = &nv50_mstm;
 
 	ret = drm_dp_mst_topology_mgr_init(&mstm->mgr, dev, aux, aux_max,
-					   max_payloads, conn_base_id);
+					   max_payloads, connector);
 	if (ret)
 		return ret;
 
@@ -1465,7 +1465,7 @@ nv50_sor_create(struct drm_connector *connector, struct dcb_output *dcbe)
 		if ((data = nvbios_dp_table(bios, &ver, &hdr, &cnt, &len)) &&
 		    ver >= 0x40 && (nvbios_rd08(bios, data + 0x08) & 0x04)) {
 			ret = nv50_mstm_new(nv_encoder, &nv_connector->aux, 16,
-					    nv_connector->base.base.id,
+					    &nv_connector->base,
 					    &nv_encoder->dp.mstm);
 			if (ret)
 				return ret;
