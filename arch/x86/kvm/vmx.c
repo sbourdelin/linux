@@ -12592,30 +12592,30 @@ static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu,
 	u32 exit_reason = EXIT_REASON_INVALID_STATE;
 	u32 exit_qual;
 
-	if (from_vmentry) {
-		if (check_vmentry_postreqs(vcpu, vmcs12, &exit_qual))
-			goto consistency_check_vmexit;
-	}
-
-	enter_guest_mode(vcpu);
-
 	if (!(vmcs12->vm_entry_controls & VM_ENTRY_LOAD_DEBUG_CONTROLS))
 		vmx->nested.vmcs01_debugctl = vmcs_read64(GUEST_IA32_DEBUGCTL);
 
 	vmx_switch_vmcs(vcpu, &vmx->nested.vmcs02);
-	vmx_segment_cache_clear(vmx);
-
-	if (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETING)
-		vcpu->arch.tsc_offset += vmcs12->tsc_offset;
 
 	prepare_vmcs02_early(vmx, vmcs12);
+
+	if (from_vmentry) {
+		nested_get_vmcs12_pages(vcpu);
+
+		if (check_vmentry_postreqs(vcpu, vmcs12, &exit_qual))
+			goto consistency_check_vmexit;
+	}
+
+	vmx_segment_cache_clear(vmx);
+
+	enter_guest_mode(vcpu);
+	if (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETING)
+		vcpu->arch.tsc_offset += vmcs12->tsc_offset;
 
 	if (prepare_vmcs02(vcpu, vmcs12, &exit_qual))
 		goto fail;
 
 	if (from_vmentry) {
-		nested_get_vmcs12_pages(vcpu);
-
 		exit_reason = EXIT_REASON_MSR_LOAD_FAIL;
 		exit_qual = nested_vmx_load_msr(vcpu,
 						vmcs12->vm_entry_msr_load_addr,
@@ -12645,7 +12645,6 @@ fail:
 	if (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETING)
 		vcpu->arch.tsc_offset -= vmcs12->tsc_offset;
 	leave_guest_mode(vcpu);
-	vmx_switch_vmcs(vcpu, &vmx->vmcs01);
 
 	/*
 	 * A consistency check VMExit during L1's VMEnter to L2 is a subset
@@ -12654,6 +12653,7 @@ fail:
 	 * reason and exit-qualification parameters).
 	 */
 consistency_check_vmexit:
+	vmx_switch_vmcs(vcpu, &vmx->vmcs01);
 	vm_entry_controls_reset_shadow(vmx);
 	vm_exit_controls_reset_shadow(vmx);
 	vmx_segment_cache_clear(vmx);
