@@ -12613,7 +12613,7 @@ static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu,
 		vcpu->arch.tsc_offset += vmcs12->tsc_offset;
 
 	if (prepare_vmcs02(vcpu, vmcs12, &exit_qual))
-		goto fail;
+		goto consistency_check_vmexit_guest_mode;
 
 	if (from_vmentry) {
 		exit_reason = EXIT_REASON_MSR_LOAD_FAIL;
@@ -12621,7 +12621,7 @@ static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu,
 						vmcs12->vm_entry_msr_load_addr,
 						vmcs12->vm_entry_msr_load_count);
 		if (exit_qual)
-			goto fail;
+			goto consistency_check_vmexit_guest_mode;
 	} else {
 		/*
 		 * The MMU is not initialized to point at the right entities yet and
@@ -12641,7 +12641,7 @@ static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu,
 	 */
 	return 0;
 
-fail:
+consistency_check_vmexit_guest_mode:
 	if (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETING)
 		vcpu->arch.tsc_offset -= vmcs12->tsc_offset;
 	leave_guest_mode(vcpu);
