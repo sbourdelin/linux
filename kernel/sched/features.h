@@ -95,3 +95,8 @@ SCHED_FEAT(UTIL_EST, true)
  * Utilization clamping lazy update.
  */
 SCHED_FEAT(UCLAMP_LAZY_UPDATE, false)
+
+/*
+ * Utilization clamping discretization.
+ */
+SCHED_FEAT(UCLAMP_ROUNDING, true)

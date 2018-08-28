@@ -807,6 +807,34 @@ static struct uclamp_map uclamp_maps[UCLAMP_CNT]
 #define UCLAMP_ENOSPC_FMT "Cannot allocate more than " \
 	__stringify(CONFIG_UCLAMP_GROUPS_COUNT) " UTIL_%s clamp groups\n"
 
+/*
+ * uclamp_round: round a clamp value to the closest trackable value
+ *
+ * The number of clamp group, which is defined at compile time, allows to
+ * track a finete number of different clamp values. This makes sense from both
+ * a practical standpoint, since we do not expect many different values at on
+ * a real system, as well as for run-time efficiency.
+ *
+ * To ensure a clamp group is always available, this methd allows to
+ * discretize a required value into one of the possible available clamp
+ * groups.
+ */
+static inline int uclamp_round(int value)
+{
+#define UCLAMP_GROUP_DELTA (SCHED_CAPACITY_SCALE / CONFIG_UCLAMP_GROUPS_COUNT)
+#define UCLAMP_GROUP_UPPER (UCLAMP_GROUP_DELTA * CONFIG_UCLAMP_GROUPS_COUNT)
+
+	if (unlikely(!sched_feat(UCLAMP_ROUNDING)))
+		return value;
+
+	if (value <= 0)
+		return value;
+	if (value >= UCLAMP_GROUP_UPPER)
+		return SCHED_CAPACITY_SCALE;
+
+	return UCLAMP_GROUP_DELTA * (value / UCLAMP_GROUP_DELTA);
+}
+
 /**
  * uclamp_group_available: checks if a clamp group is available
  * @clamp_id: the utilization clamp index (i.e. min or max clamp)
@@ -845,6 +873,9 @@ static inline void uclamp_group_init(int clamp_id, int group_id,
 	struct uclamp_map *uc_map = &uclamp_maps[clamp_id][0];
 	struct uclamp_cpu *uc_cpu;
 	int cpu;
+
+	/* Clamp groups are always initialized to the rounded clamp value */
+	clamp_value = uclamp_round(clamp_value);
 
 	/* Set clamp group map */
 	uc_map[group_id].value = clamp_value;
@@ -892,6 +923,7 @@ uclamp_group_find(int clamp_id, unsigned int clamp_value)
 	int free_group_id = UCLAMP_NOT_VALID;
 	unsigned int group_id = 0;
 
+	clamp_value = uclamp_round(clamp_value);
 	for ( ; group_id <= CONFIG_UCLAMP_GROUPS_COUNT; ++group_id) {
 		/* Keep track of first free clamp group */
 		if (uclamp_group_available(clamp_id, group_id)) {
@@ -979,6 +1011,22 @@ static inline void uclamp_cpu_update(struct rq *rq, int clamp_id,
  *    task_struct::uclamp::effective::value
  * is updated to represent the clamp value corresponding to the taks effective
  * group index.
+ *
+ * Thus, the effective clamp value for a task is granted to be in the range of
+ * the rounded clamp values of its effective clamp group. For example:
+ *  - CONFIG_UCLAMP_GROUPS_COUNT=5 => UCLAMP_GROUP_DELTA=20%
+ *  - TaskA:      util_min=25%     => clamp_group1: range [20-39]%
+ *  - TaskB:      util_min=35%     => clamp_group1: range [20-39]%
+ *  - TaskGroupA: util_min=10%     => clamp_group0: range [ 0-19]%
+ * Then, when TaskA is part of TaskGroupA, it will be:
+ *  - allocated in clamp_group1
+ *  - clamp_group1.value=25
+ *    while TaskA is running alone
+ *  - clamp_group1.value=35
+ *    since TaskB was RUNNABLE and until TaskA is RUNNABLE
+ *  - clamp_group1.value=20
+ *    i.e. CPU's clamp group value is reset to the nominal rounded value,
+ *    while TaskA and TaskB are not RUNNABLE
  */
 static inline int uclamp_task_group_id(struct task_struct *p, int clamp_id)
 {
@@ -1106,6 +1154,10 @@ static inline void uclamp_cpu_get_id(struct task_struct *p,
 		uc_cpu->value[clamp_id] = clamp_value;
 	}
 
+	/* Track the max effective clamp value for each CPU's clamp group */
+	if (clamp_value > uc_cpu->group[clamp_id][group_id].value)
+		uc_cpu->group[clamp_id][group_id].value = clamp_value;
+
 	/*
 	 * If this is the new max utilization clamp value, then we can update
 	 * straight away the CPU clamp value. Otherwise, the current CPU clamp
@@ -1170,8 +1222,13 @@ static inline void uclamp_cpu_put_id(struct task_struct *p,
 		     cpu_of(rq), clamp_id, group_id);
 	}
 #endif
-	if (clamp_value >= uc_cpu->value[clamp_id])
+	if (clamp_value >= uc_cpu->value[clamp_id]) {
+		/* Reset CPU's clamp value to rounded clamp group value */
+		clamp_value = uclamp_group_value(clamp_id, group_id);
+		uc_cpu->group[clamp_id][group_id].value = clamp_value;
+
 		uclamp_cpu_update(rq, clamp_id, clamp_value);
+	}
 }
 
 /**

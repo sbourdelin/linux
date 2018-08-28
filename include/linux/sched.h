@@ -608,17 +608,18 @@ struct sched_dl_entity {
  * either tasks or task groups, to enforce the same clamp "value" for a given
  * clamp index.
  *
- * Scheduling entity's specific clamp group index can be different
- * from the effective clamp group index used at enqueue time since
- * task groups's clamps can be restricted by their parent task group.
+ * Scheduling entity's specific clamp value and group index can be different
+ * from the effective value and group index used at enqueue time. Indeed:
+ * - task's clamps can be restricted by their task group calmps
+ * - task groups's clamps can be restricted by their parent task group
  */
 struct uclamp_se {
 	unsigned int value;
 	unsigned int group_id;
 	/*
-	 * Effective task (group) clamp value and group index.
-	 * For task groups it's the value (eventually) enforced by a parent
-	 * task group.
+	 * Effective task (group) clamp value and group index:
+	 * for tasks: those used at enqueue time
+	 * for task groups: those (eventually) enforced by a parent task group
 	 */
 	struct {
 		unsigned int value;
