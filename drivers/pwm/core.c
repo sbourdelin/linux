@@ -136,6 +136,7 @@ struct pwm_device *
 of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
 {
 	struct pwm_device *pwm;
+	int modebit;
 
 	/* check, whether the driver supports a third cell for flags */
 	if (pc->of_pwm_n_cells < 3)
@@ -154,9 +155,23 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
 
 	pwm->args.period = args->args[1];
 	pwm->args.polarity = PWM_POLARITY_NORMAL;
+	pwm->args.mode = pwm_mode_get_valid(pc, pwm);
 
-	if (args->args_count > 2 && args->args[2] & PWM_POLARITY_INVERTED)
-		pwm->args.polarity = PWM_POLARITY_INVERSED;
+	if (args->args_count > 2) {
+		if (args->args[2] & PWM_POLARITY_INVERTED)
+			pwm->args.polarity = PWM_POLARITY_INVERSED;
+
+		for (modebit = PWMC_MODE_COMPLEMENTARY_BIT;
+		     modebit < PWMC_MODE_CNT; modebit++) {
+			unsigned long mode = BIT(modebit);
+
+			if ((args->args[2] & mode) &&
+			    pwm_mode_valid(pwm, mode)) {
+				pwm->args.mode = mode;
+				break;
+			}
+		}
+	}
 
 	return pwm;
 }
@@ -183,6 +198,7 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 		return pwm;
 
 	pwm->args.period = args->args[1];
+	pwm->args.mode = pwm_mode_get_valid(pc, pwm);
 
 	return pwm;
 }
@@ -250,6 +266,97 @@ static bool pwm_ops_check(const struct pwm_ops *ops)
 }
 
 /**
+ * pwm_get_caps() - get PWM capabilities of a PWM device
+ * @chip: PWM chip
+ * @pwm: PWM device to get the capabilities for
+ * @caps: returned capabilities
+ *
+ * Returns: 0 on success or a negative error code on failure
+ */
+int pwm_get_caps(struct pwm_chip *chip, struct pwm_device *pwm,
+		 struct pwm_caps *caps)
+{
+	if (!chip || !pwm || !caps)
+		return -EINVAL;
+
+	if (chip->ops && chip->ops->get_caps)
+		pwm->chip->ops->get_caps(chip, pwm, caps);
+	else if (chip->get_default_caps)
+		chip->get_default_caps(caps);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_get_caps);
+
+static void pwmchip_get_default_caps(struct pwm_caps *caps)
+{
+	static const struct pwm_caps default_caps = {
+		.modes = PWMC_MODE(NORMAL),
+	};
+
+	if (!caps)
+		return;
+
+	*caps = default_caps;
+}
+
+/**
+ * pwm_mode_get_valid() - get the first available valid mode for PWM
+ * @chip: PWM chip
+ * @pwm: PWM device to get the valid mode for
+ *
+ * Returns: first valid mode for PWM device
+ */
+unsigned long pwm_mode_get_valid(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct pwm_caps caps;
+
+	if (pwm_get_caps(chip, pwm, &caps))
+		return PWMC_MODE(NORMAL);
+
+	return BIT(ffs(caps.modes) - 1);
+}
+EXPORT_SYMBOL_GPL(pwm_mode_get_valid);
+
+/**
+ * pwm_mode_valid() - check if mode is valid for PWM device
+ * @pwm: PWM device
+ * @mode: PWM mode to check if valid
+ *
+ * Returns: true if mode is valid and false otherwise
+ */
+bool pwm_mode_valid(struct pwm_device *pwm, unsigned long mode)
+{
+	struct pwm_caps caps;
+
+	if (!pwm || !mode)
+		return false;
+
+	if (hweight_long(mode) != 1 || ffs(mode) - 1 >= PWMC_MODE_CNT)
+		return false;
+
+	if (pwm_get_caps(pwm->chip, pwm, &caps))
+		return false;
+
+	return (caps.modes & mode);
+}
+EXPORT_SYMBOL_GPL(pwm_mode_valid);
+
+const char *pwm_mode_desc(struct pwm_device *pwm, unsigned long mode)
+{
+	static const char * const modes[] = {
+		"invalid",
+		"normal",
+		"complementary",
+	};
+
+	if (!pwm_mode_valid(pwm, mode))
+		return modes[0];
+
+	return modes[ffs(mode)];
+}
+
+/**
  * pwmchip_add_with_polarity() - register a new PWM chip
  * @chip: the PWM chip to add
  * @polarity: initial polarity of PWM channels
@@ -275,6 +382,8 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 
 	mutex_lock(&pwm_lock);
 
+	chip->get_default_caps = pwmchip_get_default_caps;
+
 	ret = alloc_pwms(chip->base, chip->npwm);
 	if (ret < 0)
 		goto out;
@@ -294,6 +403,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 		pwm->pwm = chip->base + i;
 		pwm->hwpwm = i;
 		pwm->state.polarity = polarity;
+		pwm->state.mode = pwm_mode_get_valid(chip, pwm);
 
 		if (chip->ops->get_state)
 			chip->ops->get_state(chip, pwm, &pwm->state);
@@ -469,7 +579,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
 	int err;
 
 	if (!pwm || !state || !state->period ||
-	    state->duty_cycle > state->period)
+	    state->duty_cycle > state->period ||
+	    !pwm_mode_valid(pwm, state->mode))
 		return -EINVAL;
 
 	if (!memcmp(state, &pwm->state, sizeof(*state)))
@@ -530,6 +641,9 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
 
 			pwm->state.enabled = state->enabled;
 		}
+
+		/* No mode support for non-atomic PWM. */
+		pwm->state.mode = state->mode;
 	}
 
 	return 0;
@@ -578,6 +692,8 @@ int pwm_adjust_config(struct pwm_device *pwm)
 
 	pwm_get_args(pwm, &pargs);
 	pwm_get_state(pwm, &state);
+
+	state.mode = pargs.mode;
 
 	/*
 	 * If the current period is zero it means that either the PWM driver
@@ -850,6 +966,7 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
 
 	pwm->args.period = chosen->period;
 	pwm->args.polarity = chosen->polarity;
+	pwm->args.mode = pwm_mode_get_valid(chip, pwm);
 
 	return pwm;
 }
@@ -999,6 +1116,7 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
 		seq_printf(s, " duty: %u ns", state.duty_cycle);
 		seq_printf(s, " polarity: %s",
 			   state.polarity ? "inverse" : "normal");
+		seq_printf(s, " mode: %s", pwm_mode_desc(pwm, state.mode));
 
 		seq_puts(s, "\n");
 	}
