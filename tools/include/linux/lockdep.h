@@ -31,11 +31,15 @@ struct task_struct {
 	gfp_t lockdep_reclaim_gfp;
 	int pid;
 	char comm[17];
+	long state;
 };
 
 extern struct task_struct *__curr(void);
 
 #define current (__curr())
+
+/* lockdep checks task_struct::state == TASK_RUNNING */
+#define TASK_RUNNING 0
 
 static inline int debug_locks_off(void)
 {
