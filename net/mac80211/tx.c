@@ -3185,11 +3185,11 @@ static bool ieee80211_amsdu_aggregate(struct ieee80211_sub_if_data *sdata,
 	u8 max_subframes = sta->sta.max_amsdu_subframes;
 	int max_frags = local->hw.max_tx_fragments;
 	int max_amsdu_len = sta->sta.max_amsdu_len;
+	int n = 1, nfrags, delta;
 	__be16 len;
 	void *data;
 	bool ret = false;
 	unsigned int orig_len;
-	int n = 1, nfrags;
 
 	if (!ieee80211_hw_check(&local->hw, TX_AMSDU))
 		return false;
@@ -3222,9 +3222,6 @@ static bool ieee80211_amsdu_aggregate(struct ieee80211_sub_if_data *sdata,
 	if (skb->len + head->len > max_amsdu_len)
 		goto out;
 
-	if (!ieee80211_amsdu_prepare_head(sdata, fast_tx, head))
-		goto out;
-
 	nfrags = 1 + skb_shinfo(skb)->nr_frags;
 	nfrags += 1 + skb_shinfo(head)->nr_frags;
 	frag_tail = &skb_shinfo(head)->frag_list;
@@ -3240,9 +3237,14 @@ static bool ieee80211_amsdu_aggregate(struct ieee80211_sub_if_data *sdata,
 	if (max_frags && nfrags > max_frags)
 		goto out;
 
-	if (!ieee80211_amsdu_realloc_pad(local, skb, sizeof(rfc1042_header) + 2,
-					 &subframe_len))
+	if (!ieee80211_amsdu_prepare_head(sdata, fast_tx, head))
 		goto out;
+
+	if (!ieee80211_amsdu_realloc_pad(local, skb, sizeof(rfc1042_header) + 2,
+					 &subframe_len)) {
+		delta = head->len - orig_len;
+		goto update_backlog;
+	}
 
 	ret = true;
 	data = skb_push(skb, ETH_ALEN + 2);
@@ -3256,11 +3258,14 @@ static bool ieee80211_amsdu_aggregate(struct ieee80211_sub_if_data *sdata,
 	head->len += skb->len;
 	head->data_len += skb->len;
 	*frag_tail = skb;
+	delta = head->len - orig_len;
 
-	flow->backlog += head->len - orig_len;
-	tin->backlog_bytes += head->len - orig_len;
-
-	fq_recalc_backlog(fq, tin, flow);
+update_backlog:
+	if (delta > 0) {
+		flow->backlog += delta;
+		tin->backlog_bytes += delta;
+		fq_recalc_backlog(fq, tin, flow);
+	}
 
 out:
 	spin_unlock_bh(&fq->lock);
