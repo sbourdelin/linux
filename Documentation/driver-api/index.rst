@@ -53,6 +53,7 @@ available subsections can be seen below.
    slimbus
    soundwire/index
    fpga/index
+   stratix10-svc
 
 .. only::  subproject and html
 
