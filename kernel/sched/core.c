@@ -741,6 +741,7 @@ unsigned int sysctl_sched_uclamp_util_min;
 unsigned int sysctl_sched_uclamp_util_max = 100;
 
 static struct uclamp_se uclamp_default[UCLAMP_CNT];
+static struct uclamp_se uclamp_default_perf[UCLAMP_CNT];
 
 /**
  * uclamp_map: reference counts a utilization "clamp value"
@@ -1052,10 +1053,15 @@ static inline int uclamp_task_group_id(struct task_struct *p, int clamp_id)
 	 */
 	if (unclamped && (task_group_is_autogroup(task_group(p)) ||
 			  task_group(p) == &root_task_group)) {
-		p->uclamp[clamp_id].effective.value =
-			uclamp_default[clamp_id].value;
 
-		return uclamp_default[clamp_id].group_id;
+		/* Unclamped RT tasks: max perfs by default */
+		uc_se = task_has_rt_policy(p)
+			? &uclamp_default_perf[clamp_id]
+			: &uclamp_default[clamp_id];
+
+		p->uclamp[clamp_id].effective.value = uc_se->value;
+
+		return uc_se->group_id;
 	}
 
 	/* Use TG's clamp value to limit task specific values */
@@ -1069,10 +1075,15 @@ static inline int uclamp_task_group_id(struct task_struct *p, int clamp_id)
 #else
 	/* By default, all tasks get the system default clamp value */
 	if (unclamped) {
-		p->uclamp[clamp_id].effective.value =
-			uclamp_default[clamp_id].value;
 
-		return uclamp_default[clamp_id].group_id;
+		/* Unclamped RT tasks: max perfs by default */
+		uc_se = task_has_rt_policy(p)
+			? &uclamp_default_perf[clamp_id]
+			: &uclamp_default[clamp_id];
+
+		p->uclamp[clamp_id].effective.value = uc_se->value;
+
+		return uc_se->group_id;
 	}
 #endif
 
@@ -1761,6 +1772,13 @@ static void __init init_uclamp(void)
 		uc_se->group_id = UCLAMP_NOT_VALID;
 		uclamp_group_get(NULL, NULL, clamp_id, 0, uc_se,
 				 uclamp_none(clamp_id));
+
+		/* Init max perf clamps: default for RT tasks */
+		uc_se = &uclamp_default_perf[clamp_id];
+		uc_se->group_id = UCLAMP_NOT_VALID;
+		uclamp_group_get(NULL, NULL, clamp_id, 0, uc_se,
+				 uclamp_none(UCLAMP_MAX));
+
 	}
 }
 
