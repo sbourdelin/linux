@@ -25,6 +25,7 @@
 #include <linux/types.h>
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_atomic.h>
+#include <drm/drm_debugfs.h>
 
 struct drm_dp_mst_branch;
 
@@ -568,6 +569,19 @@ struct drm_dp_mst_topology_mgr {
 	 * avoid locking inversion.
 	 */
 	struct work_struct destroy_connector_work;
+#ifdef CONFIG_DEBUG_FS
+	/**
+	 * @debugfs_init_cb: Pending debugfs callback for initializing the
+	 * debugfs files for this topology.
+	 */
+	struct drm_debugfs_callback *debugfs_init_cb;
+
+	/**
+	 * @debugfs_entry: dentry for dp_mst_status located in connector's
+	 * debugfs directory.
+	 */
+	struct dentry *debugfs;
+#endif
 };
 
 int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
