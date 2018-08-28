@@ -1254,7 +1254,8 @@ static int dpu_plane_sspp_atomic_update(struct drm_plane *plane,
 	const struct dpu_format *fmt;
 	struct drm_crtc *crtc;
 	struct drm_framebuffer *fb;
-	struct drm_rect src, dst;
+	struct drm_rect clip = { 0 }, src, dst;
+	int hscale, vscale;
 
 	if (!plane) {
 		DPU_ERROR("invalid plane\n");
@@ -1299,6 +1300,17 @@ static int dpu_plane_sspp_atomic_update(struct drm_plane *plane,
 	src.y2 = src.y1 + (state->src_h >> 16);
 
 	dst = drm_plane_state_dest(state);
+
+	hscale = drm_rect_calc_hscale(&src, &dst,
+				      pdpu->pipe_sblk->maxupscale,
+				      pdpu->pipe_sblk->maxdwnscale);
+	vscale = drm_rect_calc_vscale(&src, &dst,
+				      pdpu->pipe_sblk->maxupscale,
+				      pdpu->pipe_sblk->maxdwnscale);
+
+	clip.x2 = crtc->state->adjusted_mode.hdisplay;
+	clip.y2 = crtc->state->adjusted_mode.vdisplay;
+	drm_rect_clip_scaled(&src, &dst, &clip, hscale, vscale);
 
 	DPU_DEBUG_PLANE(pdpu, "FB[%u] " DRM_RECT_FMT "->crtc%u " DRM_RECT_FMT
 			", %4.4s ubwc %d\n", fb->base.id, DRM_RECT_ARG(&src),
