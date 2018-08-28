@@ -8867,7 +8867,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	BUG_ON(strlen(name) >= sizeof(dev->name));
 
 	if (txqs < 1) {
-		pr_err("alloc_netdev: Unable to allocate device with zero queues\n");
+		pr_err("alloc_netdev: Unable to allocate device with zero TX queues\n");
 		return NULL;
 	}
 
