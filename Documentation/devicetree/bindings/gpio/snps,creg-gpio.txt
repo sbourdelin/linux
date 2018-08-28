@@ -1,0 +1,49 @@
+GPIO via CREG (Control REGisers) driver
+
+This is is single-register MMIO GPIO driver to control such strangely mapped 
+outputs:
+
+31            11        8         7        5         0   < bit number
+|              |        |         |        |         |
+[   not used   | gpio-1 | shift-1 | gpio-0 | shift-0 ]   < 32 bit MMIO register
+                   ^                  ^
+                   |                  |
+                   |           write 0x2 == set output to "1" (on)
+                   |           write 0x3 == set output to "0" (off)
+                   |
+            write 0x1 == set output to "1" (on)
+            write 0x4 == set output to "0" (off)
+
+
+Required properties:
+- compatible : "snps,creg-gpio"
+- reg : Exactly one register range with length 0x4.
+- #gpio-cells : Should be one - the pin number.
+- gpio-controller : Marks the device node as a GPIO controller.
+- snps,ngpios: Number of GPIO pins.
+- snps,bit-per-line: Number of bits per each gpio line (see picture).
+  Array the size of "snps,ngpios"
+- snps,shift: Shift (in bits) of the each GPIO field from the previous one in
+  register (see picture). Array the size of "snps,ngpios"
+- snps,on-val: Value should be set in corresponding field to set
+  output to "1" (see picture). Array the size of "snps,ngpios"
+- snps,off-val: Value should be set in corresponding field to set
+  output to "0" (see picture). Array the size of "snps,ngpios"
+
+Optional properties:
+- snps,default-val: default output field values. Array the size of "snps,ngpios"
+
+Example (see picture):
+
+gpio: gpio@f00014b0 {
+	compatible = "snps,creg-gpio";
+	reg = <0xf00014b0 0x4>;
+	gpio-controller;
+	#gpio-cells = <1>;
+	snps,ngpios = <2>;
+	snps,shift = <5 1>;
+	snps,bit-per-line = <2 3>;
+	snps,on-val = <2 1>;
+	snps,off-val = <3 4>;
+	snps,default-val = <2 1>;
+};
