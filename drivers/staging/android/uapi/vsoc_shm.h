@@ -92,7 +92,7 @@ struct fd_scoped_permission_arg {
  *    The transmitter can choose any appropriate hashing algorithm, including
  *    hash = futex_offset & ((1 << num_nodes_lg2) - 1)
  *
- * 3. The transmitter should atomically compare and swap futex_offset with 0
+ * 2. The transmitter should atomically compare and swap futex_offset with 0
  *    at hash. There are 3 possible outcomes
  *      a. The swap fails because the futex_offset is already in the table.
  *         The transmitter should stop.
