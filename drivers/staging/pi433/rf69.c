@@ -185,21 +185,25 @@ int rf69_set_modulation_shaping(struct spi_device *spi,
 	case FSK:
 		switch (mod_shaping) {
 		case SHAPING_OFF:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_NONE);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_NONE);
 		case SHAPING_1_0:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_1_0);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_1_0);
 		case SHAPING_0_5:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_0_5);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_0_5);
 		case SHAPING_0_3:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_0_3);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_0_3);
 		default:
 			dev_dbg(&spi->dev, "set: illegal input param");
 			return -EINVAL;
@@ -207,17 +211,20 @@ int rf69_set_modulation_shaping(struct spi_device *spi,
 	case OOK:
 		switch (mod_shaping) {
 		case SHAPING_OFF:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_NONE);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_NONE);
 		case SHAPING_BR:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_BR);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_BR);
 		case SHAPING_2BR:
-			return rf69_read_mod_write(spi, REG_DATAMODUL,
-						   MASK_DATAMODUL_MODULATION_SHAPE,
-						   DATAMODUL_MODULATION_SHAPE_2BR);
+			return rf69_read_mod_write(
+					spi, REG_DATAMODUL,
+					MASK_DATAMODUL_MODULATION_SHAPE,
+					DATAMODUL_MODULATION_SHAPE_2BR);
 		default:
 			dev_dbg(&spi->dev, "set: illegal input param");
 			return -EINVAL;
@@ -573,41 +580,58 @@ bool rf69_get_flag(struct spi_device *spi, enum flag flag)
 {
 	switch (flag) {
 	case mode_switch_completed:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_MODE_READY);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_MODE_READY);
 	case ready_to_receive:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_RX_READY);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_RX_READY);
 	case ready_to_send:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_TX_READY);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_TX_READY);
 	case pll_locked:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_PLL_LOCK);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_PLL_LOCK);
 	case rssi_exceeded_threshold:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_RSSI);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_RSSI);
 	case timeout:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_TIMEOUT);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_TIMEOUT);
 	case automode:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_AUTOMODE);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_AUTOMODE);
 	case sync_address_match:
-		return (rf69_read_reg(spi, REG_IRQFLAGS1) & MASK_IRQFLAGS1_SYNC_ADDRESS_MATCH);
+		return (rf69_read_reg(spi, REG_IRQFLAGS1) &
+				MASK_IRQFLAGS1_SYNC_ADDRESS_MATCH);
 	case fifo_full:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_FIFO_FULL);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_FIFO_FULL);
 /*
  *	case fifo_not_empty:
- *		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_FIFO_NOT_EMPTY);
+ *		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+ *				MASK_IRQFLAGS2_FIFO_NOT_EMPTY);
  */
 	case fifo_empty:
-		return !(rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_FIFO_NOT_EMPTY);
+		return !(rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_FIFO_NOT_EMPTY);
 	case fifo_level_below_threshold:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_FIFO_LEVEL);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_FIFO_LEVEL);
 	case fifo_overrun:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_FIFO_OVERRUN);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_FIFO_OVERRUN);
 	case packet_sent:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_PACKET_SENT);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_PACKET_SENT);
 	case payload_ready:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_PAYLOAD_READY);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_PAYLOAD_READY);
 	case crc_ok:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_CRC_OK);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_CRC_OK);
 	case battery_low:
-		return (rf69_read_reg(spi, REG_IRQFLAGS2) & MASK_IRQFLAGS2_LOW_BAT);
+		return (rf69_read_reg(spi, REG_IRQFLAGS2) &
+				MASK_IRQFLAGS2_LOW_BAT);
 	default:			 return false;
 	}
 }
@@ -718,7 +742,8 @@ int rf69_enable_crc(struct spi_device *spi)
 
 int rf69_disable_crc(struct spi_device *spi)
 {
-	return rf69_clear_bit(spi, REG_PACKETCONFIG1, MASK_PACKETCONFIG1_CRC_ON);
+	return rf69_clear_bit(spi, REG_PACKETCONFIG1,
+			      MASK_PACKETCONFIG1_CRC_ON);
 }
 
 int rf69_set_address_filtering(struct spi_device *spi,
