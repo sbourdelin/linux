@@ -2002,7 +2002,7 @@ int btrfs_release_file(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int start_ordered_ops(struct inode *inode, loff_t start, loff_t end)
+int btrfs_start_ordered_ops(struct inode *inode, loff_t start, loff_t end)
 {
 	int ret;
 	struct blk_plug plug;
@@ -2060,7 +2060,7 @@ int btrfs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	 * multi-task, and make the performance up.  See
 	 * btrfs_wait_ordered_range for an explanation of the ASYNC check.
 	 */
-	ret = start_ordered_ops(inode, start, end);
+	ret = btrfs_start_ordered_ops(inode, start, end);
 	if (ret)
 		goto out;
 

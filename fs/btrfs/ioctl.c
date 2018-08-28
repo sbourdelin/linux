@@ -3873,6 +3873,27 @@ static noinline int btrfs_clone_files(struct file *file, struct file *file_src,
 	}
 
 	/*
+	 * btrfs_cross_ref_exist() only does check at extent level,
+	 * we could cause unexpected NOCOW write to be COWed.
+	 * E.g.:
+	 * falloc 0 2M file1
+	 * pwrite 0 1M file1 (at this point it should go NOCOW)
+	 * reflink src=file1 srcoff=1M dst=file1 dstoff=4M len=1M
+	 * sync
+	 *
+	 * In above case, due to the preallocated extent is shared
+	 * the data at 0~1M can't go NOCOW.
+	 *
+	 * So flush the whole src inode to avoid any unneeded CoW.
+	 */
+	ret = btrfs_start_ordered_ops(src, 0, -1);
+	if (ret < 0)
+		goto out_unlock;
+	ret = btrfs_wait_ordered_range(src, 0, -1);
+	if (ret < 0)
+		goto out_unlock;
+
+	/*
 	 * Lock the target range too. Right after we replace the file extent
 	 * items in the fs tree (which now point to the cloned data), we might
 	 * have a worker replace them with extent items relative to a write
