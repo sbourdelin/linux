@@ -728,6 +728,20 @@ static void set_load_weight(struct task_struct *p, bool update_load)
  */
 static DEFINE_MUTEX(uclamp_mutex);
 
+/*
+ * Minimum utilization for tasks in the root cgroup
+ * default: 0
+ */
+unsigned int sysctl_sched_uclamp_util_min;
+
+/*
+ * Maximum utilization for tasks in the root cgroup
+ * default: 1024
+ */
+unsigned int sysctl_sched_uclamp_util_max = SCHED_CAPACITY_SCALE;
+
+static struct uclamp_se uclamp_default[UCLAMP_CNT];
+
 /**
  * uclamp_map: reference counts a utilization "clamp value"
  * @value:    the utilization "clamp value" required
@@ -961,11 +975,16 @@ static inline void uclamp_cpu_update(struct rq *rq, int clamp_id,
  *
  * This method returns the effective group index for a task, depending on its
  * status and a proper aggregation of the clamp values listed above.
+ * Moreover, it ensures that the task's effective value:
+ *    task_struct::uclamp::effective::value
+ * is updated to represent the clamp value corresponding to the taks effective
+ * group index.
  */
 static inline int uclamp_task_group_id(struct task_struct *p, int clamp_id)
 {
 	struct uclamp_se *uc_se;
 	int clamp_value;
+	bool unclamped;
 	int group_id;
 
 	/* Taks currently accounted into a clamp group */
@@ -977,12 +996,39 @@ static inline int uclamp_task_group_id(struct task_struct *p, int clamp_id)
 	clamp_value = uc_se->value;
 	group_id = uc_se->group_id;
 
+	unclamped = (clamp_value == UCLAMP_NOT_VALID);
 #ifdef CONFIG_UCLAMP_TASK_GROUP
+	/*
+	 * Tasks in the root group, which do not have a task specific clamp
+	 * value, get the system default clamp value.
+	 */
+	if (unclamped && (task_group_is_autogroup(task_group(p)) ||
+			  task_group(p) == &root_task_group)) {
+		p->uclamp[clamp_id].effective.value =
+			uclamp_default[clamp_id].value;
+
+		return uclamp_default[clamp_id].group_id;
+	}
+
 	/* Use TG's clamp value to limit task specific values */
 	uc_se = &task_group(p)->uclamp[clamp_id];
-	if (clamp_value > uc_se->effective.value)
-		group_id = uc_se->effective.group_id;
+	if (unclamped || clamp_value > uc_se->effective.value) {
+		p->uclamp[clamp_id].effective.value =
+			uc_se->effective.value;
+
+		return uc_se->effective.group_id;
+	}
+#else
+	/* By default, all tasks get the system default clamp value */
+	if (unclamped) {
+		p->uclamp[clamp_id].effective.value =
+			uclamp_default[clamp_id].value;
+
+		return uclamp_default[clamp_id].group_id;
+	}
 #endif
+
+	p->uclamp[clamp_id].effective.value = clamp_value;
 
 	return group_id;
 }
@@ -999,9 +1045,10 @@ static inline int uclamp_group_value(int clamp_id, int group_id)
 
 static inline int uclamp_task_value(struct task_struct *p, int clamp_id)
 {
-	int group_id = uclamp_task_group_id(p, clamp_id);
+	/* Ensure effective task's clamp value is update */
+	uclamp_task_group_id(p, clamp_id);
 
-	return uclamp_group_value(clamp_id, group_id);
+	return p->uclamp[clamp_id].effective.value;
 }
 
 /**
@@ -1047,7 +1094,7 @@ static inline void uclamp_cpu_get_id(struct task_struct *p,
 
 	/* Reset clamp holds on idle exit */
 	uc_cpu = &rq->uclamp;
-	clamp_value = p->uclamp[clamp_id].value;
+	clamp_value = p->uclamp[clamp_id].effective.value;
 	if (unlikely(uc_cpu->flags & UCLAMP_FLAG_IDLE)) {
 		/*
 		 * This function is called for both UCLAMP_MIN (before) and
@@ -1300,6 +1347,77 @@ static inline void uclamp_group_get(struct task_struct *p,
 	uclamp_group_put(clamp_id, prev_group_id);
 }
 
+int sched_uclamp_handler(struct ctl_table *table, int write,
+			 void __user *buffer, size_t *lenp,
+			 loff_t *ppos)
+{
+	int group_id[UCLAMP_CNT] = { UCLAMP_NOT_VALID };
+	struct uclamp_se *uc_se;
+	int old_min, old_max;
+	unsigned int value;
+	int result;
+
+	mutex_lock(&uclamp_mutex);
+
+	old_min = sysctl_sched_uclamp_util_min;
+	old_max = sysctl_sched_uclamp_util_max;
+
+	result = proc_dointvec(table, write, buffer, lenp, ppos);
+	if (result)
+		goto undo;
+	if (!write)
+		goto done;
+
+	result = -EINVAL;
+	if (sysctl_sched_uclamp_util_min > sysctl_sched_uclamp_util_max)
+		goto undo;
+	if (sysctl_sched_uclamp_util_max > SCHED_CAPACITY_SCALE)
+		goto undo;
+
+	/* Find a valid group_id for each required clamp value */
+	if (old_min != sysctl_sched_uclamp_util_min) {
+		value = sysctl_sched_uclamp_util_min;
+		result = uclamp_group_find(UCLAMP_MIN, value);
+		if (result == -ENOSPC) {
+			pr_err(UCLAMP_ENOSPC_FMT, "MIN");
+			goto undo;
+		}
+		group_id[UCLAMP_MIN] = result;
+	}
+	if (old_max != sysctl_sched_uclamp_util_max) {
+		value = sysctl_sched_uclamp_util_max;
+		result = uclamp_group_find(UCLAMP_MAX, value);
+		if (result == -ENOSPC) {
+			pr_err(UCLAMP_ENOSPC_FMT, "MAX");
+			goto undo;
+		}
+		group_id[UCLAMP_MAX] = result;
+	}
+	result = 0;
+
+	/* Update each required clamp group */
+	if (old_min != sysctl_sched_uclamp_util_min) {
+		uc_se = &uclamp_default[UCLAMP_MIN];
+		uclamp_group_get(NULL, UCLAMP_MIN, group_id[UCLAMP_MIN],
+				 uc_se, sysctl_sched_uclamp_util_min);
+	}
+	if (old_max != sysctl_sched_uclamp_util_max) {
+		uc_se = &uclamp_default[UCLAMP_MAX];
+		uclamp_group_get(NULL, UCLAMP_MAX, group_id[UCLAMP_MAX],
+				 uc_se, sysctl_sched_uclamp_util_max);
+	}
+	goto done;
+
+undo:
+	sysctl_sched_uclamp_util_min = old_min;
+	sysctl_sched_uclamp_util_max = old_max;
+
+done:
+	mutex_unlock(&uclamp_mutex);
+
+	return result;
+}
+
 #ifdef CONFIG_UCLAMP_TASK_GROUP
 /**
  * alloc_uclamp_sched_group: initialize a new TG's for utilization clamping
@@ -1468,6 +1586,8 @@ static void uclamp_fork(struct task_struct *p, bool reset)
 		if (unlikely(reset)) {
 			next_group_id = 0;
 			p->uclamp[clamp_id].value = uclamp_none(clamp_id);
+			p->uclamp[clamp_id].effective.value =
+				uclamp_none(clamp_id);
 		}
 		/* Forked tasks are not yet enqueued */
 		p->uclamp[clamp_id].effective.group_id = UCLAMP_NOT_VALID;
@@ -1475,6 +1595,10 @@ static void uclamp_fork(struct task_struct *p, bool reset)
 		p->uclamp[clamp_id].group_id = UCLAMP_NOT_VALID;
 		uclamp_group_get(NULL, clamp_id, next_group_id, uc_se,
 				 p->uclamp[clamp_id].value);
+
+		/* By default we do not want task-specific clamp values */
+		if (unlikely(reset))
+			p->uclamp[clamp_id].value = UCLAMP_NOT_VALID;
 	}
 }
 
@@ -1509,12 +1633,17 @@ static void __init init_uclamp(void)
 		uc_se->group_id = UCLAMP_NOT_VALID;
 		uclamp_group_get(NULL, clamp_id, 0, uc_se,
 				 uclamp_none(clamp_id));
+		/*
+		 * By default we do not want task-specific clamp values,
+		 * so that system default values apply.
+		 */
+		uc_se->value = UCLAMP_NOT_VALID;
 
 #ifdef CONFIG_UCLAMP_TASK_GROUP
 		/* Init root TG's clamp group */
 		uc_se = &root_task_group.uclamp[clamp_id];
 
-		uc_se->effective.value = uclamp_none(clamp_id);
+		uc_se->effective.value = uclamp_none(UCLAMP_MAX);
 		uc_se->effective.group_id = 0;
 
 		/*
@@ -1526,6 +1655,12 @@ static void __init init_uclamp(void)
 		uclamp_group_get(NULL, clamp_id, 0, uc_se,
 				 uclamp_none(UCLAMP_MAX));
 #endif
+
+		/* Init system defaul's clamp group */
+		uc_se = &uclamp_default[clamp_id];
+		uc_se->group_id = UCLAMP_NOT_VALID;
+		uclamp_group_get(NULL, clamp_id, 0, uc_se,
+				 uclamp_none(clamp_id));
 	}
 }
 
