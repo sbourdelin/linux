@@ -583,6 +583,10 @@ struct sched_dl_entity {
  *
  * A utilization clamp group maps a "clamp value" (value), i.e.
  * util_{min,max}, to a "clamp group index" (group_id).
+ *
+ * The same "group_id" can be used by multiple scheduling entities, i.e.
+ * either tasks or task groups, to enforce the same clamp "value" for a given
+ * clamp index.
  */
 struct uclamp_se {
 	unsigned int value;
