@@ -1416,6 +1416,13 @@ static int cnl_calc_wrpll_link(struct drm_i915_private *dev_priv,
 
 	ref_clock = dev_priv->cdclk.hw.ref;
 
+	/*
+	 * For ICL, the spec states: if reference frequency is 38.4, use 19.2
+	 * because the DPLL automatically divides that by 2.
+	 */
+	if (IS_ICELAKE(dev_priv) && ref_clock == 38400)
+		ref_clock = 19200;
+
 	dco_freq = (cfgcr0 & DPLL_CFGCR0_DCO_INTEGER_MASK) * ref_clock;
 
 	dco_freq += (((cfgcr0 & DPLL_CFGCR0_DCO_FRACTION_MASK) >>
