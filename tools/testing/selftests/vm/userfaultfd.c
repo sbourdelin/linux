@@ -636,9 +636,11 @@ static int userfaultfd_open(int features)
 
 	uffd = syscall(__NR_userfaultfd, O_CLOEXEC | O_NONBLOCK);
 	if (uffd < 0) {
-		fprintf(stderr,
-			"userfaultfd syscall not available in this kernel\n");
-		return 1;
+		int errnum = errno;
+
+		perror("userfaultfd syscall not available in this kernel");
+
+		exit(errnum == ENOSYS ? KSFT_SKIP : 1);
 	}
 	uffd_flags = fcntl(uffd, F_GETFD, NULL);
 
