@@ -45,7 +45,7 @@
  */
 DEFINE_MUTEX(klp_mutex);
 
-/* Registered patches */
+/* Actively used patches. */
 LIST_HEAD(klp_patches);
 
 static struct kobject *klp_root_kobj;
@@ -81,17 +81,6 @@ static void klp_find_object_module(struct klp_object *obj)
 		obj->mod = mod;
 
 	mutex_unlock(&module_mutex);
-}
-
-static bool klp_is_patch_registered(struct klp_patch *patch)
-{
-	struct klp_patch *mypatch;
-
-	list_for_each_entry(mypatch, &klp_patches, list)
-		if (mypatch == patch)
-			return true;
-
-	return false;
 }
 
 static bool klp_initialized(void)
@@ -292,7 +281,6 @@ static int klp_write_object_relocations(struct module *pmod,
  * /sys/kernel/livepatch/<patch>/<object>/<function,sympos>
  */
 static int __klp_disable_patch(struct klp_patch *patch);
-static int __klp_enable_patch(struct klp_patch *patch);
 
 static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 			     const char *buf, size_t count)
@@ -309,40 +297,33 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	mutex_lock(&klp_mutex);
 
-	if (!klp_is_patch_registered(patch)) {
-		/*
-		 * Module with the patch could either disappear meanwhile or is
-		 * not properly initialized yet.
-		 */
-		ret = -EINVAL;
-		goto err;
-	}
-
 	if (patch->enabled == enabled) {
 		/* already in requested state */
 		ret = -EINVAL;
-		goto err;
+		goto out;
 	}
 
-	if (patch == klp_transition_patch) {
+	/*
+	 * Allow to reverse a pending transition in both ways. It might be
+	 * necessary to complete the transition without forcing and breaking
+	 * the system integrity.
+	 *
+	 * Do not allow to re-enable a disabled patch because this interface
+	 * is being destroyed.
+	 */
+	if (patch == klp_transition_patch)
 		klp_reverse_transition();
-	} else if (enabled) {
-		ret = __klp_enable_patch(patch);
-		if (ret)
-			goto err;
-	} else {
+	else if (!enabled)
 		ret = __klp_disable_patch(patch);
-		if (ret)
-			goto err;
-	}
+	else
+		ret = -EINVAL;
 
+out:
 	mutex_unlock(&klp_mutex);
 
+	if (ret)
+		return ret;
 	return count;
-
-err:
-	mutex_unlock(&klp_mutex);
-	return ret;
 }
 
 static ssize_t enabled_show(struct kobject *kobj,
@@ -439,7 +420,12 @@ static void klp_kobj_release_patch(struct kobject *kobj)
 	struct klp_patch *patch;
 
 	patch = container_of(kobj, struct klp_patch, kobj);
-	complete(&patch->finish);
+
+	/* module_put() has to be the last call accessing the livepatch! */
+	if (patch->wait_free)
+		complete(&patch->finish);
+	else if (patch->module_put)
+		module_put(patch->mod);
 }
 
 static struct kobj_type klp_ktype_patch = {
@@ -513,6 +499,21 @@ static void __klp_free_patch(struct klp_patch *patch)
 }
 
 /*
+ * Asynchonous variant is useful when there the patch is disabled
+ * via sysfs interface, see enabled_store(). The module is put
+ * from patch->kobj() release callback.
+ */
+void klp_free_patch_nowait(struct klp_patch *patch)
+{
+	patch->wait_free = false;
+
+	__klp_free_patch(patch);
+}
+
+/*
+ * The synchronous variant is needed when the patch is freed in
+ * the klp_enable_patch() error paths.
+ *
  * Some operations are synchronized by klp_mutex, e.g. the access to
  * klp_patches list. But the caller has to wait for patch->kobj release
  * callback outside the lock. Otherwise, there might be a deadlock with
@@ -541,6 +542,10 @@ static void klp_free_patch_wait(struct klp_patch *patch)
 	/* Wait only when patch->kobj was initialized */
 	if (patch->wait_free)
 		wait_for_completion(&patch->finish);
+
+	/* Put the module after the last access to struct klp_patch. */
+	if (patch->module_put)
+		module_put(patch->mod);
 }
 
 static int klp_init_func(struct klp_object *obj, struct klp_func *func)
@@ -655,116 +660,38 @@ static int klp_init_patch(struct klp_patch *patch)
 	struct klp_object *obj;
 	int ret;
 
+	patch->enabled = false;
+	patch->module_put = false;
+	INIT_LIST_HEAD(&patch->list);
+	init_completion(&patch->finish);
+
 	if (!patch->objs)
 		return -EINVAL;
 
-	mutex_lock(&klp_mutex);
-
-	patch->enabled = false;
-	patch->forced = false;
-	INIT_LIST_HEAD(&patch->list);
-	init_completion(&patch->finish);
+	/*
+	 * A reference is taken on the patch module to prevent it from being
+	 * unloaded.
+	 */
+	if (!try_module_get(patch->mod))
+		return -ENODEV;
+	patch->module_put = true;
 
 	ret = kobject_init_and_add(&patch->kobj, &klp_ktype_patch,
 				   klp_root_kobj, "%s", patch->mod->name);
 	if (ret) {
-		mutex_unlock(&klp_mutex);
 		return ret;
 	}
 
 	klp_for_each_object(patch, obj) {
 		ret = klp_init_object(patch, obj);
 		if (ret)
-			goto free;
+			return ret;
 	}
 
 	list_add_tail(&patch->list, &klp_patches);
 
-	mutex_unlock(&klp_mutex);
-
 	return 0;
-
-free:
-	klp_free_patch_wait_prepare(patch);
-
-	mutex_unlock(&klp_mutex);
-
-	klp_free_patch_wait(patch);
-
-	return ret;
 }
-
-/**
- * klp_unregister_patch() - unregisters a patch
- * @patch:	Disabled patch to be unregistered
- *
- * Frees the data structures and removes the sysfs interface.
- *
- * Return: 0 on success, otherwise error
- */
-int klp_unregister_patch(struct klp_patch *patch)
-{
-	int ret;
-
-	mutex_lock(&klp_mutex);
-
-	if (!klp_is_patch_registered(patch)) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	if (patch->enabled) {
-		ret = -EBUSY;
-		goto err;
-	}
-
-	klp_free_patch_wait_prepare(patch);
-
-	mutex_unlock(&klp_mutex);
-
-	klp_free_patch_wait(patch);
-
-	return 0;
-err:
-	mutex_unlock(&klp_mutex);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(klp_unregister_patch);
-
-/**
- * klp_register_patch() - registers a patch
- * @patch:	Patch to be registered
- *
- * Initializes the data structure associated with the patch and
- * creates the sysfs interface.
- *
- * There is no need to take the reference on the patch module here. It is done
- * later when the patch is enabled.
- *
- * Return: 0 on success, otherwise error
- */
-int klp_register_patch(struct klp_patch *patch)
-{
-	if (!patch || !patch->mod)
-		return -EINVAL;
-
-	if (!is_livepatch_module(patch->mod)) {
-		pr_err("module %s is not marked as a livepatch module\n",
-		       patch->mod->name);
-		return -EINVAL;
-	}
-
-	if (!klp_initialized())
-		return -ENODEV;
-
-	if (!klp_have_reliable_stack()) {
-		pr_err("This architecture doesn't have support for the livepatch consistency model.\n");
-		return -ENOSYS;
-	}
-
-	return klp_init_patch(patch);
-}
-EXPORT_SYMBOL_GPL(klp_register_patch);
 
 static int __klp_disable_patch(struct klp_patch *patch)
 {
@@ -777,8 +704,7 @@ static int __klp_disable_patch(struct klp_patch *patch)
 		return -EBUSY;
 
 	/* enforce stacking: only the last enabled patch can be disabled */
-	if (!list_is_last(&patch->list, &klp_patches) &&
-	    list_next_entry(patch, list)->enabled)
+	if (!list_is_last(&patch->list, &klp_patches))
 		return -EBUSY;
 
 	klp_init_transition(patch, KLP_UNPATCHED);
@@ -797,43 +723,11 @@ static int __klp_disable_patch(struct klp_patch *patch)
 	smp_wmb();
 
 	klp_start_transition();
-	klp_try_complete_transition();
 	patch->enabled = false;
+	klp_try_complete_transition();
 
 	return 0;
 }
-
-/**
- * klp_disable_patch() - disables a registered patch
- * @patch:	The registered, enabled patch to be disabled
- *
- * Unregisters the patched functions from ftrace.
- *
- * Return: 0 on success, otherwise error
- */
-int klp_disable_patch(struct klp_patch *patch)
-{
-	int ret;
-
-	mutex_lock(&klp_mutex);
-
-	if (!klp_is_patch_registered(patch)) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	if (!patch->enabled) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	ret = __klp_disable_patch(patch);
-
-err:
-	mutex_unlock(&klp_mutex);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(klp_disable_patch);
 
 static int __klp_enable_patch(struct klp_patch *patch)
 {
@@ -846,17 +740,8 @@ static int __klp_enable_patch(struct klp_patch *patch)
 	if (WARN_ON(patch->enabled))
 		return -EINVAL;
 
-	/* enforce stacking: only the first disabled patch can be enabled */
-	if (patch->list.prev != &klp_patches &&
-	    !list_prev_entry(patch, list)->enabled)
-		return -EBUSY;
-
-	/*
-	 * A reference is taken on the patch module to prevent it from being
-	 * unloaded.
-	 */
-	if (!try_module_get(patch->mod))
-		return -ENODEV;
+	if (!patch->kobj.state_initialized)
+		return -EINVAL;
 
 	pr_notice("enabling patch '%s'\n", patch->mod->name);
 
@@ -891,8 +776,8 @@ static int __klp_enable_patch(struct klp_patch *patch)
 	}
 
 	klp_start_transition();
-	klp_try_complete_transition();
 	patch->enabled = true;
+	klp_try_complete_transition();
 
 	return 0;
 err:
@@ -903,11 +788,15 @@ err:
 }
 
 /**
- * klp_enable_patch() - enables a registered patch
- * @patch:	The registered, disabled patch to be enabled
+ * klp_enable_patch() - enable the livepatch
+ * @patch:	patch to be enabled
  *
- * Performs the needed symbol lookups and code relocations,
- * then registers the patched functions with ftrace.
+ * Initializes the data structure associated with the patch, creates the sysfs
+ * interface, performs the needed symbol lookups and code relocations,
+ * registers the patched functions with ftrace.
+ *
+ * This function is supposed to be called from the livepatch module_init()
+ * callback.
  *
  * Return: 0 on success, otherwise error
  */
@@ -915,17 +804,44 @@ int klp_enable_patch(struct klp_patch *patch)
 {
 	int ret;
 
-	mutex_lock(&klp_mutex);
+	if (!patch || !patch->mod)
+		return -EINVAL;
 
-	if (!klp_is_patch_registered(patch)) {
-		ret = -EINVAL;
-		goto err;
+	if (!is_livepatch_module(patch->mod)) {
+		pr_err("module %s is not marked as a livepatch module\n",
+		       patch->mod->name);
+		return -EINVAL;
 	}
 
+	if (!klp_initialized())
+		return -ENODEV;
+
+	if (!klp_have_reliable_stack()) {
+		pr_err("This architecture doesn't have support for the livepatch consistency model.\n");
+		return -ENOSYS;
+	}
+
+	mutex_lock(&klp_mutex);
+
+	ret = klp_init_patch(patch);
+	if (ret)
+		goto err;
+
 	ret = __klp_enable_patch(patch);
+	if (ret)
+		goto err;
+
+	mutex_unlock(&klp_mutex);
+
+	return 0;
 
 err:
+	klp_free_patch_wait_prepare(patch);
+
 	mutex_unlock(&klp_mutex);
+
+	klp_free_patch_wait(patch);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(klp_enable_patch);
