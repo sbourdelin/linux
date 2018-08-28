@@ -239,6 +239,9 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
 		goto err_clear_flag;
 
 	/* setup generic device info */
+	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	if (!dev->dev.dma_mask)
+		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
 	dev->dev.of_node = of_node_get(node);
 	dev->dev.fwnode = &node->fwnode;
 	dev->dev.parent = parent ? : &platform_bus;
