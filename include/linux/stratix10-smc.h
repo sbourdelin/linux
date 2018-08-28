@@ -67,6 +67,12 @@
  *
  * INTEL_SIP_SMC_FPGA_CONFIG_STATUS_ERROR:
  * There is error during the FPGA configuration process.
+ *
+ * INTEL_SIP_SMC_REG_ERROR:
+ * There is error during a read or write operation of the protected registers.
+ *
+ * INTEL_SIP_SMC_RSU_ERROR:
+ * There is error during a remote status update.
  */
 #define INTEL_SIP_SMC_RETURN_UNKNOWN_FUNCTION		0xFFFFFFFF
 #define INTEL_SIP_SMC_STATUS_OK				0x0
