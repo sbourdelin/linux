@@ -55,7 +55,9 @@ MODULE_FIRMWARE(I915_CSR_BXT);
 #define BXT_CSR_VERSION_REQUIRED	CSR_VERSION(1, 7)
 
 
-#define CSR_MAX_FW_SIZE			0x2FFF
+#define BXT_CSR_MAX_FW_SIZE		0x2FFF
+#define GLK_CNL_CSR_MAX_FW_SIZE		0x3FFF
+#define ICL_CSR_MAX_FW_SIZE		0x5FFF
 #define CSR_DEFAULT_FW_OFFSET		0xFFFFFFFF
 
 struct intel_css_header {
@@ -359,6 +361,8 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 			  si->stepping);
 		return NULL;
 	}
+	/* Convert dmc_offset into number of bytes. By default it is in dwords*/
+	dmc_offset *= 4;
 	readcount += dmc_offset;
 
 	/* Extract dmc_header information. */
@@ -391,9 +395,21 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 
 	/* fw_size is in dwords, so multiplied by 4 to convert into bytes. */
 	nbytes = dmc_header->fw_size * 4;
-	if (nbytes > CSR_MAX_FW_SIZE) {
-		DRM_ERROR("DMC firmware too big (%u bytes)\n", nbytes);
-		return NULL;
+	if (IS_BROXTON(dev_priv)) {
+		if (nbytes > BXT_CSR_MAX_FW_SIZE) {
+			DRM_ERROR("DMC FW too big (%u bytes)\n", nbytes);
+			return NULL;
+		}
+	} else if (IS_CANNONLAKE(dev_priv) || IS_GEMINILAKE(dev_priv)) {
+		if (nbytes > GLK_CNL_CSR_MAX_FW_SIZE) {
+			DRM_ERROR("DMC FW too big (%u bytes)\n", nbytes);
+			return NULL;
+		}
+	} else {
+		if (nbytes > ICL_CSR_MAX_FW_SIZE) {
+			DRM_ERROR("DMC FW too big (%u bytes)\n", nbytes);
+			return NULL;
+		}
 	}
 	csr->dmc_fw_size = dmc_header->fw_size;
 
