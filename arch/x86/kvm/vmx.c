@@ -2056,9 +2056,6 @@ static inline bool is_nmi(u32 intr_info)
 static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 			      u32 exit_intr_info,
 			      unsigned long exit_qualification);
-static void nested_vmx_entry_failure(struct kvm_vcpu *vcpu,
-			struct vmcs12 *vmcs12,
-			u32 reason, unsigned long qualification);
 
 static int __find_msr_index(struct vcpu_vmx *vmx, u32 msr)
 {
@@ -12543,25 +12540,23 @@ static int check_vmentry_postreqs(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	return 0;
 }
 
+static void load_vmcs12_host_state(struct kvm_vcpu *vcpu,
+				   struct vmcs12 *vmcs12);
 /*
  * If exit_qual is NULL, this is being called from state restore (either RSM
  * or KVM_SET_NESTED_STATE).  Otherwise it's called from vmlaunch/vmresume.
  */
-static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu, u32 *exit_qual)
+static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu,
+					  bool from_vmentry)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
-	bool from_vmentry = !!exit_qual;
-	u32 dummy_exit_qual;
-	int r;
+	u32 exit_reason = EXIT_REASON_INVALID_STATE;
+	u32 exit_qual;
 
 	if (from_vmentry) {
-		r = check_vmentry_postreqs(vcpu, vmcs12, exit_qual);
-		if (r) {
-			nested_vmx_entry_failure(vcpu, vmcs12,
-				EXIT_REASON_INVALID_STATE, *exit_qual);
-			return 1;
-		}
+		if (check_vmentry_postreqs(vcpu, vmcs12, &exit_qual))
+			goto consistency_check_vmexit;
 	}
 
 	enter_guest_mode(vcpu);
@@ -12575,18 +12570,17 @@ static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu, u32 *exit_qual)
 	if (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETING)
 		vcpu->arch.tsc_offset += vmcs12->tsc_offset;
 
-	r = EXIT_REASON_INVALID_STATE;
-	if (prepare_vmcs02(vcpu, vmcs12, from_vmentry ? exit_qual : &dummy_exit_qual))
+	if (prepare_vmcs02(vcpu, vmcs12, &exit_qual))
 		goto fail;
 
 	if (from_vmentry) {
 		nested_get_vmcs12_pages(vcpu);
 
-		r = EXIT_REASON_MSR_LOAD_FAIL;
-		*exit_qual = nested_vmx_load_msr(vcpu,
-	     					 vmcs12->vm_entry_msr_load_addr,
-					      	 vmcs12->vm_entry_msr_load_count);
-		if (*exit_qual)
+		exit_reason = EXIT_REASON_MSR_LOAD_FAIL;
+		exit_qual = nested_vmx_load_msr(vcpu,
+						vmcs12->vm_entry_msr_load_addr,
+						vmcs12->vm_entry_msr_load_count);
+		if (exit_qual)
 			goto fail;
 	} else {
 		/*
@@ -12612,7 +12606,28 @@ fail:
 		vcpu->arch.tsc_offset -= vmcs12->tsc_offset;
 	leave_guest_mode(vcpu);
 	vmx_switch_vmcs(vcpu, &vmx->vmcs01);
-	return r;
+
+	/*
+	 * A consistency check VMExit during L1's VMEnter to L2 is a subset
+	 * of a normal VMexit, as explained in 23.7 "VM-entry failures during
+	 * or after loading guest state" (this also lists the acceptable exit-
+	 * reason and exit-qualification parameters).
+	 */
+consistency_check_vmexit:
+	vm_entry_controls_reset_shadow(vmx);
+	vm_exit_controls_reset_shadow(vmx);
+	vmx_segment_cache_clear(vmx);
+
+	if (!from_vmentry)
+		return 1;
+
+	load_vmcs12_host_state(vcpu, vmcs12);
+	vmcs12->vm_exit_reason = exit_reason | VMX_EXIT_REASONS_FAILED_VMENTRY;
+	vmcs12->exit_qualification = exit_qual;
+	nested_vmx_succeed(vcpu);
+	if (enable_shadow_vmcs)
+		vmx->nested.sync_shadow_vmcs = true;
+	return 1;
 }
 
 /*
@@ -12624,7 +12639,6 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	struct vmcs12 *vmcs12;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 interrupt_shadow = vmx_get_interrupt_shadow(vcpu);
-	u32 exit_qual;
 	int ret;
 
 	if (!nested_vmx_check_permission(vcpu))
@@ -12693,9 +12707,8 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	 */
 
 	vmx->nested.nested_run_pending = 1;
-	ret = nested_vmx_enter_non_root_mode(vcpu, &exit_qual);
+	ret = nested_vmx_enter_non_root_mode(vcpu, true);
 	if (ret) {
-		nested_vmx_entry_failure(vcpu, vmcs12, ret, exit_qual);
 		vmx->nested.nested_run_pending = 0;
 		return 1;
 	}
@@ -13361,31 +13374,6 @@ static void vmx_leave_nested(struct kvm_vcpu *vcpu)
 	free_nested(to_vmx(vcpu));
 }
 
-/*
- * L1's failure to enter L2 is a subset of a normal exit, as explained in
- * 23.7 "VM-entry failures during or after loading guest state" (this also
- * lists the acceptable exit-reason and exit-qualification parameters).
- * It should only be called before L2 actually succeeded to run, and when
- * vmcs01 is current (it doesn't leave_guest_mode() or switch vmcss).
- */
-static void nested_vmx_entry_failure(struct kvm_vcpu *vcpu,
-			struct vmcs12 *vmcs12,
-			u32 reason, unsigned long qualification)
-{
-	struct vcpu_vmx *vmx = to_vmx(vcpu);
-
-	vm_entry_controls_reset_shadow(vmx);
-	vm_exit_controls_reset_shadow(vmx);
-	vmx_segment_cache_clear(vmx);
-
-	load_vmcs12_host_state(vcpu, vmcs12);
-	vmcs12->vm_exit_reason = reason | VMX_EXIT_REASONS_FAILED_VMENTRY;
-	vmcs12->exit_qualification = qualification;
-	nested_vmx_succeed(vcpu);
-	if (enable_shadow_vmcs)
-		vmx->nested.sync_shadow_vmcs = true;
-}
-
 static int vmx_check_intercept(struct kvm_vcpu *vcpu,
 			       struct x86_instruction_info *info,
 			       enum x86_intercept_stage stage)
@@ -13815,7 +13803,7 @@ static int vmx_pre_leave_smm(struct kvm_vcpu *vcpu, u64 smbase)
 
 	if (vmx->nested.smm.guest_mode) {
 		vcpu->arch.hflags &= ~HF_SMM_MASK;
-		ret = nested_vmx_enter_non_root_mode(vcpu, NULL);
+		ret = nested_vmx_enter_non_root_mode(vcpu, false);
 		vcpu->arch.hflags |= HF_SMM_MASK;
 		if (ret)
 			return ret;
@@ -14016,7 +14004,7 @@ static int vmx_set_nested_state(struct kvm_vcpu *vcpu,
 		vmx->nested.nested_run_pending = 1;
 
 	vmx->nested.dirty_vmcs12 = true;
-	ret = nested_vmx_enter_non_root_mode(vcpu, NULL);
+	ret = nested_vmx_enter_non_root_mode(vcpu, false);
 	if (ret)
 		return -EINVAL;
 
