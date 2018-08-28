@@ -951,13 +951,74 @@ static inline void uclamp_cpu_update(struct rq *rq, int clamp_id,
 }
 
 /**
+ * uclamp_task_group_id: get the effective clamp group index of a task
+ *
+ * The effective clamp group index of a task depends on its status, RUNNABLE
+ * or SLEEPING, and on:
+ * - the task specific clamp value, when !UCLAMP_NOT_VALID
+ * - its task group effective clamp value, for tasks not in the root group
+ * - the system default clamp value, for tasks in the root group
+ *
+ * This method returns the effective group index for a task, depending on its
+ * status and a proper aggregation of the clamp values listed above.
+ */
+static inline int uclamp_task_group_id(struct task_struct *p, int clamp_id)
+{
+	struct uclamp_se *uc_se;
+	int clamp_value;
+	int group_id;
+
+	/* Taks currently accounted into a clamp group */
+	if (uclamp_task_affects(p, clamp_id))
+		return p->uclamp[clamp_id].effective.group_id;
+
+	/* Task specific clamp value */
+	uc_se = &p->uclamp[clamp_id];
+	clamp_value = uc_se->value;
+	group_id = uc_se->group_id;
+
+#ifdef CONFIG_UCLAMP_TASK_GROUP
+	/* Use TG's clamp value to limit task specific values */
+	uc_se = &task_group(p)->uclamp[clamp_id];
+	if (clamp_value > uc_se->effective.value)
+		group_id = uc_se->effective.group_id;
+#endif
+
+	return group_id;
+}
+
+static inline int uclamp_group_value(int clamp_id, int group_id)
+{
+	struct uclamp_map *uc_map = &uclamp_maps[clamp_id][0];
+
+	if (group_id == UCLAMP_NOT_VALID)
+		return uclamp_none(clamp_id);
+
+	return uc_map[group_id].value;
+}
+
+static inline int uclamp_task_value(struct task_struct *p, int clamp_id)
+{
+	int group_id = uclamp_task_group_id(p, clamp_id);
+
+	return uclamp_group_value(clamp_id, group_id);
+}
+
+/**
  * uclamp_cpu_get_id(): increase reference count for a clamp group on a CPU
  * @p: the task being enqueued on a CPU
  * @rq: the CPU's rq where the clamp group has to be reference counted
  * @clamp_id: the utilization clamp (e.g. min or max utilization) to reference
  *
- * Once a task is enqueued on a CPU's RQ, the clamp group currently defined by
- * the task's uclamp.group_id is reference counted on that CPU.
+ * Once a task is enqueued on a CPU's RQ, the most restrictive clamp group,
+ * among the task specific and that of the task's cgroup one, is reference
+ * counted on that CPU.
+ *
+ * Since the CPUs reference counted clamp group can be either that of the task
+ * or of its cgroup, we keep track of the reference counted clamp group by
+ * storing its index (group_id) into task_struct::uclamp::effective::group_id.
+ * This group index will then be used at task's dequeue time to release the
+ * correct refcount.
  */
 static inline void uclamp_cpu_get_id(struct task_struct *p,
 				     struct rq *rq, int clamp_id)
@@ -968,7 +1029,7 @@ static inline void uclamp_cpu_get_id(struct task_struct *p,
 	int group_id;
 
 	/* Every task must reference a clamp group */
-	group_id = p->uclamp[clamp_id].group_id;
+	group_id = uclamp_task_group_id(p, clamp_id);
 #ifdef CONFIG_SCHED_DEBUG
 	if (unlikely(group_id == UCLAMP_NOT_VALID)) {
 		WARN(1, "invalid task [%d:%s] clamp group\n",
@@ -976,6 +1037,9 @@ static inline void uclamp_cpu_get_id(struct task_struct *p,
 		return;
 	}
 #endif
+
+	/* Track the effective clamp group */
+	p->uclamp[clamp_id].effective.group_id = group_id;
 
 	/* Reference count the task into its current group_id */
 	uc_grp = &rq->uclamp.group[clamp_id][0];
@@ -1025,7 +1089,7 @@ static inline void uclamp_cpu_put_id(struct task_struct *p,
 	int group_id;
 
 	/* New tasks don't have a previous clamp group */
-	group_id = p->uclamp[clamp_id].group_id;
+	group_id = p->uclamp[clamp_id].effective.group_id;
 	if (group_id == UCLAMP_NOT_VALID)
 		return;
 
@@ -1039,6 +1103,9 @@ static inline void uclamp_cpu_put_id(struct task_struct *p,
 		     cpu_of(rq), clamp_id, group_id);
 	}
 #endif
+
+	/* Flag the task as not affecting any clamp index */
+	p->uclamp[clamp_id].effective.group_id = UCLAMP_NOT_VALID;
 
 	/* If this is not the last task, no updates are required */
 	if (uc_grp[group_id].tasks > 0)
@@ -1402,6 +1469,8 @@ static void uclamp_fork(struct task_struct *p, bool reset)
 			next_group_id = 0;
 			p->uclamp[clamp_id].value = uclamp_none(clamp_id);
 		}
+		/* Forked tasks are not yet enqueued */
+		p->uclamp[clamp_id].effective.group_id = UCLAMP_NOT_VALID;
 
 		p->uclamp[clamp_id].group_id = UCLAMP_NOT_VALID;
 		uclamp_group_get(NULL, clamp_id, next_group_id, uc_se,
@@ -5500,8 +5569,8 @@ SYSCALL_DEFINE4(sched_getattr, pid_t, pid, struct sched_attr __user *, uattr,
 		attr.sched_nice = task_nice(p);
 
 #ifdef CONFIG_UCLAMP_TASK
-	attr.sched_util_min = p->uclamp[UCLAMP_MIN].value;
-	attr.sched_util_max = p->uclamp[UCLAMP_MAX].value;
+	attr.sched_util_min = uclamp_task_value(p, UCLAMP_MIN);
+	attr.sched_util_max = uclamp_task_value(p, UCLAMP_MAX);
 #endif
 
 	rcu_read_unlock();
@@ -7318,8 +7387,11 @@ static void cpu_util_update_hier(struct cgroup_subsys_state *css,
 		 * groups we consider their current value.
 		 */
 		uc_se = &css_tg(css)->uclamp[clamp_id];
-		if (css != top_css)
+		if (css != top_css) {
 			value = uc_se->value;
+			group_id = uc_se->effective.group_id;
+		}
+
 		/*
 		 * Skip the whole subtrees if the current effective clamp is
 		 * alredy matching the TG's clamp value.
