@@ -1793,6 +1793,9 @@ static int tcp_init_tso_segs(struct sk_buff *skb, unsigned int mss_now)
 	int tso_segs = tcp_skb_pcount(skb);
 
 	if (!tso_segs || (tso_segs > 1 && tcp_skb_mss(skb) != mss_now)) {
+		if (skb_unclone(skb, GFP_ATOMIC))
+			return -ENOMEM;
+
 		tcp_set_skb_tso_segs(skb, mss_now);
 		tso_segs = tcp_skb_pcount(skb);
 	}
@@ -2045,6 +2048,7 @@ static int tcp_mtu_probe(struct sock *sk)
 	int copy, len;
 	int mss_now;
 	int interval;
+	int err;
 
 	/* Not currently probing/verifying,
 	 * not in recovery,
@@ -2151,7 +2155,9 @@ static int tcp_mtu_probe(struct sock *sk)
 		if (len >= probe_size)
 			break;
 	}
-	tcp_init_tso_segs(nskb, nskb->len);
+	err = tcp_init_tso_segs(nskb, nskb->len);
+	if (unlikely(err < 0))
+		return err;
 
 	/* We're ready to send.  If this fails, the probe will
 	 * be resegmented into mss-sized pieces by tcp_write_xmit().
@@ -2309,6 +2315,8 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 		tso_segs = tcp_init_tso_segs(skb, mss_now);
 		BUG_ON(!tso_segs);
+		if (unlikely(tso_segs < 0))
+			break;
 
 		if (unlikely(tp->repair) && tp->repair_queue == TCP_SEND_QUEUE) {
 			/* "skb_mstamp" is used as a start point for the retransmit timer */
