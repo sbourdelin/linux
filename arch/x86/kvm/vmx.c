@@ -12553,7 +12553,16 @@ static int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu, u32 *exit_qual)
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
 	bool from_vmentry = !!exit_qual;
 	u32 dummy_exit_qual;
-	int r = 0;
+	int r;
+
+	if (from_vmentry) {
+		r = check_vmentry_postreqs(vcpu, vmcs12, exit_qual);
+		if (r) {
+			nested_vmx_entry_failure(vcpu, vmcs12,
+				EXIT_REASON_INVALID_STATE, *exit_qual);
+			return 1;
+		}
+	}
 
 	enter_guest_mode(vcpu);
 
@@ -12677,13 +12686,6 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	 * the singlestep trap is missed.
 	 */
 	skip_emulated_instruction(vcpu);
-
-	ret = check_vmentry_postreqs(vcpu, vmcs12, &exit_qual);
-	if (ret) {
-		nested_vmx_entry_failure(vcpu, vmcs12,
-					 EXIT_REASON_INVALID_STATE, exit_qual);
-		return 1;
-	}
 
 	/*
 	 * We're finally done with prerequisite checking, and can start with
