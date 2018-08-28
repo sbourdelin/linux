@@ -647,8 +647,11 @@ static int userfaultfd_open(int features)
 	uffdio_api.api = UFFD_API;
 	uffdio_api.features = features;
 	if (ioctl(uffd, UFFDIO_API, &uffdio_api)) {
-		fprintf(stderr, "UFFDIO_API\n");
-		return 1;
+		int errnum = errno;
+
+		perror("UFFDIO_API");
+
+		return errnum == EINVAL ? KSFT_SKIP : 1;
 	}
 	if (uffdio_api.api != UFFD_API) {
 		fprintf(stderr, "UFFDIO_API error %Lu\n", uffdio_api.api);
@@ -854,6 +857,7 @@ static int userfaultfd_zeropage_test(void)
 {
 	struct uffdio_register uffdio_register;
 	unsigned long expected_ioctls;
+	int err;
 
 	printf("testing UFFDIO_ZEROPAGE: ");
 	fflush(stdout);
@@ -861,8 +865,10 @@ static int userfaultfd_zeropage_test(void)
 	if (uffd_test_ops->release_pages(area_dst))
 		return 1;
 
-	if (userfaultfd_open(0))
-		return 1;
+	err = userfaultfd_open(0);
+	if (err)
+		return err;
+
 	uffdio_register.range.start = (unsigned long) area_dst;
 	uffdio_register.range.len = nr_pages * page_size;
 	uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
@@ -904,8 +910,10 @@ static int userfaultfd_events_test(void)
 
 	features = UFFD_FEATURE_EVENT_FORK | UFFD_FEATURE_EVENT_REMAP |
 		UFFD_FEATURE_EVENT_REMOVE;
-	if (userfaultfd_open(features))
-		return 1;
+	err = userfaultfd_open(features);
+	if (err)
+		return err;
+
 	fcntl(uffd, F_SETFL, uffd_flags | O_NONBLOCK);
 
 	uffdio_register.range.start = (unsigned long) area_dst;
@@ -963,8 +971,9 @@ static int userfaultfd_sig_test(void)
 		return 1;
 
 	features = UFFD_FEATURE_EVENT_FORK|UFFD_FEATURE_SIGBUS;
-	if (userfaultfd_open(features))
-		return 1;
+	err = userfaultfd_open(features);
+	if (err)
+		return err;
 	fcntl(uffd, F_SETFL, uffd_flags | O_NONBLOCK);
 
 	uffdio_register.range.start = (unsigned long) area_dst;
@@ -1029,8 +1038,9 @@ static int userfaultfd_stress(void)
 	if (!area_dst)
 		return 1;
 
-	if (userfaultfd_open(0))
-		return 1;
+	err = userfaultfd_open(0);
+	if (err)
+		return err;
 
 	count_verify = malloc(nr_pages * sizeof(unsigned long long));
 	if (!count_verify) {
@@ -1201,8 +1211,16 @@ static int userfaultfd_stress(void)
 		return err;
 
 	close(uffd);
-	return userfaultfd_zeropage_test() || userfaultfd_sig_test()
-		|| userfaultfd_events_test();
+
+	err = userfaultfd_zeropage_test();
+	if (err && err != KSFT_SKIP)
+		return err;
+
+	err = userfaultfd_sig_test();
+	if (err && err != KSFT_SKIP)
+		return err;
+
+	return userfaultfd_events_test();
 }
 
 /*
