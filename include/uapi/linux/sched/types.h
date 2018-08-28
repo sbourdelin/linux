@@ -84,16 +84,18 @@ struct sched_param {
  *
  *  @sched_util_min	represents the minimum utilization
  *  @sched_util_max	represents the maximum utilization
+ *  @sched_util_min	represents the minimum utilization percentage
+ *  @sched_util_max	represents the maximum utilization percentage
  *
- * Utilization is a value in the range [0..SCHED_CAPACITY_SCALE] which
- * represents the percentage of CPU time used by a task when running at the
- * maximum frequency on the highest capacity CPU of the system. Thus, for
- * example, a 20% utilization task is a task running for 2ms every 10ms.
+ * Utilization is a value in the range [0..100] which represents the
+ * percentage of CPU time used by a task when running at the maximum frequency
+ * on the highest capacity CPU of the system. Thus, for example, a 20%
+ * utilization task is a task running for 2ms every 10ms.
  *
- * A task with a min utilization value bigger then 0 is more likely to be
+ * A task with a min utilization value bigger then 0% is more likely to be
  * scheduled on a CPU which has a capacity big enough to fit the specified
  * minimum utilization value.
- * A task with a max utilization value smaller then 1024 is more likely to be
+ * A task with a max utilization value smaller then 100% is more likely to be
  * scheduled on a CPU which do not necessarily have more capacity then the
  * specified max utilization value.
  */

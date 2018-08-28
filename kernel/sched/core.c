@@ -730,15 +730,15 @@ static DEFINE_MUTEX(uclamp_mutex);
 
 /*
  * Minimum utilization for tasks in the root cgroup
- * default: 0
+ * default: 0%
  */
 unsigned int sysctl_sched_uclamp_util_min;
 
 /*
  * Maximum utilization for tasks in the root cgroup
- * default: 1024
+ * default: 100%
  */
-unsigned int sysctl_sched_uclamp_util_max = SCHED_CAPACITY_SCALE;
+unsigned int sysctl_sched_uclamp_util_max = 100;
 
 static struct uclamp_se uclamp_default[UCLAMP_CNT];
 
@@ -940,7 +940,7 @@ static inline void uclamp_cpu_update(struct rq *rq, int clamp_id,
 		max_value = max(max_value, uc_grp[group_id].value);
 
 		/* Stop if we reach the max possible clamp */
-		if (max_value >= SCHED_CAPACITY_SCALE)
+		if (max_value >= 100)
 			break;
 	}
 
@@ -1397,7 +1397,7 @@ int sched_uclamp_handler(struct ctl_table *table, int write,
 	result = -EINVAL;
 	if (sysctl_sched_uclamp_util_min > sysctl_sched_uclamp_util_max)
 		goto undo;
-	if (sysctl_sched_uclamp_util_max > SCHED_CAPACITY_SCALE)
+	if (sysctl_sched_uclamp_util_max > 100)
 		goto undo;
 
 	/* Find a valid group_id for each required clamp value */
@@ -1424,13 +1424,15 @@ int sched_uclamp_handler(struct ctl_table *table, int write,
 	/* Update each required clamp group */
 	if (old_min != sysctl_sched_uclamp_util_min) {
 		uc_se = &uclamp_default[UCLAMP_MIN];
+		value = util_from_pct(sysctl_sched_uclamp_util_min);
 		uclamp_group_get(NULL, NULL, UCLAMP_MIN, group_id[UCLAMP_MIN],
-				 uc_se, sysctl_sched_uclamp_util_min);
+				 uc_se, value);
 	}
 	if (old_max != sysctl_sched_uclamp_util_max) {
 		uc_se = &uclamp_default[UCLAMP_MAX];
+		value = util_from_pct(sysctl_sched_uclamp_util_max);
 		uclamp_group_get(NULL, NULL, UCLAMP_MAX, group_id[UCLAMP_MAX],
-				 uc_se, sysctl_sched_uclamp_util_max);
+				 uc_se, value);
 	}
 	goto done;
 
@@ -1525,7 +1527,7 @@ static inline int __setscheduler_uclamp(struct task_struct *p,
 			: p->uclamp[UCLAMP_MAX].value;
 
 		if (upper_bound == UCLAMP_NOT_VALID)
-			upper_bound = SCHED_CAPACITY_SCALE;
+			upper_bound = 100;
 		if (attr->sched_util_min > upper_bound) {
 			result = -EINVAL;
 			goto done;
@@ -1546,7 +1548,7 @@ static inline int __setscheduler_uclamp(struct task_struct *p,
 		if (lower_bound == UCLAMP_NOT_VALID)
 			lower_bound = 0;
 		if (attr->sched_util_max < lower_bound ||
-		    attr->sched_util_max > SCHED_CAPACITY_SCALE) {
+		    attr->sched_util_max > 100) {
 			result = -EINVAL;
 			goto done;
 		}
@@ -1563,12 +1565,12 @@ static inline int __setscheduler_uclamp(struct task_struct *p,
 	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MIN) {
 		uc_se = &p->uclamp[UCLAMP_MIN];
 		uclamp_group_get(p, NULL, UCLAMP_MIN, group_id[UCLAMP_MIN],
-				 uc_se, attr->sched_util_min);
+				 uc_se, util_from_pct(attr->sched_util_min));
 	}
 	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX) {
 		uc_se = &p->uclamp[UCLAMP_MAX];
 		uclamp_group_get(p, NULL, UCLAMP_MAX, group_id[UCLAMP_MAX],
-				 uc_se, attr->sched_util_max);
+				 uc_se, util_from_pct(attr->sched_util_max));
 	}
 
 done:
@@ -5730,8 +5732,8 @@ SYSCALL_DEFINE4(sched_getattr, pid_t, pid, struct sched_attr __user *, uattr,
 		attr.sched_nice = task_nice(p);
 
 #ifdef CONFIG_UCLAMP_TASK
-	attr.sched_util_min = uclamp_task_value(p, UCLAMP_MIN);
-	attr.sched_util_max = uclamp_task_value(p, UCLAMP_MAX);
+	attr.sched_util_min = util_to_pct(uclamp_task_value(p, UCLAMP_MIN));
+	attr.sched_util_max = util_to_pct(uclamp_task_value(p, UCLAMP_MAX));
 #endif
 
 	rcu_read_unlock();
@@ -7591,8 +7593,10 @@ static int cpu_util_min_write_u64(struct cgroup_subsys_state *css,
 	int ret = -EINVAL;
 	int group_id;
 
-	if (min_value > SCHED_CAPACITY_SCALE)
+	/* Check range and scale to internal representation */
+	if (min_value > 100)
 		return -ERANGE;
+	min_value = util_from_pct(min_value);
 
 	mutex_lock(&uclamp_mutex);
 	rcu_read_lock();
@@ -7636,8 +7640,10 @@ static int cpu_util_max_write_u64(struct cgroup_subsys_state *css,
 	int ret = -EINVAL;
 	int group_id;
 
-	if (max_value > SCHED_CAPACITY_SCALE)
+	/* Check range and scale to internal representation */
+	if (max_value > 100)
 		return -ERANGE;
+	max_value = util_from_pct(max_value);
 
 	mutex_lock(&uclamp_mutex);
 	rcu_read_lock();
@@ -7687,7 +7693,7 @@ static inline u64 cpu_uclamp_read(struct cgroup_subsys_state *css,
 		: tg->uclamp[clamp_id].value;
 	rcu_read_unlock();
 
-	return util_clamp;
+	return util_to_pct(util_clamp);
 }
 
 static u64 cpu_util_min_read_u64(struct cgroup_subsys_state *css,
