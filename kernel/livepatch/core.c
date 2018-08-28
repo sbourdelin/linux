@@ -50,6 +50,21 @@ LIST_HEAD(klp_patches);
 
 static struct kobject *klp_root_kobj;
 
+static void klp_init_lists(struct klp_patch *patch)
+{
+	struct klp_object *obj;
+	struct klp_func *func;
+
+	INIT_LIST_HEAD(&patch->obj_list);
+	klp_for_each_object_static(patch, obj) {
+		list_add(&obj->node, &patch->obj_list);
+
+		INIT_LIST_HEAD(&obj->func_list);
+		klp_for_each_func_static(obj, func)
+			list_add(&func->node, &obj->func_list);
+	}
+}
+
 static bool klp_is_module(struct klp_object *obj)
 {
 	return obj->name;
@@ -664,6 +679,7 @@ static int klp_init_patch(struct klp_patch *patch)
 	patch->module_put = false;
 	INIT_LIST_HEAD(&patch->list);
 	init_completion(&patch->finish);
+	klp_init_lists(patch);
 
 	if (!patch->objs)
 		return -EINVAL;
