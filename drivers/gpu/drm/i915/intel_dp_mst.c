@@ -583,7 +583,8 @@ intel_dp_create_fake_mst_encoders(struct intel_digital_port *intel_dig_port)
 }
 
 int
-intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port, int conn_base_id)
+intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port,
+			  struct drm_connector *connector)
 {
 	struct intel_dp *intel_dp = &intel_dig_port->dp;
 	struct drm_device *dev = intel_dig_port->base.base.dev;
@@ -595,7 +596,8 @@ intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port, int conn_ba
 	/* create encoders */
 	intel_dp_create_fake_mst_encoders(intel_dig_port);
 	ret = drm_dp_mst_topology_mgr_init(&intel_dp->mst_mgr, dev,
-					   &intel_dp->aux, 16, 3, conn_base_id);
+					   &intel_dp->aux, 16, 3,
+					   connector);
 	if (ret) {
 		intel_dp->can_mst = false;
 		return ret;

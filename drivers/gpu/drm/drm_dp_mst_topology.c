@@ -3161,14 +3161,16 @@ EXPORT_SYMBOL(drm_atomic_get_mst_topology_state);
  * @aux: DP helper aux channel to talk to this device
  * @max_dpcd_transaction_bytes: hw specific DPCD transaction limit
  * @max_payloads: maximum number of payloads this GPU can source
- * @conn_base_id: the connector object ID the MST device is connected to.
+ * @connector: the &struct drm_connector the MST device is connected to.
  *
  * Return 0 for success, or negative error code on failure
  */
 int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
-				 struct drm_device *dev, struct drm_dp_aux *aux,
+				 struct drm_device *dev,
+				 struct drm_dp_aux *aux,
 				 int max_dpcd_transaction_bytes,
-				 int max_payloads, int conn_base_id)
+				 int max_payloads,
+				 struct drm_connector *connector)
 {
 	struct drm_dp_mst_topology_state *mst_state;
 
@@ -3186,7 +3188,7 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 	mgr->aux = aux;
 	mgr->max_dpcd_transaction_bytes = max_dpcd_transaction_bytes;
 	mgr->max_payloads = max_payloads;
-	mgr->conn_base_id = conn_base_id;
+	mgr->conn_base_id = connector->base.id;
 	if (max_payloads + 1 > sizeof(mgr->payload_mask) * 8 ||
 	    max_payloads + 1 > sizeof(mgr->vcpi_mask) * 8)
 		return -EINVAL;

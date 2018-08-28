@@ -1749,7 +1749,8 @@ bool intel_digital_port_connected(struct intel_encoder *encoder);
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector);
 
 /* intel_dp_mst.c */
-int intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port, int conn_id);
+int intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port,
+			      struct drm_connector *connector);
 void intel_dp_mst_encoder_cleanup(struct intel_digital_port *intel_dig_port);
 /* vlv_dsi.c */
 void vlv_dsi_init(struct drm_i915_private *dev_priv);
