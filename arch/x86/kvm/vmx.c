@@ -13352,12 +13352,18 @@ static void nested_vmx_entry_failure(struct kvm_vcpu *vcpu,
 			struct vmcs12 *vmcs12,
 			u32 reason, unsigned long qualification)
 {
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	vm_entry_controls_reset_shadow(vmx);
+	vm_exit_controls_reset_shadow(vmx);
+	vmx_segment_cache_clear(vmx);
+
 	load_vmcs12_host_state(vcpu, vmcs12);
 	vmcs12->vm_exit_reason = reason | VMX_EXIT_REASONS_FAILED_VMENTRY;
 	vmcs12->exit_qualification = qualification;
 	nested_vmx_succeed(vcpu);
 	if (enable_shadow_vmcs)
-		to_vmx(vcpu)->nested.sync_shadow_vmcs = true;
+		vmx->nested.sync_shadow_vmcs = true;
 }
 
 static int vmx_check_intercept(struct kvm_vcpu *vcpu,
