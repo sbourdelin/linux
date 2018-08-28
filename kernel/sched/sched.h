@@ -805,6 +805,17 @@ struct uclamp_group {
 struct uclamp_cpu {
 	struct uclamp_group group[UCLAMP_CNT][CONFIG_UCLAMP_GROUPS_COUNT + 1];
 	int value[UCLAMP_CNT];
+/*
+ * Idle clamp holding
+ * Whenever a CPU is idle, we enforce the util_max clamp value of the last
+ * task running on that CPU. This bit is used to flag a clamp holding
+ * currently active for a CPU. This flag is:
+ * - set when we update the clamp value of a CPU at the time of dequeuing the
+ *   last before entering idle
+ * - reset when we enqueue the first task after a CPU wakeup from IDLE
+ */
+#define UCLAMP_FLAG_IDLE 0x01
+	int flags;
 };
 #endif /* CONFIG_UCLAMP_TASK */
 

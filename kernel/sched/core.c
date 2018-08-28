@@ -910,7 +910,8 @@ uclamp_group_find(int clamp_id, unsigned int clamp_value)
  * For the specified clamp index, this method computes the new CPU utilization
  * clamp to use until the next change on the set of RUNNABLE tasks on that CPU.
  */
-static inline void uclamp_cpu_update(struct rq *rq, int clamp_id)
+static inline void uclamp_cpu_update(struct rq *rq, int clamp_id,
+				     unsigned int last_clamp_value)
 {
 	struct uclamp_group *uc_grp = &rq->uclamp.group[clamp_id][0];
 	int max_value = UCLAMP_NOT_VALID;
@@ -928,6 +929,24 @@ static inline void uclamp_cpu_update(struct rq *rq, int clamp_id)
 		if (max_value >= SCHED_CAPACITY_SCALE)
 			break;
 	}
+
+	/*
+	 * Just for the UCLAMP_MAX value, in case there are no RUNNABLE
+	 * task, we want to keep the CPU clamped to the last task's clamp
+	 * value. This is to avoid frequency spikes to MAX when one CPU, with
+	 * an high blocked utilization, sleeps and another CPU, in the same
+	 * frequency domain, do not see anymore the clamp on the first CPU.
+	 *
+	 * The UCLAMP_FLAG_IDLE is set whenever we detect, from the above
+	 * loop, that there are no more RUNNABLE taks on that CPU.
+	 * In this case we enforce the CPU util_max to that of the last
+	 * dequeued task.
+	 */
+	if (clamp_id == UCLAMP_MAX && max_value == UCLAMP_NOT_VALID) {
+		rq->uclamp.flags |= UCLAMP_FLAG_IDLE;
+		max_value = last_clamp_value;
+	}
+
 	rq->uclamp.value[clamp_id] = max_value;
 }
 
@@ -962,13 +981,25 @@ static inline void uclamp_cpu_get_id(struct task_struct *p,
 	uc_grp = &rq->uclamp.group[clamp_id][0];
 	uc_grp[group_id].tasks += 1;
 
+	/* Reset clamp holds on idle exit */
+	uc_cpu = &rq->uclamp;
+	clamp_value = p->uclamp[clamp_id].value;
+	if (unlikely(uc_cpu->flags & UCLAMP_FLAG_IDLE)) {
+		/*
+		 * This function is called for both UCLAMP_MIN (before) and
+		 * UCLAMP_MAX (after). Let's reset the flag only the second
+		 * once we know that UCLAMP_MIN has been already updated.
+		 */
+		if (clamp_id == UCLAMP_MAX)
+			uc_cpu->flags &= ~UCLAMP_FLAG_IDLE;
+		uc_cpu->value[clamp_id] = clamp_value;
+	}
+
 	/*
 	 * If this is the new max utilization clamp value, then we can update
 	 * straight away the CPU clamp value. Otherwise, the current CPU clamp
 	 * value is still valid and we are done.
 	 */
-	uc_cpu = &rq->uclamp;
-	clamp_value = p->uclamp[clamp_id].value;
 	if (uc_cpu->value[clamp_id] < clamp_value)
 		uc_cpu->value[clamp_id] = clamp_value;
 }
@@ -1026,7 +1057,7 @@ static inline void uclamp_cpu_put_id(struct task_struct *p,
 	}
 #endif
 	if (clamp_value >= uc_cpu->value[clamp_id])
-		uclamp_cpu_update(rq, clamp_id);
+		uclamp_cpu_update(rq, clamp_id, clamp_value);
 }
 
 /**
