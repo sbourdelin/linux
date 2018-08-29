@@ -571,18 +571,27 @@ int kvm_pv_send_ipi(struct kvm *kvm, unsigned long ipi_bitmap_low,
 	rcu_read_lock();
 	map = rcu_dereference(kvm->arch.apic_map);
 
+	if (unlikely((s32)(map->max_apic_id - __fls(ipi_bitmap_low)) < min))
+		goto out;
 	/* Bits above cluster_size are masked in the caller.  */
 	for_each_set_bit(i, &ipi_bitmap_low, BITS_PER_LONG) {
-		vcpu = map->phys_map[min + i]->vcpu;
-		count += kvm_apic_set_irq(vcpu, &irq, NULL);
+		if (map->phys_map[min + i]) {
+			vcpu = map->phys_map[min + i]->vcpu;
+			count += kvm_apic_set_irq(vcpu, &irq, NULL);
+		}
 	}
 
 	min += cluster_size;
+	if (unlikely((s32)(map->max_apic_id - __fls(ipi_bitmap_high)) < min))
+		goto out;
 	for_each_set_bit(i, &ipi_bitmap_high, BITS_PER_LONG) {
-		vcpu = map->phys_map[min + i]->vcpu;
-		count += kvm_apic_set_irq(vcpu, &irq, NULL);
+		if (map->phys_map[min + i]) {
+			vcpu = map->phys_map[min + i]->vcpu;
+			count += kvm_apic_set_irq(vcpu, &irq, NULL);
+		}
 	}
 
+out:
 	rcu_read_unlock();
 	return count;
 }
