@@ -2897,37 +2897,31 @@ bool lock_sock_fast(struct sock *sk)
 }
 EXPORT_SYMBOL(lock_sock_fast);
 
-int sock_get_timestamp(struct sock *sk, struct timeval __user *userstamp)
+int sock_gettstamp(struct socket *sock, void __user *userstamp,
+		   bool timeval, bool time32)
 {
-	struct timeval tv;
+	struct sock *sk = sock->sk;
+	struct timespec64 ts;
 
 	sock_enable_timestamp(sk, SOCK_TIMESTAMP);
-	tv = ktime_to_timeval(sk->sk_stamp);
-	if (tv.tv_sec == -1)
-		return -ENOENT;
-	if (tv.tv_sec == 0) {
-		sk->sk_stamp = ktime_get_real();
-		tv = ktime_to_timeval(sk->sk_stamp);
-	}
-	return copy_to_user(userstamp, &tv, sizeof(tv)) ? -EFAULT : 0;
-}
-EXPORT_SYMBOL(sock_get_timestamp);
-
-int sock_get_timestampns(struct sock *sk, struct timespec __user *userstamp)
-{
-	struct timespec ts;
-
-	sock_enable_timestamp(sk, SOCK_TIMESTAMP);
-	ts = ktime_to_timespec(sk->sk_stamp);
+	ts = ktime_to_timespec64(sk->sk_stamp);
 	if (ts.tv_sec == -1)
 		return -ENOENT;
 	if (ts.tv_sec == 0) {
 		sk->sk_stamp = ktime_get_real();
-		ts = ktime_to_timespec(sk->sk_stamp);
+		ts = ktime_to_timespec64(sk->sk_stamp);
 	}
-	return copy_to_user(userstamp, &ts, sizeof(ts)) ? -EFAULT : 0;
+
+	if (timeval)
+		ts.tv_nsec /= 1000;
+#ifdef CONFIG_COMPAT_32BIT_TIME
+	if (time32)
+		return put_old_timespec32(&ts, userstamp);
+#endif
+
+	return put_timespec64(&ts, userstamp);
 }
-EXPORT_SYMBOL(sock_get_timestampns);
+EXPORT_SYMBOL(sock_gettstamp);
 
 void sock_enable_timestamp(struct sock *sk, int flag)
 {
