@@ -2,4 +2,5 @@
 include include/uapi/asm-generic/Kbuild.asm
 
 generic-y += bpf_perf_event.h
+generic-y += sockios.h
 generic-y += types.h
