@@ -1072,6 +1072,7 @@ int _opp_add(struct device *dev, struct dev_pm_opp *new_opp,
 
 	if (!_opp_supported_by_regulators(new_opp, opp_table)) {
 		new_opp->available = false;
+		new_opp->disable_count = 1;
 		dev_warn(dev, "%s: OPP not supported by regulators (%lu)\n",
 			 __func__, new_opp->rate);
 	}
@@ -1592,8 +1593,16 @@ static int _opp_set_availability(struct device *dev, unsigned long freq,
 		goto unlock;
 	}
 
+	if (availability_req)
+		opp->disable_count--;
+	else
+		opp->disable_count++;
+
 	/* Is update really needed? */
 	if (opp->available == availability_req)
+		goto unlock;
+
+	if (availability_req && opp->disable_count > 0)
 		goto unlock;
 
 	opp->available = availability_req;

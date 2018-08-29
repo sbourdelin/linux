@@ -55,6 +55,8 @@ extern struct list_head opp_tables;
  *		order.
  * @kref:	for reference count of the OPP.
  * @available:	true/false - marks if this OPP as available or not
+ * @disable_count: tracks the number of times the OPP has been disabled
+ *              (without re-enabling it).
  * @dynamic:	not-created from static DT entries.
  * @turbo:	true if turbo (boost) OPP
  * @suspend:	true if suspend OPP
@@ -74,6 +76,7 @@ struct dev_pm_opp {
 	struct kref kref;
 
 	bool available;
+	unsigned int disable_count;
 	bool dynamic;
 	bool turbo;
 	bool suspend;
