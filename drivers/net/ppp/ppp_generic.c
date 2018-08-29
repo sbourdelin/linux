@@ -899,6 +899,7 @@ static const struct file_operations ppp_device_fops = {
 	.write		= ppp_write,
 	.poll		= ppp_poll,
 	.unlocked_ioctl	= ppp_ioctl,
+	.compat_ioctl	= ppp_ioctl,
 	.open		= ppp_open,
 	.release	= ppp_release,
 	.llseek		= noop_llseek,
