@@ -512,6 +512,9 @@ mcr20a_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 
 	dev_dbg(printdev(lp), "%s\n", __func__);
 
+	if (channel < 11 || channel - 11 >= ARRAY_SIZE(PLL_INT))
+		return -EINVAL;
+
 	/* freqency = ((PLL_INT+64) + (PLL_FRAC/65536)) * 32 MHz */
 	ret = regmap_write(lp->regmap_dar, DAR_PLL_INT0, PLL_INT[channel - 11]);
 	if (ret)
