@@ -12575,6 +12575,22 @@ static int enter_vmx_non_root_mode(struct kvm_vcpu *vcpu, u32 *exit_qual)
 	}
 
 	/*
+	 * If L1 had a pending event until it executed
+	 * VMLAUNCH/VMRESUME which wasn't delivered because it was
+	 * disallowed (e.g. interrupts disabled), L0 needs to
+	 * evaluate if this pending event should cause an exit from L2
+	 * to L1 or delivered directly to L2 (In case L1 don't
+	 * intercept EXTERNAL_INTERRUPT).
+	 *
+	 * Usually this would be handled by L0 requesting a window
+	 * (e.g. IRQ window) by setting VMCS accordingly. However,
+	 * this setting was done on VMCS01 and now VMCS02 is active
+	 * instead. Thus, we force L0 to perform pending event
+	 * evaluation by requesting a KVM_REQ_EVENT.
+	 */
+	kvm_make_request(KVM_REQ_EVENT, vcpu);
+
+	/*
 	 * Note no nested_vmx_succeed or nested_vmx_fail here. At this point
 	 * we are no longer running L1, and VMLAUNCH/VMRESUME has not yet
 	 * returned as far as L1 is concerned. It will only return (and set
