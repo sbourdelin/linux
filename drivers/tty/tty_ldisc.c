@@ -340,8 +340,7 @@ void tty_ldisc_unlock(struct tty_struct *tty)
 	__tty_ldisc_unlock(tty);
 }
 
-static int
-tty_ldisc_lock_pair_timeout(struct tty_struct *tty, struct tty_struct *tty2,
+int tty_ldisc_lock_pair_timeout(struct tty_struct *tty, struct tty_struct *tty2,
 			    unsigned long timeout)
 {
 	int ret;
@@ -381,8 +380,7 @@ static void tty_ldisc_lock_pair(struct tty_struct *tty, struct tty_struct *tty2)
 	tty_ldisc_lock_pair_timeout(tty, tty2, MAX_SCHEDULE_TIMEOUT);
 }
 
-static void tty_ldisc_unlock_pair(struct tty_struct *tty,
-				  struct tty_struct *tty2)
+void tty_ldisc_unlock_pair(struct tty_struct *tty, struct tty_struct *tty2)
 {
 	__tty_ldisc_unlock(tty);
 	if (tty2)

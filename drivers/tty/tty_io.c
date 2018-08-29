@@ -1342,7 +1342,7 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 			"%s: %s driver does not set tty->port. This will crash the kernel later. Fix the driver!\n",
 			__func__, tty->driver->name);
 
-	retval = tty_ldisc_lock(tty, 5 * HZ);
+	retval = tty_ldisc_lock_pair_timeout(tty, tty->link, 5 * HZ);
 	if (retval)
 		goto err_release_lock;
 	tty->port->itty = tty;
@@ -1353,9 +1353,9 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 	 * to decrement the use counts, as release_tty doesn't care.
 	 */
 	retval = tty_ldisc_setup(tty, tty->link);
+	tty_ldisc_unlock_pair(tty, tty->link);
 	if (retval)
 		goto err_release_tty;
-	tty_ldisc_unlock(tty);
 	/* Return the tty locked so that it cannot vanish under the caller */
 	return tty;
 
@@ -1368,7 +1368,6 @@ err_module_put:
 
 	/* call the tty release_tty routine to clean out this slot */
 err_release_tty:
-	tty_ldisc_unlock(tty);
 	tty_info_ratelimited(tty, "ldisc open failed (%d), clearing slot %d\n",
 			     retval, idx);
 err_release_lock:

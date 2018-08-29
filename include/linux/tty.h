@@ -409,6 +409,10 @@ extern void tty_kclose(struct tty_struct *tty);
 extern int tty_dev_name_to_number(const char *name, dev_t *number);
 extern int tty_ldisc_lock(struct tty_struct *tty, unsigned long timeout);
 extern void tty_ldisc_unlock(struct tty_struct *tty);
+extern int tty_ldisc_lock_pair_timeout(struct tty_struct *tty,
+		struct tty_struct *tty2, unsigned long timeout);
+extern void tty_ldisc_unlock_pair(struct tty_struct *tty,
+		struct tty_struct *tty2);
 #else
 static inline void tty_kref_put(struct tty_struct *tty)
 { }
