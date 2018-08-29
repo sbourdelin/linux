@@ -17,6 +17,7 @@
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM8996";
+	compatible = "qcom,msm8996";
 
 	interrupt-parent = <&intc>;
 
