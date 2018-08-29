@@ -2097,6 +2097,11 @@ static int __init console_msg_format_setup(char *str)
 }
 __setup("console_msg_format=", console_msg_format_setup);
 
+void __init __weak arch_console_setup(void)
+{
+	return;
+}
+
 /*
  * Set up a console.  Called via do_early_param() in init/main.c
  * for each "console=" parameter in the boot command line.
@@ -2106,6 +2111,11 @@ static int __init console_setup(char *str)
 	char buf[sizeof(console_cmdline[0].name) + 4]; /* 4 for "ttyS" */
 	char *s, *options, *brl_options = NULL;
 	int idx;
+
+	if (!strcmp(str, "spcr")) {
+		arch_console_setup();
+		return 1;
+	}
 
 	if (_braille_console_setup(&str, &brl_options))
 		return 1;

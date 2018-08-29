@@ -183,6 +183,7 @@ extern int is_console_locked(void);
 extern int braille_register_console(struct console *, int index,
 		char *console_options, char *braille_options);
 extern int braille_unregister_console(struct console *);
+void arch_console_setup(void);
 #ifdef CONFIG_TTY
 extern void console_sysfs_notify(void);
 #else
