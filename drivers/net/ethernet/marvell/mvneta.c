@@ -2899,21 +2899,18 @@ static void mvneta_rxq_hw_init(struct mvneta_port *pp,
 	mvreg_write(pp, MVNETA_RXQ_BASE_ADDR_REG(rxq->id), rxq->descs_phys);
 	mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
 
+	/* Set Offset */
+	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
+
 	/* Set coalescing pkts and time */
 	mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
 	mvneta_rx_time_coal_set(pp, rxq, rxq->time_coal);
 
 	if (!pp->bm_priv) {
-		/* Set Offset */
-		mvneta_rxq_offset_set(pp, rxq, 0);
 		mvneta_rxq_buf_size_set(pp, rxq, pp->frag_size);
 		mvneta_rxq_bm_disable(pp, rxq);
 		mvneta_rxq_fill(pp, rxq, rxq->size);
 	} else {
-		/* Set Offset */
-		mvneta_rxq_offset_set(pp, rxq,
-				      NET_SKB_PAD - pp->rx_offset_correction);
-
 		mvneta_rxq_bm_enable(pp, rxq);
 		/* Fill RXQ with buffers from RX pool */
 		mvneta_rxq_long_pool_set(pp, rxq);
@@ -4547,7 +4544,13 @@ static int mvneta_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	pp->id = global_port_id++;
-	pp->rx_offset_correction = 0; /* not relevant for SW BM */
+
+	/* Set RX packet offset correction for platforms, whose
+	 * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
+	 * platforms and 0B for 32-bit ones.
+	 */
+	pp->rx_offset_correction =
+		max(0, NET_SKB_PAD - MVNETA_RX_PKT_OFFSET_CORRECTION);
 
 	/* Obtain access to BM resources if enabled and already initialized */
 	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
@@ -4562,13 +4565,6 @@ static int mvneta_probe(struct platform_device *pdev)
 				pp->bm_priv = NULL;
 			}
 		}
-		/* Set RX packet offset correction for platforms, whose
-		 * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
-		 * platforms and 0B for 32-bit ones.
-		 */
-		pp->rx_offset_correction = max(0,
-					       NET_SKB_PAD -
-					       MVNETA_RX_PKT_OFFSET_CORRECTION);
 	}
 	of_node_put(bm_node);
 
