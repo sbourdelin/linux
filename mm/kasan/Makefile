@@ -14,5 +14,5 @@ CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
 CFLAGS_khwasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
 
 obj-$(CONFIG_KASAN) := common.o kasan_init.o report.o
-obj-$(CONFIG_KASAN_GENERIC) += kasan.o quarantine.o
-obj-$(CONFIG_KASAN_HW) += khwasan.o
+obj-$(CONFIG_KASAN_GENERIC) += kasan.o kasan_report.o quarantine.o
+obj-$(CONFIG_KASAN_HW) += khwasan.o khwasan_report.o
