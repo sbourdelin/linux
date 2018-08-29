@@ -1885,7 +1885,7 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 			ret = 1;
 		break;
 	default:
-		ret = 1;
+		ret = -ENOENT;
 		break;
 	}
 	if (ret)

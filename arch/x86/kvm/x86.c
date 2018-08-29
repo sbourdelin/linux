@@ -2216,7 +2216,7 @@ static int set_msr_mce(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			vcpu->arch.mce_banks[offset] = data;
 			break;
 		}
-		return 1;
+		return -ENOENT;
 	}
 	return 0;
 }
@@ -2558,7 +2558,7 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (!ignore_msrs) {
 			vcpu_debug_ratelimited(vcpu, "unhandled wrmsr: 0x%x data 0x%llx\n",
 				    msr, data);
-			return 1;
+			return -ENOENT;
 		} else {
 			if (report_ignored_msrs)
 				vcpu_unimpl(vcpu,
@@ -2612,7 +2612,7 @@ static int get_msr_mce(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata, bool host)
 			data = vcpu->arch.mce_banks[offset];
 			break;
 		}
-		return 1;
+		return -ENOENT;
 	}
 	*pdata = data;
 	return 0;
@@ -2791,7 +2791,7 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (!ignore_msrs) {
 			vcpu_debug_ratelimited(vcpu, "unhandled rdmsr: 0x%x\n",
 					       msr_info->index);
-			return 1;
+			return -ENOENT;
 		} else {
 			if (report_ignored_msrs)
 				vcpu_unimpl(vcpu, "ignored rdmsr: 0x%x\n",

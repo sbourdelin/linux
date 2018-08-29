@@ -3952,7 +3952,7 @@ static int vmx_set_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 data)
 		/*
 		 * The rest of the VMX capability MSRs do not support restore.
 		 */
-		return -EINVAL;
+		return -ENOENT;
 	}
 }
 
@@ -4028,7 +4028,7 @@ static int vmx_get_vmx_msr(struct nested_vmx_msrs *msrs, u32 msr_index, u64 *pda
 		*pdata = msrs->vmfunc_controls;
 		break;
 	default:
-		return 1;
+		return -ENOENT;
 	}
 
 	return 0;

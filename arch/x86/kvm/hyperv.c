@@ -289,7 +289,7 @@ static int synic_set_msr(struct kvm_vcpu_hv_synic *synic,
 		ret = synic_set_sint(synic, msr - HV_X64_MSR_SINT0, data, host);
 		break;
 	default:
-		ret = 1;
+		ret = -ENOENT;
 		break;
 	}
 	return ret;
@@ -324,7 +324,7 @@ static int synic_get_msr(struct kvm_vcpu_hv_synic *synic, u32 msr, u64 *pdata,
 		*pdata = atomic64_read(&synic->sint[msr - HV_X64_MSR_SINT0]);
 		break;
 	default:
-		ret = 1;
+		ret = -ENOENT;
 		break;
 	}
 	return ret;
@@ -774,7 +774,7 @@ static int kvm_hv_msr_get_crash_data(struct kvm_vcpu *vcpu,
 	struct kvm_hv *hv = &vcpu->kvm->arch.hyperv;
 
 	if (WARN_ON_ONCE(index >= ARRAY_SIZE(hv->hv_crash_param)))
-		return -EINVAL;
+		return -ENOENT;
 
 	*pdata = hv->hv_crash_param[index];
 	return 0;
@@ -817,7 +817,7 @@ static int kvm_hv_msr_set_crash_data(struct kvm_vcpu *vcpu,
 	struct kvm_hv *hv = &vcpu->kvm->arch.hyperv;
 
 	if (WARN_ON_ONCE(index >= ARRAY_SIZE(hv->hv_crash_param)))
-		return -EINVAL;
+		return -ENOENT;
 
 	hv->hv_crash_param[index] = data;
 	return 0;
@@ -1023,7 +1023,7 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 	default:
 		vcpu_unimpl(vcpu, "Hyper-V uhandled wrmsr: 0x%x data 0x%llx\n",
 			    msr, data);
-		return 1;
+		return -ENOENT;
 	}
 	return 0;
 }
@@ -1116,7 +1116,7 @@ static int kvm_hv_set_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data, bool host)
 	default:
 		vcpu_unimpl(vcpu, "Hyper-V uhandled wrmsr: 0x%x data 0x%llx\n",
 			    msr, data);
-		return 1;
+		return -ENOENT;
 	}
 
 	return 0;
@@ -1161,7 +1161,7 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 		break;
 	default:
 		vcpu_unimpl(vcpu, "Hyper-V unhandled rdmsr: 0x%x\n", msr);
-		return 1;
+		return -ENOENT;
 	}
 
 	*pdata = data;
@@ -1223,7 +1223,7 @@ static int kvm_hv_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		break;
 	default:
 		vcpu_unimpl(vcpu, "Hyper-V unhandled rdmsr: 0x%x\n", msr);
-		return 1;
+		return -ENOENT;
 	}
 	*pdata = data;
 	return 0;

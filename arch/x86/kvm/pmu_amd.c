@@ -228,7 +228,7 @@ static int amd_pmu_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *data)
 		return 0;
 	}
 
-	return 1;
+	return -ENOENT;
 }
 
 static int amd_pmu_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
@@ -243,16 +243,18 @@ static int amd_pmu_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	if (pmc) {
 		pmc->counter += data - pmc_read_counter(pmc);
 		return 0;
-	}
-	/* MSR_EVNTSELn */
-	pmc = get_gp_pmc_amd(pmu, msr, PMU_TYPE_EVNTSEL);
-	if (pmc) {
-		if (data == pmc->eventsel)
-			return 0;
-		if (!(data & pmu->reserved_bits)) {
-			reprogram_gp_counter(pmc, data);
-			return 0;
-		}
+	} else {
+		/* MSR_EVNTSELn */
+		pmc = get_gp_pmc_amd(pmu, msr, PMU_TYPE_EVNTSEL);
+		if (pmc) {
+			if (data == pmc->eventsel)
+				return 0;
+			if (!(data & pmu->reserved_bits)) {
+				reprogram_gp_counter(pmc, data);
+				return 0;
+			}
+		} else
+			return -ENOENT;
 	}
 
 	return 1;

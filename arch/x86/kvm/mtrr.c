@@ -383,8 +383,12 @@ int kvm_mtrr_set_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 {
 	int index;
 
-	if (!kvm_mtrr_valid(vcpu, msr, data))
-		return 1;
+	if (!kvm_mtrr_valid(vcpu, msr, data)) {
+		if (!msr_mtrr_valid(msr))
+			return -ENOENT;
+		else
+			return 1;
+	}
 
 	index = fixed_msr_to_range_index(msr);
 	if (index >= 0)
@@ -417,7 +421,7 @@ int kvm_mtrr_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 	}
 
 	if (!msr_mtrr_valid(msr))
-		return 1;
+		return -ENOENT;
 
 	index = fixed_msr_to_range_index(msr);
 	if (index >= 0)
