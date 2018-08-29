@@ -97,4 +97,11 @@ config SND_ATMEL_SOC_I2S
 	help
 	  Say Y or M if you want to add support for Atmel ASoc driver for boards
 	  using I2S.
+
+config SND_SOC_MIKROE_PROTO
+	tristate "Support for Mikroe-PROTO board"
+	depends on OF
+	select SND_SOC_WM8731
+	help
+	  Say Y or M if you want to add support for Audio Codec Board PROTO (WM8731).
 endif
