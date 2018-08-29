@@ -2221,14 +2221,14 @@ static inline unsigned long cpu_util_irq(struct rq *rq)
 }
 
 static inline
-unsigned long scale_irq_capacity(unsigned long util, unsigned long irq, unsigned long max)
+unsigned long _scale_irq_capacity(unsigned long util, unsigned long irq, unsigned long max)
 {
 	util *= (max - irq);
 	util /= max;
 
 	return util;
-
 }
+
 #else
 static inline unsigned long cpu_util_irq(struct rq *rq)
 {
@@ -2236,8 +2236,26 @@ static inline unsigned long cpu_util_irq(struct rq *rq)
 }
 
 static inline
+unsigned long _scale_irq_capacity(unsigned long util, unsigned long irq, unsigned long max)
+{
+	return util;
+}
+#endif
+
+/*
+ * scale_irq_capacity is used by schedutil to scale utilization only when
+ * irq time is accounted. This scaling is not necessary when only virtual time
+ * is accounted as guest doesn't have access to frequency scaling.
+ */
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+
+#define scale_irq_capacity _scale_irq_capacity
+
+#else
+static inline
 unsigned long scale_irq_capacity(unsigned long util, unsigned long irq, unsigned long max)
 {
 	return util;
 }
 #endif
+

@@ -7501,7 +7501,7 @@ static unsigned long scale_rt_capacity(int cpu)
 
 	free = max - used;
 
-	return scale_irq_capacity(free, irq, max);
+	return _scale_irq_capacity(free, irq, max);
 }
 
 static void update_cpu_capacity(struct sched_domain *sd, int cpu)
