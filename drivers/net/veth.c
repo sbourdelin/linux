@@ -1242,18 +1242,76 @@ static struct rtnl_link_ops veth_link_ops = {
 	.get_link_net	= veth_get_link_net,
 };
 
+static int veth_notify(struct notifier_block *this,
+		       unsigned long event, void *ptr)
+{
+	struct net_device *peer, *dev = netdev_notifier_info_to_dev(ptr);
+	struct net *peer_net, *net = dev_net(dev);
+	int nsid, ret = NOTIFY_DONE;
+	struct veth_priv *priv;
+
+	if (dev->netdev_ops != &veth_netdev_ops)
+		return NOTIFY_DONE;
+
+	if (event != NETDEV_REGISTER)
+		return NOTIFY_DONE;
+
+	priv = netdev_priv(dev);
+
+	rcu_read_lock();
+
+	peer = rcu_dereference(priv->peer);
+	if (!peer)
+		goto out;
+
+	peer_net = dev_net(peer);
+	/* do not forward events if both veth devices
+	 * are in the same namespace
+	 */
+	if (peer_net == net)
+		goto out;
+
+	/* notify on peer namespace new IFLA_LINK_NETNSID
+	 * and IFLA_LINK values
+	 */
+	nsid = peernet2id_alloc(peer_net, net);
+	rtmsg_ifinfo_newnet(RTM_NEWLINK, peer, ~0U, GFP_ATOMIC,
+			    &nsid, dev->ifindex);
+	ret = NOTIFY_OK;
+
+out:
+	rcu_read_unlock();
+
+	return ret;
+}
+
+static struct notifier_block veth_notifier = {
+	.notifier_call = veth_notify,
+};
+
 /*
  * init/fini
  */
 
 static __init int veth_init(void)
 {
-	return rtnl_link_register(&veth_link_ops);
+	int err;
+
+	err = register_netdevice_notifier(&veth_notifier);
+	if (err < 0)
+		return err;
+
+	err = rtnl_link_register(&veth_link_ops);
+	if (err < 0)
+		unregister_netdevice_notifier(&veth_notifier);
+
+	return err;
 }
 
 static __exit void veth_exit(void)
 {
 	rtnl_link_unregister(&veth_link_ops);
+	unregister_netdevice_notifier(&veth_notifier);
 }
 
 module_init(veth_init);
