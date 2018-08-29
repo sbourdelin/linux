@@ -308,13 +308,36 @@ static const struct soc_device_attribute gen3_soc_whitelist[] = {
 static int renesas_sdhi_internal_dmac_probe(struct platform_device *pdev)
 {
 	const struct soc_device_attribute *soc = soc_device_match(gen3_soc_whitelist);
+	struct device *dev = &pdev->dev;
 
 	if (!soc)
 		return -ENODEV;
 
 	global_flags |= (unsigned long)soc->data;
 
+	if (!dev->dma_parms) {
+		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
+		if (!dev->dma_parms)
+			return -ENOMEM;
+	}
+
+	if (dma_set_max_seg_size(dev, 0xffffffff))
+		dev_warn(dev, "Unable to set seg size\n");
+
 	return renesas_sdhi_probe(pdev, &renesas_sdhi_internal_dmac_dma_ops);
+}
+
+static int renesas_sdhi_internal_dmac_remove(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	int ret;
+
+	ret = renesas_sdhi_remove(pdev);
+
+	kfree(dev->dma_parms);
+	dev->dma_parms = NULL;
+
+	return ret;
 }
 
 static const struct dev_pm_ops renesas_sdhi_internal_dmac_dev_pm_ops = {
@@ -332,7 +355,7 @@ static struct platform_driver renesas_internal_dmac_sdhi_driver = {
 		.of_match_table = renesas_sdhi_internal_dmac_of_match,
 	},
 	.probe		= renesas_sdhi_internal_dmac_probe,
-	.remove		= renesas_sdhi_remove,
+	.remove		= renesas_sdhi_internal_dmac_remove,
 };
 
 module_platform_driver(renesas_internal_dmac_sdhi_driver);
