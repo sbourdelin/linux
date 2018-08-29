@@ -1180,6 +1180,9 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		lladdr = neigh->ha;
 	}
 
+	if (new & NUD_CONNECTED)
+		neigh->confirmed = jiffies;
+
 	/* If entry was valid and address is not changed,
 	   do not change entry state, if new one is STALE.
 	 */
@@ -1205,11 +1208,8 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	 * neighbour entry. Otherwise we risk to move the locktime window with
 	 * noop updates and ignore relevant ARP updates.
 	 */
-	if (new != old || lladdr != neigh->ha) {
-		if (new & NUD_CONNECTED)
-			neigh->confirmed = jiffies;
+	if (new != old || lladdr != neigh->ha)
 		neigh->updated = jiffies;
-	}
 
 	if (new != old) {
 		neigh_del_timer(neigh);
