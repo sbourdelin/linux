@@ -181,7 +181,7 @@ struct kvm_msr_entry {
 /* for KVM_GET_MSRS and KVM_SET_MSRS */
 struct kvm_msrs {
 	__u32 nmsrs; /* number of msrs in entries */
-	__u32 pad;
+	__u32 errno; /* error from 1st failed MSR access */
 
 	struct kvm_msr_entry entries[0];
 };

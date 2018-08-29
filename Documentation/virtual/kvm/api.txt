@@ -487,7 +487,7 @@ Capability: basic (vcpu), KVM_CAP_GET_MSR_FEATURES (system)
 Architectures: x86
 Type: system ioctl, vcpu ioctl
 Parameters: struct kvm_msrs (in/out)
-Returns: number of msrs successfully returned;
+Returns: number of msrs successfully read;
         -1 on error
 
 When used as a system ioctl:
@@ -500,9 +500,12 @@ When used as a vcpu ioctl:
 Reads model-specific registers from the vcpu.  Supported msr indices can
 be obtained using KVM_GET_MSR_INDEX_LIST in a system ioctl.
 
+If return value is non-negative and < kvm_msrs.nmsrs, then kvm_msrs.errno
+contains a (positive) value from errno.h for first MSR access that failed.
+
 struct kvm_msrs {
 	__u32 nmsrs; /* number of msrs in entries */
-	__u32 pad;
+	__u32 errno; /* error from 1st failed MSR access */
 
 	struct kvm_msr_entry entries[0];
 };
@@ -524,7 +527,8 @@ Capability: basic
 Architectures: x86
 Type: vcpu ioctl
 Parameters: struct kvm_msrs (in)
-Returns: 0 on success, -1 on error
+Returns: number of msrs successfully written;
+        -1 on error
 
 Writes model-specific registers to the vcpu.  See KVM_GET_MSRS for the
 data structures.
@@ -533,6 +537,8 @@ Application code should set the 'nmsrs' member (which indicates the
 size of the entries array), and the 'index' and 'data' members of each
 array entry.
 
+If return value is non-negative and < kvm_msrs.nmsrs, then kvm_msrs.errno
+contains a (positive) value from errno.h for first MSR access that failed.
 
 4.20 KVM_SET_CPUID
 

@@ -2209,10 +2209,10 @@ static int set_msr_mce(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			 */
 			if ((offset & 0x3) == 0 &&
 			    data != 0 && (data | (1 << 10)) != ~(u64)0)
-				return -1;
+				return 1;
 			if (!msr_info->host_initiated &&
 				(offset & 0x3) == 1 && data != 0)
-				return -1;
+				return 1;
 			vcpu->arch.mce_banks[offset] = data;
 			break;
 		}
@@ -2807,18 +2807,23 @@ EXPORT_SYMBOL_GPL(kvm_get_msr_common);
 /*
  * Read or write a bunch of msrs. All parameters are kernel addresses.
  *
- * @return number of msrs set successfully.
+ * @return number of msrs accessed successfully.
  */
 static int __msr_io(struct kvm_vcpu *vcpu, struct kvm_msrs *msrs,
 		    struct kvm_msr_entry *entries,
 		    int (*do_msr)(struct kvm_vcpu *vcpu,
 				  unsigned index, u64 *data))
 {
-	int i;
+	int i, r;
 
-	for (i = 0; i < msrs->nmsrs; ++i)
-		if (do_msr(vcpu, entries[i].index, &entries[i].data))
+	for (i = 0; i < msrs->nmsrs; ++i) {
+		r = do_msr(vcpu, entries[i].index, &entries[i].data);
+		if (r) {
+			/* Convert non-standard returns to generic error */
+			msrs->errno = r > 0 ? EINVAL : -r;
 			break;
+		}
+	}
 
 	return i;
 }
@@ -2853,11 +2858,14 @@ static int msr_io(struct kvm_vcpu *vcpu, struct kvm_msrs __user *user_msrs,
 		goto out;
 	}
 
-	r = n = __msr_io(vcpu, &msrs, entries, do_msr);
-	if (r < 0)
-		goto out_free;
+	msrs.errno = 0;
+	n = __msr_io(vcpu, &msrs, entries, do_msr);
 
 	r = -EFAULT;
+	if (copy_to_user(&user_msrs->errno, &msrs.errno,
+			 sizeof user_msrs->errno))
+		goto out_free;
+
 	if (writeback && copy_to_user(user_msrs->entries, entries, size))
 		goto out_free;
 
