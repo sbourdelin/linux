@@ -85,6 +85,8 @@ extern void unregister_pppox_proto(int proto_num);
 extern void pppox_unbind_sock(struct sock *sk);/* delete ppp-channel binding */
 extern int pppox_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg);
 
+#define PPPOEIOCSFWD32    _IOW(0xB1 ,0, compat_size_t)
+
 /* PPPoX socket states */
 enum {
     PPPOX_NONE		= 0,  /* initial state */
