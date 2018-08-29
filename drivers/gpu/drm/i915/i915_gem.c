@@ -6182,4 +6182,5 @@ err_unlock:
 #include "selftests/huge_pages.c"
 #include "selftests/i915_gem_object.c"
 #include "selftests/i915_gem_coherency.c"
+#include "selftests/i915_gem.c"
 #endif
