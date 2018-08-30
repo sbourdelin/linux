@@ -145,6 +145,16 @@ static inline unsigned int __sel_hash(const struct xfrm_selector *sel,
 	const xfrm_address_t *saddr = &sel->saddr;
 	unsigned int h = 0;
 
+	/* A selector with a prefixlen of zero can basically be ignored in
+	 * the matching. To speed up the lookup, let's hash it without those
+	 * component. In the lookup, we'll do an additional check for a zero
+	 * daddr and a zero saddr.
+	 */
+	if (sel->prefixlen_d == 0)
+		dbits = 0;
+	if (sel->prefixlen_s == 0)
+		sbits = 0;
+
 	switch (family) {
 	case AF_INET:
 		if (sel->prefixlen_d < dbits ||
