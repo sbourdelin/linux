@@ -34,6 +34,7 @@
 #include <linux/fb.h>
 #include <linux/fbcon.h>
 #include <linux/mem_encrypt.h>
+#include <linux/pci.h>
 
 #include <asm/fb.h>
 
@@ -1819,6 +1820,27 @@ int remove_conflicting_framebuffers(struct apertures_struct *a,
 	return ret;
 }
 EXPORT_SYMBOL(remove_conflicting_framebuffers);
+
+int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const char *name)
+{
+	struct apertures_struct *ap;
+	bool primary = false;
+
+	ap = alloc_apertures(1);
+	if (!ap)
+		return -ENOMEM;
+
+	ap->ranges[0].base = pci_resource_start(pdev, res_id);
+	ap->ranges[0].size = pci_resource_len(pdev, res_id);
+#ifdef CONFIG_X86
+	primary = pdev->resource[PCI_ROM_RESOURCE].flags &
+					IORESOURCE_ROM_SHADOW;
+#endif
+	remove_conflicting_framebuffers(ap, name, primary);
+	kfree(ap);
+	return 0;
+}
+EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 
 /**
  *	register_framebuffer - registers a frame buffer device
