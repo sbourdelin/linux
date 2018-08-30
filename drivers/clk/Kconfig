@@ -283,6 +283,12 @@ config COMMON_CLK_STM32H7
 	---help---
 	  Support for stm32h7 SoC family clocks
 
+config COMMON_CLK_BD718XX
+	tristate "Clock driver for ROHM BD71837 PMIC MFD"
+	depends on MFD_ROHM_BD718XX
+	help
+	  This driver supports ROHM BD71837 PMIC clock.
+
 source "drivers/clk/actions/Kconfig"
 source "drivers/clk/bcm/Kconfig"
 source "drivers/clk/hisilicon/Kconfig"
