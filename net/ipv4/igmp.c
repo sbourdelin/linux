@@ -86,6 +86,7 @@
 #include <linux/inetdevice.h>
 #include <linux/igmp.h>
 #include <linux/if_arp.h>
+#include <net/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/times.h>
 #include <linux/pkt_sched.h>
@@ -1384,6 +1385,91 @@ static void ip_mc_hash_remove(struct in_device *in_dev,
 }
 
 
+static int fill_addr(struct sk_buff *skb, struct net_device *dev, __be32 addr,
+		     int type, unsigned int flags)
+{
+	struct nlmsghdr *nlh;
+	struct ifaddrmsg *ifm;
+
+	nlh = nlmsg_put(skb, 0, 0, type, sizeof(*ifm), flags);
+	if (!nlh)
+		return -EMSGSIZE;
+
+	ifm = nlmsg_data(nlh);
+	ifm->ifa_family = AF_INET;
+	ifm->ifa_prefixlen = 32;
+	ifm->ifa_flags = IFA_F_PERMANENT;
+	ifm->ifa_scope = RT_SCOPE_LINK;
+	ifm->ifa_index = dev->ifindex;
+
+	if (nla_put_in_addr(skb, IFA_ADDRESS, addr))
+		goto nla_put_failure;
+	nlmsg_end(skb, nlh);
+	return 0;
+
+nla_put_failure:
+	nlmsg_cancel(skb, nlh);
+	return -EMSGSIZE;
+}
+
+static inline size_t addr_nlmsg_size(void)
+{
+	return NLMSG_ALIGN(sizeof(struct ifaddrmsg))
+		+ nla_total_size(sizeof(__be32));
+}
+
+static void ip_mc_addr_notify(struct net_device *dev, __be32 addr, int type)
+{
+	struct net *net = dev_net(dev);
+	struct sk_buff *skb;
+	int err = -ENOBUFS;
+
+	skb = nlmsg_new(addr_nlmsg_size(), GFP_ATOMIC);
+	if (!skb)
+		goto errout;
+
+	err = fill_addr(skb, dev, addr, type, 0);
+	if (err < 0) {
+		WARN_ON(err == -EMSGSIZE);
+		kfree_skb(skb);
+		goto errout;
+	}
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV4_IFADDR, NULL, GFP_ATOMIC);
+	return;
+errout:
+	if (err < 0)
+		rtnl_set_sk_err(net, RTNLGRP_LINK, err);
+}
+
+int ip_mc_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb,
+		      struct net_device *dev)
+{
+	int s_idx;
+	int idx = 0;
+	struct ip_mc_list *im;
+	struct in_device *in_dev;
+
+	ASSERT_RTNL();
+
+	s_idx = cb->args[4];
+	in_dev = __in_dev_get_rtnl(dev);
+
+	for_each_pmc_rtnl(in_dev, im) {
+		if (idx < s_idx)
+			continue;
+		if (fill_addr(skb, dev, im->multiaddr, RTM_NEWADDR,
+			      NLM_F_MULTI) < 0)
+			goto done;
+		nl_dump_check_consistent(cb, nlmsg_hdr(skb));
+		idx++;
+	}
+
+ done:
+	cb->args[4] = idx;
+
+	return skb->len;
+}
+
 /*
  *	A socket has joined a multicast group on device dev.
  */
@@ -1433,6 +1519,8 @@ static void __ip_mc_inc_group(struct in_device *in_dev, __be32 addr,
 	igmpv3_del_delrec(in_dev, im);
 #endif
 	igmp_group_added(im);
+
+	ip_mc_addr_notify(in_dev->dev, addr, RTM_NEWADDR);
 	if (!in_dev->dead)
 		ip_rt_multicast_event(in_dev);
 out:
@@ -1664,6 +1752,8 @@ void ip_mc_dec_group(struct in_device *in_dev, __be32 addr)
 				in_dev->mc_count--;
 				igmp_group_dropped(i);
 				ip_mc_clear_src(i);
+				ip_mc_addr_notify(in_dev->dev, addr,
+						  RTM_DELADDR);
 
 				if (!in_dev->dead)
 					ip_rt_multicast_event(in_dev);

@@ -57,6 +57,7 @@
 #endif
 #include <linux/kmod.h>
 #include <linux/netconf.h>
+#include <linux/igmp.h>
 
 #include <net/arp.h>
 #include <net/ip.h>
@@ -1651,6 +1652,7 @@ static int inet_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 	int h, s_h;
 	int idx, s_idx;
 	int ip_idx, s_ip_idx;
+	int multicast, mcast_idx;
 	struct net_device *dev;
 	struct in_device *in_dev;
 	struct in_ifaddr *ifa;
@@ -1659,6 +1661,8 @@ static int inet_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 	s_h = cb->args[0];
 	s_idx = idx = cb->args[1];
 	s_ip_idx = ip_idx = cb->args[2];
+	multicast = cb->args[3];
+	mcast_idx = cb->args[4];
 
 	for (h = s_h; h < NETDEV_HASHENTRIES; h++, s_idx = 0) {
 		idx = 0;
@@ -1675,18 +1679,29 @@ static int inet_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 			if (!in_dev)
 				goto cont;
 
-			for (ifa = in_dev->ifa_list, ip_idx = 0; ifa;
-			     ifa = ifa->ifa_next, ip_idx++) {
-				if (ip_idx < s_ip_idx)
-					continue;
-				if (inet_fill_ifaddr(skb, ifa,
-					     NETLINK_CB(cb->skb).portid,
-					     cb->nlh->nlmsg_seq,
-					     RTM_NEWADDR, NLM_F_MULTI) < 0) {
-					rcu_read_unlock();
-					goto done;
+			if (!multicast) {
+				for (ifa = in_dev->ifa_list, ip_idx = 0; ifa;
+				     ifa = ifa->ifa_next, ip_idx++) {
+					if (ip_idx < s_ip_idx)
+						continue;
+					if (inet_fill_ifaddr(skb, ifa,
+							     NETLINK_CB(cb->skb).portid,
+							     cb->nlh->nlmsg_seq,
+							     RTM_NEWADDR,
+							     NLM_F_MULTI) < 0) {
+						rcu_read_unlock();
+						goto done;
+					}
+					nl_dump_check_consistent(cb,
+								 nlmsg_hdr(skb));
 				}
-				nl_dump_check_consistent(cb, nlmsg_hdr(skb));
+				/* set for multicast loop */
+				multicast++;
+			}
+			/* loop over multicast addresses */
+			if (ip_mc_dump_ifaddr(skb, cb, dev) < 0) {
+				rcu_read_unlock();
+				goto done;
 			}
 cont:
 			idx++;
@@ -1698,6 +1713,8 @@ done:
 	cb->args[0] = h;
 	cb->args[1] = idx;
 	cb->args[2] = ip_idx;
+	cb->args[3] = multicast;
+	cb->args[4] = mcast_idx;
 
 	return skb->len;
 }

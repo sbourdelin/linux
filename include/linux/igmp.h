@@ -130,6 +130,8 @@ extern void ip_mc_unmap(struct in_device *);
 extern void ip_mc_remap(struct in_device *);
 extern void ip_mc_dec_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_inc_group(struct in_device *in_dev, __be32 addr);
+extern int ip_mc_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb,
+			     struct net_device *dev);
 int ip_mc_check_igmp(struct sk_buff *skb, struct sk_buff **skb_trimmed);
 
 #endif
