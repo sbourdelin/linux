@@ -10,6 +10,7 @@
 #define pr_fmt(fmt)	"DMAR: " fmt
 
 #include <linux/bitops.h>
+#include <linux/cpufeature.h>
 #include <linux/dmar.h>
 #include <linux/intel-iommu.h>
 #include <linux/iommu.h>
@@ -377,6 +378,26 @@ static inline void pasid_set_page_snoop(struct pasid_entry *pe, bool value)
 	pasid_set_bits(&pe->val[1], 1 << 23, value);
 }
 
+/*
+ * Setup the First Level Page table Pointer field (Bit 140~191)
+ * of a scalable mode PASID entry.
+ */
+static inline void
+pasid_set_flptr(struct pasid_entry *pe, u64 value)
+{
+	pasid_set_bits(&pe->val[2], VTD_PAGE_MASK, value);
+}
+
+/*
+ * Setup the First Level Paging Mode field (Bit 130~131) of a
+ * scalable mode PASID entry.
+ */
+static inline void
+pasid_set_flpm(struct pasid_entry *pe, u64 value)
+{
+	pasid_set_bits(&pe->val[2], GENMASK_ULL(3, 2), value << 2);
+}
+
 static void
 pasid_based_pasid_cache_invalidation(struct intel_iommu *iommu,
 				     int did, int pasid)
@@ -443,6 +464,74 @@ static void tear_down_one_pasid_entry(struct intel_iommu *iommu,
 	/* Device IOTLB doesn't need to be flushed in caching mode. */
 	if (!cap_caching_mode(iommu->cap))
 		pasid_based_dev_iotlb_cache_invalidation(iommu, dev, pasid);
+}
+
+/*
+ * Set up the scalable mode pasid table entry for first only
+ * translation type.
+ */
+int intel_pasid_setup_first_level(struct intel_iommu *iommu,
+				  struct mm_struct *mm,
+				  struct device *dev,
+				  u16 did, int pasid)
+{
+	struct pasid_entry *pte;
+
+	if (!ecap_flts(iommu->ecap)) {
+		pr_err("No first level translation support on %s\n",
+		       iommu->name);
+		return -EINVAL;
+	}
+
+	pte = intel_pasid_get_entry(dev, pasid);
+	if (WARN_ON(!pte))
+		return -EINVAL;
+
+	pasid_clear_entry(pte);
+
+	/* Setup the first level page table pointer: */
+	if (mm) {
+		pasid_set_flptr(pte, (u64)__pa(mm->pgd));
+	} else {
+		pasid_set_sre(pte);
+		pasid_set_flptr(pte, (u64)__pa(init_mm.pgd));
+	}
+
+#ifdef CONFIG_X86
+	if (cpu_feature_enabled(X86_FEATURE_LA57))
+		pasid_set_flpm(pte, 1);
+#endif /* CONFIG_X86 */
+
+	pasid_set_domain_id(pte, did);
+	pasid_set_address_width(pte, iommu->agaw);
+	pasid_set_page_snoop(pte, !!ecap_smpwc(iommu->ecap));
+
+	/* Setup Present and PASID Granular Transfer Type: */
+	pasid_set_translation_type(pte, 1);
+	pasid_set_present(pte);
+
+	if (!ecap_coherent(iommu->ecap))
+		clflush_cache_range(pte, sizeof(*pte));
+
+	if (cap_caching_mode(iommu->cap)) {
+		pasid_based_pasid_cache_invalidation(iommu, did, pasid);
+		pasid_based_iotlb_cache_invalidation(iommu, did, pasid);
+	} else {
+		iommu_flush_write_buffer(iommu);
+	}
+
+	return 0;
+}
+
+/*
+ * Tear down the scalable mode pasid table entry for first only
+ * translation type.
+ */
+void intel_pasid_tear_down_first_level(struct intel_iommu *iommu,
+				       struct device *dev,
+				       u16 did, int pasid)
+{
+	tear_down_one_pasid_entry(iommu, dev, did, pasid);
 }
 
 /*
