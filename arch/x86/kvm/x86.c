@@ -4518,10 +4518,11 @@ set_identity_unlock:
 		r = -EFAULT;
 		if (copy_from_user(&u.ps, argp, sizeof u.ps))
 			goto out;
+		mutex_lock(&kvm->lock);
 		r = -ENXIO;
-		if (!kvm->arch.vpit)
-			goto out;
-		r = kvm_vm_ioctl_set_pit(kvm, &u.ps);
+		if (kvm->arch.vpit)
+			r = kvm_vm_ioctl_set_pit(kvm, &u.ps);
+		mutex_unlock(&kvm->lock);
 		break;
 	}
 	case KVM_GET_PIT2: {
@@ -4541,10 +4542,11 @@ set_identity_unlock:
 		r = -EFAULT;
 		if (copy_from_user(&u.ps2, argp, sizeof(u.ps2)))
 			goto out;
+		mutex_lock(&kvm->lock);
 		r = -ENXIO;
-		if (!kvm->arch.vpit)
-			goto out;
-		r = kvm_vm_ioctl_set_pit2(kvm, &u.ps2);
+		if (kvm->arch.vpit)
+			r = kvm_vm_ioctl_set_pit2(kvm, &u.ps2);
+		mutex_unlock(&kvm->lock);
 		break;
 	}
 	case KVM_REINJECT_CONTROL: {
