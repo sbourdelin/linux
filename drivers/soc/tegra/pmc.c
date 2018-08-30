@@ -297,8 +297,8 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
 
 	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
 
-	err = readx_poll_timeout(tegra_powergate_state, id, status,
-				 status == new_state, 10, 100000);
+	err = readx_poll_timeout_atomic(tegra_powergate_state, id, status,
+					status == new_state, 10, 100000);
 
 	spin_unlock(&pmc->powergates_lock);
 
