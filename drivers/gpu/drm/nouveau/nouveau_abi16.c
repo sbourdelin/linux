@@ -236,7 +236,7 @@ nouveau_abi16_ioctl_getparam(ABI16_IOCTL_ARGS)
 		getparam->value = nvkm_gr_units(gr);
 		break;
 	default:
-		NV_PRINTK(dbg, cli, "unknown parameter %lld\n", getparam->param);
+		nv_cli_dbg(cli, "unknown parameter %lld\n", getparam->param);
 		return -EINVAL;
 	}
 

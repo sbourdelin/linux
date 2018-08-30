@@ -240,13 +240,15 @@ nouveau_platform_device_create(const struct nvkm_device_tegra_func *,
 			       struct platform_device *, struct nvkm_device **);
 void nouveau_drm_device_remove(struct drm_device *dev);
 
-#define NV_PRINTK(l,c,f,a...) do {                                             \
-	struct nouveau_cli *_cli = (c);                                        \
-	dev_##l(_cli->drm->dev->dev, "%s: "f, _cli->name, ##a);                \
-} while(0)
-
 __printf(2, 3)
 void nouveau_cli_printk(struct nouveau_cli *cli, const char *fmt, ...);
+
+#define nv_cli_err(cli, fmt, ...)					\
+	nouveau_cli_printk(cli, KERN_ERR fmt, ##__VA_ARGS__)
+#define nv_cli_warn(cli, fmt, ...)					\
+	nouveau_cli_printk(cli, KERN_WARNING fmt, ##__VA_ARGS__)
+#define nv_cli_dbg(cli, fmt, ...)					\
+	dev_dbg((cli)->drm->dev->dev, "%s: " fmt, (cli)->name, ##__VA_ARGS__)
 
 #define NV_FATAL(drm, fmt, ...)						\
 	nouveau_cli_printk(&(drm)->client, KERN_CRIT fmt, ##__VA_ARGS__)

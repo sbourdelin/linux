@@ -51,7 +51,7 @@ nouveau_channel_killed(struct nvif_notify *ntfy)
 {
 	struct nouveau_channel *chan = container_of(ntfy, typeof(*chan), kill);
 	struct nouveau_cli *cli = (void *)chan->user.client;
-	NV_PRINTK(warn, cli, "channel %d killed!\n", chan->chid);
+	nv_cli_warn(cli, "channel %d killed!\n", chan->chid);
 	atomic_set(&chan->killed, 1);
 	return NVIF_NOTIFY_DROP;
 }
@@ -71,8 +71,8 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 		}
 
 		if (ret) {
-			NV_PRINTK(err, cli, "failed to idle channel %d [%s]\n",
-				  chan->chid, nvxx_client(&cli->base)->name);
+			nv_cli_err(cli, "failed to idle channel %d [%s]\n",
+				   chan->chid, nvxx_client(&cli->base)->name);
 			return ret;
 		}
 	}
@@ -460,17 +460,17 @@ nouveau_channel_new(struct nouveau_drm *drm, struct nvif_device *device,
 
 	ret = nouveau_channel_ind(drm, device, arg0, pchan);
 	if (ret) {
-		NV_PRINTK(dbg, cli, "ib channel create, %d\n", ret);
+		nv_cli_dbg(cli, "ib channel create, %d\n", ret);
 		ret = nouveau_channel_dma(drm, device, pchan);
 		if (ret) {
-			NV_PRINTK(dbg, cli, "dma channel create, %d\n", ret);
+			nv_cli_dbg(cli, "dma channel create, %d\n", ret);
 			goto done;
 		}
 	}
 
 	ret = nouveau_channel_init(*pchan, arg0, arg1);
 	if (ret) {
-		NV_PRINTK(err, cli, "channel failed to initialise, %d\n", ret);
+		nv_cli_err(cli, "channel failed to initialise, %d\n", ret);
 		nouveau_channel_del(pchan);
 	}
 
