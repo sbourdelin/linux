@@ -1,0 +1,38 @@
+Binding for NVIDIA Tegra20 CPUFreq
+==================================
+
+Required properties:
+- clocks: Must contain an entry for each entry in clock-names.
+  See ../clocks/clock-bindings.txt for details.
+- clock-names: Must include the following entries:
+  - pll_x: main-parent for CPU clock, must be the first entry
+  - backup: intermediate-parent for CPU clock
+  - cpu: the CPU clock
+- operating-points-v2: See ../bindings/opp/opp.txt for details.
+- #cooling-cells: Should be 2. See ../thermal/thermal.txt for details.
+
+Example:
+	cpu0_opp_table: opp_table0 {
+		compatible = "operating-points-v2";
+
+		opp@216000000 {
+			clock-latency-ns = <300000>;
+			opp-hz = /bits/ 64 <216000000>;
+			opp-microvolt = <7500000>;
+			opp-suspend;
+		};
+
+		...
+	};
+
+	cpus {
+		cpu@0 {
+			compatible = "arm,cortex-a9";
+			clocks = <&tegra_car TEGRA20_CLK_PLL_X>,
+				 <&tegra_car TEGRA20_CLK_PLL_P>,
+				 <&tegra_car TEGRA20_CLK_CCLK>;
+			clock-names = "pll_x", "backup", "cpu";
+			operating-points-v2 = <&cpu0_opp_table>;
+			#cooling-cells = <2>;
+		};
+	};
