@@ -1390,6 +1390,27 @@ static void vfio_iommu_detach_group(struct vfio_domain *domain,
 		iommu_detach_group(domain->domain, group->iommu_group);
 }
 
+static int vfio_mdev_domain_type(struct device *dev, void *data)
+{
+	enum mdev_domain_type new, *old = data;
+	enum mdev_domain_type (*fn)(struct device *dev);
+
+	fn = symbol_get(mdev_get_domain_type);
+	if (fn) {
+		new = fn(dev);
+		symbol_put(mdev_get_domain_type);
+
+		if (*old && *old != new)
+			return -EINVAL;
+
+		*old = new;
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
 static int vfio_iommu_type1_attach_group(void *iommu_data,
 					 struct iommu_group *iommu_group)
 {
@@ -1433,9 +1454,19 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 
 	mdev_bus = symbol_get(mdev_bus_type);
 
-	if (mdev_bus) {
-		if ((bus == mdev_bus) && !iommu_present(bus)) {
-			symbol_put(mdev_bus_type);
+	if (mdev_bus && bus == mdev_bus) {
+		enum mdev_domain_type type = 0;
+
+		symbol_put(mdev_bus_type);
+
+		/* Determine the domain type: */
+		ret = iommu_group_for_each_dev(iommu_group, &type,
+					       vfio_mdev_domain_type);
+		if (ret)
+			goto out_free;
+
+		switch (type) {
+		case DOMAIN_TYPE_NO_IOMMU:
 			if (!iommu->external_domain) {
 				INIT_LIST_HEAD(&domain->group_list);
 				iommu->external_domain = domain;
@@ -1445,10 +1476,18 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 			list_add(&group->next,
 				 &iommu->external_domain->group_list);
 			mutex_unlock(&iommu->lock);
+
 			return 0;
+		case DOMAIN_TYPE_ATTACH_PARENT:
+		/* FALLTHROUGH */
+		default:
+			ret = -EINVAL;
+			goto out_free;
 		}
-		symbol_put(mdev_bus_type);
 	}
+
+	if (mdev_bus)
+		symbol_put(mdev_bus_type);
 
 	domain->domain = iommu_domain_alloc(bus);
 	if (!domain->domain) {
