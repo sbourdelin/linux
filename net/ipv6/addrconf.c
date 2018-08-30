@@ -4855,11 +4855,13 @@ error:
 }
 
 static int inet6_fill_ifmcaddr(struct sk_buff *skb, struct ifmcaddr6 *ifmca,
-				u32 portid, u32 seq, int event, u16 flags)
+			u32 portid, u32 seq, int event, u16 flags)
 {
 	struct nlmsghdr  *nlh;
 	u8 scope = RT_SCOPE_UNIVERSE;
 	int ifindex = ifmca->idev->dev->ifindex;
+	int addr_type = (event == RTM_GETMULTICAST) ? IFA_MULTICAST :
+		IFA_ADDRESS;
 
 	if (ipv6_addr_scope(&ifmca->mca_addr) & IFA_SITE)
 		scope = RT_SCOPE_SITE;
@@ -4869,7 +4871,7 @@ static int inet6_fill_ifmcaddr(struct sk_buff *skb, struct ifmcaddr6 *ifmca,
 		return -EMSGSIZE;
 
 	put_ifaddrmsg(nlh, 128, IFA_F_PERMANENT, scope, ifindex);
-	if (nla_put_in6_addr(skb, IFA_MULTICAST, &ifmca->mca_addr) < 0 ||
+	if (nla_put_in6_addr(skb, addr_type, &ifmca->mca_addr) < 0 ||
 	    put_cacheinfo(skb, ifmca->mca_cstamp, ifmca->mca_tstamp,
 			  INFINITY_LIFE_TIME, INFINITY_LIFE_TIME) < 0) {
 		nlmsg_cancel(skb, nlh);
@@ -4916,7 +4918,7 @@ enum addr_type_t {
 /* called with rcu_read_lock() */
 static int in6_dump_addrs(struct inet6_dev *idev, struct sk_buff *skb,
 			  struct netlink_callback *cb, enum addr_type_t type,
-			  int s_ip_idx, int *p_ip_idx)
+			  int s_ip_idx, int *p_ip_idx, int msg_type)
 {
 	struct ifmcaddr6 *ifmca;
 	struct ifacaddr6 *ifaca;
@@ -4935,7 +4937,7 @@ static int in6_dump_addrs(struct inet6_dev *idev, struct sk_buff *skb,
 			err = inet6_fill_ifaddr(skb, ifa,
 						NETLINK_CB(cb->skb).portid,
 						cb->nlh->nlmsg_seq,
-						RTM_NEWADDR,
+						msg_type,
 						NLM_F_MULTI);
 			if (err < 0)
 				break;
@@ -4952,7 +4954,7 @@ static int in6_dump_addrs(struct inet6_dev *idev, struct sk_buff *skb,
 			err = inet6_fill_ifmcaddr(skb, ifmca,
 						  NETLINK_CB(cb->skb).portid,
 						  cb->nlh->nlmsg_seq,
-						  RTM_GETMULTICAST,
+						  msg_type,
 						  NLM_F_MULTI);
 			if (err < 0)
 				break;
@@ -4967,7 +4969,7 @@ static int in6_dump_addrs(struct inet6_dev *idev, struct sk_buff *skb,
 			err = inet6_fill_ifacaddr(skb, ifaca,
 						  NETLINK_CB(cb->skb).portid,
 						  cb->nlh->nlmsg_seq,
-						  RTM_GETANYCAST,
+						  msg_type,
 						  NLM_F_MULTI);
 			if (err < 0)
 				break;
@@ -4982,7 +4984,7 @@ static int in6_dump_addrs(struct inet6_dev *idev, struct sk_buff *skb,
 }
 
 static int inet6_dump_addr(struct sk_buff *skb, struct netlink_callback *cb,
-			   enum addr_type_t type)
+			   enum addr_type_t type, int msg_type)
 {
 	struct net *net = sock_net(skb->sk);
 	int h, s_h;
@@ -5012,7 +5014,7 @@ static int inet6_dump_addr(struct sk_buff *skb, struct netlink_callback *cb,
 				goto cont;
 
 			if (in6_dump_addrs(idev, skb, cb, type,
-					   s_ip_idx, &ip_idx) < 0)
+					   s_ip_idx, &ip_idx, msg_type) < 0)
 				goto done;
 cont:
 			idx++;
@@ -5029,16 +5031,34 @@ done:
 
 static int inet6_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 {
-	enum addr_type_t type = UNICAST_ADDR;
+	enum addr_type_t type;
+	int ret;
 
-	return inet6_dump_addr(skb, cb, type);
+	type = cb->args[3];
+	if (type == UNICAST_ADDR) {
+		ret =  = inet6_dump_addr(skb, cb, type, RTM_NEWADDR);
+		if (ret > 0)
+			goto done;
+
+		/* reset indices and move on to multicast*/
+		cb->args[0] = 0;
+		cb->args[1] = 0;
+		cb->args[2] = 0;
+		type = MULTICAST_ADDR;
+	}
+
+	/* do the RTM_NEWADDR notifications for multicast type */
+	ret = inet6_dump_addr(skb, cb, type, RTM_NEWADDR);
+ done:
+	cb->args[3] = type;
+	return ret;
 }
 
 static int inet6_dump_ifmcaddr(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	enum addr_type_t type = MULTICAST_ADDR;
 
-	return inet6_dump_addr(skb, cb, type);
+	return inet6_dump_addr(skb, cb, type, RTM_GETMULTICAST);
 }
 
 
@@ -5046,7 +5066,7 @@ static int inet6_dump_ifacaddr(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	enum addr_type_t type = ANYCAST_ADDR;
 
-	return inet6_dump_addr(skb, cb, type);
+	return inet6_dump_addr(skb, cb, type, RTM_GETANYCAST);
 }
 
 static int inet6_rtm_getaddr(struct sk_buff *in_skb, struct nlmsghdr *nlh,

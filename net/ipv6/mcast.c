@@ -880,6 +880,67 @@ static struct ifmcaddr6 *mca_alloc(struct inet6_dev *idev,
 	return mc;
 }
 
+static int fill_addr(struct sk_buff *skb, struct net_device *dev,
+		     const struct in6_addr *addr, int type, unsigned int flags)
+{
+	struct nlmsghdr *nlh;
+	struct ifaddrmsg *ifm;
+	u8 scope = RT_SCOPE_UNIVERSE;
+
+	if (ipv6_addr_scope(addr) & IFA_SITE)
+		scope = RT_SCOPE_SITE;
+
+	nlh = nlmsg_put(skb, 0, 0, type, sizeof(*ifm), flags);
+	if (!nlh)
+		return -EMSGSIZE;
+
+	ifm = nlmsg_data(nlh);
+	ifm->ifa_family = AF_INET6;
+	ifm->ifa_prefixlen = 128;
+	ifm->ifa_flags = IFA_F_PERMANENT;
+	ifm->ifa_scope = scope;
+	ifm->ifa_index = dev->ifindex;
+
+	if (nla_put_in6_addr(skb, IFA_ADDRESS, addr))
+		goto nla_put_failure;
+	nlmsg_end(skb, nlh);
+	return 0;
+
+nla_put_failure:
+	nlmsg_cancel(skb, nlh);
+	return -EMSGSIZE;
+}
+
+static inline size_t addr_nlmsg_size(void)
+{
+	return NLMSG_ALIGN(sizeof(struct ifaddrmsg))
+		+ nla_total_size(sizeof(struct in6_addr));
+}
+
+static void ipv6_mc_addr_notify(struct net_device *dev,
+				const struct in6_addr *addr, int type)
+{
+	struct net *net = dev_net(dev);
+	struct sk_buff *skb;
+	int err = -ENOBUFS;
+
+	skb = nlmsg_new(addr_nlmsg_size(), GFP_ATOMIC);
+	if (!skb)
+		goto errout;
+
+	err = fill_addr(skb, dev, addr, type, 0);
+	if (err < 0) {
+		WARN_ON(err == -EMSGSIZE);
+		kfree_skb(skb);
+		goto errout;
+	}
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFADDR, NULL, GFP_ATOMIC);
+	return;
+errout:
+	if (err < 0)
+		rtnl_set_sk_err(net, RTNLGRP_IPV6_IFADDR, err);
+}
+
 /*
  *	device multicast group inc (add if not found)
  */
@@ -932,6 +993,9 @@ static int __ipv6_dev_mc_inc(struct net_device *dev,
 
 	mld_del_delrec(idev, mc);
 	igmp6_group_added(mc);
+
+	ipv6_mc_addr_notify(dev, addr, RTM_NEWADDR);
+
 	ma_put(mc);
 	return 0;
 }
@@ -960,6 +1024,8 @@ int __ipv6_dev_mc_dec(struct inet6_dev *idev, const struct in6_addr *addr)
 				igmp6_group_dropped(ma);
 				ip6_mc_clear_src(ma);
 
+				ipv6_mc_addr_notify(idev->dev, addr,
+						    RTM_DELADDR);
 				ma_put(ma);
 				return 0;
 			}
