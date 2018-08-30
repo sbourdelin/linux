@@ -5391,6 +5391,8 @@ static int __intel_engines_record_defaults(struct drm_i915_private *i915)
 	for_each_engine(engine, i915, id) {
 		struct i915_vma *state;
 
+		GEM_BUG_ON(to_intel_context(ctx, engine)->pin_count);
+
 		state = to_intel_context(ctx, engine)->state;
 		if (!state)
 			continue;

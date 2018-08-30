@@ -1316,7 +1316,7 @@ static int __context_pin(struct i915_gem_context *ctx, struct i915_vma *vma)
 	 * on an active context (which by nature is already on the GPU).
 	 */
 	if (!(vma->flags & I915_VMA_GLOBAL_BIND)) {
-		err = i915_gem_object_set_to_gtt_domain(vma->obj, true);
+		err = i915_gem_object_set_to_wc_domain(vma->obj, true);
 		if (err)
 			return err;
 	}
@@ -1345,7 +1345,9 @@ __execlists_context_pin(struct intel_engine_cs *engine,
 	if (ret)
 		goto err;
 
-	vaddr = i915_gem_object_pin_map(ce->state->obj, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(ce->state->obj,
+					i915_coherent_map_type(ctx->i915) |
+					I915_MAP_OVERRIDE);
 	if (IS_ERR(vaddr)) {
 		ret = PTR_ERR(vaddr);
 		goto unpin_vma;
@@ -2709,7 +2711,7 @@ populate_lr_context(struct i915_gem_context *ctx,
 		void *defaults;
 
 		defaults = i915_gem_object_pin_map(engine->default_state,
-						   I915_MAP_WB);
+						   I915_MAP_FORCE_WB);
 		if (IS_ERR(defaults)) {
 			ret = PTR_ERR(defaults);
 			goto err_unpin_ctx;
