@@ -127,8 +127,7 @@ int intel_pasid_alloc_table(struct device *dev)
 	int ret, order;
 
 	info = dev->archdata.iommu;
-	if (WARN_ON(!info || !dev_is_pci(dev) ||
-		    !info->pasid_supported || info->pasid_table))
+	if (WARN_ON(!info || !dev_is_pci(dev) || info->pasid_table))
 		return -EINVAL;
 
 	/* DMA alias device already has a pasid table, use it: */
@@ -143,8 +142,9 @@ int intel_pasid_alloc_table(struct device *dev)
 		return -ENOMEM;
 	INIT_LIST_HEAD(&pasid_table->dev);
 
-	size = sizeof(struct pasid_entry);
+	size = sizeof(struct pasid_dir_entry);
 	count = min_t(int, pci_max_pasids(to_pci_dev(dev)), intel_pasid_max_id);
+	count >>= PASID_PDE_SHIFT;
 	order = get_order(size * count);
 	pages = alloc_pages_node(info->iommu->node,
 				 GFP_ATOMIC | __GFP_ZERO,
@@ -154,7 +154,7 @@ int intel_pasid_alloc_table(struct device *dev)
 
 	pasid_table->table = page_address(pages);
 	pasid_table->order = order;
-	pasid_table->max_pasid = count;
+	pasid_table->max_pasid = count << PASID_PDE_SHIFT;
 
 attach_out:
 	device_attach_pasid_table(info, pasid_table);
@@ -162,14 +162,33 @@ attach_out:
 	return 0;
 }
 
+/* Get PRESENT bit of a PASID directory entry. */
+static inline bool
+pasid_pde_is_present(struct pasid_dir_entry *pde)
+{
+	return READ_ONCE(pde->val) & PASID_PTE_PRESENT;
+}
+
+/* Get PASID table from a PASID directory entry. */
+static inline struct pasid_entry *
+get_pasid_table_from_pde(struct pasid_dir_entry *pde)
+{
+	if (!pasid_pde_is_present(pde))
+		return NULL;
+
+	return phys_to_virt(READ_ONCE(pde->val) & PDE_PFN_MASK);
+}
+
 void intel_pasid_free_table(struct device *dev)
 {
 	struct device_domain_info *info;
 	struct pasid_table *pasid_table;
+	struct pasid_dir_entry *dir;
+	struct pasid_entry *table;
+	int i, max_pde;
 
 	info = dev->archdata.iommu;
-	if (!info || !dev_is_pci(dev) ||
-	    !info->pasid_supported || !info->pasid_table)
+	if (!info || !dev_is_pci(dev) || !info->pasid_table)
 		return;
 
 	pasid_table = info->pasid_table;
@@ -177,6 +196,14 @@ void intel_pasid_free_table(struct device *dev)
 
 	if (!list_empty(&pasid_table->dev))
 		return;
+
+	/* Free scalable mode PASID directory tables: */
+	dir = pasid_table->table;
+	max_pde = pasid_table->max_pasid >> PASID_PDE_SHIFT;
+	for (i = 0; i < max_pde; i++) {
+		table = get_pasid_table_from_pde(&dir[i]);
+		free_pgtable_page(table);
+	}
 
 	free_pages((unsigned long)pasid_table->table, pasid_table->order);
 	kfree(pasid_table);
@@ -206,17 +233,37 @@ int intel_pasid_get_dev_max_id(struct device *dev)
 
 struct pasid_entry *intel_pasid_get_entry(struct device *dev, int pasid)
 {
+	struct device_domain_info *info;
 	struct pasid_table *pasid_table;
+	struct pasid_dir_entry *dir;
 	struct pasid_entry *entries;
+	int dir_index, index;
 
 	pasid_table = intel_pasid_get_table(dev);
 	if (WARN_ON(!pasid_table || pasid < 0 ||
 		    pasid >= intel_pasid_get_dev_max_id(dev)))
 		return NULL;
 
-	entries = pasid_table->table;
+	dir = pasid_table->table;
+	info = dev->archdata.iommu;
+	dir_index = pasid >> PASID_PDE_SHIFT;
+	index = pasid & PASID_PTE_MASK;
 
-	return &entries[pasid];
+	spin_lock(&pasid_lock);
+	entries = get_pasid_table_from_pde(&dir[dir_index]);
+	if (!entries) {
+		entries = alloc_pgtable_page(info->iommu->node);
+		if (!entries) {
+			spin_unlock(&pasid_lock);
+			return NULL;
+		}
+
+		WRITE_ONCE(dir[dir_index].val,
+			   (u64)virt_to_phys(entries) | PASID_PTE_PRESENT);
+	}
+	spin_unlock(&pasid_lock);
+
+	return &entries[index];
 }
 
 /*
@@ -224,7 +271,14 @@ struct pasid_entry *intel_pasid_get_entry(struct device *dev, int pasid)
  */
 static inline void pasid_clear_entry(struct pasid_entry *pe)
 {
-	WRITE_ONCE(pe->val, 0);
+	WRITE_ONCE(pe->val[0], 0);
+	WRITE_ONCE(pe->val[1], 0);
+	WRITE_ONCE(pe->val[2], 0);
+	WRITE_ONCE(pe->val[3], 0);
+	WRITE_ONCE(pe->val[4], 0);
+	WRITE_ONCE(pe->val[5], 0);
+	WRITE_ONCE(pe->val[6], 0);
+	WRITE_ONCE(pe->val[7], 0);
 }
 
 void intel_pasid_clear_entry(struct device *dev, int pasid)
