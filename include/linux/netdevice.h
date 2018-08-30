@@ -2322,7 +2322,7 @@ struct packet_type {
 					 struct net_device *,
 					 struct packet_type *,
 					 struct net_device *);
-	void			(*list_func) (struct list_head *,
+	int			(*list_func) (struct list_head *,
 					      struct packet_type *,
 					      struct net_device *);
 	bool			(*id_match)(struct packet_type *ptype,
@@ -3519,7 +3519,7 @@ int netif_rx(struct sk_buff *skb);
 int netif_rx_ni(struct sk_buff *skb);
 int netif_receive_skb(struct sk_buff *skb);
 int netif_receive_skb_core(struct sk_buff *skb);
-void netif_receive_skb_list(struct list_head *head);
+int netif_receive_skb_list(struct list_head *head);
 gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb);
 int napi_gro_receive_list(struct napi_struct *napi, struct list_head *head);
 void napi_gro_flush(struct napi_struct *napi, bool flush_old);

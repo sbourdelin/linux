@@ -4920,24 +4920,27 @@ int netif_receive_skb_core(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_receive_skb_core);
 
-static inline void __netif_receive_skb_list_ptype(struct list_head *head,
-						  struct packet_type *pt_prev,
-						  struct net_device *orig_dev)
+static inline int __netif_receive_skb_list_ptype(struct list_head *head,
+						 struct packet_type *pt_prev,
+						 struct net_device *orig_dev)
 {
 	struct sk_buff *skb, *next;
+	int kept = 0;
 
 	if (!pt_prev)
-		return;
+		return 0;
 	if (list_empty(head))
-		return;
+		return 0;
 	if (pt_prev->list_func != NULL)
-		pt_prev->list_func(head, pt_prev, orig_dev);
+		kept = pt_prev->list_func(head, pt_prev, orig_dev);
 	else
 		list_for_each_entry_safe(skb, next, head, list)
-			pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+			if (pt_prev->func(skb, skb->dev, pt_prev, orig_dev) == NET_RX_SUCCESS)
+				kept++;
+	return kept;
 }
 
-static void __netif_receive_skb_list_core(struct list_head *head, bool pfmemalloc)
+static int __netif_receive_skb_list_core(struct list_head *head, bool pfmemalloc)
 {
 	/* Fast-path assumptions:
 	 * - There is no RX handler.
@@ -4954,6 +4957,7 @@ static void __netif_receive_skb_list_core(struct list_head *head, bool pfmemallo
 	struct net_device *od_curr = NULL;
 	struct list_head sublist;
 	struct sk_buff *skb, *next;
+	int kept = 0, ret;
 
 	INIT_LIST_HEAD(&sublist);
 	list_for_each_entry_safe(skb, next, head, list) {
@@ -4961,12 +4965,15 @@ static void __netif_receive_skb_list_core(struct list_head *head, bool pfmemallo
 		struct packet_type *pt_prev = NULL;
 
 		list_del(&skb->list);
-		__netif_receive_skb_core(skb, pfmemalloc, &pt_prev);
-		if (!pt_prev)
+		ret = __netif_receive_skb_core(skb, pfmemalloc, &pt_prev);
+		if (!pt_prev) {
+			if (ret == NET_RX_SUCCESS)
+				kept++;
 			continue;
+		}
 		if (pt_curr != pt_prev || od_curr != orig_dev) {
 			/* dispatch old sublist */
-			__netif_receive_skb_list_ptype(&sublist, pt_curr, od_curr);
+			kept += __netif_receive_skb_list_ptype(&sublist, pt_curr, od_curr);
 			/* start new sublist */
 			INIT_LIST_HEAD(&sublist);
 			pt_curr = pt_prev;
@@ -4976,7 +4983,8 @@ static void __netif_receive_skb_list_core(struct list_head *head, bool pfmemallo
 	}
 
 	/* dispatch final sublist */
-	__netif_receive_skb_list_ptype(&sublist, pt_curr, od_curr);
+	kept += __netif_receive_skb_list_ptype(&sublist, pt_curr, od_curr);
+	return kept;
 }
 
 static int __netif_receive_skb(struct sk_buff *skb)
@@ -5004,11 +5012,12 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	return ret;
 }
 
-static void __netif_receive_skb_list(struct list_head *head)
+static int __netif_receive_skb_list(struct list_head *head)
 {
 	unsigned long noreclaim_flag = 0;
 	struct sk_buff *skb, *next;
 	bool pfmemalloc = false; /* Is current sublist PF_MEMALLOC? */
+	int kept = 0;
 
 	list_for_each_entry_safe(skb, next, head, list) {
 		if ((sk_memalloc_socks() && skb_pfmemalloc(skb)) != pfmemalloc) {
@@ -5017,7 +5026,7 @@ static void __netif_receive_skb_list(struct list_head *head)
 			/* Handle the previous sublist */
 			list_cut_before(&sublist, head, &skb->list);
 			if (!list_empty(&sublist))
-				__netif_receive_skb_list_core(&sublist, pfmemalloc);
+				kept += __netif_receive_skb_list_core(&sublist, pfmemalloc);
 			pfmemalloc = !pfmemalloc;
 			/* See comments in __netif_receive_skb */
 			if (pfmemalloc)
@@ -5028,10 +5037,11 @@ static void __netif_receive_skb_list(struct list_head *head)
 	}
 	/* Handle the remaining sublist */
 	if (!list_empty(head))
-		__netif_receive_skb_list_core(head, pfmemalloc);
+		kept += __netif_receive_skb_list_core(head, pfmemalloc);
 	/* Restore pflags */
 	if (pfmemalloc)
 		memalloc_noreclaim_restore(noreclaim_flag);
+	return kept;
 }
 
 static int generic_xdp_install(struct net_device *dev, struct netdev_bpf *xdp)
@@ -5107,17 +5117,20 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
 	return ret;
 }
 
-static void netif_receive_skb_list_internal(struct list_head *head)
+static int netif_receive_skb_list_internal(struct list_head *head)
 {
 	struct bpf_prog *xdp_prog = NULL;
 	struct sk_buff *skb, *next;
 	struct list_head sublist;
+	int kept = 0;
 
 	INIT_LIST_HEAD(&sublist);
 	list_for_each_entry_safe(skb, next, head, list) {
 		net_timestamp_check(netdev_tstamp_prequeue, skb);
 		list_del(&skb->list);
-		if (!skb_defer_rx_timestamp(skb))
+		if (skb_defer_rx_timestamp(skb))
+			kept++;
+		else
 			list_add_tail(&skb->list, &sublist);
 	}
 	list_splice_init(&sublist, head);
@@ -5147,13 +5160,15 @@ static void netif_receive_skb_list_internal(struct list_head *head)
 			if (cpu >= 0) {
 				/* Will be handled, remove from list */
 				list_del(&skb->list);
-				enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
+				if (enqueue_to_backlog(skb, cpu, &rflow->last_qtail) == NET_RX_SUCCESS)
+					kept++;
 			}
 		}
 	}
 #endif
-	__netif_receive_skb_list(head);
+	kept += __netif_receive_skb_list(head);
 	rcu_read_unlock();
+	return kept;
 }
 
 /**
@@ -5183,21 +5198,21 @@ EXPORT_SYMBOL(netif_receive_skb);
  *	netif_receive_skb_list - process many receive buffers from network
  *	@head: list of skbs to process.
  *
- *	Since return value of netif_receive_skb() is normally ignored, and
- *	wouldn't be meaningful for a list, this function returns void.
+ *	Returns the number of skbs for which netif_receive_skb() would have
+ *	returned %NET_RX_SUCCESS.
  *
  *	This function may only be called from softirq context and interrupts
  *	should be enabled.
  */
-void netif_receive_skb_list(struct list_head *head)
+int netif_receive_skb_list(struct list_head *head)
 {
 	struct sk_buff *skb;
 
 	if (list_empty(head))
-		return;
+		return 0;
 	list_for_each_entry(skb, head, list)
 		trace_netif_receive_skb_list_entry(skb);
-	netif_receive_skb_list_internal(head);
+	return netif_receive_skb_list_internal(head);
 }
 EXPORT_SYMBOL(netif_receive_skb_list);
 

@@ -76,20 +76,24 @@ int ip6_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 	return dst_input(skb);
 }
 
-static void ip6_sublist_rcv_finish(struct list_head *head)
+static int ip6_sublist_rcv_finish(struct list_head *head)
 {
 	struct sk_buff *skb, *next;
+	int kept = 0;
 
 	list_for_each_entry_safe(skb, next, head, list)
-		dst_input(skb);
+		if (dst_input(skb) == NET_RX_SUCCESS)
+			kept++;
+	return kept;
 }
 
-static void ip6_list_rcv_finish(struct net *net, struct sock *sk,
-				struct list_head *head)
+static int ip6_list_rcv_finish(struct net *net, struct sock *sk,
+			       struct list_head *head)
 {
 	struct dst_entry *curr_dst = NULL;
 	struct sk_buff *skb, *next;
 	struct list_head sublist;
+	int kept = 0;
 
 	INIT_LIST_HEAD(&sublist);
 	list_for_each_entry_safe(skb, next, head, list) {
@@ -100,14 +104,16 @@ static void ip6_list_rcv_finish(struct net *net, struct sock *sk,
 		 * skb to its handler for processing
 		 */
 		skb = l3mdev_ip6_rcv(skb);
-		if (!skb)
+		if (!skb) {
+			kept++;
 			continue;
+		}
 		ip6_rcv_finish_core(net, sk, skb);
 		dst = skb_dst(skb);
 		if (curr_dst != dst) {
 			/* dispatch old sublist */
 			if (!list_empty(&sublist))
-				ip6_sublist_rcv_finish(&sublist);
+				kept += ip6_sublist_rcv_finish(&sublist);
 			/* start new sublist */
 			INIT_LIST_HEAD(&sublist);
 			curr_dst = dst;
@@ -115,7 +121,8 @@ static void ip6_list_rcv_finish(struct net *net, struct sock *sk,
 		list_add_tail(&skb->list, &sublist);
 	}
 	/* dispatch final sublist */
-	ip6_sublist_rcv_finish(&sublist);
+	kept += ip6_sublist_rcv_finish(&sublist);
+	return kept;
 }
 
 static struct sk_buff *ip6_rcv_core(struct sk_buff *skb, struct net_device *dev,
@@ -273,22 +280,23 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 		       ip6_rcv_finish);
 }
 
-static void ip6_sublist_rcv(struct list_head *head, struct net_device *dev,
-			    struct net *net)
+static int ip6_sublist_rcv(struct list_head *head, struct net_device *dev,
+			   struct net *net)
 {
 	NF_HOOK_LIST(NFPROTO_IPV6, NF_INET_PRE_ROUTING, net, NULL,
 		     head, dev, NULL, ip6_rcv_finish);
-	ip6_list_rcv_finish(net, NULL, head);
+	return ip6_list_rcv_finish(net, NULL, head);
 }
 
 /* Receive a list of IPv6 packets */
-void ipv6_list_rcv(struct list_head *head, struct packet_type *pt,
-		   struct net_device *orig_dev)
+int ipv6_list_rcv(struct list_head *head, struct packet_type *pt,
+		  struct net_device *orig_dev)
 {
 	struct net_device *curr_dev = NULL;
 	struct net *curr_net = NULL;
 	struct sk_buff *skb, *next;
 	struct list_head sublist;
+	int kept = 0;
 
 	INIT_LIST_HEAD(&sublist);
 	list_for_each_entry_safe(skb, next, head, list) {
@@ -303,7 +311,7 @@ void ipv6_list_rcv(struct list_head *head, struct packet_type *pt,
 		if (curr_dev != dev || curr_net != net) {
 			/* dispatch old sublist */
 			if (!list_empty(&sublist))
-				ip6_sublist_rcv(&sublist, curr_dev, curr_net);
+				kept += ip6_sublist_rcv(&sublist, curr_dev, curr_net);
 			/* start new sublist */
 			INIT_LIST_HEAD(&sublist);
 			curr_dev = dev;
@@ -312,7 +320,8 @@ void ipv6_list_rcv(struct list_head *head, struct packet_type *pt,
 		list_add_tail(&skb->list, &sublist);
 	}
 	/* dispatch final sublist */
-	ip6_sublist_rcv(&sublist, curr_dev, curr_net);
+	kept += ip6_sublist_rcv(&sublist, curr_dev, curr_net);
+	return kept;
 }
 
 /*
