@@ -1,0 +1,31 @@
+Turris Mox Moxtet GPIO expander
+
+Required properties:
+ - compatible		: Should be "cznic,moxtet-gpio".
+ - gpio-controller	: Marks the device node as a GPIO controller.
+ - #gpio-cells		: Should be two. For consumer use see gpio.txt.
+ - moxtet,input-mask	: Bitmask. Those bits which correspond to input GPIOs
+			  when read from Moxtet bus should be set here.
+			  For example if bit 0 and bit 3 are input GPIO bits,
+			  this should be set to 0x9.
+			  Since there are only 4 input bits, 0xf is max value.
+ - moxtet,output-mask	: Bitmask. Those bits which correspond to output GPIOs
+			  when written to Moxtet bus should be set here.
+			  For example if bit 1 and bit 6 are output GPIO bits,
+			  this should be set to 0x41.
+			  Since there are at most 8 output bits, 0xff is max
+			  value.
+Other properties are required for a moxtet bus device, please refer to
+Documentation/devicetree/bindings/mfd/moxtet.txt.
+
+Example:
+
+	moxtet_sfp: moxtet-sfp@0 {
+		compatible = "cznic,moxtet-gpio";
+		gpio-controller;
+		#gpio-cells;
+		reg = <0>;
+		moxtet,id = <1>;
+		moxtet,input-mask = <0x7>;
+		moxtet,output-mask = <0x3>;
+	}
