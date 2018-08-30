@@ -351,7 +351,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
 	user->fpsimd = NULL;
 	user->sve = NULL;
 
-	if (!IS_ALIGNED((unsigned long)base, 16))
+	if (!IS_ALIGNED((__force unsigned long)base, 16))
 		goto invalid;
 
 	while (1) {
@@ -450,7 +450,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
 			have_extra_context = true;
 
 			base = (__force void __user *)extra_datap;
-			if (!IS_ALIGNED((unsigned long)base, 16))
+			if (!IS_ALIGNED((__force unsigned long)base, 16))
 				goto invalid;
 
 			if (!IS_ALIGNED(extra_size, 16))
@@ -742,16 +742,16 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 	__sigrestore_t sigtramp;
 
 	regs->regs[0] = usig;
-	regs->sp = (unsigned long)user->sigframe;
-	regs->regs[29] = (unsigned long)&user->next_frame->fp;
-	regs->pc = (unsigned long)ka->sa.sa_handler;
+	regs->sp = (__force unsigned long)user->sigframe;
+	regs->regs[29] = (__force unsigned long)&user->next_frame->fp;
+	regs->pc = (__force unsigned long)ka->sa.sa_handler;
 
 	if (ka->sa.sa_flags & SA_RESTORER)
 		sigtramp = ka->sa.sa_restorer;
 	else
 		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
 
-	regs->regs[30] = (unsigned long)sigtramp;
+	regs->regs[30] = (__force unsigned long)sigtramp;
 }
 
 static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
@@ -777,8 +777,8 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
 		setup_return(regs, &ksig->ka, &user, usig);
 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
-			regs->regs[1] = (unsigned long)&frame->info;
-			regs->regs[2] = (unsigned long)&frame->uc;
+			regs->regs[1] = (__force unsigned long)&frame->info;
+			regs->regs[2] = (__force unsigned long)&frame->uc;
 		}
 	}
 

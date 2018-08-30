@@ -5971,6 +5971,6 @@ long btrfs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 
-	return btrfs_ioctl(file, cmd, (unsigned long) compat_ptr(arg));
+	return btrfs_ioctl(file, cmd, (__force unsigned long) compat_ptr(arg));
 }
 #endif

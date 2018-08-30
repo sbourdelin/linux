@@ -1405,7 +1405,8 @@ find_memory_area(struct usb_dev_state *ps, const struct usbdevfs_urb *uurb)
 {
 	struct usb_memory *usbm = NULL, *iter;
 	unsigned long flags;
-	unsigned long uurb_start = (unsigned long)untagged_addr(uurb->buffer);
+	unsigned long uurb_start =
+		(__force unsigned long)untagged_addr(uurb->buffer);
 
 	spin_lock_irqsave(&ps->lock, flags);
 	list_for_each_entry(iter, &ps->memory_list, memlist) {
@@ -1635,7 +1636,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 	} else if (uurb->buffer_length > 0) {
 		if (as->usbm) {
 			unsigned long uurb_start =
-				(unsigned long)untagged_addr(uurb->buffer);
+				(__force unsigned long)untagged_addr(
+								uurb->buffer);
 
 			as->urb->transfer_buffer = as->usbm->mem +
 					(uurb_start - as->usbm->vm_start);
@@ -1715,7 +1717,7 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 	as->userurb = arg;
 	if (as->usbm) {
 		unsigned long uurb_start =
-			(unsigned long)untagged_addr(uurb->buffer);
+			(__force unsigned long)untagged_addr(uurb->buffer);
 
 		as->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		as->urb->transfer_dma = as->usbm->dma_handle +

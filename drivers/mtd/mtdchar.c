@@ -1090,7 +1090,7 @@ static long mtdchar_compat_ioctl(struct file *file, unsigned int cmd,
 	}
 
 	default:
-		ret = mtdchar_ioctl(file, cmd, (unsigned long)argp);
+		ret = mtdchar_ioctl(file, cmd, (__force unsigned long)argp);
 	}
 
 	mutex_unlock(&mtd_mutex);

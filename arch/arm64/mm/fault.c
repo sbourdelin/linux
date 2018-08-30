@@ -299,7 +299,7 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
 
 static void __do_user_fault(struct siginfo *info, unsigned int esr)
 {
-	current->thread.fault_address = (unsigned long)info->si_addr;
+	current->thread.fault_address = (__force unsigned long)info->si_addr;
 
 	/*
 	 * If the faulting address is in the kernel, we must sanitize the ESR.

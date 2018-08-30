@@ -175,10 +175,10 @@ static ssize_t process_vm_rw_core(pid_t pid, struct iov_iter *iter,
 	for (i = 0; i < riovcnt; i++) {
 		iov_len = rvec[i].iov_len;
 		if (iov_len > 0) {
-			nr_pages_iov = ((unsigned long)rvec[i].iov_base
-					+ iov_len)
-				/ PAGE_SIZE - (unsigned long)rvec[i].iov_base
-				/ PAGE_SIZE + 1;
+			nr_pages_iov = ((__force unsigned long)rvec[i].iov_base
+					+ iov_len) / PAGE_SIZE -
+				(__force unsigned long)rvec[i].iov_base
+					/ PAGE_SIZE + 1;
 			nr_pages = max(nr_pages, nr_pages_iov);
 		}
 	}
@@ -218,8 +218,9 @@ static ssize_t process_vm_rw_core(pid_t pid, struct iov_iter *iter,
 
 	for (i = 0; i < riovcnt && iov_iter_count(iter) && !rc; i++)
 		rc = process_vm_rw_single_vec(
-			(unsigned long)rvec[i].iov_base, rvec[i].iov_len,
-			iter, process_pages, mm, task, vm_write);
+			(__force unsigned long)rvec[i].iov_base,
+			rvec[i].iov_len, iter, process_pages, mm, task,
+			vm_write);
 
 	/* copied = space before - space after */
 	total_len -= iov_iter_count(iter);

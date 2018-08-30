@@ -799,7 +799,8 @@ static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
 static int mmc_blk_compat_ioctl(struct block_device *bdev, fmode_t mode,
 	unsigned int cmd, unsigned long arg)
 {
-	return mmc_blk_ioctl(bdev, mode, cmd, (unsigned long) compat_ptr(arg));
+	return mmc_blk_ioctl(bdev, mode, cmd,
+			(__force unsigned long) compat_ptr(arg));
 }
 #endif
 
@@ -2491,7 +2492,8 @@ static long mmc_rpmb_ioctl(struct file *filp, unsigned int cmd,
 static long mmc_rpmb_ioctl_compat(struct file *filp, unsigned int cmd,
 			      unsigned long arg)
 {
-	return mmc_rpmb_ioctl(filp, cmd, (unsigned long)compat_ptr(arg));
+	return mmc_rpmb_ioctl(filp, cmd,
+			(__force unsigned long)compat_ptr(arg));
 }
 #endif
 

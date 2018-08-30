@@ -103,7 +103,7 @@ int get_compat_msghdr(struct msghdr *kmsg,
 	((ucmlen) >= sizeof(struct compat_cmsghdr) && \
 	 (ucmlen) <= (unsigned long) \
 	 ((mhdr)->msg_controllen - \
-	  ((char *)(ucmsg) - (char *)(mhdr)->msg_control)))
+	  ((char __force *)(ucmsg) - (char __force *)(mhdr)->msg_control)))
 
 static inline struct compat_cmsghdr __user *cmsg_compat_nxthdr(struct msghdr *msg,
 		struct compat_cmsghdr __user *cmsg, int cmsg_len)
@@ -582,7 +582,7 @@ int compat_mc_setsockopt(struct sock *sock, int level, int optname,
 	case MCAST_JOIN_GROUP:
 	case MCAST_LEAVE_GROUP:
 	{
-		struct compat_group_req __user *gr32 = (void *)optval;
+		struct compat_group_req __user *gr32 = (__force void *)optval;
 		struct group_req __user *kgr =
 			compat_alloc_user_space(sizeof(struct group_req));
 		u32 interface;
@@ -603,7 +603,8 @@ int compat_mc_setsockopt(struct sock *sock, int level, int optname,
 	case MCAST_BLOCK_SOURCE:
 	case MCAST_UNBLOCK_SOURCE:
 	{
-		struct compat_group_source_req __user *gsr32 = (void *)optval;
+		struct compat_group_source_req __user *gsr32 =
+			(__force void *)optval;
 		struct group_source_req __user *kgsr = compat_alloc_user_space(
 			sizeof(struct group_source_req));
 		u32 interface;
@@ -624,7 +625,8 @@ int compat_mc_setsockopt(struct sock *sock, int level, int optname,
 	}
 	case MCAST_MSFILTER:
 	{
-		struct compat_group_filter __user *gf32 = (void *)optval;
+		struct compat_group_filter __user *gf32 =
+			(__force void *)optval;
 		struct group_filter __user *kgf;
 		u32 interface, fmode, numsrc;
 
@@ -662,7 +664,7 @@ int compat_mc_getsockopt(struct sock *sock, int level, int optname,
 	char __user *optval, int __user *optlen,
 	int (*getsockopt)(struct sock *, int, int, char __user *, int __user *))
 {
-	struct compat_group_filter __user *gf32 = (void *)optval;
+	struct compat_group_filter __user *gf32 = (__force void *)optval;
 	struct group_filter __user *kgf;
 	int __user	*koptlen;
 	u32 interface, fmode, numsrc;

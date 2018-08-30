@@ -1128,7 +1128,7 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 static long tap_compat_ioctl(struct file *file, unsigned int cmd,
 			     unsigned long arg)
 {
-	return tap_ioctl(file, cmd, (unsigned long)compat_ptr(arg));
+	return tap_ioctl(file, cmd, (__force unsigned long)compat_ptr(arg));
 }
 #endif
 

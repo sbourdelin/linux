@@ -843,7 +843,7 @@ struct gntdev_copy_batch {
 static int gntdev_get_page(struct gntdev_copy_batch *batch, void __user *virt,
 			   bool writeable, unsigned long *gfn)
 {
-	unsigned long addr = (unsigned long)virt;
+	unsigned long addr = (__force unsigned long)virt;
 	struct page *page;
 	unsigned long xen_pfn;
 	int ret;
@@ -953,7 +953,7 @@ static int gntdev_grant_copy_seg(struct gntdev_copy_batch *batch,
 			op->flags |= GNTCOPY_source_gref;
 		} else {
 			virt = seg->source.virt + copied;
-			off = (unsigned long)virt & ~XEN_PAGE_MASK;
+			off = (__force unsigned long)virt & ~XEN_PAGE_MASK;
 			len = min(len, (size_t)XEN_PAGE_SIZE - off);
 
 			ret = gntdev_get_page(batch, virt, false, &gfn);
@@ -972,7 +972,7 @@ static int gntdev_grant_copy_seg(struct gntdev_copy_batch *batch,
 			op->flags |= GNTCOPY_dest_gref;
 		} else {
 			virt = seg->dest.virt + copied;
-			off = (unsigned long)virt & ~XEN_PAGE_MASK;
+			off = (__force unsigned long)virt & ~XEN_PAGE_MASK;
 			len = min(len, (size_t)XEN_PAGE_SIZE - off);
 
 			ret = gntdev_get_page(batch, virt, true, &gfn);

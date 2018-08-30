@@ -1582,7 +1582,7 @@ static int do_pages_move(struct mm_struct *mm, nodemask_t task_nodes,
 			goto out_flush;
 		if (get_user(node, nodes + i))
 			goto out_flush;
-		addr = (unsigned long)p;
+		addr = (__force unsigned long)p;
 
 		err = -ENODEV;
 		if (node < 0 || node >= MAX_NUMNODES)
@@ -1656,7 +1656,7 @@ static void do_pages_stat_array(struct mm_struct *mm, unsigned long nr_pages,
 	down_read(&mm->mmap_sem);
 
 	for (i = 0; i < nr_pages; i++) {
-		unsigned long addr = (unsigned long)(*pages);
+		unsigned long addr = (__force unsigned long)(*pages);
 		struct vm_area_struct *vma;
 		struct page *page;
 		int err = -EFAULT;

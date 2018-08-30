@@ -3494,7 +3494,7 @@ do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
 				return -ENOMEM;
 		}
 
-		t->sas_ss_sp = (unsigned long) ss_sp;
+		t->sas_ss_sp = (__force unsigned long) ss_sp;
 		t->sas_ss_size = ss_size;
 		t->sas_ss_flags = ss_flags;
 	}

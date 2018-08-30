@@ -558,7 +558,7 @@ static long privcmd_ioctl_mmap_batch(
 
 	if (state.global_error) {
 		/* Write back errors in second pass. */
-		state.user_gfn = (xen_pfn_t *)m.arr;
+		state.user_gfn = (xen_pfn_t __user *)m.arr;
 		state.user_err = m.err;
 		ret = traverse_pages_block(m.num, sizeof(xen_pfn_t),
 					   &pagelist, mmap_return_errors, &state);
@@ -596,7 +596,7 @@ static int lock_pages(
 			return -ENOSPC;
 
 		pinned = get_user_pages_fast(
-			(unsigned long) kbufs[i].uptr,
+			(__force unsigned long) kbufs[i].uptr,
 			requested, FOLL_WRITE, pages);
 		if (pinned < 0)
 			return pinned;

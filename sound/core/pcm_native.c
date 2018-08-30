@@ -2888,7 +2888,8 @@ static int snd_pcm_common_ioctl(struct file *file,
 	case SNDRV_PCM_IOCTL_START:
 		return snd_pcm_start_lock_irq(substream);
 	case SNDRV_PCM_IOCTL_LINK:
-		return snd_pcm_link(substream, (int)(unsigned long) arg);
+		return snd_pcm_link(substream,
+				(int)(__force unsigned long) arg);
 	case SNDRV_PCM_IOCTL_UNLINK:
 		return snd_pcm_unlink(substream);
 	case SNDRV_PCM_IOCTL_RESUME:
@@ -2925,7 +2926,7 @@ static int snd_pcm_common_ioctl(struct file *file,
 	case SNDRV_PCM_IOCTL_PAUSE:
 		return snd_pcm_action_lock_irq(&snd_pcm_action_pause,
 					       substream,
-					       (int)(unsigned long)arg);
+					       (int)(__force unsigned long)arg);
 	case SNDRV_PCM_IOCTL_WRITEI_FRAMES:
 	case SNDRV_PCM_IOCTL_READI_FRAMES:
 		return snd_pcm_xferi_frames_ioctl(substream, arg);

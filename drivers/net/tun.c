@@ -3191,7 +3191,7 @@ static long tun_chr_compat_ioctl(struct file *file,
 	case TUNSETSNDBUF:
 	case SIOCGIFHWADDR:
 	case SIOCSIFHWADDR:
-		arg = (unsigned long)compat_ptr(arg);
+		arg = (__force unsigned long)compat_ptr(arg);
 		break;
 	default:
 		arg = (compat_ulong_t)arg;

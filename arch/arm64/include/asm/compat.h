@@ -155,7 +155,7 @@ static inline void __user *compat_ptr(compat_uptr_t uptr)
 
 static inline compat_uptr_t ptr_to_compat(void __user *uptr)
 {
-	return (u32)(unsigned long)uptr;
+	return (u32)(__force unsigned long)uptr;
 }
 
 #define compat_user_stack_pointer() (user_stack_pointer(task_pt_regs(current)))

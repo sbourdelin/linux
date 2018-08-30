@@ -176,7 +176,8 @@ static long fat_generic_compat_ioctl(struct file *filp, unsigned int cmd,
 				      unsigned long arg)
 
 {
-	return fat_generic_ioctl(filp, cmd, (unsigned long)compat_ptr(arg));
+	return fat_generic_ioctl(filp, cmd,
+			(__force unsigned long)compat_ptr(arg));
 }
 #endif
 

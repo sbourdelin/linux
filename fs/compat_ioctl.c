@@ -152,7 +152,7 @@ static int do_video_get_event(struct file *file,
 	if (kevent == NULL)
 		return -EFAULT;
 
-	err = do_ioctl(file, cmd, (unsigned long)kevent);
+	err = do_ioctl(file, cmd, (__force unsigned long)kevent);
 	if (!err) {
 		err  = convert_in_user(&kevent->type, &up->type);
 		err |= convert_in_user(&kevent->timestamp, &up->timestamp);
@@ -193,7 +193,7 @@ static int do_video_stillpicture(struct file *file,
 	if (err)
 		return -EFAULT;
 
-	err = do_ioctl(file, cmd, (unsigned long) up_native);
+	err = do_ioctl(file, cmd, (__force unsigned long) up_native);
 
 	return err;
 }
@@ -264,7 +264,7 @@ static int sg_ioctl_trans(struct file *file, unsigned int cmd,
 	if (get_user(interface_id, &sgio32->interface_id))
 		return -EFAULT;
 	if (interface_id != 'S')
-		return do_ioctl(file, cmd, (unsigned long)sgio32);
+		return do_ioctl(file, cmd, (__force unsigned long)sgio32);
 
 	if (get_user(iovec_count, &sgio32->iovec_count))
 		return -EFAULT;
@@ -324,7 +324,7 @@ static int sg_ioctl_trans(struct file *file, unsigned int cmd,
 	if (put_user(compat_ptr(data), &sgio->usr_ptr))
 		return -EFAULT;
 
-	err = do_ioctl(file, cmd, (unsigned long) sgio);
+	err = do_ioctl(file, cmd, (__force unsigned long) sgio);
 
 	if (err >= 0) {
 		void __user *datap;
@@ -332,7 +332,7 @@ static int sg_ioctl_trans(struct file *file, unsigned int cmd,
 		if (copy_in_user(&sgio32->pack_id, &sgio->pack_id,
 				 sizeof(int)) ||
 		    get_user(datap, &sgio->usr_ptr) ||
-		    put_user((u32)(unsigned long)datap,
+		    put_user((u32)(__force unsigned long)datap,
 			     &sgio32->usr_ptr) ||
 		    copy_in_user(&sgio32->status, &sgio->status,
 				 (4 * sizeof(unsigned char)) +
@@ -361,7 +361,7 @@ static int sg_grt_trans(struct file *file,
 	int err, i;
 	sg_req_info_t __user *r;
 	r = compat_alloc_user_space(sizeof(sg_req_info_t)*SG_MAX_QUEUE);
-	err = do_ioctl(file, cmd, (unsigned long)r);
+	err = do_ioctl(file, cmd, (__force unsigned long)r);
 	if (err < 0)
 		return err;
 	for (i = 0; i < SG_MAX_QUEUE; i++) {
@@ -371,7 +371,7 @@ static int sg_grt_trans(struct file *file,
 		if (copy_in_user(o + i, r + i, offsetof(sg_req_info_t, usr_ptr)) ||
 		    get_user(ptr, &r[i].usr_ptr) ||
 		    get_user(d, &r[i].duration) ||
-		    put_user((u32)(unsigned long)(ptr), &o[i].usr_ptr) ||
+		    put_user((u32)(__force unsigned long)(ptr), &o[i].usr_ptr) ||
 		    put_user(d, &o[i].duration))
 			return -EFAULT;
 	}
@@ -410,7 +410,7 @@ static int ppp_sock_fprog_ioctl_trans(struct file *file,
 	else
 		cmd = PPPIOCSACTIVE;
 
-	return do_ioctl(file, cmd, (unsigned long) u_fprog64);
+	return do_ioctl(file, cmd, (__force unsigned long) u_fprog64);
 }
 
 struct ppp_option_data32 {
@@ -435,7 +435,7 @@ static int ppp_gidle(struct file *file, unsigned int cmd,
 
 	idle = compat_alloc_user_space(sizeof(*idle));
 
-	err = do_ioctl(file, PPPIOCGIDLE, (unsigned long) idle);
+	err = do_ioctl(file, PPPIOCGIDLE, (__force unsigned long) idle);
 
 	if (!err) {
 		if (get_user(xmit, &idle->xmit_idle) ||
@@ -467,7 +467,7 @@ static int ppp_scompress(struct file *file, unsigned int cmd,
 			 sizeof(__u32) + sizeof(int)))
 		return -EFAULT;
 
-	return do_ioctl(file, PPPIOCSCOMPRESS, (unsigned long) odata);
+	return do_ioctl(file, PPPIOCSCOMPRESS, (__force unsigned long) odata);
 }
 
 #ifdef CONFIG_BLOCK
@@ -607,7 +607,7 @@ static int serial_struct_ioctl(struct file *file,
 		    put_user(0UL, &ss->iomap_base))
 			return -EFAULT;
         }
-	err = do_ioctl(file, cmd, (unsigned long)ss);
+	err = do_ioctl(file, cmd, (__force unsigned long)ss);
         if (cmd == TIOCGSERIAL && err >= 0) {
 		if (copy_in_user(ss32, ss, offsetof(SS32, iomem_base)) ||
 		    get_user(iomem_base, &ss->iomem_base))
@@ -641,14 +641,16 @@ static int rtc_ioctl(struct file *file,
 	case RTC_EPOCH_READ32:
 		ret = do_ioctl(file, (cmd == RTC_IRQP_READ32) ?
 					RTC_IRQP_READ : RTC_EPOCH_READ,
-					(unsigned long)valp);
+					(__force unsigned long)valp);
 		if (ret)
 			return ret;
 		return convert_in_user(valp, (unsigned int __user *)argp);
 	case RTC_IRQP_SET32:
-		return do_ioctl(file, RTC_IRQP_SET, (unsigned long)argp);
+		return do_ioctl(file, RTC_IRQP_SET,
+					(__force unsigned long)argp);
 	case RTC_EPOCH_SET32:
-		return do_ioctl(file, RTC_EPOCH_SET, (unsigned long)argp);
+		return do_ioctl(file, RTC_EPOCH_SET,
+					(__force unsigned long)argp);
 	}
 
 	return -ENOIOCTLCMD;
@@ -1436,7 +1438,7 @@ COMPAT_SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd,
 	goto out_fput;
 
  found_handler:
-	arg = (unsigned long)compat_ptr(arg);
+	arg = (__force unsigned long)compat_ptr(arg);
  do_ioctl:
 	error = do_vfs_ioctl(f.file, fd, cmd, arg);
  out_fput:

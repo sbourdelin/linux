@@ -366,8 +366,8 @@ static int compat_fillonedir(struct dir_context *ctx, const char *name,
 	buf->result++;
 	dirent = buf->dirent;
 	if (!access_ok(VERIFY_WRITE, dirent,
-			(unsigned long)(dirent->d_name + namlen + 1) -
-				(unsigned long)dirent))
+			(__force unsigned long)(dirent->d_name + namlen + 1) -
+				(__force unsigned long)dirent))
 		goto efault;
 	if (	__put_user(d_ino, &dirent->d_ino) ||
 		__put_user(offset, &dirent->d_offset) ||

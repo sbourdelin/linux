@@ -1274,7 +1274,7 @@ static int fb_getput_cmap(struct fb_info *info, unsigned int cmd,
 	    put_user(compat_ptr(data), &cmap->transp))
 		return -EFAULT;
 
-	err = do_fb_ioctl(info, cmd, (unsigned long) cmap);
+	err = do_fb_ioctl(info, cmd, (__force unsigned long) cmap);
 
 	if (!err) {
 		if (copy_in_user(&cmap32->start,
@@ -1346,7 +1346,7 @@ static long fb_compat_ioctl(struct file *file, unsigned int cmd,
 	case FBIOPAN_DISPLAY:
 	case FBIOGET_CON2FBMAP:
 	case FBIOPUT_CON2FBMAP:
-		arg = (unsigned long) compat_ptr(arg);
+		arg = (__force unsigned long) compat_ptr(arg);
 		/* fall through */
 	case FBIOBLANK:
 		ret = do_fb_ioctl(info, cmd, arg);

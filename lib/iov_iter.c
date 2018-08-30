@@ -1112,9 +1112,9 @@ unsigned long iov_iter_alignment(const struct iov_iter *i)
 		return size;
 	}
 	iterate_all_kinds(i, size, v,
-		(res |= (unsigned long)v.iov_base | v.iov_len, 0),
+		(res |= (__force unsigned long)v.iov_base | v.iov_len, 0),
 		res |= v.bv_offset | v.bv_len,
-		res |= (unsigned long)v.iov_base | v.iov_len
+		res |= (__force unsigned long)v.iov_base | v.iov_len
 	)
 	return res;
 }
@@ -1131,11 +1131,11 @@ unsigned long iov_iter_gap_alignment(const struct iov_iter *i)
 	}
 
 	iterate_all_kinds(i, size, v,
-		(res |= (!res ? 0 : (unsigned long)v.iov_base) |
+		(res |= (!res ? 0 : (__force unsigned long)v.iov_base) |
 			(size != v.iov_len ? size : 0), 0),
 		(res |= (!res ? 0 : (unsigned long)v.bv_offset) |
 			(size != v.bv_len ? size : 0)),
-		(res |= (!res ? 0 : (unsigned long)v.iov_base) |
+		(res |= (!res ? 0 : (__force unsigned long)v.iov_base) |
 			(size != v.iov_len ? size : 0))
 		);
 	return res;
@@ -1196,7 +1196,7 @@ ssize_t iov_iter_get_pages(struct iov_iter *i,
 	if (unlikely(i->type & ITER_PIPE))
 		return pipe_get_pages(i, pages, maxsize, maxpages, start);
 	iterate_all_kinds(i, maxsize, v, ({
-		unsigned long addr = (unsigned long)v.iov_base;
+		unsigned long addr = (__force unsigned long)v.iov_base;
 		size_t len = v.iov_len + (*start = addr & (PAGE_SIZE - 1));
 		int n;
 		int res;
@@ -1273,7 +1273,7 @@ ssize_t iov_iter_get_pages_alloc(struct iov_iter *i,
 	if (unlikely(i->type & ITER_PIPE))
 		return pipe_get_pages_alloc(i, pages, maxsize, start);
 	iterate_all_kinds(i, maxsize, v, ({
-		unsigned long addr = (unsigned long)v.iov_base;
+		unsigned long addr = (__force unsigned long)v.iov_base;
 		size_t len = v.iov_len + (*start = addr & (PAGE_SIZE - 1));
 		int n;
 		int res;
@@ -1457,7 +1457,7 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages)
 		if (npages >= maxpages)
 			return maxpages;
 	} else iterate_all_kinds(i, size, v, ({
-		unsigned long p = (unsigned long)v.iov_base;
+		unsigned long p = (__force unsigned long)v.iov_base;
 		npages += DIV_ROUND_UP(p + v.iov_len, PAGE_SIZE)
 			- p / PAGE_SIZE;
 		if (npages >= maxpages)
@@ -1467,7 +1467,7 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages)
 		if (npages >= maxpages)
 			return maxpages;
 	}),({
-		unsigned long p = (unsigned long)v.iov_base;
+		unsigned long p = (__force unsigned long)v.iov_base;
 		npages += DIV_ROUND_UP(p + v.iov_len, PAGE_SIZE)
 			- p / PAGE_SIZE;
 		if (npages >= maxpages)

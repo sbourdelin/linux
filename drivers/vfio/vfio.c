@@ -1204,7 +1204,7 @@ static long vfio_fops_unl_ioctl(struct file *filep,
 static long vfio_fops_compat_ioctl(struct file *filep,
 				   unsigned int cmd, unsigned long arg)
 {
-	arg = (unsigned long)compat_ptr(arg);
+	arg = (__force unsigned long)compat_ptr(arg);
 	return vfio_fops_unl_ioctl(filep, cmd, arg);
 }
 #endif	/* CONFIG_COMPAT */
@@ -1576,7 +1576,7 @@ static long vfio_group_fops_unl_ioctl(struct file *filep,
 static long vfio_group_fops_compat_ioctl(struct file *filep,
 					 unsigned int cmd, unsigned long arg)
 {
-	arg = (unsigned long)compat_ptr(arg);
+	arg = (__force unsigned long)compat_ptr(arg);
 	return vfio_group_fops_unl_ioctl(filep, cmd, arg);
 }
 #endif	/* CONFIG_COMPAT */
@@ -1707,7 +1707,7 @@ static int vfio_device_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 static long vfio_device_fops_compat_ioctl(struct file *filep,
 					  unsigned int cmd, unsigned long arg)
 {
-	arg = (unsigned long)compat_ptr(arg);
+	arg = (__force unsigned long)compat_ptr(arg);
 	return vfio_device_fops_unl_ioctl(filep, cmd, arg);
 }
 #endif	/* CONFIG_COMPAT */

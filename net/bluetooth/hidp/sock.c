@@ -185,7 +185,7 @@ static int hidp_sock_compat_ioctl(struct socket *sock, unsigned int cmd, unsigne
 				copy_to_user(&uca->name[0], &ca.name[0], 128))
 			return -EFAULT;
 
-		arg = (unsigned long) uca;
+		arg = (__force unsigned long) uca;
 
 		/* Fall through. We don't actually write back any _changes_
 		   to the structure anyway, so there's no need to copy back

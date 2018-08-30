@@ -431,7 +431,7 @@ snapshot_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case SNAPSHOT_CREATE_IMAGE:
 		return snapshot_ioctl(file, cmd,
-				      (unsigned long) compat_ptr(arg));
+				      (__force unsigned long) compat_ptr(arg));
 
 	case SNAPSHOT_SET_SWAP_AREA: {
 		struct compat_resume_swap_area __user *u_swap_area =

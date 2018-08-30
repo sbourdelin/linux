@@ -1108,7 +1108,7 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 		return 0;
 
 	case EVIOCRMFF:
-		return input_ff_erase(dev, (int)(unsigned long) p, file);
+		return input_ff_erase(dev, (int)(__force unsigned long)p, file);
 
 	case EVIOCGEFFECTS:
 		i = test_bit(EV_FF, dev->evbit) ?

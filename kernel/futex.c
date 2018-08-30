@@ -499,7 +499,7 @@ static void drop_futex_key_refs(union futex_key *key)
 static int
 get_futex_key(u32 __user *uaddr, int fshared, union futex_key *key, int rw)
 {
-	unsigned long address = (unsigned long)uaddr;
+	unsigned long address = (__force unsigned long)uaddr;
 	struct mm_struct *mm = current->mm;
 	struct page *page, *tail;
 	struct address_space *mapping;
@@ -727,7 +727,7 @@ static int fault_in_user_writeable(u32 __user *uaddr)
 	int ret;
 
 	down_read(&mm->mmap_sem);
-	ret = fixup_user_fault(current, mm, (unsigned long)uaddr,
+	ret = fixup_user_fault(current, mm, (__force unsigned long)uaddr,
 			       FAULT_FLAG_WRITE, NULL);
 	up_read(&mm->mmap_sem);
 
@@ -3584,7 +3584,7 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 	 */
 	if (cmd == FUTEX_REQUEUE || cmd == FUTEX_CMP_REQUEUE ||
 	    cmd == FUTEX_CMP_REQUEUE_PI || cmd == FUTEX_WAKE_OP)
-		val2 = (u32) (unsigned long) utime;
+		val2 = (u32) (__force unsigned long) utime;
 
 	return do_futex(uaddr, op, val, tp, uaddr2, val2, val3);
 }

@@ -579,8 +579,8 @@ static inline int fault_in_pages_writeable(char __user *uaddr, int size)
 	} while (uaddr <= end);
 
 	/* Check whether the range spilled into the next page. */
-	if (((unsigned long)uaddr & PAGE_MASK) ==
-			((unsigned long)end & PAGE_MASK))
+	if (((__force unsigned long)uaddr & PAGE_MASK) ==
+			((__force unsigned long)end & PAGE_MASK))
 		return __put_user(0, end);
 
 	return 0;
@@ -604,8 +604,8 @@ static inline int fault_in_pages_readable(const char __user *uaddr, int size)
 	} while (uaddr <= end);
 
 	/* Check whether the range spilled into the next page. */
-	if (((unsigned long)uaddr & PAGE_MASK) ==
-			((unsigned long)end & PAGE_MASK)) {
+	if (((__force unsigned long)uaddr & PAGE_MASK) ==
+			((__force unsigned long)end & PAGE_MASK)) {
 		return __get_user(c, end);
 	}
 

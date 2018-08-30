@@ -42,7 +42,7 @@ static inline long do_strnlen_user(const char __user *src, unsigned long count, 
 	 * Do everything aligned. But that means that we
 	 * need to also expand the maximum..
 	 */
-	align = (sizeof(long) - 1) & (unsigned long)src;
+	align = (sizeof(long) - 1) & (__force unsigned long)src;
 	src -= align;
 	max += align;
 
@@ -111,7 +111,7 @@ long strnlen_user(const char __user *str, long count)
 	str = untagged_addr(str);
 
 	max_addr = user_addr_max();
-	src_addr = (unsigned long)str;
+	src_addr = (__force unsigned long)str;
 	if (likely(src_addr < max_addr)) {
 		unsigned long max = max_addr - src_addr;
 		long retval;

@@ -505,7 +505,8 @@ static int get_v4l2_plane32(struct v4l2_plane __user *p64,
 		break;
 	case V4L2_MEMORY_USERPTR:
 		if (get_user(p, &p32->m.userptr) ||
-		    put_user((unsigned long)compat_ptr(p), &p64->m.userptr))
+		    put_user((__force unsigned long)compat_ptr(p),
+				&p64->m.userptr))
 			return -EFAULT;
 		break;
 	case V4L2_MEMORY_DMABUF:
@@ -657,7 +658,7 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *p64,
 			compat_ulong_t userptr;
 
 			if (get_user(userptr, &p32->m.userptr) ||
-			    put_user((unsigned long)compat_ptr(userptr),
+			    put_user((__force unsigned long)compat_ptr(userptr),
 				     &p64->m.userptr))
 				return -EFAULT;
 			break;
@@ -1340,9 +1341,9 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	 * Otherwise, it will pass the newly allocated @new_p64 argument.
 	 */
 	if (compatible_arg)
-		err = native_ioctl(file, cmd, (unsigned long)p32);
+		err = native_ioctl(file, cmd, (__force unsigned long)p32);
 	else
-		err = native_ioctl(file, cmd, (unsigned long)new_p64);
+		err = native_ioctl(file, cmd, (__force unsigned long)new_p64);
 
 	if (err == -ENOTTY)
 		return err;

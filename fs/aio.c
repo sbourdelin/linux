@@ -1084,7 +1084,7 @@ static void aio_complete(struct aio_kiocb *iocb, long res, long res2)
 	ev_page = kmap_atomic(ctx->ring_pages[pos / AIO_EVENTS_PER_PAGE]);
 	event = ev_page + pos % AIO_EVENTS_PER_PAGE;
 
-	event->obj = (u64)(unsigned long)iocb->ki_user_iocb;
+	event->obj = (u64)(__force unsigned long)iocb->ki_user_iocb;
 	event->data = iocb->ki_user_data;
 	event->res = res;
 	event->res2 = res2;

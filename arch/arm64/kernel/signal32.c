@@ -483,8 +483,10 @@ int compat_setup_rt_frame(int usig, struct ksignal *ksig,
 
 	if (err == 0) {
 		compat_setup_return(regs, &ksig->ka, frame->sig.retcode, frame, usig);
-		regs->regs[1] = (compat_ulong_t)(unsigned long)&frame->info;
-		regs->regs[2] = (compat_ulong_t)(unsigned long)&frame->sig.uc;
+		regs->regs[1] =
+			(compat_ulong_t)(__force unsigned long)&frame->info;
+		regs->regs[2] =
+			(compat_ulong_t)(__force unsigned long)&frame->sig.uc;
 	}
 
 	return err;

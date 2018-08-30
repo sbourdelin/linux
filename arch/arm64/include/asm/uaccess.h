@@ -76,7 +76,7 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
 {
 	unsigned long ret, limit = current_thread_info()->addr_limit;
 
-	__chk_user_ptr(addr);
+	__chk_user_ptr((void __force *)addr);
 	asm volatile(
 	// A + B <= C + 1 for all A,B,C, in four easy steps:
 	// 1: X = A + B; X' = X % 2^64
@@ -103,7 +103,7 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
  * pass on to access_ok(), for instance.
  */
 #define untagged_addr(addr)		\
-	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
+	((__typeof__(addr))sign_extend64((__force __u64)(addr), 55))
 
 #define access_ok(type, addr, size)	\
 	__range_ok(untagged_addr(addr), size)

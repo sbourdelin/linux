@@ -418,7 +418,8 @@ static int snd_ctl_elem_add_compat(struct snd_ctl_file *file,
 				   sizeof(data->value.enumerated)))
 			goto error;
 		data->value.enumerated.names_ptr =
-			(uintptr_t)compat_ptr(data->value.enumerated.names_ptr);
+			(__force uintptr_t)compat_ptr(
+					data->value.enumerated.names_ptr);
 		break;
 	default:
 		break;
@@ -465,7 +466,7 @@ static inline long snd_ctl_ioctl_compat(struct file *file, unsigned int cmd, uns
 	case SNDRV_CTL_IOCTL_TLV_READ:
 	case SNDRV_CTL_IOCTL_TLV_WRITE:
 	case SNDRV_CTL_IOCTL_TLV_COMMAND:
-		return snd_ctl_ioctl(file, cmd, (unsigned long)argp);
+		return snd_ctl_ioctl(file, cmd, (__force unsigned long)argp);
 	case SNDRV_CTL_IOCTL_ELEM_LIST32:
 		return snd_ctl_elem_list_compat(ctl->card, argp);
 	case SNDRV_CTL_IOCTL_ELEM_INFO32:

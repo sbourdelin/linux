@@ -85,7 +85,7 @@ static int compat_hdio_ioctl(struct block_device *bdev, fmode_t mode,
 
 	p = compat_alloc_user_space(sizeof(unsigned long));
 	error = __blkdev_driver_ioctl(bdev, mode,
-				cmd, (unsigned long)p);
+				cmd, (__force unsigned long)p);
 	if (error == 0) {
 		unsigned int __user *uvp = compat_ptr(arg);
 		unsigned long v;
@@ -138,7 +138,7 @@ static int compat_cdrom_read_audio(struct block_device *bdev, fmode_t mode,
 		return -EFAULT;
 
 	return __blkdev_driver_ioctl(bdev, mode, cmd,
-			(unsigned long)cdread_audio);
+			(__force unsigned long)cdread_audio);
 }
 
 static int compat_cdrom_generic_command(struct block_device *bdev, fmode_t mode,
@@ -170,7 +170,8 @@ static int compat_cdrom_generic_command(struct block_device *bdev, fmode_t mode,
 	    put_user(compat_ptr(data), &cgc->reserved[0]))
 		return -EFAULT;
 
-	return __blkdev_driver_ioctl(bdev, mode, cmd, (unsigned long)cgc);
+	return __blkdev_driver_ioctl(bdev, mode, cmd,
+			(__force unsigned long)cgc);
 }
 
 struct compat_blkpg_ioctl_arg {
@@ -199,7 +200,7 @@ static int compat_blkpg_ioctl(struct block_device *bdev, fmode_t mode,
 	if (err)
 		return err;
 
-	return blkdev_ioctl(bdev, mode, cmd, (unsigned long)a);
+	return blkdev_ioctl(bdev, mode, cmd, (__force unsigned long)a);
 }
 
 #define BLKBSZGET_32		_IOR(0x12, 112, int)
@@ -276,7 +277,7 @@ static int compat_blkdev_driver_ioctl(struct block_device *bdev, fmode_t mode,
 	case DVD_READ_STRUCT:
 	case DVD_WRITE_STRUCT:
 	case DVD_AUTH:
-		arg = (unsigned long)compat_ptr(arg);
+		arg = (__force unsigned long)compat_ptr(arg);
 	/* These intepret arg as an unsigned long, not as a pointer,
 	 * so we must not do compat_ptr() conversion. */
 	case HDIO_SET_MULTCOUNT:
@@ -355,10 +356,10 @@ long compat_blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 	 */
 	case BLKRRPART:
 		return blkdev_ioctl(bdev, mode, cmd,
-				(unsigned long)compat_ptr(arg));
+				(__force unsigned long)compat_ptr(arg));
 	case BLKBSZSET_32:
 		return blkdev_ioctl(bdev, mode, BLKBSZSET,
-				(unsigned long)compat_ptr(arg));
+				(__force unsigned long)compat_ptr(arg));
 	case BLKPG:
 		return compat_blkpg_ioctl(bdev, mode, cmd, compat_ptr(arg));
 	case BLKRAGET:

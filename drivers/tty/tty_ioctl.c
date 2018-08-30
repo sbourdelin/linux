@@ -949,7 +949,8 @@ long n_tty_compat_ioctl_helper(struct tty_struct *tty, struct file *file,
 	switch (cmd) {
 	case TIOCGLCKTRMIOS:
 	case TIOCSLCKTRMIOS:
-		return tty_mode_ioctl(tty, file, cmd, (unsigned long) compat_ptr(arg));
+		return tty_mode_ioctl(tty, file, cmd,
+				(__force unsigned long) compat_ptr(arg));
 	default:
 		return -ENOIOCTLCMD;
 	}

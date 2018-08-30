@@ -109,7 +109,7 @@ long strncpy_from_user(char *dst, const char __user *src, long count)
 	src = untagged_addr(src);
 
 	max_addr = user_addr_max();
-	src_addr = (unsigned long)src;
+	src_addr = (__force unsigned long)src;
 	if (likely(src_addr < max_addr)) {
 		unsigned long max = max_addr - src_addr;
 		long retval;

@@ -1255,7 +1255,7 @@ static inline void fuse_page_descs_length_init(struct fuse_req *req,
 
 static inline unsigned long fuse_get_user_addr(const struct iov_iter *ii)
 {
-	return (unsigned long)ii->iov->iov_base + ii->iov_offset;
+	return (__force unsigned long)ii->iov->iov_base + ii->iov_offset;
 }
 
 static inline size_t fuse_get_frag_size(const struct iov_iter *ii,

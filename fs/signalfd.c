@@ -105,7 +105,7 @@ static int signalfd_copyinfo(struct signalfd_siginfo __user *uinfo,
 	case SIL_TIMER:
 		new.ssi_tid = kinfo->si_tid;
 		new.ssi_overrun = kinfo->si_overrun;
-		new.ssi_ptr = (long) kinfo->si_ptr;
+		new.ssi_ptr = (__force long) kinfo->si_ptr;
 		new.ssi_int = kinfo->si_int;
 		break;
 	case SIL_POLL:
@@ -122,13 +122,13 @@ static int signalfd_copyinfo(struct signalfd_siginfo __user *uinfo,
 		 * it as SIL_FAULT.
 		 */
 	case SIL_FAULT:
-		new.ssi_addr = (long) kinfo->si_addr;
+		new.ssi_addr = (__force long) kinfo->si_addr;
 #ifdef __ARCH_SI_TRAPNO
 		new.ssi_trapno = kinfo->si_trapno;
 #endif
 		break;
 	case SIL_FAULT_MCEERR:
-		new.ssi_addr = (long) kinfo->si_addr;
+		new.ssi_addr = (__force long) kinfo->si_addr;
 #ifdef __ARCH_SI_TRAPNO
 		new.ssi_trapno = kinfo->si_trapno;
 #endif
@@ -147,11 +147,11 @@ static int signalfd_copyinfo(struct signalfd_siginfo __user *uinfo,
 		 */
 		new.ssi_pid = kinfo->si_pid;
 		new.ssi_uid = kinfo->si_uid;
-		new.ssi_ptr = (long) kinfo->si_ptr;
+		new.ssi_ptr = (__force long) kinfo->si_ptr;
 		new.ssi_int = kinfo->si_int;
 		break;
 	case SIL_SYS:
-		new.ssi_call_addr = (long) kinfo->si_call_addr;
+		new.ssi_call_addr = (__force long) kinfo->si_call_addr;
 		new.ssi_syscall   = kinfo->si_syscall;
 		new.ssi_arch      = kinfo->si_arch;
 		break;
