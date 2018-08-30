@@ -119,7 +119,8 @@ void *hcd_buffer_alloc(
 	struct usb_bus		*bus,
 	size_t			size,
 	gfp_t			mem_flags,
-	dma_addr_t		*dma
+	dma_addr_t		*dma,
+	unsigned long		attrs
 )
 {
 	struct usb_hcd		*hcd = bus_to_hcd(bus);
@@ -136,18 +137,22 @@ void *hcd_buffer_alloc(
 		return kmalloc(size, mem_flags);
 	}
 
-	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		if (size <= pool_max[i])
-			return dma_pool_alloc(hcd->pool[i], mem_flags, dma);
+	/* Only use pools for coherent buffer requests */
+	if (!attrs) {
+		for (i = 0; i < HCD_BUFFER_POOLS; i++)
+			if (size <= pool_max[i])
+				return dma_pool_alloc(hcd->pool[i],
+						mem_flags, dma);
 	}
-	return dma_alloc_coherent(hcd->self.sysdev, size, dma, mem_flags);
+	return dma_alloc_attrs(hcd->self.sysdev, size, dma, mem_flags, attrs);
 }
 
 void hcd_buffer_free(
 	struct usb_bus		*bus,
 	size_t			size,
 	void			*addr,
-	dma_addr_t		dma
+	dma_addr_t		dma,
+	unsigned long		attrs
 )
 {
 	struct usb_hcd		*hcd = bus_to_hcd(bus);
@@ -163,11 +168,13 @@ void hcd_buffer_free(
 		return;
 	}
 
-	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		if (size <= pool_max[i]) {
-			dma_pool_free(hcd->pool[i], addr, dma);
-			return;
+	if (!attrs) {
+		for (i = 0; i < HCD_BUFFER_POOLS; i++) {
+			if (size <= pool_max[i]) {
+				dma_pool_free(hcd->pool[i], addr, dma);
+				return;
+			}
 		}
 	}
-	dma_free_coherent(hcd->self.sysdev, size, addr, dma);
+	dma_free_attrs(hcd->self.sysdev, size, addr, dma, attrs);
 }

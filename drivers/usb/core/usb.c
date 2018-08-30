@@ -859,6 +859,58 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
 EXPORT_SYMBOL_GPL(__usb_get_extra_descriptor);
 
 /**
+ * usb_alloc_noncoherent - allocate dma-non-coherent buffer
+ * @dev: device the buffer will be used with
+ * @size: requested buffer size
+ * @mem_flags: affect whether allocation may block
+ * @dma: used to return DMA address of buffer
+ *
+ * Return: Either null (indicating no buffer could be allocated), or the
+ * cpu-space pointer to a non-coherent buffer that may be used to perform
+ * DMA to the specified device. Such cpu-space buffers are returned along
+ * with the DMA address (through the pointer provided).
+ *
+ * Note:
+ * These non-conherent buffers are used with URB_NO_xxx_DMA_MAP set in
+ * urb->transfer_flags to avoid using "DMA bounce buffers". When using
+ * this API, you must have the necessary syncs points. If you are unsure
+ * about this, you should be using coherent buffers via usb_alloc_coherent.
+ *
+ * When the buffer is no longer used, free it with usb_free_noncoherent().
+ */
+void *usb_alloc_noncoherent(struct usb_device *dev, size_t size, gfp_t mem_flags,
+			 dma_addr_t *dma)
+{
+	if (!dev || !dev->bus)
+		return NULL;
+	return hcd_buffer_alloc(dev->bus, size,
+			mem_flags, dma, DMA_ATTR_NON_CONSISTENT);
+}
+EXPORT_SYMBOL_GPL(usb_alloc_noncoherent);
+
+/**
+ * usb_free_noncoherent - free memory allocated with usb_alloc_noncoherent()
+ * @dev: device the buffer was used with
+ * @size: requested buffer size
+ * @addr: CPU address of buffer
+ * @dma: DMA address of buffer
+ *
+ * This reclaims an I/O buffer, letting it be reused.  The memory must have
+ * been allocated using usb_alloc_noncoherent(), and the parameters must match
+ * those provided in that allocation request.
+ */
+void usb_free_noncoherent(struct usb_device *dev, size_t size, void *addr,
+		       dma_addr_t dma)
+{
+	if (!dev || !dev->bus)
+		return;
+	if (!addr)
+		return;
+	hcd_buffer_free(dev->bus, size, addr, dma, DMA_ATTR_NON_CONSISTENT);
+}
+EXPORT_SYMBOL_GPL(usb_free_noncoherent);
+
+/**
  * usb_alloc_coherent - allocate dma-consistent buffer for URB_NO_xxx_DMA_MAP
  * @dev: device the buffer will be used with
  * @size: requested buffer size
@@ -886,7 +938,7 @@ void *usb_alloc_coherent(struct usb_device *dev, size_t size, gfp_t mem_flags,
 {
 	if (!dev || !dev->bus)
 		return NULL;
-	return hcd_buffer_alloc(dev->bus, size, mem_flags, dma);
+	return hcd_buffer_alloc(dev->bus, size, mem_flags, dma, 0);
 }
 EXPORT_SYMBOL_GPL(usb_alloc_coherent);
 
@@ -908,7 +960,7 @@ void usb_free_coherent(struct usb_device *dev, size_t size, void *addr,
 		return;
 	if (!addr)
 		return;
-	hcd_buffer_free(dev->bus, size, addr, dma);
+	hcd_buffer_free(dev->bus, size, addr, dma, 0);
 }
 EXPORT_SYMBOL_GPL(usb_free_coherent);
 

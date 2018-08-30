@@ -1383,7 +1383,7 @@ static int hcd_alloc_coherent(struct usb_bus *bus,
 	}
 
 	vaddr = hcd_buffer_alloc(bus, size + sizeof(vaddr),
-				 mem_flags, dma_handle);
+				 mem_flags, dma_handle, 0);
 	if (!vaddr)
 		return -ENOMEM;
 
@@ -1416,7 +1416,8 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
 	if (dir == DMA_FROM_DEVICE)
 		memcpy(vaddr, *vaddr_handle, size);
 
-	hcd_buffer_free(bus, size + sizeof(vaddr), *vaddr_handle, *dma_handle);
+	hcd_buffer_free(bus, size + sizeof(vaddr),
+			*vaddr_handle, *dma_handle, 0);
 
 	*vaddr_handle = vaddr;
 	*dma_handle = 0;
