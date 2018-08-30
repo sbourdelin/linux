@@ -1808,6 +1808,11 @@ static int sock_map_delete_elem(struct bpf_map *map, void *key)
 	return 0;
 }
 
+static bool psock_is_smap_sk(struct sock *sk)
+{
+	return inet_csk(sk)->icsk_ulp_ops == &bpf_tcp_ulp_ops;
+}
+
 /* Locking notes: Concurrent updates, deletes, and lookups are allowed and are
  * done inside rcu critical sections. This ensures on updates that the psock
  * will not be released via smap_release_sock() until concurrent updates/deletes
@@ -1892,6 +1897,10 @@ static int __sock_map_ctx_update_elem(struct bpf_map *map,
 	 * doesn't update user data.
 	 */
 	if (psock) {
+		if (!psock_is_smap_sk(sock)) {
+			err = -EBUSY;
+			goto out_progs;
+		}
 		if (READ_ONCE(psock->bpf_parse) && parse) {
 			err = -EBUSY;
 			goto out_progs;
