@@ -5150,12 +5150,39 @@ static phys_addr_t intel_iommu_iova_to_phys(struct iommu_domain *domain,
 	return phys;
 }
 
+static inline bool scalable_mode_support(void)
+{
+	struct dmar_drhd_unit *drhd;
+	struct intel_iommu *iommu;
+	bool ret = true;
+
+	rcu_read_lock();
+	for_each_active_iommu(iommu, drhd) {
+		if (!sm_supported(iommu)) {
+			ret = false;
+			break;
+		}
+	}
+	rcu_read_unlock();
+
+	return ret;
+}
+
 static bool intel_iommu_capable(enum iommu_cap cap)
 {
-	if (cap == IOMMU_CAP_CACHE_COHERENCY)
+	switch (cap) {
+	case IOMMU_CAP_CACHE_COHERENCY:
 		return domain_update_iommu_snooping(NULL) == 1;
-	if (cap == IOMMU_CAP_INTR_REMAP)
+	case IOMMU_CAP_INTR_REMAP:
 		return irq_remapping_enabled == 1;
+	case IOMMU_CAP_AUX_DOMAIN:
+		return scalable_mode_support();
+	case IOMMU_CAP_NOEXEC:
+	/* PASSTHROUGH */
+	default:
+		pr_info("Unsupported capability query %d\n", cap);
+		break;
+	}
 
 	return false;
 }
