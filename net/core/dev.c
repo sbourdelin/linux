@@ -5615,6 +5615,7 @@ EXPORT_SYMBOL(napi_gro_receive);
 int napi_gro_receive_list(struct napi_struct *napi, struct list_head *head)
 {
 	struct sk_buff *skb, *next;
+	struct list_head sublist;
 	gro_result_t result;
 	int kept = 0;
 
@@ -5624,14 +5625,26 @@ int napi_gro_receive_list(struct napi_struct *napi, struct list_head *head)
 		skb_gro_reset_offset(skb);
 	}
 
+	INIT_LIST_HEAD(&sublist);
 	list_for_each_entry_safe(skb, next, head, list) {
 		list_del(&skb->list);
 		skb->next = NULL;
 		result = dev_gro_receive(napi, skb);
-		result = napi_skb_finish(result, skb);
-		if (result != GRO_DROP)
-			kept++;
+		if (result == GRO_NORMAL) {
+			list_add_tail(&skb->list, &sublist);
+			continue;
+		} else {
+			if (!list_empty(&sublist)) {
+				/* Handle the GRO_NORMAL skbs to prevent OoO */
+				kept += netif_receive_skb_list_internal(&sublist);
+				INIT_LIST_HEAD(&sublist);
+			}
+			result = napi_skb_finish(result, skb);
+			if (result != GRO_DROP)
+				kept++;
+		}
 	}
+	kept += netif_receive_skb_list_internal(&sublist);
 	return kept;
 }
 EXPORT_SYMBOL(napi_gro_receive_list);
