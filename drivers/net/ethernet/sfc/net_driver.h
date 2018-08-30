@@ -502,6 +502,7 @@ struct efx_channel {
 	unsigned int rx_pkt_index;
 
 	struct list_head *rx_list;
+	struct list_head *gro_list;
 
 	struct efx_rx_queue rx_queue;
 	struct efx_tx_queue tx_queue[EFX_TXQ_TYPES];

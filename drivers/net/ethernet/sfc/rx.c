@@ -453,9 +453,19 @@ efx_rx_packet_gro(struct efx_channel *channel, struct efx_rx_buffer *rx_buf,
 
 	skb_record_rx_queue(skb, channel->rx_queue.core_index);
 
-	gro_result = napi_gro_frags(napi);
-	if (gro_result != GRO_DROP)
-		channel->irq_mod_score += 2;
+	/* Pass the packet up */
+	if (channel->gro_list != NULL) {
+		/* Clear napi->skb and prepare skb for GRO */
+		skb = napi_frags_skb(napi);
+		if (skb)
+			/* Add to list, will pass up later */
+			list_add_tail(&skb->list, channel->gro_list);
+	} else {
+		/* No list, so pass it up now */
+		gro_result = napi_gro_frags(napi);
+		if (gro_result != GRO_DROP)
+			channel->irq_mod_score += 2;
+	}
 }
 
 /* Allocate and construct an SKB around page fragments */

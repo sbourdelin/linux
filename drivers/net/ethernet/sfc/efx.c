@@ -263,9 +263,9 @@ static int efx_check_disabled(struct efx_nic *efx)
  */
 static int efx_process_channel(struct efx_channel *channel, int budget)
 {
+	struct list_head rx_list, gro_list;
 	struct efx_tx_queue *tx_queue;
-	struct list_head rx_list;
-	int spent;
+	int spent, gro_count;
 
 	if (unlikely(!channel->enabled))
 		return 0;
@@ -274,6 +274,10 @@ static int efx_process_channel(struct efx_channel *channel, int budget)
 	EFX_WARN_ON_PARANOID(channel->rx_list != NULL);
 	INIT_LIST_HEAD(&rx_list);
 	channel->rx_list = &rx_list;
+
+	EFX_WARN_ON_PARANOID(channel->gro_list != NULL);
+	INIT_LIST_HEAD(&gro_list);
+	channel->gro_list = &gro_list;
 
 	efx_for_each_channel_tx_queue(tx_queue, channel) {
 		tx_queue->pkts_compl = 0;
@@ -300,6 +304,9 @@ static int efx_process_channel(struct efx_channel *channel, int budget)
 	/* Receive any packets we queued up */
 	netif_receive_skb_list(channel->rx_list);
 	channel->rx_list = NULL;
+	gro_count = napi_gro_receive_list(&channel->napi_str, channel->gro_list);
+	channel->irq_mod_score += gro_count * 2;
+	channel->gro_list = NULL;
 
 	return spent;
 }
