@@ -26,6 +26,7 @@
 #include "irammap.h"
 #include "sleep.h"
 
+#define EMC_INTSTATUS			0x0
 #define EMC_CFG				0xc
 #define EMC_ADR_CFG			0x10
 #define EMC_TIMING_CONTROL		0x28
@@ -43,6 +44,9 @@
 #define EMC_ZQ_CAL			0x2ec
 #define EMC_XM2VTTGENPADCTRL		0x310
 #define EMC_XM2VTTGENPADCTRL2		0x314
+
+#define EMC_CLKCHANGE_COMPLETE_INT	(1 << 4)
+#define EMC_DLL_ALARM_INT		(1 << 7)
 
 #define MC_EMEM_ARB_CFG			0x90
 
@@ -538,6 +542,9 @@ zcal_done:
 	str	r1, [r0, #EMC_CFG]
 
 	emc_timing_update r1, r0
+
+	mov	r1, #(EMC_CLKCHANGE_COMPLETE_INT | EMC_DLL_ALARM_INT)
+	str	r1, [r0, #EMC_INTSTATUS]	@ clear interrupts
 
 	/* Tegra114 had dual EMC channel, now config the other one */
 	cmp	r10, #TEGRA114
