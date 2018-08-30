@@ -101,6 +101,8 @@ enum iommu_cap {
 					   transactions */
 	IOMMU_CAP_INTR_REMAP,		/* IOMMU supports interrupt isolation */
 	IOMMU_CAP_NOEXEC,		/* IOMMU_NOEXEC flag */
+	IOMMU_CAP_AUX_DOMAIN,		/* IOMMU supports multiple domains per
+					   device */
 };
 
 /*
@@ -185,6 +187,9 @@ struct iommu_resv_region {
  * @domain_get_windows: Return the number of windows for a domain
  * @of_xlate: add OF master IDs to iommu grouping
  * @pgsize_bitmap: bitmap of all possible supported page sizes
+ * @enable_auxd: enable multiple domains per device support
+ * @disable_auxd: disable multiple domains per device support
+ * @auxd_id: return the id of an auxiliary domain
  */
 struct iommu_ops {
 	bool (*capable)(enum iommu_cap);
@@ -230,6 +235,10 @@ struct iommu_ops {
 
 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
 	bool (*is_attach_deferred)(struct iommu_domain *domain, struct device *dev);
+
+	int (*enable_auxd)(struct device *dev);
+	void (*disable_auxd)(struct device *dev);
+	int (*auxd_id)(struct iommu_domain *domain);
 
 	unsigned long pgsize_bitmap;
 };
@@ -399,6 +408,10 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
 void iommu_fwspec_free(struct device *dev);
 int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
 const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode);
+
+int iommu_enable_aux_domain(struct device *dev);
+void iommu_disable_aux_domain(struct device *dev);
+int iommu_auxiliary_id(struct iommu_domain *domain);
 
 #else /* CONFIG_IOMMU_API */
 

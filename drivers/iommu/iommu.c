@@ -2014,3 +2014,32 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(iommu_fwspec_add_ids);
+
+int iommu_enable_aux_domain(struct device *dev)
+{
+	const struct iommu_ops *ops = dev->bus->iommu_ops;
+
+	if (ops && ops->enable_auxd)
+		return ops->enable_auxd(dev);
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(iommu_enable_aux_domain);
+
+void iommu_disable_aux_domain(struct device *dev)
+{
+	const struct iommu_ops *ops = dev->bus->iommu_ops;
+
+	if (ops && ops->disable_auxd)
+		ops->disable_auxd(dev);
+}
+EXPORT_SYMBOL_GPL(iommu_disable_aux_domain);
+
+int iommu_auxiliary_id(struct iommu_domain *domain)
+{
+	if (domain->ops->auxd_id)
+		return domain->ops->auxd_id(domain);
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(iommu_auxiliary_id);
