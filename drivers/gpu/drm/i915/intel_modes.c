@@ -133,3 +133,24 @@ intel_attach_aspect_ratio_property(struct drm_connector *connector)
 			connector->dev->mode_config.aspect_ratio_property,
 			DRM_MODE_PICTURE_ASPECT_NONE);
 }
+
+void
+intel_attach_max_bpc_property(struct drm_connector *connector, int min, int
+			       max)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_mode_config *config = &dev->mode_config;
+	struct drm_property *prop;
+
+	prop = config->max_bpc_property;
+	if (prop == NULL) {
+		prop = drm_property_create_range(dev, 0, "max bpc", min, max);
+		if (prop == NULL)
+			return;
+
+		config->max_bpc_property = prop;
+	}
+
+	drm_object_attach_property(&connector->base, prop, max);
+	connector->state->max_bpc = max;
+}

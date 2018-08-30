@@ -10780,6 +10780,28 @@ connected_sink_compute_bpp(struct intel_connector *connector,
 	}
 }
 
+static void
+connected_sink_max_bpp(struct drm_connector_state *conn_state,
+			     struct intel_crtc_state *pipe_config)
+{
+	switch (conn_state->max_bpc) {
+	case 8:
+	case 9:
+		pipe_config->pipe_bpp = 8*3;
+		break;
+	case 10:
+	case 11:
+		pipe_config->pipe_bpp = 10*3;
+		break;
+	case 12:
+		pipe_config->pipe_bpp = 12*3;
+		break;
+	default:
+		break;
+	}
+	DRM_DEBUG_KMS("Limiting display bpp to %d\n", pipe_config->pipe_bpp);
+}
+
 static int
 compute_baseline_pipe_bpp(struct intel_crtc *crtc,
 			  struct intel_crtc_state *pipe_config)
@@ -10807,6 +10829,9 @@ compute_baseline_pipe_bpp(struct intel_crtc *crtc,
 	for_each_new_connector_in_state(state, connector, connector_state, i) {
 		if (connector_state->crtc != &crtc->base)
 			continue;
+
+		if (connector_state->max_bpc)
+			connected_sink_max_bpp(connector_state, pipe_config);
 
 		connected_sink_compute_bpp(to_intel_connector(connector),
 					   pipe_config);
