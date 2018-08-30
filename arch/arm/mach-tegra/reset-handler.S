@@ -20,6 +20,7 @@
 #include <soc/tegra/flowctrl.h>
 #include <soc/tegra/fuse.h>
 
+#include <asm/assembler.h>
 #include <asm/asm-offsets.h>
 #include <asm/cache.h>
 
@@ -112,9 +113,19 @@ ENTRY(__tegra_cpu_reset_handler_start)
  * NOTE: This code is copied to IRAM. All code and data accesses
  *       must be position-independent.
  */
-
+	.arm
 	.align L1_CACHE_SHIFT
 ENTRY(__tegra_cpu_reset_handler)
+
+	/*
+	 * Tegra30 ignores first bit of the reset vector and always jumps
+	 * into kernel in .ARM mode from the firmware, hence force the mode
+	 * switch if kernel is compiled in Thumb-2.
+	 */
+ THUMB(	badr	r0, 1f		)
+ THUMB(	bx	r0		)
+ THUMB(	.thumb 			)
+ THUMB(	1: 			)
 
 	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
 
@@ -215,7 +226,7 @@ __no_cpu0_chk:
 	ldr	lr, [r12, #RESET_DATA(STARTUP_SECONDARY)]
 	cmp	lr, #0
 	bleq	__die				@ no secondary startup handler
-	bx	lr
+	ret	lr
 #endif
 
 /*
