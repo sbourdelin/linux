@@ -5596,6 +5596,31 @@ gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(napi_gro_receive);
 
+/* Returns the number of SKBs on the list successfully received */
+int napi_gro_receive_list(struct napi_struct *napi, struct list_head *head)
+{
+	struct sk_buff *skb, *next;
+	gro_result_t result;
+	int kept = 0;
+
+	list_for_each_entry(skb, head, list) {
+		skb_mark_napi_id(skb, napi);
+		trace_napi_gro_receive_entry(skb);
+		skb_gro_reset_offset(skb);
+	}
+
+	list_for_each_entry_safe(skb, next, head, list) {
+		list_del(&skb->list);
+		skb->next = NULL;
+		result = dev_gro_receive(napi, skb);
+		result = napi_skb_finish(result, skb);
+		if (result != GRO_DROP)
+			kept++;
+	}
+	return kept;
+}
+EXPORT_SYMBOL(napi_gro_receive_list);
+
 static void napi_reuse_skb(struct napi_struct *napi, struct sk_buff *skb)
 {
 	if (unlikely(skb->pfmemalloc)) {
@@ -5667,7 +5692,7 @@ static gro_result_t napi_frags_finish(struct napi_struct *napi,
  * Drivers could call both napi_gro_frags() and napi_gro_receive()
  * We copy ethernet header into skb->data to have a common layout.
  */
-static struct sk_buff *napi_frags_skb(struct napi_struct *napi)
+struct sk_buff *napi_frags_skb(struct napi_struct *napi)
 {
 	struct sk_buff *skb = napi->skb;
 	const struct ethhdr *eth;
@@ -5703,6 +5728,7 @@ static struct sk_buff *napi_frags_skb(struct napi_struct *napi)
 
 	return skb;
 }
+EXPORT_SYMBOL(napi_frags_skb);
 
 gro_result_t napi_gro_frags(struct napi_struct *napi)
 {
