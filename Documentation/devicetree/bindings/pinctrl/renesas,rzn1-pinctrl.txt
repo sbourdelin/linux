@@ -1,0 +1,97 @@
+Renesas RZ/N1 SoC Pinctrl node description.
+
+Pin controller node
+-------------------
+Required properties:
+- compatible: SoC-specific compatible string "renesas,<soc-specific>-pinctrl"
+  followed by "renesas,rzn1-pinctrl" as fallback. The SoC-specific compatible
+  strings must be one of:
+	"renesas,r9a06g032-pinctrl" for RZ/N1D
+	"renesas,r9a06g033-pinctrl" for RZ/N1S
+- reg: Address base and length of the memory area where the pin controller
+  hardware is mapped to.
+- clocks: phandles for the clock, see the description of clock-names below.
+- clock-names: Contains the name of the clock:
+    "bus", the bus clock, sometimes described as pclk, for register accesses.
+
+Example:
+	pinctrl: pin-controller@40067000 {
+	    compatible = "renesas,r9a06g032-pinctrl", "renesas,rzn1-pinctrl";
+	    reg = <0x40067000 0x1000>, <0x51000000 0x480>;
+	    clocks = <&sysctrl R9A06G032_HCLK_PINCONFIG>;
+	    clock-names = "bus";
+	};
+
+Sub-nodes
+---------
+  The child nodes of the pin controller node describe a pin multiplexing
+  group that can be used by device nodes.
+
+  A pin multiplexing sub-node describes how to configure a set of pins, or a
+  single pin, in some desired alternate function mode.
+  A single sub-node may define several pin configurations.
+
+  The allowed generic formats for a pin multiplexing sub-node are the
+  following ones:
+
+  Client sub-nodes shall refer to pin multiplexing sub-nodes using the phandle
+  of the most external one. See the generic pinctrl-bindings.txt for details.
+
+  Required properties:
+    - renesas,rzn1-pinctrl:
+      Array of integers representing each 'pin' and it's configuration.
+
+      A 'pin number' does not correspond 1:1 to the hardware manual notion of
+      PL_GPIO directly. Numbers 0...169 are PL_GPIOs, however there is also two
+      extra 170 and 171 that corresponds to the MDIO0 and MDIO1 bus config.
+
+      A 'function' also does not correspond 1:1 to the hardware manual. There
+      are 2 levels of pin muxing, Level 1, level 2 -- to this are added the
+      MDIO configurations.
+
+      Helper macros to ease assembling the pin index and function identifier
+      are provided by the pin controller header file at:
+      <include/dt-bindings/pinctrl/rzn1-pinctrl.h>
+
+Example #1:
+  A simple case configuring only the function for a given 'pin' works as follow:
+	#include <include/dt-bindings/pinctrl/rzn1-pinctrl.h>
+	&pinctrl {
+		pinsuart0: pinsuart0 {
+			renesas,rzn1-pinmux-ids = <
+				RZN1_MUX(103, UART0_I)	/* UART0_TXD */
+				RZN1_MUX(104, UART0_I)	/* UART0_RXD */
+			>;
+		};
+	};
+
+  Note that in this case the other attributes of the pins, pull up/down/none and
+  drive strength, are not changed.
+
+Example #2:
+  Here we also set the pullups on the RXD pin:
+	&pinctrl {
+		pinsuart0: pinsuart0 {
+			renesas,rzn1-pinmux-ids = <
+				RZN1_MUX(103, UART0_I)	/* UART0_TXD */
+				RZN1_MUX_PUP(104, UART0_I)	/* UART0_RXD */
+			>;
+		};
+	};
+  There are many alternative macros to set the pull up/down/none and the drive
+  strength in the rzn1-pinctrl.h header file.
+
+Example #3:
+  The SoC has two configurable MDIO muxes, these can also be configured
+  with this interface using the 'special' MDIO constants:
+
+	&pinctrl {
+		mdio_mux: mdiomux {
+			renesas,rzn1-pinmux-ids = <
+				RZN1_MUX(RZN1_MDIO_BUS0, RZN1_FUNC_MDIO_MUX_MAC0)
+				RZN1_MUX(RZN1_MDIO_BUS1, RZN1_FUNC_MDIO_MUX_SWITCH)
+			>;
+		};
+	};
+  Clearly the pull up/down/none and drive constants will be ignored, even if
+  specified.
