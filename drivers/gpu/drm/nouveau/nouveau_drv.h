@@ -244,18 +244,28 @@ void nouveau_drm_device_remove(struct drm_device *dev);
 	struct nouveau_cli *_cli = (c);                                        \
 	dev_##l(_cli->drm->dev->dev, "%s: "f, _cli->name, ##a);                \
 } while(0)
-#define NV_FATAL(drm,f,a...) NV_PRINTK(crit, &(drm)->client, f, ##a)
-#define NV_ERROR(drm,f,a...) NV_PRINTK(err, &(drm)->client, f, ##a)
-#define NV_WARN(drm,f,a...) NV_PRINTK(warn, &(drm)->client, f, ##a)
-#define NV_INFO(drm,f,a...) NV_PRINTK(info, &(drm)->client, f, ##a)
-#define NV_DEBUG(drm,f,a...) do {                                              \
-	if (unlikely(drm_debug & DRM_UT_DRIVER))                               \
-		NV_PRINTK(info, &(drm)->client, f, ##a);                       \
-} while(0)
-#define NV_ATOMIC(drm,f,a...) do {                                             \
-	if (unlikely(drm_debug & DRM_UT_ATOMIC))                               \
-		NV_PRINTK(info, &(drm)->client, f, ##a);                       \
-} while(0)
+
+__printf(2, 3)
+void nouveau_cli_printk(struct nouveau_cli *cli, const char *fmt, ...);
+
+#define NV_FATAL(drm, fmt, ...)						\
+	nouveau_cli_printk(&(drm)->client, KERN_CRIT fmt, ##__VA_ARGS__)
+#define NV_ERROR(drm, fmt, ...)						\
+	nouveau_cli_printk(&(drm)->client, KERN_ERR fmt, ##__VA_ARGS__)
+#define NV_WARN(drm, fmt, ...)						\
+	nouveau_cli_printk(&(drm)->client, KERN_WARNING fmt, ##__VA_ARGS__)
+#define NV_INFO(drm, fmt, ...)						\
+	nouveau_cli_printk(&(drm)->client, KERN_INFO fmt, ##__VA_ARGS__)
+#define NV_DEBUG(drm, fmt, ...)						\
+do {									\
+	if (unlikely(drm_debug & DRM_UT_DRIVER))			\
+		NV_INFO(drm, fmt, ##__VA_ARGS__);			\
+} while (0)
+#define NV_ATOMIC(drm, fmt, ...)					\
+do {									\
+	if (unlikely(drm_debug & DRM_UT_ATOMIC))			\
+		NV_INFO(drm, fmt, ##__VA_ARGS__);			\
+} while (0)
 
 extern int nouveau_modeset;
 

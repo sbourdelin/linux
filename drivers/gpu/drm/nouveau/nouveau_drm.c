@@ -1153,6 +1153,27 @@ err_free:
 	return ERR_PTR(err);
 }
 
+void nouveau_cli_printk(struct nouveau_cli *cli, const char *fmt, ...)
+{
+	struct va_format vaf;
+	va_list args;
+	char level[2] = {KERN_SOH_ASCII, 0};
+
+	level[1] = printk_get_level(fmt);
+	if (level[1] == 0)
+		level[1] = 'd';
+
+	va_start(args, fmt);
+
+	vaf.fmt = printk_skip_headers(fmt);
+	vaf.va = &args;
+
+	dev_printk(level, cli->drm->dev->dev, "%s: %pV",
+		   cli->name, &vaf);
+
+	va_end(args);
+}
+
 static int __init
 nouveau_drm_init(void)
 {
