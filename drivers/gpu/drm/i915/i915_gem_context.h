@@ -136,6 +136,8 @@ struct i915_gem_context {
 	 * id for the lifetime of the context.
 	 */
 	unsigned int hw_id;
+	atomic_t pin_hw_id;
+	struct list_head hw_id_link;
 
 	/**
 	 * @user_handle: userspace identifier
@@ -255,6 +257,21 @@ static inline bool i915_gem_context_force_single_submission(const struct i915_ge
 static inline void i915_gem_context_set_force_single_submission(struct i915_gem_context *ctx)
 {
 	__set_bit(CONTEXT_FORCE_SINGLE_SUBMISSION, &ctx->flags);
+}
+
+int __i915_gem_context_pin_hw_id(struct i915_gem_context *ctx);
+static inline int i915_gem_context_pin_hw_id(struct i915_gem_context *ctx)
+{
+	if (atomic_inc_not_zero(&ctx->pin_hw_id))
+		return 0;
+
+	return __i915_gem_context_pin_hw_id(ctx);
+}
+
+static inline void i915_gem_context_unpin_hw_id(struct i915_gem_context *ctx)
+{
+	GEM_BUG_ON(atomic_read(&ctx->pin_hw_id) == 0u);
+	atomic_dec(&ctx->pin_hw_id);
 }
 
 static inline bool i915_gem_context_is_default(const struct i915_gem_context *c)
