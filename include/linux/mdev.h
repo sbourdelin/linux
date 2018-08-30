@@ -15,6 +15,32 @@
 
 struct mdev_device;
 
+enum mdev_domain_type {
+	DOMAIN_TYPE_NO_IOMMU,		/* Don't need any IOMMU support.
+					 * All isolation and protection
+					 * are handled by the parent
+					 * device driver with a device
+					 * specific mechanism.
+					 */
+	DOMAIN_TYPE_ATTACH_PARENT,	/* IOMMU can isolate and protect
+					 * the mdev, and the isolation
+					 * domain should be attaced with
+					 * the parent device.
+					 */
+};
+
+/*
+ * Called by the parent device driver to set the domain type.
+ * By default, the domain type is set to DOMAIN_TYPE_EXTERNAL.
+ */
+int mdev_set_domain_type(struct device *dev, enum mdev_domain_type type);
+
+/* Check the domain type. */
+enum mdev_domain_type mdev_get_domain_type(struct device *dev);
+
+int mdev_set_domain(struct device *dev, void *domain);
+void *mdev_get_domain(struct device *dev);
+
 /**
  * struct mdev_parent_ops - Structure to be registered for each parent device to
  * register the device to mdev module.

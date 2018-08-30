@@ -390,6 +390,42 @@ int mdev_device_remove(struct device *dev, bool force_remove)
 	return 0;
 }
 
+int mdev_set_domain_type(struct device *dev, enum mdev_domain_type type)
+{
+	struct mdev_device *mdev = to_mdev_device(dev);
+
+	mdev->domain_type = type;
+
+	return 0;
+}
+EXPORT_SYMBOL(mdev_set_domain_type);
+
+enum mdev_domain_type mdev_get_domain_type(struct device *dev)
+{
+	struct mdev_device *mdev = to_mdev_device(dev);
+
+	return mdev->domain_type;
+}
+EXPORT_SYMBOL(mdev_get_domain_type);
+
+int mdev_set_domain(struct device *dev, void *domain)
+{
+	struct mdev_device *mdev = to_mdev_device(dev);
+
+	mdev->domain = domain;
+
+	return 0;
+}
+EXPORT_SYMBOL(mdev_set_domain);
+
+void *mdev_get_domain(struct device *dev)
+{
+	struct mdev_device *mdev = to_mdev_device(dev);
+
+	return mdev->domain;
+}
+EXPORT_SYMBOL(mdev_get_domain);
+
 static int __init mdev_init(void)
 {
 	return mdev_bus_register();
