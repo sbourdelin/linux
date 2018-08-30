@@ -1,0 +1,7 @@
+LOGIC Technologies Inc. LTTD800x480 L2RT 7" (800x480 pixels) TFT LCD panel
+
+Required properties:
+- compatible: should be "logictechnologies,lttd800480070-l2rt"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
