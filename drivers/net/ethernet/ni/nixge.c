@@ -16,6 +16,7 @@
 #include <linux/of_irq.h>
 #include <linux/skbuff.h>
 #include <linux/phy.h>
+#include <linux/pci.h>
 #include <linux/mii.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/ethtool.h>
@@ -165,6 +166,7 @@ struct nixge_priv {
 	struct net_device *ndev;
 	struct napi_struct napi;
 	struct device *dev;
+	struct device *sysdev;
 
 	/* Connection to PHY device */
 	struct device_node *phy_node;
@@ -250,7 +252,7 @@ static void nixge_hw_dma_bd_release(struct net_device *ndev)
 		phys_addr = nixge_hw_dma_bd_get_addr(&priv->rx_bd_v[i],
 						     phys);
 
-		dma_unmap_single(ndev->dev.parent, phys_addr,
+		dma_unmap_single(priv->sysdev, phys_addr,
 				 NIXGE_MAX_JUMBO_FRAME_SIZE,
 				 DMA_FROM_DEVICE);
 
@@ -261,16 +263,16 @@ static void nixge_hw_dma_bd_release(struct net_device *ndev)
 	}
 
 	if (priv->rx_bd_v)
-		dma_free_coherent(ndev->dev.parent,
+		dma_free_coherent(priv->sysdev,
 				  sizeof(*priv->rx_bd_v) * RX_BD_NUM,
 				  priv->rx_bd_v,
 				  priv->rx_bd_p);
 
 	if (priv->tx_skb)
-		devm_kfree(ndev->dev.parent, priv->tx_skb);
+		devm_kfree(priv->sysdev, priv->tx_skb);
 
 	if (priv->tx_bd_v)
-		dma_free_coherent(ndev->dev.parent,
+		dma_free_coherent(priv->sysdev,
 				  sizeof(*priv->tx_bd_v) * TX_BD_NUM,
 				  priv->tx_bd_v,
 				  priv->tx_bd_p);
@@ -290,19 +292,19 @@ static int nixge_hw_dma_bd_init(struct net_device *ndev)
 	priv->rx_bd_ci = 0;
 
 	/* Allocate the Tx and Rx buffer descriptors. */
-	priv->tx_bd_v = dma_zalloc_coherent(ndev->dev.parent,
+	priv->tx_bd_v = dma_zalloc_coherent(priv->sysdev,
 					    sizeof(*priv->tx_bd_v) * TX_BD_NUM,
 					    &priv->tx_bd_p, GFP_KERNEL);
 	if (!priv->tx_bd_v)
 		goto out;
 
-	priv->tx_skb = devm_kcalloc(ndev->dev.parent,
+	priv->tx_skb = devm_kcalloc(priv->sysdev,
 				    TX_BD_NUM, sizeof(*priv->tx_skb),
 				    GFP_KERNEL);
 	if (!priv->tx_skb)
 		goto out;
 
-	priv->rx_bd_v = dma_zalloc_coherent(ndev->dev.parent,
+	priv->rx_bd_v = dma_zalloc_coherent(priv->sysdev,
 					    sizeof(*priv->rx_bd_v) * RX_BD_NUM,
 					    &priv->rx_bd_p, GFP_KERNEL);
 	if (!priv->rx_bd_v)
@@ -327,7 +329,7 @@ static int nixge_hw_dma_bd_init(struct net_device *ndev)
 			goto out;
 
 		nixge_hw_dma_bd_set_offset(&priv->rx_bd_v[i], skb);
-		phys = dma_map_single(ndev->dev.parent, skb->data,
+		phys = dma_map_single(priv->sysdev, skb->data,
 				      NIXGE_MAX_JUMBO_FRAME_SIZE,
 				      DMA_FROM_DEVICE);
 
@@ -438,10 +440,10 @@ static void nixge_tx_skb_unmap(struct nixge_priv *priv,
 {
 	if (tx_skb->mapping) {
 		if (tx_skb->mapped_as_page)
-			dma_unmap_page(priv->ndev->dev.parent, tx_skb->mapping,
+			dma_unmap_page(priv->sysdev, tx_skb->mapping,
 				       tx_skb->size, DMA_TO_DEVICE);
 		else
-			dma_unmap_single(priv->ndev->dev.parent,
+			dma_unmap_single(priv->sysdev,
 					 tx_skb->mapping,
 					 tx_skb->size, DMA_TO_DEVICE);
 		tx_skb->mapping = 0;
@@ -519,9 +521,9 @@ static int nixge_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		return NETDEV_TX_OK;
 	}
 
-	cur_phys = dma_map_single(ndev->dev.parent, skb->data,
+	cur_phys = dma_map_single(priv->sysdev, skb->data,
 				  skb_headlen(skb), DMA_TO_DEVICE);
-	if (dma_mapping_error(ndev->dev.parent, cur_phys))
+	if (dma_mapping_error(priv->sysdev, cur_phys))
 		goto drop;
 	nixge_hw_dma_bd_set_phys(cur_p, cur_phys);
 
@@ -539,10 +541,10 @@ static int nixge_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		tx_skb = &priv->tx_skb[priv->tx_bd_tail];
 		frag = &skb_shinfo(skb)->frags[ii];
 
-		cur_phys = skb_frag_dma_map(ndev->dev.parent, frag, 0,
+		cur_phys = skb_frag_dma_map(priv->sysdev, frag, 0,
 					    skb_frag_size(frag),
 					    DMA_TO_DEVICE);
-		if (dma_mapping_error(ndev->dev.parent, cur_phys))
+		if (dma_mapping_error(priv->sysdev, cur_phys))
 			goto frag_err;
 		nixge_hw_dma_bd_set_phys(cur_p, cur_phys);
 
@@ -579,7 +581,7 @@ frag_err:
 		cur_p = &priv->tx_bd_v[priv->tx_bd_tail];
 		cur_p->status = 0;
 	}
-	dma_unmap_single(priv->ndev->dev.parent,
+	dma_unmap_single(priv->sysdev,
 			 tx_skb->mapping,
 			 tx_skb->size, DMA_TO_DEVICE);
 drop:
@@ -611,7 +613,7 @@ static int nixge_recv(struct net_device *ndev, int budget)
 		if (length > NIXGE_MAX_JUMBO_FRAME_SIZE)
 			length = NIXGE_MAX_JUMBO_FRAME_SIZE;
 
-		dma_unmap_single(ndev->dev.parent,
+		dma_unmap_single(priv->sysdev,
 				 nixge_hw_dma_bd_get_addr(cur_p, phys),
 				 NIXGE_MAX_JUMBO_FRAME_SIZE,
 				 DMA_FROM_DEVICE);
@@ -636,10 +638,10 @@ static int nixge_recv(struct net_device *ndev, int budget)
 		if (!new_skb)
 			return packets;
 
-		cur_phys = dma_map_single(ndev->dev.parent, new_skb->data,
+		cur_phys = dma_map_single(priv->sysdev, new_skb->data,
 					  NIXGE_MAX_JUMBO_FRAME_SIZE,
 					  DMA_FROM_DEVICE);
-		if (dma_mapping_error(ndev->dev.parent, cur_phys)) {
+		if (dma_mapping_error(priv->sysdev, cur_phys)) {
 			/* FIXME: bail out and clean up */
 			netdev_err(ndev, "Failed to map ...\n");
 		}
@@ -1303,6 +1305,7 @@ static int nixge_probe(struct platform_device *pdev)
 	struct net_device *ndev;
 	struct resource *dmares;
 	struct device_node *np;
+	struct device *sysdev;
 	const u8 *mac_addr;
 	int err;
 
@@ -1331,9 +1334,20 @@ static int nixge_probe(struct platform_device *pdev)
 		eth_hw_addr_random(ndev);
 	}
 
+	sysdev = &pdev->dev;
+#ifdef CONFIG_PCI
+	/* if this is a subdevice of a PCI device we'll have to
+	 * make sure we'll use parent instead of our own platform
+	 * device to make sure  the DMA API if we use an IOMMU
+	 */
+	if (sysdev->parent && sysdev->parent->bus == &pci_bus_type)
+		sysdev = sysdev->parent;
+#endif
+
 	priv = netdev_priv(ndev);
 	priv->ndev = ndev;
 	priv->dev = &pdev->dev;
+	priv->sysdev = sysdev;
 
 	netif_napi_add(ndev, &priv->napi, nixge_poll, NAPI_POLL_WEIGHT);
 
