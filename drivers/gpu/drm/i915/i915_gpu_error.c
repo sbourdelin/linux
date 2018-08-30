@@ -1765,6 +1765,8 @@ static int capture(void *data)
 
 	error->epoch = capture_find_epoch(error);
 
+	i915_check_and_clear_faults(error->i915);
+
 	return 0;
 }
 
