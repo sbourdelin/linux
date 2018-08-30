@@ -1474,7 +1474,8 @@ void mpt3sas_base_update_missing_delay(struct MPT3SAS_ADAPTER *ioc,
 	u16 device_missing_delay, u8 io_missing_delay);
 
 int mpt3sas_port_enable(struct MPT3SAS_ADAPTER *ioc);
-
+u8 mpt3sas_base_pci_device_is_unplugged(struct MPT3SAS_ADAPTER *ioc);
+u8 mpt3sas_base_pci_device_is_available(struct MPT3SAS_ADAPTER *ioc);
 void
 mpt3sas_wait_for_commands_to_complete(struct MPT3SAS_ADAPTER *ioc);
 

@@ -2846,9 +2846,19 @@ scsih_abort(struct scsi_cmnd *scmd)
 		"attempting task abort! scmd(%p)\n", scmd);
 	_scsih_tm_display_info(ioc, scmd);
 
+	if (mpt3sas_base_pci_device_is_unplugged(ioc) || ioc->remove_host) {
+		sdev_printk(KERN_INFO, scmd->device, "%s scmd(%p)\n",
+		    ((ioc->remove_host) ? ("shost is getting removed!") :
+		    ("pci device been removed!")), scmd);
+		if (st && st->smid)
+			mpt3sas_base_free_smid(ioc, st->smid);
+		scmd->result = DID_NO_CONNECT << 16;
+		r = FAST_IO_FAIL;
+		goto out;
+	}
+
 	sas_device_priv_data = scmd->device->hostdata;
-	if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
-	    ioc->remove_host) {
+	if (!sas_device_priv_data || !sas_device_priv_data->sas_target) {
 		sdev_printk(KERN_INFO, scmd->device,
 			"device been deleted! scmd(%p)\n", scmd);
 		scmd->result = DID_NO_CONNECT << 16;
@@ -2917,6 +2927,15 @@ scsih_dev_reset(struct scsi_cmnd *scmd)
 	sdev_printk(KERN_INFO, scmd->device,
 		"attempting device reset! scmd(%p)\n", scmd);
 	_scsih_tm_display_info(ioc, scmd);
+
+	if (mpt3sas_base_pci_device_is_unplugged(ioc) || ioc->remove_host) {
+		sdev_printk(KERN_INFO, scmd->device, "%s scmd(%p)\n",
+		    ((ioc->remove_host) ? ("shost is getting removed!") :
+		    ("pci device been removed!")), scmd);
+		scmd->result = DID_NO_CONNECT << 16;
+		r = FAST_IO_FAIL;
+		goto out;
+	}
 
 	sas_device_priv_data = scmd->device->hostdata;
 	if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
@@ -2995,9 +3014,17 @@ scsih_target_reset(struct scsi_cmnd *scmd)
 		scmd);
 	_scsih_tm_display_info(ioc, scmd);
 
+	if (mpt3sas_base_pci_device_is_unplugged(ioc) || ioc->remove_host) {
+		sdev_printk(KERN_INFO, scmd->device, "%s scmd(%p)\n",
+		    ((ioc->remove_host) ? ("shost is getting removed!") :
+		    ("pci device been removed!")), scmd);
+		scmd->result = DID_NO_CONNECT << 16;
+		r = FAST_IO_FAIL;
+		goto out;
+	}
+
 	sas_device_priv_data = scmd->device->hostdata;
-	if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
-	    ioc->remove_host) {
+	if (!sas_device_priv_data || !sas_device_priv_data->sas_target) {
 		starget_printk(KERN_INFO, starget, "target been deleted! scmd(%p)\n",
 			scmd);
 		scmd->result = DID_NO_CONNECT << 16;
@@ -4474,7 +4501,9 @@ _scsih_flush_running_cmds(struct MPT3SAS_ADAPTER *ioc)
 		st = scsi_cmd_priv(scmd);
 		mpt3sas_base_clear_st(ioc, st);
 		scsi_dma_unmap(scmd);
-		if (ioc->pci_error_recovery || ioc->remove_host)
+
+		if ((!mpt3sas_base_pci_device_is_available(ioc))
+				|| ioc->remove_host)
 			scmd->result = DID_NO_CONNECT << 16;
 		else
 			scmd->result = DID_RESET << 16;
@@ -9724,6 +9753,9 @@ _scsih_ir_shutdown(struct MPT3SAS_ADAPTER *ioc)
 
 	/* are there any volumes ? */
 	if (list_empty(&ioc->raid_device_list))
+		return;
+
+	if (mpt3sas_base_pci_device_is_unplugged(ioc))
 		return;
 
 	mutex_lock(&ioc->scsih_cmds.mutex);

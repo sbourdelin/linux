@@ -61,7 +61,7 @@
 #include <linux/kthread.h>
 #include <asm/page.h>        /* To get host page size per arch */
 #include <linux/aer.h>
-
+#include <../drivers/pci/pci.h>
 
 #include "mpt3sas_base.h"
 
@@ -540,6 +540,44 @@ static int mpt3sas_remove_dead_ioc_func(void *arg)
 		return -1;
 	pci_stop_and_remove_bus_device_locked(pdev);
 	return 0;
+}
+
+/**
+ * mpt3sas_base_pci_device_is_unplugged - Check whether HBA device is
+ *				 hot unplugged or not
+ * @ioc: per adapter object
+ *
+ * Return 1 if the HBA device is hot unplugged else return 0.
+ */
+u8
+mpt3sas_base_pci_device_is_unplugged(struct MPT3SAS_ADAPTER *ioc)
+{
+	struct pci_dev *pdev = ioc->pdev;
+	int devfn = pdev->devfn;
+	u32 l;
+
+	if (pci_bus_read_dev_vendor_id(pdev->bus, devfn, &l, 0))
+		return 0;
+
+	return 1;
+}
+
+/**
+ * mpt3sas_base_pci_device_is_available - check whether pci device is
+ *			available for any transactions with FW
+ *
+ * @ioc: per adapter object
+ *
+ * Return 1 if pci device state is up and running else return 0.
+ */
+u8
+mpt3sas_base_pci_device_is_available(struct MPT3SAS_ADAPTER *ioc)
+{
+	if (ioc->pci_error_recovery ||
+		mpt3sas_base_pci_device_is_unplugged(ioc))
+		return 0;
+
+	return 1;
 }
 
 /**
@@ -6853,6 +6891,14 @@ mpt3sas_wait_for_commands_to_complete(struct MPT3SAS_ADAPTER *ioc)
 
 	ioc->pending_io_count = 0;
 
+	if (!mpt3sas_base_pci_device_is_available(ioc)) {
+		pr_err(MPT3SAS_FMT
+				"%s: pci error recovery reset or"
+				" pci device unplug occurred\n",
+				ioc->name, __func__);
+		return;
+	}
+
 	ioc_state = mpt3sas_base_get_iocstate(ioc, 0);
 	if ((ioc_state & MPI2_IOC_STATE_MASK) != MPI2_IOC_STATE_OPERATIONAL)
 		return;
@@ -6898,6 +6944,19 @@ mpt3sas_base_hard_reset_handler(struct MPT3SAS_ADAPTER *ioc,
 
 	/* wait for an active reset in progress to complete */
 	mutex_lock(&ioc->reset_in_progress_mutex);
+
+	if (!mpt3sas_base_pci_device_is_available(ioc)) {
+		pr_err(MPT3SAS_FMT
+		    "%s: pci error recovery reset or"
+		    " pci device unplug occurred\n",
+		    ioc->name, __func__);
+		if (mpt3sas_base_pci_device_is_unplugged(ioc))
+			ioc->schedule_dead_ioc_flush_running_cmds(ioc);
+		r = 0;
+		goto out_unlocked;
+	}
+
+	mpt3sas_halt_firmware(ioc);
 
 	spin_lock_irqsave(&ioc->ioc_reset_in_progress_lock, flags);
 	ioc->shost_recovery = 1;
