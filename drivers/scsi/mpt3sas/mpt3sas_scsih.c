@@ -9828,9 +9828,11 @@ static void scsih_remove(struct pci_dev *pdev)
 	ioc->remove_host = 1;
 
 	mpt3sas_wait_for_commands_to_complete(ioc);
+	spin_lock_irqsave(&ioc->hba_hot_unplug_lock, flags);
 	_scsih_flush_running_cmds(ioc);
 
 	_scsih_fw_event_cleanup_queue(ioc);
+	spin_unlock_irqrestore(&ioc->hba_hot_unplug_lock, flags);
 
 	spin_lock_irqsave(&ioc->fw_event_lock, flags);
 	wq = ioc->firmware_event_thread;
@@ -10724,6 +10726,7 @@ scsih_suspend(struct pci_dev *pdev, pm_message_t state)
 	pci_power_t device_state;
 
 	mpt3sas_base_stop_watchdog(ioc);
+	mpt3sas_base_stop_hba_unplug_watchdog(ioc);
 	flush_scheduled_work();
 	scsi_block_requests(shost);
 	device_state = pci_choose_state(pdev, state);
@@ -10766,6 +10769,7 @@ scsih_resume(struct pci_dev *pdev)
 	mpt3sas_base_hard_reset_handler(ioc, SOFT_RESET);
 	scsi_unblock_requests(shost);
 	mpt3sas_base_start_watchdog(ioc);
+	mpt3sas_base_start_hba_unplug_watchdog(ioc);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -10796,12 +10800,14 @@ scsih_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 		ioc->pci_error_recovery = 1;
 		scsi_block_requests(ioc->shost);
 		mpt3sas_base_stop_watchdog(ioc);
+		mpt3sas_base_stop_hba_unplug_watchdog(ioc);
 		mpt3sas_base_free_resources(ioc);
 		return PCI_ERS_RESULT_NEED_RESET;
 	case pci_channel_io_perm_failure:
 		/* Permanent error, prepare for device removal */
 		ioc->pci_error_recovery = 1;
 		mpt3sas_base_stop_watchdog(ioc);
+		mpt3sas_base_stop_hba_unplug_watchdog(ioc);
 		_scsih_flush_running_cmds(ioc);
 		return PCI_ERS_RESULT_DISCONNECT;
 	}
@@ -10862,6 +10868,7 @@ scsih_pci_resume(struct pci_dev *pdev)
 
 	pci_cleanup_aer_uncorrect_error_status(pdev);
 	mpt3sas_base_start_watchdog(ioc);
+	mpt3sas_base_start_hba_unplug_watchdog(ioc);
 	scsi_unblock_requests(ioc->shost);
 }
 

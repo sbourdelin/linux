@@ -1140,8 +1140,11 @@ struct MPT3SAS_ADAPTER {
 
 	/* fw fault handler */
 	char		fault_reset_work_q_name[20];
+	char		hba_hot_unplug_work_q_name[20];
 	struct workqueue_struct *fault_reset_work_q;
+	struct workqueue_struct *hba_hot_unplug_work_q;
 	struct delayed_work fault_reset_work;
+	struct delayed_work hba_hot_unplug_work;
 
 	/* fw event handler */
 	char		firmware_event_name[20];
@@ -1158,6 +1161,7 @@ struct MPT3SAS_ADAPTER {
 
 	struct mutex	reset_in_progress_mutex;
 	spinlock_t	ioc_reset_in_progress_lock;
+	spinlock_t	hba_hot_unplug_lock;
 	u8		ioc_link_reset_in_progress;
 
 	u8		ignore_loginfos;
@@ -1482,6 +1486,8 @@ mpt3sas_wait_for_commands_to_complete(struct MPT3SAS_ADAPTER *ioc);
 u8 mpt3sas_base_check_cmd_timeout(struct MPT3SAS_ADAPTER *ioc,
 	u8 status, void *mpi_request, int sz);
 
+void mpt3sas_base_start_hba_unplug_watchdog(struct MPT3SAS_ADAPTER *ioc);
+void mpt3sas_base_stop_hba_unplug_watchdog(struct MPT3SAS_ADAPTER *ioc);
 /* scsih shared API */
 struct scsi_cmnd *mpt3sas_scsih_scsi_lookup_get(struct MPT3SAS_ADAPTER *ioc,
 	u16 smid);

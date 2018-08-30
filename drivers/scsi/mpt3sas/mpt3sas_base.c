@@ -69,6 +69,7 @@ static MPT_CALLBACK	mpt_callbacks[MPT_MAX_CALLBACKS];
 
 
 #define FAULT_POLLING_INTERVAL 1000 /* in milliseconds */
+#define HBA_HOTUNPLUG_POLLING_INTERVAL 1000 /* in milliseconds */
 
  /* maximum controller queue depth */
 #define MAX_HBA_QUEUE_DEPTH	30000
@@ -672,6 +673,46 @@ _base_fault_reset_work(struct work_struct *work)
 	spin_unlock_irqrestore(&ioc->ioc_reset_in_progress_lock, flags);
 }
 
+static void
+_base_hba_hot_unplug_work(struct work_struct *work)
+{
+	struct MPT3SAS_ADAPTER *ioc =
+	    container_of(work, struct MPT3SAS_ADAPTER,
+		hba_hot_unplug_work.work);
+	unsigned long	 flags;
+
+	spin_lock_irqsave(&ioc->hba_hot_unplug_lock, flags);
+	if (ioc->shost_recovery || ioc->pci_error_recovery)
+		goto rearm_timer;
+
+	if (mpt3sas_base_pci_device_is_unplugged(ioc)) {
+		if (ioc->remove_host) {
+			pr_err(MPT3SAS_FMT
+			    "The IOC seems hot unplugged and the driver is "
+			    "waiting for pciehp module to remove the PCIe "
+			    "device instance associated with IOC!!!\n",
+			    ioc->name);
+			goto rearm_timer;
+		}
+
+		/* Set remove_host flag here, since kernel will invoke driver's
+		 * .remove() callback function one after the other for all hot
+		 * un-plugged devices, so it may take some time to call
+		 * .remove() function for subsequent hot un-plugged
+		 * PCI devices.
+		 */
+		ioc->remove_host = 1;
+	}
+
+rearm_timer:
+	if (ioc->hba_hot_unplug_work_q)
+		queue_delayed_work(ioc->hba_hot_unplug_work_q,
+		    &ioc->hba_hot_unplug_work,
+		    msecs_to_jiffies(HBA_HOTUNPLUG_POLLING_INTERVAL));
+	spin_unlock_irqrestore(&ioc->hba_hot_unplug_lock, flags);
+}
+
+
 /**
  * mpt3sas_base_start_watchdog - start the fault_reset_work_q
  * @ioc: per adapter object
@@ -725,6 +766,54 @@ mpt3sas_base_stop_watchdog(struct MPT3SAS_ADAPTER *ioc)
 	spin_unlock_irqrestore(&ioc->ioc_reset_in_progress_lock, flags);
 	if (wq) {
 		if (!cancel_delayed_work_sync(&ioc->fault_reset_work))
+			flush_workqueue(wq);
+		destroy_workqueue(wq);
+	}
+}
+
+void
+mpt3sas_base_start_hba_unplug_watchdog(struct MPT3SAS_ADAPTER *ioc)
+{
+	unsigned long	 flags;
+
+	if (ioc->hba_hot_unplug_work_q)
+		return;
+
+	/* Initialize hba hot unplug polling */
+	INIT_DELAYED_WORK(&ioc->hba_hot_unplug_work,
+	    _base_hba_hot_unplug_work);
+	snprintf(ioc->hba_hot_unplug_work_q_name,
+		sizeof(ioc->hba_hot_unplug_work_q_name), "poll_%s%d_hba_unplug",
+		ioc->driver_name, ioc->id);
+	ioc->hba_hot_unplug_work_q =
+		create_singlethread_workqueue(ioc->hba_hot_unplug_work_q_name);
+	if (!ioc->hba_hot_unplug_work_q) {
+		pr_err(MPT3SAS_FMT "%s: failed (line=%d)\n",
+		    ioc->name, __func__, __LINE__);
+			return;
+	}
+
+	spin_lock_irqsave(&ioc->hba_hot_unplug_lock, flags);
+	if (ioc->hba_hot_unplug_work_q)
+		queue_delayed_work(ioc->hba_hot_unplug_work_q,
+		    &ioc->hba_hot_unplug_work,
+		    msecs_to_jiffies(HBA_HOTUNPLUG_POLLING_INTERVAL));
+	spin_unlock_irqrestore(&ioc->hba_hot_unplug_lock, flags);
+}
+
+void
+mpt3sas_base_stop_hba_unplug_watchdog(struct MPT3SAS_ADAPTER *ioc)
+{
+	unsigned long flags;
+	struct workqueue_struct *wq;
+
+	spin_lock_irqsave(&ioc->hba_hot_unplug_lock, flags);
+	wq = ioc->hba_hot_unplug_work_q;
+	ioc->hba_hot_unplug_work_q = NULL;
+	spin_unlock_irqrestore(&ioc->hba_hot_unplug_lock, flags);
+
+	if (wq) {
+		if (!cancel_delayed_work_sync(&ioc->hba_hot_unplug_work))
 			flush_workqueue(wq);
 		destroy_workqueue(wq);
 	}
@@ -6458,7 +6547,7 @@ _base_make_ioc_operational(struct MPT3SAS_ADAPTER *ioc)
 	}
 
  skip_init_reply_post_host_index:
-
+	mpt3sas_base_start_hba_unplug_watchdog(ioc);
 	_base_unmask_interrupts(ioc);
 
 	if (ioc->hba_mpi_version_belonged != MPI2_VERSION) {
@@ -6789,6 +6878,7 @@ mpt3sas_base_detach(struct MPT3SAS_ADAPTER *ioc)
 	    __func__));
 
 	mpt3sas_base_stop_watchdog(ioc);
+	mpt3sas_base_stop_hba_unplug_watchdog(ioc);
 	mpt3sas_base_free_resources(ioc);
 	_base_release_memory_pools(ioc);
 	mpt3sas_free_enclosure_list(ioc);
