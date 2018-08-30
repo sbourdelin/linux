@@ -9809,6 +9809,35 @@ _scsih_ir_shutdown(struct MPT3SAS_ADAPTER *ioc)
 }
 
 /**
+ * _scsih_get_shost_and_ioc - get shost and ioc
+ *			and verify whether they are NULL or not
+ * @pdev: PCI device struct
+ * @shost: address of scsi host pointer
+ * @ioc: address of HBA adapter pointer
+ *
+ * Return zero if *shost and *ioc are not NULL otherwise return error number.
+ */
+static int
+_scsih_get_shost_and_ioc(struct pci_dev *pdev,
+	struct Scsi_Host **shost, struct MPT3SAS_ADAPTER **ioc)
+{
+	*shost = pci_get_drvdata(pdev);
+	if (*shost == NULL) {
+		dev_err(&pdev->dev, "pdev's driver data is null\n");
+		return -ENXIO;
+	}
+
+	*ioc = shost_priv(*shost);
+	if (*ioc == NULL) {
+		dev_err(&pdev->dev, "shost's private data is null\n");
+		return -ENXIO;
+	}
+
+	return 0;
+}
+
+
+/**
  * scsih_remove - detach and remove add host
  * @pdev: PCI device struct
  *
@@ -9816,8 +9845,8 @@ _scsih_ir_shutdown(struct MPT3SAS_ADAPTER *ioc)
  */
 static void scsih_remove(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 	struct _sas_port *mpt3sas_port, *next_port;
 	struct _raid_device *raid_device, *next;
 	struct MPT3SAS_TARGET *sas_target_priv_data;
@@ -9825,6 +9854,10 @@ static void scsih_remove(struct pci_dev *pdev)
 	struct workqueue_struct	*wq;
 	unsigned long flags;
 
+	if (_scsih_get_shost_and_ioc(pdev, &shost, &ioc)) {
+		dev_err(&pdev->dev, "unable to remove device\n");
+		return;
+	}
 	ioc->remove_host = 1;
 
 	mpt3sas_wait_for_commands_to_complete(ioc);
@@ -9900,10 +9933,15 @@ static void scsih_remove(struct pci_dev *pdev)
 static void
 scsih_shutdown(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 	struct workqueue_struct	*wq;
 	unsigned long flags;
+
+	if (_scsih_get_shost_and_ioc(pdev, &shost, &ioc)) {
+		dev_err(&pdev->dev, "unable to shutdown device\n");
+		return;
+	}
 
 	ioc->remove_host = 1;
 
@@ -10721,10 +10759,16 @@ out_add_shost_fail:
 static int
 scsih_suspend(struct pci_dev *pdev, pm_message_t state)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 	pci_power_t device_state;
+	int rc;
 
+	rc = _scsih_get_shost_and_ioc(pdev, &shost, &ioc);
+	if (rc) {
+		dev_err(&pdev->dev, "unable to suspend device\n");
+		return rc;
+	}
 	mpt3sas_base_stop_watchdog(ioc);
 	mpt3sas_base_stop_hba_unplug_watchdog(ioc);
 	flush_scheduled_work();
@@ -10749,10 +10793,16 @@ scsih_suspend(struct pci_dev *pdev, pm_message_t state)
 static int
 scsih_resume(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 	pci_power_t device_state = pdev->current_state;
 	int r;
+
+	r = _scsih_get_shost_and_ioc(pdev, &shost, &ioc);
+	if (r) {
+		dev_err(&pdev->dev, "unable to resume device\n");
+		return r;
+	}
 
 	pr_info(MPT3SAS_FMT
 		"pdev=0x%p, slot=%s, previous operating state [D%d]\n",
@@ -10786,9 +10836,13 @@ scsih_resume(struct pci_dev *pdev)
 static pci_ers_result_t
 scsih_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 
+	if (_scsih_get_shost_and_ioc(pdev, &shost, &ioc)) {
+		dev_err(&pdev->dev, "device unavailable\n");
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
 	pr_info(MPT3SAS_FMT "PCI error: detected callback, state(%d)!!\n",
 	    ioc->name, state);
 
@@ -10825,10 +10879,14 @@ scsih_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 static pci_ers_result_t
 scsih_pci_slot_reset(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 	int rc;
 
+	if (_scsih_get_shost_and_ioc(pdev, &shost, &ioc)) {
+		dev_err(&pdev->dev, "unable to perform slot reset\n");
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
 	pr_info(MPT3SAS_FMT "PCI error: slot reset callback!!\n",
 	     ioc->name);
 
@@ -10861,9 +10919,13 @@ scsih_pci_slot_reset(struct pci_dev *pdev)
 static void
 scsih_pci_resume(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 
+	if (_scsih_get_shost_and_ioc(pdev, &shost, &ioc)) {
+		dev_err(&pdev->dev, "unable to resume device\n");
+		return;
+	}
 	pr_info(MPT3SAS_FMT "PCI error: resume callback!!\n", ioc->name);
 
 	pci_cleanup_aer_uncorrect_error_status(pdev);
@@ -10879,9 +10941,13 @@ scsih_pci_resume(struct pci_dev *pdev)
 static pci_ers_result_t
 scsih_pci_mmio_enabled(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct MPT3SAS_ADAPTER *ioc = shost_priv(shost);
+	struct Scsi_Host *shost = NULL;
+	struct MPT3SAS_ADAPTER *ioc = NULL;
 
+	if (_scsih_get_shost_and_ioc(pdev, &shost, &ioc)) {
+		dev_err(&pdev->dev, "unable to enable mmio\n");
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
 	pr_info(MPT3SAS_FMT "PCI error: mmio enabled callback!!\n",
 	    ioc->name);
 
