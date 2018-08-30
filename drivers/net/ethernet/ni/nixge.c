@@ -1189,9 +1189,36 @@ static int nixge_mdio_write(struct mii_bus *bus, int phy_id, int reg, u16 val)
 	return err;
 }
 
+static int nixge_of_get_phy(struct nixge_priv *priv, struct device_node *np)
+{
+	priv->phy_mode = of_get_phy_mode(np);
+	if (priv->phy_mode < 0) {
+		dev_err(priv->dev, "not find \"phy-mode\" property\n");
+		return -EINVAL;
+	}
+
+	if (of_phy_is_fixed_link(np)) {
+		if (of_phy_register_fixed_link(np) < 0) {
+			dev_err(priv->dev, "broken fixed link spec\n");
+			return -EINVAL;
+		}
+
+		priv->phy_node = of_node_get(np);
+	} else {
+		priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
+		if (!priv->phy_node) {
+			dev_err(priv->dev, "not find \"phy-handle\" property\n");
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
 static int nixge_mdio_setup(struct nixge_priv *priv, struct device_node *np)
 {
 	struct mii_bus *bus;
+	int err;
 
 	bus = devm_mdiobus_alloc(priv->dev);
 	if (!bus)
@@ -1230,12 +1257,15 @@ static int nixge_probe(struct platform_device *pdev)
 	struct nixge_priv *priv;
 	struct net_device *ndev;
 	struct resource *dmares;
+	struct device_node *np;
 	const u8 *mac_addr;
 	int err;
 
 	ndev = alloc_etherdev(sizeof(*priv));
 	if (!ndev)
 		return -ENOMEM;
+
+	np = pdev->dev.of_node;
 
 	platform_set_drvdata(pdev, ndev);
 	SET_NETDEV_DEV(ndev, &pdev->dev);
@@ -1286,24 +1316,19 @@ static int nixge_probe(struct platform_device *pdev)
 	priv->coalesce_count_rx = XAXIDMA_DFT_RX_THRESHOLD;
 	priv->coalesce_count_tx = XAXIDMA_DFT_TX_THRESHOLD;
 
-	err = nixge_mdio_setup(priv, pdev->dev.of_node);
-	if (err) {
-		netdev_err(ndev, "error registering mdio bus");
-		goto free_netdev;
+	if (np) {
+		err = nixge_of_get_phy(priv, np);
+		if (err)
+			goto free_netdev;
 	}
 
-	priv->phy_mode = of_get_phy_mode(pdev->dev.of_node);
-	if (priv->phy_mode < 0) {
-		netdev_err(ndev, "not find \"phy-mode\" property\n");
-		err = -EINVAL;
-		goto unregister_mdio;
-	}
-
-	priv->phy_node = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
-	if (!priv->phy_node) {
-		netdev_err(ndev, "not find \"phy-handle\" property\n");
-		err = -EINVAL;
-		goto unregister_mdio;
+	/* only if it's not a fixed link, do we care about MDIO at all */
+	if (priv->phy_node && !of_phy_is_fixed_link(np)) {
+		err = nixge_mdio_setup(priv, np);
+		if (err) {
+			dev_err(&pdev->dev, "error registering mdio bus");
+			goto free_phy;
+		}
 	}
 
 	err = register_netdev(priv->ndev);
@@ -1315,8 +1340,13 @@ static int nixge_probe(struct platform_device *pdev)
 	return 0;
 
 unregister_mdio:
-	mdiobus_unregister(priv->mii_bus);
-
+	if (priv->mii_bus)
+		mdiobus_unregister(priv->mii_bus);
+free_phy:
+	if (np && of_phy_is_fixed_link(np)) {
+		of_phy_deregister_fixed_link(np);
+		of_node_put(np);
+	}
 free_netdev:
 	free_netdev(ndev);
 
@@ -1330,7 +1360,11 @@ static int nixge_remove(struct platform_device *pdev)
 
 	unregister_netdev(ndev);
 
-	mdiobus_unregister(priv->mii_bus);
+	if (priv->mii_bus)
+		mdiobus_unregister(priv->mii_bus);
+
+	if (np && of_phy_is_fixed_link(np))
+		of_phy_deregister_fixed_link(np);
 
 	free_netdev(ndev);
 
