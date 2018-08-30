@@ -541,7 +541,7 @@
 
 	sound {
 		compatible = "nvidia,tegra-audio-wm9712-colibri_t20",
-			         "nvidia,tegra-audio-wm9712";
+			     "nvidia,tegra-audio-wm9712";
 		nvidia,model = "Colibri T20 AC97 Audio";
 
 		nvidia,audio-routing =
