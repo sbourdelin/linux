@@ -186,7 +186,7 @@ struct tegra_pmc_soc {
  * @lp0_vec_phys: physical base address of the LP0 warm boot code
  * @lp0_vec_size: size of the LP0 warm boot code
  * @powergates_available: Bitmap of available power gates
- * @powergates_lock: mutex for power gate register access
+ * @powergates_lock: lock for power gate register access
  */
 struct tegra_pmc {
 	struct device *dev;
@@ -215,7 +215,7 @@ struct tegra_pmc {
 	u32 lp0_vec_size;
 	DECLARE_BITMAP(powergates_available, TEGRA_POWERGATE_MAX);
 
-	struct mutex powergates_lock;
+	spinlock_t powergates_lock;
 };
 
 static struct tegra_pmc *pmc = &(struct tegra_pmc) {
@@ -288,10 +288,10 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
 	if (id == TEGRA_POWERGATE_3D && pmc->soc->has_gpu_clamps)
 		return -EINVAL;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 
 	if (tegra_powergate_state(id) == new_state) {
-		mutex_unlock(&pmc->powergates_lock);
+		spin_unlock(&pmc->powergates_lock);
 		return 0;
 	}
 
@@ -300,7 +300,7 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
 	err = readx_poll_timeout(tegra_powergate_state, id, status,
 				 status == new_state, 10, 100000);
 
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 
 	return err;
 }
@@ -309,7 +309,7 @@ static int __tegra_powergate_remove_clamping(unsigned int id)
 {
 	u32 mask;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 
 	/*
 	 * On Tegra124 and later, the clamps for the GPU are controlled by a
@@ -336,7 +336,7 @@ static int __tegra_powergate_remove_clamping(unsigned int id)
 	tegra_pmc_writel(mask, REMOVE_CLAMPING);
 
 out:
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 
 	return 0;
 }
@@ -529,9 +529,9 @@ int tegra_powergate_is_powered(unsigned int id)
 	if (!tegra_powergate_is_valid(id))
 		return -EINVAL;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 	status = tegra_powergate_state(id);
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 
 	return status;
 }
@@ -998,7 +998,7 @@ int tegra_io_pad_power_enable(enum tegra_io_pad id)
 	u32 mask;
 	int err;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 
 	err = tegra_io_pad_prepare(id, &request, &status, &mask);
 	if (err < 0) {
@@ -1017,7 +1017,7 @@ int tegra_io_pad_power_enable(enum tegra_io_pad id)
 	tegra_io_pad_unprepare();
 
 unlock:
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 	return err;
 }
 EXPORT_SYMBOL(tegra_io_pad_power_enable);
@@ -1034,7 +1034,7 @@ int tegra_io_pad_power_disable(enum tegra_io_pad id)
 	u32 mask;
 	int err;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 
 	err = tegra_io_pad_prepare(id, &request, &status, &mask);
 	if (err < 0) {
@@ -1053,7 +1053,7 @@ int tegra_io_pad_power_disable(enum tegra_io_pad id)
 	tegra_io_pad_unprepare();
 
 unlock:
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 	return err;
 }
 EXPORT_SYMBOL(tegra_io_pad_power_disable);
@@ -1071,7 +1071,7 @@ int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 	if (pad->voltage == UINT_MAX)
 		return -ENOTSUPP;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 
 	/* write-enable PMC_PWR_DET_VALUE[pad->voltage] */
 	value = tegra_pmc_readl(PMC_PWR_DET);
@@ -1088,7 +1088,7 @@ int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 
 	tegra_pmc_writel(value, PMC_PWR_DET_VALUE);
 
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 
 	usleep_range(100, 250);
 
@@ -1436,10 +1436,10 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->powergates_lock);
 	iounmap(pmc->base);
 	pmc->base = base;
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->powergates_lock);
 
 	return 0;
 }
@@ -1919,7 +1919,7 @@ static int __init tegra_pmc_early_init(void)
 	struct resource regs;
 	bool invert;
 
-	mutex_init(&pmc->powergates_lock);
+	spin_lock_init(&pmc->powergates_lock);
 
 	np = of_find_matching_node_and_match(NULL, tegra_pmc_match, &match);
 	if (!np) {
