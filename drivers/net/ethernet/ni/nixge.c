@@ -7,6 +7,8 @@
 #include <linux/etherdevice.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <linux/phy_fixed.h>
+#include <linux/platform_data/nixge.h>
 #include <linux/of_address.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
@@ -167,6 +169,7 @@ struct nixge_priv {
 	/* Connection to PHY device */
 	struct device_node *phy_node;
 	phy_interface_t		phy_mode;
+	struct phy_device *phydev;
 
 	int link;
 	unsigned int speed;
@@ -859,15 +862,25 @@ static void nixge_dma_err_handler(unsigned long data)
 static int nixge_open(struct net_device *ndev)
 {
 	struct nixge_priv *priv = netdev_priv(ndev);
-	struct phy_device *phy;
+	struct phy_device *phy = NULL;
 	int ret;
 
 	nixge_device_reset(ndev);
 
-	phy = of_phy_connect(ndev, priv->phy_node,
-			     &nixge_handle_link_change, 0, priv->phy_mode);
-	if (!phy)
-		return -ENODEV;
+	if (priv->dev->of_node) {
+		phy = of_phy_connect(ndev, priv->phy_node,
+				     &nixge_handle_link_change, 0,
+				     priv->phy_mode);
+		if (!phy)
+			return -ENODEV;
+	} else if (priv->phydev) {
+		ret = phy_connect_direct(ndev, priv->phydev,
+					 &nixge_handle_link_change,
+					 priv->phy_mode);
+		if (ret)
+			return ret;
+		phy = priv->phydev;
+	}
 
 	phy_start(phy);
 
@@ -1215,10 +1228,41 @@ static int nixge_of_get_phy(struct nixge_priv *priv, struct device_node *np)
 	return 0;
 }
 
+static int nixge_pdata_get_phy(struct nixge_priv *priv,
+			       struct nixge_platform_data *pdata)
+{
+	struct phy_device *phy = NULL;
+
+	if (!pdata)
+		return -EINVAL;
+
+	if (pdata && pdata->phy_interface == PHY_INTERFACE_MODE_NA) {
+		struct fixed_phy_status fphy_status = {
+			.link = 1,
+			.duplex = pdata->phy_duplex,
+			.speed = pdata->phy_speed,
+			.pause = 0,
+			.asym_pause = 0,
+		};
+
+		/* TODO: Pull out GPIO from pdata */
+		phy = fixed_phy_register(PHY_POLL, &fphy_status, -1,
+					 NULL);
+		if (IS_ERR_OR_NULL(phy)) {
+			dev_err(priv->dev,
+				"failed to register fixed PHY device\n");
+			return -ENODEV;
+		}
+	}
+	priv->phy_mode = pdata->phy_interface;
+	priv->phydev = phy;
+
+	return 0;
+}
+
 static int nixge_mdio_setup(struct nixge_priv *priv, struct device_node *np)
 {
 	struct mii_bus *bus;
-	int err;
 
 	bus = devm_mdiobus_alloc(priv->dev);
 	if (!bus)
@@ -1254,6 +1298,7 @@ static void *nixge_get_nvmem_address(struct device *dev)
 
 static int nixge_probe(struct platform_device *pdev)
 {
+	struct nixge_platform_data *pdata = NULL;
 	struct nixge_priv *priv;
 	struct net_device *ndev;
 	struct resource *dmares;
@@ -1320,10 +1365,16 @@ static int nixge_probe(struct platform_device *pdev)
 		err = nixge_of_get_phy(priv, np);
 		if (err)
 			goto free_netdev;
+	} else {
+		pdata = dev_get_platdata(&pdev->dev);
+		err = nixge_pdata_get_phy(priv, pdata);
+		if (err)
+			goto free_netdev;
 	}
 
 	/* only if it's not a fixed link, do we care about MDIO at all */
-	if (priv->phy_node && !of_phy_is_fixed_link(np)) {
+	if ((priv->phy_node && !of_phy_is_fixed_link(np)) ||
+	    (pdata && pdata->phy_interface != PHY_INTERFACE_MODE_NA)) {
 		err = nixge_mdio_setup(priv, np);
 		if (err) {
 			dev_err(&pdev->dev, "error registering mdio bus");
@@ -1347,6 +1398,9 @@ free_phy:
 		of_phy_deregister_fixed_link(np);
 		of_node_put(np);
 	}
+
+	if (priv->phydev && phy_is_pseudo_fixed_link(priv->phydev))
+		fixed_phy_unregister(priv->phydev);
 free_netdev:
 	free_netdev(ndev);
 
@@ -1357,6 +1411,7 @@ static int nixge_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct nixge_priv *priv = netdev_priv(ndev);
+	struct device_node *np = pdev->dev.of_node;
 
 	unregister_netdev(ndev);
 
@@ -1365,6 +1420,8 @@ static int nixge_remove(struct platform_device *pdev)
 
 	if (np && of_phy_is_fixed_link(np))
 		of_phy_deregister_fixed_link(np);
+	else if (priv->phydev && phy_is_pseudo_fixed_link(priv->phydev))
+		fixed_phy_unregister(priv->phydev);
 
 	free_netdev(ndev);
 
