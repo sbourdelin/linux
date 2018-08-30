@@ -701,6 +701,15 @@ static void pvrdma_netdevice_event_handle(struct pvrdma_dev *dev,
 	switch (event) {
 	case NETDEV_REBOOT:
 	case NETDEV_DOWN:
+		pvrdma_write_reg(dev, PVRDMA_REG_CTL,
+				 PVRDMA_DEVICE_CTL_QUIESCE);
+
+		mb();
+
+		if (pvrdma_read_reg(dev, PVRDMA_REG_ERR))
+			dev_warn(&dev->pdev->dev,
+				 "failed to quiesce device during link down\n");
+
 		pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ERR);
 		break;
 	case NETDEV_UP:
@@ -711,7 +720,7 @@ static void pvrdma_netdevice_event_handle(struct pvrdma_dev *dev,
 
 		if (pvrdma_read_reg(dev, PVRDMA_REG_ERR))
 			dev_err(&dev->pdev->dev,
-				"failed to activate device during link up\n");
+				"failed to unquiesce device during link up\n");
 		else
 			pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ACTIVE);
 		break;
