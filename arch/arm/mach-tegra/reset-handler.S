@@ -69,7 +69,7 @@ ENTRY(tegra_resume)
 
 	mov32	r9, 0xc09
 	cmp	r8, r9
-	bne	end_ca9_scu_l2_resume
+	bne	end_ca9_scu_resume
 #ifdef CONFIG_HAVE_ARM_SCU
 	/* enable SCU */
 	mov32	r0, TEGRA_ARM_PERIF_BASE
@@ -78,11 +78,7 @@ ENTRY(tegra_resume)
 	str	r1, [r0]
 #endif
 
-#ifdef CONFIG_CACHE_L2X0
-	/* L2 cache resume & re-enable */
-	bl	l2c310_early_resume
-#endif
-end_ca9_scu_l2_resume:
+end_ca9_scu_resume:
 	mov32	r9, 0xc0f
 	cmp	r8, r9
 	bleq	tegra_init_l2_for_a15

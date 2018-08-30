@@ -132,8 +132,12 @@ ENTRY(tegra_shut_off_mmu)
 #ifdef CONFIG_CACHE_L2X0
 	/* Disable L2 cache */
 	check_cpu_part_num 0xc09, r9, r10
+	retne	r0
+
 	movweq	r2, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
 	movteq	r2, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
+	ldr	r3, [r2, #L2X0_CTRL]
+	cmp	r3, #1
 	moveq	r3, #0
 	streq	r3, [r2, #L2X0_CTRL]
 #endif
