@@ -158,7 +158,7 @@ Boards:
   compatible = "phytec,am335x-pcm-953", "phytec,am335x-phycore-som", "ti,am33xx"
 
 - AM335X UC-2100: Wireless-enabled palm-sized industrial computing platform
-  compatible = "moxa,uc-2101", "ti,am33xx"
+  compatible = "moxa,uc-2101", "moxa,uc-2102", "ti,am33xx"
 
 - AM335X UC-8100-ME-T: Communication-centric industrial computing platform
   compatible = "moxa,uc-8100-me-t", "ti,am33xx";
