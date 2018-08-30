@@ -604,6 +604,16 @@ drm_fbdev_generic_setup(struct drm_device *dev, unsigned int preferred_bpp)
 
 #endif
 
+/**
+ * drm_fb_helper_remove_conflicting_framebuffers - remove firmware framebuffers
+ * @a: memory range, users of which are to be removed
+ * @name: requesting driver name
+ * @primary: also kick vga16fb if present
+ *
+ * This function removes framebuffer devices (eg. initialized by firmware)
+ * which use memory range described by @a. If @a is NULL all such devices are
+ * removed.
+ */
 static inline int
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 					      const char *name, bool primary)
