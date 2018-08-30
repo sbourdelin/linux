@@ -5540,6 +5540,14 @@ static void intel_iommu_disable_auxd(struct device *dev)
 	spin_unlock_irqrestore(&device_domain_lock, flags);
 }
 
+static int intel_iommu_auxd_id(struct iommu_domain *domain)
+{
+	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
+
+	return dmar_domain->default_pasid > 0 ?
+			dmar_domain->default_pasid : -EINVAL;
+}
+
 const struct iommu_ops intel_iommu_ops = {
 	.capable		= intel_iommu_capable,
 	.domain_alloc		= intel_iommu_domain_alloc,
@@ -5556,6 +5564,7 @@ const struct iommu_ops intel_iommu_ops = {
 	.device_group		= pci_device_group,
 	.enable_auxd		= intel_iommu_enable_auxd,
 	.disable_auxd		= intel_iommu_disable_auxd,
+	.auxd_id		= intel_iommu_auxd_id,
 	.pgsize_bitmap		= INTEL_IOMMU_PGSIZES,
 };
 
