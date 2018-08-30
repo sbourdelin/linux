@@ -299,7 +299,6 @@ _transport_expander_report_manufacture(struct MPT3SAS_ADAPTER *ioc,
 	struct rep_manu_request *manufacture_request;
 	int rc;
 	u16 smid;
-	u32 ioc_state;
 	void *psge;
 	u8 issue_reset = 0;
 	void *data_out = NULL;
@@ -307,7 +306,6 @@ _transport_expander_report_manufacture(struct MPT3SAS_ADAPTER *ioc,
 	dma_addr_t data_in_dma;
 	size_t data_in_sz;
 	size_t data_out_sz;
-	u16 wait_state_count;
 
 	if (ioc->shost_recovery || ioc->pci_error_recovery) {
 		pr_info(MPT3SAS_FMT "%s: host reset in progress!\n",
@@ -325,25 +323,10 @@ _transport_expander_report_manufacture(struct MPT3SAS_ADAPTER *ioc,
 	}
 	ioc->transport_cmds.status = MPT3_CMD_PENDING;
 
-	wait_state_count = 0;
-	ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-	while (ioc_state != MPI2_IOC_STATE_OPERATIONAL) {
-		if (wait_state_count++ == 10) {
-			pr_err(MPT3SAS_FMT
-			    "%s: failed due to ioc not operational\n",
-			    ioc->name, __func__);
-			rc = -EFAULT;
-			goto out;
-		}
-		ssleep(1);
-		ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-		pr_info(MPT3SAS_FMT
-			"%s: waiting for operational state(count=%d)\n",
-			ioc->name, __func__, wait_state_count);
-	}
-	if (wait_state_count)
-		pr_info(MPT3SAS_FMT "%s: ioc is operational\n",
-		    ioc->name, __func__);
+	rc = mpt3sas_wait_for_ioc_to_operational(ioc,
+					IOC_OPERATIONAL_WAIT_COUNT);
+	if (rc)
+		goto out;
 
 	smid = mpt3sas_base_get_smid(ioc, ioc->transport_cb_idx);
 	if (!smid) {
@@ -1089,13 +1072,11 @@ _transport_get_expander_phy_error_log(struct MPT3SAS_ADAPTER *ioc,
 	struct phy_error_log_reply *phy_error_log_reply;
 	int rc;
 	u16 smid;
-	u32 ioc_state;
 	void *psge;
 	u8 issue_reset = 0;
 	void *data_out = NULL;
 	dma_addr_t data_out_dma;
 	u32 sz;
-	u16 wait_state_count;
 
 	if (ioc->shost_recovery || ioc->pci_error_recovery) {
 		pr_info(MPT3SAS_FMT "%s: host reset in progress!\n",
@@ -1113,25 +1094,10 @@ _transport_get_expander_phy_error_log(struct MPT3SAS_ADAPTER *ioc,
 	}
 	ioc->transport_cmds.status = MPT3_CMD_PENDING;
 
-	wait_state_count = 0;
-	ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-	while (ioc_state != MPI2_IOC_STATE_OPERATIONAL) {
-		if (wait_state_count++ == 10) {
-			pr_err(MPT3SAS_FMT
-			    "%s: failed due to ioc not operational\n",
-			    ioc->name, __func__);
-			rc = -EFAULT;
-			goto out;
-		}
-		ssleep(1);
-		ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-		pr_info(MPT3SAS_FMT
-			"%s: waiting for operational state(count=%d)\n",
-			ioc->name, __func__, wait_state_count);
-	}
-	if (wait_state_count)
-		pr_info(MPT3SAS_FMT "%s: ioc is operational\n",
-		    ioc->name, __func__);
+	rc = mpt3sas_wait_for_ioc_to_operational(ioc,
+					IOC_OPERATIONAL_WAIT_COUNT);
+	if (rc)
+		goto out;
 
 	smid = mpt3sas_base_get_smid(ioc, ioc->transport_cb_idx);
 	if (!smid) {
@@ -1402,13 +1368,11 @@ _transport_expander_phy_control(struct MPT3SAS_ADAPTER *ioc,
 	struct phy_control_reply *phy_control_reply;
 	int rc;
 	u16 smid;
-	u32 ioc_state;
 	void *psge;
 	u8 issue_reset = 0;
 	void *data_out = NULL;
 	dma_addr_t data_out_dma;
 	u32 sz;
-	u16 wait_state_count;
 
 	if (ioc->shost_recovery || ioc->pci_error_recovery) {
 		pr_info(MPT3SAS_FMT "%s: host reset in progress!\n",
@@ -1426,25 +1390,10 @@ _transport_expander_phy_control(struct MPT3SAS_ADAPTER *ioc,
 	}
 	ioc->transport_cmds.status = MPT3_CMD_PENDING;
 
-	wait_state_count = 0;
-	ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-	while (ioc_state != MPI2_IOC_STATE_OPERATIONAL) {
-		if (wait_state_count++ == 10) {
-			pr_err(MPT3SAS_FMT
-			    "%s: failed due to ioc not operational\n",
-			    ioc->name, __func__);
-			rc = -EFAULT;
-			goto out;
-		}
-		ssleep(1);
-		ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-		pr_info(MPT3SAS_FMT
-			"%s: waiting for operational state(count=%d)\n",
-			ioc->name, __func__, wait_state_count);
-	}
-	if (wait_state_count)
-		pr_info(MPT3SAS_FMT "%s: ioc is operational\n",
-		    ioc->name, __func__);
+	rc = mpt3sas_wait_for_ioc_to_operational(ioc,
+					IOC_OPERATIONAL_WAIT_COUNT);
+	if (rc)
+		goto out;
 
 	smid = mpt3sas_base_get_smid(ioc, ioc->transport_cb_idx);
 	if (!smid) {

@@ -5289,6 +5289,53 @@ _base_send_ioc_reset(struct MPT3SAS_ADAPTER *ioc, u8 reset_type, int timeout)
 }
 
 /**
+ * mpt3sas_wait_for_ioc_to_operational - IOC's operational
+ *		state and HBA hot unplug status are checked here.
+ * @ioc: per adapter object
+ * @wait_count: timeout in seconds
+ *
+ * Return:  Returns EFAULT, if HBA is hot unplugged or IOC is
+ * not in operational state, within the wait_count.
+ * And returns 0, If not hot unplugged Or ioc is in
+ * operational state.
+ */
+
+int
+mpt3sas_wait_for_ioc_to_operational(struct MPT3SAS_ADAPTER *ioc,
+	int wait_count)
+{
+	int wait_state_count = 0;
+	u32 ioc_state;
+
+	if (mpt3sas_base_pci_device_is_unplugged(ioc))
+		return -EFAULT;
+
+	ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
+	while (ioc_state != MPI2_IOC_STATE_OPERATIONAL) {
+
+		if (mpt3sas_base_pci_device_is_unplugged(ioc))
+			return -EFAULT;
+
+		if (wait_state_count++ == wait_count) {
+			pr_err(MPT3SAS_FMT
+			    "%s: failed due to ioc not operational\n",
+			    ioc->name, __func__);
+			return -EFAULT;
+		}
+		ssleep(1);
+		ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
+		pr_info(MPT3SAS_FMT "%s: waiting for "
+		    "operational state(count=%d)\n", ioc->name,
+		    __func__, wait_state_count);
+	}
+	if (wait_state_count)
+		pr_info(MPT3SAS_FMT "%s: ioc is operational\n",
+		    ioc->name, __func__);
+
+	return 0;
+}
+
+/**
  * _base_handshake_req_reply_wait - send request thru doorbell interface
  * @ioc: per adapter object
  * @request_bytes: request length
@@ -5429,11 +5476,9 @@ mpt3sas_base_sas_iounit_control(struct MPT3SAS_ADAPTER *ioc,
 	Mpi2SasIoUnitControlRequest_t *mpi_request)
 {
 	u16 smid;
-	u32 ioc_state;
 	u8 issue_reset = 0;
 	int rc;
 	void *request;
-	u16 wait_state_count;
 
 	dinitprintk(ioc, pr_info(MPT3SAS_FMT "%s\n", ioc->name,
 	    __func__));
@@ -5447,22 +5492,10 @@ mpt3sas_base_sas_iounit_control(struct MPT3SAS_ADAPTER *ioc,
 		goto out;
 	}
 
-	wait_state_count = 0;
-	ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-	while (ioc_state != MPI2_IOC_STATE_OPERATIONAL) {
-		if (wait_state_count++ == 10) {
-			pr_err(MPT3SAS_FMT
-			    "%s: failed due to ioc not operational\n",
-			    ioc->name, __func__);
-			rc = -EFAULT;
-			goto out;
-		}
-		ssleep(1);
-		ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-		pr_info(MPT3SAS_FMT
-			"%s: waiting for operational state(count=%d)\n",
-			ioc->name, __func__, wait_state_count);
-	}
+	rc = mpt3sas_wait_for_ioc_to_operational(ioc,
+					IOC_OPERATIONAL_WAIT_COUNT);
+	if (rc)
+		goto out;
 
 	smid = mpt3sas_base_get_smid(ioc, ioc->base_cb_idx);
 	if (!smid) {
@@ -5529,11 +5562,9 @@ mpt3sas_base_scsi_enclosure_processor(struct MPT3SAS_ADAPTER *ioc,
 	Mpi2SepReply_t *mpi_reply, Mpi2SepRequest_t *mpi_request)
 {
 	u16 smid;
-	u32 ioc_state;
 	u8 issue_reset = 0;
 	int rc;
 	void *request;
-	u16 wait_state_count;
 
 	dinitprintk(ioc, pr_info(MPT3SAS_FMT "%s\n", ioc->name,
 	    __func__));
@@ -5547,23 +5578,10 @@ mpt3sas_base_scsi_enclosure_processor(struct MPT3SAS_ADAPTER *ioc,
 		goto out;
 	}
 
-	wait_state_count = 0;
-	ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-	while (ioc_state != MPI2_IOC_STATE_OPERATIONAL) {
-		if (wait_state_count++ == 10) {
-			pr_err(MPT3SAS_FMT
-			    "%s: failed due to ioc not operational\n",
-			    ioc->name, __func__);
-			rc = -EFAULT;
-			goto out;
-		}
-		ssleep(1);
-		ioc_state = mpt3sas_base_get_iocstate(ioc, 1);
-		pr_info(MPT3SAS_FMT
-			"%s: waiting for operational state(count=%d)\n",
-			ioc->name,
-		    __func__, wait_state_count);
-	}
+	rc = mpt3sas_wait_for_ioc_to_operational(ioc,
+					IOC_OPERATIONAL_WAIT_COUNT);
+	if (rc)
+		goto out;
 
 	smid = mpt3sas_base_get_smid(ioc, ioc->base_cb_idx);
 	if (!smid) {
