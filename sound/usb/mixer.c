@@ -3474,9 +3474,15 @@ int snd_usb_create_mixer(struct snd_usb_audio *chip, int ctrlif,
 	if (err < 0)
 		goto _error;
 
-	err = create_keep_iface_ctl(mixer);
-	if (err < 0)
-		goto _error;
+	/* For known cards, make the keep_iface quirk static
+	 * otherwiese, add a mixer control */
+	if(snd_usb_mixer_keep_iface_static_quirk(mixer)) {
+		mixer->chip->keep_iface = true;
+	} else {
+		err = create_keep_iface_ctl(mixer);
+		if (err < 0)
+			goto _error;
+	}
 
 	snd_usb_mixer_apply_create_quirk(mixer);
 

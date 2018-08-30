@@ -2000,3 +2000,13 @@ void snd_usb_mixer_fu_apply_quirk(struct usb_mixer_interface *mixer,
 	}
 }
 
+bool snd_usb_mixer_keep_iface_static_quirk(struct usb_mixer_interface *mixer)
+{
+	switch (mixer->chip->usb_id) {
+	case USB_ID(0x170b, 0x0015): /* Phonic Helix Board 12 Universal */
+	case USB_ID(0x1397, 0x0003): /* Behringer FCA 610 */
+		return true;
+	}
+
+	return false;
+}
