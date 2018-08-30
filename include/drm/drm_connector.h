@@ -460,6 +460,12 @@ struct drm_connector_state {
 	 * drm_writeback_signal_completion()
 	 */
 	struct drm_writeback_job *writeback_job;
+
+	/**
+	 * @max_bpc: Connector property to limit the maximum bit depth of
+	 * the pixels.
+	 */
+	unsigned int max_bpc;
 };
 
 /**
