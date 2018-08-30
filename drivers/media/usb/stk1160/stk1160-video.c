@@ -240,6 +240,9 @@ static void stk1160_process_isoc(struct stk1160 *dev, struct urb *urb)
 		return;
 	}
 
+	dma_sync_single_for_cpu(&urb->dev->dev, urb->transfer_dma,
+		urb->transfer_buffer_length, DMA_FROM_DEVICE);
+
 	for (i = 0; i < urb->number_of_packets; i++) {
 		status = urb->iso_frame_desc[i].status;
 		if (status < 0) {
@@ -379,16 +382,11 @@ void stk1160_free_isoc(struct stk1160 *dev)
 		urb = dev->isoc_ctl.urb[i];
 		if (urb) {
 
-			if (dev->isoc_ctl.transfer_buffer[i]) {
-#ifndef CONFIG_DMA_NONCOHERENT
-				usb_free_coherent(dev->udev,
+			if (dev->isoc_ctl.transfer_buffer[i])
+				usb_free_noncoherent(dev->udev,
 					urb->transfer_buffer_length,
 					dev->isoc_ctl.transfer_buffer[i],
 					urb->transfer_dma);
-#else
-				kfree(dev->isoc_ctl.transfer_buffer[i]);
-#endif
-			}
 			usb_free_urb(urb);
 			dev->isoc_ctl.urb[i] = NULL;
 		}
@@ -461,12 +459,8 @@ int stk1160_alloc_isoc(struct stk1160 *dev)
 			goto free_i_bufs;
 		dev->isoc_ctl.urb[i] = urb;
 
-#ifndef CONFIG_DMA_NONCOHERENT
-		dev->isoc_ctl.transfer_buffer[i] = usb_alloc_coherent(dev->udev,
+		dev->isoc_ctl.transfer_buffer[i] = usb_alloc_noncoherent(dev->udev,
 			sb_size, GFP_KERNEL, &urb->transfer_dma);
-#else
-		dev->isoc_ctl.transfer_buffer[i] = kmalloc(sb_size, GFP_KERNEL);
-#endif
 		if (!dev->isoc_ctl.transfer_buffer[i]) {
 			stk1160_err("cannot alloc %d bytes for tx[%d] buffer\n",
 				sb_size, i);
@@ -490,11 +484,7 @@ int stk1160_alloc_isoc(struct stk1160 *dev)
 		urb->interval = 1;
 		urb->start_frame = 0;
 		urb->number_of_packets = max_packets;
-#ifndef CONFIG_DMA_NONCOHERENT
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-#else
-		urb->transfer_flags = URB_ISO_ASAP;
-#endif
 
 		k = 0;
 		for (j = 0; j < max_packets; j++) {
