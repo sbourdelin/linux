@@ -9,6 +9,7 @@
 
 #define pr_fmt(fmt)	"DMAR: " fmt
 
+#include <linux/bitops.h>
 #include <linux/dmar.h>
 #include <linux/intel-iommu.h>
 #include <linux/iommu.h>
@@ -290,4 +291,249 @@ void intel_pasid_clear_entry(struct device *dev, int pasid)
 		return;
 
 	pasid_clear_entry(pe);
+}
+
+static inline void pasid_set_bits(u64 *ptr, u64 mask, u64 bits)
+{
+	u64 old;
+
+	old = READ_ONCE(*ptr);
+	WRITE_ONCE(*ptr, (old & ~mask) | bits);
+}
+
+/*
+ * Setup the DID(Domain Identifier) field (Bit 64~79) of scalable mode
+ * PASID entry.
+ */
+static inline void
+pasid_set_domain_id(struct pasid_entry *pe, u64 value)
+{
+	pasid_set_bits(&pe->val[1], GENMASK_ULL(15, 0), value);
+}
+
+/*
+ * Setup the SLPTPTR(Second Level Page Table Pointer) field (Bit 12~63)
+ * of a scalable mode PASID entry.
+ */
+static inline void
+pasid_set_address_root(struct pasid_entry *pe, u64 value)
+{
+	pasid_set_bits(&pe->val[0], VTD_PAGE_MASK, value);
+}
+
+/*
+ * Setup the AW(Address Width) field (Bit 2~4) of a scalable mode PASID
+ * entry.
+ */
+static inline void
+pasid_set_address_width(struct pasid_entry *pe, u64 value)
+{
+	pasid_set_bits(&pe->val[0], GENMASK_ULL(4, 2), value << 2);
+}
+
+/*
+ * Setup the PGTT(PASID Granular Translation Type) field (Bit 6~8)
+ * of a scalable mode PASID entry.
+ */
+static inline void
+pasid_set_translation_type(struct pasid_entry *pe, u64 value)
+{
+	pasid_set_bits(&pe->val[0], GENMASK_ULL(8, 6), value << 6);
+}
+
+/*
+ * Enable fault processing by clearing the FPD(Fault Processing
+ * Disable) field (Bit 1) of a scalable mode PASID entry.
+ */
+static inline void pasid_set_fault_enable(struct pasid_entry *pe)
+{
+	pasid_set_bits(&pe->val[0], 1 << 1, 0);
+}
+
+/*
+ * Setup the SRE(Supervisor Request Enable) field (Bit 128) of a
+ * scalable mode PASID entry.
+ */
+static inline void pasid_set_sre(struct pasid_entry *pe)
+{
+	pasid_set_bits(&pe->val[2], 1 << 0, 1);
+}
+
+/*
+ * Setup the P(Present) field (Bit 0) of a scalable mode PASID
+ * entry.
+ */
+static inline void pasid_set_present(struct pasid_entry *pe)
+{
+	pasid_set_bits(&pe->val[0], 1 << 0, 1);
+}
+
+/*
+ * Setup Page Walk Snoop bit (Bit 87) of a scalable mode PASID
+ * entry.
+ */
+static inline void pasid_set_page_snoop(struct pasid_entry *pe, bool value)
+{
+	pasid_set_bits(&pe->val[1], 1 << 23, value);
+}
+
+static void
+pasid_based_pasid_cache_invalidation(struct intel_iommu *iommu,
+				     int did, int pasid)
+{
+	struct qi_desc desc;
+
+	desc.qw0 = QI_PC_DID(did) | QI_PC_PASID_SEL | QI_PC_PASID(pasid);
+	desc.qw1 = 0;
+	desc.qw2 = 0;
+	desc.qw3 = 0;
+
+	qi_submit_sync(&desc, iommu);
+}
+
+static void
+pasid_based_iotlb_cache_invalidation(struct intel_iommu *iommu,
+				     u16 did, u32 pasid)
+{
+	struct qi_desc desc;
+
+	desc.qw0 = QI_EIOTLB_PASID(pasid) | QI_EIOTLB_DID(did) |
+			QI_EIOTLB_GRAN(QI_GRAN_NONG_PASID) | QI_EIOTLB_TYPE;
+	desc.qw1 = 0;
+	desc.qw2 = 0;
+	desc.qw3 = 0;
+
+	qi_submit_sync(&desc, iommu);
+}
+
+static void
+pasid_based_dev_iotlb_cache_invalidation(struct intel_iommu *iommu,
+					 struct device *dev, int pasid)
+{
+	struct device_domain_info *info;
+	u16 sid, qdep, pfsid;
+
+	info = dev->archdata.iommu;
+	if (!info || !info->ats_enabled)
+		return;
+
+	sid = info->bus << 8 | info->devfn;
+	qdep = info->ats_qdep;
+	pfsid = info->pfsid;
+
+	qi_flush_dev_iotlb(iommu, sid, pfsid, qdep, 0, 64 - VTD_PAGE_SHIFT);
+}
+
+static void tear_down_one_pasid_entry(struct intel_iommu *iommu,
+				      struct device *dev, u16 did,
+				      int pasid)
+{
+	struct pasid_entry *pte;
+
+	intel_pasid_clear_entry(dev, pasid);
+
+	if (!ecap_coherent(iommu->ecap)) {
+		pte = intel_pasid_get_entry(dev, pasid);
+		clflush_cache_range(pte, sizeof(*pte));
+	}
+
+	pasid_based_pasid_cache_invalidation(iommu, did, pasid);
+	pasid_based_iotlb_cache_invalidation(iommu, did, pasid);
+
+	/* Device IOTLB doesn't need to be flushed in caching mode. */
+	if (!cap_caching_mode(iommu->cap))
+		pasid_based_dev_iotlb_cache_invalidation(iommu, dev, pasid);
+}
+
+/*
+ * Set up the scalable mode pasid table entry for second only or
+ * passthrough translation type.
+ */
+int intel_pasid_setup_second_level(struct intel_iommu *iommu,
+				   struct dmar_domain *domain,
+				   struct device *dev, int pasid,
+				   bool pass_through)
+{
+	struct pasid_entry *pte;
+	struct dma_pte *pgd;
+	u64 pgd_val;
+	int agaw;
+	u16 did;
+
+	/*
+	 * If hardware advertises no support for second level translation,
+	 * we only allow pass through translation setup.
+	 */
+	if (!(ecap_slts(iommu->ecap) || pass_through)) {
+		pr_err("No first level translation support on %s, only pass-through mode allowed\n",
+		       iommu->name);
+		return -EINVAL;
+	}
+
+	/*
+	 * Skip top levels of page tables for iommu which has less agaw
+	 * than default. Unnecessary for PT mode.
+	 */
+	pgd = domain->pgd;
+	if (!pass_through) {
+		for (agaw = domain->agaw; agaw != iommu->agaw; agaw--) {
+			pgd = phys_to_virt(dma_pte_addr(pgd));
+			if (!dma_pte_present(pgd)) {
+				dev_err(dev, "Invalid domain page table\n");
+				return -EINVAL;
+			}
+		}
+	}
+	pgd_val = pass_through ? 0 : virt_to_phys(pgd);
+	did = pass_through ? FLPT_DEFAULT_DID :
+			domain->iommu_did[iommu->seq_id];
+
+	pte = intel_pasid_get_entry(dev, pasid);
+	if (!pte) {
+		dev_err(dev, "Failed to get pasid entry of PASID %d\n", pasid);
+		return -ENODEV;
+	}
+
+	pasid_clear_entry(pte);
+	pasid_set_domain_id(pte, did);
+
+	if (!pass_through)
+		pasid_set_address_root(pte, pgd_val);
+
+	pasid_set_address_width(pte, iommu->agaw);
+	pasid_set_translation_type(pte, pass_through ? 4 : 2);
+	pasid_set_fault_enable(pte);
+	pasid_set_page_snoop(pte, !!ecap_smpwc(iommu->ecap));
+
+	/*
+	 * Since it is a second level only translation setup, we should
+	 * set SRE bit as well (addresses are expected to be GPAs).
+	 */
+	pasid_set_sre(pte);
+	pasid_set_present(pte);
+
+	if (!ecap_coherent(iommu->ecap))
+		clflush_cache_range(pte, sizeof(*pte));
+
+	if (cap_caching_mode(iommu->cap)) {
+		pasid_based_pasid_cache_invalidation(iommu, did, pasid);
+		pasid_based_iotlb_cache_invalidation(iommu, did, pasid);
+	} else {
+		iommu_flush_write_buffer(iommu);
+	}
+
+	return 0;
+}
+
+/*
+ * Tear down the scalable mode pasid table entry for second only or
+ * passthrough translation type.
+ */
+void intel_pasid_tear_down_second_level(struct intel_iommu *iommu,
+					struct dmar_domain *domain,
+					struct device *dev, int pasid)
+{
+	u16 did = domain->iommu_did[iommu->seq_id];
+
+	tear_down_one_pasid_entry(iommu, dev, did, pasid);
 }
