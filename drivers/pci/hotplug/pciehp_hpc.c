@@ -643,6 +643,15 @@ static irqreturn_t pciehp_ist(int irq, void *dev_id)
 
 	synchronize_hardirq(irq);
 	events = atomic_xchg(&ctrl->pending_events, 0);
+
+	/*
+	 * Ignore link events on the suborinate bus if error handling is
+	 * active, as link down may be expected. We'll continue to handle
+	 * presence detect changes.
+	 */
+	if (pdev->subordinate && pci_bus_offline(pdev->subordinate))
+		events &= ~PCI_EXP_SLTSTA_DLLSC;
+
 	if (!events) {
 		pci_config_pm_runtime_put(pdev);
 		return IRQ_NONE;

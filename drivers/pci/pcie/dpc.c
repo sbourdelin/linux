@@ -92,7 +92,8 @@ static pci_ers_result_t dpc_reset_link(struct pci_dev *pdev)
 
 	pci_write_config_word(pdev, cap + PCI_EXP_DPC_STATUS,
 			      PCI_EXP_DPC_STATUS_TRIGGER);
-
+	if (pdev->subordinate)
+		pdev->subordinate->error_state = pci_channel_io_normal;
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
@@ -204,8 +205,11 @@ static irqreturn_t dpc_irq(int irq, void *context)
 
 	pci_write_config_word(pdev, cap + PCI_EXP_DPC_STATUS,
 			      PCI_EXP_DPC_STATUS_INTERRUPT);
-	if (status & PCI_EXP_DPC_STATUS_TRIGGER)
+	if (status & PCI_EXP_DPC_STATUS_TRIGGER) {
+		if (pdev->subordinate)
+			pdev->subordinate->error_state = pci_channel_io_frozen;
 		return IRQ_WAKE_THREAD;
+	}
 	return IRQ_HANDLED;
 }
 

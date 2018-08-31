@@ -573,8 +573,14 @@ struct pci_bus {
 	struct device		dev;
 	struct bin_attribute	*legacy_io;	/* Legacy I/O for this bus */
 	struct bin_attribute	*legacy_mem;	/* Legacy mem */
+	pci_channel_state_t error_state;	/* Current connectivity state */
 	unsigned int		is_added:1;
 };
+
+static inline int pci_bus_offline(struct pci_bus *bus)
+{
+	return (bus->error_state != pci_channel_io_normal);
+}
 
 #define to_pci_bus(n)	container_of(n, struct pci_bus, dev)
 
