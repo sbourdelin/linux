@@ -163,7 +163,7 @@ struct tx_desc_819x_usb {
 	u8	reserved0:3;
 	u8	cmd_init:1;
 	u8	last_seg:1;
-	u8	FirstSeg:1;
+	u8	first_seg:1;
 	u8	LINIP:1;
 	u8	OWN:1;
 
