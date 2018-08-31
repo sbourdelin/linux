@@ -1421,6 +1421,7 @@ static int aic31xx_i2c_probe(struct i2c_client *i2c,
 	fwnode_property_read_u32(aic31xx->dev->fwnode, "ai31xx-micbias-vg",
 				 &micbias_value);
 	switch (micbias_value) {
+	case MICBIAS_OFF:
 	case MICBIAS_2_0V:
 	case MICBIAS_2_5V:
 	case MICBIAS_AVDDV:
