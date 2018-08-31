@@ -983,10 +983,6 @@ static int ov2680_v4l2_init(struct ov2680_dev *sensor)
 
 	sensor->sd.ctrl_handler = hdl;
 
-	ret = v4l2_async_register_subdev(&sensor->sd);
-	if (ret < 0)
-		goto cleanup_entity;
-
 	return 0;
 
 cleanup_entity:
@@ -1096,6 +1092,10 @@ static int ov2680_probe(struct i2c_client *client)
 	if (ret < 0)
 		goto error_cleanup;
 
+	ret = v4l2_async_register_subdev(&sensor->sd);
+	if (ret < 0)
+		goto error_cleanup;
+
 	dev_info(dev, "ov2680 init correctly\n");
 
 	return 0;
@@ -1104,7 +1104,6 @@ error_cleanup:
 	dev_err(dev, "ov2680 init fail: %d\n", ret);
 
 	media_entity_cleanup(&sensor->sd.entity);
-	v4l2_async_unregister_subdev(&sensor->sd);
 	v4l2_ctrl_handler_free(&sensor->ctrls.handler);
 
 lock_destroy:
