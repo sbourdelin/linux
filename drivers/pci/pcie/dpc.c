@@ -169,7 +169,7 @@ static irqreturn_t dpc_handler(int irq, void *context)
 
 	reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN) >> 1;
 	ext_reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN_EXT) >> 5;
-	dev_warn(dev, "DPC %s detected, remove downstream devices\n",
+	dev_warn(dev, "DPC %s detected\n",
 		 (reason == 0) ? "unmasked uncorrectable error" :
 		 (reason == 1) ? "ERR_NONFATAL" :
 		 (reason == 2) ? "ERR_FATAL" :
