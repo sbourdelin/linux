@@ -1466,7 +1466,14 @@ static int cio2_notifier_complete(struct v4l2_async_notifier *notifier)
 		}
 	}
 
-	return v4l2_device_register_subdev_nodes(&cio2->v4l2_dev);
+	ret = v4l2_device_register_subdev_nodes(&cio2->v4l2_dev);
+	if (ret) {
+		dev_err(&cio2->pci_dev->dev,
+			"failed to register V4L2 subdev nodes (%d)\n", ret);
+		return ret;
+	}
+
+	return media_device_register(&cio2->media_dev);
 }
 
 static const struct v4l2_async_notifier_operations cio2_async_ops = {
@@ -1790,16 +1797,12 @@ static int cio2_pci_probe(struct pci_dev *pci_dev,
 	cio2->media_dev.hw_revision = 0;
 
 	media_device_init(&cio2->media_dev);
-	r = media_device_register(&cio2->media_dev);
-	if (r < 0)
-		goto fail_mutex_destroy;
-
 	cio2->v4l2_dev.mdev = &cio2->media_dev;
 	r = v4l2_device_register(&pci_dev->dev, &cio2->v4l2_dev);
 	if (r) {
 		dev_err(&pci_dev->dev,
 			"failed to register V4L2 device (%d)\n", r);
-		goto fail_media_device_unregister;
+		goto fail_media_device_cleanup;
 	}
 
 	r = cio2_queues_init(cio2);
@@ -1829,10 +1832,8 @@ fail_cio2_queue_exit:
 	cio2_queues_exit(cio2);
 fail_v4l2_device_unregister:
 	v4l2_device_unregister(&cio2->v4l2_dev);
-fail_media_device_unregister:
-	media_device_unregister(&cio2->media_dev);
+fail_media_device_cleanup:
 	media_device_cleanup(&cio2->media_dev);
-fail_mutex_destroy:
 	mutex_destroy(&cio2->lock);
 	cio2_fbpt_exit_dummy(cio2);
 
