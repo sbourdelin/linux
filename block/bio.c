@@ -1747,6 +1747,9 @@ again:
 	if (!bio_integrity_endio(bio))
 		return;
 
+	if (bio->bi_blkg && bio->bi_blkg->parent)
+		blkg_record_latency(bio);
+
 	if (bio->bi_disk)
 		rq_qos_done_bio(bio->bi_disk->queue, bio);
 

@@ -17,6 +17,7 @@
 #include <linux/ioprio.h>
 #include <linux/kdev_t.h>
 #include <linux/module.h>
+#include <linux/sched/loadavg.h>
 #include <linux/sched/signal.h>
 #include <linux/err.h>
 #include <linux/blkdev.h>
@@ -31,6 +32,18 @@
 #include "blk.h"
 
 #define MAX_KEY_LEN 100
+
+/*
+ * This constant is used to fake the fixed-point moving average calculation
+ * just like load average for blkg->lat_avg.  The call to CALC_LOAD folds
+ * (FIXED_1 (2048) - exp_factor) * new_sample into lat_avg.  The sampling
+ * window size is fixed to 1s, so BLKCG_EXP_12s is the corresponding value
+ * to create a 1/exp decay rate every 12s when windows elapse immediately.
+ * Note, windows only elapse with IO activity and idle periods extend the
+ * most recent window.
+ */
+#define BLKG_EXP_12s 1884
+#define BLKG_STAT_WIN_SIZE NSEC_PER_SEC
 
 /*
  * blkcg_pol_mutex protects blkcg_policy[] and policy [de]activation.
@@ -71,6 +84,9 @@ static void blkg_free(struct blkcg_gq *blkg)
 
 	if (!blkg)
 		return;
+
+	if (blkg->rq_stat)
+		free_percpu(blkg->rq_stat);
 
 	for (i = 0; i < BLKCG_MAX_POLS; i++)
 		if (blkg->pd[i])
@@ -120,7 +136,7 @@ static struct blkcg_gq *blkg_alloc(struct blkcg *blkcg, struct request_queue *q,
 				   gfp_t gfp_mask)
 {
 	struct blkcg_gq *blkg;
-	int i;
+	int i, cpu;
 
 	/* alloc and init base part */
 	blkg = kzalloc_node(sizeof(*blkg), gfp_mask, q->node);
@@ -158,6 +174,20 @@ static struct blkcg_gq *blkg_alloc(struct blkcg *blkcg, struct request_queue *q,
 		pd->blkg = blkg;
 		pd->plid = i;
 	}
+
+	/* init rq_stats */
+	blkg->rq_stat = __alloc_percpu_gfp(sizeof(struct blk_rq_stat),
+					   __alignof__(struct blk_rq_stat),
+					   gfp_mask);
+	if (!blkg->rq_stat)
+		goto err_free;
+	for_each_possible_cpu(cpu) {
+		struct blk_rq_stat *s;
+		s = per_cpu_ptr(blkg->rq_stat, cpu);
+		blk_rq_stat_init(s);
+	}
+	blk_rq_stat_init(&blkg->last_rq_stat);
+	atomic64_set(&blkg->win_start, ktime_to_ns(ktime_get()));
 
 	return blkg;
 
@@ -981,7 +1011,7 @@ static int blkcg_print_stat(struct seq_file *sf, void *v)
 		const char *dname;
 		char *buf;
 		struct blkg_rwstat rwstat;
-		u64 rbytes, wbytes, rios, wios, dbytes, dios;
+		u64 rbytes, wbytes, rios, wios, dbytes, dios, avg_lat;
 		size_t size = seq_get_buf(sf, &buf), off = 0;
 		int i;
 		bool has_stats = false;
@@ -1012,14 +1042,16 @@ static int blkcg_print_stat(struct seq_file *sf, void *v)
 		wios = atomic64_read(&rwstat.aux_cnt[BLKG_RWSTAT_WRITE]);
 		dios = atomic64_read(&rwstat.aux_cnt[BLKG_RWSTAT_DISCARD]);
 
+		avg_lat = div64_u64(blkg->lat_avg, NSEC_PER_USEC);
+
 		spin_unlock_irq(blkg->q->queue_lock);
 
 		if (rbytes || wbytes || rios || wios) {
 			has_stats = true;
 			off += scnprintf(buf+off, size-off,
-					 "rbytes=%llu wbytes=%llu rios=%llu wios=%llu dbytes=%llu dios=%llu",
-					 rbytes, wbytes, rios, wios,
-					 dbytes, dios);
+				 "rbytes=%llu wbytes=%llu rios=%llu wios=%llu dbytes=%llu dios=%llu avg_lat=%llu",
+				 rbytes, wbytes, rios, wios, dbytes, dios,
+				 avg_lat);
 		}
 
 		if (!blkcg_debug_stats)
@@ -1637,6 +1669,81 @@ out_unlock:
 	mutex_unlock(&blkcg_pol_register_mutex);
 }
 EXPORT_SYMBOL_GPL(blkcg_policy_unregister);
+
+/*
+ * This aggregates the latency of all bios under this cgroup and then
+ * advances the moving average window.  A window contributes a single
+ * value to the moving average regardless of how many IOs occurred.
+ */
+static void blkg_aggregate_latency(struct blkcg_gq *blkg)
+{
+	struct blk_rq_stat rq_stat;
+	struct blk_rq_stat *last_rq_stat;
+	u64 mean;
+	int cpu;
+
+	blk_rq_stat_init(&rq_stat);
+	preempt_disable();
+	for_each_online_cpu(cpu) {
+		struct blk_rq_stat *s;
+		s = per_cpu_ptr(blkg->rq_stat, cpu);
+		blk_rq_stat_sum(&rq_stat, s);
+	}
+	preempt_enable();
+
+	last_rq_stat = &blkg->last_rq_stat;
+
+	mean = div64_u64(rq_stat.nr_samples * rq_stat.mean -
+			 last_rq_stat->nr_samples * last_rq_stat->mean,
+			 rq_stat.nr_samples - last_rq_stat->nr_samples);
+	CALC_LOAD(blkg->lat_avg, BLKG_EXP_12s, mean);
+	blkg->last_rq_stat = rq_stat;
+}
+
+/**
+ * blkg_record_latency - records the latency of a bio
+ * @bio: bio of interest
+ *
+ * This records the latency of a bio in all nodes up to root, excluding root.
+ */
+void blkg_record_latency(struct bio *bio)
+{
+	u64 now = ktime_to_ns(ktime_get());
+	u64 start = bio_issue_time(&bio->bi_issue);
+	u64 win_start, req_time;
+	struct blkcg_gq *blkg;
+	struct blk_rq_stat *rq_stat;
+	bool issue_as_root = bio_issue_as_root_blkg(bio);
+
+	blkg = bio->bi_blkg;
+	if (!blkg)
+		return;
+
+	/*
+	 * Have to do this so we are truncated to the correct time that our
+	 * issue is truncated to.
+	 */
+	now = __bio_issue_time(now);
+
+	if (now <= start || issue_as_root)
+		return;
+
+	req_time = now - start;
+
+	while (blkg && blkg->parent) {
+		rq_stat = get_cpu_ptr(blkg->rq_stat);
+		blk_rq_stat_add(rq_stat, req_time);
+		put_cpu_ptr(rq_stat);
+
+		win_start = atomic64_read(&blkg->win_start);
+		if (now > win_start && (now - win_start) >= BLKG_STAT_WIN_SIZE)
+			if (atomic64_cmpxchg(&blkg->win_start,
+					     win_start, now) == win_start)
+				blkg_aggregate_latency(blkg);
+
+		blkg = blkg->parent;
+	}
+}
 
 /*
  * Scale the accumulated delay based on how long it has been since we updated

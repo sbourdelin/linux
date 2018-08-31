@@ -1539,9 +1539,9 @@ IO Latency Interface Files
 
 	  avg_lat
 		This is an exponential moving average with a decay rate of 1/exp
-		bound by the sampling interval.  The decay rate interval can be
-		calculated by multiplying the win value in io.stat by the
-		corresponding number of samples based on the win value.
+		every 12 samples, with a sampling rate of 1s.  Only IO activity
+		can elapse a window and idle periods extend the most recent
+		window.
 
 	  win
 		The sampling window size in milliseconds.  This is the minimum
