@@ -23,6 +23,15 @@ Compressed Formats
       - 'JPEG'
       - TBD. See also :ref:`VIDIOC_G_JPEGCOMP <VIDIOC_G_JPEGCOMP>`,
 	:ref:`VIDIOC_S_JPEGCOMP <VIDIOC_G_JPEGCOMP>`.
+    * .. _V4L2-PIX-FMT-JPEG-RAW:
+
+      - ``V4L2_PIX_FMT_JPEG_RAW``
+      - 'Raw JPEG'
+      - Raw JPEG bitstream, containing a compressed payload. This format
+        contains an image scan, i.e. without any metadata or headers.
+        The user is expected to set the needed metadata such as
+        quantization and entropy encoding tables, via ``V4L2_CID_JPEG``
+        controls, see :ref:`jpeg-control-id`.
     * .. _V4L2-PIX-FMT-MPEG:
 
       - ``V4L2_PIX_FMT_MPEG``
