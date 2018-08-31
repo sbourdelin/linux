@@ -159,7 +159,7 @@ struct ftrace_likely_data {
 	 sizeof(t) == sizeof(int) || sizeof(t) == sizeof(long))
 
 #ifndef __attribute_const__
-#define __attribute_const__	__attribute__((__const__))
+#define __attribute_const__	__attribute__((const))
 #endif
 
 #ifndef __noclone
@@ -203,14 +203,14 @@ struct ftrace_likely_data {
 #define __maybe_unused		__attribute__((unused))
 #define __always_unused		__attribute__((unused))
 #define __mode(x)		__attribute__((mode(x)))
-#define __malloc		__attribute__((__malloc__))
-#define __used			__attribute__((__used__))
+#define __malloc		__attribute__((malloc))
+#define __used			__attribute__((used))
 #define __noreturn		__attribute__((noreturn))
 #define __packed		__attribute__((packed))
 #define __weak			__attribute__((weak))
 #define __alias(symbol)		__attribute__((alias(#symbol)))
 #define __cold			__attribute__((cold))
-#define __section(S)		__attribute__((__section__(#S)))
+#define __section(S)		__attribute__((section(#S)))
 
 
 #ifdef CONFIG_ENABLE_MUST_CHECK

@@ -132,7 +132,7 @@
 	} while (0)
 
 /* Mark a function definition as prohibited from being cloned. */
-#define __noclone	__attribute__((__noclone__, __optimize__("no-tracer")))
+#define __noclone	__attribute__((noclone, optimize("no-tracer")))
 
 #if defined(RANDSTRUCT_PLUGIN) && !defined(__CHECKER__)
 #define __randomize_layout __attribute__((randomize_layout))
@@ -165,7 +165,7 @@
  * compiler should see some alignment anyway, when the return value is
  * massaged by 'flags = ptr & 3; ptr &= ~3;').
  */
-#define __assume_aligned(a, ...) __attribute__((__assume_aligned__(a, ## __VA_ARGS__)))
+#define __assume_aligned(a, ...) __attribute__((assume_aligned(a, ## __VA_ARGS__)))
 #endif
 
 /*
