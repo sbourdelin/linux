@@ -5,6 +5,7 @@
  * Copyright (C) 2011 Renesas Solutions Corp.
  * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
  */
+#include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
@@ -336,10 +337,22 @@ static void usbhsc_power_ctrl(struct usbhs_priv *priv, int enable)
 {
 	struct platform_device *pdev = usbhs_priv_to_pdev(priv);
 	struct device *dev = usbhs_priv_to_dev(priv);
+	int ret;
 
 	if (enable) {
 		/* enable PM */
 		pm_runtime_get_sync(dev);
+
+		/* enable clks if exist */
+		if (priv->clks) {
+			ret = clk_bulk_prepare(priv->num_clks, priv->clks);
+			if (!ret) {
+				ret = clk_bulk_enable(priv->num_clks,
+						      priv->clks);
+				if (ret)
+					return;
+			}
+		}
 
 		/* enable platform power */
 		usbhs_platform_call(priv, power_ctrl, pdev, priv->base, enable);
@@ -352,6 +365,12 @@ static void usbhsc_power_ctrl(struct usbhs_priv *priv, int enable)
 
 		/* disable platform power */
 		usbhs_platform_call(priv, power_ctrl, pdev, priv->base, enable);
+
+		/* disable clks if exist */
+		if (priv->clks) {
+			clk_bulk_disable(priv->num_clks, priv->clks);
+			clk_bulk_unprepare(priv->num_clks, priv->clks);
+		}
 
 		/* disable PM */
 		pm_runtime_put_sync(dev);
@@ -534,6 +553,11 @@ static struct renesas_usbhs_platform_info *usbhs_parse_dt(struct device *dev)
 	return info;
 }
 
+static const struct clk_bulk_data usbhs_rcar3_clks[] = {
+	{ .id = "hsusb" },
+	{ .id = "ehci/ohci" },
+};
+
 static int usbhs_probe(struct platform_device *pdev)
 {
 	struct renesas_usbhs_platform_info *info = renesas_usbhs_get_info(pdev);
@@ -620,6 +644,15 @@ static int usbhs_probe(struct platform_device *pdev)
 		break;
 	}
 
+	if (priv->dparam.type == USBHS_TYPE_RCAR_GEN3 ||
+	    priv->dparam.type == USBHS_TYPE_RCAR_GEN3_WITH_PLL) {
+		priv->clks = devm_kmemdup(&pdev->dev, usbhs_rcar3_clks,
+					  sizeof(usbhs_rcar3_clks), GFP_KERNEL);
+		if (!priv->clks)
+			return -ENOMEM;
+		priv->num_clks = ARRAY_SIZE(usbhs_rcar3_clks);
+	}
+
 	/* set driver callback functions for platform */
 	dfunc			= &info->driver_callback;
 	dfunc->notify_hotplug	= usbhsc_drvcllbck_notify_hotplug;
@@ -666,6 +699,12 @@ static int usbhs_probe(struct platform_device *pdev)
 	ret = reset_control_deassert(priv->rsts);
 	if (ret)
 		goto probe_fail_rst;
+
+	if (priv->clks) {
+		ret = clk_bulk_get(&pdev->dev, priv->num_clks, priv->clks);
+		if (ret == -EPROBE_DEFER)
+			goto probe_fail_clks;
+	}
 
 	/*
 	 * deviece reset here because
@@ -720,6 +759,8 @@ static int usbhs_probe(struct platform_device *pdev)
 	return ret;
 
 probe_end_mod_exit:
+	clk_bulk_put(priv->num_clks, priv->clks);
+probe_fail_clks:
 	reset_control_assert(priv->rsts);
 probe_fail_rst:
 	usbhs_mod_remove(priv);
