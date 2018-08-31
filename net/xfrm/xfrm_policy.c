@@ -1096,8 +1096,10 @@ static struct xfrm_policy *xfrm_policy_lookup_bytype(struct net *net, u8 type,
 	int err;
 	struct xfrm_policy *pol, *ret;
 	const xfrm_address_t *daddr, *saddr;
+	static const xfrm_address_t zero_addr = {0};
+
 	struct hlist_head *chain;
-	unsigned int sequence;
+	unsigned int sequence, first_sequence;
 	u32 priority;
 
 	daddr = xfrm_flowi_daddr(fl, family);
@@ -1112,6 +1114,7 @@ static struct xfrm_policy *xfrm_policy_lookup_bytype(struct net *net, u8 type,
 		chain = policy_hash_direct(net, daddr, saddr, family, dir);
 	} while (read_seqcount_retry(&xfrm_policy_hash_generation, sequence));
 
+	first_sequence = sequence;
 	priority = ~0U;
 	ret = NULL;
 	hlist_for_each_entry_rcu(pol, chain, bydst) {
@@ -1129,6 +1132,86 @@ static struct xfrm_policy *xfrm_policy_lookup_bytype(struct net *net, u8 type,
 			break;
 		}
 	}
+
+	/* Do an additional lookup for saddr == 0, since we stored source
+	 * selector with a prefix len of 0 that way in the bydst hash
+	 */
+	do {
+		sequence = read_seqcount_begin(&xfrm_policy_hash_generation);
+		chain = policy_hash_direct(net, daddr, &zero_addr, family, dir);
+	} while (read_seqcount_retry(&xfrm_policy_hash_generation, sequence));
+
+	hlist_for_each_entry_rcu(pol, chain, bydst) {
+		if ((pol->priority >= priority) && ret)
+			break;
+
+		err = xfrm_policy_match(pol, fl, type, family, dir, if_id);
+		if (err) {
+			if (err == -ESRCH)
+				continue;
+			else {
+				ret = ERR_PTR(err);
+				goto fail;
+			}
+		} else {
+			ret = pol;
+			priority = ret->priority;
+			break;
+		}
+	}
+
+	/* Do an additional lookup for daddr == 0, since we stored dest
+	 * selector with a prefix len of 0 that way in the bydst hash
+	 */
+	do {
+		sequence = read_seqcount_begin(&xfrm_policy_hash_generation);
+		chain = policy_hash_direct(net, &zero_addr, saddr, family, dir);
+	} while (read_seqcount_retry(&xfrm_policy_hash_generation, sequence));
+
+	hlist_for_each_entry_rcu(pol, chain, bydst) {
+		if ((pol->priority >= priority) && ret)
+			break;
+
+		err = xfrm_policy_match(pol, fl, type, family, dir, if_id);
+		if (err) {
+			if (err == -ESRCH)
+				continue;
+			else {
+				ret = ERR_PTR(err);
+				goto fail;
+			}
+		} else {
+			ret = pol;
+			priority = ret->priority;
+			break;
+		}
+	}
+
+	/* Do an additional lookup for both saddr and daddr == 0 */
+	do {
+		sequence = read_seqcount_begin(&xfrm_policy_hash_generation);
+		chain = policy_hash_direct(net, &zero_addr, &zero_addr, family, dir);
+	} while (read_seqcount_retry(&xfrm_policy_hash_generation, sequence));
+
+	hlist_for_each_entry_rcu(pol, chain, bydst) {
+		if ((pol->priority >= priority) && ret)
+			break;
+
+		err = xfrm_policy_match(pol, fl, type, family, dir, if_id);
+		if (err) {
+			if (err == -ESRCH)
+				continue;
+			else {
+				ret = ERR_PTR(err);
+				goto fail;
+			}
+		} else {
+			ret = pol;
+			priority = ret->priority;
+			break;
+		}
+	}
+
 	chain = &net->xfrm.policy_inexact[dir];
 	hlist_for_each_entry_rcu(pol, chain, bydst) {
 		if ((pol->priority >= priority) && ret)
@@ -1148,7 +1231,7 @@ static struct xfrm_policy *xfrm_policy_lookup_bytype(struct net *net, u8 type,
 		}
 	}
 
-	if (read_seqcount_retry(&xfrm_policy_hash_generation, sequence))
+	if (read_seqcount_retry(&xfrm_policy_hash_generation, first_sequence))
 		goto retry;
 
 	if (ret && !xfrm_pol_hold_rcu(ret))
