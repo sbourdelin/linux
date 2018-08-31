@@ -537,28 +537,49 @@ static inline struct request_list *blk_get_rl(struct request_queue *q,
 
 	rcu_read_lock();
 
-	blkcg = bio_blkcg(bio);
-	if (!blkcg)
+	blkg = bio->bi_blkg;
+	if (blkg) {
+		blkcg = bio->bi_blkg->blkcg;
+		if (blkcg == &blkcg_root)
+			goto rl_use_root;
+
+		blkg_get(blkg);
+		return &blkg->rl;
+	}
+
+	while (true) {
 		blkcg = css_to_blkcg(blkcg_css());
+		if (blkcg == &blkcg_root)
+			goto rl_use_root;
 
-	/* bypass blkg lookup and use @q->root_rl directly for root */
-	if (blkcg == &blkcg_root)
-		goto root_rl;
+		blkg = blkg_lookup(blkcg, q);
 
-	/*
-	 * Try to use blkg->rl.  blkg lookup may fail under memory pressure
-	 * or if either the blkcg or queue is going away.  Fall back to
-	 * root_rl in such cases.
-	 */
-	blkg = blkg_lookup(blkcg, q);
-	if (unlikely(!blkg))
-		goto root_rl;
+		if (unlikely(!blkg))
+			blkg = __blkg_lookup_create(blkcg, q);
 
-	if (!blkg_try_get(blkg))
-		goto root_rl;
+		if (IS_ERR(blkg)) {
+			if (PTR_ERR(blkg) == -ENODEV) {
+				cpu_relax();
+				continue;
+			} else {
+				goto rl_use_root;
+			}
+		}
+
+		if (blkg_try_get(blkg))
+			break;
+		cpu_relax();
+	}
+
 	rcu_read_unlock();
 	return &blkg->rl;
-root_rl:
+
+	/*
+	 * Each blkg has its own request_list, however, the root blkcg
+	 * uses the request_queue's root_rl.  This is to avoid most
+	 * overhead for the root blkcg.
+	 */
+rl_use_root:
 	rcu_read_unlock();
 	return &q->root_rl;
 }
