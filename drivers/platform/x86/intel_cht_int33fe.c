@@ -181,7 +181,7 @@ static int cht_int33fe_probe(struct i2c_client *client)
 	data->connections[0].id = "typec-switch";
 	data->connections[1].endpoint[0] = "i2c-fusb302";
 	data->connections[1].endpoint[1] = "i2c-pi3usb30532";
-	data->connections[1].id = "typec-mux";
+	data->connections[1].id = "idff01m01";
 
 	/* Only adding connection for role switch if UDC exists */
 	udc = pci_get_class(PCI_CLASS_SERIAL_USB_DEVICE, NULL);
