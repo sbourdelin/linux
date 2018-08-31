@@ -36,6 +36,8 @@ Optional properties:
   - dmas: Must contain a list of references to DMA specifiers.
   - dma-names : named "ch%d", where %d is the channel number ranging from zero
                 to the number of channels (DnFIFOs) minus one.
+  - clock-names: For a "renesas,rcar-gen3-usbhs" compatible device,
+		 "hsusb" and "ehci/ohci" can be set.
 
 Example:
 	usbhs: usb@e6590000 {
