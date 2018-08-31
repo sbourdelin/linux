@@ -202,7 +202,7 @@ static int ad7606_write_raw(struct iio_dev *indio_dev,
 			    long mask)
 {
 	struct ad7606_state *st = iio_priv(indio_dev);
-	int values[3];
+	DECLARE_BITMAP(value_bitmap, 3);
 	int ret, i;
 
 	switch (mask) {
@@ -227,13 +227,10 @@ static int ad7606_write_raw(struct iio_dev *indio_dev,
 		if (ret < 0)
 			return ret;
 
-		values[0] = (ret >> 0) & 1;
-		values[1] = (ret >> 1) & 1;
-		values[2] = (ret >> 2) & 1;
+		*value_bitmap = ret;
 
 		mutex_lock(&st->lock);
-		gpiod_set_array_value(ARRAY_SIZE(values), st->gpio_os->desc,
-				      values);
+		gpiod_set_array_value(3, st->gpio_os->desc, value_bitmap);
 		st->oversampling = val;
 		mutex_unlock(&st->lock);
 

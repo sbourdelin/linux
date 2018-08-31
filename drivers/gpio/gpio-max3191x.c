@@ -315,17 +315,20 @@ static void gpiod_set_array_single_value_cansleep(unsigned int ndescs,
 						  struct gpio_desc **desc,
 						  int value)
 {
-	int i, *values;
+	unsigned long *value_bitmap;
 
-	values = kmalloc_array(ndescs, sizeof(*values), GFP_KERNEL);
-	if (!values)
+	value_bitmap = kmalloc_array(BITS_TO_LONGS(ndescs),
+				     sizeof(*value_bitmap), GFP_KERNEL);
+	if (!value_bitmap)
 		return;
 
-	for (i = 0; i < ndescs; i++)
-		values[i] = value;
+	if (value)
+		bitmap_fill(value_bitmap, ndescs);
+	else
+		bitmap_zero(value_bitmap, ndescs);
 
-	gpiod_set_array_value_cansleep(ndescs, desc, values);
-	kfree(values);
+	gpiod_set_array_value_cansleep(ndescs, desc, value_bitmap);
+	kfree(value_bitmap);
 }
 
 static struct gpio_descs *devm_gpiod_get_array_optional_count(
