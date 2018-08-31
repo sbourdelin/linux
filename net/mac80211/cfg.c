@@ -792,6 +792,40 @@ static int ieee80211_set_probe_resp(struct ieee80211_sub_if_data *sdata,
 	return 0;
 }
 
+static int ieee80211_set_ftm_responder_params(
+				struct ieee80211_sub_if_data *sdata,
+				const u8 *lci, size_t lci_len,
+				const u8 *civic, size_t civic_len)
+{
+	struct cfg80211_ftm_responder_params *new, *old;
+	struct ieee80211_bss_conf *bss_conf;
+
+	if ((!lci || !lci_len) && (!civic || !civic_len))
+		return 1;
+
+	bss_conf = &sdata->vif.bss_conf;
+
+	old = bss_conf->ftmr_params;
+
+	new = kzalloc(sizeof(*new) + lci_len + civic_len, GFP_KERNEL);
+	if (!new)
+		return -ENOMEM;
+
+	if (lci)
+		memcpy(new->lci, lci, lci_len);
+
+	if (civic)
+		memcpy(new->civic, civic, civic_len);
+
+	new->lci_len = lci_len;
+	new->civic_len = civic_len;
+	bss_conf->ftmr_params = new;
+
+	kfree(old);
+
+	return 0;
+}
+
 static int ieee80211_assign_beacon(struct ieee80211_sub_if_data *sdata,
 				   struct cfg80211_beacon_data *params,
 				   const struct ieee80211_csa_settings *csa)
@@ -864,6 +898,20 @@ static int ieee80211_assign_beacon(struct ieee80211_sub_if_data *sdata,
 		return err;
 	if (err == 0)
 		changed |= BSS_CHANGED_AP_PROBE_RESP;
+
+	if (params->ftm_responder) {
+		sdata->vif.bss_conf.ftm_responder = 1;
+		err = ieee80211_set_ftm_responder_params(sdata,
+							 params->lci,
+							 params->lci_len,
+							 params->civic,
+							 params->civic_len);
+
+		if (err < 0)
+			return err;
+
+		changed |= BSS_CHANGED_FTM_RESPONDER;
+	}
 
 	rcu_assign_pointer(sdata->u.ap.beacon, new);
 
@@ -2874,6 +2922,20 @@ cfg80211_beacon_dup(struct cfg80211_beacon_data *beacon)
 		memcpy(pos, beacon->probe_resp, beacon->probe_resp_len);
 		pos += beacon->probe_resp_len;
 	}
+	if (beacon->ftm_responder)
+		new_beacon->ftm_responder = beacon->ftm_responder;
+	if (beacon->lci) {
+		new_beacon->lci_len = beacon->lci_len;
+		new_beacon->lci = pos;
+		memcpy(pos, beacon->lci, beacon->lci_len);
+		pos += beacon->lci_len;
+	}
+	if (beacon->civic) {
+		new_beacon->civic_len = beacon->civic_len;
+		new_beacon->civic = pos;
+		memcpy(pos, beacon->civic, beacon->civic_len);
+		pos += beacon->civic_len;
+	}
 
 	return new_beacon;
 }
@@ -3764,6 +3826,17 @@ out:
 	return ret;
 }
 
+static int
+ieee80211_get_ftm_responder_stats(struct wiphy *wiphy,
+				  struct net_device *dev,
+				  struct cfg80211_ftm_responder_stats *ftm_stats)
+{
+	struct ieee80211_local *local = wiphy_priv(wiphy);
+	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+
+	return drv_get_ftm_responder_stats(local, sdata, ftm_stats);
+}
+
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
 	.del_virtual_intf = ieee80211_del_iface,
@@ -3858,4 +3931,5 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.set_multicast_to_unicast = ieee80211_set_multicast_to_unicast,
 	.tx_control_port = ieee80211_tx_control_port,
 	.get_txq_stats = ieee80211_get_txq_stats,
+	.get_ftm_responder_stats = ieee80211_get_ftm_responder_stats,
 };
