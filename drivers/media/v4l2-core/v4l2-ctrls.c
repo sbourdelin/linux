@@ -999,6 +999,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_JPEG_RESTART_INTERVAL:	return "Restart Interval";
 	case V4L2_CID_JPEG_COMPRESSION_QUALITY:	return "Compression Quality";
 	case V4L2_CID_JPEG_ACTIVE_MARKER:	return "Active Markers";
+	case V4L2_CID_JPEG_QUANTIZATION:	return "JPEG Quantization Tables";
 
 	/* Image source controls */
 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
@@ -1285,6 +1286,9 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		break;
 	case V4L2_CID_DETECT_MD_REGION_GRID:
 		*type = V4L2_CTRL_TYPE_U8;
+		break;
+	case V4L2_CID_JPEG_QUANTIZATION:
+		*type = V4L2_CTRL_TYPE_JPEG_QUANTIZATION;
 		break;
 	case V4L2_CID_DETECT_MD_THRESHOLD_GRID:
 		*type = V4L2_CTRL_TYPE_U16;
@@ -1610,6 +1614,9 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
 			return -ERANGE;
 		if ((len - (u32)ctrl->minimum) % (u32)ctrl->step)
 			return -ERANGE;
+		return 0;
+
+	case V4L2_CTRL_TYPE_JPEG_QUANTIZATION:
 		return 0;
 
 	default:
@@ -2132,6 +2139,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		break;
 	case V4L2_CTRL_TYPE_U32:
 		elem_size = sizeof(u32);
+		break;
+	case V4L2_CTRL_TYPE_JPEG_QUANTIZATION:
+		elem_size = sizeof(struct v4l2_ctrl_jpeg_quantization);
 		break;
 	default:
 		if (type < V4L2_CTRL_COMPOUND_TYPES)

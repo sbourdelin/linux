@@ -3354,7 +3354,30 @@ JPEG Control IDs
     Specify which JPEG markers are included in compressed stream. This
     control is valid only for encoders.
 
+.. _jpeg-quant-tables-control:
 
+``V4L2_CID_JPEG_QUANTIZATION (struct)``
+    Specifies the luma and chroma quantization matrices for encoding
+    or decoding a V4L2_PIX_FMT_JPEG_RAW format buffer. The two matrices
+    must be set in JPEG zigzag order, as per the JPEG specification.
+
+
+.. c:type:: struct v4l2_ctrl_jpeg_quantization
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_ctrl_jpeg_quantization
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``luma_quantization_matrix[64]``
+      - Sets the luma quantization table.
+
+    * - __u8
+      - ``chroma_quantization_matrix[64]``
+      - Sets the chroma quantization table.
 
 .. flat-table::
     :header-rows:  0
