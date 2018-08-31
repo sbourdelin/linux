@@ -2216,6 +2216,7 @@ static void write_blk_ctl(struct nfit_blk *nfit_blk, unsigned int bw,
 {
 	u64 cmd, offset;
 	struct nfit_blk_mmio *mmio = &nfit_blk->mmio[DCR];
+	struct nd_region *nd_region = nfit_blk->nd_region;
 
 	enum {
 		BCW_OFFSET_MASK = (1ULL << 48)-1,
@@ -2234,7 +2235,7 @@ static void write_blk_ctl(struct nfit_blk *nfit_blk, unsigned int bw,
 		offset = to_interleave_offset(offset, mmio);
 
 	writeq(cmd, mmio->addr.base + offset);
-	nvdimm_flush(nfit_blk->nd_region);
+	nd_region->flush(nd_region);
 
 	if (nfit_blk->dimm_flags & NFIT_BLK_DCR_LATCH)
 		readq(mmio->addr.base + offset);
@@ -2245,6 +2246,7 @@ static int acpi_nfit_blk_single_io(struct nfit_blk *nfit_blk,
 		unsigned int lane)
 {
 	struct nfit_blk_mmio *mmio = &nfit_blk->mmio[BDW];
+	struct nd_region *nd_region = nfit_blk->nd_region;
 	unsigned int copied = 0;
 	u64 base_offset;
 	int rc;
@@ -2283,7 +2285,8 @@ static int acpi_nfit_blk_single_io(struct nfit_blk *nfit_blk,
 	}
 
 	if (rw)
-		nvdimm_flush(nfit_blk->nd_region);
+		nd_region->flush(nd_region);
+
 
 	rc = read_blk_stat(nfit_blk, lane) ? -EIO : 0;
 	return rc;
