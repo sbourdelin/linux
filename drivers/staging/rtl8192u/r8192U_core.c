@@ -1557,7 +1557,7 @@ short rtl8192_tx(struct net_device *dev, struct sk_buff *skb)
 	 */
 	/* DWORD 0 */
 	tx_desc->FirstSeg = 1;
-	tx_desc->LastSeg = 1;
+	tx_desc->last_seg = 1;
 	tx_desc->OWN = 1;
 
 	/* DWORD 2 */
