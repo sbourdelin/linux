@@ -332,6 +332,9 @@ struct i915_address_space {
 
 	struct pagestash free_pages;
 
+	/* Global GTT */
+	bool is_ggtt:1;
+
 	/* Some systems require uncached updates of the page directories */
 	bool pt_kmap_wc:1;
 
@@ -365,7 +368,7 @@ struct i915_address_space {
 	I915_SELFTEST_DECLARE(bool scrub_64K);
 };
 
-#define i915_is_ggtt(V) (!(V)->file)
+#define i915_is_ggtt(vm) ((vm)->is_ggtt)
 
 static inline bool
 i915_vm_is_48bit(const struct i915_address_space *vm)
