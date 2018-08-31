@@ -1977,18 +1977,42 @@ int bio_associate_blkg(struct bio *bio, struct blkcg_gq *blkg)
 	return 0;
 }
 
+/**
+ * __bio_associate_blkg_from_css - internal blkg association function
+ *
+ * This in the core association function that all association paths rely on.
+ * This handles -ENOMEM, but propagates -ENODEV to allow for separate retry
+ * scenarios.  This takes a reference on the blkg, which is released upon
+ * freeing of the bio.
+ */
 static int __bio_associate_blkg_from_css(struct bio *bio,
 					 struct cgroup_subsys_state *css)
 {
+	struct request_queue *q = bio->bi_disk->queue;
 	struct blkcg_gq *blkg;
+	int ret;
 
 	rcu_read_lock();
 
-	blkg = blkg_lookup_create(css_to_blkcg(css), bio->bi_disk->queue);
+	if (!css || !css->parent) {
+		blkg = q->root_blkg;
+	} else {
+		blkg = blkg_lookup_create(css_to_blkcg(css), q);
 
+		if (IS_ERR(blkg)) {
+			ret = PTR_ERR(blkg);
+			if (ret != -ENOMEM)
+				blkg = q->root_blkg;
+			else
+				goto afc_out;
+		}
+	}
+
+	ret = bio_associate_blkg(bio, blkg);
+
+afc_out:
 	rcu_read_unlock();
-
-	return bio_associate_blkg(bio, blkg);
+	return ret;
 }
 
 /**
@@ -1997,14 +2021,18 @@ static int __bio_associate_blkg_from_css(struct bio *bio,
  * @css: target css
  *
  * Associate @bio with the blkg found by combining the css's blkg and the
- * request_queue of the @bio.  This takes a reference on the css that will
- * be put upon freeing of @bio.
+ * request_queue of the @bio.  This falls back to the queue's root_blkg if
+ * the association fails with the css.
  */
 int bio_associate_blkg_from_css(struct bio *bio,
 				struct cgroup_subsys_state *css)
 {
-	css_get(css);
-	return __bio_associate_blkg_from_css(bio, css);
+	if (unlikely(bio->bi_blkg))
+		return -EBUSY;
+	/* there is no retry to get another css so fallback to the root_blkg */
+	if (__bio_associate_blkg_from_css(bio, css))
+		bio_associate_blkg(bio, bio->bi_disk->queue->root_blkg);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(bio_associate_blkg_from_css);
 
@@ -2015,22 +2043,35 @@ EXPORT_SYMBOL_GPL(bio_associate_blkg_from_css);
  * @page: the page to lookup the blkcg from
  *
  * Associate @bio with the blkg from @page's owning memcg and the respective
- * request_queue.  This works like every other associate function wrt
- * references.
+ * request_queue.  If cgroup_e_css returns NULL, fall back to the queue's
+ * root_blkg.
  *
  * Note: this must be called after bio has an associated device.
  */
 int bio_associate_blkg_from_page(struct bio *bio, struct page *page)
 {
 	struct cgroup_subsys_state *css;
+	int ret;
 
 	if (unlikely(bio->bi_blkg))
 		return -EBUSY;
 	if (!page->mem_cgroup)
 		return 0;
-	css = cgroup_get_e_css(page->mem_cgroup->css.cgroup, &io_cgrp_subsys);
 
-	return __bio_associate_blkg_from_css(bio, css);
+	rcu_read_lock();
+
+	while (true) {
+		css = cgroup_e_css(page->mem_cgroup->css.cgroup,
+				   &io_cgrp_subsys);
+
+		ret = __bio_associate_blkg_from_css(bio, css);
+		if (ret != -ENODEV)
+			break;
+		cpu_relax();
+	}
+
+	rcu_read_unlock();
+	return ret;
 }
 #endif /* CONFIG_MEMCG */
 
@@ -2040,12 +2081,12 @@ int bio_associate_blkg_from_page(struct bio *bio, struct page *page)
  * @bio: target bio
  *
  * Associate @bio with the blkg found from the bio's css and the request_queue.
- * If one is not found, bio_lookup_blkg creates the blkg.
+ * If one is not found, bio_lookup_blkg creates the blkg.  This falls back to
+ * the queue's root_blkg if association fails.
  */
 int bio_associate_create_blkg(struct request_queue *q, struct bio *bio)
 {
-	struct blkcg *blkcg;
-	struct blkcg_gq *blkg;
+	struct cgroup_subsys_state *css;
 	int ret = 0;
 
 	/* someone has already associated this bio with a blkg */
@@ -2054,19 +2095,19 @@ int bio_associate_create_blkg(struct request_queue *q, struct bio *bio)
 
 	rcu_read_lock();
 
-	blkcg = css_to_blkcg(blkcg_get_css());
+	while (true) {
+		css = blkcg_css();
 
-	if (!blkcg->css.parent) {
-		ret = bio_associate_blkg(bio, q->root_blkg);
-		goto assoc_out;
+		ret = __bio_associate_blkg_from_css(bio, css);
+		if (ret != -ENODEV)
+			break;
+		cpu_relax();
 	}
 
-	blkg = blkg_lookup_create(blkcg, q);
-	if (IS_ERR(blkg))
-		blkg = q->root_blkg;
+	/* explicitly fall back to root */
+	if (unlikely(!bio->bi_blkg))
+		bio_associate_blkg(bio, q->root_blkg);
 
-	ret = bio_associate_blkg(bio, blkg);
-assoc_out:
 	rcu_read_unlock();
 	return ret;
 }
@@ -2082,8 +2123,6 @@ void bio_disassociate_task(struct bio *bio)
 		bio->bi_ioc = NULL;
 	}
 	if (bio->bi_blkg) {
-		/* a ref is always taken on css */
-		css_put(&bio_blkcg(bio)->css);
 		blkg_put(bio->bi_blkg);
 		bio->bi_blkg = NULL;
 	}
