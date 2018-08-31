@@ -166,6 +166,15 @@ out:
 	return 0;
 }
 
+static int report_disconnect(struct pci_dev *dev, void *data)
+{
+	device_lock(&dev->dev);
+	pci_dev_set_disconnected(dev, NULL);
+	pci_uevent_ers(dev, PCI_ERS_RESULT_DISCONNECT);
+	device_unlock(&dev->dev);
+	return 0;
+}
+
 /**
  * default_reset_link - default reset function
  * @dev: pointer to pci_dev data structure
@@ -271,6 +280,34 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
 	return result_data.result;
 }
 
+/**
+ * pcie_disconnect_device - Called when error handling ends with
+ * 			    PCI_ERS_RESULT_DISCONNECT status.
+ *
+ * Reaching here means error handling has irrevocably failed. This function
+ * will ungracefully disconnect all the devices below the bus that has
+ * experienced the unrecoverable error.
+ *
+ * If the link is active after the removing all devices on the bus, this will
+ * attempt to re-enumerate the bus from scratch.
+ */
+static void pcie_disconnect_device(struct pci_dev *dev)
+{
+	struct pci_bus *bus = dev->subordinate;
+	struct pci_dev *child, *tmp;
+
+	broadcast_error_message(dev, PCI_ERS_RESULT_DISCONNECT,
+				"disconnect", report_disconnect);
+	pci_lock_rescan_remove();
+	list_for_each_entry_safe(child, tmp, &bus->devices, bus_list)
+		pci_stop_and_remove_bus_device(child);
+
+	pci_bridge_secondary_bus_reset(dev);
+	if (pcie_wait_for_link(dev, true))
+		pci_rescan_bus(bus);
+	pci_unlock_rescan_remove();
+}
+
 static void pcie_do_recovery(struct pci_dev *dev, enum pci_channel_state state,
 			     u32 service)
 {
@@ -313,12 +350,9 @@ static void pcie_do_recovery(struct pci_dev *dev, enum pci_channel_state state,
 
 	pci_info(dev, "AER: Device recovery successful\n");
 	return;
-
 failed:
-	pci_uevent_ers(dev, PCI_ERS_RESULT_DISCONNECT);
-
-	/* TODO: Should kernel panic here? */
 	pci_info(dev, "AER: Device recovery failed\n");
+	pcie_disconnect_device(dev);
 }
 
 void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
