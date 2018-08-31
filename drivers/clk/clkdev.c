@@ -54,30 +54,29 @@ EXPORT_SYMBOL(of_clk_get);
 
 static struct clk *__of_clk_get_by_name(struct device_node *np,
 					const char *dev_id,
-					const char *name)
+					const char *name,
+					bool optional)
 {
 	struct clk *clk = ERR_PTR(-ENOENT);
+	struct device_node *child = np;
+	int index = 0;
 
 	/* Walk up the tree of devices looking for a clock that matches */
 	while (np) {
-		int index = 0;
 
 		/*
 		 * For named clocks, first look up the name in the
 		 * "clock-names" property.  If it cannot be found, then
-		 * index will be an error code, and of_clk_get() will fail.
+		 * index will be an error code.
 		 */
 		if (name)
 			index = of_property_match_string(np, "clock-names", name);
-		clk = __of_clk_get(np, index, dev_id, name);
-		if (!IS_ERR(clk)) {
-			break;
-		} else if (name && index >= 0) {
-			if (PTR_ERR(clk) != -EPROBE_DEFER)
-				pr_err("ERROR: could not get clock %pOF:%s(%i)\n",
-					np, name ? name : "", index);
+		if (index >= 0)
+			clk = __of_clk_get(np, index, dev_id, name);
+		if (!IS_ERR(clk))
 			return clk;
-		}
+		if (name && index >= 0)
+			break;
 
 		/*
 		 * No matching clock found on this node.  If the parent node
@@ -87,6 +86,16 @@ static struct clk *__of_clk_get_by_name(struct device_node *np,
 		np = np->parent;
 		if (np && !of_get_property(np, "clock-ranges", NULL))
 			break;
+	}
+
+	/* The clock is not valid, but it could be optional or deferred */
+	if (optional && PTR_ERR(clk) == -ENOENT) {
+		clk = NULL;
+		pr_info("no optional clock %pOF:%s\n", child,
+			name ? name : "");
+	} else if (name && index >= 0 && PTR_ERR(clk) != -EPROBE_DEFER) {
+		pr_err("ERROR: could not get clock %pOF:%s(%i)\n",
+			child, name, index);
 	}
 
 	return clk;
@@ -106,15 +115,37 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
 	if (!np)
 		return ERR_PTR(-ENOENT);
 
-	return __of_clk_get_by_name(np, np->full_name, name);
+	return __of_clk_get_by_name(np, np->full_name, name, false);
 }
 EXPORT_SYMBOL(of_clk_get_by_name);
+
+/**
+ * of_clk_get_by_name_optional() - Parse and lookup an optional clock referenced
+ * by a device node
+ * @np: pointer to clock consumer node
+ * @name: name of consumer's clock input, or NULL for the first clock reference
+ *
+ * This function parses the clocks and clock-names properties, and uses them to
+ * look up the struct clk from the registered list of clock providers.
+ * It behaves the same as of_clk_get_by_name(), except when np is NULL or no
+ * clock provider is found, when it then returns NULL.
+ */
+struct clk *of_clk_get_by_name_optional(struct device_node *np,
+					const char *name)
+{
+	if (!np)
+		return NULL;
+
+	return __of_clk_get_by_name(np, np->full_name, name, true);
+}
+EXPORT_SYMBOL(of_clk_get_by_name_optional);
 
 #else /* defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK) */
 
 static struct clk *__of_clk_get_by_name(struct device_node *np,
 					const char *dev_id,
-					const char *name)
+					const char *name,
+					bool optional)
 {
 	return ERR_PTR(-ENOENT);
 }
@@ -197,7 +228,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
 	struct clk *clk;
 
 	if (dev && dev->of_node) {
-		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
+		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id, false);
 		if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
 			return clk;
 	}
