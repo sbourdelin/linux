@@ -279,7 +279,9 @@ static void msdc_tasklet_card(struct work_struct *work)
 		mmc_detect_change(host->mmc, msecs_to_jiffies(20));
 	}
 
-	IRQ_MSG("card found<%s>", inserted ? "inserted" : "removed");
+	dev_err(mmc_dev(host->mmc),
+		"%d -> card found<%s>\n",
+		host->id, inserted ? "inserted" : "removed");
 #endif
 
 	spin_unlock(&host->lock);
@@ -1638,14 +1640,17 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 	if (intsts & MSDC_INT_CDSC) {
 		if (host->mmc->caps & MMC_CAP_NEEDS_POLL)
 			return IRQ_HANDLED;
-		IRQ_MSG("MSDC_INT_CDSC irq<0x%.8x>", intsts);
+		dev_err(mmc_dev(host->mmc),
+			"%d -> MSDC_INT_CDSC irq<0x%.8x>\n", host->id, intsts);
 		schedule_delayed_work(&host->card_delaywork, HZ);
 		/* tuning when plug card ? */
 	}
 
 	/* sdio interrupt */
 	if (intsts & MSDC_INT_SDIOIRQ) {
-		IRQ_MSG("XXX MSDC_INT_SDIOIRQ");  /* seems not sdio irq */
+		dev_err(mmc_dev(host->mmc),
+			"%d -> XXX MSDC_INT_SDIOIRQ\n",
+			host->id); /* seems not sdio irq */
 		//mmc_signal_sdio_irq(host->mmc);
 	}
 
@@ -1663,10 +1668,15 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 			msdc_clr_int();
 
 			if (intsts & MSDC_INT_DATTMO) {
-				IRQ_MSG("XXX CMD<%d> MSDC_INT_DATTMO", host->mrq->cmd->opcode);
+				dev_err(mmc_dev(host->mmc),
+					"%d -> XXX CMD<%d> MSDC_INT_DATTMO\n",
+					host->id, host->mrq->cmd->opcode);
 				data->error = -ETIMEDOUT;
 			} else if (intsts & MSDC_INT_DATCRCERR) {
-				IRQ_MSG("XXX CMD<%d> MSDC_INT_DATCRCERR, SDC_DCRC_STS<0x%x>", host->mrq->cmd->opcode, readl(host->base + SDC_DCRC_STS));
+				dev_err(mmc_dev(host->mmc),
+					"%d -> XXX CMD<%d> MSDC_INT_DATCRCERR, SDC_DCRC_STS<0x%x>\n",
+					host->id, host->mrq->cmd->opcode,
+					readl(host->base + SDC_DCRC_STS);
 				data->error = -EIO;
 			}
 
@@ -1699,15 +1709,23 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 			}
 		} else if ((intsts & MSDC_INT_RSPCRCERR) || (intsts & MSDC_INT_ACMDCRCERR)) {
 			if (intsts & MSDC_INT_ACMDCRCERR)
-				IRQ_MSG("XXX CMD<%d> MSDC_INT_ACMDCRCERR", cmd->opcode);
+				dev_err(mmc_dev(host->mmc),
+					"%d -> XXX CMD<%d> MSDC_INT_ACMDCRCERR\n",
+					host->id, cmd->opcode);
 			else
-				IRQ_MSG("XXX CMD<%d> MSDC_INT_RSPCRCERR", cmd->opcode);
+				dev_err(mmc_dev(host->mmc),
+					"%d -> XXX CMD<%d> MSDC_INT_RSPCRCERR\n",
+					host->id, cmd->opcode);
 			cmd->error = -EIO;
 		} else if ((intsts & MSDC_INT_CMDTMO) || (intsts & MSDC_INT_ACMDTMO)) {
 			if (intsts & MSDC_INT_ACMDTMO)
-				IRQ_MSG("XXX CMD<%d> MSDC_INT_ACMDTMO", cmd->opcode);
+				dev_err(mmc_dev(host->mmc),
+					"%d -> XXX CMD<%d> MSDC_INT_ACMDTMO\n",
+					host->id, cmd->opcode);
 			else
-				IRQ_MSG("XXX CMD<%d> MSDC_INT_CMDTMO", cmd->opcode);
+				dev_err(mmc_dev(host->mmc),
+					"%d -> XXX CMD<%d> MSDC_INT_CMDTMO\n",
+					host->id, cmd->opcode);
 			cmd->error = -ETIMEDOUT;
 			msdc_reset_hw(host);
 			msdc_clr_fifo(host);
