@@ -158,10 +158,6 @@ struct ftrace_likely_data {
 	(sizeof(t) == sizeof(char) || sizeof(t) == sizeof(short) || \
 	 sizeof(t) == sizeof(int) || sizeof(t) == sizeof(long))
 
-#ifndef __attribute_const__
-#define __attribute_const__	__attribute__((const))
-#endif
-
 #ifndef __noclone
 #define __noclone
 #endif
@@ -196,6 +192,7 @@ struct ftrace_likely_data {
  * [...]
  */
 #define __pure			__attribute__((pure))
+#define __const			__attribute__((const))
 #define __aligned(x)		__attribute__((aligned(x)))
 #define __aligned_largest	__attribute__((aligned))
 #define __printf(a, b)		__attribute__((format(printf, a, b)))
@@ -227,17 +224,7 @@ struct ftrace_likely_data {
 
 #define __compiler_offsetof(a, b)	__builtin_offsetof(a, b)
 
-/*
- * Feature detection for gnu_inline (gnu89 extern inline semantics). Either
- * __GNUC_STDC_INLINE__ is defined (not using gnu89 extern inline semantics,
- * and we opt in to the gnu89 semantics), or __GNUC_STDC_INLINE__ is not
- * defined so the gnu89 semantics are the default.
- */
-#ifdef __GNUC_STDC_INLINE__
-# define __gnu_inline	__attribute__((gnu_inline))
-#else
-# define __gnu_inline
-#endif
+#define __gnu_inline	__attribute__((gnu_inline))
 
 /*
  * Force always-inline if the user requests it so via the .config.
@@ -263,9 +250,7 @@ struct ftrace_likely_data {
 #define __inline inline
 #define noinline	__attribute__((noinline))
 
-#ifndef __always_inline
 #define __always_inline inline __attribute__((always_inline))
-#endif
 
 /*
  * Rather then using noinline to prevent stack consumption, use
