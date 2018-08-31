@@ -150,7 +150,7 @@ extern u32 rt_global_debug_component;
 #define RTL819X_DEFAULT_RF_TYPE RF_1T2R
 
 #define IEEE80211_WATCH_DOG_TIME    2000
-#define		PHY_Beacon_RSSI_SLID_WIN_MAX		10
+#define	PHY_BEACON_RSSI_SLID_WIN_MAX		10
 /* For Tx Power Tracking */
 #define		OFDM_Table_Length	19
 #define	CCK_Table_length	12
