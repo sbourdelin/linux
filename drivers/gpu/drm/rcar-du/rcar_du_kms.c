@@ -128,6 +128,38 @@ static const struct rcar_du_format_info rcar_du_format_infos[] = {
 		.fourcc = DRM_FORMAT_YVU444,
 		.bpp = 24,
 		.planes = 3,
+	}, {
+		.fourcc = DRM_FORMAT_RGB332,
+		.bpp = 8,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_ARGB4444,
+		.bpp = 16,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_XRGB4444,
+		.bpp = 16,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_BGR888,
+		.bpp = 24,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_RGB888,
+		.bpp = 24,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_BGRA8888,
+		.bpp = 32,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_BGRX8888,
+		.bpp = 32,
+		.planes = 1,
+	}, {
+		.fourcc = DRM_FORMAT_YVYU,
+		.bpp = 16,
+		.planes = 1,
 	},
 };
 
