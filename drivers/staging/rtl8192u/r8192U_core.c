@@ -1516,7 +1516,7 @@ short rtl8192_tx(struct net_device *dev, struct sk_buff *skb)
 	/* DWORD 0 */
 	tx_desc->LINIP = 0;
 	tx_desc->CmdInit = 1;
-	tx_desc->Offset =  sizeof(struct tx_fwinfo_819x_usb) + 8;
+	tx_desc->offset =  sizeof(struct tx_fwinfo_819x_usb) + 8;
 	tx_desc->pkt_size = (skb->len - TX_PACKET_SHIFT_BYTES) & 0xffff;
 
 	/*DWORD 1*/

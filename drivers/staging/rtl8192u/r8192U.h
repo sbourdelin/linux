@@ -159,7 +159,7 @@ extern u32 rt_global_debug_component;
 struct tx_desc_819x_usb {
 	/* DWORD 0 */
 	u16	pkt_size;
-	u8	Offset;
+	u8	offset;
 	u8	Reserved0:3;
 	u8	CmdInit:1;
 	u8	LastSeg:1;
