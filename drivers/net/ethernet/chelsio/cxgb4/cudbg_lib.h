@@ -171,6 +171,9 @@ int cudbg_collect_hma_indirect(struct cudbg_init *pdbg_init,
 int cudbg_collect_hma_meminfo(struct cudbg_init *pdbg_init,
 			      struct cudbg_buffer *dbg_buff,
 			      struct cudbg_error *cudbg_err);
+int cudbg_collect_qdesc(struct cudbg_init *pdbg_init,
+			struct cudbg_buffer *dbg_buff,
+			struct cudbg_error *cudbg_err);
 
 struct cudbg_entity_hdr *cudbg_get_entity_hdr(void *outbuf, int i);
 void cudbg_align_debug_buffer(struct cudbg_buffer *dbg_buff,
@@ -182,4 +185,6 @@ int cudbg_fill_meminfo(struct adapter *padap,
 		       struct cudbg_meminfo *meminfo_buff);
 void cudbg_fill_le_tcam_info(struct adapter *padap,
 			     struct cudbg_tcam *tcam_region);
+void cudbg_fill_qdesc_num_and_size(const struct adapter *padap,
+				   u32 *num, u32 *size);
 #endif /* __CUDBG_LIB_H__ */
