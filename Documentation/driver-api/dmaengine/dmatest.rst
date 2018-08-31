@@ -26,28 +26,43 @@ Part 2 - When dmatest is built as a module
 
 Example of usage::
 
-    % modprobe dmatest channel=dma0chan0 timeout=2000 iterations=1 run=1
+    % modprobe dmatest timeout=2000 iterations=1 channel=dma0chan0 run=1
 
 ...or::
 
     % modprobe dmatest
-    % echo dma0chan0 > /sys/module/dmatest/parameters/channel
     % echo 2000 > /sys/module/dmatest/parameters/timeout
     % echo 1 > /sys/module/dmatest/parameters/iterations
+    % echo dma0chan0 > /sys/module/dmatest/parameters/channel
     % echo 1 > /sys/module/dmatest/parameters/run
 
 ...or on the kernel command line::
 
-    dmatest.channel=dma0chan0 dmatest.timeout=2000 dmatest.iterations=1 dmatest.run=1
+    dmatest.timeout=2000 dmatest.iterations=1 dmatest.channel=dma0chan0 dmatest.run=1
 
+Example of multi-channel test usage:
+    % modprobe dmatest
+    % echo 2000 > /sys/module/dmatest/parameters/timeout
+    % echo 1 > /sys/module/dmatest/parameters/iterations
+    % echo dma0chan0 > /sys/module/dmatest/parameters/channel
+    % echo dma0chan1 > /sys/module/dmatest/parameters/channel
+    % echo dma0chan2 > /sys/module/dmatest/parameters/channel
+    % echo 1 > /sys/module/dmatest/parameters/run
+
+Note: the channel parameter should always be the last parameter set prior to
+running the test (setting run=1), this is because upon setting the channel
+parameter, that specific channel is requested using the dmaengine and a thread
+is created with the existing parameters. This thread is set as pending
+and will be executed once run is set to 1. Any parameters set after the thread
+is created are not applied.
 .. hint::
   available channel list could be extracted by running the following command::
 
     % ls -1 /sys/class/dma/
 
-Once started a message like "dmatest: Started 1 threads using dma0chan0" is
-emitted. After that only test failure messages are reported until the test
-stops.
+Once started a message like " dmatest: Added 1 threads using dma0chan0" is
+emitted. A thread for that specific channel is created and is now pending, the
+pending thread is started once run is to 1.
 
 Note that running a new test will not stop any in progress test.
 
