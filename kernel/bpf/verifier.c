@@ -1948,6 +1948,7 @@ static int check_func_arg(struct bpf_verifier_env *env, u32 regno,
 			verbose(env, "invalid map_ptr to access map->key\n");
 			return -EACCES;
 		}
+
 		err = check_helper_mem_access(env, regno,
 					      meta->map_ptr->key_size, false,
 					      NULL);
@@ -2369,7 +2370,10 @@ record_func_map(struct bpf_verifier_env *env, struct bpf_call_arg_meta *meta,
 	if (func_id != BPF_FUNC_tail_call &&
 	    func_id != BPF_FUNC_map_lookup_elem &&
 	    func_id != BPF_FUNC_map_update_elem &&
-	    func_id != BPF_FUNC_map_delete_elem)
+	    func_id != BPF_FUNC_map_delete_elem &&
+	    func_id != BPF_FUNC_map_push_elem &&
+	    func_id != BPF_FUNC_map_pop_elem &&
+	    func_id != BPF_FUNC_map_peek_elem)
 		return 0;
 
 	if (meta->map_ptr == NULL) {

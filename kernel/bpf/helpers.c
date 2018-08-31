@@ -76,6 +76,50 @@ const struct bpf_func_proto bpf_map_delete_elem_proto = {
 	.arg2_type	= ARG_PTR_TO_MAP_KEY,
 };
 
+BPF_CALL_3(bpf_map_push_elem, struct bpf_map *, map, void *, value, u64, flags)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held());
+	return map->ops->map_update_elem(map, NULL, value, flags);
+}
+
+const struct bpf_func_proto bpf_map_push_elem_proto = {
+	.func		= bpf_map_push_elem,
+	.gpl_only	= false,
+	.pkt_access	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_PTR_TO_MAP_VALUE,
+	.arg3_type	= ARG_ANYTHING,
+};
+
+BPF_CALL_1(bpf_map_pop_elem, struct bpf_map *, map)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held());
+	return (unsigned long) map->ops->map_lookup_and_delete_elem(map, NULL);
+}
+
+const struct bpf_func_proto bpf_map_pop_elem_proto = {
+	.func		= bpf_map_pop_elem,
+	.gpl_only	= false,
+	.pkt_access	= true,
+	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+};
+
+BPF_CALL_1(bpf_map_peek_elem, struct bpf_map *, map)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held());
+	return (unsigned long) map->ops->map_lookup_elem(map, NULL);
+}
+
+const struct bpf_func_proto bpf_map_peek_elem_proto = {
+	.func		= bpf_map_pop_elem,
+	.gpl_only	= false,
+	.pkt_access	= true,
+	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+};
+
 const struct bpf_func_proto bpf_get_prandom_u32_proto = {
 	.func		= bpf_user_rnd_u32,
 	.gpl_only	= false,
