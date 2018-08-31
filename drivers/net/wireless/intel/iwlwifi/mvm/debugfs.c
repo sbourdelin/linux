@@ -1728,6 +1728,57 @@ iwl_dbgfs_send_echo_cmd_write(struct iwl_mvm *mvm, char *buf,
 }
 
 static ssize_t
+iwl_dbgfs_set_aid_read(struct file *file, char __user *user_buf,
+		       size_t count, loff_t *ppos)
+{
+	return 0;
+}
+
+static ssize_t
+iwl_dbgfs_set_aid_write(struct file *file, const char __user *user_buf,
+			size_t count, loff_t *ppos)
+{
+	struct iwl_mvm *mvm = file->private_data;
+	struct iwl_he_monitor_cmd he_mon_cmd = {};
+	u8 tmp_buf[32];
+	u32 aid;
+	int ret;
+
+	if (!iwl_mvm_firmware_running(mvm))
+		return -EIO;
+
+	if (count > sizeof(tmp_buf))
+		return -EINVAL;
+
+	if (copy_from_user(tmp_buf, user_buf, count))
+		return -EIO;
+
+	ret = sscanf(tmp_buf, "%x %2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", &aid,
+		     &he_mon_cmd.bssid[0], &he_mon_cmd.bssid[1],
+		     &he_mon_cmd.bssid[2], &he_mon_cmd.bssid[3],
+		     &he_mon_cmd.bssid[4], &he_mon_cmd.bssid[5]);
+	if (ret != 7)
+		return -EINVAL;
+
+	he_mon_cmd.aid = cpu_to_le16(aid);
+
+	mutex_lock(&mvm->mutex);
+	ret = iwl_mvm_send_cmd_pdu(mvm, iwl_cmd_id(HE_AIR_SNIFFER_CONFIG_CMD,
+						   DATA_PATH_GROUP, 0), 0,
+				   sizeof(he_mon_cmd), &he_mon_cmd);
+	mutex_unlock(&mvm->mutex);
+
+	return ret ?: count;
+}
+
+static const struct file_operations iwl_dbgfs_set_aid_ops = {
+	.read = iwl_dbgfs_set_aid_read,
+	.write = iwl_dbgfs_set_aid_write,
+	.open = simple_open,
+	.llseek = default_llseek,
+};
+
+static ssize_t
 iwl_dbgfs_uapsd_noagg_bssids_read(struct file *file, char __user *user_buf,
 				  size_t count, loff_t *ppos)
 {
@@ -2046,6 +2097,8 @@ int iwl_mvm_dbgfs_register(struct iwl_mvm *mvm, struct dentry *dbgfs_dir)
 		goto err;
 
 	debugfs_create_file("mem", 0600, dbgfs_dir, mvm, &iwl_dbgfs_mem_ops);
+	debugfs_create_file("set_aid", 0200, dbgfs_dir, mvm,
+			    &iwl_dbgfs_set_aid_ops);
 
 	/*
 	 * Create a symlink with mac80211. It will be removed when mac80211
