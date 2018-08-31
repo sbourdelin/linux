@@ -301,6 +301,55 @@ static void pciehp_remove(struct pcie_device *dev)
 	pciehp_release_ctrl(ctrl);
 }
 
+static void pciehp_error_detected(struct pci_dev *dev)
+{
+	struct controller *ctrl;
+	struct pcie_device *pcie_dev;
+	struct device *device = pcie_port_find_device(dev, PCIE_PORT_SERVICE_HP);
+
+	if (!device)
+		return;
+
+	pcie_dev = to_pcie_device(device);
+	ctrl = get_service_data(pcie_dev);
+
+	/*
+	 * Shutdown notification to ignore hotplug events during error
+	 * handling. We'll recheck the status when error handling completes.
+	 *
+	 * It is possible link event related to this error handling may have
+	 * triggered a the hotplug interrupt ahead of this notification, but we
+	 * can't do anything about that race.
+	 */
+	pcie_shutdown_notification(ctrl);
+}
+
+static void pciehp_slot_reset(struct pci_dev *dev)
+{
+	u8 changed;
+	struct controller *ctrl;
+	struct pcie_device *pcie_dev;
+	struct device *device = pcie_port_find_device(dev, PCIE_PORT_SERVICE_HP);
+
+	if (!device)
+		return;
+
+	pcie_dev = to_pcie_device(device);
+	ctrl = get_service_data(pcie_dev);
+
+	/*
+	 * Cache presence detect change, but ignore other hotplug events that
+	 * may occur during error handling. Ports that implement only in-band
+	 * presence detection may inadvertently believe the device has changed,
+	 * so those devices will have to be re-enumerated.
+	 */
+	pciehp_get_adapter_changed(ctrl->slot, &changed);
+	pcie_clear_hotplug_events(ctrl);
+	if (changed)
+		pciehp_request(ctrl, PCI_EXP_SLTSTA_PDC);
+	pcie_init_notification(ctrl);
+}
+
 #ifdef CONFIG_PM
 static int pciehp_suspend(struct pcie_device *dev)
 {
@@ -340,6 +389,8 @@ static struct pcie_port_service_driver hpdriver_portdrv = {
 
 	.probe		= pciehp_probe,
 	.remove		= pciehp_remove,
+	.error_detected	= pciehp_error_detected,
+	.slot_reset	= pciehp_slot_reset,
 
 #ifdef	CONFIG_PM
 	.suspend	= pciehp_suspend,

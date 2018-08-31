@@ -195,6 +195,7 @@ void pciehp_get_attention_status(struct slot *slot, u8 *status);
 void pciehp_set_attention_status(struct slot *slot, u8 status);
 void pciehp_get_latch_status(struct slot *slot, u8 *status);
 void pciehp_get_adapter_status(struct slot *slot, u8 *status);
+void pciehp_get_adapter_changed(struct slot *slot, u8 *changed);
 int pciehp_query_power_fault(struct slot *slot);
 void pciehp_green_led_on(struct slot *slot);
 void pciehp_green_led_off(struct slot *slot);

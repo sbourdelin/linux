@@ -398,6 +398,15 @@ void pciehp_get_adapter_status(struct slot *slot, u8 *status)
 	*status = !!(slot_status & PCI_EXP_SLTSTA_PDS);
 }
 
+void pciehp_get_adapter_changed(struct slot *slot, u8 *changed)
+{
+	struct pci_dev *pdev = ctrl_dev(slot->ctrl);
+	u16 slot_status;
+
+	pcie_capability_read_word(pdev, PCI_EXP_SLTSTA, &slot_status);
+	*changed = !!(slot_status & PCI_EXP_SLTSTA_PDC);
+}
+
 int pciehp_query_power_fault(struct slot *slot)
 {
 	struct pci_dev *pdev = ctrl_dev(slot->ctrl);
