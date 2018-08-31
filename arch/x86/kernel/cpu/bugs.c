@@ -325,6 +325,12 @@ static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 	return cmd;
 }
 
+static bool __init stibp_needed(void)
+{
+	return (cpu_smt_control != CPU_SMT_NOT_SUPPORTED &&
+			boot_cpu_has(X86_FEATURE_STIBP));
+}
+
 static void __init spectre_v2_select_mitigation(void)
 {
 	enum spectre_v2_mitigation_cmd cmd = spectre_v2_parse_cmdline();
@@ -344,6 +350,12 @@ static void __init spectre_v2_select_mitigation(void)
 
 	case SPECTRE_V2_CMD_FORCE:
 	case SPECTRE_V2_CMD_AUTO:
+		if (stibp_needed()) {
+			/* Enable STIBP on SMT-capable systems */
+			pr_info("Spectre v2 cross-process SMT mitigation: Enabling STIBP\n");
+			x86_spec_ctrl_base |= SPEC_CTRL_STIBP;
+			wrmsrl(MSR_IA32_SPEC_CTRL, x86_spec_ctrl_base);
+		}
 		if (boot_cpu_has(X86_FEATURE_IBRS_ENHANCED)) {
 			mode = SPECTRE_V2_IBRS_ENHANCED;
 			/* Force it so VMEXIT will restore correctly */
