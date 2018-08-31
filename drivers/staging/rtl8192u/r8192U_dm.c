@@ -454,7 +454,7 @@ static void dm_bandwidth_autoswitch(struct net_device *dev)
 }	/* dm_BandwidthAutoSwitch */
 
 /* OFDM default at 0db, index=6. */
-static u32 OFDMSwingTable[OFDM_Table_Length] = {
+static u32 OFDMSwingTable[OFDM_TABLE_LENGTH] = {
 	0x7f8001fe,	/* 0, +6db */
 	0x71c001c7,	/* 1, +5db */
 	0x65400195,	/* 2, +4db */
@@ -672,7 +672,7 @@ static void dm_TXPowerTrackingCallback_ThermalMeter(struct net_device *dev)
 	if (!priv->btxpower_trackingInit) {
 		/* Query OFDM default setting */
 		tmpRegA = rtl8192_QueryBBReg(dev, rOFDM0_XATxIQImbalance, bMaskDWord);
-		for (i = 0; i < OFDM_Table_Length; i++) { /* find the index */
+		for (i = 0; i < OFDM_TABLE_LENGTH; i++) { /* find the index */
 			if (tmpRegA == OFDMSwingTable[i]) {
 				priv->OFDM_index = (u8)i;
 				RT_TRACE(COMP_POWER_TRACKING, "Initial reg0x%x = 0x%x, OFDM_index=0x%x\n",
@@ -716,8 +716,8 @@ static void dm_TXPowerTrackingCallback_ThermalMeter(struct net_device *dev)
 	if (priv->ThermalMeter[0] >= (u8)tmpRegA) {	/* lower temperature */
 		tmpOFDMindex = tmpCCK20Mindex = 6+(priv->ThermalMeter[0]-(u8)tmpRegA);
 		tmpCCK40Mindex = tmpCCK20Mindex - 6;
-		if (tmpOFDMindex >= OFDM_Table_Length)
-			tmpOFDMindex = OFDM_Table_Length-1;
+		if (tmpOFDMindex >= OFDM_TABLE_LENGTH)
+			tmpOFDMindex = OFDM_TABLE_LENGTH - 1;
 		if (tmpCCK20Mindex >= CCK_Table_length)
 			tmpCCK20Mindex = CCK_Table_length-1;
 		if (tmpCCK40Mindex >= CCK_Table_length)

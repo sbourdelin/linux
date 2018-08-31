@@ -152,7 +152,7 @@ extern u32 rt_global_debug_component;
 #define IEEE80211_WATCH_DOG_TIME    2000
 #define	PHY_BEACON_RSSI_SLID_WIN_MAX		10
 /* For Tx Power Tracking */
-#define		OFDM_Table_Length	19
+#define		OFDM_TABLE_LENGTH	19
 #define	CCK_Table_length	12
 
 /* For rtl819x */
