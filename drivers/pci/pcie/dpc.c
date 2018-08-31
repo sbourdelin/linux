@@ -66,32 +66,38 @@ static int dpc_wait_rp_inactive(struct dpc_dev *dpc)
 
 static pci_ers_result_t dpc_reset_link(struct pci_dev *pdev)
 {
-	struct dpc_dev *dpc;
-	struct pcie_device *pciedev;
-	struct device *devdpc;
-
-	u16 cap;
+	struct device *dev = pcie_port_find_device(pdev, PCIE_PORT_SERVICE_DPC);
+	struct pcie_device *pciedev = to_pcie_device(dev);
+	struct dpc_dev *dpc = get_service_data(pciedev);
+	u16 cap = dpc->cap_pos;
 
 	/*
 	 * DPC disables the Link automatically in hardware, so it has
 	 * already been reset by the time we get here.
-	 */
-	devdpc = pcie_port_find_device(pdev, PCIE_PORT_SERVICE_DPC);
-	pciedev = to_pcie_device(devdpc);
-	dpc = get_service_data(pciedev);
-	cap = dpc->cap_pos;
-
-	/*
+	 *
 	 * Wait until the Link is inactive, then clear DPC Trigger Status
 	 * to allow the Port to leave DPC.
 	 */
 	pcie_wait_for_link(pdev, false);
-
 	if (dpc->rp_extensions && dpc_wait_rp_inactive(dpc))
 		return PCI_ERS_RESULT_DISCONNECT;
 
 	pci_write_config_word(pdev, cap + PCI_EXP_DPC_STATUS,
 			      PCI_EXP_DPC_STATUS_TRIGGER);
+	/*
+	 * PCIe 4.0r1 6.6.1, a component must enter LTSSM Detect within 20ms,
+	 * after which we should expect an link active if the reset was
+	 * successful. If so, software must wait a minimum 100ms before sending
+	 * configuration requests to devices downstream this port.
+	 *
+	 * If the link fails to activate, either the device was physically
+	 * removed or the link is permanently failed.
+	 */
+	msleep(20);
+	if (!pcie_wait_for_link(pdev, true))
+		return PCI_ERS_RESULT_DISCONNECT;
+	msleep(100);
+
 	if (pdev->subordinate)
 		pdev->subordinate->error_state = pci_channel_io_normal;
 	return PCI_ERS_RESULT_RECOVERED;
