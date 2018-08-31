@@ -83,10 +83,16 @@
 	.family		= _family,				\
 	.model		= _model,				\
 	.feature	= X86_FEATURE_ANY,			\
-	.driver_data	= (kernel_ulong_t)&_driver_data		\
+	.driver_data	= (kernel_ulong_t)_driver_data		\
 }
 
 #define INTEL_CPU_FAM6(_model, _driver_data)			\
-	INTEL_CPU_FAM_ANY(6, INTEL_FAM6_##_model, _driver_data)
+	INTEL_CPU_FAM_ANY(6, INTEL_FAM6_##_model, &_driver_data)
+
+#define INTEL_CPU_FAM_ANY_NODATA(_family, _model)		\
+	INTEL_CPU_FAM_ANY(_family, _model, NULL)
+
+#define INTEL_CPU_FAM6_NODATA(_model)				\
+	INTEL_CPU_FAM_ANY_NODATA(6, INTEL_FAM6_##_model)
 
 #endif /* _ASM_X86_INTEL_FAMILY_H */
