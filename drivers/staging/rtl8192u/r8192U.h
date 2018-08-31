@@ -103,28 +103,8 @@ extern u32 rt_global_debug_component;
 				 #expr, __FILE__, __func__, __LINE__);	\
 		}							\
 	} while (0)
-/*
- * Debug out data buf.
- * If you want to print DATA buffer related BA,
- * please set ieee80211_debug_level to DATA|BA
- */
-#define RT_DEBUG_DATA(level, data, datalen) \
-	do {								\
-		if ((rt_global_debug_component & (level)) == (level)) {	\
-			int i;						\
-			u8 *pdata = (u8 *)data;				\
-			pr_debug("RTL8192U: %s()\n", __func__);		\
-			for (i = 0; i < (int)(datalen); i++) {		\
-				printk("%2x ", pdata[i]);               \
-				if ((i+1)%16 == 0)			\
-					printk("\n");			\
-			}						\
-			printk("\n");					\
-		}							\
-	} while (0)
 #else
 #define RTL8192U_ASSERT(expr) do {} while (0)
-#define RT_DEBUG_DATA(level, data, datalen) do {} while (0)
 #endif /* RTL8169_DEBUG */
 
 /* Queue Select Value in TxDesc */
