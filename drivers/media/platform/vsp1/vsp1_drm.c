@@ -814,6 +814,16 @@ int vsp1_du_atomic_update(struct device *dev, unsigned int pipe_index,
 	rpf->format.num_planes = fmtinfo->planes;
 	rpf->format.plane_fmt[0].bytesperline = cfg->pitch;
 	rpf->format.plane_fmt[1].bytesperline = cfg->pitch;
+
+	/*
+	 * Packed YUV formats are subsampled, but the packing of two components
+	 * into a single plane compensates for this leaving the bytesperline
+	 * to be the correct value. For multiplanar formats we must adjust the
+	 * pitch accordingly.
+	 */
+	if (fmtinfo->planes == 3)
+		rpf->format.plane_fmt[1].bytesperline /= fmtinfo->hsub;
+
 	rpf->alpha = cfg->alpha;
 
 	rpf->mem.addr[0] = cfg->mem[0];
