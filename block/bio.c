@@ -610,6 +610,8 @@ void __bio_clone_fast(struct bio *bio, struct bio *bio_src)
 	bio->bi_io_vec = bio_src->bi_io_vec;
 
 	bio_clone_blkcg_association(bio, bio_src);
+
+	bio_issue_init(&bio->bi_issue, bio_sectors(bio));
 }
 EXPORT_SYMBOL(__bio_clone_fast);
 

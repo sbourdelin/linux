@@ -844,6 +844,8 @@ static inline bool blkcg_bio_issue_check(struct request_queue *q,
 		blkg_rwstat_add(&blkg->stat_ios, bio->bi_opf, 1);
 	}
 
+	bio_issue_init(&bio->bi_issue, bio_sectors(bio));
+
 	return !throtl;
 }
 
