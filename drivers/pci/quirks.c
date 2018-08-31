@@ -5119,3 +5119,26 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_MICROSEMI, 0x8575,
 			quirk_switchtec_ntb_dma_alias);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_MICROSEMI, 0x8576,
 			quirk_switchtec_ntb_dma_alias);
+
+/*
+ * The Nvidia GPU on many Intel-based Asus products is unusable after
+ * S3 resume. However, for unknown reasons, rewriting the value of register
+ * 'Prefetchable Base Upper 32 Bits' on the parent PCI bridge works around
+ * the issue.
+ */
+static void quirk_asus_pci_prefetch(struct pci_dev *bridge)
+{
+	const char *sys_vendor = dmi_get_system_info(DMI_SYS_VENDOR);
+	u32 value;
+
+	if (strcmp(sys_vendor, "ASUSTeK COMPUTER INC.") != 0)
+		return;
+
+	pci_read_config_dword(bridge, PCI_PREF_BASE_UPPER32, &value);
+	pci_write_config_dword(bridge, PCI_PREF_BASE_UPPER32, value);
+}
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL, 0x1901, quirk_asus_pci_prefetch);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL, 0x31d8, quirk_asus_pci_prefetch);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL, 0x5ad8, quirk_asus_pci_prefetch);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL, 0x9d10, quirk_asus_pci_prefetch);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL, 0x9dbc, quirk_asus_pci_prefetch);
