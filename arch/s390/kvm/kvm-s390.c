@@ -156,6 +156,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	{ "instruction_diag_9c", VCPU_STAT(diagnose_9c) },
 	{ "instruction_diag_258", VCPU_STAT(diagnose_258) },
 	{ "instruction_diag_308", VCPU_STAT(diagnose_308) },
+	{ "instruction_diag_318", VCPU_STAT(diagnose_318) },
 	{ "instruction_diag_500", VCPU_STAT(diagnose_500) },
 	{ "instruction_diag_other", VCPU_STAT(diagnose_other) },
 	{ NULL }
@@ -370,6 +371,10 @@ static void kvm_s390_cpu_feat_init(void)
 
 	if (MACHINE_HAS_ESOP)
 		allow_cpu_feat(KVM_S390_VM_CPU_FEAT_ESOP);
+
+	/* Always allow diag318 for a guest */
+	allow_cpu_feat(KVM_S390_VM_CPU_FEAT_DIAG318);
+
 	/*
 	 * We need SIE support, ESOP (PROT_READ protection for gmap_shadow),
 	 * 64bit SCAO (SCA passthrough) and IDTE (for gmap_shadow unshadowing).
@@ -1140,6 +1145,72 @@ static int kvm_s390_get_tod(struct kvm *kvm, struct kvm_device_attr *attr)
 	return ret;
 }
 
+void kvm_s390_set_cpc(struct kvm *kvm, u64 cpc)
+{
+	struct kvm_vcpu *vcpu;
+	int i;
+
+	mutex_lock(&kvm->lock);
+	kvm->arch.cpnc = cpc >> 56;
+	kvm->arch.cpvc = cpc & 0x00ffffffffffffffUL;
+
+	VM_EVENT(kvm, 3, "SET: CPNC: 0x%x CPVC: 0x%llx",
+		 kvm->arch.cpnc, kvm->arch.cpvc);
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		vcpu->arch.sie_block->cpnc = kvm->arch.cpnc;
+	}
+	mutex_unlock(&kvm->lock);
+}
+
+static int kvm_s390_set_misc(struct kvm *kvm, struct kvm_device_attr *attr)
+{
+	int ret;
+	u64 cpc;
+
+	switch (attr->attr) {
+	case KVM_S390_VM_MISC_CPC:
+		ret = -EFAULT;
+		if (get_user(cpc, (u64 __user *)attr->addr))
+			break;
+		kvm_s390_set_cpc(kvm, cpc);
+		ret = 0;
+		break;
+	default:
+		ret = -ENXIO;
+		break;
+	}
+	return ret;
+}
+
+static int kvm_s390_get_cpc(struct kvm *kvm, struct kvm_device_attr *attr)
+{
+	u64 cpc = ((u64)kvm->arch.cpnc << 56) | kvm->arch.cpvc;
+
+	if (put_user(cpc, (u64 __user *)attr->addr))
+		return -EFAULT;
+
+	VM_EVENT(kvm, 3, "QUERY: CPNC: 0x%x CPVC: 0x%llx",
+		 kvm->arch.cpnc, kvm->arch.cpvc);
+
+	return 0;
+}
+
+static int kvm_s390_get_misc(struct kvm *kvm, struct kvm_device_attr *attr)
+{
+	int ret;
+
+	switch (attr->attr) {
+	case KVM_S390_VM_MISC_CPC:
+		ret = kvm_s390_get_cpc(kvm, attr);
+		break;
+	default:
+		ret = -ENXIO;
+		break;
+	}
+	return ret;
+}
+
 static int kvm_s390_set_processor(struct kvm *kvm, struct kvm_device_attr *attr)
 {
 	struct kvm_s390_vm_cpu_processor *proc;
@@ -1402,6 +1473,9 @@ static int kvm_s390_vm_set_attr(struct kvm *kvm, struct kvm_device_attr *attr)
 	case KVM_S390_VM_MIGRATION:
 		ret = kvm_s390_vm_set_migration(kvm, attr);
 		break;
+	case KVM_S390_VM_MISC:
+		ret = kvm_s390_set_misc(kvm, attr);
+		break;
 	default:
 		ret = -ENXIO;
 		break;
@@ -1426,6 +1500,9 @@ static int kvm_s390_vm_get_attr(struct kvm *kvm, struct kvm_device_attr *attr)
 		break;
 	case KVM_S390_VM_MIGRATION:
 		ret = kvm_s390_vm_get_migration(kvm, attr);
+		break;
+	case KVM_S390_VM_MISC:
+		ret = kvm_s390_get_misc(kvm, attr);
 		break;
 	default:
 		ret = -ENXIO;
@@ -1496,6 +1573,16 @@ static int kvm_s390_vm_has_attr(struct kvm *kvm, struct kvm_device_attr *attr)
 		break;
 	case KVM_S390_VM_MIGRATION:
 		ret = 0;
+		break;
+	case KVM_S390_VM_MISC:
+		switch (attr->attr) {
+		case KVM_S390_VM_MISC_CPC:
+			ret = 0;
+			break;
+		default:
+			ret = -ENXIO;
+			break;
+		}
 		break;
 	default:
 		ret = -ENXIO;
@@ -2568,6 +2655,9 @@ void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
 	vcpu->arch.sie_block->epoch = vcpu->kvm->arch.epoch;
 	vcpu->arch.sie_block->epdx = vcpu->kvm->arch.epdx;
 	preempt_enable();
+
+	vcpu->arch.sie_block->cpnc = vcpu->kvm->arch.cpnc;
+
 	mutex_unlock(&vcpu->kvm->lock);
 	if (!kvm_is_ucontrol(vcpu->kvm)) {
 		vcpu->arch.gmap = vcpu->kvm->arch.gmap;
