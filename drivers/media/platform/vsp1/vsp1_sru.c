@@ -314,6 +314,10 @@ static unsigned int sru_max_width(struct vsp1_entity *entity,
 	output = vsp1_entity_get_pad_format(&sru->entity, sru->entity.config,
 					    SRU_PAD_SOURCE);
 
+	/*
+	 * The maximum width of the SRU is 288 input pixels, but to support the
+	 * partition algorithm, this is currently kept at 256.
+	 */
 	if (input->width != output->width)
 		return 512;
 	else
