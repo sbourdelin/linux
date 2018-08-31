@@ -123,45 +123,6 @@ enum nd_mapping_lock_class {
 	ND_MAPPING_UUID_SCAN,
 };
 
-struct nd_mapping {
-	struct nvdimm *nvdimm;
-	u64 start;
-	u64 size;
-	int position;
-	struct list_head labels;
-	struct mutex lock;
-	/*
-	 * @ndd is for private use at region enable / disable time for
-	 * get_ndd() + put_ndd(), all other nd_mapping to ndd
-	 * conversions use to_ndd() which respects enabled state of the
-	 * nvdimm.
-	 */
-	struct nvdimm_drvdata *ndd;
-};
-
-struct nd_region {
-	struct device dev;
-	struct ida ns_ida;
-	struct ida btt_ida;
-	struct ida pfn_ida;
-	struct ida dax_ida;
-	unsigned long flags;
-	struct device *ns_seed;
-	struct device *btt_seed;
-	struct device *pfn_seed;
-	struct device *dax_seed;
-	u16 ndr_mappings;
-	u64 ndr_size;
-	u64 ndr_start;
-	int id, num_lanes, ro, numa_node;
-	void *provider_data;
-	struct kernfs_node *bb_state;
-	struct badblocks bb;
-	struct nd_interleave_set *nd_set;
-	struct nd_percpu_lane __percpu *lane;
-	struct nd_mapping mapping[0];
-};
-
 struct nd_blk_region {
 	int (*enable)(struct nvdimm_bus *nvdimm_bus, struct device *dev);
 	int (*do_io)(struct nd_blk_region *ndbr, resource_size_t dpa,
