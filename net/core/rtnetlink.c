@@ -3326,6 +3326,7 @@ errout:
 		rtnl_set_sk_err(net, RTNLGRP_LINK, err);
 	return NULL;
 }
+EXPORT_SYMBOL(rtmsg_ifinfo_build_skb);
 
 void rtmsg_ifinfo_send(struct sk_buff *skb, struct net_device *dev, gfp_t flags)
 {
