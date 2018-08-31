@@ -16,6 +16,8 @@
  * that group keep the CPUID for the variants sorted by model number.
  */
 
+#define INTEL_FAM5_QUARK_X1000		0x09
+
 #define INTEL_FAM6_CORE_YONAH		0x0E
 
 #define INTEL_FAM6_CORE2_MEROM		0x0F
