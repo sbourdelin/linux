@@ -199,10 +199,6 @@ static int uverbs_hot_unplug_completion_event_file(struct ib_uobject *uobj,
 			     uobj);
 	struct ib_uverbs_event_queue *event_queue = &comp_event_file->ev_queue;
 
-	spin_lock_irq(&event_queue->lock);
-	event_queue->is_closed = 1;
-	spin_unlock_irq(&event_queue->lock);
-
 	if (why == RDMA_REMOVE_DRIVER_REMOVE) {
 		wake_up_interruptible(&event_queue->poll_wait);
 		kill_fasync(&event_queue->async_queue, SIGIO, POLL_IN);
