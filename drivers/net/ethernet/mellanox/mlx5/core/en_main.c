@@ -4558,7 +4558,7 @@ void mlx5e_build_nic_params(struct mlx5_core_dev *mdev,
 	params->tx_min_inline_mode = mlx5e_params_calculate_tx_min_inline(mdev);
 
 	/* RSS */
-	params->rss_hfunc = ETH_RSS_HASH_XOR;
+	params->rss_hfunc = ETH_RSS_HASH_TOP;
 	netdev_rss_key_fill(params->toeplitz_hash_key, sizeof(params->toeplitz_hash_key));
 	mlx5e_build_default_indir_rqt(params->indirection_rqt,
 				      MLX5E_INDIR_RQT_SIZE, max_channels);
