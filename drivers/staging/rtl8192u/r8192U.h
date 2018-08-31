@@ -160,7 +160,7 @@ struct tx_desc_819x_usb {
 	/* DWORD 0 */
 	u16	pkt_size;
 	u8	offset;
-	u8	Reserved0:3;
+	u8	reserved0:3;
 	u8	CmdInit:1;
 	u8	LastSeg:1;
 	u8	FirstSeg:1;
@@ -177,7 +177,7 @@ struct tx_desc_819x_usb {
 	u8	PIFS:1;
 	u8	QueueSelect:5;
 	u8	NoACM:1;
-	u8	Reserved1:2;
+	u8	reserved1:2;
 	u8	SecCAMID:5;
 	u8	SecDescAssign:1;
 	u8	SecType:2;
@@ -185,13 +185,13 @@ struct tx_desc_819x_usb {
 	/* DWORD 2 */
 	u16	TxBufferSize;
 	u8	ResvForPaddingLen:7;
-	u8	Reserved3:1;
-	u8	Reserved4;
+	u8	reserved3:1;
+	u8	reserved4;
 
 	/* DWORD 3, 4, 5 */
-	u32	Reserved5;
-	u32	Reserved6;
-	u32	Reserved7;
+	u32	reserved5;
+	u32	reserved6;
+	u32	reserved7;
 };
 
 struct tx_desc_cmd_819x_usb {
