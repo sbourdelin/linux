@@ -25,9 +25,19 @@ static unsigned int write_buffer_size;
 module_param(write_buffer_size, uint, 0644);
 MODULE_PARM_DESC(write_buffer_size, "number of entries in a write buffer");
 
-static struct kmem_cache *pblk_ws_cache, *pblk_rec_cache, *pblk_g_rq_cache,
-				*pblk_w_rq_cache;
-static DECLARE_RWSEM(pblk_lock);
+struct pblk_global_caches {
+	struct kmem_cache *ws_cache;
+	struct kmem_cache *rec_cache;
+	struct kmem_cache *g_rq_cache;
+	struct kmem_cache *w_rq_cache;
+	struct kref kref;
+};
+
+static struct pblk_global_caches caches = {
+	.kref = KREF_INIT(0)
+};
+
+static DECLARE_RWSEM(pblk_lock);	/* Protects global caches */
 struct bio_set pblk_bio_set;
 
 static int pblk_rw_io(struct request_queue *q, struct pblk *pblk,
@@ -306,53 +316,68 @@ static int pblk_set_addrf(struct pblk *pblk)
 	return 0;
 }
 
-static int pblk_init_global_caches(struct pblk *pblk)
+static int pblk_get_global_caches(void)
 {
 	down_write(&pblk_lock);
-	pblk_ws_cache = kmem_cache_create("pblk_blk_ws",
+
+	if (kref_read(&caches.kref) > 0)
+		goto caches_available;
+
+	caches.ws_cache = kmem_cache_create("pblk_blk_ws",
 				sizeof(struct pblk_line_ws), 0, 0, NULL);
-	if (!pblk_ws_cache) {
-		up_write(&pblk_lock);
-		return -ENOMEM;
-	}
+	if (!caches.ws_cache)
+		goto fail;
 
-	pblk_rec_cache = kmem_cache_create("pblk_rec",
+	caches.rec_cache = kmem_cache_create("pblk_rec",
 				sizeof(struct pblk_rec_ctx), 0, 0, NULL);
-	if (!pblk_rec_cache) {
-		kmem_cache_destroy(pblk_ws_cache);
-		up_write(&pblk_lock);
-		return -ENOMEM;
-	}
+	if (!caches.rec_cache)
+		goto fail_destroy_ws_cache;
 
-	pblk_g_rq_cache = kmem_cache_create("pblk_g_rq", pblk_g_rq_size,
+	caches.g_rq_cache = kmem_cache_create("pblk_g_rq", pblk_g_rq_size,
 				0, 0, NULL);
-	if (!pblk_g_rq_cache) {
-		kmem_cache_destroy(pblk_ws_cache);
-		kmem_cache_destroy(pblk_rec_cache);
-		up_write(&pblk_lock);
-		return -ENOMEM;
-	}
+	if (!caches.g_rq_cache)
+		goto fail_destroy_rec_cache;
 
-	pblk_w_rq_cache = kmem_cache_create("pblk_w_rq", pblk_w_rq_size,
+	caches.w_rq_cache = kmem_cache_create("pblk_w_rq", pblk_w_rq_size,
 				0, 0, NULL);
-	if (!pblk_w_rq_cache) {
-		kmem_cache_destroy(pblk_ws_cache);
-		kmem_cache_destroy(pblk_rec_cache);
-		kmem_cache_destroy(pblk_g_rq_cache);
-		up_write(&pblk_lock);
-		return -ENOMEM;
-	}
+	if (!caches.w_rq_cache)
+		goto fail_destroy_g_rq_cache;
+
+caches_available:
+	kref_get(&caches.kref);
 	up_write(&pblk_lock);
 
 	return 0;
+
+fail_destroy_g_rq_cache:
+	kmem_cache_destroy(caches.g_rq_cache);
+fail_destroy_rec_cache:
+	kmem_cache_destroy(caches.rec_cache);
+fail_destroy_ws_cache:
+	kmem_cache_destroy(caches.ws_cache);
+fail:
+	up_write(&pblk_lock);
+
+	return -ENOMEM;
 }
 
-static void pblk_free_global_caches(struct pblk *pblk)
+static void pblk_destroy_global_caches(struct kref *ref)
 {
-	kmem_cache_destroy(pblk_ws_cache);
-	kmem_cache_destroy(pblk_rec_cache);
-	kmem_cache_destroy(pblk_g_rq_cache);
-	kmem_cache_destroy(pblk_w_rq_cache);
+	struct pblk_global_caches *c;
+
+	c = container_of(ref, struct pblk_global_caches, kref);
+
+	kmem_cache_destroy(c->ws_cache);
+	kmem_cache_destroy(c->rec_cache);
+	kmem_cache_destroy(c->g_rq_cache);
+	kmem_cache_destroy(c->w_rq_cache);
+}
+
+static void pblk_put_global_caches(void)
+{
+	down_write(&pblk_lock);
+	kref_put(&caches.kref, pblk_destroy_global_caches);
+	up_write(&pblk_lock);
 }
 
 static int pblk_core_init(struct pblk *pblk)
@@ -387,7 +412,7 @@ static int pblk_core_init(struct pblk *pblk)
 	if (!pblk->pad_dist)
 		return -ENOMEM;
 
-	if (pblk_init_global_caches(pblk))
+	if (pblk_get_global_caches())
 		goto fail_free_pad_dist;
 
 	/* Internal bios can be at most the sectors signaled by the device. */
@@ -396,27 +421,27 @@ static int pblk_core_init(struct pblk *pblk)
 		goto free_global_caches;
 
 	ret = mempool_init_slab_pool(&pblk->gen_ws_pool, PBLK_GEN_WS_POOL_SIZE,
-				     pblk_ws_cache);
+				     caches.ws_cache);
 	if (ret)
 		goto free_page_bio_pool;
 
 	ret = mempool_init_slab_pool(&pblk->rec_pool, geo->all_luns,
-				     pblk_rec_cache);
+				     caches.rec_cache);
 	if (ret)
 		goto free_gen_ws_pool;
 
 	ret = mempool_init_slab_pool(&pblk->r_rq_pool, geo->all_luns,
-				     pblk_g_rq_cache);
+				     caches.g_rq_cache);
 	if (ret)
 		goto free_rec_pool;
 
 	ret = mempool_init_slab_pool(&pblk->e_rq_pool, geo->all_luns,
-				     pblk_g_rq_cache);
+				     caches.g_rq_cache);
 	if (ret)
 		goto free_r_rq_pool;
 
 	ret = mempool_init_slab_pool(&pblk->w_rq_pool, geo->all_luns,
-				     pblk_w_rq_cache);
+				     caches.w_rq_cache);
 	if (ret)
 		goto free_e_rq_pool;
 
@@ -462,7 +487,7 @@ free_gen_ws_pool:
 free_page_bio_pool:
 	mempool_exit(&pblk->page_bio_pool);
 free_global_caches:
-	pblk_free_global_caches(pblk);
+	pblk_put_global_caches();
 fail_free_pad_dist:
 	kfree(pblk->pad_dist);
 	return -ENOMEM;
@@ -486,7 +511,7 @@ static void pblk_core_free(struct pblk *pblk)
 	mempool_exit(&pblk->e_rq_pool);
 	mempool_exit(&pblk->w_rq_pool);
 
-	pblk_free_global_caches(pblk);
+	pblk_put_global_caches();
 	kfree(pblk->pad_dist);
 }
 
@@ -1165,7 +1190,6 @@ static void pblk_exit(void *private, bool graceful)
 {
 	struct pblk *pblk = private;
 
-	down_write(&pblk_lock);
 	pblk_gc_exit(pblk, graceful);
 	pblk_tear_down(pblk, graceful);
 
@@ -1174,7 +1198,6 @@ static void pblk_exit(void *private, bool graceful)
 #endif
 
 	pblk_free(pblk);
-	up_write(&pblk_lock);
 }
 
 static sector_t pblk_capacity(void *private)
