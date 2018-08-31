@@ -53,6 +53,12 @@ struct pcie_port_service_driver {
 	int (*resume_noirq) (struct pcie_device *dev);
 	int (*resume) (struct pcie_device *dev);
 
+	/* Device driver notification of error handling */
+	void (*error_detected)(struct pci_dev *dev);
+
+	/* Device driver notification of slot reset */
+	void (*slot_reset)(struct pci_dev *dev);
+
 	/* Device driver may resume normal operations */
 	void (*error_resume)(struct pci_dev *dev);
 

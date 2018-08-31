@@ -139,11 +139,43 @@ static void pcie_portdrv_remove(struct pci_dev *dev)
 	pcie_port_device_remove(dev);
 }
 
+static int detected_iter(struct device *device, void *data)
+{
+	struct pci_dev *pdev = data;
+	struct pcie_port_service_driver *driver;
+
+	if (device->bus == &pcie_port_bus_type && device->driver) {
+		driver = to_service_driver(device->driver);
+		if (driver && driver->error_detected)
+			driver->error_detected(pdev);
+	}
+	return 0;
+}
+
 static pci_ers_result_t pcie_portdrv_error_detected(struct pci_dev *dev,
 					enum pci_channel_state error)
 {
-	/* Root Port has no impact. Always recovers. */
+	device_for_each_child(&dev->dev, dev, detected_iter);
 	return PCI_ERS_RESULT_CAN_RECOVER;
+}
+
+static int slot_reset_iter(struct device *device, void *data)
+{
+	struct pci_dev *pdev = data;
+	struct pcie_port_service_driver *driver;
+
+	if (device->bus == &pcie_port_bus_type && device->driver) {
+		driver = to_service_driver(device->driver);
+		if (driver && driver->slot_reset)
+			driver->slot_reset(pdev);
+	}
+	return 0;
+}
+
+static pci_ers_result_t pcie_portdrv_slot_reset(struct pci_dev *dev)
+{
+	device_for_each_child(&dev->dev, dev, slot_reset_iter);
+	return PCI_ERS_RESULT_RECOVERED;
 }
 
 static pci_ers_result_t pcie_portdrv_mmio_enabled(struct pci_dev *dev)
@@ -185,6 +217,7 @@ static const struct pci_device_id port_pci_ids[] = { {
 
 static const struct pci_error_handlers pcie_portdrv_err_handler = {
 	.error_detected = pcie_portdrv_error_detected,
+	.slot_reset = pcie_portdrv_slot_reset,
 	.mmio_enabled = pcie_portdrv_mmio_enabled,
 	.resume = pcie_portdrv_err_resume,
 };
