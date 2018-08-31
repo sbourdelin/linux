@@ -14,7 +14,7 @@ static void devm_clk_release(struct device *dev, void *res)
 	clk_put(*(struct clk **)res);
 }
 
-struct clk *devm_clk_get(struct device *dev, const char *id)
+static struct clk *__devm_clk_get(struct device *dev, const char *id, bool optional)
 {
 	struct clk **ptr, *clk;
 
@@ -22,7 +22,10 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
 	if (!ptr)
 		return ERR_PTR(-ENOMEM);
 
-	clk = clk_get(dev, id);
+	if (!optional)
+		clk = clk_get(dev, id);
+	else
+		clk = clk_get_optional(dev, id);
 	if (!IS_ERR(clk)) {
 		*ptr = clk;
 		devres_add(dev, ptr);
@@ -32,7 +35,18 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
 
 	return clk;
 }
+
+struct clk *devm_clk_get(struct device *dev, const char *id)
+{
+	return __devm_clk_get(dev, id, false);
+}
 EXPORT_SYMBOL(devm_clk_get);
+
+struct clk *devm_clk_get_optional(struct device *dev, const char *id)
+{
+	return __devm_clk_get(dev, id, true);
+}
+EXPORT_SYMBOL(devm_clk_get_optional);
 
 struct clk_bulk_devres {
 	struct clk_bulk_data *clks;

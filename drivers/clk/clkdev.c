@@ -222,20 +222,33 @@ out:
 }
 EXPORT_SYMBOL(clk_get_sys);
 
-struct clk *clk_get(struct device *dev, const char *con_id)
+static struct clk *internal_clk_get(struct device *dev, const char *con_id,
+				    bool optional)
 {
 	const char *dev_id = dev ? dev_name(dev) : NULL;
 	struct clk *clk;
 
 	if (dev && dev->of_node) {
-		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id, false);
+		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id,
+					   optional);
 		if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
 			return clk;
 	}
 
 	return clk_get_sys(dev_id, con_id);
 }
+
+struct clk *clk_get(struct device *dev, const char *con_id)
+{
+	return internal_clk_get(dev, con_id, false);
+}
 EXPORT_SYMBOL(clk_get);
+
+struct clk *clk_get_optional(struct device *dev, const char *con_id)
+{
+	return internal_clk_get(dev, con_id, true);
+}
+EXPORT_SYMBOL(clk_get_optional);
 
 void clk_put(struct clk *clk)
 {
