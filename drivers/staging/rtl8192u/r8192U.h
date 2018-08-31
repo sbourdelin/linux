@@ -153,7 +153,7 @@ extern u32 rt_global_debug_component;
 #define	PHY_BEACON_RSSI_SLID_WIN_MAX		10
 /* For Tx Power Tracking */
 #define		OFDM_TABLE_LENGTH	19
-#define	CCK_Table_length	12
+#define	CCK_TABLE_LENGTH	12
 
 /* For rtl819x */
 struct tx_desc_819x_usb {

@@ -476,7 +476,7 @@ static u32 OFDMSwingTable[OFDM_TABLE_LENGTH] = {
 	0x10000040	/* 18, -12db */
 };
 
-static u8	CCKSwingTable_Ch1_Ch13[CCK_Table_length][8] = {
+static u8	CCKSwingTable_Ch1_Ch13[CCK_TABLE_LENGTH][8] = {
 	{0x36, 0x35, 0x2e, 0x25, 0x1c, 0x12, 0x09, 0x04},	/* 0, +0db ===> CCK40M default */
 	{0x30, 0x2f, 0x29, 0x21, 0x19, 0x10, 0x08, 0x03},	/* 1, -1db */
 	{0x2b, 0x2a, 0x25, 0x1e, 0x16, 0x0e, 0x07, 0x03},	/* 2, -2db */
@@ -491,7 +491,7 @@ static u8	CCKSwingTable_Ch1_Ch13[CCK_Table_length][8] = {
 	{0x0f, 0x0f, 0x0d, 0x0b, 0x08, 0x05, 0x03, 0x01}	/* 11, -11db */
 };
 
-static u8	CCKSwingTable_Ch14[CCK_Table_length][8] = {
+static u8	CCKSwingTable_Ch14[CCK_TABLE_LENGTH][8] = {
 	{0x36, 0x35, 0x2e, 0x1b, 0x00, 0x00, 0x00, 0x00},	/* 0, +0db  ===> CCK40M default */
 	{0x30, 0x2f, 0x29, 0x18, 0x00, 0x00, 0x00, 0x00},	/* 1, -1db */
 	{0x2b, 0x2a, 0x25, 0x15, 0x00, 0x00, 0x00, 0x00},	/* 2, -2db */
@@ -682,7 +682,7 @@ static void dm_TXPowerTrackingCallback_ThermalMeter(struct net_device *dev)
 
 		/* Query CCK default setting From 0xa22 */
 		TempCCk = rtl8192_QueryBBReg(dev, rCCK0_TxFilter1, bMaskByte2);
-		for (i = 0; i < CCK_Table_length; i++) {
+		for (i = 0; i < CCK_TABLE_LENGTH; i++) {
 			if (TempCCk == (u32)CCKSwingTable_Ch1_Ch13[i][0]) {
 				priv->CCK_index = (u8) i;
 				RT_TRACE(COMP_POWER_TRACKING, "Initial reg0x%x = 0x%x, CCK_index=0x%x\n",
@@ -718,10 +718,10 @@ static void dm_TXPowerTrackingCallback_ThermalMeter(struct net_device *dev)
 		tmpCCK40Mindex = tmpCCK20Mindex - 6;
 		if (tmpOFDMindex >= OFDM_TABLE_LENGTH)
 			tmpOFDMindex = OFDM_TABLE_LENGTH - 1;
-		if (tmpCCK20Mindex >= CCK_Table_length)
-			tmpCCK20Mindex = CCK_Table_length-1;
-		if (tmpCCK40Mindex >= CCK_Table_length)
-			tmpCCK40Mindex = CCK_Table_length-1;
+		if (tmpCCK20Mindex >= CCK_TABLE_LENGTH)
+			tmpCCK20Mindex = CCK_TABLE_LENGTH - 1;
+		if (tmpCCK40Mindex >= CCK_TABLE_LENGTH)
+			tmpCCK40Mindex = CCK_TABLE_LENGTH - 1;
 	} else {
 		tmpval = (u8)tmpRegA - priv->ThermalMeter[0];
 
