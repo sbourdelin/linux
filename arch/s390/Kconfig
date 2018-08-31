@@ -598,6 +598,14 @@ config EXPOLINE_FULL
 
 endchoice
 
+config DISTRO_ID
+	string "Distribution Identifier"
+	help
+	  This option sets a unique distribution identifier for this kernel build
+	  that will assist with internal problem diagnosis for IBM Z.
+
+	  Only the first three characters of this string will be utilized.
+
 endmenu
 
 menu "Memory setup"

@@ -54,7 +54,9 @@ struct read_info_sccb {
 	u16	hcpua;			/* 120-121 */
 	u8	_pad_122[124 - 122];	/* 122-123 */
 	u32	hmfai;			/* 124-127 */
-	u8	_pad_128[4096 - 128];	/* 128-4095 */
+	u8	_pad_128[134 - 128];	/* 128-133 */
+	u8	fac134;			/* 134 */
+	u8	_pad_135[4096 - 135];	/* 135-4095 */
 } __packed __aligned(PAGE_SIZE);
 
 static struct sclp_ipl_info sclp_ipl_info;
@@ -107,6 +109,8 @@ static void __init sclp_early_facilities_detect(struct read_info_sccb *sccb)
 		S390_lowcore.machine_flags |= MACHINE_FLAG_ESOP;
 	if (sccb->fac91 & 0x40)
 		S390_lowcore.machine_flags |= MACHINE_FLAG_TLB_GUEST;
+	if (sccb->cpuoff > 134)
+		sclp.has_diag318 = !!(sccb->fac134 & 0x80);
 	sclp.rnmax = sccb->rnmax ? sccb->rnmax : sccb->rnmax2;
 	sclp.rzm = sccb->rnsize ? sccb->rnsize : sccb->rnsize2;
 	sclp.rzm <<= 20;
