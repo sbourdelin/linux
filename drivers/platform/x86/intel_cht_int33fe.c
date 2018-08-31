@@ -24,6 +24,7 @@
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/pci.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 
@@ -96,6 +97,7 @@ static int cht_int33fe_probe(struct i2c_client *client)
 	struct i2c_client *max17047;
 	struct regulator *regulator;
 	unsigned long long ptyp;
+	struct pci_dev *udc;
 	acpi_status status;
 	int fusb302_irq;
 	int ret;
@@ -180,9 +182,15 @@ static int cht_int33fe_probe(struct i2c_client *client)
 	data->connections[1].endpoint[0] = "i2c-fusb302";
 	data->connections[1].endpoint[1] = "i2c-pi3usb30532";
 	data->connections[1].id = "typec-mux";
-	data->connections[2].endpoint[0] = "i2c-fusb302";
-	data->connections[2].endpoint[1] = "intel_xhci_usb_sw-role-switch";
-	data->connections[2].id = "usb-role-switch";
+
+	/* Only adding connection for role switch if UDC exists */
+	udc = pci_get_class(PCI_CLASS_SERIAL_USB_DEVICE, NULL);
+	if (udc) {
+		pci_dev_put(udc);
+		data->connections[2].endpoint[0] = "i2c-fusb302";
+		data->connections[2].endpoint[1] = "intel_xhci_usb_sw-role-switch";
+		data->connections[2].id = "usb-role-switch";
+	}
 
 	device_connections_add(data->connections);
 
