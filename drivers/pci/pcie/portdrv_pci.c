@@ -174,7 +174,9 @@ static int slot_reset_iter(struct device *device, void *data)
 
 static pci_ers_result_t pcie_portdrv_slot_reset(struct pci_dev *dev)
 {
+	pci_restore_state(dev);
 	device_for_each_child(&dev->dev, dev, slot_reset_iter);
+	pci_save_state(dev);
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
