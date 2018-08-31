@@ -46,7 +46,7 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
 		*value_bitmap = value;
 
 		gpiod_set_array_value_cansleep(nvalues, reset_gpios->desc,
-					       value_bitmap);
+					       reset_gpios->info, value_bitmap);
 	}
 }
 

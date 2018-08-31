@@ -366,7 +366,8 @@ static int soc_common_pcmcia_config_skt(
 		}
 
 		if (n)
-			gpiod_set_array_value_cansleep(n, descs, value_bitmap);
+			gpiod_set_array_value_cansleep(n, descs, NULL,
+						       value_bitmap);
 
 		/*
 		 * This really needs a better solution.  The IRQ

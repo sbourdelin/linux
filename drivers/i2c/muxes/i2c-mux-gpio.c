@@ -31,7 +31,7 @@ static void i2c_mux_gpio_set(const struct gpiomux *mux, unsigned val)
 	*value_bitmap = val;
 
 	gpiod_set_array_value_cansleep(mux->data.n_gpios,
-				       mux->gpios, value_bitmap);
+				       mux->gpios, NULL, value_bitmap);
 }
 
 static int i2c_mux_gpio_select(struct i2c_mux_core *muxc, u32 chan)

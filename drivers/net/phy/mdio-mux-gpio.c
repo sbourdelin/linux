@@ -34,7 +34,7 @@ static int mdio_mux_gpio_switch_fn(int current_child, int desired_child,
 	*value_bitmap = desired_child;
 
 	gpiod_set_array_value_cansleep(s->gpios->ndescs, s->gpios->desc,
-				       value_bitmap);
+				       s->gpios->info, value_bitmap);
 
 	return 0;
 }

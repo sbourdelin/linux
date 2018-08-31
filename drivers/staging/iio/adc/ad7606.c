@@ -230,7 +230,8 @@ static int ad7606_write_raw(struct iio_dev *indio_dev,
 		*value_bitmap = ret;
 
 		mutex_lock(&st->lock);
-		gpiod_set_array_value(3, st->gpio_os->desc, value_bitmap);
+		gpiod_set_array_value(3, st->gpio_os->desc, st->gpio_os->info,
+				      value_bitmap);
 		st->oversampling = val;
 		mutex_unlock(&st->lock);
 

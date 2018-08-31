@@ -27,7 +27,8 @@ static int mux_gpio_set(struct mux_control *mux, int state)
 	*value_bitmap = state;
 
 	gpiod_set_array_value_cansleep(mux_gpio->gpios->ndescs,
-				       mux_gpio->gpios->desc, value_bitmap);
+				       mux_gpio->gpios->desc,
+				       mux_gpio->gpios->info, value_bitmap);
 
 	return 0;
 }

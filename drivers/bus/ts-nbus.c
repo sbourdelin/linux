@@ -114,7 +114,8 @@ static void ts_nbus_reset_bus(struct ts_nbus *ts_nbus)
 	
 	*value_bitmap = 0;
 
-	gpiod_set_array_value_cansleep(8, ts_nbus->data->desc, value_bitmap);
+	gpiod_set_array_value_cansleep(8, ts_nbus->data->desc,
+				       ts_nbus->data->info, value_bitmap);
 	gpiod_set_value_cansleep(ts_nbus->csn, 0);
 	gpiod_set_value_cansleep(ts_nbus->strobe, 0);
 	gpiod_set_value_cansleep(ts_nbus->ale, 0);
@@ -157,7 +158,8 @@ static void ts_nbus_write_byte(struct ts_nbus *ts_nbus, u8 byte)
 	struct gpio_descs *gpios = ts_nbus->data;
 	DECLARE_BITMAP(value_bitmap, 8) = { byte, };
 
-	gpiod_set_array_value_cansleep(8, gpios->desc, value_bitmap);
+	gpiod_set_array_value_cansleep(8, gpios->desc, gpios->info,
+				       value_bitmap);
 }
 
 /*
