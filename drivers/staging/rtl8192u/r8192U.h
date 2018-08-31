@@ -165,7 +165,7 @@ struct tx_desc_819x_usb {
 	u8	last_seg:1;
 	u8	first_seg:1;
 	u8	linip:1;
-	u8	OWN:1;
+	u8	own:1;
 
 	/* DWORD 1 */
 	u8	TxFWInfoSize;

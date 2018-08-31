@@ -1558,7 +1558,7 @@ short rtl8192_tx(struct net_device *dev, struct sk_buff *skb)
 	/* DWORD 0 */
 	tx_desc->first_seg = 1;
 	tx_desc->last_seg = 1;
-	tx_desc->OWN = 1;
+	tx_desc->own = 1;
 
 	/* DWORD 2 */
 	tx_desc->TxBufferSize = (u32)(skb->len - USB_HWDESC_HEADER_LEN);
