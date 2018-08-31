@@ -3414,6 +3414,7 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 	unsigned int blkbits = inode->i_blkbits;
 	unsigned long first_block = offset >> blkbits;
 	unsigned long last_block = (offset + length - 1) >> blkbits;
+	unsigned long len;
 	struct ext4_map_blocks map;
 	bool delalloc = false;
 	int ret;
@@ -3434,7 +3435,8 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 	}
 
 	map.m_lblk = first_block;
-	map.m_len = last_block - first_block + 1;
+	len = last_block - first_block + 1;
+	map.m_len = (len < UINT_MAX) ? len : UINT_MAX;
 
 	if (flags & IOMAP_REPORT) {
 		ret = ext4_map_blocks(NULL, inode, &map, 0);
