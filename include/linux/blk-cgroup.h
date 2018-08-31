@@ -56,6 +56,7 @@ struct blkcg {
 	struct list_head		all_blkcgs_node;
 #ifdef CONFIG_CGROUP_WRITEBACK
 	struct list_head		cgwb_list;
+	atomic_t			nr_cgwbs;
 #endif
 };
 
@@ -384,6 +385,34 @@ static inline struct blkcg_gq *pd_to_blkg(struct blkg_policy_data *pd)
 static inline struct blkcg *cpd_to_blkcg(struct blkcg_policy_data *cpd)
 {
 	return cpd ? cpd->blkcg : NULL;
+}
+
+/**
+ * blkcg_cgwb_inc - increment the count for cgwb_list
+ * @blkcg: blkcg of interest
+ *
+ * This is used to count the number of active wb's related to a blkcg.
+ */
+static inline void blkcg_cgwb_inc(struct blkcg *blkcg)
+{
+	atomic_inc(&blkcg->nr_cgwbs);
+}
+
+extern void blkcg_destroy_blkgs(struct blkcg *blkcg);
+
+/**
+ * blkcg_cgwb_dec - decrement the count for cgwb_list
+ * @blkcg: blkcg of interest
+ *
+ * This is used to count the number of active wb's related to a blkcg.
+ * When this count goes to zero, all active wb has finished so the
+ * blkcg can be destroyed.  This does blkg destruction if the nr_cgwbs
+ * drops to zero.
+ */
+static inline void blkcg_cgwb_dec(struct blkcg *blkcg)
+{
+	if (atomic_dec_and_test(&blkcg->nr_cgwbs))
+		blkcg_destroy_blkgs(blkcg);
 }
 
 /**
