@@ -2281,7 +2281,7 @@ static void ib_mad_recv_done(struct ib_cq *cq, struct ib_wc *wc)
 		goto out;
 
 	mad_size = recv->mad_size;
-	response = alloc_mad_private(mad_size, GFP_KERNEL);
+	response = alloc_mad_private(mad_size, GFP_ATOMIC);
 	if (!response)
 		goto out;
 
