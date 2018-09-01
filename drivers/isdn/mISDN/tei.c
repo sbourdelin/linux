@@ -1055,7 +1055,7 @@ create_teimgr(struct manager *mgr, struct channel_req *crq)
 		       crq->adr.tei, crq->adr.sapi);
 	if (!l2)
 		return -ENOMEM;
-	l2->tm = kzalloc(sizeof(struct teimgr), GFP_KERNEL);
+	l2->tm = kzalloc(sizeof(struct teimgr), GFP_ATOMIC);
 	if (!l2->tm) {
 		kfree(l2);
 		printk(KERN_ERR "kmalloc teimgr failed\n");
