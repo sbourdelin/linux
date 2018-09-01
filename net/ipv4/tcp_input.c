@@ -4910,6 +4910,7 @@ restart:
 	while (before(start, end)) {
 		int copy = min_t(int, SKB_MAX_ORDER(0, 0), end - start);
 		struct sk_buff *nskb;
+		int len = copy;
 
 		nskb = alloc_skb(copy, GFP_ATOMIC);
 		if (!nskb)
@@ -4928,12 +4929,24 @@ restart:
 
 		/* Copy data, releasing collapsed skbs. */
 		while (copy > 0) {
-			int offset = start - TCP_SKB_CB(skb)->seq;
 			int size = TCP_SKB_CB(skb)->end_seq - start;
+			int offset = start - TCP_SKB_CB(skb)->seq;
 
 			BUG_ON(offset < 0);
 			if (size > 0) {
-				size = min(copy, size);
+				if (copy >= size) {
+					skb_shinfo(nskb)->gso_segs +=
+						max_t(u16, 1, skb_shinfo(skb)->gso_segs);
+				} else {
+					skb_shinfo(nskb)->gso_size =
+						skb_shinfo(skb)->gso_size;
+					skb_shinfo(nskb)->gso_segs =
+						DIV_ROUND_UP(len, skb_shinfo(nskb)->gso_size);
+					skb_shinfo(skb)->gso_segs =
+						DIV_ROUND_UP(size - copy, skb_shinfo(skb)->gso_size);
+					size = copy;
+				}
+
 				if (skb_copy_bits(skb, offset, skb_put(nskb, size), size))
 					BUG();
 				TCP_SKB_CB(nskb)->end_seq += size;
