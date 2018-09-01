@@ -939,13 +939,13 @@ static void lpss_iosf_exit_d3_state(void)
 
 	mutex_lock(&lpss_iosf_mutex);
 
+	iosf_mbi_modify(LPSS_IOSF_UNIT_LPIOEP, MBI_CR_WRITE,
+			LPSS_IOSF_GPIODEF0, value1, mask1);
+
 	if (!lpss_iosf_d3_entered)
 		goto exit;
 
 	lpss_iosf_d3_entered = false;
-
-	iosf_mbi_modify(LPSS_IOSF_UNIT_LPIOEP, MBI_CR_WRITE,
-			LPSS_IOSF_GPIODEF0, value1, mask1);
 
 	iosf_mbi_modify(LPSS_IOSF_UNIT_LPIO2, MBI_CFG_WRITE,
 			LPSS_IOSF_PMCSR, value2, mask2);
