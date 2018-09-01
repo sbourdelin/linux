@@ -224,7 +224,13 @@ static void  __noreturn pnv_restart(char *cmd)
 	pnv_prepare_going_down();
 
 	while (rc == OPAL_BUSY || rc == OPAL_BUSY_EVENT) {
-		rc = opal_cec_reboot();
+
+		/* See if we need to do a full IPL reboot */
+		if (cmd && strcmp(cmd, "full") == 0)
+			rc = opal_cec_reboot2(OPAL_REBOOT_FULL_IPL, NULL);
+		else
+			rc = opal_cec_reboot();
+
 		if (rc == OPAL_BUSY_EVENT)
 			opal_poll_events(NULL);
 		else
