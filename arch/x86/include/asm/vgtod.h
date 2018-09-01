@@ -32,6 +32,7 @@ struct vsyscall_gtod_data {
 	gtod_long_t	wall_time_coarse_nsec;
 	gtod_long_t	monotonic_time_coarse_sec;
 	gtod_long_t	monotonic_time_coarse_nsec;
+	gtod_long_t	tai_time_sec;
 
 	int		tz_minuteswest;
 	int		tz_dsttime;

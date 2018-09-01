@@ -246,6 +246,27 @@ notrace static int __always_inline do_monotonic(struct timespec *ts)
 	return mode;
 }
 
+notrace static int __always_inline do_tai(struct timespec *ts)
+{
+	unsigned long seq;
+	u64 ns;
+	int mode;
+
+	do {
+		seq = gtod_read_begin(gtod);
+		mode = gtod->vclock_mode;
+		ts->tv_sec = gtod->tai_time_sec;
+		ns = gtod->wall_time_snsec;
+		ns += vgetsns(&mode);
+		ns >>= gtod->shift;
+	} while (unlikely(gtod_read_retry(gtod, seq)));
+
+	ts->tv_sec += __iter_div_u64_rem(ns, NSEC_PER_SEC, &ns);
+	ts->tv_nsec = ns;
+
+	return mode;
+}
+
 notrace static void do_realtime_coarse(struct timespec *ts)
 {
 	unsigned long seq;
@@ -275,6 +296,10 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
 		break;
 	case CLOCK_MONOTONIC:
 		if (do_monotonic(ts) == VCLOCK_NONE)
+			goto fallback;
+		break;
+	case CLOCK_TAI:
+		if (do_tai(ts) == VCLOCK_NONE)
 			goto fallback;
 		break;
 	case CLOCK_REALTIME_COARSE:
