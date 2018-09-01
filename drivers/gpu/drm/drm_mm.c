@@ -127,7 +127,7 @@ static void show_leaks(struct drm_mm *mm)
 	unsigned long entries[STACKDEPTH];
 	char *buf;
 
-	buf = kmalloc(BUFSZ, GFP_KERNEL);
+	buf = kmalloc(BUFSZ, GFP_ATOMIC);
 	if (!buf)
 		return;
 
