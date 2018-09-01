@@ -304,17 +304,11 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 }
 
 /**
- * dwc2_driver_remove() - Called when the DWC_otg core is unregistered with the
- * DWC_otg driver
+ * dwc2_driver_shutdown() - Called on device shutdown
  *
  * @dev: Platform device
- *
- * This routine is called, for example, when the rmmod command is executed. The
- * device may or may not be electrically present. If it is present, the driver
- * stops device processing. Any resources used on behalf of this device are
- * freed.
  */
-static int dwc2_driver_remove(struct platform_device *dev)
+static void dwc2_driver_shutdown(struct platform_device *dev)
 {
 	struct dwc2_hsotg *hsotg = platform_get_drvdata(dev);
 
@@ -329,27 +323,24 @@ static int dwc2_driver_remove(struct platform_device *dev)
 
 	reset_control_assert(hsotg->reset);
 	reset_control_assert(hsotg->reset_ecc);
-
-	return 0;
 }
 
 /**
- * dwc2_driver_shutdown() - Called on device shutdown
+ * dwc2_driver_remove() - Called when the DWC_otg core is unregistered with the
+ * DWC_otg driver
  *
  * @dev: Platform device
  *
- * In specific conditions (involving usb hubs) dwc2 devices can create a
- * lot of interrupts, even to the point of overwhelming devices running
- * at low frequencies. Some devices need to do special clock handling
- * at shutdown-time which may bring the system clock below the threshold
- * of being able to handle the dwc2 interrupts. Disabling dwc2-irqs
- * prevents reboots/poweroffs from getting stuck in such cases.
+ * This routine is called, for example, when the rmmod command is executed. The
+ * device may or may not be electrically present. If it is present, the driver
+ * stops device processing. Any resources used on behalf of this device are
+ * freed.
  */
-static void dwc2_driver_shutdown(struct platform_device *dev)
+static int dwc2_driver_remove(struct platform_device *dev)
 {
-	struct dwc2_hsotg *hsotg = platform_get_drvdata(dev);
+	dwc2_driver_shutdown(dev);
 
-	disable_irq(hsotg->irq);
+	return 0;
 }
 
 /**
