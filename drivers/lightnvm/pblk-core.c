@@ -803,7 +803,7 @@ static int pblk_line_submit_smeta_io(struct pblk *pblk, struct pblk_line *line,
 
 	memset(&rqd, 0, sizeof(struct nvm_rq));
 
-	rqd.meta_list = nvm_dev_dma_alloc(dev->parent, GFP_KERNEL,
+	rqd.meta_list = nvm_dev_dma_alloc(dev->parent, GFP_ATOMIC,
 							&rqd.dma_meta_list);
 	if (!rqd.meta_list)
 		return -ENOMEM;
@@ -811,7 +811,7 @@ static int pblk_line_submit_smeta_io(struct pblk *pblk, struct pblk_line *line,
 	rqd.ppa_list = rqd.meta_list + pblk_dma_meta_size;
 	rqd.dma_ppa_list = rqd.dma_meta_list + pblk_dma_meta_size;
 
-	bio = bio_map_kern(dev->q, line->smeta, lm->smeta_len, GFP_KERNEL);
+	bio = bio_map_kern(dev->q, line->smeta, lm->smeta_len, GFP_ATOMIC);
 	if (IS_ERR(bio)) {
 		ret = PTR_ERR(bio);
 		goto free_ppa_list;
