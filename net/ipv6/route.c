@@ -2737,7 +2737,7 @@ static int ip6_convert_metrics(struct net *net, struct fib6_info *rt,
 	if (!cfg->fc_mx)
 		return 0;
 
-	p = kzalloc(sizeof(*rt->fib6_metrics), GFP_KERNEL);
+	p = kzalloc(sizeof(*rt->fib6_metrics), GFP_ATOMIC);
 	if (unlikely(!p))
 		return -ENOMEM;
 
