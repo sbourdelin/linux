@@ -946,6 +946,8 @@ static void __init __efi_enter_virtual_mode(void)
 
 	pa = __pa(new_memmap);
 
+	efi_save_original_memmap();
+
 	/*
 	 * Unregister the early EFI memmap from efi_init() and install
 	 * the new EFI memory map that we are about to pass to the
