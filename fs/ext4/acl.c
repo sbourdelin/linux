@@ -52,6 +52,8 @@ ext4_acl_from_disk(const void *value, size_t size)
 		case ACL_OTHER:
 			value = (char *)value +
 				sizeof(ext4_acl_entry_short);
+			if ((char *)value > end)
+				goto fail;
 			break;
 
 		case ACL_USER:
