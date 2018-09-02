@@ -144,8 +144,15 @@ extern void efi_switch_mm(struct mm_struct *mm);
 
 #ifdef CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS
 extern void __init efi_save_original_memmap(void);
+extern int efi_illegal_accesses_fixup(unsigned long phys_addr,
+				      struct pt_regs *regs);
 #else
 static inline void __init efi_save_original_memmap(void) { }
+static inline int efi_illegal_accesses_fixup(unsigned long phys_addr,
+					     struct pt_regs *regs)
+{
+	return 0;
+}
 #endif /* CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS */
 
 struct efi_setup_data {

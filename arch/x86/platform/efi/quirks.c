@@ -16,6 +16,7 @@
 #include <asm/efi.h>
 #include <asm/uv/uv.h>
 #include <asm/cpu_device_id.h>
+#include <asm/reboot.h>
 
 #define EFI_MIN_RESERVE 5120
 
@@ -701,5 +702,156 @@ void __init efi_save_original_memmap(void)
 	original_memory_map.desc_version = efi.memmap.desc_version;
 
 	original_memory_map_present = true;
+}
+
+/*
+ * From the original EFI memory map passed by the firmware, return a
+ * pointer to the memory descriptor that describes the given physical
+ * address. If not found, return NULL.
+ */
+static efi_memory_desc_t *efi_get_md(unsigned long phys_addr)
+{
+	efi_memory_desc_t *md;
+
+	for_each_efi_memory_desc_in_map(&original_memory_map, md) {
+		if (md->phys_addr <= phys_addr &&
+		    (phys_addr < (md->phys_addr +
+		    (md->num_pages << EFI_PAGE_SHIFT)))) {
+			return md;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * Detect illegal accesses by the firmware and
+ * 1. If the illegally accessed region is EFI_BOOT_SERVICES_<CODE/DATA>,
+ *   fix it up by mapping the requested region.
+ * 2. If any other region (Eg: EFI_CONVENTIONAL_MEMORY or
+ *   EFI_LOADER_<CODE/DATA>), then
+ *   a. Freeze efi_rts_wq.
+ *   b. Return error status to the efi caller process.
+ *   c. Disable EFI Runtime Services forever and
+ *   d. Schedule another process by explicitly calling scheduler.
+ *
+ * @return: Return 1, if the page fault is handled by mapping the
+ * requested region. Return 0 otherwise.
+ */
+int efi_illegal_accesses_fixup(unsigned long phys_addr, struct pt_regs *regs)
+{
+	char buf[64];
+	efi_memory_desc_t *md;
+	unsigned long long phys_addr_end, size_in_MB;
+
+	/* Fix page faults caused *only* by the firmware */
+	if (current->active_mm != &efi_mm)
+		return 0;
+
+	/*
+	 * Address range 0x0000 - 0x0fff is always mapped in the efi_pgd, so
+	 * page faulting on these addresses isn't expected.
+	 */
+	if (phys_addr >= 0x0000 && phys_addr <= 0x0fff)
+		return 0;
+
+	/*
+	 * Original memory map is needed to retrieve the memory descriptor
+	 * that the firmware has faulted on. So, check if the kernel had
+	 * saved the original memory map passed by the firmware during boot.
+	 */
+	if (!original_memory_map_present) {
+		pr_info("Original memory map not found, aborting fixing illegal "
+			"access by firmware\n");
+		return 0;
+	}
+
+	/*
+	 * EFI Memory map could sometimes have holes, eg: SMRAM. So, make
+	 * sure that a valid memory descriptor is present for the physical
+	 * address that triggered page fault.
+	 */
+	md = efi_get_md(phys_addr);
+	if (!md) {
+		pr_info("Failed to find EFI memory descriptor for PA: 0x%lx\n",
+			phys_addr);
+		return 0;
+	}
+
+	/*
+	 * EFI_RUNTIME_SERVICES_<CODE/DATA> regions are mapped into efi_pgd
+	 * by the kernel during boot and hence accesses to these regions
+	 * should never page fault.
+	 */
+	if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+	    md->type == EFI_RUNTIME_SERVICES_DATA) {
+		pr_info("Kernel shouldn't page fault on accesses to "
+			"EFI_RUNTIME_SERVICES_<CODE/DATA> regions\n");
+		return 0;
+	}
+
+	/*
+	 * Now it's clear that an illegal access by the firmware has caused
+	 * the page fault. Print stack trace and memory descriptor as it is
+	 * useful to know which EFI Runtime Service is buggy and what did it
+	 * try to access.
+	 */
+	phys_addr_end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1;
+	size_in_MB = md->num_pages >> (20 - EFI_PAGE_SHIFT);
+	WARN(1, FW_BUG "Detected illegal access by Firmware at PA: 0x%lx\n",
+	     phys_addr);
+	pr_info("EFI Memory Descriptor for offending PA is:\n");
+	pr_info("%s range=[0x%016llx-0x%016llx] (%lluMB)\n",
+		efi_md_typeattr_format(buf, sizeof(buf), md), md->phys_addr,
+		phys_addr_end, size_in_MB);
+
+	/*
+	 * Fix illegal accesses by firmware to EFI_BOOT_SERVICES_<CODE/DATA>
+	 * regions by creating VA->PA mappings. Further accesses to these
+	 * regions will not page fault.
+	 */
+	if (md->type == EFI_BOOT_SERVICES_CODE ||
+	    md->type == EFI_BOOT_SERVICES_DATA) {
+		efi_map_region(md);
+		pr_info("Fixed illegal access at PA: 0x%lx\n", phys_addr);
+		return 1;
+	}
+
+	/*
+	 * Buggy efi_reset_system() is handled differently from other EFI
+	 * Runtime Services as it doesn't use efi_rts_wq. Although,
+	 * native_machine_emergency_restart() says that machine_real_restart()
+	 * could fail, it's better not to compilcate this fault handler
+	 * because this case occurs *very* rarely and hence could be improved
+	 * on a need by basis.
+	 */
+	if (efi_rts_work.efi_rts_id == RESET_SYSTEM) {
+		pr_info("efi_reset_system() buggy! Reboot through BIOS\n");
+		machine_real_restart(MRR_BIOS);
+		return 0;
+	}
+
+	/*
+	 * Firmware didn't page fault on EFI_RUNTIME_SERVICES_<CODE/DATA> or
+	 * EFI_BOOT_SERVICES_<CODE/DATA> regions. This means that the
+	 * firmware has illegally accessed some other EFI region which can't
+	 * be fixed. Hence, freeze efi_rts_wq.
+	 */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+
+	/*
+	 * Before calling EFI Runtime Service, the kernel has switched the
+	 * calling process to efi_mm. Hence, switch back to task_mm.
+	 */
+	arch_efi_call_virt_teardown();
+
+	/* Signal error status to the efi caller process */
+	efi_rts_work.status = EFI_ABORTED;
+	complete(&efi_rts_work.efi_rts_comp);
+
+	clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+	pr_info("Froze efi_rts_wq and disabled EFI Runtime Services\n");
+	schedule();
+
+	return 0;
 }
 #endif /* CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS */
