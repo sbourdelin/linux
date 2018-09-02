@@ -1107,11 +1107,23 @@ extern int efi_memattr_apply_permissions(struct mm_struct *mm,
 	for_each_efi_memory_desc_in_map(&efi.memmap, md)
 
 /*
+ * __efi_init_fixup - if CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS is enabled,
+ *		  remove __init modifier.
+ */
+#ifdef CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS
+#define __efi_init_fixup
+#define __efi_initdata_fixup
+#else
+#define __efi_init_fixup __init
+#define __efi_initdata_fixup __initdata
+#endif
+
+/*
  * Format an EFI memory descriptor's type and attributes to a user-provided
  * character buffer, as per snprintf(), and return the buffer.
  */
-char * __init efi_md_typeattr_format(char *buf, size_t size,
-				     const efi_memory_desc_t *md);
+char * __efi_init_fixup efi_md_typeattr_format(char *buf, size_t size,
+					       const efi_memory_desc_t *md);
 
 /**
  * efi_range_is_wc - check the WC bit on an address range

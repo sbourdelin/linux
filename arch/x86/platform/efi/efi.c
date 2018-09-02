@@ -572,7 +572,7 @@ void __init runtime_code_page_mkexec(void)
 	}
 }
 
-void __init efi_memory_uc(u64 addr, unsigned long size)
+void __efi_init_fixup efi_memory_uc(u64 addr, unsigned long size)
 {
 	unsigned long page_shift = 1UL << EFI_PAGE_SHIFT;
 	u64 npages;
@@ -582,7 +582,7 @@ void __init efi_memory_uc(u64 addr, unsigned long size)
 	set_memory_uc(addr, npages);
 }
 
-void __init old_map_region(efi_memory_desc_t *md)
+void __efi_init_fixup old_map_region(efi_memory_desc_t *md)
 {
 	u64 start_pfn, end_pfn, end;
 	unsigned long size;

@@ -58,7 +58,7 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 	return 0;
 }
 
-void __init efi_map_region(efi_memory_desc_t *md)
+void __efi_init_fixup efi_map_region(efi_memory_desc_t *md)
 {
 	old_map_region(md);
 }
