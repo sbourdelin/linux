@@ -1506,9 +1506,7 @@ static int fat_read_bpb(struct super_block *sb, struct fat_boot_sector *b,
 		goto out;
 	}
 
-	if (!is_power_of_2(bpb->fat_sector_size)
-	    || (bpb->fat_sector_size < 512)
-	    || (bpb->fat_sector_size > 4096)) {
+	if (!is_power_of_2(bpb->fat_sector_size)) {
 		if (!silent)
 			fat_msg(sb, KERN_ERR, "bogus logical sector size %u",
 			       (unsigned)bpb->fat_sector_size);
