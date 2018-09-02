@@ -224,8 +224,11 @@ static int get_port_device_capability(struct pci_dev *dev)
 		/*
 		 * Disable AER on this port in case it's been enabled by the
 		 * BIOS (the AER service driver will enable it when necessary).
+		 * Don't disable it if the AER service driver has already
+		 * enabled it from the root port bus walking
 		 */
-		pci_disable_pcie_error_reporting(dev);
+		if (!dev->aer_configured)
+			pci_disable_pcie_error_reporting(dev);
 	}
 #endif
 

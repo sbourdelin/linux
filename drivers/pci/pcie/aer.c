@@ -1333,6 +1333,7 @@ static int set_device_error_reporting(struct pci_dev *dev, void *data)
 	if (enable)
 		pcie_set_ecrc_checking(dev);
 
+	dev->aer_configured = 1;
 	return 0;
 }
 
