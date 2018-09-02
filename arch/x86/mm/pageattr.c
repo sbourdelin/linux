@@ -926,7 +926,13 @@ static void unmap_pud_range(p4d_t *p4d, unsigned long start, unsigned long end)
 
 static int alloc_pte_page(pmd_t *pmd)
 {
-	pte_t *pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
+	pte_t *pte;
+
+	if (in_atomic())
+		pte = (pte_t *)get_zeroed_page(GFP_ATOMIC);
+	else
+		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
+
 	if (!pte)
 		return -1;
 
@@ -936,7 +942,13 @@ static int alloc_pte_page(pmd_t *pmd)
 
 static int alloc_pmd_page(pud_t *pud)
 {
-	pmd_t *pmd = (pmd_t *)get_zeroed_page(GFP_KERNEL);
+	pmd_t *pmd;
+
+	if (in_atomic())
+		pmd = (pmd_t *)get_zeroed_page(GFP_ATOMIC);
+	else
+		pmd = (pmd_t *)get_zeroed_page(GFP_KERNEL);
+
 	if (!pmd)
 		return -1;
 
