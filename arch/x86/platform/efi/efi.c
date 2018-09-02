@@ -768,9 +768,13 @@ static bool should_map_region(efi_memory_desc_t *md)
 	/*
 	 * Map boot services regions as a workaround for buggy
 	 * firmware that accesses them even when they shouldn't.
+	 * (only if CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS is disabled)
 	 *
 	 * See efi_{reserve,free}_boot_services().
 	 */
+	if (IS_ENABLED(CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS))
+		return false;
+
 	if (md->type == EFI_BOOT_SERVICES_CODE ||
 	    md->type == EFI_BOOT_SERVICES_DATA)
 		return true;
