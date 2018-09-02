@@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
 		if (val & PCIE_ATU_ENABLE)
 			return;
 
-		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+		udelay(LINK_WAIT_IATU_MAX);
 	}
 	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
 }
