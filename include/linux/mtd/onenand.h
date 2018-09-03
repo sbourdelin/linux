@@ -221,6 +221,7 @@ struct onenand_manufacturers {
         char *name;
 };
 
+struct mtd_oob_ops;
 int onenand_bbt_read_oob(struct mtd_info *mtd, loff_t from,
 			 struct mtd_oob_ops *ops);
 unsigned onenand_block(struct onenand_chip *this, loff_t addr);
