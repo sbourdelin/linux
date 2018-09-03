@@ -16,6 +16,7 @@ Contents:
    e1000
    e1000e
    fm10k
+   igb
    ixgb
    kapi
    z8530book
