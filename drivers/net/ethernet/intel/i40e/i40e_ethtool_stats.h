@@ -190,7 +190,7 @@ i40e_add_queue_stats(u64 **data, struct i40e_ring *ring)
  * Format and copy the strings described by stats into the buffer pointed at
  * by p.
  **/
-static inline void __i40e_add_stat_strings(u8 **p, const struct i40e_stats stats[],
+static void __i40e_add_stat_strings(u8 **p, const struct i40e_stats stats[],
 				    const unsigned int size, ...)
 {
 	unsigned int i;
