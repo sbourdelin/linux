@@ -268,9 +268,10 @@ static int ptrace_has_cap(struct user_namespace *ns, unsigned int mode)
 }
 
 /* Returns 0 on success, -errno on denial. */
-static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
+int ___ptrace_may_access(struct task_struct *curr, struct task_struct *task,
+		unsigned int mode)
 {
-	const struct cred *cred = current_cred(), *tcred;
+	const struct cred *cred, *tcred;
 	struct mm_struct *mm;
 	kuid_t caller_uid;
 	kgid_t caller_gid;
@@ -290,9 +291,10 @@ static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
 	 */
 
 	/* Don't let security modules deny introspection */
-	if (same_thread_group(task, current))
+	if (same_thread_group(task, curr))
 		return 0;
 	rcu_read_lock();
+	cred =  __task_cred(curr);
 	if (mode & PTRACE_MODE_FSCREDS) {
 		caller_uid = cred->fsuid;
 		caller_gid = cred->fsgid;
@@ -329,6 +331,11 @@ ok:
 	    return -EPERM;
 
 	return security_ptrace_access_check(task, mode);
+}
+
+static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
+{
+	return ___ptrace_may_access(current, task, mode);
 }
 
 bool ptrace_may_access(struct task_struct *task, unsigned int mode)

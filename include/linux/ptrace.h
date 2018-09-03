@@ -87,6 +87,18 @@ extern void exit_ptrace(struct task_struct *tracer, struct list_head *dead);
  */
 extern bool ptrace_may_access(struct task_struct *task, unsigned int mode);
 
+/**
+ * ___ptrace_may_access - variant of ptrace_may_access that can be used
+ * between two arbitrary tasks
+ * @curr: source task
+ * @task: target task
+ * @mode: selects type of access and caller credentials
+ *
+ * Returns true on success, false on denial.
+ */
+extern int ___ptrace_may_access(struct task_struct *curr, struct task_struct *task,
+				unsigned int mode);
+
 static inline int ptrace_reparented(struct task_struct *child)
 {
 	return !same_thread_group(child->real_parent, child->parent);
