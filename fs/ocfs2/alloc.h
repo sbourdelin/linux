@@ -323,4 +323,10 @@ int ocfs2_find_cpos_for_left_leaf(struct super_block *sb,
 int ocfs2_find_subtree_root(struct ocfs2_extent_tree *et,
 			    struct ocfs2_path *left,
 			    struct ocfs2_path *right);
+
+int ocfs2_free_local_alloc_bits(struct ocfs2_super *osb,
+				handle_t *handle,
+				struct ocfs2_alloc_context *ac,
+				u32 bit_off,
+				u32 num_bits);
 #endif /* OCFS2_ALLOC_H */
