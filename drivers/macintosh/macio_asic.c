@@ -403,19 +403,19 @@ static struct macio_dev * macio_add_one_device(struct macio_chip *chip,
 
 	/* MacIO itself has a different reg, we use it's PCI base */
 	if (np == chip->of_node) {
-		dev_set_name(&dev->ofdev.dev, "%1d.%08x:%.*s",
+		dev_set_name(&dev->ofdev.dev, "%1d.%08x:%.*pOFn",
 			     chip->lbus.index,
 #ifdef CONFIG_PCI
 			(unsigned int)pci_resource_start(chip->lbus.pdev, 0),
 #else
 			0, /* NuBus may want to do something better here */
 #endif
-			MAX_NODE_NAME_SIZE, np->name);
+			MAX_NODE_NAME_SIZE, np);
 	} else {
 		reg = of_get_property(np, "reg", NULL);
-		dev_set_name(&dev->ofdev.dev, "%1d.%08x:%.*s",
+		dev_set_name(&dev->ofdev.dev, "%1d.%08x:%.*pOFn",
 			     chip->lbus.index,
-			     reg ? *reg : 0, MAX_NODE_NAME_SIZE, np->name);
+			     reg ? *reg : 0, MAX_NODE_NAME_SIZE, np);
 	}
 
 	/* Setup interrupts & resources */
