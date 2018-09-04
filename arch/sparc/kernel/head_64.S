@@ -942,7 +942,7 @@ swapper_4m_tsb:
 ! 0x0000000000428000
 
 #include "hvcalls.S"
-#include "systbls_64.S"
+#include "syscall_table_64.S"
 
 	.data
 	.align	8
