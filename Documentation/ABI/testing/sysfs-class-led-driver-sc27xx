@@ -1,0 +1,11 @@
+What:		/sys/class/leds/<led>/hw_pattern
+Date:		September 2018
+KernelVersion:	4.20
+Description:
+		Specify a hardware pattern for the SC27XX LED. For the SC27XX
+		LED controller, it only supports 4 hardware patterns to configure
+		the low time, rise time, high time and fall time for the breathing
+		mode, and each stage duration unit is 125ms. So the format of
+		the hardware pattern values should be:
+		"brightness_1 duration_1 brightness_2 duration_2 brightness_3
+		duration_3 brightness_4 duration_4".
