@@ -18,8 +18,6 @@
 #include "afs_fs.h"
 #include "xdr_fs.h"
 
-static const struct afs_fid afs_zero_fid;
-
 /*
  * We need somewhere to discard into in case the server helpfully returns more
  * than we asked for in FS.FetchData{,64}.
