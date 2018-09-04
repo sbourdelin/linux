@@ -130,6 +130,9 @@ static inline struct crypto_skcipher *crypto_spawn_skcipher(
 static inline int crypto_skcipher_set_reqsize(
 	struct crypto_skcipher *skcipher, unsigned int reqsize)
 {
+	if (WARN_ON(reqsize > SKCIPHER_MAX_REQSIZE))
+		return -EINVAL;
+
 	skcipher->reqsize = reqsize;
 
 	return 0;
