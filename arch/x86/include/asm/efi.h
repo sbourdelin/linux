@@ -141,6 +141,12 @@ extern int __init efi_reuse_config(u64 tables, int nr_tables);
 extern void efi_delete_dummy_variable(void);
 extern void efi_switch_mm(struct mm_struct *mm);
 
+#ifdef CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS
+extern void __init efi_save_original_memmap(void);
+#else
+static inline void __init efi_save_original_memmap(void) { }
+#endif /* CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS */
+
 struct efi_setup_data {
 	u64 fw_vendor;
 	u64 runtime;

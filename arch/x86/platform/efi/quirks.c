@@ -654,3 +654,51 @@ int efi_capsule_setup_info(struct capsule_info *cap_info, void *kbuff,
 }
 
 #endif
+
+#ifdef CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS
+
+static bool original_memory_map_present;
+static struct efi_memory_map original_memory_map;
+
+/*
+ * The efi page fault handler that recovers from page faults caused by
+ * buggy firmware needs original memory map passed by firmware. Hence,
+ * build a new EFI memmap that has all entries and save it for later use.
+ */
+void __init efi_save_original_memmap(void)
+{
+	efi_memory_desc_t *md;
+	void *remapped_phys, *new_md;
+	phys_addr_t new_phys, new_size;
+
+	new_size = efi.memmap.desc_size * efi.memmap.nr_map;
+	new_phys = efi_memmap_alloc(efi.memmap.nr_map);
+	if (!new_phys) {
+		pr_err("Failed to allocate new EFI memmap\n");
+		return;
+	}
+
+	remapped_phys = memremap(new_phys, new_size, MEMREMAP_WB);
+	if (!remapped_phys) {
+		pr_err("Failed to remap new EFI memmap\n");
+		__free_pages(pfn_to_page(PHYS_PFN(new_phys)), get_order(new_size));
+		return;
+	}
+
+	new_md = remapped_phys;
+	for_each_efi_memory_desc(md) {
+		memcpy(new_md, md, efi.memmap.desc_size);
+		new_md += efi.memmap.desc_size;
+	}
+
+	original_memory_map.late = 1;
+	original_memory_map.phys_map = new_phys;
+	original_memory_map.map = remapped_phys;
+	original_memory_map.nr_map = efi.memmap.nr_map;
+	original_memory_map.desc_size = efi.memmap.desc_size;
+	original_memory_map.map_end = remapped_phys + new_size;
+	original_memory_map.desc_version = efi.memmap.desc_version;
+
+	original_memory_map_present = true;
+}
+#endif /* CONFIG_EFI_WARN_ON_ILLEGAL_ACCESS */
