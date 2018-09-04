@@ -476,6 +476,17 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 	delta = freeable >> priority;
 	delta *= 4;
 	do_div(delta, shrinker->seeks);
+
+	/*
+	 * Make sure we apply some minimal pressure even on
+	 * small cgroups. This is necessary because some of
+	 * belonging objects can hold a reference to a dying
+	 * child cgroup. If we don't scan them, the dying
+	 * cgroup can't go away unless the memory pressure
+	 * (and the scanning priority) raise significantly.
+	 */
+	delta = max(delta, min(freeable, batch_size));
+
 	total_scan += delta;
 	if (total_scan < 0) {
 		pr_err("shrink_slab: %pF negative objects to delete nr=%ld\n",
