@@ -970,7 +970,14 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen,
 	 */
 	ret = cpuhp_down_callbacks(cpu, st, target);
 	if (ret && st->state > CPUHP_TEARDOWN_CPU && st->state < prev_state) {
-		cpuhp_reset_state(st, prev_state);
+		/*
+		 * As st->last is not set, cpuhp_reset_state() increments
+		 * st->state, which results in CPUHP_AP_SMPBOOT_THREADS being
+		 * skipped during rollback. So, don't use it here.
+		 */
+		st->rollback = true;
+		st->target = prev_state;
+		st->bringup = !st->bringup;
 		__cpuhp_kick_ap(st);
 	}
 
