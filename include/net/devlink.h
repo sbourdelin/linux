@@ -781,7 +781,7 @@ static inline int
 devlink_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
 				   union devlink_param_value init_val)
 {
-	return -EOPNOTSUPP;
+	return 0;
 }
 
 static inline void
