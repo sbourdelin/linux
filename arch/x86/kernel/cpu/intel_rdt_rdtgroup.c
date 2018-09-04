@@ -1329,7 +1329,7 @@ static struct rftype res_common_files[] = {
 		.mode		= 0444,
 		.kf_ops		= &rdtgroup_kf_single_ops,
 		.seq_show	= rdtgroup_size_show,
-		.fflags		= RF_CTRL_BASE,
+		.fflags		= RF_CTRL_INFO | RFTYPE_RES_CACHE,
 	},
 
 };
