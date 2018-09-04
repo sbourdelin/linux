@@ -696,7 +696,7 @@ int __meminit sparse_add_one_section(struct pglist_data *pgdat,
 		goto out;
 	}
 
-#ifdef CONFIG_DEBUG_VM
+#ifdef CONFIG_DEBUG_VM_PGFLAGS
 	/*
 	 * Poison uninitialized struct pages in order to catch invalid flags
 	 * combinations.
