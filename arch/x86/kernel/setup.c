@@ -93,6 +93,7 @@
 #include <asm/processor.h>
 #include <asm/bugs.h>
 #include <asm/kasan.h>
+#include <asm/cmdline.h>
 
 #include <asm/vsyscall.h>
 #include <asm/cpu.h>
@@ -862,6 +863,16 @@ void __init setup_arch(char **cmdline_p)
 #else
 	printk(KERN_INFO "Command line: %s\n", boot_command_line);
 	boot_cpu_data.x86_phys_bits = MAX_PHYSMEM_BITS;
+#endif
+
+#if !defined CONFIG_CMDLINE_BOOL || !defined CONFIG_CMDLINE_OVERRIDE
+	/*
+	 * We call parse_early_param() somewhat late, see x86_configure_nx()
+	 * comment. Deal with "quiet" here to suppress printing of early
+	 * boot messages when quiet has been requested.
+	 */
+	if (cmdline_find_option_bool(boot_command_line, "quiet"))
+		console_loglevel = CONSOLE_LOGLEVEL_QUIET;
 #endif
 
 	/*
