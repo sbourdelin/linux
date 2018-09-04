@@ -1504,6 +1504,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		hugetlb = true;
 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
 	} else {
+		unsigned long pmd_fn_mask = PTRS_PER_PMD - 1;
+
 		/*
 		 * Pages belonging to memslots that don't have the same
 		 * alignment for userspace and IPA cannot be mapped using
@@ -1513,8 +1515,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		 * unmapping, updates, and splits of the THP or other pages
 		 * in the stage-2 block range.
 		 */
-		if ((memslot->userspace_addr & ~PMD_MASK) !=
-		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
+		int aligned = ((memslot->userspace_addr & ~PMD_MASK) ==
+			((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK));
+
+		/*
+		 * We also can't map a huge page if it would violate the bounds
+		 * of the containing memslot.
+		 */
+		int in_bounds = ((memslot->base_gfn <= (gfn & ~pmd_fn_mask)) &&
+			((memslot->base_gfn + memslot->npages) > (gfn | pmd_fn_mask)));
+
+		if (!aligned || !in_bounds)
 			force_pte = true;
 	}
 	up_read(&current->mm->mmap_sem);
