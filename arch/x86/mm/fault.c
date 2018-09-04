@@ -16,6 +16,7 @@
 #include <linux/prefetch.h>		/* prefetchw			*/
 #include <linux/context_tracking.h>	/* exception_enter(), ...	*/
 #include <linux/uaccess.h>		/* faulthandler_disabled()	*/
+#include <linux/efi.h>			/* fixup for buggy UEFI firmware*/
 
 #include <asm/cpufeature.h>		/* boot_cpu_has, ...		*/
 #include <asm/traps.h>			/* dotraplinkage, ...		*/
@@ -24,6 +25,7 @@
 #include <asm/vsyscall.h>		/* emulate_vsyscall		*/
 #include <asm/vm86.h>			/* struct vm86			*/
 #include <asm/mmu_context.h>		/* vma_pkey()			*/
+#include <asm/efi.h>			/* fixup for buggy UEFI firmware*/
 
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
@@ -787,6 +789,13 @@ no_context(struct pt_regs *regs, unsigned long error_code,
 		return;
 
 	if (is_errata93(regs, address))
+		return;
+
+	/*
+	 * Buggy firmware could trigger illegal accesses to some EFI regions
+	 * which might page fault, try to recover from such faults.
+	 */
+	if (efi_illegal_accesses_fixup(address))
 		return;
 
 	/*
