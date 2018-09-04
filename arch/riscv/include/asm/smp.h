@@ -27,6 +27,16 @@
 /* SMP initialization hook for setup_arch */
 void __init setup_smp(void);
 
+/*
+ * Called from C code, this handles an IPI.
+ */
+void handle_IPI(struct pt_regs *regs);
+
+/*
+ * Provide a function to raise an IPI on CPUs in callmap.
+ */
+void __init set_smp_ipi_trigger(void (*fn)(const struct cpumask *));
+
 /* Hook for the generic smp_call_function_many() routine. */
 void arch_send_call_function_ipi_mask(struct cpumask *mask);
 

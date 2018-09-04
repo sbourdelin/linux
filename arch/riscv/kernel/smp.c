@@ -38,16 +38,18 @@ enum ipi_message_type {
 	IPI_MAX
 };
 
-
 /* Unsupported */
 int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
 }
 
-void riscv_software_interrupt(void)
+void handle_IPI(struct pt_regs *regs)
 {
+	struct pt_regs *old_regs = set_irq_regs(regs);
 	unsigned long *pending_ipis = &ipi_data[smp_processor_id()].bits;
+
+	irq_enter();
 
 	/* Clear pending IPI */
 	csr_clear(sip, SIE_SSIE);
@@ -60,7 +62,7 @@ void riscv_software_interrupt(void)
 
 		ops = xchg(pending_ipis, 0);
 		if (ops == 0)
-			return;
+			goto done;
 
 		if (ops & (1 << IPI_RESCHEDULE))
 			scheduler_ipi();
@@ -73,6 +75,17 @@ void riscv_software_interrupt(void)
 		/* Order data access and bit testing. */
 		mb();
 	}
+
+done:
+	irq_exit();
+	set_irq_regs(old_regs);
+}
+
+static void (*__smp_ipi_trigger)(const struct cpumask *);
+
+void __init set_smp_ipi_trigger(void (*fn)(const struct cpumask *))
+{
+	__smp_ipi_trigger = fn;
 }
 
 static void
@@ -85,7 +98,9 @@ send_ipi_message(const struct cpumask *to_whom, enum ipi_message_type operation)
 		set_bit(operation, &ipi_data[i].bits);
 
 	mb();
-	sbi_send_ipi(cpumask_bits(to_whom));
+
+	if (__smp_ipi_trigger)
+		__smp_ipi_trigger(to_whom);
 }
 
 void arch_send_call_function_ipi_mask(struct cpumask *mask)

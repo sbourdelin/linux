@@ -9,6 +9,8 @@
 #include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 
+#include <asm/sbi.h>
+
 /*
  * Possible interrupt causes:
  */
@@ -26,12 +28,15 @@
 
 asmlinkage void __irq_entry do_IRQ(struct pt_regs *regs, unsigned long cause)
 {
-	struct pt_regs *old_regs = set_irq_regs(regs);
+	struct pt_regs *old_regs;
 
-	irq_enter();
 	switch (cause & ~INTERRUPT_CAUSE_FLAG) {
 	case INTERRUPT_CAUSE_TIMER:
+		old_regs = set_irq_regs(regs);
+		irq_enter();
 		riscv_timer_interrupt();
+		irq_exit();
+		set_irq_regs(old_regs);
 		break;
 #ifdef CONFIG_SMP
 	case INTERRUPT_CAUSE_SOFTWARE:
@@ -39,21 +44,32 @@ asmlinkage void __irq_entry do_IRQ(struct pt_regs *regs, unsigned long cause)
 		 * We only use software interrupts to pass IPIs, so if a non-SMP
 		 * system gets one, then we don't know what to do.
 		 */
-		riscv_software_interrupt();
+		handle_IPI(regs);
 		break;
 #endif
 	case INTERRUPT_CAUSE_EXTERNAL:
+		old_regs = set_irq_regs(regs);
+		irq_enter();
 		handle_arch_irq(regs);
+		irq_exit();
+		set_irq_regs(old_regs);
 		break;
 	default:
 		panic("unexpected interrupt cause");
 	}
-	irq_exit();
-
-	set_irq_regs(old_regs);
 }
+
+#ifdef CONFIG_SMP
+static void smp_ipi_trigger_sbi(const struct cpumask *to_whom)
+{
+	sbi_send_ipi(cpumask_bits(to_whom));
+}
+#endif
 
 void __init init_IRQ(void)
 {
 	irqchip_init();
+#ifdef CONFIG_SMP
+	set_smp_ipi_trigger(smp_ipi_trigger_sbi);
+#endif
 }
