@@ -8,6 +8,7 @@
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/irqchip.h>
+#include <linux/irqchip/chained_irq.h>
 #include <linux/irqdomain.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -146,13 +147,16 @@ static struct irq_domain *plic_irqdomain;
  * that source ID back to the same claim register.  This automatically enables
  * and disables the interrupt, so there's nothing else to do.
  */
-static void plic_handle_irq(struct pt_regs *regs)
+static void plic_handle_irq(struct irq_desc *desc)
 {
 	struct plic_handler *handler = this_cpu_ptr(&plic_handlers);
+	struct irq_chip *chip = irq_desc_get_chip(desc);
 	void __iomem *claim = plic_hart_offset(handler->ctxid) + CONTEXT_CLAIM;
 	irq_hw_number_t hwirq;
 
 	WARN_ON_ONCE(!handler->present);
+
+	chained_irq_enter(chip, desc);
 
 	csr_clear(sie, SIE_SEIE);
 	while ((hwirq = readl(claim))) {
@@ -166,6 +170,8 @@ static void plic_handle_irq(struct pt_regs *regs)
 		writel(hwirq, claim);
 	}
 	csr_set(sie, SIE_SEIE);
+
+	chained_irq_exit(chip, desc);
 }
 
 /*
@@ -183,7 +189,7 @@ static int plic_find_hart_id(struct device_node *node)
 }
 
 static int __init plic_init(struct device_node *node,
-		struct device_node *parent)
+			    struct device_node *parent)
 {
 	int error = 0, nr_handlers, nr_mapped = 0, i;
 	u32 nr_irqs;
@@ -218,7 +224,7 @@ static int __init plic_init(struct device_node *node,
 		struct of_phandle_args parent;
 		struct plic_handler *handler;
 		irq_hw_number_t hwirq;
-		int cpu;
+		int cpu, parent_irq;
 
 		if (of_irq_parse_one(node, i, &parent)) {
 			pr_err("failed to parse parent for context %d.\n", i);
@@ -228,6 +234,13 @@ static int __init plic_init(struct device_node *node,
 		/* skip context holes */
 		if (parent.args[0] == -1)
 			continue;
+
+		if (irq_find_host(parent.np)) {
+			parent_irq = irq_of_parse_and_map(node, i);
+			if (parent_irq)
+				irq_set_chained_handler(parent_irq,
+							plic_handle_irq);
+		}
 
 		cpu = plic_find_hart_id(parent.np);
 		if (cpu < 0) {
@@ -248,7 +261,7 @@ static int __init plic_init(struct device_node *node,
 
 	pr_info("mapped %d interrupts to %d (out of %d) handlers.\n",
 		nr_irqs, nr_mapped, nr_handlers);
-	set_handle_irq(plic_handle_irq);
+
 	return 0;
 
 out_iounmap:

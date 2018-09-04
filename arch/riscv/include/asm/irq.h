@@ -15,7 +15,20 @@
 #ifndef _ASM_RISCV_IRQ_H
 #define _ASM_RISCV_IRQ_H
 
-#define NR_IRQS         0
+/*
+ * Possible interrupt causes:
+ */
+#define INTERRUPT_CAUSE_SOFTWARE    1
+#define INTERRUPT_CAUSE_TIMER       5
+#define INTERRUPT_CAUSE_EXTERNAL    9
+
+/*
+ * The high order bit of the trap cause register is always set for
+ * interrupts, which allows us to differentiate them from exceptions
+ * quickly.  The INTERRUPT_CAUSE_* macros don't contain that bit, so we
+ * need to mask it off.
+ */
+#define INTERRUPT_CAUSE_FLAG	(1UL << (__riscv_xlen - 1))
 
 void riscv_timer_interrupt(void);
 
