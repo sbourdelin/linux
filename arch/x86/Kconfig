@@ -1957,6 +1957,23 @@ config EFI_MIXED
 
 	   If unsure, say N.
 
+config EFI_WARN_ON_ILLEGAL_ACCESS
+	bool "Warn about illegal memory accesses by firmware" if EXPERT
+	depends on EFI
+	help
+	  Enable this debug feature so that the kernel can detect illegal
+	  memory accesses by firmware and issue a warning. Also,
+	  1. If the illegally accessed region is any region other than
+	     EFI_RUNTIME_SERVICES_<CODE/DATA>, then the kernel freezes
+	     efi_rts_wq and schedules a new process. Also, it disables EFI
+	     Runtime Services, so that it will never again call buggy firmware.
+	  2. If the illegal access is by efi_reset_system(), then the
+	     platform is rebooted through BIOS.
+	  Please see the UEFI specification for details on the expectations
+	  of memory usage.
+
+	  If unsure, say N.
+
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"
