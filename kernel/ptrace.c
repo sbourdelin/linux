@@ -330,7 +330,9 @@ ok:
 	     !ptrace_has_cap(mm->user_ns, mode)))
 	    return -EPERM;
 
-	return security_ptrace_access_check(task, mode);
+	if (!(mode & PTRACE_MODE_NOACCESS_CHK))
+		return security_ptrace_access_check(task, mode);
+	return 0;
 }
 
 static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
