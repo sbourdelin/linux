@@ -241,10 +241,8 @@ static int mv_cesa_skcipher_cra_init(struct crypto_tfm *tfm)
 
 	ctx->ops = &mv_cesa_skcipher_req_ops;
 
-	crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
+	return crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
 				    sizeof(struct mv_cesa_skcipher_req));
-
-	return 0;
 }
 
 static int mv_cesa_aes_setkey(struct crypto_skcipher *cipher, const u8 *key,

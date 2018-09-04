@@ -127,10 +127,12 @@ static inline struct crypto_skcipher *crypto_spawn_skcipher(
 	return crypto_spawn_tfm2(&spawn->base);
 }
 
-static inline void crypto_skcipher_set_reqsize(
+static inline int crypto_skcipher_set_reqsize(
 	struct crypto_skcipher *skcipher, unsigned int reqsize)
 {
 	skcipher->reqsize = reqsize;
+
+	return 0;
 }
 
 int crypto_register_skcipher(struct skcipher_alg *alg);

@@ -74,6 +74,7 @@ static int nitrox_skcipher_init(struct crypto_skcipher *tfm)
 {
 	struct nitrox_crypto_ctx *nctx = crypto_skcipher_ctx(tfm);
 	void *fctx;
+	int ret;
 
 	/* get the first device */
 	nctx->ndev = nitrox_get_first_device();
@@ -87,9 +88,13 @@ static int nitrox_skcipher_init(struct crypto_skcipher *tfm)
 		return -ENOMEM;
 	}
 	nctx->u.ctx_handle = (uintptr_t)fctx;
-	crypto_skcipher_set_reqsize(tfm, crypto_skcipher_reqsize(tfm) +
+	ret = crypto_skcipher_set_reqsize(tfm, crypto_skcipher_reqsize(tfm) +
 				    sizeof(struct nitrox_kcrypt_request));
-	return 0;
+	if (ret) {
+		crypto_free_context(fctx);
+		nitrox_put_device(nctx->ndev);
+	}
+	return ret;
 }
 
 static void nitrox_skcipher_exit(struct crypto_skcipher *tfm)

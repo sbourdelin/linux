@@ -782,9 +782,12 @@ static int safexcel_skcipher_cra_init(struct crypto_tfm *tfm)
 	struct safexcel_alg_template *tmpl =
 		container_of(tfm->__crt_alg, struct safexcel_alg_template,
 			     alg.skcipher.base);
+	int ret;
 
-	crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
+	ret = crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
 				    sizeof(struct safexcel_cipher_req));
+	if (ret)
+		return ret;
 
 	ctx->priv = tmpl->priv;
 

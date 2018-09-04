@@ -880,10 +880,13 @@ static int sec_alg_skcipher_decrypt(struct skcipher_request *req)
 static int sec_alg_skcipher_init(struct crypto_skcipher *tfm)
 {
 	struct sec_alg_tfm_ctx *ctx = crypto_skcipher_ctx(tfm);
+	int ret;
 
 	mutex_init(&ctx->lock);
 	INIT_LIST_HEAD(&ctx->backlog);
-	crypto_skcipher_set_reqsize(tfm, sizeof(struct sec_request));
+	ret = crypto_skcipher_set_reqsize(tfm, sizeof(struct sec_request));
+	if (ret)
+		return ret;
 
 	ctx->queue = sec_queue_alloc_start_safe();
 	if (IS_ERR(ctx->queue))

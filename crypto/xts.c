@@ -364,6 +364,7 @@ static int init_tfm(struct crypto_skcipher *tfm)
 	struct priv *ctx = crypto_skcipher_ctx(tfm);
 	struct crypto_skcipher *child;
 	struct crypto_cipher *tweak;
+	int ret;
 
 	child = crypto_spawn_skcipher(&ictx->spawn);
 	if (IS_ERR(child))
@@ -379,10 +380,14 @@ static int init_tfm(struct crypto_skcipher *tfm)
 
 	ctx->tweak = tweak;
 
-	crypto_skcipher_set_reqsize(tfm, crypto_skcipher_reqsize(child) +
-					 sizeof(struct rctx));
+	ret = crypto_skcipher_set_reqsize(tfm,
+			crypto_skcipher_reqsize(child) + sizeof(struct rctx));
+	if (ret) {
+		crypto_free_cipher(ctx->tweak);
+		crypto_free_skcipher(ctx->child);
+	}
 
-	return 0;
+	return ret;
 }
 
 static void exit_tfm(struct crypto_skcipher *tfm)

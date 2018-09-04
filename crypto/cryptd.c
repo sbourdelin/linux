@@ -563,15 +563,18 @@ static int cryptd_skcipher_init_tfm(struct crypto_skcipher *tfm)
 	struct crypto_skcipher_spawn *spawn = &ictx->spawn;
 	struct cryptd_skcipher_ctx *ctx = crypto_skcipher_ctx(tfm);
 	struct crypto_skcipher *cipher;
+	int ret;
 
 	cipher = crypto_spawn_skcipher(spawn);
 	if (IS_ERR(cipher))
 		return PTR_ERR(cipher);
 
 	ctx->child = cipher;
-	crypto_skcipher_set_reqsize(
+	ret = crypto_skcipher_set_reqsize(
 		tfm, sizeof(struct cryptd_skcipher_request_ctx));
-	return 0;
+	if (ret)
+		crypto_free_skcipher(ctx->child);
+	return ret;
 }
 
 static void cryptd_skcipher_exit_tfm(struct crypto_skcipher *tfm)

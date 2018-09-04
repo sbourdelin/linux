@@ -136,13 +136,15 @@ static int cc_cipher_init(struct crypto_tfm *tfm)
 				     skcipher_alg.base);
 	struct device *dev = drvdata_to_dev(cc_alg->drvdata);
 	unsigned int max_key_buf_size = cc_alg->skcipher_alg.max_keysize;
-	int rc = 0;
+	int rc;
 
 	dev_dbg(dev, "Initializing context @%p for %s\n", ctx_p,
 		crypto_tfm_alg_name(tfm));
 
-	crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
+	rc = crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
 				    sizeof(struct cipher_req_ctx));
+	if (rc)
+		return rc;
 
 	ctx_p->cipher_mode = cc_alg->cipher_mode;
 	ctx_p->flow_mode = cc_alg->flow_mode;

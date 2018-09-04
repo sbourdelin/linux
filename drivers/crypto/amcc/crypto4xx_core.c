@@ -951,6 +951,8 @@ static int crypto4xx_sk_init(struct crypto_skcipher *sk)
 	struct crypto4xx_ctx *ctx =  crypto_skcipher_ctx(sk);
 
 	if (alg->base.cra_flags & CRYPTO_ALG_NEED_FALLBACK) {
+		int ret;
+
 		ctx->sw_cipher.cipher =
 			crypto_alloc_skcipher(alg->base.cra_name, 0,
 					      CRYPTO_ALG_NEED_FALLBACK |
@@ -958,9 +960,13 @@ static int crypto4xx_sk_init(struct crypto_skcipher *sk)
 		if (IS_ERR(ctx->sw_cipher.cipher))
 			return PTR_ERR(ctx->sw_cipher.cipher);
 
-		crypto_skcipher_set_reqsize(sk,
+		ret = crypto_skcipher_set_reqsize(sk,
 			sizeof(struct skcipher_request) + 32 +
 			crypto_skcipher_reqsize(ctx->sw_cipher.cipher));
+		if (ret) {
+			crypto_free_skcipher(ctx->sw_cipher.cipher);
+			return ret;
+		}
 	}
 
 	amcc_alg = container_of(alg, struct crypto4xx_alg, alg.u.cipher);

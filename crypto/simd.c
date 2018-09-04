@@ -112,6 +112,7 @@ static int simd_skcipher_init(struct crypto_skcipher *tfm)
 	struct simd_skcipher_alg *salg;
 	struct skcipher_alg *alg;
 	unsigned reqsize;
+	int ret;
 
 	alg = crypto_skcipher_alg(tfm);
 	salg = container_of(alg, struct simd_skcipher_alg, alg);
@@ -127,9 +128,11 @@ static int simd_skcipher_init(struct crypto_skcipher *tfm)
 	reqsize = sizeof(struct skcipher_request);
 	reqsize += crypto_skcipher_reqsize(&cryptd_tfm->base);
 
-	crypto_skcipher_set_reqsize(tfm, reqsize);
+	ret = crypto_skcipher_set_reqsize(tfm, reqsize);
+	if (ret)
+		cryptd_free_skcipher(ctx->cryptd_tfm);
 
-	return 0;
+	return ret;
 }
 
 struct simd_skcipher_alg *simd_skcipher_create_compat(const char *algname,

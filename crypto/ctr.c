@@ -319,6 +319,7 @@ static int crypto_rfc3686_init_tfm(struct crypto_skcipher *tfm)
 	struct crypto_skcipher *cipher;
 	unsigned long align;
 	unsigned int reqsize;
+	int ret;
 
 	cipher = crypto_spawn_skcipher(spawn);
 	if (IS_ERR(cipher))
@@ -330,9 +331,11 @@ static int crypto_rfc3686_init_tfm(struct crypto_skcipher *tfm)
 	align &= ~(crypto_tfm_ctx_alignment() - 1);
 	reqsize = align + sizeof(struct crypto_rfc3686_req_ctx) +
 		  crypto_skcipher_reqsize(cipher);
-	crypto_skcipher_set_reqsize(tfm, reqsize);
+	ret = crypto_skcipher_set_reqsize(tfm, reqsize);
+	if (ret)
+		crypto_free_skcipher(ctx->child);
 
-	return 0;
+	return ret;
 }
 
 static void crypto_rfc3686_exit_tfm(struct crypto_skcipher *tfm)

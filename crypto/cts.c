@@ -289,6 +289,7 @@ static int crypto_cts_init_tfm(struct crypto_skcipher *tfm)
 	unsigned reqsize;
 	unsigned bsize;
 	unsigned align;
+	int ret;
 
 	cipher = crypto_spawn_skcipher(spawn);
 	if (IS_ERR(cipher))
@@ -303,9 +304,11 @@ static int crypto_cts_init_tfm(struct crypto_skcipher *tfm)
 			crypto_tfm_ctx_alignment()) +
 		  (align & ~(crypto_tfm_ctx_alignment() - 1)) + bsize;
 
-	crypto_skcipher_set_reqsize(tfm, reqsize);
+	ret = crypto_skcipher_set_reqsize(tfm, reqsize);
+	if (ret)
+		crypto_free_skcipher(ctx->child);
 
-	return 0;
+	return ret;
 }
 
 static void crypto_cts_exit_tfm(struct crypto_skcipher *tfm)

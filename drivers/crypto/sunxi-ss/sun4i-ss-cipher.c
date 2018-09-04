@@ -465,10 +465,8 @@ int sun4i_ss_cipher_init(struct crypto_tfm *tfm)
 			    alg.crypto.base);
 	op->ss = algt->ss;
 
-	crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
+	return crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
 				    sizeof(struct sun4i_cipher_req_ctx));
-
-	return 0;
 }
 
 /* check and set the AES key, prepare the mode to be used */
