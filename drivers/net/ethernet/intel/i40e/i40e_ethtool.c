@@ -232,6 +232,21 @@ static const struct i40e_priv_flags i40e_gl_gstrings_priv_flags[] = {
 
 #define I40E_GL_PRIV_FLAGS_STR_LEN ARRAY_SIZE(i40e_gl_gstrings_priv_flags)
 
+static void __i40e_add_stat_strings(u8 **p, const struct i40e_stats stats[],
+                                    const unsigned int size, ...)
+{
+        unsigned int i;
+
+        for (i = 0; i < size; i++) {
+                va_list args;
+
+                va_start(args, size);
+                vsnprintf(*p, ETH_GSTRING_LEN, stats[i].stat_string, args);
+                *p += ETH_GSTRING_LEN;
+                va_end(args);
+        }
+}
+
 /**
  * i40e_partition_setting_complaint - generic complaint for MFP restriction
  * @pf: the PF struct
