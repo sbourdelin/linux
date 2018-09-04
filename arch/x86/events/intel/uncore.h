@@ -44,6 +44,7 @@ struct freerunning_counters;
 
 struct intel_uncore_type {
 	const char *name;
+	const char **alias;
 	int num_counters;
 	int num_boxes;
 	int perf_ctr_bits;

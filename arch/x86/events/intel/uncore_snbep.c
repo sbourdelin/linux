@@ -3596,8 +3596,18 @@ static const struct attribute_group skx_uncore_iio_freerunning_format_group = {
 	.attrs = skx_uncore_iio_freerunning_formats_attr,
 };
 
+static const char *skx_uncore_iio_free_running_aliases[] = {
+	"iio_cbdma",
+	"iio_pcie0",
+	"iio_pcie1",
+	"iio_pcie2",
+	"iio_mcp0",
+	"iio_mcp1",
+};
+
 static struct intel_uncore_type skx_uncore_iio_free_running = {
 	.name			= "iio_free_running",
+	.alias			= skx_uncore_iio_free_running_aliases,
 	.num_counters		= 17,
 	.num_boxes		= 6,
 	.num_freerunning_types	= SKX_IIO_FREERUNNING_TYPE_MAX,

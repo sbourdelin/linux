@@ -812,8 +812,13 @@ static int uncore_pmu_register(struct intel_uncore_pmu *pmu)
 		else
 			sprintf(pmu->name, "uncore");
 	} else {
-		sprintf(pmu->name, "uncore_%s_%d", pmu->type->name,
-			pmu->pmu_idx);
+		if (pmu->type->alias && pmu->pmu_idx < pmu->type->num_boxes) {
+			sprintf(pmu->name, "uncore_%s",
+				pmu->type->alias[pmu->pmu_idx]);
+		} else {
+			sprintf(pmu->name, "uncore_%s_%d", pmu->type->name,
+				pmu->pmu_idx);
+		}
 	}
 
 	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
