@@ -422,6 +422,6 @@
 #define __NR_pwritev2		359
 #define __NR_statx		360
 
-#define NR_syscalls		361
+#define __NR_syscalls		361
 
 #endif /* _UAPI_SPARC_UNISTD_H */

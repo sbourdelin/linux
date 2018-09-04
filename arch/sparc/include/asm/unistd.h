@@ -17,6 +17,8 @@
 
 #include <uapi/asm/unistd.h>
 
+#define NR_syscalls __NR_syscalls
+
 #ifndef __32bit_syscall_numbers__
 #ifndef __arch64__
 #define __32bit_syscall_numbers__
