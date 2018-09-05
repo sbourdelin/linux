@@ -10391,6 +10391,7 @@ F:	drivers/nvmem/
 F:	Documentation/devicetree/bindings/nvmem/
 F:	Documentation/ABI/stable/sysfs-bus-nvmem
 F:	include/linux/nvmem-consumer.h
+F:	include/linux/nvmem-machine.h
 F:	include/linux/nvmem-provider.h
 
 NXP SGTL5000 DRIVER
