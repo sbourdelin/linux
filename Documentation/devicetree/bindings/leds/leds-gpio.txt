@@ -23,6 +23,9 @@ LED sub-node properties:
   remains up.
 - panic-indicator : (optional)
   see Documentation/devicetree/bindings/leds/common.txt
+- light-state: (optional) Values should be "high" or "low", which indicates
+	the state of the GPIO pin when the led is on.
+  see Documentation/devicetree/bindings/leds/common.txt
 
 Examples:
 
@@ -64,3 +67,15 @@ leds {
 		retain-state-suspended;
 	};
 };
+
+leds {
+	compatible = "gpio-leds";
+
+	led0 {
+		label = "led0";
+		gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
+		linux,default-trigger = "heartbeat";
+		default-state = "off";
+		light-state = "low";
+	};
+}

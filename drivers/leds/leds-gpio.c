@@ -26,8 +26,12 @@ struct gpio_led_data {
 	struct gpio_desc *gpiod;
 	u8 can_sleep;
 	u8 blinking;
+	u8 light_state;
 	gpio_blink_set_t platform_gpio_blink_set;
 };
+
+#define LEDS_GPIO_LIGHTSTATE_HIGH	0
+#define LEDS_GPIO_LIGHTSTATE_LOW	1
 
 static inline struct gpio_led_data *
 			cdev_to_gpio_led_data(struct led_classdev *led_cdev)
@@ -42,9 +46,15 @@ static void gpio_led_set(struct led_classdev *led_cdev,
 	int level;
 
 	if (value == LED_OFF)
-		level = 0;
+		if (led_dat->light_state == LEDS_GPIO_LIGHTSTATE_HIGH)
+			level = 0;
+		else
+			level = 1;
 	else
-		level = 1;
+		if (led_dat->light_state == LEDS_GPIO_LIGHTSTATE_HIGH)
+			level = 1;
+		else
+			level = 0;
 
 	if (led_dat->blinking) {
 		led_dat->platform_gpio_blink_set(led_dat->gpiod, level,
@@ -203,6 +213,17 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 				led.default_state = LEDS_GPIO_DEFSTATE_ON;
 			else
 				led.default_state = LEDS_GPIO_DEFSTATE_OFF;
+		}
+
+		if (!fwnode_property_read_string(child, "light-state",
+						 &state)) {
+			if (!strcmp(state, "low"))
+				led_dat->light_state =
+					LEDS_GPIO_LIGHTSTATE_LOW;
+			else{
+				led_dat->light_state =
+					LEDS_GPIO_LIGHTSTATE_HIGH;
+			}
 		}
 
 		if (fwnode_property_present(child, "retain-state-suspended"))
