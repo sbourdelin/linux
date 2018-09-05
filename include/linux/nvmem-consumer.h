@@ -21,14 +21,6 @@ struct device_node;
 struct nvmem_cell;
 struct nvmem_device;
 
-struct nvmem_cell_info {
-	const char		*name;
-	unsigned int		offset;
-	unsigned int		bytes;
-	unsigned int		bit_offset;
-	unsigned int		nbits;
-};
-
 #if IS_ENABLED(CONFIG_NVMEM)
 
 /* Cell based interface */
@@ -50,10 +42,6 @@ int nvmem_device_read(struct nvmem_device *nvmem, unsigned int offset,
 		      size_t bytes, void *buf);
 int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
 		       size_t bytes, void *buf);
-ssize_t nvmem_device_cell_read(struct nvmem_device *nvmem,
-			   struct nvmem_cell_info *info, void *buf);
-int nvmem_device_cell_write(struct nvmem_device *nvmem,
-			    struct nvmem_cell_info *info, void *buf);
 
 #else
 
@@ -114,20 +102,6 @@ static inline void nvmem_device_put(struct nvmem_device *nvmem)
 static inline void devm_nvmem_device_put(struct device *dev,
 					 struct nvmem_device *nvmem)
 {
-}
-
-static inline ssize_t nvmem_device_cell_read(struct nvmem_device *nvmem,
-					 struct nvmem_cell_info *info,
-					 void *buf)
-{
-	return -ENOSYS;
-}
-
-static inline int nvmem_device_cell_write(struct nvmem_device *nvmem,
-					  struct nvmem_cell_info *info,
-					  void *buf)
-{
-	return -ENOSYS;
 }
 
 static inline int nvmem_device_read(struct nvmem_device *nvmem,
