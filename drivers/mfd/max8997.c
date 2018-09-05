@@ -152,12 +152,7 @@ static struct max8997_platform_data *max8997_i2c_parse_dt_pdata(
 		return ERR_PTR(-ENOMEM);
 
 	pd->ono = irq_of_parse_and_map(dev->of_node, 1);
-
-	/*
-	 * ToDo: the 'wakeup' member in the platform data is more of a linux
-	 * specfic information. Hence, there is no binding for that yet and
-	 * not parsed here.
-	 */
+	pd->wakeup = true;
 
 	return pd;
 }
