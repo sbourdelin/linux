@@ -21,6 +21,7 @@ extern struct dentry *blk_debugfs_root;
 
 enum blk_queue_gate_flag_t {
 	BLK_QUEUE_GATE_PREEMPT_ONLY,
+	BLK_QUEUE_GATE_CLOSED,
 };
 
 struct blk_flush_queue {

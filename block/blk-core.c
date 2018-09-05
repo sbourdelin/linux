@@ -449,6 +449,23 @@ void blk_clear_preempt_only(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_clear_preempt_only);
 
+int blk_set_queue_closed(struct request_queue *q)
+{
+	if (test_and_set_bit(BLK_QUEUE_GATE_CLOSED, &q->queue_gate))
+		return 1;
+
+	synchronize_rcu();
+	return 0;
+}
+EXPORT_SYMBOL_GPL(blk_set_queue_closed);
+
+void blk_clear_queue_closed(struct request_queue *q)
+{
+	clear_bit(BLK_QUEUE_GATE_CLOSED, &q->queue_gate);
+	wake_up_all(&q->mq_freeze_wq);
+}
+EXPORT_SYMBOL_GPL(blk_clear_queue_closed);
+
 /**
  * __blk_run_queue_uncond - run a queue whether or not it has been stopped
  * @q:	The queue to run

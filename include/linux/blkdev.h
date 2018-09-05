@@ -741,6 +741,9 @@ bool blk_queue_flag_test_and_clear(unsigned int flag, struct request_queue *q);
 extern int blk_set_preempt_only(struct request_queue *q);
 extern void blk_clear_preempt_only(struct request_queue *q);
 
+extern int blk_set_queue_closed(struct request_queue *q);
+extern void blk_clear_queue_closed(struct request_queue *q);
+
 static inline int queue_in_flight(struct request_queue *q)
 {
 	return q->in_flight[0] + q->in_flight[1];
