@@ -13,6 +13,7 @@
 #include <linux/mm_types.h>
 #include <generated/bounds.h>
 #endif /* !__GENERATING_BOUNDS_H */
+#include <linux/string.h>
 
 /*
  * Various page->flags bits:
@@ -160,6 +161,13 @@ static __always_inline int PageCompound(struct page *page)
 static inline int PagePoisoned(const struct page *page)
 {
 	return page->flags == PAGE_POISON_PATTERN;
+}
+
+static inline void page_init_poison(struct page *page, size_t size)
+{
+#ifdef CONFIG_DEBUG_VM_PAGE_INIT_POISON
+	memset(page, PAGE_POISON_PATTERN, size);
+#endif
 }
 
 /*

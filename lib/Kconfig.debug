@@ -637,6 +637,20 @@ config DEBUG_VM_PGFLAGS
 
 	  If unsure, say N.
 
+config DEBUG_VM_PAGE_INIT_POISON
+	bool "Enable early page metadata poisoning"
+	default y
+	depends on DEBUG_VM
+	help
+	  Seed the page metadata with a poison pattern to improve the
+	  likelihood of detecting attempts to access the page prior to
+	  initialization by the memory subsystem.
+
+	  This initialization can result in a longer boot time for systems
+	  with a large amount of memory.
+
+	  If unsure, say Y.
+
 config ARCH_HAS_DEBUG_VIRTUAL
 	bool
 
