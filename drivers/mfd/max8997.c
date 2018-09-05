@@ -470,6 +470,7 @@ static int max8997_suspend(struct device *dev)
 
 	if (device_may_wakeup(dev))
 		irq_set_irq_wake(max8997->irq, 1);
+	disable_irq(max8997->irq);
 	return 0;
 }
 
@@ -480,6 +481,7 @@ static int max8997_resume(struct device *dev)
 
 	if (device_may_wakeup(dev))
 		irq_set_irq_wake(max8997->irq, 0);
+	enable_irq(max8997->irq);
 	return max8997_irq_resume(max8997);
 }
 
