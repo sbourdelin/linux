@@ -396,7 +396,7 @@ continue_unlock:
 		cond_resched();
 	}
 stop:
-	if (nwritten)
+	if (nwritten || unlikely(f2fs_cp_error(sbi)))
 		f2fs_submit_merged_write(sbi, type);
 
 	blk_finish_plug(&plug);
