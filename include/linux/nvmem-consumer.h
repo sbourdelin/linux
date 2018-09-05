@@ -14,12 +14,18 @@
 
 #include <linux/err.h>
 #include <linux/errno.h>
+#include <linux/notifier.h>
 
 struct device;
 struct device_node;
 /* consumer cookie */
 struct nvmem_cell;
 struct nvmem_device;
+
+enum {
+	NVMEM_ADD = 1,
+	NVMEM_REMOVE,
+};
 
 #if IS_ENABLED(CONFIG_NVMEM)
 
@@ -44,6 +50,9 @@ int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
 		       size_t bytes, void *buf);
 
 const char *nvmem_dev_name(struct nvmem_device *nvmem);
+
+int nvmem_register_notifier(struct notifier_block *nb);
+int nvmem_unregister_notifier(struct notifier_block *nb);
 
 #else
 
@@ -123,6 +132,16 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
 static inline const char *nvmem_dev_name(struct nvmem_device *nvmem)
 {
 	return NULL;
+}
+
+static inline int nvmem_register_notifier(struct notifier_block *nb)
+{
+	return -ENOSYS;
+}
+
+static inline int int nvmem_unregister_notifier(struct notifier_block *nb)
+{
+	return -ENOSYS;
 }
 
 #endif /* CONFIG_NVMEM */
