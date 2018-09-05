@@ -334,15 +334,15 @@ The following functions get or set the values of an array of GPIOs::
 					   struct gpio_desc **desc_array,
 					   int *value_array);
 
-	void gpiod_set_array_value(unsigned int array_size,
-				   struct gpio_desc **desc_array,
-				   int *value_array)
+	int gpiod_set_array_value(unsigned int array_size,
+				  struct gpio_desc **desc_array,
+				  int *value_array)
 	int gpiod_set_raw_array_value(unsigned int array_size,
 				      struct gpio_desc **desc_array,
 				      int *value_array)
-	void gpiod_set_array_value_cansleep(unsigned int array_size,
-					    struct gpio_desc **desc_array,
-					    int *value_array)
+	int gpiod_set_array_value_cansleep(unsigned int array_size,
+					   struct gpio_desc **desc_array,
+					   int *value_array)
 	int gpiod_set_raw_array_value_cansleep(unsigned int array_size,
 					       struct gpio_desc **desc_array,
 					       int *value_array)
