@@ -1216,6 +1216,32 @@ kselftest-merge:
 	+$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
 
 # ---------------------------------------------------------------------------
+# Devicetree files
+
+ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
+dtstree := arch/$(SRCARCH)/boot/dts
+endif
+
+ifdef CONFIG_OF_EARLY_FLATTREE
+
+%.dtb %.dtb.S %.dtb.o: | dtc
+	$(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
+
+PHONY += dtbs
+dtbs: | dtc
+	$(Q)$(MAKE) $(build)=$(dtstree)
+
+dtbs_install: dtbs
+	$(Q)$(MAKE) $(dtbinst)=$(dtstree)
+
+all: dtbs
+
+dtc:
+	$(Q)$(MAKE) $(build)=scripts/dtc
+
+endif
+
+# ---------------------------------------------------------------------------
 # Modules
 
 ifdef CONFIG_MODULES
@@ -1424,6 +1450,12 @@ help:
 	@echo  '  kselftest-merge - Merge all the config dependencies of kselftest to existing'
 	@echo  '                    .config.'
 	@echo  ''
+	@$(if $(dtstree), \
+		echo 'Devicetree:'; \
+		echo '* dtbs            - Build device tree blobs for enabled boards'; \
+		echo '  dtbs_install    - Install dtbs to $(INSTALL_DTBS_PATH)'; \
+		echo '')
+
 	@echo 'Userspace tools targets:'
 	@echo '  use "make tools/help"'
 	@echo '  or  "cd tools; make help"'
