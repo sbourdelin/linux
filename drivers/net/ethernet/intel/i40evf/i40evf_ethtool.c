@@ -172,6 +172,30 @@ static void i40evf_get_priv_flag_strings(struct net_device *netdev, u8 *data)
 }
 
 /**
+ * __i40e_add_stat_strings - copy stat strings into ethtool buffer
+ * @p: ethtool supplied buffer
+ * @stats: stat definitions array
+ * @size: size of the stats array
+ *
+ * Format and copy the strings described by stats into the buffer pointed at
+ * by p.
+ **/
+void __i40e_add_stat_strings(u8 **p, const struct i40e_stats stats[],
+			     const unsigned int size, ...)
+{
+	unsigned int i;
+
+	for (i = 0; i < size; i++) {
+		va_list args;
+
+		va_start(args, size);
+		vsnprintf(*p, ETH_GSTRING_LEN, stats[i].stat_string, args);
+		*p += ETH_GSTRING_LEN;
+		va_end(args);
+	}
+}
+
+/**
  * i40evf_get_stat_strings - Get stat strings
  * @netdev: network interface device structure
  * @data: buffer for string data
