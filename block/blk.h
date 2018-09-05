@@ -19,6 +19,10 @@
 extern struct dentry *blk_debugfs_root;
 #endif
 
+enum blk_queue_gate_flag_t {
+	BLK_QUEUE_GATE_PREEMPT_ONLY,
+};
+
 struct blk_flush_queue {
 	unsigned int		flush_queue_delayed:1;
 	unsigned int		flush_pending_idx:1;

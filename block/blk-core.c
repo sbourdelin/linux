@@ -420,22 +420,31 @@ void blk_sync_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL(blk_sync_queue);
 
-/**
- * blk_set_preempt_only - set QUEUE_FLAG_PREEMPT_ONLY
- * @q: request queue pointer
- *
- * Returns the previous value of the PREEMPT_ONLY flag - 0 if the flag was not
- * set and 1 if the flag was already set.
+/*
+ * When blk_set_preempt_only returns:
+ *  - only preempt bio could enter the queue
+ *  - there is no non-preempt bios in the queue
  */
 int blk_set_preempt_only(struct request_queue *q)
 {
-	return blk_queue_flag_test_and_set(QUEUE_FLAG_PREEMPT_ONLY, q);
+	if (test_and_set_bit(BLK_QUEUE_GATE_PREEMPT_ONLY, &q->queue_gate))
+		return 1;
+
+	synchronize_rcu();
+	/*
+	 * After this, the non-preempt bios either get q_usage_counter
+	 * and enter, or go to wait.
+	 * Next, let's drain the entered ones.
+	 */
+	blk_mq_freeze_queue(q);
+	blk_mq_unfreeze_queue(q);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(blk_set_preempt_only);
 
 void blk_clear_preempt_only(struct request_queue *q)
 {
-	blk_queue_flag_clear(QUEUE_FLAG_PREEMPT_ONLY, q);
+	clear_bit(BLK_QUEUE_GATE_PREEMPT_ONLY, &q->queue_gate);
 	wake_up_all(&q->mq_freeze_wq);
 }
 EXPORT_SYMBOL_GPL(blk_clear_preempt_only);
@@ -910,6 +919,19 @@ struct request_queue *blk_alloc_queue(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(blk_alloc_queue);
 
+static inline bool blk_queue_gate_allow(struct request_queue *q,
+		blk_mq_req_flags_t flags)
+{
+	if (!q->queue_gate)
+		return true;
+
+	if (test_bit(BLK_QUEUE_GATE_PREEMPT_ONLY, &q->queue_gate) &&
+		!(flags & BLK_MQ_REQ_PREEMPT))
+		return false;
+
+	return true;
+}
+
 /**
  * blk_queue_enter() - try to increase q->q_usage_counter
  * @q: request queue pointer
@@ -917,29 +939,20 @@ EXPORT_SYMBOL(blk_alloc_queue);
  */
 int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 {
-	const bool preempt = flags & BLK_MQ_REQ_PREEMPT;
-
 	while (true) {
-		bool success = false;
 
 		rcu_read_lock();
-		if (percpu_ref_tryget_live(&q->q_usage_counter)) {
-			/*
-			 * The code that sets the PREEMPT_ONLY flag is
-			 * responsible for ensuring that that flag is globally
-			 * visible before the queue is unfrozen.
-			 */
-			if (preempt || !blk_queue_preempt_only(q)) {
-				success = true;
-			} else {
-				percpu_ref_put(&q->q_usage_counter);
-			}
+		if (unlikely(READ_ONCE(q->queue_gate))) {
+			if (!blk_queue_gate_allow(q, flags))
+				goto wait;
 		}
-		rcu_read_unlock();
 
-		if (success)
+		if (percpu_ref_tryget_live(&q->q_usage_counter)) {
+			rcu_read_unlock();
 			return 0;
-
+		}
+wait:
+		rcu_read_unlock();
 		if (flags & BLK_MQ_REQ_NOWAIT)
 			return -EBUSY;
 
@@ -954,7 +967,7 @@ int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 
 		wait_event(q->mq_freeze_wq,
 			   (atomic_read(&q->mq_freeze_depth) == 0 &&
-			    (preempt || !blk_queue_preempt_only(q))) ||
+			    blk_queue_gate_allow(q, flags)) ||
 			   blk_queue_dying(q));
 		if (blk_queue_dying(q))
 			return -ENODEV;

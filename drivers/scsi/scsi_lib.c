@@ -3048,16 +3048,6 @@ scsi_device_quiesce(struct scsi_device *sdev)
 
 	blk_set_preempt_only(q);
 
-	blk_mq_freeze_queue(q);
-	/*
-	 * Ensure that the effect of blk_set_preempt_only() will be visible
-	 * for percpu_ref_tryget() callers that occur after the queue
-	 * unfreeze even if the queue was already frozen before this function
-	 * was called. See also https://lwn.net/Articles/573497/.
-	 */
-	synchronize_rcu();
-	blk_mq_unfreeze_queue(q);
-
 	mutex_lock(&sdev->state_mutex);
 	err = scsi_device_set_state(sdev, SDEV_QUIESCE);
 	if (err == 0)
