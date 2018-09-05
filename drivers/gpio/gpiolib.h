@@ -189,9 +189,9 @@ int gpiod_get_array_value_complex(bool raw, bool can_sleep,
 				  struct gpio_desc **desc_array,
 				  int *value_array);
 int gpiod_set_array_value_complex(bool raw, bool can_sleep,
-				   unsigned int array_size,
-				   struct gpio_desc **desc_array,
-				   int *value_array);
+				  unsigned int array_size,
+				  struct gpio_desc **desc_array,
+				  int *value_array);
 
 /* This is just passed between gpiolib and devres */
 struct gpio_desc *gpiod_get_from_of_node(struct device_node *node,

@@ -114,8 +114,7 @@ int gpiod_get_raw_array_value(unsigned int array_size,
 			      int *value_array);
 void gpiod_set_raw_value(struct gpio_desc *desc, int value);
 int gpiod_set_raw_array_value(unsigned int array_size,
-			       struct gpio_desc **desc_array,
-			       int *value_array);
+			      struct gpio_desc **desc_array, int *value_array);
 
 /* Value get/set from sleeping context */
 int gpiod_get_value_cansleep(const struct gpio_desc *desc);
@@ -132,8 +131,8 @@ int gpiod_get_raw_array_value_cansleep(unsigned int array_size,
 				       int *value_array);
 void gpiod_set_raw_value_cansleep(struct gpio_desc *desc, int value);
 int gpiod_set_raw_array_value_cansleep(unsigned int array_size,
-					struct gpio_desc **desc_array,
-					int *value_array);
+				       struct gpio_desc **desc_array,
+				       int *value_array);
 
 int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
 int gpiod_set_transitory(struct gpio_desc *desc, bool transitory);
@@ -369,8 +368,8 @@ static inline void gpiod_set_raw_value(struct gpio_desc *desc, int value)
 	WARN_ON(1);
 }
 static inline int gpiod_set_raw_array_value(unsigned int array_size,
-					     struct gpio_desc **desc_array,
-					     int *value_array)
+					    struct gpio_desc **desc_array,
+					    int *value_array)
 {
 	/* GPIO can never have been requested */
 	WARN_ON(1);

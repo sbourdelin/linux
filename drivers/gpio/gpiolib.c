@@ -3025,9 +3025,9 @@ static void gpio_chip_set_multiple(struct gpio_chip *chip,
 }
 
 int gpiod_set_array_value_complex(bool raw, bool can_sleep,
-				   unsigned int array_size,
-				   struct gpio_desc **desc_array,
-				   int *value_array)
+				  unsigned int array_size,
+				  struct gpio_desc **desc_array,
+				  int *value_array)
 {
 	int i = 0;
 
@@ -3163,7 +3163,7 @@ EXPORT_SYMBOL_GPL(gpiod_set_value);
  * complain if the GPIO chip functions potentially sleep.
  */
 int gpiod_set_raw_array_value(unsigned int array_size,
-			 struct gpio_desc **desc_array, int *value_array)
+			      struct gpio_desc **desc_array, int *value_array)
 {
 	if (!desc_array)
 		return -EINVAL;
@@ -3503,8 +3503,8 @@ EXPORT_SYMBOL_GPL(gpiod_set_value_cansleep);
  * This function is to be called from contexts that can sleep.
  */
 int gpiod_set_raw_array_value_cansleep(unsigned int array_size,
-					struct gpio_desc **desc_array,
-					int *value_array)
+				       struct gpio_desc **desc_array,
+				       int *value_array)
 {
 	might_sleep_if(extra_checks);
 	if (!desc_array)
