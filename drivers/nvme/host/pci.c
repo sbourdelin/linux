@@ -2145,23 +2145,25 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 	struct pci_dev *pdev = to_pci_dev(dev->dev);
 
 	mutex_lock(&dev->shutdown_lock);
+	nvme_close_queues(&dev->ctrl);
 	if (pci_is_enabled(pdev)) {
 		u32 csts = readl(dev->bar + NVME_REG_CSTS);
 
-		if (dev->ctrl.state == NVME_CTRL_LIVE ||
-		    dev->ctrl.state == NVME_CTRL_RESETTING)
-			nvme_start_freeze(&dev->ctrl);
 		dead = !!((csts & NVME_CSTS_CFS) || !(csts & NVME_CSTS_RDY) ||
 			pdev->error_state  != pci_channel_io_normal);
-	}
 
-	/*
-	 * Give the controller a chance to complete all entered requests if
-	 * doing a safe shutdown.
-	 */
-	if (!dead) {
-		if (shutdown)
-			nvme_wait_freeze_timeout(&dev->ctrl, NVME_IO_TIMEOUT);
+		if (dev->ctrl.state == NVME_CTRL_LIVE ||
+		    dev->ctrl.state == NVME_CTRL_RESETTING) {
+			/*
+			 * Give the controller a chance to complete all entered
+			 * requests if doing a safe shutdown.
+			 */
+			if (!dead && shutdown) {
+				nvme_start_freeze(&dev->ctrl);
+				nvme_wait_freeze_timeout(&dev->ctrl, NVME_IO_TIMEOUT);
+				nvme_unfreeze(&dev->ctrl);
+			}
+		}
 	}
 
 	nvme_stop_queues(&dev->ctrl);
@@ -2328,11 +2330,9 @@ static void nvme_reset_work(struct work_struct *work)
 		new_state = NVME_CTRL_ADMIN_ONLY;
 	} else {
 		nvme_start_queues(&dev->ctrl);
-		nvme_wait_freeze(&dev->ctrl);
 		/* hit this only when allocate tagset fails */
 		if (nvme_dev_add(dev))
 			new_state = NVME_CTRL_ADMIN_ONLY;
-		nvme_unfreeze(&dev->ctrl);
 	}
 
 	/*
@@ -2345,6 +2345,7 @@ static void nvme_reset_work(struct work_struct *work)
 		goto out;
 	}
 
+	nvme_open_queues(&dev->ctrl);
 	nvme_start_ctrl(&dev->ctrl);
 	return;
 
