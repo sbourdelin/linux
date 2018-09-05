@@ -346,6 +346,7 @@ void cpu_die(void)
 	idle_task_exit();
 
 	local_daif_mask();
+	stop_critical_timings();
 
 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
 	(void)cpu_report_death();
