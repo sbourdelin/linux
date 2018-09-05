@@ -961,11 +961,13 @@ void __init txx9_sramc_init(struct resource *r)
 	err = sysfs_create_bin_file(&dev->dev.kobj, &dev->bindata_attr);
 	if (err) {
 		device_unregister(&dev->dev);
-		iounmap(dev->base);
-		kfree(dev);
+		goto exit_free;
 	}
 	return;
 exit_put:
 	put_device(&dev->dev);
+exit_free:
+	iounmap(dev->base);
+	kfree(dev);
 	return;
 }
