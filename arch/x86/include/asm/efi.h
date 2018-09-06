@@ -141,6 +141,15 @@ extern int __init efi_reuse_config(u64 tables, int nr_tables);
 extern void efi_delete_dummy_variable(void);
 extern void efi_switch_mm(struct mm_struct *mm);
 
+#ifdef CONFIG_EFI_PAGE_FAULT_HANDLER
+extern int efi_recover_from_page_fault(unsigned long phys_addr);
+#else
+static inline int efi_recover_from_page_fault(unsigned long phys_addr)
+{
+	return 0;
+}
+#endif /* CONFIG_EFI_PAGE_FAULT_HANDLER */
+
 struct efi_setup_data {
 	u64 fw_vendor;
 	u64 runtime;
