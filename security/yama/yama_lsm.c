@@ -353,7 +353,7 @@ static int yama_ptrace_access_check(struct task_struct *child,
 
 	/* require ptrace target be a child of ptracer on attach */
 	if (mode & PTRACE_MODE_ATTACH) {
-		switch (ptrace_scope) {
+		switch (READ_ONCE(ptrace_scope)) {
 		case YAMA_SCOPE_DISABLED:
 			/* No additional restrictions. */
 			break;
@@ -395,7 +395,7 @@ int yama_ptrace_traceme(struct task_struct *parent)
 	int rc = 0;
 
 	/* Only disallow PTRACE_TRACEME on more aggressive settings. */
-	switch (ptrace_scope) {
+	switch (READ_ONCE(ptrace_scope)) {
 	case YAMA_SCOPE_CAPABILITY:
 		if (!has_ns_capability(parent, current_user_ns(), CAP_SYS_PTRACE))
 			rc = -EPERM;
