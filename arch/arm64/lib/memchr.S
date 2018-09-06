@@ -30,6 +30,7 @@
  * Returns:
  *	x0 - address of first occurrence of 'c' or 0
  */
+.weak memchr
 ENTRY(memchr)
 	and	w1, w1, #0xff
 1:	subs	x2, x2, #1
