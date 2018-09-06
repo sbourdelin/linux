@@ -17,12 +17,17 @@
 
 #include <xen/page.h>
 
+#ifdef CONFIG_XEN_SCRUB_PAGES
+extern bool xen_scrub_pages;
+
 static inline void xenmem_reservation_scrub_page(struct page *page)
 {
-#ifdef CONFIG_XEN_SCRUB_PAGES
-	clear_highpage(page);
-#endif
+	if (xen_scrub_pages)
+		clear_highpage(page);
 }
+#else
+static inline void xenmem_reservation_scrub_page(struct page *page) { }
+#endif
 
 #ifdef CONFIG_XEN_HAVE_PVMMU
 void __xenmem_reservation_va_mapping_update(unsigned long count,

@@ -87,7 +87,10 @@ config XEN_SCRUB_PAGES
 	  Scrub pages before returning them to the system for reuse by
 	  other domains.  This makes sure that any confidential data
 	  is not accidentally visible to other domains.  Is it more
-	  secure, but slightly less efficient.
+	  secure, but slightly less efficient. It can be disabled with
+	  mem_reservation.xen_scrub_pages=0 and also controlled at runtime with
+	  /sys/module/mem_reservation/parameters/xen_scrub_pages.
+
 	  If in doubt, say yes.
 
 config XEN_DEV_EVTCHN

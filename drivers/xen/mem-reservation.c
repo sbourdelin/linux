@@ -14,6 +14,13 @@
 
 #include <xen/interface/memory.h>
 #include <xen/mem-reservation.h>
+#include <linux/moduleparam.h>
+
+#ifdef CONFIG_XEN_SCRUB_PAGES
+bool __read_mostly xen_scrub_pages = true;
+module_param(xen_scrub_pages, bool, 0644);
+MODULE_PARM_DESC(xen_scrub_pages, "Scrub ballooned pages before giving them back to Xen");
+#endif
 
 /*
  * Use one extent per PAGE_SIZE to avoid to break down the page into
