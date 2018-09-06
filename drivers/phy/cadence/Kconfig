@@ -1,0 +1,9 @@
+#
+# Phy drivers for Cadence PHYs
+#
+config CDNS_SIERRA_PHY
+	tristate "Cadence Sierra PHY Driver"
+	depends on OF && HAS_IOMEM && RESET_CONTROLLER
+	select GENERIC_PHY
+	help
+	  Enable this to support the Cadence Sierra PHY driver
