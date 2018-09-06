@@ -844,7 +844,6 @@ static int soc_bind_dai_link(struct snd_soc_card *card,
 	struct snd_soc_component *component;
 	struct snd_soc_dai **codec_dais;
 	struct device_node *platform_of_node;
-	const char *platform_name;
 	int i;
 
 	if (dai_link->ignore)
@@ -891,11 +890,6 @@ static int soc_bind_dai_link(struct snd_soc_card *card,
 	/* Single codec links expect codec and codec_dai in runtime data */
 	rtd->codec_dai = codec_dais[0];
 
-	/* if there's no platform we match on the empty platform */
-	platform_name = dai_link->platform->name;
-	if (!platform_name && !dai_link->platform->of_node)
-		platform_name = "snd-soc-dummy";
-
 	/* find one from the set of registered platforms */
 	list_for_each_entry(component, &component_list, list) {
 		platform_of_node = component->dev->of_node;
@@ -906,7 +900,7 @@ static int soc_bind_dai_link(struct snd_soc_card *card,
 			if (platform_of_node != dai_link->platform->of_node)
 				continue;
 		} else {
-			if (strcmp(component->name, platform_name))
+			if (strcmp(component->name, dai_link->platform->name))
 				continue;
 		}
 
@@ -1019,6 +1013,8 @@ static void soc_remove_dai_links(struct snd_soc_card *card)
 static int snd_soc_init_platform(struct snd_soc_card *card,
 				 struct snd_soc_dai_link *dai_link)
 {
+	const char *name;
+
 	/*
 	 * FIXME
 	 *
@@ -1034,7 +1030,12 @@ static int snd_soc_init_platform(struct snd_soc_card *card,
 	if (!dai_link->platform)
 		return -ENOMEM;
 
-	dai_link->platform->name	= dai_link->platform_name;
+	/* if there's no platform we match on the empty platform */
+	name = dai_link->platform->name;
+	if (!name && !dai_link->platform_of_node)
+		name = "snd-soc-dummy";
+
+	dai_link->platform->name	= name;
 	dai_link->platform->of_node	= dai_link->platform_of_node;
 	dai_link->platform->dai_name	= NULL;
 
