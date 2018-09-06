@@ -469,6 +469,29 @@ static int drm_copy_field(char __user *buf, size_t *buf_len, const char *value)
 	return 0;
 }
 
+static int drm_mode_addfb2_check(struct drm_device *dev,
+				 void *data, struct drm_file *file_priv)
+{
+#ifdef __BIG_ENDIAN
+	if (!dev->mode_config.quirk_addfb_prefer_host_byte_order) {
+		/*
+		 * Drivers must set the
+		 * quirk_addfb_prefer_host_byte_order quirk to make
+		 * the drm_mode_addfb() compat code work correctly on
+		 * bigendian machines.
+		 *
+		 * If they don't they interpret pixel_format values
+		 * incorrectly for bug compatibility, which in turn
+		 * implies the ADDFB2 ioctl does not work correctly
+		 * then.  So block it to make userspace fallback to
+		 * ADDFB.
+		 */
+		return -EINVAL;
+	}
+#endif
+	return drm_mode_addfb2(dev, data, file_priv);
+}
+
 /*
  * Get version information
  *
@@ -645,7 +668,7 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPROPBLOB, drm_mode_getblob_ioctl, DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETFB, drm_mode_getfb, DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ADDFB, drm_mode_addfb_ioctl, DRM_UNLOCKED),
-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ADDFB2, drm_mode_addfb2, DRM_UNLOCKED),
+	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ADDFB2, drm_mode_addfb2_check, DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_RMFB, drm_mode_rmfb_ioctl, DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_PAGE_FLIP, drm_mode_page_flip_ioctl, DRM_MASTER|DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DIRTYFB, drm_mode_dirtyfb_ioctl, DRM_MASTER|DRM_UNLOCKED),
