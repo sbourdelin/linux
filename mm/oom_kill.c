@@ -399,13 +399,21 @@ static void dump_tasks(struct mem_cgroup *memcg, const nodemask_t *nodemask)
 {
 	struct task_struct *p;
 	struct task_struct *task;
+	unsigned long start;
+	unsigned int skipped = 0;
 
 	pr_info("Tasks state (memory values in pages):\n");
 	pr_info("[  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name\n");
 	rcu_read_lock();
+	start = jiffies;
 	for_each_process(p) {
 		if (oom_unkillable_task(p, memcg, nodemask))
 			continue;
+
+		if (time_after(jiffies, start + 3 * HZ)) {
+			skipped++;
+			continue;
+		}
 
 		task = find_lock_task_mm(p);
 		if (!task) {
@@ -426,6 +434,8 @@ static void dump_tasks(struct mem_cgroup *memcg, const nodemask_t *nodemask)
 		task_unlock(task);
 	}
 	rcu_read_unlock();
+	if (skipped)
+		pr_info("Printing %u tasks omitted.\n", skipped);
 }
 
 static void dump_header(struct oom_control *oc, struct task_struct *p)
