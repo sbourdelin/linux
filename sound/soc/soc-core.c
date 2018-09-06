@@ -736,6 +736,31 @@ static struct snd_soc_component *soc_find_component(
 	return NULL;
 }
 
+struct snd_soc_component *snd_soc_find_component(
+	const struct snd_soc_dai_link_component *dlc)
+{
+	struct snd_soc_component *component;
+	struct device_node *component_of_node;
+
+	lockdep_assert_held(&client_mutex);
+
+	/* Find CPU DAI from registered DAIs*/
+	list_for_each_entry(component, &component_list, list) {
+		component_of_node = component->dev->of_node;
+		if (!component_of_node && component->dev->parent)
+			component_of_node = component->dev->parent->of_node;
+
+		if (dlc->of_node && component_of_node != dlc->of_node)
+			continue;
+		if (dlc->name && strcmp(component->name, dlc->name))
+			continue;
+
+		return component;
+	}
+
+	return NULL;
+}
+
 /**
  * snd_soc_find_dai - Find a registered DAI
  *
@@ -752,28 +777,18 @@ struct snd_soc_dai *snd_soc_find_dai(
 {
 	struct snd_soc_component *component;
 	struct snd_soc_dai *dai;
-	struct device_node *component_of_node;
 
-	lockdep_assert_held(&client_mutex);
+	component = snd_soc_find_component(dlc);
+	if (!component)
+		return NULL;
 
-	/* Find CPU DAI from registered DAIs*/
-	list_for_each_entry(component, &component_list, list) {
-		component_of_node = component->dev->of_node;
-		if (!component_of_node && component->dev->parent)
-			component_of_node = component->dev->parent->of_node;
-
-		if (dlc->of_node && component_of_node != dlc->of_node)
+	list_for_each_entry(dai, &component->dai_list, list) {
+		if (dlc->dai_name && strcmp(dai->name, dlc->dai_name)
+		    && (!dai->driver->name
+			|| strcmp(dai->driver->name, dlc->dai_name)))
 			continue;
-		if (dlc->name && strcmp(component->name, dlc->name))
-			continue;
-		list_for_each_entry(dai, &component->dai_list, list) {
-			if (dlc->dai_name && strcmp(dai->name, dlc->dai_name)
-			    && (!dai->driver->name
-				|| strcmp(dai->driver->name, dlc->dai_name)))
-				continue;
 
-			return dai;
-		}
+		return dai;
 	}
 
 	return NULL;
