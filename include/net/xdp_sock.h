@@ -14,6 +14,7 @@
 #include <net/sock.h>
 
 struct net_device;
+struct xdp_umem_fq_reuse;
 struct xsk_queue;
 
 struct xdp_umem_page {
@@ -37,6 +38,7 @@ struct xdp_umem {
 	struct page **pgs;
 	u32 npgs;
 	struct net_device *dev;
+	struct xdp_umem_fq_reuse *fq_reuse;
 	u16 queue_id;
 	bool zc;
 	spinlock_t xsk_list_lock;
@@ -138,5 +140,46 @@ static inline dma_addr_t xdp_umem_get_dma(struct xdp_umem *umem, u64 addr)
 	return 0;
 }
 #endif /* CONFIG_XDP_SOCKETS */
+
+struct xdp_umem_fq_reuse {
+	u32 nentries;
+	u32 length;
+	u64 handles[];
+};
+
+/* Following functions are not thread-safe in any way */
+struct xdp_umem_fq_reuse *xsk_reuseq_prepare(u32 nentries);
+struct xdp_umem_fq_reuse *xsk_reuseq_swap(struct xdp_umem *umem,
+					  struct xdp_umem_fq_reuse *newq);
+void xsk_reuseq_free(struct xdp_umem_fq_reuse *rq);
+
+/* Reuse-queue aware version of FILL queue helpers */
+static inline u64 *xsk_umem_peek_addr_rq(struct xdp_umem *umem, u64 *addr)
+{
+	struct xdp_umem_fq_reuse *rq = umem->fq_reuse;
+
+	if (!rq->length)
+		return xsk_umem_peek_addr(umem, addr);
+
+	*addr = rq->handles[rq->length - 1];
+	return addr;
+}
+
+static inline void xsk_umem_discard_addr_rq(struct xdp_umem *umem)
+{
+	struct xdp_umem_fq_reuse *rq = umem->fq_reuse;
+
+	if (!rq->length)
+		xsk_umem_discard_addr(umem);
+	else
+		rq->length--;
+}
+
+static inline void xsk_umem_fq_reuse(struct xdp_umem *umem, u64 addr)
+{
+	struct xdp_umem_fq_reuse *rq = umem->fq_reuse;
+
+	rq->handles[rq->length++] = addr;
+}
 
 #endif /* _LINUX_XDP_SOCK_H */
