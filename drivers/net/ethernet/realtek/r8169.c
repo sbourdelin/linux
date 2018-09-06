@@ -7254,6 +7254,22 @@ static int rtl_jumbo_max(struct rtl8169_private *tp)
 	}
 }
 
+static void rtl_pci_cardbus_check(struct pci_dev *pdev)
+{
+	struct pci_dev *parent = pdev;
+
+	while ((parent = pci_upstream_bridge(parent)) != NULL) {
+		if (parent->hdr_type != PCI_HEADER_TYPE_CARDBUS)
+			continue;
+
+		dev_info(&pdev->dev,
+			 "device is behind a CardBus bridge\n");
+		dev_info(&pdev->dev,
+			 "in case of erratic or no operation try disabling CLKRUN protocol in the CardBus bridge or in the southbridge\n");
+		break;
+	}
+}
+
 static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	const struct rtl_cfg_info *cfg = rtl_cfg_infos + ent->driver_data;
@@ -7305,8 +7321,10 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	tp->mmio_addr = pcim_iomap_table(pdev)[region];
 
-	if (!pci_is_pcie(pdev))
+	if (!pci_is_pcie(pdev)) {
 		dev_info(&pdev->dev, "not PCI Express\n");
+		rtl_pci_cardbus_check(pdev);
+	}
 
 	/* Identify chip attached to board */
 	rtl8169_get_mac_version(tp, cfg->default_ver);
