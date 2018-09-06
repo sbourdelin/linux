@@ -244,6 +244,8 @@ static int find_free_channels(unsigned long *bitmap, unsigned int start,
 			;
 		if (i == width)
 			return pos;
+
+		pos += i;
 	}
 
 	return -1;
