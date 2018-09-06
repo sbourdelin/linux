@@ -245,7 +245,7 @@ extern void __add_wrong_size(void)
 	asm volatile(pfx "cmpxchg%c4b %2; sete %0"			\
 		     : "=a" (__ret), "+d" (__old2),			\
 		       "+m" (*(p1)), "+m" (*(p2))			\
-		     : "i" (2 * sizeof(long)), "a" (__old1),		\
+		     : "i" (2 * sizeof(long)), "0" (__old1),		\
 		       "b" (__new1), "c" (__new2));			\
 	__ret;								\
 })
