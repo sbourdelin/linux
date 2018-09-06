@@ -1957,6 +1957,24 @@ config EFI_MIXED
 
 	   If unsure, say N.
 
+config EFI_PAGE_FAULT_HANDLER
+	bool "EFI page fault handler support" if EXPERT
+	depends on EFI
+	help
+	  Enable this debug feature so that the kernel can recover from page
+	  faults caused by buggy firmware. Also,
+	  1. If the page fault is caused by efi_reset_system(), then the
+	     platform is rebooted through BIOS.
+	  2. If the page fault is caused by any other efi runtime service,
+	     then the kernel freezes efi_rts_wq (work queue that runs efi
+	     runtime services) and schedules a new process. Also, it disables
+	     EFI Runtime Services, so that it will never again call buggy
+	     firmware.
+	  Please see the UEFI specification for details on the expectations
+	  of memory usage.
+
+	  If unsure, say N.
+
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"
