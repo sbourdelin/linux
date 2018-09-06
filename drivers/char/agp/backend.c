@@ -121,7 +121,8 @@ static int agp_find_max(void)
 #endif
 	index = 1;
 
-	while ((memory > maxes_table[index].mem) && (index < 8))
+	while ((index < ARRAY_SIZE(maxes_table) - 1) &&
+	       (memory > maxes_table[index].mem))
 		index++;
 
 	result = maxes_table[index - 1].agp +
