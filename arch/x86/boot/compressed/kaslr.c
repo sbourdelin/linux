@@ -573,6 +573,10 @@ static unsigned long slots_fetch_random(void)
 	return 0;
 }
 
+typedef void (*handles_mem_region)(struct mem_vector *entry,
+			       unsigned long minimum,
+			       unsigned long image_size);
+
 static void process_mem_region(struct mem_vector *entry,
 			       unsigned long minimum,
 			       unsigned long image_size)
@@ -658,7 +662,8 @@ static void process_mem_region(struct mem_vector *entry,
  * for slots adding)
  */
 static bool
-process_efi_entries(unsigned long minimum, unsigned long image_size)
+process_efi_entries(unsigned long minimum, unsigned long image_size,
+	handles_mem_region handle)
 {
 	struct efi_info *e = &boot_params->efi_info;
 	bool efi_mirror_found = false;
@@ -717,7 +722,7 @@ process_efi_entries(unsigned long minimum, unsigned long image_size)
 
 		region.start = md->phys_addr;
 		region.size = md->num_pages << EFI_PAGE_SHIFT;
-		process_mem_region(&region, minimum, image_size);
+		(*handle)(&region, minimum, image_size);
 		if (slot_area_index == MAX_SLOT_AREA) {
 			debug_putstr("Aborted EFI scan (slot_areas full)!\n");
 			break;
@@ -727,14 +732,15 @@ process_efi_entries(unsigned long minimum, unsigned long image_size)
 }
 #else
 static inline bool
-process_efi_entries(unsigned long minimum, unsigned long image_size)
+process_efi_entries(unsigned long minimum, unsigned long image_size,
+	handles_mem_region handle)
 {
 	return false;
 }
 #endif
 
 static void process_e820_entries(unsigned long minimum,
-				 unsigned long image_size)
+	unsigned long image_size, handles_mem_region handle)
 {
 	int i;
 	struct mem_vector region;
@@ -748,7 +754,7 @@ static void process_e820_entries(unsigned long minimum,
 			continue;
 		region.start = entry->addr;
 		region.size = entry->size;
-		process_mem_region(&region, minimum, image_size);
+		(*handle)(&region, minimum, image_size);
 		if (slot_area_index == MAX_SLOT_AREA) {
 			debug_putstr("Aborted e820 scan (slot_areas full)!\n");
 			break;
@@ -768,10 +774,10 @@ static unsigned long find_random_phys_addr(unsigned long minimum,
 	/* Make sure minimum is aligned. */
 	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
 
-	if (process_efi_entries(minimum, image_size))
+	if (process_efi_entries(minimum, image_size, process_mem_region))
 		return slots_fetch_random();
 
-	process_e820_entries(minimum, image_size);
+	process_e820_entries(minimum, image_size, process_mem_region);
 	return slots_fetch_random();
 }
 
