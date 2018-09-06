@@ -89,7 +89,7 @@ static unsigned long get_boot_seed(void)
 
 struct mem_vector {
 	unsigned long long start;
-	unsigned long long size;
+	long long size;
 };
 
 /* Only supporting at most 4 unusable memmap regions with kaslr */
@@ -577,9 +577,12 @@ typedef void (*handles_mem_region)(struct mem_vector *entry,
 			       unsigned long minimum,
 			       unsigned long image_size);
 
-static void process_mem_region(struct mem_vector *entry,
-			       unsigned long minimum,
-			       unsigned long image_size)
+typedef void (*store_info)(struct mem_vector *region,
+	unsigned long image_size);
+
+static void __process_mem_region(struct mem_vector *entry,
+	unsigned long minimum, unsigned long volume, unsigned long align,
+	store_info store)
 {
 	struct mem_vector region, overlap;
 	struct slot_area slot_area;
@@ -598,9 +601,11 @@ static void process_mem_region(struct mem_vector *entry,
 	end = min(entry->size + entry->start, mem_limit);
 	if (entry->start >= end)
 		return;
-	cur_entry.start = entry->start;
-	cur_entry.size = end - entry->start;
 
+	cur_entry.start =  ALIGN(entry->start,  align);
+	cur_entry.size = end - cur_entry.start;
+	if (cur_entry.size < 0)
+		return;
 	region.start = cur_entry.start;
 	region.size = cur_entry.size;
 
@@ -613,7 +618,7 @@ static void process_mem_region(struct mem_vector *entry,
 			region.start = minimum;
 
 		/* Potentially raise address to meet alignment needs. */
-		region.start = ALIGN(region.start, CONFIG_PHYSICAL_ALIGN);
+		region.start = ALIGN(region.start, align);
 
 		/* Did we raise the address above the passed in memory entry? */
 		if (region.start > cur_entry.start + cur_entry.size)
@@ -628,22 +633,22 @@ static void process_mem_region(struct mem_vector *entry,
 			region.size = KERNEL_IMAGE_SIZE - region.start;
 
 		/* Return if region can't contain decompressed kernel */
-		if (region.size < image_size)
+		if (region.size < volume)
 			return;
 
 		/* If nothing overlaps, store the region and return. */
 		if (!mem_avoid_overlap(&region, &overlap)) {
-			process_gb_huge_pages(&region, image_size);
+			(*store)(&region, volume);
 			return;
 		}
 
-		/* Store beginning of region if holds at least image_size. */
-		if (overlap.start > region.start + image_size) {
+		/* Store beginning of region if holds at least volume. */
+		if (overlap.start > region.start + volume) {
 			struct mem_vector beginning;
 
 			beginning.start = region.start;
 			beginning.size = overlap.start - region.start;
-			process_gb_huge_pages(&beginning, image_size);
+			(*store)(&beginning, volume);
 		}
 
 		/* Return if overlap extends to or past end of region. */
@@ -654,6 +659,13 @@ static void process_mem_region(struct mem_vector *entry,
 		region.size -= overlap.start - region.start + overlap.size;
 		region.start = overlap.start + overlap.size;
 	}
+}
+
+static void process_mem_region(struct mem_vector *entry,
+	unsigned long minimum, unsigned long image_size)
+{
+	__process_mem_region(entry, minimum, image_size, CONFIG_PHYSICAL_ALIGN,
+		store_slot_info);
 }
 
 #ifdef CONFIG_EFI
