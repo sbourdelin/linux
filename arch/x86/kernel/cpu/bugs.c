@@ -325,6 +325,56 @@ static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 	return cmd;
 }
 
+static bool stibp_needed(void)
+{
+	if (spectre_v2_enabled == SPECTRE_V2_NONE)
+		return false;
+
+	if (cpu_smt_control != CPU_SMT_ENABLED)
+		return false;
+
+	if (!boot_cpu_has(X86_FEATURE_STIBP))
+		return false;
+
+	return true;
+}
+
+/*
+ * The read-modify-write of the MSR doesn't need any race protection here,
+ * as we're running in atomic context.
+ */
+static void enable_stibp(void *info)
+{
+	u64 mask;
+	rdmsrl(MSR_IA32_SPEC_CTRL, mask);
+	mask |= SPEC_CTRL_STIBP;
+	wrmsrl(MSR_IA32_SPEC_CTRL, mask);
+}
+
+static void disable_stibp(void *info)
+{
+	u64 mask;
+	rdmsrl(MSR_IA32_SPEC_CTRL, mask);
+	mask &= ~SPEC_CTRL_STIBP;
+	wrmsrl(MSR_IA32_SPEC_CTRL, mask);
+}
+
+void arch_smt_enable_errata(void)
+{
+	if (stibp_needed()) {
+		pr_info("Spectre v2 cross-process SMT mitigation: Enabling STIBP\n");
+		on_each_cpu(enable_stibp, NULL, 1);
+	}
+}
+
+void arch_smt_disable_errata(void)
+{
+	if (stibp_needed()) {
+		pr_info("Spectre v2 cross-process SMT mitigation: Disabling STIBP\n");
+		on_each_cpu(disable_stibp, NULL, 1);
+	}
+}
+
 static void __init spectre_v2_select_mitigation(void)
 {
 	enum spectre_v2_mitigation_cmd cmd = spectre_v2_parse_cmdline();
@@ -424,6 +474,9 @@ specv2_set_mode:
 		setup_force_cpu_cap(X86_FEATURE_USE_IBRS_FW);
 		pr_info("Enabling Restricted Speculation for firmware calls\n");
 	}
+
+	/* Enable STIBP on BP if needed */
+	arch_smt_enable_errata();
 }
 
 #undef pr_fmt
@@ -655,6 +708,16 @@ void x86_spec_ctrl_setup_ap(void)
 
 	if (ssb_mode == SPEC_STORE_BYPASS_DISABLE)
 		x86_amd_ssb_disable();
+
+	/*
+	 * If we are here during system bootup, enable STIBP.
+	 *
+	 * If we are here because of SMT hotplug, STIBP will be enabled by the
+	 * SMT control code (enabling here would not be sufficient, as it
+	 * needs to happen on primary threads as well).
+	 */
+	if (stibp_needed() && system_state < SYSTEM_RUNNING)
+		enable_stibp(NULL);
 }
 
 #undef pr_fmt

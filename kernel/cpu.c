@@ -2025,17 +2025,27 @@ static void cpuhp_online_cpu_device(unsigned int cpu)
 	kobject_uevent(&dev->kobj, KOBJ_ONLINE);
 }
 
+/*
+ * Architectures that need SMT-specific errata handling during SMT hotplug
+ * should override these.
+ */
+void __weak arch_smt_enable_errata(void) { };
+void __weak arch_smt_disable_errata(void) { };
+
 static int cpuhp_smt_disable(enum cpuhp_smt_control ctrlval)
 {
 	int cpu, ret = 0;
 
 	cpu_maps_update_begin();
+	arch_smt_disable_errata();
 	for_each_online_cpu(cpu) {
 		if (topology_is_primary_thread(cpu))
 			continue;
 		ret = cpu_down_maps_locked(cpu, CPUHP_OFFLINE);
-		if (ret)
+		if (ret) {
+			arch_smt_enable_errata();
 			break;
+		}
 		/*
 		 * As this needs to hold the cpu maps lock it's impossible
 		 * to call device_offline() because that ends up calling
@@ -2073,6 +2083,7 @@ static int cpuhp_smt_enable(void)
 		/* See comment in cpuhp_smt_disable() */
 		cpuhp_online_cpu_device(cpu);
 	}
+	arch_smt_enable_errata();
 	cpu_maps_update_done();
 	return ret;
 }
