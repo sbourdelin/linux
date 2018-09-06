@@ -122,6 +122,11 @@ In precedence order, they are:
 	Results in the lower 16-bits of the return value being passed
 	to userland as the errno without executing the system call.
 
+``SECCOMP_RET_USER_NOTIF``:
+    Results in a ``struct seccomp_notif`` message sent on the userspace
+    notification fd, if it is attached, or ``-ENOSYS`` if it is not. See below
+    on discussion of how to handle user notifications.
+
 ``SECCOMP_RET_TRACE``:
 	When returned, this value will cause the kernel to attempt to
 	notify a ``ptrace()``-based tracer prior to executing the system
@@ -182,6 +187,74 @@ Example
 The ``samples/seccomp/`` directory contains both an x86-specific example
 and a more generic example of a higher level macro interface for BPF
 program generation.
+
+Userspace Notification
+======================
+
+The ``SECCOMP_RET_USER_NOTIF`` return code lets seccomp filters pass a
+particular syscall to userspace to be handled. This may be useful for
+applications like container managers, which wish to intercept particular
+syscalls (``mount()``, ``finit_module()``, etc.) and change their behavior.
+
+There are currently two APIs to acquire a userspace notification fd for a
+particular filter. The first is when the filter is installed, the task
+installing the filter can ask the ``seccomp()`` syscall:
+
+.. code-block::
+
+    fd = seccomp(SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog);
+
+which (on success) will return a listener fd for the filter, which can then be
+passed around via ``SCM_RIGHTS`` or similar. Alternatively, a filter fd can be
+acquired via:
+
+.. code-block::
+
+    fd = ptrace(PTRACE_SECCOMP_NEW_LISTENER, pid, 0);
+
+which grabs the 0th filter for some task which the tracer has privilege over.
+Note that filter fds correspond to a particular filter, and not a particular
+task. So if this task then forks, notifications from both tasks will appear on
+the same filter fd. Reads and writes to/from a filter fd are also synchronized,
+so a filter fd can safely have many readers.
+
+The interface for a seccomp notification fd consists of two structures:
+
+.. code-block::
+
+    struct seccomp_notif {
+        __u16 len;
+        __u64 id;
+        pid_t pid;
+        __u8 signalled;
+        struct seccomp_data data;
+    };
+
+    struct seccomp_notif_resp {
+        __u16 len;
+        __u64 id;
+        __s32 error;
+        __s64 val;
+    };
+
+Users can read via ``ioctl(SECCOMP_NOTIF_RECV)``  (or ``poll()``) on a seccomp
+notification fd to receive a ``struct seccomp_notif``, which contains five
+members: the input length of the structure, a globally unique ``id``, the
+``pid`` of the task which triggered this request (which may be 0 if the task is
+in a pid ns not visible from the listener's pid namespace), a flag representing
+whether or not the notification is a result of a non-fatal signal, and the
+``data`` passed to seccomp. Userspace can then make a decision based on this
+information about what to do, and ``ioctl(SECCOMP_NOTIF_SEND)`` a response,
+indicating what should be returned to userspace. The ``id`` member of ``struct
+seccomp_notif_resp`` should be the same ``id`` as in ``struct seccomp_notif``.
+
+It is worth noting that ``struct seccomp_data`` contains the values of register
+arguments to the syscall, but does not contain pointers to memory. The task's
+memory is accessible to suitably privileged traces via ``ptrace()`` or
+``/proc/pid/map_files/``. However, care should be taken to avoid the TOCTOU
+mentioned above in this document: all arguments being read from the tracee's
+memory should be read into the tracer's memory before any policy decisions are
+made. This allows for an atomic decision on syscall arguments.
 
 Sysctls
 =======
