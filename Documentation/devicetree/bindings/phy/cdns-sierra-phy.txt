@@ -1,0 +1,65 @@
+Cadence Sierra PHY
+-----------------------
+
+Required properties:
+- compatible:	cdns,sierra-phy-t0
+- clocks:	Must contain an entry in clock-names.
+		See ../clocks/clock-bindings.txt for details.
+- clock-names:	Must be "phy_clk"
+- resets:	Must contain an entry for each in reset-names.
+		See ../reset/reset.txt for details.
+- reset-names:	Must include "sierra_reset" and "sierra_apb" and one for each
+		sub-node.
+		"sierra_reset" must control the reset line to the PHY.
+		"sierra_apb" must control the reset line to the APB PHY
+		interface.
+		Resets for each subnode must control the master lane for the
+		subnode lane group.
+- reg:		register range for the PHY.
+- reg-names:	Must be "reg".
+- #address-cells: Should be 1
+- #size-cells:	Should be 0
+
+Optional properties:
+- cdns,autoconf:	If present, indicates that the PHY registers will
+			be configured by hardware.  If not present, all
+			sub-node optional properties must be provided.
+
+Sub-nodes:
+  Each group of PHY lanes with a single master lane should be represented as
+  a sub-node. Note that the actual configuration of each lane is determined by
+  hardware strapping, and must match the configuration specified here.
+
+Sub-node required properties:
+- #phy-cells:	Generic PHY binding; must be 0.
+
+Sub-node optional properties:
+- reg:			The master lane number.
+- cdns,num-lanes:	Number of lanes in this group.  From 1 to 4.
+- cdns,phy-type:	Can be PHY_TYPE_PCIE or PHY_TYPE_USB3, depending on
+			configuration of lanes.
+
+Example:
+	pcie_phy4: pcie-phy4@fd240000 {
+		compatible = "cdns,sierra-phy-t0";
+		reg = <0x0 0xfd240000 0x0 0x40000>;
+		reg-names = "reg";
+		resets = <&phyrst 0>, <&phyrst 1>,<&phyrst 2>,<&phyrst 4>;
+		reset-names = "sierra_reset","sierra_apb","pcie_phy0",pcie_phy1;
+		clocks = <&phyclock>;
+		clock-names = "phy_clk";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		pcie0_phy0: pcie-phy0@0 {
+				reg = <0>;
+				cdns,num-lanes = <2>;
+				#phy-cells = <0>;
+				cdns,phy-type = <PHY_TYPE_PCIE>;
+		};
+		pcie0_phy1: pcie-phy1@0 {
+				reg = <2>;
+				cdns,num-lanes = <1>;
+				#phy-cells = <0>;
+				cdns,phy-type = <PHY_TYPE_PCIE>;
+		};
+
