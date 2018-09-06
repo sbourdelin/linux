@@ -2560,9 +2560,11 @@ static int tcpm_init_vbus(struct tcpm_port *port)
 {
 	int ret;
 
-	ret = port->tcpc->set_vbus(port->tcpc, false, false);
-	port->vbus_source = false;
-	port->vbus_charge = false;
+	/* default to source and sink enabled in case USB is our only power
+	 * source */
+	ret = port->tcpc->set_vbus(port->tcpc, true, true);
+	port->vbus_source = true;
+	port->vbus_charge = true;
 	return ret;
 }
 
