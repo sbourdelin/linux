@@ -369,7 +369,6 @@ static void xenbus_cleanup_devices(const char *path, struct bus_type *bus)
 		bus_for_each_dev(bus, NULL, &info, cleanup_dev);
 		if (info.dev) {
 			device_unregister(&info.dev->dev);
-			put_device(&info.dev->dev);
 		}
 	} while (info.dev);
 }
