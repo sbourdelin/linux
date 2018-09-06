@@ -120,6 +120,7 @@ test_reqs()
 
 function load_req_mod()
 {
+        trap "test_modprobe" EXIT
 	if [ ! -d $DIR ]; then
 		if ! modprobe -q -n $TEST_DRIVER; then
 			echo "$0: module $TEST_DRIVER not found [SKIP]"
@@ -770,7 +771,6 @@ function parse_args()
 test_reqs
 allow_user_defaults
 check_production_sysctl_writes_strict
-test_modprobe
 load_req_mod
 
 trap "test_finish" EXIT
