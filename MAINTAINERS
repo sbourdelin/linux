@@ -6983,7 +6983,7 @@ S:	Supported
 F:	drivers/scsi/ibmvscsi/ibmvfc*
 
 IBM Power Virtual Management Channel Driver
-M:	Bryant G. Ly <bryantly@linux.vnet.ibm.com>
+M:	Bryant G. Ly <bryangly@gmail.com>
 M:	Steven Royer <seroyer@linux.vnet.ibm.com>
 S:	Supported
 F:	drivers/misc/ibmvmc.*
@@ -6996,7 +6996,7 @@ F:	drivers/scsi/ibmvscsi/ibmvscsi*
 F:	include/scsi/viosrp.h
 
 IBM Power Virtual SCSI Device Target Driver
-M:	Bryant G. Ly <bryantly@linux.vnet.ibm.com>
+M:	Bryant G. Ly <bryangly@gmail.com>
 M:	Michael Cyr <mikecyr@linux.vnet.ibm.com>
 L:	linux-scsi@vger.kernel.org
 L:	target-devel@vger.kernel.org
