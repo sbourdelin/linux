@@ -122,7 +122,7 @@ EXPORT_SYMBOL(udp_table);
 long sysctl_udp_mem[3] __read_mostly;
 EXPORT_SYMBOL(sysctl_udp_mem);
 
-atomic_long_t udp_memory_allocated;
+struct percpu_counter udp_memory_allocated;
 EXPORT_SYMBOL(udp_memory_allocated);
 
 #define MAX_UDP_PORTS 65536
@@ -2922,6 +2922,8 @@ void __init udp_init(void)
 	sysctl_udp_mem[2] = sysctl_udp_mem[0] * 2;
 
 	__udp_sysctl_init(&init_net);
+
+	percpu_counter_init(&udp_memory_allocated, 0, GFP_KERNEL);
 
 	/* 16 spinlocks per cpu */
 	udp_busylocks_log = ilog2(nr_cpu_ids) + 4;

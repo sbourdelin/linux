@@ -1391,6 +1391,10 @@ static __init int sctp_init(void)
 	if (!sctp_chunk_cachep)
 		goto err_chunk_cachep;
 
+	status = percpu_counter_init(&sctp_memory_allocated, 0, GFP_KERNEL);
+	if (status)
+		goto err_percpu_memory_init;
+
 	status = percpu_counter_init(&sctp_sockets_allocated, 0, GFP_KERNEL);
 	if (status)
 		goto err_percpu_counter_init;
@@ -1559,6 +1563,8 @@ err_thash_alloc:
 err_ehash_alloc:
 	percpu_counter_destroy(&sctp_sockets_allocated);
 err_percpu_counter_init:
+	percpu_counter_destroy(&sctp_memory_allocated);
+err_percpu_memory_init:
 	kmem_cache_destroy(sctp_chunk_cachep);
 err_chunk_cachep:
 	kmem_cache_destroy(sctp_bucket_cachep);

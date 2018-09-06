@@ -156,7 +156,7 @@ static const struct proto_ops dn_proto_ops;
 static DEFINE_RWLOCK(dn_hash_lock);
 static struct hlist_head dn_sk_hash[DN_SK_HASH_SIZE];
 static struct hlist_head dn_wild_sk;
-static atomic_long_t decnet_memory_allocated;
+static struct percpu_counter decnet_memory_allocated;
 
 static int __dn_setsockopt(struct socket *sock, int level, int optname, char __user *optval, unsigned int optlen, int flags);
 static int __dn_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen, int flags);
@@ -2356,6 +2356,7 @@ static int __init decnet_init(void)
 	int rc;
 
 	printk(banner);
+	percpu_counter_init(&decnet_memory_allocated, 0, GFP_KERNEL);
 
 	rc = proto_register(&dn_proto, 1);
 	if (rc != 0)

@@ -107,7 +107,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 			      enum sctp_socket_type type);
 
 static unsigned long sctp_memory_pressure;
-static atomic_long_t sctp_memory_allocated;
+struct percpu_counter sctp_memory_allocated;
 struct percpu_counter sctp_sockets_allocated;
 
 static void sctp_enter_memory_pressure(struct sock *sk)

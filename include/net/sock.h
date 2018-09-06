@@ -1114,7 +1114,7 @@ struct proto {
 	/* Memory pressure */
 	void			(*enter_memory_pressure)(struct sock *sk);
 	void			(*leave_memory_pressure)(struct sock *sk);
-	atomic_long_t		*memory_allocated;	/* Current allocated memory. */
+	struct percpu_counter	*memory_allocated;	/* Current allocated memory. */
 	struct percpu_counter	*sockets_allocated;	/* Current number of sockets. */
 	/*
 	 * Pressure flag: try to collapse.
@@ -1237,19 +1237,19 @@ static inline bool sk_under_memory_pressure(const struct sock *sk)
 static inline long
 sk_memory_allocated(const struct sock *sk)
 {
-	return atomic_long_read(sk->sk_prot->memory_allocated);
+	return percpu_counter_sum_positive(sk->sk_prot->memory_allocated);
 }
 
-static inline long
+static inline void
 sk_memory_allocated_add(struct sock *sk, int amt)
 {
-	return atomic_long_add_return(amt, sk->sk_prot->memory_allocated);
+	percpu_counter_add(sk->sk_prot->memory_allocated, amt);
 }
 
 static inline void
 sk_memory_allocated_sub(struct sock *sk, int amt)
 {
-	atomic_long_sub(amt, sk->sk_prot->memory_allocated);
+	percpu_counter_sub(sk->sk_prot->memory_allocated, amt);
 }
 
 static inline void sk_sockets_allocated_dec(struct sock *sk)
@@ -1277,7 +1277,7 @@ proto_sockets_allocated_sum_positive(struct proto *prot)
 static inline long
 proto_memory_allocated(struct proto *prot)
 {
-	return atomic_long_read(prot->memory_allocated);
+	return percpu_counter_sum_positive(prot->memory_allocated);
 }
 
 static inline bool

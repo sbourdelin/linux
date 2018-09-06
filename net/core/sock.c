@@ -2394,8 +2394,11 @@ EXPORT_SYMBOL(sk_wait_data);
 int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 {
 	struct proto *prot = sk->sk_prot;
-	long allocated = sk_memory_allocated_add(sk, amt);
+	long allocated;
 	bool charged = true;
+
+	sk_memory_allocated_add(sk, amt);
+	allocated = sk_memory_allocated(sk);
 
 	if (mem_cgroup_sockets_enabled && sk->sk_memcg &&
 	    !(charged = mem_cgroup_charge_skmem(sk->sk_memcg, amt)))

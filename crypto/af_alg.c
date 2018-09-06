@@ -29,7 +29,7 @@ struct alg_type_list {
 	struct list_head list;
 };
 
-static atomic_long_t alg_memory_allocated;
+static struct percpu_counter alg_memory_allocated;
 
 static struct proto alg_proto = {
 	.name			= "ALG",
@@ -1183,13 +1183,19 @@ static int __init af_alg_init(void)
 	if (err)
 		goto out;
 
-	err = sock_register(&alg_family);
+	err = percpu_counter_init(&alg_memory_allocated, 0, GFP_KERNEL);
 	if (err != 0)
 		goto out_unregister_proto;
+
+	err = sock_register(&alg_family);
+	if (err != 0)
+		goto out_free_percpu;
 
 out:
 	return err;
 
+out_free_percpu:
+	percpu_counter_destroy(&alg_memory_allocated);
 out_unregister_proto:
 	proto_unregister(&alg_proto);
 	goto out;

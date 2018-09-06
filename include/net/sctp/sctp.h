@@ -36,7 +36,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Ardelle Fan           <ardelle.fan@intel.com>
  *    Ryan Layer            <rmlayer@us.ibm.com>
- *    Kevin Gao             <kevin.gao@intel.com> 
+ *    Kevin Gao             <kevin.gao@intel.com>
  */
 
 #ifndef __net_sctp_h__
@@ -114,6 +114,7 @@ __poll_t sctp_poll(struct file *file, struct socket *sock,
 void sctp_sock_rfree(struct sk_buff *skb);
 void sctp_copy_sock(struct sock *newsk, struct sock *sk,
 		    struct sctp_association *asoc);
+extern struct percpu_counter sctp_memory_allocated;
 extern struct percpu_counter sctp_sockets_allocated;
 int sctp_asconf_mgmt(struct sctp_sock *, struct sctp_sockaddr_entry *);
 struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);

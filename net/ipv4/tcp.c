@@ -289,7 +289,7 @@ EXPORT_SYMBOL_GPL(tcp_orphan_count);
 long sysctl_tcp_mem[3] __read_mostly;
 EXPORT_SYMBOL(sysctl_tcp_mem);
 
-atomic_long_t tcp_memory_allocated;	/* Current allocated memory. */
+struct percpu_counter tcp_memory_allocated;	/* Current allocated memory. */
 EXPORT_SYMBOL(tcp_memory_allocated);
 
 #if IS_ENABLED(CONFIG_SMC)
@@ -3832,6 +3832,7 @@ void __init tcp_init(void)
 	BUILD_BUG_ON(sizeof(struct tcp_skb_cb) >
 		     FIELD_SIZEOF(struct sk_buff, cb));
 
+	percpu_counter_init(&tcp_memory_allocated, 0, GFP_KERNEL);
 	percpu_counter_init(&tcp_sockets_allocated, 0, GFP_KERNEL);
 	percpu_counter_init(&tcp_orphan_count, 0, GFP_KERNEL);
 	inet_hashinfo_init(&tcp_hashinfo);
