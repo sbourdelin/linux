@@ -50,6 +50,7 @@ unsigned int ptrs_per_p4d __ro_after_init = 1;
 #endif
 
 extern unsigned long get_cmd_line_ptr(void);
+static int figure_hugepage_layout(unsigned long kernel_sz);
 
 /* Used by PAGE_KERN* macros: */
 pteval_t __default_kernel_pte_mask __read_mostly = ~0;
@@ -109,6 +110,9 @@ enum mem_avoid_index {
 	MEM_AVOID_BOOTPARAMS,
 	MEM_AVOID_MEMMAP_BEGIN,
 	MEM_AVOID_MEMMAP_END = MEM_AVOID_MEMMAP_BEGIN + MAX_MEMMAP_REGIONS - 1,
+	MEM_AVOID_HUGEPAGE_BEGIN,
+	/* support 4 continuous chunk which can hold GiB */
+	MEM_AVOID_HUGEPAGE_END = MEM_AVOID_HUGEPAGE_BEGIN + 4,
 	MEM_AVOID_MAX,
 };
 
@@ -241,7 +245,7 @@ static void parse_gb_huge_pages(char *param, char *val)
 }
 
 
-static int handle_mem_options(void)
+static int handle_mem_options(unsigned long output_size)
 {
 	char *args = (char *)get_cmd_line_ptr();
 	size_t len = strlen((char *)args);
@@ -291,6 +295,8 @@ static int handle_mem_options(void)
 		}
 	}
 
+	if (max_gb_huge_pages != 0)
+		figure_hugepage_layout(output_size);
 	free(tmp_cmdline);
 	return 0;
 }
@@ -370,7 +376,7 @@ static int handle_mem_options(void)
  * becomes the MEM_AVOID_ZO_RANGE below.
  */
 static void mem_avoid_init(unsigned long input, unsigned long input_size,
-			   unsigned long output)
+			   unsigned long output, unsigned long output_size)
 {
 	unsigned long init_size = boot_params->hdr.init_size;
 	u64 initrd_start, initrd_size;
@@ -416,7 +422,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	/* We don't need to set a mapping for setup_data. */
 
 	/* Mark the memmap regions we need to avoid */
-	handle_mem_options();
+	handle_mem_options(output_size);
 
 #ifdef CONFIG_X86_VERBOSE_BOOTUP
 	/* Make sure video RAM can be used. */
@@ -495,60 +501,6 @@ static void store_slot_info(struct mem_vector *region, unsigned long image_size)
 	}
 }
 
-/*
- * Skip as many 1GB huge pages as possible in the passed region
- * according to the number which users specified:
- */
-static void
-process_gb_huge_pages(struct mem_vector *region, unsigned long image_size)
-{
-	unsigned long addr, size = 0;
-	struct mem_vector tmp;
-	int i = 0;
-
-	if (!max_gb_huge_pages) {
-		store_slot_info(region, image_size);
-		return;
-	}
-
-	addr = ALIGN(region->start, PUD_SIZE);
-	/* Did we raise the address above the passed in memory entry? */
-	if (addr < region->start + region->size)
-		size = region->size - (addr - region->start);
-
-	/* Check how many 1GB huge pages can be filtered out: */
-	while (size > PUD_SIZE && max_gb_huge_pages) {
-		size -= PUD_SIZE;
-		max_gb_huge_pages--;
-		i++;
-	}
-
-	/* No good 1GB huge pages found: */
-	if (!i) {
-		store_slot_info(region, image_size);
-		return;
-	}
-
-	/*
-	 * Skip those 'i'*1GB good huge pages, and continue checking and
-	 * processing the remaining head or tail part of the passed region
-	 * if available.
-	 */
-
-	if (addr >= region->start + image_size) {
-		tmp.start = region->start;
-		tmp.size = addr - region->start;
-		store_slot_info(&tmp, image_size);
-	}
-
-	size  = region->size - (addr - region->start) - i * PUD_SIZE;
-	if (size >= image_size) {
-		tmp.start = addr + i * PUD_SIZE;
-		tmp.size = size;
-		store_slot_info(&tmp, image_size);
-	}
-}
-
 static unsigned long slots_fetch_random(void)
 {
 	unsigned long slot;
@@ -573,12 +525,28 @@ static unsigned long slots_fetch_random(void)
 	return 0;
 }
 
+static struct slot_area gb_slots[MAX_SLOT_AREA];
+static int max_gb_chunk;
+
 typedef void (*handles_mem_region)(struct mem_vector *entry,
 			       unsigned long minimum,
 			       unsigned long image_size);
 
 typedef void (*store_info)(struct mem_vector *region,
 	unsigned long image_size);
+
+static void store_gb_slot_info(struct mem_vector *region,
+	unsigned long unused_image_size)
+{
+	int num;
+
+	if (region->size < PUD_SIZE)
+		return;
+	num = region->size / PUD_SIZE;
+	gb_slots[max_gb_chunk].addr = region->start;
+	gb_slots[max_gb_chunk].num = num;
+	max_gb_chunk++;
+}
 
 static void __process_mem_region(struct mem_vector *entry,
 	unsigned long minimum, unsigned long volume, unsigned long align,
@@ -751,6 +719,26 @@ process_efi_entries(unsigned long minimum, unsigned long image_size,
 }
 #endif
 
+
+/* the candidate region for 1GiB page should avoid [0, MEM_AVOID_MEMMAP_END]
+ */
+static void calc_gb_slots(struct mem_vector *entry, unsigned long unused_min,
+	unsigned long unused)
+{
+	struct mem_vector v;
+	unsigned long start;
+
+	if (max_gb_chunk == MAX_SLOT_AREA) {
+		debug_putstr("Aborted GiB chunks full)!\n");
+		return;
+	}
+	v.start = ALIGN(entry->start, PUD_SIZE);
+	v.size = entry->start + entry->size - v.start;
+	if (v.size < 0)
+		return;
+	__process_mem_region(&v, 0, PUD_SIZE, PUD_SIZE, store_gb_slot_info);
+}
+
 static void process_e820_entries(unsigned long minimum,
 	unsigned long image_size, handles_mem_region handle)
 {
@@ -772,6 +760,76 @@ static void process_e820_entries(unsigned long minimum,
 			break;
 		}
 	}
+}
+
+/* figure out the good 1GiB page slots, and compare the GiB slots num with
+ * "hugepages=x" in cmdline. For little and equal, It falls into 3 cases:
+ * 1st: equal, then prevent kaslr from extract kernel into these GiB slots
+ * 2nd. equal x plus 1, then pick up a GiB slot randomly into which kaslr is
+ * allows to extract kernel.
+ * 3rd. the rest, kaslr can extract kernel to any GiB slot
+ */
+static int figure_hugepage_layout(unsigned long kernel_sz)
+{
+	int i, idx = 0;
+	struct mem_vector region;
+	unsigned long first_end, second_start;
+	long slot_chosen, cur_slot_num;
+	long off;
+	int gb_total_slot = 0;
+
+	if (!process_efi_entries(0x1000000, kernel_sz, calc_gb_slots))
+		process_e820_entries(0x1000000, kernel_sz, calc_gb_slots);
+
+	/* for hugepage, the load addr should be only limited when ... */
+
+	for (i = 0; i < max_gb_chunk; i++)
+		gb_total_slot += gb_slots[i].num;
+	if (max_gb_huge_pages < (unsigned long)(gb_total_slot - 1))
+		return 0;
+
+	idx = MEM_AVOID_HUGEPAGE_BEGIN;
+	if (max_gb_huge_pages == gb_total_slot) {
+		for (i = 0; i < gb_total_slot; i++, idx++) {
+			mem_avoid[idx].start = gb_slots[i].addr;
+			mem_avoid[idx].size = gb_slots[i].num * PUD_SIZE;
+		}
+	/* randomly choose a GiB slot to load kernel */
+	} else if (max_gb_huge_pages == gb_total_slot - 1) {
+		slot_chosen = kaslr_get_random_long("Physical") % gb_total_slot;
+		cur_slot_num = 0;
+		for (i = 0; i < max_gb_chunk; i++) {
+			off = slot_chosen - cur_slot_num;
+			if (off > 0 && off < gb_slots[i].num) {
+				/* split the continuous area into two parts */
+				first_end = gb_slots[i].addr
+					+ (off - 1) * PUD_SIZE;
+				/* prevent kernel from crossing the GiB boundary
+				 * otherwise waste a good hugepage
+				 */
+				second_start = gb_slots[i].addr + off * PUD_SIZE
+				  - ALIGN(kernel_sz, CONFIG_PHYSICAL_ALIGN);
+				if (first_end != gb_slots[i].addr) {
+					mem_avoid[idx].start = gb_slots[i].addr;
+					mem_avoid[idx].size =
+						first_end - gb_slots[i].addr;
+					idx++;
+				}
+				mem_avoid[idx].start = second_start;
+				mem_avoid[idx].size = gb_slots[i].addr +
+				    gb_slots[i].num * PUD_SIZE - second_start;
+				idx++;
+			} else {
+				mem_avoid[idx].start = gb_slots[i].addr;
+				mem_avoid[idx].size =
+					gb_slots[i].num * PUD_SIZE;
+				idx++;
+			}
+			cur_slot_num += gb_slots[i].num;
+		}
+	}
+
+	return 0;
 }
 
 static unsigned long find_random_phys_addr(unsigned long minimum,
@@ -847,7 +905,7 @@ void choose_random_location(unsigned long input,
 	initialize_identity_maps();
 
 	/* Record the various known unsafe memory ranges. */
-	mem_avoid_init(input, input_size, *output);
+	mem_avoid_init(input, input_size, *output, output_size);
 
 	/*
 	 * Low end of the randomization range should be the
