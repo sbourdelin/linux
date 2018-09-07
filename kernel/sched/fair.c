@@ -8464,7 +8464,7 @@ redo:
 	}
 
 	group = find_busiest_group(&env);
-	if (!group) {
+	if (!group || !env.imbalance) {
 		schedstat_inc(sd->lb_nobusyg[idle]);
 		goto out_balanced;
 	}
