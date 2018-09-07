@@ -546,7 +546,10 @@ static int ath3k_probe(struct usb_interface *intf,
 			BT_ERR("Set normal mode failed");
 			return ret;
 		}
-		ath3k_switch_pid(udev);
+		ret = ath3k_switch_pid(udev);
+		if (ret < 0)
+			BT_WARN("Warning: switch pid failed (ret=%d)", ret);
+
 		return 0;
 	}
 
