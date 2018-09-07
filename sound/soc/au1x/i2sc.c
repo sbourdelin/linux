@@ -264,15 +264,13 @@ static int au1xi2s_drvprobe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
-	return snd_soc_register_component(&pdev->dev, &au1xi2s_component,
+	return devm_snd_soc_register_component(&pdev->dev, &au1xi2s_component,
 					  &au1xi2s_dai_driver, 1);
 }
 
 static int au1xi2s_drvremove(struct platform_device *pdev)
 {
 	struct au1xpsc_audio_data *ctx = platform_get_drvdata(pdev);
-
-	snd_soc_unregister_component(&pdev->dev);
 
 	WR(ctx, I2S_ENABLE, EN_D);	/* clock off, disable */
 

@@ -275,7 +275,7 @@ static int au1xac97c_drvprobe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = snd_soc_register_component(&pdev->dev, &au1xac97c_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &au1xac97c_component,
 					 &au1xac97c_dai_driver, 1);
 	if (ret)
 		return ret;
@@ -287,8 +287,6 @@ static int au1xac97c_drvprobe(struct platform_device *pdev)
 static int au1xac97c_drvremove(struct platform_device *pdev)
 {
 	struct au1xpsc_audio_data *ctx = platform_get_drvdata(pdev);
-
-	snd_soc_unregister_component(&pdev->dev);
 
 	WR(ctx, AC97_ENABLE, EN_D);	/* clock off, disable */
 
