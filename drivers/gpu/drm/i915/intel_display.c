@@ -86,6 +86,7 @@ static const uint32_t skl_primary_formats[] = {
 	DRM_FORMAT_YVYU,
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
+	DRM_FORMAT_XYUV,
 };
 
 static const uint32_t skl_pri_planar_formats[] = {
@@ -101,6 +102,7 @@ static const uint32_t skl_pri_planar_formats[] = {
 	DRM_FORMAT_YVYU,
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
+	DRM_FORMAT_XYUV,
 	DRM_FORMAT_NV12,
 };
 
@@ -2667,6 +2669,8 @@ int skl_format_to_fourcc(int format, bool rgb_order, bool alpha)
 		return DRM_FORMAT_RGB565;
 	case PLANE_CTL_FORMAT_NV12:
 		return DRM_FORMAT_NV12;
+	case PLANE_CTL_FORMAT_XYUV:
+		return DRM_FORMAT_XYUV;
 	default:
 	case PLANE_CTL_FORMAT_XRGB_8888:
 		if (rgb_order) {
@@ -3497,6 +3501,8 @@ static u32 skl_plane_ctl_format(uint32_t pixel_format)
 		return PLANE_CTL_FORMAT_XRGB_2101010;
 	case DRM_FORMAT_XBGR2101010:
 		return PLANE_CTL_ORDER_RGBX | PLANE_CTL_FORMAT_XRGB_2101010;
+	case DRM_FORMAT_XYUV:
+		return PLANE_CTL_FORMAT_XYUV;
 	case DRM_FORMAT_YUYV:
 		return PLANE_CTL_FORMAT_YUV422 | PLANE_CTL_YUV422_YUYV;
 	case DRM_FORMAT_YVYU:
@@ -4955,6 +4961,7 @@ static int skl_update_scaler_plane(struct intel_crtc_state *crtc_state,
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_XYUV:
 		break;
 	default:
 		DRM_DEBUG_KMS("[PLANE:%d:%s] FB:%d unsupported scaling format 0x%x\n",
@@ -13409,6 +13416,7 @@ static bool skl_plane_format_mod_supported(struct drm_plane *_plane,
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_XYUV:
 		if (modifier == I915_FORMAT_MOD_Yf_TILED)
 			return true;
 		/* fall through */
@@ -14527,6 +14535,13 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 		break;
 	case DRM_FORMAT_ABGR2101010:
 		if (!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv)) {
+			DRM_DEBUG_KMS("unsupported pixel format: %s\n",
+				      drm_get_format_name(mode_cmd->pixel_format, &format_name));
+			goto err;
+		}
+		break;
+	case DRM_FORMAT_XYUV:
+		if (INTEL_GEN(dev_priv) < 9) {
 			DRM_DEBUG_KMS("unsupported pixel format: %s\n",
 				      drm_get_format_name(mode_cmd->pixel_format, &format_name));
 			goto err;

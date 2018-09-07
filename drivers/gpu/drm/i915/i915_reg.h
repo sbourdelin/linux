@@ -6511,7 +6511,7 @@ enum {
 #define   PLANE_CTL_FORMAT_XRGB_2101010		(2 << 24)
 #define   PLANE_CTL_FORMAT_XRGB_8888		(4 << 24)
 #define   PLANE_CTL_FORMAT_XRGB_16161616F	(6 << 24)
-#define   PLANE_CTL_FORMAT_AYUV			(8 << 24)
+#define   PLANE_CTL_FORMAT_XYUV			(8 << 24)
 #define   PLANE_CTL_FORMAT_INDEXED		(12 << 24)
 #define   PLANE_CTL_FORMAT_RGB_565		(14 << 24)
 #define   ICL_PLANE_CTL_FORMAT_MASK		(0x1f << 23)
