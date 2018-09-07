@@ -200,6 +200,7 @@
 	rtc@68 {
 		compatible = "nxp,pcf8523";
 		reg = <0x68>;
+		nxp,quartz_load_12.5pf;
 	};
 
 	tmp75@48 {
