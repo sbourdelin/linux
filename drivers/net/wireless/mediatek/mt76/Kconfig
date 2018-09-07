@@ -17,6 +17,7 @@ config MT76x2_COMMON
 config MT76x0U
 	tristate "MediaTek MT76x0U (USB) support"
 	select MT76_CORE
+	select MT76_USB
 	depends on MAC80211
 	depends on USB
 	select MT76x02_LIB
