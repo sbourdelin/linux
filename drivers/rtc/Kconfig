@@ -195,6 +195,17 @@ config RTC_DRV_ABX80X
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-abx80x.
 
+config RTC_DRV_ABX80X_WDT
+	bool "Abracon ABx80x Watchdog"
+	default y
+	depends on RTC_DRV_ABX80X
+	help
+	  If you say yes here you get watchdog support for Abracon ABX804 and ABX805
+	  clock chips. This watchdog supports timeouts up to 31 seconds with 1 second
+	  granularity.
+
+          This watchdog device is part of the rtc-abx80x module.
+
 config RTC_DRV_AC100
 	tristate "X-Powers AC100"
 	depends on MFD_AC100
