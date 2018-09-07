@@ -252,11 +252,9 @@ static int rxrpc_krb5_decode_principal(struct krb5_principal *princ,
 		paddedlen = (tmp + 3) & ~3;
 		if (paddedlen > toklen)
 			return -EINVAL;
-		princ->name_parts[loop] = kmalloc(tmp + 1, GFP_KERNEL);
+		princ->name_parts[loop] = kmemdup_nul(xdr, tmp, GFP_KERNEL);
 		if (!princ->name_parts[loop])
 			return -ENOMEM;
-		memcpy(princ->name_parts[loop], xdr, tmp);
-		princ->name_parts[loop][tmp] = 0;
 		toklen -= paddedlen;
 		xdr += paddedlen >> 2;
 	}
@@ -270,11 +268,9 @@ static int rxrpc_krb5_decode_principal(struct krb5_principal *princ,
 	paddedlen = (tmp + 3) & ~3;
 	if (paddedlen > toklen)
 		return -EINVAL;
-	princ->realm = kmalloc(tmp + 1, GFP_KERNEL);
+	princ->realm = kmemdup_nul(xdr, tmp, GFP_KERNEL);
 	if (!princ->realm)
 		return -ENOMEM;
-	memcpy(princ->realm, xdr, tmp);
-	princ->realm[tmp] = 0;
 	toklen -= paddedlen;
 	xdr += paddedlen >> 2;
 
