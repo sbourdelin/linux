@@ -19,11 +19,15 @@ static void enable_hotplug_cpu(int cpu)
 
 static void disable_hotplug_cpu(int cpu)
 {
+	if (!cpu_is_hotpluggable(cpu))
+		return;
 	if (cpu_online(cpu)) {
 		lock_device_hotplug();
 		device_offline(get_cpu_device(cpu));
 		unlock_device_hotplug();
 	}
+	if (cpu_online(cpu))
+		return;
 	if (cpu_present(cpu))
 		xen_arch_unregister_cpu(cpu);
 
