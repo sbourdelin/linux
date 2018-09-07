@@ -803,7 +803,7 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
 	}
 	dev_set_drvdata(&pdev->dev, drvdata);
 
-	ret = snd_soc_register_component(&pdev->dev, &ux500_msp_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &ux500_msp_component,
 					 &ux500_msp_dai_drv, 1);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
@@ -816,14 +816,10 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev,
 			"Error: %s: Failed to register PCM platform device!\n",
 			__func__);
-		goto err_reg_plat;
+		return ret;
 	}
 
 	return 0;
-
-err_reg_plat:
-	snd_soc_unregister_component(&pdev->dev);
-	return ret;
 }
 
 static int ux500_msp_drv_remove(struct platform_device *pdev)
@@ -831,8 +827,6 @@ static int ux500_msp_drv_remove(struct platform_device *pdev)
 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
 
 	ux500_pcm_unregister_platform(pdev);
-
-	snd_soc_unregister_component(&pdev->dev);
 
 	prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP, "ux500_msp_i2s");
 
