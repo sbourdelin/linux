@@ -85,7 +85,7 @@ static int pcf8523_write(struct i2c_client *client, u8 reg, u8 value)
 	return 0;
 }
 
-static int pcf8523_select_capacitance(struct i2c_client *client, bool high)
+static int pcf8523_select_capacitance(struct i2c_client *client)
 {
 	u8 value;
 	int err;
@@ -94,7 +94,7 @@ static int pcf8523_select_capacitance(struct i2c_client *client, bool high)
 	if (err < 0)
 		return err;
 
-	if (!high)
+	if (!device_property_present(&client->dev, "nxp,quartz_load_12.5pf"))
 		value &= ~REG_CONTROL1_CAP_SEL;
 	else
 		value |= REG_CONTROL1_CAP_SEL;
@@ -331,7 +331,7 @@ static int pcf8523_probe(struct i2c_client *client,
 	if (!pcf)
 		return -ENOMEM;
 
-	err = pcf8523_select_capacitance(client, true);
+	err = pcf8523_select_capacitance(client);
 	if (err < 0)
 		return err;
 
