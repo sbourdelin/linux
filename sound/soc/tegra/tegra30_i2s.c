@@ -474,7 +474,7 @@ static int tegra30_i2s_platform_probe(struct platform_device *pdev)
 		goto err_free_rx_fifo;
 	}
 
-	ret = snd_soc_register_component(&pdev->dev, &tegra30_i2s_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &tegra30_i2s_component,
 				   &i2s->dai, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register DAI: %d\n", ret);
@@ -487,13 +487,11 @@ static int tegra30_i2s_platform_probe(struct platform_device *pdev)
 				i2s->capture_dma_chan);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
-		goto err_unregister_component;
+		goto err_unroute_rx_fifo;
 	}
 
 	return 0;
 
-err_unregister_component:
-	snd_soc_unregister_component(&pdev->dev);
 err_unroute_rx_fifo:
 	tegra30_ahub_unset_rx_cif_source(i2s->capture_fifo_cif);
 err_free_rx_fifo:
@@ -522,7 +520,6 @@ static int tegra30_i2s_platform_remove(struct platform_device *pdev)
 		tegra30_i2s_runtime_suspend(&pdev->dev);
 
 	tegra_pcm_platform_unregister(&pdev->dev);
-	snd_soc_unregister_component(&pdev->dev);
 
 	tegra30_ahub_unset_rx_cif_source(i2s->capture_fifo_cif);
 	tegra30_ahub_free_rx_fifo(i2s->capture_fifo_cif);

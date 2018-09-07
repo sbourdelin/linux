@@ -390,7 +390,7 @@ static int tegra20_i2s_platform_probe(struct platform_device *pdev)
 			goto err_pm_disable;
 	}
 
-	ret = snd_soc_register_component(&pdev->dev, &tegra20_i2s_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &tegra20_i2s_component,
 					 &i2s->dai, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register DAI: %d\n", ret);
@@ -401,13 +401,11 @@ static int tegra20_i2s_platform_probe(struct platform_device *pdev)
 	ret = tegra_pcm_platform_register(&pdev->dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
-		goto err_unregister_component;
+		goto err_suspend;
 	}
 
 	return 0;
 
-err_unregister_component:
-	snd_soc_unregister_component(&pdev->dev);
 err_suspend:
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		tegra20_i2s_runtime_suspend(&pdev->dev);
@@ -428,7 +426,6 @@ static int tegra20_i2s_platform_remove(struct platform_device *pdev)
 		tegra20_i2s_runtime_suspend(&pdev->dev);
 
 	tegra_pcm_platform_unregister(&pdev->dev);
-	snd_soc_unregister_component(&pdev->dev);
 
 	clk_put(i2s->clk_i2s);
 
