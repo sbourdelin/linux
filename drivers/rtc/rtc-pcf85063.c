@@ -27,6 +27,7 @@
 */
 
 #define PCF85063_REG_CTRL1		0x00 /* status */
+#define PCF85063_REG_CTRL1_CAP_SEL	BIT(0)
 #define PCF85063_REG_CTRL1_STOP		BIT(5)
 #define PCF85063_REG_CTRL2		0x01
 
@@ -180,6 +181,31 @@ static const struct rtc_class_ops pcf85063_rtc_ops = {
 	.set_time	= pcf85063_rtc_set_time
 };
 
+static int pcf85063_select_capacitance(struct i2c_client *client)
+{
+	int rc;
+	u8 reg;
+
+	rc = i2c_smbus_read_byte_data(client, PCF85063_REG_CTRL1);
+	if (rc < 0) {
+		dev_err(&client->dev, "Failing to read Control1 reg\n");
+		return -EIO;
+	}
+
+	if (device_property_present(&client->dev, "nxp,quartz_load_12.5pf"))
+		reg = rc |= PCF85063_REG_CTRL1_CAP_SEL;
+	else
+		reg = rc &= ~PCF85063_REG_CTRL1_CAP_SEL;
+
+	rc = i2c_smbus_write_byte_data(client, PCF85063_REG_CTRL1, reg);
+	if (rc < 0) {
+		dev_err(&client->dev, "Failing to configure device\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
 static int pcf85063_probe(struct i2c_client *client,
 				const struct i2c_device_id *id)
 {
@@ -196,6 +222,11 @@ static int pcf85063_probe(struct i2c_client *client,
 		dev_err(&client->dev, "RTC chip is not present\n");
 		return err;
 	}
+
+	err = pcf85063_select_capacitance(client);
+	if (err < 0)
+		dev_warn(&client->dev,
+			 "Capacitance  setup failed. Trying to continue\n");
 
 	rtc = devm_rtc_device_register(&client->dev,
 				       pcf85063_driver.driver.name,
