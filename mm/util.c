@@ -128,7 +128,7 @@ EXPORT_SYMBOL(kmemdup);
  * @len: The size of the data
  * @gfp: the GFP mask used in the kmalloc() call when allocating memory
  */
-char *kmemdup_nul(const char *s, size_t len, gfp_t gfp)
+void *kmemdup_nul(const void *s, size_t len, gfp_t gfp)
 {
 	char *buf;
 
