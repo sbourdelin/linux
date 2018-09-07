@@ -41,6 +41,7 @@
 #include <linux/kthread.h>
 #include <linux/init.h>
 #include <linux/mmu_notifier.h>
+#include <linux/sched/debug.h>
 
 #include <asm/tlb.h>
 #include "internal.h"
@@ -446,6 +447,10 @@ static void dump_header(struct oom_control *oc, struct task_struct *p)
 		if (is_dump_unreclaim_slabs())
 			dump_unreclaimable_slab();
 	}
+#ifdef CONFIG_DEBUG_AID_FOR_SYZBOT
+	show_state();
+	panic("Out of memory");
+#endif
 	if (sysctl_oom_dump_tasks)
 		dump_tasks(oc->memcg, oc->nodemask);
 }
