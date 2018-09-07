@@ -272,8 +272,15 @@ extern void lockdep_reset_lock(struct lockdep_map *lock);
 extern void lockdep_free_key_range(void *start, unsigned long size);
 extern asmlinkage void lockdep_sys_exit(void);
 
-extern void lockdep_off(void);
-extern void lockdep_on(void);
+static inline void lockdep_off(void)
+{
+	current->lockdep_recursion++;
+}
+
+static inline void lockdep_on(void)
+{
+	current->lockdep_recursion--;
+}
 
 /*
  * These methods are used by specific locking variants (spinlocks,

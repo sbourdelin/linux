@@ -62,8 +62,8 @@ extern void irq_exit(void);
 
 #define nmi_enter()						\
 	do {							\
-		printk_nmi_enter();				\
 		lockdep_off();					\
+		printk_nmi_enter();				\
 		ftrace_nmi_enter();				\
 		BUG_ON(in_nmi());				\
 		preempt_count_add(NMI_OFFSET + HARDIRQ_OFFSET);	\
@@ -78,8 +78,8 @@ extern void irq_exit(void);
 		BUG_ON(!in_nmi());				\
 		preempt_count_sub(NMI_OFFSET + HARDIRQ_OFFSET);	\
 		ftrace_nmi_exit();				\
-		lockdep_on();					\
 		printk_nmi_exit();				\
+		lockdep_on();					\
 	} while (0)
 
 #endif /* LINUX_HARDIRQ_H */

@@ -322,18 +322,6 @@ static inline u64 iterate_chain_key(u64 key, u32 idx)
 	return k0 | (u64)k1 << 32;
 }
 
-void lockdep_off(void)
-{
-	current->lockdep_recursion++;
-}
-EXPORT_SYMBOL(lockdep_off);
-
-void lockdep_on(void)
-{
-	current->lockdep_recursion--;
-}
-EXPORT_SYMBOL(lockdep_on);
-
 /*
  * Debugging switches:
  */
