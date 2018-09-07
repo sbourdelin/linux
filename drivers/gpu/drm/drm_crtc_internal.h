@@ -174,6 +174,8 @@ void drm_fb_release(struct drm_file *file_priv);
 
 int drm_mode_addfb(struct drm_device *dev, struct drm_mode_fb_cmd *or,
 		   struct drm_file *file_priv);
+int drm_mode_addfb2(struct drm_device *dev,
+		    void *data, struct drm_file *file_priv);
 int drm_mode_rmfb(struct drm_device *dev, u32 fb_id,
 		  struct drm_file *file_priv);
 
@@ -181,8 +183,8 @@ int drm_mode_rmfb(struct drm_device *dev, u32 fb_id,
 /* IOCTL */
 int drm_mode_addfb_ioctl(struct drm_device *dev,
 			 void *data, struct drm_file *file_priv);
-int drm_mode_addfb2(struct drm_device *dev,
-		    void *data, struct drm_file *file_priv);
+int drm_mode_addfb2_ioctl(struct drm_device *dev,
+			  void *data, struct drm_file *file_priv);
 int drm_mode_rmfb_ioctl(struct drm_device *dev,
 			void *data, struct drm_file *file_priv);
 int drm_mode_getfb(struct drm_device *dev,
