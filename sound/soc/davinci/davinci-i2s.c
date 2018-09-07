@@ -726,7 +726,7 @@ static int davinci_i2s_probe(struct platform_device *pdev)
 	dev->dev = &pdev->dev;
 	dev_set_drvdata(&pdev->dev, dev);
 
-	ret = snd_soc_register_component(&pdev->dev, &davinci_i2s_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &davinci_i2s_component,
 					 &davinci_i2s_dai, 1);
 	if (ret != 0)
 		goto err_release_clk;
@@ -734,13 +734,11 @@ static int davinci_i2s_probe(struct platform_device *pdev)
 	ret = edma_pcm_platform_register(&pdev->dev);
 	if (ret) {
 		dev_err(&pdev->dev, "register PCM failed: %d\n", ret);
-		goto err_unregister_component;
+		goto err_release_clk;
 	}
 
 	return 0;
 
-err_unregister_component:
-	snd_soc_unregister_component(&pdev->dev);
 err_release_clk:
 	clk_disable(dev->clk);
 	clk_put(dev->clk);
@@ -750,8 +748,6 @@ err_release_clk:
 static int davinci_i2s_remove(struct platform_device *pdev)
 {
 	struct davinci_mcbsp_dev *dev = dev_get_drvdata(&pdev->dev);
-
-	snd_soc_unregister_component(&pdev->dev);
 
 	clk_disable(dev->clk);
 	clk_put(dev->clk);
