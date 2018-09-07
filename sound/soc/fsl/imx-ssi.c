@@ -593,7 +593,7 @@ static int imx_ssi_probe(struct platform_device *pdev)
 		goto failed_register;
 	}
 
-	ret = snd_soc_register_component(&pdev->dev, &imx_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &imx_component,
 					 dai, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "register DAI failed\n");
@@ -610,13 +610,11 @@ static int imx_ssi_probe(struct platform_device *pdev)
 
 	if (ssi->fiq_init && ssi->dma_init) {
 		ret = ssi->fiq_init;
-		goto failed_pcm;
+		goto failed_register;
 	}
 
 	return 0;
 
-failed_pcm:
-	snd_soc_unregister_component(&pdev->dev);
 failed_register:
 	clk_disable_unprepare(ssi->clk);
 failed_clk:
@@ -631,8 +629,6 @@ static int imx_ssi_remove(struct platform_device *pdev)
 
 	if (!ssi->fiq_init)
 		imx_pcm_fiq_exit(pdev);
-
-	snd_soc_unregister_component(&pdev->dev);
 
 	if (ssi->flags & IMX_SSI_USE_AC97)
 		ac97_ssi = NULL;

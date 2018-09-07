@@ -294,7 +294,7 @@ static int psc_ac97_of_probe(struct platform_device *op)
 		return rc;
 	}
 
-	rc = snd_soc_register_component(&op->dev, &psc_ac97_component,
+	rc = devm_snd_soc_register_component(&op->dev, &psc_ac97_component,
 					psc_ac97_dai, ARRAY_SIZE(psc_ac97_dai));
 	if (rc != 0) {
 		dev_err(&op->dev, "Failed to register DAI\n");
@@ -320,7 +320,6 @@ static int psc_ac97_of_probe(struct platform_device *op)
 static int psc_ac97_of_remove(struct platform_device *op)
 {
 	mpc5200_audio_dma_destroy(op);
-	snd_soc_unregister_component(&op->dev);
 	snd_soc_set_ac97_ops(NULL);
 	return 0;
 }
