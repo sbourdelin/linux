@@ -1,0 +1,19 @@
+* NXP PCF85063 Real Time Clock
+
+NXP PCF85063 Real Time Clock
+
+Required properties:
+- compatible: Should contain "nxp,pcf85063".
+- reg: I2C address for chip.
+
+Optional property:
+- nxp,quartz_load_12.5pF: The capacitive load on the quartz is 12.5 pF,
+  which differ from the default value of 7 pF
+
+Example:
+
+pcf85063: pcf85063@51 {
+	compatible = "nxp,pcf85063";
+	reg = <0x51>;
+	nxp,quartz_load_12.5pF;
+};
