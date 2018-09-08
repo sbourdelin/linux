@@ -23,17 +23,11 @@
 
 #include "dpu_io_util.h"
 
-/* event will be triggered before power handler disable */
-#define DPU_POWER_EVENT_PRE_DISABLE	0x1
+/* event will be triggered on power handler disable */
+#define DPU_POWER_EVENT_DISABLE	BIT(1)
 
-/* event will be triggered after power handler disable */
-#define DPU_POWER_EVENT_POST_DISABLE	0x2
-
-/* event will be triggered before power handler enable */
-#define DPU_POWER_EVENT_PRE_ENABLE	0x4
-
-/* event will be triggered after power handler enable */
-#define DPU_POWER_EVENT_POST_ENABLE	0x8
+/* event will be triggered on power handler enable */
+#define DPU_POWER_EVENT_ENABLE	BIT(2)
 
 /**
  * mdss_bus_vote_type: register bus vote type
