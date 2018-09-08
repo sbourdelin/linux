@@ -1086,7 +1086,7 @@ int reg_reload_regdb(void)
 	}
 
 	rtnl_lock();
-	if (!IS_ERR_OR_NULL(regdb))
+	if (!IS_ERR(regdb))
 		kfree(regdb);
 	regdb = db;
 	rtnl_unlock();
@@ -3919,7 +3919,7 @@ void regulatory_exit(void)
 		kfree(reg_request);
 	}
 
-	if (!IS_ERR_OR_NULL(regdb))
+	if (!IS_ERR(regdb))
 		kfree(regdb);
 
 	free_regdb_keyring();
