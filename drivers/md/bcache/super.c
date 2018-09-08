@@ -1513,12 +1513,11 @@ static void cache_set_free(struct closure *cl)
 	bch_btree_cache_free(c);
 	bch_journal_free(c);
 
-	for_each_cache(ca, c, i)
-		if (ca) {
-			ca->set = NULL;
-			c->cache[ca->sb.nr_this_dev] = NULL;
-			kobject_put(&ca->kobj);
-		}
+	for_each_cache(ca, c, i) {
+		ca->set = NULL;
+		c->cache[ca->sb.nr_this_dev] = NULL;
+		kobject_put(&ca->kobj);
+	}
 
 	bch_bset_sort_state_free(&c->sort);
 	free_pages((unsigned long) c->uuids, ilog2(bucket_pages(c)));
