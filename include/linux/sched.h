@@ -1174,9 +1174,10 @@ struct task_struct {
 	unsigned long			task_state_change;
 #endif
 	int				pagefault_disabled;
-#ifdef CONFIG_MMU
-	struct task_struct		*oom_reaper_list;
-#endif
+	struct list_head		oom_victim_list;
+	unsigned long			last_oom_compared;
+	unsigned long			last_oom_score;
+	unsigned char			oom_reap_stall_count;
 #ifdef CONFIG_VMAP_STACK
 	struct vm_struct		*stack_vm_area;
 #endif

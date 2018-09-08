@@ -1008,6 +1008,8 @@ static inline void __mmput(struct mm_struct *mm)
 	}
 	if (mm->binfmt)
 		module_put(mm->binfmt->module);
+	if (unlikely(mm_is_oom_victim(mm)))
+		exit_oom_mm(mm);
 	mmdrop(mm);
 }
 
