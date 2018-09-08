@@ -114,7 +114,7 @@ static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
 			break;
 
 		if (time_after(jiffies, deadline)) {
-			dev_err(domain->dev, "falied to command PGC\n");
+			dev_err(domain->dev, "failed to command PGC\n");
 			ret = -ETIMEDOUT;
 			/*
 			 * If we were in a process of enabling a
