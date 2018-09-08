@@ -6341,7 +6341,10 @@ bool intel_dp_init(struct drm_i915_private *dev_priv,
 		else
 			intel_encoder->crtc_mask = (1 << 0) | (1 << 1);
 	} else {
-		intel_encoder->crtc_mask = (1 << 0) | (1 << 1) | (1 << 2);
+		enum pipe pipe;
+
+		for_each_pipe(dev_priv, pipe)
+			intel_encoder->crtc_mask |= BIT(pipe);
 	}
 	intel_encoder->cloneable = 0;
 	intel_encoder->port = port;
