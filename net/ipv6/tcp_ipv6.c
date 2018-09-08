@@ -391,7 +391,8 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		goto out;
 
 	if (ipv6_hdr(skb)->hop_limit < inet6_sk(sk)->min_hopcount) {
-		__NET_INC_STATS(net, LINUX_MIB_TCPMINTTLDROP);
+		__NET_ADD_STATS(net, LINUX_MIB_TCPMINTTLDROP,
+				tcp_skb_pcount(skb));
 		goto out;
 	}
 
@@ -1523,7 +1524,8 @@ process:
 		}
 	}
 	if (hdr->hop_limit < inet6_sk(sk)->min_hopcount) {
-		__NET_INC_STATS(net, LINUX_MIB_TCPMINTTLDROP);
+		__NET_ADD_STATS(net, LINUX_MIB_TCPMINTTLDROP,
+				tcp_skb_pcount(skb));
 		goto discard_and_relse;
 	}
 

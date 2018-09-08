@@ -4496,7 +4496,8 @@ static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 	tcp_ecn_check_ce(sk, skb);
 
 	if (unlikely(tcp_try_rmem_schedule(sk, skb, skb->truesize))) {
-		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFODROP);
+		NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPOFODROP,
+			      tcp_skb_pcount(skb));
 		tcp_drop(sk, skb);
 		return;
 	}
@@ -4505,7 +4506,8 @@ static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 	tp->pred_flags = 0;
 	inet_csk_schedule_ack(sk);
 
-	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFOQUEUE);
+	NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPOFOQUEUE,
+		      tcp_skb_pcount(skb));
 	seq = TCP_SKB_CB(skb)->seq;
 	end_seq = TCP_SKB_CB(skb)->end_seq;
 	SOCK_DEBUG(sk, "out of order segment: rcv_next %X seq %X - %X\n",
@@ -4666,7 +4668,8 @@ int tcp_send_rcvq(struct sock *sk, struct msghdr *msg, size_t size)
 	skb->len = size;
 
 	if (tcp_try_rmem_schedule(sk, skb, skb->truesize)) {
-		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
+		NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP,
+			      tcp_skb_pcount(skb));
 		goto err_free;
 	}
 
@@ -4725,7 +4728,8 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	 */
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {
 		if (tcp_receive_window(tp) == 0) {
-			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPZEROWINDOWDROP);
+			NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPZEROWINDOWDROP,
+				      tcp_skb_pcount(skb));
 			goto out_of_window;
 		}
 
@@ -4734,7 +4738,8 @@ queue_and_out:
 		if (skb_queue_len(&sk->sk_receive_queue) == 0)
 			sk_forced_mem_schedule(sk, skb->truesize);
 		else if (tcp_try_rmem_schedule(sk, skb, skb->truesize)) {
-			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
+			NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP,
+				      tcp_skb_pcount(skb));
 			goto drop;
 		}
 
@@ -4796,7 +4801,8 @@ drop:
 		 * remembering D-SACK for its head made in previous line.
 		 */
 		if (!tcp_receive_window(tp)) {
-			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPZEROWINDOWDROP);
+			NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPZEROWINDOWDROP,
+				      tcp_skb_pcount(skb));
 			goto out_of_window;
 		}
 		goto queue_and_out;
