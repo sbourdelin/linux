@@ -4670,20 +4670,33 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 			 int iif, int type, u32 portid, u32 seq,
 			 unsigned int flags)
 {
-	struct rtmsg *rtm;
+	struct rt6key *fib6_prefsrc, *fib6_dst, *fib6_src;
+	struct rt6_info *rt6 = (struct rt6_info *)dst;
+	u32 *pmetrics, table, fib6_flags;
 	struct nlmsghdr *nlh;
+	struct rtmsg *rtm;
 	long expires = 0;
-	u32 *pmetrics;
-	u32 table;
 
 	nlh = nlmsg_put(skb, portid, seq, type, sizeof(*rtm), flags);
 	if (!nlh)
 		return -EMSGSIZE;
 
+	if (rt6) {
+		fib6_dst = &rt6->rt6i_dst;
+		fib6_src = &rt6->rt6i_src;
+		fib6_flags = rt6->rt6i_flags;
+		fib6_prefsrc = &rt6->rt6i_prefsrc;
+	} else {
+		fib6_dst = &rt->fib6_dst;
+		fib6_src = &rt->fib6_src;
+		fib6_flags = rt->fib6_flags;
+		fib6_prefsrc = &rt->fib6_prefsrc;
+	}
+
 	rtm = nlmsg_data(nlh);
 	rtm->rtm_family = AF_INET6;
-	rtm->rtm_dst_len = rt->fib6_dst.plen;
-	rtm->rtm_src_len = rt->fib6_src.plen;
+	rtm->rtm_dst_len = fib6_dst->plen;
+	rtm->rtm_src_len = fib6_src->plen;
 	rtm->rtm_tos = 0;
 	if (rt->fib6_table)
 		table = rt->fib6_table->tb6_id;
@@ -4698,7 +4711,7 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 	rtm->rtm_scope = RT_SCOPE_UNIVERSE;
 	rtm->rtm_protocol = rt->fib6_protocol;
 
-	if (rt->fib6_flags & RTF_CACHE)
+	if (fib6_flags & RTF_CACHE)
 		rtm->rtm_flags |= RTM_F_CLONED;
 
 	if (dest) {
@@ -4706,7 +4719,7 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 			goto nla_put_failure;
 		rtm->rtm_dst_len = 128;
 	} else if (rtm->rtm_dst_len)
-		if (nla_put_in6_addr(skb, RTA_DST, &rt->fib6_dst.addr))
+		if (nla_put_in6_addr(skb, RTA_DST, &fib6_dst->addr))
 			goto nla_put_failure;
 #ifdef CONFIG_IPV6_SUBTREES
 	if (src) {
@@ -4714,12 +4727,12 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 			goto nla_put_failure;
 		rtm->rtm_src_len = 128;
 	} else if (rtm->rtm_src_len &&
-		   nla_put_in6_addr(skb, RTA_SRC, &rt->fib6_src.addr))
+		   nla_put_in6_addr(skb, RTA_SRC, &fib6_src->addr))
 		goto nla_put_failure;
 #endif
 	if (iif) {
 #ifdef CONFIG_IPV6_MROUTE
-		if (ipv6_addr_is_multicast(&rt->fib6_dst.addr)) {
+		if (ipv6_addr_is_multicast(&fib6_dst->addr)) {
 			int err = ip6mr_get_route(net, skb, rtm, portid);
 
 			if (err == 0)
@@ -4737,9 +4750,9 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 			goto nla_put_failure;
 	}
 
-	if (rt->fib6_prefsrc.plen) {
+	if (fib6_prefsrc->plen) {
 		struct in6_addr saddr_buf;
-		saddr_buf = rt->fib6_prefsrc.addr;
+		saddr_buf = fib6_prefsrc->addr;
 		if (nla_put_in6_addr(skb, RTA_PREFSRC, &saddr_buf))
 			goto nla_put_failure;
 	}
@@ -4777,7 +4790,7 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 			goto nla_put_failure;
 	}
 
-	if (rt->fib6_flags & RTF_EXPIRES) {
+	if (fib6_flags & RTF_EXPIRES) {
 		expires = dst ? dst->expires : rt->expires;
 		expires -= jiffies;
 	}
@@ -4785,7 +4798,7 @@ static int rt6_fill_node(struct net *net, struct sk_buff *skb,
 	if (rtnl_put_cacheinfo(skb, dst, 0, expires, dst ? dst->error : 0) < 0)
 		goto nla_put_failure;
 
-	if (nla_put_u8(skb, RTA_PREF, IPV6_EXTRACT_PREF(rt->fib6_flags)))
+	if (nla_put_u8(skb, RTA_PREF, IPV6_EXTRACT_PREF(fib6_flags)))
 		goto nla_put_failure;
 
 
