@@ -19,6 +19,10 @@
 #include <linux/export.h>
 #include <linux/types.h>
 #include <linux/io.h>
+#include <linux/sched/clock.h>
+
+#define CREATE_TRACE_POINTS
+#include <asm-generic/io-trace.h>
 
 /*
  * Copy data from IO memory space to "real" memory space.
@@ -106,3 +110,21 @@ void __memset_io(volatile void __iomem *dst, int c, size_t count)
 	}
 }
 EXPORT_SYMBOL(__memset_io);
+
+#if defined(CONFIG_TRACING_EVENTS_IO)
+void do_trace_io_write(const char *type, void *addr)
+{
+	trace_io_write(type, raw_smp_processor_id(), sched_clock(), addr,
+		       _RET_IP_);
+}
+EXPORT_SYMBOL(do_trace_io_write);
+EXPORT_TRACEPOINT_SYMBOL(io_write);
+
+void do_trace_io_read(const char *type, void *addr)
+{
+	trace_io_read(type, raw_smp_processor_id(), sched_clock(), addr,
+		      _RET_IP_);
+}
+EXPORT_SYMBOL(do_trace_io_read);
+EXPORT_TRACEPOINT_SYMBOL(io_read);
+#endif
