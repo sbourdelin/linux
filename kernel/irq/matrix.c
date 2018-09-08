@@ -124,6 +124,26 @@ static unsigned int matrix_alloc_area(struct irq_matrix *m, struct cpumap *cm,
 	return area;
 }
 
+/* Find the best CPU which has the lowest vector allocation count */
+static int matrix_find_best_cpu(struct irq_matrix *m,
+				const struct cpumask *msk, int *best_cpu)
+{
+	unsigned int cpu, maxavl = 0;
+	struct cpumap *cm;
+
+	for_each_cpu(cpu, msk) {
+		cm = per_cpu_ptr(m->maps, cpu);
+
+		if (!cm->online || cm->available <= maxavl)
+			continue;
+
+		*best_cpu = cpu;
+		maxavl = cm->available;
+	}
+
+	return maxavl;
+}
+
 /**
  * irq_matrix_assign_system - Assign system wide entry in the matrix
  * @m:		Matrix pointer
@@ -322,35 +342,25 @@ void irq_matrix_remove_reserved(struct irq_matrix *m)
 int irq_matrix_alloc(struct irq_matrix *m, const struct cpumask *msk,
 		     bool reserved, unsigned int *mapped_cpu)
 {
-	unsigned int cpu, best_cpu, maxavl = 0;
+	unsigned int best_cpu = UINT_MAX;
 	struct cpumap *cm;
 	unsigned int bit;
 
-	best_cpu = UINT_MAX;
-	for_each_cpu(cpu, msk) {
-		cm = per_cpu_ptr(m->maps, cpu);
+	if (!matrix_find_best_cpu(m, msk, &best_cpu))
+		return -ENOSPC;
 
-		if (!cm->online || cm->available <= maxavl)
-			continue;
-
-		best_cpu = cpu;
-		maxavl = cm->available;
-	}
-
-	if (maxavl) {
-		cm = per_cpu_ptr(m->maps, best_cpu);
-		bit = matrix_alloc_area(m, cm, 1, false);
-		if (bit < m->alloc_end) {
-			cm->allocated++;
-			cm->available--;
-			m->total_allocated++;
-			m->global_available--;
-			if (reserved)
-				m->global_reserved--;
-			*mapped_cpu = best_cpu;
-			trace_irq_matrix_alloc(bit, best_cpu, m, cm);
-			return bit;
-		}
+	cm = per_cpu_ptr(m->maps, best_cpu);
+	bit = matrix_alloc_area(m, cm, 1, false);
+	if (bit < m->alloc_end) {
+		cm->allocated++;
+		cm->available--;
+		m->total_allocated++;
+		m->global_available--;
+		if (reserved)
+			m->global_reserved--;
+		*mapped_cpu = best_cpu;
+		trace_irq_matrix_alloc(bit, best_cpu, m, cm);
+		return bit;
 	}
 	return -ENOSPC;
 }
