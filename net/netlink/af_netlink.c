@@ -575,8 +575,7 @@ static int netlink_insert(struct sock *sk, u32 portid)
 		goto err;
 
 	err = -ENOMEM;
-	if (BITS_PER_LONG > 32 &&
-	    unlikely(atomic_read(&table->hash.nelems) >= UINT_MAX))
+	if (unlikely(atomic_read(&table->hash.nelems) == INT_MAX))
 		goto err;
 
 	nlk_sk(sk)->portid = portid;
