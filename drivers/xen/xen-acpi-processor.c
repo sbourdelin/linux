@@ -268,7 +268,7 @@ static int push_pxx_to_hypervisor(struct acpi_processor *_pr)
 		pr_warn("(_PXX): Hypervisor error (%d) for ACPI CPU%u\n",
 			ret, _pr->acpi_id);
 err_free:
-	if (!IS_ERR_OR_NULL(dst_states))
+	if (!IS_ERR(dst_states))
 		kfree(dst_states);
 
 	return ret;
