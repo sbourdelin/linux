@@ -900,6 +900,7 @@ enum ftrace_dump_mode;
 
 extern enum ftrace_dump_mode ftrace_dump_on_oops;
 extern int tracepoint_printk;
+extern int tracepoint_pstore;
 
 extern void disable_trace_on_warning(void);
 extern int __disable_trace_on_warning;
@@ -907,9 +908,12 @@ extern int __disable_trace_on_warning;
 int tracepoint_printk_sysctl(struct ctl_table *table, int write,
 			     void __user *buffer, size_t *lenp,
 			     loff_t *ppos);
+int tracepoint_pstore_sysctl(struct ctl_table *table, int write,
+			     void __user *buffer, size_t *lenp,
+			     loff_t *ppos);
 
 #else /* CONFIG_TRACING */
-static inline void  disable_trace_on_warning(void) { }
+static inline void disable_trace_on_warning(void) { }
 #endif /* CONFIG_TRACING */
 
 #ifdef CONFIG_FTRACE_SYSCALLS
