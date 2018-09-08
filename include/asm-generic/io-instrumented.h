@@ -2,6 +2,8 @@
 #ifndef _ASM_GENERIC_IO_INSTRUMENTED_H
 #define _ASM_GENERIC_IO_INSTRUMENTED_H
 
+#include <linux/dynamic_debug.h>
+
 #if defined(CONFIG_TRACING_EVENTS_IO)
 #include <linux/tracepoint-defs.h>
 
@@ -19,7 +21,7 @@ static inline void do_trace_io_read(const char *type, void *addr) {}
 #define __raw_write(v, a, _l)	({						\
 	volatile void __iomem *_a = (a);					\
 	if (io_tracepoint_active(__tracepoint_io_write))			\
-		do_trace_io_write(__stringify(write##_l), (void __force *)(_a));\
+		dynamic_io_write(__stringify(write##_l), (void __force *)(_a));	\
 	arch_raw_write##_l((v), _a);						\
 	})
 
@@ -32,7 +34,7 @@ static inline void do_trace_io_read(const char *type, void *addr) {}
 	_t __a;									\
 	const volatile void __iomem *_a = (a);					\
 	if (io_tracepoint_active(__tracepoint_io_read))				\
-		do_trace_io_read(__stringify(read##_l), (void __force *)(_a));	\
+		dynamic_io_read(__stringify(read##_l), (void __force *)(_a));	\
 	__a = arch_raw_read##_l(_a);						\
 	__a;									\
 	})
@@ -41,5 +43,27 @@ static inline void do_trace_io_read(const char *type, void *addr) {}
 #define __raw_readw(a)	__raw_read((a), w, u16)
 #define __raw_readl(a)	__raw_read((a), l, u32)
 #define __raw_readq(a)	__raw_read((a), q, u64)
+
+#if defined(CONFIG_DYNAMIC_DEBUG) && defined(CONFIG_TRACING_EVENTS_IO)
+#define dynamic_io_write(type, addr)					\
+do {									\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, type);		\
+	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_EVENT))		\
+		do_trace_io_write(type, addr);				\
+} while (0)
+
+#define dynamic_io_read(type, addr)					\
+do {									\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, type);		\
+	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_EVENT))		\
+		do_trace_io_read(type, addr);				\
+} while (0)
+#elif defined(CONFIG_TRACING_EVENTS_IO)
+#define dynamic_io_write(type, addr)	do_trace_io_write(type, addr)
+#define dynamic_io_read(type, addr)	do_trace_io_read(type, addr)
+#else
+#define dynamic_io_write(type, addr)
+#define dynamic_io_read(type, addr)
+#endif /* CONFIG_DYNAMIC_DEBUG && CONFIG_TRACING_EVENTS_IO */
 
 #endif /* _ASM_GENERIC_IO_INSTRUMENTED_H */
