@@ -475,7 +475,8 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 		goto out;
 
 	if (unlikely(iph->ttl < inet_sk(sk)->min_ttl)) {
-		__NET_INC_STATS(net, LINUX_MIB_TCPMINTTLDROP);
+		__NET_ADD_STATS(net, LINUX_MIB_TCPMINTTLDROP,
+				max_t(u16, 1, skb_shinfo(skb)->gso_segs));
 		goto out;
 	}
 
@@ -1633,7 +1634,8 @@ bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb)
 
 	if (unlikely(sk_add_backlog(sk, skb, limit))) {
 		bh_unlock_sock(sk);
-		__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP);
+		__NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP,
+				max_t(u16, 1, skb_shinfo(skb)->gso_segs));
 		return true;
 	}
 	return false;
@@ -1790,7 +1792,8 @@ process:
 		}
 	}
 	if (unlikely(iph->ttl < inet_sk(sk)->min_ttl)) {
-		__NET_INC_STATS(net, LINUX_MIB_TCPMINTTLDROP);
+		__NET_ADD_STATS(net, LINUX_MIB_TCPMINTTLDROP,
+				max_t(u16, 1, skb_shinfo(skb)->gso_segs));
 		goto discard_and_relse;
 	}
 
