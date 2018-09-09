@@ -2242,14 +2242,11 @@ static __init unsigned long __maxindex(unsigned int height)
 
 static __init void radix_tree_init_maxnodes(void)
 {
-	unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1];
-	unsigned int i, j;
+	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(height_to_maxindex); i++)
-		height_to_maxindex[i] = __maxindex(i);
-	for (i = 0; i < ARRAY_SIZE(height_to_maxnodes); i++) {
-		for (j = i; j > 0; j--)
-			height_to_maxnodes[i] += height_to_maxindex[j - 1] + 1;
+	for (i = 1; i < ARRAY_SIZE(height_to_maxnodes); i++) {
+		height_to_maxnodes[i] = height_to_maxnodes[i - 1]
+					+  __maxindex(i - 1) + 1;
 	}
 }
 
