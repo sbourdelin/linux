@@ -1703,7 +1703,8 @@ int tcp_v4_rcv(struct sk_buff *skb)
 		goto discard_it;
 
 	/* Count it even if it's bad */
-	__TCP_INC_STATS(net, TCP_MIB_INSEGS);
+	__TCP_ADD_STATS(net, TCP_MIB_INSEGS,
+			max_t(u16, 1, skb_shinfo(skb)->gso_segs));
 
 	if (!pskb_may_pull(skb, sizeof(struct tcphdr)))
 		goto discard_it;
