@@ -83,8 +83,10 @@ static int gc_thread_func(void *data)
 		if (!mutex_trylock(&sbi->gc_mutex))
 			goto next;
 
-		if (!is_idle(sbi)) {
-			increase_sleep_time(gc_th, &wait_ms);
+		if (!is_idle(sbi, GC_TIME)) {
+			wait_ms = f2fs_get_wait_time(sbi, GC_TIME);
+			if (!wait_ms)
+				increase_sleep_time(gc_th, &wait_ms);
 			mutex_unlock(&sbi->gc_mutex);
 			goto next;
 		}
