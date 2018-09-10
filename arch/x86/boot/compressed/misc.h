@@ -115,3 +115,11 @@ static inline void console_init(void)
 void set_sev_encryption_mask(void);
 
 #endif
+
+/* acpitb.c */
+/* Store the amount of immovable memory regions */
+int num_immovable_mem;
+#ifdef CONFIG_MEMORY_HOTREMOVE
+#define ACPI_MAX_TABLES                128
+void get_immovable_mem(void);
+#endif
