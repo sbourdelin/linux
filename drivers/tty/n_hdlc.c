@@ -101,7 +101,6 @@
 #include <linux/if.h>
 #include <linux/bitops.h>
 
-#include <asm/termios.h>
 #include <linux/uaccess.h>
 
 /*

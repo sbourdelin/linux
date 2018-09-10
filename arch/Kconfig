@@ -727,6 +727,9 @@ config OLD_SIGACTION
 config COMPAT_OLD_SIGACTION
 	bool
 
+config HAS_TERMIOS_INTERNAL
+	bool
+
 config 64BIT_TIME
 	def_bool ARCH_HAS_64BIT_TIME
 	help
