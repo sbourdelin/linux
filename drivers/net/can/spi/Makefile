@@ -5,3 +5,4 @@
 
 obj-$(CONFIG_CAN_HI311X)	+= hi311x.o
 obj-$(CONFIG_CAN_MCP251X)	+= mcp251x.o
+obj-$(CONFIG_CAN_TCAN4X5X)	+= tcan4x5x.o
