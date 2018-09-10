@@ -48,6 +48,9 @@ struct stmmac_tx_info {
 
 /* Frequently used values are kept adjacent for cache effect */
 struct stmmac_tx_queue {
+	u32 tx_count_frames;
+	int tx_timer_active;
+	struct timer_list txtimer;
 	u32 queue_index;
 	struct stmmac_priv *priv_data;
 	struct dma_extended_desc *dma_etx ____cacheline_aligned_in_smp;
@@ -59,6 +62,7 @@ struct stmmac_tx_queue {
 	dma_addr_t dma_tx_phy;
 	u32 tx_tail_addr;
 	u32 mss;
+	struct napi_struct napi ____cacheline_aligned_in_smp;
 };
 
 struct stmmac_rx_queue {
@@ -109,14 +113,12 @@ struct stmmac_pps_cfg {
 
 struct stmmac_priv {
 	/* Frequently used values are kept adjacent for cache effect */
-	u32 tx_count_frames;
 	u32 tx_coal_frames;
 	u32 tx_coal_timer;
 
 	int tx_coalesce;
 	int hwts_tx_en;
 	bool tx_path_in_lpi_mode;
-	struct timer_list txtimer;
 	bool tso;
 
 	unsigned int dma_buf_sz;
