@@ -6648,6 +6648,7 @@ static int rtl8169_close(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	struct pci_dev *pdev = tp->pci_dev;
+	int i;
 
 	pm_runtime_get_sync(&pdev->dev);
 
@@ -6655,7 +6656,9 @@ static int rtl8169_close(struct net_device *dev)
 	rtl8169_update_counters(tp);
 
 	rtl_lock_work(tp);
-	clear_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags);
+	/* Clear all task flags */
+	for (i = 0; i < RTL_FLAG_MAX; i++)
+		clear_bit(i, tp->wk.flags);
 
 	rtl8169_down(dev);
 	rtl_unlock_work(tp);
@@ -6828,6 +6831,7 @@ rtl8169_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 static void rtl8169_net_suspend(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
+	int i;
 
 	if (!netif_running(dev))
 		return;
@@ -6838,7 +6842,10 @@ static void rtl8169_net_suspend(struct net_device *dev)
 
 	rtl_lock_work(tp);
 	napi_disable(&tp->napi);
-	clear_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags);
+	/* Clear all task flags */
+	for (i = 0; i < RTL_FLAG_MAX; i++)
+		clear_bit(i, tp->wk.flags);
+
 	rtl_unlock_work(tp);
 
 	rtl_pll_power_down(tp);
