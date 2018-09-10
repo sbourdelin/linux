@@ -24,6 +24,12 @@
 #define __no_sanitize_address __attribute__((no_sanitize("address")))
 
 /*
+ * ARM32 is currently the only user of __naked supported by Clang. Follow
+ * gcc: Do not trace naked functions and make sure they don't get inlined.
+ */
+#define __naked __attribute__((naked)) noinline notrace
+
+/*
  * Not all versions of clang implement the the type-generic versions
  * of the builtin overflow checkers. Fortunately, clang implements
  * __has_builtin allowing us to avoid awkward version
