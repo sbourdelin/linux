@@ -62,6 +62,30 @@
 #include <rdma/rvt-abi.h>
 
 /*
+ * If any fields within struct rvt_wc change, the function
+ * copy_rvt_wc_to_ib_wc() should be updated.
+ */
+struct rvt_wc {
+	u64			wr_id;
+	enum ib_wc_status	status;
+	enum ib_wc_opcode	opcode;
+	u32			vendor_err;
+	u32			byte_len;
+	struct ib_qp	       *qp;
+	union {
+		__be32		imm_data;
+		u32		invalidate_rkey;
+	} ex;
+	u32			src_qp;
+	int			wc_flags;
+	u32			slid;
+	u16			pkey_index;
+	u8			sl;
+	u8			dlid_path_bits;
+	u8			port_num; /* valid only for DR SMPs onswitches*/
+} ____cacheline_aligned_in_smp;
+
+/*
  * This structure is used to contain the head pointer, tail pointer,
  * and completion queue entries as a single memory allocation so
  * it can be mmap'ed into user space.
@@ -69,7 +93,8 @@
 struct rvt_k_cq_wc {
 	u32 head;               /* index of next entry to fill */
 	u32 tail;               /* index of next ib_poll_cq() entry */
-	struct ib_wc kqueue[0];
+	/* this is actually size ibcq.cqe + 1 */
+	struct rvt_wc kqueue[0];
 };
 
 /*
@@ -93,6 +118,6 @@ static inline struct rvt_cq *ibcq_to_rvtcq(struct ib_cq *ibcq)
 	return container_of(ibcq, struct rvt_cq, ibcq);
 }
 
-void rvt_cq_enter(struct rvt_cq *cq, struct ib_wc *entry, bool solicited);
+void rvt_cq_enter(struct rvt_cq *cq, struct rvt_wc *entry, bool solicited);
 
 #endif          /* DEF_RDMAVT_INCCQH */

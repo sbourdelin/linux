@@ -589,7 +589,7 @@ static inline void rvt_qp_swqe_complete(
 	if (!(qp->s_flags & RVT_S_SIGNAL_REQ_WR) ||
 	    (wqe->wr.send_flags & IB_SEND_SIGNALED) ||
 	     status != IB_WC_SUCCESS) {
-		struct ib_wc wc;
+		struct rvt_wc wc;
 
 		memset(&wc, 0, sizeof(wc));
 		wc.wr_id = wqe->wr.wr_id;

@@ -62,10 +62,10 @@ static struct workqueue_struct *comp_vector_wq;
  *
  * This may be called with qp->s_lock held.
  */
-void rvt_cq_enter(struct rvt_cq *cq, struct ib_wc *entry, bool solicited)
+void rvt_cq_enter(struct rvt_cq *cq, struct rvt_wc *entry, bool solicited)
 {
 	struct ib_uverbs_wc *uqueue = NULL;
-	struct ib_wc *kqueue = NULL;
+	struct rvt_wc *kqueue = NULL;
 	struct rvt_cq_wc *u_wc = NULL;
 	struct rvt_k_cq_wc *k_wc = NULL;
 	unsigned long flags;
@@ -230,6 +230,8 @@ struct ib_cq *rvt_create_cq(struct ib_device *ibdev,
 	 * numbers of entries.
 	 */
 	if (udata && udata->outlen >= sizeof(__u64)) {
+		int err;
+
 		sz = sizeof(struct ib_uverbs_wc) * (entries + 1);
 		sz += sizeof(*u_wc);
 		u_wc = vmalloc_user(sz);
@@ -237,23 +239,11 @@ struct ib_cq *rvt_create_cq(struct ib_device *ibdev,
 			ret = ERR_PTR(-ENOMEM);
 			goto bail_cq;
 		}
-	} else {
-		sz = sizeof(struct ib_wc) * (entries + 1);
-		sz += sizeof(*k_wc);
-		k_wc = vzalloc_node(sz, rdi->dparms.node);
-		if (!k_wc) {
-			ret = ERR_PTR(-ENOMEM);
-			goto bail_cq;
-		}
-	}
 
-	/*
-	 * Return the address of the WC as the offset to mmap.
-	 * See rvt_mmap() for details.
-	 */
-	if (udata && udata->outlen >= sizeof(__u64)) {
-		int err;
-
+		/*
+		 * Return the address of the WC as the offset to mmap.
+		 * See rvt_mmap() for details.
+		 */
 		cq->ip = rvt_create_mmap_info(rdi, sz, context, u_wc);
 		if (!cq->ip) {
 			ret = ERR_PTR(-ENOMEM);
@@ -265,6 +255,14 @@ struct ib_cq *rvt_create_cq(struct ib_device *ibdev,
 		if (err) {
 			ret = ERR_PTR(err);
 			goto bail_ip;
+		}
+	} else {
+		sz = sizeof(struct rvt_wc) * (entries + 1);
+		sz += sizeof(*k_wc);
+		k_wc = vzalloc_node(sz, rdi->dparms.node);
+		if (!k_wc) {
+			ret = ERR_PTR(-ENOMEM);
+			goto bail_cq;
 		}
 	}
 
@@ -343,6 +341,7 @@ int rvt_destroy_cq(struct ib_cq *ibcq)
 		kref_put(&cq->ip->ref, rvt_release_mmap_info);
 	else
 		vfree(cq->queue);
+	vfree(cq->kqueue);
 	kfree(cq);
 
 	return 0;
@@ -418,7 +417,7 @@ int rvt_resize_cq(struct ib_cq *ibcq, int cqe, struct ib_udata *udata)
 		if (!u_wc)
 			return -ENOMEM;
 	} else {
-		sz = sizeof(struct ib_wc) * (cqe + 1);
+		sz = sizeof(struct rvt_wc) * (cqe + 1);
 		sz += sizeof(*k_wc);
 		k_wc = vzalloc_node(sz, rdi->dparms.node);
 		if (!k_wc)
@@ -520,6 +519,24 @@ bail_free:
 	return ret;
 }
 
+static void copy_rvt_wc_to_ib_wc(struct ib_wc *ibwc, struct rvt_wc *rvtwc)
+{
+	ibwc->wr_id = rvtwc->wr_id;
+	ibwc->status = rvtwc->status;
+	ibwc->opcode = rvtwc->opcode;
+	ibwc->vendor_err = rvtwc->vendor_err;
+	ibwc->byte_len = rvtwc->byte_len;
+	ibwc->qp = rvtwc->qp;
+	ibwc->ex.invalidate_rkey = rvtwc->ex.invalidate_rkey;
+	ibwc->src_qp = rvtwc->src_qp;
+	ibwc->wc_flags = rvtwc->wc_flags;
+	ibwc->slid = rvtwc->slid;
+	ibwc->pkey_index = rvtwc->pkey_index;
+	ibwc->sl = rvtwc->sl;
+	ibwc->dlid_path_bits = rvtwc->dlid_path_bits;
+	ibwc->port_num = rvtwc->port_num;
+}
+
 /**
  * rvt_poll_cq - poll for work completion entries
  * @ibcq: the completion queue to poll
@@ -554,7 +571,7 @@ int rvt_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *entry)
 			break;
 		/* The kernel doesn't need a RMB since it has the lock. */
 		trace_rvt_cq_poll(cq, &wc->kqueue[tail], npolled);
-		*entry = wc->kqueue[tail];
+		copy_rvt_wc_to_ib_wc(entry, &wc->kqueue[tail]);
 		if (tail >= cq->ibcq.cqe)
 			tail = 0;
 		else

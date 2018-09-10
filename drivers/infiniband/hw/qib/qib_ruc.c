@@ -191,7 +191,7 @@ static void qib_ruc_loopback(struct rvt_qp *sqp)
 	struct rvt_swqe *wqe;
 	struct rvt_sge *sge;
 	unsigned long flags;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u64 sdata;
 	atomic64_t *maddr;
 	enum ib_wc_status send_status;

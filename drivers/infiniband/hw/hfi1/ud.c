@@ -79,7 +79,7 @@ static void ud_loopback(struct rvt_qp *sqp, struct rvt_swqe *swqe)
 	unsigned long flags;
 	struct rvt_sge_state ssge;
 	struct rvt_sge *sge;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 length;
 	enum ib_qp_type sqptype, dqptype;
 
@@ -867,7 +867,7 @@ static int opa_smp_check(struct hfi1_ibport *ibp, u16 pkey, u8 sc5,
 void hfi1_ud_rcv(struct hfi1_packet *packet)
 {
 	u32 hdrsize = packet->hlen;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 src_qp;
 	u16 pkey;
 	int mgmt_pkey_idx = -1;

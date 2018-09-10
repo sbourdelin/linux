@@ -1049,7 +1049,7 @@ bail_swq:
  */
 int rvt_error_qp(struct rvt_qp *qp, enum ib_wc_status err)
 {
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	int ret = 0;
 	struct rvt_dev_info *rdi = ib_to_rvt(qp->ibqp.device);
 
@@ -1573,7 +1573,7 @@ int rvt_post_recv(struct ib_qp *ibqp, const struct ib_recv_wr *wr,
 			return -ENOMEM;
 		}
 		if (unlikely(qp_err_flush)) {
-			struct ib_wc wc;
+			struct rvt_wc wc;
 
 			memset(&wc, 0, sizeof(wc));
 			wc.qp = &qp->ibqp;
@@ -1996,7 +1996,7 @@ int rvt_post_srq_recv(struct ib_srq *ibsrq, const struct ib_recv_wr *wr,
 static int init_sge(struct rvt_qp *qp, struct rvt_rwqe *wqe)
 {
 	int i, j, ret;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	struct rvt_lkey_table *rkt;
 	struct rvt_pd *pd;
 	struct rvt_sge_state *ss;

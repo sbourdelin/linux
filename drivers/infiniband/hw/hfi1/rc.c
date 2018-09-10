@@ -2041,7 +2041,7 @@ void hfi1_rc_rcv(struct hfi1_packet *packet)
 	u32 hdrsize = packet->hlen;
 	u32 psn = ib_bth_get_psn(packet->ohdr);
 	u32 pad = packet->pad;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 pmtu = qp->pmtu;
 	int diff;
 	struct ib_reth *reth;

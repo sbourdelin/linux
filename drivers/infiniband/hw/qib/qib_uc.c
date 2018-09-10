@@ -242,7 +242,7 @@ void qib_uc_rcv(struct qib_ibport *ibp, struct ib_header *hdr,
 	u32 hdrsize;
 	u32 psn;
 	u32 pad;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 pmtu = qp->pmtu;
 	struct ib_reth *reth;
 	int ret;

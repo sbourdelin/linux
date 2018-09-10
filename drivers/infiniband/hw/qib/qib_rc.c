@@ -1744,7 +1744,7 @@ void qib_rc_rcv(struct qib_ctxtdata *rcd, struct ib_header *hdr,
 	u32 hdrsize;
 	u32 psn;
 	u32 pad;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 pmtu = qp->pmtu;
 	int diff;
 	struct ib_reth *reth;

@@ -109,7 +109,7 @@ DEFINE_EVENT(rvt_cq_template, rvt_create_cq,
 
 DECLARE_EVENT_CLASS(
 	rvt_cq_entry_template,
-	TP_PROTO(struct rvt_cq *cq, struct ib_wc *wc, u32 idx),
+	TP_PROTO(struct rvt_cq *cq, struct rvt_wc *wc, u32 idx),
 	TP_ARGS(cq, wc, idx),
 	TP_STRUCT__entry(
 		RDI_DEV_ENTRY(cq->rdi)
@@ -143,12 +143,12 @@ DECLARE_EVENT_CLASS(
 
 DEFINE_EVENT(
 	rvt_cq_entry_template, rvt_cq_enter,
-	TP_PROTO(struct rvt_cq *cq, struct ib_wc *wc, u32 idx),
+	TP_PROTO(struct rvt_cq *cq, struct rvt_wc *wc, u32 idx),
 	TP_ARGS(cq, wc, idx));
 
 DEFINE_EVENT(
 	rvt_cq_entry_template, rvt_cq_poll,
-	TP_PROTO(struct rvt_cq *cq, struct ib_wc *wc, u32 idx),
+	TP_PROTO(struct rvt_cq *cq, struct rvt_wc *wc, u32 idx),
 	TP_ARGS(cq, wc, idx));
 
 #endif /* __RVT_TRACE_CQ_H */

@@ -58,7 +58,7 @@ static void qib_ud_loopback(struct rvt_qp *sqp, struct rvt_swqe *swqe)
 	unsigned long flags;
 	struct rvt_sge_state ssge;
 	struct rvt_sge *sge;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 length;
 	enum ib_qp_type sqptype, dqptype;
 
@@ -434,7 +434,7 @@ void qib_ud_rcv(struct qib_ibport *ibp, struct ib_header *hdr,
 	int opcode;
 	u32 hdrsize;
 	u32 pad;
-	struct ib_wc wc;
+	struct rvt_wc wc;
 	u32 qkey;
 	u32 src_qp;
 	u16 dlid;
