@@ -2129,6 +2129,38 @@ void nd_region_create_ns_seed(struct nd_region *nd_region)
 		nd_device_register(nd_region->ns_seed);
 }
 
+void nd_region_reset_ns_seed(struct nd_region *nd_region)
+{
+	struct device *dev = nd_region->ns_seed;
+	unsigned long long val = 0;
+	ssize_t rc;
+	u8 **uuid = NULL;
+
+	rc = __holder_class_store(dev, "");
+	dev_dbg(dev, "%s(%zd)\n", rc < 0 ? "fail to reset claim_class " : "", rc);
+
+	rc = __size_store(dev, val);
+	if (rc >= 0)
+		rc = nd_namespace_label_update(nd_region, dev);
+	dev_dbg(dev, "%s(%zd)\n", rc < 0 ? "fail to reset size " : "", rc);
+
+	if (is_namespace_pmem(dev)) {
+		struct nd_namespace_pmem *nspm = to_nd_namespace_pmem(dev);
+
+		uuid = &nspm->uuid;
+	} else if (is_namespace_blk(dev)) {
+		struct nd_namespace_blk *nsblk = to_nd_namespace_blk(dev);
+
+		uuid = &nsblk->uuid;
+	}
+
+	if (rc == 0 && val == 0 && uuid) {
+		/* setting size zero == 'delete namespace' */
+		kfree(*uuid);
+		*uuid = NULL;
+	}
+}
+
 void nd_region_create_dax_seed(struct nd_region *nd_region)
 {
 	WARN_ON(!is_nvdimm_bus_locked(&nd_region->dev));
