@@ -615,7 +615,7 @@ static void vpu_init_ipi_handler(void *data, unsigned int len, void *priv)
 	struct vpu_run *run = (struct vpu_run *)data;
 
 	vpu->run.signaled = run->signaled;
-	strncpy(vpu->run.fw_ver, run->fw_ver, VPU_FW_VER_LEN);
+	strscpy(vpu->run.fw_ver, run->fw_ver, VPU_FW_VER_LEN);
 	vpu->run.dec_capability = run->dec_capability;
 	vpu->run.enc_capability = run->enc_capability;
 	wake_up_interruptible(&vpu->run.wq);
