@@ -459,11 +459,11 @@ TRACE_EVENT(xprtrdma_marshal,
 	TP_PROTO(
 		const struct rpc_rqst *rqst,
 		unsigned int hdrlen,
-		unsigned int rtype,
-		unsigned int wtype
+		unsigned int argtype,
+		unsigned int restype
 	),
 
-	TP_ARGS(rqst, hdrlen, rtype, wtype),
+	TP_ARGS(rqst, hdrlen, argtype, restype),
 
 	TP_STRUCT__entry(
 		__field(unsigned int, task_id)
@@ -473,8 +473,8 @@ TRACE_EVENT(xprtrdma_marshal,
 		__field(unsigned int, headlen)
 		__field(unsigned int, pagelen)
 		__field(unsigned int, taillen)
-		__field(unsigned int, rtype)
-		__field(unsigned int, wtype)
+		__field(unsigned int, argtype)
+		__field(unsigned int, restype)
 	),
 
 	TP_fast_assign(
@@ -485,16 +485,16 @@ TRACE_EVENT(xprtrdma_marshal,
 		__entry->headlen = rqst->rq_snd_buf.head[0].iov_len;
 		__entry->pagelen = rqst->rq_snd_buf.page_len;
 		__entry->taillen = rqst->rq_snd_buf.tail[0].iov_len;
-		__entry->rtype = rtype;
-		__entry->wtype = wtype;
+		__entry->argtype = argtype;
+		__entry->restype = restype;
 	),
 
 	TP_printk("task:%u@%u xid=0x%08x: hdr=%u xdr=%u/%u/%u %s/%s",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->hdrlen,
 		__entry->headlen, __entry->pagelen, __entry->taillen,
-		xprtrdma_show_chunktype(__entry->rtype),
-		xprtrdma_show_chunktype(__entry->wtype)
+		xprtrdma_show_chunktype(__entry->argtype),
+		xprtrdma_show_chunktype(__entry->restype)
 	)
 );
 

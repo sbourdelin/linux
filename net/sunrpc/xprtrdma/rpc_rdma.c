@@ -200,11 +200,10 @@ rpcrdma_convert_kvec(struct kvec *vec, struct rpcrdma_mr_seg *seg,
  *
  * Returns positive number of SGEs consumed, or a negative errno.
  */
-
 static int
 rpcrdma_convert_iovs(struct rpcrdma_xprt *r_xprt, struct xdr_buf *xdrbuf,
-		     unsigned int pos, enum rpcrdma_chunktype type,
-		     struct rpcrdma_mr_seg *seg)
+		     unsigned int pos, struct rpcrdma_mr_seg *seg,
+		     bool omit_xdr_pad)
 {
 	unsigned long page_base;
 	unsigned int len, n;
@@ -236,18 +235,10 @@ rpcrdma_convert_iovs(struct rpcrdma_xprt *r_xprt, struct xdr_buf *xdrbuf,
 		page_base = 0;
 	}
 
-	/* When encoding a Read chunk, the tail iovec contains an
-	 * XDR pad and may be omitted.
+	/* A normal Read or Write chunk may omit the XDR pad.
+	 * The upper layer provides the pad in @xdrbuf's tail.
 	 */
-	if (type == rpcrdma_readch && r_xprt->rx_ia.ri_implicit_roundup)
-		goto out;
-
-	/* When encoding a Write chunk, some servers need to see an
-	 * extra segment for non-XDR-aligned Write chunks. The upper
-	 * layer provides space in the tail iovec that may be used
-	 * for this purpose.
-	 */
-	if (type == rpcrdma_writech && r_xprt->rx_ia.ri_implicit_roundup)
+	if (omit_xdr_pad)
 		goto out;
 
 	if (xdrbuf->tail[0].iov_len)
@@ -338,23 +329,31 @@ encode_read_segment(struct xdr_stream *xdr, struct rpcrdma_mr *mr,
  */
 static noinline int
 rpcrdma_encode_read_list(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
-			 struct rpc_rqst *rqst, enum rpcrdma_chunktype rtype)
+			 struct rpc_rqst *rqst, enum rpcrdma_chunktype argtype)
 {
 	struct xdr_stream *xdr = &req->rl_stream;
 	struct rpcrdma_mr_seg *seg;
 	struct rpcrdma_mr *mr;
+	bool omit_xdr_pad;
 	unsigned int pos;
 	int nsegs;
 
-	if (rtype == rpcrdma_noch)
-		goto done;
-
-	pos = rqst->rq_snd_buf.head[0].iov_len;
-	if (rtype == rpcrdma_areadch)
+	switch (argtype) {
+	case rpcrdma_readch:
+		omit_xdr_pad = r_xprt->rx_ia.ri_implicit_roundup;
+		pos = rqst->rq_snd_buf.head[0].iov_len;
+		break;
+	case rpcrdma_areadch:
+		omit_xdr_pad = false;
 		pos = 0;
+		break;
+	default:
+		goto done;
+	}
+
 	seg = req->rl_segments;
-	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_snd_buf, pos,
-				     rtype, seg);
+	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_snd_buf, pos, seg,
+				     omit_xdr_pad);
 	if (nsegs < 0)
 		return nsegs;
 
@@ -394,7 +393,7 @@ done:
  */
 static noinline int
 rpcrdma_encode_write_list(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
-			  struct rpc_rqst *rqst, enum rpcrdma_chunktype wtype)
+			  struct rpc_rqst *rqst, enum rpcrdma_chunktype restype)
 {
 	struct xdr_stream *xdr = &req->rl_stream;
 	struct rpcrdma_mr_seg *seg;
@@ -402,13 +401,18 @@ rpcrdma_encode_write_list(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 	int nsegs, nchunks;
 	__be32 *segcount;
 
-	if (wtype != rpcrdma_writech)
+	if (restype != rpcrdma_writech)
 		goto done;
 
+	/* When encoding a Write chunk, some servers need to see an
+	 * extra segment for non-XDR-aligned Write chunks. The upper
+	 * layer provides space in the tail iovec that may be used
+	 * for this purpose.
+	 */
 	seg = req->rl_segments;
 	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_rcv_buf,
-				     rqst->rq_rcv_buf.head[0].iov_len,
-				     wtype, seg);
+				     rqst->rq_rcv_buf.head[0].iov_len, seg,
+				     r_xprt->rx_ia.ri_implicit_roundup);
 	if (nsegs < 0)
 		return nsegs;
 
@@ -457,8 +461,9 @@ done:
  * @xdr is advanced to the next position in the stream.
  */
 static noinline int
-rpcrdma_encode_reply_chunk(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
-			   struct rpc_rqst *rqst, enum rpcrdma_chunktype wtype)
+rpcrdma_encode_reply_chunk(struct rpcrdma_xprt *r_xprt,
+			   struct rpcrdma_req *req, struct rpc_rqst *rqst,
+			   enum rpcrdma_chunktype restype)
 {
 	struct xdr_stream *xdr = &req->rl_stream;
 	struct rpcrdma_mr_seg *seg;
@@ -466,11 +471,11 @@ rpcrdma_encode_reply_chunk(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 	int nsegs, nchunks;
 	__be32 *segcount;
 
-	if (wtype != rpcrdma_replych)
+	if (restype != rpcrdma_replych)
 		return encode_item_not_present(xdr);
 
 	seg = req->rl_segments;
-	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_rcv_buf, 0, wtype, seg);
+	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_rcv_buf, 0, seg, false);
 	if (nsegs < 0)
 		return nsegs;
 
@@ -563,7 +568,7 @@ out_regbuf:
  */
 static bool
 rpcrdma_prepare_msg_sges(struct rpcrdma_ia *ia, struct rpcrdma_req *req,
-			 struct xdr_buf *xdr, enum rpcrdma_chunktype rtype)
+			 struct xdr_buf *xdr, enum rpcrdma_chunktype argtype)
 {
 	struct rpcrdma_sendctx *sc = req->rl_sendctx;
 	unsigned int sge_no, page_base, len, remaining;
@@ -591,7 +596,7 @@ rpcrdma_prepare_msg_sges(struct rpcrdma_ia *ia, struct rpcrdma_req *req,
 	 * well as additional content, and may not reside in the
 	 * same page as the head iovec.
 	 */
-	if (rtype == rpcrdma_readch) {
+	if (argtype == rpcrdma_readch) {
 		len = xdr->tail[0].iov_len;
 
 		/* Do not include the tail if it is only an XDR pad */
@@ -688,14 +693,14 @@ out_mapping_err:
  * @req: context of RPC Call being marshalled
  * @hdrlen: size of transport header, in bytes
  * @xdr: xdr_buf containing RPC Call
- * @rtype: chunk type being encoded
+ * @argtype: chunk type being encoded
  *
  * Returns 0 on success; otherwise a negative errno is returned.
  */
 int
 rpcrdma_prepare_send_sges(struct rpcrdma_xprt *r_xprt,
 			  struct rpcrdma_req *req, u32 hdrlen,
-			  struct xdr_buf *xdr, enum rpcrdma_chunktype rtype)
+			  struct xdr_buf *xdr, enum rpcrdma_chunktype argtype)
 {
 	req->rl_sendctx = rpcrdma_sendctx_get_locked(&r_xprt->rx_buf);
 	if (!req->rl_sendctx)
@@ -708,8 +713,9 @@ rpcrdma_prepare_send_sges(struct rpcrdma_xprt *r_xprt,
 	if (!rpcrdma_prepare_hdr_sge(&r_xprt->rx_ia, req, hdrlen))
 		return -EIO;
 
-	if (rtype != rpcrdma_areadch)
-		if (!rpcrdma_prepare_msg_sges(&r_xprt->rx_ia, req, xdr, rtype))
+	if (argtype != rpcrdma_areadch)
+		if (!rpcrdma_prepare_msg_sges(&r_xprt->rx_ia, req,
+					      xdr, argtype))
 			return -EIO;
 
 	return 0;
@@ -739,7 +745,7 @@ rpcrdma_marshal_req(struct rpcrdma_xprt *r_xprt, struct rpc_rqst *rqst)
 {
 	struct rpcrdma_req *req = rpcr_to_rdmar(rqst);
 	struct xdr_stream *xdr = &req->rl_stream;
-	enum rpcrdma_chunktype rtype, wtype;
+	enum rpcrdma_chunktype argtype, restype;
 	bool ddp_allowed;
 	__be32 *p;
 	int ret;
@@ -774,11 +780,11 @@ rpcrdma_marshal_req(struct rpcrdma_xprt *r_xprt, struct rpc_rqst *rqst)
 	 * o Large non-read ops return as a single reply chunk.
 	 */
 	if (rpcrdma_results_inline(r_xprt, rqst))
-		wtype = rpcrdma_noch;
+		restype = rpcrdma_noch;
 	else if (ddp_allowed && rqst->rq_rcv_buf.flags & XDRBUF_READ)
-		wtype = rpcrdma_writech;
+		restype = rpcrdma_writech;
 	else
-		wtype = rpcrdma_replych;
+		restype = rpcrdma_replych;
 
 	/*
 	 * Chunks needed for arguments?
@@ -796,14 +802,14 @@ rpcrdma_marshal_req(struct rpcrdma_xprt *r_xprt, struct rpc_rqst *rqst)
 	 */
 	if (rpcrdma_args_inline(r_xprt, rqst)) {
 		*p++ = rdma_msg;
-		rtype = rpcrdma_noch;
+		argtype = rpcrdma_noch;
 	} else if (ddp_allowed && rqst->rq_snd_buf.flags & XDRBUF_WRITE) {
 		*p++ = rdma_msg;
-		rtype = rpcrdma_readch;
+		argtype = rpcrdma_readch;
 	} else {
 		r_xprt->rx_stats.nomsg_call_count++;
 		*p++ = rdma_nomsg;
-		rtype = rpcrdma_areadch;
+		argtype = rpcrdma_areadch;
 	}
 
 	/* If this is a retransmit, discard previously registered
@@ -839,19 +845,19 @@ rpcrdma_marshal_req(struct rpcrdma_xprt *r_xprt, struct rpc_rqst *rqst)
 	 * send a Call message with a Position Zero Read chunk and a
 	 * regular Read chunk at the same time.
 	 */
-	ret = rpcrdma_encode_read_list(r_xprt, req, rqst, rtype);
+	ret = rpcrdma_encode_read_list(r_xprt, req, rqst, argtype);
 	if (ret)
 		goto out_err;
-	ret = rpcrdma_encode_write_list(r_xprt, req, rqst, wtype);
+	ret = rpcrdma_encode_write_list(r_xprt, req, rqst, restype);
 	if (ret)
 		goto out_err;
-	ret = rpcrdma_encode_reply_chunk(r_xprt, req, rqst, wtype);
+	ret = rpcrdma_encode_reply_chunk(r_xprt, req, rqst, restype);
 	if (ret)
 		goto out_err;
-	trace_xprtrdma_marshal(rqst, xdr_stream_pos(xdr), rtype, wtype);
+	trace_xprtrdma_marshal(rqst, xdr_stream_pos(xdr), argtype, restype);
 
 	ret = rpcrdma_prepare_send_sges(r_xprt, req, xdr_stream_pos(xdr),
-					&rqst->rq_snd_buf, rtype);
+					&rqst->rq_snd_buf, argtype);
 	if (ret)
 		goto out_err;
 	return 0;
