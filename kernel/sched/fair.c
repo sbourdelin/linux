@@ -8108,6 +8108,20 @@ void fix_small_imbalance(struct lb_env *env, struct sd_lb_stats *sds)
 	local = &sds->local_stat;
 	busiest = &sds->busiest_stat;
 
+	/*
+	 * There is available capacity in local group and busiest group is
+	 * overloaded but calculate_imbalance can't compute the amount of load
+	 * to migrate because load_avg became meaningless due to asymetric
+	 * capacity between groups. In such case, we only want to migrate at
+	 * least one tasks of the busiest group and rely of the average load
+	 * per task to ensure the migration.
+	 */
+	if (env->idle != CPU_NOT_IDLE && group_has_capacity(env, local) &&
+	    busiest->group_no_capacity) {
+		env->imbalance = busiest->load_per_task;
+		return;
+	}
+
 	if (!local->sum_nr_running)
 		local->load_per_task = cpu_avg_load_per_task(env->dst_cpu);
 	else if (busiest->load_per_task > local->load_per_task)
