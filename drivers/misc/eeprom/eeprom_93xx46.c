@@ -439,7 +439,7 @@ static int eeprom_93xx46_probe(struct spi_device *spi)
 		return -ENODEV;
 	}
 
-	edev = kzalloc(sizeof(*edev), GFP_KERNEL);
+	edev = devm_kzalloc(&spi->dev, sizeof(*edev), GFP_KERNEL);
 	if (!edev)
 		return -ENOMEM;
 
@@ -473,7 +473,7 @@ static int eeprom_93xx46_probe(struct spi_device *spi)
 	edev->nvmem_config.word_size = 1;
 	edev->nvmem_config.size = edev->size;
 
-	edev->nvmem = nvmem_register(&edev->nvmem_config);
+	edev->nvmem = devm_nvmem_register(&spi->dev, &edev->nvmem_config);
 	if (IS_ERR(edev->nvmem)) {
 		err = PTR_ERR(edev->nvmem);
 		goto fail;
@@ -499,12 +499,9 @@ static int eeprom_93xx46_remove(struct spi_device *spi)
 {
 	struct eeprom_93xx46_dev *edev = spi_get_drvdata(spi);
 
-	nvmem_unregister(edev->nvmem);
-
 	if (!(edev->pdata->flags & EE_READONLY))
 		device_remove_file(&spi->dev, &dev_attr_erase);
 
-	kfree(edev);
 	return 0;
 }
 
