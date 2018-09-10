@@ -1888,8 +1888,7 @@ void __ref remove_memory(int nid, u64 start, u64 size)
 	 */
 	ret = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
 				check_memblock_offlined_cb);
-	if (ret)
-		BUG();
+	BUG(ret);
 
 	/* remove memmap entry */
 	firmware_map_remove(start, start + size, "System RAM");
