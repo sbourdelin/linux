@@ -703,7 +703,27 @@ void nd_mapping_free_labels(struct nd_mapping *nd_mapping)
 		kfree(label_ent);
 	}
 }
+/*
+ * To ensure pfn_seed/dax_seed and namespace_seed are ready for
+ * next namespace creation, here to do detach and reset.
+ */
+void nd_region_detach_and_reset(struct device *dev,
+		struct nd_region *nd_region)
+{
+	/* Only nd_pmem has been verified, fix me for other dev type. */
+	if (!is_nd_pmem(&nd_region->dev))
+		return;
 
+	if (is_nd_pfn(dev) || is_nd_dax(dev)) {
+		struct nd_pfn *nd_pfn = to_nd_pfn_safe(dev);
+		struct nd_namespace_common *ndns = to_ndns(nd_region->ns_seed);
+
+		if (nd_pfn->ndns == ndns && ndns->claim == dev) {
+			nd_detach_and_reset(dev, &nd_pfn->ndns);
+			nd_region_reset_ns_seed(nd_region);
+			}
+	}
+}
 /*
  * Upon successful probe/remove, take/release a reference on the
  * associated interleave set (if present), and plant new btt + namespace
@@ -772,6 +792,20 @@ static void nd_region_notify_driver_action(struct nvdimm_bus *nvdimm_bus,
 			nd_region_create_dax_seed(nd_region);
 		if (nd_region->ns_seed == &nd_dax->nd_pfn.ndns->dev)
 			nd_region_create_ns_seed(nd_region);
+		nvdimm_bus_unlock(dev);
+	}
+	if (is_nd_pfn(dev) && !probe) {
+		nd_region = to_nd_region(dev->parent);
+		nvdimm_bus_lock(dev);
+		if (nd_region->pfn_seed == dev)
+			nd_region_detach_and_reset(dev, nd_region);
+		nvdimm_bus_unlock(dev);
+	}
+	if (is_nd_dax(dev) && !probe) {
+		nd_region = to_nd_region(dev->parent);
+		nvdimm_bus_lock(dev);
+		if (nd_region->dax_seed == dev)
+			nd_region_detach_and_reset(dev, nd_region);
 		nvdimm_bus_unlock(dev);
 	}
 }
