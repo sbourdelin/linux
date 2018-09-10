@@ -727,7 +727,8 @@ static int vlynq_probe(struct platform_device *pdev)
 	dev->local_irq = dev->irq_end - dev->irq_start;
 	dev->remote_irq = dev->local_irq - 1;
 
-	if (device_register(&dev->dev))
+	result = device_register(&dev->dev);
+	if (result)
 		goto fail_register;
 	platform_set_drvdata(pdev, dev);
 
