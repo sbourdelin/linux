@@ -27,6 +27,7 @@
 #include <linux/io.h>
 #include <linux/mm.h>
 #include <linux/nd.h>
+#include <linux/cpu.h>
 #include "nd-core.h"
 #include "nd.h"
 #include "pfn.h"
@@ -90,6 +91,48 @@ static void nvdimm_bus_probe_end(struct nvdimm_bus *nvdimm_bus)
 	nvdimm_bus_unlock(&nvdimm_bus->dev);
 }
 
+struct nvdimm_drv_dev {
+	struct nd_device_driver *nd_drv;
+	struct device *dev;
+};
+
+static long __nvdimm_call_probe(void *_nddd)
+{
+	struct nvdimm_drv_dev *nddd = _nddd;
+	struct nd_device_driver *nd_drv = nddd->nd_drv;
+
+	return nd_drv->probe(nddd->dev);
+}
+
+static int nvdimm_call_probe(struct nd_device_driver *nd_drv,
+			     struct device *dev)
+{
+	struct nvdimm_drv_dev nddd = { nd_drv, dev };
+	int rc, node, cpu;
+
+	/*
+	 * Execute driver initialization on node where the device is
+	 * attached.  This way the driver will be able to access local
+	 * memory instead of having to initialize memory across nodes.
+	 */
+	node = dev_to_node(dev);
+
+	cpu_hotplug_disable();
+
+	if (node < 0 || node >= MAX_NUMNODES || !node_online(node))
+		cpu = nr_cpu_ids;
+	else
+		cpu = cpumask_any_and(cpumask_of_node(node), cpu_online_mask);
+
+	if (cpu < nr_cpu_ids)
+		rc = work_on_cpu(cpu, __nvdimm_call_probe, &nddd);
+	else
+		rc = __nvdimm_call_probe(&nddd);
+
+	cpu_hotplug_enable();
+	return rc;
+}
+
 static int nvdimm_bus_probe(struct device *dev)
 {
 	struct nd_device_driver *nd_drv = to_nd_device_driver(dev->driver);
@@ -104,7 +147,7 @@ static int nvdimm_bus_probe(struct device *dev)
 			dev->driver->name, dev_name(dev));
 
 	nvdimm_bus_probe_start(nvdimm_bus);
-	rc = nd_drv->probe(dev);
+	rc = nvdimm_call_probe(nd_drv, dev);
 	if (rc == 0)
 		nd_region_probe_success(nvdimm_bus, dev);
 	else
