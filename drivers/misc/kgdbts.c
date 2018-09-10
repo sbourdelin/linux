@@ -1061,6 +1061,15 @@ static void kgdbts_run_tests(void)
 	configured = 0;
 }
 
+static void kgdbts_set_verbose(void)
+{
+	verbose = 0;
+	if (strstr(config, "V1"))
+		verbose = 1;
+	if (strstr(config, "V2"))
+		verbose = 2;
+}
+
 static int kgdbts_option_setup(char *opt)
 {
 	if (strlen(opt) >= MAX_CONFIG_LEN) {
@@ -1068,13 +1077,7 @@ static int kgdbts_option_setup(char *opt)
 		return -ENOSPC;
 	}
 	strcpy(config, opt);
-
-	verbose = 0;
-	if (strstr(config, "V1"))
-		verbose = 1;
-	if (strstr(config, "V2"))
-		verbose = 2;
-
+	kgdbts_set_verbose();
 	return 0;
 }
 
@@ -1086,9 +1089,7 @@ static int configure_kgdbts(void)
 
 	if (!strlen(config) || isspace(config[0]))
 		goto noconfig;
-	err = kgdbts_option_setup(config);
-	if (err)
-		goto noconfig;
+	kgdbts_set_verbose();
 
 	final_ack = 0;
 	run_plant_and_detach_test(1);
