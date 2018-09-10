@@ -514,6 +514,8 @@ struct radeon_bo {
 	pid_t				pid;
 
 	struct radeon_mn		*mn;
+	uint64_t			*pfns;
+	unsigned long			userptr;
 	struct list_head		mn_list;
 };
 #define gem_to_radeon_bo(gobj) container_of((gobj), struct radeon_bo, gem_base)
@@ -1787,12 +1789,22 @@ void radeon_test_syncing(struct radeon_device *rdev);
 #if defined(CONFIG_MMU_NOTIFIER)
 int radeon_mn_register(struct radeon_bo *bo, unsigned long addr);
 void radeon_mn_unregister(struct radeon_bo *bo);
+int radeon_mn_bo_map(struct radeon_bo *bo, struct ttm_dma_tt *dma, bool write);
+void radeon_mn_bo_unmap(struct radeon_bo *bo, struct ttm_dma_tt *dma,
+			bool write);
 #else
 static inline int radeon_mn_register(struct radeon_bo *bo, unsigned long addr)
 {
 	return -ENODEV;
 }
 static inline void radeon_mn_unregister(struct radeon_bo *bo) {}
+static int radeon_mn_bo_map(struct radeon_bo *bo, struct ttm_dma_tt *dma,
+			    bool write)
+{
+	return -ENODEV;
+}
+static void radeon_mn_bo_unmap(struct radeon_bo *bo, struct ttm_dma_tt *dma,
+			       bool write) {}
 #endif
 
 /*
@@ -2818,7 +2830,7 @@ extern void radeon_legacy_set_clock_gating(struct radeon_device *rdev, int enabl
 extern void radeon_atom_set_clock_gating(struct radeon_device *rdev, int enable);
 extern void radeon_ttm_placement_from_domain(struct radeon_bo *rbo, u32 domain);
 extern bool radeon_ttm_bo_is_radeon_bo(struct ttm_buffer_object *bo);
-extern int radeon_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
+extern int radeon_ttm_tt_set_userptr(struct ttm_tt *ttm, struct radeon_bo *bo,
 				     uint32_t flags);
 extern bool radeon_ttm_tt_has_userptr(struct ttm_tt *ttm);
 extern bool radeon_ttm_tt_is_readonly(struct ttm_tt *ttm);

@@ -262,9 +262,18 @@ int radeon_mn_register(struct radeon_bo *bo, unsigned long addr)
 	struct list_head bos;
 	struct interval_tree_node *it;
 
+	bo->userptr = addr;
+	bo->pfns = kvmalloc_array(bo->tbo.num_pages, sizeof(uint64_t),
+				  GFP_KERNEL | __GFP_ZERO);
+	if (bo->pfns == NULL)
+		return -ENOMEM;
+
 	rmn = radeon_mn_get(rdev);
-	if (IS_ERR(rmn))
+	if (IS_ERR(rmn)) {
+		kvfree(bo->pfns);
+		bo->pfns = NULL;
 		return PTR_ERR(rmn);
+	}
 
 	INIT_LIST_HEAD(&bos);
 
@@ -283,6 +292,8 @@ int radeon_mn_register(struct radeon_bo *bo, unsigned long addr)
 		node = kmalloc(sizeof(struct radeon_mn_node), GFP_KERNEL);
 		if (!node) {
 			mutex_unlock(&rmn->lock);
+			kvfree(bo->pfns);
+			bo->pfns = NULL;
 			return -ENOMEM;
 		}
 	}
@@ -338,4 +349,148 @@ void radeon_mn_unregister(struct radeon_bo *bo)
 
 	mutex_unlock(&rmn->lock);
 	mutex_unlock(&rdev->mn_lock);
+
+	kvfree(bo->pfns);
+	bo->pfns = NULL;
+}
+
+/**
+ * radeon_mn_bo_map - map range of virtual address as buffer object
+ *
+ * @bo: radeon buffer object
+ * @ttm: ttm_tt object in which holds mirroring result
+ * @write: can GPU write to the range ?
+ * Returns: 0 on success, error code otherwise
+ *
+ * Use HMM to mirror a range of virtual address as a buffer object mapped into
+ * GPU address space (thus allowing transparent GPU access to this range). It
+ * does not pin pages for range but rely on HMM and underlying synchronizations
+ * to make sure that both CPU and GPU points to same physical memory for the
+ * range.
+ */
+int radeon_mn_bo_map(struct radeon_bo *bo, struct ttm_dma_tt *dma, bool write)
+{
+	static const uint64_t radeon_range_flags[HMM_PFN_FLAG_MAX] = {
+		(1 << 0), /* HMM_PFN_VALID */
+		(1 << 1), /* HMM_PFN_WRITE */
+		0 /* HMM_PFN_DEVICE_PRIVATE */
+	};
+	static const uint64_t radeon_range_values[HMM_PFN_VALUE_MAX] = {
+		0xfffffffffffffffeUL, /* HMM_PFN_ERROR */
+		0, /* HMM_PFN_NONE */
+		0xfffffffffffffffcUL /* HMM_PFN_SPECIAL */
+	};
+
+	unsigned long i, npages = bo->tbo.num_pages;
+	enum dma_data_direction direction = write ?
+		DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
+	struct radeon_device *rdev = bo->rdev;
+	struct ttm_tt *ttm = &dma->ttm;
+	struct hmm_range range;
+	struct radeon_mn *rmn;
+	int ret;
+
+	/*
+	 * FIXME This whole protection shouldn't be needed as we should only
+	 * reach that code with a valid reserved bo that can not under go a
+	 * concurrent radeon_mn_unregister().
+	 */
+	mutex_lock(&rdev->mn_lock);
+	if (bo->mn == NULL) {
+		mutex_unlock(&rdev->mn_lock);
+		return -EINVAL;
+	}
+	rmn = bo->mn;
+	mutex_unlock(&rdev->mn_lock);
+
+	range.pfn_shift = 12;
+	range.pfns = bo->pfns;
+	range.start = bo->userptr;
+	range.flags = radeon_range_flags;
+	range.values = radeon_range_values;
+	range.end = bo->userptr + radeon_bo_size(bo);
+
+	range.vma = find_vma(rmn->mm, bo->userptr);
+	if (!range.vma || range.vma->vm_file || range.vma->vm_end < range.end)
+		return -EPERM;
+
+	memset(ttm->pages, 0, sizeof(void*) * npages);
+
+again:
+	for (i = 0; i < npages; ++i) {
+		range.pfns[i] = range.flags[HMM_PFN_VALID];
+		range.pfns[i] |= write ? range.flags[HMM_PFN_WRITE] : 0;
+	}
+
+	ret = hmm_vma_fault(&range, true);
+	if (ret)
+		goto err_unmap;
+
+	for (i = 0; i < npages; ++i) {
+		struct page *page = hmm_pfn_to_page(&range, range.pfns[i]);
+
+		if (page == NULL)
+			goto again;
+
+		if (ttm->pages[i] == page)
+			continue;
+
+		if (ttm->pages[i])
+			dma_unmap_page(rdev->dev, dma->dma_address[i],
+				       PAGE_SIZE, direction);
+		ttm->pages[i] = page;
+
+		dma->dma_address[i] = dma_map_page(rdev->dev, page, 0,
+						   PAGE_SIZE, direction);
+		if (dma_mapping_error(rdev->dev, dma->dma_address[i])) {
+			hmm_vma_range_done(&range);
+			ttm->pages[i] = NULL;
+			ret = -ENOMEM;
+			goto err_unmap;
+		}
+	}
+
+	/*
+	 * Taking rmn->lock is not necessary here as we are protected from any
+	 * concurrent invalidation through ttm object reservation. Involved
+	 * functions: radeon_sync_cpu_device_pagetables()
+	 *            radeon_bo_list_validate()
+	 *            radeon_gem_userptr_ioctl()
+	 */
+	if (!hmm_vma_range_done(&range))
+		goto again;
+
+	return 0;
+
+err_unmap:
+	radeon_mn_bo_unmap(bo, dma, write);
+	return ret;
+}
+
+/**
+ * radeon_mn_bo_unmap - unmap range of virtual address as buffer object
+ *
+ * @bo: radeon buffer object
+ * @ttm: ttm_tt object in which holds mirroring result
+ * @write: can GPU write to the range ?
+ * Returns: 0 on success, error code otherwise
+ */
+void radeon_mn_bo_unmap(struct radeon_bo *bo, struct ttm_dma_tt *dma,
+			bool write)
+{
+	unsigned long i, npages = bo->tbo.num_pages;
+	enum dma_data_direction direction = write ?
+		DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
+	struct radeon_device *rdev = bo->rdev;
+	struct ttm_tt *ttm = &dma->ttm;
+
+	for (i = 0; i < npages; ++i) {
+		/* No need to go beyond first NULL page */
+		if (ttm->pages[i] == NULL)
+			break;
+
+		dma_unmap_page(rdev->dev, dma->dma_address[i],
+			       PAGE_SIZE, direction);
+		ttm->pages[i] = NULL;
+	}
 }

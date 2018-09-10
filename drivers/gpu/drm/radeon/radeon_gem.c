@@ -323,15 +323,19 @@ int radeon_gem_userptr_ioctl(struct drm_device *dev, void *data,
 		goto handle_lockup;
 
 	bo = gem_to_radeon_bo(gobj);
-	r = radeon_ttm_tt_set_userptr(bo->tbo.ttm, args->addr, args->flags);
+
+	/*
+	 * Always register an HMM mirror (if one is not already registered).
+	 * This means ignoring RADEON_GEM_USERPTR_REGISTER flag but that flag
+	 * is already made mandatory by flags sanity check above.
+	 */
+	r = radeon_mn_register(bo, args->addr);
 	if (r)
 		goto release_object;
 
-	if (args->flags & RADEON_GEM_USERPTR_REGISTER) {
-		r = radeon_mn_register(bo, args->addr);
-		if (r)
-			goto release_object;
-	}
+	r = radeon_ttm_tt_set_userptr(bo->tbo.ttm, bo, args->flags);
+	if (r)
+		goto release_object;
 
 	if (args->flags & RADEON_GEM_USERPTR_VALIDATE) {
 		down_read(&current->mm->mmap_sem);

@@ -533,102 +533,9 @@ struct radeon_ttm_tt {
 	struct radeon_device		*rdev;
 	u64				offset;
 
-	uint64_t			userptr;
-	struct mm_struct		*usermm;
+	struct radeon_bo		*bo;
 	uint32_t			userflags;
 };
-
-/* prepare the sg table with the user pages */
-static int radeon_ttm_tt_pin_userptr(struct ttm_tt *ttm)
-{
-	struct radeon_device *rdev = radeon_get_rdev(ttm->bdev);
-	struct radeon_ttm_tt *gtt = (void *)ttm;
-	unsigned pinned = 0, nents;
-	int r;
-
-	int write = !(gtt->userflags & RADEON_GEM_USERPTR_READONLY);
-	enum dma_data_direction direction = write ?
-		DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
-
-	if (current->mm != gtt->usermm)
-		return -EPERM;
-
-	if (gtt->userflags & RADEON_GEM_USERPTR_ANONONLY) {
-		/* check that we only pin down anonymous memory
-		   to prevent problems with writeback */
-		unsigned long end = gtt->userptr + ttm->num_pages * PAGE_SIZE;
-		struct vm_area_struct *vma;
-		vma = find_vma(gtt->usermm, gtt->userptr);
-		if (!vma || vma->vm_file || vma->vm_end < end)
-			return -EPERM;
-	}
-
-	do {
-		unsigned num_pages = ttm->num_pages - pinned;
-		uint64_t userptr = gtt->userptr + pinned * PAGE_SIZE;
-		struct page **pages = ttm->pages + pinned;
-
-		r = get_user_pages(userptr, num_pages, write ? FOLL_WRITE : 0,
-				   pages, NULL);
-		if (r < 0)
-			goto release_pages;
-
-		pinned += r;
-
-	} while (pinned < ttm->num_pages);
-
-	r = sg_alloc_table_from_pages(ttm->sg, ttm->pages, ttm->num_pages, 0,
-				      ttm->num_pages << PAGE_SHIFT,
-				      GFP_KERNEL);
-	if (r)
-		goto release_sg;
-
-	r = -ENOMEM;
-	nents = dma_map_sg(rdev->dev, ttm->sg->sgl, ttm->sg->nents, direction);
-	if (nents != ttm->sg->nents)
-		goto release_sg;
-
-	drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
-					 gtt->ttm.dma_address, ttm->num_pages);
-
-	return 0;
-
-release_sg:
-	kfree(ttm->sg);
-
-release_pages:
-	release_pages(ttm->pages, pinned);
-	return r;
-}
-
-static void radeon_ttm_tt_unpin_userptr(struct ttm_tt *ttm)
-{
-	struct radeon_device *rdev = radeon_get_rdev(ttm->bdev);
-	struct radeon_ttm_tt *gtt = (void *)ttm;
-	struct sg_page_iter sg_iter;
-
-	int write = !(gtt->userflags & RADEON_GEM_USERPTR_READONLY);
-	enum dma_data_direction direction = write ?
-		DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
-
-	/* double check that we don't free the table twice */
-	if (!ttm->sg->sgl)
-		return;
-
-	/* free the sg table and pages again */
-	dma_unmap_sg(rdev->dev, ttm->sg->sgl, ttm->sg->nents, direction);
-
-	for_each_sg_page(ttm->sg->sgl, &sg_iter, ttm->sg->nents, 0) {
-		struct page *page = sg_page_iter_page(&sg_iter);
-		if (!(gtt->userflags & RADEON_GEM_USERPTR_READONLY))
-			set_page_dirty(page);
-
-		mark_page_accessed(page);
-		put_page(page);
-	}
-
-	sg_free_table(ttm->sg);
-}
 
 static int radeon_ttm_backend_bind(struct ttm_tt *ttm,
 				   struct ttm_mem_reg *bo_mem)
@@ -638,8 +545,12 @@ static int radeon_ttm_backend_bind(struct ttm_tt *ttm,
 		RADEON_GART_PAGE_WRITE;
 	int r;
 
-	if (gtt->userptr) {
-		radeon_ttm_tt_pin_userptr(ttm);
+	if (gtt->bo) {
+		bool write = !(gtt->userflags & RADEON_GEM_USERPTR_READONLY);
+
+		r = radeon_mn_bo_map(gtt->bo, &gtt->ttm, write);
+		if (r)
+			return r;
 		flags &= ~RADEON_GART_PAGE_WRITE;
 	}
 
@@ -666,8 +577,11 @@ static int radeon_ttm_backend_unbind(struct ttm_tt *ttm)
 
 	radeon_gart_unbind(gtt->rdev, gtt->offset, ttm->num_pages);
 
-	if (gtt->userptr)
-		radeon_ttm_tt_unpin_userptr(ttm);
+	if (gtt->bo) {
+		bool write = !(gtt->userflags & RADEON_GEM_USERPTR_READONLY);
+
+		radeon_mn_bo_unmap(gtt->bo, &gtt->ttm, write);
+	}
 
 	return 0;
 }
@@ -727,12 +641,7 @@ static int radeon_ttm_tt_populate(struct ttm_tt *ttm,
 	struct radeon_device *rdev;
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
 
-	if (gtt && gtt->userptr) {
-		ttm->sg = kzalloc(sizeof(struct sg_table), GFP_KERNEL);
-		if (!ttm->sg)
-			return -ENOMEM;
-
-		ttm->page_flags |= TTM_PAGE_FLAG_SG;
+	if (gtt && gtt->bo) {
 		ttm->state = tt_unbound;
 		return 0;
 	}
@@ -766,11 +675,8 @@ static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	struct radeon_ttm_tt *gtt = radeon_ttm_tt_to_gtt(ttm);
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
 
-	if (gtt && gtt->userptr) {
-		kfree(ttm->sg);
-		ttm->page_flags &= ~TTM_PAGE_FLAG_SG;
+	if (gtt && gtt->bo)
 		return;
-	}
 
 	if (slave)
 		return;
@@ -793,7 +699,7 @@ static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	ttm_unmap_and_unpopulate_pages(rdev->dev, &gtt->ttm);
 }
 
-int radeon_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
+int radeon_ttm_tt_set_userptr(struct ttm_tt *ttm, struct radeon_bo *bo,
 			      uint32_t flags)
 {
 	struct radeon_ttm_tt *gtt = radeon_ttm_tt_to_gtt(ttm);
@@ -801,8 +707,7 @@ int radeon_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
 	if (gtt == NULL)
 		return -EINVAL;
 
-	gtt->userptr = addr;
-	gtt->usermm = current->mm;
+	gtt->bo = bo;
 	gtt->userflags = flags;
 	return 0;
 }
@@ -814,7 +719,7 @@ bool radeon_ttm_tt_has_userptr(struct ttm_tt *ttm)
 	if (gtt == NULL)
 		return false;
 
-	return !!gtt->userptr;
+	return !!gtt->bo;
 }
 
 bool radeon_ttm_tt_is_readonly(struct ttm_tt *ttm)
