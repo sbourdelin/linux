@@ -179,7 +179,13 @@
 		clock-names = "i2s_clk", "i2s_hclk";
 		dmas = <&dmac 11>, <&dmac 12>;
 		dma-names = "tx", "rx";
+		#sound-dai-cells = <0>;
 		status = "disabled";
+
+		i2s0_p0: port {
+			i2s0_p0_0: endpoint {
+			};
+		};
 	};
 
 	i2s1: i2s@ff010000 {
@@ -190,7 +196,13 @@
 		clock-names = "i2s_clk", "i2s_hclk";
 		dmas = <&dmac 14>, <&dmac 15>;
 		dma-names = "tx", "rx";
+		#sound-dai-cells = <0>;
 		status = "disabled";
+
+		i2s1_p0: port {
+			i2s1_p0_0: endpoint {
+			};
+		};
 	};
 
 	i2s2: i2s@ff020000 {
@@ -201,7 +213,13 @@
 		clock-names = "i2s_clk", "i2s_hclk";
 		dmas = <&dmac 0>, <&dmac 1>;
 		dma-names = "tx", "rx";
+		#sound-dai-cells = <0>;
 		status = "disabled";
+
+		i2s2_p0: port {
+			i2s2_p0_0: endpoint {
+			};
+		};
 	};
 
 	spdif: spdif@ff030000 {
@@ -214,7 +232,13 @@
 		dma-names = "tx";
 		pinctrl-names = "default";
 		pinctrl-0 = <&spdifm2_tx>;
+		#sound-dai-cells = <0>;
 		status = "disabled";
+
+		spdif_p0: port {
+			spdif_p0_0: endpoint {
+			};
+		};
 	};
 
 	pdm: pdm@ff040000 {
