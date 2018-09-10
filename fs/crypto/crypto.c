@@ -313,20 +313,24 @@ static int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags)
 {
 	struct dentry *dir;
 	int dir_has_key, cached_with_key;
+	struct inode *dir_inode;
 
-	if (flags & LOOKUP_RCU)
-		return -ECHILD;
-
-	dir = dget_parent(dentry);
-	if (!IS_ENCRYPTED(d_inode(dir))) {
-		dput(dir);
+	rcu_read_lock();
+repeat:
+	dir = READ_ONCE(dentry->d_parent);
+	dir_inode = d_inode_rcu(dir);
+	if (!IS_ENCRYPTED(dir_inode)) {
+		rcu_read_unlock();
 		return 0;
 	}
+	dir_has_key = (dir_inode->i_crypt_info != NULL);
+	if (unlikely(READ_ONCE(dir->d_lockref.count) < 0 ||
+		READ_ONCE(dir->d_parent) != dir))
+		goto repeat;
+	rcu_read_unlock();
 
 	cached_with_key = READ_ONCE(dentry->d_flags) &
 		DCACHE_ENCRYPTED_WITH_KEY;
-	dir_has_key = (d_inode(dir)->i_crypt_info != NULL);
-	dput(dir);
 
 	/*
 	 * If the dentry was cached without the key, and it is a
