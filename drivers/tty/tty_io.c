@@ -97,6 +97,7 @@
 #include <linux/seq_file.h>
 #include <linux/serial.h>
 #include <linux/ratelimit.h>
+#include <linux/termios_internal.h>
 
 #include <linux/uaccess.h>
 
