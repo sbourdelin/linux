@@ -117,7 +117,7 @@ struct nd_pfn *to_nd_pfn_safe(struct device *dev)
 	return NULL;
 }
 
-static void nd_detach_and_reset(struct device *dev,
+void nd_detach_and_reset(struct device *dev,
 		struct nd_namespace_common **_ndns)
 {
 	/* detach the namespace and destroy / reset the device */
