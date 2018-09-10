@@ -1395,15 +1395,26 @@ static void __init i8042_register_ports(void)
 	for (i = 0; i < I8042_NUM_PORTS; i++) {
 		struct serio *serio = i8042_ports[i].serio;
 
-		if (serio) {
-			printk(KERN_INFO "serio: %s at %#lx,%#lx irq %d\n",
-				serio->name,
-				(unsigned long) I8042_DATA_REG,
-				(unsigned long) I8042_COMMAND_REG,
-				i8042_ports[i].irq);
-			serio_register_port(serio);
-			device_set_wakeup_capable(&serio->dev, true);
-		}
+		if (!serio)
+			continue;
+
+		printk(KERN_INFO "serio: %s at %#lx,%#lx irq %d\n",
+			serio->name,
+			(unsigned long) I8042_DATA_REG,
+			(unsigned long) I8042_COMMAND_REG,
+			i8042_ports[i].irq);
+		serio_register_port(serio);
+		device_set_wakeup_capable(&serio->dev, true);
+
+		/*
+		 * On platforms using suspend-to-idle by default, make the keyboard
+		 * wake up the system from sleep by enabling keyboard wakeups by
+		 * default.  That is consistent with keyboard wakeup behavior on
+		 * many platforms using suspend-to-RAM (ACPI S3) by default.
+		 */
+		if (mem_sleep_current == PM_SUSPEND_TO_IDLE
+		    && i == I8042_KBD_PORT_NO)
+			device_set_wakeup_enable(&serio->dev, true);
 	}
 }
 
