@@ -202,21 +202,20 @@ rpcrdma_convert_kvec(struct kvec *vec, struct rpcrdma_mr_seg *seg,
  */
 static int
 rpcrdma_convert_iovs(struct rpcrdma_xprt *r_xprt, struct xdr_buf *xdrbuf,
-		     unsigned int pos, struct rpcrdma_mr_seg *seg,
-		     bool omit_xdr_pad)
+		     unsigned int pos, unsigned int page_len,
+		     struct rpcrdma_mr_seg *seg, bool omit_xdr_pad)
 {
 	unsigned long page_base;
-	unsigned int len, n;
 	struct page **ppages;
+	unsigned int n;
 
 	n = 0;
 	if (pos == 0)
 		seg = rpcrdma_convert_kvec(&xdrbuf->head[0], seg, &n);
 
-	len = xdrbuf->page_len;
 	ppages = xdrbuf->pages + (xdrbuf->page_base >> PAGE_SHIFT);
 	page_base = offset_in_page(xdrbuf->page_base);
-	while (len) {
+	while (page_len) {
 		if (unlikely(!*ppages)) {
 			/* XXX: Certain upper layer operations do
 			 *	not provide receive buffer pages.
@@ -227,8 +226,8 @@ rpcrdma_convert_iovs(struct rpcrdma_xprt *r_xprt, struct xdr_buf *xdrbuf,
 		}
 		seg->mr_page = *ppages;
 		seg->mr_offset = (char *)page_base;
-		seg->mr_len = min_t(u32, PAGE_SIZE - page_base, len);
-		len -= seg->mr_len;
+		seg->mr_len = min_t(u32, PAGE_SIZE - page_base, page_len);
+		page_len -= seg->mr_len;
 		++ppages;
 		++seg;
 		++n;
@@ -352,8 +351,9 @@ rpcrdma_encode_read_list(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 	}
 
 	seg = req->rl_segments;
-	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_snd_buf, pos, seg,
-				     omit_xdr_pad);
+	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_snd_buf, pos,
+				     rqst->rq_snd_buf.page_len,
+				     seg, omit_xdr_pad);
 	if (nsegs < 0)
 		return nsegs;
 
@@ -401,8 +401,13 @@ rpcrdma_encode_write_list(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 	int nsegs, nchunks;
 	__be32 *segcount;
 
-	if (restype != rpcrdma_writech)
+	switch (restype) {
+	case rpcrdma_writech:
+	case rpcrdma_writereply:
+		break;
+	default:
 		goto done;
+	}
 
 	/* When encoding a Write chunk, some servers need to see an
 	 * extra segment for non-XDR-aligned Write chunks. The upper
@@ -411,8 +416,9 @@ rpcrdma_encode_write_list(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 	 */
 	seg = req->rl_segments;
 	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_rcv_buf,
-				     rqst->rq_rcv_buf.head[0].iov_len, seg,
-				     r_xprt->rx_ia.ri_implicit_roundup);
+				     rqst->rq_rcv_buf.head[0].iov_len,
+				     rqst->rq_rcv_buf.page_len,
+				     seg, r_xprt->rx_ia.ri_implicit_roundup);
 	if (nsegs < 0)
 		return nsegs;
 
@@ -468,14 +474,24 @@ rpcrdma_encode_reply_chunk(struct rpcrdma_xprt *r_xprt,
 	struct xdr_stream *xdr = &req->rl_stream;
 	struct rpcrdma_mr_seg *seg;
 	struct rpcrdma_mr *mr;
+	unsigned int page_len;
 	int nsegs, nchunks;
 	__be32 *segcount;
 
-	if (restype != rpcrdma_replych)
+	switch (restype) {
+	case rpcrdma_replych:
+		page_len = rqst->rq_rcv_buf.page_len;
+		break;
+	case rpcrdma_writereply:
+		page_len = 0;
+		break;
+	default:
 		return encode_item_not_present(xdr);
+	}
 
 	seg = req->rl_segments;
-	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_rcv_buf, 0, seg, false);
+	nsegs = rpcrdma_convert_iovs(r_xprt, &rqst->rq_rcv_buf, 0,
+				     page_len, seg, false);
 	if (nsegs < 0)
 		return nsegs;
 
@@ -775,16 +791,21 @@ rpcrdma_marshal_req(struct rpcrdma_xprt *r_xprt, struct rpc_rqst *rqst)
 	 *
 	 * o If the expected result is under the inline threshold, all ops
 	 *   return as inline.
-	 * o Large read ops return data as write chunk(s), header as
-	 *   inline.
+	 * o Large read ops return data as a write chunk and
+	 *   small header as inline, large header as a reply chunk.
 	 * o Large non-read ops return as a single reply chunk.
 	 */
 	if (rpcrdma_results_inline(r_xprt, rqst))
 		restype = rpcrdma_noch;
-	else if (ddp_allowed && rqst->rq_rcv_buf.flags & XDRBUF_READ)
+	else if (ddp_allowed && rqst->rq_rcv_buf.flags & XDRBUF_READ) {
 		restype = rpcrdma_writech;
-	else
+		if ((rqst->rq_rcv_buf.head[0].iov_len +
+		     rqst->rq_rcv_buf.tail[0].iov_len) >
+		    r_xprt->rx_ia.ri_max_inline_read)
+			restype = rpcrdma_writereply;
+	} else {
 		restype = rpcrdma_replych;
+	}
 
 	/*
 	 * Chunks needed for arguments?
@@ -1163,14 +1184,12 @@ rpcrdma_decode_nomsg(struct rpcrdma_xprt *r_xprt, struct rpcrdma_rep *rep)
 		return -EIO;
 
 	/* RDMA_NOMSG sanity checks */
-	if (unlikely(writelist))
-		return -EIO;
 	if (unlikely(!replychunk))
 		return -EIO;
 
 	/* Reply chunk buffer already is the reply vector */
-	r_xprt->rx_stats.total_rdma_reply += replychunk;
-	return replychunk;
+	r_xprt->rx_stats.total_rdma_reply += writelist + replychunk;
+	return writelist + replychunk;
 }
 
 static noinline int

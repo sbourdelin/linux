@@ -446,6 +446,7 @@ TRACE_DEFINE_ENUM(rpcrdma_readch);
 TRACE_DEFINE_ENUM(rpcrdma_areadch);
 TRACE_DEFINE_ENUM(rpcrdma_writech);
 TRACE_DEFINE_ENUM(rpcrdma_replych);
+TRACE_DEFINE_ENUM(rpcrdma_writereply);
 
 #define xprtrdma_show_chunktype(x)					\
 		__print_symbolic(x,					\
@@ -453,7 +454,8 @@ TRACE_DEFINE_ENUM(rpcrdma_replych);
 				{ rpcrdma_readch, "read list" },	\
 				{ rpcrdma_areadch, "*read list" },	\
 				{ rpcrdma_writech, "write list" },	\
-				{ rpcrdma_replych, "reply chunk" })
+				{ rpcrdma_replych, "reply chunk" },	\
+				{ rpcrdma_writereply, "write+reply" })
 
 TRACE_EVENT(xprtrdma_marshal,
 	TP_PROTO(

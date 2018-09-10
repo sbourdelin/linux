@@ -627,7 +627,8 @@ enum rpcrdma_chunktype {
 	rpcrdma_readch,
 	rpcrdma_areadch,
 	rpcrdma_writech,
-	rpcrdma_replych
+	rpcrdma_replych,
+	rpcrdma_writereply,
 };
 
 int rpcrdma_prepare_send_sges(struct rpcrdma_xprt *r_xprt,
