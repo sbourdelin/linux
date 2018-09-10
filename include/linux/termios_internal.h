@@ -8,13 +8,24 @@
 #include <asm/termios_internal.h>
 #endif
 
-#ifndef INIT_C_CC
 /*	intr=^C		quit=^\		erase=del	kill=^U
 	eof=^D		vtime=\0	vmin=\1		sxtc=\0
 	start=^Q	stop=^S		susp=^Z		eol=\0
 	reprint=^R	discard=^U	werase=^W	lnext=^V
 	eol2=\0
+	... except that discard is actually ^O on most of them.
 */
+#ifndef INIT_C_CC_VDISCARD
+#define INIT_C_CC_VDISCARD 'O'-0x40
+#endif
+
+#ifdef VDSUSP
+#define INIT_C_CC_VDSUSP_EXTRA [VDSUSP] = 'Y'-0x40,
+#else
+#define INIT_C_CC_VDSUSP_EXTRA
+#endif
+
+#ifndef INIT_C_CC
 #define INIT_C_CC {		\
 	[VINTR] = 'C'-0x40,	\
 	[VQUIT] = '\\'-0x40,	\
@@ -25,9 +36,10 @@
 	[VSTOP] = 'S'-0x40,	\
 	[VSUSP] = 'Z'-0x40,	\
 	[VREPRINT] = 'R'-0x40,	\
-	[VDISCARD] = 'O'-0x40,	\
+	[VDISCARD] = INIT_C_CC_VDISCARD,	\
 	[VWERASE] = 'W'-0x40,	\
 	[VLNEXT] = 'V'-0x40,	\
+	INIT_C_CC_VDSUSP_EXTRA	\
 	[VMIN] = 1 }
 #endif
 
