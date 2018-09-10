@@ -157,6 +157,9 @@ static void sanitize_options_early(struct drm_i915_private *i915)
 			 yesno(GUC_LOG_LEVEL_IS_VERBOSE(i915_modparams.guc_log_level)),
 			 GUC_LOG_LEVEL_TO_VERBOSITY(i915_modparams.guc_log_level));
 
+	/* HAX: Never allow GuC submission */
+	i915_modparams.enable_guc &= ~ENABLE_GUC_SUBMISSION;
+
 	/* Make sure that sanitization was done */
 	GEM_BUG_ON(i915_modparams.enable_guc < 0);
 	GEM_BUG_ON(i915_modparams.guc_log_level < 0);
