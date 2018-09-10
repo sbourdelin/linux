@@ -246,17 +246,19 @@ static int get_boost_mode(unsigned int cpu)
 
 /* --freq / -f */
 
-static int get_freq_kernel(unsigned int cpu, unsigned int human)
+static int get_freq_kernel(unsigned int cpu, unsigned int human, int fail_msg)
 {
 	unsigned long freq = cpufreq_get_freq_kernel(cpu);
-	printf(_("  current CPU frequency: "));
+
 	if (!freq) {
-		printf(_(" Unable to call to kernel\n"));
+		if (fail_msg)
+			printf(_("  current CPU frequency: Unable to call to kernel\n"));
 		return -EINVAL;
 	}
-	if (human) {
+	printf(_("  current CPU frequency: "));
+	if (human)
 		print_speed(freq);
-	} else
+	else
 		printf("%lu", freq);
 	printf(_(" (asserted by call to kernel)\n"));
 	return 0;
@@ -265,17 +267,19 @@ static int get_freq_kernel(unsigned int cpu, unsigned int human)
 
 /* --hwfreq / -w */
 
-static int get_freq_hardware(unsigned int cpu, unsigned int human)
+static int get_freq_hardware(unsigned int cpu, unsigned int human, int fail_msg)
 {
 	unsigned long freq = cpufreq_get_freq_hardware(cpu);
-	printf(_("  current CPU frequency: "));
+
 	if (!freq) {
-		printf("Unable to call hardware\n");
+		if (fail_msg)
+			printf(_("  current CPU frequency: Unable to call hardware\n"));
 		return -EINVAL;
 	}
-	if (human) {
+	printf(_("  current CPU frequency: "));
+	if (human)
 		print_speed(freq);
-	} else
+	else
 		printf("%lu", freq);
 	printf(_(" (asserted by call to hardware)\n"));
 	return 0;
@@ -475,8 +479,12 @@ static void debug_output_one(unsigned int cpu)
 
 	get_available_governors(cpu);
 	get_policy(cpu);
-	if (get_freq_hardware(cpu, 1) < 0)
-		get_freq_kernel(cpu, 1);
+	if (get_freq_hardware(cpu, 1, 0)) {
+		if (get_freq_kernel(cpu, 1, 0)) {
+			printf(_("  current CPU frequency: Unable to call hardware\n"));
+			printf(_("  current CPU frequency: Unable to call kernel\n"));
+		}
+	}
 	get_boost_mode(cpu);
 }
 
@@ -627,10 +635,10 @@ int cmd_freq_info(int argc, char **argv)
 			ret = get_hardware_limits(cpu, human);
 			break;
 		case 'w':
-			ret = get_freq_hardware(cpu, human);
+			ret = get_freq_hardware(cpu, human, 1);
 			break;
 		case 'f':
-			ret = get_freq_kernel(cpu, human);
+			ret = get_freq_kernel(cpu, human, 1);
 			break;
 		case 's':
 			ret = get_freq_stats(cpu, human);
