@@ -30,7 +30,7 @@
 
 #include <linux/firmware.h>
 #include <linux/module.h>
-#include <linux/mmu_notifier.h>
+#include <linux/hmm.h>
 #include <drm/drmP.h>
 #include <drm/drm.h>
 
@@ -40,7 +40,7 @@ struct radeon_mn {
 	/* constant after initialisation */
 	struct radeon_device	*rdev;
 	struct mm_struct	*mm;
-	struct mmu_notifier	mn;
+	struct hmm_mirror	mirror;
 
 	/* only used on destruction */
 	struct work_struct	work;
@@ -87,72 +87,67 @@ static void radeon_mn_destroy(struct work_struct *work)
 	}
 	mutex_unlock(&rmn->lock);
 	mutex_unlock(&rdev->mn_lock);
-	mmu_notifier_unregister(&rmn->mn, rmn->mm);
+	hmm_mirror_unregister(&rmn->mirror);
 	kfree(rmn);
 }
 
 /**
  * radeon_mn_release - callback to notify about mm destruction
  *
- * @mn: our notifier
- * @mn: the mm this callback is about
+ * @mirror: our mirror struct
  *
  * Shedule a work item to lazy destroy our notifier.
  */
-static void radeon_mn_release(struct mmu_notifier *mn,
-			      struct mm_struct *mm)
+static void radeon_mirror_release(struct hmm_mirror *mirror)
 {
-	struct radeon_mn *rmn = container_of(mn, struct radeon_mn, mn);
+	struct radeon_mn *rmn = container_of(mirror, struct radeon_mn, mirror);
 	INIT_WORK(&rmn->work, radeon_mn_destroy);
 	schedule_work(&rmn->work);
 }
 
 /**
- * radeon_mn_invalidate_range_start - callback to notify about mm change
+ * radeon_sync_cpu_device_pagetables - callback to synchronize with mm changes
  *
- * @mn: our notifier
- * @mn: the mm this callback is about
- * @start: start of updated range
- * @end: end of updated range
+ * @mirror: our HMM mirror
+ * @update: update informations (start, end, event, blockable, ...)
  *
- * We block for all BOs between start and end to be idle and
- * unmap them by move them into system domain again.
+ * We block for all BOs between start and end to be idle and unmap them by
+ * moving them into system domain again (trigger a call to ttm_backend_func.
+ * unbind see radeon_ttm.c).
  */
-static int radeon_mn_invalidate_range_start(struct mmu_notifier *mn,
-					     struct mm_struct *mm,
-					     unsigned long start,
-					     unsigned long end,
-					     bool blockable)
+static int radeon_sync_cpu_device_pagetables(struct hmm_mirror *mirror,
+					     const struct hmm_update *update)
 {
-	struct radeon_mn *rmn = container_of(mn, struct radeon_mn, mn);
+	struct radeon_mn *rmn = container_of(mirror, struct radeon_mn, mirror);
 	struct ttm_operation_ctx ctx = { false, false };
 	struct interval_tree_node *it;
+	unsigned long end;
 	int ret = 0;
 
 	/* notification is exclusive, but interval is inclusive */
-	end -= 1;
+	end = update->end - 1;
 
 	/* TODO we should be able to split locking for interval tree and
 	 * the tear down.
 	 */
-	if (blockable)
+	if (update->blockable)
 		mutex_lock(&rmn->lock);
 	else if (!mutex_trylock(&rmn->lock))
 		return -EAGAIN;
 
-	it = interval_tree_iter_first(&rmn->objects, start, end);
+	it = interval_tree_iter_first(&rmn->objects, update->start, end);
 	while (it) {
 		struct radeon_mn_node *node;
 		struct radeon_bo *bo;
 		long r;
 
-		if (!blockable) {
+		if (!update->blockable) {
 			ret = -EAGAIN;
 			goto out_unlock;
 		}
 
 		node = container_of(it, struct radeon_mn_node, it);
-		it = interval_tree_iter_next(it, start, end);
+		it = interval_tree_iter_next(it, update->start, end);
 
 		list_for_each_entry(bo, &node->bos, mn_list) {
 
@@ -178,16 +173,16 @@ static int radeon_mn_invalidate_range_start(struct mmu_notifier *mn,
 			radeon_bo_unreserve(bo);
 		}
 	}
-	
+
 out_unlock:
 	mutex_unlock(&rmn->lock);
 
 	return ret;
 }
 
-static const struct mmu_notifier_ops radeon_mn_ops = {
-	.release = radeon_mn_release,
-	.invalidate_range_start = radeon_mn_invalidate_range_start,
+static const struct hmm_mirror_ops radeon_mirror_ops = {
+	.sync_cpu_device_pagetables = &radeon_sync_cpu_device_pagetables,
+	.release = &radeon_mirror_release,
 };
 
 /**
@@ -200,48 +195,53 @@ static const struct mmu_notifier_ops radeon_mn_ops = {
 static struct radeon_mn *radeon_mn_get(struct radeon_device *rdev)
 {
 	struct mm_struct *mm = current->mm;
-	struct radeon_mn *rmn;
+	struct radeon_mn *rmn, *new;
 	int r;
 
-	if (down_write_killable(&mm->mmap_sem))
-		return ERR_PTR(-EINTR);
-
 	mutex_lock(&rdev->mn_lock);
+	hash_for_each_possible(rdev->mn_hash, rmn, node, (unsigned long)mm) {
+		if (rmn->mm == mm) {
+			mutex_unlock(&rdev->mn_lock);
+			return rmn;
+		}
+	}
+	mutex_unlock(&rdev->mn_lock);
 
-	hash_for_each_possible(rdev->mn_hash, rmn, node, (unsigned long)mm)
-		if (rmn->mm == mm)
-			goto release_locks;
+	new = kzalloc(sizeof(*rmn), GFP_KERNEL);
+	if (!new) {
+		return ERR_PTR(-ENOMEM);
+	}
+	new->mm = mm;
+	new->rdev = rdev;
+	mutex_init(&new->lock);
+	new->objects = RB_ROOT_CACHED;
+	new->mirror.ops = &radeon_mirror_ops;
 
-	rmn = kzalloc(sizeof(*rmn), GFP_KERNEL);
-	if (!rmn) {
-		rmn = ERR_PTR(-ENOMEM);
-		goto release_locks;
+	if (down_write_killable(&mm->mmap_sem)) {
+		kfree(new);
+		return ERR_PTR(-EINTR);
+	}
+	r = hmm_mirror_register(&new->mirror, mm);
+	up_write(&mm->mmap_sem);
+	if (r) {
+		kfree(new);
+		return ERR_PTR(r);
 	}
 
-	rmn->rdev = rdev;
-	rmn->mm = mm;
-	rmn->mn.ops = &radeon_mn_ops;
-	mutex_init(&rmn->lock);
-	rmn->objects = RB_ROOT_CACHED;
-	
-	r = __mmu_notifier_register(&rmn->mn, mm);
-	if (r)
-		goto free_rmn;
-
-	hash_add(rdev->mn_hash, &rmn->node, (unsigned long)mm);
-
-release_locks:
+	mutex_lock(&rdev->mn_lock);
+	/* Check again in case some other thread raced with us ... */
+	hash_for_each_possible(rdev->mn_hash, rmn, node, (unsigned long)mm) {
+		if (rmn->mm == mm) {
+			mutex_unlock(&rdev->mn_lock);
+			hmm_mirror_unregister(&new->mirror);
+			kfree(new);
+			return rmn;
+		}
+	}
+	hash_add(rdev->mn_hash, &new->node, (unsigned long)mm);
 	mutex_unlock(&rdev->mn_lock);
-	up_write(&mm->mmap_sem);
 
-	return rmn;
-
-free_rmn:
-	mutex_unlock(&rdev->mn_lock);
-	up_write(&mm->mmap_sem);
-	kfree(rmn);
-
-	return ERR_PTR(r);
+	return new;
 }
 
 /**
