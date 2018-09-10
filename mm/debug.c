@@ -175,4 +175,20 @@ void dump_mm(const struct mm_struct *mm)
 	);
 }
 
+static bool page_init_poisoning __read_mostly = true;
+
+static int __init page_init_poison_param(char *buf)
+{
+	if (!buf)
+		return -EINVAL;
+	return strtobool(buf, &page_init_poisoning);
+}
+early_param("page_init_poison", page_init_poison_param);
+
+void page_init_poison(struct page *page, size_t size)
+{
+	if (page_init_poisoning)
+		memset(page, PAGE_POISON_PATTERN, size);
+}
+EXPORT_SYMBOL_GPL(page_init_poison);
 #endif		/* CONFIG_DEBUG_VM */

@@ -3047,6 +3047,14 @@
 			off: turn off poisoning (default)
 			on: turn on poisoning
 
+	page_init_poison=	[KNL] Boot-time parameter changing the
+			state of poisoning of page structures during early
+			boot. Used to verify page metadata is not accessed
+			prior to initialization. Available with
+			CONFIG_DEBUG_VM=y.
+			off: turn off poisoning
+			on: turn on poisoning (default)
+
 	panic=		[KNL] Kernel behaviour on panic: delay <timeout>
 			timeout > 0: seconds before rebooting
 			timeout = 0: wait forever
