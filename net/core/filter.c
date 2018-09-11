@@ -121,6 +121,41 @@ int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap)
 }
 EXPORT_SYMBOL(sk_filter_trim_cap);
 
+int sg_filter_run(struct sock *sk, struct scatterlist *sg)
+{
+	struct sk_filter *filter;
+	int result = 0;
+
+	if (!sg)
+		return result;
+
+	rcu_read_lock();
+	filter = rcu_dereference(sk->sk_filter);
+	if (filter) {
+		struct sk_msg_buff mb = {0};
+
+		memcpy(mb.sg_data, sg, sizeof(*sg) * MAX_SKB_FRAGS);
+		mb.sg_start = 0;
+		mb.sg_end = sg_nents(sg);
+		mb.data = sg_virt(sg);
+		mb.data_end = mb.data + sg->length;
+		mb.sg_copy[mb.sg_end - 1] = true;
+
+		result = BPF_PROG_RUN(filter->prog, &mb);
+
+		/* BPF prog may have changed mb.sg_data e.g. may linearize
+		 * multiple scatterlist entries into one. Therefore, make sure
+		 * to update original sg and mark the sg end.
+		 */
+		memcpy(sg, mb.sg_data, sizeof(*sg) * MAX_SKB_FRAGS);
+		sg_mark_end(&sg[mb.sg_end - 1]);
+	}
+	rcu_read_unlock();
+
+	return result;
+}
+EXPORT_SYMBOL(sg_filter_run);
+
 BPF_CALL_1(bpf_skb_get_pay_offset, struct sk_buff *, skb)
 {
 	return skb_get_poff(skb);

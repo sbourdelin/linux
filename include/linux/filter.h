@@ -1113,4 +1113,12 @@ struct bpf_sock_ops_kern {
 					 */
 };
 
+enum __socksg_action {
+	__SOCKSG_PASS = 0,
+	__SOCKSG_DROP,
+	__SOCKSG_REDIRECT,
+};
+
+int sg_filter_run(struct sock *sk, struct scatterlist *sg);
+
 #endif /* __LINUX_FILTER_H__ */

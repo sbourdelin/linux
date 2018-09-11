@@ -2428,6 +2428,12 @@ enum sk_action {
 	SK_PASS,
 };
 
+enum socksg_action {
+	SOCKSG_PASS = 0,
+	SOCKSG_DROP,
+	SOCKSG_REDIRECT,
+};
+
 /* user accessible metadata for SK_MSG packet hook, new fields must
  * be added to the end of this structure
  */
