@@ -569,9 +569,8 @@ static irqreturn_t ipmmu_irq(int irq, void *dev)
 	struct ipmmu_vmsa_device *mmu = dev;
 	irqreturn_t status = IRQ_NONE;
 	unsigned int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&mmu->lock, flags);
+	spin_lock(&mmu->lock);
 
 	/*
 	 * Check interrupts for all active contexts.
@@ -583,7 +582,7 @@ static irqreturn_t ipmmu_irq(int irq, void *dev)
 			status = IRQ_HANDLED;
 	}
 
-	spin_unlock_irqrestore(&mmu->lock, flags);
+	spin_unlock(&mmu->lock);
 
 	return status;
 }
