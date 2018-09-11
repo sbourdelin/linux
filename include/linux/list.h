@@ -47,6 +47,8 @@ static inline bool __list_del_entry_valid(struct list_head *entry)
 }
 #endif
 
+extern void smp_list_del(struct list_head *entry);
+
 /*
  * Insert a new entry between two known consecutive entries.
  *
