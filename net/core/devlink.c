@@ -2676,6 +2676,11 @@ static const struct devlink_param devlink_param_generic[] = {
 		.name = DEVLINK_PARAM_GENERIC_REGION_SNAPSHOT_NAME,
 		.type = DEVLINK_PARAM_GENERIC_REGION_SNAPSHOT_TYPE,
 	},
+	{
+		.id = DEVLINK_PARAM_GENERIC_ID_HW_TC_OFFLOAD,
+		.name = DEVLINK_PARAM_GENERIC_HW_TC_OFFLOAD_NAME,
+		.type = DEVLINK_PARAM_GENERIC_HW_TC_OFFLOAD_TYPE,
+	},
 };
 
 static int devlink_param_generic_verify(const struct devlink_param *param)
