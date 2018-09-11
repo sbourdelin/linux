@@ -126,28 +126,12 @@ static int capture_enum_frameintervals(struct file *file, void *fh,
 {
 	struct capture_priv *priv = video_drvdata(file);
 	const struct imx_media_pixfmt *cc;
-	struct v4l2_subdev_frame_interval_enum fie = {
-		.index = fival->index,
-		.pad = priv->src_sd_pad,
-		.width = fival->width,
-		.height = fival->height,
-		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-	};
-	int ret;
 
 	cc = imx_media_find_format(fival->pixel_format, CS_SEL_ANY, true);
 	if (!cc)
 		return -EINVAL;
 
-	fie.code = cc->codes[0];
-
-	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_interval,
-			       NULL, &fie);
-	if (ret)
-		return ret;
-
-	fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
-	fival->discrete = fie.interval;
+	return v4l2_fill_frmivalenum_from_subdev(priv->src_sd, fival, cc->codes[0]);
 
 	return 0;
 }
