@@ -384,4 +384,16 @@ int v4l2_g_parm_cap(struct video_device *vdev,
 int v4l2_s_parm_cap(struct video_device *vdev,
 		    struct v4l2_subdev *sd, struct v4l2_streamparm *a);
 
+/**
+ * v4l2_fill_frmivalenum_from_subdev - helper for vidioc_enum_frameintervals
+ *      calling the enum_frame_interval op of the given subdev.
+ *
+ * @sd: the sub-device pointer.
+ * @fival: the VIDIOC_ENUM_FRAMEINTERVALS argument.
+ * @code: the MEDIA_BUS_FMT_ code (not fival->pixel_format !)
+ */
+int v4l2_fill_frmivalenum_from_subdev(struct v4l2_subdev *sd,
+	       			      struct v4l2_frmivalenum *fival,
+				      int code);
+
 #endif /* V4L2_COMMON_H_ */

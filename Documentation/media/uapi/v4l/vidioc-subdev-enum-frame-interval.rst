@@ -51,6 +51,41 @@ EINVAL error code if one of the input fields is invalid. All frame
 intervals are enumerable by beginning at index zero and incrementing by
 one until ``EINVAL`` is returned.
 
+If the sub-device can work only with a fixed set of frame intervals, then
+the driver must enumerate them with increasing indexes, by setting the
+``type`` field to ``V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE`` and only filling
+the ``interval`` field .  If the sub-device can work with a continuous
+range of frame intervals, then the driver must only return success for
+index 0, set the ``type`` field to ``V4L2_SUBDEV_FRMIVAL_TYPE_CONTINUOUS``,
+fill ``interval`` with the minimum interval and ``max_interval`` with
+the maximum interval.  If it is worth mentioning the step in the
+continuous interval, the driver must set the ``type`` field to
+``V4L2_SUBDEV_FRMIVAL_TYPE_STEPWISE`` and fill also the ``step_interval``
+field with the step between the possible intervals.
+
+Callers are expected to use the returned information as follows:
+
+.. code-block:: c
+
+        struct v4l2_frmivalenum *fival;
+        struct v4l2_subdev_frame_interval_enum fie;
+
+        if (fie.type == V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE) {
+                fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
+                fival->discrete = fie.interval;
+        } else if (fie.type == V4L2_SUBDEV_FRMIVAL_TYPE_CONTINUOUS) {
+                fival->type = V4L2_FRMIVAL_TYPE_CONTINUOUS;
+                fival->stepwise.min = fie.interval;
+                fival->stepwise.max = fie.max_interval;
+        } else {
+                fival->type = V4L2_FRMIVAL_TYPE_STEPWISE;
+                fival->stepwise.min = fie.interval;
+                fival->stepwise.max = fie.max_interval;
+                fival->stepwise.step = fie.step_interval;
+        }
+
+.. code-block:: c
+
 Available frame intervals may depend on the current 'try' formats at
 other pads of the sub-device, as well as on the current active links.
 See :ref:`VIDIOC_SUBDEV_G_FMT` for more
@@ -93,9 +128,41 @@ multiple pads of the same sub-device is not defined.
       - Frame intervals to be enumerated, from enum
 	:ref:`v4l2_subdev_format_whence <v4l2-subdev-format-whence>`.
     * - __u32
-      - ``reserved``\ [8]
+      - ``type``
+      - Type of enumerated interval
+	:ref:`v4l2_subdev_frmival_type <v4l2-subdev-frmival-type>`.
+    * - struct :c:type:`v4l2_fract`
+      - ``max_interval``
+      - Maximum period, in seconds, between consecutive video frames, or 0.
+    * - struct :c:type:`v4l2_fract`
+      - ``step_interval``
+      - Frame interval step size, in seconds, or 0.
+    * - __u32
+      - ``reserved``\ [3]
       - Reserved for future extensions. Applications and drivers must set
 	the array to zero.
+
+
+
+.. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
+
+.. _v4l2-subdev-frmival-type:
+
+.. flat-table:: enum v4l2_subdev_format_whence
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       3 1 4
+
+    * - V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE
+      - 0
+      - This frame interval is fixed
+    * - V4L2_SUBDEV_FRMIVAL_TYPE_CONTINUOUS
+      - 1
+      - Any frame interval between min and max is available
+    * - V4L2_SUBDEV_FRMIVAL_TYPE_STEPWISE
+      - 2
+      - Many frame intervals between min and max are available, with a
+        significant and constant step between them.
 
 
 Return Value
