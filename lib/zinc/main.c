@@ -3,6 +3,7 @@
  * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
+#include <zinc/chacha20poly1305.h>
 #include <zinc/chacha20.h>
 #include <zinc/poly1305.h>
 
@@ -26,6 +27,9 @@ static int __init mod_init(void)
 #ifdef CONFIG_ZINC_POLY1305
 	poly1305_fpu_init();
 	selftest(poly1305);
+#endif
+#ifdef CONFIG_ZINC_CHACHA20POLY1305
+	selftest(chacha20poly1305);
 #endif
 	return 0;
 }

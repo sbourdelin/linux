@@ -47,6 +47,10 @@ CFLAGS_poly1305.o += -include $(srctree)/$(src)/poly1305/poly1305-mips-glue.h
 endif
 endif
 
+ifeq ($(CONFIG_ZINC_CHACHA20POLY1305),y)
+zinc-y += chacha20poly1305.o
+endif
+
 zinc-y += main.o
 
 obj-$(CONFIG_ZINC) := zinc.o
