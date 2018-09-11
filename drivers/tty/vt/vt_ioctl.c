@@ -542,6 +542,15 @@ int vt_ioctl(struct tty_struct *tty,
 		ret = vt_do_kdsk_ioctl(cmd, up, perm, console);
 		break;
 
+	case KDGKBIENT:
+	case KDSKBIENT:
+		ret = vt_do_kdski_ioctl(cmd, up, perm, console);
+		break;
+
+	case KDSKBIRST:
+		ret = vt_do_kdskirst_ioctl(cmd, up, perm, console);
+		break;
+
 	case KDGKBSENT:
 	case KDSKBSENT:
 		ret = vt_do_kdgkb_ioctl(cmd, up, perm);
