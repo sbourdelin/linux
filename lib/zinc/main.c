@@ -7,6 +7,7 @@
 #include <zinc/chacha20.h>
 #include <zinc/poly1305.h>
 #include <zinc/blake2s.h>
+#include <zinc/curve25519.h>
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -35,6 +36,10 @@ static int __init mod_init(void)
 #ifdef CONFIG_ZINC_BLAKE2S
 	blake2s_fpu_init();
 	selftest(blake2s);
+#endif
+#ifdef CONFIG_ZINC_CURVE25519
+	curve25519_fpu_init();
+	selftest(curve25519);
 #endif
 	return 0;
 }

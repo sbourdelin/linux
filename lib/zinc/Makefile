@@ -51,6 +51,10 @@ ifeq ($(CONFIG_ZINC_CHACHA20POLY1305),y)
 zinc-y += chacha20poly1305.o
 endif
 
+ifeq ($(CONFIG_ZINC_CURVE25519),y)
+zinc-y += curve25519/curve25519.o
+endif
+
 ifeq ($(CONFIG_ZINC_BLAKE2S),y)
 zinc-y += blake2s/blake2s.o
 ifeq ($(CONFIG_X86_64)$(CONFIG_UML),y)
