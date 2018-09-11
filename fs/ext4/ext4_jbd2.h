@@ -437,6 +437,14 @@ static inline int ext4_should_writeback_data(struct inode *inode)
 	return ext4_inode_journal_mode(inode) & EXT4_INODE_WRITEBACK_DATA_MODE;
 }
 
+static inline int ext4_is_journal_inode(struct inode *inode)
+{
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+	unsigned int journal_inum = le32_to_cpu(sbi->s_es->s_journal_inum);
+
+	return journal_inum && (journal_inum == inode->i_ino);
+}
+
 /*
  * This function controls whether or not we should try to go down the
  * dioread_nolock code paths, which makes it safe to avoid taking

@@ -4686,6 +4686,8 @@ static bool ext4_should_use_dax(struct inode *inode)
 		return false;
 	if (ext4_should_journal_data(inode))
 		return false;
+	if (ext4_is_journal_inode(inode))
+		return false;
 	if (ext4_has_inline_data(inode))
 		return false;
 	if (ext4_encrypted_inode(inode))
