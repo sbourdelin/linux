@@ -4,6 +4,7 @@
  */
 
 #include <zinc/chacha20.h>
+#include <zinc/poly1305.h>
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -21,6 +22,10 @@ static int __init mod_init(void)
 {
 #ifdef CONFIG_ZINC_CHACHA20
 	chacha20_fpu_init();
+#endif
+#ifdef CONFIG_ZINC_POLY1305
+	poly1305_fpu_init();
+	selftest(poly1305);
 #endif
 	return 0;
 }

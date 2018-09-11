@@ -23,6 +23,10 @@ CFLAGS_chacha20.o += -include $(srctree)/$(src)/chacha20/chacha20-mips-glue.h
 endif
 endif
 
+ifeq ($(CONFIG_ZINC_POLY1305),y)
+zinc-y += poly1305/poly1305.o
+endif
+
 zinc-y += main.o
 
 obj-$(CONFIG_ZINC) := zinc.o
