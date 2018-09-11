@@ -701,7 +701,7 @@ static inline void add_to_buddy_common(struct page *page, struct zone *zone,
 					unsigned int order)
 {
 	set_page_order(page, order);
-	zone->free_area[order].nr_free++;
+	atomic_long_inc(&zone->free_area[order].nr_free);
 }
 
 static inline void add_to_buddy_head(struct page *page, struct zone *zone,
@@ -728,7 +728,7 @@ static inline void remove_from_buddy(struct page *page, struct zone *zone,
 					unsigned int order)
 {
 	list_del(&page->lru);
-	zone->free_area[order].nr_free--;
+	atomic_long_dec(&zone->free_area[order].nr_free);
 	rmv_page_order(page);
 }
 
@@ -2225,7 +2225,7 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 	int i;
 	int fallback_mt;
 
-	if (area->nr_free == 0)
+	if (atomic_long_read(&area->nr_free) == 0)
 		return -1;
 
 	*can_steal = false;
@@ -3178,7 +3178,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		struct free_area *area = &z->free_area[o];
 		int mt;
 
-		if (!area->nr_free)
+		if (atomic_long_read(&area->nr_free) == 0)
 			continue;
 
 		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
@@ -5029,7 +5029,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			struct free_area *area = &zone->free_area[order];
 			int type;
 
-			nr[order] = area->nr_free;
+			nr[order] = atomic_long_read(&area->nr_free);
 			total += nr[order] << order;
 
 			types[order] = 0;
@@ -5562,7 +5562,7 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	unsigned int order, t;
 	for_each_migratetype_order(order, t) {
 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
-		zone->free_area[order].nr_free = 0;
+		atomic_long_set(&zone->free_area[order].nr_free, 0);
 	}
 }
 
