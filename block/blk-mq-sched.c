@@ -422,6 +422,84 @@ void blk_mq_sched_insert_requests(struct request_queue *q,
 	blk_mq_run_hw_queue(hctx, run_queue_async);
 }
 
+static void blk_mq_sched_retrieve_one_req(struct request *rq,
+		struct bio_list *list)
+{
+	blk_steal_bios(list, rq);
+	blk_mq_end_request(rq, BLK_STS_OK);
+}
+
+static void __blk_mq_sched_retrieve_bios(struct blk_mq_hw_ctx *hctx)
+{
+	struct request_queue *q = hctx->queue;
+	struct bio_list bio_list;
+	LIST_HEAD(rq_list);
+	struct request *rq;
+
+	bio_list_init(&bio_list);
+
+	if (!list_empty_careful(&hctx->dispatch)) {
+		spin_lock(&hctx->lock);
+		if (!list_empty(&hctx->dispatch))
+			list_splice_tail_init(&hctx->dispatch, &rq_list);
+		spin_unlock(&hctx->lock);
+	}
+
+	if (!q->elevator)
+		blk_mq_flush_busy_ctxs(hctx, &rq_list);
+
+	while (!list_empty(&rq_list)) {
+		rq = list_first_entry(&rq_list, struct request, queuelist);
+		list_del_init(&rq->queuelist);
+		blk_mq_sched_retrieve_one_req(rq, &bio_list);
+	}
+
+	if (q->elevator) {
+		struct elevator_queue *e = hctx->queue->elevator;
+
+		while (e->type->ops.mq.has_work &&
+				e->type->ops.mq.has_work(hctx)) {
+			rq = e->type->ops.mq.dispatch_request(hctx);
+			if (!rq)
+				continue;
+
+			blk_mq_sched_retrieve_one_req(rq, &bio_list);
+		}
+	}
+	/*
+	 * There could still be rqs in flush queue, the caller will check
+	 * q_usage_counter and come back again.
+	 */
+	blk_mq_requeue_bios(q, &bio_list, false);
+}
+
+/*
+ * When blk_mq_sched_retrieve_bios returns:
+ *  - All the rqs are ended, q_usage_counter is zero
+ *  - All the bios are queued to q->requeue_bios
+ */
+void blk_mq_sched_retrieve_bios(struct request_queue *q)
+{
+	struct blk_mq_hw_ctx *hctx;
+	int i;
+
+	BUG_ON(!atomic_read(&q->mq_freeze_depth) ||
+			!blk_queue_quiesced(q));
+
+	/*
+	 * Kick the requeue_work to flush the reqs in requeue_list
+	 */
+	blk_mq_kick_requeue_list(q);
+
+	while (!percpu_ref_is_zero(&q->q_usage_counter)) {
+		queue_for_each_hw_ctx(q, hctx, i)
+			__blk_mq_sched_retrieve_bios(hctx);
+	}
+
+	blk_mq_requeue_bios(q, NULL, true);
+}
+EXPORT_SYMBOL_GPL(blk_mq_sched_retrieve_bios);
+
 static void blk_mq_sched_free_tags(struct blk_mq_tag_set *set,
 				   struct blk_mq_hw_ctx *hctx,
 				   unsigned int hctx_idx)

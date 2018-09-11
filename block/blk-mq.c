@@ -689,6 +689,44 @@ void blk_mq_requeue_request(struct request *rq, bool kick_requeue_list)
 }
 EXPORT_SYMBOL(blk_mq_requeue_request);
 
+static void blk_mq_bio_requeue_work(struct work_struct *work)
+{
+	struct request_queue *q =
+		container_of(work, struct request_queue, bio_requeue_work.work);
+	struct bio *bio;
+
+	/* Defects:
+	 *  - Bios from all cpus have to be issued on one.
+	 *  - The requeued older bios have to contend tags with following
+	 *    new bios.
+	 */
+	while (true) {
+		spin_lock_irq(&q->requeue_lock);
+		bio = bio_list_pop(&q->requeue_bios);
+		spin_unlock_irq(&q->requeue_lock);
+		if (!bio)
+			break;
+		/*
+		 * generic_make_request will handle the queue DYING case.
+		 */
+		generic_make_request(bio);
+	}
+}
+
+void blk_mq_requeue_bios(struct request_queue *q,
+		struct bio_list *bio_list, bool kick)
+{
+	if (bio_list) {
+		spin_lock_irq(&q->requeue_lock);
+		bio_list_merge(&q->requeue_bios, bio_list);
+		spin_unlock_irq(&q->requeue_lock);
+	}
+
+	if (kick)
+		kblockd_mod_delayed_work_on(WORK_CPU_UNBOUND, &q->bio_requeue_work, 0);
+}
+EXPORT_SYMBOL(blk_mq_requeue_bios);
+
 static void blk_mq_requeue_work(struct work_struct *work)
 {
 	struct request_queue *q =
@@ -2607,7 +2645,9 @@ struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 	q->sg_reserved_size = INT_MAX;
 
 	INIT_DELAYED_WORK(&q->requeue_work, blk_mq_requeue_work);
+	INIT_DELAYED_WORK(&q->bio_requeue_work, blk_mq_bio_requeue_work);
 	INIT_LIST_HEAD(&q->requeue_list);
+	bio_list_init(&q->requeue_bios);
 	spin_lock_init(&q->requeue_lock);
 
 	blk_queue_make_request(q, blk_mq_make_request);

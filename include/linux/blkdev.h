@@ -627,8 +627,10 @@ struct request_queue {
 	struct blk_flush_queue	*fq;
 
 	struct list_head	requeue_list;
+	struct bio_list 	requeue_bios;
 	spinlock_t		requeue_lock;
 	struct delayed_work	requeue_work;
+	struct delayed_work	bio_requeue_work;
 
 	struct mutex		sysfs_lock;
 
