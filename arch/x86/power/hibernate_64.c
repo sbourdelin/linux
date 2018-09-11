@@ -265,9 +265,9 @@ free_tfm:
 	return ret;
 }
 
-static void hibernation_e820_save(void *buf)
+static int hibernation_e820_save(void *buf)
 {
-	get_e820_md5(e820_table_firmware, buf);
+	return get_e820_md5(e820_table_firmware, buf);
 }
 
 static bool hibernation_e820_mismatch(void *buf)
@@ -287,8 +287,9 @@ static bool hibernation_e820_mismatch(void *buf)
 	return memcmp(result, buf, MD5_DIGEST_SIZE) ? true : false;
 }
 #else
-static void hibernation_e820_save(void *buf)
+static int hibernation_e820_save(void *buf)
 {
+	return 0;
 }
 
 static bool hibernation_e820_mismatch(void *buf)
@@ -306,6 +307,7 @@ static bool hibernation_e820_mismatch(void *buf)
 int arch_hibernation_header_save(void *addr, unsigned int max_size)
 {
 	struct restore_data_record *rdr = addr;
+	int ret = -EINVAL;
 
 	if (max_size < sizeof(struct restore_data_record))
 		return -EOVERFLOW;
@@ -333,7 +335,9 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
 
 	rdr->magic = RESTORE_MAGIC;
 
-	hibernation_e820_save(rdr->e820_digest);
+	ret = hibernation_e820_save(rdr->e820_digest);
+	if (ret)
+		return ret;
 
 	return 0;
 }
