@@ -833,15 +833,11 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct drm_i915_gem_context_param *args = data;
 	struct i915_gem_context *ctx;
-	int ret;
+	int ret = 0;
 
 	ctx = i915_gem_context_lookup(file_priv, args->ctx_id);
 	if (!ctx)
 		return -ENOENT;
-
-	ret = i915_mutex_lock_interruptible(dev);
-	if (ret)
-		goto out;
 
 	switch (args->param) {
 	case I915_CONTEXT_PARAM_BAN_PERIOD:
@@ -897,9 +893,7 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 		ret = -EINVAL;
 		break;
 	}
-	mutex_unlock(&dev->struct_mutex);
 
-out:
 	i915_gem_context_put(ctx);
 	return ret;
 }
