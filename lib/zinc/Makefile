@@ -25,6 +25,10 @@ endif
 
 ifeq ($(CONFIG_ZINC_POLY1305),y)
 zinc-y += poly1305/poly1305.o
+ifeq ($(CONFIG_X86_64)$(CONFIG_UML),y)
+zinc-y += poly1305/poly1305-x86_64.o
+CFLAGS_poly1305.o += -include $(srctree)/$(src)/poly1305/poly1305-x86_64-glue.h
+endif
 ifeq ($(CONFIG_ARM),y)
 zinc-y += poly1305/poly1305-arm.o
 CFLAGS_poly1305.o += -include $(srctree)/$(src)/poly1305/poly1305-arm-glue.h
