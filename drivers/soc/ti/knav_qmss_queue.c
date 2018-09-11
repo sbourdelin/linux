@@ -30,6 +30,7 @@
 #include <linux/soc/ti/knav_qmss.h>
 
 #include "knav_qmss.h"
+#include "knav_qmssm.h"
 
 static struct knav_device *kdev;
 static DEFINE_MUTEX(knav_dev_lock);
@@ -101,6 +102,12 @@ void knav_queue_notify(struct knav_queue_inst *inst)
 			continue;
 		this_cpu_inc(qh->stats->notifies);
 		qh->notifier_fn(qh->notifier_fn_arg);
+
+		if (atomic_read(&qh->monitor_enabled) == KNAV_QMSSM_DISABLE)
+			continue;
+		if (WARN_ON(!qh->monitor_cfg))
+			continue;
+		qh->monitor_cfg->fn(qh);
 	}
 	rcu_read_unlock();
 }
@@ -600,6 +607,7 @@ int knav_queue_device_control(void *qhandle, enum knav_queue_ctrl_cmd cmd,
 {
 	struct knav_queue *qh = qhandle;
 	struct knav_queue_notify_config *cfg;
+	struct knav_queue_monitor_config *mcfg;
 	int ret;
 
 	switch ((int)cmd) {
@@ -626,6 +634,11 @@ int knav_queue_device_control(void *qhandle, enum knav_queue_ctrl_cmd cmd,
 
 	case KNAV_QUEUE_GET_COUNT:
 		ret = knav_queue_get_count(qh);
+		break;
+
+	case KNAV_QUEUE_SET_MONITOR:
+		mcfg = (void *)arg;
+		ret = knav_queue_set_monitor(qh, mcfg);
 		break;
 
 	default:
@@ -1874,6 +1887,10 @@ static int knav_queue_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	ret = knav_qmssm_register(kdev);
+	if (ret < 0)
+		dev_err(dev, "knav qmssm registration failed\n");
+
 	debugfs_create_file("qmss", S_IFREG | S_IRUGO, NULL, NULL,
 			    &knav_queue_debug_ops);
 	device_ready = true;
@@ -1891,6 +1908,7 @@ err:
 static int knav_queue_remove(struct platform_device *pdev)
 {
 	/* TODO: Free resources */
+	knav_qmssm_unregister(kdev);
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	return 0;

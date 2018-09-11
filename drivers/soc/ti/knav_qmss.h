@@ -289,6 +289,8 @@ struct knav_queue {
 	knav_queue_notify_fn		notifier_fn;
 	void				*notifier_fn_arg;
 	atomic_t			notifier_enabled;
+	struct knav_queue_monitor_config *monitor_cfg;
+	atomic_t			monitor_enabled;
 	struct rcu_head			rcu;
 	unsigned			flags;
 	struct list_head		list;
@@ -313,6 +315,7 @@ struct knav_device {
 	struct list_head			pdsps;
 	struct list_head			qmgrs;
 	enum qmss_version			version;
+	struct knav_qmssm			*qmon;
 };
 
 struct knav_range_ops {

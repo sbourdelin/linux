@@ -34,6 +34,8 @@
 /* queue flags */
 #define KNAV_QUEUE_SHARED	0x0001		/* Queue can be shared */
 
+#define KNAV_QMSSM_FDQ_PER_CHAN 4
+
 /**
  * enum knav_queue_ctrl_cmd -	queue operations.
  * @KNAV_QUEUE_GET_ID:		Get the ID number for an open queue
@@ -49,7 +51,9 @@ enum knav_queue_ctrl_cmd {
 	KNAV_QUEUE_SET_NOTIFIER,
 	KNAV_QUEUE_ENABLE_NOTIFY,
 	KNAV_QUEUE_DISABLE_NOTIFY,
-	KNAV_QUEUE_GET_COUNT
+	KNAV_QUEUE_GET_COUNT,
+	KNAV_QUEUE_SET_MONITOR,
+	KNAV_QUEUE_ENABLE_MONITOR
 };
 
 /* Queue notifier callback prototype */
@@ -63,6 +67,19 @@ typedef void (*knav_queue_notify_fn)(void *arg);
 struct knav_queue_notify_config {
 	knav_queue_notify_fn fn;
 	void *fn_arg;
+};
+
+/* Queue monitor callback prototype */
+typedef void (*knav_queue_monitor_fn)(void *arg);
+
+/**
+ * struct knav_queue_moncfg:   Monitor configuration
+ * @fn: Monitor function
+ * @fdq_arg: Monitor fdq
+ */
+struct knav_queue_monitor_config {
+	knav_queue_monitor_fn fn;
+	void *fdq_arg[KNAV_QMSSM_FDQ_PER_CHAN];
 };
 
 void *knav_queue_open(const char *name, unsigned id,

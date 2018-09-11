@@ -1592,12 +1592,15 @@ static void netcp_free_navigator_resources(struct netcp_intf *netcp)
 		knav_pool_destroy(netcp->tx_pool);
 		netcp->tx_pool = NULL;
 	}
+
+	knav_queue_device_control(netcp->rx_queue, KNAV_QUEUE_SET_MONITOR, 0);
 }
 
 static int netcp_setup_navigator_resources(struct net_device *ndev)
 {
 	struct netcp_intf *netcp = netdev_priv(ndev);
 	struct knav_queue_notify_config notify_cfg;
+	struct knav_queue_monitor_config monitor_cfg;
 	struct knav_dma_cfg config;
 	u32 last_fdq = 0;
 	u8 name[16];
@@ -1664,6 +1667,9 @@ static int netcp_setup_navigator_resources(struct net_device *ndev)
 	knav_queue_disable_notify(netcp->rx_queue);
 
 	/* open Rx FDQs */
+	for (i = 0; i < KNAV_DMA_FDQ_PER_CHAN; i++)
+		monitor_cfg.fdq_arg[i] = NULL;
+
 	for (i = 0; i < KNAV_DMA_FDQ_PER_CHAN && netcp->rx_queue_depths[i];
 	     ++i) {
 		snprintf(name, sizeof(name), "rx-fdq-%s-%d", ndev->name, i);
@@ -1672,7 +1678,15 @@ static int netcp_setup_navigator_resources(struct net_device *ndev)
 			ret = PTR_ERR(netcp->rx_fdq[i]);
 			goto fail;
 		}
+		monitor_cfg.fdq_arg[i] = netcp->rx_fdq[i];
 	}
+
+	/* Set monitor for Rx queue */
+	monitor_cfg.fn = knav_qmssm_event_callback;
+	ret = knav_queue_device_control(netcp->rx_queue,
+					KNAV_QUEUE_SET_MONITOR, &monitor_cfg);
+	if (ret)
+		dev_err(netcp->ndev_dev, "fail set qmms %d", netcp->rx_queue_id);
 
 	memset(&config, 0, sizeof(config));
 	config.direction		= DMA_DEV_TO_MEM;

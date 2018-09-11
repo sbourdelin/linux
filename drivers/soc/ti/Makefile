@@ -3,7 +3,7 @@
 # TI Keystone SOC drivers
 #
 obj-$(CONFIG_KEYSTONE_NAVIGATOR_QMSS)	+= knav_qmss.o
-knav_qmss-y := knav_qmss_queue.o knav_qmss_acc.o
+knav_qmss-y := knav_qmss_queue.o knav_qmss_acc.o knav_qmssm.o
 obj-$(CONFIG_KEYSTONE_NAVIGATOR_DMA)	+= knav_dma.o
 obj-$(CONFIG_AMX3_PM)			+= pm33xx.o
 obj-$(CONFIG_WKUP_M3_IPC)		+= wkup_m3_ipc.o
