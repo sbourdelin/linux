@@ -568,6 +568,8 @@ struct brcms_c_info {
 	u16 beacon_tim_offset;
 	u16 beacon_dtim_period;
 	struct sk_buff *probe_resp;
+	
+	struct ieee80211_vif *vif;
 };
 
 /* antsel module specific state */
