@@ -1918,11 +1918,14 @@ out_err:
  * held, primarily to keep smi_num consistent, we only one to do these
  * one at a time.
  */
+#define GET_DEVICE_ID_ATTEMPTS	5
 static int try_smi_init(struct smi_info *new_smi)
 {
 	int rv = 0;
 	int i;
 	char *init_name = NULL;
+	bool platform_device_registered = false;
+	unsigned long sleep_rm;
 
 	pr_info(PFX "Trying %s-specified %s state machine at %s address 0x%lx, slave address 0x%x, irq %d\n",
 		ipmi_addr_src_to_str(new_smi->io.addr_source),
@@ -2003,7 +2006,26 @@ static int try_smi_init(struct smi_info *new_smi)
 	 * Attempt a get device id command.  If it fails, we probably
 	 * don't have a BMC here.
 	 */
-	rv = try_get_dev_id(new_smi);
+	for (i = 0; i < GET_DEVICE_ID_ATTEMPTS; i++) {
+		pr_info(PFX "Attempting to read BMC device ID\n");
+		rv = try_get_dev_id(new_smi);
+		/* If it succeeded, stop trying */
+		if (!rv)
+			break;
+
+		/* Sleep for ~0.25s before trying again instead of hammering
+		 * the BMC.
+		 */
+		sleep_rm = msleep_interruptible(250);
+		if (sleep_rm != 0) {
+			pr_info(PFX "Find BMC interrupted\n");
+			rv = -EINTR;
+			goto out_err;
+		}
+	}
+
+	/* If we exited the loop above and rv is non-zero we ran out of tries.
+	 */
 	if (rv) {
 		if (new_smi->io.addr_source)
 			dev_err(new_smi->io.dev,
