@@ -10,17 +10,18 @@
 #include <linux/prefetch.h>
 
 /*
- * smp_list_del is a variant of list_del that allows concurrent list removals
- * under certain assumptions.  The idea is to get away from overly coarse
- * synchronization, such as using a lock to guard an entire list, which
- * serializes all operations even though those operations might be happening on
- * disjoint parts.
+ * smp_list_del and smp_list_splice are variants of list_del and list_splice,
+ * respectively, that allow concurrent list operations under certain
+ * assumptions.  The idea is to get away from overly coarse synchronization,
+ * such as using a lock to guard an entire list, which serializes all
+ * operations even though those operations might be happening on disjoint
+ * parts.
  *
  * If you want to use other functions from the list API concurrently,
  * additional synchronization may be necessary.  For example, you could use a
  * rwlock as a two-mode lock, where readers use the lock in shared mode and are
- * allowed to call smp_list_del concurrently, and writers use the lock in
- * exclusive mode and are allowed to use all list operations.
+ * allowed to call smp_list_* functions concurrently, and writers use the lock
+ * in exclusive mode and are allowed to use all list operations.
  */
 
 /**
@@ -155,4 +156,49 @@ void smp_list_del(struct list_head *entry)
 
 	entry->next = LIST_POISON1;
 	entry->prev = LIST_POISON2;
+}
+
+/**
+ * smp_list_splice - thread-safe splice of two lists
+ * @list: the new list to add
+ * @head: the place to add it in the first list
+ *
+ * Safely handles concurrent smp_list_splice operations onto the same list head
+ * and concurrent smp_list_del operations of any list entry except @head.
+ * Assumes that @head cannot be removed.
+ */
+void smp_list_splice(struct list_head *list, struct list_head *head)
+{
+	struct list_head *first = list->next;
+	struct list_head *last = list->prev;
+	struct list_head *succ;
+
+	/*
+	 * Lock the front of @head by replacing its next pointer with NULL.
+	 * Should another thread be adding to the front, wait until it's done.
+	 */
+	succ = READ_ONCE(head->next);
+	while (succ == NULL || cmpxchg(&head->next, succ, NULL) != succ) {
+		cpu_relax();
+		succ = READ_ONCE(head->next);
+	}
+
+	first->prev = head;
+	last->next = succ;
+
+	/*
+	 * It is safe to write to succ, head's successor, because locking head
+	 * prevents succ from being removed in smp_list_del.
+	 */
+	succ->prev = last;
+
+	/*
+	 * Pairs with the implied full barrier before the cmpxchg above.
+	 * Ensures the write that unlocks the head is seen last to avoid list
+	 * corruption.
+	 */
+	smp_wmb();
+
+	/* Simultaneously complete the splice and unlock the head node. */
+	WRITE_ONCE(head->next, first);
 }
