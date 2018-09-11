@@ -5,6 +5,14 @@ ccflags-$(CONFIG_ZINC_DEBUG) += -DDEBUG
 
 ifeq ($(CONFIG_ZINC_CHACHA20),y)
 zinc-y += chacha20/chacha20.o
+ifeq ($(CONFIG_ARM),y)
+zinc-y += chacha20/chacha20-arm.o
+CFLAGS_chacha20.o += -include $(srctree)/$(src)/chacha20/chacha20-arm-glue.h
+endif
+ifeq ($(CONFIG_ARM64),y)
+zinc-y += chacha20/chacha20-arm64.o
+CFLAGS_chacha20.o += -include $(srctree)/$(src)/chacha20/chacha20-arm-glue.h
+endif
 endif
 
 zinc-y += main.o
