@@ -4921,8 +4921,8 @@ restart:
 			BUG_ON(offset < 0);
 			if (size > 0) {
 				size = min(copy, size);
-				if (skb_copy_bits(skb, offset, skb_put(nskb, size), size))
-					BUG();
+				BUG_ON(skb_copy_bits(skb, offset,
+						     skb_put(nskb, size), size));
 				TCP_SKB_CB(nskb)->end_seq += size;
 				copy -= size;
 				start += size;
@@ -5314,8 +5314,8 @@ static void tcp_urg(struct sock *sk, struct sk_buff *skb, const struct tcphdr *t
 		/* Is the urgent pointer pointing into this packet? */
 		if (ptr < skb->len) {
 			u8 tmp;
-			if (skb_copy_bits(skb, ptr, &tmp, 1))
-				BUG();
+
+			BUG_ON(skb_copy_bits(skb, ptr, &tmp, 1));
 			tp->urg_data = TCP_URG_VALID | tmp;
 			if (!sock_flag(sk, SOCK_DEAD))
 				sk->sk_data_ready(sk);
