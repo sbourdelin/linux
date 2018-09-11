@@ -118,6 +118,8 @@ static void __ldsem_wake_readers(struct ld_semaphore *sem)
 		tsk = waiter->task;
 		smp_mb();
 		waiter->task = NULL;
+		/* Make sure down_read_failed() will see !waiter->task update */
+		smp_wmb();
 		wake_up_process(tsk);
 		put_task_struct(tsk);
 	}
@@ -217,7 +219,7 @@ down_read_failed(struct ld_semaphore *sem, long count, long timeout)
 	for (;;) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 
-		if (!waiter.task)
+		if (!READ_ONCE(waiter.task))
 			break;
 		if (!timeout)
 			break;
