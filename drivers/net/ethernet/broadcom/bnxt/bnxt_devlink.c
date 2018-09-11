@@ -24,6 +24,10 @@ static const struct devlink_ops bnxt_dl_ops = {
 static const struct bnxt_dl_nvm_param nvm_params[] = {
 	{DEVLINK_PARAM_GENERIC_ID_ENABLE_SRIOV, NVM_OFF_ENABLE_SRIOV,
 	 BNXT_NVM_SHARED_CFG, 1},
+	{DEVLINK_PARAM_GENERIC_ID_HW_TC_OFFLOAD, NVM_OFF_HW_TC_OFFLOAD,
+	 BNXT_NVM_SHARED_CFG, 1},
+	{DEVLINK_PARAM_GENERIC_ID_IGNORE_ARI, NVM_OFF_IGNORE_ARI,
+	 BNXT_NVM_SHARED_CFG, 1},
 };
 
 static int bnxt_hwrm_nvm_req(struct bnxt *bp, u32 param_id, void *msg,
@@ -102,6 +106,14 @@ static int bnxt_dl_nvm_param_set(struct devlink *dl, u32 id,
 
 static const struct devlink_param bnxt_dl_params[] = {
 	DEVLINK_PARAM_GENERIC(ENABLE_SRIOV,
+			      BIT(DEVLINK_PARAM_CMODE_PERMANENT),
+			      bnxt_dl_nvm_param_get, bnxt_dl_nvm_param_set,
+			      NULL),
+	DEVLINK_PARAM_GENERIC(HW_TC_OFFLOAD,
+			      BIT(DEVLINK_PARAM_CMODE_PERMANENT),
+			      bnxt_dl_nvm_param_get, bnxt_dl_nvm_param_set,
+			      NULL),
+	DEVLINK_PARAM_GENERIC(IGNORE_ARI,
 			      BIT(DEVLINK_PARAM_CMODE_PERMANENT),
 			      bnxt_dl_nvm_param_get, bnxt_dl_nvm_param_set,
 			      NULL),
