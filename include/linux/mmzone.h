@@ -467,9 +467,6 @@ struct zone {
 	/* Primarily protects free_area */
 	rwlock_t		lock;
 
-	/* Protects merge operation for a range of order=(MAX_ORDER-1) pages */
-	spinlock_t		*range_locks;
-
 	/* Write-intensive fields used by compaction and vmstats. */
 	ZONE_PADDING(_pad2_)
 
