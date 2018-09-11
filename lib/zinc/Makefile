@@ -57,6 +57,9 @@ ifeq ($(CONFIG_ARM)$(CONFIG_KERNEL_MODE_NEON),yy)
 zinc-y += curve25519/curve25519-arm.o
 CFLAGS_curve25519.o += -include $(srctree)/$(src)/curve25519/curve25519-arm-glue.h
 endif
+ifeq ($(CONFIG_X86_64)$(CONFIG_UML),y)
+CFLAGS_curve25519.o += -include $(srctree)/$(src)/curve25519/curve25519-x86_64-glue.h
+endif
 endif
 
 ifeq ($(CONFIG_ZINC_BLAKE2S),y)
