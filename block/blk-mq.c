@@ -3013,7 +3013,15 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 		return;
 
 	list_for_each_entry(q, &set->tag_list, tag_set_list)
-		blk_mq_freeze_queue(q);
+		blk_freeze_queue_start(q);
+
+	/*
+	 * Wait the percpu ref to be switched to atomic mode.
+	 */
+	synchronize_sched();
+
+	list_for_each_entry(q, &set->tag_list, tag_set_list)
+		blk_mq_sched_retrieve_bios(q);
 	/*
 	 * Sync with blk_mq_queue_tag_busy_iter.
 	 */
