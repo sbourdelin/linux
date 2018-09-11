@@ -339,6 +339,17 @@ static inline bool update_defer_init(pg_data_t *pgdat,
 }
 #endif
 
+/* Return a pointer to the spinblock for a pageblock this page belongs to */
+static inline spinlock_t *get_range_lock(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+	unsigned long zone_start_pfn = zone->zone_start_pfn;
+	unsigned long range = (page_to_pfn(page) - zone_start_pfn) >>
+								(MAX_ORDER - 1);
+
+	return &zone->range_locks[range];
+}
+
 /* Return a pointer to the bitmap storing bits affecting a block of pages */
 static inline unsigned long *get_pageblock_bitmap(struct page *page,
 							unsigned long pfn)
@@ -697,25 +708,12 @@ static inline void set_page_order(struct page *page, unsigned int order)
 	__SetPageBuddy(page);
 }
 
-static inline void add_to_buddy_common(struct page *page, struct zone *zone,
-					unsigned int order)
+static inline void add_to_buddy(struct page *page, struct zone *zone,
+				unsigned int order, int mt)
 {
 	set_page_order(page, order);
 	atomic_long_inc(&zone->free_area[order].nr_free);
-}
-
-static inline void add_to_buddy_head(struct page *page, struct zone *zone,
-					unsigned int order, int mt)
-{
-	add_to_buddy_common(page, zone, order);
-	list_add(&page->lru, &zone->free_area[order].free_list[mt]);
-}
-
-static inline void add_to_buddy_tail(struct page *page, struct zone *zone,
-					unsigned int order, int mt)
-{
-	add_to_buddy_common(page, zone, order);
-	list_add_tail(&page->lru, &zone->free_area[order].free_list[mt]);
+	smp_list_add(&page->lru, &zone->free_area[order].free_list[mt]);
 }
 
 static inline void rmv_page_order(struct page *page)
@@ -724,12 +722,25 @@ static inline void rmv_page_order(struct page *page)
 	set_page_private(page, 0);
 }
 
+static inline void remove_from_buddy_common(struct page *page,
+				struct zone *zone, unsigned int order)
+{
+	atomic_long_dec(&zone->free_area[order].nr_free);
+	rmv_page_order(page);
+}
+
 static inline void remove_from_buddy(struct page *page, struct zone *zone,
 					unsigned int order)
 {
 	list_del(&page->lru);
-	atomic_long_dec(&zone->free_area[order].nr_free);
-	rmv_page_order(page);
+	remove_from_buddy_common(page, zone, order);
+}
+
+static inline void remove_from_buddy_concurrent(struct page *page,
+				struct zone *zone, unsigned int order)
+{
+	smp_list_del(&page->lru);
+	remove_from_buddy_common(page, zone, order);
 }
 
 /*
@@ -806,6 +817,7 @@ static inline void __free_one_page(struct page *page,
 	unsigned long uninitialized_var(buddy_pfn);
 	struct page *buddy;
 	unsigned int max_order;
+	spinlock_t *range_lock;
 
 	max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
 
@@ -819,6 +831,8 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(pfn & ((1 << order) - 1), page);
 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
 
+	range_lock = get_range_lock(page);
+	spin_lock(range_lock);
 continue_merging:
 	while (order < max_order - 1) {
 		buddy_pfn = __find_buddy_pfn(pfn, order);
@@ -835,7 +849,7 @@ continue_merging:
 		if (page_is_guard(buddy))
 			clear_page_guard(zone, buddy, order, migratetype);
 		else
-			remove_from_buddy(buddy, zone, order);
+			remove_from_buddy_concurrent(buddy, zone, order);
 		combined_pfn = buddy_pfn & pfn;
 		page = page + (combined_pfn - pfn);
 		pfn = combined_pfn;
@@ -867,28 +881,8 @@ continue_merging:
 	}
 
 done_merging:
-	/*
-	 * If this is not the largest possible page, check if the buddy
-	 * of the next-highest order is free. If it is, it's possible
-	 * that pages are being freed that will coalesce soon. In case,
-	 * that is happening, add the free page to the tail of the list
-	 * so it's less likely to be used soon and more likely to be merged
-	 * as a higher order page
-	 */
-	if ((order < MAX_ORDER-2) && pfn_valid_within(buddy_pfn)) {
-		struct page *higher_page, *higher_buddy;
-		combined_pfn = buddy_pfn & pfn;
-		higher_page = page + (combined_pfn - pfn);
-		buddy_pfn = __find_buddy_pfn(combined_pfn, order + 1);
-		higher_buddy = higher_page + (buddy_pfn - combined_pfn);
-		if (pfn_valid_within(buddy_pfn) &&
-		    page_is_buddy(higher_page, higher_buddy, order + 1)) {
-			add_to_buddy_tail(page, zone, order, migratetype);
-			return;
-		}
-	}
-
-	add_to_buddy_head(page, zone, order, migratetype);
+	add_to_buddy(page, zone, order, migratetype);
+	spin_unlock(range_lock);
 }
 
 /*
@@ -1154,7 +1148,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		} while (--count && --batch_free && !list_empty(list));
 	}
 
-	write_lock(&zone->lock);
+	read_lock(&zone->lock);
 	isolated_pageblocks = has_isolate_pageblock(zone);
 
 	/*
@@ -1172,7 +1166,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		__free_one_page(page, page_to_pfn(page), zone, 0, mt);
 		trace_mm_page_pcpu_drain(page, 0, mt);
 	}
-	write_unlock(&zone->lock);
+	read_unlock(&zone->lock);
 }
 
 static void free_one_page(struct zone *zone,
@@ -1826,7 +1820,7 @@ static inline void expand(struct zone *zone, struct page *page,
 		if (set_page_guard(zone, &page[size], high, migratetype))
 			continue;
 
-		add_to_buddy_head(&page[size], zone, high, migratetype);
+		add_to_buddy(&page[size], zone, high, migratetype);
 	}
 }
 
@@ -6286,6 +6280,18 @@ void __ref free_area_init_core_hotplug(int nid)
 }
 #endif
 
+static void __init setup_range_locks(struct zone *zone)
+{
+	unsigned long nr = (zone->spanned_pages >> (MAX_ORDER - 1)) + 1;
+	unsigned long size = nr * sizeof(spinlock_t);
+	unsigned long i;
+
+	zone->range_locks = memblock_virt_alloc_node_nopanic(size,
+						zone->zone_pgdat->node_id);
+	for (i = 0; i < nr; i++)
+		spin_lock_init(&zone->range_locks[i]);
+}
+
 /*
  * Set up the zone data structures:
  *   - mark all pages reserved
@@ -6357,6 +6363,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		setup_usemap(pgdat, zone, zone_start_pfn, size);
 		init_currently_empty_zone(zone, zone_start_pfn, size);
 		memmap_init(size, nid, j, zone_start_pfn);
+		setup_range_locks(zone);
 	}
 }
 

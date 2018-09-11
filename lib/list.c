@@ -202,3 +202,26 @@ void smp_list_splice(struct list_head *list, struct list_head *head)
 	/* Simultaneously complete the splice and unlock the head node. */
 	WRITE_ONCE(head->next, first);
 }
+
+void smp_list_add(struct list_head *entry, struct list_head *head)
+{
+	struct list_head *succ;
+
+	/*
+	 * Lock the front of @head by replacing its next pointer with NULL.
+	 * Should another thread be adding to the front, wait until it's done.
+	 */
+	succ = READ_ONCE(head->next);
+	while (succ == NULL || cmpxchg(&head->next, succ, NULL) != succ) {
+		cpu_relax();
+		succ = READ_ONCE(head->next);
+	}
+
+	entry->next = succ;
+	entry->prev = head;
+	succ->prev = entry;
+
+	smp_wmb();
+
+	WRITE_ONCE(head->next, entry);
+}
