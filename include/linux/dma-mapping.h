@@ -700,6 +700,11 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
 	return -EIO;
 }
 
+extern int dmam_set_dma_parms(struct device *dev, unsigned int max_seg_size,
+			      unsigned long seg_bound_mask);
+
+extern void dmam_free_dma_parms(struct device *dev);
+
 #ifndef dma_max_pfn
 static inline unsigned long dma_max_pfn(struct device *dev)
 {
