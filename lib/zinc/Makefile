@@ -37,6 +37,14 @@ ifeq ($(CONFIG_ARM64),y)
 zinc-y += poly1305/poly1305-arm64.o
 CFLAGS_poly1305.o += -include $(srctree)/$(src)/poly1305/poly1305-arm-glue.h
 endif
+ifeq ($(CONFIG_MIPS)$(CONFIG_CPU_MIPS32_R2),yy)
+zinc-y += poly1305/poly1305-mips.o
+CFLAGS_poly1305.o += -include $(srctree)/$(src)/poly1305/poly1305-mips-glue.h
+endif
+ifeq ($(CONFIG_MIPS)$(CONFIG_64BIT),yy)
+zinc-y += poly1305/poly1305-mips64.o
+CFLAGS_poly1305.o += -include $(srctree)/$(src)/poly1305/poly1305-mips-glue.h
+endif
 endif
 
 zinc-y += main.o
