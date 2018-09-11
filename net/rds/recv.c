@@ -290,6 +290,8 @@ void rds_recv_incoming(struct rds_connection *conn, struct in6_addr *saddr,
 	struct sock *sk;
 	unsigned long flags;
 	struct rds_conn_path *cp;
+	struct sk_filter *filter;
+	int result = __SOCKSG_PASS;
 
 	inc->i_conn = conn;
 	inc->i_rx_jiffies = jiffies;
@@ -373,6 +375,16 @@ void rds_recv_incoming(struct rds_connection *conn, struct in6_addr *saddr,
 
 	/* We can be racing with rds_release() which marks the socket dead. */
 	sk = rds_rs_to_sk(rs);
+
+	rcu_read_lock();
+	filter = rcu_dereference(sk->sk_filter);
+	if (filter && conn->c_trans->inc_to_sg_get) {
+		struct scatterlist *sg = NULL;
+
+		if (conn->c_trans->inc_to_sg_get(inc, &sg) == 0)
+			result = sg_filter_run(sk, sg);
+	}
+	rcu_read_unlock();
 
 	/* serialize with rds_release -> sock_orphan */
 	write_lock_irqsave(&rs->rs_recv_lock, flags);

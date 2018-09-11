@@ -527,6 +527,7 @@ struct rds_transport rds_ib_transport = {
 	.conn_path_shutdown	= rds_ib_conn_path_shutdown,
 	.inc_copy_to_user	= rds_ib_inc_copy_to_user,
 	.inc_free		= rds_ib_inc_free,
+	.inc_to_sg_get		= rds_ib_inc_to_sg_get,
 	.cm_initiate_connect	= rds_ib_cm_initiate_connect,
 	.cm_handle_connect	= rds_ib_cm_handle_connect,
 	.cm_connect_complete	= rds_ib_cm_connect_complete,

@@ -50,14 +50,113 @@ static void rds_tcp_inc_purge(struct rds_incoming *inc)
 void rds_tcp_inc_free(struct rds_incoming *inc)
 {
 	struct rds_tcp_incoming *tinc;
+	int i;
+
 	tinc = container_of(inc, struct rds_tcp_incoming, ti_inc);
 	rds_tcp_inc_purge(inc);
+
+	if (tinc->sg) {
+		for (i = 0; i < sg_nents(tinc->sg); i++) {
+			struct page *page;
+
+			page = sg_page(&tinc->sg[i]);
+			put_page(page);
+		}
+		kfree(tinc->sg);
+	}
+
 	rdsdebug("freeing tinc %p inc %p\n", tinc, inc);
 	kmem_cache_free(rds_tcp_incoming_slab, tinc);
 }
 
+#define MAX_SG MAX_SKB_FRAGS
+int rds_tcp_inc_to_sg_get(struct rds_incoming *inc, struct scatterlist **sg)
+{
+	struct rds_tcp_incoming *tinc;
+	struct sk_buff *skb;
+	int num_sg = 0;
+	int i;
+
+	tinc = container_of(inc, struct rds_tcp_incoming, ti_inc);
+
+	/* For now we are assuming that the max sg elements we need is MAX_SG.
+	 * To determine actual number of sg elements we need to traverse the
+	 * skb queue e.g.
+	 *
+	 * skb_queue_walk(&tinc->ti_skb_list, skb) {
+	 *	num_sg += skb_shinfo(skb)->nr_frags + 1;
+	 * }
+	 */
+	tinc->sg = kzalloc(sizeof(*tinc->sg) * MAX_SG, GFP_KERNEL);
+	if (!tinc->sg)
+		return -ENOMEM;
+
+	sg_init_table(tinc->sg, MAX_SG);
+	skb_queue_walk(&tinc->ti_skb_list, skb) {
+		num_sg += skb_to_sgvec_nomark(skb, &tinc->sg[num_sg], 0,
+					      skb->len);
+	}
+
+	/* packet can have zero length */
+	if (num_sg <= 0) {
+		kfree(tinc->sg);
+		tinc->sg = NULL;
+		return -ENODATA;
+	}
+
+	sg_mark_end(&tinc->sg[num_sg - 1]);
+	*sg = tinc->sg;
+
+	for (i = 0; i < num_sg; i++)
+		get_page(sg_page(&tinc->sg[i]));
+
+	return 0;
+}
+
+static int rds_tcp_inc_copy_sg_to_user(struct rds_incoming *inc,
+				       struct iov_iter *to)
+{
+	struct rds_tcp_incoming *tinc;
+	struct scatterlist *sg;
+	unsigned long copied = 0;
+	unsigned long len;
+	u8 i = 0;
+
+	tinc = container_of(inc, struct rds_tcp_incoming, ti_inc);
+	len = be32_to_cpu(inc->i_hdr.h_len);
+	sg = tinc->sg;
+
+	do {
+		struct page *page;
+		unsigned long n, copy, to_copy;
+
+		sg = &tinc->sg[i];
+		copy = sg->length;
+		page = sg_page(sg);
+		to_copy = iov_iter_count(to);
+		to_copy = min_t(unsigned long, to_copy, copy);
+
+		n = copy_page_to_iter(page, sg->offset, to_copy, to);
+		if (n != copy)
+			return -EFAULT;
+
+		rds_stats_add(s_copy_to_user, to_copy);
+		copied += to_copy;
+		sg->offset += to_copy;
+		sg->length -= to_copy;
+
+		if (!sg->length)
+			i++;
+
+		if (copied == len)
+			break;
+	} while (i != sg_nents(tinc->sg));
+	return copied;
+}
 /*
- * this is pretty lame, but, whatever.
+ * This is pretty lame, but, whatever.
+ * Note: bpf filter can change RDS packet and if so then the modified packet is
+ * contained in the form of scatterlist, not skb.
  */
 int rds_tcp_inc_copy_to_user(struct rds_incoming *inc, struct iov_iter *to)
 {
@@ -69,6 +168,12 @@ int rds_tcp_inc_copy_to_user(struct rds_incoming *inc, struct iov_iter *to)
 		goto out;
 
 	tinc = container_of(inc, struct rds_tcp_incoming, ti_inc);
+
+	/* if tinc->sg is not NULL means bpf filter ran on packet and so packet
+	 * now is in the form of scatterlist.
+	 */
+	if (tinc->sg)
+		return rds_tcp_inc_copy_sg_to_user(inc, to);
 
 	skb_queue_walk(&tinc->ti_skb_list, skb) {
 		unsigned long to_copy, skb_off;
@@ -176,6 +281,7 @@ static int rds_tcp_data_recv(read_descriptor_t *desc, struct sk_buff *skb,
 				desc->error = -ENOMEM;
 				goto out;
 			}
+			tinc->sg = NULL;
 			tc->t_tinc = tinc;
 			rdsdebug("alloced tinc %p\n", tinc);
 			rds_inc_path_init(&tinc->ti_inc, cp,
