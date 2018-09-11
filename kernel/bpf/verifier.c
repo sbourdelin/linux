@@ -1234,6 +1234,7 @@ static bool may_access_direct_pkt_data(struct bpf_verifier_env *env,
 	case BPF_PROG_TYPE_LWT_XMIT:
 	case BPF_PROG_TYPE_SK_SKB:
 	case BPF_PROG_TYPE_SK_MSG:
+	case BPF_PROG_TYPE_SOCKET_SG_FILTER:
 		if (meta)
 			return meta->pkt_access;
 

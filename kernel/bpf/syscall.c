@@ -1361,6 +1361,7 @@ static int bpf_prog_load(union bpf_attr *attr)
 
 	if (type != BPF_PROG_TYPE_SOCKET_FILTER &&
 	    type != BPF_PROG_TYPE_CGROUP_SKB &&
+	    type != BPF_PROG_TYPE_SOCKET_SG_FILTER &&
 	    !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 

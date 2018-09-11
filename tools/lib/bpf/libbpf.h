@@ -208,6 +208,7 @@ int bpf_program__set_perf_event(struct bpf_program *prog);
 void bpf_program__set_type(struct bpf_program *prog, enum bpf_prog_type type);
 void bpf_program__set_expected_attach_type(struct bpf_program *prog,
 					   enum bpf_attach_type type);
+int bpf_program__set_socket_sg_filter(struct bpf_program *prog);
 
 bool bpf_program__is_socket_filter(struct bpf_program *prog);
 bool bpf_program__is_tracepoint(struct bpf_program *prog);
@@ -217,6 +218,7 @@ bool bpf_program__is_sched_cls(struct bpf_program *prog);
 bool bpf_program__is_sched_act(struct bpf_program *prog);
 bool bpf_program__is_xdp(struct bpf_program *prog);
 bool bpf_program__is_perf_event(struct bpf_program *prog);
+bool bpf_program__is_socket_sg_filter(struct bpf_program *prog);
 
 /*
  * No need for __attribute__((packed)), all members of 'bpf_map_def'

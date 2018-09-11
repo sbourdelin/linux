@@ -1140,7 +1140,8 @@ static void bpf_release_orig_filter(struct bpf_prog *fp)
 
 static void __bpf_prog_release(struct bpf_prog *prog)
 {
-	if (prog->type == BPF_PROG_TYPE_SOCKET_FILTER) {
+	if (prog->type == BPF_PROG_TYPE_SOCKET_FILTER ||
+	    prog->type == BPF_PROG_TYPE_SOCKET_SG_FILTER) {
 		bpf_prog_put(prog);
 	} else {
 		bpf_release_orig_filter(prog);
@@ -1539,10 +1540,16 @@ int sk_reuseport_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 
 static struct bpf_prog *__get_bpf(u32 ufd, struct sock *sk)
 {
+	struct bpf_prog *prog;
+
 	if (sock_flag(sk, SOCK_FILTER_LOCKED))
 		return ERR_PTR(-EPERM);
 
-	return bpf_prog_get_type(ufd, BPF_PROG_TYPE_SOCKET_FILTER);
+	prog = bpf_prog_get_type(ufd, BPF_PROG_TYPE_SOCKET_FILTER);
+	if (IS_ERR(prog))
+		prog = bpf_prog_get_type(ufd, BPF_PROG_TYPE_SOCKET_SG_FILTER);
+
+	return prog;
 }
 
 int sk_attach_bpf(u32 ufd, struct sock *sk)
@@ -4935,6 +4942,17 @@ cg_skb_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 }
 
 static const struct bpf_func_proto *
+socksg_filter_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
+{
+	switch (func_id) {
+	case BPF_FUNC_msg_pull_data:
+		return &bpf_msg_pull_data_proto;
+	default:
+		return bpf_base_func_proto(func_id);
+	}
+}
+
+static const struct bpf_func_proto *
 tc_cls_act_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
 	switch (func_id) {
@@ -6753,6 +6771,30 @@ static u32 sk_skb_convert_ctx_access(enum bpf_access_type type,
 	return insn - insn_buf;
 }
 
+static u32 socksg_filter_convert_ctx_access(enum bpf_access_type type,
+					    const struct bpf_insn *si,
+					    struct bpf_insn *insn_buf,
+					    struct bpf_prog *prog,
+					    u32 *target_size)
+{
+	struct bpf_insn *insn = insn_buf;
+
+	switch (si->off) {
+	case offsetof(struct sk_msg_md, data):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sk_msg_buff, data),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sk_msg_buff, data));
+		break;
+	case offsetof(struct sk_msg_md, data_end):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sk_msg_buff, data_end),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sk_msg_buff, data_end));
+		break;
+	}
+
+	return insn - insn_buf;
+}
+
 static u32 sk_msg_convert_ctx_access(enum bpf_access_type type,
 				     const struct bpf_insn *si,
 				     struct bpf_insn *insn_buf,
@@ -6889,6 +6931,15 @@ const struct bpf_verifier_ops sk_filter_verifier_ops = {
 
 const struct bpf_prog_ops sk_filter_prog_ops = {
 	.test_run		= bpf_prog_test_run_skb,
+};
+
+const struct bpf_verifier_ops socksg_filter_verifier_ops = {
+	.get_func_proto         = socksg_filter_func_proto,
+	.is_valid_access        = sk_msg_is_valid_access,
+	.convert_ctx_access     = socksg_filter_convert_ctx_access,
+};
+
+const struct bpf_prog_ops socksg_filter_prog_ops = {
 };
 
 const struct bpf_verifier_ops tc_cls_act_verifier_ops = {
