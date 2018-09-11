@@ -24,21 +24,40 @@ ENTRY(swsusp_arch_suspend)
 	pushfl
 	popl saved_context_eflags
 
+	/* save cr3 */
+	movl	%cr3, %eax
+	movl	%eax, restore_cr3
+
 	call swsusp_save
 	ret
+ENDPROC(swsusp_arch_suspend)
 
 ENTRY(restore_image)
-	movl	mmu_cr4_features, %ecx
-	movl	resume_pg_dir, %eax
-	subl	$__PAGE_OFFSET, %eax
+	/* prepare to jump to the image kernel */
+	movl	restore_jump_address, %ebx
+	movl	restore_cr3, %ebp
+
+	movl	mmu_cr4_features, %edx
+
+	/* jump to relocated restore code */
+	movl	relocated_restore_code, %eax
+	jmpl	*%eax
+
+	/* code below has been relocated to a safe page */
+ENTRY(core_restore_code)
+	movl	temp_pgt, %eax
 	movl	%eax, %cr3
 
+	/* flush TLB */
+	movl	%edx, %ecx
 	jecxz	1f	# cr4 Pentium and higher, skip if zero
 	andl	$~(X86_CR4_PGE), %ecx
 	movl	%ecx, %cr4;  # turn off PGE
 	movl	%cr3, %eax;  # flush TLB
 	movl	%eax, %cr3
+	movl	%edx, %cr4;  # turn PGE back on
 1:
+	/* prepare to copy image data to their original locations */
 	movl	restore_pblist, %edx
 	.p2align 4,,7
 
@@ -49,7 +68,7 @@ copy_loop:
 	movl	pbe_address(%edx), %esi
 	movl	pbe_orig_address(%edx), %edi
 
-	movl	$1024, %ecx
+	movl	$(PAGE_SIZE >> 2), %ecx
 	rep
 	movsl
 
@@ -58,13 +77,22 @@ copy_loop:
 	.p2align 4,,7
 
 done:
+	jmpl	*%ebx
+	.align PAGE_SIZE
+
+ENTRY(restore_registers)
 	/* go back to the original page tables */
-	movl	$swapper_pg_dir, %eax
-	subl	$__PAGE_OFFSET, %eax
-	movl	%eax, %cr3
-	movl	mmu_cr4_features, %ecx
+	movl	%ebp, %cr3
+
+	/* flush TLB */
+	movl	mmu_cr4_features, %edx
+	movl	%edx, %ecx
 	jecxz	1f	# cr4 Pentium and higher, skip if zero
-	movl	%ecx, %cr4;  # turn PGE back on
+	andl	$~(X86_CR4_PGE), %ecx
+	movl	%ecx, %cr4;  # turn off PGE
+	movl	%cr3, %ecx;  # flush TLB
+	movl	%ecx, %cr3;
+	movl	%edx, %cr4;  # turn PGE back on
 1:
 
 	movl saved_context_esp, %esp
@@ -82,4 +110,7 @@ done:
 
 	xorl	%eax, %eax
 
+	movl	%eax, in_suspend
+
 	ret
+ENDPROC(restore_registers)

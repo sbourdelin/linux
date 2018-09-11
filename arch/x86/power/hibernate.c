@@ -69,7 +69,6 @@ int pfn_is_nosave(unsigned long pfn)
 	return pfn >= nosave_begin_pfn && pfn < nosave_end_pfn;
 }
 
-#ifdef CONFIG_X86_64
 static int relocate_restore_code(void)
 {
 	pgd_t *pgd;
@@ -262,4 +261,3 @@ int arch_hibernation_header_restore(void *addr)
 
 	return 0;
 }
-#endif
