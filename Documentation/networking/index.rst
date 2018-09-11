@@ -21,6 +21,7 @@ Contents:
    net_failover
    alias
    bridge
+   tcp
 
 .. only::  subproject
 
