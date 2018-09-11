@@ -122,6 +122,7 @@ struct kbd_handle {
 	struct kref ref;
 	struct kbd_conf *conf;
 	struct input_handle handle;
+	unsigned long key_down[BITS_TO_LONGS(KEY_CNT)];/* keyboard key bitmap */
 };
 #define hdl_to_kbd_handle(h) (container_of(h, struct kbd_handle, handle))
 
@@ -140,7 +141,6 @@ static const int NR_TYPES = ARRAY_SIZE(max_vals);
 static struct input_handler kbd_handler;
 static DEFINE_SPINLOCK(kbd_event_lock);
 static DEFINE_SPINLOCK(led_lock);
-static unsigned long key_down[BITS_TO_LONGS(KEY_CNT)];	/* keyboard key bitmap */
 static unsigned char shift_down[NR_SHIFT];		/* shift state counters.. */
 static bool dead_key_next;
 static int npadch = -1;					/* -1 or number assembled on pad */
@@ -378,20 +378,18 @@ static void to_utf8(struct vc_data *vc, uint c)
 
 /*
  * Called after returning from RAW mode or when changing consoles - recompute
- * shift_down[] and shift_state from key_down[] maybe called when keymap is
- * undefined, so that shiftkey release is seen. The caller must hold the
- * kbd_event_lock.
+ * shift_down[] and shift_state from each input's key_down[] maybe called when
+ * keymap is undefined, so that shiftkey release is seen. The caller must hold
+ * the kbd_event_lock.
  */
 
-static void do_compute_shiftstate(void)
+static int do_compute_input_shiftstate(struct input_handle *handle, void *data)
 {
+	struct kbd_handle *kh = hdl_to_kbd_handle(handle);
 	unsigned int k, sym, val;
 
-	shift_state = 0;
-	memset(shift_down, 0, sizeof(shift_down));
-
-	for_each_set_bit(k, key_down, min(NR_KEYS, KEY_CNT)) {
-		sym = U(key_maps[0][k]);
+	for_each_set_bit(k, kh->key_down, min(NR_KEYS, KEY_CNT)) {
+		sym = U(kh->conf->maps[0][k]);
 		if (KTYP(sym) != KT_SHIFT && KTYP(sym) != KT_SLOCK)
 			continue;
 
@@ -402,6 +400,15 @@ static void do_compute_shiftstate(void)
 		shift_down[val]++;
 		shift_state |= BIT(val);
 	}
+	return 0;
+}
+
+static void do_compute_shiftstate(void)
+{
+	shift_state = 0;
+	memset(shift_down, 0, sizeof(shift_down));
+	input_handler_for_each_handle(&kbd_handler, NULL,
+			do_compute_input_shiftstate);
 }
 
 /* We still have to export this method to vt.c */
@@ -1278,6 +1285,17 @@ static int sparc_l1_a_state;
 extern void sun_do_break(void);
 #endif
 
+static int is_alt_down(struct input_handle *handle, void *data)
+{
+	struct kbd_handle *kh = hdl_to_kbd_handle(handle);
+
+	if (test_bit(KEY_LEFTALT, kh->key_down) ||
+			test_bit(KEY_RIGHTALT, kh->key_down))
+		return 1;
+
+	return 0;
+}
+
 static int emulate_raw(struct vc_data *vc, unsigned int keycode,
 		       unsigned char up_flag)
 {
@@ -1308,8 +1326,8 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode,
 		 * pressing PrtSc/SysRq alone, but simply 0x54
 		 * when pressing Alt+PrtSc/SysRq.
 		 */
-		if (test_bit(KEY_LEFTALT, key_down) ||
-		    test_bit(KEY_RIGHTALT, key_down)) {
+		if (input_handler_for_each_handle(&kbd_handler, NULL,
+					is_alt_down)) {
 			put_queue(vc, 0x54 | up_flag);
 		} else {
 			put_queue(vc, 0xe0);
@@ -1424,9 +1442,9 @@ static void kbd_keycode(struct kbd_handle *kh, unsigned int keycode, int down,
 	}
 
 	if (down)
-		set_bit(keycode, key_down);
+		set_bit(keycode, kh->key_down);
 	else
-		clear_bit(keycode, key_down);
+		clear_bit(keycode, kh->key_down);
 
 	if (rep &&
 	    (!vc_kbd_mode(kbd, VC_REPEAT) ||
