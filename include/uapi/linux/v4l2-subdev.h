@@ -100,6 +100,16 @@ struct v4l2_subdev_frame_size_enum {
 };
 
 /**
+ * enum v4l2_subdev_frmival_type - Frame interval type
+ */
+enum v4l2_subdev_frmival_type {
+	V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE = 0,
+	V4L2_SUBDEV_FRMIVAL_TYPE_CONTINUOUS = 1,
+	V4L2_SUBDEV_FRMIVAL_TYPE_STEPWISE = 2,
+};
+
+
+/**
  * struct v4l2_subdev_frame_interval - Pad-level frame rate
  * @pad: pad number, as reported by the media API
  * @interval: frame interval in seconds
@@ -117,8 +127,13 @@ struct v4l2_subdev_frame_interval {
  * @code: format code (MEDIA_BUS_FMT_ definitions)
  * @width: frame width in pixels
  * @height: frame height in pixels
- * @interval: frame interval in seconds
+ * @interval: minimum frame interval in seconds
  * @which: format type (from enum v4l2_subdev_format_whence)
+ * @type: frame interval type (from enum v4l2_subdev_frmival_type)
+ * @max_interval: maximum frame interval in seconds,
+ *                if type != V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE
+ * @step_interval: step between frame intervals, in seconds,
+ *                 if type == V4L2_SUBDEV_FRMIVAL_TYPE_STEPWISE
  */
 struct v4l2_subdev_frame_interval_enum {
 	__u32 index;
@@ -128,7 +143,10 @@ struct v4l2_subdev_frame_interval_enum {
 	__u32 height;
 	struct v4l2_fract interval;
 	__u32 which;
-	__u32 reserved[8];
+	__u32 type;
+	struct v4l2_fract max_interval;
+	struct v4l2_fract step_interval;
+	__u32 reserved[3];
 };
 
 /**

@@ -444,3 +444,35 @@ int v4l2_s_parm_cap(struct video_device *vdev,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(v4l2_s_parm_cap);
+
+int v4l2_fill_frmivalenum_from_subdev(struct v4l2_subdev *sd, struct v4l2_frmivalenum *fival, int code)
+{
+	struct v4l2_subdev_frame_interval_enum fie;
+	int ret;
+
+	fie.index = fival->index;
+	fie.code = code;
+	fie.width = fival->width;
+	fie.height = fival->height;
+	fie.type = V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE; /* for old subdev drivers */
+
+	ret = v4l2_subdev_call(sd, pad, enum_frame_interval, NULL, &fie);
+
+	if (!ret) {
+		if (fie.type == V4L2_SUBDEV_FRMIVAL_TYPE_DISCRETE) {
+			fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
+			fival->discrete = fie.interval;
+		} else if (fie.type == V4L2_SUBDEV_FRMIVAL_TYPE_CONTINUOUS) {
+			fival->type = V4L2_FRMIVAL_TYPE_CONTINUOUS;
+			fival->stepwise.min = fie.interval;
+			fival->stepwise.max = fie.max_interval;
+		} else {
+			fival->type = V4L2_FRMIVAL_TYPE_STEPWISE;
+			fival->stepwise.min = fie.interval;
+			fival->stepwise.max = fie.max_interval;
+			fival->stepwise.step = fie.step_interval;
+		}
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(v4l2_fill_frmivalenum_from_subdev);
