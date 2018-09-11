@@ -62,7 +62,7 @@ static int check_all_cpu_dscr_defaults(unsigned long val)
 		if (!strstr(dp->d_name, "cpu"))
 			continue;
 
-		len = snprintf(file, LEN_MAX, "%s%s/dscr", CPU_PATH, dp->d_name);
+		len = snprintf(file, LEN_MAX, "%scpu%ld/dscr", CPU_PATH, val);
 		if (len >= LEN_MAX)
 			continue;
 		if (access(file, F_OK))
