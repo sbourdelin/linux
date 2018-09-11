@@ -1098,6 +1098,72 @@ void __init percpu_mergelist_init(void)
 	}
 }
 
+static inline bool buddy_in_list(struct page *page, struct page *buddy,
+				 struct list_head *list)
+{
+	list_for_each_entry_continue(page, list, lru)
+		if (page == buddy)
+			return true;
+
+	return false;
+}
+
+static inline void merge_in_pcp(struct list_head *list)
+{
+	int order;
+	struct page *page;
+
+	/* Set order information to 0 initially since they are PCP pages */
+	list_for_each_entry(page, list, lru)
+		set_page_private(page, 0);
+
+	/*
+	 * Check for mergable pages for each order.
+	 *
+	 * For each order, check if their buddy is also in the list and
+	 * if so, do merge, then remove the merged buddy from the list.
+	 */
+	for (order = 0; order < MAX_ORDER - 1; order++) {
+		bool has_merge = false;
+
+		page = list_first_entry(list, struct page, lru);
+		while (&page->lru != list) {
+			unsigned long pfn, buddy_pfn, combined_pfn;
+			struct page *buddy, *n;
+
+			if (page_order(page) != order) {
+				page = list_next_entry(page, lru);
+				continue;
+			}
+
+			pfn = page_to_pfn(page);
+			buddy_pfn = __find_buddy_pfn(pfn, order);
+			buddy = page + (buddy_pfn - pfn);
+			if (!buddy_in_list(page, buddy, list) ||
+			    page_order(buddy) != order) {
+				page = list_next_entry(page, lru);
+				continue;
+			}
+
+			combined_pfn = pfn & buddy_pfn;
+			if (combined_pfn == pfn) {
+				set_page_private(page, order + 1);
+				list_del(&buddy->lru);
+				page = list_next_entry(page, lru);
+			} else {
+				set_page_private(buddy, order + 1);
+				n = list_next_entry(page, lru);
+				list_del(&page->lru);
+				page = n;
+			}
+			has_merge = true;
+		}
+
+		if (!has_merge)
+			break;
+	}
+}
+
 /*
  * Frees a number of pages from the PCP lists
  * Assumes all pages on list are in same zone, and of same order.
@@ -1165,6 +1231,12 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		} while (--count && --batch_free && !list_empty(list));
 	}
 
+	/*
+	 * Before acquiring the possibly heavily contended zone lock, do merge
+	 * among these to-be-freed PCP pages before sending them to Buddy.
+	 */
+	merge_in_pcp(&head);
+
 	read_lock(&zone->lock);
 	isolated_pageblocks = has_isolate_pageblock(zone);
 
@@ -1182,10 +1254,9 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		if (unlikely(isolated_pageblocks))
 			mt = get_pageblock_migratetype(page);
 
-		order = 0;
+		order = page_order(page);
 		merged_page = do_merge(page, page_to_pfn(page), zone, &order, mt);
 		list_add(&merged_page->lru, this_cpu_ptr(&merge_lists[order][mt]));
-		trace_mm_page_pcpu_drain(page, 0, mt);
 	}
 
 	for_each_migratetype_order(order, migratetype) {
