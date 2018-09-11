@@ -3,6 +3,8 @@
  * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
+#include <zinc/chacha20.h>
+
 #include <linux/init.h>
 #include <linux/module.h>
 
@@ -17,6 +19,9 @@
 
 static int __init mod_init(void)
 {
+#ifdef CONFIG_ZINC_CHACHA20
+	chacha20_fpu_init();
+#endif
 	return 0;
 }
 

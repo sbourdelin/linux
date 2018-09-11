@@ -6,6 +6,10 @@ config ZINC
 	select NEON
 	select KERNEL_MODE_NEON
 
+config ZINC_CHACHA20
+	bool
+	select ZINC
+
 config ZINC_DEBUG
 	bool "Zinc cryptography library debugging and self-tests"
 	depends on ZINC
