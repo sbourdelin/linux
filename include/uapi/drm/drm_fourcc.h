@@ -114,6 +114,14 @@ extern "C" {
 #define DRM_FORMAT_AYUV		fourcc_code('A', 'Y', 'U', 'V') /* [31:0] A:Y:Cb:Cr 8:8:8:8 little endian */
 
 /*
+ * Y2xx indicate for each component, xx valid data occupy msb
+ * 16-xx padding occupy lsb
+ */
+#define DRM_FORMAT_Y210         fourcc_code('Y', '2', '1', '0') /* [63:0] Y0:Cb0:Y1:Cr1 10:10:10:10 little endian */
+#define DRM_FORMAT_Y212         fourcc_code('Y', '2', '1', '2') /* [63:0] Y0:Cb0:Y1:Cr1 12:12:12:12 little endian */
+#define DRM_FORMAT_Y216         fourcc_code('Y', '2', '1', '6') /* [63:0] Y0:Cb0:Y1:Cr1 16:16:16:16 little endian */
+
+/*
  * 2 plane RGB + A
  * index 0 = RGB plane, same format as the corresponding non _A8 format has
  * index 1 = A plane, [7:0] A
