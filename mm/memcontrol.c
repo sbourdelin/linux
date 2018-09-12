@@ -2895,12 +2895,8 @@ static int mem_cgroup_force_empty(struct mem_cgroup *memcg)
 
 		progress = try_to_free_mem_cgroup_pages(memcg, 1,
 							GFP_KERNEL, true);
-		if (!progress) {
+		if (!progress)
 			nr_retries--;
-			/* maybe some writeback is necessary */
-			congestion_wait(BLK_RW_ASYNC, HZ/10);
-		}
-
 	}
 
 	return 0;
