@@ -5467,6 +5467,10 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	int same_flow;
 	int grow;
 
+	list_add_tail(&skb->list, &napi->rx_list);
+	ret = GRO_CONSUMED;
+	goto out;
+
 	if (netif_elide_gro(skb->dev))
 		goto normal;
 
@@ -5556,7 +5560,7 @@ ok:
 	} else if (test_bit(hash, &napi->gro_bitmask)) {
 		__clear_bit(hash, &napi->gro_bitmask);
 	}
-
+out:
 	return ret;
 
 normal:
@@ -5955,7 +5959,7 @@ bool napi_complete_done(struct napi_struct *n, int work_done)
 				 NAPIF_STATE_IN_BUSY_POLL)))
 		return false;
 
-	if (n->gro_bitmask) {
+	if (!list_empty(&n->rx_list)) {
 		unsigned long timeout = 0;
 
 		if (work_done)
@@ -5964,8 +5968,10 @@ bool napi_complete_done(struct napi_struct *n, int work_done)
 		if (timeout)
 			hrtimer_start(&n->timer, ns_to_ktime(timeout),
 				      HRTIMER_MODE_REL_PINNED);
-		else
-			napi_gro_flush(n, false);
+		else {
+			netif_receive_skb_list(&n->rx_list);
+			INIT_LIST_HEAD(&n->rx_list);
+		}
 	}
 	if (unlikely(!list_empty(&n->poll_list))) {
 		/* If n->poll_list is not empty, we need to mask irqs */
@@ -6186,6 +6192,7 @@ void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
 		    int (*poll)(struct napi_struct *, int), int weight)
 {
 	INIT_LIST_HEAD(&napi->poll_list);
+	INIT_LIST_HEAD(&napi->rx_list);
 	hrtimer_init(&napi->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
 	napi->timer.function = napi_watchdog;
 	init_gro_hash(napi);
@@ -6286,11 +6293,9 @@ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
 		goto out_unlock;
 	}
 
-	if (n->gro_bitmask) {
-		/* flush too old packets
-		 * If HZ < 1000, flush all packets.
-		 */
-		napi_gro_flush(n, HZ >= 1000);
+	if (!list_empty(&n->rx_list)) {
+		netif_receive_skb_list(&n->rx_list);
+		INIT_LIST_HEAD(&n->rx_list);
 	}
 
 	/* Some drivers may have called napi_schedule

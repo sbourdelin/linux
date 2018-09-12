@@ -333,7 +333,10 @@ struct napi_struct {
 	int			poll_owner;
 #endif
 	struct net_device	*dev;
-	struct gro_list		gro_hash[GRO_HASH_BUCKETS];
+	union {
+		struct list_head	rx_list;
+		struct gro_list		gro_hash[GRO_HASH_BUCKETS];
+	};
 	struct sk_buff		*skb;
 	struct hrtimer		timer;
 	struct list_head	dev_list;
