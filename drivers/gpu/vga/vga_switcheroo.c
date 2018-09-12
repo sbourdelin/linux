@@ -486,6 +486,26 @@ enum vga_switcheroo_state vga_switcheroo_get_client_state(struct pci_dev *pdev)
 EXPORT_SYMBOL(vga_switcheroo_get_client_state);
 
 /**
+ * vga_switcheroo_get_client_id() - obtain client id of a given client
+ * @pdev: client pci device
+ */
+enum vga_switcheroo_client_id vga_switcheroo_get_client_id(struct pci_dev *pdev)
+{
+	struct vga_switcheroo_client *client;
+	enum vga_switcheroo_client_id ret;
+
+	mutex_lock(&vgasr_mutex);
+	client = find_client_from_pci(&vgasr_priv.clients, pdev);
+	if (!client)
+		ret = VGA_SWITCHEROO_UNKNOWN_ID;
+	else
+		ret = client_id(client);
+	mutex_unlock(&vgasr_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(vga_switcheroo_get_client_id);
+
+/**
  * vga_switcheroo_unregister_client() - unregister client
  * @pdev: client pci device
  *

@@ -167,6 +167,7 @@ int vga_switcheroo_process_delayed_switch(void);
 
 bool vga_switcheroo_client_probe_defer(struct pci_dev *pdev);
 enum vga_switcheroo_state vga_switcheroo_get_client_state(struct pci_dev *dev);
+enum vga_switcheroo_client_id vga_switcheroo_get_client_id(struct pci_dev *dev);
 
 int vga_switcheroo_init_domain_pm_ops(struct device *dev, struct dev_pm_domain *domain);
 void vga_switcheroo_fini_domain_pm_ops(struct device *dev);

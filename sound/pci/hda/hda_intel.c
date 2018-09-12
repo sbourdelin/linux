@@ -1146,6 +1146,14 @@ static int azx_runtime_idle(struct device *dev)
 	    azx_bus(chip)->codec_powered || !chip->running)
 		return -EBUSY;
 
+#ifdef SUPPORT_VGA_SWITCHEROO
+	/* ELD notification gets broken on AMD GPUs when HD-audio bus is off */
+	if ((chip->pci->vendor == PCI_VENDOR_ID_ATI ||
+	     chip->pci->vendor == PCI_VENDOR_ID_AMD) &&
+	    vga_switcheroo_get_client_id(chip->pci) != VGA_SWITCHEROO_DIS)
+		return -EBUSY;
+#endif
+
 	return 0;
 }
 
