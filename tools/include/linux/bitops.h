@@ -3,14 +3,11 @@
 #define _TOOLS_LINUX_BITOPS_H_
 
 #include <asm/types.h>
+#include <asm/bitsperlong.h>
 #include <linux/compiler.h>
 
 #ifndef __WORDSIZE
 #define __WORDSIZE (__SIZEOF_LONG__ * 8)
-#endif
-
-#ifndef BITS_PER_LONG
-# define BITS_PER_LONG __WORDSIZE
 #endif
 
 #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
