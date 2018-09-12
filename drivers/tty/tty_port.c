@@ -622,6 +622,9 @@ EXPORT_SYMBOL(tty_port_close_end);
 
 /**
  * tty_port_close()
+ * @port: tty port
+ * @tty: the tty
+ * @filp: the file pointer
  *
  * Caller holds tty lock
  */
@@ -657,6 +660,9 @@ EXPORT_SYMBOL_GPL(tty_port_install);
 
 /**
  * tty_port_open()
+ * @port: tty port
+ * @tty: the tty
+ * @filp: the file pointer
  *
  * Caller holds tty lock.
  *
