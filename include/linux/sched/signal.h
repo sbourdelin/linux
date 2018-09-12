@@ -565,6 +565,16 @@ extern bool current_is_single_threaded(void);
 #define for_each_process_thread(p, t)	\
 	for_each_process(p) for_each_thread(p, t)
 
+static inline void
+for_each_process_thread_break(struct task_struct *p, struct task_struct *t)
+{
+	get_task_struct(p);
+	get_task_struct(t);
+}
+
+extern void
+for_each_process_thread_continue(struct task_struct **, struct task_struct **);
+
 typedef int (*proc_visitor)(struct task_struct *p, void *data);
 void walk_process_tree(struct task_struct *top, proc_visitor, void *);
 

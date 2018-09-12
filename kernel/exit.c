@@ -319,6 +319,48 @@ void rcuwait_wake_up(struct rcuwait *w)
 	rcu_read_unlock();
 }
 
+void for_each_process_thread_continue(struct task_struct **p_leader,
+				      struct task_struct **p_thread)
+{
+	struct task_struct *leader = *p_leader, *thread = *p_thread;
+	struct task_struct *prev, *next;
+	u64 start_time;
+
+	if (pid_alive(thread)) {
+		/* mt exec could change the leader */
+		*p_leader = thread->group_leader;
+	} else if (pid_alive(leader)) {
+		start_time = thread->start_time;
+		prev = leader;
+
+		for_each_thread(leader, next) {
+			if (next->start_time > start_time)
+				break;
+			prev = next;
+		}
+
+		*p_thread = prev;
+	} else {
+		start_time = leader->start_time;
+		prev = &init_task;
+
+		for_each_process(next) {
+			if (next->start_time > start_time)
+				break;
+			prev = next;
+		}
+
+		*p_leader = prev;
+		/* a new thread can come after that, but this is fine */
+		*p_thread = list_last_entry(&prev->signal->thread_head,
+						struct task_struct,
+						thread_node);
+	}
+
+	put_task_struct(leader);
+	put_task_struct(thread);
+}
+
 /*
  * Determine if a process group is "orphaned", according to the POSIX
  * definition in 2.2.2.52.  Orphaned process groups are not to be affected
