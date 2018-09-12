@@ -2884,7 +2884,7 @@ static int smu7_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 				cast_phw_smu7_power_state(&request_ps->hardware);
 	uint32_t sclk;
 	uint32_t mclk;
-	struct PP_Clocks minimum_clocks = {0};
+	struct PP_Clocks minimum_clocks = {};
 	bool disable_mclk_switching;
 	bool disable_mclk_switching_for_frame_lock;
 	const struct phm_clock_and_voltage_limits *max_limits;
@@ -3580,7 +3580,7 @@ static int smu7_find_dpm_states_clocks_in_dpm_table(struct pp_hwmgr *hwmgr, cons
 	struct smu7_single_dpm_table *mclk_table = &(data->dpm_table.mclk_table);
 	uint32_t mclk = smu7_ps->performance_levels
 			[smu7_ps->performance_level_count - 1].memory_clock;
-	struct PP_Clocks min_clocks = {0};
+	struct PP_Clocks min_clocks = {};
 	uint32_t i;
 
 	for (i = 0; i < sclk_table->count; i++) {

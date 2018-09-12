@@ -54,7 +54,7 @@ void mqd_symmetrically_map_cu_mask(struct mqd_manager *mm,
 		uint32_t *se_mask)
 {
 	struct kfd_cu_info cu_info;
-	uint32_t cu_per_sh[4] = {0};
+	uint32_t cu_per_sh[4] = {};
 	int i, se, cu = 0;
 
 	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);

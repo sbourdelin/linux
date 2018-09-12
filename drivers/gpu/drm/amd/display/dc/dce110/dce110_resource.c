@@ -983,7 +983,7 @@ static struct pipe_ctx *dce110_acquire_underlay(
 	pipe_ctx->stream = stream;
 
 	if (!dc->current_state->res_ctx.pipe_ctx[underlay_idx].stream) {
-		struct tg_color black_color = {0};
+		struct tg_color black_color = {};
 		struct dc_bios *dcb = dc->ctx->dc_bios;
 
 		dc->hwss.enable_display_power_gating(
@@ -1081,7 +1081,7 @@ static bool underlay_create(struct dc_context *ctx, struct resource_pool *pool)
 
 static void bw_calcs_data_update_from_pplib(struct dc *dc)
 {
-	struct dm_pp_clock_levels clks = {0};
+	struct dm_pp_clock_levels clks = {};
 
 	/*do system clock*/
 	dm_pp_get_clock_levels_by_type(
@@ -1154,7 +1154,7 @@ static bool construct(
 	struct dc_context *ctx = dc->ctx;
 	struct dc_firmware_info info;
 	struct dc_bios *bp;
-	struct dm_pp_static_clock_info static_clk_info = {0};
+	struct dm_pp_static_clock_info static_clk_info = {};
 
 	ctx->dc_bios->regs = &bios_regs;
 

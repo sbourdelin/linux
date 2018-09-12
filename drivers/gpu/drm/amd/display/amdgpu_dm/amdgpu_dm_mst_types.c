@@ -42,7 +42,7 @@
 
 static inline char *side_band_msg_type_to_str(uint32_t address)
 {
-	static char str[10] = {0};
+	static char str[10] = {};
 
 	if (address < DP_SIDEBAND_MSG_UP_REP_BASE)
 		strcpy(str, "DOWN_REQ");

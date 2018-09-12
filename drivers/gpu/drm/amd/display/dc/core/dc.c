@@ -109,7 +109,7 @@ static bool create_links(
 		num_virtual_links);
 
 	for (i = 0; i < connectors_num; i++) {
-		struct link_init_data link_init_params = {0};
+		struct link_init_data link_init_params = {};
 		struct dc_link *link;
 
 		link_init_params.ctx = dc->ctx;
@@ -128,7 +128,7 @@ static bool create_links(
 
 	for (i = 0; i < num_virtual_links; i++) {
 		struct dc_link *link = kzalloc(sizeof(*link), GFP_KERNEL);
-		struct encoder_init_data enc_init = {0};
+		struct encoder_init_data enc_init = {};
 
 		if (link == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -875,7 +875,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct pipe_ctx *pipe;
 	int i, k, l;
-	struct dc_stream_state *dc_streams[MAX_STREAMS] = {0};
+	struct dc_stream_state *dc_streams[MAX_STREAMS] = {};
 
 	disable_dangling_plane(dc, context);
 

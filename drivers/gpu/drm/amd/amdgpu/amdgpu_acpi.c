@@ -219,7 +219,7 @@ out:
 static acpi_handle amdgpu_atif_probe_handle(acpi_handle dhandle)
 {
 	acpi_handle handle = NULL;
-	char acpi_method_name[255] = { 0 };
+	char acpi_method_name[255] = {};
 	struct acpi_buffer buffer = { sizeof(acpi_method_name), acpi_method_name };
 	acpi_status status;
 

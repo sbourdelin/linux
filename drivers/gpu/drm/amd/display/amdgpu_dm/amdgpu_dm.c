@@ -948,7 +948,7 @@ static void handle_hpd_irq(void *param)
 
 static void dm_handle_hpd_rx_irq(struct amdgpu_dm_connector *aconnector)
 {
-	uint8_t esi[DP_PSR_ERROR_STATUS - DP_SINK_COUNT_ESI] = { 0 };
+	uint8_t esi[DP_PSR_ERROR_STATUS - DP_SINK_COUNT_ESI] = {};
 	uint8_t dret;
 	bool new_irq_handled = false;
 	int dpcd_addr;
@@ -1071,7 +1071,7 @@ static void register_hpd_handlers(struct amdgpu_device *adev)
 	struct drm_connector *connector;
 	struct amdgpu_dm_connector *aconnector;
 	const struct dc_link *dc_link;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 
 	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
 	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
@@ -1109,7 +1109,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 	int r;
 	int i;
 	unsigned client_id = AMDGPU_IH_CLIENTID_LEGACY;
@@ -1196,7 +1196,7 @@ static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 	int r;
 	int i;
 
@@ -1335,7 +1335,7 @@ static void
 amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
 	char bl_name[16];
-	struct backlight_properties props = { 0 };
+	struct backlight_properties props = {};
 
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
 	props.brightness = AMDGPU_MAX_BL_LEVEL;
@@ -2032,8 +2032,8 @@ static void update_stream_scaling_settings(const struct drm_display_mode *mode,
 {
 	enum amdgpu_rmx_type rmx_type;
 
-	struct rect src = { 0 }; /* viewport in composition space*/
-	struct rect dst = { 0 }; /* stream addressable area */
+	struct rect src = {}; /* viewport in composition space*/
+	struct rect dst = {}; /* stream addressable area */
 
 	/* no mode. nothing to be done */
 	if (!mode)
@@ -2344,7 +2344,7 @@ decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
 static struct dc_sink *
 create_fake_sink(struct amdgpu_dm_connector *aconnector)
 {
-	struct dc_sink_init_data sink_init_data = { 0 };
+	struct dc_sink_init_data sink_init_data = {};
 	struct dc_sink *sink = NULL;
 	sink_init_data.link = aconnector->dc_link;
 	sink_init_data.sink_signal = aconnector->dc_link->connector_signal;
@@ -3924,9 +3924,9 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 	struct amdgpu_bo *abo = gem_to_amdgpu_bo(fb->obj[0]);
 	struct amdgpu_device *adev = crtc->dev->dev_private;
 	bool async_flip = (crtc->state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
-	struct dc_flip_addrs addr = { {0} };
+	struct dc_flip_addrs addr = {};
 	/* TODO eliminate or rename surface_update */
-	struct dc_surface_update surface_updates[1] = { {0} };
+	struct dc_surface_update surface_updates[1] = {};
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(crtc->state);
 
 

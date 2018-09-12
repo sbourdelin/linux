@@ -414,7 +414,7 @@ static enum bp_result bios_parser_get_voltage_ddc_info(struct dc_bios *dcb,
 	enum bp_result result = BP_RESULT_NORECORD;
 	uint8_t *voltage_info_address;
 	ATOM_COMMON_TABLE_HEADER *header;
-	struct atom_data_revision revision = {0};
+	struct atom_data_revision revision = {};
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!DATA_TABLES(VoltageObjectInfo))
@@ -4042,7 +4042,7 @@ static bool bios_parser_construct(
 	uint16_t *rom_header_offset = NULL;
 	ATOM_ROM_HEADER *rom_header = NULL;
 	ATOM_OBJECT_HEADER *object_info_tbl;
-	struct atom_data_revision tbl_rev = {0};
+	struct atom_data_revision tbl_rev = {};
 
 	if (!init)
 		return false;

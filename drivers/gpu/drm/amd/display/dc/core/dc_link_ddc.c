@@ -708,7 +708,7 @@ void dal_ddc_service_write_scdc_data(struct ddc_service *ddc_service,
 	uint8_t slave_address = HDMI_SCDC_ADDRESS;
 	uint8_t offset = HDMI_SCDC_SINK_VERSION;
 	uint8_t sink_version = 0;
-	uint8_t write_buffer[2] = {0};
+	uint8_t write_buffer[2] = {};
 	/*Lower than 340 Scramble bit from SCDC caps*/
 
 	dal_ddc_service_query_ddc_data(ddc_service, slave_address, &offset,
@@ -743,7 +743,7 @@ void dal_ddc_service_read_scdc_data(struct ddc_service *ddc_service)
 	dal_ddc_service_query_ddc_data(ddc_service, slave_address, &offset,
 			sizeof(offset), &tmds_config, sizeof(tmds_config));
 	if (tmds_config & 0x1) {
-		union hdmi_scdc_status_flags_data status_data = { {0} };
+		union hdmi_scdc_status_flags_data status_data = {};
 		uint8_t scramble_status = 0;
 
 		offset = HDMI_SCDC_SCRAMBLER_STATUS;

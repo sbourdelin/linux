@@ -148,7 +148,7 @@ struct resource_pool *dc_create_resource_pool(
 		break;
 	}
 	if (res_pool != NULL) {
-		struct dc_firmware_info fw_info = { { 0 } };
+		struct dc_firmware_info fw_info = {};
 
 		if (dc->ctx->dc_bios->funcs->get_firmware_info(
 				dc->ctx->dc_bios, &fw_info) == BP_RESULT_OK) {
@@ -207,7 +207,7 @@ bool resource_construct(
 	const struct resource_caps *caps = pool->res_cap;
 	int i;
 	unsigned int num_audio = caps->num_audio;
-	struct resource_straps straps = {0};
+	struct resource_straps straps = {};
 
 	if (create_funcs->read_dce_straps)
 		create_funcs->read_dce_straps(dc->ctx, &straps);
@@ -480,7 +480,7 @@ static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 	const struct dc_stream_state *stream = pipe_ctx->stream;
 	struct scaler_data *data = &pipe_ctx->plane_res.scl_data;
 	struct rect surf_src = plane_state->src_rect;
-	struct rect clip = { 0 };
+	struct rect clip = {};
 	int vpc_div = (data->format == PIXEL_FORMAT_420BPP8
 			|| data->format == PIXEL_FORMAT_420BPP10) ? 2 : 1;
 	bool pri_split = pipe_ctx->bottom_pipe &&
@@ -1043,7 +1043,7 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 {
 	const struct dc_plane_state *plane_state = pipe_ctx->plane_state;
 	struct dc_crtc_timing *timing = &pipe_ctx->stream->timing;
-	struct rect recout_full = { 0 };
+	struct rect recout_full = {};
 	bool res = false;
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
 	/* Important: scaling ratio calculation requires pixel format,
@@ -1442,7 +1442,7 @@ bool dc_rem_all_planes_for_stream(
 {
 	int i, old_plane_count;
 	struct dc_stream_status *stream_status = NULL;
-	struct dc_plane_state *del_planes[MAX_SURFACE_NUM] = { 0 };
+	struct dc_plane_state *del_planes[MAX_SURFACE_NUM] = {};
 
 	for (i = 0; i < context->stream_count; i++)
 			if (context->streams[i] == stream) {
@@ -2079,7 +2079,7 @@ static void set_avi_info_frame(
 	uint8_t *check_sum = NULL;
 	uint8_t byte_index = 0;
 	union hdmi_info_packet hdmi_info;
-	union display_content_support support = {0};
+	union display_content_support support = {};
 	unsigned int vic = pipe_ctx->stream->timing.vic;
 	enum dc_timing_3d_format format;
 

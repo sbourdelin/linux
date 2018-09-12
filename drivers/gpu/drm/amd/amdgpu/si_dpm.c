@@ -4785,7 +4785,7 @@ static int si_do_program_memory_timing_parameters(struct amdgpu_device *adev,
 {
 	struct si_power_info *si_pi = si_get_pi(adev);
 	struct  si_ps *state = si_get_ps(amdgpu_state);
-	SMC_SIslands_MCArbDramTimingRegisterSet arb_regs = { 0 };
+	SMC_SIslands_MCArbDramTimingRegisterSet arb_regs = {};
 	int i, ret = 0;
 
 	for (i = 0; i < state->performance_level_count; i++) {
@@ -5124,7 +5124,7 @@ static int si_program_ulv_memory_timing_parameters(struct amdgpu_device *adev)
 {
 	struct si_power_info *si_pi = si_get_pi(adev);
 	struct si_ulv_param *ulv = &si_pi->ulv;
-	SMC_SIslands_MCArbDramTimingRegisterSet arb_regs = { 0 };
+	SMC_SIslands_MCArbDramTimingRegisterSet arb_regs = {};
 	int ret;
 
 	ret = si_populate_memory_timing_parameters(adev, &ulv->pl,

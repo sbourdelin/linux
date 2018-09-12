@@ -266,7 +266,7 @@ dce110_set_input_transfer_func(struct pipe_ctx *pipe_ctx,
 {
 	struct input_pixel_processor *ipp = pipe_ctx->plane_res.ipp;
 	const struct dc_transfer_func *tf = NULL;
-	struct ipp_prescale_params prescale_params = { 0 };
+	struct ipp_prescale_params prescale_params = {};
 	bool result = true;
 
 	if (ipp == NULL)
@@ -621,7 +621,7 @@ static enum dc_status bios_parser_crtc_source_select(
 	/* call VBIOS table to set CRTC source for the HW
 	 * encoder block
 	 * note: video bios clears all FMT setting here. */
-	struct bp_crtc_source_select crtc_source_select = {0};
+	struct bp_crtc_source_select crtc_source_select = {};
 	const struct dc_sink *sink = pipe_ctx->stream->sink;
 
 	crtc_source_select.engine_id = pipe_ctx->stream_res.stream_enc->id;
@@ -849,7 +849,7 @@ void hwss_edp_power_control(
 {
 	struct dc_context *ctx = link->ctx;
 	struct dce_hwseq *hwseq = ctx->dc->hwseq;
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 	enum bp_result bp_result;
 
 
@@ -931,7 +931,7 @@ void hwss_edp_backlight_control(
 {
 	struct dc_context *ctx = link->ctx;
 	struct dce_hwseq *hws = ctx->dc->hwseq;
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 
 	if (dal_graphics_object_id_get_connector_id(link->link_enc->connector)
 		!= CONNECTOR_ID_EDP) {
@@ -1071,7 +1071,7 @@ void dce110_disable_stream(struct pipe_ctx *pipe_ctx, int option)
 void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
 		struct dc_link_settings *link_settings)
 {
-	struct encoder_unblank_param params = { { 0 } };
+	struct encoder_unblank_param params = {};
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct dc_link *link = stream->sink->link;
 
@@ -1248,7 +1248,7 @@ static void get_surface_visual_confirm_color(const struct pipe_ctx *pipe_ctx,
 static void program_scaler(const struct dc *dc,
 		const struct pipe_ctx *pipe_ctx)
 {
-	struct tg_color color = {0};
+	struct tg_color color = {};
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* TOFPGA */
@@ -1285,7 +1285,7 @@ static enum dc_status dce110_enable_stream_timing(
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct pipe_ctx *pipe_ctx_old = &dc->current_state->res_ctx.
 			pipe_ctx[pipe_ctx->pipe_idx];
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 
 	if (!pipe_ctx_old->stream) {
 
@@ -1718,7 +1718,7 @@ static void set_drr(struct pipe_ctx **pipe_ctx,
 		int num_pipes, int vmin, int vmax)
 {
 	int i = 0;
-	struct drr_params params = {0};
+	struct drr_params params = {};
 
 	params.vertical_total_max = vmax;
 	params.vertical_total_min = vmin;
@@ -2091,7 +2091,7 @@ enum dc_status dce110_apply_ctx_to_hw(
  ******************************************************************************/
 static void set_default_colors(struct pipe_ctx *pipe_ctx)
 {
-	struct default_adjustment default_adjust = { 0 };
+	struct default_adjustment default_adjust = {};
 
 	default_adjust.force_hw_default = false;
 	default_adjust.in_color_space = pipe_ctx->plane_state->color_space;
@@ -2265,7 +2265,7 @@ static void dce110_enable_timing_synchronization(
 		struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-	struct dcp_gsl_params gsl_params = { 0 };
+	struct dcp_gsl_params gsl_params = {};
 	int i;
 
 	DC_SYNC_INFO("GSL: Setting-up...\n");
@@ -2310,7 +2310,7 @@ static void dce110_enable_per_frame_crtc_position_reset(
 		struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-	struct dcp_gsl_params gsl_params = { 0 };
+	struct dcp_gsl_params gsl_params = {};
 	int i;
 
 	gsl_params.gsl_group = 0;

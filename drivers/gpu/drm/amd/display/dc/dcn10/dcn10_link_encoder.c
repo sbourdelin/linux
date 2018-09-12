@@ -634,7 +634,7 @@ void dcn10_link_encoder_construct(
 	const struct dcn10_link_enc_shift *link_shift,
 	const struct dcn10_link_enc_mask *link_mask)
 {
-	struct bp_encoder_cap_info bp_cap_info = {0};
+	struct bp_encoder_cap_info bp_cap_info = {};
 	const struct dc_vbios_funcs *bp_funcs = init_data->ctx->dc_bios->funcs;
 	enum bp_result result = BP_RESULT_OK;
 
@@ -781,7 +781,7 @@ void dcn10_link_encoder_hw_init(
 	struct link_encoder *enc)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 	enum bp_result result;
 
 	cntl.action = TRANSMITTER_CONTROL_INIT;
@@ -875,7 +875,7 @@ void dcn10_link_encoder_enable_tmds_output(
 	uint32_t pixel_clock)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -911,7 +911,7 @@ void dcn10_link_encoder_enable_dp_output(
 	enum clock_source_id clock_source)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -950,7 +950,7 @@ void dcn10_link_encoder_enable_dp_mst_output(
 	enum clock_source_id clock_source)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -990,7 +990,7 @@ void dcn10_link_encoder_disable_output(
 	enum signal_type signal)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 	enum bp_result result;
 
 	if (!dcn10_is_dig_enabled(enc)) {
@@ -1037,9 +1037,9 @@ void dcn10_link_encoder_dp_set_lane_settings(
 	const struct link_training_settings *link_settings)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	union dpcd_training_lane_set training_lane_set = { { 0 } };
+	union dpcd_training_lane_set training_lane_set = {};
 	int32_t lane = 0;
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = {};
 
 	if (!link_settings) {
 		BREAK_TO_DEBUGGER();

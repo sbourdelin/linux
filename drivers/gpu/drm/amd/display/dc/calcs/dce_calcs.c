@@ -2027,8 +2027,8 @@ void bw_calcs_init(struct bw_calcs_dceip *bw_dceip,
 	struct bw_calcs_vbios *bw_vbios,
 	struct hw_asic_id asic_id)
 {
-	struct bw_calcs_dceip dceip = { 0 };
-	struct bw_calcs_vbios vbios = { 0 };
+	struct bw_calcs_dceip dceip = {};
+	struct bw_calcs_vbios vbios = {};
 
 	enum bw_calcs_version version = bw_calcs_version_from_asic_id(asic_id);
 

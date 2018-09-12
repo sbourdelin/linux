@@ -151,7 +151,7 @@ bool amdgpu_read_bios(struct amdgpu_device *adev)
 
 static bool amdgpu_read_bios_from_rom(struct amdgpu_device *adev)
 {
-	u8 header[AMD_VBIOS_SIGNATURE_END+1] = {0};
+	u8 header[AMD_VBIOS_SIGNATURE_END+1] = {};
 	int len;
 
 	if (!adev->asic_funcs->read_bios_from_rom)

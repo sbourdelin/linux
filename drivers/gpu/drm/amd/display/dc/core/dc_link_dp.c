@@ -94,8 +94,8 @@ static void dpcd_set_link_settings(
 	uint8_t rate = (uint8_t)
 	(lt_settings->link_settings.link_rate);
 
-	union down_spread_ctrl downspread = { {0} };
-	union lane_count_set lane_count_set = { {0} };
+	union down_spread_ctrl downspread = {};
+	union lane_count_set lane_count_set = {};
 	uint8_t link_set_buffer[2];
 
 	downspread.raw = (uint8_t)
@@ -165,11 +165,11 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	const struct link_training_settings *lt_settings,
 	enum hw_dp_training_pattern pattern)
 {
-	union dpcd_training_lane dpcd_lane[LANE_COUNT_DP_MAX] = { { {0} } };
+	union dpcd_training_lane dpcd_lane[LANE_COUNT_DP_MAX] = {};
 	const uint32_t dpcd_base_lt_offset =
 	DP_TRAINING_PATTERN_SET;
-	uint8_t dpcd_lt_buffer[5] = {0};
-	union dpcd_training_pattern dpcd_pattern = { {0} };
+	uint8_t dpcd_lt_buffer[5] = {};
+	union dpcd_training_pattern dpcd_pattern = {};
 	uint32_t lane;
 	uint32_t size_in_bytes;
 	bool edp_workaround = false; /* TODO link_prop.INTERNAL */
@@ -428,9 +428,9 @@ static void get_lane_status_and_drive_settings(
 	union lane_align_status_updated *ln_status_updated,
 	struct link_training_settings *req_settings)
 {
-	uint8_t dpcd_buf[6] = {0};
-	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = { { {0} } };
-	struct link_training_settings request_settings = { {0} };
+	uint8_t dpcd_buf[6] = {};
+	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = {};
+	struct link_training_settings request_settings = {};
 	uint32_t lane;
 
 	memset(req_settings, '\0', sizeof(struct link_training_settings));
@@ -504,7 +504,7 @@ static void dpcd_set_lane_settings(
 	struct dc_link *link,
 	const struct link_training_settings *link_training_setting)
 {
-	union dpcd_training_lane dpcd_lane[LANE_COUNT_DP_MAX] = {{{0}}};
+	union dpcd_training_lane dpcd_lane[LANE_COUNT_DP_MAX] = {};
 	uint32_t lane;
 
 	for (lane = 0; lane <
@@ -535,7 +535,7 @@ static void dpcd_set_lane_settings(
 	/*
 	if (LTSettings.link.rate == LinkRate_High2)
 	{
-		DpcdTrainingLaneSet2 dpcd_lane2[lane_count_DPMax] = {0};
+		DpcdTrainingLaneSet2 dpcd_lane2[lane_count_DPMax] = {};
 		for ( uint32_t lane = 0;
 		lane < lane_count_DPMax; lane++)
 		{
@@ -725,8 +725,8 @@ static enum link_training_result perform_channel_equalization_sequence(
 	enum hw_dp_training_pattern hw_tr_pattern;
 	uint32_t retries_ch_eq;
 	enum dc_lane_count lane_count = lt_settings->link_settings.lane_count;
-	union lane_align_status_updated dpcd_lane_status_updated = { {0} };
-	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = { { {0} } };
+	union lane_align_status_updated dpcd_lane_status_updated = {};
+	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = {};
 
 	hw_tr_pattern = get_supported_tp(link);
 
@@ -891,8 +891,8 @@ static inline enum link_training_result perform_link_training_int(
 	struct link_training_settings *lt_settings,
 	enum link_training_result status)
 {
-	union lane_count_set lane_count_set = { {0} };
-	union dpcd_training_pattern dpcd_pattern = { {0} };
+	union lane_count_set lane_count_set = {};
+	union dpcd_training_pattern dpcd_pattern = {};
 
 	/* 3. set training not in progress*/
 	dpcd_pattern.v1_4.TRAINING_PATTERN_SET = DPCD_TRAINING_PATTERN_VIDEOIDLE;
@@ -1094,10 +1094,10 @@ bool dp_verify_link_cap(
 	struct dc_link_settings *known_limit_link_setting,
 	int *fail_count)
 {
-	struct dc_link_settings max_link_cap = {0};
-	struct dc_link_settings cur_link_setting = {0};
+	struct dc_link_settings max_link_cap = {};
+	struct dc_link_settings cur_link_setting = {};
 	struct dc_link_settings *cur = &cur_link_setting;
-	struct dc_link_settings initial_link_settings = {0};
+	struct dc_link_settings initial_link_settings = {};
 	bool success;
 	bool skip_link_training;
 	bool skip_video_pattern;
@@ -1201,7 +1201,7 @@ static struct dc_link_settings get_common_supported_link_settings(
 		struct dc_link_settings link_setting_a,
 		struct dc_link_settings link_setting_b)
 {
-	struct dc_link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {};
 
 	link_settings.lane_count =
 		(link_setting_a.lane_count <=
@@ -1721,7 +1721,7 @@ static bool handle_hpd_irq_psr_sink(const struct dc_link *link)
 
 
 	if (psr_configuration.bits.ENABLE) {
-		unsigned char dpcdbuf[3] = {0};
+		unsigned char dpcdbuf[3] = {};
 		union psr_error_status psr_error_status;
 		union psr_sink_psr_status psr_sink_psr_status;
 
@@ -1767,7 +1767,7 @@ static bool handle_hpd_irq_psr_sink(const struct dc_link *link)
 
 static void dp_test_send_link_training(struct dc_link *link)
 {
-	struct dc_link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {};
 
 	core_link_read_dpcd(
 			link,
@@ -1798,7 +1798,7 @@ static void dp_test_send_phy_test_pattern(struct dc_link *link)
 	unsigned char dpcd_post_cursor_2_adjustment = 0;
 	unsigned char test_80_bit_pattern[
 			(DP_TEST_80BIT_CUSTOM_PATTERN_79_72 -
-			DP_TEST_80BIT_CUSTOM_PATTERN_7_0)+1] = {0};
+			DP_TEST_80BIT_CUSTOM_PATTERN_7_0)+1] = {};
 	enum dp_test_pattern test_pattern;
 	struct dc_link_training_settings link_settings;
 	union lane_adjust dpcd_lane_adjust;
@@ -2011,8 +2011,8 @@ static void handle_automated_test(struct dc_link *link)
 
 bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd_irq_dpcd_data, bool *out_link_loss)
 {
-	union hpd_irq_data hpd_irq_dpcd_data = { { { {0} } } };
-	union device_service_irq device_service_clear = { { 0 } };
+	union hpd_irq_data hpd_irq_dpcd_data = {};
+	union device_service_irq device_service_clear = {};
 	enum dc_status result;
 
 	bool status = false;
@@ -2293,7 +2293,7 @@ static void dp_wa_power_up_0010FA(struct dc_link *link, uint8_t *dpcd_data,
 		int length)
 {
 	int retry = 0;
-	union dp_downstream_port_present ds_port = { 0 };
+	union dp_downstream_port_present ds_port = {};
 
 	if (!link->dpcd_caps.dpcd_rev.raw) {
 		do {
@@ -2337,7 +2337,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 	struct dp_device_vendor_id sink_id;
 	union down_stream_port_count down_strm_port_count;
 	union edp_configuration_cap edp_config_cap;
-	union dp_downstream_port_present ds_port = { 0 };
+	union dp_downstream_port_present ds_port = {};
 	enum dc_status status = DC_ERROR_UNEXPECTED;
 	uint32_t read_dpcd_retry_cnt = 3;
 	int i;
@@ -2592,7 +2592,7 @@ bool dc_link_dp_set_test_pattern(
 	struct pipe_ctx *pipe_ctx = &pipes[0];
 	unsigned int lane;
 	unsigned int i;
-	unsigned char link_qual_pattern[LANE_COUNT_DP_MAX] = {0};
+	unsigned char link_qual_pattern[LANE_COUNT_DP_MAX] = {};
 	union dpcd_training_pattern training_pattern;
 	enum dpcd_phy_test_patterns pattern;
 

@@ -693,7 +693,7 @@ static uint32_t dce110_get_pix_rate_in_hz(
 static bool disable_spread_spectrum(struct dce110_clk_src *clk_src)
 {
 	enum bp_result result;
-	struct bp_spread_spectrum_parameters bp_ss_params = {0};
+	struct bp_spread_spectrum_parameters bp_ss_params = {};
 
 	bp_ss_params.pll_id = clk_src->base.id;
 
@@ -775,7 +775,7 @@ static bool enable_spread_spectrum(
 		struct dce110_clk_src *clk_src,
 		enum signal_type signal, struct pll_settings *pll_settings)
 {
-	struct bp_spread_spectrum_parameters bp_params = {0};
+	struct bp_spread_spectrum_parameters bp_params = {};
 	struct delta_sigma_data d_s_data;
 	const struct spread_spectrum_data *ss_data = NULL;
 
@@ -907,7 +907,7 @@ static bool dce110_program_pix_clk(
 		struct pll_settings *pll_settings)
 {
 	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
-	struct bp_pixel_clock_parameters bp_pc_params = {0};
+	struct bp_pixel_clock_parameters bp_pc_params = {};
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	if (IS_FPGA_MAXIMUS_DC(clock_source->ctx->dce_environment)) {
@@ -1017,7 +1017,7 @@ static bool dce110_clock_source_power_down(
 {
 	struct dce110_clk_src *dce110_clk_src = TO_DCE110_CLK_SRC(clk_src);
 	enum bp_result bp_result;
-	struct bp_pixel_clock_parameters bp_pixel_clock_params = {0};
+	struct bp_pixel_clock_parameters bp_pixel_clock_params = {};
 
 	if (clk_src->dp_clk_src)
 		return true;
@@ -1191,7 +1191,7 @@ static bool calc_pll_max_vco_construct(
 			struct calc_pll_clock_source_init_data *init_data)
 {
 	uint32_t i;
-	struct dc_firmware_info fw_info = { { 0 } };
+	struct dc_firmware_info fw_info = {};
 	if (calc_pll_cs == NULL ||
 			init_data == NULL ||
 			init_data->bp == NULL)
@@ -1273,7 +1273,7 @@ bool dce110_clk_src_construct(
 	const struct dce110_clk_src_shift *cs_shift,
 	const struct dce110_clk_src_mask *cs_mask)
 {
-	struct dc_firmware_info fw_info = { { 0 } };
+	struct dc_firmware_info fw_info = {};
 	struct calc_pll_clock_source_init_data calc_pll_cs_init_data_hdmi;
 	struct calc_pll_clock_source_init_data calc_pll_cs_init_data;
 

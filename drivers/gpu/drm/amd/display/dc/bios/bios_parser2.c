@@ -231,7 +231,7 @@ static enum bp_result bios_parser_get_src_obj(struct dc_bios *dcb,
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	unsigned int i;
 	enum bp_result  bp_result = BP_RESULT_BADINPUT;
-	struct graphics_object_id obj_id = {0};
+	struct graphics_object_id obj_id = {};
 	struct object_info_table *tbl = &bp->object_info_tbl;
 
 	if (!src_object_id)
@@ -290,7 +290,7 @@ static enum bp_result bios_parser_get_dst_obj(struct dc_bios *dcb,
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	unsigned int i;
 	enum bp_result  bp_result = BP_RESULT_BADINPUT;
-	struct graphics_object_id obj_id = {0};
+	struct graphics_object_id obj_id = {};
 	struct object_info_table *tbl = &bp->object_info_tbl;
 
 	if (!dest_object_id)
@@ -331,7 +331,7 @@ static struct atom_display_object_path_v2 *get_bios_object(
 	struct graphics_object_id id)
 {
 	unsigned int i;
-	struct graphics_object_id obj_id = {0};
+	struct graphics_object_id obj_id = {};
 
 	switch (id.type) {
 	case OBJECT_TYPE_ENCODER:
@@ -552,7 +552,7 @@ static enum bp_result bios_parser_get_voltage_ddc_info(struct dc_bios *dcb,
 	enum bp_result result = BP_RESULT_NORECORD;
 	uint8_t *voltage_info_address;
 	struct atom_common_table_header *header;
-	struct atom_data_revision revision = {0};
+	struct atom_data_revision revision = {};
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!DATA_TABLES(voltageobject_info))
@@ -2151,7 +2151,7 @@ static bool bios_parser_construct(
 	uint16_t *rom_header_offset = NULL;
 	struct atom_rom_header_v2_2 *rom_header = NULL;
 	struct display_object_info_table_v1_4 *object_info_tbl;
-	struct atom_data_revision tbl_rev = {0};
+	struct atom_data_revision tbl_rev = {};
 
 	if (!init)
 		return false;

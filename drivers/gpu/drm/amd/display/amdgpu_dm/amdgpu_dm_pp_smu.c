@@ -306,8 +306,8 @@ bool dm_pp_get_clock_levels_by_type(
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	void *pp_handle = adev->powerplay.pp_handle;
-	struct amd_pp_clocks pp_clks = { 0 };
-	struct amd_pp_simple_clock_info validation_clks = { 0 };
+	struct amd_pp_clocks pp_clks = {};
+	struct amd_pp_simple_clock_info validation_clks = {};
 	uint32_t i;
 
 	if (adev->powerplay.pp_funcs->get_clock_by_type) {
@@ -378,7 +378,7 @@ bool dm_pp_get_clock_levels_by_type_with_latency(
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	void *pp_handle = adev->powerplay.pp_handle;
-	struct pp_clock_levels_with_latency pp_clks = { 0 };
+	struct pp_clock_levels_with_latency pp_clks = {};
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
 	if (!pp_funcs || !pp_funcs->get_clock_by_type_with_latency)
@@ -401,7 +401,7 @@ bool dm_pp_get_clock_levels_by_type_with_voltage(
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	void *pp_handle = adev->powerplay.pp_handle;
-	struct pp_clock_levels_with_voltage pp_clk_info = {0};
+	struct pp_clock_levels_with_voltage pp_clk_info = {};
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
 	if (pp_funcs->get_clock_by_type_with_voltage(pp_handle,
@@ -435,7 +435,7 @@ bool dm_pp_apply_clock_for_voltage_request(
 	struct dm_pp_clock_for_voltage_req *clock_for_voltage_req)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
-	struct pp_display_clock_request pp_clock_request = {0};
+	struct pp_display_clock_request pp_clock_request = {};
 	int ret = 0;
 
 	pp_clock_request.clock_type = dc_to_pp_clock_type(clock_for_voltage_req->clk_type);
@@ -458,7 +458,7 @@ bool dm_pp_get_static_clocks(
 	struct dm_pp_static_clock_info *static_clk_info)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
-	struct amd_pp_clock_info pp_clk_info = {0};
+	struct amd_pp_clock_info pp_clk_info = {};
 	int ret = 0;
 
 	if (adev->powerplay.pp_funcs->get_current_clocks)
@@ -482,7 +482,7 @@ void pp_rv_set_display_requirement(struct pp_smu *pp,
 	struct amdgpu_device *adev = ctx->driver_context;
 	void *pp_handle = adev->powerplay.pp_handle;
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
-	struct pp_display_clock_request clock = {0};
+	struct pp_display_clock_request clock = {};
 
 	if (!pp_funcs || !pp_funcs->display_clock_voltage_request)
 		return;

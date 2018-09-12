@@ -282,7 +282,7 @@ void dcn10_log_hw_state(struct dc *dc)
 
 	DTN_INFO("MPCC:  OPP  DPP  MPCCBOT  MODE  ALPHA_MODE  PREMULT  OVERLAP_ONLY  IDLE\n");
 	for (i = 0; i < pool->pipe_count; i++) {
-		struct mpcc_state s = {0};
+		struct mpcc_state s = {};
 
 		pool->mpc->funcs->read_mpcc_state(pool->mpc, i, &s);
 		if (s.opp_id != 0xf)
@@ -298,7 +298,7 @@ void dcn10_log_hw_state(struct dc *dc)
 
 	for (i = 0; i < pool->timing_generator_count; i++) {
 		struct timing_generator *tg = pool->timing_generators[i];
-		struct dcn_otg_state s = {0};
+		struct dcn_otg_state s = {};
 
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 
@@ -627,7 +627,7 @@ static enum dc_status dcn10_enable_stream_timing(
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_color_space color_space;
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 
 	/* by upper caller loop, pipe0 is parent pipe and be called first.
 	 * back end is set up by for pipe0. Other children pipe share back end
@@ -1570,8 +1570,8 @@ static void mmhub_read_vm_context0_settings(struct dcn10_hubp *hubp1,
 static void dcn10_program_pte_vm(struct dce_hwseq *hws, struct hubp *hubp)
 {
 	struct dcn10_hubp *hubp1 = TO_DCN10_HUBP(hubp);
-	struct vm_system_aperture_param apt = { {{ 0 } } };
-	struct vm_context0_param vm0 = { { { 0 } } };
+	struct vm_system_aperture_param apt = {};
+	struct vm_context0_param vm0 = {};
 
 	mmhub_read_vm_system_aperture_settings(hubp1, &apt, hws);
 	mmhub_read_vm_context0_settings(hubp1, &vm0, hws);
@@ -1882,7 +1882,7 @@ void build_prescale_params(struct  dc_bias_and_scale *bias_and_scale,
 
 static void update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state)
 {
-	struct dc_bias_and_scale bns_params = {0};
+	struct dc_bias_and_scale bns_params = {};
 
 	// program the input csc
 	dpp->funcs->dpp_setup(dpp,
@@ -1900,7 +1900,7 @@ static void update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state)
 static void dcn10_update_mpcc(struct dc *dc, struct pipe_ctx *pipe_ctx)
 {
 	struct hubp *hubp = pipe_ctx->plane_res.hubp;
-	struct mpcc_blnd_cfg blnd_cfg = {0};
+	struct mpcc_blnd_cfg blnd_cfg = {};
 	bool per_pixel_alpha = pipe_ctx->plane_state->per_pixel_alpha && pipe_ctx->bottom_pipe;
 	int mpcc_id;
 	struct mpcc *new_mpcc;
@@ -2112,7 +2112,7 @@ static void dcn10_blank_pixel_data(
 		bool blank)
 {
 	enum dc_color_space color_space;
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 	struct stream_resource *stream_res = &pipe_ctx->stream_res;
 	struct dc_stream_state *stream = pipe_ctx->stream;
 
@@ -2387,7 +2387,7 @@ static void set_drr(struct pipe_ctx **pipe_ctx,
 		int num_pipes, int vmin, int vmax)
 {
 	int i = 0;
-	struct drr_params params = {0};
+	struct drr_params params = {};
 
 	params.vertical_total_max = vmax;
 	params.vertical_total_min = vmin;
@@ -2469,7 +2469,7 @@ static void dcn10_config_stereo_parameters(
 
 static void dcn10_setup_stereo(struct pipe_ctx *pipe_ctx, struct dc *dc)
 {
-	struct crtc_stereo_flags flags = { 0 };
+	struct crtc_stereo_flags flags = {};
 	struct dc_stream_state *stream = pipe_ctx->stream;
 
 	dcn10_config_stereo_parameters(stream, &flags);
@@ -2617,7 +2617,7 @@ static void dcn10_set_cursor_sdr_white_level(struct pipe_ctx *pipe_ctx)
 {
 	uint32_t sdr_white_level = pipe_ctx->stream->cursor_attributes.sdr_white_level;
 	struct fixed31_32 multiplier;
-	struct dpp_cursor_attributes opt_attr = { 0 };
+	struct dpp_cursor_attributes opt_attr = {};
 	uint32_t hw_scale = 0x3c00; // 1.0 default multiplier
 	struct custom_float_format fmt;
 

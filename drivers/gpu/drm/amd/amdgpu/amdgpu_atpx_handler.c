@@ -604,7 +604,7 @@ static void amdgpu_atpx_get_quirks(struct pci_dev *pdev)
  */
 static bool amdgpu_atpx_detect(void)
 {
-	char acpi_method_name[255] = { 0 };
+	char acpi_method_name[255] = {};
 	struct acpi_buffer buffer = {sizeof(acpi_method_name), acpi_method_name};
 	struct pci_dev *pdev = NULL;
 	bool has_atpx = false;

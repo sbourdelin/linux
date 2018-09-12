@@ -199,7 +199,7 @@ static enum bp_result encoder_control_dig1_v1(
 	struct bp_encoder_control *cntl)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	DIG_ENCODER_CONTROL_PARAMETERS_V2 params = {0};
+	DIG_ENCODER_CONTROL_PARAMETERS_V2 params = {};
 
 	bp->cmd_helper->assign_control_parameter(bp->cmd_helper, cntl, &params);
 
@@ -214,7 +214,7 @@ static enum bp_result encoder_control_dig2_v1(
 	struct bp_encoder_control *cntl)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	DIG_ENCODER_CONTROL_PARAMETERS_V2 params = {0};
+	DIG_ENCODER_CONTROL_PARAMETERS_V2 params = {};
 
 	bp->cmd_helper->assign_control_parameter(bp->cmd_helper, cntl, &params);
 
@@ -229,7 +229,7 @@ static enum bp_result encoder_control_digx_v3(
 	struct bp_encoder_control *cntl)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	DIG_ENCODER_CONTROL_PARAMETERS_V3 params = {0};
+	DIG_ENCODER_CONTROL_PARAMETERS_V3 params = {};
 
 	if (LANE_COUNT_FOUR < cntl->lanes_number)
 		params.acConfig.ucDPLinkRate = 1; /* dual link 2.7GHz */
@@ -258,7 +258,7 @@ static enum bp_result encoder_control_digx_v4(
 	struct bp_encoder_control *cntl)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	DIG_ENCODER_CONTROL_PARAMETERS_V4 params = {0};
+	DIG_ENCODER_CONTROL_PARAMETERS_V4 params = {};
 
 	if (LANE_COUNT_FOUR < cntl->lanes_number)
 		params.acConfig.ucDPLinkRate = 1; /* dual link 2.7GHz */
@@ -287,7 +287,7 @@ static enum bp_result encoder_control_digx_v5(
 	struct bp_encoder_control *cntl)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	ENCODER_STREAM_SETUP_PARAMETERS_V5 params = {0};
+	ENCODER_STREAM_SETUP_PARAMETERS_V5 params = {};
 
 	params.ucDigId = (uint8_t)(cntl->engine_id);
 	params.ucAction = bp->cmd_helper->encoder_action_to_atom(cntl->action);
@@ -1459,7 +1459,7 @@ static enum bp_result adjust_display_pll_v2(
 	struct bp_adjust_pixel_clock_parameters *bp_params)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	ADJUST_DISPLAY_PLL_PS_ALLOCATION params = { 0 };
+	ADJUST_DISPLAY_PLL_PS_ALLOCATION params = {};
 
 	/* We need to convert from KHz units into 10KHz units and then convert
 	 * output pixel clock back 10KHz-->KHz */
@@ -1745,7 +1745,7 @@ static enum bp_result set_crtc_timing_v1(
 	struct bp_hw_crtc_timing_parameters *bp_params)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	SET_CRTC_TIMING_PARAMETERS_PS_ALLOCATION params = {0};
+	SET_CRTC_TIMING_PARAMETERS_PS_ALLOCATION params = {};
 	uint8_t atom_controller_id;
 
 	if (bp->cmd_helper->controller_id_to_atom(
@@ -1818,7 +1818,7 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 	struct bp_hw_crtc_timing_parameters *bp_params)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	SET_CRTC_USING_DTD_TIMING_PARAMETERS params = {0};
+	SET_CRTC_USING_DTD_TIMING_PARAMETERS params = {};
 	uint8_t atom_controller_id;
 
 	if (bp->cmd_helper->controller_id_to_atom(
@@ -2043,7 +2043,7 @@ static enum bp_result enable_crtc_v1(
 	bool enable)
 {
 	bool result = BP_RESULT_FAILURE;
-	ENABLE_CRTC_PARAMETERS params = {0};
+	ENABLE_CRTC_PARAMETERS params = {};
 	uint8_t id;
 
 	if (bp->cmd_helper->controller_id_to_atom(controller_id, &id))
@@ -2093,7 +2093,7 @@ static enum bp_result enable_crtc_mem_req_v1(
 	bool enable)
 {
 	bool result = BP_RESULT_BADINPUT;
-	ENABLE_CRTC_PARAMETERS params = {0};
+	ENABLE_CRTC_PARAMETERS params = {};
 	uint8_t id;
 
 	if (bp->cmd_helper->controller_id_to_atom(controller_id, &id)) {
@@ -2375,7 +2375,7 @@ static enum bp_result enable_disp_power_gating_v2_1(
 {
 	enum bp_result result = BP_RESULT_FAILURE;
 
-	ENABLE_DISP_POWER_GATING_PS_ALLOCATION params = {0};
+	ENABLE_DISP_POWER_GATING_PS_ALLOCATION params = {};
 	uint8_t atom_crtc_id;
 
 	if (bp->cmd_helper->controller_id_to_atom(crtc_id, &atom_crtc_id))

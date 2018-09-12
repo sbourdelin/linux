@@ -800,7 +800,7 @@ static void polaris10_get_sclk_range_table(struct pp_hwmgr *hwmgr,
 	struct polaris10_smumgr *smu_data = (struct polaris10_smumgr *)(hwmgr->smu_backend);
 	uint32_t i, ref_clk;
 
-	struct pp_atom_ctrl_sclk_range_table range_table_from_vbios = { { {0} } };
+	struct pp_atom_ctrl_sclk_range_table range_table_from_vbios = {};
 
 	ref_clk = amdgpu_asic_get_xclk((struct amdgpu_device *)hwmgr->adev);
 
@@ -911,7 +911,7 @@ static int polaris10_populate_single_graphic_level(struct pp_hwmgr *hwmgr,
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 	struct phm_ppt_v1_information *table_info =
 			(struct phm_ppt_v1_information *)(hwmgr->pptable);
-	SMU_SclkSetting curr_sclk_setting = { 0 };
+	SMU_SclkSetting curr_sclk_setting = {};
 	phm_ppt_v1_clock_voltage_dependency_table *vdd_dep_table = NULL;
 
 	result = polaris10_calculate_sclk_params(hwmgr, clock, &curr_sclk_setting);
@@ -1629,9 +1629,9 @@ static int polaris10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 
 	SMU74_Discrete_DpmTable  *table = &(smu_data->smc_state_table);
 	int result = 0;
-	struct pp_atom_ctrl__avfs_parameters avfs_params = {0};
-	AVFS_meanNsigma_t AVFS_meanNsigma = { {0} };
-	AVFS_Sclk_Offset_t AVFS_SclkOffset = { {0} };
+	struct pp_atom_ctrl__avfs_parameters avfs_params = {};
+	AVFS_meanNsigma_t AVFS_meanNsigma = {};
+	AVFS_Sclk_Offset_t AVFS_SclkOffset = {};
 	uint32_t tmp, i;
 
 	struct phm_ppt_v1_information *table_info =

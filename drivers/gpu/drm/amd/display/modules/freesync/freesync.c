@@ -772,7 +772,7 @@ void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 	unsigned int min_frame_duration_in_ns, vmax, vmin = 0;
 	struct freesync_state *state;
 	struct core_freesync *core_freesync = NULL;
-	struct dc_static_screen_events triggers = {0};
+	struct dc_static_screen_events triggers = {};
 
 	if (mod_freesync == NULL)
 		return;
@@ -882,7 +882,7 @@ void mod_freesync_update_state(struct mod_freesync *mod_freesync,
 	unsigned int stream_index;
 	struct freesync_state *state;
 	struct core_freesync *core_freesync = NULL;
-	struct dc_static_screen_events triggers = {0};
+	struct dc_static_screen_events triggers = {};
 
 	if (mod_freesync == NULL)
 		return;
@@ -1218,7 +1218,7 @@ void mod_freesync_notify_mode_change(struct mod_freesync *mod_freesync,
 	unsigned int stream_index, map_index;
 	struct freesync_state *state;
 	struct core_freesync *core_freesync = NULL;
-	struct dc_static_screen_events triggers = {0};
+	struct dc_static_screen_events triggers = {};
 	unsigned long long temp = 0;
 
 	if (mod_freesync == NULL)

@@ -162,7 +162,7 @@ bool dal_i2caux_submit_i2c_command(
 
 		struct i2c_payload *payload = cmd->payloads + index_of_payload;
 
-		struct i2caux_transaction_request request = { 0 };
+		struct i2caux_transaction_request request = {};
 
 		request.operation = payload->write ?
 			I2CAUX_TRANSACTION_WRITE :
@@ -221,7 +221,7 @@ bool dal_i2caux_submit_aux_command(
 
 	while (index_of_payload < cmd->number_of_payloads) {
 		struct aux_payload *payload = cmd->payloads + index_of_payload;
-		struct i2caux_transaction_request request = { 0 };
+		struct i2caux_transaction_request request = {};
 
 		if (cmd->mot == I2C_MOT_UNDEF)
 			mot = (index_of_payload != cmd->number_of_payloads - 1);
@@ -325,7 +325,7 @@ void dal_i2caux_destroy(
 uint32_t dal_i2caux_get_reference_clock(
 		struct dc_bios *bios)
 {
-	struct dc_firmware_info info = { { 0 } };
+	struct dc_firmware_info info = {};
 
 	if (bios->funcs->get_firmware_info(bios, &info) != BP_RESULT_OK)
 		return 0;

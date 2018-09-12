@@ -587,8 +587,8 @@ static bool is_same_edid(struct dc_edid *old_edid, struct dc_edid *new_edid)
 
 bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 {
-	struct dc_sink_init_data sink_init_data = { 0 };
-	struct display_sink_capability sink_caps = { 0 };
+	struct dc_sink_init_data sink_init_data = {};
+	struct display_sink_capability sink_caps = {};
 	uint8_t i;
 	bool converter_disable_audio = false;
 	struct audio_support *aud_support = &link->dc->res_pool->audio_support;
@@ -1024,10 +1024,10 @@ static bool construct(
 {
 	uint8_t i;
 	struct gpio *hpd_gpio = NULL;
-	struct ddc_service_init_data ddc_service_init_data = { { 0 } };
+	struct ddc_service_init_data ddc_service_init_data = {};
 	struct dc_context *dc_ctx = init_params->ctx;
-	struct encoder_init_data enc_init_data = { 0 };
-	struct integrated_info info = {{{ 0 }}};
+	struct encoder_init_data enc_init_data = {};
+	struct integrated_info info = {};
 	struct dc_bios *bios = init_params->dc->ctx->dc_bios;
 	const struct dc_vbios_funcs *bp_funcs = bios->funcs;
 	DC_LOGGER_INIT(dc_ctx->logger);
@@ -1316,7 +1316,7 @@ static enum dc_status enable_link_dp(
 	enum dc_status status;
 	bool skip_video_pattern;
 	struct dc_link *link = stream->sink->link;
-	struct dc_link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {};
 	enum dp_panel_mode panel_mode;
 	enum dc_link_rate max_link_rate = LINK_RATE_HIGH2;
 
@@ -1515,8 +1515,8 @@ static bool get_ext_hdmi_settings(struct pipe_ctx *pipe_ctx,
 static bool i2c_write(struct pipe_ctx *pipe_ctx,
 		uint8_t address, uint8_t *buffer, uint32_t length)
 {
-	struct i2c_command cmd = {0};
-	struct i2c_payload payload = {0};
+	struct i2c_command cmd = {};
+	struct i2c_payload payload = {};
 
 	memset(&payload, 0, sizeof(payload));
 	memset(&cmd, 0, sizeof(cmd));
@@ -1811,7 +1811,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->sink->link;
 	enum dc_color_depth display_color_depth;
 	enum engine_id eng_id;
-	struct ext_hdmi_settings settings = {0};
+	struct ext_hdmi_settings settings = {};
 	bool is_over_340mhz = false;
 	bool is_vga_mode = (stream->timing.h_addressable == 640)
 			&& (stream->timing.v_addressable == 480);
@@ -2193,8 +2193,7 @@ static void update_mst_stream_alloc_table(
 	struct stream_encoder *stream_enc,
 	const struct dp_mst_stream_allocation_table *proposed_table)
 {
-	struct link_mst_stream_allocation work_table[MAX_CONTROLLER_NUM] = {
-			{ 0 } };
+	struct link_mst_stream_allocation work_table[MAX_CONTROLLER_NUM] = {};
 	struct link_mst_stream_allocation *dc_alloc;
 
 	int i;
@@ -2246,7 +2245,7 @@ static enum dc_status allocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->sink->link;
 	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = pipe_ctx->stream_res.stream_enc;
-	struct dp_mst_stream_allocation_table proposed_table = {0};
+	struct dp_mst_stream_allocation_table proposed_table = {};
 	struct fixed31_32 avg_time_slots_per_mtp;
 	struct fixed31_32 pbn;
 	struct fixed31_32 pbn_per_slot;
@@ -2326,7 +2325,7 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->sink->link;
 	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = pipe_ctx->stream_res.stream_enc;
-	struct dp_mst_stream_allocation_table proposed_table = {0};
+	struct dp_mst_stream_allocation_table proposed_table = {};
 	struct fixed31_32 avg_time_slots_per_mtp = dc_fixpt_from_int(0);
 	uint8_t i;
 	bool mst_mode = (link->type == dc_connection_mst_branch);

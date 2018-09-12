@@ -434,9 +434,9 @@ static void dcn_bw_calc_rq_dlg_ttu(
 	struct _vcs_dpi_display_dlg_regs_st *dlg_regs = &pipe->dlg_regs;
 	struct _vcs_dpi_display_ttu_regs_st *ttu_regs = &pipe->ttu_regs;
 	struct _vcs_dpi_display_rq_regs_st *rq_regs = &pipe->rq_regs;
-	struct _vcs_dpi_display_rq_params_st rq_param = {0};
-	struct _vcs_dpi_display_dlg_sys_params_st dlg_sys_param = {0};
-	struct _vcs_dpi_display_e2e_pipe_params_st input = { { { 0 } } };
+	struct _vcs_dpi_display_rq_params_st rq_param = {};
+	struct _vcs_dpi_display_dlg_sys_params_st dlg_sys_param = {};
+	struct _vcs_dpi_display_e2e_pipe_params_st input = {};
 	float total_active_bw = 0;
 	float total_prefetch_bw = 0;
 	int total_flip_bytes = 0;
@@ -1344,7 +1344,7 @@ static bool verify_clock_values(struct dm_pp_clock_levels_with_voltage *clks)
 void dcn_bw_update_from_pplib(struct dc *dc)
 {
 	struct dc_context *ctx = dc->ctx;
-	struct dm_pp_clock_levels_with_voltage fclks = {0}, dcfclks = {0};
+	struct dm_pp_clock_levels_with_voltage fclks = {}, dcfclks = {};
 	bool res;
 
 	kernel_fpu_begin();
@@ -1391,7 +1391,7 @@ void dcn_bw_update_from_pplib(struct dc *dc)
 void dcn_bw_notify_pplib_of_wm_ranges(struct dc *dc)
 {
 	struct pp_smu_funcs_rv *pp = dc->res_pool->pp_smu;
-	struct pp_smu_wm_range_sets ranges = {0};
+	struct pp_smu_wm_range_sets ranges = {};
 	int min_fclk_khz, min_dcfclk_khz, socclk_khz;
 	const int overdrive = 5000000; /* 5 GHz to cover Overdrive */
 

@@ -928,10 +928,10 @@ static const struct resource_funcs dce112_res_pool_funcs = {
 
 static void bw_calcs_data_update_from_pplib(struct dc *dc)
 {
-	struct dm_pp_clock_levels_with_latency eng_clks = {0};
-	struct dm_pp_clock_levels_with_latency mem_clks = {0};
-	struct dm_pp_wm_sets_with_clock_ranges clk_ranges = {0};
-	struct dm_pp_clock_levels clks = {0};
+	struct dm_pp_clock_levels_with_latency eng_clks = {};
+	struct dm_pp_clock_levels_with_latency mem_clks = {};
+	struct dm_pp_wm_sets_with_clock_ranges clk_ranges = {};
+	struct dm_pp_clock_levels clks = {};
 
 	/*do system clock  TODO PPLIB: after PPLIB implement,
 	 * then remove old way
@@ -1087,7 +1087,7 @@ static bool construct(
 {
 	unsigned int i;
 	struct dc_context *ctx = dc->ctx;
-	struct dm_pp_static_clock_info static_clk_info = {0};
+	struct dm_pp_static_clock_info static_clk_info = {};
 
 	ctx->dc_bios->regs = &bios_regs;
 

@@ -778,7 +778,7 @@ void dce_aud_wall_dto_setup(
 {
 	struct dce_audio *aud = DCE_AUD(audio);
 
-	struct azalia_clock_info clock_info = { 0 };
+	struct azalia_clock_info clock_info = {};
 
 	if (dc_is_hdmi_signal(signal)) {
 		uint32_t src_sel;

@@ -242,7 +242,7 @@ static int dce_set_clock(
 	int requested_clk_khz)
 {
 	struct dce_dccg *clk_dce = TO_DCE_CLOCKS(clk);
-	struct bp_pixel_clock_parameters pxl_clk_params = { 0 };
+	struct bp_pixel_clock_parameters pxl_clk_params = {};
 	struct dc_bios *bp = clk->ctx->dc_bios;
 	int actual_clock = requested_clk_khz;
 
@@ -345,8 +345,8 @@ static void dce_clock_read_integrated_info(struct dce_dccg *clk_dce)
 {
 	struct dc_debug_options *debug = &clk_dce->base.ctx->dc->debug;
 	struct dc_bios *bp = clk_dce->base.ctx->dc_bios;
-	struct integrated_info info = { { { 0 } } };
-	struct dc_firmware_info fw_info = { { 0 } };
+	struct integrated_info info = {};
+	struct dc_firmware_info fw_info = {};
 	int i;
 
 	if (bp->integrated_info)
@@ -406,7 +406,7 @@ static void dce_clock_read_ss_info(struct dce_dccg *clk_dce)
 			bp, AS_SIGNAL_TYPE_GPU_PLL);
 
 	if (ss_info_num) {
-		struct spread_spectrum_info info = { { 0 } };
+		struct spread_spectrum_info info = {};
 		enum bp_result result = bp->funcs->get_spread_spectrum_info(
 				bp, AS_SIGNAL_TYPE_GPU_PLL, 0, &info);
 
@@ -464,7 +464,7 @@ static void dce12_update_clocks(struct dccg *dccg,
 			struct dc_clocks *new_clocks,
 			bool safe_to_lower)
 {
-	struct dm_pp_clock_for_voltage_req clock_voltage_req = {0};
+	struct dm_pp_clock_for_voltage_req clock_voltage_req = {};
 
 	if (should_set_clock(safe_to_lower, new_clocks->dispclk_khz, dccg->clks.dispclk_khz)) {
 		clock_voltage_req.clk_type = DM_PP_CLOCK_TYPE_DISPLAY_CLK;
@@ -572,7 +572,7 @@ static void dcn1_update_clocks(struct dccg *dccg,
 			&dc->res_pool->pp_smu_req;
 	struct pp_smu_display_requirement_rv smu_req = *smu_req_cur;
 	struct pp_smu_funcs_rv *pp_smu = dc->res_pool->pp_smu;
-	struct dm_pp_clock_for_voltage_req clock_voltage_req = {0};
+	struct dm_pp_clock_for_voltage_req clock_voltage_req = {};
 	bool send_request_to_increase = false;
 	bool send_request_to_lower = false;
 
@@ -834,7 +834,7 @@ struct dccg *dcn1_dccg_create(struct dc_context *ctx)
 {
 	struct dc_debug_options *debug = &ctx->dc->debug;
 	struct dc_bios *bp = ctx->dc_bios;
-	struct dc_firmware_info fw_info = { { 0 } };
+	struct dc_firmware_info fw_info = {};
 	struct dce_dccg *clk_dce = kzalloc(sizeof(*clk_dce), GFP_KERNEL);
 
 	if (clk_dce == NULL) {

@@ -47,7 +47,7 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
 	struct vi_mqd *m;
-	uint32_t se_mask[4] = {0}; /* 4 is the max # of SEs */
+	uint32_t se_mask[4] = {}; /* 4 is the max # of SEs */
 
 	if (q->cu_mask_count == 0)
 		return;

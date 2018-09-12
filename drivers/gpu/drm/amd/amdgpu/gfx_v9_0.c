@@ -4196,7 +4196,7 @@ static void gfx_v9_ring_emit_sb(struct amdgpu_ring *ring)
 
 static void gfx_v9_0_ring_emit_ce_meta(struct amdgpu_ring *ring)
 {
-	struct v9_ce_ib_state ce_payload = {0};
+	struct v9_ce_ib_state ce_payload = {};
 	uint64_t csa_addr;
 	int cnt;
 
@@ -4215,7 +4215,7 @@ static void gfx_v9_0_ring_emit_ce_meta(struct amdgpu_ring *ring)
 
 static void gfx_v9_0_ring_emit_de_meta(struct amdgpu_ring *ring)
 {
-	struct v9_de_ib_state de_payload = {0};
+	struct v9_de_ib_state de_payload = {};
 	uint64_t csa_addr, gds_addr;
 	int cnt;
 
