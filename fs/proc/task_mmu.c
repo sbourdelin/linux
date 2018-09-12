@@ -1583,6 +1583,16 @@ struct numa_maps_private {
 	struct numa_maps md;
 };
 
+#define NUMA_VAMAPS_BUFSZ      1024
+struct numa_vamaps_private {
+	struct mm_struct *mm;
+	struct numa_maps md;
+	u64 vm_start;
+	size_t from;
+	size_t count; /* residual bytes in buf at offset 'from' */
+	char buf[NUMA_VAMAPS_BUFSZ]; /* buffer */
+};
+
 static void gather_stats(struct page *page, struct numa_maps *md, int pte_dirty,
 			unsigned long nr_pages)
 {
@@ -1848,6 +1858,34 @@ static int pid_numa_maps_open(struct inode *inode, struct file *file)
 				sizeof(struct numa_maps_private));
 }
 
+static int numa_vamaps_open(struct inode *inode, struct file *file)
+{
+	struct mm_struct *mm;
+	struct numa_vamaps_private *nvm;
+	nvm = kzalloc(sizeof(struct numa_vamaps_private), GFP_KERNEL);
+	if (!nvm)
+		return -ENOMEM;
+
+	mm = proc_mem_open(inode, PTRACE_MODE_READ);
+	if (IS_ERR(mm)) {
+		kfree(nvm);
+		return PTR_ERR(mm);
+	}
+	nvm->mm = mm;
+	file->private_data = nvm;
+	return 0;
+}
+
+static int numa_vamaps_release(struct inode *inode, struct file *file)
+{
+	struct numa_vamaps_private *nvm = file->private_data;
+
+	if (nvm->mm)
+		mmdrop(nvm->mm);
+	kfree(nvm);
+	return 0;
+}
+
 const struct file_operations proc_pid_numa_maps_operations = {
 	.open		= pid_numa_maps_open,
 	.read		= seq_read,
@@ -1855,4 +1893,8 @@ const struct file_operations proc_pid_numa_maps_operations = {
 	.release	= proc_map_release,
 };
 
+const struct file_operations proc_numa_vamaps_operations = {
+	.open		= numa_vamaps_open,
+	.release	= numa_vamaps_release,
+};
 #endif /* CONFIG_NUMA */
