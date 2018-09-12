@@ -1527,9 +1527,8 @@ static struct nf_proto_net *tcp_get_net_proto(struct net *net)
 	return &net->ct.nf_ct_proto.tcp.pn;
 }
 
-const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp4 =
+const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp =
 {
-	.l3proto		= PF_INET,
 	.l4proto 		= IPPROTO_TCP,
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
 	.print_conntrack 	= tcp_print_conntrack,
@@ -1558,37 +1557,3 @@ const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp4 =
 	.init_net		= tcp_init_net,
 	.get_net_proto		= tcp_get_net_proto,
 };
-EXPORT_SYMBOL_GPL(nf_conntrack_l4proto_tcp4);
-
-const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp6 =
-{
-	.l3proto		= PF_INET6,
-	.l4proto 		= IPPROTO_TCP,
-#ifdef CONFIG_NF_CONNTRACK_PROCFS
-	.print_conntrack 	= tcp_print_conntrack,
-#endif
-	.packet 		= tcp_packet,
-	.can_early_drop		= tcp_can_early_drop,
-#if IS_ENABLED(CONFIG_NF_CT_NETLINK)
-	.nlattr_size		= TCP_NLATTR_SIZE,
-	.to_nlattr		= tcp_to_nlattr,
-	.from_nlattr		= nlattr_to_tcp,
-	.tuple_to_nlattr	= nf_ct_port_tuple_to_nlattr,
-	.nlattr_to_tuple	= nf_ct_port_nlattr_to_tuple,
-	.nlattr_tuple_size	= tcp_nlattr_tuple_size,
-	.nla_policy		= nf_ct_port_nla_policy,
-#endif
-#if IS_ENABLED(CONFIG_NF_CT_NETLINK_TIMEOUT)
-	.ctnl_timeout		= {
-		.nlattr_to_obj	= tcp_timeout_nlattr_to_obj,
-		.obj_to_nlattr	= tcp_timeout_obj_to_nlattr,
-		.nlattr_max	= CTA_TIMEOUT_TCP_MAX,
-		.obj_size	= sizeof(unsigned int) *
-					TCP_CONNTRACK_TIMEOUT_MAX,
-		.nla_policy	= tcp_timeout_nla_policy,
-	},
-#endif /* CONFIG_NF_CT_NETLINK_TIMEOUT */
-	.init_net		= tcp_init_net,
-	.get_net_proto		= tcp_get_net_proto,
-};
-EXPORT_SYMBOL_GPL(nf_conntrack_l4proto_tcp6);

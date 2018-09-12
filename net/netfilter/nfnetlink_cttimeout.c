@@ -125,7 +125,7 @@ static int cttimeout_new_timeout(struct net *net, struct sock *ctnl,
 		return -EBUSY;
 	}
 
-	l4proto = nf_ct_l4proto_find_get(l3num, l4num);
+	l4proto = nf_ct_l4proto_find_get(l4num);
 
 	/* This protocol is not supportted, skip. */
 	if (l4proto->l4proto != l4num) {
@@ -369,7 +369,7 @@ static int cttimeout_default_set(struct net *net, struct sock *ctnl,
 
 	l3num = ntohs(nla_get_be16(cda[CTA_TIMEOUT_L3PROTO]));
 	l4num = nla_get_u8(cda[CTA_TIMEOUT_L4PROTO]);
-	l4proto = nf_ct_l4proto_find_get(l3num, l4num);
+	l4proto = nf_ct_l4proto_find_get(l4num);
 
 	/* This protocol is not supported, skip. */
 	if (l4proto->l4proto != l4num) {
@@ -391,7 +391,7 @@ err:
 
 static int
 cttimeout_default_fill_info(struct net *net, struct sk_buff *skb, u32 portid,
-			    u32 seq, u32 type, int event,
+			    u32 seq, u32 type, int event, u16 l3num,
 			    const struct nf_conntrack_l4proto *l4proto)
 {
 	struct nlmsghdr *nlh;
@@ -408,7 +408,7 @@ cttimeout_default_fill_info(struct net *net, struct sk_buff *skb, u32 portid,
 	nfmsg->version = NFNETLINK_V0;
 	nfmsg->res_id = 0;
 
-	if (nla_put_be16(skb, CTA_TIMEOUT_L3PROTO, htons(l4proto->l3proto)) ||
+	if (nla_put_be16(skb, CTA_TIMEOUT_L3PROTO, htons(l3num)) ||
 	    nla_put_u8(skb, CTA_TIMEOUT_L4PROTO, l4proto->l4proto))
 		goto nla_put_failure;
 
@@ -454,7 +454,7 @@ static int cttimeout_default_get(struct net *net, struct sock *ctnl,
 
 	l3num = ntohs(nla_get_be16(cda[CTA_TIMEOUT_L3PROTO]));
 	l4num = nla_get_u8(cda[CTA_TIMEOUT_L4PROTO]);
-	l4proto = nf_ct_l4proto_find_get(l3num, l4num);
+	l4proto = nf_ct_l4proto_find_get(l4num);
 
 	/* This protocol is not supported, skip. */
 	if (l4proto->l4proto != l4num) {
@@ -472,6 +472,7 @@ static int cttimeout_default_get(struct net *net, struct sock *ctnl,
 					  nlh->nlmsg_seq,
 					  NFNL_MSG_TYPE(nlh->nlmsg_type),
 					  IPCTNL_MSG_TIMEOUT_DEFAULT_SET,
+					  l3num,
 					  l4proto);
 	if (ret <= 0) {
 		kfree_skb(skb2);
