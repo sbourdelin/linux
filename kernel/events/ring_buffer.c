@@ -101,6 +101,7 @@ again:
 
 out:
 	preempt_enable();
+	atomic_set(&rb->recursion, 0);
 }
 
 static __always_inline bool
@@ -140,6 +141,12 @@ __perf_output_begin(struct perf_output_handle *handle,
 		goto out;
 
 	if (unlikely(rb->paused)) {
+		if (rb->nr_pages)
+			local_inc(&rb->lost);
+		goto out;
+	}
+
+	if (atomic_cmpxchg(&rb->recursion, 0, 1) != 0) {
 		if (rb->nr_pages)
 			local_inc(&rb->lost);
 		goto out;
@@ -286,6 +293,7 @@ ring_buffer_init(struct ring_buffer *rb, long watermark, int flags)
 		rb->overwrite = 1;
 
 	atomic_set(&rb->refcount, 1);
+	atomic_set(&rb->recursion, 0);
 
 	INIT_LIST_HEAD(&rb->event_list);
 	spin_lock_init(&rb->event_lock);

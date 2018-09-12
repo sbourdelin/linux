@@ -11,6 +11,7 @@
 
 struct ring_buffer {
 	atomic_t			refcount;
+	atomic_t			recursion;
 	struct rcu_head			rcu_head;
 #ifdef CONFIG_PERF_USE_VMALLOC
 	struct work_struct		work;
