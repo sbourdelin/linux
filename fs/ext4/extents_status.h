@@ -183,6 +183,11 @@ static inline int ext4_es_is_mapped(struct extent_status *es)
 	return (ext4_es_is_written(es) || ext4_es_is_unwritten(es));
 }
 
+static inline int ext4_es_is_delonly(struct extent_status *es)
+{
+	return (ext4_es_is_delayed(es) && !ext4_es_is_unwritten(es));
+}
+
 static inline void ext4_es_set_referenced(struct extent_status *es)
 {
 	es->es_pblk |= ((ext4_fsblk_t)EXTENT_STATUS_REFERENCED) << ES_SHIFT;
@@ -239,5 +244,9 @@ extern void ext4_remove_pending(struct inode *inode, ext4_lblk_t lblk);
 extern bool ext4_is_pending(struct inode *inode, ext4_lblk_t lblk);
 extern int ext4_es_insert_delayed_block(struct inode *inode, ext4_lblk_t lblk,
 					bool allocated);
+extern unsigned int ext4_es_delayed_clu(struct inode *inode, ext4_lblk_t lblk,
+					ext4_lblk_t len);
+extern void ext4_es_remove_blks(struct inode *inode, ext4_lblk_t lblk,
+				ext4_lblk_t len);
 
 #endif /* _EXT4_EXTENTS_STATUS_H */
