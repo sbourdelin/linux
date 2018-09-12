@@ -733,17 +733,13 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 	rq = kmem_cache_alloc(i915->requests,
 			      GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	if (unlikely(!rq)) {
+		i915_retire_requests(i915);
+
 		/* Ratelimit ourselves to prevent oom from malicious clients */
 		rq = i915_gem_active_raw(&ce->ring->timeline->last_request,
 					 &i915->drm.struct_mutex);
-		if (rq && i915_request_wait(rq,
-					    I915_WAIT_LOCKED |
-					    I915_WAIT_INTERRUPTIBLE,
-					    1) == -EINTR) {
-			ret = -EINTR;
-			goto err_unreserve;
-		}
-		i915_retire_requests(i915);
+		if (rq)
+			cond_synchronize_rcu(rq->rcustate);
 
 		/*
 		 * We've forced the client to stall and catch up with whatever
@@ -762,6 +758,8 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 			goto err_unreserve;
 		}
 	}
+
+	rq->rcustate = get_state_synchronize_rcu();
 
 	INIT_LIST_HEAD(&rq->active_list);
 	rq->i915 = i915;
