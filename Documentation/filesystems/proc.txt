@@ -150,6 +150,9 @@ Table 1-1: Process specific entries in /proc
 		each mapping and flags associated with it
  numa_maps	an extension based on maps, showing the memory locality and
 		binding policy as well as mem usage (in pages) of each mapping.
+ numa_vamaps	Presents information about mapped address ranges to numa node
+		from where the physical memory is allocated.
+
 ..............................................................................
 
 For example, to get the status information of a process, all you have to do is
@@ -570,6 +573,24 @@ Where:
 "mapping details" summarizes mapping data such as mapping type, page usage counters,
 node locality page counters (N0 == node0, N1 == node1, ...) and the kernel page
 size, in KB, that is backing the mapping up.
+
+The /proc/pid/numa_vamaps shows mapped address ranges to numa node id from
+where the physical pages are allocated. For mapped address ranges not having
+any pages mapped a '-' is shown instead of the node id. Each line in the file
+will show address range to one numa node.
+
+address-range	numa-node-id
+
+00400000-00410000 N1
+00410000-0047f000 N0
+0047f000-00480000 N2
+00480000-00481000 -
+00481000-004a0000 N0
+004a0000-004a2000 -
+004a2000-004aa000 N2
+004aa000-004ad000 N0
+004ad000-004ae000 -
+..
 
 1.2 Kernel data
 ---------------
