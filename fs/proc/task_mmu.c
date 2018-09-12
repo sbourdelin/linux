@@ -2043,7 +2043,7 @@ static int numa_vamaps_open(struct inode *inode, struct file *file)
 	if (!nvm)
 		return -ENOMEM;
 
-	mm = proc_mem_open(inode, PTRACE_MODE_READ);
+	mm = proc_mem_open(inode, PTRACE_MODE_READ | PTRACE_MODE_REALCREDS);
 	if (IS_ERR(mm)) {
 		kfree(nvm);
 		return PTR_ERR(mm);

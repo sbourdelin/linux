@@ -745,7 +745,9 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 	struct mm_struct *mm = ERR_PTR(-ESRCH);
 
 	if (task) {
-		mm = mm_access(task, mode | PTRACE_MODE_FSCREDS);
+		if (!(mode & PTRACE_MODE_REALCREDS))
+			mode |= PTRACE_MODE_FSCREDS;
+		mm = mm_access(task, mode);
 		put_task_struct(task);
 
 		if (!IS_ERR_OR_NULL(mm)) {
