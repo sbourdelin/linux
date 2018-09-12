@@ -196,23 +196,13 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 		const struct drm_bridge_timings *btimings = bridge->timings;
 
 		/*
-		 * Here is when things get really fun. Sometimes the bridge
-		 * timings are such that the signal out from PL11x is not
-		 * stable before the receiving bridge (such as a dumb VGA DAC
-		 * or similar) samples it. If that happens, we compensate by
-		 * the only method we have: output the data on the opposite
-		 * edge of the clock so it is for sure stable when it gets
-		 * sampled.
-		 *
-		 * The PL111 manual does not contain proper timining diagrams
-		 * or data for these details, but we know from experiments
-		 * that the setup time is more than 3000 picoseconds (3 ns).
-		 * If we have a bridge that requires the signal to be stable
-		 * earlier than 3000 ps before the clock pulse, we have to
-		 * output the data on the opposite edge to avoid flicker.
+		 * Use LCD Timing 2 Register Invert Pixel Clock (IPC) bit
+		 * to make sure to drive data on falling edge if requested
+		 * by bridge.
 		 */
-		if (btimings && btimings->setup_time_ps >= 3000)
-			tim2 ^= TIM2_IPC;
+		if (btimings && btimings->input_bus_flags &
+		    DRM_BUS_FLAG_PIXDATA_NEGEDGE)
+			tim2 |= TIM2_IPC;
 	}
 
 	tim2 |= cpl << 16;
