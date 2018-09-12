@@ -737,7 +737,7 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 		ret = i915_gem_wait_for_idle(i915,
 					     I915_WAIT_LOCKED |
 					     I915_WAIT_INTERRUPTIBLE,
-					     MAX_SCHEDULE_TIMEOUT);
+					     1);
 		if (ret)
 			goto err_unreserve;
 
