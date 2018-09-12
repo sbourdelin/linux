@@ -272,7 +272,8 @@ static int ip_finish_output_gso(struct net *net, struct sock *sk,
 		return -ENOMEM;
 	}
 
-	consume_skb(skb);
+	if (segs != skb)
+		consume_skb(skb);
 
 	do {
 		struct sk_buff *nskb = segs->next;

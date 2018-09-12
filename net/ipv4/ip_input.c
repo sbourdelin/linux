@@ -190,13 +190,19 @@ bool ip_call_ra_chain(struct sk_buff *skb)
 
 static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
-	__skb_pull(skb, skb_network_header_len(skb));
+	if (skb_shinfo(skb)->gso_type & SKB_GSO_FRAGLIST)
+		skb_segment_list(skb);
 
 	rcu_read_lock();
-	{
+	do {
 		int protocol = ip_hdr(skb)->protocol;
 		const struct net_protocol *ipprot;
+		struct sk_buff *nskb = skb->next;
 		int raw;
+
+		skb->next = NULL;
+
+		__skb_pull(skb, skb_network_header_len(skb));
 
 	resubmit:
 		raw = raw_local_deliver(skb, protocol);
@@ -208,7 +214,7 @@ static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_b
 			if (!ipprot->no_policy) {
 				if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 					kfree_skb(skb);
-					goto out;
+					continue;
 				}
 				nf_reset(skb);
 			}
@@ -231,8 +237,8 @@ static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_b
 				consume_skb(skb);
 			}
 		}
-	}
- out:
+		skb = nskb;
+	} while (skb);
 	rcu_read_unlock();
 
 	return 0;
@@ -403,6 +409,10 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	int ret;
 
+	/* Remove any debris in the socket control block */
+	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
+	IPCB(skb)->iif = skb->skb_iif;
+
 	/* if ingress device is enslaved to an L3 master device pass the
 	 * skb to its handler for processing
 	 */
@@ -416,10 +426,108 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 	return ret;
 }
 
+struct dissect_skb_cb {
+	struct sk_buff *last;
+	struct	flow_keys_digest keys;
+};
+
+static inline struct dissect_skb_cb *dissect_skb_cb(const struct sk_buff *skb) {
+	return (struct dissect_skb_cb *)skb->cb;
+}
+
+static void ip_sublist_rcv(struct list_head *head, struct net_device *dev,
+			   struct net *net);
+
+static struct sk_buff *ip_flow_dissect(struct sk_buff *skb, struct list_head *rx_list)
+{
+	unsigned int maclen = skb->dev->hard_header_len;
+	const struct iphdr *iph  = ip_hdr(skb);
+	unsigned int gso_type = 0;
+	struct sk_buff *p;
+	u32 poff;
+
+	if (*(u8 *)iph != 0x45)
+		goto out;
+
+	if (ip_is_fragment(iph))
+		goto out;
+
+	dissect_skb_cb(skb)->last = NULL;
+	poff = skb_flow_keys_rx_digest(skb, &dissect_skb_cb(skb)->keys);
+	if (!poff)
+		goto out;
+
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		gso_type = SKB_GSO_TCPV4;
+		break;
+	case IPPROTO_UDP:
+		gso_type = SKB_GSO_UDP_L4;
+		break;
+	default:
+		goto out;
+	}
+
+	list_for_each_entry(p, rx_list, list) {
+		unsigned long diffs;
+
+		diffs = (unsigned long)p->dev ^ (unsigned long)skb->dev;
+		diffs |= p->vlan_tci ^ skb->vlan_tci;
+		diffs |= skb_metadata_dst_cmp(p, skb);
+		diffs |= skb_metadata_differs(p, skb);
+		if (maclen == ETH_HLEN)
+			diffs |= compare_ether_header(skb_mac_header(p),
+						      skb_mac_header(skb));
+		else if (!diffs)
+			diffs = memcmp(skb_mac_header(p),
+				       skb_mac_header(skb),
+				       maclen);
+
+		if (diffs)
+			continue;
+
+		if (memcmp(&dissect_skb_cb(p)->keys,
+			   &dissect_skb_cb(skb)->keys,
+			   sizeof(dissect_skb_cb(skb)->keys)))
+			continue;
+
+		if (p->len != skb->len) {
+			if (!list_empty(rx_list))
+				ip_sublist_rcv(rx_list, p->dev, dev_net(p->dev));
+			INIT_LIST_HEAD(rx_list);
+			goto out;
+	}
+
+		skb->next = NULL;
+		skb->prev = NULL;
+
+		if (!dissect_skb_cb(p)->last) {
+			skb_shinfo(p)->gso_size = p->len - poff;
+			skb_shinfo(p)->gso_type |= (SKB_GSO_FRAGLIST | gso_type);
+			skb_shinfo(p)->frag_list = skb;
+			skb_shinfo(p)->gso_segs = 1;
+		} else {
+			dissect_skb_cb(p)->last->next = skb;
+		}
+
+		dissect_skb_cb(p)->last = skb;
+
+		skb_shinfo(p)->gso_segs++;
+		p->data_len += skb->len;
+		p->truesize += skb->truesize;
+		p->len += skb->len;
+
+		return NULL;
+	}
+
+out:
+	return skb;
+}
+
 /*
  * 	Main IP Receive routine.
  */
-static struct sk_buff *ip_rcv_core(struct sk_buff *skb, struct net *net)
+static struct sk_buff *ip_rcv_core(struct list_head *head, struct sk_buff *skb, struct net *net)
 {
 	const struct iphdr *iph;
 	u32 len;
@@ -491,12 +599,13 @@ static struct sk_buff *ip_rcv_core(struct sk_buff *skb, struct net *net)
 
 	skb->transport_header = skb->network_header + iph->ihl*4;
 
-	/* Remove any debris in the socket control block */
-	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
-	IPCB(skb)->iif = skb->skb_iif;
-
 	/* Must drop socket now because of tproxy. */
 	skb_orphan(skb);
+
+	if (IN_DEV_FORWARD(__in_dev_get_rcu(skb->dev))) {
+		if (head)
+			return ip_flow_dissect(skb, head);
+	}
 
 	return skb;
 
@@ -518,9 +627,10 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt,
 {
 	struct net *net = dev_net(dev);
 
-	skb = ip_rcv_core(skb, net);
+	skb = ip_rcv_core(NULL, skb, net);
 	if (skb == NULL)
 		return NET_RX_DROP;
+
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
 		       net, NULL, skb, dev, NULL,
 		       ip_rcv_finish);
@@ -552,6 +662,11 @@ static void ip_list_rcv_finish(struct net *net, struct sock *sk,
 		struct dst_entry *dst;
 
 		list_del(&skb->list);
+
+		/* Remove any debris in the socket control block */
+		memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
+		IPCB(skb)->iif = skb->skb_iif;
+
 		/* if ingress device is enslaved to an L3 master device pass the
 		 * skb to its handler for processing
 		 */
@@ -599,7 +714,7 @@ void ip_list_rcv(struct list_head *head, struct packet_type *pt,
 		struct net *net = dev_net(dev);
 
 		list_del(&skb->list);
-		skb = ip_rcv_core(skb, net);
+		skb = ip_rcv_core(&sublist, skb, net);
 		if (skb == NULL)
 			continue;
 

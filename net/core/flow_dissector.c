@@ -1211,6 +1211,46 @@ static inline u32 ___skb_get_hash(const struct sk_buff *skb,
 	return __flow_hash_from_keys(keys, keyval);
 }
 
+struct _flow_keys_rx_digest_data {
+	__be16	n_proto;
+	u8	ip_proto;
+	u8	poff;
+	__be32	ports;
+	__be32	src;
+	__be32	dst;
+};
+
+u32 skb_flow_keys_rx_digest(struct sk_buff *skb, struct flow_keys_digest *digest)
+{
+	struct flow_keys keys;
+	struct _flow_keys_rx_digest_data *data =
+	    (struct _flow_keys_rx_digest_data *)digest;
+	struct flow_keys_basic *bkeys;
+	u32 poff;
+
+	__flow_hash_secret_init();
+
+	skb_flow_dissect_flow_keys(skb, &keys,
+				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
+
+	bkeys = (struct flow_keys_basic *)&keys;
+	poff = __skb_get_poff(skb, skb->data, bkeys, skb_headlen(skb));
+	if (poff > 255)
+		poff = 0;
+
+	BUILD_BUG_ON(sizeof(*data) > sizeof(*digest));
+
+	data->n_proto = keys.basic.n_proto;
+	data->ip_proto = keys.basic.ip_proto;
+	data->ports = keys.ports.ports;
+	data->poff = poff;
+	data->src = keys.addrs.v4addrs.src;
+	data->dst = keys.addrs.v4addrs.dst;
+
+	return poff;
+}
+EXPORT_SYMBOL(skb_flow_keys_rx_digest);
+
 struct _flow_keys_digest_data {
 	__be16	n_proto;
 	u8	ip_proto;

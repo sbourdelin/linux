@@ -3492,6 +3492,58 @@ static inline skb_frag_t skb_head_frag_to_page_desc(struct sk_buff *frag_skb)
 	return head_frag;
 }
 
+void skb_segment_list(struct sk_buff *skb)
+{
+	struct sk_buff *list_skb = skb_shinfo(skb)->frag_list;
+	unsigned int delta_truesize = 0;
+	unsigned int delta_len = 0;
+	struct sk_buff *tail = NULL;
+	struct sk_buff *nskb;
+
+
+	skb_shinfo(skb)->frag_list = NULL;
+
+	do {
+		nskb = list_skb;
+		list_skb = list_skb->next;
+
+		if (!tail)
+			skb->next = nskb;
+		else
+			tail->next = nskb;
+
+		tail = nskb;
+
+		delta_len += nskb->len;
+		delta_truesize += nskb->truesize;
+
+		if (!secpath_exists(nskb))
+			nskb->sp = secpath_get(skb->sp);
+
+		memcpy(nskb->cb, skb->cb, sizeof(skb->cb));
+
+		nskb->tstamp = skb->tstamp;
+		nskb->dev = skb->dev;
+		nskb->queue_mapping = skb->queue_mapping;
+
+		nskb->mac_len = skb->mac_len;
+		nskb->mac_header = skb->mac_header;
+		nskb->transport_header = skb->transport_header;
+		nskb->network_header = skb->network_header;
+		skb_dst_copy(nskb, skb);
+
+	} while (list_skb);
+
+	skb->truesize = skb->truesize - delta_truesize;
+	skb->data_len = skb->data_len - delta_len;
+	skb->len = skb->len - delta_len;
+
+	skb_gso_reset(skb);
+
+	skb->prev = tail;
+}
+EXPORT_SYMBOL_GPL(skb_segment_list);
+
 /**
  *	skb_segment - Perform protocol segmentation on skb.
  *	@head_skb: buffer to segment

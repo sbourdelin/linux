@@ -2995,6 +2995,34 @@ static inline bool skb_needs_check(struct sk_buff *skb, bool tx_path)
 	return skb->ip_summed == CHECKSUM_NONE;
 }
 
+static void skb_segment_list_ip(struct sk_buff *skb)
+{
+	unsigned int tnl_hlen = 0;
+	struct sk_buff *nskb;
+	int id;
+
+	id = ntohs(ip_hdr(skb)->id);
+	skb_segment_list(skb);
+
+	tnl_hlen = skb_tnl_header_len(skb);
+
+	nskb = skb->next;
+
+	do {
+		skb_push(nskb, skb_network_header(nskb) - skb_mac_header(nskb));
+		skb_headers_offset_update(nskb, skb_headroom(nskb) - skb_headroom(skb));
+		skb_copy_from_linear_data_offset(skb, -tnl_hlen,
+						 nskb->data - tnl_hlen,
+						 skb_transport_header(nskb) -
+						 skb_mac_header(nskb) +
+						 tnl_hlen);
+
+		ip_hdr(nskb)->id = htons(++id);
+		ip_send_check(ip_hdr(nskb));
+		nskb = nskb->next;
+	} while (nskb);
+}
+
 /**
  *	__skb_gso_segment - Perform segmentation on skb.
  *	@skb: buffer to segment
@@ -3012,6 +3040,21 @@ struct sk_buff *__skb_gso_segment(struct sk_buff *skb,
 				  netdev_features_t features, bool tx_path)
 {
 	struct sk_buff *segs;
+
+	if (skb_shinfo(skb)->gso_type & SKB_GSO_FRAGLIST) {
+		int dummy;
+
+		if (skb_network_protocol(skb, &dummy) != htons(ETH_P_IP))
+			return ERR_PTR(-EINVAL);
+
+		skb_segment_list_ip(skb);
+
+		if (skb_needs_linearize(skb, features) &&
+		    __skb_linearize(skb))
+			return ERR_PTR(-EINVAL);
+
+		return skb;
+	}
 
 	if (unlikely(skb_needs_check(skb, tx_path))) {
 		int err;
@@ -3286,7 +3329,7 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 		segs = skb_gso_segment(skb, features);
 		if (IS_ERR(segs)) {
 			goto out_kfree_skb;
-		} else if (segs) {
+		} else if (segs && segs != skb) {
 			consume_skb(skb);
 			skb = segs;
 		}
