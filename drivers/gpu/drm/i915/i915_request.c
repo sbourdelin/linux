@@ -734,12 +734,16 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 			      GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	if (unlikely(!rq)) {
 		/* Ratelimit ourselves to prevent oom from malicious clients */
-		ret = i915_gem_wait_for_idle(i915,
-					     I915_WAIT_LOCKED |
-					     I915_WAIT_INTERRUPTIBLE,
-					     1);
-		if (ret)
+		rq = i915_gem_active_raw(&ce->ring->timeline->last_request,
+					 &i915->drm.struct_mutex);
+		if (rq && i915_request_wait(rq,
+					    I915_WAIT_LOCKED |
+					    I915_WAIT_INTERRUPTIBLE,
+					    1) == -EINTR) {
+			ret = -EINTR;
 			goto err_unreserve;
+		}
+		i915_retire_requests(i915);
 
 		/*
 		 * We've forced the client to stall and catch up with whatever
