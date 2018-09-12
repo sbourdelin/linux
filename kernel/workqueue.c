@@ -1969,13 +1969,10 @@ restart:
 	mod_timer(&pool->mayday_timer, jiffies + MAYDAY_INITIAL_TIMEOUT);
 
 	while (true) {
-		if (create_worker(pool) || !need_to_create_worker(pool))
+		if (!need_to_create_worker(pool) || create_worker(pool))
 			break;
 
 		schedule_timeout_interruptible(CREATE_COOLDOWN);
-
-		if (!need_to_create_worker(pool))
-			break;
 	}
 
 	del_timer_sync(&pool->mayday_timer);
