@@ -5,9 +5,15 @@
 #ifdef CONFIG_X86_64
 #define __percpu_seg		gs
 #define __percpu_mov_op		movq
+# ifdef __SEG_GS
+#  define __percpu_addrspace	__seg_gs
+# endif
 #else
 #define __percpu_seg		fs
 #define __percpu_mov_op		movl
+# ifdef __SEG_FS
+#  define __percpu_addrspace	__seg_fs
+# endif
 #endif
 
 #ifdef __ASSEMBLY__
