@@ -2004,6 +2004,7 @@ void intel_display_power_put(struct drm_i915_private *dev_priv,
 	 */
 #define ICL_DISPLAY_DC_OFF_POWER_DOMAINS (		\
 	ICL_PW_2_POWER_DOMAINS |			\
+	BIT_ULL(POWER_DOMAIN_GT_IRQ) |			\
 	BIT_ULL(POWER_DOMAIN_MODESET) |			\
 	BIT_ULL(POWER_DOMAIN_AUX_A) |			\
 	BIT_ULL(POWER_DOMAIN_INIT))
