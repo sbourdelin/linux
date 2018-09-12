@@ -229,14 +229,14 @@ static int dumb_vga_remove(struct platform_device *pdev)
 /*
  * We assume the ADV7123 DAC is the "default" for historical reasons
  * Information taken from the ADV7123 datasheet, revision D.
- * NOTE: the ADV7123EP seems to have other timings and need a new timings
- * set if used.
  */
 static const struct drm_bridge_timings default_dac_timings = {
-	/* Timing specifications, datasheet page 7 */
+	/*
+	 * From Timing diagram, datasheet page 7. The bridge samples
+	 * on pixel clocks positive edge, hence the display controller
+	 * should drive signals on the negative edge.
+	 */
 	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-	.setup_time_ps = 500,
-	.hold_time_ps = 1500,
 };
 
 /*
@@ -246,10 +246,6 @@ static const struct drm_bridge_timings default_dac_timings = {
 static const struct drm_bridge_timings ti_ths8134_dac_timings = {
 	/* From timing diagram, datasheet page 9 */
 	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-	/* From datasheet, page 12 */
-	.setup_time_ps = 3000,
-	/* I guess this means latched input */
-	.hold_time_ps = 0,
 };
 
 /*
@@ -259,9 +255,6 @@ static const struct drm_bridge_timings ti_ths8134_dac_timings = {
 static const struct drm_bridge_timings ti_ths8135_dac_timings = {
 	/* From timing diagram, datasheet page 14 */
 	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-	/* From datasheet, page 16 */
-	.setup_time_ps = 2000,
-	.hold_time_ps = 500,
 };
 
 static const struct of_device_id dumb_vga_match[] = {

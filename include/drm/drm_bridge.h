@@ -251,20 +251,6 @@ struct drm_bridge_timings {
 	 * &drm_display_info->bus_flags.
 	 */
 	u32 input_bus_flags;
-	/**
-	 * @setup_time_ps:
-	 *
-	 * Defines the time in picoseconds the input data lines must be
-	 * stable before the clock edge.
-	 */
-	u32 setup_time_ps;
-	/**
-	 * @hold_time_ps:
-	 *
-	 * Defines the time in picoseconds taken for the bridge to sample the
-	 * input signal after the clock edge.
-	 */
-	u32 hold_time_ps;
 };
 
 /**
