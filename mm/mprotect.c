@@ -115,6 +115,17 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 			if (preserve_write)
 				ptent = pte_mk_savedwrite(ptent);
 
+                       /*
+                        * The extra PageDirty() check will make sure
+                        * we'll capture the dirty page even if the PTE
+                        * dirty bit is unset.  One case is when the
+                        * PTE is splitted from a huge PMD, in that
+                        * case the dirty flag might only be set on the
+                        * compound page instead of this PTE.
+                        */
+			if (PageDirty(pte_page(ptent)))
+				ptent = pte_mkdirty(ptent);
+
 			/* Avoid taking write faults for known dirty pages */
 			if (dirty_accountable && pte_dirty(ptent) &&
 					(pte_soft_dirty(ptent) ||
