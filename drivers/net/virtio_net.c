@@ -73,6 +73,10 @@ static const unsigned long guest_offloads[] = {
 	VIRTIO_NET_F_GUEST_UFO
 };
 
+static const char virtnet_ethtool_priv_flags[][ETH_GSTRING_LEN] = {
+	"tx-napi",
+};
+
 struct virtnet_stat_desc {
 	char desc[ETH_GSTRING_LEN];
 	size_t offset;
@@ -2059,6 +2063,9 @@ static void virtnet_get_strings(struct net_device *dev, u32 stringset, u8 *data)
 			}
 		}
 		break;
+	case ETH_SS_PRIV_FLAGS:
+		memcpy(data, virtnet_ethtool_priv_flags,
+		       sizeof(virtnet_ethtool_priv_flags));
 	}
 }
 
@@ -2070,6 +2077,9 @@ static int virtnet_get_sset_count(struct net_device *dev, int sset)
 	case ETH_SS_STATS:
 		return vi->curr_queue_pairs * (VIRTNET_RQ_STATS_LEN +
 					       VIRTNET_SQ_STATS_LEN);
+	case ETH_SS_PRIV_FLAGS:
+		return ARRAY_SIZE(virtnet_ethtool_priv_flags);
+
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -2181,6 +2191,43 @@ static int virtnet_get_link_ksettings(struct net_device *dev,
 	return 0;
 }
 
+static int virtnet_set_priv_flags(struct net_device *dev, u32 priv_flags)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	int i, napi_weight;
+
+	napi_weight = priv_flags & 0x1 ? NAPI_POLL_WEIGHT : 0;
+
+	if (napi_weight ^ vi->sq[0].napi.weight) {
+		for (i = 0; i < vi->max_queue_pairs; i++) {
+			struct netdev_queue *txq =
+				netdev_get_tx_queue(vi->dev, i);
+
+			virtnet_napi_tx_disable(&vi->sq[i].napi);
+			__netif_tx_lock_bh(txq);
+			vi->sq[i].napi.weight = napi_weight;
+			if (!napi_weight)
+				virtqueue_enable_cb(vi->sq[i].vq);
+			__netif_tx_unlock_bh(txq);
+			virtnet_napi_tx_enable(vi, vi->sq[i].vq,
+					       &vi->sq[i].napi);
+		}
+	}
+
+	return 0;
+}
+
+static u32 virtnet_get_priv_flags(struct net_device *dev)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	int priv_flags = 0;
+
+	if (vi->sq[0].napi.weight)
+		priv_flags |= 0x1;
+
+	return priv_flags;
+}
+
 static void virtnet_init_settings(struct net_device *dev)
 {
 	struct virtnet_info *vi = netdev_priv(dev);
@@ -2219,6 +2266,8 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.get_ts_info = ethtool_op_get_ts_info,
 	.get_link_ksettings = virtnet_get_link_ksettings,
 	.set_link_ksettings = virtnet_set_link_ksettings,
+	.set_priv_flags = virtnet_set_priv_flags,
+	.get_priv_flags = virtnet_get_priv_flags,
 };
 
 static void virtnet_freeze_down(struct virtio_device *vdev)
