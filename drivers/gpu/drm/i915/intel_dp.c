@@ -459,6 +459,8 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct drm_display_mode *fixed_mode = intel_connector->panel.fixed_mode;
+	struct drm_display_mode *downclock_mode =
+		intel_connector->panel.downclock_mode;
 	int target_clock = mode->clock;
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk;
@@ -475,7 +477,10 @@ intel_dp_mode_valid(struct drm_connector *connector,
 		if (mode->vdisplay > fixed_mode->vdisplay)
 			return MODE_PANEL;
 
-		target_clock = fixed_mode->clock;
+		if (target_clock < fixed_mode->clock && downclock_mode)
+			target_clock = downclock_mode->clock;
+		else
+			target_clock = fixed_mode->clock;
 	}
 
 	max_link_clock = intel_dp_max_link_rate(intel_dp);
