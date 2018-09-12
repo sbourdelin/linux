@@ -18,6 +18,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
 
 Optional properties:
 - vdd-supply: Power supply for DAC
+- de-active: Polarity of the data enable signal. 0 for active low, 1 for
+  active high, unset for system-specific defaults.
 
 Example
 -------
