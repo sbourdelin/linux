@@ -87,6 +87,9 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 	}
 
 	switch (pt->type) {
+	case NLA_REJECT:
+		return -EINVAL;
+
 	case NLA_FLAG:
 		if (attrlen > 0)
 			return -ERANGE;

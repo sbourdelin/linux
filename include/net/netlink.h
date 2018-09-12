@@ -180,6 +180,7 @@ enum {
 	NLA_S32,
 	NLA_S64,
 	NLA_BITFIELD32,
+	NLA_REJECT,
 	__NLA_TYPE_MAX,
 };
 
