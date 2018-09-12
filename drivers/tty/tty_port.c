@@ -74,7 +74,7 @@ void tty_port_init(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_init);
 
 /**
- * tty_port_link_device - link tty and tty_port
+ * tty_port_link_device() - Link tty and tty_port.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @index: index of the tty
@@ -94,7 +94,7 @@ void tty_port_link_device(struct tty_port *port,
 EXPORT_SYMBOL_GPL(tty_port_link_device);
 
 /**
- * tty_port_register_device - register tty device
+ * tty_port_register_device() - Register tty device.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @index: index of the tty
@@ -113,7 +113,7 @@ struct device *tty_port_register_device(struct tty_port *port,
 EXPORT_SYMBOL_GPL(tty_port_register_device);
 
 /**
- * tty_port_register_device_attr - register tty device
+ * tty_port_register_device_attr() - Register tty device.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @index: index of the tty
@@ -137,7 +137,7 @@ struct device *tty_port_register_device_attr(struct tty_port *port,
 EXPORT_SYMBOL_GPL(tty_port_register_device_attr);
 
 /**
- * tty_port_register_device_attr_serdev - register tty or serdev device
+ * tty_port_register_device_attr_serdev() - Register tty or serdev device.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @index: index of the tty
@@ -169,7 +169,7 @@ struct device *tty_port_register_device_attr_serdev(struct tty_port *port,
 EXPORT_SYMBOL_GPL(tty_port_register_device_attr_serdev);
 
 /**
- * tty_port_register_device_serdev - register tty or serdev device
+ * tty_port_register_device_serdev() - Register tty or serdev device.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @index: index of the tty
@@ -188,7 +188,7 @@ struct device *tty_port_register_device_serdev(struct tty_port *port,
 EXPORT_SYMBOL_GPL(tty_port_register_device_serdev);
 
 /**
- * tty_port_unregister_device - deregister a tty or serdev device
+ * tty_port_unregister_device() - Deregister a tty or serdev device.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @index: index of the tty
@@ -235,7 +235,7 @@ void tty_port_free_xmit_buf(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_free_xmit_buf);
 
 /**
- * tty_port_destroy -- destroy inited port
+ * tty_port_destroy() - Destroy inited port.
  * @port: tty port to be destroyed
  *
  * When a port was initialized using tty_port_init, one has to destroy the
@@ -273,11 +273,11 @@ void tty_port_put(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_put);
 
 /**
- *	tty_port_tty_get	-	get a tty reference
- *	@port: tty port
+ * tty_port_tty_get() - Get a tty reference.
+ * @port: tty port
  *
- *	Return a refcount protected tty instance or NULL if the port is not
- *	associated with a tty (eg due to close or hangup)
+ * Return a refcount protected tty instance or NULL if the port is not
+ * associated with a tty (eg due to close or hangup)
  */
 struct tty_struct *tty_port_tty_get(struct tty_port *port)
 {
@@ -292,12 +292,12 @@ struct tty_struct *tty_port_tty_get(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_tty_get);
 
 /**
- *	tty_port_tty_set	-	set the tty of a port
- *	@port: tty port
- *	@tty: the tty
+ * tty_port_tty_set - Set the tty of a port.
+ * @port: tty port
+ * @tty: the tty
  *
- *	Associate the port and tty pair. Manages any internal refcounts.
- *	Pass NULL to deassociate a port
+ * Associate the port and tty pair. Manages any internal refcounts.
+ * Pass NULL to deassociate a port
  */
 void tty_port_tty_set(struct tty_port *port, struct tty_struct *tty)
 {
@@ -333,13 +333,13 @@ out:
 }
 
 /**
- *	tty_port_hangup		-	hangup helper
- *	@port: tty port
+ * tty_port_hangup() - Hangup helper.
+ * @port: tty port
  *
- *	Perform port level tty hangup flag and count changes. Drop the tty
- *	reference.
+ * Perform port level tty hangup flag and count changes. Drop the tty
+ * reference.
  *
- *	Caller holds tty lock.
+ * Caller holds tty lock.
  */
 void tty_port_hangup(struct tty_port *port)
 {
@@ -362,8 +362,7 @@ void tty_port_hangup(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_hangup);
 
 /**
- * tty_port_tty_hangup - helper to hang up a tty
- *
+ * tty_port_tty_hangup() - Helper to hang up a tty.
  * @port: tty port
  * @check_clocal: hang only ttys with CLOCAL unset?
  */
@@ -378,8 +377,7 @@ void tty_port_tty_hangup(struct tty_port *port, bool check_clocal)
 EXPORT_SYMBOL_GPL(tty_port_tty_hangup);
 
 /**
- * tty_port_tty_wakeup - helper to wake up a tty
- *
+ * tty_port_tty_wakeup() - Helper to wake up a tty.
  * @port: tty port
  */
 void tty_port_tty_wakeup(struct tty_port *port)
@@ -389,12 +387,12 @@ void tty_port_tty_wakeup(struct tty_port *port)
 EXPORT_SYMBOL_GPL(tty_port_tty_wakeup);
 
 /**
- *	tty_port_carrier_raised	-	carrier raised check
- *	@port: tty port
+ * tty_port_carrier_raised() - Carrier raised check.
+ * @port: tty port
  *
- *	Wrapper for the carrier detect logic. For the moment this is used
- *	to hide some internal details. This will eventually become entirely
- *	internal to the tty port.
+ * Wrapper for the carrier detect logic. For the moment this is used
+ * to hide some internal details. This will eventually become entirely
+ * internal to the tty port.
  */
 int tty_port_carrier_raised(struct tty_port *port)
 {
@@ -405,12 +403,12 @@ int tty_port_carrier_raised(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_carrier_raised);
 
 /**
- *	tty_port_raise_dtr_rts	-	Raise DTR/RTS
- *	@port: tty port
+ * tty_port_raise_dtr_rts() - Raise DTR/RTS.
+ * @port: tty port
  *
- *	Wrapper for the DTR/RTS raise logic. For the moment this is used
- *	to hide some internal details. This will eventually become entirely
- *	internal to the tty port.
+ * Wrapper for the DTR/RTS raise logic. For the moment this is used
+ * to hide some internal details. This will eventually become entirely
+ * internal to the tty port.
  */
 void tty_port_raise_dtr_rts(struct tty_port *port)
 {
@@ -420,12 +418,12 @@ void tty_port_raise_dtr_rts(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_raise_dtr_rts);
 
 /**
- *	tty_port_lower_dtr_rts	-	Lower DTR/RTS
- *	@port: tty port
+ * tty_port_lower_dtr_rts() - Lower DTR/RTS.
+ * @port: tty port
  *
- *	Wrapper for the DTR/RTS raise logic. For the moment this is used
- *	to hide some internal details. This will eventually become entirely
- *	internal to the tty port.
+ * Wrapper for the DTR/RTS raise logic. For the moment this is used
+ * to hide some internal details. This will eventually become entirely
+ * internal to the tty port.
  */
 void tty_port_lower_dtr_rts(struct tty_port *port)
 {
@@ -435,28 +433,28 @@ void tty_port_lower_dtr_rts(struct tty_port *port)
 EXPORT_SYMBOL(tty_port_lower_dtr_rts);
 
 /**
- *	tty_port_block_til_ready	-	Waiting logic for tty open
- *	@port: the tty port being opened
- *	@tty: the tty device being bound
- *	@filp: the file pointer of the opener or NULL
+ * tty_port_block_til_ready() -	Waiting logic for tty open.
+ * @port: the tty port being opened
+ * @tty: the tty device being bound
+ * @filp: the file pointer of the opener or NULL
  *
- *	Implement the core POSIX/SuS tty behaviour when opening a tty device.
- *	Handles:
- *		- hangup (both before and during)
- *		- non blocking open
- *		- rts/dtr/dcd
- *		- signals
- *		- port flags and counts
+ * Implement the core POSIX/SuS tty behaviour when opening a tty device.
+ * Handles:
+ *  - hangup (both before and during)
+ *  - non blocking open
+ *  - rts/dtr/dcd
+ *  - signals
+ *  - port flags and counts
  *
- *	The passed tty_port must implement the carrier_raised method if it can
- *	do carrier detect and the dtr_rts method if it supports software
- *	management of these lines. Note that the dtr/rts raise is done each
- *	iteration as a hangup may have previously dropped them while we wait.
+ * The passed tty_port must implement the carrier_raised method if it can
+ * do carrier detect and the dtr_rts method if it supports software
+ * management of these lines. Note that the dtr/rts raise is done each
+ * iteration as a hangup may have previously dropped them while we wait.
  *
- *	Caller holds tty lock.
+ * Caller holds tty lock.
  *
- *      NB: May drop and reacquire tty lock when blocking, so tty and tty_port
- *      may have changed state (eg., may have been hung up).
+ * NB: May drop and reacquire tty lock when blocking, so tty and tty_port
+ * may have changed state (eg., may have been hung up).
  */
 int tty_port_block_til_ready(struct tty_port *port,
 				struct tty_struct *tty, struct file *filp)
@@ -623,7 +621,7 @@ void tty_port_close_end(struct tty_port *port, struct tty_struct *tty)
 EXPORT_SYMBOL(tty_port_close_end);
 
 /**
- * tty_port_close
+ * tty_port_close()
  *
  * Caller holds tty lock
  */
@@ -640,7 +638,7 @@ void tty_port_close(struct tty_port *port, struct tty_struct *tty,
 EXPORT_SYMBOL(tty_port_close);
 
 /**
- * tty_port_install - generic tty->ops->install handler
+ * tty_port_install() - Generic tty->ops->install handler.
  * @port: tty_port of the device
  * @driver: tty_driver for this device
  * @tty: tty to be installed
@@ -658,7 +656,7 @@ int tty_port_install(struct tty_port *port, struct tty_driver *driver,
 EXPORT_SYMBOL_GPL(tty_port_install);
 
 /**
- * tty_port_open
+ * tty_port_open()
  *
  * Caller holds tty lock.
  *
