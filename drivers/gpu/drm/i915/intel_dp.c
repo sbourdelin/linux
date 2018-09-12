@@ -6003,44 +6003,30 @@ void intel_edp_drrs_flush(struct drm_i915_private *dev_priv,
  * This function is  called only once at driver load to initialize basic
  * DRRS stuff.
  *
- * Returns:
- * Downclock mode if panel supports it, else return NULL.
- * DRRS support is determined by the presence of downclock mode (apart
- * from VBT setting).
  */
-static struct drm_display_mode *
+static void
 intel_dp_drrs_init(struct intel_connector *connector,
 		   struct drm_display_mode *fixed_mode)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
-	struct drm_display_mode *downclock_mode = NULL;
 
 	INIT_DELAYED_WORK(&dev_priv->drrs.work, intel_edp_drrs_downclock_work);
 	mutex_init(&dev_priv->drrs.mutex);
 
 	if (INTEL_GEN(dev_priv) <= 6) {
 		DRM_DEBUG_KMS("DRRS supported for Gen7 and above\n");
-		return NULL;
+		return;
 	}
 
 	if (dev_priv->vbt.drrs_type != SEAMLESS_DRRS_SUPPORT) {
 		DRM_DEBUG_KMS("VBT doesn't support DRRS\n");
-		return NULL;
-	}
-
-	downclock_mode = intel_find_panel_downclock(dev_priv, fixed_mode,
-						    &connector->base);
-
-	if (!downclock_mode) {
-		DRM_DEBUG_KMS("Downclock mode is not found. DRRS not supported\n");
-		return NULL;
+		return;
 	}
 
 	dev_priv->drrs.type = dev_priv->vbt.drrs_type;
 
 	dev_priv->drrs.refresh_rate_type = DRRS_HIGH_RR;
 	DRM_DEBUG_KMS("seamless DRRS supported for eDP panel.\n");
-	return downclock_mode;
 }
 
 static bool intel_edp_init_connector(struct intel_dp *intel_dp,
@@ -6108,8 +6094,13 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	list_for_each_entry(scan, &connector->probed_modes, head) {
 		if ((scan->type & DRM_MODE_TYPE_PREFERRED)) {
 			fixed_mode = drm_mode_duplicate(dev, scan);
-			downclock_mode = intel_dp_drrs_init(
-						intel_connector, fixed_mode);
+			downclock_mode = intel_find_panel_downclock(dev_priv,
+								    fixed_mode,
+								    connector);
+			if (downclock_mode)
+				intel_dp_drrs_init(intel_connector, fixed_mode);
+			else
+				DRM_DEBUG_KMS("Downclock mode is not found. DRRS not supported\n");
 			break;
 		}
 	}
