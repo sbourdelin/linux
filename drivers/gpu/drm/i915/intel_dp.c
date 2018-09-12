@@ -406,12 +406,21 @@ static bool intel_dp_can_link_train_fallback_for_edp(struct intel_dp *intel_dp,
 						     uint8_t lane_count)
 {
 	struct drm_display_mode *fixed_mode = intel_dp->attached_connector->panel.fixed_mode;
+	struct drm_display_mode *downclock_mode =
+		intel_dp->attached_connector->panel.downclock_mode;
 	int mode_rate, max_rate;
 
 	mode_rate = intel_dp_link_required(fixed_mode->clock, 18);
 	max_rate = intel_dp_max_data_rate(link_rate, lane_count);
-	if (mode_rate > max_rate)
+	if (mode_rate > max_rate) {
+		if (downclock_mode) {
+			mode_rate = intel_dp_link_required(downclock_mode->clock,
+							   18);
+			if (mode_rate > max_rate)
+				return false;
+		}
 		return false;
+	}
 
 	return true;
 }
