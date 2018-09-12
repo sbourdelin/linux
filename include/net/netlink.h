@@ -181,6 +181,8 @@ enum {
 	NLA_S64,
 	NLA_BITFIELD32,
 	NLA_REJECT,
+	NLA_ETH_ADDR,
+	NLA_ETH_ADDR_COMPAT,
 	__NLA_TYPE_MAX,
 };
 
@@ -213,6 +215,8 @@ enum {
  *                         data must point to a u32 value of valid flags
  *    NLA_REJECT           Reject this attribute, validation data may point
  *                         to a string to report as the error in extended ACK.
+ *    NLA_ETH_ADDR         Ethernet address, rejected if not exactly 6 octets.
+ *    NLA_ETH_ADDR_COMPAT  Ethernet address, only warns if not exactly 6 octets.
  *    All other            Minimum length of attribute payload
  *
  * Example:
