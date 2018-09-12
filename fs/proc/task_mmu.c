@@ -1569,8 +1569,14 @@ struct numa_maps {
 	unsigned long mapcount_max;
 	unsigned long dirty;
 	unsigned long swapcache;
+        unsigned long nextaddr;
+		 long nid;
+		 long isvamaps;
 	unsigned long node[MAX_NUMNODES];
 };
+
+#define        NUMA_VAMAPS_NID_NOPAGES         (-1)
+#define        NUMA_VAMAPS_NID_NONE    (-2)
 
 struct numa_maps_private {
 	struct proc_maps_private proc_maps;
@@ -1653,6 +1659,20 @@ static struct page *can_gather_numa_stats_pmd(pmd_t pmd,
 }
 #endif
 
+static bool
+vamap_match_nid(struct numa_maps *md, unsigned long addr, struct page *page)
+{
+	long target = (page ? page_to_nid(page) : NUMA_VAMAPS_NID_NOPAGES);
+
+	if (md->nid == NUMA_VAMAPS_NID_NONE)
+		md->nid = target;
+	if (md->nid == target)
+		return 0;
+	/* did not match */
+	md->nextaddr = addr;
+	return 1;
+}
+
 static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 		unsigned long end, struct mm_walk *walk)
 {
@@ -1661,6 +1681,7 @@ static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 	spinlock_t *ptl;
 	pte_t *orig_pte;
 	pte_t *pte;
+	int ret = 0;
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	ptl = pmd_trans_huge_lock(pmd, vma);
@@ -1668,11 +1689,13 @@ static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 		struct page *page;
 
 		page = can_gather_numa_stats_pmd(*pmd, vma, addr);
-		if (page)
+		if (md->isvamaps)
+			ret = vamap_match_nid(md, addr, page);
+		if (page && !ret)
 			gather_stats(page, md, pmd_dirty(*pmd),
 				     HPAGE_PMD_SIZE/PAGE_SIZE);
 		spin_unlock(ptl);
-		return 0;
+		return ret;
 	}
 
 	if (pmd_trans_unstable(pmd))
@@ -1681,6 +1704,10 @@ static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 	orig_pte = pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
 	do {
 		struct page *page = can_gather_numa_stats(*pte, vma, addr);
+		if (md->isvamaps && vamap_match_nid(md, addr, page)) {
+			ret = 1;
+			break;
+		}
 		if (!page)
 			continue;
 		gather_stats(page, md, pte_dirty(*pte), 1);
@@ -1688,7 +1715,7 @@ static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 	pte_unmap_unlock(orig_pte, ptl);
 	cond_resched();
-	return 0;
+	return ret;
 }
 #ifdef CONFIG_HUGETLB_PAGE
 static int gather_hugetlb_stats(pte_t *pte, unsigned long hmask,
@@ -1697,15 +1724,18 @@ static int gather_hugetlb_stats(pte_t *pte, unsigned long hmask,
 	pte_t huge_pte = huge_ptep_get(pte);
 	struct numa_maps *md;
 	struct page *page;
+	int ret = 0;
+	md = walk->private;
 
 	if (!pte_present(huge_pte))
-		return 0;
+		return (md->isvamaps ? vamap_match_nid(md, addr, NULL) : 0);
 
 	page = pte_page(huge_pte);
-	if (!page)
-		return 0;
+	if (md->isvamaps)
+		ret = vamap_match_nid(md, addr, page);
+	if (!page || ret)
+		return ret;
 
-	md = walk->private;
 	gather_stats(page, md, pte_dirty(huge_pte), 1);
 	return 0;
 }
