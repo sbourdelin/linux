@@ -1866,6 +1866,27 @@ static int gather_hole_info_vamap(unsigned long start, unsigned long end,
 	return 0;
 }
 
+static loff_t numa_vamaps_llseek(struct file *file, loff_t offset, int orig)
+{
+	struct numa_vamaps_private *nvm = file->private_data;
+
+	if (orig == SEEK_CUR && offset < 0 && nvm->vm_start < -offset)
+		return -EINVAL;
+
+	switch (orig) {
+	case SEEK_SET:
+		nvm->vm_start = offset & PAGE_MASK;
+		break;
+	case SEEK_CUR:
+		nvm->vm_start += offset;
+		nvm->vm_start = nvm->vm_start & PAGE_MASK;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return nvm->vm_start;
+}
+
 static int vamap_vprintf(struct numa_vamaps_private *nvm, const char *f, ...)
 {
 	va_list args;
@@ -2052,7 +2073,7 @@ const struct file_operations proc_pid_numa_maps_operations = {
 const struct file_operations proc_numa_vamaps_operations = {
 	.open		= numa_vamaps_open,
 	.read		= numa_vamaps_read,
-	.llseek		= noop_llseek,
+	.llseek		= numa_vamaps_llseek,
 	.release	= numa_vamaps_release,
 };
 #endif /* CONFIG_NUMA */
