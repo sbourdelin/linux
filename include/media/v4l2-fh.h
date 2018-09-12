@@ -42,6 +42,9 @@ struct v4l2_ctrl_handler;
  * @available: list of events waiting to be dequeued
  * @navailable: number of available events at @available list
  * @sequence: event sequence number
+ * @mutex: hold event subscriptions during subscribing;
+ *	   guarantee that the add and del event callbacks are orderly called
+ *
  * @m2m_ctx: pointer to &struct v4l2_m2m_ctx
  */
 struct v4l2_fh {
@@ -56,6 +59,7 @@ struct v4l2_fh {
 	struct list_head	available;
 	unsigned int		navailable;
 	u32			sequence;
+	struct mutex		mutex;
 
 #if IS_ENABLED(CONFIG_V4L2_MEM2MEM_DEV)
 	struct v4l2_m2m_ctx	*m2m_ctx;
