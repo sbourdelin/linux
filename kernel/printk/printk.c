@@ -2004,6 +2004,61 @@ asmlinkage __visible int printk(const char *fmt, ...)
 }
 EXPORT_SYMBOL(printk);
 
+#define PR_LINE_TRUNCATED_MSG "** truncated **\n"
+
+int vpr_line(struct pr_line *pl, const char *fmt, va_list args)
+{
+	int len;
+
+	if (unlikely(pl->size >= LOG_LINE_MAX))
+		pl->size = LOG_LINE_MAX - sizeof(PR_LINE_TRUNCATED_MSG);
+
+	if (fmt[0] == '\n') {
+		pr_line_flush(pl);
+		return 0;
+	}
+
+	if (pl->len >= pl->size)
+		return -1;
+
+	len = vsnprintf(pl->buffer + pl->len, pl->size - pl->len, fmt, args);
+	if (pl->len + len >= pl->size) {
+		pl->len = pl->size + 1;
+		return -1;
+	}
+
+	pl->len += len;
+	if (pl->len && pl->buffer[pl->len - 1] == '\n')
+		pr_line_flush(pl);
+	return 0;
+}
+EXPORT_SYMBOL(vpr_line);
+
+int pr_line(struct pr_line *pl, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vpr_line(pl, fmt, ap);
+	va_end(ap);
+	return ret;
+}
+EXPORT_SYMBOL(pr_line);
+
+void pr_line_flush(struct pr_line *pl)
+{
+	if (!pl->len)
+		return;
+
+	if (pl->len < pl->size)
+		printk("%s%.*s", pl->level, pl->len, pl->buffer);
+	else
+		printk("%s%.*s%s", pl->level, pl->len, pl->buffer,
+			PR_LINE_TRUNCATED_MSG);
+	pl->len = 0;
+}
+EXPORT_SYMBOL(pr_line_flush);
 #else /* CONFIG_PRINTK */
 
 #define LOG_LINE_MAX		0

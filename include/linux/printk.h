@@ -157,6 +157,15 @@ static inline void printk_nmi_direct_enter(void) { }
 static inline void printk_nmi_direct_exit(void) { }
 #endif /* PRINTK_NMI */
 
+#define PRINTK_PR_LINE_BUF_SZ	80
+
+struct pr_line {
+	char			*buffer;
+	int			size;
+	int			len;
+	char			*level;
+};
+
 #ifdef CONFIG_PRINTK
 asmlinkage __printf(5, 0)
 int vprintk_emit(int facility, int level,
@@ -209,6 +218,30 @@ extern asmlinkage void dump_stack(void) __cold;
 extern void printk_safe_init(void);
 extern void printk_safe_flush(void);
 extern void printk_safe_flush_on_panic(void);
+
+#define DEFINE_PR_LINE(lev, name)				\
+	char		__pr_line_buf[PRINTK_PR_LINE_BUF_SZ];	\
+	struct pr_line	name = {				\
+		.buffer = __pr_line_buf,			\
+		.size 	= PRINTK_PR_LINE_BUF_SZ,		\
+		.len 	= 0,					\
+		.level	= lev,					\
+	}
+
+#define DEFINE_PR_LINE_BUF(lev, name, buf, sz)			\
+	struct pr_line	name = {				\
+		.buffer = buf,					\
+		.size 	= (sz),					\
+		.len 	= 0,					\
+		.level	= lev,					\
+	}
+
+extern __printf(2, 3)
+int pr_line(struct pr_line *pl, const char *fmt, ...);
+extern __printf(2, 0)
+int vpr_line(struct pr_line *pl, const char *fmt, va_list args);
+extern void pr_line_flush(struct pr_line *pl);
+
 #else
 static inline __printf(1, 0)
 int vprintk(const char *s, va_list args)
@@ -282,6 +315,36 @@ static inline void printk_safe_flush(void)
 }
 
 static inline void printk_safe_flush_on_panic(void)
+{
+}
+
+#define DEFINE_PR_LINE(lev, name)				\
+	struct pr_line	name = {				\
+		.buffer = NULL,					\
+		.size 	= 0,					\
+		.len 	= 0,					\
+		.level	= lev,					\
+	}
+
+#define DEFINE_PR_LINE_BUF(lev, name, buf, sz)			\
+	struct pr_line	name = {				\
+		.buffer = buf,					\
+		.size 	= 0,					\
+		.len 	= 0,					\
+		.level	= lev,					\
+	}
+
+static inline __printf(2, 3)
+int pr_line(struct pr_line *pl, const char *fmt, ...)
+{
+	return 0;
+}
+static inline __printf(2, 0)
+int vpr_line(struct pr_line *pl, const char *fmt, va_list args)
+{
+	return 0;
+}
+static inline void pr_line_flush(struct pr_line *pl)
 {
 }
 #endif
