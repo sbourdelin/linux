@@ -1109,7 +1109,7 @@ archprepare: archheaders archscripts prepare1 scripts_basic
 prepare0: archprepare gcc-plugins
 	$(Q)$(MAKE) $(build)=.
 
-# All the preparing..
+# All the preparing...
 prepare: prepare0 prepare-objtool
 
 # Support for using generic headers in asm-generic
