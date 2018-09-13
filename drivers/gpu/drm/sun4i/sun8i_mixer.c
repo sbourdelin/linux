@@ -545,7 +545,15 @@ static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
 	.vi_num		= 1,
 };
 
-static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
+static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+	.vi_num = 2,
+	.ui_num = 1,
+	.scaler_mask = 0x3,
+	.ccsc = 0,
+	.mod_rate = 150000000,
+};
+
+static const struct sun8i_mixer_cfg sun50i_a64_mixer0_cfg = {
 	.ccsc		= 0,
 	.mod_rate	= 297000000,
 	.scaler_mask	= 0xf,
@@ -553,20 +561,12 @@ static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
 	.vi_num		= 1,
 };
 
-static const struct sun8i_mixer_cfg sun8i_r40_mixer1_cfg = {
+static const struct sun8i_mixer_cfg sun50i_a64_mixer1_cfg = {
 	.ccsc		= 1,
 	.mod_rate	= 297000000,
 	.scaler_mask	= 0x3,
 	.ui_num		= 1,
 	.vi_num		= 1,
-};
-
-static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
-	.vi_num = 2,
-	.ui_num = 1,
-	.scaler_mask = 0x3,
-	.ccsc = 0,
-	.mod_rate = 150000000,
 };
 
 static const struct of_device_id sun8i_mixer_of_table[] = {
@@ -583,16 +583,16 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
 		.data = &sun8i_h3_mixer0_cfg,
 	},
 	{
-		.compatible = "allwinner,sun8i-r40-de2-mixer-0",
-		.data = &sun8i_r40_mixer0_cfg,
-	},
-	{
-		.compatible = "allwinner,sun8i-r40-de2-mixer-1",
-		.data = &sun8i_r40_mixer1_cfg,
-	},
-	{
 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
 		.data = &sun8i_v3s_mixer_cfg,
+	},
+	{
+		.compatible = "allwinner,sun50i-a64-de2-mixer-0",
+		.data = &sun50i_a64_mixer0_cfg,
+	},
+	{
+		.compatible = "allwinner,sun50i-a64-de2-mixer-1",
+		.data = &sun50i_a64_mixer1_cfg,
 	},
 	{ }
 };

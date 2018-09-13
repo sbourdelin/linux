@@ -87,10 +87,10 @@ enum {
 enum { UDF_MAX_LINKS = 0xffff };
 
 /* These are the "meat" - everything else is stuffing */
-static int udf_fill_super(struct super_block *, void *, int);
+static int udf_fill_super(struct super_block *, void *, size_t, int);
 static void udf_put_super(struct super_block *);
 static int udf_sync_fs(struct super_block *, int);
-static int udf_remount_fs(struct super_block *, int *, char *);
+static int udf_remount_fs(struct super_block *, int *, char *, size_t);
 static void udf_load_logicalvolint(struct super_block *, struct kernel_extent_ad);
 static int udf_find_fileset(struct super_block *, struct kernel_lb_addr *,
 			    struct kernel_lb_addr *);
@@ -126,9 +126,11 @@ struct logicalVolIntegrityDescImpUse *udf_sb_lvidiu(struct super_block *sb)
 
 /* UDF filesystem type */
 static struct dentry *udf_mount(struct file_system_type *fs_type,
-		      int flags, const char *dev_name, void *data)
+				int flags, const char *dev_name,
+				void *data, size_t data_size)
 {
-	return mount_bdev(fs_type, flags, dev_name, data, udf_fill_super);
+	return mount_bdev(fs_type, flags, dev_name, data, data_size,
+			  udf_fill_super);
 }
 
 static struct file_system_type udf_fstype = {
@@ -290,12 +292,8 @@ static void udf_free_partition(struct udf_part_map *map)
 
 	if (map->s_partition_flags & UDF_PART_FLAG_UNALLOC_TABLE)
 		iput(map->s_uspace.s_table);
-	if (map->s_partition_flags & UDF_PART_FLAG_FREED_TABLE)
-		iput(map->s_fspace.s_table);
 	if (map->s_partition_flags & UDF_PART_FLAG_UNALLOC_BITMAP)
 		udf_sb_free_bitmap(map->s_uspace.s_bitmap);
-	if (map->s_partition_flags & UDF_PART_FLAG_FREED_BITMAP)
-		udf_sb_free_bitmap(map->s_fspace.s_bitmap);
 	if (map->s_partition_type == UDF_SPARABLE_MAP15)
 		for (i = 0; i < 4; i++)
 			brelse(map->s_type_specific.s_sparing.s_spar_map[i]);
@@ -608,19 +606,17 @@ static int udf_parse_options(char *options, struct udf_options *uopt,
 	return 1;
 }
 
-static int udf_remount_fs(struct super_block *sb, int *flags, char *options)
+static int udf_remount_fs(struct super_block *sb, int *flags,
+			  char *options, size_t data_size)
 {
 	struct udf_options uopt;
 	struct udf_sb_info *sbi = UDF_SB(sb);
 	int error = 0;
-	struct logicalVolIntegrityDescImpUse *lvidiu = udf_sb_lvidiu(sb);
+
+	if (!(*flags & SB_RDONLY) && UDF_QUERY_FLAG(sb, UDF_FLAG_RW_INCOMPAT))
+		return -EACCES;
 
 	sync_filesystem(sb);
-	if (lvidiu) {
-		int write_rev = le16_to_cpu(lvidiu->minUDFWriteRev);
-		if (write_rev > UDF_MAX_WRITE_VERSION && !(*flags & SB_RDONLY))
-			return -EACCES;
-	}
 
 	uopt.flags = sbi->s_flags;
 	uopt.uid   = sbi->s_uid;
@@ -988,12 +984,62 @@ static struct udf_bitmap *udf_sb_alloc_bitmap(struct super_block *sb, u32 index)
 	return bitmap;
 }
 
+static int check_partition_desc(struct super_block *sb,
+				struct partitionDesc *p,
+				struct udf_part_map *map)
+{
+	bool umap, utable, fmap, ftable;
+	struct partitionHeaderDesc *phd;
+
+	switch (le32_to_cpu(p->accessType)) {
+	case PD_ACCESS_TYPE_READ_ONLY:
+	case PD_ACCESS_TYPE_WRITE_ONCE:
+	case PD_ACCESS_TYPE_REWRITABLE:
+	case PD_ACCESS_TYPE_NONE:
+		goto force_ro;
+	}
+
+	/* No Partition Header Descriptor? */
+	if (strcmp(p->partitionContents.ident, PD_PARTITION_CONTENTS_NSR02) &&
+	    strcmp(p->partitionContents.ident, PD_PARTITION_CONTENTS_NSR03))
+		goto force_ro;
+
+	phd = (struct partitionHeaderDesc *)p->partitionContentsUse;
+	utable = phd->unallocSpaceTable.extLength;
+	umap = phd->unallocSpaceBitmap.extLength;
+	ftable = phd->freedSpaceTable.extLength;
+	fmap = phd->freedSpaceBitmap.extLength;
+
+	/* No allocation info? */
+	if (!utable && !umap && !ftable && !fmap)
+		goto force_ro;
+
+	/* We don't support blocks that require erasing before overwrite */
+	if (ftable || fmap)
+		goto force_ro;
+	/* UDF 2.60: 2.3.3 - no mixing of tables & bitmaps, no VAT. */
+	if (utable && umap)
+		goto force_ro;
+
+	if (map->s_partition_type == UDF_VIRTUAL_MAP15 ||
+	    map->s_partition_type == UDF_VIRTUAL_MAP20)
+		goto force_ro;
+
+	return 0;
+force_ro:
+	if (!sb_rdonly(sb))
+		return -EACCES;
+	UDF_SET_FLAG(sb, UDF_FLAG_RW_INCOMPAT);
+	return 0;
+}
+
 static int udf_fill_partdesc_info(struct super_block *sb,
 		struct partitionDesc *p, int p_index)
 {
 	struct udf_part_map *map;
 	struct udf_sb_info *sbi = UDF_SB(sb);
 	struct partitionHeaderDesc *phd;
+	int err;
 
 	map = &sbi->s_partmaps[p_index];
 
@@ -1013,8 +1059,16 @@ static int udf_fill_partdesc_info(struct super_block *sb,
 		  p_index, map->s_partition_type,
 		  map->s_partition_root, map->s_partition_len);
 
-	if (strcmp(p->partitionContents.ident, PD_PARTITION_CONTENTS_NSR02) &&
-	    strcmp(p->partitionContents.ident, PD_PARTITION_CONTENTS_NSR03))
+	err = check_partition_desc(sb, p, map);
+	if (err)
+		return err;
+
+	/*
+	 * Skip loading allocation info it we cannot ever write to the fs.
+	 * This is a correctness thing as we may have decided to force ro mount
+	 * to avoid allocation info we don't support.
+	 */
+	if (UDF_QUERY_FLAG(sb, UDF_FLAG_RW_INCOMPAT))
 		return 0;
 
 	phd = (struct partitionHeaderDesc *)p->partitionContentsUse;
@@ -1050,40 +1104,6 @@ static int udf_fill_partdesc_info(struct super_block *sb,
 			  p_index, bitmap->s_extPosition);
 	}
 
-	if (phd->partitionIntegrityTable.extLength)
-		udf_debug("partitionIntegrityTable (part %d)\n", p_index);
-
-	if (phd->freedSpaceTable.extLength) {
-		struct kernel_lb_addr loc = {
-			.logicalBlockNum = le32_to_cpu(
-				phd->freedSpaceTable.extPosition),
-			.partitionReferenceNum = p_index,
-		};
-		struct inode *inode;
-
-		inode = udf_iget_special(sb, &loc);
-		if (IS_ERR(inode)) {
-			udf_debug("cannot load freedSpaceTable (part %d)\n",
-				  p_index);
-			return PTR_ERR(inode);
-		}
-		map->s_fspace.s_table = inode;
-		map->s_partition_flags |= UDF_PART_FLAG_FREED_TABLE;
-		udf_debug("freedSpaceTable (part %d) @ %lu\n",
-			  p_index, map->s_fspace.s_table->i_ino);
-	}
-
-	if (phd->freedSpaceBitmap.extLength) {
-		struct udf_bitmap *bitmap = udf_sb_alloc_bitmap(sb, p_index);
-		if (!bitmap)
-			return -ENOMEM;
-		map->s_fspace.s_bitmap = bitmap;
-		bitmap->s_extPosition = le32_to_cpu(
-				phd->freedSpaceBitmap.extPosition);
-		map->s_partition_flags |= UDF_PART_FLAG_FREED_BITMAP;
-		udf_debug("freedSpaceBitmap (part %d) @ %u\n",
-			  p_index, bitmap->s_extPosition);
-	}
 	return 0;
 }
 
@@ -1257,6 +1277,7 @@ static int udf_load_partdesc(struct super_block *sb, sector_t block)
 			ret = -EACCES;
 			goto out_bh;
 		}
+		UDF_SET_FLAG(sb, UDF_FLAG_RW_INCOMPAT);
 		ret = udf_load_vat(sb, i, type1_idx);
 		if (ret < 0)
 			goto out_bh;
@@ -2032,7 +2053,8 @@ u64 lvid_get_unique_id(struct super_block *sb)
 	return ret;
 }
 
-static int udf_fill_super(struct super_block *sb, void *options, int silent)
+static int udf_fill_super(struct super_block *sb,
+			  void *options, size_t data_size, int silent)
 {
 	int ret = -EINVAL;
 	struct inode *inode = NULL;
@@ -2155,10 +2177,12 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 				UDF_MAX_READ_VERSION);
 			ret = -EINVAL;
 			goto error_out;
-		} else if (minUDFWriteRev > UDF_MAX_WRITE_VERSION &&
-			   !sb_rdonly(sb)) {
-			ret = -EACCES;
-			goto error_out;
+		} else if (minUDFWriteRev > UDF_MAX_WRITE_VERSION) {
+			if (!sb_rdonly(sb)) {
+				ret = -EACCES;
+				goto error_out;
+			}
+			UDF_SET_FLAG(sb, UDF_FLAG_RW_INCOMPAT);
 		}
 
 		sbi->s_udfrev = minUDFWriteRev;
@@ -2176,10 +2200,12 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	}
 
 	if (sbi->s_partmaps[sbi->s_partition].s_partition_flags &
-			UDF_PART_FLAG_READ_ONLY &&
-	    !sb_rdonly(sb)) {
-		ret = -EACCES;
-		goto error_out;
+			UDF_PART_FLAG_READ_ONLY) {
+		if (!sb_rdonly(sb)) {
+			ret = -EACCES;
+			goto error_out;
+		}
+		UDF_SET_FLAG(sb, UDF_FLAG_RW_INCOMPAT);
 	}
 
 	if (udf_find_fileset(sb, &fileset, &rootdir)) {
@@ -2433,10 +2459,6 @@ static unsigned int udf_count_free(struct super_block *sb)
 		accum += udf_count_free_bitmap(sb,
 					       map->s_uspace.s_bitmap);
 	}
-	if (map->s_partition_flags & UDF_PART_FLAG_FREED_BITMAP) {
-		accum += udf_count_free_bitmap(sb,
-					       map->s_fspace.s_bitmap);
-	}
 	if (accum)
 		return accum;
 
@@ -2444,11 +2466,6 @@ static unsigned int udf_count_free(struct super_block *sb)
 		accum += udf_count_free_table(sb,
 					      map->s_uspace.s_table);
 	}
-	if (map->s_partition_flags & UDF_PART_FLAG_FREED_TABLE) {
-		accum += udf_count_free_table(sb,
-					      map->s_fspace.s_table);
-	}
-
 	return accum;
 }
 

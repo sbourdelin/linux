@@ -572,12 +572,8 @@ union rcu_special {
 	struct {
 		u8			blocked;
 		u8			need_qs;
-		u8			exp_need_qs;
-
-		/* Otherwise the compiler can store garbage here: */
-		u8			pad;
 	} b; /* Bits. */
-	u32 s; /* Set of bits. */
+	u16 s; /* Set of bits. */
 };
 
 enum perf_event_task_context {
@@ -743,6 +739,12 @@ struct task_struct {
 	/* to be used once the psi infrastructure lands upstream. */
 	unsigned			use_memdelay:1;
 #endif
+
+	/*
+	 * May usercopy functions fault on kernel addresses?
+	 * This is not just a single bit because this can potentially nest.
+	 */
+	unsigned int			kernel_uaccess_faults_ok;
 
 	unsigned long			atomic_flags; /* Flags requiring atomic access. */
 
@@ -1206,6 +1208,11 @@ struct task_struct {
 	unsigned int			getblk_executed;
 	unsigned int			getblk_bh_count;
 	unsigned long			getblk_bh_state;
+#endif
+
+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+	unsigned long			lowest_stack;
+	unsigned long			prev_lowest_stack;
 #endif
 
 	/*

@@ -750,8 +750,8 @@ static bool rt5682_readable_register(struct device *dev, unsigned int reg)
 }
 
 static const DECLARE_TLV_DB_SCALE(hp_vol_tlv, -2250, 150, 0);
-static const DECLARE_TLV_DB_SCALE(dac_vol_tlv, -65625, 375, 0);
-static const DECLARE_TLV_DB_SCALE(adc_vol_tlv, -17625, 375, 0);
+static const DECLARE_TLV_DB_SCALE(dac_vol_tlv, -6525, 75, 0);
+static const DECLARE_TLV_DB_SCALE(adc_vol_tlv, -1725, 75, 0);
 static const DECLARE_TLV_DB_SCALE(adc_bst_tlv, 0, 1200, 0);
 
 /* {0, +20, +24, +30, +35, +40, +44, +50, +52} dB */
@@ -1114,7 +1114,7 @@ static const struct snd_kcontrol_new rt5682_snd_controls[] = {
 
 	/* DAC Digital Volume */
 	SOC_DOUBLE_TLV("DAC1 Playback Volume", RT5682_DAC1_DIG_VOL,
-		RT5682_L_VOL_SFT, RT5682_R_VOL_SFT, 175, 0, dac_vol_tlv),
+		RT5682_L_VOL_SFT + 1, RT5682_R_VOL_SFT + 1, 86, 0, dac_vol_tlv),
 
 	/* IN Boost Volume */
 	SOC_SINGLE_TLV("CBJ Boost Volume", RT5682_CBJ_BST_CTRL,
@@ -1124,7 +1124,7 @@ static const struct snd_kcontrol_new rt5682_snd_controls[] = {
 	SOC_DOUBLE("STO1 ADC Capture Switch", RT5682_STO1_ADC_DIG_VOL,
 		RT5682_L_MUTE_SFT, RT5682_R_MUTE_SFT, 1, 1),
 	SOC_DOUBLE_TLV("STO1 ADC Capture Volume", RT5682_STO1_ADC_DIG_VOL,
-		RT5682_L_VOL_SFT, RT5682_R_VOL_SFT, 127, 0, adc_vol_tlv),
+		RT5682_L_VOL_SFT + 1, RT5682_R_VOL_SFT + 1, 63, 0, adc_vol_tlv),
 
 	/* ADC Boost Volume Control */
 	SOC_DOUBLE_TLV("STO1 ADC Boost Gain Volume", RT5682_STO1_ADC_BOOST,
@@ -2419,7 +2419,8 @@ static const struct regmap_config rt5682_regmap = {
 	.cache_type = REGCACHE_RBTREE,
 	.reg_defaults = rt5682_reg,
 	.num_reg_defaults = ARRAY_SIZE(rt5682_reg),
-	.use_single_rw = true,
+	.use_single_read = true,
+	.use_single_write = true,
 };
 
 static const struct i2c_device_id rt5682_i2c_id[] = {
@@ -2454,27 +2455,15 @@ static void rt5682_calibrate(struct rt5682_priv *rt5682)
 	regmap_write(rt5682->regmap, RT5682_PWR_ANLG_1, 0xa2bf);
 	usleep_range(15000, 20000);
 	regmap_write(rt5682->regmap, RT5682_PWR_ANLG_1, 0xf2bf);
-	regmap_write(rt5682->regmap, RT5682_MICBIAS_2, 0x0380);
-	regmap_write(rt5682->regmap, RT5682_PWR_DIG_1, 0x8001);
-	regmap_write(rt5682->regmap, RT5682_TEST_MODE_CTRL_1, 0x0000);
-	regmap_write(rt5682->regmap, RT5682_STO1_DAC_MIXER, 0x2080);
-	regmap_write(rt5682->regmap, RT5682_STO1_ADC_MIXER, 0x4040);
-	regmap_write(rt5682->regmap, RT5682_DEPOP_1, 0x0069);
+	regmap_write(rt5682->regmap, RT5682_MICBIAS_2, 0x0300);
+	regmap_write(rt5682->regmap, RT5682_GLB_CLK, 0x8000);
+	regmap_write(rt5682->regmap, RT5682_PWR_DIG_1, 0x0100);
 	regmap_write(rt5682->regmap, RT5682_CHOP_DAC, 0x3000);
-	regmap_write(rt5682->regmap, RT5682_HP_CTRL_2, 0x6000);
-	regmap_write(rt5682->regmap, RT5682_HP_CHARGE_PUMP_1, 0x0f26);
-	regmap_write(rt5682->regmap, RT5682_CALIB_ADC_CTRL, 0x7f05);
-	regmap_write(rt5682->regmap, RT5682_STO1_ADC_MIXER, 0x686c);
-	regmap_write(rt5682->regmap, RT5682_CAL_REC, 0x0d0d);
-	regmap_write(rt5682->regmap, RT5682_HP_CALIB_CTRL_9, 0x000f);
-	regmap_write(rt5682->regmap, RT5682_PWR_DIG_1, 0x8d01);
 	regmap_write(rt5682->regmap, RT5682_HP_CALIB_CTRL_2, 0x0321);
 	regmap_write(rt5682->regmap, RT5682_HP_LOGIC_CTRL_2, 0x0004);
 	regmap_write(rt5682->regmap, RT5682_HP_CALIB_CTRL_1, 0x7c00);
 	regmap_write(rt5682->regmap, RT5682_HP_CALIB_CTRL_3, 0x06a1);
-	regmap_write(rt5682->regmap, RT5682_A_DAC1_MUX, 0x0311);
-	regmap_write(rt5682->regmap, RT5682_RESET_HPF_CTRL, 0x0000);
-	regmap_write(rt5682->regmap, RT5682_ADC_STO1_HP_CTRL_1, 0x3320);
+	regmap_write(rt5682->regmap, RT5682_HP_CALIB_CTRL_1, 0x7c00);
 
 	regmap_write(rt5682->regmap, RT5682_HP_CALIB_CTRL_1, 0xfc00);
 
@@ -2490,7 +2479,7 @@ static void rt5682_calibrate(struct rt5682_priv *rt5682)
 		pr_err("HP Calibration Failure\n");
 
 	/* restore settings */
-	regmap_write(rt5682->regmap, RT5682_STO1_ADC_MIXER, 0xc0c4);
+	regmap_write(rt5682->regmap, RT5682_GLB_CLK, 0x0000);
 	regmap_write(rt5682->regmap, RT5682_PWR_DIG_1, 0x0000);
 
 	mutex_unlock(&rt5682->calibrate_mutex);

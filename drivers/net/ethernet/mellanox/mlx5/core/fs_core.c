@@ -76,6 +76,14 @@
 					   FS_CAP(flow_table_properties_nic_receive.identified_miss_table_mode), \
 					   FS_CAP(flow_table_properties_nic_receive.flow_table_modify))
 
+#define FS_CHAINING_CAPS_EGRESS                                                \
+	FS_REQUIRED_CAPS(                                                      \
+		FS_CAP(flow_table_properties_nic_transmit.flow_modify_en),     \
+		FS_CAP(flow_table_properties_nic_transmit.modify_root),        \
+		FS_CAP(flow_table_properties_nic_transmit                      \
+			       .identified_miss_table_mode),                   \
+		FS_CAP(flow_table_properties_nic_transmit.flow_table_modify))
+
 #define LEFTOVERS_NUM_LEVELS 1
 #define LEFTOVERS_NUM_PRIOS 1
 
@@ -148,6 +156,17 @@ static struct init_tree_node {
 			 ADD_NS(ADD_MULTIPLE_PRIO(LEFTOVERS_NUM_PRIOS, LEFTOVERS_NUM_LEVELS))),
 		ADD_PRIO(0, ANCHOR_MIN_LEVEL, 0, {},
 			 ADD_NS(ADD_MULTIPLE_PRIO(ANCHOR_NUM_PRIOS, ANCHOR_NUM_LEVELS))),
+	}
+};
+
+static struct init_tree_node egress_root_fs = {
+	.type = FS_TYPE_NAMESPACE,
+	.ar_size = 1,
+	.children = (struct init_tree_node[]) {
+		ADD_PRIO(0, MLX5_BY_PASS_NUM_PRIOS, 0,
+			 FS_CHAINING_CAPS_EGRESS,
+			 ADD_NS(ADD_MULTIPLE_PRIO(MLX5_BY_PASS_NUM_PRIOS,
+						  BY_PASS_PRIO_NUM_LEVELS))),
 	}
 };
 
@@ -1388,7 +1407,7 @@ static bool check_conflicting_actions(u32 action1, u32 action2)
 		return false;
 
 	if (xored_actions & (MLX5_FLOW_CONTEXT_ACTION_DROP  |
-			     MLX5_FLOW_CONTEXT_ACTION_ENCAP |
+			     MLX5_FLOW_CONTEXT_ACTION_PACKET_REFORMAT |
 			     MLX5_FLOW_CONTEXT_ACTION_DECAP |
 			     MLX5_FLOW_CONTEXT_ACTION_MOD_HDR  |
 			     MLX5_FLOW_CONTEXT_ACTION_VLAN_POP |
@@ -1578,6 +1597,33 @@ static u64 matched_fgs_get_version(struct list_head *match_head)
 	return version;
 }
 
+static struct fs_fte *
+lookup_fte_locked(struct mlx5_flow_group *g,
+		  u32 *match_value,
+		  bool take_write)
+{
+	struct fs_fte *fte_tmp;
+
+	if (take_write)
+		nested_down_write_ref_node(&g->node, FS_LOCK_PARENT);
+	else
+		nested_down_read_ref_node(&g->node, FS_LOCK_PARENT);
+	fte_tmp = rhashtable_lookup_fast(&g->ftes_hash, match_value,
+					 rhash_fte);
+	if (!fte_tmp || !tree_get_node(&fte_tmp->node)) {
+		fte_tmp = NULL;
+		goto out;
+	}
+
+	nested_down_write_ref_node(&fte_tmp->node, FS_LOCK_CHILD);
+out:
+	if (take_write)
+		up_write_ref_node(&g->node);
+	else
+		up_read_ref_node(&g->node);
+	return fte_tmp;
+}
+
 static struct mlx5_flow_handle *
 try_add_to_existing_fg(struct mlx5_flow_table *ft,
 		       struct list_head *match_head,
@@ -1600,10 +1646,6 @@ try_add_to_existing_fg(struct mlx5_flow_table *ft,
 	if (IS_ERR(fte))
 		return  ERR_PTR(-ENOMEM);
 
-	list_for_each_entry(iter, match_head, list) {
-		nested_down_read_ref_node(&iter->g->node, FS_LOCK_PARENT);
-	}
-
 search_again_locked:
 	version = matched_fgs_get_version(match_head);
 	/* Try to find a fg that already contains a matching fte */
@@ -1611,39 +1653,15 @@ search_again_locked:
 		struct fs_fte *fte_tmp;
 
 		g = iter->g;
-		fte_tmp = rhashtable_lookup_fast(&g->ftes_hash, spec->match_value,
-						 rhash_fte);
-		if (!fte_tmp || !tree_get_node(&fte_tmp->node))
+		fte_tmp = lookup_fte_locked(g, spec->match_value, take_write);
+		if (!fte_tmp)
 			continue;
-
-		nested_down_write_ref_node(&fte_tmp->node, FS_LOCK_CHILD);
-		if (!take_write) {
-			list_for_each_entry(iter, match_head, list)
-				up_read_ref_node(&iter->g->node);
-		} else {
-			list_for_each_entry(iter, match_head, list)
-				up_write_ref_node(&iter->g->node);
-		}
-
 		rule = add_rule_fg(g, spec->match_value,
 				   flow_act, dest, dest_num, fte_tmp);
 		up_write_ref_node(&fte_tmp->node);
 		tree_put_node(&fte_tmp->node);
 		kmem_cache_free(steering->ftes_cache, fte);
 		return rule;
-	}
-
-	/* No group with matching fte found. Try to add a new fte to any
-	 * matching fg.
-	 */
-
-	if (!take_write) {
-		list_for_each_entry(iter, match_head, list)
-			up_read_ref_node(&iter->g->node);
-		list_for_each_entry(iter, match_head, list)
-			nested_down_write_ref_node(&iter->g->node,
-						   FS_LOCK_PARENT);
-		take_write = true;
 	}
 
 	/* Check the ft version, for case that new flow group
@@ -1657,27 +1675,30 @@ search_again_locked:
 	/* Check the fgs version, for case the new FTE with the
 	 * same values was added while the fgs weren't locked
 	 */
-	if (version != matched_fgs_get_version(match_head))
+	if (version != matched_fgs_get_version(match_head)) {
+		take_write = true;
 		goto search_again_locked;
+	}
 
 	list_for_each_entry(iter, match_head, list) {
 		g = iter->g;
 
 		if (!g->node.active)
 			continue;
+
+		nested_down_write_ref_node(&g->node, FS_LOCK_PARENT);
+
 		err = insert_fte(g, fte);
 		if (err) {
+			up_write_ref_node(&g->node);
 			if (err == -ENOSPC)
 				continue;
-			list_for_each_entry(iter, match_head, list)
-				up_write_ref_node(&iter->g->node);
 			kmem_cache_free(steering->ftes_cache, fte);
 			return ERR_PTR(err);
 		}
 
 		nested_down_write_ref_node(&fte->node, FS_LOCK_CHILD);
-		list_for_each_entry(iter, match_head, list)
-			up_write_ref_node(&iter->g->node);
+		up_write_ref_node(&g->node);
 		rule = add_rule_fg(g, spec->match_value,
 				   flow_act, dest, dest_num, fte);
 		up_write_ref_node(&fte->node);
@@ -1686,8 +1707,6 @@ search_again_locked:
 	}
 	rule = ERR_PTR(-ENOENT);
 out:
-	list_for_each_entry(iter, match_head, list)
-		up_write_ref_node(&iter->g->node);
 	kmem_cache_free(steering->ftes_cache, fte);
 	return rule;
 }
@@ -1726,6 +1745,8 @@ search_again_locked:
 	if (err) {
 		if (take_write)
 			up_write_ref_node(&ft->node);
+		else
+			up_read_ref_node(&ft->node);
 		return ERR_PTR(err);
 	}
 
@@ -1978,7 +1999,7 @@ struct mlx5_flow_namespace *mlx5_get_flow_namespace(struct mlx5_core_dev *dev,
 {
 	struct mlx5_flow_steering *steering = dev->priv.steering;
 	struct mlx5_flow_root_namespace *root_ns;
-	int prio;
+	int prio = 0;
 	struct fs_prio *fs_prio;
 	struct mlx5_flow_namespace *ns;
 
@@ -1986,40 +2007,29 @@ struct mlx5_flow_namespace *mlx5_get_flow_namespace(struct mlx5_core_dev *dev,
 		return NULL;
 
 	switch (type) {
-	case MLX5_FLOW_NAMESPACE_BYPASS:
-	case MLX5_FLOW_NAMESPACE_LAG:
-	case MLX5_FLOW_NAMESPACE_OFFLOADS:
-	case MLX5_FLOW_NAMESPACE_ETHTOOL:
-	case MLX5_FLOW_NAMESPACE_KERNEL:
-	case MLX5_FLOW_NAMESPACE_LEFTOVERS:
-	case MLX5_FLOW_NAMESPACE_ANCHOR:
-		prio = type;
-		break;
 	case MLX5_FLOW_NAMESPACE_FDB:
 		if (steering->fdb_root_ns)
 			return &steering->fdb_root_ns->ns;
-		else
-			return NULL;
+		return NULL;
 	case MLX5_FLOW_NAMESPACE_SNIFFER_RX:
 		if (steering->sniffer_rx_root_ns)
 			return &steering->sniffer_rx_root_ns->ns;
-		else
-			return NULL;
+		return NULL;
 	case MLX5_FLOW_NAMESPACE_SNIFFER_TX:
 		if (steering->sniffer_tx_root_ns)
 			return &steering->sniffer_tx_root_ns->ns;
-		else
-			return NULL;
-	case MLX5_FLOW_NAMESPACE_EGRESS:
-		if (steering->egress_root_ns)
-			return &steering->egress_root_ns->ns;
-		else
-			return NULL;
-	default:
 		return NULL;
+	default:
+		break;
 	}
 
-	root_ns = steering->root_ns;
+	if (type == MLX5_FLOW_NAMESPACE_EGRESS) {
+		root_ns = steering->egress_root_ns;
+	} else { /* Must be NIC RX */
+		root_ns = steering->root_ns;
+		prio = type;
+	}
+
 	if (!root_ns)
 		return NULL;
 
@@ -2535,16 +2545,23 @@ cleanup_root_ns:
 
 static int init_egress_root_ns(struct mlx5_flow_steering *steering)
 {
-	struct fs_prio *prio;
+	int err;
 
 	steering->egress_root_ns = create_root_ns(steering,
 						  FS_FT_NIC_TX);
 	if (!steering->egress_root_ns)
 		return -ENOMEM;
 
-	/* create 1 prio*/
-	prio = fs_create_prio(&steering->egress_root_ns->ns, 0, 1);
-	return PTR_ERR_OR_ZERO(prio);
+	err = init_root_tree(steering, &egress_root_fs,
+			     &steering->egress_root_ns->ns.node);
+	if (err)
+		goto cleanup;
+	set_prio_attrs(steering->egress_root_ns);
+	return 0;
+cleanup:
+	cleanup_root_ns(steering->egress_root_ns);
+	steering->egress_root_ns = NULL;
+	return err;
 }
 
 int mlx5_init_fs(struct mlx5_core_dev *dev)
@@ -2612,7 +2629,7 @@ int mlx5_init_fs(struct mlx5_core_dev *dev)
 			goto err;
 	}
 
-	if (MLX5_IPSEC_DEV(dev)) {
+	if (MLX5_IPSEC_DEV(dev) || MLX5_CAP_FLOWTABLE_NIC_TX(dev, ft_support)) {
 		err = init_egress_root_ns(steering);
 		if (err)
 			goto err;

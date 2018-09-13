@@ -388,10 +388,9 @@ static const struct regulator_desc bd71837_regulators[] = {
 		.ops = &bd71837_ldo_regulator_nolinear_ops,
 		.type = REGULATOR_VOLTAGE,
 		.volt_table = &ldo_2_volts[0],
+		.n_voltages = ARRAY_SIZE(ldo_2_volts),
 		.vsel_reg = BD71837_REG_LDO2_VOLT,
 		.vsel_mask = LDO2_MASK,
-		.n_voltages = ARRAY_SIZE(ldo_2_volts),
-		.n_voltages = BD71837_LDO2_VOLTAGE_NUM,
 		.enable_reg = BD71837_REG_LDO2_VOLT,
 		.enable_mask = BD71837_LDO_EN,
 		.owner = THIS_MODULE,
@@ -567,6 +566,25 @@ static int bd71837_probe(struct platform_device *pdev)
 	} else {
 		dev_dbg(&pmic->pdev->dev, "Unlocked lock register 0x%x\n",
 			BD71837_REG_REGLOCK);
+	}
+
+	/*
+	 * There is a HW quirk in BD71837. The shutdown sequence timings for
+	 * bucks/LDOs which are controlled via register interface are changed.
+	 * At PMIC poweroff the voltage for BUCK6/7 is cut immediately at the
+	 * beginning of shut-down sequence. As bucks 6 and 7 are parent
+	 * supplies for LDO5 and LDO6 - this causes LDO5/6 voltage
+	 * monitoring to errorneously detect under voltage and force PMIC to
+	 * emergency state instead of poweroff. In order to avoid this we
+	 * disable voltage monitoring for LDO5 and LDO6
+	 */
+	err = regmap_update_bits(pmic->mfd->regmap, BD718XX_REG_MVRFLTMASK2,
+				 BD718XX_LDO5_VRMON80 | BD718XX_LDO6_VRMON80,
+				 BD718XX_LDO5_VRMON80 | BD718XX_LDO6_VRMON80);
+	if (err) {
+		dev_err(&pmic->pdev->dev,
+			"Failed to disable voltage monitoring\n");
+		goto err;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(pmic_regulator_inits); i++) {
