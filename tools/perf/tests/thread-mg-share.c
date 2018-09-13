@@ -24,6 +24,9 @@ int test__thread_mg_share(struct test *test __maybe_unused, int subtest __maybe_
 	 * with several threads and checks they properly share and
 	 * maintain map groups info (struct map_groups).
 	 *
+	 * Note that a leader thread has one more refcnt for its
+	 * (current) map groups.
+	 *
 	 * thread group (pid: 0, tids: 0, 1, 2, 3)
 	 * other  group (pid: 4, tids: 4, 5)
 	*/
@@ -44,7 +47,7 @@ int test__thread_mg_share(struct test *test __maybe_unused, int subtest __maybe_
 			leader && t1 && t2 && t3 && other);
 
 	mg = leader->mg;
-	TEST_ASSERT_EQUAL("wrong refcnt", refcount_read(&mg->refcnt), 4);
+	TEST_ASSERT_EQUAL("wrong refcnt", refcount_read(&mg->refcnt), 5);
 
 	/* test the map groups pointer is shared */
 	TEST_ASSERT_VAL("map groups don't match", mg == t1->mg);
@@ -72,7 +75,7 @@ int test__thread_mg_share(struct test *test __maybe_unused, int subtest __maybe_
 	machine__remove_thread(machine, other_leader);
 
 	other_mg = other->mg;
-	TEST_ASSERT_EQUAL("wrong refcnt", refcount_read(&other_mg->refcnt), 2);
+	TEST_ASSERT_EQUAL("wrong refcnt", refcount_read(&other_mg->refcnt), 3);
 
 	TEST_ASSERT_VAL("map groups don't match", other_mg == other_leader->mg);
 

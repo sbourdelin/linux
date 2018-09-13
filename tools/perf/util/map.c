@@ -504,6 +504,8 @@ void map_groups__init(struct map_groups *mg, struct machine *machine)
 	maps__init(&mg->maps);
 	mg->machine = machine;
 	refcount_set(&mg->refcnt, 1);
+	mg->timestamp = 0;
+	INIT_LIST_HEAD(&mg->list);
 }
 
 static void __maps__purge(struct maps *maps)
@@ -550,6 +552,7 @@ struct map_groups *map_groups__new(struct machine *machine)
 void map_groups__delete(struct map_groups *mg)
 {
 	map_groups__exit(mg);
+	list_del(&mg->list);
 	free(mg);
 }
 
