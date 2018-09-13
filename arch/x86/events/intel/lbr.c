@@ -444,9 +444,21 @@ void intel_pmu_lbr_sched_task(struct perf_event_context *ctx, bool sched_in)
 	 * are not tagged with an identifier, we need to wipe the LBR, even for
 	 * per-cpu events. You simply cannot resolve the branches from the old
 	 * address space.
+	 * We don't need to wipe the LBR for a kernel thread which share the
+	 * same mm with previous user thread.
 	 */
-	if (sched_in)
-		intel_pmu_lbr_reset();
+	if (!current || !current->mm)
+		return;
+	if (sched_in) {
+		/*
+		 * Only flush when switching to user threads
+		 * and mm context changed
+		 */
+		if (current->mm->context.ctx_id != cpuc->last_ctx_id)
+			intel_pmu_lbr_reset();
+	} else {
+		cpuc->last_ctx_id = current->mm->context.ctx_id;
+	}
 }
 
 static inline bool branch_user_callstack(unsigned br_sel)
