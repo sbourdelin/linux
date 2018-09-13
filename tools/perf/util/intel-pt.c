@@ -2517,7 +2517,7 @@ int intel_pt_process_auxtrace_info(union perf_event *event,
 	 * current thread lifetime assuption is kept and we don't segfault
 	 * at list_del_init().
 	 */
-	INIT_LIST_HEAD(&pt->unknown_thread->node);
+	INIT_LIST_HEAD(&pt->unknown_thread->tid_list);
 
 	err = thread__set_comm(pt->unknown_thread, "unknown", 0);
 	if (err)

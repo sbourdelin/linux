@@ -41,10 +41,11 @@ static void machine__threads_init(struct machine *machine)
 
 	for (i = 0; i < THREADS__TABLE_SIZE; i++) {
 		struct threads *threads = &machine->threads[i];
+
 		threads->entries = RB_ROOT;
+		threads->dead    = RB_ROOT;
 		init_rwsem(&threads->lock);
 		threads->nr = 0;
-		INIT_LIST_HEAD(&threads->dead);
 		threads->last_match = NULL;
 	}
 }
@@ -171,6 +172,28 @@ static void dsos__exit(struct dsos *dsos)
 	exit_rwsem(&dsos->lock);
 }
 
+static void threads__delete_dead(struct threads *threads)
+{
+	struct rb_node *nd = rb_first(&threads->dead);
+
+	while (nd) {
+		struct thread *t = rb_entry(nd, struct thread, rb_node);
+		struct thread *pos;
+
+		nd = rb_next(nd);
+		rb_erase_init(&t->rb_node, &threads->dead);
+
+		while (!list_empty(&t->tid_list)) {
+			pos = list_first_entry(&t->tid_list,
+					       struct thread, tid_list);
+			list_del_init(&pos->tid_list);
+			thread__delete(pos);
+		}
+
+		thread__delete(t);
+	}
+}
+
 void machine__delete_threads(struct machine *machine)
 {
 	struct rb_node *nd;
@@ -178,6 +201,7 @@ void machine__delete_threads(struct machine *machine)
 
 	for (i = 0; i < THREADS__TABLE_SIZE; i++) {
 		struct threads *threads = &machine->threads[i];
+
 		down_write(&threads->lock);
 		nd = rb_first(&threads->entries);
 		while (nd) {
@@ -186,6 +210,9 @@ void machine__delete_threads(struct machine *machine)
 			nd = rb_next(nd);
 			__machine__remove_thread(machine, t, false);
 		}
+
+		threads__delete_dead(threads);
+
 		up_write(&threads->lock);
 	}
 }
@@ -1673,6 +1700,8 @@ out_problem:
 static void __machine__remove_thread(struct machine *machine, struct thread *th, bool lock)
 {
 	struct threads *threads = machine__threads(machine, th->tid);
+	struct rb_node **p, *parent;
+	struct thread *pos;
 
 	if (threads->last_match == th)
 		threads__set_last_match(threads, NULL);
@@ -1684,14 +1713,44 @@ static void __machine__remove_thread(struct machine *machine, struct thread *th,
 	RB_CLEAR_NODE(&th->rb_node);
 	--threads->nr;
 	/*
-	 * Move it first to the dead_threads list, then drop the reference,
-	 * if this is the last reference, then the thread__delete destructor
-	 * will be called and we will remove it from the dead_threads list.
+	 * No need to have an additional reference for non-index file
+	 * as they can be released when reference holders died and
+	 * there will be no more new references.
 	 */
-	list_add_tail(&th->node, &threads->dead);
+	if (!perf_has_index) {
+		thread__put(th);
+		goto out;
+	}
+
+	p = &threads->dead.rb_node;
+	parent = NULL;
+
+	/*
+	 * For indexed file, We may have references to this (dead)
+	 * thread, as samples are processed after fork/exit events.
+	 * Just move them to a separate rbtree and keep a reference.
+	 */
+	while (*p != NULL) {
+		parent = *p;
+		pos = rb_entry(parent, struct thread, rb_node);
+
+		if (pos->tid == th->tid) {
+			list_add_tail(&th->tid_list, &pos->tid_list);
+			goto out;
+		}
+
+		if (th->tid < pos->tid)
+			p = &(*p)->rb_left;
+		else
+			p = &(*p)->rb_right;
+	}
+
+	rb_link_node(&th->rb_node, parent, p);
+	rb_insert_color(&th->rb_node, &threads->dead);
+
+out:
 	if (lock)
 		up_write(&threads->lock);
-	thread__put(th);
 }
 
 void machine__remove_thread(struct machine *machine, struct thread *th)
@@ -2395,7 +2454,7 @@ int machine__for_each_thread(struct machine *machine,
 {
 	struct threads *threads;
 	struct rb_node *nd;
-	struct thread *thread;
+	struct thread *thread, *pos;
 	int rc = 0;
 	int i;
 
@@ -2408,10 +2467,17 @@ int machine__for_each_thread(struct machine *machine,
 				return rc;
 		}
 
-		list_for_each_entry(thread, &threads->dead, node) {
+		for (nd = rb_first(&threads->dead); nd; nd = rb_next(nd)) {
+			thread = rb_entry(nd, struct thread, rb_node);
 			rc = fn(thread, priv);
 			if (rc != 0)
 				return rc;
+
+			list_for_each_entry(pos, &thread->tid_list, tid_list) {
+				rc = fn(pos, priv);
+				if (rc != 0)
+					return rc;
+			}
 		}
 	}
 	return rc;

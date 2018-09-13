@@ -29,11 +29,11 @@ struct vdso_info;
 #define THREADS__TABLE_SIZE	(1 << THREADS__TABLE_BITS)
 
 struct threads {
-	struct rb_root	  entries;
-	struct rw_semaphore lock;
-	unsigned int	  nr;
-	struct list_head  dead;
-	struct thread	  *last_match;
+	struct rb_root		 entries;
+	struct rb_root		 dead;
+	struct rw_semaphore	 lock;
+	unsigned int		 nr;
+	struct thread		*last_match;
 };
 
 struct machine {
