@@ -3752,11 +3752,8 @@ EXPORT_SYMBOL(blk_finish_plug);
  */
 void blk_pm_runtime_init(struct request_queue *q, struct device *dev)
 {
-	/* Don't enable runtime PM for blk-mq until it is ready */
-	if (q->mq_ops) {
-		pm_runtime_disable(dev);
+	if (WARN_ON_ONCE(blk_queue_admin(q)))
 		return;
-	}
 
 	q->dev = dev;
 	q->rpm_status = RPM_ACTIVE;
@@ -3764,6 +3761,23 @@ void blk_pm_runtime_init(struct request_queue *q, struct device *dev)
 	pm_runtime_use_autosuspend(q->dev);
 }
 EXPORT_SYMBOL(blk_pm_runtime_init);
+
+static void blk_mq_pm_count_req(struct blk_mq_hw_ctx *hctx,
+		struct request *rq, void *priv, bool reserved)
+{
+	unsigned long *cnt = priv;
+
+	(*cnt)++;
+}
+
+static bool blk_mq_pm_queue_busy(struct request_queue *q)
+{
+	unsigned long cnt = 0;
+
+	blk_mq_queue_sched_tag_busy_iter(q, blk_mq_pm_count_req, &cnt);
+
+	return cnt > 0;
+}
 
 /**
  * blk_pre_runtime_suspend - Pre runtime suspend check
@@ -3789,18 +3803,33 @@ EXPORT_SYMBOL(blk_pm_runtime_init);
 int blk_pre_runtime_suspend(struct request_queue *q)
 {
 	int ret = 0;
+	bool busy = true;
+	unsigned long last_busy;
 
 	if (!q->dev)
 		return ret;
 
+	last_busy = READ_ONCE(q->dev->power.last_busy);
+
+	if (q->mq_ops)
+		busy = blk_mq_pm_queue_busy(q);
+
 	spin_lock_irq(q->queue_lock);
-	if (q->nr_pending) {
+	busy = q->mq_ops ? busy : !!q->nr_pending;
+	if (busy) {
 		ret = -EBUSY;
 		pm_runtime_mark_last_busy(q->dev);
 	} else {
 		q->rpm_status = RPM_SUSPENDING;
 	}
 	spin_unlock_irq(q->queue_lock);
+
+	/*
+	 * Any new IO during this window will prevent the current suspend
+	 * from going on
+	 */
+	if (unlikely(last_busy != READ_ONCE(q->dev->power.last_busy)))
+		ret = -EBUSY;
 
 	if (!ret)
 		blk_freeze_queue_lock(q);

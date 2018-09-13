@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/crash_dump.h>
 #include <linux/prefetch.h>
+#include <linux/pm_runtime.h>
 
 #include <trace/events/block.h>
 
@@ -503,6 +504,9 @@ static void __blk_mq_free_request(struct request *rq)
 		blk_mq_put_tag(hctx, hctx->sched_tags, ctx, sched_tag);
 	blk_mq_sched_restart(hctx);
 	blk_queue_exit(q);
+
+	if (q->dev)
+		pm_runtime_mark_last_busy(q->dev);
 }
 
 void blk_mq_free_request(struct request *rq)

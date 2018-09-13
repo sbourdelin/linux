@@ -322,8 +322,8 @@ void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 }
 EXPORT_SYMBOL(blk_mq_tagset_busy_iter);
 
-void blk_mq_queue_tag_busy_iter(struct request_queue *q, busy_iter_fn *fn,
-		void *priv)
+static void __blk_mq_queue_tag_busy_iter(struct request_queue *q,
+		busy_iter_fn *fn, void *priv, bool sched_tag)
 {
 	struct blk_mq_hw_ctx *hctx;
 	int i;
@@ -344,6 +344,9 @@ void blk_mq_queue_tag_busy_iter(struct request_queue *q, busy_iter_fn *fn,
 	queue_for_each_hw_ctx(q, hctx, i) {
 		struct blk_mq_tags *tags = hctx->tags;
 
+		if (sched_tag && hctx->sched_tags)
+			tags = hctx->sched_tags;
+
 		/*
 		 * If not software queues are currently mapped to this
 		 * hardware queue, there's nothing to check
@@ -356,6 +359,20 @@ void blk_mq_queue_tag_busy_iter(struct request_queue *q, busy_iter_fn *fn,
 		bt_for_each(hctx, &tags->bitmap_tags, fn, priv, false);
 	}
 	rcu_read_unlock();
+}
+
+void blk_mq_queue_tag_busy_iter(struct request_queue *q,
+		busy_iter_fn *fn, void *priv)
+{
+
+	__blk_mq_queue_tag_busy_iter(q, fn, priv, false);
+}
+
+void blk_mq_queue_sched_tag_busy_iter(struct request_queue *q,
+		busy_iter_fn *fn, void *priv)
+{
+
+	__blk_mq_queue_tag_busy_iter(q, fn, priv, true);
 }
 
 static int bt_alloc(struct sbitmap_queue *bt, unsigned int depth,
