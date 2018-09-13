@@ -2938,10 +2938,12 @@ static bool icl_pll_get_hw_state(struct drm_i915_private *dev_priv,
 	switch (id) {
 	case DPLL_ID_ICL_DPLL0:
 	case DPLL_ID_ICL_DPLL1:
-	case DPLL_ID_ICL_TBTPLL:
 		hw_state->cfgcr0 = I915_READ(ICL_DPLL_CFGCR0(id));
 		hw_state->cfgcr1 = I915_READ(ICL_DPLL_CFGCR1(id));
 		break;
+	case DPLL_ID_ICL_TBTPLL:
+		hw_state->cfgcr0 = I915_READ(ICL_TBTPLL_CFGCR0);
+		hw_state->cfgcr1 = I915_READ(ICL_TBTPLL_CFGCR1);
 	case DPLL_ID_ICL_MGPLL1:
 	case DPLL_ID_ICL_MGPLL2:
 	case DPLL_ID_ICL_MGPLL3:
@@ -3003,6 +3005,16 @@ static void icl_dpll_write(struct drm_i915_private *dev_priv,
 	I915_WRITE(ICL_DPLL_CFGCR0(id), hw_state->cfgcr0);
 	I915_WRITE(ICL_DPLL_CFGCR1(id), hw_state->cfgcr1);
 	POSTING_READ(ICL_DPLL_CFGCR1(id));
+}
+
+static void icl_tbtpll_write(struct drm_i915_private *dev_priv,
+			     struct intel_shared_dpll *pll)
+{
+	struct intel_dpll_hw_state *hw_state = &pll->state.hw_state;
+
+	I915_WRITE(ICL_TBTPLL_CFGCR0, hw_state->cfgcr0);
+	I915_WRITE(ICL_TBTPLL_CFGCR1, hw_state->cfgcr1);
+	POSTING_READ(ICL_TBTPLL_CFGCR1);
 }
 
 static void icl_mg_pll_write(struct drm_i915_private *dev_priv,
@@ -3077,8 +3089,10 @@ static void icl_pll_enable(struct drm_i915_private *dev_priv,
 	switch (id) {
 	case DPLL_ID_ICL_DPLL0:
 	case DPLL_ID_ICL_DPLL1:
-	case DPLL_ID_ICL_TBTPLL:
 		icl_dpll_write(dev_priv, pll);
+		break;
+	case DPLL_ID_ICL_TBTPLL:
+		icl_tbtpll_write(dev_priv, pll);
 		break;
 	case DPLL_ID_ICL_MGPLL1:
 	case DPLL_ID_ICL_MGPLL2:
