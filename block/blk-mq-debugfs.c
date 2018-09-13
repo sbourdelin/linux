@@ -133,6 +133,7 @@ static const char *const blk_queue_flag_name[] = {
 	QUEUE_FLAG_NAME(SCSI_PASSTHROUGH),
 	QUEUE_FLAG_NAME(QUIESCED),
 	QUEUE_FLAG_NAME(PREEMPT_ONLY),
+	QUEUE_FLAG_NAME(NO_SCHED),
 };
 #undef QUEUE_FLAG_NAME
 
@@ -246,7 +247,6 @@ static const char *const hctx_flag_name[] = {
 	HCTX_FLAG_NAME(TAG_SHARED),
 	HCTX_FLAG_NAME(SG_MERGE),
 	HCTX_FLAG_NAME(BLOCKING),
-	HCTX_FLAG_NAME(NO_SCHED),
 };
 #undef HCTX_FLAG_NAME
 

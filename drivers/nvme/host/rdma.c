@@ -692,7 +692,6 @@ static struct blk_mq_tag_set *nvme_rdma_alloc_tagset(struct nvme_ctrl *nctrl,
 		set->driver_data = ctrl;
 		set->nr_hw_queues = 1;
 		set->timeout = ADMIN_TIMEOUT;
-		set->flags = BLK_MQ_F_NO_SCHED;
 	} else {
 		set = &ctrl->tag_set;
 		memset(set, 0, sizeof(*set));
@@ -770,7 +769,8 @@ static int nvme_rdma_configure_admin_queue(struct nvme_rdma_ctrl *ctrl,
 			goto out_free_async_qe;
 		}
 
-		ctrl->ctrl.admin_q = blk_mq_init_queue(&ctrl->admin_tag_set);
+		ctrl->ctrl.admin_q = __blk_mq_init_queue(&ctrl->admin_tag_set,
+				QUEUE_FLAG_MQ_NO_SCHED_DEFAULT);
 		if (IS_ERR(ctrl->ctrl.admin_q)) {
 			error = PTR_ERR(ctrl->ctrl.admin_q);
 			goto out_free_tagset;

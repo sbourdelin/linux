@@ -1484,14 +1484,14 @@ static int nvme_alloc_admin_tags(struct nvme_dev *dev)
 		dev->admin_tagset.timeout = ADMIN_TIMEOUT;
 		dev->admin_tagset.numa_node = dev_to_node(dev->dev);
 		dev->admin_tagset.cmd_size = nvme_pci_cmd_size(dev, false);
-		dev->admin_tagset.flags = BLK_MQ_F_NO_SCHED;
 		dev->admin_tagset.driver_data = dev;
 
 		if (blk_mq_alloc_tag_set(&dev->admin_tagset))
 			return -ENOMEM;
 		dev->ctrl.admin_tagset = &dev->admin_tagset;
 
-		dev->ctrl.admin_q = blk_mq_init_queue(&dev->admin_tagset);
+		dev->ctrl.admin_q = __blk_mq_init_queue(&dev->admin_tagset,
+				QUEUE_FLAG_MQ_NO_SCHED_DEFAULT);
 		if (IS_ERR(dev->ctrl.admin_q)) {
 			blk_mq_free_tag_set(&dev->admin_tagset);
 			return -ENOMEM;

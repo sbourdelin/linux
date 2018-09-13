@@ -1617,8 +1617,6 @@ static int null_init_tag_set(struct nullb *nullb, struct blk_mq_tag_set *set)
 	set->numa_node = nullb ? nullb->dev->home_node : g_home_node;
 	set->cmd_size	= sizeof(struct nullb_cmd);
 	set->flags = BLK_MQ_F_SHOULD_MERGE;
-	if (g_no_sched)
-		set->flags |= BLK_MQ_F_NO_SCHED;
 	set->driver_data = NULL;
 
 	if ((nullb && nullb->dev->blocking) || g_blocking)
@@ -1703,6 +1701,9 @@ static int null_add_dev(struct nullb_device *dev)
 		goto out_free_nullb;
 
 	if (dev->queue_mode == NULL_Q_MQ) {
+		unsigned long q_flags = g_no_sched ?
+			QUEUE_FLAG_MQ_NO_SCHED_DEFAULT : QUEUE_FLAG_MQ_DEFAULT;
+
 		if (shared_tags) {
 			nullb->tag_set = &tag_set;
 			rv = 0;
@@ -1718,7 +1719,7 @@ static int null_add_dev(struct nullb_device *dev)
 			goto out_cleanup_queues;
 
 		nullb->tag_set->timeout = 5 * HZ;
-		nullb->q = blk_mq_init_queue(nullb->tag_set);
+		nullb->q = __blk_mq_init_queue(nullb->tag_set, q_flags);
 		if (IS_ERR(nullb->q)) {
 			rv = -ENOMEM;
 			goto out_cleanup_tags;
