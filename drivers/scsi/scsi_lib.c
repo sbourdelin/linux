@@ -2110,19 +2110,22 @@ static void scsi_mq_done(struct scsi_cmnd *cmd)
 	blk_mq_complete_request(cmd->request);
 }
 
-static void scsi_mq_put_budget(struct blk_mq_hw_ctx *hctx)
+static void __scsi_mq_put_budget(struct blk_mq_hw_ctx *hctx,
+		struct scsi_device *sdev)
 {
-	struct request_queue *q = hctx->queue;
-	struct scsi_device *sdev = q->queuedata;
-
 	atomic_dec(&sdev->device_busy);
 	put_device(&sdev->sdev_gendev);
 }
 
-static bool scsi_mq_get_budget(struct blk_mq_hw_ctx *hctx)
+static void scsi_mq_put_budget(struct blk_mq_hw_ctx *hctx)
+{
+	__scsi_mq_put_budget(hctx, hctx->queue->queuedata);
+}
+
+static bool __scsi_mq_get_budget(struct blk_mq_hw_ctx *hctx,
+		struct scsi_device *sdev)
 {
 	struct request_queue *q = hctx->queue;
-	struct scsi_device *sdev = q->queuedata;
 
 	if (!get_device(&sdev->sdev_gendev))
 		goto out;
@@ -2139,12 +2142,17 @@ out:
 	return false;
 }
 
-static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
-			 const struct blk_mq_queue_data *bd)
+static bool scsi_mq_get_budget(struct blk_mq_hw_ctx *hctx)
+{
+	return __scsi_mq_get_budget(hctx, hctx->queue->queuedata);
+}
+
+static blk_status_t __scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
+			 const struct blk_mq_queue_data *bd,
+			 struct scsi_device *sdev)
 {
 	struct request *req = bd->rq;
 	struct request_queue *q = req->q;
-	struct scsi_device *sdev = q->queuedata;
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
@@ -2192,7 +2200,7 @@ out_dec_target_busy:
 	if (scsi_target(sdev)->can_queue > 0)
 		atomic_dec(&scsi_target(sdev)->target_busy);
 out_put_budget:
-	scsi_mq_put_budget(hctx);
+	__scsi_mq_put_budget(hctx, sdev);
 	switch (ret) {
 	case BLK_STS_OK:
 		break;
@@ -2212,6 +2220,29 @@ out_put_budget:
 		break;
 	}
 	return ret;
+}
+
+static blk_status_t scsi_admin_queue_rq(struct blk_mq_hw_ctx *hctx,
+			 const struct blk_mq_queue_data *bd)
+{
+	struct scsi_device *sdev = scsi_req(bd->rq)->sdev;
+
+	WARN_ON_ONCE(hctx->queue == sdev->request_queue);
+
+	if (!__scsi_mq_get_budget(hctx, sdev))
+		return BLK_STS_RESOURCE;
+
+	return __scsi_queue_rq(hctx, bd, sdev);
+}
+
+static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
+			 const struct blk_mq_queue_data *bd)
+{
+	struct scsi_device *sdev = hctx->queue->queuedata;
+
+	WARN_ON_ONCE(hctx->queue == sdev->host->admin_q);
+
+	return __scsi_queue_rq(hctx, bd, hctx->queue->queuedata);
 }
 
 static enum blk_eh_timer_return scsi_timeout(struct request *req,
@@ -2346,9 +2377,9 @@ static void scsi_old_exit_rq(struct request_queue *q, struct request *rq)
 			       cmd->sense_buffer);
 }
 
-struct request_queue *scsi_old_alloc_queue(struct scsi_device *sdev)
+static struct request_queue *__scsi_old_alloc_queue(struct Scsi_Host *shost,
+		bool admin)
 {
-	struct Scsi_Host *shost = sdev->host;
 	struct request_queue *q;
 
 	q = blk_alloc_queue_node(GFP_KERNEL, NUMA_NO_NODE, NULL);
@@ -2367,12 +2398,31 @@ struct request_queue *scsi_old_alloc_queue(struct scsi_device *sdev)
 	}
 
 	__scsi_init_queue(shost, q);
-	blk_queue_flag_set(QUEUE_FLAG_SCSI_PASSTHROUGH, q);
+
+	if (!admin)
+		blk_queue_flag_set(QUEUE_FLAG_SCSI_PASSTHROUGH, q);
 	blk_queue_prep_rq(q, scsi_prep_fn);
 	blk_queue_unprep_rq(q, scsi_unprep_fn);
 	blk_queue_softirq_done(q, scsi_softirq_done);
 	blk_queue_rq_timed_out(q, scsi_times_out);
 	blk_queue_lld_busy(q, scsi_lld_busy);
+	return q;
+}
+
+struct request_queue *scsi_old_alloc_queue(struct scsi_device *sdev)
+{
+	return __scsi_old_alloc_queue(sdev->host, false);
+}
+
+static struct request_queue *scsi_old_alloc_admin_queue(struct Scsi_Host *shost)
+{
+	struct request_queue *q = __scsi_old_alloc_queue(shost, true);
+
+	if (!q)
+		return NULL;
+
+	blk_queue_init_tags(q, shost->cmd_per_lun, shost->bqt,
+			    shost->hostt->tag_alloc_policy);
 	return q;
 }
 
@@ -2391,6 +2441,16 @@ static const struct blk_mq_ops scsi_mq_ops = {
 	.map_queues	= scsi_map_queues,
 };
 
+static const struct blk_mq_ops scsi_mq_admin_ops = {
+	.queue_rq	= scsi_admin_queue_rq,
+	.complete	= scsi_softirq_done,
+	.timeout	= scsi_timeout,
+	.init_request	= scsi_mq_init_request,
+	.exit_request	= scsi_mq_exit_request,
+	.initialize_rq_fn = scsi_initialize_rq,
+	.map_queues	= scsi_map_queues,
+};
+
 struct request_queue *scsi_mq_alloc_queue(struct scsi_device *sdev)
 {
 	sdev->request_queue = blk_mq_init_queue(&sdev->host->tag_set);
@@ -2400,6 +2460,37 @@ struct request_queue *scsi_mq_alloc_queue(struct scsi_device *sdev)
 	__scsi_init_queue(sdev->host, sdev->request_queue);
 	blk_queue_flag_set(QUEUE_FLAG_SCSI_PASSTHROUGH, sdev->request_queue);
 	return sdev->request_queue;
+}
+
+static struct request_queue *scsi_mq_alloc_admin_queue(struct Scsi_Host *shost)
+{
+	struct request_queue *q = __blk_mq_init_queue(&shost->tag_set,
+			QUEUE_FLAG_MQ_ADMIN_DEFAULT);
+	if (IS_ERR(q))
+		return NULL;
+
+	q->mq_ops = &scsi_mq_admin_ops;
+
+	__scsi_init_queue(shost, q);
+
+	return q;
+}
+
+struct request_queue *scsi_init_admin_queue(struct Scsi_Host *shost)
+{
+	struct request_queue *q;
+
+	if (shost_use_blk_mq(shost))
+		q = scsi_mq_alloc_admin_queue(shost);
+	else
+		q = scsi_old_alloc_admin_queue(shost);
+
+	if (!q)
+		return NULL;
+
+	WARN_ON(!blk_get_queue(q));
+	shost->admin_q = q;
+	return q;
 }
 
 int scsi_mq_setup_tags(struct Scsi_Host *shost)

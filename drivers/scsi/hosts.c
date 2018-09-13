@@ -242,6 +242,9 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 
 	shost->dma_dev = dma_dev;
 
+	if (!scsi_init_admin_queue(shost))
+		goto out_remove_tags;
+
 	/*
 	 * Increase usage count temporarily here so that calling
 	 * scsi_autopm_put_host() will trigger runtime idle if there is
@@ -309,6 +312,9 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 	pm_runtime_disable(&shost->shost_gendev);
 	pm_runtime_set_suspended(&shost->shost_gendev);
 	pm_runtime_put_noidle(&shost->shost_gendev);
+	blk_cleanup_queue(shost->admin_q);
+	blk_put_queue(shost->admin_q);
+ out_remove_tags:
 	if (shost_use_blk_mq(shost))
 		scsi_mq_destroy_tags(shost);
  fail:
@@ -343,6 +349,9 @@ static void scsi_host_dev_release(struct device *dev)
 		 */
 		kfree(dev_name(&shost->shost_dev));
 	}
+
+	blk_cleanup_queue(shost->admin_q);
+	blk_put_queue(shost->admin_q);
 
 	if (shost_use_blk_mq(shost)) {
 		if (shost->tag_set.tags)
