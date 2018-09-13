@@ -1055,9 +1055,6 @@ static void ib_uverbs_add_one(struct ib_device *device)
 	if (ib_uverbs_create_uapi(device, uverbs_dev))
 		goto err_uapi;
 
-<<<<<<< HEAD
-	cdev_init(&uverbs_dev->cdev, NULL);
-=======
 	device_initialize(&uverbs_dev->dev);
 	uverbs_dev->dev.class = uverbs_class;
 	uverbs_dev->dev.parent = device->dev.parent;
@@ -1069,7 +1066,6 @@ static void ib_uverbs_add_one(struct ib_device *device)
 
 	cdev_init(&uverbs_dev->cdev,
 		  device->mmap ? &uverbs_mmap_fops : &uverbs_fops);
->>>>>>> linux-next/akpm-base
 	uverbs_dev->cdev.owner = THIS_MODULE;
 
 	ret = cdev_device_add(&uverbs_dev->cdev, &uverbs_dev->dev);
@@ -1079,16 +1075,9 @@ static void ib_uverbs_add_one(struct ib_device *device)
 	ib_set_client_data(device, &uverbs_client, uverbs_dev);
 	return;
 
-<<<<<<< HEAD
-err_class:
-	device_destroy(uverbs_class, uverbs_dev->cdev.dev);
-err_cdev:
-	cdev_del(&uverbs_dev->cdev);
-=======
 err_cdev:
 	cdev_del(&uverbs_dev->cdev);
 	put_device(&uverbs_dev->dev);
->>>>>>> linux-next/akpm-base
 err_uapi:
 	clear_bit(devnum, dev_map);
 err:
