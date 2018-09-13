@@ -59,6 +59,7 @@ enum bkw_mmap_state {
 struct mmap_params {
 	int			    prot, mask;
 	struct auxtrace_mmap_params auxtrace_mp;
+	bool track_mmap;
 };
 
 int perf_mmap__mmap(struct perf_mmap *map, struct mmap_params *mp, int fd, int cpu);

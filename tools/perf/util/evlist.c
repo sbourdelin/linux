@@ -736,9 +736,15 @@ static void perf_evlist__munmap_nofree(struct perf_evlist *evlist)
 {
 	int i;
 
-	if (evlist->mmap)
+	if (evlist->mmap) {
 		for (i = 0; i < evlist->nr_mmaps; i++)
 			perf_mmap__munmap(&evlist->mmap[i]);
+	}
+
+	if (evlist->track_mmap) {
+		for (i = 0; i < evlist->nr_mmaps; i++)
+			perf_mmap__munmap(&evlist->track_mmap[i]);
+	}
 
 	if (evlist->overwrite_mmap)
 		for (i = 0; i < evlist->nr_mmaps; i++)
@@ -792,14 +798,20 @@ perf_evlist__should_poll(struct perf_evlist *evlist __maybe_unused,
 }
 
 static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
-				       struct mmap_params *mp, int cpu_idx,
-				       int thread, int *_output, int *_output_overwrite)
+				       struct mmap_params *_mp, int cpu_idx,
+				       int thread, int *_output, int *_output_overwrite,
+				       int *_output_track)
 {
+	struct mmap_params mp_track = {
+		.prot = PROT_READ | PROT_WRITE,
+		.mask = TRACK_MMAP_SIZE - page_size - 1,
+	};
 	struct perf_evsel *evsel;
 	int revent;
 	int evlist_cpu = cpu_map__cpu(evlist->cpus, cpu_idx);
 
 	evlist__for_each_entry(evlist, evsel) {
+		struct mmap_params *mp = _mp;
 		struct perf_mmap *maps = evlist->mmap;
 		int *output = _output;
 		int fd;
@@ -819,6 +831,12 @@ static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
 					perf_evlist__toggle_bkw_mmap(evlist, BKW_MMAP_RUNNING);
 			}
 			mp->prot &= ~PROT_WRITE;
+		}
+
+		if (mp->track_mmap && perf_evsel__is_dummy_tracking(evsel)) {
+			output = _output_track;
+			maps   = evlist->track_mmap;
+			mp     = &mp_track;
 		}
 
 		if (evsel->system_wide && thread)
@@ -880,13 +898,15 @@ static int perf_evlist__mmap_per_cpu(struct perf_evlist *evlist,
 	for (cpu = 0; cpu < nr_cpus; cpu++) {
 		int output = -1;
 		int output_overwrite = -1;
+		int output_track = -1;
 
 		auxtrace_mmap_params__set_idx(&mp->auxtrace_mp, evlist, cpu,
 					      true);
 
 		for (thread = 0; thread < nr_threads; thread++) {
 			if (perf_evlist__mmap_per_evsel(evlist, cpu, mp, cpu,
-							thread, &output, &output_overwrite))
+							thread, &output, &output_overwrite,
+							&output_track))
 				goto out_unmap;
 		}
 	}
@@ -908,12 +928,13 @@ static int perf_evlist__mmap_per_thread(struct perf_evlist *evlist,
 	for (thread = 0; thread < nr_threads; thread++) {
 		int output = -1;
 		int output_overwrite = -1;
+		int output_track = -1;
 
 		auxtrace_mmap_params__set_idx(&mp->auxtrace_mp, evlist, thread,
 					      false);
 
 		if (perf_evlist__mmap_per_evsel(evlist, thread, mp, 0, thread,
-						&output, &output_overwrite))
+						&output, &output_overwrite, &output_track))
 			goto out_unmap;
 	}
 
@@ -1058,12 +1079,26 @@ int perf_evlist__mmap_ex(struct perf_evlist *evlist, unsigned int pages,
 	 * Its value is decided by evsel's write_backward.
 	 * So &mp should not be passed through const pointer.
 	 */
-	struct mmap_params mp;
+	struct mmap_params mp = {
+		.track_mmap = false,
+	};
 
-	if (!evlist->mmap)
-		evlist->mmap = perf_evlist__alloc_mmap(evlist, false);
-	if (!evlist->mmap)
-		return -ENOMEM;
+	if (!evlist->mmap) {
+		struct perf_mmap *map;
+
+		map = perf_evlist__alloc_mmap(evlist, false);
+		if (!map)
+			return -ENOMEM;
+
+		evlist->mmap = map;
+		if (mp.track_mmap) {
+			map = perf_evlist__alloc_mmap(evlist, false);
+			if (!map)
+				return -ENOMEM;
+
+			evlist->track_mmap = map;
+		}
+	}
 
 	if (evlist->pollfd.entries == NULL && perf_evlist__alloc_pollfd(evlist) < 0)
 		return -ENOMEM;

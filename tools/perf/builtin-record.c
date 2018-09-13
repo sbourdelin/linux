@@ -533,6 +533,8 @@ static int record__mmap_read_evlist(struct record *rec, struct perf_evlist *evli
 
 	for (i = 0; i < evlist->nr_mmaps; i++) {
 		struct perf_mmap *map = &maps[i];
+		struct perf_mmap *track_map =  evlist->track_mmap ?
+					      &evlist->track_mmap[i] : NULL;
 
 		if (map->base) {
 			if (perf_mmap__push(map, rec, record__pushfn) != 0) {
@@ -545,6 +547,13 @@ static int record__mmap_read_evlist(struct record *rec, struct perf_evlist *evli
 		    record__auxtrace_mmap_read(rec, map) != 0) {
 			rc = -1;
 			goto out;
+		}
+
+		if (track_map && track_map->base) {
+			if (perf_mmap__push(track_map, rec, record__pushfn) != 0) {
+				rc = -1;
+				goto out;
+			}
 		}
 	}
 
