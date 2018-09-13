@@ -280,6 +280,10 @@ static struct test generic_tests[] = {
 		.func = test__mem2node,
 	},
 	{
+		.desc = "Test thread comm handling",
+		.func = test__thread_comm,
+	},
+	{
 		.func = NULL,
 	},
 };
