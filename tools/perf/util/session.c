@@ -1797,6 +1797,8 @@ fetch_mmaped_event(struct perf_session *session,
 }
 
 struct process_args {
+	struct ui_progress	prog;
+
 	u64	data_offset;
 	u64	data_size;
 	u64	file_size;
@@ -1826,7 +1828,6 @@ static int __perf_session__process_events(struct perf_session *session,
 	size_t	mmap_size;
 	char *buf, *mmaps[NUM_MMAPS];
 	union perf_event *event;
-	struct ui_progress prog;
 	s64 skip;
 
 	perf_tool__fill_defaults(tool);
@@ -1840,8 +1841,6 @@ static int __perf_session__process_events(struct perf_session *session,
 
 	if (args->data_offset + args->data_size < file_size)
 		file_size = args->data_offset + args->data_size;
-
-	ui_progress__init_size(&prog, file_size, "Processing events...");
 
 	mmap_size = MMAP_SIZE;
 	if (mmap_size > file_size) {
@@ -1907,7 +1906,7 @@ more:
 	head += size;
 	file_pos += size;
 
-	ui_progress__update(&prog, size);
+	ui_progress__update(&args->prog, size);
 
 	if (session_done())
 		goto out;
@@ -1936,11 +1935,28 @@ out_err:
 	return err;
 }
 
+static u64 get_index_size(struct perf_session *session)
+{
+	u64 size = 0;
+	int i;
+
+	for (i = 0; i < (int)session->header.nr_index; i++) {
+		struct perf_file_section *idx = &session->header.index[i];
+
+		size += idx->size;
+	}
+
+	return size;
+}
+
 static int __perf_session__process_indexed_events(struct perf_session *session)
 {
 	struct process_args args;
 	struct perf_tool *tool = session->tool;
 	int err = 0, i;
+
+	ui_progress__init_size(&args.prog, get_index_size(session),
+			       "Processing events");
 
 	for (i = 0; i < (int)session->header.nr_index; i++) {
 		struct perf_file_section *idx = &session->header.index[i];
@@ -1981,6 +1997,9 @@ int perf_session__process_events(struct perf_session *session)
 	args.data_offset = session->header.data_offset;
 	args.data_size   = session->header.data_size;
 	args.file_size   = perf_data__size(data);
+
+	ui_progress__init_size(&args.prog, args.file_size,
+			       "Processing events");
 
 	err = __perf_session__process_events(session, &args);
 
