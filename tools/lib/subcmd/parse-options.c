@@ -250,6 +250,8 @@ static int get_value(struct parse_opt_ctx_t *p,
 			*(int *)opt->value = 0;
 			return 0;
 		}
+		if (opt->set)
+			*(bool *)opt->set = true;
 		if (opt->flags & PARSE_OPT_OPTARG && !p->opt) {
 			*(int *)opt->value = opt->defval;
 			return 0;
