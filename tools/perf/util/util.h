@@ -80,4 +80,6 @@ void perf_set_multithreaded(void);
 #endif
 #endif
 
+int copyfile_offset(int ifd, loff_t off_in, int ofd, loff_t off_out, u64 size);
+
 #endif /* GIT_COMPAT_UTIL_H */
