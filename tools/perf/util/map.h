@@ -65,10 +65,13 @@ struct maps {
 
 struct map_groups {
 	struct maps	 maps;
-	struct machine	 *machine;
+	struct machine	*machine;
 	refcount_t	 refcnt;
 	u64		 timestamp;
 	struct list_head list;
+#ifdef HAVE_LIBUNWIND_SUPPORT
+	void		*addr_space;
+#endif
 };
 
 struct map_groups *map_groups__new(struct machine *machine);

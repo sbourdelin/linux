@@ -617,32 +617,35 @@ static unw_accessors_t accessors = {
 	.get_proc_name		= get_proc_name,
 };
 
-static int _unwind__prepare_access(struct thread *thread)
+static int _unwind__prepare_access(struct map_groups *mg)
 {
 	if (!dwarf_callchain_users)
 		return 0;
-	thread->addr_space = unw_create_addr_space(&accessors, 0);
-	if (!thread->addr_space) {
+
+	mg->addr_space = unw_create_addr_space(&accessors, 0);
+	if (!mg->addr_space) {
 		pr_err("unwind: Can't create unwind address space.\n");
 		return -ENOMEM;
 	}
 
-	unw_set_caching_policy(thread->addr_space, UNW_CACHE_GLOBAL);
+	unw_set_caching_policy(mg->addr_space, UNW_CACHE_GLOBAL);
 	return 0;
 }
 
-static void _unwind__flush_access(struct thread *thread)
+static void _unwind__flush_access(struct map_groups *mg)
 {
 	if (!dwarf_callchain_users)
 		return;
-	unw_flush_cache(thread->addr_space, 0, 0);
+
+	unw_flush_cache(mg->addr_space, 0, 0);
 }
 
-static void _unwind__finish_access(struct thread *thread)
+static void _unwind__finish_access(struct map_groups *mg)
 {
 	if (!dwarf_callchain_users)
 		return;
-	unw_destroy_addr_space(thread->addr_space);
+
+	unw_destroy_addr_space(mg->addr_space);
 }
 
 static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
@@ -650,7 +653,6 @@ static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
 {
 	u64 val;
 	unw_word_t ips[max_stack];
-	unw_addr_space_t addr_space;
 	unw_cursor_t c;
 	int ret, i = 0;
 
@@ -666,13 +668,15 @@ static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
 	 * unwind itself.
 	 */
 	if (max_stack - 1 > 0) {
-		WARN_ONCE(!ui->thread, "WARNING: ui->thread is NULL");
-		addr_space = ui->thread->addr_space;
+		struct map_groups *mg;
 
-		if (addr_space == NULL)
+		WARN_ONCE(!ui->thread, "WARNING: ui->thread is NULL");
+
+		mg = thread__get_map_groups(ui->thread, ui->sample->time);
+		if (mg == NULL || mg->addr_space == NULL)
 			return -1;
 
-		ret = unw_init_remote(&c, addr_space, ui);
+		ret = unw_init_remote(&c, mg->addr_space, ui);
 		if (ret)
 			display_error(ret);
 

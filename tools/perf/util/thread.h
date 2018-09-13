@@ -40,7 +40,6 @@ struct thread {
 	struct thread_stack	*ts;
 	struct nsinfo		*nsinfo;
 #ifdef HAVE_LIBUNWIND_SUPPORT
-	void				*addr_space;
 	struct unwind_libunwind_ops	*unwind_libunwind_ops;
 #endif
 };
