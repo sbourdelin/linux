@@ -29,6 +29,8 @@ static const u8 nla_attr_len[NLA_TYPE_MAX+1] = {
 	[NLA_S16]	= sizeof(s16),
 	[NLA_S32]	= sizeof(s32),
 	[NLA_S64]	= sizeof(s64),
+	[NLA_ETH_ADDR]	= ETH_ALEN,
+	[NLA_ETH_ADDR_COMPAT] = ETH_ALEN,
 };
 
 static const u8 nla_attr_minlen[NLA_TYPE_MAX+1] = {
@@ -42,6 +44,7 @@ static const u8 nla_attr_minlen[NLA_TYPE_MAX+1] = {
 	[NLA_S16]	= sizeof(s16),
 	[NLA_S32]	= sizeof(s32),
 	[NLA_S64]	= sizeof(s64),
+	[NLA_ETH_ADDR_COMPAT] = ETH_ALEN,
 };
 
 static int validate_nla_bitfield32(const struct nlattr *nla,
@@ -92,6 +95,11 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 		if (pt->validation_data && extack)
 			extack->_msg = pt->validation_data;
 		return -EINVAL;
+
+	case NLA_ETH_ADDR:
+		if (attrlen != ETH_ALEN)
+			return -ERANGE;
+		break;
 
 	case NLA_FLAG:
 		if (attrlen > 0)
