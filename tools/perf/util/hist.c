@@ -592,7 +592,7 @@ __hists__add_entry(struct hists *hists,
 	struct namespaces *ns = thread__namespaces(al->thread);
 	struct hist_entry entry = {
 		.thread	= al->thread,
-		.comm = thread__comm(al->thread),
+		.comm = thread__comm_by_time(al->thread, sample->time),
 		.cgroup_id = {
 			.dev = ns ? ns->link_info[CGROUP_NS_INDEX].dev : 0,
 			.ino = ns ? ns->link_info[CGROUP_NS_INDEX].ino : 0,
@@ -952,7 +952,7 @@ iter_add_next_cumulative_entry(struct hist_entry_iter *iter,
 		.hists = evsel__hists(evsel),
 		.cpu = al->cpu,
 		.thread = al->thread,
-		.comm = thread__comm(al->thread),
+		.comm = thread__comm_by_time(al->thread, sample->time),
 		.ip = al->addr,
 		.ms = {
 			.map = al->map,
