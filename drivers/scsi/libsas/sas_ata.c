@@ -601,7 +601,7 @@ void sas_ata_task_abort(struct sas_task *task)
 
 	/* Bounce SCSI-initiated commands to the SCSI EH */
 	if (qc->scsicmd) {
-		struct request_queue *q = qc->scsicmd->device->request_queue;
+		struct request_queue *q = qc->scsicmd->request->q;
 		unsigned long flags;
 
 		spin_lock_irqsave(q->queue_lock, flags);

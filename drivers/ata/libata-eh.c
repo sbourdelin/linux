@@ -919,7 +919,7 @@ static void ata_eh_set_pending(struct ata_port *ap, int fastdrain)
 void ata_qc_schedule_eh(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct request_queue *q = qc->scsicmd->device->request_queue;
+	struct request_queue *q = qc->scsicmd->request->q;
 	unsigned long flags;
 
 	WARN_ON(!ap->ops->error_handler);

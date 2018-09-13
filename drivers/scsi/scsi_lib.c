@@ -168,7 +168,7 @@ static void scsi_mq_requeue_cmd(struct scsi_cmnd *cmd)
 static void __scsi_queue_insert(struct scsi_cmnd *cmd, int reason, bool unbusy)
 {
 	struct scsi_device *device = cmd->device;
-	struct request_queue *q = device->request_queue;
+	struct request_queue *q = cmd->request->q;
 	unsigned long flags;
 
 	SCSI_LOG_MLQUEUE(1, scmd_printk(KERN_INFO, cmd,
@@ -674,7 +674,7 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = cmd->device;
-	struct request_queue *q = sdev->request_queue;
+	struct request_queue *q = cmd->request->q;
 
 	if (blk_update_request(req, error, bytes))
 		return true;
@@ -1044,7 +1044,7 @@ static int scsi_io_completion_nz_result(struct scsi_cmnd *cmd, int result,
 void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 {
 	int result = cmd->result;
-	struct request_queue *q = cmd->device->request_queue;
+	struct request_queue *q = cmd->request->q;
 	struct request *req = cmd->request;
 	blk_status_t blk_stat = BLK_STS_OK;
 

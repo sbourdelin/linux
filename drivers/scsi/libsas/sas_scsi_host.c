@@ -933,7 +933,7 @@ void sas_task_abort(struct sas_task *task)
 	if (dev_is_sata(task->dev)) {
 		sas_ata_task_abort(task);
 	} else {
-		struct request_queue *q = sc->device->request_queue;
+		struct request_queue *q = sc->request->q;
 		unsigned long flags;
 
 		spin_lock_irqsave(q->queue_lock, flags);
