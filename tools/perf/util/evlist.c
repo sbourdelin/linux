@@ -1057,6 +1057,7 @@ int perf_evlist__parse_mmap_pages(const struct option *opt, const char *str,
  * @overwrite: overwrite older events?
  * @auxtrace_pages - auxtrace map length in pages
  * @auxtrace_overwrite - overwrite older auxtrace data?
+ * @use_track_mmap: use another mmaps to track meta events
  *
  * If @overwrite is %false the user needs to signal event consumption using
  * perf_mmap__write_tail().  Using perf_evlist__mmap_read() does this
@@ -1069,7 +1070,7 @@ int perf_evlist__parse_mmap_pages(const struct option *opt, const char *str,
  */
 int perf_evlist__mmap_ex(struct perf_evlist *evlist, unsigned int pages,
 			 unsigned int auxtrace_pages,
-			 bool auxtrace_overwrite)
+			 bool auxtrace_overwrite, bool use_track_mmap)
 {
 	struct perf_evsel *evsel;
 	const struct cpu_map *cpus = evlist->cpus;
@@ -1080,7 +1081,7 @@ int perf_evlist__mmap_ex(struct perf_evlist *evlist, unsigned int pages,
 	 * So &mp should not be passed through const pointer.
 	 */
 	struct mmap_params mp = {
-		.track_mmap = false,
+		.track_mmap = use_track_mmap,
 	};
 
 	if (!evlist->mmap) {
@@ -1125,7 +1126,7 @@ int perf_evlist__mmap_ex(struct perf_evlist *evlist, unsigned int pages,
 
 int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages)
 {
-	return perf_evlist__mmap_ex(evlist, pages, 0, false);
+	return perf_evlist__mmap_ex(evlist, pages, 0, false, false);
 }
 
 int perf_evlist__create_maps(struct perf_evlist *evlist, struct target *target)
