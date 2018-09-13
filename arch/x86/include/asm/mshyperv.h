@@ -355,6 +355,8 @@ void hv_apic_init(void);
 static inline void hv_apic_init(void) {}
 #endif
 
+void __init hv_init_spinlocks(void);
+
 #else /* CONFIG_HYPERV */
 static inline void hyperv_init(void) {}
 static inline bool hv_is_hyperv_initialized(void) { return false; }
@@ -368,6 +370,7 @@ static inline struct hv_vp_assist_page *hv_get_vp_assist_page(unsigned int cpu)
 	return NULL;
 }
 static inline int hyperv_flush_guest_mapping(u64 as) { return -1; }
+void __init hv_init_spinlocks(void) {}
 #endif /* CONFIG_HYPERV */
 
 #ifdef CONFIG_HYPERV_TSCPAGE
