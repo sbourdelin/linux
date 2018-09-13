@@ -380,20 +380,66 @@ static const struct nf_conntrack_l4proto nf_conntrack_l4proto_gre4 = {
 	.init_net	= gre_init_net,
 };
 
+/* protocol helper struct */
+static const struct nf_conntrack_l4proto nf_conntrack_l4proto_gre6 = {
+	.l3proto	 = AF_INET6,
+	.l4proto	 = IPPROTO_GRE,
+	.pkt_to_tuple	 = gre_pkt_to_tuple,
+#ifdef CONFIG_NF_CONNTRACK_PROCFS
+	.print_conntrack = gre_print_conntrack,
+#endif
+	.packet		 = gre_packet,
+	.new		 = gre_new,
+	.destroy	 = gre_destroy,
+	.me		 = THIS_MODULE,
+#if IS_ENABLED(CONFIG_NF_CT_NETLINK)
+	.tuple_to_nlattr = nf_ct_port_tuple_to_nlattr,
+	.nlattr_tuple_size = nf_ct_port_nlattr_tuple_size,
+	.nlattr_to_tuple = nf_ct_port_nlattr_to_tuple,
+	.nla_policy	 = nf_ct_port_nla_policy,
+#endif
+#if IS_ENABLED(CONFIG_NF_CT_NETLINK_TIMEOUT)
+	.ctnl_timeout    = {
+		.nlattr_to_obj	= gre_timeout_nlattr_to_obj,
+		.obj_to_nlattr	= gre_timeout_obj_to_nlattr,
+		.nlattr_max	= CTA_TIMEOUT_GRE_MAX,
+		.obj_size	= sizeof(unsigned int) * GRE_CT_MAX,
+		.nla_policy	= gre_timeout_nla_policy,
+	},
+#endif /* CONFIG_NF_CT_NETLINK_TIMEOUT */
+	.net_id		= &proto_gre_net_id,
+	.init_net	= gre_init_net,
+};
+
 static int proto_gre_net_init(struct net *net)
 {
 	int ret = 0;
 
 	ret = nf_ct_l4proto_pernet_register_one(net,
 						&nf_conntrack_l4proto_gre4);
-	if (ret < 0)
+	if (ret < 0) {
 		pr_err("nf_conntrack_gre4: pernet registration failed.\n");
+		goto out;
+	}
+
+	ret = nf_ct_l4proto_pernet_register_one(net,
+						&nf_conntrack_l4proto_gre6);
+	if (ret < 0) {
+		pr_err("nf_conntrack_gre6: pernet registration failed.\n");
+		goto cleanup_gre4;
+	}
+	return 0;
+
+cleanup_gre4:
+	nf_ct_l4proto_pernet_unregister_one(net, &nf_conntrack_l4proto_gre4);
+out:
 	return ret;
 }
 
 static void proto_gre_net_exit(struct net *net)
 {
 	nf_ct_l4proto_pernet_unregister_one(net, &nf_conntrack_l4proto_gre4);
+	nf_ct_l4proto_pernet_unregister_one(net, &nf_conntrack_l4proto_gre6);
 	nf_ct_gre_keymap_flush(net);
 }
 
@@ -414,8 +460,13 @@ static int __init nf_ct_proto_gre_init(void)
 	ret = nf_ct_l4proto_register_one(&nf_conntrack_l4proto_gre4);
 	if (ret < 0)
 		goto out_gre4;
+	ret = nf_ct_l4proto_register_one(&nf_conntrack_l4proto_gre6);
+	if (ret < 0)
+		goto out_gre6;
 
 	return 0;
+out_gre6:
+	nf_ct_l4proto_unregister_one(&nf_conntrack_l4proto_gre4);
 out_gre4:
 	unregister_pernet_subsys(&proto_gre_net_ops);
 out_pernet:
@@ -425,6 +476,7 @@ out_pernet:
 static void __exit nf_ct_proto_gre_fini(void)
 {
 	nf_ct_l4proto_unregister_one(&nf_conntrack_l4proto_gre4);
+	nf_ct_l4proto_unregister_one(&nf_conntrack_l4proto_gre6);
 	unregister_pernet_subsys(&proto_gre_net_ops);
 }
 
