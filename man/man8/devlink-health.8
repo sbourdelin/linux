@@ -1,0 +1,171 @@
+.TH DEVLINK\-HEALTH 8 "15 Aug 2018" "iproute2" "Linux"
+.SH NAME
+devlink-health \- devlink health configuration
+.SH SYNOPSIS
+.sp
+.ad l
+.in +8
+.ti -8
+.B devlink
+.RI "[ " OPTIONS " ]"
+.BR health
+.RI  " { " COMMAND " | "
+.BR help " }"
+.sp
+
+.ti -8
+.IR OPTIONS " := { "
+\fB\-V\fR[\fIersion\fR] |
+\fB\-n\fR[\fIno-nice-names\fR] }
+
+.ti -8
+.B devlink health show
+.RI "[ " DEV " ]"
+.RI "[ "
+.B sensor
+.IR NAME
+.RI "]"
+
+.ti -8
+.B devlink health sensor set
+.IR DEV
+.B name
+.IR NAME
+.RI "[ "
+.BR action
+.IR NAME
+.R "{" active "|" inactive "}" ]"
+
+.ti -8
+.B devlink health action set
+.IR DEV
+.B name
+.IR NAME
+.BR period
+.IR PERIOD
+.BR count
+.IR COUNT
+.BR fail " { "
+.IR ignore
+.BR "| "
+.IR down
+.R "} "
+
+.ti -8
+.B devlink health action reinit
+.IR DEV
+.B name
+.IR NAME
+
+.ti -8
+.B devlink health help
+
+.SH "DESCRIPTION"
+.B devlink-health
+tool allows user to configure the way driver treats unexpected status. The tool allows configuration of the sensors that can trigger health activity. Set for each sensor the follow up operations, such as, reset and dump of info. In addition, set the health activity termination action.
+
+.SS devlink health show - Display devlink health sensors and actions attributes
+.PP
+.B "DEV"
+- Specifies the devlink device to show.
+If this argument is omitted, all devices are listed.
+
+.in +4
+Format is:
+.in +2
+BUS_NAME/BUS_ADDRESS
+
+.PP
+.BR sensor
+.IR "NAME"
+- Specifies the devlink sensor to show.
+
+.SS devlink health sensor set - sets devlink health sensor attributes
+
+.TP
+.B "DEV"
+Specifies the devlink device to show.
+
+.TP
+.BI name " NAME"
+Name of the sensor to set.
+
+.TP
+.BR action
+.IR NAME
+.R "{" active "|" inactive "} "
+.in +4
+Specify which actions to activate and which to deactivate once a sensor was triggered. actions can be dump, reset, etc.
+
+.SS devlink health action set - sets devlink action attributes
+
+.TP
+.B "DEV"
+Specifies the devlink device to set.
+
+.TP
+.BI name " NAME"
+Specifies the devlink action to set.
+
+.TP
+.BI period " PERIOD"
+The period on which we limit the amount of performed actions, measured in seconds.
+
+.TP
+.BI count " COUNT"
+The maximum amount of actions performed in a limit time frame.
+
+.TP
+.BR fail
+.R "{" ignore "|" down "}"
+.in +4
+Specify the behavior once count limit was reached.
+
+.I ignore
+- Ignore errors without execution of any action.
+
+.I down
+- Driver will remain in nonoperational state.
+
+.SS devlink health action reinit - reset devlink action attributes (period, count, fail, etc)
+
+.TP
+.B "DEV"
+Specifies the devlink device to set.
+
+.TP
+.BI name " NAME"
+Specifies the devlink action to set.
+
+.SH "EXAMPLES"
+.PP
+devlink health show
+.RS 4
+Shows the health state of all devlink devices on the system.
+.RE
+.PP
+devlink health show pci/0000:01:00.0
+.RS 4
+Shows the health state of specified devlink device.
+.RE
+.PP
+devlink health sensor set pci/0000:01:00.0 name TX_COMP_ERROR action reset off action dump on
+.RS 4
+Sets TX_COMP_ERROR sensor parameters for a specific device.
+.RE
+.PP
+devlink health action set pci/0000:01:00.0 name reset period 3600 count 5 fail ignore
+.RS 4
+Sets health attributes for reset action.
+.RE
+
+.SH SEE ALSO
+.BR devlink (8),
+.BR devlink-port (8),
+.BR devlink-sb (8),
+.BR devlink-monitor (8),
+.BR devlink-dev (8),
+.br
+
+.SH AUTHOR
+Eran ben Elisha <eranbe@mellanox.com>
