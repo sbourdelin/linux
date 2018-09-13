@@ -102,6 +102,7 @@ struct record {
 	unsigned long long	samples;
 	struct record_thread	*threads;
 	int			threads_cnt;
+	bool			threads_set;
 	int			threads_signal_cnt;
 	pthread_mutex_t		threads_signal_mutex;
 	pthread_cond_t		threads_signal_cond;
@@ -1133,10 +1134,37 @@ record__threads_create(struct record *rec)
 	return threads ? 0 : -ENOMEM;
 }
 
+static int record__threads_cnt(struct record *rec)
+{
+	struct perf_evlist *evlist = rec->evlist;
+	int cnt;
+
+	if (rec->threads_set) {
+		if (rec->threads_cnt) {
+			pr_err("failed: Can't specify number of threads yet.\n");
+			return -EINVAL;
+		}
+		if (evlist->overwrite_mmap) {
+			pr_err("failed: Can't use multiple threads with overwrite mmaps yet.\n");
+			return -EINVAL;
+		}
+		cnt = evlist->nr_mmaps;
+	} else {
+		cnt = 1;
+	}
+
+	rec->threads_cnt = cnt;
+	return 0;
+}
+
 static int
 record__threads_config(struct record *rec)
 {
 	int ret;
+
+	ret = record__threads_cnt(rec);
+	if (ret)
+		goto out;
 
 	ret = record__threads_create(rec);
 	if (ret)
@@ -2119,6 +2147,8 @@ static struct option __record_options[] = {
 		    "Parse options then exit"),
 	OPT_BOOLEAN(0, "index", &record.opts.index,
 		    "make index for sample data to speed-up processing"),
+	OPT_INTEGER_OPTARG_SET(0, "threads", &record.threads_cnt, &record.threads_set,
+			       "count", "Enabled threads (count)", 0),
 	OPT_END()
 };
 
@@ -2266,6 +2296,12 @@ int cmd_record(int argc, const char **argv)
 		pr_err("Not enough memory for event selector list\n");
 		goto out;
 	}
+
+	/*
+	 * Threads need index data file.
+	 */
+	if (record.threads_set)
+		record.opts.index = true;
 
 	if (rec->opts.index) {
 		if (!rec->opts.sample_time) {
