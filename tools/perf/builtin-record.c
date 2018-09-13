@@ -70,7 +70,14 @@ enum {
 	RECORD_THREAD__STOP	= 1,
 };
 
+struct thread_stat {
+	u64	bytes_written;
+	u64	poll;
+	u64	poll_skip;
+};
+
 struct record_thread {
+	int			  pid;
 	struct perf_mmap	**mmap;
 	int			  mmap_nr;
 	struct perf_mmap	**ovw_mmap;
@@ -81,6 +88,7 @@ struct record_thread {
 	u64			  bytes_written;
 	pthread_t		  pt;
 	int			  state;
+	struct thread_stat	  stats;
 };
 
 struct record {
@@ -149,7 +157,8 @@ static int record__write(struct record *rec, struct perf_mmap *map,
 		return -1;
 	}
 
-	thread->bytes_written += size;
+	thread->bytes_written       += size;
+	thread->stats.bytes_written += size;
 
 	if (switch_output_size(rec))
 		trigger_hit(&switch_output_trigger);
@@ -1186,6 +1195,11 @@ out:
 	return ret;
 }
 
+static inline pid_t gettid(void)
+{
+	return (pid_t) syscall(__NR_gettid);
+}
+
 static void*
 record_thread__process(struct record *rec)
 {
@@ -1197,6 +1211,8 @@ record_thread__process(struct record *rec)
 			break;
 
 		if (hits == thread->samples) {
+			thread->stats.poll++;
+
 			err = fdarray__poll(&thread->pollfd, 500);
 			/*
 			 * Propagate error, only if there's any. Ignore positive
@@ -1209,6 +1225,8 @@ record_thread__process(struct record *rec)
 			if (fdarray__filter(&thread->pollfd, POLLERR|POLLHUP,
 					    perf_mmap__put_filtered, NULL) == 0)
 				break;
+		} else {
+			thread->stats.poll_skip++;
 		}
 	}
 
@@ -1241,6 +1259,7 @@ static void *worker(void *arg)
 	struct record *rec = th->rec;
 
 	thread        = th;
+	thread->pid   = gettid();
 	thread->state = RECORD_THREAD__RUNNING;
 
 	signal_main(rec);
@@ -1285,6 +1304,50 @@ static int record__threads_stop(struct record *rec)
 	}
 
 	return err;
+}
+
+static void record_thread__display(struct record_thread *t, unsigned long s)
+{
+	char buf_size[20];
+	char buf_time[20];
+
+	unit_number__scnprintf(buf_size, sizeof(buf_size), t->stats.bytes_written);
+
+	if (s)
+		scnprintf(buf_time, sizeof(buf_time), "%5lus", s);
+	else
+		buf_time[0] = 0;
+
+	fprintf(stderr, "%6s %6d %10s %10" PRIu64" %10" PRIu64"\n",
+		buf_time, t->pid, buf_size, t->stats.poll, t->stats.poll_skip);
+}
+
+static void record__threads_stats(struct record *rec)
+{
+	struct record_thread *threads = rec->threads;
+	static time_t last, last_header, start;
+	time_t current = time(NULL);
+	int i;
+
+	if (last == current)
+		return;
+
+	if (!start)
+		start = current - 1;
+
+	last = current;
+
+	if (!last_header || (last_header + 10 < current)) {
+		fprintf(stderr, "%6s %6s %10s %10s %10s\n", " ", "pid", "write", "poll", "skip");
+		last_header = current;
+	}
+
+	for (i = 0; i < rec->threads_cnt; i++) {
+		struct record_thread *t = threads + i;
+
+		record_thread__display(t, !i ? current - start : 0);
+		memset(&t->stats, 0, sizeof(t->stats));
+	}
 }
 
 static int __cmd_record(struct record *rec, int argc, const char **argv)
@@ -1371,6 +1434,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	}
 
 	thread = &rec->threads[0];
+	thread->pid = gettid();
 
 	err = bpf__apply_obj_config();
 	if (err) {
@@ -1573,7 +1637,10 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		if (hits == thread->samples) {
 			if (done || draining)
 				break;
-			err = fdarray__poll(&thread->pollfd, -1);
+
+			err = fdarray__poll(&thread->pollfd, 1000);
+			thread->stats.poll++;
+
 			/*
 			 * Propagate error, only if there's any. Ignore positive
 			 * number of returned events and interrupt error.
@@ -1582,9 +1649,15 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 				err = 0;
 			rec->waking++;
 
-			if (perf_evlist__filter_pollfd(rec->evlist, POLLERR | POLLHUP) == 0)
+			if (fdarray__filter(&thread->pollfd, POLLERR|POLLHUP,
+					    perf_mmap__put_filtered, NULL) == 0)
 				draining = true;
+		} else {
+			thread->stats.poll_skip++;
 		}
+
+		if (debug_threads)
+			record__threads_stats(rec);
 
 		/*
 		 * When perf is starting the traced process, at the end events
