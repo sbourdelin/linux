@@ -102,6 +102,9 @@ struct record {
 	unsigned long long	samples;
 	struct record_thread	*threads;
 	int			threads_cnt;
+	int			threads_signal_cnt;
+	pthread_mutex_t		threads_signal_mutex;
+	pthread_cond_t		threads_signal_cond;
 	unsigned long		waking;
 };
 
@@ -1145,6 +1148,9 @@ record__threads_config(struct record *rec)
 
 	ret = record__threads_create_poll(rec);
 
+	pthread_mutex_init(&rec->threads_signal_mutex, NULL);
+	pthread_cond_init(&rec->threads_signal_cond, NULL);
+
 out:
 	if (ret)
 		record__threads_clean(rec);
@@ -1181,6 +1187,26 @@ record_thread__process(struct record *rec)
 	return NULL;
 }
 
+static void signal_main(struct record *rec)
+{
+	pthread_mutex_lock(&rec->threads_signal_mutex);
+	rec->threads_signal_cnt++;
+	pthread_cond_signal(&rec->threads_signal_cond);
+	pthread_mutex_unlock(&rec->threads_signal_mutex);
+}
+
+static void wait_for_signal(struct record *rec)
+{
+	pthread_mutex_lock(&rec->threads_signal_mutex);
+
+	while (rec->threads_signal_cnt < rec->threads_cnt) {
+		pthread_cond_wait(&rec->threads_signal_cond,
+				  &rec->threads_signal_mutex);
+	}
+
+	pthread_mutex_unlock(&rec->threads_signal_mutex);
+}
+
 static void *worker(void *arg)
 {
 	struct record_thread *th = arg;
@@ -1188,6 +1214,8 @@ static void *worker(void *arg)
 
 	thread        = th;
 	thread->state = RECORD_THREAD__RUNNING;
+
+	signal_main(rec);
 
 	return record_thread__process(rec);
 }
@@ -1197,11 +1225,16 @@ static int record__threads_start(struct record *rec)
 	struct record_thread *threads = rec->threads;
 	int i, err = 0;
 
+	rec->threads_signal_cnt = 1;
+
 	for (i = 1; !err && i < rec->threads_cnt; i++) {
 		struct record_thread *th = threads + i;
 
 		err = pthread_create(&th->pt, NULL, worker, th);
 	}
+
+	if (rec->threads_cnt > 1)
+		wait_for_signal(rec);
 
 	return err;
 }
