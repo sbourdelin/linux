@@ -254,8 +254,7 @@ int drm_connector_init(struct drm_device *dev,
 	config->num_connector++;
 	spin_unlock_irq(&config->connector_list_lock);
 
-	if (connector_type != DRM_MODE_CONNECTOR_VIRTUAL &&
-	    connector_type != DRM_MODE_CONNECTOR_WRITEBACK)
+	if (connector_type != DRM_MODE_CONNECTOR_WRITEBACK)
 		drm_object_attach_property(&connector->base,
 					      config->edid_property,
 					      0);
