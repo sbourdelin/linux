@@ -635,6 +635,9 @@ struct request_queue {
 	int			bypass_depth;
 	atomic_t		mq_freeze_depth;
 
+	bool			q_frozen;
+	struct mutex		freeze_lock;
+
 #if defined(CONFIG_BLK_DEV_BSG)
 	bsg_job_fn		*bsg_job_fn;
 	struct bsg_class_device bsg_dev;

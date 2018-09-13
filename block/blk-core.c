@@ -890,6 +890,28 @@ struct request_queue *blk_alloc_queue(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(blk_alloc_queue);
 
+#ifdef CONFIG_PM
+static void blk_resume_queue(struct request_queue *q)
+{
+	int rpm_status;
+
+	if (!q->dev)
+		return;
+
+	spin_lock_irq(q->queue_lock);
+	rpm_status = q->rpm_status;
+	spin_unlock_irq(q->queue_lock);
+
+	/* PM request needs to be dealt with out of band */
+	if (rpm_status == RPM_SUSPENDED || rpm_status == RPM_SUSPENDING)
+		pm_runtime_resume(q->dev);
+}
+#else
+static void blk_resume_queue(struct request_queue *q)
+{
+}
+#endif
+
 /**
  * blk_queue_enter() - try to increase q->q_usage_counter
  * @q: request queue pointer
@@ -913,11 +935,20 @@ int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 		 */
 		smp_rmb();
 
+		blk_resume_queue(q);
+
 		wait_event(q->mq_freeze_wq,
 			   atomic_read(&q->mq_freeze_depth) == 0 ||
 			   blk_queue_dying(q));
 		if (blk_queue_dying(q))
 			return -ENODEV;
+
+		/*
+		 * This allocation may be blocked via queue freezing before
+		 * the queue is suspended, so we have to resume queue again
+		 * after waking up.
+		 */
+		blk_resume_queue(q);
 	}
 }
 
@@ -1023,6 +1054,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id,
 	q->bypass_depth = 1;
 	queue_flag_set_unlocked(QUEUE_FLAG_BYPASS, q);
 
+	mutex_init(&q->freeze_lock);
 	init_waitqueue_head(&q->mq_freeze_wq);
 
 	/*
@@ -1470,6 +1502,23 @@ rq_starved:
 	return ERR_PTR(-ENOMEM);
 }
 
+#ifdef CONFIG_PM
+static void blk_pm_add_request(struct request_queue *q)
+{
+	if (q->dev)
+		q->nr_pending++;
+}
+static void blk_pm_put_request(struct request_queue *q)
+{
+	if (q->dev && !--q->nr_pending)
+		pm_runtime_mark_last_busy(q->dev);
+}
+#else
+static inline void blk_pm_put_request(struct request_queue *q) {}
+static inline void blk_pm_add_request(struct request_queue *q){}
+#endif
+
+
 /**
  * get_request - get a free request
  * @q: request_queue to allocate request from
@@ -1498,16 +1547,19 @@ static struct request *get_request(struct request_queue *q, unsigned int op,
 
 	rl = blk_get_rl(q, bio);	/* transferred to @rq on success */
 retry:
+	blk_pm_add_request(q);
 	rq = __get_request(rl, op, bio, flags, gfp);
 	if (!IS_ERR(rq))
 		return rq;
 
 	if (op & REQ_NOWAIT) {
+		blk_pm_put_request(q);
 		blk_put_rl(rl);
 		return ERR_PTR(-EAGAIN);
 	}
 
 	if ((flags & BLK_MQ_REQ_NOWAIT) || unlikely(blk_queue_dying(q))) {
+		blk_pm_put_request(q);
 		blk_put_rl(rl);
 		return rq;
 	}
@@ -1518,6 +1570,7 @@ retry:
 
 	trace_block_sleeprq(q, bio, op);
 
+	blk_pm_put_request(q);
 	spin_unlock_irq(q->queue_lock);
 	io_schedule();
 
@@ -1686,16 +1739,6 @@ void part_round_stats(struct request_queue *q, int cpu, struct hd_struct *part)
 }
 EXPORT_SYMBOL_GPL(part_round_stats);
 
-#ifdef CONFIG_PM
-static void blk_pm_put_request(struct request *rq)
-{
-	if (rq->q->dev && !(rq->rq_flags & RQF_PM) && !--rq->q->nr_pending)
-		pm_runtime_mark_last_busy(rq->q->dev);
-}
-#else
-static inline void blk_pm_put_request(struct request *rq) {}
-#endif
-
 void __blk_put_request(struct request_queue *q, struct request *req)
 {
 	req_flags_t rq_flags = req->rq_flags;
@@ -1711,7 +1754,7 @@ void __blk_put_request(struct request_queue *q, struct request *req)
 	lockdep_assert_held(q->queue_lock);
 
 	blk_req_zone_write_unlock(req);
-	blk_pm_put_request(req);
+	blk_pm_put_request(q);
 
 	elv_completed_request(q, req);
 
@@ -2709,30 +2752,6 @@ void blk_account_io_done(struct request *req, u64 now)
 	}
 }
 
-#ifdef CONFIG_PM
-/*
- * Don't process normal requests when queue is suspended
- * or in the process of suspending/resuming
- */
-static bool blk_pm_allow_request(struct request *rq)
-{
-	switch (rq->q->rpm_status) {
-	case RPM_RESUMING:
-	case RPM_SUSPENDING:
-		return rq->rq_flags & RQF_PM;
-	case RPM_SUSPENDED:
-		return false;
-	default:
-		return true;
-	}
-}
-#else
-static bool blk_pm_allow_request(struct request *rq)
-{
-	return true;
-}
-#endif
-
 void blk_account_io_start(struct request *rq, bool new_io)
 {
 	struct hd_struct *part;
@@ -2777,13 +2796,8 @@ static struct request *elv_next_request(struct request_queue *q)
 	WARN_ON_ONCE(q->mq_ops);
 
 	while (1) {
-		list_for_each_entry(rq, &q->queue_head, queuelist) {
-			if (blk_pm_allow_request(rq))
-				return rq;
-
-			if (rq->rq_flags & RQF_SOFTBARRIER)
-				break;
-		}
+		list_for_each_entry(rq, &q->queue_head, queuelist)
+			return rq;
 
 		/*
 		 * Flush request is running and flush request isn't queueable
@@ -3787,6 +3801,10 @@ int blk_pre_runtime_suspend(struct request_queue *q)
 		q->rpm_status = RPM_SUSPENDING;
 	}
 	spin_unlock_irq(q->queue_lock);
+
+	if (!ret)
+		blk_freeze_queue_lock(q);
+
 	return ret;
 }
 EXPORT_SYMBOL(blk_pre_runtime_suspend);
@@ -3864,13 +3882,15 @@ void blk_post_runtime_resume(struct request_queue *q, int err)
 	spin_lock_irq(q->queue_lock);
 	if (!err) {
 		q->rpm_status = RPM_ACTIVE;
-		__blk_run_queue(q);
 		pm_runtime_mark_last_busy(q->dev);
 		pm_request_autosuspend(q->dev);
 	} else {
 		q->rpm_status = RPM_SUSPENDED;
 	}
 	spin_unlock_irq(q->queue_lock);
+
+	if (!err)
+		blk_unfreeze_queue_lock(q);
 }
 EXPORT_SYMBOL(blk_post_runtime_resume);
 

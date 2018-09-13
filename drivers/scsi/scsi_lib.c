@@ -278,12 +278,17 @@ int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	struct request *req;
 	struct scsi_request *rq;
 	int ret = DRIVER_ERROR << 24;
+	bool pm_rq = rq_flags & RQF_PM;
+
+	if (!pm_rq)
+		scsi_autopm_get_device(sdev);
 
 	req = blk_get_request(sdev->host->admin_q,
 			data_direction == DMA_TO_DEVICE ?
 			REQ_OP_SCSI_OUT : REQ_OP_SCSI_IN, BLK_MQ_REQ_PREEMPT);
 	if (IS_ERR(req))
-		return ret;
+		goto fail;
+
 	rq = scsi_req(req);
 
 	if (bufflen &&	blk_rq_map_kern(req->q, req,
@@ -327,6 +332,9 @@ int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 
 	atomic_dec(&sdev->nr_admin_pending);
 	wake_up_all(&sdev->admin_wq);
+ fail:
+	if (!pm_rq)
+		scsi_autopm_put_device(sdev);
 
 	return ret;
 }
@@ -3193,7 +3201,7 @@ scsi_device_quiesce(struct scsi_device *sdev)
 {
 	int err;
 
-	blk_mq_freeze_queue(sdev->request_queue);
+	blk_freeze_queue_lock(sdev->request_queue);
 
 	mutex_lock(&sdev->state_mutex);
 	err = scsi_device_set_state(sdev, SDEV_QUIESCE);
@@ -3223,7 +3231,7 @@ void scsi_device_resume(struct scsi_device *sdev)
 		scsi_device_set_state(sdev, SDEV_RUNNING);
 	mutex_unlock(&sdev->state_mutex);
 
-	blk_mq_unfreeze_queue(sdev->request_queue);
+	blk_unfreeze_queue_lock(sdev->request_queue);
 }
 EXPORT_SYMBOL(scsi_device_resume);
 

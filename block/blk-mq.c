@@ -204,6 +204,28 @@ void blk_mq_unfreeze_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue);
 
+void blk_unfreeze_queue_lock(struct request_queue *q)
+{
+	mutex_lock(&q->freeze_lock);
+	if (q->q_frozen) {
+		blk_mq_unfreeze_queue(q);
+		q->q_frozen = false;
+	}
+	mutex_unlock(&q->freeze_lock);
+}
+EXPORT_SYMBOL(blk_unfreeze_queue_lock);
+
+void blk_freeze_queue_lock(struct request_queue *q)
+{
+	mutex_lock(&q->freeze_lock);
+	if (!q->q_frozen) {
+		blk_mq_freeze_queue(q);
+		q->q_frozen = true;
+	}
+	mutex_unlock(&q->freeze_lock);
+}
+EXPORT_SYMBOL(blk_freeze_queue_lock);
+
 /*
  * FIXME: replace the scsi_internal_device_*block_nowait() calls in the
  * mpt3sas driver such that this function can be removed.
