@@ -30,7 +30,8 @@ bool blk_mq_has_free_tags(struct blk_mq_tags *tags)
 bool __blk_mq_tag_busy(struct blk_mq_hw_ctx *hctx)
 {
 	if (!test_bit(BLK_MQ_S_TAG_ACTIVE, &hctx->state) &&
-	    !test_and_set_bit(BLK_MQ_S_TAG_ACTIVE, &hctx->state))
+	    !test_and_set_bit(BLK_MQ_S_TAG_ACTIVE, &hctx->state) &&
+	    !blk_queue_admin(hctx->queue))
 		atomic_inc(&hctx->tags->active_queues);
 
 	return true;
@@ -57,7 +58,8 @@ void __blk_mq_tag_idle(struct blk_mq_hw_ctx *hctx)
 	if (!test_and_clear_bit(BLK_MQ_S_TAG_ACTIVE, &hctx->state))
 		return;
 
-	atomic_dec(&tags->active_queues);
+	if (!blk_queue_admin(hctx->queue))
+		atomic_dec(&tags->active_queues);
 
 	blk_mq_tag_wakeup_all(tags, false);
 }
@@ -82,6 +84,12 @@ static inline bool hctx_may_queue(struct blk_mq_hw_ctx *hctx,
 	if (bt->sb.depth == 1)
 		return true;
 
+	/*
+	 * Needn't to deal with admin queue specially here even though we
+	 * don't take it account to tags->active_queues, so blk_queue_admin()
+	 * can be avoided to check in the fast path, also with implicit benefit
+	 * of avoiding too many in-flight admin requests
+	 */
 	users = atomic_read(&hctx->tags->active_queues);
 	if (!users)
 		return true;
