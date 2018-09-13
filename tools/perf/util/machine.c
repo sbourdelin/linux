@@ -1828,6 +1828,9 @@ static void __machine__remove_thread(struct machine *machine, struct thread *th,
 	rb_erase_init(&th->rb_node, &threads->entries);
 	RB_CLEAR_NODE(&th->rb_node);
 	--threads->nr;
+
+	th->dead = true;
+
 	/*
 	 * No need to have an additional reference for non-index file
 	 * as they can be released when reference holders died and
