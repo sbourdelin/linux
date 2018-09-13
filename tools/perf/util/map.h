@@ -36,6 +36,7 @@ struct map {
 	u32			maj, min; /* only valid for MMAP2 record */
 	u64			ino;      /* only valid for MMAP2 record */
 	u64			ino_generation;/* only valid for MMAP2 record */
+	u64			timestamp;
 
 	/* ip -> dso rip */
 	u64			(*map_ip)(struct map *, u64);
@@ -142,12 +143,14 @@ struct thread;
 	__map__for_each_symbol_by_name(map, sym_name, (pos))
 
 void map__init(struct map *map,
-	       u64 start, u64 end, u64 pgoff, struct dso *dso);
+	       u64 start, u64 end, u64 pgoff, struct dso *dso,
+	       u64 timestamp);
 struct map *map__new(struct machine *machine, u64 start, u64 len,
 		     u64 pgoff, u32 d_maj, u32 d_min, u64 ino,
 		     u64 ino_gen, u32 prot, u32 flags,
-		     char *filename, struct thread *thread);
-struct map *map__new2(u64 start, struct dso *dso);
+		     char *filename, struct thread *thread,
+		     u64 timestamp);
+struct map *map__new2(u64 start, struct dso *dso, u64 timestamp);
 void map__delete(struct map *map);
 struct map *map__clone(struct map *map);
 

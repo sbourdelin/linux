@@ -40,16 +40,16 @@ int test__thread_mg_time(struct test *test __maybe_unused, int subtest __maybe_u
 	if (verbose > 1)
 		map_groups__fprintf(t->mg, stderr);
 
-	thread__find_addr_map(t, PERF_RECORD_MISC_USER, MAP__FUNCTION,
-			      PERF_MAP_START, &al);
+	thread__find_map(t, PERF_RECORD_MISC_USER,
+			 PERF_MAP_START, &al);
 
 	TEST_ASSERT_VAL("cannot find mapping for perf", al.map != NULL);
 	TEST_ASSERT_VAL("non matched mapping found", al.map == map);
 	TEST_ASSERT_VAL("incorrect map groups", al.map->groups == mg);
 	TEST_ASSERT_VAL("incorrect map groups", al.map->groups == t->mg);
 
-	thread__find_addr_map_by_time(t, PERF_RECORD_MISC_USER, MAP__FUNCTION,
-				      PERF_MAP_START, &al, -1ULL);
+	thread__find_map_by_time(t, PERF_RECORD_MISC_USER,
+				 PERF_MAP_START, &al, -1ULL);
 
 	TEST_ASSERT_VAL("cannot find timed mapping for perf", al.map != NULL);
 	TEST_ASSERT_VAL("non matched timed mapping", al.map == map);
@@ -71,8 +71,8 @@ int test__thread_mg_time(struct test *test __maybe_unused, int subtest __maybe_u
 	if (verbose > 1)
 		map_groups__fprintf(t->mg, stderr);
 
-	thread__find_addr_map(t, PERF_RECORD_MISC_USER, MAP__FUNCTION,
-			      PERF_MAP_START + 4, &al);
+	thread__find_map(t, PERF_RECORD_MISC_USER,
+			 PERF_MAP_START + 4, &al);
 
 	TEST_ASSERT_VAL("cannot find mapping for perf-test", al.map != NULL);
 	TEST_ASSERT_VAL("invalid mapping found", al.map == map);
@@ -80,8 +80,8 @@ int test__thread_mg_time(struct test *test __maybe_unused, int subtest __maybe_u
 	TEST_ASSERT_VAL("incorrect map groups", al.map->groups == t->mg);
 
 	pr_debug("searching map in the old mag groups\n");
-	thread__find_addr_map_by_time(t, PERF_RECORD_MISC_USER, MAP__FUNCTION,
-				      PERF_MAP_START, &al, 5000);
+	thread__find_map_by_time(t, PERF_RECORD_MISC_USER,
+				 PERF_MAP_START, &al, 5000);
 
 	TEST_ASSERT_VAL("cannot find timed mapping for perf-test", al.map != NULL);
 	TEST_ASSERT_VAL("non matched timed mapping", al.map == old_map);

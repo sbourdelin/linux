@@ -1010,7 +1010,7 @@ struct map *dso__new_map(const char *name)
 	struct dso *dso = dso__new(name);
 
 	if (dso)
-		map = map__new2(0, dso);
+		map = map__new2(0, dso, 0);
 
 	return map;
 }

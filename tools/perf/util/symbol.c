@@ -832,7 +832,7 @@ static int map_groups__split_kallsyms(struct map_groups *kmaps, struct dso *dso,
 
 			ndso->kernel = dso->kernel;
 
-			curr_map = map__new2(pos->start, ndso);
+			curr_map = map__new2(pos->start, ndso, 0);
 			if (curr_map == NULL) {
 				dso__put(ndso);
 				return -1;
@@ -1139,7 +1139,7 @@ static int kcore_mapfn(u64 start, u64 len, u64 pgoff, void *data)
 	struct kcore_mapfn_data *md = data;
 	struct map *map;
 
-	map = map__new2(start, md->dso);
+	map = map__new2(start, md->dso, 0);
 	if (map == NULL)
 		return -ENOMEM;
 
