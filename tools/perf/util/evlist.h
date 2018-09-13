@@ -316,4 +316,5 @@ bool perf_evlist__exclude_kernel(struct perf_evlist *evlist);
 
 void perf_evlist__force_leader(struct perf_evlist *evlist);
 
+void perf_mmap__put_filtered(struct fdarray *fda, int fd, void *arg);
 #endif /* __PERF_EVLIST_H */
