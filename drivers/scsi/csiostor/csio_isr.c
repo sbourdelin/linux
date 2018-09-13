@@ -480,7 +480,6 @@ csio_enable_msix(struct csio_hw *hw)
 	int i, j, k, n, min, cnt;
 	int extra = CSIO_EXTRA_VECS;
 	struct csio_scsi_cpu_info *info;
-	struct irq_affinity desc = { .pre_vectors = 2 };
 
 	min = hw->num_pports + extra;
 	cnt = hw->num_sqsets + extra;
@@ -491,8 +490,7 @@ csio_enable_msix(struct csio_hw *hw)
 
 	csio_dbg(hw, "FW supp #niq:%d, trying %d msix's\n", hw->cfg_niq, cnt);
 
-	cnt = pci_alloc_irq_vectors_affinity(hw->pdev, min, cnt,
-			PCI_IRQ_MSIX | PCI_IRQ_AFFINITY, &desc);
+	cnt = pci_alloc_irq_vectors(hw->pdev, min, cnt,	PCI_IRQ_MSIX);
 	if (cnt < 0)
 		return cnt;
 
