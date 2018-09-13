@@ -1456,7 +1456,7 @@ void __hid_request(struct hid_device *hid, struct hid_report *report,
 	int ret;
 	u32 len;
 
-	buf = hid_alloc_report_buf(report, GFP_KERNEL);
+	buf = hid_alloc_report_buf(report, GFP_ATOMIC);
 	if (!buf)
 		return;
 
