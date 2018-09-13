@@ -65,6 +65,11 @@ struct switch_output {
 	bool		 set;
 };
 
+enum {
+	RECORD_THREAD__RUNNING	= 0,
+	RECORD_THREAD__STOP	= 1,
+};
+
 struct record_thread {
 	struct perf_mmap	**mmap;
 	int			  mmap_nr;
@@ -74,6 +79,8 @@ struct record_thread {
 	struct record		 *rec;
 	unsigned long long	  samples;
 	u64			  bytes_written;
+	pthread_t		  pt;
+	int			  state;
 };
 
 struct record {
@@ -1145,6 +1152,80 @@ out:
 	return ret;
 }
 
+static void*
+record_thread__process(struct record *rec)
+{
+	while (thread->state != RECORD_THREAD__STOP) {
+		unsigned long long hits = thread->samples;
+		int err;
+
+		if (record__mmap_read_all(thread->rec) < 0)
+			break;
+
+		if (hits == thread->samples) {
+			err = fdarray__poll(&thread->pollfd, 500);
+			/*
+			 * Propagate error, only if there's any. Ignore positive
+			 * number of returned events and interrupt error.
+			 */
+			if (err > 0 || (err < 0 && errno == EINTR))
+				err = 0;
+			rec->waking++;
+
+			if (fdarray__filter(&thread->pollfd, POLLERR|POLLHUP,
+					    perf_mmap__put_filtered, NULL) == 0)
+				break;
+		}
+	}
+
+	return NULL;
+}
+
+static void *worker(void *arg)
+{
+	struct record_thread *th = arg;
+	struct record *rec = th->rec;
+
+	thread        = th;
+	thread->state = RECORD_THREAD__RUNNING;
+
+	return record_thread__process(rec);
+}
+
+static int record__threads_start(struct record *rec)
+{
+	struct record_thread *threads = rec->threads;
+	int i, err = 0;
+
+	for (i = 1; !err && i < rec->threads_cnt; i++) {
+		struct record_thread *th = threads + i;
+
+		err = pthread_create(&th->pt, NULL, worker, th);
+	}
+
+	return err;
+}
+
+static int record__threads_stop(struct record *rec)
+{
+	struct record_thread *threads = rec->threads;
+	int i, err = 0;
+
+	for (i = 1; i < rec->threads_cnt; i++) {
+		struct record_thread *th = threads + i;
+
+		th->state = RECORD_THREAD__STOP;
+	}
+
+	for (i = 1; !err && i < rec->threads_cnt; i++) {
+		struct record_thread *th = threads + i;
+
+		err = pthread_join(th->pt, NULL);
+	}
+
+	return err;
+}
+
 static int __cmd_record(struct record *rec, int argc, const char **argv)
 {
 	int err;
@@ -1269,6 +1350,14 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		err = -1;
 		goto out_child;
 	}
+
+	/*
+	 * We need to call this before record__synthesize, so in case we
+	 * sample system wide perf threads get synthesized as well.
+	 */
+	err = record__threads_start(rec);
+	if (err < 0)
+		goto out_child;
 
 	err = record__synthesize(rec, false);
 	if (err < 0)
@@ -1449,6 +1538,9 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	}
 	trigger_off(&auxtrace_snapshot_trigger);
 	trigger_off(&switch_output_trigger);
+
+	if (record__threads_stop(rec))
+		pr_err("failed to stop threads\n");
 
 	if (forks && workload_exec_errno) {
 		char msg[STRERR_BUFSIZE];
