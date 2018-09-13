@@ -2603,6 +2603,7 @@ static int process_data_index(struct feat_fd *ff, void *data __maybe_unused)
 
 	ph->index = idx;
 	ph->nr_index = nr_idx;
+	perf_has_index = true;
 	return 0;
 }
 

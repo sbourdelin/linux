@@ -53,6 +53,8 @@
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <linux/time64.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 struct switch_output {
 	bool		 enabled;
