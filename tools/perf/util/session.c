@@ -1796,6 +1796,12 @@ fetch_mmaped_event(struct perf_session *session,
 	return event;
 }
 
+struct process_args {
+	u64	data_offset;
+	u64	data_size;
+	u64	file_size;
+};
+
 /*
  * On 64bit we can mmap the data file in one go. No need for tiny mmap
  * slices. On 32bit we use 32MB.
@@ -1809,13 +1815,13 @@ fetch_mmaped_event(struct perf_session *session,
 #endif
 
 static int __perf_session__process_events(struct perf_session *session,
-					  u64 data_offset, u64 data_size,
-					  u64 file_size)
+					  struct process_args *args)
 {
 	struct ordered_events *oe = &session->ordered_events;
 	struct perf_tool *tool = session->tool;
 	int fd = perf_data__fd(session->data);
 	u64 head, page_offset, file_offset, file_pos, size;
+	u64 file_size = args->file_size;
 	int err, mmap_prot, mmap_flags, map_idx = 0;
 	size_t	mmap_size;
 	char *buf, *mmaps[NUM_MMAPS];
@@ -1825,15 +1831,15 @@ static int __perf_session__process_events(struct perf_session *session,
 
 	perf_tool__fill_defaults(tool);
 
-	page_offset = page_size * (data_offset / page_size);
+	page_offset = page_size * (args->data_offset / page_size);
 	file_offset = page_offset;
-	head = data_offset - page_offset;
+	head = args->data_offset - page_offset;
 
-	if (data_size == 0)
+	if (args->data_size == 0)
 		goto out;
 
-	if (data_offset + data_size < file_size)
-		file_size = data_offset + data_size;
+	if (args->data_offset + args->data_size < file_size)
+		file_size = args->data_offset + args->data_size;
 
 	ui_progress__init_size(&prog, file_size, "Processing events...");
 
@@ -1932,6 +1938,7 @@ out_err:
 
 static int __perf_session__process_indexed_events(struct perf_session *session)
 {
+	struct process_args args;
 	struct perf_tool *tool = session->tool;
 	int err = 0, i;
 
@@ -1941,9 +1948,11 @@ static int __perf_session__process_indexed_events(struct perf_session *session)
 		if (!idx->size)
 			continue;
 
-		err = __perf_session__process_events(session, idx->offset,
-						     idx->size,
-						     idx->offset + idx->size);
+		args.data_offset = idx->offset;
+		args.data_size   = idx->size;
+		args.file_size   = idx->offset + idx->size;
+
+		err = __perf_session__process_events(session, &args);
 		if (err < 0)
 			break;
 	}
@@ -1956,9 +1965,9 @@ static int __perf_session__process_indexed_events(struct perf_session *session)
 
 int perf_session__process_events(struct perf_session *session)
 {
+	struct process_args args;
 	struct perf_tool *tool = session->tool;
 	struct perf_data *data = session->data;
-	u64 size = perf_data__size(data);
 	int err;
 
 	if (perf_session__register_idle_thread(session) < 0)
@@ -1969,10 +1978,11 @@ int perf_session__process_events(struct perf_session *session)
 	if (perf_has_index)
 		return __perf_session__process_indexed_events(session);
 
-	err = __perf_session__process_events(session,
-					     session->header.data_offset,
-					     session->header.data_size,
-					     size);
+	args.data_offset = session->header.data_offset;
+	args.data_size   = session->header.data_size;
+	args.file_size   = perf_data__size(data);
+
+	err = __perf_session__process_events(session, &args);
 
 	if (!tool->no_warn)
 		perf_session__warn_about_errors(session);
