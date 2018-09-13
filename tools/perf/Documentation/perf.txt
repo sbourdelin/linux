@@ -22,6 +22,7 @@ OPTIONS
 	  verbose          - general debug messages
 	  ordered-events   - ordered events object debug messages
 	  data-convert     - data convert command debug messages
+	  threads          - threads debug/stats messages
 
 --buildid-dir::
 	Setup buildid cache directory. It has higher priority than
