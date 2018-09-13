@@ -65,6 +65,10 @@ struct crypto_skcipher {
 	struct crypto_tfm base;
 };
 
+struct crypto_sync_skcipher {
+	struct crypto_skcipher base;
+};
+
 /**
  * struct skcipher_alg - symmetric key cipher definition
  * @min_keysize: Minimum key size supported by the transformation. This is the
@@ -139,9 +143,17 @@ struct skcipher_alg {
 	struct crypto_alg base;
 };
 
+#define MAX_SYNC_SKCIPHER_REQSIZE      384
+/*
+ * This performs a type-check against the "tfm" argument to make sure
+ * all users have the correct skcipher tfm for doing on-stack requests.
+ */
 #define SKCIPHER_REQUEST_ON_STACK(name, tfm) \
 	char __##name##_desc[sizeof(struct skcipher_request) + \
-		crypto_skcipher_reqsize(tfm)] CRYPTO_MINALIGN_ATTR; \
+			     MAX_SYNC_SKCIPHER_REQSIZE + \
+			     (!(sizeof((struct crypto_sync_skcipher *)1 == \
+				       (typeof(tfm))1))) \
+			    ] CRYPTO_MINALIGN_ATTR; \
 	struct skcipher_request *name = (void *)__##name##_desc
 
 /**
@@ -197,6 +209,9 @@ static inline struct crypto_skcipher *__crypto_skcipher_cast(
 struct crypto_skcipher *crypto_alloc_skcipher(const char *alg_name,
 					      u32 type, u32 mask);
 
+struct crypto_sync_skcipher *crypto_alloc_sync_skcipher(const char *alg_name,
+					      u32 type, u32 mask);
+
 static inline struct crypto_tfm *crypto_skcipher_tfm(
 	struct crypto_skcipher *tfm)
 {
@@ -210,6 +225,11 @@ static inline struct crypto_tfm *crypto_skcipher_tfm(
 static inline void crypto_free_skcipher(struct crypto_skcipher *tfm)
 {
 	crypto_destroy_tfm(tfm, crypto_skcipher_tfm(tfm));
+}
+
+static inline void crypto_free_sync_skcipher(struct crypto_sync_skcipher *tfm)
+{
+	crypto_free_skcipher(&tfm->base);
 }
 
 /**
@@ -401,6 +421,12 @@ static inline int crypto_skcipher_setkey(struct crypto_skcipher *tfm,
 	return tfm->setkey(tfm, key, keylen);
 }
 
+static inline int crypto_sync_skcipher_setkey(struct crypto_sync_skcipher *tfm,
+					 const u8 *key, unsigned int keylen)
+{
+	return crypto_skcipher_setkey(&tfm->base, key, keylen);
+}
+
 static inline unsigned int crypto_skcipher_default_keysize(
 	struct crypto_skcipher *tfm)
 {
@@ -498,6 +524,12 @@ static inline void skcipher_request_set_tfm(struct skcipher_request *req,
 					    struct crypto_skcipher *tfm)
 {
 	req->base.tfm = crypto_skcipher_tfm(tfm);
+}
+
+static inline void skcipher_request_set_sync_tfm(struct skcipher_request *req,
+					    struct crypto_sync_skcipher *tfm)
+{
+	skcipher_request_set_tfm(req, &tfm->base);
 }
 
 static inline struct skcipher_request *skcipher_request_cast(
