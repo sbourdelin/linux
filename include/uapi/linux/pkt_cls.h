@@ -379,6 +379,25 @@ enum {
 
 #define TCA_BPF_MAX (__TCA_BPF_MAX - 1)
 
+/* RANGE classifier */
+
+enum {
+	TCA_RANGE_UNSPEC,
+	TCA_RANGE_CLASSID,		/* u32 */
+	TCA_RANGE_INDEV,
+	TCA_RANGE_ACT,
+	TCA_RANGE_KEY_ETH_TYPE,		/* be16 */
+	TCA_RANGE_KEY_IP_PROTO,		/* u8 */
+	TCA_RANGE_KEY_PORT_SRC_MIN,	/* be16 */
+	TCA_RANGE_KEY_PORT_SRC_MAX,	/* be16 */
+	TCA_RANGE_KEY_PORT_DST_MIN,	/* be16 */
+	TCA_RANGE_KEY_PORT_DST_MAX,	/* be16 */
+	TCA_RANGE_FLAGS,		/* u32 */
+	__TCA_RANGE_MAX,
+};
+
+#define TCA_RANGE_MAX (__TCA_RANGE_MAX - 1)
+
 /* Flower classifier */
 
 enum {

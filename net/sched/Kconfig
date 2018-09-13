@@ -585,6 +585,16 @@ config NET_CLS_FLOWER
 	  To compile this code as a module, choose M here: the module will
 	  be called cls_flower.
 
+config NET_CLS_RANGE
+	tristate "Range classifier"
+	select NET_CLS
+	help
+	  If you say Y here, you will be able to classify packets based on
+	  ranges with minimum and maximum values.
+
+	  To compile this code as a module, choose M here: the module will
+	  be called cls_range.
+
 config NET_CLS_MATCHALL
 	tristate "Match-all classifier"
 	select NET_CLS
