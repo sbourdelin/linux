@@ -288,6 +288,10 @@ static struct test generic_tests[] = {
 		.func = test__thread_lookup_time,
 	},
 	{
+		.desc = "Test thread map group handling with time",
+		.func = test__thread_mg_time,
+	},
+	{
 		.func = NULL,
 	},
 };
