@@ -66,6 +66,8 @@ DECLARE_EWMA(pkt_len, 0, 64)
 
 #define VIRTNET_DRIVER_VERSION "1.0.0"
 
+static const u32 ethtool_coalesce_napi_mask = (1UL << 10);
+
 static const unsigned long guest_offloads[] = {
 	VIRTIO_NET_F_GUEST_TSO4,
 	VIRTIO_NET_F_GUEST_TSO6,
@@ -1444,7 +1446,10 @@ static int virtnet_poll_tx(struct napi_struct *napi, int budget)
 
 	virtqueue_napi_complete(napi, sq->vq, 0);
 
-	if (sq->vq->num_free >= 2 + MAX_SKB_FRAGS)
+	/* Check napi.weight to avoid tx stall since it could be set
+	 * to zero by ethtool after skb_xmit_done().
+	 */
+	if (sq->vq->num_free >= 2 + MAX_SKB_FRAGS || !sq->napi.weight)
 		netif_tx_wake_queue(txq);
 
 	return 0;
@@ -2181,6 +2186,61 @@ static int virtnet_get_link_ksettings(struct net_device *dev,
 	return 0;
 }
 
+static int virtnet_set_coalesce(struct net_device *dev,
+				struct ethtool_coalesce *ec)
+{
+	struct ethtool_coalesce ec_default = {
+		.cmd = ETHTOOL_SCOALESCE,
+		.rx_max_coalesced_frames = 1,
+	};
+	struct virtnet_info *vi = netdev_priv(dev);
+	int i, napi_weight;
+
+	if (ec->tx_max_coalesced_frames > 1)
+		return -EINVAL;
+
+	ec_default.tx_max_coalesced_frames = ec->tx_max_coalesced_frames;
+	napi_weight = ec->tx_max_coalesced_frames ? NAPI_POLL_WEIGHT : 0;
+
+	/* disallow changes to fields not explicitly tested above */
+	if (memcmp(ec, &ec_default, sizeof(ec_default)))
+		return -EINVAL;
+
+	if (napi_weight ^ vi->sq[0].napi.weight) {
+		for (i = 0; i < vi->max_queue_pairs; i++) {
+			struct netdev_queue *txq =
+			       netdev_get_tx_queue(vi->dev, i);
+
+			virtnet_napi_tx_disable(&vi->sq[i].napi);
+			__netif_tx_lock_bh(txq);
+			vi->sq[i].napi.weight = napi_weight;
+			__netif_tx_unlock_bh(txq);
+			virtnet_napi_tx_enable(vi, vi->sq[i].vq,
+					       &vi->sq[i].napi);
+		}
+	}
+
+	return 0;
+}
+
+static int virtnet_get_coalesce(struct net_device *dev,
+				struct ethtool_coalesce *ec)
+{
+	struct ethtool_coalesce ec_default = {
+		.cmd = ETHTOOL_GCOALESCE,
+		.rx_max_coalesced_frames = 1,
+		.tx_max_coalesced_frames = 0,
+	};
+	struct virtnet_info *vi = netdev_priv(dev);
+
+	memcpy(ec, &ec_default, sizeof(ec_default));
+
+	if (vi->sq[0].napi.weight)
+		ec->tx_max_coalesced_frames = 1;
+
+	return 0;
+}
+
 static void virtnet_init_settings(struct net_device *dev)
 {
 	struct virtnet_info *vi = netdev_priv(dev);
@@ -2219,6 +2279,8 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.get_ts_info = ethtool_op_get_ts_info,
 	.get_link_ksettings = virtnet_get_link_ksettings,
 	.set_link_ksettings = virtnet_set_link_ksettings,
+	.set_coalesce = virtnet_set_coalesce,
+	.get_coalesce = virtnet_get_coalesce,
 };
 
 static void virtnet_freeze_down(struct virtio_device *vdev)
