@@ -192,6 +192,21 @@ struct comm *thread__exec_comm(const struct thread *thread)
 	return last;
 }
 
+struct comm *thread__comm_by_time(const struct thread *thread, u64 timestamp)
+{
+	struct comm *comm;
+
+	list_for_each_entry(comm, &thread->comm_list, list) {
+		if (timestamp >= comm->start)
+			return comm;
+	}
+
+	if (list_empty(&thread->comm_list))
+		return NULL;
+
+	return list_last_entry(&thread->comm_list, struct comm, list);
+}
+
 static int ____thread__set_comm(struct thread *thread, const char *str,
 				u64 timestamp, bool exec)
 {
@@ -206,7 +221,13 @@ static int ____thread__set_comm(struct thread *thread, const char *str,
 		new = comm__new(str, timestamp, exec);
 		if (!new)
 			return -ENOMEM;
-		list_add(&new->list, &thread->comm_list);
+
+		/* sort by time */
+		list_for_each_entry(curr, &thread->comm_list, list) {
+			if (timestamp >= curr->start)
+				break;
+		}
+		list_add_tail(&new->list, &curr->list);
 
 		if (exec)
 			unwind__flush_access(thread);
@@ -264,6 +285,16 @@ const char *thread__comm_str(const struct thread *thread)
 	up_read((struct rw_semaphore *)&thread->comm_lock);
 
 	return str;
+}
+
+const char *thread__comm_str_by_time(const struct thread *thread, u64 timestamp)
+{
+	const struct comm *comm = thread__comm_by_time(thread, timestamp);
+
+	if (!comm)
+		return NULL;
+
+	return comm__str(comm);
 }
 
 /* CHECKME: it should probably better return the max comm len from its comm list */
