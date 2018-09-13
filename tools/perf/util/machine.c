@@ -2011,7 +2011,7 @@ static bool symbol__match_regex(struct symbol *sym, regex_t *regex)
 
 static void ip__resolve_ams(struct thread *thread,
 			    struct addr_map_symbol *ams,
-			    u64 ip)
+			    u64 ip, u64 timestamp)
 {
 	struct addr_location al;
 
@@ -2023,7 +2023,8 @@ static void ip__resolve_ams(struct thread *thread,
 	 * Thus, we have to try consecutively until we find a match
 	 * or else, the symbol is unknown
 	 */
-	thread__find_cpumode_addr_location(thread, ip, &al);
+	thread__find_cpumode_addr_location_by_time(thread, ip,
+						   &al, timestamp);
 
 	ams->addr = ip;
 	ams->al_addr = al.addr;
@@ -2034,13 +2035,14 @@ static void ip__resolve_ams(struct thread *thread,
 
 static void ip__resolve_data(struct thread *thread,
 			     u8 m, struct addr_map_symbol *ams,
-			     u64 addr, u64 phys_addr)
+			     u64 addr, u64 phys_addr, u64 timestamp)
 {
 	struct addr_location al;
 
 	memset(&al, 0, sizeof(al));
 
-	thread__find_symbol(thread, m, addr, &al);
+	thread__find_symbol_by_time(thread, m, addr,
+				    &al, timestamp);
 
 	ams->addr = addr;
 	ams->al_addr = al.addr;
@@ -2057,9 +2059,9 @@ struct mem_info *sample__resolve_mem(struct perf_sample *sample,
 	if (!mi)
 		return NULL;
 
-	ip__resolve_ams(al->thread, &mi->iaddr, sample->ip);
+	ip__resolve_ams(al->thread, &mi->iaddr, sample->ip, sample->time);
 	ip__resolve_data(al->thread, al->cpumode, &mi->daddr,
-			 sample->addr, sample->phys_addr);
+			 sample->addr, sample->phys_addr, sample->time);
 	mi->data_src.val = sample->data_src;
 
 	return mi;
@@ -2175,8 +2177,10 @@ struct branch_info *sample__resolve_bstack(struct perf_sample *sample,
 		return NULL;
 
 	for (i = 0; i < bs->nr; i++) {
-		ip__resolve_ams(al->thread, &bi[i].to, bs->entries[i].to);
-		ip__resolve_ams(al->thread, &bi[i].from, bs->entries[i].from);
+		ip__resolve_ams(al->thread, &bi[i].to,
+				bs->entries[i].to, sample->time);
+		ip__resolve_ams(al->thread, &bi[i].from,
+				bs->entries[i].from, sample->time);
 		bi[i].flags = bs->entries[i].flags;
 	}
 	return bi;
