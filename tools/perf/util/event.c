@@ -1516,12 +1516,11 @@ int perf_event__process(struct perf_tool *tool __maybe_unused,
 	return machine__process_event(machine, event, sample);
 }
 
-static
-struct map *map_groups__find_map(struct map_groups *mg, u8 cpumode,
-				 u64 addr, struct addr_location *al)
+static bool map_groups__set_addr_location(struct map_groups *mg,
+					  struct addr_location *al,
+					  u8 cpumode, u64 addr)
 {
 	struct machine *machine = mg->machine;
-	bool load_map = false;
 
 	al->machine = machine;
 	al->addr = addr;
@@ -1530,21 +1529,17 @@ struct map *map_groups__find_map(struct map_groups *mg, u8 cpumode,
 
 	if (machine == NULL) {
 		al->map = NULL;
-		return NULL;
+		return true;
 	}
 
 	BUG_ON(mg == NULL);
 
 	if (cpumode == PERF_RECORD_MISC_KERNEL && perf_host) {
 		al->level = 'k';
-		mg = &machine->kmaps;
-		load_map = true;
 	} else if (cpumode == PERF_RECORD_MISC_USER && perf_host) {
 		al->level = '.';
 	} else if (cpumode == PERF_RECORD_MISC_GUEST_KERNEL && perf_guest) {
 		al->level = 'g';
-		mg = &machine->kmaps;
-		load_map = true;
 	} else if (cpumode == PERF_RECORD_MISC_GUEST_USER && perf_guest) {
 		al->level = 'u';
 	} else {
@@ -1560,10 +1555,78 @@ struct map *map_groups__find_map(struct map_groups *mg, u8 cpumode,
 			!perf_host)
 			al->filtered |= (1 << HIST_FILTER__HOST);
 
-		return NULL;
+		return true;
 	}
+	return false;
+}
+
+static
+struct map *map_groups__find_map(struct map_groups *mg, u8 cpumode,
+				 u64 addr, struct addr_location *al)
+{
+	struct machine *machine = mg->machine;
+	bool load_map = false;
+
+	if (map_groups__set_addr_location(mg, al, cpumode, addr))
+		return NULL;
+
+	if ((cpumode == PERF_RECORD_MISC_KERNEL && perf_host) ||
+	    (cpumode == PERF_RECORD_MISC_GUEST_KERNEL && perf_guest)) {
+		mg = &machine->kmaps;
+		load_map = true;
+	}
+
 try_again:
 	al->map = map_groups__find(mg, al->addr);
+	if (al->map == NULL) {
+		/*
+		 * If this is outside of all known maps, and is a negative
+		 * address, try to look it up in the kernel dso, as it might be
+		 * a vsyscall or vdso (which executes in user-mode).
+		 *
+		 * XXX This is nasty, we should have a symbol list in the
+		 * "[vdso]" dso, but for now lets use the old trick of looking
+		 * in the whole kernel symbol list.
+		 */
+		if (cpumode == PERF_RECORD_MISC_USER && machine &&
+		    mg != &machine->kmaps &&
+		    machine__kernel_ip(machine, al->addr)) {
+			mg = &machine->kmaps;
+			load_map = true;
+			goto try_again;
+		}
+	} else {
+		/*
+		 * Kernel maps might be changed when loading symbols so loading
+		 * must be done prior to using kernel maps.
+		 */
+		if (load_map)
+			map__load(al->map);
+		al->addr = al->map->map_ip(al->map, al->addr);
+	}
+
+	return al->map;
+}
+
+static
+struct map *map_groups__find_map_by_time(struct map_groups *mg, u8 cpumode,
+					 u64 addr, struct addr_location *al,
+					 u64 timestamp)
+{
+	struct machine *machine = mg->machine;
+	bool load_map = false;
+
+	if (map_groups__set_addr_location(mg, al, cpumode, addr))
+		return NULL;
+
+	if ((cpumode == PERF_RECORD_MISC_KERNEL && perf_host) ||
+	    (cpumode == PERF_RECORD_MISC_GUEST_KERNEL && perf_guest)) {
+		mg = &machine->kmaps;
+		load_map = true;
+	}
+
+try_again:
+	al->map = map_groups__find_by_time(mg, al->addr, timestamp);
 	if (al->map == NULL) {
 		/*
 		 * If this is outside of all known maps, and is a negative
@@ -1613,7 +1676,7 @@ struct map *thread__find_map_by_time(struct thread *thread, u8 cpumode,
 		mg = thread->mg;
 
 	al->thread = thread;
-	return map_groups__find_map(mg, cpumode, addr, al);
+	return map_groups__find_map_by_time(mg, cpumode, addr, al, timestamp);
 }
 
 struct symbol *thread__find_symbol(struct thread *thread, u8 cpumode,

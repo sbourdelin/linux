@@ -449,8 +449,12 @@ int thread__insert_map(struct thread *thread, struct map *map)
 	if (ret)
 		return ret;
 
-	map_groups__fixup_overlappings(thread->mg, map, stderr);
-	map_groups__insert(thread->mg, map);
+	if (perf_has_index) {
+		map_groups__insert_by_time(thread->mg, map);
+	} else {
+		map_groups__fixup_overlappings(thread->mg, map, stderr);
+		map_groups__insert(thread->mg, map);
+	}
 
 	return 0;
 }
