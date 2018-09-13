@@ -180,6 +180,7 @@ enum {
 	NLA_S32,
 	NLA_S64,
 	NLA_BITFIELD32,
+	NLA_REJECT,
 	__NLA_TYPE_MAX,
 };
 
@@ -208,7 +209,10 @@ enum {
  *    NLA_MSECS            Leaving the length field zero will verify the
  *                         given type fits, using it verifies minimum length
  *                         just like "All other"
- *    NLA_BITFIELD32      A 32-bit bitmap/bitselector attribute
+ *    NLA_BITFIELD32       A 32-bit bitmap/bitselector attribute, validation
+ *                         data must point to a u32 value of valid flags
+ *    NLA_REJECT           Reject this attribute, validation data may point
+ *                         to a string to report as the error in extended ACK.
  *    All other            Minimum length of attribute payload
  *
  * Example:
