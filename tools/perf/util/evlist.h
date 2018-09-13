@@ -76,6 +76,7 @@ static inline int perf_evlist__add_default(struct perf_evlist *evlist)
 	return __perf_evlist__add_default(evlist, true);
 }
 
+int perf_evlist__add_dummy_tracking(struct perf_evlist *evlist);
 int __perf_evlist__add_default_attrs(struct perf_evlist *evlist,
 				     struct perf_event_attr *attrs, size_t nr_attrs);
 

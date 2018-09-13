@@ -411,6 +411,21 @@ static inline bool perf_evsel__is_clock(struct perf_evsel *evsel)
 	       perf_evsel__match(evsel, SOFTWARE, SW_TASK_CLOCK);
 }
 
+/**
+ * perf_evsel__is_dummy_tracking - Return whether given evsel is a dummy
+ * event for tracking meta events only
+ *
+ * @evsel - evsel selector to be tested
+ *
+ * Return %true if event is a dummy tracking event
+ */
+static inline bool perf_evsel__is_dummy_tracking(struct perf_evsel *evsel)
+{
+	return evsel->attr.type == PERF_TYPE_SOFTWARE &&
+		evsel->attr.config == PERF_COUNT_SW_DUMMY &&
+		evsel->attr.task == 1 && evsel->attr.mmap == 1;
+}
+
 struct perf_attr_details {
 	bool freq;
 	bool verbose;
