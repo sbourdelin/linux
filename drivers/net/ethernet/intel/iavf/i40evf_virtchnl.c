@@ -18,11 +18,11 @@
  *
  * Send message to PF and print status if failure.
  **/
-static int iavf_send_pf_msg(struct iavf_adapter *adapter,
-			      enum virtchnl_ops op, u8 *msg, u16 len)
+static int iavf_send_pf_msg(struct iavf_adapter *adapter, enum virtchnl_ops op,
+			    u8 *msg, u16 len)
 {
 	struct i40e_hw *hw = &adapter->hw;
-	i40e_status err;
+	iavf_status err;
 
 	if (adapter->flags & IAVF_FLAG_PF_COMMS_FAILED)
 		return 0; /* nothing to see here, move along */
@@ -51,7 +51,7 @@ int iavf_send_api_ver(struct iavf_adapter *adapter)
 	vvi.minor = VIRTCHNL_VERSION_MINOR;
 
 	return iavf_send_pf_msg(adapter, VIRTCHNL_OP_VERSION, (u8 *)&vvi,
-				  sizeof(vvi));
+				sizeof(vvi));
 }
 
 /**
@@ -69,7 +69,7 @@ int iavf_verify_api_ver(struct iavf_adapter *adapter)
 	struct i40e_hw *hw = &adapter->hw;
 	struct i40e_arq_event_info event;
 	enum virtchnl_ops op;
-	i40e_status err;
+	iavf_status err;
 
 	event.buf_len = IAVF_MAX_AQ_BUF_SIZE;
 	event.msg_buf = kzalloc(event.buf_len, GFP_KERNEL);
@@ -92,7 +92,7 @@ int iavf_verify_api_ver(struct iavf_adapter *adapter)
 	}
 
 
-	err = (i40e_status)le32_to_cpu(event.desc.cookie_low);
+	err = (iavf_status)le32_to_cpu(event.desc.cookie_low);
 	if (err)
 		goto out_alloc;
 
@@ -144,13 +144,11 @@ int iavf_send_vf_config_msg(struct iavf_adapter *adapter)
 	adapter->current_op = VIRTCHNL_OP_GET_VF_RESOURCES;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_GET_CONFIG;
 	if (PF_IS_V11(adapter))
-		return iavf_send_pf_msg(adapter,
-					  VIRTCHNL_OP_GET_VF_RESOURCES,
-					  (u8 *)&caps, sizeof(caps));
+		return iavf_send_pf_msg(adapter, VIRTCHNL_OP_GET_VF_RESOURCES,
+					(u8 *)&caps, sizeof(caps));
 	else
-		return iavf_send_pf_msg(adapter,
-					  VIRTCHNL_OP_GET_VF_RESOURCES,
-					  NULL, 0);
+		return iavf_send_pf_msg(adapter, VIRTCHNL_OP_GET_VF_RESOURCES,
+					NULL, 0);
 }
 
 /**
@@ -193,7 +191,7 @@ int iavf_get_vf_config(struct iavf_adapter *adapter)
 	struct i40e_hw *hw = &adapter->hw;
 	struct i40e_arq_event_info event;
 	enum virtchnl_ops op;
-	i40e_status err;
+	iavf_status err;
 	u16 len;
 
 	len =  sizeof(struct virtchnl_vf_resource) +
@@ -218,7 +216,7 @@ int iavf_get_vf_config(struct iavf_adapter *adapter)
 			break;
 	}
 
-	err = (i40e_status)le32_to_cpu(event.desc.cookie_low);
+	err = (iavf_status)le32_to_cpu(event.desc.cookie_low);
 	memcpy(adapter->vf_res, event.msg_buf, min(event.msg_len, len));
 
 	/* some PFs send more queues than we should have so validate that
@@ -287,8 +285,8 @@ void iavf_configure_queues(struct iavf_adapter *adapter)
 	}
 
 	adapter->aq_required &= ~IAVF_FLAG_AQ_CONFIGURE_QUEUES;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_VSI_QUEUES,
-			   (u8 *)vqci, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_VSI_QUEUES, (u8 *)vqci,
+			 len);
 	kfree(vqci);
 }
 
@@ -313,8 +311,8 @@ void iavf_enable_queues(struct iavf_adapter *adapter)
 	vqs.tx_queues = BIT(adapter->num_active_queues) - 1;
 	vqs.rx_queues = vqs.tx_queues;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_ENABLE_QUEUES;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ENABLE_QUEUES,
-			   (u8 *)&vqs, sizeof(vqs));
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ENABLE_QUEUES, (u8 *)&vqs,
+			 sizeof(vqs));
 }
 
 /**
@@ -338,8 +336,8 @@ void iavf_disable_queues(struct iavf_adapter *adapter)
 	vqs.tx_queues = BIT(adapter->num_active_queues) - 1;
 	vqs.rx_queues = vqs.tx_queues;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_DISABLE_QUEUES;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DISABLE_QUEUES,
-			   (u8 *)&vqs, sizeof(vqs));
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DISABLE_QUEUES, (u8 *)&vqs,
+			 sizeof(vqs));
 }
 
 /**
@@ -394,8 +392,7 @@ void iavf_map_queues(struct iavf_adapter *adapter)
 	vecmap->rxq_map = 0;
 
 	adapter->aq_required &= ~IAVF_FLAG_AQ_MAP_VECTORS;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_IRQ_MAP,
-			   (u8 *)vimi, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_IRQ_MAP, (u8 *)vimi, len);
 	kfree(vimi);
 }
 
@@ -423,7 +420,7 @@ int iavf_request_queues(struct iavf_adapter *adapter, int num)
 	adapter->current_op = VIRTCHNL_OP_REQUEST_QUEUES;
 	adapter->flags |= IAVF_FLAG_REINIT_ITR_NEEDED;
 	return iavf_send_pf_msg(adapter, VIRTCHNL_OP_REQUEST_QUEUES,
-				  (u8 *)&vfres, sizeof(vfres));
+				(u8 *)&vfres, sizeof(vfres));
 }
 
 /**
@@ -493,8 +490,7 @@ void iavf_add_ether_addrs(struct iavf_adapter *adapter)
 
 	spin_unlock_bh(&adapter->mac_vlan_list_lock);
 
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ADD_ETH_ADDR,
-			   (u8 *)veal, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ADD_ETH_ADDR, (u8 *)veal, len);
 	kfree(veal);
 }
 
@@ -565,8 +561,7 @@ void iavf_del_ether_addrs(struct iavf_adapter *adapter)
 
 	spin_unlock_bh(&adapter->mac_vlan_list_lock);
 
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DEL_ETH_ADDR,
-			   (u8 *)veal, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DEL_ETH_ADDR, (u8 *)veal, len);
 	kfree(veal);
 }
 
@@ -756,7 +751,7 @@ void iavf_set_promiscuous(struct iavf_adapter *adapter, int flags)
 	vpi.vsi_id = adapter->vsi_res->vsi_id;
 	vpi.flags = flags;
 	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE,
-			   (u8 *)&vpi, sizeof(vpi));
+			 (u8 *)&vpi, sizeof(vpi));
 }
 
 /**
@@ -776,8 +771,8 @@ void iavf_request_stats(struct iavf_adapter *adapter)
 	adapter->current_op = VIRTCHNL_OP_GET_STATS;
 	vqs.vsi_id = adapter->vsi_res->vsi_id;
 	/* queue maps are ignored for this message - only the vsi is used */
-	if (iavf_send_pf_msg(adapter, VIRTCHNL_OP_GET_STATS,
-			       (u8 *)&vqs, sizeof(vqs)))
+	if (iavf_send_pf_msg(adapter, VIRTCHNL_OP_GET_STATS, (u8 *)&vqs,
+			     sizeof(vqs)))
 		/* if the request failed, don't lock out others */
 		adapter->current_op = VIRTCHNL_OP_UNKNOWN;
 }
@@ -798,8 +793,7 @@ void iavf_get_hena(struct iavf_adapter *adapter)
 	}
 	adapter->current_op = VIRTCHNL_OP_GET_RSS_HENA_CAPS;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_GET_HENA;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_GET_RSS_HENA_CAPS,
-			   NULL, 0);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_GET_RSS_HENA_CAPS, NULL, 0);
 }
 
 /**
@@ -821,8 +815,8 @@ void iavf_set_hena(struct iavf_adapter *adapter)
 	vrh.hena = adapter->hena;
 	adapter->current_op = VIRTCHNL_OP_SET_RSS_HENA;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_SET_HENA;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_SET_RSS_HENA,
-			   (u8 *)&vrh, sizeof(vrh));
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_SET_RSS_HENA, (u8 *)&vrh,
+			 sizeof(vrh));
 }
 
 /**
@@ -853,8 +847,7 @@ void iavf_set_rss_key(struct iavf_adapter *adapter)
 
 	adapter->current_op = VIRTCHNL_OP_CONFIG_RSS_KEY;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_SET_RSS_KEY;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_RSS_KEY,
-			   (u8 *)vrk, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_RSS_KEY, (u8 *)vrk, len);
 	kfree(vrk);
 }
 
@@ -885,8 +878,7 @@ void iavf_set_rss_lut(struct iavf_adapter *adapter)
 	memcpy(vrl->lut, adapter->rss_lut, adapter->rss_lut_size);
 	adapter->current_op = VIRTCHNL_OP_CONFIG_RSS_LUT;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_SET_RSS_LUT;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_RSS_LUT,
-			   (u8 *)vrl, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_CONFIG_RSS_LUT, (u8 *)vrl, len);
 	kfree(vrl);
 }
 
@@ -906,8 +898,7 @@ void iavf_enable_vlan_stripping(struct iavf_adapter *adapter)
 	}
 	adapter->current_op = VIRTCHNL_OP_ENABLE_VLAN_STRIPPING;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_ENABLE_VLAN_STRIPPING;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ENABLE_VLAN_STRIPPING,
-			   NULL, 0);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ENABLE_VLAN_STRIPPING, NULL, 0);
 }
 
 /**
@@ -926,8 +917,7 @@ void iavf_disable_vlan_stripping(struct iavf_adapter *adapter)
 	}
 	adapter->current_op = VIRTCHNL_OP_DISABLE_VLAN_STRIPPING;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_DISABLE_VLAN_STRIPPING;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DISABLE_VLAN_STRIPPING,
-			   NULL, 0);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DISABLE_VLAN_STRIPPING, NULL, 0);
 }
 
 /**
@@ -1011,8 +1001,7 @@ void iavf_enable_channels(struct iavf_adapter *adapter)
 	adapter->flags |= IAVF_FLAG_REINIT_ITR_NEEDED;
 	adapter->current_op = VIRTCHNL_OP_ENABLE_CHANNELS;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_ENABLE_CHANNELS;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ENABLE_CHANNELS,
-			   (u8 *)vti, len);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_ENABLE_CHANNELS, (u8 *)vti, len);
 	kfree(vti);
 }
 
@@ -1035,8 +1024,7 @@ void iavf_disable_channels(struct iavf_adapter *adapter)
 	adapter->flags |= IAVF_FLAG_REINIT_ITR_NEEDED;
 	adapter->current_op = VIRTCHNL_OP_DISABLE_CHANNELS;
 	adapter->aq_required &= ~IAVF_FLAG_AQ_DISABLE_CHANNELS;
-	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DISABLE_CHANNELS,
-			   NULL, 0);
+	iavf_send_pf_msg(adapter, VIRTCHNL_OP_DISABLE_CHANNELS, NULL, 0);
 }
 
 /**
@@ -1047,7 +1035,7 @@ void iavf_disable_channels(struct iavf_adapter *adapter)
  * Print the cloud filter
  **/
 static void iavf_print_cloud_filter(struct iavf_adapter *adapter,
-				      struct virtchnl_filter *f)
+				    struct virtchnl_filter *f)
 {
 	switch (f->flow_type) {
 	case VIRTCHNL_TCP_V4_FLOW:
@@ -1114,9 +1102,8 @@ void iavf_add_cloud_filter(struct iavf_adapter *adapter)
 			memcpy(f, &cf->f, sizeof(struct virtchnl_filter));
 			cf->add = false;
 			cf->state = __IAVF_CF_ADD_PENDING;
-			iavf_send_pf_msg(adapter,
-					   VIRTCHNL_OP_ADD_CLOUD_FILTER,
-					   (u8 *)f, len);
+			iavf_send_pf_msg(adapter, VIRTCHNL_OP_ADD_CLOUD_FILTER,
+					 (u8 *)f, len);
 		}
 	}
 	kfree(f);
@@ -1163,9 +1150,8 @@ void iavf_del_cloud_filter(struct iavf_adapter *adapter)
 			memcpy(f, &cf->f, sizeof(struct virtchnl_filter));
 			cf->del = false;
 			cf->state = __IAVF_CF_DEL_PENDING;
-			iavf_send_pf_msg(adapter,
-					   VIRTCHNL_OP_DEL_CLOUD_FILTER,
-					   (u8 *)f, len);
+			iavf_send_pf_msg(adapter, VIRTCHNL_OP_DEL_CLOUD_FILTER,
+					 (u8 *)f, len);
 		}
 	}
 	kfree(f);
@@ -1197,9 +1183,8 @@ void iavf_request_reset(struct iavf_adapter *adapter)
  * This function handles the reply messages.
  **/
 void iavf_virtchnl_completion(struct iavf_adapter *adapter,
-				enum virtchnl_ops v_opcode,
-				i40e_status v_retval,
-				u8 *msg, u16 msglen)
+			      enum virtchnl_ops v_opcode, iavf_status v_retval,
+			      u8 *msg, u16 msglen)
 {
 	struct net_device *netdev = adapter->netdev;
 
@@ -1207,6 +1192,7 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 		struct virtchnl_pf_event *vpe =
 			(struct virtchnl_pf_event *)msg;
 		bool link_up = vpe->event_data.link_event.link_status;
+
 		switch (vpe->event) {
 		case VIRTCHNL_EVENT_LINK_CHANGE:
 			adapter->link_speed =
@@ -1304,9 +1290,8 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 					cf->state = __IAVF_CF_INVALID;
 					dev_info(&adapter->pdev->dev, "Failed to add cloud filter, error %s\n",
 						 iavf_stat_str(&adapter->hw,
-								 v_retval));
-					iavf_print_cloud_filter(adapter,
-								  &cf->f);
+							       v_retval));
+					iavf_print_cloud_filter(adapter, &cf->f);
 					list_del(&cf->list);
 					kfree(cf);
 					adapter->num_cloud_filters--;
@@ -1323,17 +1308,15 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 					cf->state = __IAVF_CF_ACTIVE;
 					dev_info(&adapter->pdev->dev, "Failed to del cloud filter, error %s\n",
 						 iavf_stat_str(&adapter->hw,
-								 v_retval));
-					iavf_print_cloud_filter(adapter,
-								  &cf->f);
+							       v_retval));
+					iavf_print_cloud_filter(adapter, &cf->f);
 				}
 			}
 			}
 			break;
 		default:
 			dev_err(&adapter->pdev->dev, "PF returned error %d (%s) to our request %d\n",
-				v_retval,
-				iavf_stat_str(&adapter->hw, v_retval),
+				v_retval, iavf_stat_str(&adapter->hw, v_retval),
 				v_opcode);
 		}
 	}
@@ -1402,8 +1385,7 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 		 * care about that.
 		 */
 		if (msglen && CLIENT_ENABLED(adapter))
-			iavf_notify_client_message(&adapter->vsi,
-						     msg, msglen);
+			iavf_notify_client_message(&adapter->vsi, msg, msglen);
 		break;
 
 	case VIRTCHNL_OP_CONFIG_IWARP_IRQ_MAP:
@@ -1412,6 +1394,7 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 		break;
 	case VIRTCHNL_OP_GET_RSS_HENA_CAPS: {
 		struct virtchnl_rss_hena *vrh = (struct virtchnl_rss_hena *)msg;
+
 		if (msglen == sizeof(*vrh))
 			adapter->hena = vrh->hena;
 		else

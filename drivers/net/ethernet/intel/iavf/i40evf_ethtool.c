@@ -277,7 +277,7 @@ static const struct iavf_priv_flags iavf_gstrings_priv_flags[] = {
  * kind of link we really have, so we fake it.
  **/
 static int iavf_get_link_ksettings(struct net_device *netdev,
-				     struct ethtool_link_ksettings *cmd)
+				   struct ethtool_link_ksettings *cmd)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 
@@ -344,7 +344,7 @@ static int iavf_get_sset_count(struct net_device *netdev, int sset)
  * All statistics are added to the data buffer as an array of u64.
  **/
 static void iavf_get_ethtool_stats(struct net_device *netdev,
-				     struct ethtool_stats *stats, u64 *data)
+				   struct ethtool_stats *stats, u64 *data)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	unsigned int i;
@@ -561,7 +561,7 @@ static void iavf_set_msglevel(struct net_device *netdev, u32 data)
  * Returns information about the driver and device for display to the user.
  **/
 static void iavf_get_drvinfo(struct net_device *netdev,
-			       struct ethtool_drvinfo *drvinfo)
+			     struct ethtool_drvinfo *drvinfo)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 
@@ -581,7 +581,7 @@ static void iavf_get_drvinfo(struct net_device *netdev,
  * but the number of rings is not reported.
  **/
 static void iavf_get_ringparam(struct net_device *netdev,
-				 struct ethtool_ringparam *ring)
+			       struct ethtool_ringparam *ring)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 
@@ -600,7 +600,7 @@ static void iavf_get_ringparam(struct net_device *netdev,
  * number of rings is not specified, so all rings get the same settings.
  **/
 static int iavf_set_ringparam(struct net_device *netdev,
-				struct ethtool_ringparam *ring)
+			      struct ethtool_ringparam *ring)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	u32 new_rx_count, new_tx_count;
@@ -645,8 +645,7 @@ static int iavf_set_ringparam(struct net_device *netdev,
  * representative value.
  **/
 static int __iavf_get_coalesce(struct net_device *netdev,
-				 struct ethtool_coalesce *ec,
-				 int queue)
+			       struct ethtool_coalesce *ec, int queue)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	struct i40e_vsi *vsi = &adapter->vsi;
@@ -689,7 +688,7 @@ static int __iavf_get_coalesce(struct net_device *netdev,
  * only represents the settings of queue 0.
  **/
 static int iavf_get_coalesce(struct net_device *netdev,
-			       struct ethtool_coalesce *ec)
+			     struct ethtool_coalesce *ec)
 {
 	return __iavf_get_coalesce(netdev, ec, -1);
 }
@@ -702,9 +701,8 @@ static int iavf_get_coalesce(struct net_device *netdev,
  *
  * Read specific queue's coalesce settings.
  **/
-static int iavf_get_per_queue_coalesce(struct net_device *netdev,
-					 u32 queue,
-					 struct ethtool_coalesce *ec)
+static int iavf_get_per_queue_coalesce(struct net_device *netdev, u32 queue,
+				       struct ethtool_coalesce *ec)
 {
 	return __iavf_get_coalesce(netdev, ec, queue);
 }
@@ -718,8 +716,7 @@ static int iavf_get_per_queue_coalesce(struct net_device *netdev,
  * Change the ITR settings for a specific queue.
  **/
 static void iavf_set_itr_per_queue(struct iavf_adapter *adapter,
-				     struct ethtool_coalesce *ec,
-				     int queue)
+				   struct ethtool_coalesce *ec, int queue)
 {
 	struct i40e_ring *rx_ring = &adapter->rx_rings[queue];
 	struct i40e_ring *tx_ring = &adapter->tx_rings[queue];
@@ -757,8 +754,7 @@ static void iavf_set_itr_per_queue(struct iavf_adapter *adapter,
  * Sets the coalesce settings for a particular queue.
  **/
 static int __iavf_set_coalesce(struct net_device *netdev,
-				 struct ethtool_coalesce *ec,
-				 int queue)
+			       struct ethtool_coalesce *ec, int queue)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	struct i40e_vsi *vsi = &adapter->vsi;
@@ -774,10 +770,7 @@ static int __iavf_set_coalesce(struct net_device *netdev,
 		   (ec->rx_coalesce_usecs > I40E_MAX_ITR)) {
 		netif_info(adapter, drv, netdev, "Invalid value, rx-usecs range is 0-8160\n");
 		return -EINVAL;
-	}
-
-	else
-	if (ec->tx_coalesce_usecs == 0) {
+	} else if (ec->tx_coalesce_usecs == 0) {
 		if (ec->use_adaptive_tx_coalesce)
 			netif_info(adapter, drv, netdev, "tx-usecs=0, need to disable adaptive-tx for a complete disable\n");
 	} else if ((ec->tx_coalesce_usecs < I40E_MIN_ITR) ||
@@ -811,7 +804,7 @@ static int __iavf_set_coalesce(struct net_device *netdev,
  * Change current coalescing settings for every queue.
  **/
 static int iavf_set_coalesce(struct net_device *netdev,
-			       struct ethtool_coalesce *ec)
+			     struct ethtool_coalesce *ec)
 {
 	return __iavf_set_coalesce(netdev, ec, -1);
 }
@@ -824,9 +817,8 @@ static int iavf_set_coalesce(struct net_device *netdev,
  *
  * Modifies a specific queue's coalesce settings.
  */
-static int iavf_set_per_queue_coalesce(struct net_device *netdev,
-					 u32 queue,
-					 struct ethtool_coalesce *ec)
+static int iavf_set_per_queue_coalesce(struct net_device *netdev, u32 queue,
+				       struct ethtool_coalesce *ec)
 {
 	return __iavf_set_coalesce(netdev, ec, queue);
 }
@@ -840,8 +832,7 @@ static int iavf_set_per_queue_coalesce(struct net_device *netdev,
  * Returns Success if the command is supported.
  **/
 static int iavf_get_rxnfc(struct net_device *netdev,
-			    struct ethtool_rxnfc *cmd,
-			    u32 *rule_locs)
+			  struct ethtool_rxnfc *cmd, u32 *rule_locs)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	int ret = -EOPNOTSUPP;
@@ -870,7 +861,7 @@ static int iavf_get_rxnfc(struct net_device *netdev,
  * queue pair. Report one extra channel to match our "other" MSI-X vector.
  **/
 static void iavf_get_channels(struct net_device *netdev,
-				struct ethtool_channels *ch)
+			      struct ethtool_channels *ch)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 
@@ -893,7 +884,7 @@ static void iavf_get_channels(struct net_device *netdev,
  * negative on failure.
  **/
 static int iavf_set_channels(struct net_device *netdev,
-			       struct ethtool_channels *ch)
+			     struct ethtool_channels *ch)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	int num_req = ch->combined_count;
@@ -960,7 +951,7 @@ static u32 iavf_get_rxfh_indir_size(struct net_device *netdev)
  * Reads the indirection table directly from the hardware. Always returns 0.
  **/
 static int iavf_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key,
-			   u8 *hfunc)
+			 u8 *hfunc)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	u16 i;
@@ -990,7 +981,7 @@ static int iavf_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key,
  * returns 0 after programming the table.
  **/
 static int iavf_set_rxfh(struct net_device *netdev, const u32 *indir,
-			   const u8 *key, const u8 hfunc)
+			 const u8 *key, const u8 hfunc)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	u16 i;
@@ -1002,9 +993,8 @@ static int iavf_set_rxfh(struct net_device *netdev, const u32 *indir,
 	if (!indir)
 		return 0;
 
-	if (key) {
+	if (key)
 		memcpy(adapter->rss_key, key, adapter->rss_key_size);
-	}
 
 	/* Each 32 bits pointed by 'indir' is stored with a lut entry */
 	for (i = 0; i < adapter->rss_lut_size; i++)
