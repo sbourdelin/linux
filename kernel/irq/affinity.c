@@ -204,7 +204,7 @@ irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 
 	/* Fill out vectors at the beginning that don't need affinity */
 	for (curvec = 0; curvec < affd->pre_vectors; curvec++)
-		cpumask_copy(masks + curvec, irq_default_affinity);
+		cpumask_clear(masks + curvec);
 
 	/* Stabilize the cpumasks */
 	get_online_cpus();
@@ -234,10 +234,13 @@ irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 	/* Fill out vectors at the end that don't need affinity */
 	if (usedvecs >= affvecs)
 		curvec = affd->pre_vectors + affvecs;
-	else
+	else {
 		curvec = affd->pre_vectors + usedvecs;
+		for (; curvec < affd->pre_vectors + affvecs; curvec++)
+			cpumask_copy(masks + curvec, irq_default_affinity);
+	}
 	for (; curvec < nvecs; curvec++)
-		cpumask_copy(masks + curvec, irq_default_affinity);
+		cpumask_clear(masks + curvec);
 
 outnodemsk:
 	free_node_to_cpumask(node_to_cpumask);
