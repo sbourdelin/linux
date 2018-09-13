@@ -1306,10 +1306,25 @@ static int record__threads_stop(struct record *rec)
 	return err;
 }
 
-static void record_thread__display(struct record_thread *t, unsigned long s)
+/* Stolen from kernel. */
+#define CIRC_CNT(head, tail, size)    (((head) - (tail)) & ((size) - 1))
+#define CIRC_SPACE(head, tail, size)  CIRC_CNT((tail), ((head)+1), (size))
+
+static u64 mmap_free_size(struct perf_mmap *map, struct perf_evlist *evlist)
+{
+	u64 head = perf_mmap__read_head(map);
+	u64 tail = perf_mmap__read_tail(map);
+
+	return CIRC_SPACE(head, tail, evlist->mmap_len);
+}
+
+static void
+record_thread__display(struct record_thread *t, struct perf_evlist *evlist,
+		       unsigned long s)
 {
 	char buf_size[20];
 	char buf_time[20];
+	int i;
 
 	unit_number__scnprintf(buf_size, sizeof(buf_size), t->stats.bytes_written);
 
@@ -1318,15 +1333,26 @@ static void record_thread__display(struct record_thread *t, unsigned long s)
 	else
 		buf_time[0] = 0;
 
-	fprintf(stderr, "%6s %6d %10s %10" PRIu64" %10" PRIu64"\n",
+	fprintf(stderr, "%6s %6d %10s %10" PRIu64" %10" PRIu64 " ",
 		buf_time, t->pid, buf_size, t->stats.poll, t->stats.poll_skip);
+
+	for (i = 0; i < t->mmap_nr; i++) {
+		u64 size = mmap_free_size(t->mmap[i], evlist);
+
+		unit_number__scnprintf(buf_size, sizeof(buf_size), size);
+		fprintf(stderr, "%5s ", buf_size);
+	}
+
+	fprintf(stderr, "\n");
 }
 
 static void record__threads_stats(struct record *rec)
 {
 	struct record_thread *threads = rec->threads;
+	struct perf_evlist *evlist = rec->evlist;
 	static time_t last, last_header, start;
 	time_t current = time(NULL);
+	char buf_size[20];
 	int i;
 
 	if (last == current)
@@ -1337,15 +1363,18 @@ static void record__threads_stats(struct record *rec)
 
 	last = current;
 
+	unit_number__scnprintf(buf_size, sizeof(buf_size), evlist->mmap_len);
+
 	if (!last_header || (last_header + 10 < current)) {
-		fprintf(stderr, "%6s %6s %10s %10s %10s\n", " ", "pid", "write", "poll", "skip");
+		fprintf(stderr, "%6s %6s %10s %10s %10s %5s (size %s)\n",
+			" ", "pid", "write", "poll", "skip", "maps", buf_size);
 		last_header = current;
 	}
 
 	for (i = 0; i < rec->threads_cnt; i++) {
 		struct record_thread *t = threads + i;
 
-		record_thread__display(t, !i ? current - start : 0);
+		record_thread__display(t, evlist, !i ? current - start : 0);
 		memset(&t->stats, 0, sizeof(t->stats));
 	}
 }
