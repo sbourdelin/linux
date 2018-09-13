@@ -299,6 +299,8 @@ int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	req->cmd_flags |= flags;
 	req->rq_flags |= rq_flags | RQF_QUIET;
 
+	atomic_inc(&sdev->nr_admin_pending);
+
 	/*
 	 * head injection *required* here otherwise quiesce won't work
 	 */
@@ -322,6 +324,9 @@ int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	ret = rq->result;
  out:
 	blk_put_request(req);
+
+	atomic_dec(&sdev->nr_admin_pending);
+	wake_up_all(&sdev->admin_wq);
 
 	return ret;
 }
@@ -3257,6 +3262,7 @@ static int scsi_internal_device_block(struct scsi_device *sdev)
 		else
 			scsi_wait_for_queuecommand(sdev);
 	}
+	wait_event(sdev->admin_wq, !atomic_read(&sdev->nr_admin_pending));
 	mutex_unlock(&sdev->state_mutex);
 
 	return err;

@@ -1393,6 +1393,7 @@ void __scsi_remove_device(struct scsi_device *sdev)
 
 	blk_cleanup_queue(sdev->request_queue);
 	cancel_work_sync(&sdev->requeue_work);
+	wait_event(sdev->admin_wq, !atomic_read(&sdev->nr_admin_pending));
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
