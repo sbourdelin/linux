@@ -13,6 +13,8 @@
 #include <linux/types.h>
 #include "rwsem.h"
 
+#include "perf.h"  /* for perf_has_index */
+
 struct dso;
 struct ip_callchain;
 struct ref_reloc_sym;
@@ -186,8 +188,10 @@ void map__fixup_end(struct map *map);
 void map__reloc_vmlinux(struct map *map);
 
 void maps__insert(struct maps *maps, struct map *map);
+void maps__insert_by_time(struct maps *maps, struct map *map);
 void maps__remove(struct maps *maps, struct map *map);
 struct map *maps__find(struct maps *maps, u64 addr);
+struct map *maps__find_by_time(struct maps *maps, u64 addr, u64 timestamp);
 struct map *maps__first(struct maps *maps);
 struct map *map__next(struct map *map);
 struct symbol *maps__find_symbol_by_name(struct maps *maps, const char *name,
@@ -207,6 +211,17 @@ static inline void map_groups__insert(struct map_groups *mg, struct map *map)
 	map->groups = mg;
 }
 
+static inline void map_groups__insert_by_time(struct map_groups *mg,
+					      struct map *map)
+{
+	if (perf_has_index)
+		maps__insert_by_time(&mg->maps, map);
+	else
+		maps__insert(&mg->maps, map);
+
+	map->groups = mg;
+}
+
 static inline void map_groups__remove(struct map_groups *mg, struct map *map)
 {
 	maps__remove(&mg->maps, map);
@@ -218,6 +233,15 @@ static inline struct map *map_groups__find(struct map_groups *mg, u64 addr)
 }
 
 struct map *map_groups__first(struct map_groups *mg);
+
+static inline struct map *map_groups__find_by_time(struct map_groups *mg,
+						   u64 addr, u64 timestamp)
+{
+	if (!perf_has_index)
+		return maps__find(&mg->maps, addr);
+
+	return maps__find_by_time(&mg->maps, addr, timestamp);
+}
 
 static inline struct map *map_groups__next(struct map *map)
 {
