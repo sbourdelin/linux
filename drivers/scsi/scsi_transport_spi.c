@@ -1052,6 +1052,9 @@ spi_dv_device(struct scsi_device *sdev)
 
 	scsi_target_resume(starget);
 
+	/* undo what scsi_device_quiesce() did */
+	scsi_device_resume(sdev);
+
 	spi_initial_dv(starget) = 1;
 
  out_free:
