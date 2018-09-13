@@ -2476,7 +2476,8 @@ void blk_mq_release(struct request_queue *q)
 	free_percpu(q->queue_ctx);
 }
 
-struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
+struct request_queue *__blk_mq_init_queue(struct blk_mq_tag_set *set,
+					  unsigned long def_flags)
 {
 	struct request_queue *uninit_q, *q;
 
@@ -2484,13 +2485,13 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	if (!uninit_q)
 		return ERR_PTR(-ENOMEM);
 
-	q = blk_mq_init_allocated_queue(set, uninit_q);
+	q = __blk_mq_init_allocated_queue(set, uninit_q, def_flags);
 	if (IS_ERR(q))
 		blk_cleanup_queue(uninit_q);
 
 	return q;
 }
-EXPORT_SYMBOL(blk_mq_init_queue);
+EXPORT_SYMBOL(__blk_mq_init_queue);
 
 static int blk_mq_hw_ctx_size(struct blk_mq_tag_set *tag_set)
 {
@@ -2564,8 +2565,9 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 	blk_mq_sysfs_register(q);
 }
 
-struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
-						  struct request_queue *q)
+struct request_queue *__blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
+						    struct request_queue *q,
+						    unsigned long def_flags)
 {
 	/* mark the queue as mq asap */
 	q->mq_ops = set->ops;
@@ -2599,7 +2601,7 @@ struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 
 	q->nr_queues = nr_cpu_ids;
 
-	q->queue_flags |= QUEUE_FLAG_MQ_DEFAULT;
+	q->queue_flags |= def_flags;
 
 	if (!(set->flags & BLK_MQ_F_SG_MERGE))
 		queue_flag_set_unlocked(QUEUE_FLAG_NO_SG_MERGE, q);
@@ -2649,7 +2651,7 @@ err_exit:
 	q->mq_ops = NULL;
 	return ERR_PTR(-ENOMEM);
 }
-EXPORT_SYMBOL(blk_mq_init_allocated_queue);
+EXPORT_SYMBOL(__blk_mq_init_allocated_queue);
 
 void blk_mq_free_queue(struct request_queue *q)
 {

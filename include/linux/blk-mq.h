@@ -200,9 +200,22 @@ enum {
 	((policy & ((1 << BLK_MQ_F_ALLOC_POLICY_BITS) - 1)) \
 		<< BLK_MQ_F_ALLOC_POLICY_START_BIT)
 
-struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *);
-struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
-						  struct request_queue *q);
+struct request_queue *__blk_mq_init_queue(struct blk_mq_tag_set *, unsigned long);
+struct request_queue *__blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
+						    struct request_queue *q,
+						    unsigned long def_flags);
+
+static inline struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
+{
+	return __blk_mq_init_queue(set, QUEUE_FLAG_MQ_DEFAULT);
+}
+
+static inline struct request_queue *
+blk_mq_init_allocated_queue(struct blk_mq_tag_set *set, struct request_queue *q)
+{
+	return __blk_mq_init_allocated_queue(set, q, QUEUE_FLAG_MQ_DEFAULT);
+}
+
 int blk_mq_register_dev(struct device *, struct request_queue *);
 void blk_mq_unregister_dev(struct device *, struct request_queue *);
 
