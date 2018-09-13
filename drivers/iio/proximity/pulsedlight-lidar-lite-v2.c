@@ -63,23 +63,7 @@ static const struct iio_chan_spec lidar_channels[] = {
 
 static int lidar_i2c_xfer(struct lidar_data *data, u8 reg, u8 *val, int len)
 {
-	struct i2c_client *client = data->client;
-	struct i2c_msg msg[2];
-	int ret;
-
-	msg[0].addr = client->addr;
-	msg[0].flags = client->flags | I2C_M_STOP;
-	msg[0].len = 1;
-	msg[0].buf  = (char *) &reg;
-
-	msg[1].addr = client->addr;
-	msg[1].flags = client->flags | I2C_M_RD;
-	msg[1].len = len;
-	msg[1].buf = (char *) val;
-
-	ret = i2c_transfer(client->adapter, msg, 2);
-
-	return (ret == 2) ? 0 : -EIO;
+	return i2c_smbus_read_i2c_block_data(data->client, reg, len, val);
 }
 
 static int lidar_smbus_xfer(struct lidar_data *data, u8 reg, u8 *val, int len)
