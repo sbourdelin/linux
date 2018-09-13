@@ -99,8 +99,6 @@ static inline bool machine__kernel_ip(struct machine *machine, u64 ip)
 	return ip >= kernel_start;
 }
 
-struct thread *machine__find_thread(struct machine *machine, pid_t pid,
-				    pid_t tid);
 struct comm *machine__thread_exec_comm(struct machine *machine,
 				       struct thread *thread);
 
@@ -194,6 +192,14 @@ int machine__nr_cpus_avail(struct machine *machine);
 
 struct thread *__machine__findnew_thread(struct machine *machine, pid_t pid, pid_t tid);
 struct thread *machine__findnew_thread(struct machine *machine, pid_t pid, pid_t tid);
+struct thread *machine__find_thread(struct machine *machine, pid_t pid,
+				    pid_t tid);
+struct thread *machine__findnew_thread_by_time(struct machine *machine,
+					       pid_t pid, pid_t tid,
+					       u64 timestamp);
+struct thread *machine__find_thread_by_time(struct machine *machine,
+					    pid_t pid, pid_t tid,
+					    u64 timestamp);
 
 struct dso *machine__findnew_dso(struct machine *machine, const char *filename);
 

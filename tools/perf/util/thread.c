@@ -225,6 +225,10 @@ static int ____thread__set_comm(struct thread *thread, const char *str,
 	/* Override the default :tid entry */
 	if (!thread->comm_set) {
 		int err = comm__override(curr, str, timestamp, exec);
+
+		if (!thread->start_time)
+			thread->start_time = timestamp;
+
 		if (err)
 			return err;
 	} else {
@@ -403,6 +407,7 @@ int thread__fork(struct thread *thread, struct thread *parent, u64 timestamp)
 	}
 
 	thread->ppid = parent->tid;
+	thread->start_time = timestamp;
 	return thread__clone_map_groups(thread, parent);
 }
 

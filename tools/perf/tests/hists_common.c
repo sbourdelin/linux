@@ -104,7 +104,7 @@ struct machine *setup_fake_machine(struct machines *machines)
 
 	for (i = 0; i < ARRAY_SIZE(fake_mmap_info); i++) {
 		struct perf_sample sample = {
-			.cpumode = PERF_RECORD_MISC_USER,
+			.cpumode = PERF_RECORD_MISC_USER, .time = -1ULL,
 		};
 		union perf_event fake_mmap_event = {
 			.mmap = {
