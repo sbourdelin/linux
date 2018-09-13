@@ -443,6 +443,33 @@ static void record__mmap_index_all(struct record *rec)
 	}
 }
 
+static void record__mmap_index_cnt(struct record *rec)
+{
+	struct perf_evlist *evlist = rec->evlist;
+	struct perf_data     *data = &rec->data;
+	int i, t;
+
+	for (i = 0; i < evlist->nr_mmaps; i++) {
+		struct perf_mmap *map = &evlist->track_mmap[i];
+
+		map->file = &data->file;
+	}
+
+	for (t = 0; t < rec->threads_cnt; t++) {
+		struct record_thread *th = rec->threads + t;
+		int nr = th->mmap_nr;
+
+		if (!t)
+			nr -= evlist->nr_mmaps;
+
+		for (i = 0; i < nr; i++) {
+			struct perf_mmap *map = th->mmap[i];
+
+			map->file = &data->index[t];
+		}
+	}
+}
+
 static int record__mmap_index(struct record *rec)
 {
 	struct perf_data *data = &rec->data;
@@ -456,6 +483,8 @@ static int record__mmap_index(struct record *rec)
 		record__mmap_index_all(rec);
 	else if (rec->threads_one)
 		record__mmap_index_single(rec);
+	else
+		record__mmap_index_cnt(rec);
 
 	return 0;
 }
@@ -1170,6 +1199,70 @@ record__threads_assign_all(struct record *rec)
 }
 
 static int
+record__threads_assign_cnt(struct record *rec)
+{
+	struct record_thread *threads = rec->threads;
+	struct record_thread *thread0 = threads;
+	struct perf_evlist *evlist = rec->evlist;
+	int cnt = rec->threads_cnt;
+	int i, j, t, nr, nr_trk, nr_thr, nr_mod, n0 = 0;
+
+	nr     = evlist->mmap       ? evlist->nr_mmaps : 0;
+	nr_trk = evlist->track_mmap ? evlist->nr_mmaps : 0;
+
+	nr_thr = nr / cnt;
+	nr_mod = nr % cnt;
+
+	/*
+	 * Create threads' mmaps first..
+	 */
+	for (t = 0; t < cnt; t++) {
+		struct record_thread *th = threads + t;
+		int n = nr_thr;
+
+		/* evenly spread the remainder of threads */
+		n += (nr_mod-- > 0) ? 1 : 0;
+
+		/* first thread deals with track mmaps */
+		if (!t) {
+			n0 = n;
+			n += nr_trk;
+		}
+
+		if (record_thread__mmap(th, n, 0))
+			return -ENOMEM;
+	}
+
+	/*
+	 *  ... and assign mmaps separatelly.
+	 */
+
+	j = 0; /* mmap in evlist->mmap */
+	i = 0; /* mmap in thread    */
+
+	while (1) {
+		for (t = 0; t < cnt; t++) {
+			struct record_thread *th = threads + t;
+
+			if (i == th->mmap_nr)
+				continue;
+
+			th->mmap[i] = &evlist->mmap[j++];
+
+			if (j == nr)
+				goto out;
+		}
+		i++;
+	}
+out:
+	/* Assign track maps to thread 0. */
+	for (i = n0, j = 0; j < nr_trk && i < thread0->mmap_nr; i++, j++)
+		thread0->mmap[i] = &evlist->track_mmap[j];
+
+	return 0;
+}
+
+static int
 record__threads_assign(struct record *rec)
 {
 	if (rec->threads_all)
@@ -1177,7 +1270,7 @@ record__threads_assign(struct record *rec)
 	else if (rec->threads_one)
 		return record__threads_assign_single(rec);
 	else
-		return -EINVAL;
+		return record__threads_assign_cnt(rec);
 }
 
 static int
@@ -1242,15 +1335,15 @@ static int record__threads_cnt(struct record *rec)
 
 	if (rec->threads_set) {
 		if (rec->threads_cnt) {
-			pr_err("failed: Can't specify number of threads yet.\n");
-			return -EINVAL;
+			cnt = rec->threads_cnt;
+		} else {
+			cnt = evlist->nr_mmaps;
+			all = true;
 		}
 		if (evlist->overwrite_mmap) {
 			pr_err("failed: Can't use multiple threads with overwrite mmaps yet.\n");
 			return -EINVAL;
 		}
-		cnt = evlist->nr_mmaps;
-		all = true;
 	} else {
 		one = true;
 		cnt = 1;
