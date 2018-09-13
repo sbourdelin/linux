@@ -99,7 +99,7 @@ static bool is_rgb_type(
 		color_space == COLOR_SPACE_XR_RGB		||
 		color_space == COLOR_SPACE_MSREF_SCRGB		||
 		color_space == COLOR_SPACE_2020_RGB_FULLRANGE	||
-		color_space == COLOR_SPACE_ADOBERGB		||
+		color_space == COLOR_SPACE_OPRGB		||
 		color_space == COLOR_SPACE_DCIP3	||
 		color_space == COLOR_SPACE_DOLBYVISION)
 		ret = true;
@@ -230,7 +230,7 @@ void color_space_to_black_color(
 	case COLOR_SPACE_XV_YCC_601:
 	case COLOR_SPACE_2020_RGB_FULLRANGE:
 	case COLOR_SPACE_2020_RGB_LIMITEDRANGE:
-	case COLOR_SPACE_ADOBERGB:
+	case COLOR_SPACE_OPRGB:
 	case COLOR_SPACE_DCIP3:
 	case COLOR_SPACE_DISPLAYNATIVE:
 	case COLOR_SPACE_DOLBYVISION:

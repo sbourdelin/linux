@@ -394,7 +394,7 @@ void enc1_stream_encoder_dp_set_stream_attribute(
 	case COLOR_SPACE_2020_YCBCR:
 	case COLOR_SPACE_XR_RGB:
 	case COLOR_SPACE_MSREF_SCRGB:
-	case COLOR_SPACE_ADOBERGB:
+	case COLOR_SPACE_OPRGB:
 	case COLOR_SPACE_DCIP3:
 	case COLOR_SPACE_XV_YCC_709:
 	case COLOR_SPACE_XV_YCC_601:

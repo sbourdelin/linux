@@ -1729,7 +1729,7 @@ bool is_rgb_cspace(enum dc_color_space output_color_space)
 	case COLOR_SPACE_SRGB_LIMITED:
 	case COLOR_SPACE_2020_RGB_FULLRANGE:
 	case COLOR_SPACE_2020_RGB_LIMITEDRANGE:
-	case COLOR_SPACE_ADOBERGB:
+	case COLOR_SPACE_OPRGB:
 		return true;
 	case COLOR_SPACE_YCBCR601:
 	case COLOR_SPACE_YCBCR709:

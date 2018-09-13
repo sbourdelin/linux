@@ -2151,8 +2151,8 @@ static void set_avi_info_frame(
 			color_space == COLOR_SPACE_2020_YCBCR) {
 		hdmi_info.bits.EC0_EC2 = COLORIMETRYEX_BT2020RGBYCBCR;
 		hdmi_info.bits.C0_C1   = COLORIMETRY_EXTENDED;
-	} else if (color_space == COLOR_SPACE_ADOBERGB) {
-		hdmi_info.bits.EC0_EC2 = COLORIMETRYEX_ADOBERGB;
+	} else if (color_space == COLOR_SPACE_OPRGB) {
+		hdmi_info.bits.EC0_EC2 = COLORIMETRYEX_OPRGB;
 		hdmi_info.bits.C0_C1   = COLORIMETRY_EXTENDED;
 	}
 
