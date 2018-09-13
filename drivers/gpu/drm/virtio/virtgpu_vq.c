@@ -596,6 +596,37 @@ static void virtio_gpu_cmd_capset_cb(struct virtio_gpu_device *vgdev,
 	wake_up(&vgdev->resp_wq);
 }
 
+static void virtio_gpu_cmd_get_edid_cb(struct virtio_gpu_device *vgdev,
+				       struct virtio_gpu_vbuffer *vbuf)
+{
+	struct virtio_gpu_resp_edid *resp =
+		(struct virtio_gpu_resp_edid *)vbuf->resp_buf;
+	uint32_t scanout = le32_to_cpu(resp->scanout);
+	uint32_t size = le32_to_cpu(resp->size);
+	struct virtio_gpu_output *output;
+	struct edid *new_edid, *old_edid;
+
+	if (scanout >= vgdev->num_scanouts)
+		return;
+	output = vgdev->outputs + scanout;
+
+	if (drm_edid_is_valid((struct edid *)resp->edid)) {
+		new_edid = kmalloc(size, GFP_KERNEL);
+		memcpy(new_edid, resp->edid, size);
+	} else {
+		new_edid = NULL;
+	}
+
+	spin_lock(&vgdev->display_info_lock);
+	old_edid = output->edid;
+	output->edid = new_edid;
+	drm_connector_update_edid_property(&output->conn, output->edid);
+	spin_unlock(&vgdev->display_info_lock);
+
+	kfree(old_edid);
+	wake_up(&vgdev->resp_wq);
+}
+
 int virtio_gpu_cmd_get_display_info(struct virtio_gpu_device *vgdev)
 {
 	struct virtio_gpu_ctrl_hdr *cmd_p;
@@ -693,6 +724,34 @@ int virtio_gpu_cmd_get_capset(struct virtio_gpu_device *vgdev,
 	cmd_p->capset_version = cpu_to_le32(version);
 	*cache_p = cache_ent;
 	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
+
+	return 0;
+}
+
+int virtio_gpu_cmd_get_edids(struct virtio_gpu_device *vgdev)
+{
+	struct virtio_gpu_get_edid *cmd_p;
+	struct virtio_gpu_vbuffer *vbuf;
+	void *resp_buf;
+	int scanout;
+
+	if (WARN_ON(!vgdev->has_edid))
+		return -EINVAL;
+
+	for (scanout = 0; scanout < vgdev->num_scanouts; scanout++) {
+		resp_buf = kzalloc(sizeof(struct virtio_gpu_resp_edid),
+				   GFP_KERNEL);
+		if (!resp_buf)
+			return -ENOMEM;
+
+		cmd_p = virtio_gpu_alloc_cmd_resp
+			(vgdev, &virtio_gpu_cmd_get_edid_cb, &vbuf,
+			 sizeof(*cmd_p), sizeof(struct virtio_gpu_resp_edid),
+			 resp_buf);
+		cmd_p->hdr.type = cpu_to_le32(VIRTIO_GPU_CMD_GET_EDID);
+		cmd_p->scanout = cpu_to_le32(scanout);
+		virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
+	}
 
 	return 0;
 }
