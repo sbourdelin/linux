@@ -187,3 +187,67 @@ out:
 	free(new_filepath);
 	return ret;
 }
+
+static void free_index(struct perf_data_file *index, int nr)
+{
+	while (--nr >= 1) {
+		close(index[nr].fd);
+		free((char *) index[nr].path);
+	}
+	free(index);
+}
+
+static void clean_index(struct perf_data *data,
+			struct perf_data_file *index,
+			int index_nr)
+{
+	char path[PATH_MAX];
+
+	scnprintf(path, sizeof(path), "%s.dir", data->file.path);
+	rm_rf(path);
+
+	free_index(index, index_nr);
+}
+
+void perf_data__clean_index(struct perf_data *data)
+{
+	clean_index(data, data->index, data->index_nr);
+}
+
+int perf_data__create_index(struct perf_data *data, int nr)
+{
+	struct perf_data_file *index;
+	char path[PATH_MAX];
+	int ret = -1, i = 0;
+
+	index = malloc(nr * sizeof(*index));
+	if (!index)
+		return -ENOMEM;
+
+	data->index    = index;
+	data->index_nr = nr;
+
+	scnprintf(path, sizeof(path), "%s.dir", data->file.path);
+	if (rm_rf(path) < 0 || mkdir(path, S_IRWXU) < 0)
+		goto out_err;
+
+	for (; i < nr; i++) {
+		struct perf_data_file *file = &index[i];
+
+		if (asprintf((char **) &file->path, "%s.dir/perf.data.%d",
+			     data->file.path, i) < 0)
+			goto out_err;
+
+		ret = open(file->path, O_RDWR|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
+		if (ret < 0)
+			goto out_err;
+
+		file->fd = ret;
+	}
+
+	return 0;
+
+out_err:
+	clean_index(data, index, i);
+	return ret;
+}

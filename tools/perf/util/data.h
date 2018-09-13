@@ -20,6 +20,8 @@ struct perf_data {
 	bool			 force;
 	unsigned long		 size;
 	enum perf_data_mode	 mode;
+	struct perf_data_file	*index;
+	int			 index_nr;
 };
 
 static inline bool perf_data__is_read(struct perf_data *data)
@@ -63,4 +65,7 @@ ssize_t perf_data_file__write(struct perf_data_file *file,
 int perf_data__switch(struct perf_data *data,
 			   const char *postfix,
 			   size_t pos, bool at_exit);
+int perf_data__create_index(struct perf_data *data,
+			    int nr);
+void perf_data__clean_index(struct perf_data *data);
 #endif /* __PERF_DATA_H */
