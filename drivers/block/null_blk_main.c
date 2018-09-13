@@ -1702,7 +1702,7 @@ static int null_add_dev(struct nullb_device *dev)
 
 	if (dev->queue_mode == NULL_Q_MQ) {
 		unsigned long q_flags = g_no_sched ?
-			QUEUE_FLAG_MQ_NO_SCHED_DEFAULT : QUEUE_FLAG_MQ_DEFAULT;
+			QUEUE_FLAG_MQ_ADMIN_DEFAULT : QUEUE_FLAG_MQ_DEFAULT;
 
 		if (shared_tags) {
 			nullb->tag_set = &tag_set;

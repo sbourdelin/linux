@@ -3041,7 +3041,7 @@ nvme_fc_init_ctrl(struct device *dev, struct nvmf_ctrl_options *opts,
 	ctrl->ctrl.admin_tagset = &ctrl->admin_tag_set;
 
 	ctrl->ctrl.admin_q = __blk_mq_init_queue(&ctrl->admin_tag_set,
-			QUEUE_FLAG_MQ_NO_SCHED_DEFAULT);
+			QUEUE_FLAG_MQ_ADMIN_DEFAULT);
 	if (IS_ERR(ctrl->ctrl.admin_q)) {
 		ret = PTR_ERR(ctrl->ctrl.admin_q);
 		goto out_free_admin_tag_set;

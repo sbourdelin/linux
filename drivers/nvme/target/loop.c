@@ -381,7 +381,7 @@ static int nvme_loop_configure_admin_queue(struct nvme_loop_ctrl *ctrl)
 	ctrl->ctrl.admin_tagset = &ctrl->admin_tag_set;
 
 	ctrl->ctrl.admin_q = __blk_mq_init_queue(&ctrl->admin_tag_set,
-			QUEUE_FLAG_MQ_NO_SCHED_DEFAULT);
+			QUEUE_FLAG_MQ_ADMIN_DEFAULT);
 	if (IS_ERR(ctrl->ctrl.admin_q)) {
 		error = PTR_ERR(ctrl->ctrl.admin_q);
 		goto out_free_tagset;

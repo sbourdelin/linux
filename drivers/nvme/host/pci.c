@@ -1491,7 +1491,7 @@ static int nvme_alloc_admin_tags(struct nvme_dev *dev)
 		dev->ctrl.admin_tagset = &dev->admin_tagset;
 
 		dev->ctrl.admin_q = __blk_mq_init_queue(&dev->admin_tagset,
-				QUEUE_FLAG_MQ_NO_SCHED_DEFAULT);
+				QUEUE_FLAG_MQ_ADMIN_DEFAULT);
 		if (IS_ERR(dev->ctrl.admin_q)) {
 			blk_mq_free_tag_set(&dev->admin_tagset);
 			return -ENOMEM;

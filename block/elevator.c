@@ -1112,7 +1112,7 @@ static int __elevator_change(struct request_queue *q, const char *name)
 
 static inline bool elv_support_iosched(struct request_queue *q)
 {
-	if (q->mq_ops && blk_queue_no_sched(q))
+	if (q->mq_ops && blk_queue_admin(q))
 		return false;
 	return true;
 }
