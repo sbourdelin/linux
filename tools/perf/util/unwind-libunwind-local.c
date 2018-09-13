@@ -366,7 +366,9 @@ static int read_unwind_spec_debug_frame(struct dso *dso,
 static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
 {
 	struct addr_location al;
-	return thread__find_map(ui->thread, PERF_RECORD_MISC_USER, ip, &al);
+
+	return thread__find_map_by_time(ui->thread, PERF_RECORD_MISC_USER, ip,
+					&al, ui->sample->time);
 }
 
 static int
@@ -568,13 +570,14 @@ static void put_unwind_info(unw_addr_space_t __maybe_unused as,
 	pr_debug("unwind: put_unwind_info called\n");
 }
 
-static int entry(u64 ip, struct thread *thread,
+static int entry(u64 ip, struct thread *thread, u64 timestamp,
 		 unwind_entry_cb_t cb, void *arg)
 {
 	struct unwind_entry e;
 	struct addr_location al;
 
-	e.sym = thread__find_symbol(thread, PERF_RECORD_MISC_USER, ip, &al);
+	e.sym = thread__find_symbol_by_time(thread, PERF_RECORD_MISC_USER, ip,
+					    &al, timestamp);
 	e.ip  = ip;
 	e.map = al.map;
 
@@ -700,7 +703,7 @@ static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
 
 		if (callchain_param.order == ORDER_CALLER)
 			j = max_stack - i - 1;
-		ret = ips[j] ? entry(ips[j], ui->thread, cb, arg) : 0;
+		ret = ips[j] ? entry(ips[j], ui->thread, ui->sample->time, cb, arg) : 0;
 	}
 
 	return ret;
