@@ -108,10 +108,15 @@ static bool switch_output_time(struct record *rec)
 	       trigger_is_ready(&switch_output_trigger);
 }
 
-static int record__write(struct record *rec, struct perf_mmap *map __maybe_unused,
+static int record__write(struct record *rec, struct perf_mmap *map,
 			 void *bf, size_t size)
 {
-	struct perf_data_file *file = &rec->session->data->file;
+	struct perf_data_file *file;
+
+	if (rec->opts.index && map)
+		file = map->file;
+	else
+		file = &rec->session->data->file;
 
 	if (perf_data_file__write(file, bf, size) < 0) {
 		pr_err("failed to write perf data, error: %m\n");
@@ -132,6 +137,7 @@ static int process_synthesized_event(struct perf_tool *tool,
 				     struct machine *machine __maybe_unused)
 {
 	struct record *rec = container_of(tool, struct record, tool);
+
 	return record__write(rec, NULL, event, event->header.size);
 }
 
@@ -331,7 +337,7 @@ static int record__mmap_evlist(struct record *rec,
 
 	if (perf_evlist__mmap_ex(evlist, opts->mmap_pages,
 				 opts->auxtrace_mmap_pages,
-				 opts->auxtrace_snapshot_mode, false) < 0) {
+				 opts->auxtrace_snapshot_mode, opts->index) < 0) {
 		if (errno == EPERM) {
 			pr_err("Permission error mapping pages.\n"
 			       "Consider increasing "
@@ -349,6 +355,31 @@ static int record__mmap_evlist(struct record *rec,
 				return -EINVAL;
 		}
 	}
+	return 0;
+}
+
+static int record__mmap_index(struct record *rec)
+{
+	struct perf_evlist *evlist = rec->evlist;
+	struct perf_data *data = &rec->data;
+	int i, ret, nr = evlist->nr_mmaps;
+
+	ret = perf_data__create_index(data, nr);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < nr; i++) {
+		struct perf_mmap *map = &evlist->mmap[i];
+
+		map->file = &data->index[i];
+	}
+
+	for (i = 0; i < nr; i++) {
+		struct perf_mmap *map = &evlist->track_mmap[i];
+
+		map->file = &data->file;
+	}
+
 	return 0;
 }
 
@@ -604,7 +635,73 @@ static void record__init_features(struct record *rec)
 		perf_header__clear_feat(&session->header, HEADER_AUXTRACE);
 
 	perf_header__clear_feat(&session->header, HEADER_STAT);
-	perf_header__clear_feat(&session->header, HEADER_DATA_INDEX);
+
+	if (!rec->opts.index)
+		perf_header__clear_feat(&session->header, HEADER_DATA_INDEX);
+}
+
+static int record__merge_index(struct record *rec)
+{
+	struct perf_file_section *idx;
+	struct perf_data *data = &rec->data;
+	struct perf_session *session = rec->session;
+	int output_fd = perf_data__fd(data);
+	int i, nr_index, ret = -ENOMEM;
+	u64 offset;
+
+	/* +1 for header file itself */
+	nr_index = data->index_nr + 1;
+
+	idx = calloc(nr_index, sizeof(*idx));
+	if (idx == NULL)
+		goto out_close;
+
+	offset = lseek(output_fd, 0, SEEK_END);
+
+	idx[0].offset = session->header.data_offset;
+	idx[0].size   = offset - idx[0].offset;
+
+	for (i = 1; i < nr_index; i++) {
+		struct stat stbuf;
+		int fd = data->index[i - 1].fd;
+		char buf[20];
+
+		ret = fstat(fd, &stbuf);
+		if (ret < 0)
+			goto out_close;
+
+		idx[i].offset = offset;
+		idx[i].size   = stbuf.st_size;
+
+		offset += stbuf.st_size;
+
+		if (idx[i].size == 0)
+			continue;
+
+		unit_number__scnprintf(buf, sizeof(buf), idx[i].size);
+		pr_debug("storing index %d, size %s ...", i, buf);
+
+		ret = copyfile_offset(fd, 0, output_fd, idx[i].offset,
+				      idx[i].size);
+		if (ret < 0)
+			goto out_close;
+
+		pr_debug(" ok\n");
+	}
+
+	session->header.index = idx;
+	session->header.nr_index = nr_index;
+
+	perf_has_index = true;
+
+	ret = 0;
+
+out_close:
+	if (ret < 0)
+		pr_err("failed to merge index files: %d\n", ret);
+
+	perf_data__clean_index(data);
+	return ret;
 }
 
 static void
@@ -617,7 +714,11 @@ record__finish_output(struct record *rec)
 		return;
 
 	rec->session->header.data_size += rec->bytes_written;
-	data->size = lseek(perf_data__fd(data), 0, SEEK_CUR);
+
+	if (rec->opts.index)
+		record__merge_index(rec);
+
+	data->size = lseek(perf_data__fd(data), 0, SEEK_END);
 
 	if (!rec->no_buildid) {
 		process_buildids(rec);
@@ -929,9 +1030,20 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	if (data->is_pipe && rec->evlist->nr_entries == 1)
 		rec->opts.sample_id = true;
 
+	if (data->is_pipe && opts->index) {
+		pr_warning("Indexing is disabled for pipe output\n");
+		opts->index = false;
+	}
+
 	if (record__open(rec) != 0) {
 		err = -1;
 		goto out_child;
+	}
+
+	if (opts->index) {
+		err = record__mmap_index(rec);
+		if (err)
+			goto out_child;
 	}
 
 	err = bpf__apply_obj_config();
@@ -1693,6 +1805,8 @@ static struct option __record_options[] = {
 			  "signal"),
 	OPT_BOOLEAN(0, "dry-run", &dry_run,
 		    "Parse options then exit"),
+	OPT_BOOLEAN(0, "index", &record.opts.index,
+		    "make index for sample data to speed-up processing"),
 	OPT_END()
 };
 
@@ -1840,6 +1954,16 @@ int cmd_record(int argc, const char **argv)
 		pr_err("Not enough memory for event selector list\n");
 		goto out;
 	}
+
+	if (rec->opts.index) {
+		if (!rec->opts.sample_time) {
+			pr_err("Sample timestamp is required for indexing\n");
+			goto out;
+		}
+
+		perf_evlist__add_dummy_tracking(rec->evlist);
+	}
+
 
 	if (rec->opts.target.tid && !rec->opts.no_inherit_set)
 		rec->opts.no_inherit = true;
