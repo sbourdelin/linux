@@ -14,7 +14,10 @@ struct scsi_request {
 	unsigned int	sense_len;
 	unsigned int	resid_len;	/* residual count */
 	int		retries;
-	void		*sense;
+	union {
+		void		*sense;
+		struct scsi_device *sdev;
+	};
 };
 
 static inline struct scsi_request *scsi_req(struct request *rq)
