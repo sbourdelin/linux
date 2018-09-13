@@ -401,7 +401,7 @@ static int serial_get_serial(struct tty_struct *tty, struct serial_struct *ss)
 	struct usb_serial_port *port = tty->driver_data;
 	if (port->serial->type->get_serial)
 		return port->serial->type->get_serial(tty, ss);
-	return -ENOIOCTLCMD;
+	return -ENOTTY;
 }
 
 static int serial_set_serial(struct tty_struct *tty, struct serial_struct *ss)
@@ -409,7 +409,7 @@ static int serial_set_serial(struct tty_struct *tty, struct serial_struct *ss)
 	struct usb_serial_port *port = tty->driver_data;
 	if (port->serial->type->set_serial)
 		return port->serial->type->get_serial(tty, ss);
-	return -ENOIOCTLCMD;
+	return -ENOTTY;
 }
 
 static int serial_ioctl(struct tty_struct *tty,
