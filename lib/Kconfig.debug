@@ -1883,6 +1883,16 @@ config TEST_BPF
 
 	  If unsure, say N.
 
+config TEST_MOD_ALLOC
+	bool "Tests for module allocator/vmalloc"
+	help
+	  This builds the "test_mod_alloc" module that performs performance
+	  and functional tests on the module text section allocator. The module
+	  uses X86_64 module text sizes for simulations, for other architectures
+	  it will be less accurate.
+
+	  If unsure, say N.
+
 config FIND_BIT_BENCHMARK
 	tristate "Test find_bit functions"
 	help
