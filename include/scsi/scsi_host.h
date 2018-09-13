@@ -532,6 +532,8 @@ struct Scsi_Host {
 	struct list_head	__devices;
 	struct list_head	__targets;
 	
+	struct request_queue	*admin_q;
+	bool                    run_admin_queue;
 	struct list_head	starved_list;
 
 	spinlock_t		default_lock;
