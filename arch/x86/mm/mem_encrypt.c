@@ -348,6 +348,16 @@ bool sev_active(void)
 EXPORT_SYMBOL(sev_active);
 
 /* Architecture __weak replacement functions */
+void __init mem_encrypt_free_decrypted_mem(void)
+{
+	if (mem_encrypt_active())
+		return;
+
+	free_init_pages("unused decrypted",
+			(unsigned long)__start_bss_decrypted_unused,
+			(unsigned long)__end_bss_decrypted);
+}
+
 void __init mem_encrypt_init(void)
 {
 	if (!sme_me_mask)
