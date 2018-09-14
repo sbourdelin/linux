@@ -479,17 +479,14 @@ static __initdata struct mdio_board_info orion_ge00_switch_board_info = {
 
 void __init orion_ge00_switch_init(struct dsa_chip_data *d)
 {
-	unsigned int i;
+	int index;
 
 	if (!IS_BUILTIN(CONFIG_PHYLIB))
 		return;
 
-	for (i = 0; i < ARRAY_SIZE(d->port_names); i++) {
-		if (!strcmp(d->port_names[i], "cpu")) {
-			d->netdev[i] = &orion_ge00.dev;
-			break;
-		}
-	}
+	index = match_string(d->port_names, ARRAY_SIZE(d->port_names), "cpu");
+	if (index >= 0)
+		d->netdev[index] = &orion_ge00.dev;
 
 	orion_ge00_switch_board_info.mdio_addr = d->sw_addr;
 	orion_ge00_switch_board_info.platform_data = d;
