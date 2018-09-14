@@ -105,6 +105,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	parent_name = __clk_get_name(parent);
+	devm_clk_put(dev, parent);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	reg = devm_ioremap_resource(dev, res);
