@@ -1652,15 +1652,14 @@ check_drain:
 		 * would succeed.
 		 */
 		if (cc->order > 0 && cc->last_migrated_pfn) {
-			int cpu;
 			unsigned long current_block_start =
 				block_start_pfn(cc->migrate_pfn, cc->order);
 
 			if (cc->last_migrated_pfn < current_block_start) {
-				cpu = get_cpu();
-				lru_add_drain_cpu(cpu);
+				lru_add_drain();
+				preempt_disable();
 				drain_local_pages(zone);
-				put_cpu();
+				preempt_enable();
 				/* No more flushing until we migrate again */
 				cc->last_migrated_pfn = 0;
 			}

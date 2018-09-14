@@ -44,13 +44,70 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
-static DEFINE_PER_CPU(struct pagevec, lru_add_pvec);
-static DEFINE_PER_CPU(struct pagevec, lru_rotate_pvecs);
-static DEFINE_PER_CPU(struct pagevec, lru_deactivate_file_pvecs);
-static DEFINE_PER_CPU(struct pagevec, lru_lazyfree_pvecs);
+struct swap_pagevec {
+	spinlock_t	lock;
+	struct pagevec	pvec;
+};
+
+#define DEFINE_PER_CPU_PAGEVEC(lvar)				\
+	DEFINE_PER_CPU(struct swap_pagevec, lvar) = {		\
+		.lock = __SPIN_LOCK_UNLOCKED((lvar).lock) }
+
+static DEFINE_PER_CPU_PAGEVEC(lru_add_pvec);
+static DEFINE_PER_CPU_PAGEVEC(lru_rotate_pvecs);
+static DEFINE_PER_CPU_PAGEVEC(lru_deactivate_file_pvecs);
+static DEFINE_PER_CPU_PAGEVEC(lru_lazyfree_pvecs);
 #ifdef CONFIG_SMP
-static DEFINE_PER_CPU(struct pagevec, activate_page_pvecs);
+static DEFINE_PER_CPU_PAGEVEC(activate_page_pvecs);
 #endif
+
+static inline
+struct swap_pagevec *lock_swap_pvec(struct swap_pagevec __percpu *p)
+{
+	struct swap_pagevec *swpvec = raw_cpu_ptr(p);
+
+	spin_lock(&swpvec->lock);
+	return swpvec;
+}
+
+static inline struct swap_pagevec *
+lock_swap_pvec_cpu(struct swap_pagevec __percpu *p, int cpu)
+{
+	struct swap_pagevec *swpvec = per_cpu_ptr(p, cpu);
+
+	spin_lock(&swpvec->lock);
+	return swpvec;
+}
+
+static inline struct swap_pagevec *
+lock_swap_pvec_irqsave(struct swap_pagevec __percpu *p, unsigned long *flags)
+{
+	struct swap_pagevec *swpvec = raw_cpu_ptr(p);
+
+	spin_lock_irqsave(&swpvec->lock, (*flags));
+	return swpvec;
+}
+
+static inline struct swap_pagevec *
+lock_swap_pvec_cpu_irqsave(struct swap_pagevec __percpu *p, int cpu,
+			   unsigned long *flags)
+{
+	struct swap_pagevec *swpvec = per_cpu_ptr(p, cpu);
+
+	spin_lock_irqsave(&swpvec->lock, *flags);
+	return swpvec;
+}
+
+static inline void unlock_swap_pvec(struct swap_pagevec *swpvec)
+{
+	spin_unlock(&swpvec->lock);
+}
+
+static inline void
+unlock_swap_pvec_irqrestore(struct swap_pagevec *swpvec, unsigned long flags)
+{
+	spin_unlock_irqrestore(&swpvec->lock, flags);
+}
 
 /*
  * This path almost never happens for VM activity - pages are normally
@@ -249,15 +306,17 @@ void rotate_reclaimable_page(struct page *page)
 {
 	if (!PageLocked(page) && !PageDirty(page) &&
 	    !PageUnevictable(page) && PageLRU(page)) {
+		struct swap_pagevec *swpvec;
 		struct pagevec *pvec;
 		unsigned long flags;
 
 		get_page(page);
-		local_irq_save(flags);
-		pvec = this_cpu_ptr(&lru_rotate_pvecs);
+
+		swpvec = lock_swap_pvec_irqsave(&lru_rotate_pvecs, &flags);
+		pvec = &swpvec->pvec;
 		if (!pagevec_add(pvec, page) || PageCompound(page))
 			pagevec_move_tail(pvec);
-		local_irq_restore(flags);
+		unlock_swap_pvec_irqrestore(swpvec, flags);
 	}
 }
 
@@ -292,27 +351,32 @@ static void __activate_page(struct page *page, struct lruvec *lruvec,
 #ifdef CONFIG_SMP
 static void activate_page_drain(int cpu)
 {
-	struct pagevec *pvec = &per_cpu(activate_page_pvecs, cpu);
+	struct swap_pagevec *swpvec = lock_swap_pvec(&activate_page_pvecs);
+	struct pagevec *pvec = &swpvec->pvec;
 
 	if (pagevec_count(pvec))
 		pagevec_lru_move_fn(pvec, __activate_page, NULL);
+	unlock_swap_pvec(swpvec);
 }
 
 static bool need_activate_page_drain(int cpu)
 {
-	return pagevec_count(&per_cpu(activate_page_pvecs, cpu)) != 0;
+	return pagevec_count(per_cpu_ptr(&activate_page_pvecs.pvec, cpu)) != 0;
 }
 
 void activate_page(struct page *page)
 {
 	page = compound_head(page);
 	if (PageLRU(page) && !PageActive(page) && !PageUnevictable(page)) {
-		struct pagevec *pvec = &get_cpu_var(activate_page_pvecs);
+		struct swap_pagevec *swpvec;
+		struct pagevec *pvec;
 
 		get_page(page);
+		swpvec = lock_swap_pvec(&activate_page_pvecs);
+		pvec = &swpvec->pvec;
 		if (!pagevec_add(pvec, page) || PageCompound(page))
 			pagevec_lru_move_fn(pvec, __activate_page, NULL);
-		put_cpu_var(activate_page_pvecs);
+		unlock_swap_pvec(swpvec);
 	}
 }
 
@@ -339,7 +403,8 @@ void activate_page(struct page *page)
 
 static void __lru_cache_activate_page(struct page *page)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
+	struct swap_pagevec *swpvec = lock_swap_pvec(&lru_add_pvec);
+	struct pagevec *pvec = &swpvec->pvec;
 	int i;
 
 	/*
@@ -361,7 +426,7 @@ static void __lru_cache_activate_page(struct page *page)
 		}
 	}
 
-	put_cpu_var(lru_add_pvec);
+	unlock_swap_pvec(swpvec);
 }
 
 /*
@@ -403,12 +468,13 @@ EXPORT_SYMBOL(mark_page_accessed);
 
 static void __lru_cache_add(struct page *page)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
+	struct swap_pagevec *swpvec = lock_swap_pvec(&lru_add_pvec);
+	struct pagevec *pvec = &swpvec->pvec;
 
 	get_page(page);
 	if (!pagevec_add(pvec, page) || PageCompound(page))
 		__pagevec_lru_add(pvec);
-	put_cpu_var(lru_add_pvec);
+	unlock_swap_pvec(swpvec);
 }
 
 /**
@@ -576,28 +642,34 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec,
  */
 void lru_add_drain_cpu(int cpu)
 {
-	struct pagevec *pvec = &per_cpu(lru_add_pvec, cpu);
+	struct swap_pagevec *swpvec = lock_swap_pvec_cpu(&lru_add_pvec, cpu);
+	struct pagevec *pvec = &swpvec->pvec;
+	unsigned long flags;
 
 	if (pagevec_count(pvec))
 		__pagevec_lru_add(pvec);
+	unlock_swap_pvec(swpvec);
 
-	pvec = &per_cpu(lru_rotate_pvecs, cpu);
+	swpvec = lock_swap_pvec_cpu_irqsave(&lru_rotate_pvecs, cpu, &flags);
+	pvec = &swpvec->pvec;
 	if (pagevec_count(pvec)) {
-		unsigned long flags;
 
 		/* No harm done if a racing interrupt already did this */
-		local_irq_save(flags);
 		pagevec_move_tail(pvec);
-		local_irq_restore(flags);
 	}
+	unlock_swap_pvec_irqrestore(swpvec, flags);
 
-	pvec = &per_cpu(lru_deactivate_file_pvecs, cpu);
+	swpvec = lock_swap_pvec_cpu(&lru_deactivate_file_pvecs, cpu);
+	pvec = &swpvec->pvec;
 	if (pagevec_count(pvec))
 		pagevec_lru_move_fn(pvec, lru_deactivate_file_fn, NULL);
+	unlock_swap_pvec(swpvec);
 
-	pvec = &per_cpu(lru_lazyfree_pvecs, cpu);
+	swpvec = lock_swap_pvec_cpu(&lru_lazyfree_pvecs, cpu);
+	pvec = &swpvec->pvec;
 	if (pagevec_count(pvec))
 		pagevec_lru_move_fn(pvec, lru_lazyfree_fn, NULL);
+	unlock_swap_pvec(swpvec);
 
 	activate_page_drain(cpu);
 }
@@ -612,6 +684,9 @@ void lru_add_drain_cpu(int cpu)
  */
 void deactivate_file_page(struct page *page)
 {
+	struct swap_pagevec *swpvec;
+	struct pagevec *pvec;
+
 	/*
 	 * In a workload with many unevictable page such as mprotect,
 	 * unevictable page deactivation for accelerating reclaim is pointless.
@@ -620,11 +695,12 @@ void deactivate_file_page(struct page *page)
 		return;
 
 	if (likely(get_page_unless_zero(page))) {
-		struct pagevec *pvec = &get_cpu_var(lru_deactivate_file_pvecs);
+		swpvec = lock_swap_pvec(&lru_deactivate_file_pvecs);
+		pvec = &swpvec->pvec;
 
 		if (!pagevec_add(pvec, page) || PageCompound(page))
 			pagevec_lru_move_fn(pvec, lru_deactivate_file_fn, NULL);
-		put_cpu_var(lru_deactivate_file_pvecs);
+		unlock_swap_pvec(swpvec);
 	}
 }
 
@@ -637,21 +713,24 @@ void deactivate_file_page(struct page *page)
  */
 void mark_page_lazyfree(struct page *page)
 {
+	struct swap_pagevec *swpvec;
+	struct pagevec *pvec;
+
 	if (PageLRU(page) && PageAnon(page) && PageSwapBacked(page) &&
 	    !PageSwapCache(page) && !PageUnevictable(page)) {
-		struct pagevec *pvec = &get_cpu_var(lru_lazyfree_pvecs);
+		swpvec = lock_swap_pvec(&lru_lazyfree_pvecs);
+		pvec = &swpvec->pvec;
 
 		get_page(page);
 		if (!pagevec_add(pvec, page) || PageCompound(page))
 			pagevec_lru_move_fn(pvec, lru_lazyfree_fn, NULL);
-		put_cpu_var(lru_lazyfree_pvecs);
+		unlock_swap_pvec(swpvec);
 	}
 }
 
 void lru_add_drain(void)
 {
-	lru_add_drain_cpu(get_cpu());
-	put_cpu();
+	lru_add_drain_cpu(raw_smp_processor_id());
 }
 
 static void lru_add_drain_per_cpu(struct work_struct *dummy)
@@ -687,10 +766,10 @@ void lru_add_drain_all(void)
 	for_each_online_cpu(cpu) {
 		struct work_struct *work = &per_cpu(lru_add_drain_work, cpu);
 
-		if (pagevec_count(&per_cpu(lru_add_pvec, cpu)) ||
-		    pagevec_count(&per_cpu(lru_rotate_pvecs, cpu)) ||
-		    pagevec_count(&per_cpu(lru_deactivate_file_pvecs, cpu)) ||
-		    pagevec_count(&per_cpu(lru_lazyfree_pvecs, cpu)) ||
+		if (pagevec_count(&per_cpu(lru_add_pvec.pvec, cpu)) ||
+		    pagevec_count(&per_cpu(lru_rotate_pvecs.pvec, cpu)) ||
+		    pagevec_count(&per_cpu(lru_deactivate_file_pvecs.pvec, cpu)) ||
+		    pagevec_count(&per_cpu(lru_lazyfree_pvecs.pvec, cpu)) ||
 		    need_activate_page_drain(cpu)) {
 			INIT_WORK(work, lru_add_drain_per_cpu);
 			queue_work_on(cpu, mm_percpu_wq, work);
