@@ -160,16 +160,16 @@ static int __must_check object_type_to_pool_type(const char *object_type,
 						 enum fsl_mc_pool_type
 								*pool_type)
 {
-	unsigned int i;
+	int ret;
 
-	for (i = 0; i < ARRAY_SIZE(fsl_mc_pool_type_strings); i++) {
-		if (strcmp(object_type, fsl_mc_pool_type_strings[i]) == 0) {
-			*pool_type = i;
-			return 0;
-		}
+	ret = match_string(fsl_mc_pool_type_strings,
+			     ARRAY_SIZE(fsl_mc_pool_type_strings), object_type);
+	if (ret >= 0) {
+		*pool_type = ret;
+		return 0;
 	}
 
-	return -EINVAL;
+	return ret;
 }
 
 int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
