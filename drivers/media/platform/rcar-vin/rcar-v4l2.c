@@ -673,6 +673,21 @@ static void rvin_mc_try_format(struct rvin_dev *vin,
 	pix->quantization = V4L2_MAP_QUANTIZATION_DEFAULT(true, pix->colorspace,
 							  pix->ycbcr_enc);
 
+	switch (vin->format.pixelformat) {
+	case V4L2_PIX_FMT_NV16:
+		pix->width = ALIGN(pix->width, 0x80);
+		break;
+	case V4L2_PIX_FMT_YUYV:
+	case V4L2_PIX_FMT_UYVY:
+	case V4L2_PIX_FMT_RGB565:
+	case V4L2_PIX_FMT_XRGB555:
+		pix->width = ALIGN(pix->width, 0x40);
+		break;
+	default:
+		pix->width = ALIGN(pix->width, 0x20);
+		break;
+	}
+
 	rvin_format_align(vin, pix);
 }
 
