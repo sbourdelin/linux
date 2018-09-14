@@ -1461,14 +1461,14 @@ static int security_context_to_sid_core(struct selinux_state *state,
 		return -ENOMEM;
 
 	if (!state->initialized) {
-		int i;
+		int index;
 
-		for (i = 1; i < SECINITSID_NUM; i++) {
-			if (!strcmp(initial_sid_to_string[i], scontext2)) {
-				*sid = i;
-				goto out;
-			}
+		index = match_string(initial_sid_to_string, SECINITSID_NUM, scontext2);
+		if (index >= 0) {
+			*sid = index;
+			goto out;
 		}
+
 		*sid = SECINITSID_KERNEL;
 		goto out;
 	}
