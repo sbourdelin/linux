@@ -896,6 +896,32 @@ static struct xenbus_watch *find_watch(const char *token)
 	return NULL;
 }
 
+static int xs_watch_insert_event(struct xs_watch_event *event, domid_t domid)
+{
+	struct mtwatch_domain *domain;
+	int ret = -1;
+
+	rcu_read_lock();
+
+	domain = mtwatch_find_domain(domid);
+	if (!domain) {
+		rcu_read_unlock();
+		return ret;
+	}
+
+	spin_lock(&domain->events_lock);
+	if (domain->state == MTWATCH_DOMAIN_UP) {
+		list_add_tail(&event->list, &domain->events);
+		wake_up(&domain->events_wq);
+		ret = 0;
+	}
+	spin_unlock(&domain->events_lock);
+
+	rcu_read_unlock();
+
+	return ret;
+}
+
 int xs_watch_msg(struct xs_watch_event *event)
 {
 	if (count_strings(event->body, event->len) != 2) {
@@ -908,10 +934,29 @@ int xs_watch_msg(struct xs_watch_event *event)
 	spin_lock(&watches_lock);
 	event->handle = find_watch(event->token);
 	if (event->handle != NULL) {
-		spin_lock(&watch_events_lock);
-		list_add_tail(&event->list, &watch_events);
-		wake_up(&watch_events_waitq);
-		spin_unlock(&watch_events_lock);
+		domid_t domid = 0;
+
+		if (xen_mtwatch && event->handle->get_domid)
+			domid = event->handle->get_domid(event->handle,
+							 event->path,
+							 event->token);
+
+		/*
+		 * The event is processed by default xenwatch thread if:
+		 *
+		 * 1. The watch does not use xenwatch multithreading.
+		 * 2. There is no per-domU xenwatch thread (or mtwatch
+		 *    domain) available for this domid.
+		 * 3. The per-domU xenwatch thread is not created
+		 *    successfully by kthread_run() during initialization.
+		 */
+		if (!(domid &&
+		      xs_watch_insert_event(event, domid) == 0)) {
+			spin_lock(&watch_events_lock);
+			list_add_tail(&event->list, &watch_events);
+			wake_up(&watch_events_waitq);
+			spin_unlock(&watch_events_lock);
+		}
 	} else
 		kfree(event);
 	spin_unlock(&watches_lock);
