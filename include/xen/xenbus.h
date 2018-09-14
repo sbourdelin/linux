@@ -241,6 +241,9 @@ extern const struct file_operations xen_xenbus_fops;
 extern struct xenstore_domain_interface *xen_store_interface;
 extern int xen_store_evtchn;
 
+void mtwatch_create_domain(domid_t domid);
+void mtwatch_put_domain(domid_t domid);
+
 extern bool xen_mtwatch;
 
 #define MTWATCH_HASH_SIZE 256

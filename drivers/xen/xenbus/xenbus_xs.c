@@ -108,6 +108,201 @@ static __init int xen_parse_mtwatch(char *arg)
 }
 early_param("xen_mtwatch", xen_parse_mtwatch);
 
+struct mtwatch_domain *mtwatch_find_domain(domid_t domid)
+{
+	struct mtwatch_domain *domain;
+	int hash = MTWATCH_HASH(domid);
+	struct hlist_head *hash_head = &mtwatch_info->domain_hash[hash];
+
+	hlist_for_each_entry_rcu(domain, hash_head, hash_node) {
+		if (domain->domid == domid)
+			return domain;
+	}
+
+	return NULL;
+}
+
+/* per-domU thread for xenwatch multithreading. */
+static int mtwatch_thread(void *arg)
+{
+	struct mtwatch_domain *domain = (struct mtwatch_domain *) arg;
+	struct list_head *ent;
+	struct xs_watch_event *event;
+
+	domain->pid = current->pid;
+
+	for (;;) {
+		wait_event_interruptible(domain->events_wq,
+					 !list_empty(&domain->events) ||
+					 domain->state == MTWATCH_DOMAIN_DOWN);
+
+		if (domain->state == MTWATCH_DOMAIN_DOWN &&
+		    list_empty(&domain->events))
+			break;
+
+		mutex_lock(&domain->domain_mutex);
+
+		spin_lock(&domain->events_lock);
+		ent = domain->events.next;
+		if (ent != &domain->events)
+			list_del(ent);
+		spin_unlock(&domain->events_lock);
+
+		if (ent != &domain->events) {
+			event = list_entry(ent, struct xs_watch_event, list);
+			event->handle->callback(event->handle, event->path,
+						event->token);
+			kfree(event);
+		}
+
+		mutex_unlock(&domain->domain_mutex);
+	}
+
+	/*
+	 * domain->state is already set to MTWATCH_DOMAIN_DOWN (to avoid
+	 * new event to domain->events) when above for loop breaks, so
+	 * that there is no requirement to cleanup domain->events again.
+	 */
+
+	spin_lock(&mtwatch_info->domain_lock);
+	list_del_rcu(&domain->list_node);
+	spin_unlock(&mtwatch_info->domain_lock);
+
+	spin_lock(&mtwatch_info->purge_lock);
+	list_add(&domain->purge_node, &mtwatch_info->purge_list);
+	spin_unlock(&mtwatch_info->purge_lock);
+
+	schedule_work(&mtwatch_info->purge_work);
+
+	return 0;
+}
+
+static void delayed_destroy_domain(struct rcu_head *head)
+{
+	struct mtwatch_domain *domain;
+
+	domain = container_of(head, struct mtwatch_domain, rcu);
+	kfree(domain);
+}
+
+static void xen_mtwatch_purge_domain(struct work_struct *work)
+{
+	struct mtwatch_domain *domain;
+	struct list_head *node;
+
+	while (!list_empty(&mtwatch_info->purge_list)) {
+
+		spin_lock(&mtwatch_info->purge_lock);
+		node = mtwatch_info->purge_list.next;
+		if (node != &mtwatch_info->purge_list)
+			list_del(node);
+		spin_unlock(&mtwatch_info->purge_lock);
+
+		if (node != &mtwatch_info->purge_list) {
+			domain = list_entry(node, struct mtwatch_domain,
+					    purge_node);
+			kthread_stop(domain->task);
+
+			call_rcu(&domain->rcu, delayed_destroy_domain);
+		}
+	}
+}
+
+/* Running in the context of default xenwatch kthread. */
+void mtwatch_create_domain(domid_t domid)
+{
+	struct mtwatch_domain *domain;
+
+	if (!domid) {
+		pr_err("Default xenwatch thread is for dom0\n");
+		return;
+	}
+
+	spin_lock(&mtwatch_info->domain_lock);
+
+	domain = mtwatch_find_domain(domid);
+	if (domain) {
+		atomic_inc(&domain->refcnt);
+		spin_unlock(&mtwatch_info->domain_lock);
+		return;
+	}
+
+	domain = kzalloc(sizeof(*domain), GFP_ATOMIC);
+	if (!domain) {
+		spin_unlock(&mtwatch_info->domain_lock);
+		pr_err("Failed to allocate memory for mtwatch thread %d\n",
+		       domid);
+		return;
+	}
+
+	domain->domid = domid;
+	atomic_set(&domain->refcnt, 1);
+	mutex_init(&domain->domain_mutex);
+	INIT_LIST_HEAD(&domain->purge_node);
+
+	init_waitqueue_head(&domain->events_wq);
+	spin_lock_init(&domain->events_lock);
+	INIT_LIST_HEAD(&domain->events);
+
+	list_add_tail_rcu(&domain->list_node, &mtwatch_info->domain_list);
+
+	hlist_add_head_rcu(&domain->hash_node,
+			   &mtwatch_info->domain_hash[MTWATCH_HASH(domid)]);
+
+	spin_unlock(&mtwatch_info->domain_lock);
+
+	domain->task = kthread_run(mtwatch_thread, domain,
+				   "xen-mtwatch-%d", domid);
+
+	if (!domain->task) {
+		pr_err("mtwatch kthread creation is failed\n");
+		domain->state = MTWATCH_DOMAIN_DOWN;
+
+		return;
+	}
+
+	domain->state = MTWATCH_DOMAIN_UP;
+}
+
+/* Running in the context of default xenwatch kthread. */
+void mtwatch_put_domain(domid_t domid)
+{
+	struct mtwatch_domain *domain;
+
+	spin_lock(&mtwatch_info->domain_lock);
+
+	domain = mtwatch_find_domain(domid);
+	if (!domain) {
+		spin_unlock(&mtwatch_info->domain_lock);
+		pr_err("mtwatch kthread for domid=%d does not exist\n",
+		       domid);
+		return;
+	}
+
+	if (atomic_dec_and_test(&domain->refcnt)) {
+
+		hlist_del_rcu(&domain->hash_node);
+
+		if (!domain->task) {
+			/*
+			 * As the task is failed to initialize during
+			 * mtwatch_create_domain(), we do not need to wait
+			 * for the kernel thread to complete.
+			 */
+			list_del_rcu(&domain->list_node);
+			call_rcu(&domain->rcu, delayed_destroy_domain);
+		} else {
+			spin_lock(&domain->events_lock);
+			domain->state = MTWATCH_DOMAIN_DOWN;
+			spin_unlock(&domain->events_lock);
+
+			wake_up(&domain->events_wq);
+		}
+	}
+
+	spin_unlock(&mtwatch_info->domain_lock);
+}
+
 static void xs_suspend_enter(void)
 {
 	spin_lock(&xs_state_lock);
@@ -793,6 +988,80 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 }
 EXPORT_SYMBOL_GPL(register_xenbus_watch);
 
+static void __unregister_single_mtwatch(struct xenbus_watch *watch,
+					struct mtwatch_domain *domain)
+{
+	struct xs_watch_event *event, *tmp;
+
+	if (current->pid != domain->pid)
+		mutex_lock(&domain->domain_mutex);
+
+	spin_lock(&domain->events_lock);
+	list_for_each_entry_safe(event, tmp,
+				 &domain->events, list) {
+		if (event->handle != watch)
+			continue;
+		list_del(&event->list);
+		kfree(event);
+	}
+	spin_unlock(&domain->events_lock);
+
+	if (current->pid != domain->pid)
+		mutex_unlock(&domain->domain_mutex);
+}
+
+static void unregister_single_mtwatch(struct xenbus_watch *watch,
+				      domid_t domid)
+{
+	struct mtwatch_domain *domain;
+	bool found = false;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(domain, &mtwatch_info->domain_list,
+				list_node) {
+		if (domain->domid == domid) {
+			found = true;
+			__unregister_single_mtwatch(watch, domain);
+		}
+	}
+
+	WARN_ON_ONCE(unlikely(!found));
+
+	rcu_read_unlock();
+}
+
+static void unregister_all_mtwatch(struct xenbus_watch *watch)
+{
+	struct mtwatch_domain *domain;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(domain, &mtwatch_info->domain_list,
+				list_node) {
+		__unregister_single_mtwatch(watch, domain);
+	}
+
+	rcu_read_unlock();
+}
+
+static void unregister_mtwatch(struct xenbus_watch *watch)
+{
+	/*
+	 * Generally, to unregister a watch. we need to traverse all
+	 * mtwatch domains to remove all inflight pending watch events for
+	 * such watch.
+	 *
+	 * One exception is we only need to remove pending watch events
+	 * from a single mtwatch domain when the watch is registered for a
+	 * specific domid.
+	 */
+	if (watch->owner_id)
+		unregister_single_mtwatch(watch, watch->owner_id);
+	else
+		unregister_all_mtwatch(watch);
+}
+
 void unregister_xenbus_watch(struct xenbus_watch *watch)
 {
 	struct xs_watch_event *event, *tmp;
@@ -831,6 +1100,9 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 
 	if (current->pid != xenwatch_pid)
 		mutex_unlock(&xenwatch_mutex);
+
+	if (xen_mtwatch && watch->get_domid)
+		unregister_mtwatch(watch);
 }
 EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 
@@ -954,6 +1226,7 @@ int xs_init(void)
 
 		spin_lock_init(&mtwatch_info->purge_lock);
 		INIT_LIST_HEAD(&mtwatch_info->purge_list);
+		INIT_WORK(&mtwatch_info->purge_work, xen_mtwatch_purge_domain);
 
 		xen_mtwatch = true;
 

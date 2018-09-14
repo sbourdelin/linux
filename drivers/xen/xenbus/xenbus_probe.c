@@ -236,6 +236,9 @@ int xenbus_dev_probe(struct device *_dev)
 	if (err)
 		goto fail;
 
+	if (xen_mtwatch && drv->use_mtwatch)
+		mtwatch_create_domain(dev->otherend_id);
+
 	err = watch_otherend(dev);
 	if (err) {
 		dev_warn(&dev->dev, "watch_otherend on %s failed.\n",
@@ -262,6 +265,9 @@ int xenbus_dev_remove(struct device *_dev)
 
 	if (drv->remove)
 		drv->remove(dev);
+
+	if (xen_mtwatch && drv->use_mtwatch)
+		mtwatch_put_domain(dev->otherend_id);
 
 	free_otherend_details(dev);
 
