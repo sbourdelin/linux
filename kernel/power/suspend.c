@@ -109,7 +109,11 @@ static void s2idle_enter(void)
 
 static void s2idle_loop(void)
 {
+	ktime_t start, delta;
+
 	pm_pr_dbg("suspend-to-idle\n");
+
+	start = ktime_get();
 
 	for (;;) {
 		int error;
@@ -148,6 +152,20 @@ static void s2idle_loop(void)
 			break;
 
 		pm_wakeup_clear(false);
+	}
+
+	/*
+	 * If the monotonic clock difference between the start of the loop and
+	 * this point is too large, user space may get confused about whether or
+	 * not the system has been suspended and tasks may get killed by
+	 * watchdogs etc., so count the loop as "sleep time" to compensate for
+	 * that.
+	 */
+	delta = ktime_sub(ktime_get(), start);
+	if (ktime_to_ns(delta) > 0) {
+		struct timespec64 timespec64_delta = ktime_to_timespec64(delta);
+
+		timekeeping_inject_sleeptime64(&timespec64_delta);
 	}
 
 	pm_pr_dbg("resume from suspend-to-idle\n");
