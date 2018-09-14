@@ -46,7 +46,10 @@ MODULE_PARM_DESC(nowayout,
 	"Watchdog cannot be stopped once started (default="
 	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 
-#define wdt_enabled (!(wdt->mr & AT91_WDT_WDDIS))
+#define wdt_enabled(reg) (!((reg) & AT91_WDT_WDDIS))
+
+#define wdt_different_counters(reg_a, reg_b) \
+	(((reg_a) ^ (reg_b)) & (AT91_WDT_WDV | AT91_WDT_WDD))
 
 #define wdt_read(wdt, field) \
 	readl_relaxed((wdt)->reg_base + (field))
@@ -78,8 +81,11 @@ static void wdt_write_nosleep(struct sama5d4_wdt *wdt, u32 field, u32 val)
 static int sama5d4_wdt_start(struct watchdog_device *wdd)
 {
 	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+	u32 reg = wdt_read(wdt, AT91_WDT_MR);
 
 	wdt->mr &= ~AT91_WDT_WDDIS;
+	if (!wdt_enabled(reg) && wdt_different_counters(reg, wdt->mr))
+		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
 	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
 
 	return 0;
@@ -88,8 +94,11 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
 static int sama5d4_wdt_stop(struct watchdog_device *wdd)
 {
 	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+	u32 reg = wdt_read(wdt, AT91_WDT_MR);
 
 	wdt->mr |= AT91_WDT_WDDIS;
+	if (wdt_enabled(reg) && wdt_different_counters(reg, wdt->mr))
+		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
 	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
 
 	return 0;
@@ -122,7 +131,7 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
 	 * If the watchdog is enabled, then the timeout can be updated. Else,
 	 * wait that the user enables it.
 	 */
-	if (wdt_enabled)
+	if (wdt_enabled(wdt->mr))
 		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
 
 	wdd->timeout = timeout;
@@ -186,13 +195,17 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
 	 * If the watchdog is already running, we can safely update it.
 	 * Else, we have to disable it properly.
 	 */
-	if (wdt_enabled) {
-		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
-	} else {
-		reg = wdt_read(wdt, AT91_WDT_MR);
-		if (!(reg & AT91_WDT_WDDIS))
+	reg = wdt_read(wdt, AT91_WDT_MR);
+	if (wdt_enabled(reg)) {
+		if (!wdt_enabled(wdt->mr))
 			wdt_write_nosleep(wdt, AT91_WDT_MR,
-					  reg | AT91_WDT_WDDIS);
+					  wdt->mr & ~AT91_WDT_WDDIS);
+		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
+	} else if (wdt_enabled(wdt->mr)) {
+		if (wdt_different_counters(reg, wdt->mr))
+			wdt_write_nosleep(wdt, AT91_WDT_MR,
+					  reg & ~AT91_WDT_WDDIS);
+		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
 	}
 	return 0;
 }
