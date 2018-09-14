@@ -67,6 +67,7 @@ enum rgmii_rx_clock_delay {
 #define MSCC_PHY_PAGE_STANDARD		  0x0000 /* Standard registers */
 #define MSCC_PHY_PAGE_EXTENDED		  0x0001 /* Extended registers */
 #define MSCC_PHY_PAGE_EXTENDED_2	  0x0002 /* Extended reg - page 2 */
+#define MSCC_PHY_PAGE_TR		  0x52b5 /* Token ring registers */
 
 /* Extended Page 1 Registers */
 #define MSCC_PHY_CU_MEDIA_CRC_VALID_CNT	  18
@@ -99,6 +100,13 @@ enum rgmii_rx_clock_delay {
 #define MSCC_PHY_WOL_MAC_CONTROL	  27
 #define SECURE_ON_ENABLE		  0x8000
 #define SECURE_ON_PASSWD_LEN_4		  0x4000
+
+/* Token ring page Registers */
+#define MSCC_PHY_TR_CNTL		  16
+#define TR_WRITE			  0x8000
+#define TR_ADDR(x)			  (0x7fff & (x))
+#define MSCC_PHY_TR_LSB			  17
+#define MSCC_PHY_TR_MSB			  18
 
 /* Microsemi PHY ID's */
 #define PHY_ID_VSC8530			  0x00070560
@@ -685,6 +693,48 @@ static int vsc85xx_set_tunable(struct phy_device *phydev,
 	}
 }
 
+static void vsc85xx_tr_write(struct phy_device *phydev, u16 addr, u32 val)
+{
+	phy_write(phydev, MSCC_PHY_TR_MSB, val >> 16);
+	phy_write(phydev, MSCC_PHY_TR_LSB, val & GENMASK(15, 0));
+	phy_write(phydev, MSCC_PHY_TR_CNTL, TR_WRITE | TR_ADDR(addr));
+}
+
+static int vsc85xx_eee_init_seq_set(struct phy_device *phydev)
+{
+	int rc;
+
+	mutex_lock(&phydev->lock);
+	rc = vsc85xx_phy_page_set(phydev, MSCC_PHY_PAGE_TR);
+	if (rc)
+		goto out_unlock;
+
+	vsc85xx_tr_write(phydev, 0x0f82, 0x0012b00a);
+	vsc85xx_tr_write(phydev, 0x1686, 0x00000004);
+	vsc85xx_tr_write(phydev, 0x168c, 0x00d2c46f);
+	vsc85xx_tr_write(phydev, 0x17a2, 0x00000620);
+	vsc85xx_tr_write(phydev, 0x16a0, 0x00eeffdd);
+	vsc85xx_tr_write(phydev, 0x16a6, 0x00071448);
+	vsc85xx_tr_write(phydev, 0x16a4, 0x0013132f);
+	vsc85xx_tr_write(phydev, 0x16a8, 0x00000000);
+	vsc85xx_tr_write(phydev, 0x0ffc, 0x00c0a028);
+	vsc85xx_tr_write(phydev, 0x0fe8, 0x0091b06c);
+	vsc85xx_tr_write(phydev, 0x0fea, 0x00041600);
+	vsc85xx_tr_write(phydev, 0x0f80, 0x00000af4);
+	vsc85xx_tr_write(phydev, 0x0fec, 0x00901809);
+	vsc85xx_tr_write(phydev, 0x0fee, 0x0000a6a1);
+	vsc85xx_tr_write(phydev, 0x0ffe, 0x00b01007);
+	vsc85xx_tr_write(phydev, 0x16b0, 0x00eeff00);
+	vsc85xx_tr_write(phydev, 0x16b2, 0x00007000);
+	vsc85xx_tr_write(phydev, 0x16b4, 0x00000814);
+
+out_unlock:
+	rc = vsc85xx_phy_page_set(phydev, MSCC_PHY_PAGE_STANDARD);
+	mutex_unlock(&phydev->lock);
+
+	return rc;
+}
+
 static int vsc85xx_config_init(struct phy_device *phydev)
 {
 	int rc, i;
@@ -699,6 +749,10 @@ static int vsc85xx_config_init(struct phy_device *phydev)
 		return rc;
 
 	rc = vsc85xx_edge_rate_cntl_set(phydev, vsc8531->rate_magic);
+	if (rc)
+		return rc;
+
+	rc = vsc85xx_eee_init_seq_set(phydev);
 	if (rc)
 		return rc;
 
