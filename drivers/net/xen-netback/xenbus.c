@@ -1203,6 +1203,7 @@ static struct xenbus_driver netback_driver = {
 	.remove = netback_remove,
 	.uevent = netback_uevent,
 	.otherend_changed = frontend_changed,
+	.use_mtwatch = true,
 };
 
 int xenvif_xenbus_init(void)
