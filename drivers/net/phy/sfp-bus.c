@@ -378,6 +378,9 @@ static void sfp_unregister_bus(struct sfp_bus *bus)
  */
 int sfp_get_module_info(struct sfp_bus *bus, struct ethtool_modinfo *modinfo)
 {
+	if (!bus->socket_ops)
+		return -EOPNOTSUPP;
+
 	return bus->socket_ops->module_info(bus->sfp, modinfo);
 }
 EXPORT_SYMBOL_GPL(sfp_get_module_info);
@@ -396,6 +399,9 @@ EXPORT_SYMBOL_GPL(sfp_get_module_info);
 int sfp_get_module_eeprom(struct sfp_bus *bus, struct ethtool_eeprom *ee,
 			  u8 *data)
 {
+	if (!bus->socket_ops)
+		return -EOPNOTSUPP;
+
 	return bus->socket_ops->module_eeprom(bus->sfp, ee, data);
 }
 EXPORT_SYMBOL_GPL(sfp_get_module_eeprom);
