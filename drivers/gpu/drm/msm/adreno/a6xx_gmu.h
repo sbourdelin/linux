@@ -153,4 +153,7 @@ void a6xx_hfi_stop(struct a6xx_gmu *gmu);
 
 void a6xx_hfi_task(unsigned long data);
 
+bool a6xx_gmu_gx_is_on(struct a6xx_gmu *gmu);
+bool a6xx_gmu_sptprac_is_on(struct a6xx_gmu *gmu);
+
 #endif
