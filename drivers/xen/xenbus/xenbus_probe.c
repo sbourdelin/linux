@@ -129,11 +129,27 @@ static int talk_to_otherend(struct xenbus_device *dev)
 }
 
 
+static domid_t otherend_get_domid(struct xenbus_watch *watch,
+				  const char *path,
+				  const char *token)
+{
+	struct xenbus_device *xendev =
+		container_of(watch, struct xenbus_device, otherend_watch);
+
+	return xendev->otherend_id;
+}
+
 
 static int watch_otherend(struct xenbus_device *dev)
 {
 	struct xen_bus_type *bus =
 		container_of(dev->dev.bus, struct xen_bus_type, bus);
+	struct xenbus_driver *drv = to_xenbus_driver(dev->dev.driver);
+
+	if (xen_mtwatch && drv->use_mtwatch) {
+		dev->otherend_watch.get_domid = otherend_get_domid;
+		dev->otherend_watch.owner_id = dev->otherend_id;
+	}
 
 	return xenbus_watch_pathfmt(dev, &dev->otherend_watch,
 				    bus->otherend_changed,
