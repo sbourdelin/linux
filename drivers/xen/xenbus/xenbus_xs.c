@@ -95,6 +95,19 @@ static pid_t xenwatch_pid;
 static DEFINE_MUTEX(xenwatch_mutex);
 static DECLARE_WAIT_QUEUE_HEAD(watch_events_waitq);
 
+bool xen_mtwatch;
+EXPORT_SYMBOL_GPL(xen_mtwatch);
+
+struct mtwatch_info *mtwatch_info;
+
+static bool param_xen_mtwatch;
+static __init int xen_parse_mtwatch(char *arg)
+{
+	param_xen_mtwatch = true;
+	return 0;
+}
+early_param("xen_mtwatch", xen_parse_mtwatch);
+
 static void xs_suspend_enter(void)
 {
 	spin_lock(&xs_state_lock);
@@ -928,6 +941,24 @@ int xs_init(void)
 	err = xb_init_comms();
 	if (err)
 		return err;
+
+	if (xen_initial_domain() && param_xen_mtwatch) {
+		int i;
+
+		mtwatch_info = kmalloc(sizeof(*mtwatch_info), GFP_KERNEL);
+
+		for (i = 0; i < MTWATCH_HASH_SIZE; i++)
+			INIT_HLIST_HEAD(&mtwatch_info->domain_hash[i]);
+		spin_lock_init(&mtwatch_info->domain_lock);
+		INIT_LIST_HEAD(&mtwatch_info->domain_list);
+
+		spin_lock_init(&mtwatch_info->purge_lock);
+		INIT_LIST_HEAD(&mtwatch_info->purge_list);
+
+		xen_mtwatch = true;
+
+		pr_info("xenwatch multithreading is enabled\n");
+	}
 
 	task = kthread_run(xenwatch_thread, NULL, "xenwatch");
 	if (IS_ERR(task))

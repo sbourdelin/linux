@@ -62,6 +62,13 @@ struct xenbus_watch
 	/* Callback (executed in a process context with no locks held). */
 	void (*callback)(struct xenbus_watch *,
 			 const char *path, const char *token);
+
+	/* Callback to help calculate the domid the path belongs to */
+	domid_t (*get_domid)(struct xenbus_watch *watch,
+			     const char *path, const char *token);
+
+	/* The owner's domid if the watch is for a specific domain */
+	domid_t owner_id;
 };
 
 
@@ -93,6 +100,7 @@ struct xenbus_device_id
 struct xenbus_driver {
 	const char *name;       /* defaults to ids[0].devicetype */
 	const struct xenbus_device_id *ids;
+	bool use_mtwatch;
 	int (*probe)(struct xenbus_device *dev,
 		     const struct xenbus_device_id *id);
 	void (*otherend_changed)(struct xenbus_device *dev,
@@ -232,5 +240,62 @@ int xenbus_frontend_closed(struct xenbus_device *dev);
 extern const struct file_operations xen_xenbus_fops;
 extern struct xenstore_domain_interface *xen_store_interface;
 extern int xen_store_evtchn;
+
+extern bool xen_mtwatch;
+
+#define MTWATCH_HASH_SIZE 256
+#define MTWATCH_HASH(_id) ((int)(_id)&(MTWATCH_HASH_SIZE-1))
+
+struct mtwatch_info {
+	/*
+	 * The mtwatch_domain is put on both a hash table and a list.
+	 * domain_list is used to optimize xenbus_watch un-registration.
+	 *
+	 * The mtwatch_domain is removed from domain_hash (with state set
+	 * to MTWATCH_DOMAIN_DOWN) when its refcnt is zero. However, it is
+	 * left on domain_list until all events belong to such
+	 * mtwatch_domain are processed in mtwatch_thread().
+	 *
+	 * While there may exist two mtwatch_domain with the same domid on
+	 * domain_list simultaneously, all mtwatch_domain on hash_hash
+	 * should have unique domid.
+	 */
+	spinlock_t domain_lock;
+	struct hlist_head domain_hash[MTWATCH_HASH_SIZE];
+	struct list_head domain_list;
+
+	/*
+	 * When a per-domU kthread is going to be destroyed, it is put
+	 * on the purge_list, and will be flushed by purge_work later.
+	 */
+	struct work_struct purge_work;
+	spinlock_t purge_lock;
+	struct list_head purge_list;
+};
+
+enum mtwatch_domain_state {
+	MTWATCH_DOMAIN_UP = 1,
+	MTWATCH_DOMAIN_DOWN = 2,
+};
+
+struct mtwatch_domain {
+	domid_t domid;
+	struct task_struct *task;
+	atomic_t refcnt;
+
+	pid_t pid;
+	struct mutex domain_mutex;
+	struct rcu_head rcu;
+
+	struct hlist_node hash_node;
+	struct list_head list_node;
+	struct list_head purge_node;
+
+	wait_queue_head_t events_wq;
+
+	spinlock_t events_lock;
+	struct list_head events;
+	enum mtwatch_domain_state state;
+};
 
 #endif /* _XEN_XENBUS_H */
