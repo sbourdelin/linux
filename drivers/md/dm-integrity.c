@@ -1948,7 +1948,8 @@ static void do_journal_write(struct dm_integrity_c *ic, unsigned write_start,
 
 			if (journal_entry_is_unused(je))
 				continue;
-			BUG_ON(unlikely(journal_entry_is_inprogress(je)) && !from_replay);
+			BUG_ON(journal_entry_is_inprogress(je) &&
+			       !from_replay);
 			sec = journal_entry_get_sector(je);
 			if (unlikely(from_replay)) {
 				if (unlikely(sec & (unsigned)(ic->sectors_per_block - 1))) {
@@ -1963,7 +1964,8 @@ static void do_journal_write(struct dm_integrity_c *ic, unsigned write_start,
 				sector_t sec2, area2, offset2;
 				if (journal_entry_is_unused(je2))
 					break;
-				BUG_ON(unlikely(journal_entry_is_inprogress(je2)) && !from_replay);
+				BUG_ON(journal_entry_is_inprogress(je2) &&
+				       !from_replay);
 				sec2 = journal_entry_get_sector(je2);
 				get_area_and_offset(ic, sec2, &area2, &offset2);
 				if (area2 != area || offset2 != offset + ((k - j) << ic->sb->log2_sectors_per_block))
