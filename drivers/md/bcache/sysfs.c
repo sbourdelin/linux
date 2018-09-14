@@ -978,6 +978,13 @@ SHOW(__bch_cache)
 		return ret;
 	}
 
+	if (attr == &sysfs_label) {
+		memcpy(buf, ca->sb.label, SB_LABEL_SIZE);
+		buf[SB_LABEL_SIZE + 1] = '\0';
+		strcat(buf, "\n");
+		return strlen(buf);
+	}
+
 	return 0;
 }
 SHOW_LOCKED(bch_cache)
@@ -1021,6 +1028,17 @@ STORE(__bch_cache)
 		atomic_set(&ca->io_errors, 0);
 	}
 
+	if (attr == &sysfs_label) {
+		if (size > SB_LABEL_SIZE)
+			return -EINVAL;
+		memcpy(ca->sb.label, buf, size);
+		if (size < SB_LABEL_SIZE)
+			ca->sb.label[size] = '\0';
+		if (size && ca->sb.label[size - 1] == '\n')
+			ca->sb.label[size - 1] = '\0';
+		bcache_write_super(ca->set);
+	}
+
 	return size;
 }
 STORE_LOCKED(bch_cache)
@@ -1037,6 +1055,7 @@ static struct attribute *bch_cache_files[] = {
 	&sysfs_io_errors,
 	&sysfs_clear_stats,
 	&sysfs_cache_replacement_policy,
+	&sysfs_label,
 	NULL
 };
 KTYPE(bch_cache);
