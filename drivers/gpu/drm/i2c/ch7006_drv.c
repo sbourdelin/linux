@@ -440,7 +440,7 @@ static int ch7006_encoder_init(struct i2c_client *client,
 			       struct drm_encoder_slave *encoder)
 {
 	struct ch7006_priv *priv;
-	int i;
+	int index;
 
 	ch7006_dbg(client, "\n");
 
@@ -464,14 +464,10 @@ static int ch7006_encoder_init(struct i2c_client *client,
 	priv->chip_version = ch7006_read(client, CH7006_VERSION_ID);
 
 	if (ch7006_tv_norm) {
-		for (i = 0; i < NUM_TV_NORMS; i++) {
-			if (!strcmp(ch7006_tv_norm_names[i], ch7006_tv_norm)) {
-				priv->norm = i;
-				break;
-			}
-		}
-
-		if (i == NUM_TV_NORMS)
+		index = match_string(ch7006_tv_norm_names, NUM_TV_NORMS, ch7006_tv_norm);
+		if (index >= 0)
+			priv->norm = index;
+		else
 			ch7006_err(client, "Invalid TV norm setting \"%s\".\n",
 				   ch7006_tv_norm);
 	}
