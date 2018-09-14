@@ -432,7 +432,7 @@ struct rdt_resource {
 };
 
 int parse_cbm(void *_data, struct rdt_resource *r, struct rdt_domain *d);
-int parse_bw(void *_buf, struct rdt_resource *r,  struct rdt_domain *d);
+int parse_bw(void *_data, struct rdt_resource *r, struct rdt_domain *d);
 
 extern struct mutex rdtgroup_mutex;
 
