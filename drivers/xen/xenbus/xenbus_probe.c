@@ -552,7 +552,7 @@ int xenbus_probe_devices(struct xen_bus_type *bus)
 }
 EXPORT_SYMBOL_GPL(xenbus_probe_devices);
 
-static unsigned int char_count(const char *str, char c)
+unsigned int char_count(const char *str, char c)
 {
 	unsigned int i, ret = 0;
 

@@ -211,9 +211,41 @@ static void backend_changed(struct xenbus_watch *watch,
 	xenbus_dev_changed(path, &xenbus_backend);
 }
 
+static domid_t path_to_domid(const char *path)
+{
+	const char *p = path;
+	domid_t domid = 0;
+
+	while (*p) {
+		if (*p < '0' || *p > '9')
+			break;
+		domid = (domid << 3) + (domid << 1) + (*p - '0');
+		p++;
+	}
+
+	return domid;
+}
+
+/* path: backend/<pvdev>/<domid>/... */
+static domid_t be_get_domid(struct xenbus_watch *watch,
+			    const char *path,
+			    const char *token)
+{
+	const char *p = path;
+
+	if (char_count(path, '/') < 2)
+		return 0;
+
+	p = strchr(p, '/') + 1;
+	p = strchr(p, '/') + 1;
+
+	return path_to_domid(p);
+}
+
 static struct xenbus_watch be_watch = {
 	.node = "backend",
 	.callback = backend_changed,
+	.get_domid = be_get_domid,
 };
 
 static int read_frontend_details(struct xenbus_device *xendev)
