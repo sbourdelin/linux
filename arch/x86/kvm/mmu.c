@@ -2267,9 +2267,6 @@ static int mmu_pages_first(struct kvm_mmu_pages *pvec,
 	struct kvm_mmu_page *sp;
 	int level;
 
-	if (pvec->nr == 0)
-		return 0;
-
 	WARN_ON(pvec->page[0].idx != INVALID_INDEX);
 
 	sp = pvec->page[0].sp;
