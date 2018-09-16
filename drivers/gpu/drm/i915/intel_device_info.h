@@ -182,6 +182,11 @@ struct intel_device_info {
 		u16 degamma_lut_size;
 		u16 gamma_lut_size;
 	} color;
+
+	struct plane_color_luts {
+		u16 plane_degamma_lut_size;
+		u16 plane_gamma_lut_size;
+	} plane_color;
 };
 
 struct intel_driver_caps {

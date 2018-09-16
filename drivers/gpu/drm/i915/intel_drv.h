@@ -536,6 +536,14 @@ struct intel_plane_state {
 	 */
 	int scaler_id;
 
+	/*
+	 * Use reduced/limited/broadcast rbg range, compressing from the full
+	 * range fed into the crtcs.
+	 */
+	bool limited_color_range;
+	/* Gamma mode programmed on the plane */
+	uint32_t gamma_mode;
+
 	struct drm_intel_sprite_colorkey ckey;
 };
 
@@ -2164,6 +2172,7 @@ void intel_color_init(struct drm_crtc *crtc);
 int intel_color_check(struct drm_crtc *crtc, struct drm_crtc_state *state);
 void intel_color_set_csc(struct drm_crtc_state *crtc_state);
 void intel_color_load_luts(struct drm_crtc_state *crtc_state);
+void intel_plane_color_init(struct drm_plane *plane);
 
 /* intel_lspcon.c */
 bool lspcon_init(struct intel_digital_port *intel_dig_port);

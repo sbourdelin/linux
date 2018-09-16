@@ -455,6 +455,11 @@ struct drm_i915_display_funcs {
 
 	void (*load_csc_matrix)(struct drm_crtc_state *crtc_state);
 	void (*load_luts)(struct drm_crtc_state *crtc_state);
+	/* Add Plane Color callbacks */
+	void (*load_plane_csc_matrix)(const struct drm_plane_state
+				      *plane_state);
+	void (*load_plane_luts)(const struct drm_plane_state
+				*plane_state);
 };
 
 #define CSR_VERSION(major, minor)	((major) << 16 | (minor))
