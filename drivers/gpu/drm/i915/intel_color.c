@@ -492,6 +492,59 @@ static void broadwell_load_luts(struct drm_crtc_state *state)
 	I915_WRITE(PREC_PAL_INDEX(pipe), 0);
 }
 
+static void bdw_load_plane_gamma_lut(const struct drm_plane_state *state,
+				     u32 offset)
+{
+	struct drm_i915_private *dev_priv = to_i915(state->plane->dev);
+	enum pipe pipe = to_intel_plane(state->plane)->pipe;
+	enum plane_id plane = to_intel_plane(state->plane)->id;
+	uint32_t i, lut_size =
+			INTEL_INFO(dev_priv)->plane_color.plane_gamma_lut_size;
+
+	if (state->gamma_lut) {
+		struct drm_color_lut_ext *lut =
+			(struct drm_color_lut_ext *) state->gamma_lut->data;
+
+		for (i = 0; i < lut_size; i++) {
+			uint32_t word =
+			(drm_color_lut_extract_ext(lut[i].red, 10) << 20) |
+			(drm_color_lut_extract_ext(lut[i].green, 10) << 10) |
+			drm_color_lut_extract_ext(lut[i].blue, 10);
+
+			I915_WRITE(PLANE_GAMC(pipe, plane, i), word);
+		}
+
+		/* Program the max register to clamp values > 1.0. */
+		i = lut_size - 1;
+		I915_WRITE(PLANE_GAMC16(pipe, plane, 0),
+			   drm_color_lut_extract_ext(lut[i].red, 16));
+		I915_WRITE(PLANE_GAMC16(pipe, plane, 1),
+			   drm_color_lut_extract_ext(lut[i].green, 16));
+		I915_WRITE(PLANE_GAMC16(pipe, plane, 2),
+			   drm_color_lut_extract_ext(lut[i].blue, 16));
+	} else {
+		for (i = 0; i < lut_size; i++) {
+			uint32_t v = (i * ((1 << 10) - 1)) / (lut_size - 1);
+
+			I915_WRITE(PLANE_GAMC(pipe, plane, i),
+				   (v << 20) | (v << 10) | v);
+		}
+
+		I915_WRITE(PLANE_GAMC16(pipe, plane, 0), (1 << 16) - 1);
+		I915_WRITE(PLANE_GAMC16(pipe, plane, 1), (1 << 16) - 1);
+		I915_WRITE(PLANE_GAMC16(pipe, plane, 2), (1 << 16) - 1);
+	}
+}
+
+/* Loads the palette/gamma unit for the CRTC on Broadwell+. */
+static void broadwell_load_plane_luts(const struct drm_plane_state *state)
+{
+	struct drm_i915_private *dev_priv = to_i915(state->plane->dev);
+
+	bdw_load_plane_gamma_lut(state,
+		INTEL_INFO(dev_priv)->plane_color.plane_degamma_lut_size);
+}
+
 static void glk_load_degamma_lut(struct drm_crtc_state *state)
 {
 	struct drm_i915_private *dev_priv = to_i915(state->crtc->dev);
@@ -647,6 +700,11 @@ void intel_plane_color_init(struct drm_plane *plane)
 	struct drm_i915_private *dev_priv = to_i915(plane->dev);
 
 	drm_plane_color_create_prop(plane->dev, plane);
+
+	if (IS_BROADWELL(dev_priv) || IS_GEN9_BC(dev_priv) ||
+		IS_BROXTON(dev_priv)) {
+		dev_priv->display.load_plane_luts = broadwell_load_plane_luts;
+	}
 
 	/* Enable color management support when we have degamma & gamma LUTs. */
 	if (INTEL_INFO(dev_priv)->plane_color.plane_degamma_lut_size != 0 &&

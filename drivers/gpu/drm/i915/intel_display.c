@@ -13806,6 +13806,10 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 						  DRM_COLOR_YCBCR_BT709,
 						  DRM_COLOR_YCBCR_LIMITED_RANGE);
 
+	/* Add Plane Color properties */
+	if (IS_BROADWELL(dev_priv) || INTEL_GEN(dev_priv) >= 9)
+		intel_plane_color_init(&primary->base);
+
 	drm_plane_helper_add(&primary->base, &intel_plane_helper_funcs);
 
 	return primary;

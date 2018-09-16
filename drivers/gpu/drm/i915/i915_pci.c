@@ -54,7 +54,10 @@
 	.cursor_offsets = { CURSOR_A_OFFSET, IVB_CURSOR_B_OFFSET, IVB_CURSOR_C_OFFSET }
 
 #define BDW_COLORS \
-	.color = { .degamma_lut_size = 512, .gamma_lut_size = 512 }
+	.color = { .degamma_lut_size = 512, .gamma_lut_size = 512 }, \
+	.plane_color = { .plane_degamma_lut_size = 0, \
+			 .plane_gamma_lut_size = 16 }
+
 #define CHV_COLORS \
 	.color = { .degamma_lut_size = 65, .gamma_lut_size = 257 }
 #define GLK_COLORS \

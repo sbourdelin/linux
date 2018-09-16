@@ -172,6 +172,10 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define _PHY3(phy, ...) _PICK(phy, __VA_ARGS__)
 #define _MMIO_PHY3(phy, a, b, c) _MMIO(_PHY3(phy, a, b, c))
 
+/* Plane Gamma Registers */
+#define _MMIO_PLANE_GAMC(plane, i, a, b)  _MMIO(_PIPE(plane, a, b) + (i) * 4)
+#define _MMIO_PLANE_GAMC16(plane, i, a, b)  _MMIO(_PIPE(plane, a, b) + (i) * 4)
+
 #define __MASKED_FIELD(mask, value) ((mask) << 16 | (value))
 #define _MASKED_FIELD(mask, value) ({					   \
 	if (__builtin_constant_p(mask))					   \
@@ -9667,6 +9671,27 @@ enum skl_power_gate {
 
 #define PRE_CSC_GAMC_INDEX(pipe)	_MMIO_PIPE(pipe, _PRE_CSC_GAMC_INDEX_A, _PRE_CSC_GAMC_INDEX_B)
 #define PRE_CSC_GAMC_DATA(pipe)		_MMIO_PIPE(pipe, _PRE_CSC_GAMC_DATA_A, _PRE_CSC_GAMC_DATA_B)
+
+/* Plane Gamma in Gen9+ */
+#define _PLANE_GAMC_1_A	0x701d0
+#define _PLANE_GAMC_1_B	0x711d0
+#define _PLANE_GAMC_2_A	0x702d0
+#define _PLANE_GAMC_2_B	0x712d0
+#define _PLANE_GAMC_1(pipe)	_PIPE(pipe, _PLANE_GAMC_1_A, _PLANE_GAMC_1_B)
+#define _PLANE_GAMC_2(pipe)	_PIPE(pipe, _PLANE_GAMC_2_A, _PLANE_GAMC_2_B)
+#define PLANE_GAMC(pipe, plane, i)	\
+	_MMIO_PLANE_GAMC(plane, i, _PLANE_GAMC_1(pipe), _PLANE_GAMC_2(pipe))
+
+#define _PLANE_GAMC16_1_A	0x70210
+#define _PLANE_GAMC16_1_B	0x71210
+#define _PLANE_GAMC16_2_A	0x70310
+#define _PLANE_GAMC16_2_B	0x71310
+#define _PLANE_GAMC16_1(pipe)	_PIPE(pipe, _PLANE_GAMC16_1_A, \
+				     _PLANE_GAMC16_1_B)
+#define _PLANE_GAMC16_2(pipe)	_PIPE(pipe, _PLANE_GAMC16_2_A, \
+				     _PLANE_GAMC16_2_B)
+#define PLANE_GAMC16(pipe, plane, i) _MMIO_PLANE_GAMC16(plane, i, \
+				_PLANE_GAMC16_1(pipe), _PLANE_GAMC16_2(pipe))
 
 /* pipe CSC & degamma/gamma LUTs on CHV */
 #define _CGM_PIPE_A_CSC_COEFF01	(VLV_DISPLAY_BASE + 0x67900)
