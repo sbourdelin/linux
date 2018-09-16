@@ -6,10 +6,12 @@
 
 struct nft_osf {
 	enum nft_registers	dreg:8;
+	u8			ttl;
 };
 
 static const struct nla_policy nft_osf_policy[NFTA_OSF_MAX + 1] = {
 	[NFTA_OSF_DREG]		= { .type = NLA_U32 },
+	[NFTA_OSF_TTL]		= { .type = NLA_U8 },
 };
 
 static void nft_osf_eval(const struct nft_expr *expr, struct nft_regs *regs,
@@ -21,6 +23,7 @@ static void nft_osf_eval(const struct nft_expr *expr, struct nft_regs *regs,
 	const struct tcphdr *tcp;
 	struct tcphdr _tcph;
 	const char *os_name;
+	int ttl_check;
 
 	tcp = skb_header_pointer(skb, ip_hdrlen(skb),
 				 sizeof(struct tcphdr), &_tcph);
@@ -33,7 +36,8 @@ static void nft_osf_eval(const struct nft_expr *expr, struct nft_regs *regs,
 		return;
 	}
 
-	os_name = nf_osf_find(skb, nf_osf_fingers);
+	ttl_check = priv->ttl;
+	os_name = nf_osf_find(skb, nf_osf_fingers, ttl_check);
 	if (!os_name)
 		strncpy((char *)dest, "unknown", NFT_OSF_MAXGENRELEN);
 	else
@@ -47,6 +51,11 @@ static int nft_osf_init(const struct nft_ctx *ctx,
 	struct nft_osf *priv = nft_expr_priv(expr);
 	int err;
 
+	if (!tb[NFTA_OSF_TTL] || nla_get_u8(tb[NFTA_OSF_TTL]) < 0 ||
+	    nla_get_u8(tb[NFTA_OSF_TTL]) > 2)
+		return ~EINVAL;
+	priv->ttl = nla_get_u8(tb[NFTA_OSF_TTL]);
+
 	priv->dreg = nft_parse_register(tb[NFTA_OSF_DREG]);
 	err = nft_validate_register_store(ctx, priv->dreg, NULL,
 					  NFTA_DATA_VALUE, NFT_OSF_MAXGENRELEN);
@@ -59,6 +68,9 @@ static int nft_osf_init(const struct nft_ctx *ctx,
 static int nft_osf_dump(struct sk_buff *skb, const struct nft_expr *expr)
 {
 	const struct nft_osf *priv = nft_expr_priv(expr);
+
+	if (nla_put_u8(skb, NFTA_OSF_TTL, priv->ttl))
+		goto nla_put_failure;
 
 	if (nft_dump_register(skb, NFTA_OSF_DREG, priv->dreg))
 		goto nla_put_failure;

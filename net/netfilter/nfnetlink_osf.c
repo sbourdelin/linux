@@ -257,7 +257,8 @@ nf_osf_match(const struct sk_buff *skb, u_int8_t family,
 EXPORT_SYMBOL_GPL(nf_osf_match);
 
 const char *nf_osf_find(const struct sk_buff *skb,
-			const struct list_head *nf_osf_fingers)
+			const struct list_head *nf_osf_fingers,
+			const int ttl_check)
 {
 	const struct iphdr *ip = ip_hdr(skb);
 	const struct nf_osf_user_finger *f;
@@ -275,7 +276,7 @@ const char *nf_osf_find(const struct sk_buff *skb,
 
 	list_for_each_entry_rcu(kf, &nf_osf_fingers[ctx.df], finger_entry) {
 		f = &kf->finger;
-		if (!nf_osf_match_one(skb, f, -1, &ctx))
+		if (!nf_osf_match_one(skb, f, ttl_check, &ctx))
 			continue;
 
 		genre = f->genre;

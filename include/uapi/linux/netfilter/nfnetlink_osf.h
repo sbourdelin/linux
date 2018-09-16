@@ -26,6 +26,7 @@
 
 #define NF_OSF_FLAGMASK		(NF_OSF_GENRE | NF_OSF_TTL | \
 				 NF_OSF_LOG | NF_OSF_INVERT)
+
 /* Wildcard MSS (kind of).
  * It is used to implement a state machine for the different wildcard values
  * of the MSS and window sizes.
