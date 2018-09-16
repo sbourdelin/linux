@@ -224,6 +224,10 @@ static void intel_plane_atomic_update(struct drm_plane *plane,
 		intel_atomic_get_new_plane_state(state, intel_plane);
 	struct drm_crtc *crtc = new_plane_state->base.crtc ?: old_state->crtc;
 
+	if (new_plane_state->base.color_mgmt_changed) {
+		intel_color_load_plane_luts(&new_plane_state->base);
+	}
+
 	if (new_plane_state->base.visible) {
 		const struct intel_crtc_state *new_crtc_state =
 			intel_atomic_get_new_crtc_state(state, to_intel_crtc(crtc));

@@ -2173,6 +2173,7 @@ int intel_color_check(struct drm_crtc *crtc, struct drm_crtc_state *state);
 void intel_color_set_csc(struct drm_crtc_state *crtc_state);
 void intel_color_load_luts(struct drm_crtc_state *crtc_state);
 void intel_plane_color_init(struct drm_plane *plane);
+void intel_color_load_plane_luts(const struct drm_plane_state *plane_state);
 
 /* intel_lspcon.c */
 bool lspcon_init(struct intel_digital_port *intel_dig_port);
