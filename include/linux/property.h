@@ -13,6 +13,7 @@
 #ifndef _LINUX_PROPERTY_H_
 #define _LINUX_PROPERTY_H_
 
+#include <linux/err.h>
 #include <linux/fwnode.h>
 #include <linux/types.h>
 
@@ -280,6 +281,34 @@ device_add_child_properties(struct device *dev,
 			    struct fwnode_handle *parent,
 			    const struct property_entry *properties);
 void device_remove_properties(struct device *dev);
+
+struct property_set {
+	struct device *dev;
+	struct fwnode_handle fwnode;
+	const struct property_entry *properties;
+
+	struct property_set *parent;
+	/* Entry in parent->children list */
+	struct list_head child_node;
+	struct list_head children;
+};
+
+extern const struct fwnode_operations pset_fwnode_ops;
+
+static inline bool is_pset_node(const struct fwnode_handle *fwnode)
+{
+	return !IS_ERR_OR_NULL(fwnode) && fwnode->ops == &pset_fwnode_ops;
+}
+
+#define to_pset_node(__fwnode)						\
+	({								\
+		typeof(__fwnode) __to_pset_node_fwnode = __fwnode;	\
+									\
+		is_pset_node(__to_pset_node_fwnode) ?			\
+			container_of(__to_pset_node_fwnode,		\
+				     struct property_set, fwnode) :	\
+			NULL;						\
+	})
 
 bool device_dma_supported(struct device *dev);
 

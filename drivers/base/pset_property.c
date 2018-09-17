@@ -14,34 +14,6 @@
 #include <linux/property.h>
 #include <linux/slab.h>
 
-struct property_set {
-	struct device *dev;
-	struct fwnode_handle fwnode;
-	const struct property_entry *properties;
-
-	struct property_set *parent;
-	/* Entry in parent->children list */
-	struct list_head child_node;
-	struct list_head children;
-};
-
-static const struct fwnode_operations pset_fwnode_ops;
-
-static inline bool is_pset_node(const struct fwnode_handle *fwnode)
-{
-	return !IS_ERR_OR_NULL(fwnode) && fwnode->ops == &pset_fwnode_ops;
-}
-
-#define to_pset_node(__fwnode)						\
-	({								\
-		typeof(__fwnode) __to_pset_node_fwnode = __fwnode;	\
-									\
-		is_pset_node(__to_pset_node_fwnode) ?			\
-			container_of(__to_pset_node_fwnode,		\
-				     struct property_set, fwnode) :	\
-			NULL;						\
-	})
-
 static const struct property_entry *
 pset_prop_get(const struct property_set *pset, const char *name)
 {
@@ -323,13 +295,14 @@ pset_fwnode_get_next_subnode(const struct fwnode_handle *fwnode,
 	return &next->fwnode;
 }
 
-static const struct fwnode_operations pset_fwnode_ops = {
+const struct fwnode_operations pset_fwnode_ops = {
 	.property_present = pset_fwnode_property_present,
 	.property_read_int_array = pset_fwnode_read_int_array,
 	.property_read_string_array = pset_fwnode_property_read_string_array,
 	.get_parent = pset_fwnode_get_parent,
 	.get_next_child_node = pset_fwnode_get_next_subnode,
 };
+EXPORT_SYMBOL_GPL(pset_fwnode_ops);
 
 static void property_entry_free_data(const struct property_entry *p)
 {
