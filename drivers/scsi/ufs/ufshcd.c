@@ -257,6 +257,7 @@ static int ufshcd_scale_clks(struct ufs_hba *hba, bool scale_up);
 static irqreturn_t ufshcd_intr(int irq, void *__hba);
 static int ufshcd_change_power_mode(struct ufs_hba *hba,
 			     struct ufs_pa_layer_attr *pwr_mode);
+
 static inline bool ufshcd_valid_tag(struct ufs_hba *hba, int tag)
 {
 	return tag >= 0 && tag < hba->nutrs;
@@ -5673,6 +5674,173 @@ static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 	else if (tm_response)
 		*tm_response = be32_to_cpu(treq.output_param1) &
 				MASK_TM_SERVICE_RESP;
+	return err;
+}
+
+/**
+ * ufshcd_issue_devman_upiu_cmd - API for sending "utrd" type requests
+ * @hba:	per-adapter instance
+ * @req_upiu:	upiu request
+ * @rsp_upiu:	upiu reply
+ * @msgcode:	message code, one of UPIU Transaction Codes Initiator to Target
+ * @desc_buff:	pointer to descriptor buffer, NULL if NA
+ * @buff_len:	descriptor size, 0 if NA
+ * @rw:		either READ or WRITE
+ *
+ * Those type of requests uses UTP Transfer Request Descriptor - utrd.
+ * Therefore, it "rides" the device management infrastructure: uses its tag and
+ * tasks work queues.
+ *
+ * Since there is only one available tag for device management commands,
+ * the caller is expected to hold the hba->dev_cmd.lock mutex.
+ */
+static int ufshcd_issue_devman_upiu_cmd(struct ufs_hba *hba,
+					struct utp_upiu_req *req_upiu,
+					struct utp_upiu_req *rsp_upiu,
+					u8 *desc_buff, int *buff_len,
+					int cmd_type, int rw)
+{
+	struct ufshcd_lrb *lrbp;
+	int err = 0;
+	int tag;
+	struct completion wait;
+	unsigned long flags;
+	u32 upiu_flags;
+	u8 *descp;
+
+	down_read(&hba->clk_scaling_lock);
+
+	wait_event(hba->dev_cmd.tag_wq, ufshcd_get_dev_cmd_tag(hba, &tag));
+
+	init_completion(&wait);
+	lrbp = &hba->lrb[tag];
+	WARN_ON(lrbp->cmd);
+
+	lrbp->cmd = NULL;
+	lrbp->sense_bufflen = 0;
+	lrbp->sense_buffer = NULL;
+	lrbp->task_tag = tag;
+	lrbp->lun = 0;
+	lrbp->command_type = hba->ufs_version == UFSHCI_VERSION_10 ||
+			     hba->ufs_version == UFSHCI_VERSION_11 ?
+			     UTP_CMD_TYPE_DEV_MANAGE :
+			     UTP_CMD_TYPE_UFS_STORAGE;
+	lrbp->intr_cmd = true;
+	hba->dev_cmd.type = cmd_type;
+
+	/* update the task tag in the request upiu */
+	req_upiu->header.dword_0 |= cpu_to_be32(tag);
+
+	ufshcd_prepare_req_desc_hdr(lrbp, &upiu_flags, DMA_NONE);
+
+	/* just copy the upiu request as it is */
+	memcpy(lrbp->ucd_req_ptr, req_upiu, GENERAL_UPIU_REQUEST_SIZE);
+
+	if (desc_buff && rw == WRITE) {
+		descp = (u8 *)lrbp->ucd_req_ptr + GENERAL_UPIU_REQUEST_SIZE;
+		memcpy(descp, desc_buff, *buff_len);
+		*buff_len = 0;
+	}
+
+	memset(lrbp->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+
+	hba->dev_cmd.complete = &wait;
+
+	/* Make sure descriptors are ready before ringing the doorbell */
+	wmb();
+	spin_lock_irqsave(hba->host->host_lock, flags);
+	ufshcd_send_command(hba, tag);
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
+
+	/*
+	 * ignore the returning value here - ufshcd_check_query_response is
+	 * bound to fail since dev_cmd.query and dev_cmd.type were left empty.
+	 * read the response directly ignoring all errors.
+	 */
+	ufshcd_wait_for_dev_cmd(hba, lrbp, QUERY_REQ_TIMEOUT);
+
+	/* just copy the upiu response as it is */
+	memcpy(rsp_upiu, lrbp->ucd_rsp_ptr, GENERAL_UPIU_REQUEST_SIZE);
+
+	ufshcd_put_dev_cmd_tag(hba, tag);
+	wake_up(&hba->dev_cmd.tag_wq);
+	up_read(&hba->clk_scaling_lock);
+	return err;
+}
+
+/**
+ * ufshcd_exec_raw_upiu_cmd - API function for sending raw upiu commands
+ * @hba:	per-adapter instance
+ * @req_upiu:	upiu request
+ * @rsp_upiu:	upiu reply - only 8 DW as we do not support scsi commands
+ * @msgcode:	message code, one of UPIU Transaction Codes Initiator to Target
+ * @desc_buff:	pointer to descriptor buffer, NULL if NA
+ * @buff_len:	descriptor size, 0 if NA
+ * @rw:		either READ or WRITE
+ *
+ * Supports UTP Transfer requests (nop and query), and UTP Task
+ * Management requests.
+ * It is up to the caller to fill the upiu conent properly, as it will
+ * be copied without any further input validations.
+ */
+int ufshcd_exec_raw_upiu_cmd(struct ufs_hba *hba,
+			     struct utp_upiu_req *req_upiu,
+			     struct utp_upiu_req *rsp_upiu,
+			     int msgcode,
+			     u8 *desc_buff, int *buff_len, int rw)
+{
+	int err;
+	int cmd_type = DEV_CMD_TYPE_QUERY;
+	struct utp_task_req_desc treq = { { 0 }, };
+	int ocs_value;
+	u8 tm_f = be32_to_cpu(req_upiu->header.dword_1) >> 16 & MASK_TM_FUNC;
+
+	if (desc_buff && rw == READ) {
+		err = -ENOTSUPP;
+		goto out;
+	}
+
+	switch (msgcode) {
+	case UPIU_TRANSACTION_NOP_OUT:
+		cmd_type = DEV_CMD_TYPE_NOP;
+		/* fall through */
+	case UPIU_TRANSACTION_QUERY_REQ:
+		ufshcd_hold(hba, false);
+		mutex_lock(&hba->dev_cmd.lock);
+		err = ufshcd_issue_devman_upiu_cmd(hba, req_upiu, rsp_upiu,
+						   desc_buff, buff_len,
+						   cmd_type, rw);
+		mutex_unlock(&hba->dev_cmd.lock);
+		ufshcd_release(hba);
+
+		break;
+	case UPIU_TRANSACTION_TASK_REQ:
+		treq.header.dword_0 = cpu_to_le32(UTP_REQ_DESC_INT_CMD);
+		treq.header.dword_2 = cpu_to_le32(OCS_INVALID_COMMAND_STATUS);
+
+		memcpy(&treq.req_header, req_upiu, GENERAL_UPIU_REQUEST_SIZE);
+
+		err = __ufshcd_issue_tm_cmd(hba, &treq, tm_f);
+		if (err == -ETIMEDOUT)
+			break;
+
+		ocs_value = le32_to_cpu(treq.header.dword_2) & MASK_OCS;
+		if (ocs_value != OCS_SUCCESS) {
+			dev_err(hba->dev, "%s: failed, ocs = 0x%x\n", __func__,
+				ocs_value);
+			break;
+		}
+
+		memcpy(rsp_upiu, &treq.rsp_header, GENERAL_UPIU_REQUEST_SIZE);
+
+		break;
+	default:
+		err = -EINVAL;
+
+		break;
+	}
+
+out:
 	return err;
 }
 
