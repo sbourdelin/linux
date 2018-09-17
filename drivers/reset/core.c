@@ -459,9 +459,38 @@ static void __reset_control_put_internal(struct reset_control *rstc)
 	kref_put(&rstc->refcnt, __reset_control_release);
 }
 
+static bool __of_reset_is_dedicated(const struct device_node *node,
+				    const struct of_phandle_args args)
+{
+	struct of_phandle_args args2;
+	struct device_node *node2;
+	int index, ret;
+
+	for_each_node_with_property(node2, "resets") {
+		if (node == node2)
+			continue;
+
+		for (index = 0; ; index++) {
+			ret = of_parse_phandle_with_args(node2, "resets",
+							 "#reset-cells", index,
+							 &args2);
+			if (ret)
+				break;
+
+			if (args2.np == args.np &&
+			    args2.args_count == args.args_count &&
+			    !memcmp(args2.args, args.args,
+				    args.args_count * sizeof(args.args[0])))
+				return false;
+		}
+	}
+
+	return true;
+}
+
 struct reset_control *__of_reset_control_get(struct device_node *node,
 				     const char *id, int index, bool shared,
-				     bool optional)
+				     bool optional, bool dedicated)
 {
 	struct reset_control *rstc;
 	struct reset_controller_dev *r, *rcdev;
@@ -514,6 +543,11 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
 		return ERR_PTR(rstc_id);
 	}
 
+	if (dedicated && !__of_reset_is_dedicated(node, args)) {
+		mutex_unlock(&reset_list_mutex);
+		return ERR_PTR(-EINVAL);
+	}
+
 	/* reset_list_mutex also protects the rcdev's reset_control list */
 	rstc = __reset_control_get_internal(rcdev, rstc_id, shared);
 
@@ -541,9 +575,25 @@ __reset_controller_by_name(const char *name)
 	return NULL;
 }
 
+static bool __reset_is_dedicated(const struct reset_control_lookup *lookup)
+{
+	const struct reset_control_lookup *lookup2;
+
+	list_for_each_entry(lookup, &reset_lookup_list, list) {
+		if (lookup2 == lookup)
+			continue;
+
+		if (lookup2->provider == lookup->provider &&
+		    lookup2->index == lookup->index)
+			return false;
+	}
+
+	return true;
+}
+
 static struct reset_control *
 __reset_control_get_from_lookup(struct device *dev, const char *con_id,
-				bool shared, bool optional)
+				bool shared, bool optional, bool dedicated)
 {
 	const struct reset_control_lookup *lookup;
 	struct reset_controller_dev *rcdev;
@@ -562,6 +612,11 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
 		if ((!con_id && !lookup->con_id) ||
 		    ((con_id && lookup->con_id) &&
 		     !strcmp(con_id, lookup->con_id))) {
+			if (dedicated && !__reset_is_dedicated(lookup)) {
+				mutex_unlock(&reset_lookup_mutex);
+				return ERR_PTR(-EINVAL);
+			}
+
 			mutex_lock(&reset_list_mutex);
 			rcdev = __reset_controller_by_name(lookup->provider);
 			if (!rcdev) {
@@ -588,13 +643,15 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
 }
 
 struct reset_control *__reset_control_get(struct device *dev, const char *id,
-					  int index, bool shared, bool optional)
+					  int index, bool shared,
+					  bool optional, bool dedicated)
 {
 	if (dev->of_node)
 		return __of_reset_control_get(dev->of_node, id, index, shared,
-					      optional);
+					      optional, dedicated);
 
-	return __reset_control_get_from_lookup(dev, id, shared, optional);
+	return __reset_control_get_from_lookup(dev, id, shared, optional,
+					       dedicated);
 }
 EXPORT_SYMBOL_GPL(__reset_control_get);
 
@@ -635,7 +692,7 @@ static void devm_reset_control_release(struct device *dev, void *res)
 
 struct reset_control *__devm_reset_control_get(struct device *dev,
 				     const char *id, int index, bool shared,
-				     bool optional)
+				     bool optional, bool dedicated)
 {
 	struct reset_control **ptr, *rstc;
 
@@ -644,7 +701,7 @@ struct reset_control *__devm_reset_control_get(struct device *dev,
 	if (!ptr)
 		return ERR_PTR(-ENOMEM);
 
-	rstc = __reset_control_get(dev, id, index, shared, optional);
+	rstc = __reset_control_get(dev, id, index, shared, optional, dedicated);
 	if (!IS_ERR(rstc)) {
 		*ptr = rstc;
 		devres_add(dev, ptr);
@@ -671,7 +728,7 @@ int __device_reset(struct device *dev, bool optional)
 	struct reset_control *rstc;
 	int ret;
 
-	rstc = __reset_control_get(dev, NULL, 0, 0, optional);
+	rstc = __reset_control_get(dev, NULL, 0, false, optional, false);
 	if (IS_ERR(rstc))
 		return PTR_ERR(rstc);
 
@@ -735,7 +792,8 @@ of_reset_control_array_get(struct device_node *np, bool shared, bool optional)
 		return ERR_PTR(-ENOMEM);
 
 	for (i = 0; i < num; i++) {
-		rstc = __of_reset_control_get(np, NULL, i, shared, optional);
+		rstc = __of_reset_control_get(np, NULL, i, shared, optional,
+					      false);
 		if (IS_ERR(rstc))
 			goto err_rst;
 		resets->rstc[i] = rstc;
