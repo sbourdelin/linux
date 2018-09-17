@@ -808,6 +808,14 @@ config SPI_SLAVE
 	  slave protocol handlers.
 
 if SPI_SLAVE
+config SPI_SLAVE_MT27XX
+	tristate "MediaTek SPI slave device"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	help
+	  This selects the MediaTek(R) SPI slave device driver.
+	  If you want to use MediaTek(R) SPI slave interface,
+	  say Y or M here.If you are not sure, say N.
+	  SPI slave drivers for Mediatek MT27XX series ARM SoCs.
 
 config SPI_SLAVE_TIME
 	tristate "SPI slave handler reporting boot up time"
