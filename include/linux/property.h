@@ -275,6 +275,10 @@ void property_entries_free(const struct property_entry *properties);
 
 int device_add_properties(struct device *dev,
 			  const struct property_entry *properties);
+struct fwnode_handle *
+device_add_child_properties(struct device *dev,
+			    struct fwnode_handle *parent,
+			    const struct property_entry *properties);
 void device_remove_properties(struct device *dev);
 
 bool device_dma_supported(struct device *dev);
