@@ -637,6 +637,16 @@ void __native_set_fixmap(enum fixed_addresses idx, pte_t pte)
 {
 	unsigned long address = __fix_to_virt(idx);
 
+#ifdef CONFIG_X86_64
+       /*
+        * In arch/x86/kernel/head_64.S, the static page table has
+	* been setup for fixmap. Add a sanity compiling check
+	* whether fixmap space has exceeded the capacity.
+        */
+	BUILD_BUG_ON(__end_of_permanent_fixed_addresses
+			> (FIXMAP_PMD_NUM * PTRS_PER_PMD));
+#endif
+
 	if (idx >= __end_of_fixed_addresses) {
 		BUG();
 		return;
