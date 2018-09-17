@@ -193,6 +193,7 @@ struct fsnotify_group {
 			unsigned int max_marks;
 			struct user_struct *user;
 			bool audit;
+			bool should_report_tid;
 		} fanotify_data;
 #endif /* CONFIG_FANOTIFY */
 	};

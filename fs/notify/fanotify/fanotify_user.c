@@ -693,9 +693,9 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 		return -EPERM;
 
 #ifdef CONFIG_AUDITSYSCALL
-	if (flags & ~(FAN_ALL_INIT_FLAGS | FAN_ENABLE_AUDIT))
+	if (flags & ~(FAN_ALL_INIT_FLAGS | FAN_ENABLE_AUDIT | FAN_EVENT_INFO_TID))
 #else
-	if (flags & ~FAN_ALL_INIT_FLAGS)
+	if (flags & ~(FAN_ALL_INIT_FLAGS | FAN_EVENT_INFO_TID))
 #endif
 		return -EINVAL;
 
@@ -731,6 +731,7 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 	}
 
 	group->fanotify_data.user = user;
+	group->fanotify_data.should_report_tid = (flags & FAN_EVENT_INFO_TID) ? true : false;
 	atomic_inc(&user->fanotify_listeners);
 	group->memcg = get_mem_cgroup_from_mm(current->mm);
 
