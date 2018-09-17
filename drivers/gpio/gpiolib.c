@@ -3993,6 +3993,80 @@ struct gpio_desc *gpiod_get_from_of_node(struct device_node *node,
 }
 EXPORT_SYMBOL(gpiod_get_from_of_node);
 
+static struct gpio_desc *pset_node_get_gpiod(struct fwnode_handle *fwnode,
+					     const char *propname, int index,
+					     enum gpio_lookup_flags *flags)
+{
+	struct property_set *pset;
+	const char *con_id;
+
+	pset = to_pset_node(fwnode);
+	if (!pset)
+		return ERR_PTR(-EINVAL);
+
+	if (fwnode_property_read_string(fwnode, propname, &con_id)) {
+		/*
+		 * We could not find string mapping property name to
+		 * entry in gpio lookup table. Let's see if we are
+		 * dealing with firmware node corresponding to the
+		 * device (and not a child node): for such nodes we can
+		 * try doing lookup directly with property name.
+		 */
+		if (pset->parent)
+			return ERR_PTR(-ENOENT);
+
+		con_id = propname;
+	}
+
+	return gpiod_find(pset->dev, con_id, index, flags);
+}
+
+static struct gpio_desc *__fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
+						  const char *propname,
+						  int index,
+						  enum gpiod_flags dflags,
+						  const char *label)
+{
+	struct gpio_desc *desc = ERR_PTR(-ENODEV);
+	enum gpio_lookup_flags lflags = 0;
+	int ret;
+
+	if (is_of_node(fwnode)) {
+		desc = gpiod_get_from_of_node(to_of_node(fwnode),
+					      propname, index,
+					      dflags,
+					      label);
+		return desc;
+	} else if (is_acpi_node(fwnode)) {
+		struct acpi_gpio_info info;
+
+		desc = acpi_node_get_gpiod(fwnode, propname, index, &info);
+		if (IS_ERR(desc))
+			return desc;
+
+		acpi_gpio_update_gpiod_flags(&dflags, &info);
+
+		if (info.polarity == GPIO_ACTIVE_LOW)
+			lflags |= GPIO_ACTIVE_LOW;
+	} else if (is_pset_node(fwnode)) {
+		desc = pset_node_get_gpiod(fwnode, propname, index, &lflags);
+		if (IS_ERR(desc))
+			return desc;
+	}
+
+	ret = gpiod_request(desc, label);
+	if (ret)
+		return ERR_PTR(ret);
+
+	ret = gpiod_configure_flags(desc, propname, lflags, dflags);
+	if (ret < 0) {
+		gpiod_put(desc);
+		return ERR_PTR(ret);
+	}
+
+	return desc;
+}
+
 /**
  * fwnode_get_named_gpiod - obtain a GPIO from firmware node
  * @fwnode:	handle of the firmware node
@@ -4019,41 +4093,16 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
 					 enum gpiod_flags dflags,
 					 const char *label)
 {
-	struct gpio_desc *desc = ERR_PTR(-ENODEV);
-	unsigned long lflags = 0;
-	int ret;
+	struct gpio_desc *desc;
 
 	if (!fwnode)
 		return ERR_PTR(-EINVAL);
 
-	if (is_of_node(fwnode)) {
-		desc = gpiod_get_from_of_node(to_of_node(fwnode),
-					      propname, index,
-					      dflags,
-					      label);
-		return desc;
-	} else if (is_acpi_node(fwnode)) {
-		struct acpi_gpio_info info;
-
-		desc = acpi_node_get_gpiod(fwnode, propname, index, &info);
-		if (IS_ERR(desc))
-			return desc;
-
-		acpi_gpio_update_gpiod_flags(&dflags, &info);
-
-		if (info.polarity == GPIO_ACTIVE_LOW)
-			lflags |= GPIO_ACTIVE_LOW;
-	}
-
-	/* Currently only ACPI takes this path */
-	ret = gpiod_request(desc, label);
-	if (ret)
-		return ERR_PTR(ret);
-
-	ret = gpiod_configure_flags(desc, propname, lflags, dflags);
-	if (ret < 0) {
-		gpiod_put(desc);
-		return ERR_PTR(ret);
+	desc = __fwnode_get_named_gpiod(fwnode, propname, index, dflags, label);
+	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT &&
+	    !IS_ERR_OR_NULL(fwnode->secondary)) {
+		desc = __fwnode_get_named_gpiod(fwnode->secondary,
+						propname, index, dflags, label);
 	}
 
 	return desc;
