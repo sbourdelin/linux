@@ -7,18 +7,131 @@
 #include "ufs_bsg.h"
 
 
+static inline struct ufs_hba *dev_to_ufs_hba(struct device *d)
+{
+	struct Scsi_Host *shost = dev_to_shost(d->parent);
+
+	return shost_priv(shost);
+}
+
+static int ufs_bsg_get_query_desc_size(struct ufs_hba *hba,
+				       struct utp_upiu_query *qr,
+				       int *desc_len)
+{
+	int desc_size = be16_to_cpu(qr->length);
+	int desc_id = qr->idn;
+	int ret = 0;
+
+	if (qr->opcode != UPIU_QUERY_OPCODE_WRITE_DESC || desc_size <= 0)
+		return -EINVAL;
+
+	ret = ufshcd_map_desc_id_to_length(hba, desc_id, desc_len);
+
+	if (ret || !*desc_len)
+		return -EINVAL;
+
+	*desc_len = min_t(int, *desc_len, desc_size);
+
+	return ret;
+}
+
+static int ufs_bsg_verify_query_size(unsigned int request_len,
+				     unsigned int reply_len,
+				     int rw, int desc_len)
+{
+	int min_req_len = sizeof(struct ufs_bsg_request);
+	int min_rsp_len = sizeof(struct ufs_bsg_reply);
+
+	if (rw == WRITE)
+		min_req_len += desc_len;
+
+	if (min_req_len > request_len)
+		return -EINVAL;
+
+	if (min_rsp_len > reply_len)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int ufs_bsg_request(struct bsg_job *job)
 {
 	struct ufs_bsg_request *bsg_request = job->request;
 	struct ufs_bsg_reply *bsg_reply = job->reply;
-	int ret = -ENOTSUPP;
+	struct ufs_hba *hba = dev_to_ufs_hba(job->dev);
+	unsigned int request_len = job->request_len;
+	unsigned int reply_len = job->reply_len;
+	struct utp_upiu_query *qr;
+	struct utp_upiu_req *req_upiu = NULL;
+	struct utp_upiu_req *rsp_upiu = NULL;
+	int msgcode;
+	uint8_t *desc_buff = NULL;
+	int desc_len = 0;
+	int rw = UFS_BSG_NOP;
+	int ret;
 
+	ret = ufs_bsg_verify_query_size(request_len, reply_len, rw, desc_len);
+	if (ret) {
+		dev_err(job->dev, "not enough space assigned\n");
+		goto out;
+	}
 	bsg_reply->reply_payload_rcv_len = 0;
 
-	/* Do Nothing for now */
-	dev_err(job->dev, "unsupported message_code 0x%x\n",
-		bsg_request->msgcode);
+	msgcode = bsg_request->msgcode;
+	switch (msgcode) {
+	case UPIU_TRANSACTION_QUERY_REQ:
+		qr = &bsg_request->tsf.qr;
+		if (qr->opcode == UPIU_QUERY_OPCODE_READ_DESC)
+			goto not_supported;
 
+		if (ufs_bsg_get_query_desc_size(hba, qr, &desc_len))
+			goto null_desc_buff;
+
+		if (qr->opcode == UPIU_QUERY_OPCODE_WRITE_DESC) {
+			rw = WRITE;
+			desc_buff = ((uint8_t *)bsg_request) +
+				    sizeof(struct ufs_bsg_request);
+		}
+
+null_desc_buff:
+		/* fall through */
+	case UPIU_TRANSACTION_NOP_OUT:
+	case UPIU_TRANSACTION_TASK_REQ:
+		/* Now that we know if its a read or write, verify again */
+		if (rw != UFS_BSG_NOP || desc_len) {
+			ret = ufs_bsg_verify_query_size(request_len, reply_len,
+							rw, desc_len);
+			if (ret) {
+				dev_err(job->dev,
+					"not enough space assigned\n");
+				goto out;
+			}
+		}
+
+		req_upiu = (struct utp_upiu_req *)&bsg_request->header;
+		rsp_upiu = (struct utp_upiu_req *)&bsg_reply->header;
+		ret = ufshcd_exec_raw_upiu_cmd(hba, req_upiu, rsp_upiu,
+					       msgcode, desc_buff, &desc_len,
+					       rw);
+
+		break;
+	case UPIU_TRANSACTION_UIC_CMD:
+		/* later */
+	case UPIU_TRANSACTION_COMMAND:
+	case UPIU_TRANSACTION_DATA_OUT:
+not_supported:
+		/* for the time being, we do not support data transfer upiu */
+		ret = -ENOTSUPP;
+		dev_err(job->dev, "unsupported msgcode 0x%x\n", msgcode);
+
+		break;
+	default:
+		ret = -EINVAL;
+
+		break;
+	}
+
+out:
 	bsg_reply->result = ret;
 	job->reply_len = sizeof(struct ufs_bsg_reply) +
 			 bsg_reply->reply_payload_rcv_len;

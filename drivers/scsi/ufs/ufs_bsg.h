@@ -12,6 +12,7 @@
 #include "ufshcd.h"
 #include "ufs.h"
 
+#define UFS_BSG_NOP (-1)
 #define UPIU_TRANSACTION_UIC_CMD 0x1F
 
 enum {
