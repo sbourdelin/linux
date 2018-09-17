@@ -205,6 +205,8 @@ static int hns_roce_query_device(struct ib_device *ib_dev,
 	props->max_qp = hr_dev->caps.num_qps;
 	props->max_qp_wr = hr_dev->caps.max_wqes;
 	props->device_cap_flags = IB_DEVICE_PORT_ACTIVE_EVENT |
+				  IB_DEVICE_MEM_WINDOW |
+				  IB_DEVICE_MEM_WINDOW_TYPE_2B |
 				  IB_DEVICE_RC_RNR_NAK_GEN;
 	props->max_send_sge = hr_dev->caps.max_sq_sg;
 	props->max_recv_sge = hr_dev->caps.max_rq_sg;
@@ -212,6 +214,7 @@ static int hns_roce_query_device(struct ib_device *ib_dev,
 	props->max_cq = hr_dev->caps.num_cqs;
 	props->max_cqe = hr_dev->caps.max_cqes;
 	props->max_mr = hr_dev->caps.num_mtpts;
+	props->max_mw = hr_dev->caps.num_mtpts;
 	props->max_pd = hr_dev->caps.num_pds;
 	props->max_qp_rd_atom = hr_dev->caps.max_qp_dest_rdma;
 	props->max_qp_init_rd_atom = hr_dev->caps.max_qp_init_rdma;
@@ -582,6 +585,12 @@ static int hns_roce_register_device(struct hns_roce_dev *hr_dev)
 	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_REREG_MR) {
 		ib_dev->rereg_user_mr	= hns_roce_rereg_user_mr;
 		ib_dev->uverbs_cmd_mask |= (1ULL << IB_USER_VERBS_CMD_REREG_MR);
+	}
+
+	/* MW */
+	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_MW) {
+		ib_dev->alloc_mw = hns_roce_alloc_mw;
+		ib_dev->uverbs_cmd_mask |= (1ULL << IB_USER_VERBS_CMD_ALLOC_MW);
 	}
 
 	/* OTHERS */
