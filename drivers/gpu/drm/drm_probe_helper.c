@@ -269,7 +269,9 @@ drm_helper_probe_detect_ctx(struct drm_connector *connector, bool force)
 retry:
 	ret = drm_modeset_lock(&connector->dev->mode_config.connection_mutex, &ctx);
 	if (!ret) {
-		if (funcs->detect_ctx)
+		if (connector->force == DRM_FORCE_OFF)
+			ret = connector_status_disconnected;
+		else if (funcs->detect_ctx)
 			ret = funcs->detect_ctx(connector, &ctx, force);
 		else if (connector->funcs->detect)
 			ret = connector->funcs->detect(connector, force);
@@ -316,6 +318,9 @@ drm_helper_probe_detect(struct drm_connector *connector,
 	ret = drm_modeset_lock(&dev->mode_config.connection_mutex, ctx);
 	if (ret)
 		return ret;
+
+	if (connector->force == DRM_FORCE_OFF)
+		return connector_status_disconnected;
 
 	if (funcs->detect_ctx)
 		return funcs->detect_ctx(connector, ctx, force);
