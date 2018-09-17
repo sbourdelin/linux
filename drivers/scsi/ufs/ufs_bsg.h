@@ -14,6 +14,8 @@
 
 #define UFS_BSG_NOP (-1)
 #define UPIU_TRANSACTION_UIC_CMD 0x1F
+/* uic commands are 4DW long, per UFSHCI V2.1 paragraph 5.6.1 */
+#define UIC_CMD_SIZE (sizeof(u32) * 4)
 
 enum {
 	REQ_UPIU_SIZE_DWORDS	= 8,

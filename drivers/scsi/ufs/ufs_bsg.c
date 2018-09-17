@@ -54,6 +54,53 @@ static int ufs_bsg_verify_query_size(unsigned int request_len,
 	return 0;
 }
 
+static int ufs_bsg_exec_uic_cmd(struct ufs_hba *hba, struct uic_command *uc)
+{
+	u32 attr_sel = uc->argument1;
+	u8 attr_set = (uc->argument2 >> 16) & 0xff;
+	u32 mib_val = uc->argument3;
+	int cmd = uc->command;
+	int ret = 0;
+
+	switch (cmd) {
+	case UIC_CMD_DME_GET:
+		ret = ufshcd_dme_get_attr(hba, attr_sel, &mib_val, DME_LOCAL);
+		break;
+	case UIC_CMD_DME_SET:
+		ret = ufshcd_dme_set_attr(hba, attr_sel, attr_set, mib_val,
+					  DME_LOCAL);
+		break;
+	case UIC_CMD_DME_PEER_GET:
+		ret = ufshcd_dme_get_attr(hba, attr_sel, &mib_val, DME_PEER);
+		break;
+	case UIC_CMD_DME_PEER_SET:
+		ret = ufshcd_dme_set_attr(hba, attr_sel, attr_set, mib_val,
+					  DME_PEER);
+		break;
+	case UIC_CMD_DME_POWERON:
+	case UIC_CMD_DME_POWEROFF:
+	case UIC_CMD_DME_ENABLE:
+	case UIC_CMD_DME_RESET:
+	case UIC_CMD_DME_END_PT_RST:
+	case UIC_CMD_DME_LINK_STARTUP:
+	case UIC_CMD_DME_HIBER_ENTER:
+	case UIC_CMD_DME_HIBER_EXIT:
+	case UIC_CMD_DME_TEST_MODE:
+		ret = -ENOTSUPP;
+		pr_err("%s unsupported command 0x%x\n", __func__, cmd);
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	if (ret)
+		pr_err("%s error in command 0x%x\n", __func__, cmd);
+
+	uc->argument3 = mib_val;
+
+	return ret;
+}
+
 static int ufs_bsg_request(struct bsg_job *job)
 {
 	struct ufs_bsg_request *bsg_request = job->request;
@@ -62,6 +109,7 @@ static int ufs_bsg_request(struct bsg_job *job)
 	unsigned int request_len = job->request_len;
 	unsigned int reply_len = job->reply_len;
 	struct utp_upiu_query *qr;
+	struct uic_command uc = {};
 	struct utp_upiu_req *req_upiu = NULL;
 	struct utp_upiu_req *rsp_upiu = NULL;
 	int msgcode;
@@ -116,7 +164,11 @@ null_desc_buff:
 
 		break;
 	case UPIU_TRANSACTION_UIC_CMD:
-		/* later */
+		memcpy(&uc, &bsg_request->tsf.uc, UIC_CMD_SIZE);
+		ret = ufs_bsg_exec_uic_cmd(hba, &uc);
+		memcpy(&bsg_reply->tsf.uc, &uc, UIC_CMD_SIZE);
+
+		break;
 	case UPIU_TRANSACTION_COMMAND:
 	case UPIU_TRANSACTION_DATA_OUT:
 not_supported:
