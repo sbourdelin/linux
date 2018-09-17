@@ -587,3 +587,121 @@ Description:
 		Valid values:
 		- 1: enabled
 		- 0: disabled
+
+What:		/sys/class/power_supply/bq2416x-charger/usb_curr_limit
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		Reports and sets the maximum current the "usb" supply can
+		support.
+
+		Access: Read, Write
+		Valid values:
+		- 100000, 150000, 500000, 800000, 900000, 1500000 (uA)
+
+What:		/sys/class/power_supply/bq2416x-charger/in_curr_limit
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		Reports and sets the maximum current the "in" (wall) supply can
+		support.
+
+		Access: Read, Write
+		Valid values:
+		- 1500000, 2500000 (uA)
+
+What:		/sys/class/power_supply/bq2416x-charger/in_dpm_voltage
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		This entry configures the "in" (wall) input dynamic power path
+		management voltage of bq2416x-type charger devices. Once the
+		supply drops to the configured voltage, the input current limit
+		is reduced down to prevent the further drop of the supply. When
+		the IC enters this mode, the charge current is lower than the
+		set value.
+
+		Access: Read, Write
+		Valid values:
+		- 4200000, 4280000, 4360000, 4440000, 4520000, 4600000, 4680000,
+		  4760000 (all uV)
+
+What:		/sys/class/power_supply/bq2416x-charger/usb_dpm_voltage
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		This entry configures the "usb" input dynamic power path
+		management voltage of bq2416x-type charger devices. Once the
+		supply drops to the configured voltage, the input current limit
+		is reduced down to prevent the further drop of the supply. When
+		the IC enters this mode, the charge current is lower than the
+		set value.
+
+		Access: Read, Write
+		Valid values:
+		- 4200000, 4280000, 4360000, 4440000, 4520000, 4600000, 4680000,
+		  4760000 (all uV)
+
+What:		/sys/class/power_supply/bq2416x-charger/high_impedance_enable
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		This entry allows enabling the high-impedance mode of
+		bq2416x-type charger devices. If enabled, it places the charger
+		IC into low power standby mode with the switch mode controller
+		disabled. When disabled, the charger operates normally.
+
+		Access: Read, Write
+		Valid values:
+		- 1: enabled
+		- 0: disabled
+
+What:		/sys/class/power_supply/bq2416x-charger/dpm_status
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		Reports whether dynamic power management is active, i.e. input
+		current of used source is limited to prevent further drop of
+		voltage.
+
+		Valid values:
+		- 0: not active
+		- 1: active
+
+What:		/sys/class/power_supply/bq2416x-charger/supply_sel
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		This entry configures which input ("in", "usb") should be
+		preferred as input source.
+
+		Valid values:
+		- "in", "usb"
+
+What:		/sys/class/power_supply/bq2416x-charger/ts_fault
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		Reports state of NTC temperature monitor.
+
+		Valid values:
+		- "normal", "cold/hot(charge suspended)",
+		  "cool(half current charge)", "warm(voltage reduced)"
+
+What:		/sys/class/power_supply/bq2416x-charger/in_status
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		Reports state of "in" input source.
+
+		Valid values:
+		- "Normal", "OVP", "Weak source", "Faulty Adapter"
+
+What:		/sys/class/power_supply/bq2416x-charger/usb_status
+Date:		September 2018
+Contact:	Karsten Mueller <mueller.k@efe-gmbh.de>
+Description:
+		Reports state of "usb" input source.
+
+		Valid values:
+		- "Normal", "OVP", "Weak source", "Faulty Adapter"
