@@ -230,7 +230,9 @@ enum ssp_chip_select {
 
 struct dma_chan;
 /**
- * struct pl022_ssp_master - device.platform_data for SPI controller devices.
+ * struct pl022_ssp_controller - device.platform_data for SPI
+ * controller devices.
+ *
  * @bus_id: identifier for this bus
  * @num_chipselect: chipselects are used to distinguish individual
  *     SPI slaves, and are numbered from zero to num_chipselects - 1.
