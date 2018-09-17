@@ -14,4 +14,20 @@ config NET_MEDIATEK_SOC
 	  This driver supports the gigabit ethernet MACs in the
 	  MediaTek SoC family.
 
+config MTK_GMAC
+	tristate "MediaTek Gigabit AVB Ethernet support"
+	select PHYLIB
+	select PTP_1588_CLOCK
+	select VLAN_8021Q
+	---help---
+	  This driver supports the gigabit avb ethernet MACs in the
+	  MediaTek MT27xx SoC family.
+
+if MTK_GMAC
+config MT2712_GMAC
+	tristate "MT2712 Gigabit Ethernet support"
+	---help---
+	  This driver supports the gigabit avb ethernet MACs in the
+	  MediaTek MT2712 SoC.
+endif #MTK_GMAC
 endif #NET_VENDOR_MEDIATEK

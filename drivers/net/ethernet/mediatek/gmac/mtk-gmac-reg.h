@@ -1,0 +1,861 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2018 MediaTek Inc.
+ */
+#ifndef __MTK_GMAC_REG_H__
+#define __MTK_GMAC_REG_H__
+
+/* Macros for reading or writing registers
+ *  The ioread macros will get bit fields or full values using the
+ *  register definitions formed using the input names
+ *
+ *  The iowrite macros will set bit fields or full values using the
+ *  register definitions formed using the input names
+ */
+#define GMAC_IOREAD(_pdata, _reg)					\
+	ioread32((_pdata)->mac_regs + (_reg))
+
+#define GMAC_IOWRITE(_pdata, _reg, _val)				\
+	iowrite32((_val), (_pdata)->mac_regs + (_reg))
+
+#define GMAC_GET_REG_BITS(var, pos, len) ({				\
+	typeof(pos) _pos = (pos);					\
+	typeof(len) _len = (len);					\
+	((var) & GENMASK(_pos + _len - 1, _pos)) >> (_pos);		\
+})
+
+#define GMAC_SET_REG_BITS(var, pos, len, val) ({			\
+	typeof(var) _var = (var);					\
+	typeof(pos) _pos = (pos);					\
+	typeof(len) _len = (len);					\
+	typeof(val) _val = (val);					\
+	_val = (_val << _pos) & GENMASK(_pos + _len - 1, _pos);		\
+	_var = (_var & ~GENMASK(_pos + _len - 1, _pos)) | _val;		\
+})
+
+enum dma_irq_status {
+	tx_hard_error = 0x1,
+	tx_hard_error_bump_tc = 0x2,
+	handle_rx = 0x4,
+	handle_tx = 0x8,
+};
+
+enum rx_dma_dbg_state {
+	rx_stopped = 0x0,
+	rx_running_fetching = 0x1,
+	rx_running_waiting = 0x3,
+	rx_suspended = 0x4,
+	rx_running_closing = 0x5,
+	rx_timestamp_write = 0x6,
+	rx_running_transfer = 0x7,
+};
+
+enum tx_dma_dbg_state {
+	tx_stopped = 0x0,
+	tx_running_fetching = 0x1,
+	tx_running_waiting = 0x2,
+	tx_running_queuing = 0x3,
+	tx_timestamp_write = 0x4,
+	tx_suspended = 0x6,
+	tx_running_closing = 0x7,
+};
+
+/* MAC register offsets */
+#define MAC_MCR				0x0000
+#define MAC_PFR				0x0008
+#define MAC_HTR(x)			(0x0010 + (x) * 4)
+#define MAC_VLANTR			0x0050
+#define MAC_VLANTFR			0x0054
+#define MAC_VLANHTR			0x0058
+#define MAC_VLANIR			0x0060
+#define MAC_Q_TFCR(x)			(0x70 + (x) * 4)
+#define MAC_RFCR			0x0090
+#define MAC_RQC0R			0x00a0
+#define MAC_RQC1R			0x00a4
+#define MAC_RQC2R			0x00a8
+#define MAC_RQC3R			0x00ac
+#define MAC_ISR				0x00b0
+#define MAC_IER				0x00b4
+#define MAC_PCSR			0x00f8
+#define MAC_VR				0x0110
+#define MAC_HWF0R			0x011c
+#define MAC_HWF1R			0x0120
+#define MAC_HWF2R			0x0124
+#define MAC_MDIOAR			0x0200
+#define MAC_MDIODR			0x0204
+#define MAC_ADDR_HR(x)			(0x0300 + (x) * 8)
+#define MAC_ADDR_LR(x)			(0x0304 + (x) * 8)
+
+/* MAC register entry bit positions and sizes */
+#define MAC_ADDR_HR_AE_POS		31
+#define MAC_ADDR_HR_AE_LEN		1
+#define MAC_HW_FEAT_ACTPHYSEL_POS	28
+#define MAC_HW_FEAT_ACTPHYSEL_LEN	3
+#define MAC_HW_FEAT_SAVLANINS_POS	27
+#define MAC_HW_FEAT_SAVLANINS_LEN	1
+#define MAC_HW_FEAT_TSSTSSEL_POS	25
+#define MAC_HW_FEAT_TSSTSSEL_LEN	2
+#define MAC_HW_FEAT_ADDMAC_POS		18
+#define MAC_HW_FEAT_ADDMAC_LEN		7
+#define MAC_HW_FEAT_RXCOESEL_POS	16
+#define MAC_HW_FEAT_RXCOESEL_LEN	1
+#define MAC_HW_FEAT_TXCOSEL_POS		14
+#define MAC_HW_FEAT_TXCOSEL_LEN		1
+#define MAC_HW_FEAT_EEESEL_POS		13
+#define MAC_HW_FEAT_EEESEL_LEN		1
+#define MAC_HW_FEAT_TSSEL_POS		12
+#define MAC_HW_FEAT_TSSEL_LEN		1
+#define MAC_HW_FEAT_ARPOFFSEL_POS	9
+#define MAC_HW_FEAT_ARPOFFSEL_LEN	1
+#define MAC_HW_FEAT_MMCSEL_POS		8
+#define MAC_HW_FEAT_MMCSEL_LEN		1
+#define MAC_HW_FEAT_MGKSEL_POS		7
+#define MAC_HW_FEAT_MGKSEL_LEN		1
+#define MAC_HW_FEAT_RWKSEL_POS		6
+#define MAC_HW_FEAT_RWKSEL_LEN		1
+#define MAC_HW_FEAT_SMASEL_POS		5
+#define MAC_HW_FEAT_SMASEL_LEN		1
+#define MAC_HW_FEAT_VLHASH_POS		4
+#define MAC_HW_FEAT_VLHASH_LEN		1
+#define MAC_HW_FEAT_PCSSEL_POS		3
+#define MAC_HW_FEAT_PCSSEL_LEN		1
+#define MAC_HW_FEAT_HDSEL_POS		2
+#define MAC_HW_FEAT_HDSEL_LEN		1
+#define MAC_HW_FEAT_GMIISEL_POS		1
+#define MAC_HW_FEAT_GMIISEL_LEN		1
+#define MAC_HW_FEAT_MIISEL_POS		0
+#define MAC_HW_FEAT_MIISEL_LEN		1
+#define MAC_HW_L3L4FNUM_POS		27
+#define MAC_HW_L3L4FNUM_LEN		4
+#define MAC_HW_HASHTBLSZ_POS		24
+#define MAC_HW_HASHTBLSZ_LEN		2
+#define MAC_HW_POUOST_POS		23
+#define MAC_HW_POUOST_LEN		1
+#define MAC_HW_RAV_POS			21
+#define MAC_HW_RAV_LEN			1
+#define MAC_HW_AV_POS			20
+#define MAC_HW_AV_LEN			1
+#define MAC_HW_DMADEBUGEN_POS		19
+#define MAC_HW_DMADEBUGEN_LEN		1
+#define MAC_HW_TSOEN_POS		18
+#define MAC_HW_TSOEN_LEN		1
+#define MAC_HW_SPHEN_POS		17
+#define MAC_HW_SPHEN_LEN		1
+#define MAC_HW_DCBEN_POS		16
+#define MAC_HW_DCBEN_LEN		1
+#define MAC_HW_ADDR64_POS		14
+#define MAC_HW_ADDR64_LEN		2
+#define MAC_HW_ADVTHWORD_POS		13
+#define MAC_HW_ADVTHWORD_LEN		1
+#define MAC_HW_PTOEN_POS		12
+#define MAC_HW_PTOEN_LEN		1
+#define MAC_HW_OSTEN_POS		11
+#define MAC_HW_OSTEN_LEN		1
+#define MAC_HW_TXFIFOSIZE_POS		6
+#define MAC_HW_TXFIFOSIZE_LEN		5
+#define MAC_HW_RXFIFOSIZE_POS		0
+#define MAC_HW_RXFIFOSIZE_LEN		5
+#define MAC_HW_FEAT_AUXSNAPNUM_POS	28
+#define MAC_HW_FEAT_AUXSNAPNUM_LEN	3
+#define MAC_HW_FEAT_PPSOUTNUM_POS	24
+#define MAC_HW_FEAT_PPSOUTNUM_LEN	3
+#define MAC_HW_FEAT_TXCHCNT_POS		18
+#define MAC_HW_FEAT_TXCHCNT_LEN		4
+#define MAC_HW_FEAT_RXCHCNT_POS		12
+#define MAC_HW_FEAT_RXCHCNT_LEN		4
+#define MAC_HW_FEAT_TXQCNT_POS		6
+#define MAC_HW_FEAT_TXQCNT_LEN		4
+#define MAC_HW_FEAT_RXQCNT_POS		0
+#define MAC_HW_FEAT_RXQCNT_LEN		4
+#define MAC_IER_RGMII_POS		0
+#define MAC_IER_RGMII_LEN		1
+#define MAC_ISR_MMCRXIS_POS		9
+#define MAC_ISR_MMCRXIS_LEN		1
+#define MAC_ISR_MMCTXIS_POS		10
+#define MAC_ISR_MMCTXIS_LEN		1
+#define MAC_ISR_MMCRXIPIS_POS		11
+#define MAC_ISR_MMCRXIPIS_LEN		1
+#define MAC_ISR_RGSMIIS_POS		0
+#define MAC_ISR_RGSMIIS_LEN		1
+#define MAC_MDIOAR_GB_POS		0
+#define MAC_MDIOAR_GB_LEN		1
+#define MAC_MDIOAR_C45E_POS		1
+#define MAC_MDIOAR_C45E_LEN		1
+#define MAC_MDIOAR_GOC_POS		2
+#define MAC_MDIOAR_GOC_LEN		2
+#define MAC_MDIOAR_CR_POS		8
+#define MAC_MDIOAR_CR_LEN		4
+#define MAC_MDIOAR_RDA_POS		16
+#define MAC_MDIOAR_RDA_LEN		5
+#define MAC_MDIOAR_PA_POS		21
+#define MAC_MDIOAR_PA_LEN		5
+#define MAC_MDIODR_GD_POS		0
+#define MAC_MDIODR_GD_LEN		16
+#define MAC_MDIODR_RA_POS		16
+#define MAC_MDIODR_RA_LEN		16
+#define MAC_MCR_ACS_POS			20
+#define MAC_MCR_ACS_LEN			1
+#define MAC_MCR_CST_POS			21
+#define MAC_MCR_CST_LEN			1
+#define MAC_MCR_IPC_POS			27
+#define MAC_MCR_IPC_LEN			1
+#define MAC_MCR_JE_POS			16
+#define MAC_MCR_JE_LEN			1
+#define MAC_MCR_LM_POS			12
+#define MAC_MCR_LM_LEN			1
+#define MAC_MCR_SS_POS			14
+#define MAC_MCR_SS_LEN			2
+#define MAC_MCR_DM_POS			13
+#define MAC_MCR_DM_LEN			2
+#define MAC_MCR_TE_POS			1
+#define MAC_MCR_TE_LEN			1
+#define MAC_MCR_RE_POS			0
+#define MAC_MCR_RE_LEN			1
+#define MAC_PFR_HMC_POS			2
+#define MAC_PFR_HMC_LEN			1
+#define MAC_PFR_HPF_POS			10
+#define MAC_PFR_HPF_LEN			1
+#define MAC_PFR_HUC_POS			1
+#define MAC_PFR_HUC_LEN			1
+#define MAC_PFR_PM_POS			4
+#define MAC_PFR_PM_LEN			1
+#define MAC_PFR_PR_POS			0
+#define MAC_PFR_PR_LEN			1
+#define MAC_PFR_VTFE_POS		16
+#define MAC_PFR_VTFE_LEN		1
+#define MAC_QTFCR_PT_POS		16
+#define MAC_QTFCR_PT_LEN		16
+#define MAC_QTFCR_TFE_POS		1
+#define MAC_QTFCR_TFE_LEN		1
+#define MAC_RFCR_RFE_POS		0
+#define MAC_RFCR_RFE_LEN		1
+#define MAC_RGMII_LNKSTS_POS		19
+#define MAC_RGMII_LNKSTS_LEN		1
+#define MAC_RGMII_SPEED_POS		17
+#define MAC_RGMII_SPEED_LEN		2
+#define MAC_RGMII_LNKMODE_POS		16
+#define MAC_RGMII_LNKMODE_LEN		1
+#define MAC_VLANHTR_VLHT_POS		0
+#define MAC_VLANHTR_VLHT_LEN		16
+#define MAC_VLANIR_VLTI_POS		20
+#define MAC_VLANIR_VLTI_LEN		1
+#define MAC_VLANIR_CSVL_POS		19
+#define MAC_VLANIR_CSVL_LEN		1
+#define MAC_VLANTR_EVLRXS_POS		24
+#define MAC_VLANTR_EVLRXS_LEN		1
+#define MAC_VLANTR_EVLS_POS		21
+#define MAC_VLANTR_EVLS_LEN		2
+#define MAC_VLANTR_DOVLTC_POS		20
+#define MAC_VLANTR_DOVLTC_LEN		1
+#define MAC_VLANTR_ERSVLM_POS		19
+#define MAC_VLANTR_ERSVLM_LEN		1
+#define MAC_VLANTR_ESVL_POS		18
+#define MAC_VLANTR_ESVL_LEN		1
+#define MAC_VLANTR_ETV_POS		16
+#define MAC_VLANTR_ETV_LEN		1
+#define MAC_VLANTR_VL_POS		0
+#define MAC_VLANTR_VL_LEN		16
+#define MAC_VLANTR_VTHM_POS		25
+#define MAC_VLANTR_VTHM_LEN		1
+#define MAC_VLANTR_VTIM_POS		17
+#define MAC_VLANTR_VTIM_LEN		1
+/* For HASH VLAN DISABLE */
+#define MAC_VLANTR_OFS_POS		2
+#define MAC_VLANTR_OFS_LEN		2
+#define MAC_VLANTR_CT_POS		1
+#define MAC_VLANTR_CT_LEN		1
+#define MAC_VLANTR_OB_POS		0
+#define MAC_VLANTR_OB_LEN		1
+#define MAC_VLANTFR_VEN_POS		16
+#define MAC_VLANTFR_VEN_LEN		1
+#define MAC_VLANTFR_VID_POS		0
+#define MAC_VLANTFR_VID_LEN		16
+#define MAC_VR_SNPSVER_POS		0
+#define MAC_VR_SNPSVER_LEN		8
+#define MAC_VR_USERVER_POS		8
+#define MAC_VR_USERVER_LEN		8
+
+/* MAC register value */
+#define GMAC_RGSMIIIS_SPEED_125		2
+#define GMAC_RGSMIIIS_SPEED_25		1
+#define GMAC_RGSMIIIS_SPEED_2_5		0
+
+/* MMC register offsets */
+/* Note:
+ * _GB register stands for good and bad frames
+ * _G is for good only.
+ */
+#define MMC_CR				0x0700
+#define MMC_RISR			0x0704
+#define MMC_TISR			0x0708
+#define MMC_RIER			0x070c
+#define MMC_TIER			0x0710
+#define MMC_IPCER			0x0800
+#define MMC_IPCSR			0x0808
+#define MMC_TXOCTETCOUNT_GB		0x714
+#define MMC_TXPACKETCOUNT_GB		0x718
+#define MMC_TXBROADCASTFRAMES_G		0x71c
+#define MMC_TXMULTICASTFRAMES_G		0x720
+#define MMC_TX64OCTETS_GB		0x724
+#define MMC_TX65TO127OCTETS_GB		0x728
+#define MMC_TX128TO255OCTETS_GB		0x72c
+#define MMC_TX256TO511OCTETS_GB		0x730
+#define MMC_TX512TO1023OCTETS_GB	0x734
+#define MMC_TX1024TOMAXOCTETS_GB	0x738
+#define MMC_TXUNICASTFRAMES_GB		0x73c
+#define MMC_TXMULTICASTFRAMES_GB	0x740
+#define MMC_TXBROADCASTFRAMES_GB	0x744
+#define MMC_TXUNDERFLOWERROR		0x748
+#define MMC_TXSINGLECOL_G		0x74c
+#define MMC_TXMULTICOL_G		0x750
+#define MMC_TXDEFERRED			0x754
+#define MMC_TXLATECOL			0x758
+#define MMC_TXEXESSCOL			0x75c
+#define MMC_TXCARRIERERROR		0x760
+#define MMC_TXOCTETCOUNT_G		0x764
+#define MMC_TXPACKETSCOUNT_G		0x768
+#define MMC_TXEXCESSDEF			0x76c
+#define MMC_TXPAUSEFRAMES		0x770
+#define MMC_TXVLANFRAMES_G		0x774
+#define MMC_TXOVERSIZE_G		0x778
+#define MMC_RXPACKETCOUNT_GB		0x780
+#define MMC_RXOCTETCOUNT_GB		0x784
+#define MMC_RXOCTETCOUNT_G		0x788
+#define MMC_RXBROADCASTFRAMES_G		0x78c
+#define MMC_RXMULTICASTFRAMES_G		0x790
+#define MMC_RXCRCERROR			0x794
+#define MMC_RXALIGNMENTERROR		0x798
+#define MMC_RXRUNTERROR			0x79c
+#define MMC_RXJABBERERROR		0x7a0
+#define MMC_RXUNDERSIZE_G		0x7a4
+#define MMC_RXOVERSIZE_G		0x7a8
+#define MMC_RX64OCTETS_GB		0x7ac
+#define MMC_RX65TO127OCTETS_GB		0x7b0
+#define MMC_RX128TO255OCTETS_GB		0x7b4
+#define MMC_RX256TO511OCTETS_GB		0x7b8
+#define MMC_RX512TO1023OCTETS_GB	0x7bc
+#define MMC_RX1024TOMAXOCTETS_GB	0x7c0
+#define MMC_RXUNICASTFRAMES_G		0x7c4
+#define MMC_RXLENGTHERROR		0x7c8
+#define MMC_RXOUTOFRANGETYPE		0x7cc
+#define MMC_RXPAUSEFRAMES		0x7d0
+#define MMC_RXFIFOOVERFLOW		0x7d4
+#define MMC_RXVLANFRAMES_GB		0x7d8
+#define MMC_RXWATCHDOGERROR		0x7dc
+#define MMC_RXRCVERROR			0x7e0
+#define MMC_RXCTRLFRAMES_G		0x7e4
+#define MMC_TXLPIUSEC			0x7ec
+#define MMC_TXLPITRAN			0x7f0
+#define MMC_RXLPIUSEC			0x7f4
+#define MMC_RXLPITRAN			0x7f8
+#define MMC_RXIPV4GDPKTS		0x810
+#define MMC_RXIPV4HDRERRPKTS		0x814
+#define MMC_RXIPV4NOPAYPKTS		0x818
+#define MMC_RXIPV4FRAGPKTS		0x81c
+#define MMC_RXIPV4UBSBLPKTS		0x820
+#define MMC_RXIPV6GDPKTS		0x824
+#define MMC_RXIPV6HDRERRPKTS		0x828
+#define MMC_RXIPV6NOPAYPKTS		0x82c
+#define MMC_RXUDPGDPKTS			0x830
+#define MMC_RXUDPERRPKTS		0x834
+#define MMC_RXTCPGDPKTS			0x838
+#define MMC_RXTCPERRPKTS		0x83c
+#define MMC_RXICMPGDPKTS		0x840
+#define MMC_RXICMPERRPKTS		0x844
+#define MMC_RXIPV4GDOCTETS		0x850
+#define MMC_RXIPV4HDRERROCTETS		0x854
+#define MMC_RXIPV4NOPAYOCTETS		0x858
+#define MMC_RXIPV4FRAGOCTETS		0x85c
+#define MMC_RXIPV4UDSBLOCTETS		0x860
+#define MMC_RXIPV6GDOCTETS		0x864
+#define MMC_RXIPV6HDRERROCTETS		0x868
+#define MMC_RXIPV6NOPAYOCTETS		0x86c
+#define MMC_RXUDPGDOCTETS		0x870
+#define MMC_RXUDPERROCTETS		0x874
+#define MMC_RXTCPGDOCTETS		0x878
+#define MMC_RXTCPERROCTETS		0x87c
+#define MMC_RXICMPGDOCTETS		0x880
+#define MMC_RXICMPERROCTETS		0x884
+
+/* MMC register entry bit positions and sizes */
+#define MMC_CR_MCF_POS				3
+#define MMC_CR_MCF_LEN				1
+#define MMC_CR_ROR_POS				2
+#define MMC_CR_ROR_LEN				1
+#define MMC_CR_CR_POS				0
+#define MMC_CR_CR_LEN				1
+#define MMC_IPCSR_RXICMPERROCTETS_POS		29
+#define MMC_IPCSR_RXICMPERROCTETS_LEN		1
+#define MMC_IPCSR_RXICMPGDOCTETS_POS		28
+#define MMC_IPCSR_RXICMPGDOCTETS_LEN		1
+#define MMC_IPCSR_RXTCPERROCTETS_POS		27
+#define MMC_IPCSR_RXTCPERROCTETS_LEN		1
+#define MMC_IPCSR_RXTCPGDOCTETS_POS		26
+#define MMC_IPCSR_RXTCPGDOCTETS_LEN		1
+#define MMC_IPCSR_RXUDPERROCTETS_POS		25
+#define MMC_IPCSR_RXUDPERROCTETS_LEN		1
+#define MMC_IPCSR_RXUDPGDOCTETS_POS		24
+#define MMC_IPCSR_RXUDPGDOCTETS_LEN		1
+#define MMC_IPCSR_RXIPV6NOPAYOCTETS_POS		23
+#define MMC_IPCSR_RXIPV6NOPAYOCTETS_LEN		1
+#define MMC_IPCSR_RXIPV6HDRERROCTETS_POS	22
+#define MMC_IPCSR_RXIPV6HDRERROCTETS_LEN	1
+#define MMC_IPCSR_RXIPV6GDOCTETS_POS		21
+#define MMC_IPCSR_RXIPV6GDOCTETS_LEN		1
+#define MMC_IPCSR_RXIPV4UDSBLOCTETS_POS		20
+#define MMC_IPCSR_RXIPV4UDSBLOCTETS_LEN		1
+#define MMC_IPCSR_RXIPV4FRAGOCTETS_POS		19
+#define MMC_IPCSR_RXIPV4FRAGOCTETS_LEN		1
+#define MMC_IPCSR_RXIPV4NOPAYOCTETS_POS		18
+#define MMC_IPCSR_RXIPV4NOPAYOCTETS_LEN		1
+#define MMC_IPCSR_RXIPV4HDRERROCTETS_POS	17
+#define MMC_IPCSR_RXIPV4HDRERROCTETS_LEN	1
+#define MMC_IPCSR_RXIPV4GDOCTETS_POS		16
+#define MMC_IPCSR_RXIPV4GDOCTETS_LEN		1
+#define MMC_IPCSR_RXICMPERRPKTS_POS		13
+#define MMC_IPCSR_RXICMPERRPKTS_LEN		1
+#define MMC_IPCSR_RXICMPGDPKTS_POS		12
+#define MMC_IPCSR_RXICMPGDPKTS_LEN		1
+#define MMC_IPCSR_RXTCPERRPKTS_POS		11
+#define MMC_IPCSR_RXTCPERRPKTS_LEN		1
+#define MMC_IPCSR_RXTCPGDPKTS_POS		10
+#define MMC_IPCSR_RXTCPGDPKTS_LEN		1
+#define MMC_IPCSR_RXUDPERRPKTS_POS		9
+#define MMC_IPCSR_RXUDPERRPKTS_LEN		1
+#define MMC_IPCSR_RXUDPGDPKTS_POS		8
+#define MMC_IPCSR_RXUDPGDPKTS_LEN		1
+#define MMC_IPCSR_RXIPV6NOPAYPKTS_POS		7
+#define MMC_IPCSR_RXIPV6NOPAYPKTS_LEN		1
+#define MMC_IPCSR_RXIPV6HDRERRPKTS_POS		6
+#define MMC_IPCSR_RXIPV6HDRERRPKTS_LEN		1
+#define MMC_IPCSR_RXIPV6GDPKTS_POS		5
+#define MMC_IPCSR_RXIPV6GDPKTS_LEN		1
+#define MMC_IPCSR_RXIPV4UBSBLPKTS_POS		4
+#define MMC_IPCSR_RXIPV4UBSBLPKTS_LEN		1
+#define MMC_IPCSR_RXIPV4FRAGPKTS_POS		3
+#define MMC_IPCSR_RXIPV4FRAGPKTS_LEN		1
+#define MMC_IPCSR_RXIPV4NOPAYPKTS_POS		2
+#define MMC_IPCSR_RXIPV4NOPAYPKTS_LEN		1
+#define MMC_IPCSR_RXIPV4HDRERRPKTS_POS		1
+#define MMC_IPCSR_RXIPV4HDRERRPKTS_LEN		1
+#define MMC_IPCSR_RXIPV4GDPKTS_POS		0
+#define MMC_IPCSR_RXIPV4GDPKTS_LEN		1
+#define MMC_RISR_RXLPITRAN_POS			27
+#define MMC_RISR_RXLPITRAN_LEN			1
+#define MMC_RISR_RXLPIUSEC_POS			26
+#define MMC_RISR_RXLPIUSEC_LEN			1
+#define MMC_RISR_RXCTRLFRAMES_POS		25
+#define MMC_RISR_RXCTRLFRAMES_LEN		1
+#define MMC_RISR_RXRCVERROR_POS			24
+#define MMC_RISR_RXRCVERROR_LEN			1
+#define MMC_RISR_RXWATCHDOGERROR_POS		23
+#define MMC_RISR_RXWATCHDOGERROR_LEN		1
+#define MMC_RISR_RXVLANFRAMES_GB_POS		22
+#define MMC_RISR_RXVLANFRAMES_GB_LEN		1
+#define MMC_RISR_RXFIFOOVERFLOW_POS		21
+#define MMC_RISR_RXFIFOOVERFLOW_LEN		1
+#define MMC_RISR_RXPAUSEFRAMES_POS		20
+#define MMC_RISR_RXPAUSEFRAMES_LEN		1
+#define MMC_RISR_RXOUTOFRANGETYPE_POS		19
+#define MMC_RISR_RXOUTOFRANGETYPE_LEN		1
+#define MMC_RISR_RXLENGTHERROR_POS		18
+#define MMC_RISR_RXLENGTHERROR_LEN		1
+#define MMC_RISR_RXUNICASTFRAMES_G_POS		17
+#define MMC_RISR_RXUNICASTFRAMES_G_LEN		1
+#define MMC_RISR_RX1024TOMAXOCTETS_GB_POS	16
+#define MMC_RISR_RX1024TOMAXOCTETS_GB_LEN	1
+#define MMC_RISR_RX512TO1023OCTETS_GB_POS	15
+#define MMC_RISR_RX512TO1023OCTETS_GB_LEN	1
+#define MMC_RISR_RX256TO511OCTETS_GB_POS	14
+#define MMC_RISR_RX256TO511OCTETS_GB_LEN	1
+#define MMC_RISR_RX128TO255OCTETS_GB_POS	13
+#define MMC_RISR_RX128TO255OCTETS_GB_LEN	1
+#define MMC_RISR_RX65TO127OCTETS_GB_POS		12
+#define MMC_RISR_RX65TO127OCTETS_GB_LEN		1
+#define MMC_RISR_RX64OCTETS_GB_POS		11
+#define MMC_RISR_RX64OCTETS_GB_LEN		1
+#define MMC_RISR_RXOVERSIZE_G_POS		10
+#define MMC_RISR_RXOVERSIZE_G_LEN		1
+#define MMC_RISR_RXUNDERSIZE_G_POS		9
+#define MMC_RISR_RXUNDERSIZE_G_LEN		1
+#define MMC_RISR_RXJABBERERROR_POS		8
+#define MMC_RISR_RXJABBERERROR_LEN		1
+#define MMC_RISR_RXRUNTERROR_POS		7
+#define MMC_RISR_RXRUNTERROR_LEN		1
+#define MMC_RISR_RXALIGNMENTERROR_POS		6
+#define MMC_RISR_RXALIGNMENTERROR_LEN		1
+#define MMC_RISR_RXCRCERROR_POS			5
+#define MMC_RISR_RXCRCERROR_LEN			1
+#define MMC_RISR_RXMULTICASTFRAMES_G_POS	4
+#define MMC_RISR_RXMULTICASTFRAMES_G_LEN	1
+#define MMC_RISR_RXBROADCASTFRAMES_G_POS	3
+#define MMC_RISR_RXBROADCASTFRAMES_G_LEN	1
+#define MMC_RISR_RXOCTETCOUNT_G_POS		2
+#define MMC_RISR_RXOCTETCOUNT_G_LEN		1
+#define MMC_RISR_RXOCTETCOUNT_GB_POS		1
+#define MMC_RISR_RXOCTETCOUNT_GB_LEN		1
+#define MMC_RISR_RXFRAMECOUNT_GB_POS		0
+#define MMC_RISR_RXFRAMECOUNT_GB_LEN		1
+#define MMC_TISR_TXLPITRAN_POS			27
+#define MMC_TISR_TXLPITRAN_LEN			1
+#define MMC_TISR_TXLPIUSEC_POS			26
+#define MMC_TISR_TXLPIUSEC_LEN			1
+#define MMC_TISR_TXOVERSIZE_G_POS		25
+#define MMC_TISR_TXOVERSIZE_G_LEN		1
+#define MMC_TISR_TXVLANFRAMES_G_POS		24
+#define MMC_TISR_TXVLANFRAMES_G_LEN		1
+#define MMC_TISR_TXPAUSEFRAMES_POS		23
+#define MMC_TISR_TXPAUSEFRAMES_LEN		1
+#define MMC_TISR_TXEXCESSDEF_POS		22
+#define MMC_TISR_TXEXCESSDEF_LEN		1
+#define MMC_TISR_TXFRAMECOUNT_G_POS		21
+#define MMC_TISR_TXFRAMECOUNT_G_LEN		1
+#define MMC_TISR_TXOCTETCOUNT_G_POS		20
+#define MMC_TISR_TXOCTETCOUNT_G_LEN		1
+#define MMC_TISR_TXCARRIERERROR_POS		19
+#define MMC_TISR_TXCARRIERERROR_LEN		1
+#define MMC_TISR_TXEXESSCOL_POS			18
+#define MMC_TISR_TXEXESSCOL_LEN			1
+#define MMC_TISR_TXLATECOL_POS			17
+#define MMC_TISR_TXLATECOL_LEN			1
+#define MMC_TISR_TXDEFERRED_POS			16
+#define MMC_TISR_TXDEFERRED_LEN			1
+#define MMC_TISR_TXMULTICOL_G_POS		15
+#define MMC_TISR_TXMULTICOL_G_LEN		1
+#define MMC_TISR_TXSINGLECOL_G_POS		14
+#define MMC_TISR_TXSINGLECOL_G_LEN		1
+#define MMC_TISR_TXUNDERFLOWERROR_POS		13
+#define MMC_TISR_TXUNDERFLOWERROR_LEN		1
+#define MMC_TISR_TXBROADCASTFRAMES_GB_POS	12
+#define MMC_TISR_TXBROADCASTFRAMES_GB_LEN	1
+#define MMC_TISR_TXMULTICASTFRAMES_GB_POS	11
+#define MMC_TISR_TXMULTICASTFRAMES_GB_LEN	1
+#define MMC_TISR_TXUNICASTFRAMES_GB_POS		10
+#define MMC_TISR_TXUNICASTFRAMES_GB_LEN		1
+#define MMC_TISR_TX1024TOMAXOCTETS_GB_POS	9
+#define MMC_TISR_TX1024TOMAXOCTETS_GB_LEN	1
+#define MMC_TISR_TX512TO1023OCTETS_GB_POS	8
+#define MMC_TISR_TX512TO1023OCTETS_GB_LEN	1
+#define MMC_TISR_TX256TO511OCTETS_GB_POS	7
+#define MMC_TISR_TX256TO511OCTETS_GB_LEN	1
+#define MMC_TISR_TX128TO255OCTETS_GB_POS	6
+#define MMC_TISR_TX128TO255OCTETS_GB_LEN	1
+#define MMC_TISR_TX65TO127OCTETS_GB_POS		5
+#define MMC_TISR_TX65TO127OCTETS_GB_LEN		1
+#define MMC_TISR_TX64OCTETS_GB_POS		4
+#define MMC_TISR_TX64OCTETS_GB_LEN		1
+#define MMC_TISR_TXMULTICASTFRAMES_G_POS	3
+#define MMC_TISR_TXMULTICASTFRAMES_G_LEN	1
+#define MMC_TISR_TXBROADCASTFRAMES_G_POS	2
+#define MMC_TISR_TXBROADCASTFRAMES_G_LEN	1
+#define MMC_TISR_TXFRAMECOUNT_GB_POS		1
+#define MMC_TISR_TXFRAMECOUNT_GB_LEN		1
+#define MMC_TISR_TXOCTETCOUNT_GB_POS		0
+#define MMC_TISR_TXOCTETCOUNT_GB_LEN		1
+
+/* IEEE 1588 PTP register offsets */
+#define	PTP_TCR		0xb00	/* Timestamp Control Reg */
+#define	PTP_SSIR	0xb04	/* Sub-Second Increment Reg */
+#define	PTP_STSR	0xb08	/* System Time  Seconds Reg */
+#define	PTP_STNSR	0xb0c	/* System Time  Nanoseconds Reg */
+#define	PTP_STSUR	0xb10	/* System Time  Seconds Update Reg */
+#define	PTP_STNSUR	0xb14	/* System Time  Nanoseconds Update Reg */
+#define	PTP_TAR		0xb18	/* Timestamp Addend Reg */
+#define PTP_TTSN	0xb30	/* Tx Timestamp status Nanoseconds Reg */
+#define PTP_TTN		0xb34	/* Tx Timestamp status Seconds Reg */
+
+/* PTP Timestamp control register entry bit positions and sizes */
+#define	PTP_SSIR_SSINC_POS		16
+#define	PTP_SSIR_SSINC_LEN		8
+#define PTP_STNSUR_ADDSUB_POS		31
+#define PTP_STNSUR_ADDSUB_LEN		1
+#define PTP_STNSUR_TSSSS_POS		0
+#define PTP_STNSUR_TSSSS_LEN		31
+#define PTP_TCR_AV8021ASMEN_POS		28
+#define PTP_TCR_AV8021ASMEN_LEN		1
+#define	PTP_TCR_SNAPTYPSEL_POS		16
+#define	PTP_TCR_SNAPTYPSEL_LEN		2
+#define	PTP_TCR_TSMSTRENA_POS		15
+#define	PTP_TCR_TSMSTRENA_LEN		1
+#define	PTP_TCR_TSEVNTENA_POS		14
+#define	PTP_TCR_TSEVNTENA_LEN		1
+#define	PTP_TCR_TSIPV4ENA_POS		13
+#define	PTP_TCR_TSIPV4ENA_LEN		1
+#define	PTP_TCR_TSIPV6ENA_POS		12
+#define	PTP_TCR_TSIPV6ENA_LEN		1
+#define	PTP_TCR_TSIPENA_POS		11
+#define	PTP_TCR_TSIPENA_LEN		1
+#define	PTP_TCR_TSVER2ENA_POS		10
+#define	PTP_TCR_TSVER2ENA_LEN		1
+#define	PTP_TCR_TSCTRLSSR_POS		9
+#define	PTP_TCR_TSCTRLSSR_LEN		1
+#define	PTP_TCR_TSENALL_POS		8
+#define	PTP_TCR_TSENALL_LEN		1
+#define	PTP_TCR_TSADDREG_POS		5
+#define	PTP_TCR_TSADDREG_LEN		1
+#define	PTP_TCR_TSUPDT_POS		3
+#define	PTP_TCR_TSUPDT_LEN		1
+#define	PTP_TCR_TSINIT_POS		2
+#define	PTP_TCR_TSINIT_LEN		1
+#define	PTP_TCR_TSCFUPDT_POS		1
+#define	PTP_TCR_TSCFUPDT_LEN		1
+#define	PTP_TCR_TSENA_POS		0
+#define	PTP_TCR_TSENA_LEN		1
+
+/* PTP Timestamp control register value */
+#define	PTP_DIGITAL_ROLLOVER_MODE	0x3B9ACA00	/* 10e9-1 ns */
+#define	PTP_BINARY_ROLLOVER_MODE	0x80000000	/* ~0.466 ns */
+
+/* MTL register offsets */
+#define MTL_OMR				0xc00
+#define MTL_RQDCM0R			0xc30
+#define MTL_RQDCM1R			0xc34
+
+/* MTL register entry bit positions and sizes */
+#define MTL_OMR_TSA_POS			5
+#define MTL_OMR_TSA_LEN			2
+#define MTL_OMR_RAA_POS			2
+#define MTL_OMR_RAA_LEN			1
+
+/* MTL queue register offsets
+ *   Multiple queues can be active.  The first queue has registers
+ *   that begin at 0xd00.  Each subsequent queue has registers that
+ *   are accessed using an offset of 0x40 from the previous queue.
+ */
+#define MTL_Q_BASE			0x0d00
+#define MTL_Q_BASE_OFFSET		0x0040
+#define MTL_QX_BASE(x)			(MTL_Q_BASE + \
+					((x) * MTL_Q_BASE_OFFSET))
+
+#define MTL_Q_TQOMR(x)			MTL_QX_BASE(x)
+#define MTL_Q_TESR(x)			(MTL_QX_BASE(x) + 0x14)
+#define MTL_Q_TQWR(x)			(MTL_QX_BASE(x) + 0x18)
+#define MTL_Q_ICSR(x)			(MTL_QX_BASE(x) + 0x2c)
+#define MTL_Q_RQOMR(x)			(MTL_QX_BASE(x) + 0x30)
+
+/* MTL queue register entry bit positions and sizes */
+#define MTL_ICR_RXOIE_POS		24
+#define MTL_ICR_RXOIE_LEN		1
+#define MTL_ICR_RXOVFIS_POS		16
+#define MTL_ICR_RXOVFIS_LEN		1
+#define MTL_ICR_ABPSIE_POS		9
+#define MTL_ICR_ABPSIE_LEN		1
+#define MTL_ICR_TXUIE_POS		8
+#define MTL_ICR_TXUIE_LEN		1
+#define MTL_ICR_ABPSIS_POS		1
+#define MTL_ICR_ABPSIS_LEN		1
+#define MTL_ICR_TXUNFIS_POS		0
+#define MTL_ICR_TXUNFIS_LEN		1
+#define MTL_Q_RQOMR_RQS_POS		20
+#define MTL_Q_RQOMR_RQS_LEN		10
+#define MTL_Q_RQOMR_RFD_POS		14
+#define MTL_Q_RQOMR_RFD_LEN		6
+#define MTL_Q_RQOMR_RFA_POS		8
+#define MTL_Q_RQOMR_RFA_LEN		6
+#define MTL_Q_RQOMR_EHFC_POS		7
+#define MTL_Q_RQOMR_EHFC_LEN		1
+#define MTL_Q_RQOMR_RSF_POS		5
+#define MTL_Q_RQOMR_RSF_LEN		1
+#define MTL_Q_RQOMR_FEP_POS		4
+#define MTL_Q_RQOMR_FEP_LEN		1
+#define MTL_Q_RQOMR_FUP_POS		3
+#define MTL_Q_RQOMR_FUP_LEN		1
+#define MTL_Q_RQOMR_RTC_POS		0
+#define MTL_Q_RQOMR_RTC_LEN		2
+#define MTL_Q_TQWR_QW_POS		0
+#define MTL_Q_TQWR_QW_LEN		21
+#define MTL_Q_TQOMR_FTQ_POS		0
+#define MTL_Q_TQOMR_FTQ_LEN		1
+#define MTL_Q_TQOMR_TQS_POS		16
+#define MTL_Q_TQOMR_TQS_LEN		10
+#define MTL_Q_TQOMR_TSF_POS		1
+#define MTL_Q_TQOMR_TSF_LEN		1
+#define MTL_Q_TQOMR_TTC_POS		4
+#define MTL_Q_TQOMR_TTC_LEN		3
+#define MTL_Q_TQOMR_TXQEN_POS		2
+#define MTL_Q_TQOMR_TXQEN_LEN		2
+
+/* MTL queue register value */
+#define MTL_RSF_DISABLE			0x00
+#define MTL_RSF_ENABLE			0x01
+#define MTL_TSF_DISABLE			0x00
+#define MTL_TSF_ENABLE			0x01
+#define MTL_RX_THRESHOLD_64		0x00
+#define MTL_RX_THRESHOLD_96		0x02
+#define MTL_RX_THRESHOLD_128		0x03
+#define MTL_TX_THRESHOLD_64		0x00
+#define MTL_TX_THRESHOLD_96		0x02
+#define MTL_TX_THRESHOLD_128		0x03
+#define MTL_TX_THRESHOLD_192		0x04
+#define MTL_TX_THRESHOLD_256		0x05
+#define MTL_TX_THRESHOLD_384		0x06
+#define MTL_TX_THRESHOLD_512		0x07
+#define MTL_TSA_WRR			0x00
+#define MTL_TSA_WFQ			0x01
+#define MTL_TSA_DWRR			0x02
+#define MTL_TSA_SP			0x03
+#define MTL_RAA_SP			0x00
+#define MTL_RAA_WSP			0x01
+#define MTL_Q_DISABLED			0x00
+#define MTL_Q_ENABLED			0x02
+#define MTL_RQDCM0R_Q0MDMACH		0x00000000
+#define MTL_RQDCM0R_Q1MDMACH		0x00000100
+#define MTL_RQDCM0R_Q2MDMACH		0x00020000
+#define MTL_RQDCM0R_Q3MDMACH		0x03000000
+#define MTL_RQDCM1R_Q4MDMACH		0x00000004
+#define MTL_RQDCM1R_Q5MDMACH		0x00000500
+#define MTL_RQDCM1R_Q6MDMACH		0x00060000
+#define MTL_RQDCM1R_Q7MDMACH		0x07000000
+
+/* DMA register offsets */
+#define DMA_MR				0x1000
+#define DMA_SBMR			0x1004
+#define DMA_ISR				0x1008
+#define DMA_DSR0			0x100c
+#define DMA_DSR1			0x1010
+
+/* DMA register entry bit positions and sizes */
+#define DMA_ISR_MACIS_POS		17
+#define DMA_ISR_MACIS_LEN		1
+#define DMA_ISR_MTLIS_POS		16
+#define DMA_ISR_MTLIS_LEN		1
+#define DMA_MR_SWR_POS			0
+#define DMA_MR_SWR_LEN			1
+#define DMA_SBMR_WR_OSR_LMT_POS		24
+#define DMA_SBMR_WR_OSR_LMT_LEN		3
+#define DMA_SBMR_RD_OSR_LMT_POS		16
+#define DMA_SBMR_RD_OSR_LMT_LEN		3
+#define DMA_SBMR_BLEN_16_POS		3
+#define DMA_SBMR_BLEN_16_LEN		1
+#define DMA_SBMR_BLEN_8_POS		2
+#define DMA_SBMR_BLEN_8_LEN		1
+#define DMA_SBMR_BLEN_4_POS		1
+#define DMA_SBMR_BLEN_4_LEN		1
+#define DMA_SBMR_FB_POS			0
+#define DMA_SBMR_FB_LEN			1
+
+/* DMA register values */
+#define DMA_SBMR_OSR_MAX		7
+#define DMA_DSR_RPS_LEN			4
+#define DMA_DSR_TPS_LEN			4
+#define DMA_DSR_Q_LEN			(DMA_DSR_RPS_LEN + DMA_DSR_TPS_LEN)
+#define DMA_DSR0_TPS_START		12
+#define DMA_DSR0_RPS_START		8
+#define DMA_DSRX_FIRST_QUEUE		3
+#define DMA_DSRX_INC			4
+#define DMA_DSRX_QPR			4
+#define DMA_DSRX_TPS_START		4
+#define DMA_DSRX_RPS_START		0
+#define DMA_ISR_MACIS_POS		17
+#define DMA_ISR_MACIS_LEN		1
+#define MAC_ISR_RGSMIIS_POS		0
+#define MAC_ISR_RGSMIIS_LEN		1
+
+/* DMA channel register offsets
+ *   Multiple channels can be active.  The first channel has registers
+ *   that begin at 0x1100.  Each subsequent channel has registers that
+ *   are accessed using an offset of 0x80 from the previous channel.
+ */
+#define DMA_CH_BASE			0x1100
+#define DMA_CH_INC			0x80
+
+#define DMA_CHX_BASE(x)			(DMA_CH_BASE + \
+					((x) * DMA_CH_INC))
+
+#define DMA_CH_CR(x)			DMA_CHX_BASE(x)
+#define DMA_CH_TCR(x)			(DMA_CHX_BASE(x) + 0x04)
+#define DMA_CH_RCR(x)			(DMA_CHX_BASE(x) + 0x08)
+#define DMA_CH_TDLR(x)			(DMA_CHX_BASE(x) + 0x14)
+#define DMA_CH_RDLR(x)			(DMA_CHX_BASE(x) + 0x1c)
+#define DMA_CH_TDTR(x)			(DMA_CHX_BASE(x) + 0x20)
+#define DMA_CH_RDTR(x)			(DMA_CHX_BASE(x) + 0x28)
+#define DMA_CH_TDRLR(x)			(DMA_CHX_BASE(x) + 0x2c)
+#define DMA_CH_RDRLR(x)			(DMA_CHX_BASE(x) + 0x30)
+#define DMA_CH_IER(x)			(DMA_CHX_BASE(x) + 0x34)
+#define DMA_CH_RIWT(x)			(DMA_CHX_BASE(x) + 0x38)
+#define DMA_CH_SR(x)			(DMA_CHX_BASE(x) + 0x60)
+
+/* DMA channel register entry bit positions and sizes */
+#define DMA_CH_CR_PBLX8_POS		16
+#define DMA_CH_CR_PBLX8_LEN		1
+#define DMA_CH_CR_SPH_POS		24
+#define DMA_CH_CR_SPH_LEN		1
+#define DMA_CH_IER_AIE_POS		14
+#define DMA_CH_IER_AIE_LEN		1
+#define DMA_CH_IER_FBEE_POS		12
+#define DMA_CH_IER_FBEE_LEN		1
+#define DMA_CH_IER_NIE_POS		15
+#define DMA_CH_IER_NIE_LEN		1
+#define DMA_CH_IER_RBUE_POS		7
+#define DMA_CH_IER_RBUE_LEN		1
+#define DMA_CH_IER_RIE_POS		6
+#define DMA_CH_IER_RIE_LEN		1
+#define DMA_CH_IER_RSE_POS		8
+#define DMA_CH_IER_RSE_LEN		1
+#define DMA_CH_IER_TBUE_POS		2
+#define DMA_CH_IER_TBUE_LEN		1
+#define DMA_CH_IER_TIE_POS		0
+#define DMA_CH_IER_TIE_LEN		1
+#define DMA_CH_IER_TXSE_POS		1
+#define DMA_CH_IER_TXSE_LEN		1
+#define DMA_CH_ISR_NIS_POS		15
+#define DMA_CH_ISR_NIS_LEN		1
+#define DMA_CH_ISR_AIS_POS		14
+#define DMA_CH_ISR_AIS_LEN		1
+#define DMA_CH_ISR_CDE_POS		13
+#define DMA_CH_ISR_CDE_LEN		1
+#define DMA_CH_ISR_FBE_POS		12
+#define DMA_CH_ISR_FBE_LEN		1
+#define DMA_CH_ISR_ERI_POS		11
+#define DMA_CH_ISR_ERI_LEN		1
+#define DMA_CH_ISR_ETI_POS		10
+#define DMA_CH_ISR_ETI_LEN		1
+#define DMA_CH_ISR_RWT_POS		9
+#define DMA_CH_ISR_RWT_LEN		1
+#define DMA_CH_ISR_RPS_POS		8
+#define DMA_CH_ISR_RPS_LEN		1
+#define DMA_CH_ISR_RBU_POS		7
+#define DMA_CH_ISR_RBU_LEN		1
+#define DMA_CH_ISR_RI_POS		6
+#define DMA_CH_ISR_RI_LEN		1
+#define DMA_CH_ISR_TBU_POS		2
+#define DMA_CH_ISR_TBU_LEN		1
+#define DMA_CH_ISR_TPS_POS		1
+#define DMA_CH_ISR_TPS_LEN		1
+#define DMA_CH_ISR_TI_POS		0
+#define DMA_CH_ISR_TI_LEN		1
+#define DMA_CH_RCR_PBL_POS		16
+#define DMA_CH_RCR_PBL_LEN		6
+#define DMA_CH_RCR_RBSZ_POS		1
+#define DMA_CH_RCR_RBSZ_LEN		14
+#define DMA_CH_RCR_SR_POS		0
+#define DMA_CH_RCR_SR_LEN		1
+#define DMA_CH_RIWT_RWT_POS		0
+#define DMA_CH_RIWT_RWT_LEN		8
+#define DMA_CH_TCR_PBL_POS		16
+#define DMA_CH_TCR_PBL_LEN		6
+#define DMA_CH_TCR_TSE_POS		12
+#define DMA_CH_TCR_TSE_LEN		1
+#define DMA_CH_TCR_OSP_POS		4
+#define DMA_CH_TCR_OSP_LEN		1
+#define DMA_CH_TCR_ST_POS		0
+#define DMA_CH_TCR_ST_LEN		1
+
+/* DMA channel register values */
+#define DMA_OSP_DISABLE			0x00
+#define DMA_OSP_ENABLE			0x01
+#define DMA_PBL_1			1
+#define DMA_PBL_2			2
+#define DMA_PBL_4			4
+#define DMA_PBL_8			8
+#define DMA_PBL_16			16
+#define DMA_PBL_32			32
+#define DMA_PBL_64			64
+#define DMA_PBL_128			128
+#define DMA_PBL_256			256
+#define DMA_PBL_X8_DISABLE		0x00
+#define DMA_PBL_X8_ENABLE		0x01
+
+#define GMAC_COPYBREAK_DEFAULT 256
+
+#endif /* __MT2712_REG_H__ */
