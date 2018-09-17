@@ -1,0 +1,45 @@
+MediaTek Gigabit Ethernet controller
+=========================================
+
+The gigabit ethernet controller can be found on MediaTek SoCs.
+
+* Ethernet controller node
+
+Required properties:
+- compatible: Should be
+	"mediatek,mt2712-eth": for MT2712 SoC
+- reg: Address and length of the register set for the device
+- interrupts: Should contain the MAC interrupts
+- interrupt-names: the name of interrupt in the interrupts property. These are
+	"macirq": For MT2712 SoC
+- clocks: the clock used by the controller
+- clock-names: the names of the clock listed in the clocks property. These are
+	"axi", "apb", "mac_ext", "ptp", "ptp_parent", "ptp_top": For MT2712 SoC
+- mac-address: See ethernet.txt in the same directory
+- power-domains: phandle to the power domain that the ethernet is part of
+- phy-mode: See ethernet.txt file in the same directory.
+- reset-gpio: gpio number for phy reset.
+
+Example:
+
+eth: eth@1101c000 {
+		compatible = "mediatek,mt2712-eth";
+		reg = <0 0x1101c000 0 0x1200>;
+		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "macirq";
+		phy-mode ="rgmii";
+		mac-address = [00 55 7b b5 7d f7];
+		clock-names = "axi",
+			      "apb",
+			      "mac_ext",
+			      "ptp",
+			      "ptp_parent",
+			      "ptp_top";
+		clocks = <&pericfg CLK_PERI_GMAC>,
+			 <&pericfg CLK_PERI_GMAC_PCLK>,
+			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
+			 <&topckgen CLK_TOP_ETHER_50M_SEL>,
+			 <&topckgen CLK_TOP_APLL1_D3>,
+			 <&topckgen CLK_TOP_APLL1>;
+		reset-gpio = <&pio 87 GPIO_ACTIVE_HIGH>;
+	};
