@@ -174,6 +174,7 @@ per stream. From ASoC DPCM framework, this stream state maybe linked to
 .startup() operation.
 
   .. code-block:: c
+
   int sdw_alloc_stream(char * stream_name);
 
 
@@ -200,6 +201,7 @@ only be invoked once by respective Master(s) and Slave(s). From ASoC DPCM
 framework, this stream state is linked to .hw_params() operation.
 
   .. code-block:: c
+
   int sdw_stream_add_master(struct sdw_bus * bus,
 		struct sdw_stream_config * stream_config,
 		struct sdw_ports_config * ports_config,
@@ -245,6 +247,7 @@ stream. From ASoC DPCM framework, this stream state is linked to
 .prepare() operation.
 
   .. code-block:: c
+
   int sdw_prepare_stream(struct sdw_stream_runtime * stream);
 
 
@@ -274,6 +277,7 @@ stream. From ASoC DPCM framework, this stream state is linked to
 .trigger() start operation.
 
   .. code-block:: c
+
   int sdw_enable_stream(struct sdw_stream_runtime * stream);
 
 SDW_STREAM_DISABLED
@@ -301,6 +305,7 @@ per stream. From ASoC DPCM framework, this stream state is linked to
 .trigger() stop operation.
 
   .. code-block:: c
+
   int sdw_disable_stream(struct sdw_stream_runtime * stream);
 
 
@@ -325,6 +330,7 @@ per stream. From ASoC DPCM framework, this stream state is linked to
 .trigger() stop operation.
 
   .. code-block:: c
+
   int sdw_deprepare_stream(struct sdw_stream_runtime * stream);
 
 
@@ -349,6 +355,7 @@ all the Master(s) and Slave(s) associated with stream. From ASoC DPCM
 framework, this stream state is linked to .hw_free() operation.
 
   .. code-block:: c
+
   int sdw_stream_remove_master(struct sdw_bus * bus,
 		struct sdw_stream_runtime * stream);
   int sdw_stream_remove_slave(struct sdw_slave * slave,
@@ -361,6 +368,7 @@ stream assigned as part of ALLOCATED state.
 In .shutdown() the data structure maintaining stream state are freed up.
 
   .. code-block:: c
+
   void sdw_release_stream(struct sdw_stream_runtime * stream);
 
 Not Supported
