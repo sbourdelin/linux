@@ -138,6 +138,12 @@ DEFINE_IRQ_VECTOR_EVENT(deferred_error_apic);
 DEFINE_IRQ_VECTOR_EVENT(thermal_apic);
 #endif
 
+/*
+ * external_interrupt - called when entering/exiting from regular device
+ * interrupt vector handler.
+ */
+DEFINE_IRQ_VECTOR_EVENT(external_interrupt);
+
 TRACE_EVENT(vector_config,
 
 	TP_PROTO(unsigned int irq, unsigned int vector,
