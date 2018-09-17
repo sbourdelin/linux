@@ -89,26 +89,11 @@ static int fanotify_get_response(struct fsnotify_group *group,
 	return ret;
 }
 
-static bool fanotify_should_send_event(struct fsnotify_iter_info *iter_info,
-				       u32 event_mask, const void *data,
-				       int data_type)
+static void fanotify_iter_mask(struct fsnotify_iter_info *iter_info,
+		  u32 event_mask, __u32 *marks_mask, __u32 *marks_ignored_mask)
 {
-	__u32 marks_mask = 0, marks_ignored_mask = 0;
-	const struct path *path = data;
-	struct fsnotify_mark *mark;
 	int type;
-
-	pr_debug("%s: report_mask=%x mask=%x data=%p data_type=%d\n",
-		 __func__, iter_info->report_mask, event_mask, data, data_type);
-
-	/* if we don't have enough info to send an event to userspace say no */
-	if (data_type != FSNOTIFY_EVENT_PATH)
-		return false;
-
-	/* sorry, fanotify only gives a damn about files and dirs */
-	if (!d_is_reg(path->dentry) &&
-	    !d_can_lookup(path->dentry))
-		return false;
+	struct fsnotify_mark *mark;
 
 	fsnotify_foreach_obj_type(type) {
 		if (!fsnotify_iter_should_report_type(iter_info, type))
@@ -123,10 +108,31 @@ static bool fanotify_should_send_event(struct fsnotify_iter_info *iter_info,
 		    !(mark->mask & FS_EVENT_ON_CHILD))
 			continue;
 
-		marks_mask |= mark->mask;
-		marks_ignored_mask |= mark->ignored_mask;
+		*marks_mask |= mark->mask;
+		*marks_ignored_mask |= mark->ignored_mask;
 	}
+}
 
+static bool fanotify_should_send_event(struct fsnotify_iter_info *iter_info,
+				       u32 event_mask, const void *data,
+				       int data_type)
+{
+	__u32 marks_mask = 0, marks_ignored_mask = 0;
+	const struct path *path = data;
+
+	pr_debug("%s: report_mask=%x mask=%x data=%p data_type=%d\n",
+		 __func__, iter_info->report_mask, event_mask, data, data_type);
+
+	/* if we don't have enough info to send an event to userspace say no */
+	if (data_type != FSNOTIFY_EVENT_PATH)
+		return false;
+
+	/* sorry, fanotify only gives a damn about files and dirs */
+	if (!d_is_reg(path->dentry) &&
+	    !d_can_lookup(path->dentry))
+		return false;
+
+	fanotify_iter_mask(iter_info, event_mask, &marks_mask, &marks_ignored_mask);
 	if (d_is_dir(path->dentry) &&
 	    !(marks_mask & FS_ISDIR & ~marks_ignored_mask))
 		return false;
@@ -138,9 +144,20 @@ static bool fanotify_should_send_event(struct fsnotify_iter_info *iter_info,
 	return false;
 }
 
+static bool fanotify_should_save_tid(struct fsnotify_iter_info *iter_info,
+		 u32 event_mask)
+{
+	__u32 marks_mask = 0, marks_ignored_mask = 0;
+
+	fanotify_iter_mask(iter_info, event_mask, &marks_mask, &marks_ignored_mask);
+	if (marks_mask & FAN_EVENT_INFO_TID)
+		return true;
+	return false;
+}
+
 struct fanotify_event_info *fanotify_alloc_event(struct fsnotify_group *group,
 						 struct inode *inode, u32 mask,
-						 const struct path *path)
+						 const struct path *path, bool should_save_tid)
 {
 	struct fanotify_event_info *event = NULL;
 	gfp_t gfp = GFP_KERNEL_ACCOUNT;
@@ -171,7 +188,10 @@ struct fanotify_event_info *fanotify_alloc_event(struct fsnotify_group *group,
 		goto out;
 init: __maybe_unused
 	fsnotify_init_event(&event->fse, inode, mask);
-	event->tgid = get_pid(task_tgid(current));
+	if (should_save_tid)
+		event->tgid = get_pid(task_pid(current));
+	else
+		event->tgid = get_pid(task_tgid(current));
 	if (path) {
 		event->path = *path;
 		path_get(&event->path);
@@ -193,6 +213,7 @@ static int fanotify_handle_event(struct fsnotify_group *group,
 	int ret = 0;
 	struct fanotify_event_info *event;
 	struct fsnotify_event *fsn_event;
+	bool should_save_tid;
 
 	BUILD_BUG_ON(FAN_ACCESS != FS_ACCESS);
 	BUILD_BUG_ON(FAN_MODIFY != FS_MODIFY);
@@ -219,8 +240,9 @@ static int fanotify_handle_event(struct fsnotify_group *group,
 		if (!fsnotify_prepare_user_wait(iter_info))
 			return 0;
 	}
+	should_save_tid = fanotify_should_save_tid(iter_info, mask);
 
-	event = fanotify_alloc_event(group, inode, mask, data);
+	event = fanotify_alloc_event(group, inode, mask, data, should_save_tid);
 	ret = -ENOMEM;
 	if (unlikely(!event)) {
 		/*

@@ -54,4 +54,4 @@ static inline struct fanotify_event_info *FANOTIFY_E(struct fsnotify_event *fse)
 
 struct fanotify_event_info *fanotify_alloc_event(struct fsnotify_group *group,
 						 struct inode *inode, u32 mask,
-						 const struct path *path);
+						 const struct path *path, bool should_save_tid);

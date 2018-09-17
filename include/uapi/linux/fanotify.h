@@ -18,6 +18,7 @@
 
 #define FAN_ONDIR		0x40000000	/* event occurred against dir */
 
+#define FAN_EVENT_INFO_TID	0x02000000	/* event save thread id replace tgid */
 #define FAN_EVENT_ON_CHILD	0x08000000	/* interested in child events */
 
 /* helper events */
