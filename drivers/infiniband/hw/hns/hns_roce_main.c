@@ -590,7 +590,10 @@ static int hns_roce_register_device(struct hns_roce_dev *hr_dev)
 	/* MW */
 	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_MW) {
 		ib_dev->alloc_mw = hns_roce_alloc_mw;
-		ib_dev->uverbs_cmd_mask |= (1ULL << IB_USER_VERBS_CMD_ALLOC_MW);
+		ib_dev->dealloc_mw = hns_roce_dealloc_mw;
+		ib_dev->uverbs_cmd_mask |=
+					(1ULL << IB_USER_VERBS_CMD_ALLOC_MW) |
+					(1ULL << IB_USER_VERBS_CMD_DEALLOC_MW);
 	}
 
 	/* OTHERS */

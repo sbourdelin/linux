@@ -1310,3 +1310,14 @@ err_bitmap:
 
 	return ERR_PTR(ret);
 }
+
+int hns_roce_dealloc_mw(struct ib_mw *ibmw)
+{
+	struct hns_roce_dev *hr_dev = to_hr_dev(ibmw->device);
+	struct hns_roce_mw *mw = to_hr_mw(ibmw);
+
+	hns_roce_mw_free(hr_dev, mw);
+	kfree(mw);
+
+	return 0;
+}

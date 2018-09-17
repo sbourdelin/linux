@@ -875,6 +875,11 @@ static inline struct hns_roce_mr *to_hr_mr(struct ib_mr *ibmr)
 	return container_of(ibmr, struct hns_roce_mr, ibmr);
 }
 
+static inline struct hns_roce_mw *to_hr_mw(struct ib_mw *ibmw)
+{
+	return container_of(ibmw, struct hns_roce_mw, ibmw);
+}
+
 static inline struct hns_roce_qp *to_hr_qp(struct ib_qp *ibqp)
 {
 	return container_of(ibqp, struct hns_roce_qp, ibqp);
@@ -988,6 +993,7 @@ unsigned long key_to_hw_index(u32 key);
 
 struct ib_mw *hns_roce_alloc_mw(struct ib_pd *pd, enum ib_mw_type,
 				struct ib_udata *udata);
+int hns_roce_dealloc_mw(struct ib_mw *ibmw);
 
 void hns_roce_buf_free(struct hns_roce_dev *hr_dev, u32 size,
 		       struct hns_roce_buf *buf);
