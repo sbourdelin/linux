@@ -144,6 +144,11 @@ DEFINE_IRQ_VECTOR_EVENT(thermal_apic);
  */
 DEFINE_IRQ_VECTOR_EVENT(external_interrupt);
 
+/*
+ * nmi - called when entering/exiting from nmi vector handler.
+ */
+DEFINE_IRQ_VECTOR_EVENT(nmi);
+
 TRACE_EVENT(vector_config,
 
 	TP_PROTO(unsigned int irq, unsigned int vector,
