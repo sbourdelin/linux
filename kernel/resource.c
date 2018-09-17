@@ -375,6 +375,7 @@ static int __walk_iomem_res_desc(struct resource *res, unsigned long desc,
 				 int (*func)(struct resource *, void *))
 {
 	u64 orig_end = res->end;
+	u64 orig_flags = res->flags;
 	int ret = -1;
 
 	while ((res->start < res->end) &&
@@ -385,6 +386,7 @@ static int __walk_iomem_res_desc(struct resource *res, unsigned long desc,
 
 		res->start = res->end + 1;
 		res->end = orig_end;
+		res->flags = orig_flags;
 	}
 
 	return ret;
