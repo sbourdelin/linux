@@ -90,6 +90,7 @@ struct Qdisc {
 	struct gnet_stats_queue	__percpu *cpu_qstats;
 	int			padded;
 	refcount_t		refcnt;
+	struct rcu_head		rcu;
 
 	/*
 	 * For performance sake on SMP, we put highly modified fields at the end
@@ -555,6 +556,7 @@ struct Qdisc *dev_graft_qdisc(struct netdev_queue *dev_queue,
 			      struct Qdisc *qdisc);
 void qdisc_reset(struct Qdisc *qdisc);
 void qdisc_put(struct Qdisc *qdisc);
+void qdisc_put_unlocked(struct Qdisc *qdisc);
 void qdisc_tree_reduce_backlog(struct Qdisc *qdisc, unsigned int n,
 			       unsigned int len);
 struct Qdisc *qdisc_alloc(struct netdev_queue *dev_queue,
