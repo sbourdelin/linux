@@ -457,6 +457,35 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
 	.endm
 
 /*
+ * clear_page - clear one page
+ *
+ *	start:	page aligned virtual address
+ */
+	.macro clear_page, start:req
+9996:	stp	xzr, xzr, [\start], #16
+	stp	xzr, xzr, [\start], #16
+	stp	xzr, xzr, [\start], #16
+	stp	xzr, xzr, [\start], #16
+	tst	\start, #(PAGE_SIZE - 1)
+	b.ne	9996b
+	.endm
+
+/*
+ * clear_pages - clear contiguous pages
+ *
+ *	start, end:	page aligned virtual addresses
+ */
+	.macro clear_pages, start:req, end:req
+	sub	\end, \end, \start
+	lsr	\end, \end, #(PAGE_SHIFT)
+9997:	cbz	\end, 9998f
+	clear_page \start
+	sub	\end, \end, #1
+	b	9997b
+9998:
+	.endm
+
+/*
  * Annotate a function as position independent, i.e., safe to be called before
  * the kernel virtual mapping is activated.
  */

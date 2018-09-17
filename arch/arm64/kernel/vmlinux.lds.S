@@ -68,6 +68,12 @@ jiffies = jiffies_64;
 #define TRAMP_TEXT
 #endif
 
+#define INIT_PG_TABLES					\
+	. = ALIGN(PAGE_SIZE);				\
+	init_pg_dir = .;				\
+	. += SWAPPER_DIR_SIZE;				\
+	init_pg_end = .;
+
 /*
  * The size of the PE/COFF section that covers the kernel image, which
  * runs from stext to _edata, must be a round multiple of the PE/COFF
@@ -160,6 +166,8 @@ SECTIONS
 	. = ALIGN(PAGE_SIZE);
 	__inittext_end = .;
 	__initdata_begin = .;
+
+	INIT_PG_TABLES
 
 	.init.data : {
 		INIT_DATA
