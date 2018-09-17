@@ -2919,7 +2919,7 @@ int i915_perf_open_ioctl(struct drm_device *dev, void *data,
 
 	if (!dev_priv->perf.initialized) {
 		DRM_DEBUG("i915 perf interface not available for this system\n");
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 	}
 
 	known_open_flags = I915_PERF_FLAG_FD_CLOEXEC |

@@ -306,6 +306,9 @@ drm_setclientcap(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
 	struct drm_set_client_cap *req = data;
 
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -EOPNOTSUPP;
+
 	switch (req->capability) {
 	case DRM_CLIENT_CAP_STEREO_3D:
 		if (req->value > 1)
