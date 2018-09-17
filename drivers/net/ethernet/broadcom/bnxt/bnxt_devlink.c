@@ -31,7 +31,7 @@ static int bnxt_hwrm_nvm_req(struct bnxt *bp, u32 param_id, void *msg,
 {
 	struct hwrm_nvm_get_variable_input *req = msg;
 	void *data_addr = NULL, *buf = NULL;
-	struct bnxt_dl_nvm_param nvm_param;
+	struct bnxt_dl_nvm_param nvm_param = {0};
 	int bytesize, idx = 0, rc, i;
 	dma_addr_t data_dma_addr;
 
