@@ -1050,6 +1050,8 @@ static snd_pcm_uframes_t acp_dma_pointer(struct snd_pcm_substream *substream)
 			bytescount -= rtd->bytescount;
 		delay = do_div(bytescount, period_bytes);
 		runtime->delay = bytes_to_frames(runtime, delay);
+		if (bytescount < period_bytes)
+			pos = 0;
 	} else {
 		buffersize = frames_to_bytes(runtime, runtime->buffer_size);
 		bytescount = acp_get_byte_count(rtd);
