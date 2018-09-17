@@ -646,6 +646,7 @@ void __init paging_init(void)
 	cpu_replace_ttbr1(__va(pgd_phys));
 	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+	init_mm.pgd = swapper_pg_dir;
 
 	pgd_clear_fixmap();
 	memblock_free(pgd_phys, PAGE_SIZE);
