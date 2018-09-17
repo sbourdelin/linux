@@ -6858,6 +6858,12 @@ static int emulator_fix_hypercall(struct x86_emulate_ctxt *ctxt)
 	char instruction[3];
 	unsigned long rip = kvm_rip_read(vcpu);
 
+	if (is_guest_mode(vcpu)) {
+		ctxt->exception.vector = UD_VECTOR;
+		ctxt->exception.error_code_valid = false;
+		return X86EMUL_PROPAGATE_FAULT;
+	}
+
 	kvm_x86_ops->patch_hypercall(vcpu, instruction);
 
 	return emulator_write_emulated(ctxt, rip, instruction, 3,
