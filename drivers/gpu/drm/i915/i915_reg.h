@@ -6997,6 +6997,7 @@ enum {
 /* MMIO address range for CSR program (0x80000 - 0x82FFF) */
 #define CSR_MMIO_START_RANGE	0x80000
 #define CSR_MMIO_END_RANGE	0x8FFFF
+/* DC3_DC5 count and DC5_DC6 count registers are same for SKL and ICL */
 #define SKL_CSR_DC3_DC5_COUNT	_MMIO(0x80030)
 #define SKL_CSR_DC5_DC6_COUNT	_MMIO(0x8002C)
 #define BXT_CSR_DC3_DC5_COUNT	_MMIO(0x80038)
