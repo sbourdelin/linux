@@ -976,21 +976,26 @@ EXPORT_SYMBOL_GPL(tpm_is_tpm2);
  * tpm_pcr_read - read a PCR value from SHA1 bank
  * @chip:	a &struct tpm_chip instance, %NULL for the default chip
  * @pcr_idx:	the PCR to be retrieved
- * @res_buf:	the value of the PCR
+ * @count:	number of digests passed
+ * @digests:	list of pcr banks and buffers current PCR values are written to
  *
  * Return: same as with tpm_transmit_cmd()
  */
-int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
+int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
+		 struct tpm_digest *digests)
 {
 	int rc;
+
+	if (count != 1)
+		return -EINVAL;
 
 	chip = tpm_find_get_ops(chip);
 	if (!chip)
 		return -ENODEV;
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-		rc = tpm2_pcr_read(chip, pcr_idx, res_buf);
+		rc = tpm2_pcr_read(chip, pcr_idx, count, digests);
 	else
-		rc = tpm_pcr_read_dev(chip, pcr_idx, res_buf);
+		rc = tpm_pcr_read_dev(chip, pcr_idx, digests[0].digest);
 	tpm_put_ops(chip);
 	return rc;
 }

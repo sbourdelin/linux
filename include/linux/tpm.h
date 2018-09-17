@@ -71,7 +71,8 @@ struct tpm_class_ops {
 #if defined(CONFIG_TCG_TPM) || defined(CONFIG_TCG_TPM_MODULE)
 
 extern int tpm_is_tpm2(struct tpm_chip *chip);
-extern int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
+extern int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
+			struct tpm_digest *digests);
 extern int tpm_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash);
 extern int tpm_send(struct tpm_chip *chip, void *cmd, size_t buflen);
 extern int tpm_get_random(struct tpm_chip *chip, u8 *data, size_t max);
@@ -87,7 +88,8 @@ static inline int tpm_is_tpm2(struct tpm_chip *chip)
 {
 	return -ENODEV;
 }
-static inline int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
+static inline int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
+			       struct tpm_digest *digests)
 {
 	return -ENODEV;
 }

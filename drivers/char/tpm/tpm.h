@@ -564,7 +564,8 @@ static inline u32 tpm2_rc_value(u32 rc)
 	return (rc & BIT(7)) ? rc & 0xff : rc;
 }
 
-int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
+int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
+		  struct tpm_digest *digests);
 int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
 		    struct tpm_digest *digests);
 int tpm2_get_random(struct tpm_chip *chip, u8 *dest, size_t max);

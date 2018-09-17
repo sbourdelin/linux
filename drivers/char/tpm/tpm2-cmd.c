@@ -179,11 +179,13 @@ struct tpm2_pcr_read_out {
  * tpm2_pcr_read() - read a PCR value
  * @chip:	TPM chip to use.
  * @pcr_idx:	index of the PCR to read.
- * @res_buf:	buffer to store the resulting hash.
+ * @count:	number of digests passed.
+ * @digests:	list of pcr banks and buffers current PCR values are written to.
  *
  * Return: Same as with tpm_transmit_cmd.
  */
-int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
+int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
+		  struct tpm_digest *digests)
 {
 	int rc;
 	struct tpm_buf buf;
@@ -191,6 +193,8 @@ int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
 	u8 pcr_select[TPM2_PCR_SELECT_MIN] = {0};
 
 	if (pcr_idx >= TPM2_PLATFORM_PCR)
+		return -EINVAL;
+	if (count > 1)
 		return -EINVAL;
 
 	rc = tpm_buf_init(&buf, TPM2_ST_NO_SESSIONS, TPM2_CC_PCR_READ);
@@ -200,16 +204,17 @@ int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
 	pcr_select[pcr_idx >> 3] = 1 << (pcr_idx & 0x7);
 
 	tpm_buf_append_u32(&buf, 1);
-	tpm_buf_append_u16(&buf, TPM_ALG_SHA1);
+	tpm_buf_append_u16(&buf, count ? digests[0].alg_id : TPM_ALG_SHA1);
 	tpm_buf_append_u8(&buf, TPM2_PCR_SELECT_MIN);
 	tpm_buf_append(&buf, (const unsigned char *)pcr_select,
 		       sizeof(pcr_select));
 
 	rc = tpm_transmit_cmd(chip, NULL, buf.data, PAGE_SIZE, 0, 0,
-			res_buf ? "attempting to read a pcr value" : NULL);
-	if (rc == 0 && res_buf) {
+			      count ? "attempting to read a pcr value" : NULL);
+	if (rc == 0 && count) {
 		out = (struct tpm2_pcr_read_out *)&buf.data[TPM_HEADER_SIZE];
-		memcpy(res_buf, out->digest, SHA1_DIGEST_SIZE);
+		memcpy(digests[0].digest, out->digest,
+		       be16_to_cpu(out->digest_size));
 	}
 
 	tpm_buf_destroy(&buf);
