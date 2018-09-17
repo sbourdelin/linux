@@ -46,6 +46,12 @@ struct tpm_digest {
 	u8 digest[SHA512_DIGEST_SIZE];
 } __packed;
 
+struct tpm_active_bank_info {
+	u16 alg_id;
+	u16 digest_size;
+	u16 crypto_id;
+};
+
 enum TPM_OPS_FLAGS {
 	TPM_OPS_AUTO_STARTUP = BIT(0),
 };

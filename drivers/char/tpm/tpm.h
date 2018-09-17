@@ -237,7 +237,7 @@ struct tpm_chip {
 	const struct attribute_group *groups[3];
 	unsigned int groups_cnt;
 
-	u16 active_banks[7];
+	struct tpm_active_bank_info active_banks[7];
 #ifdef CONFIG_ACPI
 	acpi_handle acpi_dev_handle;
 	char ppi_version[TPM_PPI_VERSION_LEN + 1];
@@ -565,7 +565,7 @@ static inline u32 tpm2_rc_value(u32 rc)
 }
 
 int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
-		  struct tpm_digest *digests);
+		  struct tpm_digest *digests, u16 *sizes);
 int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
 		    struct tpm_digest *digests);
 int tpm2_get_random(struct tpm_chip *chip, u8 *dest, size_t max);

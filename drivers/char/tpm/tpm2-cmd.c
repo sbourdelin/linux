@@ -181,11 +181,12 @@ struct tpm2_pcr_read_out {
  * @pcr_idx:	index of the PCR to read.
  * @count:	number of digests passed.
  * @digests:	list of pcr banks and buffers current PCR values are written to.
+ * @sizes:	list of digest sizes.
  *
  * Return: Same as with tpm_transmit_cmd.
  */
 int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
-		  struct tpm_digest *digests)
+		  struct tpm_digest *digests, u16 *sizes)
 {
 	int rc;
 	struct tpm_buf buf;
@@ -215,6 +216,9 @@ int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
 		out = (struct tpm2_pcr_read_out *)&buf.data[TPM_HEADER_SIZE];
 		memcpy(digests[0].digest, out->digest,
 		       be16_to_cpu(out->digest_size));
+
+		if (sizes)
+			sizes[0] = be16_to_cpu(out->digest_size);
 	}
 
 	tpm_buf_destroy(&buf);
@@ -245,7 +249,6 @@ int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
 	struct tpm2_null_auth_area auth_area;
 	int rc;
 	int i;
-	int j;
 
 	if (count > ARRAY_SIZE(chip->active_banks))
 		return -EINVAL;
@@ -267,14 +270,9 @@ int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
 	tpm_buf_append_u32(&buf, count);
 
 	for (i = 0; i < count; i++) {
-		for (j = 0; j < ARRAY_SIZE(tpm2_hash_map); j++) {
-			if (digests[i].alg_id != tpm2_hash_map[j].tpm_id)
-				continue;
-			tpm_buf_append_u16(&buf, digests[i].alg_id);
-			tpm_buf_append(&buf, (const unsigned char
-					      *)&digests[i].digest,
-			       hash_digest_size[tpm2_hash_map[j].crypto_id]);
-		}
+		tpm_buf_append_u16(&buf, digests[i].alg_id);
+		tpm_buf_append(&buf, (const unsigned char *)&digests[i].digest,
+			       chip->active_banks[i].digest_size);
 	}
 
 	rc = tpm_transmit_cmd(chip, NULL, buf.data, PAGE_SIZE, 0, 0,
@@ -851,6 +849,26 @@ int tpm2_probe(struct tpm_chip *chip)
 }
 EXPORT_SYMBOL_GPL(tpm2_probe);
 
+static int tpm2_init_active_bank_info(struct tpm_chip *chip,
+				      struct tpm_active_bank_info *active_bank)
+{
+	struct tpm_digest digest = {.alg_id = active_bank->alg_id};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(tpm2_hash_map); i++) {
+		enum hash_algo crypto_algo = tpm2_hash_map[i].crypto_id;
+
+		if (active_bank->alg_id != tpm2_hash_map[i].tpm_id)
+			continue;
+
+		active_bank->digest_size = hash_digest_size[crypto_algo];
+		active_bank->crypto_id = crypto_algo;
+		return 0;
+	}
+
+	return tpm2_pcr_read(chip, 0, 1, &digest, &active_bank->digest_size);
+}
+
 struct tpm2_pcr_selection {
 	__be16  hash_alg;
 	u8  size_of_select;
@@ -905,7 +923,12 @@ static ssize_t tpm2_get_pcr_allocation(struct tpm_chip *chip)
 		}
 
 		memcpy(&pcr_selection, marker, sizeof(pcr_selection));
-		chip->active_banks[i] = be16_to_cpu(pcr_selection.hash_alg);
+		chip->active_banks[i].alg_id =
+			be16_to_cpu(pcr_selection.hash_alg);
+		rc =  tpm2_init_active_bank_info(chip, &chip->active_banks[i]);
+		if (rc)
+			break;
+
 		sizeof_pcr_selection = sizeof(pcr_selection.hash_alg) +
 			sizeof(pcr_selection.size_of_select) +
 			pcr_selection.size_of_select;
@@ -914,7 +937,7 @@ static ssize_t tpm2_get_pcr_allocation(struct tpm_chip *chip)
 
 out:
 	if (i < ARRAY_SIZE(chip->active_banks))
-		chip->active_banks[i] = TPM_ALG_ERROR;
+		chip->active_banks[i].alg_id = TPM_ALG_ERROR;
 
 	tpm_buf_destroy(&buf);
 

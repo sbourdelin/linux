@@ -993,7 +993,7 @@ int tpm_pcr_read(struct tpm_chip *chip, int pcr_idx, u32 count,
 	if (!chip)
 		return -ENODEV;
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-		rc = tpm2_pcr_read(chip, pcr_idx, count, digests);
+		rc = tpm2_pcr_read(chip, pcr_idx, count, digests, NULL);
 	else
 		rc = tpm_pcr_read_dev(chip, pcr_idx, digests[0].digest);
 	tpm_put_ops(chip);
@@ -1056,8 +1056,8 @@ int tpm_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash)
 		memset(digest_list, 0, sizeof(digest_list));
 
 		for (i = 0; i < ARRAY_SIZE(chip->active_banks) &&
-			    chip->active_banks[i] != TPM_ALG_ERROR; i++) {
-			digest_list[i].alg_id = chip->active_banks[i];
+		     chip->active_banks[i].alg_id != TPM_ALG_ERROR; i++) {
+			digest_list[i].alg_id = chip->active_banks[i].alg_id;
 			memcpy(digest_list[i].digest, hash, TPM_DIGEST_SIZE);
 			count++;
 		}
@@ -1157,6 +1157,11 @@ int tpm1_auto_startup(struct tpm_chip *chip)
 		dev_err(&chip->dev, "TPM self test failed\n");
 		goto out;
 	}
+
+	chip->active_banks[0].alg_id = TPM_ALG_SHA1;
+	chip->active_banks[0].digest_size = hash_digest_size[HASH_ALGO_SHA1];
+	chip->active_banks[0].crypto_id = HASH_ALGO_SHA1;
+	chip->active_banks[1].alg_id = TPM_ALG_ERROR;
 
 	return rc;
 out:
