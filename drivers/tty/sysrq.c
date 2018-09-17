@@ -132,10 +132,10 @@ static struct sysrq_key_op sysrq_unraw_op = {
 #define sysrq_unraw_op (*(struct sysrq_key_op *)NULL)
 #endif /* CONFIG_VT */
 
+char *sysrq_killer;
+
 static void sysrq_handle_crash(int key)
 {
-	char *killer = NULL;
-
 	/* we need to release the RCU read lock here,
 	 * otherwise we get an annoying
 	 * 'BUG: sleeping function called from invalid context'
@@ -144,7 +144,7 @@ static void sysrq_handle_crash(int key)
 	rcu_read_unlock();
 	panic_on_oops = 1;	/* force panic */
 	wmb();
-	*killer = 1;
+	*sysrq_killer = 1;
 }
 static struct sysrq_key_op sysrq_crash_op = {
 	.handler	= sysrq_handle_crash,
