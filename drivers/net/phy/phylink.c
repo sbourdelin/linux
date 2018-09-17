@@ -1631,6 +1631,7 @@ static int phylink_sfp_module_insert(void *upstream,
 	if (pl->link_an_mode != MLO_AN_INBAND ||
 	    pl->link_config.interface != config.interface) {
 		pl->link_config.interface = config.interface;
+		pl->link_interface = config.interface;
 		pl->link_an_mode = MLO_AN_INBAND;
 
 		changed = true;
