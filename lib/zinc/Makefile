@@ -11,4 +11,5 @@ zinc_chacha20-$(CONFIG_ZINC_ARCH_MIPS) += chacha20/chacha20-mips.o
 obj-$(CONFIG_ZINC_CHACHA20) += zinc_chacha20.o
 
 zinc_poly1305-y := poly1305/poly1305.o
+zinc_poly1305-$(CONFIG_ZINC_ARCH_X86_64) += poly1305/poly1305-x86_64.o
 obj-$(CONFIG_ZINC_POLY1305) += zinc_poly1305.o

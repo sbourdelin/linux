@@ -15,7 +15,9 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#ifndef HAVE_POLY1305_ARCH_IMPLEMENTATION
+#if defined(CONFIG_ZINC_ARCH_X86_64)
+#include "poly1305-x86_64-glue.h"
+#else
 static inline bool poly1305_init_arch(void *ctx,
 				      const u8 key[POLY1305_KEY_SIZE])
 {
