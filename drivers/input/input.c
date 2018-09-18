@@ -367,12 +367,15 @@ static int input_get_disposition(struct input_dev *dev,
 }
 
 static void input_handle_event(struct input_dev *dev,
-			       unsigned int type, unsigned int code, int value)
+			       unsigned int type, unsigned int code, int value,
+			       bool can_credit_entropy)
 {
 	int disposition = input_get_disposition(dev, type, code, &value);
 
-	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
+	if (can_credit_entropy &&
+	    disposition != INPUT_IGNORE_EVENT && type != EV_SYN) {
 		add_input_randomness(type, code, value);
+	}
 
 	if ((disposition & INPUT_PASS_TO_DEVICE) && dev->event)
 		dev->event(dev, type, code, value);
@@ -433,7 +436,7 @@ void input_event(struct input_dev *dev,
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 
 		spin_lock_irqsave(&dev->event_lock, flags);
-		input_handle_event(dev, type, code, value);
+		input_handle_event(dev, type, code, value, true);
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 	}
 }
@@ -463,7 +466,7 @@ void input_inject_event(struct input_handle *handle,
 		rcu_read_lock();
 		grab = rcu_dereference(dev->grab);
 		if (!grab || grab == handle)
-			input_handle_event(dev, type, code, value);
+			input_handle_event(dev, type, code, value, false);
 		rcu_read_unlock();
 
 		spin_unlock_irqrestore(&dev->event_lock, flags);
