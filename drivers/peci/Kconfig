@@ -1,0 +1,12 @@
+#
+# Platform Environment Control Interface (PECI) subsystem configuration
+#
+
+config PECI
+	bool "PECI support"
+	select RT_MUTEXES
+	select CRC8
+	help
+	  The Platform Environment Control Interface (PECI) is a one-wire bus
+	  interface that provides a communication channel from Intel processors
+	  and chipset components to external monitoring or control devices.
