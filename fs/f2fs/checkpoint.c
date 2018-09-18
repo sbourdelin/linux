@@ -121,7 +121,7 @@ retry:
 			goto retry;
 
 		f2fs_stop_checkpoint(sbi, false);
-		f2fs_bug_on(sbi, 1);
+		return NULL;
 	}
 
 	return page;

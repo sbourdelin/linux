@@ -1066,6 +1066,8 @@ static int do_garbage_collect(struct f2fs_sb_info *sbi,
 	/* reference all summary page */
 	while (segno < end_segno) {
 		sum_page = f2fs_get_sum_page(sbi, segno++);
+		if (!sum_page)
+			return -EIO;
 		unlock_page(sum_page);
 	}
 
