@@ -996,7 +996,7 @@ static bool defrag_check_next_extent(struct inode *inode, struct extent_map *em)
 
 static int should_defrag_range(struct inode *inode, u64 start, u32 thresh,
 			       u64 *last_len, u64 *skip, u64 *defrag_end,
-			       int compress)
+			       int compress, int compress_type)
 {
 	struct extent_map *em;
 	int ret = 1;
@@ -1031,8 +1031,29 @@ static int should_defrag_range(struct inode *inode, u64 start, u32 thresh,
 	 * real extent, don't bother defragging it
 	 */
 	if (!compress && (*last_len == 0 || *last_len >= thresh) &&
-	    (em->len >= thresh || (!next_mergeable && !prev_mergeable)))
+	    (em->len >= thresh || (!next_mergeable && !prev_mergeable))) {
 		ret = 0;
+		goto out;
+	}
+
+
+	/*
+	 * Try not recompress compressed extents
+	 * thresh >= BTRFS_MAX_UNCOMPRESSED will lead to
+	 * recompress all compressed extents
+	 */
+	if (em->compress_type != 0 && thresh >= BTRFS_MAX_UNCOMPRESSED) {
+		if (!compress) {
+			if (em->len == BTRFS_MAX_UNCOMPRESSED)
+				ret = 0;
+		} else {
+			if (em->compress_type != compress_type)
+				goto out;
+			if (em->len == BTRFS_MAX_UNCOMPRESSED)
+				ret = 0;
+		}
+	}
+
 out:
 	/*
 	 * last_len ends up being a counter of how many bytes we've defragged.
@@ -1331,7 +1352,8 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 
 		if (!should_defrag_range(inode, (u64)i << PAGE_SHIFT,
 					 extent_thresh, &last_len, &skip,
-					 &defrag_end, do_compress)){
+					 &defrag_end, do_compress,
+					 compress_type)){
 			unsigned long next;
 			/*
 			 * the should_defrag function tells us how much to skip
