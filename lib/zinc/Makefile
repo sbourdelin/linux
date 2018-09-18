@@ -24,3 +24,6 @@ obj-$(CONFIG_ZINC_CHACHA20POLY1305) += zinc_chacha20poly1305.o
 zinc_blake2s-y := blake2s/blake2s.o
 zinc_blake2s-$(CONFIG_ZINC_ARCH_X86_64) += blake2s/blake2s-x86_64.o
 obj-$(CONFIG_ZINC_BLAKE2S) += zinc_blake2s.o
+
+zinc_curve25519-y := curve25519/curve25519.o
+obj-$(CONFIG_ZINC_CURVE25519) += zinc_curve25519.o
