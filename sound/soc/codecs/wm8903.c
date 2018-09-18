@@ -124,6 +124,30 @@ static const char *wm8903_supply_names[WM8903_NUM_SUPPLIES] = {
 	"DCVDD",
 };
 
+/*
+ * Used to enable configuration of a GPIO to all zeros; a gpio_cfg value of
+ * zero in platform data means "don't touch this pin".
+ */
+#define WM8903_GPIO_CONFIG_ZERO 0x8000
+
+#define WM8903_NUM_GPIO 5
+
+struct wm8903_platform_data {
+	bool irq_active_low;   /* Set if IRQ active low, default high */
+
+        /* Default register value for R6 (Mic bias), used to configure
+	 * microphone detection.  In conjunction with gpio_cfg this
+	 * can be used to route the microphone status signals out onto
+	 * the GPIOs for use with snd_soc_jack_add_gpios().
+	 */
+	u16 micdet_cfg;
+
+	int micdet_delay;      /* Delay after microphone detection (ms) */
+
+	int gpio_base;
+	u32 gpio_cfg[WM8903_NUM_GPIO]; /* Default register values for GPIO pin mux */
+};
+
 struct wm8903_priv {
 	struct wm8903_platform_data *pdata;
 	struct device *dev;
