@@ -366,6 +366,7 @@ static int find_next_iomem_res(struct resource *res, unsigned long desc,
 		res->end = p->end;
 	res->flags = p->flags;
 	res->desc = p->desc;
+	res->name = p->name;
 	return 0;
 }
 
