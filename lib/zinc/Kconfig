@@ -2,6 +2,9 @@ config ZINC_CHACHA20
 	tristate
 	select CRYPTO_ALGAPI
 
+config ZINC_POLY1305
+	tristate
+
 config ZINC_DEBUG
 	bool "Zinc cryptography library debugging and self-tests"
 	help
