@@ -369,7 +369,11 @@ static int geni_i2c_rx_one_msg(struct geni_i2c_dev *gi2c, struct i2c_msg *msg,
 	unsigned long time_left = XFER_TIMEOUT;
 
 	gi2c->cur = msg;
-	mode = msg->len > 32 ? GENI_SE_DMA : GENI_SE_FIFO;
+
+	mode = GENI_SE_FIFO;
+	if (msg->len > 32 && (msg->flags & I2C_M_DMA_SAFE))
+		mode = GENI_SE_DMA;
+
 	geni_se_select_mode(&gi2c->se, mode);
 	writel_relaxed(msg->len, gi2c->se.base + SE_I2C_RX_TRANS_LEN);
 	geni_se_setup_m_cmd(&gi2c->se, I2C_READ, m_param);
@@ -405,7 +409,11 @@ static int geni_i2c_tx_one_msg(struct geni_i2c_dev *gi2c, struct i2c_msg *msg,
 	unsigned long time_left;
 
 	gi2c->cur = msg;
-	mode = msg->len > 32 ? GENI_SE_DMA : GENI_SE_FIFO;
+
+	mode = GENI_SE_FIFO;
+	if (msg->len > 32 && (msg->flags & I2C_M_DMA_SAFE))
+		mode = GENI_SE_DMA;
+
 	geni_se_select_mode(&gi2c->se, mode);
 	writel_relaxed(msg->len, gi2c->se.base + SE_I2C_TX_TRANS_LEN);
 	geni_se_setup_m_cmd(&gi2c->se, I2C_WRITE, m_param);
