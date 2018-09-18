@@ -4,9 +4,21 @@ Required properties:
 	- compatible: must be "st,vl53l0x-i2c"
 	- reg: i2c address where to find the device
 
+Optional properties:
+	- interrupts : Interrupt line receiving GPIO1's measuring complete
+	  output, supports IRQ_TYPE_EDGE_FALLING only.
+
+	Refer to interrupt-controller/interrupts.txt for generic
+	interrupt client node bindings.
+
 Example:
 
 vl53l0x@29 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&vl53l0x_pins>;
+
 	compatible = "st,vl53l0x-i2c";
 	reg = <0x29>;
-};
+	interrupt-parent = <&gpio3>;
+	interrupts = <17 IRQ_TYPE_EDGE_FALLING>;
+}
