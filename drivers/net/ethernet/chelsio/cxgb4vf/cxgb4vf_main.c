@@ -138,6 +138,7 @@ static struct dentry *cxgb4vf_debugfs_root;
 void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
 {
 	struct net_device *dev = adapter->port[pidx];
+	const struct port_info *pi = netdev_priv(dev);
 
 	/*
 	 * If the port is disabled or the current recorded "link up"
@@ -153,7 +154,9 @@ void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
 	if (link_ok) {
 		const char *s;
 		const char *fc;
-		const struct port_info *pi = netdev_priv(dev);
+
+		if (!(pi->eth_flags & PRIV_FLAG_PORT_FORCE_LINKUP))
+			netif_carrier_on(dev);
 
 		switch (pi->link_cfg.speed) {
 		case 100:
@@ -200,6 +203,8 @@ void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
 
 		netdev_info(dev, "link up, %s, full-duplex, %s PAUSE\n", s, fc);
 	} else {
+		if (!(pi->eth_flags & PRIV_FLAG_PORT_FORCE_LINKUP))
+			netif_carrier_off(dev);
 		netdev_info(dev, "link down\n");
 	}
 }
@@ -283,7 +288,7 @@ static int link_start(struct net_device *dev)
 	 * no errors in enabling vi.
 	 */
 
-	if (ret == 0)
+	if (ret == 0 && (pi->eth_flags & PRIV_FLAG_PORT_FORCE_LINKUP))
 		netif_carrier_on(dev);
 
 	return ret;
@@ -1502,6 +1507,10 @@ static int cxgb4vf_get_fecparam(struct net_device *dev,
 	return 0;
 }
 
+static const char cxgb4vf_priv_flags_strings[][ETH_GSTRING_LEN] = {
+	[PRIV_FLAG_PORT_FORCE_LINKUP_BIT] = "port_force_linkup",
+};
+
 /*
  * Return our driver information.
  */
@@ -1524,6 +1533,7 @@ static void cxgb4vf_get_drvinfo(struct net_device *dev,
 		 FW_HDR_FW_VER_MINOR_G(adapter->params.dev.tprev),
 		 FW_HDR_FW_VER_MICRO_G(adapter->params.dev.tprev),
 		 FW_HDR_FW_VER_BUILD_G(adapter->params.dev.tprev));
+	drvinfo->n_priv_flags = ARRAY_SIZE(cxgb4vf_priv_flags_strings);
 }
 
 /*
@@ -1728,6 +1738,8 @@ static int cxgb4vf_get_sset_count(struct net_device *dev, int sset)
 	switch (sset) {
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(stats_strings);
+	case ETH_SS_PRIV_FLAGS:
+		return ARRAY_SIZE(cxgb4vf_priv_flags_strings);
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -1744,6 +1756,10 @@ static void cxgb4vf_get_strings(struct net_device *dev,
 	switch (sset) {
 	case ETH_SS_STATS:
 		memcpy(data, stats_strings, sizeof(stats_strings));
+		break;
+	case ETH_SS_PRIV_FLAGS:
+		memcpy(data, cxgb4vf_priv_flags_strings,
+		       sizeof(cxgb4vf_priv_flags_strings));
 		break;
 	}
 }
@@ -1868,6 +1884,36 @@ static void cxgb4vf_get_wol(struct net_device *dev,
 	memset(&wol->sopass, 0, sizeof(wol->sopass));
 }
 
+static u32 cxgb4vf_get_priv_flags(struct net_device *netdev)
+{
+	struct port_info *pi = netdev_priv(netdev);
+	struct adapter *adapter = pi->adapter;
+
+	return (adapter->eth_flags | pi->eth_flags);
+}
+
+/**
+ *	set_flags - set/unset specified flags if passed in new_flags
+ *	@cur_flags: pointer to current flags
+ *	@new_flags: new incoming flags
+ *	@flags: set of flags to set/unset
+ */
+static inline void set_flags(u32 *cur_flags, u32 new_flags, u32 flags)
+{
+	*cur_flags = (*cur_flags & ~flags) | (new_flags & flags);
+}
+
+static int cxgb4vf_set_priv_flags(struct net_device *netdev, u32 flags)
+{
+	struct port_info *pi = netdev_priv(netdev);
+	struct adapter *adapter = pi->adapter;
+
+	set_flags(&adapter->eth_flags, flags, PRIV_FLAGS_ADAP);
+	set_flags(&pi->eth_flags, flags, PRIV_FLAGS_PORT);
+
+	return 0;
+}
+
 /*
  * TCP Segmentation Offload flags which we support.
  */
@@ -1892,6 +1938,8 @@ static const struct ethtool_ops cxgb4vf_ethtool_ops = {
 	.get_regs_len		= cxgb4vf_get_regs_len,
 	.get_regs		= cxgb4vf_get_regs,
 	.get_wol		= cxgb4vf_get_wol,
+	.get_priv_flags		= cxgb4vf_get_priv_flags,
+	.set_priv_flags		= cxgb4vf_set_priv_flags,
 };
 
 /*
@@ -3138,6 +3186,7 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
 			dev_info(&pdev->dev,
 				 "Using assigned MAC ACL: %pM\n", mac);
 		}
+		pi->eth_flags = DEFAULT_PRIV_FLAGS_PORT;
 	}
 
 	/* See what interrupts we'll be using.  If we've been configured to
@@ -3168,6 +3217,7 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
 		}
 		adapter->flags |= USING_MSI;
 	}
+	adapter->eth_flags = DEFAULT_PRIV_FLAGS_ADAP;
 
 	/* Now that we know how many "ports" we have and what interrupt
 	 * mechanism we're going to use, we can configure our queue resources.

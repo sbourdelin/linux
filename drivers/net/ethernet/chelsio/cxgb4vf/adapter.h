@@ -78,6 +78,18 @@ enum {
 	MAX_EGRQ	= MAX_ETH_QSETS*2,
 };
 
+enum {
+	PRIV_FLAG_PORT_FORCE_LINKUP_BIT,
+};
+
+#define PRIV_FLAG_PORT_FORCE_LINKUP	\
+				BIT(PRIV_FLAG_PORT_FORCE_LINKUP_BIT)
+
+#define PRIV_FLAGS_ADAP		0x0
+#define DEFAULT_PRIV_FLAGS_ADAP	0x0
+#define PRIV_FLAGS_PORT		PRIV_FLAG_PORT_FORCE_LINKUP
+#define DEFAULT_PRIV_FLAGS_PORT	PRIV_FLAG_PORT_FORCE_LINKUP
+
 /*
  * Forward structure definition references.
  */
@@ -103,6 +115,7 @@ struct port_info {
 	u8 port_id;			/* physical port ID */
 	u8 nqsets;			/* # of "Queue Sets" */
 	u8 first_qset;			/* index of first "Queue Set" */
+	u32 eth_flags;			/* ethtool private flags */
 	struct link_config link_cfg;	/* physical port configuration */
 };
 
@@ -373,6 +386,9 @@ struct adapter {
 	unsigned long open_device_map;
 	unsigned long flags;
 	struct adapter_params params;
+
+	/* ethtool private flags */
+	u32 eth_flags;
 
 	/* queue and interrupt resources */
 	struct {
