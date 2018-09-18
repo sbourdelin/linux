@@ -1123,7 +1123,7 @@ void phy_state_machine(struct work_struct *work)
 	 * PHY, if PHY_IGNORE_INTERRUPT is set, then we will be moving
 	 * between states from phy_mac_interrupt()
 	 */
-	if (phy_polling_mode(phydev))
+	if (phy_polling_mode(phydev) && old_state != PHY_HALTED)
 		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
 				   PHY_STATE_TIME * HZ);
 }
