@@ -215,6 +215,8 @@ static void ib_device_release(struct device *device)
 		ib_cache_release_one(dev);
 		kfree(dev->port_immutable);
 	}
+	if (dev->release)
+		dev->release(dev);
 	kfree(dev);
 }
 

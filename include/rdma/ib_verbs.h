@@ -2271,6 +2271,8 @@ struct ib_device {
 
 	struct iw_cm_verbs	     *iwcm;
 
+	void			   (*release)(struct ib_device *device);
+
 	/**
 	 * alloc_hw_stats - Allocate a struct rdma_hw_stats and fill in the
 	 *   driver initialized data.  The struct is kfree()'ed by the sysfs
