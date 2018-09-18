@@ -265,6 +265,8 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
 		 * The error is non fatal so the bus is ok; just invoke
 		 * the callback for the function that logged the error.
 		 */
+		if (cb == report_resume)
+			pci_cleanup_aer_uncorrect_error_status(dev);
 		cb(dev, &result_data);
 	}
 
