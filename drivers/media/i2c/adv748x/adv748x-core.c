@@ -207,13 +207,23 @@ static int adv748x_write_regs(struct adv748x_state *state,
 			      const struct adv748x_reg_value *regs)
 {
 	int ret;
+	u8 value;
 
 	while (regs->page != ADV748X_PAGE_EOR) {
 		if (regs->page == ADV748X_PAGE_WAIT) {
 			msleep(regs->value);
 		} else {
+			value = regs->value;
+
+			/*
+			 * Register 0x00 in TXA needs to bei injected with
+			 * the number of CSI-2 lanes used to transmitt.
+			 */
+			if (regs->page == ADV748X_PAGE_TXA && regs->reg == 0x00)
+				value = (value & ~7) | state->txa.num_lanes;
+
 			ret = adv748x_write(state, regs->page, regs->reg,
-				      regs->value);
+					    value);
 			if (ret < 0) {
 				adv_err(state,
 					"Error regs page: 0x%02x reg: 0x%02x\n",
@@ -233,14 +243,18 @@ static int adv748x_write_regs(struct adv748x_state *state,
 
 static const struct adv748x_reg_value adv748x_power_up_txa_4lane[] = {
 
-	{ADV748X_PAGE_TXA, 0x00, 0x84},	/* Enable 4-lane MIPI */
-	{ADV748X_PAGE_TXA, 0x00, 0xa4},	/* Set Auto DPHY Timing */
+	/* NOTE: NUM_LANES[2:0] in TXA register 0x00 is injected on write. */
+	{ADV748X_PAGE_TXA, 0x00, 0x80},	/* Enable n-lane MIPI */
+	{ADV748X_PAGE_TXA, 0x00, 0xa0},	/* Set Auto DPHY Timing */
 
 	{ADV748X_PAGE_TXA, 0x31, 0x82},	/* ADI Required Write */
 	{ADV748X_PAGE_TXA, 0x1e, 0x40},	/* ADI Required Write */
 	{ADV748X_PAGE_TXA, 0xda, 0x01},	/* i2c_mipi_pll_en - 1'b1 */
 	{ADV748X_PAGE_WAIT, 0x00, 0x02},/* delay 2 */
-	{ADV748X_PAGE_TXA, 0x00, 0x24 },/* Power-up CSI-TX */
+
+	/* NOTE: NUM_LANES[2:0] in TXA register 0x00 is injected on write. */
+	{ADV748X_PAGE_TXA, 0x00, 0x20 },/* Power-up CSI-TX */
+
 	{ADV748X_PAGE_WAIT, 0x00, 0x01},/* delay 1 */
 	{ADV748X_PAGE_TXA, 0xc1, 0x2b},	/* ADI Required Write */
 	{ADV748X_PAGE_WAIT, 0x00, 0x01},/* delay 1 */
@@ -253,7 +267,10 @@ static const struct adv748x_reg_value adv748x_power_down_txa_4lane[] = {
 
 	{ADV748X_PAGE_TXA, 0x31, 0x82},	/* ADI Required Write */
 	{ADV748X_PAGE_TXA, 0x1e, 0x00},	/* ADI Required Write */
-	{ADV748X_PAGE_TXA, 0x00, 0x84},	/* Enable 4-lane MIPI */
+
+	/* NOTE: NUM_LANES[2:0] in TXA register 0x00 is injected on write. */
+	{ADV748X_PAGE_TXA, 0x00, 0x80},	/* Enable n-lane MIPI */
+
 	{ADV748X_PAGE_TXA, 0xda, 0x01},	/* i2c_mipi_pll_en - 1'b1 */
 	{ADV748X_PAGE_TXA, 0xc1, 0x3b},	/* ADI Required Write */
 
@@ -399,8 +416,10 @@ static const struct adv748x_reg_value adv748x_init_txa_4lane[] = {
 	/* Outputs Enabled */
 	{ADV748X_PAGE_IO, 0x10, 0xa0},	/* Enable 4-lane CSI Tx & Pixel Port */
 
-	{ADV748X_PAGE_TXA, 0x00, 0x84},	/* Enable 4-lane MIPI */
-	{ADV748X_PAGE_TXA, 0x00, 0xa4},	/* Set Auto DPHY Timing */
+	/* NOTE: NUM_LANES[2:0] in TXA register 0x00 is injected on write. */
+	{ADV748X_PAGE_TXA, 0x00, 0x80},	/* Enable n-lane MIPI */
+	{ADV748X_PAGE_TXA, 0x00, 0xa0},	/* Set Auto DPHY Timing */
+
 	{ADV748X_PAGE_TXA, 0xdb, 0x10},	/* ADI Required Write */
 	{ADV748X_PAGE_TXA, 0xd6, 0x07},	/* ADI Required Write */
 	{ADV748X_PAGE_TXA, 0xc4, 0x0a},	/* ADI Required Write */
@@ -412,7 +431,10 @@ static const struct adv748x_reg_value adv748x_init_txa_4lane[] = {
 	{ADV748X_PAGE_TXA, 0x1e, 0x40},	/* ADI Required Write */
 	{ADV748X_PAGE_TXA, 0xda, 0x01},	/* i2c_mipi_pll_en - 1'b1 */
 	{ADV748X_PAGE_WAIT, 0x00, 0x02},/* delay 2 */
-	{ADV748X_PAGE_TXA, 0x00, 0x24 },/* Power-up CSI-TX */
+
+	/* NOTE: NUM_LANES[2:0] in TXA register 0x00 is injected on write. */
+	{ADV748X_PAGE_TXA, 0x00, 0x20 },/* Power-up CSI-TX */
+
 	{ADV748X_PAGE_WAIT, 0x00, 0x01},/* delay 1 */
 	{ADV748X_PAGE_TXA, 0xc1, 0x2b},	/* ADI Required Write */
 	{ADV748X_PAGE_WAIT, 0x00, 0x01},/* delay 1 */
