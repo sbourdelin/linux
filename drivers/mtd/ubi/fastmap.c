@@ -684,7 +684,7 @@ static int ubi_attach_fastmap(struct ubi_device *ubi,
 			be32_to_cpu(fmec->ec), 1);
 	}
 
-	ai->mean_ec = div_u64(ai->ec_sum, ai->ec_count);
+	ai->mean_ec = div_u64(ai->ec_sum+ai->ec_count-1, ai->ec_count);
 	ai->bad_peb_count = be32_to_cpu(fmhdr->bad_peb_count);
 
 	/* Iterate over all volumes and read their EBA table */

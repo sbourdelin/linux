@@ -1414,7 +1414,7 @@ static int scan_all(struct ubi_device *ubi, struct ubi_attach_info *ai,
 
 	/* Calculate mean erase counter */
 	if (ai->ec_count)
-		ai->mean_ec = div_u64(ai->ec_sum, ai->ec_count);
+		ai->mean_ec = div_u64(ai->ec_sum+ai->ec_count-1, ai->ec_count);
 
 	err = late_analysis(ubi, ai);
 	if (err)
