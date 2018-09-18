@@ -19,7 +19,9 @@
 #include <linux/init.h>
 #include <crypto/algapi.h>
 
-#ifndef HAVE_CURVE25519_ARCH_IMPLEMENTATION
+#if defined(CONFIG_ZINC_ARCH_X86_64)
+#include "curve25519-x86_64-glue.h"
+#else
 void __init curve25519_fpu_init(void)
 {
 }
