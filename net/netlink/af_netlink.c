@@ -278,11 +278,11 @@ static bool netlink_filter_tap(const struct sk_buff *skb)
 	return false;
 }
 
-static int __netlink_deliver_tap_skb(struct sk_buff *skb,
+static int __netlink_deliver_tap_skb(struct sk_buff **skb,
 				     struct net_device *dev)
 {
 	struct sk_buff *nskb;
-	struct sock *sk = skb->sk;
+	struct sock *sk = (*skb)->sk;
 	int ret = -ENOMEM;
 
 	if (!net_eq(dev_net(dev), sock_net(sk)))
@@ -290,10 +290,12 @@ static int __netlink_deliver_tap_skb(struct sk_buff *skb,
 
 	dev_hold(dev);
 
-	if (is_vmalloc_addr(skb->head))
-		nskb = netlink_to_full_skb(skb, GFP_ATOMIC);
+	if (is_vmalloc_addr((*skb)->head)) {
+		nskb = netlink_to_full_skb(*skb, GFP_ATOMIC);
+		*skb = nskb;
+	}
 	else
-		nskb = skb_clone(skb, GFP_ATOMIC);
+		nskb = skb_clone(*skb, GFP_ATOMIC);
 	if (nskb) {
 		nskb->dev = dev;
 		nskb->protocol = htons((u16) sk->sk_protocol);
@@ -318,7 +320,7 @@ static void __netlink_deliver_tap(struct sk_buff *skb, struct netlink_tap_net *n
 		return;
 
 	list_for_each_entry_rcu(tmp, &nn->netlink_tap_all, list) {
-		ret = __netlink_deliver_tap_skb(skb, tmp->dev);
+		ret = __netlink_deliver_tap_skb(&skb, tmp->dev);
 		if (unlikely(ret))
 			break;
 	}
