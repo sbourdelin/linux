@@ -132,6 +132,7 @@ struct venus_core {
 	struct device *dev_enc;
 	struct video_firmware {
 		struct device *dev;
+		struct iommu_domain *iommu_domain;
 	} fw;
 	bool no_tz;
 	struct mutex lock;
