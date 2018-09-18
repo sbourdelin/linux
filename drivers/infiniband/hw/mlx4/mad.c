@@ -268,9 +268,9 @@ static void smp_snoop(struct ib_device *ibdev, u8 port_num, const struct ib_mad 
 				pr_debug("PKEY[%d] = x%x\n",
 					 i + bn*32, be16_to_cpu(base[i]));
 				if (be16_to_cpu(base[i]) !=
-				    dev->pkeys.phys_pkey_cache[port_num - 1][i + bn*32]) {
+				    dev->pkeys->phys_pkey_cache[port_num - 1][i + bn*32]) {
 					pkey_change_bitmap |= (1 << i);
-					dev->pkeys.phys_pkey_cache[port_num - 1][i + bn*32] =
+					dev->pkeys->phys_pkey_cache[port_num - 1][i + bn*32] =
 						be16_to_cpu(base[i]);
 				}
 			}
@@ -348,7 +348,7 @@ static void __propagate_pkey_ev(struct mlx4_ib_dev *dev, int port_num,
 				continue;
 			for (ix = 0;
 			     ix < dev->dev->caps.pkey_table_len[port_num]; ix++) {
-				if (dev->pkeys.virt2phys_pkey[slave][port_num - 1]
+				if (dev->pkeys->virt2phys_pkey[slave][port_num - 1]
 				    [ix] == i + 32 * block) {
 					err = mlx4_gen_pkey_eqe(dev->dev, slave, port_num);
 					pr_debug("propagate_pkey_ev: slave %d,"
@@ -455,10 +455,10 @@ static int find_slave_port_pkey_ix(struct mlx4_ib_dev *dev, int slave,
 	unassigned_pkey_ix = dev->dev->phys_caps.pkey_phys_table_len[port] - 1;
 
 	for (i = 0; i < dev->dev->caps.pkey_table_len[port]; i++) {
-		if (dev->pkeys.virt2phys_pkey[slave][port - 1][i] == unassigned_pkey_ix)
+		if (dev->pkeys->virt2phys_pkey[slave][port - 1][i] == unassigned_pkey_ix)
 			continue;
 
-		pkey_ix = dev->pkeys.virt2phys_pkey[slave][port - 1][i];
+		pkey_ix = dev->pkeys->virt2phys_pkey[slave][port - 1][i];
 
 		ret = ib_get_cached_pkey(&dev->ib_dev, port, pkey_ix, &slot_pkey);
 		if (ret)
@@ -546,7 +546,7 @@ int mlx4_ib_send_to_slave(struct mlx4_ib_dev *dev, int slave, u8 port,
 			return -EINVAL;
 		tun_pkey_ix = pkey_ix;
 	} else
-		tun_pkey_ix = dev->pkeys.virt2phys_pkey[slave][port - 1][0];
+		tun_pkey_ix = dev->pkeys->virt2phys_pkey[slave][port - 1][0];
 
 	dqpn = dev->dev->phys_caps.base_proxy_sqpn + 8 * slave + port + (dest_qpt * 2) - 1;
 
@@ -1382,11 +1382,11 @@ int mlx4_ib_send_to_wire(struct mlx4_ib_dev *dev, int slave, u8 port,
 	if (dest_qpt == IB_QPT_SMI) {
 		src_qpnum = 0;
 		sqp = &sqp_ctx->qp[0];
-		wire_pkey_ix = dev->pkeys.virt2phys_pkey[slave][port - 1][0];
+		wire_pkey_ix = dev->pkeys->virt2phys_pkey[slave][port - 1][0];
 	} else {
 		src_qpnum = 1;
 		sqp = &sqp_ctx->qp[1];
-		wire_pkey_ix = dev->pkeys.virt2phys_pkey[slave][port - 1][pkey_index];
+		wire_pkey_ix = dev->pkeys->virt2phys_pkey[slave][port - 1][pkey_index];
 	}
 
 	send_qp = sqp->qp;
@@ -1840,7 +1840,7 @@ static int create_pv_sqp(struct mlx4_ib_demux_pv_ctx *ctx,
 					      &attr.pkey_index);
 	if (ret || !create_tun)
 		attr.pkey_index =
-			to_mdev(ctx->ib_dev)->pkeys.virt2phys_pkey[ctx->slave][ctx->port - 1][0];
+			to_mdev(ctx->ib_dev)->pkeys->virt2phys_pkey[ctx->slave][ctx->port - 1][0];
 	attr.qkey = IB_QP1_QKEY;
 	attr.port_num = ctx->port;
 	ret = ib_modify_qp(tun_qp->qp, &attr, qp_attr_mask_INIT);

@@ -2477,12 +2477,12 @@ static void init_pkeys(struct mlx4_ib_dev *ibdev)
 				for (i = 0;
 				     i < ibdev->dev->phys_caps.pkey_phys_table_len[port];
 				     ++i) {
-					ibdev->pkeys.virt2phys_pkey[slave][port - 1][i] =
+					ibdev->pkeys->virt2phys_pkey[slave][port - 1][i] =
 					/* master has the identity virt2phys pkey mapping */
 						(slave == mlx4_master_func_num(ibdev->dev) || !i) ? i :
 							ibdev->dev->phys_caps.pkey_phys_table_len[port] - 1;
 					mlx4_sync_pkey_table(ibdev->dev, slave, port, i,
-							     ibdev->pkeys.virt2phys_pkey[slave][port - 1][i]);
+							     ibdev->pkeys->virt2phys_pkey[slave][port - 1][i]);
 				}
 			}
 		}
@@ -2491,7 +2491,7 @@ static void init_pkeys(struct mlx4_ib_dev *ibdev)
 			for (i = 0;
 			     i < ibdev->dev->phys_caps.pkey_phys_table_len[port];
 			     ++i)
-				ibdev->pkeys.phys_pkey_cache[port-1][i] =
+				ibdev->pkeys->phys_pkey_cache[port-1][i] =
 					(i) ? 0 : 0xFFFF;
 		}
 	}
@@ -2595,6 +2595,7 @@ static void mlx4_ib_release(struct ib_device *device)
 						 ib_dev);
 
 	kvfree(ibdev->iboe);
+	kvfree(ibdev->pkeys);
 }
 
 static void *mlx4_ib_add(struct mlx4_dev *dev)
@@ -2635,6 +2636,10 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 
 	ibdev->iboe->parent = ibdev;
 	iboe = ibdev->iboe;
+
+	ibdev->pkeys = kvzalloc(sizeof(struct pkey_mgt), GFP_KERNEL);
+	if (!ibdev->pkeys)
+		goto err_dealloc;
 
 	if (mlx4_pd_alloc(dev, &ibdev->priv_pdn))
 		goto err_dealloc;

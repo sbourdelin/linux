@@ -447,12 +447,12 @@ static ssize_t show_port_pkey(struct mlx4_port *p, struct port_attribute *attr,
 		container_of(attr, struct port_table_attribute, attr);
 	ssize_t ret = -ENODEV;
 
-	if (p->dev->pkeys.virt2phys_pkey[p->slave][p->port_num - 1][tab_attr->index] >=
+	if (p->dev->pkeys->virt2phys_pkey[p->slave][p->port_num - 1][tab_attr->index] >=
 	    (p->dev->dev->caps.pkey_table_len[p->port_num]))
 		ret = sprintf(buf, "none\n");
 	else
 		ret = sprintf(buf, "%d\n",
-			      p->dev->pkeys.virt2phys_pkey[p->slave]
+			      p->dev->pkeys->virt2phys_pkey[p->slave]
 			      [p->port_num - 1][tab_attr->index]);
 	return ret;
 }
@@ -476,8 +476,8 @@ static ssize_t store_port_pkey(struct mlx4_port *p, struct port_attribute *attr,
 		 idx < 0)
 		return -EINVAL;
 
-	p->dev->pkeys.virt2phys_pkey[p->slave][p->port_num - 1]
-				    [tab_attr->index] = idx;
+	p->dev->pkeys->virt2phys_pkey[p->slave][p->port_num - 1]
+				     [tab_attr->index] = idx;
 	mlx4_sync_pkey_table(p->dev->dev, p->slave, p->port_num,
 			     tab_attr->index, idx);
 	err = mlx4_gen_pkey_eqe(p->dev->dev, p->slave, p->port_num);
@@ -687,7 +687,7 @@ static int add_port(struct mlx4_ib_dev *dev, int port_num, int slave)
 	if (ret)
 		goto err_free_gid;
 
-	list_add_tail(&p->kobj.entry, &dev->pkeys.pkey_port_list[slave]);
+	list_add_tail(&p->kobj.entry, &dev->pkeys->pkey_port_list[slave]);
 	return 0;
 
 err_free_gid:
@@ -716,19 +716,19 @@ static int register_one_pkey_tree(struct mlx4_ib_dev *dev, int slave)
 
 	get_name(dev, name, slave, sizeof name);
 
-	dev->pkeys.device_parent[slave] =
+	dev->pkeys->device_parent[slave] =
 		kobject_create_and_add(name, kobject_get(dev->iov_parent));
 
-	if (!dev->pkeys.device_parent[slave]) {
+	if (!dev->pkeys->device_parent[slave]) {
 		err = -ENOMEM;
 		goto fail_dev;
 	}
 
-	INIT_LIST_HEAD(&dev->pkeys.pkey_port_list[slave]);
+	INIT_LIST_HEAD(&dev->pkeys->pkey_port_list[slave]);
 
 	dev->dev_ports_parent[slave] =
 		kobject_create_and_add("ports",
-				       kobject_get(dev->pkeys.device_parent[slave]));
+				       kobject_get(dev->pkeys->device_parent[slave]));
 
 	if (!dev->dev_ports_parent[slave]) {
 		err = -ENOMEM;
@@ -748,7 +748,7 @@ static int register_one_pkey_tree(struct mlx4_ib_dev *dev, int slave)
 
 err_add:
 	list_for_each_entry_safe(p, t,
-				 &dev->pkeys.pkey_port_list[slave],
+				 &dev->pkeys->pkey_port_list[slave],
 				 entry) {
 		list_del(&p->entry);
 		mport = container_of(p, struct mlx4_port, kobj);
@@ -760,9 +760,9 @@ err_add:
 	kobject_put(dev->dev_ports_parent[slave]);
 
 err_ports:
-	kobject_put(dev->pkeys.device_parent[slave]);
+	kobject_put(dev->pkeys->device_parent[slave]);
 	/* extra put for the device_parent create_and_add */
-	kobject_put(dev->pkeys.device_parent[slave]);
+	kobject_put(dev->pkeys->device_parent[slave]);
 
 fail_dev:
 	kobject_put(dev->iov_parent);
@@ -793,7 +793,7 @@ static void unregister_pkey_tree(struct mlx4_ib_dev *device)
 
 	for (slave = device->dev->persist->num_vfs; slave >= 0; --slave) {
 		list_for_each_entry_safe(p, t,
-					 &device->pkeys.pkey_port_list[slave],
+					 &device->pkeys->pkey_port_list[slave],
 					 entry) {
 			list_del(&p->entry);
 			port = container_of(p, struct mlx4_port, kobj);
@@ -804,8 +804,8 @@ static void unregister_pkey_tree(struct mlx4_ib_dev *device)
 			kobject_put(device->dev_ports_parent[slave]);
 		}
 		kobject_put(device->dev_ports_parent[slave]);
-		kobject_put(device->pkeys.device_parent[slave]);
-		kobject_put(device->pkeys.device_parent[slave]);
+		kobject_put(device->pkeys->device_parent[slave]);
+		kobject_put(device->pkeys->device_parent[slave]);
 		kobject_put(device->iov_parent);
 	}
 }

@@ -608,7 +608,7 @@ struct mlx4_ib_dev {
 	struct kobject	       *ports_parent;
 	struct kobject	       *dev_ports_parent[MLX4_MFUNC_MAX];
 	struct mlx4_ib_iov_port	iov_ports[MLX4_MAX_PORTS];
-	struct pkey_mgt		pkeys;
+	struct pkey_mgt	       *pkeys;
 	unsigned long *ib_uc_qpns_bitmap;
 	int steer_qpn_count;
 	int steer_qpn_base;
