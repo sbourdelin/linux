@@ -16,6 +16,8 @@
  *	01Mar01 Andrew Morton
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/tty.h>
@@ -1048,7 +1050,7 @@ static void __init log_buf_len_update(unsigned size)
 /* save requested log_buf_len since it's too early to process it */
 static int __init log_buf_len_setup(char *str)
 {
-	unsigned size;
+	unsigned int size;
 
 	if (!str) {
 		pr_err("Config string not provided\n");
@@ -2359,7 +2361,7 @@ again:
 		raw_spin_lock(&logbuf_lock);
 		if (console_seq < log_first_seq) {
 			len = sprintf(text, "** %u printk messages dropped **\n",
-				      (unsigned)(log_first_seq - console_seq));
+				   (unsigned int)(log_first_seq - console_seq));
 
 			/* messages are gone, move to first one */
 			console_seq = log_first_seq;
