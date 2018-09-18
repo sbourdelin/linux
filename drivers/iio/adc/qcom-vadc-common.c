@@ -282,7 +282,7 @@ static int qcom_vadc_scale_code_voltage_factor(u16 adc_code,
 	voltage = div64_s64(voltage, data->full_scale_code_volt);
 	if (voltage > 0) {
 		voltage *= prescale->den;
-		temp = prescale->num * factor;
+		temp = prescale->num * (s64)factor;
 		voltage = div64_s64(voltage, temp);
 	} else {
 		voltage = 0;
