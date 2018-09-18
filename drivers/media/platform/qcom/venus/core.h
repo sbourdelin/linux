@@ -130,6 +130,9 @@ struct venus_core {
 	struct device *dev;
 	struct device *dev_dec;
 	struct device *dev_enc;
+	struct video_firmware {
+		struct device *dev;
+	} fw;
 	bool no_tz;
 	struct mutex lock;
 	struct list_head instances;
