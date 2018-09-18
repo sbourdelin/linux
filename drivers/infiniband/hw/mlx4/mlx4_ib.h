@@ -501,6 +501,7 @@ struct mlx4_ib_sriov {
 	spinlock_t id_map_lock;
 	struct rb_root sl_id_map;
 	struct idr pv_id_table;
+	struct mlx4_ib_dev *parent;
 };
 
 struct gid_cache_context {
@@ -597,7 +598,7 @@ struct mlx4_ib_dev {
 	struct ib_ah	       *sm_ah[MLX4_MAX_PORTS];
 	spinlock_t		sm_lock;
 	atomic64_t		sl2vl[MLX4_MAX_PORTS];
-	struct mlx4_ib_sriov	sriov;
+	struct mlx4_ib_sriov   *sriov;
 
 	struct mutex		cap_mask_mutex;
 	bool			ib_active;

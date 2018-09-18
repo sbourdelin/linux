@@ -143,7 +143,7 @@ static union ib_gid gid_from_req_msg(struct ib_device *ibdev, struct ib_mad *mad
 static struct id_map_entry *
 id_map_find_by_sl_id(struct ib_device *ibdev, u32 slave_id, u32 sl_cm_id)
 {
-	struct rb_root *sl_id_map = &to_mdev(ibdev)->sriov.sl_id_map;
+	struct rb_root *sl_id_map = &to_mdev(ibdev)->sriov->sl_id_map;
 	struct rb_node *node = sl_id_map->rb_node;
 
 	while (node) {
@@ -170,7 +170,7 @@ static void id_map_ent_timeout(struct work_struct *work)
 	struct id_map_entry *ent = container_of(delay, struct id_map_entry, timeout);
 	struct id_map_entry *db_ent, *found_ent;
 	struct mlx4_ib_dev *dev = ent->dev;
-	struct mlx4_ib_sriov *sriov = &dev->sriov;
+	struct mlx4_ib_sriov *sriov = dev->sriov;
 	struct rb_root *sl_id_map = &sriov->sl_id_map;
 	int pv_id = (int) ent->pv_cm_id;
 
@@ -191,7 +191,7 @@ out:
 
 static void id_map_find_del(struct ib_device *ibdev, int pv_cm_id)
 {
-	struct mlx4_ib_sriov *sriov = &to_mdev(ibdev)->sriov;
+	struct mlx4_ib_sriov *sriov = to_mdev(ibdev)->sriov;
 	struct rb_root *sl_id_map = &sriov->sl_id_map;
 	struct id_map_entry *ent, *found_ent;
 
@@ -209,7 +209,7 @@ out:
 
 static void sl_id_map_add(struct ib_device *ibdev, struct id_map_entry *new)
 {
-	struct rb_root *sl_id_map = &to_mdev(ibdev)->sriov.sl_id_map;
+	struct rb_root *sl_id_map = &to_mdev(ibdev)->sriov->sl_id_map;
 	struct rb_node **link = &sl_id_map->rb_node, *parent = NULL;
 	struct id_map_entry *ent;
 	int slave_id = new->slave_id;
@@ -244,7 +244,7 @@ id_map_alloc(struct ib_device *ibdev, int slave_id, u32 sl_cm_id)
 {
 	int ret;
 	struct id_map_entry *ent;
-	struct mlx4_ib_sriov *sriov = &to_mdev(ibdev)->sriov;
+	struct mlx4_ib_sriov *sriov = to_mdev(ibdev)->sriov;
 
 	ent = kmalloc(sizeof (struct id_map_entry), GFP_KERNEL);
 	if (!ent)
@@ -257,7 +257,7 @@ id_map_alloc(struct ib_device *ibdev, int slave_id, u32 sl_cm_id)
 	INIT_DELAYED_WORK(&ent->timeout, id_map_ent_timeout);
 
 	idr_preload(GFP_KERNEL);
-	spin_lock(&to_mdev(ibdev)->sriov.id_map_lock);
+	spin_lock(&to_mdev(ibdev)->sriov->id_map_lock);
 
 	ret = idr_alloc_cyclic(&sriov->pv_id_table, ent, 0, 0, GFP_NOWAIT);
 	if (ret >= 0) {
@@ -282,7 +282,7 @@ static struct id_map_entry *
 id_map_get(struct ib_device *ibdev, int *pv_cm_id, int slave_id, int sl_cm_id)
 {
 	struct id_map_entry *ent;
-	struct mlx4_ib_sriov *sriov = &to_mdev(ibdev)->sriov;
+	struct mlx4_ib_sriov *sriov = to_mdev(ibdev)->sriov;
 
 	spin_lock(&sriov->id_map_lock);
 	if (*pv_cm_id == -1) {
@@ -298,7 +298,7 @@ id_map_get(struct ib_device *ibdev, int *pv_cm_id, int slave_id, int sl_cm_id)
 
 static void schedule_delayed(struct ib_device *ibdev, struct id_map_entry *id)
 {
-	struct mlx4_ib_sriov *sriov = &to_mdev(ibdev)->sriov;
+	struct mlx4_ib_sriov *sriov = to_mdev(ibdev)->sriov;
 	unsigned long flags;
 
 	spin_lock(&sriov->id_map_lock);
@@ -404,17 +404,17 @@ int mlx4_ib_demux_cm_handler(struct ib_device *ibdev, int port, int *slave,
 
 void mlx4_ib_cm_paravirt_init(struct mlx4_ib_dev *dev)
 {
-	spin_lock_init(&dev->sriov.id_map_lock);
-	INIT_LIST_HEAD(&dev->sriov.cm_list);
-	dev->sriov.sl_id_map = RB_ROOT;
-	idr_init(&dev->sriov.pv_id_table);
+	spin_lock_init(&dev->sriov->id_map_lock);
+	INIT_LIST_HEAD(&dev->sriov->cm_list);
+	dev->sriov->sl_id_map = RB_ROOT;
+	idr_init(&dev->sriov->pv_id_table);
 }
 
 /* slave = -1 ==> all slaves */
 /* TBD -- call paravirt clean for single slave.  Need for slave RESET event */
 void mlx4_ib_cm_paravirt_clean(struct mlx4_ib_dev *dev, int slave)
 {
-	struct mlx4_ib_sriov *sriov = &dev->sriov;
+	struct mlx4_ib_sriov *sriov = dev->sriov;
 	struct rb_root *sl_id_map = &sriov->sl_id_map;
 	struct list_head lh;
 	struct rb_node *nd;
@@ -423,7 +423,7 @@ void mlx4_ib_cm_paravirt_clean(struct mlx4_ib_dev *dev, int slave)
 	/* cancel all delayed work queue entries */
 	INIT_LIST_HEAD(&lh);
 	spin_lock(&sriov->id_map_lock);
-	list_for_each_entry_safe(map, tmp_map, &dev->sriov.cm_list, list) {
+	list_for_each_entry_safe(map, tmp_map, &dev->sriov->cm_list, list) {
 		if (slave < 0 || slave == map->slave_id) {
 			if (map->scheduled_delete)
 				need_flush |= !cancel_delayed_work(&map->timeout);
@@ -446,7 +446,7 @@ void mlx4_ib_cm_paravirt_clean(struct mlx4_ib_dev *dev, int slave)
 			rb_erase(&ent->node, sl_id_map);
 			idr_remove(&sriov->pv_id_table, (int) ent->pv_cm_id);
 		}
-		list_splice_init(&dev->sriov.cm_list, &lh);
+		list_splice_init(&dev->sriov->cm_list, &lh);
 	} else {
 		/* first, move nodes belonging to slave to db remove list */
 		nd = rb_first(sl_id_map);
@@ -464,7 +464,7 @@ void mlx4_ib_cm_paravirt_clean(struct mlx4_ib_dev *dev, int slave)
 		}
 
 		/* add remaining nodes from cm_list */
-		list_for_each_entry_safe(map, tmp_map, &dev->sriov.cm_list, list) {
+		list_for_each_entry_safe(map, tmp_map, &dev->sriov->cm_list, list) {
 			if (slave == map->slave_id)
 				list_move_tail(&map->list, &lh);
 		}

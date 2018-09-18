@@ -84,25 +84,25 @@ static ssize_t store_admin_alias_guid(struct device *dev,
 		pr_err("GUID 0 block 0 is RO\n");
 		return count;
 	}
-	spin_lock_irqsave(&mdev->sriov.alias_guid.ag_work_lock, flags);
+	spin_lock_irqsave(&mdev->sriov->alias_guid.ag_work_lock, flags);
 	sscanf(buf, "%llx", &sysadmin_ag_val);
-	*(__be64 *)&mdev->sriov.alias_guid.ports_guid[port->num - 1].
+	*(__be64 *)&mdev->sriov->alias_guid.ports_guid[port->num - 1].
 		all_rec_per_port[record_num].
 		all_recs[GUID_REC_SIZE * guid_index_in_rec] =
 			cpu_to_be64(sysadmin_ag_val);
 
 	/* Change the state to be pending for update */
-	mdev->sriov.alias_guid.ports_guid[port->num - 1].all_rec_per_port[record_num].status
+	mdev->sriov->alias_guid.ports_guid[port->num - 1].all_rec_per_port[record_num].status
 		= MLX4_GUID_INFO_STATUS_IDLE ;
 	mlx4_set_admin_guid(mdev->dev, cpu_to_be64(sysadmin_ag_val),
 			    mlx4_ib_iov_dentry->entry_num,
 			    port->num);
 
 	/* set the record index */
-	mdev->sriov.alias_guid.ports_guid[port->num - 1].all_rec_per_port[record_num].guid_indexes
+	mdev->sriov->alias_guid.ports_guid[port->num - 1].all_rec_per_port[record_num].guid_indexes
 		|= mlx4_ib_get_aguid_comp_mask_from_ix(guid_index_in_rec);
 
-	spin_unlock_irqrestore(&mdev->sriov.alias_guid.ag_work_lock, flags);
+	spin_unlock_irqrestore(&mdev->sriov->alias_guid.ag_work_lock, flags);
 	mlx4_ib_init_alias_guid_work(mdev, port->num - 1);
 
 	return count;

@@ -3031,11 +3031,11 @@ static int build_mlx_header(struct mlx4_ib_sqp *sqp, const struct ib_ud_wr *wr,
 				 * we must use our own cache
 				 */
 				sqp->ud_header.grh.source_gid.global.subnet_prefix =
-					cpu_to_be64(atomic64_read(&(to_mdev(ib_dev)->sriov.
+					cpu_to_be64(atomic64_read(&(to_mdev(ib_dev)->sriov->
 								    demux[sqp->qp.port - 1].
 								    subnet_prefix)));
 				sqp->ud_header.grh.source_gid.global.interface_id =
-					to_mdev(ib_dev)->sriov.demux[sqp->qp.port - 1].
+					to_mdev(ib_dev)->sriov->demux[sqp->qp.port - 1].
 						       guid_cache[ah->av.ib.gid_index];
 			} else {
 				sqp->ud_header.grh.source_gid =

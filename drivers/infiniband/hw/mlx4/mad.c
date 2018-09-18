@@ -281,7 +281,7 @@ static void smp_snoop(struct ib_device *ibdev, u8 port_num, const struct ib_mad 
 			if (pkey_change_bitmap) {
 				mlx4_ib_dispatch_event(dev, port_num,
 						       IB_EVENT_PKEY_CHANGE);
-				if (!dev->sriov.is_going_down)
+				if (!dev->sriov->is_going_down)
 					__propagate_pkey_ev(dev, port_num, bn,
 							    pkey_change_bitmap);
 			}
@@ -296,7 +296,7 @@ static void smp_snoop(struct ib_device *ibdev, u8 port_num, const struct ib_mad 
 						       IB_EVENT_GID_CHANGE);
 			/*if master, notify relevant slaves*/
 			if (mlx4_is_master(dev->dev) &&
-			    !dev->sriov.is_going_down) {
+			    !dev->sriov->is_going_down) {
 				bn = be32_to_cpu(((struct ib_smp *)mad)->attr_mod);
 				mlx4_ib_update_cache_on_guid_change(dev, bn, port_num,
 								    (u8 *)(&((struct ib_smp *)mad)->data));
@@ -435,7 +435,7 @@ int mlx4_ib_find_real_gid(struct ib_device *ibdev, u8 port, __be64 guid)
 	int i;
 
 	for (i = 0; i < dev->dev->caps.sqp_demux; i++) {
-		if (dev->sriov.demux[port - 1].guid_cache[i] == guid)
+		if (dev->sriov->demux[port - 1].guid_cache[i] == guid)
 			return i;
 	}
 	return -1;
@@ -523,7 +523,7 @@ int mlx4_ib_send_to_slave(struct mlx4_ib_dev *dev, int slave, u8 port,
 	if (dest_qpt > IB_QPT_GSI)
 		return -EINVAL;
 
-	tun_ctx = dev->sriov.demux[port-1].tun[slave];
+	tun_ctx = dev->sriov->demux[port-1].tun[slave];
 
 	/* check if proxy qp created */
 	if (!tun_ctx || tun_ctx->state != DEMUX_PV_STATE_ACTIVE)
@@ -736,7 +736,7 @@ static int mlx4_ib_demux_mad(struct ib_device *ibdev, u8 port,
 		if (grh->dgid.global.interface_id ==
 			cpu_to_be64(IB_SA_WELL_KNOWN_GUID) &&
 		    grh->dgid.global.subnet_prefix == cpu_to_be64(
-			atomic64_read(&dev->sriov.demux[port - 1].subnet_prefix))) {
+			atomic64_read(&dev->sriov->demux[port - 1].subnet_prefix))) {
 			slave = 0;
 		} else {
 			slave = mlx4_ib_find_real_gid(ibdev, port,
@@ -1085,7 +1085,7 @@ static void handle_lid_change_event(struct mlx4_ib_dev *dev, u8 port_num)
 {
 	mlx4_ib_dispatch_event(dev, port_num, IB_EVENT_LID_CHANGE);
 
-	if (mlx4_is_master(dev->dev) && !dev->sriov.is_going_down)
+	if (mlx4_is_master(dev->dev) && !dev->sriov->is_going_down)
 		mlx4_gen_slaves_port_mgt_ev(dev->dev, port_num,
 					    MLX4_EQ_PORT_INFO_LID_CHANGE_MASK);
 }
@@ -1096,8 +1096,8 @@ static void handle_client_rereg_event(struct mlx4_ib_dev *dev, u8 port_num)
 	if (mlx4_is_master(dev->dev)) {
 		mlx4_ib_invalidate_all_guid_record(dev, port_num);
 
-		if (!dev->sriov.is_going_down) {
-			mlx4_ib_mcg_port_cleanup(&dev->sriov.demux[port_num - 1], 0);
+		if (!dev->sriov->is_going_down) {
+			mlx4_ib_mcg_port_cleanup(&dev->sriov->demux[port_num - 1], 0);
 			mlx4_gen_slaves_port_mgt_ev(dev->dev, port_num,
 						    MLX4_EQ_PORT_INFO_CLIENT_REREG_MASK);
 		}
@@ -1223,9 +1223,9 @@ void handle_port_mgmt_change_event(struct work_struct *work)
 				} else {
 					pr_debug("Changing QP1 subnet prefix for port %d. old=0x%llx. new=0x%llx\n",
 						 port,
-						 (u64)atomic64_read(&dev->sriov.demux[port - 1].subnet_prefix),
+						 (u64)atomic64_read(&dev->sriov->demux[port - 1].subnet_prefix),
 						 be64_to_cpu(gid.global.subnet_prefix));
-					atomic64_set(&dev->sriov.demux[port - 1].subnet_prefix,
+					atomic64_set(&dev->sriov->demux[port - 1].subnet_prefix,
 						     be64_to_cpu(gid.global.subnet_prefix));
 				}
 			}
@@ -1242,7 +1242,7 @@ void handle_port_mgmt_change_event(struct work_struct *work)
 
 	case MLX4_DEV_PMC_SUBTYPE_PKEY_TABLE:
 		mlx4_ib_dispatch_event(dev, port, IB_EVENT_PKEY_CHANGE);
-		if (mlx4_is_master(dev->dev) && !dev->sriov.is_going_down)
+		if (mlx4_is_master(dev->dev) && !dev->sriov->is_going_down)
 			propagate_pkey_ev(dev, port, eqe);
 		break;
 	case MLX4_DEV_PMC_SUBTYPE_GUID_INFO:
@@ -1250,7 +1250,7 @@ void handle_port_mgmt_change_event(struct work_struct *work)
 		if (!mlx4_is_master(dev->dev))
 			mlx4_ib_dispatch_event(dev, port, IB_EVENT_GID_CHANGE);
 		/*if master, notify relevant slaves*/
-		else if (!dev->sriov.is_going_down) {
+		else if (!dev->sriov->is_going_down) {
 			tbl_block = GET_BLK_PTR_FROM_EQE(eqe);
 			change_bitmap = GET_MASK_FROM_EQE(eqe);
 			handle_slaves_guid_change(dev, port, tbl_block, change_bitmap);
@@ -1299,10 +1299,10 @@ static void mlx4_ib_tunnel_comp_handler(struct ib_cq *cq, void *arg)
 	unsigned long flags;
 	struct mlx4_ib_demux_pv_ctx *ctx = cq->cq_context;
 	struct mlx4_ib_dev *dev = to_mdev(ctx->ib_dev);
-	spin_lock_irqsave(&dev->sriov.going_down_lock, flags);
-	if (!dev->sriov.is_going_down && ctx->state == DEMUX_PV_STATE_ACTIVE)
+	spin_lock_irqsave(&dev->sriov->going_down_lock, flags);
+	if (!dev->sriov->is_going_down && ctx->state == DEMUX_PV_STATE_ACTIVE)
 		queue_work(ctx->wq, &ctx->work);
-	spin_unlock_irqrestore(&dev->sriov.going_down_lock, flags);
+	spin_unlock_irqrestore(&dev->sriov->going_down_lock, flags);
 }
 
 static int mlx4_ib_post_pv_qp_buf(struct mlx4_ib_demux_pv_ctx *ctx,
@@ -1373,7 +1373,7 @@ int mlx4_ib_send_to_wire(struct mlx4_ib_dev *dev, int slave, u8 port,
 	u16 wire_pkey_ix;
 	int src_qpnum;
 
-	sqp_ctx = dev->sriov.sqps[port-1];
+	sqp_ctx = dev->sriov->sqps[port-1];
 
 	/* check if proxy qp created */
 	if (!sqp_ctx || sqp_ctx->state != DEMUX_PV_STATE_ACTIVE)
@@ -1960,9 +1960,9 @@ static int alloc_pv_object(struct mlx4_ib_dev *dev, int slave, int port,
 
 static void free_pv_object(struct mlx4_ib_dev *dev, int slave, int port)
 {
-	if (dev->sriov.demux[port - 1].tun[slave]) {
-		kfree(dev->sriov.demux[port - 1].tun[slave]);
-		dev->sriov.demux[port - 1].tun[slave] = NULL;
+	if (dev->sriov->demux[port - 1].tun[slave]) {
+		kfree(dev->sriov->demux[port - 1].tun[slave]);
+		dev->sriov->demux[port - 1].tun[slave] = NULL;
 	}
 }
 
@@ -2036,7 +2036,7 @@ static int create_pv_resources(struct ib_device *ibdev, int slave, int port,
 	else
 		INIT_WORK(&ctx->work, mlx4_ib_sqp_comp_worker);
 
-	ctx->wq = to_mdev(ibdev)->sriov.demux[port - 1].wq;
+	ctx->wq = to_mdev(ibdev)->sriov->demux[port - 1].wq;
 
 	ret = ib_req_notify_cq(ctx->cq, IB_CQ_NEXT_COMP);
 	if (ret) {
@@ -2107,25 +2107,25 @@ static int mlx4_ib_tunnels_update(struct mlx4_ib_dev *dev, int slave,
 	int ret = 0;
 
 	if (!do_init) {
-		clean_vf_mcast(&dev->sriov.demux[port - 1], slave);
+		clean_vf_mcast(&dev->sriov->demux[port - 1], slave);
 		/* for master, destroy real sqp resources */
 		if (slave == mlx4_master_func_num(dev->dev))
 			destroy_pv_resources(dev, slave, port,
-					     dev->sriov.sqps[port - 1], 1);
+					     dev->sriov->sqps[port - 1], 1);
 		/* destroy the tunnel qp resources */
 		destroy_pv_resources(dev, slave, port,
-				     dev->sriov.demux[port - 1].tun[slave], 1);
+				     dev->sriov->demux[port - 1].tun[slave], 1);
 		return 0;
 	}
 
 	/* create the tunnel qp resources */
 	ret = create_pv_resources(&dev->ib_dev, slave, port, 1,
-				  dev->sriov.demux[port - 1].tun[slave]);
+				  dev->sriov->demux[port - 1].tun[slave]);
 
 	/* for master, create the real sqp resources */
 	if (!ret && slave == mlx4_master_func_num(dev->dev))
 		ret = create_pv_resources(&dev->ib_dev, slave, port, 0,
-					  dev->sriov.sqps[port - 1]);
+					  dev->sriov->sqps[port - 1]);
 	return ret;
 }
 
@@ -2276,8 +2276,8 @@ int mlx4_ib_init_sriov(struct mlx4_ib_dev *dev)
 	if (!mlx4_is_mfunc(dev->dev))
 		return 0;
 
-	dev->sriov.is_going_down = 0;
-	spin_lock_init(&dev->sriov.going_down_lock);
+	dev->sriov->is_going_down = 0;
+	spin_lock_init(&dev->sriov->going_down_lock);
 	mlx4_ib_cm_paravirt_init(dev);
 
 	mlx4_ib_warn(&dev->ib_dev, "multi-function enabled\n");
@@ -2312,14 +2312,14 @@ int mlx4_ib_init_sriov(struct mlx4_ib_dev *dev)
 		err = __mlx4_ib_query_gid(&dev->ib_dev, i + 1, 0, &gid, 1);
 		if (err)
 			goto demux_err;
-		dev->sriov.demux[i].guid_cache[0] = gid.global.interface_id;
-		atomic64_set(&dev->sriov.demux[i].subnet_prefix,
+		dev->sriov->demux[i].guid_cache[0] = gid.global.interface_id;
+		atomic64_set(&dev->sriov->demux[i].subnet_prefix,
 			     be64_to_cpu(gid.global.subnet_prefix));
 		err = alloc_pv_object(dev, mlx4_master_func_num(dev->dev), i + 1,
-				      &dev->sriov.sqps[i]);
+				      &dev->sriov->sqps[i]);
 		if (err)
 			goto demux_err;
-		err = mlx4_ib_alloc_demux_ctx(dev, &dev->sriov.demux[i], i + 1);
+		err = mlx4_ib_alloc_demux_ctx(dev, &dev->sriov->demux[i], i + 1);
 		if (err)
 			goto free_pv;
 	}
@@ -2331,7 +2331,7 @@ free_pv:
 demux_err:
 	while (--i >= 0) {
 		free_pv_object(dev, mlx4_master_func_num(dev->dev), i + 1);
-		mlx4_ib_free_demux_ctx(&dev->sriov.demux[i]);
+		mlx4_ib_free_demux_ctx(&dev->sriov->demux[i]);
 	}
 	mlx4_ib_device_unregister_sysfs(dev);
 
@@ -2352,16 +2352,16 @@ void mlx4_ib_close_sriov(struct mlx4_ib_dev *dev)
 	if (!mlx4_is_mfunc(dev->dev))
 		return;
 
-	spin_lock_irqsave(&dev->sriov.going_down_lock, flags);
-	dev->sriov.is_going_down = 1;
-	spin_unlock_irqrestore(&dev->sriov.going_down_lock, flags);
+	spin_lock_irqsave(&dev->sriov->going_down_lock, flags);
+	dev->sriov->is_going_down = 1;
+	spin_unlock_irqrestore(&dev->sriov->going_down_lock, flags);
 	if (mlx4_is_master(dev->dev)) {
 		for (i = 0; i < dev->num_ports; i++) {
-			flush_workqueue(dev->sriov.demux[i].ud_wq);
-			mlx4_ib_free_sqp_ctx(dev->sriov.sqps[i]);
-			kfree(dev->sriov.sqps[i]);
-			dev->sriov.sqps[i] = NULL;
-			mlx4_ib_free_demux_ctx(&dev->sriov.demux[i]);
+			flush_workqueue(dev->sriov->demux[i].ud_wq);
+			mlx4_ib_free_sqp_ctx(dev->sriov->sqps[i]);
+			kfree(dev->sriov->sqps[i]);
+			dev->sriov->sqps[i] = NULL;
+			mlx4_ib_free_demux_ctx(&dev->sriov->demux[i]);
 		}
 
 		mlx4_ib_cm_paravirt_clean(dev, -1);

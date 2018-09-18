@@ -2596,6 +2596,7 @@ static void mlx4_ib_release(struct ib_device *device)
 
 	kvfree(ibdev->iboe);
 	kvfree(ibdev->pkeys);
+	kvfree(ibdev->sriov);
 }
 
 static void *mlx4_ib_add(struct mlx4_dev *dev)
@@ -2640,6 +2641,12 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	ibdev->pkeys = kvzalloc(sizeof(struct pkey_mgt), GFP_KERNEL);
 	if (!ibdev->pkeys)
 		goto err_dealloc;
+
+	ibdev->sriov = kvzalloc(sizeof(struct mlx4_ib_sriov), GFP_KERNEL);
+	if (!ibdev->sriov)
+		goto err_dealloc;
+
+	ibdev->sriov->parent = ibdev;
 
 	if (mlx4_pd_alloc(dev, &ibdev->priv_pdn))
 		goto err_dealloc;
@@ -3152,13 +3159,13 @@ static void do_slave_init(struct mlx4_ib_dev *ibdev, int slave, int do_init)
 		dm[i]->dev = ibdev;
 	}
 	/* initialize or tear down tunnel QPs for the slave */
-	spin_lock_irqsave(&ibdev->sriov.going_down_lock, flags);
-	if (!ibdev->sriov.is_going_down) {
+	spin_lock_irqsave(&ibdev->sriov->going_down_lock, flags);
+	if (!ibdev->sriov->is_going_down) {
 		for (i = 0; i < ports; i++)
-			queue_work(ibdev->sriov.demux[i].ud_wq, &dm[i]->work);
-		spin_unlock_irqrestore(&ibdev->sriov.going_down_lock, flags);
+			queue_work(ibdev->sriov->demux[i].ud_wq, &dm[i]->work);
+		spin_unlock_irqrestore(&ibdev->sriov->going_down_lock, flags);
 	} else {
-		spin_unlock_irqrestore(&ibdev->sriov.going_down_lock, flags);
+		spin_unlock_irqrestore(&ibdev->sriov->going_down_lock, flags);
 		for (i = 0; i < ports; i++)
 			kfree(dm[i]);
 	}

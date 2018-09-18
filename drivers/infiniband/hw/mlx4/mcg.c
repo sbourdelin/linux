@@ -884,7 +884,7 @@ int mlx4_ib_mcg_demux_handler(struct ib_device *ibdev, int port, int slave,
 {
 	struct mlx4_ib_dev *dev = to_mdev(ibdev);
 	struct ib_sa_mcmember_data *rec = (struct ib_sa_mcmember_data *)mad->data;
-	struct mlx4_ib_demux_ctx *ctx = &dev->sriov.demux[port - 1];
+	struct mlx4_ib_demux_ctx *ctx = &dev->sriov->demux[port - 1];
 	struct mcast_group *group;
 
 	switch (mad->mad_hdr.method) {
@@ -933,7 +933,7 @@ int mlx4_ib_mcg_multiplex_handler(struct ib_device *ibdev, int port,
 {
 	struct mlx4_ib_dev *dev = to_mdev(ibdev);
 	struct ib_sa_mcmember_data *rec = (struct ib_sa_mcmember_data *)sa_mad->data;
-	struct mlx4_ib_demux_ctx *ctx = &dev->sriov.demux[port - 1];
+	struct mlx4_ib_demux_ctx *ctx = &dev->sriov->demux[port - 1];
 	struct mcast_group *group;
 	struct mcast_req *req;
 	int may_create = 0;
