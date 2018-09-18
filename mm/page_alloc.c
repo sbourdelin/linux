@@ -14,6 +14,8 @@
  *          (lots of bits borrowed from Ingo Molnar & Andrew Morton)
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/stddef.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
@@ -629,6 +631,11 @@ struct page_ext_operations debug_guardpage_ops = {
 static int __init debug_guardpage_minorder_setup(char *buf)
 {
 	unsigned long res;
+
+	if (!buf) {
+		pr_err("Config string not provided\n");
+		return -EINVAL;
+	}
 
 	if (kstrtoul(buf, 10, &res) < 0 ||  res > MAX_ORDER / 2) {
 		pr_err("Bad debug_guardpage_minorder value\n");
@@ -6952,6 +6959,11 @@ static int __init cmdline_parse_core(char *p, unsigned long *core,
  */
 static int __init cmdline_parse_kernelcore(char *p)
 {
+	if (!p) {
+		pr_err("Config string not provided\n");
+		return -EINVAL;
+	}
+
 	/* parse kernelcore=mirror */
 	if (parse_option_str(p, "mirror")) {
 		mirrored_kernelcore = true;
