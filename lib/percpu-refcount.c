@@ -343,6 +343,42 @@ void percpu_ref_kill_and_confirm(struct percpu_ref *ref,
 }
 EXPORT_SYMBOL_GPL(percpu_ref_kill_and_confirm);
 
+/*
+ * If @need_drop_zero isn't set, clear the DEAD & ATOMIC flag and reinit
+ * the ref without checking if its ref value drops zero.
+ */
+static void __percpu_ref_reinit(struct percpu_ref *ref, bool need_drop_zero)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&percpu_ref_switch_lock, flags);
+
+	if (need_drop_zero) {
+		WARN_ON_ONCE(!percpu_ref_is_zero(ref));
+	} else {
+		unsigned long __percpu *percpu_count;
+
+		WARN_ON_ONCE(__ref_is_percpu(ref, &percpu_count));
+
+		/* get one extra ref for avoiding race with .release */
+		rcu_read_lock_sched();
+		atomic_long_add(1, &ref->count);
+		rcu_read_unlock_sched();
+	}
+
+	ref->percpu_count_ptr &= ~__PERCPU_REF_DEAD;
+	percpu_ref_get(ref);
+	__percpu_ref_switch_mode(ref, NULL);
+
+	if (!need_drop_zero) {
+		rcu_read_lock_sched();
+		atomic_long_sub(1, &ref->count);
+		rcu_read_unlock_sched();
+	}
+
+	spin_unlock_irqrestore(&percpu_ref_switch_lock, flags);
+}
+
 /**
  * percpu_ref_reinit - re-initialize a percpu refcount
  * @ref: perpcu_ref to re-initialize
@@ -356,16 +392,21 @@ EXPORT_SYMBOL_GPL(percpu_ref_kill_and_confirm);
  */
 void percpu_ref_reinit(struct percpu_ref *ref)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&percpu_ref_switch_lock, flags);
-
-	WARN_ON_ONCE(!percpu_ref_is_zero(ref));
-
-	ref->percpu_count_ptr &= ~__PERCPU_REF_DEAD;
-	percpu_ref_get(ref);
-	__percpu_ref_switch_mode(ref, NULL);
-
-	spin_unlock_irqrestore(&percpu_ref_switch_lock, flags);
+	__percpu_ref_reinit(ref, true);
 }
 EXPORT_SYMBOL_GPL(percpu_ref_reinit);
+
+/**
+ * percpu_ref_resurge - resurge a percpu refcount
+ * @ref: perpcu_ref to resurge
+ *
+ * Resurge @ref so that it's in the same state as before it is killed.
+ *
+ * Note that percpu_ref_tryget[_live]() are safe to perform on @ref while
+ * this function is in progress.
+ */
+void percpu_ref_resurge(struct percpu_ref *ref)
+{
+	__percpu_ref_reinit(ref, false);
+}
+EXPORT_SYMBOL_GPL(percpu_ref_resurge);
