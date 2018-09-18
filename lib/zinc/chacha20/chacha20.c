@@ -14,7 +14,9 @@
 #include <linux/init.h>
 #include <crypto/algapi.h>
 
-#ifndef HAVE_CHACHA20_ARCH_IMPLEMENTATION
+#if defined(CONFIG_ZINC_ARCH_X86_64)
+#include "chacha20-x86_64-glue.h"
+#else
 void __init chacha20_fpu_init(void)
 {
 }
