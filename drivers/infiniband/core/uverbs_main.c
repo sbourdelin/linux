@@ -72,7 +72,7 @@ enum {
 static dev_t dynamic_uverbs_dev;
 static struct class *uverbs_class;
 
-static DECLARE_BITMAP(dev_map, IB_UVERBS_MAX_DEVICES);
+static DEFINE_IDA(uverbs_ida);
 
 static ssize_t (*uverbs_cmd_table[])(struct ib_uverbs_file *file,
 				     const char __user *buf, int in_len,
@@ -1039,11 +1039,11 @@ static void ib_uverbs_add_one(struct ib_device *device)
 	INIT_LIST_HEAD(&uverbs_dev->uverbs_file_list);
 	INIT_LIST_HEAD(&uverbs_dev->uverbs_events_file_list);
 
-	devnum = find_first_zero_bit(dev_map, IB_UVERBS_MAX_DEVICES);
-	if (devnum >= IB_UVERBS_MAX_DEVICES)
+	devnum = ida_alloc_max(&uverbs_ida, IB_UVERBS_MAX_DEVICES - 1,
+			       GFP_KERNEL);
+	if (devnum < 0)
 		goto err;
 	uverbs_dev->devnum = devnum;
-	set_bit(devnum, dev_map);
 	if (devnum >= IB_UVERBS_NUM_FIXED_MINOR)
 		base = dynamic_uverbs_dev + devnum - IB_UVERBS_NUM_FIXED_MINOR;
 	else
@@ -1079,7 +1079,7 @@ err_cdev:
 	cdev_del(&uverbs_dev->cdev);
 	put_device(&uverbs_dev->dev);
 err_uapi:
-	clear_bit(devnum, dev_map);
+	ida_free(&uverbs_ida, devnum);
 err:
 	if (atomic_dec_and_test(&uverbs_dev->refcount))
 		ib_uverbs_comp_dev(uverbs_dev);
@@ -1154,7 +1154,7 @@ static void ib_uverbs_remove_one(struct ib_device *device, void *client_data)
 		return;
 
 	cdev_device_del(&uverbs_dev->cdev, &uverbs_dev->dev);
-	clear_bit(uverbs_dev->devnum, dev_map);
+	ida_free(&uverbs_ida, uverbs_dev->devnum);
 
 	if (device->disassociate_ucontext) {
 		/* We disassociate HW resources and immediately return.
