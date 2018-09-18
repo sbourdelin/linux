@@ -3129,6 +3129,82 @@ static const struct drm_private_state_funcs mst_state_funcs = {
 	.atomic_destroy_state = drm_dp_mst_destroy_state,
 };
 
+static bool
+drm_dp_mst_connector_still_exists(struct drm_connector *connector,
+				  struct drm_dp_mst_topology_mgr *mgr,
+				  struct drm_dp_mst_branch *mstb)
+{
+	struct drm_dp_mst_port *port;
+	bool exists = false;
+
+	mstb = drm_dp_get_validated_mstb_ref(mgr, mstb);
+	if (!mstb)
+		return false;
+
+	list_for_each_entry(port, &mstb->ports, next) {
+		port = drm_dp_get_validated_port_ref(mgr, port);
+		if (!port)
+			continue;
+
+		exists = (port->connector == connector ||
+			  (port->mstb &&
+			   drm_dp_mst_connector_still_exists(connector, mgr,
+							     port->mstb)));
+
+		drm_dp_put_port(port);
+		if (exists)
+			break;
+	}
+
+	drm_dp_put_mst_branch_device(mstb);
+	return exists;
+}
+
+/**
+ * drm_dp_mst_connector_atomic_check - Helper for validating a new atomic
+ *                                     state on an MST connector
+ * @connector: drm connector
+ * @connector_state: the new atomic state of @connector
+ * @mgr: the MST topology mgr for @connector
+ *
+ * This function performs various atomic checks that apply to all drivers
+ * using the DRM DP MST helpers. This should be called by all drivers at the
+ * start of the atomic_check function for their MST connectors.
+ *
+ * Return 0 for success, or negative error code on failure.
+ */
+int
+drm_dp_mst_connector_atomic_check(struct drm_connector *connector,
+				  struct drm_connector_state *connector_state,
+				  struct drm_dp_mst_topology_mgr *mgr)
+{
+	struct drm_atomic_state *state = connector_state->state;
+	struct drm_crtc *crtc = connector_state->crtc;
+	struct drm_crtc_state *new_crtc_state;
+
+	if (!crtc)
+		return 0;
+
+	new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+	if (!new_crtc_state)
+		return 0;
+
+	if (!drm_atomic_crtc_needs_modeset(new_crtc_state) ||
+	    !new_crtc_state->active)
+		return 0;
+
+	/* Make sure that the port for this MST connector still exists */
+	if (!drm_dp_mst_connector_still_exists(connector, mgr,
+					       mgr->mst_primary)) {
+		DRM_DEBUG_ATOMIC("[CONNECTOR:%d:%s] has disappeared from the MST topology\n",
+				 connector->base.id, connector->name);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_dp_mst_connector_atomic_check);
+
 /**
  * drm_atomic_get_mst_topology_state: get MST topology state
  *
