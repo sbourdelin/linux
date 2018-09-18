@@ -191,18 +191,39 @@ void blk_mq_freeze_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_mq_freeze_queue);
 
-void blk_mq_unfreeze_queue(struct request_queue *q)
+static void __blk_mq_unfreeze_queue(struct request_queue *q,
+		bool need_drop_zero)
 {
 	int freeze_depth;
 
 	freeze_depth = atomic_dec_return(&q->mq_freeze_depth);
 	WARN_ON_ONCE(freeze_depth < 0);
 	if (!freeze_depth) {
-		percpu_ref_reinit(&q->q_usage_counter);
+		if (need_drop_zero)
+			percpu_ref_reinit(&q->q_usage_counter);
+		else
+			percpu_ref_resurge(&q->q_usage_counter);
 		wake_up_all(&q->mq_freeze_wq);
 	}
 }
+
+void blk_mq_unfreeze_queue(struct request_queue *q)
+{
+	__blk_mq_unfreeze_queue(q, true);
+}
 EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue);
+
+/*
+ * Compared with blk_mq_unfreeze_queue(), the verion of _no_drain_io
+ * doesn't require the queue is really frozen, and it is useful in
+ * case of timeout handling in which IO can't be drained and has to
+ * be retried after controler is recovered.
+ */
+void blk_mq_unfreeze_queue_no_drain_io(struct request_queue *q)
+{
+	__blk_mq_unfreeze_queue(q, false);
+}
+EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue_no_drain_io);
 
 /*
  * FIXME: replace the scsi_internal_device_*block_nowait() calls in the
