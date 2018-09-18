@@ -144,7 +144,6 @@ struct wm8903_platform_data {
 
 	int micdet_delay;      /* Delay after microphone detection (ms) */
 
-	int gpio_base;
 	u32 gpio_cfg[WM8903_NUM_GPIO]; /* Default register values for GPIO pin mux */
 };
 
@@ -1876,17 +1875,12 @@ static const struct gpio_chip wm8903_template_chip = {
 
 static void wm8903_init_gpio(struct wm8903_priv *wm8903)
 {
-	struct wm8903_platform_data *pdata = wm8903->pdata;
 	int ret;
 
 	wm8903->gpio_chip = wm8903_template_chip;
 	wm8903->gpio_chip.ngpio = WM8903_NUM_GPIO;
 	wm8903->gpio_chip.parent = wm8903->dev;
-
-	if (pdata->gpio_base)
-		wm8903->gpio_chip.base = pdata->gpio_base;
-	else
-		wm8903->gpio_chip.base = -1;
+	wm8903->gpio_chip.base = -1;
 
 	ret = gpiochip_add_data(&wm8903->gpio_chip, wm8903);
 	if (ret != 0)
