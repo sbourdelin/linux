@@ -504,8 +504,11 @@ static int ieee80211_start_sw_scan(struct ieee80211_local *local,
 static bool ieee80211_can_scan(struct ieee80211_local *local,
 			       struct ieee80211_sub_if_data *sdata)
 {
-	if (ieee80211_is_radar_required(local))
-		return false;
+	if (sdata->wdev.cac_started)
+		return -EBUSY;
+
+	if (sdata->vif.csa_active)
+		return -EBUSY;
 
 	if (!list_empty(&local->roc_list))
 		return false;
@@ -610,7 +613,7 @@ static int __ieee80211_start_scan(struct ieee80211_sub_if_data *sdata,
 
 	lockdep_assert_held(&local->mtx);
 
-	if (local->scan_req || ieee80211_is_radar_required(local))
+	if (local->scan_req)
 		return -EBUSY;
 
 	if (!ieee80211_can_scan(local, sdata)) {
