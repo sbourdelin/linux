@@ -1868,7 +1868,7 @@ static int handle_eth_ud_smac_index(struct mlx4_ib_dev *dev,
 	u64 u64_mac;
 	int smac_index;
 
-	u64_mac = atomic64_read(&dev->iboe.mac[qp->port - 1]);
+	u64_mac = atomic64_read(&dev->iboe->mac[qp->port - 1]);
 
 	context->pri_path.sched_queue = MLX4_IB_DEFAULT_SCHED_QUEUE | ((qp->port - 1) << 6);
 	if (!qp->pri.smac && !qp->pri.smac_port) {
@@ -2926,7 +2926,7 @@ static int fill_gid_by_hw_index(struct mlx4_ib_dev *ibdev, u8 port_num,
 				int index, union ib_gid *gid,
 				enum ib_gid_type *gid_type)
 {
-	struct mlx4_ib_iboe *iboe = &ibdev->iboe;
+	struct mlx4_ib_iboe *iboe = ibdev->iboe;
 	struct mlx4_port_gid_table *port_gid_table;
 	unsigned long flags;
 

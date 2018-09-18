@@ -524,6 +524,7 @@ struct mlx4_ib_iboe {
 	atomic64_t		mac[MLX4_MAX_PORTS];
 	struct notifier_block 	nb;
 	struct mlx4_port_gid_table gids[MLX4_MAX_PORTS];
+	struct mlx4_ib_dev     *parent;
 };
 
 struct pkey_mgt {
@@ -600,7 +601,7 @@ struct mlx4_ib_dev {
 
 	struct mutex		cap_mask_mutex;
 	bool			ib_active;
-	struct mlx4_ib_iboe	iboe;
+	struct mlx4_ib_iboe    *iboe;
 	struct mlx4_ib_counters counters_table[MLX4_MAX_PORTS];
 	int		       *eq_table;
 	struct kobject	       *iov_parent;
