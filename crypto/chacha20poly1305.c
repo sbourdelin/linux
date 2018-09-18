@@ -13,7 +13,7 @@
 #include <crypto/internal/hash.h>
 #include <crypto/internal/skcipher.h>
 #include <crypto/scatterwalk.h>
-#include <crypto/chacha20.h>
+#include <zinc/chacha20.h>
 #include <zinc/poly1305.h>
 #include <linux/err.h>
 #include <linux/init.h>
