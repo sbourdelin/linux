@@ -609,6 +609,14 @@ config ATCPIT100_TIMER
 	help
 	  This option enables support for the Andestech ATCPIT100 timers.
 
+config CSKY_MPTIMER
+	bool "C-SKY Multi Processor Timer"
+	depends on CSKY
+	select TIMER_OF
+	help
+	  Say yes here to enable C-SKY SMP timer driver used for C-SKY SMP
+	  system.
+
 config RISCV_TIMER
 	bool "Timer for the RISC-V platform"
 	depends on RISCV
