@@ -1179,17 +1179,17 @@ extern int perf_cpu_time_max_percent_handler(struct ctl_table *table, int write,
 int perf_event_max_stack_handler(struct ctl_table *table, int write,
 				 void __user *buffer, size_t *lenp, loff_t *ppos);
 
-static inline bool perf_paranoid_tracepoint_raw(void)
+static inline bool perf_paranoid_tracepoint_raw(const struct pmu *pmu)
 {
 	return sysctl_perf_event_paranoid > -1;
 }
 
-static inline bool perf_paranoid_cpu(void)
+static inline bool perf_paranoid_cpu(const struct pmu *pmu)
 {
 	return sysctl_perf_event_paranoid > 0;
 }
 
-static inline bool perf_paranoid_kernel(void)
+static inline bool perf_paranoid_kernel(const struct pmu *pmu)
 {
 	return sysctl_perf_event_paranoid > 1;
 }

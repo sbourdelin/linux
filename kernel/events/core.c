@@ -4108,7 +4108,7 @@ find_get_context(struct pmu *pmu, struct task_struct *task,
 
 	if (!task) {
 		/* Must be root to operate on a CPU event: */
-		if (perf_paranoid_cpu() && !capable(CAP_SYS_ADMIN))
+		if (perf_paranoid_cpu(pmu) && !capable(CAP_SYS_ADMIN))
 			return ERR_PTR(-EACCES);
 
 		cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
@@ -5676,7 +5676,7 @@ accounting:
 	lock_limit >>= PAGE_SHIFT;
 	locked = vma->vm_mm->pinned_vm + extra;
 
-	if ((locked > lock_limit) && perf_paranoid_tracepoint_raw() &&
+	if ((locked > lock_limit) && perf_paranoid_tracepoint_raw(event->pmu) &&
 		!capable(CAP_IPC_LOCK)) {
 		ret = -EPERM;
 		goto unlock;
@@ -10485,8 +10485,10 @@ SYSCALL_DEFINE5(perf_event_open,
 		goto err_cred;
 	}
 
+	pmu = event->pmu;
+
 	if (!attr.exclude_kernel) {
-		if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN)) {
+		if (perf_paranoid_kernel(pmu) && !capable(CAP_SYS_ADMIN)) {
 			err = -EACCES;
 			goto err_alloc;
 		}
@@ -10494,7 +10496,7 @@ SYSCALL_DEFINE5(perf_event_open,
 
 	/* Only privileged users can get physical addresses */
 	if ((attr.sample_type & PERF_SAMPLE_PHYS_ADDR) &&
-	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN)) {
+	    perf_paranoid_kernel(pmu) && !capable(CAP_SYS_ADMIN)) {
 		err = -EACCES;
 		goto err_alloc;
 	}
@@ -10502,13 +10504,13 @@ SYSCALL_DEFINE5(perf_event_open,
 	/* privileged levels capture (kernel, hv): check permissions */
 	if ((attr.sample_type & PERF_SAMPLE_BRANCH_STACK) &&
 	    (attr.branch_sample_type & PERF_SAMPLE_BRANCH_PERM_PLM) &&
-	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN)) {
+	    perf_paranoid_kernel(pmu) && !capable(CAP_SYS_ADMIN)) {
 		err = -EACCES;
 		goto err_alloc;
 	}
 
 	if (is_sampling_event(event)) {
-		if (event->pmu->capabilities & PERF_PMU_CAP_NO_INTERRUPT) {
+		if (pmu->capabilities & PERF_PMU_CAP_NO_INTERRUPT) {
 			err = -EOPNOTSUPP;
 			goto err_alloc;
 		}
@@ -10518,7 +10520,6 @@ SYSCALL_DEFINE5(perf_event_open,
 	 * Special case software events and allow them to be part of
 	 * any hardware group.
 	 */
-	pmu = event->pmu;
 
 	if (attr.use_clockid) {
 		err = perf_event_set_clock(event, attr.clockid);

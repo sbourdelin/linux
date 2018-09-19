@@ -46,7 +46,8 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
 
 	/* The ftrace function trace is allowed only for root. */
 	if (ftrace_event_is_function(tp_event)) {
-		if (perf_paranoid_tracepoint_raw() && !capable(CAP_SYS_ADMIN))
+		if (perf_paranoid_tracepoint_raw(p_event->pmu) &&
+		    !capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
 		if (!is_sampling_event(p_event))
@@ -82,7 +83,8 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
 	 * ...otherwise raw tracepoint data can be a severe data leak,
 	 * only allow root to have these.
 	 */
-	if (perf_paranoid_tracepoint_raw() && !capable(CAP_SYS_ADMIN))
+	if (perf_paranoid_tracepoint_raw(p_event->pmu) &&
+	    !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	return 0;
