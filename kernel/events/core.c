@@ -10187,10 +10187,6 @@ static int perf_copy_attr(struct perf_event_attr __user *uattr,
 			 */
 			attr->branch_sample_type = mask;
 		}
-		/* privileged levels capture (kernel, hv): check permissions */
-		if ((mask & PERF_SAMPLE_BRANCH_PERM_PLM)
-		    && perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
-			return -EACCES;
 	}
 
 	if (attr->sample_type & PERF_SAMPLE_REGS_USER) {
@@ -10407,11 +10403,6 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (err)
 		return err;
 
-	if (!attr.exclude_kernel) {
-		if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
-			return -EACCES;
-	}
-
 	if (attr.namespaces) {
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
@@ -10424,11 +10415,6 @@ SYSCALL_DEFINE5(perf_event_open,
 		if (attr.sample_period & (1ULL << 63))
 			return -EINVAL;
 	}
-
-	/* Only privileged users can get physical addresses */
-	if ((attr.sample_type & PERF_SAMPLE_PHYS_ADDR) &&
-	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
-		return -EACCES;
 
 	/*
 	 * In cgroup mode, the pid argument is used to pass the fd
@@ -10497,6 +10483,28 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (IS_ERR(event)) {
 		err = PTR_ERR(event);
 		goto err_cred;
+	}
+
+	if (!attr.exclude_kernel) {
+		if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN)) {
+			err = -EACCES;
+			goto err_alloc;
+		}
+	}
+
+	/* Only privileged users can get physical addresses */
+	if ((attr.sample_type & PERF_SAMPLE_PHYS_ADDR) &&
+	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN)) {
+		err = -EACCES;
+		goto err_alloc;
+	}
+
+	/* privileged levels capture (kernel, hv): check permissions */
+	if ((attr.sample_type & PERF_SAMPLE_BRANCH_STACK) &&
+	    (attr.branch_sample_type & PERF_SAMPLE_BRANCH_PERM_PLM) &&
+	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN)) {
+		err = -EACCES;
+		goto err_alloc;
 	}
 
 	if (is_sampling_event(event)) {
