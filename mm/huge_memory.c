@@ -851,12 +851,23 @@ static void touch_pmd(struct vm_area_struct *vma, unsigned long addr,
 		update_mmu_cache_pmd(vma, addr, pmd);
 }
 
+static struct page *pagemap_page(struct follow_page_context *ctx,
+				 unsigned long pfn)
+{
+	struct page *page;
+
+	ctx->pgmap = get_dev_pagemap(pfn, ctx->pgmap);
+	if (!ctx->pgmap)
+		return ERR_PTR(-EFAULT);
+	page = pfn_to_page(pfn);
+	get_page(page);
+	return page;
+}
+
 struct page *follow_devmap_pmd(struct follow_page_context *ctx, pmd_t *pmd)
 {
 	unsigned long pfn = pmd_pfn(*pmd);
 	struct mm_struct *mm = ctx->vma->vm_mm;
-	struct dev_pagemap *pgmap;
-	struct page *page;
 
 	assert_spin_locked(pmd_lockptr(mm, pmd));
 
@@ -885,14 +896,7 @@ struct page *follow_devmap_pmd(struct follow_page_context *ctx, pmd_t *pmd)
 		return ERR_PTR(-EEXIST);
 
 	pfn += (ctx->address & ~PMD_MASK) >> PAGE_SHIFT;
-	pgmap = get_dev_pagemap(pfn, NULL);
-	if (!pgmap)
-		return ERR_PTR(-EFAULT);
-	page = pfn_to_page(pfn);
-	get_page(page);
-	put_dev_pagemap(pgmap);
-
-	return page;
+	return pagemap_page(ctx, pfn);
 }
 
 int copy_huge_pmd(struct mm_struct *dst_mm, struct mm_struct *src_mm,
@@ -1002,8 +1006,6 @@ struct page *follow_devmap_pud(struct follow_page_context *ctx, pud_t *pud)
 {
 	unsigned long pfn = pud_pfn(*pud);
 	struct mm_struct *mm = ctx->vma->vm_mm;
-	struct dev_pagemap *pgmap;
-	struct page *page;
 
 	assert_spin_locked(pud_lockptr(mm, pud));
 
@@ -1026,14 +1028,7 @@ struct page *follow_devmap_pud(struct follow_page_context *ctx, pud_t *pud)
 		return ERR_PTR(-EEXIST);
 
 	pfn += (ctx->address & ~PUD_MASK) >> PAGE_SHIFT;
-	pgmap = get_dev_pagemap(pfn, NULL);
-	if (!pgmap)
-		return ERR_PTR(-EFAULT);
-	page = pfn_to_page(pfn);
-	get_page(page);
-	put_dev_pagemap(pgmap);
-
-	return page;
+	return pagemap_page(ctx, pfn);
 }
 
 int copy_huge_pud(struct mm_struct *dst_mm, struct mm_struct *src_mm,
