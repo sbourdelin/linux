@@ -9,6 +9,7 @@
 
 #include <byteswap.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <linux/bitops.h>
 #include <api/fs/fs.h>
@@ -20,6 +21,7 @@
 #include <linux/err.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include "asm/bug.h"
@@ -2843,10 +2845,37 @@ static bool find_process(const char *name)
 	return ret ? false : true;
 }
 
+static int __pmu_paranoid_value(const char *name, char *buf, int bufsz)
+{
+	char path[PATH_MAX];
+	int fd, ret;
+
+	ret = snprintf(path, sizeof(path),
+		       "%s/bus/event_source/devices/%s/perf_event_paranoid",
+			sysfs__mountpoint(), name);
+	if (ret < 0 || ret == sizeof(path))
+		return -1;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = read(fd, buf, bufsz - 1);
+	if (ret <= 0)
+		return -1;
+
+	if (buf[ret - 1] == '\n')
+		buf[ret - 1] = 0;
+	else
+		buf[ret] = 0;
+
+	return 0;
+}
+
 int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
 			      int err, char *msg, size_t size)
 {
-	char sbuf[STRERR_BUFSIZE];
+	char sbuf[STRERR_BUFSIZE], buf[4];
 	int printed = 0;
 
 	switch (err) {
@@ -2870,9 +2899,15 @@ int perf_evsel__open_strerror(struct perf_evsel *evsel, struct target *target,
 		 ">= 1: Disallow CPU event access by users without CAP_SYS_ADMIN\n"
 		 ">= 2: Disallow kernel profiling by users without CAP_SYS_ADMIN\n\n"
 		 "To make this setting permanent, edit /etc/sysctl.conf too, e.g.:\n\n"
-		 "	kernel.perf_event_paranoid = -1\n" ,
+		 "	kernel.perf_event_paranoid = -1\n\n"
+		 "Alternatively an identical per PMU setting can be found and adjusted at\n"
+		 "/sys/bus/event_source/devices/%s/perf_event_paranoid for fine-grained\n"
+		 "access control. The current value is '%s'.\n",
 				 target->system_wide ? "system-wide " : "",
-				 perf_event_paranoid());
+				 perf_event_paranoid(),
+				 evsel->pmu_name,
+				 __pmu_paranoid_value(evsel->pmu_name, buf,
+						      sizeof(buf)) ? "-" : buf);
 	case ENOENT:
 		return scnprintf(msg, size, "The %s event is not supported.",
 				 perf_evsel__name(evsel));

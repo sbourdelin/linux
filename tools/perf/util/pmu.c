@@ -545,6 +545,22 @@ static int pmu_type(const char *name, __u32 *type)
 	return ret;
 }
 
+static int pmu_paranoid(const char *name)
+{
+	char path[PATH_MAX];
+	int ret, paranoid;
+
+	ret = snprintf(path, sizeof(path),
+		       EVENT_SOURCE_DEVICE_PATH "%s/perf_event_paranoid",
+		       name);
+
+	if (ret > 0 && ret < (int)sizeof(path) &&
+	    !sysfs__read_int(path, &paranoid))
+		return paranoid;
+
+	return perf_event_paranoid();
+}
+
 /* Add all pmus in sysfs to pmu list: */
 static void pmu_read_sysfs(void)
 {
@@ -825,6 +841,7 @@ static struct perf_pmu *pmu_lookup(const char *name)
 	pmu->name = strdup(name);
 	pmu->type = type;
 	pmu->is_uncore = pmu_is_uncore(name);
+	pmu->paranoid = pmu_paranoid(name);
 	pmu_add_cpu_aliases(&aliases, pmu);
 
 	INIT_LIST_HEAD(&pmu->format);
