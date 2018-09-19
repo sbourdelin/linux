@@ -1145,7 +1145,9 @@ static struct ctl_table kern_table[] = {
 		.data		= &sysctl_perf_event_paranoid,
 		.maxlen		= sizeof(sysctl_perf_event_paranoid),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler   = perf_proc_paranoid_handler,
+		.extra1         = &neg_one,
+		.extra2         = &two,
 	},
 	{
 		.procname	= "perf_event_mlock_kb",

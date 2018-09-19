@@ -432,6 +432,24 @@ static void update_perf_cpu_limits(void)
 
 static bool perf_rotate_context(struct perf_cpu_context *cpuctx);
 
+int perf_proc_paranoid_handler(struct ctl_table *table, int write,
+		void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	struct pmu *pmu;
+
+	if (ret || !write)
+		return ret;
+
+	mutex_lock(&pmus_lock);
+	list_for_each_entry(pmu, &pmus, entry)
+		pmu->perf_event_paranoid = sysctl_perf_event_paranoid;
+	mutex_unlock(&pmus_lock);
+
+	return 0;
+}
+
 int perf_proc_update_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)
@@ -9427,6 +9445,41 @@ static void free_pmu_context(struct pmu *pmu)
 }
 
 /*
+ * Fine-grained access control:
+ */
+static ssize_t
+perf_event_paranoid_show(struct device *dev,
+			 struct device_attribute *attr,
+			 char *page)
+{
+	struct pmu *pmu = dev_get_drvdata(dev);
+
+	return snprintf(page, PAGE_SIZE - 1, "%d\n", pmu->perf_event_paranoid);
+}
+
+static ssize_t
+perf_event_paranoid_store(struct device *dev,
+			  struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct pmu *pmu = dev_get_drvdata(dev);
+	int ret, val;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val < -1 || val > 2)
+		return -EINVAL;
+
+	pmu->perf_event_paranoid = val;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(perf_event_paranoid);
+
+/*
  * Let userspace know that this PMU supports address range filtering:
  */
 static ssize_t nr_addr_filters_show(struct device *dev,
@@ -9540,6 +9593,11 @@ static int pmu_dev_alloc(struct pmu *pmu)
 	if (ret)
 		goto free_dev;
 
+	/* Add fine-grained access control attribute. */
+	ret = device_create_file(pmu->dev, &dev_attr_perf_event_paranoid);
+	if (ret)
+		goto del_dev;
+
 	/* For PMUs with address filters, throw in an extra attribute: */
 	if (pmu->nr_addr_filters)
 		ret = device_create_file(pmu->dev, &dev_attr_nr_addr_filters);
@@ -9571,6 +9629,7 @@ int perf_pmu_register(struct pmu *pmu, const char *name, int type)
 	if (!pmu->pmu_disable_count)
 		goto unlock;
 
+	pmu->perf_event_paranoid = sysctl_perf_event_paranoid;
 	pmu->type = -1;
 	if (!name)
 		goto skip_type;
