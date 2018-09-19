@@ -3486,20 +3486,21 @@ static int macsec_notify(struct notifier_block *this, unsigned long event,
 			 void *ptr)
 {
 	struct net_device *real_dev = netdev_notifier_info_to_dev(ptr);
-	LIST_HEAD(head);
+	struct macsec_dev *m;
+	struct macsec_rxh_data *rxd;
 
 	if (!is_macsec_master(real_dev))
 		return NOTIFY_DONE;
 
+	rxd = macsec_data_rtnl(real_dev);
+
 	switch (event) {
 	case NETDEV_UNREGISTER: {
-		struct macsec_dev *m, *n;
-		struct macsec_rxh_data *rxd;
+		struct macsec_dev *n;
+		LIST_HEAD(head);
 
-		rxd = macsec_data_rtnl(real_dev);
-		list_for_each_entry_safe(m, n, &rxd->secys, secys) {
+		list_for_each_entry_safe(m, n, &rxd->secys, secys)
 			macsec_common_dellink(m->secy.netdev, &head);
-		}
 
 		netdev_rx_handler_unregister(real_dev);
 		kfree(rxd);
@@ -3507,11 +3508,7 @@ static int macsec_notify(struct notifier_block *this, unsigned long event,
 		unregister_netdevice_many(&head);
 		break;
 	}
-	case NETDEV_CHANGEMTU: {
-		struct macsec_dev *m;
-		struct macsec_rxh_data *rxd;
-
-		rxd = macsec_data_rtnl(real_dev);
+	case NETDEV_CHANGEMTU:
 		list_for_each_entry(m, &rxd->secys, secys) {
 			struct net_device *dev = m->secy.netdev;
 			unsigned int mtu = real_dev->mtu - (m->secy.icv_len +
@@ -3520,7 +3517,45 @@ static int macsec_notify(struct notifier_block *this, unsigned long event,
 			if (dev->mtu > mtu)
 				dev_set_mtu(dev, mtu);
 		}
+		break;
+	case NETDEV_CHANGE:
+		list_for_each_entry(m, &rxd->secys, secys) {
+			struct net_device *dev = m->secy.netdev;
+
+			netif_stacked_transfer_operstate(real_dev, dev);
+		}
+		break;
+	case NETDEV_DOWN: {
+		struct net_device *dev, *tmp;
+		LIST_HEAD(close_list);
+
+		list_for_each_entry(m, &rxd->secys, secys) {
+			dev = m->secy.netdev;
+
+			if (dev->flags & IFF_UP)
+				list_add(&dev->close_list, &close_list);
+		}
+
+		dev_close_many(&close_list, false);
+
+		list_for_each_entry_safe(dev, tmp, &close_list, close_list) {
+			netif_stacked_transfer_operstate(real_dev, dev);
+			list_del_init(&dev->close_list);
+		}
+		list_del(&close_list);
+		break;
 	}
+	case NETDEV_UP:
+		list_for_each_entry(m, &rxd->secys, secys) {
+			struct net_device *dev = m->secy.netdev;
+			int flags = dev_get_flags(dev);
+
+			if (!(flags & IFF_UP)) {
+				dev_change_flags(dev, flags | IFF_UP);
+				netif_stacked_transfer_operstate(real_dev, dev);
+			}
+		}
+		break;
 	}
 
 	return NOTIFY_OK;
