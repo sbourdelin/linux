@@ -71,7 +71,7 @@ static inline bool init_done(struct zram *zram)
 static inline bool zram_allocated(struct zram *zram, u32 index)
 {
 
-	return (zram->table[index].value >> (ZRAM_FLAG_SHIFT + 1)) ||
+	return zram->table[index].value >> ZRAM_FLAG_SHIFT ||
 					zram->table[index].handle;
 }
 
