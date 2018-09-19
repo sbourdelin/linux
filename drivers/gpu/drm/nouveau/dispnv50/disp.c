@@ -843,22 +843,16 @@ nv50_mstc_atomic_best_encoder(struct drm_connector *connector,
 {
 	struct nv50_head *head = nv50_head(connector_state->crtc);
 	struct nv50_mstc *mstc = nv50_mstc(connector);
-	if (mstc->port) {
-		struct nv50_mstm *mstm = mstc->mstm;
-		return &mstm->msto[head->base.index]->encoder;
-	}
-	return NULL;
+
+	return &mstc->mstm->msto[head->base.index]->encoder;
 }
 
 static struct drm_encoder *
 nv50_mstc_best_encoder(struct drm_connector *connector)
 {
 	struct nv50_mstc *mstc = nv50_mstc(connector);
-	if (mstc->port) {
-		struct nv50_mstm *mstm = mstc->mstm;
-		return &mstm->msto[0]->encoder;
-	}
-	return NULL;
+
+	return &mstc->mstm->msto[0]->encoder;
 }
 
 static enum drm_mode_status
@@ -888,10 +882,21 @@ nv50_mstc_get_modes(struct drm_connector *connector)
 	return ret;
 }
 
+static int
+nv50_mstc_atomic_check(struct drm_connector *connector,
+		       struct drm_connector_state *state)
+{
+	struct nv50_mstc *mstc = nv50_mstc(connector);
+
+	return drm_dp_mst_connector_atomic_check(connector, state,
+						 &mstc->mstm->mgr);
+}
+
 static const struct drm_connector_helper_funcs
 nv50_mstc_help = {
 	.get_modes = nv50_mstc_get_modes,
 	.mode_valid = nv50_mstc_mode_valid,
+	.atomic_check = nv50_mstc_atomic_check,
 	.best_encoder = nv50_mstc_best_encoder,
 	.atomic_best_encoder = nv50_mstc_atomic_best_encoder,
 };
