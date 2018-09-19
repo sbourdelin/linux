@@ -193,7 +193,9 @@ static int parse_options(struct super_block *sb, char *options)
 {
 	substring_t args[MAX_OPT_ARGS];
 	char *p;
+#ifdef CONFIG_EROFS_FAULT_INJECTION
 	int arg = 0;
+#endif
 
 	if (!options)
 		return 0;
