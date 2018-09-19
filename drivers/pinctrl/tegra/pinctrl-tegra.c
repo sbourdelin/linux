@@ -613,7 +613,7 @@ static struct pinctrl_desc tegra_pinctrl_desc = {
 	.owner = THIS_MODULE,
 };
 
-static void tegra_pinctrl_clear_parked_bits(struct tegra_pmx *pmx)
+static void __init tegra_pinctrl_clear_parked_bits(struct tegra_pmx *pmx)
 {
 	int i = 0;
 	const struct tegra_pingroup *g;
@@ -629,7 +629,7 @@ static void tegra_pinctrl_clear_parked_bits(struct tegra_pmx *pmx)
 	}
 }
 
-static bool gpio_node_has_range(const char *compatible)
+static bool __init gpio_node_has_range(const char *compatible)
 {
 	struct device_node *np;
 	bool has_prop = false;
@@ -645,7 +645,7 @@ static bool gpio_node_has_range(const char *compatible)
 	return has_prop;
 }
 
-int tegra_pinctrl_probe(struct platform_device *pdev,
+int __init tegra_pinctrl_probe(struct platform_device *pdev,
 			const struct tegra_pinctrl_soc_data *soc_data)
 {
 	struct tegra_pmx *pmx;

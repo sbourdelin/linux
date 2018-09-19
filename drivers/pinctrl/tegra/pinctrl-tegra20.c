@@ -2252,7 +2252,7 @@ static void tegra20_pinctrl_register_clock_muxes(struct platform_device *pdev)
 			 pmx->regs[1] + 0x8, 4, 2, CLK_MUX_READ_ONLY, NULL);
 }
 
-static int tegra20_pinctrl_probe(struct platform_device *pdev)
+static int __init tegra20_pinctrl_probe(struct platform_device *pdev)
 {
 	int err;
 
@@ -2275,11 +2275,11 @@ static struct platform_driver tegra20_pinctrl_driver = {
 		.name = "tegra20-pinctrl",
 		.of_match_table = tegra20_pinctrl_of_match,
 	},
-	.probe = tegra20_pinctrl_probe,
 };
 
 static int __init tegra20_pinctrl_init(void)
 {
-	return platform_driver_register(&tegra20_pinctrl_driver);
+	return platform_driver_probe(&tegra20_pinctrl_driver,
+				     tegra20_pinctrl_probe);
 }
 arch_initcall(tegra20_pinctrl_init);

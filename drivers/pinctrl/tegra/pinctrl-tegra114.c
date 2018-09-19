@@ -1851,7 +1851,7 @@ static const struct tegra_pinctrl_soc_data tegra114_pinctrl = {
 	.drvtype_in_mux = false,
 };
 
-static int tegra114_pinctrl_probe(struct platform_device *pdev)
+static int __init tegra114_pinctrl_probe(struct platform_device *pdev)
 {
 	return tegra_pinctrl_probe(pdev, &tegra114_pinctrl);
 }
@@ -1866,11 +1866,11 @@ static struct platform_driver tegra114_pinctrl_driver = {
 		.name = "tegra114-pinctrl",
 		.of_match_table = tegra114_pinctrl_of_match,
 	},
-	.probe = tegra114_pinctrl_probe,
 };
 
 static int __init tegra114_pinctrl_init(void)
 {
-	return platform_driver_register(&tegra114_pinctrl_driver);
+	return platform_driver_probe(&tegra114_pinctrl_driver,
+				     tegra114_pinctrl_probe);
 }
 arch_initcall(tegra114_pinctrl_init);
