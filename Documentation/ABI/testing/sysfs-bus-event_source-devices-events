@@ -92,3 +92,17 @@ Description:	Perf event scaling factors
 
 		This is provided to avoid performing floating point arithmetic
 		in the kernel.
+
+What: /sys/bus/event_source/devices/<pmu>/perf_event_paranoid
+Date: 2018/06/26
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+Description:	Per PMU access control file
+
+		This is the per PMU version of the perf_event_paranoid sysctl
+		which allows controlling the access control level for each
+		individual PMU.
+
+		Writes to the sysctl will propagate to all PMU providers.
+
+		For explanation of supported values please consult the sysctl
+		documentation.
