@@ -192,6 +192,18 @@ static void clocksource_watchdog(struct timer_list *unused)
 	if (!watchdog_running)
 		goto out;
 
+	/*
+	 * When the timer tick is incorrectly stopped on a CPU with
+	 * pending events, for example, it is possible that the
+	 * clocksource watchdog will stop running for a sufficiently
+	 * long enough time to cause overflow in the delta
+	 * computation leading to incorrect report of unstable clock
+	 * source. So print a warning if there is unusually large
+	 * delay (> 0.5s) in the invocation of the watchdog. That
+	 * can indicate a hidden bug in the timer tick code.
+	 */
+	WARN_ON_ONCE(jiffies - watchdog_timer.expires > WATCHDOG_INTERVAL);
+
 	reset_pending = atomic_read(&watchdog_reset_pending);
 
 	list_for_each_entry(cs, &watchdog_list, wd_list) {
