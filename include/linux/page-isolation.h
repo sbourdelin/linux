@@ -47,7 +47,7 @@ int move_freepages_block(struct zone *zone, struct page *page,
  */
 int
 start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-			 unsigned migratetype, bool skip_hwpoisoned_pages);
+	unsigned int migratetype, bool skip_hwpoisoned_pages, bool reuse);
 
 /*
  * Changes MIGRATE_ISOLATE to MIGRATE_MOVABLE.
@@ -55,7 +55,7 @@ start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
  */
 int
 undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-			unsigned migratetype);
+	unsigned int migratetype, bool reuse);
 
 /*
  * Test all pages in [start_pfn, end_pfn) are isolated or not.

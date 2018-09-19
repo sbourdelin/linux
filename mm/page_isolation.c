@@ -15,8 +15,18 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/page_isolation.h>
 
+#define get_pageblock_isolate_skip(page) \
+			get_pageblock_flags_group(page, PB_isolate_skip,     \
+							PB_isolate_skip)
+#define clear_pageblock_isolate_skip(page) \
+			set_pageblock_flags_group(page, 0, PB_isolate_skip,  \
+							PB_isolate_skip)
+#define set_pageblock_isolate_skip(page) \
+			set_pageblock_flags_group(page, 1, PB_isolate_skip,  \
+							PB_isolate_skip)
+
 static int set_migratetype_isolate(struct page *page, int migratetype,
-				bool skip_hwpoisoned_pages)
+				bool skip_hwpoisoned_pages, bool reuse)
 {
 	struct zone *zone;
 	unsigned long flags, pfn;
@@ -33,8 +43,11 @@ static int set_migratetype_isolate(struct page *page, int migratetype,
 	 * If it is already set, then someone else must have raced and
 	 * set it before us.  Return -EBUSY
 	 */
-	if (is_migrate_isolate_page(page))
+	if (is_migrate_isolate_page(page)) {
+		if (reuse && get_pageblock_isolate_skip(page))
+			ret = 0;
 		goto out;
+	}
 
 	pfn = page_to_pfn(page);
 	arg.start_pfn = pfn;
@@ -75,6 +88,8 @@ out:
 		int mt = get_pageblock_migratetype(page);
 
 		set_pageblock_migratetype(page, MIGRATE_ISOLATE);
+		if (reuse)
+			set_pageblock_isolate_skip(page);
 		zone->nr_isolate_pageblock++;
 		nr_pages = move_freepages_block(zone, page, MIGRATE_ISOLATE,
 									NULL);
@@ -185,7 +200,7 @@ __first_valid_page(unsigned long pfn, unsigned long nr_pages)
  * prevents two threads from simultaneously working on overlapping ranges.
  */
 int start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-			     unsigned migratetype, bool skip_hwpoisoned_pages)
+	unsigned int migratetype, bool skip_hwpoisoned_pages, bool reuse)
 {
 	unsigned long pfn;
 	unsigned long undo_pfn;
@@ -199,7 +214,8 @@ int start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
 	     pfn += pageblock_nr_pages) {
 		page = __first_valid_page(pfn, pageblock_nr_pages);
 		if (page &&
-		    set_migratetype_isolate(page, migratetype, skip_hwpoisoned_pages)) {
+		    set_migratetype_isolate(page, migratetype,
+			skip_hwpoisoned_pages, reuse)) {
 			undo_pfn = pfn;
 			goto undo;
 		}
@@ -222,7 +238,7 @@ undo:
  * Make isolated pages available again.
  */
 int undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-			    unsigned migratetype)
+	unsigned int migratetype, bool reuse)
 {
 	unsigned long pfn;
 	struct page *page;
@@ -236,6 +252,8 @@ int undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
 		page = __first_valid_page(pfn, pageblock_nr_pages);
 		if (!page || !is_migrate_isolate_page(page))
 			continue;
+		if (reuse)
+			clear_pageblock_isolate_skip(page);
 		unset_migratetype_isolate(page, migratetype);
 	}
 	return 0;
