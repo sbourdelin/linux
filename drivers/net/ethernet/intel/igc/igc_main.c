@@ -108,6 +108,8 @@ static void igc_reset(struct igc_adapter *adapter)
 
 	if (!netif_running(adapter->netdev))
 		igc_power_down_link(adapter);
+
+	igc_get_phy_info(hw);
 }
 
 /**
@@ -116,6 +118,12 @@ static void igc_reset(struct igc_adapter *adapter)
  **/
 static void igc_power_up_link(struct igc_adapter *adapter)
 {
+	igc_reset_phy(&adapter->hw);
+
+	if (adapter->hw.phy.media_type == igc_media_type_copper)
+		igc_power_up_phy_copper(&adapter->hw);
+
+	igc_setup_link(&adapter->hw);
 }
 
 /**
@@ -124,6 +132,8 @@ static void igc_power_up_link(struct igc_adapter *adapter)
  **/
 static void igc_power_down_link(struct igc_adapter *adapter)
 {
+	if (adapter->hw.phy.media_type == igc_media_type_copper)
+		igc_power_down_phy_copper_base(&adapter->hw);
 }
 
 /**
@@ -3405,6 +3415,7 @@ static int igc_probe(struct pci_dev *pdev,
 
 	/* Copy the default MAC and PHY function pointers */
 	memcpy(&hw->mac.ops, ei->mac_ops, sizeof(hw->mac.ops));
+	memcpy(&hw->phy.ops, ei->phy_ops, sizeof(hw->phy.ops));
 
 	/* Initialize skew-specific constants */
 	err = ei->get_invariants(hw);
