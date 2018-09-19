@@ -222,7 +222,7 @@ static int __init qcom_cpufreq_kryo_init(void)
 }
 module_init(qcom_cpufreq_kryo_init);
 
-static void __init qcom_cpufreq_kryo_exit(void)
+static void __exit qcom_cpufreq_kryo_exit(void)
 {
 	platform_device_unregister(kryo_cpufreq_pdev);
 	platform_driver_unregister(&qcom_cpufreq_kryo_driver);
