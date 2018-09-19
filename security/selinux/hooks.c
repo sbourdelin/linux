@@ -6603,7 +6603,30 @@ static void selinux_inode_invalidate_secctx(struct inode *inode)
  */
 static int selinux_inode_notifysecctx(struct inode *inode, void *ctx, u32 ctxlen)
 {
-	return selinux_inode_setsecurity(inode, XATTR_SELINUX_SUFFIX, ctx, ctxlen, 0);
+	struct superblock_security_struct *sbsec;
+	struct inode_security_struct *isec;
+	int rc;
+
+	rc = selinux_inode_setsecurity(inode, XATTR_SELINUX_SUFFIX, ctx, ctxlen, 0);
+
+	/*
+	 * In case of Native labeling with defcontext mount option fall back
+	 * to a default SID if received context is invalid.
+	 */
+	if (rc == -EINVAL) {
+		sbsec = inode->i_sb->s_security;
+		if (sbsec->behavior == SECURITY_FS_USE_NATIVE &&
+		    sbsec->flags & DEFCONTEXT_MNT) {
+			isec = inode->i_security;
+			if (!isec->initialized) {
+				isec->sclass = inode_mode_to_security_class(inode->i_mode);
+				isec->sid = sbsec->def_sid;
+				isec->initialized = 1;
+			}
+			rc = 0;
+		}
+	}
+	return rc;
 }
 
 /*
