@@ -294,10 +294,22 @@ static struct drm_encoder *dm_mst_best_encoder(struct drm_connector *connector)
 	return &amdgpu_dm_connector->mst_encoder->base;
 }
 
+static int
+amdgpu_dm_mst_connector_atomic_check(struct drm_connector *connector,
+				     struct drm_connector_state *new_cstate)
+{
+	struct amdgpu_dm_connector *aconnector =
+		to_amdgpu_dm_connector(connector);
+
+	return drm_dp_mst_connector_atomic_check(connector, new_cstate,
+						 &aconnector->mst_mgr);
+}
+
 static const struct drm_connector_helper_funcs dm_dp_mst_connector_helper_funcs = {
 	.get_modes = dm_dp_mst_get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.best_encoder = dm_mst_best_encoder,
+	.atomic_check = amdgpu_dm_mst_connector_atomic_check,
 };
 
 static void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
