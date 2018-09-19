@@ -1347,18 +1347,10 @@ static unsigned long scan_movable_pages(unsigned long start, unsigned long end)
 
 static struct page *new_node_page(struct page *page, unsigned long private)
 {
-	int nid = page_to_nid(page);
-	nodemask_t nmask = node_states[N_MEMORY];
+	nodemask_t nmask = *(nodemask_t *)private;
+	int nid;
 
-	/*
-	 * try to allocate from a different node but reuse this node if there
-	 * are no other online nodes to be used (e.g. we are offlining a part
-	 * of the only existing node)
-	 */
-	node_clear(nid, nmask);
-	if (nodes_empty(nmask))
-		node_set(nid, nmask);
-
+	nid = page_to_nid(page);
 	return new_page_nodemask(page, nid, &nmask);
 }
 
@@ -1372,6 +1364,8 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 	int not_managed = 0;
 	int ret = 0;
 	LIST_HEAD(source);
+	int nid;
+	nodemask_t nmask = node_states[N_MEMORY];
 
 	for (pfn = start_pfn; pfn < end_pfn && move_pages > 0; pfn++) {
 		if (!pfn_valid(pfn))
@@ -1431,8 +1425,21 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 			goto out;
 		}
 
+		page = list_entry(source.next, struct page, lru);
+		nid = page_to_nid(page);
+		if (!NODE_DATA(nid)->partial_offline) {
+			/*
+			 * try to allocate from a different node but reuse this
+			 * node if there are no other online nodes to be used
+			 * (e.g. we are offlining a part of the only existing
+			 * node)
+			 */
+			node_clear(nid, nmask);
+			if (nodes_empty(nmask))
+				node_set(nid, nmask);
+		}
 		/* Allocate a new page from the nearest neighbor node */
-		ret = migrate_pages(&source, new_node_page, NULL, 0,
+		ret = migrate_pages(&source, new_node_page, NULL, &nmask,
 					MIGRATE_SYNC, MR_MEMORY_HOTPLUG);
 		if (ret)
 			putback_movable_pages(&source);

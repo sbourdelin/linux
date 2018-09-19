@@ -25,6 +25,36 @@ static struct bus_type node_subsys = {
 	.dev_name = "node",
 };
 
+static ssize_t read_partial_offline(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int nid = dev->id;
+	struct pglist_data *pgdat = NODE_DATA(nid);
+	ssize_t len = 0;
+
+	if (pgdat->partial_offline)
+		len = sprintf(buf, "1\n");
+	else
+		len = sprintf(buf, "0\n");
+
+	return len;
+}
+
+static ssize_t write_partial_offline(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int nid = dev->id;
+	struct pglist_data *pgdat = NODE_DATA(nid);
+
+	if (sysfs_streq(buf, "1"))
+		pgdat->partial_offline = true;
+	else if (sysfs_streq(buf, "0"))
+		pgdat->partial_offline = false;
+	else
+		return -EINVAL;
+
+	return strlen(buf);
+}
 
 static ssize_t node_read_cpumap(struct device *dev, bool list, char *buf)
 {
@@ -56,6 +86,8 @@ static inline ssize_t node_read_cpulist(struct device *dev,
 	return node_read_cpumap(dev, true, buf);
 }
 
+static DEVICE_ATTR(partial_offline, 0600, read_partial_offline,
+	write_partial_offline);
 static DEVICE_ATTR(cpumap,  S_IRUGO, node_read_cpumask, NULL);
 static DEVICE_ATTR(cpulist, S_IRUGO, node_read_cpulist, NULL);
 
@@ -235,6 +267,7 @@ static struct attribute *node_dev_attrs[] = {
 	&dev_attr_numastat.attr,
 	&dev_attr_distance.attr,
 	&dev_attr_vmstat.attr,
+	&dev_attr_partial_offline.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(node_dev);
