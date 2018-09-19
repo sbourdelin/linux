@@ -19,6 +19,7 @@
 #include <linux/memory.h>
 #include <linux/memory_hotplug.h>
 #include <linux/mm.h>
+#include <linux/page-isolation.h>
 #include <linux/mutex.h>
 #include <linux/stat.h>
 #include <linux/slab.h>
@@ -165,6 +166,9 @@ static ssize_t show_mem_state(struct device *dev,
 		break;
 	case MEM_GOING_OFFLINE:
 		len = sprintf(buf, "going-offline\n");
+		break;
+	case MEM_ISOLATED:
+		len = sprintf(buf, "isolated\n");
 		break;
 	default:
 		len = sprintf(buf, "ERROR-UNKNOWN-%ld\n",
@@ -323,6 +327,9 @@ store_mem_state(struct device *dev,
 {
 	struct memory_block *mem = to_memory_block(dev);
 	int ret, online_type;
+	int isolated = 0;
+	unsigned long start_pfn;
+	unsigned long nr_pages = PAGES_PER_SECTION * sections_per_block;
 
 	ret = lock_device_hotplug_sysfs();
 	if (ret)
@@ -336,7 +343,13 @@ store_mem_state(struct device *dev,
 		online_type = MMOP_ONLINE_KEEP;
 	else if (sysfs_streq(buf, "offline"))
 		online_type = MMOP_OFFLINE;
-	else {
+	else if (sysfs_streq(buf, "isolate")) {
+		isolated = 1;
+		goto memblock_isolated;
+	} else if (sysfs_streq(buf, "unisolate")) {
+		isolated = -1;
+		goto memblock_isolated;
+	} else {
 		ret = -EINVAL;
 		goto err;
 	}
@@ -366,6 +379,20 @@ store_mem_state(struct device *dev,
 
 	mem_hotplug_done();
 err:
+memblock_isolated:
+	if (isolated == 1 && mem->state == MEM_ONLINE) {
+		start_pfn = section_nr_to_pfn(mem->start_section_nr);
+		ret = start_isolate_page_range(start_pfn, start_pfn + nr_pages,
+			MIGRATE_MOVABLE, true, true);
+		if (!ret)
+			mem->state = MEM_ISOLATED;
+	} else if (isolated == -1 && mem->state == MEM_ISOLATED) {
+		start_pfn = section_nr_to_pfn(mem->start_section_nr);
+		ret = undo_isolate_page_range(start_pfn, start_pfn + nr_pages,
+			MIGRATE_MOVABLE, true);
+		if (!ret)
+			mem->state = MEM_ONLINE;
+	}
 	unlock_device_hotplug();
 
 	if (ret < 0)
@@ -453,6 +480,7 @@ static DEVICE_ATTR(phys_index, 0444, show_mem_start_phys_index, NULL);
 static DEVICE_ATTR(state, 0644, show_mem_state, store_mem_state);
 static DEVICE_ATTR(phys_device, 0444, show_phys_device, NULL);
 static DEVICE_ATTR(removable, 0444, show_mem_removable, NULL);
+//static DEVICE_ATTR(isolate, 0600, show_mem_isolate, store_mem_isolate);
 
 /*
  * Block size attribute stuff
@@ -629,6 +657,7 @@ static struct attribute *memory_memblk_attrs[] = {
 #ifdef CONFIG_MEMORY_HOTREMOVE
 	&dev_attr_valid_zones.attr,
 #endif
+	//&dev_attr_isolate.attr,
 	NULL
 };
 
