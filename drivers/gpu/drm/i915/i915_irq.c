@@ -3137,10 +3137,6 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, 0);
 
 	master_ctl = raw_reg_read(regs, GEN11_GFX_MSTR_IRQ) & ~GEN11_MASTER_IRQ;
-	if (!master_ctl) {
-		raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
-		return IRQ_NONE;
-	}
 
 	/* Find, clear, then process each source of interrupt. */
 	gen11_gt_irq_handler(i915, master_ctl);
@@ -3165,7 +3161,7 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 
 	gen11_gu_misc_irq_handler(i915, master_ctl, gu_misc_iir);
 
-	return IRQ_HANDLED;
+	return master_ctl ? IRQ_HANDLED : IRQ_NONE;
 }
 
 static void i915_reset_device(struct drm_i915_private *dev_priv,
