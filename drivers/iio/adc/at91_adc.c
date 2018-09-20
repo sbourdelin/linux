@@ -712,6 +712,11 @@ static int at91_adc_read_raw(struct iio_dev *idev,
 		at91_adc_writel(st, AT91_ADC_CHDR,
 				AT91_ADC_CH(chan->channel));
 		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
+		/*
+		 * we need to ack the DRDY irq, otherwise it will be
+		 * left pending and irq handler will be confused
+		 */
+		at91_adc_readl(st, AT91_ADC_LCDR);
 
 		st->last_value = 0;
 		st->done = false;
