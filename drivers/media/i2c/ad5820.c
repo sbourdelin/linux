@@ -22,6 +22,7 @@
  * General Public License for more details.
  */
 
+#include <linux/acpi.h>
 #include <linux/errno.h>
 #include <linux/i2c.h>
 #include <linux/kernel.h>
@@ -380,6 +381,15 @@ static const struct of_device_id ad5820_of_table[] = {
 MODULE_DEVICE_TABLE(of, ad5820_of_table);
 #endif
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id ad5820_acpi_ids[] = {
+	{ "AD5820" },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(acpi, ad5820_acpi_ids);
+#endif
+
 static SIMPLE_DEV_PM_OPS(ad5820_pm, ad5820_suspend, ad5820_resume);
 
 static struct i2c_driver ad5820_i2c_driver = {
@@ -387,6 +397,7 @@ static struct i2c_driver ad5820_i2c_driver = {
 		.name	= AD5820_NAME,
 		.pm	= &ad5820_pm,
 		.of_match_table = of_match_ptr(ad5820_of_table),
+		.acpi_match_table = ACPI_PTR(ad5820_acpi_ids),
 	},
 	.probe		= ad5820_probe,
 	.remove		= ad5820_remove,
