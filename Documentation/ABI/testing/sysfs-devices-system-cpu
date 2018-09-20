@@ -511,3 +511,17 @@ Description:	Control Symetric Multi Threading (SMT)
 
 			 If control status is "forceoff" or "notsupported" writes
 			 are rejected.
+
+What:		/sys/devices/system/cpu/cpu#/topology/smallcore_thread_siblings
+		/sys/devices/system/cpu/cpu#/topology/smallcore_thread_siblings_list
+Date:		Sept 2018
+Contact:	Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description: 	CPU topology files that describe the thread siblings of a
+		logical CPU that share the L1-cache with it on POWER9
+		big-core configurations.
+
+		smallcore_thread_siblings: internal kernel map of
+		cpu#'s hardware threads that share L1-cache with cpu#.
+
+		smallcore_thread_siblings_list: human-readable list of
+		cpu#'s hardware threads that share L1-cache with cpu#.

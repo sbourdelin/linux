@@ -18,6 +18,7 @@
 #include <asm/smp.h>
 #include <asm/pmc.h>
 #include <asm/firmware.h>
+#include <asm/cputhreads.h>
 
 #include "cacheinfo.h"
 #include "setup.h"
@@ -714,6 +715,62 @@ static struct device_attribute pa6t_attrs[] = {
 #endif /* HAS_PPC_PMC_PA6T */
 #endif /* HAS_PPC_PMC_CLASSIC */
 
+static ssize_t smallcore_thread_siblings_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	int cpu = dev->id;
+
+	return cpumap_print_to_pagebuf(false, buf, cpu_smallcore_mask(cpu));
+}
+static DEVICE_ATTR_RO(smallcore_thread_siblings);
+
+static ssize_t smallcore_thread_siblings_list_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	int cpu = dev->id;
+
+	return cpumap_print_to_pagebuf(true, buf, cpu_smallcore_mask(cpu));
+}
+static DEVICE_ATTR_RO(smallcore_thread_siblings_list);
+
+static struct attribute *smallcore_attrs[] = {
+	&dev_attr_smallcore_thread_siblings.attr,
+	&dev_attr_smallcore_thread_siblings_list.attr,
+	NULL
+};
+
+static const struct attribute_group smallcore_attr_group = {
+	.name = "topology",
+	.attrs = smallcore_attrs
+};
+
+static int smallcore_register_cpu_online(unsigned int cpu)
+{
+	int err;
+	struct device *cpu_dev = get_cpu_device(cpu);
+
+	if (!has_big_cores)
+		return 0;
+
+	err = sysfs_merge_group(&cpu_dev->kobj, &smallcore_attr_group);
+
+	return err;
+}
+
+static int smallcore_unregister_cpu_online(unsigned int cpu)
+{
+	struct device *cpu_dev = get_cpu_device(cpu);
+
+	if (!has_big_cores)
+		return 0;
+
+	sysfs_unmerge_group(&cpu_dev->kobj, &smallcore_attr_group);
+
+	return 0;
+}
+
 static int register_cpu_online(unsigned int cpu)
 {
 	struct cpu *c = &per_cpu(cpu_devices, cpu);
@@ -1060,3 +1117,34 @@ static int __init topology_init(void)
 	return 0;
 }
 subsys_initcall(topology_init);
+
+/*
+ * NOTE: The smallcore_register_cpu_online
+ *       (resp. smallcore_unregister_cpu_online) callback will merge
+ *       (resp. unmerge) a couple of additional attributes to the
+ *       "topology" attribute group of a CPU device when the CPU comes
+ *       online (resp. goes offline).
+ *
+ *       Hence, the registration of these callbacks must happen after
+ *       topology_sysfs_init() is called so that the topology
+ *       attribute group is created before these additional attributes
+ *       can be merged/unmerged. We cannot register these callbacks in
+ *       topology_init() since this function is called before
+ *       topology_sysfs_init(). Hence we define the following
+ *       late_initcall for this purpose.
+ */
+static int __init smallcore_topology_init(void)
+{
+	int r;
+
+	if (!has_big_cores)
+		return 0;
+
+	r = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
+			      "powerpc/topology/smallcore:online",
+			      smallcore_register_cpu_online,
+			      smallcore_unregister_cpu_online);
+	WARN_ON(r < 0);
+	return 0;
+}
+late_initcall(smallcore_topology_init);
