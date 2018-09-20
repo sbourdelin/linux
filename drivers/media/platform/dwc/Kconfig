@@ -20,6 +20,17 @@ config DWC_MIPI_CSI2_HOST
 
 if DWC_MIPI_CSI2_HOST
 
+config DWC_MIPI_CSI2_HOST_PLATFORM
+	tristate "Platform bus based CSI-2 Host Controller support"
+	depends on HAS_DMA
+	help
+	 This selects the CSI-2 host controller support. Select this if
+	 you have an CSI-2 Host controller on Platform bus.
+
+	 If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
 config DWC_MIPI_TC_DPHY_G128
 	tristate "DesignWare platform support using a G128 Test Chip"
 	depends on DWC_MIPI_CSI2_HOST
