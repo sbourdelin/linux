@@ -3128,9 +3128,11 @@ static inline void gen11_master_irq_enable(void __iomem * const regs)
 	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
 }
 
-static inline void gen11_master_irq_disable(void __iomem * const regs)
+static inline u32 gen11_master_irq_disable(void __iomem * const regs)
 {
 	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, 0);
+
+	return raw_reg_read(regs, GEN11_GFX_MSTR_IRQ) & ~GEN11_MASTER_IRQ;
 }
 
 static irqreturn_t gen11_irq_handler(int irq, void *arg)
@@ -3143,8 +3145,7 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 	if (!intel_irqs_enabled(i915))
 		return IRQ_NONE;
 
-	gen11_master_irq_disable(regs);
-	master_ctl = raw_reg_read(regs, GEN11_GFX_MSTR_IRQ) & ~GEN11_MASTER_IRQ;
+	master_ctl = gen11_master_irq_disable(regs);
 
 	/* Find, clear, then process each source of interrupt. */
 	gen11_gt_irq_handler(i915, master_ctl);
@@ -3638,10 +3639,10 @@ static void gen11_gt_irq_reset(struct drm_i915_private *dev_priv)
 static void gen11_irq_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	void __iomem * const regs = dev_priv->regs;
 	int pipe;
 
-	I915_WRITE(GEN11_GFX_MSTR_IRQ, 0);
-	POSTING_READ(GEN11_GFX_MSTR_IRQ);
+	gen11_master_irq_disable(regs);
 
 	gen11_gt_irq_reset(dev_priv);
 
@@ -4294,6 +4295,7 @@ static void icp_irq_postinstall(struct drm_device *dev)
 static int gen11_irq_postinstall(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	void __iomem * const regs = dev_priv->regs;
 	u32 gu_misc_masked = GEN11_GU_MISC_GSE;
 
 	if (HAS_PCH_ICP(dev_priv))
@@ -4306,8 +4308,7 @@ static int gen11_irq_postinstall(struct drm_device *dev)
 
 	I915_WRITE(GEN11_DISPLAY_INT_CTL, GEN11_DISPLAY_IRQ_ENABLE);
 
-	I915_WRITE(GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
-	POSTING_READ(GEN11_GFX_MSTR_IRQ);
+	gen11_master_irq_enable(regs);
 
 	return 0;
 }
