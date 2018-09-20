@@ -177,6 +177,29 @@ void ib_device_get_name(struct ib_device *ibdev, char *name)
 }
 EXPORT_SYMBOL(ib_device_get_name);
 
+int ib_device_rename(struct ib_device *ibdev, const char *name)
+{
+	struct ib_device *device;
+	int ret = 0;
+
+	if (!strcmp(name, ibdev->name))
+		return ret;
+
+	mutex_lock(&device_mutex);
+	list_for_each_entry(device, &device_list, core_list) {
+		if (!strcmp(name, device->name)) {
+			ret = -EEXIST;
+			goto out;
+		}
+	}
+
+	strlcpy(ibdev->name, name, IB_DEVICE_NAME_MAX);
+	ret = device_rename(&ibdev->dev, name);
+out:
+	mutex_unlock(&device_mutex);
+	return ret;
+}
+
 static int alloc_name(char *name)
 {
 	unsigned long *inuse;
