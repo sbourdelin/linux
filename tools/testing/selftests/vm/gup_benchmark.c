@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 	char *file = NULL;
 	char *p;
 
-	while ((opt = getopt(argc, argv, "m:r:n:f:tTLU")) != -1) {
+	while ((opt = getopt(argc, argv, "m:r:n:f:tTLUH")) != -1) {
 		switch (opt) {
 		case 'm':
 			size = atoi(optarg) * MB;
@@ -63,6 +63,9 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			write = 1;
+			break;
+		case 'H':
+			flags |= MAP_HUGETLB;
 			break;
 		case 'f':
 			file = optarg;
