@@ -2195,7 +2195,7 @@ static int imx_uart_probe(struct platform_device *pdev)
 	int ret = 0;
 	u32 ucr1;
 	struct resource *res;
-	int txirq, rxirq, rtsirq;
+	int txirq, rxirq;
 
 	sport = devm_kzalloc(&pdev->dev, sizeof(*sport), GFP_KERNEL);
 	if (!sport)
@@ -2220,7 +2220,6 @@ static int imx_uart_probe(struct platform_device *pdev)
 
 	rxirq = platform_get_irq(pdev, 0);
 	txirq = platform_get_irq(pdev, 1);
-	rtsirq = platform_get_irq(pdev, 2);
 
 	sport->port.dev = &pdev->dev;
 	sport->port.mapbase = res->start;
