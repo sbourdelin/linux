@@ -432,15 +432,32 @@ EXPORT_SYMBOL_GPL(ip6_input);
 
 int ip6_mc_input(struct sk_buff *skb)
 {
+	int sdif = inet6_sdif(skb);
 	const struct ipv6hdr *hdr;
+	struct net_device *dev;
 	bool deliver;
 
 	__IP6_UPD_PO_STATS(dev_net(skb_dst(skb)->dev),
 			 __in6_dev_get_safely(skb->dev), IPSTATS_MIB_INMCAST,
 			 skb->len);
 
+	/* skb->dev passed may be master dev for vrfs. */
+	if (sdif) {
+		rcu_read_lock();
+		dev = dev_get_by_index_rcu(dev_net(skb->dev), sdif);
+		if (!dev) {
+			rcu_read_unlock();
+			kfree_skb(skb);
+			return -ENODEV;
+		}
+	} else {
+		dev = skb->dev;
+	}
+
 	hdr = ipv6_hdr(skb);
-	deliver = ipv6_chk_mcast_addr(skb->dev, &hdr->daddr, NULL);
+	deliver = ipv6_chk_mcast_addr(dev, &hdr->daddr, NULL);
+	if (sdif)
+		rcu_read_unlock();
 
 #ifdef CONFIG_IPV6_MROUTE
 	/*
