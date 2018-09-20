@@ -626,6 +626,9 @@ done:
 
 			rcu_read_unlock();
 
+			if (!sk->sk_bound_dev_if && midx)
+				goto e_inval;
+
 			if (sk->sk_bound_dev_if &&
 			    sk->sk_bound_dev_if != val &&
 			    (!midx || midx != sk->sk_bound_dev_if))

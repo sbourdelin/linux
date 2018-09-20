@@ -892,6 +892,9 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 		dev_put(dev);
 
 		err = -EINVAL;
+		if (!sk->sk_bound_dev_if && midx)
+			break;
+
 		if (sk->sk_bound_dev_if &&
 		    mreq.imr_ifindex != sk->sk_bound_dev_if &&
 		    (!midx || midx != sk->sk_bound_dev_if))
