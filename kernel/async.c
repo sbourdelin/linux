@@ -56,6 +56,7 @@ asynchronous and synchronous parts of the kernel.
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
+#include <linux/cpu.h>
 
 #include "workqueue_internal.h"
 
@@ -149,8 +150,11 @@ static void async_run_entry_fn(struct work_struct *work)
 	wake_up(&async_done);
 }
 
-static async_cookie_t __async_schedule(async_func_t func, void *data, struct async_domain *domain)
+static async_cookie_t __async_schedule(async_func_t func, void *data,
+				       struct async_domain *domain,
+				       int node)
 {
+	int cpu = WORK_CPU_UNBOUND;
 	struct async_entry *entry;
 	unsigned long flags;
 	async_cookie_t newcookie;
@@ -194,30 +198,40 @@ static async_cookie_t __async_schedule(async_func_t func, void *data, struct asy
 	/* mark that this task has queued an async job, used by module init */
 	current->flags |= PF_USED_ASYNC;
 
+	/* guarantee cpu_online_mask doesn't change during scheduling */
+	get_online_cpus();
+
+	if (node >= 0 && node < MAX_NUMNODES && node_online(node))
+		cpu = cpumask_any_and(cpumask_of_node(node), cpu_online_mask);
+
 	/* schedule for execution */
-	queue_work(system_unbound_wq, &entry->work);
+	queue_work_on(cpu, system_unbound_wq, &entry->work);
+
+	put_online_cpus();
 
 	return newcookie;
 }
 
 /**
- * async_schedule - schedule a function for asynchronous execution
+ * async_schedule_on - schedule a function for asynchronous execution
  * @func: function to execute asynchronously
  * @data: data pointer to pass to the function
+ * @node: NUMA node to complete the work on
  *
  * Returns an async_cookie_t that may be used for checkpointing later.
  * Note: This function may be called from atomic or non-atomic contexts.
  */
-async_cookie_t async_schedule(async_func_t func, void *data)
+async_cookie_t async_schedule_on(async_func_t func, void *data, int node)
 {
-	return __async_schedule(func, data, &async_dfl_domain);
+	return __async_schedule(func, data, &async_dfl_domain, node);
 }
-EXPORT_SYMBOL_GPL(async_schedule);
+EXPORT_SYMBOL_GPL(async_schedule_on);
 
 /**
- * async_schedule_domain - schedule a function for asynchronous execution within a certain domain
+ * async_schedule_on_domain - schedule a function for asynchronous execution within a certain domain
  * @func: function to execute asynchronously
  * @data: data pointer to pass to the function
+ * @node: NUMA node to complete the work on
  * @domain: the domain
  *
  * Returns an async_cookie_t that may be used for checkpointing later.
@@ -226,12 +240,12 @@ EXPORT_SYMBOL_GPL(async_schedule);
  * synchronization domain is specified via @domain.  Note: This function
  * may be called from atomic or non-atomic contexts.
  */
-async_cookie_t async_schedule_domain(async_func_t func, void *data,
-				     struct async_domain *domain)
+async_cookie_t async_schedule_on_domain(async_func_t func, void *data, int node,
+					struct async_domain *domain)
 {
-	return __async_schedule(func, data, domain);
+	return __async_schedule(func, data, domain, node);
 }
-EXPORT_SYMBOL_GPL(async_schedule_domain);
+EXPORT_SYMBOL_GPL(async_schedule_on_domain);
 
 /**
  * async_synchronize_full - synchronize all asynchronous function calls
