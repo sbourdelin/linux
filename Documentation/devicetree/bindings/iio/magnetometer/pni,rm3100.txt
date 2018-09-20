@@ -1,0 +1,57 @@
+* PNI RM3100 9-axis magnetometer sensor
+
+I2C Bus:
+
+Required properties:
+
+- compatible : should be "pni,rm3100-i2c"
+- reg : the I2C address of the magnetometer
+
+Optional properties:
+
+- interrupts: data ready (DRDY) from the chip.
+  The interrupts can be triggered on rising edges.
+
+	Refer to interrupt-controller/interrupts.txt for generic
+	interrupt client node bindings.
+
+- pinctrl-*: pinctrl setup for DRDY line.
+
+Example:
+
+rm3100: rm3100@20 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&rm3100_pins>;
+
+	compatible = "pni,rm3100-i2c";
+	reg = <0x20>;
+	interrupt-parent = <&gpio0>;
+	interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+};
+
+SPI Bus:
+
+Required properties:
+
+- compatible : should be "pni,rm3100-spi"
+- reg : address of sensor, usually 0 or 1.
+
+Optional properties:
+
+- interrupts: data ready (DRDY) from the chip.
+  The interrupts can be triggered on rising edges.
+
+	Refer to interrupt-controller/interrupts.txt for generic
+	interrupt client node bindings.
+
+- pinctrl-*: pinctrl setup for DRDY line, depands on archtechture.
+
+Example:
+
+rm3100: rm3100@0{
+	compatible = "pni,rm3100-spi";
+	reg = <0>;
+
+	interrupt-parent = <&gpio0>;
+	interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+};
