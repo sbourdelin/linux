@@ -2968,22 +2968,18 @@ gen11_gt_engine_identity(struct drm_i915_private * const i915,
 			 const unsigned int bank, const unsigned int bit)
 {
 	void __iomem * const regs = i915->regs;
-	u32 timeout_ts;
-	u32 ident;
+	u32 ident, retry = 0;
 
 	lockdep_assert_held(&i915->irq_lock);
 
 	raw_reg_write(regs, GEN11_IIR_REG_SELECTOR(bank), BIT(bit));
 
-	/*
-	 * NB: Specs do not specify how long to spin wait,
-	 * so we do ~100us as an educated guess.
-	 */
-	timeout_ts = (local_clock() >> 10) + 100;
 	do {
 		ident = raw_reg_read(regs, GEN11_INTR_IDENTITY_REG(bank));
-	} while (!(ident & GEN11_INTR_DATA_VALID) &&
-		 !time_after32(local_clock() >> 10, timeout_ts));
+	} while (!(ident & GEN11_INTR_DATA_VALID) && ++retry <= 10);
+
+	if (unlikely(GEM_SHOW_DEBUG() && retry))
+		WARN_ONCE(1, "INTR_IDENTITY took %u reads to settle\n", retry);
 
 	if (unlikely(!(ident & GEN11_INTR_DATA_VALID))) {
 		DRM_ERROR("INTR_IDENTITY_REG%u:%u 0x%08x not valid!\n",
@@ -3034,9 +3030,6 @@ gen11_gt_identity_handler(struct drm_i915_private * const i915,
 	const u8 instance = GEN11_INTR_ENGINE_INSTANCE(identity);
 	const u16 intr = GEN11_INTR_ENGINE_INTR(identity);
 
-	if (unlikely(!intr))
-		return;
-
 	if (class <= COPY_ENGINE_CLASS)
 		return gen11_engine_irq_handler(i915, class, instance, intr);
 
@@ -3068,11 +3061,14 @@ gen11_gt_bank_handler(struct drm_i915_private * const i915,
 		const u32 ident = gen11_gt_engine_identity(i915,
 							   bank, bit);
 
-		gen11_gt_identity_handler(i915, ident);
-	}
+		if (unlikely(!ident))
+			continue;
 
-	/* Clear must be after shared has been served for engine */
-	raw_reg_write(regs, GEN11_GT_INTR_DW(bank), intr_dw);
+		gen11_gt_identity_handler(i915, ident);
+
+		/* Clear must be after shared has been served for engine */
+		raw_reg_write(regs, GEN11_GT_INTR_DW(bank), BIT(bit));
+	}
 }
 
 static void
