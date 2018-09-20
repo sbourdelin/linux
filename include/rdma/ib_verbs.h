@@ -2248,6 +2248,11 @@ struct ib_device {
 	/* Do not access @dma_device directly from ULP nor from HW drivers. */
 	struct device                *dma_device;
 
+	/*
+	 * Do not access @name directly,
+	 * use ib_device_get_name()/ib_device_alloc_name()
+	 * and don't assume that it can't change after access.
+	 */
 	char                          name[IB_DEVICE_NAME_MAX];
 
 	struct list_head              event_handler_list;
@@ -2618,7 +2623,8 @@ struct ib_device *ib_alloc_device(size_t size);
 void ib_dealloc_device(struct ib_device *device);
 
 void ib_get_device_fw_str(struct ib_device *device, char *str);
-
+int ib_device_alloc_name(struct ib_device *ibdev, const char *pattern);
+void ib_device_get_name(struct ib_device *ibdev, char *name);
 int ib_register_device(struct ib_device *device,
 		       int (*port_callback)(struct ib_device *,
 					    u8, struct kobject *));

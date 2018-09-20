@@ -169,6 +169,14 @@ static struct ib_device *__ib_device_get_by_name(const char *name)
 	return NULL;
 }
 
+void ib_device_get_name(struct ib_device *ibdev, char *name)
+{
+	down_read(&lists_rwsem);
+	strlcpy(name, ibdev->name, IB_DEVICE_NAME_MAX);
+	up_read(&lists_rwsem);
+}
+EXPORT_SYMBOL(ib_device_get_name);
+
 static int alloc_name(char *name)
 {
 	unsigned long *inuse;
@@ -200,6 +208,21 @@ static int alloc_name(char *name)
 	strlcpy(name, buf, IB_DEVICE_NAME_MAX);
 	return 0;
 }
+
+int ib_device_alloc_name(struct ib_device *ibdev, const char *pattern)
+{
+	int ret = 0;
+
+	mutex_lock(&device_mutex);
+	strlcpy(ibdev->name, pattern, IB_DEVICE_NAME_MAX);
+	if (strchr(ibdev->name, '%'))
+		ret = alloc_name(ibdev->name);
+
+	mutex_unlock(&device_mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL(ib_device_alloc_name);
 
 static void ib_device_release(struct device *device)
 {
@@ -498,7 +521,6 @@ int ib_register_device(struct ib_device *device,
 		ret = alloc_name(device->name);
 		if (ret)
 			goto out;
-	}
 
 	if (ib_device_check_mandatory(device)) {
 		ret = -EINVAL;
