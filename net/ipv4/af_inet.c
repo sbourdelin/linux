@@ -1938,6 +1938,9 @@ static int __init inet_init(void)
 	for (q = inetsw_array; q < &inetsw_array[INETSW_ARRAY_LEN]; ++q)
 		inet_register_protosw(q);
 
+	if (init_inet_pernet_ops())
+		pr_crit("%s: Cannot init ipv4 inet pernet ops\n", __func__);
+
 	/*
 	 *	Set the ARP module up
 	 */
@@ -1975,9 +1978,6 @@ static int __init inet_init(void)
 	if (ip_mr_init())
 		pr_crit("%s: Cannot init ipv4 mroute\n", __func__);
 #endif
-
-	if (init_inet_pernet_ops())
-		pr_crit("%s: Cannot init ipv4 inet pernet ops\n", __func__);
 	/*
 	 *	Initialise per-cpu ipv4 mibs
 	 */
