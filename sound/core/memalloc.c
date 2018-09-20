@@ -161,22 +161,8 @@ static void snd_free_dev_iram(struct snd_dma_buffer *dmab)
  *
  */
 
-
-/**
- * snd_dma_alloc_pages - allocate the buffer area according to the given type
- * @type: the DMA buffer type
- * @device: the device pointer
- * @size: the buffer size to allocate
- * @dmab: buffer allocation record to store the allocated data
- *
- * Calls the memory-allocator function for the corresponding
- * buffer type.
- *
- * Return: Zero if the buffer with the given size is allocated successfully,
- * otherwise a negative value on error.
- */
-int snd_dma_alloc_pages(int type, struct device *device, size_t size,
-			struct snd_dma_buffer *dmab)
+static int __snd_dma_alloc_pages(struct device *device, int type, size_t size,
+				 gfp_t gfp_flags, struct snd_dma_buffer *dmab)
 {
 	if (WARN_ON(!size))
 		return -ENXIO;
@@ -188,8 +174,7 @@ int snd_dma_alloc_pages(int type, struct device *device, size_t size,
 	dmab->bytes = 0;
 	switch (type) {
 	case SNDRV_DMA_TYPE_CONTINUOUS:
-		dmab->area = snd_malloc_pages(size,
-					(__force gfp_t)(unsigned long)device);
+		dmab->area = snd_malloc_pages(size, gfp_flags);
 		dmab->addr = 0;
 		break;
 #ifdef CONFIG_HAS_DMA
@@ -224,6 +209,30 @@ int snd_dma_alloc_pages(int type, struct device *device, size_t size,
 		return -ENOMEM;
 	dmab->bytes = size;
 	return 0;
+}
+
+/**
+ * snd_dma_alloc_pages - allocate the buffer area according to the given type
+ * @type: the DMA buffer type
+ * @device: the device pointer
+ * @size: the buffer size to allocate
+ * @dmab: buffer allocation record to store the allocated data
+ *
+ * Calls the memory-allocator function for the corresponding
+ * buffer type.
+ *
+ * Return: Zero if the buffer with the given size is allocated successfully,
+ * otherwise a negative value on error.
+ */
+int snd_dma_alloc_pages(int type, struct device *device, size_t size,
+			struct snd_dma_buffer *dmab)
+{
+	gfp_t gfp_flags = 0;
+
+	if (type == SNDRV_DMA_TYPE_CONTINUOUS)
+		gfp_flags = (__force gfp_t)(unsigned long)device;
+
+	return __snd_dma_alloc_pages(device, type, size, gfp_flags, dmab);
 }
 EXPORT_SYMBOL(snd_dma_alloc_pages);
 
@@ -296,3 +305,46 @@ void snd_dma_free_pages(struct snd_dma_buffer *dmab)
 	}
 }
 EXPORT_SYMBOL(snd_dma_free_pages);
+
+/* called by devres */
+static void __snd_release_pages(struct device *dev, void *res)
+{
+	snd_dma_free_pages(res);
+}
+
+/**
+ * snd_devm_alloc_pages - allocate the buffer and manage with devres
+ * @dev: the device pointer
+ * @type: the DMA buffer type
+ * @size: the buffer size to allocate
+ *
+ * Allocate buffer pages depending on the given type and manage using devres.
+ * The pages will be released automatically at the device removal.
+ *
+ * The function cannot handle GFP flags for SNDRV_DMA_TYPE_CONTINUOUS type,
+ * only GFP_KERNEL is assumed.
+ *
+ * The function returns the snd_dma_buffer object at success or the encoded
+ * error pointer via ERR_PTR().  The caller needs to check the error via
+ * IS_ERR() and PTR_ERR().
+ */
+struct snd_dma_buffer *
+snd_devm_alloc_pages(struct device *dev, int type, size_t size)
+{
+	struct snd_dma_buffer *dmab;
+	int err;
+
+	dmab = devres_alloc(__snd_release_pages, sizeof(*dmab), GFP_KERNEL);
+	if (!dmab)
+		return ERR_PTR(-ENOMEM);
+
+	err = __snd_dma_alloc_pages(dev, type, size, GFP_KERNEL, dmab);
+	if (err < 0) {
+		devres_free(dmab);
+		return ERR_PTR(err);
+	}
+
+	devres_add(dev, dmab);
+	return dmab;
+}
+EXPORT_SYMBOL_GPL(snd_devm_alloc_pages);

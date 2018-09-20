@@ -156,5 +156,9 @@ void snd_dma_free_pages(struct snd_dma_buffer *dmab);
 void *snd_malloc_pages(size_t size, gfp_t gfp_flags);
 void snd_free_pages(void *ptr, size_t size);
 
+/* device-managed memory allocator */
+struct snd_dma_buffer *snd_devm_alloc_pages(struct device *dev, int type,
+					    size_t size);
+
 #endif /* __SOUND_MEMALLOC_H */
 
