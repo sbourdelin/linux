@@ -3121,6 +3121,27 @@ gen11_gu_misc_irq_handler(struct drm_i915_private *dev_priv,
 	DRM_ERROR("Unexpected GU_MISC interrupt 0x%x\n", iir);
 }
 
+static void
+gen11_display_irq_handler(struct drm_i915_private * const i915,
+			  const u32 master_ctl)
+{
+	u32 disp_ctl;
+
+	if (!(master_ctl & GEN11_DISPLAY_IRQ))
+		return;
+
+	/* IRQs are synced during runtime_suspend, we don't require a wakeref */
+	disp_ctl = raw_reg_read(i915->regs, GEN11_DISPLAY_INT_CTL);
+
+	disable_rpm_wakeref_asserts(i915);
+	/*
+	 * GEN11_DISPLAY_INT_CTL has same format as GEN8_MASTER_IRQ
+	 * for the display related bits.
+	 */
+	gen8_de_irq_handler(i915, disp_ctl);
+	enable_rpm_wakeref_asserts(i915);
+}
+
 static inline void gen11_master_irq_enable(void __iomem * const regs)
 {
 	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
@@ -3147,20 +3168,7 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 
 	/* Find, clear, then process each source of interrupt. */
 	gen11_gt_irq_handler(i915, master_ctl);
-
-	/* IRQs are synced during runtime_suspend, we don't require a wakeref */
-	if (master_ctl & GEN11_DISPLAY_IRQ) {
-		const u32 disp_ctl = raw_reg_read(regs, GEN11_DISPLAY_INT_CTL);
-
-		disable_rpm_wakeref_asserts(i915);
-		/*
-		 * GEN11_DISPLAY_INT_CTL has same format as GEN8_MASTER_IRQ
-		 * for the display related bits.
-		 */
-		gen8_de_irq_handler(i915, disp_ctl);
-		enable_rpm_wakeref_asserts(i915);
-	}
-
+	gen11_display_irq_handler(i915, master_ctl);
 	gu_misc_iir = gen11_gu_misc_irq_ack(regs, master_ctl);
 
 	gen11_master_irq_enable(regs);
