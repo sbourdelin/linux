@@ -159,10 +159,13 @@ static struct net_device *pvrdma_get_netdev(struct ib_device *ibdev,
 
 static int pvrdma_register_device(struct pvrdma_dev *dev)
 {
-	int ret = -1;
 	int i = 0;
+	int ret;
 
-	strlcpy(dev->ib_dev.name, "vmw_pvrdma%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(&dev->ib_dev, "vmw_pvrdma%d");
+	if (ret)
+		return ret;
+
 	dev->ib_dev.node_guid = dev->dsr->caps.node_guid;
 	dev->sys_image_guid = dev->dsr->caps.sys_image_guid;
 	dev->flags = 0;
@@ -235,7 +238,7 @@ static int pvrdma_register_device(struct pvrdma_dev *dev)
 	dev->cq_tbl = kcalloc(dev->dsr->caps.max_cq, sizeof(struct pvrdma_cq *),
 			      GFP_KERNEL);
 	if (!dev->cq_tbl)
-		return ret;
+		return -ENOMEM;
 	spin_lock_init(&dev->cq_tbl_lock);
 
 	dev->qp_tbl = kcalloc(dev->dsr->caps.max_qp, sizeof(struct pvrdma_qp *),

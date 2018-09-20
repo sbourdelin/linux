@@ -116,7 +116,12 @@ static void get_dev_fw_str(struct ib_device *device, char *str)
 
 static int ocrdma_register_device(struct ocrdma_dev *dev)
 {
-	strlcpy(dev->ibdev.name, "ocrdma%d", IB_DEVICE_NAME_MAX);
+	int ret;
+
+	ret = ib_device_alloc_name(&dev->ibdev, "ocrdma%d");
+	if (ret)
+		return ret;
+
 	ocrdma_get_guid(dev, (u8 *)&dev->ibdev.node_guid);
 	BUILD_BUG_ON(sizeof(OCRDMA_NODE_DESC) > IB_DEVICE_NODE_DESC_MAX);
 	memcpy(dev->ibdev.node_desc, OCRDMA_NODE_DESC,

@@ -1159,7 +1159,10 @@ int rxe_register_device(struct rxe_dev *rxe)
 	struct ib_device *dev = &rxe->ib_dev;
 	struct crypto_shash *tfm;
 
-	strlcpy(dev->name, "rxe%d", IB_DEVICE_NAME_MAX);
+	err = ib_device_alloc_name(dev, "rxe%d");
+	if (err)
+		return err;
+
 	strlcpy(dev->node_desc, "rxe", sizeof(dev->node_desc));
 
 	dev->owner = THIS_MODULE;

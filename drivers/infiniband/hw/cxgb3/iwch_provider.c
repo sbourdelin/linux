@@ -1319,7 +1319,10 @@ int iwch_register_device(struct iwch_dev *dev)
 	int i;
 
 	pr_debug("%s iwch_dev %p\n", __func__, dev);
-	strlcpy(dev->ibdev.name, "cxgb3_%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(&dev->ibdev, "cxgb3_%d");
+	if (ret)
+		return ret;
+
 	memset(&dev->ibdev.node_guid, 0, sizeof(dev->ibdev.node_guid));
 	memcpy(&dev->ibdev.node_guid, dev->rdev.t3cdev_p->lldev->dev_addr, 6);
 	dev->ibdev.owner = THIS_MODULE;

@@ -1198,7 +1198,10 @@ int mthca_register_device(struct mthca_dev *dev)
 	if (ret)
 		return ret;
 
-	strlcpy(dev->ib_dev.name, "mthca%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(&dev->ib_dev, "mthca%d");
+	if (ret)
+		return ret;
+
 	dev->ib_dev.owner                = THIS_MODULE;
 
 	dev->ib_dev.uverbs_abi_ver	 = MTHCA_UVERBS_ABI_VERSION;

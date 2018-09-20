@@ -170,7 +170,9 @@ static int qedr_register_device(struct qedr_dev *dev)
 {
 	int rc;
 
-	strlcpy(dev->ibdev.name, "qedr%d", IB_DEVICE_NAME_MAX);
+	rc = ib_device_alloc_name(&dev->ibdev, "qedr%d");
+	if (rc)
+		return rc;
 
 	dev->ibdev.node_guid = dev->attr.node_guid;
 	memcpy(dev->ibdev.node_desc, QEDR_NODE_DESC, sizeof(QEDR_NODE_DESC));

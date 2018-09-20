@@ -575,11 +575,15 @@ static void bnxt_re_unregister_ib(struct bnxt_re_dev *rdev)
 static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 {
 	struct ib_device *ibdev = &rdev->ibdev;
+	int ret;
 
 	/* ib device init */
 	ibdev->owner = THIS_MODULE;
 	ibdev->node_type = RDMA_NODE_IB_CA;
-	strlcpy(ibdev->name, "bnxt_re%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(ibdev, "bnxt_re%d");
+	if (ret)
+		return ret;
+
 	strlcpy(ibdev->node_desc, BNXT_RE_DESC " HCA",
 		strlen(BNXT_RE_DESC) + 5);
 	ibdev->phys_port_cnt = 1;

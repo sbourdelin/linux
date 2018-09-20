@@ -2746,13 +2746,18 @@ static struct i40iw_ib_device *i40iw_init_rdma_device(struct i40iw_device *iwdev
 	struct i40iw_ib_device *iwibdev;
 	struct net_device *netdev = iwdev->netdev;
 	struct pci_dev *pcidev = (struct pci_dev *)iwdev->hw.dev_context;
+	int ret;
 
 	iwibdev = (struct i40iw_ib_device *)ib_alloc_device(sizeof(*iwibdev));
 	if (!iwibdev) {
 		i40iw_pr_err("iwdev == NULL\n");
 		return NULL;
 	}
-	strlcpy(iwibdev->ibdev.name, "i40iw%d", IB_DEVICE_NAME_MAX);
+
+	ret = ib_device_alloc_name(&iwibdev->ibdev, "i40iw%d");
+	if (ret)
+		return NULL;
+
 	iwibdev->ibdev.owner = THIS_MODULE;
 	iwdev->iwibdev = iwibdev;
 	iwibdev->iwdev = iwdev;

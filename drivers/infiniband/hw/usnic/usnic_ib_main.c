@@ -335,6 +335,7 @@ static void *usnic_ib_device_add(struct pci_dev *dev)
 	union ib_gid gid;
 	struct in_device *ind;
 	struct net_device *netdev;
+	int ret;
 
 	usnic_dbg("\n");
 	netdev = pci_get_drvdata(dev);
@@ -364,7 +365,9 @@ static void *usnic_ib_device_add(struct pci_dev *dev)
 	us_ibdev->ib_dev.num_comp_vectors = USNIC_IB_NUM_COMP_VECTORS;
 	us_ibdev->ib_dev.dev.parent = &dev->dev;
 	us_ibdev->ib_dev.uverbs_abi_ver = USNIC_UVERBS_ABI_VERSION;
-	strlcpy(us_ibdev->ib_dev.name, "usnic_%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(&us_ibdev->ib_dev, "usnic_%d");
+	if (ret)
+		goto err_fwd_dealloc;
 
 	us_ibdev->ib_dev.uverbs_cmd_mask =
 		(1ull << IB_USER_VERBS_CMD_GET_CONTEXT) |

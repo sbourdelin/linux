@@ -2636,7 +2636,10 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	ibdev->dev = dev;
 	ibdev->bond_next_port	= 0;
 
-	strlcpy(ibdev->ib_dev.name, "mlx4_%d", IB_DEVICE_NAME_MAX);
+	err = ib_device_alloc_name(&ibdev->ib_dev, "mlx4_%d");
+	if (err)
+		goto err_name;
+
 	ibdev->ib_dev.owner		= THIS_MODULE;
 	ibdev->ib_dev.node_type		= RDMA_NODE_IB_CA;
 	ibdev->ib_dev.local_dma_lkey	= dev->caps.reserved_lkey;
@@ -2978,6 +2981,8 @@ err_counter:
 
 err_map:
 	mlx4_ib_free_eqs(dev, ibdev);
+
+err_name:
 	iounmap(ibdev->uar_map);
 
 err_uar:

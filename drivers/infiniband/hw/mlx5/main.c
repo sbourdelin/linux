@@ -5673,8 +5673,10 @@ int mlx5_ib_stage_init_init(struct mlx5_ib_dev *dev)
 		name = "mlx5_%d";
 	else
 		name = "mlx5_bond_%d";
+	err = ib_device_alloc_name(&dev->ib_dev, name);
+	if (err)
+		goto err_mp;
 
-	strlcpy(dev->ib_dev.name, name, IB_DEVICE_NAME_MAX);
 	dev->ib_dev.owner		= THIS_MODULE;
 	dev->ib_dev.node_type		= RDMA_NODE_IB_CA;
 	dev->ib_dev.local_dma_lkey	= 0 /* not supported for now */;

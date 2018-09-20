@@ -517,11 +517,6 @@ int ib_register_device(struct ib_device *device,
 
 	mutex_lock(&device_mutex);
 
-	if (strchr(device->name, '%')) {
-		ret = alloc_name(device->name);
-		if (ret)
-			goto out;
-
 	if (ib_device_check_mandatory(device)) {
 		ret = -EINVAL;
 		goto out;

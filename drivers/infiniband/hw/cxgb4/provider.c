@@ -535,7 +535,10 @@ void c4iw_register_device(struct work_struct *work)
 	struct c4iw_dev *dev = ctx->dev;
 
 	pr_debug("c4iw_dev %p\n", dev);
-	strlcpy(dev->ibdev.name, "cxgb4_%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(&dev->ibdev, "cxgb4_%d");
+	if (ret)
+		return;
+
 	memset(&dev->ibdev.node_guid, 0, sizeof(dev->ibdev.node_guid));
 	memcpy(&dev->ibdev.node_guid, dev->rdev.lldi.ports[0]->dev_addr, 6);
 	dev->ibdev.owner = THIS_MODULE;

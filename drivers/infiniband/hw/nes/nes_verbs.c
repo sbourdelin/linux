@@ -3635,12 +3635,16 @@ struct nes_ib_device *nes_init_ofa_device(struct net_device *netdev)
 	struct nes_ib_device *nesibdev;
 	struct nes_vnic *nesvnic = netdev_priv(netdev);
 	struct nes_device *nesdev = nesvnic->nesdev;
+	int ret;
 
 	nesibdev = (struct nes_ib_device *)ib_alloc_device(sizeof(struct nes_ib_device));
 	if (nesibdev == NULL) {
 		return NULL;
 	}
-	strlcpy(nesibdev->ibdev.name, "nes%d", IB_DEVICE_NAME_MAX);
+	ret = ib_device_alloc_name(&nesibdev->ibdev, "nes%d");
+	if (ret)
+		return NULL;
+
 	nesibdev->ibdev.owner = THIS_MODULE;
 
 	nesibdev->ibdev.node_type = RDMA_NODE_RNIC;
