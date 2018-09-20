@@ -212,10 +212,8 @@ static inline int hpage_nr_pages(struct page *page)
 	return 1;
 }
 
-struct page *follow_devmap_pmd(struct vm_area_struct *vma, unsigned long addr,
-		pmd_t *pmd, int flags);
-struct page *follow_devmap_pud(struct vm_area_struct *vma, unsigned long addr,
-		pud_t *pud, int flags);
+struct page *follow_devmap_pmd(struct follow_page_context *ctx, pmd_t *pmd);
+struct page *follow_devmap_pud(struct follow_page_context *ctx, pud_t *pud);
 
 extern vm_fault_t do_huge_pmd_numa_page(struct vm_fault *vmf, pmd_t orig_pmd);
 
@@ -343,14 +341,12 @@ static inline void mm_put_huge_zero_page(struct mm_struct *mm)
 	return;
 }
 
-static inline struct page *follow_devmap_pmd(struct vm_area_struct *vma,
-		unsigned long addr, pmd_t *pmd, int flags)
+static inline struct page *follow_devmap_pmd(struct gup_context *ctx, pmd_t *pmd)
 {
 	return NULL;
 }
 
-static inline struct page *follow_devmap_pud(struct vm_area_struct *vma,
-		unsigned long addr, pud_t *pud, int flags)
+static inline struct page *follow_devmap_pud(struct gup_context *ctx, pud_t *pud)
 {
 	return NULL;
 }

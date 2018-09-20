@@ -378,6 +378,13 @@ struct vm_fault {
 					 */
 };
 
+struct follow_page_context {
+	struct vm_area_struct *vma;
+	unsigned long address;
+	unsigned int page_mask;
+	unsigned int flags;
+};
+
 /* page entry size for vm->huge_fault() */
 enum page_entry_size {
 	PE_SIZE_PTE = 0,
@@ -2534,15 +2541,19 @@ static inline vm_fault_t vmf_error(int err)
 	return VM_FAULT_SIGBUS;
 }
 
-struct page *follow_page_mask(struct vm_area_struct *vma,
-			      unsigned long address, unsigned int foll_flags,
-			      unsigned int *page_mask);
+struct page *follow_page_mask(struct follow_page_context *ctx);
 
 static inline struct page *follow_page(struct vm_area_struct *vma,
 		unsigned long address, unsigned int foll_flags)
 {
-	unsigned int unused_page_mask;
-	return follow_page_mask(vma, address, foll_flags, &unused_page_mask);
+	struct follow_page_context ctx = {
+		.vma = vma,
+		.address = address,
+		.page_mask = 0,
+		.flags = foll_flags,
+	};
+
+	return follow_page_mask(&ctx);
 }
 
 #define FOLL_WRITE	0x01	/* check pte is writable */

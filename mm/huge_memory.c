@@ -851,11 +851,10 @@ static void touch_pmd(struct vm_area_struct *vma, unsigned long addr,
 		update_mmu_cache_pmd(vma, addr, pmd);
 }
 
-struct page *follow_devmap_pmd(struct vm_area_struct *vma, unsigned long addr,
-		pmd_t *pmd, int flags)
+struct page *follow_devmap_pmd(struct follow_page_context *ctx, pmd_t *pmd)
 {
 	unsigned long pfn = pmd_pfn(*pmd);
-	struct mm_struct *mm = vma->vm_mm;
+	struct mm_struct *mm = ctx->vma->vm_mm;
 	struct dev_pagemap *pgmap;
 	struct page *page;
 
@@ -865,9 +864,9 @@ struct page *follow_devmap_pmd(struct vm_area_struct *vma, unsigned long addr,
 	 * When we COW a devmap PMD entry, we split it into PTEs, so we should
 	 * not be in this function with `flags & FOLL_COW` set.
 	 */
-	WARN_ONCE(flags & FOLL_COW, "mm: In follow_devmap_pmd with FOLL_COW set");
+	WARN_ONCE(ctx->flags & FOLL_COW, "mm: In follow_devmap_pmd with FOLL_COW set");
 
-	if (flags & FOLL_WRITE && !pmd_write(*pmd))
+	if (ctx->flags & FOLL_WRITE && !pmd_write(*pmd))
 		return NULL;
 
 	if (pmd_present(*pmd) && pmd_devmap(*pmd))
@@ -875,17 +874,17 @@ struct page *follow_devmap_pmd(struct vm_area_struct *vma, unsigned long addr,
 	else
 		return NULL;
 
-	if (flags & FOLL_TOUCH)
-		touch_pmd(vma, addr, pmd, flags);
+	if (ctx->flags & FOLL_TOUCH)
+		touch_pmd(ctx->vma, ctx->address, pmd, ctx->flags);
 
 	/*
 	 * device mapped pages can only be returned if the
 	 * caller will manage the page reference count.
 	 */
-	if (!(flags & FOLL_GET))
+	if (!(ctx->flags & FOLL_GET))
 		return ERR_PTR(-EEXIST);
 
-	pfn += (addr & ~PMD_MASK) >> PAGE_SHIFT;
+	pfn += (ctx->address & ~PMD_MASK) >> PAGE_SHIFT;
 	pgmap = get_dev_pagemap(pfn, NULL);
 	if (!pgmap)
 		return ERR_PTR(-EFAULT);
@@ -999,17 +998,16 @@ static void touch_pud(struct vm_area_struct *vma, unsigned long addr,
 		update_mmu_cache_pud(vma, addr, pud);
 }
 
-struct page *follow_devmap_pud(struct vm_area_struct *vma, unsigned long addr,
-		pud_t *pud, int flags)
+struct page *follow_devmap_pud(struct follow_page_context *ctx, pud_t *pud)
 {
 	unsigned long pfn = pud_pfn(*pud);
-	struct mm_struct *mm = vma->vm_mm;
+	struct mm_struct *mm = ctx->vma->vm_mm;
 	struct dev_pagemap *pgmap;
 	struct page *page;
 
 	assert_spin_locked(pud_lockptr(mm, pud));
 
-	if (flags & FOLL_WRITE && !pud_write(*pud))
+	if (ctx->flags & FOLL_WRITE && !pud_write(*pud))
 		return NULL;
 
 	if (pud_present(*pud) && pud_devmap(*pud))
@@ -1017,17 +1015,17 @@ struct page *follow_devmap_pud(struct vm_area_struct *vma, unsigned long addr,
 	else
 		return NULL;
 
-	if (flags & FOLL_TOUCH)
-		touch_pud(vma, addr, pud, flags);
+	if (ctx->flags & FOLL_TOUCH)
+		touch_pud(ctx->vma, ctx->address, pud, ctx->flags);
 
 	/*
 	 * device mapped pages can only be returned if the
 	 * caller will manage the page reference count.
 	 */
-	if (!(flags & FOLL_GET))
+	if (!(ctx->flags & FOLL_GET))
 		return ERR_PTR(-EEXIST);
 
-	pfn += (addr & ~PUD_MASK) >> PAGE_SHIFT;
+	pfn += (ctx->address & ~PUD_MASK) >> PAGE_SHIFT;
 	pgmap = get_dev_pagemap(pfn, NULL);
 	if (!pgmap)
 		return ERR_PTR(-EFAULT);
