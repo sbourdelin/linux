@@ -170,8 +170,7 @@ static int hmc5843_wait_measurement(struct hmc5843_data *data)
 	}
 
 	if (tries < 0) {
-		dev_err(data->dev, "data not ready\n");
-		return -EIO;
+		return -ETIMEDOUT;
 	}
 
 	return 0;
