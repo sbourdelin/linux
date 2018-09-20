@@ -1,0 +1,32 @@
+#
+#  Synopsys DWC Platform drivers
+#	Most drivers here are currently for MIPI CSI-2 and MIPI DPHY support
+
+config DWC_MIPI_CSI2_HOST
+	bool "Synopsys Designware CSI-2 Host Controller and DPHY-RX support"
+	select VIDEO_DEV
+	select VIDEO_V4L2
+	select VIDEO_V4L2_SUBDEV_API
+	select VIDEOBUF2_VMALLOC
+	select VIDEOBUF2_DMA_CONTIG
+	select GENERIC_PHY
+	select VIDEO_OV5647
+	help
+	 This selects the CSI-2 host controller support.
+
+	 If you have a controller with this interface, say Y.
+
+	  If unsure, say N.
+
+if DWC_MIPI_CSI2_HOST
+
+config DWC_MIPI_TC_DPHY_G128
+	tristate "DesignWare platform support using a G128 Test Chip"
+	depends on DWC_MIPI_CSI2_HOST
+	help
+	 Synopsys Test Chip is a MIPI D-PHY for prototyping purposes.
+
+	  If unsure, say N.
+
+endif # DWC_MIPI_CSI2_HOST
+
