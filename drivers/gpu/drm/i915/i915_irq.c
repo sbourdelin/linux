@@ -3123,6 +3123,16 @@ gen11_gu_misc_irq_handler(struct drm_i915_private *dev_priv,
 		DRM_ERROR("Unexpected GU_MISC interrupt 0x%x\n", iir);
 }
 
+static inline void gen11_master_irq_enable(void __iomem * const regs)
+{
+	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
+}
+
+static inline void gen11_master_irq_disable(void __iomem * const regs)
+{
+	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, 0);
+}
+
 static irqreturn_t gen11_irq_handler(int irq, void *arg)
 {
 	struct drm_i915_private * const i915 = to_i915(arg);
@@ -3133,9 +3143,7 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 	if (!intel_irqs_enabled(i915))
 		return IRQ_NONE;
 
-	/* Disable interrupts. */
-	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, 0);
-
+	gen11_master_irq_disable(regs);
 	master_ctl = raw_reg_read(regs, GEN11_GFX_MSTR_IRQ) & ~GEN11_MASTER_IRQ;
 
 	/* Find, clear, then process each source of interrupt. */
@@ -3156,8 +3164,7 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 
 	gen11_gu_misc_irq_ack(i915, master_ctl, &gu_misc_iir);
 
-	/* Enable interrupts. */
-	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
+	gen11_master_irq_enable(regs);
 
 	gen11_gu_misc_irq_handler(i915, master_ctl, gu_misc_iir);
 
