@@ -380,6 +380,7 @@ struct vm_fault {
 
 struct follow_page_context {
 	struct vm_area_struct *vma;
+	struct dev_pagemap *pgmap;
 	unsigned long address;
 	unsigned int page_mask;
 	unsigned int flags;
@@ -2546,14 +2547,19 @@ struct page *follow_page_mask(struct follow_page_context *ctx);
 static inline struct page *follow_page(struct vm_area_struct *vma,
 		unsigned long address, unsigned int foll_flags)
 {
+	struct page *page;
 	struct follow_page_context ctx = {
 		.vma = vma,
+		.pgmap = NULL,
 		.address = address,
 		.page_mask = 0,
 		.flags = foll_flags,
 	};
 
-	return follow_page_mask(&ctx);
+	page = follow_page_mask(&ctx);
+	if (ctx.pgmap)
+		put_dev_pagemap(ctx.pgmap);
+	return page;
 }
 
 #define FOLL_WRITE	0x01	/* check pte is writable */
