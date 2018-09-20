@@ -325,9 +325,12 @@ static int ip6_input_finish(struct net *net, struct sock *sk, struct sk_buff *sk
 {
 	const struct inet6_protocol *ipprot;
 	struct inet6_dev *idev;
+	struct net_device *dev;
 	unsigned int nhoff;
+	int sdif = inet6_sdif(skb);
 	int nexthdr;
 	bool raw;
+	bool deliver;
 	bool have_final = false;
 
 	/*
@@ -371,9 +374,27 @@ resubmit_final:
 			skb_postpull_rcsum(skb, skb_network_header(skb),
 					   skb_network_header_len(skb));
 			hdr = ipv6_hdr(skb);
-			if (ipv6_addr_is_multicast(&hdr->daddr) &&
-			    !ipv6_chk_mcast_addr(skb->dev, &hdr->daddr,
-			    &hdr->saddr) &&
+
+			/* skb->dev passed may be master dev for vrfs. */
+			if (sdif) {
+				rcu_read_lock();
+				dev = dev_get_by_index_rcu(dev_net(skb->dev),
+							   sdif);
+				if (!dev) {
+					rcu_read_unlock();
+					kfree_skb(skb);
+					return -ENODEV;
+				}
+			} else {
+				dev = skb->dev;
+			}
+
+			deliver = ipv6_chk_mcast_addr(dev, &hdr->daddr,
+						      &hdr->saddr);
+			if (sdif)
+				rcu_read_unlock();
+
+			if (ipv6_addr_is_multicast(&hdr->daddr) && !deliver &&
 			    !ipv6_is_mld(skb, nexthdr, skb_network_header_len(skb)))
 				goto discard;
 		}
