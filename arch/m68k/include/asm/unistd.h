@@ -31,4 +31,11 @@
 #define __ARCH_WANT_SYS_FORK
 #define __ARCH_WANT_SYS_VFORK
 
+#define __IGNORE_seccomp
+#define __IGNORE_pkey_mprotect
+#define __IGNORE_pkey_alloc
+#define __IGNORE_pkey_free
+#define __IGNORE_io_pgetevents
+#define __IGNORE_rseq
+
 #endif /* _ASM_M68K_UNISTD_H_ */
