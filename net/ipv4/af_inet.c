@@ -1818,6 +1818,8 @@ static __net_init int inet_init_net(struct net *net)
 	net->ipv4.sysctl_igmp_llm_reports = 1;
 	net->ipv4.sysctl_igmp_qrv = 2;
 
+	mutex_init(&net->ipv4.ra_mutex);
+
 	return 0;
 }
 
