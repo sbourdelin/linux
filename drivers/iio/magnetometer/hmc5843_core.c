@@ -92,6 +92,34 @@ static const char *const hmc5843_meas_conf_modes[] = {"normal", "positivebias",
 static const char *const hmc5983_meas_conf_modes[] = {"normal", "positivebias",
 						      "negativebias",
 						      "disabled"};
+
+static const struct regmap_range hmc5843_readable_ranges[] = {
+		regmap_reg_range(0, HMC5843_ID_END),
+};
+
+const struct regmap_access_table hmc5843_readable_table = {
+		.yes_ranges = hmc5843_readable_ranges,
+		.n_yes_ranges = ARRAY_SIZE(hmc5843_readable_ranges),
+};
+
+static const struct regmap_range hmc5843_writable_ranges[] = {
+		regmap_reg_range(0, HMC5843_MODE_REG),
+};
+
+const struct regmap_access_table hmc5843_writable_table = {
+		.yes_ranges = hmc5843_writable_ranges,
+		.n_yes_ranges = ARRAY_SIZE(hmc5843_writable_ranges),
+};
+
+static const struct regmap_range hmc5843_volatile_ranges[] = {
+		regmap_reg_range(HMC5843_DATA_OUT_MSB_REGS, HMC5843_STATUS_REG),
+};
+
+const struct regmap_access_table hmc5843_volatile_table = {
+		.yes_ranges = hmc5843_volatile_ranges,
+		.n_yes_ranges = ARRAY_SIZE(hmc5843_volatile_ranges),
+};
+
 /* Scaling factors: 10000000/Gain */
 static const int hmc5843_regval_to_nanoscale[] = {
 	6173, 7692, 10309, 12821, 18868, 21739, 25641, 35714

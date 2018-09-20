@@ -46,6 +46,10 @@ struct hmc5843_data {
 	__be16 buffer[8];
 };
 
+extern const struct regmap_access_table hmc5843_readable_table;
+extern const struct regmap_access_table hmc5843_writable_table;
+extern const struct regmap_access_table hmc5843_volatile_table;
+
 int hmc5843_common_probe(struct device *dev, struct regmap *regmap,
 			 enum hmc5843_ids id, const char *name);
 int hmc5843_common_remove(struct device *dev);
