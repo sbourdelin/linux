@@ -3133,13 +3133,14 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 	if (!intel_irqs_enabled(i915))
 		return IRQ_NONE;
 
-	master_ctl = raw_reg_read(regs, GEN11_GFX_MSTR_IRQ);
-	master_ctl &= ~GEN11_MASTER_IRQ;
-	if (!master_ctl)
-		return IRQ_NONE;
-
 	/* Disable interrupts. */
 	raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, 0);
+
+	master_ctl = raw_reg_read(regs, GEN11_GFX_MSTR_IRQ) & ~GEN11_MASTER_IRQ;
+	if (!master_ctl) {
+		raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, GEN11_MASTER_IRQ);
+		return IRQ_NONE;
+	}
 
 	/* Find, clear, then process each source of interrupt. */
 	gen11_gt_irq_handler(i915, master_ctl);
