@@ -487,7 +487,9 @@ static void nd_async_device_register(void *d, async_cookie_t cookie)
 		dev_err(dev, "%s: failed\n", __func__);
 		put_device(dev);
 	}
+
 	put_device(dev);
+	put_device(dev->parent);
 }
 
 static void nd_async_device_unregister(void *d, async_cookie_t cookie)
@@ -504,12 +506,25 @@ static void nd_async_device_unregister(void *d, async_cookie_t cookie)
 
 void __nd_device_register(struct device *dev)
 {
+	int node;
+
 	if (!dev)
 		return;
+
 	dev->bus = &nvdimm_bus_type;
+	get_device(dev->parent);
 	get_device(dev);
-	async_schedule_domain(nd_async_device_register, dev,
-			&nd_async_domain);
+
+	/*
+	 * For a region we can break away from the parent node,
+	 * otherwise for all other devices we just inherit the node from
+	 * the parent.
+	 */
+	node = is_nd_region(dev) ? to_nd_region(dev)->numa_node :
+				   dev_to_node(dev->parent);
+
+	async_schedule_on_domain(nd_async_device_register, dev, node,
+				 &nd_async_domain);
 }
 
 void nd_device_register(struct device *dev)
