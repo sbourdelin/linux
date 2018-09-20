@@ -279,21 +279,25 @@ static bool netlink_filter_tap(const struct sk_buff *skb)
 }
 
 static int __netlink_deliver_tap_skb(struct sk_buff *skb,
-				     struct net_device *dev)
+				 struct net_device *dev, bool alloc, bool last)
 {
 	struct sk_buff *nskb;
 	struct sock *sk = skb->sk;
 	int ret = -ENOMEM;
 
-	if (!net_eq(dev_net(dev), sock_net(sk)))
+	if (!net_eq(dev_net(dev), sock_net(sk))) {
+		if (last && alloc)
+			consume_skb(skb);
 		return 0;
+	}
 
 	dev_hold(dev);
 
-	if (is_vmalloc_addr(skb->head))
-		nskb = netlink_to_full_skb(skb, GFP_ATOMIC);
+	if (unlikely(last && alloc))
+		nskb = skb;
 	else
 		nskb = skb_clone(skb, GFP_ATOMIC);
+
 	if (nskb) {
 		nskb->dev = dev;
 		nskb->protocol = htons((u16) sk->sk_protocol);
@@ -303,6 +307,8 @@ static int __netlink_deliver_tap_skb(struct sk_buff *skb,
 		ret = dev_queue_xmit(nskb);
 		if (unlikely(ret > 0))
 			ret = net_xmit_errno(ret);
+	} else if (alloc) {
+		kfree_skb(skb);
 	}
 
 	dev_put(dev);
@@ -311,16 +317,33 @@ static int __netlink_deliver_tap_skb(struct sk_buff *skb,
 
 static void __netlink_deliver_tap(struct sk_buff *skb, struct netlink_tap_net *nn)
 {
+	struct netlink_tap *tmp, *next;
+	bool alloc = false;
 	int ret;
-	struct netlink_tap *tmp;
 
 	if (!netlink_filter_tap(skb))
 		return;
 
-	list_for_each_entry_rcu(tmp, &nn->netlink_tap_all, list) {
-		ret = __netlink_deliver_tap_skb(skb, tmp->dev);
+	tmp = list_first_or_null_rcu(&nn->netlink_tap_all,
+					struct netlink_tap, list);
+	if (!tmp)
+		return;
+
+	if (is_vmalloc_addr(skb->head)) {
+		skb = netlink_to_full_skb(skb, GFP_ATOMIC);
+		if (!skb)
+			return;
+		alloc = true;
+	}
+
+	while (tmp) {
+		next = list_next_or_null_rcu(&nn->netlink_tap_all, &tmp->list,
+					struct netlink_tap, list);
+
+		ret = __netlink_deliver_tap_skb(skb, tmp->dev, alloc, !next);
 		if (unlikely(ret))
 			break;
+		tmp = next;
 	}
 }
 
