@@ -3166,13 +3166,12 @@ static irqreturn_t gen11_irq_handler(int irq, void *arg)
 
 	master_ctl = gen11_master_irq_disable(regs);
 
-	/* Find, clear, then process each source of interrupt. */
-	gen11_gt_irq_handler(i915, master_ctl);
 	gen11_display_irq_handler(i915, master_ctl);
 	gu_misc_iir = gen11_gu_misc_irq_ack(regs, master_ctl);
 
 	gen11_master_irq_enable(regs);
 
+	gen11_gt_irq_handler(i915, master_ctl);
 	gen11_gu_misc_irq_handler(i915, gu_misc_iir);
 
 	return master_ctl ? IRQ_HANDLED : IRQ_NONE;
