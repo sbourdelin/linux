@@ -18,6 +18,8 @@
 #include <linux/etherdevice.h>
 #include <linux/phy.h>
 
+#define BD_ADDR_LEN	6
+
 struct property_set {
 	struct device *dev;
 	struct fwnode_handle fwnode;
@@ -1314,6 +1316,53 @@ void *device_get_mac_address(struct device *dev, char *addr, int alen)
 	return fwnode_get_mac_address(dev_fwnode(dev), addr, alen);
 }
 EXPORT_SYMBOL(device_get_mac_address);
+
+/**
+ * fwnode_get_bd_address - Get the Bluetooth Device Address (BD_ADDR) from the
+ *                         firmware node
+ * @fwnode:	Pointer to the firmware node
+ * @addr:	Address of buffer to store the BD address in
+ * @alen:	Length of the buffer pointed to by addr, should be BD_ADDR_LEN
+ *
+ * Search the firmware node for 'local-bd-address'.
+ *
+ * All-zero BD addresses are rejected, because those could be properties
+ * that exist in the firmware tables, but were not updated by the firmware. For
+ * example, the DTS could define 'local-bd-address', with zero BD addresses.
+ */
+int fwnode_get_bd_address(struct fwnode_handle *fwnode, u8 *addr, int alen)
+{
+	u8 buf[BD_ADDR_LEN];
+	int ret;
+
+	if (alen != BD_ADDR_LEN)
+		return -EINVAL;
+
+	ret = fwnode_property_read_u8_array(fwnode, "local-bd-address",
+					    buf, alen);
+	if (ret < 0)
+		return ret;
+	if (is_zero_ether_addr(buf))
+		return -ENODATA;
+
+	memcpy(addr, buf, BD_ADDR_LEN);
+
+	return 0;
+}
+EXPORT_SYMBOL(fwnode_get_bd_address);
+
+/**
+ * device_get_bd_address - Get the Bluetooth Device Address (BD_ADDR) for a
+ *                         given device
+ * @dev:	Pointer to the device
+ * @addr:	Address of buffer to store the BD address in
+ * @alen:	Length of the buffer pointed to by addr, should be BD_ADDR_LEN
+ */
+int device_get_bd_address(struct device *dev, u8 *addr, int alen)
+{
+	return fwnode_get_bd_address(dev_fwnode(dev), addr, alen);
+}
+EXPORT_SYMBOL(device_get_bd_address);
 
 /**
  * fwnode_irq_get - Get IRQ directly from a fwnode
