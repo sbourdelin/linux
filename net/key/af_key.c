@@ -275,13 +275,13 @@ static int pfkey_broadcast(struct sk_buff *skb, gfp_t allocation,
 		if ((broadcast_flags & BROADCAST_REGISTERED) && err)
 			err = err2;
 	}
-	rcu_read_unlock();
 
 	if (one_sk != NULL)
 		err = pfkey_broadcast_one(skb, &skb2, allocation, one_sk);
 
 	kfree_skb(skb2);
 	kfree_skb(skb);
+	rcu_read_unlock();
 	return err;
 }
 
