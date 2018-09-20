@@ -3482,9 +3482,15 @@ void ixgbe_configure_tx_ring(struct ixgbe_adapter *adapter,
 	IXGBE_WRITE_REG(hw, IXGBE_TDBAH(reg_idx), (tdba >> 32));
 	IXGBE_WRITE_REG(hw, IXGBE_TDLEN(reg_idx),
 			ring->count * sizeof(union ixgbe_adv_tx_desc));
+
+	/* reset head and tail pointers */
 	IXGBE_WRITE_REG(hw, IXGBE_TDH(reg_idx), 0);
 	IXGBE_WRITE_REG(hw, IXGBE_TDT(reg_idx), 0);
 	ring->tail = adapter->io_addr + IXGBE_TDT(reg_idx);
+
+	/* reset ntu and ntc to place SW in sync with hardwdare */
+	ring->next_to_clean = 0;
+	ring->next_to_use = 0;
 
 	/*
 	 * set WTHRESH to encourage burst writeback, it should not be set
@@ -4052,9 +4058,15 @@ void ixgbe_configure_rx_ring(struct ixgbe_adapter *adapter,
 	/* Force flushing of IXGBE_RDLEN to prevent MDD */
 	IXGBE_WRITE_FLUSH(hw);
 
+	/* reset head and tail pointers */
 	IXGBE_WRITE_REG(hw, IXGBE_RDH(reg_idx), 0);
 	IXGBE_WRITE_REG(hw, IXGBE_RDT(reg_idx), 0);
 	ring->tail = adapter->io_addr + IXGBE_RDT(reg_idx);
+
+	/* reset ntu and ntc to place SW in sync with hardwdare */
+	ring->next_to_clean = 0;
+	ring->next_to_use = 0;
+	ring->next_to_alloc = 0;
 
 	ixgbe_configure_srrctl(adapter, ring);
 	ixgbe_configure_rscctl(adapter, ring);
@@ -5244,10 +5256,6 @@ static void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 			rx_buffer = rx_ring->rx_buffer_info;
 		}
 	}
-
-	rx_ring->next_to_alloc = 0;
-	rx_ring->next_to_clean = 0;
-	rx_ring->next_to_use = 0;
 }
 
 static int ixgbe_fwd_ring_up(struct ixgbe_adapter *adapter,
@@ -5939,10 +5947,6 @@ static void ixgbe_clean_tx_ring(struct ixgbe_ring *tx_ring)
 	/* reset BQL for queue */
 	if (!ring_is_xdp(tx_ring))
 		netdev_tx_reset_queue(txring_txq(tx_ring));
-
-	/* reset next_to_use and next_to_clean */
-	tx_ring->next_to_use = 0;
-	tx_ring->next_to_clean = 0;
 }
 
 /**
@@ -6375,8 +6379,6 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	if (!tx_ring->desc)
 		goto err;
 
-	tx_ring->next_to_use = 0;
-	tx_ring->next_to_clean = 0;
 	return 0;
 
 err:
@@ -6468,9 +6470,6 @@ int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
 						   &rx_ring->dma, GFP_KERNEL);
 	if (!rx_ring->desc)
 		goto err;
-
-	rx_ring->next_to_clean = 0;
-	rx_ring->next_to_use = 0;
 
 	/* XDP RX-queue info */
 	if (xdp_rxq_info_reg(&rx_ring->xdp_rxq, adapter->netdev,
