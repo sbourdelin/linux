@@ -80,6 +80,9 @@ static inline int setup_sigcontext_fpu(struct pt_regs *regs,
 
 	enable_ptreg_fpu(task_pt_regs(tsk));
 	fpload(&init_fpuregs);
+#if IS_ENABLED(CONFIG_SUPPORT_DENORMAL_ARITHMETIC)
+	current->thread.fpu.UDF_trap = init_fpuregs.UDF_trap;
+#endif
 #if !IS_ENABLED(CONFIG_UNLAZY_FPU)	//Lazy FPU
 	last_task_used_math = current;
 #endif
