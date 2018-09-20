@@ -1318,18 +1318,11 @@ static int azx_free(struct azx *chip)
 
 	if (bus->irq >= 0)
 		free_irq(bus->irq, (void*)chip);
-	if (chip->msi)
-		pci_disable_msi(chip->pci);
-	iounmap(bus->remap_addr);
 
 	azx_free_stream_pages(chip);
 	azx_free_streams(chip);
 	snd_hdac_bus_exit(bus);
 
-	if (chip->region_requested)
-		pci_release_regions(chip->pci);
-
-	pci_disable_device(chip->pci);
 #ifdef CONFIG_SND_HDA_PATCH_LOADER
 	release_firmware(chip->fw);
 #endif
@@ -1657,15 +1650,13 @@ static int azx_create(struct snd_card *card, struct pci_dev *pci,
 
 	*rchip = NULL;
 
-	err = pci_enable_device(pci);
+	err = pcim_enable_device(pci);
 	if (err < 0)
 		return err;
 
 	hda = kzalloc(sizeof(*hda), GFP_KERNEL);
-	if (!hda) {
-		pci_disable_device(pci);
+	if (!hda)
 		return -ENOMEM;
-	}
 
 	chip = &hda->chip;
 	mutex_init(&chip->open_mutex);
@@ -1707,7 +1698,6 @@ static int azx_create(struct snd_card *card, struct pci_dev *pci,
 	err = azx_bus_init(chip, model[dev], &pci_hda_io_ops);
 	if (err < 0) {
 		kfree(hda);
-		pci_disable_device(pci);
 		return err;
 	}
 
@@ -1751,17 +1741,12 @@ static int azx_first_init(struct azx *chip)
 	}
 #endif
 
-	err = pci_request_regions(pci, "ICH HD audio");
+	err = pcim_iomap_regions(pci, 1 << 0, "ICH HD audio");
 	if (err < 0)
 		return err;
-	chip->region_requested = 1;
 
 	bus->addr = pci_resource_start(pci, 0);
-	bus->remap_addr = pci_ioremap_bar(pci, 0);
-	if (bus->remap_addr == NULL) {
-		dev_err(card->dev, "ioremap error\n");
-		return -ENXIO;
-	}
+	bus->remap_addr = pcim_iomap_table(pci)[0];
 
 	if (chip->driver_type == AZX_DRIVER_SKL)
 		snd_hdac_bus_parse_capabilities(bus);
@@ -2057,16 +2042,14 @@ static int azx_probe(struct pci_dev *pci,
 		return -ENOENT;
 	}
 
-	err = snd_card_new(&pci->dev, index[dev], id[dev], THIS_MODULE,
-			   0, &card);
-	if (err < 0) {
-		dev_err(&pci->dev, "Error creating card!\n");
+	err = snd_devm_card_new(&pci->dev, index[dev], id[dev], THIS_MODULE, 0,
+				&card);
+	if (err < 0)
 		return err;
-	}
 
 	err = azx_create(card, pci, dev, pci_id->driver_data, &chip);
 	if (err < 0)
-		goto out_free;
+		return err;
 	card->private_data = chip;
 	hda = container_of(chip, struct hda_intel, chip);
 
@@ -2075,7 +2058,7 @@ static int azx_probe(struct pci_dev *pci,
 	err = register_vga_switcheroo(chip);
 	if (err < 0) {
 		dev_err(card->dev, "Error registering vga_switcheroo client\n");
-		goto out_free;
+		return err;
 	}
 
 	if (check_hdmi_disabled(pci)) {
@@ -2094,7 +2077,7 @@ static int azx_probe(struct pci_dev *pci,
 					      &pci->dev, GFP_KERNEL, card,
 					      azx_firmware_cb);
 		if (err < 0)
-			goto out_free;
+			return err;
 		schedule_probe = false; /* continued in azx_firmware_cb() */
 	}
 #endif /* CONFIG_SND_HDA_PATCH_LOADER */
@@ -2111,10 +2094,6 @@ static int azx_probe(struct pci_dev *pci,
 	if (chip->disabled)
 		complete_all(&hda->probe_wait);
 	return 0;
-
-out_free:
-	snd_card_free(card);
-	return err;
 }
 
 #ifdef CONFIG_PM
@@ -2304,8 +2283,6 @@ static void azx_remove(struct pci_dev *pci)
 		device_unlock(&pci->dev);
 		cancel_work_sync(&hda->probe_work);
 		device_lock(&pci->dev);
-
-		snd_card_free(card);
 	}
 }
 
