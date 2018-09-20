@@ -52,8 +52,12 @@ static const struct fb_var_screeninfo cfag12864bfb_var = {
 
 static int cfag12864bfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
-	return vm_insert_page(vma, vma->vm_start,
-		virt_to_page(cfag12864b_buffer));
+	struct page *page;
+	unsigned long size = vma->vm_end - vma->vm_start;
+
+	page = virt_to_page(cfag12864b_buffer);
+	return remap_pfn_range(vma, vma->vm_start, page_to_pfn(page),
+				size, vma->vm_page_prot);
 }
 
 static struct fb_ops cfag12864bfb_ops = {
