@@ -293,8 +293,9 @@ static int kcov_mmap(struct file *filep, struct vm_area_struct *vma)
 		spin_unlock(&kcov->lock);
 		for (off = 0; off < size; off += PAGE_SIZE) {
 			page = vmalloc_to_page(kcov->area + off);
-			if (vm_insert_page(vma, vma->vm_start + off, page))
-				WARN_ONCE(1, "vm_insert_page() failed");
+			if (vmf_insert_page(vma, vma->vm_start + off, page)
+					!= VM_FAULT_NOPAGE)
+				WARN_ONCE(1, "vmf_insert_page() failed");
 		}
 		return 0;
 	}
