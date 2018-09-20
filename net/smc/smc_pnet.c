@@ -70,15 +70,14 @@ struct smc_pnetentry {
 	u8 ib_port;
 };
 
-/* Check if two RDMA device entries are identical. Use device name and port
+/* Check if two RDMA device entries are identical. Use device index and port
  * number for comparison.
  */
-static bool smc_pnet_same_ibname(struct smc_pnetentry *pnetelem, char *ibname,
-				 u8 ibport)
+static bool smc_pnet_same_ibindex(struct smc_pnetentry *pnetelem, u32 ibindex,
+				  u8 ibport)
 {
 	return pnetelem->ib_port == ibport &&
-	       !strncmp(pnetelem->smcibdev->ibdev->name, ibname,
-			sizeof(pnetelem->smcibdev->ibdev->name));
+	       pnetelem->smcibdev->ibdev->index == ibindex;
 }
 
 /* Find a pnetid in the pnet table.
@@ -179,9 +178,9 @@ static int smc_pnet_enter(struct smc_pnetentry *new_pnetelem)
 			     sizeof(new_pnetelem->pnet_name)) ||
 		    !strncmp(pnetelem->ndev->name, new_pnetelem->ndev->name,
 			     sizeof(new_pnetelem->ndev->name)) ||
-		    smc_pnet_same_ibname(pnetelem,
-					 new_pnetelem->smcibdev->ibdev->name,
-					 new_pnetelem->ib_port)) {
+		    smc_pnet_same_ibindex(pnetelem,
+					  new_pnetelem->smcibdev->ibdev->index,
+					  new_pnetelem->ib_port)) {
 			dev_put(pnetelem->ndev);
 			goto found;
 		}
@@ -227,10 +226,11 @@ static struct smc_ib_device *smc_pnet_find_ib(char *ib_name)
 
 	spin_lock(&smc_ib_devices.lock);
 	list_for_each_entry(ibdev, &smc_ib_devices.list, list) {
-		if (!strncmp(ibdev->ibdev->name, ib_name,
-			     sizeof(ibdev->ibdev->name))) {
+		char name[IB_DEVICE_NAME_MAX] = {};
+
+		ib_device_get_name(ibdev->ibdev, name);
+		if (!strncmp(name, ib_name, IB_DEVICE_NAME_MAX))
 			goto out;
-		}
 	}
 	ibdev = NULL;
 out:
@@ -267,6 +267,11 @@ static int smc_pnet_fill_entry(struct net *net, struct smc_pnetentry *pnetelem,
 		goto error;
 
 	rc = -EINVAL;
+	/* NOTE !!!: Sadly enough, but this is part of ABI.
+	 * From day one, the accesses are performed with device names and not
+	 * device indexes for both ETH and IB. It means that this function isn't
+	 * reliable after device renaming.
+	 */
 	if (!tb[SMC_PNETID_IBNAME])
 		goto error;
 	rc = -ENOENT;

@@ -156,9 +156,9 @@ static int __smc_diag_dump(struct sock *sk, struct sk_buff *skb,
 			.lnk[0].link_id = smc->conn.lgr->lnk[0].link_id,
 		};
 
-		memcpy(linfo.lnk[0].ibname,
-		       smc->conn.lgr->lnk[0].smcibdev->ibdev->name,
-		       sizeof(smc->conn.lgr->lnk[0].smcibdev->ibdev->name));
+		ib_device_get_name(smc->conn.lgr->lnk[0].smcibdev->ibdev,
+				   linfo.lnk[0].ibname);
+
 		smc_gid_be16_convert(linfo.lnk[0].gid,
 				     smc->conn.lgr->lnk[0].gid);
 		smc_gid_be16_convert(linfo.lnk[0].peer_gid,
