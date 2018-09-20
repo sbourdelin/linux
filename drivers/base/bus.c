@@ -373,6 +373,27 @@ struct device *bus_find_device_by_name(struct bus_type *bus,
 }
 EXPORT_SYMBOL_GPL(bus_find_device_by_name);
 
+static int match_of_node(struct device *dev, void *data)
+{
+	struct device_node *node = data;
+
+	return dev->of_node == node;
+}
+
+/**
+ * bus_find_device_by_name - device iterator for locating a particular device
+ * having a specific device node
+ * @bus: bus type
+ * @start: Device to begin with
+ * @node: device node pointer
+ */
+struct device *bus_find_device_by_of_node(struct bus_type *bus,
+					struct device *start, struct device_node *node)
+{
+	return bus_find_device(bus, start, (void *)node, match_of_node);
+}
+EXPORT_SYMBOL_GPL(bus_find_device_by_of_node);
+
 /**
  * subsys_find_device_by_id - find a device with a specific enumeration number
  * @subsys: subsystem
