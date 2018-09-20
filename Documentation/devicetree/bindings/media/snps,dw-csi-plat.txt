@@ -1,0 +1,74 @@
+Synopsys DesignWare CSI-2 Host controller
+
+Description
+-----------
+
+This HW block is used to receive image coming from an MIPI CSI-2 compatible
+camera.
+
+Required properties:
+- compatible: shall be "snps,dw-csi-plat"
+- reg			: physical base address and size of the device memory mapped
+  registers;
+- interrupts		: CSI-2 Host interrupt
+- snps,output-type	: Core output to be used (IPI-> 0 or IDI->1 or BOTH->2) These
+			  values choose which of the Core outputs will be used, it
+			  can be Image Data Interface or Image Pixel Interface.
+- phys			: List of one PHY specifier (as defined in
+			  Documentation/devicetree/bindings/phy/phy-bindings.txt).
+			  This PHY is a MIPI DPHY working in RX mode.
+- resets		: Reference to a reset controller (optional)
+
+Optional properties(if in IPI mode):
+- snps,ipi-mode 	: Mode to be used when in IPI(Camera -> 0 or Controller -> 1)
+			  This property defines if the controller will use the video
+			  timings available
+			  in the video stream or if it will use pre-defined ones.
+- snps,ipi-color-mode	: Bus depth to be used in IPI (48 bits -> 0 or 16 bits -> 1)
+			  This property defines the width of the IPI bus.
+- snps,ipi-auto-flush	: Data auto-flush (1 -> Yes or 0 -> No). This property defines
+			  if the data is automatically flushed in each vsync or if
+			  this process is done manually
+- snps,virtual-channel	: Virtual channel where data is present when in IPI mode. This
+			  property chooses the virtual channel which IPI will use to
+			  retrieve the video stream.
+
+The per-board settings:
+ - port sub-node describing a single endpoint connected to the camera as
+   described in video-interfaces.txt[1].
+
+Example:
+
+	csi2_1: csi2@3000 {
+		compatible = "snps,dw-csi-plat";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = < 0x03000 0x7FF>;
+		interrupts = <2>;
+		output-type = <2>;
+		resets = <&dw_rst 1>;
+		phys = <&mipi_dphy_rx1 0>;
+		phy-names = "csi2-dphy";
+
+		/* IPI optional Configurations */
+		snps,ipi-mode = <0>;
+		snps,ipi-color-mode = <0>;
+		snps,ipi-auto-flush = <1>;
+		snps,virtual-channel = <0>;
+
+		/* CSI-2 per-board settings */
+		port@1 {
+			reg = <1>;
+			csi1_ep1: endpoint {
+				remote-endpoint = <&camera_1>;
+				data-lanes = <1 2>;
+			};
+		};
+		port@2 {
+			csi1_ep2: endpoint {
+				remote-endpoint = <&vif1_ep>;
+			};
+		};
+	};
+
+
