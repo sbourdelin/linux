@@ -170,7 +170,7 @@ struct tpm2_pcr_read_out {
  *
  * Return: Same as with tpm_transmit_cmd.
  */
-int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
+int tpm2_pcr_read(struct tpm_chip *chip, u32 pcr_idx, u8 *res_buf)
 {
 	int rc;
 	struct tpm_buf buf;
@@ -220,7 +220,7 @@ struct tpm2_null_auth_area {
  *
  * Return: Same as with tpm_transmit_cmd.
  */
-static int __tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
+static int __tpm2_pcr_extend(struct tpm_chip *chip, u32 pcr_idx, u32 count,
 			     struct tpm2_digest *digests)
 {
 	struct tpm_buf buf;
@@ -275,7 +275,7 @@ static int __tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
  *
  * Return: Same as with tpm_transmit_cmd.
  */
-int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash)
+int tpm2_pcr_extend(struct tpm_chip *chip, u32 pcr_idx, const u8 *hash)
 {
 	int rc;
 	struct tpm2_digest digest_list[ARRAY_SIZE(chip->active_banks)];
