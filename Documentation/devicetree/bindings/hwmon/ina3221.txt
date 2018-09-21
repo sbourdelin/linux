@@ -1,0 +1,38 @@
+ina3221 properties
+
+1) ina3221 node
+  Required properties:
+  - compatible: Must be "ti,ina3221"
+  - reg: I2C address
+
+  = The node contains optional child nodes for three channels =
+  = Each child node describes the information of input source =
+
+  Example:
+
+  ina3221@40 {
+          compatible = "ti,ina3221";
+          reg = <0x40>;
+          [ child node definitions... ]
+  };
+
+2) child nodes
+  The names of child nodes should indicate input source names
+
+  Required properties:
+  - input-id: Must be 1, 2 or 3
+
+  Optional properties:
+  - shunt-resistor: Shunt resistor value in micro-Ohm
+  - status: Should be "disabled" if no input source
+
+  Example:
+
+  input1 {
+          input-id = <0x1>;
+          status = "disabled";
+  };
+  VDD_GPU {
+          input-id = <0x2>;
+          shunt-resistor = <5>;
+  };
