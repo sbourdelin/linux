@@ -214,6 +214,41 @@ bool spi_mem_supports_op(struct spi_mem *mem, const struct spi_mem_op *op)
 EXPORT_SYMBOL_GPL(spi_mem_supports_op);
 
 /**
+ * spi_set_xfer_bpw() - Set the bits_per_word for each transfer based on
+ *			the bits_per_word_mask of the spi controller
+ * @ctrl: the spi controller
+ * @xfer: the spi transfer
+ *
+ * This function sets the bits_per_word for each transfer based on the spi
+ * controller's bits_per_word_mask to improve the efficiency of spi transport.
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+int spi_set_xfer_bpw(struct spi_controller *ctlr, struct spi_transfer *xfer)
+{
+	if (!ctlr || !xfer) {
+		dev_err(&ctlr->dev,
+			"Fail to set bits_per_word for spi transfer\n");
+		return -EINVAL;
+	}
+
+	if (ctlr->bits_per_word_mask) {
+		if (!(xfer->len % 4)) {
+			if (ctlr->bits_per_word_mask & SPI_BPW_MASK(32))
+				xfer->bits_per_word = 32;
+		} else if (!(xfer->len % 2)) {
+			if (ctlr->bits_per_word_mask & SPI_BPW_MASK(16))
+				xfer->bits_per_word = 16;
+		} else {
+			xfer->bits_per_word = 8;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(spi_set_xfer_bpw);
+
+/**
  * spi_mem_exec_op() - Execute a memory operation
  * @mem: the SPI memory
  * @op: the memory operation to execute
@@ -294,6 +329,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	xfers[xferpos].tx_buf = tmpbuf;
 	xfers[xferpos].len = sizeof(op->cmd.opcode);
 	xfers[xferpos].tx_nbits = op->cmd.buswidth;
+	spi_set_xfer_bpw(ctlr, &xfers[xferpos]);
 	spi_message_add_tail(&xfers[xferpos], &msg);
 	xferpos++;
 	totalxferlen++;
@@ -308,6 +344,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		xfers[xferpos].tx_buf = tmpbuf + 1;
 		xfers[xferpos].len = op->addr.nbytes;
 		xfers[xferpos].tx_nbits = op->addr.buswidth;
+		spi_set_xfer_bpw(ctlr, &xfers[xferpos]);
 		spi_message_add_tail(&xfers[xferpos], &msg);
 		xferpos++;
 		totalxferlen += op->addr.nbytes;
@@ -318,6 +355,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		xfers[xferpos].tx_buf = tmpbuf + op->addr.nbytes + 1;
 		xfers[xferpos].len = op->dummy.nbytes;
 		xfers[xferpos].tx_nbits = op->dummy.buswidth;
+		spi_set_xfer_bpw(ctlr, &xfers[xferpos]);
 		spi_message_add_tail(&xfers[xferpos], &msg);
 		xferpos++;
 		totalxferlen += op->dummy.nbytes;
@@ -333,6 +371,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		}
 
 		xfers[xferpos].len = op->data.nbytes;
+		spi_set_xfer_bpw(ctlr, &xfers[xferpos]);
 		spi_message_add_tail(&xfers[xferpos], &msg);
 		xferpos++;
 		totalxferlen += op->data.nbytes;
