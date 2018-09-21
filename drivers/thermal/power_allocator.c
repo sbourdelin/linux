@@ -496,8 +496,6 @@ static void get_governor_trips(struct thermal_zone_device *tz,
 			}
 		} else if (type == THERMAL_TRIP_ACTIVE) {
 			last_active = i;
-		} else {
-			break;
 		}
 	}
 
