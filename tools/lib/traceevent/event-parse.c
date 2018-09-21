@@ -18,7 +18,6 @@
 #include <errno.h>
 #include <stdint.h>
 #include <limits.h>
-#include <linux/string.h>
 #include <linux/time64.h>
 
 #include <netinet/in.h>
@@ -6214,7 +6213,10 @@ int tep_strerror(struct tep_handle *pevent __maybe_unused,
 	const char *msg;
 
 	if (errnum >= 0) {
-		str_error_r(errnum, buf, buflen);
+		const char *error_str = strerror(errnum);
+
+		strncpy(buf, error_str, buflen);
+		buf[buflen - 1] = 0;
 		return 0;
 	}
 
