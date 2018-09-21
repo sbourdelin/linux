@@ -2239,6 +2239,7 @@ err_exit_unroll:
 static void ice_remove(struct pci_dev *pdev)
 {
 	struct ice_pf *pf = pci_get_drvdata(pdev);
+	int i;
 
 	if (!pf)
 		return;
@@ -2250,6 +2251,11 @@ static void ice_remove(struct pci_dev *pdev)
 		ice_free_vfs(pf);
 	ice_vsi_release_all(pf);
 	ice_free_irq_msix_misc(pf);
+	ice_for_each_vsi(pf, i) {
+		if (!pf->vsi[i])
+			continue;
+		ice_vsi_free_q_vectors(pf->vsi[i]);
+	}
 	ice_clear_interrupt_scheme(pf);
 	ice_deinit_pf(pf);
 	ice_deinit_hw(&pf->hw);
