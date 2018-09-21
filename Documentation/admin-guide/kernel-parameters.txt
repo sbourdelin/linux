@@ -2764,6 +2764,12 @@
 			noexec=on: enable non-executable mappings (default)
 			noexec=off: disable non-executable mappings
 
+	no_cet_ibt	[X86-64] Disable indirect branch tracking for user-mode
+			applications
+
+	no_cet_shstk	[X86-64] Disable shadow stack support for user-mode
+			applications
+
 	nosmap		[X86]
 			Disable SMAP (Supervisor Mode Access Prevention)
 			even if it is supported by processor.
