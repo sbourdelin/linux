@@ -24,6 +24,7 @@ struct vm86;
 #include <asm/special_insns.h>
 #include <asm/fpu/types.h>
 #include <asm/unwind_hints.h>
+#include <asm/cet.h>
 
 #include <linux/personality.h>
 #include <linux/cache.h>
@@ -504,6 +505,10 @@ struct thread_struct {
 
 	unsigned int		sig_on_uaccess_err:1;
 	unsigned int		uaccess_err:1;	/* uaccess failed */
+
+#ifdef CONFIG_X86_INTEL_CET
+	struct cet_status	cet;
+#endif
 
 	/* Floating point and extended processor state */
 	struct fpu		fpu;
