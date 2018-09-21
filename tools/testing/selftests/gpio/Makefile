@@ -7,7 +7,7 @@ EXTRA_PROGS := ../gpiogpio-event-mon ../gpiogpio-hammer ../gpiolsgpio
 EXTRA_DIRS := ../gpioinclude/
 EXTRA_OBJS := ../gpiogpio-event-mon-in.o ../gpiogpio-event-mon.o
 EXTRA_OBJS += ../gpiogpio-hammer-in.o ../gpiogpio-utils.o ../gpiolsgpio-in.o
-EXTRA_OBJS += ../gpiolsgpio.o
+EXTRA_OBJS += ../gpiolsgpio.o ../gpiogpio-hammer.o
 
 include ../lib.mk
 
@@ -22,7 +22,7 @@ CFLAGS += -O2 -g -std=gnu99 -Wall -I../../../../usr/include/
 LDLIBS += -lmount -I/usr/include/libmount
 
 $(BINARIES):| khdr
-$(BINARIES): ../../../gpio/gpio-utils.o
+$(BINARIES): ../gpiogpio-utils.o
 
-../../../gpio/gpio-utils.o:
-	make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C ../../../gpio
+../gpiogpio-utils.o:
+	make OUTPUT=$(OUTPUT) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C ../../../gpio
