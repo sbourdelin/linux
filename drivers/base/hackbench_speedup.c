@@ -38,9 +38,9 @@ static int task_container_status(struct task_data *master)
 		return -EINVAL;
 
 	list_for_each_entry(td, &master->subtasks, subtasks) {
-		mutex_lock(&td->lock);
+		/* mutex_lock(&td->lock); */
 		/* get status */
-		mutex_unlock(&td->lock);
+		/* mutex_unlock(&td->lock); */
 	}
 
 
@@ -62,9 +62,9 @@ static void task_status_check(struct work_struct *work)
 	if (!td->get_status)
 		return;
 
-	mutex_lock(&td->lock);
+	/* mutex_lock(&td->lock); */
 	ret = td->get_status(td);
-	mutex_unlock(&td->lock);
+	/* mutex_unlock(&td->lock); */
 
 	mod_delayed_work(system_freezable_wq, &td->wq,
 			 msecs_to_jiffies(POLLING_DELAY));
