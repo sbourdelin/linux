@@ -53,6 +53,26 @@ struct intel_context_ops {
 	void (*destroy)(struct intel_context *ce);
 };
 
+enum gem_load_type {
+	LOAD_TYPE_LOW,
+	LOAD_TYPE_MEDIUM,
+	LOAD_TYPE_HIGH,
+	LOAD_TYPE_MAX
+};
+
+enum gem_tier_versions {
+	CHERRYVIEW = 0,
+	KABYLAKE_GT2,
+	KABYLAKE_GT3,
+	TIER_VERSION_MAX
+};
+
+struct optimum_config {
+	int slice;
+	int subslice;
+	int eu;
+};
+
 /**
  * struct i915_gem_context - client state
  *
@@ -210,6 +230,16 @@ struct i915_gem_context {
 	/** eu_cnt: used to set the # of eu to be enabled. */
 	u8 eu_cnt;
 
+	/** load_type: The designated load_type (high/medium/low) for a given
+	 * number of pending commands in the command queue.
+	 */
+	u8 load_type;
+
+	/** prev_load_type: The earlier load type that the GPU was configured
+	 * for (high/medium/low).
+	 */
+	u8 prev_load_type;
+
 	/** update_render_config: to track the updates to the render
 	 * configuration (S/SS/EU Configuration on the GPU)
 	 */
@@ -342,6 +372,8 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file_priv);
 int i915_gem_context_reset_stats_ioctl(struct drm_device *dev, void *data,
 				       struct drm_file *file);
+void i915_set_optimum_config(int type, struct i915_gem_context *ctx,
+			     enum gem_tier_versions version);
 
 struct i915_gem_context *
 i915_gem_context_create_kernel(struct drm_i915_private *i915, int prio);

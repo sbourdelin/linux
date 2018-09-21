@@ -94,6 +94,32 @@
 
 #define ALL_L3_SLICES(dev) (1 << NUM_L3_SLICES(dev)) - 1
 
+static struct optimum_config opt_config[TIER_VERSION_MAX][LOAD_TYPE_MAX] = {
+	{
+		/* Cherry trail low */
+		{ 1, 1, 4},
+		/* Cherry trail medium */
+		{ 1, 1, 6},
+		/* Cherry trail high */
+		{ 1, 2, 6}
+	},
+	{
+		/* kbl gt2 low */
+		{ 2, 3, 4},
+		/* kbl gt2 medium */
+		{ 2, 3, 6},
+		/* kbl gt2 high */
+		{ 2, 3, 8}
+	},
+	{
+		/* kbl gt3 low */
+		{ 2, 3, 4},
+		/* kbl gt3 medium */
+		{ 2, 3, 6},
+		/* kbl gt3 high */
+		{ 2, 3, 8}
+	}
+};
 static void lut_close(struct i915_gem_context *ctx)
 {
 	struct i915_lut_handle *lut, *ln;
@@ -393,10 +419,30 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 	ctx->subslice_cnt = hweight8(
 			INTEL_INFO(dev_priv)->sseu.subslice_mask[0]);
 	ctx->eu_cnt = INTEL_INFO(dev_priv)->sseu.eu_per_subslice;
+	ctx->load_type = 0;
+	ctx->prev_load_type = 0;
 
 	return ctx;
 }
 
+
+void i915_set_optimum_config(int type, struct i915_gem_context *ctx,
+		enum gem_tier_versions version)
+{
+	struct intel_context *ce = &ctx->__engine[RCS];
+	u32 *reg_state = ce->lrc_reg_state;
+	u32 rpcs_config = 0;
+	/* Call opt_config to get correct configuration for eu,slice,subslice */
+	ctx->slice_cnt = (u8)opt_config[version][type].slice;
+	ctx->subslice_cnt = (u8)opt_config[version][type].subslice;
+	ctx->eu_cnt = (u8)opt_config[version][type].eu;
+
+	/* Enabling this to update the rpcs */
+	if (ctx->prev_load_type != type)
+		ctx->update_render_config = 1;
+
+	ctx->prev_load_type = type;
+}
 /**
  * i915_gem_context_create_gvt - create a GVT GEM context
  * @dev: drm device *
