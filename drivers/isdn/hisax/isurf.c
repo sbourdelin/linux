@@ -263,7 +263,7 @@ int setup_isurf(struct IsdnCard *card)
 		       cs->hw.isurf.reset);
 		return (0);
 	}
-	if (!request_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE, "isurf iomem")) {
+	if (!request_mem_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE, "isurf iomem")) {
 		printk(KERN_WARNING "HiSax: Siemens I-Surf memory region "
 		       "%lx-%lx already in use\n",
 		       cs->hw.isurf.phymem,
