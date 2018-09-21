@@ -6,6 +6,7 @@
 
 #include "../i915_selftest.h"
 #include "igt_flush_test.h"
+#include "i915_random.h"
 
 #include "mock_context.h"
 
@@ -565,6 +566,87 @@ err_unlock:
 	return err;
 }
 
+static int random_range(struct rnd_state *rnd, int min, int max)
+{
+	return i915_prandom_u32_max_state(max - min, rnd) + min;
+}
+
+static int random_priority(struct rnd_state *rnd)
+{
+	return random_range(rnd, I915_PRIORITY_MIN, I915_PRIORITY_MAX);
+}
+
+static int live_preempt_smoke(void *arg)
+{
+#define NCTX 1024
+	struct drm_i915_private *i915 = arg;
+	struct i915_gem_context **contexts;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	IGT_TIMEOUT(end_time);
+	I915_RND_STATE(prng);
+	unsigned long count;
+	int err = -ENOMEM;
+	int n;
+
+	if (!HAS_LOGICAL_RING_PREEMPTION(i915))
+		return 0;
+
+	contexts = kmalloc_array(NCTX, sizeof(*contexts), GFP_KERNEL);
+	if (!contexts)
+		return -ENOMEM;
+
+	mutex_lock(&i915->drm.struct_mutex);
+	intel_runtime_pm_get(i915);
+
+	for (n = 0; n < NCTX; n++) {
+		contexts[n] = kernel_context(i915);
+		if (!contexts[n])
+			goto err_ctx;
+	}
+
+	count = 0;
+	do {
+		for_each_engine(engine, i915, id) {
+			struct i915_gem_context *ctx =
+				contexts[i915_prandom_u32_max_state(NCTX,
+								    &prng)];
+			struct i915_request *rq;
+
+			ctx->sched.priority = random_priority(&prng);
+
+			rq = i915_request_alloc(engine,  ctx);
+			if (IS_ERR(rq)) {
+				err = PTR_ERR(rq);
+				goto err_ctx;
+			}
+
+			i915_request_add(rq);
+			count++;
+		}
+	} while (!__igt_timeout(end_time, NULL));
+
+	pr_info("Submitted %lu requests across %d engines and %d contexts\n",
+		count, INTEL_INFO(i915)->num_rings, NCTX);
+
+	err = 0;
+err_ctx:
+	if (igt_flush_test(i915, I915_WAIT_LOCKED))
+		err = -EIO;
+
+	for (n = 0; n < NCTX; n++) {
+		if (!contexts[n])
+			break;
+		kernel_context_close(contexts[n]);
+	}
+
+	intel_runtime_pm_put(i915);
+	mutex_unlock(&i915->drm.struct_mutex);
+	kfree(contexts);
+	return err;
+#undef NCTX
+}
+
 int intel_execlists_live_selftests(struct drm_i915_private *i915)
 {
 	static const struct i915_subtest tests[] = {
@@ -572,6 +654,7 @@ int intel_execlists_live_selftests(struct drm_i915_private *i915)
 		SUBTEST(live_preempt),
 		SUBTEST(live_late_preempt),
 		SUBTEST(live_preempt_hang),
+		SUBTEST(live_preempt_smoke),
 	};
 
 	if (!HAS_EXECLISTS(i915))
