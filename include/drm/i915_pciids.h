@@ -369,6 +369,10 @@
 	INTEL_VGA_DEVICE(0x591C, info),  /* ULX GT2 */ \
 	INTEL_VGA_DEVICE(0x87C0, info) /* ULX GT2 */
 
+/* AML/CFL Y GT2 */
+#define INTEL_AML_GT2_2_IDS(info) \
+	INTEL_VGA_DEVICE(0x87CA, info)
+
 #define INTEL_KBL_IDS(info) \
 	INTEL_KBL_GT1_IDS(info), \
 	INTEL_KBL_GT2_IDS(info), \
