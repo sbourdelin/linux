@@ -101,13 +101,12 @@ static struct property *dlpar_clone_property(struct property *prop,
 	return new_prop;
 }
 
-static u32 find_aa_index(struct device_node *dr_node,
+static int find_aa_index(struct device_node *dr_node,
 			 struct property *ala_prop, const u32 *lmb_assoc)
 {
 	u32 *assoc_arrays;
-	u32 aa_index;
 	int aa_arrays, aa_array_entries, aa_array_sz;
-	int i, index;
+	int i, index, aa_index;
 
 	/*
 	 * The ibm,associativity-lookup-arrays property is defined to be
@@ -168,7 +167,7 @@ static int update_lmb_associativity_index(struct drmem_lmb *lmb)
 	struct device_node *parent, *lmb_node, *dr_node;
 	struct property *ala_prop;
 	const u32 *lmb_assoc;
-	u32 aa_index;
+	int aa_index;
 
 	parent = of_find_node_by_path("/");
 	if (!parent)
