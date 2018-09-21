@@ -211,23 +211,22 @@ struct tpm2_null_auth_area {
 } __packed;
 
 /**
- * tpm2_pcr_extend() - extend a PCR value
+ * __tpm2_pcr_extend() - extend a PCR value
  *
- * @chip:	TPM chip to use.
- * @pcr_idx:	index of the PCR.
- * @count:	number of digests passed.
- * @digests:	list of pcr banks and corresponding digest values to extend.
+ * @chip:       TPM chip to use.
+ * @pcr_idx:    index of the PCR.
+ * @count:      number of digests passed.
+ * @digests:    list of pcr banks and corresponding digest values to extend.
  *
  * Return: Same as with tpm_transmit_cmd.
  */
-int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
-		    struct tpm2_digest *digests)
+static int __tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
+			     struct tpm2_digest *digests)
 {
 	struct tpm_buf buf;
 	struct tpm2_null_auth_area auth_area;
+	u32 i, j;
 	int rc;
-	int i;
-	int j;
 
 	if (count > ARRAY_SIZE(chip->active_banks))
 		return -EINVAL;
@@ -264,6 +263,35 @@ int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, u32 count,
 
 	tpm_buf_destroy(&buf);
 
+	return rc;
+}
+
+/**
+ * tpm2_pcr_extend() - extend a PCR value
+ *
+ * @chip:       TPM chip to use.
+ * @pcr_idx:    index of the PCR to extend.
+ * @hash:       the hash of a measurement.
+ *
+ * Return: Same as with tpm_transmit_cmd.
+ */
+int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash)
+{
+	int rc;
+	struct tpm2_digest digest_list[ARRAY_SIZE(chip->active_banks)];
+	u32 count = 0;
+	unsigned int i;
+
+	memset(digest_list, 0, sizeof(digest_list));
+	for (i = 0; i < ARRAY_SIZE(chip->active_banks); i++) {
+		if (chip->active_banks[i] == TPM2_ALG_ERROR)
+			break;
+		digest_list[i].alg_id = chip->active_banks[i];
+		memcpy(digest_list[i].digest, hash, TPM_DIGEST_SIZE);
+		count++;
+	}
+
+	rc = __tpm2_pcr_extend(chip, pcr_idx, count, digest_list);
 	return rc;
 }
 
