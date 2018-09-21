@@ -305,6 +305,8 @@ struct mmci_host;
  *	       register.
  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
  * @reset: true if variant has need reset signal.
+ * @dma_lli: true if variant has dma link list feature.
+ * @stm32_idmabsize_mask: stm32 sdmmc idma buffer size.
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -348,6 +350,8 @@ struct variant_data {
 	unsigned int		irq_pio_mask;
 	u32			start_err;
 	u32			opendrain;
+	bool			dma_lli;
+	u32			stm32_idmabsize_mask;
 	void (*init)(struct mmci_host *host);
 };
 
@@ -421,6 +425,7 @@ void mmci_write_clkreg(struct mmci_host *host, u32 clk);
 void mmci_write_pwrreg(struct mmci_host *host, u32 pwr);
 
 void mmci_variant_init(struct mmci_host *host);
+void sdmmc_variant_init(struct mmci_host *host);
 
 int mmci_dmae_prep_data(struct mmci_host *host, struct mmc_data *data,
 			bool next);
