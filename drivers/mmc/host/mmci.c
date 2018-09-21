@@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
  * no custom DMA interfaces are supported.
  */
 #ifdef CONFIG_DMA_ENGINE
-static void mmci_dma_setup(struct mmci_host *host)
+static int mmci_dma_setup(struct mmci_host *host)
 {
 	const char *rxname, *txname;
 
@@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
 	}
 
 	if (host->ops && host->ops->dma_setup)
-		host->ops->dma_setup(host);
+		return host->ops->dma_setup(host);
+
+	return 0;
 }
 
 /*
@@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
 static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
 {
 }
-static inline void mmci_dma_setup(struct mmci_host *host)
+
+static inline int mmci_dma_setup(struct mmci_host *host)
 {
+	return 0;
 }
 
 static inline void mmci_dma_release(struct mmci_host *host)
@@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
 		 amba_rev(dev), (unsigned long long)dev->res.start,
 		 dev->irq[0], dev->irq[1]);
 
-	mmci_dma_setup(host);
+	ret = mmci_dma_setup(host);
+	if (ret)
+		goto clk_disable;
 
 	pm_runtime_set_autosuspend_delay(&dev->dev, 50);
 	pm_runtime_use_autosuspend(&dev->dev);
