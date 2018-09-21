@@ -276,12 +276,6 @@ struct mmci_host_ops {
 	int (*dma_setup)(struct mmci_host *host);
 };
 
-struct mmci_host_next {
-	struct dma_async_tx_descriptor	*dma_desc;
-	struct dma_chan			*dma_chan;
-	s32				cookie;
-};
-
 struct mmci_host {
 	phys_addr_t		phybase;
 	void __iomem		*base;
@@ -323,16 +317,6 @@ struct mmci_host {
 	unsigned int		size;
 	int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
 
-#ifdef CONFIG_DMA_ENGINE
-	/* DMA stuff */
-	struct dma_chan		*dma_current;
-	struct dma_chan		*dma_rx_channel;
-	struct dma_chan		*dma_tx_channel;
-	struct dma_async_tx_descriptor	*dma_desc_current;
-	struct mmci_host_next	next_data;
-	bool			dma_in_progress;
-
-#define dma_inprogress(host)	((host)->dma_in_progress)
-#endif
+	void			*dma_priv;
 };
 
