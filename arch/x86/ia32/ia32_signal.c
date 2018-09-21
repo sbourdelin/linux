@@ -34,6 +34,7 @@
 #include <asm/sigframe.h>
 #include <asm/sighandling.h>
 #include <asm/smap.h>
+#include <asm/cet.h>
 
 /*
  * Do a signal return; undo the signal stack.
@@ -107,6 +108,9 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
 	} get_user_catch(err);
 
 	err |= fpu__restore_sig(buf, 1);
+
+	if (!err)
+		err = restore_sigcontext_ext(buf);
 
 	force_iret();
 
@@ -234,6 +238,10 @@ static void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 	if (fpu->initialized) {
 		unsigned long fx_aligned, math_size;
 
+		/* sigcontext extension */
+		if (boot_cpu_has(X86_FEATURE_SHSTK))
+			sp -= (sizeof(struct sc_ext) + 8);
+
 		sp = fpu__alloc_mathframe(sp, 1, &fx_aligned, &math_size);
 		*fpstate = (struct _fpstate_32 __user *) sp;
 		if (copy_fpstate_to_sigframe(*fpstate, (void __user *)fx_aligned,
@@ -276,6 +284,8 @@ int ia32_setup_frame(int sig, struct ksignal *ksig,
 		return -EFAULT;
 
 	if (ia32_setup_sigcontext(&frame->sc, fpstate, regs, set->sig[0]))
+		return -EFAULT;
+	if (setup_sigcontext_ext(ksig, fpstate))
 		return -EFAULT;
 
 	if (_COMPAT_NSIG_WORDS > 1) {
@@ -383,6 +393,9 @@ int ia32_setup_rt_frame(int sig, struct ksignal *ksig,
 	err |= ia32_setup_sigcontext(&frame->uc.uc_mcontext, fpstate,
 				     regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
+
+	if (!err)
+		err = setup_sigcontext_ext(ksig, fpstate);
 
 	if (err)
 		return -EFAULT;

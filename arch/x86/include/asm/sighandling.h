@@ -17,4 +17,9 @@ void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 int setup_sigcontext(struct sigcontext __user *sc, void __user *fpstate,
 		     struct pt_regs *regs, unsigned long mask);
 
+#ifdef CONFIG_X86_64
+int setup_sigcontext_ext(struct ksignal *ksig, void __user *fpu);
+int restore_sigcontext_ext(void __user *fpu);
+#endif
+
 #endif /* _ASM_X86_SIGHANDLING_H */

@@ -18,6 +18,7 @@
 #include <asm/fpu/types.h>
 #include <asm/compat.h>
 #include <asm/cet.h>
+#include <asm/special_insns.h>
 
 static int set_shstk_ptr(unsigned long addr)
 {
@@ -44,6 +45,69 @@ static unsigned long get_shstk_addr(void)
 
 	rdmsrl(MSR_IA32_PL3_SSP, ptr);
 	return ptr;
+}
+
+/*
+ * Verify the restore token at the address of 'ssp' is
+ * valid and then set shadow stack pointer according to the
+ * token.
+ */
+static int verify_rstor_token(bool ia32, unsigned long ssp,
+			      unsigned long *new_ssp)
+{
+	unsigned long token;
+
+	*new_ssp = 0;
+
+	if (!IS_ALIGNED(ssp, 8))
+		return -EINVAL;
+
+	if (get_user(token, (unsigned long __user *)ssp))
+		return -EFAULT;
+
+	/* Is 64-bit mode flag correct? */
+	if (ia32 && (token & 3) != 0)
+		return -EINVAL;
+	else if ((token & 3) != 1)
+		return -EINVAL;
+
+	token &= ~(1UL);
+
+	if ((!ia32 && !IS_ALIGNED(token, 8)) || !IS_ALIGNED(token, 4))
+		return -EINVAL;
+
+	if ((ALIGN_DOWN(token, 8) - 8) != ssp)
+		return -EINVAL;
+
+	*new_ssp = token;
+	return 0;
+}
+
+/*
+ * Create a restore token on the shadow stack.
+ * A token is always 8-byte and aligned to 8.
+ */
+static int create_rstor_token(bool ia32, unsigned long ssp,
+			      unsigned long *new_ssp)
+{
+	unsigned long addr;
+
+	*new_ssp = 0;
+
+	if ((!ia32 && !IS_ALIGNED(ssp, 8)) || !IS_ALIGNED(ssp, 4))
+		return -EINVAL;
+
+	addr = ALIGN_DOWN(ssp, 8) - 8;
+
+	/* Is the token for 64-bit? */
+	if (!ia32)
+		ssp |= 1;
+
+	if (write_user_shstk_64(addr, ssp))
+		return -EFAULT;
+
+	*new_ssp = addr;
+	return 0;
 }
 
 int cet_setup_shstk(void)
@@ -106,4 +170,55 @@ void cet_disable_free_shstk(struct task_struct *tsk)
 	}
 
 	tsk->thread.cet.shstk_enabled = 0;
+}
+
+int cet_restore_signal(unsigned long ssp)
+{
+	unsigned long new_ssp;
+	int err;
+
+	if (!current->thread.cet.shstk_enabled)
+		return 0;
+
+	err = verify_rstor_token(in_ia32_syscall(), ssp, &new_ssp);
+
+	if (err)
+		return err;
+
+	return set_shstk_ptr(new_ssp);
+}
+
+/*
+ * Setup the shadow stack for the signal handler: first,
+ * create a restore token to keep track of the current ssp,
+ * and then the return address of the signal handler.
+ */
+int cet_setup_signal(bool ia32, unsigned long rstor_addr,
+		     unsigned long *new_ssp)
+{
+	unsigned long ssp;
+	int err;
+
+	if (!current->thread.cet.shstk_enabled)
+		return 0;
+
+	ssp = get_shstk_addr();
+	err = create_rstor_token(ia32, ssp, new_ssp);
+
+	if (err)
+		return err;
+
+	if (ia32) {
+		ssp = *new_ssp - sizeof(u32);
+		err = write_user_shstk_32(ssp, (unsigned int)rstor_addr);
+	} else {
+		ssp = *new_ssp - sizeof(u64);
+		err = write_user_shstk_64(ssp, rstor_addr);
+	}
+
+	if (err)
+		return err;
+
+	set_shstk_ptr(ssp);
+	return 0;
 }

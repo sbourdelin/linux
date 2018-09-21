@@ -196,6 +196,23 @@ struct _xstate {
 	/* New processor state extensions go here: */
 };
 
+#ifdef __x86_64__
+/*
+ * Sigcontext extension (struct sc_ext) is located after
+ * sigcontext->fpstate.  Because currently only the shadow
+ * stack pointer is saved there and the shadow stack depends
+ * on XSAVES, we can find sc_ext from sigcontext->fpstate.
+ *
+ * The 64-bit fpstate has a size of fpu_user_xstate_size, plus
+ * FP_XSTATE_MAGIC2_SIZE when XSAVE* is used.  The struct sc_ext
+ * is located at the end of sigcontext->fpstate, aligned to 8.
+ */
+struct sc_ext {
+	unsigned long total_size;
+	unsigned long ssp;
+};
+#endif
+
 /*
  * The 32-bit signal frame:
  */

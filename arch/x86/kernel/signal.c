@@ -46,6 +46,7 @@
 
 #include <asm/sigframe.h>
 #include <asm/signal.h>
+#include <asm/cet.h>
 
 #define COPY(x)			do {			\
 	get_user_ex(regs->x, &sc->x);			\
@@ -151,6 +152,10 @@ static int restore_sigcontext(struct pt_regs *regs,
 	} get_user_catch(err);
 
 	err |= fpu__restore_sig(buf, IS_ENABLED(CONFIG_X86_32));
+
+#ifdef CONFIG_X86_64
+	err |= restore_sigcontext_ext(buf);
+#endif
 
 	force_iret();
 
@@ -266,6 +271,11 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size,
 	}
 
 	if (fpu->initialized) {
+#ifdef CONFIG_X86_64
+		/* sigcontext extension */
+		if (boot_cpu_has(X86_FEATURE_SHSTK))
+			sp -= sizeof(struct sc_ext) + 8;
+#endif
 		sp = fpu__alloc_mathframe(sp, IS_ENABLED(CONFIG_X86_32),
 					  &buf_fx, &math_size);
 		*fpstate = (void __user *)sp;
@@ -493,6 +503,9 @@ static int __setup_rt_frame(int sig, struct ksignal *ksig,
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, fp, regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
 
+	if (!err)
+		err = setup_sigcontext_ext(ksig, fp);
+
 	if (err)
 		return -EFAULT;
 
@@ -575,6 +588,9 @@ static int x32_setup_rt_frame(struct ksignal *ksig,
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, fpstate,
 				regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
+
+	if (!err)
+		err = setup_sigcontext_ext(ksig, fpstate);
 
 	if (err)
 		return -EFAULT;
@@ -706,6 +722,86 @@ setup_rt_frame(struct ksignal *ksig, struct pt_regs *regs)
 		return __setup_rt_frame(ksig->sig, ksig, set, regs);
 	}
 }
+
+#ifdef CONFIG_X86_64
+static int copy_ext_from_user(struct sc_ext *ext, void __user *fpu)
+{
+	void __user *p;
+
+	if (!fpu)
+		return -EINVAL;
+
+	p = fpu + fpu_user_xstate_size + FP_XSTATE_MAGIC2_SIZE;
+	p = (void __user *)ALIGN((unsigned long)p, 8);
+
+	if (!access_ok(VERIFY_READ, p, sizeof(*ext)))
+		return -EFAULT;
+
+	if (__copy_from_user(ext, p, sizeof(*ext)))
+		return -EFAULT;
+
+	if (ext->total_size != sizeof(*ext))
+		return -EINVAL;
+	return 0;
+}
+
+static int copy_ext_to_user(void __user *fpu, struct sc_ext *ext)
+{
+	void __user *p;
+
+	if (!fpu)
+		return -EINVAL;
+
+	if (ext->total_size != sizeof(*ext))
+		return -EINVAL;
+
+	p = fpu + fpu_user_xstate_size + FP_XSTATE_MAGIC2_SIZE;
+	p = (void __user *)ALIGN((unsigned long)p, 8);
+
+	if (!access_ok(VERIFY_WRITE, p, sizeof(*ext)))
+		return -EFAULT;
+
+	if (__copy_to_user(p, ext, sizeof(*ext)))
+		return -EFAULT;
+
+	return 0;
+}
+
+int restore_sigcontext_ext(void __user *fp)
+{
+	int err = 0;
+
+	if (boot_cpu_has(X86_FEATURE_SHSTK) && fp) {
+		struct sc_ext ext = {0, 0};
+
+		err = copy_ext_from_user(&ext, fp);
+
+		if (!err)
+			err = cet_restore_signal(ext.ssp);
+	}
+
+	return err;
+}
+
+int setup_sigcontext_ext(struct ksignal *ksig, void __user *fp)
+{
+	int err = 0;
+
+	if (boot_cpu_has(X86_FEATURE_SHSTK) && fp) {
+		struct sc_ext ext = {0, 0};
+		unsigned long rstor;
+
+		rstor = (unsigned long)ksig->ka.sa.sa_restorer;
+		err = cet_setup_signal(is_ia32_frame(ksig), rstor, &ext.ssp);
+		if (!err) {
+			ext.total_size = sizeof(ext);
+			err = copy_ext_to_user(fp, &ext);
+		}
+	}
+
+	return err;
+}
+#endif
 
 static void
 handle_signal(struct ksignal *ksig, struct pt_regs *regs)
