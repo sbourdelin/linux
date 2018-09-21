@@ -1919,12 +1919,16 @@ config X86_INTEL_CET
 config ARCH_HAS_SHSTK
 	def_bool n
 
+config ARCH_HAS_PROGRAM_PROPERTIES
+	def_bool n
+
 config X86_INTEL_SHADOW_STACK_USER
 	prompt "Intel Shadow Stack for user-mode"
 	def_bool n
 	depends on CPU_SUP_INTEL && X86_64
 	select X86_INTEL_CET
 	select ARCH_HAS_SHSTK
+	select ARCH_HAS_PROGRAM_PROPERTIES
 	---help---
 	  Shadow stack provides hardware protection against program stack
 	  corruption.  Only when all the following are true will an application

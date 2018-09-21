@@ -382,4 +382,9 @@ struct va_alignment {
 
 extern struct va_alignment va_align;
 extern unsigned long align_vdso_addr(unsigned long);
+
+#ifdef CONFIG_ARCH_HAS_PROGRAM_PROPERTIES
+extern int arch_setup_features(void *ehdr, void *phdr, struct file *file,
+			       bool interp);
+#endif
 #endif /* _ASM_X86_ELF_H */

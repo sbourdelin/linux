@@ -141,6 +141,8 @@ obj-$(CONFIG_UNWINDER_GUESS)		+= unwind_guess.o
 
 obj-$(CONFIG_X86_INTEL_CET)		+= cet.o
 
+obj-$(CONFIG_ARCH_HAS_PROGRAM_PROPERTIES) += elf.o
+
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)

@@ -1081,6 +1081,21 @@ static int load_elf_binary(struct linux_binprm *bprm)
 		goto out_free_dentry;
 	}
 
+#ifdef CONFIG_ARCH_HAS_PROGRAM_PROPERTIES
+	if (interpreter) {
+		retval = arch_setup_features(&loc->interp_elf_ex,
+					     interp_elf_phdata,
+					     interpreter, true);
+	} else {
+		retval = arch_setup_features(&loc->elf_ex,
+					     elf_phdata,
+					     bprm->file, false);
+	}
+
+	if (retval < 0)
+		goto out_free_dentry;
+#endif
+
 	if (elf_interpreter) {
 		unsigned long interp_map_addr = 0;
 
