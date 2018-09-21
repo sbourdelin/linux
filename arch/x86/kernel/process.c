@@ -792,6 +792,11 @@ long do_arch_prctl_common(struct task_struct *task, int option,
 		return get_cpuid_mode();
 	case ARCH_SET_CPUID:
 		return set_cpuid_mode(task, cpuid_enabled);
+	case ARCH_CET_STATUS:
+	case ARCH_CET_DISABLE:
+	case ARCH_CET_LOCK:
+	case ARCH_CET_ALLOC_SHSTK:
+		return prctl_cet(option, cpuid_enabled);
 	}
 
 	return -EINVAL;
