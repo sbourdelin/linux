@@ -126,6 +126,8 @@ static int qcom_dma_setup(struct mmci_host *host)
 	int consumer_id, producer_id;
 	struct device_node *np = host->mmc->parent->of_node;
 
+	mmci_dmae_setup(host);
+
 	consumer_id = of_get_dml_pipe_index(np, "tx");
 	producer_id = of_get_dml_pipe_index(np, "rx");
 

@@ -334,4 +334,5 @@ int mmci_dmae_prep_data(struct mmci_host *host, struct mmc_data *data,
 void mmci_dmae_unprep_data(struct mmci_host *host, struct mmc_data *data,
 			   int err);
 void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data);
+int mmci_dmae_setup(struct mmci_host *host);
 

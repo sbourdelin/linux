@@ -398,6 +398,17 @@ void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
 		host->ops->get_next_data(host, data);
 }
 
+int mmci_dma_setup(struct mmci_host *host)
+{
+	if (!host->ops || !host->ops->dma_setup)
+		return 0;
+
+	/* initialize pre request cookie */
+	host->next_cookie = 1;
+
+	return host->ops->dma_setup(host);
+}
+
 static void
 mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 {
@@ -472,7 +483,7 @@ struct mmci_dmae_priv {
 
 #define mmci_dmae_inprogress(dmae) ((dmae)->in_progress)
 
-static int mmci_dma_setup(struct mmci_host *host)
+int mmci_dmae_setup(struct mmci_host *host)
 {
 	const char *rxname, *txname;
 	struct mmci_dmae_priv *dmae;
@@ -487,9 +498,6 @@ static int mmci_dma_setup(struct mmci_host *host)
 						     "rx");
 	dmae->tx_channel = dma_request_slave_channel(mmc_dev(host->mmc),
 						     "tx");
-
-	/* initialize pre request cookie */
-	host->next_cookie = 1;
 
 	/*
 	 * If only an RX channel is specified, the driver will
@@ -530,9 +538,6 @@ static int mmci_dma_setup(struct mmci_host *host)
 		if (max_seg_size < host->mmc->max_seg_size)
 			host->mmc->max_seg_size = max_seg_size;
 	}
-
-	if (host->ops && host->ops->dma_setup)
-		return host->ops->dma_setup(host);
 
 	return 0;
 }
@@ -793,14 +798,10 @@ static struct mmci_host_ops mmci_variant_ops = {
 	.prep_data = mmci_dmae_prep_data,
 	.unprep_data = mmci_dmae_unprep_data,
 	.get_next_data = mmci_dmae_get_next_data,
+	.dma_setup = mmci_dmae_setup,
 };
 #else
 /* Blank functions if the DMA engine is not available */
-static inline int mmci_dma_setup(struct mmci_host *host)
-{
-	return 0;
-}
-
 static inline void mmci_dma_release(struct mmci_host *host)
 {
 }
