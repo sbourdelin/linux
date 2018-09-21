@@ -1,0 +1,23 @@
+ina3221 properties
+
+Required properties:
+- compatible: Must be "ti,ina3221"
+- reg: I2C address
+
+Optional properties:
+
+- ti,channel1-name:
+- ti,channel2-name:
+- ti,channel3-name:
+	The names of the input sources (described in the schematics)
+	Set the names with "NC" to indicate not-connected channels
+
+Example:
+
+ina3221@40 {
+	compatible = "ti,ina3221";
+	reg = <0x40>;
+	ti,channel1-name = "NC";
+	ti,channel2-name = "VDD_5V0_EXT";
+	ti,channel3-name = "VDD_19V";
+};
