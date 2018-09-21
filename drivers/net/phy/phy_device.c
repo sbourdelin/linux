@@ -75,23 +75,12 @@ extern struct phy_driver genphy_10g_driver;
 static LIST_HEAD(phy_fixup_list);
 static DEFINE_MUTEX(phy_fixup_lock);
 
-#ifdef CONFIG_PM
-static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
+static bool phy_may_suspend(struct phy_device *phydev)
 {
-	struct device_driver *drv = phydev->mdio.dev.driver;
-	struct phy_driver *phydrv = to_phy_driver(drv);
 	struct net_device *netdev = phydev->attached_dev;
 
-	if (!drv || !phydrv->suspend)
-		return false;
-
-	/* PHY not attached? May suspend if the PHY has not already been
-	 * suspended as part of a prior call to phy_disconnect() ->
-	 * phy_detach() -> phy_suspend() because the parent netdev might be the
-	 * MDIO bus driver and clock gated at this point.
-	 */
 	if (!netdev)
-		return !phydev->suspended;
+		return true;
 
 	/* Don't suspend PHY if the attached netdev parent may wakeup.
 	 * The parent may point to a PCI device, as in tg3 driver.
@@ -103,15 +92,14 @@ static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
 	 * is the case for devices w/o underlaying pwr. mgmt. aware bus,
 	 * e.g. SoC devices.
 	 */
-	if (device_may_wakeup(&netdev->dev))
-		return false;
-
-	return true;
+	return !device_may_wakeup(&netdev->dev);
 }
 
+#ifdef CONFIG_PM
 static int mdio_bus_phy_suspend(struct device *dev)
 {
 	struct phy_device *phydev = to_phy_device(dev);
+	int ret;
 
 	/* We must stop the state machine manually, otherwise it stops out of
 	 * control, possibly with the phydev->lock held. Upon resume, netdev
@@ -121,25 +109,22 @@ static int mdio_bus_phy_suspend(struct device *dev)
 	if (phydev->attached_dev && phydev->adjust_link)
 		phy_stop_machine(phydev);
 
-	if (!mdio_bus_phy_may_suspend(phydev))
-		return 0;
+	ret = phy_suspend(phydev);
 
-	return phy_suspend(phydev);
+	return ret == -EBUSY ? 0 : ret;
 }
 
 static int mdio_bus_phy_resume(struct device *dev)
 {
 	struct phy_device *phydev = to_phy_device(dev);
-	int ret;
+	int ret = 0;
 
-	if (!mdio_bus_phy_may_suspend(phydev))
-		goto no_resume;
+	if (phydev->suspended)
+		ret = phy_resume(phydev);
 
-	ret = phy_resume(phydev);
 	if (ret < 0)
 		return ret;
 
-no_resume:
 	if (phydev->attached_dev && phydev->adjust_link)
 		phy_start_machine(phydev);
 
@@ -1132,9 +1117,9 @@ void phy_detach(struct phy_device *phydev)
 		sysfs_remove_link(&dev->dev.kobj, "phydev");
 		sysfs_remove_link(&phydev->mdio.dev.kobj, "attached_dev");
 	}
+	phy_suspend(phydev);
 	phydev->attached_dev->phydev = NULL;
 	phydev->attached_dev = NULL;
-	phy_suspend(phydev);
 	phydev->phylink = NULL;
 
 	phy_led_triggers_unregister(phydev);
@@ -1171,9 +1156,12 @@ int phy_suspend(struct phy_device *phydev)
 	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
 	int ret = 0;
 
+	if (phydev->suspended)
+		return 0;
+
 	/* If the device has WOL enabled, we cannot suspend the PHY */
 	phy_ethtool_get_wol(phydev, &wol);
-	if (wol.wolopts)
+	if (wol.wolopts || !phy_may_suspend(phydev))
 		return -EBUSY;
 
 	if (phydev->drv && phydrv->suspend)
