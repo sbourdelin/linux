@@ -388,6 +388,11 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 
 	trace_i915_context_create(ctx);
 	ctx->req_cnt = 0;
+	ctx->update_render_config = 0;
+	ctx->slice_cnt = hweight8(INTEL_INFO(dev_priv)->sseu.slice_mask);
+	ctx->subslice_cnt = hweight8(
+			INTEL_INFO(dev_priv)->sseu.subslice_mask[0]);
+	ctx->eu_cnt = INTEL_INFO(dev_priv)->sseu.eu_per_subslice;
 
 	return ctx;
 }

@@ -200,6 +200,20 @@ struct i915_gem_context {
 	 * controlled via a mutex
 	 */
 	u64 req_cnt;
+
+	/** slice_cnt: used to set the # of slices to be enabled. */
+	u8 slice_cnt;
+
+	/** subslice_cnt: used to set the # of subslices to be enabled. */
+	u8 subslice_cnt;
+
+	/** eu_cnt: used to set the # of eu to be enabled. */
+	u8 eu_cnt;
+
+	/** update_render_config: to track the updates to the render
+	 * configuration (S/SS/EU Configuration on the GPU)
+	 */
+	bool update_render_config;
 };
 
 static inline bool i915_gem_context_is_closed(const struct i915_gem_context *ctx)

@@ -364,6 +364,36 @@ execlists_unwind_incomplete_requests(struct intel_engine_execlists *execlists)
 	spin_unlock_irqrestore(&engine->timeline.lock, flags);
 }
 
+static u32
+get_context_rpcs_config(struct i915_gem_context *ctx)
+{
+	struct drm_i915_private *dev_priv = ctx->i915;
+	u32 rpcs = 0;
+
+	if (INTEL_GEN(dev_priv) < 8)
+		return 0;
+
+	if (INTEL_INFO(dev_priv)->sseu.has_slice_pg) {
+		rpcs |= GEN8_RPCS_S_CNT_ENABLE;
+		rpcs |= ctx->slice_cnt << GEN8_RPCS_S_CNT_SHIFT;
+		rpcs |= GEN8_RPCS_ENABLE;
+	}
+
+	if (INTEL_INFO(dev_priv)->sseu.has_subslice_pg) {
+		rpcs |= GEN8_RPCS_SS_CNT_ENABLE;
+		rpcs |= ctx->subslice_cnt << GEN8_RPCS_SS_CNT_SHIFT;
+		rpcs |= GEN8_RPCS_ENABLE;
+	}
+
+	if (INTEL_INFO(dev_priv)->sseu.has_eu_pg) {
+		rpcs |= ctx->eu_cnt << GEN8_RPCS_EU_MIN_SHIFT;
+		rpcs |= ctx->eu_cnt << GEN8_RPCS_EU_MAX_SHIFT;
+		rpcs |= GEN8_RPCS_ENABLE;
+	}
+
+	return rpcs;
+}
+
 static inline void
 execlists_context_status_change(struct i915_request *rq, unsigned long status)
 {
@@ -418,11 +448,22 @@ execlists_update_context_pdps(struct i915_hw_ppgtt *ppgtt, u32 *reg_state)
 static u64 execlists_update_context(struct i915_request *rq)
 {
 	struct intel_context *ce = rq->hw_context;
+	struct i915_gem_context *ctx = rq->gem_context;
+	struct intel_engine_cs *engine = rq->engine;
 	struct i915_hw_ppgtt *ppgtt =
 		rq->gem_context->ppgtt ?: rq->i915->mm.aliasing_ppgtt;
 	u32 *reg_state = ce->lrc_reg_state;
+	u32 rpcs_config = 0;
 
 	reg_state[CTX_RING_TAIL+1] = intel_ring_set_tail(rq->ring, rq->tail);
+	if (ctx->pid && ctx->name && (rq->engine->id == RCS) &&
+			ctx->update_render_config) {
+		rpcs_config = get_context_rpcs_config(ctx);
+		reg_state[CTX_LRI_HEADER_2] = MI_LOAD_REGISTER_IMM(1);
+		CTX_REG(reg_state, CTX_R_PWR_CLK_STATE, GEN8_R_PWR_CLK_STATE,
+				rpcs_config);
+		ctx->update_render_config = 0;
+	}
 
 	/* True 32b PPGTT with dynamic page allocation: update PDP
 	 * registers and point the unallocated PDPs to scratch page.
