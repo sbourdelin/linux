@@ -98,6 +98,7 @@
 						KASAN_TAG_SHIFTED(tag))
 #define KASAN_RESET_TAG(addr)		KASAN_SET_TAG(addr, 0xff)
 #else
+#define KASAN_SET_TAG(addr, tag)	addr
 #define KASAN_RESET_TAG(addr)		addr
 #endif
 
@@ -309,7 +310,13 @@ static inline void *phys_to_virt(phys_addr_t x)
 #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
 #define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
 
-#define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+#define page_to_virt(page)	({					\
+	unsigned long __addr =						\
+		((__page_to_voff(page)) | PAGE_OFFSET);			\
+	__addr = KASAN_SET_TAG(__addr, page_kasan_tag(page));		\
+	((void *)__addr);						\
+})
+
 #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
 
 #define _virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
