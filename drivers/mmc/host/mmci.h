@@ -247,6 +247,7 @@ struct mmci_host;
  * @start_err: bitmask identifying the STARTBITERR bit inside MMCISTATUS
  *	       register.
  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
+ * @reset: true if variant has need reset signal.
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -285,6 +286,7 @@ struct variant_data {
 	bool			qcom_dml;
 	bool			reversed_irq_handling;
 	bool			mmcimask1;
+	bool			reset;
 	unsigned int		irq_pio_mask;
 	u32			start_err;
 	u32			opendrain;
@@ -317,6 +319,8 @@ struct mmci_host {
 	struct mmc_host		*mmc;
 	struct clk		*clk;
 	bool			singleirq;
+
+	struct reset_control	*rst;
 
 	spinlock_t		lock;
 
