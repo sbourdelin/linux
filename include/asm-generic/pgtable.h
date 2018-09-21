@@ -1127,4 +1127,12 @@ static inline bool arch_has_pfn_modify_check(void)
 #endif
 #endif
 
+#ifndef CONFIG_ARCH_HAS_SHSTK
+#define pte_set_vma_features(pte, vma) pte
+#define arch_copy_pte_mapping(vma_flags) false
+#else
+inline pte_t pte_set_vma_features(pte_t pte, struct vm_area_struct *vma);
+bool arch_copy_pte_mapping(vm_flags_t vm_flags);
+#endif
+
 #endif /* _ASM_GENERIC_PGTABLE_H */
