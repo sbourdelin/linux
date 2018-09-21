@@ -4740,6 +4740,97 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_drrs_status", i915_drrs_status, 0},
 	{"i915_rps_boost_info", i915_rps_boost_info, 0},
 };
+
+#define POLL_PERIOD_MS	(1000 * 1000)
+#define PENDING_REQ_0	0 /* No active request pending*/
+#define PENDING_REQ_3	3 /* Threshold value of 3 active request pending*/
+			  /* Anything above this is considered as HIGH load
+			   * context
+			   */
+			  /* And less is considered as LOW load*/
+			  /* And equal is considered as mediaum load */
+
+static int predictive_load_enable;
+static int predictive_load_timer_init;
+
+static enum hrtimer_restart predictive_load_cb(struct hrtimer *hrtimer)
+{
+	struct drm_i915_private *dev_priv =
+		container_of(hrtimer, typeof(*dev_priv),
+				pred_timer);
+	enum intel_engine_id id;
+	struct intel_engine_cs *engine;
+	struct i915_gem_context *ctx;
+	u64 req_pending;
+
+	list_for_each_entry(ctx, &dev_priv->contexts.list, link) {
+
+		if (!ctx->name)
+			continue;
+
+		mutex_lock(&dev_priv->pred_mutex);
+		req_pending = ctx->req_cnt;
+		mutex_unlock(&dev_priv->pred_mutex);
+
+		if (req_pending == PENDING_REQ_0)
+			continue;
+
+		if (req_pending > PENDING_REQ_3)
+			ctx->load_type = LOAD_TYPE_HIGH;
+		else if (req_pending == PENDING_REQ_3)
+			ctx->load_type = LOAD_TYPE_MEDIUM;
+		else if (req_pending < PENDING_REQ_3)
+			ctx->load_type = LOAD_TYPE_LOW;
+
+		i915_set_optimum_config(ctx->load_type, ctx, KABYLAKE_GT3);
+	}
+
+	hrtimer_forward_now(hrtimer,
+			ns_to_ktime(predictive_load_enable*POLL_PERIOD_MS));
+
+	return HRTIMER_RESTART;
+}
+
+static int
+i915_predictive_load_get(void *data, u64 *val)
+{
+	struct drm_i915_private *dev_priv = data;
+
+	*val = predictive_load_enable;
+	return 0;
+}
+
+static int
+i915_predictive_load_set(void *data, u64 val)
+{
+	struct drm_i915_private *dev_priv = data;
+	struct intel_device_info *info;
+
+	info = mkwrite_device_info(dev_priv);
+
+	predictive_load_enable = val;
+
+	if (predictive_load_enable) {
+		if (!predictive_load_timer_init) {
+			hrtimer_init(&dev_priv->pred_timer, CLOCK_MONOTONIC,
+					HRTIMER_MODE_REL);
+			dev_priv->pred_timer.function = predictive_load_cb;
+			predictive_load_timer_init = 1;
+		}
+		hrtimer_start(&dev_priv->pred_timer,
+			ns_to_ktime(predictive_load_enable*POLL_PERIOD_MS),
+			HRTIMER_MODE_REL_PINNED);
+	} else {
+		hrtimer_cancel(&dev_priv->pred_timer);
+	}
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(i915_predictive_load_ctl,
+			i915_predictive_load_get, i915_predictive_load_set,
+			"%llu\n");
+
 #define I915_DEBUGFS_ENTRIES ARRAY_SIZE(i915_debugfs_list)
 
 static const struct i915_debugfs_files {
@@ -4769,7 +4860,8 @@ static const struct i915_debugfs_files {
 	{"i915_hpd_storm_ctl", &i915_hpd_storm_ctl_fops},
 	{"i915_ipc_status", &i915_ipc_status_fops},
 	{"i915_drrs_ctl", &i915_drrs_ctl_fops},
-	{"i915_edp_psr_debug", &i915_edp_psr_debug_fops}
+	{"i915_edp_psr_debug", &i915_edp_psr_debug_fops},
+	{"i915_predictive_load_ctl", &i915_predictive_load_ctl}
 };
 
 int i915_debugfs_register(struct drm_i915_private *dev_priv)

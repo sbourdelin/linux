@@ -1552,6 +1552,7 @@ struct intel_cdclk_state {
 };
 
 struct drm_i915_private {
+	struct hrtimer pred_timer;
 	struct drm_device drm;
 
 	struct kmem_cache *objects;
