@@ -2178,6 +2178,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		       struct drm_syncobj **fences)
 {
 	struct i915_execbuffer eb;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct dma_fence *in_fence = NULL;
 	struct sync_file *out_fence = NULL;
 	int out_fence_fd = -1;
@@ -2389,6 +2390,10 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	 * to explicitly hold another reference here.
 	 */
 	eb.request->batch = eb.batch;
+
+	mutex_lock(&dev_priv->pred_mutex);
+	eb.ctx->req_cnt++;
+	mutex_unlock(&dev_priv->pred_mutex);
 
 	trace_i915_request_queue(eb.request, eb.batch_flags);
 	err = eb_submit(&eb);

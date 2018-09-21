@@ -387,6 +387,7 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 	}
 
 	trace_i915_context_create(ctx);
+	ctx->req_cnt = 0;
 
 	return ctx;
 }

@@ -194,6 +194,12 @@ struct i915_gem_context {
 	 * context close.
 	 */
 	struct list_head handles_list;
+
+	/** req_cnt: tracks the pending commands, based on which we decide to
+	 * go for low/medium/high load configuration of the GPU, this is
+	 * controlled via a mutex
+	 */
+	u64 req_cnt;
 };
 
 static inline bool i915_gem_context_is_closed(const struct i915_gem_context *ctx)

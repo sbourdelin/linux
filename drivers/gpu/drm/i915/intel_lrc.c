@@ -728,6 +728,12 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			trace_i915_request_in(rq, port_index(port, execlists));
 			last = rq;
 			submit = true;
+
+			mutex_lock(&rq->i915->pred_mutex);
+			if (rq->gem_context->req_cnt > 0) {
+				rq->gem_context->req_cnt--;
+			}
+			mutex_unlock(&rq->i915->pred_mutex);
 		}
 
 		rb_erase_cached(&p->node, &execlists->queue);

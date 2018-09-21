@@ -1609,6 +1609,11 @@ struct drm_i915_private {
 	 * controller on different i2c buses. */
 	struct mutex gmbus_mutex;
 
+	/** pred_mutex protects against councurrent usage of pending
+	 * request counter for multiple contexts
+	 */
+	struct mutex pred_mutex;
+
 	/**
 	 * Base address of the gmbus and gpio block.
 	 */
