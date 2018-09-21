@@ -596,7 +596,12 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
 		return -EINVAL;
 	}
 
-	cfg->output_rate >>= p_div;
+	if (cfg->m == 0) {
+		cfg->output_rate = 0;
+	} else {
+		cfg->output_rate = cfg->n * DIV_ROUND_UP(parent_rate, cfg->m);
+		cfg->output_rate >>= p_div;
+	}
 
 	if (pll->params->pdiv_tohw) {
 		ret = _p_div_to_hw(hw, 1 << p_div);
