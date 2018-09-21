@@ -363,7 +363,7 @@ void fpu__drop(struct fpu *fpu)
  * Clear FPU registers by setting them up from
  * the init fpstate:
  */
-static inline void copy_init_fpstate_to_fpregs(void)
+static inline void copy_init_user_fpstate_to_fpregs(void)
 {
 	if (use_xsave())
 		copy_kernel_to_xregs(&init_fpstate.xsave, -1);
@@ -395,7 +395,7 @@ void fpu__clear(struct fpu *fpu)
 		preempt_disable();
 		fpu__initialize(fpu);
 		user_fpu_begin();
-		copy_init_fpstate_to_fpregs();
+		copy_init_user_fpstate_to_fpregs();
 		preempt_enable();
 	}
 }

@@ -93,7 +93,8 @@ static inline void fpstate_init_xstate(struct xregs_state *xsave)
 	 * XRSTORS requires these bits set in xcomp_bv, or it will
 	 * trigger #GP:
 	 */
-	xsave->header.xcomp_bv = XCOMP_BV_COMPACTED_FORMAT | xfeatures_mask;
+	xsave->header.xcomp_bv = XCOMP_BV_COMPACTED_FORMAT |
+			xfeatures_mask_user;
 }
 
 static inline void fpstate_init_fxstate(struct fxregs_state *fx)
@@ -233,7 +234,7 @@ static inline void copy_fxregs_to_kernel(struct fpu *fpu)
 
 /*
  * If XSAVES is enabled, it replaces XSAVEOPT because it supports a compact
- * format and supervisor states in addition to modified optimization in
+ * format and system states in addition to modified optimization in
  * XSAVEOPT.
  *
  * Otherwise, if XSAVEOPT is enabled, XSAVEOPT replaces XSAVE because XSAVEOPT
