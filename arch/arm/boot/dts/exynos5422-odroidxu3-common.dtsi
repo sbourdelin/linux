@@ -135,7 +135,8 @@
 			};
 		};
 		cpu1_thermal: cpu1-thermal {
-			thermal-sensors = <&tmu_cpu1 0>;
+			// thermal-sensors = <&tmu_cpu1 0>;
+			thermal-sensors = <&tmu_cpu3 0>;
 			polling-delay-passive = <250>;
 			polling-delay = <0>;
 			trips {
@@ -269,7 +270,8 @@
 			};
 		};
 		cpu3_thermal: cpu3-thermal {
-			thermal-sensors = <&tmu_cpu3 0>;
+			// thermal-sensors = <&tmu_cpu3 0>;
+			thermal-sensors = <&tmu_cpu1 0>;
 			polling-delay-passive = <250>;
 			polling-delay = <0>;
 			trips {
