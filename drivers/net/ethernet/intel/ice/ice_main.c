@@ -3905,6 +3905,12 @@ static const struct net_device_ops ice_netdev_ops = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller = ice_netpoll,
 #endif /* CONFIG_NET_POLL_CONTROLLER */
+	.ndo_set_vf_spoofchk = ice_set_vf_spoofchk,
+	.ndo_set_vf_mac = ice_set_vf_mac,
+	.ndo_get_vf_config = ice_get_vf_cfg,
+	.ndo_set_vf_trust = ice_set_vf_trust,
+	.ndo_set_vf_vlan = ice_set_vf_port_vlan,
+	.ndo_set_vf_link_state	= ice_set_vf_link_state,
 	.ndo_vlan_rx_add_vid = ice_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid = ice_vlan_rx_kill_vid,
 	.ndo_set_features = ice_set_features,
