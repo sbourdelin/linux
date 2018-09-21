@@ -157,11 +157,24 @@ int xfrm_output_resume(struct sk_buff *skb, int err)
 		if (!skb_dst(skb)->xfrm)
 			return dst_output(net, skb->sk, skb);
 
-		err = nf_hook(skb_dst(skb)->ops->family,
-			      NF_INET_POST_ROUTING, net, skb->sk, skb,
-			      NULL, skb_dst(skb)->dev, xfrm_output2);
-		if (unlikely(err != 1))
-			goto out;
+		switch (skb_dst(skb)->ops->family) {
+		case AF_INET:
+			err = nf_hook(NFPROTO_IPV4,
+				      NF_INET_POST_ROUTING, net, skb->sk, skb,
+				      NULL, skb_dst(skb)->dev, xfrm_output2);
+			if (unlikely(err != 1))
+				goto out;
+			break;
+		case AF_INET6:
+			err = nf_hook(NFPROTO_IPV6,
+				      NF_INET_POST_ROUTING, net, skb->sk, skb,
+				      NULL, skb_dst(skb)->dev, xfrm_output2);
+			if (unlikely(err != 1))
+				goto out;
+			break;
+		default:
+			break;
+		}
 	}
 
 	if (err == -EINPROGRESS)
