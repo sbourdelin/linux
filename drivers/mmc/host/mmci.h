@@ -318,5 +318,7 @@ struct mmci_host {
 	int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
 
 	void			*dma_priv;
+
+	s32			next_cookie;
 };
 
