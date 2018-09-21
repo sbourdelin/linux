@@ -1131,10 +1131,14 @@ static inline bool arch_has_pfn_modify_check(void)
 #define pte_set_vma_features(pte, vma) pte
 #define pmd_set_vma_features(pmd, vma) pmd
 #define arch_copy_pte_mapping(vma_flags) false
+#define pte_exclusive(pte, vma) pte_dirty(pte)
+#define pmd_exclusive(pmd, vma) pmd_dirty(pmd)
 #else
 inline pte_t pte_set_vma_features(pte_t pte, struct vm_area_struct *vma);
 inline pmd_t pmd_set_vma_features(pmd_t pmd, struct vm_area_struct *vma);
 bool arch_copy_pte_mapping(vm_flags_t vm_flags);
+bool pte_exclusive(pte_t pte, struct vm_area_struct *vma);
+bool pmd_exclusive(pmd_t pmd, struct vm_area_struct *vma);
 #endif
 
 #endif /* _ASM_GENERIC_PGTABLE_H */
