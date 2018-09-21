@@ -220,9 +220,15 @@ static u32 dspi_pop_tx(struct fsl_dspi *dspi)
 		if (dspi->bytes_per_word == 1)
 			txdata = *(u8 *)dspi->tx;
 		else if (dspi->bytes_per_word == 2)
-			txdata = *(u16 *)dspi->tx;
+			if (dspi->cur_chip->ctar_val & SPI_CTAR_LSBFE(1))
+				txdata =  cpu_to_le16(*(u16 *)dspi->tx);
+			else
+				txdata =  cpu_to_be16(*(u16 *)dspi->tx);
 		else  /* dspi->bytes_per_word == 4 */
-			txdata = *(u32 *)dspi->tx;
+			if (dspi->cur_chip->ctar_val & SPI_CTAR_LSBFE(1))
+				txdata = cpu_to_le32(*(u32 *)dspi->tx);
+			else
+				txdata = cpu_to_be32(*(u32 *)dspi->tx);
 		dspi->tx += dspi->bytes_per_word;
 	}
 	dspi->len -= dspi->bytes_per_word;
@@ -243,15 +249,18 @@ static void dspi_push_rx(struct fsl_dspi *dspi, u32 rxdata)
 	if (!dspi->rx)
 		return;
 
-	/* Mask of undefined bits */
-	rxdata &= (1 << dspi->bits_per_word) - 1;
-
 	if (dspi->bytes_per_word == 1)
 		*(u8 *)dspi->rx = rxdata;
 	else if (dspi->bytes_per_word == 2)
-		*(u16 *)dspi->rx = rxdata;
+		if (dspi->cur_chip->ctar_val & SPI_CTAR_LSBFE(1))
+			*(u16 *)dspi->rx = be16_to_cpu(rxdata);
+		else
+			*(u16 *)dspi->rx = be16_to_cpu(rxdata);
 	else /* dspi->bytes_per_word == 4 */
-		*(u32 *)dspi->rx = rxdata;
+		if (dspi->cur_chip->ctar_val & SPI_CTAR_LSBFE(1))
+			*(u32 *)dspi->rx = le32_to_cpu(rxdata);
+		else
+			*(u32 *)dspi->rx = be32_to_cpu(rxdata);
 	dspi->rx += dspi->bytes_per_word;
 }
 
@@ -593,16 +602,16 @@ static void dspi_tcfq_write(struct fsl_dspi *dspi)
 		 */
 		u32 data = dspi_pop_tx(dspi);
 
+		cmd_fifo_write(dspi);
 		if (dspi->cur_chip->ctar_val & SPI_CTAR_LSBFE(1)) {
 			/* LSB */
-			tx_fifo_write(dspi, data & 0xFFFF);
 			tx_fifo_write(dspi, data >> 16);
+			tx_fifo_write(dspi, data & 0xFFFF);
 		} else {
 			/* MSB */
-			tx_fifo_write(dspi, data >> 16);
 			tx_fifo_write(dspi, data & 0xFFFF);
+			tx_fifo_write(dspi, data >> 16);
 		}
-		cmd_fifo_write(dspi);
 	} else {
 		/* Write one entry to both TX FIFO and CMD FIFO
 		 * simultaneously.
