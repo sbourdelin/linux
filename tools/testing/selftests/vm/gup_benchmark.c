@@ -33,9 +33,12 @@ int main(int argc, char **argv)
 	unsigned long size = 128 * MB;
 	int i, fd, opt, nr_pages = 1, thp = -1, repeats = 1, write = 0;
 	int cmd = GUP_FAST_BENCHMARK;
+	int file_map = -1;
+	int flags = MAP_ANONYMOUS | MAP_PRIVATE;
+	char *file = NULL;
 	char *p;
 
-	while ((opt = getopt(argc, argv, "m:r:n:tTLU")) != -1) {
+	while ((opt = getopt(argc, argv, "m:r:n:f:tTLU")) != -1) {
 		switch (opt) {
 		case 'm':
 			size = atoi(optarg) * MB;
@@ -61,9 +64,20 @@ int main(int argc, char **argv)
 		case 'w':
 			write = 1;
 			break;
+		case 'f':
+			file = optarg;
+			flags &= ~(MAP_PRIVATE | MAP_ANONYMOUS);
+			flags |= MAP_SHARED;
+			break;
 		default:
 			return -1;
 		}
+	}
+
+	if (file) {
+		file_map = open(file, O_RDWR|O_CREAT);
+		if (file_map < 0)
+			perror("open"), exit(file_map);
 	}
 
 	gup.nr_pages_per_call = nr_pages;
@@ -73,8 +87,7 @@ int main(int argc, char **argv)
 	if (fd == -1)
 		perror("open"), exit(1);
 
-	p = mmap(NULL, size, PROT_READ | PROT_WRITE,
-			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	p = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, file_map, 0);
 	if (p == MAP_FAILED)
 		perror("mmap"), exit(1);
 	gup.addr = (unsigned long)p;
