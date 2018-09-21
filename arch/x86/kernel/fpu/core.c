@@ -365,8 +365,13 @@ void fpu__drop(struct fpu *fpu)
  */
 static inline void copy_init_user_fpstate_to_fpregs(void)
 {
+	/*
+	 * Only XSAVES user states are copied.
+	 * System states are preserved.
+	 */
 	if (use_xsave())
-		copy_kernel_to_xregs(&init_fpstate.xsave, -1);
+		copy_kernel_to_xregs(&init_fpstate.xsave,
+				     xfeatures_mask_user);
 	else if (static_cpu_has(X86_FEATURE_FXSR))
 		copy_kernel_to_fxregs(&init_fpstate.fxsave);
 	else

@@ -51,13 +51,16 @@ static short xsave_cpuid_features[] __initdata = {
 };
 
 /*
- * Mask of xstate features supported by the CPU and the kernel:
+ * Mask of xstate features supported by the CPU and the kernel.
+ * This is the result from CPUID query, SUPPORTED_XFEATURES_MASK,
+ * and boot_cpu_has().
  */
 u64 xfeatures_mask_user __read_mostly;
+u64 xfeatures_mask_all __read_mostly;
 
 static unsigned int xstate_offsets[XFEATURE_MAX] = { [ 0 ... XFEATURE_MAX - 1] = -1};
 static unsigned int xstate_sizes[XFEATURE_MAX]   = { [ 0 ... XFEATURE_MAX - 1] = -1};
-static unsigned int xstate_comp_offsets[sizeof(xfeatures_mask_user)*8];
+static unsigned int xstate_comp_offsets[sizeof(xfeatures_mask_all)*8];
 
 /*
  * The XSAVE area of kernel can be in standard or compacted format;
@@ -82,7 +85,7 @@ void fpu__xstate_clear_all_cpu_caps(void)
  */
 int cpu_has_xfeatures(u64 xfeatures_needed, const char **feature_name)
 {
-	u64 xfeatures_missing = xfeatures_needed & ~xfeatures_mask_user;
+	u64 xfeatures_missing = xfeatures_needed & ~xfeatures_mask_all;
 
 	if (unlikely(feature_name)) {
 		long xfeature_idx, max_idx;
@@ -164,7 +167,7 @@ void fpstate_sanitize_xstate(struct fpu *fpu)
 	 * None of the feature bits are in init state. So nothing else
 	 * to do for us, as the memory layout is up to date.
 	 */
-	if ((xfeatures & xfeatures_mask_user) == xfeatures_mask_user)
+	if ((xfeatures & xfeatures_mask_all) == xfeatures_mask_all)
 		return;
 
 	/*
@@ -219,30 +222,31 @@ void fpstate_sanitize_xstate(struct fpu *fpu)
  */
 void fpu__init_cpu_xstate(void)
 {
-	if (!boot_cpu_has(X86_FEATURE_XSAVE) || !xfeatures_mask_user)
+	if (!boot_cpu_has(X86_FEATURE_XSAVE) || !xfeatures_mask_all)
 		return;
-	/*
-	 * Make it clear that XSAVES system states are not yet
-	 * implemented should anyone expect it to work by changing
-	 * bits in XFEATURE_MASK_* macros and XCR0.
-	 */
-	WARN_ONCE((xfeatures_mask_user & XFEATURE_MASK_SYSTEM),
-		"x86/fpu: XSAVES system states are not yet implemented.\n");
-
-	xfeatures_mask_user &= ~XFEATURE_MASK_SYSTEM;
 
 	cr4_set_bits(X86_CR4_OSXSAVE);
-	xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures_mask_user);
+
+	/*
+	 * XCR_XFEATURE_ENABLED_MASK sets the features that are managed
+	 * by XSAVE{C, OPT} and XRSTOR.  Only XSAVE user states can be
+	 * set here.
+	 */
+	xsetbv(XCR_XFEATURE_ENABLED_MASK,
+	       xfeatures_mask_user);
+
+	/*
+	 * MSR_IA32_XSS sets which XSAVES system states to be managed by
+	 * XSAVES.  Only XSAVES system states can be set here.
+	 */
+	if (boot_cpu_has(X86_FEATURE_XSAVES))
+		wrmsrl(MSR_IA32_XSS,
+		       xfeatures_mask_all & ~xfeatures_mask_user);
 }
 
-/*
- * Note that in the future we will likely need a pair of
- * functions here: one for user xstates and the other for
- * system xstates.  For now, they are the same.
- */
 static int xfeature_enabled(enum xfeature xfeature)
 {
-	return !!(xfeatures_mask_user & BIT_ULL(xfeature));
+	return !!(xfeatures_mask_all & BIT_ULL(xfeature));
 }
 
 /*
@@ -348,7 +352,7 @@ static int xfeature_is_aligned(int xfeature_nr)
  */
 static void __init setup_xstate_comp(void)
 {
-	unsigned int xstate_comp_sizes[sizeof(xfeatures_mask_user)*8];
+	unsigned int xstate_comp_sizes[sizeof(xfeatures_mask_all)*8];
 	int i;
 
 	/*
@@ -422,7 +426,7 @@ static void __init setup_init_fpu_buf(void)
 
 	if (boot_cpu_has(X86_FEATURE_XSAVES))
 		init_fpstate.xsave.header.xcomp_bv =
-			BIT_ULL(63) | xfeatures_mask_user;
+			BIT_ULL(63) | xfeatures_mask_all;
 
 	/*
 	 * Init all the features state with header.xfeatures being 0x0
@@ -441,11 +445,10 @@ static int xfeature_uncompacted_offset(int xfeature_nr)
 	u32 eax, ebx, ecx, edx;
 
 	/*
-	 * Only XSAVES supports system states and it uses compacted
-	 * format. Checking a system state's uncompacted offset is
-	 * an error.
+	 * Checking a system or unsupported state's uncompacted offset
+	 * is an error.
 	 */
-	if (XFEATURE_MASK_SYSTEM & (1 << xfeature_nr)) {
+	if (~xfeatures_mask_user & BIT_ULL(xfeature_nr)) {
 		WARN_ONCE(1, "No fixed offset for xstate %d\n", xfeature_nr);
 		return -1;
 	}
@@ -482,7 +485,7 @@ int using_compacted_format(void)
 int validate_xstate_header(const struct xstate_header *hdr)
 {
 	/* No unknown or system features may be set */
-	if (hdr->xfeatures & (~xfeatures_mask_user | XFEATURE_MASK_SYSTEM))
+	if (hdr->xfeatures & ~xfeatures_mask_user)
 		return -EINVAL;
 
 	/* Userspace must use the uncompacted format */
@@ -617,15 +620,12 @@ static void do_extra_xstate_size_checks(void)
 
 
 /*
- * Get total size of enabled xstates in XCR0/xfeatures_mask_user.
+ * Get total size of enabled xstates in XCR0 | IA32_XSS.
  *
  * Note the SDM's wording here.  "sub-function 0" only enumerates
  * the size of the *user* states.  If we use it to size a buffer
  * that we use 'XSAVES' on, we could potentially overflow the
  * buffer because 'XSAVES' saves system states too.
- *
- * Note that we do not currently set any bits on IA32_XSS so
- * 'XCR0 | IA32_XSS == XCR0' for now.
  */
 static unsigned int __init get_xsaves_size(void)
 {
@@ -707,6 +707,7 @@ static int init_xstate_size(void)
  */
 static void fpu__init_disable_system_xstate(void)
 {
+	xfeatures_mask_all = 0;
 	xfeatures_mask_user = 0;
 	cr4_clear_bits(X86_CR4_OSXSAVE);
 	fpu__xstate_clear_all_cpu_caps();
@@ -722,6 +723,8 @@ void __init fpu__init_system_xstate(void)
 	static int on_boot_cpu __initdata = 1;
 	int err;
 	int i;
+	u64 cpu_user_xfeatures_mask;
+	u64 cpu_system_xfeatures_mask;
 
 	WARN_ON_FPU(!on_boot_cpu);
 	on_boot_cpu = 0;
@@ -742,10 +745,24 @@ void __init fpu__init_system_xstate(void)
 		return;
 	}
 
+	/*
+	 * Find user states supported by the processor.
+	 * Only these bits can be set in XCR0.
+	 */
 	cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
-	xfeatures_mask_user = eax + ((u64)edx << 32);
+	cpu_user_xfeatures_mask = eax + ((u64)edx << 32);
 
-	if ((xfeatures_mask_user & XFEATURE_MASK_FPSSE) != XFEATURE_MASK_FPSSE) {
+	/*
+	 * Find system states supported by the processor.
+	 * Only these bits can be set in IA32_XSS MSR.
+	 */
+	cpuid_count(XSTATE_CPUID, 1, &eax, &ebx, &ecx, &edx);
+	cpu_system_xfeatures_mask = ecx + ((u64)edx << 32);
+
+	xfeatures_mask_all = cpu_user_xfeatures_mask |
+			     cpu_system_xfeatures_mask;
+
+	if ((xfeatures_mask_all & XFEATURE_MASK_FPSSE) != XFEATURE_MASK_FPSSE) {
 		/*
 		 * This indicates that something really unexpected happened
 		 * with the enumeration.  Disable XSAVE and try to continue
@@ -760,10 +777,11 @@ void __init fpu__init_system_xstate(void)
 	 */
 	for (i = 0; i < ARRAY_SIZE(xsave_cpuid_features); i++) {
 		if (!boot_cpu_has(xsave_cpuid_features[i]))
-			xfeatures_mask_user &= ~BIT_ULL(i);
+			xfeatures_mask_all &= ~BIT_ULL(i);
 	}
 
-	xfeatures_mask_user &= fpu__get_supported_xfeatures_mask();
+	xfeatures_mask_all &= SUPPORTED_XFEATURES_MASK;
+	xfeatures_mask_user = xfeatures_mask_all & cpu_user_xfeatures_mask;
 
 	/* Enable xstate instructions to be able to continue with initialization: */
 	fpu__init_cpu_xstate();
@@ -775,8 +793,7 @@ void __init fpu__init_system_xstate(void)
 	 * Update info used for ptrace frames; use standard-format size and no
 	 * system xstates:
 	 */
-	update_regset_xstate_info(fpu_user_xstate_size,
-				  xfeatures_mask_user & ~XFEATURE_MASK_SYSTEM);
+	update_regset_xstate_info(fpu_user_xstate_size, xfeatures_mask_user);
 
 	fpu__init_prepare_fx_sw_frame();
 	setup_init_fpu_buf();
@@ -784,7 +801,7 @@ void __init fpu__init_system_xstate(void)
 	print_xstate_offset_size();
 
 	pr_info("x86/fpu: Enabled xstate features 0x%llx, context size is %d bytes, using '%s' format.\n",
-		xfeatures_mask_user,
+		xfeatures_mask_all,
 		fpu_kernel_xstate_size,
 		boot_cpu_has(X86_FEATURE_XSAVES) ? "compacted" : "standard");
 	return;
@@ -804,6 +821,13 @@ void fpu__resume_cpu(void)
 	 */
 	if (boot_cpu_has(X86_FEATURE_XSAVE))
 		xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures_mask_user);
+
+	/*
+	 * Restore IA32_XSS
+	 */
+	if (boot_cpu_has(X86_FEATURE_XSAVES))
+		wrmsrl(MSR_IA32_XSS,
+		       xfeatures_mask_all & ~xfeatures_mask_user);
 }
 
 /*
@@ -853,9 +877,9 @@ void *get_xsave_addr(struct xregs_state *xsave, int xstate_feature)
 	/*
 	 * We should not ever be requesting features that we
 	 * have not enabled.  Remember that pcntxt_mask is
-	 * what we write to the XCR0 register.
+	 * what we write to the XCR0 | IA32_XSS registers.
 	 */
-	WARN_ONCE(!(xfeatures_mask_user & xstate_feature),
+	WARN_ONCE(!(xfeatures_mask_all & xstate_feature),
 		  "get of unsupported state");
 	/*
 	 * This assumes the last 'xsave*' instruction to
@@ -1005,7 +1029,7 @@ int copy_xstate_to_kernel(void *kbuf, struct xregs_state *xsave, unsigned int of
 	 */
 	memset(&header, 0, sizeof(header));
 	header.xfeatures = xsave->header.xfeatures;
-	header.xfeatures &= ~XFEATURE_MASK_SYSTEM;
+	header.xfeatures &= xfeatures_mask_user;
 
 	/*
 	 * Copy xregs_state->header:
@@ -1089,7 +1113,7 @@ int copy_xstate_to_user(void __user *ubuf, struct xregs_state *xsave, unsigned i
 	 */
 	memset(&header, 0, sizeof(header));
 	header.xfeatures = xsave->header.xfeatures;
-	header.xfeatures &= ~XFEATURE_MASK_SYSTEM;
+	header.xfeatures &= xfeatures_mask_user;
 
 	/*
 	 * Copy xregs_state->header:
@@ -1182,7 +1206,7 @@ int copy_kernel_to_xstate(struct xregs_state *xsave, const void *kbuf)
 	 * The state that came in from userspace was user-state only.
 	 * Mask all the user states out of 'xfeatures':
 	 */
-	xsave->header.xfeatures &= XFEATURE_MASK_SYSTEM;
+	xsave->header.xfeatures &= (xfeatures_mask_all & ~xfeatures_mask_user);
 
 	/*
 	 * Add back in the features that came in from userspace:
@@ -1238,7 +1262,7 @@ int copy_user_to_xstate(struct xregs_state *xsave, const void __user *ubuf)
 	 * The state that came in from userspace was user-state only.
 	 * Mask all the user states out of 'xfeatures':
 	 */
-	xsave->header.xfeatures &= XFEATURE_MASK_SYSTEM;
+	xsave->header.xfeatures &= (xfeatures_mask_all & ~xfeatures_mask_user);
 
 	/*
 	 * Add back in the features that came in from userspace:
