@@ -7344,7 +7344,7 @@ F:	Documentation/networking/e1000.rst
 F:	Documentation/networking/e1000e.rst
 F:	Documentation/networking/fm10k.rst
 F:	Documentation/networking/igb.rst
-F:	Documentation/networking/igbvf.txt
+F:	Documentation/networking/igbvf.rst
 F:	Documentation/networking/ixgb.rst
 F:	Documentation/networking/ixgbe.txt
 F:	Documentation/networking/ixgbevf.txt
