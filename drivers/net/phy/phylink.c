@@ -738,7 +738,7 @@ int phylink_connect_phy(struct phylink *pl, struct phy_device *phy)
 
 	if (WARN_ON(pl->link_an_mode == MLO_AN_FIXED ||
 		    (pl->link_an_mode == MLO_AN_INBAND &&
-		     phy_interface_mode_is_8023z(pl->link_interface))))
+		     phy_interface_mode_is_8023z(pl->link_config.interface))))
 		return -EINVAL;
 
 	if (pl->phydev)
@@ -750,7 +750,7 @@ int phylink_connect_phy(struct phylink *pl, struct phy_device *phy)
 		pl->link_config.interface = pl->link_interface;
 	}
 
-	ret = phy_attach_direct(pl->netdev, phy, 0, pl->link_interface);
+	ret = phy_attach_direct(pl->netdev, phy, 0, pl->link_config.interface);
 	if (ret)
 		return ret;
 
