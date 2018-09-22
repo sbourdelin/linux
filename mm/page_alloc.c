@@ -630,6 +630,12 @@ static int __init debug_guardpage_minorder_setup(char *buf)
 {
 	unsigned long res;
 
+	if (!buf) {
+		pr_err("kernel option debug_guardpage_minorder requires an \
+			argument\n");
+		return -EINVAL;
+	}
+
 	if (kstrtoul(buf, 10, &res) < 0 ||  res > MAX_ORDER / 2) {
 		pr_err("Bad debug_guardpage_minorder value\n");
 		return 0;
@@ -6952,6 +6958,11 @@ static int __init cmdline_parse_core(char *p, unsigned long *core,
  */
 static int __init cmdline_parse_kernelcore(char *p)
 {
+	if (!p) {
+		pr_err("kernel option kernelcore requires an argument\n");
+		return -EINVAL;
+	}
+
 	/* parse kernelcore=mirror */
 	if (parse_option_str(p, "mirror")) {
 		mirrored_kernelcore = true;
