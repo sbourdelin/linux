@@ -552,7 +552,7 @@ static inline void inc_tlb_flush_pending(struct mm_struct *mm)
 	 *	flush_tlb_range();
 	 *	atomic_dec(&mm->tlb_flush_pending);
 	 *
-	 * Where the increment if constrained by the PTL unlock, it thus
+	 * Where the increment is constrained by the PTL unlock, it thus
 	 * ensures that the increment is visible if the PTE modification is
 	 * visible. After all, if there is no PTE modification, nobody cares
 	 * about TLB flushes either.
