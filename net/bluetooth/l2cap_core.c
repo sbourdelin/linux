@@ -3815,9 +3815,24 @@ static struct l2cap_chan *l2cap_connect(struct l2cap_conn *conn,
 
 	result = L2CAP_CR_NO_MEM;
 
-	/* Check if we already have channel with that dcid */
-	if (__l2cap_get_chan_by_dcid(conn, scid))
+	/* As per ESR08_V1.0.0, Erratum 3253, check the CID is in valid
+	 * dynamic range and is not allocated already.
+	 * Send the new result codes accordingly
+	 */
+
+	/* Check for valid dynamic CID range */
+	if (scid < L2CAP_CID_DYN_START || scid > L2CAP_CID_DYN_END) {
+		result = L2CAP_CR_BREDR_INVALID_SCID;
+		chan = NULL;
 		goto response;
+	}
+
+	/* Check if we already have channel with that dcid */
+	if (__l2cap_get_chan_by_dcid(conn, scid)) {
+		result = L2CAP_CR_BREDR_SCID_IN_USE;
+		chan = NULL;
+		goto response;
+	}
 
 	chan = pchan->ops->new_connection(pchan);
 	if (!chan)
