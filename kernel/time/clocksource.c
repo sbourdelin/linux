@@ -187,10 +187,39 @@ static void clocksource_watchdog(struct timer_list *unused)
 	u64 csnow, wdnow, cslast, wdlast, delta;
 	int64_t wd_nsec, cs_nsec;
 	int next_cpu, reset_pending;
+	static bool prev_running; /* Set if previously in SYSTEM_RUNNING */
 
 	spin_lock(&watchdog_lock);
 	if (!watchdog_running)
 		goto out;
+
+	/*
+	 * When the timer tick is incorrectly stopped on a CPU with
+	 * pending events, for example, it is possible that the
+	 * clocksource watchdog will stop running for a sufficiently
+	 * long enough time to cause overflow in the delta computation
+	 * leading to incorrect report of unstable clock source.
+	 * So print a warning if there is unusually large delay (> 0.5s)
+	 * in the invocation of the watchdog. That can indicate a hidden
+	 * bug in the timer tick code.
+	 *
+	 * This check is performed only when the system is previously
+	 * running in the SYSTEM_RUNNING state as large delay may happen
+	 * when running in other states, especially when self-tests are
+	 * being run. If the watchdog was previously in the running state,
+	 * that will make sure that the current timer expiry happened in
+	 * that state too.
+	 */
+	if (prev_running) {
+		unsigned long delay = jiffies - watchdog_timer.expires;
+
+		if (delay > WATCHDOG_INTERVAL) {
+			pr_warn("watchdog delayed by %ld ticks!\n", delay);
+			WARN_ON_ONCE(1);
+		}
+	} else if (system_state == SYSTEM_RUNNING) {
+		prev_running = true;
+	}
 
 	reset_pending = atomic_read(&watchdog_reset_pending);
 
