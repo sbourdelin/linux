@@ -1393,7 +1393,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 		dev_priv->uncore.fw_set = FORCEWAKE_KERNEL;
 		dev_priv->uncore.fw_clear = 0;
 	} else {
-		/* WaRsClearFWBitsAtReset:bdw,skl */
+		/* WaRsClearFWBitsAtFLR:bdw,skl,bxt,kbl,glk,cfl */
 		dev_priv->uncore.fw_reset = _MASKED_BIT_DISABLE(0xffff);
 		dev_priv->uncore.fw_set = _MASKED_BIT_ENABLE(FORCEWAKE_KERNEL);
 		dev_priv->uncore.fw_clear = _MASKED_BIT_DISABLE(FORCEWAKE_KERNEL);
