@@ -26,6 +26,7 @@
 
 #include <linux/uaccess.h>
 #include <asm/ioctls.h>
+#include <linux/sched/clock.h>
 
 #include "internal.h"
 
@@ -40,6 +41,7 @@ unsigned int pipe_max_size = 1048576;
  */
 unsigned long pipe_user_pages_hard;
 unsigned long pipe_user_pages_soft = PIPE_DEF_BUFFERS * INR_OPEN_CUR;
+unsigned int pipe_busy_poll;
 
 /*
  * We use a start+len construction, which provides full use of the 
@@ -106,6 +108,7 @@ void pipe_double_lock(struct pipe_inode_info *pipe1,
 void pipe_wait(struct pipe_inode_info *pipe)
 {
 	DEFINE_WAIT(wait);
+	u64 start;
 
 	/*
 	 * Pipes are system-local resources, so sleeping on them
@@ -113,6 +116,10 @@ void pipe_wait(struct pipe_inode_info *pipe)
 	 */
 	prepare_to_wait(&pipe->wait, &wait, TASK_INTERRUPTIBLE);
 	pipe_unlock(pipe);
+	start = local_clock();
+	while (current->state != TASK_RUNNING &&
+	       ((local_clock() - start) >> 10) < pipe->pipe_ll_usec)
+		cpu_relax();
 	schedule();
 	finish_wait(&pipe->wait, &wait);
 	pipe_lock(pipe);
@@ -825,6 +832,7 @@ static int do_pipe2(int __user *fildes, int flags)
 	struct file *files[2];
 	int fd[2];
 	int error;
+	struct pipe_inode_info *pipe;
 
 	error = __do_pipe_flags(fd, files, flags);
 	if (!error) {
@@ -838,6 +846,10 @@ static int do_pipe2(int __user *fildes, int flags)
 			fd_install(fd[0], files[0]);
 			fd_install(fd[1], files[1]);
 		}
+		pipe = files[0]->private_data;
+		pipe->pipe_ll_usec = pipe_busy_poll;
+		pipe = files[1]->private_data;
+		pipe->pipe_ll_usec = pipe_busy_poll;
 	}
 	return error;
 }

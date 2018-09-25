@@ -1863,6 +1863,13 @@ static struct ctl_table fs_table[] = {
 		.proc_handler	= proc_doulongvec_minmax,
 	},
 	{
+		.procname       = "pipe-busy-poll",
+		.data           = &pipe_busy_poll,
+		.maxlen         = sizeof(unsigned int),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+	},
+	{
 		.procname	= "mount-max",
 		.data		= &sysctl_mount_max,
 		.maxlen		= sizeof(unsigned int),
