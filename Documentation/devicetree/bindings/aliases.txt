@@ -1,0 +1,47 @@
+The aliases node
+----------------
+
+The aliases node contains properties that represent aliases to device tree
+nodes. The name of the property is the alias name, the value is the path of
+a the device tree node that corresponds to the alias. The path may be
+specified as a string or a phandle.
+
+Alias names are often suffixed with a numeric ID, especially when there may
+be multiple instances of the same type. The ID typically corresponds to the
+hardware layout, it may also be used by drivers for a stable mapping of
+device names and hardware entities.
+
+Alias names
+-----------
+
+The devicetree specification doesn't require the use of specific alias
+names to refer to hardware entities of a given type, however the Linux
+kernel aims for a certain level of consistency.
+
+The following standardized alias names shall be used for their
+corresponding hardware components:
+
+  bluetoothN		Bluetooth controller
+  ethernetN		Ethernet interface
+  gpioN			GPIO controller
+  i2cN			i2c bus
+  mmcN			MMC bus
+  rtcN			Real time clock
+  serialN		UART port
+  spiN			SPI bus
+  wifiN			Wireless network interface
+
+The above list is not exhaustive and will be extended over time. Please
+send patches to devicetree@vger.kernel.org if you think a hardware
+component and its alias name should be on the list.
+
+Example
+-------
+
+aliases {
+	bluetooth0 = "/soc/serial@fdf01000/bluetooth";
+	rtc0 = &rtc0;
+	wifi0 = &wlcore;
+};
+
+(based on arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts)
