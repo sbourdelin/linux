@@ -971,10 +971,16 @@ this <tt>rcu_segcblist</tt> structure, <i>not</i> the <tt>-&gt;head</tt>
 pointer.
 The reason for this is that all the ready-to-invoke callbacks
 (that is, those in the <tt>RCU_DONE_TAIL</tt> segment) are extracted
-all at once at callback-invocation time.
+all at once at callback-invocation time (<tt>rcu_do_batch</tt>), due
+to which <tt>-&gt;head</tt> may be set to NULL if there are no more
+callbacks on the <tt>rcu_segcblist</tt>.
 If callback invocation must be postponed, for example, because a
 high-priority process just woke up on this CPU, then the remaining
-callbacks are placed back on the <tt>RCU_DONE_TAIL</tt> segment.
+callbacks are placed back on the <tt>RCU_DONE_TAIL</tt> segment and
+<tt>-&gt;head</tt> would point to the start of the segment. So as you
+can see, the head field is briefly NULL even though not all callbacks
+could be invoked, so we can't rely on it to tell us if there are no
+callbacks associated with the <tt>rcu_segcb_list</tt>.
 Either way, the <tt>-&gt;len</tt> and <tt>-&gt;len_lazy</tt> counts
 are adjusted after the corresponding callbacks have been invoked, and so
 again it is the <tt>-&gt;len</tt> count that accurately reflects whether
