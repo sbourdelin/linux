@@ -17,6 +17,7 @@
 #include <linux/string.h>
 #include <linux/mutex.h>
 #include <linux/sysfs.h>
+#include <linux/of.h>
 #include "base.h"
 #include "power/power.h"
 
@@ -372,6 +373,31 @@ struct device *bus_find_device_by_name(struct bus_type *bus,
 	return bus_find_device(bus, start, (void *)name, match_name);
 }
 EXPORT_SYMBOL_GPL(bus_find_device_by_name);
+
+static int match_fwnode(struct device *dev, void *data)
+{
+	struct fwnode_handle *fwnode = data;
+	struct device_node *of_node = to_of_node(fwnode);
+
+	if (of_node)
+		return dev->of_node == of_node;
+	else
+		return dev->fwnode == fwnode;
+}
+
+/**
+ * bus_find_device_by_fwnode - device iterator for locating a particular device
+ * having a specific firmware node
+ * @bus: bus type
+ * @start: Device to begin with
+ * @fwnode: firmware node of the device to match
+ */
+struct device *bus_find_device_by_fwnode(struct bus_type *bus, struct device *start,
+					struct fwnode_handle *fwnode)
+{
+	return bus_find_device(bus, start, (void *)fwnode, match_fwnode);
+}
+EXPORT_SYMBOL_GPL(bus_find_device_by_fwnode);
 
 /**
  * subsys_find_device_by_id - find a device with a specific enumeration number
