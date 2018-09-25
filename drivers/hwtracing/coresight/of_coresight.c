@@ -17,12 +17,6 @@
 #include <linux/cpumask.h>
 #include <asm/smp_plat.h>
 
-
-static int of_dev_node_match(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static struct device *
 of_coresight_get_endpoint_device(struct device_node *endpoint)
 {
@@ -32,8 +26,8 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
 	 * If we have a non-configurable replicator, it will be found on the
 	 * platform bus.
 	 */
-	dev = bus_find_device(&platform_bus_type, NULL,
-			      endpoint, of_dev_node_match);
+	dev = bus_find_device_by_fwnode(&platform_bus_type, NULL,
+					&endpoint->fwnode);
 	if (dev)
 		return dev;
 
@@ -41,8 +35,8 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
 	 * We have a configurable component - circle through the AMBA bus
 	 * looking for the device that matches the endpoint node.
 	 */
-	return bus_find_device(&amba_bustype, NULL,
-			       endpoint, of_dev_node_match);
+	return bus_find_device_by_fwnode(&amba_bustype, NULL,
+					&endpoint->fwnode);
 }
 
 static void of_coresight_get_ports(const struct device_node *node,
