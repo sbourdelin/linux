@@ -18,27 +18,13 @@
 
 	.text
 	.code32
-ENTRY(get_sev_encryption_bit)
+do_get_sev_encryption_bit:
 	xor	%eax, %eax
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	push	%ebx
 	push	%ecx
 	push	%edx
-	push	%edi
-
-	/*
-	 * RIP-relative addressing is needed to access the encryption bit
-	 * variable. Since we are running in 32-bit mode we need this call/pop
-	 * sequence to get the proper relative addressing.
-	 */
-	call	1f
-1:	popl	%edi
-	subl	$1b, %edi
-
-	movl	enc_bit(%edi), %eax
-	cmpl	$0, %eax
-	jge	.Lsev_exit
 
 	/* Check if running under a hypervisor */
 	movl	$1, %eax
@@ -69,15 +55,12 @@ ENTRY(get_sev_encryption_bit)
 
 	movl	%ebx, %eax
 	andl	$0x3f, %eax		/* Return the encryption bit location */
-	movl	%eax, enc_bit(%edi)
 	jmp	.Lsev_exit
 
 .Lno_sev:
 	xor	%eax, %eax
-	movl	%eax, enc_bit(%edi)
 
 .Lsev_exit:
-	pop	%edi
 	pop	%edx
 	pop	%ecx
 	pop	%ebx
@@ -85,9 +68,52 @@ ENTRY(get_sev_encryption_bit)
 #endif	/* CONFIG_AMD_MEM_ENCRYPT */
 
 	ret
+
+ENTRY(get_sev_encryption_bit)
+	xor	%eax, %eax
+
+#ifdef CONFIG_AMD_MEM_ENCRYPT
+	push	%edi
+
+	/*
+	 * RIP-relative addressing is needed to access the encryption bit
+	 * variable. Since we are running in 32-bit mode we need this call/pop
+	 * sequence to get the proper relative addressing.
+	 */
+	call	1f
+1:	popl	%edi
+	subl	$1b, %edi
+
+	movl	enc_bit(%edi), %eax
+	cmpl	$0, %eax
+	jge 2f
+
+	call    do_get_sev_encryption_bit
+	movl	%eax, enc_bit(%edi)
+2:
+	pop	%edi
+#endif	/* CONFIG_AMD_MEM_ENCRYPT */
+
+	ret
 ENDPROC(get_sev_encryption_bit)
 
 	.code64
+ENTRY(get_sev_encryption_bit_64)
+	xor	%rax, %rax
+
+#ifdef CONFIG_AMD_MEM_ENCRYPT
+	movl	enc_bit(%rip), %eax
+	cmpl	$0, %eax
+	jge 1f
+
+	call    do_get_sev_encryption_bit
+	movl	%eax, enc_bit(%rip)
+1:
+#endif	/* CONFIG_AMD_MEM_ENCRYPT */
+
+	ret
+ENDPROC(get_sev_encryption_bit_64)
+
 ENTRY(set_sev_encryption_mask)
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	push	%rbp
@@ -95,7 +121,7 @@ ENTRY(set_sev_encryption_mask)
 
 	movq	%rsp, %rbp		/* Save current stack pointer */
 
-	call	get_sev_encryption_bit	/* Get the encryption bit position */
+	call	get_sev_encryption_bit_64	/* Get the encryption bit position */
 	testl	%eax, %eax
 	jz	.Lno_sev_mask
 
