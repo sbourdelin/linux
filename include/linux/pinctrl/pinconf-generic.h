@@ -150,7 +150,7 @@ static inline u32 pinconf_to_config_argument(unsigned long config)
 	return (u32) ((config >> 8) & 0xffffffUL);
 }
 
-static inline unsigned long pinconf_to_config_packed(enum pin_config_param param,
+static inline unsigned long pinconf_to_config_packed(int param,
 						     u32 argument)
 {
 	return PIN_CONF_PACKED(param, argument);
@@ -164,7 +164,7 @@ static inline unsigned long pinconf_to_config_packed(enum pin_config_param param
 	}
 
 struct pin_config_item {
-	const enum pin_config_param param;
+	const int param;
 	const char * const display;
 	const char * const format;
 	bool has_arg;
@@ -180,7 +180,7 @@ struct pinctrl_map;
 
 struct pinconf_generic_params {
 	const char * const property;
-	enum pin_config_param param;
+	int param;
 	u32 default_value;
 };
 
