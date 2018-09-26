@@ -22,26 +22,24 @@
  * Miscelanous functionality used in the other GenWQE driver parts.
  */
 
-#include <linux/kernel.h>
+#include <asm/pgtable.h>
+#include <linux/ctype.h>
+#include <linux/delay.h>
 #include <linux/dma-mapping.h>
-#include <linux/sched.h>
-#include <linux/vmalloc.h>
-#include <linux/page-flags.h>
-#include <linux/scatterlist.h>
 #include <linux/hugetlb.h>
 #include <linux/iommu.h>
-#include <linux/delay.h>
-#include <linux/pci.h>
-#include <linux/dma-mapping.h>
-#include <linux/ctype.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/page-flags.h>
+#include <linux/pci.h>
 #include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <asm/pgtable.h>
+#include <linux/scatterlist.h>
+#include <linux/sched.h>
+#include <linux/vmalloc.h>
 
-#include "genwqe_driver.h"
 #include "card_base.h"
 #include "card_ddcb.h"
+#include "genwqe_driver.h"
 
 /**
  * __genwqe_writeq() - Write 64-bit register
