@@ -78,8 +78,6 @@ static inline int ieee80211_networks_allocate(struct ieee80211_device *ieee)
 
 static inline void ieee80211_networks_free(struct ieee80211_device *ieee)
 {
-	if (!ieee->networks)
-		return;
 	kfree(ieee->networks);
 	ieee->networks = NULL;
 }
@@ -180,6 +178,7 @@ struct net_device *alloc_ieee80211(int sizeof_priv)
 	return dev;
 
  failed:
+	ieee80211_networks_free(ieee);
 	if (dev)
 		free_netdev(dev);
 
