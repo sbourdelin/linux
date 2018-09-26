@@ -1232,6 +1232,10 @@ int tmio_mmc_host_probe(struct tmio_mmc_host *_host)
 	_host->set_clock(_host, 0);
 	tmio_mmc_reset(_host);
 
+	if (pdata->flags & TMIO_MMC_MIN_RCAR2)
+		sd_ctrl_write32_as_16_and_16(_host, CTL_IRQ_MASK,
+					     TMIO_MASK_INIT_RCAR2);
+
 	_host->sdcard_irq_mask = sd_ctrl_read16_and_16_as_32(_host, CTL_IRQ_MASK);
 	tmio_mmc_disable_mmc_irqs(_host, TMIO_MASK_ALL);
 
