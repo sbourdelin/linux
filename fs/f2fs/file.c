@@ -47,7 +47,7 @@ static vm_fault_t f2fs_vm_page_mkwrite(struct vm_fault *vmf)
 	struct page *page = vmf->page;
 	struct inode *inode = file_inode(vmf->vma->vm_file);
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
-	struct dnode_of_data dn;
+	struct dnode_of_data dn = { .node_changed = false };
 	int err;
 
 	if (unlikely(f2fs_cp_error(sbi))) {
@@ -58,19 +58,6 @@ static vm_fault_t f2fs_vm_page_mkwrite(struct vm_fault *vmf)
 	sb_start_pagefault(inode->i_sb);
 
 	f2fs_bug_on(sbi, f2fs_has_inline_data(inode));
-
-	/* block allocation */
-	f2fs_lock_op(sbi);
-	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = f2fs_reserve_block(&dn, page->index);
-	if (err) {
-		f2fs_unlock_op(sbi);
-		goto out;
-	}
-	f2fs_put_dnode(&dn);
-	f2fs_unlock_op(sbi);
-
-	f2fs_balance_fs(sbi, dn.node_changed);
 
 	file_update_time(vmf->vma->vm_file);
 	down_read(&F2FS_I(inode)->i_mmap_sem);
@@ -108,12 +95,24 @@ mapped:
 	/* fill the page */
 	f2fs_wait_on_page_writeback(page, DATA, false);
 
+	/* block allocation */
+	__do_map_lock(sbi, F2FS_GET_BLOCK_PRE_AIO, true);
+	set_new_dnode(&dn, inode, NULL, NULL, 0);
+	err = f2fs_reserve_block(&dn, page->index);
+	if (err)
+		goto out_unlock;
+
 	/* wait for GCed page writeback via META_MAPPING */
 	f2fs_wait_on_block_writeback(inode, dn.data_blkaddr);
 
+	f2fs_put_dnode(&dn);
+out_unlock:
+	__do_map_lock(sbi, F2FS_GET_BLOCK_PRE_AIO, false);
 out_sem:
 	up_read(&F2FS_I(inode)->i_mmap_sem);
-out:
+
+	f2fs_balance_fs(sbi, dn.node_changed);
+
 	sb_end_pagefault(inode->i_sb);
 	f2fs_update_time(sbi, REQ_TIME);
 err:
