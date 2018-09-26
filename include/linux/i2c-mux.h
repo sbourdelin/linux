@@ -36,6 +36,7 @@ struct i2c_mux_core {
 	unsigned int arbitrator:1;
 	unsigned int gate:1;
 
+	struct i2c_algorithm algo;
 	void *priv;
 
 	int (*select)(struct i2c_mux_core *, u32 chan_id);
