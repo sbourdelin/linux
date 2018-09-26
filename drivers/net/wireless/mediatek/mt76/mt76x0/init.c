@@ -377,7 +377,8 @@ void mt76x0_mac_stop(struct mt76x0_dev *dev)
 {
 	cancel_delayed_work_sync(&dev->cal_work);
 	cancel_delayed_work_sync(&dev->mac_work);
-	mt76u_stop_stat_wk(&dev->mt76);
+	if (IS_ENABLED(CONFIG_MT76x0U))
+		mt76u_stop_stat_wk(&dev->mt76);
 	mt76x0_mac_stop_hw(dev);
 }
 EXPORT_SYMBOL_GPL(mt76x0_mac_stop);
@@ -457,6 +458,7 @@ int mt76x0_init_hardware(struct mt76x0_dev *dev)
 }
 EXPORT_SYMBOL_GPL(mt76x0_init_hardware);
 
+#ifdef CONFIG_MT76x0U
 void mt76x0_cleanup(struct mt76x0_dev *dev)
 {
 	clear_bit(MT76_STATE_INITIALIZED, &dev->mt76.state);
@@ -465,6 +467,7 @@ void mt76x0_cleanup(struct mt76x0_dev *dev)
 	mt76u_mcu_deinit(&dev->mt76);
 }
 EXPORT_SYMBOL_GPL(mt76x0_cleanup);
+#endif
 
 struct mt76x0_dev *
 mt76x0_alloc_device(struct device *pdev, const struct mt76_driver_ops *drv_ops)

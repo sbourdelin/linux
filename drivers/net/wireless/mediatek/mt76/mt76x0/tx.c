@@ -17,6 +17,7 @@
 #include "../mt76x02_util.h"
 #include "../mt76x02_usb.h"
 
+#ifdef CONFIG_MT76x0U
 static struct mt76x02_txwi *
 mt76x0_push_txwi(struct mt76x0_dev *dev, struct sk_buff *skb,
 		  struct ieee80211_sta *sta, struct mt76_wcid *wcid,
@@ -53,6 +54,7 @@ mt76x0_push_txwi(struct mt76x0_dev *dev, struct sk_buff *skb,
 
 	return txwi;
 }
+#endif
 
 void mt76x0_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
 	       struct sk_buff *skb)
@@ -82,6 +84,7 @@ void mt76x0_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
 	mt76_tx(&dev->mt76, control->sta, wcid, skb);
 }
 
+#ifdef CONFIG_MT76x0U
 int mt76x0_tx_prepare_skb(struct mt76_dev *mdev, void *data,
 			  struct sk_buff *skb, struct mt76_queue *q,
 			  struct mt76_wcid *wcid, struct ieee80211_sta *sta,
@@ -97,6 +100,7 @@ int mt76x0_tx_prepare_skb(struct mt76_dev *mdev, void *data,
 	return mt76x02u_set_txinfo(skb, wcid, q2ep(q->hw_idx));
 }
 EXPORT_SYMBOL_GPL(mt76x0_tx_prepare_skb);
+#endif
 
 void mt76x0_queue_rx_skb(struct mt76_dev *mdev, enum mt76_rxq_id q,
 			 struct sk_buff *skb)
