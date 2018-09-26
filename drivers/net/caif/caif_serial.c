@@ -275,7 +275,7 @@ error:
 	return tty_wr;
 }
 
-static int caif_xmit(struct sk_buff *skb, struct net_device *dev)
+static netdev_tx_t caif_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ser_device *ser;
 
@@ -290,7 +290,10 @@ static int caif_xmit(struct sk_buff *skb, struct net_device *dev)
 		ser->common.flowctrl(ser->dev, OFF);
 
 	skb_queue_tail(&ser->head, skb);
-	return handle_tx(ser);
+	if (handle_tx(ser))
+		return NETDEV_TX_BUSY;
+
+	return NETDEV_TX_OK;
 }
 
 
