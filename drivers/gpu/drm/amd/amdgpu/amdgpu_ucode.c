@@ -428,7 +428,6 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 	uint64_t fw_offset = 0;
 	int i, err;
 	struct amdgpu_firmware_info *ucode = NULL;
-	const struct common_firmware_header *header = NULL;
 
 	if (!adev->firmware.fw_size) {
 		dev_warn(adev->dev, "No ip firmware need to load\n");
@@ -465,7 +464,6 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 	for (i = 0; i < adev->firmware.max_ucodes; i++) {
 		ucode = &adev->firmware.ucode[i];
 		if (ucode->fw) {
-			header = (const struct common_firmware_header *)ucode->fw->data;
 			amdgpu_ucode_init_single_fw(adev, ucode, adev->firmware.fw_buf_mc + fw_offset,
 						    adev->firmware.fw_buf_ptr + fw_offset);
 			if (i == AMDGPU_UCODE_ID_CP_MEC1 &&
