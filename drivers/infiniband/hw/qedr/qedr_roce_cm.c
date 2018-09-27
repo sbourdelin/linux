@@ -195,7 +195,7 @@ static int qedr_ll2_post_tx(struct qedr_dev *dev,
 
 	ll2_tx_pkt.num_of_bds = 1 /* hdr */  + pkt->n_seg;
 	ll2_tx_pkt.vlan = 0;
-	ll2_tx_pkt.tx_dest = pkt->tx_dest;
+	ll2_tx_pkt.tx_dest = (enum qed_ll2_tx_dest)pkt->tx_dest;
 	ll2_tx_pkt.qed_roce_flavor = roce_flavor;
 	ll2_tx_pkt.first_frag = pkt->header.baddr;
 	ll2_tx_pkt.first_frag_len = pkt->header.len;
