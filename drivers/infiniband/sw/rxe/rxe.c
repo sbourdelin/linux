@@ -102,7 +102,8 @@ static void rxe_init_device_param(struct rxe_dev *rxe)
 	rxe->attr.max_res_rd_atom		= RXE_MAX_RES_RD_ATOM;
 	rxe->attr.max_qp_init_rd_atom		= RXE_MAX_QP_INIT_RD_ATOM;
 	rxe->attr.max_ee_init_rd_atom		= RXE_MAX_EE_INIT_RD_ATOM;
-	rxe->attr.atomic_cap			= RXE_ATOMIC_CAP;
+	rxe->attr.atomic_cap			=
+					(enum ib_atomic_cap)RXE_ATOMIC_CAP;
 	rxe->attr.max_ee			= RXE_MAX_EE;
 	rxe->attr.max_rdd			= RXE_MAX_RDD;
 	rxe->attr.max_mw			= RXE_MAX_MW;
@@ -127,9 +128,9 @@ static void rxe_init_device_param(struct rxe_dev *rxe)
 /* initialize port attributes */
 static int rxe_init_port_param(struct rxe_port *port)
 {
-	port->attr.state		= RXE_PORT_STATE;
-	port->attr.max_mtu		= RXE_PORT_MAX_MTU;
-	port->attr.active_mtu		= RXE_PORT_ACTIVE_MTU;
+	port->attr.state		= (enum ib_port_state)RXE_PORT_STATE;
+	port->attr.max_mtu		= (enum ib_mtu)RXE_PORT_MAX_MTU;
+	port->attr.active_mtu		= (enum ib_mtu)RXE_PORT_ACTIVE_MTU;
 	port->attr.gid_tbl_len		= RXE_PORT_GID_TBL_LEN;
 	port->attr.port_cap_flags	= RXE_PORT_PORT_CAP_FLAGS;
 	port->attr.max_msg_sz		= RXE_PORT_MAX_MSG_SZ;
@@ -147,7 +148,7 @@ static int rxe_init_port_param(struct rxe_port *port)
 	port->attr.active_speed		= RXE_PORT_ACTIVE_SPEED;
 	port->attr.phys_state		= RXE_PORT_PHYS_STATE;
 	port->mtu_cap			=
-				ib_mtu_enum_to_int(RXE_PORT_ACTIVE_MTU);
+			ib_mtu_enum_to_int((enum ib_mtu)RXE_PORT_ACTIVE_MTU);
 	port->subnet_prefix		= cpu_to_be64(RXE_PORT_SUBNET_PREFIX);
 
 	return 0;
