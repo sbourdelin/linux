@@ -101,6 +101,34 @@ struct kimage_arch {
 	unsigned long dtb_mem;
 };
 
+/**
+ * struct arm64_image_header - arm64 kernel image header
+ * See Documentation/arm64/booting.txt for details
+ *
+ * @mz_magic: DOS header magic number ('MZ', optional)
+ * @code1: Instruction (branch to stext)
+ * @text_offset: Image load offset
+ * @image_size: Effective image size
+ * @flags: Bit-field flags
+ * @reserved: Reserved
+ * @magic: Magic number
+ * @pe_header: Offset to PE COFF header (optional)
+ **/
+
+struct arm64_image_header {
+	__le16 mz_magic; /* also code0 */
+	__le16 pad;
+	__le32 code1;
+	__le64 text_offset;
+	__le64 image_size;
+	__le64 flags;
+	__le64 reserved[3];
+	__le32 magic;
+	__le32 pe_header;
+};
+
+extern const struct kexec_file_ops kexec_image_ops;
+
 struct kimage;
 
 extern int arch_kimage_file_post_load_cleanup(struct kimage *image);
