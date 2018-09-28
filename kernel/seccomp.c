@@ -1030,12 +1030,12 @@ out:
 	return filter;
 }
 
-long seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
-			void __user *data)
+int seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
+		       void __user *data)
 {
 	struct seccomp_filter *filter;
 	struct sock_fprog_kern *fprog;
-	long ret;
+	int ret;
 
 	if (!capable(CAP_SYS_ADMIN) ||
 	    current->seccomp.mode != SECCOMP_MODE_DISABLED) {
