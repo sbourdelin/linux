@@ -19,6 +19,7 @@
 #include <net/addrconf.h>
 #include <net/ipv6.h>
 #include <net/if_inet6.h>
+#include <net/genetlink.h>
 
 #include "internal.h"
 #include "ncsi-pkt.h"
@@ -406,7 +407,12 @@ static void ncsi_request_timeout(struct timer_list *t)
 {
 	struct ncsi_request *nr = from_timer(nr, t, timer);
 	struct ncsi_dev_priv *ndp = nr->ndp;
+	struct ncsi_package *np;
+	struct ncsi_channel *nc;
+	struct ncsi_cmd_pkt *cmd;
 	unsigned long flags;
+
+	netdev_dbg(ndp->ndev.dev, "NCSI: %s\n", __func__);
 
 	/* If the request already had associated response,
 	 * let the response handler to release it.
@@ -415,9 +421,25 @@ static void ncsi_request_timeout(struct timer_list *t)
 	nr->enabled = false;
 	if (nr->rsp || !nr->cmd) {
 		spin_unlock_irqrestore(&ndp->lock, flags);
+
+		netdev_dbg(ndp->ndev.dev,
+			   "NCSI: %s - early return\n", __func__);
+
 		return;
 	}
 	spin_unlock_irqrestore(&ndp->lock, flags);
+
+	if (nr->flags == NCSI_REQ_FLAG_NETLINK_DRIVEN) {
+		if (nr->cmd) {
+			/* Find the package */
+			cmd = (struct ncsi_cmd_pkt *)
+			      skb_network_header(nr->cmd);
+			ncsi_find_package_and_channel(ndp,
+						      cmd->cmd.common.channel,
+						      &np, &nc);
+			ncsi_send_netlink_timeout(nr, np, nc);
+		}
+	}
 
 	/* Release the request */
 	ncsi_free_request(nr);
