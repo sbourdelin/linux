@@ -72,8 +72,13 @@
 #include <asm/fixmap.h>
 #endif
 
-#define STACK_PT_REGS_OFFSET(sym, val)	\
-	DEFINE(sym, STACK_FRAME_OVERHEAD + offsetof(struct pt_regs, val))
+#define STACK_INT_REGS_OFFSET(sym, val)				\
+	DEFINE(sym, STACK_FRAME_OVERHEAD + offsetof(struct int_regs, val))
+
+#define STACK_PT_REGS_OFFSET(sym, val)				\
+	DEFINE(sym, STACK_FRAME_OVERHEAD +			\
+			offsetof(struct int_regs, pt_regs) +	\
+			offsetof(struct pt_regs, val))
 
 int main(void)
 {
@@ -150,7 +155,7 @@ int main(void)
 	OFFSET(THREAD_CKFPSTATE, thread_struct, ckfp_state.fpr);
 	/* Local pt_regs on stack for Transactional Memory funcs. */
 	DEFINE(TM_FRAME_SIZE, STACK_FRAME_OVERHEAD +
-	       sizeof(struct pt_regs) + 16);
+	       sizeof(struct int_regs) + 16);
 #endif /* CONFIG_PPC_TRANSACTIONAL_MEM */
 
 	OFFSET(TI_FLAGS, thread_info, flags);
@@ -264,11 +269,11 @@ int main(void)
 
 	/* Interrupt register frame */
 	DEFINE(INT_FRAME_SIZE, STACK_INT_FRAME_SIZE);
-	DEFINE(SWITCH_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs));
+	DEFINE(SWITCH_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct int_regs));
 #ifdef CONFIG_PPC64
 	/* Create extra stack space for SRR0 and SRR1 when calling prom/rtas. */
-	DEFINE(PROM_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs) + 16);
-	DEFINE(RTAS_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs) + 16);
+	DEFINE(PROM_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct int_regs) + 16);
+	DEFINE(RTAS_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct int_regs) + 16);
 #endif /* CONFIG_PPC64 */
 	STACK_PT_REGS_OFFSET(GPR0, gpr[0]);
 	STACK_PT_REGS_OFFSET(GPR1, gpr[1]);
@@ -315,8 +320,8 @@ int main(void)
 	STACK_PT_REGS_OFFSET(SOFTE, softe);
 
 	/* These _only_ to be used with {PROM,RTAS}_FRAME_SIZE!!! */
-	DEFINE(_SRR0, STACK_FRAME_OVERHEAD+sizeof(struct pt_regs));
-	DEFINE(_SRR1, STACK_FRAME_OVERHEAD+sizeof(struct pt_regs)+8);
+	DEFINE(_SRR0, STACK_FRAME_OVERHEAD+sizeof(struct int_regs));
+	DEFINE(_SRR1, STACK_FRAME_OVERHEAD+sizeof(struct int_regs)+8);
 #endif /* CONFIG_PPC64 */
 
 #if defined(CONFIG_PPC32)

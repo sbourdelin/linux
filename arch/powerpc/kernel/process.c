@@ -1627,7 +1627,7 @@ static void setup_ksp_vsid(struct task_struct *p, unsigned long sp)
 int copy_thread(unsigned long clone_flags, unsigned long usp,
 		unsigned long kthread_arg, struct task_struct *p)
 {
-	struct pt_regs *childregs, *kregs;
+	struct int_regs *childregs, *kregs;
 	extern void ret_from_fork(void);
 	extern void ret_from_kernel_thread(void);
 	void (*f)(void);
@@ -1637,44 +1637,44 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	klp_init_thread_info(ti);
 
 	/* Copy registers */
-	sp -= sizeof(struct pt_regs);
-	childregs = (struct pt_regs *) sp;
+	sp -= sizeof(struct int_regs);
+	childregs = (struct int_regs *) sp;
 	if (unlikely(p->flags & PF_KTHREAD)) {
 		/* kernel thread */
-		memset(childregs, 0, sizeof(struct pt_regs));
-		childregs->gpr[1] = sp + sizeof(struct pt_regs);
+		memset(childregs, 0, sizeof(struct int_regs));
+		childregs->pt_regs.gpr[1] = sp + sizeof(struct int_regs);
 		/* function */
 		if (usp)
-			childregs->gpr[14] = ppc_function_entry((void *)usp);
+			childregs->pt_regs.gpr[14] = ppc_function_entry((void *)usp);
 #ifdef CONFIG_PPC64
 		clear_tsk_thread_flag(p, TIF_32BIT);
-		childregs->softe = IRQS_ENABLED;
+		childregs->pt_regs.softe = IRQS_ENABLED;
 #endif
-		childregs->gpr[15] = kthread_arg;
+		childregs->pt_regs.gpr[15] = kthread_arg;
 		p->thread.regs = NULL;	/* no user register state */
 		ti->flags |= _TIF_RESTOREALL;
 		f = ret_from_kernel_thread;
 	} else {
 		/* user thread */
-		struct pt_regs *regs = current_pt_regs();
-		CHECK_FULL_REGS(regs);
+		struct int_regs *regs = current_int_regs();
+		CHECK_FULL_REGS(&regs->pt_regs);
 		*childregs = *regs;
 		if (usp)
-			childregs->gpr[1] = usp;
-		p->thread.regs = childregs;
-		childregs->gpr[3] = 0;  /* Result from fork() */
+			childregs->pt_regs.gpr[1] = usp;
+		p->thread.regs = &childregs->pt_regs;
+		childregs->pt_regs.gpr[3] = 0;  /* Result from fork() */
 		if (clone_flags & CLONE_SETTLS) {
 #ifdef CONFIG_PPC64
 			if (!is_32bit_task())
-				childregs->gpr[13] = childregs->gpr[6];
+				childregs->pt_regs.gpr[13] = childregs->pt_regs.gpr[6];
 			else
 #endif
-				childregs->gpr[2] = childregs->gpr[6];
+				childregs->pt_regs.gpr[2] = childregs->pt_regs.gpr[6];
 		}
 
 		f = ret_from_fork;
 	}
-	childregs->msr &= ~(MSR_FP|MSR_VEC|MSR_VSX);
+	childregs->pt_regs.msr &= ~(MSR_FP|MSR_VEC|MSR_VSX);
 	sp -= STACK_FRAME_OVERHEAD;
 
 	/*
@@ -1686,8 +1686,8 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	 * system call, using the stack frame created above.
 	 */
 	((unsigned long *)sp)[0] = 0;
-	sp -= sizeof(struct pt_regs);
-	kregs = (struct pt_regs *) sp;
+	sp -= sizeof(struct int_regs);
+	kregs = (struct int_regs *) sp;
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
 #ifdef CONFIG_PPC32
@@ -1715,7 +1715,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 
 	p->thread.tidr = 0;
 #endif
-	kregs->nip = ppc_function_entry(f);
+	kregs->pt_regs.nip = ppc_function_entry(f);
 	return 0;
 }
 
@@ -1739,8 +1739,8 @@ void start_thread(struct pt_regs *regs, unsigned long start, unsigned long sp)
 	 * set.  Do it now.
 	 */
 	if (!current->thread.regs) {
-		struct pt_regs *regs = task_stack_page(current) + THREAD_SIZE;
-		current->thread.regs = regs - 1;
+		struct int_regs *iregs = task_stack_page(current) + THREAD_SIZE;
+		current->thread.regs = &(iregs - 1)->pt_regs;
 	}
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
@@ -2106,11 +2106,13 @@ void show_stack(struct task_struct *tsk, unsigned long *stack)
 		 */
 		if (validate_sp(sp, tsk, STACK_INT_FRAME_SIZE)
 		    && stack[STACK_FRAME_MARKER] == STACK_FRAME_REGS_MARKER) {
-			struct pt_regs *regs = (struct pt_regs *)
-				(sp + STACK_FRAME_OVERHEAD);
-			lr = regs->link;
+			struct int_regs *regs;
+			regs = (struct int_regs *)(sp + STACK_FRAME_OVERHEAD);
+			lr = regs->pt_regs.link;
 			printk("--- interrupt: %lx at %pS\n    LR = %pS\n",
-			       regs->trap, (void *)regs->nip, (void *)lr);
+			       regs->pt_regs.trap,
+			       (void *)regs->pt_regs.nip,
+			       (void *)lr);
 			firstframe = 1;
 		}
 

@@ -120,7 +120,7 @@ save_stack_trace_tsk_reliable(struct task_struct *tsk,
 		 * an unreliable stack trace until it's been
 		 * _switch()'ed to for the first time.
 		 */
-		stack_end -= STACK_FRAME_OVERHEAD + sizeof(struct pt_regs);
+		stack_end -= STACK_FRAME_OVERHEAD + sizeof(struct int_regs);
 	} else {
 		/*
 		 * idle tasks have a custom stack layout,

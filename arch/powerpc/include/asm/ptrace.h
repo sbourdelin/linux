@@ -26,7 +26,6 @@
 #include <uapi/asm/ptrace.h>
 #include <asm/asm-const.h>
 
-
 #ifdef __powerpc64__
 
 /*
@@ -44,7 +43,7 @@
 #define STACK_FRAME_OVERHEAD	112	/* size of minimum stack frame */
 #define STACK_FRAME_LR_SAVE	2	/* Location of LR in stack frame */
 #define STACK_FRAME_REGS_MARKER	ASM_CONST(0x7265677368657265)
-#define STACK_INT_FRAME_SIZE	(sizeof(struct pt_regs) + \
+#define STACK_INT_FRAME_SIZE	(sizeof(struct int_regs) + \
 				 STACK_FRAME_OVERHEAD + KERNEL_REDZONE_SIZE)
 #define STACK_FRAME_MARKER	12
 
@@ -75,6 +74,11 @@
 #endif /* __powerpc64__ */
 
 #ifndef __ASSEMBLY__
+
+struct int_regs {
+	/* pt_regs must be offset 0 so r1 + STACK_FRAME_OVERHEAD points to it */
+	struct pt_regs pt_regs;
+};
 
 #define GET_IP(regs)		((regs)->nip)
 #define GET_USP(regs)		((regs)->gpr[1])
@@ -119,8 +123,11 @@ extern int ptrace_get_reg(struct task_struct *task, int regno,
 extern int ptrace_put_reg(struct task_struct *task, int regno,
 			  unsigned long data);
 
-#define current_pt_regs() \
-	((struct pt_regs *)((unsigned long)current_thread_info() + THREAD_SIZE) - 1)
+#define current_int_regs() \
+ ((struct int_regs *)((unsigned long)current_thread_info() + THREAD_SIZE) - 1)
+
+#define current_pt_regs() (&current_int_regs()->pt_regs)
+
 /*
  * We use the least-significant bit of the trap field to indicate
  * whether we have saved the full set of registers, or only a
@@ -137,7 +144,7 @@ extern int ptrace_put_reg(struct task_struct *task, int regno,
 #define TRAP(regs)		((regs)->trap & ~0xF)
 #ifdef __powerpc64__
 #define NV_REG_POISON		0xdeadbeefdeadbeefUL
-#define CHECK_FULL_REGS(regs)	BUG_ON(regs->trap & 1)
+#define CHECK_FULL_REGS(regs)	BUG_ON((regs)->trap & 1)
 #else
 #define NV_REG_POISON		0xdeadbeef
 #define CHECK_FULL_REGS(regs)						      \
