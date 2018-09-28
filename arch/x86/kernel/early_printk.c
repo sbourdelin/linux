@@ -213,8 +213,10 @@ static unsigned int mem32_serial_in(unsigned long addr, int offset)
  * early_pci_serial_init()
  *
  * This function is invoked when the early_printk param starts with "pciserial"
- * The rest of the param should be ",B:D.F,baud" where B, D & F describe the
- * location of a PCI device that must be a UART device.
+ * The rest of the param should be ",B:D.F,baud" or ",B:D.F,force,baud", where
+ * B, D & F describe the location of a PCI device that must be a UART device,
+ * "force" is optional and means insisting using a UART device with a wrong
+ * pci class code.
  */
 static __init void early_pci_serial_init(char *s)
 {
@@ -224,6 +226,7 @@ static __init void early_pci_serial_init(char *s)
 	u32 classcode, bar0;
 	u16 cmdreg;
 	char *e;
+	int force = 0;
 
 
 	/*
@@ -252,6 +255,15 @@ static __init void early_pci_serial_init(char *s)
 	if (*s == ',')
 		s++;
 
+	/* User may insist to use a UART device with wrong class code */
+	if (!strncmp(s, "force", 5)) {
+		force = 1;
+		s += 5;
+
+		if (*s == ',')
+			s++;
+	}
+
 	/*
 	 * Second, find the device from the BDF
 	 */
@@ -262,10 +274,12 @@ static __init void early_pci_serial_init(char *s)
 	/*
 	 * Verify it is a UART type device
 	 */
-	if (((classcode >> 16 != PCI_CLASS_COMMUNICATION_MODEM) &&
-	     (classcode >> 16 != PCI_CLASS_COMMUNICATION_SERIAL)) ||
-	   (((classcode >> 8) & 0xff) != 0x02)) /* 16550 I/F at BAR0 */
-		return;
+	if (!force) {
+		if (((classcode >> 16 != PCI_CLASS_COMMUNICATION_MODEM) &&
+		     (classcode >> 16 != PCI_CLASS_COMMUNICATION_SERIAL)) ||
+		   (((classcode >> 8) & 0xff) != 0x02)) /* 16550 I/F at BAR0 */
+			return;
+	}
 
 	/*
 	 * Determine if it is IO or memory mapped
