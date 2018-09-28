@@ -81,6 +81,7 @@ struct record_opts {
 	unsigned     initial_delay;
 	bool         use_clockid;
 	clockid_t    clockid;
+	size_t       clockid_res_ns;
 	unsigned int proc_map_timeout;
 };
 
