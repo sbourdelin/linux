@@ -2307,6 +2307,7 @@ int __netlink_dump_start(struct sock *ssk, struct sk_buff *skb,
 	cb->module = control->module;
 	cb->min_dump_alloc = control->min_dump_alloc;
 	cb->skb = skb;
+	cb->extack = control->extack;
 
 	if (control->start) {
 		ret = control->start(cb);
