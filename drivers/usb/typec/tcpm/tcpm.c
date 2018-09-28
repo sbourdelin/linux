@@ -2433,6 +2433,10 @@ static int tcpm_pd_build_pps_request(struct tcpm_port *port, u32 *rdo)
 
 	flags = RDO_USB_COMM | RDO_NO_SUSPEND;
 
+	/* Round down output voltage and current to align with PPS valid steps */
+	out_mv = out_mv - (out_mv % RDO_PROG_VOLT_MV_STEP);
+	op_ma = op_ma - (op_ma % RDO_PROG_CURR_MA_STEP);
+
 	op_mw = (op_ma * out_mv) / 1000;
 	if (op_mw < port->operating_snk_mw) {
 		/*
