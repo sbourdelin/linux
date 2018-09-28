@@ -243,6 +243,9 @@ static int ufshcd_reset_and_restore(struct ufs_hba *hba);
 static int ufshcd_eh_host_reset_handler(struct scsi_cmnd *cmd);
 static int ufshcd_clear_tm_cmd(struct ufs_hba *hba, int tag);
 static void ufshcd_hba_exit(struct ufs_hba *hba);
+static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
+				   enum ufs_dev_pwr_mode pwr_mode);
+
 static int ufshcd_probe_hba(struct ufs_hba *hba);
 static int __ufshcd_setup_clocks(struct ufs_hba *hba, bool on,
 				 bool skip_ref_clk);
@@ -4250,6 +4253,35 @@ out:
 }
 
 /**
+ * ufshcd_power_on() - checks device power state, and sends START STOP UNIT
+ * if needed to bring the device out of sleep mode.
+ * @hba: per-adapter instance
+ *
+ */
+static int ufshcd_power_on(struct ufs_hba *hba)
+{
+	uint32_t current_pwr_mode;
+	int rc;
+
+	rc = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
+		QUERY_ATTR_IDN_POWER_MODE, 0, 0,
+		&current_pwr_mode);
+
+	if (rc) {
+		dev_err(hba->dev, "Failed to get bCurrentPowerMode: %d\n", rc);
+		return rc;
+	}
+
+	if (current_pwr_mode != UFS_PWR_SLEEP)
+		return 0;
+
+	rc = ufshcd_set_dev_pwr_mode(hba, UFS_ACTIVE_PWR_MODE);
+	if (rc)
+		dev_err(hba->dev, "Failed to set power mode: %d\n", rc);
+
+	return rc;
+}
+/**
  * ufshcd_make_hba_operational - Make UFS controller operational
  * @hba: per adapter instance
  *
@@ -6715,6 +6747,17 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	if (ret)
 		goto out;
 
+	/*
+	 * Unit Attention will need to be cleared after a reset and before
+	 * the device can be told to come out of sleep mode.
+	 */
+	hba->wlun_dev_clr_ua = true;
+	ret = ufshcd_power_on(hba);
+	if (ret) {
+		dev_err(hba->dev, "Failed to start unit. err = %d\n", ret);
+		goto out;
+	}
+
 	/* Init check for device descriptor sizes */
 	ufshcd_init_desc_sizes(hba);
 
@@ -6736,7 +6779,6 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	/* UFS device is also active now */
 	ufshcd_set_ufs_dev_active(hba);
 	ufshcd_force_reset_auto_bkops(hba);
-	hba->wlun_dev_clr_ua = true;
 
 	if (ufshcd_get_max_pwr_mode(hba)) {
 		dev_err(hba->dev,
