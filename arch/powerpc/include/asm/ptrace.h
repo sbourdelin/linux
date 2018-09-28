@@ -78,6 +78,7 @@
 struct int_regs {
 	/* pt_regs must be offset 0 so r1 + STACK_FRAME_OVERHEAD points to it */
 	struct pt_regs pt_regs;
+	unsigned long ppr;
 };
 
 #define GET_IP(regs)		((regs)->nip)
