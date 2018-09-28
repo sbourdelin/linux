@@ -25,6 +25,7 @@
 #include <linux/debugfs.h>
 #include <linux/serial_core.h>
 #include <linux/sysfs.h>
+#include <linux/types.h>
 
 #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
 #include <asm/page.h>
@@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
 #endif
 
 #endif /* CONFIG_OF_EARLY_FLATTREE */
+
+#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
+#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
+
+int fdt_prop_len(const char *prop_name, int len)
+{
+	return (strlen(prop_name) + 1) +
+		sizeof(struct fdt_property) +
+		FDT_TAGALIGN(len);
+}
+
+static void fill_property(void *buf, u64 val64, int cells)
+{
+	__be32 val32;
+
+	while (cells) {
+		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+		memcpy(buf, &val32, sizeof(val32));
+		buf += sizeof(val32);
+	}
+}
+
+int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+						u64 addr, u64 size)
+{
+	int addr_cells, size_cells;
+	char buf[sizeof(__be32) * 2 * 2];
+		/* assume dt_root_[addr|size]_cells <= 2 */
+	void *prop;
+	size_t buf_size;
+
+	addr_cells = fdt_address_cells(fdt, 0);
+	if (addr_cells < 0)
+		return addr_cells;
+	size_cells = fdt_size_cells(fdt, 0);
+	if (size_cells < 0)
+		return size_cells;
+
+	/* if *_cells >= 2, cells can hold 64-bit values anyway */
+	if ((addr_cells == 1) && (addr > U32_MAX))
+		return -FDT_ERR_BADVALUE;
+
+	if ((size_cells == 1) && (size > U32_MAX))
+		return -FDT_ERR_BADVALUE;
+
+	buf_size = (addr_cells + size_cells) * sizeof(u32);
+	prop = buf;
+
+	fill_property(prop, addr, addr_cells);
+	prop += addr_cells * sizeof(u32);
+
+	fill_property(prop, size, size_cells);
+
+	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
+}
