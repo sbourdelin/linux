@@ -35,6 +35,42 @@ qla_nvmet_targetport_delete(struct nvmet_fc_target_port *targetport)
 }
 
 /*
+ * Build NVMET LS response
+ */
+int
+qla_nvmet_ls(srb_t *sp, void *pkt)
+{
+	struct srb_iocb *nvme;
+	struct pt_ls4_request *rsp_pkt = (struct pt_ls4_request *)pkt;
+	int     rval = QLA_SUCCESS;
+
+	nvme = &sp->u.iocb_cmd;
+
+	rsp_pkt->entry_type = PT_LS4_REQUEST;
+	rsp_pkt->entry_count = 1;
+	rsp_pkt->control_flags = cpu_to_le16(CF_LS4_RESPONDER << CF_LS4_SHIFT);
+	rsp_pkt->handle = sp->handle;
+
+	rsp_pkt->nport_handle = sp->fcport->loop_id;
+	rsp_pkt->vp_index = nvme->u.nvme.vp_index;
+	rsp_pkt->exchange_address = cpu_to_le32(nvme->u.nvme.exchange_address);
+
+	rsp_pkt->tx_dseg_count = 1;
+	rsp_pkt->tx_byte_count = cpu_to_le16(nvme->u.nvme.rsp_len);
+	rsp_pkt->dseg0_len = cpu_to_le16(nvme->u.nvme.rsp_len);
+	rsp_pkt->dseg0_address[0] = cpu_to_le32(LSD(nvme->u.nvme.rsp_dma));
+	rsp_pkt->dseg0_address[1] = cpu_to_le32(MSD(nvme->u.nvme.rsp_dma));
+
+	ql_log(ql_log_info, sp->vha, 0xffff,
+	    "Dumping the NVME-LS response IOCB\n");
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, sp->vha, 0x2075,
+	    (uint8_t *)rsp_pkt, sizeof(*rsp_pkt));
+
+	return rval;
+}
+
+
+/*
  * qlt_nvmet_ls_done -
  * Invoked by the firmware interface to indicate the completion
  * of an LS cmd

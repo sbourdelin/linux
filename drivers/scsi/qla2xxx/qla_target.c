@@ -40,6 +40,7 @@
 #include <target/target_core_fabric.h>
 
 #include "qla_def.h"
+#include "qla_nvmet.h"
 #include "qla_target.h"
 
 static int ql2xtgt_tape_enable;
@@ -77,6 +78,8 @@ int ql2x_ini_mode = QLA2XXX_INI_MODE_EXCLUSIVE;
 
 static int qla_sam_status = SAM_STAT_BUSY;
 static int tc_sam_status = SAM_STAT_TASK_SET_FULL; /* target core */
+
+int qlt_op_target_mode;
 
 /*
  * From scsi/fc/fc_fcp.h
@@ -149,10 +152,15 @@ static inline uint32_t qlt_make_handle(struct qla_qpair *);
  */
 static struct kmem_cache *qla_tgt_mgmt_cmd_cachep;
 struct kmem_cache *qla_tgt_plogi_cachep;
+static struct kmem_cache *qla_tgt_purex_plogi_cachep;
 static mempool_t *qla_tgt_mgmt_cmd_mempool;
 static struct workqueue_struct *qla_tgt_wq;
+static struct workqueue_struct *qla_nvmet_wq;
 static DEFINE_MUTEX(qla_tgt_mutex);
 static LIST_HEAD(qla_tgt_glist);
+
+/* WQ for nvmet completions */
+struct workqueue_struct *qla_nvmet_comp_wq;
 
 static const char *prot_op_str(u32 prot_op)
 {
@@ -348,13 +356,653 @@ void qlt_unknown_atio_work_fn(struct work_struct *work)
 	qlt_try_to_dequeue_unknown_atios(vha, 0);
 }
 
+#define ELS_RJT 0x01
+#define ELS_ACC 0x02
+
+struct fc_port *qla_nvmet_find_sess_by_s_id(
+	scsi_qla_host_t *vha,
+	const uint32_t s_id)
+{
+	struct fc_port *sess = NULL, *other_sess;
+	uint32_t other_sid;
+
+	list_for_each_entry(other_sess, &vha->vp_fcports, list) {
+		other_sid = other_sess->d_id.b.domain << 16 |
+				other_sess->d_id.b.area << 8 |
+				other_sess->d_id.b.al_pa;
+
+		if (other_sid == s_id) {
+			sess = other_sess;
+			break;
+		}
+	}
+	return sess;
+}
+
+/* Send an ELS response */
+int qlt_send_els_resp(srb_t *sp, struct __els_pt *els_pkt)
+{
+	struct purex_entry_24xx *purex = (struct purex_entry_24xx *)
+					sp->u.snvme_els.ptr;
+	dma_addr_t udma = sp->u.snvme_els.dma_addr;
+	struct fc_port *fcport;
+	port_id_t port_id;
+	uint16_t loop_id;
+
+	port_id.b.domain = purex->s_id[2];
+	port_id.b.area   = purex->s_id[1];
+	port_id.b.al_pa  = purex->s_id[0];
+	port_id.b.rsvd_1 = 0;
+
+	fcport = qla2x00_find_fcport_by_nportid(sp->vha, &port_id, 1);
+	if (fcport)
+		/* There is no session with the swt */
+		loop_id = fcport->loop_id;
+	else
+		loop_id = 0xFFFF;
+
+	ql_log(ql_log_info, sp->vha, 0xfff9,
+	    "sp: %p, purex: %p, udma: %pad, loop_id: 0x%x\n",
+	    sp, purex, &udma, loop_id);
+
+	els_pkt->entry_type = ELS_IOCB_TYPE;
+	els_pkt->entry_count = 1;
+
+	els_pkt->handle = sp->handle;
+	els_pkt->nphdl = cpu_to_le16(loop_id);
+	els_pkt->tx_dsd_cnt = cpu_to_le16(1);
+	els_pkt->vp_index = purex->vp_idx;
+	els_pkt->sof = EST_SOFI3;
+	els_pkt->rcv_exchg_id = cpu_to_le32(purex->rx_xchg_addr);
+	els_pkt->op_code = sp->cmd_type;
+	els_pkt->did_lo = cpu_to_le16(purex->s_id[0] | (purex->s_id[1] << 8));
+	els_pkt->did_hi = purex->s_id[2];
+	els_pkt->sid_hi = purex->d_id[2];
+	els_pkt->sid_lo = cpu_to_le16(purex->d_id[0] | (purex->d_id[1] << 8));
+
+	if (sp->gen2 == ELS_ACC)
+		els_pkt->cntl_flags = cpu_to_le16(EPD_ELS_ACC);
+	else
+		els_pkt->cntl_flags = cpu_to_le16(EPD_ELS_RJT);
+
+	els_pkt->tx_bc = cpu_to_le32(sp->gen1);
+	els_pkt->tx_dsd[0] = cpu_to_le32(LSD(udma));
+	els_pkt->tx_dsd[1] = cpu_to_le32(MSD(udma));
+	els_pkt->tx_dsd_len = cpu_to_le32(sp->gen1);
+	/* Memory Barrier */
+	wmb();
+
+	ql_log(ql_log_info, sp->vha, 0x11030, "Dumping PLOGI ELS\n");
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, sp->vha, 0xffff,
+		(uint8_t *)els_pkt, sizeof(*els_pkt));
+
+	return 0;
+}
+
+static void qlt_nvme_els_done(void *s, int res)
+{
+	struct srb *sp = s;
+
+	ql_log(ql_log_info, sp->vha, 0x11031,
+	    "Done with NVME els command\n");
+
+	ql_log(ql_log_info, sp->vha, 0x11032,
+	    "sp: %p vha: %p, dma_ptr: %p, dma_addr: %pad, len: %#x\n",
+	    sp, sp->vha, sp->u.snvme_els.dma_ptr, &sp->u.snvme_els.dma_addr,
+	    sp->gen1);
+
+	qla2x00_rel_sp(sp);
+}
+
+static int qlt_send_plogi_resp(struct scsi_qla_host *vha, uint8_t op_code,
+	struct purex_entry_24xx *purex, struct fc_port *fcport)
+{
+	int ret, rval, i;
+	dma_addr_t plogi_ack_udma = vha->vha_tgt.qla_tgt->nvme_els_rsp;
+	void *plogi_ack_buf = vha->vha_tgt.qla_tgt->nvme_els_ptr;
+	uint8_t *tmp;
+	uint32_t *opcode;
+	srb_t *sp;
+
+	/* Alloc SRB structure */
+	sp = qla2x00_get_sp(vha, fcport, GFP_KERNEL);
+	if (!sp) {
+		ql_log(ql_log_info, vha, 0x11033,
+		    "Failed to allocate SRB\n");
+		return -ENOMEM;
+	}
+
+	sp->type = SRB_NVME_ELS_RSP;
+	sp->done = qlt_nvme_els_done;
+	sp->vha = vha;
+
+	ql_log(ql_log_info, vha, 0x11034,
+	    "sp: %p, vha: %p, plogi_ack_buf: %p\n",
+	    sp, vha, plogi_ack_buf);
+
+	sp->u.snvme_els.dma_addr = plogi_ack_udma;
+	sp->u.snvme_els.dma_ptr = plogi_ack_buf;
+	sp->gen1 = 116;
+	sp->gen2 = ELS_ACC;
+	sp->u.snvme_els.ptr = (struct purex_entry_24xx *)purex;
+	sp->cmd_type = ELS_PLOGI;
+
+	tmp = (uint8_t *)plogi_ack_udma;
+
+	tmp += 4;	/* fw doesn't return 1st 4 bytes where opcode goes */
+
+	ret = qla2x00_get_plogi_template(vha, (dma_addr_t)tmp, (116/4 - 1));
+	if (ret) {
+		ql_log(ql_log_warn, vha, 0x11035,
+		    "Failed to get plogi template\n");
+		return -ENOMEM;
+	}
+
+	opcode = (uint32_t *) plogi_ack_buf;
+	*opcode = cpu_to_be32(ELS_ACC << 24);
+
+	for (i = 0; i < 0x1c; i++) {
+		++opcode;
+		*opcode = cpu_to_be32(*opcode);
+	}
+
+	ql_dbg(ql_dbg_disc + ql_dbg_verbose, vha, 0xfff3,
+	    "Dumping the PLOGI from fw\n");
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_verbose, vha, 0x70cf,
+		(uint8_t *)plogi_ack_buf, 116);
+
+	rval = qla2x00_start_sp(sp);
+	if (rval != QLA_SUCCESS)
+		qla2x00_rel_sp(sp);
+
+	return 0;
+}
+
+static struct qlt_purex_plogi_ack_t *
+qlt_plogi_find_add(struct scsi_qla_host *vha, port_id_t *id,
+		struct __fc_plogi *rcvd_plogi)
+{
+	struct qlt_purex_plogi_ack_t *pla;
+
+	list_for_each_entry(pla, &vha->plogi_ack_list, list) {
+		if (pla->id.b24 == id->b24)
+			return pla;
+	}
+
+	pla = kmem_cache_zalloc(qla_tgt_purex_plogi_cachep, GFP_ATOMIC);
+	if (!pla) {
+		ql_dbg(ql_dbg_async, vha, 0x5088,
+		       "qla_target(%d): Allocation of plogi_ack failed\n",
+		       vha->vp_idx);
+		return NULL;
+	}
+
+	pla->id = *id;
+	memcpy(&pla->rcvd_plogi, rcvd_plogi, sizeof(struct __fc_plogi));
+	ql_log(ql_log_info, vha, 0xf101,
+	    "New session(%p) created for port: %#x\n",
+	    pla, pla->id.b24);
+
+	list_add_tail(&pla->list, &vha->plogi_ack_list);
+
+	return pla;
+}
+
+static void __swap_wwn(uint8_t *ptr, uint32_t size)
+{
+	uint32_t *iptr = (uint32_t *)ptr;
+	uint32_t *optr = (uint32_t *)ptr;
+	uint32_t i = size >> 2;
+
+	for (; i ; i--)
+		*optr++ = be32_to_cpu(*iptr++);
+}
+
+static int abort_cmds_for_s_id(struct scsi_qla_host *vha, port_id_t *s_id);
+/*
+ * Parse the PLOGI from the peer port
+ * Retrieve WWPN, WWNN from the payload
+ * Create and fc port if it is a new WWN
+ * else clean up the prev exchange
+ * Return a response
+ */
+static void qlt_process_plogi(struct scsi_qla_host *vha,
+		struct purex_entry_24xx *purex, void *buf)
+{
+	uint64_t pname, nname;
+	struct __fc_plogi *rcvd_plogi = (struct __fc_plogi *)buf;
+	struct qla_tgt *tgt = vha->vha_tgt.qla_tgt;
+	uint16_t loop_id;
+	unsigned long flags;
+	struct fc_port *sess = NULL, *conflict_sess = NULL;
+	struct qlt_purex_plogi_ack_t *pla;
+	port_id_t port_id;
+	int sess_handling = 0;
+
+	port_id.b.domain = purex->s_id[2];
+	port_id.b.area   = purex->s_id[1];
+	port_id.b.al_pa  = purex->s_id[0];
+	port_id.b.rsvd_1 = 0;
+
+	if (IS_SW_RESV_ADDR(port_id)) {
+		ql_log(ql_log_info, vha, 0x11036,
+		    "Received plogi from switch, just send an ACC\n");
+		goto send_plogi_resp;
+	}
+
+	loop_id = le16_to_cpu(purex->nport_handle);
+
+	/* Clean up prev commands if any */
+	if (sess_handling) {
+		ql_log(ql_log_info, vha, 0x11037,
+		   "%s %d Cleaning up prev commands\n",
+		   __func__, __LINE__);
+		abort_cmds_for_s_id(vha, &port_id);
+	}
+
+	__swap_wwn(rcvd_plogi->pname, 4);
+	__swap_wwn(&rcvd_plogi->pname[4], 4);
+	pname = wwn_to_u64(rcvd_plogi->pname);
+
+	__swap_wwn(rcvd_plogi->nname, 4);
+	__swap_wwn(&rcvd_plogi->nname[4], 4);
+	nname = wwn_to_u64(rcvd_plogi->nname);
+
+	ql_log(ql_log_info, vha, 0x11038,
+	    "%s %d, pname:%llx, nname:%llx port_id: %#x\n",
+	    __func__, __LINE__, pname, nname, loop_id);
+
+	/* Invalidate other sessions if any */
+	spin_lock_irqsave(&tgt->ha->tgt.sess_lock, flags);
+	sess = qlt_find_sess_invalidate_other(vha, pname,
+	    port_id, loop_id, &conflict_sess);
+	spin_unlock_irqrestore(&tgt->ha->tgt.sess_lock, flags);
+
+	/* Add the inbound plogi(if from a new device) to the list */
+	pla = qlt_plogi_find_add(vha, &port_id, rcvd_plogi);
+
+	/* If there is no existing session, create one */
+	if (unlikely(!sess)) {
+		ql_log(ql_log_info, vha, 0xf102,
+		    "Creating a new session\n");
+		init_completion(&vha->purex_plogi_sess);
+		qla24xx_post_nvmet_newsess_work(vha, &port_id,
+			rcvd_plogi->pname, pla);
+		wait_for_completion_timeout(&vha->purex_plogi_sess, 500);
+		/* Send a PLOGI response */
+		goto send_plogi_resp;
+	} else {
+		/* Session existing with No loop_ID assigned */
+		if (sess->loop_id == FC_NO_LOOP_ID) {
+			sess->loop_id = qla2x00_find_new_loop_id(vha, sess);
+			ql_log(ql_log_info, vha, 0x11039,
+			    "Allocated new loop_id: %#x for fcport: %p\n",
+			    sess->loop_id, sess);
+		}
+		sess->d_id = port_id;
+
+		sess->fw_login_state = DSC_LS_PLOGI_PEND;
+	}
+send_plogi_resp:
+	/* Send a PLOGI response */
+	qlt_send_plogi_resp(vha, ELS_PLOGI, purex, sess);
+}
+
+static int qlt_process_logo(struct scsi_qla_host *vha,
+		struct purex_entry_24xx *purex, void *buf)
+{
+	struct __fc_logo_acc *logo_acc;
+	dma_addr_t logo_ack_udma = vha->vha_tgt.qla_tgt->nvme_els_rsp;
+	void *logo_ack_buf = vha->vha_tgt.qla_tgt->nvme_els_ptr;
+	srb_t *sp;
+	int rval;
+	uint32_t look_up_sid;
+	fc_port_t *sess = NULL;
+	port_id_t port_id;
+
+	port_id.b.domain = purex->s_id[2];
+	port_id.b.area   = purex->s_id[1];
+	port_id.b.al_pa  = purex->s_id[0];
+	port_id.b.rsvd_1 = 0;
+
+	if (!IS_SW_RESV_ADDR(port_id)) {
+		look_up_sid = purex->s_id[2] << 16 | purex->s_id[1] << 8 |
+				purex->s_id[0];
+		ql_log(ql_log_info, vha, 0x11040,
+			"%s - Look UP sid: %#x\n", __func__, look_up_sid);
+
+		sess = qla_nvmet_find_sess_by_s_id(vha, look_up_sid);
+		if (unlikely(!sess))
+			WARN_ON(1);
+	}
+
+	/* Alloc SRB structure */
+	sp = qla2x00_get_sp(vha, NULL, GFP_KERNEL);
+	if (!sp) {
+		ql_log(ql_log_info, vha, 0x11041,
+		    "Failed to allocate SRB\n");
+		return -ENOMEM;
+	}
+
+	sp->type = SRB_NVME_ELS_RSP;
+	sp->done = qlt_nvme_els_done;
+	sp->vha = vha;
+	sp->fcport = sess;
+
+	ql_log(ql_log_info, vha, 0x11042,
+	    "sp: %p, vha: %p, logo_ack_buf: %p\n",
+	    sp, vha, logo_ack_buf);
+
+	logo_acc = (struct __fc_logo_acc *)logo_ack_buf;
+	memset(logo_acc, 0, sizeof(*logo_acc));
+	logo_acc->op_code = ELS_ACC;
+
+	/* Send response */
+	sp->u.snvme_els.dma_addr = logo_ack_udma;
+	sp->u.snvme_els.dma_ptr = logo_ack_buf;
+	sp->gen1 = sizeof(struct __fc_logo_acc);
+	sp->gen2 = ELS_ACC;
+	sp->u.snvme_els.ptr = (struct purex_entry_24xx *)purex;
+	sp->cmd_type = ELS_LOGO;
+
+	rval = qla2x00_start_sp(sp);
+	if (rval != QLA_SUCCESS)
+		qla2x00_rel_sp(sp);
+
+	return 0;
+}
+
+static int qlt_process_prli(struct scsi_qla_host *vha,
+		struct purex_entry_24xx *purex, void *buf)
+{
+	struct __fc_prli *prli = (struct __fc_prli *)buf;
+	struct __fc_prli_acc *prli_acc;
+	struct __fc_prli_rjt *prli_rej;
+	dma_addr_t prli_ack_udma = vha->vha_tgt.qla_tgt->nvme_els_rsp;
+	void *prli_ack_buf = vha->vha_tgt.qla_tgt->nvme_els_ptr;
+	srb_t *sp;
+	struct fc_port *sess = NULL;
+	int rval;
+	uint32_t look_up_sid;
+	port_id_t port_id;
+
+	port_id.b.domain = purex->s_id[2];
+	port_id.b.area   = purex->s_id[1];
+	port_id.b.al_pa  = purex->s_id[0];
+	port_id.b.rsvd_1 = 0;
+
+	if (!IS_SW_RESV_ADDR(port_id)) {
+		look_up_sid = purex->s_id[2] << 16 | purex->s_id[1] << 8 |
+				purex->s_id[0];
+		ql_log(ql_log_info, vha, 0x11043,
+		    "%s - Look UP sid: %#x\n", __func__, look_up_sid);
+
+		sess = qla_nvmet_find_sess_by_s_id(vha, look_up_sid);
+		if (unlikely(!sess))
+			WARN_ON(1);
+	}
+	/* Alloc SRB structure */
+	sp = qla2x00_get_sp(vha, NULL, GFP_KERNEL);
+	if (!sp) {
+		ql_log(ql_log_info, vha, 0x11044,
+		    "Failed to allocate SRB\n");
+		return -ENOMEM;
+	}
+
+	sp->type = SRB_NVME_ELS_RSP;
+	sp->done = qlt_nvme_els_done;
+	sp->vha = vha;
+	sp->fcport = sess;
+
+	ql_log(ql_log_info, vha, 0x11045,
+	    "sp: %p, vha: %p, prli_ack_buf: %p, prli_ack_udma: %pad\n",
+	    sp, vha, prli_ack_buf, &prli_ack_udma);
+
+	memset(prli_ack_buf, 0, sizeof(struct __fc_prli_acc));
+
+	/* Parse PRLI */
+	if (prli->prli_type == PRLI_TYPE_FCP) {
+		/* Send a RJT for FCP */
+		prli_rej = (struct __fc_prli_rjt *)prli_ack_buf;
+		prli_rej->op_code = ELS_RJT;
+		prli_rej->reason = PRLI_RJT_REASON;
+	} else if (prli->prli_type == PRLI_TYPE_NVME) {
+		uint32_t spinfo;
+
+		prli_acc = (struct __fc_prli_acc *)prli_ack_buf;
+		prli_acc->op_code = ELS_ACC;
+		prli_acc->type = PRLI_TYPE_NVME;
+		prli_acc->page_length = PRLI_NVME_PAGE_LENGTH;
+		prli_acc->common = cpu_to_be16(PRLI_REQ_EXEC);
+		prli_acc->pyld_length = cpu_to_be16(PRLI_ACC_NVME_RESP_LEN);
+		spinfo = NVME_PRLI_DISC | NVME_PRLI_TRGT;
+		prli_acc->nvme.sp_info = cpu_to_be32(spinfo);
+	}
+
+	/* Send response */
+	sp->u.snvme_els.dma_addr = prli_ack_udma;
+	sp->u.snvme_els.dma_ptr = prli_ack_buf;
+
+	if (prli->prli_type == PRLI_TYPE_FCP) {
+		sp->gen1 = sizeof(struct __fc_prli_rjt);
+		sp->gen2 = ELS_RJT;
+	} else if (prli->prli_type == PRLI_TYPE_NVME) {
+		sp->gen1 = sizeof(struct __fc_prli_acc);
+		sp->gen2 = ELS_ACC;
+	}
+
+	sp->u.snvme_els.ptr = (struct purex_entry_24xx *)purex;
+	sp->cmd_type = ELS_PRLI;
+
+	rval = qla2x00_start_sp(sp);
+	if (rval != QLA_SUCCESS)
+		qla2x00_rel_sp(sp);
+
+	return 0;
+}
+
+static void *qlt_get_next_atio_pkt(struct scsi_qla_host *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	void *pkt;
+
+	ha->tgt.atio_ring_index++;
+	if (ha->tgt.atio_ring_index == ha->tgt.atio_q_length) {
+		ha->tgt.atio_ring_index = 0;
+		ha->tgt.atio_ring_ptr = ha->tgt.atio_ring;
+	} else {
+		ha->tgt.atio_ring_ptr++;
+	}
+	pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
+
+	return pkt;
+}
+
+static void qlt_process_purex(struct scsi_qla_host *vha,
+		struct qla_tgt_purex_op *p)
+{
+	struct atio_from_isp *atio = &p->atio;
+	struct purex_entry_24xx *purex =
+		(struct purex_entry_24xx *)&atio->u.raw;
+	uint16_t len = purex->frame_size;
+
+	ql_log(ql_log_info, vha, 0xf100,
+	    "Purex IOCB: EC:%#x, Len:%#x ELS_OP:%#x oxid:%#x  rxid:%#x\n",
+	    purex->entry_count, len, purex->pyld[3],
+	    purex->ox_id, purex->rx_id);
+
+	switch (purex->pyld[3]) {
+	case ELS_PLOGI:
+		qlt_process_plogi(vha, purex, p->purex_pyld);
+		break;
+	case ELS_PRLI:
+		qlt_process_prli(vha, purex, p->purex_pyld);
+		break;
+	case ELS_LOGO:
+		qlt_process_logo(vha, purex, p->purex_pyld);
+		break;
+	default:
+		ql_log(ql_log_warn, vha, 0x11046,
+		    "Unexpected ELS 0x%x\n", purex->pyld[3]);
+		break;
+	}
+}
+
+void qlt_dequeue_purex(struct scsi_qla_host *vha)
+{
+	struct qla_tgt_purex_op *p, *t;
+	unsigned long flags;
+
+	list_for_each_entry_safe(p, t, &vha->purex_atio_list, cmd_list) {
+		ql_log(ql_log_info, vha, 0xff1e,
+		    "Processing ATIO %p\n", &p->atio);
+
+		qlt_process_purex(vha, p);
+		spin_lock_irqsave(&vha->cmd_list_lock, flags);
+		list_del(&p->cmd_list);
+		spin_unlock_irqrestore(&vha->cmd_list_lock, flags);
+		kfree(p->purex_pyld);
+		kfree(p);
+	}
+}
+
+static void qlt_queue_purex(scsi_qla_host_t *vha,
+	struct atio_from_isp *atio)
+{
+	struct qla_tgt_purex_op *p;
+	unsigned long flags;
+	struct purex_entry_24xx *purex =
+		(struct purex_entry_24xx *)&atio->u.raw;
+	uint16_t len = purex->frame_size;
+	uint8_t *purex_pyld_tmp;
+
+	p = kzalloc(sizeof(*p), GFP_ATOMIC);
+	if (p == NULL)
+		goto out;
+
+	p->vha = vha;
+	memcpy(&p->atio, atio, sizeof(*atio));
+
+	ql_dbg(ql_dbg_disc + ql_dbg_buffer, vha, 0xff11,
+	    "Dumping the Purex IOCB received\n");
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0xe012,
+		(uint8_t *)purex, 64);
+
+	p->purex_pyld = kzalloc(sizeof(purex->entry_count * 64), GFP_ATOMIC);
+	if (p->purex_pyld == NULL) {
+		kfree(p);
+		goto out;
+	}
+	purex_pyld_tmp = (uint8_t *)p->purex_pyld;
+	p->purex_pyld_len = len;
+
+	if (len < PUREX_PYLD_SIZE)
+		len = PUREX_PYLD_SIZE;
+
+	memcpy(p->purex_pyld, &purex->d_id, PUREX_PYLD_SIZE);
+	purex_pyld_tmp += PUREX_PYLD_SIZE;
+	len -= PUREX_PYLD_SIZE;
+
+	while (len > 0) {
+		int cpylen;
+		struct __status_cont *cont_atio;
+
+		cont_atio = (struct __status_cont *)qlt_get_next_atio_pkt(vha);
+		cpylen = len > CONT_SENSE_DATA ? CONT_SENSE_DATA : len;
+		ql_log(ql_log_info, vha, 0xff12,
+		    "cont_atio: %p, cpylen: %#x\n", cont_atio, cpylen);
+
+		memcpy(purex_pyld_tmp, &cont_atio->data[0], cpylen);
+
+		purex_pyld_tmp += cpylen;
+		len -= cpylen;
+	}
+
+	ql_dbg(ql_dbg_disc + ql_dbg_buffer, vha, 0xff11,
+	    "Dumping the Purex IOCB(%p) received\n", p->purex_pyld);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0xe011,
+		(uint8_t *)p->purex_pyld, p->purex_pyld_len);
+
+	INIT_LIST_HEAD(&p->cmd_list);
+
+	spin_lock_irqsave(&vha->cmd_list_lock, flags);
+	list_add_tail(&p->cmd_list, &vha->purex_atio_list);
+	spin_unlock_irqrestore(&vha->cmd_list_lock, flags);
+
+out:
+	return;
+}
+
+static void sys_to_be32_cpy(uint8_t *dest, uint8_t *src, uint16_t len)
+{
+	uint32_t *d, *s, i;
+
+	d = (uint32_t *) dest;
+	s = (uint32_t *) src;
+	for (i = 0; i < len; i++)
+		d[i] = cpu_to_be32(s[i]);
+}
+
+/* Prepare an LS req received from the wire to be sent to the nvmet */
+static void *qlt_nvmet_prepare_ls(struct scsi_qla_host *vha,
+	struct pt_ls4_rx_unsol *ls4)
+{
+	int desc_len = cpu_to_le16(ls4->desc_len) + 8;
+	int copy_len, bc;
+	void *buf;
+	uint8_t *cpy_buf;
+	int i;
+	struct __status_cont *cont_atio;
+
+	ql_dbg(ql_dbg_tgt, vha, 0xe072,
+	    "%s: desc_len:%d\n", __func__, desc_len);
+
+	buf = kzalloc(desc_len, GFP_ATOMIC);
+	if (!buf)
+		return NULL;
+
+	cpy_buf = buf;
+	bc = desc_len;
+
+	if (bc < PT_LS4_FIRST_PACKET_LEN)
+		copy_len = bc;
+	else
+		copy_len = PT_LS4_FIRST_PACKET_LEN;
+
+	sys_to_be32_cpy(cpy_buf, &((uint8_t *)ls4)[PT_LS4_PAYLOAD_OFFSET],
+				copy_len/4);
+
+	bc -= copy_len;
+	cpy_buf += copy_len;
+
+	cont_atio = (struct __status_cont *)ls4;
+
+	for (i = 1; i < ls4->entry_count && bc > 0; i++) {
+		if (bc < CONT_SENSE_DATA)
+			copy_len = bc;
+		else
+			copy_len = CONT_SENSE_DATA;
+
+		cont_atio = (struct __status_cont *)qlt_get_next_atio_pkt(vha);
+
+		sys_to_be32_cpy(cpy_buf, (uint8_t *)&cont_atio->data,
+			copy_len/4);
+		cpy_buf += copy_len;
+		bc -= copy_len;
+	}
+
+	ql_dbg(ql_dbg_disc + ql_dbg_buffer, vha, 0xc0f1,
+	    "Dump the first 128 bytes of LS request\n");
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)buf, 128);
+
+	return buf;
+}
+
 static bool qlt_24xx_atio_pkt_all_vps(struct scsi_qla_host *vha,
 	struct atio_from_isp *atio, uint8_t ha_locked)
 {
-	ql_dbg(ql_dbg_tgt, vha, 0xe072,
-		"%s: qla_target(%d): type %x ox_id %04x\n",
-		__func__, vha->vp_idx, atio->u.raw.entry_type,
-		be16_to_cpu(atio->u.isp24.fcp_hdr.ox_id));
+	void *buf;
 
 	switch (atio->u.raw.entry_type) {
 	case ATIO_TYPE7:
@@ -414,46 +1062,78 @@ static bool qlt_24xx_atio_pkt_all_vps(struct scsi_qla_host *vha,
 	{
 		struct abts_recv_from_24xx *entry =
 			(struct abts_recv_from_24xx *)atio;
-		struct scsi_qla_host *host = qlt_find_host_by_vp_idx(vha,
-			entry->vp_index);
-		unsigned long flags;
 
-		if (unlikely(!host)) {
-			ql_dbg(ql_dbg_tgt, vha, 0xe00a,
-			    "qla_target(%d): Response pkt (ABTS_RECV_24XX) "
-			    "received, with unknown vp_index %d\n",
-			    vha->vp_idx, entry->vp_index);
+		if (unlikely(atio->u.nvme_isp27.fcnvme_hdr.scsi_fc_id ==
+			NVMEFC_CMD_IU_SCSI_FC_ID)) {
+			qla_nvmet_handle_abts(vha, entry);
 			break;
 		}
-		if (!ha_locked)
-			spin_lock_irqsave(&host->hw->hardware_lock, flags);
-		qlt_24xx_handle_abts(host, (struct abts_recv_from_24xx *)atio);
-		if (!ha_locked)
-			spin_unlock_irqrestore(&host->hw->hardware_lock, flags);
-		break;
+
+		{
+			struct abts_recv_from_24xx *entry =
+				(struct abts_recv_from_24xx *)atio;
+			struct scsi_qla_host *host = qlt_find_host_by_vp_idx
+				(vha, entry->vp_index);
+			unsigned long flags;
+
+			if (unlikely(!host)) {
+				ql_dbg(ql_dbg_tgt, vha, 0xe00a,
+				    "qla_target(%d): Response pkt (ABTS_RECV_24XX) received, with unknown vp_index %d\n",
+				    vha->vp_idx, entry->vp_index);
+				break;
+			}
+			if (!ha_locked)
+				spin_lock_irqsave(&host->hw->hardware_lock,
+				    flags);
+			qlt_24xx_handle_abts(host,
+			    (struct abts_recv_from_24xx *)atio);
+			if (!ha_locked)
+				spin_unlock_irqrestore(
+				    &host->hw->hardware_lock, flags);
+			break;
+		}
 	}
 
-	/* case PUREX_IOCB_TYPE: ql2xmvasynctoatio */
+	/* NVME */
+	case ATIO_PURLS:
+	{
+		struct scsi_qla_host *host = vha;
+		unsigned long flags;
+
+		/* Received an LS4 from the init, pass it to the NVMEt */
+		ql_log(ql_log_info, vha, 0x11047,
+		    "%s %d Received an LS4 from the initiator on ATIO\n",
+		    __func__, __LINE__);
+		spin_lock_irqsave(&host->hw->hardware_lock, flags);
+		buf = qlt_nvmet_prepare_ls(host,
+		    (struct pt_ls4_rx_unsol *)atio);
+		if (buf)
+			qla_nvmet_handle_ls(host,
+			    (struct pt_ls4_rx_unsol *)atio, buf);
+		spin_unlock_irqrestore(&host->hw->hardware_lock, flags);
+	}
+	break;
+
+	case PUREX_IOCB_TYPE: /* NVMET */
+	{
+		/* Received a PUREX IOCB */
+		/* Queue the iocb and wake up dpc */
+		qlt_queue_purex(vha, atio);
+		set_bit(NVMET_PUREX, &vha->dpc_flags);
+		qla2xxx_wake_dpc(vha);
+		break;
+	}
 
 	default:
 		ql_dbg(ql_dbg_tgt, vha, 0xe040,
 		    "qla_target(%d): Received unknown ATIO atio "
 		    "type %x\n", vha->vp_idx, atio->u.raw.entry_type);
+		ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0xe011,
+		    (uint8_t *)atio, sizeof(*atio));
 		break;
 	}
 
 	return false;
-}
-
-int qlt_send_els_resp(srb_t *sp, void *pkt)
-{
-	return 0;
-}
-
-int
-qla_nvmet_ls(srb_t *sp, void *rsp_pkt)
-{
-	return 0;
 }
 
 void qlt_response_pkt_all_vps(struct scsi_qla_host *vha,
@@ -552,6 +1232,10 @@ void qlt_response_pkt_all_vps(struct scsi_qla_host *vha,
 			break;
 		}
 		qlt_response_pkt(host, rsp, pkt);
+		if (unlikely(qlt_op_target_mode))
+			qla24xx_nvmet_abts_resp_iocb(vha,
+				(struct abts_resp_to_24xx *)pkt,
+				rsp->req);
 		break;
 	}
 	default:
@@ -1634,6 +2318,11 @@ static void qlt_release(struct qla_tgt *tgt)
 		    ha->tgt.tgt_ops->remove_target &&
 		    vha->vha_tgt.target_lport_ptr)
 			ha->tgt.tgt_ops->remove_target(vha);
+
+	if (tgt->nvme_els_ptr) {
+		dma_free_coherent(&vha->hw->pdev->dev, 256,
+			tgt->nvme_els_ptr, tgt->nvme_els_rsp);
+	}
 
 	vha->vha_tgt.qla_tgt = NULL;
 
@@ -5660,6 +6349,101 @@ qlt_chk_qfull_thresh_hold(struct scsi_qla_host *vha, struct qla_qpair *qpair,
 	return 1;
 }
 
+/*
+ * Worker thread that dequeues the nvme cmd off the list and
+ * called nvme-t to process the cmd
+ */
+static void qla_nvmet_work(struct work_struct *work)
+{
+	struct qla_nvmet_cmd *cmd =
+		container_of(work, struct qla_nvmet_cmd, work);
+	scsi_qla_host_t *vha = cmd->vha;
+
+	qla_nvmet_process_cmd(vha, cmd);
+}
+/*
+ * Handle the NVME cmd IU
+ */
+static void qla_nvmet_handle_cmd(struct scsi_qla_host *vha,
+		struct atio_from_isp *atio)
+{
+	struct qla_nvmet_cmd *tgt_cmd;
+	unsigned long flags;
+	struct qla_hw_data *ha = vha->hw;
+	struct fc_port *fcport;
+	struct fcp_hdr *fcp_hdr;
+	uint32_t s_id = 0;
+	void *next_pkt;
+	uint8_t *nvmet_cmd_ptr;
+	uint32_t nvmet_cmd_iulen = 0;
+	uint32_t nvmet_cmd_iulen_min = 64;
+
+	/* Create an NVME cmd and queue it up to the work queue */
+	tgt_cmd = kzalloc(sizeof(struct qla_nvmet_cmd), GFP_ATOMIC);
+	if (tgt_cmd == NULL)
+		return;
+
+	tgt_cmd->vha = vha;
+
+	fcp_hdr = &atio->u.nvme_isp27.fcp_hdr;
+
+	/* Get the session for this command */
+	s_id = fcp_hdr->s_id[0] << 16 | fcp_hdr->s_id[1] << 8
+		| fcp_hdr->s_id[2];
+	tgt_cmd->ox_id = fcp_hdr->ox_id;
+
+	fcport = qla_nvmet_find_sess_by_s_id(vha, s_id);
+	if (unlikely(!fcport)) {
+		ql_log(ql_log_warn, vha, 0x11049,
+			"Cant' find the session for port_id: %#x\n", s_id);
+		kfree(tgt_cmd);
+		return;
+	}
+
+	tgt_cmd->fcport = fcport;
+
+	memcpy(&tgt_cmd->atio, atio, sizeof(*atio));
+
+	/* The FC-NMVE cmd covers 2 ATIO IOCBs */
+
+	nvmet_cmd_ptr = (uint8_t *)&tgt_cmd->nvme_cmd_iu;
+	nvmet_cmd_iulen = be16_to_cpu(atio->u.nvme_isp27.fcnvme_hdr.iu_len) * 4;
+	tgt_cmd->cmd_len = nvmet_cmd_iulen;
+
+	if (unlikely(ha->tgt.atio_ring_index + atio->u.raw.entry_count >
+			ha->tgt.atio_q_length)) {
+		uint8_t i;
+
+		memcpy(nvmet_cmd_ptr, &((uint8_t *)atio)[NVME_ATIO_CMD_OFF],
+			ATIO_NVME_FIRST_PACKET_CMDLEN);
+		nvmet_cmd_ptr += ATIO_NVME_FIRST_PACKET_CMDLEN;
+		nvmet_cmd_iulen -= ATIO_NVME_FIRST_PACKET_CMDLEN;
+
+		for (i = 1; i < atio->u.raw.entry_count; i++) {
+			uint8_t cplen = min(nvmet_cmd_iulen_min,
+			nvmet_cmd_iulen);
+
+			next_pkt = qlt_get_next_atio_pkt(vha);
+			memcpy(nvmet_cmd_ptr, (uint8_t *)next_pkt, cplen);
+			nvmet_cmd_ptr += cplen;
+			nvmet_cmd_iulen -= cplen;
+		}
+	} else {
+		memcpy(nvmet_cmd_ptr, &((uint8_t *)atio)[NVME_ATIO_CMD_OFF],
+			nvmet_cmd_iulen);
+		next_pkt = qlt_get_next_atio_pkt(vha);
+	}
+
+	/* Add cmd to the list */
+	spin_lock_irqsave(&vha->cmd_list_lock, flags);
+	list_add_tail(&tgt_cmd->cmd_list, &vha->qla_cmd_list);
+	spin_unlock_irqrestore(&vha->cmd_list_lock, flags);
+
+	/* Queue the work item */
+	INIT_WORK(&tgt_cmd->work, qla_nvmet_work);
+	queue_work(qla_nvmet_wq, &tgt_cmd->work);
+}
+
 /* ha->hardware_lock supposed to be held on entry */
 /* called via callback from qla2xxx */
 static void qlt_24xx_atio_pkt(struct scsi_qla_host *vha,
@@ -5696,6 +6480,13 @@ static void qlt_24xx_atio_pkt(struct scsi_qla_host *vha,
 			if (!ha_locked)
 				spin_unlock_irqrestore(&ha->hardware_lock,
 				    flags);
+			break;
+		}
+
+		/* NVME Target*/
+		if (unlikely(atio->u.nvme_isp27.fcnvme_hdr.scsi_fc_id
+				== NVMEFC_CMD_IU_SCSI_FC_ID)) {
+			qla_nvmet_handle_cmd(vha, atio);
 			break;
 		}
 
@@ -6549,6 +7340,14 @@ int qlt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 	if (ha->tgt.tgt_ops && ha->tgt.tgt_ops->add_target)
 		ha->tgt.tgt_ops->add_target(base_vha);
 
+	tgt->nvme_els_ptr = dma_alloc_coherent(&base_vha->hw->pdev->dev, 256,
+		&tgt->nvme_els_rsp, GFP_KERNEL);
+	if (!tgt->nvme_els_ptr) {
+		ql_dbg(ql_dbg_tgt, base_vha, 0xe066,
+		    "Unable to allocate DMA buffer for NVME ELS request\n");
+		return -ENOMEM;
+	}
+
 	return 0;
 }
 
@@ -6843,6 +7642,7 @@ qlt_rff_id(struct scsi_qla_host *vha)
 	u8 fc4_feature = 0;
 	/*
 	 * FC-4 Feature bit 0 indicates target functionality to the name server.
+	 * NVME FC-4 Feature bit 2 indicates discovery controller
 	 */
 	if (qla_tgt_mode_enabled(vha)) {
 		fc4_feature = BIT_0;
@@ -6880,6 +7680,76 @@ qlt_init_atio_q_entries(struct scsi_qla_host *vha)
 
 }
 
+static void
+qlt_27xx_process_nvme_atio_queue(struct scsi_qla_host *vha, uint8_t ha_locked)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct atio_from_isp *pkt;
+	int cnt;
+	uint32_t atio_q_in;
+	uint16_t num_atios = 0;
+	uint8_t nvme_pkts = 0;
+
+	if (!ha->flags.fw_started)
+		return;
+
+	pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
+	while (num_atios < pkt->u.raw.entry_count) {
+		atio_q_in =	RD_REG_DWORD(ISP_ATIO_Q_IN(vha));
+		if (atio_q_in < ha->tgt.atio_ring_index)
+			num_atios = ha->tgt.atio_q_length -
+				(ha->tgt.atio_ring_index - atio_q_in);
+		else
+			num_atios = atio_q_in - ha->tgt.atio_ring_index;
+		if (num_atios == 0)
+			return;
+	}
+
+	while ((num_atios) || fcpcmd_is_corrupted(ha->tgt.atio_ring_ptr)) {
+		pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
+		cnt = pkt->u.raw.entry_count;
+
+		if (unlikely(fcpcmd_is_corrupted(ha->tgt.atio_ring_ptr))) {
+			/*
+			 * This packet is corrupted. The header + payload
+			 * can not be trusted. There is no point in passing
+			 * it further up.
+			 */
+			ql_log(ql_log_warn, vha, 0xd03c,
+			    "corrupted fcp frame SID[%3phN] OXID[%04x] EXCG[%x] %64phN\n",
+			    pkt->u.isp24.fcp_hdr.s_id,
+			    be16_to_cpu(pkt->u.isp24.fcp_hdr.ox_id),
+			    le32_to_cpu(pkt->u.isp24.exchange_addr), pkt);
+
+			adjust_corrupted_atio(pkt);
+			qlt_send_term_exchange(ha->base_qpair, NULL, pkt,
+			    ha_locked, 0);
+		} else {
+			qlt_24xx_atio_pkt_all_vps(vha,
+			    (struct atio_from_isp *)pkt, ha_locked);
+			nvme_pkts++;
+		}
+
+		/* Just move by one index since we have already accounted the
+		 * additional ones while processing individual ATIOs
+		 */
+		ha->tgt.atio_ring_index++;
+		if (ha->tgt.atio_ring_index == ha->tgt.atio_q_length) {
+			ha->tgt.atio_ring_index = 0;
+			ha->tgt.atio_ring_ptr = ha->tgt.atio_ring;
+		} else
+			ha->tgt.atio_ring_ptr++;
+
+		pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
+		num_atios -= cnt;
+		/* memory barrier */
+		wmb();
+	}
+
+	/* Adjust ring index */
+	WRT_REG_DWORD(ISP_ATIO_Q_OUT(vha), ha->tgt.atio_ring_index);
+}
+
 /*
  * qlt_24xx_process_atio_queue() - Process ATIO queue entries.
  * @ha: SCSI driver HA context
@@ -6891,9 +7761,15 @@ qlt_24xx_process_atio_queue(struct scsi_qla_host *vha, uint8_t ha_locked)
 	struct atio_from_isp *pkt;
 	int cnt, i;
 
+	if (unlikely(qlt_op_target_mode)) {
+		qlt_27xx_process_nvme_atio_queue(vha, ha_locked);
+		return;
+	}
+
 	if (!ha->flags.fw_started)
 		return;
 
+	pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
 	while ((ha->tgt.atio_ring_ptr->signature != ATIO_PROCESSED) ||
 	    fcpcmd_is_corrupted(ha->tgt.atio_ring_ptr)) {
 		pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
@@ -6919,6 +7795,7 @@ qlt_24xx_process_atio_queue(struct scsi_qla_host *vha, uint8_t ha_locked)
 			    (struct atio_from_isp *)pkt, ha_locked);
 		}
 
+		cnt = 1;
 		for (i = 0; i < cnt; i++) {
 			ha->tgt.atio_ring_index++;
 			if (ha->tgt.atio_ring_index == ha->tgt.atio_q_length) {
@@ -6930,11 +7807,13 @@ qlt_24xx_process_atio_queue(struct scsi_qla_host *vha, uint8_t ha_locked)
 			pkt->u.raw.signature = ATIO_PROCESSED;
 			pkt = (struct atio_from_isp *)ha->tgt.atio_ring_ptr;
 		}
+		/* memory barrier */
 		wmb();
 	}
 
 	/* Adjust ring index */
 	WRT_REG_DWORD(ISP_ATIO_Q_OUT(vha), ha->tgt.atio_ring_index);
+	RD_REG_DWORD_RELAXED(ISP_ATIO_Q_OUT(vha));
 }
 
 void
@@ -7231,6 +8110,9 @@ qlt_probe_one_stage1(struct scsi_qla_host *base_vha, struct qla_hw_data *ha)
 	INIT_DELAYED_WORK(&base_vha->unknown_atio_work,
 	    qlt_unknown_atio_work_fn);
 
+	/* NVMET */
+	INIT_LIST_HEAD(&base_vha->purex_atio_list);
+
 	qlt_clear_mode(base_vha);
 
 	rc = btree_init32(&ha->tgt.host_map);
@@ -7457,13 +8339,25 @@ int __init qlt_init(void)
 		goto out_mgmt_cmd_cachep;
 	}
 
+	qla_tgt_purex_plogi_cachep =
+		kmem_cache_create("qla_tgt_purex_plogi_cachep",
+			sizeof(struct qlt_purex_plogi_ack_t),
+			__alignof__(struct qlt_purex_plogi_ack_t), 0, NULL);
+
+	if (!qla_tgt_purex_plogi_cachep) {
+		ql_log(ql_log_fatal, NULL, 0xe06d,
+		    "kmem_cache_create for qla_tgt_purex_plogi_cachep failed\n");
+		ret = -ENOMEM;
+		goto out_plogi_cachep;
+	}
+
 	qla_tgt_mgmt_cmd_mempool = mempool_create(25, mempool_alloc_slab,
 	    mempool_free_slab, qla_tgt_mgmt_cmd_cachep);
 	if (!qla_tgt_mgmt_cmd_mempool) {
 		ql_log(ql_log_fatal, NULL, 0xe06e,
 		    "mempool_create for qla_tgt_mgmt_cmd_mempool failed\n");
 		ret = -ENOMEM;
-		goto out_plogi_cachep;
+		goto out_purex_plogi_cachep;
 	}
 
 	qla_tgt_wq = alloc_workqueue("qla_tgt_wq", 0, 0);
@@ -7473,6 +8367,25 @@ int __init qlt_init(void)
 		ret = -ENOMEM;
 		goto out_cmd_mempool;
 	}
+
+	qla_nvmet_wq = alloc_workqueue("qla_nvmet_wq", 0, 0);
+	if (!qla_nvmet_wq) {
+		ql_log(ql_log_fatal, NULL, 0xe070,
+		    "alloc_workqueue for qla_nvmet_wq failed\n");
+		ret = -ENOMEM;
+		destroy_workqueue(qla_tgt_wq);
+		goto out_cmd_mempool;
+	}
+
+	qla_nvmet_comp_wq = alloc_workqueue("qla_nvmet_comp_wq", 0, 0);
+	if (!qla_nvmet_comp_wq) {
+		ql_log(ql_log_fatal, NULL, 0xe071,
+		    "alloc_workqueue for qla_nvmet_wq failed\n");
+		ret = -ENOMEM;
+		destroy_workqueue(qla_nvmet_wq);
+		destroy_workqueue(qla_tgt_wq);
+		goto out_cmd_mempool;
+	}
 	/*
 	 * Return 1 to signal that initiator-mode is being disabled
 	 */
@@ -7480,6 +8393,8 @@ int __init qlt_init(void)
 
 out_cmd_mempool:
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
+out_purex_plogi_cachep:
+	kmem_cache_destroy(qla_tgt_purex_plogi_cachep);
 out_plogi_cachep:
 	kmem_cache_destroy(qla_tgt_plogi_cachep);
 out_mgmt_cmd_cachep:
@@ -7492,8 +8407,19 @@ void qlt_exit(void)
 	if (!QLA_TGT_MODE_ENABLED())
 		return;
 
+	destroy_workqueue(qla_nvmet_comp_wq);
+	destroy_workqueue(qla_nvmet_wq);
 	destroy_workqueue(qla_tgt_wq);
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
 	kmem_cache_destroy(qla_tgt_plogi_cachep);
+	kmem_cache_destroy(qla_tgt_purex_plogi_cachep);
 	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
+}
+
+void nvmet_release_sessions(struct scsi_qla_host *vha)
+{
+	struct qlt_purex_plogi_ack_t *pla, *tpla;
+
+	list_for_each_entry_safe(pla, tpla, &vha->plogi_ack_list, list)
+		list_del(&pla->list);
 }

@@ -142,8 +142,10 @@ int ql2xnvmeenable;
 #endif
 module_param(ql2xnvmeenable, int, 0644);
 MODULE_PARM_DESC(ql2xnvmeenable,
-    "Enables NVME support. "
-    "0 - no NVMe.  Default is Y");
+		"Enables NVME support.\n"
+		"0 - no NVMe.\n"
+		"1 - initiator,\n"
+		"2 - target. Default is 1\n");
 
 int ql2xenablehba_err_chk = 2;
 module_param(ql2xenablehba_err_chk, int, S_IRUGO|S_IWUSR);
@@ -3421,6 +3423,9 @@ skip_dpc:
 
 	qlt_add_target(ha, base_vha);
 
+	if (ql2xnvmeenable == 2)
+		qla_nvmet_create_targetport(base_vha);
+
 	clear_bit(PFLG_DRIVER_PROBING, &base_vha->pci_flags);
 
 	if (test_bit(UNLOADING, &base_vha->dpc_flags))
@@ -3700,6 +3705,8 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	set_bit(UNLOADING, &base_vha->dpc_flags);
 
 	qla_nvme_delete(base_vha);
+
+	qla_nvmet_delete(base_vha);
 
 	dma_free_coherent(&ha->pdev->dev,
 		base_vha->gnl.size, base_vha->gnl.l, base_vha->gnl.ldma);
@@ -5024,6 +5031,53 @@ static void qla_sp_retry(struct scsi_qla_host *vha, struct qla_work_evt *e)
 		qla24xx_sp_unmap(vha, sp);
 	}
 }
+/* NVMET */
+static
+void qla24xx_create_new_nvmet_sess(struct scsi_qla_host *vha,
+	struct qla_work_evt *e)
+{
+	unsigned long flags;
+	fc_port_t *fcport = NULL;
+
+	spin_lock_irqsave(&vha->hw->tgt.sess_lock, flags);
+	fcport = qla2x00_find_fcport_by_wwpn(vha, e->u.new_sess.port_name, 1);
+	if (fcport) {
+		ql_log(ql_log_info, vha, 0x11020,
+		    "Found fcport: %p for WWN: %8phC\n", fcport,
+		    e->u.new_sess.port_name);
+		fcport->d_id = e->u.new_sess.id;
+
+		/* Session existing with No loop_ID assigned */
+		if (fcport->loop_id == FC_NO_LOOP_ID) {
+			fcport->loop_id = qla2x00_find_new_loop_id(vha, fcport);
+			ql_log(ql_log_info, vha, 0x11021,
+			    "Allocated new loop_id: %#x for fcport: %p\n",
+			    fcport->loop_id, fcport);
+			fcport->fw_login_state = DSC_LS_PLOGI_PEND;
+		}
+	} else {
+		fcport = qla2x00_alloc_fcport(vha, GFP_KERNEL);
+		if (fcport) {
+			fcport->d_id = e->u.new_sess.id;
+			fcport->loop_id = qla2x00_find_new_loop_id(vha, fcport);
+			ql_log(ql_log_info, vha, 0x11022,
+			    "Allocated new loop_id: %#x for fcport: %p\n",
+			    fcport->loop_id, fcport);
+
+			fcport->scan_state = QLA_FCPORT_FOUND;
+			fcport->flags |= FCF_FABRIC_DEVICE;
+			fcport->fw_login_state = DSC_LS_PLOGI_PEND;
+
+			memcpy(fcport->port_name, e->u.new_sess.port_name,
+			    WWN_SIZE);
+
+			list_add_tail(&fcport->list, &vha->vp_fcports);
+		}
+	}
+	spin_unlock_irqrestore(&vha->hw->tgt.sess_lock, flags);
+
+	complete(&vha->purex_plogi_sess);
+}
 
 void
 qla2x00_do_work(struct scsi_qla_host *vha)
@@ -5128,6 +5182,10 @@ qla2x00_do_work(struct scsi_qla_host *vha)
 		case QLA_EVT_ELS_PLOGI:
 			qla24xx_els_dcmd2_iocb(vha, ELS_DCMD_PLOGI,
 			    e->u.fcport.fcport, false);
+			break;
+		/* FC-NVMe Target */
+		case QLA_EVT_NEW_NVMET_SESS:
+			qla24xx_create_new_nvmet_sess(vha, e);
 			break;
 		}
 		if (e->flags & QLA_EVT_FLAG_FREE)
@@ -6100,6 +6158,12 @@ qla2x00_do_dpc(void *data)
 				set_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags);
 		}
 
+		if (test_and_clear_bit(NVMET_PUREX, &base_vha->dpc_flags)) {
+			ql_log(ql_log_info, base_vha, 0x11022,
+			    "qla2xxx-nvmet: Received a frame on the wire\n");
+			qlt_dequeue_purex(base_vha);
+		}
+
 		if (test_and_clear_bit
 		    (ISP_ABORT_NEEDED, &base_vha->dpc_flags) &&
 		    !test_bit(UNLOADING, &base_vha->dpc_flags)) {
@@ -6273,6 +6337,13 @@ intr_on_check:
 				    ha->nvme_last_rptd_aen);
 			}
 		}
+#if (IS_ENABLED(CONFIG_NVME_TARGET_FC))
+		if (test_and_clear_bit(NVMET_PUREX, &base_vha->dpc_flags)) {
+			ql_log(ql_log_info, base_vha, 0x11025,
+				"nvmet: Received a frame on the wire\n");
+			qlt_dequeue_purex(base_vha);
+		}
+#endif
 
 		if (test_and_clear_bit(SET_ZIO_THRESHOLD_NEEDED,
 		    &base_vha->dpc_flags)) {
