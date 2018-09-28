@@ -1068,10 +1068,10 @@ out:
 	return ret;
 }
 
-long seccomp_get_metadata(struct task_struct *task,
-			  unsigned long size, void __user *data)
+int seccomp_get_metadata(struct task_struct *task,
+			 unsigned long size, void __user *data)
 {
-	long ret;
+	int ret;
 	struct seccomp_filter *filter;
 	struct seccomp_metadata kmd = {};
 
