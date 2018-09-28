@@ -344,6 +344,9 @@ void slb_setup_new_exec(void)
 		if (preload_add(ti, mm->mmap_base))
 			slb_allocate_user(mm, mm->mmap_base);
 	}
+
+	/* see switch_slb */
+	asm volatile("isync" : : : "memory");
 }
 
 void preload_new_slb_context(unsigned long start, unsigned long sp)
@@ -373,6 +376,9 @@ void preload_new_slb_context(unsigned long start, unsigned long sp)
 		if (preload_add(ti, heap))
 			slb_allocate_user(mm, heap);
 	}
+
+	/* see switch_slb */
+	asm volatile("isync" : : : "memory");
 }
 
 
@@ -389,6 +395,7 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 	 * which would update the slb_cache/slb_cache_ptr fields in the PACA.
 	 */
 	hard_irq_disable();
+	asm volatile("isync" : : : "memory");
 	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
 		/*
 		 * SLBIA IH=3 invalidates all Class=1 SLBEs and their
@@ -396,7 +403,7 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 		 * switch_slb wants. So ARCH_300 does not use the slb
 		 * cache.
 		 */
-		asm volatile("isync ; " PPC_SLBIA(3)" ; isync");
+		asm volatile(PPC_SLBIA(3));
 	} else {
 		unsigned long offset = get_paca()->slb_cache_ptr;
 
@@ -404,7 +411,6 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 		    offset <= SLB_CACHE_ENTRIES) {
 			unsigned long slbie_data = 0;
 
-			asm volatile("isync" : : : "memory");
 			for (i = 0; i < offset; i++) {
 				/* EA */
 				slbie_data = (unsigned long)
@@ -419,7 +425,6 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 			if (!cpu_has_feature(CPU_FTR_ARCH_207S) && offset == 1)
 				asm volatile("slbie %0" : : "r" (slbie_data));
 
-			asm volatile("isync" : : : "memory");
 		} else {
 			struct slb_shadow *p = get_slb_shadow();
 			unsigned long ksp_esid_data =
@@ -427,8 +432,7 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 			unsigned long ksp_vsid_data =
 				be64_to_cpu(p->save_area[KSTACK_INDEX].vsid);
 
-			asm volatile("isync\n"
-				     PPC_SLBIA(1) "\n"
+			asm volatile(PPC_SLBIA(1) "\n"
 				     "slbmte	%0,%1\n"
 				     "isync"
 				     :: "r"(ksp_vsid_data),
@@ -464,6 +468,13 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 
 		slb_allocate_user(mm, ea);
 	}
+
+	/*
+	 * Synchronize slbmte preloads with possible subsequent user memory
+	 * address accesses by the kernel (user mode won't happen until
+	 * rfid, which is safe).
+	 */
+	asm volatile("isync" : : : "memory");
 }
 
 void slb_set_size(u16 size)
@@ -625,6 +636,17 @@ static long slb_insert_entry(unsigned long ea, unsigned long context,
 	if (!vsid)
 		return -EFAULT;
 
+	/*
+	 * There must not be a kernel SLB fault in alloc_slb_index or before
+	 * slbmte here or the allocation bitmaps could get out of whack with
+	 * the SLB.
+	 *
+	 * User SLB faults or preloads take this path which might get inlined
+	 * into the caller, so add compiler barriers here to ensure unsafe
+	 * memory accesses do not come between
+	 */
+	barrier();
+
 	index = alloc_slb_index(kernel);
 
 	vsid_data = __mk_vsid_data(vsid, ssize, flags);
@@ -633,9 +655,12 @@ static long slb_insert_entry(unsigned long ea, unsigned long context,
 	/*
 	 * No need for an isync before or after this slbmte. The exception
 	 * we enter with and the rfid we exit with are context synchronizing.
-	 * Also we only handle user segments here.
+	 * User preloads should add isync afterwards in case the kernel
+	 * accesses user memory before it returns to userspace with rfid.
 	 */
 	asm volatile("slbmte %0, %1" : : "r" (vsid_data), "r" (esid_data));
+
+	barrier();
 
 	if (!kernel)
 		slb_cache_update(esid_data);
