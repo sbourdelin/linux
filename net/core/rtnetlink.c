@@ -3759,16 +3759,17 @@ static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
 	int err = 0;
 	int fidx = 0;
 
-	err = nlmsg_parse(cb->nlh, sizeof(struct ifinfomsg), tb,
-			  IFLA_MAX, ifla_policy, NULL);
-	if (err < 0) {
-		return -EINVAL;
-	} else if (err == 0) {
+	/* The family header may _not_ be struct ifinfomsg
+	 * (e.g., struct ndmsg).  Usage of the ifm pointer
+	 * must check payload length (e.g., nlmsg_parse()).
+	 */
+	if (nlmsg_parse(cb->nlh, sizeof(struct ifinfomsg), tb,
+			IFLA_MAX, ifla_policy, NULL) == 0) {
 		if (tb[IFLA_MASTER])
 			br_idx = nla_get_u32(tb[IFLA_MASTER]);
-	}
 
-	brport_idx = ifm->ifi_index;
+		brport_idx = ifm->ifi_index;
+	}
 
 	if (br_idx) {
 		br_dev = __dev_get_by_index(net, br_idx);
