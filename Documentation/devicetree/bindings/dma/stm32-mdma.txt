@@ -10,7 +10,7 @@ Required properties:
 - interrupts: Should contain the MDMA interrupt.
 - clocks: Should contain the input clock of the DMA instance.
 - resets: Reference to a reset controller asserting the DMA controller.
-- #dma-cells : Must be <5>. See DMA client paragraph for more details.
+- #dma-cells : Must be <6>. See DMA client paragraph for more details.
 
 Optional properties:
 - dma-channels: Number of DMA channels supported by the controller.
@@ -26,7 +26,7 @@ Example:
 		interrupts = <122>;
 		clocks = <&timer_clk>;
 		resets = <&rcc 992>;
-		#dma-cells = <5>;
+		#dma-cells = <6>;
 		dma-channels = <16>;
 		dma-requests = <32>;
 		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
@@ -35,8 +35,8 @@ Example:
 * DMA client
 
 DMA clients connected to the STM32 MDMA controller must use the format
-described in the dma.txt file, using a five-cell specifier for each channel:
-a phandle to the MDMA controller plus the following five integer cells:
+described in the dma.txt file, using a six-cell specifier for each channel:
+a phandle to the MDMA controller plus the following six integer cells:
 
 1. The request line number
 2. The priority level
@@ -76,6 +76,10 @@ a phandle to the MDMA controller plus the following five integer cells:
    if no HW ack signal is used by the MDMA client
 5. A 32bit mask specifying the value to be written to acknowledge the request
    if no HW ack signal is used by the MDMA client
+6. A bitfield value specifying if the MDMA client wants to generate M2M
+   transfer with HW trigger (1) or not (0). This bitfield should be only
+   enabled for M2M transfer triggered by STM32 DMA client. The memory devices
+   involved in this kind of transfer are SRAM and DDR.
 
 Example:
 
