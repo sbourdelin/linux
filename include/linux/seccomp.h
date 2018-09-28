@@ -22,8 +22,8 @@ struct seccomp_filter;
  * @filter: must always point to a valid seccomp-filter or NULL as it is
  *          accessed without locking during system call entry.
  *
- *          @filter must only be accessed from the context of current as there
- *          is no read locking.
+ *          @filter is read-protected by task->signal->cred_guard_mutex when
+ *          outside of current context.
  */
 struct seccomp {
 	int mode;

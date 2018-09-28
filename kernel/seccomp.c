@@ -1042,7 +1042,12 @@ int seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
 		return -EACCES;
 	}
 
+	ret = mutex_lock_killable(&task->signal->cred_guard_mutex);
+	if (ret < 0)
+		return ret;
+
 	filter = get_nth_filter(task, filter_off);
+	mutex_unlock(&task->signal->cred_guard_mutex);
 	if (IS_ERR(filter))
 		return PTR_ERR(filter);
 
@@ -1088,7 +1093,12 @@ int seccomp_get_metadata(struct task_struct *task,
 	if (copy_from_user(&kmd.filter_off, data, sizeof(kmd.filter_off)))
 		return -EFAULT;
 
+	ret = mutex_lock_killable(&task->signal->cred_guard_mutex);
+	if (ret < 0)
+		return ret;
+
 	filter = get_nth_filter(task, kmd.filter_off);
+	mutex_unlock(&task->signal->cred_guard_mutex);
 	if (IS_ERR(filter))
 		return PTR_ERR(filter);
 
