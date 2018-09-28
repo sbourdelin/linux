@@ -898,17 +898,17 @@ static struct platform_driver ramoops_driver = {
 	},
 };
 
-static void ramoops_register_dummy(void)
+static int ramoops_register_dummy(void)
 {
 	if (!mem_size)
-		return;
+		return -EINVAL;
 
 	pr_info("using module parameters\n");
 
 	dummy_data = kzalloc(sizeof(*dummy_data), GFP_KERNEL);
 	if (!dummy_data) {
 		pr_info("could not allocate pdata\n");
-		return;
+		return -ENOMEM;
 	}
 
 	dummy_data->mem_size = mem_size;
@@ -932,13 +932,25 @@ static void ramoops_register_dummy(void)
 	if (IS_ERR(dummy)) {
 		pr_info("could not create platform device: %ld\n",
 			PTR_ERR(dummy));
+		kfree(dummy_data);
+		return PTR_ERR(dummy);
 	}
+	return 0;
 }
 
 static int __init ramoops_init(void)
 {
-	ramoops_register_dummy();
-	return platform_driver_register(&ramoops_driver);
+	int ret = ramoops_register_dummy();
+
+	if (ret != 0)
+		return ret;
+
+	ret = platform_driver_register(&ramoops_driver);
+	if (ret != 0) {
+		platform_device_unregister(dummy);
+		kfree(dummy_data);
+	}
+	return ret;
 }
 late_initcall(ramoops_init);
 
