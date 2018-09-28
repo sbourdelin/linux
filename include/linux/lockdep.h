@@ -102,7 +102,7 @@ struct lock_class {
 	/*
 	 * Statistics counter:
 	 */
-	unsigned long			ops;
+	unsigned long __percpu		*pops;
 
 	const char			*name;
 	int				name_version;

@@ -140,6 +140,7 @@ static struct lock_list list_entries[MAX_LOCKDEP_ENTRIES];
  */
 unsigned long nr_lock_classes;
 static struct lock_class lock_classes[MAX_LOCKDEP_KEYS];
+static DEFINE_PER_CPU(unsigned long [MAX_LOCKDEP_KEYS], lock_class_ops);
 
 static inline struct lock_class *hlock_class(struct held_lock *hlock)
 {
@@ -785,11 +786,14 @@ register_lock_class(struct lockdep_map *lock, unsigned int subclass, int force)
 		dump_stack();
 		return NULL;
 	}
-	class = lock_classes + nr_lock_classes++;
+	class = lock_classes + nr_lock_classes;
 	debug_atomic_inc(nr_unused_locks);
 	class->key = key;
 	class->name = lock->name;
 	class->subclass = subclass;
+	class->pops = &lock_class_ops[nr_lock_classes];
+	nr_lock_classes++;
+
 	INIT_LIST_HEAD(&class->lock_entry);
 	INIT_LIST_HEAD(&class->locks_before);
 	INIT_LIST_HEAD(&class->locks_after);
@@ -1388,11 +1392,15 @@ find_usage_backwards(struct lock_list *root, enum lock_usage_bit bit,
 
 static void print_lock_class_header(struct lock_class *class, int depth)
 {
-	int bit;
+	int bit, cpu;
+	unsigned long ops = 0UL;
+
+	for_each_possible_cpu(cpu)
+		ops += *per_cpu(class->pops, cpu);
 
 	printk("%*s->", depth, "");
 	print_lock_name(class);
-	printk(KERN_CONT " ops: %lu", class->ops);
+	printk(KERN_CONT " ops: %lu", ops);
 	printk(KERN_CONT " {\n");
 
 	for (bit = 0; bit < LOCK_USAGE_STATES; bit++) {
@@ -3227,7 +3235,9 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 		if (!class)
 			return 0;
 	}
-	atomic_inc((atomic_t *)&class->ops);
+
+	__this_cpu_inc(*class->pops);
+
 	if (very_verbose(class)) {
 		printk("\nacquire class [%px] %s", class->key, class->name);
 		if (class->name_version > 1)
