@@ -16,6 +16,15 @@ static int usb_port_block_power_off;
 
 static const struct attribute_group *port_dev_group[];
 
+static ssize_t location_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct usb_port *port_dev = to_usb_port(dev);
+
+	return sprintf(buf, "0x%08x\n", port_dev->location);
+}
+static DEVICE_ATTR_RO(location);
+
 static ssize_t connect_type_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
 {

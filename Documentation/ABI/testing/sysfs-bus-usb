@@ -173,14 +173,14 @@ Description:
 		The file will be present for all speeds of USB devices, and will
 		always read "no" for USB 1.1 and USB 2.0 devices.
 
-What:		/sys/bus/usb/devices/.../(hub interface)/portX
+What:		/sys/bus/usb/devices/.../(hub interface)/usbY-portX
 Date:		August 2012
 Contact:	Lan Tianyu <tianyu.lan@intel.com>
 Description:
 		The /sys/bus/usb/devices/.../(hub interface)/portX
 		is usb port device's sysfs directory.
 
-What:		/sys/bus/usb/devices/.../(hub interface)/portX/connect_type
+What:		/sys/bus/usb/devices/.../(hub interface)/usbY-portX/connect_type
 Date:		January 2013
 Contact:	Lan Tianyu <tianyu.lan@intel.com>
 Description:
@@ -189,7 +189,17 @@ Description:
 		The file will read "hotplug", "wired" and "not used" if the
 		information is available, and "unknown" otherwise.
 
-What:		/sys/bus/usb/devices/.../(hub interface)/portX/quirks
+What:		/sys/bus/usb/devices/.../(hub interface)/usbY-portX/location
+Date:		October 2018
+Contact:	Bjørn Mork <bjorn@mork.no>
+Description:
+		Some platforms provide usb port physical location through
+		firmware. This is used by the kernel to pair up logical ports
+		mapping to the same physical connector. The attribute exposes the
+		raw location value as a hex integer.
+
+
+What:		/sys/bus/usb/devices/.../(hub interface)/usbY-portX/quirks
 Date:		May 2018
 Contact:	Nicolas Boichat <drinkcat@chromium.org>
 Description:
@@ -211,7 +221,7 @@ Description:
 		   used to help make enumeration work better on some high speed
 		   devices.
 
-What:		/sys/bus/usb/devices/.../(hub interface)/portX/over_current_count
+What:		/sys/bus/usb/devices/.../(hub interface)/usbY-portX/over_current_count
 Date:		February 2018
 Contact:	Richard Leitner <richard.leitner@skidata.com>
 Description:
