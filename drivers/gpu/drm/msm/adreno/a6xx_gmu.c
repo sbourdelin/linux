@@ -637,6 +637,8 @@ out:
 
 int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
 {
+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
+	struct msm_gpu *gpu = &adreno_gpu->base;
 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
 	int status, ret;
 
@@ -651,6 +653,9 @@ int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
 	ret = clk_bulk_prepare_enable(gmu->nr_clocks, gmu->clocks);
 	if (ret)
 		goto out;
+
+	/* Set the bus quota to a reasonable value for boot */
+	icc_set(gpu->icc_path, 0, 3072000000);
 
 	a6xx_gmu_irq_enable(gmu);
 
@@ -692,6 +697,8 @@ bool a6xx_gmu_isidle(struct a6xx_gmu *gmu)
 
 int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
 {
+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
+	struct msm_gpu *gpu = &adreno_gpu->base;
 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
 	u32 val;
 
@@ -737,6 +744,9 @@ int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
 
 	/* Tell RPMh to power off the GPU */
 	a6xx_rpmh_stop(gmu);
+
+	/* Remove the bus vote */
+	icc_set(gpu->icc_path, 0, 0);
 
 	clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
 
