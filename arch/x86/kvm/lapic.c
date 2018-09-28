@@ -70,6 +70,8 @@
 #define APIC_BROADCAST			0xFF
 #define X2APIC_BROADCAST		0xFFFFFFFFul
 
+static bool __read_mostly lapic_timer_advance_adjust_done = false;
+
 static inline int apic_test_vector(int vec, void *bitmap)
 {
 	return test_bit(VEC_POS(vec), (bitmap) + REG_POS(vec));
@@ -1471,6 +1473,11 @@ void wait_lapic_expire(struct kvm_vcpu *vcpu)
 	if (guest_tsc < tsc_deadline)
 		__delay(min(tsc_deadline - guest_tsc,
 			nsec_to_cycles(vcpu, lapic_timer_advance_ns)));
+	if (!lapic_timer_advance_adjust_done) {
+		lapic_timer_advance_ns += (s64)(guest_tsc - tsc_deadline) / 8;
+		if (abs(guest_tsc - tsc_deadline) < 100)
+			lapic_timer_advance_adjust_done = true;
+	}
 }
 
 static void start_sw_tscdeadline(struct kvm_lapic *apic)
