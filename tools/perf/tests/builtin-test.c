@@ -124,7 +124,7 @@ static struct test generic_tests[] = {
 		.desc = "Watchpoint",
 		.func = test__wp,
 		.subtest = {
-			.skip_if_fail	= false,
+			.skip_if_fail	= true,
 			.get_nr		= test__wp_subtest_get_nr,
 			.get_desc	= test__wp_subtest_get_desc,
 		},

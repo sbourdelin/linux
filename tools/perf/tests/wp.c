@@ -162,7 +162,7 @@ static int wp_modify_test(void)
 
 static bool wp_ro_supported(void)
 {
-#if defined (__x86_64__) || defined (__i386__)
+#if defined(__x86_64__) || defined(__i386__) || defined(__s390x__)
 	return false;
 #else
 	return true;
@@ -171,7 +171,7 @@ static bool wp_ro_supported(void)
 
 static void wp_ro_skip_msg(void)
 {
-#if defined (__x86_64__) || defined (__i386__)
+#if defined(__x86_64__) || defined (__i386__) || defined(__s390x__)
 	pr_debug("Hardware does not support read only watchpoints.\n");
 #endif
 }
