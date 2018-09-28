@@ -2,6 +2,7 @@
 # Makefile for the nubus specific drivers.
 #
 
-obj-y := nubus.o bus.o
+obj-$(CONFIG_NUBUS) := nubus_all.o
+nubus_all-y += bus.o nubus.o
 
-obj-$(CONFIG_PROC_FS) += proc.o
+nubus_all-$(CONFIG_PROC_FS) += proc.o
