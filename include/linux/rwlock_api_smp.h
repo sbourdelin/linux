@@ -215,63 +215,63 @@ static inline void __raw_write_lock(rwlock_t *lock)
 
 static inline void __raw_write_unlock(rwlock_t *lock)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_write_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	preempt_enable();
 }
 
 static inline void __raw_read_unlock(rwlock_t *lock)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_read_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	preempt_enable();
 }
 
 static inline void
 __raw_read_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_read_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	local_irq_restore(flags);
 	preempt_enable();
 }
 
 static inline void __raw_read_unlock_irq(rwlock_t *lock)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_read_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	local_irq_enable();
 	preempt_enable();
 }
 
 static inline void __raw_read_unlock_bh(rwlock_t *lock)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_read_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	__local_bh_enable_ip(_RET_IP_, SOFTIRQ_LOCK_OFFSET);
 }
 
 static inline void __raw_write_unlock_irqrestore(rwlock_t *lock,
 					     unsigned long flags)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_write_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	local_irq_restore(flags);
 	preempt_enable();
 }
 
 static inline void __raw_write_unlock_irq(rwlock_t *lock)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_write_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	local_irq_enable();
 	preempt_enable();
 }
 
 static inline void __raw_write_unlock_bh(rwlock_t *lock)
 {
-	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	do_raw_write_unlock(lock);
+	rwlock_release(&lock->dep_map, 1, _RET_IP_);
 	__local_bh_enable_ip(_RET_IP_, SOFTIRQ_LOCK_OFFSET);
 }
 
