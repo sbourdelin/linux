@@ -931,7 +931,7 @@ bool kvm_irq_delivery_to_apic_fast(struct kvm *kvm, struct kvm_lapic *src,
 	int i;
 	bool ret;
 
-	*r = -1;
+	*r = -ENXIO;
 
 	if (irq->shorthand == APIC_DEST_SELF) {
 		*r = kvm_apic_set_irq(src->vcpu, irq, dest_map);
