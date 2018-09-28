@@ -888,6 +888,10 @@
 #define DP_AUX_HDCP_KSV_FIFO		0x6802C
 #define DP_AUX_HDCP_AINFO		0x6803B
 
+/* DP 1.2 MST sideband reply types */
+#define DP_REPLY_ACK		0x00
+#define DP_REPLY_NAK		0x01
+
 /* DP 1.2 Sideband message defines */
 /* peer device type - DP 1.2a Table 2-92 */
 #define DP_PEER_DEVICE_NONE		0x0
