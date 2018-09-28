@@ -259,7 +259,7 @@ static int ocfs2_osb_dump(struct ocfs2_super *osb, char *buf, int len)
 
 	if (cconn) {
 		out += snprintf(buf + out, len - out,
-				"%10s => Stack: %s  Name: %*s  "
+				"%10s => Stack: %s  Name: %.*s  "
 				"Version: %d.%d\n", "Cluster",
 				(*osb->osb_cluster_stack == '\0' ?
 				 "o2cb" : osb->osb_cluster_stack),
