@@ -84,8 +84,21 @@ static int hsdk_reset_reset(struct reset_controller_dev *rcdev,
 	return ret;
 }
 
+static int hsdk_reset_dummy(struct reset_controller_dev *rcd, unsigned long id)
+{
+	return 0;
+}
+
+/*
+ * Doing real reset from .assert isn't necessary/useful here. So we pass
+ * 'hsdk_reset_dummy' to .assert callback to prevent -ENOTSUPP returning by
+ * reset_control_assert() to make happy drivers which check
+ * reset_control_{assert | deassert} return status.
+ */
 static const struct reset_control_ops hsdk_reset_ops = {
 	.reset	= hsdk_reset_reset,
+	.assert = hsdk_reset_dummy,
+	.deassert = hsdk_reset_reset,
 };
 
 static int hsdk_reset_probe(struct platform_device *pdev)
