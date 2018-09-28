@@ -95,6 +95,9 @@ extern unsigned long transparent_hugepage_flags;
 
 static inline bool transparent_hugepage_enabled(struct vm_area_struct *vma)
 {
+	if (vma_is_dax(vma))
+		return true;
+
 	if (vma->vm_flags & VM_NOHUGEPAGE)
 		return false;
 
@@ -105,9 +108,6 @@ static inline bool transparent_hugepage_enabled(struct vm_area_struct *vma)
 		return false;
 
 	if (transparent_hugepage_flags & (1 << TRANSPARENT_HUGEPAGE_FLAG))
-		return true;
-
-	if (vma_is_dax(vma))
 		return true;
 
 	if (transparent_hugepage_flags &
