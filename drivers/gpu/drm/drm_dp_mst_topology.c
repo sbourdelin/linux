@@ -66,6 +66,64 @@ static bool drm_dp_validate_guid(struct drm_dp_mst_topology_mgr *mgr,
 static int drm_dp_mst_register_i2c_bus(struct drm_dp_aux *aux);
 static void drm_dp_mst_unregister_i2c_bus(struct drm_dp_aux *aux);
 static void drm_dp_mst_kick_tx(struct drm_dp_mst_topology_mgr *mgr);
+
+#define STR(x) [DP_ ## x] = #x
+
+static const char *drm_dp_mst_req_type_str(u8 req_type)
+{
+	static const char * const req_type_str[] = {
+		STR(GET_MSG_TRANSACTION_VERSION),
+		STR(LINK_ADDRESS),
+		STR(CONNECTION_STATUS_NOTIFY),
+		STR(ENUM_PATH_RESOURCES),
+		STR(ALLOCATE_PAYLOAD),
+		STR(QUERY_PAYLOAD),
+		STR(RESOURCE_STATUS_NOTIFY),
+		STR(CLEAR_PAYLOAD_ID_TABLE),
+		STR(REMOTE_DPCD_READ),
+		STR(REMOTE_DPCD_WRITE),
+		STR(REMOTE_I2C_READ),
+		STR(REMOTE_I2C_WRITE),
+		STR(POWER_UP_PHY),
+		STR(POWER_DOWN_PHY),
+		STR(SINK_EVENT_NOTIFY),
+		STR(QUERY_STREAM_ENC_STATUS),
+	};
+
+	if (req_type >= ARRAY_SIZE(req_type_str) ||
+	    !req_type_str[req_type])
+		return "unknown";
+
+	return req_type_str[req_type];
+}
+
+#undef STR
+#define STR(x) [DP_NAK_ ## x] = #x
+
+static const char *drm_dp_mst_nak_reason_str(u8 nak_reason)
+{
+	static const char * const nak_reason_str[] = {
+		STR(WRITE_FAILURE),
+		STR(INVALID_READ),
+		STR(CRC_FAILURE),
+		STR(BAD_PARAM),
+		STR(DEFER),
+		STR(LINK_FAILURE),
+		STR(NO_RESOURCES),
+		STR(DPCD_FAIL),
+		STR(I2C_NAK),
+		STR(ALLOCATE_FAIL),
+	};
+
+	if (nak_reason >= ARRAY_SIZE(nak_reason_str) ||
+	    !nak_reason_str[nak_reason])
+		return "unknown";
+
+	return nak_reason_str[nak_reason];
+}
+
+#undef STR
+
 /* sideband msg handling */
 static u8 drm_dp_msg_header_crc4(const uint8_t *data, size_t num_nibbles)
 {
@@ -2348,7 +2406,12 @@ static int drm_dp_mst_handle_down_rep(struct drm_dp_mst_topology_mgr *mgr)
 
 		drm_dp_sideband_parse_reply(&mgr->down_rep_recv, &txmsg->reply);
 		if (txmsg->reply.reply_type == DP_REPLY_NAK) {
-			DRM_DEBUG_KMS("Got NAK reply: req 0x%02x, reason 0x%02x, nak data 0x%02x\n", txmsg->reply.req_type, txmsg->reply.u.nak.reason, txmsg->reply.u.nak.nak_data);
+			DRM_DEBUG_KMS("Got NAK reply: req 0x%02x (%s), reason 0x%02x (%s), nak data 0x%02x\n",
+				      txmsg->reply.req_type,
+				      drm_dp_mst_req_type_str(txmsg->reply.req_type),
+				      txmsg->reply.u.nak.reason,
+				      drm_dp_mst_nak_reason_str(txmsg->reply.u.nak.reason),
+				      txmsg->reply.u.nak.nak_data);
 		}
 
 		memset(&mgr->down_rep_recv, 0, sizeof(struct drm_dp_sideband_msg_rx));
