@@ -572,8 +572,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
 		ret = mtk_pcie_allocate_msi_domains(port);
 		if (ret)
 			return ret;
-
-		mtk_pcie_enable_msi(port);
 	}
 
 	return 0;
@@ -693,6 +691,9 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
 	val = readl(port->base + PCIE_INT_MASK);
 	val &= ~INTX_MASK;
 	writel(val, port->base + PCIE_INT_MASK);
+
+	if (IS_ENABLED(CONFIG_PCI_MSI))
+		mtk_pcie_enable_msi(port);
 
 	/* Set AHB to PCIe translation windows */
 	size = mem->end - mem->start;
