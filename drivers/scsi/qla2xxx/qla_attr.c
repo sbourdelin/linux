@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 
 static int qla24xx_vport_disable(struct fc_vport *, bool);
+extern void qlt_set_mode(struct scsi_qla_host *vha);
 
 /* SYSFS attributes --------------------------------------------------------- */
 
@@ -631,6 +632,37 @@ static struct bin_attribute sysfs_sfp_attr = {
 };
 
 static ssize_t
+qla2x00_sysfs_write_nvmet(struct file *filp, struct kobject *kobj,
+			struct bin_attribute *bin_attr,
+			char *buf, loff_t off, size_t count)
+{
+	struct scsi_qla_host *vha = shost_priv(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+	struct qla_hw_data *ha = vha->hw;
+	scsi_qla_host_t *base_vha = pci_get_drvdata(ha->pdev);
+
+	ql_log(ql_log_info, vha, 0x706e,
+	    "Bringing up target mode!! vha:%p\n", vha);
+	qlt_op_target_mode = 1;
+	qlt_set_mode(base_vha);
+	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+	qla2xxx_wake_dpc(vha);
+	qla2x00_wait_for_hba_online(vha);
+
+	return count;
+}
+
+static struct bin_attribute sysfs_nvmet_attr = {
+	.attr = {
+		.name = "nvmet",
+		.mode = 0200,
+	},
+	.size = 0,
+	.write = qla2x00_sysfs_write_nvmet,
+};
+
+
+static ssize_t
 qla2x00_sysfs_write_reset(struct file *filp, struct kobject *kobj,
 			struct bin_attribute *bin_attr,
 			char *buf, loff_t off, size_t count)
@@ -943,6 +975,7 @@ static struct sysfs_entry {
 	{ "issue_logo", &sysfs_issue_logo_attr, },
 	{ "xgmac_stats", &sysfs_xgmac_stats_attr, 3 },
 	{ "dcbx_tlv", &sysfs_dcbx_tlv_attr, 3 },
+	{ "nvmet", &sysfs_nvmet_attr, },
 	{ NULL },
 };
 
