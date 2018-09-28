@@ -1,0 +1,53 @@
+* Texas Instruments - lm3632 Single-Chip Backlight and 1.5-A Flash LED Driver
+
+The LM3632A integrates LED drivers for both
+the backlight of the LCD panel and the camera flash
+along with the bias power for the LCD panel into one
+device.
+
+Required properties:
+	- compatible : Can be one of the following
+		"ti,lm3632"
+	- reg : I2C slave address
+	- #address-cells : 1
+	- #size-cells : 0
+
+Required child properties:
+	- reg : 0 - Indicates a backlight mode
+		1 - Indicates a Torch/Strobe (white LED) mode
+
+Required properties for flash LED child nodes:
+	See Documentation/devicetree/bindings/leds/common.txt
+	- flash-max-microamp : Range from 100mA - 1.5A
+	- flash-max-timeout-us : Range from 32ms - 1024ms
+	- led-max-microamp : Range from 25mA - 375mA
+
+Optional child properties:
+	- label : see Documentation/devicetree/bindings/leds/common.txt
+	- linux,default-trigger :
+	   see Documentation/devicetree/bindings/leds/common.txt
+
+Example:
+led-controller@11 {
+	compatible = "ti,lm3632";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	reg = <0x11>;
+
+	led@0 {
+		reg = <0>;
+		label = "white:backlight";
+		linux,default-trigger = "backlight";
+	};
+
+	led@1 {
+		reg = <1>;
+		label = "white:torch";
+		led-max-microamp = <375000>;
+		flash-max-microamp = <1500000>;
+		flash-max-timeout-us = <1000000>;
+	};
+}
+
+For more product information please see the links below:
+http://www.ti.com/product/LM3632
