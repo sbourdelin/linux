@@ -3,9 +3,10 @@
 # Makefile for the Zorro bus specific drivers.
 #
 
-obj-$(CONFIG_ZORRO)	+= zorro.o zorro-driver.o zorro-sysfs.o
-obj-$(CONFIG_PROC_FS)	+= proc.o
-obj-$(CONFIG_ZORRO_NAMES) +=  names.o
+obj-$(CONFIG_ZORRO) 		:= zorro_all.o
+zorro_all-y			+= zorro.o zorro-driver.o zorro-sysfs.o
+zorro_all-$(CONFIG_ZORRO_NAMES) += names.o
+zorro_all-$(CONFIG_PROC_FS)	+= proc.o
 
 hostprogs-y 		:= gen-devlist
 
