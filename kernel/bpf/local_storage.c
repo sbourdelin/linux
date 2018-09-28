@@ -191,7 +191,7 @@ int bpf_percpu_cgroup_storage_update(struct bpf_map *_map, void *_key,
 	int cpu, off = 0;
 	u32 size;
 
-	if (unlikely(map_flags & BPF_EXIST))
+	if (map_flags & BPF_NOEXIST)
 		return -EINVAL;
 
 	rcu_read_lock();
