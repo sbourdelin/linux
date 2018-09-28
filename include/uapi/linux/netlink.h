@@ -57,6 +57,7 @@ struct nlmsghdr {
 #define NLM_F_ECHO		0x08	/* Echo this request 		*/
 #define NLM_F_DUMP_INTR		0x10	/* Dump was inconsistent due to sequence change */
 #define NLM_F_DUMP_FILTERED	0x20	/* Dump was filtered as requested */
+#define NLM_F_DUMP_PROPER_HDR	0x40	/* Dump request has the proper header for type */
 
 /* Modifiers to GET request */
 #define NLM_F_ROOT	0x100	/* specify tree	root	*/
