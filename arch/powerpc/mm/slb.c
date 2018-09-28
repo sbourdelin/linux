@@ -312,6 +312,13 @@ void slb_setup_new_exec(void)
 	unsigned long exec = 0x10000000;
 
 	/*
+	 * preload cache can only be used to determine whether a SLB
+	 * entry exists if it does not start to overflow.
+	 */
+	if (ti->slb_preload_nr + 2 > SLB_PRELOAD_NR)
+		return;
+
+	/*
 	 * We have no good place to clear the slb preload cache on exec,
 	 * flush_thread is about the earliest arch hook but that happens
 	 * after we switch to the mm and have aleady preloaded the SLBEs.
@@ -344,6 +351,10 @@ void preload_new_slb_context(unsigned long start, unsigned long sp)
 	struct thread_info *ti = current_thread_info();
 	struct mm_struct *mm = current->mm;
 	unsigned long heap = mm->start_brk;
+
+	/* see above */
+	if (ti->slb_preload_nr + 3 > SLB_PRELOAD_NR)
+		return;
 
 	/* Userspace entry address. */
 	if (!is_kernel_addr(start)) {
