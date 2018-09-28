@@ -774,8 +774,16 @@ config LEDS_LM3697
           This supports the LED device LM3697.
 
 config LEDS_LM3633
-	tristate "LED driver for LM3633"
+	tristate "LED driver for LM3632"
  	depends on LEDS_TI_LMU_COMMON
+	help
+          Say Y to enable the LED driver for TI LMU devices.
+          This supports the LED device LM3632.
+
+config LEDS_LM3632
+	tristate "LED driver for LM3632"
+	depends on LEDS_TI_LMU_COMMON
+	depends on LEDS_CLASS_FLASH
 	help
           Say Y to enable the LED driver for TI LMU devices.
           This supports the LED device LM3633.
