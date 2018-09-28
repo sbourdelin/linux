@@ -909,6 +909,12 @@ static void icl_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 	/* WaEnable32PlaneMode:icl */
 	I915_WRITE(GEN9_CSFE_CHICKEN1_RCS,
 		   _MASKED_BIT_ENABLE(GEN11_ENABLE_32_PLANE_MODE));
+
+	/* Wa_1406609255:icl (pre-prod) */
+	if (IS_ICL_REVID(dev_priv, ICL_REVID_A0, ICL_REVID_C0))
+		I915_WRITE(GEN7_SARCHKMD,
+			   I915_READ(GEN7_SARCHKMD) |
+			   GEN7_DISABLE_DEMAND_PREFETCH);
 }
 
 void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv)
