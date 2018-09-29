@@ -52,6 +52,7 @@ int omap2_clk_deny_idle(struct clk *clk)
 		c->ops->deny_idle(c);
 	return 0;
 }
+EXPORT_SYMBOL(omap2_clk_deny_idle);
 
 /**
  * omap2_clk_allow_idle - enable autoidle on an OMAP clock
@@ -68,6 +69,7 @@ int omap2_clk_allow_idle(struct clk *clk)
 		c->ops->allow_idle(c);
 	return 0;
 }
+EXPORT_SYMBOL(omap2_clk_allow_idle);
 
 static void _allow_autoidle(struct clk_ti_autoidle *clk)
 {

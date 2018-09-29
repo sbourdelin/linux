@@ -18,6 +18,8 @@
 #include <linux/sched.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#include <linux/clk.h>
+#include <linux/clk/ti.h>
 
 #include <linux/w1.h>
 
@@ -59,6 +61,14 @@ MODULE_PARM_DESC(w1_id, "1-wire id for the slave detection in HDQ mode");
 
 struct hdq_data {
 	struct device		*dev;
+	/*
+	 * needed to disable autoidle, if system power state is too low
+	 * hdq transactions will not work correctly, although registers
+	 * are accessible.
+	 * According to AM/DM3730 TRM p.2879 the hwmod has to way to
+	 * keep iclk running during a transfer if autoidle is enabled
+	 */
+	struct clk		*ick;
 	void __iomem		*hdq_base;
 	/* lock status update */
 	struct  mutex		hdq_mutex;
@@ -414,6 +424,9 @@ static int omap_hdq_get(struct hdq_data *hdq_data)
 		try_module_get(THIS_MODULE);
 		if (1 == hdq_data->hdq_usecount) {
 
+			if (!IS_ERR_OR_NULL(hdq_data->ick))
+				omap2_clk_deny_idle(hdq_data->ick);
+
 			pm_runtime_get_sync(hdq_data->dev);
 
 			/* make sure HDQ/1W is out of reset */
@@ -460,8 +473,11 @@ static int omap_hdq_put(struct hdq_data *hdq_data)
 	} else {
 		hdq_data->hdq_usecount--;
 		module_put(THIS_MODULE);
-		if (0 == hdq_data->hdq_usecount)
+		if (hdq_data->hdq_usecount == 0) {
 			pm_runtime_put_sync(hdq_data->dev);
+			if (!IS_ERR_OR_NULL(hdq_data->ick))
+				omap2_clk_allow_idle(hdq_data->ick);
+		}
 	}
 	mutex_unlock(&hdq_data->hdq_mutex);
 
@@ -681,7 +697,14 @@ static int omap_hdq_probe(struct platform_device *pdev)
 
 	hdq_data->hdq_usecount = 0;
 	hdq_data->rrw = 0;
+	hdq_data->ick = devm_clk_get(dev, "hdq_ick");
+	if (IS_ERR_OR_NULL(hdq_data->ick))
+		dev_info(dev, "no hdq_ick, lets hope autoidle behaves!");
+
 	mutex_init(&hdq_data->hdq_mutex);
+
+	if (!IS_ERR_OR_NULL(hdq_data->ick))
+		omap2_clk_deny_idle(hdq_data->ick);
 
 	pm_runtime_enable(&pdev->dev);
 	ret = pm_runtime_get_sync(&pdev->dev);
@@ -718,6 +741,8 @@ static int omap_hdq_probe(struct platform_device *pdev)
 	omap_hdq_break(hdq_data);
 
 	pm_runtime_put_sync(&pdev->dev);
+	if (!IS_ERR_OR_NULL(hdq_data->ick))
+		omap2_clk_allow_idle(hdq_data->ick);
 
 	ret = of_property_read_string(pdev->dev.of_node, "ti,mode", &mode);
 	if (ret < 0 || !strcmp(mode, "hdq")) {
