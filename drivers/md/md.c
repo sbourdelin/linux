@@ -7907,14 +7907,11 @@ static int md_seq_open(struct inode *inode, struct file *file)
 	return error;
 }
 
-static int md_unloading;
 static __poll_t mdstat_poll(struct file *filp, poll_table *wait)
 {
 	struct seq_file *seq = filp->private_data;
 	__poll_t mask;
 
-	if (md_unloading)
-		return EPOLLIN|EPOLLRDNORM|EPOLLERR|EPOLLPRI;
 	poll_wait(filp, &md_event_waiters, wait);
 
 	/* always allow read */
@@ -7926,7 +7923,6 @@ static __poll_t mdstat_poll(struct file *filp, poll_table *wait)
 }
 
 static const struct file_operations md_seq_fops = {
-	.owner		= THIS_MODULE,
 	.open           = md_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
@@ -9336,7 +9332,6 @@ static __exit void md_exit(void)
 {
 	struct mddev *mddev;
 	struct list_head *tmp;
-	int delay = 1;
 
 	blk_unregister_region(MKDEV(MD_MAJOR,0), 512);
 	blk_unregister_region(MKDEV(mdp_major,0), 1U << MINORBITS);
@@ -9346,17 +9341,8 @@ static __exit void md_exit(void)
 	unregister_reboot_notifier(&md_notifier);
 	unregister_sysctl_table(raid_table_header);
 
-	/* We cannot unload the modules while some process is
-	 * waiting for us in select() or poll() - wake them up
-	 */
-	md_unloading = 1;
-	while (waitqueue_active(&md_event_waiters)) {
-		/* not safe to leave yet */
-		wake_up(&md_event_waiters);
-		msleep(delay);
-		delay += delay;
-	}
 	remove_proc_entry("mdstat", NULL);
+	wake_up_all(&md_event_waiters);
 
 	for_each_mddev(mddev, tmp) {
 		export_array(mddev);
