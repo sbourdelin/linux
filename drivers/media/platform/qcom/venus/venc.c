@@ -1005,12 +1005,30 @@ bufs_done:
 	return ret;
 }
 
+void venc_stop_streaming(struct vb2_queue *q)
+{
+	struct venus_inst *inst = vb2_get_drv_priv(q);
+
+	mutex_lock(&inst->lock);
+
+	if (inst->streamon_out & inst->streamon_cap)
+		venus_helper_vb2_stop_streaming(q);
+
+	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+		inst->streamon_out = 0;
+	else
+		inst->streamon_cap = 0;
+
+	mutex_unlock(&inst->lock);
+}
+EXPORT_SYMBOL_GPL(venc_stop_streaming);
+
 static const struct vb2_ops venc_vb2_ops = {
 	.queue_setup = venc_queue_setup,
 	.buf_init = venus_helper_vb2_buf_init,
 	.buf_prepare = venus_helper_vb2_buf_prepare,
 	.start_streaming = venc_start_streaming,
-	.stop_streaming = venus_helper_vb2_stop_streaming,
+	.stop_streaming = venc_stop_streaming,
 	.buf_queue = venus_helper_vb2_buf_queue,
 };
 

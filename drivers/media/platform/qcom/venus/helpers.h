@@ -31,6 +31,8 @@ void venus_helper_vb2_stop_streaming(struct vb2_queue *q);
 int venus_helper_vb2_start_streaming(struct venus_inst *inst);
 void venus_helper_m2m_device_run(void *priv);
 void venus_helper_m2m_job_abort(void *priv);
+int venus_helper_queue_initial_bufs(struct venus_inst *inst, unsigned int type);
+int venus_helper_alloc_intbufs(struct venus_inst *inst);
 int venus_helper_get_bufreq(struct venus_inst *inst, u32 type,
 			    struct hfi_buffer_requirements *req);
 u32 venus_helper_get_framesz_raw(u32 hfi_fmt, u32 width, u32 height);
@@ -62,4 +64,5 @@ int venus_helper_alloc_dpb_bufs(struct venus_inst *inst);
 int venus_helper_free_dpb_bufs(struct venus_inst *inst);
 int venus_helper_power_enable(struct venus_core *core, u32 session_type,
 			      bool enable);
+int venus_helper_alloc_reconfig_bufs(struct venus_inst *inst);
 #endif

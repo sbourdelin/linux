@@ -207,7 +207,6 @@ static int vdec_g_fmt(struct file *file, void *fh, struct v4l2_format *f)
 
 		inst->out_width = inst->reconfig_width;
 		inst->out_height = inst->reconfig_height;
-		inst->reconfig = false;
 
 		format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 		format.fmt.pix_mp.pixelformat = inst->fmt_cap->pixfmt;
@@ -223,6 +222,9 @@ static int vdec_g_fmt(struct file *file, void *fh, struct v4l2_format *f)
 	pixmp->pixelformat = fmt->pixfmt;
 
 	if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+		if (!(inst->reconfig))
+			return -EINVAL;
+
 		pixmp->width = inst->width;
 		pixmp->height = inst->height;
 		pixmp->colorspace = inst->colorspace;
@@ -451,6 +453,8 @@ vdec_try_decoder_cmd(struct file *file, void *fh, struct v4l2_decoder_cmd *cmd)
 		if (cmd->flags & V4L2_DEC_CMD_STOP_TO_BLACK)
 			return -EINVAL;
 		break;
+	case V4L2_DEC_CMD_START:
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -464,6 +468,9 @@ vdec_decoder_cmd(struct file *file, void *fh, struct v4l2_decoder_cmd *cmd)
 	struct venus_inst *inst = to_inst(file);
 	struct hfi_frame_data fdata = {0};
 	int ret;
+
+	if (cmd->cmd != V4L2_DEC_CMD_STOP)
+		return 0;
 
 	ret = vdec_try_decoder_cmd(file, fh, cmd);
 	if (ret)
@@ -790,22 +797,60 @@ static int vdec_start_streaming(struct vb2_queue *q, unsigned int count)
 {
 	struct venus_inst *inst = vb2_get_drv_priv(q);
 	int ret;
+	bool is_mplane_enabled;
 
 	mutex_lock(&inst->lock);
+	is_mplane_enabled = q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
+				inst->streamon_cap;
+	is_mplane_enabled |= q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE &&
+				inst->streamon_out;
 
-	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
-		inst->streamon_out = 1;
-	else
-		inst->streamon_cap = 1;
-
-	if (!(inst->streamon_out & inst->streamon_cap)) {
+	if (is_mplane_enabled) {
 		mutex_unlock(&inst->lock);
 		return 0;
 	}
 
+	if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
+	    !inst->streamon_out){
+		mutex_unlock(&inst->lock);
+		return 0;
+	}
+
+	if (inst->streamon_out && !inst->streamon_cap &&
+	    q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+		ret = vdec_output_conf(inst);
+		if (ret)
+			goto deinit_sess;
+
+		ret = venus_helper_set_num_bufs(inst, inst->num_input_bufs,
+						inst->num_output_bufs,
+						inst->num_output_bufs);
+
+		if (ret)
+			goto deinit_sess;
+
+		ret = vdec_verify_conf(inst);
+		if (ret)
+			goto deinit_sess;
+
+		if (inst->reconfig)
+			ret = venus_helper_alloc_reconfig_bufs(inst);
+
+		if (ret)
+			goto deinit_sess;
+
+		ret = venus_helper_alloc_dpb_bufs(inst);
+		if (ret)
+			goto deinit_sess;
+
+		if (inst->reconfig) {
+			hfi_session_continue(inst);
+			inst->reconfig = false;
+		}
+		goto enable_mplane;
+	}
 	venus_helper_init_instance(inst);
 
-	inst->reconfig = false;
 	inst->sequence_cap = 0;
 	inst->sequence_out = 0;
 
@@ -830,14 +875,17 @@ static int vdec_start_streaming(struct vb2_queue *q, unsigned int count)
 	if (ret)
 		goto deinit_sess;
 
-	ret = venus_helper_alloc_dpb_bufs(inst);
-	if (ret)
-		goto deinit_sess;
-
 	ret = venus_helper_vb2_start_streaming(inst);
 	if (ret)
 		goto deinit_sess;
 
+enable_mplane:
+	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+		inst->streamon_out = 1;
+	else if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+		inst->streamon_cap = 1;
+
+	ret = venus_helper_queue_initial_bufs(inst, q->type);
 	mutex_unlock(&inst->lock);
 
 	return 0;
@@ -854,12 +902,42 @@ bufs_done:
 	return ret;
 }
 
+static void vdec_stop_streaming(struct vb2_queue *q)
+{
+	struct venus_inst *inst = vb2_get_drv_priv(q);
+	int ret;
+
+	mutex_lock(&inst->lock);
+
+	if (!inst->streamon_cap && !inst->streamon_out)
+		goto unlock;
+
+	if (inst->streamon_cap &&
+	    q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+		ret = hfi_session_stop(inst);
+		inst->streamon_cap = 0;
+	}
+
+	if (inst->streamon_out && !inst->streamon_cap) {
+		inst->streamon_out = 0;
+		venus_helper_vb2_stop_streaming(q);
+	}
+
+	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+		inst->streamon_out = 0;
+	else
+		inst->streamon_cap = 0;
+unlock:
+	venus_helper_buffers_done(inst, VB2_BUF_STATE_ERROR);
+	mutex_unlock(&inst->lock);
+}
+
 static const struct vb2_ops vdec_vb2_ops = {
 	.queue_setup = vdec_queue_setup,
 	.buf_init = venus_helper_vb2_buf_init,
 	.buf_prepare = venus_helper_vb2_buf_prepare,
 	.start_streaming = vdec_start_streaming,
-	.stop_streaming = venus_helper_vb2_stop_streaming,
+	.stop_streaming = vdec_stop_streaming,
 	.buf_queue = venus_helper_vb2_buf_queue,
 };
 
