@@ -60,6 +60,7 @@
 #include <linux/rtc.h>
 #include <linux/sched/cputime.h>
 #include <linux/processor.h>
+#include <linux/nmi.h>
 #include <asm/trace.h>
 
 #include <asm/io.h>
@@ -575,7 +576,8 @@ void timer_interrupt(struct pt_regs *regs)
 	 * 31 bits, which is about 4 seconds on most systems, which gives
 	 * the watchdog a chance of catching timer interrupt hard lockups.
 	 */
-	if (IS_ENABLED(CONFIG_PPC_WATCHDOG))
+	if (IS_ENABLED(CONFIG_PPC_WATCHDOG) &&
+	    cpumask_test_cpu(smp_processor_id(), &watchdog_cpumask))
 		set_dec(0x7fffffff);
 	else
 		set_dec(decrementer_max);
