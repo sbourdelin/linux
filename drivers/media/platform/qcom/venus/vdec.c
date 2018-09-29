@@ -700,6 +700,8 @@ static int vdec_num_buffers(struct venus_inst *inst, unsigned int *in_num,
 
 	*out_num = HFI_BUFREQ_COUNT_MIN(&bufreq, ver);
 
+	return 0;
+
 deinit:
 	hfi_session_deinit(inst);
 
