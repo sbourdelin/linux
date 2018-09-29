@@ -978,7 +978,7 @@ static void vdec_buf_done(struct venus_inst *inst, unsigned int buf_type,
 
 		if (vbuf->flags & V4L2_BUF_FLAG_LAST) {
 			const struct v4l2_event ev = { .type = V4L2_EVENT_EOS };
-
+			vb->planes[0].bytesused = bytesused;
 			v4l2_event_queue_fh(&inst->fh, &ev);
 		}
 	} else {
