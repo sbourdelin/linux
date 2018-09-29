@@ -16,13 +16,18 @@
 void add_cmdname(struct cmdnames *cmds, const char *name, size_t len)
 {
 	struct cmdname *ent = malloc(sizeof(*ent) + len + 1);
-
+        if (!ent) {
+                printf("mem alloc failed\n");
+                goto error;
+        }
 	ent->len = len;
 	memcpy(ent->name, name, len);
 	ent->name[len] = 0;
 
 	ALLOC_GROW(cmds->names, cmds->cnt + 1, cmds->alloc);
 	cmds->names[cmds->cnt++] = ent;
+        error:
+                if (ent) free(ent);
 }
 
 void clean_cmdnames(struct cmdnames *cmds)
