@@ -413,6 +413,8 @@ static int vdec_enum_framesizes(struct file *file, void *fh,
 				  V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
 		if (!fmt)
 			return -EINVAL;
+		inst->fmt_out = fmt;
+		inst->hfi_codec = v4l2_venus_fmt(fmt->pixfmt);
 	}
 
 	if (fsize->index)

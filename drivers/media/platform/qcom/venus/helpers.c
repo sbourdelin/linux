@@ -36,47 +36,44 @@ struct intbuf {
 	unsigned long attrs;
 };
 
+u32 v4l2_venus_fmt(u32 pixfmt)
+{
+	switch (pixfmt) {
+	case V4L2_PIX_FMT_H264:
+	case V4L2_PIX_FMT_H264_NO_SC:
+		return HFI_VIDEO_CODEC_H264;
+	case V4L2_PIX_FMT_H263:
+		return HFI_VIDEO_CODEC_H263;
+	case V4L2_PIX_FMT_MPEG1:
+		return HFI_VIDEO_CODEC_MPEG1;
+	case V4L2_PIX_FMT_MPEG2:
+		return HFI_VIDEO_CODEC_MPEG2;
+	case V4L2_PIX_FMT_MPEG4:
+		return HFI_VIDEO_CODEC_MPEG4;
+	case V4L2_PIX_FMT_VC1_ANNEX_G:
+	case V4L2_PIX_FMT_VC1_ANNEX_L:
+		return HFI_VIDEO_CODEC_VC1;
+	case V4L2_PIX_FMT_VP8:
+		return HFI_VIDEO_CODEC_VP8;
+	case V4L2_PIX_FMT_VP9:
+		return HFI_VIDEO_CODEC_VP9;
+	case V4L2_PIX_FMT_XVID:
+		return HFI_VIDEO_CODEC_DIVX;
+	case V4L2_PIX_FMT_HEVC:
+		return HFI_VIDEO_CODEC_HEVC;
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL_GPL(v4l2_venus_fmt);
+
 bool venus_helper_check_codec(struct venus_inst *inst, u32 v4l2_pixfmt)
 {
 	struct venus_core *core = inst->core;
 	u32 session_type = inst->session_type;
 	u32 codec;
 
-	switch (v4l2_pixfmt) {
-	case V4L2_PIX_FMT_H264:
-		codec = HFI_VIDEO_CODEC_H264;
-		break;
-	case V4L2_PIX_FMT_H263:
-		codec = HFI_VIDEO_CODEC_H263;
-		break;
-	case V4L2_PIX_FMT_MPEG1:
-		codec = HFI_VIDEO_CODEC_MPEG1;
-		break;
-	case V4L2_PIX_FMT_MPEG2:
-		codec = HFI_VIDEO_CODEC_MPEG2;
-		break;
-	case V4L2_PIX_FMT_MPEG4:
-		codec = HFI_VIDEO_CODEC_MPEG4;
-		break;
-	case V4L2_PIX_FMT_VC1_ANNEX_G:
-	case V4L2_PIX_FMT_VC1_ANNEX_L:
-		codec = HFI_VIDEO_CODEC_VC1;
-		break;
-	case V4L2_PIX_FMT_VP8:
-		codec = HFI_VIDEO_CODEC_VP8;
-		break;
-	case V4L2_PIX_FMT_VP9:
-		codec = HFI_VIDEO_CODEC_VP9;
-		break;
-	case V4L2_PIX_FMT_XVID:
-		codec = HFI_VIDEO_CODEC_DIVX;
-		break;
-	case V4L2_PIX_FMT_HEVC:
-		codec = HFI_VIDEO_CODEC_HEVC;
-		break;
-	default:
-		return false;
-	}
+	codec = v4l2_venus_fmt(v4l2_pixfmt);
 
 	if (session_type == VIDC_SESSION_TYPE_ENC && core->enc_codecs & codec)
 		return true;
