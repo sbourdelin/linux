@@ -991,6 +991,12 @@ static void vdec_buf_done(struct venus_inst *inst, unsigned int buf_type,
 	if (hfi_flags & HFI_BUFFERFLAG_DATACORRUPT)
 		state = VB2_BUF_STATE_ERROR;
 
+	if (hfi_flags & HFI_BUFFERFLAG_DROP_FRAME) {
+		vb->planes[0].bytesused = 0;
+		vb->timestamp = 0;
+		state = VB2_BUF_STATE_ERROR;
+	}
+
 	v4l2_m2m_buf_done(vbuf, state);
 }
 
