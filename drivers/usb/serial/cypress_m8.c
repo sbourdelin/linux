@@ -686,7 +686,7 @@ finish:
 
 static void cypress_send(struct usb_serial_port *port)
 {
-	int count = 0, result, offset, actual_size;
+	int count = 0, result, offset;
 	struct cypress_private *priv = usb_get_serial_port_data(port);
 	struct device *dev = &port->dev;
 	unsigned long flags;
@@ -757,12 +757,6 @@ send:
 	spin_lock_irqsave(&priv->lock, flags);
 	priv->write_urb_in_use = 1;
 	spin_unlock_irqrestore(&priv->lock, flags);
-
-	if (priv->cmd_ctrl)
-		actual_size = 1;
-	else
-		actual_size = count +
-			      (priv->pkt_fmt == packet_format_1 ? 2 : 1);
 
 	usb_serial_debug_data(dev, __func__, port->interrupt_out_size,
 			      port->interrupt_out_urb->transfer_buffer);
@@ -863,7 +857,7 @@ static void cypress_set_termios(struct tty_struct *tty,
 	struct cypress_private *priv = usb_get_serial_port_data(port);
 	struct device *dev = &port->dev;
 	int data_bits, stop_bits, parity_type, parity_enable;
-	unsigned cflag, iflag;
+	unsigned int cflag;
 	unsigned long flags;
 	__u8 oldlines;
 	int linechange = 0;
@@ -899,7 +893,6 @@ static void cypress_set_termios(struct tty_struct *tty,
 	tty->termios.c_cflag &= ~(CMSPAR|CRTSCTS);
 
 	cflag = tty->termios.c_cflag;
-	iflag = tty->termios.c_iflag;
 
 	/* check if there are new settings */
 	if (old_termios) {
