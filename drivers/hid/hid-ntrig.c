@@ -159,7 +159,7 @@ static void ntrig_report_version(struct hid_device *hdev)
 			      USB_CTRL_SET_TIMEOUT);
 
 	if (ret == 8) {
-		ret = ntrig_version_string(&data[2], buf);
+		ntrig_version_string(&data[2], buf);
 
 		hid_info(hdev, "Firmware version: %s (%02x%02x %02x%02x)\n",
 			 buf, data[2], data[3], data[4], data[5]);
