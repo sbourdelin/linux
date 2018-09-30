@@ -76,8 +76,14 @@ arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
 arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
 arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
 
+# We do not actually support the ARMv3 ISA and prefer it above only for
+# code generation purposes, which does not apply to assembly. So we pass
+# v4 to the assembler, so that we can still assemble all instructions.
+arch-asflags-$(CONFIG_CPU_32v3)	=-march=armv4
+
 # Evaluate arch cc-option calls now
 arch-y := $(arch-y)
+arch-asflags-y := $(arch-asflags-y)
 
 # This selects how we optimise for the processor.
 tune-$(CONFIG_CPU_ARM7TDMI)	=-mtune=arm7tdmi
@@ -130,7 +136,7 @@ endif
 
 # Need -Uarm for gcc < 3.x
 KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
-KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) $(arch-asflags-y) -include asm/unified.h -msoft-float
 
 CHECKFLAGS	+= -D__arm__
 
