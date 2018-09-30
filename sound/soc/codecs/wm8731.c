@@ -36,12 +36,15 @@
 #include "wm8731.h"
 
 #define WM8731_NUM_SUPPLIES 4
+
+#if defined(CONFIG_I2C) || defined(CONFIG_SPI_MASTER)
 static const char *wm8731_supply_names[WM8731_NUM_SUPPLIES] = {
 	"AVDD",
 	"HPVDD",
 	"DCVDD",
 	"DBVDD",
 };
+#endif
 
 /* codec private data */
 struct wm8731_priv {
@@ -572,6 +575,7 @@ static struct snd_soc_dai_driver wm8731_dai = {
 	.symmetric_rates = 1,
 };
 
+#if defined(CONFIG_I2C) || defined(CONFIG_SPI_MASTER)
 static int wm8731_request_supplies(struct device *dev,
 		struct wm8731_priv *wm8731)
 {
@@ -627,6 +631,7 @@ err_regulator_enable:
 
 	return ret;
 }
+#endif
 
 static const struct snd_soc_component_driver soc_component_dev_wm8731 = {
 	.set_bias_level		= wm8731_set_bias_level,
