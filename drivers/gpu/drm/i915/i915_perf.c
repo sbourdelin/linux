@@ -354,6 +354,7 @@ struct perf_open_properties {
 	u32 sample_flags;
 
 	u64 single_context:1;
+	u64 context_disable_preemption:1;
 	u64 ctx_handle;
 
 	/* OA sampling state */
@@ -1360,6 +1361,12 @@ static void i915_oa_stream_destroy(struct i915_perf_stream *stream)
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	dev_priv->perf.oa.exclusive_stream = NULL;
 	dev_priv->perf.oa.ops.disable_metric_set(dev_priv);
+	if (stream->ctx) {
+		struct intel_context *ce =
+			to_intel_context(stream->ctx, dev_priv->engine[RCS]);
+
+		ce->arb_enable = MI_ARB_ENABLE;
+	}
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
 	free_oa_buffer(dev_priv);
@@ -2099,6 +2106,13 @@ static int i915_oa_stream_init(struct i915_perf_stream *stream,
 		goto err_enable;
 	}
 
+	if (props->context_disable_preemption) {
+		struct intel_context *ce =
+			to_intel_context(stream->ctx, dev_priv->engine[RCS]);
+
+		ce->arb_enable = MI_ARB_DISABLE;
+	}
+
 	stream->ops = &i915_oa_stream_ops;
 
 	dev_priv->perf.oa.exclusive_stream = stream;
@@ -2555,6 +2569,15 @@ i915_perf_open_ioctl_locked(struct drm_i915_private *dev_priv,
 		}
 	}
 
+	if (props->context_disable_preemption) {
+		if (!props->single_context) {
+			DRM_DEBUG("preemption disable with no context\n");
+			ret = -EINVAL;
+			goto err;
+		}
+		privileged_op = true;
+	}
+
 	/*
 	 * On Haswell the OA unit supports clock gating off for a specific
 	 * context and in this mode there's no visibility of metrics for the
@@ -2569,8 +2592,10 @@ i915_perf_open_ioctl_locked(struct drm_i915_private *dev_priv,
 	 * MI_REPORT_PERF_COUNT commands and so consider it a privileged op to
 	 * enable the OA unit by default.
 	 */
-	if (IS_HASWELL(dev_priv) && specific_ctx)
+	if (IS_HASWELL(dev_priv) && specific_ctx &&
+	    !props->context_disable_preemption) {
 		privileged_op = false;
+	}
 
 	/* Similar to perf's kernel.perf_paranoid_cpu sysctl option
 	 * we check a dev.i915.perf_stream_paranoid sysctl option
@@ -2579,7 +2604,7 @@ i915_perf_open_ioctl_locked(struct drm_i915_private *dev_priv,
 	 */
 	if (privileged_op &&
 	    i915_perf_stream_paranoid && !capable(CAP_SYS_ADMIN)) {
-		DRM_DEBUG("Insufficient privileges to open system-wide i915 perf stream\n");
+		DRM_DEBUG("Insufficient privileges to open i915 perf stream\n");
 		ret = -EACCES;
 		goto err_ctx;
 	}
@@ -2770,6 +2795,9 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 
 			props->oa_periodic = true;
 			props->oa_period_exponent = value;
+			break;
+		case DRM_I915_PERF_PROP_HOLD_PREEMPTION:
+			props->context_disable_preemption = value != 0 ? 1 : 0;
 			break;
 		case DRM_I915_PERF_PROP_MAX:
 			MISSING_CASE(id);
