@@ -2022,6 +2022,8 @@ static int gen8_emit_bb_start(struct i915_request *rq,
 {
 	u32 *cs;
 	int ret;
+	bool use_oa_config =
+		rq->i915->perf.oa.exclusive_stream && rq->oa_config;
 
 	/* Don't rely in hw updating PDPs, specially in lite-restore.
 	 * Ideally, we should set Force PD Restore in ctx descriptor,
@@ -2040,9 +2042,18 @@ static int gen8_emit_bb_start(struct i915_request *rq,
 		rq->gem_context->ppgtt->pd_dirty_rings &= ~intel_engine_flag(rq->engine);
 	}
 
-	cs = intel_ring_begin(rq, 6);
+	cs = intel_ring_begin(rq, use_oa_config ? 10 : 6);
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
+
+	if (use_oa_config) {
+		u32 oa_config_offset = i915_ggtt_offset(rq->oa_config);
+
+		*cs++ = MI_BATCH_BUFFER_START_GEN8;
+		*cs++ = oa_config_offset;
+		*cs++ = 0;
+		*cs++ = MI_NOOP;
+	}
 
 	/*
 	 * WaDisableCtxRestoreArbitration:bdw,chv

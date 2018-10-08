@@ -2036,10 +2036,19 @@ hsw_emit_bb_start(struct i915_request *rq,
 		  unsigned int dispatch_flags)
 {
 	u32 *cs;
+	bool use_oa_config =
+		rq->i915->perf.oa.exclusive_stream && rq->oa_config;
 
-	cs = intel_ring_begin(rq, 2);
+	cs = intel_ring_begin(rq, use_oa_config ? 4 : 2);
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
+
+	if (use_oa_config) {
+		u32 oa_config_offset = i915_ggtt_offset(rq->oa_config);
+
+		*cs++ = MI_BATCH_BUFFER_START;
+		*cs++ = oa_config_offset;
+	}
 
 	*cs++ = MI_BATCH_BUFFER_START | (dispatch_flags & I915_DISPATCH_SECURE ?
 		0 : MI_BATCH_PPGTT_HSW | MI_BATCH_NON_SECURE_HSW);

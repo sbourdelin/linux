@@ -188,6 +188,8 @@ struct i915_request {
 	struct drm_i915_file_private *file_priv;
 	/** file_priv list entry for this request */
 	struct list_head client_link;
+
+	struct i915_vma *oa_config; /** HW configuration for OA, NULL is not needed. */
 };
 
 #define I915_FENCE_GFP (GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_NOWARN)

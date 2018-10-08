@@ -464,6 +464,9 @@ static void i915_request_retire(struct i915_request *request)
 
 	unreserve_gt(request->i915);
 
+	if (request->oa_config)
+		i915_vma_put(request->oa_config);
+
 	i915_sched_node_fini(request->i915, &request->sched);
 	i915_request_put(request);
 }
@@ -789,6 +792,7 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 	rq->batch = NULL;
 	rq->capture_list = NULL;
 	rq->waitboost = false;
+	rq->oa_config = NULL;
 
 	/*
 	 * Reserve space in the ring buffer for all the commands required to

@@ -286,6 +286,8 @@ struct i915_execbuffer {
 	 */
 	int lut_size;
 	struct hlist_head *buckets; /** ht for relocation handles */
+
+	struct i915_vma *oa_config; /** HW configuration for OA, NULL is not needed. */
 };
 
 #define exec_entry(EB, VMA) (&(EB)->exec[(VMA)->exec_flags - (EB)->flags])
@@ -1121,6 +1123,32 @@ static void clflush_write32(u32 *addr, u32 value, unsigned int flushes)
 		*addr = value;
 }
 
+static int
+get_execbuf_oa_config(struct drm_i915_private *dev_priv,
+		      int perf_fd, u32 oa_config_id,
+		      struct i915_vma **out_oa_vma)
+{
+	struct file *perf_file;
+	int ret;
+
+	if (!dev_priv->perf.oa.exclusive_stream)
+		return -EINVAL;
+
+	perf_file = fget(perf_fd);
+	if (!perf_file)
+		return -EINVAL;
+
+	if (perf_file->private_data != dev_priv->perf.oa.exclusive_stream)
+		return -EINVAL;
+
+	fput(perf_file);
+
+	ret = i915_perf_get_oa_config(dev_priv, oa_config_id,
+				      NULL, out_oa_vma);
+
+	return ret;
+}
+
 static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 			     struct i915_vma *vma,
 			     unsigned int len)
@@ -1172,6 +1200,9 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 		err = PTR_ERR(rq);
 		goto err_unpin;
 	}
+
+	rq->oa_config = eb->oa_config;
+	eb->oa_config = NULL;
 
 	err = i915_request_await_object(rq, vma->obj, true);
 	if (err)
@@ -1875,12 +1906,15 @@ static bool i915_gem_check_execbuffer(struct drm_i915_gem_execbuffer2 *exec)
 			return false;
 	}
 
-	if (exec->DR4 == 0xffffffff) {
-		DRM_DEBUG("UXA submitting garbage DR4, fixing up\n");
-		exec->DR4 = 0;
+	/* We reuse DR1 & DR4 fields for passing the perf config detail. */
+	if (!(exec->flags & I915_EXEC_PERF_CONFIG)) {
+		if (exec->DR4 == 0xffffffff) {
+			DRM_DEBUG("UXA submitting garbage DR4, fixing up\n");
+			exec->DR4 = 0;
+		}
+		if (exec->DR1 || exec->DR4)
+			return false;
 	}
-	if (exec->DR1 || exec->DR4)
-		return false;
 
 	if ((exec->batch_start_offset | exec->batch_len) & 0x7)
 		return false;
@@ -2224,6 +2258,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	eb.buffer_count = args->buffer_count;
 	eb.batch_start_offset = args->batch_start_offset;
 	eb.batch_len = args->batch_len;
+	eb.oa_config = NULL;
 
 	eb.batch_flags = 0;
 	if (args->flags & I915_EXEC_SECURE) {
@@ -2253,9 +2288,16 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		}
 	}
 
+	if (args->flags & I915_EXEC_PERF_CONFIG) {
+		err = get_execbuf_oa_config(eb.i915, args->DR1, args->DR4,
+					    &eb.oa_config);
+		if (err)
+			goto err_out_fence;
+	}
+
 	err = eb_create(&eb);
 	if (err)
-		goto err_out_fence;
+		goto err_perf;
 
 	GEM_BUG_ON(!eb.lut_size);
 
@@ -2365,6 +2407,9 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		goto err_batch_unpin;
 	}
 
+	eb.request->oa_config = eb.oa_config;
+	eb.oa_config = NULL;
+
 	if (in_fence) {
 		err = i915_request_await_dma_fence(eb.request, in_fence);
 		if (err < 0)
@@ -2426,6 +2471,9 @@ err_rpm:
 	i915_gem_context_put(eb.ctx);
 err_destroy:
 	eb_destroy(&eb);
+err_perf:
+	if (eb.oa_config)
+		i915_vma_put(eb.oa_config);
 err_out_fence:
 	if (out_fence_fd != -1)
 		put_unused_fd(out_fence_fd);
