@@ -8995,6 +8995,13 @@ static int handle_invept(struct kvm_vcpu *vcpu)
 	return kvm_skip_emulated_instruction(vcpu);
 }
 
+static u16 nested_get_vpid02(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	return vmx->nested.vpid02 ? vmx->nested.vpid02 : vmx->vpid;
+}
+
 static int handle_invvpid(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -9006,6 +9013,7 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 		u64 vpid;
 		u64 gla;
 	} operand;
+	u16 vpid02;
 
 	if (!(vmx->nested.msrs.secondary_ctls_high &
 	      SECONDARY_EXEC_ENABLE_VPID) ||
@@ -9045,6 +9053,7 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 		return kvm_skip_emulated_instruction(vcpu);
 	}
 
+	vpid02 = nested_get_vpid02(vcpu);
 	switch (type) {
 	case VMX_VPID_EXTENT_INDIVIDUAL_ADDR:
 		if (!operand.vpid ||
@@ -9053,12 +9062,11 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 				VMXERR_INVALID_OPERAND_TO_INVEPT_INVVPID);
 			return kvm_skip_emulated_instruction(vcpu);
 		}
-		if (cpu_has_vmx_invvpid_individual_addr() &&
-		    vmx->nested.vpid02) {
+		if (cpu_has_vmx_invvpid_individual_addr()) {
 			__invvpid(VMX_VPID_EXTENT_INDIVIDUAL_ADDR,
-				vmx->nested.vpid02, operand.gla);
+				vpid02, operand.gla);
 		} else
-			__vmx_flush_tlb(vcpu, vmx->nested.vpid02, true);
+			__vmx_flush_tlb(vcpu, vpid02, true);
 		break;
 	case VMX_VPID_EXTENT_SINGLE_CONTEXT:
 	case VMX_VPID_EXTENT_SINGLE_NON_GLOBAL:
@@ -9067,10 +9075,10 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 				VMXERR_INVALID_OPERAND_TO_INVEPT_INVVPID);
 			return kvm_skip_emulated_instruction(vcpu);
 		}
-		__vmx_flush_tlb(vcpu, vmx->nested.vpid02, true);
+		__vmx_flush_tlb(vcpu, vpid02, true);
 		break;
 	case VMX_VPID_EXTENT_ALL_CONTEXT:
-		__vmx_flush_tlb(vcpu, vmx->nested.vpid02, true);
+		__vmx_flush_tlb(vcpu, vpid02, true);
 		break;
 	default:
 		WARN_ON_ONCE(1);
