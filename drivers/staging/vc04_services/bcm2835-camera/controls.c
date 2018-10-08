@@ -588,7 +588,6 @@ static int ctrl_set_colfx(struct bm2835_mmal_dev *dev,
 
 	control = &dev->component[MMAL_COMPONENT_CAMERA]->control;
 
-	dev->colourfx.enable = (ctrl->val & 0xff00) >> 8;
 	dev->colourfx.enable = ctrl->val & 0xff;
 
 	ret = vchiq_mmal_port_parameter_set(dev->instance, control,
