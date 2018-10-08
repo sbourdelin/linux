@@ -334,8 +334,10 @@ static int vhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	usbip_dbg_vhci_rh("typeReq %x wValue %x wIndex %x\n", typeReq, wValue,
 			  wIndex);
 
-	if (wIndex > VHCI_HC_PORTS)
+	if (wIndex > VHCI_HC_PORTS) {
 		pr_err("invalid port number %d\n", wIndex);
+		return -ENODEV;
+	}
 	rhport = wIndex - 1;
 
 	vhci_hcd = hcd_to_vhci_hcd(hcd);
