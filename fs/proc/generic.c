@@ -231,7 +231,7 @@ static int proc_misc_d_revalidate(struct dentry *dentry, unsigned int flags)
 
 static int proc_misc_d_delete(const struct dentry *dentry)
 {
-	return atomic_read(&PDE(d_inode(dentry))->in_use) < 0;
+	return 1; // Don't retain negative dentries
 }
 
 static const struct dentry_operations proc_misc_dentry_ops = {
