@@ -123,6 +123,17 @@ config PINCTRL_DIGICOLOR
 	select PINMUX
 	select GENERIC_PINCONF
 
+config PINCTRL_DS90UX9XX
+	tristate "TI DS90Ux9xx pin multiplexer and GPIO driver"
+	depends on MFD_DS90UX9XX
+	default MFD_DS90UX9XX
+	select GPIOLIB
+	select PINMUX
+	select GENERIC_PINCONF
+	help
+	  Select this option to enable pinmux and GPIO bridge/controller
+	  driver for the TI DS90Ux9xx de-/serializer chip family.
+
 config PINCTRL_LANTIQ
 	bool
 	depends on LANTIQ
