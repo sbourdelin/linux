@@ -1271,6 +1271,20 @@ config MFD_DM355EVM_MSP
 	  boards.  MSP430 firmware manages resets and power sequencing,
 	  inputs from buttons and the IR remote, LEDs, an RTC, and more.
 
+config MFD_DS90UX9XX
+	tristate "TI DS90Ux9xx FPD-Link de-/serializer driver"
+	depends on I2C && OF
+	select MFD_CORE
+	select REGMAP_I2C
+	help
+	  Say yes here to enable support for TI DS90UX9XX de-/serializer ICs.
+
+	  This driver provides basic support for setting up the de-/serializer
+	  chips. Additional functionalities like connection handling to
+	  remote de-/serializers, I2C bridging, pin multiplexing, GPIO
+	  controller and so on are provided by separate drivers and should
+	  enabled individually.
+
 config MFD_LP3943
 	tristate "TI/National Semiconductor LP3943 MFD Driver"
 	depends on I2C
