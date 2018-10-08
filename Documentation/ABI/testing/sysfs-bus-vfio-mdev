@@ -85,6 +85,22 @@ Users:
 		a particular <type-id> that can help in understanding the
 		features provided by that type of mediated device.
 
+What:		/sys/.../mdev_supported_types/<type-id>/single_usage_restriction
+Date:           October 2018
+Contact:        Kirti Wankhede <kwankhede@nvidia.com>
+Description:
+		Reading this attribute will return Y or N. Returning Y indicates
+		vendor driver has restriction of single mdev device of this
+		particular <type-id> assigned to one user space application.
+		Returning N indicates that multiple mdev devices of particular
+		<type-id> can be assigned to one user space application.
+		This is optional and readonly attribute.
+Users:
+		User space application should read if 'single_usage_restriction'
+		attibute is present in <type-id> directory of all mdev devices
+		which are going to be used. If all read N then user space
+		application can proceed with multiple mdev devices.
+
 What:           /sys/.../<device>/<UUID>/
 Date:           October 2016
 Contact:        Kirti Wankhede <kwankhede@nvidia.com>
