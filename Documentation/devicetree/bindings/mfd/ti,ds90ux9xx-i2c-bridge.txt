@@ -1,0 +1,61 @@
+TI DS90Ux9xx de-/serializer I2C bridge subcontroller
+
+Required properties:
+- compatible: Must contain a generic "ti,ds90ux9xx-i2c-bridge" value and
+	may contain one more specific value from the list:
+	"ti,ds90ux925-i2c-bridge",
+	"ti,ds90ux926-i2c-bridge",
+	"ti,ds90ux927-i2c-bridge",
+	"ti,ds90ux928-i2c-bridge",
+	"ti,ds90ux940-i2c-bridge".
+
+Required properties of a de-/serializer device connected to a local I2C bus:
+- ti,i2c-bridges: List of phandles to remote de-/serializer devices with
+	two arguments: id of a local de-/serializer FPD link and an assigned
+	I2C address of a remote de-/serializer to be accessed on a local
+	I2C bus.
+
+Optional properties of a de-/serializer device connected to a local I2C bus:
+- ti,i2c-bridge-maps: List of 3-cell values:
+	- the first argument is id of a local de-/serializer FPD link,
+	- the second argument is an I2C address of a device connected to
+	  a remote de-/serializer IC,
+	- the third argument is an I2C address of the remote I2C device
+	  for access on a local I2C bus.
+- ti,i2c-bridge-auto-ack: Enables AUTO ACK mode.
+- ti,i2c-bridge-pass-all: Enables PASS ALL mode, remote I2C slave devices
+	are accessible on a local (host) I2C bus without I2C address
+	remappings.
+
+Remote de-/serializer device may contain a list of device nodes, each
+one represents an I2C device connected to that remote de-/serializer IC.
+
+Example (remote device is a deserializer with Atmel MXT touchscreen):
+
+serializer: serializer@c {
+	compatible = "ti,ds90ub927q", "ti,ds90ux9xx";
+	reg = <0xc>;
+
+	i2c-bridge {
+		compatible = "ti,ds90ux927-i2c-bridge",
+			     "ti,ds90ux9xx-i2c-bridge";
+		ti,i2c-bridges = <&deserializer 0 0x3b>;
+		ti,i2c-bridge-maps = <0 0x4b 0x64>;
+	};
+};
+
+deserializer: deserializer {
+	compatible = "ti,ds90ub928q", "ti,ds90ux9xx";
+
+	i2c-bridge {
+		compatible = "ti,ds90ux928-i2c-bridge",
+			     "ti,ds90ux9xx-i2c-bridge";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		touchscreen@4b {
+			compatible = "atmel,maxtouch";
+			reg = <0x4b>;
+		};
+	};
+};
