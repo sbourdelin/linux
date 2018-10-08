@@ -1285,6 +1285,14 @@ config MFD_DS90UX9XX
 	  controller and so on are provided by separate drivers and should
 	  enabled individually.
 
+config MFD_DS90UX9XX_I2C
+	tristate "TI DS90Ux9xx I2C bridge/alias driver"
+	default MFD_DS90UX9XX
+	depends on MFD_DS90UX9XX
+	help
+	  Select this option to enable I2C bridge/alias and link connection
+	  handling driver for the TI DS90Ux9xx FPD Link de-/serializer ICs.
+
 config MFD_LP3943
 	tristate "TI/National Semiconductor LP3943 MFD Driver"
 	depends on I2C

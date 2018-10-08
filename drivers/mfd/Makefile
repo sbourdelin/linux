@@ -224,6 +224,7 @@ obj-$(CONFIG_MFD_DLN2)		+= dln2.o
 obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
 obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
 obj-$(CONFIG_MFD_DS90UX9XX)	+= ds90ux9xx-core.o
+obj-$(CONFIG_MFD_DS90UX9XX_I2C)	+= ds90ux9xx-i2c-bridge.o
 
 intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
 obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
