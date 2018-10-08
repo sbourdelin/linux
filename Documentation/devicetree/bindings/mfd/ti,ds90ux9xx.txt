@@ -1,0 +1,66 @@
+Texas Instruments DS90Ux9xx de-/serializer controllers
+
+Required properties:
+- compatible: Must contain a generic "ti,ds90ux9xx" value and
+	may contain one more specific value from the list:
+	"ti,ds90ub925q",
+	"ti,ds90uh925q",
+	"ti,ds90ub927q",
+	"ti,ds90uh927q",
+	"ti,ds90ub926q",
+	"ti,ds90uh926q",
+	"ti,ds90ub928q",
+	"ti,ds90uh928q",
+	"ti,ds90ub940q",
+	"ti,ds90uh940q".
+
+Optional properties:
+- reg : Specifies the I2C slave address of a local de-/serializer.
+- power-gpios : GPIO line to control supplied power to the device.
+- ti,backward-compatible-mode : Overrides backward compatibility mode.
+	Possible values are "<1>" or "<0>".
+	If "ti,backward-compatible-mode" is not mentioned, the backward
+	compatibility mode is not touched and given by hardware pin strapping.
+- ti,low-frequency-mode : Overrides low frequency mode.
+	Possible values are "<1>" or "<0>".
+	If "ti,low-frequency-mode" is not mentioned, the low frequency mode
+	is not touched and given by hardware pin strapping.
+- ti,video-map-select-msb: Sets video bridge pins to MSB mode, if it is set
+	MAPSEL pin value is ignored.
+- ti,video-map-select-lsb: Sets video bridge pins to LSB mode, if it is set
+	MAPSEL pin value is ignored.
+- ti,pixel-clock-edge : Selects Pixel Clock Edge.
+	Possible values are "<1>" or "<0>".
+	If "ti,pixel-clock-edge" is High <1>, output data is strobed on the
+	Rising edge of the PCLK. If ti,pixel-clock-edge is Low <0>, data is
+	strobed on the Falling edge of the PCLK.
+	If "ti,pixel-clock-edge" is not mentioned, the pixel clock edge
+	value is not touched and given by hardware pin strapping.
+- ti,spread-spectrum-clock-generation : Spread Sprectrum Clock Generation.
+	Possible values are from "<0>" to "<7>". The same value will be
+	written to SSC register. If "ti,spread-spectrum-clock-gen" is not
+	found, then SSCG will be disabled.
+
+TI DS90Ux9xx serializers and deserializer device nodes may contain a number
+of children device nodes to describe and enable particular subcomponents
+found on ICs.
+
+Example:
+
+serializer: serializer@c {
+	compatible = "ti,ds90ub927q", "ti,ds90ux9xx";
+	reg = <0xc>;
+	power-gpios = <&gpio5 12 GPIO_ACTIVE_HIGH>;
+	ti,backward-compatible-mode = <0>;
+	ti,low-frequency-mode = <0>;
+	ti,pixel-clock-edge = <0>;
+	...
+}
+
+deserializer: deserializer@3c {
+	compatible = "ti,ds90ub940q", "ti,ds90ux9xx";
+	reg = <0x3c>;
+	power-gpios = <&gpio6 31 GPIO_ACTIVE_HIGH>;
+	...
+}
+
