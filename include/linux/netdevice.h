@@ -1651,10 +1651,6 @@ enum netdev_priv_flags {
  * 	@dev_port:		Used to differentiate devices that share
  * 				the same function
  *	@addr_list_lock:	XXX: need comments on this one
- *	@uc_promisc:		Counter that indicates promiscuous mode
- *				has been enabled due to the need to listen to
- *				additional unicast addresses in a device that
- *				does not implement ndo_set_rx_mode()
  *	@uc:			unicast mac addresses
  *	@mc:			multicast mac addresses
  *	@dev_addrs:		list of device hw addresses
@@ -1714,11 +1710,9 @@ enum netdev_priv_flags {
  *	@link_watch_list:	XXX: need comments on this one
  *
  *	@reg_state:		Register/unregister state machine
- *	@dismantle:		Device is going to be freed
  *	@rtnl_link_state:	This enum represents the phases of creating
  *				a new link
  *
- *	@needs_free_netdev:	Should unregister perform free_netdev?
  *	@priv_destructor:	Called from unregister
  *	@npinfo:		XXX: need comments on this one
  * 	@nd_net:		Network namespace this network device is inside
@@ -1757,6 +1751,15 @@ enum netdev_priv_flags {
  *
  *	@qdisc_tx_busylock: lockdep class annotating Qdisc->busylock spinlock
  *	@qdisc_running_key: lockdep class annotating Qdisc->running seqcount
+ *
+ *	@uc_promisc:	Flag that indicates promiscuous mode
+ *			has been enabled due to the need to listen to
+ *			additional unicast addresses in a device that
+ *			does not implement ndo_set_rx_mode()
+ *
+ *	@dismantle:	Device is going to be freed
+ *
+ *	@needs_free_netdev:	Should unregister perform free_netdev?
  *
  *	@proto_down:	protocol port state information can be sent to the
  *			switch driver and used to set the phys state of the
@@ -1879,7 +1882,6 @@ struct net_device {
 	unsigned short          dev_port;
 	spinlock_t		addr_list_lock;
 	unsigned char		name_assign_type;
-	bool			uc_promisc;
 	struct netdev_hw_addr_list	uc;
 	struct netdev_hw_addr_list	mc;
 	struct netdev_hw_addr_list	dev_addrs;
@@ -1986,14 +1988,11 @@ struct net_device {
 	       NETREG_DUMMY,		/* dummy device for NAPI poll */
 	} reg_state:8;
 
-	bool dismantle;
-
 	enum {
 		RTNL_LINK_INITIALIZED,
 		RTNL_LINK_INITIALIZING,
 	} rtnl_link_state:16;
 
-	bool needs_free_netdev;
 	void (*priv_destructor)(struct net_device *dev);
 
 #ifdef CONFIG_NETPOLL
@@ -2046,7 +2045,10 @@ struct net_device {
 	struct sfp_bus		*sfp_bus;
 	struct lock_class_key	*qdisc_tx_busylock;
 	struct lock_class_key	*qdisc_running_key;
-	bool			proto_down;
+	unsigned		uc_promisc:1;
+	unsigned		dismantle:1;
+	unsigned		needs_free_netdev:1;
+	unsigned		proto_down:1;
 	unsigned		wol_enabled:1;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
