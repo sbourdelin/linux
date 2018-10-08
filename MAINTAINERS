@@ -14544,6 +14544,16 @@ S:	Maintained
 F:	drivers/media/platform/davinci/
 F:	include/media/davinci/
 
+TI DS90UX9XX FPD-LINK III SERDES DRIVERS
+M:	Vladimir Zapolskiy <vz@mleia.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+F:	drivers/mfd/ds90ux9xx-core.c
+F:	drivers/mfd/ds90ux9xx-i2c-bridge.c
+F:	drivers/pinctrl/pinctrl-ds90ux9xx.c
+F:	include/linux/mfd/ds90ux9xx.h
+N:	ds90u[bhx]9*
+
 TI ETHERNET SWITCH DRIVER (CPSW)
 R:	Grygorii Strashko <grygorii.strashko@ti.com>
 L:	linux-omap@vger.kernel.org
