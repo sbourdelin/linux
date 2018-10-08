@@ -1,0 +1,83 @@
+TI DS90Ux9xx de-/serializer pinmux and GPIO subcontroller
+
+Required properties:
+- compatible: Must contain a generic "ti,ds90ux9xx-pinctrl" value and
+	may contain one more specific value from the list:
+	"ti,ds90ux925-pinctrl",
+	"ti,ds90ux926-pinctrl",
+	"ti,ds90ux927-pinctrl",
+	"ti,ds90ux928-pinctrl",
+	"ti,ds90ux940-pinctrl".
+
+- gpio-controller: Marks the device node as a GPIO controller.
+
+- #gpio-cells: Must be set to 2,
+	- the first cell is the GPIO offset number within the controller,
+	- the second cell is used to specify the GPIO line polarity.
+
+- gpio-ranges: Mapping to pin controller pins (as described in
+	Documentation/devicetree/bindings/gpio/gpio.txt)
+
+Optional properties:
+- ti,video-depth-18bit: Sets video bridge pins to RGB 18-bit mode.
+
+Available pins, groups and functions (reference to device datasheets):
+
+function: "gpio" ("gpio4" is on DS90Ux925 and DS90Ux926 only,
+		  "gpio9" is on DS90Ux940 only)
+ - pins: "gpio0", "gpio1", "gpio2", "gpio3", "gpio4", "gpio5", "gpio6",
+	 "gpio7", "gpio8", "gpio9"
+
+function: "gpio-remote"
+ - pins: "gpio0", "gpio1", "gpio2", "gpio3"
+
+function: "pass" (DS90Ux940 specific only)
+ - pins: "gpio0", "gpio3"
+
+function: "i2s-1"
+ - group: "i2s-1"
+
+function: "i2s-2"
+ - group: "i2s-2"
+
+function: "i2s-3" (DS90Ux927, DS90Ux928 and DS90Ux940 specific only)
+ - group: "i2s-3"
+
+function: "i2s-4" (DS90Ux927, DS90Ux928 and DS90Ux940 specific only)
+ - group: "i2s-4"
+
+function: "i2s-m" (DS90Ux928 and DS90Ux940 specific only)
+ - group: "i2s-m"
+
+function: "parallel" (DS90Ux925 and DS90Ux926 specific only)
+ - group: "parallel"
+
+Example (deserializer with pins GPIO[3:0] set to bridged output
+	 function and pin GPIO4 in standard hogged GPIO function):
+
+deserializer {
+	compatible = "ti,ds90ub928q", "ti,ds90ux9xx";
+
+	ds90ux928_pctrl: pin-controller {
+		compatible = "ti,ds90ux928-pinctrl", "ti,ds90ux9xx-pinctrl";
+		gpio-controller;
+		#gpio-cells = <2>;
+		gpio-ranges = <&ds90ux928_pctrl 0 0 8>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&ds90ux928_pins>;
+
+		ds90ux928_pins: pinmux {
+			gpio-remote {
+				pins = "gpio0", "gpio1", "gpio2", "gpio3";
+				function = "gpio-remote";
+			};
+		};
+
+		rst {
+			gpio-hog;
+			gpios = <4 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+	};
+};
