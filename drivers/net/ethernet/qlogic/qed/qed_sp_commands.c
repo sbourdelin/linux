@@ -79,8 +79,10 @@ int qed_sp_init_request(struct qed_hwfn *p_hwfn,
 		break;
 
 	case QED_SPQ_MODE_BLOCK:
-		if (!p_data->p_comp_data)
-			return -EINVAL;
+		if (!p_data->p_comp_data) {
+			rc = -EINVAL;
+			goto err;
+		}
 
 		p_ent->comp_cb.cookie = p_data->p_comp_data->cookie;
 		break;
@@ -95,7 +97,8 @@ int qed_sp_init_request(struct qed_hwfn *p_hwfn,
 	default:
 		DP_NOTICE(p_hwfn, "Unknown SPQE completion mode %d\n",
 			  p_ent->comp_mode);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto err;
 	}
 
 	DP_VERBOSE(p_hwfn, QED_MSG_SPQ,
@@ -109,6 +112,13 @@ int qed_sp_init_request(struct qed_hwfn *p_hwfn,
 	memset(&p_ent->ramrod, 0, sizeof(p_ent->ramrod));
 
 	return 0;
+
+err:
+	qed_spq_return_entry(p_hwfn, *pp_ent);
+	*pp_ent = NULL;
+
+	return rc;
+
 }
 
 static enum tunnel_clss qed_tunn_clss_to_fw_clss(u8 type)
