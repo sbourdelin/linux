@@ -113,7 +113,6 @@ static unsigned int cs_dbs_update(struct cpufreq_policy *policy)
 			requested_freq = policy->max;
 
 		__cpufreq_driver_target(policy, requested_freq, CPUFREQ_RELATION_H);
-		dbs_info->requested_freq = requested_freq;
 		goto out;
 	}
 
@@ -136,10 +135,10 @@ static unsigned int cs_dbs_update(struct cpufreq_policy *policy)
 			requested_freq = policy->min;
 
 		__cpufreq_driver_target(policy, requested_freq, CPUFREQ_RELATION_L);
-		dbs_info->requested_freq = requested_freq;
 	}
 
  out:
+	dbs_info->requested_freq = requested_freq;
 	return dbs_data->sampling_rate;
 }
 
