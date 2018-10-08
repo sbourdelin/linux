@@ -1674,9 +1674,9 @@ xfs_fs_fill_super(
 			rtdev_is_dax = bdev_dax_supported(
 				mp->m_rtdev_targp->bt_bdev, sb->s_blocksize);
 		if (!rtdev_is_dax && !datadev_is_dax) {
-			xfs_alert(mp,
-			"DAX unsupported by block device. Turning off DAX.");
-			mp->m_flags &= ~XFS_MOUNT_DAX;
+			xfs_alert(mp, "DAX unsupported by block device.");
+			error = -EINVAL;
+			goto out_filestream_unmount;
 		}
 		if (xfs_sb_version_hasreflink(&mp->m_sb)) {
 			xfs_alert(mp,
