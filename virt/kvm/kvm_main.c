@@ -1403,16 +1403,6 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 	if (npages != 1)
 		return npages;
 
-	/* map read fault as writable if possible */
-	if (unlikely(!write_fault) && writable) {
-		struct page *wpage;
-
-		if (__get_user_pages_fast(addr, 1, 1, &wpage) == 1) {
-			*writable = true;
-			put_page(page);
-			page = wpage;
-		}
-	}
 	*pfn = page_to_pfn(page);
 	return npages;
 }
