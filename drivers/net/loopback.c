@@ -50,6 +50,7 @@
 #include <linux/ethtool.h>
 #include <net/sock.h>
 #include <net/checksum.h>
+#include <net/xfrm.h>
 #include <linux/if_ether.h>	/* For the statistics structure. */
 #include <linux/if_arp.h>	/* For ARPHRD_ETHER */
 #include <linux/ip.h>
@@ -81,6 +82,9 @@ static netdev_tx_t loopback_xmit(struct sk_buff *skb,
 	 * make sure dst is refcounted.
 	 */
 	skb_dst_force(skb);
+
+	// Clear secpath to ensure xfrm policy check not tainted by outbound SAs.
+	secpath_reset(skb);
 
 	skb->protocol = eth_type_trans(skb, dev);
 
