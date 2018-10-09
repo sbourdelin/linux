@@ -11333,6 +11333,13 @@ L:	linux-pci@vger.kernel.org
 S:	Maintained
 F:	drivers/pci/controller/dwc/*spear*
 
+PCIE DRIVER FOR AMLOGIC MESON
+M:	Yue Wang <yue.wang@Amlogic.com>
+L:	linux-pci@vger.kernel.org
+L:	linux-amlogic@lists.infradead.org
+S:	Maintained
+F:	drivers/pci/controller/dwc/pci-meson.c
+
 PCMCIA SUBSYSTEM
 M:	Dominik Brodowski <linux@dominikbrodowski.net>
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/brodo/pcmcia.git
