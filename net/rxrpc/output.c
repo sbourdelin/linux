@@ -524,7 +524,7 @@ void rxrpc_reject_packets(struct rxrpc_local *local)
 	struct kvec iov[2];
 	size_t size;
 	__be32 code;
-	int ret, ioc;
+	int ret;
 
 	_enter("%d", local->debug_id);
 
@@ -548,13 +548,11 @@ void rxrpc_reject_packets(struct rxrpc_local *local)
 		case RXRPC_SKB_MARK_REJECT_BUSY:
 			whdr.type = RXRPC_PACKET_TYPE_BUSY;
 			size = sizeof(whdr);
-			ioc = 1;
 			break;
 		case RXRPC_SKB_MARK_REJECT_ABORT:
 			whdr.type = RXRPC_PACKET_TYPE_ABORT;
 			code = htonl(skb->priority);
 			size = sizeof(whdr) + sizeof(code);
-			ioc = 2;
 			break;
 		default:
 			rxrpc_free_skb(skb, rxrpc_skb_rx_freed);
