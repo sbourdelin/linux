@@ -1,0 +1,19 @@
+NXP 74AUP1G157GW Low-power 2-input multiplexer for clock
+
+Required properties:
+- compatible:	"nxp,74aup1g157gw-clk"      (select closest input as output)
+		"nxp,74aup1g157gw-audio-clk (select 48kHz / 44.1kHz as output)
+- clocks:	select input clock as i0, i1
+- clock-names:	"i0" and "i1"
+- sel-gpios:	selector pin
+
+Examples:
+
+	clk {
+		#clock-cells = <0>;
+		compatible = "nxp,74aup1g157gw-audio-clk";
+		clocks = <&clk8snd>, <&clksnd>;
+		clock-names = "i0", "i1";
+		sel-gpios = <&gpio_exp_75 13 GPIO_ACTIVE_HIGH>;
+	};
+
