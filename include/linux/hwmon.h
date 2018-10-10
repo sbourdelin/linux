@@ -366,13 +366,37 @@ struct hwmon_channel_info {
 };
 
 /**
+ * Chip operating mode information
+ * @names:	A list of available operating mode names.
+ * @list_size:	The total number of available operating mode names.
+ * @get_index:	Callback to get current operating mode index. Mandatory.
+ *		Parameters are:
+ *		@dev:	Pointer to hardware monitoring device
+ *		@index:	Pointer to returned mode index
+ *		The function returns 0 on success or a negative error number.
+ * @set_index:	Callback to set operating mode using the index. Mandatory.
+ *		Parameters are:
+ *		@dev:	Pointer to hardware monitoring device
+ *		@index:	Mode index in the mode list
+ *		The function returns 0 on success or a negative error number.
+ */
+struct hwmon_mode {
+	const char **names;
+	unsigned int list_size;
+	int (*get_index)(struct device *dev, unsigned int *index);
+	int (*set_index)(struct device *dev, unsigned int index);
+};
+
+/**
  * Chip configuration
  * @ops:	Pointer to hwmon operations.
  * @info:	Null-terminated list of channel information.
+ * @mode:	Pointer to hwmon operating mode (optional).
  */
 struct hwmon_chip_info {
 	const struct hwmon_ops *ops;
 	const struct hwmon_channel_info **info;
+	const struct hwmon_mode *mode;
 };
 
 /* hwmon_device_register() is deprecated */

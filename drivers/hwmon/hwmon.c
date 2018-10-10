@@ -69,25 +69,88 @@ name_show(struct device *dev, struct device_attribute *attr, char *buf)
 }
 static DEVICE_ATTR_RO(name);
 
+static ssize_t available_modes_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct hwmon_device *hwdev = to_hwmon_device(dev);
+	const struct hwmon_chip_info *chip = hwdev->chip;
+	const struct hwmon_mode *mode = chip->mode;
+	int i;
+
+	for (i = 0; i < mode->list_size; i++)
+		snprintf(buf, PAGE_SIZE, "%s%s ", buf, mode->names[i]);
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", buf);
+}
+static DEVICE_ATTR_RO(available_modes);
+
+static ssize_t mode_show(struct device *dev,
+			 struct device_attribute *attr, char *buf)
+{
+	struct hwmon_device *hwdev = to_hwmon_device(dev);
+	const struct hwmon_chip_info *chip = hwdev->chip;
+	const struct hwmon_mode *mode = chip->mode;
+	unsigned int index;
+	int ret;
+
+	ret = mode->get_index(dev, &index);
+	if (ret)
+		return ret;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", mode->names[index]);
+}
+
+static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct hwmon_device *hwdev = to_hwmon_device(dev);
+	const struct hwmon_chip_info *chip = hwdev->chip;
+	const struct hwmon_mode *mode = chip->mode;
+	const char **names = mode->names;
+	unsigned int index;
+	int ret;
+
+	/* Get the corresponding mode index */
+	for (index = 0; index < mode->list_size; index++) {
+		if (!strncmp(buf, names[index], strlen(names[index])))
+			break;
+	}
+
+	if (index >= mode->list_size)
+		return -EINVAL;
+
+	ret = mode->set_index(dev, index);
+	if (ret)
+		return ret;
+
+	return count;
+}
+static DEVICE_ATTR_RW(mode);
+
 static struct attribute *hwmon_dev_attrs[] = {
-	&dev_attr_name.attr,
+	&dev_attr_name.attr,		/* index = 0 */
+	&dev_attr_available_modes.attr,	/* index = 1 */
+	&dev_attr_mode.attr,		/* index = 2 */
 	NULL
 };
 
-static umode_t hwmon_dev_name_is_visible(struct kobject *kobj,
-					 struct attribute *attr, int n)
+static umode_t hwmon_dev_is_visible(struct kobject *kobj,
+				    struct attribute *attr, int n)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
+	struct hwmon_device *hwdev = to_hwmon_device(dev);
 
-	if (to_hwmon_device(dev)->name == NULL)
-		return 0;
+	if (n == 0 && hwdev->name)
+		return attr->mode;
+	else if (n <= 2 && hwdev->chip->mode)
+		return attr->mode;
 
-	return attr->mode;
+	return 0;
 }
 
 static const struct attribute_group hwmon_dev_attr_group = {
 	.attrs		= hwmon_dev_attrs,
-	.is_visible	= hwmon_dev_name_is_visible,
+	.is_visible	= hwmon_dev_is_visible,
 };
 
 static const struct attribute_group *hwmon_dev_attr_groups[] = {
@@ -577,6 +640,16 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
 	if (chip) {
 		struct attribute **attrs;
 		int ngroups = 2; /* terminating NULL plus &hwdev->groups */
+
+		/* Validate optional hwmon_mode */
+		if (chip->mode) {
+			/* Check mandatory properties */
+			if (!chip->mode->names || !chip->mode->list_size ||
+			    !chip->mode->get_index || !chip->mode->set_index) {
+				err = -EINVAL;
+				goto free_hwmon;
+			}
+		}
 
 		if (groups)
 			for (i = 0; groups[i]; i++)

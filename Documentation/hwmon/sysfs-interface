@@ -92,6 +92,21 @@ name		The chip name.
 		I2C devices get this attribute created automatically.
 		RO
 
+available_modes The available operating modes of the chip.
+		This should be short, lowercase string, not containing
+		whitespace, or the wildcard character '*'.
+		This attribute shows all the available of the operating modes,
+		for example, "power-down" "one-shot" and "continuous".
+		RO
+
+mode		The current operating mode of the chip.
+		This should be short, lowercase string, not containing
+		whitespace, or the wildcard character '*'.
+		This attribute shows the current operating mode of the chip.
+		Writing a valid string from the list of available_modes will
+		configure the chip to the corresponding operating mode.
+		RW
+
 update_interval	The interval at which the chip will update readings.
 		Unit: millisecond
 		RW
