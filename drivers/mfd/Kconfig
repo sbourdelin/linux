@@ -8,7 +8,6 @@ menu "Multifunction device drivers"
 config MFD_CORE
 	tristate
 	select IRQ_DOMAIN
-	default n
 
 config MFD_CS5535
 	tristate "AMD CS5535 and CS5536 southbridge core functions"
@@ -861,7 +860,6 @@ config MFD_VIPERBOARD
         tristate "Nano River Technologies Viperboard"
 	select MFD_CORE
 	depends on USB
-	default n
 	help
 	  Say yes here if you want support for Nano River Technologies
 	  Viperboard.
@@ -1566,7 +1564,6 @@ config MFD_TWL4030_AUDIO
 	bool "TI TWL4030 Audio"
 	depends on TWL4030_CORE
 	select MFD_CORE
-	default n
 
 config TWL6040_CORE
 	bool "TI TWL6040 audio codec"
@@ -1574,7 +1571,6 @@ config TWL6040_CORE
 	select MFD_CORE
 	select REGMAP_I2C
 	select REGMAP_IRQ
-	default n
 	help
 	  Say yes here if you want support for Texas Instruments TWL6040 audio
 	  codec.
@@ -1596,7 +1592,6 @@ config MFD_WL1273_CORE
 	tristate "TI WL1273 FM radio"
 	depends on I2C
 	select MFD_CORE
-	default n
 	help
 	  This is the core driver for the TI WL1273 FM radio. This MFD
 	  driver connects the radio-wl1273 V4L2 module and the wl1273
@@ -1640,7 +1635,6 @@ config MFD_TC3589X
 
 config MFD_TMIO
 	bool
-	default n
 
 config MFD_T7L66XB
 	bool "Toshiba T7L66XB"
