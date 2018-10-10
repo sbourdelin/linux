@@ -23,6 +23,8 @@
 #include <asm/sizes.h>
 #include <asm/mach/flash.h>
 
+#define SA1100_NUM_CS 6
+
 struct sa_subdev_info {
 	char name[16];
 	struct map_info map;
@@ -157,7 +159,7 @@ static struct sa_info *sa1100_setup_mtd(struct platform_device *pdev,
 	/*
 	 * Count number of devices.
 	 */
-	for (nr = 0; ; nr++)
+	for (nr = 0; nr < SA1100_NUM_CS; nr++)
 		if (!platform_get_resource(pdev, IORESOURCE_MEM, nr))
 			break;
 
@@ -221,7 +223,7 @@ static struct sa_info *sa1100_setup_mtd(struct platform_device *pdev,
 		info->mtd = info->subdev[0].mtd;
 		ret = 0;
 	} else if (info->num_subdev > 1) {
-		struct mtd_info *cdev[nr];
+		struct mtd_info *cdev[SA1100_NUM_CS];
 		/*
 		 * We detected multiple devices.  Concatenate them together.
 		 */
