@@ -130,6 +130,7 @@ struct cxusb_medion_dev {
 	u32 input;
 	bool stop_streaming;
 	u32 width, height;
+	bool raw_mode;
 	struct cxusb_medion_auxbuf auxbuf;
 	v4l2_std_id norm;
 
@@ -152,6 +153,9 @@ struct cxusb_medion_vbuffer {
 	struct vb2_v4l2_buffer vb2;
 	struct list_head list;
 };
+
+/* Capture streaming parameters extendedmode field flags */
+#define CXUSB_EXTENDEDMODE_CAPTURE_RAW 1
 
 /* defines for "debug" module parameter */
 #define CXUSB_DBG_RC BIT(0)
