@@ -1,0 +1,4 @@
+config CLK_74AUP1G157GW
+	tristate "NXP 74AUP1G157GW Low-power 2-input multiplexer support as clock"
+	help
+	  This enables NXP 74AUP1G157GW 2-input multiplexer as clock driver

@@ -84,7 +84,7 @@ obj-$(CONFIG_ARCH_MMP)			+= mmp/
 endif
 obj-y					+= mvebu/
 obj-$(CONFIG_ARCH_MXS)			+= mxs/
-obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
+obj-y					+= nxp/
 obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
 obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
 obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
