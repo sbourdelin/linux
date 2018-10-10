@@ -195,6 +195,8 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
 					goto out;
 			}
 		}
+		dws->cs_override = of_property_read_bool(pdev->dev.of_node,
+							 "cs-override");
 	}
 
 	init_func = device_get_match_data(&pdev->dev);
