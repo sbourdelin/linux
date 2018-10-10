@@ -788,6 +788,12 @@ KBUILD_CFLAGS_KERNEL += -ffunction-sections -fdata-sections
 LDFLAGS_vmlinux += --gc-sections
 endif
 
+ifdef CONFIG_KERNEL_LZ4
+ifeq ($(CONFIG_SHELL which lz4c),)
+$(error "lz4 tool not found on this system but CONFIG_KERNEL_LZ4 enabled")
+endif
+endif
+
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
 
