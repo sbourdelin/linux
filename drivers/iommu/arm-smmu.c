@@ -568,6 +568,9 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 			    fsr, iova, fsynr, cfg->cbndx);
 
 	writel(fsr, cb_base + ARM_SMMU_CB_FSR);
+
+	report_iommu_fault(domain, smmu->dev, iova, 0);
+
 	return IRQ_HANDLED;
 }
 
