@@ -48,3 +48,24 @@ const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id *match)
 	return NULL;
 }
 EXPORT_SYMBOL(x86_match_cpu);
+
+const struct x86_ucode_id *x86_match_ucode(const struct x86_ucode_id *match)
+{
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+	const struct x86_ucode_id *m;
+
+	for (m = match; m->vendor | m->family | m->model; m++) {
+		if (c->x86_vendor != m->vendor)
+			continue;
+		if (c->x86 != m->family)
+			continue;
+		if (c->x86_model != m->model)
+			continue;
+		if (c->x86_stepping != m->stepping)
+			continue;
+		if (c->microcode < m->min_ucode)
+			continue;
+		return m;
+	}
+	return NULL;
+}
