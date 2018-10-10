@@ -512,7 +512,6 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 
 		if (chip->ops->req_canceled(chip, status)) {
 			dev_err(&chip->dev, "Operation Canceled\n");
-			rc = -ECANCELED;
 			goto out;
 		}
 
@@ -522,7 +521,6 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 
 	chip->ops->cancel(chip);
 	dev_err(&chip->dev, "Operation Timed out\n");
-	rc = -ETIME;
 	goto out;
 
 out_recv:
@@ -533,14 +531,12 @@ out_recv:
 			"tpm_transmit: tpm_recv: error %d\n", rc);
 		goto out;
 	} else if (len < TPM_HEADER_SIZE) {
-		rc = -EFAULT;
 		goto out;
 	}
 
-	if (len != be32_to_cpu(header->length)) {
-		rc = -EFAULT;
+	if (len != be32_to_cpu(header->length))
 		goto out;
-	}
+
 
 	rc = tpm2_commit_space(chip, space, ordinal, buf, &len);
 	if (rc)
