@@ -292,7 +292,7 @@ static int snd_cs423x_pnp_init_mpu(int dev, struct pnp_dev *pdev)
 		mpu_irq[dev] = SNDRV_AUTO_IRQ;
 	} else {
 		mpu_port[dev] = pnp_port_start(pdev, 0);
-		if (mpu_irq[dev] >= 0 &&
+		if (!mpu_irq[dev] &&
 		    pnp_irq_valid(pdev, 0) && pnp_irq(pdev, 0) >= 0) {
 			mpu_irq[dev] = pnp_irq(pdev, 0);
 		} else {
