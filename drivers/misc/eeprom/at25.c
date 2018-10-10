@@ -136,6 +136,7 @@ static int at25_ee_write(void *priv, unsigned int off, void *val, size_t count)
 	int			status = 0;
 	unsigned		buf_size;
 	u8			*bounce;
+	struct spi_transfer	t[2];
 
 	if (unlikely(off >= at25->chip.byte_len))
 		return -EFBIG;
@@ -160,7 +161,7 @@ static int at25_ee_write(void *priv, unsigned int off, void *val, size_t count)
 		unsigned long	timeout, retries;
 		unsigned	segment;
 		unsigned	offset = off;
-		u8		*cp = bounce;
+		u8		*cp = bounce + buf_size;
 		int		sr;
 		u8		instr;
 
@@ -194,9 +195,17 @@ static int at25_ee_write(void *priv, unsigned int off, void *val, size_t count)
 		segment = buf_size - (offset % buf_size);
 		if (segment > count)
 			segment = count;
-		memcpy(cp, buf, segment);
-		status = spi_write(at25->spi, bounce,
-				segment + at25->addrlen + 1);
+		memcpy(bounce, buf, segment);
+
+		memset(t, 0, sizeof(t));
+
+		t[0].tx_buf = bounce + buf_size;
+		t[0].len = at25->addrlen + 1;
+
+		t[1].tx_buf = bounce;
+		t[1].len = segment;
+
+		status = spi_sync_transfer(at25->spi, t, ARRAY_SIZE(t));
 		dev_dbg(&at25->spi->dev, "write %u bytes at %u --> %d\n",
 			segment, offset, status);
 		if (status < 0)
