@@ -1230,6 +1230,7 @@ static int pvinfo_mmio_write(struct intel_vgpu *vgpu, unsigned int offset,
 {
 	u32 data;
 	int ret;
+	struct intel_gvt_irq_ops *ops = vgpu->gvt->irq.ops;
 
 	write_vreg(vgpu, offset, p_data, bytes);
 	data = vgpu_vreg(vgpu, offset);
@@ -1255,6 +1256,9 @@ static int pvinfo_mmio_write(struct intel_vgpu *vgpu, unsigned int offset,
 	case _vgtif_reg(shared_page_gpa.hi):
 		vgpu->shared_page_gpa = vgpu_vreg64_t(vgpu,
 			vgtif_reg(shared_page_gpa));
+		break;
+	case _vgtif_reg(check_pending_irq):
+		ops->check_pending_irq(vgpu);
 		break;
 	/* add xhot and yhot to handled list to avoid error log */
 	case _vgtif_reg(cursor_x_hot):
