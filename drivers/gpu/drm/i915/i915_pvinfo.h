@@ -143,8 +143,9 @@ struct vgt_if {
 		u32 lo;
 		u32 hi;
 	} shared_page_gpa;
+	u32 check_pending_irq;
 
-	u32  rsv7[0x200 - 27];    /* pad to one page */
+	u32  rsv7[0x200 - 28];    /* pad to one page */
 } __packed;
 
 #define vgtif_reg(x) \

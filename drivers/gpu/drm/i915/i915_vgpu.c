@@ -66,7 +66,7 @@ void i915_check_vgpu(struct drm_i915_private *dev_priv)
 
 	BUILD_BUG_ON(sizeof(struct vgt_if) != VGT_PVINFO_SIZE);
 
-	dev_priv->vgpu.pv_caps = PVMMIO_ELSP_SUBMIT;
+	dev_priv->vgpu.pv_caps = PVMMIO_ELSP_SUBMIT | PVMMIO_MASTER_IRQ;
 
 	magic = __raw_i915_read64(dev_priv, vgtif_reg(magic));
 	if (magic != VGT_MAGIC)

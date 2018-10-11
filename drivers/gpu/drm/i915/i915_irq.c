@@ -2901,7 +2901,10 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 	if (!master_ctl)
 		return IRQ_NONE;
 
-	I915_WRITE_FW(GEN8_MASTER_IRQ, 0);
+	if (PVMMIO_LEVEL_ENABLE(dev_priv, PVMMIO_MASTER_IRQ))
+		dev_priv->vgpu.shared_page->disable_irq = 1;
+	else
+		I915_WRITE_FW(GEN8_MASTER_IRQ, 0);
 
 	/* Find, clear, then process each source of interrupt */
 	gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
@@ -2913,7 +2916,12 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 		enable_rpm_wakeref_asserts(dev_priv);
 	}
 
-	I915_WRITE_FW(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
+	if (PVMMIO_LEVEL_ENABLE(dev_priv, PVMMIO_MASTER_IRQ)) {
+		dev_priv->vgpu.shared_page->disable_irq = 0;
+		__raw_i915_write32(dev_priv, vgtif_reg(check_pending_irq), 1);
+	} else {
+		I915_WRITE_FW(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
+	}
 
 	gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
@@ -3598,8 +3606,12 @@ static void gen8_irq_reset(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int pipe;
 
-	I915_WRITE(GEN8_MASTER_IRQ, 0);
-	POSTING_READ(GEN8_MASTER_IRQ);
+	if (PVMMIO_LEVEL_ENABLE(dev_priv, PVMMIO_MASTER_IRQ)) {
+		dev_priv->vgpu.shared_page->disable_irq = 1;
+	} else {
+		I915_WRITE(GEN8_MASTER_IRQ, 0);
+		POSTING_READ(GEN8_MASTER_IRQ);
+	}
 
 	gen8_gt_irq_reset(dev_priv);
 
@@ -4244,8 +4256,13 @@ static int gen8_irq_postinstall(struct drm_device *dev)
 	if (HAS_PCH_SPLIT(dev_priv))
 		ibx_irq_postinstall(dev);
 
-	I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
-	POSTING_READ(GEN8_MASTER_IRQ);
+	if (PVMMIO_LEVEL_ENABLE(dev_priv, PVMMIO_MASTER_IRQ)) {
+		dev_priv->vgpu.shared_page->disable_irq = 0;
+		__raw_i915_write32(dev_priv, vgtif_reg(check_pending_irq), 1);
+	} else {
+		I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
+		POSTING_READ(GEN8_MASTER_IRQ);
+	}
 
 	return 0;
 }
