@@ -268,6 +268,20 @@ __visible inline void syscall_return_slowpath(struct pt_regs *regs)
 	prepare_exit_to_usermode(regs);
 }
 
+__visible inline void l1_cache_flush(struct pt_regs *regs)
+{
+	if (IS_ENABLED(CONFIG_SYSCALL_FLUSH) &&
+	    static_cpu_has(X86_FEATURE_FLUSH_L1D)) {
+		if (regs->ax == 0 || regs->ax == -EAGAIN ||
+		    regs->ax == -EEXIST || regs->ax == -ENOENT ||
+		    regs->ax == -EXDEV || regs->ax == -ETIMEDOUT ||
+		    regs->ax == -ENOTCONN || regs->ax == -EINPROGRESS)
+			return;
+
+		wrmsrl(MSR_IA32_FLUSH_CMD, L1D_FLUSH);
+	}
+}
+
 #ifdef CONFIG_X86_64
 __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 {
@@ -289,6 +303,8 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 		nr = array_index_nospec(nr, NR_syscalls);
 		regs->ax = sys_call_table[nr](regs);
 	}
+
+	l1_cache_flush(regs);
 
 	syscall_return_slowpath(regs);
 }
@@ -337,6 +353,8 @@ static __always_inline void do_syscall_32_irqs_on(struct pt_regs *regs)
 			(unsigned int)regs->di, (unsigned int)regs->bp);
 #endif /* CONFIG_IA32_EMULATION */
 	}
+
+	l1_cache_flush(regs);
 
 	syscall_return_slowpath(regs);
 }

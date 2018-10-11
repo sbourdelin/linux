@@ -447,6 +447,15 @@ config RETPOLINE
 	  code are eliminated. Since this includes the syscall entry path,
 	  it is not entirely pointless.
 
+config SYSCALL_FLUSH
+	bool "Clear L1 Cache on syscall errors"
+	default n
+	help
+	  Selecting 'y' allows the L1 cache to be cleared upon return of
+	  an error code from a syscall if the CPU supports "flush_l1d".
+	  This may reduce the likelyhood of speculative execution style
+	  attacks on syscalls.
+
 config INTEL_RDT
 	bool "Intel Resource Director Technology support"
 	default n
