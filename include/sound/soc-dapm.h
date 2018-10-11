@@ -275,7 +275,12 @@ struct device;
 
 #define SND_SOC_DAPM_RATE(wname, wreg, wshift, winvert, wops, wpriv) \
 {	.id = snd_soc_dapm_rate, .name = wname, \
-	SND_SOC_DAPM_INIT_REG_VAL(wreg, wshift, winvert) }
+	SND_SOC_DAPM_INIT_REG_VAL(wreg, wshift, winvert), \
+	.event = snd_soc_domain_event, \
+	.event_flags = SND_SOC_DAPM_WILL_PMU | SND_SOC_DAPM_PRE_PMU | \
+		       SND_SOC_DAPM_POST_PMD, \
+	.priv = (&(struct snd_soc_domain_group_driver){ \
+	.name = wname, .ops = wops, .private_data = wpriv}),}
 
 
 /* dapm kcontrol types */
@@ -409,6 +414,9 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 				 struct snd_soc_dai *dai);
 int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card);
 void snd_soc_dapm_connect_dai_link_widgets(struct snd_soc_card *card);
+
+int snd_soc_dapm_connect_domains(struct snd_soc_dapm_context *dapm,
+				 const char * const a, const char * const b);
 
 /* dapm path setup */
 int snd_soc_dapm_new_widgets(struct snd_soc_card *card);
@@ -629,6 +637,8 @@ struct snd_soc_dapm_widget {
 	int endpoints[2];
 
 	struct clk *clk;
+
+	struct snd_soc_domain_group *dgroup;
 };
 
 struct snd_soc_dapm_update {

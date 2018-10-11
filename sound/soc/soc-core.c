@@ -1345,6 +1345,13 @@ static int soc_probe_component(struct snd_soc_card *card,
 		}
 	}
 
+	ret = devm_snd_soc_domain_init(component);
+	if (ret < 0) {
+		dev_err(component->dev, "Failed to initialise domains: %d\n",
+			ret);
+		goto err_probe;
+	}
+
 	if (component->driver->controls)
 		snd_soc_add_component_controls(component,
 					       component->driver->controls,
@@ -2739,6 +2746,7 @@ int snd_soc_register_card(struct snd_soc_card *card)
 	card->instantiated = 0;
 	mutex_init(&card->mutex);
 	mutex_init(&card->dapm_mutex);
+	mutex_init(&card->domain_mutex);
 
 	return snd_soc_bind_card(card);
 }

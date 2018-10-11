@@ -2179,6 +2179,9 @@ static void soc_dapm_connect_path(struct snd_soc_dapm_path *path,
 	if (path->connect == connect)
 		return;
 
+	/* TODO: Need to handle routes that are already connected */
+	snd_soc_domain_connect_widgets(path->source, path->sink, connect);
+
 	path->connect = connect;
 	dapm_mark_dirty(path->source, reason);
 	dapm_mark_dirty(path->sink, reason);
@@ -2684,6 +2687,14 @@ static int snd_soc_dapm_add_path(struct snd_soc_dapm_context *dapm,
 
 	if (wsource->is_supply || wsink->is_supply)
 		path->is_supply = 1;
+
+	switch (wsource->id) {
+	case snd_soc_dapm_rate:
+		wsink->dgroup = wsource->dgroup;
+		break;
+	default:
+		break;
+	}
 
 	/* connect static paths */
 	if (control == NULL) {
@@ -3460,6 +3471,14 @@ snd_soc_dapm_new_control_unlocked(struct snd_soc_dapm_context *dapm,
 		w->clk = devm_clk_get(dapm->dev, w->name);
 		if (IS_ERR(w->clk)) {
 			ret = PTR_ERR(w->clk);
+			goto request_failed;
+		}
+		break;
+	case snd_soc_dapm_rate:
+		w->dgroup = devm_snd_soc_domain_group_new(dapm->component,
+							  w->priv);
+		if (IS_ERR(w->dgroup)) {
+			ret = PTR_ERR(w->dgroup);
 			goto request_failed;
 		}
 		break;
@@ -4565,6 +4584,22 @@ void snd_soc_dapm_shutdown(struct snd_soc_card *card)
 		snd_soc_dapm_set_bias_level(&card->dapm,
 					    SND_SOC_BIAS_OFF);
 }
+
+int snd_soc_dapm_connect_domains(struct snd_soc_dapm_context *dapm,
+				 const char * const a, const char * const b)
+{
+	struct snd_soc_dapm_widget *wa, *wb;
+
+	wa = dapm_find_widget(dapm, a, false);
+	if (!wa)
+		return -ENODEV;
+	wb = dapm_find_widget(dapm, b, false);
+	if (!wb)
+		return -ENODEV;
+
+	return snd_soc_domain_connect_widgets(wa, wb, true);
+}
+EXPORT_SYMBOL_GPL(snd_soc_dapm_connect_domains);
 
 /* Module information */
 MODULE_AUTHOR("Liam Girdwood, lrg@slimlogic.co.uk");

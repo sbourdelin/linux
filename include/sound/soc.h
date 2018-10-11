@@ -413,6 +413,7 @@ struct snd_soc_jack_pin;
 #include <sound/soc-dapm.h>
 #include <sound/soc-dpcm.h>
 #include <sound/soc-topology.h>
+#include <sound/soc-domain.h>
 
 struct snd_soc_jack_gpio;
 
@@ -763,6 +764,9 @@ struct snd_soc_component_driver {
 	const struct snd_soc_dapm_route *dapm_routes;
 	unsigned int num_dapm_routes;
 
+	const struct snd_soc_domain_driver *domains;
+	unsigned int num_domains;
+
 	int (*probe)(struct snd_soc_component *);
 	void (*remove)(struct snd_soc_component *);
 	int (*suspend)(struct snd_soc_component *);
@@ -837,6 +841,9 @@ struct snd_soc_component {
 
 	struct list_head dai_list;
 	int num_dai;
+
+	struct snd_soc_domain *domains;
+	int num_domains;
 
 	struct regmap *regmap;
 	int val_bytes;
@@ -1036,6 +1043,7 @@ struct snd_soc_card {
 
 	struct mutex mutex;
 	struct mutex dapm_mutex;
+	struct mutex domain_mutex;
 
 	bool instantiated;
 	bool topology_shortname_created;
