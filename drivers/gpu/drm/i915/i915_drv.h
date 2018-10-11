@@ -56,6 +56,7 @@
 
 #include "i915_params.h"
 #include "i915_reg.h"
+#include "i915_pvinfo.h"
 #include "i915_utils.h"
 
 #include "intel_bios.h"
@@ -1340,6 +1341,7 @@ struct i915_workarounds {
 struct i915_virtual_gpu {
 	bool active;
 	u32 caps;
+	u32 pv_caps;
 };
 
 /* used in computing the new watermarks state */
@@ -2844,6 +2846,11 @@ static inline bool intel_vgpu_active(struct drm_i915_private *dev_priv)
 	return dev_priv->vgpu.active;
 }
 
+static inline bool intel_vgpu_has_pvmmio(struct drm_i915_private *dev_priv)
+{
+	return dev_priv->vgpu.caps & VGT_CAPS_PVMMIO;
+}
+
 u32 i915_pipestat_enable_mask(struct drm_i915_private *dev_priv,
 			      enum pipe pipe);
 void
@@ -3870,5 +3877,9 @@ static inline int intel_hws_csb_write_index(struct drm_i915_private *i915)
 	else
 		return I915_HWS_CSB_WRITE_INDEX;
 }
+
+#define PVMMIO_LEVEL_ENABLE(dev_priv, level)	\
+	(intel_vgpu_active(dev_priv) && intel_vgpu_has_pvmmio(dev_priv) \
+			&& (dev_priv->vgpu.pv_caps & level))
 
 #endif
