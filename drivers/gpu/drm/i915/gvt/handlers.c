@@ -1241,6 +1241,16 @@ static int pvinfo_mmio_write(struct intel_vgpu *vgpu, unsigned int offset,
 	case _vgtif_reg(g2v_notify):
 		ret = handle_g2v_notification(vgpu, data);
 		break;
+	case _vgtif_reg(enable_pvmmio):
+		if (vgpu->gvt->dev_priv->vgpu.pv_caps) {
+			vgpu_vreg(vgpu, offset) = data &
+				vgpu->gvt->dev_priv->vgpu.pv_caps;
+			DRM_INFO("vgpu id=%d pvmmio=0x%x\n",
+				vgpu->id, VGPU_PVMMIO(vgpu));
+		} else {
+			vgpu_vreg(vgpu, offset) = 0;
+		}
+		break;
 	/* add xhot and yhot to handled list to avoid error log */
 	case _vgtif_reg(cursor_x_hot):
 	case _vgtif_reg(cursor_y_hot):
