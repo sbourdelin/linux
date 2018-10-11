@@ -68,6 +68,7 @@ static int dapm_up_seq[] = {
 	[snd_soc_dapm_regulator_supply] = 1,
 	[snd_soc_dapm_pinctrl] = 1,
 	[snd_soc_dapm_clock_supply] = 1,
+	[snd_soc_dapm_rate] = 2,
 	[snd_soc_dapm_supply] = 2,
 	[snd_soc_dapm_micbias] = 3,
 	[snd_soc_dapm_dai_link] = 2,
@@ -115,6 +116,7 @@ static int dapm_down_seq[] = {
 	[snd_soc_dapm_dai_out] = 10,
 	[snd_soc_dapm_dai_link] = 11,
 	[snd_soc_dapm_supply] = 12,
+	[snd_soc_dapm_rate] = 12,
 	[snd_soc_dapm_clock_supply] = 13,
 	[snd_soc_dapm_pinctrl] = 13,
 	[snd_soc_dapm_regulator_supply] = 13,
@@ -1912,6 +1914,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 			case snd_soc_dapm_vmid:
 				break;
 			case snd_soc_dapm_supply:
+			case snd_soc_dapm_rate:
 			case snd_soc_dapm_regulator_supply:
 			case snd_soc_dapm_pinctrl:
 			case snd_soc_dapm_clock_supply:
@@ -2326,6 +2329,7 @@ static ssize_t dapm_widget_show_component(struct snd_soc_component *cmpnt,
 		case snd_soc_dapm_mixer:
 		case snd_soc_dapm_mixer_named_ctl:
 		case snd_soc_dapm_supply:
+		case snd_soc_dapm_rate:
 		case snd_soc_dapm_regulator_supply:
 		case snd_soc_dapm_pinctrl:
 		case snd_soc_dapm_clock_supply:
@@ -3522,6 +3526,7 @@ snd_soc_dapm_new_control_unlocked(struct snd_soc_dapm_context *dapm,
 		w->power_check = dapm_generic_check_power;
 		break;
 	case snd_soc_dapm_supply:
+	case snd_soc_dapm_rate:
 	case snd_soc_dapm_regulator_supply:
 	case snd_soc_dapm_pinctrl:
 	case snd_soc_dapm_clock_supply:
