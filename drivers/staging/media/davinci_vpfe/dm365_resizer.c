@@ -946,7 +946,7 @@ resizer_get_configuration(struct vpfe_resizer_device *resizer,
 	if (copy_to_user((void __user *)chan_config->config,
 			 (void *)&resizer->config.user_config,
 			 sizeof(struct vpfe_rsz_config_params))) {
-		dev_err(dev, "resizer_get_configuration: Error in copy to user\n");
+		dev_err(dev, "%s: Error in copy to user\n", __func__);
 		return -EFAULT;
 	}
 
