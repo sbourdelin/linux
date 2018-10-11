@@ -1532,6 +1532,14 @@ enum drm_i915_perf_property_id {
 	 */
 	DRM_I915_PERF_PROP_OA_EXPONENT,
 
+	/**
+	 * Specify a global OA buffer size to be allocated in bytes.
+	 * The driver will allocate a HW supported size that is at
+	 * least as large as specified by this property. Larger sizes
+	 * than what the HW supports will fail.
+	 */
+	DRM_I915_PERF_PROP_OA_BUFFER_SIZE,
+
 	DRM_I915_PERF_PROP_MAX /* non-ABI */
 };
 
