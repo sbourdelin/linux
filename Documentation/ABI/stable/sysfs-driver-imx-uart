@@ -1,0 +1,13 @@
+What:		/sys/class/tty/ttymxc*/dma_buffer_count
+Date:		October 2018
+Contact:	Fabien Lahoudere <fabien.lahoudere@collabora.com>
+Description:	imx serial use dma buffer for rx communication. The size of this
+		buffer is splited in several chunk. The number of chunk is
+		determined by the field rx_periods (in struct imx_uart). This
+		attribute allows to modify rx_periods.
+
+What:		/sys/class/tty/ttymxc*/dma_buffer_size
+Date:		October 2018
+Contact:	Fabien Lahoudere <fabien.lahoudere@collabora.com>
+Description:	Field rx_period_length (in struct imx_uart) allows us to
+		determine the size of each chunk of rx DMA buffer.

@@ -219,6 +219,8 @@ struct imx_port {
 	struct scatterlist	rx_sgl, tx_sgl[2];
 	void			*rx_buf;
 	struct circ_buf		rx_ring;
+	unsigned int		rx_buf_size;
+	unsigned int		rx_period_length;
 	unsigned int		rx_periods;
 	dma_cookie_t		rx_cookie;
 	unsigned int		tx_bytes;
@@ -1029,8 +1031,6 @@ static void imx_uart_timeout(struct timer_list *t)
 	}
 }
 
-#define RX_BUF_SIZE	(PAGE_SIZE)
-
 /*
  * There are two kinds of RX DMA interrupts(such as in the MX6Q):
  *   [1] the RX DMA buffer is full.
@@ -1125,9 +1125,8 @@ static int imx_uart_start_rx_dma(struct imx_port *sport)
 
 	sport->rx_ring.head = 0;
 	sport->rx_ring.tail = 0;
-	sport->rx_periods = RX_DMA_PERIODS;
 
-	sg_init_one(sgl, sport->rx_buf, RX_BUF_SIZE);
+	sg_init_one(sgl, sport->rx_buf, sport->rx_buf_size);
 	ret = dma_map_sg(dev, sgl, 1, DMA_FROM_DEVICE);
 	if (ret == 0) {
 		dev_err(dev, "DMA mapping error for RX.\n");
@@ -1245,7 +1244,8 @@ static int imx_uart_dma_init(struct imx_port *sport)
 		goto err;
 	}
 
-	sport->rx_buf = kzalloc(RX_BUF_SIZE, GFP_KERNEL);
+	sport->rx_buf_size = sport->rx_period_length * sport->rx_periods;
+	sport->rx_buf = kzalloc(sport->rx_buf_size, GFP_KERNEL);
 	if (!sport->rx_buf) {
 		ret = -ENOMEM;
 		goto err;
@@ -1705,6 +1705,82 @@ static const char *imx_uart_type(struct uart_port *port)
 
 	return sport->port.type == PORT_IMX ? "IMX" : NULL;
 }
+
+
+static ssize_t dma_buffer_size_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	unsigned int plen;
+	int ret;
+	struct device *port_device = dev->parent;
+	struct imx_port *sport = dev_get_drvdata(port_device);
+
+	if (sport->dma_chan_rx) {
+		dev_warn(dev, "DMA channel is not initialized\n");
+		return -EBUSY;
+	}
+	ret = kstrtou32(buf, 0, &plen);
+	if (ret == 0) {
+		sport->rx_period_length = plen;
+		ret = count;
+	}
+	return ret;
+}
+
+static ssize_t dma_buffer_size_show(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct device *port_device = dev->parent;
+	struct imx_port *sport = dev_get_drvdata(port_device);
+
+	return sprintf(buf, "%u\n", sport->rx_period_length);
+}
+
+static DEVICE_ATTR_RW(dma_buffer_size);
+
+static ssize_t dma_buffer_count_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	unsigned int periods;
+	int ret;
+	struct device *port_device = dev->parent;
+	struct imx_port *sport = dev_get_drvdata(port_device);
+
+	if (sport->dma_chan_rx) {
+		dev_warn(dev, "DMA channel is not initialized\n");
+		return -EBUSY;
+	}
+	ret = kstrtou32(buf, 0, &periods);
+	if (ret == 0) {
+		sport->rx_periods = periods;
+		ret = count;
+	}
+	return ret;
+}
+
+static ssize_t dma_buffer_count_show(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct device *port_device = dev->parent;
+	struct imx_port *sport = dev_get_drvdata(port_device);
+
+	return sprintf(buf, "%u\n", sport->rx_periods);
+}
+
+static DEVICE_ATTR_RW(dma_buffer_count);
+
+static struct attribute *imx_uart_attrs[] = {
+	&dev_attr_dma_buffer_size.attr,
+	&dev_attr_dma_buffer_count.attr,
+	NULL
+};
+static struct attribute_group imx_uart_attr_group = {
+	.attrs = imx_uart_attrs,
+};
 
 /*
  * Configure/autoconfigure the port.
@@ -2237,6 +2313,9 @@ static int imx_uart_probe(struct platform_device *pdev)
 	sport->port.rs485_config = imx_uart_rs485_config;
 	sport->port.flags = UPF_BOOT_AUTOCONF;
 	timer_setup(&sport->timer, imx_uart_timeout, 0);
+	sport->rx_period_length = PAGE_SIZE / RX_DMA_PERIODS;
+	sport->rx_periods = RX_DMA_PERIODS;
+	sport->port.attr_group = &imx_uart_attr_group;
 
 	sport->gpios = mctrl_gpio_init(&sport->port, 0);
 	if (IS_ERR(sport->gpios))
