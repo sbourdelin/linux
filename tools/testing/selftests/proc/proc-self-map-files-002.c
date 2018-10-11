@@ -55,7 +55,9 @@ int main(void)
 	if (fd == -1)
 		return 1;
 
-	p = mmap(NULL, PAGE_SIZE, PROT_NONE, MAP_PRIVATE|MAP_FILE|MAP_FIXED, fd, 0);
+	p = mmap((void *) (2 * PAGE_SIZE), PAGE_SIZE, PROT_NONE,
+			MAP_PRIVATE|MAP_FILE|MAP_FIXED, fd, 0);
+
 	if (p == MAP_FAILED) {
 		if (errno == EPERM)
 			return 2;
