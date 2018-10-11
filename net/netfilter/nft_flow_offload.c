@@ -54,8 +54,6 @@ static bool nft_flow_offload_skip(struct sk_buff *skb)
 
 	if (unlikely(opt->optlen))
 		return true;
-	if (skb_sec_path(skb))
-		return true;
 
 	return false;
 }
