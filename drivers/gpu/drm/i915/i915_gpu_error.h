@@ -342,6 +342,7 @@ static inline void i915_gpu_state_put(struct i915_gpu_state *gpu)
 
 struct i915_gpu_state *i915_first_error_state(struct drm_i915_private *i915);
 void i915_reset_error_state(struct drm_i915_private *i915);
+void i915_disable_error_state(struct drm_i915_private *i915, int err);
 
 #else
 
@@ -354,10 +355,15 @@ static inline void i915_capture_error_state(struct drm_i915_private *dev_priv,
 static inline struct i915_gpu_state *
 i915_first_error_state(struct drm_i915_private *i915)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 
 static inline void i915_reset_error_state(struct drm_i915_private *i915)
+{
+}
+
+static inline void i915_disable_error_state(struct drm_i915_private *i915,
+					    int err)
 {
 }
 
