@@ -451,6 +451,11 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 	struct intel_engine_execlists *execlists = &engine->execlists;
 	struct execlist_port *port = execlists->port;
 	unsigned int n;
+	u32 __iomem *elsp =
+		engine->i915->regs + i915_mmio_reg_offset(RING_ELSP(engine));
+	u32 *elsp_data;
+	u32 descs[4];
+	int i = 0;
 
 	/*
 	 * We can skip acquiring intel_runtime_pm_get() here as it was taken
@@ -493,8 +498,24 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 			GEM_BUG_ON(!n);
 			desc = 0;
 		}
+		if (PVMMIO_LEVEL_ENABLE(engine->i915, PVMMIO_ELSP_SUBMIT)) {
+			GEM_BUG_ON(i >= 4);
+			descs[i] = upper_32_bits(desc);
+			descs[i + 1] = lower_32_bits(desc);
+			i += 2;
+		} else {
+			write_desc(execlists, desc, n);
+		}
+	}
 
-		write_desc(execlists, desc, n);
+	if (PVMMIO_LEVEL_ENABLE(engine->i915, PVMMIO_ELSP_SUBMIT)) {
+		spin_lock(&engine->i915->vgpu.shared_page_lock);
+		elsp_data = engine->i915->vgpu.shared_page->elsp_data;
+		*elsp_data = descs[0];
+		*(elsp_data + 1) = descs[1];
+		*(elsp_data + 2) = descs[2];
+		writel(descs[3], elsp);
+		spin_unlock(&engine->i915->vgpu.shared_page_lock);
 	}
 
 	/* we need to manually load the submit queue */
@@ -537,10 +558,24 @@ static void inject_preempt_context(struct intel_engine_cs *engine)
 	struct intel_engine_execlists *execlists = &engine->execlists;
 	struct intel_context *ce =
 		to_intel_context(engine->i915->preempt_context, engine);
+	u32 __iomem *elsp =
+		engine->i915->regs + i915_mmio_reg_offset(RING_ELSP(engine));
+	u32 *elsp_data;
 	unsigned int n;
 
 	GEM_BUG_ON(execlists->preempt_complete_status !=
 		   upper_32_bits(ce->lrc_desc));
+
+	if (PVMMIO_LEVEL_ENABLE(engine->i915, PVMMIO_ELSP_SUBMIT)) {
+		spin_lock(&engine->i915->vgpu.shared_page_lock);
+		elsp_data = engine->i915->vgpu.shared_page->elsp_data;
+		*elsp_data = 0;
+		*(elsp_data + 1) = 0;
+		*(elsp_data + 2) = upper_32_bits(ce->lrc_desc);
+		writel(lower_32_bits(ce->lrc_desc), elsp);
+		spin_unlock(&engine->i915->vgpu.shared_page_lock);
+		return;
+	}
 
 	/*
 	 * Switch to our empty preempt context so
