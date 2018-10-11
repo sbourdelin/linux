@@ -304,7 +304,12 @@ static int fpu_emu(struct fpu_struct *fpu_reg, unsigned long insn)
 	/*
 	 * If an exception is required, generate a tidy SIGFPE exception.
 	 */
+#if IS_ENABLED(CONFIG_SUPPORT_DENORMAL_ARITHMETIC)
+	if (((fpu_reg->fpcsr << 5) & fpu_reg->fpcsr & FPCSR_mskALLE_NO_UDFE) ||
+	    ((fpu_reg->fpcsr & FPCSR_mskUDF) && (fpu_reg->UDF_trap)))
+#else
 	if ((fpu_reg->fpcsr << 5) & fpu_reg->fpcsr & FPCSR_mskALLE)
+#endif
 		return SIGFPE;
 	return 0;
 }
@@ -316,7 +321,7 @@ int do_fpuemu(struct pt_regs *regs, struct fpu_struct *fpu)
 	unsigned long emulpc, contpc;
 	unsigned char *pc = (void *)&insn;
 	char c;
-	int i = 0;
+	int i = 0, ret;
 
 	for (i = 0; i < 4; i++) {
 		if (__get_user(c, (unsigned char *)addr++))
@@ -329,33 +334,24 @@ int do_fpuemu(struct pt_regs *regs, struct fpu_struct *fpu)
 	emulpc = regs->ipc;
 	contpc = regs->ipc + 4;
 
-	switch (NDS32Insn_OPCODE(insn)) {
-	case cop0_op:
-		switch (NDS32Insn_OPCODE_COP0(insn)) {
-
-		case fs1_op:
-		case fs2_op:
-		case fd1_op:
-		case fd2_op:
-			{
-				/* Do fpu emulation */
-				int sig = fpu_emu(fpu, insn);
-
-				if (sig)
-					return sig;
-			}
-			break;
-
-		default:
-			return SIGILL;
+	if (NDS32Insn_OPCODE(insn) != cop0_op)
+		return SIGILL;
+	switch (NDS32Insn_OPCODE_COP0(insn)) {
+	case fs1_op:
+	case fs2_op:
+	case fd1_op:
+	case fd2_op:
+		{
+			/* a real fpu computation instruction */
+			ret = fpu_emu(fpu, insn);
+			if (!ret)
+				regs->ipc = contpc;
 		}
 		break;
+
 	default:
 		return SIGILL;
 	}
 
-	/* we did it !! */
-	regs->ipc = contpc;
-
-	return 0;
+	return ret;
 }
