@@ -135,6 +135,7 @@ enum intel_gvt_mm_type {
 
 struct intel_vgpu_mm {
 	enum intel_gvt_mm_type type;
+	struct i915_hw_ppgtt *ppgtt;
 	struct intel_vgpu *vgpu;
 
 	struct kref ref;
@@ -272,4 +273,12 @@ int intel_vgpu_emulate_ggtt_mmio_read(struct intel_vgpu *vgpu,
 int intel_vgpu_emulate_ggtt_mmio_write(struct intel_vgpu *vgpu,
 	unsigned int off, void *p_data, unsigned int bytes);
 
+int intel_vgpu_g2v_pv_ppgtt_alloc_4lvl(struct intel_vgpu *vgpu,
+		u64 pdps[]);
+
+int intel_vgpu_g2v_pv_ppgtt_clear_4lvl(struct intel_vgpu *vgpu,
+		u64 pdps[]);
+
+int intel_vgpu_g2v_pv_ppgtt_insert_4lvl(struct intel_vgpu *vgpu,
+		u64 pdps[]);
 #endif /* _GVT_GTT_H_ */

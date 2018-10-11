@@ -1185,7 +1185,7 @@ static int handle_g2v_notification(struct intel_vgpu *vgpu, int notification)
 	intel_gvt_gtt_type_t root_entry_type = GTT_TYPE_PPGTT_ROOT_L4_ENTRY;
 	struct intel_vgpu_mm *mm;
 	u64 *pdps;
-
+	int ret = 0;
 	pdps = (u64 *)&vgpu_vreg64_t(vgpu, vgtif_reg(pdp[0]));
 
 	switch (notification) {
@@ -1198,6 +1198,15 @@ static int handle_g2v_notification(struct intel_vgpu *vgpu, int notification)
 	case VGT_G2V_PPGTT_L3_PAGE_TABLE_DESTROY:
 	case VGT_G2V_PPGTT_L4_PAGE_TABLE_DESTROY:
 		return intel_vgpu_put_ppgtt_mm(vgpu, pdps);
+	case VGT_G2V_PPGTT_L4_ALLOC:
+		ret = intel_vgpu_g2v_pv_ppgtt_alloc_4lvl(vgpu, pdps);
+			break;
+	case VGT_G2V_PPGTT_L4_INSERT:
+		ret = intel_vgpu_g2v_pv_ppgtt_insert_4lvl(vgpu, pdps);
+		break;
+	case VGT_G2V_PPGTT_L4_CLEAR:
+		ret = intel_vgpu_g2v_pv_ppgtt_clear_4lvl(vgpu, pdps);
+		break;
 	case VGT_G2V_EXECLIST_CONTEXT_CREATE:
 	case VGT_G2V_EXECLIST_CONTEXT_DESTROY:
 	case 1:	/* Remove this in guest driver. */
@@ -1205,7 +1214,7 @@ static int handle_g2v_notification(struct intel_vgpu *vgpu, int notification)
 	default:
 		gvt_vgpu_err("Invalid PV notification %d\n", notification);
 	}
-	return 0;
+	return ret;
 }
 
 static int send_display_ready_uevent(struct intel_vgpu *vgpu, int ready)
