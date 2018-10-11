@@ -591,3 +591,17 @@ void intel_gvt_reset_vgpu(struct intel_vgpu *vgpu)
 	intel_gvt_reset_vgpu_locked(vgpu, true, 0);
 	mutex_unlock(&vgpu->vgpu_lock);
 }
+
+/**
+ * intel_gvt_read_shared_page - read content from shared page
+ */
+void intel_gvt_read_shared_page(struct intel_vgpu *vgpu,
+		unsigned int offset, void *buf, unsigned long len)
+{
+	int ret = 0;
+	unsigned long gpa = vgpu->shared_page_gpa + offset;
+
+	ret = intel_gvt_hypervisor_read_gpa(vgpu, gpa, buf, len);
+	if (ret)
+		gvt_vgpu_err("read shared page (offset %x) failed", offset);
+}

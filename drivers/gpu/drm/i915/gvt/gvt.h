@@ -232,6 +232,7 @@ struct intel_vgpu {
 	struct completion vblank_done;
 
 	u32 scan_nonprivbb;
+	u64 shared_page_gpa;
 };
 
 /* validating GM healthy status*/
@@ -690,7 +691,8 @@ int intel_gvt_debugfs_add_vgpu(struct intel_vgpu *vgpu);
 void intel_gvt_debugfs_remove_vgpu(struct intel_vgpu *vgpu);
 int intel_gvt_debugfs_init(struct intel_gvt *gvt);
 void intel_gvt_debugfs_clean(struct intel_gvt *gvt);
-
+void intel_gvt_read_shared_page(struct intel_vgpu *vgpu,
+		unsigned int offset, void *buf, unsigned long len);
 
 #include "trace.h"
 #include "mpt.h"

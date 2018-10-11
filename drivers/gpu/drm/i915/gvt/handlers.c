@@ -1251,6 +1251,11 @@ static int pvinfo_mmio_write(struct intel_vgpu *vgpu, unsigned int offset,
 			vgpu_vreg(vgpu, offset) = 0;
 		}
 		break;
+	case _vgtif_reg(shared_page_gpa.lo):
+	case _vgtif_reg(shared_page_gpa.hi):
+		vgpu->shared_page_gpa = vgpu_vreg64_t(vgpu,
+			vgtif_reg(shared_page_gpa));
+		break;
 	/* add xhot and yhot to handled list to avoid error log */
 	case _vgtif_reg(cursor_x_hot):
 	case _vgtif_reg(cursor_y_hot):
