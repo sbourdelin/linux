@@ -59,19 +59,16 @@ static DEFINE_PER_CPU_ALIGNED(struct cyc2ns, cyc2ns);
 
 void cyc2ns_read_begin(struct cyc2ns_data *data)
 {
-	int seq, idx;
+	const struct cyc2ns *c2n;
+	int seq;
 
 	preempt_disable_notrace();
 
+	c2n = this_cpu_ptr(&cyc2ns);
 	do {
-		seq = this_cpu_read(cyc2ns.seq.sequence);
-		idx = seq & 1;
-
-		data->cyc2ns_offset = this_cpu_read(cyc2ns.data[idx].cyc2ns_offset);
-		data->cyc2ns_mul    = this_cpu_read(cyc2ns.data[idx].cyc2ns_mul);
-		data->cyc2ns_shift  = this_cpu_read(cyc2ns.data[idx].cyc2ns_shift);
-
-	} while (unlikely(seq != this_cpu_read(cyc2ns.seq.sequence)));
+		seq = raw_read_seqcount_latch(&c2n->seq);
+		*data = c2n->data[seq & 1];
+	} while (read_seqcount_retry(&c2n->seq, seq));
 }
 
 void cyc2ns_read_end(void)
