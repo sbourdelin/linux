@@ -1,0 +1,55 @@
+#!/bin/sh
+# description: event trigger - test inter-event histogram trigger snapshot action
+
+do_reset() {
+    reset_trigger
+    echo > set_event
+    echo 0 > snapshot
+    clear_trace
+}
+
+fail() { #msg
+    do_reset
+    echo $1
+    exit_fail
+}
+
+if [ ! -f set_event ]; then
+    echo "event tracing is not supported"
+    exit_unsupported
+fi
+
+if [ ! -f snapshot ]; then
+    echo "snapshot is not supported"
+    exit_unsupported
+fi
+
+grep "onchange(var)" README > /dev/null || exit_unsupported # version issue
+
+grep "snapshot()" README > /dev/null || exit_unsupported # version issue
+
+reset_tracer
+do_reset
+
+echo "Test snapshot action"
+
+echo 1 > /sys/kernel/debug/tracing/events/sched/enable
+
+echo 'hist:keys=comm:newprio=prio:onchange($newprio).save(comm,prio):onchange($newprio).snapshot() if comm=="ping"' >> /sys/kernel/debug/tracing/events/sched/sched_waking/trigger
+
+ping localhost -c 3
+nice -n 1 ping localhost -c 3
+
+echo 0 > /sys/kernel/debug/tracing/events/sched/enable
+
+if ! grep -q "changed:" events/sched/sched_waking/hist; then
+    fail "Failed to create onchange action inter-event histogram"
+fi
+
+if ! grep -q "comm=ping" snapshot; then
+    fail "Failed to create snapshot action inter-event histogram"
+fi
+
+do_reset
+
+exit 0
