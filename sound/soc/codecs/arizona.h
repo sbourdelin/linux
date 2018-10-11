@@ -63,6 +63,10 @@
 #define ARIZONA_MAX_ADSP 4
 
 #define ARIZONA_DVFS_SR1_RQ	0x001
+#define ARIZONA_DVFS_SR2_RQ	0x002
+#define ARIZONA_DVFS_SR3_RQ	0x004
+#define ARIZONA_DVFS_ASR1_RQ	0x008
+#define ARIZONA_DVFS_ASR2_RQ	0x010
 #define ARIZONA_DVFS_ADSP1_RQ	0x100
 
 /* Notifier events */
@@ -189,6 +193,26 @@ extern unsigned int arizona_mixer_values[ARIZONA_NUM_MIXER_INPUTS];
 	ARIZONA_MIXER_INPUT_ROUTES(name " Input 3"), \
 	ARIZONA_MIXER_INPUT_ROUTES(name " Input 4")
 
+#define ARIZONA_MUX_ROUTES_R(widget, name, rate) \
+	{ widget, NULL, name " Input" }, \
+	{ name " Input", NULL, rate }, \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Input")
+
+#define ARIZONA_MIXER_ROUTES_R(widget, name, rate) \
+	{ widget, NULL, name " Mixer" },         \
+	{ name " Mixer", NULL, name " Input 1" }, \
+	{ name " Mixer", NULL, name " Input 2" }, \
+	{ name " Mixer", NULL, name " Input 3" }, \
+	{ name " Mixer", NULL, name " Input 4" }, \
+	{ name " Input 1", NULL, rate }, \
+	{ name " Input 2", NULL, rate }, \
+	{ name " Input 3", NULL, rate }, \
+	{ name " Input 4", NULL, rate }, \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Input 1"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Input 2"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Input 3"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Input 4")
+
 #define ARIZONA_DSP_ROUTES(name) \
 	{ name, NULL, name " Preloader"}, \
 	{ name " Preloader", NULL, "SYSCLK" }, \
@@ -208,6 +232,32 @@ extern unsigned int arizona_mixer_values[ARIZONA_NUM_MIXER_INPUTS];
 	ARIZONA_MIXER_ROUTES(name, name "L"), \
 	ARIZONA_MIXER_ROUTES(name, name "R")
 
+#define ARIZONA_DSP_ROUTES_R(name, rate) \
+	{ name, NULL, rate }, \
+	{ name, NULL, name " Preloader"}, \
+	{ name " Preloader", NULL, "SYSCLK" }, \
+	{ name " Preload", NULL, name " Preloader"}, \
+	{ name, NULL, name " Aux 1" }, \
+	{ name, NULL, name " Aux 2" }, \
+	{ name, NULL, name " Aux 3" }, \
+	{ name, NULL, name " Aux 4" }, \
+	{ name, NULL, name " Aux 5" }, \
+	{ name, NULL, name " Aux 6" }, \
+	{ name " Aux 1", NULL, rate }, \
+	{ name " Aux 2", NULL, rate }, \
+	{ name " Aux 3", NULL, rate }, \
+	{ name " Aux 4", NULL, rate }, \
+	{ name " Aux 5", NULL, rate }, \
+	{ name " Aux 6", NULL, rate }, \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Aux 1"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Aux 2"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Aux 3"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Aux 4"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Aux 5"), \
+	ARIZONA_MIXER_INPUT_ROUTES(name " Aux 6"), \
+	ARIZONA_MIXER_ROUTES_R(name, name "L", rate), \
+	ARIZONA_MIXER_ROUTES_R(name, name "R", rate)
+
 #define ARIZONA_EQ_CONTROL(xname, xbase)                      \
 {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname,   \
 	.info = snd_soc_bytes_info, .get = snd_soc_bytes_get, \
@@ -222,7 +272,7 @@ extern unsigned int arizona_mixer_values[ARIZONA_NUM_MIXER_INPUTS];
 	((unsigned long)&(struct soc_bytes) { .base = xbase,  \
 	 .num_regs = 1 }) }
 
-#define ARIZONA_RATE_ENUM_SIZE 4
+#define ARIZONA_RATE_ENUM_SIZE 5
 #define ARIZONA_SAMPLE_RATE_ENUM_SIZE 14
 
 extern const char * const arizona_rate_text[ARIZONA_RATE_ENUM_SIZE];
@@ -353,5 +403,29 @@ static inline int arizona_unregister_notifier(struct snd_soc_component *componen
 }
 
 int arizona_of_get_audio_pdata(struct arizona *arizona);
+
+struct arizona_rate_dom_priv {
+	unsigned int reg;
+	unsigned int val;
+	int dvfs_mask;
+};
+
+struct arizona_rate_grp_priv {
+	unsigned int reg;
+	unsigned int mask;
+	unsigned int shift;
+
+	bool sync;
+	bool async;
+};
+
+#define ARIZONA_RATE_WIDGET(rname, rsync, rasync, rreg, rmask) \
+	SND_SOC_DAPM_RATE(rname, SND_SOC_NOPM, 0, 0, &arizona_dgrp_ops, \
+		(&(struct arizona_rate_grp_priv){ .reg = rreg, \
+		.mask = rmask##_MASK, .shift = rmask##_SHIFT, \
+		.sync = rsync, .async = rasync}))
+
+extern const struct snd_soc_domain_group_ops arizona_dgrp_ops;
+extern const struct snd_soc_domain_driver arizona_rate_domains[ARIZONA_RATE_ENUM_SIZE];
 
 #endif

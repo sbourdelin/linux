@@ -633,12 +633,12 @@ const char *arizona_sample_rate_val_to_name(unsigned int rate_val)
 EXPORT_SYMBOL_GPL(arizona_sample_rate_val_to_name);
 
 const char * const arizona_rate_text[ARIZONA_RATE_ENUM_SIZE] = {
-	"SYNCCLK rate", "8kHz", "16kHz", "ASYNCCLK rate",
+	"SYNCCLK rate", "8kHz", "16kHz", "ASYNCCLK rate", "ASYNCCLK rate 2",
 };
 EXPORT_SYMBOL_GPL(arizona_rate_text);
 
 const unsigned int arizona_rate_val[ARIZONA_RATE_ENUM_SIZE] = {
-	0, 1, 2, 8,
+	0, 1, 2, 8, 9,
 };
 EXPORT_SYMBOL_GPL(arizona_rate_val);
 
@@ -1681,40 +1681,15 @@ static int arizona_hw_params_rate(struct snd_pcm_substream *substream,
 	struct snd_soc_component *component = dai->component;
 	struct arizona_priv *priv = snd_soc_component_get_drvdata(component);
 	struct arizona_dai_priv *dai_priv = &priv->dai[dai->id - 1];
-	int base = dai->driver->base;
-	int i, sr_val, ret;
+	int ret;
+	struct snd_soc_domain_group *dgrp;
 
-	/*
-	 * We will need to be more flexible than this in future,
-	 * currently we use a single sample rate for SYSCLK.
-	 */
-	for (i = 0; i < ARRAY_SIZE(arizona_sr_vals); i++)
-		if (arizona_sr_vals[i] == params_rate(params))
-			break;
-	if (i == ARRAY_SIZE(arizona_sr_vals)) {
-		arizona_aif_err(dai, "Unsupported sample rate %dHz\n",
-				params_rate(params));
-		return -EINVAL;
-	}
-	sr_val = i;
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		dgrp = dai->playback_widget->dgroup;
+	else
+		dgrp = dai->capture_widget->dgroup;
 
-	switch (priv->arizona->type) {
-	case WM5102:
-	case WM8997:
-		if (arizona_sr_vals[sr_val] >= 88200)
-			ret = arizona_dvfs_up(component, ARIZONA_DVFS_SR1_RQ);
-		else
-			ret = arizona_dvfs_down(component, ARIZONA_DVFS_SR1_RQ);
-
-		if (ret) {
-			arizona_aif_err(dai, "Failed to change DVFS %d\n", ret);
-			return ret;
-		}
-		break;
-	default:
-		break;
-	}
-
+	/* TODO: This should be handled on power up of the OUT_RATE widget */
 	switch (dai_priv->clk) {
 	case ARIZONA_CLK_SYSCLK:
 		switch (priv->arizona->type) {
@@ -1725,30 +1700,37 @@ static int arizona_hw_params_rate(struct snd_pcm_substream *substream,
 		default:
 			break;
 		}
-
-		snd_soc_component_update_bits(component, ARIZONA_SAMPLE_RATE_1,
-					      ARIZONA_SAMPLE_RATE_1_MASK,
-					      sr_val);
-		if (base)
-			snd_soc_component_update_bits(component,
-					base + ARIZONA_AIF_RATE_CTRL,
-					ARIZONA_AIF1_RATE_MASK, 0);
 		break;
 	case ARIZONA_CLK_ASYNCCLK:
-		snd_soc_component_update_bits(component,
-					      ARIZONA_ASYNC_SAMPLE_RATE_1,
-					      ARIZONA_ASYNC_SAMPLE_RATE_1_MASK,
-					      sr_val);
-		if (base)
-			snd_soc_component_update_bits(component,
-					base + ARIZONA_AIF_RATE_CTRL,
-					ARIZONA_AIF1_RATE_MASK,
-					8 << ARIZONA_AIF1_RATE_SHIFT);
 		break;
 	default:
 		arizona_aif_err(dai, "Invalid clock %d\n", dai_priv->clk);
 		return -EINVAL;
 	}
+
+	/* TODO: Needs updated to handle multiple calls of hw_params */
+	ret = snd_soc_domain_attach(dgrp);
+	if (ret)
+		return ret;
+
+	ret = snd_soc_domain_set_rate(dgrp, params_rate(params));
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int arizona_hw_free(struct snd_pcm_substream *substream,
+			   struct snd_soc_dai *dai)
+{
+	struct snd_soc_domain_group *dgrp;
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		dgrp = dai->playback_widget->dgroup;
+	else
+		dgrp = dai->capture_widget->dgroup;
+
+	snd_soc_domain_detach(dgrp);
 
 	return 0;
 }
@@ -2029,6 +2011,7 @@ const struct snd_soc_dai_ops arizona_dai_ops = {
 	.set_fmt = arizona_set_fmt,
 	.set_tdm_slot = arizona_set_tdm_slot,
 	.hw_params = arizona_hw_params,
+	.hw_free = arizona_hw_free,
 	.set_sysclk = arizona_dai_set_sysclk,
 	.set_tristate = arizona_set_tristate,
 };
@@ -2857,6 +2840,176 @@ int arizona_of_get_audio_pdata(struct arizona *arizona)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(arizona_of_get_audio_pdata);
+
+static int arizona_set_rate(struct snd_soc_domain *dom, int rate)
+{
+	struct snd_soc_component *component = dom->component;
+	struct arizona *arizona = dev_get_drvdata(component->dev->parent);
+	const struct arizona_rate_dom_priv *dpriv = dom->driver->private_data;
+	int i, ret;
+
+	dev_dbg(arizona->dev, "Set %s to %d Hz\n", dom->driver->name, rate);
+
+	switch (arizona->type) {
+	case WM5102:
+	case WM8997:
+		if (rate >= 88200)
+			ret = arizona_dvfs_up(component, dpriv->dvfs_mask);
+		else
+			ret = arizona_dvfs_down(component, dpriv->dvfs_mask);
+
+		if (ret) {
+			dev_err(arizona->dev,
+				"Failed to change DVFS for %s: %d\n",
+				dom->driver->name, ret);
+			return ret;
+		}
+		break;
+	default:
+		break;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(arizona_sr_vals); i++) {
+		if (arizona_sr_vals[i] == rate)
+			break;
+	}
+
+	if (i == ARRAY_SIZE(arizona_sr_vals)) {
+		dev_err(arizona->dev, "Invalid sample rate: %d Hz\n", rate);
+		return -EINVAL;
+	}
+
+	return regmap_update_bits(arizona->regmap, dpriv->reg,
+				  ARIZONA_SAMPLE_RATE_1_MASK, i);
+}
+
+static int arizona_get_rate(struct snd_soc_domain *dom)
+{
+	struct snd_soc_component *component = dom->component;
+	struct arizona *arizona = dev_get_drvdata(component->dev->parent);
+	const struct arizona_rate_dom_priv *dpriv = dom->driver->private_data;
+	unsigned int rate;
+	int ret;
+
+	ret = regmap_read(arizona->regmap, dpriv->reg, &rate);
+	if (ret)
+		return ret;
+
+	rate &= ARIZONA_SAMPLE_RATE_1_MASK;
+
+	if (rate >= ARRAY_SIZE(arizona_sr_vals)) {
+		dev_err(arizona->dev, "Read bad sample rate: 0x%x\n", rate);
+		return -EINVAL;
+	}
+
+	rate = arizona_sr_vals[rate];
+
+	dev_dbg(arizona->dev, "Got %u Hz for %s\n", rate, dom->driver->name);
+
+	return (int)rate;
+}
+
+static const struct snd_soc_domain_ops arizona_dom_ops = {
+	.set_rate = arizona_set_rate,
+	.get_rate = arizona_get_rate,
+};
+
+const struct snd_soc_domain_driver arizona_rate_domains[ARIZONA_RATE_ENUM_SIZE] = {
+	{
+		.name = "Sample Rate 1",
+		.ops = &arizona_dom_ops,
+		.private_data = &(struct arizona_rate_dom_priv){
+			.reg = ARIZONA_SAMPLE_RATE_1,
+			.val = 0,
+			.dvfs_mask = ARIZONA_DVFS_SR1_RQ,
+		},
+	},
+	{
+		.name = "Sample Rate 2",
+		.ops = &arizona_dom_ops,
+		.private_data = &(struct arizona_rate_dom_priv){
+			.reg = ARIZONA_SAMPLE_RATE_2,
+			.val = 1,
+			.dvfs_mask = ARIZONA_DVFS_SR2_RQ,
+		},
+	},
+	{
+		.name = "Sample Rate 3",
+		.ops = &arizona_dom_ops,
+		.private_data = &(struct arizona_rate_dom_priv){
+			.reg = ARIZONA_SAMPLE_RATE_3,
+			.val = 2,
+			.dvfs_mask = ARIZONA_DVFS_SR3_RQ,
+		},
+	},
+	{
+		.name = "Async Sample Rate 1",
+		.ops = &arizona_dom_ops,
+		.private_data = &(struct arizona_rate_dom_priv){
+			.reg = ARIZONA_ASYNC_SAMPLE_RATE_1,
+			.val = 8,
+			.dvfs_mask = ARIZONA_DVFS_ASR1_RQ,
+		},
+	},
+	{
+		.name = "Async Sample Rate 2",
+		.ops = &arizona_dom_ops,
+		.private_data = &(struct arizona_rate_dom_priv){
+			.reg = ARIZONA_ASYNC_SAMPLE_RATE_2,
+			.val = 9,
+			.dvfs_mask = ARIZONA_DVFS_ASR2_RQ,
+		},
+	},
+};
+
+int arizona_set_domain(struct snd_soc_domain_group *dgrp, int dom)
+{
+	struct arizona *arizona = dev_get_drvdata(dgrp->component->dev->parent);
+	const struct arizona_rate_grp_priv *gpriv = dgrp->driver->private_data;
+	const struct arizona_rate_dom_priv *dpriv = arizona_rate_domains[dom].private_data;
+
+	return regmap_update_bits(arizona->regmap, gpriv->reg, gpriv->mask,
+			dpriv->val << gpriv->shift);
+}
+
+int arizona_mask_domain(struct snd_soc_domain_group *dgrp, unsigned long *mask)
+{
+	const struct arizona_rate_grp_priv *gpriv = dgrp->driver->private_data;
+	struct snd_soc_component *component = dgrp->component;
+	struct arizona_priv *priv = snd_soc_component_get_drvdata(component);
+	unsigned long supported = 0;
+
+	switch (gpriv->reg) {
+	case ARIZONA_AIF1_RATE_CTRL:
+	case ARIZONA_AIF2_RATE_CTRL:
+	case ARIZONA_AIF3_RATE_CTRL:
+		switch (priv->dai[ARIZONA_AIF1_RATE_CTRL - gpriv->reg].clk) {
+		case ARIZONA_CLK_ASYNCCLK:
+			supported |= 0x18;
+			break;
+		default:
+			supported |= 0x7;
+			break;
+		}
+		break;
+	default:
+		if (gpriv->sync)
+			supported |= 0x7;
+		if (gpriv->async)
+			supported |= 0x18;
+		break;
+	}
+
+	*mask &= supported;
+
+	return 0;
+}
+
+const struct snd_soc_domain_group_ops arizona_dgrp_ops = {
+	.set_domain = arizona_set_domain,
+	.mask_domains = arizona_mask_domain,
+};
+EXPORT_SYMBOL_GPL(arizona_dgrp_ops);
 
 MODULE_DESCRIPTION("ASoC Wolfson Arizona class device support");
 MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
