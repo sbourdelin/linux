@@ -1383,8 +1383,10 @@ static int handle_command(struct controlvm_message inmsg, u64 channel_addr)
 	controlvm_init_response(&ackmsg, &inmsg.hdr, CONTROLVM_RESP_SUCCESS);
 	err = visorchannel_signalinsert(chipset_dev->controlvm_channel,
 					CONTROLVM_QUEUE_ACK, &ackmsg);
-	if (err)
+	if (err) {
+		kfree(parser_ctx);
 		return err;
+	}
 	switch (inmsg.hdr.id) {
 	case CONTROLVM_CHIPSET_INIT:
 		err = chipset_init(&inmsg);
