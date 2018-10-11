@@ -520,6 +520,7 @@ void stop_this_cpu(void *dummy)
 	 * Remove this CPU:
 	 */
 	set_cpu_online(smp_processor_id(), false);
+	set_cpu_active(smp_processor_id(), false);
 	disable_local_APIC();
 	mcheck_cpu_clear(this_cpu_ptr(&cpu_info));
 
