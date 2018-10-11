@@ -1316,12 +1316,6 @@ static void aer_enable_rootport(struct aer_rpc *rpc)
 	pci_read_config_dword(pdev, aer_pos + PCI_ERR_UNCOR_STATUS, &reg32);
 	pci_write_config_dword(pdev, aer_pos + PCI_ERR_UNCOR_STATUS, reg32);
 
-	/*
-	 * Enable error reporting for the root port device and downstream port
-	 * devices.
-	 */
-	set_downstream_devices_error_reporting(pdev, true);
-
 	/* Enable Root Port's interrupt in response to error messages */
 	pci_read_config_dword(pdev, aer_pos + PCI_ERR_ROOT_COMMAND, &reg32);
 	reg32 |= ROOT_PORT_INTR_ON_MESG_MASK;
@@ -1378,9 +1372,16 @@ static void aer_remove(struct pcie_device *dev)
  */
 static int aer_probe(struct pcie_device *dev)
 {
+	struct pci_dev *pdev = dev->port;
+	int type = pci_pcie_type(pdev);
 	int status;
 	struct aer_rpc *rpc;
 	struct device *device = &dev->device;
+
+	if (type == PCI_EXP_TYPE_UPSTREAM || type == PCI_EXP_TYPE_DOWNSTREAM) {
+		pci_enable_pcie_error_reporting(pdev);
+		return 0;
+	}
 
 	rpc = devm_kzalloc(device, sizeof(struct aer_rpc), GFP_KERNEL);
 	if (!rpc) {
@@ -1399,6 +1400,7 @@ static int aer_probe(struct pcie_device *dev)
 	}
 
 	aer_enable_rootport(rpc);
+	pci_enable_pcie_error_reporting(pdev);
 	dev_info(device, "AER enabled with IRQ %d\n", dev->irq);
 	return 0;
 }
@@ -1439,7 +1441,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
 
 static struct pcie_port_service_driver aerdriver = {
 	.name		= "aer",
-	.port_type	= PCI_EXP_TYPE_ROOT_PORT,
+	.port_type	= PCIE_ANY_PORT,
 	.service	= PCIE_PORT_SERVICE_AER,
 
 	.probe		= aer_probe,
