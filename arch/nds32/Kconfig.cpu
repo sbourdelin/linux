@@ -7,6 +7,28 @@ config CPU_LITTLE_ENDIAN
 	bool "Little endian"
 	default y
 
+config FPU
+	bool "FPU support"
+	default n
+	help
+	  If FPU ISA is used in user space, this configure shall be Y to make
+	  the fpu context switch and fpu exception handler is enabled in kernel.
+	  Lazy FPU is the default scheme for fpu context switch. If user wants
+	  to disable Lazy FPU scheme, please enable CONFIG_UNLAZY_FPU.
+
+	  If no FPU ISA is used in user space, say N.
+
+config UNLAZY_FPU
+	bool "Unlazy FPU support"
+	depends on FPU
+	default n
+	help
+	  Say Y here to disable lazy FPU scheme. Disable lazy FPU scheme causes
+	  some performance loss because the fpu register are loaded and stored
+	  in each context switch.
+
+	  For nomal case, say N.
+
 config HWZOL
 	bool "hardware zero overhead loop support"
 	depends on CPU_D10 || CPU_D15

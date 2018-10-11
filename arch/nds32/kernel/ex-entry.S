@@ -18,9 +18,18 @@
 
 	.macro	save_user_regs
 
+#if defined(CONFIG_FPU)
+	mfsr    $p0, $FUCOP_CTL
+	smw.adm $p0, [$sp], $p0, #0x1
+	bclr    $p0, $p0, #FUCOP_CTL_offCP0EN
+	mtsr    $p0, $FUCOP_CTL
+	/* move $SP to the bottom of pt_regs */
+	addi    $sp, $sp, -FUCOP_CTL_OFFSET
+#else
 	smw.adm $sp, [$sp], $sp, #0x1
 	/* move $SP to the bottom of pt_regs */
 	addi    $sp, $sp, -OSP_OFFSET
+#endif
 
 	/* push $r0 ~ $r25 */
 	smw.bim $r0, [$sp], $r25

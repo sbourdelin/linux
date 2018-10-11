@@ -16,6 +16,7 @@
 #include <asm/proc-fns.h>
 #include <asm/cache_info.h>
 #include <asm/elf.h>
+#include <asm/fpu.h>
 #include <nds32_intrinsic.h>
 
 #define HWCAP_MFUSR_PC		0x000001
@@ -136,6 +137,10 @@ static void __init dump_cpu_info(int cpu)
 		L1_cache_info[DCACHE].aliasing_mask =
 		    (aliasing_num - 1) << PAGE_SHIFT;
 	}
+#endif
+#ifdef CONFIG_FPU
+	/* Disable fpu and enable when it is used. */
+	disable_fpu();
 #endif
 }
 
