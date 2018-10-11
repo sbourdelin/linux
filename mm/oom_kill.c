@@ -1106,6 +1106,21 @@ bool out_of_memory(struct oom_control *oc)
 	select_bad_process(oc);
 	/* Found nothing?!?! */
 	if (!oc->chosen) {
+#ifdef CONFIG_MEMCG
+		/*
+		 * Don't flood with dump_header() if already reported, in case
+		 * current->signal->oom_score_adj == OOM_SCORE_ADJ_MIN. Maybe
+		 * this variable should be per "struct mem_cgroup". But since
+		 * we can't prove that multiple concurrent memcg OOM without
+		 * eligible task won't cause flooding, choose global variable
+		 * for safety.
+		 */
+		static u64 last_warned;
+
+		if (is_memcg_oom(oc) && current->memcg_oom_no_eligible_warned
+		    && time_before64(get_jiffies_64(), last_warned + 60 * HZ))
+			return false;
+#endif
 		dump_header(oc, NULL);
 		pr_warn("Out of memory and no killable processes...\n");
 		/*
@@ -1115,6 +1130,14 @@ bool out_of_memory(struct oom_control *oc)
 		 */
 		if (!is_sysrq_oom(oc) && !is_memcg_oom(oc))
 			panic("System is deadlocked on memory\n");
+#ifdef CONFIG_MEMCG
+		if (is_memcg_oom(oc)) {
+			last_warned = get_jiffies_64();
+			current->memcg_oom_no_eligible_warned = 1;
+		}
+	} else if (is_memcg_oom(oc)) {
+		current->memcg_oom_no_eligible_warned = 0;
+#endif
 	}
 	if (oc->chosen && oc->chosen != (void *)-1UL)
 		oom_kill_process(oc, !is_memcg_oom(oc) ? "Out of memory" :
