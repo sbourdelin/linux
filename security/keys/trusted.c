@@ -123,7 +123,7 @@ out:
  */
 static int TSS_authhmac(unsigned char *digest, const unsigned char *key,
 			unsigned int keylen, unsigned char *h1,
-			unsigned char *h2, unsigned char h3, ...)
+			unsigned char h2, unsigned char *h3, ...)
 {
 	unsigned char paramdigest[SHA1_DIGEST_SIZE];
 	struct sdesc *sdesc;
@@ -139,7 +139,7 @@ static int TSS_authhmac(unsigned char *digest, const unsigned char *key,
 		return PTR_ERR(sdesc);
 	}
 
-	c = h3;
+	c = h2;
 	ret = crypto_shash_init(&sdesc->shash);
 	if (ret < 0)
 		goto out;
@@ -163,7 +163,7 @@ static int TSS_authhmac(unsigned char *digest, const unsigned char *key,
 	if (!ret)
 		ret = TSS_rawhmac(digest, key, keylen, SHA1_DIGEST_SIZE,
 				  paramdigest, TPM_NONCE_SIZE, h1,
-				  TPM_NONCE_SIZE, h2, 1, &c, 0, 0);
+				  TPM_NONCE_SIZE, h3, 1, &c, 0, 0);
 out:
 	kzfree(sdesc);
 	return ret;
@@ -509,7 +509,7 @@ static int tpm_seal(struct tpm_buf *tb, uint16_t keytype,
 	if (pcrinfosize == 0) {
 		/* no pcr info specified */
 		ret = TSS_authhmac(td->pubauth, sess.secret, SHA1_DIGEST_SIZE,
-				   sess.enonce, td->nonceodd, cont,
+				   sess.enonce, cont, td->nonceodd,
 				   sizeof(uint32_t), &ordinal, SHA1_DIGEST_SIZE,
 				   td->encauth, sizeof(uint32_t), &pcrsize,
 				   sizeof(uint32_t), &datsize, datalen, data, 0,
@@ -517,7 +517,7 @@ static int tpm_seal(struct tpm_buf *tb, uint16_t keytype,
 	} else {
 		/* pcr info specified */
 		ret = TSS_authhmac(td->pubauth, sess.secret, SHA1_DIGEST_SIZE,
-				   sess.enonce, td->nonceodd, cont,
+				   sess.enonce, cont, td->nonceodd,
 				   sizeof(uint32_t), &ordinal, SHA1_DIGEST_SIZE,
 				   td->encauth, sizeof(uint32_t), &pcrsize,
 				   pcrinfosize, pcrinfo, sizeof(uint32_t),
@@ -609,12 +609,12 @@ static int tpm_unseal(struct tpm_buf *tb,
 		return ret;
 	}
 	ret = TSS_authhmac(authdata1, keyauth, TPM_NONCE_SIZE,
-			   enonce1, nonceodd, cont, sizeof(uint32_t),
+			   enonce1, cont, nonceodd, sizeof(uint32_t),
 			   &ordinal, bloblen, blob, 0, 0);
 	if (ret < 0)
 		return ret;
 	ret = TSS_authhmac(authdata2, blobauth, TPM_NONCE_SIZE,
-			   enonce2, nonceodd, cont, sizeof(uint32_t),
+			   enonce2, cont, nonceodd, sizeof(uint32_t),
 			   &ordinal, bloblen, blob, 0, 0);
 	if (ret < 0)
 		return ret;
