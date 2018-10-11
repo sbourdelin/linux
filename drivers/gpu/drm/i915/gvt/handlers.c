@@ -1666,12 +1666,24 @@ static int elsp_mmio_write(struct intel_vgpu *vgpu, unsigned int offset,
 	int ring_id = intel_gvt_render_mmio_to_ring_id(vgpu->gvt, offset);
 	struct intel_vgpu_execlist *execlist;
 	u32 data = *(u32 *)p_data;
+	u32 elsp_data[4];
+	u32 elsp_data_off;
 	int ret = 0;
 
 	if (WARN_ON(ring_id < 0 || ring_id >= I915_NUM_ENGINES))
 		return -EINVAL;
 
 	execlist = &vgpu->submission.execlist[ring_id];
+
+	if (VGPU_PVMMIO(vgpu) & PVMMIO_ELSP_SUBMIT) {
+		elsp_data_off = offsetof(struct gvt_shared_page, elsp_data);
+		intel_gvt_read_shared_page(vgpu, elsp_data_off, &elsp_data, 16);
+		execlist->elsp_dwords.data[3] = elsp_data[0];
+		execlist->elsp_dwords.data[2] = elsp_data[1];
+		execlist->elsp_dwords.data[1] = elsp_data[2];
+		execlist->elsp_dwords.data[0] = data;
+		return intel_vgpu_submit_execlist(vgpu, ring_id);
+	}
 
 	execlist->elsp_dwords.data[3 - execlist->elsp_dwords.index] = data;
 	if (execlist->elsp_dwords.index == 3) {
