@@ -195,7 +195,7 @@ static void rzn1_hw_set_lock(struct rzn1_pinctrl *ipctl, u8 lock, u8 value)
 static void rzn1_pinctrl_mdio_select(struct rzn1_pinctrl *ipctl, int mdio,
 				     u32 func)
 {
-	if (ipctl->mdio_func[mdio] >= 0 && ipctl->mdio_func[mdio] != func)
+	if (ipctl->mdio_func[mdio] != func)
 		dev_warn(ipctl->dev, "conflicting setting for mdio%d!\n", mdio);
 	ipctl->mdio_func[mdio] = func;
 
