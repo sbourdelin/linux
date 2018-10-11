@@ -49,6 +49,24 @@ enum vgt_g2v_type {
 	VGT_G2V_MAX,
 };
 
+struct pv_ppgtt_update {
+	u64 pdp;
+	u64 start;
+	u64 length;
+	u32 cache_level;
+};
+
+/*
+ * shared page(4KB) between gvt and VM, could be allocated by guest driver
+ * or a fixed location in PCI bar 0 region
+ */
+struct gvt_shared_page {
+	u32 elsp_data[4];
+	u32 reg_addr;
+	u32 disable_irq;
+	struct pv_ppgtt_update pv_ppgtt;
+};
+
 #define VGPU_PVMMIO(vgpu) vgpu_vreg_t(vgpu, vgtif_reg(enable_pvmmio))
 
 /*
@@ -121,8 +139,12 @@ struct vgt_if {
 	u32 execlist_context_descriptor_lo;
 	u32 execlist_context_descriptor_hi;
 	u32 enable_pvmmio;
+	struct {
+		u32 lo;
+		u32 hi;
+	} shared_page_gpa;
 
-	u32  rsv7[0x200 - 25];    /* pad to one page */
+	u32  rsv7[0x200 - 27];    /* pad to one page */
 } __packed;
 
 #define vgtif_reg(x) \

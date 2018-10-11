@@ -1342,6 +1342,8 @@ struct i915_virtual_gpu {
 	bool active;
 	u32 caps;
 	u32 pv_caps;
+	spinlock_t shared_page_lock;
+	struct gvt_shared_page *shared_page;
 };
 
 /* used in computing the new watermarks state */

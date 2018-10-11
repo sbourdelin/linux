@@ -62,6 +62,7 @@ void i915_check_vgpu(struct drm_i915_private *dev_priv)
 {
 	u64 magic;
 	u16 version_major;
+	u64 shared_page_gpa;
 
 	BUILD_BUG_ON(sizeof(struct vgt_if) != VGT_PVINFO_SIZE);
 
@@ -91,7 +92,23 @@ void i915_check_vgpu(struct drm_i915_private *dev_priv)
 			dev_priv->vgpu.pv_caps);
 	dev_priv->vgpu.pv_caps = __raw_i915_read32(dev_priv,
 			vgtif_reg(enable_pvmmio));
+	if (intel_vgpu_active(dev_priv) && dev_priv->vgpu.pv_caps) {
+		dev_priv->vgpu.shared_page =  (struct gvt_shared_page *)
+				get_zeroed_page(GFP_KERNEL);
+		if (!dev_priv->vgpu.shared_page) {
+			DRM_ERROR("out of memory for shared page memory\n");
+			return;
+		}
+		shared_page_gpa = __pa(dev_priv->vgpu.shared_page);
+		__raw_i915_write32(dev_priv, vgtif_reg(shared_page_gpa.lo),
+				lower_32_bits(shared_page_gpa));
+		__raw_i915_write32(dev_priv, vgtif_reg(shared_page_gpa.hi),
+				upper_32_bits(shared_page_gpa));
 
+		spin_lock_init(&dev_priv->vgpu.shared_page_lock);
+
+		DRM_INFO("VGPU shared page enabled\n");
+	}
 	DRM_INFO("Virtual GPU for Intel GVT-g detected with pvmmio 0x%x\n",
 			dev_priv->vgpu.pv_caps);
 }

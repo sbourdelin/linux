@@ -987,6 +987,8 @@ static void i915_mmio_cleanup(struct drm_i915_private *dev_priv)
 
 	intel_teardown_mchbar(dev_priv);
 	pci_iounmap(pdev, dev_priv->regs);
+	if (intel_vgpu_active(dev_priv) && dev_priv->vgpu.shared_page)
+		free_page((unsigned long)dev_priv->vgpu.shared_page);
 }
 
 /**
@@ -1029,6 +1031,8 @@ static int i915_driver_init_mmio(struct drm_i915_private *dev_priv)
 	return 0;
 
 err_uncore:
+	if (intel_vgpu_active(dev_priv) && dev_priv->vgpu.shared_page)
+		free_page((unsigned long)dev_priv->vgpu.shared_page);
 	intel_uncore_fini(dev_priv);
 err_bridge:
 	pci_dev_put(dev_priv->bridge_dev);
