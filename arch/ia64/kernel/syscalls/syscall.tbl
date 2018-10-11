@@ -335,3 +335,19 @@
 323     common  copy_file_range                 sys_copy_file_range
 324     common  preadv2                         sys_preadv2
 325     common  pwritev2                        sys_pwritev2
+# perf_event_open requires an architecture specific implementation
+326	common	perf_event_open			sys_perf_event_open
+# seccomp requires an architecture specific implementation
+327	common	seccomp				sys_seccomp
+# pkey_mprotect requires an architecture specific implementation
+328	common	pkey_mprotect			sys_pkey_mprotect
+# pkey_alloc requires an architecture specific implementation
+329	common	pkey_alloc			sys_pkey_alloc
+# pkey_free requires an architecture specific implementation
+330	common	pkey_free			sys_pkey_free
+# statx requires an architecture specific implementation
+331	common	statx				sys_statx
+# io_pgetevents requires an architecture specific implementation
+332	common	io_pgetevents			sys_io_pgetevents
+# rseq requires an architecture specific implementation
+333	common	rseq				sys_rseq
