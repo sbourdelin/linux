@@ -1049,7 +1049,7 @@ snapshot_trigger(struct event_trigger_data *data, void *rec,
 	struct trace_event_file *file = data->private_data;
 
 	if (file)
-		tracing_snapshot_instance(file->tr);
+		tracing_snapshot_instance(file->tr, NULL);
 	else
 		tracing_snapshot();
 }
