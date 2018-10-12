@@ -635,6 +635,65 @@ static int set_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
+
+/* NCSI OEM Command APIs */
+static void ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
+{
+	unsigned char data[NCSI_OEM_BCM_CMD_GMA_LEN];
+	int ret = 0;
+
+	nca->payload = NCSI_OEM_BCM_CMD_GMA_LEN;
+
+	memset(data, 0, NCSI_OEM_BCM_CMD_GMA_LEN);
+	*(unsigned int *)data = ntohl(NCSI_OEM_MFR_BCM_ID);
+	data[5] = NCSI_OEM_BCM_CMD_GMA;
+
+	nca->data = data;
+
+	ret = ncsi_xmit_cmd(nca);
+	if (ret)
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: Failed to transmit cmd 0x%x during configure\n",
+			   nca->type);
+}
+
+/* OEM Command handlers initialization */
+static struct ncsi_oem_gma_handler {
+	unsigned int	mfr_id;
+	void		(*handler)(struct ncsi_cmd_arg *nca);
+} ncsi_oem_gma_handlers[] = {
+	{ NCSI_OEM_MFR_BCM_ID, ncsi_oem_gma_handler_bcm }
+};
+
+static int ncsi_oem_handler(struct ncsi_cmd_arg *nca, unsigned int mf_id)
+{
+	struct ncsi_oem_gma_handler *nch = NULL;
+	int i;
+
+	/* Find gma handler for given manufacturer id */
+	for (i = 0; i < ARRAY_SIZE(ncsi_oem_gma_handlers); i++) {
+		if (ncsi_oem_gma_handlers[i].mfr_id == mf_id) {
+			if (ncsi_oem_gma_handlers[i].handler)
+				nch = &ncsi_oem_gma_handlers[i];
+			break;
+			}
+	}
+
+	if (!nch) {
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: No GMA handler available for MFR-ID (0x%x)\n",
+			   mf_id);
+		return -1;
+	}
+
+	/* Get Mac address from NCSI device */
+	nch->handler(nca);
+	return 0;
+}
+
+#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
+
 static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 {
 	struct ncsi_dev *nd = &ndp->ndev;
@@ -685,7 +744,23 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			goto error;
 		}
 
+		nd->state = ncsi_dev_state_config_oem_gma;
+		break;
+	case ncsi_dev_state_config_oem_gma:
 		nd->state = ncsi_dev_state_config_clear_vids;
+		ret = -1;
+
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
+		nca.type = NCSI_PKT_CMD_OEM;
+		nca.package = np->id;
+		nca.channel = nc->id;
+		ndp->pending_req_num = 1;
+		ret = ncsi_oem_handler(&nca, nc->version.mf_id);
+#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
+
+		if (ret < 0)
+			schedule_work(&ndp->work);
+
 		break;
 	case ncsi_dev_state_config_clear_vids:
 	case ncsi_dev_state_config_svf:
