@@ -5369,6 +5369,11 @@ out:
 	return ret;
 }
 
+void i915_gem_fini_hw(struct drm_i915_private *i915)
+{
+	intel_uc_fini_hw(i915);
+}
+
 static int __intel_engines_record_defaults(struct drm_i915_private *i915)
 {
 	struct i915_gem_context *ctx;
@@ -5621,7 +5626,7 @@ err_init_hw:
 	i915_gem_drain_workqueue(dev_priv);
 
 	mutex_lock(&dev_priv->drm.struct_mutex);
-	intel_uc_fini_hw(dev_priv);
+	i915_gem_fini_hw(dev_priv);
 err_uc_init:
 	intel_uc_fini(dev_priv);
 err_pm:
@@ -5679,7 +5684,7 @@ void i915_gem_fini(struct drm_i915_private *dev_priv)
 	i915_gem_drain_workqueue(dev_priv);
 
 	mutex_lock(&dev_priv->drm.struct_mutex);
-	intel_uc_fini_hw(dev_priv);
+	i915_gem_fini_hw(dev_priv);
 	intel_uc_fini(dev_priv);
 	i915_gem_cleanup_engines(dev_priv);
 	i915_gem_contexts_fini(dev_priv);
