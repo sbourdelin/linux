@@ -15,6 +15,14 @@ Optional properties:
   pinctrl binding [1]).
 - vcc-supply: a phandle for the regulator supplying 3.3V power.
 - elan,trackpoint: touchpad can support a trackpoint (boolean)
+- elan,clickpad: touchpad is a clickpad (the entire surface is a button)
+- elan,max_x: the maximum reported value on the X axis
+- elan,max_y: the maximum reported value on the Y axis
+- elan,min_x: the minimum reported value on the X axis
+- elan,min_y: the minimum reported value on the Y axis
+- elan,x_res: the resolution of the X axis (in units per mm)
+- elan,y_res: the resolution of the Y axis (in units per mm)
+- elan,width: max reported width of a blob
 
 [0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
 [1]: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
