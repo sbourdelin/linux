@@ -1,6 +1,7 @@
 config AFS_FS
 	tristate "Andrew File System support (AFS)"
 	depends on INET
+	depends on IPV6 || !IPV6
 	select AF_RXRPC
 	select DNS_RESOLVER
 	help
