@@ -1755,17 +1755,30 @@ static int elantech_create_smbus(struct psmouse *psmouse,
 				 struct elantech_device_info *info,
 				 bool leave_breadcrumbs)
 {
-	const struct property_entry i2c_properties[] = {
-		PROPERTY_ENTRY_BOOL("elan,trackpoint"),
-		{ },
-	};
+	struct property_entry i2c_props[10] = {};
 	struct i2c_board_info smbus_board = {
 		I2C_BOARD_INFO("elan_i2c", 0x15),
 		.flags = I2C_CLIENT_HOST_NOTIFY,
 	};
+	unsigned int prop_idx = 0;
+
+	smbus_board.properties = i2c_props;
+
+	i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,max_x", info->x_max);
+	i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,max_y", info->y_max);
+	i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,min_x", info->x_min);
+	i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,min_y", info->y_min);
+	i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,x_res", info->x_res);
+	i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,y_res", info->y_res);
 
 	if (info->has_trackpoint)
-		smbus_board.properties = i2c_properties;
+		i2c_props[prop_idx++] = PROPERTY_ENTRY_BOOL("elan,trackpoint");
+
+	if (info->width)
+		i2c_props[prop_idx++] = PROPERTY_ENTRY_U32("elan,width", info->width);
+
+	if (elantech_is_buttonpad(info))
+		i2c_props[prop_idx++] = PROPERTY_ENTRY_BOOL("elan,clickpad");
 
 	return psmouse_smbus_init(psmouse, &smbus_board, NULL, 0, false,
 				  leave_breadcrumbs);
