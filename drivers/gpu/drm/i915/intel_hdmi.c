@@ -1915,6 +1915,8 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
 	struct intel_encoder *encoder = &hdmi_to_dig_port(intel_hdmi)->base;
+	struct i2c_adapter *adapter =
+		intel_gmbus_get_adapter(dev_priv, intel_hdmi->ddc_bus);
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
@@ -1929,6 +1931,16 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 
 	if (intel_hdmi_set_edid(connector))
 		status = connector_status_connected;
+
+	if (connector->display_info.hdmi.scdc.supported) {
+		/* SCDC source version HDMI 2.1 Sec. 10.4.1.2 */
+		if (drm_scdc_writeb(adapter, SCDC_SOURCE_VERSION, 0x01) < 0)
+			DRM_DEBUG_KMS("Unable to set SCDC Source Version register\n");
+
+		/* Clear SCDC CONFIG_0 HDMI 2.1 Sec. 10.4.1.6 - RR_Enable Polling Only */
+		if (drm_scdc_writeb(adapter, SCDC_CONFIG_0, 0x00) < 0)
+			DRM_DEBUG_KMS("Unable to set SCDC CONFIG_0 register\n");
+	}
 
 out:
 	intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
