@@ -43,6 +43,33 @@ TRACE_EVENT(tegra_dma_complete_cb,
 		      __entry->count, __entry->ptr)
 );
 
+TRACE_EVENT(tegra_dma_tx_state,
+	    TP_PROTO(struct dma_chan *dc, unsigned long ahb,
+		     unsigned long wc, unsigned int done,
+		     unsigned long byte_count, unsigned int residual),
+	    TP_ARGS(dc, ahb, wc, done, byte_count, residual),
+	    TP_STRUCT__entry(
+		    __field(struct dma_chan *,	dc)
+		    __field(unsigned long,	ahb)
+		    __field(unsigned long,	wc)
+		    __field(unsigned long,	done)
+		    __field(unsigned int,	residual)
+		    __field(unsigned long,	byte_count)
+		    ),
+	    TP_fast_assign(
+		    __entry->dc = dc;
+		    __entry->ahb = ahb;
+		    __entry->wc = wc;
+		    __entry->done = done;
+		    __entry->residual = residual;
+		    __entry->byte_count = byte_count;
+		    ),
+	    TP_printk("%s: txresidual: ahb %08lx wc %08lx => done %lu bc %lu residual %u",
+		      dev_name(&__entry->dc->dev->device),
+		      __entry->ahb, __entry->wc, __entry->done,
+		      __entry->byte_count, __entry->residual)
+);
+
 TRACE_EVENT(tegra_dma_isr,
 	    TP_PROTO(struct dma_chan *dc, int irq),
 	    TP_ARGS(dc, irq),
