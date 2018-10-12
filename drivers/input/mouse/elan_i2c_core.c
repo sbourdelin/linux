@@ -366,27 +366,50 @@ static unsigned int elan_convert_resolution(u8 val)
 
 static int elan_query_device_parameters(struct elan_tp_data *data)
 {
+	struct i2c_client *client = data->client;
 	unsigned int x_traces, y_traces;
 	u8 hw_x_res, hw_y_res;
 	int error;
 
-	error = data->ops->get_max(data->client, &data->max_x, &data->max_y);
-	if (error)
-		return error;
+	if (device_property_read_u32(&client->dev,
+				     "elan,max_x", &data->max_x) ||
+	    device_property_read_u32(&client->dev,
+				     "elan,max_y", &data->max_y)) {
+		error = data->ops->get_max(data->client,
+					   &data->max_x,
+					   &data->max_y);
+		if (error)
+			return error;
+	}
 
-	error = data->ops->get_num_traces(data->client, &x_traces, &y_traces);
-	if (error)
-		return error;
+	if (device_property_read_u32(&client->dev,
+				     "elan,width", &data->width_x)) {
+		error = data->ops->get_num_traces(data->client,
+						  &x_traces, &y_traces);
+		if (error)
+			return error;
 
-	data->width_x = data->max_x / x_traces;
-	data->width_y = data->max_y / y_traces;
+		data->width_x = data->max_x / x_traces;
+		data->width_y = data->max_y / y_traces;
+	} else {
+		data->width_y = data->width_x;
+	}
 
-	error = data->ops->get_resolution(data->client, &hw_x_res, &hw_y_res);
-	if (error)
-		return error;
+	if (device_property_read_u32(&client->dev,
+				     "elan,x_res", &data->x_res) ||
+	    device_property_read_u32(&client->dev,
+				     "elan,y_res", &data->y_res)) {
+		error = data->ops->get_resolution(data->client,
+						  &hw_x_res, &hw_y_res);
+		if (error)
+			return error;
 
-	data->x_res = elan_convert_resolution(hw_x_res);
-	data->y_res = elan_convert_resolution(hw_y_res);
+		data->x_res = elan_convert_resolution(hw_x_res);
+		data->y_res = elan_convert_resolution(hw_y_res);
+	}
+
+	if (device_property_read_bool(&client->dev, "elan,clickpad"))
+		data->clickpad = 1;
 
 	return 0;
 }
