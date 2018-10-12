@@ -1207,28 +1207,31 @@ struct xt_table *xt_find_table_lock(struct net *net, u_int8_t af,
 				    const char *name)
 {
 	struct xt_table *t, *found = NULL;
+	int err;
 
 	mutex_lock(&xt[af].mutex);
 	list_for_each_entry(t, &net->xt.tables[af], list)
 		if (strcmp(t->name, name) == 0 && try_module_get(t->me))
 			return t;
 
-	if (net == &init_net)
+	if (net == &init_net) {
+		err = -ENOENT;
 		goto out;
+	}
 
 	/* Table doesn't exist in this netns, re-try init */
 	list_for_each_entry(t, &init_net.xt.tables[af], list) {
-		int err;
-
 		if (strcmp(t->name, name))
 			continue;
-		if (!try_module_get(t->me))
+		if (!try_module_get(t->me)) {
+			err = -ENOENT;
 			goto out;
+		}
 		mutex_unlock(&xt[af].mutex);
 		err = t->table_init(net);
 		if (err < 0) {
 			module_put(t->me);
-			return ERR_PTR(err);
+			goto out;
 		}
 
 		found = t;
@@ -1237,8 +1240,10 @@ struct xt_table *xt_find_table_lock(struct net *net, u_int8_t af,
 		break;
 	}
 
-	if (!found)
+	if (!found) {
+		err = -ENOENT;
 		goto out;
+	}
 
 	/* and once again: */
 	list_for_each_entry(t, &net->xt.tables[af], list)
@@ -1248,7 +1253,7 @@ struct xt_table *xt_find_table_lock(struct net *net, u_int8_t af,
 	module_put(found->me);
  out:
 	mutex_unlock(&xt[af].mutex);
-	return ERR_PTR(-ENOENT);
+	return ERR_PTR(err);
 }
 EXPORT_SYMBOL_GPL(xt_find_table_lock);
 
