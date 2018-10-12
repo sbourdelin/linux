@@ -2662,46 +2662,23 @@ void intel_update_cdclk(struct drm_i915_private *dev_priv)
 static int cnp_rawclk(struct drm_i915_private *dev_priv)
 {
 	u32 rawclk;
-	int divider, fraction;
-
-	if (I915_READ(SFUSE_STRAP) & SFUSE_STRAP_RAW_FREQUENCY) {
-		/* 24 MHz */
-		divider = 24000;
-		fraction = 0;
-	} else {
-		/* 19.2 MHz */
-		divider = 19000;
-		fraction = 200;
-	}
-
-	rawclk = CNP_RAWCLK_DIV((divider / 1000) - 1);
-	if (fraction)
-		rawclk |= CNP_RAWCLK_FRAC(DIV_ROUND_CLOSEST(1000,
-							    fraction) - 1);
-
-	I915_WRITE(PCH_RAWCLK_FREQ, rawclk);
-	return divider + fraction;
-}
-
-static int icp_rawclk(struct drm_i915_private *dev_priv)
-{
-	u32 rawclk;
 	int divider, numerator, denominator, frequency;
 
 	if (I915_READ(SFUSE_STRAP) & SFUSE_STRAP_RAW_FREQUENCY) {
 		frequency = 24000;
-		divider = 23;
+		divider = 24;
 		numerator = 0;
 		denominator = 0;
 	} else {
 		frequency = 19200;
-		divider = 18;
+		divider = 19;
 		numerator = 1;
 		denominator = 4;
 	}
 
-	rawclk = CNP_RAWCLK_DIV(divider) | ICP_RAWCLK_NUM(numerator) |
-		 ICP_RAWCLK_DEN(denominator);
+	rawclk = CNP_RAWCLK_DIV(divider) | CNP_RAWCLK_FRAC(denominator);
+	if (HAS_PCH_ICP(dev_priv))
+		rawclk |= ICP_RAWCLK_NUM(numerator);
 
 	I915_WRITE(PCH_RAWCLK_FREQ, rawclk);
 	return frequency;
@@ -2754,9 +2731,7 @@ static int g4x_hrawclk(struct drm_i915_private *dev_priv)
  */
 void intel_update_rawclk(struct drm_i915_private *dev_priv)
 {
-	if (HAS_PCH_ICP(dev_priv))
-		dev_priv->rawclk_freq = icp_rawclk(dev_priv);
-	else if (HAS_PCH_CNP(dev_priv))
+	if (HAS_PCH_CNP(dev_priv) || HAS_PCH_ICP(dev_priv))
 		dev_priv->rawclk_freq = cnp_rawclk(dev_priv);
 	else if (HAS_PCH_SPLIT(dev_priv))
 		dev_priv->rawclk_freq = pch_rawclk(dev_priv);
