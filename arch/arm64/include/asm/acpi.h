@@ -22,12 +22,12 @@
 #include <asm/tlbflush.h>
 
 /* Macros for consistency checks of the GICC subtable of MADT */
-#define ACPI_MADT_GICC_LENGTH	\
-	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+#define ACPI_MADT_GICC_MIN_LENGTH   ACPI_OFFSET(  \
+	struct acpi_madt_generic_interrupt, efficiency_class)
 
 #define BAD_MADT_GICC_ENTRY(entry, end)					\
-	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
-	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
+	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
+	(unsigned long)(entry) + (entry)->header.length > (end))
 
 /* Basic configuration for ACPI */
 #ifdef	CONFIG_ACPI
