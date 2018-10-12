@@ -320,6 +320,18 @@ static int tcf_police_search(struct net *net, struct tc_action **a, u32 index,
 	return tcf_idr_search(tn, a, index);
 }
 
+static int tcf_police_fallback_action(const struct tc_action *a)
+{
+	struct tcf_police *police = to_police(a);
+	int retval;
+
+	spin_lock_bh(&police->tcf_lock);
+	retval =  police->tcfp_result;
+	spin_unlock_bh(&police->tcf_lock);
+
+	return retval;
+}
+
 MODULE_AUTHOR("Alexey Kuznetsov");
 MODULE_DESCRIPTION("Policing actions");
 MODULE_LICENSE("GPL");
@@ -333,6 +345,7 @@ static struct tc_action_ops act_police_ops = {
 	.init		=	tcf_police_init,
 	.walk		=	tcf_police_walker,
 	.lookup		=	tcf_police_search,
+	.fallback_act	=	tcf_police_fallback_action,
 	.size		=	sizeof(struct tcf_police),
 };
 

@@ -30,10 +30,9 @@
 #include <net/act_api.h>
 #include <net/netlink.h>
 
-static int tcf_action_goto_chain_init(struct tc_action *a, struct tcf_proto *tp)
+static int tcf_action_goto_chain_init(struct tc_action *a, struct tcf_proto *tp,
+				      u32 chain_index)
 {
-	u32 chain_index = a->tcfa_action & TC_ACT_EXT_VAL_MASK;
-
 	if (!tp)
 		return -EINVAL;
 	a->goto_chain = tcf_chain_get_by_act(tp->chain->block, chain_index);
@@ -798,7 +797,9 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 	struct tc_cookie *cookie = NULL;
 	char act_name[IFNAMSIZ];
 	struct nlattr *tb[TCA_ACT_MAX + 1];
+	bool do_init_chain = false;
 	struct nlattr *kind;
+	u32 chain_id;
 	int err;
 
 	if (name == NULL) {
@@ -886,7 +887,23 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 		module_put(a_o->owner);
 
 	if (TC_ACT_EXT_CMP(a->tcfa_action, TC_ACT_GOTO_CHAIN)) {
-		err = tcf_action_goto_chain_init(a, tp);
+		do_init_chain = true;
+		chain_id = a->tcfa_action & TC_ACT_EXT_VAL_MASK;
+		if (a_o->fallback_act && TC_ACT_EXT_CMP(a_o->fallback_act(a),
+							TC_ACT_GOTO_CHAIN)) {
+			NL_SET_ERR_MSG(extack, "Too many 'goto chain'");
+			return ERR_PTR(-EINVAL);
+		}
+	} else if (a_o->fallback_act) {
+		chain_id = a_o->fallback_act(a);
+		if (TC_ACT_EXT_CMP(chain_id, TC_ACT_GOTO_CHAIN)) {
+			do_init_chain = true;
+			chain_id &= TC_ACT_EXT_VAL_MASK;
+		}
+	}
+
+	if (do_init_chain) {
+		err = tcf_action_goto_chain_init(a, tp, chain_id);
 		if (err) {
 			tcf_action_destroy_1(a, bind);
 			NL_SET_ERR_MSG(extack, "Failed to init TC action chain");
@@ -894,7 +911,8 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 		}
 	}
 
-	if (!tcf_action_valid(a->tcfa_action)) {
+	if (!tcf_action_valid(a->tcfa_action) ||
+	    (a_o->fallback_act && !tcf_action_valid(a_o->fallback_act(a)))) {
 		tcf_action_destroy_1(a, bind);
 		NL_SET_ERR_MSG(extack, "Invalid control action value");
 		return ERR_PTR(-EINVAL);

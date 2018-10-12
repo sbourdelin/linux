@@ -47,6 +47,11 @@ static int gact_determ(struct tcf_gact *gact)
 
 typedef int (*g_rand)(struct tcf_gact *gact);
 static g_rand gact_rand[MAX_RAND] = { NULL, gact_net_rand, gact_determ };
+
+static int tcf_gact_fallback_action(const struct tc_action *act)
+{
+	return to_gact(act)->tcfg_paction;
+}
 #endif /* CONFIG_GACT_PROB */
 
 static const struct nla_policy gact_policy[TCA_GACT_MAX + 1] = {
@@ -254,6 +259,9 @@ static struct tc_action_ops act_gact_ops = {
 	.walk		=	tcf_gact_walker,
 	.lookup		=	tcf_gact_search,
 	.get_fill_size	=	tcf_gact_get_fill_size,
+#ifdef CONFIG_GACT_PROB
+	.fallback_act	=	tcf_gact_fallback_action,
+#endif
 	.size		=	sizeof(struct tcf_gact),
 };
 

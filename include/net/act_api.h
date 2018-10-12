@@ -99,6 +99,7 @@ struct tc_action_ops {
 	size_t  (*get_fill_size)(const struct tc_action *act);
 	struct net_device *(*get_dev)(const struct tc_action *a);
 	void	(*put_dev)(struct net_device *dev);
+	int	(*fallback_act)(const struct tc_action *a);
 };
 
 struct tc_action_net {
