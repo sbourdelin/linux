@@ -826,7 +826,10 @@ static void netpoll_async_cleanup(struct work_struct *work)
 
 void __netpoll_free_async(struct netpoll *np)
 {
-	schedule_work(&np->cleanup_work);
+	if (rtnl_is_locked())
+		__netpoll_cleanup(np);
+	else
+		schedule_work(&np->cleanup_work);
 }
 EXPORT_SYMBOL_GPL(__netpoll_free_async);
 
