@@ -55,6 +55,27 @@ static void reprogram_fixed_counters(struct kvm_pmu *pmu, u64 data)
 	pmu->fixed_ctr_ctrl = data;
 }
 
+static void fast_global_ctrl_changed(struct kvm_pmu *pmu, u64 data)
+{
+	pmu->global_ctrl = data;
+
+	if (!data) {
+		/*
+		 * The guest PMI handler is asking for disabling all the perf
+		 * counters
+		 */
+		pmu->counter_mask = intel_pmu_disable_guest_counters();
+	} else {
+		/*
+		 * The guest PMI handler is asking for enabling the perf
+		 * counters. This happens at the end of the guest PMI handler,
+		 * so clear in_pmi.
+		 */
+		intel_pmu_enable_guest_counters(pmu->counter_mask);
+		pmu->in_pmi = false;
+	}
+}
+
 /* function is called when global control register has been updated. */
 static void global_ctrl_changed(struct kvm_pmu *pmu, u64 data)
 {
@@ -219,6 +240,15 @@ static int intel_pmu_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		}
 		break; /* RO MSR */
 	case MSR_CORE_PERF_GLOBAL_CTRL:
+		/*
+		 * If this is from the guest PMI handler to disable or enable
+		 * the perf counters, there is no need to release and allocate
+		 * a new perf event, which is too time consuming.
+		 */
+		if (pmu->in_pmi) {
+			fast_global_ctrl_changed(pmu, data);
+			return 0;
+		}
 		if (pmu->global_ctrl == data)
 			return 0;
 		if (!(data & pmu->global_ctrl_mask)) {
@@ -237,9 +267,23 @@ static int intel_pmu_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	default:
 		if ((pmc = get_gp_pmc(pmu, msr, MSR_IA32_PERFCTR0)) ||
 		    (pmc = get_fixed_pmc(pmu, msr))) {
-			if (!msr_info->host_initiated)
-				data = (s64)(s32)data;
-			pmc->counter += data - pmc_read_counter(pmc);
+			if (pmu->in_pmi) {
+				/*
+				 * Since we are not re-allocating a perf event
+				 * to reconfigure the sampling time when the
+				 * guest pmu is in PMI, just set the value to
+				 * the hardware perf counter. Counting will
+				 * continue after the guest enables the
+				 * counter bit in MSR_CORE_PERF_GLOBAL_CTRL.
+				 */
+				struct hw_perf_event *hwc =
+						&pmc->perf_event->hw;
+				wrmsrl(hwc->event_base, data);
+			} else {
+				if (!msr_info->host_initiated)
+					data = (s64)(s32)data;
+				pmc->counter += data - pmc_read_counter(pmc);
+			}
 			return 0;
 		} else if ((pmc = get_gp_pmc(pmu, msr, MSR_P6_EVNTSEL0))) {
 			if (data == pmc->eventsel)

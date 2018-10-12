@@ -288,6 +288,8 @@ static inline void perf_check_microcode(void) { }
 
 #ifdef CONFIG_CPU_SUP_INTEL
  extern void intel_pt_handle_vmx(int on);
+extern u64 intel_pmu_disable_guest_counters(void);
+extern void intel_pmu_enable_guest_counters(u64 mask);
 #endif
 
 #if defined(CONFIG_PERF_EVENTS) && defined(CONFIG_CPU_SUP_AMD)

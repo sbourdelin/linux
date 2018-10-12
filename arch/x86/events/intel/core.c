@@ -1858,6 +1858,41 @@ static __initconst const u64 knl_hw_cache_extra_regs
 	},
 };
 
+/**
+ * intel_pmu_disable_guest_counters - disable perf counters for the guest
+ *
+ * Disable all the perf counters for the guest via setting the host mask.
+ * This will cause all the perf counters to be disabled when entering
+ * the guest.
+ *
+ * Returns: the old counter mask.
+ */
+u64 intel_pmu_disable_guest_counters(void)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	u64 mask = cpuc->intel_ctrl_host_mask;
+
+	cpuc->intel_ctrl_host_mask = ULONG_MAX;
+
+	return mask;
+}
+EXPORT_SYMBOL_GPL(intel_pmu_disable_guest_counters);
+
+/**
+ * intel_pmu_enable_guest_counters - enable perf counters for the guest
+ *
+ * Enable perf counters for the guest via setting the host mask to the
+ * caller's counter mask. The counters corresponding to the unmasked bits
+ * will be enabled when entering the guest.
+ */
+void intel_pmu_enable_guest_counters(u64 mask)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+
+	cpuc->intel_ctrl_host_mask = mask;
+}
+EXPORT_SYMBOL_GPL(intel_pmu_enable_guest_counters);
+
 /*
  * Used from PMIs where the LBRs are already disabled.
  *
