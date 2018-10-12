@@ -342,6 +342,7 @@ static bool __intel_breadcrumbs_enable_irq(struct intel_breadcrumbs *b)
 
 static inline struct intel_wait *to_wait(struct rb_node *node)
 {
+	BUILD_BUG_ON(offsetof(struct intel_wait, node));
 	return rb_entry(node, struct intel_wait, node);
 }
 
