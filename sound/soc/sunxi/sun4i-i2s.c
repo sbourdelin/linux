@@ -649,6 +649,9 @@ static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
 {
 	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
 
+	if (dai->active)
+		return 0;
+
 	/* Enable the whole hardware block */
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
 			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
@@ -666,6 +669,9 @@ static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+
+	if (dai->active)
+		return;
 
 	clk_disable_unprepare(i2s->mod_clk);
 
