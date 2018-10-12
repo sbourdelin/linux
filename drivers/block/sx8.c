@@ -75,7 +75,7 @@ MODULE_PARM_DESC(max_queue, "Maximum number of queued commands. (min==1, max==30
 /* 0xf is just arbitrary, non-zero noise; this is sorta like poisoning */
 #define TAG_ENCODE(tag)	(((tag) << 16) | 0xf)
 #define TAG_DECODE(tag)	(((tag) >> 16) & 0x1f)
-#define TAG_VALID(tag)	((((tag) & 0xf) == 0xf) && (TAG_DECODE(tag) < 32))
+#define TAG_VALID(tag)	(((tag) & 0xf) == 0xf)
 
 /* note: prints function name for you */
 #ifdef CARM_DEBUG
