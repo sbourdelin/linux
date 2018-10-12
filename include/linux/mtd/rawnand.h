@@ -1346,4 +1346,14 @@ void nand_release(struct nand_chip *chip);
  */
 int nand_soft_waitrdy(struct nand_chip *chip, unsigned long timeout_ms);
 
+#ifdef CONFIG_GPIOLIB
+struct gpio_desc;
+/*
+ * External helper for controller drivers that have to implement the WAITRDY
+ * instruction and do have GPIO pin to check it.
+ */
+int nand_gpio_waitrdy(struct nand_chip *chip, struct gpio_desc *gpiod,
+		      unsigned long timeout_ms);
+#endif
+
 #endif /* __LINUX_MTD_RAWNAND_H */
