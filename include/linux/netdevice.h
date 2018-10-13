@@ -1487,6 +1487,7 @@ struct net_device_ops {
  * @IFF_NO_RX_HANDLER: device doesn't support the rx_handler hook
  * @IFF_FAILOVER: device is a failover master device
  * @IFF_FAILOVER_SLAVE: device is lower dev of a failover master device
+ * @IFF_VXLAN: device is a VxLAN device
  */
 enum netdev_priv_flags {
 	IFF_802_1Q_VLAN			= 1<<0,
@@ -1518,6 +1519,7 @@ enum netdev_priv_flags {
 	IFF_NO_RX_HANDLER		= 1<<26,
 	IFF_FAILOVER			= 1<<27,
 	IFF_FAILOVER_SLAVE		= 1<<28,
+	IFF_VXLAN			= 1<<29,
 };
 
 #define IFF_802_1Q_VLAN			IFF_802_1Q_VLAN
@@ -1548,6 +1550,7 @@ enum netdev_priv_flags {
 #define IFF_NO_RX_HANDLER		IFF_NO_RX_HANDLER
 #define IFF_FAILOVER			IFF_FAILOVER
 #define IFF_FAILOVER_SLAVE		IFF_FAILOVER_SLAVE
+#define IFF_VXLAN			IFF_VXLAN
 
 /**
  *	struct net_device - The DEVICE structure.
@@ -4565,6 +4568,11 @@ static inline bool netif_is_failover(const struct net_device *dev)
 static inline bool netif_is_failover_slave(const struct net_device *dev)
 {
 	return dev->priv_flags & IFF_FAILOVER_SLAVE;
+}
+
+static inline bool netif_is_vxlan(const struct net_device *dev)
+{
+	return dev->priv_flags & IFF_VXLAN;
 }
 
 /* This device needs to keep skb dst for qdisc enqueue or ndo_start_xmit() */

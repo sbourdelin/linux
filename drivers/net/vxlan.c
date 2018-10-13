@@ -3178,6 +3178,7 @@ static int __vxlan_dev_create(struct net *net, struct net_device *dev,
 	if (err)
 		return err;
 
+	dev->priv_flags |= IFF_VXLAN;
 	dev->ethtool_ops = &vxlan_ethtool_ops;
 
 	/* create an fdb entry for a valid default destination */
