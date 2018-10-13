@@ -517,6 +517,7 @@ static struct clk_fixed_factor gxbb_fclk_div4_div = {
 		.ops = &clk_fixed_factor_ops,
 		.parent_names = (const char *[]){ "fixed_pll" },
 		.num_parents = 1,
+		.flags = CLK_IS_CRITICAL,
 	},
 };
 
