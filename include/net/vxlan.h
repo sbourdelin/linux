@@ -5,6 +5,7 @@
 #include <linux/if_vlan.h>
 #include <net/udp_tunnel.h>
 #include <net/dst_metadata.h>
+#include <net/switchdev.h>
 
 /* VXLAN protocol (RFC 7348) header:
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -401,5 +402,15 @@ static inline bool vxlan_addr_multicast(const union vxlan_addr *ipa)
 }
 
 #endif /* IS_ENABLED(CONFIG_IPV6) */
+
+struct switchdev_notifier_vxlan_fdb_info {
+	struct switchdev_notifier_info info; /* must be first */
+	union vxlan_addr remote_ip;
+	__be16 remote_port;
+	__be32 remote_vni;
+	u32 remote_ifindex;
+	u8 eth_addr[ETH_ALEN];
+	__be32 vni;
+};
 
 #endif
