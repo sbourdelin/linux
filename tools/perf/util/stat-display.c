@@ -604,7 +604,7 @@ static void print_aggr(struct perf_stat_config *config,
 	u64 ena, run, val;
 	bool first;
 
-	if (!(config->aggr_map || config->aggr_get_id))
+	if (!config->aggr_map || !config->aggr_get_id)
 		return;
 
 	aggr_update_shadow(config, evlist);
