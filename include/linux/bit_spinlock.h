@@ -15,22 +15,17 @@
  */
 static inline void bit_spin_lock(int bitnum, unsigned long *addr)
 {
-	/*
-	 * Assuming the lock is uncontended, this never enters
-	 * the body of the outer loop. If it is contended, then
-	 * within the inner loop a non-atomic test is used to
-	 * busywait with less bus contention for a good time to
-	 * attempt to acquire the lock bit.
-	 */
-	preempt_disable();
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
-	while (unlikely(test_and_set_bit_lock(bitnum, addr))) {
-		preempt_enable();
-		do {
-			cpu_relax();
-		} while (test_bit(bitnum, addr));
+	while (1) {
+		smp_cond_load_relaxed(&addr[BIT_WORD(bitnum)],
+				      !(VAL >> (bitnum & (BITS_PER_LONG-1))));
 		preempt_disable();
+		if (!test_and_set_bit_lock(bitnum, addr))
+			break;
+		preempt_enable();
 	}
+#else
+	preempt_disable();
 #endif
 	__acquire(bitlock);
 }
