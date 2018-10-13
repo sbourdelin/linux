@@ -1949,6 +1949,245 @@ asmlinkage int printk_emit(int facility, int level,
 }
 EXPORT_SYMBOL(printk_emit);
 
+#ifdef CONFIG_PRINTK_LINE_BUFFERED
+/*
+ * A structure for line-buffered printk() output.
+ */
+static struct printk_buffer {
+	unsigned short int used; /* Valid bytes in buf[]. */
+	char buf[LOG_LINE_MAX];
+} printk_buffers[CONFIG_PRINTK_NUM_LINE_BUFFERS] __aligned(1024);
+static DECLARE_BITMAP(printk_buffers_in_use, CONFIG_PRINTK_NUM_LINE_BUFFERS);
+
+
+#ifdef CONFIG_PRINTK_REPORT_OUT_OF_LINE_BUFFERS
+static struct {
+	unsigned long stamp;
+	struct stack_trace trace;
+	unsigned long entries[20];
+} printk_buffers_dump[CONFIG_PRINTK_NUM_LINE_BUFFERS];
+static int buffer_users_report_scheduled;
+
+static void reset_holdoff_flag(struct timer_list *timer)
+{
+	buffer_users_report_scheduled = 0;
+}
+static DEFINE_TIMER(buffer_users_holdoff_timer, reset_holdoff_flag);
+
+static void report_buffer_users(struct work_struct *work)
+{
+	long i;
+	unsigned int j;
+
+	/*
+	 * This report is racy. But it does not worth introducing a lock
+	 * dependency.
+	 */
+	pr_info("printk: All line buffers are in use.\n");
+	for (i = 0; i < CONFIG_PRINTK_NUM_LINE_BUFFERS; i++) {
+		if (!test_bit(i, printk_buffers_in_use))
+			continue;
+		pr_info("buffer[%lu] was reserved %lu jiffies ago by\n",
+			i, jiffies - printk_buffers_dump[i].stamp);
+		for (j = 0; j < printk_buffers_dump[i].trace.nr_entries; j++)
+			pr_info("  %pS\n", (void *)
+				printk_buffers_dump[i].entries[j]);
+		cond_resched();
+	}
+	/* Wait for at least 60 seconds before reporting again. */
+	mod_timer(&buffer_users_holdoff_timer, jiffies + 60 * HZ);
+}
+#endif
+
+/**
+ * get_printk_buffer - Try to get printk_buffer.
+ *
+ * Returns pointer to "struct printk_buffer" on success, NULL otherwise.
+ *
+ * If this function returned "struct printk_buffer", the caller is responsible
+ * for passing it to put_printk_buffer() so that "struct printk_buffer" can be
+ * reused in the future.
+ *
+ * Even if this function returned NULL, the caller does not need to check for
+ * NULL, for passing NULL to buffered_printk() simply acts like normal printk()
+ * and passing NULL to flush_printk_buffer()/put_printk_buffer() is a no-op.
+ */
+struct printk_buffer *get_printk_buffer(void)
+{
+#ifdef CONFIG_PRINTK_REPORT_OUT_OF_LINE_BUFFERS
+	static DECLARE_WORK(work, report_buffer_users);
+#endif
+	long i;
+
+	for (i = 0; i < CONFIG_PRINTK_NUM_LINE_BUFFERS; i++) {
+		if (test_bit(i, printk_buffers_in_use) ||
+		    test_and_set_bit(i, printk_buffers_in_use))
+			continue;
+		printk_buffers[i].used = 0;
+#ifdef CONFIG_PRINTK_REPORT_OUT_OF_LINE_BUFFERS
+		printk_buffers_dump[i].stamp = jiffies;
+		printk_buffers_dump[i].trace.nr_entries = 0;
+		printk_buffers_dump[i].trace.entries =
+			printk_buffers_dump[i].entries;
+		printk_buffers_dump[i].trace.max_entries = 20;
+		printk_buffers_dump[i].trace.skip = 0;
+		save_stack_trace(&printk_buffers_dump[i].trace);
+#endif
+		return &printk_buffers[i];
+	}
+#ifdef CONFIG_PRINTK_REPORT_OUT_OF_LINE_BUFFERS
+	/*
+	 * Oops, out of "struct printk_buffer" happened. Fallback to normal
+	 * printk(). You might notice it by partial lines being printed.
+	 *
+	 * If you think that it might be due to missing put_printk_buffer()
+	 * calls, you can enable CONFIG_PRINTK_REPORT_OUT_OF_LINE_BUFFERS.
+	 * Then, who is using the buffers will be reported (from workqueue
+	 * context because reporting CONFIG_PRINTK_NUM_LINE_BUFFERS entries
+	 * from atomic context might be too slow). If it does not look like
+	 * missing put_printk_buffer() calls, you might want to increase
+	 * CONFIG_PRINTK_NUM_LINE_BUFFERS.
+	 *
+	 * But if it turns out that allocating "struct printk_buffer" on stack
+	 * or in .bss section or from kzalloc() is more suitable than tuning
+	 * CONFIG_PRINTK_NUM_LINE_BUFFERS, we can update to do so.
+	 */
+	if (!in_nmi() && !cmpxchg(&buffer_users_report_scheduled, 0, 1))
+		queue_work(system_unbound_wq, &work);
+#endif
+	return NULL;
+}
+EXPORT_SYMBOL(get_printk_buffer);
+
+/**
+ * buffered_vprintk - Try to vprintk() in line buffered mode.
+ *
+ * @ptr:  Pointer to "struct printk_buffer". It can be NULL.
+ * @fmt:  printk() format string.
+ * @args: va_list structure.
+ *
+ * Returns the return value of vprintk().
+ *
+ * Try to store to @ptr first. If it fails, flush @ptr and then try to store to
+ * @ptr again. If it still fails, use unbuffered printing.
+ */
+int buffered_vprintk(struct printk_buffer *ptr, const char *fmt, va_list args)
+{
+	va_list tmp_args;
+	unsigned short int i;
+	int r;
+
+	if (!ptr)
+		goto unbuffered;
+	for (i = 0; i < 2; i++) {
+		unsigned int pos = ptr->used;
+		char *text = ptr->buf + pos;
+
+		va_copy(tmp_args, args);
+		r = vsnprintf(text, sizeof(ptr->buf) - pos, fmt, tmp_args);
+		va_end(tmp_args);
+		if (r + pos < sizeof(ptr->buf)) {
+			/*
+			 * Eliminate KERN_CONT at this point because we can
+			 * concatenate incomplete lines inside printk_buffer.
+			 */
+			if (r >= 2 && printk_get_level(text) == 'c') {
+				memmove(text, text + 2, r - 2);
+				ptr->used += r - 2;
+			} else {
+				ptr->used += r;
+			}
+			/* Flush already completed lines if any. */
+			while (1) {
+				char *cp = memchr(ptr->buf, '\n', ptr->used);
+
+				if (!cp)
+					break;
+				*cp = '\0';
+				printk("%s\n", ptr->buf);
+				i = cp - ptr->buf + 1;
+				ptr->used -= i;
+				memmove(ptr->buf, ptr->buf + i, ptr->used);
+			}
+			return r;
+		}
+		if (i)
+			break;
+		flush_printk_buffer(ptr);
+	}
+ unbuffered:
+	return vprintk(fmt, args);
+}
+
+/**
+ * buffered_printk - Try to printk() in line buffered mode.
+ *
+ * @ptr:  Pointer to "struct printk_buffer". It can be NULL.
+ * @fmt:  printk() format string, followed by arguments.
+ *
+ * Returns the return value of printk().
+ *
+ * Try to store to @ptr first. If it fails, flush @ptr and then try to store to
+ * @ptr again. If it still fails, use unbuffered printing.
+ */
+int buffered_printk(struct printk_buffer *ptr, const char *fmt, ...)
+{
+	va_list args;
+	int r;
+
+	va_start(args, fmt);
+	r = buffered_vprintk(ptr, fmt, args);
+	va_end(args);
+	return r;
+}
+EXPORT_SYMBOL(buffered_printk);
+
+/**
+ * flush_printk_buffer - Flush incomplete line in printk_buffer.
+ *
+ * @ptr: Pointer to "struct printk_buffer". It can be NULL.
+ *
+ * Returns nothing.
+ *
+ * Flush if @ptr contains partial data. But usually there is no need to call
+ * this function because @ptr is flushed by put_printk_buffer().
+ */
+void flush_printk_buffer(struct printk_buffer *ptr)
+{
+	if (!ptr || !ptr->used)
+		return;
+	/* buffered_vprintk() keeps 0 <= ptr->used < sizeof(ptr->buf) true. */
+	ptr->buf[ptr->used] = '\0';
+	printk("%s", ptr->buf);
+	ptr->used = 0;
+}
+EXPORT_SYMBOL(flush_printk_buffer);
+
+/**
+ * put_printk_buffer - Release printk_buffer.
+ *
+ * @ptr: Pointer to "struct printk_buffer". It can be NULL.
+ *
+ * Returns nothing.
+ *
+ * Flush and release @ptr.
+ */
+void put_printk_buffer(struct printk_buffer *ptr)
+{
+	long i = ptr - printk_buffers;
+
+	if (!ptr || i < 0 || i >= CONFIG_PRINTK_NUM_LINE_BUFFERS)
+		return;
+	if (ptr->used)
+		flush_printk_buffer(ptr);
+	/* Make sure in_use flag is cleared after setting ptr->used = 0. */
+	wmb();
+	clear_bit(i, printk_buffers_in_use);
+}
+EXPORT_SYMBOL(put_printk_buffer);
+
+#endif
+
 int vprintk_default(const char *fmt, va_list args)
 {
 	int r;

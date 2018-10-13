@@ -604,6 +604,37 @@ config PRINTK_SAFE_LOG_BUF_SHIFT
 		     13 =>   8 KB for each CPU
 		     12 =>   4 KB for each CPU
 
+config PRINTK_LINE_BUFFERED
+	bool "Allow line buffered printk()"
+	default y
+	depends on PRINTK
+	help
+	  The line buffered printk() tries to buffer printk() output up to '\n'
+	  so that incomplete lines won't be mixed when there are multiple
+	  threads concurrently calling printk() which does not end with '\n'.
+
+config PRINTK_NUM_LINE_BUFFERS
+	int "Number of buffers for line buffered printk()"
+	range 1 4096
+	default 16
+	depends on PRINTK_LINE_BUFFERED
+	help
+	  Specify the number of statically preallocated "struct printk_buffer"
+	  for line buffered printk(). You don't need to specify a large number
+	  here because "struct printk_buffer" makes difference only when there
+	  are multiple threads concurrently calling printk() which does not end
+	  with '\n', and line buffered printk() will fallback to normal
+	  printk() when out of statically preallocated "struct printk_buffer"
+	  happened.
+
+config PRINTK_REPORT_OUT_OF_LINE_BUFFERS
+	bool "Report out of buffers for line buffered printk()"
+	default n
+	depends on PRINTK_LINE_BUFFERED && STACKTRACE
+	help
+	  Select this if you want to know who is using statically preallocated
+	  "struct printk_buffer" when out of "struct printk_buffer" happened.
+
 #
 # Architectures with an unreliable sched_clock() should select this:
 #

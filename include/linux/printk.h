@@ -286,6 +286,30 @@ static inline void printk_safe_flush_on_panic(void)
 }
 #endif
 
+struct printk_buffer;
+#if defined(CONFIG_PRINTK_LINE_BUFFERED)
+struct printk_buffer *get_printk_buffer(void);
+void flush_printk_buffer(struct printk_buffer *ptr);
+__printf(2, 3)
+int buffered_printk(struct printk_buffer *ptr, const char *fmt, ...);
+__printf(2, 0)
+int buffered_vprintk(struct printk_buffer *ptr, const char *fmt, va_list args);
+void put_printk_buffer(struct printk_buffer *ptr);
+#else
+static inline struct printk_buffer *get_printk_buffer(void)
+{
+	return NULL;
+}
+static inline void flush_printk_buffer(struct printk_buffer *ptr)
+{
+}
+#define buffered_printk(ptr, fmt, ...) printk(fmt, ##__VA_ARGS__)
+#define buffered_vprintk(ptr, fmt, args) vprintk(fmt, args)
+static inline void put_printk_buffer(struct printk_buffer *ptr)
+{
+}
+#endif
+
 extern int kptr_restrict;
 
 #ifndef pr_fmt
@@ -300,19 +324,34 @@ extern int kptr_restrict;
  */
 #define pr_emerg(fmt, ...) \
 	printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_emerg(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_alert(fmt, ...) \
 	printk(KERN_ALERT pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_alert(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_ALERT pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_crit(fmt, ...) \
 	printk(KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_crit(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_err(fmt, ...) \
 	printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_err(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_warning(fmt, ...) \
 	printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_warning(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_warn pr_warning
+#define bpr_warn bpr_warning
 #define pr_notice(fmt, ...) \
 	printk(KERN_NOTICE pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_notice(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_NOTICE pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_info(fmt, ...) \
 	printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_info(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 /*
  * Like KERN_CONT, pr_cont() should only be used when continuing
  * a line with no newline ('\n') enclosed. Otherwise it defaults
@@ -320,6 +359,8 @@ extern int kptr_restrict;
  */
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
+#define bpr_cont(ptr, fmt, ...) \
+	buffered_printk(ptr, KERN_CONT fmt, ##__VA_ARGS__)
 
 /* pr_devel() should produce zero code unless DEBUG is defined */
 #ifdef DEBUG
