@@ -760,9 +760,11 @@ no_context(struct pt_regs *regs, unsigned long error_code,
 		 * and then double-fault, though, because we're likely to
 		 * break the console driver and lose most of the stack dump.
 		 */
-		asm volatile ("movq %[stack], %%rsp\n\t"
+		asm volatile (UNWIND_HINT_SAVE
+			      "movq %[stack], %%rsp\n\t"
 			      "call handle_stack_overflow\n\t"
-			      "1: jmp 1b"
+			      "1: jmp 1b\n\t"
+			      UNWIND_HINT_RESTORE
 			      : ASM_CALL_CONSTRAINT
 			      : "D" ("kernel stack overflow (page fault)"),
 				"S" (regs), "d" (address),
