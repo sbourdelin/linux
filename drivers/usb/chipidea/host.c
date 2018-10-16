@@ -28,6 +28,20 @@ struct ehci_ci_priv {
 	struct regulator *reg_vbus;
 };
 
+/* This function is used to override WKCN, WKDN, and WKOC */
+static void ci_ehci_override_wakeup_flag(struct ehci_hcd *ehci,
+		u32 __iomem *reg, u32 flags, bool set)
+{
+	u32 val = ehci_readl(ehci, reg);
+
+	if (set)
+		val |= flags;
+	else
+		val &= ~flags;
+
+	ehci_writel(ehci, val, reg);
+}
+
 static int ehci_ci_portpower(struct usb_hcd *hcd, int portnum, bool enable)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
@@ -170,6 +184,11 @@ static int host_start(struct ci_hdrc *ci)
 			otg->host = &hcd->self;
 			hcd->self.otg_port = 1;
 		}
+
+		if (ci->platdata->notify_event &&
+			(ci->platdata->flags & CI_HDRC_IMX_IS_HSIC))
+			ci->platdata->notify_event
+				(ci, CI_HDRC_IMX_HSIC_ACTIVE_EVENT);
 	}
 
 	return ret;
@@ -218,6 +237,8 @@ void ci_hdrc_host_destroy(struct ci_hdrc *ci)
 static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	struct device *dev = hcd->self.controller;
+	struct ci_hdrc *ci = dev_get_drvdata(dev);
 	int port;
 	u32 tmp;
 
@@ -249,6 +270,9 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
 			 * It needs a short delay between set RS bit and PHCD.
 			 */
 			usleep_range(150, 200);
+			if (ci->platdata->flags & CI_HDRC_IMX_IS_HSIC)
+				ci_ehci_override_wakeup_flag(ehci, reg,
+					PORT_WKDISC_E | PORT_WKCONN_E, false);
 			break;
 		}
 	}
