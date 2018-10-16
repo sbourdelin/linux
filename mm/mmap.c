@@ -2213,7 +2213,7 @@ struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 			rb_node = rb_node->rb_right;
 	}
 
-	if (vma)
+	if (vma && vma->vm_start <= addr)
 		vmacache_update(addr, vma);
 	return vma;
 }
