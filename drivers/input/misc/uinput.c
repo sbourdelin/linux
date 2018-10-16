@@ -42,6 +42,8 @@
 #include <linux/input/mt.h>
 #include "../input-compat.h"
 
+#include <linux/nospec.h>
+
 #define UINPUT_NAME		"uinput"
 #define UINPUT_BUFFER_SIZE	16
 #define UINPUT_NUM_REQUESTS	16
@@ -497,6 +499,7 @@ static int uinput_abs_setup(struct uinput_device *udev,
 
 	if (setup.code > ABS_MAX)
 		return -ERANGE;
+	setup.code = array_index_nospec(setup.code, ABS_MAX + 1);
 
 	dev = udev->dev;
 
