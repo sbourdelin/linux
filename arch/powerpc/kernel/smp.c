@@ -1027,7 +1027,7 @@ static void cpu_idle_thread_init(unsigned int cpu, struct task_struct *idle)
 	paca_ptrs[cpu]->canary = idle->stack_canary;
 #endif
 #endif
-	ti->cpu = cpu;
+	idle->cpu = cpu;
 	secondary_ti = current_set[cpu] = ti;
 }
 
