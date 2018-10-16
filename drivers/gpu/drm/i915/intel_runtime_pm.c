@@ -3964,11 +3964,22 @@ static void intel_power_domains_verify_state(struct drm_i915_private *dev_priv)
 		enabled = power_well->desc->ops->is_enabled(dev_priv,
 							    power_well);
 		if ((power_well->count || power_well->desc->always_on) !=
-		    enabled)
+		    enabled) {
+			/* If DMC firmware is not loaded it could cause a
+			 * mismatch state as we can't disable DC off, so let's
+			 * do not print any errors in this scenario.
+			 */
+
+			if (!strcmp("DC off", power_well->desc->name) &&
+			    !dev_priv->csr.dmc_payload)
+				goto skip_state_mismatch_error;
+
 			DRM_ERROR("power well %s state mismatch (refcount %d/enabled %d)",
 				  power_well->desc->name,
 				  power_well->count, enabled);
+		}
 
+skip_state_mismatch_error:
 		domains_count = 0;
 		for_each_power_domain(domain, power_well->desc->domains)
 			domains_count += power_domains->domain_use_count[domain];
