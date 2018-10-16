@@ -129,4 +129,19 @@ config SPI_STM32_QUADSPI
 	  This enables support for the STM32 Quad SPI controller.
 	  We only connect the NOR to this controller.
 
+config SPI_AMD_SPIROM
+	tristate "AMD Hudson FCH SPI flash drvier (DANGEROUS)"
+	depends on X86 && PCI
+	help
+	  This enables support for the AMD Family 16h SPI flash controller to
+	  access the boot flash from Linux as an mtd device.
+
+	  Using this driver it is possible to upgrade BIOS directly from Linux.
+
+	  Say N here unless you know what you are doing. Overwriting the
+	  SPI flash may render the system unbootable.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called amd-spirom.
+
 endif # MTD_SPI_NOR
