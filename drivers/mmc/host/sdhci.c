@@ -4130,7 +4130,7 @@ int sdhci_setup_host(struct sdhci_host *host)
 		/* This may alter mmc->*_blk_* parameters */
 		ret = sdhci_allocate_bounce_buffer(host);
 		if (ret)
-			return ret;
+			goto unreg;
 	}
 
 	return 0;
