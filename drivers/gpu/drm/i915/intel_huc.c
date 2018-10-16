@@ -108,8 +108,9 @@ fail:
  * This function reads status register to verify if HuC
  * firmware was successfully loaded.
  *
- * Returns positive value if HuC firmware is loaded and verified
- * and -ENODEV if HuC is not present.
+ * Returns: 1 if HuC firmware is loaded and verified,
+ * 0 if HuC firmware is not loaded and -ENODEV if HuC
+ * is not present on this platform.
  */
 int intel_huc_check_status(struct intel_huc *huc)
 {
@@ -120,8 +121,8 @@ int intel_huc_check_status(struct intel_huc *huc)
 		return -ENODEV;
 
 	intel_runtime_pm_get(dev_priv);
-	status = I915_READ(HUC_STATUS2) & HUC_FW_VERIFIED;
+	status = I915_READ(HUC_STATUS2);
 	intel_runtime_pm_put(dev_priv);
 
-	return status;
+	return status & HUC_FW_VERIFIED ? 1 : 0;
 }
