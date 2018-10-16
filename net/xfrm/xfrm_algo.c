@@ -241,7 +241,11 @@ static struct xfrm_algo_desc aalg_list[] = {
 
 	.uinfo = {
 		.auth = {
+#if IS_ENABLED(CONFIG_XFRM_HMAC_SHA256_RFC4868)
+			.icv_truncbits = 128,
+#else
 			.icv_truncbits = 96,
+#endif
 			.icv_fullbits = 256,
 		}
 	},

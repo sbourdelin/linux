@@ -15,6 +15,16 @@ config XFRM_ALGO
 	select XFRM
 	select CRYPTO
 
+config XFRM_HMAC_SHA256_RFC4868
+	bool "Strict RFC4868 hmac(sha256) 128-bit truncation"
+	depends on XFRM_ALGO
+	default n
+	---help---
+	  Support strict RFC4868 hmac(sha256) 128-bit truncation
+	  (default on Android) instead of the default 96-bit Linux truncation.
+
+	  If unsure, say N.
+
 config XFRM_USER
 	tristate "Transformation user configuration interface"
 	depends on INET
