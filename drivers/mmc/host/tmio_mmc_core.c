@@ -1330,8 +1330,8 @@ int tmio_mmc_host_runtime_resume(struct device *dev)
 {
 	struct tmio_mmc_host *host = dev_get_drvdata(dev);
 
-	tmio_mmc_reset(host);
 	tmio_mmc_clk_enable(host);
+	tmio_mmc_reset(host);
 
 	if (host->clk_cache)
 		host->set_clock(host, host->clk_cache);
