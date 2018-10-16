@@ -73,14 +73,12 @@ config CMDLINE
 config CMDLINE_FORCE
 	bool "Force default kernel command string"
 	depends on CMDLINE_BOOL
-	default n
 	help
 	  Set this to have arguments from the default kernel command string
 	  override those passed by the boot loader.
 
 config CPU_BIG_ENDIAN
 	bool "Build big-endian kernel"
-	default n
 	help
 	  Say Y if you plan on running a kernel in big-endian mode.
 	  Note that your board must be properly built and your board
