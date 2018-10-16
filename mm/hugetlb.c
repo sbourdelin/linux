@@ -3285,7 +3285,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			}
 			set_huge_swap_pte_at(dst, addr, dst_pte, entry, sz);
 		} else {
-			if (cow) {
+			if (cow && huge_pte_write(entry)) {
 				/*
 				 * No need to notify as we are downgrading page
 				 * table protection not changing it to point
