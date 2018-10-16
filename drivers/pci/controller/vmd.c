@@ -589,6 +589,7 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	LIST_HEAD(resources);
 	resource_size_t offset[2] = {0};
 	resource_size_t membar2_offset = 0x2000, busn_start = 0;
+	u8 interface;
 
 	/*
 	 * Shadow registers may exist in certain VMD device ids which allow
@@ -717,6 +718,35 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	vmd_setup_dma_ops(vmd);
 	dev_set_msi_domain(&vmd->bus->dev, vmd->irq_domain);
 	pci_rescan_bus(vmd->bus);
+
+	/*
+	 * Certain VMD devices may request firmware-first error handling
+	 * support on the domain. These domains are virtual and not described
+	 * by ACPI and must be configured manually. VMD domains which utilize
+	 * firmware-first may still require further kernel error handling, but
+	 * the domain is intended to first interrupt upon error to system
+	 * firmware before being passed back to the kernel. The system error
+	 * handling bits in the root port control register must be enabled
+	 * following the AER service driver configuration in order to generate
+	 * these system interrupts.
+	 *
+	 * Because the root ports are not described by ACPI and _OSC is
+	 * unsupported in VMD domains, the intent to use firmware-first error
+	 * handling in the root ports is instead described by the VMD device's
+	 * interface bit.
+	 */
+	pci_read_config_byte(vmd->dev, PCI_CLASS_PROG, &interface);
+	if (interface == 0x1) {
+		struct pci_dev *rpdev;
+
+		list_for_each_entry(rpdev, &vmd->bus->devices, bus_list) {
+			if (rpdev->aer_cap)
+				pcie_capability_set_word(rpdev, PCI_EXP_RTCTL,
+							 PCI_EXP_RTCTL_SECEE  |
+							 PCI_EXP_RTCTL_SENFEE |
+							 PCI_EXP_RTCTL_SEFEE);
+		}
+	}
 
 	WARN(sysfs_create_link(&vmd->dev->dev.kobj, &vmd->bus->dev.kobj,
 			       "domain"), "Can't create symlink to domain\n");
