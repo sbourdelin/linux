@@ -16,9 +16,9 @@ struct xt_quota_info {
 	__u32 pad;
 	__aligned_u64 quota;
 #ifdef __KERNEL__
-	atomic64_t counter;
+	atomic64_t consumed;
 #else
-	__aligned_u64 remain;
+	__aligned_u64 consumed;
 #endif
 };
 
