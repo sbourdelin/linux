@@ -87,6 +87,19 @@
  */
 #define GASKET_EXTENDED_LVL1_SHIFT 12
 
+/*
+ * Utilities for accessing flags bitfields.
+ */
+#define MASK(field)            (((1u << field##_WIDTH) - 1) << field##_SHIFT)
+#define GET(field, flags)      (((flags) & MASK(field)) >> field##_SHIFT)
+#define SET(field, flags, val) (((flags) & ~MASK(field)) | ((val) << field##_SHIFT))
+
+#define FLAGS_STATUS_SHIFT 0
+#define FLAGS_STATUS_WIDTH 1
+
+#define FLAGS_DMA_DIRECTION_SHIFT 1
+#define FLAGS_DMA_DIRECTION_WIDTH 2
+
 /* Type declarations */
 /* Valid states for a struct gasket_page_table_entry. */
 enum pte_status {
@@ -108,8 +121,12 @@ enum pte_status {
  * to the actual page mapped and described by this structure.
  */
 struct gasket_page_table_entry {
-	/* The status of this entry/slot: free or in use. */
-	enum pte_status status;
+	/*
+	 * Internal structure matches gasket_page_table_ioctl_flags.flags.
+	 * NOTE: All fields should have a default value of 0. This ensures that
+	 * the kernel will be backwards compatible with old drivers.
+	 */
+	u32 flags;
 
 	/*
 	 * Index for alignment into host vaddrs.
@@ -305,7 +322,7 @@ static bool gasket_is_pte_range_free(struct gasket_page_table_entry *ptes,
 	int i;
 
 	for (i = 0; i < num_entries; i++) {
-		if (ptes[i].status != PTE_FREE)
+		if (GET(FLAGS_STATUS, ptes[i].flags) != PTE_FREE)
 			return false;
 	}
 
@@ -321,7 +338,7 @@ static void gasket_free_extended_subtable(struct gasket_page_table *pg_tbl,
 					  u64 __iomem *slot)
 {
 	/* Release the page table from the driver */
-	pte->status = PTE_FREE;
+	pte->flags = SET(FLAGS_STATUS, pte->flags, PTE_FREE);
 
 	/* Release the page table from the device */
 	writeq(0, slot);
@@ -355,7 +372,7 @@ gasket_page_table_garbage_collect_nolock(struct gasket_page_table *pg_tbl)
 	     slot = pg_tbl->base_slot + pg_tbl->num_simple_entries;
 	     pte < pg_tbl->entries + pg_tbl->config.total_entries;
 	     pte++, slot++) {
-		if (pte->status == PTE_INUSE) {
+		if (GET(FLAGS_STATUS, pte->flags) == PTE_INUSE) {
 			if (gasket_is_pte_range_free(pte->sublevel,
 						     GASKET_PAGES_PER_SUBTABLE))
 				gasket_free_extended_subtable(pg_tbl, pte,
@@ -404,7 +421,7 @@ int gasket_page_table_partition(struct gasket_page_table *pg_tbl,
 	start = min(pg_tbl->num_simple_entries, num_simple_entries);
 
 	for (i = start; i < pg_tbl->config.total_entries; i++) {
-		if (pg_tbl->entries[i].status != PTE_FREE) {
+		if (GET(FLAGS_STATUS, pg_tbl->entries[i].flags) != PTE_FREE) {
 			dev_err(pg_tbl->device, "entry %d is not free\n", i);
 			mutex_unlock(&pg_tbl->mutex);
 			return -EBUSY;
@@ -465,7 +482,8 @@ static bool gasket_release_page(struct page *page)
 static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
 				  struct gasket_page_table_entry *ptes,
 				  u64 __iomem *slots, ulong host_addr,
-				  uint num_pages, int is_simple_mapping)
+				  uint num_pages, u32 flags,
+				  int is_simple_mapping)
 {
 	int ret;
 	ulong offset;
@@ -473,6 +491,12 @@ static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
 	dma_addr_t dma_addr;
 	ulong page_addr;
 	int i;
+
+	if (GET(FLAGS_DMA_DIRECTION, flags) == DMA_NONE) {
+		dev_err(pg_tbl->device, "invalid DMA direction flags=0x%lx\n",
+			(unsigned long)flags);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < num_pages; i++) {
 		page_addr = host_addr + i * PAGE_SIZE;
@@ -502,9 +526,8 @@ static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
 			ptes[i].offset = offset;
 
 			/* Map the page into DMA space. */
-			ptes[i].dma_addr =
-				dma_map_page(pg_tbl->device, page, 0, PAGE_SIZE,
-					     DMA_BIDIRECTIONAL);
+			ptes[i].dma_addr = dma_map_page(pg_tbl->device, page, 0, PAGE_SIZE,
+							GET(FLAGS_DMA_DIRECTION, flags));
 
 			if (dma_mapping_error(pg_tbl->device,
 					      ptes[i].dma_addr)) {
@@ -531,7 +554,9 @@ static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
 				       (void *)&((u64 __force *)slots)[i],
 				       sizeof(u64), DMA_TO_DEVICE);
 		}
-		ptes[i].status = PTE_INUSE;
+
+		/* Set PTE flags equal to flags param with STATUS=PTE_INUSE. */
+		ptes[i].flags = SET(FLAGS_STATUS, flags, PTE_INUSE);
 	}
 	return 0;
 }
@@ -600,7 +625,8 @@ static void gasket_perform_unmapping(struct gasket_page_table *pg_tbl,
 	 */
 	for (i = 0; i < num_pages; i++) {
 		/* release the address from the device, */
-		if (is_simple_mapping || ptes[i].status == PTE_INUSE) {
+		if (is_simple_mapping ||
+		    GET(FLAGS_STATUS, ptes[i].flags) == PTE_INUSE) {
 			writeq(0, &slots[i]);
 		} else {
 			((u64 __force *)slots)[i] = 0;
@@ -609,15 +635,14 @@ static void gasket_perform_unmapping(struct gasket_page_table *pg_tbl,
 		}
 
 		/* release the address from the driver, */
-		if (ptes[i].status == PTE_INUSE) {
+		if (GET(FLAGS_STATUS, ptes[i].flags) == PTE_INUSE) {
 			if (ptes[i].page && ptes[i].dma_addr) {
-				dma_unmap_page(pg_tbl->device, ptes[i].dma_addr,
-					       PAGE_SIZE, DMA_BIDIRECTIONAL);
+				dma_unmap_page(pg_tbl->device, ptes[i].dma_addr, PAGE_SIZE,
+					       GET(FLAGS_DMA_DIRECTION, ptes[i].flags));
+				if (gasket_release_page(ptes[i].page))
+					--pg_tbl->num_active_pages;
 			}
-			if (gasket_release_page(ptes[i].page))
-				--pg_tbl->num_active_pages;
 		}
-
 		/* and clear the PTE. */
 		memset(&ptes[i], 0, sizeof(struct gasket_page_table_entry));
 	}
@@ -656,7 +681,7 @@ static void gasket_unmap_extended_pages(struct gasket_page_table *pg_tbl,
 		/* TODO: Add check to ensure pte remains valid? */
 		len = min(remain, GASKET_PAGES_PER_SUBTABLE - slot_idx);
 
-		if (pte->status == PTE_INUSE) {
+		if (GET(FLAGS_STATUS, pte->flags) == PTE_INUSE) {
 			slot_base = (u64 __iomem *)(page_address(pte->page) +
 						    pte->offset);
 			gasket_perform_unmapping(pg_tbl,
@@ -818,7 +843,7 @@ static void gasket_page_table_unmap_nolock(struct gasket_page_table *pg_tbl,
  */
 static int gasket_map_simple_pages(struct gasket_page_table *pg_tbl,
 				   ulong host_addr, ulong dev_addr,
-				   uint num_pages)
+				   uint num_pages, u32 flags)
 {
 	int ret;
 	uint slot_idx = gasket_simple_page_idx(pg_tbl, dev_addr);
@@ -833,7 +858,7 @@ static int gasket_map_simple_pages(struct gasket_page_table *pg_tbl,
 
 	ret = gasket_perform_mapping(pg_tbl, pg_tbl->entries + slot_idx,
 				     pg_tbl->base_slot + slot_idx, host_addr,
-				     num_pages, 1);
+				     num_pages, flags, 1);
 
 	if (ret) {
 		gasket_page_table_unmap_nolock(pg_tbl, dev_addr, num_pages);
@@ -888,7 +913,7 @@ static int gasket_alloc_extended_subtable(struct gasket_page_table *pg_tbl,
 	dma_addr = (pte->dma_addr + pte->offset) | GASKET_VALID_SLOT_FLAG;
 	writeq(dma_addr, slot);
 
-	pte->status = PTE_INUSE;
+	pte->flags = SET(FLAGS_STATUS, pte->flags, PTE_INUSE);
 
 	return 0;
 }
@@ -926,7 +951,7 @@ static int gasket_alloc_extended_entries(struct gasket_page_table *pg_tbl,
 		len = min(remain,
 			  GASKET_PAGES_PER_SUBTABLE - subtable_slot_idx);
 
-		if (pte->status == PTE_FREE) {
+		if (GET(FLAGS_STATUS, pte->flags) == PTE_FREE) {
 			ret = gasket_alloc_extended_subtable(pg_tbl, pte, slot);
 			if (ret) {
 				dev_err(pg_tbl->device,
@@ -954,7 +979,7 @@ static int gasket_alloc_extended_entries(struct gasket_page_table *pg_tbl,
  */
 static int gasket_map_extended_pages(struct gasket_page_table *pg_tbl,
 				     ulong host_addr, ulong dev_addr,
-				     uint num_pages)
+				     uint num_pages, u32 flags)
 {
 	int ret;
 	ulong dev_addr_end;
@@ -988,7 +1013,7 @@ static int gasket_map_extended_pages(struct gasket_page_table *pg_tbl,
 			(u64 __iomem *)(page_address(pte->page) + pte->offset);
 		ret = gasket_perform_mapping(pg_tbl, pte->sublevel + slot_idx,
 					     slot_base + slot_idx, host_addr,
-					     len, 0);
+					     len, flags, 0);
 		if (ret) {
 			gasket_page_table_unmap_nolock(pg_tbl, dev_addr,
 						       num_pages);
@@ -1013,7 +1038,7 @@ static int gasket_map_extended_pages(struct gasket_page_table *pg_tbl,
  * The page table mutex is held for the entire operation.
  */
 int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
-			  ulong dev_addr, uint num_pages)
+			  ulong dev_addr, uint num_pages, u32 flags)
 {
 	int ret;
 
@@ -1024,10 +1049,10 @@ int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
 
 	if (gasket_addr_is_simple(pg_tbl, dev_addr)) {
 		ret = gasket_map_simple_pages(pg_tbl, host_addr, dev_addr,
-					      num_pages);
+					      num_pages, flags);
 	} else {
 		ret = gasket_map_extended_pages(pg_tbl, host_addr, dev_addr,
-						num_pages);
+						num_pages, flags);
 	}
 
 	mutex_unlock(&pg_tbl->mutex);
@@ -1102,7 +1127,7 @@ int gasket_page_table_lookup_page(
 			goto fail;
 
 		pte = pg_tbl->entries + page_num;
-		if (pte->status != PTE_INUSE)
+		if (GET(FLAGS_STATUS, pte->flags) != PTE_INUSE)
 			goto fail;
 	} else {
 		/* Find the level 0 entry, */
@@ -1111,13 +1136,13 @@ int gasket_page_table_lookup_page(
 			goto fail;
 
 		pte = pg_tbl->entries + pg_tbl->num_simple_entries + page_num;
-		if (pte->status != PTE_INUSE)
+		if (GET(FLAGS_STATUS, pte->flags) != PTE_INUSE)
 			goto fail;
 
 		/* and its contained level 1 entry. */
 		page_num = gasket_extended_lvl1_page_idx(pg_tbl, dev_addr);
 		pte = pte->sublevel + page_num;
-		if (pte->status != PTE_INUSE)
+		if (GET(FLAGS_STATUS, pte->flags) != PTE_INUSE)
 			goto fail;
 	}
 
