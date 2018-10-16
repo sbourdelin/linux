@@ -194,6 +194,16 @@ config IXGBE_DCB
 
 	  If unsure, say N.
 
+config IXGBE_IPSEC
+	bool "IPSec XFRM cryptography-offload accelaration"
+	default n
+	depends on IXGBE
+	depends on XFRM_OFFLOAD
+	default y
+	select XFRM_ALGO
+	---help---
+	  Enable support for IPSec offload in ixgbe.ko
+
 config IXGBEVF
 	tristate "Intel(R) 10GbE PCI Express Virtual Function Ethernet support"
 	depends on PCI_MSI
