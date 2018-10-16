@@ -2778,10 +2778,12 @@ static bool ieee80211_mark_sta_auth(struct ieee80211_sub_if_data *sdata,
 	sta = sta_info_get(sdata, bssid);
 	if (!sta) {
 		WARN_ONCE(1, "%s: STA %pM not found", sdata->name, bssid);
+		mutex_unlock(&sdata->local->sta_mtx);
 		return false;
 	}
 	if (sta_info_move_state(sta, IEEE80211_STA_AUTH)) {
 		sdata_info(sdata, "failed moving %pM to auth\n", bssid);
+		mutex_unlock(&sdata->local->sta_mtx);
 		return false;
 	}
 	mutex_unlock(&sdata->local->sta_mtx);
