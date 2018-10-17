@@ -50,7 +50,8 @@ void intel_guc_init_send_regs(struct intel_guc *guc)
 	unsigned int i;
 
 	guc->send_regs.base = i915_mmio_reg_offset(SOFT_SCRATCH(0));
-	guc->send_regs.count = SOFT_SCRATCH_COUNT - 1;
+	guc->send_regs.count = 8;
+	GEM_BUG_ON(guc->send_regs.count > SOFT_SCRATCH_COUNT);
 
 	for (i = 0; i < guc->send_regs.count; i++) {
 		fw_domains |= intel_uncore_forcewake_for_reg(dev_priv,
