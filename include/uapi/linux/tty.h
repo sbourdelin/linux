@@ -38,5 +38,6 @@
 #define N_NCI		25	/* NFC NCI UART */
 #define N_SPEAKUP	26	/* Speakup communication with synths */
 #define N_NULL		27	/* Null ldisc used for error handling */
+#define N_PN532		28	/* NXP PN532 NFC chip */
 
 #endif /* _UAPI_LINUX_TTY_H */
