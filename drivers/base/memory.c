@@ -283,6 +283,8 @@ static int memory_subsys_online(struct device *dev)
 	struct memory_block *mem = to_memory_block(dev);
 	int ret;
 
+	lockdep_assert_held(&dev->mutex);
+
 	if (mem->state == MEM_ONLINE)
 		return 0;
 
@@ -306,6 +308,8 @@ static int memory_subsys_online(struct device *dev)
 static int memory_subsys_offline(struct device *dev)
 {
 	struct memory_block *mem = to_memory_block(dev);
+
+	lockdep_assert_held(&dev->mutex);
 
 	if (mem->state == MEM_OFFLINE)
 		return 0;

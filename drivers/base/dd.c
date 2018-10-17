@@ -315,11 +315,15 @@ __exitcall(deferred_probe_exit);
  */
 bool device_is_bound(struct device *dev)
 {
+	lockdep_assert_held(&dev->mutex);
+
 	return dev->p && klist_node_attached(&dev->p->knode_driver);
 }
 
 static void driver_bound(struct device *dev)
 {
+	lockdep_assert_held(&dev->mutex);
+
 	if (device_is_bound(dev)) {
 		printk(KERN_WARNING "%s: device %s already bound\n",
 			__func__, kobject_name(&dev->kobj));
@@ -362,6 +366,8 @@ static DEVICE_ATTR_WO(coredump);
 static int driver_sysfs_add(struct device *dev)
 {
 	int ret;
+
+	lockdep_assert_held(&dev->mutex);
 
 	if (dev->bus)
 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
@@ -421,6 +427,8 @@ int device_bind_driver(struct device *dev)
 {
 	int ret;
 
+	lockdep_assert_held(&dev->mutex);
+
 	ret = driver_sysfs_add(dev);
 	if (!ret)
 		driver_bound(dev);
@@ -449,6 +457,8 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 	int local_trigger_count = atomic_read(&deferred_trigger_count);
 	bool test_remove = IS_ENABLED(CONFIG_DEBUG_TEST_DRIVER_REMOVE) &&
 			   !drv->suppress_bind_attrs;
+
+	lockdep_assert_held(&dev->mutex);
 
 	if (defer_all_probes) {
 		/*
@@ -589,6 +599,8 @@ static int really_probe_debug(struct device *dev, struct device_driver *drv)
 	ktime_t calltime, delta, rettime;
 	int ret;
 
+	lockdep_assert_held(&dev->mutex);
+
 	calltime = ktime_get();
 	ret = really_probe(dev, drv);
 	rettime = ktime_get();
@@ -644,6 +656,8 @@ EXPORT_SYMBOL_GPL(wait_for_device_probe);
 int driver_probe_device(struct device_driver *drv, struct device *dev)
 {
 	int ret = 0;
+
+	lockdep_assert_held(&dev->mutex);
 
 	/*
 	 * Several callers check the driver pointer without holding the
@@ -931,6 +945,8 @@ EXPORT_SYMBOL_GPL(driver_attach);
 static void __device_release_driver(struct device *dev, struct device *parent)
 {
 	struct device_driver *drv;
+
+	lockdep_assert_held(&dev->mutex);
 
 	drv = dev->driver;
 	if (drv) {
