@@ -27,6 +27,7 @@
 #include <linux/async.h>
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/devinfo.h>
+#include <linux/slab.h>
 
 #include "base.h"
 #include "power/power.h"
@@ -691,6 +692,49 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
 	return ret;
 }
 
+struct driver_and_dev {
+	struct device_driver	*drv;
+	struct device		*dev;
+};
+
+static void __driver_probe_device_async(void *data, async_cookie_t cookie)
+{
+	struct driver_and_dev *dd = data;
+	struct device_driver *drv = dd->drv;
+	struct device *dev = dd->dev;
+
+	device_lock(dev);
+	driver_probe_device(drv, dev);
+	device_unlock(dev);
+	kobject_put(&drv->p->kobj);
+	module_put(drv->owner);
+	kfree(dd);
+}
+
+static void driver_probe_device_async(struct device_driver *drv,
+				      struct device *dev)
+{
+	struct driver_and_dev *dd;
+
+	if (!try_module_get(drv->owner))
+		return;
+	dd = kmalloc(sizeof(*dd), GFP_KERNEL);
+	if (!dd) {
+		/* If out of memory, scan synchronously. */
+		device_lock(dev);
+		driver_probe_device(drv, dev);
+		device_unlock(dev);
+		module_put(drv->owner);
+		return;
+	}
+	*dd = (struct driver_and_dev){
+		.drv = drv,
+		.dev = dev,
+	};
+	kobject_get(&drv->p->kobj);
+	async_schedule(__driver_probe_device_async, dd);
+}
+
 bool driver_allows_async_probing(struct device_driver *drv)
 {
 	switch (drv->probe_type) {
@@ -776,6 +820,11 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
 
 	if (data->check_async && async_allowed != data->want_async)
 		return 0;
+
+	if (data->check_async) {
+		driver_probe_device_async(drv, dev);
+		return 0;
+	}
 
 	return driver_probe_device(drv, dev);
 }
