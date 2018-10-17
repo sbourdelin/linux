@@ -87,6 +87,8 @@ static inline u_int8_t xt_family(const struct xt_action_param *par)
  * @match:	struct xt_match through which this function was invoked
  * @matchinfo:	per-match data
  * @hook_mask:	via which hooks the new rule is reachable
+ * @family:	address family
+ * @nft_compat:	true if extensions run from nft compat layer
  * Other fields as above.
  */
 struct xt_mtchk_param {
