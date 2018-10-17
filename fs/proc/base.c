@@ -2356,7 +2356,7 @@ static ssize_t timerslack_ns_write(struct file *file, const char __user *buf,
 		return -ESRCH;
 
 	if (p != current) {
-		if (!capable(CAP_SYS_NICE)) {
+		if (!ns_capable(file->f_cred->user_ns, CAP_SYS_NICE)) {
 			count = -EPERM;
 			goto out;
 		}
@@ -2393,7 +2393,7 @@ static int timerslack_ns_show(struct seq_file *m, void *v)
 
 	if (p != current) {
 
-		if (!capable(CAP_SYS_NICE)) {
+		if (!ns_capable(seq_user_ns(m), CAP_SYS_NICE)) {
 			err = -EPERM;
 			goto out;
 		}
