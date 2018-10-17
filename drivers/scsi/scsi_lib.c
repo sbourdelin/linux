@@ -3052,11 +3052,12 @@ scsi_device_quiesce(struct scsi_device *sdev)
 	int err;
 
 	/*
-	 * It is allowed to call scsi_device_quiesce() multiple times from
-	 * the same context but concurrent scsi_device_quiesce() calls are
-	 * not allowed.
+	 * Since all scsi_device_quiesce() and scsi_device_resume() calls
+	 * are serialized it is safe here to check the device state without
+	 * holding the SCSI device state mutex.
 	 */
-	WARN_ON_ONCE(sdev->quiesced_by && sdev->quiesced_by != current);
+	if (sdev->sdev_state == SDEV_QUIESCE)
+		return 0;
 
 	blk_set_preempt_only(q);
 
@@ -3072,9 +3073,7 @@ scsi_device_quiesce(struct scsi_device *sdev)
 
 	mutex_lock(&sdev->state_mutex);
 	err = scsi_device_set_state(sdev, SDEV_QUIESCE);
-	if (err == 0)
-		sdev->quiesced_by = current;
-	else
+	if (err)
 		blk_clear_preempt_only(q);
 	mutex_unlock(&sdev->state_mutex);
 
@@ -3098,8 +3097,6 @@ void scsi_device_resume(struct scsi_device *sdev)
 	 * device deleted during suspend)
 	 */
 	mutex_lock(&sdev->state_mutex);
-	WARN_ON_ONCE(!sdev->quiesced_by);
-	sdev->quiesced_by = NULL;
 	blk_clear_preempt_only(sdev->request_queue);
 	if (sdev->sdev_state == SDEV_QUIESCE)
 		scsi_device_set_state(sdev, SDEV_RUNNING);
