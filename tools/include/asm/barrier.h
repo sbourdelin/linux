@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+#include <linux/compiler.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include "../../arch/x86/include/asm/barrier.h"
 #elif defined(__arm__)
@@ -25,4 +26,14 @@
 #include "../../arch/xtensa/include/asm/barrier.h"
 #else
 #include <asm-generic/barrier.h>
+#endif
+/* Fallback definitions for archs that haven't been updated yet. */
+#ifndef smp_rmb
+# define smp_rmb()	rmb()
+#endif
+#ifndef smp_wmb
+# define smp_wmb()	wmb()
+#endif
+#ifndef smp_mb
+# define smp_mb()	mb()
 #endif
