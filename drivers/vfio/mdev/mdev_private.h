@@ -63,4 +63,6 @@ int  mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid,
 			unsigned int instances);
 int  mdev_device_remove(struct device *dev, bool force_remove);
 
+int  mdev_max_aggregated_instances(struct kobject *kobj, struct device *dev,
+				   unsigned int *m);
 #endif /* MDEV_PRIVATE_H */

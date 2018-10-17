@@ -103,6 +103,18 @@ static ssize_t create_store(struct kobject *kobj, struct device *dev,
 
 MDEV_TYPE_ATTR_WO(create);
 
+static ssize_t
+aggregation_show(struct kobject *kobj, struct device *dev, char *buf)
+{
+	unsigned int m;
+
+	if (mdev_max_aggregated_instances(kobj, dev, &m))
+		return sprintf(buf, "1\n");
+	else
+		return sprintf(buf, "%u\n", m);
+}
+MDEV_TYPE_ATTR_RO(aggregation);
+
 static void mdev_type_release(struct kobject *kobj)
 {
 	struct mdev_type *type = to_mdev_type(kobj);
@@ -145,6 +157,14 @@ struct mdev_type *add_mdev_supported_type(struct mdev_parent *parent,
 	if (ret)
 		goto attr_create_failed;
 
+	if (parent->ops->create_with_instances &&
+	    parent->ops->max_aggregated_instances) {
+		ret = sysfs_create_file(&type->kobj,
+					&mdev_type_attr_aggregation.attr);
+		if (ret)
+			goto attr_aggregate_failed;
+	}
+
 	type->devices_kobj = kobject_create_and_add("devices", &type->kobj);
 	if (!type->devices_kobj) {
 		ret = -ENOMEM;
@@ -165,6 +185,8 @@ struct mdev_type *add_mdev_supported_type(struct mdev_parent *parent,
 attrs_failed:
 	kobject_put(type->devices_kobj);
 attr_devices_failed:
+	sysfs_remove_file(&type->kobj, &mdev_type_attr_aggregation.attr);
+attr_aggregate_failed:
 	sysfs_remove_file(&type->kobj, &mdev_type_attr_create.attr);
 attr_create_failed:
 	kobject_del(&type->kobj);

@@ -39,6 +39,11 @@ struct mdev_device;
  *			      that is being created
  *                      @instances: number of instances to aggregate
  *			Returns integer: success (0) or error (< 0)
+ * @max_aggregated_instances: Return max number for aggregated resources
+ *			@kobj: kobject of type
+ *                      @dev: mdev parent device for target type
+ *                      @max: return max number of instances which can aggregate
+ *			Returns integer: success (0) or error (< 0)
  * @remove:		Called to free resources in parent device's driver for a
  *			a mediated device. It is mandatory to provide 'remove'
  *			ops.
@@ -82,6 +87,9 @@ struct mdev_parent_ops {
 	int     (*create_with_instances)(struct kobject *kobj,
 					 struct mdev_device *mdev,
 					 unsigned int instances);
+	int     (*max_aggregated_instances)(struct kobject *kobj,
+					    struct device *dev,
+					    unsigned int *max);
 	int     (*remove)(struct mdev_device *mdev);
 	int     (*open)(struct mdev_device *mdev);
 	void    (*release)(struct mdev_device *mdev);
