@@ -35,6 +35,11 @@ extern struct drmem_lmb_info *drmem_info;
 		&drmem_info->lmbs[0],				\
 		&drmem_info->lmbs[drmem_info->n_lmbs - 1])
 
+#define for_each_dinfo_lmb(dinfo, lmb)				\
+	for_each_drmem_lmb_in_range((lmb),			\
+		&dinfo->lmbs[0],				\
+		&dinfo->lmbs[dinfo->n_lmbs - 1])
+
 /*
  * The of_drconf_cell_v1 struct defines the layout of the LMB data
  * specified in the ibm,dynamic-memory device tree property.
@@ -93,6 +98,14 @@ u64 drmem_lmb_memory_max(void);
 void __init walk_drmem_lmbs(struct device_node *dn,
 			void (*func)(struct drmem_lmb *, const __be32 **));
 int drmem_update_dt(void);
+
+struct drmem_lmb_info *drmem_lmbs_init(struct property *prop);
+void drmem_lmbs_free(struct drmem_lmb_info *dinfo);
+int walk_drmem_lmbs_pairs(struct drmem_lmb_info *dinfo_oth,
+			  int (*func)(struct drmem_lmb *cnt,
+					struct drmem_lmb *oth,
+					void *data),
+			  void *data);
 
 #ifdef CONFIG_PPC_PSERIES
 void __init walk_drmem_lmbs_early(unsigned long node,
