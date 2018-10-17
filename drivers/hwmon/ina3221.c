@@ -45,12 +45,16 @@
 #define INA3221_CONFIG_MODE_BUS		BIT(1)
 #define INA3221_CONFIG_MODE_CONTINUOUS	BIT(2)
 #define INA3221_CONFIG_CHx_EN(x)	BIT(14 - (x))
+#define INA3221_CONFIG_CHs_EN_MASK	GENMASK(14, 12)
 
 #define INA3221_RSHUNT_DEFAULT		10000
 
 enum ina3221_fields {
 	/* Configuration */
 	F_RST,
+
+	/* Status Flags */
+	F_CVRF,
 
 	/* Alert Flags */
 	F_WF3, F_WF2, F_WF1,
@@ -63,6 +67,7 @@ enum ina3221_fields {
 static const struct reg_field ina3221_reg_fields[] = {
 	[F_RST] = REG_FIELD(INA3221_CONFIG, 15, 15),
 
+	[F_CVRF] = REG_FIELD(INA3221_MASK_ENABLE, 0, 0),
 	[F_WF3] = REG_FIELD(INA3221_MASK_ENABLE, 3, 3),
 	[F_WF2] = REG_FIELD(INA3221_MASK_ENABLE, 4, 4),
 	[F_WF1] = REG_FIELD(INA3221_MASK_ENABLE, 5, 5),
@@ -109,6 +114,19 @@ struct ina3221_data {
 static inline bool ina3221_is_enabled(struct ina3221_data *ina, int channel)
 {
 	return ina->reg_config & INA3221_CONFIG_CHx_EN(channel);
+}
+
+static inline int ina3221_wait_for_data_if_active(struct ina3221_data *ina)
+{
+	u32 cvrf;
+
+	/* No need to wait if all channels are disabled */
+	if ((ina->reg_config & INA3221_CONFIG_CHs_EN_MASK) == 0)
+		return 0;
+
+	/* Polling the CVRF bit to make sure read data is ready */
+	return regmap_field_read_poll_timeout(ina->fields[F_CVRF],
+					      cvrf, cvrf, 100, 100000);
 }
 
 static int ina3221_read_value(struct ina3221_data *ina, unsigned int reg,
@@ -257,6 +275,13 @@ static int ina3221_write_enable(struct device *dev, int channel, bool enable)
 	ret = regmap_read(ina->regmap, INA3221_CONFIG, &ina->reg_config);
 	if (ret)
 		return ret;
+
+	/* Make sure data conversion is finished */
+	ret = ina3221_wait_for_data_if_active(ina);
+	if (ret) {
+		dev_err(dev, "Timed out at waiting for CVRF bit\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -675,6 +700,13 @@ static int __maybe_unused ina3221_resume(struct device *dev)
 	ret = regmap_write(ina->regmap, INA3221_CONFIG, ina->reg_config);
 	if (ret)
 		return ret;
+
+	/* Make sure data conversion is finished */
+	ret = ina3221_wait_for_data_if_active(ina);
+	if (ret) {
+		dev_err(dev, "Timed out at waiting for CVRF bit\n");
+		return ret;
+	}
 
 	return 0;
 }
