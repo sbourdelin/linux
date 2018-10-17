@@ -128,7 +128,7 @@ reset_hfcpci(struct IsdnCardState *cs)
 	Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
 
 	/* Clear already pending ints */
-	if (Read_hfc(cs, HFCPCI_INT_S1));
+	(void) Read_hfc(cs, HFCPCI_INT_S1);
 
 	Write_hfc(cs, HFCPCI_STATES, HFCPCI_LOAD_STATE | 2);	/* HFC ST 2 */
 	udelay(10);
@@ -158,7 +158,7 @@ reset_hfcpci(struct IsdnCardState *cs)
 	/* Finally enable IRQ output */
 	cs->hw.hfcpci.int_m2 = HFCPCI_IRQ_ENABLE;
 	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
-	if (Read_hfc(cs, HFCPCI_INT_S1));
+	(void) Read_hfc(cs, HFCPCI_INT_S1);
 }
 
 /***************************************************/
@@ -1537,7 +1537,7 @@ hfcpci_bh(struct work_struct *work)
 					cs->hw.hfcpci.int_m1 &= ~HFCPCI_INTS_TIMER;
 					Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
 					/* Clear already pending ints */
-					if (Read_hfc(cs, HFCPCI_INT_S1));
+					(void) Read_hfc(cs, HFCPCI_INT_S1);
 					Write_hfc(cs, HFCPCI_STATES, 4 | HFCPCI_LOAD_STATE);
 					udelay(10);
 					Write_hfc(cs, HFCPCI_STATES, 4);
