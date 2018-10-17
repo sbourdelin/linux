@@ -38,6 +38,9 @@
 #include <linux/mii.h>
 #include <linux/bitops.h>
 #include <linux/if_vlan.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/tcp.h>
 #include <linux/workqueue.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -1410,6 +1413,52 @@ static inline u16 emac_tx_csum(struct emac_instance *dev,
 	return 0;
 }
 
+const u32 tah_ss[TAH_NO_SSR] = { 9000, 4500, 1500, 1300, 576, 176 };
+
+static int emac_tx_tso(struct emac_instance *dev, struct sk_buff *skb,
+		       u16 *ctrl)
+{
+	if (emac_has_feature(dev, EMAC_FTR_TAH_HAS_TSO) &&
+	    skb_is_gso(skb) && !!(skb_shinfo(skb)->gso_type &
+				(SKB_GSO_TCPV4 | SKB_GSO_TCPV6))) {
+		u32 seg_size = 0, i;
+
+		/* Get the MTU */
+		seg_size = skb_shinfo(skb)->gso_size + tcp_hdrlen(skb)
+			+ skb_network_header_len(skb);
+
+		/* Restriction applied for the segmentation size
+		 * to use HW segmentation offload feature: the size
+		 * of the segment must not be less than 168 bytes for
+		 * DIX formatted segments, or 176 bytes for
+		 * IEEE formatted segments.
+		 *
+		 * I use value 176 to check for the segment size here
+		 * as it can cover both 2 conditions above.
+		 */
+		if (seg_size < 176)
+			return -ENODEV;
+
+		/* Get the best suitable MTU */
+		for (i = 0; i < ARRAY_SIZE(tah_ss); i++) {
+			u32 curr_seg = tah_ss[i];
+
+			if (curr_seg > dev->ndev->mtu ||
+			    curr_seg > seg_size)
+				continue;
+
+			*ctrl &= ~EMAC_TX_CTRL_TAH_CSUM;
+			*ctrl |= EMAC_TX_CTRL_TAH_SSR(i);
+			return 0;
+		}
+
+		/* none found fall back to software */
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static inline netdev_tx_t emac_xmit_finish(struct emac_instance *dev, int len)
 {
 	struct emac_regs __iomem *p = dev->emacp;
@@ -1452,8 +1501,46 @@ static inline u16 emac_tx_vlan(struct emac_instance *dev, struct sk_buff *skb)
 	return 0;
 }
 
+static netdev_tx_t
+emac_start_xmit(struct sk_buff *skb, struct net_device *ndev);
+
+static netdev_tx_t emac_sw_tso(struct sk_buff *skb, struct net_device *ndev)
+{
+	struct emac_instance *dev = netdev_priv(ndev);
+	struct sk_buff *segs, *curr;
+
+	segs = skb_gso_segment(skb, ndev->features &
+					~(NETIF_F_TSO | NETIF_F_TSO6));
+	if (IS_ERR_OR_NULL(segs)) {
+		goto drop;
+	} else {
+		while (segs) {
+			/* check for overflow */
+			if (dev->tx_cnt >= NUM_TX_BUFF) {
+				dev_kfree_skb_any(segs);
+				goto drop;
+			}
+
+			curr = segs;
+			segs = curr->next;
+			curr->next = NULL;
+
+			emac_start_xmit(curr, ndev);
+		}
+		dev_consume_skb_any(skb);
+	}
+
+	return NETDEV_TX_OK;
+
+drop:
+	++dev->estats.tx_dropped;
+	dev_kfree_skb_any(skb);
+	return NETDEV_TX_OK;
+}
+
 /* Tx lock BH */
-static netdev_tx_t emac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+static netdev_tx_t
+emac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct emac_instance *dev = netdev_priv(ndev);
 	unsigned int len = skb->len;
@@ -1461,6 +1548,9 @@ static netdev_tx_t emac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	u16 ctrl = EMAC_TX_CTRL_GFCS | EMAC_TX_CTRL_GP | MAL_TX_CTRL_READY |
 	    MAL_TX_CTRL_LAST | emac_tx_csum(dev, skb) | emac_tx_vlan(dev, skb);
+
+	if (emac_tx_tso(dev, skb, &ctrl))
+		return emac_sw_tso(skb, ndev);
 
 	slot = dev->tx_slot++;
 	if (dev->tx_slot == NUM_TX_BUFF) {
@@ -1536,6 +1626,9 @@ emac_start_xmit_sg(struct sk_buff *skb, struct net_device *ndev)
 
 	ctrl = EMAC_TX_CTRL_GFCS | EMAC_TX_CTRL_GP | MAL_TX_CTRL_READY |
 	    emac_tx_csum(dev, skb) | emac_tx_vlan(dev, skb);
+	if (emac_tx_tso(dev, skb, &ctrl))
+		return emac_sw_tso(skb, ndev);
+
 	slot = dev->tx_slot;
 
 	/* skb data */
@@ -2946,6 +3039,9 @@ static int emac_init_config(struct emac_instance *dev)
 	if (dev->tah_ph != 0) {
 #ifdef CONFIG_IBM_EMAC_TAH
 		dev->features |= EMAC_FTR_HAS_TAH;
+
+		if (of_device_is_compatible(np, "ibm,emac-apm821xx"))
+			dev->features |= EMAC_FTR_TAH_HAS_TSO;
 #else
 		printk(KERN_ERR "%pOF: TAH support not enabled !\n", np);
 		return -ENXIO;
@@ -3166,6 +3262,9 @@ static int emac_probe(struct platform_device *ofdev)
 
 	if (dev->tah_dev) {
 		ndev->hw_features = NETIF_F_IP_CSUM | NETIF_F_SG;
+
+		if (emac_has_feature(dev, EMAC_FTR_TAH_HAS_TSO))
+			ndev->hw_features |= NETIF_F_TSO;
 
 		if (emac_has_feature(dev, EMAC_FTR_HAS_VLAN_CTAG_TX)) {
 			ndev->vlan_features |= ndev->hw_features;
