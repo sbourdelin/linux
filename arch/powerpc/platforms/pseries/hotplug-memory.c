@@ -507,6 +507,19 @@ static int dlpar_memory_remove_by_index(u32 drc_index)
 	return rc;
 }
 
+static int dlpar_memory_readd_helper(struct drmem_lmb *lmb)
+{
+	int rc;
+
+	rc = dlpar_remove_lmb(lmb);
+	if (!rc) {
+		rc = dlpar_add_lmb(lmb);
+		if (rc)
+			dlpar_release_drc(lmb->drc_index);
+	}
+	return rc;
+}
+
 static int dlpar_memory_readd_by_index(u32 drc_index)
 {
 	struct drmem_lmb *lmb;
@@ -519,12 +532,7 @@ static int dlpar_memory_readd_by_index(u32 drc_index)
 	for_each_drmem_lmb(lmb) {
 		if (lmb->drc_index == drc_index) {
 			lmb_found = 1;
-			rc = dlpar_remove_lmb(lmb);
-			if (!rc) {
-				rc = dlpar_add_lmb(lmb);
-				if (rc)
-					dlpar_release_drc(lmb->drc_index);
-			}
+			rc = dlpar_memory_readd_helper(lmb);
 			break;
 		}
 	}
@@ -537,6 +545,26 @@ static int dlpar_memory_readd_by_index(u32 drc_index)
 			lmb->base_addr);
 	else
 		pr_info("Memory at %llx was updated\n", lmb->base_addr);
+
+	return rc;
+}
+
+static int dlpar_memory_readd_multiple(void)
+{
+	struct drmem_lmb *lmb;
+	int rc = 0;
+
+	pr_info("Attempting to update multiple LMBs\n");
+
+	for_each_drmem_lmb(lmb) {
+		if (drmem_lmb_update(lmb)) {
+			rc |= dlpar_memory_readd_helper(lmb);
+			drmem_remove_lmb_update(lmb);
+		}
+	}
+
+	if (rc)
+		return -EIO;
 
 	return rc;
 }
@@ -638,6 +666,10 @@ static int dlpar_memory_remove_by_index(u32 drc_index)
 	return -EOPNOTSUPP;
 }
 static int dlpar_memory_readd_by_index(u32 drc_index)
+{
+	return -EOPNOTSUPP;
+}
+static int dlpar_memory_readd_multiple(void)
 {
 	return -EOPNOTSUPP;
 }
@@ -917,6 +949,9 @@ int dlpar_memory(struct pseries_hp_errorlog *hp_elog)
 	case PSERIES_HP_ELOG_ACTION_READD:
 		drc_index = hp_elog->_drc_u.drc_index;
 		rc = dlpar_memory_readd_by_index(drc_index);
+		break;
+	case PSERIES_HP_ELOG_ACTION_READD_MULTIPLE:
+		rc = dlpar_memory_readd_multiple();
 		break;
 	default:
 		pr_err("Invalid action (%d) specified\n", hp_elog->action);
