@@ -1,0 +1,16 @@
+config NRF24
+        tristate "nRF24L01+ 2.4GHz radio module support"
+        depends on SPI
+        help
+          This enables support for Nordic Semiconductor nRF24L01+ radio module,
+          with the following features:
+            - multiple radio module instances via nrfX
+            - dedicated /dev/nrfX.Y device per pipe per instance
+            - dynamic and static payload lengths
+            - configuration via sysfs (/sys/class/nrfX)
+            - poll mechanism
+            - 64kB RX FIFO per pipe
+            - 64kB TX FIFO
+
+          To compile this driver as a module, choose M here: the module will be
+          called nrf24.
