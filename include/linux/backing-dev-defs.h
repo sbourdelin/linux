@@ -258,7 +258,7 @@ static inline void wb_get(struct bdi_writeback *wb)
  */
 static inline void wb_put(struct bdi_writeback *wb)
 {
-	if (wb != &wb->bdi->wb)
+	if (!WARN_ON(!wb->bdi) && wb != &wb->bdi->wb)
 		percpu_ref_put(&wb->refcnt);
 }
 
