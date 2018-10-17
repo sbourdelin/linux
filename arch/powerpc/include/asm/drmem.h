@@ -17,6 +17,7 @@ struct drmem_lmb {
 	u32     drc_index;
 	u32     aa_index;
 	u32     flags;
+	u32     internal_flags;
 };
 
 struct drmem_lmb_info {
@@ -92,6 +93,23 @@ static inline void drmem_remove_lmb_reservation(struct drmem_lmb *lmb)
 static inline bool drmem_lmb_reserved(struct drmem_lmb *lmb)
 {
 	return lmb->flags & DRMEM_LMB_RESERVED;
+}
+
+#define DRMEM_LMBINT_UPDATE	0x00000001
+
+static inline void drmem_mark_lmb_update(struct drmem_lmb *lmb)
+{
+	lmb->internal_flags |= DRMEM_LMBINT_UPDATE;
+}
+
+static inline void drmem_remove_lmb_update(struct drmem_lmb *lmb)
+{
+	lmb->internal_flags &= ~DRMEM_LMBINT_UPDATE;
+}
+
+static inline bool drmem_lmb_update(struct drmem_lmb *lmb)
+{
+	return lmb->internal_flags & DRMEM_LMBINT_UPDATE;
 }
 
 u64 drmem_lmb_memory_max(void);

@@ -207,6 +207,7 @@ static void read_drconf_v1_cell(struct drmem_lmb *lmb,
 
 	lmb->aa_index = of_read_number(p++, 1);
 	lmb->flags = of_read_number(p++, 1);
+	lmb->internal_flags = 0;
 
 	*prop = p;
 }
@@ -265,6 +266,7 @@ static void __walk_drmem_v2_lmbs(const __be32 *prop, const __be32 *usm,
 
 			lmb.aa_index = dr_cell.aa_index;
 			lmb.flags = dr_cell.flags;
+			lmb.internal_flags = 0;
 
 			func(&lmb, &usm);
 		}
@@ -441,6 +443,7 @@ static void init_drmem_v2_lmbs(const __be32 *prop,
 
 			lmb->aa_index = dr_cell.aa_index;
 			lmb->flags = dr_cell.flags;
+			lmb->internal_flags = 0;
 		}
 	}
 }
