@@ -1,0 +1,34 @@
+* Inline Crypto Engine (ICE)
+
+Required properties:
+  - compatible			: should be "qcom,ice"
+  - reg 			: <register mapping>
+
+Optional properties:
+  - interrupt-names     	: name describing the interrupts for ICE IRQ
+  - interrupts          	: <interrupt mapping for ICE IRQ>
+  - qcom,enable-ice-clk 	: should enable clocks for ICE HW
+  - clocks              	: List of phandle and clock specifier pairs
+  - clock-names         	: List of clock input name strings sorted in the same
+				  order as the clocks property.
+  - qcom,op-freq-hz     	: max clock speed sorted in the same order as the clocks
+				  property.
+  - qcom,instance-type  	: describe the storage type for which ICE node is defined
+				  currently, only "ufs" and "sdcc" are supported storage type
+  - power-domains		: regulator supply to be used by ICE HW
+
+Example:
+	ufs_ice: ufsice@1d90000 {
+		compatible = "qcom,ice";
+		reg = <0x1d90000 0x8000>;
+		qcom,enable-ice-clk;
+		clock-names = "ufs_core_clk", "bus_clk",
+				"iface_clk", "ice_core_clk";
+		clocks = <&gcc GCC_UFS_PHY_AXI_CLK>,
+			 <&gcc GCC_UFS_MEM_CLKREF_CLK>,
+			 <&gcc GCC_UFS_PHY_AHB_CLK>,
+			 <&gcc GCC_UFS_PHY_ICE_CORE_CLK>;
+		qcom,op-freq-hz = <0>, <0>, <0>, <300000000>;
+		power-domains = <&gcc UFS_PHY_GDSC>;
+		qcom,instance-type = "ufs";
+	};
