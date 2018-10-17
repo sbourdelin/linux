@@ -1334,13 +1334,6 @@ static void srp_terminate_io(struct srp_rport *rport)
 	struct scsi_device *sdev;
 	int i, j;
 
-	/*
-	 * Invoking srp_terminate_io() while srp_queuecommand() is running
-	 * is not safe. Hence the warning statement below.
-	 */
-	shost_for_each_device(sdev, shost)
-		WARN_ON_ONCE(sdev->request_queue->request_fn_active);
-
 	for (i = 0; i < target->ch_count; i++) {
 		ch = &target->ch[i];
 
