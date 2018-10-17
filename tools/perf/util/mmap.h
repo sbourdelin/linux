@@ -73,7 +73,8 @@ static inline u64 perf_mmap__read_head(struct perf_mmap *mm)
 {
 	struct perf_event_mmap_page *pc = mm->base;
 	u64 head = READ_ONCE(pc->data_head);
-	rmb();
+
+	smp_rmb();
 	return head;
 }
 
@@ -84,7 +85,7 @@ static inline void perf_mmap__write_tail(struct perf_mmap *md, u64 tail)
 	/*
 	 * ensure all reads are done before we write the tail out.
 	 */
-	mb();
+	smp_mb();
 	pc->data_tail = tail;
 }
 
