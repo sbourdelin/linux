@@ -27,7 +27,11 @@
 #define check_pgt_cache()		do { } while (0)
 
 #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
+#ifdef CONFIG_ARM64_52BIT_VA
+#define PGD_SIZE	((1 << (52 - PGDIR_SHIFT)) * sizeof(pgd_t))
+#else
 #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
+#endif
 
 #if CONFIG_PGTABLE_LEVELS > 2
 

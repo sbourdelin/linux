@@ -19,13 +19,16 @@
 #ifndef __ASM_PROCESSOR_H
 #define __ASM_PROCESSOR_H
 
-#define TASK_SIZE_64		(UL(1) << VA_BITS)
-
-#define KERNEL_DS	UL(-1)
-#define USER_DS		(TASK_SIZE_64 - 1)
-
+#define KERNEL_DS		UL(-1)
+#ifdef CONFIG_ARM64_52BIT_VA
+#define USER_DS			((UL(1) << 52) - 1)
+#else
+#define USER_DS			((UL(1) << VA_BITS) - 1)
+#endif /* CONFIG_ARM64_52IT_VA */
 #ifndef __ASSEMBLY__
 
+extern u64 vabits_user;
+#define TASK_SIZE_64		(UL(1) << vabits_user)
 #define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS)
 
 /*
