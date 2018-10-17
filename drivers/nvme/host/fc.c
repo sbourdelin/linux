@@ -477,6 +477,8 @@ nvme_fc_signal_discovery_scan(struct nvme_fc_lport *lport,
 	char hostaddr[FCNVME_TRADDR_LENGTH];	/* NVMEFC_HOST_TRADDR=...*/
 	char tgtaddr[FCNVME_TRADDR_LENGTH];	/* NVMEFC_TRADDR=...*/
 	char *envp[4] = { "FC_EVENT=nvmediscovery", hostaddr, tgtaddr, NULL };
+	char *aen_envp[5] = { "NVME_EVENT=discovery", "NVME_TRTYPE=fc",
+			      hostaddr, tgtaddr, NULL };
 
 	if (!(rport->remoteport.port_role & FC_PORT_ROLE_NVME_DISCOVERY))
 		return;
@@ -487,6 +489,14 @@ nvme_fc_signal_discovery_scan(struct nvme_fc_lport *lport,
 	snprintf(tgtaddr, sizeof(tgtaddr),
 		"NVMEFC_TRADDR=nn-0x%016llx:pn-0x%016llx",
 		rport->remoteport.node_name, rport->remoteport.port_name);
+	kobject_uevent_env(&fc_udev_device->kobj, KOBJ_CHANGE, envp);
+	/* Simulate Discovery AENs */
+	snprintf(hostaddr, sizeof(hostaddr),
+		 "NVME_TRADDR=nn-0x%016llx:pn-0x%016llx",
+		rport->remoteport.node_name, rport->remoteport.port_name);
+	snprintf(tgtaddr, sizeof(tgtaddr),
+		 "NVME_HOST_TRADDR=nn-0x%016llx:pn-0x%016llx",
+		lport->localport.node_name, lport->localport.port_name);
 	kobject_uevent_env(&fc_udev_device->kobj, KOBJ_CHANGE, envp);
 }
 
