@@ -63,12 +63,20 @@ extern int dlpar_release_drc(u32 drc_index);
 void queue_hotplug_event(struct pseries_hp_errorlog *hp_errlog);
 int handle_dlpar_errorlog(struct pseries_hp_errorlog *hp_errlog);
 
+void dlpar_memory_pmt_changes_set(void);
+void dlpar_memory_pmt_changes_clear(void);
+int dlpar_memory_pmt_changes(void);
+
 #ifdef CONFIG_MEMORY_HOTPLUG
 int dlpar_memory(struct pseries_hp_errorlog *hp_elog);
+void dlpar_memory_pmt_changes_action(void);
 #else
 static inline int dlpar_memory(struct pseries_hp_errorlog *hp_elog)
 {
 	return -EOPNOTSUPP;
+}
+static inline void dlpar_memory_pmt_changes_action(void)
+{
 }
 #endif
 

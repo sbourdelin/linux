@@ -537,8 +537,11 @@ static int dlpar_memory_readd_by_index(u32 drc_index)
 		}
 	}
 
-	if (!lmb_found)
-		rc = -EINVAL;
+	if (!lmb_found) {
+		pr_info("Failed to update memory for drc index %lx\n",
+			(unsigned long) drc_index);
+		return -EINVAL;
+	}
 
 	if (rc)
 		pr_info("Failed to update memory at %llx\n",
@@ -1001,55 +1004,173 @@ static int pseries_add_mem_node(struct device_node *np)
 	return (ret < 0) ? -EINVAL : 0;
 }
 
-static int pseries_update_drconf_memory(struct of_reconfig_data *pr)
+static int pmt_changes = 0;
+
+void dlpar_memory_pmt_changes_set(void)
 {
-	struct of_drconf_cell_v1 *new_drmem, *old_drmem;
+	pmt_changes = 1;
+}
+
+void dlpar_memory_pmt_changes_clear(void)
+{
+	pmt_changes = 0;
+}
+
+int dlpar_memory_pmt_changes(void)
+{
+	return pmt_changes;
+}
+
+void dlpar_memory_pmt_changes_action(void)
+{
+	if (dlpar_memory_pmt_changes()) {
+		struct pseries_hp_errorlog hp_errlog;
+
+		hp_errlog.resource = PSERIES_HP_ELOG_RESOURCE_MEM;
+		hp_errlog.action = PSERIES_HP_ELOG_ACTION_READD_MULTIPLE;
+		hp_errlog.id_type = 0;
+
+		queue_hotplug_event(&hp_errlog);
+
+		dlpar_memory_pmt_changes_clear();
+	}
+}
+
+struct dlpar_memory_lmb_chk_affinity_data {
 	unsigned long memblock_size;
-	u32 entries;
-	__be32 *p;
-	int i, rc = -EINVAL;
+};
+
+int dlpar_memory_lmb_chk_affinity(struct drmem_lmb *old_lmb,
+				  struct drmem_lmb *new_lmb,
+				  void *data)
+{
+	struct dlpar_memory_lmb_chk_affinity_data *ldata = data;
+	int rc = 1;
+
+	if (new_lmb->drc_index != old_lmb->drc_index)
+		return rc;
+
+	if ((old_lmb->flags & DRCONF_MEM_ASSIGNED) &&
+	    (!(new_lmb->flags & DRCONF_MEM_ASSIGNED))) {
+		rc = pseries_remove_memblock(
+				old_lmb->base_addr,
+				ldata->memblock_size);
+	} else if ((!(old_lmb->flags & DRCONF_MEM_ASSIGNED)) &&
+			(new_lmb->flags & DRCONF_MEM_ASSIGNED)) {
+		rc = memblock_add(old_lmb->base_addr,
+				ldata->memblock_size);
+		rc = (rc < 0) ? -EINVAL : 0;
+	} else if ((old_lmb->aa_index != new_lmb->aa_index) &&
+			(new_lmb->flags & DRCONF_MEM_ASSIGNED)) {
+		drmem_mark_lmb_update(old_lmb);
+		dlpar_memory_pmt_changes_set();
+	}
+
+	return rc;
+}
+
+static int pseries_update_drconf_memory(struct drmem_lmb_info *new_dinfo)
+{
+	struct dlpar_memory_lmb_chk_affinity_data data;
+	int rc = 0;
 
 	if (rtas_hp_event)
 		return 0;
 
-	memblock_size = pseries_memory_block_size();
-	if (!memblock_size)
+	data.memblock_size = pseries_memory_block_size();
+	if (!data.memblock_size)
 		return -EINVAL;
+
+	/* Arrays should have the same size and DRC indexes */
+	rc = walk_drmem_lmbs_pairs(new_dinfo,
+			dlpar_memory_lmb_chk_affinity, &data);
+	return rc;
+}
+
+static void pseries_update_ala_memory_aai(int aa_index)
+{
+	struct drmem_lmb *lmb;
+
+	/* Readd all LMBs which were previously using the
+	 * specified aa_index value.
+	 */
+	for_each_drmem_lmb(lmb) {
+		if ((lmb->aa_index == aa_index) &&
+			(lmb->flags & DRCONF_MEM_ASSIGNED)) {
+			drmem_mark_lmb_update(lmb);
+			dlpar_memory_pmt_changes_set();
+		}
+	}
+}
+
+static int pseries_update_ala_memory(struct of_reconfig_data *pr)
+{
+	struct assoc_arrays new_ala, old_ala;
+	__be32 *p;
+	int i, lim;
+
+	if (rtas_hp_event)
+		return 0;
+
+	/*
+	 * The layout of the ibm,associativity-lookup-arrays
+	 * property is a number N indicating the number of
+	 * associativity arrays, followed by a number M
+	 * indicating the size of each associativity array,
+	 * followed by a list of N associativity arrays.
+	 */
 
 	p = (__be32 *) pr->old_prop->value;
 	if (!p)
 		return -EINVAL;
+	old_ala.n_arrays = of_read_number(p++, 1);
+	old_ala.array_sz = of_read_number(p++, 1);
+	old_ala.arrays = p;
 
-	/* The first int of the property is the number of lmb's described
-	 * by the property. This is followed by an array of of_drconf_cell
-	 * entries. Get the number of entries and skip to the array of
-	 * of_drconf_cell's.
-	 */
-	entries = be32_to_cpu(*p++);
-	old_drmem = (struct of_drconf_cell_v1 *)p;
+	p = (__be32 *) pr->prop->value;
+	if (!p)
+		return -EINVAL;
+	new_ala.n_arrays = of_read_number(p++, 1);
+	new_ala.array_sz = of_read_number(p++, 1);
+	new_ala.arrays = p;
 
-	p = (__be32 *)pr->prop->value;
-	p++;
-	new_drmem = (struct of_drconf_cell_v1 *)p;
+	lim = (new_ala.n_arrays > old_ala.n_arrays) ? old_ala.n_arrays :
+			new_ala.n_arrays;
 
-	for (i = 0; i < entries; i++) {
-		if ((be32_to_cpu(old_drmem[i].flags) & DRCONF_MEM_ASSIGNED) &&
-		    (!(be32_to_cpu(new_drmem[i].flags) & DRCONF_MEM_ASSIGNED))) {
-			rc = pseries_remove_memblock(
-				be64_to_cpu(old_drmem[i].base_addr),
-						     memblock_size);
-			break;
-		} else if ((!(be32_to_cpu(old_drmem[i].flags) &
-			    DRCONF_MEM_ASSIGNED)) &&
-			    (be32_to_cpu(new_drmem[i].flags) &
-			    DRCONF_MEM_ASSIGNED)) {
-			rc = memblock_add(be64_to_cpu(old_drmem[i].base_addr),
-					  memblock_size);
-			rc = (rc < 0) ? -EINVAL : 0;
-			break;
+	if (old_ala.array_sz == new_ala.array_sz) {
+
+		/* Iterate comparing rows of the old and new
+		 * ibm,associativity-lookup-arrays looking for
+		 * changes.  If a row has changed, then mark all
+		 * memory blocks using that index for readd.
+		 */
+		for (i = 0; i < lim; i++) {
+			int index = (i * new_ala.array_sz);
+
+			if (!memcmp(&old_ala.arrays[index],
+				&new_ala.arrays[index],
+				new_ala.array_sz))
+				continue;
+
+			pseries_update_ala_memory_aai(i);
 		}
+
+		/* Reset any entries representing the extra rows.
+		 * There shouldn't be any, but just in case ...
+		 */
+		for (i = lim; i < new_ala.n_arrays; i++)
+			pseries_update_ala_memory_aai(i);
+
+	} else {
+		/* Update all entries representing these rows;
+		 * as all rows have different sizes, none can
+		 * have equivalent values.
+		 */
+		for (i = 0; i < lim; i++)
+			pseries_update_ala_memory_aai(i);
 	}
-	return rc;
+
+	return 0;
 }
 
 static int pseries_memory_notifier(struct notifier_block *nb,
@@ -1066,8 +1187,16 @@ static int pseries_memory_notifier(struct notifier_block *nb,
 		err = pseries_remove_mem_node(rd->dn);
 		break;
 	case OF_RECONFIG_UPDATE_PROPERTY:
-		if (!strcmp(rd->prop->name, "ibm,dynamic-memory"))
-			err = pseries_update_drconf_memory(rd);
+		if (!strcmp(rd->prop->name, "ibm,dynamic-memory")) {
+			struct drmem_lmb_info *dinfo =
+				drmem_lmbs_init(rd->prop);
+			if (!dinfo)
+				return -EINVAL;
+			err = pseries_update_drconf_memory(dinfo);
+			drmem_lmbs_free(dinfo);
+		} else if (!strcmp(rd->prop->name,
+				"ibm,associativity-lookup-arrays"))
+			err = pseries_update_ala_memory(rd);
 		break;
 	}
 	return notifier_from_errno(err);

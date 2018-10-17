@@ -373,6 +373,9 @@ static ssize_t migration_store(struct class *class,
 
 	post_mobility_fixup();
 
+	/* Apply any necessary changes identified during fixup */
+	dlpar_memory_pmt_changes_action();
+
 	start_topology_update();
 
 	return count;

@@ -368,12 +368,6 @@ static unsigned long read_n_cells(int n, const __be32 **buf)
 	return result;
 }
 
-struct assoc_arrays {
-	u32	n_arrays;
-	u32	array_sz;
-	const __be32 *arrays;
-};
-
 /*
  * Retrieve and validate the list of associativity arrays for drconf
  * memory from the ibm,associativity-lookup-arrays property of the

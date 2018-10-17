@@ -135,5 +135,12 @@ static inline void shared_proc_topology_init(void) {}
 #endif
 #endif
 
+
+struct assoc_arrays {
+	u32 n_arrays;
+	u32 array_sz;
+	const __be32 *arrays;
+};
+
 #endif /* __KERNEL__ */
 #endif	/* _ASM_POWERPC_TOPOLOGY_H */
