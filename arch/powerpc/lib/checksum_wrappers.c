@@ -26,7 +26,7 @@
 __wsum csum_and_copy_from_user(const void __user *src, void *dst,
 			       int len, __wsum sum, int *err_ptr)
 {
-	unsigned int csum;
+	unsigned int csum, amr = unlock_user_access();
 
 	might_sleep();
 
@@ -60,6 +60,7 @@ __wsum csum_and_copy_from_user(const void __user *src, void *dst,
 	}
 
 out:
+	lock_user_access(amr);
 	return (__force __wsum)csum;
 }
 EXPORT_SYMBOL(csum_and_copy_from_user);
@@ -67,7 +68,7 @@ EXPORT_SYMBOL(csum_and_copy_from_user);
 __wsum csum_and_copy_to_user(const void *src, void __user *dst, int len,
 			     __wsum sum, int *err_ptr)
 {
-	unsigned int csum;
+	unsigned int csum, amr = unlock_user_access();
 
 	might_sleep();
 
@@ -97,6 +98,7 @@ __wsum csum_and_copy_to_user(const void *src, void __user *dst, int len,
 	}
 
 out:
+	lock_user_access(amr);
 	return (__force __wsum)csum;
 }
 EXPORT_SYMBOL(csum_and_copy_to_user);
