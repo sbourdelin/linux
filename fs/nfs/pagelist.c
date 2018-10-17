@@ -1168,11 +1168,6 @@ out_failed:
 		struct nfs_pgio_mirror *mirror;
 		void (*func)(struct list_head *);
 
-		/* remember fatal errors */
-		if (nfs_error_is_fatal(desc->pg_error))
-			nfs_context_set_write_error(req->wb_context,
-						    desc->pg_error);
-
 		func = desc->pg_completion_ops->error_cleanup;
 		for (midx = 0; midx < desc->pg_mirror_count; midx++) {
 			mirror = &desc->pg_mirrors[midx];
