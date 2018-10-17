@@ -157,6 +157,9 @@ struct usb_hcd {
 	 */
 	unsigned		skip_phy_initialization:1;
 
+	/* Some phys don't want the phy's exit/init called on suspend/resume */
+	unsigned		suspend_without_phy_exit:1;
+
 	/* The next flag is a stopgap, to be removed when all the HCDs
 	 * support the new root-hub polling mechanism. */
 	unsigned		uses_new_polling:1;
