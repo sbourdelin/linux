@@ -211,12 +211,20 @@ Directories and files under the sysfs for Each Physical Device
   |     |   |--- description
   |     |   |--- [devices]
   |     |--- [<type-id>]
-  |          |--- create
-  |          |--- name
-  |          |--- available_instances
-  |          |--- device_api
-  |          |--- description
-  |          |--- [devices]
+  |     |    |--- create
+  |     |    |--- name
+  |     |    |--- available_instances
+  |     |    |--- device_api
+  |     |    |--- description
+  |     |    |--- [devices]
+  |     |--- [<type-id>]
+  |     |    |--- create
+  |     |    |--- name
+  |     |    |--- available_instances
+  |     |    |--- device_api
+  |     |    |--- description
+  |     |    |--- <aggregation>
+  |     |    |--- [devices]
 
 * [mdev_supported_types]
 
@@ -260,6 +268,23 @@ Directories and files under the sysfs for Each Physical Device
   This attribute should show brief features/description of the type. This is
   optional attribute.
 
+* <aggregation>
+
+  <aggregation> is an optional attributes to show max number that the
+  instance resources of [<type-id>] can be aggregated to be assigned
+  for one mdev device. No <aggregation> attribute means driver doesn't
+  support to aggregate instance resoures for one mdev device.
+  <aggregation> may be less than available_instances which depends on
+  driver. <aggregation> number can't exceed available_instances.
+
+  Set number of instances by appending "aggregate=N" parameter for
+  create attribute. By default without "aggregate=N" parameter it
+  will create one instance as normal.
+
+Example::
+
+	# echo "<uuid>,aggregate=N" > create
+
 Directories and Files Under the sysfs for Each mdev Device
 ----------------------------------------------------------
 
@@ -268,6 +293,7 @@ Directories and Files Under the sysfs for Each mdev Device
   |- [parent phy device]
   |--- [$MDEV_UUID]
          |--- remove
+	 |--- <aggregated_instances>
          |--- mdev_type {link to its type}
          |--- vendor-specific-attributes [optional]
 
@@ -280,6 +306,12 @@ doesn't support hot unplug.
 Example::
 
 	# echo 1 > /sys/bus/mdev/devices/$mdev_UUID/remove
+
+* <aggregated_instances> (read only)
+
+For mdev created with aggregate parameter, this shows number of
+instances assigned for this mdev. For normal type this attribute will
+not exist.
 
 Mediated device Hot plug
 ------------------------
