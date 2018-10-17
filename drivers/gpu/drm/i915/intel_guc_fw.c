@@ -125,22 +125,17 @@ static void guc_prepare_xfer(struct intel_guc *guc)
 }
 
 /* Copy RSA signature from the fw image to HW for verification */
-static int guc_xfer_rsa(struct intel_guc *guc, struct i915_vma *vma)
+static void guc_xfer_rsa(struct intel_guc *guc, struct i915_vma *vma)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
-	struct intel_uc_fw *guc_fw = &guc->fw;
-	struct sg_table *sg = vma->pages;
 	u32 rsa[UOS_RSA_SCRATCH_COUNT];
 	int i;
 
-	if (sg_pcopy_to_buffer(sg->sgl, sg->nents, rsa, sizeof(rsa),
-			       guc_fw->rsa_offset) != sizeof(rsa))
-		return -EINVAL;
+	sg_pcopy_to_buffer(vma->pages->sgl, vma->pages->nents,
+			   rsa, sizeof(rsa), guc->fw.rsa_offset);
 
 	for (i = 0; i < UOS_RSA_SCRATCH_COUNT; i++)
 		I915_WRITE(UOS_RSA_SCRATCH(i), rsa[i]);
-
-	return 0;
 }
 
 /*
@@ -251,17 +246,11 @@ static int guc_fw_xfer(struct intel_uc_fw *guc_fw, struct i915_vma *vma)
 	 * by the DMA engine in one operation, whereas the RSA signature is
 	 * loaded via MMIO.
 	 */
-	ret = guc_xfer_rsa(guc, vma);
-	if (ret)
-		DRM_WARN("GuC firmware signature xfer error %d\n", ret);
+	guc_xfer_rsa(guc, vma);
 
 	ret = guc_xfer_ucode(guc, vma);
-	if (ret)
-		DRM_WARN("GuC firmware code xfer error %d\n", ret);
-
-	ret = guc_wait_ucode(guc);
-	if (ret)
-		DRM_ERROR("GuC firmware xfer error %d\n", ret);
+	if (ret == 0)
+		ret = guc_wait_ucode(guc);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 
