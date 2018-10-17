@@ -425,6 +425,8 @@ static inline ktime_t uvc_video_get_time(void)
 {
 	if (uvc_clock_param == CLOCK_MONOTONIC)
 		return ktime_get();
+	else if (uvc_clock_param == CLOCK_BOOTTIME)
+		return ktime_get_boottime();
 	else
 		return ktime_get_real();
 }
