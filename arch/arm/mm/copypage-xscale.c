@@ -45,7 +45,7 @@ mc_copy_user_page(void *from, void *to)
 	 */
 	asm volatile(
 	"stmfd	sp!, {r4, r5, lr}		\n\
-	mov	lr, %2				\n\
+	mov	lr, %0				\n\
 	pld	[r0, #0]			\n\
 	pld	[r0, #32]			\n\
 	pld	[r1, #0]			\n\
@@ -81,7 +81,7 @@ mc_copy_user_page(void *from, void *to)
 	beq	2b				\n\
 	ldmfd	sp!, {r4, r5, pc}		"
 	:
-	: "r" (from), "r" (to), "I" (PAGE_SIZE / 64 - 1));
+	: "I" (PAGE_SIZE / 64 - 1));
 }
 
 void xscale_mc_copy_user_highpage(struct page *to, struct page *from,
