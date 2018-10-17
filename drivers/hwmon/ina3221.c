@@ -200,6 +200,8 @@ static int ina3221_read_curr(struct device *dev, u32 attr,
 		return 0;
 	case hwmon_curr_crit_alarm:
 	case hwmon_curr_max_alarm:
+		if (!ina3221_is_enabled(ina, channel))
+			return -ENODATA;
 		ret = regmap_field_read(ina->fields[reg], &regval);
 		if (ret)
 			return ret;
