@@ -1,0 +1,6 @@
+config PVPANIC_MMIO
+        tristate "pvpanic mmio device support"
+        help
+          This driver provides support for the pvpanic mmio device. pvpanic mmio
+          is a paravirtualized device provided by QEMU; it lets a virtual machine
+          (guest) communicate panic events to the host.
