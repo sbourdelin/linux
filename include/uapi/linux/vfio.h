@@ -779,6 +779,7 @@ struct vfio_eeh_pe_op {
 	__u32 argsz;
 	__u32 flags;
 	__u32 op;
+	__u32 __resv;
 	union {
 		struct vfio_eeh_pe_err err;
 	};

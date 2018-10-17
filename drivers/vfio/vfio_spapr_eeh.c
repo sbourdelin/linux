@@ -37,6 +37,7 @@ long vfio_spapr_iommu_eeh_ioctl(struct iommu_group *group,
 	struct eeh_pe *pe;
 	struct vfio_eeh_pe_op op;
 	unsigned long minsz;
+	unsigned long start, end;
 	long ret = -EINVAL;
 
 	switch (cmd) {
@@ -86,10 +87,12 @@ long vfio_spapr_iommu_eeh_ioctl(struct iommu_group *group,
 			ret = eeh_pe_configure(pe);
 			break;
 		case VFIO_EEH_PE_INJECT_ERR:
-			minsz = offsetofend(struct vfio_eeh_pe_op, err.mask);
-			if (op.argsz < minsz)
+			start = offsetof(struct vfio_eeh_pe_op, err.type);
+			end = offsetofend(struct vfio_eeh_pe_op, err.mask);
+			if (op.argsz < end)
 				return -EINVAL;
-			if (copy_from_user(&op, (void __user *)arg, minsz))
+			if (copy_from_user(&op.err, (char __user *)arg +
+						start, end - start))
 				return -EFAULT;
 
 			ret = eeh_pe_inject_err(pe, op.err.type, op.err.func,
