@@ -770,6 +770,9 @@ static int of_overlay_apply(const void *fdt, struct device_node *tree,
 	of_overlay_mutex_lock();
 	mutex_lock(&of_mutex);
 
+	/* live tree may change after this point, user space synchronization */
+	tree_version_increment();
+
 	ret = of_resolve_phandles(tree);
 	if (ret)
 		goto err_free_tree;
@@ -832,6 +835,9 @@ err_free_overlay_changeset:
 	free_overlay_changeset(ovcs);
 
 out_unlock:
+	/* live tree change complete, user space synchronization */
+	tree_version_increment();
+
 	mutex_unlock(&of_mutex);
 	of_overlay_mutex_unlock();
 
@@ -1028,6 +1034,9 @@ int of_overlay_remove(int *ovcs_id)
 
 	mutex_lock(&of_mutex);
 
+	/* live tree may change after this point, user space synchronization */
+	tree_version_increment();
+
 	ovcs = idr_find(&ovcs_idr, *ovcs_id);
 	if (!ovcs) {
 		ret = -ENODEV;
@@ -1083,6 +1092,9 @@ int of_overlay_remove(int *ovcs_id)
 	free_overlay_changeset(ovcs);
 
 out_unlock:
+	/* live tree change complete, user space synchronization */
+	tree_version_increment();
+
 	mutex_unlock(&of_mutex);
 
 out:

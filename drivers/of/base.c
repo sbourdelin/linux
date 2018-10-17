@@ -176,9 +176,71 @@ int of_free_phandle_cache(void)
 late_initcall_sync(of_free_phandle_cache);
 #endif
 
+#define show_one(object)						\
+	static ssize_t show_##object					\
+	(struct kobject *kobj, struct attribute *attr, char *buf)	\
+	{								\
+		return sprintf(buf, "%u\n", object);			\
+	}
+
+struct global_attr {
+	struct attribute attr;
+	ssize_t (*show)(struct kobject *kobj,
+			struct attribute *attr, char *buf);
+	ssize_t (*store)(struct kobject *a, struct attribute *b,
+			 const char *c, size_t count);
+};
+
+#define define_one_global_ro(_name)		\
+static struct global_attr attr_##_name =	\
+__ATTR(_name, 0444, show_##_name, NULL)
+
+/*
+ * tree_version must be unsigned so that at maximum value it wraps
+ * from an odd value (4294967295) to an even value (0).
+ */
+static u32 tree_version;
+
+show_one(tree_version);
+
+define_one_global_ro(tree_version);
+
+static struct attribute *of_attributes[] = {
+	&attr_tree_version.attr,
+	NULL
+};
+
+static const struct attribute_group of_attr_group = {
+	.attrs = of_attributes,
+};
+
+/*
+ * internal documentation
+ * tree_version_increment() - increment base version
+ *
+ * Before starting overlay apply or overlay remove, call this function.
+ * After completing overlay apply or overlay remove, call this function.
+ *
+ * caller must hold of_mutex
+ *
+ * Userspace can use the value of this variable to determine whether the
+ * devicetree has changed while accessing the devicetree.  An odd value
+ * means a modification is underway.  An even value means no modification
+ * is underway.
+ *
+ * The use of both (1) dynamic devicetree modifications and (2) overlay apply
+ * and removal are not supported during the same boot cycle.  Thus non-overlay
+ * dynamic modifications are not reflected in the value of tree_version.
+ */
+void tree_version_increment(void)
+{
+	tree_version++;
+}
+
 void __init of_core_init(void)
 {
 	struct device_node *np;
+	int ret;
 
 	of_populate_phandle_cache();
 
@@ -197,6 +259,10 @@ void __init of_core_init(void)
 	/* Symlink in /proc as required by userspace ABI */
 	if (of_root)
 		proc_symlink("device-tree", NULL, "/sys/firmware/devicetree/base");
+
+	ret = sysfs_create_group(&of_kset->kobj, &of_attr_group);
+	if (ret)
+		pr_err("sysfs_create_group of_attr_group failed: %d\n", ret);
 }
 
 static struct property *__of_find_property(const struct device_node *np,
