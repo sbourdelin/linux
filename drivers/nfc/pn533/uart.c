@@ -162,7 +162,7 @@ static int pn532_open(struct tty_struct *tty)
 	if (pn532->wq_open_tty == NULL)
 		goto err_skb;
 
-	priv = pn533_register_device(PN533_DEVICE_PN532,
+	priv = pn533_register_device(PN533_DEVICE_PN532_AUTOPOLL,
 				     PN533_NO_TYPE_B_PROTOCOLS,
 				     PN533_PROTO_REQ_ACK_RESP,
 				     pn532, &uart_phy_ops, NULL,
