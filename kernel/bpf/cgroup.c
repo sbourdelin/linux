@@ -566,6 +566,10 @@ int __cgroup_bpf_run_filter_skb(struct sock *sk,
 	save_sk = skb->sk;
 	skb->sk = sk;
 	__skb_push(skb, offset);
+
+	/* compute pointers for the bpf prog */
+	bpf_compute_data_pointers(skb);
+
 	ret = BPF_PROG_RUN_ARRAY(cgrp->bpf.effective[type], skb,
 				 bpf_prog_run_save_cb);
 	__skb_pull(skb, offset);
