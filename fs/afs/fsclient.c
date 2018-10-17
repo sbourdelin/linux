@@ -485,9 +485,10 @@ static int afs_deliver_fs_fetch_data(struct afs_call *call)
 			goto no_msw;
 		}
 
-		/* extract the upper part of the returned data length of an
+		/* Extract the upper part of the returned data length of an
 		 * FSFETCHDATA64 op (which should always be 0 using this
 		 * client) */
+		/* Fall through */
 	case 1:
 		_debug("extract data length (MSW)");
 		ret = afs_extract_data(call, &call->tmp, 4, true);
@@ -499,6 +500,7 @@ static int afs_deliver_fs_fetch_data(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
+		/* Fall through */
 	no_msw:
 		/* extract the returned data length */
 	case 2:
@@ -527,7 +529,7 @@ static int afs_deliver_fs_fetch_data(struct afs_call *call)
 		ASSERTCMP(call->count, <=, PAGE_SIZE);
 		req->remain -= size;
 
-		/* extract the returned data */
+		/* Fall through - and extract the returned data */
 	case 3:
 		_debug("extract data %llu/%llu %zu/%u",
 		       req->remain, req->actual_len, call->offset, call->count);
@@ -572,7 +574,7 @@ static int afs_deliver_fs_fetch_data(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall = 5;
 
-		/* extract the metadata */
+		/* Fall through - and extract the metadata */
 	case 5:
 		ret = afs_extract_data(call, call->buffer,
 				       (21 + 3 + 6) * 4, false);
@@ -1590,7 +1592,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* extract the returned status record */
+		/* Fall through - and extract the returned status record */
 	case 1:
 		_debug("extract status");
 		ret = afs_extract_data(call, call->buffer,
@@ -1603,7 +1605,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* extract the volume name length */
+		/* Fall through - and extract the volume name length */
 	case 2:
 		ret = afs_extract_data(call, &call->tmp, 4, true);
 		if (ret < 0)
@@ -1616,7 +1618,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* extract the volume name */
+		/* Fall through - and extract the volume name */
 	case 3:
 		_debug("extract volname");
 		if (call->count > 0) {
@@ -1640,6 +1642,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		}
 		call->count = 4 - (call->count & 3);
 
+		/* Fall through */
 	case 4:
 		ret = afs_extract_data(call, call->buffer,
 				       call->count, true);
@@ -1648,6 +1651,8 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 
 		call->offset = 0;
 		call->unmarshall++;
+
+		/* Fall through */
 	no_volname_padding:
 
 		/* extract the offline message length */
@@ -1663,7 +1668,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* extract the offline message */
+		/* Fall through - and extract the offline message */
 	case 6:
 		_debug("extract offline");
 		if (call->count > 0) {
@@ -1687,6 +1692,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		}
 		call->count = 4 - (call->count & 3);
 
+		/* Fall through */
 	case 7:
 		ret = afs_extract_data(call, call->buffer,
 				       call->count, true);
@@ -1695,6 +1701,8 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 
 		call->offset = 0;
 		call->unmarshall++;
+
+		/* Fall through */
 	no_offline_padding:
 
 		/* extract the message of the day length */
@@ -1710,7 +1718,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* extract the message of the day */
+		/* Fall through - and extract the message of the day */
 	case 9:
 		_debug("extract motd");
 		if (call->count > 0) {
@@ -1730,6 +1738,7 @@ static int afs_deliver_fs_get_volume_status(struct afs_call *call)
 		/* extract the message of the day padding */
 		call->count = (4 - (call->count & 3)) & 3;
 
+		/* Fall through */
 	case 10:
 		ret = afs_extract_data(call, call->buffer,
 				       call->count, false);
@@ -2012,7 +2021,7 @@ again:
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* Extract the capabilities word count */
+		/* Fall through - and extract the capabilities word count */
 	case 1:
 		ret = afs_extract_data(call, &call->tmp,
 				       1 * sizeof(__be32),
@@ -2027,7 +2036,7 @@ again:
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* Extract capabilities words */
+		/* Fall through - and extract capabilities words */
 	case 2:
 		count = min(call->count, 16U);
 		ret = afs_extract_data(call, call->buffer,
@@ -2197,6 +2206,7 @@ static int afs_deliver_fs_inline_bulk_status(struct afs_call *call)
 		call->unmarshall++;
 
 		/* Extract the file status count and array in two steps */
+		/* Fall through */
 	case 1:
 		_debug("extract status count");
 		ret = afs_extract_data(call, &call->tmp, 4, true);
@@ -2213,6 +2223,7 @@ static int afs_deliver_fs_inline_bulk_status(struct afs_call *call)
 	more_counts:
 		call->offset = 0;
 
+		/* Fall through */
 	case 2:
 		_debug("extract status array %u", call->count);
 		ret = afs_extract_data(call, call->buffer, 21 * 4, true);
@@ -2235,6 +2246,7 @@ static int afs_deliver_fs_inline_bulk_status(struct afs_call *call)
 		call->offset = 0;
 
 		/* Extract the callback count and array in two steps */
+		/* Fall through */
 	case 3:
 		_debug("extract CB count");
 		ret = afs_extract_data(call, &call->tmp, 4, true);
@@ -2250,6 +2262,7 @@ static int afs_deliver_fs_inline_bulk_status(struct afs_call *call)
 	more_cbs:
 		call->offset = 0;
 
+		/* Fall through */
 	case 4:
 		_debug("extract CB array");
 		ret = afs_extract_data(call, call->buffer, 3 * 4, true);
@@ -2272,6 +2285,7 @@ static int afs_deliver_fs_inline_bulk_status(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
+		/* Fall through */
 	case 5:
 		ret = afs_extract_data(call, call->buffer, 6 * 4, false);
 		if (ret < 0)

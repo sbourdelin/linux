@@ -195,7 +195,9 @@ again:
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* Extract the returned uuid, uniquifier, nentries and blkaddrs size */
+		/* Extract the returned uuid, uniquifier, nentries and
+		 * blkaddrs size */
+		/* Fall through */
 	case 1:
 		ret = afs_extract_data(call, call->buffer,
 				       sizeof(struct afs_uuid__xdr) + 3 * sizeof(__be32),
@@ -219,7 +221,7 @@ again:
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* Extract entries */
+		/* Fall through - and extract entries */
 	case 2:
 		count = min(call->count, 4U);
 		ret = afs_extract_data(call, call->buffer,
@@ -326,7 +328,7 @@ again:
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* Extract the capabilities word count */
+		/* Fall through - and extract the capabilities word count */
 	case 1:
 		ret = afs_extract_data(call, &call->tmp,
 				       1 * sizeof(__be32),
@@ -341,7 +343,7 @@ again:
 		call->offset = 0;
 		call->unmarshall++;
 
-		/* Extract capabilities words */
+		/* Fall through - and extract capabilities words */
 	case 2:
 		count = min(call->count, 16U);
 		ret = afs_extract_data(call, call->buffer,
@@ -437,6 +439,7 @@ again:
 		/* Extract the returned uuid, uniquifier, fsEndpoints count and
 		 * either the first fsEndpoint type or the volEndpoints
 		 * count if there are no fsEndpoints. */
+		/* Fall through */
 	case 1:
 		ret = afs_extract_data(call, call->buffer,
 				       sizeof(uuid_t) +
@@ -465,7 +468,7 @@ again:
 
 		call->unmarshall = 2;
 
-		/* Extract fsEndpoints[] entries */
+		/* Fall through - and extract fsEndpoints[] entries */
 	case 2:
 		switch (call->count2) {
 		case YFS_ENDPOINT_IPV4:
@@ -526,6 +529,7 @@ again:
 		 * extract the type of the next endpoint when we extract the
 		 * data of the current one, but this is the first...
 		 */
+		/* Fall through */
 	case 3:
 		ret = afs_extract_data(call, call->buffer, sizeof(__be32), true);
 		if (ret < 0)
@@ -536,7 +540,7 @@ again:
 		call->offset = 0;
 		call->unmarshall = 4;
 
-		/* Extract volEndpoints[] entries */
+		/* Fall through - and extract volEndpoints[] entries */
 	case 4:
 		switch (call->count2) {
 		case YFS_ENDPOINT_IPV4:
@@ -584,7 +588,7 @@ again:
 	end:
 		call->unmarshall = 5;
 
-		/* Done */
+		/* Fall through - Done */
 	case 5:
 		ret = afs_extract_data(call, call->buffer, 0, false);
 		if (ret < 0)

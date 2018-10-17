@@ -180,6 +180,7 @@ static int afs_deliver_cb_callback(struct afs_call *call)
 		call->unmarshall++;
 
 		/* extract the FID array and its count in two steps */
+		/* fall through */
 	case 1:
 		_debug("extract FID count");
 		ret = afs_extract_data(call, &call->tmp, 4, true);
@@ -198,6 +199,7 @@ static int afs_deliver_cb_callback(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
+		/* Fall through */
 	case 2:
 		_debug("extract FID array");
 		ret = afs_extract_data(call, call->buffer,
@@ -225,6 +227,7 @@ static int afs_deliver_cb_callback(struct afs_call *call)
 		call->unmarshall++;
 
 		/* extract the callback array and its count in two steps */
+		/* fall through */
 	case 3:
 		_debug("extract CB count");
 		ret = afs_extract_data(call, &call->tmp, 4, true);
@@ -238,6 +241,7 @@ static int afs_deliver_cb_callback(struct afs_call *call)
 		call->offset = 0;
 		call->unmarshall++;
 
+		/* Fall through */
 	case 4:
 		_debug("extract CB array");
 		ret = afs_extract_data(call, call->buffer,
@@ -336,6 +340,7 @@ static int afs_deliver_cb_init_call_back_state3(struct afs_call *call)
 			return -ENOMEM;
 		call->unmarshall++;
 
+		/* Fall through */
 	case 1:
 		_debug("extract UUID");
 		ret = afs_extract_data(call, call->buffer,
@@ -459,6 +464,7 @@ static int afs_deliver_cb_probe_uuid(struct afs_call *call)
 			return -ENOMEM;
 		call->unmarshall++;
 
+		/* Fall through */
 	case 1:
 		_debug("extract UUID");
 		ret = afs_extract_data(call, call->buffer,
