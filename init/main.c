@@ -400,6 +400,7 @@ static noinline void __ref rest_init(void)
 	int pid;
 
 	rcu_scheduler_starting();
+	pr_info("After rcu_scheduler_starting\n");
 	/*
 	 * We need to spawn init first so that it obtains pid 1, however
 	 * the init task will end up wanting to create kthreads, which, if
@@ -413,14 +414,18 @@ static noinline void __ref rest_init(void)
 	 */
 	rcu_read_lock();
 	tsk = find_task_by_pid_ns(pid, &init_pid_ns);
+	pr_info("After find_task_by_pid_ns\n");
 	set_cpus_allowed_ptr(tsk, cpumask_of(smp_processor_id()));
 	rcu_read_unlock();
 
 	numa_default_policy();
+	pr_info("After numa_default_policy\n");
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
 	rcu_read_lock();
+	pr_info("After rcu_read_lock\n");
 	kthreadd_task = find_task_by_pid_ns(pid, &init_pid_ns);
 	rcu_read_unlock();
+	pr_info("After rcu_read_unlock\n");
 
 	/*
 	 * Enable might_sleep() and smp_processor_id() checks.
@@ -432,14 +437,17 @@ static noinline void __ref rest_init(void)
 	system_state = SYSTEM_SCHEDULING;
 
 	complete(&kthreadd_done);
+	pr_info("After kthreadd_done\n");
 
 	/*
 	 * The boot idle thread must execute schedule()
 	 * at least once to get things moving:
 	 */
 	schedule_preempt_disabled();
+	pr_info("After schedule_preempt_disabled\n");
 	/* Call into cpu_idle with preempt disabled */
 	cpu_startup_entry(CPUHP_ONLINE);
+	pr_info("After cpu_startup_entry\n");
 }
 
 /* Check for early params. */
@@ -550,19 +558,29 @@ asmlinkage __visible void __init start_kernel(void)
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
+	pr_info("After setup_arch\n");
 	/*
 	 * Set up the the initial canary and entropy after arch
 	 * and after adding latent and command line entropy.
 	 */
 	add_latent_entropy();
+	pr_info("After add_latent_entropy\n");
 	add_device_randomness(command_line, strlen(command_line));
+	pr_info("After add_device_randomness\n");
 	boot_init_stack_canary();
+	pr_info("After boot_init_stack_canary\n");
 	mm_init_cpumask(&init_mm);
+	pr_info("After mm_init_cpumask\n");
 	setup_command_line(command_line);
+	pr_info("After setup_command_line\n");
 	setup_nr_cpu_ids();
+	pr_info("After setup_nr_cpu_ids\n");
 	setup_per_cpu_areas();
+	pr_info("After setup_per_cpu_areas\n");
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
+	pr_info("After smp_perpare_boot_cpu\n");
 	boot_cpu_hotplug_init();
+	pr_info("After boot_cpu_hotplug_init\n");
 
 	build_all_zonelists(NULL);
 	page_alloc_init();
@@ -588,6 +606,7 @@ asmlinkage __visible void __init start_kernel(void)
 	sort_main_extable();
 	trap_init();
 	mm_init();
+	pr_info("After mm_init\n");
 
 	ftrace_init();
 
@@ -600,6 +619,7 @@ asmlinkage __visible void __init start_kernel(void)
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
+	pr_info("After sched_init\n");
 	/*
 	 * Disable preemption - early bootup scheduling is extremely
 	 * fragile until we cpu_idle() for the first time.
@@ -624,6 +644,7 @@ asmlinkage __visible void __init start_kernel(void)
 	workqueue_init_early();
 
 	rcu_init();
+	pr_info("After rcu_init\n");
 
 	/* Trace events are available after this */
 	trace_init();
@@ -726,10 +747,14 @@ asmlinkage __visible void __init start_kernel(void)
 	delayacct_init();
 
 	check_bugs();
+	pr_info("After check_bugs\n");
 
 	acpi_subsystem_init();
+	pr_info("After acpi_subsystem_init\n");
 	arch_post_acpi_subsys_init();
+	pr_info("After arch_post_acpi_subsys_init\n");
 	sfi_init_late();
+	pr_info("After sfi_init_late\n");
 
 	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
 		efi_free_boot_services();
@@ -737,6 +762,7 @@ asmlinkage __visible void __init start_kernel(void)
 
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
+	pr_info("After rest_init\n");
 }
 
 /* Call all constructor functions linked into the kernel. */

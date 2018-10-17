@@ -855,6 +855,8 @@ static int crng_fast_load(const char *cp, size_t len)
 	unsigned long flags;
 	char *p;
 
+	pr_notice("random: 1\n");
+
 	if (!spin_trylock_irqsave(&primary_crng.lock, flags))
 		return 0;
 	if (crng_init != 0) {
@@ -862,11 +864,14 @@ static int crng_fast_load(const char *cp, size_t len)
 		return 0;
 	}
 	p = (unsigned char *) &primary_crng.state[4];
+	pr_notice("random: 2\n");
 	while (len > 0 && crng_init_cnt < CRNG_INIT_CNT_THRESH) {
 		p[crng_init_cnt % CHACHA20_KEY_SIZE] ^= *cp;
 		cp++; crng_init_cnt++; len--;
 	}
+	pr_notice("random: 3\n");
 	spin_unlock_irqrestore(&primary_crng.lock, flags);
+	pr_notice("random: 4\n");
 	if (crng_init_cnt >= CRNG_INIT_CNT_THRESH) {
 		invalidate_batched_entropy();
 		crng_init = 1;
