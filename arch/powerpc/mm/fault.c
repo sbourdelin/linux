@@ -462,6 +462,15 @@ static int __do_page_fault(struct pt_regs *regs, unsigned long address,
 		return bad_key_fault_exception(regs, address,
 					       get_mm_addr_key(mm, address));
 
+	if (mmu_has_feature(MMU_FTR_RADIX_KHRAP)) {
+		if (unlikely(!is_user &&
+			     (error_code & DSISR_PROTFAULT) &&
+			     (mfspr(SPRN_AMR) & AMR_LOCKED))) {
+			printk(KERN_CRIT "Kernel attempted to access user data"
+			       " unsafely, possible security vulnerability\n");
+			return bad_area_nosemaphore(regs, address);
+		}
+	}
 	/*
 	 * We want to do this outside mmap_sem, because reading code around nip
 	 * can result in fault, which will cause a deadlock when called with

@@ -286,6 +286,9 @@ BEGIN_FTR_SECTION
 	HMT_MEDIUM_LOW
 END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 
+	/* headed back to userspace, so unlock the AMR */
+	UNLOCK_AMR(r2)
+
 	ld	r13,GPR13(r1)	/* only restore r13 if returning to usermode */
 	ld	r2,GPR2(r1)
 	ld	r1,GPR1(r1)
@@ -965,6 +968,10 @@ BEGIN_FTR_SECTION
 	ld	r2,_PPR(r1)
 	mtspr	SPRN_PPR,r2
 END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
+
+	/* headed back to userspace, so unlock the AMR */
+	UNLOCK_AMR(r2)
+
 	ACCOUNT_CPU_USER_EXIT(r13, r2, r4)
 	REST_GPR(13, r1)
 

@@ -240,6 +240,22 @@ BEGIN_FTR_SECTION_NESTED(941)						\
 	mtspr	SPRN_PPR,ra;						\
 END_FTR_SECTION_NESTED(CPU_FTR_HAS_PPR,CPU_FTR_HAS_PPR,941)
 
+#define LOCK_AMR(reg)							\
+BEGIN_MMU_FTR_SECTION_NESTED(69)						\
+	LOAD_REG_IMMEDIATE(reg,AMR_LOCKED);				\
+	isync;				    				\
+	mtspr	SPRN_AMR,reg;						\
+	isync;								\
+END_MMU_FTR_SECTION_NESTED(MMU_FTR_RADIX_KHRAP,MMU_FTR_RADIX_KHRAP,69)
+
+#define UNLOCK_AMR(reg)							\
+BEGIN_MMU_FTR_SECTION_NESTED(420)						\
+	li	reg,0;							\
+	isync;				    				\
+	mtspr	SPRN_AMR,reg;						\
+	isync;								\
+END_MMU_FTR_SECTION_NESTED(MMU_FTR_RADIX_KHRAP,MMU_FTR_RADIX_KHRAP,420)
+
 /*
  * Get an SPR into a register if the CPU has the given feature
  */
@@ -500,6 +516,7 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 	beq	4f;			/* if from kernel mode		*/ \
 	ACCOUNT_CPU_USER_ENTRY(r13, r9, r10);				   \
 	SAVE_PPR(area, r9);						   \
+	LOCK_AMR(r9);							   \
 4:	EXCEPTION_PROLOG_COMMON_2(area)					   \
 	EXCEPTION_PROLOG_COMMON_3(n)					   \
 	ACCOUNT_STOLEN_TIME
