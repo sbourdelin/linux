@@ -10,6 +10,7 @@
 #include <linux/file.h>
 #include <linux/fdtable.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/security.h>
@@ -386,4 +387,11 @@ void __init files_maxfiles_init(void)
 	n = ((totalram_pages - memreserve) * (PAGE_SIZE / 1024)) / 10;
 
 	files_stat.max_files = max_t(unsigned long, n, NR_FILE);
+
+	/*
+	 * The percpu counters only handle long ints so cap maximum number of
+	 * files at LONG_MAX.
+	 */
+	if (files_stat.max_files > LONG_MAX)
+		files_stat.max_files = LONG_MAX;
 }
