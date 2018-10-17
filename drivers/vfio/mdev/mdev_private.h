@@ -33,6 +33,7 @@ struct mdev_device {
 	struct kref ref;
 	struct list_head next;
 	struct kobject *type_kobj;
+	unsigned int type_instances;
 	bool active;
 };
 
@@ -58,7 +59,8 @@ void parent_remove_sysfs_files(struct mdev_parent *parent);
 int  mdev_create_sysfs_files(struct device *dev, struct mdev_type *type);
 void mdev_remove_sysfs_files(struct device *dev, struct mdev_type *type);
 
-int  mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid);
+int  mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid,
+			unsigned int instances);
 int  mdev_device_remove(struct device *dev, bool force_remove);
 
 #endif /* MDEV_PRIVATE_H */
