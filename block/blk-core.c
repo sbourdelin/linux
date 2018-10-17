@@ -807,6 +807,8 @@ void blk_cleanup_queue(struct request_queue *q)
 
 	/* @q won't process any more request, flush async actions */
 	del_timer_sync(&q->backing_dev_info->laptop_mode_wb_timer);
+	if (q->mq_ops)
+		cancel_delayed_work_sync(&q->bio_requeue_work);
 	blk_sync_queue(q);
 
 	/*
