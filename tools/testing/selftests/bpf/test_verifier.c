@@ -4863,6 +4863,36 @@ static struct bpf_test tests[] = {
 		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
+		"direct packet read for CGROUP_SKB",
+		.insns = {
+			BPF_LDX_MEM(BPF_W, BPF_REG_2, BPF_REG_1,
+				    offsetof(struct __sk_buff, data)),
+			BPF_LDX_MEM(BPF_W, BPF_REG_3, BPF_REG_1,
+				    offsetof(struct __sk_buff, data_end)),
+			BPF_LDX_MEM(BPF_W, BPF_REG_4, BPF_REG_1,
+				    offsetof(struct __sk_buff, len)),
+			BPF_MOV64_REG(BPF_REG_0, BPF_REG_2),
+			BPF_ALU64_IMM(BPF_ADD, BPF_REG_0, 8),
+			BPF_JMP_REG(BPF_JGT, BPF_REG_0, BPF_REG_3, 1),
+			BPF_LDX_MEM(BPF_B, BPF_REG_0, BPF_REG_2, 0),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.result = ACCEPT,
+		.prog_type = BPF_PROG_TYPE_CGROUP_SKB,
+	},
+	{
+		"invalid access of tc_classid for CGROUP_SKB",
+		.insns = {
+			BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_1,
+				    offsetof(struct __sk_buff, tc_classid)),
+			BPF_EXIT_INSN(),
+		},
+		.result = REJECT,
+		.errstr = "invalid bpf_context access",
+		.prog_type = BPF_PROG_TYPE_CGROUP_SKB,
+	},
+	{
 		"valid cgroup storage access",
 		.insns = {
 			BPF_MOV64_IMM(BPF_REG_2, 0),
