@@ -85,6 +85,24 @@ Users:
 		a particular <type-id> that can help in understanding the
 		features provided by that type of mediated device.
 
+What:           /sys/.../mdev_supported_types/<type-id>/aggregation
+Date:           October 2018
+Contact:        Zhenyu Wang <zhenyuw@linux.intel.com>
+Description:
+		Reading this attribute will show number of mdev instances
+		that can be aggregated to assign for one mdev device.
+		This is optional attribute. If this attribute exists that
+		means driver supports to aggregate target mdev type's
+		resources assigned for one mdev device.
+Users:
+		Userspace applications interested in creating mediated
+		device with aggregated type instances. Userspace application
+		should check the number of aggregation instances that could
+		be created before creating mediated device by applying this,
+		e.g
+		# echo "83b8f4f2-509f-382f-3c1e-e6bfe0fa1001,aggregate=XX" > \
+		       /sys/devices/foo/mdev_supported_types/foo-1/create
+
 What:           /sys/.../<device>/<UUID>/
 Date:           October 2016
 Contact:        Kirti Wankhede <kwankhede@nvidia.com>
@@ -109,3 +127,10 @@ Description:
 		is active and the vendor driver doesn't support hot unplug.
 		Example:
 		# echo 1 > /sys/bus/mdev/devices/<UUID>/remove
+
+What:           /sys/.../<device>/<UUID>/aggregated_instances
+Date:           October 2018
+Contact:        Zhenyu Wang <zhenyuw@linux.intel.com>
+Description:
+		This attributes shows number of aggregated instances if this
+		mediated device was created with "aggregate" parameter.
