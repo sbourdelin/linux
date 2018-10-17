@@ -166,10 +166,9 @@ tb_cfg_request_find(struct tb_ctl *ctl, struct ctl_pkg *pkg)
 
 
 static int check_header(const struct ctl_pkg *pkg, u32 len,
-			enum tb_cfg_pkg_type type, u64 route)
+			enum tb_cfg_pkg_type type, u64 route,
+			const struct tb_cfg_header *hdr)
 {
-	struct tb_cfg_header *header = pkg->buffer;
-
 	/* check frame, TODO: frame flags */
 	if (WARN(len != pkg->frame.size,
 			"wrong framesize (expected %#x, got %#x)\n",
@@ -183,12 +182,12 @@ static int check_header(const struct ctl_pkg *pkg, u32 len,
 		return -EIO;
 
 	/* check header */
-	if (WARN(header->unknown != 1 << 9,
-			"header->unknown is %#x\n", header->unknown))
+	if (WARN(hdr->unknown != 1 << 9,
+			"hdr->unknown is %#x\n", hdr->unknown))
 		return -EIO;
-	if (WARN(route != tb_cfg_get_route(header),
+	if (WARN(route != tb_cfg_get_route(hdr),
 			"wrong route (expected %llx, got %llx)",
-			route, tb_cfg_get_route(header)))
+			route, tb_cfg_get_route(hdr)))
 		return -EIO;
 	return 0;
 }
@@ -215,14 +214,15 @@ static int check_config_address(struct tb_cfg_address addr,
 	return 0;
 }
 
-static struct tb_cfg_result decode_error(const struct ctl_pkg *response)
+static struct tb_cfg_result decode_error(const struct ctl_pkg *response,
+					 const struct tb_cfg_header *hdr)
 {
 	struct cfg_error_pkg *pkg = response->buffer;
 	struct tb_cfg_result res = { 0 };
-	res.response_route = tb_cfg_get_route(&pkg->header);
+	res.response_route = tb_cfg_get_route(hdr);
 	res.response_port = 0;
 	res.err = check_header(response, sizeof(*pkg), TB_CFG_PKG_ERROR,
-			       tb_cfg_get_route(&pkg->header));
+			       tb_cfg_get_route(hdr), hdr);
 	if (res.err)
 		return res;
 
@@ -237,17 +237,17 @@ static struct tb_cfg_result decode_error(const struct ctl_pkg *response)
 }
 
 static struct tb_cfg_result parse_header(const struct ctl_pkg *pkg, u32 len,
-					 enum tb_cfg_pkg_type type, u64 route)
+					 enum tb_cfg_pkg_type type, u64 route,
+					 const struct tb_cfg_header *hdr)
 {
-	struct tb_cfg_header *header = pkg->buffer;
 	struct tb_cfg_result res = { 0 };
 
 	if (pkg->frame.eof == TB_CFG_PKG_ERROR)
-		return decode_error(pkg);
+		return decode_error(pkg, hdr);
 
 	res.response_port = 0; /* will be updated later for cfg_read/write */
-	res.response_route = tb_cfg_get_route(header);
-	res.err = check_header(pkg, len, type, route);
+	res.response_route = tb_cfg_get_route(hdr);
+	res.err = check_header(pkg, len, type, route, hdr);
 	return res;
 }
 
@@ -753,13 +753,18 @@ static bool tb_cfg_match(const struct tb_cfg_request *req,
 
 static bool tb_cfg_copy(struct tb_cfg_request *req, const struct ctl_pkg *pkg)
 {
+	struct tb_cfg_header hdr;
 	struct tb_cfg_result res;
+
+	hdr = *(struct tb_cfg_header *)pkg->buffer;
 
 	/* Now make sure it is in expected format */
 	res = parse_header(pkg, req->response_size, req->response_type,
-			   tb_cfg_get_route(req->request));
-	if (!res.err)
+			   tb_cfg_get_route(req->request), &hdr);
+	if (!res.err) {
 		memcpy(req->response, pkg->buffer, req->response_size);
+		*(struct tb_cfg_header *)req->response = hdr;
+	}
 
 	req->result = res;
 
