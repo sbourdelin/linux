@@ -103,8 +103,7 @@ static ssize_t iscsi_stat_instance_fail_sess_show(struct config_item *item,
 	u32 sess_err_count;
 
 	spin_lock_bh(&sess_err->lock);
-	sess_err_count = (sess_err->cxn_timeout_errors +
-			  sess_err->pdu_format_errors);
+	sess_err_count = sess_err->cxn_timeout_errors;
 	spin_unlock_bh(&sess_err->lock);
 
 	return snprintf(page, PAGE_SIZE, "%u\n", sess_err_count);
@@ -217,23 +216,12 @@ static ssize_t iscsi_stat_sess_err_cxn_errors_show(struct config_item *item,
 	return snprintf(page, PAGE_SIZE, "%u\n", sess_err->cxn_timeout_errors);
 }
 
-static ssize_t iscsi_stat_sess_err_format_errors_show(struct config_item *item,
-		char *page)
-{
-	struct iscsi_tiqn *tiqn = iscsi_sess_err_tiqn(item);
-	struct iscsi_sess_err_stats *sess_err = &tiqn->sess_err_stats;
-
-	return snprintf(page, PAGE_SIZE, "%u\n", sess_err->pdu_format_errors);
-}
-
 CONFIGFS_ATTR_RO(iscsi_stat_sess_err_, inst);
 CONFIGFS_ATTR_RO(iscsi_stat_sess_err_, cxn_errors);
-CONFIGFS_ATTR_RO(iscsi_stat_sess_err_, format_errors);
 
 static struct configfs_attribute *iscsi_stat_sess_err_attrs[] = {
 	&iscsi_stat_sess_err_attr_inst,
 	&iscsi_stat_sess_err_attr_cxn_errors,
-	&iscsi_stat_sess_err_attr_format_errors,
 	NULL,
 };
 

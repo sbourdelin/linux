@@ -22,13 +22,11 @@ extern struct config_item_type iscsi_stat_sess_cit;
 /* iSCSI session error types */
 #define ISCSI_SESS_ERR_UNKNOWN		0
 #define ISCSI_SESS_ERR_CXN_TIMEOUT	2
-#define ISCSI_SESS_ERR_PDU_FORMAT	3
 
 /* iSCSI session error stats */
 struct iscsi_sess_err_stats {
 	spinlock_t	lock;
 	u32		cxn_timeout_errors;
-	u32		pdu_format_errors;
 	u32		last_sess_failure_type;
 	char		last_sess_fail_rem_name[224];
 } ____cacheline_aligned;
