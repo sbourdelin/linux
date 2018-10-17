@@ -16,6 +16,7 @@
  * some useful macros
  */
 #define in_range(b,first,len)	((b)>=(first)&&(b)<(first)+(len))
+#define S_SHIFT			12
 
 /*
  * functions used for retyping
@@ -158,34 +159,16 @@ ufs_set_de_type(struct super_block *sb, struct ufs_dir_entry *de, int mode)
 	if ((UFS_SB(sb)->s_flags & UFS_DE_MASK) != UFS_DE_44BSD)
 		return;
 
-	/*
-	 * TODO turn this into a table lookup
-	 */
-	switch (mode & S_IFMT) {
-	case S_IFSOCK:
-		de->d_u.d_44.d_type = DT_SOCK;
-		break;
-	case S_IFLNK:
-		de->d_u.d_44.d_type = DT_LNK;
-		break;
-	case S_IFREG:
-		de->d_u.d_44.d_type = DT_REG;
-		break;
-	case S_IFBLK:
-		de->d_u.d_44.d_type = DT_BLK;
-		break;
-	case S_IFDIR:
-		de->d_u.d_44.d_type = DT_DIR;
-		break;
-	case S_IFCHR:
-		de->d_u.d_44.d_type = DT_CHR;
-		break;
-	case S_IFIFO:
-		de->d_u.d_44.d_type = DT_FIFO;
-		break;
-	default:
-		de->d_u.d_44.d_type = DT_UNKNOWN;
-	}
+	/* Compile-time assertions that S_IFx >> S_SHIFT == DT_x */
+	BUILD_BUG_ON(S_IFIFO >> S_SHIFT != DT_FIFO);
+	BUILD_BUG_ON(S_IFCHR >> S_SHIFT != DT_CHR);
+	BUILD_BUG_ON(S_IFDIR >> S_SHIFT != DT_DIR);
+	BUILD_BUG_ON(S_IFBLK >> S_SHIFT != DT_BLK);
+	BUILD_BUG_ON(S_IFREG >> S_SHIFT != DT_REG);
+	BUILD_BUG_ON(S_IFLNK >> S_SHIFT != DT_LNK);
+	BUILD_BUG_ON(S_IFSOCK >> S_SHIFT != DT_SOCK);
+
+	de->d_u.d_44.d_type = (mode & S_IFMT) >> S_SHIFT;
 }
 
 static inline u32
