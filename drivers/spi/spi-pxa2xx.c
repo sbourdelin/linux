@@ -1453,9 +1453,11 @@ pxa2xx_spi_init_pdata(struct platform_device *pdev)
 	if (pdev->dev.of_node)
 		of_id = of_match_device(pdev->dev.driver->of_match_table,
 					&pdev->dev);
+#ifdef CONFIG_PCI
 	else if (dev_is_pci(pdev->dev.parent))
 		pcidev_id = pci_match_id(pxa2xx_spi_pci_compound_match,
 					 to_pci_dev(pdev->dev.parent));
+#endif
 	else if (adev)
 		adev_id = acpi_match_device(pdev->dev.driver->acpi_match_table,
 					    &pdev->dev);
