@@ -645,6 +645,14 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
 {
 	int ret = 0;
 
+	/*
+	 * Several callers check the driver pointer without holding the
+	 * device mutex. Hence check the driver pointer again while holding
+	 * the device mutex.
+	 */
+	if (dev->driver)
+		return dev->driver == drv;
+
 	if (!device_is_registered(dev))
 		return -ENODEV;
 
