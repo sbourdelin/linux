@@ -132,7 +132,12 @@ static unsigned long bgpio_line2mask(struct gpio_chip *gc, unsigned int line)
 static int bgpio_get_set(struct gpio_chip *gc, unsigned int gpio)
 {
 	unsigned long pinmask = bgpio_line2mask(gc, gpio);
-	bool dir = !!(gc->bgpio_dir & pinmask);
+	bool dir;
+
+	if (gc->bgpio_regs_are_volatile)
+		gc->bgpio_dir = gc->read_reg(gc->reg_dir);
+
+	dir = !!(gc->bgpio_dir & pinmask);
 
 	/*
 	 * If the direction is OUT we read the value from the SET
@@ -163,6 +168,9 @@ static int bgpio_get_set_multiple(struct gpio_chip *gc, unsigned long *mask,
 
 	/* Make sure we first clear any bits that are zero when we read the register */
 	*bits &= ~*mask;
+
+	if (gc->bgpio_regs_are_volatile)
+		gc->bgpio_dir = gc->read_reg(gc->reg_dir);
 
 	/* Exploit the fact that we know which directions are set */
 	if (gc->bgpio_dir_inverted) {
@@ -234,21 +242,31 @@ static void bgpio_set_none(struct gpio_chip *gc, unsigned int gpio, int val)
 {
 }
 
-static void bgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+static void bgpio_set_single_reg(struct gpio_chip *gc, unsigned int gpio,
+				 int val, void __iomem *reg)
 {
 	unsigned long mask = bgpio_line2mask(gc, gpio);
 	unsigned long flags;
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
+	if (gc->bgpio_regs_are_volatile)
+		gc->bgpio_data = gc->read_reg(reg);
+
 	if (val)
 		gc->bgpio_data |= mask;
 	else
 		gc->bgpio_data &= ~mask;
 
-	gc->write_reg(gc->reg_dat, gc->bgpio_data);
+	gc->write_reg(reg, gc->bgpio_data);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
+
+}
+
+static void bgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+{
+	bgpio_set_single_reg(gc, gpio, val, gc->reg_dat);
 }
 
 static void bgpio_set_with_clear(struct gpio_chip *gc, unsigned int gpio,
@@ -264,19 +282,7 @@ static void bgpio_set_with_clear(struct gpio_chip *gc, unsigned int gpio,
 
 static void bgpio_set_set(struct gpio_chip *gc, unsigned int gpio, int val)
 {
-	unsigned long mask = bgpio_line2mask(gc, gpio);
-	unsigned long flags;
-
-	spin_lock_irqsave(&gc->bgpio_lock, flags);
-
-	if (val)
-		gc->bgpio_data |= mask;
-	else
-		gc->bgpio_data &= ~mask;
-
-	gc->write_reg(gc->reg_set, gc->bgpio_data);
-
-	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
+	bgpio_set_single_reg(gc, gpio, val, gc->reg_set);
 }
 
 static void bgpio_multiple_get_masks(struct gpio_chip *gc,
@@ -312,6 +318,9 @@ static void bgpio_set_multiple_single_reg(struct gpio_chip *gc,
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
 	bgpio_multiple_get_masks(gc, mask, bits, &set_mask, &clear_mask);
+
+	if (gc->bgpio_regs_are_volatile)
+		gc->bgpio_data = gc->read_reg(reg);
 
 	gc->bgpio_data |= set_mask;
 	gc->bgpio_data &= ~clear_mask;
@@ -372,6 +381,9 @@ static int bgpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
+	if (gc->bgpio_regs_are_volatile)
+		gc->bgpio_dir = gc->read_reg(gc->reg_dir);
+
 	if (gc->bgpio_dir_inverted)
 		gc->bgpio_dir |= bgpio_line2mask(gc, gpio);
 	else
@@ -399,6 +411,9 @@ static int bgpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
 	gc->set(gc, gpio, val);
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
+
+	if (gc->bgpio_regs_are_volatile)
+		gc->bgpio_dir = gc->read_reg(gc->reg_dir);
 
 	if (gc->bgpio_dir_inverted)
 		gc->bgpio_dir &= ~bgpio_line2mask(gc, gpio);
@@ -636,6 +651,9 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 		gc->bgpio_data = gc->read_reg(gc->reg_set);
 	if (gc->reg_dir && !(flags & BGPIOF_UNREADABLE_REG_DIR))
 		gc->bgpio_dir = gc->read_reg(gc->reg_dir);
+
+	if (flags & BGPIOF_VOLATILE_REG)
+		gc->bgpio_regs_are_volatile = true;
 
 	return ret;
 }

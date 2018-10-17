@@ -301,6 +301,7 @@ struct gpio_chip {
 	spinlock_t bgpio_lock;
 	unsigned long bgpio_data;
 	unsigned long bgpio_dir;
+	bool bgpio_regs_are_volatile;
 #endif
 
 #ifdef CONFIG_GPIOLIB_IRQCHIP
@@ -461,6 +462,7 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 #define BGPIOF_BIG_ENDIAN_BYTE_ORDER	BIT(3)
 #define BGPIOF_READ_OUTPUT_REG_SET	BIT(4) /* reg_set stores output value */
 #define BGPIOF_NO_OUTPUT		BIT(5) /* only input */
+#define BGPIOF_VOLATILE_REG		BIT(6) /* update shadow before writing*/
 
 #endif
 
