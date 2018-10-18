@@ -127,7 +127,6 @@ struct cc_drvdata {
 	bool coherent;
 	char *hw_rev_name;
 	enum cc_hw_rev hw_rev;
-	u32 hash_len_sz;
 	u32 axim_mon_offset;
 	u32 sig_offset;
 	u32 ver_offset;
@@ -182,6 +181,7 @@ int init_cc_regs(struct cc_drvdata *drvdata, bool is_probe);
 void fini_cc_regs(struct cc_drvdata *drvdata);
 int cc_clk_on(struct cc_drvdata *drvdata);
 void cc_clk_off(struct cc_drvdata *drvdata);
+unsigned int cc_get_default_hash_len(struct cc_drvdata *drvdata);
 
 static inline void cc_iowrite(struct cc_drvdata *drvdata, u32 reg, u32 val)
 {
