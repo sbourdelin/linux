@@ -113,14 +113,39 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
 				  clk_div_mask(div->width) << div->shift, val);
 };
 
-/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+static void clk_regmap_div_init(struct clk_hw *hw)
+{
+	struct clk_regmap *clk = to_clk_regmap(hw);
+	struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
+	unsigned int val;
+	int ret;
 
+	ret = regmap_read(clk->map, div->offset, &val);
+	if (ret)
+		return;
+
+	val &= (clk_div_mask(div->width) << div->shift);
+	if (!val)
+		regmap_update_bits(clk->map, div->offset,
+				   clk_div_mask(div->width) << div->shift,
+				   clk_div_mask(div->width));
+}
+
+/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
 const struct clk_ops clk_regmap_divider_ops = {
 	.recalc_rate = clk_regmap_div_recalc_rate,
 	.round_rate = clk_regmap_div_round_rate,
 	.set_rate = clk_regmap_div_set_rate,
 };
 EXPORT_SYMBOL_GPL(clk_regmap_divider_ops);
+
+const struct clk_ops clk_regmap_divider_with_init_ops = {
+	.recalc_rate = clk_regmap_div_recalc_rate,
+	.round_rate = clk_regmap_div_round_rate,
+	.set_rate = clk_regmap_div_set_rate,
+	.init = clk_regmap_div_init,
+};
+EXPORT_SYMBOL_GPL(clk_regmap_divider_with_init_ops);
 
 const struct clk_ops clk_regmap_divider_ro_ops = {
 	.recalc_rate = clk_regmap_div_recalc_rate,

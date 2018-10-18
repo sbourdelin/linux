@@ -109,5 +109,6 @@ clk_get_regmap_mux_data(struct clk_regmap *clk)
 
 extern const struct clk_ops clk_regmap_mux_ops;
 extern const struct clk_ops clk_regmap_mux_ro_ops;
+extern const struct clk_ops clk_regmap_divider_with_init_ops;
 
 #endif /* __CLK_REGMAP_H */
