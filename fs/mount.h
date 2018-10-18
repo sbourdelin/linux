@@ -134,6 +134,7 @@ struct proc_mounts {
 	void *cached_mount;
 	u64 cached_event;
 	loff_t cached_index;
+	struct super_block *locked_sb;
 };
 
 extern const struct seq_operations mounts_op;
