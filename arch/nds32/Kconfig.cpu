@@ -111,8 +111,9 @@ config ALIGNMENT_TRAP
 
 config HW_SUPPORT_UNALIGNMENT_ACCESS
 	bool "Kernel support unaligned access handling by hw"
+	select HAVE_EFFICIENT_UNALIGNED_ACCESS
 	depends on !ALIGNMENT_TRAP
-	default n
+	default y
 	help
 	  Andes processors load/store world/half-word instructions can access
 	  unaligned memory locations without generating the Data Alignment
