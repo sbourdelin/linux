@@ -1533,13 +1533,11 @@ static int lpc_eth_drv_resume(struct platform_device *pdev)
 }
 #endif
 
-#ifdef CONFIG_OF
 static const struct of_device_id lpc_eth_match[] = {
 	{ .compatible = "nxp,lpc-eth" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, lpc_eth_match);
-#endif
 
 static struct platform_driver lpc_eth_driver = {
 	.probe		= lpc_eth_drv_probe,
@@ -1550,7 +1548,7 @@ static struct platform_driver lpc_eth_driver = {
 #endif
 	.driver		= {
 		.name	= MODNAME,
-		.of_match_table = of_match_ptr(lpc_eth_match),
+		.of_match_table = lpc_eth_match,
 	},
 };
 
