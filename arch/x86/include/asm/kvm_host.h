@@ -179,7 +179,6 @@ enum {
 #define DR6_BS		(1 << 14)
 #define DR6_RTM		(1 << 16)
 #define DR6_FIXED_1	0xfffe0ff0
-#define DR6_INIT	0xffff0ff0
 #define DR6_VOLATILE	0x0001e00f
 
 #define DR7_BP_EN_MASK	0x000000ff

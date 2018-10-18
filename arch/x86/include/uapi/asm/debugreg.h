@@ -16,7 +16,9 @@
    are either reserved or not of interest to us. */
 
 /* Define reserved bits in DR6 which are always set to 1 */
-#define DR6_RESERVED	(0xFFFF0FF0)
+#define DR6_RESERVED	(0xFFFE0FF0)
+/* Initial (reset) value of DR6 */
+#define DR6_INIT	(0xFFFF0FF0)
 
 #define DR_TRAP0	(0x1)		/* db0 */
 #define DR_TRAP1	(0x2)		/* db1 */
@@ -26,6 +28,7 @@
 
 #define DR_STEP		(0x4000)	/* single-step */
 #define DR_SWITCH	(0x8000)	/* task switch */
+#define DR_RTM		(0x10000)	/* #DB/#BP in RTM region */
 
 /* Now define a bunch of things for manipulating the control register.
    The top two bytes of the control register consist of 4 fields of 4
