@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  * Copyright (C) 2006-2017 CRYPTOGAMS by <appro@openssl.org>. All Rights Reserved.
+ *
+ * This is based in part on Andy Polyakov's implementation from CRYPTOGAMS.
  */
 
-#include "arm_arch.h"
+#include <linux/linkage.h>
 
 .text
 #if defined(__thumb2__)
@@ -13,13 +16,8 @@
 .code	32
 #endif
 
-.globl	poly1305_emit
-.globl	poly1305_blocks
-.globl	poly1305_init
-.type	poly1305_init,%function
 .align	5
-poly1305_init:
-.Lpoly1305_init:
+ENTRY(poly1305_init_arm)
 	stmdb	sp!,{r4-r11}
 
 	eor	r3,r3,r3
@@ -38,10 +36,6 @@ poly1305_init:
 	moveq	r0,#0
 	beq	.Lno_key
 
-#if	__ARM_MAX_ARCH__>=7
-	adr	r11,.Lpoly1305_init
-	ldr	r12,.LOPENSSL_armcap
-#endif
 	ldrb	r4,[r1,#0]
 	mov	r10,#0x0fffffff
 	ldrb	r5,[r1,#1]
@@ -56,12 +50,6 @@ poly1305_init:
 	ldrb	r7,[r1,#6]
 	and	r4,r4,r10
 
-#if	__ARM_MAX_ARCH__>=7
-	ldr	r12,[r11,r12]		@ OPENSSL_armcap_P
-# ifdef	__APPLE__
-	ldr	r12,[r12]
-# endif
-#endif
 	ldrb	r8,[r1,#7]
 	orr	r5,r5,r6,lsl#8
 	ldrb	r6,[r1,#8]
@@ -71,35 +59,6 @@ poly1305_init:
 	ldrb	r8,[r1,#10]
 	and	r5,r5,r3
 
-#if	__ARM_MAX_ARCH__>=7
-	tst	r12,#ARMV7_NEON		@ check for NEON
-# ifdef	__APPLE__
-	adr	r9,poly1305_blocks_neon
-	adr	r11,poly1305_blocks
-#  ifdef __thumb2__
-	it	ne
-#  endif
-	movne	r11,r9
-	adr	r12,poly1305_emit
-	adr	r10,poly1305_emit_neon
-#  ifdef __thumb2__
-	it	ne
-#  endif
-	movne	r12,r10
-# else
-#  ifdef __thumb2__
-	itete	eq
-#  endif
-	addeq	r12,r11,#(poly1305_emit-.Lpoly1305_init)
-	addne	r12,r11,#(poly1305_emit_neon-.Lpoly1305_init)
-	addeq	r11,r11,#(poly1305_blocks-.Lpoly1305_init)
-	addne	r11,r11,#(poly1305_blocks_neon-.Lpoly1305_init)
-# endif
-# ifdef	__thumb2__
-	orr	r12,r12,#1	@ thumb-ify address
-	orr	r11,r11,#1
-# endif
-#endif
 	ldrb	r9,[r1,#11]
 	orr	r6,r6,r7,lsl#8
 	ldrb	r7,[r1,#12]
@@ -118,26 +77,20 @@ poly1305_init:
 	str	r6,[r0,#8]
 	and	r7,r7,r3
 	str	r7,[r0,#12]
-#if	__ARM_MAX_ARCH__>=7
-	stmia	r2,{r11,r12}		@ fill functions table
-	mov	r0,#1
-#else
-	mov	r0,#0
-#endif
 .Lno_key:
 	ldmia	sp!,{r4-r11}
-#if	__ARM_ARCH__>=5
+#if __LINUX_ARM_ARCH__ >= 5
 	bx	lr				@ bx	lr
 #else
 	tst	lr,#1
 	moveq	pc,lr			@ be binary compatible with V4, yet
 	.word	0xe12fff1e			@ interoperable with Thumb ISA:-)
 #endif
-.size	poly1305_init,.-poly1305_init
-.type	poly1305_blocks,%function
+ENDPROC(poly1305_init_arm)
+
 .align	5
-poly1305_blocks:
-.Lpoly1305_blocks:
+ENTRY(poly1305_blocks_arm)
+.Lpoly1305_blocks_arm:
 	stmdb	sp!,{r3-r11,lr}
 
 	ands	r2,r2,#-16
@@ -158,11 +111,11 @@ poly1305_blocks:
 	b	.Loop
 
 .Loop:
-#if __ARM_ARCH__<7
+#if __LINUX_ARM_ARCH__ < 7
 	ldrb	r0,[lr],#16		@ load input
-# ifdef	__thumb2__
+#ifdef	__thumb2__
 	it	hi
-# endif
+#endif
 	addhi	r8,r8,#1		@ 1<<128
 	ldrb	r1,[lr,#-15]
 	ldrb	r2,[lr,#-14]
@@ -201,19 +154,19 @@ poly1305_blocks:
 	orr	r3,r2,r3,lsl#24
 #else
 	ldr	r0,[lr],#16		@ load input
-# ifdef	__thumb2__
+#ifdef	__thumb2__
 	it	hi
-# endif
+#endif
 	addhi	r8,r8,#1		@ padbit
 	ldr	r1,[lr,#-12]
 	ldr	r2,[lr,#-8]
 	ldr	r3,[lr,#-4]
-# ifdef	__ARMEB__
+#ifdef	__ARMEB__
 	rev	r0,r0
 	rev	r1,r1
 	rev	r2,r2
 	rev	r3,r3
-# endif
+#endif
 	adds	r4,r4,r0		@ accumulate input
 	str	lr,[sp,#8]		@ offload input pointer
 	adcs	r5,r5,r1
@@ -283,7 +236,7 @@ poly1305_blocks:
 	stmia	r0,{r4-r8}		@ store the result
 
 .Lno_data:
-#if	__ARM_ARCH__>=5
+#if __LINUX_ARM_ARCH__ >= 5
 	ldmia	sp!,{r3-r11,pc}
 #else
 	ldmia	sp!,{r3-r11,lr}
@@ -291,13 +244,12 @@ poly1305_blocks:
 	moveq	pc,lr			@ be binary compatible with V4, yet
 	.word	0xe12fff1e			@ interoperable with Thumb ISA:-)
 #endif
-.size	poly1305_blocks,.-poly1305_blocks
-.type	poly1305_emit,%function
+ENDPROC(poly1305_blocks_arm)
+
 .align	5
-poly1305_emit:
+ENTRY(poly1305_emit_arm)
 	stmdb	sp!,{r4-r11}
 .Lpoly1305_emit_enter:
-
 	ldmia	r0,{r3-r7}
 	adds	r8,r3,#5		@ compare to modulus
 	adcs	r9,r4,#0
@@ -332,13 +284,13 @@ poly1305_emit:
 	adcs	r5,r5,r10
 	adc	r6,r6,r11
 
-#if __ARM_ARCH__>=7
-# ifdef __ARMEB__
+#if __LINUX_ARM_ARCH__ >= 7
+#ifdef __ARMEB__
 	rev	r3,r3
 	rev	r4,r4
 	rev	r5,r5
 	rev	r6,r6
-# endif
+#endif
 	str	r3,[r1,#0]
 	str	r4,[r1,#4]
 	str	r5,[r1,#8]
@@ -377,20 +329,22 @@ poly1305_emit:
 	strb	r6,[r1,#15]
 #endif
 	ldmia	sp!,{r4-r11}
-#if	__ARM_ARCH__>=5
+#if __LINUX_ARM_ARCH__ >= 5
 	bx	lr				@ bx	lr
 #else
 	tst	lr,#1
 	moveq	pc,lr			@ be binary compatible with V4, yet
 	.word	0xe12fff1e			@ interoperable with Thumb ISA:-)
 #endif
-.size	poly1305_emit,.-poly1305_emit
-#if	__ARM_MAX_ARCH__>=7
+ENDPROC(poly1305_emit_arm)
+
+
+#ifdef CONFIG_KERNEL_MODE_NEON
 .fpu	neon
 
-.type	poly1305_init_neon,%function
 .align	5
-poly1305_init_neon:
+ENTRY(poly1305_init_neon)
+.Lpoly1305_init_neon:
 	ldr	r4,[r0,#20]		@ load key base 2^32
 	ldr	r5,[r0,#24]
 	ldr	r6,[r0,#28]
@@ -600,11 +554,10 @@ poly1305_init_neon:
 	vst1.32		{d8[1]},[r7]
 
 	bx	lr				@ bx	lr
-.size	poly1305_init_neon,.-poly1305_init_neon
+ENDPROC(poly1305_init_neon)
 
-.type	poly1305_blocks_neon,%function
 .align	5
-poly1305_blocks_neon:
+ENTRY(poly1305_blocks_neon)
 	ldr	ip,[r0,#36]		@ is_base2_26
 	ands	r2,r2,#-16
 	beq	.Lno_data_neon
@@ -612,7 +565,7 @@ poly1305_blocks_neon:
 	cmp	r2,#64
 	bhs	.Lenter_neon
 	tst	ip,ip			@ is_base2_26?
-	beq	.Lpoly1305_blocks
+	beq	.Lpoly1305_blocks_arm
 
 .Lenter_neon:
 	stmdb	sp!,{r4-r7}
@@ -622,7 +575,7 @@ poly1305_blocks_neon:
 	bne	.Lbase2_26_neon
 
 	stmdb	sp!,{r1-r3,lr}
-	bl	poly1305_init_neon
+	bl	.Lpoly1305_init_neon
 
 	ldr	r4,[r0,#0]		@ load hash value base 2^32
 	ldr	r5,[r0,#4]
@@ -686,12 +639,12 @@ poly1305_blocks_neon:
 	sub		r2,r2,#16
 	add		r4,r1,#32
 
-# ifdef	__ARMEB__
+#ifdef	__ARMEB__
 	vrev32.8	q10,q10
 	vrev32.8	q13,q13
 	vrev32.8	q11,q11
 	vrev32.8	q12,q12
-# endif
+#endif
 	vsri.u32	d28,d26,#8	@ base 2^32 -> base 2^26
 	vshl.u32	d26,d26,#18
 
@@ -735,12 +688,12 @@ poly1305_blocks_neon:
 	addhi		r7,r0,#(48+1*9*4)
 	addhi		r6,r0,#(48+3*9*4)
 
-# ifdef	__ARMEB__
+#ifdef	__ARMEB__
 	vrev32.8	q10,q10
 	vrev32.8	q13,q13
 	vrev32.8	q11,q11
 	vrev32.8	q12,q12
-# endif
+#endif
 	vsri.u32	q14,q13,#8		@ base 2^32 -> base 2^26
 	vshl.u32	q13,q13,#18
 
@@ -866,12 +819,12 @@ poly1305_blocks_neon:
 
 	vld4.32		{d20,d22,d24,d26},[r1]	@ inp[0:1]
 	add		r1,r1,#64
-# ifdef	__ARMEB__
+#ifdef	__ARMEB__
 	vrev32.8	q10,q10
 	vrev32.8	q11,q11
 	vrev32.8	q12,q12
 	vrev32.8	q13,q13
-# endif
+#endif
 
 	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	@ lazy reduction interleaved with base 2^32 -> base 2^26 of
@@ -1086,11 +1039,10 @@ poly1305_blocks_neon:
 	ldmia	sp!,{r4-r7}
 .Lno_data_neon:
 	bx	lr					@ bx	lr
-.size	poly1305_blocks_neon,.-poly1305_blocks_neon
+ENDPROC(poly1305_blocks_neon)
 
-.type	poly1305_emit_neon,%function
 .align	5
-poly1305_emit_neon:
+ENTRY(poly1305_emit_neon)
 	ldr	ip,[r0,#36]		@ is_base2_26
 
 	stmdb	sp!,{r4-r11}
@@ -1144,12 +1096,12 @@ poly1305_emit_neon:
 	adcs	r5,r5,r10
 	adc	r6,r6,r11
 
-# ifdef __ARMEB__
+#ifdef __ARMEB__
 	rev	r3,r3
 	rev	r4,r4
 	rev	r5,r5
 	rev	r6,r6
-# endif
+#endif
 	str	r3,[r1,#0]		@ store the result
 	str	r4,[r1,#4]
 	str	r5,[r1,#8]
@@ -1157,16 +1109,9 @@ poly1305_emit_neon:
 
 	ldmia	sp!,{r4-r11}
 	bx	lr				@ bx	lr
-.size	poly1305_emit_neon,.-poly1305_emit_neon
+ENDPROC(poly1305_emit_neon)
 
 .align	5
 .Lzeros:
 .long	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-.LOPENSSL_armcap:
-.word	OPENSSL_armcap_P-.Lpoly1305_init
-#endif
-.asciz	"Poly1305 for ARMv4/NEON, CRYPTOGAMS by <appro@openssl.org>"
-.align	2
-#if	__ARM_MAX_ARCH__>=7
-.comm   OPENSSL_armcap_P,4,4
 #endif

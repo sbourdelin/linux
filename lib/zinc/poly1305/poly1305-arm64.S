@@ -1,21 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  * Copyright (C) 2006-2017 CRYPTOGAMS by <appro@openssl.org>. All Rights Reserved.
+ *
+ * This is based in part on Andy Polyakov's implementation from CRYPTOGAMS.
  */
 
-#include "arm_arch.h"
-
+#include <linux/linkage.h>
 .text
 
-// forward "declarations" are required for Apple
-
-.globl	poly1305_blocks
-.globl	poly1305_emit
-
-.globl	poly1305_init
-.type	poly1305_init,%function
 .align	5
-poly1305_init:
+ENTRY(poly1305_init_arm)
 	cmp	x1,xzr
 	stp	xzr,xzr,[x0]		// zero hash value
 	stp	xzr,xzr,[x0,#16]	// [along with is_base2_26]
@@ -23,18 +18,10 @@ poly1305_init:
 	csel	x0,xzr,x0,eq
 	b.eq	.Lno_key
 
-#ifdef	__ILP32__
-	ldrsw	x11,.LOPENSSL_armcap_P
-#else
-	ldr	x11,.LOPENSSL_armcap_P
-#endif
-	adr	x10,.LOPENSSL_armcap_P
-
 	ldp	x7,x8,[x1]		// load key
 	mov	x9,#0xfffffffc0fffffff
 	movk	x9,#0x0fff,lsl#48
-	ldr	w17,[x10,x11]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x7,x7			// flip bytes
 	rev	x8,x8
 #endif
@@ -43,30 +30,12 @@ poly1305_init:
 	and	x8,x8,x9		// &=0ffffffc0ffffffc
 	stp	x7,x8,[x0,#32]	// save key value
 
-	tst	w17,#ARMV7_NEON
-
-	adr	x12,poly1305_blocks
-	adr	x7,poly1305_blocks_neon
-	adr	x13,poly1305_emit
-	adr	x8,poly1305_emit_neon
-
-	csel	x12,x12,x7,eq
-	csel	x13,x13,x8,eq
-
-#ifdef	__ILP32__
-	stp	w12,w13,[x2]
-#else
-	stp	x12,x13,[x2]
-#endif
-
-	mov	x0,#1
 .Lno_key:
 	ret
-.size	poly1305_init,.-poly1305_init
+ENDPROC(poly1305_init_arm)
 
-.type	poly1305_blocks,%function
 .align	5
-poly1305_blocks:
+ENTRY(poly1305_blocks_arm)
 	ands	x2,x2,#-16
 	b.eq	.Lno_data
 
@@ -80,7 +49,7 @@ poly1305_blocks:
 .Loop:
 	ldp	x10,x11,[x1],#16	// load input
 	sub	x2,x2,#16
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x10,x10
 	rev	x11,x11
 #endif
@@ -126,11 +95,10 @@ poly1305_blocks:
 
 .Lno_data:
 	ret
-.size	poly1305_blocks,.-poly1305_blocks
+ENDPROC(poly1305_blocks_arm)
 
-.type	poly1305_emit,%function
 .align	5
-poly1305_emit:
+ENTRY(poly1305_emit_arm)
 	ldp	x4,x5,[x0]		// load hash base 2^64
 	ldr	x6,[x0,#16]
 	ldp	x10,x11,[x2]	// load nonce
@@ -144,23 +112,23 @@ poly1305_emit:
 	csel	x4,x4,x12,eq
 	csel	x5,x5,x13,eq
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x10,x10,#32		// flip nonce words
 	ror	x11,x11,#32
 #endif
 	adds	x4,x4,x10		// accumulate nonce
 	adc	x5,x5,x11
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x4,x4			// flip output bytes
 	rev	x5,x5
 #endif
 	stp	x4,x5,[x1]		// write result
 
 	ret
-.size	poly1305_emit,.-poly1305_emit
-.type	poly1305_mult,%function
+ENDPROC(poly1305_emit_arm)
+
 .align	5
-poly1305_mult:
+__poly1305_mult:
 	mul	x12,x4,x7		// h0*r0
 	umulh	x13,x4,x7
 
@@ -193,11 +161,8 @@ poly1305_mult:
 	adc	x6,x6,xzr
 
 	ret
-.size	poly1305_mult,.-poly1305_mult
 
-.type	poly1305_splat,%function
-.align	5
-poly1305_splat:
+__poly1305_splat:
 	and	x12,x4,#0x03ffffff	// base 2^64 -> base 2^26
 	ubfx	x13,x4,#26,#26
 	extr	x14,x5,x4,#52
@@ -220,15 +185,14 @@ poly1305_splat:
 	str	w15,[x0,#16*8]	// s4
 
 	ret
-.size	poly1305_splat,.-poly1305_splat
 
-.type	poly1305_blocks_neon,%function
+#ifdef CONFIG_KERNEL_MODE_NEON
 .align	5
-poly1305_blocks_neon:
+ENTRY(poly1305_blocks_neon)
 	ldr	x17,[x0,#24]
 	cmp	x2,#128
 	b.hs	.Lblocks_neon
-	cbz	x17,poly1305_blocks
+	cbz	x17,poly1305_blocks_arm
 
 .Lblocks_neon:
 	stp	x29,x30,[sp,#-80]!
@@ -268,7 +232,7 @@ poly1305_blocks_neon:
 	adcs	x5,x5,xzr
 	adc	x6,x6,xzr
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x12,x12
 	rev	x13,x13
 #endif
@@ -276,7 +240,7 @@ poly1305_blocks_neon:
 	adcs	x5,x5,x13
 	adc	x6,x6,x3
 
-	bl	poly1305_mult
+	bl	__poly1305_mult
 	ldr	x30,[sp,#8]
 
 	cbz	x3,.Lstore_base2_64_neon
@@ -314,7 +278,7 @@ poly1305_blocks_neon:
 	ldp	x12,x13,[x1],#16	// load input
 	sub	x2,x2,#16
 	add	x9,x8,x8,lsr#2	// s1 = r1 + (r1 >> 2)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x12,x12
 	rev	x13,x13
 #endif
@@ -322,7 +286,7 @@ poly1305_blocks_neon:
 	adcs	x5,x5,x13
 	adc	x6,x6,x3
 
-	bl	poly1305_mult
+	bl	__poly1305_mult
 
 .Linit_neon:
 	and	x10,x4,#0x03ffffff	// base 2^64 -> base 2^26
@@ -349,19 +313,19 @@ poly1305_blocks_neon:
 	mov	x5,x8
 	mov	x6,xzr
 	add	x0,x0,#48+12
-	bl	poly1305_splat
+	bl	__poly1305_splat
 
-	bl	poly1305_mult		// r^2
+	bl	__poly1305_mult		// r^2
 	sub	x0,x0,#4
-	bl	poly1305_splat
+	bl	__poly1305_splat
 
-	bl	poly1305_mult		// r^3
+	bl	__poly1305_mult		// r^3
 	sub	x0,x0,#4
-	bl	poly1305_splat
+	bl	__poly1305_splat
 
-	bl	poly1305_mult		// r^4
+	bl	__poly1305_mult		// r^4
 	sub	x0,x0,#4
-	bl	poly1305_splat
+	bl	__poly1305_splat
 	ldr	x30,[sp,#8]
 
 	add	x16,x1,#32
@@ -399,7 +363,7 @@ poly1305_blocks_neon:
 	lsl	x3,x3,#24
 	add	x15,x0,#48
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x8,x8
 	rev	x12,x12
 	rev	x9,x9
@@ -435,7 +399,7 @@ poly1305_blocks_neon:
 	ld1	{v4.4s,v5.4s,v6.4s,v7.4s},[x15],#64
 	ld1	{v8.4s},[x15]
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x8,x8
 	rev	x12,x12
 	rev	x9,x9
@@ -496,7 +460,7 @@ poly1305_blocks_neon:
 	umull	v20.2d,v14.2s,v1.s[2]
 	ldp	x9,x13,[x16],#48
 	umull	v19.2d,v14.2s,v0.s[2]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x8,x8
 	rev	x12,x12
 	rev	x9,x9
@@ -561,7 +525,7 @@ poly1305_blocks_neon:
 	umlal	v23.2d,v11.2s,v3.s[0]
 	umlal	v20.2d,v11.2s,v8.s[0]
 	umlal	v21.2d,v11.2s,v0.s[0]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x8,x8
 	rev	x12,x12
 	rev	x9,x9
@@ -801,13 +765,12 @@ poly1305_blocks_neon:
 .Lno_data_neon:
 	ldr	x29,[sp],#80
 	ret
-.size	poly1305_blocks_neon,.-poly1305_blocks_neon
+ENDPROC(poly1305_blocks_neon)
 
-.type	poly1305_emit_neon,%function
 .align	5
-poly1305_emit_neon:
+ENTRY(poly1305_emit_neon)
 	ldr	x17,[x0,#24]
-	cbz	x17,poly1305_emit
+	cbz	x17,poly1305_emit_arm
 
 	ldp	w10,w11,[x0]		// load hash value base 2^26
 	ldp	w12,w13,[x0,#8]
@@ -840,30 +803,22 @@ poly1305_emit_neon:
 	csel	x4,x4,x12,eq
 	csel	x5,x5,x13,eq
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x10,x10,#32		// flip nonce words
 	ror	x11,x11,#32
 #endif
 	adds	x4,x4,x10		// accumulate nonce
 	adc	x5,x5,x11
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x4,x4			// flip output bytes
 	rev	x5,x5
 #endif
 	stp	x4,x5,[x1]		// write result
 
 	ret
-.size	poly1305_emit_neon,.-poly1305_emit_neon
+ENDPROC(poly1305_emit_neon)
 
 .align	5
 .Lzeros:
 .long	0,0,0,0,0,0,0,0
-.LOPENSSL_armcap_P:
-#ifdef	__ILP32__
-.long	OPENSSL_armcap_P-.
-#else
-.quad	OPENSSL_armcap_P-.
 #endif
-.byte	80,111,108,121,49,51,48,53,32,102,111,114,32,65,82,77,118,56,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
-.align	2
-.align	2
