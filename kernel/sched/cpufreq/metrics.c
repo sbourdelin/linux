@@ -11,7 +11,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include "sched.h"
+#include "../sched.h"
 
 #include <trace/events/power.h>
 
