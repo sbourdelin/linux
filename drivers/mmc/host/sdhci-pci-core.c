@@ -706,10 +706,27 @@ static int intel_execute_tuning(struct mmc_host *mmc, u32 opcode)
 static void byt_probe_slot(struct sdhci_pci_slot *slot)
 {
 	struct mmc_host_ops *ops = &slot->host->mmc_host_ops;
+	struct intel_host *intel_host = sdhci_pci_priv(slot);
 
 	byt_read_dsm(slot);
 
 	ops->execute_tuning = intel_execute_tuning;
+
+	/* Check if we have the appropriate voltage switch DSM methods */
+	if (!(intel_host->dsm_fns & (1 << INTEL_DSM_V18_SWITCH))) {
+		pr_info("%s: no DSM function for 1.8 voltage switch\n",
+			 mmc_hostname(slot->host->mmc));
+		slot->host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
+
+		if (!(intel_host->dsm_fns & (1 << INTEL_DSM_V33_SWITCH))) {
+			/* No voltage switching supported at all, there's no
+			 * point in installing the callback: return.
+			 */
+			pr_info("%s: Voltage switching unsupported\n",
+				mmc_hostname(slot->host->mmc));
+			return;
+		}
+	}
 	ops->start_signal_voltage_switch = intel_start_signal_voltage_switch;
 }
 
