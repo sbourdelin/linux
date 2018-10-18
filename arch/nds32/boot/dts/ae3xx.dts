@@ -82,4 +82,9 @@
 			interrupts = <18>;
 		};
 	};
+
+	pmu {
+		compatible = "andestech,atcpmu";
+		interrupts= <13>;
+	};
 };
