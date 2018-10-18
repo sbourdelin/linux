@@ -1,26 +1,49 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  * Copyright (C) 2006-2017 CRYPTOGAMS by <appro@openssl.org>. All Rights Reserved.
+ *
+ * This is based in part on Andy Polyakov's implementation from CRYPTOGAMS.
  */
 
-#include "mips_arch.h"
+#if (defined(_MIPS_ARCH_MIPS64R3) || defined(_MIPS_ARCH_MIPS64R5) || \
+     defined(_MIPS_ARCH_MIPS64R6)) && !defined(_MIPS_ARCH_MIPS64R2)
+#define _MIPS_ARCH_MIPS64R2
+#endif
 
-#ifdef MIPSEB
-# define MSB 0
-# define LSB 7
+#ifdef __MIPSEB__
+#define MSB 0
+#define LSB 7
 #else
-# define MSB 7
-# define LSB 0
+#define MSB 7
+#define LSB 0
+#endif
+
+#if defined(_MIPS_ARCH_MIPS64R6)
+#define dmultu(rs,rt)
+#define mflo(rd,rs,rt)	dmulu	rd,rs,rt
+#define mfhi(rd,rs,rt)	dmuhu	rd,rs,rt
+#else
+#define dmultu(rs,rt)		dmultu	rs,rt
+#define multu(rs,rt)		multu	rs,rt
+#define mflo(rd,rs,rt)	mflo	rd
+#define mfhi(rd,rs,rt)	mfhi	rd
 #endif
 
 .text
 .set	noat
 .set	noreorder
 
+/* While most of the assembly in the kernel prefers ENTRY() and ENDPROC(),
+ * there is no existing MIPS assembly that uses it, and MIPS assembler seems
+ * to like its own .ent/.end notation, which the MIPS include files don't
+ * provide in a MIPS-specific ENTRY/ENDPROC definition. So, we skip these
+ * for now, until somebody complains. */
+
 .align	5
-.globl	poly1305_init
-.ent	poly1305_init
-poly1305_init:
+.globl	poly1305_init_mips
+.ent	poly1305_init_mips
+poly1305_init_mips:
 	.frame	$29,0,$31
 	.set	reorder
 
@@ -39,13 +62,13 @@ poly1305_init:
 	ldr	$8,0+LSB($5)
 	ldr	$9,8+LSB($5)
 #endif
-#ifdef	MIPSEB
-# if defined(_MIPS_ARCH_MIPS64R2)
+#ifdef	__MIPSEB__
+#if defined(_MIPS_ARCH_MIPS64R2)
 	dsbh	$8,$8		# byte swap
 	 dsbh	$9,$9
 	dshd	$8,$8
 	 dshd	$9,$9
-# else
+#else
 	ori	$10,$0,0xFF
 	dsll	$1,$10,32
 	or	$10,$1		# 0x000000FF000000FF
@@ -79,7 +102,7 @@ poly1305_init:
 	 dsll	$9,32
 	or	$8,$11
 	 or	$9,$2
-# endif
+#endif
 #endif
 	li	$10,1
 	dsll	$10,32
@@ -100,18 +123,19 @@ poly1305_init:
 .Lno_key:
 	li	$2,0			# return 0
 	jr	$31
-.end	poly1305_init
+.end	poly1305_init_mips
+
 .align	5
-.globl	poly1305_blocks
-.ent	poly1305_blocks
-poly1305_blocks:
+.globl	poly1305_blocks_mips
+.ent	poly1305_blocks_mips
+poly1305_blocks_mips:
 	.set	noreorder
 	dsrl	$6,4			# number of complete blocks
 	bnez	$6,poly1305_blocks_internal
 	nop
 	jr	$31
 	nop
-.end	poly1305_blocks
+.end	poly1305_blocks_mips
 
 .align	5
 .ent	poly1305_blocks_internal
@@ -144,13 +168,13 @@ poly1305_blocks_internal:
 #endif
 	daddiu	$6,-1
 	daddiu	$5,16
-#ifdef	MIPSEB
-# if defined(_MIPS_ARCH_MIPS64R2)
+#ifdef	__MIPSEB__
+#if defined(_MIPS_ARCH_MIPS64R2)
 	dsbh	$8,$8		# byte swap
 	 dsbh	$9,$9
 	dshd	$8,$8
 	 dshd	$9,$9
-# else
+#else
 	ori	$10,$0,0xFF
 	dsll	$1,$10,32
 	or	$10,$1		# 0x000000FF000000FF
@@ -184,7 +208,7 @@ poly1305_blocks_internal:
 	 dsll	$9,32
 	or	$8,$11
 	 or	$9,$2
-# endif
+#endif
 #endif
 	daddu	$12,$8		# accumulate input
 	daddu	$13,$9
@@ -257,10 +281,11 @@ poly1305_blocks_internal:
 	jr	$31
 	daddu	$29,6*8
 .end	poly1305_blocks_internal
+
 .align	5
-.globl	poly1305_emit
-.ent	poly1305_emit
-poly1305_emit:
+.globl	poly1305_emit_mips
+.ent	poly1305_emit_mips
+poly1305_emit_mips:
 	.frame	$29,0,$31
 	.set	reorder
 
@@ -332,7 +357,4 @@ poly1305_emit:
 	sb	$11,15($5)
 
 	jr	$31
-.end	poly1305_emit
-.rdata
-.asciiz	"Poly1305 for MIPS64, CRYPTOGAMS by <appro@openssl.org>"
-.align	2
+.end	poly1305_emit_mips
