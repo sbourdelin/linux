@@ -152,12 +152,16 @@ extern int va_writable(struct pt_regs *regs, unsigned long addr);
 
 int unalign_access_mode = 0, unalign_access_debug = 0;
 
-static inline unsigned long *idx_to_addr(struct pt_regs *regs, int idx)
+static inline unsigned long *idx_to_addr(struct pt_regs *regs, int idx,
+				int idx_mode)
 {
 	/* this should be consistent with ptrace.h */
-	if (idx >= 0 && idx <= 25)	/* R0-R25 */
-		return &regs->uregs[0] + idx;
-	else if (idx >= 28 && idx <= 30)	/* FP, GP, LP */
+	if (idx >= 0 && idx <= 25) {	/* R0-R25 */
+		if (idx_mode == 4 && idx > 11)
+			return &regs->uregs[0] + idx + 4;
+		else
+			return &regs->uregs[0] + idx;
+	} else if (idx >= 28 && idx <= 30)	/* FP, GP, LP */
 		return &regs->fp + (idx - 28);
 	else if (idx == 31)	/* SP */
 		return &regs->sp;
@@ -270,10 +274,10 @@ static inline int do_16(unsigned long inst, struct pt_regs *regs)
 	}
 
 	if (addr_mode == 3) {
-		unaligned_addr = *idx_to_addr(regs, RA3(inst));
+		unaligned_addr = *idx_to_addr(regs, RA3(inst), addr_mode);
 		source_idx = RA3(inst);
 	} else {
-		unaligned_addr = *idx_to_addr(regs, RA5(inst));
+		unaligned_addr = *idx_to_addr(regs, RA5(inst), addr_mode);
 		source_idx = RA5(inst);
 	}
 
@@ -293,16 +297,17 @@ static inline int do_16(unsigned long inst, struct pt_regs *regs)
 			return -EACCES;
 
 		get_data(unaligned_addr, &target_val, len);
-		*idx_to_addr(regs, target_idx) = target_val;
+		*idx_to_addr(regs, target_idx, idx_mode) = target_val;
 	} else {
 		if (!access_ok(VERIFY_WRITE, (void *)unaligned_addr, len))
 			return -EACCES;
-		target_val = *idx_to_addr(regs, target_idx);
+		target_val = *idx_to_addr(regs, target_idx, idx_mode);
 		set_data((void *)unaligned_addr, target_val, len);
 	}
 
 	if (!regular)
-		*idx_to_addr(regs, source_idx) = unaligned_addr + shift;
+		*idx_to_addr(regs, source_idx, idx_mode) =
+			unaligned_addr + shift;
 	regs->ipc += 2;
 
 	return 0;
@@ -312,10 +317,10 @@ fault:
 
 static inline int do_32(unsigned long inst, struct pt_regs *regs)
 {
-	int imm, regular, load, len, sign_ext;
+	int imm, regular, load, len, sign_ext, idx_mode = 5;
 	unsigned long unaligned_addr, target_val, shift;
 
-	unaligned_addr = *idx_to_addr(regs, RA(inst));
+	unaligned_addr = *idx_to_addr(regs, RA(inst), idx_mode);
 
 	switch ((inst >> 25) << 1) {
 
@@ -472,7 +477,7 @@ static inline int do_32(unsigned long inst, struct pt_regs *regs)
 	if (imm)
 		shift = GET_IMMSVAL(IMM(inst)) * len;
 	else
-		shift = *idx_to_addr(regs, RB(inst)) << SV(inst);
+		shift = *idx_to_addr(regs, RB(inst), idx_mode) << SV(inst);
 
 	if (regular)
 		unaligned_addr += shift;
@@ -485,21 +490,21 @@ static inline int do_32(unsigned long inst, struct pt_regs *regs)
 		get_data(unaligned_addr, &target_val, len);
 
 		if (sign_ext)
-			*idx_to_addr(regs, RT(inst)) =
+			*idx_to_addr(regs, RT(inst), idx_mode) =
 			    sign_extend(target_val, len);
 		else
-			*idx_to_addr(regs, RT(inst)) = target_val;
+			*idx_to_addr(regs, RT(inst), idx_mode) = target_val;
 	} else {
 
 		if (!access_ok(VERIFY_WRITE, (void *)unaligned_addr, len))
 			return -EACCES;
 
-		target_val = *idx_to_addr(regs, RT(inst));
+		target_val = *idx_to_addr(regs, RT(inst), idx_mode);
 		set_data((void *)unaligned_addr, target_val, len);
 	}
 
 	if (!regular)
-		*idx_to_addr(regs, RA(inst)) = unaligned_addr + shift;
+		*idx_to_addr(regs, RA(inst), idx_mode) = unaligned_addr + shift;
 
 	regs->ipc += 4;
 
