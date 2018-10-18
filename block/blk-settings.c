@@ -525,6 +525,54 @@ void blk_queue_stack_limits(struct request_queue *t, struct request_queue *b)
 EXPORT_SYMBOL(blk_queue_stack_limits);
 
 /**
+ * blk_queue_dma_alignment - set dma length and memory alignment
+ * @q:     the request queue for the device
+ * @mask:  alignment mask
+ *
+ * description:
+ *    set required memory and length alignment for direct dma transactions.
+ *    this is used when building direct io requests for the queue.
+ *
+ **/
+void blk_queue_dma_alignment(struct request_queue *q, int mask)
+{
+	q->limits.dma_alignment = mask;
+}
+EXPORT_SYMBOL(blk_queue_dma_alignment);
+
+static int __blk_queue_update_dma_alignment(struct queue_limits *t, int mask)
+{
+	BUG_ON(mask >= PAGE_SIZE);
+
+	if (mask > t->dma_alignment)
+		return mask;
+	else
+		return t->dma_alignment;
+}
+
+/**
+ * blk_queue_update_dma_alignment - update dma length and memory alignment
+ * @q:     the request queue for the device
+ * @mask:  alignment mask
+ *
+ * description:
+ *    update required memory and length alignment for direct dma transactions.
+ *    If the requested alignment is larger than the current alignment, then
+ *    the current queue alignment is updated to the new value, otherwise it
+ *    is left alone.  The design of this is to allow multiple objects
+ *    (driver, device, transport etc) to set their respective
+ *    alignments without having them interfere.
+ *
+ **/
+void blk_queue_update_dma_alignment(struct request_queue *q, int mask)
+{
+	q->limits.dma_alignment =
+		__blk_queue_update_dma_alignment(&q->limits, mask);
+}
+EXPORT_SYMBOL(blk_queue_update_dma_alignment);
+
+
+/**
  * blk_stack_limits - adjust queue_limits for stacked devices
  * @t:	the stacking driver limits (top device)
  * @b:  the underlying queue limits (bottom, component device)
@@ -563,6 +611,8 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 					    b->seg_boundary_mask);
 	t->virt_boundary_mask = min_not_zero(t->virt_boundary_mask,
 					    b->virt_boundary_mask);
+	t->dma_alignment = __blk_queue_update_dma_alignment(t,
+							    b->dma_alignment);
 
 	t->max_segments = min_not_zero(t->max_segments, b->max_segments);
 	t->max_discard_segments = min_not_zero(t->max_discard_segments,
@@ -817,45 +867,6 @@ void blk_queue_virt_boundary(struct request_queue *q, unsigned long mask)
 	q->limits.virt_boundary_mask = mask;
 }
 EXPORT_SYMBOL(blk_queue_virt_boundary);
-
-/**
- * blk_queue_dma_alignment - set dma length and memory alignment
- * @q:     the request queue for the device
- * @mask:  alignment mask
- *
- * description:
- *    set required memory and length alignment for direct dma transactions.
- *    this is used when building direct io requests for the queue.
- *
- **/
-void blk_queue_dma_alignment(struct request_queue *q, int mask)
-{
-	q->limits.dma_alignment = mask;
-}
-EXPORT_SYMBOL(blk_queue_dma_alignment);
-
-/**
- * blk_queue_update_dma_alignment - update dma length and memory alignment
- * @q:     the request queue for the device
- * @mask:  alignment mask
- *
- * description:
- *    update required memory and length alignment for direct dma transactions.
- *    If the requested alignment is larger than the current alignment, then
- *    the current queue alignment is updated to the new value, otherwise it
- *    is left alone.  The design of this is to allow multiple objects
- *    (driver, device, transport etc) to set their respective
- *    alignments without having them interfere.
- *
- **/
-void blk_queue_update_dma_alignment(struct request_queue *q, int mask)
-{
-	BUG_ON(mask > PAGE_SIZE);
-
-	if (mask > q->limits.dma_alignment)
-		q->limits.dma_alignment = mask;
-}
-EXPORT_SYMBOL(blk_queue_update_dma_alignment);
 
 void blk_queue_flush_queueable(struct request_queue *q, bool queueable)
 {
