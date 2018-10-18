@@ -69,6 +69,8 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 		return false;
 	}
 	memcpy_fromio(rdev->bios, bios, size);
+	rdev->bios[0] = 0x55;
+	rdev->bios[1] = 0xaa;
 	iounmap(bios);
 	return true;
 }
