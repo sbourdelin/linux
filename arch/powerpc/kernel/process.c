@@ -1310,7 +1310,7 @@ void show_user_instructions(struct pt_regs *regs)
 	 * Make sure the NIP points at userspace, not kernel text/data or
 	 * elsewhere.
 	 */
-	if (!__access_ok(pc, NR_INSN_TO_PRINT * sizeof(int), USER_DS)) {
+	if (!__access_ok(VERIFY_READ, pc, NR_INSN_TO_PRINT * sizeof(int), USER_DS)) {
 		pr_info("%s[%d]: Bad NIP, not dumping instructions.\n",
 			current->comm, current->pid);
 		return;
