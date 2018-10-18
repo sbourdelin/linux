@@ -1,46 +1,24 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  * Copyright (C) 2006-2017 CRYPTOGAMS by <appro@openssl.org>. All Rights Reserved.
+ *
+ * This is based in part on Andy Polyakov's implementation from CRYPTOGAMS.
  */
 
-#include "arm_arch.h"
+#include <linux/linkage.h>
 
 .text
-
-
-
 .align	5
 .Lsigma:
 .quad	0x3320646e61707865,0x6b20657479622d32		// endian-neutral
 .Lone:
 .long	1,0,0,0
-.LOPENSSL_armcap_P:
-#ifdef	__ILP32__
-.long	OPENSSL_armcap_P-.
-#else
-.quad	OPENSSL_armcap_P-.
-#endif
-.byte	67,104,97,67,104,97,50,48,32,102,111,114,32,65,82,77,118,56,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
-.align	2
 
-.globl	ChaCha20_ctr32
-.type	ChaCha20_ctr32,%function
 .align	5
-ChaCha20_ctr32:
+ENTRY(chacha20_arm)
 	cbz	x2,.Labort
-	adr	x5,.LOPENSSL_armcap_P
-	cmp	x2,#192
-	b.lo	.Lshort
-#ifdef	__ILP32__
-	ldrsw	x6,[x5]
-#else
-	ldr	x6,[x5]
-#endif
-	ldr	w17,[x6,x5]
-	tst	w17,#ARMV7_NEON
-	b.ne	ChaCha20_neon
 
-.Lshort:
 	stp	x29,x30,[sp,#-96]!
 	add	x29,sp,#0
 
@@ -56,7 +34,7 @@ ChaCha20_ctr32:
 	ldp	x24,x25,[x3]		// load key
 	ldp	x26,x27,[x3,#16]
 	ldp	x28,x30,[x4]		// load counter
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x24,x24,#32
 	ror	x25,x25,#32
 	ror	x26,x26,#32
@@ -217,7 +195,7 @@ ChaCha20_ctr32:
 	add	x20,x20,x21,lsl#32
 	ldp	x19,x21,[x1,#48]
 	add	x1,x1,#64
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
 	rev	x9,x9
@@ -273,7 +251,7 @@ ChaCha20_ctr32:
 	add	x15,x15,x16,lsl#32
 	add	x17,x17,x19,lsl#32
 	add	x20,x20,x21,lsl#32
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
 	rev	x9,x9
@@ -309,11 +287,13 @@ ChaCha20_ctr32:
 	ldp	x27,x28,[x29,#80]
 	ldp	x29,x30,[sp],#96
 	ret
-.size	ChaCha20_ctr32,.-ChaCha20_ctr32
+ENDPROC(chacha20_arm)
 
-.type	ChaCha20_neon,%function
+#ifdef CONFIG_KERNEL_MODE_NEON
 .align	5
-ChaCha20_neon:
+ENTRY(chacha20_neon)
+	cbz	x2,.Labort_neon
+
 	stp	x29,x30,[sp,#-96]!
 	add	x29,sp,#0
 
@@ -336,7 +316,7 @@ ChaCha20_neon:
 	ldp	x28,x30,[x4]		// load counter
 	ld1	{v27.4s},[x4]
 	ld1	{v31.4s},[x5]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev64	v24.4s,v24.4s
 	ror	x24,x24,#32
 	ror	x25,x25,#32
@@ -634,7 +614,7 @@ ChaCha20_neon:
 	add	x20,x20,x21,lsl#32
 	ldp	x19,x21,[x1,#48]
 	add	x1,x1,#64
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
 	rev	x9,x9
@@ -713,7 +693,7 @@ ChaCha20_neon:
 	add	x20,x20,x21,lsl#32
 	ldp	x19,x21,[x1,#48]
 	add	x1,x1,#64
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
 	rev	x9,x9
@@ -803,19 +783,6 @@ ChaCha20_neon:
 	ldp	x27,x28,[x29,#80]
 	ldp	x29,x30,[sp],#96
 	ret
-.size	ChaCha20_neon,.-ChaCha20_neon
-.type	ChaCha20_512_neon,%function
-.align	5
-ChaCha20_512_neon:
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
-
-	adr	x5,.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
 
 .L512_or_more_neon:
 	sub	sp,sp,#128+64
@@ -828,7 +795,7 @@ ChaCha20_512_neon:
 	ldp	x28,x30,[x4]		// load counter
 	ld1	{v27.4s},[x4]
 	ld1	{v31.4s},[x5]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev64	v24.4s,v24.4s
 	ror	x24,x24,#32
 	ror	x25,x25,#32
@@ -1341,7 +1308,7 @@ ChaCha20_512_neon:
 	add	x20,x20,x21,lsl#32
 	ldp	x19,x21,[x1,#48]
 	add	x1,x1,#64
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
 	rev	x9,x9
@@ -1855,7 +1822,7 @@ ChaCha20_512_neon:
 	add	x1,x1,#64
 	add	v21.4s,v21.4s,v25.4s
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
 	rev	x9,x9
@@ -1969,5 +1936,7 @@ ChaCha20_512_neon:
 	ldp	x25,x26,[x29,#64]
 	ldp	x27,x28,[x29,#80]
 	ldp	x29,x30,[sp],#96
+.Labort_neon:
 	ret
-.size	ChaCha20_512_neon,.-ChaCha20_512_neon
+ENDPROC(chacha20_neon)
+#endif
