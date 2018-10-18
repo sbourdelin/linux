@@ -794,6 +794,7 @@ static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
  *
  * Determine which operations (read/write) will not block and return info
  * to caller.
+ *
  * Returns a bit mask containing info on which ops will not block.
  */
 static __poll_t n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
@@ -918,6 +919,7 @@ static void n_hdlc_buf_put(struct n_hdlc_buf_list *buf_list,
  *
  * Remove and return an HDLC buffer from the head of the specified HDLC buffer
  * list.
+ *
  * Returns a pointer to HDLC buffer if available, otherwise %NULL.
  */
 static struct n_hdlc_buf *n_hdlc_buf_get(struct n_hdlc_buf_list *buf_list)

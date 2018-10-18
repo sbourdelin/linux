@@ -74,7 +74,6 @@
 
 /**
  * tegra_uart_chip_data: SOC specific data.
- *
  * @tx_fifo_full_status: Status flag available for checking tx fifo full.
  * @allow_txfifo_reset_fifo_mode: allow_tx fifo reset with fifo mode or not.
  *			Tegra30 does not allow this.
@@ -220,7 +219,6 @@ static void tegra_uart_break_ctl(struct uart_port *u, int break_ctl)
 
 /**
  * tegra_uart_wait_cycle_time() - Wait for N UART clock periods
- *
  * @tup:	Tegra serial port data structure.
  * @cycles:	Number of clock periods to wait.
  *

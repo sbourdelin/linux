@@ -148,6 +148,7 @@ void tty_buffer_free_all(struct tty_port *port)
  * Allocate a new tty buffer to hold the desired number of characters.
  * We round our buffers off in 256 character chunks to get better
  * allocation behaviour.
+ *
  * Return NULL if out of memory or the allocation would exceed the
  * per device queue
  */

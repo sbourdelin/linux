@@ -605,7 +605,6 @@ static struct uart_driver ulite_uart_driver = {
 
 /**
  * ulite_assign() - register a uartlite device with the driver
- *
  * @dev: pointer to device structure
  * @id: requested id number.  Pass -1 for automatic port assignment
  * @base: base address of uartlite registers
@@ -687,7 +686,6 @@ static int ulite_assign(struct device *dev, int id, u32 base, int irq,
 
 /**
  * ulite_release() - register a uartlite device with the driver
- *
  * @dev: pointer to device structure
  */
 static int ulite_release(struct device *dev)
@@ -706,7 +704,6 @@ static int ulite_release(struct device *dev)
 
 /**
  * ulite_suspend() - Stop the device.
- *
  * @dev: handle to the device structure.
  * Return: 0 always.
  */
@@ -722,8 +719,8 @@ static int __maybe_unused ulite_suspend(struct device *dev)
 
 /**
  * ulite_resume() - Resume the device.
- *
  * @dev: handle to the device structure.
+ *
  * Return: 0 on success, errno otherwise.
  */
 static int __maybe_unused ulite_resume(struct device *dev)

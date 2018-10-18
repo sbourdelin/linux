@@ -363,7 +363,6 @@ EXPORT_SYMBOL(tty_port_hangup);
 
 /**
  * tty_port_tty_hangup() - helper to hang up a tty
- *
  * @port: tty port
  * @check_clocal: hang only ttys with CLOCAL unset?
  */
@@ -379,7 +378,6 @@ EXPORT_SYMBOL_GPL(tty_port_tty_hangup);
 
 /**
  * tty_port_tty_wakeup() - helper to wake up a tty
- *
  * @port: tty port
  */
 void tty_port_tty_wakeup(struct tty_port *port)
