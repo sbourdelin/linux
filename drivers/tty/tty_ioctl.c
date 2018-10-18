@@ -52,7 +52,6 @@
  * output queue. If no private method is supplied there is assumed
  * to be no queue on the device.
  */
-
 int tty_chars_in_buffer(struct tty_struct *tty)
 {
 	if (tty->ops->chars_in_buffer)
@@ -72,7 +71,6 @@ EXPORT_SYMBOL(tty_chars_in_buffer);
  * the number of bytes written. If no method is provided 2K is always
  * returned and data may be lost as there will be no flow control.
  */
-
 int tty_write_room(struct tty_struct *tty)
 {
 	if (tty->ops->write_room)
@@ -105,7 +103,6 @@ EXPORT_SYMBOL(tty_driver_flush_buffer);
  * and also to ensure the driver can consistently reference its own
  * termios data at this point when implementing software flow control.
  */
-
 void tty_throttle(struct tty_struct *tty)
 {
 	down_write(&tty->termios_rwsem);
@@ -130,7 +127,6 @@ EXPORT_SYMBOL(tty_throttle);
  * Drivers should however remember that the stack can issue a throttle,
  * then change flow control method, then unthrottle.
  */
-
 void tty_unthrottle(struct tty_struct *tty)
 {
 	down_write(&tty->termios_rwsem);
@@ -153,7 +149,6 @@ EXPORT_SYMBOL(tty_unthrottle);
  *
  * Returns 0 if tty is throttled (or was already throttled)
  */
-
 int tty_throttle_safe(struct tty_struct *tty)
 {
 	int ret = 0;
@@ -184,7 +179,6 @@ int tty_throttle_safe(struct tty_struct *tty)
  *
  * Returns 0 if tty is unthrottled (or was already unthrottled)
  */
-
 int tty_unthrottle_safe(struct tty_struct *tty)
 {
 	int ret = 0;
@@ -214,7 +208,6 @@ int tty_unthrottle_safe(struct tty_struct *tty)
  *
  * Locking: none
  */
-
 void tty_wait_until_sent(struct tty_struct *tty, long timeout)
 {
 	tty_debug_wait_until_sent(tty, "wait until sent, timeout=%ld\n", timeout);
@@ -310,7 +303,6 @@ EXPORT_SYMBOL(tty_termios_hw_change);
  *
  * Locking: termios_rwsem
  */
-
 int tty_set_termios(struct tty_struct *tty, struct ktermios *new_termios)
 {
 	struct ktermios old_termios;
@@ -358,7 +350,6 @@ EXPORT_SYMBOL_GPL(tty_set_termios);
  * Locking:
  *         Called functions take ldisc and termios_rwsem locks
  */
-
 static int set_termios(struct tty_struct *tty, void __user *arg, int opt)
 {
 	struct ktermios tmp_termios;
@@ -455,7 +446,6 @@ static int get_termio(struct tty_struct *tty, struct termio __user *termio)
  * Implement the device calling points for the SYS5 termiox ioctl
  * interface in Linux
  */
-
 static int set_termiox(struct tty_struct *tty, void __user *arg, int opt)
 {
 	struct termiox tnew;
@@ -563,7 +553,6 @@ static void set_sgflags(struct ktermios *termios, int flags)
  *
  * Locking: termios_rwsem
  */
-
 static int set_sgttyb(struct tty_struct *tty, struct sgttyb __user *sgttyb)
 {
 	int retval;
@@ -674,7 +663,6 @@ static int set_ltchars(struct tty_struct *tty, struct ltchars __user *ltchars)
  * Perform a change to the CLOCAL state and call into the driver
  * layer to make it visible. All done with the termios rwsem
  */
-
 static int tty_change_softcar(struct tty_struct *tty, int arg)
 {
 	int ret = 0;
@@ -704,7 +692,6 @@ static int tty_change_softcar(struct tty_struct *tty, int arg)
  * is designed to be called by line disciplines to ensure they provide
  * consistent mode setting.
  */
-
 int tty_mode_ioctl(struct tty_struct *tty, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {

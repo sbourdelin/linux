@@ -52,7 +52,6 @@
  * On release, the buffer work is restarted if there is data in the
  * flip buffer
  */
-
 void tty_buffer_lock_exclusive(struct tty_port *port)
 {
 	struct tty_bufhead *buf = &port->buf;
@@ -87,7 +86,6 @@ EXPORT_SYMBOL_GPL(tty_buffer_unlock_exclusive);
  * the returned # of bytes (use tty_prepare_flip_string_xxx() to
  * pre-allocate if memory guarantee is required).
  */
-
 int tty_buffer_space_avail(struct tty_port *port)
 {
 	int space = port->buf.mem_limit - atomic_read(&port->buf.mem_used);
@@ -112,7 +110,6 @@ static void tty_buffer_reset(struct tty_buffer *p, size_t size)
  * Remove all the buffers pending on a tty whether queued with data
  * or in the free ring. Must be called when the tty is no longer in use
  */
-
 void tty_buffer_free_all(struct tty_port *port)
 {
 	struct tty_bufhead *buf = &port->buf;
@@ -152,7 +149,6 @@ void tty_buffer_free_all(struct tty_port *port)
  * Return NULL if out of memory or the allocation would exceed the
  * per device queue
  */
-
 static struct tty_buffer *tty_buffer_alloc(struct tty_port *port, size_t size)
 {
 	struct llist_node *free;
@@ -191,7 +187,6 @@ found:
  * Free a tty buffer, or add it to the free list according to our
  * internal strategy
  */
-
 static void tty_buffer_free(struct tty_port *port, struct tty_buffer *b)
 {
 	struct tty_bufhead *buf = &port->buf;
@@ -216,7 +211,6 @@ static void tty_buffer_free(struct tty_port *port, struct tty_buffer *b)
  * Locking: takes buffer lock to ensure single-threaded flip buffer
  *          'consumer'
  */
-
 void tty_buffer_flush(struct tty_struct *tty, struct tty_ldisc *ld)
 {
 	struct tty_port *port = tty->port;
@@ -308,7 +302,6 @@ EXPORT_SYMBOL_GPL(tty_buffer_request_room);
  * Queue a series of bytes to the tty buffering. All the characters
  * passed are marked with the supplied flag. Returns the number added.
  */
-
 int tty_insert_flip_string_fixed_flag(struct tty_port *port,
 		const unsigned char *chars, char flag, size_t size)
 {
@@ -344,7 +337,6 @@ EXPORT_SYMBOL(tty_insert_flip_string_fixed_flag);
  * the flags array indicates the status of the character. Returns the
  * number added.
  */
-
 int tty_insert_flip_string_flags(struct tty_port *port,
 		const unsigned char *chars, const char *flags, size_t size)
 {
@@ -402,7 +394,6 @@ EXPORT_SYMBOL(__tty_insert_flip_char);
  * ldisc side of the queue. It then schedules those characters for
  * processing by the line discipline.
  */
-
 void tty_schedule_flip(struct tty_port *port)
 {
 	struct tty_bufhead *buf = &port->buf;
@@ -427,7 +418,6 @@ EXPORT_SYMBOL(tty_schedule_flip);
  * that need their own block copy routines into the buffer. There is no
  * guarantee the buffer is a DMA target!
  */
-
 int tty_prepare_flip_string(struct tty_port *port, unsigned char **chars,
 		size_t size)
 {
@@ -497,7 +487,6 @@ receive_buf(struct tty_port *port, struct tty_buffer *head, int count)
  * Locking: takes buffer lock to ensure single-threaded flip buffer
  *          'consumer'
  */
-
 static void flush_to_ldisc(struct work_struct *work)
 {
 	struct tty_port *port = container_of(work, struct tty_port, buf.work);
@@ -551,7 +540,6 @@ static void flush_to_ldisc(struct work_struct *work)
  * In the event of the queue being busy for flipping the work will be
  * held off and retried later.
  */
-
 void tty_flip_buffer_push(struct tty_port *port)
 {
 	tty_schedule_flip(port);
@@ -565,7 +553,6 @@ EXPORT_SYMBOL(tty_flip_buffer_push);
  * Set up the initial state of the buffer management for a tty device.
  * Must be called before the other tty buffer functions are used.
  */
-
 void tty_buffer_init(struct tty_port *port)
 {
 	struct tty_bufhead *buf = &port->buf;
@@ -588,7 +575,6 @@ void tty_buffer_init(struct tty_port *port)
  * Change the tty buffer memory limit.
  * Must be called before the other tty buffer functions are used.
  */
-
 int tty_buffer_set_limit(struct tty_port *port, int limit)
 {
 	if (limit < MIN_TTYB_SIZE)

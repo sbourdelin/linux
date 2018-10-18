@@ -986,7 +986,6 @@ intr_connect(struct ioc4_soft *soft, int type,
  * @irq: irq value
  * @arg: handler arg
  */
-
 static irqreturn_t ioc4_intr(int irq, void *arg)
 {
 	struct ioc4_soft *soft;
@@ -2064,7 +2063,6 @@ static void ioc4_cb_post_ncs(struct uart_port *the_port, int ncs)
  * @buf: place to put the stuff we read
  * @len: how big 'buf' is
  */
-
 static inline int do_read(struct uart_port *the_port, unsigned char *buf,
 				int len)
 {
@@ -2637,7 +2635,6 @@ static struct uart_driver ioc4_uart_rs422 = {
  *
  * @idd: IOC4 master module data for this IOC4
  */
-
 static int ioc4_serial_remove_one(struct ioc4_driver_data *idd)
 {
 	int port_num, port_type;

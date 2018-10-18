@@ -57,7 +57,6 @@ static int n_baud_table = ARRAY_SIZE(baud_table);
  *
  * Locking: none
  */
-
 speed_t tty_termios_baud_rate(struct ktermios *termios)
 {
 	unsigned int cbaud;
@@ -92,7 +91,6 @@ EXPORT_SYMBOL(tty_termios_baud_rate);
  *
  * Locking: none
  */
-
 speed_t tty_termios_input_baud_rate(struct ktermios *termios)
 {
 #ifdef IBSHIFT
@@ -141,7 +139,6 @@ EXPORT_SYMBOL(tty_termios_input_baud_rate);
  * The ifdefs deal with platforms whose owners have yet to update them
  * and will all go away once this is done.
  */
-
 void tty_termios_encode_baud_rate(struct ktermios *termios,
 				  speed_t ibaud, speed_t obaud)
 {
@@ -233,7 +230,6 @@ EXPORT_SYMBOL_GPL(tty_termios_encode_baud_rate);
  * settings. The caller must hold the termios_rwsem for the tty in
  * question.
  */
-
 void tty_encode_baud_rate(struct tty_struct *tty, speed_t ibaud, speed_t obaud)
 {
 	tty_termios_encode_baud_rate(&tty->termios, ibaud, obaud);

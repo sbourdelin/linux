@@ -985,7 +985,6 @@ static int ifx_spi_reset(struct ifx_spi_device *ifx_dev)
  * -	Support for multiple devices
  * -	Split out MID specific GPIO handling eventually
  */
-
 static int ifx_spi_spi_probe(struct spi_device *spi)
 {
 	int ret;
@@ -1224,7 +1223,6 @@ error_ret:
  * FIXME: We should be shutting the device down here not in
  * the module unload path.
  */
-
 static int ifx_spi_spi_remove(struct spi_device *spi)
 {
 	struct ifx_spi_device *ifx_dev = spi_get_drvdata(spi);
@@ -1253,7 +1251,6 @@ static int ifx_spi_spi_remove(struct spi_device *spi)
  *
  * No action needs to be taken here
  */
-
 static void ifx_spi_spi_shutdown(struct spi_device *spi)
 {
 	struct ifx_spi_device *ifx_dev = spi_get_drvdata(spi);
@@ -1363,7 +1360,6 @@ static struct spi_driver ifx_spi_driver = {
  *
  * Unload the module.
  */
-
 static void __exit ifx_spi_exit(void)
 {
 	/* unregister */
@@ -1380,7 +1376,6 @@ static void __exit ifx_spi_exit(void)
  * We need to initialize upper-edge spi driver after the tty
  * driver because otherwise the spi probe will race
  */
-
 static int __init ifx_spi_init(void)
 {
 	int result;

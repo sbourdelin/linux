@@ -106,7 +106,6 @@ static void pty_unthrottle(struct tty_struct *tty)
  * end of the link as if we were an IRQ handler receiving stuff for
  * the other side of the pty/tty pair.
  */
-
 static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
 {
 	struct tty_struct *to = tty->link;
@@ -134,7 +133,6 @@ static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
  * Report how many bytes the ldisc can send into the queue for
  * the other device.
  */
-
 static int pty_write_room(struct tty_struct *tty)
 {
 	if (tty->stopped)
@@ -149,7 +147,6 @@ static int pty_write_room(struct tty_struct *tty)
  * Report how much we have in the transmit queue. As everything is
  * instantly at the other end this is easy to implement.
  */
-
 static int pty_chars_in_buffer(struct tty_struct *tty)
 {
 	return 0;
@@ -298,7 +295,6 @@ static void pty_set_termios(struct tty_struct *tty,
  * Update the termios variables and send the necessary signals to
  * peform a terminal resize correctly
  */
-
 static int pty_resize(struct tty_struct *tty,  struct winsize *ws)
 {
 	struct pid *pgrp, *rpgrp;
@@ -694,7 +690,6 @@ static long pty_unix98_compat_ioctl(struct tty_struct *tty,
  * Look up a pty master device. Called under the tty_mutex for now.
  * This provides our locking.
  */
-
 static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
 		struct file *file, int idx)
 {
@@ -710,7 +705,6 @@ static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
  * Look up a pty master device. Called under the tty_mutex for now.
  * This provides our locking for the tty pointer.
  */
-
 static struct tty_struct *pts_unix98_lookup(struct tty_driver *driver,
 		struct file *file, int idx)
 {
@@ -797,7 +791,6 @@ static const struct tty_operations pty_unix98_ops = {
  *          protect the rest.
  *          allocated_ptys_lock handles the list of free pty numbers
  */
-
 static int ptmx_open(struct inode *inode, struct file *filp)
 {
 	struct pts_fs_info *fsi;

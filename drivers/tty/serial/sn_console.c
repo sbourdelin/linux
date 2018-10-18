@@ -835,7 +835,6 @@ device_initcall(sn_sal_init);
  * ia64_sn_console_putb (what sal_puts_raw below actually does).
  *
  */
-
 static void puts_raw_fixed(int (*puts_raw) (const char *s, int len),
 			   const char *s, int count)
 {

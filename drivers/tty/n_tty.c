@@ -198,7 +198,6 @@ static int tty_copy_to_user(struct tty_struct *tty, void __user *to,
  * n_tty_read()/consumer path:
  *    holds non-exclusive termios_rwsem
  */
-
 static void n_tty_kick_worker(struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -239,7 +238,6 @@ static ssize_t chars_in_buffer(struct tty_struct *tty)
  * that attach themselves to the master and rely on ASYNC
  * IO must be woken up
  */
-
 static void n_tty_write_wakeup(struct tty_struct *tty)
 {
 	clear_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
@@ -311,7 +309,6 @@ static void n_tty_check_unthrottle(struct tty_struct *tty)
  * n_tty_receive_buf()/producer path:
  *     caller holds non-exclusive termios_rwsem
  */
-
 static inline void put_tty_queue(unsigned char c, struct n_tty_data *ldata)
 {
 	*read_buf_addr(ldata, ldata->read_head) = c;
@@ -328,7 +325,6 @@ static inline void put_tty_queue(unsigned char c, struct n_tty_data *ldata)
  * Locking: caller holds exclusive termios_rwsem
  *          (or locking is not required)
  */
-
 static void reset_buffer_flags(struct n_tty_data *ldata)
 {
 	ldata->read_head = ldata->canon_head = ldata->read_tail = 0;
@@ -365,7 +361,6 @@ static void n_tty_packet_mode_flush(struct tty_struct *tty)
  *
  * Locking: ctrl_lock, exclusive termios_rwsem
  */
-
 static void n_tty_flush_buffer(struct tty_struct *tty)
 {
 	down_write(&tty->termios_rwsem);
@@ -385,7 +380,6 @@ static void n_tty_flush_buffer(struct tty_struct *tty)
  * character. We use this to correctly compute the on screen size
  * of the character when printing
  */
-
 static inline int is_utf8_continuation(unsigned char c)
 {
 	return (c & 0xc0) == 0x80;
@@ -398,7 +392,6 @@ static inline int is_utf8_continuation(unsigned char c)
  * Returns true if the utf8 character 'c' is a multibyte continuation
  * character and the terminal is in unicode mode.
  */
-
 static inline int is_continuation(unsigned char c, struct tty_struct *tty)
 {
 	return I_IUTF8(tty) && is_utf8_continuation(c);
@@ -425,7 +418,6 @@ static inline int is_continuation(unsigned char c, struct tty_struct *tty)
  * Locking: should be called under the output_lock to protect
  *          the column state and space left in the buffer
  */
-
 static int do_output_char(unsigned char c, struct tty_struct *tty, int space)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -500,7 +492,6 @@ static int do_output_char(unsigned char c, struct tty_struct *tty, int space)
  *          (also, this is called from n_tty_write under the
  *          tty layer write lock)
  */
-
 static int process_output(unsigned char c, struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -536,7 +527,6 @@ static int process_output(unsigned char c, struct tty_struct *tty)
  *          (also, this is called from n_tty_write under the
  *          tty layer write lock)
  */
-
 static ssize_t process_output_block(struct tty_struct *tty,
 				    const unsigned char *buf, unsigned int nr)
 {
@@ -620,7 +610,6 @@ break_out:
  *
  * Locking: callers must hold output_lock
  */
-
 static size_t __process_echoes(struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -835,7 +824,6 @@ static void flush_echoes(struct tty_struct *tty)
  *
  * Add a character or operation byte to the echo buffer.
  */
-
 static inline void add_echo_byte(unsigned char c, struct n_tty_data *ldata)
 {
 	*echo_buf_addr(ldata, ldata->echo_head) = c;
@@ -849,7 +837,6 @@ static inline void add_echo_byte(unsigned char c, struct n_tty_data *ldata)
  *
  * Add an operation to the echo buffer to move back one column.
  */
-
 static void echo_move_back_col(struct n_tty_data *ldata)
 {
 	add_echo_byte(ECHO_OP_START, ldata);
@@ -863,7 +850,6 @@ static void echo_move_back_col(struct n_tty_data *ldata)
  * Add an operation to the echo buffer to set the canon column
  * to the current column.
  */
-
 static void echo_set_canon_col(struct n_tty_data *ldata)
 {
 	add_echo_byte(ECHO_OP_START, ldata);
@@ -884,7 +870,6 @@ static void echo_set_canon_col(struct n_tty_data *ldata)
  * canon column (if applicable), to go back the correct number
  * of columns.
  */
-
 static void echo_erase_tab(unsigned int num_chars, int after_tab,
 			   struct n_tty_data *ldata)
 {
@@ -911,7 +896,6 @@ static void echo_erase_tab(unsigned int num_chars, int after_tab,
  *
  * This variant does not treat control characters specially.
  */
-
 static void echo_char_raw(unsigned char c, struct n_tty_data *ldata)
 {
 	if (c == ECHO_OP_START) {
@@ -933,7 +917,6 @@ static void echo_char_raw(unsigned char c, struct n_tty_data *ldata)
  * This variant tags control characters to be echoed as "^X"
  * (where X is the letter representing the control char).
  */
-
 static void echo_char(unsigned char c, struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -952,7 +935,6 @@ static void echo_char(unsigned char c, struct tty_struct *tty)
  * finish_erasing() - complete erase
  * @ldata: n_tty data
  */
-
 static inline void finish_erasing(struct n_tty_data *ldata)
 {
 	if (ldata->erasing) {
@@ -973,7 +955,6 @@ static inline void finish_erasing(struct n_tty_data *ldata)
  * n_tty_receive_buf()/producer path:
  *     caller holds non-exclusive termios_rwsem
  */
-
 static void eraser(unsigned char c, struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -1106,7 +1087,6 @@ static void eraser(unsigned char c, struct tty_struct *tty)
  *
  * Locking: ctrl_lock
  */
-
 static void __isig(int sig, struct tty_struct *tty)
 {
 	struct pid *tty_pgrp = tty_get_pgrp(tty);
@@ -1163,7 +1143,6 @@ static void isig(int sig, struct tty_struct *tty)
  *
  * Note: may get exclusive termios_rwsem if flushing input buffer
  */
-
 static void n_tty_receive_break(struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -1193,7 +1172,6 @@ static void n_tty_receive_break(struct tty_struct *tty)
  * need locking as num_overrun and overrun_time are function
  * private.
  */
-
 static void n_tty_receive_overrun(struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -1264,7 +1242,6 @@ n_tty_receive_signal_char(struct tty_struct *tty, int signal, unsigned char c)
  *
  * Returns 1 if LNEXT was received, else returns 0
  */
-
 static int
 n_tty_receive_char_special(struct tty_struct *tty, unsigned char c)
 {
@@ -1788,7 +1765,6 @@ static int n_tty_receive_buf2(struct tty_struct *tty, const unsigned char *cp,
  *
  * Locking: Caller holds tty->termios_rwsem
  */
-
 static void n_tty_set_termios(struct tty_struct *tty, struct ktermios *old)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -1882,7 +1858,6 @@ static void n_tty_set_termios(struct tty_struct *tty, struct ktermios *old)
  * discipline change. The function will not be called while other
  * ldisc methods are in progress.
  */
-
 static void n_tty_close(struct tty_struct *tty)
 {
 	struct n_tty_data *ldata = tty->disc_data;
@@ -1903,7 +1878,6 @@ static void n_tty_close(struct tty_struct *tty)
  * other events will occur in parallel. No further open will occur
  * until a close.
  */
-
 static int n_tty_open(struct tty_struct *tty)
 {
 	struct n_tty_data *ldata;
@@ -1956,7 +1930,6 @@ static inline int input_available_p(struct tty_struct *tty, int poll)
  *     caller holds non-exclusive termios_rwsem
  *     read_tail published
  */
-
 static int copy_from_read_buf(struct tty_struct *tty,
 				      unsigned char __user **b,
 				      size_t *nr)
@@ -2012,7 +1985,6 @@ static int copy_from_read_buf(struct tty_struct *tty,
  *     caller holds non-exclusive termios_rwsem
  *     read_tail published
  */
-
 static int canon_copy_from_read_buf(struct tty_struct *tty,
 				    unsigned char __user **b,
 				    size_t *nr)
@@ -2093,7 +2065,6 @@ extern ssize_t redirected_tty_write(struct file *, const char __user *,
  *          current->signal->tty check is safe
  *          ctrl_lock to safely reference tty->pgrp
  */
-
 static int job_control(struct tty_struct *tty, struct file *file)
 {
 	/* Job control check -- must be done at start and after
@@ -2126,7 +2097,6 @@ static int job_control(struct tty_struct *tty, struct file *file)
  *     claims non-exclusive termios_rwsem
  *     publishes read_tail
  */
-
 static ssize_t n_tty_read(struct tty_struct *tty, struct file *file,
 			 unsigned char __user *buf, size_t nr)
 {
@@ -2295,7 +2265,6 @@ static ssize_t n_tty_read(struct tty_struct *tty, struct file *file,
  *          (note that the process_output*() functions take this
  *          lock themselves)
  */
-
 static ssize_t n_tty_write(struct tty_struct *tty, struct file *file,
 			   const unsigned char *buf, size_t nr)
 {
@@ -2396,7 +2365,6 @@ break_out:
  * This code must be sure never to sleep through a hangup.
  * Called without the kernel lock held - fine
  */
-
 static __poll_t n_tty_poll(struct tty_struct *tty, struct file *file,
 							poll_table *wait)
 {
@@ -2487,7 +2455,6 @@ static struct tty_ldisc_ops n_tty_ops = {
  *
  * Enables a 'subclass' line discipline to 'inherit' N_TTY methods.
  */
-
 void n_tty_inherit_ops(struct tty_ldisc_ops *ops)
 {
 	*ops = n_tty_ops;

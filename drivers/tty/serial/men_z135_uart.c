@@ -860,7 +860,6 @@ err:
 
 /**
  * men_z135_remove() - Remove a z135 instance from the system
- *
  * @mdev: The MCB device
  */
 static void men_z135_remove(struct mcb_device *mdev)

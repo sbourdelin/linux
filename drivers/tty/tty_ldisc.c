@@ -57,7 +57,6 @@ static struct tty_ldisc_ops *tty_ldiscs[NR_LDISCS];
  * Locking:
  *         takes tty_ldiscs_lock to guard against ldisc races
  */
-
 int tty_register_ldisc(int disc, struct tty_ldisc_ops *new_ldisc)
 {
 	unsigned long flags;
@@ -87,7 +86,6 @@ EXPORT_SYMBOL(tty_register_ldisc);
  * Locking:
  *         takes tty_ldiscs_lock to guard against ldisc races
  */
-
 int tty_unregister_ldisc(int disc)
 {
 	unsigned long flags;
@@ -155,7 +153,6 @@ static void put_ldops(struct tty_ldisc_ops *ldops)
  * Locking:
  *         takes tty_ldiscs_lock to guard against ldisc races
  */
-
 static struct tty_ldisc *tty_ldisc_get(struct tty_struct *tty, int disc)
 {
 	struct tty_ldisc *ld;
@@ -255,7 +252,6 @@ const struct seq_operations tty_ldiscs_seq_ops = {
  * Note: a file_operations routine (read/poll/write) should use this
  * function to wait for any ldisc lifetime events to finish.
  */
-
 struct tty_ldisc *tty_ldisc_ref_wait(struct tty_struct *tty)
 {
 	struct tty_ldisc *ld;
@@ -276,7 +272,6 @@ EXPORT_SYMBOL_GPL(tty_ldisc_ref_wait);
  * reference to it. If the line discipline is in flux then
  * return NULL. Can be called from IRQ and timer functions.
  */
-
 struct tty_ldisc *tty_ldisc_ref(struct tty_struct *tty)
 {
 	struct tty_ldisc *ld = NULL;
@@ -297,7 +292,6 @@ EXPORT_SYMBOL_GPL(tty_ldisc_ref);
  * Undoes the effect of tty_ldisc_ref or tty_ldisc_ref_wait. May
  * be called in IRQ context.
  */
-
 void tty_ldisc_deref(struct tty_ldisc *ld)
 {
 	ldsem_up_read(&ld->tty->ldisc_sem);
@@ -396,7 +390,6 @@ static void tty_ldisc_unlock_pair(struct tty_struct *tty,
  * Flush the line discipline queue (if any) and the tty flip buffers
  * for this tty.
  */
-
 void tty_ldisc_flush(struct tty_struct *tty)
 {
 	struct tty_ldisc *ld = tty_ldisc_ref(tty);
@@ -422,7 +415,6 @@ EXPORT_SYMBOL_GPL(tty_ldisc_flush);
  *
  * Locking: takes termios_rwsem
  */
-
 static void tty_set_termios_ldisc(struct tty_struct *tty, int disc)
 {
 	down_write(&tty->termios_rwsem);
@@ -443,7 +435,6 @@ static void tty_set_termios_ldisc(struct tty_struct *tty, int disc)
  *
  * Locking: always called with BTM already held.
  */
-
 static int tty_ldisc_open(struct tty_struct *tty, struct tty_ldisc *ld)
 {
 	WARN_ON(test_and_set_bit(TTY_LDISC_OPEN, &tty->flags));
@@ -468,7 +459,6 @@ static int tty_ldisc_open(struct tty_struct *tty, struct tty_ldisc *ld)
  * A helper close method. Also a convenient debugging and check
  * point.
  */
-
 static void tty_ldisc_close(struct tty_struct *tty, struct tty_ldisc *ld)
 {
 	WARN_ON(!test_bit(TTY_LDISC_OPEN, &tty->flags));
@@ -486,7 +476,6 @@ static void tty_ldisc_close(struct tty_struct *tty, struct tty_ldisc *ld)
  * Helper to try and recover a tty when switching back to the old
  * ldisc fails and we need something attached.
  */
-
 static int tty_ldisc_failto(struct tty_struct *tty, int ld)
 {
 	struct tty_ldisc *disc = tty_ldisc_get(tty, ld);
@@ -509,7 +498,6 @@ static int tty_ldisc_failto(struct tty_struct *tty, int ld)
  * Restore the previous line discipline or N_TTY when a line discipline
  * change fails due to an open error
  */
-
 static void tty_ldisc_restore(struct tty_struct *tty, struct tty_ldisc *old)
 {
 	/* There is an outstanding reference here so this is safe */
@@ -536,7 +524,6 @@ static void tty_ldisc_restore(struct tty_struct *tty, struct tty_ldisc *old)
  * overlapping ldisc change (including on the other end of pty pairs),
  * the close of one side of a tty/pty pair, and eventually hangup.
  */
-
 int tty_set_ldisc(struct tty_struct *tty, int disc)
 {
 	int retval;
@@ -632,7 +619,6 @@ static void tty_ldisc_kill(struct tty_struct *tty)
  *
  * Restore a terminal to the driver default state.
  */
-
 static void tty_reset_termios(struct tty_struct *tty)
 {
 	down_write(&tty->termios_rwsem);
@@ -656,7 +642,6 @@ static void tty_reset_termios(struct tty_struct *tty)
  *
  * Returns 0 if successful, otherwise error code < 0
  */
-
 int tty_ldisc_reinit(struct tty_struct *tty, int disc)
 {
 	struct tty_ldisc *ld;
@@ -698,7 +683,6 @@ int tty_ldisc_reinit(struct tty_struct *tty, int disc)
  * In the pty pair case this occurs in the close() path of the
  * tty itself so we must be careful about locking rules.
  */
-
 void tty_ldisc_hangup(struct tty_struct *tty, bool reinit)
 {
 	struct tty_ldisc *ld;
@@ -752,7 +736,6 @@ void tty_ldisc_hangup(struct tty_struct *tty, bool reinit)
  * line disciplines and bind them to the tty. This has no locking issues
  * as the device isn't yet active.
  */
-
 int tty_ldisc_setup(struct tty_struct *tty, struct tty_struct *o_tty)
 {
 	int retval = tty_ldisc_open(tty, tty->ldisc);
@@ -776,7 +759,6 @@ int tty_ldisc_setup(struct tty_struct *tty, struct tty_struct *o_tty)
  * Called during the final close of a tty or a pty pair in order to shut
  * down the line discpline layer. On exit, each tty's ldisc is NULL.
  */
-
 void tty_ldisc_release(struct tty_struct *tty)
 {
 	struct tty_struct *o_tty = tty->link;
@@ -806,7 +788,6 @@ EXPORT_SYMBOL_GPL(tty_ldisc_release);
  * Set up the line discipline objects for a newly allocated tty. Note that
  * the tty structure is not completely set up when this call is made.
  */
-
 int tty_ldisc_init(struct tty_struct *tty)
 {
 	struct tty_ldisc *ld = tty_ldisc_get(tty, N_TTY);

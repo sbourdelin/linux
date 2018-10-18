@@ -165,7 +165,6 @@ static void release_tty(struct tty_struct *tty, int idx);
  *
  * Locking: none. Must be called after tty is definitely unused
  */
-
 static void free_tty_struct(struct tty_struct *tty)
 {
 	tty_ldisc_deinit(tty);
@@ -241,7 +240,6 @@ static void tty_del_file(struct file *file)
  *
  * Locking: none
  */
-
 const char *tty_name(const struct tty_struct *tty)
 {
 	if (!tty) /* Hmm.  NULL pointer.  That's fun. */
@@ -313,7 +311,6 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
  *
  * Locking: caller must hold tty_mutex
  */
-
 static struct tty_driver *get_tty_driver(dev_t device, int *index)
 {
 	struct tty_driver *p;
@@ -520,7 +517,6 @@ static struct file *redirect;
  * informs the line discipline if present that the driver is ready
  * to receive more output data.
  */
-
 void tty_wakeup(struct tty_struct *tty)
 {
 	struct tty_ldisc *ld;
@@ -670,7 +666,6 @@ static void do_tty_hangup(struct work_struct *work)
  * A carrier loss (virtual or otherwise) has occurred on this like
  * schedule a hangup sequence to run after this event.
  */
-
 void tty_hangup(struct tty_struct *tty)
 {
 	tty_debug_hangup(tty, "hangup\n");
@@ -687,7 +682,6 @@ EXPORT_SYMBOL(tty_hangup);
  * We do this synchronously so that when the syscall returns the process
  * is complete. That guarantee is necessary for security reasons.
  */
-
 void tty_vhangup(struct tty_struct *tty)
 {
 	tty_debug_hangup(tty, "vhangup\n");
@@ -702,7 +696,6 @@ EXPORT_SYMBOL(tty_vhangup);
  *
  * Perform a vhangup on the current controlling tty
  */
-
 void tty_vhangup_self(void)
 {
 	struct tty_struct *tty;
@@ -724,7 +717,6 @@ void tty_vhangup_self(void)
  * We do this synchronously so that when the syscall returns the process
  * is complete. That guarantee is necessary for security reasons.
  */
-
 void tty_vhangup_session(struct tty_struct *tty)
 {
 	tty_debug_hangup(tty, "session hangup\n");
@@ -738,7 +730,6 @@ void tty_vhangup_session(struct tty_struct *tty)
  * Return true if the tty has been subject to a vhangup or a carrier
  * loss
  */
-
 int tty_hung_up_p(struct file *filp)
 {
 	return (filp && filp->f_op == &hung_up_tty_fops);
@@ -762,7 +753,6 @@ EXPORT_SYMBOL(tty_hung_up_p);
  * Locking:
  *         flow_lock
  */
-
 void __stop_tty(struct tty_struct *tty)
 {
 	if (tty->stopped)
@@ -793,7 +783,6 @@ EXPORT_SYMBOL(stop_tty);
  * Locking:
  *         flow_lock
  */
-
 void __start_tty(struct tty_struct *tty)
 {
 	if (!tty->stopped || tty->flow_stopped)
@@ -842,7 +831,6 @@ static void tty_update_time(struct timespec64 *time)
  *         Locks the line discipline internally while needed. Multiple
  * read calls may be outstanding in parallel.
  */
-
 static ssize_t tty_read(struct file *file, char __user *buf, size_t count,
 			loff_t *ppos)
 {
@@ -988,7 +976,6 @@ out:
  *
  * We must still hold the BTM and test the CLOSING flag for the moment.
  */
-
 void tty_write_message(struct tty_struct *tty, char *msg)
 {
 	if (tty) {
@@ -1018,7 +1005,6 @@ void tty_write_message(struct tty_struct *tty, char *msg)
  * and are then processed in chunks to the device. The line discipline
  * write method will not be invoked in parallel for each device.
  */
-
 static ssize_t tty_write(struct file *file, const char __user *buf,
 						size_t count, loff_t *ppos)
 {
@@ -1070,7 +1056,6 @@ ssize_t redirected_tty_write(struct file *file, const char __user *buf,
  *
  * Locking: none for xchar method, write ordering for write method.
  */
-
 int tty_send_xchar(struct tty_struct *tty, char ch)
 {
 	int	was_stopped = tty->stopped;
@@ -1173,7 +1158,6 @@ static struct tty_struct *tty_driver_lookup_tty(struct tty_driver *driver,
  * Initialise the termios structures for this tty. Thus runs under
  * the tty_mutex currently so we can be relaxed about ordering.
  */
-
 void tty_init_termios(struct tty_struct *tty)
 {
 	struct ktermios *tp;
@@ -1302,7 +1286,6 @@ static int tty_reopen(struct tty_struct *tty)
  * really quite straightforward.  The mutex locking can probably be
  * relaxed for the (most common) case of reopening a tty.
  */
-
 struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 {
 	struct tty_struct *tty;
@@ -1463,7 +1446,6 @@ static void queue_release_one_tty(struct kref *kref)
  * Release a reference to a tty device and if need be let the kref
  * layer destruct the object for us
  */
-
 void tty_kref_put(struct tty_struct *tty)
 {
 	if (tty)
@@ -1627,7 +1609,6 @@ EXPORT_SYMBOL_GPL(tty_release_struct);
  * WSH 09/09/97: rewritten to avoid some nasty race conditions that could
  * lead to double frees or releasing memory still in use.
  */
-
 int tty_release(struct inode *inode, struct file *filp)
 {
 	struct tty_struct *tty = file_tty(filp);
@@ -1992,7 +1973,6 @@ out:
  * Note: the tty_unlock/lock cases without a ref are only safe due to
  * tty_mutex
  */
-
 static int tty_open(struct inode *inode, struct file *filp)
 {
 	struct tty_struct *tty;
@@ -2076,7 +2056,6 @@ retry_open:
  * Locking: locks called line discipline but ldisc poll method
  * may be re-entered freely by other callers.
  */
-
 static __poll_t tty_poll(struct file *filp, poll_table *wait)
 {
 	struct tty_struct *tty = file_tty(filp);
@@ -2159,7 +2138,6 @@ static int tty_fasync(int fd, struct file *filp, int on)
  *
  * FIXME: may race normal receive processing
  */
-
 static int tiocsti(struct tty_struct *tty, char __user *p)
 {
 	char ch, mbz = 0;
@@ -2188,7 +2166,6 @@ static int tiocsti(struct tty_struct *tty, char __user *p)
  * Locking: tty->winsize_mutex is taken to ensure the winsize data
  *          is consistent.
  */
-
 static int tiocgwinsz(struct tty_struct *tty, struct winsize __user *arg)
 {
 	int err;
@@ -2209,7 +2186,6 @@ static int tiocgwinsz(struct tty_struct *tty, struct winsize __user *arg)
  * Update the termios variables and send the necessary signals to
  * peform a terminal resize correctly
  */
-
 int tty_do_resize(struct tty_struct *tty, struct winsize *ws)
 {
 	struct pid *pgrp;
@@ -2246,7 +2222,6 @@ EXPORT_SYMBOL(tty_do_resize);
  * tty termios mutex and ctrl_lock. The console takes its own lock
  * then calls into the default method.
  */
-
 static int tiocswinsz(struct tty_struct *tty, struct winsize __user *arg)
 {
 	struct winsize tmp_ws;
@@ -2267,7 +2242,6 @@ static int tiocswinsz(struct tty_struct *tty, struct winsize __user *arg)
  *
  * Locking: uses redirect_lock to guard the redirect information
  */
-
 static int tioccons(struct file *file)
 {
 	if (!capable(CAP_SYS_ADMIN))
@@ -2303,7 +2277,6 @@ static int tioccons(struct file *file)
  *
  * Locking: none, the open file handle ensures it won't go away.
  */
-
 static int fionbio(struct file *file, int __user *p)
 {
 	int nonblock;
@@ -2329,7 +2302,6 @@ static int fionbio(struct file *file, int __user *p)
  *
  * Locking: see tty_set_ldisc, this function is just a helper
  */
-
 static int tiocsetd(struct tty_struct *tty, int __user *p)
 {
 	int disc;
@@ -2353,7 +2325,6 @@ static int tiocsetd(struct tty_struct *tty, int __user *p)
  * Locking: waits for ldisc reference (in case the line discipline
  *          is changing or the tty is being hungup)
  */
-
 static int tiocgetd(struct tty_struct *tty, int __user *p)
 {
 	struct tty_ldisc *ld;
@@ -2379,7 +2350,6 @@ static int tiocgetd(struct tty_struct *tty, int __user *p)
  *         atomic_write_lock serializes
  *
  */
-
 static int send_break(struct tty_struct *tty, unsigned int duration)
 {
 	int retval;
@@ -2418,7 +2388,6 @@ out:
  *
  * Locking: none (up to the driver)
  */
-
 static int tty_tiocmget(struct tty_struct *tty, int __user *p)
 {
 	int retval = -EINVAL;
@@ -2443,7 +2412,6 @@ static int tty_tiocmget(struct tty_struct *tty, int __user *p)
  *
  * Locking: none (up to the driver)
  */
-
 static int tty_tiocmset(struct tty_struct *tty, unsigned int cmd,
 	     unsigned __user *p)
 {
@@ -2810,7 +2778,6 @@ static struct device *tty_get_device(struct tty_struct *tty)
  *
  * Locking: none - tty in question is not exposed at this point
  */
-
 struct tty_struct *alloc_tty_struct(struct tty_driver *driver, int idx)
 {
 	struct tty_struct *tty;
@@ -2862,7 +2829,6 @@ struct tty_struct *alloc_tty_struct(struct tty_driver *driver, int idx)
  * Note: the specific put_char operation in the driver layer may go
  * away soon. Don't call it directly, use this method
  */
-
 int tty_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	if (tty->ops->put_char)
@@ -2908,7 +2874,6 @@ static int tty_cdev_add(struct tty_driver *driver, dev_t dev,
  *
  * Locking: ??
  */
-
 struct device *tty_register_device(struct tty_driver *driver, unsigned index,
 				   struct device *device)
 {
@@ -3022,7 +2987,6 @@ EXPORT_SYMBOL_GPL(tty_register_device_attr);
  *
  * Locking: ??
  */
-
 void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
 	device_destroy(tty_class,

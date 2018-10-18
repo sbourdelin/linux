@@ -366,7 +366,6 @@ static const u8 gsm_fcs8[256] = {
  * Update the FCS to include c. Uses the algorithm in the specification
  * notes.
  */
-
 static inline u8 gsm_fcs_add(u8 fcs, u8 c)
 {
 	return gsm_fcs8[fcs ^ c];
@@ -381,7 +380,6 @@ static inline u8 gsm_fcs_add(u8 fcs, u8 c)
  * Update the FCS to include c. Uses the algorithm in the specification
  * notes.
  */
-
 static inline u8 gsm_fcs_add_block(u8 fcs, u8 *c, int len)
 {
 	while (len--)
@@ -397,7 +395,6 @@ static inline u8 gsm_fcs_add_block(u8 fcs, u8 *c, int len)
  * Processes one byte of an EA. Updates the passed variable
  * and returns 1 if the EA is now completely read
  */
-
 static int gsm_read_ea(unsigned int *val, u8 c)
 {
 	/* Add the next 7 bits into the value */
@@ -414,7 +411,6 @@ static int gsm_read_ea(unsigned int *val, u8 c)
  * Returns the correct GSM encoded modem status bits (6 bit field) for
  * the current status of the DLCI and attached tty object
  */
-
 static u8 gsm_encode_modem(const struct gsm_dlci *dlci)
 {
 	u8 modembits = 0;
@@ -444,7 +440,6 @@ static u8 gsm_encode_modem(const struct gsm_dlci *dlci)
  * Displays a packet in human readable format for debugging purposes. The
  * style is based on amateur radio LAP-B dump display.
  */
-
 static void gsm_print_packet(const char *hdr, int addr, int cr,
 					u8 control, const u8 *data, int dlen)
 {
@@ -525,7 +520,6 @@ static void gsm_print_packet(const char *hdr, int addr, int cr,
  * is doubling and the caller is responsible for handing out
  * suitable sized buffers.
  */
-
 static int gsm_stuff_frame(const u8 *input, u8 *output, int len)
 {
 	int olen = 0;
@@ -555,7 +549,6 @@ static int gsm_stuff_frame(const u8 *input, u8 *output, int len)
  *
  * FIXME: Lock versus data TX path
  */
-
 static void gsm_send(struct gsm_mux *gsm, int addr, int cr, int control)
 {
 	int len;
@@ -602,7 +595,6 @@ static void gsm_send(struct gsm_mux *gsm, int addr, int cr, int control)
  *
  * Format up and transmit a link level response frame.
  */
-
 static inline void gsm_response(struct gsm_mux *gsm, int addr, int control)
 {
 	gsm_send(gsm, addr, 0, control);
@@ -616,7 +608,6 @@ static inline void gsm_response(struct gsm_mux *gsm, int addr, int control)
  *
  * Format up and transmit a link level command frame.
  */
-
 static inline void gsm_command(struct gsm_mux *gsm, int addr, int control)
 {
 	gsm_send(gsm, addr, 1, control);
@@ -637,7 +628,6 @@ static inline void gsm_command(struct gsm_mux *gsm, int addr, int control)
  * at the front for header bytes but that is treated as an implementation
  * detail and not for the high level code to use
  */
-
 static struct gsm_msg *gsm_data_alloc(struct gsm_mux *gsm, u8 addr, int len,
 								u8 ctrl)
 {
@@ -664,7 +654,6 @@ static struct gsm_msg *gsm_data_alloc(struct gsm_mux *gsm, u8 addr, int len,
  *
  * FIXME: lock against link layer control transmissions
  */
-
 static void gsm_data_kick(struct gsm_mux *gsm)
 {
 	struct gsm_msg *msg, *nmsg;
@@ -715,7 +704,6 @@ static void gsm_data_kick(struct gsm_mux *gsm)
  * out of the mux tty if not already doing so. The Caller must hold
  * the gsm tx lock.
  */
-
 static void __gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
 {
 	struct gsm_mux *gsm = dlci->gsm;
@@ -766,7 +754,6 @@ static void __gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
  * out of the mux tty if not already doing so. Take the
  * the gsm tx lock and dlci lock.
  */
-
 static void gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
 {
 	unsigned long flags;
@@ -786,7 +773,6 @@ static void gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
  *
  * Caller must hold the tx_lock of the mux.
  */
-
 static int gsm_dlci_data_output(struct gsm_mux *gsm, struct gsm_dlci *dlci)
 {
 	struct gsm_msg *msg;
@@ -839,7 +825,6 @@ static int gsm_dlci_data_output(struct gsm_mux *gsm, struct gsm_dlci *dlci)
  *
  * Caller must hold the tx_lock of the mux.
  */
-
 static int gsm_dlci_data_output_framed(struct gsm_mux *gsm,
 						struct gsm_dlci *dlci)
 {
@@ -913,7 +898,6 @@ static int gsm_dlci_data_output_framed(struct gsm_mux *gsm,
  * FIXME: We should round robin between groups and in theory you can
  * renegotiate DLCI priorities with optional stuff. Needs optimising.
  */
-
 static void gsm_dlci_data_sweep(struct gsm_mux *gsm)
 {
 	int len;
@@ -950,7 +934,6 @@ static void gsm_dlci_data_sweep(struct gsm_mux *gsm)
  * a tty wakeup except when we filled the pipe so we need to fire off
  * new data ourselves in other cases.
  */
-
 static void gsm_dlci_data_kick(struct gsm_dlci *dlci)
 {
 	unsigned long flags;
@@ -987,7 +970,6 @@ static void gsm_dlci_data_kick(struct gsm_dlci *dlci)
  *
  * Encode up and queue a UI/UIH frame containing our response.
  */
-
 static void gsm_control_reply(struct gsm_mux *gsm, int cmd, u8 *data,
 					int dlen)
 {
@@ -1010,7 +992,6 @@ static void gsm_control_reply(struct gsm_mux *gsm, int cmd, u8 *data,
  * Used when a modem control message or line state inline in adaption
  * layer 2 is processed. Sort out the local modem state and throttles
  */
-
 static void gsm_process_modem(struct tty_struct *tty, struct gsm_dlci *dlci,
 							u32 modem, int clen)
 {
@@ -1072,7 +1053,6 @@ static void gsm_process_modem(struct tty_struct *tty, struct gsm_dlci *dlci,
  * to indicate break signals. Unpack it, convert to Linux representation
  * and if need be stuff a break message down the tty.
  */
-
 static void gsm_control_modem(struct gsm_mux *gsm, u8 *data, int clen)
 {
 	unsigned int addr = 0;
@@ -1133,7 +1113,6 @@ static void gsm_control_modem(struct gsm_mux *gsm, u8 *data, int clen)
  * it wishes to send us an error state from the virtual link. Stuff
  * this into the uplink tty if present
  */
-
 static void gsm_control_rls(struct gsm_mux *gsm, u8 *data, int clen)
 {
 	struct tty_port *port;
@@ -1187,7 +1166,6 @@ static void gsm_dlci_begin_close(struct gsm_dlci *dlci);
  * Processes the incoming request and queues a response frame or an
  * NSC response if not supported
  */
-
 static void gsm_control_message(struct gsm_mux *gsm, unsigned int command,
 							u8 *data, int clen)
 {
@@ -1259,7 +1237,6 @@ static void gsm_control_message(struct gsm_mux *gsm, unsigned int command,
  * is done by the caller, we just update the fields, flag it as done
  * and return
  */
-
 static void gsm_control_response(struct gsm_mux *gsm, unsigned int command,
 							u8 *data, int clen)
 {
@@ -1291,7 +1268,6 @@ static void gsm_control_response(struct gsm_mux *gsm, unsigned int command,
  *
  * Send out a pending control command (called under control lock)
  */
-
 static void gsm_control_transmit(struct gsm_mux *gsm, struct gsm_control *ctrl)
 {
 	struct gsm_msg *msg = gsm_data_alloc(gsm, 0, ctrl->len + 1, gsm->ftype);
@@ -1312,7 +1288,6 @@ static void gsm_control_transmit(struct gsm_mux *gsm, struct gsm_control *ctrl)
  * In that situation the timer may still occur in a small window but
  * gsm->pending_cmd will be NULL and we just let the timer expire.
  */
-
 static void gsm_control_retransmit(struct timer_list *t)
 {
 	struct gsm_mux *gsm = from_timer(gsm, t, t2_timer);
@@ -1347,7 +1322,6 @@ static void gsm_control_retransmit(struct timer_list *t)
  * active at a time. In theory more can be outstanding but the matching
  * gets really complicated so for now stick to one outstanding.
  */
-
 static struct gsm_control *gsm_control_send(struct gsm_mux *gsm,
 		unsigned int command, u8 *data, int clen)
 {
@@ -1389,7 +1363,6 @@ retry:
  * resources and returns 0 for success, or an error if the remote
  * rejected or ignored the request.
  */
-
 static int gsm_control_wait(struct gsm_mux *gsm, struct gsm_control *control)
 {
 	int err;
@@ -1415,7 +1388,6 @@ static int gsm_control_wait(struct gsm_mux *gsm, struct gsm_control *control)
  * Perform processing when moving a DLCI into closed state. If there
  * is an attached tty this is hung up
  */
-
 static void gsm_dlci_close(struct gsm_dlci *dlci)
 {
 	del_timer(&dlci->t1);
@@ -1438,7 +1410,6 @@ static void gsm_dlci_close(struct gsm_dlci *dlci)
  *
  * Perform processing when moving a DLCI into open state.
  */
-
 static void gsm_dlci_open(struct gsm_dlci *dlci)
 {
 	/* Note that SABM UA .. SABM UA first UA lost can mean that we go
@@ -1465,7 +1436,6 @@ static void gsm_dlci_open(struct gsm_dlci *dlci)
  * fine. In that case we can just keep the control dlci open after the
  * DLCI_OPENING retries time out.
  */
-
 static void gsm_dlci_t1(struct timer_list *t)
 {
 	struct gsm_dlci *dlci = from_timer(dlci, t, t1);
@@ -1508,7 +1478,6 @@ static void gsm_dlci_t1(struct timer_list *t)
  * we will move into open state. Opening is done asynchronously with retry
  * running off timers and the responses.
  */
-
 static void gsm_dlci_begin_open(struct gsm_dlci *dlci)
 {
 	struct gsm_mux *gsm = dlci->gsm;
@@ -1530,7 +1499,6 @@ static void gsm_dlci_begin_open(struct gsm_dlci *dlci)
  * off timers. We may also receive a DM reply from the other end which
  * indicates the channel was already closed.
  */
-
 static void gsm_dlci_begin_close(struct gsm_dlci *dlci)
 {
 	struct gsm_mux *gsm = dlci->gsm;
@@ -1552,7 +1520,6 @@ static void gsm_dlci_begin_close(struct gsm_dlci *dlci)
  * other than the control channel. If the relevant virtual tty is
  * open we shovel the bits down it, if not we drop them.
  */
-
 static void gsm_dlci_data(struct gsm_dlci *dlci, u8 *data, int clen)
 {
 	/* krefs .. */
@@ -1602,7 +1569,6 @@ static void gsm_dlci_data(struct gsm_dlci *dlci, u8 *data, int clen)
  * control data bytes. The command EA contains a command/response bit
  * and we divide up the work accordingly.
  */
-
 static void gsm_dlci_command(struct gsm_dlci *dlci, u8 *data, int len)
 {
 	/* See what command is involved */
@@ -1640,7 +1606,6 @@ static void gsm_dlci_command(struct gsm_dlci *dlci, u8 *data, int len)
  *
  * FIXME: review locking races
  */
-
 static struct gsm_dlci *gsm_dlci_alloc(struct gsm_mux *gsm, int addr)
 {
 	struct gsm_dlci *dlci = kzalloc(sizeof(struct gsm_dlci), GFP_ATOMIC);
@@ -1741,7 +1706,6 @@ static void gsm_dlci_release(struct gsm_dlci *dlci)
  * been handled below us and the frame is unpacked into the structures.
  * The fcs holds the header FCS but any data FCS must be added here.
  */
-
 static void gsm_queue(struct gsm_mux *gsm)
 {
 	struct gsm_dlci *dlci;
@@ -2012,7 +1976,6 @@ static void gsm1_receive(struct gsm_mux *gsm, unsigned char c)
  *
  * FIXME: better diagnostics ?
  */
-
 static void gsm_error(struct gsm_mux *gsm,
 				unsigned char data, unsigned char flag)
 {
@@ -2055,7 +2018,6 @@ static int gsm_disconnect(struct gsm_mux *gsm)
  * protocols. Remove the mux from the mux table, stop all the timers
  * and then shut down each device hanging up the channels as we go.
  */
-
 static void gsm_cleanup_mux(struct gsm_mux *gsm)
 {
 	int i;
@@ -2101,7 +2063,6 @@ static void gsm_cleanup_mux(struct gsm_mux *gsm)
  * protocols. Add the mux to the mux table so it can be opened and
  * finally kick off connecting to DLCI 0 on the modem.
  */
-
 static int gsm_activate_mux(struct gsm_mux *gsm)
 {
 	struct gsm_dlci *dlci;
@@ -2220,7 +2181,6 @@ static struct gsm_mux *gsm_alloc_mux(void)
  * Write a block of data from the GSM mux to the data channel. This
  * will eventually be serialized from above but at the moment isn't.
  */
-
 static int gsmld_output(struct gsm_mux *gsm, u8 *data, int len)
 {
 	if (tty_write_room(gsm->tty) < len) {
@@ -2243,7 +2203,6 @@ static int gsmld_output(struct gsm_mux *gsm, u8 *data, int len)
  * modem. Currently called from the line discipline set up but
  * will need moving to an ioctl path.
  */
-
 static int gsmld_attach_gsm(struct tty_struct *tty, struct gsm_mux *gsm)
 {
 	int ret, i, base;
@@ -2340,7 +2299,6 @@ static void gsmld_flush_buffer(struct tty_struct *tty)
  * discipline change. The function will not be called while other
  * ldisc methods are in progress.
  */
-
 static void gsmld_close(struct tty_struct *tty)
 {
 	struct gsm_mux *gsm = tty->disc_data;
@@ -2361,7 +2319,6 @@ static void gsmld_close(struct tty_struct *tty)
  * other events will occur in parallel. No further open will occur
  * until a close.
  */
-
 static int gsmld_open(struct tty_struct *tty)
 {
 	struct gsm_mux *gsm;
@@ -2426,7 +2383,6 @@ static void gsmld_write_wakeup(struct tty_struct *tty)
  *
  * This code must be sure never to sleep through a hangup.
  */
-
 static ssize_t gsmld_read(struct tty_struct *tty, struct file *file,
 			 unsigned char __user *buf, size_t nr)
 {
@@ -2446,7 +2402,6 @@ static ssize_t gsmld_read(struct tty_struct *tty, struct file *file,
  * by userspace. Frames are either sent whole or not at all as this
  * avoids pain user side.
  */
-
 static ssize_t gsmld_write(struct tty_struct *tty, struct file *file,
 			   const unsigned char *buf, size_t nr)
 {
@@ -2470,7 +2425,6 @@ static ssize_t gsmld_write(struct tty_struct *tty, struct file *file,
  * This code must be sure never to sleep through a hangup.
  * Called without the kernel lock held - fine
  */
-
 static __poll_t gsmld_poll(struct tty_struct *tty, struct file *file,
 							poll_table *wait)
 {

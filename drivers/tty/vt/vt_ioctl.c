@@ -86,7 +86,6 @@ static DECLARE_WAIT_QUEUE_HEAD(vt_event_waitqueue);
  *
  * Post an VT event to interested VT handlers
  */
-
 void vt_event_post(unsigned int event, unsigned int old, unsigned int new)
 {
 	struct list_head *pos, *head;
@@ -163,7 +162,6 @@ static void vt_event_wait(struct vt_event_wait *vw)
  *
  * Implement the VT_WAITEVENT ioctl using the VT event interface
  */
-
 static int vt_event_wait_ioctl(struct vt_event __user *event)
 {
 	struct vt_event_wait vw;
@@ -192,7 +190,6 @@ static int vt_event_wait_ioctl(struct vt_event __user *event)
  * Helper for event waits. Used to implement the legacy
  * event waiting ioctls in terms of events
  */
-
 int vt_waitactive(int n)
 {
 	struct vt_event_wait vw;

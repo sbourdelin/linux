@@ -1110,7 +1110,6 @@ static void ioc3_cb_post_ncs(struct uart_port *the_port, int ncs)
  * @buf: place to put the stuff we read
  * @len: how big 'buf' is
  */
-
 static inline int do_read(struct uart_port *the_port, char *buf, int len)
 {
 	int prod_ptr, cons_ptr, total;
@@ -1426,7 +1425,6 @@ static int receive_chars(struct uart_port *the_port)
  * @idd: driver data
  * @pending: interrupts to handle
  */
-
 static inline int
 ioc3uart_intr_one(struct ioc3_submodule *is,
 			struct ioc3_driver_data *idd,
@@ -1626,7 +1624,6 @@ ioc3uart_intr_one(struct ioc3_submodule *is,
  * @pending: interrupts to handle
  *
  */
-
 static int ioc3uart_intr(struct ioc3_submodule *is,
 			struct ioc3_driver_data *idd,
 			unsigned int pending)
@@ -1964,7 +1961,6 @@ static inline int ioc3_serial_core_attach( struct ioc3_submodule *is,
  * @is: submodule struct for this submodule
  * @idd: ioc3 driver data for this submodule
  */
-
 static int ioc3uart_remove(struct ioc3_submodule *is,
 			struct ioc3_driver_data *idd)
 {
@@ -2002,7 +1998,6 @@ static int ioc3uart_remove(struct ioc3_submodule *is,
  * @is: submodule struct for this submodule
  * @idd: ioc3 driver data for this card
  */
-
 static int
 ioc3uart_probe(struct ioc3_submodule *is, struct ioc3_driver_data *idd)
 {
