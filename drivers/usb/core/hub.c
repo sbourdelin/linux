@@ -2894,6 +2894,11 @@ done:
 		if (udev) {
 			struct usb_hcd *hcd = bus_to_hcd(udev->bus);
 
+			/* Hub needs extra delay after resetting its port. */
+			if (udev->parent &&
+			    udev->parent->quirks & USB_QUIRK_HUB_SLOW_RESET)
+				msleep(100);
+
 			update_devnum(udev, 0);
 			/* The xHC may think the device is already reset,
 			 * so ignore the status.
