@@ -2733,7 +2733,7 @@ static int snd_soc_bind_card(struct snd_soc_card *card)
 int snd_soc_register_card(struct snd_soc_card *card)
 {
 	int i, ret;
-	struct snd_soc_dai_link *link;
+	struct snd_soc_dai_link *link = NULL;
 
 	if (!card->name || !card->dev)
 		return -EINVAL;
@@ -2744,7 +2744,7 @@ int snd_soc_register_card(struct snd_soc_card *card)
 		if (ret) {
 			dev_err(card->dev, "ASoC: failed to init link %s\n",
 				link->name);
-			return ret;
+			goto err;
 		}
 	}
 
@@ -2763,7 +2763,17 @@ int snd_soc_register_card(struct snd_soc_card *card)
 	mutex_init(&card->mutex);
 	mutex_init(&card->dapm_mutex);
 
-	return snd_soc_bind_card(card);
+	ret = snd_soc_bind_card(card);
+	if (ret)
+		goto err;
+
+	return 0;
+
+err:
+	if (link && link->platform)
+		link->platform = NULL;
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(snd_soc_register_card);
 
