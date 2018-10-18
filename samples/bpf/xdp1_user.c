@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <sys/resource.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <linux/if.h>
 
 #include "bpf_util.h"
 #include "bpf/bpf.h"
@@ -59,7 +62,7 @@ static void poll_stats(int map_fd, int interval)
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"usage: %s [OPTS] IFINDEX\n\n"
+		"usage: %s [OPTS] IFACE\n\n"
 		"OPTS:\n"
 		"    -S    use skb-mode\n"
 		"    -N    enforce native mode\n",
@@ -74,9 +77,11 @@ int main(int argc, char **argv)
 	};
 	const char *optstr = "SN";
 	int prog_fd, map_fd, opt;
+	struct ifreq ifr = { 0 };
 	struct bpf_object *obj;
 	struct bpf_map *map;
 	char filename[256];
+	int sock;
 
 	while ((opt = getopt(argc, argv, optstr)) != -1) {
 		switch (opt) {
@@ -102,7 +107,24 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	ifindex = strtoul(argv[optind], NULL, 0);
+	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (sock == -1) {
+		perror("socket");
+		return 1;
+	}
+
+	if (strlen(argv[optind]) >= IFNAMSIZ) {
+		printf("invalid ifname '%s'\n", argv[optind]);
+		return 1;
+	}
+
+	strcpy(ifr.ifr_name, argv[optind]);
+	if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+		perror("SIOCGIFINDEX");
+		return 1;
+	}
+	close(sock);
+	ifindex = ifr.ifr_ifindex;
 
 	snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
 	prog_load_attr.file = filename;
