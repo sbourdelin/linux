@@ -90,6 +90,22 @@ static inline void u64_stats_update_end(struct u64_stats_sync *syncp)
 #endif
 }
 
+static inline void u64_stats_update_begin_bh(struct u64_stats_sync *syncp)
+{
+#if BITS_PER_LONG==32
+	local_bh_disable();
+	write_seqcount_begin(&syncp->seq);
+#endif
+}
+
+static inline void u64_stats_update_end_bh(struct u64_stats_sync *syncp)
+{
+#if BITS_PER_LONG==32
+	write_seqcount_end(&syncp->seq);
+	local_bh_enable();
+#endif
+}
+
 static inline unsigned long
 u64_stats_update_begin_irqsave(struct u64_stats_sync *syncp)
 {
