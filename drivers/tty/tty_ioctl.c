@@ -832,7 +832,7 @@ int tty_mode_ioctl(struct tty_struct *tty, struct file *file,
 		return set_termiox(real_tty, p, TERMIOS_WAIT);
 	case TCSETXF:
 		return set_termiox(real_tty, p, TERMIOS_FLUSH);
-#endif		
+#endif
 	case TIOCGSOFTCAR:
 		copy_termios(real_tty, &kterm);
 		ret = put_user((kterm.c_cflag & CLOCAL) ? 1 : 0,
