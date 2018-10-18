@@ -28,7 +28,7 @@ TEST_GEN_PROGS = test_verifier test_tag test_maps test_lru_map test_lpm_map test
 
 TEST_GEN_FILES = test_pkt_access.o test_xdp.o test_l4lb.o test_tcp_estats.o test_obj_id.o \
 	test_pkt_md_access.o test_xdp_redirect.o test_xdp_meta.o sockmap_parse_prog.o     \
-	sockmap_verdict_prog.o dev_cgroup.o sample_ret0.o test_tracepoint.o \
+	sockmap_verdict_prog.o sockmap_kcm.o dev_cgroup.o sample_ret0.o test_tracepoint.o \
 	test_l4lb_noinline.o test_xdp_noinline.o test_stacktrace_map.o \
 	sample_map_ret0.o test_tcpbpf_kern.o test_stacktrace_build_id.o \
 	sockmap_tcp_msg_prog.o connect4_prog.o connect6_prog.o test_adjust_tail.o \
