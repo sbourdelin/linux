@@ -566,16 +566,26 @@ static int nds32_pmu_get_event_idx(struct pmu_hw_events *cpuc,
 	/*
 	 * Try to get the counter for correpsonding event
 	 */
-	if (!test_and_set_bit(idx, cpuc->used_mask))
-		return idx;
-
-	/*
-	 * The counter is in use.
-	 * The system will hang in the loop.
-	 */
-	pr_err
-	("Multiple events map to one counter, the behavior is undefined.\n");
-	return -EPERM;
+	if (evtype == SPAV3_0_SEL_TOTAL_CYCLES) {
+		if (!test_and_set_bit(idx, cpuc->used_mask))
+			return idx;
+		if (!test_and_set_bit(NDS32_IDX_COUNTER0, cpuc->used_mask))
+			return NDS32_IDX_COUNTER0;
+		if (!test_and_set_bit(NDS32_IDX_COUNTER1, cpuc->used_mask))
+			return NDS32_IDX_COUNTER1;
+	} else if (evtype == SPAV3_1_SEL_COMPLETED_INSTRUCTION) {
+		if (!test_and_set_bit(idx, cpuc->used_mask))
+			return idx;
+		else if (!test_and_set_bit(NDS32_IDX_COUNTER1, cpuc->used_mask))
+			return NDS32_IDX_COUNTER1;
+		else if (!test_and_set_bit
+			 (NDS32_IDX_CYCLE_COUNTER, cpuc->used_mask))
+			return NDS32_IDX_CYCLE_COUNTER;
+	} else {
+		if (!test_and_set_bit(idx, cpuc->used_mask))
+			return idx;
+	}
+	return -EAGAIN;
 }
 
 static void nds32_pmu_start(struct nds32_pmu *cpu_pmu)

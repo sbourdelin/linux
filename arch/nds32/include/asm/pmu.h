@@ -55,6 +55,7 @@ enum { PFMC0, PFMC1, PFMC2, MAX_COUNTERS };
  */
 #define NDS32_IDX_CYCLE_COUNTER			0
 #define NDS32_IDX_COUNTER0			1
+#define NDS32_IDX_COUNTER1			2
 #define NDS32_IDX_COUNTER_LAST(cpu_pmu) \
 	(NDS32_IDX_CYCLE_COUNTER + (cpu_pmu)->num_events - 1)
 
