@@ -148,6 +148,7 @@ struct statx {
 #define STATX_BLOCKS		0x00000400U	/* Want/got stx_blocks */
 #define STATX_BASIC_STATS	0x000007ffU	/* The stuff in the normal stat struct */
 #define STATX_BTIME		0x00000800U	/* Want/got stx_btime */
+#define STATX_ATTRIBUTES	0x00001000U	/* Want/got stx_attributes */
 
 #define STATX__RESERVED		0x80000000U	/* Reserved for future struct statx expansion */
 
