@@ -47,13 +47,16 @@ static inline void set_fs(mm_segment_t fs)
  * This check is sufficient because there is a large enough
  * gap between user addresses and the kernel addresses
  */
-#define __access_ok(addr, size, segment)	\
-	(((addr) <= (segment).seg) && ((size) <= (segment).seg))
+static inline int __access_ok(int type, unsigned long addr, unsigned long size,
+			      mm_segment_t seg)
+{
+	return addr <= seg.seg && size <= seg.seg;
+}
 
 #else
 
-static inline int __access_ok(unsigned long addr, unsigned long size,
-			mm_segment_t seg)
+static inline int __access_ok(int type, unsigned long addr, unsigned long size,
+			      mm_segment_t seg)
 {
 	if (addr > seg.seg)
 		return 0;
@@ -64,7 +67,7 @@ static inline int __access_ok(unsigned long addr, unsigned long size,
 
 #define access_ok(type, addr, size)		\
 	(__chk_user_ptr(addr),			\
-	 __access_ok((__force unsigned long)(addr), (size), get_fs()))
+	 __access_ok((type), (__force unsigned long)(addr), (size), get_fs()))
 
 /*
  * These are the main single-value transfer routines.  They automatically
