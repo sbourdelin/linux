@@ -43,7 +43,7 @@ static inline char *bfd_demangle(void __maybe_unused *v,
 #endif
 
 #ifndef HAVE_ELF_GETPHDRNUM_SUPPORT
-static int elf_getphdrnum(Elf *elf, size_t *dst)
+int elf_getphdrnum(Elf *elf, size_t *dst)
 {
 	GElf_Ehdr gehdr;
 	GElf_Ehdr *ehdr;
@@ -59,7 +59,7 @@ static int elf_getphdrnum(Elf *elf, size_t *dst)
 #endif
 
 #ifndef HAVE_ELF_GETSHDRSTRNDX_SUPPORT
-static int elf_getshdrstrndx(Elf *elf __maybe_unused, size_t *dst __maybe_unused)
+int elf_getshdrstrndx(Elf *elf __maybe_unused, size_t *dst __maybe_unused)
 {
 	pr_err("%s: update your libelf to > 0.140, this one lacks elf_getshdrstrndx().\n", __func__);
 	return -1;
