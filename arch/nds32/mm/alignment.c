@@ -524,8 +524,10 @@ int do_unaligned_access(unsigned long addr, struct pt_regs *regs)
 	DEBUG((unalign_access_debug > 0), 1,
 	      "Faulting addr: 0x%08lx, pc: 0x%08lx [inst: 0x%08lx ]\n", addr,
 	      regs->ipc, inst);
-
-	set_fs(USER_DS);
+	if ((user_mode(regs) && unalign_access_mode))
+		set_fs(USER_DS);
+	else if (va_kernel_present(addr))
+		set_fs(KERNEL_DS);
 
 	if (inst & NDS32_16BIT_INSTRUCTION)
 		ret = do_16((inst >> 16) & 0xffff, regs);

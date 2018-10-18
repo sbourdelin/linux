@@ -331,6 +331,7 @@ void do_revinsn(struct pt_regs *regs)
 #ifdef CONFIG_ALIGNMENT_TRAP
 extern int unalign_access_mode;
 extern int do_unaligned_access(unsigned long addr, struct pt_regs *regs);
+extern int va_kernel_present(unsigned long addr);
 #endif
 void do_dispatch_general(unsigned long entry, unsigned long addr,
 			 unsigned long itype, struct pt_regs *regs,
@@ -341,7 +342,8 @@ void do_dispatch_general(unsigned long entry, unsigned long addr,
 	if (type == ETYPE_ALIGNMENT_CHECK) {
 #ifdef CONFIG_ALIGNMENT_TRAP
 		/* Alignment check */
-		if (user_mode(regs) && unalign_access_mode) {
+		if ((user_mode(regs) && unalign_access_mode) ||
+		    va_kernel_present(addr)) {
 			int ret;
 			ret = do_unaligned_access(addr, regs);
 
