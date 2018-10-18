@@ -1429,11 +1429,11 @@ static void __init mxser_normal_mode(int port)
 	outb(0x00, port + 4);
 }
 
-#define CHIP_SK 	0x01	/* Serial Data Clock  in Eprom */
-#define CHIP_DO 	0x02	/* Serial Data Output in Eprom */
-#define CHIP_CS 	0x04	/* Serial Chip Select in Eprom */
-#define CHIP_DI 	0x08	/* Serial Data Input  in Eprom */
-#define EN_CCMD 	0x000	/* Chip's command register     */
+#define CHIP_SK	0x01	/* Serial Data Clock  in Eprom */
+#define CHIP_DO	0x02	/* Serial Data Output in Eprom */
+#define CHIP_CS	0x04	/* Serial Chip Select in Eprom */
+#define CHIP_DI	0x08	/* Serial Data Input  in Eprom */
+#define EN_CCMD	0x000	/* Chip's command register     */
 #define EN0_RSARLO	0x008	/* Remote start address reg 0  */
 #define EN0_RSARHI	0x009	/* Remote start address reg 1  */
 #define EN0_RCNTLO	0x00A	/* Remote byte count reg WR    */

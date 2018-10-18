@@ -72,7 +72,7 @@ EXPORT_SYMBOL(tty_chars_in_buffer);
  *	the number of bytes written. If no method is provided 2K is always
  *	returned and data may be lost as there will be no flow control.
  */
- 
+
 int tty_write_room(struct tty_struct *tty)
 {
 	if (tty->ops->write_room)

@@ -243,9 +243,9 @@ static void dw8250_serial_out32be(struct uart_port *p, int offset, int value)
 
 static unsigned int dw8250_serial_in32be(struct uart_port *p, int offset)
 {
-       unsigned int value = ioread32be(p->membase + (offset << p->regshift));
+	unsigned int value = ioread32be(p->membase + (offset << p->regshift));
 
-       return dw8250_modify_msr(p, offset, value);
+	return dw8250_modify_msr(p, offset, value);
 }
 
 

@@ -1822,11 +1822,11 @@ static int sbsa_uart_startup(struct uart_port *port)
 static void pl011_shutdown_channel(struct uart_amba_port *uap,
 					unsigned int lcrh)
 {
-      unsigned long val;
+	unsigned long val;
 
-      val = pl011_read(uap, lcrh);
-      val &= ~(UART01x_LCRH_BRK | UART01x_LCRH_FEN);
-      pl011_write(val, uap, lcrh);
+	val = pl011_read(uap, lcrh);
+	val &= ~(UART01x_LCRH_BRK | UART01x_LCRH_FEN);
+	pl011_write(val, uap, lcrh);
 }
 
 /*

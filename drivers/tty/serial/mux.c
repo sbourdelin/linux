@@ -405,7 +405,7 @@ static void mux_console_write(struct console *co, const char *s, unsigned count)
 
 static int mux_console_setup(struct console *co, char *options)
 {
-        return 0;
+	return 0;
 }
 
 static struct console mux_console = {
@@ -457,7 +457,7 @@ static int __init mux_probe(struct parisc_device *dev)
 
 	dev_set_drvdata(&dev->dev, (void *)(long)port_count);
 	request_mem_region(dev->hpa.start + MUX_OFFSET,
-                           port_count * MUX_LINE_OFFSET, "Mux");
+			   port_count * MUX_LINE_OFFSET, "Mux");
 
 	if(!port_cnt) {
 		mux_driver.cons = MUX_CONSOLE;
@@ -576,7 +576,7 @@ static int __init mux_init(void)
 		mod_timer(&mux_timer, jiffies + MUX_POLL_DELAY);
 
 #ifdef CONFIG_SERIAL_MUX_CONSOLE
-	        register_console(&mux_console);
+		register_console(&mux_console);
 #endif
 	}
 

@@ -18,7 +18,7 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *  Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 
- * 		1998, 1999  Theodore Ts'o
+ *		1998, 1999  Theodore Ts'o
  *
  */
 
@@ -26,8 +26,8 @@
  * Serial driver configuration section.  Here are the various options:
  *
  * SERIAL_PARANOIA_CHECK
- * 		Check the magic number for the async_structure where
- * 		ever possible.
+ *		Check the magic number for the async_structure where
+ *		ever possible.
  */
 
 #include <linux/delay.h>
@@ -104,8 +104,8 @@ struct serial_state {
 	int			ignore_status_mask;
 	int			timeout;
 	int			quot;
-	int			IER; 	/* Interrupt Enable Register */
-	int			MCR; 	/* Modem control register */
+	int			IER;	/* Interrupt Enable Register */
+	int			MCR;	/* Modem control register */
 	int			x_char;	/* xon/xoff character */
 };
 
@@ -173,7 +173,8 @@ static inline int serial_paranoia_check(struct serial_state *info,
 
 static __inline__ void rtsdtr_ctrl(int bits)
 {
-    ciab.pra = ((bits & (SER_RTS | SER_DTR)) ^ (SER_RTS | SER_DTR)) | (ciab.pra & ~(SER_RTS | SER_DTR));
+	ciab.pra = ((bits & (SER_RTS | SER_DTR)) ^ (SER_RTS | SER_DTR)) |
+		   (ciab.pra & ~(SER_RTS | SER_DTR));
 }
 
 /*
@@ -243,13 +244,13 @@ static void rs_start(struct tty_struct *tty)
  *
  * and look at the resulting assemble code in serial.s.
  *
- * 				- Ted Ts'o (tytso@mit.edu), 7-Mar-93
+ *				- Ted Ts'o (tytso@mit.edu), 7-Mar-93
  * -----------------------------------------------------------------------
  */
 
 static void receive_chars(struct serial_state *info)
 {
-        int status;
+	int status;
 	int serdatr;
 	unsigned char ch, flag;
 	struct	async_icount *icount;
@@ -912,7 +913,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 static void rs_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct serial_state *info = tty->driver_data;
-        unsigned long flags;
+	unsigned long flags;
 
 	if (serial_paranoia_check(info, tty->name, "rs_send_xchar"))
 		return;
@@ -921,8 +922,8 @@ static void rs_send_xchar(struct tty_struct *tty, char ch)
 	if (ch) {
 		/* Make sure transmit interrupts are on */
 
-	        /* Check this ! */
-	        local_irq_save(flags);
+		/* Check this ! */
+		local_irq_save(flags);
 		if(!(custom.intenar & IF_TBE)) {
 		    custom.intena = IF_SETCLR | IF_TBE;
 		    mb();
@@ -1000,7 +1001,7 @@ static int get_serial_info(struct tty_struct *tty, struct serial_state *state,
 			   struct serial_struct __user * retinfo)
 {
 	struct serial_struct tmp;
-   
+
 	memset(&tmp, 0, sizeof(tmp));
 	tty_lock(tty);
 	tmp.line = tty->index;
@@ -1023,7 +1024,7 @@ static int set_serial_info(struct tty_struct *tty, struct serial_state *state,
 	struct tty_port *port = &state->tport;
 	struct serial_struct new_serial;
 	bool change_spd;
-	int 			retval = 0;
+	int			retval = 0;
 
 	if (copy_from_user(&new_serial,new_info,sizeof(new_serial)))
 		return -EFAULT;
@@ -1036,7 +1037,7 @@ static int set_serial_info(struct tty_struct *tty, struct serial_state *state,
 		tty_unlock(tty);
 		return -EINVAL;
 	}
-  
+
 	if (!serial_isroot()) {
 		if ((new_serial.baud_base != state->baud_base) ||
 		    (new_serial.close_delay != port->close_delay) ||
@@ -1089,11 +1090,11 @@ check_and_exit:
  * get_lsr_info - get line status register info
  *
  * Purpose: Let user call ioctl() to get info when the UART physically
- * 	    is emptied.  On bus types like RS485, the transmitter must
- * 	    release the bus after transmitting. This must be done when
- * 	    the transmit shift register is empty, not be done when the
- * 	    transmit holding register is empty.  This functionality
- * 	    allows an RS485 driver to be written in user space. 
+ *	    is emptied.  On bus types like RS485, the transmitter must
+ *	    release the bus after transmitting. This must be done when
+ *	    the transmit shift register is empty, not be done when the
+ *	    transmit holding register is empty.  This functionality
+ *	    allows an RS485 driver to be written in user space.
  */
 static int get_lsr_info(struct serial_state *info, unsigned int __user *value)
 {
@@ -1251,7 +1252,7 @@ static int rs_ioctl(struct tty_struct *tty,
 		/*
 		 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change
 		 * - mask passed in arg for lines of interest
- 		 *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
+		 *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
 		 * Caller should use TIOCGICOUNT to see which one it was
 		 */
 		case TIOCMIWAIT:
@@ -1581,7 +1582,7 @@ static int rs_proc_show(struct seq_file *m, void *v)
  */
 static void show_serial_version(void)
 {
- 	printk(KERN_INFO "%s version %s\n", serial_name, serial_version);
+	printk(KERN_INFO "%s version %s\n", serial_name, serial_version);
 }
 
 

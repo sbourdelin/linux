@@ -700,7 +700,7 @@ void update_region(struct vc_data *vc, unsigned long start, int count)
 /* Structure of attributes is hardware-dependent */
 
 static u8 build_attr(struct vc_data *vc, u8 _color, u8 _intensity, u8 _blink,
-    u8 _underline, u8 _reverse, u8 _italic)
+		     u8 _underline, u8 _reverse, u8 _italic)
 {
 	if (vc->vc_sw->con_build_attr)
 		return vc->vc_sw->con_build_attr(vc, _color, _intensity,
@@ -1399,7 +1399,7 @@ static void gotoxy(struct vc_data *vc, int new_x, int new_y)
 			vc->vc_x = new_x;
 	}
 
- 	if (vc->vc_decom) {
+	if (vc->vc_decom) {
 		min_y = vc->vc_top;
 		max_y = vc->vc_bottom;
 	} else {
@@ -1436,13 +1436,13 @@ void scrollfront(struct vc_data *vc, int lines)
 
 static void lf(struct vc_data *vc)
 {
-    	/* don't scroll if above bottom of scrolling region, or
+	/* don't scroll if above bottom of scrolling region, or
 	 * if below scrolling region
 	 */
-    	if (vc->vc_y + 1 == vc->vc_bottom)
+	if (vc->vc_y + 1 == vc->vc_bottom)
 		con_scroll(vc, vc->vc_top, vc->vc_bottom, SM_UP, 1);
 	else if (vc->vc_y < vc->vc_rows - 1) {
-	    	vc->vc_y++;
+		vc->vc_y++;
 		vc->vc_pos += vc->vc_size_row;
 	}
 	vc->vc_need_wrap = 0;
@@ -1451,7 +1451,7 @@ static void lf(struct vc_data *vc)
 
 static void ri(struct vc_data *vc)
 {
-    	/* don't scroll if below top of scrolling region, or
+	/* don't scroll if below top of scrolling region, or
 	 * if above scrolling region
 	 */
 	if (vc->vc_y == vc->vc_top)
@@ -2653,17 +2653,17 @@ rescan_last_byte:
 					&param) == NOTIFY_STOP)
 			continue;
 
-                /* If the original code was a control character we
-                 * only allow a glyph to be displayed if the code is
-                 * not normally used (such as for cursor movement) or
-                 * if the disp_ctrl mode has been explicitly enabled.
-                 * Certain characters (as given by the CTRL_ALWAYS
-                 * bitmap) are always displayed as control characters,
-                 * as the console would be pretty useless without
-                 * them; to display an arbitrary font position use the
-                 * direct-to-font zone in UTF-8 mode.
-                 */
-                ok = tc && (c >= 32 ||
+		/* If the original code was a control character we
+		 * only allow a glyph to be displayed if the code is
+		 * not normally used (such as for cursor movement) or
+		 * if the disp_ctrl mode has been explicitly enabled.
+		 * Certain characters (as given by the CTRL_ALWAYS
+		 * bitmap) are always displayed as control characters,
+		 * as the console would be pretty useless without
+		 * them; to display an arbitrary font position use the
+		 * direct-to-font zone in UTF-8 mode.
+		 */
+		ok = tc && (c >= 32 ||
 			    !(vc->vc_disp_ctrl ? (CTRL_ALWAYS >> c) & 1 :
 				  vc->vc_utf || ((CTRL_ACTION >> c) & 1)))
 			&& (c != 127 || vc->vc_disp_ctrl)
@@ -2847,7 +2847,7 @@ struct tty_driver *console_driver;
 /**
  * vt_kmsg_redirect() - Sets/gets the kernel message console
  * @new:	The new virtual terminal number or -1 if the console should stay
- * 		unchanged
+ *		unchanged
  *
  * By default, the kernel messages are always printed on the current virtual
  * console. However, the user may modify that default with the
@@ -3636,7 +3636,7 @@ static int vt_bind(struct con_driver *con)
 	const struct consw *defcsw = NULL, *csw = NULL;
 	int i, more = 1, first = -1, last = -1, deflt = 0;
 
- 	if (!con->con || !(con->flag & CON_DRIVER_FLAG_MODULE))
+	if (!con->con || !(con->flag & CON_DRIVER_FLAG_MODULE))
 		goto err;
 
 	csw = con->con;
@@ -3687,7 +3687,7 @@ static int vt_unbind(struct con_driver *con)
 	int i, more = 1, first = -1, last = -1, deflt = 0;
 	int ret;
 
- 	if (!con->con || !(con->flag & CON_DRIVER_FLAG_MODULE))
+	if (!con->con || !(con->flag & CON_DRIVER_FLAG_MODULE))
 		goto err;
 
 	csw = con->con;

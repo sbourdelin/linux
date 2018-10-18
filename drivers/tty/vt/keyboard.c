@@ -1110,8 +1110,9 @@ static unsigned char getledstate(void)
 
 void setledstate(struct kbd_struct *kb, unsigned int led)
 {
-        unsigned long flags;
-        spin_lock_irqsave(&led_lock, flags);
+	unsigned long flags;
+
+	spin_lock_irqsave(&led_lock, flags);
 	if (!(led & ~7)) {
 		ledioctl = led;
 		kb->ledmode = LED_SHOW_IOCTL;
@@ -2047,7 +2048,7 @@ int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm)
 			fj = first_free;
 
 		delta = (q ? -strlen(q) : 1) + strlen(kbs->kb_string);
-		if (delta <= funcbufleft) { 	/* it fits in current buf */
+		if (delta <= funcbufleft) {	/* it fits in current buf */
 		    if (j < MAX_NR_FUNC) {
 			memmove(fj + delta, fj, first_free - fj);
 			for (k = j; k < MAX_NR_FUNC; k++)
@@ -2099,16 +2100,16 @@ reterr:
 int vt_do_kdskled(int console, int cmd, unsigned long arg, int perm)
 {
 	struct kbd_struct *kb = kbd_table + console;
-        unsigned long flags;
+	unsigned long flags;
 	unsigned char ucval;
 
-        switch(cmd) {
+	switch(cmd) {
 	/* the ioctls below read/set the flags usually shown in the leds */
 	/* don't use them - they will go away without warning */
 	case KDGKBLED:
-                spin_lock_irqsave(&kbd_event_lock, flags);
+		spin_lock_irqsave(&kbd_event_lock, flags);
 		ucval = kb->ledflagstate | (kb->default_ledflagstate << 4);
-                spin_unlock_irqrestore(&kbd_event_lock, flags);
+		spin_unlock_irqrestore(&kbd_event_lock, flags);
 		return put_user(ucval, (char __user *)arg);
 
 	case KDSKBLED:
@@ -2116,11 +2117,11 @@ int vt_do_kdskled(int console, int cmd, unsigned long arg, int perm)
 			return -EPERM;
 		if (arg & ~0x77)
 			return -EINVAL;
-                spin_lock_irqsave(&led_lock, flags);
+		spin_lock_irqsave(&led_lock, flags);
 		kb->ledflagstate = (arg & 7);
 		kb->default_ledflagstate = ((arg >> 4) & 7);
 		set_leds();
-                spin_unlock_irqrestore(&led_lock, flags);
+		spin_unlock_irqrestore(&led_lock, flags);
 		return 0;
 
 	/* the ioctls below only set the lights, not the functions */
@@ -2134,8 +2135,8 @@ int vt_do_kdskled(int console, int cmd, unsigned long arg, int perm)
 			return -EPERM;
 		setledstate(kb, arg);
 		return 0;
-        }
-        return -ENOIOCTLCMD;
+	}
+	return -ENOIOCTLCMD;
 }
 
 int vt_do_kdgkbmode(int console)
@@ -2165,7 +2166,7 @@ int vt_do_kdgkbmode(int console)
 int vt_do_kdgkbmeta(int console)
 {
 	struct kbd_struct *kb = kbd_table + console;
-        /* Again a spot read so no locking */
+	/* Again a spot read so no locking */
 	return vc_kbd_mode(kb, VC_META) ? K_ESCPREFIX : K_METABIT;
 }
 
@@ -2192,8 +2193,8 @@ void vt_reset_unicode(int console)
  */
 int vt_get_shift_state(void)
 {
-        /* Don't lock as this is a transient report */
-        return shift_state;
+	/* Don't lock as this is a transient report */
+	return shift_state;
 }
 
 /**

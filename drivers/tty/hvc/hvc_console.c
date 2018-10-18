@@ -268,7 +268,7 @@ static void hvc_check_console(int index)
 	if (hvc_console.flags & CON_ENABLED)
 		return;
 
- 	/* If this index is what the user requested, then register
+	/* If this index is what the user requested, then register
 	 * now (setup won't fail at this point).  It's ok to just
 	 * call register again if previously .setup failed.
 	 */

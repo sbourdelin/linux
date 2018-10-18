@@ -648,7 +648,7 @@ int __serdev_device_driver_register(struct serdev_device_driver *sdrv, struct mo
 	sdrv->driver.owner = owner;
 
 	/* force drivers to async probe so I/O is possible in probe */
-        sdrv->driver.probe_type = PROBE_PREFER_ASYNCHRONOUS;
+	sdrv->driver.probe_type = PROBE_PREFER_ASYNCHRONOUS;
 
 	return driver_register(&sdrv->driver);
 }

@@ -654,7 +654,7 @@ static void calc_ebrg(int baud, int *n_ret, int *m_ret)
 		*m_ret = 0;
 		return;
 	}
-     
+
 	/*
 	 * We scale numbers by 10 so that we get better accuracy
 	 * without having to use floating point.  Here we increment m

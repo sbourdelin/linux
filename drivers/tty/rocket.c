@@ -1253,7 +1253,7 @@ static int reset_rm2(struct r_port *info, void __user *arg)
 		reset = 1;
 
 	if (rcktpt_type[info->board] != ROCKET_TYPE_MODEMII &&
-            rcktpt_type[info->board] != ROCKET_TYPE_MODEMIII)
+	    rcktpt_type[info->board] != ROCKET_TYPE_MODEMIII)
 		return -EINVAL;
 
 	if (info->ctlp->BusType == isISA)
@@ -1619,8 +1619,8 @@ static int rp_write(struct tty_struct *tty,
 		set_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
 	
 end:
- 	if (info->xmit_cnt < WAKEUP_CHARS) {
- 		tty_wakeup(tty);
+	if (info->xmit_cnt < WAKEUP_CHARS) {
+		tty_wakeup(tty);
 #ifdef ROCKETPORT_HAVE_POLL_WAIT
 		wake_up_interruptible(&tty->poll_wait);
 #endif
@@ -2257,7 +2257,7 @@ static int __init init_ISA(int i)
 		rcktpt_io_addr[i] = 0;
 		return (0);
 	}
-  
+
 	rocketModel[i].startingPortNumber = nextLineNumber;
 
 	for (aiop = 0; aiop < num_aiops; aiop++) {

@@ -33,7 +33,7 @@
  *	-- Nick Holloway <alfie@dcs.warwick.ac.uk>, 27th May 1993.
  *
  * Rewrote canonical mode and added more termios flags.
- * 	-- julian@uhunix.uhcc.hawaii.edu (J. Cowley), 13Jan94
+ *	-- julian@uhunix.uhcc.hawaii.edu (J. Cowley), 13Jan94
  *
  * Reorganized FASYNC support so mouse code can share it.
  *	-- ctm@ardi.com, 9Sep95
@@ -1023,7 +1023,7 @@ static ssize_t tty_write(struct file *file, const char __user *buf,
 						size_t count, loff_t *ppos)
 {
 	struct tty_struct *tty = file_tty(file);
- 	struct tty_ldisc *ld;
+	struct tty_ldisc *ld;
 	ssize_t ret;
 
 	if (tty_paranoia_check(tty, file_inode(file), "tty_write"))
@@ -1244,8 +1244,8 @@ static void tty_driver_remove_tty(struct tty_driver *driver, struct tty_struct *
 }
 
 /*
- * 	tty_reopen()	- fast re-open of an open tty
- * 	@tty	- the tty to open
+ *	tty_reopen()	- fast re-open of an open tty
+ *	@tty	- the tty to open
  *
  *	Return 0 on success, -errno on error.
  *	Re-opens on master ptys are not allowed and return -EIO.
@@ -1811,8 +1811,8 @@ static struct tty_struct *tty_open_current_tty(dev_t device, struct file *filp)
  *	@index: index for the device in the @return driver
  *	@return: driver for this inode (with increased refcount)
  *
- * 	If @return is not erroneous, the caller is responsible to decrement the
- * 	refcount by tty_driver_kref_put.
+ *	If @return is not erroneous, the caller is responsible to decrement the
+ *	refcount by tty_driver_kref_put.
  *
  *	Locking: tty_mutex protects get_tty_driver
  */
@@ -2624,7 +2624,7 @@ long tty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case TIOCGICOUNT:
 		retval = tty_tiocgicount(tty, p);
 		/* For the moment allow fall through to the old method */
-        	if (retval != -EINVAL)
+		if (retval != -EINVAL)
 			return retval;
 		break;
 	case TCFLSH:
@@ -3013,11 +3013,11 @@ err_put:
 EXPORT_SYMBOL_GPL(tty_register_device_attr);
 
 /**
- * 	tty_unregister_device - unregister a tty device
- * 	@driver: the tty driver that describes the tty device
- * 	@index: the index in the tty driver for this tty device
+ *	tty_unregister_device - unregister a tty device
+ *	@driver: the tty driver that describes the tty device
+ *	@index: the index in the tty driver for this tty device
  *
- * 	If a tty device is registered with a call to tty_register_device() then
+ *	If a tty device is registered with a call to tty_register_device() then
  *	this function must be called when the tty device is gone.
  *
  *	Locking: ??

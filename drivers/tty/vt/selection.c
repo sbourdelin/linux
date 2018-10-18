@@ -37,7 +37,7 @@ extern void poke_blanked_console(void);
 /* Use a dynamic buffer, instead of static (Dec 1994) */
 struct vc_data *sel_cons;		/* must not be deallocated */
 static int use_unicode;
-static volatile int sel_start = -1; 	/* cleared by clear_selection */
+static volatile int sel_start = -1;	/* cleared by clear_selection */
 static int sel_end;
 static int sel_buffer_lth;
 static char *sel_buffer;
@@ -86,10 +86,10 @@ void clear_selection(void)
  * 128 bits. Locked by the console lock.
  */
 static u32 inwordLut[]={
-  0x00000000, /* control chars     */
-  0x03FFE000, /* digits and "-./"  */
-  0x87FFFFFE, /* uppercase and '_' */
-  0x07FFFFFE, /* lowercase         */
+	0x00000000, /* control chars     */
+	0x03FFE000, /* digits and "-./"  */
+	0x87FFFFFE, /* uppercase and '_' */
+	0x07FFFFFE, /* lowercase         */
 };
 
 static inline int inword(const u32 c)
@@ -154,7 +154,7 @@ static int store_utf8(u32 c, char *p)
 }
 
 /**
- *	set_selection		- 	set the current selection.
+ *	set_selection		-	set the current selection.
  *	@sel: user selection info
  *	@tty: the console tty
  *

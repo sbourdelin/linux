@@ -230,7 +230,7 @@ do_fontx_ioctl(int cmd, struct consolefontdesc __user *user_cfd, int perm, struc
 
 	if (copy_from_user(&cfdarg, user_cfd, sizeof(struct consolefontdesc))) 
 		return -EFAULT;
- 	
+
 	switch (cmd) {
 	case PIO_FONTX:
 		if (!perm)
@@ -345,7 +345,7 @@ int vt_ioctl(struct tty_struct *tty,
 	console = vc->vc_num;
 
 
-	if (!vc_cons_allocated(console)) { 	/* impossible? */
+	if (!vc_cons_allocated(console)) {	/* impossible? */
 		ret = -ENOIOCTLCMD;
 		goto out;
 	}
@@ -358,7 +358,7 @@ int vt_ioctl(struct tty_struct *tty,
 	perm = 0;
 	if (current->signal->tty == tty || capable(CAP_SYS_TTY_CONFIG))
 		perm = 1;
- 
+
 	switch (cmd) {
 	case TIOCLINUX:
 		ret = tioclinux(tty, arg);
@@ -915,14 +915,14 @@ int vt_ioctl(struct tty_struct *tty,
 	}
 
 	case PIO_CMAP:
-                if (!perm)
+		if (!perm)
 			ret = -EPERM;
 		else
-	                ret = con_set_cmap(up);
+			ret = con_set_cmap(up);
 		break;
 
 	case GIO_CMAP:
-                ret = con_get_cmap(up);
+		ret = con_get_cmap(up);
 		break;
 
 	case PIO_FONTX:
@@ -1182,7 +1182,7 @@ long vt_compat_ioctl(struct tty_struct *tty,
 
 	console = vc->vc_num;
 
-	if (!vc_cons_allocated(console)) { 	/* impossible? */
+	if (!vc_cons_allocated(console)) {	/* impossible? */
 		ret = -ENOIOCTLCMD;
 		goto out;
 	}

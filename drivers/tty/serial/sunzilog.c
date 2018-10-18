@@ -394,7 +394,7 @@ sunzilog_receive_chars(struct uart_sunzilog_port *up,
 
 		if (up->port.ignore_status_mask == 0xff ||
 		    (r1 & up->port.ignore_status_mask) == 0) {
-		    	tty_insert_flip_char(port, ch, flag);
+			tty_insert_flip_char(port, ch, flag);
 		}
 		if (r1 & Rx_OVR)
 			tty_insert_flip_char(port, 0, TTY_OVERRUN);

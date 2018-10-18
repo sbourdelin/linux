@@ -29,7 +29,7 @@ static u32 jsm_offset_table[8] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x8
  */
 static inline void neo_pci_posting_flush(struct jsm_board *bd)
 {
-      readb(bd->re_map_membase + 0x8D);
+	readb(bd->re_map_membase + 0x8D);
 }
 
 static void neo_set_cts_flow_control(struct jsm_channel *ch)

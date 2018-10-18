@@ -86,7 +86,7 @@
  *	10/12/03  Ravindra		Made to work for Fedora Core 1 of
  *					Red Hat Distribution
  *
- *	06/01/05  Alan Cox 		Merged the ISI and base kernel strands
+ *	06/01/05  Alan Cox		Merged the ISI and base kernel strands
  *					into a single 2.6 driver
  *
  *	***********************************************************
@@ -1665,7 +1665,7 @@ static int __init isicom_init(void)
 		goto error;
 	}
 
-	isicom_normal->name 			= "ttyM";
+	isicom_normal->name			= "ttyM";
 	isicom_normal->major			= ISICOM_NMAJOR;
 	isicom_normal->minor_start		= 0;
 	isicom_normal->type			= TTY_DRIVER_TYPE_SERIAL;

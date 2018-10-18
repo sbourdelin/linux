@@ -1259,7 +1259,7 @@ static int __init serial_txx9_init(void)
 {
 	int ret;
 
- 	printk(KERN_INFO "%s version %s\n", serial_name, serial_version);
+	printk(KERN_INFO "%s version %s\n", serial_name, serial_version);
 
 	ret = uart_register_driver(&serial_txx9_reg);
 	if (ret)

@@ -74,7 +74,7 @@ static const struct serial_uart_config uart_config[] = {
 	{ "16450",	1,	0 },
 	{ "16550",	1,	0 },
 	{ "16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "Cirrus",	1, 	0 },
+	{ "Cirrus",	1,	0 },
 	{ "ST16650",	1,	UART_CLEAR_FIFO | UART_STARTECH },
 	{ "ST16650V2",	32,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
 	{ "TI16750",	64,	UART_CLEAR_FIFO | UART_USE_FIFO },
@@ -1138,7 +1138,7 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 			 * mode if the UART_FCR7_64BYTE bit was set
 			 * while UART_LCR_DLAB was latched.
 			 */
- 			serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
+			serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
 			serial_outp(up, UART_LCR, 0);
 			serial_outp(up, UART_FCR,
 				    UART_FCR_ENABLE_FIFO | UART_FCR7_64BYTE);

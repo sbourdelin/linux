@@ -39,7 +39,7 @@
  * but Soft-UART is a hack and we want to keep everything related to it in
  * this file.
  */
-#define UCC_SLOW_GUMR_H_SUART   	0x00004000      /* Soft-UART */
+#define UCC_SLOW_GUMR_H_SUART		0x00004000      /* Soft-UART */
 
 /*
  * soft_uart is 1 if we need to use Soft-UART mode
@@ -87,82 +87,82 @@ static int firmware_loaded;
 
 struct ucc_uart_pram {
 	struct ucc_slow_pram common;
-	u8 res1[8];     	/* reserved */
-	__be16 maxidl;  	/* Maximum idle chars */
-	__be16 idlc;    	/* temp idle counter */
-	__be16 brkcr;   	/* Break count register */
-	__be16 parec;   	/* receive parity error counter */
-	__be16 frmec;   	/* receive framing error counter */
-	__be16 nosec;   	/* receive noise counter */
-	__be16 brkec;   	/* receive break condition counter */
-	__be16 brkln;   	/* last received break length */
+	u8 res1[8];		/* reserved */
+	__be16 maxidl;		/* Maximum idle chars */
+	__be16 idlc;		/* temp idle counter */
+	__be16 brkcr;		/* Break count register */
+	__be16 parec;		/* receive parity error counter */
+	__be16 frmec;		/* receive framing error counter */
+	__be16 nosec;		/* receive noise counter */
+	__be16 brkec;		/* receive break condition counter */
+	__be16 brkln;		/* last received break length */
 	__be16 uaddr[2];	/* UART address character 1 & 2 */
-	__be16 rtemp;   	/* Temp storage */
-	__be16 toseq;   	/* Transmit out of sequence char */
+	__be16 rtemp;		/* Temp storage */
+	__be16 toseq;		/* Transmit out of sequence char */
 	__be16 cchars[8];       /* control characters 1-8 */
-	__be16 rccm;    	/* receive control character mask */
-	__be16 rccr;    	/* receive control character register */
-	__be16 rlbc;    	/* receive last break character */
-	__be16 res2;    	/* reserved */
-	__be32 res3;    	/* reserved, should be cleared */
+	__be16 rccm;		/* receive control character mask */
+	__be16 rccr;		/* receive control character register */
+	__be16 rlbc;		/* receive last break character */
+	__be16 res2;		/* reserved */
+	__be32 res3;		/* reserved, should be cleared */
 	u8 res4;		/* reserved, should be cleared */
-	u8 res5[3];     	/* reserved, should be cleared */
-	__be32 res6;    	/* reserved, should be cleared */
-	__be32 res7;    	/* reserved, should be cleared */
-	__be32 res8;    	/* reserved, should be cleared */
-	__be32 res9;    	/* reserved, should be cleared */
-	__be32 res10;   	/* reserved, should be cleared */
-	__be32 res11;   	/* reserved, should be cleared */
-	__be32 res12;   	/* reserved, should be cleared */
-	__be32 res13;   	/* reserved, should be cleared */
+	u8 res5[3];		/* reserved, should be cleared */
+	__be32 res6;		/* reserved, should be cleared */
+	__be32 res7;		/* reserved, should be cleared */
+	__be32 res8;		/* reserved, should be cleared */
+	__be32 res9;		/* reserved, should be cleared */
+	__be32 res10;		/* reserved, should be cleared */
+	__be32 res11;		/* reserved, should be cleared */
+	__be32 res12;		/* reserved, should be cleared */
+	__be32 res13;		/* reserved, should be cleared */
 /* The rest is for Soft-UART only */
-	__be16 supsmr;  	/* 0x90, Shadow UPSMR */
-	__be16 res92;   	/* 0x92, reserved, initialize to 0 */
+	__be16 supsmr;		/* 0x90, Shadow UPSMR */
+	__be16 res92;		/* 0x92, reserved, initialize to 0 */
 	__be32 rx_state;	/* 0x94, RX state, initialize to 0 */
-	__be32 rx_cnt;  	/* 0x98, RX count, initialize to 0 */
-	u8 rx_length;   	/* 0x9C, Char length, set to 1+CL+PEN+1+SL */
-	u8 rx_bitmark;  	/* 0x9D, reserved, initialize to 0 */
+	__be32 rx_cnt;		/* 0x98, RX count, initialize to 0 */
+	u8 rx_length;		/* 0x9C, Char length, set to 1+CL+PEN+1+SL */
+	u8 rx_bitmark;		/* 0x9D, reserved, initialize to 0 */
 	u8 rx_temp_dlst_qe;     /* 0x9E, reserved, initialize to 0 */
 	u8 res14[0xBC - 0x9F];  /* reserved */
 	__be32 dump_ptr;	/* 0xBC, Dump pointer */
 	__be32 rx_frame_rem;    /* 0xC0, reserved, initialize to 0 */
 	u8 rx_frame_rem_size;   /* 0xC4, reserved, initialize to 0 */
-	u8 tx_mode;     	/* 0xC5, mode, 0=AHDLC, 1=UART */
+	u8 tx_mode;		/* 0xC5, mode, 0=AHDLC, 1=UART */
 	__be16 tx_state;	/* 0xC6, TX state */
 	u8 res15[0xD0 - 0xC8];  /* reserved */
-	__be32 resD0;   	/* 0xD0, reserved, initialize to 0 */
-	u8 resD4;       	/* 0xD4, reserved, initialize to 0 */
-	__be16 resD5;   	/* 0xD5, reserved, initialize to 0 */
+	__be32 resD0;		/* 0xD0, reserved, initialize to 0 */
+	u8 resD4;		/* 0xD4, reserved, initialize to 0 */
+	__be16 resD5;		/* 0xD5, reserved, initialize to 0 */
 } __attribute__ ((packed));
 
 /* SUPSMR definitions, for Soft-UART only */
-#define UCC_UART_SUPSMR_SL      	0x8000
+#define UCC_UART_SUPSMR_SL		0x8000
 #define UCC_UART_SUPSMR_RPM_MASK	0x6000
-#define UCC_UART_SUPSMR_RPM_ODD 	0x0000
-#define UCC_UART_SUPSMR_RPM_LOW 	0x2000
+#define UCC_UART_SUPSMR_RPM_ODD	0x0000
+#define UCC_UART_SUPSMR_RPM_LOW	0x2000
 #define UCC_UART_SUPSMR_RPM_EVEN	0x4000
 #define UCC_UART_SUPSMR_RPM_HIGH	0x6000
-#define UCC_UART_SUPSMR_PEN     	0x1000
+#define UCC_UART_SUPSMR_PEN		0x1000
 #define UCC_UART_SUPSMR_TPM_MASK	0x0C00
-#define UCC_UART_SUPSMR_TPM_ODD 	0x0000
-#define UCC_UART_SUPSMR_TPM_LOW 	0x0400
+#define UCC_UART_SUPSMR_TPM_ODD	0x0000
+#define UCC_UART_SUPSMR_TPM_LOW	0x0400
 #define UCC_UART_SUPSMR_TPM_EVEN	0x0800
 #define UCC_UART_SUPSMR_TPM_HIGH	0x0C00
-#define UCC_UART_SUPSMR_FRZ     	0x0100
-#define UCC_UART_SUPSMR_UM_MASK 	0x00c0
+#define UCC_UART_SUPSMR_FRZ		0x0100
+#define UCC_UART_SUPSMR_UM_MASK	0x00c0
 #define UCC_UART_SUPSMR_UM_NORMAL       0x0000
 #define UCC_UART_SUPSMR_UM_MAN_MULTI    0x0040
 #define UCC_UART_SUPSMR_UM_AUTO_MULTI   0x00c0
-#define UCC_UART_SUPSMR_CL_MASK 	0x0030
-#define UCC_UART_SUPSMR_CL_8    	0x0030
-#define UCC_UART_SUPSMR_CL_7    	0x0020
-#define UCC_UART_SUPSMR_CL_6    	0x0010
-#define UCC_UART_SUPSMR_CL_5    	0x0000
+#define UCC_UART_SUPSMR_CL_MASK	0x0030
+#define UCC_UART_SUPSMR_CL_8		0x0030
+#define UCC_UART_SUPSMR_CL_7		0x0020
+#define UCC_UART_SUPSMR_CL_6		0x0010
+#define UCC_UART_SUPSMR_CL_5		0x0000
 
-#define UCC_UART_TX_STATE_AHDLC 	0x00
-#define UCC_UART_TX_STATE_UART  	0x01
-#define UCC_UART_TX_STATE_X1    	0x00
-#define UCC_UART_TX_STATE_X16   	0x80
+#define UCC_UART_TX_STATE_AHDLC	0x00
+#define UCC_UART_TX_STATE_UART		0x01
+#define UCC_UART_TX_STATE_X1		0x00
+#define UCC_UART_TX_STATE_X16		0x80
 
 #define UCC_UART_PRAM_ALIGNMENT 0x100
 
@@ -191,18 +191,18 @@ struct uart_qe_port {
 	struct qe_bd *tx_cur;
 	unsigned char *tx_buf;
 	unsigned char *rx_buf;
-	void *bd_virt;  	/* virtual address of the BD buffers */
+	void *bd_virt;		/* virtual address of the BD buffers */
 	dma_addr_t bd_dma_addr; /* bus address of the BD buffers */
 	unsigned int bd_size;   /* size of BD buffer space */
 };
 
 static struct uart_driver ucc_uart_driver = {
-	.owner  	= THIS_MODULE,
+	.owner		= THIS_MODULE,
 	.driver_name    = "ucc_uart",
 	.dev_name       = "ttyQE",
-	.major  	= SERIAL_QE_MAJOR,
-	.minor  	= SERIAL_QE_MINOR,
-	.nr     	= UCC_MAX_UART,
+	.major		= SERIAL_QE_MAJOR,
+	.minor		= SERIAL_QE_MINOR,
+	.nr		= UCC_MAX_UART,
 };
 
 /*
@@ -1094,7 +1094,7 @@ static const struct uart_ops qe_uart_pops = {
 	.startup	= qe_uart_startup,
 	.shutdown       = qe_uart_shutdown,
 	.set_termios    = qe_uart_set_termios,
-	.type   	= qe_uart_type,
+	.type		= qe_uart_type,
 	.release_port   = qe_uart_release_port,
 	.request_port   = qe_uart_request_port,
 	.config_port    = qe_uart_config_port,
@@ -1111,16 +1111,16 @@ static const struct uart_ops qe_uart_pops = {
  *
  * The new way is:
  *
- *      	cpu@0 {
- *      		compatible = "PowerPC,8323";
- *      		device_type = "cpu";
- *      		...
+ *		cpu@0 {
+ *			compatible = "PowerPC,8323";
+ *			device_type = "cpu";
+ *			...
  *
  *
  * The old way is:
- *      	 PowerPC,8323@0 {
- *      		device_type = "cpu";
- *      		...
+ *		 PowerPC,8323@0 {
+ *			device_type = "cpu";
+ *			...
  *
  * This code first checks the new way, and then the old way.
  */
@@ -1488,8 +1488,8 @@ static struct platform_driver ucc_uart_of_driver = {
 		.name = "ucc_uart",
 		.of_match_table    = ucc_uart_match,
 	},
-	.probe  	= ucc_uart_probe,
-	.remove 	= ucc_uart_remove,
+	.probe	= ucc_uart_probe,
+	.remove	= ucc_uart_remove,
 };
 
 static int __init ucc_uart_init(void)

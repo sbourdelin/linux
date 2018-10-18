@@ -98,7 +98,7 @@ static char zs_version[] __initdata = "0.10";
 #define ZS_CHAN_IO_STRIDE 4		/* Register alignment.  */
 #define ZS_CHAN_IO_OFFSET 1		/* The SCC resides on the high byte
 					   of the 16-bit IOBUS.  */
-#define ZS_CLOCK        7372800 	/* Z85C30 PCLK input clock rate.  */
+#define ZS_CLOCK        7372800	/* Z85C30 PCLK input clock rate.  */
 
 #define to_zport(uport) container_of(uport, struct zs_port, port)
 
@@ -299,11 +299,11 @@ static void load_zsregs(struct zs_port *zport, u8 *regs, int irq)
  * zs_tx_empty() -- get the transmitter empty status
  *
  * Purpose: Let user call ioctl() to get info when the UART physically
- * 	    is emptied.  On bus types like RS485, the transmitter must
- * 	    release the bus after transmitting.  This must be done when
- * 	    the transmit shift register is empty, not be done when the
- * 	    transmit holding register is empty.  This functionality
- * 	    allows an RS485 driver to be written in user space.
+ *	    is emptied.  On bus types like RS485, the transmitter must
+ *	    release the bus after transmitting.  This must be done when
+ *	    the transmit shift register is empty, not be done when the
+ *	    transmit holding register is empty.  This functionality
+ *	    allows an RS485 driver to be written in user space.
  */
 static unsigned int zs_tx_empty(struct uart_port *uport)
 {

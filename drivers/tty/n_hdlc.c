@@ -382,10 +382,10 @@ static void n_hdlc_send_frames(struct n_hdlc *n_hdlc, struct tty_struct *tty)
 		printk("%s(%d)n_hdlc_send_frames() called\n",__FILE__,__LINE__);
  check_again:
 		
- 	spin_lock_irqsave(&n_hdlc->tx_buf_list.spinlock, flags);
+	spin_lock_irqsave(&n_hdlc->tx_buf_list.spinlock, flags);
 	if (n_hdlc->tbusy) {
 		n_hdlc->woke_up = 1;
- 		spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock, flags);
+		spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock, flags);
 		return;
 	}
 	n_hdlc->tbusy = 1;
@@ -447,7 +447,7 @@ static void n_hdlc_send_frames(struct n_hdlc *n_hdlc, struct tty_struct *tty)
 	n_hdlc->tbusy = 0;
 	spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock, flags); 
 	
-        if (n_hdlc->woke_up)
+	if (n_hdlc->woke_up)
 	  goto check_again;
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
@@ -554,7 +554,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *data,
  * @file - pointer to open file object
  * @buf - pointer to returned data buffer
  * @nr - size of returned data buffer
- * 	
+ *
  * Returns the number of bytes returned or error code.
  */
 static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
@@ -638,7 +638,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
  * @file - pointer to file object data
  * @data - pointer to transmit data (one frame)
  * @count - size of transmit frame in bytes
- * 		
+ *
  * Returns the number of bytes written (or error code).
  */
 static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,

@@ -35,7 +35,7 @@
 #include "hardware.h"
 #include "main.h"
 
-#define IPWIRELESS_PCMCIA_START 	(0)
+#define IPWIRELESS_PCMCIA_START	(0)
 #define IPWIRELESS_PCMCIA_MINORS	(24)
 #define IPWIRELESS_PCMCIA_MINOR_RANGE	(8)
 

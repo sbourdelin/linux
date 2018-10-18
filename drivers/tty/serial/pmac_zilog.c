@@ -1845,7 +1845,7 @@ MODULE_DEVICE_TABLE (of, pmz_match);
 
 static struct macio_driver pmz_driver = {
 	.driver = {
-		.name 		= "pmac_zilog",
+		.name		= "pmac_zilog",
 		.owner		= THIS_MODULE,
 		.of_match_table	= pmz_match,
 	},
@@ -1894,7 +1894,7 @@ static int __init init_pmz(void)
 	if (rc) {
 		printk(KERN_ERR 
 			"pmac_zilog: Error registering serial device, disabling pmac_zilog.\n"
-		 	"pmac_zilog: Did another serial driver already claim the minors?\n"); 
+			"pmac_zilog: Did another serial driver already claim the minors?\n");
 		/* effectively "pmz_unprobe()" */
 		for (i=0; i < pmz_ports_count; i++)
 			pmz_dispose_port(&pmz_ports[i]);

@@ -187,7 +187,7 @@ static unsigned short translations[][256] = {
 static int inv_translate[MAX_NR_CONSOLES];
 
 struct uni_pagedir {
-	u16 		**uni_pgdir[32];
+	u16		**uni_pgdir[32];
 	unsigned long	refcount;
 	unsigned long	sum;
 	unsigned char	*inverse_translations[4];
@@ -215,7 +215,7 @@ static void set_inverse_transl(struct vc_data *conp, struct uni_pagedir *p, int 
 		glyph = conv_uni_to_pc(conp, t[j]);
 		if (glyph >= 0 && glyph < MAX_GLYPH && q[glyph] < 32) {
 			/* prefer '-' above SHY etc. */
-		  	q[glyph] = j;
+			q[glyph] = j;
 		}
 	}
 }
@@ -249,7 +249,7 @@ static void set_inverse_trans_unicode(struct vc_data *conp,
 				glyph = p2[k];
 				if (glyph >= 0 && glyph < MAX_GLYPH
 					       && q[glyph] < 32)
-		  			q[glyph] = (i << 11) + (j << 6) + k;
+					q[glyph] = (i << 11) + (j << 6) + k;
 			}
 		}
 	}
