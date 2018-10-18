@@ -664,6 +664,10 @@ xfs_blkdev_get(
 		xfs_warn(mp, "Invalid device [%s], error=%d", name, error);
 	}
 
+	error = bdev_create_sec_buf_slabs(*bdevp);
+	if (error)
+		blkdev_put(*bdevp, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+
 	return error;
 }
 
@@ -671,8 +675,10 @@ STATIC void
 xfs_blkdev_put(
 	struct block_device	*bdev)
 {
-	if (bdev)
+	if (bdev) {
+		bdev_destroy_sec_buf_slabs(bdev);
 		blkdev_put(bdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+	}
 }
 
 void
@@ -706,6 +712,8 @@ xfs_close_devices(
 	}
 	xfs_free_buftarg(mp->m_ddev_targp);
 	fs_put_dax(dax_ddev);
+
+	bdev_destroy_sec_buf_slabs(mp->m_super->s_bdev);
 }
 
 /*
@@ -773,6 +781,9 @@ xfs_open_devices(
 	} else {
 		mp->m_logdev_targp = mp->m_ddev_targp;
 	}
+
+	if (bdev_create_sec_buf_slabs(ddev))
+		goto out_free_rtdev_targ;
 
 	return 0;
 

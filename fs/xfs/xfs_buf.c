@@ -314,10 +314,32 @@ xfs_buf_free(
 			__free_page(page);
 		}
 	} else if (bp->b_flags & _XBF_KMEM)
-		kmem_free(bp->b_addr);
+		bdev_free_sec_buf(bp->b_target->bt_bdev, bp->b_addr,
+				BBTOB(bp->b_length));
 	_xfs_buf_free_pages(bp);
 	xfs_buf_free_maps(bp);
 	kmem_zone_free(xfs_buf_zone, bp);
+}
+
+void *
+xfs_buf_allocate_memory_from_slab(xfs_buf_t *bp, int size)
+{
+	int	retries = 0;
+	gfp_t	lflags = kmem_flags_convert(KM_NOFS);
+	void	*ptr;
+
+	do {
+		ptr = bdev_alloc_sec_buf(bp->b_target->bt_bdev, size, lflags);
+		if (ptr)
+			return ptr;
+		if (!(++retries % 100))
+			xfs_err(NULL,
+	"%s(%u) possible memory allocation deadlock size %u in %s (mode:0x%x)",
+				current->comm, current->pid,
+				(unsigned int)size, __func__, lflags);
+		congestion_wait(BLK_RW_ASYNC, HZ/50);
+	} while (1);
+
 }
 
 /*
@@ -342,7 +364,7 @@ xfs_buf_allocate_memory(
 	 */
 	size = BBTOB(bp->b_length);
 	if (size < PAGE_SIZE) {
-		bp->b_addr = kmem_alloc(size, KM_NOFS);
+		bp->b_addr = xfs_buf_allocate_memory_from_slab(bp, size);
 		if (!bp->b_addr) {
 			/* low memory - use alloc_page loop instead */
 			goto use_alloc_page;
@@ -351,7 +373,7 @@ xfs_buf_allocate_memory(
 		if (((unsigned long)(bp->b_addr + size - 1) & PAGE_MASK) !=
 		    ((unsigned long)bp->b_addr & PAGE_MASK)) {
 			/* b_addr spans two pages - use alloc_page instead */
-			kmem_free(bp->b_addr);
+			bdev_free_sec_buf(bp->b_target->bt_bdev, bp->b_addr, size);
 			bp->b_addr = NULL;
 			goto use_alloc_page;
 		}
