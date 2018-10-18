@@ -404,9 +404,10 @@ static struct uart_8250_port serial8250_ports[UART_NR];
  * This struct *must* *not* be used to perform a 8250 or serial core operation
  * which is not accessible otherwise. Its only purpose is to make the struct
  * accessible to the runtime-pm callbacks for context suspend/restore.
- * The lock assumption made here is none because runtime-pm suspend/resume
- * callbacks should not be invoked if there is any operation performed on the
- * port.
+ *
+ * Context: The lock assumption made here is none because runtime-pm
+ *          suspend/resume callbacks should not be invoked if there is any
+ *          operation performed on the port.
  */
 struct uart_8250_port *serial8250_get_port(int line)
 {
@@ -624,7 +625,7 @@ static int univ8250_console_setup(struct console *co, char *options)
  * Performs console setup for a match (as required by interface)
  * If no <options> are specified, then assume the h/w is already setup.
  *
- * Returns 0 if console matches; otherwise non-zero to use default matching
+ * Return: 0 if console matches; otherwise non-zero to use default matching.
  */
 static int univ8250_console_match(struct console *co, char *name, int idx,
 				  char *options)
@@ -1066,8 +1067,9 @@ EXPORT_SYMBOL(serial8250_register_8250_port);
  * serial8250_unregister_port() - remove a 16x50 serial port at runtime
  * @line: serial line number
  *
- * Remove one serial port.  This may not be called from interrupt
- * context.  We hand the port back to the our control.
+ * Remove one serial port.  We hand the port back to the our control.
+ *
+ * Context: This may not be called from interrupt context.
  */
 void serial8250_unregister_port(int line)
 {

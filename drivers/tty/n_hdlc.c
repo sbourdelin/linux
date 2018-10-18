@@ -321,7 +321,7 @@ static void n_hdlc_tty_close(struct tty_struct *tty)
  * n_hdlc_tty_open() - called when line discipline changed to n_hdlc
  * @tty - pointer to tty info structure
  *
- * Returns 0 if success, otherwise error code
+ * Return: 0 if success, otherwise error code.
  */
 static int n_hdlc_tty_open (struct tty_struct *tty)
 {
@@ -555,7 +555,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *data,
  * @buf - pointer to returned data buffer
  * @nr - size of returned data buffer
  *
- * Returns the number of bytes returned or error code.
+ * Return: The number of bytes returned or error code.
  */
 static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 			   __u8 __user *buf, size_t nr)
@@ -639,7 +639,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
  * @data - pointer to transmit data (one frame)
  * @count - size of transmit frame in bytes
  *
- * Returns the number of bytes written (or error code).
+ * Return: The number of bytes written or error code.
  */
 static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 			    const unsigned char *data, size_t count)
@@ -723,7 +723,7 @@ static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
  * @cmd - IOCTL command code
  * @arg - argument for IOCTL call (cmd dependent)
  *
- * Returns command dependent result.
+ * Return: Command dependent result.
  */
 static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			    unsigned int cmd, unsigned long arg)
@@ -795,7 +795,7 @@ static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
  * Determine which operations (read/write) will not block and return info
  * to caller.
  *
- * Returns a bit mask containing info on which ops will not block.
+ * Return: A bit mask containing info on which ops will not block.
  */
 static __poll_t n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
 				    poll_table *wait)
@@ -830,7 +830,7 @@ static __poll_t n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
 /**
  * n_hdlc_alloc() - allocate an n_hdlc instance data structure
  *
- * Returns a pointer to newly created structure if success, otherwise %NULL
+ * Return: A pointer to newly created structure if success, otherwise %NULL.
  */
 static struct n_hdlc *n_hdlc_alloc(void)
 {
@@ -920,7 +920,7 @@ static void n_hdlc_buf_put(struct n_hdlc_buf_list *buf_list,
  * Remove and return an HDLC buffer from the head of the specified HDLC buffer
  * list.
  *
- * Returns a pointer to HDLC buffer if available, otherwise %NULL.
+ * Return: A pointer to HDLC buffer if available, otherwise %NULL.
  */
 static struct n_hdlc_buf *n_hdlc_buf_get(struct n_hdlc_buf_list *buf_list)
 {

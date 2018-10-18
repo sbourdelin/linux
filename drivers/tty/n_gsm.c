@@ -393,7 +393,8 @@ static inline u8 gsm_fcs_add_block(u8 fcs, u8 *c, int len)
  * @c: byte going into the EA
  *
  * Processes one byte of an EA. Updates the passed variable
- * and returns 1 if the EA is now completely read
+ *
+ * Return: 1 if the EA is now completely read.
  */
 static int gsm_read_ea(unsigned int *val, u8 c)
 {
@@ -701,8 +702,9 @@ static void gsm_data_kick(struct gsm_mux *gsm)
  * @msg: message queued
  *
  * Add data to the transmit queue and try and get stuff moving
- * out of the mux tty if not already doing so. The Caller must hold
- * the gsm tx lock.
+ * out of the mux tty if not already doing so.
+ *
+ * Context: The Caller must hold the gsm tx lock.
  */
 static void __gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
 {
@@ -751,8 +753,9 @@ static void __gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
  * @msg: message queued
  *
  * Add data to the transmit queue and try and get stuff moving
- * out of the mux tty if not already doing so. Take the
- * the gsm tx lock and dlci lock.
+ * out of the mux tty if not already doing so.
+ *
+ * Context: Take the gsm tx lock and dlci lock.
  */
 static void gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
 {
@@ -771,7 +774,7 @@ static void gsm_data_queue(struct gsm_dlci *dlci, struct gsm_msg *msg)
  * is data. Keep to the MRU of the mux. This path handles the usual tty
  * interface which is a byte stream with optional modem data.
  *
- * Caller must hold the tx_lock of the mux.
+ * Context: Caller must hold the tx_lock of the mux.
  */
 static int gsm_dlci_data_output(struct gsm_mux *gsm, struct gsm_dlci *dlci)
 {
@@ -823,7 +826,7 @@ static int gsm_dlci_data_output(struct gsm_mux *gsm, struct gsm_dlci *dlci)
  * is data. Keep to the MRU of the mux. This path handles framed data
  * queued as skbuffs to the DLCI.
  *
- * Caller must hold the tx_lock of the mux.
+ * Context: Caller must hold the tx_lock of the mux.
  */
 static int gsm_dlci_data_output_framed(struct gsm_mux *gsm,
 						struct gsm_dlci *dlci)
@@ -1266,7 +1269,9 @@ static void gsm_control_response(struct gsm_mux *gsm, unsigned int command,
  * @gsm: gsm mux
  * @ctrl: frame to send
  *
- * Send out a pending control command (called under control lock)
+ * Send out a pending control command.
+
+ * Context: Called under control lock.
  */
 static void gsm_control_transmit(struct gsm_mux *gsm, struct gsm_control *ctrl)
 {
@@ -1360,8 +1365,10 @@ retry:
  * @control: control we are waiting on
  *
  * Waits for the control to complete or time out. Frees any used
- * resources and returns 0 for success, or an error if the remote
- * rejected or ignored the request.
+ * resources.
+ *
+ * Return: 0 for success, or an error if the remote rejected or
+ *         ignored the request.
  */
 static int gsm_control_wait(struct gsm_mux *gsm, struct gsm_control *control)
 {
@@ -1641,7 +1648,7 @@ static struct gsm_dlci *gsm_dlci_alloc(struct gsm_mux *gsm, int addr)
  *
  * Free up a DLCI.
  *
- * Can sleep.
+ * Context: Can sleep.
  */
 static void gsm_dlci_free(struct tty_port *port)
 {
@@ -1674,7 +1681,7 @@ static void gsm_destroy_network(struct gsm_dlci *dlci);
  * Release a DLCI. Actual free is deferred until either
  * mux is closed or tty is closed - whichever is last.
  *
- * Can sleep.
+ * Context: Can sleep.
  */
 static void gsm_dlci_release(struct gsm_dlci *dlci)
 {
@@ -2381,7 +2388,7 @@ static void gsmld_write_wakeup(struct tty_struct *tty)
  * parallel readers and must handle this ourselves. We may also get
  * a hangup. Always called in user context, may sleep.
  *
- * This code must be sure never to sleep through a hangup.
+ * Context: This code must be sure never to sleep through a hangup.
  */
 static ssize_t gsmld_read(struct tty_struct *tty, struct file *file,
 			 unsigned char __user *buf, size_t nr)
@@ -2422,8 +2429,8 @@ static ssize_t gsmld_write(struct tty_struct *tty, struct file *file,
  * for special events. This code is not serialized with respect to
  * other events save open/close.
  *
- * This code must be sure never to sleep through a hangup.
- * Called without the kernel lock held - fine
+ * Context: This code must be sure never to sleep through a hangup.
+ *          Called without the kernel lock held - fine.
  */
 static __poll_t gsmld_poll(struct tty_struct *tty, struct file *file,
 							poll_table *wait)

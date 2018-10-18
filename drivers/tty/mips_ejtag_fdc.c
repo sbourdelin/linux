@@ -409,7 +409,7 @@ static struct mips_ejtag_fdc_console mips_ejtag_fdc_con = {
  * Write a single block of data out to the debug adapter. If the circular buffer
  * is wrapped then only the first block is written.
  *
- * Returns:	The number of bytes that were written.
+ * Return: The number of bytes that were written.
  */
 static unsigned int mips_ejtag_fdc_put_chan(struct mips_ejtag_fdc_tty *priv,
 					    unsigned int chan)
@@ -643,7 +643,7 @@ static void mips_ejtag_fdc_handle(struct mips_ejtag_fdc_tty *priv)
  *
  * It simply triggers the common FDC handler code.
  *
- * Returns:	IRQ_HANDLED if an FDC interrupt was pending.
+ * Return:	IRQ_HANDLED if an FDC interrupt was pending.
  *		IRQ_NONE otherwise.
  */
 static irqreturn_t mips_ejtag_fdc_isr(int irq, void *dev_id)

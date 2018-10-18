@@ -1140,8 +1140,8 @@ static inline int resize_screen(struct vc_data *vc, int width, int height,
  * If the caller passes a tty structure then update the termios winsize
  * information and perform any necessary signal handling.
  *
- * Caller must hold the console semaphore. Takes the termios rwsem and
- * ctrl_lock of the tty IFF a tty is passed.
+ * Context: Caller must hold the console semaphore. Takes the termios_rwsem
+ *          and ctrl_lock of the tty IFF a tty is passed.
  */
 
 static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
@@ -3797,10 +3797,10 @@ static void vtconsole_deinit_device(struct con_driver *con)
  * con_is_bound() - checks if driver is bound to the console
  * @csw: console driver
  *
- * RETURNS: zero if unbound, nonzero if bound
- *
  * Drivers can call this and if zero, they should release
  * all resources allocated on con_startup()
+ *
+ * Return: zero if unbound, nonzero if bound.
  */
 int con_is_bound(const struct consw *csw)
 {
@@ -3825,9 +3825,8 @@ EXPORT_SYMBOL(con_is_bound);
  * function needs to save the current console state, then put the console
  * into a state suitable for the kernel debugger.
  *
- * RETURNS:
- * Zero on success, nonzero if a failure occurred when trying to prepare
- * the console for the debugger.
+ * Return: Zero on success, nonzero if a failure occurred when trying to
+ *         prepare the console for the debugger.
  */
 int con_debug_enter(struct vc_data *vc)
 {
@@ -3882,9 +3881,8 @@ EXPORT_SYMBOL_GPL(con_debug_enter);
  * Restore the console state to what it was before the kernel debugger
  * was invoked.
  *
- * RETURNS:
- * Zero on success, nonzero if a failure occurred when trying to restore
- * the console.
+ * Return: Zero on success, nonzero if a failure occurred when trying
+ *         to restore the console.
  */
 int con_debug_leave(void)
 {
@@ -3977,10 +3975,10 @@ err:
  * do_unregister_con_driver() - unregister console driver from console layer
  * @csw: console driver
  *
- * DESCRIPTION: All drivers that registers to the console layer must
- * call this function upon exit, or if the console driver is in a state
- * where it won't be able to handle console services, such as the
- * framebuffer console without loaded framebuffer drivers.
+ * All drivers that registers to the console layer must call this function
+ * upon exit, or if the console driver is in a state where it won't be able
+ * to handle console services, such as the framebuffer console without
+ * loaded framebuffer drivers.
  *
  * The driver must unbind first prior to unregistration.
  */

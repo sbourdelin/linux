@@ -70,7 +70,9 @@ sel_pos(int n)
  * clear_selection() - remove current selection
  *
  * Remove the current selection highlight, if any from the console
- * holding the selection. The caller must hold the console lock.
+ * holding the selection.
+ *
+ * Context: The caller must hold the console lock.
  */
 void clear_selection(void)
 {
@@ -101,8 +103,10 @@ static inline int inword(const u32 c)
  * sel_loadlut() - load the LUT table
  * @p: user table
  *
- * Load the LUT table from user space. The caller must hold the console
- * lock. Make a temporary copy so a partial update doesn't make a mess.
+ * Load the LUT table from user space.  Make a temporary copy so a
+ * partial update doesn't make a mess.
+ *
+ * Context: The caller must hold the console lock.
  */
 int sel_loadlut(char __user *p)
 {

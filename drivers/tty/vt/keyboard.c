@@ -1789,7 +1789,8 @@ int vt_do_diacrit(unsigned int cmd, void __user *udp, int perm)
  * @arg: the requested mode
  *
  * Update the keyboard mode bits while holding the correct locks.
- * Return 0 for success or an error code.
+ *
+ * Return: 0 for success or an error code.
  */
 int vt_do_kdskbmode(int console, unsigned int arg)
 {
@@ -1829,7 +1830,8 @@ int vt_do_kdskbmode(int console, unsigned int arg)
  * @arg: the requested meta state
  *
  * Update the keyboard meta bits while holding the correct locks.
- * Return 0 for success or an error code.
+ *
+ * Return: 0 for success or an error code.
  */
 int vt_do_kdskbmeta(int console, unsigned int arg)
 {

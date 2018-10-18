@@ -1059,8 +1059,9 @@ static int serial_txx9_register_port(struct uart_port *port)
  * serial_txx9_unregister_port() - remove a txx9 serial port at runtime
  * @line: serial line number
  *
- * Remove one serial port.  This may not be called from interrupt
- * context.  We hand the port back to the our control.
+ * Remove one serial port.  We hand the port back to the our control.
+ *
+ * Context: This may not be called from interrupt context.
  */
 static void serial_txx9_unregister_port(int line)
 {

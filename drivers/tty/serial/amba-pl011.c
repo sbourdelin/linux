@@ -2355,7 +2355,7 @@ static int __init pl011_console_setup(struct console *co, char *options)
  * Performs console setup for a match (as required by interface)
  * If no <options> are specified, then assume the h/w is already setup.
  *
- * Returns 0 if console matches; otherwise non-zero to use default matching
+ * Return: 0 if console matches; otherwise non-zero to use default matching.
  */
 static int __init pl011_console_match(struct console *co, char *name, int idx,
 				      char *options)

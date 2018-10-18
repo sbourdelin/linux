@@ -147,7 +147,7 @@ EXPORT_SYMBOL(tty_unthrottle);
  * throttle due to race conditions when throttling is conditional
  * on factors evaluated prior to throttling.
  *
- * Returns 0 if tty is throttled (or was already throttled)
+ * Return: 0 if tty is throttled (or was already throttled).
  */
 int tty_throttle_safe(struct tty_struct *tty)
 {
@@ -177,7 +177,7 @@ int tty_throttle_safe(struct tty_struct *tty)
  * unthrottle due to race conditions when unthrottling is conditional
  * on factors evaluated prior to unthrottling.
  *
- * Returns 0 if tty is unthrottled (or was already unthrottled)
+ * Return: 0 if tty is unthrottled (or was already unthrottled).
  */
 int tty_unthrottle_safe(struct tty_struct *tty)
 {
@@ -206,7 +206,7 @@ int tty_unthrottle_safe(struct tty_struct *tty)
  * Wait for characters pending in a tty driver to hit the wire, or
  * for a timeout to occur (eg due to flow control)
  *
- * Locking: none
+ * Context: No locks taken.
  */
 void tty_wait_until_sent(struct tty_struct *tty, long timeout)
 {
@@ -301,7 +301,7 @@ EXPORT_SYMBOL(tty_termios_hw_change);
  * Perform updates to the termios values set on this terminal.
  * A master pty's termios should never be set.
  *
- * Locking: termios_rwsem
+ * Context: Takes termios_rwsem.
  */
 int tty_set_termios(struct tty_struct *tty, struct ktermios *new_termios)
 {
@@ -347,8 +347,7 @@ EXPORT_SYMBOL_GPL(tty_set_termios);
  * Helper function to prepare termios data and run necessary other
  * functions before using tty_set_termios to do the actual changes.
  *
- * Locking:
- *         Called functions take ldisc and termios_rwsem locks
+ * Context: Takes termios_rwsem.  Called functions take ldisc.
  */
 static int set_termios(struct tty_struct *tty, void __user *arg, int opt)
 {
@@ -551,7 +550,7 @@ static void set_sgflags(struct ktermios *termios, int flags)
  * Updates a terminal from the legacy BSD style terminal information
  * structure.
  *
- * Locking: termios_rwsem
+ * Context: Takes termios_rwsem.
  */
 static int set_sgttyb(struct tty_struct *tty, struct sgttyb __user *sgttyb)
 {
@@ -662,6 +661,8 @@ static int set_ltchars(struct tty_struct *tty, struct ltchars __user *ltchars)
  *
  * Perform a change to the CLOCAL state and call into the driver
  * layer to make it visible. All done with the termios rwsem
+ *
+ * Context: Takes termios_rwsem.
  */
 static int tty_change_softcar(struct tty_struct *tty, int arg)
 {

@@ -54,8 +54,7 @@ static struct tty_ldisc_ops *tty_ldiscs[NR_LDISCS];
  * is set up as unreferenced and then made available to the kernel
  * from this point onwards.
  *
- * Locking:
- *         takes tty_ldiscs_lock to guard against ldisc races
+ * Context: Takes tty_ldiscs_lock to guard against ldisc races.
  */
 int tty_register_ldisc(int disc, struct tty_ldisc_ops *new_ldisc)
 {
@@ -83,8 +82,7 @@ EXPORT_SYMBOL(tty_register_ldisc);
  * Remove a line discipline from the kernel providing it is not
  * currently in use.
  *
- * Locking:
- *         takes tty_ldiscs_lock to guard against ldisc races
+ * Context: Takes tty_ldiscs_lock to guard against ldisc races.
  */
 int tty_unregister_ldisc(int disc)
 {
@@ -141,17 +139,16 @@ static void put_ldops(struct tty_ldisc_ops *ldops)
  * Takes a reference to a line discipline. Deals with refcounts and
  * module locking counts.
  *
- * Returns: -EINVAL if the discipline index is not [N_TTY..NR_LDISCS] or
- *                  if the discipline is not registeredn
- *          -EAGAIN if request_module() failed to load or register the
- *                  the discipline
- *          -ENOMEM if allocation failure
+ * Context: Takes tty_ldiscs_lock to guard against ldisc races.
  *
- *          Otherwise, returns a pointer to the discipline and bumps the
- *          ref count
+ * Return: -EINVAL if the discipline index is not [N_TTY..NR_LDISCS] or
+ *                 if the discipline is not registered
+ *         -EAGAIN if request_module() failed to load or register the
+ *                 the discipline
+ *         -ENOMEM if allocation failure
  *
- * Locking:
- *         takes tty_ldiscs_lock to guard against ldisc races
+ *         Otherwise, returns a pointer to the discipline and bumps the
+ *         ref count.
  */
 static struct tty_ldisc *tty_ldisc_get(struct tty_struct *tty, int disc)
 {
@@ -241,9 +238,6 @@ const struct seq_operations tty_ldiscs_seq_ops = {
  * reference to it. If the line discipline is in flux then
  * wait patiently until it changes.
  *
- * Returns: NULL if the tty has been hungup and not re-opened with
- *          a new file descriptor, otherwise valid ldisc reference
- *
  * Note: Must not be called from an IRQ/timer context. The caller
  * must also be careful not to hold other locks that will deadlock
  * against a discipline change, such as an existing ldisc reference
@@ -251,6 +245,9 @@ const struct seq_operations tty_ldiscs_seq_ops = {
  *
  * Note: a file_operations routine (read/poll/write) should use this
  * function to wait for any ldisc lifetime events to finish.
+ *
+ * Return: NULL if the tty has been hungup and not re-opened with
+ *         a new file descriptor, otherwise valid ldisc reference
  */
 struct tty_ldisc *tty_ldisc_ref_wait(struct tty_struct *tty)
 {
@@ -413,7 +410,7 @@ EXPORT_SYMBOL_GPL(tty_ldisc_flush);
  * prevent the ldisc driver from re-using stale information for
  * the new ldisc instance.
  *
- * Locking: takes termios_rwsem
+ * Context: Takes termios_rwsem.
  */
 static void tty_set_termios_ldisc(struct tty_struct *tty, int disc)
 {
@@ -433,7 +430,7 @@ static void tty_set_termios_ldisc(struct tty_struct *tty, int disc)
  * A helper opening method. Also a convenient debugging and check
  * point.
  *
- * Locking: always called with BTM already held.
+ * Context: Always called with BTM already held.
  */
 static int tty_ldisc_open(struct tty_struct *tty, struct tty_ldisc *ld)
 {
@@ -640,7 +637,7 @@ static void tty_reset_termios(struct tty_struct *tty)
  * is dropped and tty->ldisc reset to NULL. The caller can then retry
  * with N_TTY instead.
  *
- * Returns 0 if successful, otherwise error code < 0
+ * Return: 0 if successful, otherwise error code < 0.
  */
 int tty_ldisc_reinit(struct tty_struct *tty, int disc)
 {
@@ -677,8 +674,8 @@ int tty_ldisc_reinit(struct tty_struct *tty, int disc)
  * event. In that situation we must also switch back to N_TTY properly
  * before we reset the termios data.
  *
- * Locking: We can take the ldisc mutex as the rest of the code is
- * careful to allow for this.
+ * Context: We can take the ldisc mutex as the rest of the code is
+ *          careful to allow for this.
  *
  * In the pty pair case this occurs in the close() path of the
  * tty itself so we must be careful about locking rules.
@@ -801,8 +798,8 @@ int tty_ldisc_init(struct tty_struct *tty)
  * tty_ldisc_deinit() - ldisc cleanup for new tty
  * @tty: tty that was allocated recently
  *
- * The tty structure must not becompletely set up (tty_ldisc_setup) when
- *      this call is made.
+ * The tty structure must not be completely set up (tty_ldisc_setup) when
+ * this call is made.
  */
 void tty_ldisc_deinit(struct tty_struct *tty)
 {

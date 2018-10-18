@@ -149,7 +149,7 @@ void tty_audit_tiocsti(struct tty_struct *tty, char ch)
 /**
  * tty_audit_push() - Flush current's pending audit data
  *
- * Returns 0 if success, -EPERM if tty audit is disabled
+ * Return: 0 if success, -EPERM if tty audit is disabled.
  */
 int tty_audit_push(void)
 {
@@ -170,9 +170,10 @@ int tty_audit_push(void)
 /**
  * tty_audit_buf_get() - Get an audit buffer.
  *
- * Get an audit buffer, allocate it if necessary.  Return %NULL
- * if out of memory or ERR_PTR(-ESRCH) if tty_audit_exit() has already
- * occurred.  Otherwise, return a new reference to the buffer.
+ * Get an audit buffer, allocate it if necessary.
+ *
+ * Return: %NULL if out of memory or ERR_PTR(-ESRCH) if tty_audit_exit()
+ * has already occurred.  Otherwise, return a new reference to the buffer.
  */
 static struct tty_audit_buf *tty_audit_buf_get(void)
 {

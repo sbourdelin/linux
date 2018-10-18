@@ -339,7 +339,7 @@ out:
  * Perform port level tty hangup flag and count changes. Drop the tty
  * reference.
  *
- * Caller holds tty lock.
+ * Context: Caller holds tty lock.
  */
 void tty_port_hangup(struct tty_port *port)
 {
@@ -451,7 +451,7 @@ EXPORT_SYMBOL(tty_port_lower_dtr_rts);
  * management of these lines. Note that the dtr/rts raise is done each
  * iteration as a hangup may have previously dropped them while we wait.
  *
- * Caller holds tty lock.
+ * Context: Caller holds tty lock.
  *
  * NB: May drop and reacquire tty lock when blocking, so tty and tty_port
  * may have changed state (eg., may have been hung up).
@@ -623,7 +623,7 @@ EXPORT_SYMBOL(tty_port_close_end);
 /**
  * tty_port_close()
  *
- * Caller holds tty lock
+ * Context: Caller holds tty lock.
  */
 void tty_port_close(struct tty_port *port, struct tty_struct *tty,
 							struct file *filp)
@@ -658,7 +658,7 @@ EXPORT_SYMBOL_GPL(tty_port_install);
 /**
  * tty_port_open()
  *
- * Caller holds tty lock.
+ * Context: Caller holds tty lock.
  *
  * NB: may drop and reacquire tty lock (in tty_port_block_til_ready()) so
  * tty and tty_port may have changed state (eg., may be hung up now)

@@ -51,15 +51,12 @@ static DEFINE_MUTEX(writelock);
  * n_tracesink_open() - Called when a tty is opened by a SW entity.
  * @tty: terminal device to the ldisc.
  *
- * Return:
- *      0 for success,
- *      -EFAULT = couldn't get a tty kref n_tracesink will sit
- *       on top of
- *      -EEXIST = open() called successfully once and it cannot
- *      be called again.
- *
  * Caveats: open() should only be successful the first time a
  * SW entity calls it.
+ *
+ * Return: 0 for success. -EFAULT = couldn't get a tty kref n_tracesink
+ *         will sit on top of. -EEXIST = open() called successfully once
+ *         and it cannot be called again.
  */
 static int n_tracesink_open(struct tty_struct *tty)
 {
@@ -111,8 +108,7 @@ static void n_tracesink_close(struct tty_struct *tty)
  * -EIO should be used just to show that there was an intent not to have
  * this function implemented.  Return value based on read() man pages.
  *
- * Return:
- *	 -EINVAL
+ * Return: -EINVAL
  */
 static ssize_t n_tracesink_read(struct tty_struct *tty, struct file *file,
 				unsigned char __user *buf, size_t nr) {
@@ -135,8 +131,7 @@ static ssize_t n_tracesink_read(struct tty_struct *tty, struct file *file,
  * just to show that there was an intent not to have this function
  * implemented.  Return value based on write() man pages.
  *
- * Return:
- *	-EINVAL
+ * Return: -EINVAL
  */
 static ssize_t n_tracesink_write(struct tty_struct *tty, struct file *file,
 				 const unsigned char *buf, size_t nr) {
@@ -192,8 +187,7 @@ static struct tty_ldisc_ops tty_n_tracesink = {
  *
  * Registers this module as a line discipline driver.
  *
- * Return:
- *	0 for success, any other value error.
+ * Return: 0 for success, any other value error.
  */
 static int __init n_tracesink_init(void)
 {

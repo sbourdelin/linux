@@ -163,7 +163,7 @@ static void release_tty(struct tty_struct *tty, int idx);
  *
  * Free the write buffers, tty queue and tty memory itself.
  *
- * Locking: none. Must be called after tty is definitely unused
+ * Context: No locks taken. Must be called after tty is definitely unused.
  */
 static void free_tty_struct(struct tty_struct *tty)
 {
@@ -238,7 +238,7 @@ static void tty_del_file(struct file *file)
  * Convert a tty structure into a name. The name reflects the kernel
  * naming policy and if udev is in use may not reflect user space
  *
- * Locking: none
+ * Context: No locks taken.
  */
 const char *tty_name(const struct tty_struct *tty)
 {
@@ -309,7 +309,7 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
  * This routine returns a tty driver structure, given a device number
  * and also passes back the index number.
  *
- * Locking: caller must hold tty_mutex
+ * Context: Caller must hold tty_mutex.
  */
 static struct tty_driver *get_tty_driver(dev_t device, int *index)
 {
@@ -334,7 +334,7 @@ static struct tty_driver *get_tty_driver(dev_t device, int *index)
  * like (4, 64) or (188, 1). If no corresponding driver is registered then
  * the function returns -ENODEV.
  *
- * Locking: this acquires tty_mutex to protect the tty_drivers list from
+ * Context: Acquires tty_mutex to protect the tty_drivers list from
  *          being modified while we are traversing it, and makes sure to
  *          release it before exiting.
  */
@@ -750,8 +750,7 @@ EXPORT_SYMBOL(tty_hung_up_p);
  * called from any context, may be under the tty atomic_write_lock
  * but not always.
  *
- * Locking:
- *         flow_lock
+ * Context: Takes flow_lock.
  */
 void __stop_tty(struct tty_struct *tty)
 {
@@ -780,8 +779,7 @@ EXPORT_SYMBOL(stop_tty);
  * tty was previous stopped and is now being started, the driver
  * start method is invoked and the line discipline woken.
  *
- * Locking:
- *         flow_lock
+ * Context: Takes flow_lock.
  */
 void __start_tty(struct tty_struct *tty)
 {
@@ -827,9 +825,8 @@ static void tty_update_time(struct timespec64 *time)
  * Perform the read system call function on this terminal device. Checks
  * for hung up devices before calling the line discipline method.
  *
- * Locking:
- *         Locks the line discipline internally while needed. Multiple
- * read calls may be outstanding in parallel.
+ * Context: Locks the line discipline internally while needed. Multiple
+ *          read calls may be outstanding in parallel.
  */
 static ssize_t tty_read(struct file *file, char __user *buf, size_t count,
 			loff_t *ppos)
@@ -999,11 +996,10 @@ void tty_write_message(struct tty_struct *tty, char *msg)
  *
  * Write data to a tty device via the line discipline.
  *
- * Locking:
- *         Locks the line discipline as required
- *         Writes to the tty driver are serialized by the atomic_write_lock
- * and are then processed in chunks to the device. The line discipline
- * write method will not be invoked in parallel for each device.
+ * Context: Locks the line discipline as required.  Writes to the tty
+ *          driver are serialized by the atomic_write_lock and are then
+ *          processed in chunks to the device. The line discipline write
+ *          method will not be invoked in parallel for each device.
  */
 static ssize_t tty_write(struct file *file, const char __user *buf,
 						size_t count, loff_t *ppos)
@@ -1054,7 +1050,7 @@ ssize_t redirected_tty_write(struct file *file, const char __user *buf,
  *
  * Send a high priority character to the tty even if stopped
  *
- * Locking: none for xchar method, write ordering for write method.
+ * Context: Takes termios_rwsem and write ordering for write method.
  */
 int tty_send_xchar(struct tty_struct *tty, char ch)
 {
@@ -1092,7 +1088,7 @@ static char ptychar[] = "pqrstuvwxyzabcde";
  * Generate a name from a driver reference and write it to the output
  * buffer.
  *
- * Locking: None
+ * Context: No locks taken.
  */
 static void pty_line_name(struct tty_driver *driver, int index, char *p)
 {
@@ -1112,7 +1108,7 @@ static void pty_line_name(struct tty_driver *driver, int index, char *p)
  * Generate a name from a driver reference and write it to the output
  * buffer.
  *
- * Locking: None
+ * Context: No locks taken.
  */
 static ssize_t tty_line_name(struct tty_driver *driver, int index, char *p)
 {
@@ -1131,7 +1127,7 @@ static ssize_t tty_line_name(struct tty_driver *driver, int index, char *p)
  * Return the tty, if found. If not found, return NULL or ERR_PTR() if the
  * driver lookup() method returns an error.
  *
- * Locking: tty_mutex must be held. If the tty is found, bump the tty kref.
+ * Context: tty_mutex must be held. If the tty is found, bump the tty kref.
  */
 static struct tty_struct *tty_driver_lookup_tty(struct tty_driver *driver,
 		struct file *file, int idx)
@@ -1200,7 +1196,7 @@ EXPORT_SYMBOL_GPL(tty_standard_install);
  * for ensuring any need additional structures are allocated and
  * configured.
  *
- * Locking: tty_mutex for now
+ * Context: tty_mutex for now.
  */
 static int tty_driver_install_tty(struct tty_driver *driver,
 						struct tty_struct *tty)
@@ -1214,10 +1210,10 @@ static int tty_driver_install_tty(struct tty_driver *driver,
  * @driver: the driver for the tty
  * @idx: the minor number
  *
- * Remvoe a tty object from the driver tables. The tty->index field
+ * Remove a tty object from the driver tables. The tty->index field
  * will be set by the time this is called.
  *
- * Locking: tty_mutex for now
+ * Context: tty_mutex for now.
  */
 static void tty_driver_remove_tty(struct tty_driver *driver, struct tty_struct *tty)
 {
@@ -1273,10 +1269,6 @@ static int tty_reopen(struct tty_struct *tty)
  * could also be an active device. The pty drivers require special
  * handling because of this.
  *
- * Locking:
- *         The function is called under the tty_mutex, which
- * protects us from the tty struct or driver itself going away.
- *
  * On exit the tty device has the line discipline attached and
  * a reference count of 1. If a pair was created for pty/tty use
  * and the other was a pty master then it too has a reference count of 1.
@@ -1285,6 +1277,9 @@ static int tty_reopen(struct tty_struct *tty)
  * failed open.  The new code protects the open with a mutex, so it's
  * really quite straightforward.  The mutex locking can probably be
  * relaxed for the (most common) case of reopening a tty.
+ *
+ * Context: The function is called under the tty_mutex, which
+ *          protects us from the tty struct or driver itself going away.
  */
 struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 {
@@ -1399,12 +1394,11 @@ static void tty_flush_works(struct tty_struct *tty)
  * driver table slots. This function is called when a device is no longer
  * in use. It also gets called when setup of a device fails.
  *
- * Locking:
- *         takes the file list lock internally when working on the list
- * of ttys that the driver keeps.
- *
  * This method gets called from a work queue so that the driver private
  * cleanup ops can sleep (needed for USB at least)
+ *
+ * Context: Takes the file list lock internally when working on the list
+ *          of ttys that the driver keeps.
  */
 static void release_one_tty(struct work_struct *work)
 {
@@ -1599,15 +1593,14 @@ EXPORT_SYMBOL_GPL(tty_release_struct);
  * Called the last time each file handle is closed that references
  * this tty. There may however be several such references.
  *
- * Locking:
- *         Takes bkl. See tty_release_dev
- *
  * Even releasing the tty structures is a tricky business.. We have
  * to be very careful that the structures are all released at the
  * same time, as interrupts might otherwise get the wrong pointers.
  *
  * WSH 09/09/97: rewritten to avoid some nasty race conditions that could
  * lead to double frees or releasing memory still in use.
+ *
+ * Context: Takes bkl. See tty_release_dev
  */
 int tty_release(struct inode *inode, struct file *filp)
 {
@@ -1840,12 +1833,12 @@ static struct tty_driver *tty_lookup_driver(dev_t device, struct file *filp,
  * makes sure it's not already opened and performs the first-time
  * tty initialization.
  *
- * Returns the locked initialized &tty_struct
- *
- * Claims the global tty_mutex to serialize:
+ * Context: Claims the global tty_mutex to serialize:
  *   - concurrent first-time tty initialization
  *   - concurrent tty driver removal w/ lookup
  *   - concurrent tty removal from driver table
+ *
+ * Return: The locked initialized &tty_struct.
  */
 struct tty_struct *tty_kopen(dev_t device)
 {
@@ -1891,12 +1884,12 @@ EXPORT_SYMBOL_GPL(tty_kopen);
  * Performs the driver lookup, checks for a reopen, or otherwise
  * performs the first-time tty initialization.
  *
- * Returns the locked initialized or re-opened &tty_struct
- *
- * Claims the global tty_mutex to serialize:
+ * Context: Claims the global tty_mutex to serialize:
  *   - concurrent first-time tty initialization
  *   - concurrent tty driver removal w/ lookup
  *   - concurrent tty removal from driver table
+ *
+ * Return: The locked initialized or re-opened &tty_struct.
  */
 static struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
 					     struct file *filp)
@@ -1966,7 +1959,7 @@ out:
  * The termios state of a pty is reset on first open so that
  * settings don't persist across reuse.
  *
- * Locking: tty_mutex protects tty, tty_lookup_driver and tty_init_dev.
+ * Context: tty_mutex protects tty, tty_lookup_driver and tty_init_dev.
  *          tty->count should protect the rest.
  *          ->siglock protects ->signal/->sighand
  *
@@ -2053,8 +2046,8 @@ retry_open:
  * Call the line discipline polling method to obtain the poll
  * status of the device.
  *
- * Locking: locks called line discipline but ldisc poll method
- * may be re-entered freely by other callers.
+ * Context: Locks called line discipline but ldisc poll method
+ *          may be re-entered freely by other callers.
  */
 static __poll_t tty_poll(struct file *filp, poll_table *wait)
 {
@@ -2132,9 +2125,8 @@ static int tty_fasync(int fd, struct file *filp, int on)
  *
  * FIXME: does not honour flow control ??
  *
- * Locking:
- *         Called functions take tty_ldiscs_lock
- *         current->signal->tty check is safe without locks
+ * Context: Called functions take tty_ldiscs_lock
+ *          current->signal->tty check is safe without locks
  *
  * FIXME: may race normal receive processing
  */
@@ -2163,7 +2155,7 @@ static int tiocsti(struct tty_struct *tty, char __user *p)
  *
  * Copies the kernel idea of the window size into the user buffer.
  *
- * Locking: tty->winsize_mutex is taken to ensure the winsize data
+ * Context: tty->winsize_mutex is taken to ensure the winsize data
  *          is consistent.
  */
 static int tiocgwinsz(struct tty_struct *tty, struct winsize __user *arg)
@@ -2217,10 +2209,9 @@ EXPORT_SYMBOL(tty_do_resize);
  * this is just advisory information but for the Linux console it
  * actually has driver level meaning and triggers a VC resize.
  *
- * Locking:
- *         Driver dependent. The default do_resize method takes the
- * tty termios mutex and ctrl_lock. The console takes its own lock
- * then calls into the default method.
+ * Context: Driver dependent. The default do_resize method takes the
+ *          tty termios mutex and ctrl_lock. The console takes its own lock
+ *          then calls into the default method.
  */
 static int tiocswinsz(struct tty_struct *tty, struct winsize __user *arg)
 {
@@ -2240,7 +2231,7 @@ static int tiocswinsz(struct tty_struct *tty, struct winsize __user *arg)
  *
  * Allow the administrator to move the redirected console device
  *
- * Locking: uses redirect_lock to guard the redirect information
+ * Context: Uses redirect_lock to guard the redirect information.
  */
 static int tioccons(struct file *file)
 {
@@ -2275,7 +2266,7 @@ static int tioccons(struct file *file)
  * the generic functionality existed. This piece of history is preserved
  * in the expected tty API of posix OS's.
  *
- * Locking: none, the open file handle ensures it won't go away.
+ * Context: No locks taken, the open file handle ensures it won't go away.
  */
 static int fionbio(struct file *file, int __user *p)
 {
@@ -2300,7 +2291,7 @@ static int fionbio(struct file *file, int __user *p)
  *
  * Set the line discipline according to user request.
  *
- * Locking: see tty_set_ldisc, this function is just a helper
+ * Context: Please see tty_set_ldisc, this function is just a helper.
  */
 static int tiocsetd(struct tty_struct *tty, int __user *p)
 {
@@ -2322,8 +2313,8 @@ static int tiocsetd(struct tty_struct *tty, int __user *p)
  *
  * Retrieves the line discipline id directly from the ldisc.
  *
- * Locking: waits for ldisc reference (in case the line discipline
- *          is changing or the tty is being hungup)
+ * Context: Waits for ldisc reference (in case the line discipline
+ *          is changing or the tty is being hungup).
  */
 static int tiocgetd(struct tty_struct *tty, int __user *p)
 {
@@ -2346,9 +2337,7 @@ static int tiocgetd(struct tty_struct *tty, int __user *p)
  * Perform a timed break on hardware that lacks its own driver level
  * timed break functionality.
  *
- * Locking:
- *         atomic_write_lock serializes
- *
+ * Context: atomic_write_lock serializes.
  */
 static int send_break(struct tty_struct *tty, unsigned int duration)
 {
@@ -2386,7 +2375,7 @@ out:
  * Obtain the modem status bits from the tty driver if the feature
  * is supported. Return -EINVAL if it is not available.
  *
- * Locking: none (up to the driver)
+ * Context: No locks taken (up to the driver).
  */
 static int tty_tiocmget(struct tty_struct *tty, int __user *p)
 {
@@ -2410,7 +2399,7 @@ static int tty_tiocmget(struct tty_struct *tty, int __user *p)
  * Set the modem status bits from the tty driver if the feature
  * is supported. Return -EINVAL if it is not available.
  *
- * Locking: none (up to the driver)
+ * Context: No locks taken (up to the driver).
  */
 static int tty_tiocmset(struct tty_struct *tty, unsigned int cmd,
 	     unsigned __user *p)
@@ -2776,7 +2765,7 @@ static struct device *tty_get_device(struct tty_struct *tty)
  *
  * This subroutine allocates and initializes a tty structure.
  *
- * Locking: none - tty in question is not exposed at this point
+ * Locking: No locks taken - tty in question is not exposed at this point.
  */
 struct tty_struct *alloc_tty_struct(struct tty_driver *driver, int idx)
 {
@@ -2824,10 +2813,12 @@ struct tty_struct *alloc_tty_struct(struct tty_driver *driver, int idx)
  * @ch: character
  *
  * Write one byte to the tty using the provided put_char method
- * if present. Returns the number of characters successfully output.
+ * if present.
  *
  * Note: the specific put_char operation in the driver layer may go
  * away soon. Don't call it directly, use this method
+ *
+ * Return: The number of characters successfully output.
  */
 int tty_put_char(struct tty_struct *tty, unsigned char ch)
 {
@@ -2864,15 +2855,15 @@ static int tty_cdev_add(struct tty_driver *driver, dev_t dev,
  *          This field is optional, if there is no known struct device
  *          for this tty device it can be set to NULL safely.
  *
- * Returns a pointer to the struct device for this tty device
- * (or ERR_PTR(-EFOO) on error).
- *
  * This call is required to be made to register an individual tty device
  * if the tty driver's flags have the TTY_DRIVER_DYNAMIC_DEV bit set.  If
  * that bit is not set, this function should not be called by a tty
  * driver.
  *
  * Locking: ??
+ *
+ * Return: A pointer to the struct device for this tty device
+ *         (or ERR_PTR(-EFOO) on error).
  */
 struct device *tty_register_device(struct tty_driver *driver, unsigned index,
 				   struct device *device)
@@ -2897,15 +2888,15 @@ static void tty_device_create_release(struct device *dev)
  * @drvdata: Driver data to be set to device.
  * @attr_grp: Attribute group to be set on device.
  *
- * Returns a pointer to the struct device for this tty device
- * (or ERR_PTR(-EFOO) on error).
- *
  * This call is required to be made to register an individual tty device
  * if the tty driver's flags have the TTY_DRIVER_DYNAMIC_DEV bit set.  If
  * that bit is not set, this function should not be called by a tty
  * driver.
  *
  * Locking: ??
+ *
+ * Return: A pointer to the struct device for this tty device
+ *         (or ERR_PTR(-EFOO) on error).
  */
 struct device *tty_register_device_attr(struct tty_driver *driver,
 				   unsigned index, struct device *device,

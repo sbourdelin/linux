@@ -50,12 +50,12 @@ static int n_baud_table = ARRAY_SIZE(baud_table);
  * tty_termios_baud_rate()
  * @termios: termios structure
  *
- * Convert termios baud rate data into a speed. This should be called
- * with the termios lock held if this termios is a terminal termios
- * structure. May change the termios data. Device drivers can call this
- * function but should use ->c_[io]speed directly as they are updated.
+ * Convert termios baud rate data into a speed.
  *
- * Locking: none
+ * Context: This should be called with the termios lock held if this termios
+ *          is a terminal termios structure. May change the termios data.
+ *          Device drivers can call this function but should use ->c_[io]speed
+ *          directly as they are updated.
  */
 speed_t tty_termios_baud_rate(struct ktermios *termios)
 {
@@ -84,12 +84,12 @@ EXPORT_SYMBOL(tty_termios_baud_rate);
  * tty_termios_input_baud_rate()
  * @termios: termios structure
  *
- * Convert termios baud rate data into a speed. This should be called
- * with the termios lock held if this termios is a terminal termios
- * structure. May change the termios data. Device drivers can call this
- * function but should use ->c_[io]speed directly as they are updated.
+ * Convert termios baud rate data into a speed.
  *
- * Locking: none
+ * Context: This should be called with the termios lock held if this termios
+ *          is a terminal termios structure. May change the termios data.
+ *          Device drivers can call this function but should use ->c_[io]speed
+ *          directly as they are updated.
  */
 speed_t tty_termios_input_baud_rate(struct ktermios *termios)
 {
@@ -133,11 +133,11 @@ EXPORT_SYMBOL(tty_termios_input_baud_rate);
  * desired speed. We allow small margins and preserve as much of possible
  * of the input intent to keep compatibility.
  *
- * Locking: Caller should hold termios lock. This is already held
- * when calling this function from the driver termios handler.
- *
  * The ifdefs deal with platforms whose owners have yet to update them
  * and will all go away once this is done.
+ *
+ * Context: Caller should hold termios lock. This is already held
+ *          when calling this function from the driver termios handler.
  */
 void tty_termios_encode_baud_rate(struct ktermios *termios,
 				  speed_t ibaud, speed_t obaud)
@@ -227,8 +227,9 @@ EXPORT_SYMBOL_GPL(tty_termios_encode_baud_rate);
  * @obad: output baud rate
  *
  * Update the current termios data for the tty with the new speed
- * settings. The caller must hold the termios_rwsem for the tty in
- * question.
+ * settings.
+ *
+ * Context: The caller must hold the termios_rwsem for the tty in question.
  */
 void tty_encode_baud_rate(struct tty_struct *tty, speed_t ibaud, speed_t obaud)
 {

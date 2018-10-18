@@ -193,10 +193,8 @@ static int tty_copy_to_user(struct tty_struct *tty, void __user *to,
  *
  * Re-schedules the flip buffer work if it may have stopped
  *
- * Caller holds exclusive termios_rwsem
- *    or
- * n_tty_read()/consumer path:
- *    holds non-exclusive termios_rwsem
+ * Context: Caller holds exclusive termios_rwsem or
+ *          n_tty_read()/consumer path: holds non-exclusive termios_rwsem
  */
 static void n_tty_kick_worker(struct tty_struct *tty)
 {
@@ -306,8 +304,8 @@ static void n_tty_check_unthrottle(struct tty_struct *tty)
  *
  * Add a character to the tty read_buf queue.
  *
- * n_tty_receive_buf()/producer path:
- *     caller holds non-exclusive termios_rwsem
+ * Context: n_tty_receive_buf()/producer path: caller holds
+ *          non-exclusive termios_rwsem.
  */
 static inline void put_tty_queue(unsigned char c, struct n_tty_data *ldata)
 {
@@ -320,10 +318,9 @@ static inline void put_tty_queue(unsigned char c, struct n_tty_data *ldata)
  * @tty: terminal to reset
  *
  * Reset the read buffer counters and clear the flags.
- * Called from n_tty_open() and n_tty_flush_buffer().
  *
- * Locking: caller holds exclusive termios_rwsem
- *          (or locking is not required)
+ * Context: Called from n_tty_open() and n_tty_flush_buffer().  Caller
+ *          holds exclusive termios_rwsem (or locking is not required).
  */
 static void reset_buffer_flags(struct n_tty_data *ldata)
 {
@@ -359,7 +356,7 @@ static void n_tty_packet_mode_flush(struct tty_struct *tty)
  * Holds termios_rwsem to exclude producer/consumer while
  * buffer indices are reset.
  *
- * Locking: ctrl_lock, exclusive termios_rwsem
+ * Context: ctrl_lock, exclusive termios_rwsem.
  */
 static void n_tty_flush_buffer(struct tty_struct *tty)
 {
@@ -412,11 +409,11 @@ static inline int is_continuation(unsigned char c, struct tty_struct *tty)
  * and NLDLY.  They simply aren't relevant in the world today.
  * If you ever need them, add them here.
  *
- * Returns the number of bytes of buffer space used or -1 if
- * no space left.
+ * Context: should be called under the output_lock to protect
+ *          the column state and space left in the buffer.
  *
- * Locking: should be called under the output_lock to protect
- *          the column state and space left in the buffer
+ * Return: The number of bytes of buffer space used or -1 if
+ *         no space left.
  */
 static int do_output_char(unsigned char c, struct tty_struct *tty, int space)
 {
@@ -485,12 +482,13 @@ static int do_output_char(unsigned char c, struct tty_struct *tty, int space)
  * @tty: terminal device
  *
  * Output one character with OPOST processing.
- * Returns -1 when the output device is full and the character
- * must be retried.
  *
- * Locking: output_lock to protect column state and space left
+ * Context: output_lock to protect column state and space left
  *          (also, this is called from n_tty_write under the
- *          tty layer write lock)
+ *          tty layer write lock).
+ *
+ * Return: -1 when the output device is full and the character
+ *         must be retried.
  */
 static int process_output(unsigned char c, struct tty_struct *tty)
 {
@@ -516,16 +514,17 @@ static int process_output(unsigned char c, struct tty_struct *tty)
  * @nr: number of bytes to output
  *
  * Output a block of characters with OPOST processing.
- * Returns the number of characters output.
  *
  * This path is used to speed up block console writes, among other
  * things when processing blocks of output data. It handles only
  * the simple cases normally found and helps to generate blocks of
  * symbols for the console driver and thus improve performance.
  *
- * Locking: output_lock to protect column state and space left
+ * Context: output_lock to protect column state and space left
  *          (also, this is called from n_tty_write under the
- *          tty layer write lock)
+ *          tty layer write lock).
+ *
+ * Return: The number of characters output.
  */
 static ssize_t process_output_block(struct tty_struct *tty,
 				    const unsigned char *buf, unsigned int nr)
@@ -608,7 +607,7 @@ break_out:
  * are prioritized.  Also, when control characters are echoed with a
  * prefixed "^", the pair is treated atomically and thus not separated.
  *
- * Locking: callers must hold output_lock
+ * Context: Caller must hold output_lock.
  */
 static size_t __process_echoes(struct tty_struct *tty)
 {
@@ -952,8 +951,8 @@ static inline void finish_erasing(struct n_tty_data *ldata)
  * present in the stream from the driver layer. Handles the complexities
  * of UTF-8 multibyte symbols.
  *
- * n_tty_receive_buf()/producer path:
- *     caller holds non-exclusive termios_rwsem
+ * Context: n_tty_receive_buf()/producer path: caller holds
+ *          non-exclusive termios_rwsem
  */
 static void eraser(unsigned char c, struct tty_struct *tty)
 {
@@ -1085,7 +1084,7 @@ static void eraser(unsigned char c, struct tty_struct *tty)
  * buffer is 'output'. The signal is processed first to alert any current
  * readers or writers to discontinue and exit their i/o loops.
  *
- * Locking: ctrl_lock
+ * Context: ctrl_lock
  */
 static void __isig(int sig, struct tty_struct *tty)
 {
@@ -1138,8 +1137,8 @@ static void isig(int sig, struct tty_struct *tty)
  * An RS232 break event has been hit in the incoming bitstream. This
  * can cause a variety of events depending upon the termios settings.
  *
- * n_tty_receive_buf()/producer path:
- *    caller holds non-exclusive termios_rwsem
+ * Context: n_tty_receive_buf()/producer path: caller holds
+ *          non-exclusive termios_rwsem.
  *
  * Note: may get exclusive termios_rwsem if flushing input buffer
  */
@@ -1193,8 +1192,8 @@ static void n_tty_receive_overrun(struct tty_struct *tty)
  * Process a parity error and queue the right data to indicate
  * the error case if necessary.
  *
- * n_tty_receive_buf()/producer path:
- *     caller holds non-exclusive termios_rwsem
+ * Context: n_tty_receive_buf()/producer path: caller holds
+ *          non-exclusive termios_rwsem
  */
 static void n_tty_receive_parity_error(struct tty_struct *tty, unsigned char c)
 {
@@ -1236,11 +1235,11 @@ n_tty_receive_signal_char(struct tty_struct *tty, int signal, unsigned char c)
  * This is serialized with respect to itself by the rules for the
  * driver above.
  *
- * n_tty_receive_buf()/producer path:
- *     caller holds non-exclusive termios_rwsem
- *     publishes canon_head if canonical mode is active
+ * Context: n_tty_receive_buf()/producer path: caller holds
+ *          non-exclusive termios_rwsem publishes canon_head if
+ *          canonical mode is active.
  *
- * Returns 1 if LNEXT was received, else returns 0
+ * Return: 1 if LNEXT was received, else returns 0.
  */
 static int
 n_tty_receive_char_special(struct tty_struct *tty, unsigned char c)
@@ -1649,8 +1648,6 @@ static void __receive_buf(struct tty_struct *tty, const unsigned char *cp,
  * not from interrupt context. The driver is responsible for making
  * calls one at a time and in order (or using flush_to_ldisc)
  *
- * Returns the # of input chars from @cp which were processed.
- *
  * In canonical mode, the maximum line length is 4096 chars (including
  * the line termination char); lines longer than 4096 chars are
  * truncated. After 4095 chars, input data is still processed but
@@ -1666,9 +1663,10 @@ static void __receive_buf(struct tty_struct *tty, const unsigned char *cp,
  * maximum canon line of 4096 chars when the mode is switched to
  * non-canonical.
  *
- * n_tty_receive_buf()/producer path:
- *     claims non-exclusive termios_rwsem
- *     publishes commit_head or canon_head
+ * Context: n_tty_receive_buf()/producer path: claims non-exclusive
+ *          termios_rwsem publishes commit_head or canon_head.
+ *
+ * Return: The number of input chars from @cp which were processed.
  */
 static int
 n_tty_receive_buf_common(struct tty_struct *tty, const unsigned char *cp,
@@ -1763,7 +1761,7 @@ static int n_tty_receive_buf2(struct tty_struct *tty, const unsigned char *cp,
  * guaranteed that this function will not be re-entered or in progress
  * when the ldisc is closed.
  *
- * Locking: Caller holds tty->termios_rwsem
+ * Context: Caller holds tty->termios_rwsem.
  */
 static void n_tty_set_termios(struct tty_struct *tty, struct ktermios *old)
 {
@@ -1873,10 +1871,11 @@ static void n_tty_close(struct tty_struct *tty)
  * n_tty_open() - open an ldisc
  * @tty: terminal to open
  *
- * Called when this line discipline is being attached to the
- * terminal device. Can sleep. Called serialized so that no
- * other events will occur in parallel. No further open will occur
- * until a close.
+ * Called when this line discipline is being attached to the terminal
+ * device. Called serialized so that no other events will occur in
+ * parallel. No further open will occur until a close.
+ *
+ * Context: Can sleep.
  */
 static int n_tty_open(struct tty_struct *tty)
 {
@@ -1924,11 +1923,9 @@ static inline int input_available_p(struct tty_struct *tty, int poll)
  * buffer, and once to drain the space from the (physical) beginning of
  * the buffer to head pointer.
  *
- * Called under the ldata->atomic_read_lock sem
- *
- * n_tty_read()/consumer path:
- *     caller holds non-exclusive termios_rwsem
- *     read_tail published
+ * Context: Called under the ldata->atomic_read_lock sem.
+ *          n_tty_read()/consumer path: caller holds non-exclusive
+ *          termios_rwsem read_tail published.
  */
 static int copy_from_read_buf(struct tty_struct *tty,
 				      unsigned char __user **b,
@@ -1979,11 +1976,9 @@ static int copy_from_read_buf(struct tty_struct *tty,
  * This causes data already processed as input to be immediately available
  * as input although a newline has not been received.
  *
- * Called under the atomic_read_lock mutex
- *
- * n_tty_read()/consumer path:
- *     caller holds non-exclusive termios_rwsem
- *     read_tail published
+ * Context: Called under the atomic_read_lock mutex.
+ *          n_tty_read()/consumer path: caller holds non-exclusive
+ *          termios_rwsem read_tail published.
  */
 static int canon_copy_from_read_buf(struct tty_struct *tty,
 				    unsigned char __user **b,
@@ -2061,9 +2056,9 @@ extern ssize_t redirected_tty_write(struct file *, const char __user *,
  * and if appropriate send any needed signals and return a negative
  * error code if action should be taken.
  *
- * Locking: redirected write test is safe
+ * Context: redirected write test is safe
  *          current->signal->tty check is safe
- *          ctrl_lock to safely reference tty->pgrp
+ *          ctrl_lock to safely reference tty->pgrp.
  */
 static int job_control(struct tty_struct *tty, struct file *file)
 {
@@ -2093,9 +2088,8 @@ static int job_control(struct tty_struct *tty, struct file *file)
  *
  * This code must be sure never to sleep through a hangup.
  *
- * n_tty_read()/consumer path:
- *     claims non-exclusive termios_rwsem
- *     publishes read_tail
+ * Context: n_tty_read()/consumer path: claims non-exclusive
+ *          termios_rwsem publishes read_tail.
  */
 static ssize_t n_tty_read(struct tty_struct *tty, struct file *file,
 			 unsigned char __user *buf, size_t nr)
@@ -2261,9 +2255,9 @@ static ssize_t n_tty_read(struct tty_struct *tty, struct file *file,
  *
  * This code must be sure never to sleep through a hangup.
  *
- * Locking: output_lock to protect column state and space left
+ * Context: output_lock to protect column state and space left
  *          (note that the process_output*() functions take this
- *          lock themselves)
+ *          lock themselves).
  */
 static ssize_t n_tty_write(struct tty_struct *tty, struct file *file,
 			   const unsigned char *buf, size_t nr)
@@ -2363,7 +2357,8 @@ break_out:
  * other events save open/close.
  *
  * This code must be sure never to sleep through a hangup.
- * Called without the kernel lock held - fine
+ *
+ * Context: Called without the kernel lock held - fine.
  */
 static __poll_t n_tty_poll(struct tty_struct *tty, struct file *file,
 							poll_table *wait)

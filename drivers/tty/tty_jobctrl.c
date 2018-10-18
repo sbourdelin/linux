@@ -26,7 +26,7 @@ static int is_ignored(int sig)
  * not in the foreground, send a SIGTTOU.  If the signal is blocked or
  * ignored, go ahead and perform the operation.  (POSIX 7.2)
  *
- * Locking: ctrl_lock
+ * Context: Takes ctrl_lock.
  */
 int __tty_check_change(struct tty_struct *tty, int sig)
 {
@@ -87,9 +87,8 @@ void proc_clear_tty(struct task_struct *p)
  * Only callable by the session leader and only if it does not already have
  * a controlling terminal.
  *
- * Caller must hold:  tty_lock()
- *                    a readlock on tasklist_lock
- *                    sighand lock
+ * Context: Caller must hold tty_lock(), a readlock on tasklist_lock, and
+ *          sighand lock.
  */
 static void __proc_set_tty(struct tty_struct *tty)
 {
@@ -335,10 +334,9 @@ void no_tty(void)
  * This ioctl is used to manage job control. It permits a session
  * leader to set this tty as the controlling tty for the session.
  *
- * Locking:
- *         Takes tty_lock() to serialize proc_set_tty() for this tty
- *         Takes tasklist_lock internally to walk sessions
- *         Takes ->siglock() when updating signal->tty
+ * Context: Takes tty_lock() to serialize proc_set_tty() for this tty
+ *          Takes tasklist_lock internally to walk sessions
+ *          Takes ->siglock() when updating signal->tty
  */
 static int tiocsctty(struct tty_struct *tty, struct file *file, int arg)
 {
@@ -438,7 +436,7 @@ static struct pid *session_of_pgrp(struct pid *pgrp)
  * Obtain the process group of the tty. If there is no process group
  * return an error.
  *
- * Locking: none. Reference to current->signal->tty is safe.
+ * Context: No Locks taken. Reference to current->signal->tty is safe.
  */
 static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
@@ -465,7 +463,7 @@ static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
  * Set the process group of the tty to the session passed. Only
  * permitted where the tty session is our session.
  *
- * Locking: RCU, ctrl lock
+ * Context: RCU, ctrl lock
  */
 static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
@@ -512,7 +510,7 @@ out_unlock:
  * Obtain the session id of the tty. If there is no session
  * return an error.
  *
- * Locking: none. Reference to current->signal->tty is safe.
+ * Context: No locks taken. Reference to current->signal->tty is safe.
  */
 static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {

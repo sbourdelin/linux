@@ -204,7 +204,6 @@ struct cdns_platform_data {
  * cdns_uart_handle_rx() - Handle the received bytes along with Rx errors.
  * @dev_id: Id of the UART port
  * @isrstatus: The interrupt status register value as read
- * Return: None
  */
 static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
 {
@@ -299,7 +298,6 @@ static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
 /**
  * cdns_uart_handle_tx() - Handle the bytes to be Txed.
  * @dev_id: Id of the UART port
- * Return: None
  */
 static void cdns_uart_handle_tx(void *dev_id)
 {
@@ -378,8 +376,6 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
  * @rbdiv: BDIV value (return value)
  * @rcd: CD value (return value)
  * @div8: Value for clk_sel bit in mod (return value)
- * Return: baud rate, requested baud when possible, or actual baud when there
- *	was too much error, zero if no valid divisors are found.
  *
  * Formula to obtain baud rate is
  *	baud_tx/rx rate = clk/CD * (BDIV + 1)
@@ -390,6 +386,9 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
  *	CD and BDIV depends on values in
  *			baud rate generate register
  *			baud rate clock divisor register
+ *
+ * Return: Baud rate, requested baud when possible, or actual baud when
+ *         there was too much error, zero if no valid divisors are found.
  */
 static unsigned int cdns_uart_calc_baud_divs(unsigned int clk,
 		unsigned int baud, u32 *rbdiv, u32 *rcd, int *div8)
@@ -437,6 +436,7 @@ static unsigned int cdns_uart_calc_baud_divs(unsigned int clk,
  * cdns_uart_set_baud_rate() - Calculate and set the baud rate
  * @port: Handle to the uart port structure
  * @baud: Baud rate to set
+ *
  * Return: baud rate, requested baud when possible, or actual baud when there
  *	   was too much error, zero if no valid divisors are found.
  */
@@ -472,6 +472,7 @@ static unsigned int cdns_uart_set_baud_rate(struct uart_port *port,
  * @nb:		Notifier block
  * @event:	Notify event
  * @data:	Notifier data
+ *
  * Return:	NOTIFY_OK or NOTIFY_DONE on success, NOTIFY_BAD on error.
  */
 static int cdns_uart_clk_notifier_cb(struct notifier_block *nb,
@@ -665,11 +666,13 @@ static void cdns_uart_break_ctl(struct uart_port *port, int ctl)
 }
 
 /**
- * cdns_uart_set_termios() - termios operations, handling data length, parity,
- *				stop bits, flow control, baud rate
+ * cdns_uart_set_termios() - termios operations
  * @port: Handle to the uart port structure
  * @termios: Handle to the input termios structure
  * @old: Values of the previously saved termios structure
+ *
+ * Termios operations, handling data length, parity, stop bits,
+ * flow control, baud rate.
  */
 static void cdns_uart_set_termios(struct uart_port *port,
 				struct ktermios *termios, struct ktermios *old)
@@ -938,10 +941,10 @@ static int cdns_uart_verify_port(struct uart_port *port,
 }
 
 /**
- * cdns_uart_request_port() - Claim the memory region attached to cdns_uart port,
- *				called when the driver adds a cdns_uart port via
- *				uart_add_one_port()
+ * cdns_uart_request_port() - Claim the memory region attached to cdns_uart port.
  * @port: Handle to the uart port structure
+ *
+ * Called when the driver adds a cdns_uart port via uart_add_one_port().
  *
  * Return: 0 on success, negative errno otherwise.
  */

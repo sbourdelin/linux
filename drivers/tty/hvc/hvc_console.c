@@ -569,7 +569,7 @@ static int hvc_write(struct tty_struct *tty, const unsigned char *buf, int count
  * The routine shall not be called within an atomic context because it
  * might sleep.
  *
- * Locking:	hp->lock
+ * Context: Take hp->lock
  */
 static void hvc_set_winsz(struct work_struct *work)
 {
@@ -784,7 +784,7 @@ EXPORT_SYMBOL_GPL(hvc_poll);
  * Stores the specified window size information in the hvc structure of @hp.
  * The function schedule the tty resize update.
  *
- * Locking:	Locking free; the function MUST be called holding hp->lock
+ * Context: Locking free; the function MUST be called holding hp->lock
  */
 void __hvc_resize(struct hvc_struct *hp, struct winsize ws)
 {

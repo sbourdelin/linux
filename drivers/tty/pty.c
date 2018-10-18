@@ -369,7 +369,7 @@ static void pty_stop(struct tty_struct *tty)
  * Perform the initial set up for the tty/pty pair. Called from the
  * tty layer when the port is first opened.
  *
- * Locking: the caller must hold the tty_mutex
+ * Context: The caller must hold the tty_mutex.
  */
 static int pty_common_install(struct tty_driver *driver, struct tty_struct *tty,
 		bool legacy)
@@ -687,8 +687,9 @@ static long pty_unix98_compat_ioctl(struct tty_struct *tty,
  * @driver: ptm driver
  * @idx: tty index
  *
- * Look up a pty master device. Called under the tty_mutex for now.
- * This provides our locking.
+ * Look up a pty master device.
+ *
+ * Context: Called under the tty_mutex for now. This provides our locking.
  */
 static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
 		struct file *file, int idx)
@@ -702,8 +703,10 @@ static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
  * @driver: pts driver
  * @idx: tty index
  *
- * Look up a pty master device. Called under the tty_mutex for now.
- * This provides our locking for the tty pointer.
+ * Look up a pty master device.
+ *
+ * Context: Called under the tty_mutex for now.  This provides our
+ *          locking for the tty pointer.
  */
 static struct tty_struct *pts_unix98_lookup(struct tty_driver *driver,
 		struct file *file, int idx)
@@ -787,9 +790,9 @@ static const struct tty_operations pty_unix98_ops = {
  *
  * Allocate a unix98 pty master device from the ptmx driver.
  *
- * Locking: tty_mutex protects the init_dev work. tty->count should
- *          protect the rest.
- *          allocated_ptys_lock handles the list of free pty numbers
+ * Context: tty_mutex protects the init_dev work. tty->count should
+ *          protect the rest.  allocated_ptys_lock handles the list
+ *          of free pty numbers.
  */
 static int ptmx_open(struct inode *inode, struct file *filp)
 {

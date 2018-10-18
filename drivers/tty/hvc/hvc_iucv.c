@@ -147,7 +147,8 @@ static struct hvc_iucv_private *hvc_iucv_get_private(uint32_t num)
  * required for receiving and sending data with IUCV.
  * Note: The total message size arises from the internal buffer size and the
  *	 members of the iucv_tty_msg structure.
- * The function returns NULL if memory allocation has failed.
+ *
+ * Return: NULL if memory allocation has failed.
  */
 static struct iucv_tty_buffer *alloc_tty_buffer(size_t size, gfp_t flags)
 {
@@ -210,9 +211,9 @@ static void destroy_tty_buffer_list(struct list_head *list)
  * If all message data has been written, the message is removed from
  * the input queue.
  *
- * The function returns the number of bytes written to the terminal, zero if
- * there are no pending data messages available or if there is no established
- * IUCV path.
+ * Return: The number of bytes written to the terminal, zero if there are no
+ * pending data messages available or if there is no established IUCV path.
+ *
  * If the IUCV path has been severed, then -EPIPE is returned to cause a
  * hang up (that is issued by the HVC layer).
  */
@@ -309,9 +310,8 @@ out_written:
  * If an IUCV communication path has been established, pending IUCV messages
  * are received and data is copied into buffer @buf up to @count bytes.
  *
- * Locking:	The routine gets called under an irqsave() spinlock; and
- *		the routine locks the struct hvc_iucv_private->lock to call
- *		helper functions.
+ * Context: The routine gets called under an irqsave() spinlock; locks
+ *          the struct hvc_iucv_private->lock to call helper functions.
  */
 static int hvc_iucv_get_chars(uint32_t vtermno, char *buf, int count)
 {

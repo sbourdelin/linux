@@ -654,7 +654,7 @@ out_unlock:
  * with.  This routine is executed at video setup, and when the
  * PIO_FONTRESET ioctl is called.
  *
- * The caller must hold the console lock
+ * Context: The caller must hold the console lock.
  */
 int con_set_default_unimap(struct vc_data *vc)
 {
@@ -710,7 +710,7 @@ EXPORT_SYMBOL(con_set_default_unimap);
  * @dst_vc: target
  * @src_vt: source
  *
- * The caller must hold the console lock when invoking this method
+ * Context: The caller must hold the console lock.
  */
 int con_copy_unimap(struct vc_data *dst_vc, struct vc_data *src_vc)
 {

@@ -169,12 +169,10 @@ ifx_spi_power_state_clear(struct ifx_spi_device *ifx_dev, unsigned char val)
 }
 
 /**
- * swap_buf_8()
+ * swap_buf_8() - Swap the contents of a buffer into big endian format.
  * @buf: our buffer
  * @len: number of bytes (not words) in the buffer
  * @end: end of buffer
- *
- * Swap the contents of a buffer into big endian format
  */
 static inline void swap_buf_8(unsigned char *buf, int len, void *end)
 {
@@ -183,12 +181,10 @@ static inline void swap_buf_8(unsigned char *buf, int len, void *end)
 }
 
 /**
- * swap_buf_16()
+ * swap_buf_16() - Swap the contents of a buffer into big endian format.
  * @buf: our buffer
  * @len: number of bytes (not words) in the buffer
  * @end: end of buffer
- *
- * Swap the contents of a buffer into big endian format
  */
 static inline void swap_buf_16(unsigned char *buf, int len, void *end)
 {
@@ -208,12 +204,10 @@ static inline void swap_buf_16(unsigned char *buf, int len, void *end)
 }
 
 /**
- * swap_buf_32()
+ * swap_buf_32() - Swap the contents of a buffer into big endian format.
  * @buf: our buffer
  * @len: number of bytes (not words) in the buffer
  * @end: end of buffer
- *
- * Swap the contents of a buffer into big endian format
  */
 static inline void swap_buf_32(unsigned char *buf, int len, void *end)
 {

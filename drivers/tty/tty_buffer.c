@@ -146,8 +146,8 @@ void tty_buffer_free_all(struct tty_port *port)
  * We round our buffers off in 256 character chunks to get better
  * allocation behaviour.
  *
- * Return NULL if out of memory or the allocation would exceed the
- * per device queue
+ * Return: NULL if out of memory or the allocation would exceed the
+ *         per device queue.
  */
 static struct tty_buffer *tty_buffer_alloc(struct tty_port *port, size_t size)
 {
@@ -208,8 +208,8 @@ static void tty_buffer_free(struct tty_port *port, struct tty_buffer *b)
  * flush all the buffers containing receive data. If ld != NULL,
  * flush the ldisc input buffer.
  *
- * Locking: takes buffer lock to ensure single-threaded flip buffer
- *          'consumer'
+ * Context: Takes buffer lock to ensure single-threaded flip buffer
+ *          'consumer'.
  */
 void tty_buffer_flush(struct tty_struct *tty, struct tty_ldisc *ld)
 {
@@ -300,7 +300,9 @@ EXPORT_SYMBOL_GPL(tty_buffer_request_room);
  * @size: size
  *
  * Queue a series of bytes to the tty buffering. All the characters
- * passed are marked with the supplied flag. Returns the number added.
+ * passed are marked with the supplied flag.
+ *
+ * Return: The number of bytes added.
  */
 int tty_insert_flip_string_fixed_flag(struct tty_port *port,
 		const unsigned char *chars, char flag, size_t size)
@@ -334,8 +336,9 @@ EXPORT_SYMBOL(tty_insert_flip_string_fixed_flag);
  * @size: size
  *
  * Queue a series of bytes to the tty buffering. For each character
- * the flags array indicates the status of the character. Returns the
- * number added.
+ * the flags array indicates the status of the character.
+ *
+ * Return: The number of bytes added.
  */
 int tty_insert_flip_string_flags(struct tty_port *port,
 		const unsigned char *chars, const char *flags, size_t size)
@@ -443,7 +446,7 @@ EXPORT_SYMBOL_GPL(tty_prepare_flip_string);
  * Callers other than flush_to_ldisc() need to exclude the kworker
  * from concurrent use of the line discipline, see paste_selection().
  *
- * Returns the number of bytes processed
+ * Return: The number of bytes processed.
  */
 int tty_ldisc_receive_buf(struct tty_ldisc *ld, const unsigned char *p,
 			  char *f, int count)
@@ -484,8 +487,8 @@ receive_buf(struct tty_port *port, struct tty_buffer *head, int count)
  *
  * The receive_buf method is single threaded for each tty instance.
  *
- * Locking: takes buffer lock to ensure single-threaded flip buffer
- *          'consumer'
+ * Context: Takes buffer lock to ensure single-threaded flip buffer
+ *          'consumer'.
  */
 static void flush_to_ldisc(struct work_struct *work)
 {
@@ -535,10 +538,11 @@ static void flush_to_ldisc(struct work_struct *work)
  * @port: tty port to push
  *
  * Queue a push of the terminal flip buffers to the line discipline.
- * Can be called from IRQ/atomic context.
  *
  * In the event of the queue being busy for flipping the work will be
  * held off and retried later.
+ *
+ * Context: Can be called from IRQ/atomic context.
  */
 void tty_flip_buffer_push(struct tty_port *port)
 {
