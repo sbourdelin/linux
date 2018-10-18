@@ -98,6 +98,8 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 		return false;
 	}
 	memcpy_fromio(rdev->bios, bios, size);
+	rdev->bios[0] = val1;
+	rdev->bios[1] = val2;
 	pci_unmap_rom(rdev->pdev, bios);
 	return true;
 }
