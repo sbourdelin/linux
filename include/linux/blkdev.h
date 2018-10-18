@@ -27,6 +27,7 @@
 #include <linux/percpu-refcount.h>
 #include <linux/scatterlist.h>
 #include <linux/blkzoned.h>
+#include <linux/blk-sec-buf.h>
 
 struct module;
 struct scsi_ioctl_command;
@@ -522,6 +523,10 @@ struct request_queue {
 	 * queue needs bounce pages for pages above this limit
 	 */
 	gfp_t			bounce_gfp;
+
+	/* for allocate less-than PAGE_SIZE io buffer */
+	struct blk_sec_buf_slabs *sec_buf_slabs;
+	struct mutex		blk_sec_buf_slabs_mutex;
 
 	/*
 	 * protects queue structures from reentrancy. ->__queue_lock should

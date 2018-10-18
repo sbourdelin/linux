@@ -1079,6 +1079,8 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id,
 	if (blkcg_init_queue(q))
 		goto fail_ref;
 
+	mutex_init(&q->blk_sec_buf_slabs_mutex);
+
 	return q;
 
 fail_ref:
