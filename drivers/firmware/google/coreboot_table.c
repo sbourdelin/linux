@@ -128,6 +128,7 @@ int coreboot_table_init(struct device *dev, void __iomem *ptr)
 		device->dev.bus = &coreboot_bus_type;
 		device->dev.release = coreboot_device_release;
 		memcpy_fromio(&device->entry, ptr_entry, entry.size);
+		device->entry = entry;
 
 		ret = device_register(&device->dev);
 		if (ret) {
