@@ -921,6 +921,8 @@ static int i915_audio_component_bind(struct device *i915_kdev,
 	dev_priv->audio_component = acomp;
 	drm_modeset_unlock_all(&dev_priv->drm);
 
+	WARN_ON(!device_link_add(hda_kdev, i915_kdev, DL_FLAG_STATELESS));
+
 	return 0;
 }
 
@@ -929,6 +931,8 @@ static void i915_audio_component_unbind(struct device *i915_kdev,
 {
 	struct i915_audio_component *acomp = data;
 	struct drm_i915_private *dev_priv = kdev_to_i915(i915_kdev);
+
+	device_link_remove(hda_kdev, i915_kdev);
 
 	drm_modeset_lock_all(&dev_priv->drm);
 	acomp->base.ops = NULL;
