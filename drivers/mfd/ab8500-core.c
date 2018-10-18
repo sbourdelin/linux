@@ -252,16 +252,18 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
 	mutex_lock(&ab8500->lock);
 
 	ret = ab8500->read(ab8500, addr);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(ab8500->dev, "failed to read reg %#x: %d\n",
 			addr, ret);
-	else
-		*value = ret;
+		return ret;
+	}
+
+	*value = ret;
 
 	mutex_unlock(&ab8500->lock);
 	dev_vdbg(ab8500->dev, "rd: addr %#x => data %#x\n", addr, ret);
 
-	return ret;
+	return 0;
 }
 
 static int ab8500_get_register(struct device *dev, u8 bank,
