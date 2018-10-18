@@ -366,6 +366,7 @@ struct queue_limits {
 	unsigned long		seg_boundary_mask;
 	unsigned long		virt_boundary_mask;
 
+	unsigned int		dma_alignment;
 	unsigned int		max_hw_sectors;
 	unsigned int		max_dev_sectors;
 	unsigned int		chunk_sectors;
@@ -561,7 +562,6 @@ struct request_queue {
 	unsigned int		dma_drain_size;
 	void			*dma_drain_buffer;
 	unsigned int		dma_pad_mask;
-	unsigned int		dma_alignment;
 
 	struct blk_queue_tag	*queue_tags;
 
@@ -1617,7 +1617,7 @@ static inline unsigned int bdev_zone_sectors(struct block_device *bdev)
 
 static inline int queue_dma_alignment(struct request_queue *q)
 {
-	return q ? q->dma_alignment : 511;
+	return q ? q->limits.dma_alignment : 511;
 }
 
 static inline int blk_rq_aligned(struct request_queue *q, unsigned long addr,
