@@ -1004,15 +1004,15 @@ int __init early_serial_txx9_setup(struct uart_port *port)
 static DEFINE_MUTEX(serial_txx9_mutex);
 
 /**
- *	serial_txx9_register_port - register a serial port
- *	@port: serial port template
+ * serial_txx9_register_port() - register a serial port
+ * @port: serial port template
  *
- *	Configure the serial port specified by the request.
+ * Configure the serial port specified by the request.
  *
- *	The port is then probed and if necessary the IRQ is autodetected
- *	If this fails an error is returned.
+ * The port is then probed and if necessary the IRQ is autodetected
+ * If this fails an error is returned.
  *
- *	On success the port is ready to use and the line number is returned.
+ * On success the port is ready to use and the line number is returned.
  */
 static int serial_txx9_register_port(struct uart_port *port)
 {
@@ -1056,11 +1056,11 @@ static int serial_txx9_register_port(struct uart_port *port)
 }
 
 /**
- *	serial_txx9_unregister_port - remove a txx9 serial port at runtime
- *	@line: serial line number
+ * serial_txx9_unregister_port() - remove a txx9 serial port at runtime
+ * @line: serial line number
  *
- *	Remove one serial port.  This may not be called from interrupt
- *	context.  We hand the port back to the our control.
+ * Remove one serial port.  This may not be called from interrupt
+ * context.  We hand the port back to the our control.
  */
 static void serial_txx9_unregister_port(int line)
 {

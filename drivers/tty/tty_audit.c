@@ -83,10 +83,10 @@ static void tty_audit_log(const char *description, dev_t dev,
 }
 
 /**
- *	tty_audit_buf_push	-	Push buffered data out
+ * tty_audit_buf_push() - Push buffered data out
  *
- *	Generate an audit message from the contents of @buf, which is owned by
- *	the current task.  @buf->mutex must be locked.
+ * Generate an audit message from the contents of @buf, which is owned by
+ * the current task.  @buf->mutex must be locked.
  */
 static void tty_audit_buf_push(struct tty_audit_buf *buf)
 {
@@ -101,13 +101,13 @@ static void tty_audit_buf_push(struct tty_audit_buf *buf)
 }
 
 /**
- *	tty_audit_exit	-	Handle a task exit
+ * tty_audit_exit() - Handle a task exit
  *
- *	Make sure all buffered data is written out and deallocate the buffer.
- *	Only needs to be called if current->signal->tty_audit_buf != %NULL.
+ * Make sure all buffered data is written out and deallocate the buffer.
+ * Only needs to be called if current->signal->tty_audit_buf != %NULL.
  *
- *	The process is single-threaded at this point; no other threads share
- *	current->signal.
+ * The process is single-threaded at this point; no other threads share
+ * current->signal.
  */
 void tty_audit_exit(void)
 {
@@ -122,9 +122,9 @@ void tty_audit_exit(void)
 }
 
 /**
- *	tty_audit_fork	-	Copy TTY audit state for a new task
+ * tty_audit_fork() - Copy TTY audit state for a new task
  *
- *	Set up TTY audit state in @sig from current.  @sig needs no locking.
+ * Set up TTY audit state in @sig from current.  @sig needs no locking.
  */
 void tty_audit_fork(struct signal_struct *sig)
 {
@@ -132,7 +132,7 @@ void tty_audit_fork(struct signal_struct *sig)
 }
 
 /**
- *	tty_audit_tiocsti	-	Log TIOCSTI
+ * tty_audit_tiocsti() - Log TIOCSTI
  */
 void tty_audit_tiocsti(struct tty_struct *tty, char ch)
 {
@@ -147,9 +147,9 @@ void tty_audit_tiocsti(struct tty_struct *tty, char ch)
 }
 
 /**
- *	tty_audit_push	-	Flush current's pending audit data
+ * tty_audit_push() - Flush current's pending audit data
  *
- *	Returns 0 if success, -EPERM if tty audit is disabled
+ * Returns 0 if success, -EPERM if tty audit is disabled
  */
 int tty_audit_push(void)
 {
@@ -168,11 +168,11 @@ int tty_audit_push(void)
 }
 
 /**
- *	tty_audit_buf_get	-	Get an audit buffer.
+ * tty_audit_buf_get() - Get an audit buffer.
  *
- *	Get an audit buffer, allocate it if necessary.  Return %NULL
- *	if out of memory or ERR_PTR(-ESRCH) if tty_audit_exit() has already
- *	occurred.  Otherwise, return a new reference to the buffer.
+ * Get an audit buffer, allocate it if necessary.  Return %NULL
+ * if out of memory or ERR_PTR(-ESRCH) if tty_audit_exit() has already
+ * occurred.  Otherwise, return a new reference to the buffer.
  */
 static struct tty_audit_buf *tty_audit_buf_get(void)
 {
@@ -195,9 +195,9 @@ static struct tty_audit_buf *tty_audit_buf_get(void)
 }
 
 /**
- *	tty_audit_add_data	-	Add data for TTY auditing.
+ * tty_audit_add_data() - Add data for TTY auditing.
  *
- *	Audit @data of @size from @tty, if necessary.
+ * Audit @data of @size from @tty, if necessary.
  */
 void tty_audit_add_data(struct tty_struct *tty, const void *data, size_t size)
 {

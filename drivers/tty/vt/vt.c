@@ -1129,19 +1129,19 @@ static inline int resize_screen(struct vc_data *vc, int width, int height,
 #define VC_RESIZE_MAXROW (32767)
 
 /**
- *	vc_do_resize	-	resizing method for the tty
- *	@tty: tty being resized
- *	@real_tty: real tty (different to tty if a pty/tty pair)
- *	@vc: virtual console private data
- *	@cols: columns
- *	@lines: lines
+ * vc_do_resize() - resizing method for the tty
+ * @tty: tty being resized
+ * @real_tty: real tty (different to tty if a pty/tty pair)
+ * @vc: virtual console private data
+ * @cols: columns
+ * @lines: lines
  *
- *	Resize a virtual console, clipping according to the actual constraints.
- *	If the caller passes a tty structure then update the termios winsize
- *	information and perform any necessary signal handling.
+ * Resize a virtual console, clipping according to the actual constraints.
+ * If the caller passes a tty structure then update the termios winsize
+ * information and perform any necessary signal handling.
  *
- *	Caller must hold the console semaphore. Takes the termios rwsem and
- *	ctrl_lock of the tty IFF a tty is passed.
+ * Caller must hold the console semaphore. Takes the termios rwsem and
+ * ctrl_lock of the tty IFF a tty is passed.
  */
 
 static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
@@ -1279,15 +1279,15 @@ static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
 }
 
 /**
- *	vc_resize		-	resize a VT
- *	@vc: virtual console
- *	@cols: columns
- *	@rows: rows
+ * vc_resize() - resize a VT
+ * @vc: virtual console
+ * @cols: columns
+ * @rows: rows
  *
- *	Resize a virtual console as seen from the console end of things. We
- *	use the common vc_do_resize methods to update the structures. The
- *	caller must hold the console sem to protect console internals and
- *	vc->port.tty
+ * Resize a virtual console as seen from the console end of things. We
+ * use the common vc_do_resize methods to update the structures. The
+ * caller must hold the console sem to protect console internals and
+ * vc->port.tty
  */
 
 int vc_resize(struct vc_data *vc, unsigned int cols, unsigned int rows)
@@ -1296,16 +1296,16 @@ int vc_resize(struct vc_data *vc, unsigned int cols, unsigned int rows)
 }
 
 /**
- *	vt_resize		-	resize a VT
- *	@tty: tty to resize
- *	@ws: winsize attributes
+ * vt_resize() - resize a VT
+ * @tty: tty to resize
+ * @ws: winsize attributes
  *
- *	Resize a virtual terminal. This is called by the tty layer as we
- *	register our own handler for resizing. The mutual helper does all
- *	the actual work.
+ * Resize a virtual terminal. This is called by the tty layer as we
+ * register our own handler for resizing. The mutual helper does all
+ * the actual work.
  *
- *	Takes the console sem and the called methods then take the tty
- *	termios_rwsem and the tty ctrl_lock in that order.
+ * Takes the console sem and the called methods then take the tty
+ * termios_rwsem and the tty ctrl_lock in that order.
  */
 static int vt_resize(struct tty_struct *tty, struct winsize *ws)
 {
@@ -2846,8 +2846,8 @@ struct tty_driver *console_driver;
 
 /**
  * vt_kmsg_redirect() - Sets/gets the kernel message console
- * @new:	The new virtual terminal number or -1 if the console should stay
- *		unchanged
+ * @new: The new virtual terminal number or -1 if the console should stay
+ *       unchanged
  *
  * By default, the kernel messages are always printed on the current virtual
  * console. However, the user may modify that default with the
@@ -3794,7 +3794,7 @@ static void vtconsole_deinit_device(struct con_driver *con)
 }
 
 /**
- * con_is_bound - checks if driver is bound to the console
+ * con_is_bound() - checks if driver is bound to the console
  * @csw: console driver
  *
  * RETURNS: zero if unbound, nonzero if bound
@@ -3818,7 +3818,7 @@ int con_is_bound(const struct consw *csw)
 EXPORT_SYMBOL(con_is_bound);
 
 /**
- * con_debug_enter - prepare the console for the kernel debugger
+ * con_debug_enter() - prepare the console for the kernel debugger
  * @sw: console driver
  *
  * Called when the console is taken over by the kernel debugger, this
@@ -3876,7 +3876,7 @@ int con_debug_enter(struct vc_data *vc)
 EXPORT_SYMBOL_GPL(con_debug_enter);
 
 /**
- * con_debug_leave - restore console state
+ * con_debug_leave() - restore console state
  * @sw: console driver
  *
  * Restore the console state to what it was before the kernel debugger
@@ -3974,7 +3974,7 @@ err:
 
 
 /**
- * do_unregister_con_driver - unregister console driver from console layer
+ * do_unregister_con_driver() - unregister console driver from console layer
  * @csw: console driver
  *
  * DESCRIPTION: All drivers that registers to the console layer must

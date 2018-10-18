@@ -298,7 +298,7 @@ struct ring_buffer {
 
 
 /**
- * set_baud - Baud rate setting code
+ * set_baud() - Baud rate setting code
  * @port: port to set
  * @baud: baud rate to use
  */
@@ -346,7 +346,7 @@ static int set_baud(struct ioc3_port *port, int baud)
 }
 
 /**
- * get_ioc3_port - given a uart port, return the control structure
+ * get_ioc3_port() - given a uart port, return the control structure
  * @the_port: uart port to find
  */
 static struct ioc3_port *get_ioc3_port(struct uart_port *the_port)
@@ -370,7 +370,7 @@ static struct ioc3_port *get_ioc3_port(struct uart_port *the_port)
 }
 
 /**
- * port_init - Initialize the sio and ioc3 hardware for a given port
+ * port_init() - Initialize the sio and ioc3 hardware for a given port
  *			called per port from attach...
  * @port: port to initialize
  */
@@ -474,7 +474,7 @@ static inline int port_init(struct ioc3_port *port)
 }
 
 /**
- * enable_intrs - enable interrupts
+ * enable_intrs() - enable interrupts
  * @port: port to enable
  * @mask: mask to use
  */
@@ -487,7 +487,7 @@ static void enable_intrs(struct ioc3_port *port, uint32_t mask)
 }
 
 /**
- * local_open - local open a port
+ * local_open() - local open a port
  * @port: port to open
  */
 static inline int local_open(struct ioc3_port *port)
@@ -536,7 +536,7 @@ static inline int local_open(struct ioc3_port *port)
 }
 
 /**
- * set_rx_timeout - Set rx timeout and threshold values.
+ * set_rx_timeout() - Set rx timeout and threshold values.
  * @port: port to use
  * @timeout: timeout value in ticks
  */
@@ -575,7 +575,7 @@ static inline int set_rx_timeout(struct ioc3_port *port, int timeout)
 }
 
 /**
- * config_port - config the hardware
+ * config_port() - config the hardware
  * @port: port to config
  * @baud: baud rate for the port
  * @byte_size: data size
@@ -667,7 +667,7 @@ config_port(struct ioc3_port *port,
 }
 
 /**
- * do_write - Write bytes to the port.  Returns the number of bytes
+ * do_write() - Write bytes to the port.  Returns the number of bytes
  *			actually written. Called from transmit_chars
  * @port: port to use
  * @buf: the stuff to write
@@ -752,7 +752,7 @@ static inline int do_write(struct ioc3_port *port, char *buf, int len)
 }
 
 /**
- * disable_intrs - disable interrupts
+ * disable_intrs() - disable interrupts
  * @port: port to enable
  * @mask: mask to use
  */
@@ -765,7 +765,7 @@ static inline void disable_intrs(struct ioc3_port *port, uint32_t mask)
 }
 
 /**
- * set_notification - Modify event notification
+ * set_notification() - Modify event notification
  * @port: port to use
  * @mask: events mask
  * @set_on: set ?
@@ -814,7 +814,7 @@ static int set_notification(struct ioc3_port *port, int mask, int set_on)
 }
 
 /**
- * set_mcr - set the master control reg
+ * set_mcr() - set the master control reg
  * @the_port: port to use
  * @mask1: mcr mask
  * @mask2: shadow mask
@@ -858,7 +858,7 @@ static inline int set_mcr(struct uart_port *the_port,
 }
 
 /**
- * ioc3_set_proto - set the protocol for the port
+ * ioc3_set_proto() - set the protocol for the port
  * @port: port to use
  * @proto: protocol to use
  */
@@ -886,7 +886,7 @@ static int ioc3_set_proto(struct ioc3_port *port, int proto)
 }
 
 /**
- * transmit_chars - upper level write, called with the_port->lock
+ * transmit_chars() - upper level write, called with the_port->lock
  * @the_port: port to write
  */
 static void transmit_chars(struct uart_port *the_port)
@@ -942,7 +942,7 @@ static void transmit_chars(struct uart_port *the_port)
 }
 
 /**
- * ioc3_change_speed - change the speed of the port
+ * ioc3_change_speed() - change the speed of the port
  * @the_port: port to change
  * @new_termios: new termios settings
  * @old_termios: old termios settings
@@ -1040,7 +1040,7 @@ ioc3_change_speed(struct uart_port *the_port,
 }
 
 /**
- * ic3_startup_local - Start up the serial port - returns >= 0 if no errors
+ * ic3_startup_local() - Start up the serial port - returns >= 0 if no errors
  * @the_port: Port to operate on
  */
 static inline int ic3_startup_local(struct uart_port *the_port)
@@ -1104,7 +1104,7 @@ static void ioc3_cb_post_ncs(struct uart_port *the_port, int ncs)
 }
 
 /**
- * do_read - Read in bytes from the port.  Return the number of bytes
+ * do_read() - Read in bytes from the port.  Return the number of bytes
  *			actually read.
  * @the_port: port to use
  * @buf: place to put the stuff we read
@@ -1385,7 +1385,7 @@ static inline int do_read(struct uart_port *the_port, char *buf, int len)
 }
 
 /**
- * receive_chars - upper level read.
+ * receive_chars() - upper level read.
  * @the_port: port to read from
  */
 static int receive_chars(struct uart_port *the_port)
@@ -1421,7 +1421,7 @@ static int receive_chars(struct uart_port *the_port)
 }
 
 /**
- * ioc3uart_intr_one - lowest level (per port) interrupt handler.
+ * ioc3uart_intr_one() - lowest level (per port) interrupt handler.
  * @is : submodule
  * @idd: driver data
  * @pending: interrupts to handle
@@ -1620,7 +1620,7 @@ ioc3uart_intr_one(struct ioc3_submodule *is,
 }
 
 /**
- * ioc3uart_intr - field all serial interrupts
+ * ioc3uart_intr() - field all serial interrupts
  * @is : submodule
  * @idd: driver data
  * @pending: interrupts to handle
@@ -1660,7 +1660,7 @@ static const char *ic3_type(struct uart_port *the_port)
 }
 
 /**
- * ic3_tx_empty - Is the transmitter empty?
+ * ic3_tx_empty() - Is the transmitter empty?
  * @port: Port to operate on
  *
  */
@@ -1675,7 +1675,7 @@ static unsigned int ic3_tx_empty(struct uart_port *the_port)
 }
 
 /**
- * ic3_stop_tx - stop the transmitter
+ * ic3_stop_tx() - stop the transmitter
  * @port: Port to operate on
  *
  */
@@ -1688,7 +1688,7 @@ static void ic3_stop_tx(struct uart_port *the_port)
 }
 
 /**
- * ic3_stop_rx - stop the receiver
+ * ic3_stop_rx() - stop the receiver
  * @port: Port to operate on
  *
  */
@@ -1710,7 +1710,7 @@ static void null_void_function(struct uart_port *the_port)
 }
 
 /**
- * ic3_shutdown - shut down the port - free irq and disable
+ * ic3_shutdown() - shut down the port - free irq and disable
  * @port: port to shut down
  *
  */
@@ -1733,7 +1733,7 @@ static void ic3_shutdown(struct uart_port *the_port)
 }
 
 /**
- * ic3_set_mctrl - set control lines (dtr, rts, etc)
+ * ic3_set_mctrl() - set control lines (dtr, rts, etc)
  * @port: Port to operate on
  * @mctrl: Lines to set/unset
  *
@@ -1757,7 +1757,7 @@ static void ic3_set_mctrl(struct uart_port *the_port, unsigned int mctrl)
 }
 
 /**
- * ic3_get_mctrl - get control line info
+ * ic3_get_mctrl() - get control line info
  * @port: port to operate on
  *
  */
@@ -1781,7 +1781,7 @@ static unsigned int ic3_get_mctrl(struct uart_port *the_port)
 }
 
 /**
- * ic3_start_tx - Start transmitter. Called with the_port->lock
+ * ic3_start_tx() - Start transmitter. Called with the_port->lock
  * @port: Port to operate on
  *
  */
@@ -1796,7 +1796,7 @@ static void ic3_start_tx(struct uart_port *the_port)
 }
 
 /**
- * ic3_break_ctl - handle breaks
+ * ic3_break_ctl() - handle breaks
  * @port: Port to operate on
  * @break_state: Break state
  *
@@ -1806,7 +1806,7 @@ static void ic3_break_ctl(struct uart_port *the_port, int break_state)
 }
 
 /**
- * ic3_startup - Start up the serial port - always return 0 (We're always on)
+ * ic3_startup() - Start up the serial port - always return 0 (We're always on)
  * @port: Port to operate on
  *
  */
@@ -1842,7 +1842,7 @@ static int ic3_startup(struct uart_port *the_port)
 }
 
 /**
- * ic3_set_termios - set termios stuff
+ * ic3_set_termios() - set termios stuff
  * @port: port to operate on
  * @termios: New settings
  * @termios: Old
@@ -1860,7 +1860,7 @@ ic3_set_termios(struct uart_port *the_port,
 }
 
 /**
- * ic3_request_port - allocate resources for port - no op....
+ * ic3_request_port() - allocate resources for port - no op....
  * @port: port to operate on
  *
  */
@@ -1900,7 +1900,7 @@ static struct uart_driver ioc3_uart = {
 };
 
 /**
- * ioc3_serial_core_attach - register with serial core
+ * ioc3_serial_core_attach() - register with serial core
  *		This is done during pci probing
  * @is: submodule struct for this
  * @idd: handle for this card
@@ -1960,7 +1960,7 @@ static inline int ioc3_serial_core_attach( struct ioc3_submodule *is,
 }
 
 /**
- * ioc3uart_remove - register detach function
+ * ioc3uart_remove() - register detach function
  * @is: submodule struct for this submodule
  * @idd: ioc3 driver data for this submodule
  */
@@ -1998,7 +1998,7 @@ static int ioc3uart_remove(struct ioc3_submodule *is,
 }
 
 /**
- * ioc3uart_probe - card probe function called from shim driver
+ * ioc3uart_probe() - card probe function called from shim driver
  * @is: submodule struct for this submodule
  * @idd: ioc3 driver data for this card
  */
@@ -2162,7 +2162,7 @@ static struct ioc3_submodule ioc3uart_ops = {
 };
 
 /**
- * ioc3_detect - module init called,
+ * ioc3_detect() - module init called
  */
 static int __init ioc3uart_init(void)
 {

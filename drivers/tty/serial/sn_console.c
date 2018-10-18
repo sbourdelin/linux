@@ -141,7 +141,7 @@ static struct sn_sal_ops intr_ops = {
 /* routines for running the console in polling mode */
 
 /**
- * snt_poll_getc - Get a character from the console in polling mode
+ * snt_poll_getc() - Get a character from the console in polling mode
  *
  */
 static int snt_poll_getc(void)
@@ -153,7 +153,7 @@ static int snt_poll_getc(void)
 }
 
 /**
- * snt_poll_input_pending - Check if any input is waiting - polling mode.
+ * snt_poll_input_pending() - Check if any input is waiting - polling mode.
  *
  */
 static int snt_poll_input_pending(void)
@@ -167,7 +167,7 @@ static int snt_poll_input_pending(void)
 /* routines for an interrupt driven console (normal) */
 
 /**
- * snt_intr_getc - Get a character from the console, interrupt mode
+ * snt_intr_getc() - Get a character from the console, interrupt mode
  *
  */
 static int snt_intr_getc(void)
@@ -176,7 +176,7 @@ static int snt_intr_getc(void)
 }
 
 /**
- * snt_intr_input_pending - Check if input is pending, interrupt mode
+ * snt_intr_input_pending() - Check if input is pending, interrupt mode
  *
  */
 static int snt_intr_input_pending(void)
@@ -187,7 +187,7 @@ static int snt_intr_input_pending(void)
 /* these functions are polled and interrupt */
 
 /**
- * snt_hw_puts_raw - Send raw string to the console, polled or interrupt mode
+ * snt_hw_puts_raw() - Send raw string to the console, polled or interrupt mode
  * @s: String
  * @len: Length
  *
@@ -199,7 +199,7 @@ static int snt_hw_puts_raw(const char *s, int len)
 }
 
 /**
- * snt_hw_puts_buffered - Send string to console, polled or interrupt mode
+ * snt_hw_puts_buffered() - Send string to console, polled or interrupt mode
  * @s: String
  * @len: Length
  *
@@ -218,7 +218,7 @@ static int snt_hw_puts_buffered(const char *s, int len)
  */
 
 /**
- * snp_type - What type of console are we?
+ * snp_type() - What type of console are we?
  * @port: Port to operate with (we ignore since we only have one port)
  *
  */
@@ -228,7 +228,7 @@ static const char *snp_type(struct uart_port *port)
 }
 
 /**
- * snp_tx_empty - Is the transmitter empty?  We pretend we're always empty
+ * snp_tx_empty() - Is the transmitter empty?  We pretend we're always empty
  * @port: Port to operate on (we ignore since we only have one port)
  *
  */
@@ -238,7 +238,7 @@ static unsigned int snp_tx_empty(struct uart_port *port)
 }
 
 /**
- * snp_stop_tx - stop the transmitter - no-op for us
+ * snp_stop_tx() - stop the transmitter - no-op for us
  * @port: Port to operat eon - we ignore - no-op function
  *
  */
@@ -247,7 +247,7 @@ static void snp_stop_tx(struct uart_port *port)
 }
 
 /**
- * snp_release_port - Free i/o and resources for port - no-op for us
+ * snp_release_port() - Free i/o and resources for port - no-op for us
  * @port: Port to operate on - we ignore - no-op function
  *
  */
@@ -256,7 +256,7 @@ static void snp_release_port(struct uart_port *port)
 }
 
 /**
- * snp_shutdown - shut down the port - free irq and disable - no-op for us
+ * snp_shutdown() - shut down the port - free irq and disable - no-op for us
  * @port: Port to shut down - we ignore
  *
  */
@@ -265,7 +265,7 @@ static void snp_shutdown(struct uart_port *port)
 }
 
 /**
- * snp_set_mctrl - set control lines (dtr, rts, etc) - no-op for our console
+ * snp_set_mctrl() - set control lines (dtr, rts, etc) - no-op for our console
  * @port: Port to operate on - we ignore
  * @mctrl: Lines to set/unset - we ignore
  *
@@ -275,7 +275,7 @@ static void snp_set_mctrl(struct uart_port *port, unsigned int mctrl)
 }
 
 /**
- * snp_get_mctrl - get contorl line info, we just return a static value
+ * snp_get_mctrl() - get contorl line info, we just return a static value
  * @port: port to operate on - we only have one port so we ignore this
  *
  */
@@ -285,7 +285,7 @@ static unsigned int snp_get_mctrl(struct uart_port *port)
 }
 
 /**
- * snp_stop_rx - Stop the receiver - we ignor ethis
+ * snp_stop_rx() - Stop the receiver - we ignor ethis
  * @port: Port to operate on - we ignore
  *
  */
@@ -294,7 +294,7 @@ static void snp_stop_rx(struct uart_port *port)
 }
 
 /**
- * snp_start_tx - Start transmitter
+ * snp_start_tx() - Start transmitter
  * @port: Port to operate on
  *
  */
@@ -317,7 +317,7 @@ static void snp_break_ctl(struct uart_port *port, int break_state)
 }
 
 /**
- * snp_startup - Start up the serial port - always return 0 (We're always on)
+ * snp_startup() - Start up the serial port - always return 0 (We're always on)
  * @port: Port to operate on
  *
  */
@@ -327,7 +327,7 @@ static int snp_startup(struct uart_port *port)
 }
 
 /**
- * snp_set_termios - set termios stuff - we ignore these
+ * snp_set_termios() - set termios stuff - we ignore these
  * @port: port to operate on
  * @termios: New settings
  * @termios: Old
@@ -340,7 +340,7 @@ snp_set_termios(struct uart_port *port, struct ktermios *termios,
 }
 
 /**
- * snp_request_port - allocate resources for port - ignored by us
+ * snp_request_port() - allocate resources for port - ignored by us
  * @port: port to operate on
  *
  */
@@ -350,7 +350,7 @@ static int snp_request_port(struct uart_port *port)
 }
 
 /**
- * snp_config_port - allocate resources, set up - we ignore,  we're always on
+ * snp_config_port() - allocate resources, set up - we ignore,  we're always on
  * @port: Port to operate on
  * @flags: flags used for port setup
  *
@@ -385,7 +385,7 @@ static const struct uart_ops sn_console_ops = {
 #ifdef DEBUG
 
 /**
- * sn_debug_printf - close to hardware debugging printf
+ * sn_debug_printf() - close to hardware debugging printf
  * @fmt: printf format
  *
  * This is as "close to the metal" as we can get, used when the driver
@@ -417,7 +417,7 @@ static int sn_debug_printf(const char *fmt, ...)
  */
 
 /**
- * sn_receive_chars - Grab characters, pass them to tty layer
+ * sn_receive_chars() - Grab characters, pass them to tty layer
  * @port: Port to operate on
  * @flags: irq flags
  *
@@ -495,7 +495,7 @@ sn_receive_chars(struct sn_cons_port *port, unsigned long flags)
 }
 
 /**
- * sn_transmit_chars - grab characters from serial core, send off
+ * sn_transmit_chars() - grab characters from serial core, send off
  * @port: Port to operate on
  * @raw: Transmit raw or buffered
  *
@@ -578,7 +578,7 @@ static void sn_transmit_chars(struct sn_cons_port *port, int raw)
 }
 
 /**
- * sn_sal_interrupt - Handle console interrupts
+ * sn_sal_interrupt() - Handle console interrupts
  * @irq: irq #, useful for debug statements
  * @dev_id: our pointer to our port (sn_cons_port which contains the uart port)
  *
@@ -604,7 +604,7 @@ static irqreturn_t sn_sal_interrupt(int irq, void *dev_id)
 }
 
 /**
- * sn_sal_timer_poll - this function handles polled console mode
+ * sn_sal_timer_poll() - this function handles polled console mode
  * @data: A pointer to our sn_cons_port (which contains the uart port)
  *
  * data is the pointer that init_timer will store for us.  This function is
@@ -636,7 +636,7 @@ static void sn_sal_timer_poll(struct timer_list *t)
  */
 
 /**
- * sn_sal_switch_to_asynch - Switch to async mode (as opposed to synch)
+ * sn_sal_switch_to_asynch() - Switch to async mode (as opposed to synch)
  * @port: Our sn_cons_port (which contains the uart port)
  *
  * So this is used by sn_sal_serial_console_init (early on, before we're
@@ -685,7 +685,7 @@ static void __init sn_sal_switch_to_asynch(struct sn_cons_port *port)
 }
 
 /**
- * sn_sal_switch_to_interrupts - Switch to interrupt driven mode
+ * sn_sal_switch_to_interrupts() - Switch to interrupt driven mode
  * @port: Our sn_cons_port (which contains the uart port)
  *
  * In sn_sal_init, after we're registered with serial core and
@@ -752,7 +752,7 @@ static struct uart_driver sal_console_uart = {
 };
 
 /**
- * sn_sal_init - When the kernel loads us, get us rolling w/ serial core
+ * sn_sal_init() - When the kernel loads us, get us rolling w/ serial core
  *
  * Before this is called, we've been printing kernel messages in a special
  * early mode not making use of the serial core infrastructure.  When our
@@ -826,7 +826,7 @@ static int __init sn_sal_init(void)
 device_initcall(sn_sal_init);
 
 /**
- * puts_raw_fixed - sn_sal_console_write helper for adding \r's as required
+ * puts_raw_fixed() - sn_sal_console_write helper for adding \r's as required
  * @puts_raw : puts function to do the writing
  * @s: input string
  * @count: length
@@ -852,7 +852,7 @@ static void puts_raw_fixed(int (*puts_raw) (const char *s, int len),
 }
 
 /**
- * sn_sal_console_write - Print statements before serial core available
+ * sn_sal_console_write() - Print statements before serial core available
  * @console: Console to operate on - we ignore since we have just one
  * @s: String to send
  * @count: length
@@ -945,7 +945,7 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 
 
 /**
- * sn_sal_console_setup - Set up console for early printing
+ * sn_sal_console_setup() - Set up console for early printing
  * @co: Console to work with
  * @options: Options to set
  *
@@ -962,7 +962,7 @@ static int sn_sal_console_setup(struct console *co, char *options)
 }
 
 /**
- * sn_sal_console_write_early - simple early output routine
+ * sn_sal_console_write_early() - simple early output routine
  * @co - console struct
  * @s - string to print
  * @count - count
@@ -988,7 +988,7 @@ static struct console sal_console_early __initdata = {
 };
 
 /**
- * sn_serial_console_early_setup - Sets up early console output support
+ * sn_serial_console_early_setup() - Sets up early console output support
  *
  * Register a console early on...  This is for output before even
  * sn_sal_serial_cosnole_init is called.  This function is called from
@@ -1010,7 +1010,7 @@ int __init sn_serial_console_early_setup(void)
 }
 
 /**
- * sn_sal_serial_console_init - Early console output - set up for register
+ * sn_sal_serial_console_init() - Early console output - set up for register
  *
  * This function is called when regular console init happens.  Because we
  * support even earlier console output with sn_serial_console_early_setup

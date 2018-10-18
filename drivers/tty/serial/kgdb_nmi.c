@@ -154,7 +154,7 @@ static int kgdb_nmi_poll_one_knock(void)
 }
 
 /**
- * kgdb_nmi_poll_knock - Check if it is time to enter the debugger
+ * kgdb_nmi_poll_knock() - Check if it is time to enter the debugger
  *
  * "Serial ports are often noisy, especially when muxed over another port (we
  * often use serial over the headset connector). Noise on the async command

@@ -39,18 +39,18 @@
 #define TTY_BUFFER_PAGE	(((PAGE_SIZE - sizeof(struct tty_buffer)) / 2) & ~0xFF)
 
 /**
- *	tty_buffer_lock_exclusive	-	gain exclusive access to buffer
- *	tty_buffer_unlock_exclusive	-	release exclusive access
+ * tty_buffer_lock_exclusive() - gain exclusive access to buffer
+ * tty_buffer_unlock_exclusive() - release exclusive access
  *
- *	@port - tty_port owning the flip buffer
+ * @port - tty_port owning the flip buffer
  *
- *	Guarantees safe use of the line discipline's receive_buf() method by
- *	excluding the buffer work and any pending flush from using the flip
- *	buffer. Data can continue to be added concurrently to the flip buffer
- *	from the driver side.
+ * Guarantees safe use of the line discipline's receive_buf() method by
+ * excluding the buffer work and any pending flush from using the flip
+ * buffer. Data can continue to be added concurrently to the flip buffer
+ * from the driver side.
  *
- *	On release, the buffer work is restarted if there is data in the
- *	flip buffer
+ * On release, the buffer work is restarted if there is data in the
+ * flip buffer
  */
 
 void tty_buffer_lock_exclusive(struct tty_port *port)
@@ -77,15 +77,15 @@ void tty_buffer_unlock_exclusive(struct tty_port *port)
 EXPORT_SYMBOL_GPL(tty_buffer_unlock_exclusive);
 
 /**
- *	tty_buffer_space_avail	-	return unused buffer space
- *	@port - tty_port owning the flip buffer
+ * tty_buffer_space_avail() - return unused buffer space
+ * @port - tty_port owning the flip buffer
  *
- *	Returns the # of bytes which can be written by the driver without
- *	reaching the buffer limit.
+ * Returns the # of bytes which can be written by the driver without
+ * reaching the buffer limit.
  *
- *	Note: this does not guarantee that memory is available to write
- *	the returned # of bytes (use tty_prepare_flip_string_xxx() to
- *	pre-allocate if memory guarantee is required).
+ * Note: this does not guarantee that memory is available to write
+ * the returned # of bytes (use tty_prepare_flip_string_xxx() to
+ * pre-allocate if memory guarantee is required).
  */
 
 int tty_buffer_space_avail(struct tty_port *port)
@@ -106,11 +106,11 @@ static void tty_buffer_reset(struct tty_buffer *p, size_t size)
 }
 
 /**
- *	tty_buffer_free_all		-	free buffers used by a tty
- *	@tty: tty to free from
+ * tty_buffer_free_all() - free buffers used by a tty
+ * @tty: tty to free from
  *
- *	Remove all the buffers pending on a tty whether queued with data
- *	or in the free ring. Must be called when the tty is no longer in use
+ * Remove all the buffers pending on a tty whether queued with data
+ * or in the free ring. Must be called when the tty is no longer in use
  */
 
 void tty_buffer_free_all(struct tty_port *port)
@@ -141,15 +141,15 @@ void tty_buffer_free_all(struct tty_port *port)
 }
 
 /**
- *	tty_buffer_alloc	-	allocate a tty buffer
- *	@tty: tty device
- *	@size: desired size (characters)
+ * tty_buffer_alloc() - allocate a tty buffer
+ * @tty: tty device
+ * @size: desired size (characters)
  *
- *	Allocate a new tty buffer to hold the desired number of characters.
- *	We round our buffers off in 256 character chunks to get better
- *	allocation behaviour.
- *	Return NULL if out of memory or the allocation would exceed the
- *	per device queue
+ * Allocate a new tty buffer to hold the desired number of characters.
+ * We round our buffers off in 256 character chunks to get better
+ * allocation behaviour.
+ * Return NULL if out of memory or the allocation would exceed the
+ * per device queue
  */
 
 static struct tty_buffer *tty_buffer_alloc(struct tty_port *port, size_t size)
@@ -183,12 +183,12 @@ found:
 }
 
 /**
- *	tty_buffer_free		-	free a tty buffer
- *	@tty: tty owning the buffer
- *	@b: the buffer to free
+ * tty_buffer_free() - free a tty buffer
+ * @tty: tty owning the buffer
+ * @b: the buffer to free
  *
- *	Free a tty buffer, or add it to the free list according to our
- *	internal strategy
+ * Free a tty buffer, or add it to the free list according to our
+ * internal strategy
  */
 
 static void tty_buffer_free(struct tty_port *port, struct tty_buffer *b)
@@ -205,15 +205,15 @@ static void tty_buffer_free(struct tty_port *port, struct tty_buffer *b)
 }
 
 /**
- *	tty_buffer_flush		-	flush full tty buffers
- *	@tty: tty to flush
- *	@ld:  optional ldisc ptr (must be referenced)
+ * tty_buffer_flush() - flush full tty buffers
+ * @tty: tty to flush
+ * @ld: optional ldisc ptr (must be referenced)
  *
- *	flush all the buffers containing receive data. If ld != NULL,
- *	flush the ldisc input buffer.
+ * flush all the buffers containing receive data. If ld != NULL,
+ * flush the ldisc input buffer.
  *
- *	Locking: takes buffer lock to ensure single-threaded flip buffer
- *		 'consumer'
+ * Locking: takes buffer lock to ensure single-threaded flip buffer
+ *          'consumer'
  */
 
 void tty_buffer_flush(struct tty_struct *tty, struct tty_ldisc *ld)
@@ -242,17 +242,17 @@ void tty_buffer_flush(struct tty_struct *tty, struct tty_ldisc *ld)
 }
 
 /**
- *	tty_buffer_request_room		-	grow tty buffer if needed
- *	@tty: tty structure
- *	@size: size desired
- *	@flags: buffer flags if new buffer allocated (default = 0)
+ * tty_buffer_request_room() - grow tty buffer if needed
+ * @tty: tty structure
+ * @size: size desired
+ * @flags: buffer flags if new buffer allocated (default = 0)
  *
- *	Make at least size bytes of linear space available for the tty
- *	buffer. If we fail return the size we managed to find.
+ * Make at least size bytes of linear space available for the tty
+ * buffer. If we fail return the size we managed to find.
  *
- *	Will change over to a new buffer if the current buffer is encoded as
- *	TTY_NORMAL (so has no flags buffer) and the new buffer requires
- *	a flags buffer.
+ * Will change over to a new buffer if the current buffer is encoded as
+ * TTY_NORMAL (so has no flags buffer) and the new buffer requires
+ * a flags buffer.
  */
 static int __tty_buffer_request_room(struct tty_port *port, size_t size,
 				     int flags)
@@ -298,14 +298,14 @@ int tty_buffer_request_room(struct tty_port *port, size_t size)
 EXPORT_SYMBOL_GPL(tty_buffer_request_room);
 
 /**
- *	tty_insert_flip_string_fixed_flag - Add characters to the tty buffer
- *	@port: tty port
- *	@chars: characters
- *	@flag: flag value for each character
- *	@size: size
+ * tty_insert_flip_string_fixed_flag() - Add characters to the tty buffer
+ * @port: tty port
+ * @chars: characters
+ * @flag: flag value for each character
+ * @size: size
  *
- *	Queue a series of bytes to the tty buffering. All the characters
- *	passed are marked with the supplied flag. Returns the number added.
+ * Queue a series of bytes to the tty buffering. All the characters
+ * passed are marked with the supplied flag. Returns the number added.
  */
 
 int tty_insert_flip_string_fixed_flag(struct tty_port *port,
@@ -333,15 +333,15 @@ int tty_insert_flip_string_fixed_flag(struct tty_port *port,
 EXPORT_SYMBOL(tty_insert_flip_string_fixed_flag);
 
 /**
- *	tty_insert_flip_string_flags	-	Add characters to the tty buffer
- *	@port: tty port
- *	@chars: characters
- *	@flags: flag bytes
- *	@size: size
+ * tty_insert_flip_string_flags() - Add characters to the tty buffer
+ * @port: tty port
+ * @chars: characters
+ * @flags: flag bytes
+ * @size: size
  *
- *	Queue a series of bytes to the tty buffering. For each character
- *	the flags array indicates the status of the character. Returns the
- *	number added.
+ * Queue a series of bytes to the tty buffering. For each character
+ * the flags array indicates the status of the character. Returns the
+ * number added.
  */
 
 int tty_insert_flip_string_flags(struct tty_port *port,
@@ -368,13 +368,13 @@ int tty_insert_flip_string_flags(struct tty_port *port,
 EXPORT_SYMBOL(tty_insert_flip_string_flags);
 
 /**
- *	__tty_insert_flip_char   -	Add one character to the tty buffer
- *	@port: tty port
- *	@ch: character
- *	@flag: flag byte
+ * __tty_insert_flip_char() - Add one character to the tty buffer
+ * @port: tty port
+ * @ch: character
+ * @flag: flag byte
  *
- *	Queue a single byte to the tty buffering, with an optional flag.
- *	This is the slow path of tty_insert_flip_char.
+ * Queue a single byte to the tty buffering, with an optional flag.
+ * This is the slow path of tty_insert_flip_char.
  */
 int __tty_insert_flip_char(struct tty_port *port, unsigned char ch, char flag)
 {
@@ -394,12 +394,12 @@ int __tty_insert_flip_char(struct tty_port *port, unsigned char ch, char flag)
 EXPORT_SYMBOL(__tty_insert_flip_char);
 
 /**
- *	tty_schedule_flip	-	push characters to ldisc
- *	@port: tty port to push from
+ * tty_schedule_flip() - push characters to ldisc
+ * @port: tty port to push from
  *
- *	Takes any pending buffers and transfers their ownership to the
- *	ldisc side of the queue. It then schedules those characters for
- *	processing by the line discipline.
+ * Takes any pending buffers and transfers their ownership to the
+ * ldisc side of the queue. It then schedules those characters for
+ * processing by the line discipline.
  */
 
 void tty_schedule_flip(struct tty_port *port)
@@ -415,16 +415,16 @@ void tty_schedule_flip(struct tty_port *port)
 EXPORT_SYMBOL(tty_schedule_flip);
 
 /**
- *	tty_prepare_flip_string		-	make room for characters
- *	@port: tty port
- *	@chars: return pointer for character write area
- *	@size: desired size
+ * tty_prepare_flip_string() - make room for characters
+ * @port: tty port
+ * @chars: return pointer for character write area
+ * @size: desired size
  *
- *	Prepare a block of space in the buffer for data. Returns the length
- *	available and buffer pointer to the space which is now allocated and
- *	accounted for as ready for normal characters. This is used for drivers
- *	that need their own block copy routines into the buffer. There is no
- *	guarantee the buffer is a DMA target!
+ * Prepare a block of space in the buffer for data. Returns the length
+ * available and buffer pointer to the space which is now allocated and
+ * accounted for as ready for normal characters. This is used for drivers
+ * that need their own block copy routines into the buffer. There is no
+ * guarantee the buffer is a DMA target!
  */
 
 int tty_prepare_flip_string(struct tty_port *port, unsigned char **chars,
@@ -443,16 +443,16 @@ int tty_prepare_flip_string(struct tty_port *port, unsigned char **chars,
 EXPORT_SYMBOL_GPL(tty_prepare_flip_string);
 
 /**
- *	tty_ldisc_receive_buf		-	forward data to line discipline
- *	@ld:	line discipline to process input
- *	@p:	char buffer
- *	@f:	TTY_* flags buffer
- *	@count:	number of bytes to process
+ * tty_ldisc_receive_buf() - forward data to line discipline
+ * @ld: line discipline to process input
+ * @p: char buffer
+ * @f: TTY_* flags buffer
+ * @count: number of bytes to process
  *
- *	Callers other than flush_to_ldisc() need to exclude the kworker
- *	from concurrent use of the line discipline, see paste_selection().
+ * Callers other than flush_to_ldisc() need to exclude the kworker
+ * from concurrent use of the line discipline, see paste_selection().
  *
- *	Returns the number of bytes processed
+ * Returns the number of bytes processed
  */
 int tty_ldisc_receive_buf(struct tty_ldisc *ld, const unsigned char *p,
 			  char *f, int count)
@@ -485,16 +485,16 @@ receive_buf(struct tty_port *port, struct tty_buffer *head, int count)
 }
 
 /**
- *	flush_to_ldisc
- *	@work: tty structure passed from work queue.
+ * flush_to_ldisc()
+ * @work: tty structure passed from work queue.
  *
- *	This routine is called out of the software interrupt to flush data
- *	from the buffer chain to the line discipline.
+ * This routine is called out of the software interrupt to flush data
+ * from the buffer chain to the line discipline.
  *
- *	The receive_buf method is single threaded for each tty instance.
+ * The receive_buf method is single threaded for each tty instance.
  *
- *	Locking: takes buffer lock to ensure single-threaded flip buffer
- *		 'consumer'
+ * Locking: takes buffer lock to ensure single-threaded flip buffer
+ *          'consumer'
  */
 
 static void flush_to_ldisc(struct work_struct *work)
@@ -541,14 +541,14 @@ static void flush_to_ldisc(struct work_struct *work)
 }
 
 /**
- *	tty_flip_buffer_push	-	terminal
- *	@port: tty port to push
+ * tty_flip_buffer_push() - terminal
+ * @port: tty port to push
  *
- *	Queue a push of the terminal flip buffers to the line discipline.
- *	Can be called from IRQ/atomic context.
+ * Queue a push of the terminal flip buffers to the line discipline.
+ * Can be called from IRQ/atomic context.
  *
- *	In the event of the queue being busy for flipping the work will be
- *	held off and retried later.
+ * In the event of the queue being busy for flipping the work will be
+ * held off and retried later.
  */
 
 void tty_flip_buffer_push(struct tty_port *port)
@@ -558,11 +558,11 @@ void tty_flip_buffer_push(struct tty_port *port)
 EXPORT_SYMBOL(tty_flip_buffer_push);
 
 /**
- *	tty_buffer_init		-	prepare a tty buffer structure
- *	@tty: tty to initialise
+ * tty_buffer_init() - prepare a tty buffer structure
+ * @tty: tty to initialise
  *
- *	Set up the initial state of the buffer management for a tty device.
- *	Must be called before the other tty buffer functions are used.
+ * Set up the initial state of the buffer management for a tty device.
+ * Must be called before the other tty buffer functions are used.
  */
 
 void tty_buffer_init(struct tty_port *port)
@@ -581,11 +581,11 @@ void tty_buffer_init(struct tty_port *port)
 }
 
 /**
- *	tty_buffer_set_limit	-	change the tty buffer memory limit
- *	@port: tty port to change
+ * tty_buffer_set_limit() - change the tty buffer memory limit
+ * @port: tty port to change
  *
- *	Change the tty buffer memory limit.
- *	Must be called before the other tty buffer functions are used.
+ * Change the tty buffer memory limit.
+ * Must be called before the other tty buffer functions are used.
  */
 
 int tty_buffer_set_limit(struct tty_port *port, int limit)

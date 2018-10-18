@@ -19,14 +19,14 @@ static int is_ignored(int sig)
 }
 
 /**
- *	tty_check_change	-	check for POSIX terminal changes
- *	@tty: tty to check
+ * tty_check_change() - check for POSIX terminal changes
+ * @tty: tty to check
  *
- *	If we try to write to, or set the state of, a terminal and we're
- *	not in the foreground, send a SIGTTOU.  If the signal is blocked or
- *	ignored, go ahead and perform the operation.  (POSIX 7.2)
+ * If we try to write to, or set the state of, a terminal and we're
+ * not in the foreground, send a SIGTTOU.  If the signal is blocked or
+ * ignored, go ahead and perform the operation.  (POSIX 7.2)
  *
- *	Locking: ctrl_lock
+ * Locking: ctrl_lock
  */
 int __tty_check_change(struct tty_struct *tty, int sig)
 {
@@ -82,14 +82,14 @@ void proc_clear_tty(struct task_struct *p)
 }
 
 /**
- * proc_set_tty -  set the controlling terminal
+ * proc_set_tty() - set the controlling terminal
  *
  * Only callable by the session leader and only if it does not already have
  * a controlling terminal.
  *
  * Caller must hold:  tty_lock()
- *		      a readlock on tasklist_lock
- *		      sighand lock
+ *                    a readlock on tasklist_lock
+ *                    sighand lock
  */
 static void __proc_set_tty(struct tty_struct *tty)
 {
@@ -177,16 +177,16 @@ void session_clear_tty(struct pid *session)
 }
 
 /**
- *	tty_signal_session_leader	- sends SIGHUP to session leader
- *	@tty		controlling tty
- *	@exit_session	if non-zero, signal all foreground group processes
+ * tty_signal_session_leader() - sends SIGHUP to session leader
+ * @tty controlling tty
+ * @exit_session if non-zero, signal all foreground group processes
  *
- *	Send SIGHUP and SIGCONT to the session leader and its process group.
- *	Optionally, signal all processes in the foreground process group.
+ * Send SIGHUP and SIGCONT to the session leader and its process group.
+ * Optionally, signal all processes in the foreground process group.
  *
- *	Returns the number of processes in the session with this tty
- *	as their controlling terminal. This value is used to drop
- *	tty references for those processes.
+ * Returns the number of processes in the session with this tty
+ * as their controlling terminal. This value is used to drop
+ * tty references for those processes.
  */
 int tty_signal_session_leader(struct tty_struct *tty, int exit_session)
 {
@@ -231,28 +231,28 @@ int tty_signal_session_leader(struct tty_struct *tty, int exit_session)
 }
 
 /**
- *	disassociate_ctty	-	disconnect controlling tty
- *	@on_exit: true if exiting so need to "hang up" the session
+ * disassociate_ctty() - disconnect controlling tty
+ * @on_exit: true if exiting so need to "hang up" the session
  *
- *	This function is typically called only by the session leader, when
- *	it wants to disassociate itself from its controlling tty.
+ * This function is typically called only by the session leader, when
+ * it wants to disassociate itself from its controlling tty.
  *
- *	It performs the following functions:
+ * It performs the following functions:
  *	(1)  Sends a SIGHUP and SIGCONT to the foreground process group
  *	(2)  Clears the tty from being controlling the session
  *	(3)  Clears the controlling tty for all processes in the
  *		session group.
  *
- *	The argument on_exit is set to 1 if called when a process is
- *	exiting; it is 0 if called by the ioctl TIOCNOTTY.
+ * The argument on_exit is set to 1 if called when a process is
+ * exiting; it is 0 if called by the ioctl TIOCNOTTY.
  *
- *	Locking:
- *		BTM is taken for hysterical raisons, and held when
- *		  called from no_tty().
- *		  tty_mutex is taken to protect tty
- *		  ->siglock is taken to protect ->signal/->sighand
- *		  tasklist_lock is taken to walk process list for sessions
- *		    ->siglock is taken to protect ->signal/->sighand
+ * Locking:
+ *	BTM is taken for hysterical raisons, and held when
+ *	  called from no_tty().
+ *	  tty_mutex is taken to protect tty
+ *	  ->siglock is taken to protect ->signal/->sighand
+ *	  tasklist_lock is taken to walk process list for sessions
+ *	    ->siglock is taken to protect ->signal/->sighand
  */
 void disassociate_ctty(int on_exit)
 {
@@ -315,7 +315,7 @@ void disassociate_ctty(int on_exit)
 
 /**
  *
- *	no_tty	- Ensure the current process does not have a controlling tty
+ * no_tty() - Ensure the current process does not have a controlling tty
  */
 void no_tty(void)
 {
@@ -328,17 +328,17 @@ void no_tty(void)
 }
 
 /**
- *	tiocsctty	-	set controlling tty
- *	@tty: tty structure
- *	@arg: user argument
+ * tiocsctty() - set controlling tty
+ * @tty: tty structure
+ * @arg: user argument
  *
- *	This ioctl is used to manage job control. It permits a session
- *	leader to set this tty as the controlling tty for the session.
+ * This ioctl is used to manage job control. It permits a session
+ * leader to set this tty as the controlling tty for the session.
  *
- *	Locking:
- *		Takes tty_lock() to serialize proc_set_tty() for this tty
- *		Takes tasklist_lock internally to walk sessions
- *		Takes ->siglock() when updating signal->tty
+ * Locking:
+ *         Takes tty_lock() to serialize proc_set_tty() for this tty
+ *         Takes tasklist_lock internally to walk sessions
+ *         Takes ->siglock() when updating signal->tty
  */
 static int tiocsctty(struct tty_struct *tty, struct file *file, int arg)
 {
@@ -389,11 +389,11 @@ unlock:
 }
 
 /**
- *	tty_get_pgrp	-	return a ref counted pgrp pid
- *	@tty: tty to read
+ * tty_get_pgrp() - return a ref counted pgrp pid
+ * @tty: tty to read
  *
- *	Returns a refcounted instance of the pid struct for the process
- *	group controlling the tty.
+ * Returns a refcounted instance of the pid struct for the process
+ * group controlling the tty.
  */
 struct pid *tty_get_pgrp(struct tty_struct *tty)
 {
@@ -430,15 +430,15 @@ static struct pid *session_of_pgrp(struct pid *pgrp)
 }
 
 /**
- *	tiocgpgrp		-	get process group
- *	@tty: tty passed by user
- *	@real_tty: tty side of the tty passed by the user if a pty else the tty
- *	@p: returned pid
+ * tiocgpgrp() - get process group
+ * @tty: tty passed by user
+ * @real_tty: tty side of the tty passed by the user if a pty else the tty
+ * @p: returned pid
  *
- *	Obtain the process group of the tty. If there is no process group
- *	return an error.
+ * Obtain the process group of the tty. If there is no process group
+ * return an error.
  *
- *	Locking: none. Reference to current->signal->tty is safe.
+ * Locking: none. Reference to current->signal->tty is safe.
  */
 static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
@@ -457,15 +457,15 @@ static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 }
 
 /**
- *	tiocspgrp		-	attempt to set process group
- *	@tty: tty passed by user
- *	@real_tty: tty side device matching tty passed by user
- *	@p: pid pointer
+ * tiocspgrp() - attempt to set process group
+ * @tty: tty passed by user
+ * @real_tty: tty side device matching tty passed by user
+ * @p: pid pointer
  *
- *	Set the process group of the tty to the session passed. Only
- *	permitted where the tty session is our session.
+ * Set the process group of the tty to the session passed. Only
+ * permitted where the tty session is our session.
  *
- *	Locking: RCU, ctrl lock
+ * Locking: RCU, ctrl lock
  */
 static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
@@ -504,15 +504,15 @@ out_unlock:
 }
 
 /**
- *	tiocgsid		-	get session id
- *	@tty: tty passed by user
- *	@real_tty: tty side of the tty passed by the user if a pty else the tty
- *	@p: pointer to returned session id
+ * tiocgsid() - get session id
+ * @tty: tty passed by user
+ * @real_tty: tty side of the tty passed by the user if a pty else the tty
+ * @p: pointer to returned session id
  *
- *	Obtain the session id of the tty. If there is no session
- *	return an error.
+ * Obtain the session id of the tty. If there is no session
+ * return an error.
  *
- *	Locking: none. Reference to current->signal->tty is safe.
+ * Locking: none. Reference to current->signal->tty is safe.
  */
 static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {

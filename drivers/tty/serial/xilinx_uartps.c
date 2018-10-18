@@ -201,7 +201,7 @@ struct cdns_platform_data {
 		clk_rate_change_nb);
 
 /**
- * cdns_uart_handle_rx - Handle the received bytes along with Rx errors.
+ * cdns_uart_handle_rx() - Handle the received bytes along with Rx errors.
  * @dev_id: Id of the UART port
  * @isrstatus: The interrupt status register value as read
  * Return: None
@@ -297,7 +297,7 @@ static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
 }
 
 /**
- * cdns_uart_handle_tx - Handle the bytes to be Txed.
+ * cdns_uart_handle_tx() - Handle the bytes to be Txed.
  * @dev_id: Id of the UART port
  * Return: None
  */
@@ -341,7 +341,7 @@ static void cdns_uart_handle_tx(void *dev_id)
 }
 
 /**
- * cdns_uart_isr - Interrupt handler
+ * cdns_uart_isr() - Interrupt handler
  * @irq: Irq number
  * @dev_id: Id of the port
  *
@@ -372,7 +372,7 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
 }
 
 /**
- * cdns_uart_calc_baud_divs - Calculate baud rate divisors
+ * cdns_uart_calc_baud_divs() - Calculate baud rate divisors
  * @clk: UART module input clock
  * @baud: Desired baud rate
  * @rbdiv: BDIV value (return value)
@@ -434,7 +434,7 @@ static unsigned int cdns_uart_calc_baud_divs(unsigned int clk,
 }
 
 /**
- * cdns_uart_set_baud_rate - Calculate and set the baud rate
+ * cdns_uart_set_baud_rate() - Calculate and set the baud rate
  * @port: Handle to the uart port structure
  * @baud: Baud rate to set
  * Return: baud rate, requested baud when possible, or actual baud when there
@@ -468,7 +468,7 @@ static unsigned int cdns_uart_set_baud_rate(struct uart_port *port,
 
 #ifdef CONFIG_COMMON_CLK
 /**
- * cdns_uart_clk_notitifer_cb - Clock notifier callback
+ * cdns_uart_clk_notitifer_cb() - Clock notifier callback
  * @nb:		Notifier block
  * @event:	Notify event
  * @data:	Notifier data
@@ -563,7 +563,7 @@ static int cdns_uart_clk_notifier_cb(struct notifier_block *nb,
 #endif
 
 /**
- * cdns_uart_start_tx -  Start transmitting bytes
+ * cdns_uart_start_tx() -  Start transmitting bytes
  * @port: Handle to the uart port structure
  */
 static void cdns_uart_start_tx(struct uart_port *port)
@@ -593,7 +593,7 @@ static void cdns_uart_start_tx(struct uart_port *port)
 }
 
 /**
- * cdns_uart_stop_tx - Stop TX
+ * cdns_uart_stop_tx() - Stop TX
  * @port: Handle to the uart port structure
  */
 static void cdns_uart_stop_tx(struct uart_port *port)
@@ -607,7 +607,7 @@ static void cdns_uart_stop_tx(struct uart_port *port)
 }
 
 /**
- * cdns_uart_stop_rx - Stop RX
+ * cdns_uart_stop_rx() - Stop RX
  * @port: Handle to the uart port structure
  */
 static void cdns_uart_stop_rx(struct uart_port *port)
@@ -624,7 +624,7 @@ static void cdns_uart_stop_rx(struct uart_port *port)
 }
 
 /**
- * cdns_uart_tx_empty -  Check whether TX is empty
+ * cdns_uart_tx_empty() -  Check whether TX is empty
  * @port: Handle to the uart port structure
  *
  * Return: TIOCSER_TEMT on success, 0 otherwise
@@ -639,7 +639,7 @@ static unsigned int cdns_uart_tx_empty(struct uart_port *port)
 }
 
 /**
- * cdns_uart_break_ctl - Based on the input ctl we have to start or stop
+ * cdns_uart_break_ctl() - Based on the input ctl we have to start or stop
  *			transmitting char breaks
  * @port: Handle to the uart port structure
  * @ctl: Value based on which start or stop decision is taken
@@ -665,7 +665,7 @@ static void cdns_uart_break_ctl(struct uart_port *port, int ctl)
 }
 
 /**
- * cdns_uart_set_termios - termios operations, handling data length, parity,
+ * cdns_uart_set_termios() - termios operations, handling data length, parity,
  *				stop bits, flow control, baud rate
  * @port: Handle to the uart port structure
  * @termios: Handle to the input termios structure
@@ -796,7 +796,7 @@ static void cdns_uart_set_termios(struct uart_port *port,
 }
 
 /**
- * cdns_uart_startup - Called when an application opens a cdns_uart port
+ * cdns_uart_startup() - Called when an application opens a cdns_uart port
  * @port: Handle to the uart port structure
  *
  * Return: 0 on success, negative errno otherwise
@@ -879,7 +879,7 @@ static int cdns_uart_startup(struct uart_port *port)
 }
 
 /**
- * cdns_uart_shutdown - Called when an application closes a cdns_uart port
+ * cdns_uart_shutdown() - Called when an application closes a cdns_uart port
  * @port: Handle to the uart port structure
  */
 static void cdns_uart_shutdown(struct uart_port *port)
@@ -904,7 +904,7 @@ static void cdns_uart_shutdown(struct uart_port *port)
 }
 
 /**
- * cdns_uart_type - Set UART type to cdns_uart port
+ * cdns_uart_type() - Set UART type to cdns_uart port
  * @port: Handle to the uart port structure
  *
  * Return: string on success, NULL otherwise
@@ -915,7 +915,7 @@ static const char *cdns_uart_type(struct uart_port *port)
 }
 
 /**
- * cdns_uart_verify_port - Verify the port params
+ * cdns_uart_verify_port() - Verify the port params
  * @port: Handle to the uart port structure
  * @ser: Handle to the structure whose members are compared
  *
@@ -938,7 +938,7 @@ static int cdns_uart_verify_port(struct uart_port *port,
 }
 
 /**
- * cdns_uart_request_port - Claim the memory region attached to cdns_uart port,
+ * cdns_uart_request_port() - Claim the memory region attached to cdns_uart port,
  *				called when the driver adds a cdns_uart port via
  *				uart_add_one_port()
  * @port: Handle to the uart port structure
@@ -962,7 +962,7 @@ static int cdns_uart_request_port(struct uart_port *port)
 }
 
 /**
- * cdns_uart_release_port - Release UART port
+ * cdns_uart_release_port() - Release UART port
  * @port: Handle to the uart port structure
  *
  * Release the memory region attached to a cdns_uart port. Called when the
@@ -976,7 +976,7 @@ static void cdns_uart_release_port(struct uart_port *port)
 }
 
 /**
- * cdns_uart_config_port - Configure UART port
+ * cdns_uart_config_port() - Configure UART port
  * @port: Handle to the uart port structure
  * @flags: If any
  */
@@ -987,7 +987,7 @@ static void cdns_uart_config_port(struct uart_port *port, int flags)
 }
 
 /**
- * cdns_uart_get_mctrl - Get the modem control state
+ * cdns_uart_get_mctrl() - Get the modem control state
  * @port: Handle to the uart port structure
  *
  * Return: the modem control state
@@ -1101,7 +1101,7 @@ static const struct uart_ops cdns_uart_ops = {
 
 #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
 /**
- * cdns_uart_console_putchar - write the character to the FIFO buffer
+ * cdns_uart_console_putchar() - write the character to the FIFO buffer
  * @port: Handle to the uart port structure
  * @ch: Character to be written
  */
@@ -1165,7 +1165,7 @@ OF_EARLYCON_DECLARE(cdns, "xlnx,zynqmp-uart", cdns_early_console_setup);
 static struct uart_port *console_port;
 
 /**
- * cdns_uart_console_write - perform write operation
+ * cdns_uart_console_write() - perform write operation
  * @co: Console handle
  * @s: Pointer to character array
  * @count: No of characters
@@ -1212,7 +1212,7 @@ static void cdns_uart_console_write(struct console *co, const char *s,
 }
 
 /**
- * cdns_uart_console_setup - Initialize the uart to default config
+ * cdns_uart_console_setup() - Initialize the uart to default config
  * @co: Console handle
  * @options: Initial settings of uart
  *
@@ -1242,7 +1242,7 @@ static int cdns_uart_console_setup(struct console *co, char *options)
 
 #ifdef CONFIG_PM_SLEEP
 /**
- * cdns_uart_suspend - suspend event
+ * cdns_uart_suspend() - suspend event
  * @device: Pointer to the device structure
  *
  * Return: 0
@@ -1278,7 +1278,7 @@ static int cdns_uart_suspend(struct device *device)
 }
 
 /**
- * cdns_uart_resume - Resume after a previous suspend
+ * cdns_uart_resume() - Resume after a previous suspend
  * @device: Pointer to the device structure
  *
  * Return: 0
@@ -1454,7 +1454,7 @@ static int cdns_get_id(struct platform_device *pdev)
 }
 
 /**
- * cdns_uart_probe - Platform driver probe
+ * cdns_uart_probe() - Platform driver probe
  * @pdev: Pointer to the platform device structure
  *
  * Return: 0 on success, negative errno otherwise
@@ -1675,7 +1675,7 @@ err_out_id:
 }
 
 /**
- * cdns_uart_remove - called when the platform driver is unregistered
+ * cdns_uart_remove() - called when the platform driver is unregistered
  * @pdev: Pointer to the platform device structure
  *
  * Return: 0 on success, negative errno otherwise

@@ -618,24 +618,24 @@ void serial8250_rpm_put(struct uart_8250_port *p)
 EXPORT_SYMBOL_GPL(serial8250_rpm_put);
 
 /**
- *	serial8250_em485_init() - put uart_8250_port into rs485 emulating
- *	@p:	uart_8250_port port instance
+ * serial8250_em485_init() - put uart_8250_port into rs485 emulating
+ * @p: uart_8250_port port instance
  *
- *	The function is used to start rs485 software emulating on the
- *	&struct uart_8250_port* @p. Namely, RTS is switched before/after
- *	transmission. The function is idempotent, so it is safe to call it
- *	multiple times.
+ * The function is used to start rs485 software emulating on the
+ * &struct uart_8250_port* @p. Namely, RTS is switched before/after
+ * transmission. The function is idempotent, so it is safe to call it
+ * multiple times.
  *
- *	The caller MUST enable interrupt on empty shift register before
- *	calling serial8250_em485_init(). This interrupt is not a part of
- *	8250 standard, but implementation defined.
+ * The caller MUST enable interrupt on empty shift register before
+ * calling serial8250_em485_init(). This interrupt is not a part of
+ * 8250 standard, but implementation defined.
  *
- *	The function is supposed to be called from .rs485_config callback
- *	or from any other callback protected with p->port.lock spinlock.
+ * The function is supposed to be called from .rs485_config callback
+ * or from any other callback protected with p->port.lock spinlock.
  *
- *	See also serial8250_em485_destroy()
+ * See also serial8250_em485_destroy()
  *
- *	Return 0 - success, -errno - otherwise
+ * Return 0 - success, -errno - otherwise
  */
 int serial8250_em485_init(struct uart_8250_port *p)
 {
@@ -661,17 +661,17 @@ int serial8250_em485_init(struct uart_8250_port *p)
 EXPORT_SYMBOL_GPL(serial8250_em485_init);
 
 /**
- *	serial8250_em485_destroy() - put uart_8250_port into normal state
- *	@p:	uart_8250_port port instance
+ * serial8250_em485_destroy() - put uart_8250_port into normal state
+ * @p: uart_8250_port port instance
  *
- *	The function is used to stop rs485 software emulating on the
- *	&struct uart_8250_port* @p. The function is idempotent, so it is safe to
- *	call it multiple times.
+ * The function is used to stop rs485 software emulating on the
+ * &struct uart_8250_port* @p. The function is idempotent, so it is safe to
+ * call it multiple times.
  *
- *	The function is supposed to be called from .rs485_config callback
- *	or from any other callback protected with p->port.lock spinlock.
+ * The function is supposed to be called from .rs485_config callback
+ * or from any other callback protected with p->port.lock spinlock.
  *
- *	See also serial8250_em485_init()
+ * See also serial8250_em485_init()
  */
 void serial8250_em485_destroy(struct uart_8250_port *p)
 {

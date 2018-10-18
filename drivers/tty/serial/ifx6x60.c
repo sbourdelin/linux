@@ -101,8 +101,8 @@ static int ifx_modem_reboot_callback(struct notifier_block *nfb,
 /* GPIO/GPE settings */
 
 /**
- *	mrdy_set_high		-	set MRDY GPIO
- *	@ifx: device we are controlling
+ * mrdy_set_high() - set MRDY GPIO
+ * @ifx: device we are controlling
  *
  */
 static inline void mrdy_set_high(struct ifx_spi_device *ifx)
@@ -111,8 +111,8 @@ static inline void mrdy_set_high(struct ifx_spi_device *ifx)
 }
 
 /**
- *	mrdy_set_low		-	clear MRDY GPIO
- *	@ifx: device we are controlling
+ * mrdy_set_low() - clear MRDY GPIO
+ * @ifx: device we are controlling
  *
  */
 static inline void mrdy_set_low(struct ifx_spi_device *ifx)
@@ -121,11 +121,11 @@ static inline void mrdy_set_low(struct ifx_spi_device *ifx)
 }
 
 /**
- *	ifx_spi_power_state_set
- *	@ifx_dev: our SPI device
- *	@val: bits to set
+ * ifx_spi_power_state_set()
+ * @ifx_dev: our SPI device
+ * @val: bits to set
  *
- *	Set bit in power status and signal power system if status becomes non-0
+ * Set bit in power status and signal power system if status becomes non-0
  */
 static void
 ifx_spi_power_state_set(struct ifx_spi_device *ifx_dev, unsigned char val)
@@ -146,11 +146,11 @@ ifx_spi_power_state_set(struct ifx_spi_device *ifx_dev, unsigned char val)
 }
 
 /**
- *	ifx_spi_power_state_clear	-	clear power bit
- *	@ifx_dev: our SPI device
- *	@val: bits to clear
+ * ifx_spi_power_state_clear() - clear power bit
+ * @ifx_dev: our SPI device
+ * @val: bits to clear
  *
- *	clear bit in power status and signal power system if status becomes 0
+ * clear bit in power status and signal power system if status becomes 0
  */
 static void
 ifx_spi_power_state_clear(struct ifx_spi_device *ifx_dev, unsigned char val)
@@ -169,12 +169,12 @@ ifx_spi_power_state_clear(struct ifx_spi_device *ifx_dev, unsigned char val)
 }
 
 /**
- *	swap_buf_8
- *	@buf: our buffer
- *	@len : number of bytes (not words) in the buffer
- *	@end: end of buffer
+ * swap_buf_8()
+ * @buf: our buffer
+ * @len: number of bytes (not words) in the buffer
+ * @end: end of buffer
  *
- *	Swap the contents of a buffer into big endian format
+ * Swap the contents of a buffer into big endian format
  */
 static inline void swap_buf_8(unsigned char *buf, int len, void *end)
 {
@@ -183,12 +183,12 @@ static inline void swap_buf_8(unsigned char *buf, int len, void *end)
 }
 
 /**
- *	swap_buf_16
- *	@buf: our buffer
- *	@len : number of bytes (not words) in the buffer
- *	@end: end of buffer
+ * swap_buf_16()
+ * @buf: our buffer
+ * @len: number of bytes (not words) in the buffer
+ * @end: end of buffer
  *
- *	Swap the contents of a buffer into big endian format
+ * Swap the contents of a buffer into big endian format
  */
 static inline void swap_buf_16(unsigned char *buf, int len, void *end)
 {
@@ -208,12 +208,12 @@ static inline void swap_buf_16(unsigned char *buf, int len, void *end)
 }
 
 /**
- *	swap_buf_32
- *	@buf: our buffer
- *	@len : number of bytes (not words) in the buffer
- *	@end: end of buffer
+ * swap_buf_32()
+ * @buf: our buffer
+ * @len: number of bytes (not words) in the buffer
+ * @end: end of buffer
  *
- *	Swap the contents of a buffer into big endian format
+ * Swap the contents of a buffer into big endian format
  */
 static inline void swap_buf_32(unsigned char *buf, int len, void *end)
 {
@@ -234,13 +234,13 @@ static inline void swap_buf_32(unsigned char *buf, int len, void *end)
 }
 
 /**
- *	mrdy_assert		-	assert MRDY line
- *	@ifx_dev: our SPI device
+ * mrdy_assert() - assert MRDY line
+ * @ifx_dev: our SPI device
  *
- *	Assert mrdy and set timer to wait for SRDY interrupt, if SRDY is low
- *	now.
+ * Assert mrdy and set timer to wait for SRDY interrupt, if SRDY is low
+ * now.
  *
- *	FIXME: Can SRDY even go high as we are running this code ?
+ * FIXME: Can SRDY even go high as we are running this code ?
  */
 static void mrdy_assert(struct ifx_spi_device *ifx_dev)
 {
@@ -257,11 +257,11 @@ static void mrdy_assert(struct ifx_spi_device *ifx_dev)
 }
 
 /**
- *	ifx_spi_timeout		-	SPI timeout
- *	@arg: our SPI device
+ * ifx_spi_timeout() - SPI timeout
+ * @arg: our SPI device
  *
- *	The SPI has timed out: hang up the tty. Users will then see a hangup
- *	and error events.
+ * The SPI has timed out: hang up the tty. Users will then see a hangup
+ * and error events.
  */
 static void ifx_spi_timeout(struct timer_list *t)
 {
@@ -276,12 +276,12 @@ static void ifx_spi_timeout(struct timer_list *t)
 /* char/tty operations */
 
 /**
- *	ifx_spi_tiocmget	-	get modem lines
- *	@tty: our tty device
- *	@filp: file handle issuing the request
+ * ifx_spi_tiocmget() - get modem lines
+ * @tty: our tty device
+ * @filp: file handle issuing the request
  *
- *	Map the signal state into Linux modem flags and report the value
- *	in Linux terms
+ * Map the signal state into Linux modem flags and report the value
+ * in Linux terms
  */
 static int ifx_spi_tiocmget(struct tty_struct *tty)
 {
@@ -299,15 +299,15 @@ static int ifx_spi_tiocmget(struct tty_struct *tty)
 }
 
 /**
- *	ifx_spi_tiocmset	-	set modem bits
- *	@tty: the tty structure
- *	@set: bits to set
- *	@clear: bits to clear
+ * ifx_spi_tiocmset() - set modem bits
+ * @tty: the tty structure
+ * @set: bits to set
+ * @clear: bits to clear
  *
- *	The IFX6x60 only supports DTR and RTS. Set them accordingly
- *	and flag that an update to the modem is needed.
+ * The IFX6x60 only supports DTR and RTS. Set them accordingly
+ * and flag that an update to the modem is needed.
  *
- *	FIXME: do we need to kick the tranfers when we do this ?
+ * FIXME: do we need to kick the tranfers when we do this ?
  */
 static int ifx_spi_tiocmset(struct tty_struct *tty,
 			    unsigned int set, unsigned int clear)
@@ -328,14 +328,14 @@ static int ifx_spi_tiocmset(struct tty_struct *tty,
 }
 
 /**
- *	ifx_spi_open	-	called on tty open
- *	@tty: our tty device
- *	@filp: file handle being associated with the tty
+ * ifx_spi_open() - called on tty open
+ * @tty: our tty device
+ * @filp: file handle being associated with the tty
  *
- *	Open the tty interface. We let the tty_port layer do all the work
- *	for us.
+ * Open the tty interface. We let the tty_port layer do all the work
+ * for us.
  *
- *	FIXME: Remove single device assumption and saved_ifx_dev
+ * FIXME: Remove single device assumption and saved_ifx_dev
  */
 static int ifx_spi_open(struct tty_struct *tty, struct file *filp)
 {
@@ -343,12 +343,12 @@ static int ifx_spi_open(struct tty_struct *tty, struct file *filp)
 }
 
 /**
- *	ifx_spi_close	-	called when our tty closes
- *	@tty: the tty being closed
- *	@filp: the file handle being closed
+ * ifx_spi_close() - called when our tty closes
+ * @tty: the tty being closed
+ * @filp: the file handle being closed
  *
- *	Perform the close of the tty. We use the tty_port layer to do all
- *	our hard work.
+ * Perform the close of the tty. We use the tty_port layer to do all
+ * our hard work.
  */
 static void ifx_spi_close(struct tty_struct *tty, struct file *filp)
 {
@@ -358,17 +358,17 @@ static void ifx_spi_close(struct tty_struct *tty, struct file *filp)
 }
 
 /**
- *	ifx_decode_spi_header	-	decode received header
- *	@buffer: the received data
- *	@length: decoded length
- *	@more: decoded more flag
- *	@received_cts: status of cts we received
+ * ifx_decode_spi_header() - decode received header
+ * @buffer: the received data
+ * @length: decoded length
+ * @more: decoded more flag
+ * @received_cts: status of cts we received
  *
- *	Note how received_cts is handled -- if header is all F it is left
- *	the same as it was, if header is all 0 it is set to 0 otherwise it is
- *	taken from the incoming header.
+ * Note how received_cts is handled -- if header is all F it is left
+ * the same as it was, if header is all 0 it is set to 0 otherwise it is
+ * taken from the incoming header.
  *
- *	FIXME: endianness
+ * FIXME: endianness
  */
 static int ifx_spi_decode_spi_header(unsigned char *buffer, int *length,
 			unsigned char *more, unsigned char *received_cts)
@@ -397,14 +397,14 @@ static int ifx_spi_decode_spi_header(unsigned char *buffer, int *length,
 }
 
 /**
- *	ifx_setup_spi_header	-	set header fields
- *	@txbuffer: pointer to start of SPI buffer
- *	@tx_count: bytes
- *	@more: indicate if more to follow
+ * ifx_setup_spi_header() - set header fields
+ * @txbuffer: pointer to start of SPI buffer
+ * @tx_count: bytes
+ * @more: indicate if more to follow
  *
- *	Format up an SPI header for a transfer
+ * Format up an SPI header for a transfer
  *
- *	FIXME: endianness?
+ * FIXME: endianness?
  */
 static void ifx_spi_setup_spi_header(unsigned char *txbuffer, int tx_count,
 					unsigned char more)
@@ -415,16 +415,16 @@ static void ifx_spi_setup_spi_header(unsigned char *txbuffer, int tx_count,
 }
 
 /**
- *	ifx_spi_prepare_tx_buffer	-	prepare transmit frame
- *	@ifx_dev: our SPI device
+ * ifx_spi_prepare_tx_buffer() - prepare transmit frame
+ * @ifx_dev: our SPI device
  *
- *	The transmit buffr needs a header and various other bits of
- *	information followed by as much data as we can pull from the FIFO
- *	and transfer. This function formats up a suitable buffer in the
- *	ifx_dev->tx_buffer
+ * The transmit buffr needs a header and various other bits of
+ * information followed by as much data as we can pull from the FIFO
+ * and transfer. This function formats up a suitable buffer in the
+ * ifx_dev->tx_buffer
  *
- *	FIXME: performance - should we wake the tty when the queue is half
- *			     empty ?
+ * FIXME: performance() - should we wake the tty when the queue is half
+ *        empty ?
  */
 static int ifx_spi_prepare_tx_buffer(struct ifx_spi_device *ifx_dev)
 {
@@ -476,14 +476,14 @@ static int ifx_spi_prepare_tx_buffer(struct ifx_spi_device *ifx_dev)
 }
 
 /**
- *	ifx_spi_write		-	line discipline write
- *	@tty: our tty device
- *	@buf: pointer to buffer to write (kernel space)
- *	@count: size of buffer
+ * ifx_spi_write() - line discipline write
+ * @tty: our tty device
+ * @buf: pointer to buffer to write (kernel space)
+ * @count: size of buffer
  *
- *	Write the characters we have been given into the FIFO. If the device
- *	is not active then activate it, when the SRDY line is asserted back
- *	this will commence I/O
+ * Write the characters we have been given into the FIFO. If the device
+ * is not active then activate it, when the SRDY line is asserted back
+ * this will commence I/O
  */
 static int ifx_spi_write(struct tty_struct *tty, const unsigned char *buf,
 			 int count)
@@ -505,11 +505,11 @@ static int ifx_spi_write(struct tty_struct *tty, const unsigned char *buf,
 }
 
 /**
- *	ifx_spi_chars_in_buffer	-	line discipline helper
- *	@tty: our tty device
+ * ifx_spi_write_room() - line discipline helper
+ * @tty: our tty device
  *
- *	Report how much data we can accept before we drop bytes. As we use
- *	a simple FIFO this is nice and easy.
+ * Report how much data we can accept before we drop bytes. As we use
+ * a simple FIFO this is nice and easy.
  */
 static int ifx_spi_write_room(struct tty_struct *tty)
 {
@@ -518,11 +518,11 @@ static int ifx_spi_write_room(struct tty_struct *tty)
 }
 
 /**
- *	ifx_spi_chars_in_buffer	-	line discipline helper
- *	@tty: our tty device
+ * ifx_spi_chars_in_buffer() - line discipline helper
+ * @tty: our tty device
  *
- *	Report how many characters we have buffered. In our case this is the
- *	number of bytes sitting in our transmit FIFO.
+ * Report how many characters we have buffered. In our case this is the
+ * number of bytes sitting in our transmit FIFO.
  */
 static int ifx_spi_chars_in_buffer(struct tty_struct *tty)
 {
@@ -531,12 +531,12 @@ static int ifx_spi_chars_in_buffer(struct tty_struct *tty)
 }
 
 /**
- *	ifx_port_hangup
- *	@port: our tty port
+ * ifx_port_hangup()
+ * @port: our tty port
  *
- *	tty port hang up. Called when tty_hangup processing is invoked either
- *	by loss of carrier, or by software (eg vhangup). Serialized against
- *	activate/shutdown by the tty layer.
+ * tty port hang up. Called when tty_hangup processing is invoked either
+ * by loss of carrier, or by software (eg vhangup). Serialized against
+ * activate/shutdown by the tty layer.
  */
 static void ifx_spi_hangup(struct tty_struct *tty)
 {
@@ -545,11 +545,11 @@ static void ifx_spi_hangup(struct tty_struct *tty)
 }
 
 /**
- *	ifx_port_activate
- *	@port: our tty port
+ * ifx_port_activate()
+ * @port: our tty port
  *
- *	tty port activate method - called for first open. Serialized
- *	with hangup and shutdown by the tty layer.
+ * tty port activate method - called for first open. Serialized
+ * with hangup and shutdown by the tty layer.
  */
 static int ifx_port_activate(struct tty_port *port, struct tty_struct *tty)
 {
@@ -576,11 +576,11 @@ static int ifx_port_activate(struct tty_port *port, struct tty_struct *tty)
 }
 
 /**
- *	ifx_port_shutdown
- *	@port: our tty port
+ * ifx_port_shutdown()
+ * @port: our tty port
  *
- *	tty port shutdown method - called for last port close. Serialized
- *	with hangup and activate by the tty layer.
+ * tty port shutdown method - called for last port close. Serialized
+ * with hangup and activate by the tty layer.
  */
 static void ifx_port_shutdown(struct tty_port *port)
 {
@@ -611,13 +611,13 @@ static const struct tty_operations ifx_spi_serial_ops = {
 };
 
 /**
- *	ifx_spi_insert_fip_string	-	queue received data
- *	@ifx_ser: our SPI device
- *	@chars: buffer we have received
- *	@size: number of chars reeived
+ * ifx_spi_insert_fip_string() - queue received data
+ * @ifx_ser: our SPI device
+ * @chars: buffer we have received
+ * @size: number of chars reeived
  *
- *	Queue bytes to the tty assuming the tty side is currently open. If
- *	not the discard the data.
+ * Queue bytes to the tty assuming the tty side is currently open. If
+ * not the discard the data.
  */
 static void ifx_spi_insert_flip_string(struct ifx_spi_device *ifx_dev,
 				    unsigned char *chars, size_t size)
@@ -627,11 +627,11 @@ static void ifx_spi_insert_flip_string(struct ifx_spi_device *ifx_dev,
 }
 
 /**
- *	ifx_spi_complete	-	SPI transfer completed
- *	@ctx: our SPI device
+ * ifx_spi_complete() - SPI transfer completed
+ * @ctx: our SPI device
  *
- *	An SPI transfer has completed. Process any received data and kick off
- *	any further transmits we can commence.
+ * An SPI transfer has completed. Process any received data and kick off
+ * any further transmits we can commence.
  */
 static void ifx_spi_complete(void *ctx)
 {
@@ -720,11 +720,11 @@ complete_exit:
 }
 
 /**
- *	ifx_spio_io		-	I/O tasklet
- *	@data: our SPI device
+ * ifx_spio_io() - I/O tasklet
+ * @data: our SPI device
  *
- *	Queue data for transmission if possible and then kick off the
- *	transfer.
+ * Queue data for transmission if possible and then kick off the
+ * transfer.
  */
 static void ifx_spi_io(unsigned long data)
 {
@@ -792,10 +792,10 @@ static void ifx_spi_io(unsigned long data)
 }
 
 /**
- *	ifx_spi_free_port	-	free up the tty side
- *	@ifx_dev: IFX device going away
+ * ifx_spi_free_port() - free up the tty side
+ * @ifx_dev: IFX device going away
  *
- *	Unregister and free up a port when the device goes away
+ * Unregister and free up a port when the device goes away
  */
 static void ifx_spi_free_port(struct ifx_spi_device *ifx_dev)
 {
@@ -806,11 +806,11 @@ static void ifx_spi_free_port(struct ifx_spi_device *ifx_dev)
 }
 
 /**
- *	ifx_spi_create_port	-	create a new port
- *	@ifx_dev: our spi device
+ * ifx_spi_create_port() - create a new port
+ * @ifx_dev: our spi device
  *
- *	Allocate and initialise the tty port that goes with this interface
- *	and add it to the tty layer so that it can be opened.
+ * Allocate and initialise the tty port that goes with this interface
+ * and add it to the tty layer so that it can be opened.
  */
 static int ifx_spi_create_port(struct ifx_spi_device *ifx_dev)
 {
@@ -847,12 +847,12 @@ error_ret:
 }
 
 /**
- *	ifx_spi_handle_srdy		-	handle SRDY
- *	@ifx_dev: device asserting SRDY
+ * ifx_spi_handle_srdy() - handle SRDY
+ * @ifx_dev: device asserting SRDY
  *
- *	Check our device state and see what we need to kick off when SRDY
- *	is asserted. This usually means killing the timer and firing off the
- *	I/O processing.
+ * Check our device state and see what we need to kick off when SRDY
+ * is asserted. This usually means killing the timer and firing off the
+ * I/O processing.
  */
 static void ifx_spi_handle_srdy(struct ifx_spi_device *ifx_dev)
 {
@@ -870,11 +870,11 @@ static void ifx_spi_handle_srdy(struct ifx_spi_device *ifx_dev)
 }
 
 /**
- *	ifx_spi_srdy_interrupt	-	SRDY asserted
- *	@irq: our IRQ number
- *	@dev: our ifx device
+ * ifx_spi_srdy_interrupt() - SRDY asserted
+ * @irq: our IRQ number
+ * @dev: our ifx device
  *
- *	The modem asserted SRDY. Handle the srdy event
+ * The modem asserted SRDY. Handle the srdy event
  */
 static irqreturn_t ifx_spi_srdy_interrupt(int irq, void *dev)
 {
@@ -885,15 +885,15 @@ static irqreturn_t ifx_spi_srdy_interrupt(int irq, void *dev)
 }
 
 /**
- *	ifx_spi_reset_interrupt	-	Modem has changed reset state
- *	@irq: interrupt number
- *	@dev: our device pointer
+ * ifx_spi_reset_interrupt() - Modem has changed reset state
+ * @irq: interrupt number
+ * @dev: our device pointer
  *
- *	The modem has either entered or left reset state. Check the GPIO
- *	line to see which.
+ * The modem has either entered or left reset state. Check the GPIO
+ * line to see which.
  *
- *	FIXME: review locking on MR_INPROGRESS versus
- *	parallel unsolicited reset/solicited reset
+ * FIXME: review locking on MR_INPROGRESS versus
+ * parallel unsolicited reset/solicited reset
  */
 static irqreturn_t ifx_spi_reset_interrupt(int irq, void *dev)
 {
@@ -920,10 +920,10 @@ static irqreturn_t ifx_spi_reset_interrupt(int irq, void *dev)
 }
 
 /**
- *	ifx_spi_free_device - free device
- *	@ifx_dev: device to free
+ * ifx_spi_free_device() - free device
+ * @ifx_dev: device to free
  *
- *	Free the IFX device
+ * Free the IFX device
  */
 static void ifx_spi_free_device(struct ifx_spi_device *ifx_dev)
 {
@@ -939,10 +939,10 @@ static void ifx_spi_free_device(struct ifx_spi_device *ifx_dev)
 }
 
 /**
- *	ifx_spi_reset	-	reset modem
- *	@ifx_dev: modem to reset
+ * ifx_spi_reset() - reset modem
+ * @ifx_dev: modem to reset
  *
- *	Perform a reset on the modem
+ * Perform a reset on the modem
  */
 static int ifx_spi_reset(struct ifx_spi_device *ifx_dev)
 {
@@ -975,15 +975,15 @@ static int ifx_spi_reset(struct ifx_spi_device *ifx_dev)
 }
 
 /**
- *	ifx_spi_spi_probe	-	probe callback
- *	@spi: our possible matching SPI device
+ * ifx_spi_spi_probe() - probe callback
+ * @spi: our possible matching SPI device
  *
- *	Probe for a 6x60 modem on SPI bus. Perform any needed device and
- *	GPIO setup.
+ * Probe for a 6x60 modem on SPI bus. Perform any needed device and
+ * GPIO setup.
  *
- *	FIXME:
- *	-	Support for multiple devices
- *	-	Split out MID specific GPIO handling eventually
+ * FIXME:
+ * -	Support for multiple devices
+ * -	Split out MID specific GPIO handling eventually
  */
 
 static int ifx_spi_spi_probe(struct spi_device *spi)
@@ -1218,11 +1218,11 @@ error_ret:
 }
 
 /**
- *	ifx_spi_spi_remove	-	SPI device was removed
- *	@spi: SPI device
+ * ifx_spi_spi_remove() - SPI device was removed
+ * @spi: SPI device
  *
- *	FIXME: We should be shutting the device down here not in
- *	the module unload path.
+ * FIXME: We should be shutting the device down here not in
+ * the module unload path.
  */
 
 static int ifx_spi_spi_remove(struct spi_device *spi)
@@ -1248,10 +1248,10 @@ static int ifx_spi_spi_remove(struct spi_device *spi)
 }
 
 /**
- *	ifx_spi_spi_shutdown	-	called on SPI shutdown
- *	@spi: SPI device
+ * ifx_spi_spi_shutdown() - called on SPI shutdown
+ * @spi: SPI device
  *
- *	No action needs to be taken here
+ * No action needs to be taken here
  */
 
 static void ifx_spi_spi_shutdown(struct spi_device *spi)
@@ -1267,11 +1267,11 @@ static void ifx_spi_spi_shutdown(struct spi_device *spi)
  */
 
 /**
- *	ifx_spi_pm_suspend	-	suspend modem on system suspend
- *	@dev: device being suspended
+ * ifx_spi_pm_suspend() - suspend modem on system suspend
+ * @dev: device being suspended
  *
- *	Suspend the modem. No action needed on Intel MID platforms, may
- *	need extending for other systems.
+ * Suspend the modem. No action needed on Intel MID platforms, may
+ * need extending for other systems.
  */
 static int ifx_spi_pm_suspend(struct device *dev)
 {
@@ -1279,12 +1279,12 @@ static int ifx_spi_pm_suspend(struct device *dev)
 }
 
 /**
- *	ifx_spi_pm_resume	-	resume modem on system resume
- *	@dev: device being suspended
+ * ifx_spi_pm_resume() - resume modem on system resume
+ * @dev: device being resumed
  *
- *	Allow the modem to resume. No action needed.
+ * Allow the modem to resume. No action needed.
  *
- *	FIXME: do we need to reset anything here ?
+ * FIXME: do we need to reset anything here ?
  */
 static int ifx_spi_pm_resume(struct device *dev)
 {
@@ -1292,10 +1292,10 @@ static int ifx_spi_pm_resume(struct device *dev)
 }
 
 /**
- *	ifx_spi_pm_runtime_resume	-	suspend modem
- *	@dev: device being suspended
+ * ifx_spi_pm_runtime_resume() - suspend modem
+ * @dev: device being resumed
  *
- *	Allow the modem to resume. No action needed.
+ * Allow the modem to resume. No action needed.
  */
 static int ifx_spi_pm_runtime_resume(struct device *dev)
 {
@@ -1303,11 +1303,11 @@ static int ifx_spi_pm_runtime_resume(struct device *dev)
 }
 
 /**
- *	ifx_spi_pm_runtime_suspend	-	suspend modem
- *	@dev: device being suspended
+ * ifx_spi_pm_runtime_suspend() - suspend modem
+ * @dev: device being suspended
  *
- *	Allow the modem to suspend and thus suspend to continue up the
- *	device tree.
+ * Allow the modem to suspend and thus suspend to continue up the
+ * device tree.
  */
 static int ifx_spi_pm_runtime_suspend(struct device *dev)
 {
@@ -1315,10 +1315,10 @@ static int ifx_spi_pm_runtime_suspend(struct device *dev)
 }
 
 /**
- *	ifx_spi_pm_runtime_idle		-	check if modem idle
- *	@dev: our device
+ * ifx_spi_pm_runtime_idle() - check if modem idle
+ * @dev: our device
  *
- *	Check conditions and queue runtime suspend if idle.
+ * Check conditions and queue runtime suspend if idle.
  */
 static int ifx_spi_pm_runtime_idle(struct device *dev)
 {
@@ -1359,9 +1359,9 @@ static struct spi_driver ifx_spi_driver = {
 };
 
 /**
- *	ifx_spi_exit	-	module exit
+ * ifx_spi_exit() - module exit
  *
- *	Unload the module.
+ * Unload the module.
  */
 
 static void __exit ifx_spi_exit(void)
@@ -1374,11 +1374,11 @@ static void __exit ifx_spi_exit(void)
 }
 
 /**
- *	ifx_spi_init		-	module entry point
+ * ifx_spi_init() - module entry point
  *
- *	Initialise the SPI and tty interfaces for the IFX SPI driver
- *	We need to initialize upper-edge spi driver after the tty
- *	driver because otherwise the spi probe will race
+ * Initialise the SPI and tty interfaces for the IFX SPI driver
+ * We need to initialize upper-edge spi driver after the tty
+ * driver because otherwise the spi probe will race
  */
 
 static int __init ifx_spi_init(void)

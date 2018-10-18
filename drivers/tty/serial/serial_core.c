@@ -309,13 +309,13 @@ static void uart_shutdown(struct tty_struct *tty, struct uart_state *state)
 }
 
 /**
- *	uart_update_timeout - update per-port FIFO timeout.
- *	@port:  uart_port structure describing the port
- *	@cflag: termios cflag value
- *	@baud:  speed of the port
+ * uart_update_timeout() - update per-port FIFO timeout.
+ * @port: uart_port structure describing the port
+ * @cflag: termios cflag value
+ * @baud: speed of the port
  *
- *	Set the port FIFO timeout value.  The @cflag value should
- *	reflect the actual hardware settings.
+ * Set the port FIFO timeout value.  The @cflag value should
+ * reflect the actual hardware settings.
  */
 void
 uart_update_timeout(struct uart_port *port, unsigned int cflag,
@@ -359,23 +359,23 @@ uart_update_timeout(struct uart_port *port, unsigned int cflag,
 EXPORT_SYMBOL(uart_update_timeout);
 
 /**
- *	uart_get_baud_rate - return baud rate for a particular port
- *	@port: uart_port structure describing the port in question.
- *	@termios: desired termios settings.
- *	@old: old termios (or NULL)
- *	@min: minimum acceptable baud rate
- *	@max: maximum acceptable baud rate
+ * uart_get_baud_rate() - return baud rate for a particular port
+ * @port: uart_port structure describing the port in question.
+ * @termios: desired termios settings.
+ * @old: old termios (or NULL)
+ * @min: minimum acceptable baud rate
+ * @max: maximum acceptable baud rate
  *
- *	Decode the termios structure into a numeric baud rate,
- *	taking account of the magic 38400 baud rate (with spd_*
- *	flags), and mapping the %B0 rate to 9600 baud.
+ * Decode the termios structure into a numeric baud rate,
+ * taking account of the magic 38400 baud rate (with spd_*
+ * flags), and mapping the %B0 rate to 9600 baud.
  *
- *	If the new baud rate is invalid, try the old termios setting.
- *	If it's still invalid, we try 9600 baud.
+ * If the new baud rate is invalid, try the old termios setting.
+ * If it's still invalid, we try 9600 baud.
  *
- *	Update the @termios structure to reflect the baud rate
- *	we're actually going to be using. Don't do this for the case
- *	where B0 is requested ("hang up").
+ * Update the @termios structure to reflect the baud rate
+ * we're actually going to be using. Don't do this for the case
+ * where B0 is requested ("hang up").
  */
 unsigned int
 uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
@@ -461,11 +461,11 @@ uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
 EXPORT_SYMBOL(uart_get_baud_rate);
 
 /**
- *	uart_get_divisor - return uart clock divisor
- *	@port: uart_port structure describing the port.
- *	@baud: desired baud rate
+ * uart_get_divisor() - return uart clock divisor
+ * @port: uart_port structure describing the port.
+ * @baud: desired baud rate
  *
- *	Calculate the uart clock divisor for the port.
+ * Calculate the uart clock divisor for the port.
  */
 unsigned int
 uart_get_divisor(struct uart_port *port, unsigned int baud)
@@ -1014,10 +1014,10 @@ static int uart_set_info_user(struct tty_struct *tty, struct uart_state *state,
 }
 
 /**
- *	uart_get_lsr_info	-	get line status register info
- *	@tty: tty associated with the UART
- *	@state: UART being queried
- *	@value: returned modem value
+ * uart_get_lsr_info() - get line status register info
+ * @tty: tty associated with the UART
+ * @state: UART being queried
+ * @value: returned modem value
  */
 static int uart_get_lsr_info(struct tty_struct *tty,
 			struct uart_state *state, unsigned int __user *value)
@@ -1900,11 +1900,11 @@ static int uart_proc_show(struct seq_file *m, void *v)
 
 #if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_CONSOLE_POLL)
 /**
- *	uart_console_write - write a console message to a serial port
- *	@port: the port to write the message
- *	@s: array of characters
- *	@count: number of characters in string to write
- *	@putchar: function to write character to port
+ * uart_console_write() - write a console message to a serial port
+ * @port: the port to write the message
+ * @s: array of characters
+ * @count: number of characters in string to write
+ * @putchar: function to write character to port
  */
 void uart_console_write(struct uart_port *port, const char *s,
 			unsigned int count,
@@ -1943,22 +1943,22 @@ uart_get_console(struct uart_port *ports, int nr, struct console *co)
 }
 
 /**
- *	uart_parse_earlycon - Parse earlycon options
- *	@p:	  ptr to 2nd field (ie., just beyond '<name>,')
- *	@iotype:  ptr for decoded iotype (out)
- *	@addr:    ptr for decoded mapbase/iobase (out)
- *	@options: ptr for <options> field; NULL if not present (out)
+ * uart_parse_earlycon() - Parse earlycon options
+ * @p: ptr to 2nd field (ie., just beyond '<name>,')
+ * @iotype: ptr for decoded iotype (out)
+ * @addr: ptr for decoded mapbase/iobase (out)
+ * @options: ptr for <options> field; NULL if not present (out)
  *
- *	Decodes earlycon kernel command line parameters of the form
- *	   earlycon=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
- *	   console=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
+ * Decodes earlycon kernel command line parameters of the form
+ *    earlycon=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
+ *    console=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
  *
- *	The optional form
- *	   earlycon=<name>,0x<addr>,<options>
- *	   console=<name>,0x<addr>,<options>
- *	is also accepted; the returned @iotype will be UPIO_MEM.
+ * The optional form
+ *    earlycon=<name>,0x<addr>,<options>
+ *    console=<name>,0x<addr>,<options>
+ * is also accepted; the returned @iotype will be UPIO_MEM.
  *
- *	Returns 0 on success or -EINVAL on failure
+ * Returns 0 on success or -EINVAL on failure
  */
 int uart_parse_earlycon(char *p, unsigned char *iotype, resource_size_t *addr,
 			char **options)
@@ -2003,16 +2003,16 @@ int uart_parse_earlycon(char *p, unsigned char *iotype, resource_size_t *addr,
 EXPORT_SYMBOL_GPL(uart_parse_earlycon);
 
 /**
- *	uart_parse_options - Parse serial port baud/parity/bits/flow control.
- *	@options: pointer to option string
- *	@baud: pointer to an 'int' variable for the baud rate.
- *	@parity: pointer to an 'int' variable for the parity.
- *	@bits: pointer to an 'int' variable for the number of data bits.
- *	@flow: pointer to an 'int' variable for the flow control character.
+ * uart_parse_options() - Parse serial port baud/parity/bits/flow control.
+ * @options: pointer to option string
+ * @baud: pointer to an 'int' variable for the baud rate.
+ * @parity: pointer to an 'int' variable for the parity.
+ * @bits: pointer to an 'int' variable for the number of data bits.
+ * @flow: pointer to an 'int' variable for the flow control character.
  *
- *	uart_parse_options decodes a string containing the serial console
- *	options.  The format of the string is <baud><parity><bits><flow>,
- *	eg: 115200n8r
+ * uart_parse_options decodes a string containing the serial console
+ * options.  The format of the string is <baud><parity><bits><flow>,
+ * eg: 115200n8r
  */
 void
 uart_parse_options(const char *options, int *baud, int *parity,
@@ -2033,13 +2033,13 @@ uart_parse_options(const char *options, int *baud, int *parity,
 EXPORT_SYMBOL_GPL(uart_parse_options);
 
 /**
- *	uart_set_options - setup the serial console parameters
- *	@port: pointer to the serial ports uart_port structure
- *	@co: console pointer
- *	@baud: baud rate
- *	@parity: parity character - 'n' (none), 'o' (odd), 'e' (even)
- *	@bits: number of data bits
- *	@flow: flow control character - 'r' (rts)
+ * uart_set_options() - setup the serial console parameters
+ * @port: pointer to the serial ports uart_port structure
+ * @co: console pointer
+ * @baud: baud rate
+ * @parity: parity character - 'n' (none), 'o' (odd), 'e' (even)
+ * @bits: number of data bits
+ * @flow: flow control character - 'r' (rts)
  */
 int
 uart_set_options(struct uart_port *port, struct console *co,
@@ -2101,7 +2101,7 @@ EXPORT_SYMBOL_GPL(uart_set_options);
 #endif /* CONFIG_SERIAL_CORE_CONSOLE */
 
 /**
- * uart_change_pm - set power state of the port
+ * uart_change_pm() - set power state of the port
  *
  * @state: port descriptor
  * @pm_state: new state
@@ -2489,17 +2489,17 @@ static const struct tty_port_operations uart_port_ops = {
 };
 
 /**
- *	uart_register_driver - register a driver with the uart core layer
- *	@drv: low level driver structure
+ * uart_register_driver() - register a driver with the uart core layer
+ * @drv: low level driver structure
  *
- *	Register a uart driver with the core driver.  We in turn register
- *	with the tty layer, and initialise the core driver per-port state.
+ * Register a uart driver with the core driver.  We in turn register
+ * with the tty layer, and initialise the core driver per-port state.
  *
- *	We have a proc file in /proc/tty/driver which is named after the
- *	normal driver.
+ * We have a proc file in /proc/tty/driver which is named after the
+ * normal driver.
  *
- *	drv->port should be NULL, and the per-port structures should be
- *	registered using uart_add_one_port after this call has succeeded.
+ * drv->port should be NULL, and the per-port structures should be
+ * registered using uart_add_one_port after this call has succeeded.
  */
 int uart_register_driver(struct uart_driver *drv)
 {
@@ -2560,13 +2560,13 @@ out:
 }
 
 /**
- *	uart_unregister_driver - remove a driver from the uart core layer
- *	@drv: low level driver structure
+ * uart_unregister_driver() - remove a driver from the uart core layer
+ * @drv: low level driver structure
  *
- *	Remove all references to a driver from the core driver.  The low
- *	level driver must have removed all its ports via the
- *	uart_remove_one_port() if it registered them with uart_add_one_port().
- *	(ie, drv->port == NULL)
+ * Remove all references to a driver from the core driver.  The low
+ * level driver must have removed all its ports via the
+ * uart_remove_one_port() if it registered them with uart_add_one_port().
+ * (ie, drv->port == NULL)
  */
 void uart_unregister_driver(struct uart_driver *drv)
 {
@@ -2760,14 +2760,14 @@ static const struct attribute_group tty_dev_attr_group = {
 	};
 
 /**
- *	uart_add_one_port - attach a driver-defined port structure
- *	@drv: pointer to the uart low level driver structure for this port
- *	@uport: uart port structure to use for this port.
+ * uart_add_one_port() - attach a driver-defined port structure
+ * @drv: pointer to the uart low level driver structure for this port
+ * @uport: uart port structure to use for this port.
  *
- *	This allows the driver to register its own uart_port structure
- *	with the core driver.  The main purpose is to allow the low
- *	level uart drivers to expand uart_port, rather than having yet
- *	more levels of structures.
+ * This allows the driver to register its own uart_port structure
+ * with the core driver.  The main purpose is to allow the low
+ * level uart drivers to expand uart_port, rather than having yet
+ * more levels of structures.
  */
 int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 {
@@ -2863,13 +2863,13 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 }
 
 /**
- *	uart_remove_one_port - detach a driver defined port structure
- *	@drv: pointer to the uart low level driver structure for this port
- *	@uport: uart port structure for this port
+ * uart_remove_one_port() - detach a driver defined port structure
+ * @drv: pointer to the uart low level driver structure for this port
+ * @uport: uart port structure for this port
  *
- *	This unhooks (and hangs up) the specified port structure from the
- *	core driver.  No further calls will be made to the low-level code
- *	for this port.
+ * This unhooks (and hangs up) the specified port structure from the
+ * core driver.  No further calls will be made to the low-level code
+ * for this port.
  */
 int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
 {
@@ -2969,11 +2969,11 @@ int uart_match_port(struct uart_port *port1, struct uart_port *port2)
 EXPORT_SYMBOL(uart_match_port);
 
 /**
- *	uart_handle_dcd_change - handle a change of carrier detect state
- *	@uport: uart_port structure for the open port
- *	@status: new carrier detect status, nonzero if active
+ * uart_handle_dcd_change() - handle a change of carrier detect state
+ * @uport: uart_port structure for the open port
+ * @status: new carrier detect status, nonzero if active
  *
- *	Caller must hold uport->lock
+ * Caller must hold uport->lock
  */
 void uart_handle_dcd_change(struct uart_port *uport, unsigned int status)
 {
@@ -3004,11 +3004,11 @@ void uart_handle_dcd_change(struct uart_port *uport, unsigned int status)
 EXPORT_SYMBOL_GPL(uart_handle_dcd_change);
 
 /**
- *	uart_handle_cts_change - handle a change of clear-to-send state
- *	@uport: uart_port structure for the open port
- *	@status: new clear to send status, nonzero if active
+ * uart_handle_cts_change() - handle a change of clear-to-send state
+ * @uport: uart_port structure for the open port
+ * @status: new clear to send status, nonzero if active
  *
- *	Caller must hold uport->lock
+ * Caller must hold uport->lock
  */
 void uart_handle_cts_change(struct uart_port *uport, unsigned int status)
 {
@@ -3035,7 +3035,7 @@ void uart_handle_cts_change(struct uart_port *uport, unsigned int status)
 EXPORT_SYMBOL_GPL(uart_handle_cts_change);
 
 /**
- * uart_insert_char - push a char to the uart layer
+ * uart_insert_char() - push a char to the uart layer
  *
  * User is responsible to call tty_flip_buffer_push when they are done with
  * insertion.

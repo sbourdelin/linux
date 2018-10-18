@@ -184,7 +184,7 @@ static struct tty_ldisc_ops tty_ptirouter_ldisc = {
 };
 
 /**
- * n_tracerouter_init -	module initialisation
+ * n_tracerouter_init() - module initialisation
  *
  * Registers this module as a line discipline driver.
  *
@@ -210,7 +210,7 @@ static int __init n_tracerouter_init(void)
 }
 
 /**
- * n_tracerouter_exit -	module unload
+ * n_tracerouter_exit() - module unload
  *
  * Removes this module as a line discipline driver.
  */

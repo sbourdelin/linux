@@ -227,7 +227,7 @@ static struct tty_ldisc_ops n_hdlc_ldisc = {
 };
 
 /**
- * n_hdlc_release - release an n_hdlc per device line discipline info structure
+ * n_hdlc_release() - release an n_hdlc per device line discipline info structure
  * @n_hdlc - per device line discipline info structure
  */
 static void n_hdlc_release(struct n_hdlc *n_hdlc)
@@ -279,7 +279,7 @@ static void n_hdlc_release(struct n_hdlc *n_hdlc)
 }	/* end of n_hdlc_release() */
 
 /**
- * n_hdlc_tty_close - line discipline close
+ * n_hdlc_tty_close() - line discipline close
  * @tty - pointer to tty info structure
  *
  * Called when the line discipline is changed to something
@@ -318,7 +318,7 @@ static void n_hdlc_tty_close(struct tty_struct *tty)
 }	/* end of n_hdlc_tty_close() */
 
 /**
- * n_hdlc_tty_open - called when line discipline changed to n_hdlc
+ * n_hdlc_tty_open() - called when line discipline changed to n_hdlc
  * @tty - pointer to tty info structure
  *
  * Returns 0 if success, otherwise error code
@@ -364,7 +364,7 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 }	/* end of n_tty_hdlc_open() */
 
 /**
- * n_hdlc_send_frames - send frames on pending send buffer list
+ * n_hdlc_send_frames() - send frames on pending send buffer list
  * @n_hdlc - pointer to ldisc instance data
  * @tty - pointer to tty instance data
  *
@@ -456,7 +456,7 @@ static void n_hdlc_send_frames(struct n_hdlc *n_hdlc, struct tty_struct *tty)
 }	/* end of n_hdlc_send_frames() */
 
 /**
- * n_hdlc_tty_wakeup - Callback for transmit wakeup
+ * n_hdlc_tty_wakeup() - Callback for transmit wakeup
  * @tty	- pointer to associated tty instance data
  *
  * Called when low level device driver can accept more send data.
@@ -481,7 +481,7 @@ static void n_hdlc_tty_wakeup(struct tty_struct *tty)
 }	/* end of n_hdlc_tty_wakeup() */
 
 /**
- * n_hdlc_tty_receive - Called by tty driver when receive data is available
+ * n_hdlc_tty_receive() - Called by tty driver when receive data is available
  * @tty	- pointer to tty instance data
  * @data - pointer to received data
  * @flags - pointer to flags for data
@@ -549,7 +549,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *data,
 }	/* end of n_hdlc_tty_receive() */
 
 /**
- * n_hdlc_tty_read - Called to retrieve one frame of data (if available)
+ * n_hdlc_tty_read() - Called to retrieve one frame of data (if available)
  * @tty - pointer to tty instance data
  * @file - pointer to open file object
  * @buf - pointer to returned data buffer
@@ -633,7 +633,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 }	/* end of n_hdlc_tty_read() */
 
 /**
- * n_hdlc_tty_write - write a single frame of data to device
+ * n_hdlc_tty_write() - write a single frame of data to device
  * @tty	- pointer to associated tty device instance data
  * @file - pointer to file object data
  * @data - pointer to transmit data (one frame)
@@ -717,7 +717,7 @@ static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 }	/* end of n_hdlc_tty_write() */
 
 /**
- * n_hdlc_tty_ioctl - process IOCTL system call for the tty device.
+ * n_hdlc_tty_ioctl() - process IOCTL system call for the tty device.
  * @tty - pointer to tty instance data
  * @file - pointer to open file object for device
  * @cmd - IOCTL command code
@@ -787,7 +787,7 @@ static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 }	/* end of n_hdlc_tty_ioctl() */
 
 /**
- * n_hdlc_tty_poll - TTY callback for poll system call
+ * n_hdlc_tty_poll() - TTY callback for poll system call
  * @tty - pointer to tty instance data
  * @filp - pointer to open file object for device
  * @poll_table - wait queue for operations
@@ -827,7 +827,7 @@ static __poll_t n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
 }	/* end of n_hdlc_tty_poll() */
 
 /**
- * n_hdlc_alloc - allocate an n_hdlc instance data structure
+ * n_hdlc_alloc() - allocate an n_hdlc instance data structure
  *
  * Returns a pointer to newly created structure if success, otherwise %NULL
  */
@@ -877,7 +877,7 @@ static struct n_hdlc *n_hdlc_alloc(void)
 }	/* end of n_hdlc_alloc() */
 
 /**
- * n_hdlc_buf_return - put the HDLC buffer after the head of the specified list
+ * n_hdlc_buf_return() - put the HDLC buffer after the head of the specified list
  * @buf_list - pointer to the buffer list
  * @buf - pointer to the buffer
  */
@@ -895,7 +895,7 @@ static void n_hdlc_buf_return(struct n_hdlc_buf_list *buf_list,
 }
 
 /**
- * n_hdlc_buf_put - add specified HDLC buffer to tail of specified list
+ * n_hdlc_buf_put() - add specified HDLC buffer to tail of specified list
  * @buf_list - pointer to buffer list
  * @buf	- pointer to buffer
  */
@@ -913,7 +913,7 @@ static void n_hdlc_buf_put(struct n_hdlc_buf_list *buf_list,
 }	/* end of n_hdlc_buf_put() */
 
 /**
- * n_hdlc_buf_get - remove and return an HDLC buffer from list
+ * n_hdlc_buf_get() - remove and return an HDLC buffer from list
  * @buf_list - pointer to HDLC buffer list
  *
  * Remove and return an HDLC buffer from the head of the specified HDLC buffer

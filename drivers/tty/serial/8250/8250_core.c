@@ -397,7 +397,7 @@ static const struct uart_8250_ops univ8250_driver_ops = {
 static struct uart_8250_port serial8250_ports[UART_NR];
 
 /**
- * serial8250_get_port - retrieve struct uart_8250_port
+ * serial8250_get_port() - retrieve struct uart_8250_port
  * @line: serial line number
  *
  * This function retrieves struct uart_8250_port for the specific line.
@@ -609,22 +609,22 @@ static int univ8250_console_setup(struct console *co, char *options)
 }
 
 /**
- *	univ8250_console_match - non-standard console matching
- *	@co:	  registering console
- *	@name:	  name from console command line
- *	@idx:	  index from console command line
- *	@options: ptr to option string from console command line
+ * univ8250_console_match() - non-standard console matching
+ * @co: registering console
+ * @name: name from console command line
+ * @idx: index from console command line
+ * @options: ptr to option string from console command line
  *
- *	Only attempts to match console command lines of the form:
- *	    console=uart[8250],io|mmio|mmio16|mmio32,<addr>[,<options>]
- *	    console=uart[8250],0x<addr>[,<options>]
- *	This form is used to register an initial earlycon boot console and
- *	replace it with the serial8250_console at 8250 driver init.
+ * Only attempts to match console command lines of the form:
+ *     console=uart[8250],io|mmio|mmio16|mmio32,<addr>[,<options>]
+ *     console=uart[8250],0x<addr>[,<options>]
+ * This form is used to register an initial earlycon boot console and
+ * replace it with the serial8250_console at 8250 driver init.
  *
- *	Performs console setup for a match (as required by interface)
- *	If no <options> are specified, then assume the h/w is already setup.
+ * Performs console setup for a match (as required by interface)
+ * If no <options> are specified, then assume the h/w is already setup.
  *
- *	Returns 0 if console matches; otherwise non-zero to use default matching
+ * Returns 0 if console matches; otherwise non-zero to use default matching
  */
 static int univ8250_console_match(struct console *co, char *name, int idx,
 				  char *options)
@@ -740,10 +740,10 @@ int __init early_serial_setup(struct uart_port *port)
 }
 
 /**
- *	serial8250_suspend_port - suspend one serial port
- *	@line:  serial line number
+ * serial8250_suspend_port() - suspend one serial port
+ * @line: serial line number
  *
- *	Suspend one serial port.
+ * Suspend one serial port.
  */
 void serial8250_suspend_port(int line)
 {
@@ -763,10 +763,10 @@ void serial8250_suspend_port(int line)
 EXPORT_SYMBOL(serial8250_suspend_port);
 
 /**
- *	serial8250_resume_port - resume one serial port
- *	@line:  serial line number
+ * serial8250_resume_port() - resume one serial port
+ * @line: serial line number
  *
- *	Resume one serial port.
+ * Resume one serial port.
  */
 void serial8250_resume_port(int line)
 {
@@ -943,17 +943,17 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 }
 
 /**
- *	serial8250_register_8250_port - register a serial port
- *	@up: serial port template
+ * serial8250_register_8250_port() - register a serial port
+ * @up: serial port template
  *
- *	Configure the serial port specified by the request. If the
- *	port exists and is in use, it is hung up and unregistered
- *	first.
+ * Configure the serial port specified by the request. If the
+ * port exists and is in use, it is hung up and unregistered
+ * first.
  *
- *	The port is then probed and if necessary the IRQ is autodetected
- *	If this fails an error is returned.
+ * The port is then probed and if necessary the IRQ is autodetected
+ * If this fails an error is returned.
  *
- *	On success the port is ready to use and the line number is returned.
+ * On success the port is ready to use and the line number is returned.
  */
 int serial8250_register_8250_port(struct uart_8250_port *up)
 {
@@ -1063,11 +1063,11 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 EXPORT_SYMBOL(serial8250_register_8250_port);
 
 /**
- *	serial8250_unregister_port - remove a 16x50 serial port at runtime
- *	@line: serial line number
+ * serial8250_unregister_port() - remove a 16x50 serial port at runtime
+ * @line: serial line number
  *
- *	Remove one serial port.  This may not be called from interrupt
- *	context.  We hand the port back to the our control.
+ * Remove one serial port.  This may not be called from interrupt
+ * context.  We hand the port back to the our control.
  */
 void serial8250_unregister_port(int line)
 {

@@ -150,22 +150,22 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
 }
 
 /**
- *	setup_earlycon - match and register earlycon console
- *	@buf:	earlycon param string
+ * setup_earlycon() - match and register earlycon console
+ * @buf: earlycon param string
  *
- *	Registers the earlycon console matching the earlycon specified
- *	in the param string @buf. Acceptable param strings are of the form
- *	   <name>,io|mmio|mmio32|mmio32be,<addr>,<options>
- *	   <name>,0x<addr>,<options>
- *	   <name>,<options>
- *	   <name>
+ * Registers the earlycon console matching the earlycon specified
+ * in the param string @buf. Acceptable param strings are of the form
+ *    <name>,io|mmio|mmio32|mmio32be,<addr>,<options>
+ *    <name>,0x<addr>,<options>
+ *    <name>,<options>
+ *    <name>
  *
- *	Only for the third form does the earlycon setup() method receive the
- *	<options> string in the 'options' parameter; all other forms set
- *	the parameter to NULL.
+ * Only for the third form does the earlycon setup() method receive the
+ * <options> string in the 'options' parameter; all other forms set
+ * the parameter to NULL.
  *
- *	Returns 0 if an attempt to register the earlycon was made,
- *	otherwise negative error code
+ * Returns 0 if an attempt to register the earlycon was made,
+ * otherwise negative error code
  */
 int __init setup_earlycon(char *buf)
 {

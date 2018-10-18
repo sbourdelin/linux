@@ -651,7 +651,7 @@ static inline int port_is_active(struct ioc4_port *port,
 
 
 /**
- * write_ireg - write the interrupt regs
+ * write_ireg() - write the interrupt regs
  * @ioc4_soft: ptr to soft struct for this port
  * @val: value to write
  * @which: which register
@@ -697,7 +697,7 @@ write_ireg(struct ioc4_soft *ioc4_soft, uint32_t val, int which, int type)
 }
 
 /**
- * set_baud - Baud rate setting code
+ * set_baud() - Baud rate setting code
  * @port: port to set
  * @baud: baud rate to use
  */
@@ -733,7 +733,7 @@ static int set_baud(struct ioc4_port *port, int baud)
 
 
 /**
- * get_ioc4_port - given a uart port, return the control structure
+ * get_ioc4_port() - given a uart port, return the control structure
  * @port: uart port
  * @set: set this port as current
  */
@@ -817,7 +817,7 @@ pending_intrs(struct ioc4_soft *soft, int type)
 }
 
 /**
- * port_init - Initialize the sio and ioc4 hardware for a given port
+ * port_init() - Initialize the sio and ioc4 hardware for a given port
  *			called per port from attach...
  * @port: port to initialize
  */
@@ -910,7 +910,7 @@ static inline int port_init(struct ioc4_port *port)
 }
 
 /**
- * handle_dma_error_intr - service any pending DMA error interrupts for the
+ * handle_dma_error_intr() - service any pending DMA error interrupts for the
  *			given port - 2nd level called via sd_intr
  * @arg: handler arg
  * @other_ir: ioc4regs
@@ -954,7 +954,7 @@ static void handle_dma_error_intr(void *arg, uint32_t other_ir)
 }
 
 /**
- * intr_connect - interrupt connect function
+ * intr_connect() - interrupt connect function
  * @soft: soft struct for this card
  * @type: interrupt type
  * @intrbits: bit pattern to set
@@ -982,7 +982,7 @@ intr_connect(struct ioc4_soft *soft, int type,
 }
 
 /**
- * ioc4_intr - Top level IOC4 interrupt handler.
+ * ioc4_intr() - Top level IOC4 interrupt handler.
  * @irq: irq value
  * @arg: handler arg
  */
@@ -1040,9 +1040,9 @@ static irqreturn_t ioc4_intr(int irq, void *arg)
 }
 
 /**
- * ioc4_attach_local - Device initialization.
- *			Called at *_attach() time for each
- *			IOC4 with serial ports in the system.
+ * ioc4_attach_local() - Device initialization.
+ *                       Called at *_attach() time for each
+ *                       IOC4 with serial ports in the system.
  * @idd: Master module data for this IOC4
  */
 static inline int ioc4_attach_local(struct ioc4_driver_data *idd)
@@ -1195,7 +1195,7 @@ free:
 }
 
 /**
- * enable_intrs - enable interrupts
+ * enable_intrs() - enable interrupts
  * @port: port to enable
  * @mask: mask to use
  */
@@ -1215,7 +1215,7 @@ static void enable_intrs(struct ioc4_port *port, uint32_t mask)
 }
 
 /**
- * local_open - local open a port
+ * local_open() - local open a port
  * @port: port to open
  */
 static inline int local_open(struct ioc4_port *port)
@@ -1264,7 +1264,7 @@ static inline int local_open(struct ioc4_port *port)
 }
 
 /**
- * set_rx_timeout - Set rx timeout and threshold values.
+ * set_rx_timeout() - Set rx timeout and threshold values.
  * @port: port to use
  * @timeout: timeout value in ticks
  */
@@ -1305,7 +1305,7 @@ static inline int set_rx_timeout(struct ioc4_port *port, int timeout)
 }
 
 /**
- * config_port - config the hardware
+ * config_port() - config the hardware
  * @port: port to config
  * @baud: baud rate for the port
  * @byte_size: data size
@@ -1396,7 +1396,7 @@ config_port(struct ioc4_port *port,
 }
 
 /**
- * do_write - Write bytes to the port.  Returns the number of bytes
+ * do_write() - Write bytes to the port.  Returns the number of bytes
  *			actually written. Called from transmit_chars
  * @port: port to use
  * @buf: the stuff to write
@@ -1481,7 +1481,7 @@ static inline int do_write(struct ioc4_port *port, char *buf, int len)
 }
 
 /**
- * disable_intrs - disable interrupts
+ * disable_intrs() - disable interrupts
  * @port: port to enable
  * @mask: mask to use
  */
@@ -1501,7 +1501,7 @@ static void disable_intrs(struct ioc4_port *port, uint32_t mask)
 }
 
 /**
- * set_notification - Modify event notification
+ * set_notification() - Modify event notification
  * @port: port to use
  * @mask: events mask
  * @set_on: set ?
@@ -1550,7 +1550,7 @@ static int set_notification(struct ioc4_port *port, int mask, int set_on)
 }
 
 /**
- * set_mcr - set the master control reg
+ * set_mcr() - set the master control reg
  * @the_port: port to use
  * @mask1: mcr mask
  * @mask2: shadow mask
@@ -1595,7 +1595,7 @@ static inline int set_mcr(struct uart_port *the_port,
 }
 
 /**
- * ioc4_set_proto - set the protocol for the port
+ * ioc4_set_proto() - set the protocol for the port
  * @port: port to use
  * @proto: protocol to use
  */
@@ -1621,7 +1621,7 @@ static int ioc4_set_proto(struct ioc4_port *port, int proto)
 }
 
 /**
- * transmit_chars - upper level write, called with ip_lock
+ * transmit_chars() - upper level write, called with ip_lock
  * @the_port: port to write
  */
 static void transmit_chars(struct uart_port *the_port)
@@ -1677,7 +1677,7 @@ static void transmit_chars(struct uart_port *the_port)
 }
 
 /**
- * ioc4_change_speed - change the speed of the port
+ * ioc4_change_speed() - change the speed of the port
  * @the_port: port to change
  * @new_termios: new termios settings
  * @old_termios: old termios settings
@@ -1783,7 +1783,7 @@ ioc4_change_speed(struct uart_port *the_port,
 }
 
 /**
- * ic4_startup_local - Start up the serial port - returns >= 0 if no errors
+ * ic4_startup_local() - Start up the serial port - returns >= 0 if no errors
  * @the_port: Port to operate on
  */
 static inline int ic4_startup_local(struct uart_port *the_port)
@@ -1829,7 +1829,7 @@ static void ioc4_cb_output_lowat(struct uart_port *the_port)
 }
 
 /**
- * handle_intr - service any interrupts for the given port - 2nd level
+ * handle_intr() - service any interrupts for the given port - 2nd level
  *			called via sd_intr
  * @arg: handler arg
  * @sio_ir: ioc4regs
@@ -2058,7 +2058,7 @@ static void ioc4_cb_post_ncs(struct uart_port *the_port, int ncs)
 }
 
 /**
- * do_read - Read in bytes from the port.  Return the number of bytes
+ * do_read() - Read in bytes from the port.  Return the number of bytes
  *			actually read.
  * @the_port: port to use
  * @buf: place to put the stuff we read
@@ -2338,7 +2338,7 @@ static inline int do_read(struct uart_port *the_port, unsigned char *buf,
 }
 
 /**
- * receive_chars - upper level read. Called with ip_lock.
+ * receive_chars() - upper level read. Called with ip_lock.
  * @the_port: port to read from
  */
 static void receive_chars(struct uart_port *the_port)
@@ -2372,7 +2372,7 @@ static void receive_chars(struct uart_port *the_port)
 }
 
 /**
- * ic4_type - What type of console are we?
+ * ic4_type() - What type of console are we?
  * @port: Port to operate with (we ignore since we only have one port)
  *
  */
@@ -2385,7 +2385,7 @@ static const char *ic4_type(struct uart_port *the_port)
 }
 
 /**
- * ic4_tx_empty - Is the transmitter empty?
+ * ic4_tx_empty() - Is the transmitter empty?
  * @port: Port to operate on
  *
  */
@@ -2402,7 +2402,7 @@ static unsigned int ic4_tx_empty(struct uart_port *the_port)
 }
 
 /**
- * ic4_stop_tx - stop the transmitter
+ * ic4_stop_tx() - stop the transmitter
  * @port: Port to operate on
  *
  */
@@ -2415,7 +2415,7 @@ static void ic4_stop_tx(struct uart_port *the_port)
 }
 
 /**
- * null_void_function -
+ * null_void_function()
  * @port: Port to operate on
  *
  */
@@ -2424,7 +2424,7 @@ static void null_void_function(struct uart_port *the_port)
 }
 
 /**
- * ic4_shutdown - shut down the port - free irq and disable
+ * ic4_shutdown() - shut down the port - free irq and disable
  * @port: Port to shut down
  *
  */
@@ -2453,7 +2453,7 @@ static void ic4_shutdown(struct uart_port *the_port)
 }
 
 /**
- * ic4_set_mctrl - set control lines (dtr, rts, etc)
+ * ic4_set_mctrl() - set control lines (dtr, rts, etc)
  * @port: Port to operate on
  * @mctrl: Lines to set/unset
  *
@@ -2482,7 +2482,7 @@ static void ic4_set_mctrl(struct uart_port *the_port, unsigned int mctrl)
 }
 
 /**
- * ic4_get_mctrl - get control line info
+ * ic4_get_mctrl() - get control line info
  * @port: port to operate on
  *
  */
@@ -2506,7 +2506,7 @@ static unsigned int ic4_get_mctrl(struct uart_port *the_port)
 }
 
 /**
- * ic4_start_tx - Start transmitter, flush any output
+ * ic4_start_tx() - Start transmitter, flush any output
  * @port: Port to operate on
  *
  */
@@ -2521,7 +2521,7 @@ static void ic4_start_tx(struct uart_port *the_port)
 }
 
 /**
- * ic4_break_ctl - handle breaks
+ * ic4_break_ctl() - handle breaks
  * @port: Port to operate on
  * @break_state: Break state
  *
@@ -2531,7 +2531,7 @@ static void ic4_break_ctl(struct uart_port *the_port, int break_state)
 }
 
 /**
- * ic4_startup - Start up the serial port
+ * ic4_startup() - Start up the serial port
  * @port: Port to operate on
  *
  */
@@ -2564,7 +2564,7 @@ static int ic4_startup(struct uart_port *the_port)
 }
 
 /**
- * ic4_set_termios - set termios stuff
+ * ic4_set_termios() - set termios stuff
  * @port: port to operate on
  * @termios: New settings
  * @termios: Old
@@ -2582,7 +2582,7 @@ ic4_set_termios(struct uart_port *the_port,
 }
 
 /**
- * ic4_request_port - allocate resources for port - no op....
+ * ic4_request_port() - allocate resources for port - no op....
  * @port: port to operate on
  *
  */
@@ -2633,7 +2633,7 @@ static struct uart_driver ioc4_uart_rs422 = {
 
 
 /**
- * ioc4_serial_remove_one - detach function
+ * ioc4_serial_remove_one() - detach function
  *
  * @idd: IOC4 master module data for this IOC4
  */
@@ -2700,7 +2700,7 @@ static int ioc4_serial_remove_one(struct ioc4_driver_data *idd)
 
 
 /**
- * ioc4_serial_core_attach_rs232 - register with serial core
+ * ioc4_serial_core_attach_rs232() - register with serial core
  *		This is done during pci probing
  * @pdev: handle for this card
  */
@@ -2765,7 +2765,7 @@ ioc4_serial_core_attach(struct pci_dev *pdev, int port_type)
 }
 
 /**
- * ioc4_serial_attach_one - register attach function
+ * ioc4_serial_attach_one() - register attach function
  *		called per card found from IOC4 master module.
  * @idd: Master module data for this IOC4
  */
@@ -2906,7 +2906,7 @@ static struct ioc4_submodule ioc4_serial_submodule = {
 };
 
 /**
- * ioc4_serial_init - module init
+ * ioc4_serial_init() - module init
  */
 static int __init ioc4_serial_init(void)
 {

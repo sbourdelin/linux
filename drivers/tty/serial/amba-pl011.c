@@ -2340,22 +2340,22 @@ static int __init pl011_console_setup(struct console *co, char *options)
 }
 
 /**
- *	pl011_console_match - non-standard console matching
- *	@co:	  registering console
- *	@name:	  name from console command line
- *	@idx:	  index from console command line
- *	@options: ptr to option string from console command line
+ * pl011_console_match() - non-standard console matching
+ * @co: registering console
+ * @name: name from console command line
+ * @idx: index from console command line
+ * @options: ptr to option string from console command line
  *
- *	Only attempts to match console command lines of the form:
- *	    console=pl011,mmio|mmio32,<addr>[,<options>]
- *	    console=pl011,0x<addr>[,<options>]
- *	This form is used to register an initial earlycon boot console and
- *	replace it with the amba_console at pl011 driver init.
+ * Only attempts to match console command lines of the form:
+ *     console=pl011,mmio|mmio32,<addr>[,<options>]
+ *     console=pl011,0x<addr>[,<options>]
+ * This form is used to register an initial earlycon boot console and
+ * replace it with the amba_console at pl011 driver init.
  *
- *	Performs console setup for a match (as required by interface)
- *	If no <options> are specified, then assume the h/w is already setup.
+ * Performs console setup for a match (as required by interface)
+ * If no <options> are specified, then assume the h/w is already setup.
  *
- *	Returns 0 if console matches; otherwise non-zero to use default matching
+ * Returns 0 if console matches; otherwise non-zero to use default matching
  */
 static int __init pl011_console_match(struct console *co, char *name, int idx,
 				      char *options)

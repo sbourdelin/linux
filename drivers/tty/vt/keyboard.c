@@ -1134,11 +1134,11 @@ static inline unsigned char getleds(void)
 }
 
 /**
- *	vt_get_leds	-	helper for braille console
- *	@console: console to read
- *	@flag: flag we want to check
+ * vt_get_leds() - helper for braille console
+ * @console: console to read
+ * @flag: flag we want to check
  *
- *	Check the status of a keyboard led flag and report it back
+ * Check the status of a keyboard led flag and report it back
  */
 int vt_get_leds(int console, int flag)
 {
@@ -1155,12 +1155,12 @@ int vt_get_leds(int console, int flag)
 EXPORT_SYMBOL_GPL(vt_get_leds);
 
 /**
- *	vt_set_led_state	-	set LED state of a console
- *	@console: console to set
- *	@leds: LED bits
+ * vt_set_led_state() - set LED state of a console
+ * @console: console to set
+ * @leds: LED bits
  *
- *	Set the LEDs on a console. This is a wrapper for the VT layer
- *	so that we can keep kbd knowledge internal
+ * Set the LEDs on a console. This is a wrapper for the VT layer
+ * so that we can keep kbd knowledge internal
  */
 void vt_set_led_state(int console, int leds)
 {
@@ -1169,17 +1169,17 @@ void vt_set_led_state(int console, int leds)
 }
 
 /**
- *	vt_kbd_con_start	-	Keyboard side of console start
- *	@console: console
+ * vt_kbd_con_start() - Keyboard side of console start
+ * @console: console
  *
- *	Handle console start. This is a wrapper for the VT layer
- *	so that we can keep kbd knowledge internal
+ * Handle console start. This is a wrapper for the VT layer
+ * so that we can keep kbd knowledge internal
  *
- *	FIXME: We eventually need to hold the kbd lock here to protect
- *	the LED updating. We can't do it yet because fn_hold calls stop_tty
- *	and start_tty under the kbd_event_lock, while normal tty paths
- *	don't hold the lock. We probably need to split out an LED lock
- *	but not during an -rc release!
+ * FIXME: We eventually need to hold the kbd lock here to protect
+ * the LED updating. We can't do it yet because fn_hold calls stop_tty
+ * and start_tty under the kbd_event_lock, while normal tty paths
+ * don't hold the lock. We probably need to split out an LED lock
+ * but not during an -rc release!
  */
 void vt_kbd_con_start(int console)
 {
@@ -1192,11 +1192,11 @@ void vt_kbd_con_start(int console)
 }
 
 /**
- *	vt_kbd_con_stop		-	Keyboard side of console stop
- *	@console: console
+ * vt_kbd_con_stop() - Keyboard side of console stop
+ * @console: console
  *
- *	Handle console stop. This is a wrapper for the VT layer
- *	so that we can keep kbd knowledge internal
+ * Handle console stop. This is a wrapper for the VT layer
+ * so that we can keep kbd knowledge internal
  */
 void vt_kbd_con_stop(int console)
 {
@@ -1634,13 +1634,13 @@ int __init kbd_init(void)
 /* Ioctl support code */
 
 /**
- *	vt_do_diacrit		-	diacritical table updates
- *	@cmd: ioctl request
- *	@udp: pointer to user data for ioctl
- *	@perm: permissions check computed by caller
+ * vt_do_diacrit() - diacritical table updates
+ * @cmd: ioctl request
+ * @udp: pointer to user data for ioctl
+ * @perm: permissions check computed by caller
  *
- *	Update the diacritical tables atomically and safely. Lock them
- *	against simultaneous keypresses
+ * Update the diacritical tables atomically and safely. Lock them
+ * against simultaneous keypresses
  */
 int vt_do_diacrit(unsigned int cmd, void __user *udp, int perm)
 {
@@ -1784,12 +1784,12 @@ int vt_do_diacrit(unsigned int cmd, void __user *udp, int perm)
 }
 
 /**
- *	vt_do_kdskbmode		-	set keyboard mode ioctl
- *	@console: the console to use
- *	@arg: the requested mode
+ * vt_do_kdskbmode() - set keyboard mode ioctl
+ * @console: the console to use
+ * @arg: the requested mode
  *
- *	Update the keyboard mode bits while holding the correct locks.
- *	Return 0 for success or an error code.
+ * Update the keyboard mode bits while holding the correct locks.
+ * Return 0 for success or an error code.
  */
 int vt_do_kdskbmode(int console, unsigned int arg)
 {
@@ -1824,12 +1824,12 @@ int vt_do_kdskbmode(int console, unsigned int arg)
 }
 
 /**
- *	vt_do_kdskbmeta		-	set keyboard meta state
- *	@console: the console to use
- *	@arg: the requested meta state
+ * vt_do_kdskbmeta() - set keyboard meta state
+ * @console: the console to use
+ * @arg: the requested meta state
  *
- *	Update the keyboard meta bits while holding the correct locks.
- *	Return 0 for success or an error code.
+ * Update the keyboard meta bits while holding the correct locks.
+ * Return 0 for success or an error code.
  */
 int vt_do_kdskbmeta(int console, unsigned int arg)
 {
@@ -2158,10 +2158,10 @@ int vt_do_kdgkbmode(int console)
 }
 
 /**
- *	vt_do_kdgkbmeta		-	report meta status
- *	@console: console to report
+ * vt_do_kdgkbmeta() - report meta status
+ * @console: console to report
  *
- *	Report the meta flag status of this console
+ * Report the meta flag status of this console
  */
 int vt_do_kdgkbmeta(int console)
 {
@@ -2171,10 +2171,10 @@ int vt_do_kdgkbmeta(int console)
 }
 
 /**
- *	vt_reset_unicode	-	reset the unicode status
- *	@console: console being reset
+ * vt_reset_unicode() - reset the unicode status
+ * @console: console being reset
  *
- *	Restore the unicode console state to its default
+ * Restore the unicode console state to its default
  */
 void vt_reset_unicode(int console)
 {
@@ -2186,10 +2186,10 @@ void vt_reset_unicode(int console)
 }
 
 /**
- *	vt_get_shiftstate	-	shift bit state
+ * vt_get_shiftstate() - shift bit state
  *
- *	Report the shift bits from the keyboard state. We have to export
- *	this to support some oddities in the vt layer.
+ * Report the shift bits from the keyboard state. We have to export
+ * this to support some oddities in the vt layer.
  */
 int vt_get_shift_state(void)
 {
@@ -2198,11 +2198,11 @@ int vt_get_shift_state(void)
 }
 
 /**
- *	vt_reset_keyboard	-	reset keyboard state
- *	@console: console to reset
+ * vt_reset_keyboard() - reset keyboard state
+ * @console: console to reset
  *
- *	Reset the keyboard bits for a console as part of a general console
- *	reset event
+ * Reset the keyboard bits for a console as part of a general console
+ * reset event
  */
 void vt_reset_keyboard(int console)
 {
@@ -2226,12 +2226,12 @@ void vt_reset_keyboard(int console)
 }
 
 /**
- *	vt_get_kbd_mode_bit	-	read keyboard status bits
- *	@console: console to read from
- *	@bit: mode bit to read
+ * vt_get_kbd_mode_bit() - read keyboard status bits
+ * @console: console to read from
+ * @bit: mode bit to read
  *
- *	Report back a vt mode bit. We do this without locking so the
- *	caller must be sure that there are no synchronization needs
+ * Report back a vt mode bit. We do this without locking so the
+ * caller must be sure that there are no synchronization needs
  */
 
 int vt_get_kbd_mode_bit(int console, int bit)
@@ -2241,12 +2241,12 @@ int vt_get_kbd_mode_bit(int console, int bit)
 }
 
 /**
- *	vt_set_kbd_mode_bit	-	read keyboard status bits
- *	@console: console to read from
- *	@bit: mode bit to read
+ * vt_set_kbd_mode_bit() - read keyboard status bits
+ * @console: console to read from
+ * @bit: mode bit to read
  *
- *	Set a vt mode bit. We do this without locking so the
- *	caller must be sure that there are no synchronization needs
+ * Set a vt mode bit. We do this without locking so the
+ * caller must be sure that there are no synchronization needs
  */
 
 void vt_set_kbd_mode_bit(int console, int bit)
@@ -2260,12 +2260,12 @@ void vt_set_kbd_mode_bit(int console, int bit)
 }
 
 /**
- *	vt_clr_kbd_mode_bit	-	read keyboard status bits
- *	@console: console to read from
- *	@bit: mode bit to read
+ * vt_clr_kbd_mode_bit() - read keyboard status bits
+ * @console: console to read from
+ * @bit: mode bit to read
  *
- *	Report back a vt mode bit. We do this without locking so the
- *	caller must be sure that there are no synchronization needs
+ * Report back a vt mode bit. We do this without locking so the
+ * caller must be sure that there are no synchronization needs
  */
 
 void vt_clr_kbd_mode_bit(int console, int bit)

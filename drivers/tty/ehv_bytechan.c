@@ -730,7 +730,7 @@ static struct platform_driver ehv_bc_tty_driver = {
 };
 
 /**
- * ehv_bc_init - ePAPR hypervisor byte channel driver initialization
+ * ehv_bc_init() - ePAPR hypervisor byte channel driver initialization
  *
  * This function is called when this driver is loaded.
  */

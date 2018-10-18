@@ -79,12 +79,12 @@ static DEFINE_SPINLOCK(vt_event_lock);
 static DECLARE_WAIT_QUEUE_HEAD(vt_event_waitqueue);
 
 /**
- *	vt_event_post
- *	@event: the event that occurred
- *	@old: old console
- *	@new: new console
+ * vt_event_post()
+ * @event: the event that occurred
+ * @old: old console
+ * @new: new console
  *
- *	Post an VT event to interested VT handlers
+ * Post an VT event to interested VT handlers
  */
 
 void vt_event_post(unsigned int event, unsigned int old, unsigned int new)
@@ -143,14 +143,13 @@ static void __vt_event_dequeue(struct vt_event_wait *vw)
 }
 
 /**
- *	vt_event_wait		-	wait for an event
- *	@vw: our event
+ * vt_event_wait() - wait for an event
+ * @vw: our event
  *
- *	Waits for an event to occur which completes our vt_event_wait
- *	structure. On return the structure has wv->done set to 1 for success
- *	or 0 if some event such as a signal ended the wait.
+ * Waits for an event to occur which completes our vt_event_wait
+ * structure. On return the structure has wv->done set to 1 for success
+ * or 0 if some event such as a signal ended the wait.
  */
-
 static void vt_event_wait(struct vt_event_wait *vw)
 {
 	__vt_event_queue(vw);
@@ -159,10 +158,10 @@ static void vt_event_wait(struct vt_event_wait *vw)
 }
 
 /**
- *	vt_event_wait_ioctl	-	event ioctl handler
- *	@arg: argument to ioctl
+ * vt_event_wait_ioctl() - event ioctl handler
+ * @arg: argument to ioctl
  *
- *	Implement the VT_WAITEVENT ioctl using the VT event interface
+ * Implement the VT_WAITEVENT ioctl using the VT event interface
  */
 
 static int vt_event_wait_ioctl(struct vt_event __user *event)
@@ -186,12 +185,12 @@ static int vt_event_wait_ioctl(struct vt_event __user *event)
 }
 
 /**
- *	vt_waitactive	-	active console wait
- *	@event: event code
- *	@n: new console
+ * vt_waitactive() - active console wait
+ * @event: event code
+ * @n: new console
  *
- *	Helper for event waits. Used to implement the legacy
- *	event waiting ioctls in terms of events
+ * Helper for event waits. Used to implement the legacy
+ * event waiting ioctls in terms of events
  */
 
 int vt_waitactive(int n)

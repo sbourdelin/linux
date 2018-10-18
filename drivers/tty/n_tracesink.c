@@ -188,7 +188,7 @@ static struct tty_ldisc_ops tty_n_tracesink = {
 };
 
 /**
- * n_tracesink_init-	module initialisation
+ * n_tracesink_init() - module initialisation
  *
  * Registers this module as a line discipline driver.
  *
@@ -207,7 +207,7 @@ static int __init n_tracesink_init(void)
 }
 
 /**
- * n_tracesink_exit -	module unload
+ * n_tracesink_exit() - module unload
  *
  * Removes this module as a line discipline driver.
  */

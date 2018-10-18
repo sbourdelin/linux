@@ -68,7 +68,7 @@ static struct timer_list mux_timer;
 #define UART_GET_FIFO_CNT(p) __raw_readl((p)->membase + IO_DCOUNT_REG_OFFSET)
 
 /**
- * get_mux_port_count - Get the number of available ports on the Mux.
+ * get_mux_port_count() - Get the number of available ports on the Mux.
  * @dev: The parisc device.
  *
  * This function is used to determine the number of ports the Mux
@@ -98,7 +98,7 @@ static int __init get_mux_port_count(struct parisc_device *dev)
 }
 
 /**
- * mux_tx_empty - Check if the transmitter fifo is empty.
+ * mux_tx_empty() - Check if the transmitter fifo is empty.
  * @port: Ptr to the uart_port.
  *
  * This function test if the transmitter fifo for the port
@@ -111,7 +111,7 @@ static unsigned int mux_tx_empty(struct uart_port *port)
 }
 
 /**
- * mux_set_mctrl - Set the current state of the modem control inputs.
+ * mux_set_mctrl() - Set the current state of the modem control inputs.
  * @ports: Ptr to the uart_port.
  * @mctrl: Modem control bits.
  *
@@ -123,7 +123,7 @@ static void mux_set_mctrl(struct uart_port *port, unsigned int mctrl)
 }
 
 /**
- * mux_get_mctrl - Returns the current state of modem control inputs.
+ * mux_get_mctrl() - Returns the current state of modem control inputs.
  * @port: Ptr to the uart_port.
  *
  * The Serial MUX does not support CTS, DCD or DSR so these lines are
@@ -135,7 +135,7 @@ static unsigned int mux_get_mctrl(struct uart_port *port)
 }
 
 /**
- * mux_stop_tx - Stop transmitting characters.
+ * mux_stop_tx() - Stop transmitting characters.
  * @port: Ptr to the uart_port.
  *
  * The Serial MUX does not support this function.
@@ -145,7 +145,7 @@ static void mux_stop_tx(struct uart_port *port)
 }
 
 /**
- * mux_start_tx - Start transmitting characters.
+ * mux_start_tx() - Start transmitting characters.
  * @port: Ptr to the uart_port.
  *
  * The Serial Mux does not support this function.
@@ -155,7 +155,7 @@ static void mux_start_tx(struct uart_port *port)
 }
 
 /**
- * mux_stop_rx - Stop receiving characters.
+ * mux_stop_rx() - Stop receiving characters.
  * @port: Ptr to the uart_port.
  *
  * The Serial Mux does not support this function.
@@ -165,7 +165,7 @@ static void mux_stop_rx(struct uart_port *port)
 }
 
 /**
- * mux_break_ctl - Control the transmitssion of a break signal.
+ * mux_break_ctl() - Control the transmitssion of a break signal.
  * @port: Ptr to the uart_port.
  * @break_state: Raise/Lower the break signal.
  *
@@ -176,7 +176,7 @@ static void mux_break_ctl(struct uart_port *port, int break_state)
 }
 
 /**
- * mux_write - Write chars to the mux fifo.
+ * mux_write() - Write chars to the mux fifo.
  * @port: Ptr to the uart_port.
  *
  * This function writes all the data from the uart buffer to
@@ -220,7 +220,7 @@ static void mux_write(struct uart_port *port)
 }
 
 /**
- * mux_read - Read chars from the mux fifo.
+ * mux_read() - Read chars from the mux fifo.
  * @port: Ptr to the uart_port.
  *
  * This reads all available data from the mux's fifo and pushes
@@ -260,7 +260,7 @@ static void mux_read(struct uart_port *port)
 }
 
 /**
- * mux_startup - Initialize the port.
+ * mux_startup() - Initialize the port.
  * @port: Ptr to the uart_port.
  *
  * Grab any resources needed for this port and start the
@@ -273,7 +273,7 @@ static int mux_startup(struct uart_port *port)
 }
 
 /**
- * mux_shutdown - Disable the port.
+ * mux_shutdown() - Disable the port.
  * @port: Ptr to the uart_port.
  *
  * Release any resources needed for the port.
@@ -284,7 +284,7 @@ static void mux_shutdown(struct uart_port *port)
 }
 
 /**
- * mux_set_termios - Chane port parameters.
+ * mux_set_termios() - Chane port parameters.
  * @port: Ptr to the uart_port.
  * @termios: new termios settings.
  * @old: old termios settings.
@@ -298,7 +298,7 @@ mux_set_termios(struct uart_port *port, struct ktermios *termios,
 }
 
 /**
- * mux_type - Describe the port.
+ * mux_type() - Describe the port.
  * @port: Ptr to the uart_port.
  *
  * Return a pointer to a string constant describing the
@@ -310,7 +310,7 @@ static const char *mux_type(struct uart_port *port)
 }
 
 /**
- * mux_release_port - Release memory and IO regions.
+ * mux_release_port() - Release memory and IO regions.
  * @port: Ptr to the uart_port.
  *
  * Release any memory and IO region resources currently in use by
@@ -321,7 +321,7 @@ static void mux_release_port(struct uart_port *port)
 }
 
 /**
- * mux_request_port - Request memory and IO regions.
+ * mux_request_port() - Request memory and IO regions.
  * @port: Ptr to the uart_port.
  *
  * Request any memory and IO region resources required by the port.
@@ -334,7 +334,7 @@ static int mux_request_port(struct uart_port *port)
 }
 
 /**
- * mux_config_port - Perform port autoconfiguration.
+ * mux_config_port() - Perform port autoconfiguration.
  * @port: Ptr to the uart_port.
  * @type: Bitmask of required configurations.
  *
@@ -350,7 +350,7 @@ static void mux_config_port(struct uart_port *port, int type)
 }
 
 /**
- * mux_verify_port - Verify the port information.
+ * mux_verify_port() - Verify the port information.
  * @port: Ptr to the uart_port.
  * @ser: Ptr to the serial information.
  *
@@ -366,7 +366,7 @@ static int mux_verify_port(struct uart_port *port, struct serial_struct *ser)
 }
 
 /**
- * mux_drv_poll - Mux poll function.
+ * mux_drv_poll() - Mux poll function.
  * @unused: Unused variable
  *
  * This function periodically polls the Serial MUX to check for new data.
@@ -442,7 +442,7 @@ static const struct uart_ops mux_pops = {
 };
 
 /**
- * mux_probe - Determine if the Serial Mux should claim this device.
+ * mux_probe() - Determine if the Serial Mux should claim this device.
  * @dev: The parisc device.
  *
  * Deterimine if the Serial Mux should claim this chip (return 0)
@@ -561,7 +561,7 @@ static struct parisc_driver serial_mux_driver __refdata = {
 };
 
 /**
- * mux_init - Serial MUX initialization procedure.
+ * mux_init() - Serial MUX initialization procedure.
  *
  * Register the Serial MUX driver.
  */
@@ -584,7 +584,7 @@ static int __init mux_init(void)
 }
 
 /**
- * mux_exit - Serial MUX cleanup procedure.
+ * mux_exit() - Serial MUX cleanup procedure.
  *
  * Unregister the Serial MUX driver from the tty layer.
  */

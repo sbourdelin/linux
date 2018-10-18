@@ -67,10 +67,10 @@ sel_pos(int n)
 }
 
 /**
- *	clear_selection		-	remove current selection
+ * clear_selection() - remove current selection
  *
- *	Remove the current selection highlight, if any from the console
- *	holding the selection. The caller must hold the console lock.
+ * Remove the current selection highlight, if any from the console
+ * holding the selection. The caller must hold the console lock.
  */
 void clear_selection(void)
 {
@@ -98,11 +98,11 @@ static inline int inword(const u32 c)
 }
 
 /**
- *	set loadlut		-	load the LUT table
- *	@p: user table
+ * sel_loadlut() - load the LUT table
+ * @p: user table
  *
- *	Load the LUT table from user space. The caller must hold the console
- *	lock. Make a temporary copy so a partial update doesn't make a mess.
+ * Load the LUT table from user space. The caller must hold the console
+ * lock. Make a temporary copy so a partial update doesn't make a mess.
  */
 int sel_loadlut(char __user *p)
 {
@@ -154,14 +154,14 @@ static int store_utf8(u32 c, char *p)
 }
 
 /**
- *	set_selection		-	set the current selection.
- *	@sel: user selection info
- *	@tty: the console tty
+ * set_selection() - set the current selection.
+ * @sel: user selection info
+ * @tty: the console tty
  *
- *	Invoked by the ioctl handle for the vt layer.
+ * Invoked by the ioctl handle for the vt layer.
  *
- *	The entire selection process is managed under the console_lock. It's
- *	 a lot under the lock but its hardly a performance path
+ * The entire selection process is managed under the console_lock. It's
+ * a lot under the lock but its hardly a performance path
  */
 int set_selection(const struct tiocl_selection __user *sel, struct tty_struct *tty)
 {

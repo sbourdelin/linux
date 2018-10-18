@@ -96,15 +96,15 @@ static void pty_unthrottle(struct tty_struct *tty)
 }
 
 /**
- *	pty_write		-	write to a pty
- *	@tty: the tty we write from
- *	@buf: kernel buffer of data
- *	@count: bytes to write
+ * pty_write() - write to a pty
+ * @tty: the tty we write from
+ * @buf: kernel buffer of data
+ * @count: bytes to write
  *
- *	Our "hardware" write method. Data is coming from the ldisc which
- *	may be in a non sleeping state. We simply throw this at the other
- *	end of the link as if we were an IRQ handler receiving stuff for
- *	the other side of the pty/tty pair.
+ * Our "hardware" write method. Data is coming from the ldisc which
+ * may be in a non sleeping state. We simply throw this at the other
+ * end of the link as if we were an IRQ handler receiving stuff for
+ * the other side of the pty/tty pair.
  */
 
 static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
@@ -128,11 +128,11 @@ static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
 }
 
 /**
- *	pty_write_room	-	write space
- *	@tty: tty we are writing from
+ * pty_write_room() - write space
+ * @tty: tty we are writing from
  *
- *	Report how many bytes the ldisc can send into the queue for
- *	the other device.
+ * Report how many bytes the ldisc can send into the queue for
+ * the other device.
  */
 
 static int pty_write_room(struct tty_struct *tty)
@@ -143,11 +143,11 @@ static int pty_write_room(struct tty_struct *tty)
 }
 
 /**
- *	pty_chars_in_buffer	-	characters currently in our tx queue
- *	@tty: our tty
+ * pty_chars_in_buffer() - characters currently in our tx queue
+ * @tty: our tty
  *
- *	Report how much we have in the transmit queue. As everything is
- *	instantly at the other end this is easy to implement.
+ * Report how much we have in the transmit queue. As everything is
+ * instantly at the other end this is easy to implement.
  */
 
 static int pty_chars_in_buffer(struct tty_struct *tty)
@@ -291,12 +291,12 @@ static void pty_set_termios(struct tty_struct *tty,
 }
 
 /**
- *	pty_do_resize		-	resize event
- *	@tty: tty being resized
- *	@ws: window size being set.
+ * pty_do_resize() - resize event
+ * @tty: tty being resized
+ * @ws: window size being set.
  *
- *	Update the termios variables and send the necessary signals to
- *	peform a terminal resize correctly
+ * Update the termios variables and send the necessary signals to
+ * peform a terminal resize correctly
  */
 
 static int pty_resize(struct tty_struct *tty,  struct winsize *ws)
@@ -329,14 +329,14 @@ done:
 }
 
 /**
- *	pty_start - start() handler
- *	pty_stop  - stop() handler
- *	@tty: tty being flow-controlled
+ * pty_start() - start handler
+ * pty_stop() - stop handler
+ * @tty: tty being flow-controlled
  *
- *	Propagates the TIOCPKT status to the master pty.
+ * Propagates the TIOCPKT status to the master pty.
  *
- *	NB: only the master pty can be in packet mode so only the slave
- *	    needs start()/stop() handlers
+ * NB: only the master pty can be in packet mode so only the slave
+ *     needs start()/stop() handlers
  */
 static void pty_start(struct tty_struct *tty)
 {
@@ -365,15 +365,15 @@ static void pty_stop(struct tty_struct *tty)
 }
 
 /**
- *	pty_common_install		-	set up the pty pair
- *	@driver: the pty driver
- *	@tty: the tty being instantiated
- *	@legacy: true if this is BSD style
+ * pty_common_install() - set up the pty pair
+ * @driver: the pty driver
+ * @tty: the tty being instantiated
+ * @legacy: true if this is BSD style
  *
- *	Perform the initial set up for the tty/pty pair. Called from the
- *	tty layer when the port is first opened.
+ * Perform the initial set up for the tty/pty pair. Called from the
+ * tty layer when the port is first opened.
  *
- *	Locking: the caller must hold the tty_mutex
+ * Locking: the caller must hold the tty_mutex
  */
 static int pty_common_install(struct tty_driver *driver, struct tty_struct *tty,
 		bool legacy)
@@ -606,14 +606,14 @@ static inline void legacy_pty_init(void) { }
 static struct cdev ptmx_cdev;
 
 /**
- *	ptm_open_peer - open the peer of a pty
- *	@master: the open struct file of the ptmx device node
- *	@tty: the master of the pty being opened
- *	@flags: the flags for open
+ * ptm_open_peer() - open the peer of a pty
+ * @master: the open struct file of the ptmx device node
+ * @tty: the master of the pty being opened
+ * @flags: the flags for open
  *
- *	Provide a race free way for userspace to open the slave end of a pty
- *	(where they have the master fd and cannot access or trust the mount
- *	namespace /dev/pts was mounted inside).
+ * Provide a race free way for userspace to open the slave end of a pty
+ * (where they have the master fd and cannot access or trust the mount
+ * namespace /dev/pts was mounted inside).
  */
 int ptm_open_peer(struct file *master, struct tty_struct *tty, int flags)
 {
@@ -687,12 +687,12 @@ static long pty_unix98_compat_ioctl(struct tty_struct *tty,
 }
 
 /**
- *	ptm_unix98_lookup	-	find a pty master
- *	@driver: ptm driver
- *	@idx: tty index
+ * ptm_unix98_lookup() - find a pty master
+ * @driver: ptm driver
+ * @idx: tty index
  *
- *	Look up a pty master device. Called under the tty_mutex for now.
- *	This provides our locking.
+ * Look up a pty master device. Called under the tty_mutex for now.
+ * This provides our locking.
  */
 
 static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
@@ -703,12 +703,12 @@ static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
 }
 
 /**
- *	pts_unix98_lookup	-	find a pty slave
- *	@driver: pts driver
- *	@idx: tty index
+ * pts_unix98_lookup() - find a pty slave
+ * @driver: pts driver
+ * @idx: tty index
  *
- *	Look up a pty master device. Called under the tty_mutex for now.
- *	This provides our locking for the tty pointer.
+ * Look up a pty master device. Called under the tty_mutex for now.
+ * This provides our locking for the tty pointer.
  */
 
 static struct tty_struct *pts_unix98_lookup(struct tty_driver *driver,
@@ -787,15 +787,15 @@ static const struct tty_operations pty_unix98_ops = {
 };
 
 /**
- *	ptmx_open		-	open a unix 98 pty master
- *	@inode: inode of device file
- *	@filp: file pointer to tty
+ * ptmx_open() - open a unix 98 pty master
+ * @inode: inode of device file
+ * @filp: file pointer to tty
  *
- *	Allocate a unix98 pty master device from the ptmx driver.
+ * Allocate a unix98 pty master device from the ptmx driver.
  *
- *	Locking: tty_mutex protects the init_dev work. tty->count should
- *		protect the rest.
- *		allocated_ptys_lock handles the list of free pty numbers
+ * Locking: tty_mutex protects the init_dev work. tty->count should
+ *          protect the rest.
+ *          allocated_ptys_lock handles the list of free pty numbers
  */
 
 static int ptmx_open(struct inode *inode, struct file *filp)

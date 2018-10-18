@@ -219,7 +219,7 @@ static void tegra_uart_break_ctl(struct uart_port *u, int break_ctl)
 }
 
 /**
- * tegra_uart_wait_cycle_time: Wait for N UART clock periods
+ * tegra_uart_wait_cycle_time() - Wait for N UART clock periods
  *
  * @tup:	Tegra serial port data structure.
  * @cycles:	Number of clock periods to wait.
