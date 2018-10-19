@@ -62,11 +62,9 @@ void kvmppc_emulate_dec(struct kvm_vcpu *vcpu)
 	dec_time = vcpu->arch.dec;
 	/*
 	 * Guest timebase ticks at the same frequency as host decrementer.
-	 * So use the host decrementer calculations for decrementer emulation.
+	 * So use the host timebase calculations for decrementer emulation.
 	 */
-	dec_time = dec_time << decrementer_clockevent.shift;
-	do_div(dec_time, decrementer_clockevent.mult);
-	dec_nsec = do_div(dec_time, NSEC_PER_SEC);
+	dec_nsec = tb_to_ns(dec_time);
 	hrtimer_start(&vcpu->arch.dec_timer,
 		ktime_set(dec_time, dec_nsec), HRTIMER_MODE_REL);
 	vcpu->arch.dec_jiffies = get_tb();
