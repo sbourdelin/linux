@@ -6485,6 +6485,12 @@ L:	linux-parisc@vger.kernel.org
 S:	Maintained
 F:	sound/parisc/harmony.*
 
+HDCAPM USB HDMI FRAME GRABBER DRIVER
+M:	Michael Grzeschik <m.grzeschik@pengutronix.de>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+F:	drivers/media/usb/hdcapm/
+
 HDPVR USB VIDEO ENCODER DRIVER
 M:	Hans Verkuil <hverkuil@xs4all.nl>
 L:	linux-media@vger.kernel.org

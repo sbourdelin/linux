@@ -1,0 +1,283 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
+/*
+ * Driver for the Startech USB2HDCAPM USB capture device
+ *
+ * Copyright (c) 2017 Steven Toth <stoth@kernellabs.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *
+ * GNU General Public License for more details.
+ */
+
+#ifndef _HDCAPM_H
+#define _HDCAPM_H
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/types.h>
+#include <linux/bitops.h>
+#include <linux/i2c.h>
+#include <linux/i2c-algo-bit.h>
+#include <linux/kdev_t.h>
+#include <linux/kthread.h>
+#include <linux/freezer.h>
+#include <linux/usb.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/firmware.h>
+#include <linux/timer.h>
+#include <media/v4l2-common.h>
+#include <media/v4l2-ctrls.h>
+#include <media/v4l2-ioctl.h>
+#include <media/v4l2-device.h>
+#include <media/v4l2-event.h>
+#include <media/v4l2-fh.h>
+
+#include "hdcapm-reg.h"
+
+extern int hdcapm_i2c_scan;
+extern int hdcapm_debug;
+
+#define HDCAPM_CARD_REV1 1
+
+#define PIPE_EP1 0x01
+#define PIPE_EP2 0x02
+#define PIPE_EP3 0x83
+#define PIPE_EP4 0x04
+
+/* The scheduler on ARM/RDU2 uses a different quanta, probably 20ms.
+ * on X86 its 10. This skews our hard timing when polling the
+ * codec memory levels (and downloading payload).
+ * SOme discussion was had re hires timers for ARM and how they may
+ * be more accurate.
+ * They're not, they just trade CPU cycles for more accurate timing.
+ * Enable this to evaluate ARM hires timers and look for the histogram
+ * results in the --log-status output, they show how accurate the
+ * kernel is for certain requested sleep intervals.
+ */
+#define TIMER_EVAL 0
+
+/* The driver started development by loading the firmware once
+ * during startup, unlike the windows driver that loads the
+ * firmware before every capture session. (ONETIME = 1).
+ * During later development, we found that if we don't load the
+ * firmware before ever capture, we lose audio in the second
+ * and subsequent capture.
+ * With ONETIME = 0 we load the firm whenever a capture starts.
+ */
+#define ONETIME_FW_LOAD 0
+
+extern struct usb_device_id hdcapm_usb_id_table[];
+
+struct hdcapm_dev;
+struct hdcapm_statistics;
+
+enum transition_state_e {
+	STATE_UNDEFINED = 0,
+	STATE_START,	/* V4L2 read() or poll() advanced to _START state. */
+
+	STATE_STARTED,	/* kernel thread notices _START state, starts
+			 * the firmware and moves state to _STARTED.
+			 */
+	STATE_STOP,     /* V4L2 close advances from _STARTED to _STOP. */
+
+	STATE_STOPPED,  /* kernel thread notices _STOPPING, stops
+			 * firmware and moves to STOPPED state.
+			 */
+};
+
+struct hdcapm_encoder_parameters {
+	/* TODO: Mostly all todo items. */
+	u32 audio_mute;
+	u32 brightness;
+	u32 bitrate_bps;
+	u32 bitrate_peak_bps;
+	u32 bitrate_mode;
+	u32 gop_size;
+
+	u32 h264_profile; /* H264 profile BASELINE etc */
+	u32 h264_level; /* H264 profile 4.1 etc */
+	u32 h264_entropy_mode; /* CABAC = 1 / CAVLC = 0 */
+	u32 h264_mode; /* VBR = 1, CBR = 0 */
+
+	/* Typically these map 1:1 to the detected timing
+	 * resolution, but these could be modified bu
+	 * s_fmt to invoke the hardware video scaler.
+	 */
+	u32 output_width;
+	u32 output_height;
+};
+
+struct hdcapm_fh {
+	struct v4l2_fh fh;
+	struct hdcapm_dev *dev;
+	atomic_t v4l_reading;
+};
+
+struct hdcapm_i2c_bus {
+	struct hdcapm_dev *dev;
+	int nr;
+	struct i2c_adapter i2c_adap;
+	struct i2c_client  i2c_client;
+	struct i2c_algo_bit_data i2c_algo;
+};
+
+struct hdcapm_dev {
+	struct list_head devlist;
+
+	char name[32];
+
+	enum transition_state_e state;
+	int thread_active;
+	struct task_struct *kthread;
+
+	struct hdcapm_statistics *stats;
+
+	/* Held by the follow driver features.
+	 * 1. During probe and disconnect.
+	 * 2. When writing commands to the firmware.
+	 */
+	struct mutex lock;
+
+	struct usb_device *udev;
+
+	/* We need to xfer USB buffers off the stack, put them here. */
+	u8  *xferbuf;
+	u32  xferbuf_len;
+
+	/* I2C.
+	 * Bus0 - MST3367.
+	 * Bus1 - Sonix chip.
+	 */
+	struct hdcapm_i2c_bus i2cbus[2];
+	//struct i2c_client *i2c_client_hdmi;
+	struct v4l2_subdev *sd;
+
+	/* V4L2 */
+	struct v4l2_device v4l2_dev;
+	struct video_device *v4l_device;
+	struct v4l2_ctrl_handler ctrl_handler;
+	atomic_t v4l_reader_count;
+	struct hdcapm_encoder_parameters encoder_parameters;
+#if TIMER_EVAL
+	struct timer_list ktimer;
+	struct hrtimer hrtimer;
+#endif
+
+	/* User buffering */
+	struct mutex dmaqueue_lock;
+	struct list_head list_buf_free;
+	struct list_head list_buf_used;
+	wait_queue_head_t wait_read;
+};
+
+struct hdcapm_buffer {
+	struct list_head   list;
+
+	int                nr;
+	struct hdcapm_dev *dev;
+	struct urb        *urb;
+
+	u8  *ptr;
+	u32  maxsize;
+	u32  actual_size;
+	u32  readpos;
+};
+
+struct hdcapm_statistics {
+	/* Number of times the driver stole a used buffer to satisfy a
+	 * free buffer streaming request.
+	 */
+	u64 buffer_overrun;
+
+	/* The amount of data we've received from the firmware
+	 * (video/audio codec data).
+	 */
+	u64 codec_bytes_received;
+
+	/* The number of buffers we're received full of codec data
+	 * (video/audio codec data).
+	 */
+	u64 codec_buffers_received;
+
+	/* Any time we call the codec to check for a TS buffer, and it
+	 * replies that it doesn't yet have one.
+	 */
+	u64 codec_ts_not_yet_ready;
+};
+
+/* -core.c */
+int hdcapm_write32(struct hdcapm_dev *dev, u32 addr, u32 val);
+int hdcapm_read32(struct hdcapm_dev *dev, u32 addr, u32 *val);
+
+/* Read N DWORDS from the firmware and optionally convert the LE
+ * firmware dwords to platform CPU DWORDS.
+ */
+int hdcapm_read32_array(struct hdcapm_dev *dev, u32 addr, u32 wordcount,
+			u32 *arr, int le_to_cpu);
+
+void hdcapm_set32(struct hdcapm_dev *dev, u32 addr, u32 mask);
+void hdcapm_clr32(struct hdcapm_dev *dev, u32 addr, u32 mask);
+
+int hdcapm_dmawrite32(struct hdcapm_dev *dev, u32 addr, const u32 *arr,
+		      u32 entries);
+int hdcapm_dmaread32(struct hdcapm_dev *dev, u32 addr, u32 *arr, u32 entries);
+int hdcapm_mem_write32(struct hdcapm_dev *dev, u32 addr, u32 val);
+int hdcapm_mem_read32(struct hdcapm_dev *dev, u32 addr, u32 *val);
+
+int hdcapm_core_ep_send(struct hdcapm_dev *dev, int endpoint, u8 *buf,
+			u32 len, u32 timeout);
+
+int hdcapm_core_ep_recv(struct hdcapm_dev *dev, int endpoint, u8 *buf,
+			u32 len, u32 *actual, u32 timeout);
+
+int hdcapm_core_stop_streaming(struct hdcapm_dev *dev);
+int hdcapm_core_start_streaming(struct hdcapm_dev *dev);
+
+/* -i2c.c */
+int hdcapm_i2c_register(struct hdcapm_dev *dev,
+			struct hdcapm_i2c_bus *bus, int nr);
+void hdcapm_i2c_unregister(struct hdcapm_dev *dev,
+			   struct hdcapm_i2c_bus *bus);
+
+/* -buffer.c */
+struct hdcapm_buffer *hdcapm_buffer_alloc(struct hdcapm_dev *dev,
+					  u32 nr, u32 maxsize);
+
+void hdcapm_buffer_free(struct hdcapm_buffer *buf);
+void hdcapm_buffers_move_all(struct hdcapm_dev *dev, struct list_head *to,
+			     struct list_head *from);
+void hdcapm_buffers_free_all(struct hdcapm_dev *dev, struct list_head *head);
+struct hdcapm_buffer *hdcapm_buffer_next_free(struct hdcapm_dev *dev);
+struct hdcapm_buffer *hdcapm_buffer_peek_used(struct hdcapm_dev *dev);
+void hdcapm_buffer_move_to_free(struct hdcapm_dev *dev,
+				struct hdcapm_buffer *buf);
+void hdcapm_buffer_move_to_used(struct hdcapm_dev *dev,
+				struct hdcapm_buffer *buf);
+void hdcapm_buffer_add_to_free(struct hdcapm_dev *dev,
+			       struct hdcapm_buffer *buf);
+void hdcapm_buffer_add_to_used(struct hdcapm_dev *dev,
+			       struct hdcapm_buffer *buf);
+int hdcapm_buffer_used_queue_stats(struct hdcapm_dev *dev,
+				   u64 *bytes, u64 *items);
+
+/* -compressor.c */
+int  hdcapm_compressor_register(struct hdcapm_dev *dev);
+void hdcapm_compressor_unregister(struct hdcapm_dev *dev);
+void hdcapm_compressor_run(struct hdcapm_dev *dev);
+void hdcapm_compressor_init_gpios(struct hdcapm_dev *dev);
+
+/* -video.c */
+int  hdcapm_video_register(struct hdcapm_dev *dev);
+void hdcapm_video_unregister(struct hdcapm_dev *dev);
+
+#endif /* _HDCAPM_H */
