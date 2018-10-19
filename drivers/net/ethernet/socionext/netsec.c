@@ -1343,10 +1343,10 @@ static int netsec_netdev_stop(struct net_device *ndev)
 	netsec_uninit_pkt_dring(priv, NETSEC_RING_TX);
 	netsec_uninit_pkt_dring(priv, NETSEC_RING_RX);
 
-	ret = netsec_reset_hardware(priv, false);
-
 	phy_stop(ndev->phydev);
 	phy_disconnect(ndev->phydev);
+
+	ret = netsec_reset_hardware(priv, false);
 
 	pm_runtime_put_sync(priv->dev);
 
@@ -1415,13 +1415,15 @@ static const struct net_device_ops netsec_netdev_ops = {
 };
 
 static int netsec_of_probe(struct platform_device *pdev,
-			   struct netsec_priv *priv)
+			   struct netsec_priv *priv, u32 *phy_addr)
 {
 	priv->phy_np = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
 	if (!priv->phy_np) {
 		dev_err(&pdev->dev, "missing required property 'phy-handle'\n");
 		return -EINVAL;
 	}
+
+	*phy_addr = of_mdio_parse_addr(&pdev->dev, priv->phy_np);
 
 	priv->clk = devm_clk_get(&pdev->dev, NULL); /* get by 'phy_ref_clk' */
 	if (IS_ERR(priv->clk)) {
@@ -1473,6 +1475,7 @@ static int netsec_register_mdio(struct netsec_priv *priv, u32 phy_addr)
 {
 	struct mii_bus *bus;
 	int ret;
+	u16 data;
 
 	bus = devm_mdiobus_alloc(priv->dev);
 	if (!bus)
@@ -1485,6 +1488,10 @@ static int netsec_register_mdio(struct netsec_priv *priv, u32 phy_addr)
 	bus->write = netsec_phy_write;
 	bus->parent = priv->dev;
 	priv->mii_bus = bus;
+
+	/* set phy power down */
+	data = netsec_phy_read(bus, phy_addr, 0) | 0x800;
+	netsec_phy_write(bus, phy_addr, 0, data);
 
 	if (dev_of_node(priv->dev)) {
 		struct device_node *mdio_node, *parent = dev_of_node(priv->dev);
@@ -1623,7 +1630,7 @@ static int netsec_probe(struct platform_device *pdev)
 	}
 
 	if (dev_of_node(&pdev->dev))
-		ret = netsec_of_probe(pdev, priv);
+		ret = netsec_of_probe(pdev, priv, &phy_addr);
 	else
 		ret = netsec_acpi_probe(pdev, priv, &phy_addr);
 	if (ret)
