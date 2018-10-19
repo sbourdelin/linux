@@ -1501,7 +1501,7 @@ static ssize_t disable_enclosure_messages_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	if (value > 2)
+	if (value < 0 || value > 2)
 		return -EINVAL;
 
 	cs->disable_enc_msg = value;
