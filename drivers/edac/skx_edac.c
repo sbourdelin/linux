@@ -1175,8 +1175,8 @@ static void __exit skx_exit(void)
 {
 	edac_dbg(2, "\n");
 	mce_unregister_decode_chain(&skx_mce_dec);
-	skx_remove();
 	teardown_skx_debug();
+	skx_remove();
 }
 
 module_init(skx_init);
