@@ -2205,6 +2205,9 @@ static struct btf *btf_parse(void __user *btf_data, u32 btf_data_size,
 		goto errout;
 	}
 
+	memcpy(data, &btf->hdr,
+		min_t(u32, btf->hdr.hdr_len, sizeof(btf->hdr)));
+
 	err = btf_parse_str_sec(env);
 	if (err)
 		goto errout;
