@@ -1845,7 +1845,6 @@ CPUMF_EVENT_ATTR(SF, SF_CYCLES_BASIC_DIAG, PERF_EVENT_CPUM_SF_DIAG);
 static struct attribute *cpumsf_pmu_events_attr[] = {
 	CPUMF_EVENT_PTR(SF, SF_CYCLES_BASIC),
 	NULL,
-	NULL,
 };
 
 PMU_FORMAT_ATTR(event, "config:0-63");
