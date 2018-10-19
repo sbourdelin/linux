@@ -1720,7 +1720,8 @@ vlv_dsi_get_hw_panel_orientation(struct intel_connector *connector)
 	return orientation;
 }
 
-static int intel_dsi_get_panel_orientation(struct intel_connector *connector)
+static enum drm_panel_orientation
+intel_dsi_get_panel_orientation(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	enum drm_panel_orientation orientation;
@@ -1730,6 +1731,14 @@ static int intel_dsi_get_panel_orientation(struct intel_connector *connector)
 		if (orientation != DRM_MODE_PANEL_ORIENTATION_UNKNOWN)
 			return orientation;
 	}
+
+	orientation = dev_priv->vbt.dsi.orientation;
+	if (orientation != DRM_MODE_PANEL_ORIENTATION_UNKNOWN)
+		return orientation;
+
+	orientation = dev_priv->vbt.orientation;
+	if (orientation != DRM_MODE_PANEL_ORIENTATION_UNKNOWN)
+		return orientation;
 
 	return DRM_MODE_PANEL_ORIENTATION_NORMAL;
 }
