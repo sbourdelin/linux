@@ -471,6 +471,16 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NETRONOME,	PCI_DEVICE_ID_NETRONOME_NFP600
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NETRONOME,	PCI_DEVICE_ID_NETRONOME_NFP5000,	quirk_nfp6000);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NETRONOME,	PCI_DEVICE_ID_NETRONOME_NFP6000_VF,	quirk_nfp6000);
 
+/*
+ * This PCIe controller causes external abort if config addresses above 0x200
+ * are read.
+ */
+static void quirk_dw_imx6(struct pci_dev *dev)
+{
+	dev->cfg_size = 0x200;
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SYNOPSYS,	PCI_DEVICE_ID_SYNOPSYS_IMX6,	quirk_dw_imx6);
+
 /*  On IBM Crocodile ipr SAS adapters, expand BAR to system page size */
 static void quirk_extend_bar_to_page(struct pci_dev *dev)
 {
