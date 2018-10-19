@@ -133,12 +133,29 @@ static ssize_t nfs4_copy_file_range(struct file *file_in, loff_t pos_in,
 				    struct file *file_out, loff_t pos_out,
 				    size_t count, unsigned int flags)
 {
+	struct nfs42_copy_notify_res *cn_resp = NULL;
 	ssize_t ret;
 
 	if (file_inode(file_in) == file_inode(file_out))
 		return -EINVAL;
 retry:
+	if (nfs42_files_from_same_server(file_in, file_out)) {  /* Intra-ssc */
+		if (file_in->f_op != file_out->f_op)
+			return -EXDEV;
+	} else {  /* Inter-ssc */
+		cn_resp = kzalloc(sizeof(struct nfs42_copy_notify_res),
+				  GFP_NOFS);
+		if (unlikely(cn_resp == NULL))
+			return -ENOMEM;
+
+		ret = nfs42_proc_copy_notify(file_in, file_out, cn_resp);
+		if (ret)
+			goto out;
+	}
 	ret = nfs42_proc_copy(file_in, pos_in, file_out, pos_out, count);
+
+out:
+	kfree(cn_resp);
 	if (ret == -EAGAIN)
 		goto retry;
 	return ret;
