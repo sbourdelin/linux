@@ -184,7 +184,7 @@ static int get_all_bus_mappings(void)
 		d->bus[1] =  GET_BITFIELD(reg, 8, 15);
 		d->bus[2] =  GET_BITFIELD(reg, 16, 23);
 		d->bus[3] =  GET_BITFIELD(reg, 24, 31);
-		edac_dbg(2, "busses: %x, %x, %x, %x\n",
+		edac_dbg(2, "busses: 0x%x, 0x%x, 0x%x, 0x%x\n",
 			 d->bus[0], d->bus[1], d->bus[2], d->bus[3]);
 		list_add_tail(&d->list, &skx_edac_list);
 		skx_num_sockets++;
@@ -220,8 +220,8 @@ static int get_all_munits(const struct munit *m)
 
 		/* Be sure that the device is enabled */
 		if (unlikely(pci_enable_device(pdev) < 0)) {
-			skx_printk(KERN_ERR,
-				"Couldn't enable %04x:%04x\n", PCI_VENDOR_ID_INTEL, m->did);
+			skx_printk(KERN_ERR, "Couldn't enable device %04x:%04x\n",
+				   PCI_VENDOR_ID_INTEL, m->did);
 			goto fail;
 		}
 
@@ -298,7 +298,7 @@ static int get_dimm_attr(u32 reg, int lobit, int hibit, int add, int minval,
 	u32 val = GET_BITFIELD(reg, lobit, hibit);
 
 	if (val < minval || val > maxval) {
-		edac_dbg(2, "bad %s = %d (raw=%x)\n", name, val, reg);
+		edac_dbg(2, "bad %s = %d (raw=0x%x)\n", name, val, reg);
 		return -EINVAL;
 	}
 	return val + add;
@@ -343,7 +343,7 @@ static int skx_get_hi_lo(void)
 	skx_tohm |= (u64)reg << 32;
 
 	pci_dev_put(pdev);
-	edac_dbg(2, "tolm=%llx tohm=%llx\n", skx_tolm, skx_tohm);
+	edac_dbg(2, "tolm=0x%llx tohm=0x%llx\n", skx_tolm, skx_tohm);
 
 	return 0;
 }
@@ -403,18 +403,18 @@ static int get_nvdimm_info(struct dimm_info *dimm, struct skx_imc *imc,
 	}
 
 	if (smbios_handle < 0) {
-		skx_printk(KERN_ERR, "Can't find handle for NVDIMM ADR=%x\n", dev_handle);
+		skx_printk(KERN_ERR, "Can't find handle for NVDIMM ADR=0x%x\n", dev_handle);
 		goto unknown_size;
 	}
 
 	if (flags & ACPI_NFIT_MEM_MAP_FAILED) {
-		skx_printk(KERN_ERR, "NVDIMM ADR=%x is not mapped\n", dev_handle);
+		skx_printk(KERN_ERR, "NVDIMM ADR=0x%x is not mapped\n", dev_handle);
 		goto unknown_size;
 	}
 
 	size = dmi_memdev_size(smbios_handle);
 	if (size == ~0ull)
-		skx_printk(KERN_ERR, "Can't find size for NVDIMM ADR=%x/SMBIOS=%x\n",
+		skx_printk(KERN_ERR, "Can't find size for NVDIMM ADR=0x%x/SMBIOS=0x%x\n",
 			   dev_handle, smbios_handle);
 
 unknown_size:
@@ -589,7 +589,7 @@ static bool skx_sad_decode(struct decoded_addr *res)
 
 	/* Simple sanity check for I/O space or out of range */
 	if (addr >= skx_tohm || (addr >= skx_tolm && addr < BIT_ULL(32))) {
-		edac_dbg(0, "Address %llx out of range\n", addr);
+		edac_dbg(0, "Address 0x%llx out of range\n", addr);
 		return false;
 	}
 
@@ -604,7 +604,7 @@ restart:
 		}
 		prev_limit = limit + 1;
 	}
-	edac_dbg(0, "No SAD entry for %llx\n", addr);
+	edac_dbg(0, "No SAD entry for 0x%llx\n", addr);
 	return false;
 
 sad_found:
@@ -682,7 +682,7 @@ sad_found:
 	res->imc = GET_BITFIELD(d->mcroute, lchan * 3, lchan * 3 + 2);
 	res->channel = GET_BITFIELD(d->mcroute, lchan * 2 + 18, lchan * 2 + 19);
 
-	edac_dbg(2, "%llx: socket=%d imc=%d channel=%d\n",
+	edac_dbg(2, "0x%llx: socket=%d imc=%d channel=%d\n",
 		 res->addr, res->socket, res->imc, res->channel);
 	return true;
 }
@@ -729,7 +729,7 @@ static bool skx_tad_decode(struct decoded_addr *res)
 		if (SKX_TAD_BASE(base) <= res->addr && res->addr <= SKX_TAD_LIMIT(wayness))
 			goto tad_found;
 	}
-	edac_dbg(0, "No TAD entry for %llx\n", res->addr);
+	edac_dbg(0, "No TAD entry for 0x%llx\n", res->addr);
 	return false;
 
 tad_found:
@@ -757,7 +757,7 @@ tad_found:
 
 	res->chan_addr = channel_addr;
 
-	edac_dbg(2, "%llx: chan_addr=%llx sktways=%d chanways=%d\n",
+	edac_dbg(2, "0x%llx: chan_addr=0x%llx sktways=%d chanways=%d\n",
 		 res->addr, res->chan_addr, res->sktways, res->chanways);
 	return true;
 }
@@ -799,7 +799,7 @@ static bool skx_rir_decode(struct decoded_addr *res)
 		}
 		prev_limit = limit;
 	}
-	edac_dbg(0, "No RIR entry for %llx\n", res->addr);
+	edac_dbg(0, "No RIR entry for 0x%llx\n", res->addr);
 	return false;
 
 rir_found:
@@ -818,7 +818,7 @@ rir_found:
 	res->dimm = chan_rank / 4;
 	res->rank = chan_rank % 4;
 
-	edac_dbg(2, "%llx: dimm=%d rank=%d chan_rank=%d rank_addr=%llx\n",
+	edac_dbg(2, "0x%llx: dimm=%d rank=%d chan_rank=%d rank_addr=0x%llx\n",
 		 res->addr, res->dimm, res->rank,
 		 res->channel_rank, res->rank_address);
 	return true;
@@ -881,7 +881,7 @@ static bool skx_mad_decode(struct decoded_addr *r)
 	}
 	r->row &= (1u << dimm->rowbits) - 1;
 
-	edac_dbg(2, "%llx: row=%x col=%x bank_addr=%d bank_group=%d\n",
+	edac_dbg(2, "0x%llx: row=0x%x col=0x%x bank_addr=%d bank_group=%d\n",
 		 r->addr, r->row, r->column, r->bank_address,
 		 r->bank_group);
 	return true;
@@ -1009,7 +1009,7 @@ static void skx_mce_output_error(struct mem_ctl_info *mci,
 	}
 
 	snprintf(msg, sizeof(msg),
-		 "%s%s err_code:%04x:%04x socket:%d imc:%d rank:%d bg:%d ba:%d row:%x col:%x",
+		 "%s%s err_code:0x%04x:0x%04x socket:%d imc:%d rank:%d bg:%d ba:%d row:0x%x col:0x%x",
 		 overflow ? " OVERFLOW" : "",
 		 (uncorrected_error && recoverable) ? " recoverable" : "",
 		 mscod, errcode,
@@ -1055,12 +1055,12 @@ static int skx_mce_check_error(struct notifier_block *nb, unsigned long val,
 	skx_mc_printk(mci, KERN_DEBUG, "CPU %d: Machine Check %s: %Lx "
 			  "Bank %d: %016Lx\n", mce->extcpu, type,
 			  mce->mcgstatus, mce->bank, mce->status);
-	skx_mc_printk(mci, KERN_DEBUG, "TSC %llx ", mce->tsc);
-	skx_mc_printk(mci, KERN_DEBUG, "ADDR %llx ", mce->addr);
-	skx_mc_printk(mci, KERN_DEBUG, "MISC %llx ", mce->misc);
+	skx_mc_printk(mci, KERN_DEBUG, "TSC 0x%llx ", mce->tsc);
+	skx_mc_printk(mci, KERN_DEBUG, "ADDR 0x%llx ", mce->addr);
+	skx_mc_printk(mci, KERN_DEBUG, "MISC 0x%llx ", mce->misc);
 
-	skx_mc_printk(mci, KERN_DEBUG, "PROCESSOR %u:%x TIME %llu SOCKET "
-			  "%u APIC %x\n", mce->cpuvendor, mce->cpuid,
+	skx_mc_printk(mci, KERN_DEBUG, "PROCESSOR %u:0x%x TIME %llu SOCKET "
+			  "%u APIC 0x%x\n", mce->cpuvendor, mce->cpuid,
 			  mce->time, mce->socketid, mce->apicid);
 
 	skx_mce_output_error(mci, mce, &res);
@@ -1136,7 +1136,7 @@ static int __init skx_init(void)
 		if (rc < 0)
 			goto fail;
 		if (rc != m->per_socket * skx_num_sockets) {
-			edac_dbg(2, "Expected %d, got %d of %x\n",
+			edac_dbg(2, "Expected %d, got %d of 0x%x\n",
 				 m->per_socket * skx_num_sockets, rc, m->did);
 			rc = -ENODEV;
 			goto fail;
