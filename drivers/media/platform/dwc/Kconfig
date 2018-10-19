@@ -1,6 +1,34 @@
 #
 #  Synopsys DWC Platform drivers
-#	Drivers here are currently for MIPI DPHY support
+#	Most drivers here are currently for MIPI CSI-2 and MIPI DPHY support
+
+config DWC_MIPI_CSI2_HOST
+	bool "Synopsys Designware CSI-2 Host Controller and DPHY-RX support"
+	select VIDEO_DEV
+	select VIDEO_V4L2
+	select VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+	 This selects the CSI-2 host controller support.
+
+	 If you have a controller with this interface, say Y.
+
+	  If unsure, say N.
+
+if DWC_MIPI_CSI2_HOST
+
+config DWC_MIPI_CSI2_HOST_PLATFORM
+	tristate "Platform bus based CSI-2 Host Controller support"
+	depends on HAS_DMA
+	help
+	 This selects the CSI-2 host controller support. Select this if
+	 you have an CSI-2 Host controller on Platform bus.
+
+	 If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
+endif # DWC_MIPI_CSI2_HOST
 
 config DWC_MIPI_DPHY_GEN3
 	tristate "DesignWare platform support using a Gen3 D-PHY"
