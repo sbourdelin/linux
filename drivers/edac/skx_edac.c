@@ -26,6 +26,7 @@
 #include <linux/bitmap.h>
 #include <linux/math64.h>
 #include <linux/mod_devicetable.h>
+#include <linux/bits.h>
 #include <acpi/nfit.h>
 #include <asm/cpu_device_id.h>
 #include <asm/intel-family.h>
@@ -894,52 +895,6 @@ static bool skx_decode(struct decoded_addr *res)
 		skx_rir_decode(res) && skx_mad_decode(res);
 }
 
-#ifdef CONFIG_EDAC_DEBUG
-/*
- * Debug feature.
- * Exercise the address decode logic by writing an address to
- * /sys/kernel/debug/edac/skx_edac_test/addr.
- */
-static struct dentry *skx_test;
-
-static int debugfs_u64_set(void *data, u64 val)
-{
-	struct decoded_addr res;
-
-	res.addr = val;
-	skx_decode(&res);
-
-	return 0;
-}
-DEFINE_SIMPLE_ATTRIBUTE(fops_u64_wo, NULL, debugfs_u64_set, "%llu\n");
-
-static void setup_skx_debug(void)
-{
-	skx_test = edac_debugfs_create_dir("skx_edac_test");
-	if (!skx_test)
-		return;
-
-	if (!edac_debugfs_create_file("addr", 0200, skx_test,
-				      NULL, &fops_u64_wo)) {
-		debugfs_remove(skx_test);
-		skx_test = NULL;
-	}
-}
-
-static void teardown_skx_debug(void)
-{
-	debugfs_remove_recursive(skx_test);
-}
-#else
-static void setup_skx_debug(void)
-{
-}
-
-static void teardown_skx_debug(void)
-{
-}
-#endif /*CONFIG_EDAC_DEBUG*/
-
 static void skx_mce_output_error(struct mem_ctl_info *mci,
 				 const struct mce *m,
 				 struct decoded_addr *res)
@@ -1071,6 +1026,52 @@ static struct notifier_block skx_mce_dec = {
 	.notifier_call	= skx_mce_check_error,
 	.priority	= MCE_PRIO_EDAC,
 };
+
+#ifdef CONFIG_EDAC_DEBUG
+/*
+ * Debug feature.
+ * Exercise the address decode logic by writing an address to
+ * /sys/kernel/debug/edac/skx_edac_test/addr.
+ */
+static struct dentry *skx_test;
+
+static int debugfs_u64_set(void *data, u64 val)
+{
+	struct mce m;
+
+	memset(&m, 0, sizeof(m));
+	/* ADDRV + MemRd + Unknown channel */
+	m.status = MCI_STATUS_ADDRV + 0x90;
+	/* One corrected error */
+	m.status |= BIT_ULL(MCI_STATUS_CEC_SHIFT);
+	m.addr = val;
+	skx_mce_check_error(NULL, 0, &m);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(fops_u64_wo, NULL, debugfs_u64_set, "%llu\n");
+
+static void setup_skx_debug(void)
+{
+	skx_test = edac_debugfs_create_dir("skx_edac_test");
+	if (!skx_test)
+		return;
+
+	if (!edac_debugfs_create_file("addr", 0200, skx_test,
+				      NULL, &fops_u64_wo)) {
+		debugfs_remove(skx_test);
+		skx_test = NULL;
+	}
+}
+
+static void teardown_skx_debug(void)
+{
+	debugfs_remove_recursive(skx_test);
+}
+#else
+static void setup_skx_debug(void) {}
+static void teardown_skx_debug(void) {}
+#endif /*CONFIG_EDAC_DEBUG*/
 
 static void skx_remove(void)
 {
