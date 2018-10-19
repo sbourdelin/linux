@@ -14492,6 +14492,9 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 	stride = i915_gem_object_get_stride(obj);
 	i915_gem_object_unlock(obj);
 
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		goto err;
+
 	if (mode_cmd->flags & DRM_MODE_FB_MODIFIERS) {
 		/*
 		 * If there's a fence, enforce that
