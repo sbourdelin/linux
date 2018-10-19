@@ -615,8 +615,6 @@ static struct scsi_transport_template *qedf_fc_vport_transport_template;
 static int qedf_eh_abort(struct scsi_cmnd *sc_cmd)
 {
 	struct fc_rport *rport = starget_to_rport(scsi_target(sc_cmd->device));
-	struct fc_rport_libfc_priv *rp = rport->dd_data;
-	struct qedf_rport *fcport;
 	struct fc_lport *lport;
 	struct qedf_ctx *qedf;
 	struct qedf_ioreq *io_req;
@@ -635,8 +633,6 @@ static int qedf_eh_abort(struct scsi_cmnd *sc_cmd)
 		QEDF_ERR(&(qedf->dbg_ctx), "link not ready.\n");
 		goto out;
 	}
-
-	fcport = (struct qedf_rport *)&rp[1];
 
 	io_req = (struct qedf_ioreq *)sc_cmd->SCp.ptr;
 	if (!io_req) {
