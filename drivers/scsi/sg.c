@@ -76,11 +76,11 @@ static int sg_proc_init(void);
 #define SG_MAX_CDB_SIZE 252
 
 /* Following defines are states of sg_request::rq_state */
-#define SG_RQ_INACTIVE 0        /* request not in use (e.g. on fl) */
-#define SG_RQ_INFLIGHT 1        /* SCSI request issued, no response yet */
-#define SG_RQ_AWAIT_READ 2      /* response received, awaiting read */
-#define SG_RQ_DONE_READ 3       /* read is ongoing or done */
-#define SG_RQ_BUSY 4            /* example: reserve request changing size */
+#define SG_RQ_INACTIVE 0	/* request not in use (e.g. on fl) */
+#define SG_RQ_INFLIGHT 1	/* SCSI request issued, no response yet */
+#define SG_RQ_AWAIT_READ 2	/* response received, awaiting read */
+#define SG_RQ_DONE_READ 3	/* read is ongoing or done */
+#define SG_RQ_BUSY 4		/* example: reserve request changing size */
 
 /* free up requests larger than this dlen size after use */
 #define SG_RQ_DATA_THRESHOLD (128 * 1024)
@@ -88,8 +88,8 @@ static int sg_proc_init(void);
 /* If sum_of(dlen) of a fd exceeds this, write() will yield E2BIG */
 #define SG_TOT_FD_THRESHOLD (16 * 1024 * 1024)
 
-#define SG_TIME_UNIT_MS 0       /* milliseconds */
-#define SG_TIME_UNIT_NS 1       /* nanoseconds */
+#define SG_TIME_UNIT_MS 0	/* milliseconds */
+#define SG_TIME_UNIT_NS 1	/* nanoseconds */
 #define SG_DEF_TIME_UNIT SG_TIME_UNIT_MS
 #define SG_DEFAULT_TIMEOUT mult_frac(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
 
@@ -184,7 +184,6 @@ struct sg_fd {		/* holds the state of a file descriptor */
 	bool cmd_q;	/* true -> allow command queuing, false -> don't */
 	bool keep_orphan;/* false -> drop (def), true -> keep for read() */
 	bool mmap_called;	/* false -> mmap() never called on this fd */
-	bool sse_seen;		/* SG_SET_EXTENDED ioctl seen */
 	bool time_in_ns;	/* report times in nanoseconds */
 	u8 next_cmd_len;	/* 0: automatic, >0: use on next write() */
 	struct sg_request *reserve_srp;	/* allocate on open(), starts on fl */
@@ -238,6 +237,8 @@ static void sg_remove_request(struct sg_fd *sfp, struct sg_request *srp);
 static struct sg_device *sg_get_dev(int min_dev);
 static void sg_device_destroy(struct kref *kref);
 static const char *sg_rq_state_str(u8 rq_state, bool long_str);
+static struct sg_request *sg_mk_srp(struct sg_fd *sfp, bool first,
+				    rwlock_t *rwlp, unsigned long *iflagsp);
 
 #define SZ_SG_HEADER sizeof(struct sg_header)	/* v1 and v2 header */
 #define SZ_SG_IO_HDR sizeof(struct sg_io_hdr)	/* v3 header */
@@ -505,9 +506,9 @@ sg_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 		return IS_ERR(sfp) ? PTR_ERR(sfp) : -ENXIO;
 	}
 	sdp = sfp->parentdp;
+	SG_LOG(3, sdp, "%s: read() count=%d\n", __func__, (int)count);
 	if (IS_ERR_OR_NULL(sdp))
 		return IS_ERR(sdp) ? PTR_ERR(sdp) : -ENXIO;
-	SG_LOG(3, sdp, "%s: read() count=%d\n", __func__, (int)count);
 
 	if (!access_ok(VERIFY_WRITE, buf, count))
 		return -EFAULT;
@@ -812,11 +813,11 @@ sg_v3_write(struct sg_fd *sfp, struct file *file, const char __user *buf,
 		return -ENOSYS;
 	if (hp->flags & SG_FLAG_MMAP_IO) {
 		if (!list_empty(&sfp->rq_list))
-			return -EBUSY;  /* already active requests on fd */
+			return -EBUSY;	/* already active requests on fd */
 		if (hp->dxfer_len > sfp->reserve_srp->data.dlen)
-			return -ENOMEM; /* MMAP_IO size must fit in reserve */
+			return -ENOMEM;	/* MMAP_IO size must fit in reserve */
 		if (hp->flags & SG_FLAG_DIRECT_IO)
-			return -EINVAL; /* not both MMAP_IO and DIRECT_IO */
+			return -EINVAL;	/* not both MMAP_IO and DIRECT_IO */
 	}
 	sfp->cmd_q = true; /* when sg_io_hdr seen, set command queuing on */
 	ul_timeout = msecs_to_jiffies(hp->timeout);
@@ -854,7 +855,7 @@ sg_common_write(struct sg_fd *sfp, const struct sg_io_hdr *hi_p,
 	srp = sg_add_request(sfp, hi_p->dxfer_len, false);
 	if (IS_ERR(srp))
 		return srp;
-	srp->header = *hi_p;    /* structure assignment, could memcpy */
+	srp->header = *hi_p;	/* structure assignment, could memcpy */
 	hp = &srp->header;
 	srp->data.cmd_opcode = cmnd[0];	/* hold opcode of command */
 	hp->status = 0;
@@ -1004,69 +1005,300 @@ srp_state_or_detaching(struct sg_device *sdp, struct sg_request *srp)
 	return ret;
 }
 
+/* For handling ioctl(SG_IO). Returns 0 on success else a negated errno */
+static int
+sg_sg_io(struct file *filp, struct sg_device *sdp, struct sg_fd *sfp,
+	 void __user *p)
+{
+	bool read_only = (O_RDWR != (filp->f_flags & O_ACCMODE));
+	int result;
+	unsigned long iflags;
+	struct sg_request *srp;
+	const char *cp;
+
+	SG_LOG(3, sdp, "%s:  ioctl(SG_IO)\n", __func__);
+	if (atomic_read(&sdp->detaching))
+		return -ENODEV;
+	if (!scsi_block_when_processing_errors(sdp->device))
+		return -ENXIO;
+	if (!access_ok(VERIFY_WRITE, p, SZ_SG_IO_HDR))
+		return -EFAULT;
+	result = sg_v3_write(sfp, filp, p, SZ_SG_IO_HDR, read_only,
+			     true, &srp);
+	if (unlikely(result < 0))
+		return result;
+	/* usually will be woken up by sg_rq_end_io() callback */
+	result = wait_event_interruptible(sfp->read_wait,
+				srp_state_or_detaching(sdp, srp));
+	spin_lock_irqsave(&srp->rq_entry_lck, iflags);
+	if (unlikely(result)) { /* -ERESTARTSYS because signal hit thread */
+		srp->orphan = true;
+		srp->rq_state = SG_RQ_INFLIGHT;
+		spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
+		SG_LOG(1, sdp, "%s:  wait_event_interruptible gave %d\n",
+		       __func__, result);
+		return result;
+	}
+	if (unlikely(atomic_read(&sdp->detaching))) {
+		srp->rq_state = SG_RQ_INACTIVE;
+		spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
+		return -ENODEV;
+	} else if (likely(srp->rq_state == SG_RQ_AWAIT_READ)) {
+		srp->rq_state = SG_RQ_DONE_READ;
+		spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
+		result = sg_new_read(sfp, p, SZ_SG_IO_HDR, srp);
+		return (result < 0) ? result : 0;
+	}
+	cp = sg_rq_state_str(srp->rq_state, true);
+	SG_LOG(1, sdp, "%s: unexpected srp=0x%p  state: %s\n", __func__,
+	       srp, cp);
+	spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
+	return -EPROTO;		/* Logic error */
+}
+
+/* Returns 0 on success, else a negated errno value */
+static int
+sg_reserved_sz(struct sg_fd *sfp, struct sg_extended_info *seip)
+{
+	bool free_n_srp = false;
+	int result = 0;
+	int val, mx_sect_bytes;
+	unsigned long iflags;
+	struct sg_request *srp;		/* prior reserve request */
+	struct sg_request *n_srp;	/* new sg_request, may be used */
+	struct sg_request *flf_srp;	/* free list first element */
+	struct sg_device *sdp = sfp->parentdp;
+
+	mx_sect_bytes = max_sectors_bytes(sdp->device->request_queue);
+	if (!(seip->valid_wr_mask & SG_SEIM_RESERVED_SIZE)) {	/* read only */
+		srp = sfp->reserve_srp;
+		seip->reserved_sz = (u32)min_t(int, srp->data.dlen,
+					       mx_sect_bytes);
+		SG_LOG(3, sdp, "%s: rd val=%u\n", __func__, seip->reserved_sz);
+		return 0;
+	}
+	val = min_t(int, (int)seip->reserved_sz, mx_sect_bytes);
+	SG_LOG(3, sdp, "%s: val=%u modify to %d\n", __func__,
+	       seip->reserved_sz, val);
+	/* Should sizes less than PAGE_SIZE be permitted? Round up? */
+	n_srp = sg_mk_srp(sfp, true, NULL, NULL);
+	if (IS_ERR(n_srp))
+		return PTR_ERR(n_srp);
+	if (val > 0) {
+		result = sg_mk_sgat_dlen(n_srp, sfp, val);
+		if (result) {
+			kfree(n_srp);
+			return result;
+		}
+	}
+	/* new sg_request object, sized correctly is now available */
+	write_lock_irqsave(&sfp->rq_list_lock, iflags);
+	srp = sfp->reserve_srp;
+	spin_lock(&srp->rq_entry_lck);
+	/* Should not matter if srp->rq_state != SG_RQ_INACTIVE */
+	if (sfp->mmap_called) {
+		result = -EBUSY;
+		free_n_srp = true;
+		goto unlock;
+	}
+	flf_srp = list_first_entry_or_null(&sfp->rq_free_list,
+					   struct sg_request, free_entry);
+	if (flf_srp && flf_srp != srp && val <= flf_srp->data.dlen) {
+		spin_lock(&flf_srp->rq_entry_lck);
+		if (flf_srp->rq_state == SG_RQ_INACTIVE) {
+			free_n_srp = true;
+			sfp->reserve_srp = flf_srp;
+		}
+		spin_unlock(&flf_srp->rq_entry_lck);
+	}
+	if (!free_n_srp) {
+		sfp->reserve_srp = n_srp;
+		list_add(&n_srp->free_entry, &sfp->rq_free_list);
+	}
+	if (seip->valid_rd_mask & SG_SEIM_RESERVED_SIZE) {
+		srp = sfp->reserve_srp;
+		seip->reserved_sz = (u32)min_t(int, srp->data.dlen,
+					       mx_sect_bytes);
+	}
+unlock:
+	spin_unlock(&srp->rq_entry_lck);
+	write_unlock_irqrestore(&sfp->rq_list_lock, iflags);
+	if (free_n_srp) {
+		sg_remove_sgat(n_srp);
+		kfree(n_srp);	/* no-one else has seen n_srp, so safe */
+	}
+	return result;
+}
+
+/* Returns 0 on success, else a negated errno value */
+static int
+sg_set_reserved_sz(struct sg_fd *sfp, int val)
+{
+	struct sg_extended_info *seip;
+	struct sg_extended_info sei;
+
+	seip = &sei;
+	memset(seip, 0, sizeof(*seip));
+	seip->valid_wr_mask = SG_SEIM_RESERVED_SIZE;
+	seip->reserved_sz = (u32)val;
+	return sg_reserved_sz(sfp, seip);
+}
+
+static bool
+sg_any_persistent_orphans(struct sg_fd *sfp)
+{
+	bool res = false;
+	unsigned long iflags;
+	struct sg_request *srp;
+
+	if (!sfp->keep_orphan)
+		return false;
+	read_lock_irqsave(&sfp->rq_list_lock, iflags);
+	list_for_each_entry(srp, &sfp->rq_list, rq_entry) {
+		if (srp->orphan) {
+			res = true;
+			break;
+		}
+	}
+	read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
+	return res;
+}
+
+static int
+sg_set_get_extended(struct sg_fd *sfp, void __user *p)
+{
+	int result = 0;
+	u32 uv;
+	struct sg_device *sdp = sfp->parentdp;
+	struct sg_extended_info *seip;
+	struct sg_extended_info sei;
+	u32 or_masks;
+
+	seip = &sei;
+	if (!access_ok(VERIFY_READ, p, SZ_SG_EXTENDED_INFO))
+		return -EFAULT;
+	if (__copy_from_user(seip, p, SZ_SG_EXTENDED_INFO))
+		return -EFAULT;
+	or_masks = seip->valid_wr_mask | seip->valid_rd_mask;
+	if (or_masks == 0) {
+		SG_LOG(2, sdp, "%s: both masks 0, do nothing\n", __func__);
+		return 0;
+	}
+	SG_LOG(3, sdp, "%s: wr_mask=0x%x rd_mask=0x%x\n", __func__,
+	       seip->valid_wr_mask, seip->valid_rd_mask);
+	if (or_masks & SG_SEIM_RESERVED_SIZE)
+		result = sg_reserved_sz(sfp, seip);
+	if (or_masks & SG_SEIM_RQ_REM_THRESH) {
+		if (seip->valid_wr_mask & SG_SEIM_RQ_REM_THRESH) {
+			uv = seip->rq_rem_sgat_thresh;
+			if (uv < PAGE_SIZE)
+				uv = PAGE_SIZE;
+			sfp->rem_sgat_thresh = uv;
+		}
+		if (seip->valid_rd_mask & SG_SEIM_RQ_REM_THRESH)
+			seip->rq_rem_sgat_thresh = sfp->rem_sgat_thresh;
+	}
+	if (or_masks & SG_SEIM_TOT_FD_THRESH) {
+		if (seip->valid_wr_mask & SG_SEIM_TOT_FD_THRESH) {
+			uv = seip->tot_fd_thresh;
+			if (uv > 0 && uv < PAGE_SIZE)
+				uv = PAGE_SIZE;
+			sfp->tot_fd_thresh = uv;
+		}
+		if (seip->valid_rd_mask & SG_SEIM_TOT_FD_THRESH)
+			seip->tot_fd_thresh = sfp->tot_fd_thresh;
+	}
+	if (or_masks & SG_SEIM_CTL_FLAGS) {
+		/* don't care whether wr or rd mask set in or_mask */
+		if (seip->ctl_flags_wr_mask & SG_CTL_FLAGM_TIME_IN_NS)
+			sfp->time_in_ns =
+				!!(seip->ctl_flags & SG_CTL_FLAGM_TIME_IN_NS);
+		if (seip->ctl_flags_rd_mask & SG_CTL_FLAGM_TIME_IN_NS) {
+			if (sfp->time_in_ns)
+				seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+			else
+				seip->ctl_flags &= ~SG_CTL_FLAGM_TIME_IN_NS;
+		}
+		if (seip->ctl_flags_rd_mask & SG_CTL_FLAGM_ORPHANS) {
+			if (sg_any_persistent_orphans(sfp))
+				seip->ctl_flags |= SG_CTL_FLAGM_ORPHANS;
+			else
+				seip->ctl_flags &= ~SG_CTL_FLAGM_ORPHANS;
+		}
+		if (seip->ctl_flags_rd_mask & SG_CTL_FLAGM_OTHER_OPENS) {
+			if (sdp->open_cnt > 1)
+				seip->ctl_flags |= SG_CTL_FLAGM_OTHER_OPENS;
+			else
+				seip->ctl_flags &= ~SG_CTL_FLAGM_OTHER_OPENS;
+		}
+	}
+	if (or_masks & SG_SEIM_MINOR_INDEX) {
+		if (seip->valid_wr_mask & SG_SEIM_MINOR_INDEX)
+			SG_LOG(2, sdp, "%s: writing to minor_index ignored\n",
+			       __func__);
+		if (seip->valid_rd_mask & SG_SEIM_MINOR_INDEX)
+			seip->minor_index = sdp->index;
+	}
+	/* send object back to user space if any read mask set */
+	if (seip->valid_rd_mask || seip->ctl_flags_rd_mask) {
+		if (access_ok(VERIFY_WRITE, p, SZ_SG_EXTENDED_INFO))
+			result = __copy_to_user(p, seip, SZ_SG_EXTENDED_INFO);
+		else
+			result = -EFAULT;
+	}
+	return result;
+}
+
 static long
 sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 {
-	bool leave;
 	void __user *p = (void __user *)arg;
 	int __user *ip = p;
-	int result, val, read_only;
 	struct sg_device *sdp;
 	struct sg_fd *sfp;
 	struct sg_request *srp;
-	const char *cp;
+	struct scsi_device *sdev;
+	const char *mlp = ", pass to mid-level";
 	unsigned long iflags;
+	int k, len, val;
+	int result = 0;
+	bool leave;
+	bool check_detach = false;
 
 	sfp = (struct sg_fd *)filp->private_data;
-	if (!sfp)
-		return -ENXIO;
+	if (IS_ERR_OR_NULL(sfp)) {
+		pr_warn("sg: %s: sfp is NULL or error\n", __func__);
+		return IS_ERR(sfp) ? PTR_ERR(sfp) : -ENXIO;
+	}
 	sdp = sfp->parentdp;
-	if (!sdp)
-		return -ENXIO;
-
-	SG_LOG(3, sdp, "%s: cmd=0x%x\n", __func__, (int)cmd_in);
-	read_only = (O_RDWR != (filp->f_flags & O_ACCMODE));
+	SG_LOG(4, sdp, "%s: cmd=0x%x\n", __func__, cmd_in);
+	if (IS_ERR_OR_NULL(sdp))
+		return IS_ERR(sdp) ? PTR_ERR(sdp) : -ENXIO;
+	sdev = sdp->device;
 
 	switch (cmd_in) {
 	case SG_IO:
-		if (atomic_read(&sdp->detaching))
-			return -ENODEV;
-		if (!scsi_block_when_processing_errors(sdp->device))
-			return -ENXIO;
-		if (!access_ok(VERIFY_WRITE, p, SZ_SG_IO_HDR))
-			return -EFAULT;
-		result = sg_v3_write(sfp, filp, p, SZ_SG_IO_HDR, read_only,
-				     true, &srp);
-		if (result < 0)
-			return result;
-		result = wait_event_interruptible(sfp->read_wait,
-					srp_state_or_detaching(sdp, srp));
-
-		spin_lock_irqsave(&srp->rq_entry_lck, iflags);
-		if (unlikely(result)) { /* -ERESTARTSYS because signal hit */
-			srp->orphan = true;
-			srp->rq_state = SG_RQ_INFLIGHT;
-			spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
-			SG_LOG(1, sdp, "%s:  wait_event_interruptible-->%d\n",
-			       __func__, result);
-			return result;
-		}
-		if (unlikely(atomic_read(&sdp->detaching))) {
-			srp->rq_state = SG_RQ_INACTIVE;
-			spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
-			return -ENODEV;
-		} else if (likely(srp->rq_state == SG_RQ_AWAIT_READ)) {
-			srp->rq_state = SG_RQ_DONE_READ;
-			spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
-			result = sg_new_read(sfp, p, SZ_SG_IO_HDR, srp);
-			return (result < 0) ? result : 0;
-		}
-		cp = sg_rq_state_str(srp->rq_state, true);
-		SG_LOG(1, sdp, "%s: unexpected srp=0x%p  state: %s\n", __func__,
-		       srp, cp);
-		spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
-		return -EPROTO;		/* Logic error */
+		return sg_sg_io(filp, sdp, sfp, p);
+	case SG_IOSUBMIT:
+		SG_LOG(3, sdp, "%s:    SG_IOSUBMIT\n", __func__);
+		/* do nothing now, more to come */
+		return 0;
+	case SG_IORECEIVE:
+		SG_LOG(3, sdp, "%s:    SG_IORECEIVE\n", __func__);
+		/* more to come */
+		return 0;
+	case SG_IOABORT:
+		SG_LOG(3, sdp, "%s:    SG_IOABORT\n", __func__);
+		/* more to come */
+		return 0;
+	case SG_SET_GET_EXTENDED:
+		SG_LOG(3, sdp, "%s:    SG_SET_GET_EXTENDED\n", __func__);
+		mutex_lock(&sfp->f_mutex);
+		result = sg_set_get_extended(sfp, p);
+		mutex_unlock(&sfp->f_mutex);
+		return 0;
 	case SG_SET_TIMEOUT:
+		SG_LOG(3, sdp, "%s:    SG_SET_TIMEOUT\n", __func__);
 		result = get_user(val, ip);
 		if (result)
 			return result;
@@ -1081,6 +1313,7 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		return 0;
 	case SG_GET_TIMEOUT:	/* N.B. User receives timeout as return value */
 				/* strange ..., for backward compatibility */
+		SG_LOG(3, sdp, "%s:    SG_GET_TIMEOUT\n", __func__);
 		return sfp->timeout_user;
 	case SG_SET_FORCE_LOW_DMA:
 		/*
@@ -1088,10 +1321,13 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		 * return an error value. So returning '0' to keep compability
 		 * with legacy applications.
 		 */
+		SG_LOG(3, sdp, "%s:    SG_SET_FORCE_LOW_DMA\n", __func__);
 		return 0;
 	case SG_GET_LOW_DMA:
-		return put_user((int)sdp->device->host->unchecked_isa_dma, ip);
+		SG_LOG(3, sdp, "%s:    SG_GET_LOW_DMA\n", __func__);
+		return put_user((int)sdev->host->unchecked_isa_dma, ip);
 	case SG_GET_SCSI_ID:
+		SG_LOG(3, sdp, "%s:    SG_GET_SCSI_ID\n", __func__);
 		if (!access_ok(VERIFY_WRITE, p, sizeof(struct sg_scsi_id)))
 			return -EFAULT;
 		else {
@@ -1099,22 +1335,22 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 
 			if (atomic_read(&sdp->detaching))
 				return -ENODEV;
-			__put_user((int)sdp->device->host->host_no,
+			__put_user((int)sdev->host->host_no,
 				   &sg_idp->host_no);
-			__put_user((int)sdp->device->channel,
-				   &sg_idp->channel);
-			__put_user((int)sdp->device->id, &sg_idp->scsi_id);
-			__put_user((int)sdp->device->lun, &sg_idp->lun);
-			__put_user((int)sdp->device->type, &sg_idp->scsi_type);
-			__put_user((short)sdp->device->host->cmd_per_lun,
+			__put_user((int)sdev->channel, &sg_idp->channel);
+			__put_user((int)sdev->id, &sg_idp->scsi_id);
+			__put_user((int)sdev->lun, &sg_idp->lun);
+			__put_user((int)sdev->type, &sg_idp->scsi_type);
+			__put_user((short)sdev->host->cmd_per_lun,
 				   &sg_idp->h_cmd_per_lun);
-			__put_user((short)sdp->device->queue_depth,
+			__put_user((short)sdev->queue_depth,
 				   &sg_idp->d_queue_depth);
 			__put_user(0, &sg_idp->unused[0]);
 			__put_user(0, &sg_idp->unused[1]);
 			return 0;
 		}
 	case SG_SET_FORCE_PACK_ID:
+		SG_LOG(3, sdp, "%s:    SG_SET_FORCE_PACK_ID\n", __func__);
 		result = get_user(val, ip);
 		if (result)
 			return result;
@@ -1156,60 +1392,54 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		       val);
 		return put_user(val, ip);
 	case SG_GET_SG_TABLESIZE:
-		return put_user(sdp->sg_tablesize, ip);
+		SG_LOG(3, sdp, "%s:    SG_GET_SG_TABLESIZE\n", __func__);
+		result = put_user(sdp->sg_tablesize, ip);
 	case SG_SET_RESERVED_SIZE:
+		mutex_lock(&sfp->f_mutex);
 		result = get_user(val, ip);
 		if (result)
-			return result;
-                if (val < 0)
-                        return -EINVAL;
-		val = min_t(int, val,
-			    max_sectors_bytes(sdp->device->request_queue));
-		srp = sfp->reserve_srp;
-		spin_lock_irqsave(&srp->rq_entry_lck, iflags);
-		if (srp->rq_state != SG_RQ_INACTIVE) {
-			result = -EBUSY;
-			spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
-			return result;
-		} else if (val != srp->data.dlen) {
-			if (sfp->mmap_called) {
-				result = -EBUSY;
-				spin_unlock_irqrestore(&srp->rq_entry_lck,
-						       iflags);
-				return result;
-			}
-			srp->rq_state = SG_RQ_BUSY;
-			spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
-			sg_remove_sgat(srp);
-			if (val > 0)
-				result = sg_mk_sgat_dlen(srp, sfp, val);
-			spin_lock_irqsave(&srp->rq_entry_lck, iflags);
-			srp->rq_state = SG_RQ_INACTIVE;
-		} else
-			result = 0;	/* nothing needs to change */
-		spin_unlock_irqrestore(&srp->rq_entry_lck, iflags);
+			;
+		else if (val >= 0 && val <= (1000 * 1000 * 1000)) {
+			SG_LOG(3, sdp, "%s: ioctl(SG_SET_RESERVED_SIZE, %d)\n",
+			       __func__, val);
+			result = sg_set_reserved_sz(sfp, val);
+		} else {
+			SG_LOG(3, sdp, "%s: invalid size\n", __func__);
+			result = -EINVAL;
+		}
+		mutex_unlock(&sfp->f_mutex);
 		return result;
 	case SG_GET_RESERVED_SIZE:
+		mutex_lock(&sfp->f_mutex);
 		val = min_t(int, sfp->reserve_srp->data.dlen,
-			    max_sectors_bytes(sdp->device->request_queue));
-		return put_user(val, ip);
+			    max_sectors_bytes(sdev->request_queue));
+		SG_LOG(3, sdp, "%s:    SG_GET_RESERVED_SIZE=%d\n",
+		       __func__, val);
+		result = put_user(val, ip);
+		mutex_unlock(&sfp->f_mutex);
+		return result;
 	case SG_SET_COMMAND_Q:
+		SG_LOG(3, sdp, "%s:    SG_SET_COMMAND_Q\n", __func__);
 		result = get_user(val, ip);
 		if (result)
 			return result;
 		sfp->cmd_q = !!val;
 		return 0;
 	case SG_GET_COMMAND_Q:
+		SG_LOG(3, sdp, "%s:    SG_GET_COMMAND_Q\n", __func__);
 		return put_user((int)sfp->cmd_q, ip);
 	case SG_SET_KEEP_ORPHAN:
+		SG_LOG(3, sdp, "%s:    SG_SET_KEEP_ORPHAN\n", __func__);
 		result = get_user(val, ip);
 		if (result)
 			return result;
 		sfp->keep_orphan = !!val;
 		return 0;
 	case SG_GET_KEEP_ORPHAN:
+		SG_LOG(3, sdp, "%s:    SG_GET_KEEP_ORPHAN\n", __func__);
 		return put_user((int)sfp->keep_orphan, ip);
 	case SG_NEXT_CMD_LEN:
+		SG_LOG(3, sdp, "%s:    SG_NEXT_CMD_LEN\n", __func__);
 		result = get_user(val, ip);
 		if (result)
 			return result;
@@ -1218,77 +1448,126 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		sfp->next_cmd_len = (val > 0) ? val : 0;
 		return 0;
 	case SG_GET_VERSION_NUM:
+		SG_LOG(3, sdp, "%s:    SG_GET_VERSION_NUM\n", __func__);
 		return put_user(sg_version_num, ip);
 	case SG_GET_ACCESS_COUNT:
+		SG_LOG(3, sdp, "%s:    SG_GET_ACCESS_COUNT\n", __func__);
 		/* faked - we don't have a real access count anymore */
-		val = (sdp->device ? 1 : 0);
+		val = (sdev ? 1 : 0);
 		return put_user(val, ip);
 	case SG_GET_REQUEST_TABLE:
-		if (!access_ok(VERIFY_WRITE, p, SZ_SG_REQ_INFO * SG_MAX_QUEUE))
-			return -EFAULT;
-		else {
+		SG_LOG(3, sdp, "%s:    SG_GET_REQUEST_TABLE\n", __func__);
+		/*
+		 * For backward compatibility, output SG_MAX_QUEUE sg_req_info
+		 * objects. Some may be empty which is indicated by
+		 * sg_req_info::req_state being equal to SG_RQ_INACTIVE, any
+		 * requests beyond SG_MAX_QUEUE are ignored.
+		 */
+		k = SG_MAX_QUEUE;
+		len = SZ_SG_REQ_INFO * k;
+		if (access_ok(VERIFY_WRITE, p, len)) {
+			int rinfos_len = len;
 			struct sg_req_info *rinfo;
 
-			rinfo = kcalloc(SG_MAX_QUEUE, SZ_SG_REQ_INFO,
-					GFP_KERNEL);
+			rinfo = kcalloc(k, SZ_SG_REQ_INFO, GFP_KERNEL);
 			if (!rinfo)
 				return -ENOMEM;
+			val = 0;
 			read_lock_irqsave(&sfp->rq_list_lock, iflags);
-			sg_fill_request_table(sfp, rinfo, SG_MAX_QUEUE);
+			list_for_each_entry(srp, &sfp->rq_list, rq_entry)
+				++val;
+			if (val > 0)
+				sg_fill_request_table(sfp, rinfo,
+						      (k < val ? k : val));
 			read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-			result = __copy_to_user(p, rinfo,
-						SZ_SG_REQ_INFO * SG_MAX_QUEUE);
+			result = __copy_to_user(p, rinfo, rinfos_len);
 			result = result ? -EFAULT : 0;
 			kfree(rinfo);
-			return result;
-		}
+		} else
+			return -EFAULT;
+		return result;
 	case SG_EMULATED_HOST:
+		SG_LOG(3, sdp, "%s:    SG_EMULATED_HOST\n", __func__);
 		if (atomic_read(&sdp->detaching))
 			return -ENODEV;
-		return put_user(sdp->device->host->hostt->emulated, ip);
+		return put_user(sdev->host->hostt->emulated, ip);
 	case SCSI_IOCTL_SEND_COMMAND:
+		SG_LOG(3, sdp, "%s:    SCSI_IOCTL_SEND_COMMAND\n", __func__);
 		if (atomic_read(&sdp->detaching))
 			return -ENODEV;
-		return sg_scsi_ioctl(sdp->device->request_queue, NULL, filp->f_mode, p);
+		return sg_scsi_ioctl(sdev->request_queue, NULL,
+				     filp->f_mode, p);
 	case SG_SET_DEBUG:
+		SG_LOG(3, sdp, "%s:    SG_SET_DEBUG\n", __func__);
 		result = get_user(val, ip);
 		if (result)
 			return result;
 		sdp->sgdebug = (char) val;
 		return 0;
 	case BLKSECTGET:
-		return put_user(max_sectors_bytes(sdp->device->request_queue),
+		SG_LOG(3, sdp, "%s:    BLKSECTGET\n", __func__);
+		return put_user(max_sectors_bytes(sdev->request_queue),
 				ip);
 	case BLKTRACESETUP:
-		return blk_trace_setup(sdp->device->request_queue,
+		SG_LOG(3, sdp, "%s:    BLKTRACESETUP\n", __func__);
+		return blk_trace_setup(sdev->request_queue,
 				       sdp->disk->disk_name,
 				       MKDEV(SCSI_GENERIC_MAJOR, sdp->index),
 				       NULL, p);
 	case BLKTRACESTART:
-		return blk_trace_startstop(sdp->device->request_queue, 1);
+		SG_LOG(3, sdp, "%s:    BLKTRACESTART\n", __func__);
+		return blk_trace_startstop(sdev->request_queue, 1);
 	case BLKTRACESTOP:
-		return blk_trace_startstop(sdp->device->request_queue, 0);
+		SG_LOG(3, sdp, "%s:    BLKTRACESTOP\n", __func__);
+		return blk_trace_startstop(sdev->request_queue, 0);
 	case BLKTRACETEARDOWN:
-		return blk_trace_remove(sdp->device->request_queue);
+		SG_LOG(3, sdp, "%s:    BLKTRACETEARDOWN\n", __func__);
+		return blk_trace_remove(sdev->request_queue);
 	case SCSI_IOCTL_GET_IDLUN:
+		SG_LOG(3, sdp, "%s:    SCSI_IOCTL_GET_IDLUN %s\n", __func__,
+		       mlp);
+		check_detach = true;
+		break;
 	case SCSI_IOCTL_GET_BUS_NUMBER:
+		SG_LOG(3, sdp, "%s:    SCSI_IOCTL_GET_BUS_NUMBER%s\n",
+		       __func__, mlp);
+		check_detach = true;
+		break;
 	case SCSI_IOCTL_PROBE_HOST:
+		SG_LOG(3, sdp, "%s:    SCSI_IOCTL_PROBE_HOST%s\n", __func__,
+		       mlp);
+		check_detach = true;
+		break;
 	case SG_GET_TRANSFORM:
+		SG_LOG(3, sdp, "%s:    SG_GET_TRANSFORM%s\n", __func__, mlp);
+		check_detach = true;
+		break;
+	case SG_SET_TRANSFORM:
+		SG_LOG(3, sdp, "%s:    SG_SET_TRANSFORM%s\n", __func__, mlp);
+		check_detach = true;
+		break;
 	case SG_SCSI_RESET:
-		if (atomic_read(&sdp->detaching))
-			return -ENODEV;
+		SG_LOG(3, sdp, "%s:    SG_SCSI_RESET\n", __func__);
+		check_detach = true;
 		break;
 	default:
-		if (read_only)
-			return -EPERM;	/* don't know so take safe approach */
+		SG_LOG(3, sdp, "%s:    unrecognized ioctl [0x%x]%s\n",
+		       __func__, cmd_in, mlp);
+		if (O_RDWR != (filp->f_flags & O_ACCMODE))
+			return -EPERM;	/* don't know, so take safer approach */
 		break;
 	}
 
-	result = scsi_ioctl_block_when_processing_errors(sdp->device,
-			cmd_in, filp->f_flags & O_NDELAY);
+	if (check_detach) {
+		if (atomic_read(&sdp->detaching))
+			return -ENODEV;
+	}
+	result = scsi_ioctl_block_when_processing_errors(sdev, cmd_in,
+						 filp->f_flags & O_NDELAY);
 	if (result)
 		return result;
-	return scsi_ioctl(sdp->device, cmd_in, p);
+	/* ioctl that reach here are forwarded to the mid-level */
+	return scsi_ioctl(sdev, cmd_in, p);
 }
 
 #ifdef CONFIG_COMPAT
@@ -1300,11 +1579,14 @@ sg_compat_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 	struct scsi_device *sdev;
 
 	sfp = (struct sg_fd *)filp->private_data;
-	if (!sfp)
-		return -ENXIO;
+	if (IS_ERR_OR_NULL(sfp)) {
+		pr_warn("sg: %s: sfp is NULL or error\n", __func__);
+		return IS_ERR(sfp) ? PTR_ERR(sfp) : -ENXIO;
+	}
 	sdp = sfp->parentdp;
-	if (!sdp)
-		return -ENXIO;
+	SG_LOG(3, sdp, "%s: cmd=0x%x\n", __func__, (int)cmd_in);
+	if (IS_ERR_OR_NULL(sdp))
+		return IS_ERR(sdp) ? PTR_ERR(sdp) : -ENXIO;
 
 	sdev = sdp->device;
 	if (sdev->host->hostt->compat_ioctl) { 
@@ -2952,9 +3234,8 @@ sg_proc_debug_helper(struct seq_file *s, struct sg_device *sdp)
 		seq_printf(s, "   cmd_q=%d f_packid=%d k_orphan=%d closed=0\n",
 			   (int)fp->cmd_q, (int)fp->force_packid,
 			   (int)fp->keep_orphan);
-		seq_printf(s, "   sse_seen=%d mmap_cal=%d sum_fd_dlens=%u\n",
-			   (int)fp->sse_seen, (int)fp->mmap_called,
-			   fp->sum_fd_dlens);
+		seq_printf(s, "   mmap_cal=%d sum_fd_dlens=%u\n",
+			   (int)fp->mmap_called, fp->sum_fd_dlens);
 		list_for_each_entry(srp, &fp->rq_list, rq_entry) {
 			spin_lock(&srp->rq_entry_lck);
 			hp = &srp->header;
@@ -3041,6 +3322,7 @@ skip:
 	read_unlock_irqrestore(&sg_index_lock, iflags);
 	return 0;
 }
+
 #endif				/* CONFIG_SCSI_PROC_FS */
 
 module_init(init_sg);
