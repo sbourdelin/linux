@@ -93,6 +93,10 @@ static int sg_proc_init(void);
 #define SG_DEF_TIME_UNIT SG_TIME_UNIT_MS
 #define SG_DEFAULT_TIMEOUT mult_frac(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
 
+#define SG_FD_Q_AT_TAIL true
+#define SG_FD_Q_AT_HEAD false
+#define SG_DEFAULT_Q_AT SG_FD_Q_AT_HEAD	/* for backward compatibility */
+
 int sg_big_buff = SG_DEF_RESERVED_SIZE;
 /* N.B. This variable is readable and writeable via
    /proc/scsi/sg/def_reserved_size . Each time sg_open() is called a buffer
@@ -185,6 +189,7 @@ struct sg_fd {		/* holds the state of a file descriptor */
 	bool keep_orphan;/* false -> drop (def), true -> keep for read() */
 	bool mmap_called;	/* false -> mmap() never called on this fd */
 	bool time_in_ns;	/* report times in nanoseconds */
+	bool q_at_tail;		/* queue at tail if true, head when false */
 	u8 next_cmd_len;	/* 0: automatic, >0: use on next write() */
 	struct sg_request *reserve_srp;	/* allocate on open(), starts on fl */
 	struct fasync_struct *async_qp;	/* used by asynchronous notification */
@@ -894,9 +899,13 @@ sg_common_write(struct sg_fd *sfp, const struct sg_io_hdr *hi_p,
 		srp->start_ts = ktime_get_with_offset(TK_OFFS_BOOT);
 	else
 		hp->duration = jiffies_to_msecs(jiffies);
-	/* at tail if v3 or later interface and tail flag set */
-	at_head = !(hp->interface_id != '\0' &&
-		    (SG_FLAG_Q_AT_TAIL & hp->flags));
+
+	if (hp->interface_id == '\0')	/* v1 and v2 interface */
+		at_head = true;		/* backward compatibility */
+	else if (sfp->q_at_tail)  /* cmd flags can override sfd setting */
+		at_head = (SG_FLAG_Q_AT_HEAD & hp->flags);
+	else		/* this sfd is defaulting to head */
+		at_head = !(SG_FLAG_Q_AT_TAIL & hp->flags);
 
 	srp->rq->timeout = timeout;
 	kref_get(&sfp->f_ref); /* sg_rq_end_io() does kref_put(). */
@@ -1186,8 +1195,10 @@ sg_set_get_extended(struct sg_fd *sfp, void __user *p)
 	}
 	SG_LOG(3, sdp, "%s: wr_mask=0x%x rd_mask=0x%x\n", __func__,
 	       seip->valid_wr_mask, seip->valid_rd_mask);
+	/* reserved_sz (u32), read-write */
 	if (or_masks & SG_SEIM_RESERVED_SIZE)
 		result = sg_reserved_sz(sfp, seip);
+	/* rq_rem_sgat_threshold (u32), read-write [impacts re-use only] */
 	if (or_masks & SG_SEIM_RQ_REM_THRESH) {
 		if (seip->valid_wr_mask & SG_SEIM_RQ_REM_THRESH) {
 			uv = seip->rq_rem_sgat_thresh;
@@ -1198,6 +1209,7 @@ sg_set_get_extended(struct sg_fd *sfp, void __user *p)
 		if (seip->valid_rd_mask & SG_SEIM_RQ_REM_THRESH)
 			seip->rq_rem_sgat_thresh = sfp->rem_sgat_thresh;
 	}
+	/* tot_fd_thresh (u32), read-write [sum of active cmd dlen_s] */
 	if (or_masks & SG_SEIM_TOT_FD_THRESH) {
 		if (seip->valid_wr_mask & SG_SEIM_TOT_FD_THRESH) {
 			uv = seip->tot_fd_thresh;
@@ -1208,8 +1220,9 @@ sg_set_get_extended(struct sg_fd *sfp, void __user *p)
 		if (seip->valid_rd_mask & SG_SEIM_TOT_FD_THRESH)
 			seip->tot_fd_thresh = sfp->tot_fd_thresh;
 	}
+	/* check all boolean flags if either wr or rd mask set in or_mask */
 	if (or_masks & SG_SEIM_CTL_FLAGS) {
-		/* don't care whether wr or rd mask set in or_mask */
+		/* TIME_IN_NS boolean, read-write */
 		if (seip->ctl_flags_wr_mask & SG_CTL_FLAGM_TIME_IN_NS)
 			sfp->time_in_ns =
 				!!(seip->ctl_flags & SG_CTL_FLAGM_TIME_IN_NS);
@@ -1219,19 +1232,32 @@ sg_set_get_extended(struct sg_fd *sfp, void __user *p)
 			else
 				seip->ctl_flags &= ~SG_CTL_FLAGM_TIME_IN_NS;
 		}
+		/* ORPHANS boolean, read-only */
 		if (seip->ctl_flags_rd_mask & SG_CTL_FLAGM_ORPHANS) {
 			if (sg_any_persistent_orphans(sfp))
 				seip->ctl_flags |= SG_CTL_FLAGM_ORPHANS;
 			else
 				seip->ctl_flags &= ~SG_CTL_FLAGM_ORPHANS;
 		}
+		/* OTHER_OPENS boolean, read-only */
 		if (seip->ctl_flags_rd_mask & SG_CTL_FLAGM_OTHER_OPENS) {
 			if (sdp->open_cnt > 1)
 				seip->ctl_flags |= SG_CTL_FLAGM_OTHER_OPENS;
 			else
 				seip->ctl_flags &= ~SG_CTL_FLAGM_OTHER_OPENS;
 		}
+		/* Q_TAIL boolean, read-write */
+		if (seip->ctl_flags_wr_mask & SG_CTL_FLAGM_Q_TAIL)
+			sfp->q_at_tail =
+				!!(seip->ctl_flags & SG_CTL_FLAGM_Q_TAIL);
+		if (seip->ctl_flags_rd_mask & SG_CTL_FLAGM_Q_TAIL) {
+			if (sfp->q_at_tail)
+				seip->ctl_flags |= SG_CTL_FLAGM_Q_TAIL;
+			else
+				seip->ctl_flags &= ~SG_CTL_FLAGM_Q_TAIL;
+		}
 	}
+	/* minor_index u32, read-only */
 	if (or_masks & SG_SEIM_MINOR_INDEX) {
 		if (seip->valid_wr_mask & SG_SEIM_MINOR_INDEX)
 			SG_LOG(2, sdp, "%s: writing to minor_index ignored\n",
@@ -2803,6 +2829,7 @@ sg_add_sfp(struct sg_device *sdp)
 	sfp->rem_sgat_thresh = SG_RQ_DATA_THRESHOLD;
 	sfp->tot_fd_thresh = SG_TOT_FD_THRESHOLD;
 	sfp->time_in_ns = !!SG_DEF_TIME_UNIT;
+	sfp->q_at_tail = SG_DEFAULT_Q_AT;
 	sfp->parentdp = sdp;
 	if (atomic_read(&sdp->detaching)) {
 		kfree(sfp);

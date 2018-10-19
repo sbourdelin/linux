@@ -109,7 +109,7 @@ typedef struct sg_io_hdr {
 #define SG_FLAG_MMAP_IO 4	/* request memory mapped IO */
 /* no transfer of kernel buffers to/from user space; to debug indirect IO */
 #define SG_FLAG_NO_DXFER 0x10000
-/* defaults: for sg driver: Q_AT_HEAD; for block layer: Q_AT_TAIL */
+/* defaults: for sg driver (v3): Q_AT_HEAD; for block layer: Q_AT_TAIL */
 #define SG_FLAG_Q_AT_TAIL 0x10
 #define SG_FLAG_Q_AT_HEAD 0x20
 
@@ -192,6 +192,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_TAG_FOR_PACK_ID	0x2
 #define SG_CTL_FLAGM_OTHER_OPENS	0x4 /* rd: other sg fd_s on this dev */
 #define SG_CTL_FLAGM_ORPHANS	0x8	/* rd: orphaned requests on this fd */
+#define SG_CTL_FLAGM_Q_TAIL	0x10	/* used for future cmds on this fd */
 
 /*
  * A pointer to the following structure is passed as the third argument to 
