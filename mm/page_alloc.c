@@ -2743,6 +2743,7 @@ static bool free_unref_page_prepare(struct page *page, unsigned long pfn)
 static void free_unref_page_commit(struct page *page, unsigned long pfn)
 {
 	struct zone *zone = page_zone(page);
+	int page_node = page_to_nid(page);
 	struct per_cpu_pages *pcp;
 	int migratetype;
 
@@ -2765,7 +2766,14 @@ static void free_unref_page_commit(struct page *page, unsigned long pfn)
 	}
 
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
-	list_add(&page->lru, &pcp->lists[migratetype]);
+	/*
+	 * If the page has the same node_id as this cpu, put the page at head.
+	 * Otherwise, put at the end.
+	 */
+	if (page_node == pcp->node)
+		list_add(&page->lru, &pcp->lists[migratetype]);
+	else
+		list_add_tail(&page->lru, &pcp->lists[migratetype]);
 	pcp->count++;
 	if (pcp->count >= pcp->high) {
 		unsigned long batch = READ_ONCE(pcp->batch);
@@ -5618,7 +5626,7 @@ static int zone_batchsize(struct zone *zone)
  * exist).
  */
 static void pageset_update(struct per_cpu_pages *pcp, unsigned long high,
-		unsigned long batch)
+			   unsigned long batch, int node_id)
 {
        /* start with a fail safe value for batch */
 	pcp->batch = 1;
@@ -5629,12 +5637,14 @@ static void pageset_update(struct per_cpu_pages *pcp, unsigned long high,
 	smp_wmb();
 
 	pcp->batch = batch;
+	pcp->node = node_id;
 }
 
 /* a companion to pageset_set_high() */
-static void pageset_set_batch(struct per_cpu_pageset *p, unsigned long batch)
+static void pageset_set_batch(struct per_cpu_pageset *p, unsigned long batch,
+			      int node_id)
 {
-	pageset_update(&p->pcp, 6 * batch, max(1UL, 1 * batch));
+	pageset_update(&p->pcp, 6 * batch, max(1UL, 1 * batch), node_id);
 }
 
 static void pageset_init(struct per_cpu_pageset *p)
@@ -5653,7 +5663,7 @@ static void pageset_init(struct per_cpu_pageset *p)
 static void setup_pageset(struct per_cpu_pageset *p, unsigned long batch)
 {
 	pageset_init(p);
-	pageset_set_batch(p, batch);
+	pageset_set_batch(p, batch, 0);
 }
 
 /*
@@ -5661,13 +5671,13 @@ static void setup_pageset(struct per_cpu_pageset *p, unsigned long batch)
  * to the value high for the pageset p.
  */
 static void pageset_set_high(struct per_cpu_pageset *p,
-				unsigned long high)
+				unsigned long high, int node_id)
 {
 	unsigned long batch = max(1UL, high / 4);
 	if ((high / 4) > (PAGE_SHIFT * 8))
 		batch = PAGE_SHIFT * 8;
 
-	pageset_update(&p->pcp, high, batch);
+	pageset_update(&p->pcp, high, batch, node_id);
 }
 
 static void pageset_set_high_and_batch(struct zone *zone,
@@ -5676,9 +5686,11 @@ static void pageset_set_high_and_batch(struct zone *zone,
 	if (percpu_pagelist_fraction)
 		pageset_set_high(pcp,
 			(zone->managed_pages /
-				percpu_pagelist_fraction));
+				percpu_pagelist_fraction),
+			zone->zone_pgdat->node_id);
 	else
-		pageset_set_batch(pcp, zone_batchsize(zone));
+		pageset_set_batch(pcp, zone_batchsize(zone),
+				  zone->zone_pgdat->node_id);
 }
 
 static void __meminit zone_pageset_init(struct zone *zone, int cpu)
