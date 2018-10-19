@@ -732,9 +732,10 @@ static struct request *attempt_merge(struct request_queue *q,
 		return NULL;
 
 	/*
-	 * not contiguous
+	 * not contiguous, except for DISCARD
 	 */
-	if (blk_rq_pos(req) + blk_rq_sectors(req) != blk_rq_pos(next))
+	if ((req_op(req) != REQ_OP_DISCARD) &&
+	    (blk_rq_pos(req) + blk_rq_sectors(req) != blk_rq_pos(next)))
 		return NULL;
 
 	if (rq_data_dir(req) != rq_data_dir(next)
