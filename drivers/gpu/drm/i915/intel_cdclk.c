@@ -2777,80 +2777,73 @@ void intel_update_rawclk(struct drm_i915_private *dev_priv)
  */
 void intel_init_cdclk_hooks(struct drm_i915_private *dev_priv)
 {
-	if (IS_CHERRYVIEW(dev_priv)) {
-		dev_priv->display.set_cdclk = chv_set_cdclk;
-		dev_priv->display.modeset_calc_cdclk =
-			vlv_modeset_calc_cdclk;
-	} else if (IS_VALLEYVIEW(dev_priv)) {
-		dev_priv->display.set_cdclk = vlv_set_cdclk;
-		dev_priv->display.modeset_calc_cdclk =
-			vlv_modeset_calc_cdclk;
-	} else if (IS_BROADWELL(dev_priv)) {
-		dev_priv->display.set_cdclk = bdw_set_cdclk;
-		dev_priv->display.modeset_calc_cdclk =
-			bdw_modeset_calc_cdclk;
-	} else if (IS_GEN9_LP(dev_priv)) {
-		dev_priv->display.set_cdclk = bxt_set_cdclk;
-		dev_priv->display.modeset_calc_cdclk =
-			bxt_modeset_calc_cdclk;
-	} else if (IS_GEN9_BC(dev_priv)) {
-		dev_priv->display.set_cdclk = skl_set_cdclk;
-		dev_priv->display.modeset_calc_cdclk =
-			skl_modeset_calc_cdclk;
+	if (IS_ICELAKE(dev_priv)) {
+		dev_priv->display.set_cdclk = icl_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk = icl_modeset_calc_cdclk;
+		dev_priv->display.get_cdclk = icl_get_cdclk;
 	} else if (IS_CANNONLAKE(dev_priv)) {
 		dev_priv->display.set_cdclk = cnl_set_cdclk;
 		dev_priv->display.modeset_calc_cdclk =
 			cnl_modeset_calc_cdclk;
-	} else if (IS_ICELAKE(dev_priv)) {
-		dev_priv->display.set_cdclk = icl_set_cdclk;
-		dev_priv->display.modeset_calc_cdclk = icl_modeset_calc_cdclk;
-	}
-
-	if (IS_ICELAKE(dev_priv))
-		dev_priv->display.get_cdclk = icl_get_cdclk;
-	else if (IS_CANNONLAKE(dev_priv))
 		dev_priv->display.get_cdclk = cnl_get_cdclk;
-	else if (IS_GEN9_BC(dev_priv))
+	} else if (IS_GEN9_BC(dev_priv)) {
+		dev_priv->display.set_cdclk = skl_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			skl_modeset_calc_cdclk;
 		dev_priv->display.get_cdclk = skl_get_cdclk;
-	else if (IS_GEN9_LP(dev_priv))
+	} else if (IS_GEN9_LP(dev_priv)) {
+		dev_priv->display.set_cdclk = bxt_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			bxt_modeset_calc_cdclk;
 		dev_priv->display.get_cdclk = bxt_get_cdclk;
-	else if (IS_BROADWELL(dev_priv))
+	} else if (IS_BROADWELL(dev_priv)) {
+		dev_priv->display.set_cdclk = bdw_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			bdw_modeset_calc_cdclk;
 		dev_priv->display.get_cdclk = bdw_get_cdclk;
-	else if (IS_HASWELL(dev_priv))
+	} else if (IS_HASWELL(dev_priv)) {
 		dev_priv->display.get_cdclk = hsw_get_cdclk;
-	else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+	} else if (IS_CHERRYVIEW(dev_priv)) {
+		dev_priv->display.set_cdclk = chv_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			vlv_modeset_calc_cdclk;
 		dev_priv->display.get_cdclk = vlv_get_cdclk;
-	else if (IS_GEN6(dev_priv) || IS_IVYBRIDGE(dev_priv))
+	} else if (IS_VALLEYVIEW(dev_priv)) {
+		dev_priv->display.set_cdclk = vlv_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			vlv_modeset_calc_cdclk;
+		dev_priv->display.get_cdclk = vlv_get_cdclk;
+	} else if (IS_GEN6(dev_priv) || IS_IVYBRIDGE(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_400mhz_get_cdclk;
-	else if (IS_GEN5(dev_priv))
+	} else if (IS_GEN5(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_450mhz_get_cdclk;
-	else if (IS_GM45(dev_priv))
+	} else if (IS_GM45(dev_priv)) {
 		dev_priv->display.get_cdclk = gm45_get_cdclk;
-	else if (IS_G45(dev_priv))
+	} else if (IS_G45(dev_priv)) {
 		dev_priv->display.get_cdclk = g33_get_cdclk;
-	else if (IS_I965GM(dev_priv))
+	} else if (IS_I965GM(dev_priv)) {
 		dev_priv->display.get_cdclk = i965gm_get_cdclk;
-	else if (IS_I965G(dev_priv))
+	} else if (IS_I965G(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_400mhz_get_cdclk;
-	else if (IS_PINEVIEW(dev_priv))
+	} else if (IS_PINEVIEW(dev_priv)) {
 		dev_priv->display.get_cdclk = pnv_get_cdclk;
-	else if (IS_G33(dev_priv))
+	} else if (IS_G33(dev_priv)) {
 		dev_priv->display.get_cdclk = g33_get_cdclk;
-	else if (IS_I945GM(dev_priv))
+	} else if (IS_I945GM(dev_priv)) {
 		dev_priv->display.get_cdclk = i945gm_get_cdclk;
-	else if (IS_I945G(dev_priv))
+	} else if (IS_I945G(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_400mhz_get_cdclk;
-	else if (IS_I915GM(dev_priv))
+	} else if (IS_I915GM(dev_priv)) {
 		dev_priv->display.get_cdclk = i915gm_get_cdclk;
-	else if (IS_I915G(dev_priv))
+	} else if (IS_I915G(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_333mhz_get_cdclk;
-	else if (IS_I865G(dev_priv))
+	} else if (IS_I865G(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_266mhz_get_cdclk;
-	else if (IS_I85X(dev_priv))
+	} else if (IS_I85X(dev_priv)) {
 		dev_priv->display.get_cdclk = i85x_get_cdclk;
-	else if (IS_I845G(dev_priv))
+	} else if (IS_I845G(dev_priv)) {
 		dev_priv->display.get_cdclk = fixed_200mhz_get_cdclk;
-	else { /* 830 */
+	} else { /* 830 */
 		WARN(!IS_I830(dev_priv),
 		     "Unknown platform. Assuming 133 MHz CDCLK\n");
 		dev_priv->display.get_cdclk = fixed_133mhz_get_cdclk;
