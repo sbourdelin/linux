@@ -51,6 +51,10 @@ static int chameleon_parse_gdd(struct mcb_bus *bus,
 		return -ENOMEM;
 
 	reg1 = readl(&gdd->reg1);
+	if ((reg1 >> 28) != CHAMELEON_DTYPE_GENERAL) {
+		ret = -EINVAL;
+		goto err;
+	}
 	reg2 = readl(&gdd->reg2);
 	offset = readl(&gdd->offset);
 	size = readl(&gdd->size);
