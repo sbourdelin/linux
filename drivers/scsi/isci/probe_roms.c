@@ -68,6 +68,7 @@ struct isci_orom *isci_request_oprom(struct pci_dev *pdev)
 			size_t copy_len;
 
 			memcpy_fromio(&oem_hdr, oprom + i, sizeof(oem_hdr));
+			memcpy(&oem_hdr.sig, oem_sig, ISCI_OEM_SIG_SIZE);
 
 			copy_len = min(oem_hdr.len - sizeof(oem_hdr),
 				       sizeof(*rom));
