@@ -1036,6 +1036,11 @@
  * @NL80211_CMD_GET_FTM_RESPONDER_STATS: Retrieve FTM responder statistics, in
  *	the %NL80211_ATTR_FTM_RESPONDER_STATS attribute.
  *
+ * @NL80211_CMD_NOTIFY_RADAR: Notify the kernel that a radar signal was
+ *	detected and reported by a neighboring device on the channel
+ *	indicated by %NL80211_ATTR_WIPHY_FREQ and other attributes
+ *	determining the width and type.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1249,6 +1254,8 @@ enum nl80211_commands {
 	NL80211_CMD_CONTROL_PORT_FRAME,
 
 	NL80211_CMD_GET_FTM_RESPONDER_STATS,
+
+	NL80211_CMD_NOTIFY_RADAR,
 
 	/* add new commands above here */
 
