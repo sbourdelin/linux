@@ -958,7 +958,9 @@ otherwise noted.
 
   fallocate: called by the VFS to preallocate blocks or punch a hole.
 
-  copy_file_range: called by the copy_file_range(2) system call.
+  copy_file_range: called by copy_file_range(2) system call. This method
+		   works on two file descriptors that might reside on
+		   different superblocks of the same type of file system.
 
   clone_file_range: called by the ioctl(2) system call for FICLONERANGE and
 	FICLONE commands.
