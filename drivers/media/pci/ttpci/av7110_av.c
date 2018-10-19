@@ -468,6 +468,8 @@ static ssize_t ts_play(struct av7110 *av7110, const char __user *buf,
 		}
 		if (copy_from_user(kb, buf, TS_SIZE))
 			return -EFAULT;
+		if (kb[0] != 0x47)
+			return -EINVAL;
 		write_ts_to_decoder(av7110, type, kb, TS_SIZE);
 		todo -= TS_SIZE;
 		buf += TS_SIZE;
