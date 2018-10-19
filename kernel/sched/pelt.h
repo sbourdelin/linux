@@ -42,6 +42,29 @@ static inline void cfs_se_util_change(struct sched_avg *avg)
 	WRITE_ONCE(avg->util_est.enqueued, enqueued);
 }
 
+void update_rq_clock_pelt(struct rq *rq, s64 delta);
+
+static inline u64 rq_clock_pelt(struct rq *rq)
+{
+	return rq->clock_pelt - rq->lost_idle_time;
+}
+
+#ifdef CONFIG_CFS_BANDWIDTH
+/* rq->task_clock normalized against any time this cfs_rq has spent throttled */
+static inline u64 cfs_rq_clock_pelt(struct cfs_rq *cfs_rq)
+{
+	if (unlikely(cfs_rq->throttle_count))
+		return cfs_rq->throttled_clock_task - cfs_rq->throttled_clock_task_time;
+
+	return rq_clock_pelt(rq_of(cfs_rq)) - cfs_rq->throttled_clock_task_time;
+}
+#else
+static inline u64 cfs_rq_clock_pelt(struct cfs_rq *cfs_rq)
+{
+	return rq_clock_pelt(rq_of(cfs_rq));
+}
+#endif
+
 #else
 
 static inline int
@@ -67,6 +90,10 @@ update_irq_load_avg(struct rq *rq, u64 running)
 {
 	return 0;
 }
+
+static inline void
+update_rq_clock_pelt(struct rq *rq, s64 delta) {}
+
 #endif
 
 

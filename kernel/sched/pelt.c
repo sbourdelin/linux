@@ -30,6 +30,72 @@
 #include "pelt.h"
 
 /*
+ * The clock_pelt scales the time to reflect the effective amount of
+ * computation done during the running delta time but then sync back to
+ * clock_task when rq is idle.
+ *
+ *
+ * absolute time   | 1| 2| 3| 4| 5| 6| 7| 8| 9|10|11|12|13|14|15|16
+ * @ max capacity  ------******---------------******---------------
+ * @ half capacity ------************---------************---------
+ * clock pelt      | 1| 2|    3|    4| 7| 8| 9|   10|   11|14|15|16
+ *
+ */
+void update_rq_clock_pelt(struct rq *rq, s64 delta)
+{
+
+	if (is_idle_task(rq->curr)) {
+		u32 divider = (LOAD_AVG_MAX - 1024 + rq->cfs.avg.period_contrib) << SCHED_CAPACITY_SHIFT;
+		u32 overload = rq->cfs.avg.util_sum + LOAD_AVG_MAX;
+		overload += rq->avg_rt.util_sum;
+		overload += rq->avg_dl.util_sum;
+
+		/*
+		 * Reflecting some stolen time makes sense only if the idle
+		 * phase would be present at max capacity. As soon as the
+		 * utilization of a rq has reached the maximum value, it is
+		 * considered as an always runnnig rq without idle time to
+		 * steal. This potential idle time is considered as lost in
+		 * this case. We keep track of this lost idle time compare to
+		 * rq's clock_task.
+		 */
+		if (overload >= divider)
+			rq->lost_idle_time += rq_clock_task(rq) - rq->clock_pelt;
+
+
+		/* The rq is idle, we can sync to clock_task */
+		rq->clock_pelt  = rq_clock_task(rq);
+
+
+	} else {
+		/*
+		 * When a rq runs at a lower compute capacity, it will need
+		 * more time to do the same amount of work than at max
+		 * capacity: either because it takes more time to compute the
+		 * same amount of work or because taking more time means
+		 * sharing more often the CPU between entities.
+		 * In order to be invariant, we scale the delta to reflect how
+		 * much work has been really done.
+		 * Running at lower capacity also means running longer to do
+		 * the same amount of work and this results in stealing some
+		 * idle time that will disturb the load signal compared to
+		 * max capacity; This stolen idle time will be automaticcally
+		 * reflected when the rq will be idle and the clock will be
+		 * synced with rq_clock_task.
+		 */
+
+		/*
+		 * scale the elapsed time to reflect the real amount of
+		 * computation
+		 */
+		delta = cap_scale(delta, arch_scale_freq_capacity(cpu_of(rq)));
+		delta = cap_scale(delta, arch_scale_cpu_capacity(NULL, cpu_of(rq)));
+
+		rq->clock_pelt += delta;
+	}
+}
+
+/*
  * Approximate:
  *   val * y^n,    where y^32 ~= 0.5 (~1 scheduling period)
  */
@@ -106,15 +172,11 @@ static u32 __accumulate_pelt_segments(u64 periods, u32 d1, u32 d3)
  *                     n=1
  */
 static __always_inline u32
-accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
+accumulate_sum(u64 delta, struct sched_avg *sa,
 	       unsigned long load, unsigned long runnable, int running)
 {
-	unsigned long scale_freq, scale_cpu;
 	u32 contrib = (u32)delta; /* p == 0 -> delta < 1024 */
 	u64 periods;
-
-	scale_freq = arch_scale_freq_capacity(cpu);
-	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
 
 	delta += sa->period_contrib;
 	periods = delta / 1024; /* A period is 1024us (~1ms) */
@@ -137,13 +199,12 @@ accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
 	}
 	sa->period_contrib = delta;
 
-	contrib = cap_scale(contrib, scale_freq);
 	if (load)
 		sa->load_sum += load * contrib;
 	if (runnable)
 		sa->runnable_load_sum += runnable * contrib;
 	if (running)
-		sa->util_sum += contrib * scale_cpu;
+		sa->util_sum += contrib << SCHED_CAPACITY_SHIFT;
 
 	return periods;
 }
@@ -221,7 +282,7 @@ ___update_load_sum(u64 now, int cpu, struct sched_avg *sa,
 	 * Step 1: accumulate *_sum since last_update_time. If we haven't
 	 * crossed period boundaries, finish.
 	 */
-	if (!accumulate_sum(delta, cpu, sa, load, runnable, running))
+	if (!accumulate_sum(delta, sa, load, runnable, running))
 		return 0;
 
 	return 1;
@@ -365,12 +426,21 @@ int update_dl_rq_load_avg(u64 now, struct rq *rq, int running)
 int update_irq_load_avg(struct rq *rq, u64 running)
 {
 	int ret = 0;
+
+	/*
+	 * We can't use clock_pelt because irq time is not accounted in
+	 * clock_task. Instead we directly scale the running time to
+	 * reflect the real amount of computation
+	 */
+	running = cap_scale(running, arch_scale_freq_capacity(cpu_of(rq)));
+	running = cap_scale(running, arch_scale_cpu_capacity(NULL, cpu_of(rq)));
+
 	/*
 	 * We know the time that has been used by interrupt since last update
 	 * but we don't when. Let be pessimistic and assume that interrupt has
 	 * happened just before the update. This is not so far from reality
 	 * because interrupt will most probably wake up task and trig an update
-	 * of rq clock during which the metric si updated.
+	 * of rq clock during which the metric is updated.
 	 * We start to decay with normal context time and then we add the
 	 * interrupt context time.
 	 * We can safely remove running from rq->clock because

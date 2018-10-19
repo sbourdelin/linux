@@ -180,6 +180,7 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
 	if ((irq_delta + steal) && sched_feat(NONTASK_CAPACITY))
 		update_irq_load_avg(rq, irq_delta + steal);
 #endif
+	update_rq_clock_pelt(rq, delta);
 }
 
 void update_rq_clock(struct rq *rq)
@@ -203,7 +204,6 @@ void update_rq_clock(struct rq *rq)
 	rq->clock += delta;
 	update_rq_clock_task(rq, delta);
 }
-
 
 #ifdef CONFIG_SCHED_HRTICK
 /*
