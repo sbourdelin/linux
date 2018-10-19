@@ -75,6 +75,22 @@ static int sg_proc_init(void);
  */
 #define SG_MAX_CDB_SIZE 252
 
+/* Following defines are states of sg_request::rq_state */
+#define SG_RQ_INACTIVE 0        /* request not in use (e.g. on fl) */
+#define SG_RQ_INFLIGHT 1        /* SCSI request issued, no response yet */
+#define SG_RQ_AWAIT_READ 2      /* response received, awaiting read */
+#define SG_RQ_DONE_READ 3       /* read is ongoing or done */
+#define SG_RQ_BUSY 4            /* example: reserve request changing size */
+
+/* free up requests larger than this dlen size after use */
+#define SG_RQ_DATA_THRESHOLD (128 * 1024)
+
+/* If sum_of(dlen) of a fd exceeds this, write() will yield E2BIG */
+#define SG_TOT_FD_THRESHOLD (16 * 1024 * 1024)
+
+#define SG_TIME_UNIT_MS 0       /* milliseconds */
+#define SG_TIME_UNIT_NS 1       /* nanoseconds */
+#define SG_DEF_TIME_UNIT SG_TIME_UNIT_MS
 #define SG_DEFAULT_TIMEOUT mult_frac(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
 
 int sg_big_buff = SG_DEF_RESERVED_SIZE;
@@ -950,6 +966,7 @@ sg_fill_request_table(struct sg_fd *sfp, struct sg_req_info *rinfo)
 	}
 }
 
+#if 0	/* temporary to shorten big patch */
 static long
 sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 {
@@ -1227,6 +1244,7 @@ sg_compat_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 	return -ENOIOCTLCMD;
 }
 #endif
+#endif		/* temporary to shorten big patch */
 
 static __poll_t
 sg_poll(struct file *filp, poll_table * wait)
@@ -1496,10 +1514,12 @@ static const struct file_operations sg_fops = {
 	.read = sg_read,
 	.write = sg_write,
 	.poll = sg_poll,
+#if 0	/* temporary to shorten big patch */
 	.unlocked_ioctl = sg_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = sg_compat_ioctl,
 #endif
+#endif		/* temporary to shorten big patch */
 	.open = sg_open,
 	.mmap = sg_mmap,
 	.release = sg_release,
@@ -2422,12 +2442,16 @@ static const struct seq_operations devstrs_seq_ops = {
 	.show  = sg_proc_seq_show_devstrs,
 };
 
+#if 0	/* temporary to shorten big patch */
 static int sg_proc_seq_show_debug(struct seq_file *s, void *v);
+#endif		/* temporary to shorten big patch */
 static const struct seq_operations debug_seq_ops = {
 	.start = dev_seq_start,
 	.next  = dev_seq_next,
 	.stop  = dev_seq_stop,
+#if 0	/* temporary to shorten big patch */
 	.show  = sg_proc_seq_show_debug,
+#endif		/* temporary to shorten big patch */
 };
 
 static int
@@ -2601,6 +2625,8 @@ sg_proc_seq_show_devstrs(struct seq_file *s, void *v)
 	return 0;
 }
 
+#if 0	/* temporary to shorten big patch */
+
 /* must be called while holding sg_index_lock */
 static void
 sg_proc_debug_helper(struct seq_file *s, struct sg_device *sdp)
@@ -2704,6 +2730,7 @@ skip:
 	read_unlock_irqrestore(&sg_index_lock, iflags);
 	return 0;
 }
+#endif		/* temporary to shorten big patch */
 
 #endif				/* CONFIG_SCSI_PROC_FS */
 
