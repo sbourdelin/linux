@@ -995,7 +995,11 @@ void phy_state_machine(struct work_struct *work)
 		}
 		break;
 	case PHY_FORCING:
-		err = genphy_update_link(phydev);
+		if (phydev->is_c45)
+			err = gen10g_read_status(phydev);
+		else
+			err = genphy_update_link(phydev);
+
 		if (err)
 			break;
 
