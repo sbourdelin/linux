@@ -1,0 +1,24 @@
+#
+#  Synopsys DWC Platform drivers
+#	Drivers here are currently for MIPI DPHY support
+
+config DWC_MIPI_DPHY_GEN3
+	tristate "DesignWare platform support using a Gen3 D-PHY"
+	depends on DWC_MIPI_CSI2_HOST
+	select GENERIC_PHY
+	help
+	 Synopsys MIPI D-PHY Generation 3 reference driver.
+
+	  If unsure, say N.
+
+if DWC_MIPI_DPHY_GEN3
+
+config DWC_MIPI_TC_DPHY_GEN3
+	bool "Platform support using a Synopsys Test Chip"
+	help
+	 Synopsys Test Chip is for prototyping purposes.
+
+	  If unsure, say N.
+
+endif # DWC_MIPI_DPHY_GEN3
+
