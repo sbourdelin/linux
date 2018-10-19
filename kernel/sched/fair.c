@@ -8436,7 +8436,7 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		 * We classify groups/runqueues into three groups:
 		 *  - regular: there are !numa tasks
 		 *  - remote:  there are numa tasks that run on the 'wrong' node
-		 *  - all:     there is no distinction
+		 *  - all:     there are numa tasks that run on the 'right' node
 		 *
 		 * In order to avoid migrating ideally placed numa tasks,
 		 * ignore those when there's better options.
