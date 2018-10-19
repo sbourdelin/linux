@@ -335,6 +335,8 @@ static int ican3_old_recv_msg(struct ican3_dev *mod, struct ican3_msg *msg)
 	mbox_page = (mbox == MSYNC_RB0) ? QUEUE_OLD_RB0 : QUEUE_OLD_RB1;
 	ican3_set_page(mod, mbox_page);
 	memcpy_fromio(msg, mod->dpm, sizeof(*msg));
+	msg->control = peer;
+	msg->spec = locl;
 
 	/*
 	 * notify the firmware that the read buffer is available
