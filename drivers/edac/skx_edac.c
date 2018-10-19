@@ -26,6 +26,7 @@
 #include <linux/bitmap.h>
 #include <linux/math64.h>
 #include <linux/mod_devicetable.h>
+#include <linux/adxl.h>
 #include <linux/bits.h>
 #include <acpi/nfit.h>
 #include <asm/cpu_device_id.h>
@@ -36,6 +37,7 @@
 #include "edac_module.h"
 
 #define EDAC_MOD_STR    "skx_edac"
+#define MSG_SIZE	1024
 
 /*
  * Debug macros
@@ -55,6 +57,29 @@
 static LIST_HEAD(skx_edac_list);
 
 static u64 skx_tolm, skx_tohm;
+static char *skx_msg;
+static int nvdimm_count;
+
+enum {
+	INDEX_SOCKET,
+	INDEX_MEMCTRL,
+	INDEX_CHANNEL,
+	INDEX_DIMM,
+	INDEX_MAX
+};
+
+static const char * const component_names[] = {
+	[INDEX_SOCKET]	= "ProcessorSocketId",
+	[INDEX_MEMCTRL]	= "MemoryControllerId",
+	[INDEX_CHANNEL]	= "ChannelId",
+	[INDEX_DIMM]	= "DimmSlotId",
+};
+
+static int component_indices[ARRAY_SIZE(component_names)];
+static int adxl_component_count;
+static const char * const *adxl_component_names;
+static u64 *adxl_values;
+static char *adxl_msg;
 
 #define NUM_IMC			2	/* memory controllers per socket */
 #define NUM_CHANNELS		3	/* channels per memory controller */
@@ -101,13 +126,13 @@ struct skx_pvt {
 struct decoded_addr {
 	struct skx_dev *dev;
 	u64	addr;
-	int	socket;
-	int	imc;
-	int	channel;
+	u64	socket;
+	u64	imc;
+	u64	channel;
 	u64	chan_addr;
 	int	sktways;
 	int	chanways;
-	int	dimm;
+	u64	dimm;
 	int	rank;
 	int	channel_rank;
 	u64	rank_address;
@@ -393,6 +418,8 @@ static int get_nvdimm_info(struct dimm_info *dimm, struct skx_imc *imc,
 	u32 dev_handle;
 	u16 flags;
 	u64 size = 0;
+
+	nvdimm_count++;
 
 	dev_handle = ACPI_NFIT_BUILD_DEVICE_HANDLE(dimmno, chan, imc->lmc,
 						   imc->src_id, 0);
@@ -683,7 +710,7 @@ sad_found:
 	res->imc = GET_BITFIELD(d->mcroute, lchan * 3, lchan * 3 + 2);
 	res->channel = GET_BITFIELD(d->mcroute, lchan * 2 + 18, lchan * 2 + 19);
 
-	edac_dbg(2, "0x%llx: socket=%d imc=%d channel=%d\n",
+	edac_dbg(2, "0x%llx: socket=%llu imc=%llu channel=%llu\n",
 		 res->addr, res->socket, res->imc, res->channel);
 	return true;
 }
@@ -819,7 +846,7 @@ rir_found:
 	res->dimm = chan_rank / 4;
 	res->rank = chan_rank % 4;
 
-	edac_dbg(2, "0x%llx: dimm=%d rank=%d chan_rank=%d rank_addr=0x%llx\n",
+	edac_dbg(2, "0x%llx: dimm=%llu rank=%d chan_rank=%d rank_addr=0x%llx\n",
 		 res->addr, res->dimm, res->rank,
 		 res->channel_rank, res->rank_address);
 	return true;
@@ -895,12 +922,45 @@ static bool skx_decode(struct decoded_addr *res)
 		skx_rir_decode(res) && skx_mad_decode(res);
 }
 
+static bool skx_adxl_decode(u64 addr, u64 *sock, u64 *imc, u64 *chan, u64 *dimm)
+
+{
+	int i, len = 0;
+
+	if (addr >= skx_tohm || (addr >= skx_tolm && addr < BIT_ULL(32))) {
+		edac_dbg(0, "Address 0x%llx out of range\n", addr);
+		return false;
+	}
+
+	if (adxl_decode(addr, adxl_values)) {
+		edac_dbg(0, "Failed to decode 0x%llx\n", addr);
+		return false;
+	}
+
+	*sock = adxl_values[component_indices[INDEX_SOCKET]];
+	*imc  = adxl_values[component_indices[INDEX_MEMCTRL]];
+	*chan = adxl_values[component_indices[INDEX_CHANNEL]];
+	*dimm = adxl_values[component_indices[INDEX_DIMM]];
+
+	for (i = 0; i < adxl_component_count; i++) {
+		if (adxl_values[i] == ~0x0ull)
+			continue;
+
+		len += snprintf(adxl_msg + len, MSG_SIZE - len, " %s:0x%llx",
+				adxl_component_names[i], adxl_values[i]);
+		if (MSG_SIZE - len <= 0)
+			break;
+	}
+
+	return true;
+}
+
 static void skx_mce_output_error(struct mem_ctl_info *mci,
 				 const struct mce *m,
 				 struct decoded_addr *res)
 {
 	enum hw_event_mc_err_type tp_event;
-	char *type, *optype, msg[256];
+	char *type, *optype;
 	bool ripv = GET_BITFIELD(m->mcgstatus, 0, 0);
 	bool overflow = GET_BITFIELD(m->status, 62, 62);
 	bool uncorrected_error = GET_BITFIELD(m->status, 61, 61);
@@ -962,21 +1022,47 @@ static void skx_mce_output_error(struct mem_ctl_info *mci,
 		}
 	}
 
-	snprintf(msg, sizeof(msg),
-		 "%s%s err_code:0x%04x:0x%04x socket:%d imc:%d rank:%d bg:%d ba:%d row:0x%x col:0x%x",
-		 overflow ? " OVERFLOW" : "",
-		 (uncorrected_error && recoverable) ? " recoverable" : "",
-		 mscod, errcode,
-		 res->socket, res->imc, res->rank,
-		 res->bank_group, res->bank_address, res->row, res->column);
+	if (adxl_component_count) {
+		snprintf(skx_msg, MSG_SIZE, "%s%s err_code:%04x:%04x %s",
+			 overflow ? " OVERFLOW" : "",
+			 (uncorrected_error && recoverable) ? " recoverable" : "",
+			 mscod, errcode, adxl_msg);
+	} else {
+		snprintf(skx_msg, MSG_SIZE, "%s%s err_code:%04x:%04x socket:%llu"
+			 " imc:%llu rank:%d bg:%d ba:%d row:%x col:%x",
+			 overflow ? " OVERFLOW" : "",
+			 (uncorrected_error && recoverable) ? " recoverable" : "",
+			 mscod, errcode, res->socket, res->imc, res->rank,
+			 res->bank_group, res->bank_address,
+			 res->row, res->column);
+	}
 
-	edac_dbg(0, "%s\n", msg);
+	edac_dbg(0, "%s\n", skx_msg);
 
 	/* Call the helper to output message */
 	edac_mc_handle_error(tp_event, mci, core_err_cnt,
 			     m->addr >> PAGE_SHIFT, m->addr & ~PAGE_MASK, 0,
 			     res->channel, res->dimm, -1,
-			     optype, msg);
+			     optype, skx_msg);
+}
+
+static struct mem_ctl_info *get_mci(u64 src_id, u64 lmc)
+{
+	struct skx_dev *d;
+
+	if (lmc > NUM_IMC - 1) {
+		skx_printk(KERN_ERR, "Bad lmc %llu\n", lmc);
+		return NULL;
+	}
+
+	list_for_each_entry(d, &skx_edac_list, list) {
+		if (d->imc[0].src_id == src_id)
+			return d->imc[lmc].mci;
+	}
+
+	skx_printk(KERN_ERR, "No mci for src_id %llu lmc %llu\n", src_id, lmc);
+
+	return NULL;
 }
 
 static int skx_mce_check_error(struct notifier_block *nb, unsigned long val,
@@ -994,10 +1080,24 @@ static int skx_mce_check_error(struct notifier_block *nb, unsigned long val,
 	if ((mce->status & 0xefff) >> 7 != 1 || !(mce->status & MCI_STATUS_ADDRV))
 		return NOTIFY_DONE;
 
+	memset(&res, 0, sizeof(res));
 	res.addr = mce->addr;
-	if (!skx_decode(&res))
+
+	if (adxl_component_count) {
+		if (!skx_adxl_decode(res.addr, &res.socket, &res.imc,
+				     &res.channel, &res.dimm))
+			return NOTIFY_DONE;
+
+		mci = get_mci(res.socket, res.imc);
+	} else {
+		if (!skx_decode(&res))
+			return NOTIFY_DONE;
+
+		mci = res.dev->imc[res.imc].mci;
+	}
+
+	if (!mci)
 		return NOTIFY_DONE;
-	mci = res.dev->imc[res.imc].mci;
 
 	if (mce->mcgstatus & MCG_STATUS_MCIP)
 		type = "Exception";
@@ -1094,6 +1194,63 @@ static void skx_remove(void)
 	}
 }
 
+static void __init skx_adxl_get(void)
+{
+	const char * const *names;
+	int i, j;
+
+	names = adxl_get_component_names();
+	if (!names) {
+		skx_printk(KERN_NOTICE, "No firmware support for address translation.");
+		skx_printk(KERN_CONT, " Only decoding DDR4 address!\n");
+		return;
+	}
+
+	for (i = 0; i < INDEX_MAX; i++) {
+		for (j = 0; names[j]; j++) {
+			if (!strcmp(component_names[i], names[j])) {
+				component_indices[i] = j;
+				break;
+			}
+		}
+
+		if (!names[j])
+			goto err;
+	}
+
+	adxl_component_names = names;
+	while (*names++)
+		adxl_component_count++;
+
+	adxl_values = kcalloc(adxl_component_count, sizeof(*adxl_values),
+			      GFP_KERNEL);
+	if (!adxl_values) {
+		adxl_component_count = 0;
+		edac_dbg(0, "No memory for adxl_decode()\n");
+	}
+
+	adxl_msg = kzalloc(MSG_SIZE, GFP_KERNEL);
+	if (!adxl_msg) {
+		adxl_component_count = 0;
+		kfree(adxl_values);
+		edac_dbg(0, "No memory for adxl_msg\n");
+	}
+
+	return;
+err:
+	skx_printk(KERN_ERR, "'%s' is not matched from DSM parameters: ",
+		   component_names[i]);
+	for (j = 0; names[j]; j++)
+		skx_printk(KERN_CONT, "%s ", names[j]);
+	skx_printk(KERN_CONT, "\n");
+}
+
+static void __exit skx_adxl_put(void)
+{
+	kfree(adxl_values);
+	kfree(adxl_msg);
+}
+
 /*
  * skx_init:
  *	make sure we are running on the correct cpu model
@@ -1158,6 +1315,16 @@ static int __init skx_init(void)
 		}
 	}
 
+	skx_msg = kzalloc(MSG_SIZE, GFP_KERNEL);
+	if (!skx_msg) {
+		edac_dbg(2, "No memory for skx_msg\n");
+		rc = -ENOMEM;
+		goto fail;
+	}
+
+	if (nvdimm_count)
+		skx_adxl_get();
+
 	/* Ensure that the OPSTATE is set correctly for POLL or NMI */
 	opstate_init();
 
@@ -1176,6 +1343,9 @@ static void __exit skx_exit(void)
 	edac_dbg(2, "\n");
 	mce_unregister_decode_chain(&skx_mce_dec);
 	teardown_skx_debug();
+	if (nvdimm_count)
+		skx_adxl_put();
+	kfree(skx_msg);
 	skx_remove();
 }
 
