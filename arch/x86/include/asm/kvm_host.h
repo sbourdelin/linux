@@ -920,6 +920,8 @@ struct kvm_arch {
 
 	bool guest_can_read_msr_platform_info;
 	bool exception_payload_enabled;
+
+	u8 dirty_logging_mode;
 };
 
 struct kvm_vm_stat {
@@ -1198,6 +1200,8 @@ struct kvm_arch_async_pf {
 };
 
 extern struct kvm_x86_ops *kvm_x86_ops;
+
+extern u8 kvm_default_dirty_log_mode;
 
 #define __KVM_HAVE_ARCH_VM_ALLOC
 static inline struct kvm *kvm_arch_alloc_vm(void)

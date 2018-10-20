@@ -7992,7 +7992,8 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->slot_disable_log_dirty = NULL;
 		kvm_x86_ops->flush_log_dirty = NULL;
 		kvm_x86_ops->get_and_reset_log_dirty = NULL;
-	}
+	} else
+		kvm_default_dirty_log_mode = KVM_DIRTY_LOG_MODE_PML;
 
 	if (!cpu_has_vmx_preemption_timer())
 		kvm_x86_ops->request_immediate_exit = __kvm_request_immediate_exit;

@@ -262,6 +262,8 @@ static const u64 shadow_nonpresent_or_rsvd_mask_len = 5;
  */
 static u64 __read_mostly shadow_nonpresent_or_rsvd_lower_gfn_mask;
 
+u8 __read_mostly kvm_default_dirty_log_mode;
+EXPORT_SYMBOL_GPL(kvm_default_dirty_log_mode);
 
 static void mmu_spte_set(u64 *sptep, u64 spte);
 static union kvm_mmu_page_role
@@ -432,8 +434,12 @@ void kvm_mmu_set_mask_ptes(u64 user_mask, u64 accessed_mask,
 	shadow_acc_track_mask = acc_track_mask;
 	shadow_me_mask = me_mask;
 
-	if (shadow_dirty_mask == 0)
+	if (shadow_dirty_mask == 0) {
 		enable_d_bit_logging = false;
+
+		if (kvm_default_dirty_log_mode == KVM_DIRTY_LOG_MODE_DBIT)
+			kvm_default_dirty_log_mode = KVM_DIRTY_LOG_MODE_WRPROT;
+	}
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_set_mask_ptes);
 
@@ -719,7 +725,7 @@ static void spte_dirty_mask_cleared(struct kvm *kvm, u64 *sptep)
 	 * the D bit would result in those pages being unnecessarily reported as
 	 * dirty again in the next round.
 	 */
-	if (enable_d_bit_logging) {
+	if (kvm->arch.dirty_logging_mode == KVM_DIRTY_LOG_MODE_DBIT) {
 		gfn_t gfn;
 		struct kvm_mmu_page *sp = page_header(__pa(sptep));
 
@@ -1722,14 +1728,19 @@ void kvm_arch_mmu_get_and_reset_log_dirty(struct kvm *kvm,
 				struct kvm_memory_slot *slot,
 				gfn_t gfn_offset, unsigned long *mask)
 {
-	if (kvm_x86_ops->get_and_reset_log_dirty)
-		kvm_x86_ops->get_and_reset_log_dirty(kvm, slot, gfn_offset,
-						     mask);
-	else if (enable_d_bit_logging)
+	switch (kvm->arch.dirty_logging_mode) {
+	case KVM_DIRTY_LOG_MODE_WRPROT:
+		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, *mask);
+		break;
+	case KVM_DIRTY_LOG_MODE_DBIT:
 		*mask |= kvm_mmu_shadow_dirty_mask_test_and_clear(kvm, slot,
 								  gfn_offset);
-	else
-		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, *mask);
+		break;
+	default:
+		if (kvm_x86_ops->get_and_reset_log_dirty)
+			kvm_x86_ops->get_and_reset_log_dirty(kvm, slot,
+							     gfn_offset, mask);
+	}
 }
 
 /**
@@ -6057,6 +6068,9 @@ int kvm_mmu_module_init(void)
 	BUILD_BUG_ON(sizeof(union kvm_mmu_role) != sizeof(u64));
 
 	kvm_mmu_reset_all_pte_masks();
+	kvm_default_dirty_log_mode = enable_d_bit_logging
+				     ? KVM_DIRTY_LOG_MODE_DBIT
+				     : KVM_DIRTY_LOG_MODE_WRPROT;
 
 	pte_list_desc_cache = kmem_cache_create("pte_list_desc",
 					    sizeof(struct pte_list_desc),

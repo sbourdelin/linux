@@ -4404,11 +4404,17 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 
 	mutex_lock(&kvm->slots_lock);
 
-	/*
-	 * Flush potentially hardware-cached dirty pages to dirty_bitmap.
-	 */
-	if (kvm_x86_ops->flush_log_dirty)
-		kvm_x86_ops->flush_log_dirty(kvm);
+	switch (kvm->arch.dirty_logging_mode) {
+	case KVM_DIRTY_LOG_MODE_WRPROT:
+	case KVM_DIRTY_LOG_MODE_DBIT:
+		break;
+	default:
+		/*
+		 * Flush potentially hardware-cached dirty pages to dirty_bitmap.
+		 */
+		if (kvm_x86_ops->flush_log_dirty)
+			kvm_x86_ops->flush_log_dirty(kvm);
+	}
 
 	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
 
@@ -9020,6 +9026,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 
 	kvm->arch.guest_can_read_msr_platform_info = true;
 
+	kvm->arch.dirty_logging_mode = kvm_default_dirty_log_mode;
+
 	INIT_DELAYED_WORK(&kvm->arch.kvmclock_update_work, kvmclock_update_fn);
 	INIT_DELAYED_WORK(&kvm->arch.kvmclock_sync_work, kvmclock_sync_fn);
 
@@ -9302,15 +9310,26 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 	 * See the comments in fast_page_fault().
 	 */
 	if (new->flags & KVM_MEM_LOG_DIRTY_PAGES) {
-		if (kvm_x86_ops->slot_enable_log_dirty)
-			kvm_x86_ops->slot_enable_log_dirty(kvm, new);
-		else if (enable_d_bit_logging)
-			kvm_mmu_slot_wrprot_lpage_and_clear_dirty(kvm, new);
-		else
+		switch (kvm->arch.dirty_logging_mode) {
+		case KVM_DIRTY_LOG_MODE_WRPROT:
 			kvm_mmu_slot_remove_write_access(kvm, new);
+			break;
+		case KVM_DIRTY_LOG_MODE_DBIT:
+			kvm_mmu_slot_wrprot_lpage_and_clear_dirty(kvm, new);
+			break;
+		default:
+			if (kvm_x86_ops->slot_enable_log_dirty)
+				kvm_x86_ops->slot_enable_log_dirty(kvm, new);
+		}
 	} else {
-		if (kvm_x86_ops->slot_disable_log_dirty)
-			kvm_x86_ops->slot_disable_log_dirty(kvm, new);
+		switch (kvm->arch.dirty_logging_mode) {
+		case KVM_DIRTY_LOG_MODE_WRPROT:
+		case KVM_DIRTY_LOG_MODE_DBIT:
+			break;
+		default:
+			if (kvm_x86_ops->slot_disable_log_dirty)
+				kvm_x86_ops->slot_disable_log_dirty(kvm, new);
+		}
 	}
 }
 
