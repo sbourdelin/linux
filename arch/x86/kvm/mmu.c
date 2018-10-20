@@ -5732,14 +5732,15 @@ static bool slot_rmap_write_protect(struct kvm *kvm,
 	return __rmap_write_protect(kvm, rmap_head, false);
 }
 
-void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
-				      struct kvm_memory_slot *memslot)
+static bool kvm_mmu_slot_remove_write_access_at_levels(struct kvm *kvm,
+						struct kvm_memory_slot *memslot,
+						int start_level, int end_level)
 {
 	bool flush;
 
 	spin_lock(&kvm->mmu_lock);
-	flush = slot_handle_all_level(kvm, memslot, slot_rmap_write_protect,
-				      false);
+	flush = slot_handle_level(kvm, memslot, slot_rmap_write_protect,
+				  start_level, end_level, false);
 	spin_unlock(&kvm->mmu_lock);
 
 	/*
@@ -5748,6 +5749,18 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 	 * kvm->slots_lock otherwise tlb flush would be missed.
 	 */
 	lockdep_assert_held(&kvm->slots_lock);
+
+	return flush;
+}
+
+void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
+				      struct kvm_memory_slot *memslot)
+{
+	bool flush;
+
+	flush = kvm_mmu_slot_remove_write_access_at_levels(kvm, memslot,
+							   PT_PAGE_TABLE_LEVEL,
+							   PT_MAX_HUGEPAGE_LEVEL);
 
 	/*
 	 * We can flush all the TLBs out of the mmu lock without TLB
@@ -5833,19 +5846,19 @@ EXPORT_SYMBOL_GPL(kvm_mmu_slot_leaf_clear_dirty);
 bool kvm_mmu_slot_largepage_remove_write_access(struct kvm *kvm,
 					struct kvm_memory_slot *memslot)
 {
-	bool flush;
-
-	spin_lock(&kvm->mmu_lock);
-	flush = slot_handle_large_level(kvm, memslot, slot_rmap_write_protect,
-					false);
-	spin_unlock(&kvm->mmu_lock);
-
-	/* see kvm_mmu_slot_remove_write_access */
-	lockdep_assert_held(&kvm->slots_lock);
-
-	return flush;
+	return kvm_mmu_slot_remove_write_access_at_levels(kvm, memslot,
+						  PT_PAGE_TABLE_LEVEL + 1,
+						  PT_MAX_HUGEPAGE_LEVEL);
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_slot_largepage_remove_write_access);
+
+static bool kvm_mmu_slot_leaf_remove_write_access(struct kvm *kvm,
+					struct kvm_memory_slot *memslot)
+{
+	return kvm_mmu_slot_remove_write_access_at_levels(kvm, memslot,
+							  PT_PAGE_TABLE_LEVEL,
+							  PT_PAGE_TABLE_LEVEL);
+}
 
 void kvm_mmu_slot_wrprot_lpage_and_clear_dirty(struct kvm *kvm,
 					       struct kvm_memory_slot *memslot)
