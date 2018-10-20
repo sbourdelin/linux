@@ -7991,7 +7991,7 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->slot_enable_log_dirty = NULL;
 		kvm_x86_ops->slot_disable_log_dirty = NULL;
 		kvm_x86_ops->flush_log_dirty = NULL;
-		kvm_x86_ops->enable_log_dirty_pt_masked = NULL;
+		kvm_x86_ops->get_and_reset_log_dirty = NULL;
 	}
 
 	if (!cpu_has_vmx_preemption_timer())
@@ -14437,9 +14437,9 @@ static int vmx_write_pml_buffer(struct kvm_vcpu *vcpu)
 
 static void vmx_enable_log_dirty_pt_masked(struct kvm *kvm,
 					   struct kvm_memory_slot *memslot,
-					   gfn_t offset, unsigned long mask)
+					   gfn_t offset, unsigned long *mask)
 {
-	kvm_mmu_clear_dirty_pt_masked(kvm, memslot, offset, mask);
+	kvm_mmu_clear_dirty_pt_masked(kvm, memslot, offset, *mask);
 }
 
 static void __pi_post_block(struct kvm_vcpu *vcpu)
@@ -15076,7 +15076,7 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.slot_enable_log_dirty = vmx_slot_enable_log_dirty,
 	.slot_disable_log_dirty = vmx_slot_disable_log_dirty,
 	.flush_log_dirty = vmx_flush_log_dirty,
-	.enable_log_dirty_pt_masked = vmx_enable_log_dirty_pt_masked,
+	.get_and_reset_log_dirty = vmx_enable_log_dirty_pt_masked,
 	.write_log_dirty = vmx_write_pml_buffer,
 
 	.pre_block = vmx_pre_block,

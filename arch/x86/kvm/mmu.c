@@ -1641,24 +1641,34 @@ void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 EXPORT_SYMBOL_GPL(kvm_mmu_clear_dirty_pt_masked);
 
 /**
- * kvm_arch_mmu_enable_log_dirty_pt_masked - enable dirty logging for selected
- * PT level pages.
+ * Gets the dirty state (if any) for selected PT level pages from the hardware
+ * MMU structures and resets the hardware state to track those pages again.
  *
- * It calls kvm_mmu_write_protect_pt_masked to write protect selected pages to
- * enable dirty logging for them.
+ * mask is initially set to the contents of the slot's dirty_bitmap for the
+ * pages starting at gfn_offset. Any pages marked dirty in the hardware state
+ * should also be marked in mask before this function returns.
+ *
+ * If the hardware dirty state has already been flushed to the slot's
+ * dirty_bitmap beforehand (e.g. through kvm_x86_ops->flush_log_dirty) then this
+ * function just needs to reset the hardware structures to keep tracking the
+ * pages.
+ *
+ * If the hardware does not maintain dirty state at all, then this function
+ * just write protects the selected pages to enable software-based dirty logging
+ * for them.
  *
  * Used when we do not need to care about huge page mappings: e.g. during dirty
  * logging we do not have any such mappings.
  */
-void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+void kvm_arch_mmu_get_and_reset_log_dirty(struct kvm *kvm,
 				struct kvm_memory_slot *slot,
-				gfn_t gfn_offset, unsigned long mask)
+				gfn_t gfn_offset, unsigned long *mask)
 {
-	if (kvm_x86_ops->enable_log_dirty_pt_masked)
-		kvm_x86_ops->enable_log_dirty_pt_masked(kvm, slot, gfn_offset,
-				mask);
+	if (kvm_x86_ops->get_and_reset_log_dirty)
+		kvm_x86_ops->get_and_reset_log_dirty(kvm, slot, gfn_offset,
+						     mask);
 	else
-		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, *mask);
 }
 
 /**

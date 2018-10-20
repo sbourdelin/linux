@@ -1123,18 +1123,21 @@ struct kvm_x86_ops {
 	 *	also called when slot is created with log dirty disabled.
 	 *  - flush_log_dirty:
 	 *	called before reporting dirty_bitmap to userspace.
-	 *  - enable_log_dirty_pt_masked:
+	 *  - get_and_reset_log_dirty:
 	 *	called when reenabling log dirty for the GFNs in the mask after
-	 *	corresponding bits are cleared in slot->dirty_bitmap.
+	 *      corresponding bits are cleared in slot->dirty_bitmap. This
+	 *      function can also add any un-flushed dirty state maintained by
+	 *      the hardware to the mask (e.g. if flush_log_dirty is not
+	 *      implemented.)
 	 */
 	void (*slot_enable_log_dirty)(struct kvm *kvm,
 				      struct kvm_memory_slot *slot);
 	void (*slot_disable_log_dirty)(struct kvm *kvm,
 				       struct kvm_memory_slot *slot);
 	void (*flush_log_dirty)(struct kvm *kvm);
-	void (*enable_log_dirty_pt_masked)(struct kvm *kvm,
-					   struct kvm_memory_slot *slot,
-					   gfn_t offset, unsigned long mask);
+	void (*get_and_reset_log_dirty)(struct kvm *kvm,
+					struct kvm_memory_slot *slot,
+					gfn_t offset, unsigned long *mask);
 	int (*write_log_dirty)(struct kvm_vcpu *vcpu);
 
 	/* pmu operations of sub-arch */

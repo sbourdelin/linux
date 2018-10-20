@@ -1179,27 +1179,20 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
 	n = kvm_dirty_bitmap_bytes(memslot);
 
 	dirty_bitmap_buffer = kvm_second_dirty_bitmap(memslot);
-	memset(dirty_bitmap_buffer, 0, n);
 
 	spin_lock(&kvm->mmu_lock);
 	*is_dirty = false;
 	for (i = 0; i < n / sizeof(long); i++) {
-		unsigned long mask;
-		gfn_t offset;
+		unsigned long mask = 0;
+		gfn_t offset = i * BITS_PER_LONG;
 
-		if (!dirty_bitmap[i])
-			continue;
+		if (dirty_bitmap[i])
+			mask = xchg(&dirty_bitmap[i], 0);
 
-		*is_dirty = true;
-
-		mask = xchg(&dirty_bitmap[i], 0);
+		kvm_arch_mmu_get_and_reset_log_dirty(kvm, memslot, offset,
+						     &mask);
+		*is_dirty |= mask != 0;
 		dirty_bitmap_buffer[i] = mask;
-
-		if (mask) {
-			offset = i * BITS_PER_LONG;
-			kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, memslot,
-								offset, mask);
-		}
 	}
 
 	spin_unlock(&kvm->mmu_lock);

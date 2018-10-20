@@ -755,10 +755,10 @@ int kvm_get_dirty_log(struct kvm *kvm,
 int kvm_get_dirty_log_protect(struct kvm *kvm,
 			struct kvm_dirty_log *log, bool *is_dirty);
 
-void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
-					struct kvm_memory_slot *slot,
-					gfn_t gfn_offset,
-					unsigned long mask);
+void kvm_arch_mmu_get_and_reset_log_dirty(struct kvm *kvm,
+					  struct kvm_memory_slot *slot,
+					  gfn_t gfn_offset,
+					  unsigned long *mask);
 
 int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
 				struct kvm_dirty_log *log);

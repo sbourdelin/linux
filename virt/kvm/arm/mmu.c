@@ -1434,17 +1434,18 @@ static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
 }
 
 /*
- * kvm_arch_mmu_enable_log_dirty_pt_masked - enable dirty logging for selected
+ * kvm_arch_mmu_get_and_reset_log_dirty - enable dirty logging for selected
  * dirty pages.
  *
  * It calls kvm_mmu_write_protect_pt_masked to write protect selected pages to
  * enable dirty logging for them.
  */
-void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+void kvm_arch_mmu_get_and_reset_log_dirty(struct kvm *kvm,
 		struct kvm_memory_slot *slot,
-		gfn_t gfn_offset, unsigned long mask)
+		gfn_t gfn_offset, unsigned long *mask)
 {
-	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+	if (*mask != 0)
+		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, *mask);
 }
 
 static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
