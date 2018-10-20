@@ -1521,15 +1521,19 @@ static bool __rmap_write_protect(struct kvm *kvm,
 	return flush;
 }
 
-static bool spte_clear_dirty(u64 *sptep)
+static bool spte_test_and_clear_dirty(u64 *sptep)
 {
-	u64 spte = *sptep;
+	int dirty_bit = ffs(shadow_dirty_mask) - 1;
+	bool dirty;
 
-	rmap_printk("rmap_clear_dirty: spte %p %llx\n", sptep, *sptep);
+	BUG_ON(shadow_dirty_mask == 0);
+	rmap_printk("%s: spte %p %llx\n", __func__, sptep, *sptep);
 
-	spte &= ~shadow_dirty_mask;
+	dirty = test_and_clear_bit(dirty_bit, (unsigned long *)sptep);
+	if (dirty)
+		kvm_set_pfn_dirty(spte_to_pfn(*sptep));
 
-	return mmu_spte_update(sptep, spte);
+	return dirty;
 }
 
 static bool wrprot_ad_disabled_spte(u64 *sptep)
@@ -1548,19 +1552,20 @@ static bool wrprot_ad_disabled_spte(u64 *sptep)
  *	- W bit on ad-disabled SPTEs.
  * Returns true iff any D or W bits were cleared.
  */
-static bool __rmap_clear_dirty(struct kvm *kvm, struct kvm_rmap_head *rmap_head)
+static bool __rmap_test_and_clear_dirty(struct kvm *kvm,
+					struct kvm_rmap_head *rmap_head)
 {
 	u64 *sptep;
 	struct rmap_iterator iter;
-	bool flush = false;
+	bool dirty = false;
 
 	for_each_rmap_spte(rmap_head, &iter, sptep)
 		if (spte_ad_enabled(*sptep))
-			flush |= spte_clear_dirty(sptep);
+			dirty |= spte_test_and_clear_dirty(sptep);
 		else
-			flush |= wrprot_ad_disabled_spte(sptep);
+			dirty |= wrprot_ad_disabled_spte(sptep);
 
-	return flush;
+	return dirty;
 }
 
 static bool spte_set_dirty(u64 *sptep)
@@ -1632,7 +1637,7 @@ void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 	while (mask) {
 		rmap_head = __gfn_to_rmap(slot->base_gfn + gfn_offset + __ffs(mask),
 					  PT_PAGE_TABLE_LEVEL, slot);
-		__rmap_clear_dirty(kvm, rmap_head);
+		__rmap_test_and_clear_dirty(kvm, rmap_head);
 
 		/* clear the first set bit */
 		mask &= mask - 1;
@@ -5740,7 +5745,8 @@ void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
 	bool flush;
 
 	spin_lock(&kvm->mmu_lock);
-	flush = slot_handle_leaf(kvm, memslot, __rmap_clear_dirty, false);
+	flush = slot_handle_leaf(kvm, memslot, __rmap_test_and_clear_dirty,
+				 false);
 	spin_unlock(&kvm->mmu_lock);
 
 	lockdep_assert_held(&kvm->slots_lock);
