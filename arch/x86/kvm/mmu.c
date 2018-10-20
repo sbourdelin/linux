@@ -701,6 +701,10 @@ static void mmu_spte_set(u64 *sptep, u64 new_spte)
 	__set_spte(sptep, new_spte);
 }
 
+static void spte_dirty_mask_cleared(struct kvm *kvm, u64 *sptep)
+{
+}
+
 /*
  * Update the SPTE (excluding the PFN), but do not track changes in its
  * accessed/dirty status.
@@ -737,7 +741,7 @@ static u64 mmu_spte_update_no_track(u64 *sptep, u64 new_spte)
  *
  * Returns true if the TLB needs to be flushed
  */
-static bool mmu_spte_update(u64 *sptep, u64 new_spte)
+static bool mmu_spte_update(struct kvm *kvm, u64 *sptep, u64 new_spte)
 {
 	bool flush = false;
 	u64 old_spte = mmu_spte_update_no_track(sptep, new_spte);
@@ -767,6 +771,7 @@ static bool mmu_spte_update(u64 *sptep, u64 new_spte)
 	if (is_dirty_spte(old_spte) && !is_dirty_spte(new_spte)) {
 		flush = true;
 		kvm_set_pfn_dirty(spte_to_pfn(old_spte));
+		spte_dirty_mask_cleared(kvm, sptep);
 	}
 
 	return flush;
@@ -778,7 +783,7 @@ static bool mmu_spte_update(u64 *sptep, u64 new_spte)
  * state bits, it is used to clear the last level sptep.
  * Returns non-zero if the PTE was previously valid.
  */
-static int mmu_spte_clear_track_bits(u64 *sptep)
+static int mmu_spte_clear_track_bits(struct kvm *kvm, u64 *sptep)
 {
 	kvm_pfn_t pfn;
 	u64 old_spte = *sptep;
@@ -803,8 +808,10 @@ static int mmu_spte_clear_track_bits(u64 *sptep)
 	if (is_accessed_spte(old_spte))
 		kvm_set_pfn_accessed(pfn);
 
-	if (is_dirty_spte(old_spte))
+	if (is_dirty_spte(old_spte)) {
 		kvm_set_pfn_dirty(pfn);
+		spte_dirty_mask_cleared(kvm, sptep);
+	}
 
 	return 1;
 }
@@ -1301,9 +1308,10 @@ static void __pte_list_remove(u64 *spte, struct kvm_rmap_head *rmap_head)
 	}
 }
 
-static void pte_list_remove(struct kvm_rmap_head *rmap_head, u64 *sptep)
+static void pte_list_remove(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
+			    u64 *sptep)
 {
-	mmu_spte_clear_track_bits(sptep);
+	mmu_spte_clear_track_bits(kvm, sptep);
 	__pte_list_remove(sptep, rmap_head);
 }
 
@@ -1436,7 +1444,7 @@ out:
 
 static void drop_spte(struct kvm *kvm, u64 *sptep)
 {
-	if (mmu_spte_clear_track_bits(sptep))
+	if (mmu_spte_clear_track_bits(kvm, sptep))
 		rmap_remove(kvm, sptep);
 }
 
@@ -1489,7 +1497,7 @@ static bool spte_test_and_clear_writable(u64 *sptep)
  *
  * Return true if tlb need be flushed.
  */
-static bool spte_write_protect(u64 *sptep, bool pt_protect)
+static bool spte_write_protect(struct kvm *kvm, u64 *sptep, bool pt_protect)
 {
 	u64 spte = *sptep;
 
@@ -1501,7 +1509,7 @@ static bool spte_write_protect(u64 *sptep, bool pt_protect)
 
 	if (pt_protect) {
 		spte &= ~(PT_WRITABLE_MASK | SPTE_MMU_WRITEABLE);
-		return mmu_spte_update(sptep, spte);
+		return mmu_spte_update(kvm, sptep, spte);
 	}
 
 	return spte_test_and_clear_writable(sptep);
@@ -1516,7 +1524,7 @@ static bool __rmap_write_protect(struct kvm *kvm,
 	bool flush = false;
 
 	for_each_rmap_spte(rmap_head, &iter, sptep)
-		flush |= spte_write_protect(sptep, pt_protect);
+		flush |= spte_write_protect(kvm, sptep, pt_protect);
 
 	return flush;
 }
@@ -1568,7 +1576,7 @@ static bool __rmap_test_and_clear_dirty(struct kvm *kvm,
 	return dirty;
 }
 
-static bool spte_set_dirty(u64 *sptep)
+static bool spte_set_dirty(struct kvm *kvm, u64 *sptep)
 {
 	u64 spte = *sptep;
 
@@ -1576,7 +1584,7 @@ static bool spte_set_dirty(u64 *sptep)
 
 	spte |= shadow_dirty_mask;
 
-	return mmu_spte_update(sptep, spte);
+	return mmu_spte_update(kvm, sptep, spte);
 }
 
 static bool __rmap_set_dirty(struct kvm *kvm, struct kvm_rmap_head *rmap_head)
@@ -1587,7 +1595,7 @@ static bool __rmap_set_dirty(struct kvm *kvm, struct kvm_rmap_head *rmap_head)
 
 	for_each_rmap_spte(rmap_head, &iter, sptep)
 		if (spte_ad_enabled(*sptep))
-			flush |= spte_set_dirty(sptep);
+			flush |= spte_set_dirty(kvm, sptep);
 
 	return flush;
 }
@@ -1723,7 +1731,7 @@ static bool kvm_zap_rmapp(struct kvm *kvm, struct kvm_rmap_head *rmap_head)
 	while ((sptep = rmap_get_first(rmap_head, &iter))) {
 		rmap_printk("%s: spte %p %llx.\n", __func__, sptep, *sptep);
 
-		pte_list_remove(rmap_head, sptep);
+		pte_list_remove(kvm, rmap_head, sptep);
 		flush = true;
 	}
 
@@ -1759,7 +1767,7 @@ restart:
 		need_flush = 1;
 
 		if (pte_write(*ptep)) {
-			pte_list_remove(rmap_head, sptep);
+			pte_list_remove(kvm, rmap_head, sptep);
 			goto restart;
 		} else {
 			new_spte = *sptep & ~PT64_BASE_ADDR_MASK;
@@ -1770,7 +1778,7 @@ restart:
 
 			new_spte = mark_spte_for_access_track(new_spte);
 
-			mmu_spte_clear_track_bits(sptep);
+			mmu_spte_clear_track_bits(kvm, sptep);
 			mmu_spte_set(sptep, new_spte);
 		}
 	}
@@ -2969,7 +2977,7 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 		spte = mark_spte_for_access_track(spte);
 
 set_pte:
-	if (mmu_spte_update(sptep, spte))
+	if (mmu_spte_update(vcpu->kvm, sptep, spte))
 		ret |= SET_SPTE_NEED_REMOTE_TLB_FLUSH;
 done:
 	return ret;
@@ -5720,7 +5728,7 @@ restart:
 		if (sp->role.direct &&
 			!kvm_is_reserved_pfn(pfn) &&
 			PageTransCompoundMap(pfn_to_page(pfn))) {
-			pte_list_remove(rmap_head, sptep);
+			pte_list_remove(kvm, rmap_head, sptep);
 			need_tlb_flush = 1;
 			goto restart;
 		}
