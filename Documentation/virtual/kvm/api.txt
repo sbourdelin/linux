@@ -3753,6 +3753,45 @@ Coalesced pio is based on coalesced mmio. There is little difference
 between coalesced mmio and pio except that coalesced pio records accesses
 to I/O ports.
 
+4.117 KVM_GET_DIRTY_LOG_MODE
+
+Capability: none
+Architectures: x86
+Type: vm ioctl
+Parameters: none
+Returns: Current dirty log mode on success, < 0 on error
+
+kvm supports 3 different mechanisms for dirty logging on x86 architectures. This
+returns the mode currently configured for this VM, which can be one of:
+
+- KVM_DIRTY_LOG_MODE_WRPROT: Uses write-protection to track dirty pages
+- KVM_DIRTY_LOG_MODE_DBIT: Uses PTE Dirty bits to track dirty pages
+- KVM_DIRTY_LOG_MODE_PML: Uses Page Modification Logging to track dirty pages
+
+4.118 KVM_GET_SUPPORTED_DIRTY_LOG_MODES
+
+Capability: none
+Architectures: x86
+Type: system ioctl
+Parameters: none
+Returns: Bitmask of dirty log modes on success, < 0 on error
+
+This returns the possible set of dirty logging modes that can be configured for
+a VM. This will be a bitmask consisting of a combination of the 3 modes listed
+above.
+
+4.119 KVM_SET_DIRTY_LOG_MODE
+
+Capability: none
+Architectures: x86
+Type: vm ioctl
+Parameters: u8
+Returns: 0 on success, < 0 on error
+
+This configures the VM's dirty logging mode according to the given parameter,
+which can be one of the 3 modes listed above, or KVM_DIRTY_LOG_MODE_DEFAULT, in
+which case kvm will choose the mode depending on enabled hardware capabilities.
+
 5. The kvm_run structure
 ------------------------
 

@@ -3164,6 +3164,11 @@ long kvm_arch_dev_ioctl(struct file *filp,
 		r = msr_io(NULL, argp, do_get_msr_feature, 1);
 		break;
 	}
+	case KVM_GET_SUPPORTED_DIRTY_LOG_MODES:
+	{
+		r = kvm_supported_dirty_log_modes;
+		break;
+	}
 	default:
 		r = -EINVAL;
 	}
@@ -4822,6 +4827,14 @@ set_identity_unlock:
 		if (copy_from_user(&hvevfd, argp, sizeof(hvevfd)))
 			goto out;
 		r = kvm_vm_ioctl_hv_eventfd(kvm, &hvevfd);
+		break;
+	}
+	case KVM_SET_DIRTY_LOG_MODE: {
+		r = kvm_mmu_switch_dirty_log_mode(kvm, arg);
+		break;
+	}
+	case KVM_GET_DIRTY_LOG_MODE: {
+		r = kvm->arch.dirty_logging_mode;
 		break;
 	}
 	default:
