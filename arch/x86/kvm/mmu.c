@@ -1460,6 +1460,22 @@ static void drop_large_spte(struct kvm_vcpu *vcpu, u64 *sptep)
 		kvm_flush_remote_tlbs(vcpu->kvm);
 }
 
+static bool spte_test_and_clear_writable(u64 *sptep)
+{
+	u64 spte = *sptep;
+
+	if (spte & PT_WRITABLE_MASK) {
+		clear_bit(PT_WRITABLE_SHIFT, (ulong *)sptep);
+
+		if (!spte_ad_enabled(spte))
+			kvm_set_pfn_dirty(spte_to_pfn(spte));
+
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * Write-protect on the specified @sptep, @pt_protect indicates whether
  * spte write-protection is caused by protecting shadow page table.
@@ -1483,11 +1499,12 @@ static bool spte_write_protect(u64 *sptep, bool pt_protect)
 
 	rmap_printk("rmap_write_protect: spte %p %llx\n", sptep, *sptep);
 
-	if (pt_protect)
-		spte &= ~SPTE_MMU_WRITEABLE;
-	spte = spte & ~PT_WRITABLE_MASK;
+	if (pt_protect) {
+		spte &= ~(PT_WRITABLE_MASK | SPTE_MMU_WRITEABLE);
+		return mmu_spte_update(sptep, spte);
+	}
 
-	return mmu_spte_update(sptep, spte);
+	return spte_test_and_clear_writable(sptep);
 }
 
 static bool __rmap_write_protect(struct kvm *kvm,
