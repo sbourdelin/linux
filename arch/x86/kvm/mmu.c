@@ -265,6 +265,9 @@ static u64 __read_mostly shadow_nonpresent_or_rsvd_lower_gfn_mask;
 u8 __read_mostly kvm_default_dirty_log_mode;
 EXPORT_SYMBOL_GPL(kvm_default_dirty_log_mode);
 
+u8 __read_mostly kvm_supported_dirty_log_modes;
+EXPORT_SYMBOL_GPL(kvm_supported_dirty_log_modes);
+
 static void mmu_spte_set(u64 *sptep, u64 spte);
 static union kvm_mmu_page_role
 kvm_mmu_calc_root_page_role(struct kvm_vcpu *vcpu);
@@ -436,6 +439,7 @@ void kvm_mmu_set_mask_ptes(u64 user_mask, u64 accessed_mask,
 
 	if (shadow_dirty_mask == 0) {
 		enable_d_bit_logging = false;
+		kvm_supported_dirty_log_modes &= ~KVM_DIRTY_LOG_MODE_DBIT;
 
 		if (kvm_default_dirty_log_mode == KVM_DIRTY_LOG_MODE_DBIT)
 			kvm_default_dirty_log_mode = KVM_DIRTY_LOG_MODE_WRPROT;
@@ -1702,6 +1706,30 @@ kvm_mmu_shadow_dirty_mask_test_and_clear(struct kvm *kvm,
 			mask |= (1UL << i);
 	}
 	return mask;
+}
+
+/*
+ * Test the D bit in the SPTE(s) corresponding to the GFN and return true if any
+ * SPTE has the D bit set.
+ *
+ * The MMU lock should be held before calling this function.
+ */
+bool kvm_mmu_test_shadow_dirty_mask(struct kvm *kvm,
+				    struct kvm_memory_slot *slot,
+				    gfn_t gfn_offset)
+{
+	struct kvm_rmap_head *rmap_head;
+	u64 *sptep;
+	struct rmap_iterator iter;
+	u64 pte_bits = 0;
+
+	rmap_head = __gfn_to_rmap(slot->base_gfn + gfn_offset,
+			      PT_PAGE_TABLE_LEVEL, slot);
+
+	for_each_rmap_spte(rmap_head, &iter, sptep)
+		pte_bits |= *sptep;
+
+	return pte_bits & shadow_dirty_mask;
 }
 
 /**
@@ -6081,9 +6109,13 @@ int kvm_mmu_module_init(void)
 	BUILD_BUG_ON(sizeof(union kvm_mmu_role) != sizeof(u64));
 
 	kvm_mmu_reset_all_pte_masks();
-	kvm_default_dirty_log_mode = enable_d_bit_logging
-				     ? KVM_DIRTY_LOG_MODE_DBIT
-				     : KVM_DIRTY_LOG_MODE_WRPROT;
+	kvm_default_dirty_log_mode = KVM_DIRTY_LOG_MODE_WRPROT;
+	kvm_supported_dirty_log_modes = KVM_DIRTY_LOG_MODE_WRPROT;
+
+	if (enable_d_bit_logging) {
+		kvm_supported_dirty_log_modes |= KVM_DIRTY_LOG_MODE_DBIT;
+		kvm_default_dirty_log_mode = KVM_DIRTY_LOG_MODE_DBIT;
+	}
 
 	pte_list_desc_cache = kmem_cache_create("pte_list_desc",
 					    sizeof(struct pte_list_desc),
@@ -6149,4 +6181,112 @@ void kvm_mmu_module_exit(void)
 	percpu_counter_destroy(&kvm_total_used_mmu_pages);
 	unregister_shrinker(&mmu_shrinker);
 	mmu_audit_disable();
+}
+
+static void switch_dirty_log_mode_dbit_to_wrprot(struct kvm *kvm)
+{
+	ulong i;
+	struct kvm_memslots *slots = kvm_memslots(kvm);
+	struct kvm_memory_slot *memslot;
+	bool flush = false;
+
+	kvm_for_each_memslot(memslot, slots)
+		if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
+			flush |= kvm_mmu_slot_leaf_remove_write_access(kvm,
+								       memslot);
+	/*
+	 * We need to ensure that the write-protection gets propagated to all
+	 * CPUs before we transfer the dirty bits to the dirty bitmap.
+	 * Otherwise, it would be possible for some other CPU to write to a
+	 * page some time after we have gone over that page in the loop below
+	 * and then the page wouldn't get marked in the dirty bitmap.
+	 */
+	if (flush)
+		kvm_flush_remote_tlbs(kvm);
+
+	spin_lock(&kvm->mmu_lock);
+
+	kvm_for_each_memslot(memslot, slots) {
+		if (!(memslot->flags & KVM_MEM_LOG_DIRTY_PAGES))
+			continue;
+
+		for (i = 0; i < memslot->npages; i++)
+			if (!test_bit(i, memslot->dirty_bitmap) &&
+			    kvm_mmu_test_shadow_dirty_mask(kvm, memslot, i))
+				set_bit(i, memslot->dirty_bitmap);
+	}
+	spin_unlock(&kvm->mmu_lock);
+
+	kvm->arch.dirty_logging_mode = KVM_DIRTY_LOG_MODE_WRPROT;
+}
+
+static void switch_dirty_log_mode_wrprot_to_dbit(struct kvm *kvm)
+{
+	struct kvm_memslots *slots = kvm_memslots(kvm);
+	struct kvm_memory_slot *memslot;
+
+	kvm_for_each_memslot(memslot, slots)
+		if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
+			kvm_mmu_slot_leaf_clear_dirty(kvm, memslot);
+
+	/*
+	 * No need to initiate a TLB flush here, since any page for which we
+	 * cleared the dirty bit above would already be marked in the dirty
+	 * bitmap. It isn't until the next get_dirty_log or enable_log_dirty
+	 * that the clearing of the dirty bits needs to be propagated
+	 * everywhere.
+	 */
+
+	kvm->arch.dirty_logging_mode = KVM_DIRTY_LOG_MODE_DBIT;
+
+	/*
+	 * As an optimization, we could also remove the write-protection from
+	 * all SPTEs here, rather than incurring faults as writes happen.
+	 */
+}
+
+int kvm_mmu_switch_dirty_log_mode(struct kvm *kvm, u8 mode)
+{
+	int err = 0;
+	u8 old_mode;
+
+	if (mode == KVM_DIRTY_LOG_MODE_DEFAULT)
+		mode = kvm_default_dirty_log_mode;
+
+	if (hweight8(mode) != 1)
+		return -EINVAL;
+
+	if (!(mode & kvm_supported_dirty_log_modes)) {
+		kvm_err("Dirty logging mode %u is not supported.\n", mode);
+		return -ENOTSUPP;
+	}
+
+	kvm_debug("Switching dirty logging mode from %u to %u.\n",
+		  kvm->arch.dirty_logging_mode, mode);
+
+	mutex_lock(&kvm->slots_lock);
+
+	old_mode = kvm->arch.dirty_logging_mode;
+
+	if (mode != old_mode) {
+		if (mode == KVM_DIRTY_LOG_MODE_WRPROT &&
+		    old_mode == KVM_DIRTY_LOG_MODE_DBIT)
+			switch_dirty_log_mode_dbit_to_wrprot(kvm);
+		else if (mode == KVM_DIRTY_LOG_MODE_DBIT &&
+			 old_mode == KVM_DIRTY_LOG_MODE_WRPROT)
+			switch_dirty_log_mode_wrprot_to_dbit(kvm);
+		else if (kvm_x86_ops->switch_dirty_log_mode)
+			err = kvm_x86_ops->switch_dirty_log_mode(kvm, mode);
+		else
+			err = -ENOTSUPP;
+	}
+
+	mutex_unlock(&kvm->slots_lock);
+
+	if (err)
+		kvm_err("Trying to switch dirty logging mode from "
+			"%u to %u failed with error %d.\n",
+			old_mode, mode, err);
+
+	return err;
 }

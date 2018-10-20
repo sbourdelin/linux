@@ -1131,6 +1131,8 @@ struct kvm_x86_ops {
 	 *      function can also add any un-flushed dirty state maintained by
 	 *      the hardware to the mask (e.g. if flush_log_dirty is not
 	 *      implemented.)
+	 *  - switch_dirty_log_mode:
+	 *      Switch to the given dirty log mode.
 	 */
 	void (*slot_enable_log_dirty)(struct kvm *kvm,
 				      struct kvm_memory_slot *slot);
@@ -1141,6 +1143,7 @@ struct kvm_x86_ops {
 					struct kvm_memory_slot *slot,
 					gfn_t offset, unsigned long *mask);
 	int (*write_log_dirty)(struct kvm_vcpu *vcpu);
+	int (*switch_dirty_log_mode)(struct kvm *kvm, u8 mode);
 
 	/* pmu operations of sub-arch */
 	const struct kvm_pmu_ops *pmu_ops;
@@ -1202,6 +1205,7 @@ struct kvm_arch_async_pf {
 extern struct kvm_x86_ops *kvm_x86_ops;
 
 extern u8 kvm_default_dirty_log_mode;
+extern u8 kvm_supported_dirty_log_modes;
 
 #define __KVM_HAVE_ARCH_VM_ALLOC
 static inline struct kvm *kvm_arch_alloc_vm(void)

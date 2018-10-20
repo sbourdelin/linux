@@ -420,6 +420,7 @@ struct kvm_nested_state {
 	__u8 data[0];
 };
 
+#define KVM_DIRTY_LOG_MODE_DEFAULT	0
 #define KVM_DIRTY_LOG_MODE_WRPROT	1
 #define KVM_DIRTY_LOG_MODE_DBIT		2
 #define KVM_DIRTY_LOG_MODE_PML		4
