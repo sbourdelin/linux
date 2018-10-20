@@ -5747,7 +5747,7 @@ void kvm_mmu_zap_collapsible_sptes(struct kvm *kvm,
 	spin_unlock(&kvm->mmu_lock);
 }
 
-void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
+bool kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
 				   struct kvm_memory_slot *memslot)
 {
 	bool flush;
@@ -5765,12 +5765,12 @@ void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
 	 * out of mmu lock also guarantees no dirty pages will be lost in
 	 * dirty_bitmap.
 	 */
-	if (flush)
-		kvm_flush_remote_tlbs(kvm);
+
+	return flush;
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_slot_leaf_clear_dirty);
 
-void kvm_mmu_slot_largepage_remove_write_access(struct kvm *kvm,
+bool kvm_mmu_slot_largepage_remove_write_access(struct kvm *kvm,
 					struct kvm_memory_slot *memslot)
 {
 	bool flush;
@@ -5783,10 +5783,21 @@ void kvm_mmu_slot_largepage_remove_write_access(struct kvm *kvm,
 	/* see kvm_mmu_slot_remove_write_access */
 	lockdep_assert_held(&kvm->slots_lock);
 
+	return flush;
+}
+EXPORT_SYMBOL_GPL(kvm_mmu_slot_largepage_remove_write_access);
+
+void kvm_mmu_slot_wrprot_lpage_and_clear_dirty(struct kvm *kvm,
+					       struct kvm_memory_slot *memslot)
+{
+	bool flush;
+
+	flush = kvm_mmu_slot_leaf_clear_dirty(kvm, memslot);
+	flush |= kvm_mmu_slot_largepage_remove_write_access(kvm, memslot);
 	if (flush)
 		kvm_flush_remote_tlbs(kvm);
 }
-EXPORT_SYMBOL_GPL(kvm_mmu_slot_largepage_remove_write_access);
+EXPORT_SYMBOL_GPL(kvm_mmu_slot_wrprot_lpage_and_clear_dirty);
 
 void kvm_mmu_slot_set_dirty(struct kvm *kvm,
 			    struct kvm_memory_slot *memslot)

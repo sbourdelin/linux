@@ -1236,10 +1236,12 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 				      struct kvm_memory_slot *memslot);
 void kvm_mmu_zap_collapsible_sptes(struct kvm *kvm,
 				   const struct kvm_memory_slot *memslot);
-void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
+bool kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
 				   struct kvm_memory_slot *memslot);
-void kvm_mmu_slot_largepage_remove_write_access(struct kvm *kvm,
+bool kvm_mmu_slot_largepage_remove_write_access(struct kvm *kvm,
 					struct kvm_memory_slot *memslot);
+void kvm_mmu_slot_wrprot_lpage_and_clear_dirty(struct kvm *kvm,
+					       struct kvm_memory_slot *memslot);
 void kvm_mmu_slot_set_dirty(struct kvm *kvm,
 			    struct kvm_memory_slot *memslot);
 void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
