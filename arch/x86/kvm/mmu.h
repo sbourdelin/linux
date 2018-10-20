@@ -43,6 +43,8 @@
 #define PT32_ROOT_LEVEL 2
 #define PT32E_ROOT_LEVEL 3
 
+extern bool enable_d_bit_logging;
+
 static inline u64 rsvd_bits(int s, int e)
 {
 	if (e < s)

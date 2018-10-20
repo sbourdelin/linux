@@ -49,6 +49,9 @@
 #include <asm/kvm_page_track.h>
 #include "trace.h"
 
+bool __read_mostly enable_d_bit_logging;
+module_param_named(d_bit_dirty_logging, enable_d_bit_logging, bool, 0444);
+
 /*
  * When setting this variable to true it enables Two-Dimensional-Paging
  * where the hardware walks 2 page tables:
@@ -263,6 +266,7 @@ static u64 __read_mostly shadow_nonpresent_or_rsvd_lower_gfn_mask;
 static void mmu_spte_set(u64 *sptep, u64 spte);
 static union kvm_mmu_page_role
 kvm_mmu_calc_root_page_role(struct kvm_vcpu *vcpu);
+static gfn_t kvm_mmu_page_get_gfn(struct kvm_mmu_page *sp, int index);
 
 void kvm_mmu_set_mmio_spte_mask(u64 mmio_mask, u64 mmio_value)
 {
@@ -427,6 +431,9 @@ void kvm_mmu_set_mask_ptes(u64 user_mask, u64 accessed_mask,
 	shadow_present_mask = p_mask;
 	shadow_acc_track_mask = acc_track_mask;
 	shadow_me_mask = me_mask;
+
+	if (shadow_dirty_mask == 0)
+		enable_d_bit_logging = false;
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_set_mask_ptes);
 
@@ -703,6 +710,24 @@ static void mmu_spte_set(u64 *sptep, u64 new_spte)
 
 static void spte_dirty_mask_cleared(struct kvm *kvm, u64 *sptep)
 {
+	/*
+	 * If D-bit based dirty logging is in use, then whenever the D bit in a
+	 * PTE is cleared, the page needs to be marked in the dirty bitmap.
+	 * However, when Write-Protection based dirty logging is in use, this
+	 * should not be done, as in that case, the get_dirty_log IOCTL does not
+	 * clear the D bits and hence marking pages dirty on later clearings of
+	 * the D bit would result in those pages being unnecessarily reported as
+	 * dirty again in the next round.
+	 */
+	if (enable_d_bit_logging) {
+		gfn_t gfn;
+		struct kvm_mmu_page *sp = page_header(__pa(sptep));
+
+		if (sp->role.level == PT_PAGE_TABLE_LEVEL) {
+			gfn = kvm_mmu_page_get_gfn(sp, sptep - sp->spt);
+			mark_page_dirty(kvm, gfn);
+		}
+	}
 }
 
 /*
@@ -1653,6 +1678,26 @@ void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_clear_dirty_pt_masked);
 
+unsigned long
+kvm_mmu_shadow_dirty_mask_test_and_clear(struct kvm *kvm,
+					 struct kvm_memory_slot *slot,
+					 gfn_t gfn_offset)
+{
+	unsigned long i, n;
+	unsigned long mask = 0;
+	struct kvm_rmap_head *rmap_head;
+
+	n = min_t(unsigned long, BITS_PER_LONG, slot->npages - gfn_offset);
+
+	for (i = 0; i < n; i++) {
+		rmap_head = __gfn_to_rmap(slot->base_gfn + gfn_offset + i,
+					  PT_PAGE_TABLE_LEVEL, slot);
+		if (__rmap_test_and_clear_dirty(kvm, rmap_head))
+			mask |= (1UL << i);
+	}
+	return mask;
+}
+
 /**
  * Gets the dirty state (if any) for selected PT level pages from the hardware
  * MMU structures and resets the hardware state to track those pages again.
@@ -1680,6 +1725,9 @@ void kvm_arch_mmu_get_and_reset_log_dirty(struct kvm *kvm,
 	if (kvm_x86_ops->get_and_reset_log_dirty)
 		kvm_x86_ops->get_and_reset_log_dirty(kvm, slot, gfn_offset,
 						     mask);
+	else if (enable_d_bit_logging)
+		*mask |= kvm_mmu_shadow_dirty_mask_test_and_clear(kvm, slot,
+								  gfn_offset);
 	else
 		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, *mask);
 }
@@ -1775,6 +1823,7 @@ restart:
 
 			new_spte &= ~PT_WRITABLE_MASK;
 			new_spte &= ~SPTE_HOST_WRITEABLE;
+			new_spte &= ~shadow_dirty_mask;
 
 			new_spte = mark_spte_for_access_track(new_spte);
 
