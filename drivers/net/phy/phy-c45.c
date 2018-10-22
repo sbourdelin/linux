@@ -330,6 +330,7 @@ struct phy_driver genphy_10g_driver = {
 	.soft_reset	= gen10g_no_soft_reset,
 	.config_init    = gen10g_config_init,
 	.features       = 0,
+	.aneg_done	= genphy_c45_aneg_done,
 	.config_aneg    = gen10g_config_aneg,
 	.read_status    = gen10g_read_status,
 	.suspend        = gen10g_suspend,
