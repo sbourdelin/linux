@@ -1,6 +1,7 @@
 /*
  * Clause 45 PHY support
  */
+#include <linux/delay.h>
 #include <linux/ethtool.h>
 #include <linux/export.h>
 #include <linux/mdio.h>
@@ -294,6 +295,35 @@ int gen10g_read_status(struct phy_device *phydev)
 }
 EXPORT_SYMBOL_GPL(gen10g_read_status);
 
+static int gen10g_poll_reset(struct phy_device *phydev)
+{
+	/* Poll until the reset bit clears (50ms per retry == 0.6 sec) */
+	unsigned int retries = 12;
+	int ret;
+
+	do {
+		msleep(50);
+		ret = phy_read_mmd(phydev, MDIO_MMD_PCS, MDIO_CTRL1);
+		if (ret < 0)
+			return ret;
+	} while (ret & MDIO_CTRL1_RESET && --retries);
+	if (ret & MDIO_CTRL1_RESET)
+		return -ETIMEDOUT;
+
+	return 0;
+}
+
+static int gen10g_soft_reset(struct phy_device *phydev)
+{
+	int val;
+
+	val = phy_write_mmd(phydev, MDIO_MMD_PCS, MDIO_CTRL1, MDIO_CTRL1_RESET);
+	if (val < 0)
+		return val;
+
+	return gen10g_poll_reset(phydev);
+}
+
 int gen10g_no_soft_reset(struct phy_device *phydev)
 {
 	/* Do nothing for now */
@@ -313,12 +343,36 @@ EXPORT_SYMBOL_GPL(gen10g_config_init);
 
 int gen10g_suspend(struct phy_device *phydev)
 {
+	int val;
+
+	val = phy_read_mmd(phydev, MDIO_MMD_PCS, MDIO_CTRL1);
+	if (val < 0)
+		return val;
+
+	val |= MDIO_CTRL1_LPOWER;
+
+	val = phy_write_mmd(phydev, MDIO_MMD_PCS, MDIO_CTRL1, val);
+	if (val < 0)
+		return val;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(gen10g_suspend);
 
 int gen10g_resume(struct phy_device *phydev)
 {
+	int val;
+
+	val = phy_read_mmd(phydev, MDIO_MMD_PCS, MDIO_CTRL1);
+	if (val < 0)
+		return val;
+
+	val &= ~MDIO_CTRL1_LPOWER;
+
+	val = phy_write_mmd(phydev, MDIO_MMD_PCS, MDIO_CTRL1, val);
+	if (val < 0)
+		return val;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(gen10g_resume);
@@ -327,7 +381,7 @@ struct phy_driver genphy_10g_driver = {
 	.phy_id         = 0xffffffff,
 	.phy_id_mask    = 0xffffffff,
 	.name           = "Generic 10G PHY",
-	.soft_reset	= gen10g_no_soft_reset,
+	.soft_reset	= gen10g_soft_reset,
 	.config_init    = gen10g_config_init,
 	.features       = 0,
 	.aneg_done	= genphy_c45_aneg_done,
