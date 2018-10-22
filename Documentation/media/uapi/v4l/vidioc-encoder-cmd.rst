@@ -50,19 +50,23 @@ currently only used by the STOP command and contains one bit: If the
 until the end of the current *Group Of Pictures*, otherwise it will stop
 immediately.
 
-A :ref:`read() <func-read>` or :ref:`VIDIOC_STREAMON <VIDIOC_STREAMON>`
-call sends an implicit START command to the encoder if it has not been
-started yet. After a STOP command, :ref:`read() <func-read>` calls will read
+After a STOP command, :ref:`read() <func-read>` calls will read
 the remaining data buffered by the driver. When the buffer is empty,
 :ref:`read() <func-read>` will return zero and the next :ref:`read() <func-read>`
 call will restart the encoder.
 
+A :ref:`read() <func-read>` or :ref:`VIDIOC_STREAMON <VIDIOC_STREAMON>`
+call sends an implicit START command to the encoder if it has not been
+started yet. Applies to both queues of mem2mem encoders.
+
 A :ref:`close() <func-close>` or :ref:`VIDIOC_STREAMOFF <VIDIOC_STREAMON>`
 call of a streaming file descriptor sends an implicit immediate STOP to
-the encoder, and all buffered data is discarded.
+the encoder, and all buffered data is discarded. Applies to both queues of
+mem2mem encoders.
 
 These ioctls are optional, not all drivers may support them. They were
-introduced in Linux 2.6.21.
+introduced in Linux 2.6.21. They are, however, mandatory for stateful mem2mem
+encoders (as further documented in :ref:`encoder`).
 
 
 .. tabularcolumns:: |p{4.4cm}|p{4.4cm}|p{8.7cm}|
@@ -107,16 +111,20 @@ introduced in Linux 2.6.21.
       - Stop the encoder. When the ``V4L2_ENC_CMD_STOP_AT_GOP_END`` flag
 	is set, encoding will continue until the end of the current *Group
 	Of Pictures*, otherwise encoding will stop immediately. When the
-	encoder is already stopped, this command does nothing. mem2mem
-	encoders will send a ``V4L2_EVENT_EOS`` event when the last frame
-	has been encoded and all frames are ready to be dequeued and will
-	set the ``V4L2_BUF_FLAG_LAST`` buffer flag on the last buffer of
-	the capture queue to indicate there will be no new buffers
-	produced to dequeue. This buffer may be empty, indicated by the
-	driver setting the ``bytesused`` field to 0. Once the
-	``V4L2_BUF_FLAG_LAST`` flag was set, the
-	:ref:`VIDIOC_DQBUF <VIDIOC_QBUF>` ioctl will not block anymore,
-	but return an ``EPIPE`` error code.
+	encoder is already stopped, this command does nothing.
+
+	A stateful mem2mem encoder will proceed with encoding the source
+	buffers pending before the command is issued and then stop producing
+	new frames. It will send a ``V4L2_EVENT_EOS`` event when the last frame
+	has been encoded and all frames are ready to be dequeued and will set
+	the ``V4L2_BUF_FLAG_LAST`` buffer flag on the last buffer of the
+	capture queue to indicate there will be no new buffers produced to
+	dequeue. This buffer may be empty, indicated by the driver setting the
+	``bytesused`` field to 0. Once the buffer with the
+	``V4L2_BUF_FLAG_LAST`` flag set was dequeued, the :ref:`VIDIOC_DQBUF
+	<VIDIOC_QBUF>` ioctl will not block anymore, but return an ``EPIPE``
+	error code. No flags or other arguments are accepted in case of mem2mem
+	encoders.  See :ref:`encoder` for more details.
     * - ``V4L2_ENC_CMD_PAUSE``
       - 2
       - Pause the encoder. When the encoder has not been started yet, the

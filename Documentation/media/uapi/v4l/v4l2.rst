@@ -56,6 +56,7 @@ Authors, in alphabetical order:
 - Figa, Tomasz <tfiga@chromium.org>
 
   - Documented the memory-to-memory decoder interface.
+  - Documented the memory-to-memory encoder interface.
 
 - H Schimek, Michael <mschimek@gmx.at>
 
@@ -68,6 +69,7 @@ Authors, in alphabetical order:
 - Osciak, Pawel <posciak@chromium.org>
 
   - Documented the memory-to-memory decoder interface.
+  - Documented the memory-to-memory encoder interface.
 
 - Osciak, Pawel <pawel@osciak.com>
 
