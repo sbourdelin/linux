@@ -15,6 +15,7 @@ Interfaces
     dev-output
     dev-osd
     dev-codec
+    dev-decoder
     dev-effect
     dev-raw-vbi
     dev-sliced-vbi

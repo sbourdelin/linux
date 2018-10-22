@@ -53,6 +53,13 @@ devices that is either the struct
 member. When the requested buffer type is not supported drivers return
 an ``EINVAL`` error code.
 
+A stateful mem2mem decoder will not allow operations on the
+``V4L2_BUF_TYPE_VIDEO_CAPTURE`` or ``V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE``
+buffer type until the corresponding ``V4L2_BUF_TYPE_VIDEO_OUTPUT`` or
+``V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE`` buffer type is configured. If such an
+operation is attempted, drivers return an ``EACCES`` error code. Refer to
+:ref:`decoder` for more details.
+
 To change the current format parameters applications initialize the
 ``type`` field and all fields of the respective ``fmt`` union member.
 For details see the documentation of the various devices types in
@@ -144,6 +151,13 @@ Return Value
 On success 0 is returned, on error -1 and the ``errno`` variable is set
 appropriately. The generic error codes are described at the
 :ref:`Generic Error Codes <gen-errors>` chapter.
+
+EACCES
+    The format is not accessible until another buffer type is configured.
+    Relevant for the V4L2_BUF_TYPE_VIDEO_CAPTURE and
+    V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE buffer types of mem2mem decoders, which
+    require the format of V4L2_BUF_TYPE_VIDEO_OUTPUT or
+    V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE buffer type to be configured first.
 
 EINVAL
     The struct :c:type:`v4l2_format` ``type`` field is
