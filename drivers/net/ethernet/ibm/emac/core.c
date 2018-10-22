@@ -37,6 +37,7 @@
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/bitops.h>
+#include <linux/if_vlan.h>
 #include <linux/workqueue.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -674,7 +675,7 @@ static int emac_configure(struct emac_instance *dev)
 		 ndev->dev_addr[5]);
 
 	/* VLAN Tag Protocol ID */
-	out_be32(&p->vtpid, 0x8100);
+	out_be32(&p->vtpid, ETH_P_8021Q);
 
 	/* Receive mode register */
 	r = emac_iff2rmr(ndev);
@@ -1435,6 +1436,22 @@ static inline netdev_tx_t emac_xmit_finish(struct emac_instance *dev, int len)
 	return NETDEV_TX_OK;
 }
 
+static inline u16 emac_tx_vlan(struct emac_instance *dev, struct sk_buff *skb)
+{
+	/* Handle VLAN TPID and TCI insert if this is a VLAN skb */
+	if (emac_has_feature(dev, EMAC_FTR_HAS_VLAN_CTAG_TX) &&
+	    skb_vlan_tag_present(skb)) {
+		struct emac_regs __iomem *p = dev->emacp;
+
+		/* update the VLAN TCI */
+		out_be32(&p->vtci, (u32)skb_vlan_tag_get(skb));
+
+		/* Insert VLAN tag */
+		return EMAC_TX_CTRL_IVT;
+	}
+	return 0;
+}
+
 /* Tx lock BH */
 static netdev_tx_t emac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
@@ -1443,7 +1460,7 @@ static netdev_tx_t emac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	int slot;
 
 	u16 ctrl = EMAC_TX_CTRL_GFCS | EMAC_TX_CTRL_GP | MAL_TX_CTRL_READY |
-	    MAL_TX_CTRL_LAST | emac_tx_csum(dev, skb);
+	    MAL_TX_CTRL_LAST | emac_tx_csum(dev, skb) | emac_tx_vlan(dev, skb);
 
 	slot = dev->tx_slot++;
 	if (dev->tx_slot == NUM_TX_BUFF) {
@@ -1518,7 +1535,7 @@ emac_start_xmit_sg(struct sk_buff *skb, struct net_device *ndev)
 		goto stop_queue;
 
 	ctrl = EMAC_TX_CTRL_GFCS | EMAC_TX_CTRL_GP | MAL_TX_CTRL_READY |
-	    emac_tx_csum(dev, skb);
+	    emac_tx_csum(dev, skb) | emac_tx_vlan(dev, skb);
 	slot = dev->tx_slot;
 
 	/* skb data */
@@ -2891,7 +2908,8 @@ static int emac_init_config(struct emac_instance *dev)
 		if (of_device_is_compatible(np, "ibm,emac-apm821xx")) {
 			dev->features |= (EMAC_APM821XX_REQ_JUMBO_FRAME_SIZE |
 					  EMAC_FTR_APM821XX_NO_HALF_DUPLEX |
-					  EMAC_FTR_460EX_PHY_CLK_FIX);
+					  EMAC_FTR_460EX_PHY_CLK_FIX |
+					  EMAC_FTR_HAS_VLAN_CTAG_TX);
 		}
 	} else if (of_device_is_compatible(np, "ibm,emac4")) {
 		dev->features |= EMAC_FTR_EMAC4;
@@ -3148,6 +3166,12 @@ static int emac_probe(struct platform_device *ofdev)
 
 	if (dev->tah_dev) {
 		ndev->hw_features = NETIF_F_IP_CSUM | NETIF_F_SG;
+
+		if (emac_has_feature(dev, EMAC_FTR_HAS_VLAN_CTAG_TX)) {
+			ndev->vlan_features |= ndev->hw_features;
+			ndev->hw_features |= NETIF_F_HW_VLAN_CTAG_TX;
+		}
+
 		ndev->features |= ndev->hw_features | NETIF_F_RXCSUM;
 	}
 	ndev->watchdog_timeo = 5 * HZ;

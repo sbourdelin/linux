@@ -334,6 +334,8 @@ struct emac_instance {
  * APM821xx does not support Half Duplex mode
  */
 #define EMAC_FTR_APM821XX_NO_HALF_DUPLEX	0x00001000
+/* EMAC can insert 802.1Q tag */
+#define EMAC_FTR_HAS_VLAN_CTAG_TX		0x00002000
 
 /* Right now, we don't quite handle the always/possible masks on the
  * most optimal way as we don't have a way to say something like
@@ -363,7 +365,9 @@ enum {
 	EMAC_FTR_460EX_PHY_CLK_FIX |
 	EMAC_FTR_440EP_PHY_CLK_FIX |
 	EMAC_APM821XX_REQ_JUMBO_FRAME_SIZE |
-	EMAC_FTR_APM821XX_NO_HALF_DUPLEX,
+	EMAC_FTR_APM821XX_NO_HALF_DUPLEX |
+	EMAC_FTR_HAS_VLAN_CTAG_TX |
+	0,
 };
 
 static inline int emac_has_feature(struct emac_instance *dev,
