@@ -1044,6 +1044,14 @@ static inline int phy_read_status(struct phy_device *phydev)
 		return genphy_read_status(phydev);
 }
 
+static inline int phy_update_link(struct phy_device *phydev)
+{
+	if (phydev->is_c45)
+		return gen10g_read_status(phydev);
+	else
+		return genphy_update_link(phydev);
+}
+
 void phy_driver_unregister(struct phy_driver *drv);
 void phy_drivers_unregister(struct phy_driver *drv, int n);
 int phy_driver_register(struct phy_driver *new_driver, struct module *owner);
