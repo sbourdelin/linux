@@ -3367,7 +3367,9 @@ again:
 	 * time.
 	 */
 	BTRFS_I(inode)->generation = 0;
+	fs_info->space_cache_updater = current;
 	ret = btrfs_update_inode(trans, root, inode);
+	fs_info->space_cache_updater = NULL;
 	if (ret) {
 		/*
 		 * So theoretically we could recover from this, simply set the
@@ -7371,7 +7373,25 @@ search:
 
 have_block_group:
 		cached = block_group_cache_done(block_group);
-		if (unlikely(!cached)) {
+		/*
+		 * If we are updating the inode of a free space cache, we can
+		 * not start the caching of any block group because we could
+		 * deadlock on an extent buffer of the root tree.
+		 * At cache_save_setup() we update the inode item of a free
+		 * space cache, so we may need to COW a leaf of the root tree,
+		 * which implies finding a free metadata extent. So if when
+		 * searching for such an extent we find a block group that was
+		 * not yet cached (which is unlikely), we can not start loading
+		 * or building its free space cache because that implies reading
+		 * its inode from disk (load_free_space_cache()) which implies
+		 * searching the root tree for its inode item, which can be
+		 * located in the same leaf that we previously locked at
+		 * cache_save_setup() for updating the inode item of the former
+		 * free space cache, therefore leading to an attempt to lock the
+		 * same leaf twice.
+		 */
+		if (unlikely(!cached) &&
+		    fs_info->space_cache_updater != current) {
 			have_caching_bg = true;
 			ret = cache_block_group(block_group, 0);
 			BUG_ON(ret < 0);
