@@ -459,8 +459,11 @@ int ion_query_heaps(struct ion_heap_query *query)
 	max_cnt = query->cnt;
 
 	plist_for_each_entry(heap, &dev->heaps, node) {
-		strncpy(hdata.name, heap->name, MAX_HEAP_NAME);
-		hdata.name[sizeof(hdata.name) - 1] = '\0';
+		if (heap->name) {
+			strncpy(hdata.name, heap->name, MAX_HEAP_NAME);
+			hdata.name[sizeof(hdata.name) - 1] = '\0';
+		}
+
 		hdata.type = heap->type;
 		hdata.heap_id = heap->id;
 
