@@ -31,6 +31,9 @@
 #include <linux/slab.h>
 #include <linux/cpuhotplug.h>
 
+#include <linux/io.h>
+#include <linux/i8253.h>
+
 #ifdef CONFIG_HYPERV_TSCPAGE
 
 static struct ms_hyperv_tsc_page *tsc_pg;
@@ -95,6 +98,26 @@ void  __percpu **hyperv_pcpu_input_arg;
 EXPORT_SYMBOL_GPL(hyperv_pcpu_input_arg);
 
 u32 hv_max_vp_index;
+
+#if defined(CONFIG_CLKEVT_I8253)
+/*
+ * Hyper-V emulation of the PIT has a quirk such that the
+ * normal i8253 pit_shutdown() routine doesn't stop the PIT.
+ * It keeps interrupting @18.2 HZ.  This alternate
+ * shutdown routine mirrors the normal one, but does not
+ * set the counter value to zero.
+ */
+static int hyperv_pit_shutdown(struct clock_event_device *evt)
+{
+	if (!clockevent_state_oneshot(evt) && !clockevent_state_periodic(evt))
+		return 0;
+
+	raw_spin_lock(&i8253_lock);
+	outb_p(0x30, PIT_MODE);
+	raw_spin_unlock(&i8253_lock);
+	return 0;
+}
+#endif
 
 static int hv_cpu_init(unsigned int cpu)
 {
@@ -307,6 +330,14 @@ void __init hyperv_init(void)
 				  hv_cpu_init, hv_cpu_die);
 	if (cpuhp < 0)
 		goto free_vp_assist_page;
+
+#if defined(CONFIG_CLKEVT_I8253)
+	/*
+	 * Override the PIT shutdown routine due to a quirk in
+	 * Hyper-V emulation of the PIT.
+	 */
+	i8253_clockevent.set_state_shutdown = hyperv_pit_shutdown;
+#endif
 
 	/*
 	 * Setup the hypercall page and enable hypercalls.
