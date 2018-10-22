@@ -496,6 +496,7 @@ static int dev_map_notification(struct notifier_block *notifier,
 				ulong event, void *ptr)
 {
 	struct net_device *netdev = netdev_notifier_info_to_dev(ptr);
+	struct net *net = dev_net(netdev);
 	struct bpf_dtab *dtab;
 	int i;
 
@@ -512,7 +513,7 @@ static int dev_map_notification(struct notifier_block *notifier,
 				struct bpf_dtab_netdev *dev, *odev;
 
 				dev = READ_ONCE(dtab->netdev_map[i]);
-				if (!dev ||
+				if (!dev || !net_eq(net, dev_net(dev->dev)) ||
 				    dev->dev->ifindex != netdev->ifindex)
 					continue;
 				odev = cmpxchg(&dtab->netdev_map[i], dev, NULL);
