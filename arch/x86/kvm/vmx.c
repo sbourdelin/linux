@@ -13240,13 +13240,11 @@ static int __noclone nested_vmx_check_vmentry_hw(struct kvm_vcpu *vcpu)
 
 		/* Check if vmlaunch of vmresume is needed */
 		"cmpl $0, %c[launched](%0)\n\t"
-		"je 1f\n\t"
-		__ex("vmresume") "\n\t"
+		"jne 1f\n\t"
+		__ex("vmlaunch") "\n\t"
 		"jmp 2f\n\t"
-		"1: " __ex("vmlaunch") "\n\t"
-		"jmp 2f\n\t"
+		"1: " __ex("vmresume") "\n\t"
 		"2: "
-
 		/* Set vmx->fail accordingly */
 		"setbe %c[fail](%0)\n\t"
 
