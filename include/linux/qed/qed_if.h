@@ -448,10 +448,32 @@ struct qed_mfw_tlv_iscsi {
 	bool tx_bytes_set;
 };
 
+enum qed_db_rec_width {
+	DB_REC_WIDTH_32B,
+	DB_REC_WIDTH_64B,
+};
+
+enum qed_db_rec_space {
+	DB_REC_KERNEL,
+	DB_REC_USER,
+};
+
 #define DIRECT_REG_WR(reg_addr, val) writel((u32)val, \
 					    (void __iomem *)(reg_addr))
 
 #define DIRECT_REG_RD(reg_addr) readl((void __iomem *)(reg_addr))
+
+#ifndef writeq
+#define writeq writeq
+static inline void writeq(u64 val, void __iomem *reg)
+{
+	writel(val & 0xffffffff, reg);
+	writel(val >> 32, reg + 0x4UL);
+}
+#endif
+
+#define DIRECT_REG_WR64(reg_addr, val) writeq((u32)val,	\
+					      (void __iomem *)(reg_addr))
 
 #define QED_COALESCE_MAX 0x1FF
 #define QED_DEFAULT_RX_USECS 12
