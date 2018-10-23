@@ -4736,6 +4736,7 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 {
 	cpumask_var_t cpus_allowed, new_mask;
 	struct task_struct *p;
+	struct cpumask *hk_mask;
 	int retval;
 
 	rcu_read_lock();
@@ -4779,6 +4780,19 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 
 	cpuset_cpus_allowed(p, cpus_allowed);
 	cpumask_and(new_mask, in_mask, cpus_allowed);
+	hk_mask = housekeeping_cpumask(HK_FLAG_DOMAIN);
+
+	/*
+	 * If the cpumask provided has CPUs that are part of isolated and
+	 * housekeeping_cpumask, then restrict it to just the CPUs that
+	 * are part of the housekeeping_cpumask.
+	 */
+	if (!cpumask_subset(new_mask, hk_mask) &&
+			cpumask_intersects(new_mask, hk_mask)) {
+		pr_info("pid %d: Mix of isolcpus and non-isolcpus provided\n",
+			       p->pid);
+		cpumask_and(new_mask, new_mask, hk_mask);
+	}
 
 	/*
 	 * Since bandwidth control happens on root_domain basis,
