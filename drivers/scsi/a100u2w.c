@@ -1089,8 +1089,6 @@ static int inia100_probe_one(struct pci_dev *pdev,
 	unsigned long port, bios;
 	int error = -ENODEV;
 	u32 sz;
-	unsigned long biosaddr;
-	char *bios_phys;
 
 	if (pci_enable_device(pdev))
 		goto out;
@@ -1140,9 +1138,6 @@ static int inia100_probe_one(struct pci_dev *pdev,
 		goto out_free_scb_array;
 	}
 
-	biosaddr = host->BIOScfg;
-	biosaddr = (biosaddr << 4);
-	bios_phys = phys_to_virt(biosaddr);
 	if (init_orchid(host)) {	/* Initialize orchid chip */
 		printk("inia100: initial orchid fail!!\n");
 		goto out_free_escb_array;
