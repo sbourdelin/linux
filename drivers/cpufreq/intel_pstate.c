@@ -390,11 +390,6 @@ static int intel_pstate_get_cppc_guranteed(int cpu)
 static void intel_pstate_set_itmt_prio(int cpu)
 {
 }
-
-static int intel_pstate_get_cppc_guranteed(int cpu)
-{
-	return -ENOTSUPP;
-}
 #endif
 
 static void intel_pstate_init_acpi_perf_limits(struct cpufreq_policy *policy)
@@ -489,6 +484,11 @@ static inline void intel_pstate_exit_perf_limits(struct cpufreq_policy *policy)
 static inline bool intel_pstate_acpi_pm_profile_server(void)
 {
 	return false;
+}
+
+static int intel_pstate_get_cppc_guranteed(int cpu)
+{
+	return -ENOTSUPP;
 }
 #endif
 
