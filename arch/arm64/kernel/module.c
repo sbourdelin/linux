@@ -457,5 +457,15 @@ int module_finalize(const Elf_Ehdr *hdr,
 #endif
 	}
 
+#ifdef CONFIG_LIVEPATCH
+	/*
+	 * For livepatching, switch to the saved section header info for .plt
+	 * stored in mod->klp_info. This is needed so that livepatch is able to
+	 * call apply_relocate_add() after patch module load.
+	 */
+	if (is_livepatch_module(me))
+		me->arch.core.plt = me->klp_info->sechdrs + me->arch.core.plt_shndx;
+#endif
+
 	return 0;
 }
