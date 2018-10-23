@@ -13,6 +13,3 @@ ptrace-pkey core-pkey: child.h
 ptrace-pkey core-pkey: LDLIBS += -pthread
 
 $(TEST_GEN_PROGS): ../harness.c ../utils.c ../lib/reg.S ptrace.h
-
-clean:
-	rm -f $(TEST_GEN_PROGS) *.o
