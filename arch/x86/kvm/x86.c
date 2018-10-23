@@ -3533,9 +3533,18 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 		events->exception_has_payload = 0;
 	}
 
-	if ((events->exception.injected || events->exception.pending) &&
-	    (events->exception.nr > 31 || events->exception.nr == NMI_VECTOR))
-		return -EINVAL;
+	if (events->exception.injected || events->exception.pending) {
+		bool needs_error_code;
+
+		if (events->exception.nr > 31 ||
+		    events->exception.nr == NMI_VECTOR)
+			return -EINVAL;
+
+		needs_error_code = is_protmode(vcpu) &&
+			x86_exception_has_error_code(events->exception.nr);
+		if (!!events->exception.has_error_code != needs_error_code)
+			return -EINVAL;
+	}
 
 	/* INITs are latched while in SMM */
 	if (events->flags & KVM_VCPUEVENT_VALID_SMM &&
@@ -8314,6 +8323,18 @@ static int kvm_valid_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 		 * segment cannot be 64-bit.
 		 */
 		if (sregs->efer & EFER_LMA || sregs->cs.l)
+			return -EINVAL;
+	}
+
+	/*
+	 * Switching between real-address mode and protected mode can
+	 * potentially invalidate a pending exception.
+	 */
+	if (vcpu->arch.exception.injected || vcpu->arch.exception.pending) {
+		bool needs_error_code = (sregs->cr0 & X86_CR0_PE) &&
+			x86_exception_has_error_code(vcpu->arch.exception.nr);
+
+		if (vcpu->arch.exception.has_error_code != needs_error_code)
 			return -EINVAL;
 	}
 
