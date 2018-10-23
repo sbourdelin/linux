@@ -6399,7 +6399,7 @@ out:
 	return ret;
 }
 
-static int ufs_get_device_desc(struct ufs_hba *hba,
+int ufs_get_device_desc(struct ufs_hba *hba,
 			       struct ufs_dev_desc *dev_desc)
 {
 	int err;
