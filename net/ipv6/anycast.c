@@ -44,7 +44,21 @@
 
 #include <net/checksum.h>
 
+#define IN6_ADDR_HSIZE_SHIFT	8
+#define IN6_ADDR_HSIZE		BIT(IN6_ADDR_HSIZE_SHIFT)
+/*	anycast address hash table
+ */
+static struct hlist_head inet6_acaddr_lst[IN6_ADDR_HSIZE];
+static DEFINE_SPINLOCK(acaddr_hash_lock);
+
 static int ipv6_dev_ac_dec(struct net_device *dev, const struct in6_addr *addr);
+
+static u32 inet6_acaddr_hash(struct net *net, const struct in6_addr *addr)
+{
+	u32 val = ipv6_addr_hash(addr) ^ net_hash_mix(net);
+
+	return hash_32(val, IN6_ADDR_HSIZE_SHIFT);
+}
 
 /*
  *	socket join an anycast group
@@ -204,6 +218,73 @@ void ipv6_sock_ac_close(struct sock *sk)
 	rtnl_unlock();
 }
 
+static struct ipv6_ac_addrlist *acal_alloc(int ifindex,
+					   const struct in6_addr *addr)
+{
+	struct ipv6_ac_addrlist *acal;
+
+	acal = kzalloc(sizeof(*acal), GFP_ATOMIC);
+	if (!acal)
+		return NULL;
+
+	acal->acal_addr = *addr;
+	acal->acal_ifindex = ifindex;
+	acal->acal_users = 1;
+	INIT_HLIST_NODE(&acal->acal_lst);
+
+	return acal;
+}
+
+static int ipv6_add_acaddr_hash(struct net *net, const struct in6_addr *addr)
+{
+	unsigned int hash = inet6_acaddr_hash(net, addr);
+	struct ipv6_ac_addrlist *acal;
+	int err = 0;
+
+	spin_lock(&acaddr_hash_lock);
+	hlist_for_each_entry(acal, &inet6_acaddr_lst[hash], acal_lst) {
+		if (acal->acal_ifindex != net->ifindex)
+			continue;
+		if (ipv6_addr_equal(&acal->acal_addr, addr)) {
+			acal->acal_users++;
+			goto out;
+		}
+	}
+
+	acal = acal_alloc(net->ifindex, addr);
+	if (!acal) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	hlist_add_head_rcu(&acal->acal_lst, &inet6_acaddr_lst[hash]);
+
+out:
+	spin_unlock(&acaddr_hash_lock);
+	return err;
+}
+
+static void ipv6_del_acaddr_hash(struct net *net, const struct in6_addr *addr)
+{
+	unsigned int hash = inet6_acaddr_hash(net, addr);
+	struct ipv6_ac_addrlist *acal;
+
+	spin_lock(&acaddr_hash_lock);
+	hlist_for_each_entry(acal, &inet6_acaddr_lst[hash], acal_lst) {
+		if (acal->acal_ifindex != net->ifindex)
+			continue;
+		if (ipv6_addr_equal(&acal->acal_addr, addr)) {
+			if (--acal->acal_users < 1) {
+				hlist_del_init_rcu(&acal->acal_lst);
+				kfree_rcu(acal, rcu);
+			}
+			spin_unlock(&acaddr_hash_lock);
+			return;
+		}
+	}
+	spin_unlock(&acaddr_hash_lock);
+}
+
 static void aca_get(struct ifacaddr6 *aca)
 {
 	refcount_inc(&aca->aca_refcnt);
@@ -275,6 +356,13 @@ int __ipv6_dev_ac_inc(struct inet6_dev *idev, const struct in6_addr *addr)
 		err = -ENOMEM;
 		goto out;
 	}
+	err = ipv6_add_acaddr_hash(dev_net(idev->dev), addr);
+	if (err) {
+		fib6_info_release(f6i);
+		fib6_info_release(f6i);
+		kfree(aca);
+		goto out;
+	}
 
 	aca->aca_next = idev->ac_list;
 	idev->ac_list = aca;
@@ -324,6 +412,7 @@ int __ipv6_dev_ac_dec(struct inet6_dev *idev, const struct in6_addr *addr)
 		prev_aca->aca_next = aca->aca_next;
 	else
 		idev->ac_list = aca->aca_next;
+	ipv6_del_acaddr_hash(dev_net(idev->dev), &aca->aca_addr);
 	write_unlock_bh(&idev->lock);
 	addrconf_leave_solict(idev, &aca->aca_addr);
 
@@ -350,6 +439,8 @@ void ipv6_ac_destroy_dev(struct inet6_dev *idev)
 	write_lock_bh(&idev->lock);
 	while ((aca = idev->ac_list) != NULL) {
 		idev->ac_list = aca->aca_next;
+		ipv6_del_acaddr_hash(dev_net(idev->dev), &aca->aca_addr);
+
 		write_unlock_bh(&idev->lock);
 
 		addrconf_leave_solict(idev, &aca->aca_addr);
@@ -391,16 +482,22 @@ bool ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
 			 const struct in6_addr *addr)
 {
 	bool found = false;
+	unsigned int hash = inet6_acaddr_hash(net, addr);
+	struct ipv6_ac_addrlist *acal;
 
 	rcu_read_lock();
 	if (dev)
 		found = ipv6_chk_acast_dev(dev, addr);
 	else
-		for_each_netdev_rcu(net, dev)
-			if (ipv6_chk_acast_dev(dev, addr)) {
+		hlist_for_each_entry_rcu(acal, &inet6_acaddr_lst[hash],
+					 acal_lst) {
+			if (acal->acal_ifindex != net->ifindex)
+				continue;
+			if (ipv6_addr_equal(&acal->acal_addr, addr)) {
 				found = true;
 				break;
 			}
+		}
 	rcu_read_unlock();
 	return found;
 }
@@ -538,5 +635,26 @@ int __net_init ac6_proc_init(struct net *net)
 void ac6_proc_exit(struct net *net)
 {
 	remove_proc_entry("anycast6", net->proc_net);
+}
+
+/*	Init / cleanup code
+ */
+int __init anycast_init(void)
+{
+	int i;
+
+	for (i = 0; i < IN6_ADDR_HSIZE; i++)
+		INIT_HLIST_HEAD(&inet6_acaddr_lst[i]);
+	return 0;
+}
+
+void anycast_cleanup(void)
+{
+	int i;
+
+	spin_lock(&acaddr_hash_lock);
+	for (i = 0; i < IN6_ADDR_HSIZE; i++)
+		WARN_ON(!hlist_empty(&inet6_acaddr_lst[i]));
+	spin_unlock(&acaddr_hash_lock);
 }
 #endif

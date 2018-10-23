@@ -312,6 +312,8 @@ bool ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
 			 const struct in6_addr *addr);
 bool ipv6_chk_acast_addr_src(struct net *net, struct net_device *dev,
 			     const struct in6_addr *addr);
+int anycast_init(void);
+void anycast_cleanup(void);
 
 /* Device notifier */
 int register_inet6addr_notifier(struct notifier_block *nb);

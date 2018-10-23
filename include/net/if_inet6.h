@@ -142,6 +142,14 @@ struct ipv6_ac_socklist {
 	struct ipv6_ac_socklist *acl_next;
 };
 
+struct ipv6_ac_addrlist {
+	struct in6_addr		acal_addr;
+	int			acal_ifindex; /* net */
+	int			acal_users;
+	struct hlist_node	acal_lst; /* inet6_acaddr_lst */
+	struct rcu_head		rcu;
+};
+
 struct ifacaddr6 {
 	struct in6_addr		aca_addr;
 	struct fib6_info	*aca_rt;
