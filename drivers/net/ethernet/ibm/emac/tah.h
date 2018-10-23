@@ -36,6 +36,8 @@ struct tah_regs {
 	u32 tsr;
 };
 
+#define TAH_NO_SSR	6
+extern const u32 tah_ss[TAH_NO_SSR];
 
 /* TAH device */
 struct tah_instance {

@@ -245,6 +245,9 @@ struct emac_instance {
 	u32				xaht_slots_shift;
 	u32				xaht_width_shift;
 
+	/* TAH TSO start index */
+	int				tso_ss_mtu_start;
+
 	/* Descriptor management
 	 */
 	struct mal_descriptor		*tx_desc;
@@ -336,6 +339,8 @@ struct emac_instance {
 #define EMAC_FTR_APM821XX_NO_HALF_DUPLEX	0x00001000
 /* EMAC can insert 802.1Q tag */
 #define EMAC_FTR_HAS_VLAN_CTAG_TX		0x00002000
+/* TAH can do TCP segmentation offload */
+#define EMAC_FTR_TAH_HAS_TSO			0x00004000
 
 /* Right now, we don't quite handle the always/possible masks on the
  * most optimal way as we don't have a way to say something like
@@ -352,6 +357,8 @@ enum {
 #endif
 #ifdef CONFIG_IBM_EMAC_TAH
 	    EMAC_FTR_HAS_TAH	|
+	    EMAC_FTR_TAH_HAS_TSO	|
+
 #endif
 #ifdef CONFIG_IBM_EMAC_ZMII
 	    EMAC_FTR_HAS_ZMII	|

@@ -266,6 +266,13 @@ struct emac_regs {
 #define EMAC_TX_CTRL_IVT		0x0020
 #define EMAC_TX_CTRL_RVT		0x0010
 #define EMAC_TX_CTRL_TAH_CSUM		0x000e
+#define EMAC_TX_CTRL_TAH_SSR(idx)	(((idx) + 1) << 1)
+#define EMAC_TX_CTRL_TAH_SSR5		0x000c
+#define EMAC_TX_CTRL_TAH_SSR4		0x000a
+#define EMAC_TX_CTRL_TAH_SSR3		0x0008
+#define EMAC_TX_CTRL_TAH_SSR2		0x0006
+#define EMAC_TX_CTRL_TAH_SSR1		0x0004
+#define EMAC_TX_CTRL_TAH_SSR0		0x0002
 
 /* EMAC specific TX descriptor status fields (read access) */
 #define EMAC_TX_ST_BFCS			0x0200

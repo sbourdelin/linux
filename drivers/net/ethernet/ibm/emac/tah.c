@@ -45,6 +45,24 @@ void tah_detach(struct platform_device *ofdev, int channel)
 	mutex_unlock(&dev->lock);
 }
 
+static void tah_set_ssr(struct platform_device *ofdev)
+{
+	struct tah_instance *dev = dev_get_drvdata(&ofdev->dev);
+	struct tah_regs __iomem *p = dev->base;
+	int i;
+
+	mutex_lock(&dev->lock);
+
+	for (i = 0; i < ARRAY_SIZE(tah_ss); i++) {
+		/* Segment size can be up to 16K, but needs
+		 * to be a multiple of 2 bytes
+		 */
+		out_be32(&p->ssr0 + i, (tah_ss[i] & 0x3ffc) << 16);
+	}
+
+	mutex_unlock(&dev->lock);
+}
+
 void tah_reset(struct platform_device *ofdev)
 {
 	struct tah_instance *dev = platform_get_drvdata(ofdev);
@@ -64,6 +82,8 @@ void tah_reset(struct platform_device *ofdev)
 	out_be32(&p->mr,
 		 TAH_MR_CVR | TAH_MR_ST_768 | TAH_MR_TFS_10KB | TAH_MR_DTFP |
 		 TAH_MR_DIG);
+
+	tah_set_ssr(ofdev);
 }
 
 int tah_get_regs_len(struct platform_device *ofdev)
@@ -118,7 +138,7 @@ static int tah_probe(struct platform_device *ofdev)
 
 	platform_set_drvdata(ofdev, dev);
 
-	/* Initialize TAH and enable IPv4 checksum verification, no TSO yet */
+	/* Initialize TAH and enable IPv4 checksum verification */
 	tah_reset(ofdev);
 
 	printk(KERN_INFO "TAH %pOF initialized\n", ofdev->dev.of_node);

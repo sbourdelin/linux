@@ -38,6 +38,9 @@
 #include <linux/mii.h>
 #include <linux/bitops.h>
 #include <linux/if_vlan.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/tcp.h>
 #include <linux/workqueue.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -1118,6 +1121,32 @@ static int emac_resize_rx_ring(struct emac_instance *dev, int new_mtu)
 	return ret;
 }
 
+/* Restriction applied for the segmentation size
+ * to use HW segmentation offload feature. the size
+ * of the segment must not be less than 168 bytes for
+ * DIX formatted segments, or 176 bytes for
+ * IEEE formatted segments. However based on actual
+ * tests any MTU less than 416 causes excessive retries
+ * due to TX FIFO underruns.
+ */
+const u32 tah_ss[TAH_NO_SSR] = { 1500, 1344, 1152, 960, 768, 416 };
+
+/* look-up matching segment size for the given mtu */
+static void emac_find_tso_ss_for_mtu(struct emac_instance *dev)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(tah_ss); i++) {
+		if (tah_ss[i] <= dev->ndev->mtu)
+			break;
+	}
+	/* if no matching segment size is found, set the tso_ss_mtu_start
+	 * variable anyway. This will cause the emac_tx_tso to skip straight
+	 * to the software fallback.
+	 */
+	dev->tso_ss_mtu_start = i;
+}
+
 /* Process ctx, rtnl_lock semaphore */
 static int emac_change_mtu(struct net_device *ndev, int new_mtu)
 {
@@ -1134,6 +1163,7 @@ static int emac_change_mtu(struct net_device *ndev, int new_mtu)
 
 	if (!ret) {
 		ndev->mtu = new_mtu;
+		emac_find_tso_ss_for_mtu(dev);
 		dev->rx_skb_size = emac_rx_skb_size(new_mtu);
 		dev->rx_sync_size = emac_rx_sync_size(new_mtu);
 	}
@@ -1410,6 +1440,33 @@ static inline u16 emac_tx_csum(struct emac_instance *dev,
 	return 0;
 }
 
+static int emac_tx_tso(struct emac_instance *dev, struct sk_buff *skb,
+		       u16 *ctrl)
+{
+	if (emac_has_feature(dev, EMAC_FTR_TAH_HAS_TSO) && skb_is_gso(skb) &&
+	    !!(skb_shinfo(skb)->gso_type & (SKB_GSO_TCPV4 | SKB_GSO_TCPV6))) {
+		u32 seg_size = 0, i;
+
+		/* Get the MTU */
+		seg_size = skb_shinfo(skb)->gso_size + tcp_hdrlen(skb) +
+			   skb_network_header_len(skb);
+
+		for (i = dev->tso_ss_mtu_start; i < ARRAY_SIZE(tah_ss); i++) {
+			if (tah_ss[i] > seg_size)
+				continue;
+
+			*ctrl |= EMAC_TX_CTRL_TAH_SSR(i);
+			return 0;
+		}
+
+		/* none found fall back to software */
+		return -EINVAL;
+	}
+
+	*ctrl |= emac_tx_csum(dev, skb);
+	return 0;
+}
+
 static inline netdev_tx_t emac_xmit_finish(struct emac_instance *dev, int len)
 {
 	struct emac_regs __iomem *p = dev->emacp;
@@ -1449,6 +1506,46 @@ static inline u16 emac_tx_vlan(struct emac_instance *dev, struct sk_buff *skb)
 		/* Insert VLAN tag */
 		return EMAC_TX_CTRL_IVT;
 	}
+	return 0;
+}
+
+static netdev_tx_t
+emac_start_xmit_sg(struct sk_buff *skb, struct net_device *ndev);
+
+static int
+emac_sw_tso(struct sk_buff *skb, struct net_device *ndev)
+{
+	struct emac_instance *dev = netdev_priv(ndev);
+	struct sk_buff *segs, *curr;
+	unsigned int i, frag_slots;
+
+	/* make sure to not overflow the tx ring */
+	frag_slots = dev->tx_cnt;
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[i];
+
+		frag_slots += mal_tx_chunks(skb_frag_size(frag));
+
+		if (frag_slots >= NUM_TX_BUFF)
+			return -ENOSPC;
+	};
+
+	segs = skb_gso_segment(skb, ndev->features &
+					~(NETIF_F_TSO | NETIF_F_TSO6));
+	if (IS_ERR_OR_NULL(segs)) {
+		++dev->estats.tx_dropped;
+		dev_kfree_skb_any(skb);
+	} else {
+		while (segs) {
+			curr = segs;
+			segs = curr->next;
+			curr->next = NULL;
+
+			emac_start_xmit_sg(curr, ndev);
+		}
+		dev_consume_skb_any(skb);
+	}
+
 	return 0;
 }
 
@@ -1535,7 +1632,12 @@ emac_start_xmit_sg(struct sk_buff *skb, struct net_device *ndev)
 		goto stop_queue;
 
 	ctrl = EMAC_TX_CTRL_GFCS | EMAC_TX_CTRL_GP | MAL_TX_CTRL_READY |
-	    emac_tx_csum(dev, skb) | emac_tx_vlan(dev, skb);
+	    emac_tx_vlan(dev, skb);
+	if (emac_tx_tso(dev, skb, &ctrl)) {
+		if (emac_sw_tso(skb, ndev))
+			goto stop_queue;
+	}
+
 	slot = dev->tx_slot;
 
 	/* skb data */
@@ -2946,6 +3048,9 @@ static int emac_init_config(struct emac_instance *dev)
 	if (dev->tah_ph != 0) {
 #ifdef CONFIG_IBM_EMAC_TAH
 		dev->features |= EMAC_FTR_HAS_TAH;
+
+		if (of_device_is_compatible(np, "ibm,emac-apm821xx"))
+			dev->features |= EMAC_FTR_TAH_HAS_TSO;
 #else
 		printk(KERN_ERR "%pOF: TAH support not enabled !\n", np);
 		return -ENXIO;
@@ -3113,6 +3218,8 @@ static int emac_probe(struct platform_device *ofdev)
 	}
 	dev->rx_skb_size = emac_rx_skb_size(ndev->mtu);
 	dev->rx_sync_size = emac_rx_sync_size(ndev->mtu);
+	ndev->gso_max_segs = NUM_TX_BUFF / 2;
+	emac_find_tso_ss_for_mtu(dev);
 
 	/* Get pointers to BD rings */
 	dev->tx_desc =
@@ -3166,6 +3273,9 @@ static int emac_probe(struct platform_device *ofdev)
 
 	if (dev->tah_dev) {
 		ndev->hw_features = NETIF_F_IP_CSUM | NETIF_F_SG;
+
+		if (emac_has_feature(dev, EMAC_FTR_TAH_HAS_TSO))
+			ndev->hw_features |= NETIF_F_TSO;
 
 		if (emac_has_feature(dev, EMAC_FTR_HAS_VLAN_CTAG_TX)) {
 			ndev->vlan_features |= ndev->hw_features;
