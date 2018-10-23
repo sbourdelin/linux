@@ -419,7 +419,7 @@ struct msr_counter bic[] = {
 	{ 0x0, "Pkg%pc7" },
 	{ 0x0, "Pkg%pc8" },
 	{ 0x0, "Pkg%pc9" },
-	{ 0x0, "Pk%pc10" },
+	{ 0x0, "Pkg%pc10" },
 	{ 0x0, "CPU%LPI" },
 	{ 0x0, "SYS%LPI" },
 	{ 0x0, "PkgWatt" },
@@ -725,7 +725,7 @@ void print_header(char *delim)
 	if (DO_BIC(BIC_Pkgpc9))
 		outp += sprintf(outp, "%sPkg%%pc9", (printed++ ? delim : ""));
 	if (DO_BIC(BIC_Pkgpc10))
-		outp += sprintf(outp, "%sPk%%pc10", (printed++ ? delim : ""));
+		outp += sprintf(outp, "%sPkg%%pc10", (printed++ ? delim : ""));
 	if (DO_BIC(BIC_CPU_LPI))
 		outp += sprintf(outp, "%sCPU%%LPI", (printed++ ? delim : ""));
 	if (DO_BIC(BIC_SYS_LPI))
