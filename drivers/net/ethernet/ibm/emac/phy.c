@@ -496,6 +496,7 @@ static struct mii_phy_def ar8035_phy_def = {
 };
 
 static struct mii_phy_def *mii_phy_table[] = {
+	/* DEPRECATED: Do not add any new PHY drivers to this list. */
 	&et1011c_phy_def,
 	&cis8201_phy_def,
 	&bcm5248_phy_def,
@@ -511,6 +512,9 @@ int emac_mii_phy_probe(struct mii_phy *phy, int address)
 	struct mii_phy_def *def;
 	int i;
 	u32 id;
+
+	pr_info("EMAC's custom phy code has been deprecated.\n"
+		"Please convert your EMAC device to PHYLIB.\n");
 
 	phy->autoneg = AUTONEG_DISABLE;
 	phy->advertising = 0;
