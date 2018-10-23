@@ -491,6 +491,49 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 	return 0;
 }
 
+int f2fs_merge_page_bio(struct f2fs_io_info *fio)
+{
+	struct bio *bio = *fio->bio;
+	struct page *page = fio->encrypted_page ?
+			fio->encrypted_page : fio->page;
+
+	if (!f2fs_is_valid_blkaddr(fio->sbi, fio->new_blkaddr,
+			__is_meta_io(fio) ? META_GENERIC : DATA_GENERIC))
+		return -EFAULT;
+
+	trace_f2fs_submit_page_bio(page, fio);
+	f2fs_trace_ios(fio, 0);
+
+	if (bio && (*fio->last_block + 1 != fio->new_blkaddr ||
+			!__same_bdev(fio->sbi, fio->new_blkaddr, bio))) {
+		__submit_bio(fio->sbi, bio, fio->type);
+		bio = NULL;
+	}
+alloc_new:
+	if (!bio) {
+		bio = __bio_alloc(fio->sbi, fio->new_blkaddr, fio->io_wbc,
+				BIO_MAX_PAGES, false, fio->type, fio->temp);
+		*fio->last_block = fio->new_blkaddr;
+		bio_set_op_attrs(bio, fio->op, fio->op_flags);
+	}
+
+	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
+		__submit_bio(fio->sbi, bio, fio->type);
+		bio = NULL;
+		goto alloc_new;
+	}
+
+	if (fio->io_wbc)
+		wbc_account_io(fio->io_wbc, page, PAGE_SIZE);
+
+	*fio->last_block = fio->new_blkaddr;
+
+	inc_page_count(fio->sbi, WB_DATA_TYPE(fio->page));
+
+	*fio->bio = bio;
+	return 0;
+}
+
 void f2fs_submit_page_write(struct f2fs_io_info *fio)
 {
 	struct f2fs_sb_info *sbi = fio->sbi;
@@ -1896,6 +1939,8 @@ out:
 }
 
 static int __write_data_page(struct page *page, bool *submitted,
+				struct bio **bio,
+				sector_t *last_block,
 				struct writeback_control *wbc,
 				enum iostat_type io_type)
 {
@@ -1921,6 +1966,8 @@ static int __write_data_page(struct page *page, bool *submitted,
 		.need_lock = LOCK_RETRY,
 		.io_type = io_type,
 		.io_wbc = wbc,
+		.bio = bio,
+		.last_block = last_block,
 	};
 
 	trace_f2fs_writepage(page, DATA);
@@ -2048,7 +2095,7 @@ redirty_out:
 static int f2fs_write_data_page(struct page *page,
 					struct writeback_control *wbc)
 {
-	return __write_data_page(page, NULL, wbc, FS_DATA_IO);
+	return __write_data_page(page, NULL, NULL, NULL, wbc, FS_DATA_IO);
 }
 
 /*
@@ -2064,6 +2111,8 @@ static int f2fs_write_cache_pages(struct address_space *mapping,
 	int done = 0;
 	struct pagevec pvec;
 	struct f2fs_sb_info *sbi = F2FS_M_SB(mapping);
+	struct bio *bio = NULL;
+	sector_t last_block;
 	int nr_pages;
 	pgoff_t uninitialized_var(writeback_index);
 	pgoff_t index;
@@ -2151,7 +2200,8 @@ continue_unlock:
 			if (!clear_page_dirty_for_io(page))
 				goto continue_unlock;
 
-			ret = __write_data_page(page, &submitted, wbc, io_type);
+			ret = __write_data_page(page, &submitted, &bio,
+						&last_block, wbc, io_type);
 			if (unlikely(ret)) {
 				/*
 				 * keep nr_to_write, since vfs uses this to
@@ -2200,6 +2250,9 @@ continue_unlock:
 	if (nwritten)
 		f2fs_submit_merged_write_cond(F2FS_M_SB(mapping), mapping->host,
 								NULL, 0, DATA);
+	/* submit cached bio of IPU write */
+	if (bio)
+		__submit_bio(sbi, bio, DATA);
 
 	return ret;
 }
