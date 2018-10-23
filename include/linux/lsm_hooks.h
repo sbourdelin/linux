@@ -1325,7 +1325,7 @@
  * @audit_rule_known:
  *	Specifies whether given @rule contains any fields related to
  *	current LSM.
- *	@rule contains the audit rule of interest.
+ *	@krule contains the audit rule of interest.
  *	Return 1 in case of relation found, 0 otherwise.
  *
  * @audit_rule_match:
@@ -1334,14 +1334,14 @@
  *	@secid contains the security id in question.
  *	@field contains the field which relates to current LSM.
  *	@op contains the operator that will be used for matching.
- *	@rule points to the audit rule that will be checked against.
+ *	@lsmrule points to the audit rule that will be checked against.
  *	@actx points to the audit context associated with the check.
  *	Return 1 if secid matches the rule, 0 if it does not, -ERRNO on failure.
  *
  * @audit_rule_free:
  *	Deallocate the LSM audit rule structure previously allocated by
  *	audit_rule_init.
- *	@rule contains the allocated rule
+ *	@lsmrule contains the allocated rule.
  *
  * @inode_invalidate_secctx:
  *	Notify the security module that it must revalidate the security context
