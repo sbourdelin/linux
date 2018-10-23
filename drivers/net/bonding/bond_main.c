@@ -2090,7 +2090,7 @@ static int bond_miimon_inspect(struct bonding *bond)
 			bond_propose_link_state(slave, BOND_LINK_FAIL);
 			commit++;
 			slave->delay = bond->params.downdelay;
-			if (slave->delay) {
+			if (slave->delay && !atomic_read(&bond->rtnl_needed)) {
 				netdev_info(bond->dev, "link status down for %sinterface %s, disabling it in %d ms\n",
 					    (BOND_MODE(bond) ==
 					     BOND_MODE_ACTIVEBACKUP) ?
@@ -2130,7 +2130,7 @@ static int bond_miimon_inspect(struct bonding *bond)
 			commit++;
 			slave->delay = bond->params.updelay;
 
-			if (slave->delay) {
+			if (slave->delay && !atomic_read(&bond->rtnl_needed)) {
 				netdev_info(bond->dev, "link status up for interface %s, enabling it in %d ms\n",
 					    slave->dev->name,
 					    ignore_updelay ? 0 :
@@ -2304,9 +2304,11 @@ static void bond_mii_monitor(struct work_struct *work)
 		if (!rtnl_trylock()) {
 			delay = 1;
 			should_notify_peers = false;
+			atomic_set(&bond->rtnl_needed, 1);
 			goto re_arm;
 		}
 
+		atomic_set(&bond->rtnl_needed, 0);
 		bond_for_each_slave(bond, slave, iter) {
 			bond_commit_link_state(slave, BOND_SLAVE_NOTIFY_LATER);
 		}
