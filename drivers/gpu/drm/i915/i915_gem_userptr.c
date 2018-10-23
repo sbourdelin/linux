@@ -50,7 +50,7 @@ struct i915_mmu_notifier {
 	struct hlist_node node;
 	struct mmu_notifier mn;
 	struct rb_root_cached objects;
-	struct workqueue_struct *wq;
+	struct i915_mm_struct *mm;
 };
 
 struct i915_mmu_object {
@@ -58,41 +58,8 @@ struct i915_mmu_object {
 	struct drm_i915_gem_object *obj;
 	struct interval_tree_node it;
 	struct list_head link;
-	struct work_struct work;
 	bool attached;
 };
-
-static void cancel_userptr(struct work_struct *work)
-{
-	struct i915_mmu_object *mo = container_of(work, typeof(*mo), work);
-	struct drm_i915_gem_object *obj = mo->obj;
-	struct work_struct *active;
-
-	/* Cancel any active worker and force us to re-evaluate gup */
-	mutex_lock(&obj->mm.lock);
-	active = fetch_and_zero(&obj->userptr.work);
-	mutex_unlock(&obj->mm.lock);
-	if (active)
-		goto out;
-
-	i915_gem_object_wait(obj, I915_WAIT_ALL, MAX_SCHEDULE_TIMEOUT, NULL);
-
-	mutex_lock(&obj->base.dev->struct_mutex);
-
-	/* We are inside a kthread context and can't be interrupted */
-	if (i915_gem_object_unbind(obj) == 0)
-		__i915_gem_object_put_pages(obj, I915_MM_NORMAL);
-	WARN_ONCE(i915_gem_object_has_pages(obj),
-		  "Failed to release pages: bind_count=%d, pages_pin_count=%d, pin_global=%d\n",
-		  obj->bind_count,
-		  atomic_read(&obj->mm.pages_pin_count),
-		  obj->pin_global);
-
-	mutex_unlock(&obj->base.dev->struct_mutex);
-
-out:
-	i915_gem_object_put(obj);
-}
 
 static void add_object(struct i915_mmu_object *mo)
 {
@@ -112,17 +79,33 @@ static void del_object(struct i915_mmu_object *mo)
 	mo->attached = false;
 }
 
+static struct mutex *__i915_mutex_lock_recursive(struct mutex *m)
+{
+	switch (mutex_trylock_recursive(m)) {
+	default:
+	case MUTEX_TRYLOCK_FAILED:
+		mutex_lock(m);
+	case MUTEX_TRYLOCK_SUCCESS:
+		return m;
+
+	case MUTEX_TRYLOCK_RECURSIVE:
+		return NULL;
+	}
+}
+
 static int i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
-						       struct mm_struct *mm,
-						       unsigned long start,
-						       unsigned long end,
-						       bool blockable)
+						      struct mm_struct *mm,
+						      unsigned long start,
+						      unsigned long end,
+						      bool blockable)
 {
 	struct i915_mmu_notifier *mn =
 		container_of(_mn, struct i915_mmu_notifier, mn);
-	struct i915_mmu_object *mo;
+	struct i915_mmu_object *mo, *next;
 	struct interval_tree_node *it;
 	LIST_HEAD(cancelled);
+	struct mutex *unlock;
+	int ret;
 
 	if (RB_EMPTY_ROOT(&mn->objects.rb_root))
 		return 0;
@@ -148,19 +131,61 @@ static int i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
 		 */
 		mo = container_of(it, struct i915_mmu_object, it);
 		if (kref_get_unless_zero(&mo->obj->base.refcount))
-			queue_work(mn->wq, &mo->work);
+			list_add(&mo->link, &cancelled);
 
-		list_add(&mo->link, &cancelled);
 		it = interval_tree_iter_next(it, start, end);
 	}
-	list_for_each_entry(mo, &cancelled, link)
-		del_object(mo);
 	spin_unlock(&mn->lock);
 
-	if (!list_empty(&cancelled))
-		flush_workqueue(mn->wq);
+	list_for_each_entry_safe(mo, next, &cancelled, link) {
+		struct drm_i915_gem_object *obj = mo->obj;
+		bool pending;
 
-	return 0;
+		/* Cancel any pending worker and force us to re-evaluate gup */
+		mutex_lock_nested(&obj->mm.lock, I915_MM_SHRINKER);
+		pending = fetch_and_zero(&obj->userptr.work);
+		mutex_unlock(&obj->mm.lock);
+		if (pending) {
+			list_del(&mo->link);
+
+			spin_lock(&mn->lock);
+			del_object(mo);
+			spin_unlock(&mn->lock);
+
+			i915_gem_object_put(obj);
+		}
+	}
+
+	if (list_empty(&cancelled))
+		return 0;
+
+	unlock = __i915_mutex_lock_recursive(&mn->mm->i915->drm.struct_mutex);
+
+	ret = 0;
+	list_for_each_entry_safe(mo, next, &cancelled, link) {
+		struct drm_i915_gem_object *obj = mo->obj;
+		int err;
+
+		err = i915_gem_object_unbind(obj);
+		if (err == 0) {
+			__i915_gem_object_put_pages(obj, I915_MM_SHRINKER);
+			GEM_BUG_ON(obj->mm.pages);
+
+			spin_lock(&mn->lock);
+			del_object(mo);
+			spin_unlock(&mn->lock);
+		} else {
+			if (ret == 0)
+				ret = err;
+		}
+
+		i915_gem_object_put(obj);
+	}
+
+	if (unlock)
+		mutex_unlock(unlock);
+
+	return ret;
 }
 
 static const struct mmu_notifier_ops i915_gem_userptr_notifier = {
@@ -168,7 +193,7 @@ static const struct mmu_notifier_ops i915_gem_userptr_notifier = {
 };
 
 static struct i915_mmu_notifier *
-i915_mmu_notifier_create(struct mm_struct *mm)
+i915_mmu_notifier_create(struct i915_mm_struct *mm)
 {
 	struct i915_mmu_notifier *mn;
 
@@ -179,13 +204,7 @@ i915_mmu_notifier_create(struct mm_struct *mm)
 	spin_lock_init(&mn->lock);
 	mn->mn.ops = &i915_gem_userptr_notifier;
 	mn->objects = RB_ROOT_CACHED;
-	mn->wq = alloc_workqueue("i915-userptr-release",
-				 WQ_UNBOUND | WQ_MEM_RECLAIM,
-				 0);
-	if (mn->wq == NULL) {
-		kfree(mn);
-		return ERR_PTR(-ENOMEM);
-	}
+	mn->mm = mm;
 
 	return mn;
 }
@@ -217,7 +236,7 @@ i915_mmu_notifier_find(struct i915_mm_struct *mm)
 	if (mn)
 		return mn;
 
-	mn = i915_mmu_notifier_create(mm->mm);
+	mn = i915_mmu_notifier_create(mm);
 	if (IS_ERR(mn))
 		err = PTR_ERR(mn);
 
@@ -240,10 +259,8 @@ i915_mmu_notifier_find(struct i915_mm_struct *mm)
 	mutex_unlock(&mm->i915->mm_lock);
 	up_write(&mm->mm->mmap_sem);
 
-	if (mn && !IS_ERR(mn)) {
-		destroy_workqueue(mn->wq);
+	if (mn && !IS_ERR(mn))
 		kfree(mn);
-	}
 
 	return err ? ERR_PTR(err) : mm->mn;
 }
@@ -273,7 +290,6 @@ i915_gem_userptr_init__mmu_notifier(struct drm_i915_gem_object *obj,
 	mo->obj = obj;
 	mo->it.start = obj->userptr.ptr;
 	mo->it.last = obj->userptr.ptr + obj->base.size - 1;
-	INIT_WORK(&mo->work, cancel_userptr);
 
 	obj->userptr.mmu_object = mo;
 	return 0;
@@ -287,7 +303,6 @@ i915_mmu_notifier_free(struct i915_mmu_notifier *mn,
 		return;
 
 	mmu_notifier_unregister(&mn->mn, mm);
-	destroy_workqueue(mn->wq);
 	kfree(mn);
 }
 
@@ -482,15 +497,10 @@ __i915_gem_userptr_set_active(struct drm_i915_gem_object *obj,
 		return 0;
 
 	spin_lock(&obj->userptr.mmu_object->mn->lock);
-	/* In order to serialise get_pages with an outstanding
-	 * cancel_userptr, we must drop the struct_mutex and try again.
-	 */
-	if (!value)
-		del_object(obj->userptr.mmu_object);
-	else if (!work_pending(&obj->userptr.mmu_object->work))
+	if (value)
 		add_object(obj->userptr.mmu_object);
 	else
-		ret = -EAGAIN;
+		del_object(obj->userptr.mmu_object);
 	spin_unlock(&obj->userptr.mmu_object->mn->lock);
 #endif
 
