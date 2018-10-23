@@ -116,6 +116,8 @@ static inline bool x86_exception_has_error_code(unsigned int vector)
 			BIT(NP_VECTOR) | BIT(SS_VECTOR) | BIT(GP_VECTOR) |
 			BIT(PF_VECTOR) | BIT(AC_VECTOR);
 
+	if (WARN_ONCE(vector >= 32, "vector 0x%x too large", vector))
+		return false;
 	return (1U << vector) & exception_has_error_code;
 }
 
