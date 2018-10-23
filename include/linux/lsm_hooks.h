@@ -305,8 +305,7 @@
  *	Return 0 if permission is granted.
  * @path_chmod:
  *	Check for permission to change DAC's permission of a file or directory.
- *	@dentry contains the dentry structure.
- *	@mnt contains the vfsmnt structure.
+ *	@path contains the path structure.
  *	@mode contains DAC's mode.
  *	Return 0 if permission is granted.
  * @path_chown:
