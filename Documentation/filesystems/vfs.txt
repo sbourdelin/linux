@@ -1,5 +1,6 @@
 
 	      Overview of the Linux Virtual File System
+- [fs] nfs: Don't let readdirplus revalidate an inode that was marked as stale (Benjamin Coddington) [1429514 1416532]
 
 	Original author: Richard Gooch <rgooch@atnf.csiro.au>
 
@@ -958,7 +959,10 @@ otherwise noted.
 
   fallocate: called by the VFS to preallocate blocks or punch a hole.
 
-  copy_file_range: called by the copy_file_range(2) system call.
+  copy_file_range: called by copy_file_range(2) system call. This method
+		   works on two file descriptors that might reside on
+		   different superblocks which might belong to file systems
+		   of different types.
 
   clone_file_range: called by the ioctl(2) system call for FICLONERANGE and
 	FICLONE commands.
