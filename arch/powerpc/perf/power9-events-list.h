@@ -97,3 +97,11 @@ EVENT(PM_MRK_DTLB_MISS_64K,			0x3d156)
 EVENT(PM_DTLB_MISS_16M,				0x4c056)
 EVENT(PM_DTLB_MISS_1G,				0x4c05a)
 EVENT(PM_MRK_DTLB_MISS_16M,			0x4c15e)
+
+/*
+ * Memory Access Events
+ * Primary PMU event used here is PM_MRK_INST_CMPL, along with
+ * Random Instruction Sampling (RIS) ([MMCRA[SM])
+ */
+EVENT(MEM_LOADS,				0x67340401e0)
+EVENT(MEM_STORES,				0x351c0401e0)
