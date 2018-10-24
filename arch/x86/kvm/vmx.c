@@ -875,7 +875,14 @@ struct nested_vmx {
 #define POSTED_INTR_ON  0
 #define POSTED_INTR_SN  1
 
-/* Posted-Interrupt Descriptor */
+/*
+ * Posted-Interrupt Descriptor
+ *
+ * Note, the physical address of this structure is used by VMX. Furthermore, the
+ * translation code assumes that the entire pi_desc struct resides within a
+ * single page, which will be true because the struct is 64 bytes and 64-byte
+ * aligned.
+ */
 struct pi_desc {
 	u32 pir[8];     /* Posted interrupt requested */
 	union {
@@ -947,8 +954,25 @@ static inline int pi_test_sn(struct pi_desc *pi_desc)
 
 struct vmx_msrs {
 	unsigned int		nr;
-	struct vmx_msr_entry	val[NR_AUTOLOAD_MSRS];
+	struct vmx_msr_entry	*val;
 };
+struct kmem_cache *vmx_msr_entry_cache;
+
+/*
+ * To prevent vmx_msr_entry array from crossing a page boundary, require:
+ * sizeof(*vmx_msrs.vmx_msr_entry.val) to be a power of two. This is guaranteed
+ * through compile-time asserts that:
+ *   - NR_AUTOLOAD_MSRS * sizeof(struct vmx_msr_entry) is a power of two
+ *   - NR_AUTOLOAD_MSRS * sizeof(struct vmx_msr_entry) <= PAGE_SIZE
+ *   - The allocation of vmx_msrs.vmx_msr_entry.val is aligned to its size.
+ */
+#define CHECK_POWER_OF_TWO(val) \
+	BUILD_BUG_ON_MSG(!((val) && !((val) & ((val) - 1))), \
+	#val " is not a power of two.")
+#define CHECK_INTRA_PAGE(val) do { \
+		CHECK_POWER_OF_TWO(val); \
+		BUILD_BUG_ON(!(val <= PAGE_SIZE)); \
+	} while (0)
 
 struct vcpu_vmx {
 	struct kvm_vcpu       vcpu;
@@ -6596,6 +6620,14 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	}
 
 	if (kvm_vcpu_apicv_active(&vmx->vcpu)) {
+		/*
+		 * Note, pi_desc is contained within a single
+		 * page because the struct is 64 bytes and 64-byte aligned.
+		 */
+		phys_addr_t pi_desc_phys =
+			page_to_phys(vmalloc_to_page(&vmx->pi_desc)) +
+			(u64)&vmx->pi_desc % PAGE_SIZE;
+
 		vmcs_write64(EOI_EXIT_BITMAP0, 0);
 		vmcs_write64(EOI_EXIT_BITMAP1, 0);
 		vmcs_write64(EOI_EXIT_BITMAP2, 0);
@@ -6604,7 +6636,7 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 		vmcs_write16(GUEST_INTR_STATUS, 0);
 
 		vmcs_write16(POSTED_INTR_NV, POSTED_INTR_VECTOR);
-		vmcs_write64(POSTED_INTR_DESC_ADDR, __pa((&vmx->pi_desc)));
+		vmcs_write64(POSTED_INTR_DESC_ADDR, pi_desc_phys);
 	}
 
 	if (!kvm_pause_in_guest(vmx->vcpu.kvm)) {
@@ -10986,18 +11018,33 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 	free_loaded_vmcs(vmx->loaded_vmcs);
 	kfree(vmx->guest_msrs);
 	kvm_vcpu_uninit(vcpu);
-	kmem_cache_free(kvm_vcpu_cache, vmx);
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.guest.val);
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.host.val);
+	vfree(vmx);
 }
 
 static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 {
 	int err;
-	struct vcpu_vmx *vmx = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+	struct vcpu_vmx *vmx = vzalloc_account(sizeof(struct vcpu_vmx));
 	unsigned long *msr_bitmap;
 	int cpu;
 
 	if (!vmx)
 		return ERR_PTR(-ENOMEM);
+
+	vmx->msr_autoload.guest.val =
+		kmem_cache_zalloc(vmx_msr_entry_cache, GFP_KERNEL);
+	if (!vmx->msr_autoload.guest.val) {
+		err = -ENOMEM;
+		goto free_vmx;
+	}
+	vmx->msr_autoload.host.val =
+		kmem_cache_zalloc(vmx_msr_entry_cache, GFP_KERNEL);
+	if (!vmx->msr_autoload.host.val) {
+		err = -ENOMEM;
+		goto free_msr_autoload_guest;
+	}
 
 	vmx->vpid = allocate_vpid();
 
@@ -11086,7 +11133,11 @@ uninit_vcpu:
 	kvm_vcpu_uninit(&vmx->vcpu);
 free_vcpu:
 	free_vpid(vmx->vpid);
-	kmem_cache_free(kvm_vcpu_cache, vmx);
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.host.val);
+free_msr_autoload_guest:
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.guest.val);
+free_vmx:
+	vfree(vmx);
 	return ERR_PTR(err);
 }
 
@@ -14292,6 +14343,10 @@ module_exit(vmx_exit);
 static int __init vmx_init(void)
 {
 	int r;
+	size_t vmx_msr_entry_size =
+		sizeof(struct vmx_msr_entry) * NR_AUTOLOAD_MSRS;
+
+	CHECK_INTRA_PAGE(vmx_msr_entry_size);
 
 #if IS_ENABLED(CONFIG_HYPERV)
 	/*
@@ -14322,10 +14377,25 @@ static int __init vmx_init(void)
 	}
 #endif
 
-	r = kvm_init(&vmx_x86_ops, sizeof(struct vcpu_vmx),
-		     __alignof__(struct vcpu_vmx), THIS_MODULE);
+	/*
+	 * Disable kmem cache; vmalloc will be used instead
+	 * to avoid OOM'ing when memory is available but not contiguous.
+	 */
+	r = kvm_init(&vmx_x86_ops, 0, 0, THIS_MODULE);
 	if (r)
 		return r;
+	/*
+	 * A vmx_msr_entry array resides exclusively within the kernel. Thus,
+	 * use kmem_cache_create_usercopy(), with the usersize argument set to
+	 * ZERO, to blacklist copying vmx_msr_entry to/from user space.
+	 */
+	vmx_msr_entry_cache =
+		kmem_cache_create_usercopy("vmx_msr_entry", vmx_msr_entry_size,
+				  vmx_msr_entry_size, SLAB_ACCOUNT, 0, 0, NULL);
+	if (!vmx_msr_entry_cache) {
+		r = -ENOMEM;
+		goto out;
+	}
 
 	/*
 	 * Must be called after kvm_init() so enable_ept is properly set
@@ -14349,5 +14419,8 @@ static int __init vmx_init(void)
 	vmx_check_vmcs12_offsets();
 
 	return 0;
+out:
+	kvm_exit();
+	return r;
 }
 module_init(vmx_init);
