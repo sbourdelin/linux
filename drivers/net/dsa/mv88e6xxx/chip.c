@@ -1696,13 +1696,14 @@ static int _mv88e6xxx_port_vlan_add(struct mv88e6xxx_chip *chip, int port,
 static void mv88e6xxx_port_vlan_add(struct dsa_switch *ds, int port,
 				    const struct switchdev_obj_port_vlan *vlan)
 {
+	struct dsa_port *dp = &ds->ports[i];
 	struct mv88e6xxx_chip *chip = ds->priv;
 	bool untagged = vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED;
 	bool pvid = vlan->flags & BRIDGE_VLAN_INFO_PVID;
 	u8 member;
 	u16 vid;
 
-	if (!chip->info->max_vid)
+	if (!chip->info->max_vid || br_vlan_enabled(dp->bridge_dev))
 		return;
 
 	if (dsa_is_dsa_port(ds, port) || dsa_is_cpu_port(ds, port))
@@ -1763,11 +1764,15 @@ static int mv88e6xxx_port_vlan_del(struct dsa_switch *ds, int port,
 				   const struct switchdev_obj_port_vlan *vlan)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
+	struct dsa_port *dp = &ds->ports[i];
 	u16 pvid, vid;
 	int err = 0;
 
 	if (!chip->info->max_vid)
 		return -EOPNOTSUPP;
+
+	if (br_vlan_enabled(dp->bridge_dev))
+		return 0;
 
 	mutex_lock(&chip->reg_lock);
 
