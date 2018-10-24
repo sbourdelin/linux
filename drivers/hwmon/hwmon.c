@@ -625,7 +625,12 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
 	hwdev->name = name;
 	hdev->class = &hwmon_class;
 	hdev->parent = dev;
-	hdev->of_node = dev ? dev->of_node : NULL;
+	if (dev) {
+		hdev->driver = dev->driver;
+		hdev->power = dev->power;
+		hdev->pm_domain = dev->pm_domain;
+		hdev->of_node = dev->of_node;
+	}
 	hwdev->chip = chip;
 	dev_set_drvdata(hdev, drvdata);
 	dev_set_name(hdev, HWMON_ID_FORMAT, id);
