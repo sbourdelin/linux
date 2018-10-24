@@ -4733,6 +4733,14 @@
 			or other driver-specific files in the
 			Documentation/watchdog/ directory.
 
+	watchdog_thresh=
+			This parameter is now available as a kernel line
+			parameter. Use watchdog_thresh=30 as example
+			This will allow early boot changes of the current
+			default of 10s to be increased when needed to
+			avoid hard lockups.
+			Default: 10
+
 	workqueue.watchdog_thresh=
 			If CONFIG_WQ_WATCHDOG is configured, workqueue can
 			warn stall conditions and dump internal state to
