@@ -914,43 +914,6 @@ static void __init create_muxes(struct clockgen *cg)
 	}
 }
 
-static void __init clockgen_init(struct device_node *np);
-
-/*
- * Legacy nodes may get probed before the parent clockgen node.
- * It is assumed that device trees with legacy nodes will not
- * contain a "clocks" property -- otherwise the input clocks may
- * not be initialized at this point.
- */
-static void __init legacy_init_clockgen(struct device_node *np)
-{
-	if (!clockgen.node)
-		clockgen_init(of_get_parent(np));
-}
-
-/* Legacy node */
-static void __init core_mux_init(struct device_node *np)
-{
-	struct clk *clk;
-	struct resource res;
-	int idx, rc;
-
-	legacy_init_clockgen(np);
-
-	if (of_address_to_resource(np, 0, &res))
-		return;
-
-	idx = (res.start & 0xf0) >> 5;
-	clk = clockgen.cmux[idx];
-
-	rc = of_clk_add_provider(np, of_clk_src_simple_get, clk);
-	if (rc) {
-		pr_err("%s: Couldn't register clk provider for node %s: %d\n",
-		       __func__, np->name, rc);
-		return;
-	}
-}
-
 static struct clk __init
 *sysclk_from_fixed(struct device_node *node, const char *name)
 {
@@ -1036,28 +999,7 @@ static struct clk * __init create_coreclk(const char *name)
 	if (!IS_ERR(clk))
 		return clk;
 
-	/*
-	 * This indicates a mix of legacy nodes with the new coreclk
-	 * mechanism, which should never happen.  If this error occurs,
-	 * don't use the wrong input clock just because coreclk isn't
-	 * ready yet.
-	 */
-	if (WARN_ON(PTR_ERR(clk) == -EPROBE_DEFER))
-		return clk;
-
 	return NULL;
-}
-
-/* Legacy node */
-static void __init sysclk_init(struct device_node *node)
-{
-	struct clk *clk;
-
-	legacy_init_clockgen(node);
-
-	clk = clockgen.sysclk;
-	if (clk)
-		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 }
 
 #define PLL_KILL BIT(31)
@@ -1160,82 +1102,6 @@ static void __init create_plls(struct clockgen *cg)
 
 	for (i = 0; i < ARRAY_SIZE(cg->pll); i++)
 		create_one_pll(cg, i);
-}
-
-static void __init legacy_pll_init(struct device_node *np, int idx)
-{
-	struct clockgen_pll *pll;
-	struct clk_onecell_data *onecell_data;
-	struct clk **subclks;
-	int count, rc;
-
-	legacy_init_clockgen(np);
-
-	pll = &clockgen.pll[idx];
-	count = of_property_count_strings(np, "clock-output-names");
-
-	BUILD_BUG_ON(ARRAY_SIZE(pll->div) < 4);
-	subclks = kcalloc(4, sizeof(struct clk *), GFP_KERNEL);
-	if (!subclks)
-		return;
-
-	onecell_data = kmalloc(sizeof(*onecell_data), GFP_KERNEL);
-	if (!onecell_data)
-		goto err_clks;
-
-	if (count <= 3) {
-		subclks[0] = pll->div[0].clk;
-		subclks[1] = pll->div[1].clk;
-		subclks[2] = pll->div[3].clk;
-	} else {
-		subclks[0] = pll->div[0].clk;
-		subclks[1] = pll->div[1].clk;
-		subclks[2] = pll->div[2].clk;
-		subclks[3] = pll->div[3].clk;
-	}
-
-	onecell_data->clks = subclks;
-	onecell_data->clk_num = count;
-
-	rc = of_clk_add_provider(np, of_clk_src_onecell_get, onecell_data);
-	if (rc) {
-		pr_err("%s: Couldn't register clk provider for node %s: %d\n",
-		       __func__, np->name, rc);
-		goto err_cell;
-	}
-
-	return;
-err_cell:
-	kfree(onecell_data);
-err_clks:
-	kfree(subclks);
-}
-
-/* Legacy node */
-static void __init pltfrm_pll_init(struct device_node *np)
-{
-	legacy_pll_init(np, PLATFORM_PLL);
-}
-
-/* Legacy node */
-static void __init core_pll_init(struct device_node *np)
-{
-	struct resource res;
-	int idx;
-
-	if (of_address_to_resource(np, 0, &res))
-		return;
-
-	if ((res.start & 0xfff) == 0xc00) {
-		/*
-		 * ls1021a devtree labels the platform PLL
-		 * with the core PLL compatible
-		 */
-		pltfrm_pll_init(np);
-	} else {
-		idx = (res.start & 0xf0) >> 5;
-		legacy_pll_init(np, CGA_PLL1 + idx);
-	}
 }
 
 static struct clk *clockgen_clk_get(struct of_phandle_args *clkspec, void *data)
@@ -1347,10 +1213,6 @@ static void __init clockgen_init(struct device_node *np)
 	int i, ret;
 	bool is_old_ls1021a = false;
 
-	/* May have already been called by a legacy probe */
-	if (clockgen.node)
-		return;
-
 	clockgen.node = np;
 	clockgen.regs = of_iomap(np, 0);
 	if (!clockgen.regs &&
@@ -1418,19 +1280,20 @@ err:
 
 CLK_OF_DECLARE(qoriq_clockgen_1, "fsl,qoriq-clockgen-1.0", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_2, "fsl,qoriq-clockgen-2.0", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_b4420, "fsl,fsl,b4420-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_b4860, "fsl,fsl,b4860-clockgen", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_ls1088a, "fsl,ls1088a-clockgen", clockgen_init);
 CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
-
-/* Legacy nodes */
-CLK_OF_DECLARE(qoriq_sysclk_1, "fsl,qoriq-sysclk-1.0", sysclk_init);
-CLK_OF_DECLARE(qoriq_sysclk_2, "fsl,qoriq-sysclk-2.0", sysclk_init);
-CLK_OF_DECLARE(qoriq_core_pll_1, "fsl,qoriq-core-pll-1.0", core_pll_init);
-CLK_OF_DECLARE(qoriq_core_pll_2, "fsl,qoriq-core-pll-2.0", core_pll_init);
-CLK_OF_DECLARE(qoriq_core_mux_1, "fsl,qoriq-core-mux-1.0", core_mux_init);
-CLK_OF_DECLARE(qoriq_core_mux_2, "fsl,qoriq-core-mux-2.0", core_mux_init);
-CLK_OF_DECLARE(qoriq_pltfrm_pll_1, "fsl,qoriq-platform-pll-1.0", pltfrm_pll_init);
-CLK_OF_DECLARE(qoriq_pltfrm_pll_2, "fsl,qoriq-platform-pll-2.0", pltfrm_pll_init);
+CLK_OF_DECLARE(qoriq_clockgen_p2041, "fsl,p2041-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_p3041, "fsl,p3041-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_p4080, "fsl,p4080-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_p5020, "fsl,p5020-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_p5040, "fsl,p5040-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_t1023, "fsl,t1023-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_t1040, "fsl,t1040-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_t2080, "fsl,t2080-clockgen", clockgen_init);
+CLK_OF_DECLARE(qoriq_clockgen_t4240, "fsl,t4240-clockgen", clockgen_init);
