@@ -56,7 +56,6 @@ static void copy_fd_bitmaps(struct fdtable *nfdt, struct fdtable *ofdt,
 	memcpy(nfdt->open_fds, ofdt->open_fds, cpy);
 	memset((char *)nfdt->open_fds + cpy, 0, set);
 	memcpy(nfdt->close_on_exec, ofdt->close_on_exec, cpy);
-	memset((char *)nfdt->close_on_exec + cpy, 0, set);
 
 	cpy = BITBIT_SIZE(count);
 	set = BITBIT_SIZE(nfdt->max_fds) - cpy;
@@ -227,7 +226,8 @@ repeat:
 
 static inline void __set_close_on_exec(unsigned int fd, struct fdtable *fdt)
 {
-	__set_bit(fd, fdt->close_on_exec);
+	if (!test_bit(fd, fdt->close_on_exec))
+		__set_bit(fd, fdt->close_on_exec);
 }
 
 static inline void __clear_close_on_exec(unsigned int fd, struct fdtable *fdt)
@@ -653,10 +653,9 @@ void do_close_on_exec(struct files_struct *files)
 		fdt = files_fdtable(files);
 		if (fd >= fdt->max_fds)
 			break;
-		set = fdt->close_on_exec[i];
+		set = fdt->close_on_exec[i] & fdt->open_fds[i];
 		if (!set)
 			continue;
-		fdt->close_on_exec[i] = 0;
 		for ( ; set ; fd++, set >>= 1) {
 			struct file *file;
 			if (!(set & 1))
