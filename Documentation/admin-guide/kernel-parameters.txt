@@ -4733,6 +4733,13 @@
 			or other driver-specific files in the
 			Documentation/watchdog/ directory.
 
+	watchdog_thresh=
+			This parameter allows early boot to change the
+			value of the watchdog timeout threshold from the default
+			of 10 seconds to avoid hard lockups.  Example:
+			watchdog_thresh=30
+			Default: 10
+
 	workqueue.watchdog_thresh=
 			If CONFIG_WQ_WATCHDOG is configured, workqueue can
 			warn stall conditions and dump internal state to
