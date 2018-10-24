@@ -1031,6 +1031,14 @@ static int __init set_debug_rodata(char *str)
 __setup("rodata=", set_debug_rodata);
 #endif
 
+static int __init is_watchdog_thresh_setup(char *str)
+{
+	get_option(&str, &watchdog_thresh);
+	return 1;
+}
+__setup("watchdog_thresh=", is_watchdog_thresh_setup);
+
+
 #ifdef CONFIG_STRICT_KERNEL_RWX
 static void mark_readonly(void)
 {
