@@ -17,9 +17,6 @@
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#include <linux/icmp.h>
 #include <linux/if_arp.h>
 #include <linux/seq_file.h>
 #include <linux/refcount.h>
@@ -30,8 +27,6 @@
 #include <net/netfilter/nf_conntrack.h>
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
-#include <net/checksum.h>
-#include <net/ip.h>
 
 #define CLUSTERIP_VERSION "0.8"
 

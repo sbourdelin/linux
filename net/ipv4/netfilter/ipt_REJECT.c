@@ -14,9 +14,6 @@
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/ip.h>
-#include <linux/udp.h>
-#include <linux/icmp.h>
-#include <net/icmp.h>
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_REJECT.h>
