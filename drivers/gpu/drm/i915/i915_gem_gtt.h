@@ -673,6 +673,11 @@ int i915_gem_gtt_insert(struct i915_address_space *vm,
 #define PIN_HIGH		BIT(9)
 #define PIN_OFFSET_BIAS		BIT(10)
 #define PIN_OFFSET_FIXED	BIT(11)
-#define PIN_OFFSET_MASK		(-I915_GTT_PAGE_SIZE)
+#define PIN_OFFSET_MASK		(-(__u64)I915_GTT_PAGE_SIZE)
+#undef PAGE_MASK		/* NOTE(sergii.romantsov): seems not the best
+				 * idea, but original PAGE_MASK can\t be used
+				 * for ppgtt at least with 32-bit kernel.
+				 */
+#define PAGE_MASK		(~((__u64)PAGE_SIZE-1))
 
 #endif

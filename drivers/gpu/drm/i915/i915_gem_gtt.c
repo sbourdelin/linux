@@ -2347,7 +2347,7 @@ static void gen6_check_faults(struct drm_i915_private *dev_priv)
 		fault = I915_READ(RING_FAULT_REG(engine));
 		if (fault & RING_FAULT_VALID) {
 			DRM_DEBUG_DRIVER("Unexpected fault\n"
-					 "\tAddr: 0x%08lx\n"
+					 "\tAddr: 0x%08llx\n"
 					 "\tAddress space: %s\n"
 					 "\tSource ID: %d\n"
 					 "\tType: %d\n",
