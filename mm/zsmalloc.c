@@ -119,6 +119,15 @@
 #define OBJ_INDEX_BITS	(BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
 #define OBJ_INDEX_MASK	((_AC(1, UL) << OBJ_INDEX_BITS) - 1)
 
+/*
+ * When using PAE, the obj encoding might overflow if arch does
+ * not re-define MAX_PHYSMEM_BITS, since zsmalloc uses HIGHMEM.
+ * This checks for a future bad page access, when de-coding obj.
+ */
+#define OBJ_OVERFLOW(_pfn) \
+	(((unsigned long long) _pfn << (OBJ_INDEX_BITS + OBJ_TAG_BITS)) >= \
+	((_AC(1, ULL)) << MAX_POSSIBLE_PHYSMEM_BITS) ? 1 : 0)
+
 #define FULLNESS_BITS	2
 #define CLASS_BITS	8
 #define ISOLATED_BITS	3
@@ -870,9 +879,14 @@ static void obj_to_location(unsigned long obj, struct page **page,
  */
 static unsigned long location_to_obj(struct page *page, unsigned int obj_idx)
 {
-	unsigned long obj;
+	unsigned long obj, pfn;
 
-	obj = page_to_pfn(page) << OBJ_INDEX_BITS;
+	pfn = page_to_pfn(page);
+
+	if (unlikely(OBJ_OVERFLOW(pfn)))
+		BUG();
+
+	obj = pfn << OBJ_INDEX_BITS;
 	obj |= obj_idx & OBJ_INDEX_MASK;
 	obj <<= OBJ_TAG_BITS;
 
