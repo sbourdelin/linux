@@ -185,4 +185,10 @@ config CLK_RENESAS_CPG_MSTP
 config CLK_RENESAS_DIV6
 	bool "DIV6 clock support" if COMPILE_TEST
 
+config CLK_RENESAS_CLK_AVB
+	bool "Renesas AVB Counter Clocks"
+	depends on CLK_RENESAS_CPG_MSSR
+	default y if ARCH_R8A7795
+	default y if ARCH_R8A7796
+
 endif # CLK_RENESAS
