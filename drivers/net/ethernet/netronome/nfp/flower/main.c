@@ -568,8 +568,18 @@ static int nfp_flower_init(struct nfp_app *app)
 		goto err_cleanup_metadata;
 	}
 
+	INIT_LIST_HEAD(&app_priv->indr_block_cb_priv);
+	app_priv->indr_block_owner = tc_indr_block_owner_create();
+	if (!app_priv->indr_block_owner) {
+		err = -ENOMEM;
+		goto err_lag_clean;
+	}
+
 	return 0;
 
+err_lag_clean:
+	if (app_priv->flower_ext_feats & NFP_FL_FEATS_LAG)
+		nfp_flower_lag_cleanup(&app_priv->nfp_lag);
 err_cleanup_metadata:
 	nfp_flower_metadata_cleanup(app);
 err_free_app_priv:
@@ -587,6 +597,8 @@ static void nfp_flower_clean(struct nfp_app *app)
 
 	if (app_priv->flower_ext_feats & NFP_FL_FEATS_LAG)
 		nfp_flower_lag_cleanup(&app_priv->nfp_lag);
+
+	nfp_flower_clean_indr_block_priv(app);
 
 	nfp_flower_metadata_cleanup(app);
 	vfree(app->priv);
@@ -678,6 +690,7 @@ static void nfp_flower_stop(struct nfp_app *app)
 		unregister_netdevice_notifier(&app_priv->nfp_lag.lag_nb);
 
 	nfp_tunnel_config_stop(app);
+	tc_indr_block_owner_clean(app_priv->indr_block_owner);
 }
 
 const struct nfp_app_type app_flower = {

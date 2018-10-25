@@ -693,3 +693,132 @@ int nfp_flower_setup_tc(struct nfp_app *app, struct net_device *netdev,
 		return -EOPNOTSUPP;
 	}
 }
+
+struct nfp_flower_indr_block_cb_priv {
+	struct net_device *netdev;
+	struct nfp_app *app;
+	struct list_head list;
+};
+
+static struct nfp_flower_indr_block_cb_priv *
+nfp_flower_indr_block_cb_priv_lookup(struct nfp_app *app,
+				     struct net_device *netdev)
+{
+	struct nfp_flower_indr_block_cb_priv *cb_priv;
+	struct nfp_flower_priv *priv = app->priv;
+
+	/* All callback list access should be protected by RTNL. */
+	ASSERT_RTNL();
+
+	list_for_each_entry(cb_priv, &priv->indr_block_cb_priv, list)
+		if (cb_priv->netdev == netdev)
+			return cb_priv;
+
+	return NULL;
+}
+
+void nfp_flower_clean_indr_block_priv(struct nfp_app *app)
+{
+	struct nfp_flower_indr_block_cb_priv *cb_priv, *temp;
+	struct nfp_flower_priv *priv = app->priv;
+
+	list_for_each_entry_safe(cb_priv, temp, &priv->indr_block_cb_priv, list)
+		kfree(cb_priv);
+}
+
+static int nfp_flower_setup_indr_block_cb(enum tc_setup_type type,
+					  void *type_data, void *cb_priv)
+{
+	struct nfp_flower_indr_block_cb_priv *priv = cb_priv;
+	struct tc_cls_flower_offload *flower = type_data;
+
+	if (flower->common.chain_index)
+		return -EOPNOTSUPP;
+
+	switch (type) {
+	case TC_SETUP_CLSFLOWER:
+		return nfp_flower_repr_offload(priv->app, priv->netdev,
+					       type_data, false);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int
+nfp_flower_setup_indr_tc_block(struct net_device *netdev, struct nfp_app *app,
+			       struct tc_block_offload *f)
+{
+	struct nfp_flower_indr_block_cb_priv *cb_priv;
+	struct nfp_flower_priv *priv = app->priv;
+	int err;
+
+	if (f->binder_type != TCF_BLOCK_BINDER_TYPE_CLSACT_INGRESS)
+		return -EOPNOTSUPP;
+
+	switch (f->command) {
+	case TC_BLOCK_BIND:
+		cb_priv = kmalloc(sizeof(*cb_priv), GFP_KERNEL);
+		if (!cb_priv)
+			return -ENOMEM;
+
+		cb_priv->netdev = netdev;
+		cb_priv->app = app;
+		list_add(&cb_priv->list, &priv->indr_block_cb_priv);
+
+		err = tcf_block_cb_register(f->block,
+					    nfp_flower_setup_indr_block_cb,
+					    netdev, cb_priv, f->extack);
+		if (err) {
+			list_del(&cb_priv->list);
+			kfree(cb_priv);
+		}
+
+		return err;
+	case TC_BLOCK_UNBIND:
+		tcf_block_cb_unregister(f->block,
+					nfp_flower_setup_indr_block_cb, netdev);
+		cb_priv = nfp_flower_indr_block_cb_priv_lookup(app, netdev);
+		if (cb_priv) {
+			list_del(&cb_priv->list);
+			kfree(cb_priv);
+		}
+
+		return 0;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
+static int
+nfp_flower_indr_setup_tc_cb(struct net_device *netdev, void *cb_priv,
+			    enum tc_setup_type type, void *type_data)
+{
+	switch (type) {
+	case TC_SETUP_BLOCK:
+		return nfp_flower_setup_indr_tc_block(netdev, cb_priv,
+						      type_data);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+void
+nfp_flower_register_indr_block(struct nfp_app *app, struct net_device *netdev)
+{
+	struct nfp_flower_priv *priv = app->priv;
+	int err;
+
+	err = __tc_indr_block_cb_register(netdev, app,
+					  nfp_flower_indr_setup_tc_cb, netdev,
+					  priv->indr_block_owner);
+	if (err)
+		nfp_flower_cmsg_warn(priv->app,
+				     "Failed to reg indirect block cb for %s\n", netdev->name);
+}
+
+void nfp_flower_unregister_indr_block(struct net_device *netdev)
+{
+	__tc_indr_block_cb_unregister(netdev, nfp_flower_indr_setup_tc_cb,
+				      netdev);
+}

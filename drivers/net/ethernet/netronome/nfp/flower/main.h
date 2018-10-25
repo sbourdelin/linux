@@ -133,6 +133,8 @@ struct nfp_fl_lag {
  * @reify_wait_queue:	wait queue for repr reify response counting
  * @mtu_conf:		Configuration of repr MTU value
  * @nfp_lag:		Link aggregation data block
+ * @indr_block_cb_priv:	List of priv data passed to indirect block registers
+ * @indr_block_owner:	Struct required for indirect blocks
  */
 struct nfp_flower_priv {
 	struct nfp_app *app;
@@ -166,6 +168,8 @@ struct nfp_flower_priv {
 	wait_queue_head_t reify_wait_queue;
 	struct nfp_mtu_conf mtu_conf;
 	struct nfp_fl_lag nfp_lag;
+	struct list_head indr_block_cb_priv;
+	struct tcf_indr_block_owner *indr_block_owner;
 };
 
 /**
@@ -269,5 +273,9 @@ int nfp_flower_lag_populate_pre_action(struct nfp_app *app,
 				       struct nfp_fl_pre_lag *pre_act);
 int nfp_flower_lag_get_output_id(struct nfp_app *app,
 				 struct net_device *master);
+void
+nfp_flower_register_indr_block(struct nfp_app *app, struct net_device *netdev);
+void nfp_flower_unregister_indr_block(struct net_device *netdev);
+void nfp_flower_clean_indr_block_priv(struct nfp_app *app);
 
 #endif
