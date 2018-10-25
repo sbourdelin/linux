@@ -61,7 +61,7 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
 Example 1 (ARM 64-bit, 6-cpu system, two clusters):
 capacities-dmips-mhz are scaled w.r.t. 1024 (cpu@0 and cpu@1)
 supposing cluster0@max-freq=1100 and custer1@max-freq=850,
-final capacities are 1024 for cluster0 and 446 for cluster1
+final capacities are 1024 for cluster0 and 578 for cluster1
 
 cpus {
 	#address-cells = <2>;
