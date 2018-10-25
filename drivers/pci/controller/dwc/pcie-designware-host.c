@@ -353,7 +353,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
 	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
 					&bridge->windows, &pp->io_base);
 	if (ret)
-		return ret;
+		goto error;
 
 	ret = devm_request_pci_bus_resources(dev, &bridge->windows);
 	if (ret)
@@ -502,6 +502,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
 	return 0;
 
 error:
+	pci_free_resource_list(&bridge->windows);
 	pci_free_host_bridge(bridge);
 	return ret;
 }
