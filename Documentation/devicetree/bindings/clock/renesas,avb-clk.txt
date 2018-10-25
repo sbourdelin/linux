@@ -1,0 +1,19 @@
+* Renesas AVB Counter Clock
+
+The AVB Counter Clocks are provided by avb_counter8 Clock Generator,
+avb_counter8 has dividers which operates with S0D1ϕ clock and has
+8 output clocks.
+
+Required Properties:
+  - compatible: Must be "renesas,clk-avb"
+  - reg: Base address and length of the memory resource used by the AVB
+  - #clock-cells: Must be 1
+
+Example
+-------
+
+	clk_avb: avb-clock@ec5a011c {
+		compatible = "renesas,clk-avb";
+		reg = <0 0xec5a011c 0 0x24>;
+		#clock-cells = <1>;
+	};
