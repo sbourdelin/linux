@@ -4,7 +4,6 @@
 #include <linux/etherdevice.h>
 #include <linux/inetdevice.h>
 #include <net/netevent.h>
-#include <net/vxlan.h>
 #include <linux/idr.h>
 #include <net/dst_metadata.h>
 #include <net/arp.h>
@@ -670,6 +669,10 @@ static int nfp_tun_mac_event_handler(struct notifier_block *nb,
 		/* If non-nfp netdev then free its offload index. */
 		if (nfp_tun_is_netdev_to_offload(netdev))
 			nfp_tun_del_mac_idx(app, netdev->ifindex);
+
+		if (event == NETDEV_UNREGISTER &&
+		    nfp_tun_is_netdev_to_offload(netdev))
+			nfp_flower_unregister_indr_block(netdev);
 	} else if (event == NETDEV_UP || event == NETDEV_CHANGEADDR ||
 		   event == NETDEV_REGISTER) {
 		app_priv = container_of(nb, struct nfp_flower_priv,
@@ -681,6 +684,10 @@ static int nfp_tun_mac_event_handler(struct notifier_block *nb,
 
 		/* Force a list write to keep NFP up to date. */
 		nfp_tunnel_write_macs(app);
+
+		if (event == NETDEV_REGISTER &&
+		    nfp_tun_is_netdev_to_offload(netdev))
+			nfp_flower_register_indr_block(app, netdev);
 	}
 	return NOTIFY_OK;
 }

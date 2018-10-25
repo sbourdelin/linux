@@ -128,6 +128,7 @@ nfp_flower_calc_opt_layer(struct flow_dissector_key_enc_opts *enc_opts,
 
 static int
 nfp_flower_calculate_key_layers(struct nfp_app *app,
+				struct net_device *netdev,
 				struct nfp_fl_key_ls *ret_key_ls,
 				struct tc_cls_flower_offload *flow,
 				bool egress,
@@ -186,8 +187,6 @@ nfp_flower_calculate_key_layers(struct nfp_app *app,
 			skb_flow_dissector_target(flow->dissector,
 						  FLOW_DISSECTOR_KEY_ENC_CONTROL,
 						  flow->key);
-		if (!egress)
-			return -EOPNOTSUPP;
 
 		if (mask_enc_ctl->addr_type != 0xffff ||
 		    enc_ctl->addr_type != FLOW_DISSECTOR_KEY_IPV4_ADDRS)
@@ -250,6 +249,10 @@ nfp_flower_calculate_key_layers(struct nfp_app *app,
 		default:
 			return -EOPNOTSUPP;
 		}
+
+		/* Ensure the ingress netdev matches the expected tun type. */
+		if (!nfp_fl_netdev_is_tunnel_type(netdev, *tun_type))
+			return -EOPNOTSUPP;
 	} else if (egress) {
 		/* Reject non tunnel matches offloaded to egress repr. */
 		return -EOPNOTSUPP;
@@ -451,8 +454,8 @@ nfp_flower_add_offload(struct nfp_app *app, struct net_device *netdev,
 	if (!key_layer)
 		return -ENOMEM;
 
-	err = nfp_flower_calculate_key_layers(app, key_layer, flow, egress,
-					      &tun_type);
+	err = nfp_flower_calculate_key_layers(app, netdev, key_layer, flow,
+					      egress, &tun_type);
 	if (err)
 		goto err_free_key_ls;
 

@@ -91,21 +91,6 @@ nfp_fl_pre_lag(struct nfp_app *app, const struct tc_action *action,
 	return act_size;
 }
 
-static bool nfp_fl_netdev_is_tunnel_type(struct net_device *out_dev,
-					 enum nfp_flower_tun_type tun_type)
-{
-	if (!out_dev->rtnl_link_ops)
-		return false;
-
-	if (!strcmp(out_dev->rtnl_link_ops->kind, "vxlan"))
-		return tun_type == NFP_FL_TUNNEL_VXLAN;
-
-	if (!strcmp(out_dev->rtnl_link_ops->kind, "geneve"))
-		return tun_type == NFP_FL_TUNNEL_GENEVE;
-
-	return false;
-}
-
 static int
 nfp_fl_output(struct nfp_app *app, struct nfp_fl_output *output,
 	      const struct tc_action *action, struct nfp_fl_payload *nfp_flow,
