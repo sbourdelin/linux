@@ -227,4 +227,14 @@ config ZPA2326_SPI
 	tristate
 	select REGMAP_SPI
 
+config HSC_SPI
+	tristate "Honeywell HSC pressure sensors (SPI)"
+	depends on SPI_MASTER
+	help
+	  Say yes here to build support for the Honeywell HSC range of
+	  pressure sensors (SPI interface only).
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called hsc_spi.
+
 endmenu

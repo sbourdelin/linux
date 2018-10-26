@@ -6697,6 +6697,12 @@ W:	http://artax.karlin.mff.cuni.cz/~mikulas/vyplody/hpfs/index-e.cgi
 S:	Maintained
 F:	fs/hpfs/
 
+HSC SERIES PRESSURE SENSORS
+M;	Carlos Iglesias <carlos.iglesias@emutex.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/iio/pressure/hsc_spi.txt
+F:	drivers/iio/pressure/hsc_spi.c
+
 HSI SUBSYSTEM
 M:	Sebastian Reichel <sre@kernel.org>
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-hsi.git
