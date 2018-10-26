@@ -1294,6 +1294,7 @@ static void set_downstream_devices_error_reporting(struct pci_dev *dev,
 static void aer_enable_rootport(struct aer_rpc *rpc)
 {
 	struct pci_dev *pdev = rpc->rpd;
+	struct pci_host_bridge *host;
 	int aer_pos;
 	u16 reg16;
 	u32 reg32;
@@ -1303,8 +1304,10 @@ static void aer_enable_rootport(struct aer_rpc *rpc)
 	pcie_capability_write_word(pdev, PCI_EXP_DEVSTA, reg16);
 
 	/* Disable system error generation in response to error messages */
-	pcie_capability_clear_word(pdev, PCI_EXP_RTCTL,
-				   SYSTEM_ERROR_INTR_ON_MESG_MASK);
+	host = pci_find_host_bridge(pdev->bus);
+	if (!host->no_disable_sys_err)
+		pcie_capability_clear_word(pdev, PCI_EXP_RTCTL,
+					   SYSTEM_ERROR_INTR_ON_MESG_MASK);
 
 	aer_pos = pdev->aer_cap;
 	/* Clear error status */
