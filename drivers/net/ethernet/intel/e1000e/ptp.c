@@ -188,6 +188,26 @@ static int e1000e_phc_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
 	return 0;
 }
 
+static int e1000e_phc_gettimex(struct ptp_clock_info *ptp,
+			       struct ptp_system_timestamp *sts)
+{
+	struct e1000_adapter *adapter = container_of(ptp, struct e1000_adapter,
+						     ptp_clock_info);
+	unsigned long flags;
+	u64 cycles, ns;
+
+	spin_lock_irqsave(&adapter->systim_lock, flags);
+
+	cycles = e1000e_read_systim(adapter, sts);
+	ns = timecounter_cyc2time(&adapter->tc, cycles);
+
+	spin_unlock_irqrestore(&adapter->systim_lock, flags);
+
+	sts->phc_ts = ns_to_timespec64(ns);
+
+	return 0;
+}
+
 /**
  * e1000e_phc_settime - Set the current time on the hardware clock
  * @ptp: ptp clock structure
@@ -259,6 +279,7 @@ static const struct ptp_clock_info e1000e_ptp_clock_info = {
 	.adjfreq	= e1000e_phc_adjfreq,
 	.adjtime	= e1000e_phc_adjtime,
 	.gettime64	= e1000e_phc_gettime,
+	.gettimex64	= e1000e_phc_gettimex,
 	.settime64	= e1000e_phc_settime,
 	.enable		= e1000e_phc_enable,
 };
