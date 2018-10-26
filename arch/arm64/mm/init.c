@@ -364,6 +364,9 @@ static void __init fdt_enforce_memory_region(void)
 void __init arm64_memblock_init(void)
 {
 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+	unsigned long __maybe_unused phys_initrd_size;
+	u64 __maybe_unused phys_initrd_start;
+	u64 __maybe_unused base, size;
 
 	/* Handle linux,usable-memory-range property */
 	fdt_enforce_memory_region();
@@ -414,8 +417,11 @@ void __init arm64_memblock_init(void)
 		 * initrd to become inaccessible via the linear mapping.
 		 * Otherwise, this is a no-op
 		 */
-		u64 base = initrd_start & PAGE_MASK;
-		u64 size = PAGE_ALIGN(initrd_end) - base;
+		phys_initrd_start = __pa(initrd_start);
+		phys_initrd_size = __pa(initrd_end) - phys_initrd_start;
+
+		base = phys_initrd_start & PAGE_MASK;
+		size = PAGE_ALIGN(phys_initrd_size);
 
 		/*
 		 * We can only add back the initrd memory if we don't end up
@@ -459,15 +465,15 @@ void __init arm64_memblock_init(void)
 	 * pagetables with memblock.
 	 */
 	memblock_reserve(__pa_symbol(_text), _end - _text);
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (initrd_start) {
-		memblock_reserve(initrd_start, initrd_end - initrd_start);
-
-		/* the generic initrd code expects virtual addresses */
-		initrd_start = __phys_to_virt(initrd_start);
-		initrd_end = __phys_to_virt(initrd_end);
+	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+		memblock_reserve(phys_initrd_start, phys_initrd_size);
+		/*
+		 * initrd_below_start_ok can be changed by
+		 * __early_init_dt_declare_initrd(), set it back to what
+		 * we want here.
+		 */
+		initrd_below_start_ok = 0;
 	}
-#endif
 
 	early_init_fdt_scan_reserved_mem();
 
