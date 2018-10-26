@@ -21,3 +21,4 @@ generic-y += statfs.h
 generic-y += termbits.h
 generic-y += termios.h
 generic-y += types.h
+generic-y += unistd_32.h
