@@ -1123,7 +1123,7 @@ static void gen8_ppgtt_insert_huge_entries(struct i915_vma *vma,
 		gen8_pte_t *vaddr;
 		u16 index, max;
 
-		if (vma->page_sizes.sg & I915_GTT_PAGE_SIZE_2M &&
+		if (vma->page_sizes.sg & -I915_GTT_PAGE_SIZE_2M &&
 		    IS_ALIGNED(iter->dma, I915_GTT_PAGE_SIZE_2M) &&
 		    rem >= I915_GTT_PAGE_SIZE_2M && !idx.pte) {
 			index = idx.pde;
@@ -1141,7 +1141,7 @@ static void gen8_ppgtt_insert_huge_entries(struct i915_vma *vma,
 			page_size = I915_GTT_PAGE_SIZE;
 
 			if (!index &&
-			    vma->page_sizes.sg & I915_GTT_PAGE_SIZE_64K &&
+			    vma->page_sizes.sg & -I915_GTT_PAGE_SIZE_64K &&
 			    IS_ALIGNED(iter->dma, I915_GTT_PAGE_SIZE_64K) &&
 			    (IS_ALIGNED(rem, I915_GTT_PAGE_SIZE_64K) ||
 			     rem >= (max - index) * I915_GTT_PAGE_SIZE))
