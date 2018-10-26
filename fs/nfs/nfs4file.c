@@ -139,8 +139,14 @@ static ssize_t nfs4_copy_file_range(struct file *file_in, loff_t pos_in,
 	nfs4_stateid *cnrs = NULL;
 	ssize_t ret;
 
-	if (file_in->f_inode->i_sb != file_out->f_inode->i_sb)
+	if (file_in->f_op != &nfs4_file_operations)
 		return -EXDEV;
+	else {
+		struct nfs_client *c_in =
+			(NFS_SERVER(file_inode(file_in)))->nfs_client;
+		if (c_in->cl_minorversion < 2)
+			return -EXDEV;
+	}
 
 	if (file_inode(file_in) == file_inode(file_out))
 		return -EINVAL;
