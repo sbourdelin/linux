@@ -550,11 +550,11 @@ static void kvm_destroy_dirty_bitmap(struct kvm_memory_slot *memslot)
  * Free any memory in @free but not in @dont.
  */
 static void kvm_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
-			      struct kvm_memory_slot *dont)
+			      struct kvm_memory_slot *dont,
+			      enum kvm_mr_change change)
 {
+	if (change == KVM_MR_DELETE) {
 #ifdef CONFIG_KVM_ROE
-	if (!dont) {
-		//TODO still this might leak
 		struct protected_chunk *pos, *n;
 		struct list_head *head = free->prot_list;
 		kvfree(free->roe_bitmap);
@@ -564,10 +564,9 @@ static void kvm_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
 			kvfree(pos);
 		}
 		kvfree(free->prot_list);
-	}
 #endif
-	if (!dont || free->dirty_bitmap != dont->dirty_bitmap)
 		kvm_destroy_dirty_bitmap(free);
+	}
 
 	kvm_arch_free_memslot(kvm, free, dont);
 
@@ -582,7 +581,7 @@ static void kvm_free_memslots(struct kvm *kvm, struct kvm_memslots *slots)
 		return;
 
 	kvm_for_each_memslot(memslot, slots)
-		kvm_free_memslot(kvm, memslot, NULL);
+		kvm_free_memslot(kvm, memslot, NULL, KVM_MR_DELETE);
 
 	kvfree(slots);
 }
@@ -1100,14 +1099,14 @@ int __kvm_set_memory_region(struct kvm *kvm,
 
 	kvm_arch_commit_memory_region(kvm, mem, &old, &new, change);
 
-	kvm_free_memslot(kvm, &old, &new);
+	kvm_free_memslot(kvm, &old, &new, change);
 	kvfree(old_memslots);
 	return 0;
 
 out_slots:
 	kvfree(slots);
 out_free:
-	kvm_free_memslot(kvm, &new, &old);
+	kvm_free_memslot(kvm, &new, &old, change);
 out:
 	return r;
 }
