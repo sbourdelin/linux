@@ -589,6 +589,7 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	LIST_HEAD(resources);
 	resource_size_t offset[2] = {0};
 	resource_size_t membar2_offset = 0x2000, busn_start = 0;
+	u8 interface;
 
 	/*
 	 * Shadow registers may exist in certain VMD device ids which allow
@@ -716,8 +717,40 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	vmd_attach_resources(vmd);
 	vmd_setup_dma_ops(vmd);
 	dev_set_msi_domain(&vmd->bus->dev, vmd->irq_domain);
-	pci_rescan_bus(vmd->bus);
 
+	/*
+	 * Certain VMD devices may request firmware-first error handling
+	 * support on the VMD domain. These domains are not described by ACPI
+	 * tables such as DSDT and HEST, so "firmware first" error handling is
+	 * currently unsupported in the driver in favor of OS native error
+	 * handing.
+	 *
+	 * VMD does support firmware error handling where errors are signaled
+	 * to firmware via SMI. It also supports a "combined model" where the
+	 * OS native error handling may be used in addition to firmware error
+	 * handling.
+	 *
+	 * Because of the lack of ACPI support on the domain and the capability
+	 * to use the 'combined model', the typical firmware-first architecture
+	 * is not used because it would disable OS native error handling.
+	 *
+	 * VMD domains do not support NMI callbacks to the OS. Pass-back to the
+	 * kernel from firmware is handled with a synthesized MSI on VMD device
+	 * vector 0, which is the same interrupt already used to signal PCIe
+	 * errors for OS native handling in the VMD domain and will trigger any
+	 * remaining required OS native error handling.
+	 *
+	 * Because the VMD domain is not described by ACPI, the intent to use
+	 * firmware-first error handling in the root ports is instead described
+	 * by the VMD device's programming interface bit being set to 0x1.
+	 */
+	pci_read_config_byte(vmd->dev, PCI_CLASS_PROG, &interface);
+	if (interface == 0x1) {
+		struct pci_host_bridge *host = pci_find_host_bridge(vmd->bus);
+		host->no_disable_sys_err = 1;
+	}
+
+	pci_rescan_bus(vmd->bus);
 	WARN(sysfs_create_link(&vmd->dev->dev.kobj, &vmd->bus->dev.kobj,
 			       "domain"), "Can't create symlink to domain\n");
 	return 0;
