@@ -335,7 +335,8 @@ void __init numa_set_distance(int from, int to, int distance)
 	}
 
 	if ((u8)distance != distance ||
-	    (from == to && distance != LOCAL_DISTANCE)) {
+	    (from == to && distance != LOCAL_DISTANCE) ||
+	    (from != to && distance == LOCAL_DISTANCE)) {
 		pr_warn_once("Warning: invalid distance parameter, from=%d to=%d distance=%d\n",
 			     from, to, distance);
 		return;
