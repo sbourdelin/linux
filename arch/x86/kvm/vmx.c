@@ -875,7 +875,14 @@ struct nested_vmx {
 #define POSTED_INTR_ON  0
 #define POSTED_INTR_SN  1
 
-/* Posted-Interrupt Descriptor */
+/*
+ * Posted-Interrupt Descriptor
+ *
+ * Note, the physical address of this structure is used by VMX. Furthermore, the
+ * translation code assumes that the entire pi_desc struct resides within a
+ * single page, which will be true because the struct is 64 bytes and 64-byte
+ * aligned.
+ */
 struct pi_desc {
 	u32 pir[8];     /* Posted interrupt requested */
 	union {
@@ -6613,6 +6620,14 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	}
 
 	if (kvm_vcpu_apicv_active(&vmx->vcpu)) {
+		/*
+		 * Note, pi_desc is contained within a single
+		 * page because the struct is 64 bytes and 64-byte aligned.
+		 */
+		phys_addr_t pi_desc_phys =
+			page_to_phys(vmalloc_to_page(&vmx->pi_desc)) +
+			(u64)&vmx->pi_desc % PAGE_SIZE;
+
 		vmcs_write64(EOI_EXIT_BITMAP0, 0);
 		vmcs_write64(EOI_EXIT_BITMAP1, 0);
 		vmcs_write64(EOI_EXIT_BITMAP2, 0);
@@ -6621,7 +6636,7 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 		vmcs_write16(GUEST_INTR_STATUS, 0);
 
 		vmcs_write16(POSTED_INTR_NV, POSTED_INTR_VECTOR);
-		vmcs_write64(POSTED_INTR_DESC_ADDR, __pa((&vmx->pi_desc)));
+		vmcs_write64(POSTED_INTR_DESC_ADDR, pi_desc_phys);
 	}
 
 	if (!kvm_pause_in_guest(vmx->vcpu.kvm)) {
@@ -11003,13 +11018,18 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 	free_loaded_vmcs(vmx->loaded_vmcs);
 	kfree(vmx->guest_msrs);
 	kvm_vcpu_uninit(vcpu);
-	kmem_cache_free(kvm_vcpu_cache, vmx);
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.guest.val);
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.host.val);
+	vfree(vmx);
 }
 
 static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 {
 	int err;
-	struct vcpu_vmx *vmx = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+	struct vcpu_vmx *vmx =
+		__vmalloc(sizeof(struct vcpu_vmx),
+			  GFP_KERNEL | __GFP_ZERO | __GFP_ACCOUNT,
+			  PAGE_KERNEL);
 	unsigned long *msr_bitmap;
 	int cpu;
 
@@ -11120,7 +11140,7 @@ free_vcpu:
 free_msr_autoload_guest:
 	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.guest.val);
 free_vmx:
-	kmem_cache_free(kvm_vcpu_cache, vmx);
+	vfree(vmx);
 	return ERR_PTR(err);
 }
 
@@ -14360,8 +14380,11 @@ static int __init vmx_init(void)
 	}
 #endif
 
-	r = kvm_init(&vmx_x86_ops, sizeof(struct vcpu_vmx),
-		__alignof__(struct vcpu_vmx), THIS_MODULE);
+	/*
+	 * Disable kmem cache; vmalloc will be used instead
+	 * to avoid OOM'ing when memory is available but not contiguous.
+	 */
+	r = kvm_init(&vmx_x86_ops, 0, 0, THIS_MODULE);
 	if (r)
 		return r;
 	/*

@@ -4029,18 +4029,22 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		goto out_free_2;
 	register_reboot_notifier(&kvm_reboot_notifier);
 
-	/* A kmem cache lets us meet the alignment requirements of fx_save. */
-	if (!vcpu_align)
-		vcpu_align = __alignof__(struct kvm_vcpu);
-	kvm_vcpu_cache =
-		kmem_cache_create_usercopy("kvm_vcpu", vcpu_size, vcpu_align,
-					   SLAB_ACCOUNT,
-					   offsetof(struct kvm_vcpu, arch),
-					   sizeof_field(struct kvm_vcpu, arch),
-					   NULL);
-	if (!kvm_vcpu_cache) {
-		r = -ENOMEM;
-		goto out_free_3;
+	/*
+	 * When vcpu_size is zero,
+	 * architecture-specific code manages its own vcpu allocation.
+	 */
+	kvm_vcpu_cache = NULL;
+	if (vcpu_size) {
+		if (!vcpu_align)
+			vcpu_align = __alignof__(struct kvm_vcpu);
+		kvm_vcpu_cache = kmem_cache_create_usercopy(
+			"kvm_vcpu", vcpu_size, vcpu_align, SLAB_ACCOUNT,
+			offsetof(struct kvm_vcpu, arch),
+			sizeof_field(struct kvm_vcpu, arch), NULL);
+		if (!kvm_vcpu_cache) {
+			r = -ENOMEM;
+			goto out_free_3;
+		}
 	}
 
 	r = kvm_async_pf_init();
