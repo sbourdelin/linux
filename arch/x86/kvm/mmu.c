@@ -1513,9 +1513,11 @@ static bool __rmap_write_protect_roe(struct kvm *kvm,
 	struct rmap_iterator iter;
 	bool prot;
 	bool flush = false;
-
+	void *full_bmp =  d->memslot->roe_bitmap;
+	void *part_bmp = d->memslot->partial_roe_bitmap;
 	for_each_rmap_spte(rmap_head, &iter, sptep) {
-		prot = !test_bit(d->i, d->memslot->roe_bitmap) && pt_protect;
+		prot = !(test_bit(d->i, full_bmp) || test_bit(d->i, part_bmp));
+		prot = prot && pt_protect;
 		flush |= spte_write_protect(sptep, prot);
 		d->i++;
 	}

@@ -164,6 +164,15 @@ This configuration lets a guest kernel have part of its read/write memory
 converted into read-only.  This action is irreversible.
 Upon successful run, the number of pages protected is returned.
 
+Usage 3:
+     a0: ROE_MPROTECT_CHUNK	(requires version >= 2)
+     a1: Start address aligned to page boundary.
+     a2: Number of bytes to be protected.
+This configuration lets a guest kernel have part of its read/write memory
+converted into read-only with bytes granularity. ROE_MPROTECT_CHUNK is
+relatively slow compared to ROE_MPROTECT. This action is irreversible.
+Upon successful run, the number of bytes protected is returned.
+
 Error codes:
 	-KVM_ENOSYS: system call being triggered from ring 3 or it is not
 	implemented.

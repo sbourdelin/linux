@@ -553,10 +553,19 @@ static void kvm_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
 			      struct kvm_memory_slot *dont)
 {
 #ifdef CONFIG_KVM_ROE
-	if (!dont)
+	if (!dont) {
+		//TODO still this might leak
+		struct protected_chunk *pos, *n;
+		struct list_head *head = free->prot_list;
 		kvfree(free->roe_bitmap);
+		kvfree(free->partial_roe_bitmap);
+		list_for_each_entry_safe(pos, n, head, list) {
+			list_del(&pos->list);
+			kvfree(pos);
+		}
+		kvfree(free->prot_list);
+	}
 #endif
-
 	if (!dont || free->dirty_bitmap != dont->dirty_bitmap)
 		kvm_destroy_dirty_bitmap(free);
 
@@ -803,13 +812,22 @@ static int kvm_create_dirty_bitmap(struct kvm_memory_slot *memslot)
 	return 0;
 }
 
-static int kvm_init_roe_bitmap(struct kvm_memory_slot *slot)
+static int kvm_init_roe(struct kvm_memory_slot *slot)
 {
 #ifdef CONFIG_KVM_ROE
 	slot->roe_bitmap = kvzalloc(BITS_TO_LONGS(slot->npages) *
 	sizeof(unsigned long), GFP_KERNEL);
 	if (!slot->roe_bitmap)
 		return -ENOMEM;
+	slot->partial_roe_bitmap = kvzalloc(BITS_TO_LONGS(slot->npages) *
+	sizeof(unsigned long), GFP_KERNEL);
+	if (!slot->partial_roe_bitmap) {
+		kvfree(slot->roe_bitmap);
+		return -ENOMEM;
+	}
+	slot->prot_list = kvzalloc(sizeof(struct list_head), GFP_KERNEL);
+	INIT_LIST_HEAD(slot->prot_list);
+
 #endif
 	return 0;
 }
@@ -1036,7 +1054,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		if (kvm_create_dirty_bitmap(&new) < 0)
 			goto out_free;
 	}
-	if (kvm_init_roe_bitmap(&new) < 0)
+	if (kvm_init_roe(&new) < 0)
 		goto out_free;
 
 	slots = kvzalloc(sizeof(struct kvm_memslots), GFP_KERNEL);
@@ -1290,26 +1308,37 @@ static bool memslot_is_readonly(struct kvm_memory_slot *slot)
 {
 	return slot->flags & KVM_MEM_READONLY;
 }
+#ifdef CONFIG_KVM_ROE
+static bool gfn_is_partially_protected(struct kvm_memory_slot *slot, gfn_t gfn)
+{
 
+	return test_bit(gfn - slot->base_gfn, slot->partial_roe_bitmap);
+}
+
+static bool gfn_is_fully_protected(struct kvm_memory_slot *slot, gfn_t gfn)
+{
+	return test_bit(gfn - slot->base_gfn, slot->roe_bitmap);
+}
+#endif
 static bool gfn_is_readonly(struct kvm_memory_slot *slot, gfn_t gfn)
 {
 #ifdef CONFIG_KVM_ROE
-	return test_bit(gfn - slot->base_gfn, slot->roe_bitmap) ||
-		memslot_is_readonly(slot);
+	return gfn_is_fully_protected(slot, gfn) ||
+	       gfn_is_partially_protected(slot, gfn) ||
+	       memslot_is_readonly(slot);
 #else
 	return memslot_is_readonly(slot);
 #endif
 }
+
 
 static unsigned long __gfn_to_hva_many(struct kvm_memory_slot *slot, gfn_t gfn,
 				       gfn_t *nr_pages, bool write)
 {
 	if (!slot || slot->flags & KVM_MEMSLOT_INVALID)
 		return KVM_HVA_ERR_BAD;
-
 	if (gfn_is_readonly(slot, gfn) && write)
 		return KVM_HVA_ERR_RO_BAD;
-
 	if (nr_pages)
 		*nr_pages = slot->npages - (gfn - slot->base_gfn);
 
@@ -1871,14 +1900,55 @@ int kvm_vcpu_read_guest_atomic(struct kvm_vcpu *vcpu, gpa_t gpa,
 	return __kvm_read_guest_atomic(slot, gfn, data, offset, len);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_read_guest_atomic);
+#ifdef CONFIG_KVM_ROE
 
+static bool kvm_roe_protected_range(struct kvm_memory_slot *slot, gpa_t gpa,
+		int len)
+{
+	struct list_head *pos;
+	struct protected_chunk *cur_chunk;
+
+	list_for_each(pos, slot->prot_list) {
+		cur_chunk = list_entry(pos, struct protected_chunk, list);
+		if (kvm_roe_range_overlap(cur_chunk, gpa, len))
+			return true;
+	}
+	return false;
+}
+static bool kvm_roe_check_range(struct kvm_memory_slot *slot,
+		gfn_t gfn, int offset, int len)
+{
+	gpa_t gpa = (gfn << PAGE_SHIFT) + offset;
+
+	if (!gfn_is_partially_protected(slot, gfn))
+		return false;
+	return kvm_roe_protected_range(slot, gpa, len);
+}
+#endif
+static u64 roe_gfn_to_hva(struct kvm_memory_slot *slot, gfn_t gfn, int offset,
+		int len)
+{
+	u64 addr;
+#ifdef CONFIG_KVM_ROE
+	if (kvm_roe_check_range(slot, gfn, offset, len))
+		return KVM_HVA_ERR_RO_BAD;
+	if (memslot_is_readonly(slot))
+		return KVM_HVA_ERR_RO_BAD;
+	if (gfn_is_fully_protected(slot, gfn))
+		return KVM_HVA_ERR_RO_BAD;
+	addr = __gfn_to_hva_many(slot, gfn, NULL, false);
+#else
+	addr = gfn_to_hva_memslot(slot, gfn);
+#endif
+	return addr;
+}
 static int __kvm_write_guest_page(struct kvm_memory_slot *memslot, gfn_t gfn,
 			          const void *data, int offset, int len)
 {
 	int r;
 	unsigned long addr;
 
-	addr = gfn_to_hva_memslot(memslot, gfn);
+	addr = roe_gfn_to_hva(memslot, gfn, offset, len);
 	if (kvm_is_error_hva(addr))
 		return -EFAULT;
 	r = __copy_to_user((void __user *)addr + offset, data, len);
