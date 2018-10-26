@@ -142,16 +142,19 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
 	node = of_get_child_by_name(pdev->dev.of_node, "tsc");
 	of_property_read_u32(node, "ti,wires", &tsc_wires);
 	of_property_read_u32(node, "ti,coordiante-readouts", &readouts);
+	of_node_put(node);
 
 	node = of_get_child_by_name(pdev->dev.of_node, "adc");
 	of_property_for_each_u32(node, "ti,adc-channels", prop, cur, val) {
 		adc_channels++;
 		if (val > 7) {
+			of_node_put(node);
 			dev_err(&pdev->dev, " PIN numbers are 0..7 (not %d)\n",
 					val);
 			return -EINVAL;
 		}
 	}
+	of_node_put(node);
 	total_channels = tsc_wires + adc_channels;
 	if (total_channels > 8) {
 		dev_err(&pdev->dev, "Number of i/p channels more than 8\n");
