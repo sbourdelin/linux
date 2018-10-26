@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
+#include <linux/of.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -669,6 +670,27 @@ static int ad2s1210_setup_gpios(struct ad2s1210_state *st)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static struct ad2s1210_platform_data *ad2s1210_parse_dt(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	struct ad2s1210_platform_data *pdata;
+
+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return NULL;
+
+	pdata->gpioin = of_property_read_bool(np, "adi,gpioin");
+
+	return pdata;
+}
+#else
+static struct ad2s1210_platform_data *ad2s1210_parse_dt(struct device *dev)
+{
+	return NULL;
+}
+#endif
+
 static int ad2s1210_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
@@ -682,7 +704,19 @@ static int ad2s1210_probe(struct spi_device *spi)
 	if (!indio_dev)
 		return -ENOMEM;
 	st = iio_priv(indio_dev);
-	st->pdata = spi->dev.platform_data;
+	if (spi->dev.of_node) {
+		st->pdata = ad2s1210_parse_dt(&spi->dev);
+		if (!st->pdata)
+			return -EINVAL;
+	} else {
+		st->pdata = spi->dev.platform_data;
+	}
+
+	if (!st->pdata) {
+		dev_err(&spi->dev, "ad2s1210: no platform data supplied\n");
+		return -EINVAL;
+	}
+
 	ret = ad2s1210_setup_gpios(st);
 	if (ret < 0)
 		return ret;
@@ -724,6 +758,12 @@ static int ad2s1210_remove(struct spi_device *spi)
 	return 0;
 }
 
+static const struct of_device_id ad2s1210_of_match[] = {
+	{ .compatible = "adi,ad2s1210", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, ad2s1210_of_match);
+
 static const struct spi_device_id ad2s1210_id[] = {
 	{ "ad2s1210" },
 	{}
@@ -733,6 +773,7 @@ MODULE_DEVICE_TABLE(spi, ad2s1210_id);
 static struct spi_driver ad2s1210_driver = {
 	.driver = {
 		.name = DRV_NAME,
+		.of_match_table = of_match_ptr(ad2s1210_of_match),
 	},
 	.probe = ad2s1210_probe,
 	.remove = ad2s1210_remove,
