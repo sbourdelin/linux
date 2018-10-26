@@ -26,7 +26,6 @@
 
 #include <linux/sched.h>
 #include "sched.h"
-#include "sched-pelt.h"
 #include "pelt.h"
 
 /*
@@ -106,15 +105,11 @@ static u32 __accumulate_pelt_segments(u64 periods, u32 d1, u32 d3)
  *                     n=1
  */
 static __always_inline u32
-accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
+accumulate_sum(u64 delta, struct sched_avg *sa,
 	       unsigned long load, unsigned long runnable, int running)
 {
-	unsigned long scale_freq, scale_cpu;
 	u32 contrib = (u32)delta; /* p == 0 -> delta < 1024 */
 	u64 periods;
-
-	scale_freq = arch_scale_freq_capacity(cpu);
-	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
 
 	delta += sa->period_contrib;
 	periods = delta / 1024; /* A period is 1024us (~1ms) */
@@ -137,13 +132,12 @@ accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
 	}
 	sa->period_contrib = delta;
 
-	contrib = cap_scale(contrib, scale_freq);
 	if (load)
 		sa->load_sum += load * contrib;
 	if (runnable)
 		sa->runnable_load_sum += runnable * contrib;
 	if (running)
-		sa->util_sum += contrib * scale_cpu;
+		sa->util_sum += contrib << SCHED_CAPACITY_SHIFT;
 
 	return periods;
 }
@@ -221,7 +215,7 @@ ___update_load_sum(u64 now, int cpu, struct sched_avg *sa,
 	 * Step 1: accumulate *_sum since last_update_time. If we haven't
 	 * crossed period boundaries, finish.
 	 */
-	if (!accumulate_sum(delta, cpu, sa, load, runnable, running))
+	if (!accumulate_sum(delta, sa, load, runnable, running))
 		return 0;
 
 	return 1;
@@ -365,12 +359,21 @@ int update_dl_rq_load_avg(u64 now, struct rq *rq, int running)
 int update_irq_load_avg(struct rq *rq, u64 running)
 {
 	int ret = 0;
+
+	/*
+	 * We can't use clock_pelt because irq time is not accounted in
+	 * clock_task. Instead we directly scale the running time to
+	 * reflect the real amount of computation
+	 */
+	running = cap_scale(running, arch_scale_freq_capacity(cpu_of(rq)));
+	running = cap_scale(running, arch_scale_cpu_capacity(NULL, cpu_of(rq)));
+
 	/*
 	 * We know the time that has been used by interrupt since last update
 	 * but we don't when. Let be pessimistic and assume that interrupt has
 	 * happened just before the update. This is not so far from reality
 	 * because interrupt will most probably wake up task and trig an update
-	 * of rq clock during which the metric si updated.
+	 * of rq clock during which the metric is updated.
 	 * We start to decay with normal context time and then we add the
 	 * interrupt context time.
 	 * We can safely remove running from rq->clock because
