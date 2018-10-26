@@ -361,6 +361,7 @@ EXPORT_SYMBOL_GPL(realmode_pfn_to_page);
 
 #ifdef CONFIG_PPC_BOOK3S_64
 static bool disable_radix = !IS_ENABLED(CONFIG_PPC_RADIX_MMU_DEFAULT);
+static bool disable_guap = !IS_ENABLED(CONFIG_PPC_RADIX_GUAP);
 
 static int __init parse_disable_radix(char *p)
 {
@@ -376,6 +377,18 @@ static int __init parse_disable_radix(char *p)
 	return 0;
 }
 early_param("disable_radix", parse_disable_radix);
+
+static int __init parse_nosmap(char *p)
+{
+	/*
+	 * nosmap is an existing option on x86 where it doesn't return -EINVAL
+	 * if the parameter is set to something, so even though it's different
+	 * to disable_radix, don't return an error for compatibility.
+	 */
+	disable_guap = true;
+	return 0;
+}
+early_param("nosmap", parse_nosmap);
 
 /*
  * If we're running under a hypervisor, we need to check the contents of
@@ -430,6 +443,8 @@ void __init mmu_early_init_devtree(void)
 	/* Disable radix mode based on kernel command line. */
 	if (disable_radix)
 		cur_cpu_spec->mmu_features &= ~MMU_FTR_TYPE_RADIX;
+	if (disable_radix || disable_guap)
+		cur_cpu_spec->mmu_features &= ~MMU_FTR_RADIX_GUAP;
 
 	/*
 	 * Check /chosen/ibm,architecture-vec-5 if running as a guest.
