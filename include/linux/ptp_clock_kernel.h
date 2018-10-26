@@ -39,6 +39,13 @@ struct ptp_clock_request {
 };
 
 struct system_device_crosststamp;
+
+struct ptp_system_timestamp {
+	struct timespec64 sys_ts1;
+	struct timespec64 phc_ts;
+	struct timespec64 sys_ts2;
+};
+
 /**
  * struct ptp_clock_info - decribes a PTP hardware clock
  *
@@ -74,6 +81,13 @@ struct system_device_crosststamp;
  *
  * @gettime64:  Reads the current time from the hardware clock.
  *              parameter ts: Holds the result.
+ *
+ * @gettimex64:  Reads the current time from the system clock, hardware clock,
+ *               and system clock again.
+ *               parameter sts:  The structure contains system time right
+ *               before reading the lowest bits of the PHC timestamp, the PHC
+ *               timestamp itself, and system time immediately after reading
+ *               the lowest bits of the PHC timestamp.
  *
  * @getcrosststamp:  Reads the current time from the hardware clock and
  *                   system clock simultaneously.
@@ -124,6 +138,8 @@ struct ptp_clock_info {
 	int (*adjfreq)(struct ptp_clock_info *ptp, s32 delta);
 	int (*adjtime)(struct ptp_clock_info *ptp, s64 delta);
 	int (*gettime64)(struct ptp_clock_info *ptp, struct timespec64 *ts);
+	int (*gettimex64)(struct ptp_clock_info *ptp,
+			  struct ptp_system_timestamp *sts);
 	int (*getcrosststamp)(struct ptp_clock_info *ptp,
 			      struct system_device_crosststamp *cts);
 	int (*settime64)(struct ptp_clock_info *p, const struct timespec64 *ts);
@@ -226,6 +242,16 @@ int ptp_find_pin(struct ptp_clock *ptp,
  */
 
 int ptp_schedule_worker(struct ptp_clock *ptp, unsigned long delay);
+
+static inline void ptp_read_system_prets(struct ptp_system_timestamp *sts)
+{
+	ktime_get_real_ts64(&sts->sys_ts1);
+}
+
+static inline void ptp_read_system_postts(struct ptp_system_timestamp *sts)
+{
+	ktime_get_real_ts64(&sts->sys_ts2);
+}
 
 #else
 static inline struct ptp_clock *ptp_clock_register(struct ptp_clock_info *info,
