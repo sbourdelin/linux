@@ -31,7 +31,7 @@
 /* Enhanced descriptors */
 static inline void ehn_desc_rx_set_on_ring(struct dma_desc *p, int end)
 {
-	p->des1 |= cpu_to_le32(((BUF_SIZE_8KiB - 1)
+	p->des1 |= cpu_to_le32((RX_BUF_SIZE_8KiB
 			<< ERDES1_BUFFER2_SIZE_SHIFT)
 		   & ERDES1_BUFFER2_SIZE_MASK);
 
@@ -61,7 +61,7 @@ static inline void enh_set_tx_desc_len_on_ring(struct dma_desc *p, int len)
 /* Normal descriptors */
 static inline void ndesc_rx_set_on_ring(struct dma_desc *p, int end)
 {
-	p->des1 |= cpu_to_le32(((BUF_SIZE_2KiB - 1)
+	p->des1 |= cpu_to_le32((BUF_SIZE_2KiB
 				<< RDES1_BUFFER2_SIZE_SHIFT)
 		    & RDES1_BUFFER2_SIZE_MASK);
 

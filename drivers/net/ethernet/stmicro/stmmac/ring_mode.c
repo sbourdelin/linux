@@ -114,14 +114,14 @@ static void refill_desc3(void *priv_ptr, struct dma_desc *p)
 	struct stmmac_priv *priv = (struct stmmac_priv *)priv_ptr;
 
 	/* Fill DES3 in case of RING mode */
-	if (priv->dma_buf_sz >= BUF_SIZE_8KiB)
-		p->des3 = cpu_to_le32(le32_to_cpu(p->des2) + BUF_SIZE_8KiB);
+	if (priv->dma_buf_sz >= RX_BUF_SIZE_8KiB)
+		p->des3 = cpu_to_le32(le32_to_cpu(p->des2) + RX_BUF_SIZE_8KiB);
 }
 
 /* In ring mode we need to fill the desc3 because it is used as buffer */
 static void init_desc3(struct dma_desc *p)
 {
-	p->des3 = cpu_to_le32(le32_to_cpu(p->des2) + BUF_SIZE_8KiB);
+	p->des3 = cpu_to_le32(le32_to_cpu(p->des2) + RX_BUF_SIZE_8KiB);
 }
 
 static void clean_desc3(void *priv_ptr, struct dma_desc *p)
@@ -140,7 +140,7 @@ static void clean_desc3(void *priv_ptr, struct dma_desc *p)
 static int set_16kib_bfsize(int mtu)
 {
 	int ret = 0;
-	if (unlikely(mtu >= BUF_SIZE_8KiB))
+	if (unlikely(mtu > RX_BUF_SIZE_8KiB))
 		ret = BUF_SIZE_16KiB;
 	return ret;
 }
