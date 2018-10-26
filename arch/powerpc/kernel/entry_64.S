@@ -297,7 +297,12 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	b	.	/* prevent speculative execution */
 
 	/* exit to kernel */
-1:	ld	r2,GPR2(r1)
+1:	/* if the AMR was unlocked before, unlock it again */
+	lbz	r2,PACA_USER_ACCESS_ALLOWED(r13)
+	cmpwi	cr1,0
+	bne	2f
+	UNLOCK_USER_ACCESS(r2)
+2:	ld	r2,GPR2(r1)
 	ld	r1,GPR1(r1)
 	mtlr	r4
 	mtcr	r5
@@ -965,6 +970,7 @@ BEGIN_FTR_SECTION
 	ld	r2,_PPR(r1)
 	mtspr	SPRN_PPR,r2
 END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
+
 	ACCOUNT_CPU_USER_EXIT(r13, r2, r4)
 	REST_GPR(13, r1)
 
@@ -983,7 +989,14 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	RFI_TO_USER
 	b	.	/* prevent speculative execution */
 
-1:	mtspr	SPRN_SRR1,r3
+1:	/* exit to kernel */
+	/* if the AMR was unlocked before, unlock it again */
+	lbz	r2,PACA_USER_ACCESS_ALLOWED(r13)
+	cmpwi	cr1,0
+	bne	2f
+	UNLOCK_USER_ACCESS(r2)
+
+2:	mtspr	SPRN_SRR1,r3
 
 	ld	r2,_CCR(r1)
 	mtcrf	0xFF,r2

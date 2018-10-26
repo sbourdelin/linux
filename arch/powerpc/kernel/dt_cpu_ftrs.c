@@ -337,6 +337,10 @@ static int __init feat_enable_mmu_radix(struct dt_cpu_feature *f)
 	cur_cpu_spec->mmu_features |= MMU_FTRS_HASH_BASE;
 	cur_cpu_spec->cpu_user_features |= PPC_FEATURE_HAS_MMU;
 
+#ifdef CONFIG_PPC_RADIX_GUAP
+	cur_cpu_spec->mmu_features |= MMU_FTR_RADIX_GUAP;
+#endif
+
 	return 1;
 #endif
 	return 0;

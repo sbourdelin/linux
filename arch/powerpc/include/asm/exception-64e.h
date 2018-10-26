@@ -215,5 +215,8 @@ exc_##label##_book3e:
 #define RFI_TO_USER							\
 	rfi
 
+#define UNLOCK_USER_ACCESS(reg)
+#define LOCK_USER_ACCESS(reg)
+
 #endif /* _ASM_POWERPC_EXCEPTION_64E_H */
 

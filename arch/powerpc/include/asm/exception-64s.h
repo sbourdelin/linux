@@ -264,6 +264,19 @@ BEGIN_FTR_SECTION_NESTED(943)						\
 	std	ra,offset(r13);						\
 END_FTR_SECTION_NESTED(ftr,ftr,943)
 
+#define LOCK_USER_ACCESS(reg)							\
+BEGIN_MMU_FTR_SECTION_NESTED(944)					\
+	LOAD_REG_IMMEDIATE(reg,AMR_LOCKED);				\
+	mtspr	SPRN_AMR,reg;						\
+END_MMU_FTR_SECTION_NESTED(MMU_FTR_RADIX_GUAP,MMU_FTR_RADIX_GUAP,944)
+
+#define UNLOCK_USER_ACCESS(reg)							\
+BEGIN_MMU_FTR_SECTION_NESTED(945)					\
+	li	reg,0;							\
+	mtspr	SPRN_AMR,reg;						\
+	isync								\
+END_MMU_FTR_SECTION_NESTED(MMU_FTR_RADIX_GUAP,MMU_FTR_RADIX_GUAP,945)
+
 #define EXCEPTION_PROLOG_0(area)					\
 	GET_PACA(r13);							\
 	std	r9,area+EX_R9(r13);	/* save r9 */			\
@@ -500,7 +513,11 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 	beq	4f;			/* if from kernel mode		*/ \
 	ACCOUNT_CPU_USER_ENTRY(r13, r9, r10);				   \
 	SAVE_PPR(area, r9);						   \
-4:	EXCEPTION_PROLOG_COMMON_2(area)					   \
+4:	lbz	r9,PACA_USER_ACCESS_ALLOWED(r13);			   \
+	cmpwi	cr1,r9,0;						   \
+	beq	5f;							   \
+	LOCK_USER_ACCESS(r9);							   \
+5:	EXCEPTION_PROLOG_COMMON_2(area)					\
 	EXCEPTION_PROLOG_COMMON_3(n)					   \
 	ACCOUNT_STOLEN_TIME
 

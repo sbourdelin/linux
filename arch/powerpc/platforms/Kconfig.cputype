@@ -351,6 +351,21 @@ config PPC_RADIX_MMU_DEFAULT
 
 	  If you're unsure, say Y.
 
+config PPC_RADIX_GUAP
+	bool "Guarded Userspace Access Prevention on Radix"
+	depends on PPC_RADIX_MMU
+	default y
+	help
+	  Enable support for Guarded Userspace Access Prevention (GUAP)
+	  when using the Radix MMU.  GUAP is a security feature
+	  preventing the kernel from directly accessing userspace data
+	  without going through the proper checks.
+
+	  GUAP has a minor performance impact on context switching and can be
+	  disabled at boot time using the "nosmap" kernel command line option.
+
+	  If you're unsure, say Y.
+
 config ARCH_ENABLE_HUGEPAGE_MIGRATION
 	def_bool y
 	depends on PPC_BOOK3S_64 && HUGETLB_PAGE && MIGRATION

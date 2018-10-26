@@ -62,6 +62,27 @@ static inline int __access_ok(unsigned long addr, unsigned long size,
 
 #endif
 
+static inline void unlock_user_access(void)
+{
+#ifdef CONFIG_PPC_RADIX_GUAP
+	if (mmu_has_feature(MMU_FTR_RADIX_GUAP)) {
+		mtspr(SPRN_AMR, 0);
+		isync();
+		get_paca()->user_access_allowed = 1;
+	}
+#endif
+}
+
+static inline void lock_user_access(void)
+{
+#ifdef CONFIG_PPC_RADIX_GUAP
+	if (mmu_has_feature(MMU_FTR_RADIX_GUAP)) {
+		mtspr(SPRN_AMR, AMR_LOCKED);
+		get_paca()->user_access_allowed = 0;
+	}
+#endif
+}
+
 #define access_ok(type, addr, size)		\
 	(__chk_user_ptr(addr),			\
 	 __access_ok((__force unsigned long)(addr), (size), get_fs()))
@@ -141,6 +162,7 @@ extern long __put_user_bad(void);
 #define __put_user_size(x, ptr, size, retval)			\
 do {								\
 	retval = 0;						\
+	unlock_user_access();					\
 	switch (size) {						\
 	  case 1: __put_user_asm(x, ptr, retval, "stb"); break;	\
 	  case 2: __put_user_asm(x, ptr, retval, "sth"); break;	\
@@ -148,6 +170,7 @@ do {								\
 	  case 8: __put_user_asm2(x, ptr, retval); break;	\
 	  default: __put_user_bad();				\
 	}							\
+	lock_user_access();					\
 } while (0)
 
 #define __put_user_nocheck(x, ptr, size)			\
@@ -240,6 +263,7 @@ do {								\
 	__chk_user_ptr(ptr);					\
 	if (size > sizeof(x))					\
 		(x) = __get_user_bad();				\
+	unlock_user_access();					\
 	switch (size) {						\
 	case 1: __get_user_asm(x, ptr, retval, "lbz"); break;	\
 	case 2: __get_user_asm(x, ptr, retval, "lhz"); break;	\
@@ -247,6 +271,7 @@ do {								\
 	case 8: __get_user_asm2(x, ptr, retval);  break;	\
 	default: (x) = __get_user_bad();			\
 	}							\
+	lock_user_access();					\
 } while (0)
 
 /*
@@ -306,15 +331,20 @@ extern unsigned long __copy_tofrom_user(void __user *to,
 static inline unsigned long
 raw_copy_in_user(void __user *to, const void __user *from, unsigned long n)
 {
-	return __copy_tofrom_user(to, from, n);
+	unsigned long ret;
+	unlock_user_access();					\
+	ret = __copy_tofrom_user(to, from, n);			\
+	lock_user_access();					\
+	return ret;						\
 }
 #endif /* __powerpc64__ */
 
 static inline unsigned long raw_copy_from_user(void *to,
 		const void __user *from, unsigned long n)
 {
+	unsigned long ret;
 	if (__builtin_constant_p(n) && (n <= 8)) {
-		unsigned long ret = 1;
+		ret = 1;
 
 		switch (n) {
 		case 1:
@@ -339,14 +369,18 @@ static inline unsigned long raw_copy_from_user(void *to,
 	}
 
 	barrier_nospec();
-	return __copy_tofrom_user((__force void __user *)to, from, n);
+	unlock_user_access();
+	ret = __copy_tofrom_user((__force void __user *)to, from, n);
+	lock_user_access();
+	return ret;
 }
 
 static inline unsigned long raw_copy_to_user(void __user *to,
 		const void *from, unsigned long n)
 {
+	unsigned long ret;
 	if (__builtin_constant_p(n) && (n <= 8)) {
-		unsigned long ret = 1;
+		ret = 1;
 
 		switch (n) {
 		case 1:
@@ -366,17 +400,24 @@ static inline unsigned long raw_copy_to_user(void __user *to,
 			return 0;
 	}
 
-	return __copy_tofrom_user(to, (__force const void __user *)from, n);
+	unlock_user_access();
+	ret = __copy_tofrom_user(to, (__force const void __user *)from, n);
+	lock_user_access();
+	return ret;
 }
 
 extern unsigned long __clear_user(void __user *addr, unsigned long size);
 
 static inline unsigned long clear_user(void __user *addr, unsigned long size)
 {
+	unsigned long ret = size;
 	might_fault();
-	if (likely(access_ok(VERIFY_WRITE, addr, size)))
-		return __clear_user(addr, size);
-	return size;
+	if (likely(access_ok(VERIFY_WRITE, addr, size))) {
+		unlock_user_access();
+		ret = __clear_user(addr, size);
+		lock_user_access();
+	}
+	return ret;
 }
 
 extern long strncpy_from_user(char *dst, const char __user *src, long count);
