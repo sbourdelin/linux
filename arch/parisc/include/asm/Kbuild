@@ -23,3 +23,6 @@ generic-y += user.h
 generic-y += vga.h
 generic-y += word-at-a-time.h
 generic-y += xor.h
+generic-y += syscall_table_32.h
+generic-y += syscall_table_64.h
+generic-y += syscall_table_c32.h
