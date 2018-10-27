@@ -521,7 +521,7 @@ static int spc_set_rate(struct clk_hw *hw, unsigned long rate,
 	return ve_spc_set_performance(spc->cluster, rate / 1000);
 }
 
-static struct clk_ops clk_spc_ops = {
+static const struct clk_ops clk_spc_ops = {
 	.recalc_rate = spc_recalc_rate,
 	.round_rate = spc_round_rate,
 	.set_rate = spc_set_rate,
