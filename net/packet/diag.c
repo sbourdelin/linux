@@ -26,7 +26,7 @@ static int pdiag_put_info(const struct packet_sock *po, struct sk_buff *nlskb)
 		pinfo.pdi_flags |= PDI_AUXDATA;
 	if (po->origdev)
 		pinfo.pdi_flags |= PDI_ORIGDEV;
-	if (po->has_vnet_hdr)
+	if (po->vnet_hdr_sz)
 		pinfo.pdi_flags |= PDI_VNETHDR;
 	if (po->tp_loss)
 		pinfo.pdi_flags |= PDI_LOSS;

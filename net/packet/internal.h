@@ -115,9 +115,9 @@ struct packet_sock {
 	unsigned int		running;	/* bind_lock must be held */
 	unsigned int		auxdata:1,	/* writer must hold sock lock */
 				origdev:1,
-				has_vnet_hdr:1,
 				tp_loss:1,
 				tp_tx_has_off:1;
+	int			vnet_hdr_sz;
 	int			pressure;
 	int			ifindex;	/* bound device		*/
 	__be16			num;
