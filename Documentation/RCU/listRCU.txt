@@ -250,8 +250,7 @@ as follows:
 				spin_lock(&e->lock);
 				if (e->deleted) {
 					spin_unlock(&e->lock);
-					rcu_read_unlock();
-					return AUDIT_BUILD_CONTEXT;
+					continue;
 				}
 				rcu_read_unlock();
 				return state;
