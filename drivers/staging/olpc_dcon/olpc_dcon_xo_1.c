@@ -11,7 +11,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/cs5535.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/delay.h>
 #include <asm/olpc.h>
 
@@ -20,26 +20,29 @@
 static int dcon_init_xo_1(struct dcon_priv *dcon)
 {
 	unsigned char lob;
+	int ret, i;
+	struct dcon_gpio *pin;
+	unsigned long flags = GPIOD_ASIS;
 
-	if (gpio_request(OLPC_GPIO_DCON_STAT0, "OLPC-DCON")) {
-		pr_err("failed to request STAT0 GPIO\n");
-		return -EIO;
-	}
-	if (gpio_request(OLPC_GPIO_DCON_STAT1, "OLPC-DCON")) {
-		pr_err("failed to request STAT1 GPIO\n");
-		goto err_gp_stat1;
-	}
-	if (gpio_request(OLPC_GPIO_DCON_IRQ, "OLPC-DCON")) {
-		pr_err("failed to request IRQ GPIO\n");
-		goto err_gp_irq;
-	}
-	if (gpio_request(OLPC_GPIO_DCON_LOAD, "OLPC-DCON")) {
-		pr_err("failed to request LOAD GPIO\n");
-		goto err_gp_load;
-	}
-	if (gpio_request(OLPC_GPIO_DCON_BLANK, "OLPC-DCON")) {
-		pr_err("failed to request BLANK GPIO\n");
-		goto err_gp_blank;
+	struct dcon_gpio gpios[] = {
+		{ .ptr = &dcon_stat0, .name = "dcon_stat0", .flags = flags },
+		{ .ptr = &dcon_stat1, .name = "dcon_stat1", .flags = flags },
+		{ .ptr = &dcon_irq, .name = "dcon_irq", .flags = flags },
+		{ .ptr = &dcon_load, .name = "dcon_load", .flags = flags },
+		{ .ptr = &dcon_blank, .name = "dcon_blank", .flags = flags },
+	};
+
+	for (i = 0; i < ARRAY_SIZE(gpios); i++) {
+		pin = &gpios[i];
+		*pin->ptr = devm_gpiod_get(&dcon->bl_dev->dev, pin->name,
+					   pin->flags);
+		if (IS_ERR(*pin->ptr)) {
+			ret = PTR_ERR(*pin->ptr);
+			dev_err(&dcon->bl_dev->dev,
+				"failed to request %s GPIO: %d\n",
+				pin->name, ret);
+			return ret;
+		}
 	}
 
 	/* Turn off the event enable for GPIO7 just to be safe */
@@ -61,12 +64,11 @@ static int dcon_init_xo_1(struct dcon_priv *dcon)
 	dcon->pending_src = dcon->curr_src;
 
 	/* Set the directions for the GPIO pins */
-	gpio_direction_input(OLPC_GPIO_DCON_STAT0);
-	gpio_direction_input(OLPC_GPIO_DCON_STAT1);
-	gpio_direction_input(OLPC_GPIO_DCON_IRQ);
-	gpio_direction_input(OLPC_GPIO_DCON_BLANK);
-	gpio_direction_output(OLPC_GPIO_DCON_LOAD,
-			      dcon->curr_src == DCON_SOURCE_CPU);
+	gpiod_direction_input(dcon_stat0);
+	gpiod_direction_input(dcon_stat1);
+	gpiod_direction_input(dcon_irq);
+	gpiod_direction_input(dcon_blank);
+	gpiod_direction_output(dcon_load, dcon->curr_src == DCON_SOURCE_CPU);
 
 	/* Set up the interrupt mappings */
 
@@ -125,18 +127,6 @@ static int dcon_init_xo_1(struct dcon_priv *dcon)
 	cs5535_gpio_set(OLPC_GPIO_DCON_BLANK, GPIO_EVENTS_ENABLE);
 
 	return 0;
-
-err_req_irq:
-	gpio_free(OLPC_GPIO_DCON_BLANK);
-err_gp_blank:
-	gpio_free(OLPC_GPIO_DCON_LOAD);
-err_gp_load:
-	gpio_free(OLPC_GPIO_DCON_IRQ);
-err_gp_irq:
-	gpio_free(OLPC_GPIO_DCON_STAT1);
-err_gp_stat1:
-	gpio_free(OLPC_GPIO_DCON_STAT0);
-	return -EIO;
 }
 
 static void dcon_wiggle_xo_1(void)
@@ -180,13 +170,13 @@ static void dcon_wiggle_xo_1(void)
 
 static void dcon_set_dconload_1(int val)
 {
-	gpio_set_value(OLPC_GPIO_DCON_LOAD, val);
+	gpiod_set_value(dcon_load, val);
 }
 
 static int dcon_read_status_xo_1(u8 *status)
 {
-	*status = gpio_get_value(OLPC_GPIO_DCON_STAT0);
-	*status |= gpio_get_value(OLPC_GPIO_DCON_STAT1) << 1;
+	*status = gpiod_get_value(dcon_stat0);
+	*status |= gpiod_get_value(dcon_stat1) << 1;
 
 	/* Clear the negative edge status for GPIO7 */
 	cs5535_gpio_set(OLPC_GPIO_DCON_IRQ, GPIO_NEGATIVE_EDGE_STS);

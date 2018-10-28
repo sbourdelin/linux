@@ -57,6 +57,18 @@
 /* Interrupt */
 #define DCON_IRQ                6
 
+struct dcon_gpio {
+	struct gpio_desc **ptr;
+	const char *name;
+	unsigned long flags;
+};
+
+struct gpio_desc *dcon_stat0;
+struct gpio_desc *dcon_stat1;
+struct gpio_desc *dcon_irq;
+struct gpio_desc *dcon_load;
+struct gpio_desc *dcon_blank;
+
 struct dcon_priv {
 	struct i2c_client *client;
 	struct fb_info *fbinfo;
