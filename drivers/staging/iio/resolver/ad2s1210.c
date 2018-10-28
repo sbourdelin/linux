@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
+#include <linux/of.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -76,7 +77,6 @@ struct ad2s1210_gpio {
 };
 
 struct ad2s1210_state {
-	const struct ad2s1210_platform_data *pdata;
 	struct mutex lock;
 	struct spi_device *sdev;
 	struct gpio_desc *sample;
@@ -84,6 +84,7 @@ struct ad2s1210_state {
 	struct gpio_desc *a1;
 	struct gpio_desc *res0;
 	struct gpio_desc *res1;
+	bool gpioin;
 	unsigned int fclkin;
 	unsigned int fexcit;
 	bool hysteresis;
@@ -314,7 +315,7 @@ static ssize_t ad2s1210_store_control(struct device *dev,
 	}
 	st->resolution
 		= ad2s1210_resolution_value[data & AD2S1210_SET_RESOLUTION];
-	if (st->pdata->gpioin) {
+	if (st->gpioin) {
 		data = ad2s1210_read_resolution_pin(st);
 		if (data != st->resolution)
 			dev_warn(dev, "ad2s1210: resolution settings not match\n");
@@ -376,7 +377,7 @@ static ssize_t ad2s1210_store_resolution(struct device *dev,
 	}
 	st->resolution
 		= ad2s1210_resolution_value[data & AD2S1210_SET_RESOLUTION];
-	if (st->pdata->gpioin) {
+	if (st->gpioin) {
 		data = ad2s1210_read_resolution_pin(st);
 		if (data != st->resolution)
 			dev_warn(dev, "ad2s1210: resolution settings not match\n");
@@ -603,7 +604,7 @@ static int ad2s1210_initial(struct ad2s1210_state *st)
 	int ret;
 
 	mutex_lock(&st->lock);
-	if (st->pdata->gpioin)
+	if (st->gpioin)
 		st->resolution = ad2s1210_read_resolution_pin(st);
 	else
 		ad2s1210_set_resolution_pin(st);
@@ -644,7 +645,7 @@ static int ad2s1210_setup_gpios(struct ad2s1210_state *st)
 	int ret, i;
 	struct spi_device *spi = st->sdev;
 	struct ad2s1210_gpio *pin;
-	unsigned long flags = st->pdata->gpioin ? GPIOD_IN : GPIOD_OUT_LOW;
+	unsigned long flags = st->gpioin ? GPIOD_IN : GPIOD_OUT_LOW;
 
 	struct ad2s1210_gpio gpios[] = {
 		{ .ptr = &st->sample, .name = "sample", .flags = GPIOD_IN },
@@ -673,16 +674,14 @@ static int ad2s1210_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
 	struct ad2s1210_state *st;
+	struct device_node *np = spi->dev.of_node;
 	int ret;
-
-	if (!spi->dev.platform_data)
-		return -EINVAL;
 
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
 	if (!indio_dev)
 		return -ENOMEM;
 	st = iio_priv(indio_dev);
-	st->pdata = spi->dev.platform_data;
+	st->gpioin = of_property_read_bool(np, "gpioin");
 	ret = ad2s1210_setup_gpios(st);
 	if (ret < 0)
 		return ret;

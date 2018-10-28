@@ -15,6 +15,7 @@ config AD2S90
 
 config AD2S1210
 	tristate "Analog Devices ad2s1210 driver"
+	depends on OF
 	depends on SPI
 	depends on GPIOLIB || COMPILE_TEST
 	help
