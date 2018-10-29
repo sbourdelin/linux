@@ -63,6 +63,7 @@ static void w1_unref_block(struct w1_cb_block *block)
 {
 	if (atomic_sub_return(1, &block->refcnt) == 0) {
 		u16 len = w1_reply_len(block);
+
 		if (len) {
 			cn_netlink_send_mult(block->first_cn, len,
 					     block->portid, 0, GFP_KERNEL);
@@ -137,6 +138,7 @@ static void w1_netlink_queue_cmd(struct w1_cb_block *block,
 				 struct w1_netlink_cmd *cmd)
 {
 	u32 space;
+
 	w1_reply_make_space(block, sizeof(struct cn_msg) +
 		sizeof(struct w1_netlink_msg) + sizeof(*cmd) + cmd->len);
 
@@ -166,6 +168,7 @@ static void w1_netlink_queue_status(struct w1_cb_block *block,
 				    int error)
 {
 	u16 space = sizeof(struct cn_msg) + sizeof(*req_msg) + sizeof(*req_cmd);
+
 	w1_reply_make_space(block, space);
 	w1_netlink_setup_msg(block, block->request_cn.ack);
 
@@ -278,6 +281,7 @@ static int w1_get_slaves(struct w1_master *dev, struct w1_netlink_cmd *req_cmd)
 
 	if (req_cmd->cmd == W1_CMD_LIST_SLAVES) {
 		u64 rn;
+
 		mutex_lock(&dev->list_mutex);
 		list_for_each_entry(sl, &dev->slist, w1_slave_entry) {
 			memcpy(&rn, &sl->reg_num, sizeof(rn));
@@ -510,6 +514,7 @@ static void w1_list_count_cmds(struct w1_netlink_msg *msg, int *cmd_count,
 	u16 mlen = msg->len;
 	u16 len;
 	int slave_list = 0;
+
 	while (mlen) {
 		if (cmd->len + sizeof(struct w1_netlink_cmd) > mlen)
 			break;
@@ -528,6 +533,7 @@ static void w1_list_count_cmds(struct w1_netlink_msg *msg, int *cmd_count,
 
 	if (slave_list) {
 		struct w1_master *dev = w1_search_master_id(msg->id.mst.id);
+
 		if (dev) {
 			/* Bytes, and likely an overstimate, and if it isn't
 			 * the results can still be split between packets.
@@ -588,6 +594,7 @@ static void w1_cn_callback(struct cn_msg *cn, struct netlink_skb_parms *nsp)
 	if (node_count) {
 		int size;
 		int reply_size = sizeof(*cn) + cn->len + slave_len;
+
 		if (cn->flags & W1_CN_BUNDLE) {
 			/* bundling duplicats some of the messages */
 			reply_size += 2 * cmd_count * (sizeof(struct cn_msg) +

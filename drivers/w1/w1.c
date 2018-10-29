@@ -128,6 +128,7 @@ static ssize_t rw_write(struct file *filp, struct kobject *kobj,
 
 out_up:
 	mutex_unlock(&sl->master->mutex);
+
 	return count;
 }
 
@@ -140,6 +141,7 @@ static ssize_t rw_read(struct file *filp, struct kobject *kobj,
 	mutex_lock(&sl->master->mutex);
 	w1_read_block(sl->master, buf, count);
 	mutex_unlock(&sl->master->mutex);
+
 	return count;
 }
 
@@ -296,6 +298,7 @@ static ssize_t w1_master_attribute_show_pointer(struct device *dev,
 	mutex_lock(&md->mutex);
 	count = sprintf(buf, "0x%p\n", md->bus_master);
 	mutex_unlock(&md->mutex);
+
 	return count;
 }
 
@@ -304,7 +307,9 @@ static ssize_t w1_master_attribute_show_timeout(struct device *dev,
 						char *buf)
 {
 	ssize_t count;
+
 	count = sprintf(buf, "%d\n", w1_timeout);
+
 	return count;
 }
 
@@ -313,7 +318,9 @@ static ssize_t w1_master_attribute_show_timeout_us(struct device *dev,
 						   char *buf)
 {
 	ssize_t count;
+
 	count = sprintf(buf, "%d\n", w1_timeout_us);
+
 	return count;
 }
 
@@ -375,6 +382,7 @@ static ssize_t w1_master_attribute_show_slave_count(struct device *dev,
 	mutex_lock(&md->mutex);
 	count = sprintf(buf, "%d\n", md->slave_count);
 	mutex_unlock(&md->mutex);
+
 	return count;
 }
 
@@ -407,8 +415,10 @@ static ssize_t w1_master_attribute_show_add(struct device *dev,
 					    char *buf)
 {
 	int c = PAGE_SIZE;
+
 	c -= snprintf(buf+PAGE_SIZE - c, c,
 		"write device id xx-xxxxxxxxxxxx to add slave\n");
+
 	return PAGE_SIZE - c;
 }
 
@@ -457,6 +467,7 @@ struct w1_slave *w1_slave_search_device(struct w1_master *dev,
 					struct w1_reg_num *rn)
 {
 	struct w1_slave *sl;
+
 	mutex_lock(&dev->list_mutex);
 	list_for_each_entry(sl, &dev->slist, w1_slave_entry) {
 		if (sl->reg_num.family == rn->family &&
@@ -467,6 +478,7 @@ struct w1_slave *w1_slave_search_device(struct w1_master *dev,
 		}
 	}
 	mutex_unlock(&dev->list_mutex);
+
 	return NULL;
 }
 
@@ -504,8 +516,10 @@ static ssize_t w1_master_attribute_show_remove(struct device *dev,
 					       char *buf)
 {
 	int c = PAGE_SIZE;
+
 	c -= snprintf(buf+PAGE_SIZE - c, c,
 		"write device id xx-xxxxxxxxxxxx to remove slave\n");
+
 	return PAGE_SIZE - c;
 }
 
@@ -684,6 +698,7 @@ static int w1_family_notify(unsigned long action, struct w1_slave *sl)
 			sysfs_remove_groups(&sl->dev.kobj, fops->groups);
 		break;
 	}
+
 	return 0;
 }
 
@@ -719,6 +734,7 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
 			"Device registration [%s] failed. err=%d\n",
 			dev_name(&sl->dev), err);
 		put_device(&sl->dev);
+
 		return err;
 	}
 	w1_family_notify(BUS_NOTIFY_ADD_DEVICE, sl);
@@ -787,6 +803,7 @@ int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 		w1_family_put(sl->family);
 		atomic_dec(&sl->master->refcnt);
 		kfree(sl);
+
 		return err;
 	}
 
@@ -803,6 +820,7 @@ int w1_unref_slave(struct w1_slave *sl)
 {
 	struct w1_master *dev = sl->master;
 	int refcnt;
+
 	mutex_lock(&dev->list_mutex);
 	refcnt = atomic_sub_return(1, &sl->refcnt);
 	if (refcnt == 0) {
@@ -827,6 +845,7 @@ int w1_unref_slave(struct w1_slave *sl)
 	}
 	atomic_dec(&dev->refcnt);
 	mutex_unlock(&dev->list_mutex);
+
 	return refcnt;
 }
 
@@ -834,6 +853,7 @@ int w1_slave_detach(struct w1_slave *sl)
 {
 	/* Only detach a slave once as it decreases the refcnt each time. */
 	int destroy_now;
+
 	mutex_lock(&sl->master->list_mutex);
 	destroy_now = !test_bit(W1_SLAVE_DETACH, &sl->flags);
 	set_bit(W1_SLAVE_DETACH, &sl->flags);
@@ -841,6 +861,7 @@ int w1_slave_detach(struct w1_slave *sl)
 
 	if (destroy_now)
 		destroy_now = !w1_unref_slave(sl);
+
 	return destroy_now ? 0 : -EBUSY;
 }
 
@@ -1006,6 +1027,7 @@ void w1_search(struct w1_master *dev, u8 search_type,
 		/* Do fast search on single slave bus */
 		if (dev->max_slave_count == 1) {
 			int rv;
+
 			w1_write_8(dev, W1_READ_ROM);
 			rv = w1_read_block(dev, (u8 *)&rn, 8);
 			mutex_unlock(&dev->bus_mutex);
@@ -1141,6 +1163,7 @@ int w1_process_callbacks(struct w1_master *dev)
 			mutex_lock(&dev->list_mutex);
 		}
 	}
+
 	return ret;
 }
 
