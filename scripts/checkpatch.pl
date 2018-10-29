@@ -921,15 +921,15 @@ sub seed_camelcase_includes {
 }
 
 sub git_commit_info {
-	my ($commit, $id, $desc) = @_;
+	my ($commit, $id, $date, $desc) = @_;
 
-	return ($id, $desc) if ((which("git") eq "") || !(-e ".git"));
+	return ($id, $date, $desc) if ((which("git") eq "") || !(-e ".git"));
 
-	my $output = `git log --no-color --format='%H %s' -1 $commit 2>&1`;
+	my $output = `git log --date=short --no-color --format='%H %ad %s' -1 $commit 2>&1`;
 	$output =~ s/^\s*//gm;
 	my @lines = split("\n", $output);
 
-	return ($id, $desc) if ($#lines < 0);
+	return ($id, $date, $desc) if ($#lines < 0);
 
 	if ($lines[0] =~ /^error: short SHA1 $commit is ambiguous\./) {
 # Maybe one day convert this block of bash into something that returns
@@ -945,10 +945,11 @@ sub git_commit_info {
 		$id = undef;
 	} else {
 		$id = substr($lines[0], 0, 12);
-		$desc = substr($lines[0], 41);
+		$date = substr($lines[0], 41, 10);
+		$desc = substr($lines[0], 52);
 	}
 
-	return ($id, $desc);
+	return ($id, $date, $desc);
 }
 
 $chk_signoff = 0 if ($file);
@@ -2718,6 +2719,8 @@ sub process {
 			my $hasdesc = 0;
 			my $hasparens = 0;
 			my $id = '0123456789ab';
+			my $orig_date = undef;
+			my $date = "";
 			my $orig_desc = "commit description";
 			my $description = "";
 
@@ -2732,29 +2735,32 @@ sub process {
 			$long = 1 if ($line =~ /\bcommit\s+[0-9a-f]{41,}/i);
 			$space = 0 if ($line =~ /\bcommit [0-9a-f]/i);
 			$case = 0 if ($line =~ /\b[Cc]ommit\s+[0-9a-f]{5,40}[^A-F]/);
-			if ($line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("([^"]+)"\)/i) {
+			if ($line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("([^"]+)"(,\s*([-0-9]+))?\)/i) {
 				$orig_desc = $1;
+				$orig_date = $3;
 				$hasparens = 1;
 			} elsif ($line =~ /\bcommit\s+[0-9a-f]{5,}\s*$/i &&
 				 defined $rawlines[$linenr] &&
-				 $rawlines[$linenr] =~ /^\s*\("([^"]+)"\)/) {
+				 $rawlines[$linenr] =~ /^\s*\("([^"]+)"(,\s*([-0-9]+))?\)/) {
 				$orig_desc = $1;
+				$orig_date = $3;
 				$hasparens = 1;
 			} elsif ($line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("[^"]+$/i &&
 				 defined $rawlines[$linenr] &&
-				 $rawlines[$linenr] =~ /^\s*[^"]+"\)/) {
+				 $rawlines[$linenr] =~ /^\s*[^"]+"(,\s*([-0-9]+))?\)/) {
 				$line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("([^"]+)$/i;
 				$orig_desc = $1;
-				$rawlines[$linenr] =~ /^\s*([^"]+)"\)/;
+				$rawlines[$linenr] =~ /^\s*([^"]+)"(,\s*([-0-9]+))?\)/;
 				$orig_desc .= " " . $1;
+				$orig_date = $3;
 				$hasparens = 1;
 			}
 
-			($id, $description) = git_commit_info($orig_commit,
-							      $id, $orig_desc);
+			($id, $date, $description) = git_commit_info($orig_commit,
+						      $id, $orig_date, $orig_desc);
 
 			if (defined($id) &&
-			   ($short || $long || $space || $case || ($orig_desc ne $description) || !$hasparens)) {
+			   ($short || $long || $space || $case || ($orig_desc ne $description) || ($orig_date && $orig_date ne $date) || !$hasparens)) {
 				ERROR("GIT_COMMIT_ID",
 				      "Please use git commit description style 'commit <12+ chars of sha1> (\"<title line>\")' - ie: '${init_char}ommit $id (\"$description\")'\n" . $herecurr);
 			}
