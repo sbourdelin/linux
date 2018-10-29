@@ -958,6 +958,9 @@ static void process_csb(struct intel_engine_cs *engine)
 			  execlists->active);
 
 		status = buf[2 * head];
+		GEM_BUG_ON(!status);
+		GEM_DEBUG_EXEC(WRITE_ONCE(*(u32 *)(buf + 2 * head), 0));
+
 		if (status & (GEN8_CTX_STATUS_IDLE_ACTIVE |
 			      GEN8_CTX_STATUS_PREEMPTED))
 			execlists_set_active(execlists,
