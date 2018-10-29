@@ -1066,7 +1066,8 @@ void w1_search(struct w1_master *dev, u8 search_type,
 
 			if (test_bit(W1_ABORT_SEARCH, &dev->flags)) {
 				mutex_unlock(&dev->bus_mutex);
-				dev_dbg(&dev->dev, "Abort w1_search\n");
+				dev_dbg(&dev->dev, "Abort %s\n", __func__);
+
 				return;
 			}
 		}
@@ -1094,7 +1095,7 @@ void w1_search(struct w1_master *dev, u8 search_type,
 			 * bus).
 			 */
 			dev_info(&dev->dev, "%s: max_slave_count %d reached, will continue next search.\n",
-				__func__, dev->max_slave_count);
+				 __func__, dev->max_slave_count);
 			set_bit(W1_WARN_MAX_COUNT, &dev->flags);
 		}
 	}

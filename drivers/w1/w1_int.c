@@ -98,7 +98,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 	if (!(master->touch_bit && master->reset_bus) &&
 	    !(master->write_bit && master->read_bit) &&
 	    !(master->write_byte && master->read_byte && master->reset_bus)) {
-		pr_err("w1_add_master_device: invalid function set\n");
+		pr_err("%s: invalid function set\n", __func__);
 		return(-EINVAL);
 	}
 
