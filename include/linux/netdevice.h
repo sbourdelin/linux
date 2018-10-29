@@ -3166,6 +3166,18 @@ static inline void netdev_txq_bql_complete_prefetchw(struct netdev_queue *dev_qu
 #endif
 }
 
+/* Variant of netdev_tx_sent_queue() for packets with xmit_more.
+ * We do want to change __QUEUE_STATE_STACK_XOFF only for the last
+ * skb of a batch.
+ */
+static inline void netdev_tx_sent_queue_more(struct netdev_queue *dev_queue,
+					     unsigned int bytes)
+{
+#ifdef CONFIG_BQL
+	dql_queued(&dev_queue->dql, bytes);
+#endif
+}
+
 static inline void netdev_tx_sent_queue(struct netdev_queue *dev_queue,
 					unsigned int bytes)
 {
