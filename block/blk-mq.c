@@ -1729,13 +1729,14 @@ static blk_status_t __blk_mq_issue_directly(struct blk_mq_hw_ctx *hctx,
 }
 
 enum mq_decision {
+	MQ_INSERT_DISPATCH,
 	MQ_INSERT_QUEUE,
 	MQ_END_REQUEST,
 	MQ_DO_NOTHING,
 };
 
 static inline enum mq_decision
-	blk_mq_make_dicision(blk_status_t ret, bool bypass_insert)
+	blk_mq_make_dicision(blk_status_t ret, bool bypass_insert, bool force)
 {
 	enum mq_decision dec;
 
@@ -1745,7 +1746,10 @@ static inline enum mq_decision
 		break;
 	case BLK_STS_DEV_RESOURCE:
 	case BLK_STS_RESOURCE:
-		dec = bypass_insert ? MQ_DO_NOTHING : MQ_INSERT_QUEUE;
+		if (force)
+			dec = bypass_insert ? MQ_INSERT_DISPATCH : MQ_INSERT_QUEUE;
+		else
+			dec = bypass_insert ? MQ_DO_NOTHING : MQ_INSERT_QUEUE;
 		break;
 	default:
 		dec = bypass_insert ? MQ_DO_NOTHING : MQ_END_REQUEST;
@@ -1761,7 +1765,7 @@ static blk_status_t blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 						bool bypass_insert)
 {
 	struct request_queue *q = rq->q;
-	bool run_queue = true;
+	bool run_queue = true, force = false;
 	enum mq_decision dec;
 	blk_status_t ret = BLK_STS_RESOURCE;
 	int srcu_idx;
@@ -1776,7 +1780,7 @@ static blk_status_t blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 	 */
 	if (blk_mq_hctx_stopped(hctx) || blk_queue_quiesced(q)) {
 		run_queue = false;
-		bypass_insert = false;
+		force = true;
 		goto out_unlock;
 	}
 
@@ -1795,8 +1799,11 @@ static blk_status_t blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 out_unlock:
 	hctx_unlock(hctx, srcu_idx);
 
-	dec = blk_mq_make_dicision(ret, bypass_insert);
+	dec = blk_mq_make_dicision(ret, bypass_insert, force);
 	switch(dec) {
+	case MQ_INSERT_DISPATCH:
+		blk_mq_request_bypass_insert(rq, run_queue);
+		break;
 	case MQ_INSERT_QUEUE:
 		blk_mq_sched_insert_request(rq, false, run_queue, false);
 		break;
