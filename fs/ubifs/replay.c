@@ -210,6 +210,34 @@ static int trun_remove_range(struct ubifs_info *c, struct replay_entry *r)
 }
 
 /**
+ * inode_relinked - check whether inode in question will be re-linked.
+ * @c: UBIFS file-system description object
+ * @rino: replay entry to test
+ *
+ * O_TMPFILE files can be re-linked, this means link count goes from 0 to 1.
+ * This case needs special care, otherwise all references to the inode will
+ * be removed upon the first replay entry of an inode with link count 0
+ * is found.
+ */
+static bool inode_relinked(struct ubifs_info *c, struct replay_entry *rino)
+{
+	struct replay_entry *r = rino;
+
+	ubifs_assert(c, rino->deletion);
+	ubifs_assert(c, key_type(c, &rino->key) == UBIFS_INO_KEY);
+
+	list_for_each_entry_from(r, &c->replay_list, list) {
+		if (key_inum(c, &r->key) == key_inum(c, &rino->key) &&
+		    r->deletion == 0) {
+			ubifs_assert(c, r->sqnum > rino->sqnum);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * apply_replay_entry - apply a replay entry to the TNC.
  * @c: UBIFS file-system description object
  * @r: replay entry to apply
@@ -235,6 +263,11 @@ static int apply_replay_entry(struct ubifs_info *c, struct replay_entry *r)
 			case UBIFS_INO_KEY:
 			{
 				ino_t inum = key_inum(c, &r->key);
+
+				if (inode_relinked(c, r)) {
+					err = 0;
+					break;
+				}
 
 				err = ubifs_tnc_remove_ino(c, inum);
 				break;
