@@ -865,6 +865,13 @@ config HAVE_ARCH_PREL32_RELOCATIONS
 	  architectures, and don't require runtime relocation on relocatable
 	  kernels.
 
+config ARCH_HAS_PHYS_INITRD
+	bool
+	help
+	  An architecture selects this when it needs to act on the physical
+	  address of the initial ramdisk and allow generic code such as
+	  FDT to populate that address.
+
 source "kernel/gcov/Kconfig"
 
 source "scripts/gcc-plugins/Kconfig"
