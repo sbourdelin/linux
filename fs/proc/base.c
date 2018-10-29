@@ -205,6 +205,44 @@ static int proc_root_link(struct dentry *dentry, struct path *path)
 	return result;
 }
 
+static ssize_t proc_pid_kill_write(struct file *file,
+				   const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	ssize_t res;
+	int sig;
+	char buffer[4];
+
+	res = -EINVAL;
+	if (*ppos != 0)
+		goto out;
+
+	res = -EINVAL;
+	if (count > sizeof(buffer) - 1)
+		goto out;
+
+	res = -EFAULT;
+	if (copy_from_user(buffer, buf, count))
+		goto out;
+
+	buffer[count] = '\0';
+	res = kstrtoint(strstrip(buffer), 10, &sig);
+	if (res)
+		goto out;
+
+	res = kill_pid(proc_pid(file_inode(file)), sig, 0);
+	if (res)
+		goto out;
+	res = count;
+out:
+	return res;
+
+}
+
+static const struct file_operations proc_pid_kill_ops = {
+	.write	= proc_pid_kill_write,
+};
+
 static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 			      size_t count, loff_t *ppos)
 {
@@ -2935,6 +2973,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_HAVE_ARCH_TRACEHOOK
 	ONE("syscall",    S_IRUSR, proc_pid_syscall),
 #endif
+	REG("kill",       S_IRUGO | S_IWUGO, proc_pid_kill_ops),
 	REG("cmdline",    S_IRUGO, proc_pid_cmdline_ops),
 	ONE("stat",       S_IRUGO, proc_tgid_stat),
 	ONE("statm",      S_IRUGO, proc_pid_statm),
