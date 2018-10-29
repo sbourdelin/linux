@@ -79,7 +79,7 @@ static u64 get_iowait_time(int cpu)
 
 #endif
 
-static int show_stat(struct seq_file *p, void *v)
+static int __show_stat(struct seq_file *p, void *v, bool irq_stats)
 {
 	int i, j;
 	u64 user, nice, system, idle, iowait, irq, softirq, steal;
@@ -100,13 +100,17 @@ static int show_stat(struct seq_file *p, void *v)
 		system += kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM];
 		idle += get_idle_time(i);
 		iowait += get_iowait_time(i);
-		irq += kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
 		softirq += kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ];
 		steal += kcpustat_cpu(i).cpustat[CPUTIME_STEAL];
 		guest += kcpustat_cpu(i).cpustat[CPUTIME_GUEST];
 		guest_nice += kcpustat_cpu(i).cpustat[CPUTIME_GUEST_NICE];
-		sum += kstat_cpu_irqs_sum(i);
-		sum += arch_irq_stat_cpu(i);
+
+		if (irq_stats) {
+			irq += kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
+
+			sum += kstat_cpu_irqs_sum(i);
+			sum += arch_irq_stat_cpu(i);
+		}
 
 		for (j = 0; j < NR_SOFTIRQS; j++) {
 			unsigned int softirq_stat = kstat_softirqs_cpu(j, i);
@@ -115,7 +119,9 @@ static int show_stat(struct seq_file *p, void *v)
 			sum_softirq += softirq_stat;
 		}
 	}
-	sum += arch_irq_stat();
+
+	if (irq_stats)
+		sum += arch_irq_stat();
 
 	seq_put_decimal_ull(p, "cpu  ", nsec_to_clock_t(user));
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(nice));
@@ -136,7 +142,8 @@ static int show_stat(struct seq_file *p, void *v)
 		system = kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM];
 		idle = get_idle_time(i);
 		iowait = get_iowait_time(i);
-		irq = kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
+		if (irq_stats)
+			irq = kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
 		softirq = kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ];
 		steal = kcpustat_cpu(i).cpustat[CPUTIME_STEAL];
 		guest = kcpustat_cpu(i).cpustat[CPUTIME_GUEST];
@@ -158,7 +165,7 @@ static int show_stat(struct seq_file *p, void *v)
 
 	/* sum again ? it could be updated? */
 	for_each_irq_nr(j)
-		seq_put_decimal_ull(p, " ", kstat_irqs_usr(j));
+		seq_put_decimal_ull(p, " ", irq_stats ? kstat_irqs_usr(j) : 0);
 
 	seq_printf(p,
 		"\nctxt %llu\n"
@@ -181,6 +188,16 @@ static int show_stat(struct seq_file *p, void *v)
 	return 0;
 }
 
+static int show_stat(struct seq_file *p, void *v)
+{
+	return __show_stat(p, v, true);
+}
+
+static int show_stat2(struct seq_file *p, void *v)
+{
+	return __show_stat(p, v, false);
+}
+
 static int stat_open(struct inode *inode, struct file *file)
 {
 	unsigned int size = 1024 + 128 * num_online_cpus();
@@ -190,8 +207,21 @@ static int stat_open(struct inode *inode, struct file *file)
 	return single_open_size(file, show_stat, NULL, size);
 }
 
+static int stat2_open(struct inode *inode, struct file *file)
+{
+	unsigned int size = 1024 + 128 * num_online_cpus();
+	return single_open_size(file, show_stat2, NULL, size);
+}
+
 static const struct file_operations proc_stat_operations = {
 	.open		= stat_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static const struct file_operations proc_stat2_operations = {
+	.open		= stat2_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
@@ -200,6 +230,7 @@ static const struct file_operations proc_stat_operations = {
 static int __init proc_stat_init(void)
 {
 	proc_create("stat", 0, NULL, &proc_stat_operations);
+	proc_create("stat2", 0, NULL, &proc_stat2_operations);
 	return 0;
 }
 fs_initcall(proc_stat_init);

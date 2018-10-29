@@ -27,7 +27,7 @@ Table of Contents
   1.5	SCSI info
   1.6	Parallel port info in /proc/parport
   1.7	TTY info in /proc/tty
-  1.8	Miscellaneous kernel statistics in /proc/stat
+  1.8	Miscellaneous kernel statistics in /proc/stat and /proc/stat2
   1.9	Ext4 file system parameters
 
   2	Modifying System Parameters
@@ -140,6 +140,7 @@ Table 1-1: Process specific entries in /proc
  mem		Memory held by this process
  root		Link to the root directory of this process
  stat		Process status
+ stat2		Process status without irq information
  statm		Process memory status information
  status		Process status in human readable form
  wchan		Present with CONFIG_KALLSYMS=y: it shows the kernel function
@@ -1301,8 +1302,8 @@ To see  which  tty's  are  currently in use, you can simply look into the file
   unknown              /dev/tty        4    1-63 console 
 
 
-1.8 Miscellaneous kernel statistics in /proc/stat
--------------------------------------------------
+1.8 Miscellaneous kernel statistics in /proc/stat and /proc/stat2
+-----------------------------------------------------------------
 
 Various pieces   of  information about  kernel activity  are  available in the
 /proc/stat file.  All  of  the numbers reported  in  this file are  aggregates
@@ -1371,6 +1372,11 @@ of the possible system softirqs. The first column is the total of all
 softirqs serviced; each subsequent column is the total for that particular
 softirq.
 
+The stat2 file acts as a performance alternative to /proc/stat for workloads
+and systems that care and are under heavy irq load. In order to to be completely
+compatible, /proc/stat and /proc/stat2 are identical with the exception that the
+later will show 0 for any (hard)irq-related fields. This refers particularly
+to the "intr" line and 'irq' column for that aggregate in the cpu line.
 
 1.9 Ext4 file system parameters
 -------------------------------
