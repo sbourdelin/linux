@@ -3037,8 +3037,10 @@ static int hns3_queue_to_ring(struct hnae3_queue *tqp,
 		return ret;
 
 	ret = hns3_ring_get_cfg(tqp, priv, HNAE3_RING_TYPE_RX);
-	if (ret)
+	if (ret) {
+		devm_kfree(priv->dev, priv->ring_data[tqp->tqp_index].ring);
 		return ret;
+	}
 
 	return 0;
 }
@@ -3047,7 +3049,7 @@ static int hns3_get_ring_config(struct hns3_nic_priv *priv)
 {
 	struct hnae3_handle *h = priv->ae_handle;
 	struct pci_dev *pdev = h->pdev;
-	int i, ret;
+	int i, j, ret;
 
 	priv->ring_data =  devm_kzalloc(&pdev->dev,
 					array3_size(h->kinfo.num_tqps,
@@ -3065,6 +3067,12 @@ static int hns3_get_ring_config(struct hns3_nic_priv *priv)
 
 	return 0;
 err:
+	for (j = i - 1; j >= 0; j--) {
+		devm_kfree(priv->dev, priv->ring_data[j].ring);
+		devm_kfree(priv->dev,
+			   priv->ring_data[j + h->kinfo.num_tqps].ring);
+	}
+
 	devm_kfree(&pdev->dev, priv->ring_data);
 	return ret;
 }
