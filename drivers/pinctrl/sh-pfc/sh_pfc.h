@@ -54,16 +54,26 @@ struct sh_pfc_pin_group {
 
 /*
  * Using union vin_data saves memory occupied by the VIN data pins.
- * VIN_DATA_PIN_GROUP() is  a macro  used  to describe the VIN pin groups
- * in this case.
+ *
+ * VIN_DATA_PIN_GROUP() is  a macro  used  to describe the VIN pin groups,
+ * while VIN_DATA_PIN_GROUP_VER() is used when the same pin group can appear
+ * on different sets of pins.
  */
-#define VIN_DATA_PIN_GROUP(n, s)				\
-	{							\
-		.name = #n#s,					\
+#define __VIN_DATA_PIN_GROUP(n, s)				\
 		.pins = n##_pins.data##s,			\
 		.mux = n##_mux.data##s,				\
 		.nr_pins = ARRAY_SIZE(n##_pins.data##s),	\
 	}
+
+#define VIN_DATA_PIN_GROUP(n, s)				\
+	{							\
+		.name = #n#s,					\
+		__VIN_DATA_PIN_GROUP(n, s)
+
+#define VIN_DATA_PIN_GROUP_VER(n, v, s)				\
+	{							\
+		.name = #n#s"_"#v,				\
+		__VIN_DATA_PIN_GROUP(n##_##v, s)
 
 union vin_data {
 	unsigned int data24[24];
