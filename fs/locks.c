@@ -2485,6 +2485,7 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock.fl_file = filp;
 	lock.fl_ops = NULL;
 	lock.fl_lmops = NULL;
+	locks_init_lock_heads(&lock);
 
 	error = vfs_lock_file(filp, F_SETLK, &lock, NULL);
 
