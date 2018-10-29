@@ -416,7 +416,7 @@ static ssize_t w1_master_attribute_show_add(struct device *dev,
 {
 	int c = PAGE_SIZE;
 
-	c -= snprintf(buf+PAGE_SIZE - c, c,
+	c -= snprintf(buf + PAGE_SIZE - c, c,
 		"write device id xx-xxxxxxxxxxxx to add slave\n");
 
 	return PAGE_SIZE - c;
@@ -517,7 +517,7 @@ static ssize_t w1_master_attribute_show_remove(struct device *dev,
 {
 	int c = PAGE_SIZE;
 
-	c -= snprintf(buf+PAGE_SIZE - c, c,
+	c -= snprintf(buf + PAGE_SIZE - c, c,
 		"write device id xx-xxxxxxxxxxxx to remove slave\n");
 
 	return PAGE_SIZE - c;
@@ -785,7 +785,7 @@ int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	spin_lock(&w1_flock);
 	f = w1_family_registered(rn->family);
 	if (!f) {
-		f= &w1_default_family;
+		f = &w1_default_family;
 		dev_info(&dev->dev, "Family %x for %02x.%012llx.%02x is not registered.\n",
 			 rn->family, rn->family,
 			 (unsigned long long)rn->id, rn->crc);
@@ -880,7 +880,7 @@ struct w1_master *w1_search_master_id(u32 id)
 	}
 	mutex_unlock(&w1_mlock);
 
-	return (found)?dev:NULL;
+	return found ? dev : NULL;
 }
 
 struct w1_slave *w1_search_slave(struct w1_reg_num *id)
@@ -909,7 +909,7 @@ struct w1_slave *w1_search_slave(struct w1_reg_num *id)
 	}
 	mutex_unlock(&w1_mlock);
 
-	return (found)?sl:NULL;
+	return found ? sl : NULL;
 }
 
 void w1_reconnect_slaves(struct w1_family *f, int attach)
@@ -960,7 +960,7 @@ void w1_slave_found(struct w1_master *dev, u64 rn)
 
 	atomic_inc(&dev->refcnt);
 
-	tmp = (struct w1_reg_num *) &rn;
+	tmp = (struct w1_reg_num *)&rn;
 
 	sl = w1_slave_search_device(dev, tmp);
 	if (sl) {
@@ -1007,12 +1007,11 @@ void w1_search(struct w1_master *dev, u8 search_type,
 
 	desc_bit = 64;
 
-	while ( !last_device && (slave_count++ < dev->max_slave_count) ) {
+	while (!last_device && (slave_count++ < dev->max_slave_count)) {
 		last_rn = rn;
 		rn = 0;
 
-		/*
-		 * Reset bus and all 1-wire device state machines
+		/* Reset bus and all 1-wire device state machines
 		 * so they can respond to our requests.
 		 *
 		 * Return 0 - device(s) present, 1 - no devices present.
@@ -1059,7 +1058,7 @@ void w1_search(struct w1_master *dev, u8 search_type,
 			triplet_ret = w1_triplet(dev, search_bit);
 
 			/* quit if no device responded */
-			if ( (triplet_ret & 0x03) == 0x03 )
+			if ((triplet_ret & 0x03) == 0x03)
 				break;
 
 			/* If both directions were valid, and we took the 0 path */
@@ -1078,13 +1077,14 @@ void w1_search(struct w1_master *dev, u8 search_type,
 		}
 		mutex_unlock(&dev->bus_mutex);
 
-		if ( (triplet_ret & 0x03) != 0x03 ) {
-			if ((desc_bit == last_zero) || (last_zero < 0)) {
+		if ((triplet_ret & 0x03) != 0x03) {
+			if (desc_bit == last_zero || last_zero < 0) {
 				last_device = 1;
 				dev->search_id = 0;
 			} else {
 				dev->search_id = rn;
 			}
+
 			desc_bit = last_zero;
 			cb(dev, rn);
 		}
@@ -1123,9 +1123,9 @@ void w1_search_process_cb(struct w1_master *dev, u8 search_type,
 			mutex_unlock(&dev->list_mutex);
 			w1_slave_detach(sl);
 			mutex_lock(&dev->list_mutex);
-		}
-		else if (test_bit(W1_SLAVE_ACTIVE, &sl->flags))
+		} else if (test_bit(W1_SLAVE_ACTIVE, &sl->flags)) {
 			sl->ttl = dev->slave_ttl;
+		}
 	}
 	mutex_unlock(&dev->list_mutex);
 
@@ -1156,7 +1156,8 @@ int w1_process_callbacks(struct w1_master *dev)
 		list_for_each_entry_safe(async_cmd, async_n, &dev->async_list,
 					 async_entry) {
 			/* drop the lock, if it is a search it can take a long
-			 * time */
+			 * time
+			 */
 			mutex_unlock(&dev->list_mutex);
 			async_cmd->cb(dev, async_cmd);
 			ret = 1;
@@ -1169,7 +1170,7 @@ int w1_process_callbacks(struct w1_master *dev)
 
 int w1_process(void *data)
 {
-	struct w1_master *dev = (struct w1_master *) data;
+	struct w1_master *dev = (struct w1_master *)data;
 	/* As long as w1_timeout is only set by a module parameter the sleep
 	 * time can be calculated in jiffies once.
 	 */
@@ -1179,7 +1180,6 @@ int w1_process(void *data)
 	unsigned long jremain = 0;
 
 	for (;;) {
-
 		if (!jremain && dev->search_count) {
 			mutex_lock(&dev->mutex);
 			w1_search_process(dev, W1_SEARCH);
@@ -1213,9 +1213,9 @@ int w1_process(void *data)
 			if (!jremain)
 				jremain = jtime;
 			jremain = schedule_timeout(jremain);
-		}
-		else
+		} else {
 			schedule();
+		}
 	}
 
 	atomic_dec(&dev->refcnt);

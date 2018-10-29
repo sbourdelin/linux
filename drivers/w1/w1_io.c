@@ -53,12 +53,13 @@ u8 w1_touch_bit(struct w1_master *dev, int bit)
 {
 	if (dev->bus_master->touch_bit)
 		return dev->bus_master->touch_bit(dev->bus_master->data, bit);
-	else if (bit)
+
+	if (bit)
 		return w1_read_bit(dev);
-	else {
-		w1_write_bit(dev, 0);
-		return 0;
-	}
+
+	w1_write_bit(dev, 0);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(w1_touch_bit);
 
@@ -140,17 +141,16 @@ void w1_write_8(struct w1_master *dev, u8 byte)
 	if (dev->bus_master->write_byte) {
 		w1_pre_write(dev);
 		dev->bus_master->write_byte(dev->bus_master->data, byte);
-	}
-	else
+	} else {
 		for (i = 0; i < 8; ++i) {
 			if (i == 7)
 				w1_pre_write(dev);
 			w1_touch_bit(dev, (byte >> i) & 0x1);
 		}
+	}
 	w1_post_write(dev);
 }
 EXPORT_SYMBOL_GPL(w1_write_8);
-
 
 /**
  * w1_read_bit() - Generates a write-1 cycle and samples the level.
@@ -234,11 +234,12 @@ u8 w1_read_8(struct w1_master *dev)
 	int i;
 	u8 res = 0;
 
-	if (dev->bus_master->read_byte)
+	if (dev->bus_master->read_byte) {
 		res = dev->bus_master->read_byte(dev->bus_master->data);
-	else
+	} else {
 		for (i = 0; i < 8; ++i)
-			res |= (w1_touch_bit(dev,1) << i);
+			res |= (w1_touch_bit(dev, 1) << i);
+	}
 
 	return res;
 }
@@ -257,10 +258,10 @@ void w1_write_block(struct w1_master *dev, const u8 *buf, int len)
 	if (dev->bus_master->write_block) {
 		w1_pre_write(dev);
 		dev->bus_master->write_block(dev->bus_master->data, buf, len);
-	}
-	else
+	} else {
 		for (i = 0; i < len; ++i)
 			w1_write_8(dev, buf[i]); /* calls w1_pre_write */
+	}
 	w1_post_write(dev);
 }
 EXPORT_SYMBOL_GPL(w1_write_block);
@@ -327,9 +328,9 @@ int w1_reset_bus(struct w1_master *dev)
 	if (w1_disable_irqs)
 		local_irq_save(flags);
 
-	if (dev->bus_master->reset_bus)
+	if (dev->bus_master->reset_bus) {
 		result = dev->bus_master->reset_bus(dev->bus_master->data) & 0x1;
-	else {
+	} else {
 		dev->bus_master->write_bit(dev->bus_master->data, 0);
 		/* minimum 480, max ? us
 		 * be nice and sleep, except 18b20 spec lists 960us maximum,
@@ -358,7 +359,7 @@ int w1_reset_bus(struct w1_master *dev)
 }
 EXPORT_SYMBOL_GPL(w1_reset_bus);
 
-u8 w1_calc_crc8(u8 * data, int len)
+u8 w1_calc_crc8(u8 *data, int len)
 {
 	u8 crc = 0;
 
@@ -396,15 +397,16 @@ int w1_reset_select_slave(struct w1_slave *sl)
 	if (w1_reset_bus(sl->master))
 		return -1;
 
-	if (sl->master->slave_count == 1)
+	if (sl->master->slave_count == 1) {
 		w1_write_8(sl->master, W1_SKIP_ROM);
-	else {
+	} else {
 		u8 match[9] = {W1_MATCH_ROM, };
-		u64 rn = le64_to_cpu(*((u64*)&sl->reg_num));
+		u64 rn = le64_to_cpu(*((u64 *)&sl->reg_num));
 
 		memcpy(&match[1], &rn, 8);
 		w1_write_block(sl->master, match, 9);
 	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(w1_reset_select_slave);

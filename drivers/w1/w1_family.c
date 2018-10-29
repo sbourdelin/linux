@@ -83,7 +83,7 @@ EXPORT_SYMBOL(w1_unregister_family);
 /*
  * Should be called under w1_flock held.
  */
-struct w1_family * w1_family_registered(u8 fid)
+struct w1_family *w1_family_registered(u8 fid)
 {
 	struct list_head *ent, *n;
 	struct w1_family *f = NULL;

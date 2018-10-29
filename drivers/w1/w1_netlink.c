@@ -35,6 +35,7 @@ struct w1_cb_block {
 	 * reply first_cn, data (w1_netlink_msg and w1_netlink_cmd)
 	 */
 };
+
 struct w1_cb_node {
 	struct w1_async_cmd async;
 	/* pointers within w1_cb_block and cn data */
@@ -178,7 +179,7 @@ static void w1_netlink_queue_status(struct w1_cb_block *block,
 	block->msg->status = (u8)-error;
 	if (req_cmd) {
 		struct w1_netlink_cmd *cmd =
-			(struct w1_netlink_cmd *) block->msg->data;
+			(struct w1_netlink_cmd *)block->msg->data;
 
 		memcpy(cmd, req_cmd, sizeof(*cmd));
 		block->cn->len += sizeof(*cmd);
@@ -400,7 +401,7 @@ static int w1_process_command_slave(struct w1_slave *sl,
 {
 	dev_dbg(&sl->master->dev, "%s: %02x.%012llx.%02x: cmd=%02x, len=%u.\n",
 		__func__, sl->reg_num.family,
-		(unsigned long long) sl->reg_num.id, sl->reg_num.crc, cmd->cmd,
+		(unsigned long long)sl->reg_num.id, sl->reg_num.crc, cmd->cmd,
 		cmd->len);
 
 	return w1_process_command_io(sl->master, cmd);
@@ -608,7 +609,7 @@ static void w1_cn_callback(struct cn_msg *cn, struct netlink_skb_parms *nsp)
 		 * space for replies which is the original message size plus
 		 * space for any list slave data and status messages
 		 * cn->len doesn't include itself which is part of the block
-		 * */
+		 */
 		size =  /* block + original message */
 			sizeof(struct w1_cb_block) + sizeof(*cn) + cn->len +
 			/* space for nodes */
@@ -645,7 +646,6 @@ static void w1_cn_callback(struct cn_msg *cn, struct netlink_skb_parms *nsp)
 
 	msg_len = cn->len;
 	while (msg_len && !err) {
-
 		dev = NULL;
 		sl = NULL;
 
