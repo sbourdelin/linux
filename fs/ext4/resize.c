@@ -874,6 +874,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 		goto exit_inode;
 	}
 	brelse(dind);
+	brelse(iloc.bh);
 
 	o_group_desc = EXT4_SB(sb)->s_group_desc;
 	memcpy(n_group_desc, o_group_desc,
