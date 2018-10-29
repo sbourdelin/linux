@@ -548,6 +548,22 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 }
 
 /*
+ * Check for ECC double-bit errors in Auxiliary Data Fault Status Register
+ */
+static void check_adfsr_for_ecc(void)
+{
+	u32 adfsr = 0;
+
+	asm("mrc p15, 0, %0, c5, c1, 0" : "=r" (adfsr));
+
+	if (adfsr & (BIT(31) | BIT(23))) {
+		pr_alert("ADFSR status 0x%x indicates that an L1 or L2 cache\n"
+			 "ECC double-bit error occurred at some time.\n",
+			  adfsr);
+	}
+}
+
+/*
  * Dispatch a data abort to the relevant handler.
  */
 asmlinkage void
@@ -559,6 +575,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
 		return;
 
+	check_adfsr_for_ecc();
 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);
 	show_pte(current->mm, addr);
@@ -593,6 +610,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
 		return;
 
+	check_adfsr_for_ecc();
 	pr_alert("Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
 		inf->name, ifsr, addr);
 
