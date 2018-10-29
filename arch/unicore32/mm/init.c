@@ -31,8 +31,8 @@
 
 #include "mm.h"
 
-static unsigned long phys_initrd_start __initdata = 0x01000000;
-static unsigned long phys_initrd_size __initdata = SZ_8M;
+phys_addr_t phys_initrd_start __initdata = 0x01000000;
+unsigned long phys_initrd_size __initdata = SZ_8M;
 
 static int __init early_initrd(char *p)
 {

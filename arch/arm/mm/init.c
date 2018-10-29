@@ -51,8 +51,8 @@ unsigned long __init __clear_cr(unsigned long mask)
 }
 #endif
 
-static phys_addr_t phys_initrd_start __initdata = 0;
-static unsigned long phys_initrd_size __initdata = 0;
+phys_addr_t phys_initrd_start __initdata = 0;
+unsigned long phys_initrd_size __initdata = 0;
 
 static int __init early_initrd(char *p)
 {
