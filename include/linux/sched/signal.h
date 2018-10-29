@@ -74,6 +74,10 @@ struct multiprocess_signals {
 	struct hlist_node node;
 };
 
+/* Need to stick the waitq for exithand outside process structures in
+ * case a process disappears across a poll.  */
+extern wait_queue_head_t wait_exithand;
+
 /*
  * NOTE! "signal_struct" does not have its own
  * locking, because a shared signal_struct always
@@ -86,6 +90,9 @@ struct signal_struct {
 	atomic_t		live;
 	int			nr_threads;
 	struct list_head	thread_head;
+
+	/* Protected with tasklist_lock.  */
+	bool                    exithand_is_interested;
 
 	wait_queue_head_t	wait_chldexit;	/* for wait4() */
 

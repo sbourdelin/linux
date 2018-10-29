@@ -1485,6 +1485,8 @@ void __wake_up_parent(struct task_struct *p, struct task_struct *parent)
 {
 	__wake_up_sync_key(&parent->signal->wait_chldexit,
 				TASK_INTERRUPTIBLE, 1, p);
+	if (p->signal->exithand_is_interested)
+		__wake_up_sync(&wait_exithand, TASK_INTERRUPTIBLE, 0);
 }
 
 static long do_wait(struct wait_opts *wo)

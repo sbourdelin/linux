@@ -304,3 +304,7 @@ extern unsigned long task_statm(struct mm_struct *,
 				unsigned long *, unsigned long *,
 				unsigned long *, unsigned long *);
 extern void task_mem(struct seq_file *, struct mm_struct *);
+
+/* exithand.c */
+
+extern const struct file_operations proc_tgid_exithand_operations;

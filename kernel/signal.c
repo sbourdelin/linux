@@ -454,6 +454,9 @@ void flush_sigqueue(struct sigpending *queue)
 	}
 }
 
+wait_queue_head_t wait_exithand =
+	__WAIT_QUEUE_HEAD_INITIALIZER(wait_exithand);
+
 /*
  * Flush all pending signals for this kthread.
  */

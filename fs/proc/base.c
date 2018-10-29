@@ -3006,6 +3006,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_LIVEPATCH
 	ONE("patch_state",  S_IRUSR, proc_pid_patch_state),
 #endif
+	REG("exithand", S_IRUGO, proc_tgid_exithand_operations),
 };
 
 static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
