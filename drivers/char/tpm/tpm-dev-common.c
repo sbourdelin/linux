@@ -64,6 +64,7 @@ static void tpm_timeout_work(struct work_struct *work)
 
 	mutex_lock(&priv->buffer_mutex);
 	priv->data_pending = 0;
+	priv->partial_data = 0;
 	memset(priv->data_buffer, 0, sizeof(priv->data_buffer));
 	mutex_unlock(&priv->buffer_mutex);
 	wake_up_interruptible(&priv->async_wait);
@@ -90,22 +91,39 @@ ssize_t tpm_common_read(struct file *file, char __user *buf,
 	ssize_t ret_size = 0;
 	int rc;
 
-	del_singleshot_timer_sync(&priv->user_read_timer);
-	flush_work(&priv->timeout_work);
 	mutex_lock(&priv->buffer_mutex);
+	if (priv->data_pending || priv->partial_data) {
+		if (*off == 0)
+			priv->partial_data = priv->data_pending;
 
-	if (priv->data_pending) {
-		ret_size = min_t(ssize_t, size, priv->data_pending);
-		if (ret_size > 0) {
-			rc = copy_to_user(buf, priv->data_buffer, ret_size);
-			memset(priv->data_buffer, 0, priv->data_pending);
-			if (rc)
-				ret_size = -EFAULT;
+		ret_size = min_t(ssize_t, size + *off, priv->partial_data);
+		if (ret_size <= 0) {
+			ret_size = 0;
+			priv->data_pending = 0;
+			priv->partial_data = 0;
+			goto out;
+		}
+
+		rc = copy_to_user(buf, priv->data_buffer + *off, ret_size);
+		if (rc) {
+			memset(priv->data_buffer, 0, TPM_BUFSIZE);
+			priv->partial_data = 0;
+			ret_size = -EFAULT;
+		} else {
+			memset(priv->data_buffer + *off, 0, ret_size);
+			priv->partial_data -= ret_size;
+			*off += ret_size;
 		}
 
 		priv->data_pending = 0;
 	}
 
+out:
+	if (!priv->partial_data) {
+		*off = 0;
+		del_singleshot_timer_sync(&priv->user_read_timer);
+		flush_work(&priv->timeout_work);
+	}
 	mutex_unlock(&priv->buffer_mutex);
 	return ret_size;
 }
@@ -149,6 +167,8 @@ ssize_t tpm_common_write(struct file *file, const char __user *buf,
 		ret = -EPIPE;
 		goto out;
 	}
+
+	priv->partial_data = 0;
 
 	/*
 	 * If in nonblocking mode schedule an async job to send

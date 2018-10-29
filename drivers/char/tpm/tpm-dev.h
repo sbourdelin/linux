@@ -11,6 +11,8 @@ struct file_priv {
 
 	/* Holds the amount of data passed or an error code from async op */
 	ssize_t data_pending;
+	/* For partial reads, holds the reminder of a response */
+	ssize_t partial_data;
 	struct mutex buffer_mutex;
 
 	struct timer_list user_read_timer;      /* user needs to claim result */
