@@ -22,8 +22,8 @@ static int w1_enable_pullup = 1;
 module_param_named(enable_pullup, w1_enable_pullup, int, 0);
 
 static struct w1_master *w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
-				       struct device_driver *driver,
-				       struct device *device)
+				      struct device_driver *driver,
+				      struct device *device)
 {
 	struct w1_master *dev;
 	int err;
@@ -31,7 +31,8 @@ static struct w1_master *w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	/*
 	 * We are in process context(kernel thread), so can sleep.
 	 */
-	dev = kzalloc(sizeof(struct w1_master) + sizeof(struct w1_bus_master), GFP_KERNEL);
+	dev = kzalloc(sizeof(struct w1_master) +
+		sizeof(struct w1_bus_master), GFP_KERNEL);
 	if (!dev) {
 		pr_err("Failed to allocate %zd bytes for new w1 device.\n",
 			sizeof(struct w1_master));
@@ -121,7 +122,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 	} while (found);
 
 	dev = w1_alloc_dev(id, w1_max_slave_count, w1_max_slave_ttl,
-		&w1_master_driver, &w1_master_device);
+			   &w1_master_driver, &w1_master_device);
 	if (!dev) {
 		mutex_unlock(&w1_mlock);
 		return -ENOMEM;
@@ -141,8 +142,8 @@ int w1_add_master_device(struct w1_bus_master *master)
 	if (IS_ERR(dev->thread)) {
 		retval = PTR_ERR(dev->thread);
 		dev_err(&dev->dev,
-			 "Failed to create new kernel thread. err=%d\n",
-			 retval);
+			"Failed to create new kernel thread. err=%d\n",
+			retval);
 		mutex_unlock(&w1_mlock);
 		goto err_out_rm_attr;
 	}
@@ -197,7 +198,7 @@ void __w1_remove_master_device(struct w1_master *dev)
 
 	while (atomic_read(&dev->refcnt)) {
 		dev_info(&dev->dev, "Waiting for %s to become free: refcnt=%d.\n",
-				dev->name, atomic_read(&dev->refcnt));
+			 dev->name, atomic_read(&dev->refcnt));
 
 		if (msleep_interruptible(1000))
 			flush_signals(current);

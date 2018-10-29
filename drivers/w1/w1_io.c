@@ -73,7 +73,8 @@ static void w1_write_bit(struct w1_master *dev, int bit)
 {
 	unsigned long flags = 0;
 
-	if(w1_disable_irqs) local_irq_save(flags);
+	if (w1_disable_irqs)
+		local_irq_save(flags);
 
 	if (bit) {
 		dev->bus_master->write_bit(dev->bus_master->data, 0);
@@ -87,7 +88,8 @@ static void w1_write_bit(struct w1_master *dev, int bit)
 		w1_delay(10);
 	}
 
-	if(w1_disable_irqs) local_irq_restore(flags);
+	if (w1_disable_irqs)
+		local_irq_restore(flags);
 }
 
 /**
@@ -101,9 +103,9 @@ static void w1_write_bit(struct w1_master *dev, int bit)
 static void w1_pre_write(struct w1_master *dev)
 {
 	if (dev->pullup_duration &&
-		dev->enable_pullup && dev->bus_master->set_pullup) {
+	    dev->enable_pullup && dev->bus_master->set_pullup) {
 		dev->bus_master->set_pullup(dev->bus_master->data,
-			dev->pullup_duration);
+					    dev->pullup_duration);
 	}
 }
 
@@ -192,9 +194,10 @@ static u8 w1_read_bit(struct w1_master *dev)
  */
 u8 w1_triplet(struct w1_master *dev, int bdir)
 {
-	if (dev->bus_master->triplet)
-		return dev->bus_master->triplet(dev->bus_master->data, bdir);
-	else {
+	if (dev->bus_master->triplet) {
+		return dev->bus_master->triplet(dev->bus_master->data,
+			bdir);
+	} else {
 		u8 id_bit   = w1_touch_bit(dev, 1);
 		u8 comp_bit = w1_touch_bit(dev, 1);
 		u8 retval;
@@ -298,9 +301,10 @@ u8 w1_read_block(struct w1_master *dev, u8 *buf, int len)
 	int i;
 	u8 ret;
 
-	if (dev->bus_master->read_block)
-		ret = dev->bus_master->read_block(dev->bus_master->data, buf, len);
-	else {
+	if (dev->bus_master->read_block) {
+		ret = dev->bus_master->read_block(dev->bus_master->data,
+			buf, len);
+	} else {
 		for (i = 0; i < len; ++i)
 			buf[i] = w1_read_8(dev);
 		ret = len;
@@ -320,7 +324,8 @@ int w1_reset_bus(struct w1_master *dev)
 	int result;
 	unsigned long flags = 0;
 
-	if(w1_disable_irqs) local_irq_save(flags);
+	if (w1_disable_irqs)
+		local_irq_save(flags);
 
 	if (dev->bus_master->reset_bus)
 		result = dev->bus_master->reset_bus(dev->bus_master->data) & 0x1;
@@ -346,7 +351,8 @@ int w1_reset_bus(struct w1_master *dev)
 		msleep(1);
 	}
 
-	if(w1_disable_irqs) local_irq_restore(flags);
+	if (w1_disable_irqs)
+		local_irq_restore(flags);
 
 	return result;
 }
@@ -363,7 +369,8 @@ u8 w1_calc_crc8(u8 * data, int len)
 }
 EXPORT_SYMBOL_GPL(w1_calc_crc8);
 
-void w1_search_devices(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb)
+void w1_search_devices(struct w1_master *dev, u8 search_type,
+		       w1_slave_found_callback cb)
 {
 	dev->attempts++;
 	if (dev->bus_master->search)

@@ -65,7 +65,7 @@ static void w1_unref_block(struct w1_cb_block *block)
 		u16 len = w1_reply_len(block);
 		if (len) {
 			cn_netlink_send_mult(block->first_cn, len,
-				block->portid, 0, GFP_KERNEL);
+					     block->portid, 0, GFP_KERNEL);
 		}
 		kfree(block);
 	}
@@ -82,8 +82,10 @@ static void w1_unref_block(struct w1_cb_block *block)
 static void w1_reply_make_space(struct w1_cb_block *block, u16 space)
 {
 	u16 len = w1_reply_len(block);
+
 	if (len + space >= block->maxlen) {
-		cn_netlink_send_mult(block->first_cn, len, block->portid, 0, GFP_KERNEL);
+		cn_netlink_send_mult(block->first_cn, len,
+				     block->portid, 0, GFP_KERNEL);
 		block->first_cn->len = 0;
 		block->cn = NULL;
 		block->msg = NULL;
@@ -110,7 +112,8 @@ static void w1_netlink_check_send(struct w1_cb_block *block)
 static void w1_netlink_setup_msg(struct w1_cb_block *block, u32 ack)
 {
 	if (block->cn && block->cn->ack == ack) {
-		block->msg = (struct w1_netlink_msg *)(block->cn->data + block->cn->len);
+		block->msg = (struct w1_netlink_msg *)
+			(block->cn->data + block->cn->len);
 	} else {
 		/* advance or set to data */
 		if (block->cn)
@@ -131,7 +134,7 @@ static void w1_netlink_setup_msg(struct w1_cb_block *block, u32 ack)
  * the results.
  */
 static void w1_netlink_queue_cmd(struct w1_cb_block *block,
-	struct w1_netlink_cmd *cmd)
+				 struct w1_netlink_cmd *cmd)
 {
 	u32 space;
 	w1_reply_make_space(block, sizeof(struct cn_msg) +
@@ -158,8 +161,9 @@ static void w1_netlink_queue_cmd(struct w1_cb_block *block,
  * copied.
  */
 static void w1_netlink_queue_status(struct w1_cb_block *block,
-	struct w1_netlink_msg *req_msg, struct w1_netlink_cmd *req_cmd,
-	int error)
+				    struct w1_netlink_msg *req_msg,
+				    struct w1_netlink_cmd *req_cmd,
+				    int error)
 {
 	u16 space = sizeof(struct cn_msg) + sizeof(*req_msg) + sizeof(*req_cmd);
 	w1_reply_make_space(block, space);
@@ -170,7 +174,9 @@ static void w1_netlink_queue_status(struct w1_cb_block *block,
 	block->msg->len = 0;
 	block->msg->status = (u8)-error;
 	if (req_cmd) {
-		struct w1_netlink_cmd *cmd = (struct w1_netlink_cmd *)block->msg->data;
+		struct w1_netlink_cmd *cmd =
+			(struct w1_netlink_cmd *) block->msg->data;
+
 		memcpy(cmd, req_cmd, sizeof(*cmd));
 		block->cn->len += sizeof(*cmd);
 		block->msg->len += sizeof(*cmd);
@@ -189,8 +195,9 @@ static void w1_netlink_queue_status(struct w1_cb_block *block,
  * Use when a block isn't available to queue the message to and cn, msg
  * might not be contiguous.
  */
-static void w1_netlink_send_error(struct cn_msg *cn, struct w1_netlink_msg *msg,
-	int portid, int error)
+static void w1_netlink_send_error(struct cn_msg *cn,
+				  struct w1_netlink_msg *msg,
+				  int portid, int error)
 {
 	struct {
 		struct cn_msg cn;
@@ -286,7 +293,7 @@ static int w1_get_slaves(struct w1_master *dev, struct w1_netlink_cmd *req_cmd)
 }
 
 static int w1_process_command_io(struct w1_master *dev,
-	struct w1_netlink_cmd *cmd)
+				 struct w1_netlink_cmd *cmd)
 {
 	int err = 0;
 
@@ -311,7 +318,7 @@ static int w1_process_command_io(struct w1_master *dev,
 }
 
 static int w1_process_command_addremove(struct w1_master *dev,
-	struct w1_netlink_cmd *cmd)
+					struct w1_netlink_cmd *cmd)
 {
 	struct w1_slave *sl;
 	int err = 0;
@@ -345,7 +352,7 @@ static int w1_process_command_addremove(struct w1_master *dev,
 }
 
 static int w1_process_command_master(struct w1_master *dev,
-	struct w1_netlink_cmd *req_cmd)
+				     struct w1_netlink_cmd *req_cmd)
 {
 	int err = -EINVAL;
 
@@ -385,11 +392,12 @@ static int w1_process_command_master(struct w1_master *dev,
 }
 
 static int w1_process_command_slave(struct w1_slave *sl,
-		struct w1_netlink_cmd *cmd)
+				    struct w1_netlink_cmd *cmd)
 {
 	dev_dbg(&sl->master->dev, "%s: %02x.%012llx.%02x: cmd=%02x, len=%u.\n",
-		__func__, sl->reg_num.family, (unsigned long long)sl->reg_num.id,
-		sl->reg_num.crc, cmd->cmd, cmd->len);
+		__func__, sl->reg_num.family,
+		(unsigned long long) sl->reg_num.id, sl->reg_num.crc, cmd->cmd,
+		cmd->len);
 
 	return w1_process_command_io(sl->master, cmd);
 }
@@ -496,7 +504,7 @@ static void w1_process_cb(struct w1_master *dev, struct w1_async_cmd *async_cmd)
 }
 
 static void w1_list_count_cmds(struct w1_netlink_msg *msg, int *cmd_count,
-	u16 *slave_len)
+			       u16 *slave_len)
 {
 	struct w1_netlink_cmd *cmd = (struct w1_netlink_cmd *)msg->data;
 	u16 mlen = msg->len;
@@ -662,7 +670,7 @@ static void w1_cn_callback(struct cn_msg *cn, struct netlink_skb_parms *nsp)
 				dev = sl->master;
 		} else {
 			pr_notice("%s: cn: %x.%x, wrong type: %u, len: %u.\n",
-				__func__, cn->id.idx, cn->id.val,
+				  __func__, cn->id.idx, cn->id.val,
 				msg->type, msg->len);
 			err = -EPROTO;
 			goto out_cont;
