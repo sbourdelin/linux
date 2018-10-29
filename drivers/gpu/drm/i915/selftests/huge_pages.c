@@ -1114,8 +1114,8 @@ static int igt_write_huge(struct i915_gem_context *ctx,
 	struct intel_engine_cs *engine;
 	I915_RND_STATE(prng);
 	IGT_TIMEOUT(end_time);
-	unsigned int max_page_size;
 	unsigned int id;
+	u64 alignment;
 	u64 max;
 	u64 num;
 	u64 size;
@@ -1126,16 +1126,19 @@ static int igt_write_huge(struct i915_gem_context *ctx,
 	GEM_BUG_ON(!i915_gem_object_has_pinned_pages(obj));
 
 	size = obj->base.size;
-	if (obj->mm.page_sizes.sg & I915_GTT_PAGE_SIZE_64K)
+	alignment = rounddown_pow_of_two(obj->mm.page_sizes.sg);
+	if (obj->mm.page_sizes.sg & I915_GTT_PAGE_SIZE_64K) {
 		size = round_up(size, I915_GTT_PAGE_SIZE_2M);
+		alignment = max(alignment, I915_GTT_PAGE_SIZE_2M);
+	}
 
-	max_page_size = rounddown_pow_of_two(obj->mm.page_sizes.sg);
-	max = div_u64((vm->total - size), max_page_size);
+	max = div_u64((vm->total - size), alignment);
 
 	n = 0;
 	for_each_engine(engine, i915, id) {
 		if (!intel_engine_can_store_dword(engine)) {
-			pr_info("store-dword-imm not supported on engine=%u\n", id);
+			pr_info("store-dword-imm not supported on engine=%u\n",
+				id);
 			continue;
 		}
 		engines[n++] = engine;
@@ -1160,24 +1163,27 @@ static int igt_write_huge(struct i915_gem_context *ctx,
 	 */
 	i = 0;
 	for_each_prime_number_from(num, 0, max) {
-		u64 offset_low = num * max_page_size;
-		u64 offset_high = (max - num) * max_page_size;
+		u64 offset_low = num * alignment;
+		u64 offset_high = (max - num) * alignment;
 		u32 dword = offset_in_page(num) / 4;
 
 		engine = engines[order[i] % n];
 		i = (i + 1) % (n * I915_NUM_ENGINES);
 
-		err = __igt_write_huge(ctx, engine, obj, size, offset_low, dword, num + 1);
+		err = __igt_write_huge(ctx, engine, obj, size, offset_low,
+				       dword, num + 1);
 		if (err)
 			break;
 
-		err = __igt_write_huge(ctx, engine, obj, size, offset_high, dword, num + 1);
+		err = __igt_write_huge(ctx, engine, obj, size, offset_high,
+				       dword, num + 1);
 		if (err)
 			break;
 
 		if (igt_timeout(end_time,
-				"%s timed out on engine=%u, offset_low=%llx offset_high=%llx, max_page_size=%x\n",
-				__func__, engine->id, offset_low, offset_high, max_page_size))
+				"%s timed out on engine=%u, offset_low=%llx offset_high=%llx, max_page_size=%lx\n",
+				__func__, engine->id, offset_low, offset_high,
+				rounddown_pow_of_two(obj->mm.page_sizes.sg)))
 			break;
 	}
 
