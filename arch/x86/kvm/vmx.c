@@ -2100,16 +2100,16 @@ static int __find_msr_index(struct vcpu_vmx *vmx, u32 msr)
 
 static inline void __invvpid(unsigned long ext, u16 vpid, gva_t gva)
 {
-    struct {
-	u64 vpid : 16;
-	u64 rsvd : 48;
-	u64 gva;
-    } operand = { vpid, 0, gva };
-    bool error;
+	struct {
+		u64 vpid : 16;
+		u64 rsvd : 48;
+		u64 gva;
+	} operand = { vpid, 0, gva };
+	bool error;
 
-    asm volatile (__ex("invvpid %2, %1") CC_SET(na)
-		  : CC_OUT(na) (error) : "r"(ext), "m"(operand));
-    BUG_ON(error);
+	asm volatile (__ex("invvpid %2, %1") CC_SET(na)
+		      : CC_OUT(na) (error) : "r"(ext), "m"(operand));
+	BUG_ON(error);
 }
 
 static inline void __invept(unsigned long ext, u64 eptp, gpa_t gpa)
