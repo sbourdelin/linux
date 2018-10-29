@@ -61,19 +61,18 @@ enum w1_netlink_message_types {
  * The netlink connector data sequence is, struct nlmsghdr, struct cn_msg,
  * then one or more struct w1_netlink_msg (each with optional data).
  */
-struct w1_netlink_msg
-{
-	__u8				type;
-	__u8				status;
-	__u16				len;
+struct w1_netlink_msg {
+	__u8 type;
+	__u8 status;
+	__u16 len;
 	union {
-		__u8			id[8];
+		__u8 id[8];
 		struct w1_mst {
-			__u32		id;
-			__u32		res;
+			__u32 id;
+			__u32 res;
 		} mst;
 	} id;
-	__u8				data[0];
+	__u8 data[0];
 };
 
 /**
@@ -117,12 +116,11 @@ enum w1_commands {
  * One or more struct w1_netlink_cmd is placed starting at w1_netlink_msg.data
  * each with optional data.
  */
-struct w1_netlink_cmd
-{
-	__u8				cmd;
-	__u8				res;
-	__u16				len;
-	__u8				data[0];
+struct w1_netlink_cmd {
+	__u8 cmd;
+	__u8 res;
+	__u16 len;
+	__u8 data[0];
 };
 
 #ifdef __KERNEL__
