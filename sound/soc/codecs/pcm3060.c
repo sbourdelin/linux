@@ -179,6 +179,13 @@ static struct snd_soc_dai_driver pcm3060_dai[] = {
 
 /* dapm */
 
+static const char * const pcm3060_dapm_out_dif_txt[] = {
+	"Differential", "Single-Ended"
+};
+
+static SOC_ENUM_SINGLE_DECL(pcm3060_dapm_out_dif_enum, PCM3060_REG64,
+			    PCM3060_REG_SHIFT_SE, pcm3060_dapm_out_dif_txt);
+
 static DECLARE_TLV_DB_SCALE(pcm3060_dapm_tlv, -10050, 50, 1);
 
 static const struct snd_kcontrol_new pcm3060_dapm_controls[] = {
@@ -195,6 +202,8 @@ static const struct snd_kcontrol_new pcm3060_dapm_controls[] = {
 			       0, pcm3060_dapm_tlv),
 	SOC_DOUBLE("Master Capture Switch", PCM3060_REG73,
 		   PCM3060_REG_SHIFT_MUT11, PCM3060_REG_SHIFT_MUT12, 1, 1),
+
+	SOC_ENUM("DAC Out Differential", pcm3060_dapm_out_dif_enum),
 };
 
 static const struct snd_soc_dapm_widget pcm3060_dapm_widgets[] = {
