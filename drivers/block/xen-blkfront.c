@@ -1350,8 +1350,10 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	if (info->rq)
 		blk_mq_stop_hw_queues(info->rq);
 
-	for (i = 0; i < info->nr_rings; i++)
-		blkif_free_ring(&info->rinfo[i]);
+	if (info->rinfo) {
+		for (i = 0; i < info->nr_rings; i++)
+			blkif_free_ring(&info->rinfo[i]);
+	}
 
 	kfree(info->rinfo);
 	info->rinfo = NULL;
@@ -1919,6 +1921,7 @@ static int negotiate_mq(struct blkfront_info *info)
 			      GFP_KERNEL);
 	if (!info->rinfo) {
 		xenbus_dev_fatal(info->xbdev, -ENOMEM, "allocating ring_info structure");
+		info->nr_rings = 0;
 		return -ENOMEM;
 	}
 
