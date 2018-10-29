@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * 1-wire busmaster driver for DS1WM and ASICs with embedded DS1WMs
  * such as HP iPAQs (including h5xxx, h2200, and devices with ASIC3
@@ -5,10 +6,6 @@
  *
  * Copyright (c) 2004-2005, Szabolcs Gyurko <szabolcs.gyurko@tlt.hu>
  * Copyright (c) 2004-2007, Matt Reimer <mreimer@vpop.net>
- *
- * Use consistent with the GNU GPL is permitted,
- * provided that this copyright notice is
- * preserved in its entirety in all copies and derived works.
  */
 
 #include <linux/module.h>
