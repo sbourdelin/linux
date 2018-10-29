@@ -1025,6 +1025,7 @@ asmlinkage long syscall_trace_enter(struct pt_regs *regs, long syscall)
 		for (i = 0; i < 6; i++)
 			sd.args[i] = args[i];
 		sd.instruction_pointer = KSTK_EIP(current);
+		sd.pkeys = 0;
 
 		ret = __secure_computing(&sd);
 		if (ret == -1)

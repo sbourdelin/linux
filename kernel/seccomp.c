@@ -91,6 +91,7 @@ static void populate_seccomp_data(struct seccomp_data *sd)
 	sd->args[4] = args[4];
 	sd->args[5] = args[5];
 	sd->instruction_pointer = KSTK_EIP(task);
+	sd->pkeys = 0;
 }
 
 /**

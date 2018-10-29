@@ -98,6 +98,7 @@ static long syscall_trace_enter(struct pt_regs *regs)
 		sd.arch = arch;
 		sd.nr = regs->orig_ax;
 		sd.instruction_pointer = regs->ip;
+		sd.pkeys = read_pkru();
 #ifdef CONFIG_X86_64
 		if (arch == AUDIT_ARCH_X86_64) {
 			sd.args[0] = regs->di;

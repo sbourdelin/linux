@@ -82,6 +82,7 @@ struct seccomp_data {
 	__u32 arch;
 	__u64 instruction_pointer;
 	__u64 args[6];
+	__u64 pkeys;
 };
 #endif
 
@@ -732,7 +733,9 @@ TEST(KILL_process)
 TEST(arg_out_of_range)
 {
 	struct sock_filter filter[] = {
-		BPF_STMT(BPF_LD|BPF_W|BPF_ABS, syscall_arg(6)),
+		BPF_STMT(BPF_LD|BPF_W|BPF_ABS,
+			offsetof(struct seccomp_data, pkeys)
+				+ sizeof(__u64)),
 		BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
 	};
 	struct sock_fprog prog = {
@@ -2932,6 +2935,108 @@ TEST(get_metadata)
 skip:
 	ASSERT_EQ(0, kill(pid, SIGKILL));
 }
+
+#if defined(__i386__) || defined(__x86_64__)
+static inline void __cpuid(unsigned int *eax, unsigned int *ebx,
+		unsigned int *ecx, unsigned int *edx)
+{
+	/* ecx is often an input as well as an output. */
+	asm volatile(
+		"cpuid;"
+		: "=a" (*eax),
+		  "=b" (*ebx),
+		  "=c" (*ecx),
+		  "=d" (*edx)
+		: "0" (*eax), "2" (*ecx));
+}
+
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx) */
+#define X86_FEATURE_PKU        (1<<3) /* Protection Keys for Userspace */
+#define X86_FEATURE_OSPKE      (1<<4) /* OS Protection Keys Enable */
+
+static inline int cpu_has_pku(void)
+{
+	unsigned int eax;
+	unsigned int ebx;
+	unsigned int ecx;
+	unsigned int edx;
+
+	eax = 0x7;
+	ecx = 0x0;
+	__cpuid(&eax, &ebx, &ecx, &edx);
+
+	if (!(ecx & X86_FEATURE_PKU))
+		return 0;
+	if (!(ecx & X86_FEATURE_OSPKE))
+		return 0;
+	return 1;
+}
+
+static inline __u32 read_pkru(void)
+{
+	if (!cpu_has_pku())
+		return 0;
+
+	__u32 ecx = 0;
+	__u32 edx, pkru;
+
+	/*
+	 * "rdpkru" instruction.  Places PKRU contents in to EAX,
+	 * clears EDX and requires that ecx=0.
+	 */
+	asm volatile(".byte 0x0f,0x01,0xee\n\t"
+		     : "=a" (pkru), "=d" (edx)
+		     : "c" (ecx));
+	return pkru;
+}
+
+static inline void write_pkru(__u32 pkru)
+{
+	if (!cpu_has_pku())
+		return;
+
+	__u32 ecx = 0, edx = 0;
+
+	/*
+	 * "wrpkru" instruction.  Loads contents in EAX to PKRU,
+	 * requires that ecx = edx = 0.
+	 */
+	asm volatile(".byte 0x0f,0x01,0xef\n\t"
+		     : : "a" (pkru), "c"(ecx), "d"(edx));
+}
+
+#define TEST_PKRU 0x55555550
+
+TEST_SIGNAL(pkeys_set, SIGSYS)
+{
+	write_pkru(TEST_PKRU);
+	/* read back the written value because pkru might not be supported */
+	__u32 pkru = read_pkru();
+
+	struct sock_filter filter[] = {
+		BPF_STMT(BPF_LD|BPF_W|BPF_ABS,
+			offsetof(struct seccomp_data, pkeys)),
+		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, pkru, 1, 0),
+		BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
+		BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_KILL),
+	};
+	struct sock_fprog prog = {
+		.len = (unsigned short)ARRAY_SIZE(filter),
+		.filter = filter,
+	};
+	long ret;
+
+	ret = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+	ASSERT_EQ(0, ret);
+
+	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog);
+	ASSERT_EQ(0, ret);
+
+	/* should never return. */
+	EXPECT_EQ(0, syscall(__NR_getpid));
+}
+#endif
+
 
 /*
  * TODO:

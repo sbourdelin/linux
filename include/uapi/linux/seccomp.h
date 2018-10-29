@@ -52,12 +52,15 @@
  * @instruction_pointer: at the time of the system call.
  * @args: up to 6 system call arguments always stored as 64-bit values
  *        regardless of the architecture.
+ * @pkeys: value of an architecture specific protection keys register
+ *         (currently PKRU on x86)
  */
 struct seccomp_data {
 	int nr;
 	__u32 arch;
 	__u64 instruction_pointer;
 	__u64 args[6];
+	__u64 pkeys;
 };
 
 #endif /* _UAPI_LINUX_SECCOMP_H */
