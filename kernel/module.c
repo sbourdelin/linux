@@ -2659,6 +2659,10 @@ static void layout_symtab(struct module *mod, struct load_info *info)
 	mod->init_layout.size = debug_align(mod->init_layout.size);
 }
 
+void __weak module_fixup_kallsyms(struct mod_kallsyms *kallsyms)
+{
+}
+
 /*
  * We use the full symtab and strtab which layout_symtab arranged to
  * be appended to the init section.  Later we switch to the cut-down
@@ -2679,6 +2683,8 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
 	mod->kallsyms->num_symtab = symsec->sh_size / sizeof(Elf_Sym);
 	/* Make sure we get permanent strtab: don't use info->strtab. */
 	mod->kallsyms->strtab = (void *)info->sechdrs[info->index.str].sh_addr;
+
+	module_fixup_kallsyms(mod->kallsyms);
 
 	/* Set types up while we still have access to sections. */
 	for (i = 0; i < mod->kallsyms->num_symtab; i++)
