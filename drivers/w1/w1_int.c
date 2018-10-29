@@ -31,7 +31,7 @@ static struct w1_master *w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	/*
 	 * We are in process context(kernel thread), so can sleep.
 	 */
-	dev = kzalloc(sizeof(struct w1_master) +
+	dev = kzalloc(sizeof(*dev) +
 		sizeof(struct w1_bus_master), GFP_KERNEL);
 	if (!dev)
 		return NULL;
