@@ -636,7 +636,7 @@ static int w1_uevent(struct device *dev, struct kobj_uevent_env *env)
 	if (err)
 		goto end;
 
-	err = add_uevent_var(env, "W1_SLAVE_ID=%024LX",
+	err = add_uevent_var(env, "W1_SLAVE_ID=%024llX",
 			     (unsigned long long)sl->reg_num.id);
 end:
 	return err;
