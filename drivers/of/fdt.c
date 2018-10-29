@@ -899,6 +899,10 @@ static void __early_init_dt_declare_initrd(unsigned long start,
 	initrd_start = (unsigned long)__va(start);
 	initrd_end = (unsigned long)__va(end);
 	initrd_below_start_ok = 1;
+#ifdef CONFIG_ARCH_HAS_PHYS_INITRD
+	phys_initrd_start = start;
+	phys_initrd_size = end - start;
+#endif
 }
 #endif
 
