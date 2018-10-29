@@ -300,28 +300,28 @@
 			compatible = "gpio-leds";
 
 			led@1 {
-				label = "apq8016-sbc:green:user1";
+				label = "green:user1";
 				gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "heartbeat";
 				default-state = "off";
 			};
 
 			led@2 {
-				label = "apq8016-sbc:green:user2";
+				label = "green:user2";
 				gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "mmc0";
 				default-state = "off";
 			};
 
 			led@3 {
-				label = "apq8016-sbc:green:user3";
+				label = "green:user3";
 				gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "mmc1";
 				default-state = "off";
 			};
 
 			led@4 {
-				label = "apq8016-sbc:green:user4";
+				label = "green:user4";
 				gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "none";
 				panic-indicator;
@@ -329,14 +329,14 @@
 			};
 
 			led@5 {
-				label = "apq8016-sbc:yellow:wlan";
+				label = "yellow:wlan";
 				gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "phy0tx";
 				default-state = "off";
 			};
 
 			led@6 {
-				label = "apq8016-sbc:blue:bt";
+				label = "blue:bt";
 				gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
 				linux,default-trigger = "bluetooth-power";
 				default-state = "off";
