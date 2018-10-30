@@ -463,6 +463,44 @@ static struct extcon_dev *dwc3_get_extcon(struct dwc3 *dwc)
 	return edev;
 }
 
+static int dwc3_usb_role_switch_set(struct device *dev, enum usb_role role)
+{
+	u32 mode;
+
+	switch (role) {
+	case USB_ROLE_HOST:
+		mode = DWC3_GCTL_PRTCAP_HOST;
+		break;
+	case USB_ROLE_DEVICE:
+		mode = DWC3_GCTL_PRTCAP_DEVICE;
+		break;
+	default:
+		mode = DWC3_GCTL_PRTCAP_OTG;
+		break;
+	};
+
+	dwc3_set_mode(dev_get_drvdata(dev), mode);
+	return 0;
+}
+
+static enum usb_role dwc3_usb_role_switch_get(struct device *dev)
+{
+	struct dwc3 *dwc = dev_get_drvdata(dev);
+	unsigned long flags;
+	enum usb_role role;
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	role = dwc->current_otg_role;
+	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	return role;
+}
+
+static const struct usb_role_switch_desc dwc3_role_switch = {
+	.set = dwc3_usb_role_switch_set,
+	.get = dwc3_usb_role_switch_get,
+};
+
 int dwc3_drd_init(struct dwc3 *dwc)
 {
 	int ret, irq;
@@ -511,6 +549,11 @@ int dwc3_drd_init(struct dwc3 *dwc)
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
 	}
 
+	dwc->role_sw = usb_role_switch_register(dwc->dev, &dwc3_role_switch);
+	if (ret) {
+		dwc3_drd_exit(dwc);
+		return PTR_ERR(dwc->role_sw);
+	}
 	return 0;
 }
 
@@ -546,4 +589,6 @@ void dwc3_drd_exit(struct dwc3 *dwc)
 
 	if (!dwc->edev)
 		free_irq(dwc->otg_irq, dwc);
+
+	usb_role_switch_unregister(dwc->role_sw);
 }
