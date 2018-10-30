@@ -40,6 +40,7 @@ struct perf_top {
 	const char	   *sym_filter;
 	float		   min_percent;
 	unsigned int	   nr_threads_synthesize;
+	atomic_t	   nr_rb_read;
 };
 
 #define CONSOLE_CLEAR "[H[2J"

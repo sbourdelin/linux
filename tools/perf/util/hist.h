@@ -442,7 +442,8 @@ int perf_evlist__tui_browse_hists(struct perf_evlist *evlist, const char *help,
 				  float min_pcnt,
 				  struct perf_env *env,
 				  bool warn_lost_event,
-				  struct annotation_options *annotation_options);
+				  struct annotation_options *annotation_options,
+				  atomic_t *nr_rb_read);
 int script_browse(const char *script_opt);
 #else
 static inline
@@ -452,7 +453,8 @@ int perf_evlist__tui_browse_hists(struct perf_evlist *evlist __maybe_unused,
 				  float min_pcnt __maybe_unused,
 				  struct perf_env *env __maybe_unused,
 				  bool warn_lost_event __maybe_unused,
-				  struct annotation_options *annotation_options __maybe_unused)
+				  struct annotation_options *annotation_options __maybe_unused,
+				  atomic_t *nr_rb_read __maybe_unused)
 {
 	return 0;
 }

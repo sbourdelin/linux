@@ -584,6 +584,8 @@ static void *display_thread_tui(void *arg)
 		.refresh	= top->delay_secs,
 	};
 
+	sleep(top->delay_secs);
+
 	/* In order to read symbols from other namespaces perf to  needs to call
 	 * setns(2).  This isn't permitted if the struct_fs has multiple users.
 	 * unshare(2) the fs so that we may continue to setns into namespaces
@@ -607,7 +609,8 @@ static void *display_thread_tui(void *arg)
 				      top->min_percent,
 				      &top->session->header.env,
 				      !top->record_opts.overwrite,
-				      &top->annotation_opts);
+				      &top->annotation_opts,
+				      &top->nr_rb_read);
 
 	done = 1;
 	return NULL;
@@ -633,6 +636,11 @@ static void *display_thread(void *arg)
 	struct termios save;
 	struct perf_top *top = arg;
 	int delay_msecs, c;
+	bool rb_read_timeout_warned = false;
+	bool rb_read_timeout = false;
+	int last_nr_rb_read = 0;
+
+	sleep(top->delay_secs);
 
 	/* In order to read symbols from other namespaces perf to  needs to call
 	 * setns(2).  This isn't permitted if the struct_fs has multiple users.
@@ -651,12 +659,26 @@ repeat:
 
 	while (!done) {
 		perf_top__print_sym_table(top);
+
+		if (!rb_read_timeout_warned && rb_read_timeout) {
+			color_fprintf(stdout, PERF_COLOR_RED,
+				      "Too slow to read ring buffer.\n"
+				      "Please try increasing the period (-c) or\n"
+				      "decreasing the freq (-F) or\n"
+				      "limiting the number of CPUs (-C)\n");
+			rb_read_timeout_warned = true;
+		}
 		/*
 		 * Either timeout expired or we got an EINTR due to SIGWINCH,
 		 * refresh screen in both cases.
 		 */
 		switch (poll(&stdin_poll, 1, delay_msecs)) {
 		case 0:
+			if (atomic_read(&top->nr_rb_read) == last_nr_rb_read)
+				rb_read_timeout = true;
+			else
+				rb_read_timeout = false;
+			last_nr_rb_read = atomic_read(&top->nr_rb_read);
 			continue;
 		case -1:
 			if (errno == EINTR)
@@ -881,10 +903,10 @@ static void perf_top__mmap_read(struct perf_top *top)
 {
 	bool overwrite = top->record_opts.overwrite;
 	struct perf_evlist *evlist = top->evlist;
-	unsigned long long start, end;
 	int i;
 
-	start = rdclock();
+	atomic_inc(&top->nr_rb_read);
+
 	if (overwrite)
 		perf_evlist__toggle_bkw_mmap(evlist, BKW_MMAP_DATA_PENDING);
 
@@ -895,13 +917,6 @@ static void perf_top__mmap_read(struct perf_top *top)
 		perf_evlist__toggle_bkw_mmap(evlist, BKW_MMAP_EMPTY);
 		perf_evlist__toggle_bkw_mmap(evlist, BKW_MMAP_RUNNING);
 	}
-	end = rdclock();
-
-	if ((end - start) > (unsigned long long)top->delay_secs * NSEC_PER_SEC)
-		ui__warning("Too slow to read ring buffer.\n"
-			    "Please try increasing the period (-c) or\n"
-			    "decreasing the freq (-F) or\n"
-			    "limiting the number of CPUs (-C)\n");
 }
 
 /*
@@ -1137,14 +1152,14 @@ static int __cmd_top(struct perf_top *top)
 	/* Wait for a minimal set of events before starting the snapshot */
 	perf_evlist__poll(top->evlist, 100);
 
-	perf_top__mmap_read(top);
-
 	ret = -1;
 	if (pthread_create(&thread, NULL, (use_browser > 0 ? display_thread_tui :
 							    display_thread), top)) {
 		ui__error("Could not create display thread.\n");
 		goto out_delete;
 	}
+
+	perf_top__mmap_read(top);
 
 	if (top->realtime_prio) {
 		struct sched_param param;

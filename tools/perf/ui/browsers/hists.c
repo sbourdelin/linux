@@ -606,18 +606,29 @@ static void ui_browser__warn_lost_events(struct ui_browser *browser)
 		"Or reduce the sampling frequency.");
 }
 
+static void ui_browser__warn_rb_read_timeout(struct ui_browser *browser)
+{
+	ui_browser__warning(browser, 4,
+		"Too slow to read ring buffer.\n\n"
+		"Please try increasing the period (-c) or\n\n"
+		"decreasing the freq (-F) or\n\n"
+		"limiting the number of CPUs (-C)\n\n");
+}
+
 static int hist_browser__title(struct hist_browser *browser, char *bf, size_t size)
 {
 	return browser->title ? browser->title(browser, bf, size) : 0;
 }
 
 int hist_browser__run(struct hist_browser *browser, const char *help,
-		      bool warn_lost_event)
+		      bool warn_lost_event, atomic_t *nr_rb_read)
 {
 	int key;
 	char title[160];
 	struct hist_browser_timer *hbt = browser->hbt;
 	int delay_secs = hbt ? hbt->refresh : 0;
+	int last_nr_rb_read = nr_rb_read ? atomic_read(nr_rb_read) : 0;
+	bool rb_read_timeout_warned = false;
 
 	browser->b.entries = &browser->hists->entries;
 	browser->b.nr_entries = hist_browser__nr_entries(browser);
@@ -648,6 +659,15 @@ int hist_browser__run(struct hist_browser *browser, const char *help,
 				browser->hists->stats.nr_lost_warned =
 					browser->hists->stats.nr_events[PERF_RECORD_LOST];
 				ui_browser__warn_lost_events(&browser->b);
+			}
+
+			if (nr_rb_read) {
+				if (!rb_read_timeout_warned &&
+				    (last_nr_rb_read == atomic_read(nr_rb_read))) {
+					ui_browser__warn_rb_read_timeout(&browser->b);
+					rb_read_timeout_warned = true;
+				}
+				last_nr_rb_read = atomic_read(nr_rb_read);
 			}
 
 			hist_browser__title(browser, title, sizeof(title));
@@ -2703,7 +2723,8 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 				    float min_pcnt,
 				    struct perf_env *env,
 				    bool warn_lost_event,
-				    struct annotation_options *annotation_opts)
+				    struct annotation_options *annotation_opts,
+				    atomic_t *nr_rb_read)
 {
 	struct hists *hists = evsel__hists(evsel);
 	struct hist_browser *browser = perf_evsel_browser__new(evsel, hbt, env, annotation_opts);
@@ -2785,7 +2806,8 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 		nr_options = 0;
 
 		key = hist_browser__run(browser, helpline,
-					warn_lost_event);
+					warn_lost_event,
+					nr_rb_read);
 
 		if (browser->he_selection != NULL) {
 			thread = hist_browser__selected_thread(browser);
@@ -3070,6 +3092,8 @@ struct perf_evsel_menu {
 	struct perf_evsel *selection;
 	struct annotation_options *annotation_opts;
 	bool lost_events, lost_events_warned;
+	bool rb_read_timeout_warned;
+	int last_nr_rb_read;
 	float min_pcnt;
 	struct perf_env *env;
 };
@@ -3127,7 +3151,8 @@ static void perf_evsel_menu__write(struct ui_browser *browser,
 static int perf_evsel_menu__run(struct perf_evsel_menu *menu,
 				int nr_events, const char *help,
 				struct hist_browser_timer *hbt,
-				bool warn_lost_event)
+				bool warn_lost_event,
+				atomic_t *nr_rb_read)
 {
 	struct perf_evlist *evlist = menu->b.priv;
 	struct perf_evsel *pos;
@@ -3152,6 +3177,14 @@ static int perf_evsel_menu__run(struct perf_evsel_menu *menu,
 				ui_browser__warn_lost_events(&menu->b);
 				menu->lost_events_warned = true;
 			}
+			if (nr_rb_read) {
+				if (!menu->rb_read_timeout_warned &&
+				    (menu->last_nr_rb_read == atomic_read(nr_rb_read))) {
+					ui_browser__warn_rb_read_timeout(&menu->b);
+					menu->rb_read_timeout_warned = true;
+				}
+				menu->last_nr_rb_read = atomic_read(nr_rb_read);
+			}
 			continue;
 		case K_RIGHT:
 		case K_ENTER:
@@ -3171,7 +3204,8 @@ browse_hists:
 						       menu->min_pcnt,
 						       menu->env,
 						       warn_lost_event,
-						       menu->annotation_opts);
+						       menu->annotation_opts,
+						       nr_rb_read);
 			ui_browser__show_title(&menu->b, title);
 			switch (key) {
 			case K_TAB:
@@ -3231,7 +3265,8 @@ static int __perf_evlist__tui_browse_hists(struct perf_evlist *evlist,
 					   float min_pcnt,
 					   struct perf_env *env,
 					   bool warn_lost_event,
-					   struct annotation_options *annotation_opts)
+					   struct annotation_options *annotation_opts,
+					   atomic_t *nr_rb_read)
 {
 	struct perf_evsel *pos;
 	struct perf_evsel_menu menu = {
@@ -3260,7 +3295,7 @@ static int __perf_evlist__tui_browse_hists(struct perf_evlist *evlist,
 	}
 
 	return perf_evsel_menu__run(&menu, nr_entries, help,
-				    hbt, warn_lost_event);
+				    hbt, warn_lost_event, nr_rb_read);
 }
 
 int perf_evlist__tui_browse_hists(struct perf_evlist *evlist, const char *help,
@@ -3268,7 +3303,8 @@ int perf_evlist__tui_browse_hists(struct perf_evlist *evlist, const char *help,
 				  float min_pcnt,
 				  struct perf_env *env,
 				  bool warn_lost_event,
-				  struct annotation_options *annotation_opts)
+				  struct annotation_options *annotation_opts,
+				  atomic_t *nr_rb_read)
 {
 	int nr_entries = evlist->nr_entries;
 
@@ -3279,7 +3315,8 @@ single_entry:
 		return perf_evsel__hists_browse(first, nr_entries, help,
 						false, hbt, min_pcnt,
 						env, warn_lost_event,
-						annotation_opts);
+						annotation_opts,
+						nr_rb_read);
 	}
 
 	if (symbol_conf.event_group) {
@@ -3298,5 +3335,6 @@ single_entry:
 	return __perf_evlist__tui_browse_hists(evlist, nr_entries, help,
 					       hbt, min_pcnt, env,
 					       warn_lost_event,
-					       annotation_opts);
+					       annotation_opts,
+					       nr_rb_read);
 }
