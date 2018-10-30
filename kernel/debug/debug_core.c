@@ -55,6 +55,7 @@
 #include <linux/mm.h>
 #include <linux/vmacache.h>
 #include <linux/rcupdate.h>
+#include <linux/irq.h>
 
 #include <asm/cacheflush.h>
 #include <asm/byteorder.h>
@@ -218,6 +219,39 @@ int __weak kgdb_arch_init(void)
 int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
 {
 	return 0;
+}
+
+/*
+ * Default (weak) implementation for kgdb_roundup_cpus
+ */
+
+static DEFINE_PER_CPU(call_single_data_t, kgdb_roundup_csd);
+
+void __weak kgdb_call_nmi_hook(void *ignored)
+{
+	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
+}
+
+void __weak kgdb_roundup_cpus(void)
+{
+	call_single_data_t *csd;
+	int cpu;
+
+	for_each_cpu(cpu, cpu_online_mask) {
+		csd = &per_cpu(kgdb_roundup_csd, cpu);
+		smp_call_function_single_async(cpu, csd);
+	}
+}
+
+static void kgdb_generic_roundup_init(void)
+{
+	call_single_data_t *csd;
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		csd = &per_cpu(kgdb_roundup_csd, cpu);
+		csd->func = kgdb_call_nmi_hook;
+	}
 }
 
 /*
@@ -992,6 +1026,8 @@ int kgdb_register_io_module(struct kgdb_io *new_dbg_io_ops)
 		pr_err("Another I/O driver is already registered with KGDB\n");
 		return -EBUSY;
 	}
+
+	kgdb_generic_roundup_init();
 
 	if (new_dbg_io_ops->init) {
 		err = new_dbg_io_ops->init();
