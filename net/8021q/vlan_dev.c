@@ -32,6 +32,7 @@
 #include <linux/phy.h>
 #include <net/arp.h>
 #include <net/switchdev.h>
+#include <net/xfrm.h>
 
 #include "vlan.h"
 #include "vlanproc.h"
@@ -546,6 +547,7 @@ static struct device_type vlan_type = {
 };
 
 static const struct net_device_ops vlan_netdev_ops;
+static const struct xfrmdev_ops vlan_xfrmdev_ops;
 
 static int vlan_dev_init(struct net_device *dev)
 {
@@ -553,6 +555,7 @@ static int vlan_dev_init(struct net_device *dev)
 
 	netif_carrier_off(dev);
 
+	/* copy netdev features into list of user selectable features */
 	/* IFF_BROADCAST|IFF_MULTICAST; ??? */
 	dev->flags  = real_dev->flags & ~(IFF_UP | IFF_PROMISC | IFF_ALLMULTI |
 					  IFF_MASTER | IFF_SLAVE);
@@ -564,6 +567,12 @@ static int vlan_dev_init(struct net_device *dev)
 			   NETIF_F_FRAGLIST | NETIF_F_GSO_SOFTWARE |
 			   NETIF_F_HIGHDMA | NETIF_F_SCTP_CRC |
 			   NETIF_F_ALL_FCOE;
+#ifdef CONFIG_XFRM_OFFLOAD
+	dev->hw_features |= real_dev->hw_features & (NETIF_F_HW_ESP |
+						     NETIF_F_HW_ESP_TX_CSUM |
+						     NETIF_F_GSO_ESP);
+	dev->xfrmdev_ops = &vlan_xfrmdev_ops;
+#endif
 
 	dev->features |= dev->hw_features | NETIF_F_LLTX;
 	dev->gso_max_size = real_dev->gso_max_size;
@@ -766,6 +775,95 @@ static int vlan_dev_get_iflink(const struct net_device *dev)
 
 	return real_dev->ifindex;
 }
+
+static int vlan_xdo_state_add(struct xfrm_state *xs)
+{
+	struct net_device *dev = xs->xso.dev;
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+	int ret;
+
+	/* swap out the vlan dev and put a hold on the real device */
+	xs->xso.dev = real_dev;
+	dev_hold(real_dev);
+
+	ret = real_dev->xfrmdev_ops->xdo_dev_state_add(xs);
+
+	/* if it wasn't successful, release the real_dev */
+	if (ret)
+		dev_put(real_dev);
+
+	/* put dev back before we leave */
+	xs->xso.dev = dev;
+
+	return ret;
+}
+
+static void vlan_xdo_state_delete(struct xfrm_state *xs)
+{
+	struct net_device *dev = xs->xso.dev;
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+
+	xs->xso.dev = real_dev;
+	real_dev->xfrmdev_ops->xdo_dev_state_delete(xs);
+	xs->xso.dev = dev;
+}
+
+static void vlan_xdo_state_free(struct xfrm_state *xs)
+{
+	struct net_device *dev = xs->xso.dev;
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+
+	/* check for optional interface */
+	if (real_dev->xfrmdev_ops->xdo_dev_state_free) {
+		xs->xso.dev = real_dev;
+		real_dev->xfrmdev_ops->xdo_dev_state_free(xs);
+		xs->xso.dev = dev;
+	}
+
+	/* let go of the real device, we're done with it */
+	dev_put(real_dev);
+}
+
+static bool vlan_xdo_offload_ok(struct sk_buff *skb, struct xfrm_state *xs)
+{
+	struct net_device *dev = xs->xso.dev;
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+	bool ret = true;
+
+	/* check for optional interface */
+	if (likely(real_dev->xfrmdev_ops->xdo_dev_offload_ok)) {
+		xs->xso.dev = real_dev;
+		ret = real_dev->xfrmdev_ops->xdo_dev_offload_ok(skb, xs);
+		xs->xso.dev = dev;
+	}
+
+	if (!ret)
+		netdev_err(dev, "%s: real_dev %s NAKd the offload\n",
+			   __func__, real_dev->name);
+
+	return ret;
+}
+
+static void vlan_xdo_advance_esn(struct xfrm_state *xs)
+{
+	struct net_device *dev = xs->xso.dev;
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+
+	/* check for optional interface */
+	if (real_dev->xfrmdev_ops->xdo_dev_state_advance_esn) {
+		xs->xso.dev = real_dev;
+		real_dev->xfrmdev_ops->xdo_dev_state_advance_esn(xs);
+		xs->xso.dev = dev;
+	}
+}
+
+static const struct xfrmdev_ops vlan_xfrmdev_ops = {
+	.xdo_dev_state_add = vlan_xdo_state_add,
+	.xdo_dev_state_delete = vlan_xdo_state_delete,
+	.xdo_dev_state_free = vlan_xdo_state_free,
+	.xdo_dev_offload_ok = vlan_xdo_offload_ok,
+	.xdo_dev_state_advance_esn = vlan_xdo_advance_esn,
+};
 
 static const struct ethtool_ops vlan_ethtool_ops = {
 	.get_link_ksettings	= vlan_ethtool_get_link_ksettings,
