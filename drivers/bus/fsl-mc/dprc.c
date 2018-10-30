@@ -461,8 +461,9 @@ int dprc_get_obj_region(struct fsl_mc_io *mc_io,
 
 	/* retrieve response parameters */
 	rsp_params = (struct dprc_rsp_get_obj_region *)cmd.params;
-	region_desc->base_offset = le64_to_cpu(rsp_params->base_addr);
+	region_desc->base_offset = le64_to_cpu(rsp_params->base_offset);
 	region_desc->size = le32_to_cpu(rsp_params->size);
+	region_desc->base_address = le64_to_cpu(rsp_params->base_addr);
 
 	return 0;
 }
