@@ -1901,7 +1901,8 @@ int usb_set_usb2_hardware_lpm(struct usb_device *udev, int enable)
 	struct usb_hcd *hcd = bus_to_hcd(udev->bus);
 	int ret = -EPERM;
 
-	if (enable && !udev->usb2_hw_lpm_allowed)
+	if (enable && !udev->usb2_hw_lpm_allowed ||
+	    udev->usb2_hw_lpm_enabled == enable)
 		return 0;
 
 	if (hcd->driver->set_usb2_hw_lpm) {
