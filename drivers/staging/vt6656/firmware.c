@@ -42,7 +42,7 @@ int vnt_download_firmware(struct vnt_private *priv)
 	if (rc) {
 		dev_err(dev, "firmware file %s request failed (%d)\n",
 			FIRMWARE_NAME, rc);
-			goto out;
+		goto out;
 	}
 
 	buffer = kmalloc(FIRMWARE_CHUNK_SIZE, GFP_KERNEL);
