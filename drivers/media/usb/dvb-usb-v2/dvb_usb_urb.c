@@ -28,11 +28,11 @@ static int dvb_usb_v2_generic_io(struct dvb_usb_device *d,
 
 	if (!wbuf || !wlen || !d->props->generic_bulk_ctrl_endpoint ||
 			!d->props->generic_bulk_ctrl_endpoint_response) {
-		dev_dbg(&d->udev->dev, "%s: failed=%d\n", __func__, -EINVAL);
+		dev_dbg(&d->udev->dev, "failed=%d\n", -EINVAL);
 		return -EINVAL;
 	}
 
-	dev_dbg(&d->udev->dev, "%s: >>> %*ph\n", __func__, wlen, wbuf);
+	dev_dbg(&d->udev->dev, ">>> %*ph\n", wlen, wbuf);
 
 	ret = usb_bulk_msg(d->udev, usb_sndbulkpipe(d->udev,
 			d->props->generic_bulk_ctrl_endpoint), wbuf, wlen,
@@ -58,8 +58,7 @@ static int dvb_usb_v2_generic_io(struct dvb_usb_device *d,
 					"%s: 2nd usb_bulk_msg() failed=%d\n",
 					KBUILD_MODNAME, ret);
 
-		dev_dbg(&d->udev->dev, "%s: <<< %*ph\n", __func__,
-				actual_length, rbuf);
+		dev_dbg(&d->udev->dev, "<<< %*ph\n", actual_length, rbuf);
 	}
 
 	return ret;
