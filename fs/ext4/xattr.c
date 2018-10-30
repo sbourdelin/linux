@@ -2303,9 +2303,11 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	};
 	struct ext4_xattr_ibody_find is = {
 		.s = { .not_found = -ENODATA, },
+		.iloc = { .bh = NULL, },
 	};
 	struct ext4_xattr_block_find bs = {
 		.s = { .not_found = -ENODATA, },
+		.bh = NULL,
 	};
 	int no_expand;
 	int error;
