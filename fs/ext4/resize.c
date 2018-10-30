@@ -871,7 +871,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	err = ext4_handle_dirty_metadata(handle, NULL, gdb_bh);
 	if (unlikely(err)) {
 		ext4_std_error(sb, err);
-		goto exit_inode;
+		goto exit_kfree;
 	}
 	brelse(dind);
 
@@ -891,8 +891,9 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	return err;
 
 exit_inode:
-	kvfree(n_group_desc);
 	brelse(iloc.bh);
+exit_kfree:
+	kvfree(n_group_desc);
 exit_dind:
 	brelse(dind);
 exit_bh:
