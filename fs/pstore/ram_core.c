@@ -495,15 +495,16 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 			pr_debug("found existing buffer, size %zu, start %zu\n",
 				 buffer_size(prz), buffer_start(prz));
 			persistent_ram_save_old(prz);
-			return 0;
+			if (!(prz->flags & PRZ_FLAG_ZAP_OLD))
+				return 0;
 		}
 	} else {
 		pr_debug("no valid data in buffer (sig = 0x%08x)\n",
 			 prz->buffer->sig);
+		prz->buffer->sig = sig;
 	}
 
 	/* Rewind missing or invalid memory area. */
-	prz->buffer->sig = sig;
 	persistent_ram_zap(prz);
 
 	return 0;
