@@ -2681,7 +2681,26 @@ static int mpage_prepare_extent_to_map(struct mpage_da_data *mpd)
 			if (mpd->map.m_len > 0 && mpd->next_page != page->index)
 				goto out;
 
-			lock_page(page);
+			if (!trylock_page(page)) {
+				/*
+				 * A rare race may happen between fault and
+				 * writeback,
+				 *
+				 * 1. fault may have raced in and locked this
+				 * page ahead of us, and if fault needs to
+				 * reclaim memory via shrink_page_list(), it may
+				 * also wait on the writeback pages we've
+				 * collected in our mpd->io_submit.
+				 *
+				 * 2. We have to submit mpd->io_submit->io_bio
+				 * to let memory reclaim make progress in order
+				 * to avoid the deadlock between fault and
+				 * ourselves(writeback).
+				 */
+				ext4_io_submit(&mpd->io_submit);
+				lock_page(page);
+			}
+
 			/*
 			 * If the page is no longer dirty, or its mapping no
 			 * longer corresponds to inode we are writing (which
