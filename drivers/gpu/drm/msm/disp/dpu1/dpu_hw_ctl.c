@@ -28,6 +28,7 @@
 #define   CTL_TOP                       0x014
 #define   CTL_FLUSH                     0x018
 #define   CTL_START                     0x01C
+#define   CTL_FLUSH_MASK                0x090
 #define   CTL_PREPARE                   0x0d0
 #define   CTL_SW_RESET                  0x030
 #define   CTL_LAYER_EXTN_OFFSET         0x40
@@ -121,6 +122,12 @@ static inline void dpu_hw_ctl_trigger_flush(struct dpu_hw_ctl *ctx)
 {
 	trace_dpu_hw_ctl_trigger_pending_flush(ctx->pending_flush_mask,
 				     dpu_hw_ctl_get_flush_register(ctx));
+
+	/*
+	 * Async updates could have changed CTL_FLUSH since it was last latched.
+	 * Mask anything not involved in this latest commit.
+	 */
+	DPU_REG_WRITE(&ctx->hw, CTL_FLUSH_MASK, ~ctx->pending_flush_mask);
 	DPU_REG_WRITE(&ctx->hw, CTL_FLUSH, ctx->pending_flush_mask);
 }
 
