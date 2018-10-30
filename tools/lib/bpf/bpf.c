@@ -26,6 +26,8 @@
 #include <unistd.h>
 #include <asm/unistd.h>
 #include <linux/bpf.h>
+#include <sys/resource.h>
+#include <sys/types.h>
 #include "bpf.h"
 #include "libbpf.h"
 #include <errno.h>
@@ -68,7 +70,10 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr,
 int bpf_create_map_xattr(const struct bpf_create_map_attr *create_attr)
 {
 	__u32 name_len = create_attr->name ? strlen(create_attr->name) : 0;
+	struct rlimit rinf = { RLIM_INFINITY, RLIM_INFINITY };
 	union bpf_attr attr;
+
+	setrlimit(RLIMIT_MEMLOCK, &rinf);
 
 	memset(&attr, '\0', sizeof(attr));
 
