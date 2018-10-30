@@ -1549,10 +1549,10 @@ out_check:
 
 	if (cur_offset <= end && cow_start == (u64)-1) {
 		cow_start = cur_offset;
-		cur_offset = end;
 	}
 
 	if (cow_start != (u64)-1) {
+		cur_offset = end;
 		ret = cow_file_range(inode, locked_page, cow_start, end, end,
 				     page_started, nr_written, 1, NULL);
 		if (ret)
