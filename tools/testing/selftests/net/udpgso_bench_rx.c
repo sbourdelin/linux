@@ -31,6 +31,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifdef SUPPORT_XDP
+#include "bpf/libbpf.h"
+#endif
+
 #ifndef UDP_GRO
 #define UDP_GRO		104
 #endif
@@ -40,6 +44,9 @@ static bool cfg_tcp;
 static bool cfg_verify;
 static bool cfg_read_all;
 static bool cfg_gro_segment;
+#ifdef SUPPORT_XDP
+static int cfg_xdp_iface;
+#endif
 
 static bool interrupted;
 static unsigned long packets, bytes;
@@ -202,14 +209,14 @@ static void do_flush_udp(int fd)
 
 static void usage(const char *filepath)
 {
-	error(1, 0, "Usage: %s [-Grtv] [-p port]", filepath);
+	error(1, 0, "Usage: %s [-Grtv] [-p port] [-x device]", filepath);
 }
 
 static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "Gp:rtv")) != -1) {
+	while ((c = getopt(argc, argv, "Gp:rtvx:")) != -1) {
 		switch (c) {
 		case 'G':
 			cfg_gro_segment = true;
@@ -227,6 +234,13 @@ static void parse_opts(int argc, char **argv)
 			cfg_verify = true;
 			cfg_read_all = true;
 			break;
+#ifdef SUPPORT_XDP
+		case 'x':
+			cfg_xdp_iface = if_nametoindex(optarg);
+			if (!cfg_xdp_iface)
+				error(1, errno, "unknown interface %s", optarg);
+			break;
+#endif
 		}
 	}
 
@@ -240,6 +254,9 @@ static void parse_opts(int argc, char **argv)
 static void do_recv(void)
 {
 	unsigned long tnow, treport;
+#ifdef SUPPORT_XDP
+	int prog_fd = -1;
+#endif
 	int fd;
 
 	fd = do_socket(cfg_tcp);
@@ -249,6 +266,22 @@ static void do_recv(void)
 		if (setsockopt(fd, IPPROTO_UDP, UDP_GRO, &val, sizeof(val)))
 			error(1, errno, "setsockopt UDP_GRO");
 	}
+
+#ifdef SUPPORT_XDP
+	if (cfg_xdp_iface) {
+		struct bpf_prog_load_attr prog_load_attr = {
+			.prog_type	= BPF_PROG_TYPE_XDP,
+			.file 		= "xdp_dummy.o",
+		};
+		struct bpf_object *obj;
+
+		if (bpf_prog_load_xattr(&prog_load_attr, &obj, &prog_fd))
+			error(1, errno, "xdp program load failed\n");
+
+		if (bpf_set_link_xdp_fd(cfg_xdp_iface, prog_fd, 0) < 0)
+			error(1, errno, "link set xdp fd failed\n");
+	}
+#endif
 
 	treport = gettimeofday_ms() + 1000;
 	do {
@@ -274,6 +307,10 @@ static void do_recv(void)
 
 	if (close(fd))
 		error(1, errno, "close");
+#ifdef SUPPORT_XDP
+	if (cfg_xdp_iface && bpf_set_link_xdp_fd(cfg_xdp_iface, -1, 0))
+		error(1, errno, "removing xdp program");
+#endif
 }
 
 int main(int argc, char **argv)
