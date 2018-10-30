@@ -1843,6 +1843,9 @@ EXPORT_SYMBOL(___pskb_trim);
  */
 int pskb_trim_rcsum_slow(struct sk_buff *skb, unsigned int len)
 {
+	__wsum old_csum = skb->csum;
+	int ret;
+
 	if (skb->ip_summed == CHECKSUM_COMPLETE) {
 		int delta = skb->len - len;
 
@@ -1850,7 +1853,10 @@ int pskb_trim_rcsum_slow(struct sk_buff *skb, unsigned int len)
 					   skb_checksum(skb, len, delta, 0),
 					   len);
 	}
-	return __pskb_trim(skb, len);
+	ret = __pskb_trim(skb, len);
+	if (unlikely(ret))
+		skb->csum = old_csum;
+	return ret;
 }
 EXPORT_SYMBOL(pskb_trim_rcsum_slow);
 
