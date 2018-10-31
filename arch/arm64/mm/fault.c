@@ -841,11 +841,9 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
 	int rv;
 
 	/*
-	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
-	 * already disabled to preserve the last enabled/disabled addresses.
+	 * Tell lockdep we disabled irqs in entry.S.
 	 */
-	if (interrupts_enabled(regs))
-		trace_hardirqs_off();
+	trace_hardirqs_off();
 
 	if (user_mode(regs) && instruction_pointer(regs) > TASK_SIZE)
 		arm64_apply_bp_hardening();
@@ -864,8 +862,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
 		rv = 0;
 	}
 
-	if (interrupts_enabled(regs))
-		trace_hardirqs_on();
+	trace_hardirqs_on();
 
 	return rv;
 }
