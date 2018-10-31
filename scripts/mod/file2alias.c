@@ -83,11 +83,7 @@ extern struct devtable *__start___devtable[], *__stop___devtable[];
 #endif /* __MACH__ */
 
 #if !defined(__used)
-# if __GNUC__ == 3 && __GNUC_MINOR__ < 3
-#  define __used			__attribute__((__unused__))
-# else
-#  define __used			__attribute__((__used__))
-# endif
+#define __used			__attribute__((__used__))
 #endif
 
 /* Define a variable f that holds the value of field f of struct devid
