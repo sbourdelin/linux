@@ -947,8 +947,25 @@ static inline int pi_test_sn(struct pi_desc *pi_desc)
 
 struct vmx_msrs {
 	unsigned int		nr;
-	struct vmx_msr_entry	val[NR_AUTOLOAD_MSRS];
+	struct vmx_msr_entry	*val;
 };
+struct kmem_cache *vmx_msr_entry_cache;
+
+/*
+ * To prevent vmx_msr_entry array from crossing a page boundary, require:
+ * sizeof(*vmx_msrs.vmx_msr_entry.val) to be a power of two. This is guaranteed
+ * through compile-time asserts that:
+ *   - NR_AUTOLOAD_MSRS * sizeof(struct vmx_msr_entry) is a power of two
+ *   - NR_AUTOLOAD_MSRS * sizeof(struct vmx_msr_entry) <= PAGE_SIZE
+ *   - The allocation of vmx_msrs.vmx_msr_entry.val is aligned to its size.
+ */
+#define CHECK_POWER_OF_TWO(val) \
+	BUILD_BUG_ON_MSG(!((val) && !((val) & ((val) - 1))), \
+	#val " is not a power of two.")
+#define CHECK_INTRA_PAGE(val) do { \
+		CHECK_POWER_OF_TWO(val); \
+		BUILD_BUG_ON(!(val <= PAGE_SIZE)); \
+	} while (0)
 
 struct vcpu_vmx {
 	struct kvm_vcpu       vcpu;
@@ -11007,6 +11024,19 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 		goto free_partial_vcpu;
 	}
 
+	vmx->msr_autoload.guest.val =
+		kmem_cache_zalloc(vmx_msr_entry_cache, GFP_KERNEL);
+	if (!vmx->msr_autoload.guest.val) {
+		err = -ENOMEM;
+		goto free_fpu;
+	}
+	vmx->msr_autoload.host.val =
+		kmem_cache_zalloc(vmx_msr_entry_cache, GFP_KERNEL);
+	if (!vmx->msr_autoload.host.val) {
+		err = -ENOMEM;
+		goto free_msr_autoload_guest;
+	}
+
 	vmx->vpid = allocate_vpid();
 
 	err = kvm_vcpu_init(&vmx->vcpu, kvm, id);
@@ -11094,6 +11124,10 @@ uninit_vcpu:
 	kvm_vcpu_uninit(&vmx->vcpu);
 free_vcpu:
 	free_vpid(vmx->vpid);
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.host.val);
+free_msr_autoload_guest:
+	kmem_cache_free(vmx_msr_entry_cache, vmx->msr_autoload.guest.val);
+free_fpu:
 	kmem_cache_free(x86_fpu_cache, vmx->vcpu.arch.guest_fpu);
 free_partial_vcpu:
 	kmem_cache_free(kvm_vcpu_cache, vmx);
@@ -14302,6 +14336,10 @@ module_exit(vmx_exit);
 static int __init vmx_init(void)
 {
 	int r;
+	size_t vmx_msr_entry_size =
+		sizeof(struct vmx_msr_entry) * NR_AUTOLOAD_MSRS;
+
+	CHECK_INTRA_PAGE(vmx_msr_entry_size);
 
 #if IS_ENABLED(CONFIG_HYPERV)
 	/*
@@ -14333,9 +14371,21 @@ static int __init vmx_init(void)
 #endif
 
 	r = kvm_init(&vmx_x86_ops, sizeof(struct vcpu_vmx),
-		     __alignof__(struct vcpu_vmx), THIS_MODULE);
+		__alignof__(struct vcpu_vmx), THIS_MODULE);
 	if (r)
 		return r;
+	/*
+	 * A vmx_msr_entry array resides exclusively within the kernel. Thus,
+	 * use kmem_cache_create_usercopy(), with the usersize argument set to
+	 * ZERO, to blacklist copying vmx_msr_entry to/from user space.
+	 */
+	vmx_msr_entry_cache =
+		kmem_cache_create_usercopy("vmx_msr_entry", vmx_msr_entry_size,
+				  vmx_msr_entry_size, SLAB_ACCOUNT, 0, 0, NULL);
+	if (!vmx_msr_entry_cache) {
+		r = -ENOMEM;
+		goto out;
+	}
 
 	/*
 	 * Must be called after kvm_init() so enable_ept is properly set
@@ -14359,5 +14409,8 @@ static int __init vmx_init(void)
 	vmx_check_vmcs12_offsets();
 
 	return 0;
+out:
+	kvm_exit();
+	return r;
 }
 module_init(vmx_init);
