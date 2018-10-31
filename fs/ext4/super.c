@@ -4100,7 +4100,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 			 le32_to_cpu(es->s_inodes_count),
 			 ((u64)sbi->s_groups_count * sbi->s_inodes_per_group));
 		ret = -EINVAL;
-		goto failed_mount;
+		db_count = 0;
+		goto failed_mount2;
 	}
 
 	bgl_lock_init(sbi->s_blockgroup_lock);
