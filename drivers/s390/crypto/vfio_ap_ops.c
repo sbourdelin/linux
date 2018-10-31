@@ -903,8 +903,12 @@ static int ap_ioctl_setirq(struct ap_matrix_mdev *matrix_mdev,
 	struct ap_status ap_status = reg2status(0);
 	unsigned long p;
 	int ret = -1;
-	int apqn;
+	int apqn, gal_isc;
 	uint32_t gd;
+
+	gal_isc = kvm_s390_gisc_register(matrix_mdev->kvm, matrix_mdev->gisc);
+	if (gal_isc < 0)
+		return -EIO;
 
 	apqn = (int)(parm->cmd & 0xffff);
 
@@ -912,7 +916,7 @@ static int ap_ioctl_setirq(struct ap_matrix_mdev *matrix_mdev,
 	if (gd & 0x01)
 		aqic_gisa.f = 1;
 	aqic_gisa.gisc = matrix_mdev->gisc;
-	aqic_gisa.isc = GAL_ISC;
+	aqic_gisa.isc = gal_isc;
 	aqic_gisa.ir = 1;
 	aqic_gisa.gisao = gisa->next_alert >> 4;
 
@@ -923,7 +927,11 @@ static int ap_ioctl_setirq(struct ap_matrix_mdev *matrix_mdev,
 	parm->status = ret;
 
 	ap_status = reg2status(ret);
-	return (ap_status.rc) ? -EIO : 0;
+	if (ap_status.rc) {
+		kvm_s390_gisc_unregister(matrix_mdev->kvm, matrix_mdev->gisc);
+		return -EIO;
+	}
+	return 0;
 }
 
 static int ap_ioctl_clrirq(struct ap_matrix_mdev *matrix_mdev,
@@ -946,6 +954,8 @@ static int ap_ioctl_clrirq(struct ap_matrix_mdev *matrix_mdev,
 	parm->status = retval;
 
 	ap_status = reg2status(retval);
+	/* unregister the IAM from the GIB anyway! */
+	kvm_s390_gisc_unregister(matrix_mdev->kvm, matrix_mdev->gisc);
 	return (ap_status.rc) ? -EIO : 0;
 }
 
