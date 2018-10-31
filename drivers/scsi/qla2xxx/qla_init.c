@@ -5526,7 +5526,8 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 		 * will be newer than discovery_gen. */
 		qlt_do_generation_tick(vha, &discovery_gen);
 
-		if (USE_ASYNC_SCAN(ha)) {
+		if (USE_ASYNC_SCAN(ha) && !(vha->flags.nvmet_enabled)) {
+		/* If NVME target mode is enabled, go through regular scan */
 			rval = qla24xx_async_gpnft(vha, FC4_TYPE_FCP_SCSI,
 			    NULL);
 			if (rval)
