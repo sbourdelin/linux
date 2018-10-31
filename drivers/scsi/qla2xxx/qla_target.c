@@ -445,6 +445,17 @@ static bool qlt_24xx_atio_pkt_all_vps(struct scsi_qla_host *vha,
 	return false;
 }
 
+int qlt_send_els_resp(srb_t *sp, void *pkt)
+{
+	return 0;
+}
+
+int
+qla_nvmet_ls(srb_t *sp, void *rsp_pkt)
+{
+	return 0;
+}
+
 void qlt_response_pkt_all_vps(struct scsi_qla_host *vha,
 	struct rsp_que *rsp, response_t *pkt)
 {

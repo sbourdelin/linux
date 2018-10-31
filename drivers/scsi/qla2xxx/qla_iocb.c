@@ -2113,7 +2113,7 @@ __qla2x00_alloc_iocbs(struct qla_qpair *qpair, srb_t *sp)
 	req_cnt = 1;
 	handle = 0;
 
-	if (sp && (sp->type != SRB_SCSI_CMD)) {
+	if (sp && (sp->type != SRB_SCSI_CMD) && (sp->type != SRB_NVMET_FCP)) {
 		/* Adjust entry-counts as needed. */
 		req_cnt = sp->iocbs;
 	}
@@ -3491,6 +3491,9 @@ qla2x00_start_sp(srb_t *sp)
 	case SRB_NVME_LS:
 		qla_nvme_ls(sp, pkt);
 		break;
+	case SRB_NVMET_LS:
+		qla_nvmet_ls(sp, pkt);
+		break;
 	case SRB_ABT_CMD:
 		IS_QLAFX00(ha) ?
 			qlafx00_abort_iocb(sp, pkt) :
@@ -3515,6 +3518,9 @@ qla2x00_start_sp(srb_t *sp)
 		break;
 	case SRB_PRLO_CMD:
 		qla24xx_prlo_iocb(sp, pkt);
+		break;
+	case SRB_NVME_ELS_RSP:
+		qlt_send_els_resp(sp, pkt);
 		break;
 	default:
 		break;

@@ -515,6 +515,9 @@ struct srb_iocb {
 #define SRB_PRLI_CMD	21
 #define SRB_CTRL_VP	22
 #define SRB_PRLO_CMD	23
+#define SRB_NVME_ELS_RSP 24
+#define SRB_NVMET_LS   25
+#define SRB_NVMET_FCP  26
 
 enum {
 	TYPE_SRB,

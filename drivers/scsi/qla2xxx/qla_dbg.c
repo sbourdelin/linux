@@ -67,6 +67,7 @@
  * | Target Mode Management	  |	  0xf09b       | 0xf002		|
  * |                              |                    | 0xf046-0xf049  |
  * | Target Mode Task Management  |	  0x1000d      |		|
+ * | NVME			  |	  0x11000      |		|
  * ----------------------------------------------------------------------
  */
 

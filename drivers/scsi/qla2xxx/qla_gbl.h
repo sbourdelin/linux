@@ -119,6 +119,13 @@ void qla_do_iidma_work(struct scsi_qla_host *vha, fc_port_t *fcport);
 int qla2x00_reserve_mgmt_server_loop_id(scsi_qla_host_t *);
 void qla_rscn_replay(fc_port_t *fcport);
 
+
+/*
+ * Used by FC-NVMe Target
+ */
+int qla_nvmet_ls(srb_t *sp, void *rsp_pkt);
+int qlt_send_els_resp(srb_t *sp, void *pkt);
+
 /*
  * Global Data in qla_os.c source file.
  */
