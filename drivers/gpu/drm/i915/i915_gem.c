@@ -2387,6 +2387,7 @@ i915_gem_object_put_pages_gtt(struct drm_i915_gem_object *obj,
 {
 	struct sgt_iter sgt_iter;
 	struct page *page;
+	struct address_space *mapping;
 
 	__i915_gem_object_release_shmem(obj, pages, true);
 
@@ -2395,12 +2396,19 @@ i915_gem_object_put_pages_gtt(struct drm_i915_gem_object *obj,
 	if (i915_gem_object_needs_bit17_swizzle(obj))
 		i915_gem_object_save_bit_17_swizzle(obj, pages);
 
+	mapping = file_inode(obj->base.filp)->i_mapping;
+	mapping_clear_unevictable(mapping);
+
 	for_each_sgt_page(page, sgt_iter, pages) {
 		if (obj->mm.dirty)
 			set_page_dirty(page);
 
 		if (obj->mm.madv == I915_MADV_WILLNEED)
 			mark_page_accessed(page);
+
+		lock_page(page);
+		check_move_lru_page(page);
+		unlock_page(page);
 
 		put_page(page);
 	}
@@ -2559,6 +2567,7 @@ rebuild_st:
 	 * Fail silently without starting the shrinker
 	 */
 	mapping = obj->base.filp->f_mapping;
+	mapping_set_unevictable(mapping);
 	noreclaim = mapping_gfp_constraint(mapping, ~__GFP_RECLAIM);
 	noreclaim |= __GFP_NORETRY | __GFP_NOWARN;
 
@@ -2630,6 +2639,10 @@ rebuild_st:
 		}
 		last_pfn = page_to_pfn(page);
 
+		lock_page(page);
+		check_move_lru_page(page);
+		unlock_page(page);
+
 		/* Check that the i965g/gm workaround works. */
 		WARN_ON((gfp & __GFP_DMA32) && (last_pfn >= 0x00100000UL));
 	}
@@ -2673,8 +2686,13 @@ rebuild_st:
 err_sg:
 	sg_mark_end(sg);
 err_pages:
-	for_each_sgt_page(page, sgt_iter, st)
+	mapping_clear_unevictable(mapping);
+	for_each_sgt_page(page, sgt_iter, st) {
+		lock_page(page);
+		check_move_lru_page(page);
+		unlock_page(page);
 		put_page(page);
+	}
 	sg_free_table(st);
 	kfree(st);
 

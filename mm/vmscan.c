@@ -4184,11 +4184,10 @@ int page_evictable(struct page *page)
 
 #ifdef CONFIG_SHMEM
 /**
- * check_move_unevictable_pages - check pages for evictability and move to appropriate zone lru list
+ * check_move_unevictable_pages - move evictable pages to appropriate evictable
+ * lru lists
  * @pages:	array of pages to check
  * @nr_pages:	number of pages to check
- *
- * Checks pages for evictability and moves them to the appropriate lru list.
  *
  * This function is only used for SysV IPC SHM_UNLOCK.
  */
@@ -4234,3 +4233,18 @@ void check_move_unevictable_pages(struct page **pages, int nr_pages)
 	}
 }
 #endif /* CONFIG_SHMEM */
+
+/**
+ * check_move_lru_page - check page for evictability and move it to
+ * appropriate zone lru list
+ * @page: page to be move to appropriate lru list
+ *
+ * If this function fails to isolate an unevictable page, vmscan will handle it
+ * when it attempts to reclaim the page.
+ */
+void check_move_lru_page(struct page *page)
+{
+	if (!isolate_lru_page(page))
+		putback_lru_page(page);
+}
+EXPORT_SYMBOL(check_move_lru_page);
