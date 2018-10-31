@@ -11,6 +11,7 @@
  */
 #include "resctrl.h"
 
+#define MB			(1024 * 1024)
 #define UNCORE_IMC		"uncore_imc"
 #define READ_FILE_NAME		"events/cas_count_read"
 #define WRITE_FILE_NAME		"events/cas_count_write"
@@ -428,4 +429,275 @@ static unsigned long get_mem_bw_resctrl(void)
 	fclose(fp);
 
 	return mbm_total;
+}
+
+pid_t bm_pid, ppid;
+
+static void ctrlc_handler(int signum, siginfo_t *info, void *ptr)
+{
+	kill(bm_pid, SIGKILL);
+	printf("Ending\n\n");
+
+	exit(EXIT_SUCCESS);
+}
+
+/*
+ * print_results_bw:	the memory bandwidth results are stored in a file
+ * @filename:		file that stores the results
+ * @bm_pid:		child pid that runs benchmark
+ * @bw_imc:		perf imc counter value
+ * @bw_resc:		memory bandwidth value
+ *
+ * Return:		0 on success. non-zero on failure.
+ */
+static int print_results_bw(char *filename,  int bm_pid, float bw_imc,
+			    unsigned long bw_resc)
+{
+	unsigned long diff = labs(bw_imc - bw_resc);
+	FILE *fp;
+
+	if (strcmp(filename, "stdio") == 0 || strcmp(filename, "stderr") == 0) {
+		printf("Pid: %d \t Mem_BW_iMC: %f \t ", bm_pid, bw_imc);
+		printf("Mem_BW_resc: %lu \t Difference: %lu\n", bw_resc, diff);
+	} else {
+		fp = fopen(filename, "a");
+		if (!fp) {
+			perror("Cannot open results file");
+
+			return errno;
+		}
+		if (fprintf(fp, "Pid: %d \t Mem_BW_iMC: %f \t Mem_BW_resc: %lu \t Difference: %lu\n",
+			    bm_pid, bw_imc, bw_resc, diff) <= 0) {
+			fclose(fp);
+			perror("Could not log results.");
+
+			return errno;
+		}
+		fclose(fp);
+	}
+
+	return 0;
+}
+
+static int
+measure_vals(struct resctrl_val_param *param, unsigned long *bw_resc_start)
+{
+	unsigned long bw_imc, bw_resc, bw_resc_end;
+	int ret;
+
+	/*
+	 * Measure memory bandwidth from resctrl and from
+	 * another source which is perf imc value or could
+	 * be something else if perf imc event is not available.
+	 * Compare the two values to validate resctrl value.
+	 * It takes 1sec to measure the data.
+	 */
+	bw_imc = get_mem_bw_imc(param->cpu_no, param->bw_report);
+	if (bw_imc < 0)
+		return bw_imc;
+
+	bw_resc_end = get_mem_bw_resctrl();
+	if (bw_resc_end < 0)
+		return bw_resc_end;
+
+	bw_resc = (bw_resc_end - *bw_resc_start) / MB;
+	ret = print_results_bw(param->filename, bm_pid, bw_imc, bw_resc);
+	if (ret)
+		return ret;
+
+	*bw_resc_start = bw_resc_end;
+
+	return 0;
+}
+
+/*
+ * membw_val:		execute benchmark and measure memory bandwidth on
+ *			the benchmark
+ * @benchmark_cmd:	benchmark command and its arguments
+ * @param:		parameters passed to membw_val()
+ *
+ * Return:		0 on success. non-zero on failure.
+ */
+int membw_val(char **benchmark_cmd, struct resctrl_val_param *param)
+{
+	int ret = 0, pipefd[2], pipe_message = 0;
+	char *resctrl_val = param->resctrl_val;
+	unsigned long bw_resc_start = 0;
+	struct sigaction sigact;
+	union sigval value;
+	FILE *fp;
+
+	if (strcmp(param->filename, "") == 0)
+		sprintf(param->filename, "stdio");
+
+	if (strcmp(param->bw_report, "") == 0)
+		param->bw_report = "total";
+
+	ret = validate_resctrl_feature_request(resctrl_val);
+	if (ret)
+		return ret;
+
+	if ((strcmp(resctrl_val, "mba")) == 0 ||
+	    (strcmp(resctrl_val, "mbm")) == 0) {
+		ret = validate_bw_report_request(param->bw_report);
+		if (ret)
+			return ret;
+	}
+
+	ret = remount_resctrlfs(param->mum_resctrlfs);
+	if (ret)
+		return ret;
+
+	/*
+	 * If benchmark wasn't successfully started by child, then child should
+	 * kill parent, so save parent's pid
+	 */
+	ppid = getpid();
+
+	/* File based synchronization between parent and child */
+	fp = fopen("sig", "w");
+	if (!fp) {
+		perror("Failed to open sig file");
+
+		return -1;
+	}
+	if (fprintf(fp, "%d\n", 0) <= 0) {
+		perror("Unable to establish sync bw parent & child");
+		fclose(fp);
+
+		return -1;
+	}
+	fclose(fp);
+
+	if (pipe(pipefd)) {
+		perror("Unable to create pipe");
+
+		return -1;
+	}
+
+	/*
+	 * Fork to start benchmark, save child's pid so that it can be killed
+	 * when needed
+	 */
+	bm_pid = fork();
+	if (bm_pid == -1) {
+		perror("Unable to fork");
+
+		return -1;
+	}
+
+	if (bm_pid == 0) {
+		/*
+		 * Mask all signals except SIGUSR1, parent uses SIGUSR1 to
+		 * start benchmark
+		 */
+		sigfillset(&sigact.sa_mask);
+		sigdelset(&sigact.sa_mask, SIGUSR1);
+
+		sigact.sa_sigaction = run_benchmark;
+		sigact.sa_flags = SA_SIGINFO;
+
+		/* Register for "SIGUSR1" signal from parent */
+		if (sigaction(SIGUSR1, &sigact, NULL))
+			PARENT_EXIT("Can't register child for signal");
+
+		/* Tell parent that child is ready */
+		close(pipefd[0]);
+		pipe_message = 1;
+		write(pipefd[1], &pipe_message, sizeof(pipe_message));
+		close(pipefd[1]);
+
+		/* Suspend child until delivery of "SIGUSR1" from parent */
+		sigsuspend(&sigact.sa_mask);
+
+		PARENT_EXIT("Child is done");
+	}
+
+	printf("Benchmark PID: %d\n", bm_pid);
+
+	/*
+	 * Register CTRL-C handler for parent, as it has to kill benchmark
+	 * before exiting
+	 */
+	sigact.sa_sigaction = ctrlc_handler;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = SA_SIGINFO;
+	if (sigaction(SIGINT, &sigact, NULL) ||
+	    sigaction(SIGHUP, &sigact, NULL)) {
+		perror("Can't register parent for CTRL-C handler");
+		ret = errno;
+		goto out;
+	}
+
+	value.sival_ptr = benchmark_cmd;
+
+	/* Taskset benchmark to specified cpu */
+	ret = taskset_benchmark(bm_pid, param->cpu_no);
+	if (ret)
+		goto out;
+
+	/* Write benchmark to specified control&monitoring grp in resctrl FS */
+	ret = write_bm_pid_to_resctrl(bm_pid, param->ctrlgrp, param->mongrp,
+				      resctrl_val);
+	if (ret)
+		goto out;
+
+	if ((strcmp(resctrl_val, "mbm") == 0) ||
+	    (strcmp(resctrl_val, "mba") == 0)) {
+		ret = initialize_mem_bw_imc();
+		if (ret)
+			goto out;
+
+		initialize_mem_bw_resctrl(param->ctrlgrp, param->mongrp,
+					  param->cpu_no, resctrl_val);
+	}
+
+	/* Parent waits for child to be ready. */
+	close(pipefd[1]);
+	while (pipe_message != 1)
+		read(pipefd[0], &pipe_message, sizeof(pipe_message));
+	close(pipefd[0]);
+
+	/* Signal child to start benchmark */
+	if (sigqueue(bm_pid, SIGUSR1, value) == -1) {
+		perror("Unable to signal child to start execution");
+		ret = errno;
+		goto out;
+	}
+
+	/* Give benchmark enough time to fully run */
+	sleep(1);
+
+	/* Test runs until the callback setup() tells the test to stop. */
+	while (1) {
+		if (strcmp(resctrl_val, "mbm") == 0) {
+			ret = param->setup(1, param);
+			if (ret) {
+				ret = 0;
+				break;
+			}
+
+			ret = measure_vals(param, &bw_resc_start);
+			if (ret)
+				break;
+		} else if ((strcmp(resctrl_val, "mba") == 0)) {
+			ret = param->setup(1, param);
+			if (ret) {
+				ret = 0;
+				break;
+			}
+
+			ret = measure_vals(param, &bw_resc_start);
+			if (ret)
+				break;
+		} else {
+			break;
+		}
+	}
+
+out:
+	kill(bm_pid, SIGKILL);
+	umount_resctrlfs();
+
+	return ret;
 }
