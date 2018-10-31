@@ -399,6 +399,20 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
 	return 0;
 }
 
+#if defined(CONFIG_THUMB2_KERNEL) && defined(CONFIG_KALLSYMS)
+void module_fixup_kallsyms(struct mod_kallsyms *kallsyms)
+{
+	int i;
+
+	for (i = 0; i < kallsyms->num_symtab; i++) {
+		Elf_Sym *sym = &kallsyms->symtab[i];
+
+		if (ELF_ST_TYPE(sym->st_info) == STT_FUNC)
+			sym->st_value &= ~1;
+	}
+}
+#endif
+
 void
 module_arch_cleanup(struct module *mod)
 {
