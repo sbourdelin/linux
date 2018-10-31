@@ -111,6 +111,7 @@ static struct buffer_head *__ext4_read_dirblock(struct inode *inode,
 	if (!bh) {
 		ext4_error_inode(inode, func, line, block,
 				 "Directory hole found");
+		brelse(bh);
 		return ERR_PTR(-EFSCORRUPTED);
 	}
 	dirent = (struct ext4_dir_entry *) bh->b_data;
