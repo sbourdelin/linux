@@ -3362,6 +3362,8 @@ static int rtnl_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 			continue;
 
 		if (idx > s_idx) {
+			if (cb->done)
+				cb->done(cb);
 			memset(&cb->args[0], 0, sizeof(cb->args));
 			cb->prev_seq = 0;
 			cb->seq = 0;
