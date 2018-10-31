@@ -40,6 +40,8 @@
 #include <linux/rcupdate.h>
 #include <linux/mutex.h>
 #include <linux/ftrace.h>
+#include <linux/stacktrace.h>
+#include <linux/perf_event.h>
 #include <asm/kprobes.h>
 
 #ifdef CONFIG_KPROBES
@@ -168,11 +170,18 @@ struct kretprobe {
 	raw_spinlock_t lock;
 };
 
+#define KRETPROBE_TRACE_SIZE 127
+struct kretprobe_trace {
+	int nr_entries;
+	unsigned long entries[KRETPROBE_TRACE_SIZE];
+};
+
 struct kretprobe_instance {
 	struct hlist_node hlist;
 	struct kretprobe *rp;
 	kprobe_opcode_t *ret_addr;
 	struct task_struct *task;
+	struct kretprobe_trace entry;
 	char data[0];
 };
 
@@ -370,6 +379,12 @@ int register_kretprobe(struct kretprobe *rp);
 void unregister_kretprobe(struct kretprobe *rp);
 int register_kretprobes(struct kretprobe **rps, int num);
 void unregister_kretprobes(struct kretprobe **rps, int num);
+
+struct kretprobe_instance *current_kretprobe_instance(void);
+void kretprobe_save_stack_trace(struct kretprobe_instance *ri,
+				struct stack_trace *trace);
+void kretprobe_perf_callchain_kernel(struct kretprobe_instance *ri,
+				     struct perf_callchain_entry_ctx *ctx);
 
 void kprobe_flush_task(struct task_struct *tk);
 void recycle_rp_inst(struct kretprobe_instance *ri, struct hlist_head *head);

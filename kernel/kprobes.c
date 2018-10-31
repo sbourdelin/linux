@@ -1206,6 +1206,16 @@ __releases(hlist_lock)
 }
 NOKPROBE_SYMBOL(kretprobe_table_unlock);
 
+static bool kretprobe_hash_is_locked(struct task_struct *tsk)
+{
+	unsigned long hash = hash_ptr(tsk, KPROBE_HASH_BITS);
+	raw_spinlock_t *hlist_lock;
+
+	hlist_lock = kretprobe_table_lock_ptr(hash);
+	return raw_spin_is_locked(hlist_lock);
+}
+NOKPROBE_SYMBOL(kretprobe_hash_is_locked);
+
 /*
  * This function is called from finish_task_switch when task tk becomes dead,
  * so that we can recycle any function-return probe instances associated
@@ -1800,6 +1810,13 @@ unsigned long __weak arch_deref_entry_point(void *entry)
 	return (unsigned long)entry;
 }
 
+static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs);
+
+static inline bool kprobe_is_retprobe(struct kprobe *kp)
+{
+	return kp->pre_handler == pre_handler_kretprobe;
+}
+
 #ifdef CONFIG_KRETPROBES
 /*
  * This kprobe pre_handler is registered with every kretprobe. When probe
@@ -1826,6 +1843,8 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 	hash = hash_ptr(current, KPROBE_HASH_BITS);
 	raw_spin_lock_irqsave(&rp->lock, flags);
 	if (!hlist_empty(&rp->free_instances)) {
+		struct stack_trace trace = {};
+
 		ri = hlist_entry(rp->free_instances.first,
 				struct kretprobe_instance, hlist);
 		hlist_del(&ri->hlist);
@@ -1833,6 +1852,11 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 
 		ri->rp = rp;
 		ri->task = current;
+
+		trace.entries = &ri->entry.entries[0];
+		trace.max_entries = KRETPROBE_TRACE_SIZE;
+		save_stack_trace_regs(regs, &trace);
+		ri->entry.nr_entries = trace.nr_entries;
 
 		if (rp->entry_handler && rp->entry_handler(ri, regs)) {
 			raw_spin_lock_irqsave(&rp->lock, flags);
@@ -1855,6 +1879,65 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 	return 0;
 }
 NOKPROBE_SYMBOL(pre_handler_kretprobe);
+
+/*
+ * Return the kretprobe_instance associated with the current_kprobe. Calling
+ * this is only reasonable from within a kretprobe handler context (otherwise
+ * return NULL).
+ *
+ * Must be called within a kretprobe_hash_lock(current, ...) context.
+ */
+struct kretprobe_instance *current_kretprobe_instance(void)
+{
+	struct kprobe *kp;
+	struct kretprobe *rp;
+	struct kretprobe_instance *ri;
+	struct hlist_head *head;
+	unsigned long hash = hash_ptr(current, KPROBE_HASH_BITS);
+
+	kp = kprobe_running();
+	if (!kp || !kprobe_is_retprobe(kp))
+		return NULL;
+	if (WARN_ON(!kretprobe_hash_is_locked(current)))
+		return NULL;
+
+	rp = container_of(kp, struct kretprobe, kp);
+	head = &kretprobe_inst_table[hash];
+
+	hlist_for_each_entry(ri, head, hlist) {
+		if (ri->task == current && ri->rp == rp)
+			return ri;
+	}
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(current_kretprobe_instance);
+NOKPROBE_SYMBOL(current_kretprobe_instance);
+
+void kretprobe_save_stack_trace(struct kretprobe_instance *ri,
+				struct stack_trace *trace)
+{
+	int i;
+	struct kretprobe_trace *krt = &ri->entry;
+
+	for (i = trace->skip; i < krt->nr_entries; i++) {
+		if (trace->nr_entries >= trace->max_entries)
+			break;
+		trace->entries[trace->nr_entries++] = krt->entries[i];
+	}
+}
+
+void kretprobe_perf_callchain_kernel(struct kretprobe_instance *ri,
+				     struct perf_callchain_entry_ctx *ctx)
+{
+	int i;
+	struct kretprobe_trace *krt = &ri->entry;
+
+	for (i = 0; i < krt->nr_entries; i++) {
+		if (krt->entries[i] == ULONG_MAX)
+			break;
+		perf_callchain_store(ctx, (u64) krt->entries[i]);
+	}
+}
 
 bool __weak arch_kprobe_on_func_entry(unsigned long offset)
 {
@@ -2005,6 +2088,22 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 }
 NOKPROBE_SYMBOL(pre_handler_kretprobe);
 
+struct kretprobe_instance *current_kretprobe_instance(void)
+{
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(current_kretprobe_instance);
+NOKPROBE_SYMBOL(current_kretprobe_instance);
+
+void kretprobe_save_stack_trace(struct kretprobe_instance *ri,
+				struct stack_trace *trace)
+{
+}
+
+void kretprobe_perf_callchain_kernel(struct kretprobe_instance *ri,
+				     struct perf_callchain_entry_ctx *ctx)
+{
+}
 #endif /* CONFIG_KRETPROBES */
 
 /* Set the kprobe gone and remove its instruction buffer. */
@@ -2241,7 +2340,7 @@ static void report_probe(struct seq_file *pi, struct kprobe *p,
 	char *kprobe_type;
 	void *addr = p->addr;
 
-	if (p->pre_handler == pre_handler_kretprobe)
+	if (kprobe_is_retprobe(p))
 		kprobe_type = "r";
 	else
 		kprobe_type = "k";
