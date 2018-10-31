@@ -45,6 +45,16 @@ config IMX_WEIM
 	  The WEIM(Wireless External Interface Module) works like a bus.
 	  You can attach many different devices on it, such as NOR, onenand.
 
+config HMS_ANYBUSS_HOST
+	tristate "HMS Anybus-S Host/Bus Driver"
+	select REGMAP
+	depends on OF
+	help
+	  Driver for the HMS Industrial Networks Anybus-S bus.
+	  You can attach Anybus-S compatible cards to it, which
+	  typically provide fieldbus and industrial ethernet
+	  functionality.
+
 config MIPS_CDMM
 	bool "MIPS Common Device Memory Map (CDMM) Driver"
 	depends on CPU_MIPSR2
