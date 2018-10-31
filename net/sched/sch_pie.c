@@ -57,6 +57,7 @@ struct pie_vars {
 	psched_time_t dq_tstamp;	/* drain rate */
 	u32 avg_dq_rate;	/* bytes per pschedtime tick,scaled */
 	u32 qlen_old;		/* in bytes */
+	bool active;		/* inactive/active */
 };
 
 /* statistics gathering */
@@ -94,6 +95,7 @@ static void pie_vars_init(struct pie_vars *vars)
 	vars->avg_dq_rate = 0;
 	/* default of 150 ms in pschedtime */
 	vars->burst_time = PSCHED_NS2TICKS(150 * NSEC_PER_MSEC);
+	vars->active = true;
 }
 
 static bool drop_early(struct Qdisc *sch, u32 packet_size)
@@ -141,12 +143,23 @@ static int pie_qdisc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	struct pie_sched_data *q = qdisc_priv(sch);
 	bool enqueue = false;
 
+	if (!q->vars.active && qdisc_qlen(sch) >= sch->limit / 3) {
+		/* If the queue occupancy is over 1/3 of the tail drop
+		 * threshold, turn on PIE.
+		 */
+		pie_vars_init(&q->vars);
+		q->vars.prob = 0;
+		q->vars.qdelay_old = 0;
+		q->vars.dq_count = 0;
+		q->vars.dq_tstamp = psched_get_time();
+	}
+
 	if (unlikely(qdisc_qlen(sch) >= sch->limit)) {
 		q->stats.overlimit++;
 		goto out;
 	}
 
-	if (!drop_early(sch, skb->len)) {
+	if (!q->vars.active || !drop_early(sch, skb->len)) {
 		enqueue = true;
 	} else if (q->params.ecn && (q->vars.prob <= MAX_PROB / 10) &&
 		   INET_ECN_set_ce(skb)) {
@@ -431,7 +444,7 @@ static void calculate_probability(struct Qdisc *sch)
 	q->vars.qdelay = qdelay;
 	q->vars.qlen_old = qlen;
 
-	/* We restart the measurement cycle if the following conditions are met
+	/* We turn off PIE if the following conditions are met
 	 * 1. If the delay has been low for 2 consecutive Tupdate periods
 	 * 2. Calculated drop probability is zero
 	 * 3. We have atleast one estimate for the avg_dq_rate ie.,
@@ -441,7 +454,7 @@ static void calculate_probability(struct Qdisc *sch)
 	    (q->vars.qdelay_old < q->params.target / 2) &&
 	    q->vars.prob == 0 &&
 	    q->vars.avg_dq_rate > 0)
-		pie_vars_init(&q->vars);
+		q->vars.active = false;
 }
 
 static void pie_timer(struct timer_list *t)
@@ -451,7 +464,8 @@ static void pie_timer(struct timer_list *t)
 	spinlock_t *root_lock = qdisc_lock(qdisc_root_sleeping(sch));
 
 	spin_lock(root_lock);
-	calculate_probability(sch);
+	if (q->vars.active)
+		calculate_probability(sch);
 
 	/* reset the timer to fire after 'tupdate'. tupdate is in jiffies. */
 	if (q->params.tupdate)
