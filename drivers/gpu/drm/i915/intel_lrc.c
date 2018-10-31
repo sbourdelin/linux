@@ -498,8 +498,10 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 	}
 
 	/* we need to manually load the submit queue */
-	if (execlists->ctrl_reg)
+	if (execlists->ctrl_reg) {
+		wmb(); /* XXX Big hammer or paper? XXX */
 		writel(EL_CTRL_LOAD, execlists->ctrl_reg);
+	}
 
 	execlists_clear_active(execlists, EXECLISTS_ACTIVE_HWACK);
 }
