@@ -13,6 +13,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/idr.h>
 #include <linux/of.h>
@@ -415,6 +416,19 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 EXPORT_SYMBOL(mmc_alloc_host);
 
+static void mmc_check_max_seg_size(struct mmc_host *host)
+{
+	unsigned int max_seg_size = dma_get_max_seg_size(mmc_dev(host));
+
+	if (host->max_seg_size <= max_seg_size)
+		return;
+
+	dev_info(mmc_dev(host), "Lowering max_seg_size for DMA: %u vs %u\n",
+		 host->max_seg_size, max_seg_size);
+
+	host->max_seg_size = max_seg_size;
+}
+
 /**
  *	mmc_add_host - initialise host hardware
  *	@host: mmc host
@@ -429,6 +443,8 @@ int mmc_add_host(struct mmc_host *host)
 
 	WARN_ON((host->caps & MMC_CAP_SDIO_IRQ) &&
 		!host->ops->enable_sdio_irq);
+
+	mmc_check_max_seg_size(host);
 
 	err = device_add(&host->class_dev);
 	if (err)
