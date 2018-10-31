@@ -120,8 +120,12 @@ void *dma_direct_alloc_pages(struct device *dev, size_t size,
 	gfp |= __dma_direct_optimal_gfp_mask(dev, dev->coherent_dma_mask,
 			&phys_mask);
 again:
-	/* CMA can be used only in the context which permits sleeping */
-	if (gfpflags_allow_blocking(gfp)) {
+	/*
+	 * CMA can be used only in the context which permits sleeping.
+	 * Since addresses within one PAGE are always contiguous, skip
+	 * CMA allocation for a single page to save CMA reserved space
+	 */
+	if (gfpflags_allow_blocking(gfp) && count > 1) {
 		page = dma_alloc_from_contiguous(dev, count, page_order,
 						 gfp & __GFP_NOWARN);
 		if (page && !dma_coherent_ok(dev, page_to_phys(page), size)) {
