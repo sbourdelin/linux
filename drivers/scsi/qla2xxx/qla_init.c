@@ -19,6 +19,7 @@
 
 #include <target/target_core_base.h>
 #include "qla_target.h"
+#include "qla_nvmet.h"
 
 /*
 *  QLogic ISP2x00 Hardware Support Function Prototypes.
@@ -1105,6 +1106,23 @@ int qla24xx_post_gpdb_work(struct scsi_qla_host *vha, fc_port_t *fcport, u8 opt)
 	e->u.fcport.fcport = fcport;
 	e->u.fcport.opt = opt;
 	fcport->flags |= FCF_ASYNC_ACTIVE;
+	return qla2x00_post_work(vha, e);
+}
+
+/* NVMET */
+int qla24xx_post_nvmet_newsess_work(struct scsi_qla_host *vha, port_id_t *id,
+	u8 *port_name, void *pla)
+{
+	struct qla_work_evt *e;
+
+	e = qla2x00_alloc_work(vha, QLA_EVT_NEW_NVMET_SESS);
+	if (!e)
+		return QLA_FUNCTION_FAILED;
+
+	e->u.new_sess.id = *id;
+	e->u.new_sess.pla = pla;
+	memcpy(e->u.new_sess.port_name, port_name, WWN_SIZE);
+
 	return qla2x00_post_work(vha, e);
 }
 
@@ -3594,6 +3612,13 @@ enable_82xx_npiv:
 					rval = qla2x00_get_fw_version(vha);
 				if (rval != QLA_SUCCESS)
 					goto failed;
+
+				if (vha->flags.nvmet_enabled) {
+					ql_log(ql_log_info, vha, 0xffff,
+					    "Enabling PUREX mode\n");
+					qla2x00_set_purex_mode(vha);
+				}
+
 				ha->flags.npiv_supported = 0;
 				if (IS_QLA2XXX_MIDTYPE(ha) &&
 					 (ha->fw_attributes & BIT_2)) {
@@ -3814,11 +3839,14 @@ qla24xx_update_fw_options(scsi_qla_host_t *vha)
 	/* Move PUREX, ABTS RX & RIDA to ATIOQ */
 	if (ql2xmvasynctoatio &&
 	    (IS_QLA83XX(ha) || IS_QLA27XX(ha))) {
-		if (qla_tgt_mode_enabled(vha) ||
-		    qla_dual_mode_enabled(vha))
+		if ((qla_tgt_mode_enabled(vha) || qla_dual_mode_enabled(vha)) &&
+		    qlt_op_target_mode) {
+			ql_log(ql_log_info, vha, 0xffff,
+			    "Moving Purex to ATIO Q\n");
 			ha->fw_options[2] |= BIT_11;
-		else
+		} else {
 			ha->fw_options[2] &= ~BIT_11;
+		}
 	}
 
 	if (IS_QLA25XX(ha) || IS_QLA83XX(ha) || IS_QLA27XX(ha)) {
@@ -5466,7 +5494,8 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 				    &vha->dpc_flags))
 					break;
 			}
-			if (vha->flags.nvme_enabled) {
+			if (vha->flags.nvme_enabled ||
+			    vha->flags.nvmet_enabled) {
 				if (qla2x00_rff_id(vha, FC_TYPE_NVME)) {
 					ql_dbg(ql_dbg_disc, vha, 0x2049,
 					    "Register NVME FC Type Features failed.\n");
@@ -5634,7 +5663,8 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha)
 
 				new_fcport->nvme_flag = 0;
 				new_fcport->fc4f_nvme = 0;
-				if (vha->flags.nvme_enabled &&
+				if ((vha->flags.nvme_enabled ||
+				    vha->flags.nvmet_enabled) &&
 				    swl[swl_idx].fc4f_nvme) {
 					new_fcport->fc4f_nvme =
 					    swl[swl_idx].fc4f_nvme;
@@ -8460,6 +8490,12 @@ qla81xx_update_fw_options(scsi_qla_host_t *vha)
 			ha->fw_options[2] |= BIT_11;
 		else
 			ha->fw_options[2] &= ~BIT_11;
+
+		if (ql2xnvmeenable == 2 && qlt_op_target_mode) {
+			/* Enabled PUREX node */
+			ha->fw_options[1] |= FO1_ENABLE_PUREX;
+			ha->fw_options[2] |= BIT_11;
+		}
 	}
 
 	if (qla_tgt_mode_enabled(vha) ||

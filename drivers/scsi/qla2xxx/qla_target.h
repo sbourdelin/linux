@@ -322,6 +322,67 @@ struct atio7_fcp_cmnd {
 	/* uint32_t data_length; */
 } __packed;
 
+struct fc_nvme_hdr {
+	union {
+		struct {
+			uint8_t scsi_id;
+#define NVMEFC_CMD_IU_SCSI_ID   0xfd
+			uint8_t fc_id;
+#define NVMEFC_CMD_IU_FC_ID     0x28
+		};
+		struct {
+			uint16_t scsi_fc_id;
+#define NVMEFC_CMD_IU_SCSI_FC_ID  0x28fd
+		};
+	};
+	uint16_t iu_len;
+	uint8_t rsv1[3];
+	uint8_t flags;
+#define NVMEFC_CMD_WRITE        0x1
+#define NVMEFC_CMD_READ         0x2
+	uint64_t conn_id;
+	uint32_t        csn;
+	uint32_t        dl;
+} __packed;
+
+struct atio7_nvme_cmnd {
+	struct fc_nvme_hdr fcnvme_hdr;
+
+	struct nvme_command nvme_cmd;
+	uint32_t        rsv2[2];
+} __packed;
+
+#define ATIO_PURLS	0x56
+struct pt_ls4_rx_unsol {
+	uint8_t entry_type; /* 0x56 */
+	uint8_t entry_count;
+	uint16_t rsvd0;
+	uint16_t rsvd1;
+	uint8_t vp_index;
+	uint8_t rsvd2;
+	uint16_t rsvd3;
+	uint16_t nport_handle;
+	uint16_t frame_size;
+	uint16_t rsvd4;
+	uint32_t exchange_address;
+	uint8_t d_id[3];
+	uint8_t r_ctl;
+	uint8_t s_id[3];
+	uint8_t cs_ctl;
+	uint8_t f_ctl[3];
+	uint8_t type;
+	uint16_t seq_cnt;
+	uint8_t df_ctl;
+	uint8_t seq_id;
+	uint16_t rx_id;
+	uint16_t ox_id;
+	uint32_t param;
+	uint32_t desc0;
+#define PT_LS4_PAYLOAD_OFFSET 0x2c
+#define PT_LS4_FIRST_PACKET_LEN 20
+	uint32_t desc_len;
+	uint32_t payload[3];
+};
 /*
  * ISP queue -	Accept Target I/O (ATIO) type entry IOCB structure.
  *		This is sent from the ISP to the target driver.
@@ -368,6 +429,21 @@ struct atio_from_isp {
 			uint32_t signature;
 #define ATIO_PROCESSED 0xDEADDEAD		/* Signature */
 		} raw;
+		/* FC-NVME */
+		struct {
+			uint8_t  entry_type;	/* Entry type. */
+			uint8_t  entry_count;	/* Entry count. */
+			uint8_t  fcp_cmnd_len_low;
+			uint8_t  fcp_cmnd_len_high:4;
+			uint8_t  attr:4;
+			uint32_t exchange_addr;
+#define ATIO_NVME_ATIO_CMD_OFF 32
+#define ATIO_NVME_FIRST_PACKET_CMDLEN (64 - ATIO_NVME_ATIO_CMD_OFF)
+			struct fcp_hdr fcp_hdr;
+			struct fc_nvme_hdr fcnvme_hdr;
+			uint8_t	nvmd_cmd[8];
+		} nvme_isp27;
+		struct pt_ls4_rx_unsol pt_ls4;
 	} u;
 } __packed;
 
@@ -836,6 +912,8 @@ struct qla_tgt {
 	int modify_lun_expected;
 	atomic_t tgt_global_resets_count;
 	struct list_head tgt_list_entry;
+	dma_addr_t nvme_els_rsp;
+	void *nvme_els_ptr;
 };
 
 struct qla_tgt_sess_op {
@@ -846,6 +924,16 @@ struct qla_tgt_sess_op {
 	struct list_head cmd_list;
 	bool aborted;
 	struct rsp_que *rsp;
+};
+
+/* NVMET */
+struct qla_tgt_purex_op {
+	struct scsi_qla_host *vha;
+	struct atio_from_isp atio;
+	uint8_t *purex_pyld;
+	uint16_t purex_pyld_len;
+	struct work_struct work;
+	struct list_head cmd_list;
 };
 
 enum trace_flags {
@@ -1112,4 +1200,6 @@ void qlt_send_resp_ctio(struct qla_qpair *, struct qla_tgt_cmd *, uint8_t,
 extern void qlt_abort_cmd_on_host_reset(struct scsi_qla_host *,
     struct qla_tgt_cmd *);
 
+/* 0 for FCP and 1 for NVMET */
+extern int qlt_op_target_mode;
 #endif /* __QLA_TARGET_H */

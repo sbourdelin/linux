@@ -61,6 +61,7 @@ static struct rom_cmd {
 	{ MBC_READ_SFP },
 	{ MBC_GET_RNID_PARAMS },
 	{ MBC_GET_SET_ZIO_THRESHOLD },
+	{ MBC_SET_RNID_PARAMS },
 };
 
 static int is_rom_cmd(uint16_t cmd)
@@ -1109,12 +1110,15 @@ qla2x00_get_fw_version(scsi_qla_host_t *vha)
 		 * FW supports nvme and driver load parameter requested nvme.
 		 * BIT 26 of fw_attributes indicates NVMe support.
 		 */
-		if ((ha->fw_attributes_h & 0x400) && ql2xnvmeenable) {
+		if ((ha->fw_attributes_h & 0x400) && (ql2xnvmeenable == 1)) {
 			vha->flags.nvme_enabled = 1;
 			ql_log(ql_log_info, vha, 0xd302,
 			    "%s: FC-NVMe is Enabled (0x%x)\n",
 			     __func__, ha->fw_attributes_h);
 		}
+
+		if ((ha->fw_attributes_h & 0x400) && (ql2xnvmeenable == 2))
+			vha->flags.nvmet_enabled = 1;
 	}
 
 	if (IS_QLA27XX(ha)) {
@@ -1185,6 +1189,101 @@ qla2x00_get_fw_options(scsi_qla_host_t *vha, uint16_t *fwopts)
 		ql_dbg(ql_dbg_mbx + ql_dbg_verbose, vha, 0x102e,
 		    "Done %s.\n", __func__);
 	}
+
+	return rval;
+}
+
+#define OPCODE_PLOGI_TMPLT 7
+int
+qla2x00_get_plogi_template(scsi_qla_host_t *vha, dma_addr_t buf,
+	uint16_t length)
+{
+	mbx_cmd_t mc;
+	mbx_cmd_t *mcp = &mc;
+	int rval;
+
+	mcp->mb[0] = MBC_GET_RNID_PARAMS;
+	mcp->mb[1] = OPCODE_PLOGI_TMPLT << 8;
+	mcp->mb[2] = MSW(LSD(buf));
+	mcp->mb[3] = LSW(LSD(buf));
+	mcp->mb[6] = MSW(MSD(buf));
+	mcp->mb[7] = LSW(MSD(buf));
+	mcp->mb[8] = length;
+	mcp->out_mb = MBX_8|MBX_7|MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_1|MBX_0;
+	mcp->buf_size = length;
+	mcp->flags = MBX_DMA_IN;
+	mcp->tov = MBX_TOV_SECONDS;
+	rval = qla2x00_mailbox_command(vha, mcp);
+
+	ql_dbg(ql_dbg_mbx, vha, 0x118f,
+	    "%s: %s rval=%x mb[0]=%x,%x.\n", __func__,
+	    (rval == QLA_SUCCESS) ? "Success" : "Failed",
+	    rval, mcp->mb[0], mcp->mb[1]);
+
+	return rval;
+}
+
+#define        OPCODE_LIST_LENGTH      32       /* ELS opcode list */
+#define        OPCODE_ELS_CMD          5        /* MBx1 cmd param */
+/*
+ * qla2x00_set_purex_mode
+ *	Enable purex mode for ELS commands
+ *
+ * Input:
+ *	vha = adapter block pointer.
+ *
+ * Returns:
+ *	qla2x00 local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+qla2x00_set_purex_mode(scsi_qla_host_t *vha)
+{
+	int rval;
+	mbx_cmd_t mc;
+	mbx_cmd_t *mcp = &mc;
+	uint8_t *els_cmd_map;
+	dma_addr_t els_cmd_map_dma;
+	struct qla_hw_data *ha = vha->hw;
+
+	ql_dbg(ql_dbg_mbx + ql_dbg_verbose, vha, 0x1197,
+	    "Entered %s.\n", __func__);
+
+	els_cmd_map = dma_zalloc_coherent(&ha->pdev->dev, OPCODE_LIST_LENGTH,
+	    &els_cmd_map_dma, GFP_KERNEL);
+	if (!els_cmd_map) {
+		ql_log(ql_log_warn, vha, 0x7101,
+		    "Failed to allocate RDP els command param.\n");
+		return QLA_MEMORY_ALLOC_FAILED;
+	}
+
+	els_cmd_map[0] = 0x28; /* enable PLOGI and LOGO ELS */
+	els_cmd_map[4] = 0x13; /* enable PRLI ELS */
+	els_cmd_map[10] = 0x5;
+
+	mcp->mb[0] = MBC_SET_RNID_PARAMS;
+	mcp->mb[1] = OPCODE_ELS_CMD << 8;
+	mcp->mb[2] = MSW(LSD(els_cmd_map_dma));
+	mcp->mb[3] = LSW(LSD(els_cmd_map_dma));
+	mcp->mb[6] = MSW(MSD(els_cmd_map_dma));
+	mcp->mb[7] = LSW(MSD(els_cmd_map_dma));
+	mcp->out_mb = MBX_7|MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_1|MBX_0;
+	mcp->tov = MBX_TOV_SECONDS;
+	mcp->flags = MBX_DMA_OUT;
+	mcp->buf_size = OPCODE_LIST_LENGTH;
+	rval = qla2x00_mailbox_command(vha, mcp);
+
+	ql_dbg(ql_dbg_mbx, vha, 0x118d,
+	    "%s: %s rval=%x mb[0]=%x,%x.\n", __func__,
+	    (rval == QLA_SUCCESS) ? "Success" : "Failed",
+	    rval, mcp->mb[0], mcp->mb[1]);
+
+	dma_free_coherent(&ha->pdev->dev, OPCODE_LIST_LENGTH,
+	   els_cmd_map, els_cmd_map_dma);
 
 	return rval;
 }

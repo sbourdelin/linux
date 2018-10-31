@@ -23,6 +23,8 @@ static void qla2x00_status_cont_entry(struct rsp_que *, sts_cont_entry_t *);
 static int qla2x00_error_entry(scsi_qla_host_t *, struct rsp_que *,
 	sts_entry_t *);
 
+extern struct workqueue_struct *qla_nvmet_comp_wq;
+
 /**
  * qla2100_intr_handler() - Process interrupts for the ISP2100 and ISP2200.
  * @irq: interrupt number
@@ -1583,6 +1585,12 @@ qla24xx_els_ct_entry(scsi_qla_host_t *vha, struct req_que *req,
 			sp->name);
 		sp->done(sp, res);
 		return;
+	case SRB_NVME_ELS_RSP:
+		type = "nvme els";
+		ql_log(ql_log_info, vha, 0xffff,
+			"Completing %s: (%p) type=%d.\n", type, sp, sp->type);
+		sp->done(sp, 0);
+		return;
 	default:
 		ql_dbg(ql_dbg_user, vha, 0x503e,
 		    "Unrecognized SRB: (%p) type=%d.\n", sp, sp->type);
@@ -2456,6 +2464,13 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 		return;
 	}
 
+	if (sp->type == SRB_NVMET_LS) {
+		ql_log(ql_log_info, vha, 0xffff,
+			"Dump NVME-LS response pkt\n");
+		ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+			(uint8_t *)pkt, 64);
+	}
+
 	if (unlikely((state_flags & BIT_1) && (sp->type == SRB_BIDI_CMD))) {
 		qla25xx_process_bidir_status_iocb(vha, pkt, req, handle);
 		return;
@@ -2825,6 +2840,12 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 	    "iocb type %xh with error status %xh, handle %xh, rspq id %d\n",
 	    pkt->entry_type, pkt->entry_status, pkt->handle, rsp->id);
 
+	ql_log(ql_log_info, vha, 0xffff,
+		"(%s-%d)Dumping the NVMET-ERROR pkt IOCB\n",
+		__func__, __LINE__);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)pkt, 64);
+
 	if (que >= ha->max_req_queues || !ha->req_q_map[que])
 		goto fatal;
 
@@ -2918,6 +2939,23 @@ qla24xx_abort_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	sp->done(sp, 0);
 }
 
+/*
+ * Post a completion to the NVMET layer
+ */
+
+static void qla_nvmet_comp_work(struct work_struct *work)
+{
+	srb_t *sp = container_of(work, srb_t, nvmet_comp_work);
+
+	sp->done(sp, sp->comp_status);
+}
+
+/**
+ * qla24xx_nvme_ls4_iocb() - Process LS4 completions
+ * @vha: SCSI driver HA context
+ * @pkt: LS4 req packet
+ * @req: Request Queue
+ */
 void qla24xx_nvme_ls4_iocb(struct scsi_qla_host *vha,
     struct pt_ls4_request *pkt, struct req_que *req)
 {
@@ -2929,10 +2967,77 @@ void qla24xx_nvme_ls4_iocb(struct scsi_qla_host *vha,
 	if (!sp)
 		return;
 
+	ql_log(ql_log_info, vha, 0xc01f,
+		"Dumping response pkt for SRB type: %#x\n", sp->type);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)pkt, 16);
+
 	comp_status = le16_to_cpu(pkt->status);
-	sp->done(sp, comp_status);
+	sp->comp_status = comp_status;
+	/* Queue the work item */
+	INIT_WORK(&sp->nvmet_comp_work, qla_nvmet_comp_work);
+	queue_work(qla_nvmet_comp_wq, &sp->nvmet_comp_work);
 }
 
+/**
+ * qla24xx_nvmet_fcp_iocb() - Process FCP completions
+ * @vha: SCSI driver HA context
+ * @pkt: FCP completion from firmware
+ * @req: Request Queue
+ */
+static void qla24xx_nvmet_fcp_iocb(struct scsi_qla_host *vha,
+	struct ctio_nvme_from_27xx *pkt, struct req_que *req)
+{
+	srb_t *sp;
+	const char func[] = "NVMET_FCP_IOCB";
+	uint16_t comp_status;
+
+	sp = qla2x00_get_sp_from_handle(vha, func, req, pkt);
+	if (!sp)
+		return;
+
+	if ((pkt->entry_status) || (pkt->status != 1)) {
+		ql_log(ql_log_info, vha, 0xc01f,
+			"Dumping response pkt for SRB type: %#x\n", sp->type);
+		ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+			(uint8_t *)pkt, 16);
+	}
+
+	comp_status = le16_to_cpu(pkt->status);
+	sp->comp_status = comp_status;
+	/* Queue the work item */
+	INIT_WORK(&sp->nvmet_comp_work, qla_nvmet_comp_work);
+	queue_work(qla_nvmet_comp_wq, &sp->nvmet_comp_work);
+}
+
+/**
+ * qla24xx_nvmet_abts_resp_iocb() - Process ABTS completions
+ * @vha: SCSI driver HA context
+ * @pkt: ABTS completion from firmware
+ * @req: Request Queue
+ */
+void qla24xx_nvmet_abts_resp_iocb(struct scsi_qla_host *vha,
+	struct abts_resp_to_24xx *pkt, struct req_que *req)
+{
+	srb_t *sp;
+	const char func[] = "NVMET_ABTS_RESP_IOCB";
+	uint16_t comp_status;
+
+	sp = qla2x00_get_sp_from_handle(vha, func, req, pkt);
+	if (!sp)
+		return;
+
+	ql_log(ql_log_info, vha, 0xc01f,
+		"Dumping response pkt for SRB type: %#x\n", sp->type);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)pkt, 16);
+
+	comp_status = le16_to_cpu(pkt->entry_status);
+	sp->comp_status = comp_status;
+	/* Queue the work item */
+	INIT_WORK(&sp->nvmet_comp_work, qla_nvmet_comp_work);
+	queue_work(qla_nvmet_comp_wq, &sp->nvmet_comp_work);
+}
 /**
  * qla24xx_process_response_queue() - Process response queue entries.
  * @vha: SCSI driver HA context
@@ -3009,6 +3114,11 @@ process_err:
 			break;
 		case PT_LS4_REQUEST:
 			qla24xx_nvme_ls4_iocb(vha, (struct pt_ls4_request *)pkt,
+			    rsp->req);
+			break;
+		case CTIO_NVME:
+			qla24xx_nvmet_fcp_iocb(vha,
+			    (struct ctio_nvme_from_27xx *)pkt,
 			    rsp->req);
 			break;
 		case NOTIFY_ACK_TYPE:

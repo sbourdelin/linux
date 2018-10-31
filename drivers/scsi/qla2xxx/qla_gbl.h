@@ -123,8 +123,19 @@ void qla_rscn_replay(fc_port_t *fcport);
 /*
  * Used by FC-NVMe Target
  */
-int qla_nvmet_ls(srb_t *sp, void *rsp_pkt);
-int qlt_send_els_resp(srb_t *sp, void *pkt);
+extern int qla_nvmet_ls(srb_t *sp, void *rsp_pkt);
+extern int qla2x00_get_plogi_template(scsi_qla_host_t *vha, dma_addr_t buf,
+	uint16_t length);
+extern void qlt_dequeue_purex(struct scsi_qla_host *vha);
+int qla24xx_post_nvmet_newsess_work(struct scsi_qla_host *vha, port_id_t *id,
+	u8 *port_name, void *pla);
+int qlt_send_els_resp(srb_t *sp, struct __els_pt *pkt);
+extern void nvmet_release_sessions(struct scsi_qla_host *vha);
+struct fc_port *qla_nvmet_find_sess_by_s_id(scsi_qla_host_t *vha,
+	const uint32_t s_id);
+void qla_nvme_cmpl_io(struct srb_iocb *);
+void qla24xx_nvmet_abts_resp_iocb(struct scsi_qla_host *vha,
+	struct abts_resp_to_24xx *pkt, struct req_que *req);
 
 /*
  * Global Data in qla_os.c source file.
@@ -320,7 +331,10 @@ extern int
 qla2x00_set_fw_options(scsi_qla_host_t *, uint16_t *);
 
 extern int
-qla2x00_mbx_reg_test(scsi_qla_host_t *);
+qla2x00_set_purex_mode(scsi_qla_host_t *vha);
+
+extern int
+qla2x00_mbx_reg_test(scsi_qla_host_t *vha);
 
 extern int
 qla2x00_verify_checksum(scsi_qla_host_t *, uint32_t);
@@ -905,5 +919,4 @@ void qlt_update_host_map(struct scsi_qla_host *, port_id_t);
 void qlt_remove_target_resources(struct qla_hw_data *);
 void qlt_clr_qp_table(struct scsi_qla_host *vha);
 void qlt_set_mode(struct scsi_qla_host *);
-
 #endif /* _QLA_GBL_H */
