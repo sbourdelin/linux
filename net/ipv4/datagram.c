@@ -78,6 +78,7 @@ int __ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 	inet->inet_id = jiffies;
 
 	sk_dst_set(sk, &rt->dst);
+	sock_reset_flag(sk, SOCK_DELAYED_BIND);
 	err = 0;
 out:
 	return err;

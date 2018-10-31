@@ -408,6 +408,9 @@ static int compute_score(struct sock *sk, struct net *net,
 			score += 4;
 	}
 
+	if (sock_flag(sk, SOCK_DELAYED_BIND))
+		return -1;
+
 	if (sk->sk_incoming_cpu == raw_smp_processor_id())
 		score++;
 	return score;
