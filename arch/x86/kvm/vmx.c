@@ -9365,7 +9365,7 @@ static int nested_vmx_handle_enlightened_vmptrld(struct kvm_vcpu *vcpu,
 
 		vmx->nested.hv_evmcs = kmap(vmx->nested.hv_evmcs_page);
 
-		if (vmx->nested.hv_evmcs->revision_id != VMCS12_REVISION) {
+		if (vmx->nested.hv_evmcs->revision_id != KVM_EVMCS_VERSION) {
 			nested_release_evmcs(vcpu);
 			return 0;
 		}
