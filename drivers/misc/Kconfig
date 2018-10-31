@@ -509,6 +509,15 @@ config PCI_ENDPOINT_TEST
            Enable this configuration option to enable the host side test driver
            for PCI Endpoint.
 
+config ARCX_ANYBUS_BRIDGE
+	tristate "Arcx Anybus-S Bridge"
+	depends on OF
+	help
+	  Select this to get support for the Arcx Anybus bridge.
+	  It connects to the SoC via a parallel memory bus, and
+	  embeds up to two Anybus-S application connectors (slots).
+	  There is also a CAN power readout, unrelated to the Anybus.
+
 config MISC_RTSX
 	tristate
 	default MISC_RTSX_PCI || MISC_RTSX_USB
