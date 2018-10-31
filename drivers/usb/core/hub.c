@@ -3523,7 +3523,8 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 		hub_port_logical_disconnect(hub, port1);
 	} else  {
 		/* Try to enable USB2 hardware LPM */
-		if (udev->usb2_hw_lpm_capable == 1)
+		if (udev->usb2_hw_lpm_capable == 1 &&
+		    !udev->usb2_hw_lpm_enabled)
 			usb_set_usb2_hardware_lpm(udev, 1);
 
 		/* Try to enable USB3 LTM */
