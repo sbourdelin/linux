@@ -886,9 +886,8 @@ static unsigned int tegra_dma_update_residual(struct tegra_dma_channel *tdc,
 	}
 
 done:	
-	dev_dbg(tdc2dev(tdc), "residual: req %08lx, ahb@%08lx, wcount %08lx, done %d\n",
-		 sg_req->ch_regs.ahb_ptr, ahbptr, wcount, done);
-
+	trace_tegra_dma_tx_state(&tdc->dma_chan, ahbptr, status, result,
+				 tmp, residual);
 	return result;
 }
 
