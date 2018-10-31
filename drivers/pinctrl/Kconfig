@@ -338,6 +338,19 @@ config PINCTRL_OCELOT
 	select GENERIC_PINMUX_FUNCTIONS
 	select REGMAP_MMIO
 
+config PINCTRL_UPBOARD
+	tristate "UP Squared pinctrl and GPIO driver"
+	depends on ACPI
+	depends on MFD_UPBOARD
+	select PINMUX
+	help
+	  Pinctrl driver for the pin headers on the UP Squared board. It
+	  handles pin control for lines routed through the on-board FPGA and
+	  propagates changes to the SoC pinctrl to keep them in sync.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called pinctrl-upboard.
+
 source "drivers/pinctrl/actions/Kconfig"
 source "drivers/pinctrl/aspeed/Kconfig"
 source "drivers/pinctrl/bcm/Kconfig"
