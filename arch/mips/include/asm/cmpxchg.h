@@ -206,6 +206,9 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
 #ifndef CONFIG_SMP
 #define cmpxchg64(ptr, o, n) cmpxchg64_local((ptr), (o), (n))
+#else
+extern u64 __cmpxchg_u64(u64 *p, u64 old, u64 new);
+#define cmpxchg64(ptr, o, n) __cmpxchg_u64((ptr), (o), (n))
 #endif
 #endif
 

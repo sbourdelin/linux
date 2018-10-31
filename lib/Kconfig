@@ -500,6 +500,9 @@ config NLATTR
 config GENERIC_ATOMIC64
        bool
 
+config GENERIC_CMPXCHG64
+	bool
+
 config LRU_CACHE
 	tristate
 

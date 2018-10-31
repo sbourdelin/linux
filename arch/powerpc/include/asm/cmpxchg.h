@@ -534,8 +534,11 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
 	cmpxchg_acquire((ptr), (o), (n));				\
 })
 #else
+extern u64 __cmpxchg_u64(u64 *p, u64 old, u64 new);
+
 #include <asm-generic/cmpxchg-local.h>
 #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
+#define cmpxchg64(ptr, o, n) __cmpxchg_u64((ptr), (o), (n))
 #endif
 
 #endif /* __KERNEL__ */
