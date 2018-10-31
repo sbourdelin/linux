@@ -1047,6 +1047,23 @@ set_rcvbuf:
 		}
 		break;
 
+	case SO_DELAYED_BIND:
+		if (sk->sk_family == PF_INET || sk->sk_family == PF_INET6) {
+			if (sk->sk_protocol != IPPROTO_UDP)
+				ret = -ENOTSUPP;
+		} else {
+			ret = -ENOTSUPP;
+		}
+
+		if (!ret) {
+			if (val < 0 || val > 1)
+				ret = -EINVAL;
+			else
+				sock_valbool_flag(sk, SOCK_DELAYED_BIND, valbool);
+		}
+
+		break;
+
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1389,6 +1406,10 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				  SOF_TXTIME_DEADLINE_MODE : 0;
 		v.txtime.flags |= sk->sk_txtime_report_errors ?
 				  SOF_TXTIME_REPORT_ERRORS : 0;
+		break;
+
+	case SO_DELAYED_BIND:
+		v.val = sock_flag(sk, SOCK_DELAYED_BIND);
 		break;
 
 	default:
