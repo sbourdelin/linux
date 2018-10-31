@@ -343,10 +343,30 @@ static void calculate_probability(struct Qdisc *sch)
 	 * appropriately 2) scaling down by 16 to come to 0-2 range.
 	 * Please see paper for details.
 	 *
-	 * We scale alpha and beta differently depending on whether we are in
-	 * light, medium or high dropping mode.
+	 * We scale alpha and beta differently depending on how heavy the
+	 * congestion is.
 	 */
-	if (q->vars.prob < MAX_PROB / 100) {
+	if (q->vars.prob < MAX_PROB / 1000000) {
+		alpha =
+		    (q->params.alpha * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 15;
+		beta =
+		    (q->params.beta * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 15;
+	} else if (q->vars.prob < MAX_PROB / 100000) {
+		alpha =
+		    (q->params.alpha * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 13;
+		beta =
+		    (q->params.beta * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 13;
+	} else if (q->vars.prob < MAX_PROB / 10000) {
+		alpha =
+		    (q->params.alpha * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 11;
+		beta =
+		    (q->params.beta * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 11;
+	} else if (q->vars.prob < MAX_PROB / 1000) {
+		alpha =
+		    (q->params.alpha * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 9;
+		beta =
+		    (q->params.beta * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 9;
+	} else if (q->vars.prob < MAX_PROB / 100) {
 		alpha =
 		    (q->params.alpha * (MAX_PROB / PSCHED_TICKS_PER_SEC)) >> 7;
 		beta =
