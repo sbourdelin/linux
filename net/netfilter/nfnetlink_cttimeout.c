@@ -384,6 +384,7 @@ cttimeout_default_fill_info(struct net *net, struct sk_buff *skb, u32 portid,
 			    u32 seq, u32 type, int event, u16 l3num,
 			    const struct nf_conntrack_l4proto *l4proto)
 {
+	unsigned int *timeouts;
 	struct nlmsghdr *nlh;
 	struct nfgenmsg *nfmsg;
 	unsigned int flags = portid ? NLM_F_MULTI : 0;
@@ -408,7 +409,34 @@ cttimeout_default_fill_info(struct net *net, struct sk_buff *skb, u32 portid,
 	if (!nest_parms)
 		goto nla_put_failure;
 
-	ret = l4proto->ctnl_timeout.obj_to_nlattr(skb, NULL);
+	switch (l4proto->l4proto) {
+	case IPPROTO_ICMP:
+		timeouts = &nf_icmp_pernet(net)->timeout;
+		break;
+	case IPPROTO_TCP:
+		timeouts = nf_tcp_pernet(net)->timeouts;
+		break;
+	case IPPROTO_UDP:
+		timeouts = nf_udp_pernet(net)->timeouts;
+		break;
+	case IPPROTO_DCCP:
+		timeouts = nf_dccp_pernet(net)->dccp_timeout;
+		break;
+	case IPPROTO_ICMPV6:
+		timeouts = &nf_icmpv6_pernet(net)->timeout;
+		break;
+	case IPPROTO_SCTP:
+		timeouts = nf_sctp_pernet(net)->timeouts;
+		break;
+	case 255:
+		timeouts = &nf_generic_pernet(net)->timeout;
+		break;
+	default:
+		WARN_ON_ONCE(1);
+		goto nla_put_failure;
+	}
+
+	ret = l4proto->ctnl_timeout.obj_to_nlattr(skb, timeouts);
 	if (ret < 0)
 		goto nla_put_failure;
 
