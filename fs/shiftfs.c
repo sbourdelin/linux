@@ -266,6 +266,33 @@ static int shiftfs_xattr_set(const struct xattr_handler *handler,
 	return shiftfs_setxattr(dentry, inode, name, value, size, flags);
 }
 
+static kuid_t shift_kuid(struct user_namespace *from, struct user_namespace *to,
+			 kuid_t kuid)
+{
+	uid_t uid = from_kuid(from, kuid);
+	return make_kuid(to, uid);
+}
+
+static kgid_t shift_kgid(struct user_namespace *from, struct user_namespace *to,
+			 kgid_t kgid)
+{
+	gid_t gid = from_kgid(from, kgid);
+	return make_kgid(to, gid);
+}
+
+static void shiftfs_copyattr(struct inode *from, struct inode *to)
+{
+	struct user_namespace *from_ns = from->i_sb->s_user_ns;
+	struct user_namespace *to_ns = to->i_sb->s_user_ns;
+
+	to->i_uid = shift_kuid(from_ns, to_ns, from->i_uid);
+	to->i_gid = shift_kgid(from_ns, to_ns, from->i_gid);
+	to->i_mode = from->i_mode;
+	to->i_atime = from->i_atime;
+	to->i_mtime = from->i_mtime;
+	to->i_ctime = from->i_ctime;
+}
+
 static void shiftfs_fill_inode(struct inode *inode, struct dentry *dentry)
 {
 	struct inode *reali;
@@ -278,6 +305,7 @@ static void shiftfs_fill_inode(struct inode *inode, struct dentry *dentry)
 	if (!reali->i_op->get_link)
 		inode->i_opflags |= IOP_NOFOLLOW;
 
+	shiftfs_copyattr(reali, inode);
 	inode->i_mapping = reali->i_mapping;
 	inode->i_private = reali;
 	set_nlink(inode, reali->i_nlink);
@@ -573,7 +601,7 @@ static int shiftfs_setattr(struct dentry *dentry, struct iattr *attr)
 		return err;
 
 	/* all OK, reflect the change on our inode */
-	setattr_copy(d_inode(dentry), attr);
+	shiftfs_copyattr(reali, d_inode(dentry));
 	return 0;
 }
 
