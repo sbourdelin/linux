@@ -613,6 +613,8 @@ static int shiftfs_getattr(const struct path *path, struct kstat *stat,
 	struct inode *reali = real->d_inode;
 	const struct inode_operations *iop = reali->i_op;
 	struct path newpath = { .mnt = path->dentry->d_sb->s_fs_info, .dentry = real };
+	struct user_namespace *from_ns = reali->i_sb->s_user_ns;
+	struct user_namespace *to_ns = inode->i_sb->s_user_ns;
 	int err = 0;
 
 	if (iop->getattr)
@@ -624,8 +626,8 @@ static int shiftfs_getattr(const struct path *path, struct kstat *stat,
 		return err;
 
 	/* transform the underlying id */
-	stat->uid = make_kuid(inode->i_sb->s_user_ns, __kuid_val(stat->uid));
-	stat->gid = make_kgid(inode->i_sb->s_user_ns, __kgid_val(stat->gid));
+	stat->uid = shift_kuid(from_ns, to_ns, stat->uid);
+	stat->gid = shift_kgid(from_ns, to_ns, stat->gid);
 	return 0;
 }
 
