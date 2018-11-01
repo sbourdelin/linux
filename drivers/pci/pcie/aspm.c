@@ -268,6 +268,15 @@ static void pcie_aspm_configure_common_clock(struct pcie_link_state *link)
 	/* Retrain link */
 	reg16 |= PCI_EXP_LNKCTL_RL;
 	pcie_capability_write_word(parent, PCI_EXP_LNKCTL, reg16);
+	if (0x12d8 == parent->vendor && 0xe111 == parent->device) {
+		/*
+		 * Due to an erratum in the Pericom PI7C9X111SLB bridge in
+		 * reverse mode the retrain link bit needs to be cleared
+		 * again manually to allow the link training to succeed.
+		 */
+		reg16 &= ~PCI_EXP_LNKCTL_RL;
+		pcie_capability_write_word(parent, PCI_EXP_LNKCTL, reg16);
+	}
 
 	/* Wait for link training end. Break out after waiting for timeout */
 	start_jiffies = jiffies;
