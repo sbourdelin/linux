@@ -667,6 +667,16 @@ static void __init smp_build_mpidr_hash(void)
 }
 #endif
 
+void panic_smp_self_stop(void)
+{
+	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has paniced\n",
+			smp_processor_id());
+	set_cpu_online(smp_processor_id(), false);
+	while (1)
+		cpu_relax();
+
+}
+
 static void __init setup_processor(void)
 {
 	struct proc_info_list *list;
