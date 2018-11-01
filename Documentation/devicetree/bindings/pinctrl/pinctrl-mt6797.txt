@@ -1,0 +1,74 @@
+* Mediatek MT6797 Pin Controller
+
+The Mediatek's MT6797 Pin controller is used to control SoC pins.
+
+Required properties:
+- compatible: Value should be one of the following.
+              "mediatek,mt6797-pinctrl", compatible with mt6797 pinctrl.
+- reg:        Should contain address and size for gpio, iocfgl, iocfgb,
+              iocfgr and iocfgt register bases.
+- reg-names:  An array of strings describing the "reg" entries. Must
+              contain "gpio", "iocfgl", "iocfgb", "iocfgr", "iocfgt".
+- gpio-controller: Marks the device node as a gpio controller.
+- #gpio-cells: Should be two. The first cell is the gpio pin number
+               and the second cell is used for optional parameters.
+
+Optional properties:
+- interrupt-controller: Marks the device node as an interrupt controller.
+- #interrupt-cells: Should be two.
+- interrupts : The interrupt outputs from the controller.
+
+Please refer to pinctrl-bindings.txt in this directory for details of the
+common pinctrl bindings used by client devices.
+
+Subnode format
+A pinctrl node should contain at least one subnodes representing the
+pinctrl groups available on the machine. Each subnode will list the
+pins it needs, and how they should be configured, with regard to muxer
+configuration, pullups, drive strength, input enable/disable and input schmitt.
+
+    node {
+        pinmux = <PIN_NUMBER_PINMUX>;
+        GENERIC_PINCONFIG;
+    };
+
+Required properties:
+- pinmux: Integer array, represents gpio pin number and mux setting.
+          Supported pin number and mux varies for different SoCs, and are
+          defined as macros in dt-bindings/pinctrl/<soc>-pinfunc.h directly.
+
+Optional properties:
+- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
+    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
+    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+
+    Some special pins have extra pull up strength, there are R0 and R1 pull-up
+    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
+    So when config bias-pull-up, it support arguments for those special pins.
+    Some macros have been defined for this usage, such as MTK_PUPD_SET_R1R0_00.
+    See dt-bindings/pinctrl/mt65xx.h.
+
+    When config drive-strength, it can support some arguments, such as
+    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
+
+Examples:
+
+        pio: pinctrl@10005000 {
+                compatible = "mediatek,mt6797-pinctrl";
+                reg = <0 0x10005000 0 0x1000>,
+                      <0 0x10002000 0 0x400>,
+                      <0 0x10002400 0 0x400>,
+                      <0 0x10002800 0 0x400>,
+                      <0 0x10002C00 0 0x400>;
+                reg-names = "gpio", "iocfgl", "iocfgb",
+                            "iocfgr", "iocfgt";
+                gpio-controller;
+                #gpio-cells = <2>;
+
+                uart1_pins_a: uart1 {
+                        pins1 {
+                                pinmux = <MT6797_GPIO232__FUNC_URXD1>,
+                                         <MT6797_GPIO233__FUNC_UTXD1>;
+                        };
+                };
+        };
