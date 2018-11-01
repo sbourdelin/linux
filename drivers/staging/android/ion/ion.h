@@ -44,6 +44,11 @@ struct ion_platform_heap {
 	void *priv;
 };
 
+struct ion_vma_list {
+	struct list_head list;
+	struct vm_area_struct *vma;
+};
+
 /**
  * struct ion_buffer - metadata for a particular buffer
  * @ref:		reference count
@@ -59,6 +64,7 @@ struct ion_platform_heap {
  * @kmap_cnt:		number of times the buffer is mapped to the kernel
  * @vaddr:		the kernel mapping if kmap_cnt is not zero
  * @sg_table:		the sg table for the buffer if dmap_cnt is not zero
+ * @vmas:		list of vma's mapping for uncached buffer
  */
 struct ion_buffer {
 	union {
@@ -76,6 +82,9 @@ struct ion_buffer {
 	void *vaddr;
 	struct sg_table *sg_table;
 	struct list_head attachments;
+	struct list_head vmas;
+	struct page **pages;
+	bool uncached_clean;
 };
 
 void ion_buffer_destroy(struct ion_buffer *buffer);
