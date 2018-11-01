@@ -3893,12 +3893,12 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
 	of_clk_del_provider(*(struct device_node **)res);
 }
 
-int devm_of_clk_add_hw_provider(struct device *dev,
+static int __devm_of_clk_add_hw_provider(struct device *dev,
 			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
 					      void *data),
-			void *data)
+			struct device_node *of_node, void *data)
 {
-	struct device_node **ptr, *np;
+	struct device_node **ptr;
 	int ret;
 
 	ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
@@ -3906,10 +3906,9 @@ int devm_of_clk_add_hw_provider(struct device *dev,
 	if (!ptr)
 		return -ENOMEM;
 
-	np = dev->of_node;
-	ret = of_clk_add_hw_provider(np, get, data);
+	*ptr = of_node;
+	ret = of_clk_add_hw_provider(of_node, get, data);
 	if (!ret) {
-		*ptr = np;
 		devres_add(dev, ptr);
 	} else {
 		devres_free(ptr);
@@ -3917,7 +3916,24 @@ int devm_of_clk_add_hw_provider(struct device *dev,
 
 	return ret;
 }
+int devm_of_clk_add_hw_provider(struct device *dev,
+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+					      void *data),
+			void *data)
+{
+	return __devm_of_clk_add_hw_provider(dev, get, dev->of_node, data);
+}
 EXPORT_SYMBOL_GPL(devm_of_clk_add_hw_provider);
+
+int devm_of_clk_add_parent_hw_provider(struct device *dev,
+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+					      void *data),
+			void *data)
+{
+	return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
+					     data);
+}
+EXPORT_SYMBOL_GPL(devm_of_clk_add_parent_hw_provider);
 
 /**
  * of_clk_del_provider() - Remove a previously registered clock provider
