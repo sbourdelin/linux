@@ -753,11 +753,7 @@ static int dpu_encoder_resource_control(struct drm_encoder *drm_enc,
 	is_vid_mode = dpu_enc->disp_info.capabilities &
 						MSM_DISPLAY_CAP_VID_MODE;
 
-	if (drm_enc->crtc->index >= ARRAY_SIZE(priv->disp_thread)) {
-		DPU_ERROR("invalid crtc index\n");
-		return -EINVAL;
-	}
-	disp_thread = &priv->disp_thread[drm_enc->crtc->index];
+	disp_thread = &priv->disp_thread;
 
 	/*
 	 * when idle_pc is not supported, process only KICKOFF, STOP and MODESET

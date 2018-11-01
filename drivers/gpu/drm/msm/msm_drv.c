@@ -257,8 +257,7 @@ static int vblank_ctrl_queue_work(struct msm_drm_private *priv,
 	list_add_tail(&vbl_ev->node, &vbl_ctrl->event_list);
 	spin_unlock_irqrestore(&vbl_ctrl->lock, flags);
 
-	kthread_queue_work(&priv->disp_thread[crtc_id].worker,
-			&vbl_ctrl->work);
+	kthread_queue_work(&priv->disp_thread.worker, &vbl_ctrl->work);
 
 	return 0;
 }
@@ -284,14 +283,12 @@ static int msm_drm_uninit(struct device *dev)
 		kfree(vbl_ev);
 	}
 
+	kthread_flush_worker(&priv->disp_thread.worker);
+	kthread_stop(priv->disp_thread.thread);
+	priv->disp_thread.thread = NULL;
+
 	/* clean up display commit/event worker threads */
 	for (i = 0; i < priv->num_crtcs; i++) {
-		if (priv->disp_thread[i].thread) {
-			kthread_flush_worker(&priv->disp_thread[i].worker);
-			kthread_stop(priv->disp_thread[i].thread);
-			priv->disp_thread[i].thread = NULL;
-		}
-
 		if (priv->event_thread[i].thread) {
 			kthread_flush_worker(&priv->event_thread[i].worker);
 			kthread_stop(priv->event_thread[i].thread);
@@ -537,6 +534,22 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	ddev->mode_config.funcs = &mode_config_funcs;
 	ddev->mode_config.helper_private = &mode_config_helper_funcs;
 
+	/* initialize display thread */
+	kthread_init_worker(&priv->disp_thread.worker);
+	priv->disp_thread.dev = ddev;
+	priv->disp_thread.thread = kthread_run(kthread_worker_fn,
+					       &priv->disp_thread.worker,
+					       "disp_thread");
+	if (IS_ERR(priv->disp_thread.thread)) {
+		DRM_DEV_ERROR(dev, "failed to create crtc_commit kthread\n");
+		priv->disp_thread.thread = NULL;
+		goto err_msm_uninit;
+	}
+
+	ret = sched_setscheduler(priv->disp_thread.thread, SCHED_FIFO, &param);
+	if (ret)
+		pr_warn("display thread priority update failed: %d\n", ret);
+
 	/**
 	 * this priority was found during empiric testing to have appropriate
 	 * realtime scheduling to process display updates and interact with
@@ -544,27 +557,6 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	 */
 	param.sched_priority = 16;
 	for (i = 0; i < priv->num_crtcs; i++) {
-
-		/* initialize display thread */
-		priv->disp_thread[i].crtc_id = priv->crtcs[i]->base.id;
-		kthread_init_worker(&priv->disp_thread[i].worker);
-		priv->disp_thread[i].dev = ddev;
-		priv->disp_thread[i].thread =
-			kthread_run(kthread_worker_fn,
-				&priv->disp_thread[i].worker,
-				"crtc_commit:%d", priv->disp_thread[i].crtc_id);
-		if (IS_ERR(priv->disp_thread[i].thread)) {
-			DRM_DEV_ERROR(dev, "failed to create crtc_commit kthread\n");
-			priv->disp_thread[i].thread = NULL;
-			goto err_msm_uninit;
-		}
-
-		ret = sched_setscheduler(priv->disp_thread[i].thread,
-					 SCHED_FIFO, &param);
-		if (ret)
-			dev_warn(dev, "disp_thread set priority failed: %d\n",
-				 ret);
-
 		/* initialize event thread */
 		priv->event_thread[i].crtc_id = priv->crtcs[i]->base.id;
 		kthread_init_worker(&priv->event_thread[i].worker);
