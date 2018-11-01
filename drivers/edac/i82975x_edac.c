@@ -375,7 +375,6 @@ static void i82975x_init_csrows(struct mem_ctl_info *mci,
 	u32 cumul_size, nr_pages;
 	int index, chan;
 	struct dimm_info *dimm;
-	enum dev_type dtype;
 
 	last_cumul_size = 0;
 
@@ -413,7 +412,6 @@ static void i82975x_init_csrows(struct mem_ctl_info *mci,
 		 *   [0-7] for single-channel; i.e. csrow->nr_channels = 1
 		 *   [0-3] for dual-channel; i.e. csrow->nr_channels = 2
 		 */
-		dtype = i82975x_dram_type(mch_window, index);
 		for (chan = 0; chan < csrow->nr_channels; chan++) {
 			dimm = mci->csrows[index]->channels[chan]->dimm;
 
