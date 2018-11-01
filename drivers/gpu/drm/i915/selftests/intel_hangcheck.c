@@ -1473,6 +1473,93 @@ err_unlock:
 	return err;
 }
 
+static void __preempt_begin(void)
+{
+	preempt_disable();
+}
+
+static void __preempt_end(void)
+{
+	preempt_enable();
+}
+
+static void __softirq_begin(void)
+{
+	local_bh_disable();
+}
+
+static void __softirq_end(void)
+{
+	local_bh_enable();
+}
+
+static void __hardirq_begin(void)
+{
+	local_irq_disable();
+}
+
+static void __hardirq_end(void)
+{
+	local_irq_enable();
+}
+
+static int igt_atomic_reset(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	int err = 0;
+
+	/* Check that the resets are usable from atomic context */
+
+	global_reset_lock(i915);
+	mutex_lock(&i915->drm.struct_mutex);
+
+	if (intel_has_reset_engine(i915)) {
+		struct intel_engine_cs *engine;
+		enum intel_engine_id id;
+
+		for_each_engine(engine, i915, id) {
+			static const struct {
+				const char *name;
+				void (*critical_section_begin)(void);
+				void (*critical_section_end)(void);
+			} phases[] = {
+				{ "preempt", __preempt_begin, __preempt_end },
+				{ "softirq", __softirq_begin, __softirq_end },
+				{ "hardirq", __hardirq_begin, __hardirq_end },
+				{ }
+			};
+			struct tasklet_struct * const t =
+				&engine->execlists.tasklet;
+			const typeof(*phases) *p;
+
+			for (p = phases; p->name; p++) {
+				GEM_TRACE("i915_reset_engine(%s) under %s\n",
+					  engine->name, p->name);
+
+				tasklet_disable_nosync(t);
+				p->critical_section_begin();
+
+				err = i915_reset_engine(engine, NULL);
+
+				p->critical_section_end();
+				tasklet_enable(t);
+
+				if (err) {
+					pr_err("i915_reset_engine(%s) failed under %s\n",
+					       engine->name, p->name);
+					goto out;
+				}
+			}
+		}
+	}
+
+out:
+	mutex_unlock(&i915->drm.struct_mutex);
+	global_reset_unlock(i915);
+
+	return err;
+}
+
 int intel_hangcheck_live_selftests(struct drm_i915_private *i915)
 {
 	static const struct i915_subtest tests[] = {
@@ -1487,6 +1574,7 @@ int intel_hangcheck_live_selftests(struct drm_i915_private *i915)
 		SUBTEST(igt_reset_evict_ppgtt),
 		SUBTEST(igt_reset_evict_fence),
 		SUBTEST(igt_handle_error),
+		SUBTEST(igt_atomic_reset),
 	};
 	bool saved_hangcheck;
 	int err;
