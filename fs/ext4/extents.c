@@ -1812,6 +1812,7 @@ static void ext4_ext_try_to_merge_up(handle_t *handle,
 	size_t s;
 	unsigned max_root = ext4_ext_space_root(inode, 0);
 	ext4_fsblk_t blk;
+	int credits = 2;
 
 	if ((path[0].p_depth != 1) ||
 	    (le16_to_cpu(path[0].p_hdr->eh_entries) != 1) ||
@@ -1820,10 +1821,12 @@ static void ext4_ext_try_to_merge_up(handle_t *handle,
 
 	/*
 	 * We need to modify the block allocation bitmap and the block
-	 * group descriptor to release the extent tree block.  If we
+	 * group descriptor to release the extent tree block.  If
+	 * quota is enabled, updates on quota are also needed.  If we
 	 * can't get the journal credits, give up.
 	 */
-	if (ext4_journal_extend(handle, 2))
+	credits += EXT4_MAXQUOTAS_TRANS_BLOCKS(inode->i_sb);
+	if (ext4_journal_extend(handle, credits))
 		return;
 
 	/*
