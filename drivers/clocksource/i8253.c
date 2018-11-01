@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/i8253.h>
 #include <linux/smp.h>
+#include <linux/hypervisor.h>
 
 /*
  * Protects access to I/O ports
@@ -109,8 +110,17 @@ static int pit_shutdown(struct clock_event_device *evt)
 	raw_spin_lock(&i8253_lock);
 
 	outb_p(0x30, PIT_MODE);
-	outb_p(0, PIT_CH0);
-	outb_p(0, PIT_CH0);
+
+	/*
+	 * A quirk in Hyper-V's emulation of the PIT causes the PIT
+	 * to continue to run and interrupt @18.2 Hz when the counter
+	 * register is set to zero. So skip setting the counter
+	 * register when running as a guest on Hyper-V.
+	 */
+	if (!hypervisor_is_mshyperv()) {
+		outb_p(0, PIT_CH0);
+		outb_p(0, PIT_CH0);
+	}
 
 	raw_spin_unlock(&i8253_lock);
 	return 0;
