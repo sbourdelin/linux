@@ -13,6 +13,8 @@
 #include <linux/user_namespace.h>
 #include <linux/uidgid.h>
 #include <linux/xattr.h>
+#include <linux/posix_acl.h>
+#include <linux/posix_acl_xattr.h>
 
 struct shiftfs_super_info {
 	struct vfsmount *mnt;
@@ -631,6 +633,183 @@ static int shiftfs_getattr(const struct path *path, struct kstat *stat,
 	return 0;
 }
 
+#ifdef CONFIG_SHIFT_FS_POSIX_ACL
+
+static int
+shift_acl_ids(struct user_namespace *from, struct user_namespace *to,
+	      struct posix_acl *acl)
+{
+	int i;
+
+	for (i = 0; i < acl->a_count; i++) {
+		struct posix_acl_entry *e = &acl->a_entries[i];
+		switch(e->e_tag) {
+		case ACL_USER:
+			e->e_uid = shift_kuid(from, to, e->e_uid);
+			if (!uid_valid(e->e_uid))
+				return -EOVERFLOW;
+			break;
+		case ACL_GROUP:
+			e->e_gid = shift_kgid(from, to, e->e_gid);
+			if (!gid_valid(e->e_gid))
+				return -EOVERFLOW;
+			break;
+		}
+	}
+	return 0;
+}
+
+static void
+shift_acl_xattr_ids(struct user_namespace *from, struct user_namespace *to,
+		    void *value, size_t size)
+{
+	struct posix_acl_xattr_header *header = value;
+	struct posix_acl_xattr_entry *entry = (void *)(header + 1), *end;
+	int count;
+	kuid_t kuid;
+	kgid_t kgid;
+
+	if (!value)
+		return;
+	if (size < sizeof(struct posix_acl_xattr_header))
+		return;
+	if (header->a_version != cpu_to_le32(POSIX_ACL_XATTR_VERSION))
+		return;
+
+	count = posix_acl_xattr_count(size);
+	if (count < 0)
+		return;
+	if (count == 0)
+		return;
+
+	for (end = entry + count; entry != end; entry++) {
+		switch(le16_to_cpu(entry->e_tag)) {
+		case ACL_USER:
+			kuid = make_kuid(&init_user_ns, le32_to_cpu(entry->e_id));
+			kuid = shift_kuid(from, to, kuid);
+			entry->e_id = cpu_to_le32(from_kuid(&init_user_ns, kuid));
+			break;
+		case ACL_GROUP:
+			kgid = make_kgid(&init_user_ns, le32_to_cpu(entry->e_id));
+			kgid = shift_kgid(from, to, kgid);
+			entry->e_id = cpu_to_le32(from_kgid(&init_user_ns, kgid));
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+static struct posix_acl *shiftfs_get_acl(struct inode *inode, int type)
+{
+	struct inode *reali = inode->i_private;
+	const struct cred *oldcred, *newcred;
+	struct posix_acl *real_acl, *acl = NULL;
+	struct user_namespace *from_ns = reali->i_sb->s_user_ns;
+	struct user_namespace *to_ns = inode->i_sb->s_user_ns;
+	int size;
+	int err;
+
+	if (!IS_POSIXACL(reali))
+		return NULL;
+
+	oldcred = shiftfs_new_creds(&newcred, inode->i_sb);
+	real_acl = get_acl(reali, type);
+	shiftfs_old_creds(oldcred, &newcred);
+
+	if (real_acl && !IS_ERR(acl)) {
+		/* XXX: export posix_acl_clone? */
+		size = sizeof(struct posix_acl) +
+			   real_acl->a_count * sizeof(struct posix_acl_entry);
+		acl = kmemdup(acl, size, GFP_KERNEL);
+		posix_acl_release(real_acl);
+
+		if (!acl)
+			return ERR_PTR(-ENOMEM);
+
+		refcount_set(&acl->a_refcount, 1);
+
+		err = shift_acl_ids(from_ns, to_ns, acl);
+		if (err) {
+			kfree(acl);
+			return ERR_PTR(err);
+		}
+	}
+
+	return acl;
+}
+
+static int
+shiftfs_posix_acl_xattr_get(const struct xattr_handler *handler,
+			   struct dentry *dentry, struct inode *inode,
+			   const char *name, void *buffer, size_t size)
+{
+	struct inode *reali = inode->i_private;
+	int ret;
+
+	ret = shiftfs_xattr_get(NULL, dentry, inode, handler->name,
+				buffer, size);
+	if (ret < 0)
+		return ret;
+
+	shift_acl_xattr_ids(reali->i_sb->s_user_ns, inode->i_sb->s_user_ns,
+			    buffer, size);
+	return ret;
+}
+
+static int
+shiftfs_posix_acl_xattr_set(const struct xattr_handler *handler,
+			    struct dentry *dentry, struct inode *inode,
+			    const char *name, const void *value,
+			    size_t size, int flags)
+{
+	struct inode *reali = inode->i_private;
+	int err;
+
+	if (!IS_POSIXACL(reali) || !reali->i_op->set_acl)
+		return -EOPNOTSUPP;
+	if (handler->flags == ACL_TYPE_DEFAULT && !S_ISDIR(inode->i_mode))
+		return value ? -EACCES : 0;
+	if (!inode_owner_or_capable(inode))
+		return -EPERM;
+
+	if (value) {
+		shift_acl_xattr_ids(inode->i_sb->s_user_ns,
+				    reali->i_sb->s_user_ns,
+				    (void *)value, size);
+		err = shiftfs_setxattr(dentry, inode, handler->name, value,
+				       size, flags);
+	} else {
+		err = shiftfs_removexattr(dentry, handler->name);
+	}
+
+	if (!err)
+		shiftfs_copyattr(reali, inode);
+	return err;
+}
+
+static const struct xattr_handler
+shiftfs_posix_acl_access_xattr_handler = {
+	.name = XATTR_NAME_POSIX_ACL_ACCESS,
+	.flags = ACL_TYPE_ACCESS,
+	.get = shiftfs_posix_acl_xattr_get,
+	.set = shiftfs_posix_acl_xattr_set,
+};
+
+static const struct xattr_handler
+shiftfs_posix_acl_default_xattr_handler = {
+	.name = XATTR_NAME_POSIX_ACL_DEFAULT,
+	.flags = ACL_TYPE_DEFAULT,
+	.get = shiftfs_posix_acl_xattr_get,
+	.set = shiftfs_posix_acl_xattr_set,
+};
+
+#else /* !CONFIG_SHIFT_FS_POSIX_ACL */
+
+#define shiftfs_get_acl NULL
+
+#endif /* CONFIG_SHIFT_FS_POSIX_ACL */
+
 static const struct inode_operations shiftfs_inode_ops = {
 	.lookup		= shiftfs_lookup,
 	.getattr	= shiftfs_getattr,
@@ -647,6 +826,7 @@ static const struct inode_operations shiftfs_inode_ops = {
 	.create		= shiftfs_create,
 	.mknod		= NULL,	/* no special files currently */
 	.listxattr	= shiftfs_listxattr,
+	.get_acl	= shiftfs_get_acl,
 };
 
 static struct inode *shiftfs_new_inode(struct super_block *sb, umode_t mode,
@@ -725,6 +905,10 @@ static const struct xattr_handler shiftfs_xattr_handler = {
 };
 
 const struct xattr_handler *shiftfs_xattr_handlers[] = {
+#ifdef CONFIG_SHIFT_FS_POSIX_ACL
+	&shiftfs_posix_acl_access_xattr_handler,
+	&shiftfs_posix_acl_default_xattr_handler,
+#endif
 	&shiftfs_xattr_handler,
 	NULL
 };
@@ -819,6 +1003,7 @@ static int shiftfs_fill_super(struct super_block *sb, void *raw_data,
 	sb->s_op = &shiftfs_super_ops;
 	sb->s_xattr = shiftfs_xattr_handlers;
 	sb->s_d_op = &shiftfs_dentry_ops;
+	sb->s_flags |= SB_POSIXACL;
 	sb->s_root = d_make_root(shiftfs_new_inode(sb, S_IFDIR, dentry));
 	sb->s_root->d_fsdata = dentry;
 
