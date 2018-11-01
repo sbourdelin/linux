@@ -177,8 +177,8 @@ static const int bfq_back_max = 16 * 1024;
 /* Penalty of a backwards seek, in number of sectors. */
 static const int bfq_back_penalty = 2;
 
-/* Idling period duration, in ns. */
-static u64 bfq_slice_idle = NSEC_PER_SEC / 125;
+/* Idling period duration, in ns. Zero for non-rotational devices. */
+static u64 bfq_slice_idle[2] = { NSEC_PER_SEC / 125, 0 };
 
 /* Minimum number of assigned budgets for which stats are safe to compute. */
 static const int bfq_stats_min_budgets = 194;
@@ -3044,7 +3044,7 @@ static bool bfq_bfqq_is_slow(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 			  */
 			*delta_ms = BFQ_MIN_TT / NSEC_PER_MSEC;
 		else /* charge at least one seek */
-			*delta_ms = bfq_slice_idle / NSEC_PER_MSEC;
+			*delta_ms = bfq_slice_idle[0] / NSEC_PER_MSEC;
 
 		return slow;
 	}
@@ -5431,7 +5431,7 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	bfqd->bfq_fifo_expire[1] = bfq_fifo_expire[1];
 	bfqd->bfq_back_max = bfq_back_max;
 	bfqd->bfq_back_penalty = bfq_back_penalty;
-	bfqd->bfq_slice_idle = bfq_slice_idle;
+	bfqd->bfq_slice_idle = bfq_slice_idle[blk_queue_nonrot(bfqd->queue)];
 	bfqd->bfq_timeout = bfq_timeout;
 
 	bfqd->bfq_requests_within_timer = 120;

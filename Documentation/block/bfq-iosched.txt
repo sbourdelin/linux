@@ -307,11 +307,13 @@ slice_idle
 ----------
 
 This parameter specifies how long BFQ should idle for next I/O
-request, when certain sync BFQ queues become empty. By default
-slice_idle is a non-zero value. Idling has a double purpose: boosting
-throughput and making sure that the desired throughput distribution is
-respected (see the description of how BFQ works, and, if needed, the
-papers referred there).
+request, when certain sync BFQ queues become empty.
+
+By default slice_idle is a non-zero value for rotational devices.
+
+Idling has a double purpose: boosting throughput and making sure that
+the desired throughput distribution is respected (see the description
+of how BFQ works, and, if needed, the papers referred there).
 
 As for throughput, idling can be very helpful on highly seeky media
 like single spindle SATA/SAS disks where we can cut down on overall
