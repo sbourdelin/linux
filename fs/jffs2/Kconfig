@@ -182,3 +182,28 @@ config JFFS2_CMODE_FAVOURLZO
 	  decompression) at the expense of size.
 
 endchoice
+
+choice
+	prompt "JFFS2 endianness"
+	default JFFS2_NATIVE_ENDIAN
+	depends on JFFS2_FS
+	help
+	  You can set here the default endianness of JFFS2 from
+	  the available options. Do not touch if unsure.
+
+config JFFS2_NATIVE_ENDIAN
+	bool "native endian"
+	help
+	  Uses a native endian bytestream.
+
+config JFFS2_BIG_ENDIAN
+	bool "big endian"
+	help
+	  Uses a big endian bytestream.
+
+config JFFS2_LITTLE_ENDIAN
+	bool "little endian"
+	help
+	  Uses a little endian bytestream.
+
+endchoice

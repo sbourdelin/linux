@@ -27,12 +27,10 @@
 #include "os-linux.h"
 #endif
 
-#define JFFS2_NATIVE_ENDIAN
-
 /* Note we handle mode bits conversion from JFFS2 (i.e. Linux) to/from
    whatever OS we're actually running on here too. */
 
-#if defined(JFFS2_NATIVE_ENDIAN)
+#if defined(CONFIG_JFFS2_NATIVE_ENDIAN)
 #define cpu_to_je16(x) ((jint16_t){x})
 #define cpu_to_je32(x) ((jint32_t){x})
 #define cpu_to_jemode(x) ((jmode_t){os_to_jffs2_mode(x)})
@@ -43,7 +41,7 @@
 #define je16_to_cpu(x) ((x).v16)
 #define je32_to_cpu(x) ((x).v32)
 #define jemode_to_cpu(x) (jffs2_to_os_mode((x).m))
-#elif defined(JFFS2_BIG_ENDIAN)
+#elif defined(CONFIG_JFFS2_BIG_ENDIAN)
 #define cpu_to_je16(x) ((jint16_t){cpu_to_be16(x)})
 #define cpu_to_je32(x) ((jint32_t){cpu_to_be32(x)})
 #define cpu_to_jemode(x) ((jmode_t){cpu_to_be32(os_to_jffs2_mode(x))})
@@ -54,7 +52,7 @@
 #define je16_to_cpu(x) (be16_to_cpu(x.v16))
 #define je32_to_cpu(x) (be32_to_cpu(x.v32))
 #define jemode_to_cpu(x) (be32_to_cpu(jffs2_to_os_mode((x).m)))
-#elif defined(JFFS2_LITTLE_ENDIAN)
+#elif defined(CONFIG_JFFS2_LITTLE_ENDIAN)
 #define cpu_to_je16(x) ((jint16_t){cpu_to_le16(x)})
 #define cpu_to_je32(x) ((jint32_t){cpu_to_le32(x)})
 #define cpu_to_jemode(x) ((jmode_t){cpu_to_le32(os_to_jffs2_mode(x))})
