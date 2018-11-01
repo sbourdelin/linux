@@ -22,6 +22,7 @@ struct shiftfs_super_info {
 
 static struct inode *shiftfs_new_inode(struct super_block *sb, umode_t mode,
 				       struct dentry *dentry);
+static void shiftfs_init_inode(struct inode *inode, umode_t mode);
 
 enum {
 	OPT_MARK,
@@ -278,15 +279,27 @@ static void shiftfs_fill_inode(struct inode *inode, struct dentry *dentry)
 		inode->i_opflags |= IOP_NOFOLLOW;
 
 	inode->i_mapping = reali->i_mapping;
-	inode->i_private = dentry;
+	inode->i_private = reali;
+	set_nlink(inode, reali->i_nlink);
+}
+
+static int shiftfs_inode_test(struct inode *inode, void *data)
+{
+	return inode->i_private == data;
+}
+
+static int shiftfs_inode_set(struct inode *inode, void *data)
+{
+	inode->i_private = data;
+	return 0;
 }
 
 static int shiftfs_make_object(struct inode *dir, struct dentry *dentry,
 			       umode_t mode, const char *symlink,
 			       struct dentry *hardlink, bool excl)
 {
-	struct dentry *real = dir->i_private, *new = dentry->d_fsdata;
-	struct inode *reali = real->d_inode, *newi;
+	struct dentry *new = dentry->d_fsdata;
+	struct inode *reali = dir->i_private, *inode, *newi;
 	const struct inode_operations *iop = reali->i_op;
 	int err;
 	const struct cred *oldcred, *newcred;
@@ -310,9 +323,14 @@ static int shiftfs_make_object(struct inode *dir, struct dentry *dentry,
 		return -EINVAL;
 
 
-	newi = shiftfs_new_inode(dentry->d_sb, mode, NULL);
-	if (!newi)
-		return -ENOMEM;
+	if (hardlink) {
+		inode = d_inode(hardlink);
+		ihold(inode);
+	} else {
+		inode = shiftfs_new_inode(dentry->d_sb, mode, NULL);
+		if (!inode)
+			return -ENOMEM;
+	}
 
 	oldcred = shiftfs_new_creds(&newcred, dentry->d_sb);
 
@@ -341,16 +359,33 @@ static int shiftfs_make_object(struct inode *dir, struct dentry *dentry,
 	if (err)
 		goto out_dput;
 
-	shiftfs_fill_inode(newi, new);
+	if (hardlink) {
+		WARN_ON(inode->i_private != new->d_inode);
+		inc_nlink(inode);
+	} else {
+		shiftfs_fill_inode(inode, new);
 
-	d_instantiate(dentry, newi);
+		newi = inode_insert5(inode, (unsigned long)new->d_inode,
+				     shiftfs_inode_test, shiftfs_inode_set,
+				     new->d_inode);
+		if (newi != inode) {
+			pr_warn_ratelimited("shiftfs: newly created inode found in cache\n");
+			iput(inode);
+			inode = newi;
+		}
+	}
+
+	if (inode->i_state & I_NEW)
+		unlock_new_inode(inode);
+
+	d_instantiate(dentry, inode);
 
 	new = NULL;
-	newi = NULL;
+	inode = NULL;
 
  out_dput:
 	dput(new);
-	iput(newi);
+	iput(inode);
 	inode_unlock(reali);
 
 	return err;
@@ -386,8 +421,8 @@ static int shiftfs_symlink(struct inode *dir, struct dentry *dentry,
 
 static int shiftfs_rm(struct inode *dir, struct dentry *dentry, bool rmdir)
 {
-	struct dentry *real = dir->i_private, *new = dentry->d_fsdata;
-	struct inode *reali = real->d_inode;
+	struct dentry *new = dentry->d_fsdata;
+	struct inode *reali = dir->i_private;
 	int err;
 	const struct cred *oldcred, *newcred;
 
@@ -399,6 +434,13 @@ static int shiftfs_rm(struct inode *dir, struct dentry *dentry, bool rmdir)
 		err = vfs_rmdir(reali, new);
 	else
 		err = vfs_unlink(reali, new, NULL);
+
+	if (!err) {
+		if (rmdir)
+			clear_nlink(d_inode(dentry));
+		else
+			drop_nlink(d_inode(dentry));
+	}
 
 	shiftfs_old_creds(oldcred, &newcred);
 	inode_unlock(reali);
@@ -420,7 +462,8 @@ static int shiftfs_rename(struct inode *olddir, struct dentry *old,
 			  struct inode *newdir, struct dentry *new,
 			  unsigned int flags)
 {
-	struct dentry *rodd = olddir->i_private, *rndd = newdir->i_private,
+	struct dentry *rodd = old->d_parent->d_fsdata,
+		*rndd = new->d_parent->d_fsdata,
 		*realold = old->d_fsdata,
 		*realnew = new->d_fsdata, *trap;
 	struct inode *realolddir = rodd->d_inode, *realnewdir = rndd->d_inode;
@@ -448,8 +491,8 @@ static int shiftfs_rename(struct inode *olddir, struct dentry *old,
 static struct dentry *shiftfs_lookup(struct inode *dir, struct dentry *dentry,
 				     unsigned int flags)
 {
-	struct dentry *real = dir->i_private, *new;
-	struct inode *reali = real->d_inode, *newi;
+	struct dentry *real = dentry->d_parent->d_fsdata, *new;
+	struct inode *reali = real->d_inode, *newi, *inode;
 	const struct cred *oldcred, *newcred;
 
 	inode_lock(reali);
@@ -463,24 +506,30 @@ static struct dentry *shiftfs_lookup(struct inode *dir, struct dentry *dentry,
 
 	dentry->d_fsdata = new;
 
-	newi = NULL;
-	if (!new->d_inode)
+	inode = NULL;
+	newi = new->d_inode;
+	if (!newi)
 		goto out;
 
-	newi = shiftfs_new_inode(dentry->d_sb, new->d_inode->i_mode, new);
-	if (!newi) {
+	inode = iget5_locked(dentry->d_sb, (unsigned long)newi,
+			     shiftfs_inode_test, shiftfs_inode_set, newi);
+	if (!inode) {
 		dput(new);
 		return ERR_PTR(-ENOMEM);
 	}
+	if (inode->i_state & I_NEW) {
+		shiftfs_init_inode(inode, newi->i_mode);
+		shiftfs_fill_inode(inode, new);
+		unlock_new_inode(inode);
+	}
 
  out:
-	return d_splice_alias(newi, dentry);
+	return d_splice_alias(inode, dentry);
 }
 
 static int shiftfs_permission(struct inode *inode, int mask)
 {
-	struct dentry *real = inode->i_private;
-	struct inode *reali = real->d_inode;
+	struct inode *reali = inode->i_private;
 	const struct inode_operations *iop = reali->i_op;
 	int err;
 	const struct cred *oldcred, *newcred;
@@ -579,6 +628,14 @@ static struct inode *shiftfs_new_inode(struct super_block *sb, umode_t mode,
 	if (!inode)
 		return NULL;
 
+	shiftfs_init_inode(inode, mode);
+	shiftfs_fill_inode(inode, dentry);
+
+	return inode;
+}
+
+static void shiftfs_init_inode(struct inode *inode, umode_t mode)
+{
 	/*
 	 * our inode is completely vestigial.  All lookups, getattr
 	 * and permission checks are done on the underlying inode, so
@@ -591,10 +648,6 @@ static struct inode *shiftfs_new_inode(struct super_block *sb, umode_t mode,
 	inode->i_flags |= S_NOATIME | S_NOCMTIME;
 
 	inode->i_op = &shiftfs_inode_ops;
-
-	shiftfs_fill_inode(inode, dentry);
-
-	return inode;
 }
 
 static int shiftfs_show_options(struct seq_file *m, struct dentry *dentry)
