@@ -15,7 +15,10 @@ snd_soc_acpi_find_machine(struct snd_soc_acpi_mach *machines)
 		if (acpi_dev_present(mach->id, NULL, -1)) {
 			if (mach->machine_quirk)
 				mach = mach->machine_quirk(mach);
-			return mach;
+
+			/* return matched machine, continue otherwise */
+			if (mach)
+				return mach;
 		}
 	}
 	return NULL;
