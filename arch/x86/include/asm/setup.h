@@ -33,7 +33,7 @@
 extern u64 relocated_ramdisk;
 
 /* Interrupt control for vSMPowered x86_64 systems */
-#ifdef CONFIG_X86_64
+#if defined(CONFIG_X86_64) && defined(CONFIG_X86_VSMP)
 void vsmp_init(void);
 #else
 static inline void vsmp_init(void) { }
