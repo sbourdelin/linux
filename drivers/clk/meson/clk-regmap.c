@@ -114,7 +114,6 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
 };
 
 /* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
-
 const struct clk_ops clk_regmap_divider_ops = {
 	.recalc_rate = clk_regmap_div_recalc_rate,
 	.round_rate = clk_regmap_div_round_rate,
