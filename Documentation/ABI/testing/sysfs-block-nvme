@@ -1,0 +1,10 @@
+What:		/sys/block/nvme*/paths
+Date:		Oct, 2019
+KernelVersion:	v4.21
+Contact:	Thadeu Lima de Souza Cascardo <cascardo@canonical.com>
+Description:
+		This is a directory containing symlinks to other block
+		devices, when the block device is a nvme multipath
+		device.
+Users:		initramfs-tools
+

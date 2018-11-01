@@ -317,9 +317,12 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	if (!head->disk)
 		return;
 
-	if (!(head->disk->flags & GENHD_FL_UP))
+	if (!(head->disk->flags & GENHD_FL_UP)) {
+		struct kobject *hd_kobj = &disk_to_dev(head->disk)->kobj;
 		device_add_disk(&head->subsys->dev, head->disk,
 				nvme_ns_id_attr_groups);
+		head->path_dir = kobject_create_and_add("paths", hd_kobj);
+	}
 
 	if (nvme_path_is_optimized(ns)) {
 		int node, srcu_idx;
@@ -530,6 +533,19 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, struct nvme_id_ns *id)
 	}
 }
 
+void nvme_mpath_add_disk_links(struct nvme_ns *ns)
+{
+	struct kobject *path_disk_kobj;
+
+	if (!ns->head->disk)
+		return;
+
+	path_disk_kobj = &disk_to_dev(ns->disk)->kobj;
+	if (sysfs_create_link(ns->head->path_dir, path_disk_kobj,
+			kobject_name(path_disk_kobj)))
+		return;
+}
+
 void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	if (!head->disk)
@@ -541,7 +557,17 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	kblockd_schedule_work(&head->requeue_work);
 	flush_work(&head->requeue_work);
 	blk_cleanup_queue(head->disk->queue);
+	kobject_put(head->path_dir);
 	put_disk(head->disk);
+}
+
+void nvme_mpath_remove_disk_links(struct nvme_ns *ns)
+{
+	if (!ns->head->disk)
+		return;
+
+	sysfs_remove_link(ns->head->path_dir,
+			kobject_name(&disk_to_dev(ns->disk)->kobj));
 }
 
 int nvme_mpath_init(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
@@ -593,4 +619,3 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 {
 	kfree(ctrl->ana_log_buf);
 }
-
