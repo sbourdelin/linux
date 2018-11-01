@@ -4118,6 +4118,12 @@ int node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned int order)
 	int ret;
 
 	/*
+	 * Do not scan if allocation will never succeed.
+	 */
+	if (order >= MAX_ORDER)
+		return NODE_RECLAIM_NOSCAN;
+
+	/*
 	 * Node reclaim reclaims unmapped file backed pages and
 	 * slab pages if we are over the defined limits.
 	 *
