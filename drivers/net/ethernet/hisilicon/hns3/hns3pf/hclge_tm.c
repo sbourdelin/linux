@@ -1168,11 +1168,12 @@ static int hclge_pfc_setup_hw(struct hclge_dev *hdev)
  */
 static int hclge_bp_setup_hw(struct hclge_dev *hdev, u8 tc)
 {
-	struct hclge_vport *vport = hdev->vport;
 	u32 i, k, qs_bitmap;
 	int ret;
 
 	for (i = 0; i < HCLGE_BP_GRP_NUM; i++) {
+		struct hclge_vport *vport = hdev->vport;
+
 		qs_bitmap = 0;
 
 		for (k = 0; k < hdev->num_alloc_vport; k++) {
