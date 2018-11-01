@@ -84,6 +84,41 @@ static inline unsigned int *nf_ct_timeout_lookup(const struct nf_conn *ct)
 	return timeouts;
 }
 
+static inline struct nf_generic_net *nf_generic_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.generic;
+}
+
+static inline struct nf_tcp_net *nf_tcp_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.tcp;
+}
+
+static inline struct nf_udp_net *nf_udp_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.udp;
+}
+
+static inline struct nf_icmp_net *nf_icmp_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.icmp;
+}
+
+static inline struct nf_icmp_net *nf_icmpv6_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.icmpv6;
+}
+
+static inline struct nf_dccp_net *nf_dccp_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.dccp;
+}
+
+static inline struct nf_sctp_net *nf_sctp_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.sctp;
+}
+
 #ifdef CONFIG_NF_CONNTRACK_TIMEOUT
 int nf_conntrack_timeout_init(void);
 void nf_conntrack_timeout_fini(void);
