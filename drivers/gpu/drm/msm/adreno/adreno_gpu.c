@@ -406,7 +406,7 @@ int adreno_gpu_state_get(struct msm_gpu *gpu, struct msm_gpu_state *state)
 				size = j + 1;
 
 		if (size) {
-			state->ring[i].data = kmalloc(size << 2, GFP_KERNEL);
+			state->ring[i].data = kvmalloc(size << 2, GFP_KERNEL);
 			if (state->ring[i].data) {
 				memcpy(state->ring[i].data, gpu->rb[i]->start, size << 2);
 				state->ring[i].data_size = size << 2;
@@ -445,7 +445,7 @@ void adreno_gpu_state_destroy(struct msm_gpu_state *state)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(state->ring); i++)
-		kfree(state->ring[i].data);
+		kvfree(state->ring[i].data);
 
 	for (i = 0; state->bos && i < state->nr_bos; i++)
 		kvfree(state->bos[i].data);
@@ -475,34 +475,15 @@ int adreno_gpu_state_put(struct msm_gpu_state *state)
 
 #if defined(CONFIG_DEBUG_FS) || defined(CONFIG_DEV_COREDUMP)
 
-static void adreno_show_object(struct drm_printer *p, u32 *ptr, int len)
+static void adreno_show_object(struct drm_printer *p, void *ptr)
 {
-	char out[ASCII85_BUFSZ];
-	long l, datalen, i;
-
-	if (!ptr || !len)
+	if (!ptr)
 		return;
-
-	/*
-	 * Only dump the non-zero part of the buffer - rarely will any data
-	 * completely fill the entire allocated size of the buffer
-	 */
-	for (datalen = 0, i = 0; i < len >> 2; i++) {
-		if (ptr[i])
-			datalen = (i << 2) + 1;
-	}
-
-	/* Skip printing the object if it is empty */
-	if (datalen == 0)
-		return;
-
-	l = ascii85_encode_len(datalen);
 
 	drm_puts(p, "    data: !!ascii85 |\n");
 	drm_puts(p, "     ");
 
-	for (i = 0; i < l; i++)
-		drm_puts(p, ascii85_encode(ptr[i], out));
+	drm_puts(p, ptr);
 
 	drm_puts(p, "\n");
 }
@@ -534,8 +515,7 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 		drm_printf(p, "    wptr: %d\n", state->ring[i].wptr);
 		drm_printf(p, "    size: %d\n", MSM_GPU_RINGBUFFER_SZ);
 
-		adreno_show_object(p, state->ring[i].data,
-			state->ring[i].data_size);
+		adreno_show_object(p, state->ring[i].data);
 	}
 
 	if (state->bos) {
@@ -546,8 +526,7 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 				state->bos[i].iova);
 			drm_printf(p, "    size: %zd\n", state->bos[i].size);
 
-			adreno_show_object(p, state->bos[i].data,
-				state->bos[i].size);
+			adreno_show_object(p, state->bos[i].data);
 		}
 	}
 

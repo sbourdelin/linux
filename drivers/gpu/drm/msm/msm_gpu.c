@@ -21,6 +21,7 @@
 #include "msm_fence.h"
 
 #include <generated/utsrelease.h>
+#include <linux/ascii85.h>
 #include <linux/string_helpers.h>
 #include <linux/pm_opp.h>
 #include <linux/devfreq.h>
@@ -375,9 +376,7 @@ static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 	/* Set the active crash state to be dumped on failure */
 	gpu->crashstate = state;
 
-	/* FIXME: Release the crashstate if this errors out? */
-	dev_coredumpm(gpu->dev->dev, THIS_MODULE, gpu, 0, GFP_KERNEL,
-		msm_gpu_devcoredump_read, msm_gpu_devcoredump_free);
+	schedule_work(&gpu->crashstate_work);
 }
 #else
 static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
@@ -419,6 +418,93 @@ find_submit(struct msm_ringbuffer *ring, uint32_t fence)
 }
 
 static void retire_submits(struct msm_gpu *gpu);
+
+static char *msm_gpu_ascii85_encode_buf(u32 *src, size_t len)
+{
+	void *buf;
+	size_t buf_itr = 0, buffer_size;
+	char out[ASCII85_BUFSZ];
+	long l;
+	int i;
+
+	if (!src || !len)
+		return NULL;
+
+	l = ascii85_encode_len(len);
+
+	/*
+	 * Ascii85 outputs either a 5 byte string or a 1 byte string. So we
+	 * account for the worst case of 5 bytes per dword plus the 1 for '\0'
+	 */
+	buffer_size = (l * 5) + 1;
+
+	buf = kvmalloc(buffer_size, GFP_KERNEL);
+	if (!buf)
+		return NULL;
+
+	for (i = 0; i < l; i++)
+		buf_itr += snprintf(buf + buf_itr, buffer_size - buf_itr, "%s",
+				ascii85_encode(src[i], out));
+
+	return buf;
+}
+
+/*
+ * Convert the binary data in the gpu crash state capture(like bos and
+ * ringbuffer data) to ascii85 encoded strings. Note that the encoded
+ * string is NULL terminated.
+ */
+static void crashstate_worker(struct work_struct *work)
+{
+	struct msm_gpu_state *state;
+	struct msm_gpu *gpu = container_of(work, struct msm_gpu,
+			crashstate_work);
+	int i;
+
+	state = msm_gpu_crashstate_get(gpu);
+	if (!state)
+		return;
+
+	for (i = 0; i < MSM_GPU_MAX_RINGS; i++) {
+		void *buf = NULL;
+
+		if (!state->ring[i].data)
+			continue;
+
+		buf = state->ring[i].data;
+
+		state->ring[i].data = msm_gpu_ascii85_encode_buf(buf,
+				state->ring[i].data_size);
+		kvfree(buf);
+	}
+
+	for (i = 0; i < state->nr_bos; i++) {
+		u32 *buf = NULL;
+		long datalen, j;
+
+		if (!state->bos[i].data)
+			continue;
+
+		buf = state->bos[i].data;
+
+		/*
+		 * Only dump the non-zero part of the buffer - rarely will
+		 * any data completely fill the entire allocated size of the
+		 * buffer
+		 */
+		for (datalen = 0, j = 0; j < state->bos[i].size >> 2; j++)
+			if (buf[j])
+				datalen = ((j + 1) << 2);
+
+		state->bos[i].data = msm_gpu_ascii85_encode_buf(buf, datalen);
+		kvfree(buf);
+	}
+
+	msm_gpu_crashstate_put(gpu);
+
+	dev_coredumpm(gpu->dev->dev, THIS_MODULE, gpu, 0, GFP_KERNEL,
+		msm_gpu_devcoredump_read, msm_gpu_devcoredump_free);
+}
 
 static void recover_worker(struct work_struct *work)
 {
@@ -856,6 +942,7 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 	INIT_LIST_HEAD(&gpu->active_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
 	INIT_WORK(&gpu->recover_work, recover_worker);
+	INIT_WORK(&gpu->crashstate_work, crashstate_worker);
 
 
 	timer_setup(&gpu->hangcheck_timer, hangcheck_handler, 0);

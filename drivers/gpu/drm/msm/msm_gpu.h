@@ -137,6 +137,7 @@ struct msm_gpu {
 	} devfreq;
 
 	struct msm_gpu_state *crashstate;
+	struct work_struct crashstate_work;
 };
 
 /* It turns out that all targets use the same ringbuffer size */
