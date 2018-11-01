@@ -551,10 +551,13 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 	struct iommu_domain *domain = iommu_get_dma_domain(dev);
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	struct iova_domain *iovad = &cookie->iovad;
+	struct scatterlist *s;
 	struct page **pages;
 	struct sg_table sgt;
 	dma_addr_t iova;
 	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
+	bool gfp_zero = false;
+	int i;
 
 	*handle = IOMMU_MAPPING_ERROR;
 
@@ -568,6 +571,15 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 	if (attrs & DMA_ATTR_ALLOC_SINGLE_PAGES)
 		alloc_sizes = min_size;
 
+	/*
+	 * The generic zeroing in a length of one page size is slow,
+	 * so do it manually in a length of scatterlist size instead
+	 */
+	if (gfp & __GFP_ZERO) {
+		gfp &= ~__GFP_ZERO;
+		gfp_zero = true;
+	}
+
 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
 	if (!pages)
@@ -580,6 +592,12 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 
 	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
 		goto out_free_iova;
+
+	if (gfp_zero) {
+		/* Now zero all the pages in the scatterlist */
+		for_each_sg(sgt.sgl, s, sgt.orig_nents, i)
+			memset(sg_virt(s), 0, s->length);
+	}
 
 	if (!(prot & IOMMU_CACHE)) {
 		struct sg_mapping_iter miter;
