@@ -1,0 +1,25 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0+
+# description: Kretprobe dynamic event with a stacktrace
+
+[ -f kprobe_events ] || exit_unsupported # this is configurable
+
+echo 0 > events/enable
+echo 1 > options/stacktrace
+
+echo 'r:teststackprobe sched_fork $retval' > kprobe_events
+grep teststackprobe kprobe_events
+test -d events/kprobes/teststackprobe
+
+clear_trace
+echo 1 > events/kprobes/teststackprobe/enable
+( echo "forked")
+echo 0 > events/kprobes/teststackprobe/enable
+
+# Make sure we don't see kretprobe_trampoline and we see _do_fork.
+! grep 'kretprobe' trace
+grep '_do_fork' trace
+
+echo '-:teststackprobe' >> kprobe_events
+clear_trace
+test -d events/kprobes/teststackprobe && exit_fail || exit_pass

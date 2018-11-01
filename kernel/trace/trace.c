@@ -42,6 +42,7 @@
 #include <linux/nmi.h>
 #include <linux/fs.h>
 #include <linux/trace.h>
+#include <linux/kprobes.h>
 #include <linux/sched/clock.h>
 #include <linux/sched/rt.h>
 
@@ -2590,6 +2591,7 @@ static void __ftrace_trace_stack(struct ring_buffer *buffer,
 	struct ring_buffer_event *event;
 	struct stack_entry *entry;
 	struct stack_trace trace;
+	struct kretprobe_instance *ri = current_kretprobe_instance();
 	int use_stack;
 	int size = FTRACE_STACK_ENTRIES;
 
@@ -2626,7 +2628,9 @@ static void __ftrace_trace_stack(struct ring_buffer *buffer,
 		trace.entries		= this_cpu_ptr(ftrace_stack.calls);
 		trace.max_entries	= FTRACE_STACK_MAX_ENTRIES;
 
-		if (regs)
+		if (ri)
+			kretprobe_save_stack_trace(ri, &trace);
+		else if (regs)
 			save_stack_trace_regs(regs, &trace);
 		else
 			save_stack_trace(&trace);
@@ -2653,7 +2657,10 @@ static void __ftrace_trace_stack(struct ring_buffer *buffer,
 	else {
 		trace.max_entries	= FTRACE_STACK_ENTRIES;
 		trace.entries		= entry->caller;
-		if (regs)
+
+		if (ri)
+			kretprobe_save_stack_trace(ri, &trace);
+		else if (regs)
 			save_stack_trace_regs(regs, &trace);
 		else
 			save_stack_trace(&trace);

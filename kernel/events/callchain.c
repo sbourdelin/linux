@@ -12,6 +12,7 @@
 #include <linux/perf_event.h>
 #include <linux/slab.h>
 #include <linux/sched/task_stack.h>
+#include <linux/kprobes.h>
 
 #include "internal.h"
 
@@ -197,9 +198,14 @@ get_perf_callchain(struct pt_regs *regs, u32 init_nr, bool kernel, bool user,
 	ctx.contexts_maxed = false;
 
 	if (kernel && !user_mode(regs)) {
+		struct kretprobe_instance *ri = current_kretprobe_instance();
+
 		if (add_mark)
 			perf_callchain_store_context(&ctx, PERF_CONTEXT_KERNEL);
-		perf_callchain_kernel(&ctx, regs);
+		if (ri)
+			kretprobe_perf_callchain_kernel(ri, &ctx);
+		else
+			perf_callchain_kernel(&ctx, regs);
 	}
 
 	if (user) {

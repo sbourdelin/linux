@@ -597,7 +597,11 @@ address with the trampoline's address, stack backtraces and calls
 to __builtin_return_address() will typically yield the trampoline's
 address instead of the real return address for kretprobed functions.
 (As far as we can tell, __builtin_return_address() is used only
-for instrumentation and error reporting.)
+for instrumentation and error reporting.) However, since return probes
+are used extensively in tracing (where stack backtraces are useful),
+return probes will stash away the stack backtrace during function entry
+so that return probe handlers can use the entry backtrace instead of
+having a trace with just kretprobe_trampoline.
 
 If the number of times a function is called does not match the number
 of times it returns, registering a return probe on that function may
