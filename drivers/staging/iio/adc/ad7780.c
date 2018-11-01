@@ -42,7 +42,6 @@ struct ad7780_state {
 	struct regulator		*reg;
 	struct gpio_desc		*powerdown_gpio;
 	unsigned int	gain;
-	u16				int_vref_mv;
 
 	struct ad_sigma_delta sd;
 };
@@ -190,9 +189,7 @@ static int ad7780_probe(struct spi_device *spi)
 	st->chip_info =
 		&ad7780_chip_info_tbl[spi_get_device_id(spi)->driver_data];
 
-	if (voltage_uv)
-		st->int_vref_mv = voltage_uv / 1000;
-	else
+	if (!voltage_uv)
 		dev_warn(&spi->dev, "Reference voltage unspecified\n");
 
 	spi_set_drvdata(spi, indio_dev);
