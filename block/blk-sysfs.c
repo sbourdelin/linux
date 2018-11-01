@@ -909,6 +909,17 @@ int blk_register_queue(struct gendisk *disk)
 	WARN_ONCE(test_bit(QUEUE_FLAG_REGISTERED, &q->queue_flags),
 		  "%s is registering an already registered queue\n",
 		  kobject_name(&dev->kobj));
+
+	/*
+	 * Initialize default elevator after probing device features.
+	 */
+	if (q->mq_ops) {
+		WARN_ON_ONCE(!blk_queue_bypass(q));
+		ret = elevator_init_mq(q);
+		if (ret)
+			return ret;
+	}
+
 	queue_flag_set_unlocked(QUEUE_FLAG_REGISTERED, q);
 
 	/*

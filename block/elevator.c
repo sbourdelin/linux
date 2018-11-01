@@ -172,6 +172,14 @@ void __init load_default_elevator_module(void)
 
 static struct kobj_type elv_ktype;
 
+static inline bool elv_support_iosched(struct request_queue *q)
+{
+	if (q->mq_ops && q->tag_set && (q->tag_set->flags &
+				BLK_MQ_F_NO_SCHED))
+		return false;
+	return true;
+}
+
 struct elevator_queue *elevator_alloc(struct request_queue *q,
 				  struct elevator_type *e)
 {
@@ -957,7 +965,7 @@ int elevator_init_mq(struct request_queue *q)
 	struct elevator_type *e;
 	int err = 0;
 
-	if (q->nr_hw_queues != 1)
+	if (q->nr_hw_queues != 1 || !elv_support_iosched(q))
 		return 0;
 
 	/*
@@ -1087,14 +1095,6 @@ static int __elevator_change(struct request_queue *q, const char *name)
 	}
 
 	return elevator_switch(q, e);
-}
-
-static inline bool elv_support_iosched(struct request_queue *q)
-{
-	if (q->mq_ops && q->tag_set && (q->tag_set->flags &
-				BLK_MQ_F_NO_SCHED))
-		return false;
-	return true;
 }
 
 ssize_t elv_iosched_store(struct request_queue *q, const char *name,
