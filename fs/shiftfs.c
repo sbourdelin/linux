@@ -930,7 +930,7 @@ static int shiftfs_fill_super(struct super_block *sb, void *raw_data,
 	struct shiftfs_data *data = raw_data;
 	char *name = kstrdup(data->path, GFP_KERNEL);
 	int err = -ENOMEM;
-	struct shiftfs_super_info *ssi = NULL;
+	struct shiftfs_super_info *ssi = NULL, *mp_ssi;
 	struct path path;
 	struct dentry *dentry;
 
@@ -946,11 +946,7 @@ static int shiftfs_fill_super(struct super_block *sb, void *raw_data,
 	if (err)
 		goto out;
 
-	/* to mark a mount point, must be real root */
-	if (ssi->mark && !capable(CAP_SYS_ADMIN))
-		goto out;
-
-	/* else to mount a mark, must be userns admin */
+	/* to mount a mark, must be userns admin */
 	if (!ssi->mark && !ns_capable(current_user_ns(), CAP_SYS_ADMIN))
 		goto out;
 
@@ -962,41 +958,66 @@ static int shiftfs_fill_super(struct super_block *sb, void *raw_data,
 
 	if (!S_ISDIR(path.dentry->d_inode->i_mode)) {
 		err = -ENOTDIR;
-		goto out_put;
-	}
-
-	sb->s_stack_depth = path.dentry->d_sb->s_stack_depth + 1;
-	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH) {
-		printk(KERN_ERR "shiftfs: maximum stacking depth exceeded\n");
-		err = -EINVAL;
-		goto out_put;
+		goto out_put_path;
 	}
 
 	if (ssi->mark) {
+		struct super_block *lower_sb = path.mnt->mnt_sb;
+
+		/* to mark a mount point, must root wrt lower s_user_ns */
+		if (!ns_capable(lower_sb->s_user_ns, CAP_SYS_ADMIN))
+			goto out_put_path;
+
+
 		/*
 		 * this part is visible unshifted, so make sure no
 		 * executables that could be used to give suid
 		 * privileges
 		 */
 		sb->s_iflags = SB_I_NOEXEC;
-		ssi->mnt = path.mnt;
-		dentry = path.dentry;
-	} else {
-		struct shiftfs_super_info *mp_ssi;
 
+		/*
+		 * Handle nesting of shiftfs mounts by referring this mark
+		 * mount back to the original mark mount. This is more
+		 * efficient and alleviates concerns about stack depth.
+		 */
+		if (lower_sb->s_magic == SHIFTFS_MAGIC) {
+			mp_ssi = lower_sb->s_fs_info;
+
+			/* Doesn't make sense to mark a mark mount */
+			if (mp_ssi->mark) {
+				err = -EINVAL;
+				goto out_put_path;
+			}
+
+			ssi->mnt = mntget(mp_ssi->mnt);
+			dentry = dget(path.dentry->d_fsdata);
+		} else {
+			ssi->mnt = mntget(path.mnt);
+			dentry = dget(path.dentry);
+		}
+	} else {
 		/*
 		 * this leg executes if we're admin capable in
 		 * the namespace, so be very careful
 		 */
 		if (path.dentry->d_sb->s_magic != SHIFTFS_MAGIC)
-			goto out_put;
+			goto out_put_path;
 		mp_ssi = path.dentry->d_sb->s_fs_info;
 		if (!mp_ssi->mark)
-			goto out_put;
+			goto out_put_path;
 		ssi->mnt = mntget(mp_ssi->mnt);
 		dentry = dget(path.dentry->d_fsdata);
-		path_put(&path);
 	}
+
+	sb->s_stack_depth = dentry->d_sb->s_stack_depth + 1;
+	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH) {
+		printk(KERN_ERR "shiftfs: maximum stacking depth exceeded\n");
+		err = -EINVAL;
+		goto out_put_mnt;
+	}
+
+	path_put(&path);
 	ssi->userns = get_user_ns(dentry->d_sb->s_user_ns);
 	sb->s_fs_info = ssi;
 	sb->s_magic = SHIFTFS_MAGIC;
@@ -1009,7 +1030,10 @@ static int shiftfs_fill_super(struct super_block *sb, void *raw_data,
 
 	return 0;
 
- out_put:
+ out_put_mnt:
+	mntput(ssi->mnt);
+	dput(dentry);
+ out_put_path:
 	path_put(&path);
  out:
 	kfree(name);
