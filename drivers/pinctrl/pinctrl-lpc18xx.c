@@ -631,13 +631,10 @@ static const struct pinctrl_pin_desc lpc18xx_pins[] = {
 };
 
 /**
- * enum lpc18xx_pin_config_param - possible pin configuration parameters
  * @PIN_CONFIG_GPIO_PIN_INT: route gpio to the gpio pin interrupt
  * 	controller.
  */
-enum lpc18xx_pin_config_param {
-	PIN_CONFIG_GPIO_PIN_INT = PIN_CONFIG_END + 1,
-};
+#define PIN_CONFIG_GPIO_PIN_INT		(PIN_CONFIG_END + 1)
 
 static const struct pinconf_generic_params lpc18xx_params[] = {
 	{"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
