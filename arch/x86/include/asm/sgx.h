@@ -14,6 +14,7 @@
 
 struct sgx_epc_page {
 	unsigned long desc;
+	void *owner;
 	struct list_head list;
 };
 
@@ -309,10 +310,17 @@ static inline int __emodt(struct sgx_secinfo *secinfo, void __iomem *addr)
 	return __encls_ret_2(SGX_EMODT, secinfo, addr);
 }
 
-struct sgx_epc_page *sgx_alloc_page(void);
+struct sgx_epc_page *sgx_alloc_page(void *owner, bool reclaim);
 int __sgx_free_page(struct sgx_epc_page *page);
 void sgx_free_page(struct sgx_epc_page *page);
 int sgx_einit(struct sgx_sigstruct *sigstruct, struct sgx_einittoken *token,
 	      struct sgx_epc_page *secs, u64 *lepubkeyhash);
+void sgx_page_reclaimable(struct sgx_epc_page *page);
+
+bool sgx_encl_page_get(struct sgx_epc_page *epc_page);
+void sgx_encl_page_put(struct sgx_epc_page *epc_page);
+bool sgx_encl_page_reclaim(struct sgx_epc_page *epc_page);
+void sgx_encl_page_block(struct sgx_epc_page *epc_page);
+void sgx_encl_page_write(struct sgx_epc_page *epc_page);
 
 #endif /* _ASM_X86_SGX_H */

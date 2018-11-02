@@ -13,7 +13,7 @@ static struct sgx_epc_page *__sgx_load_faulted_page(
 	struct sgx_epc_page *epc_page;
 	int ret;
 
-	epc_page = sgx_alloc_page();
+	epc_page = sgx_alloc_page(encl_page, false);
 	if (IS_ERR(epc_page))
 		return epc_page;
 	ret = sgx_encl_load_page(encl_page, epc_page);
@@ -73,6 +73,7 @@ static struct sgx_encl_page *__sgx_fault_page(struct vm_area_struct *vma,
 
 	encl->secs_child_cnt++;
 	sgx_test_and_clear_young(entry);
+	sgx_page_reclaimable(entry->epc_page);
 	if (do_reserve)
 		entry->desc |= SGX_ENCL_PAGE_RESERVED;
 

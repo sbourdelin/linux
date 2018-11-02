@@ -1916,6 +1916,7 @@ config X86_INTEL_MEMORY_PROTECTION_KEYS
 config INTEL_SGX_CORE
 	bool "Intel SGX core functionality"
 	depends on X86_64 && CPU_SUP_INTEL
+	select INTEL_SGX
 	help
 	Intel Software Guard eXtensions (SGX) CPU feature that allows ring 3
 	applications to create enclaves: private regions of memory that are
