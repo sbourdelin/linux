@@ -7,6 +7,7 @@
 #include <linux/compiler.h>
 #include <linux/kasan-checks.h>
 #include <linux/string.h>
+#include <linux/nospec.h>
 #include <asm/asm.h>
 #include <asm/page.h>
 #include <asm/smap.h>
@@ -69,6 +70,33 @@ static inline bool __chk_range_not_ok(unsigned long addr, unsigned long size, un
 	__chk_range_not_ok((unsigned long __force)(addr), size, limit); \
 })
 
+/*
+ * Test whether a block of memory is a valid user space address.
+ * Returns 0 if the range is valid, address itself otherwise.
+ */
+static inline unsigned long __verify_range_nospec(unsigned long addr,
+						  unsigned long size,
+						  unsigned long limit)
+{
+	/* Be careful about overflow */
+	limit = array_index_nospec(limit, size);
+
+	/*
+	 * If we have used "sizeof()" for the size,
+	 * we know it won't overflow the limit (but
+	 * it might overflow the 'addr', so it's
+	 * important to subtract the size from the
+	 * limit, not add it to the address).
+	 */
+	if (__builtin_constant_p(size)) {
+		return array_index_nospec(addr, limit - size + 1);
+	}
+
+	/* Arbitrary sizes? Be careful about overflow */
+	return array_index_mask_nospec(limit, size) &
+		array_index_nospec(addr, limit - size + 1);
+}
+
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
 # define WARN_ON_IN_IRQ()	WARN_ON_ONCE(!in_task())
 #else
@@ -95,11 +123,45 @@ static inline bool __chk_range_not_ok(unsigned long addr, unsigned long size, un
  * checks that the pointer is in the user space range - after calling
  * this function, memory access functions may still return -EFAULT.
  */
-#define access_ok(type, addr, size)					\
+#define unsafe_access_ok(type, addr, size)					\
 ({									\
 	WARN_ON_IN_IRQ();						\
 	likely(!__range_not_ok(addr, size, user_addr_max()));		\
 })
+
+/**
+ * access_ok_nospec: - Checks if a user space pointer is valid
+ * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE.  Note that
+ *        %VERIFY_WRITE is a superset of %VERIFY_READ - if it is safe
+ *        to write to a block, it is always safe to read from it.
+ * @addr: User space pointer to start of block to check
+ * @size: Size of block to check
+ *
+ * Context: User context only. This function may sleep if pagefaults are
+ *          enabled.
+ *
+ * Checks if a pointer to a block of memory in user space is valid.
+ *
+ * Returns address itself (nonzero) if the memory block may be valid,
+ * zero if it is definitely invalid.
+ *
+ * To prevent speculation, the returned value must then be used
+ * for accesses.
+ *
+ * Note that, depending on architecture, this function probably just
+ * checks that the pointer is in the user space range - after calling
+ * this function, memory access functions may still return -EFAULT.
+ */
+#define access_ok_nospec(type, addr, size)			\
+({								\
+	WARN_ON_IN_IRQ();					\
+	__chk_user_ptr(addr);					\
+	addr = (typeof(addr) __force)				\
+	__verify_range_nospec((unsigned long __force)(addr),	\
+			       size, user_addr_max());		\
+})
+
+#define access_ok(type, addr, size) access_ok_nospec(type, addr, size)
 
 /*
  * These are the main single-value transfer routines.  They automatically
