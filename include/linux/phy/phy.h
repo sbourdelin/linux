@@ -72,6 +72,7 @@ struct phy_ops {
  */
 struct phy_attrs {
 	u32			bus_width;
+	u32			max_bitrate;
 	enum phy_mode		mode;
 };
 
@@ -178,6 +179,10 @@ static inline int phy_get_bus_width(struct phy *phy)
 static inline void phy_set_bus_width(struct phy *phy, int bus_width)
 {
 	phy->attrs.bus_width = bus_width;
+}
+static inline int phy_get_max_bitrate(struct phy *phy)
+{
+	return phy->attrs.max_bitrate;
 }
 struct phy *phy_get(struct device *dev, const char *string);
 struct phy *phy_optional_get(struct device *dev, const char *string);
