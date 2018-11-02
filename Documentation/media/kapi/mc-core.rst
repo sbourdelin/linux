@@ -257,8 +257,45 @@ Subsystems should facilitate link validation by providing subsystem specific
 helper functions to provide easy access for commonly needed information, and
 in the end provide a way to use driver-specific callbacks.
 
+Media Controller Device Allocator API
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When media device belongs to more than one driver, the shared media device
+is allocated with the shared struct device as the key for look ups.
+
+Shared media device should stay in registered state until the last driver
+unregisters it. In addition, media device should be released when all the
+references are released. Each driver gets a reference to the media device
+during probe, when it allocates the media device. If media device is already
+allocated, allocate API bumps up the refcount and return the existing media
+device. Driver puts the reference back from its disconnect routine when it
+calls :c:func:`media_device_delete()`.
+
+Media device is unregistered and cleaned up from the kref put handler to
+ensure that the media device stays in registered state until the last driver
+unregisters the media device.
+
+**Driver Usage**
+
+Drivers should use the media-core routines to get register reference and
+call :c:func:`media_device_delete()` routine to make sure the shared media
+device delete is handled correctly.
+
+**driver probe:**
+Call :c:func:`media_device_usb_allocate()` to allocate or get a reference
+Call :c:func:`media_device_register()`, if media devnode isn't registered
+
+**driver disconnect:**
+Call :c:func:`media_device_delete()` to free the media_device. Free'ing is
+handled by the kref put handler.
+
+API Definitions
+^^^^^^^^^^^^^^^
+
 .. kernel-doc:: include/media/media-device.h
 
 .. kernel-doc:: include/media/media-devnode.h
 
 .. kernel-doc:: include/media/media-entity.h
+
+.. kernel-doc:: include/media/media-dev-allocator.h
