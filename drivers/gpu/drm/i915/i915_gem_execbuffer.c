@@ -613,7 +613,7 @@ static int eb_reserve_vma(const struct i915_execbuffer *eb,
 
 	if (exec_flags & EXEC_OBJECT_PINNED) {
 		pin_flags |= entry->offset | PIN_OFFSET_FIXED;
-		pin_flags &= ~PIN_NONBLOCK; /* force overlapping checks */
+		pin_flags &= ~(u64)PIN_NONBLOCK; /* force overlapping checks */
 	} else if (exec_flags & __EXEC_OBJECT_NEEDS_BIAS) {
 		pin_flags |= BATCH_OFFSET_BIAS | PIN_OFFSET_BIAS;
 	}
