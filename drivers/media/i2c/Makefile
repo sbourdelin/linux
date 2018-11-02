@@ -111,5 +111,6 @@ obj-$(CONFIG_VIDEO_IMX274)	+= imx274.o
 obj-$(CONFIG_VIDEO_IMX319)	+= imx319.o
 obj-$(CONFIG_VIDEO_IMX355)	+= imx355.o
 obj-$(CONFIG_VIDEO_MAX9286)	+= max9286.o
+obj-$(CONFIG_VIDEO_RDACM20)	+= rdacm20.o
 
 obj-$(CONFIG_SDR_MAX2175) += max2175.o

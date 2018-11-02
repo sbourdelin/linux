@@ -989,6 +989,17 @@ config VIDEO_S5C73M3
 	  This is a V4L2 sensor driver for Samsung S5C73M3
 	  8 Mpixel camera.
 
+config VIDEO_RDACM20
+	tristate "IMI RDACM20 camera support"
+	depends on I2C && VIDEO_V4L2_SUBDEV_API && MEDIA_CONTROLLER
+	select V4L2_FWNODE
+	help
+	  This driver supports the IMI RDACM20 GMSL camera, used in
+	  ADAS systems.
+
+	  This camera should be used in conjunction with a GMSL
+	  deserialiser such as the MAX9286.
+
 comment "Flash devices"
 
 config VIDEO_ADP1653
