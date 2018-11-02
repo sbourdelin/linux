@@ -331,15 +331,11 @@ megasas_free_cmds_fusion(struct megasas_instance *instance)
 		kfree(fusion->cmd_list);
 	}
 
-	if (fusion->sg_dma_pool) {
-		dma_pool_destroy(fusion->sg_dma_pool);
-		fusion->sg_dma_pool = NULL;
-	}
-	if (fusion->sense_dma_pool) {
-		dma_pool_destroy(fusion->sense_dma_pool);
-		fusion->sense_dma_pool = NULL;
-	}
+	dma_pool_destroy(fusion->sg_dma_pool);
+	fusion->sg_dma_pool = NULL;
 
+	dma_pool_destroy(fusion->sense_dma_pool);
+	fusion->sense_dma_pool = NULL;
 
 	/* Reply Frame, Desc*/
 	if (instance->is_rdpq)
@@ -356,10 +352,9 @@ megasas_free_cmds_fusion(struct megasas_instance *instance)
 		dma_pool_free(fusion->io_request_frames_pool,
 			fusion->io_request_frames,
 			fusion->io_request_frames_phys);
-	if (fusion->io_request_frames_pool) {
-		dma_pool_destroy(fusion->io_request_frames_pool);
-		fusion->io_request_frames_pool = NULL;
-	}
+
+	dma_pool_destroy(fusion->io_request_frames_pool);
+	fusion->io_request_frames_pool = NULL;
 }
 
 /**
@@ -807,10 +802,8 @@ megasas_free_rdpq_fusion(struct megasas_instance *instance) {
 
 	}
 
-	if (fusion->reply_frames_desc_pool)
-		dma_pool_destroy(fusion->reply_frames_desc_pool);
-	if (fusion->reply_frames_desc_pool_align)
-		dma_pool_destroy(fusion->reply_frames_desc_pool_align);
+	dma_pool_destroy(fusion->reply_frames_desc_pool);
+	dma_pool_destroy(fusion->reply_frames_desc_pool_align);
 
 	if (fusion->rdpq_virt)
 		dma_free_coherent(&instance->pdev->dev,
@@ -830,8 +823,7 @@ megasas_free_reply_fusion(struct megasas_instance *instance) {
 			fusion->reply_frames_desc[0],
 			fusion->reply_frames_desc_phys[0]);
 
-	if (fusion->reply_frames_desc_pool)
-		dma_pool_destroy(fusion->reply_frames_desc_pool);
+	dma_pool_destroy(fusion->reply_frames_desc_pool);
 
 }
 
