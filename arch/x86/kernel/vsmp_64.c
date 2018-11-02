@@ -146,8 +146,10 @@ static void __init detect_vsmp_box(void)
 		is_vsmp = 1;
 }
 
-static int is_vsmp_box(void)
+static int __init is_vsmp_box(void)
 {
+	detect_vsmp_box();
+
 	if (is_vsmp != -1)
 		return is_vsmp;
 	else {
@@ -157,10 +159,7 @@ static int is_vsmp_box(void)
 }
 
 #else
-static void __init detect_vsmp_box(void)
-{
-}
-static int is_vsmp_box(void)
+static __always_inline int is_vsmp_box(void)
 {
 	return 0;
 }
@@ -213,7 +212,6 @@ static void vsmp_apic_post_init(void)
 
 void __init vsmp_init(void)
 {
-	detect_vsmp_box();
 	if (!is_vsmp_box())
 		return;
 
