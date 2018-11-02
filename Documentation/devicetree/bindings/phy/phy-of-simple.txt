@@ -1,0 +1,29 @@
+Generic simple phy device tree binding
+--------------------------------------
+
+A good number of phy implementations merely read dts properties,
+enable clocks, regulators or do resets without having a dedicated register
+map. This binding implements a generic phy driver which can be used for
+such simple implementations and avoid boilerplate code duplication.
+
+Required Properties:
+-  compatible	: must be "simple-phy"
+-  phy-cells    : must be 0
+
+Optional Properties:
+-  bus-width	: generic bus-width. Must be positive.
+-  max-bitrate	: generic max-bitrate. Must be positive.
+-  pwr		: phandle to phy pwr regulator node.
+
+Example:
+
+The following example is a can transceiver implemented as a generic phy.
+It has a max-bitrate property and a pwr regulator.
+
+
+transceiver1: can-transceiver {
+	compatible = "simple-phy";
+	max-bitrate = <5000000>;
+	pwr-supply = <&transceiver1_fixed>;
+	#phy-cells = <0>;
+};
