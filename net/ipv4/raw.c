@@ -805,7 +805,7 @@ out:
 	return copied;
 }
 
-static int raw_init(struct sock *sk)
+static int raw_sk_init(struct sock *sk)
 {
 	struct raw_sock *rp = raw_sk(sk);
 
@@ -970,7 +970,7 @@ struct proto raw_prot = {
 	.connect	   = ip4_datagram_connect,
 	.disconnect	   = __udp_disconnect,
 	.ioctl		   = raw_ioctl,
-	.init		   = raw_init,
+	.init		   = raw_sk_init,
 	.setsockopt	   = raw_setsockopt,
 	.getsockopt	   = raw_getsockopt,
 	.sendmsg	   = raw_sendmsg,
@@ -1132,5 +1132,17 @@ int __init raw_proc_init(void)
 void __init raw_proc_exit(void)
 {
 	unregister_pernet_subsys(&raw_net_ops);
+}
+
+static void raw_sysctl_init(void)
+{
+#ifdef CONFIG_NET_L3_MASTER_DEV
+	init_net.ipv4.sysctl_raw_l3mdev_accept = 1;
+#endif
+}
+
+void __init raw_init(void)
+{
+	raw_sysctl_init();
 }
 #endif /* CONFIG_PROC_FS */
