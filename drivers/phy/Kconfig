@@ -40,6 +40,13 @@ config PHY_XGENE
 	help
 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
 
+config PHY_OF_SIMPLE
+	tristate "PHY Simple Driver"
+	select GENERIC_PHY
+	help
+	  This driver supports simple generic phy implementations which don't
+	  need a dedicated register map.
+
 source "drivers/phy/allwinner/Kconfig"
 source "drivers/phy/amlogic/Kconfig"
 source "drivers/phy/broadcom/Kconfig"
