@@ -1612,7 +1612,7 @@ static void balance_dirty_pages(struct bdi_writeback *wb,
 			bg_thresh = gdtc->bg_thresh;
 		}
 
-		if (mdtc) {
+		if (IS_ENABLED(CONFIG_CGROUP_WRITEBACK) && mdtc) {
 			unsigned long filepages, headroom, writeback;
 
 			/*
@@ -1945,7 +1945,7 @@ bool wb_over_bg_thresh(struct bdi_writeback *wb)
 	    wb_calc_thresh(gdtc->wb, gdtc->bg_thresh))
 		return true;
 
-	if (mdtc) {
+	if (IS_ENABLED(CONFIG_CGROUP_WRITEBACK) && mdtc) {
 		unsigned long filepages, headroom, writeback;
 
 		mem_cgroup_wb_stats(wb, &filepages, &headroom, &mdtc->dirty,
