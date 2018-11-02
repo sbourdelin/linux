@@ -1729,78 +1729,96 @@ static blk_status_t __blk_mq_issue_directly(struct blk_mq_hw_ctx *hctx,
 	return ret;
 }
 
-static blk_status_t __blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
+enum mq_issue_decision {
+	MQ_ISSUE_INSERT_QUEUE,
+	MQ_ISSUE_END_REQUEST,
+	MQ_ISSUE_DO_NOTHING,
+};
+
+static inline enum mq_issue_decision
+	blk_mq_make_dicision(blk_status_t ret, bool bypass)
+{
+	enum mq_issue_decision dec;
+
+	switch(ret) {
+	case BLK_STS_OK:
+		dec = MQ_ISSUE_DO_NOTHING;
+		break;
+	case BLK_STS_DEV_RESOURCE:
+	case BLK_STS_RESOURCE:
+		dec = bypass ? MQ_ISSUE_DO_NOTHING : MQ_ISSUE_INSERT_QUEUE;
+		break;
+	default:
+		dec = bypass ? MQ_ISSUE_DO_NOTHING : MQ_ISSUE_END_REQUEST;
+		break;
+	}
+
+	return dec;
+}
+
+static blk_status_t blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 						struct request *rq,
 						blk_qc_t *cookie,
-						bool bypass_insert)
+						bool bypass)
 {
 	struct request_queue *q = rq->q;
 	bool run_queue = true;
-
-	/*
-	 * RCU or SRCU read lock is needed before checking quiesced flag.
-	 *
-	 * When queue is stopped or quiesced, ignore 'bypass_insert' from
-	 * blk_mq_request_issue_directly(), and return BLK_STS_OK to caller,
-	 * and avoid driver to try to dispatch again.
-	 */
-	if (blk_mq_hctx_stopped(hctx) || blk_queue_quiesced(q)) {
-		run_queue = false;
-		bypass_insert = false;
-		goto insert;
-	}
-
-	if (q->elevator && !bypass_insert)
-		goto insert;
-
-	if (!blk_mq_get_dispatch_budget(hctx))
-		goto insert;
-
-	if (!blk_mq_get_driver_tag(rq)) {
-		blk_mq_put_dispatch_budget(hctx);
-		goto insert;
-	}
-
-	return __blk_mq_issue_directly(hctx, rq, cookie);
-insert:
-	if (bypass_insert)
-		return BLK_STS_RESOURCE;
-
-	blk_mq_sched_insert_request(rq, false, run_queue, false);
-	return BLK_STS_OK;
-}
-
-static void blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
-		struct request *rq, blk_qc_t *cookie)
-{
-	blk_status_t ret;
+	blk_status_t ret = BLK_STS_RESOURCE;
+	enum mq_issue_decision dec;
 	int srcu_idx;
-
-	might_sleep_if(hctx->flags & BLK_MQ_F_BLOCKING);
 
 	hctx_lock(hctx, &srcu_idx);
 
-	ret = __blk_mq_try_issue_directly(hctx, rq, cookie, false);
-	if (ret == BLK_STS_RESOURCE || ret == BLK_STS_DEV_RESOURCE)
-		blk_mq_sched_insert_request(rq, false, true, false);
-	else if (ret != BLK_STS_OK)
-		blk_mq_end_request(rq, ret);
+	/*
+	 * hctx_lock is needed before checking quiesced flag.
+	 *
+	 * When queue is stopped or quiesced, ignore 'bypass', insert
+	 * and return BLK_STS_OK to caller, and avoid driver to try to
+	 * dispatch again.
+	 */
+	if (blk_mq_hctx_stopped(hctx) || blk_queue_quiesced(q)) {
+		run_queue = false;
+		bypass = false;
+		goto out_unlock;
+	}
 
+	if (q->elevator && !bypass)
+		goto out_unlock;
+
+	if (!blk_mq_get_dispatch_budget(hctx))
+		goto out_unlock;
+
+	if (!blk_mq_get_driver_tag(rq)) {
+		blk_mq_put_dispatch_budget(hctx);
+		goto out_unlock;
+	}
+
+	ret = __blk_mq_issue_directly(hctx, rq, cookie);
+
+out_unlock:
 	hctx_unlock(hctx, srcu_idx);
+
+	dec = blk_mq_make_dicision(ret, bypass);
+	switch(dec) {
+	case MQ_ISSUE_INSERT_QUEUE:
+		blk_mq_sched_insert_request(rq, false, run_queue, false);
+		break;
+	case MQ_ISSUE_END_REQUEST:
+		blk_mq_end_request(rq, ret);
+		break;
+	default:
+		return ret;
+	}
+
+	return BLK_STS_OK;
 }
 
 blk_status_t blk_mq_request_issue_directly(struct request *rq)
 {
-	blk_status_t ret;
-	int srcu_idx;
 	struct blk_mq_ctx *ctx = rq->mq_ctx;
 	struct blk_mq_hw_ctx *hctx = blk_mq_map_queue(rq->q, ctx->cpu);
 
-	hctx_lock(hctx, &srcu_idx);
-	ret = __blk_mq_try_issue_directly(hctx, rq, NULL, true);
-	hctx_unlock(hctx, srcu_idx);
-
-	return ret;
+	return blk_mq_try_issue_directly(hctx, rq, NULL, true);
 }
 
 void blk_mq_try_issue_list_directly(struct blk_mq_hw_ctx *hctx,
@@ -1922,13 +1940,13 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 			data.hctx = blk_mq_map_queue(q,
 					same_queue_rq->mq_ctx->cpu);
 			blk_mq_try_issue_directly(data.hctx, same_queue_rq,
-					&cookie);
+					&cookie, false);
 		}
 	} else if ((q->nr_hw_queues > 1 && is_sync) || (!q->elevator &&
 			!data.hctx->dispatch_busy)) {
 		blk_mq_put_ctx(data.ctx);
 		blk_mq_bio_to_request(rq, bio);
-		blk_mq_try_issue_directly(data.hctx, rq, &cookie);
+		blk_mq_try_issue_directly(data.hctx, rq, &cookie, false);
 	} else {
 		blk_mq_put_ctx(data.ctx);
 		blk_mq_bio_to_request(rq, bio);
