@@ -46,13 +46,16 @@ struct macvlan_port {
 	struct net_device	*dev;
 	struct hlist_head	vlan_hash[MACVLAN_HASH_SIZE];
 	struct list_head	vlans;
-	struct sk_buff_head	bc_queue;
-	struct work_struct	bc_work;
 	u32			flags;
 	int			count;
 	struct hlist_head	vlan_source_hash[MACVLAN_HASH_SIZE];
 	DECLARE_BITMAP(mc_filter, MACVLAN_MC_FILTER_SZ);
 	unsigned char           perm_addr[ETH_ALEN];
+};
+
+struct macvlan_bc_work {
+	struct sk_buff_head	bc_queue;
+	struct work_struct	bc_work;
 };
 
 struct macvlan_source_entry {
@@ -63,6 +66,7 @@ struct macvlan_source_entry {
 };
 
 struct macvlan_skb_cb {
+	const struct macvlan_port *port;
 	const struct macvlan_dev *src;
 };
 
@@ -295,20 +299,23 @@ static void macvlan_broadcast(struct sk_buff *skb,
 	}
 }
 
+static DEFINE_PER_CPU(struct macvlan_bc_work, macvlan_bc_work);
+
 static void macvlan_process_broadcast(struct work_struct *w)
 {
-	struct macvlan_port *port = container_of(w, struct macvlan_port,
+	struct macvlan_bc_work *work = container_of(w, struct macvlan_bc_work,
 						 bc_work);
 	struct sk_buff *skb;
 	struct sk_buff_head list;
 
 	__skb_queue_head_init(&list);
 
-	spin_lock_bh(&port->bc_queue.lock);
-	skb_queue_splice_tail_init(&port->bc_queue, &list);
-	spin_unlock_bh(&port->bc_queue.lock);
+	spin_lock_bh(&work->bc_queue.lock);
+	skb_queue_splice_tail_init(&work->bc_queue, &list);
+	spin_unlock_bh(&work->bc_queue.lock);
 
 	while ((skb = __skb_dequeue(&list))) {
+		const struct macvlan_port *port = MACVLAN_SKB_CB(skb)->port;
 		const struct macvlan_dev *src = MACVLAN_SKB_CB(skb)->src;
 
 		rcu_read_lock();
@@ -345,6 +352,7 @@ static void macvlan_broadcast_enqueue(struct macvlan_port *port,
 				      const struct macvlan_dev *src,
 				      struct sk_buff *skb)
 {
+	struct macvlan_bc_work *work;
 	struct sk_buff *nskb;
 	int err = -ENOMEM;
 
@@ -352,24 +360,30 @@ static void macvlan_broadcast_enqueue(struct macvlan_port *port,
 	if (!nskb)
 		goto err;
 
+	MACVLAN_SKB_CB(nskb)->port = port;
 	MACVLAN_SKB_CB(nskb)->src = src;
 
-	spin_lock(&port->bc_queue.lock);
-	if (skb_queue_len(&port->bc_queue) < MACVLAN_BC_QUEUE_LEN) {
+	work = get_cpu_ptr(&macvlan_bc_work);
+
+	spin_lock(&work->bc_queue.lock);
+	if (skb_queue_len(&work->bc_queue) < MACVLAN_BC_QUEUE_LEN) {
 		if (src)
 			dev_hold(src->dev);
-		__skb_queue_tail(&port->bc_queue, nskb);
+		__skb_queue_tail(&work->bc_queue, nskb);
 		err = 0;
 	}
-	spin_unlock(&port->bc_queue.lock);
+	spin_unlock(&work->bc_queue.lock);
 
 	if (err)
 		goto free_nskb;
 
-	schedule_work(&port->bc_work);
+	schedule_work_on(smp_processor_id(), &work->bc_work);
+	put_cpu_ptr(work);
+
 	return;
 
 free_nskb:
+	put_cpu_ptr(work);
 	kfree_skb(nskb);
 err:
 	atomic_long_inc(&skb->dev->rx_dropped);
@@ -1168,9 +1182,6 @@ static int macvlan_port_create(struct net_device *dev)
 	for (i = 0; i < MACVLAN_HASH_SIZE; i++)
 		INIT_HLIST_HEAD(&port->vlan_source_hash[i]);
 
-	skb_queue_head_init(&port->bc_queue);
-	INIT_WORK(&port->bc_work, macvlan_process_broadcast);
-
 	err = netdev_rx_handler_register(dev, macvlan_handle_frame, port);
 	if (err)
 		kfree(port);
@@ -1182,24 +1193,16 @@ static int macvlan_port_create(struct net_device *dev)
 static void macvlan_port_destroy(struct net_device *dev)
 {
 	struct macvlan_port *port = macvlan_port_get_rtnl(dev);
-	struct sk_buff *skb;
+	int cpu;
 
 	dev->priv_flags &= ~IFF_MACVLAN_PORT;
 	netdev_rx_handler_unregister(dev);
 
 	/* After this point, no packet can schedule bc_work anymore,
-	 * but we need to cancel it and purge left skbs if any.
+	 * but we need to flush work.
 	 */
-	cancel_work_sync(&port->bc_work);
-
-	while ((skb = __skb_dequeue(&port->bc_queue))) {
-		const struct macvlan_dev *src = MACVLAN_SKB_CB(skb)->src;
-
-		if (src)
-			dev_put(src->dev);
-
-		kfree_skb(skb);
-	}
+	for_each_possible_cpu(cpu)
+		flush_work(per_cpu_ptr(&macvlan_bc_work.bc_work, cpu));
 
 	/* If the lower device address has been changed by passthru
 	 * macvlan, put it back.
@@ -1702,7 +1705,15 @@ static struct notifier_block macvlan_notifier_block __read_mostly = {
 
 static int __init macvlan_init_module(void)
 {
-	int err;
+	int err, cpu;
+
+	for_each_possible_cpu(cpu) {
+		struct macvlan_bc_work *work;
+
+		work = per_cpu_ptr(&macvlan_bc_work, cpu);
+		skb_queue_head_init(&work->bc_queue);
+		INIT_WORK(&work->bc_work, macvlan_process_broadcast);
+	}
 
 	register_netdevice_notifier(&macvlan_notifier_block);
 
