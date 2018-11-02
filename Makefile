@@ -135,6 +135,7 @@ KBUILD_OUTPUT := $(shell mkdir -p $(KBUILD_OUTPUT) && cd $(KBUILD_OUTPUT) \
 $(if $(KBUILD_OUTPUT),, \
      $(error failed to create output directory "$(saved-output)"))
 
+export KBUILD_OUTPUT
 # Look for make include files relative to root of kernel src
 #
 # This does not become effective immediately because MAKEFLAGS is re-parsed
@@ -597,7 +598,11 @@ virt-y		:= virt/
 endif # KBUILD_EXTMOD
 
 ifeq ($(dot-config),1)
+ifeq ($(KBUILD_OUTPUT),)
 include include/config/auto.conf
+else
+include $(KBUILD_OUTPUT)/include/config/auto.conf
+endif
 endif
 
 # The all: target is the default when no target is given on the
