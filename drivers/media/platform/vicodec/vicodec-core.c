@@ -636,6 +636,17 @@ static int vidioc_s_fmt(struct vicodec_ctx *ctx, struct v4l2_format *f)
 		q_data->width = pix->width;
 		q_data->height = pix->height;
 		q_data->sizeimage = pix->sizeimage;
+
+		/* Propagate changes to CAPTURE queue */
+		if (V4L2_TYPE_IS_OUTPUT(f->type)) {
+			struct v4l2_pix_format dst_pix;
+
+			v4l2_fill_pixfmt(&dst_pix, ctx->q_data[V4L2_M2M_DST].info->id,
+					pix->width, pix->height);
+			ctx->q_data[V4L2_M2M_DST].width = pix->width;
+			ctx->q_data[V4L2_M2M_DST].height = pix->height;
+			ctx->q_data[V4L2_M2M_DST].sizeimage = dst_pix.sizeimage;
+		}
 		break;
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
@@ -656,6 +667,17 @@ static int vidioc_s_fmt(struct vicodec_ctx *ctx, struct v4l2_format *f)
 		q_data->width = pix_mp->width;
 		q_data->height = pix_mp->height;
 		q_data->sizeimage = pix_mp->plane_fmt[0].sizeimage;
+
+		/* Propagate changes to CAPTURE queue */
+		if (V4L2_TYPE_IS_OUTPUT(f->type)) {
+			struct v4l2_pix_format_mplane dst_pix;
+
+			v4l2_fill_pixfmt_mp(&dst_pix, ctx->q_data[V4L2_M2M_DST].info->id,
+					pix_mp->width, pix_mp->height);
+			ctx->q_data[V4L2_M2M_DST].width = pix_mp->width;
+			ctx->q_data[V4L2_M2M_DST].height = pix_mp->height;
+			ctx->q_data[V4L2_M2M_DST].sizeimage = dst_pix.plane_fmt[0].sizeimage;
+		}
 		break;
 	default:
 		return -EINVAL;
