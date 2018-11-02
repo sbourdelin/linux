@@ -6,6 +6,8 @@ obj-$(CONFIG_INTEL_SGX) += intel_sgx.o
 
 intel_sgx-$(CONFIG_INTEL_SGX) += \
 	sgx_encl.o \
+	sgx_encl_page.o \
+	sgx_fault.o \
 	sgx_ioctl.o \
 	sgx_main.o \
 	sgx_util.o \
