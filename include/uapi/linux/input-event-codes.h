@@ -689,6 +689,19 @@
 #define BTN_TRIGGER_HAPPY39		0x2e6
 #define BTN_TRIGGER_HAPPY40		0x2e7
 
+/* Remote control buttons found across provider & universal remotes */
+#define KEY_LIVE_TV			0x2e8	/* Jump to live tv viewing */
+#define KEY_OPTIONS			0x2e9	/* Jump to options */
+#define KEY_INTERACTIVE			0x2ea	/* Jump to interactive system/menu/item */
+#define KEY_MIC_INPUT			0x2eb	/* Trigger MIC input/listen mode */
+#define KEY_SCREEN_INPUT		0x2ec	/* Open on-screen input system */
+#define KEY_SYSTEM			0x2ed	/* Open systems menu/display */
+#define KEY_SERVICES			0x2ee	/* Open services menu/display */
+#define KEY_DISPLAY_FORMAT		0x2ef	/* Cycle display formats */
+#define KEY_PIP				0x2f0	/* Toggle Picture-in-Picture on/off */
+#define KEY_PIP_SWAP			0x2f1	/* Swap contents between main view and PIP window */
+#define KEY_PIP_POSITION		0x2f2	/* Cycle PIP window position */
+
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE
 #define KEY_MAX			0x2ff
