@@ -4694,10 +4694,10 @@ unsigned long nr_free_pagecache_pages(void)
 	return nr_free_zone_pages(gfp_zone(GFP_HIGHUSER_MOVABLE));
 }
 
-static inline void show_node(struct zone *zone)
+static inline void show_node(struct zone *zone, struct printk_buffer *buf)
 {
 	if (IS_ENABLED(CONFIG_NUMA))
-		printk("Node %d ", zone_to_nid(zone));
+		printk_buffered(buf, "Node %d ", zone_to_nid(zone));
 }
 
 long si_mem_available(void)
@@ -4814,7 +4814,7 @@ static bool show_mem_node_skip(unsigned int flags, int nid, nodemask_t *nodemask
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 
-static void show_migration_types(unsigned char type)
+static void show_migration_types(unsigned char type, struct printk_buffer *buf)
 {
 	static const char types[MIGRATE_TYPES] = {
 		[MIGRATE_UNMOVABLE]	= 'U',
@@ -4838,7 +4838,7 @@ static void show_migration_types(unsigned char type)
 	}
 
 	*p = '\0';
-	printk(KERN_CONT "(%s) ", tmp);
+	printk_buffered(buf, "(%s) ", tmp);
 }
 
 /*
@@ -4852,6 +4852,7 @@ static void show_migration_types(unsigned char type)
  */
 void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 {
+	struct printk_buffer *buf = get_printk_buffer();
 	unsigned long free_pcp = 0;
 	int cpu;
 	struct zone *zone;
@@ -4950,8 +4951,8 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		for_each_online_cpu(cpu)
 			free_pcp += per_cpu_ptr(zone->pageset, cpu)->pcp.count;
 
-		show_node(zone);
-		printk(KERN_CONT
+		show_node(zone, buf);
+		printk_buffered(buf,
 			"%s"
 			" free:%lukB"
 			" min:%lukB"
@@ -4993,10 +4994,10 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			K(free_pcp),
 			K(this_cpu_read(zone->pageset->pcp.count)),
 			K(zone_page_state(zone, NR_FREE_CMA_PAGES)));
-		printk("lowmem_reserve[]:");
+		printk_buffered(buf, "lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
-			printk(KERN_CONT " %ld", zone->lowmem_reserve[i]);
-		printk(KERN_CONT "\n");
+			printk_buffered(buf, " %ld", zone->lowmem_reserve[i]);
+		printk_buffered(buf, "\n");
 	}
 
 	for_each_populated_zone(zone) {
@@ -5006,8 +5007,8 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 
 		if (show_mem_node_skip(filter, zone_to_nid(zone), nodemask))
 			continue;
-		show_node(zone);
-		printk(KERN_CONT "%s: ", zone->name);
+		show_node(zone, buf);
+		printk_buffered(buf, "%s: ", zone->name);
 
 		spin_lock_irqsave(&zone->lock, flags);
 		for (order = 0; order < MAX_ORDER; order++) {
@@ -5025,12 +5026,12 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		}
 		spin_unlock_irqrestore(&zone->lock, flags);
 		for (order = 0; order < MAX_ORDER; order++) {
-			printk(KERN_CONT "%lu*%lukB ",
-			       nr[order], K(1UL) << order);
+			printk_buffered(buf, "%lu*%lukB ",
+					nr[order], K(1UL) << order);
 			if (nr[order])
-				show_migration_types(types[order]);
+				show_migration_types(types[order], buf);
 		}
-		printk(KERN_CONT "= %lukB\n", K(total));
+		printk_buffered(buf, "= %lukB\n", K(total));
 	}
 
 	hugetlb_show_meminfo();
@@ -5038,6 +5039,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 	printk("%ld total pagecache pages\n", global_node_page_state(NR_FILE_PAGES));
 
 	show_swap_cache_info();
+	put_printk_buffer(buf);
 }
 
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
