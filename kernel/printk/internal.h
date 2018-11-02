@@ -22,6 +22,9 @@
 #define PRINTK_NMI_DIRECT_CONTEXT_MASK	 0x40000000
 #define PRINTK_NMI_CONTEXT_MASK		 0x80000000
 
+#define PREFIX_MAX		32
+#define LOG_LINE_MAX		(1024 - PREFIX_MAX)
+
 extern raw_spinlock_t logbuf_lock;
 
 __printf(5, 0)

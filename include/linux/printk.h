@@ -157,6 +157,7 @@ static inline void printk_nmi_direct_enter(void) { }
 static inline void printk_nmi_direct_exit(void) { }
 #endif /* PRINTK_NMI */
 
+struct printk_buffer;
 #ifdef CONFIG_PRINTK
 asmlinkage __printf(5, 0)
 int vprintk_emit(int facility, int level,
@@ -173,6 +174,20 @@ int printk_emit(int facility, int level,
 
 asmlinkage __printf(1, 2) __cold
 int printk(const char *fmt, ...);
+struct printk_buffer *get_printk_buffer(void);
+bool flush_printk_buffer(struct printk_buffer *ptr);
+__printf(2, 3)
+int printk_buffered(struct printk_buffer *ptr, const char *fmt, ...);
+__printf(2, 0)
+int vprintk_buffered(struct printk_buffer *ptr, const char *fmt, va_list args);
+/*
+ * In order to avoid accidentally reusing "ptr" after put_printk_buffer("ptr"),
+ * put_printk_buffer() is defined as a macro which explicitly resets "ptr" to
+ * NULL.
+ */
+void __put_printk_buffer(struct printk_buffer *ptr);
+#define put_printk_buffer(ptr)					\
+	do { __put_printk_buffer(ptr); ptr = NULL; } while (0)
 
 /*
  * Special printk facility for scheduler/timekeeping use only, _DO_NOT_USE_ !
@@ -220,6 +235,17 @@ int printk(const char *s, ...)
 {
 	return 0;
 }
+static inline struct printk_buffer *get_printk_buffer(void)
+{
+	return NULL;
+}
+static inline bool flush_printk_buffer(struct printk_buffer *ptr)
+{
+	return false;
+}
+#define printk_buffered(ptr, fmt, ...) printk(fmt, ##__VA_ARGS__)
+#define vprintk_buffered(ptr, fmt, args) vprintk(fmt, args)
+#define put_printk_buffer(ptr) do { ptr = NULL; } while (0)
 static inline __printf(1, 2) __cold
 int printk_deferred(const char *s, ...)
 {
@@ -330,6 +356,23 @@ extern int kptr_restrict;
 	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #endif
 
+#define bpr_emerg(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_alert(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_ALERT pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_crit(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_err(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_warning(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_warn bpr_warning
+#define bpr_notice(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_NOTICE pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_info(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+#define bpr_cont(ptr, fmt, ...) \
+	printk_buffered(ptr, KERN_CONT fmt, ##__VA_ARGS__)
 
 /* If you are writing a driver, please use dev_dbg instead */
 #if defined(CONFIG_DYNAMIC_DEBUG)
