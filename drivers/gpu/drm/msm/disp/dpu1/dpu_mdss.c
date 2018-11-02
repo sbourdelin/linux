@@ -161,7 +161,7 @@ static void dpu_mdss_destroy(struct drm_device *dev)
 	free_irq(platform_get_irq(pdev, 0), dpu_mdss);
 
 	msm_dss_put_clk(mp->clk_config, mp->num_clk);
-	devm_kfree(&pdev->dev, mp->clk_config);
+	kfree(mp->clk_config);
 
 	if (dpu_mdss->mmio)
 		devm_iounmap(&pdev->dev, dpu_mdss->mmio);
@@ -169,6 +169,8 @@ static void dpu_mdss_destroy(struct drm_device *dev)
 
 	pm_runtime_disable(dev->dev);
 	priv->mdss = NULL;
+
+	kfree(dpu_mdss);
 }
 
 static const struct msm_mdss_funcs mdss_funcs = {
@@ -186,7 +188,7 @@ int dpu_mdss_init(struct drm_device *dev)
 	struct dss_module_power *mp;
 	int ret = 0;
 
-	dpu_mdss = devm_kzalloc(dev->dev, sizeof(*dpu_mdss), GFP_KERNEL);
+	dpu_mdss = kzalloc(sizeof(*dpu_mdss), GFP_KERNEL);
 	if (!dpu_mdss)
 		return -ENOMEM;
 
@@ -239,7 +241,7 @@ irq_error:
 irq_domain_error:
 	msm_dss_put_clk(mp->clk_config, mp->num_clk);
 clk_parse_err:
-	devm_kfree(&pdev->dev, mp->clk_config);
+	kfree(mp->clk_config);
 	if (dpu_mdss->mmio)
 		devm_iounmap(&pdev->dev, dpu_mdss->mmio);
 	dpu_mdss->mmio = NULL;

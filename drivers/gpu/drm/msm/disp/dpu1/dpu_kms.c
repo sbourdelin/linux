@@ -1086,13 +1086,14 @@ static int dpu_bind(struct device *dev, struct device *master, void *data)
 	struct dss_module_power *mp;
 	int ret = 0;
 
-	dpu_kms = devm_kzalloc(&pdev->dev, sizeof(*dpu_kms), GFP_KERNEL);
+	dpu_kms = kzalloc(sizeof(*dpu_kms), GFP_KERNEL);
 	if (!dpu_kms)
 		return -ENOMEM;
 
 	mp = &dpu_kms->mp;
 	ret = msm_dss_parse_clock(pdev, mp);
 	if (ret) {
+		kfree(dpu_kms);
 		DPU_ERROR("failed to parse clocks, ret=%d\n", ret);
 		return ret;
 	}
@@ -1109,7 +1110,7 @@ static int dpu_bind(struct device *dev, struct device *master, void *data)
 	dpu_kms->rpm_enabled = true;
 
 	priv->kms = &dpu_kms->base;
-	return ret;
+	return 0;
 }
 
 static void dpu_unbind(struct device *dev, struct device *master, void *data)
@@ -1120,11 +1121,12 @@ static void dpu_unbind(struct device *dev, struct device *master, void *data)
 
 	dpu_power_resource_deinit(pdev, &dpu_kms->phandle);
 	msm_dss_put_clk(mp->clk_config, mp->num_clk);
-	devm_kfree(&pdev->dev, mp->clk_config);
-	mp->num_clk = 0;
+	kfree(mp->clk_config);
 
 	if (dpu_kms->rpm_enabled)
 		pm_runtime_disable(&pdev->dev);
+
+	kfree(dpu_kms);
 }
 
 static const struct component_ops dpu_ops = {

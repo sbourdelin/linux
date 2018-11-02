@@ -155,9 +155,7 @@ int msm_dss_parse_clock(struct platform_device *pdev,
 		return 0;
 	}
 
-	mp->clk_config = devm_kzalloc(&pdev->dev,
-				      sizeof(struct dss_clk) * num_clk,
-				      GFP_KERNEL);
+	mp->clk_config = kcalloc(num_clk, sizeof(struct dss_clk), GFP_KERNEL);
 	if (!mp->clk_config)
 		return -ENOMEM;
 
