@@ -69,7 +69,7 @@ Following properties relate to DDR timing:
 
 - rockchip,ddr3_odt_dis_freq :	  When the DRAM type is DDR3, this parameter defines
 				  the ODT disable frequency in MHz (Mega Hz).
-				  when the DDR frequency is  less then ddr3_odt_dis_freq,
+				  when the DDR frequency is  less than ddr3_odt_dis_freq,
 				  the ODT on the DRAM side and controller side are
 				  both disabled.
 
@@ -96,7 +96,7 @@ Following properties relate to DDR timing:
 
 - rockchip,lpddr3_odt_dis_freq : When the DRAM type is LPDDR3, this parameter defines
 				  then ODT disable frequency in MHz (Mega Hz).
-				  When DDR frequency is less then ddr3_odt_dis_freq,
+				  When DDR frequency is less than ddr3_odt_dis_freq,
 				  the ODT on the DRAM side and controller side are
 				  both disabled.
 
@@ -124,7 +124,7 @@ Following properties relate to DDR timing:
 
 - rockchip,lpddr4_odt_dis_freq : When the DRAM type is LPDDR4, this parameter
 				  defines the ODT disable frequency in
-				  MHz (Mega Hz). When the DDR frequency is less then
+				  MHz (Mega Hz). When the DDR frequency is less than
 				  ddr3_odt_dis_freq, the ODT on the DRAM side and
 				  controller side are both disabled.
 

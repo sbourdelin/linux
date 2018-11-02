@@ -31,7 +31,7 @@
 #define MAX17042_DEFAULT_TEMP_MIN	(0)    /* For sys without temp sensor */
 #define MAX17042_DEFAULT_TEMP_MAX	(700)  /* 70 degrees Celcius */
 
-/* Consider RepCap which is less then 10 units below FullCAP full */
+/* Consider RepCap which is less than 10 units below FullCAP full */
 #define MAX17042_FULL_THRESHOLD		10
 
 #define MAX17042_CHARACTERIZATION_DATA_SIZE 48

@@ -121,7 +121,7 @@
     capped.
 
     If this parameter is provided, and the number of files specified
-    in “file” argument is greater then the value of “luns”, all excess
+    in “file” argument is greater than the value of “luns”, all excess
     files will be ignored.
 
     If this parameter is not present, the number of logical units will

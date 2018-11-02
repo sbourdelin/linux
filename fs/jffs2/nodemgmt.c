@@ -87,7 +87,7 @@ int jffs2_reserve_space(struct jffs2_sb_info *c, uint32_t minsize,
 	spin_lock(&c->erase_completion_lock);
 
 	/*
-	 * Check if the free space is greater then size of the reserved pool.
+	 * Check if the free space is greater than size of the reserved pool.
 	 * If not, only allow root to proceed with writing.
 	 */
 	if (prio != ALLOC_DELETION && !jffs2_rp_can_write(c)) {

@@ -697,7 +697,7 @@ artpec6_crypto_dma_unmap_all(struct artpec6_crypto_req_common *common)
  * @dst: The virtual address of the data
  * @len: The length of the data
  * @eop: True if this is the last buffer in the packet
- * @use_short: If this is true and the data length is 7 bytes or less then
+ * @use_short: If this is true and the data length is 7 bytes or less than
  *	a short descriptor will be used
  *
  * @return 0 on success

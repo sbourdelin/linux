@@ -398,7 +398,7 @@ static const struct file_operations dfs_fops = {
 	.owner  = THIS_MODULE,
 };
 
-/* As long as the position is less then that total number of erase blocks,
+/* As long as the position is less than that total number of erase blocks,
  * we still have more to print.
  */
 static void *eraseblk_count_seq_start(struct seq_file *s, loff_t *pos)

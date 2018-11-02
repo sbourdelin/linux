@@ -123,7 +123,7 @@
 
 #define SPI_MAX_XFER			(SZ_64K - 64)
 
-/* high speed mode is when bus rate is greater then 26MHz */
+/* high speed mode is when bus rate is greater than 26MHz */
 #define SPI_HS_MIN_RATE			26000000
 #define SPI_MAX_RATE			50000000
 

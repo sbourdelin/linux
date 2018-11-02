@@ -32,7 +32,7 @@
 ENTRY(copy_user_generic_unrolled)
 	ASM_STAC
 	cmpl $8,%edx
-	jb 20f		/* less then 8 bytes, go to byte copy loop */
+	jb 20f		/* less than 8 bytes, go to byte copy loop */
 	ALIGN_DESTINATION
 	movl %edx,%ecx
 	andl $63,%edx
@@ -176,7 +176,7 @@ EXPORT_SYMBOL(copy_user_generic_string)
 ENTRY(copy_user_enhanced_fast_string)
 	ASM_STAC
 	cmpl $64,%edx
-	jb .L_copy_short_string	/* less then 64 bytes, avoid the costly 'rep' */
+	jb .L_copy_short_string	/* less than 64 bytes, avoid the costly 'rep' */
 	movl %edx,%ecx
 1:	rep
 	movsb

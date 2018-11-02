@@ -70,7 +70,7 @@ static void _rtl88e_write_fw(struct ieee80211_hw *hw,
 	remainsize = size % FW_8192C_PAGE_SIZE;
 
 	if (pagenums > 8)
-		pr_err("Page numbers should not greater then 8\n");
+		pr_err("Page numbers should not greater than 8\n");
 
 	for (page = 0; page < pagenums; page++) {
 		offset = page * FW_8192C_PAGE_SIZE;

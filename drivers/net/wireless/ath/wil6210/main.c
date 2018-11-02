@@ -461,7 +461,7 @@ static void wil_fw_error_worker(struct work_struct *work)
 	}
 	wdev = ndev->ieee80211_ptr;
 
-	/* increment @recovery_count if less then WIL6210_FW_RECOVERY_TO
+	/* increment @recovery_count if less than WIL6210_FW_RECOVERY_TO
 	 * passed since last recovery attempt
 	 */
 	if (time_is_after_jiffies(wil->last_fw_recovery +

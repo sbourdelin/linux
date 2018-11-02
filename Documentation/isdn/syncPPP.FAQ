@@ -194,7 +194,7 @@ Q11: I can't connect. How can I check where the problem is.
 
 A: A good help log is the debug output from the ipppd...
    Check whether you can find there:
-   - only a few LCP-conf-req SENT messages (less then 10)
+   - only a few LCP-conf-req SENT messages (less than 10)
      and then a Term-REQ:
      -> check whether your ISDN card is well configured
         it seems, that your machine doesn't dial

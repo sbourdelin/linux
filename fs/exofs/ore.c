@@ -241,7 +241,7 @@ int  _ore_get_io_state(struct ore_layout *layout,
  *
  * If a user needs to call ore_read/write() this version must be used becase it
  * allocates extra stuff for striping and raid.
- * The ore might decide to only IO less then @length bytes do to alignmets
+ * The ore might decide to only IO less than @length bytes do to alignmets
  * and constrains as follows:
  * - The IO cannot cross group boundary.
  * - In raid5/6 The end of the IO must align at end of a stripe eg.

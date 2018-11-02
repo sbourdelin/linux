@@ -486,7 +486,7 @@ static void sci_oem_defaults(struct isci_host *ihost)
 
 		/* Previous Vitesse based expanders had a arbitration issue that
 		 * is worked around by having the upper 32-bits of SAS address
-		 * with a value greater then the Vitesse company identifier.
+		 * with a value greater than the Vitesse company identifier.
 		 * Hence, usage of 0x5FCFFFFF.
 		 */
 		oem->phys[i].sas_address.low = 0x1 + ihost->id;

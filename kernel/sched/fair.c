@@ -5531,7 +5531,7 @@ static unsigned long cpu_avg_load_per_task(int cpu)
 static void record_wakee(struct task_struct *p)
 {
 	/*
-	 * Only decay a single time; tasks that have less then 1 wakeup per
+	 * Only decay a single time; tasks that have less than 1 wakeup per
 	 * jiffy will not have built up many flips.
 	 */
 	if (time_after(jiffies, current->wakee_flip_decay_ts + HZ)) {

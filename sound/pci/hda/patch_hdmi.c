@@ -946,7 +946,7 @@ static int hdmi_setup_stream(struct hda_codec *codec, hda_nid_t cvt_nid,
 }
 
 /* Try to find an available converter
- * If pin_idx is less then zero, just try to find an available converter.
+ * If pin_idx is less than zero, just try to find an available converter.
  * Otherwise, try to find an available converter and get the cvt mux index
  * of the pin.
  */

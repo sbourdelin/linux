@@ -719,7 +719,7 @@ void sctp_ulpq_reasm_flushtsn(struct sctp_ulpq *ulpq, __u32 fwd_tsn)
 
 		/* Since the entire message must be abandoned by the
 		 * sender (item A3 in Section 3.5, RFC 3758), we can
-		 * free all fragments on the list that are less then
+		 * free all fragments on the list that are less than
 		 * or equal to ctsn_point
 		 */
 		if (TSN_lte(tsn, fwd_tsn)) {

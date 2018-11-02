@@ -122,7 +122,7 @@ EXPORT_SYMBOL_GPL(xpc_clear_interface);
  *		       this large enough to hold their largest message.
  *	nentries - max #of XPC message entries a message queue can contain.
  *		   The actual number, which is determined when a connection
- * 		   is established and may be less then requested, will be
+ * 		   is established and may be less than requested, will be
  *		   passed to the user via the xpConnected callout.
  *	assigned_limit - max number of kthreads allowed to be processing
  * 			 messages (per connection) at any given instant.

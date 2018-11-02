@@ -157,7 +157,7 @@ static int calc_rd_timings(struct extif_timings *t)
 		recyc = reoff + 1;
 
 	tw1 = recyc - tw0;
-	/* values less then 3 result in the SOSSI block resetting itself */
+	/* values less than 3 result in the SOSSI block resetting itself */
 	if (tw1 < 3)
 		tw1 = 3;
 	if (tw1 > 0x40)
@@ -206,7 +206,7 @@ static int calc_wr_timings(struct extif_timings *t)
 		wecyc = weoff + 1;
 
 	tw1 = wecyc - tw0;
-	/* values less then 3 result in the SOSSI block resetting itself */
+	/* values less than 3 result in the SOSSI block resetting itself */
 	if (tw1 < 3)
 		tw1 = 3;
 	if (tw1 > 0x40)

@@ -1995,7 +1995,7 @@ EXPORT_SYMBOL_GPL(of_alias_get_id);
  * device match structures and alias stem.
  *
  * Return:	0 or -ENOSYS when !CONFIG_OF or
- *		-EOVERFLOW if alias ID is greater then allocated nbits
+ *		-EOVERFLOW if alias ID is greater than allocated nbits
  */
 int of_alias_get_alias_list(const struct of_device_id *matches,
 			     const char *stem, unsigned long *bitmap,

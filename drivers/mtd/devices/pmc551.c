@@ -40,7 +40,7 @@
  *	reloaded.  Soooo, to help, the module supports an msize
  *	option to allow the specification of the onboard memory, and
  *	an asize option, to allow the specification of the aperture
- *	size.  The aperture must be equal to or less then the memory
+ *	size.  The aperture must be equal to or less than the memory
  *	size, the driver will correct this if you screw it up.  This
  *	problem is not relevant for compiled in drivers as compiled
  *	in drivers only init once.

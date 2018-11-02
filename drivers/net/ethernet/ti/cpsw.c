@@ -883,7 +883,7 @@ static void cpsw_split_res(struct net_device *ndev)
 	} else {
 		max_rate = cpsw->speed * 1000;
 
-		/* if max_rate is less then expected due to reduced link speed,
+		/* if max_rate is less than expected due to reduced link speed,
 		 * split proportionally according next potential max speed
 		 */
 		if (max_rate < consumed_rate)

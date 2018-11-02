@@ -44,7 +44,7 @@ MODULE_LICENSE("GPL");
  * The size of the buffer for iucv data transfer is one page,
  * but in addition to the data we read from iucv we also
  * place an integer and some characters into that buffer,
- * so the maximum size for record data is a little less then
+ * so the maximum size for record data is a little less than
  * one page.
  */
 #define NET_BUFFER_SIZE	(PAGE_SIZE - sizeof(int) - sizeof(FENCE))

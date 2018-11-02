@@ -510,7 +510,7 @@ enum {
 #define HEADER_FMT_16BITS		0x00002000
 #define HEADER_FMT_24BITS		0x00004000
 #define HEADER_FMT_UPTO11		0x00000200	/* frequency is less or equ. to 11k.*/
-#define HEADER_FMT_UPTO32		0x00000100	/* frequency is over 11k and less then 32k.*/
+#define HEADER_FMT_UPTO32		0x00000100	/* frequency is over 11k and less than 32k.*/
 
 /* Constants used to access the Codec */
 #define XX_CODEC_SELECTOR               0x20

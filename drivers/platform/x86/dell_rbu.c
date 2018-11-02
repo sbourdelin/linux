@@ -403,7 +403,7 @@ static void img_update_free(void)
  * values are stored globally and on every call to this function the new
  * size is checked to see if more data is required than the existing size.
  * If true the previous memory is freed and new allocation is done to
- * accommodate the new size. If the incoming size is less then than the
+ * accommodate the new size. If the incoming size is less than than the
  * already allocated size, then that memory is reused. This function is
  * called with lock held and returns with lock held.
  */

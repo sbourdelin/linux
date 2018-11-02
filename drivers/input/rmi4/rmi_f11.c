@@ -1278,7 +1278,7 @@ static irqreturn_t rmi_f11_attention(int irq, void *ctx)
 
 	if (drvdata->attn_data.data) {
 		/*
-		 * The valid data in the attention report is less then
+		 * The valid data in the attention report is less than
 		 * expected. Only process the complete fingers.
 		 */
 		if (f11->sensor.attn_size > drvdata->attn_data.size)

@@ -586,7 +586,7 @@ isolate_fail:
  * undo its actions and return zero.
  *
  * Otherwise, function returns one-past-the-last PFN of isolated page
- * (which may be greater then end_pfn if end fell in a middle of
+ * (which may be greater than end_pfn if end fell in a middle of
  * a free page).
  */
 unsigned long

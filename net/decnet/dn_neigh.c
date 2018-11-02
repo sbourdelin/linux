@@ -148,7 +148,7 @@ static int dn_neigh_construct(struct neighbour *neigh)
 
 	/*
 	 * Make an estimate of the remote block size by assuming that its
-	 * two less then the device mtu, which it true for ethernet (and
+	 * two less than the device mtu, which it true for ethernet (and
 	 * other things which support long format headers) since there is
 	 * an extra length field (of 16 bits) which isn't part of the
 	 * ethernet headers and which the DECnet specs won't admit is part

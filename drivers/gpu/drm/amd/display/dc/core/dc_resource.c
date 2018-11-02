@@ -2037,7 +2037,7 @@ enum dc_status resource_map_pool_resources(
 		/*
 		 * Audio assigned in order first come first get.
 		 * There are asics which has number of audio
-		 * resources less then number of pipes
+		 * resources less than number of pipes
 		 */
 		if (pipe_ctx->stream_res.audio)
 			update_audio_usage(&context->res_ctx, pool,

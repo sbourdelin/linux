@@ -3549,7 +3549,7 @@ enum sctp_disposition sctp_sf_ootb(struct net *net,
 
 	ch = (struct sctp_chunkhdr *)chunk->chunk_hdr;
 	do {
-		/* Report violation if the chunk is less then minimal */
+		/* Report violation if the chunk is less than minimal */
 		if (ntohs(ch->length) < sizeof(*ch))
 			return sctp_sf_violation_chunklen(net, ep, asoc, type, arg,
 						  commands);

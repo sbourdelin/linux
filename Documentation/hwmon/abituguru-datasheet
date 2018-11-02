@@ -61,7 +61,7 @@ in a bank for a sensor is one or more bytes large.
 
 The number of bytes is fixed for a given bank, you should always read or write
 that many bytes, reading / writing more will fail, the results when writing
-less then the number of bytes for a given bank are undetermined.
+less than the number of bytes for a given bank are undetermined.
 
 See below for all known bank addresses, numbers of sensors in that bank,
 number of bytes data per sensor and contents/meaning of those bytes.

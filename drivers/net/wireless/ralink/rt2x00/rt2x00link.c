@@ -28,7 +28,7 @@
 #include "rt2x00lib.h"
 
 /*
- * When we lack RSSI information return something less then -80 to
+ * When we lack RSSI information return something less than -80 to
  * tell the driver to tune the device to maximum sensitivity.
  */
 #define DEFAULT_RSSI		-128

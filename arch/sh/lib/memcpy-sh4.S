@@ -570,7 +570,7 @@ ENTRY(memcpy)
 
 	.balign	32
 .Lcase2:
-	! Size is 16 or greater and less then 64, but may have trailing bytes
+	! Size is 16 or greater and less than 64, but may have trailing bytes
 
 2:	mov	r5, r6		!   5 MT (latency=0)
 	add	#-2,r5		!  50 EX

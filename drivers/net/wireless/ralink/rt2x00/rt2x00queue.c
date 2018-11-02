@@ -557,7 +557,7 @@ static void rt2x00queue_kick_tx_queue(struct data_queue *queue,
 	 *	   by another frame which in some way are related to eachother.
 	 *	   This is true for fragments, RTS or CTS-to-self frames.
 	 *	2) Rule 1 can be broken when the available entries
-	 *	   in the queue are less then a certain threshold.
+	 *	   in the queue are less than a certain threshold.
 	 */
 	if (rt2x00queue_threshold(queue) ||
 	    !test_bit(ENTRY_TXD_BURST, &txdesc->flags))

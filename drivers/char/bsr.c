@@ -222,7 +222,7 @@ static int bsr_add_node(struct device_node *bn)
 		cur->bsr_stride = bsr_stride[i];
 		cur->bsr_dev    = MKDEV(bsr_major, i + total_bsr_devs);
 
-		/* if we have a bsr_len of > 4k and less then PAGE_SIZE (64k pages) */
+		/* if we have a bsr_len of > 4k and less than PAGE_SIZE (64k pages) */
 		/* we can only map 4k of it, so only advertise the 4k in sysfs */
 		if (cur->bsr_len > 4096 && cur->bsr_len < PAGE_SIZE)
 			cur->bsr_len = 4096;

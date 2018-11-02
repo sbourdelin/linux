@@ -119,7 +119,7 @@ static void mxs_lradc_setup_ts_channel(struct mxs_lradc_ts *ts, unsigned int ch)
 	 *
 	 * from the datasheet:
 	 * "The ACCUMULATE bit in the appropriate channel register
-	 * HW_LRADC_CHn must be set to 1 if NUM_SAMPLES is greater then 0;
+	 * HW_LRADC_CHn must be set to 1 if NUM_SAMPLES is greater than 0;
 	 * otherwise, the IRQs will not fire."
 	 */
 	writel(LRADC_CH_ACCUMULATE |
@@ -176,7 +176,7 @@ static void mxs_lradc_setup_ts_pressure(struct mxs_lradc_ts *ts,
 	 *
 	 * from the datasheet:
 	 * "The ACCUMULATE bit in the appropriate channel register
-	 * HW_LRADC_CHn must be set to 1 if NUM_SAMPLES is greater then 0;
+	 * HW_LRADC_CHn must be set to 1 if NUM_SAMPLES is greater than 0;
 	 * otherwise, the IRQs will not fire."
 	 */
 	reg = LRADC_CH_ACCUMULATE |

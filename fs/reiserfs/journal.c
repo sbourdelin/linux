@@ -2665,7 +2665,7 @@ static int journal_init_dev(struct super_block *super,
  * blocksize/standard_blocksize.
  *
  * For blocks >= standard_blocksize transaction size should
- * be not less then JOURNAL_TRANS_MIN_DEFAULT, and not more
+ * be not less than JOURNAL_TRANS_MIN_DEFAULT, and not more
  * then JOURNAL_TRANS_MAX_DEFAULT.
  *
  * For blocks < standard_blocksize these boundaries should be

@@ -75,7 +75,7 @@ static void _rtl92d_write_fw(struct ieee80211_hw *hw,
 	pagenums = size / FW_8192D_PAGE_SIZE;
 	remainsize = size % FW_8192D_PAGE_SIZE;
 	if (pagenums > 8)
-		pr_err("Page numbers should not greater then 8\n");
+		pr_err("Page numbers should not greater than 8\n");
 	for (page = 0; page < pagenums; page++) {
 		offset = page * FW_8192D_PAGE_SIZE;
 		rtl_fw_page_write(hw, page, (bufferptr + offset),

@@ -591,7 +591,7 @@ int mwifiex_11n_rx_reorder_pkt(struct mwifiex_private *priv,
 		end_win = ((start_win + win_size) - 1) & (MAX_TID_VALUE - 1);
 	} else {
 		/*
-		 * If seq_num is less then starting win then ignore and drop
+		 * If seq_num is less than starting win then ignore and drop
 		 * the packet
 		 */
 		if ((start_win + TWOPOW11) > (MAX_TID_VALUE - 1)) {

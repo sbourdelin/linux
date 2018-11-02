@@ -1857,7 +1857,7 @@ megasas_is_prp_possible(struct megasas_instance *instance,
 
 	/*
 	 * NVMe uses one PRP for each page (or part of a page)
-	 * look at the data length - if 4 pages or less then IEEE is OK
+	 * look at the data length - if 4 pages or less than IEEE is OK
 	 * if  > 5 pages then we need to build a native SGL
 	 * if > 4 and <= 5 pages, then check physical address of 1st SG entry
 	 * if this first size in the page is >= the residual beyond 4 pages

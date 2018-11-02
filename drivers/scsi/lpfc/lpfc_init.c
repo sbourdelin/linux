@@ -218,7 +218,7 @@ lpfc_config_port_prep(struct lpfc_hba *phba)
 	vp->rev.postKernRev = mb->un.varRdRev.postKernRev;
 	vp->rev.opFwRev = mb->un.varRdRev.opFwRev;
 
-	/* If the sli feature level is less then 9, we must
+	/* If the sli feature level is less than 9, we must
 	 * tear down all RPIs and VPIs on link down if NPIV
 	 * is enabled.
 	 */

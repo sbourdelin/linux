@@ -270,7 +270,7 @@ static unsigned int calculate_alignment(slab_flags_t flags,
 	 * suggestion if the object is sufficiently large.
 	 *
 	 * The hardware cache alignment cannot override the specified
-	 * alignment though. If that is greater then use it.
+	 * alignment though. If that is greater than use it.
 	 */
 	if (flags & SLAB_HWCACHE_ALIGN) {
 		unsigned int ralign;

@@ -42,7 +42,7 @@ struct sxgbe_mtl_ops;
 #define SXGBE_RX_QUEUES   16
 
 /* Calculated based how much time does it take to fill 256KB Rx memory
- * at 10Gb speed at 156MHz clock rate and considered little less then
+ * at 10Gb speed at 156MHz clock rate and considered little less than
  * the actual value.
  */
 #define SXGBE_MAX_DMA_RIWT	0x70

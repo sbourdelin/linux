@@ -1452,7 +1452,7 @@ static void mgslpc_change_params(MGSLPC_INFO *info, struct tty_struct *tty)
 	bits_per_char = info->params.data_bits +
 			info->params.stop_bits + 1;
 
-	/* if port data rate is set to 460800 or less then
+	/* if port data rate is set to 460800 or less than
 	 * allow tty settings to override, otherwise keep the
 	 * current data rate.
 	 */

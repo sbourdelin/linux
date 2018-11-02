@@ -3739,7 +3739,7 @@ static void clone_update_extent_map(struct btrfs_inode *inode,
  * with NO_HOLES enabled). If we find our destination inode only has one inline
  * extent, just overwrite it with the source inline extent if its size is less
  * than the source extent's size, or we could copy the source inline extent's
- * data into the destination inode's inline extent if the later is greater then
+ * data into the destination inode's inline extent if the later is greater than
  * the former.
  */
 static int clone_copy_inline_extent(struct inode *dst,

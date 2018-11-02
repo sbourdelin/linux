@@ -808,7 +808,7 @@ Changes from 20040908 to 20040920
 	  void - move lpfc_do_dpc and lpfc_disc_done to lpfc_hbadisc.c -
 	  remove checking of list emptiness before calling lpfc_disc_done,
 	  it handles the empty list case just fine and the additional
-	  instructions cost less then the bustlocked spinlock operations.
+	  instructions cost less than the bustlocked spinlock operations.
 	* Integrated patch from Christoph Hellwig: This adds a new 64bit
 	  counter instead, brd_no isn't reused anymore.  Also some tiny
 	  whitespace cleanups in surrounding code.

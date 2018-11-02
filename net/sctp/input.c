@@ -680,7 +680,7 @@ static int sctp_rcv_ootb(struct sk_buff *skb)
 
 		ch = skb_header_pointer(skb, offset, sizeof(*ch), &_ch);
 
-		/* Break out if chunk length is less then minimal. */
+		/* Break out if chunk length is less than minimal. */
 		if (ntohs(ch->length) < sizeof(_ch))
 			break;
 
@@ -1156,7 +1156,7 @@ static struct sctp_association *__sctp_rcv_walk_lookup(struct net *net,
 	 */
 	ch = (struct sctp_chunkhdr *)skb->data;
 	do {
-		/* Break out if chunk length is less then minimal. */
+		/* Break out if chunk length is less than minimal. */
 		if (ntohs(ch->length) < sizeof(*ch))
 			break;
 
