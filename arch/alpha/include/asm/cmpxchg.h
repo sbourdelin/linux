@@ -36,7 +36,6 @@
 #undef ____cmpxchg
 #define ____xchg(type, args...)		__xchg ##type(args)
 #define ____cmpxchg(type, args...)	__cmpxchg ##type(args)
-#include <asm/xchg.h>
 
 /*
  * The leading and the trailing memory barriers guarantee that these
