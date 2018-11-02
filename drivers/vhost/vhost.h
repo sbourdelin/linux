@@ -32,6 +32,7 @@ struct vhost_poll {
 	struct vhost_work	  work;
 	__poll_t		  mask;
 	struct vhost_dev	 *dev;
+	struct vhost_virtqueue   *vq;
 };
 
 void vhost_work_init(struct vhost_work *work, vhost_work_fn_t fn);
@@ -86,6 +87,7 @@ struct vhost_virtqueue {
 
 	/* The actual ring of buffers. */
 	struct mutex mutex;
+	unsigned int index;
 	unsigned int num;
 	struct vring_desc __user *desc;
 	struct vring_avail __user *avail;
@@ -145,6 +147,10 @@ struct vhost_virtqueue {
 	bool user_be;
 #endif
 	u32 busyloop_timeout;
+
+	struct llist_head work_list;
+	struct task_struct *worker;
+	struct vhost_work work;
 };
 
 struct vhost_msg_node {
@@ -158,12 +164,11 @@ struct vhost_msg_node {
 
 struct vhost_dev {
 	struct mm_struct *mm;
+	pid_t pid;
 	struct mutex mutex;
 	struct vhost_virtqueue **vqs;
 	int nvqs;
 	struct eventfd_ctx *log_ctx;
-	struct llist_head work_list;
-	struct task_struct *worker;
 	struct vhost_umem *umem;
 	struct vhost_umem *iotlb;
 	spinlock_t iotlb_lock;
@@ -184,6 +189,8 @@ long vhost_dev_ioctl(struct vhost_dev *, unsigned int ioctl, void __user *argp);
 long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp);
 bool vhost_vq_access_ok(struct vhost_virtqueue *vq);
 bool vhost_log_access_ok(struct vhost_dev *);
+
+void vhost_vq_work_queue(struct vhost_virtqueue *vq, struct vhost_work *work);
 
 int vhost_get_vq_desc(struct vhost_virtqueue *,
 		      struct iovec iov[], unsigned int iov_count,

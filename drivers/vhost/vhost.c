@@ -184,17 +184,26 @@ void vhost_work_init(struct vhost_work *work, vhost_work_fn_t fn)
 }
 EXPORT_SYMBOL_GPL(vhost_work_init);
 
-/* Init poll structure */
-void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
-		     __poll_t mask, struct vhost_dev *dev)
+
+static void vhost_vq_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
+			       __poll_t mask, struct vhost_virtqueue *vq)
 {
 	init_waitqueue_func_entry(&poll->wait, vhost_poll_wakeup);
 	init_poll_funcptr(&poll->table, vhost_poll_func);
 	poll->mask = mask;
-	poll->dev = dev;
+	poll->dev = vq->dev;
+	poll->vq = vq;
 	poll->wqh = NULL;
 
 	vhost_work_init(&poll->work, fn);
+}
+EXPORT_SYMBOL_GPL(vhost_vq_poll_init);
+
+/* Init poll structure */
+void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
+		     __poll_t mask, struct vhost_dev *dev)
+{
+	vhost_vq_poll_init(poll, fn, mask, dev->vqs[0]);
 }
 EXPORT_SYMBOL_GPL(vhost_poll_init);
 
@@ -231,17 +240,54 @@ void vhost_poll_stop(struct vhost_poll *poll)
 }
 EXPORT_SYMBOL_GPL(vhost_poll_stop);
 
-void vhost_work_flush(struct vhost_dev *dev, struct vhost_work *work)
+
+static void vhost_vq_poll_start_work(struct vhost_work *w)
+{
+	struct vhost_virtqueue *vq = container_of(w, struct vhost_virtqueue,
+						  work);
+
+	vhost_poll_start(&vq->poll, vq->kick);
+}
+
+static int vhost_vq_worker(void *data);
+
+static int vhost_vq_poll_start(struct vhost_virtqueue *vq)
+{
+	if (!vq->worker) {
+		vq->worker = kthread_create(vhost_vq_worker, vq, "vhost-%d/%i",
+					    vq->dev->pid, vq->index);
+		if (IS_ERR(vq->worker)) {
+			int ret = PTR_ERR(vq->worker);
+
+			pr_err("%s: can't create vq worker: %d\n", __func__,
+			       ret);
+			vq->worker = NULL;
+			return ret;
+		}
+	}
+	vhost_work_init(&vq->work, vhost_vq_poll_start_work);
+	vhost_vq_work_queue(vq, &vq->work);
+	return 0;
+}
+
+static void vhost_vq_work_flush(struct vhost_virtqueue *vq,
+				struct vhost_work *work)
 {
 	struct vhost_flush_struct flush;
 
-	if (dev->worker) {
+	if (vq->worker) {
 		init_completion(&flush.wait_event);
 		vhost_work_init(&flush.work, vhost_flush_work);
 
-		vhost_work_queue(dev, &flush.work);
+		vhost_vq_work_queue(vq, &flush.work);
 		wait_for_completion(&flush.wait_event);
 	}
+}
+EXPORT_SYMBOL_GPL(vhost_vq_work_flush);
+
+void vhost_work_flush(struct vhost_dev *dev, struct vhost_work *work)
+{
+	vhost_vq_work_flush(dev->vqs[0], work);
 }
 EXPORT_SYMBOL_GPL(vhost_work_flush);
 
@@ -249,13 +295,19 @@ EXPORT_SYMBOL_GPL(vhost_work_flush);
  * locks that are also used by the callback. */
 void vhost_poll_flush(struct vhost_poll *poll)
 {
-	vhost_work_flush(poll->dev, &poll->work);
+	vhost_vq_work_flush(poll->vq, &poll->work);
 }
 EXPORT_SYMBOL_GPL(vhost_poll_flush);
 
 void vhost_work_queue(struct vhost_dev *dev, struct vhost_work *work)
 {
-	if (!dev->worker)
+	return vhost_vq_work_queue(dev->vqs[0], work);
+}
+EXPORT_SYMBOL_GPL(vhost_work_queue);
+
+void vhost_vq_work_queue(struct vhost_virtqueue *vq, struct vhost_work *work)
+{
+	if (!vq->worker)
 		return;
 
 	if (!test_and_set_bit(VHOST_WORK_QUEUED, &work->flags)) {
@@ -263,22 +315,22 @@ void vhost_work_queue(struct vhost_dev *dev, struct vhost_work *work)
 		 * sure it was not in the list.
 		 * test_and_set_bit() implies a memory barrier.
 		 */
-		llist_add(&work->node, &dev->work_list);
-		wake_up_process(dev->worker);
+		llist_add(&work->node, &vq->work_list);
+		wake_up_process(vq->worker);
 	}
 }
-EXPORT_SYMBOL_GPL(vhost_work_queue);
+EXPORT_SYMBOL_GPL(vhost_vq_work_queue);
 
 /* A lockless hint for busy polling code to exit the loop */
 bool vhost_has_work(struct vhost_dev *dev)
 {
-	return !llist_empty(&dev->work_list);
+	return !llist_empty(&dev->vqs[0]->work_list);
 }
 EXPORT_SYMBOL_GPL(vhost_has_work);
 
 void vhost_poll_queue(struct vhost_poll *poll)
 {
-	vhost_work_queue(poll->dev, &poll->work);
+	vhost_vq_work_queue(poll->vq, &poll->work);
 }
 EXPORT_SYMBOL_GPL(vhost_poll_queue);
 
@@ -329,9 +381,10 @@ static void vhost_vq_reset(struct vhost_dev *dev,
 	__vhost_vq_meta_reset(vq);
 }
 
-static int vhost_worker(void *data)
+static int vhost_vq_worker(void *data)
 {
-	struct vhost_dev *dev = data;
+	struct vhost_virtqueue *vq = data;
+	struct vhost_dev *dev = vq->dev;
 	struct vhost_work *work, *work_next;
 	struct llist_node *node;
 	mm_segment_t oldfs = get_fs();
@@ -347,8 +400,7 @@ static int vhost_worker(void *data)
 			__set_current_state(TASK_RUNNING);
 			break;
 		}
-
-		node = llist_del_all(&dev->work_list);
+		node = llist_del_all(&vq->work_list);
 		if (!node)
 			schedule();
 
@@ -425,25 +477,26 @@ void vhost_dev_init(struct vhost_dev *dev,
 	dev->umem = NULL;
 	dev->iotlb = NULL;
 	dev->mm = NULL;
-	dev->worker = NULL;
-	init_llist_head(&dev->work_list);
 	init_waitqueue_head(&dev->wait);
 	INIT_LIST_HEAD(&dev->read_list);
 	INIT_LIST_HEAD(&dev->pending_list);
 	spin_lock_init(&dev->iotlb_lock);
 
-
 	for (i = 0; i < dev->nvqs; ++i) {
 		vq = dev->vqs[i];
+		vq->index = i;
 		vq->log = NULL;
 		vq->indirect = NULL;
 		vq->heads = NULL;
 		vq->dev = dev;
+		vq->worker = NULL;
 		mutex_init(&vq->mutex);
 		vhost_vq_reset(dev, vq);
+		init_llist_head(&vq->work_list);
+		vq->worker = NULL;
 		if (vq->handle_kick)
-			vhost_poll_init(&vq->poll, vq->handle_kick,
-					EPOLLIN, dev);
+			vhost_vq_poll_init(&vq->poll, vq->handle_kick,
+					   EPOLLIN, vq);
 	}
 }
 EXPORT_SYMBOL_GPL(vhost_dev_init);
@@ -502,14 +555,16 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 
 	/* No owner, become one */
 	dev->mm = get_task_mm(current);
-	worker = kthread_create(vhost_worker, dev, "vhost-%d", current->pid);
+	dev->pid = current->pid;
+	worker = kthread_create(vhost_vq_worker, dev->vqs[0], "vhost-%d/0",
+				current->pid);
 	if (IS_ERR(worker)) {
 		err = PTR_ERR(worker);
 		goto err_worker;
 	}
 
-	dev->worker = worker;
-	wake_up_process(worker);	/* avoid contributing to loadavg */
+	dev->vqs[0]->worker = worker;
+	wake_up_process(worker);        /* avoid contributing to loadavg */
 
 	err = vhost_attach_cgroups(dev);
 	if (err)
@@ -522,7 +577,7 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 	return 0;
 err_cgroup:
 	kthread_stop(worker);
-	dev->worker = NULL;
+	dev->vqs[0]->worker = NULL;
 err_worker:
 	if (dev->mm)
 		mmput(dev->mm);
@@ -634,11 +689,15 @@ void vhost_dev_cleanup(struct vhost_dev *dev)
 	dev->iotlb = NULL;
 	vhost_clear_msg(dev);
 	wake_up_interruptible_poll(&dev->wait, EPOLLIN | EPOLLRDNORM);
-	WARN_ON(!llist_empty(&dev->work_list));
-	if (dev->worker) {
-		kthread_stop(dev->worker);
-		dev->worker = NULL;
+
+	for (i = 0; i < dev->nvqs; ++i) {
+		WARN_ON(!llist_empty(&dev->vqs[i]->work_list));
+		if (dev->vqs[i]->worker) {
+			kthread_stop(dev->vqs[i]->worker);
+			dev->vqs[i]->worker = NULL;
+		}
 	}
+
 	if (dev->mm)
 		mmput(dev->mm);
 	dev->mm = NULL;
@@ -1572,7 +1631,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 		fput(filep);
 
 	if (pollstart && vq->handle_kick)
-		r = vhost_poll_start(&vq->poll, vq->kick);
+		r = vhost_vq_poll_start(vq);
 
 	mutex_unlock(&vq->mutex);
 
