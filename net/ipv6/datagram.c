@@ -782,7 +782,10 @@ int ip6_datagram_send_ctl(struct net *net, struct sock *sk,
 
 			if (src_info->ipi6_ifindex) {
 				if (fl6->flowi6_oif &&
-				    src_info->ipi6_ifindex != fl6->flowi6_oif)
+				    src_info->ipi6_ifindex != fl6->flowi6_oif &&
+				    (sk->sk_bound_dev_if != fl6->flowi6_oif ||
+				     !sk_dev_equal_l3scope(
+					     sk, src_info->ipi6_ifindex)))
 					return -EINVAL;
 				fl6->flowi6_oif = src_info->ipi6_ifindex;
 			}
