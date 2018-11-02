@@ -618,6 +618,8 @@ static void detect_sgx(struct cpuinfo_x86 *c)
 		setup_clear_cpu_cap(X86_FEATURE_SGX1);
 		setup_clear_cpu_cap(X86_FEATURE_SGX2);
 	}
+	if (unsupported || !(fc & FEATURE_CONTROL_SGX_LE_WR))
+		setup_clear_cpu_cap(X86_FEATURE_SGX_LC);
 }
 
 static void init_intel_energy_perf(struct cpuinfo_x86 *c)
