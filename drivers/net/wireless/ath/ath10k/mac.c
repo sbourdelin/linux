@@ -8321,6 +8321,8 @@ static int ath10k_mac_get_wrdd_regulatory(struct ath10k *ar, u16 *rd)
 	u32 alpha2_code;
 	char alpha2[3];
 
+	*rd = ar->hw_eeprom_rd;
+
 	root_handle = ACPI_HANDLE(&pdev->dev);
 	if (!root_handle)
 		return -EOPNOTSUPP;
@@ -8365,11 +8367,9 @@ static int ath10k_mac_init_rd(struct ath10k *ar)
 	u16 rd;
 
 	ret = ath10k_mac_get_wrdd_regulatory(ar, &rd);
-	if (ret) {
+	if (ret)
 		ath10k_dbg(ar, ATH10K_DBG_BOOT,
 			   "fallback to eeprom programmed regulatory settings\n");
-		rd = ar->hw_eeprom_rd;
-	}
 
 	ar->ath_common.regulatory.current_rd = rd;
 	return 0;
