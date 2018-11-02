@@ -396,4 +396,9 @@ int v4l2_g_parm_cap(struct video_device *vdev,
 int v4l2_s_parm_cap(struct video_device *vdev,
 		    struct v4l2_subdev *sd, struct v4l2_streamparm *a);
 
+void v4l2_fill_pixfmt(struct v4l2_pix_format *pixfmt, int pixelformat,
+		      int width, int height);
+void v4l2_fill_pixfmt_mp(struct v4l2_pix_format_mplane *pixfmt, int pixelformat,
+			 int width, int height);
+
 #endif /* V4L2_COMMON_H_ */
