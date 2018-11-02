@@ -30,9 +30,35 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 
+static int modeswitch_delay_ms;
+module_param(modeswitch_delay_ms, uint, 0644);
+
 struct dmic {
 	struct gpio_desc *gpio_en;
 	int wakeup_delay;
+	/* Delay after DMIC mode switch */
+	int modeswitch_delay_ms;
+};
+
+int dmic_daiops_trigger(struct snd_pcm_substream *substream,
+		int cmd, struct snd_soc_dai *dai)
+{
+	struct snd_soc_component *component = dai->component;
+	struct dmic *dmic = snd_soc_component_get_drvdata(component);
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_STOP:
+		if (dmic->modeswitch_delay_ms)
+			mdelay(dmic->modeswitch_delay_ms);
+
+		break;
+	}
+
+	return 0;
+}
+
+static const struct snd_soc_dai_ops dmic_dai_ops = {
+	.trigger	= dmic_daiops_trigger,
 };
 
 static int dmic_aif_event(struct snd_soc_dapm_widget *w,
@@ -68,6 +94,7 @@ static struct snd_soc_dai_driver dmic_dai = {
 			| SNDRV_PCM_FMTBIT_S24_LE
 			| SNDRV_PCM_FMTBIT_S16_LE,
 	},
+	.ops    = &dmic_dai_ops,
 };
 
 static int dmic_component_probe(struct snd_soc_component *component)
@@ -85,6 +112,10 @@ static int dmic_component_probe(struct snd_soc_component *component)
 
 	device_property_read_u32(component->dev, "wakeup-delay-ms",
 				 &dmic->wakeup_delay);
+	device_property_read_u32(component->dev, "modeswitch_delay_ms",
+				 &dmic->modeswitch_delay_ms);
+	if (modeswitch_delay_ms)
+		dmic->modeswitch_delay_ms  = modeswitch_delay_ms;
 
 	snd_soc_component_set_drvdata(component, dmic);
 
