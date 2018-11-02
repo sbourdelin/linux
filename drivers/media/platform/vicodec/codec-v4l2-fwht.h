@@ -10,9 +10,6 @@
 
 struct v4l2_fwht_pixfmt_info {
 	u32 id;
-	unsigned int bytesperline_mult;
-	unsigned int sizeimage_mult;
-	unsigned int sizeimage_div;
 	unsigned int luma_step;
 	unsigned int chroma_step;
 	/* Chroma plane subsampling */
