@@ -132,6 +132,10 @@ Example 1: PFUZE100
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 			};
+			coin_reg: coin {
+				regulator-min-microvolt = <2500000>;
+				regulator-max-microvolt = <3300000>;
+			};
 		};
 	};
 
