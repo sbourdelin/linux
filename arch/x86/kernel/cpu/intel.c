@@ -596,6 +596,30 @@ detect_keyid_bits:
 	c->x86_phys_bits -= keyid_bits;
 }
 
+static void detect_sgx(struct cpuinfo_x86 *c)
+{
+	bool unsupported = false;
+	unsigned long long fc;
+
+	rdmsrl(MSR_IA32_FEATURE_CONTROL, fc);
+	if (!(fc & FEATURE_CONTROL_LOCKED)) {
+		pr_err_once("sgx: IA32_FEATURE_CONTROL MSR is not locked\n");
+		unsupported = true;
+	} else if (!(fc & FEATURE_CONTROL_SGX_ENABLE)) {
+		pr_err_once("sgx: not enabled in IA32_FEATURE_CONTROL MSR\n");
+		unsupported = true;
+	} else if (!cpu_has(c, X86_FEATURE_SGX1)) {
+		pr_err_once("sgx: SGX1 instruction set not supported\n");
+		unsupported = true;
+	}
+
+	if (unsupported) {
+		setup_clear_cpu_cap(X86_FEATURE_SGX);
+		setup_clear_cpu_cap(X86_FEATURE_SGX1);
+		setup_clear_cpu_cap(X86_FEATURE_SGX2);
+	}
+}
+
 static void init_intel_energy_perf(struct cpuinfo_x86 *c)
 {
 	u64 epb;
@@ -762,6 +786,9 @@ static void init_intel(struct cpuinfo_x86 *c)
 
 	if (cpu_has(c, X86_FEATURE_TME))
 		detect_tme(c);
+
+	if (cpu_has(c, X86_FEATURE_SGX))
+		detect_sgx(c);
 
 	init_intel_energy_perf(c);
 
