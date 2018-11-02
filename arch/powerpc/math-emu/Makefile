@@ -18,3 +18,7 @@ CFLAGS_fabs.o = -fno-builtin-fabs
 CFLAGS_math.o = -fno-builtin-fabs
 
 ccflags-y = -I. -Iinclude/math-emu -w
+
+ifdef CONFIG_CC_IS_CLANG
+ccflags-y += -fheinous-gnu-extensions
+endif
