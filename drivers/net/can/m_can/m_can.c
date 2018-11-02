@@ -26,6 +26,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/iopoll.h>
 #include <linux/can/dev.h>
+#include <linux/phy/phy.h>
 #include <linux/pinctrl/consumer.h>
 
 /* napi related */
@@ -1582,6 +1583,7 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	struct device_node *np;
 	u32 mram_config_vals[MRAM_CFG_LEN];
 	u32 tx_fifo_size;
+	struct phy *transceiver;
 
 	np = pdev->dev.of_node;
 
@@ -1671,7 +1673,26 @@ static int m_can_plat_probe(struct platform_device *pdev)
 
 	devm_can_led_init(dev);
 
-	of_can_transceiver(dev);
+	transceiver = devm_phy_optional_get(&pdev->dev, "can_transceiver");
+	if (IS_ERR(transceiver)) {
+		ret = PTR_ERR(transceiver);
+		dev_err(&pdev->dev, "Couldn't get phy. err=%d\n", ret);
+		return ret;
+	}
+
+	if (!transceiver) {
+		dev_warn(&pdev->dev, "No transceiver phy. Falling back to legacy API\n");
+		of_can_transceiver(dev);
+	} else {
+		ret = phy_power_on(transceiver);
+		if (ret) {
+			dev_err(&pdev->dev, "phy_power_on err:%d\n", ret);
+			return ret;
+		}
+		priv->can.bitrate_max = phy_get_max_bitrate(transceiver);
+		if (!priv->can.bitrate_max)
+			dev_warn(&pdev->dev, "Invalid value for transceiver max bitrate. Ignoring bitrate limit\n");
+	}
 
 	dev_info(&pdev->dev, "%s device registered (irq=%d, version=%d)\n",
 		 KBUILD_MODNAME, dev->irq, priv->version);
