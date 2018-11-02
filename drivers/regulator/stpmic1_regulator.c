@@ -224,8 +224,6 @@ static struct regulator_ops stpmic1_switch_regul_ops = {
 	.vsel_mask = LDO_VOLTAGE_MASK, \
 	.enable_reg = ids##_ACTIVE_CR, \
 	.enable_mask = LDO_ENABLE_MASK, \
-	.enable_val = 1, \
-	.disable_val = 0, \
 	.enable_time = PMIC_ENABLE_TIME_US, \
 	.pull_down_reg = ids##_PULL_DOWN_REG, \
 	.pull_down_mask = ids##_PULL_DOWN_MASK, \
@@ -245,8 +243,6 @@ static struct regulator_ops stpmic1_switch_regul_ops = {
 	.vsel_mask = LDO_VOLTAGE_MASK, \
 	.enable_reg = LDO3_ACTIVE_CR, \
 	.enable_mask = LDO_ENABLE_MASK, \
-	.enable_val = 1, \
-	.disable_val = 0, \
 	.enable_time = PMIC_ENABLE_TIME_US, \
 	.bypass_reg = LDO3_ACTIVE_CR, \
 	.bypass_mask = LDO_BYPASS_MASK, \
@@ -268,8 +264,6 @@ static struct regulator_ops stpmic1_switch_regul_ops = {
 	.fixed_uV = 3300000, \
 	.enable_reg = LDO4_ACTIVE_CR, \
 	.enable_mask = LDO_ENABLE_MASK, \
-	.enable_val = 1, \
-	.disable_val = 0, \
 	.enable_time = PMIC_ENABLE_TIME_US, \
 	.pull_down_reg = ids##_PULL_DOWN_REG, \
 	.pull_down_mask = ids##_PULL_DOWN_MASK, \
@@ -289,8 +283,6 @@ static struct regulator_ops stpmic1_switch_regul_ops = {
 	.vsel_mask = BUCK_VOLTAGE_MASK, \
 	.enable_reg = ids##_ACTIVE_CR, \
 	.enable_mask = BUCK_ENABLE_MASK, \
-	.enable_val = 1, \
-	.disable_val = 0, \
 	.enable_time = PMIC_ENABLE_TIME_US, \
 	.of_map_mode = stpmic1_map_mode, \
 	.pull_down_reg = ids##_PULL_DOWN_REG, \
@@ -309,15 +301,13 @@ static struct regulator_ops stpmic1_switch_regul_ops = {
 	.fixed_uV = 500000, \
 	.enable_reg = VREF_DDR_ACTIVE_CR, \
 	.enable_mask = BUCK_ENABLE_MASK, \
-	.enable_val = 1, \
-	.disable_val = 0, \
 	.enable_time = PMIC_ENABLE_TIME_US, \
 	.pull_down_reg = ids##_PULL_DOWN_REG, \
 	.pull_down_mask = ids##_PULL_DOWN_MASK, \
 	.supply_name = #base, \
 }
 
-#define REG_SWITCH(ids, base, reg, mask, val) { \
+#define REG_SWITCH(ids, base, reg, mask) { \
 	.name = #ids, \
 	.id = STPMIC1_##ids, \
 	.n_voltages = 1, \
@@ -328,8 +318,6 @@ static struct regulator_ops stpmic1_switch_regul_ops = {
 	.fixed_uV = 5000000, \
 	.enable_reg = (reg), \
 	.enable_mask = (mask), \
-	.enable_val = (val), \
-	.disable_val = 0, \
 	.enable_time = PMIC_ENABLE_TIME_US, \
 	.supply_name = #base, \
 }
@@ -412,21 +400,18 @@ struct stpmic1_regulator_cfg stpmic1_regulator_cfgs[] = {
 	},
 	[STPMIC1_BOOST] = {
 		.desc = REG_SWITCH(BOOST, boost, BST_SW_CR,
-				   BOOST_ENABLED,
 				   BOOST_ENABLED),
 		.icc_reg = BUCKS_ICCTO_CR,
 		.icc_mask = BIT(6),
 	},
 	[STPMIC1_VBUS_OTG] = {
 		.desc = REG_SWITCH(VBUS_OTG, pwr_sw1, BST_SW_CR,
-				   USBSW_OTG_SWITCH_ENABLED,
 				   USBSW_OTG_SWITCH_ENABLED),
 		.icc_reg = BUCKS_ICCTO_CR,
 		.icc_mask = BIT(4),
 	},
 	[STPMIC1_SW_OUT] = {
 		.desc = REG_SWITCH(SW_OUT, pwr_sw2, BST_SW_CR,
-				   SWIN_SWOUT_ENABLED,
 				   SWIN_SWOUT_ENABLED),
 		.icc_reg = BUCKS_ICCTO_CR,
 		.icc_mask = BIT(5),
