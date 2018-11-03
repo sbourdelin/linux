@@ -95,6 +95,24 @@ Optional properties:
 			this and tx-thr-num-pkt-prd to a valid, non-zero value
 			1-16 (DWC_usb31 programming guide section 1.2.3) to
 			enable periodic ESS TX threshold.
+ - snps,refclk-period-ns: set to program the reference clock period. The valid
+   			input periods are as follow:
+			+-------------+-----------------+
+			| Period (ns) | Freq (MHz)      |
+			+-------------+-----------------+
+			| 25          | 39.7/40         |
+			| 41          | 24.4            |
+			| 50          | 20              |
+			| 52          | 19.2            |
+			| 58          | 17.2            |
+			| 62          | 16.1            |
+			+-------------+-----------------+
+ - snps,enable-refclk-lpm: set to enable low power scheduling of isochronous
+			transfers by running SOF/ITP counters using the
+			reference clock. Only valid for DWC_usb31 peripheral
+			controller v1.80a and higher. Both
+			"snps,dis_u2_susphy_quirk" and
+			"snps,dis_enblslpm_quirk" must not be set.
 
  - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be reallocated.
  - snps,incr-burst-type-adjustment: Value for INCR burst type of GSBUSCFG0
