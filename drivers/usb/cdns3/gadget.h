@@ -1066,14 +1066,18 @@ struct cdns3_device {
 
 int cdns3_handshake(void __iomem *ptr, u32 mask, u32 done, int usec);
 void cdns3_set_register_bit(void __iomem *ptr, u32 mask);
+void cdns3_pending_setup_status_handler(struct work_struct *work);
 int cdns3_init_ep0(struct cdns3_device *priv_dev);
 void cdns3_ep0_config(struct cdns3_device *priv_dev);
+void cdns3_ep_config(struct cdns3_endpoint *priv_ep);
 void cdns3_check_ep0_interrupt_proceed(struct cdns3_device *priv_dev, int dir);
 void cdns3_select_ep(struct cdns3_device *priv_dev, u32 ep);
 void cdns3_enable_l1(struct cdns3_device *priv_dev, int enable);
 struct usb_request *cdns3_next_request(struct list_head *list);
+void cdns3_gadget_unconfig(struct cdns3_device *priv_dev);
 int cdns3_ep_run_transfer(struct cdns3_endpoint *priv_ep,
 			  struct usb_request *request);
+u8 cdns3_ep_addr_to_index(u8 ep_addr);
 int cdns3_gadget_ep_set_wedge(struct usb_ep *ep);
 int cdns3_gadget_ep_set_halt(struct usb_ep *ep, int value);
 struct usb_request *cdns3_gadget_ep_alloc_request(struct usb_ep *ep,

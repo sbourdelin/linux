@@ -10,6 +10,7 @@
  *	    Peter Chen <peter.chen@nxp.com>
  */
 
+#include <linux/usb/composite.h>
 #include "gadget.h"
 
 static struct usb_endpoint_descriptor cdns3_gadget_ep0_desc = {
@@ -52,9 +53,31 @@ static void cdns3_ep0_run_transfer(struct cdns3_device *priv_dev,
 		writel(EP_CMD_ERDY, &priv_dev->regs->ep_cmd);
 }
 
+/**
+ * cdns3_ep0_delegate_req - Returns status of handling setup packet
+ * Setup is handled by gadget driver
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns zero on success or negative value on failure
+ */
+static int cdns3_ep0_delegate_req(struct cdns3_device *priv_dev,
+				  struct usb_ctrlrequest *ctrl_req)
+{
+	int ret;
+
+	spin_unlock(&priv_dev->lock);
+	priv_dev->setup_pending = 1;
+	ret = priv_dev->gadget_driver->setup(&priv_dev->gadget, ctrl_req);
+	priv_dev->setup_pending = 0;
+	spin_lock(&priv_dev->lock);
+	return ret;
+}
+
 static void cdns3_prepare_setup_packet(struct cdns3_device *priv_dev)
 {
-	//TODO: Implements this function
+	priv_dev->ep0_data_dir = 0;
+	cdns3_ep0_run_transfer(priv_dev, priv_dev->setup_dma, 8, 0);
 }
 
 static void cdns3_set_hw_configuration(struct cdns3_device *priv_dev)
@@ -90,9 +113,430 @@ static void cdns3_set_hw_configuration(struct cdns3_device *priv_dev)
 	}
 }
 
+/**
+ * cdns3_req_ep0_set_configuration - Handling of SET_CONFIG standard USB request
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns 0 if success, 0x7FFF on deferred status stage, error code on error
+ */
+static int cdns3_req_ep0_set_configuration(struct cdns3_device *priv_dev,
+					   struct usb_ctrlrequest *ctrl_req)
+{
+	enum usb_device_state device_state = priv_dev->gadget.state;
+	struct cdns3_endpoint *priv_ep, *temp_ep;
+	u32 config = le16_to_cpu(ctrl_req->wValue);
+	int result = 0;
+
+	switch (device_state) {
+	case USB_STATE_ADDRESS:
+		/* Configure non-control EPs */
+		list_for_each_entry_safe(priv_ep, temp_ep,
+					 &priv_dev->ep_match_list,
+					 ep_match_pending_list)
+			cdns3_ep_config(priv_ep);
+
+		result = cdns3_ep0_delegate_req(priv_dev, ctrl_req);
+
+		if (result)
+			return result;
+
+		if (config) {
+			cdns3_set_hw_configuration(priv_dev);
+		} else {
+			cdns3_gadget_unconfig(priv_dev);
+			usb_gadget_set_state(&priv_dev->gadget,
+					     USB_STATE_ADDRESS);
+		}
+		break;
+	case USB_STATE_CONFIGURED:
+		result = cdns3_ep0_delegate_req(priv_dev, ctrl_req);
+
+		if (!config && !result) {
+			cdns3_gadget_unconfig(priv_dev);
+			usb_gadget_set_state(&priv_dev->gadget,
+					     USB_STATE_ADDRESS);
+		}
+		break;
+	default:
+		result = -EINVAL;
+	}
+
+	return result;
+}
+
+/**
+ * cdns3_req_ep0_set_address - Handling of SET_ADDRESS standard USB request
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns 0 if success, error code on error
+ */
+static int cdns3_req_ep0_set_address(struct cdns3_device *priv_dev,
+				     struct usb_ctrlrequest *ctrl_req)
+{
+	enum usb_device_state device_state = priv_dev->gadget.state;
+	u32 reg;
+	u32 addr;
+
+	addr = le16_to_cpu(ctrl_req->wValue);
+
+	if (addr > DEVICE_ADDRESS_MAX) {
+		dev_err(&priv_dev->dev,
+			"Device address (%d) cannot be greater than %d\n",
+			addr, DEVICE_ADDRESS_MAX);
+		return -EINVAL;
+	}
+
+	if (device_state == USB_STATE_CONFIGURED) {
+		dev_err(&priv_dev->dev, "USB device already configured\n");
+		return -EINVAL;
+	}
+
+	reg = readl(&priv_dev->regs->usb_cmd);
+
+	writel(reg | USB_CMD_FADDR(addr) | USB_CMD_SET_ADDR,
+	       &priv_dev->regs->usb_cmd);
+
+	usb_gadget_set_state(&priv_dev->gadget,
+			     (addr ? USB_STATE_ADDRESS : USB_STATE_DEFAULT));
+
+	cdns3_prepare_setup_packet(priv_dev);
+
+	writel(EP_CMD_ERDY | EP_CMD_REQ_CMPL, &priv_dev->regs->ep_cmd);
+
+	return 0;
+}
+
+/**
+ * cdns3_req_ep0_get_status - Handling of GET_STATUS standard USB request
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns 0 if success, error code on error
+ */
+static int cdns3_req_ep0_get_status(struct cdns3_device *priv_dev,
+				    struct usb_ctrlrequest *ctrl)
+{
+	__le16 *response_pkt;
+	u16 usb_status = 0;
+	u32 recip;
+	u32 reg;
+
+	recip = ctrl->bRequestType & USB_RECIP_MASK;
+
+	switch (recip) {
+	case USB_RECIP_DEVICE:
+		/* self powered */
+		usb_status |= priv_dev->gadget.is_selfpowered;
+
+		if (priv_dev->gadget.speed != USB_SPEED_SUPER)
+			break;
+
+		reg = readl(&priv_dev->regs->usb_sts);
+
+		if (USB_STS_U2ENS(reg))
+			usb_status |= BIT(USB_DEV_STAT_U1_ENABLED);
+
+		if (USB_STS_U2ENS(reg))
+			usb_status |= BIT(USB_DEV_STAT_U2_ENABLED);
+
+		if (priv_dev->wake_up_flag)
+			usb_status |= BIT(USB_DEVICE_REMOTE_WAKEUP);
+		break;
+	case USB_RECIP_INTERFACE:
+		return cdns3_ep0_delegate_req(priv_dev, ctrl);
+	case USB_RECIP_ENDPOINT:
+		/* check if endpoint is stalled */
+		cdns3_select_ep(priv_dev, ctrl->wIndex);
+		if (EP_STS_STALL(readl(&priv_dev->regs->ep_sts)))
+			usb_status =  BIT(USB_ENDPOINT_HALT);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	response_pkt = (__le16 *)priv_dev->setup;
+	*response_pkt = cpu_to_le16(usb_status);
+
+	cdns3_ep0_run_transfer(priv_dev, priv_dev->setup_dma,
+			       sizeof(*response_pkt), 1);
+	return 0;
+}
+
+static int cdns3_ep0_feature_handle_device(struct cdns3_device *priv_dev,
+					   struct usb_ctrlrequest *ctrl,
+					   int set)
+{
+	enum usb_device_state state;
+	enum usb_device_speed speed;
+	int ret = 0;
+	u32 wValue;
+	u32 wIndex;
+	u16 tmode;
+
+	wValue = le16_to_cpu(ctrl->wValue);
+	wIndex = le16_to_cpu(ctrl->wIndex);
+	state = priv_dev->gadget.state;
+	speed = priv_dev->gadget.speed;
+
+	switch (ctrl->wValue) {
+	case USB_DEVICE_REMOTE_WAKEUP:
+		priv_dev->wake_up_flag = !!set;
+		break;
+	case USB_DEVICE_U1_ENABLE:
+		if (state != USB_STATE_CONFIGURED || speed != USB_SPEED_SUPER)
+			return -EINVAL;
+
+		cdns3_set_register_bit(&priv_dev->regs->usb_conf,
+				       (set) ? USB_CONF_U1EN : USB_CONF_U1DS);
+		break;
+	case USB_DEVICE_U2_ENABLE:
+		if (state != USB_STATE_CONFIGURED || speed != USB_SPEED_SUPER)
+			return -EINVAL;
+
+		cdns3_set_register_bit(&priv_dev->regs->usb_conf,
+				       (set) ? USB_CONF_U2EN : USB_CONF_U2DS);
+		break;
+	case USB_DEVICE_LTM_ENABLE:
+		ret = -EINVAL;
+		break;
+	case USB_DEVICE_TEST_MODE:
+		if (state != USB_STATE_CONFIGURED || speed > USB_SPEED_HIGH)
+			return -EINVAL;
+
+		tmode = le16_to_cpu(ctrl->wIndex);
+
+		if (!set || (tmode & 0xff) != 0)
+			return -EINVAL;
+
+		switch (tmode >> 8) {
+		case TEST_J:
+		case TEST_K:
+		case TEST_SE0_NAK:
+		case TEST_PACKET:
+			cdns3_set_register_bit(&priv_dev->regs->usb_cmd,
+					       USB_CMD_STMODE |
+					       USB_STS_TMODE_SEL(tmode - 1));
+			break;
+		default:
+			ret = -EINVAL;
+		}
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static int cdns3_ep0_feature_handle_intf(struct cdns3_device *priv_dev,
+					 struct usb_ctrlrequest *ctrl,
+					 int set)
+{
+	u32 wValue;
+	int ret = 0;
+
+	wValue = le16_to_cpu(ctrl->wValue);
+
+	switch (wValue) {
+	case USB_INTRF_FUNC_SUSPEND:
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static int cdns3_ep0_feature_handle_endpoint(struct cdns3_device *priv_dev,
+					     struct usb_ctrlrequest *ctrl,
+					     int set)
+{
+	struct cdns3_endpoint *priv_ep;
+	int ret = 0;
+	u8 index;
+
+	index = cdns3_ep_addr_to_index(ctrl->wIndex);
+	priv_ep = priv_dev->eps[index];
+
+	cdns3_select_ep(priv_dev, ctrl->wIndex);
+
+	if (le16_to_cpu(ctrl->wValue) != USB_ENDPOINT_HALT)
+		return -EINVAL;
+
+	if (set) {
+		writel(EP_CMD_SSTALL, &priv_dev->regs->ep_cmd);
+		priv_ep->flags |= EP_STALL;
+	} else {
+		struct usb_request *request;
+
+		if (priv_dev->eps[index]->flags & EP_WEDGE) {
+			cdns3_select_ep(priv_dev, 0x00);
+			return 0;
+		}
+
+		writel(EP_CMD_CSTALL | EP_CMD_EPRST, &priv_dev->regs->ep_cmd);
+
+		/* wait for EPRST cleared */
+		ret = cdns3_handshake(&priv_dev->regs->ep_cmd,
+				      EP_CMD_EPRST, 0, 100);
+		if (ret)
+			return -EINVAL;
+
+		priv_ep->flags &= ~EP_STALL;
+
+		request = cdns3_next_request(&priv_ep->request_list);
+		if (request)
+			cdns3_ep_run_transfer(priv_ep, request);
+	}
+	return ret;
+}
+
+/**
+ * cdns3_req_ep0_handle_feature -
+ * Handling of GET/SET_FEATURE standard USB request
+ *
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ * @set: must be set to 1 for SET_FEATURE request
+ *
+ * Returns 0 if success, error code on error
+ */
+static int cdns3_req_ep0_handle_feature(struct cdns3_device *priv_dev,
+					struct usb_ctrlrequest *ctrl,
+					int set)
+{
+	int ret = 0;
+	u32 recip;
+
+	recip = ctrl->bRequestType & USB_RECIP_MASK;
+
+	switch (recip) {
+	case USB_RECIP_DEVICE:
+		ret = cdns3_ep0_feature_handle_device(priv_dev, ctrl, set);
+		break;
+	case USB_RECIP_INTERFACE:
+		ret = cdns3_ep0_feature_handle_intf(priv_dev, ctrl, set);
+		break;
+	case USB_RECIP_ENDPOINT:
+		ret = cdns3_ep0_feature_handle_endpoint(priv_dev, ctrl, set);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (!ret)
+		writel(EP_CMD_ERDY | EP_CMD_REQ_CMPL, &priv_dev->regs->ep_cmd);
+
+	return ret;
+}
+
+/**
+ * cdns3_req_ep0_set_sel - Handling of SET_SEL standard USB request
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns 0 if success, error code on error
+ */
+static int cdns3_req_ep0_set_sel(struct cdns3_device *priv_dev,
+				 struct usb_ctrlrequest *ctrl_req)
+{
+	if (priv_dev->gadget.state < USB_STATE_ADDRESS)
+		return -EINVAL;
+
+	if (ctrl_req->wLength != 6) {
+		dev_err(&priv_dev->dev, "Set SEL should be 6 bytes, got %d\n",
+			ctrl_req->wLength);
+		return -EINVAL;
+	}
+
+	priv_dev->ep0_data_dir = 0;
+	cdns3_ep0_run_transfer(priv_dev, priv_dev->setup_dma, 6, 1);
+	return 0;
+}
+
+/**
+ * cdns3_req_ep0_set_isoch_delay -
+ * Handling of GET_ISOCH_DELAY standard USB request
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns 0 if success, error code on error
+ */
+static int cdns3_req_ep0_set_isoch_delay(struct cdns3_device *priv_dev,
+					 struct usb_ctrlrequest *ctrl_req)
+{
+	if (ctrl_req->wIndex || ctrl_req->wLength)
+		return -EINVAL;
+
+	priv_dev->isoch_delay = ctrl_req->wValue;
+	writel(EP_CMD_ERDY | EP_CMD_REQ_CMPL, &priv_dev->regs->ep_cmd);
+	return 0;
+}
+
+/**
+ * cdns3_ep0_standard_request - Handling standard USB requests
+ * @priv_dev: extended gadget object
+ * @ctrl_req: pointer to received setup packet
+ *
+ * Returns 0 if success, error code on error
+ */
+static int cdns3_ep0_standard_request(struct cdns3_device *priv_dev,
+				      struct usb_ctrlrequest *ctrl_req)
+{
+	int ret;
+
+	switch (ctrl_req->bRequest) {
+	case USB_REQ_SET_ADDRESS:
+		ret = cdns3_req_ep0_set_address(priv_dev, ctrl_req);
+		break;
+	case USB_REQ_SET_CONFIGURATION:
+		ret = cdns3_req_ep0_set_configuration(priv_dev, ctrl_req);
+		break;
+	case USB_REQ_GET_STATUS:
+		ret = cdns3_req_ep0_get_status(priv_dev, ctrl_req);
+		break;
+	case USB_REQ_CLEAR_FEATURE:
+		ret = cdns3_req_ep0_handle_feature(priv_dev, ctrl_req, 0);
+		break;
+	case USB_REQ_SET_FEATURE:
+		ret = cdns3_req_ep0_handle_feature(priv_dev, ctrl_req, 1);
+		break;
+	case USB_REQ_SET_SEL:
+		ret = cdns3_req_ep0_set_sel(priv_dev, ctrl_req);
+		break;
+	case USB_REQ_SET_ISOCH_DELAY:
+		ret = cdns3_req_ep0_set_isoch_delay(priv_dev, ctrl_req);
+		break;
+	default:
+		ret = cdns3_ep0_delegate_req(priv_dev, ctrl_req);
+		break;
+	}
+
+	return ret;
+}
+
 static void __pending_setup_status_handler(struct cdns3_device *priv_dev)
 {
-	//TODO: Implements this function
+	struct usb_request *request = priv_dev->pending_status_request;
+
+	if (priv_dev->status_completion_no_call && request &&
+	    request->complete) {
+		request->complete(priv_dev->gadget.ep0, request);
+		priv_dev->status_completion_no_call = 0;
+	}
+}
+
+void cdns3_pending_setup_status_handler(struct work_struct *work)
+{
+	struct cdns3_device *priv_dev = container_of(work, struct cdns3_device,
+			pending_status_wq);
+	unsigned long flags;
+
+	spin_lock_irqsave(&priv_dev->lock, flags);
+	__pending_setup_status_handler(priv_dev);
+	spin_unlock_irqrestore(&priv_dev->lock, flags);
 }
 
 /**
@@ -101,12 +545,50 @@ static void __pending_setup_status_handler(struct cdns3_device *priv_dev)
  */
 static void cdns3_ep0_setup_phase(struct cdns3_device *priv_dev)
 {
-	//TODO: Implements this function.
+	struct usb_ctrlrequest *ctrl = priv_dev->setup;
+	int result;
+
+	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_STANDARD)
+		result = cdns3_ep0_standard_request(priv_dev, ctrl);
+	else
+		result = cdns3_ep0_delegate_req(priv_dev, ctrl);
+
+	if (result != 0 && result != USB_GADGET_DELAYED_STATUS) {
+		dev_dbg(&priv_dev->dev, "STALL(00) %d\n", result);
+		/* set_stall on ep0 */
+		cdns3_select_ep(priv_dev, 0x00);
+		writel(EP_CMD_SSTALL, &priv_dev->regs->ep_cmd);
+		writel(EP_CMD_ERDY | EP_CMD_REQ_CMPL, &priv_dev->regs->ep_cmd);
+	}
 }
 
 static void cdns3_transfer_completed(struct cdns3_device *priv_dev)
 {
-	//TODO: Implements this function
+	if (priv_dev->ep0_request) {
+		usb_gadget_unmap_request_by_dev(priv_dev->sysdev,
+						priv_dev->ep0_request,
+						priv_dev->ep0_data_dir);
+
+		priv_dev->ep0_request->actual =
+			TRB_LEN(le32_to_cpu(priv_dev->trb_ep0->length));
+
+		dev_dbg(&priv_dev->dev, "Ep0 completion length %d\n",
+			priv_dev->ep0_request->actual);
+		list_del_init(&priv_dev->ep0_request->list);
+	}
+
+	if (priv_dev->ep0_request &&
+	    priv_dev->ep0_request->complete) {
+		spin_unlock(&priv_dev->lock);
+		priv_dev->ep0_request->complete(priv_dev->gadget.ep0,
+						priv_dev->ep0_request);
+
+		priv_dev->ep0_request = NULL;
+		spin_lock(&priv_dev->lock);
+	}
+
+	cdns3_prepare_setup_packet(priv_dev);
+	writel(EP_CMD_REQ_CMPL, &priv_dev->regs->ep_cmd);
 }
 
 /**

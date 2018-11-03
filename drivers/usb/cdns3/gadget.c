@@ -71,6 +71,30 @@ static u8 cdns3_ep_reg_pos_to_index(int i)
 }
 
 /**
+ * cdns3_ep_addr_to_index - Macro converts endpoint address to
+ * index of endpoint object in cdns3_device.eps[] container
+ * @ep_addr: endpoint address for which endpoint object is required
+ *
+ * Remember that endpoint container doesn't contain default endpoint
+ */
+u8 cdns3_ep_addr_to_index(u8 ep_addr)
+{
+	return (((ep_addr & 0x7F) - 1) + ((ep_addr & USB_DIR_IN) ? 1 : 0));
+}
+
+/**
+ * cdns3_ep_addr_to_bit_pos - Macro converts endpoint address to
+ * bit position in ep_ists register
+ * @ep_addr: endpoint address for which bit position is required
+ *
+ * Remember that endpoint container doesn't contain default endpoint
+ */
+static u32 cdns3_ep_addr_to_bit_pos(u8 ep_addr)
+{
+	return (1 << (ep_addr & 0x7F)) << ((ep_addr & 0x80) ? 16 : 0);
+}
+
+/**
  * cdns3_next_request - returns next request from list
  * @list: list containing requests
  *
@@ -452,6 +476,99 @@ static irqreturn_t cdns3_irq_handler_thread(struct cdns3 *cdns)
 irqend:
 	spin_unlock_irqrestore(&priv_dev->lock, flags);
 	return ret;
+}
+
+/**
+ * cdns3_ep_onchip_buffer_alloc - Try to allocate onchip buf for EP
+ *
+ * The real allocation will occur during write to EP_CFG register,
+ * this function is used to check if the 'size' allocation is allowed.
+ *
+ * @priv_dev: extended gadget object
+ * @size: the size (KB) for EP would like to allocate
+ * @is_in: the direction for EP
+ *
+ * Return 0 if the later allocation is allowed or negative value on failure
+ */
+static int cdns3_ep_onchip_buffer_alloc(struct cdns3_device *priv_dev,
+					int size, int is_in)
+{
+	if (is_in) {
+		priv_dev->onchip_mem_allocated_size += size;
+	} else if (!priv_dev->out_mem_is_allocated) {
+		 /* ALL OUT EPs are shared the same chunk onchip memory */
+		priv_dev->onchip_mem_allocated_size += size;
+		priv_dev->out_mem_is_allocated = 1;
+	}
+
+	if (priv_dev->onchip_mem_allocated_size > CDNS3_ONCHIP_BUF_SIZE) {
+		priv_dev->onchip_mem_allocated_size -= size;
+		return -EPERM;
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * cdns3_ep_config Configure hardware endpoint
+ * @priv_ep: extended endpoint object
+ */
+void cdns3_ep_config(struct cdns3_endpoint *priv_ep)
+{
+	bool is_iso_ep = (priv_ep->type == USB_ENDPOINT_XFER_ISOC);
+	struct cdns3_device *priv_dev = priv_ep->cdns3_dev;
+	u32 bEndpointAddress = priv_ep->num | priv_ep->dir;
+	u32 interrupt_mask = EP_STS_EN_TRBERREN;
+	u32 max_packet_size = 0;
+	u32 ep_cfg = 0;
+	int ret;
+
+	if (priv_ep->type == USB_ENDPOINT_XFER_INT) {
+		ep_cfg = EP_CFG_EPTYPE(USB_ENDPOINT_XFER_INT);
+	} else if (priv_ep->type == USB_ENDPOINT_XFER_BULK) {
+		ep_cfg = EP_CFG_EPTYPE(USB_ENDPOINT_XFER_BULK);
+	} else {
+		ep_cfg = EP_CFG_EPTYPE(USB_ENDPOINT_XFER_ISOC);
+		interrupt_mask = 0xFFFFFFFF;
+	}
+
+	switch (priv_dev->gadget.speed) {
+	case USB_SPEED_FULL:
+		max_packet_size = is_iso_ep ? 1023 : 64;
+		break;
+	case USB_SPEED_HIGH:
+		max_packet_size = is_iso_ep ? 1024 : 512;
+		break;
+	case USB_SPEED_SUPER:
+		max_packet_size = 1024;
+		break;
+	default:
+		//all other speed are not supported
+		return;
+	}
+
+	ret = cdns3_ep_onchip_buffer_alloc(priv_dev, CDNS3_EP_BUF_SIZE,
+					   priv_ep->dir);
+	if (ret) {
+		dev_err(&priv_dev->dev, "onchip mem is full, ep is invalid\n");
+		return;
+	}
+
+	ep_cfg |= EP_CFG_MAXPKTSIZE(max_packet_size) |
+		  EP_CFG_BUFFERING(CDNS3_EP_BUF_SIZE - 1) |
+		  EP_CFG_MAXBURST(priv_ep->endpoint.maxburst);
+
+	cdns3_select_ep(priv_dev, bEndpointAddress);
+
+	writel(ep_cfg, &priv_dev->regs->ep_cfg);
+	writel(interrupt_mask, &priv_dev->regs->ep_sts_en);
+
+	dev_dbg(&priv_dev->dev, "Configure %s: with val %08x\n",
+		priv_ep->name, ep_cfg);
+
+	/* enable interrupt for selected endpoint */
+	cdns3_set_register_bit(&priv_dev->regs->ep_ien,
+			       cdns3_ep_addr_to_bit_pos(bEndpointAddress));
 }
 
 /* Find correct direction for HW endpoint according to description */
@@ -1088,6 +1205,8 @@ static int __cdns3_gadget_init(struct cdns3 *cdns)
 	priv_dev->is_connected = 0;
 
 	spin_lock_init(&priv_dev->lock);
+	INIT_WORK(&priv_dev->pending_status_wq,
+		  cdns3_pending_setup_status_handler);
 
 	priv_dev->in_standby_mode = 1;
 
