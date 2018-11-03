@@ -1064,4 +1064,8 @@ struct cdns3_device {
 	struct usb_request		*pending_status_request;
 };
 
+void cdns3_set_register_bit(void __iomem *ptr, u32 mask);
+int cdns3_init_ep0(struct cdns3_device *priv_dev);
+void cdns3_ep0_config(struct cdns3_device *priv_dev);
+void cdns3_select_ep(struct cdns3_device *priv_dev, u32 ep);
 #endif /* __LINUX_CDNS3_GADGET */
