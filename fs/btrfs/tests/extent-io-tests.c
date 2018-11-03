@@ -60,7 +60,7 @@ static int test_find_delalloc(u32 sectorsize)
 	struct page *page;
 	struct page *locked_page = NULL;
 	unsigned long index = 0;
-	u64 total_dirty = SZ_256M;
+	u64 total_dirty = SZ_64M;
 	u64 max_bytes = SZ_128M;
 	u64 start, end, test_start;
 	u64 found;
