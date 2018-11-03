@@ -18,6 +18,7 @@
 #include "core.h"
 #include "host-export.h"
 #include "gadget-export.h"
+#include "drd.h"
 
 static inline struct cdns3_role_driver *cdns3_role(struct cdns3 *cdns)
 {
@@ -70,8 +71,10 @@ static void cdns3_set_role(struct cdns3 *cdns, enum cdns3_roles role)
 static enum cdns3_roles cdns3_get_role(struct cdns3 *cdns)
 {
 	if (cdns->roles[CDNS3_ROLE_HOST] && cdns->roles[CDNS3_ROLE_GADGET]) {
-		//TODO: implements selecting device/host mode
-		return CDNS3_ROLE_HOST;
+		if (cdns3_is_host(cdns))
+			return CDNS3_ROLE_HOST;
+		if (cdns3_is_device(cdns))
+			return CDNS3_ROLE_GADGET;
 	}
 	return cdns->roles[CDNS3_ROLE_HOST]
 		? CDNS3_ROLE_HOST
@@ -141,6 +144,12 @@ static irqreturn_t cdns3_irq(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
+	if (cdns->dr_mode == USB_DR_MODE_OTG) {
+		ret = cdns3_drd_irq(cdns);
+		if (ret == IRQ_HANDLED)
+			return ret;
+	}
+
 	/* Handle device/host interrupt */
 	if (cdns->role != CDNS3_ROLE_END)
 		ret = cdns3_role(cdns)->irq(cdns);
@@ -202,12 +211,8 @@ static void cdns3_role_switch(struct work_struct *work)
 	bool device, host;
 
 	cdns = container_of(work, struct cdns3, role_switch_wq);
-
-	//TODO: implements this functions.
-	//host = cdns3_is_host(cdns);
-	//device = cdns3_is_device(cdns);
-	host = 1;
-	device = 0;
+	host = cdns3_is_host(cdns);
+	device = cdns3_is_device(cdns);
 
 	if (host) {
 		if (cdns->roles[CDNS3_ROLE_HOST])
@@ -286,6 +291,7 @@ static int cdns3_probe(struct platform_device *pdev)
 	if (ret)
 		goto err3;
 
+	ret = cdns3_drd_probe(cdns);
 	if (ret)
 		goto err3;
 
