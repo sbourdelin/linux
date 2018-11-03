@@ -309,6 +309,7 @@ static int cdns3_probe(struct platform_device *pdev)
 	if (ret)
 		goto err4;
 
+	cdns3_debugfs_init(cdns);
 	device_set_wakeup_capable(dev, true);
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
@@ -346,6 +347,7 @@ static int cdns3_remove(struct platform_device *pdev)
 	pm_runtime_get_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	pm_runtime_put_noidle(&pdev->dev);
+	cdns3_debugfs_exit(cdns);
 	cdns3_remove_roles(cdns);
 	usb_phy_shutdown(cdns->usbphy);
 

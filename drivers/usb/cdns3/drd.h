@@ -119,4 +119,7 @@ int cdns3_drd_probe(struct cdns3 *cdns);
 void cdns3_set_hw_mode(struct cdns3 *cdns, u32 mode);
 irqreturn_t cdns3_drd_irq(struct cdns3 *cdns);
 
+void cdns3_debugfs_init(struct cdns3 *cdns);
+void cdns3_debugfs_exit(struct cdns3 *cdns);
+
 #endif /* __LINUX_CDNS3_DRD */
