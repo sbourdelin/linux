@@ -147,21 +147,6 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 		return -E2BIG;
 	}
 
-	rc = tpm2_prepare_space(chip, space, buf, bufsiz);
-	/*
-	 * If the command is not implemented by the TPM, synthesize a
-	 * response with a TPM2_RC_COMMAND_CODE return for user-space.
-	 */
-	if (rc == -EOPNOTSUPP) {
-		header->length = cpu_to_be32(sizeof(*header));
-		header->tag = cpu_to_be16(TPM2_ST_NO_SESSIONS);
-		header->return_code = cpu_to_be32(TPM2_RC_COMMAND_CODE |
-						  TSS2_RESMGR_TPM_RC_LAYER);
-		return sizeof(*header);
-	}
-	if (rc)
-		return rc;
-
 	rc = chip->ops->send(chip, buf, count);
 	if (rc < 0) {
 		if (rc != -EPIPE)
@@ -201,12 +186,6 @@ out_recv:
 	}
 	if (len < TPM_HEADER_SIZE || len != be32_to_cpu(header->length))
 		return -EFAULT;
-
-	rc = tpm2_commit_space(chip, space, buf, &len);
-	if (rc) {
-		dev_err(&chip->dev, "%s: commit error %d\n", __func__, rc);
-		return rc;
-	}
 
 	return len;
 }
