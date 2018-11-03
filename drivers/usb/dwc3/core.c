@@ -1021,6 +1021,16 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		}
 	}
 
+	/* Enable low power isoc transfer scheduling using reference clock */
+	if  (dwc->use_refclk_lpm &&
+	     dwc->dr_mode == USB_DR_MODE_PERIPHERAL &&
+	     dwc->revision >= DWC3_USB31_REVISION_180A &&
+	     !dwc->dis_enblslpm_quirk && !dwc->dis_u2_susphy_quirk) {
+		reg = dwc3_readl(dwc->regs, DWC3_GFLADJ);
+		reg |= DWC3_GFLADJ_REFCLK_FLADJ;
+		dwc3_writel(dwc->regs, DWC3_GFLADJ, reg);
+	}
+
 	/*
 	 * Must config both number of packets and max burst settings to enable
 	 * RX and/or TX threshold.
@@ -1266,6 +1276,8 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				&hird_threshold);
 	dwc->usb3_lpm_capable = device_property_read_bool(dev,
 				"snps,usb3_lpm_capable");
+	dwc->use_refclk_lpm = device_property_read_bool(dev,
+				"snps,enable-refclk-lpm");
 	device_property_read_u8(dev, "snps,refclk-period-ns",
 				&dwc->refclk_period_ns);
 	device_property_read_u8(dev, "snps,rx-thr-num-pkt-prd",
