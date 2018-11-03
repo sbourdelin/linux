@@ -429,6 +429,12 @@ union map_info *dm_get_rq_mapinfo(struct request *rq);
  */
 int dm_ioctl_cmd(unsigned int command, struct dm_ioctl *param);
 
+/*
+ * Device mapper function to parse and create devices specified in the kernel
+ * command line boot parameter "dm="
+ */
+void __init dm_boot_setup_drives(char *boot_param);
+
 struct queue_limits *dm_get_queue_limits(struct mapped_device *md);
 
 /*
