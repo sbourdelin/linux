@@ -124,6 +124,14 @@ void cdns3_select_ep(struct cdns3_device *priv_dev, u32 ep)
 	wmb();
 }
 
+dma_addr_t cdns3_trb_virt_to_dma(struct cdns3_endpoint *priv_ep,
+				 struct cdns3_trb *trb)
+{
+	u32 offset = (char *)trb - (char *)priv_ep->trb_pool;
+
+	return priv_ep->trb_pool_dma + offset;
+}
+
 /**
  * cdns3_allocate_trb_pool - Allocates TRB's pool for selected endpoint
  * @priv_ep:  endpoint object
@@ -428,6 +436,8 @@ int cdns3_ep_run_transfer(struct cdns3_endpoint *priv_ep,
 		trb->control |= first_pcs;
 
 	priv_req->on_ring = 1;
+
+	cdns3_dbg_ep_rings(priv_dev, priv_ep);
 arm:
 	/* arm transfer on selected endpoint */
 	cdns3_select_ep(priv_ep->cdns3_dev, address);
@@ -536,6 +546,8 @@ static int cdns3_check_ep_interrupt_proceed(struct cdns3_endpoint *priv_ep)
 
 	cdns3_select_ep(priv_dev, priv_ep->endpoint.address);
 	ep_sts_reg = readl(&regs->ep_sts);
+
+	dev_dbg(&priv_dev->dev, "%s\n", cdns3_decode_epx_irq(priv_ep));
 
 	if (ep_sts_reg & EP_STS_TRBERR)
 		writel(EP_STS_TRBERR, &regs->ep_sts);

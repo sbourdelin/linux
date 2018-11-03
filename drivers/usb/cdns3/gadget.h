@@ -1085,5 +1085,16 @@ struct usb_request *cdns3_gadget_ep_alloc_request(struct usb_ep *ep,
 void cdns3_gadget_ep_free_request(struct usb_ep *ep,
 				  struct usb_request *request);
 int cdns3_gadget_ep_dequeue(struct usb_ep *ep, struct usb_request *request);
+dma_addr_t cdns3_trb_virt_to_dma(struct cdns3_endpoint *priv_ep,
+				 struct cdns3_trb *trb);
 
+char *cdns3_decode_epx_irq(struct cdns3_endpoint *priv_ep);
+char *cdns3_decode_ep0_irq(struct cdns3_device *priv_dev, int dir);
+void cdns3_dbg_ring(struct cdns3_device *priv_dev,
+		    struct cdns3_endpoint *priv_ep);
+void cdns3_dbg_ring_ptrs(struct cdns3_device *priv_dev,
+			 struct cdns3_endpoint *priv_ep);
+void cdns3_dbg_ep_rings(struct cdns3_device *priv_dev,
+			struct cdns3_endpoint *priv_ep);
+void cdns3_dbg_setup(struct cdns3_device *priv_dev);
 #endif /* __LINUX_CDNS3_GADGET */

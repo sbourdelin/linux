@@ -604,12 +604,15 @@ void cdns3_check_ep0_interrupt_proceed(struct cdns3_device *priv_dev, int dir)
 	cdns3_select_ep(priv_dev, 0 | (dir ? USB_DIR_IN : USB_DIR_OUT));
 	ep_sts_reg = readl(&regs->ep_sts);
 
+	dev_dbg(&priv_dev->dev, "%s\n", cdns3_decode_ep0_irq(priv_dev, dir));
+
 	__pending_setup_status_handler(priv_dev);
 
 	if ((ep_sts_reg & EP_STS_SETUP) && dir == 0) {
 		struct usb_ctrlrequest *setup = priv_dev->setup;
 
 		writel(EP_STS_SETUP | EP_STS_IOC | EP_STS_ISP, &regs->ep_sts);
+		cdns3_dbg_setup(priv_dev);
 
 		priv_dev->ep0_data_dir = setup->bRequestType & USB_DIR_IN;
 		cdns3_ep0_setup_phase(priv_dev);
