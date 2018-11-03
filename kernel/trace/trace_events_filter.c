@@ -1719,6 +1719,8 @@ static int create_filter(struct trace_event_call *call,
 	if (err && set_str)
 		append_filter_err(pe, *filterp);
 
+	create_filter_finish(pe);
+
 	return err;
 }
 
