@@ -1,15 +1,16 @@
-What:		/sys/firmware/devicetree/*
+What:		/sys/firmware/devicetree/
+Date:		November 2013
+Contact:	Frank Rowand <frowand.list@gmail.com>, devicetree@vger.kernel.org
+Description:
+		Top level Open Firmware, aka devicetree, sysfs directory.
+
+What:		/sys/firmware/devicetree/base
 Date:		November 2013
 Contact:	Grant Likely <grant.likely@arm.com>, devicetree@vger.kernel.org
 Description:
 		When using OpenFirmware or a Flattened Device Tree to enumerate
 		hardware, the device tree structure will be exposed in this
 		directory.
-
-		It is possible for multiple device-tree directories to exist.
-		Some device drivers use a separate detached device tree which
-		have no attachment to the system tree and will appear in a
-		different subdirectory under /sys/firmware/devicetree.
 
 		Userspace must not use the /sys/firmware/devicetree/base
 		path directly, but instead should follow /proc/device-tree
@@ -20,12 +21,88 @@ Description:
 		filesystem support, and has largely the same semantics and
 		should be compatible with existing userspace.
 
-		The contents of /sys/firmware/devicetree/ is a
+		The /sys/firmware/devicetree/base directory is the root
+		node of the devicetree.
+
+		The contents of /sys/firmware/devicetree/base is a
 		hierarchy of directories, one per device tree node. The
 		directory name is the resolved path component name (node
 		name plus address). Properties are represented as files
 		in the directory. The contents of each file is the exact
 		binary data from the device tree.
+
+What:		/sys/firmware/devicetree/tree_version
+Date:		October 2018
+KernelVersion:	4.20
+Contact:	Frank Rowand <frowand.list@gmail.com>, devicetree@vger.kernel.org
+Description:
+		When an overlay is applied or removed, the live devicetree
+		visible in /proc/device-tree/, aka
+		/sys/firmware/devicetree/base/, reflects the changes.
+
+		tree_version provides a way for user space to determine if the
+		live devicetree has remained unchanged while a series of one
+		or more accesses of /proc/device-tree/ occur.
+
+		Details about the value of tree_version:
+
+		   - tree_version is never decremented
+
+		   - tree_version is incremented for each overlay changeset
+		     that is applied or removed
+
+		   - when the tree is locked to apply or remove an overlay
+		     changeset, tree_version is incremented
+
+		   - while the tree is locked, all reads of tree_version
+		     will block
+
+		   - when the overlay changeset apply or remove is completed
+		     (or an error aborts the overlay changeset apply or
+		     remove), the tree is unlocked
+
+		   - the granularity of tree_version is based on overlay
+		     changesets; it will never be smaller than a changeset,
+		     but may in the future be extended to cover apply and
+		     remove of non-overlay changesets
+
+		   - the value of tree_version is initially 0 at the start
+		     of kernel boot, but may increase during the boot process,
+		     for example due to devicetree unittest activity
+
+		   - tree_version is the ascii representation of a kernel
+		     unsigned 64 bit int variable, and when incremented
+		     from maximum value, it wraps around to 0
+
+		The use of both dynamic devicetree modifications and overlay
+		apply and removal are not supported during the same boot
+		cycle.  Thus non-overlay dynamic modifications are not
+		reflected in the value of tree_version.
+
+		Example shell use of tree_version:
+
+		# set done false (1)
+		done=1
+
+		# keep trying until we can make it through the loop without
+		# live tree being changed by an overlay changeset during the
+		# 'critical region'
+		while [ $done = 1 ] ; do
+
+		   pre_version=$(cat /sys/firmware/devicetree/tree_version)
+
+		   # 'critical region'
+		   # access /proc/device-tree/ one or more times
+
+		   # check that overlay did not change DT during critical region
+		   post_version=$(cat /sys/firmware/devicetree/tree_version)
+		   if [ ${post_version} = ${pre_version} ] ; then
+		      # set done true (0)
+		      done=0
+		   fi
+
+		done
+
 
 What:		/sys/firmware/fdt
 Date:		February 2015

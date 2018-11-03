@@ -178,9 +178,80 @@ int of_free_phandle_cache(void)
 late_initcall_sync(of_free_phandle_cache);
 #endif
 
+#define show_one_under_of_mutex(object)					\
+	static ssize_t show_##object					\
+	(struct kobject *kobj, struct attribute *attr, char *buf)	\
+	{								\
+		ssize_t ret;						\
+									\
+		mutex_lock(&of_mutex);					\
+		ret = sprintf(buf, "%llu\n", object);			\
+		mutex_unlock(&of_mutex);				\
+		return ret;						\
+	}
+
+struct global_attr {
+	struct attribute attr;
+	ssize_t (*show)(struct kobject *kobj,
+			struct attribute *attr, char *buf);
+	ssize_t (*store)(struct kobject *a, struct attribute *b,
+			 const char *c, size_t count);
+};
+
+#define define_one_global_ro(_name)		\
+static struct global_attr attr_##_name =	\
+__ATTR(_name, 0444, show_##_name, NULL)
+
+/*
+ * unsigned so it will wrap from maximum value to zero.
+ *
+ * If 32 bit, then continuously applying and removing an overlay at the
+ * rate of once per millisecond would cause a wrap in slightly over
+ * one hour.  This rate is not realistic, except possibly in a test
+ * system.  None the less, prevent this (extremely remote) possibility
+ * by using an unsigned 64 bit.
+ */
+static u64 tree_version;
+
+show_one_under_of_mutex(tree_version);
+
+define_one_global_ro(tree_version);
+
+static struct attribute *of_attributes[] = {
+	&attr_tree_version.attr,
+	NULL
+};
+
+static const struct attribute_group of_attr_group = {
+	.attrs = of_attributes,
+};
+
+/*
+ * internal documentation
+ * tree_version_increment() - increment base version
+ *
+ * Before an overlay apply or overlay remove modifies the live devicetree,
+ * call this function while holding of_mutex.  The mutex must be held until
+ * all modifications to the live devicetree are completed.
+ *
+ * Userspace can use the value of this variable to determine whether the
+ * devicetree has changed while accessing the devicetree.  The sysfs show
+ * function acquires of_mutex to ensure that user space access of tree_version
+ * will block while an overlay apply or remove is in progress.
+ *
+ * The use of both (1) dynamic devicetree modifications and (2) overlay apply
+ * and removal are not supported during the same boot cycle.  Thus non-overlay
+ * dynamic modifications are not reflected in the value of tree_version.
+ */
+void tree_version_increment(void)
+{
+	tree_version++;
+}
+
 void __init of_core_init(void)
 {
 	struct device_node *np;
+	int ret;
 
 	of_populate_phandle_cache();
 
@@ -199,6 +270,10 @@ void __init of_core_init(void)
 	/* Symlink in /proc as required by userspace ABI */
 	if (of_root)
 		proc_symlink("device-tree", NULL, "/sys/firmware/devicetree/base");
+
+	ret = sysfs_create_group(&of_kset->kobj, &of_attr_group);
+	if (ret)
+		pr_err("sysfs_create_group of_attr_group failed: %d\n", ret);
 }
 
 static struct property *__of_find_property(const struct device_node *np,
