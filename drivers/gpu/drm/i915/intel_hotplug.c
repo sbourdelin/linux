@@ -351,7 +351,7 @@ static void i915_hotplug_work_func(struct work_struct *work)
 	hpd_event_bits = dev_priv->hotplug.event_bits;
 	dev_priv->hotplug.event_bits = 0;
 
-	/* Disable hotplug on connectors that hit an irq storm. */
+	/* Enable polling for connectors which had HPD IRQ storms */
 	intel_hpd_irq_storm_disable(dev_priv);
 
 	spin_unlock_irq(&dev_priv->irq_lock);
@@ -458,6 +458,10 @@ void intel_hpd_irq_handler(struct drm_i915_private *dev_priv,
 		}
 	}
 
+	/*
+	 * Disable any IRQs that storms were detected on. Polling enablement
+	 * happens later in our hotplug work.
+	 */
 	if (storm_detected && dev_priv->display_irqs_enabled)
 		dev_priv->display.hpd_irq_setup(dev_priv);
 	spin_unlock(&dev_priv->irq_lock);
