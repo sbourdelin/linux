@@ -178,6 +178,14 @@ static void cdns3_ep_stall_flush(struct cdns3_endpoint *priv_ep)
 	priv_ep->flags |= EP_STALL;
 }
 
+void cdns3_enable_l1(struct cdns3_device *priv_dev, int enable)
+{
+	if (enable)
+		writel(USB_CONF_L1EN, &priv_dev->regs->usb_conf);
+	else
+		writel(USB_CONF_L1DS, &priv_dev->regs->usb_conf);
+}
+
 /**
  * cdns3_gadget_giveback - call struct usb_request's ->complete callback
  * @priv_ep: The endpoint to whom the request belongs to
