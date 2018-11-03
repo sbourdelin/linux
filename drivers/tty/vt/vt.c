@@ -1525,7 +1525,7 @@ static void csi_J(struct vc_data *vc, int vpar)
 static void csi_K(struct vc_data *vc, int vpar)
 {
 	unsigned int count;
-	unsigned short *start = (unsigned short *)vc->vc_pos;
+	unsigned short *start;
 	int offset;
 
 	switch (vpar) {
@@ -1545,7 +1545,8 @@ static void csi_K(struct vc_data *vc, int vpar)
 			return;
 	}
 	vc_uniscr_clear_line(vc, vc->vc_x + offset, count);
-	scr_memsetw(start + offset, vc->vc_video_erase_char, 2 * count);
+	start = (unsigned short *)vc->vc_pos + offset;
+	scr_memsetw(start, vc->vc_video_erase_char, 2 * count);
 	vc->vc_need_wrap = 0;
 	if (con_should_update(vc))
 		do_update_region(vc, (unsigned long) start, count);
