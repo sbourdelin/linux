@@ -1068,6 +1068,7 @@ int cdns3_handshake(void __iomem *ptr, u32 mask, u32 done, int usec);
 void cdns3_set_register_bit(void __iomem *ptr, u32 mask);
 int cdns3_init_ep0(struct cdns3_device *priv_dev);
 void cdns3_ep0_config(struct cdns3_device *priv_dev);
+void cdns3_check_ep0_interrupt_proceed(struct cdns3_device *priv_dev, int dir);
 void cdns3_select_ep(struct cdns3_device *priv_dev, u32 ep);
 void cdns3_enable_l1(struct cdns3_device *priv_dev, int enable);
 struct usb_request *cdns3_next_request(struct list_head *list);

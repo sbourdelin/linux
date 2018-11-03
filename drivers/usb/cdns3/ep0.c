@@ -90,6 +90,69 @@ static void cdns3_set_hw_configuration(struct cdns3_device *priv_dev)
 	}
 }
 
+static void __pending_setup_status_handler(struct cdns3_device *priv_dev)
+{
+	//TODO: Implements this function
+}
+
+/**
+ * cdns3_ep0_setup_phase - Handling setup USB requests
+ * @priv_dev: extended gadget object
+ */
+static void cdns3_ep0_setup_phase(struct cdns3_device *priv_dev)
+{
+	//TODO: Implements this function.
+}
+
+static void cdns3_transfer_completed(struct cdns3_device *priv_dev)
+{
+	//TODO: Implements this function
+}
+
+/**
+ * cdns3_check_ep0_interrupt_proceed - Processes interrupt related to endpoint 0
+ * @priv_dev: extended gadget object
+ * @dir: 1 for IN direction, 0 for OUT direction
+ */
+void cdns3_check_ep0_interrupt_proceed(struct cdns3_device *priv_dev, int dir)
+{
+	struct cdns3_usb_regs __iomem *regs = priv_dev->regs;
+	u32 ep_sts_reg;
+
+	cdns3_select_ep(priv_dev, 0 | (dir ? USB_DIR_IN : USB_DIR_OUT));
+	ep_sts_reg = readl(&regs->ep_sts);
+
+	__pending_setup_status_handler(priv_dev);
+
+	if ((ep_sts_reg & EP_STS_SETUP) && dir == 0) {
+		struct usb_ctrlrequest *setup = priv_dev->setup;
+
+		writel(EP_STS_SETUP | EP_STS_IOC | EP_STS_ISP, &regs->ep_sts);
+
+		priv_dev->ep0_data_dir = setup->bRequestType & USB_DIR_IN;
+		cdns3_ep0_setup_phase(priv_dev);
+		ep_sts_reg &= ~(EP_STS_SETUP | EP_STS_IOC | EP_STS_ISP);
+	}
+
+	if (ep_sts_reg & EP_STS_TRBERR)
+		writel(EP_STS_TRBERR, &priv_dev->regs->ep_sts);
+
+	if (ep_sts_reg & EP_STS_DESCMIS) {
+		writel(EP_STS_DESCMIS, &priv_dev->regs->ep_sts);
+
+		if (dir == 0 && !priv_dev->setup_pending) {
+			priv_dev->ep0_data_dir = 0;
+			cdns3_ep0_run_transfer(priv_dev, priv_dev->setup_dma,
+					       8, 0);
+		}
+	}
+
+	if ((ep_sts_reg & EP_STS_IOC) || (ep_sts_reg & EP_STS_ISP)) {
+		writel(EP_STS_IOC, &priv_dev->regs->ep_sts);
+		cdns3_transfer_completed(priv_dev);
+	}
+}
+
 /**
  * cdns3_gadget_ep0_enable
  * Function shouldn't be called by gadget driver,

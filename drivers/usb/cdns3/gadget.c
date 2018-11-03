@@ -59,6 +59,18 @@ void cdns3_set_register_bit(void __iomem *ptr, u32 mask)
 }
 
 /**
+ * cdns3_ep_reg_pos_to_index - Macro converts bit position of ep_ists register
+ * to index of endpoint object in cdns3_device.eps[] container
+ * @i: bit position of endpoint for which endpoint object is required
+ *
+ * Remember that endpoint container doesn't contain default endpoint
+ */
+static u8 cdns3_ep_reg_pos_to_index(int i)
+{
+	return ((i / 16) + (((i % 16) - 2) * 2));
+}
+
+/**
  * cdns3_next_request - returns next request from list
  * @list: list containing requests
  *
@@ -178,12 +190,44 @@ static void cdns3_ep_stall_flush(struct cdns3_endpoint *priv_ep)
 	priv_ep->flags |= EP_STALL;
 }
 
+/**
+ * cdns3_gadget_unconfig - reset device configuration
+ * @priv_dev: extended gadget object
+ */
+void cdns3_gadget_unconfig(struct cdns3_device *priv_dev)
+{
+	/* RESET CONFIGURATION */
+	writel(USB_CONF_CFGRST, &priv_dev->regs->usb_conf);
+
+	cdns3_enable_l1(priv_dev, 0);
+	priv_dev->hw_configured_flag = 0;
+	priv_dev->onchip_mem_allocated_size = 0;
+	priv_dev->out_mem_is_allocated = 0;
+}
+
 void cdns3_enable_l1(struct cdns3_device *priv_dev, int enable)
 {
 	if (enable)
 		writel(USB_CONF_L1EN, &priv_dev->regs->usb_conf);
 	else
 		writel(USB_CONF_L1DS, &priv_dev->regs->usb_conf);
+}
+
+static enum usb_device_speed cdns3_get_speed(struct cdns3_device *priv_dev)
+{
+	u32 reg;
+
+	reg = readl(&priv_dev->regs->usb_sts);
+
+	if (DEV_SUPERSPEED(reg))
+		return USB_SPEED_SUPER;
+	else if (DEV_HIGHSPEED(reg))
+		return USB_SPEED_HIGH;
+	else if (DEV_FULLSPEED(reg))
+		return USB_SPEED_FULL;
+	else if (DEV_LOWSPEED(reg))
+		return USB_SPEED_LOW;
+	return USB_SPEED_UNKNOWN;
 }
 
 /**
@@ -212,9 +256,133 @@ void cdns3_gadget_giveback(struct cdns3_endpoint *priv_ep,
 int cdns3_ep_run_transfer(struct cdns3_endpoint *priv_ep,
 			  struct usb_request *request)
 {
+	return 0;
+}
+
+static void cdns3_transfer_completed(struct cdns3_device *priv_dev,
+				     struct cdns3_endpoint *priv_ep)
+{
 	//TODO: Implements this function.
+}
+
+/**
+ * cdns3_check_ep_interrupt_proceed - Processes interrupt related to endpoint
+ * @priv_ep: endpoint object
+ *
+ * Returns 0
+ */
+static int cdns3_check_ep_interrupt_proceed(struct cdns3_endpoint *priv_ep)
+{
+	struct cdns3_device *priv_dev = priv_ep->cdns3_dev;
+	struct cdns3_usb_regs __iomem *regs;
+	u32 ep_sts_reg;
+
+	regs = priv_dev->regs;
+
+	cdns3_select_ep(priv_dev, priv_ep->endpoint.address);
+	ep_sts_reg = readl(&regs->ep_sts);
+
+	if (ep_sts_reg & EP_STS_TRBERR)
+		writel(EP_STS_TRBERR, &regs->ep_sts);
+
+	if (ep_sts_reg & EP_STS_ISOERR)
+		writel(EP_STS_ISOERR, &regs->ep_sts);
+
+	if (ep_sts_reg & EP_STS_OUTSMM)
+		writel(EP_STS_OUTSMM, &regs->ep_sts);
+
+	if (ep_sts_reg & EP_STS_NRDY)
+		writel(EP_STS_NRDY, &regs->ep_sts);
+
+	if ((ep_sts_reg & EP_STS_IOC) || (ep_sts_reg & EP_STS_ISP)) {
+		writel(EP_STS_IOC | EP_STS_ISP, &regs->ep_sts);
+		cdns3_transfer_completed(priv_dev, priv_ep);
+	}
+
+	if (ep_sts_reg & EP_STS_DESCMIS)
+		writel(EP_STS_DESCMIS, &regs->ep_sts);
 
 	return 0;
+}
+
+/**
+ * cdns3_check_usb_interrupt_proceed - Processes interrupt related to device
+ * @priv_dev: extended gadget object
+ * @usb_ists: bitmap representation of device's reported interrupts
+ * (usb_ists register value)
+ */
+static void cdns3_check_usb_interrupt_proceed(struct cdns3_device *priv_dev,
+					      u32 usb_ists)
+{
+	struct cdns3_usb_regs __iomem *regs;
+	int speed = 0;
+
+	regs = priv_dev->regs;
+
+	/* Connection detected */
+	if (usb_ists & (USB_ISTS_CON2I | USB_ISTS_CONI)) {
+		writel(USB_ISTS_CON2I | USB_ISTS_CONI, &regs->usb_ists);
+		speed = cdns3_get_speed(priv_dev);
+
+		dev_dbg(&priv_dev->dev, "Connection detected at speed: %s %d\n",
+			usb_speed_string(speed), speed);
+
+		priv_dev->gadget.speed = speed;
+		priv_dev->is_connected = 1;
+		usb_gadget_set_state(&priv_dev->gadget, USB_STATE_POWERED);
+		cdns3_ep0_config(priv_dev);
+	}
+
+	/* SS Disconnection detected */
+	if (usb_ists & (USB_ISTS_DIS2I | USB_ISTS_DISI)) {
+		dev_dbg(&priv_dev->dev, "Disconnection detected\n");
+
+		writel(USB_ISTS_DIS2I | USB_ISTS_DISI, &regs->usb_ists);
+		if (priv_dev->gadget_driver &&
+		    priv_dev->gadget_driver->disconnect) {
+			spin_unlock(&priv_dev->lock);
+			priv_dev->gadget_driver->disconnect(&priv_dev->gadget);
+			spin_lock(&priv_dev->lock);
+		}
+		priv_dev->gadget.speed = USB_SPEED_UNKNOWN;
+		usb_gadget_set_state(&priv_dev->gadget, USB_STATE_NOTATTACHED);
+		priv_dev->is_connected = 0;
+		cdns3_gadget_unconfig(priv_dev);
+	}
+
+	if (usb_ists & USB_ISTS_L2ENTI) {
+		dev_dbg(&priv_dev->dev, "Device suspended\n");
+		writel(USB_ISTS_L2ENTI, &regs->usb_ists);
+	}
+
+	/* Exit from standby mode on L2 exit (Suspend in HS/FS or SS) */
+	if (usb_ists & USB_ISTS_L2EXTI) {
+		dev_dbg(&priv_dev->dev, "[Interrupt] L2 exit detected\n");
+		writel(USB_ISTS_L2EXTI, &regs->usb_ists);
+	}
+
+	/* Exit from standby mode on U3 exit (Suspend in HS/FS or SS). */
+	if (usb_ists & USB_ISTS_U3EXTI) {
+		dev_dbg(&priv_dev->dev, "U3 exit detected\n");
+		writel(USB_ISTS_U3EXTI, &regs->usb_ists);
+	}
+
+	/* resets cases */
+	if (usb_ists & (USB_ISTS_UWRESI | USB_ISTS_UHRESI | USB_ISTS_U2RESI)) {
+		writel(USB_ISTS_U2RESI | USB_ISTS_UWRESI | USB_ISTS_UHRESI,
+		       &regs->usb_ists);
+
+		/*read again to check the actuall speed*/
+		speed = cdns3_get_speed(priv_dev);
+
+		dev_dbg(&priv_dev->dev, "Reset detected at speed: %s %d\n",
+			usb_speed_string(speed), speed);
+
+		usb_gadget_set_state(&priv_dev->gadget, USB_STATE_DEFAULT);
+		priv_dev->gadget.speed = speed;
+		cdns3_gadget_unconfig(priv_dev);
+		cdns3_ep0_config(priv_dev);
+	}
 }
 
 /**
@@ -227,8 +395,62 @@ int cdns3_ep_run_transfer(struct cdns3_endpoint *priv_ep,
  */
 static irqreturn_t cdns3_irq_handler_thread(struct cdns3 *cdns)
 {
+	struct cdns3_device *priv_dev;
 	irqreturn_t ret = IRQ_NONE;
-	//TODO: implements this function
+	unsigned long flags;
+	u32 reg;
+
+	priv_dev = container_of(cdns->gadget_dev, struct cdns3_device, dev);
+	spin_lock_irqsave(&priv_dev->lock, flags);
+
+	/* check USB device interrupt */
+	reg = readl(&priv_dev->regs->usb_ists);
+	if (reg) {
+		dev_dbg(&priv_dev->dev, "IRQ: usb_ists: %08X\n", reg);
+		cdns3_check_usb_interrupt_proceed(priv_dev, reg);
+		ret = IRQ_HANDLED;
+	}
+
+	/* check endpoint interrupt */
+	reg = readl(&priv_dev->regs->ep_ists);
+	if (reg != 0) {
+		dev_dbg(&priv_dev->dev, "IRQ ep_ists: %08X\n", reg);
+	} else {
+		if (USB_STS_CFGSTS(readl(&priv_dev->regs->usb_sts)))
+			ret = IRQ_HANDLED;
+		goto irqend;
+	}
+
+	/* handle default endpoint OUT */
+	if (reg & EP_ISTS_EP_OUT0) {
+		cdns3_check_ep0_interrupt_proceed(priv_dev, 0);
+		ret = IRQ_HANDLED;
+	}
+
+	/* handle default endpoint IN */
+	if (reg & EP_ISTS_EP_IN0) {
+		cdns3_check_ep0_interrupt_proceed(priv_dev, 1);
+		ret = IRQ_HANDLED;
+	}
+
+	/* check if interrupt from non default endpoint, if no exit */
+	reg &= ~(EP_ISTS_EP_OUT0 | EP_ISTS_EP_IN0);
+	if (!reg)
+		goto irqend;
+
+	do {
+		unsigned int bit_pos = ffs(reg);
+		u32 bit_mask = 1 << (bit_pos - 1);
+		int index;
+
+		index = cdns3_ep_reg_pos_to_index(bit_pos);
+		cdns3_check_ep_interrupt_proceed(priv_dev->eps[index]);
+		reg &= ~bit_mask;
+		ret = IRQ_HANDLED;
+	} while (reg);
+
+irqend:
+	spin_unlock_irqrestore(&priv_dev->lock, flags);
 	return ret;
 }
 
