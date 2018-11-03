@@ -25,6 +25,8 @@
 #include "io.h"
 #include "debug.h"
 
+#define DWC3_LSP_MUX_UNSELECTED 0xfffff
+
 #define dump_register(nm)				\
 {							\
 	.name	= __stringify(nm),			\
@@ -82,10 +84,6 @@ static const struct debugfs_reg32 dwc3_regs[] = {
 	dump_register(GDBGFIFOSPACE),
 	dump_register(GDBGLTSSM),
 	dump_register(GDBGBMU),
-	dump_register(GDBGLSPMUX),
-	dump_register(GDBGLSP),
-	dump_register(GDBGEPINFO0),
-	dump_register(GDBGEPINFO1),
 	dump_register(GPRTBIMAP_HS0),
 	dump_register(GPRTBIMAP_HS1),
 	dump_register(GPRTBIMAP_FS0),
@@ -277,6 +275,164 @@ static const struct debugfs_reg32 dwc3_regs[] = {
 	dump_register(OEVT),
 	dump_register(OEVTEN),
 	dump_register(OSTS),
+};
+
+static u32 dwc3_host_lsp_register(struct dwc3 *dwc, bool is_dbc, int select)
+{
+	unsigned long		flags;
+	u32			reg;
+
+	reg = DWC3_GDBGLSPMUX_HOSTSELECT(select);
+
+	if (is_dbc)
+		reg |= DWC3_GDBGLSPMUX_ENDBC;
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc3_writel(dwc->regs, DWC3_GDBGLSPMUX, reg);
+	reg = dwc3_readl(dwc->regs, DWC3_GDBGLSP);
+	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	return reg;
+}
+
+static u32 dwc3_gadget_lsp_register(struct dwc3 *dwc, int select)
+{
+	unsigned long		flags;
+	u32			reg;
+
+	reg = DWC3_GDBGLSPMUX_DEVSELECT(select);
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc3_writel(dwc->regs, DWC3_GDBGLSPMUX, reg);
+	reg = dwc3_readl(dwc->regs, DWC3_GDBGLSP);
+	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	return reg;
+}
+
+static u64 dwc3_ep_info_register(struct dwc3 *dwc, int select)
+{
+	unsigned long		flags;
+	u64			ep_info;
+	u32			lower_32_bits;
+	u32			upper_32_bits;
+	u32			reg;
+
+	reg = DWC3_GDBGLSPMUX_EPSELECT(select);
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc3_writel(dwc->regs, DWC3_GDBGLSPMUX, reg);
+	lower_32_bits = dwc3_readl(dwc->regs, DWC3_GDBGEPINFO0);
+	upper_32_bits = dwc3_readl(dwc->regs, DWC3_GDBGEPINFO1);
+	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	ep_info = ((u64)upper_32_bits << 32) | lower_32_bits;
+
+	return ep_info;
+}
+
+static void dwc3_dump_host_internal_states(struct seq_file *s)
+{
+	struct dwc3		*dwc = s->private;
+	int			sel;
+	u32			reg;
+
+	sel = dwc->dbg_lsp_select;
+
+	if (sel == DWC3_LSP_MUX_UNSELECTED) {
+		seq_printf(s, "No LSP MUX selection\n");
+		return;
+	}
+
+	reg = dwc3_host_lsp_register(dwc, false, sel);
+	seq_printf(s, "GDBGLSP[%d] = 0x%08x\n", sel, reg);
+
+	reg = dwc3_host_lsp_register(dwc, true, sel);
+	seq_printf(s, "GDBGLSP_DBC[%d] = 0x%08x\n", sel, reg);
+}
+
+static void dwc3_dump_gadget_internal_states(struct seq_file *s)
+{
+	struct dwc3		*dwc = s->private;
+	int			num_selects = 16;
+	int			i;
+	u32			reg;
+	u64			ep_info;
+
+	for (i = 0; i < num_selects; i++) {
+		reg = dwc3_gadget_lsp_register(dwc, i);
+		seq_printf(s, "GDBGLSP[%d] = 0x%08x\n", i, reg);
+	}
+
+	for (i = 0; i < dwc->num_eps; i++) {
+		ep_info = dwc3_ep_info_register(dwc, i);
+		seq_printf(s, "GDBGEPINFO[%d] = 0x%016llx\n", i, ep_info);
+	}
+}
+
+static int dwc3_internal_states_show(struct seq_file *s, void *unused)
+{
+	struct dwc3		*dwc = s->private;
+	unsigned int		current_mode;
+	unsigned long		flags;
+	u32			reg;
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	reg = dwc3_readl(dwc->regs, DWC3_GSTS);
+	current_mode = DWC3_GSTS_CURMOD(reg);
+
+	reg = dwc3_readl(dwc->regs, DWC3_GDBGBMU);
+	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	seq_printf(s, "GDBGBMU = 0x%08x\n", reg);
+
+	switch (current_mode) {
+	case DWC3_GSTS_CURMOD_HOST:
+		dwc3_dump_host_internal_states(s);
+		break;
+	case DWC3_GSTS_CURMOD_DEVICE:
+		dwc3_dump_gadget_internal_states(s);
+		break;
+	default:
+		seq_printf(s, "Mode is unknown, no LSP register printed\n");
+		break;
+	}
+
+	return 0;
+}
+
+static int dwc3_internal_states_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dwc3_internal_states_show, inode->i_private);
+}
+
+static ssize_t dwc3_internal_states_write(struct file *file,
+		const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file		*s = file->private_data;
+	struct dwc3		*dwc = s->private;
+	char			buf[32] = { 0 };
+	int			sel;
+	int			ret;
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	ret = kstrtoint(buf, 0, &sel);
+	if (ret)
+		return ret;
+
+	dwc->dbg_lsp_select = sel;
+
+	return count;
+}
+
+static const struct file_operations dwc3_internal_states_fops = {
+	.open			= dwc3_internal_states_open,
+	.write			= dwc3_internal_states_write,
+	.read			= seq_read,
+	.llseek			= seq_lseek,
+	.release		= single_release,
 };
 
 static int dwc3_mode_show(struct seq_file *s, void *unused)
@@ -742,6 +898,8 @@ void dwc3_debugfs_init(struct dwc3 *dwc)
 	if (!dwc->regset)
 		return;
 
+	dwc->dbg_lsp_select = DWC3_LSP_MUX_UNSELECTED;
+
 	dwc->regset->regs = dwc3_regs;
 	dwc->regset->nregs = ARRAY_SIZE(dwc3_regs);
 	dwc->regset->base = dwc->regs - DWC3_GLOBALS_REGS_START;
@@ -750,6 +908,9 @@ void dwc3_debugfs_init(struct dwc3 *dwc)
 	dwc->root = root;
 
 	debugfs_create_regset32("regdump", S_IRUGO, root, dwc->regset);
+
+	debugfs_create_file("internal_states", S_IRUGO | S_IWUSR, root, dwc,
+			    &dwc3_internal_states_fops);
 
 	if (IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)) {
 		debugfs_create_file("mode", S_IRUGO | S_IWUSR, root, dwc,
