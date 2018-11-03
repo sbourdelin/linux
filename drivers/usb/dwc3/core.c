@@ -1001,6 +1001,26 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		dwc3_writel(dwc->regs, DWC3_GUCTL, reg);
 	}
 
+	if (dwc->refclk_period_ns) {
+		switch (dwc->refclk_period_ns) {
+		case DWC3_GUCTL_REFCLKPER_25NS:
+		case DWC3_GUCTL_REFCLKPER_41NS:
+		case DWC3_GUCTL_REFCLKPER_50NS:
+		case DWC3_GUCTL_REFCLKPER_52NS:
+		case DWC3_GUCTL_REFCLKPER_58NS:
+		case DWC3_GUCTL_REFCLKPER_62NS:
+			reg = dwc3_readl(dwc->regs, DWC3_GUCTL);
+			reg &= ~DWC3_GUCTL_REFCLKPER(~0);
+			reg |= DWC3_GUCTL_REFCLKPER(dwc->refclk_period_ns);
+			dwc3_writel(dwc->regs, DWC3_GUCTL, reg);
+			break;
+		default:
+			dev_err(dwc->dev, "Invalid refclk period: %dns\n",
+				dwc->refclk_period_ns);
+			break;
+		}
+	}
+
 	/*
 	 * Must config both number of packets and max burst settings to enable
 	 * RX and/or TX threshold.
@@ -1246,6 +1266,8 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				&hird_threshold);
 	dwc->usb3_lpm_capable = device_property_read_bool(dev,
 				"snps,usb3_lpm_capable");
+	device_property_read_u8(dev, "snps,refclk-period-ns",
+				&dwc->refclk_period_ns);
 	device_property_read_u8(dev, "snps,rx-thr-num-pkt-prd",
 				&rx_thr_num_pkt_prd);
 	device_property_read_u8(dev, "snps,rx-max-burst-prd",
