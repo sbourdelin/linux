@@ -1068,4 +1068,7 @@ void cdns3_set_register_bit(void __iomem *ptr, u32 mask);
 int cdns3_init_ep0(struct cdns3_device *priv_dev);
 void cdns3_ep0_config(struct cdns3_device *priv_dev);
 void cdns3_select_ep(struct cdns3_device *priv_dev, u32 ep);
+int cdns3_gadget_ep_set_wedge(struct usb_ep *ep);
+int cdns3_gadget_ep_set_halt(struct usb_ep *ep, int value);
+
 #endif /* __LINUX_CDNS3_GADGET */

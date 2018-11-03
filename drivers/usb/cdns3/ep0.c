@@ -24,6 +24,24 @@ static void cdns3_prepare_setup_packet(struct cdns3_device *priv_dev)
 }
 
 /**
+ * cdns3_gadget_ep_set_wedge Set wedge on selected endpoint
+ * @ep: endpoint object
+ *
+ * Returns 0
+ */
+int cdns3_gadget_ep_set_wedge(struct usb_ep *ep)
+{
+	struct cdns3_endpoint *priv_ep = ep_to_cdns3_ep(ep);
+	struct cdns3_device *priv_dev = priv_ep->cdns3_dev;
+
+	dev_dbg(&priv_dev->dev, "Wedge for %s\n", ep->name);
+	cdns3_gadget_ep_set_halt(ep, 1);
+	priv_ep->flags |= EP_WEDGE;
+
+	return 0;
+}
+
+/**
  * cdns3_ep0_config - Configures default endpoint
  * @priv_dev: extended gadget object
  *
