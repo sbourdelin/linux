@@ -201,9 +201,8 @@ ftrace_pop_return_trace(struct ftrace_graph_ret *trace, unsigned long *ret,
 	if (index < 0)
 		index += FTRACE_NOTRACE_DEPTH;
 
-	if (unlikely(index < 0 || index >= FTRACE_RETFUNC_DEPTH)) {
+	if (WARN_ON(index < 0 || index >= FTRACE_RETFUNC_DEPTH)) {
 		ftrace_graph_stop();
-		WARN_ON(1);
 		/* Might as well panic, otherwise we have no where to go */
 		*ret = (unsigned long)panic;
 		return;
@@ -274,9 +273,8 @@ unsigned long ftrace_return_to_handler(unsigned long frame_pointer)
 	 */
 	ftrace_graph_return(&trace);
 
-	if (unlikely(!ret)) {
+	if (WARN_ON(!ret)) {
 		ftrace_graph_stop();
-		WARN_ON(1);
 		/* Might as well panic. What else to do? */
 		ret = (unsigned long)panic;
 	}
