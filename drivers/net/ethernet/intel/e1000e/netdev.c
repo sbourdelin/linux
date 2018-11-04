@@ -39,6 +39,8 @@ static int debug = -1;
 module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
+struct workqueue_struct *e1000e_workqueue;
+
 static const struct e1000_info *e1000_info_tbl[] = {
 	[board_82571]		= &e1000_82571_info,
 	[board_82572]		= &e1000_82572_info,
@@ -5137,9 +5139,9 @@ static void e1000_watchdog(struct timer_list *t)
 	struct e1000_adapter *adapter = from_timer(adapter, t, watchdog_timer);
 
 	/* Do the rest outside of interrupt context */
-	schedule_work(&adapter->watchdog_task);
+	struct delayed_work *dwork = to_delayed_work(&adapter->watchdog_task);
 
-	/* TODO: make this use queue_delayed_work() */
+	queue_delayed_work(e1000e_workqueue, dwork, 1);
 }
 
 static void e1000_watchdog_task(struct work_struct *work)
@@ -7572,6 +7574,13 @@ static int __init e1000_init_module(void)
 		e1000e_driver_version);
 	pr_info("Copyright(c) 1999 - 2015 Intel Corporation.\n");
 
+	e1000e_workqueue = alloc_workqueue("%s", WQ_MEM_RECLAIM, 0,
+					   e1000e_driver_name);
+	if (!e1000e_workqueue) {
+		pr_err("%s: Failed to create workqueue\n", e1000e_driver_name);
+		return -ENOMEM;
+	}
+
 	return pci_register_driver(&e1000_driver);
 }
 module_init(e1000_init_module);
@@ -7585,6 +7594,7 @@ module_init(e1000_init_module);
 static void __exit e1000_exit_module(void)
 {
 	pci_unregister_driver(&e1000_driver);
+	destroy_workqueue(e1000e_workqueue);
 }
 module_exit(e1000_exit_module);
 
