@@ -4088,9 +4088,7 @@ static int dwc2_hsotg_ep_disable(struct usb_ep *ep)
 
 	epctrl_reg = dir_in ? DIEPCTL(index) : DOEPCTL(index);
 
-	locked = spin_is_locked(&hsotg->lock);
-	if (!locked)
-		spin_lock_irqsave(&hsotg->lock, flags);
+	locked = spin_trylock_irqsave(&hsotg->lock, flags);
 
 	ctrl = dwc2_readl(hsotg, epctrl_reg);
 
@@ -4114,7 +4112,7 @@ static int dwc2_hsotg_ep_disable(struct usb_ep *ep)
 	hs_ep->fifo_index = 0;
 	hs_ep->fifo_size = 0;
 
-	if (!locked)
+	if (locked)
 		spin_unlock_irqrestore(&hsotg->lock, flags);
 
 	return 0;
