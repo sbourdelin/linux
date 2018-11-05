@@ -1,0 +1,21 @@
+What:		/sys/class/sas_phy/phy-<host>:<phy identifier>,
+				   phy-<host>:<scsi target id>:<phy identifier>
+Date:		Nov, 2018
+KernelVersion:	2.6.13
+Contact:	linux-scsi@vger.kernel.org
+Description:	SAS PHY entry directory, which includes interfaces to control
+		the PHY, physical layer information on the PHY, and other SAS
+		fabric management information asscoiated with the PHY.
+
+What:		/sys/class/sas_port/port-<host>:<port identifier>,
+				    port-<host>:<scsi target id>:<port identifier>
+Date:		Nov, 2018
+KernelVersion:	2.6.13
+Contact:	linux-scsi@vger.kernel.org
+Description:	SAS Port entry directory, with constituient PHY count and
+		other SAS fabric management information asscoiated with the
+		Port.
+
+
+
+
