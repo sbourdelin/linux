@@ -14,6 +14,29 @@
 #define MDEV_H
 
 struct mdev_device;
+struct iommu_domain;
+
+/*
+ * Called by the parent device driver to set the PCI device which represents
+ * this mdev in iommu protection scope. By default, the iommu device is NULL,
+ * that indicates using vendor defined isolation.
+ *
+ * @dev: the mediated device that iommu will isolate.
+ * @iommu_device: a pci device which represents the iommu for @dev.
+ *
+ * Return 0 for success, otherwise negative error value.
+ */
+int mdev_set_iommu_device(struct device *dev, struct device *iommu_device);
+
+struct device *mdev_get_iommu_device(struct device *dev);
+
+/*
+ * Called by vfio iommu modules to save the iommu domain after a domain being
+ * attached to the mediated device.
+ */
+int mdev_set_iommu_domain(struct device *dev, void *domain);
+
+void *mdev_get_iommu_domain(struct device *dev);
 
 /**
  * struct mdev_parent_ops - Structure to be registered for each parent device to

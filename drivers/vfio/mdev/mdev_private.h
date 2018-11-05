@@ -34,6 +34,8 @@ struct mdev_device {
 	struct list_head next;
 	struct kobject *type_kobj;
 	bool active;
+	struct device *iommu_device;
+	void *iommu_domain;
 };
 
 #define to_mdev_device(dev)	container_of(dev, struct mdev_device, dev)
