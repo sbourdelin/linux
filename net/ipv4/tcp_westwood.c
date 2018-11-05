@@ -43,11 +43,10 @@ struct westwood {
 };
 
 /* TCP Westwood functions and constants */
-#define TCP_WESTWOOD_RTT_MIN   (HZ/20)	/* 50ms */
-#define TCP_WESTWOOD_INIT_RTT  (20*HZ)	/* maybe too conservative?! */
+#define TCP_WESTWOOD_RTT_MIN   (HZ / 20)	/* 50ms */
+#define TCP_WESTWOOD_INIT_RTT  (20 * HZ)	/* maybe too conservative?! */
 
-/*
- * @tcp_westwood_create
+/* @tcp_westwood_create
  * This function initializes fields used in TCP Westwood+,
  * it is called after the initial SYN, so the sequence numbers
  * are correct but new passive connections we have no
@@ -67,14 +66,14 @@ static void tcp_westwood_init(struct sock *sk)
 	w->accounted = 0;
 	w->cumul_ack = 0;
 	w->reset_rtt_min = 1;
-	w->rtt_min = w->rtt = TCP_WESTWOOD_INIT_RTT;
+	w->rtt_min = TCP_WESTWOOD_INIT_RTT;
+	w->rtt = TCP_WESTWOOD_INIT_RTT;
 	w->rtt_win_sx = tcp_jiffies32;
 	w->snd_una = tcp_sk(sk)->snd_una;
 	w->first_ack = 1;
 }
 
-/*
- * @westwood_do_filter
+/* @westwood_do_filter
  * Low-pass filter. Implemented using constant coefficients.
  */
 static inline u32 westwood_do_filter(u32 a, u32 b)
@@ -94,8 +93,7 @@ static void westwood_filter(struct westwood *w, u32 delta)
 	}
 }
 
-/*
- * @westwood_pkts_acked
+/* @westwood_pkts_acked
  * Called after processing group of packets.
  * but all westwood needs is the last sample of srtt.
  */
@@ -108,8 +106,7 @@ static void tcp_westwood_pkts_acked(struct sock *sk,
 		w->rtt = usecs_to_jiffies(sample->rtt_us);
 }
 
-/*
- * @westwood_update_window
+/* @westwood_update_window
  * It updates RTT evaluation window if it is the right moment to do
  * it. If so it calls filter for evaluating bandwidth.
  */
@@ -127,8 +124,7 @@ static void westwood_update_window(struct sock *sk)
 		w->first_ack = 0;
 	}
 
-	/*
-	 * See if a RTT-window has passed.
+	/* See if a RTT-window has passed.
 	 * Be careful since if RTT is less than
 	 * 50ms we don't filter but we continue 'building the sample'.
 	 * This minimum limit was chosen since an estimation on small
@@ -149,12 +145,12 @@ static inline void update_rtt_min(struct westwood *w)
 	if (w->reset_rtt_min) {
 		w->rtt_min = w->rtt;
 		w->reset_rtt_min = 0;
-	} else
+	} else {
 		w->rtt_min = min(w->rtt, w->rtt_min);
+	}
 }
 
-/*
- * @westwood_fast_bw
+/* @westwood_fast_bw
  * It is called when we are in fast path. In particular it is called when
  * header prediction is successful. In such case in fact update is
  * straight forward and doesn't need any particular care.
@@ -171,8 +167,7 @@ static inline void westwood_fast_bw(struct sock *sk)
 	update_rtt_min(w);
 }
 
-/*
- * @westwood_acked_count
+/* @westwood_acked_count
  * This function evaluates cumul_ack for evaluating bk in case of
  * delayed or partial acks.
  */
@@ -207,8 +202,7 @@ static inline u32 westwood_acked_count(struct sock *sk)
 	return w->cumul_ack;
 }
 
-/*
- * TCP Westwood
+/* TCP Westwood
  * Here limit is evaluated as Bw estimation*RTTmin (for obtaining it
  * in packets we use mss_cache). Rttmin is guaranteed to be >= 2
  * so avoids ever returning 0.
@@ -243,7 +237,8 @@ static void tcp_westwood_event(struct sock *sk, enum tcp_ca_event event)
 
 	switch (event) {
 	case CA_EVENT_COMPLETE_CWR:
-		tp->snd_cwnd = tp->snd_ssthresh = tcp_westwood_bw_rttmin(sk);
+		tp->snd_cwnd = tcp_westwood_bw_rttmin(sk);
+		tp->snd_ssthresh = tcp_westwood_bw_rttmin(sk);
 		break;
 	case CA_EVENT_LOSS:
 		tp->snd_ssthresh = tcp_westwood_bw_rttmin(sk);
