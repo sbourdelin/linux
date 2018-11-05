@@ -442,6 +442,23 @@ static const struct media_device_ops imx_media_md_ops = {
 	.link_notify = imx_media_link_notify,
 };
 
+static void imx_media_notify(struct v4l2_subdev *sd, unsigned int notification,
+			     void *arg)
+{
+	struct imx_media_dev *imxmd;
+	struct imx_media_video_dev *vdev;
+
+	imxmd = container_of(sd->v4l2_dev, struct imx_media_dev, v4l2_dev);
+	list_for_each_entry(vdev, &imxmd->vdev_list, list) {
+		if (sd->entity.pipe &&
+		    sd->entity.pipe == vdev->vfd->entity.pipe &&
+		    notification == V4L2_DEVICE_NOTIFY_EVENT) {
+			v4l2_event_queue(vdev->vfd, arg);
+			break;
+		}
+	}
+}
+
 static int imx_media_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -464,6 +481,7 @@ static int imx_media_probe(struct platform_device *pdev)
 	imxmd->v4l2_dev.mdev = &imxmd->md;
 	strscpy(imxmd->v4l2_dev.name, "imx-media",
 		sizeof(imxmd->v4l2_dev.name));
+	imxmd->v4l2_dev.notify = imx_media_notify;
 
 	media_device_init(&imxmd->md);
 
