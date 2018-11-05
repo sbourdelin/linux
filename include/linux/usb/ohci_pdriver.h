@@ -35,6 +35,7 @@ struct usb_ohci_pdata {
 	unsigned	big_endian_desc:1;
 	unsigned	big_endian_mmio:1;
 	unsigned	no_big_frame_no:1;
+	unsigned	suspend_without_phy_exit:1;
 	unsigned int	num_ports;
 
 	/* Turn on all power and clocks */

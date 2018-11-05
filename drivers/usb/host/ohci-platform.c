@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/err.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
@@ -99,12 +100,23 @@ static int ohci_platform_probe(struct platform_device *dev)
 	if (usb_disabled())
 		return -ENODEV;
 
-	/*
-	 * Use reasonable defaults so platforms don't have to provide these
-	 * with DT probing on ARM.
-	 */
-	if (!pdata)
-		pdata = &ohci_platform_defaults;
+	if (!pdata) {
+		const struct usb_ohci_pdata *match_pdata;
+
+		match_pdata = of_device_get_match_data(&dev->dev);
+		if (match_pdata) {
+			pdata = devm_kmemdup(&dev->dev, match_pdata,
+					     sizeof(*pdata), GFP_KERNEL);
+			if (!pdata)
+				return -ENOMEM;
+		} else {
+			/*
+			 * Use reasonable defaults so platforms don't have
+			 * to provide these with DT probing on ARM.
+			 */
+			pdata = &ohci_platform_defaults;
+		}
+	}
 
 	err = dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
 	if (err)
@@ -177,6 +189,8 @@ static int ohci_platform_probe(struct platform_device *dev)
 		ohci->flags |= OHCI_QUIRK_FRAME_NO;
 	if (pdata->num_ports)
 		ohci->num_ports = pdata->num_ports;
+	if (pdata->suspend_without_phy_exit)
+		hcd->suspend_without_phy_exit = 1;
 
 #ifndef CONFIG_USB_OHCI_BIG_ENDIAN_MMIO
 	if (ohci->flags & OHCI_QUIRK_BE_MMIO) {
@@ -305,10 +319,18 @@ static int ohci_platform_resume(struct device *dev)
 }
 #endif /* CONFIG_PM_SLEEP */
 
+static const struct usb_ohci_pdata ohci_plat_brcm_bcm7445_ohci = {
+	.power_on =		ohci_platform_power_on,
+	.power_suspend =	ohci_platform_power_off,
+	.power_off =		ohci_platform_power_off,
+	.suspend_without_phy_exit = 1,
+};
+
 static const struct of_device_id ohci_platform_ids[] = {
 	{ .compatible = "generic-ohci", },
 	{ .compatible = "cavium,octeon-6335-ohci", },
 	{ .compatible = "ti,ohci-omap3", },
+	{ .compatible = "brcm,bcm7445-ohci", &ohci_plat_brcm_bcm7445_ohci},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, ohci_platform_ids);
