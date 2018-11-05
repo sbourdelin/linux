@@ -204,10 +204,9 @@ static int capture_g_fmt_vid_cap(struct file *file, void *fh,
 }
 
 static int __capture_try_fmt_vid_cap(struct capture_priv *priv,
-				     struct v4l2_subev_format *fmt_src,
+				     struct v4l2_subdev_format *fmt_src,
 				     struct v4l2_format *f)
 {
-	struct capture_priv *priv = video_drvdata(file);
 	const struct imx_media_pixfmt *cc, *cc_src;
 
 	cc_src = imx_media_find_ipu_format(fmt_src->format.code, CS_SEL_ANY);
@@ -250,7 +249,7 @@ static int capture_try_fmt_vid_cap(struct file *file, void *fh,
 	if (ret)
 		return ret;
 
-	return __capture_try_fmt(priv, &fmt_src, f);
+	return __capture_try_fmt_vid_cap(priv, &fmt_src, f);
 }
 
 static int capture_s_fmt_vid_cap(struct file *file, void *fh,
@@ -280,8 +279,8 @@ static int capture_s_fmt_vid_cap(struct file *file, void *fh,
 					      CS_SEL_ANY, true);
 	priv->vdev.compose.left = 0;
 	priv->vdev.compose.top = 0;
-	priv->vdev.compose.width = fmt_src.width;
-	priv->vdev.compose.height = fmt_src.height;
+	priv->vdev.compose.width = fmt_src.format.width;
+	priv->vdev.compose.height = fmt_src.format.height;
 
 	return 0;
 }
