@@ -102,7 +102,6 @@ struct dpu_irq {
 	atomic_t *enable_counts;
 	atomic_t *irq_counts;
 	spinlock_t cb_lock;
-	struct dentry *debugfs_file;
 };
 
 struct dpu_kms {
@@ -114,11 +113,6 @@ struct dpu_kms {
 	struct dpu_power_handle phandle;
 	struct dpu_power_client *core_client;
 	struct dpu_power_event *power_event;
-
-	/* directory entry for debugfs */
-	struct dentry *debugfs_root;
-	struct dentry *debugfs_danger;
-	struct dentry *debugfs_vbif;
 
 	/* io/register spaces: */
 	void __iomem *mmio, *vbif[VBIF_MAX], *reg_dma;
