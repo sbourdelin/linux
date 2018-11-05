@@ -113,30 +113,17 @@ static int _dpu_danger_signal_status(struct seq_file *s,
 	return 0;
 }
 
-#define DEFINE_DPU_DEBUGFS_SEQ_FOPS(__prefix)				\
-static int __prefix ## _open(struct inode *inode, struct file *file)	\
-{									\
-	return single_open(file, __prefix ## _show, inode->i_private);	\
-}									\
-static const struct file_operations __prefix ## _fops = {		\
-	.owner = THIS_MODULE,						\
-	.open = __prefix ## _open,					\
-	.release = single_release,					\
-	.read = seq_read,						\
-	.llseek = seq_lseek,						\
-}
-
 static int dpu_debugfs_danger_stats_show(struct seq_file *s, void *v)
 {
 	return _dpu_danger_signal_status(s, true);
 }
-DEFINE_DPU_DEBUGFS_SEQ_FOPS(dpu_debugfs_danger_stats);
+DEFINE_SHOW_ATTRIBUTE(dpu_debugfs_danger_stats);
 
 static int dpu_debugfs_safe_stats_show(struct seq_file *s, void *v)
 {
 	return _dpu_danger_signal_status(s, false);
 }
-DEFINE_DPU_DEBUGFS_SEQ_FOPS(dpu_debugfs_safe_stats);
+DEFINE_SHOW_ATTRIBUTE(dpu_debugfs_safe_stats);
 
 static void dpu_debugfs_danger_destroy(struct dpu_kms *dpu_kms)
 {
@@ -162,7 +149,7 @@ static int dpu_debugfs_danger_init(struct dpu_kms *dpu_kms,
 	return 0;
 }
 
-static int _dpu_debugfs_show_regset32(struct seq_file *s, void *data)
+static int dpu_debugfs_regset32_show(struct seq_file *s, void *data)
 {
 	struct dpu_debugfs_regset32 *regset;
 	struct dpu_kms *dpu_kms;
@@ -212,18 +199,7 @@ static int _dpu_debugfs_show_regset32(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int dpu_debugfs_open_regset32(struct inode *inode,
-		struct file *file)
-{
-	return single_open(file, _dpu_debugfs_show_regset32, inode->i_private);
-}
-
-static const struct file_operations dpu_fops_regset32 = {
-	.open =		dpu_debugfs_open_regset32,
-	.read =		seq_read,
-	.llseek =	seq_lseek,
-	.release =	single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(dpu_debugfs_regset32);
 
 void dpu_debugfs_setup_regset32(struct dpu_debugfs_regset32 *regset,
 		uint32_t offset, uint32_t length, struct dpu_kms *dpu_kms)
@@ -245,7 +221,7 @@ void *dpu_debugfs_create_regset32(const char *name, umode_t mode,
 	regset->offset = round_down(regset->offset, 4);
 
 	return debugfs_create_file(name, mode, parent,
-			regset, &dpu_fops_regset32);
+			regset, &dpu_debugfs_regset32_fops);
 }
 
 static int _dpu_debugfs_init(struct dpu_kms *dpu_kms)
