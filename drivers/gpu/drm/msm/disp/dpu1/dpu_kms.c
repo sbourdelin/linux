@@ -266,12 +266,6 @@ static int _dpu_debugfs_init(struct dpu_kms *dpu_kms)
 		return PTR_ERR(dpu_kms->debugfs_root);
 	}
 
-	rc = dpu_dbg_debugfs_register(dpu_kms->debugfs_root);
-	if (rc) {
-		DRM_ERROR("failed to reg dpu dbg debugfs: %d\n", rc);
-		return rc;
-	}
-
 	/* allow root to be NULL */
 	debugfs_create_x32(DPU_DEBUGFS_HWMASKNAME, 0600, dpu_kms->debugfs_root, p);
 
@@ -705,7 +699,6 @@ static void dpu_kms_destroy(struct msm_kms *kms)
 
 	dpu_kms = to_dpu_kms(kms);
 
-	dpu_dbg_destroy();
 	_dpu_kms_hw_destroy(dpu_kms);
 }
 
@@ -866,16 +859,10 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 		return rc;
 	}
 
-	rc = dpu_dbg_init(&dpu_kms->pdev->dev);
-	if (rc) {
-		DRM_ERROR("failed to init dpu dbg: %d\n", rc);
-		return rc;
-	}
-
 	priv = dev->dev_private;
 	if (!priv) {
 		DPU_ERROR("invalid private data\n");
-		goto dbg_destroy;
+		return rc;
 	}
 
 	dpu_kms->mmio = msm_ioremap(dpu_kms->pdev, "mdp", "mdp");
@@ -939,8 +926,6 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 		dpu_kms->catalog = NULL;
 		goto power_error;
 	}
-
-	dpu_dbg_init_dbg_buses(dpu_kms->core_rev);
 
 	/*
 	 * Now we need to read the HW catalog and initialize resources such as
@@ -1048,8 +1033,7 @@ power_error:
 	pm_runtime_put_sync(&dpu_kms->pdev->dev);
 error:
 	_dpu_kms_hw_destroy(dpu_kms);
-dbg_destroy:
-	dpu_dbg_destroy();
+
 	return rc;
 }
 
