@@ -808,6 +808,7 @@ static int __device_attach(struct device *dev, bool allow_async)
 			ret = 1;
 		else {
 			dev->driver = NULL;
+			dev_set_drvdata(dev, NULL);
 			ret = 0;
 		}
 	} else {
@@ -925,6 +926,32 @@ int device_driver_attach(struct device_driver *drv, struct device *dev)
 	return ret;
 }
 
+static void __driver_attach_async_helper(void *_dev, async_cookie_t cookie)
+{
+	struct device *dev = _dev;
+	struct device_driver *drv;
+
+	__device_driver_lock(dev, dev->parent);
+
+	/*
+	 * If someone attempted to bind a driver either successfully or
+	 * unsuccessfully before we got here we should just skip the driver
+	 * probe call.
+	 */
+	drv = dev_get_drv_async(dev);
+	if (drv && !dev->driver)
+		driver_probe_device(drv, dev);
+
+	/* We made our attempt at an async_probe, clear the flag */
+	dev->async_probe = false;
+
+	__device_driver_unlock(dev, dev->parent);
+
+	put_device(dev);
+
+	dev_dbg(dev, "async probe completed\n");
+}
+
 static int __driver_attach(struct device *dev, void *data)
 {
 	struct device_driver *drv = data;
@@ -951,6 +978,25 @@ static int __driver_attach(struct device *dev, void *data)
 		dev_dbg(dev, "Bus failed to match device: %d", ret);
 		return ret;
 	} /* ret > 0 means positive match */
+
+	if (driver_allows_async_probing(drv)) {
+		/*
+		 * Instead of probing the device synchronously we will
+		 * probe it asynchronously to allow for more parallelism.
+		 *
+		 * We only take the device lock here in order to guarantee
+		 * that the dev->driver and driver_data fields are protected
+		 */
+		dev_dbg(dev, "scheduling asynchronous probe\n");
+		device_lock(dev);
+		if (!dev->driver) {
+			get_device(dev);
+			dev_set_drv_async(dev, drv);
+			async_schedule(__driver_attach_async_helper, dev);
+		}
+		device_unlock(dev);
+		return 0;
+	}
 
 	device_driver_attach(drv, dev);
 
@@ -1049,6 +1095,12 @@ void device_release_driver_internal(struct device *dev,
 {
 	__device_driver_lock(dev, parent);
 
+	/*
+	 * We shouldn't need to add a check for any pending async_probe here
+	 * because the only caller that will pass us a driver, driver_detach,
+	 * should have been called after the driver was removed from the bus
+	 * and will call async_synchronize_full before we get to this point.
+	 */
 	if (!drv || drv == dev->driver)
 		__device_release_driver(dev, parent);
 
