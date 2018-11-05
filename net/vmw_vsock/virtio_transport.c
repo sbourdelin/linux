@@ -359,11 +359,62 @@ static bool virtio_transport_more_replies(struct virtio_vsock *vsock)
 	return val < virtqueue_get_vring_size(vq);
 }
 
+static struct virtio_vsock_pkt *receive_mergeable(struct virtqueue *vq,
+		struct virtio_vsock *vsock, unsigned int *total_len)
+{
+	struct virtio_vsock_pkt *pkt;
+	u16 num_buf;
+	void *page;
+	unsigned int len;
+	int i = 0;
+
+	page = virtqueue_get_buf(vq, &len);
+	if (!page)
+		return NULL;
+
+	*total_len = len;
+	vsock->rx_buf_nr--;
+
+	pkt = page;
+	num_buf = le16_to_cpu(pkt->mrg_rxbuf_hdr.num_buffers);
+	if (!num_buf || num_buf > VIRTIO_VSOCK_MAX_MRG_BUF_NUM)
+		goto err;
+
+	pkt->mergeable = true;
+	if (!le32_to_cpu(pkt->hdr.len))
+		return pkt;
+
+	len -= sizeof(struct virtio_vsock_pkt);
+	pkt->mrg_rxbuf[i].buf = page + sizeof(struct virtio_vsock_pkt);
+	pkt->mrg_rxbuf[i].len = len;
+	i++;
+
+	while (--num_buf) {
+		page = virtqueue_get_buf(vq, &len);
+		if (!page)
+			goto err;
+
+		*total_len += len;
+		vsock->rx_buf_nr--;
+
+		pkt->mrg_rxbuf[i].buf = page;
+		pkt->mrg_rxbuf[i].len = len;
+		i++;
+	}
+
+	return pkt;
+err:
+	virtio_transport_free_pkt(pkt);
+	return NULL;
+}
+
 static void virtio_transport_rx_work(struct work_struct *work)
 {
 	struct virtio_vsock *vsock =
 		container_of(work, struct virtio_vsock, rx_work);
 	struct virtqueue *vq;
+	size_t vsock_hlen = vsock->mergeable ? sizeof(struct virtio_vsock_pkt) :
+			sizeof(struct virtio_vsock_hdr);
 
 	vq = vsock->vqs[VSOCK_VQ_RX];
 
@@ -383,21 +434,29 @@ static void virtio_transport_rx_work(struct work_struct *work)
 				goto out;
 			}
 
-			pkt = virtqueue_get_buf(vq, &len);
-			if (!pkt) {
-				break;
+			if (likely(vsock->mergeable)) {
+				pkt = receive_mergeable(vq, vsock, &len);
+				if (!pkt)
+					break;
+
+				pkt->len = le32_to_cpu(pkt->hdr.len);
+			} else {
+				pkt = virtqueue_get_buf(vq, &len);
+				if (!pkt) {
+					break;
+				}
+
+				vsock->rx_buf_nr--;
 			}
 
-			vsock->rx_buf_nr--;
-
 			/* Drop short/long packets */
-			if (unlikely(len < sizeof(pkt->hdr) ||
-				     len > sizeof(pkt->hdr) + pkt->len)) {
+			if (unlikely(len < vsock_hlen ||
+				     len > vsock_hlen + pkt->len)) {
 				virtio_transport_free_pkt(pkt);
 				continue;
 			}
 
-			pkt->len = len - sizeof(pkt->hdr);
+			pkt->len = len - vsock_hlen;
 			virtio_transport_deliver_tap_pkt(pkt);
 			virtio_transport_recv_pkt(pkt);
 		}

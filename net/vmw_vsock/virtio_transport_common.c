@@ -272,14 +272,49 @@ virtio_transport_stream_do_dequeue(struct vsock_sock *vsk,
 		 */
 		spin_unlock_bh(&vvs->rx_lock);
 
-		err = memcpy_to_msg(msg, pkt->buf + pkt->off, bytes);
-		if (err)
-			goto out;
+		if (pkt->mergeable) {
+			struct virtio_vsock_mrg_rxbuf *buf = pkt->mrg_rxbuf;
+			size_t mrg_copy_bytes, last_buf_total = 0, rxbuf_off;
+			size_t tmp_bytes = bytes;
+			int i;
+
+			for (i = 0; i < le16_to_cpu(pkt->mrg_rxbuf_hdr.num_buffers); i++) {
+				if (pkt->off > last_buf_total + buf[i].len) {
+					last_buf_total += buf[i].len;
+					continue;
+				}
+
+				rxbuf_off = pkt->off - last_buf_total;
+				mrg_copy_bytes = min(buf[i].len - rxbuf_off, tmp_bytes);
+				err = memcpy_to_msg(msg, buf[i].buf + rxbuf_off, mrg_copy_bytes);
+				if (err)
+					goto out;
+
+				tmp_bytes -= mrg_copy_bytes;
+				pkt->off += mrg_copy_bytes;
+				last_buf_total += buf[i].len;
+				if (!tmp_bytes)
+					break;
+			}
+
+			if (tmp_bytes) {
+				printk(KERN_WARNING "WARNING! bytes = %llu, "
+						"bytes = %llu\n",
+						(unsigned long long)bytes,
+						(unsigned long long)tmp_bytes);
+			}
+
+			total += (bytes - tmp_bytes);
+		} else {
+			err = memcpy_to_msg(msg, pkt->buf + pkt->off, bytes);
+			if (err)
+				goto out;
+
+			total += bytes;
+			pkt->off += bytes;
+		}
 
 		spin_lock_bh(&vvs->rx_lock);
-
-		total += bytes;
-		pkt->off += bytes;
 		if (pkt->off == pkt->len) {
 			virtio_transport_dec_rx_pkt(vvs, pkt);
 			list_del(&pkt->list);
@@ -1050,8 +1085,16 @@ EXPORT_SYMBOL_GPL(virtio_transport_recv_pkt);
 
 void virtio_transport_free_pkt(struct virtio_vsock_pkt *pkt)
 {
-	kfree(pkt->buf);
-	kfree(pkt);
+	int i;
+
+	if (pkt->mergeable) {
+		for (i = 1; i < le16_to_cpu(pkt->mrg_rxbuf_hdr.num_buffers); i++)
+			free_page((unsigned long)pkt->mrg_rxbuf[i].buf);
+		free_page((unsigned long)(void *)pkt);
+	} else {
+		kfree(pkt->buf);
+		kfree(pkt);
+	}
 }
 EXPORT_SYMBOL_GPL(virtio_transport_free_pkt);
 

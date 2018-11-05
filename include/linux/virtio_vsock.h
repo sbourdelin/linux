@@ -13,6 +13,8 @@
 #define VIRTIO_VSOCK_DEFAULT_RX_BUF_SIZE	(1024 * 4)
 #define VIRTIO_VSOCK_MAX_BUF_SIZE		0xFFFFFFFFUL
 #define VIRTIO_VSOCK_MAX_PKT_BUF_SIZE		(1024 * 64)
+/* virtio_vsock_pkt + max_pkt_len(default MAX_PKT_BUF_SIZE) */
+#define VIRTIO_VSOCK_MAX_MRG_BUF_NUM ((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE / PAGE_SIZE) + 1)
 
 /* Virtio-vsock feature */
 #define VIRTIO_VSOCK_F_MRG_RXBUF 0 /* Host can merge receive buffers. */
@@ -48,6 +50,11 @@ struct virtio_vsock_sock {
 	struct list_head rx_queue;
 };
 
+struct virtio_vsock_mrg_rxbuf {
+	void *buf;
+	u32 len;
+};
+
 struct virtio_vsock_pkt {
 	struct virtio_vsock_hdr	hdr;
 	struct virtio_vsock_mrg_rxbuf_hdr mrg_rxbuf_hdr;
@@ -59,6 +66,8 @@ struct virtio_vsock_pkt {
 	u32 len;
 	u32 off;
 	bool reply;
+	bool mergeable;
+	struct virtio_vsock_mrg_rxbuf mrg_rxbuf[VIRTIO_VSOCK_MAX_MRG_BUF_NUM];
 };
 
 struct virtio_vsock_pkt_info {
