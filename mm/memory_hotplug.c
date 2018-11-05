@@ -1206,9 +1206,8 @@ static struct page *next_active_pageblock(struct page *page)
 	return page + pageblock_nr_pages;
 }
 
-static bool is_pageblock_removable_nolock(struct page *page)
+static bool is_pageblock_removable_nolock(struct page *page, struct zone **zone)
 {
-	struct zone *zone;
 	unsigned long pfn;
 
 	/*
@@ -1218,15 +1217,14 @@ static bool is_pageblock_removable_nolock(struct page *page)
 	 * We have to take care about the node as well. If the node is offline
 	 * its NODE_DATA will be NULL - see page_zone.
 	 */
+	pfn = page_to_pfn(page);
+	if (*zone && !zone_spans_pfn(*zone, pfn))
+		return false;
 	if (!node_online(page_to_nid(page)))
 		return false;
+	*zone = page_zone(page);
 
-	zone = page_zone(page);
-	pfn = page_to_pfn(page);
-	if (!zone_spans_pfn(zone, pfn))
-		return false;
-
-	return !has_unmovable_pages(zone, page, 0, MIGRATE_MOVABLE, true);
+	return !has_unmovable_pages(*zone, page, 0, MIGRATE_MOVABLE, true);
 }
 
 /* Checks if this range of memory is likely to be hot-removable. */
@@ -1234,10 +1232,11 @@ bool is_mem_section_removable(unsigned long start_pfn, unsigned long nr_pages)
 {
 	struct page *page = pfn_to_page(start_pfn);
 	struct page *end_page = page + nr_pages;
+	struct zone *zone = NULL;
 
 	/* Check the starting page of each pageblock within the range */
 	for (; page < end_page; page = next_active_pageblock(page)) {
-		if (!is_pageblock_removable_nolock(page))
+		if (!is_pageblock_removable_nolock(page, &zone))
 			return false;
 		cond_resched();
 	}
@@ -1273,6 +1272,9 @@ int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn,
 				i++;
 			if (i == MAX_ORDER_NR_PAGES || pfn + i >= end_pfn)
 				continue;
+			/* Check if we got outside of the zone */
+			if (zone && !zone_spans_pfn(zone, pfn + i))
+				return 0;
 			page = pfn_to_page(pfn + i);
 			if (zone && page_zone(page) != zone)
 				return 0;
