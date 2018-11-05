@@ -1043,14 +1043,15 @@ struct device {
 	struct iommu_group	*iommu_group;
 	struct iommu_fwspec	*iommu_fwspec;
 
-	bool			offline_disabled:1;
-	bool			offline:1;
-	bool			of_node_reused:1;
+	u8			offline_disabled:1;
+	u8			offline:1;
+	u8			of_node_reused:1;
 #if defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_DEVICE) || \
     defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU) || \
     defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL)
-	bool			dma_coherent:1;
+	u8			dma_coherent:1;
 #endif
+	u8			async_probe:1;
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)
