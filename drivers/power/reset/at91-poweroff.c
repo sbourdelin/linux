@@ -160,6 +160,9 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
 	u32 ddr_type;
 	int ret;
 
+	if (at91_shdwc)
+		return -EBUSY;
+
 	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
 	if (!at91_shdwc)
 		return -ENOMEM;
