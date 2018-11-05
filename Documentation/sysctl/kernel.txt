@@ -407,12 +407,18 @@ are being generated.
 
 0: legacy mode
 1: delete mode
+2: cyclic mode
 
 There are two components in an IPC id - an integer identifier and a
 sequence number. In the legacy mode, the sequence number is incremented
 every time a new id is generated. In the delete mode, the sequence number
-is only incremented if one or more ids have been previously deleted. The
-delete mode reduces the chance that a given id will be reused again.
+is only incremented if one or more ids have been previously deleted.
+In the cyclic mode, the sequence number increments in the same way as the
+delete mode, but the identifier is allocated cyclically through the whole
+IPC identifier number space instead of using the lowest available number.
+
+The cyclic mode has the lowest chance of IPC id reuse followed by the
+delete mode and the legacy mode.
 
 ==============================================================
 

@@ -33,6 +33,7 @@ struct ipc_ids {
 enum ipc_id_mode {
 	ipc_id_legacy,	/* Sequence # incremented on every allocation */
 	ipc_id_delete,	/* Sequence # incremented only if an ID was deleted */
+	ipc_id_cyclic,	/* Identifier is allocated cyclically */
 };
 
 struct ipc_namespace {

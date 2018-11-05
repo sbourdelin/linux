@@ -119,6 +119,7 @@ static int proc_ipc_sem_dointvec(struct ctl_table *table, int write,
 
 static int zero;
 static int one = 1;
+static int two = 2;
 static int int_max = INT_MAX;
 int ipc_mni = IPCMNI;
 int ipc_mni_shift = IPCMNI_SHIFT;
@@ -207,7 +208,7 @@ static struct ctl_table ipc_kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_ipc_dointvec_minmax,
 		.extra1		= &zero,
-		.extra2		= &one,
+		.extra2		= &two,
 	},
 #ifdef CONFIG_CHECKPOINT_RESTORE
 	{

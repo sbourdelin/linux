@@ -230,7 +230,11 @@ static inline int ipc_idr_alloc(struct ipc_ids *ids, struct kern_ipc_perm *new,
 			ids->deleted = false;
 		}
 		new->seq = ids->seq;
-		idx = idr_alloc(&ids->ipcs_idr, new, 0, 0, GFP_NOWAIT);
+		if (idmode == ipc_id_cyclic)
+			idx = idr_alloc_cyclic(&ids->ipcs_idr, new, 0, IPCMNI,
+						GFP_NOWAIT);
+		else
+			idx = idr_alloc(&ids->ipcs_idr, new, 0, 0, GFP_NOWAIT);
 	} else {
 		new->seq = ipcid_to_seqx(next_id);
 		idx = idr_alloc(&ids->ipcs_idr, new, ipcid_to_idx(next_id),
