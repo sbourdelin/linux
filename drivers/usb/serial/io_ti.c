@@ -341,9 +341,8 @@ static int read_download_mem(struct usb_device *dev, int start_address,
 		else
 			read_length = (__u8)length;
 
-		if (read_length > 1) {
+		if (read_length > 1)
 			dev_dbg(&dev->dev, "%s - @ %x for %d\n", __func__, start_address, read_length);
-		}
 		/*
 		 * NOTE: Must use swab as wIndex is sent in little-endian
 		 *       byte order regardless of host byte order.
@@ -820,7 +819,7 @@ static int build_i2c_fw_hdr(u8 *header, const struct firmware *fw)
 	 * Allocate a 15.5k buffer + 2 bytes for version number (Firmware
 	 * Record)
 	 */
-	buffer_size = (((1024 * 16) - 512 ) +
+	buffer_size = (((1024 * 16) - 512) +
 			sizeof(struct ti_i2c_firmware_rec));
 
 	buffer = kmalloc(buffer_size, GFP_KERNEL);
@@ -843,7 +842,7 @@ static int build_i2c_fw_hdr(u8 *header, const struct firmware *fw)
 		&fw->data[4 + sizeof(struct ti_i2c_image_header)],
 		le16_to_cpu(img_header->Length));
 
-	for (i=0; i < buffer_size; i++) {
+	for (i = 0; i < buffer_size; i++) {
 		cs = (__u8)(cs + buffer[i]);
 	}
 
@@ -851,7 +850,7 @@ static int build_i2c_fw_hdr(u8 *header, const struct firmware *fw)
 
 	/* Build new header */
 	i2c_header =  (struct ti_i2c_desc *)header;
-	firmware_rec =  (struct ti_i2c_firmware_rec*)i2c_header->Data;
+	firmware_rec =  (struct ti_i2c_firmware_rec *)i2c_header->Data;
 
 	i2c_header->Type	= I2C_DESC_TYPE_FIRMWARE_BLANK;
 	i2c_header->Size	= cpu_to_le16(buffer_size);
@@ -2147,9 +2146,8 @@ static void edge_throttle(struct tty_struct *tty)
 	if (I_IXOFF(tty)) {
 		unsigned char stop_char = STOP_CHAR(tty);
 		status = edge_write(tty, port, &stop_char, 1);
-		if (status <= 0) {
+		if (status <= 0)
 			dev_err(&port->dev, "%s - failed to write stop character, %d\n", __func__, status);
-		}
 	}
 
 	/*
@@ -2174,9 +2172,8 @@ static void edge_unthrottle(struct tty_struct *tty)
 	if (I_IXOFF(tty)) {
 		unsigned char start_char = START_CHAR(tty);
 		status = edge_write(tty, port, &start_char, 1);
-		if (status <= 0) {
+		if (status <= 0)
 			dev_err(&port->dev, "%s - failed to write start character, %d\n", __func__, status);
-		}
 	}
 	/*
 	 * if we are implementing RTS/CTS, restart reads
@@ -2231,11 +2228,11 @@ static void change_port_settings(struct tty_struct *tty,
 	struct device *dev = &edge_port->port->dev;
 	struct ump_uart_config *config;
 	int baud;
-	unsigned cflag;
+	unsigned int cflag;
 	int status;
 	int port_number = edge_port->port->port_number;
 
-	config = kmalloc (sizeof (*config), GFP_KERNEL);
+	config = kmalloc(sizeof (*config), GFP_KERNEL);
 	if (!config) {
 		tty->termios = *old_termios;
 		return;
@@ -2423,12 +2420,12 @@ static int edge_tiocmget(struct tty_struct *tty)
 
 	msr = edge_port->shadow_msr;
 	mcr = edge_port->shadow_mcr;
-	result = ((mcr & MCR_DTR)	? TIOCM_DTR: 0)	  /* 0x002 */
-		  | ((mcr & MCR_RTS)	? TIOCM_RTS: 0)   /* 0x004 */
-		  | ((msr & EDGEPORT_MSR_CTS)	? TIOCM_CTS: 0)   /* 0x020 */
-		  | ((msr & EDGEPORT_MSR_CD)	? TIOCM_CAR: 0)   /* 0x040 */
-		  | ((msr & EDGEPORT_MSR_RI)	? TIOCM_RI:  0)   /* 0x080 */
-		  | ((msr & EDGEPORT_MSR_DSR)	? TIOCM_DSR: 0);  /* 0x100 */
+	result = ((mcr & MCR_DTR)	? TIOCM_DTR : 0)	  /* 0x002 */
+		  | ((mcr & MCR_RTS)	? TIOCM_RTS : 0)   /* 0x004 */
+		  | ((msr & EDGEPORT_MSR_CTS)	? TIOCM_CTS : 0)   /* 0x020 */
+		  | ((msr & EDGEPORT_MSR_CD)	? TIOCM_CAR : 0)   /* 0x040 */
+		  | ((msr & EDGEPORT_MSR_RI)	? TIOCM_RI :  0)   /* 0x080 */
+		  | ((msr & EDGEPORT_MSR_DSR)	? TIOCM_DSR : 0);  /* 0x100 */
 
 
 	dev_dbg(&port->dev, "%s -- %x\n", __func__, result);
@@ -2442,7 +2439,7 @@ static int get_serial_info(struct tty_struct *tty,
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
-	unsigned cwait;
+	unsigned int cwait;
 
 	cwait = edge_port->port->port.closing_wait;
 	if (cwait != ASYNC_CLOSING_WAIT_NONE)
@@ -2656,7 +2653,7 @@ static ssize_t uart_mode_store(struct device *dev,
 {
 	struct usb_serial_port *port = to_usb_serial_port(dev);
 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
-	unsigned int v = simple_strtoul(valbuf, NULL, 0);
+	unsigned int v = kstrtoul(valbuf, NULL, 0);
 
 	dev_dbg(dev, "%s: setting uart_mode = %d\n", __func__, v);
 
