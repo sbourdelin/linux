@@ -1370,9 +1370,9 @@ static int tegra_soctherm_probe(struct platform_device *pdev)
 							 &tegra_of_thermal_ops);
 		if (IS_ERR(z)) {
 			err = PTR_ERR(z);
-			dev_err(&pdev->dev, "failed to register sensor: %d\n",
+			dev_warn(&pdev->dev, "failed to register sensor: %d\n",
 				err);
-			goto disable_clocks;
+			continue;
 		}
 
 		zone->tz = z;
@@ -1434,6 +1434,8 @@ static int __maybe_unused soctherm_resume(struct device *dev)
 		struct thermal_zone_device *tz;
 
 		tz = tegra->thermctl_tzs[soc->ttgs[i]->id];
+		if (!tz)
+			continue;
 		err = tegra_soctherm_set_hwtrips(dev, soc->ttgs[i], tz);
 		if (err) {
 			dev_err(&pdev->dev,
