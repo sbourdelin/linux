@@ -182,7 +182,7 @@ int kvm_setup_async_pf(struct kvm_vcpu *vcpu, gva_t gva, unsigned long hva,
 {
 	struct kvm_async_pf *work;
 
-	if (vcpu->async_pf.queued >= ASYNC_PF_PER_VCPU)
+	if (vcpu->async_pf.queued >= roundup_pow_of_two(ASYNC_PF_PER_VCPU))
 		return 0;
 
 	/* setup delayed work */
