@@ -2030,3 +2030,55 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(iommu_fwspec_add_ids);
+
+/*
+ * Generic interfaces to get or set per device IOMMU attributions.
+ */
+int iommu_get_dev_attr(struct device *dev, enum iommu_dev_attr attr, void *data)
+{
+	const struct iommu_ops *ops = dev->bus->iommu_ops;
+
+	if (ops && ops->get_dev_attr)
+		return ops->get_dev_attr(dev, attr, data);
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(iommu_get_dev_attr);
+
+int iommu_set_dev_attr(struct device *dev, enum iommu_dev_attr attr, void *data)
+{
+	const struct iommu_ops *ops = dev->bus->iommu_ops;
+
+	if (ops && ops->set_dev_attr)
+		return ops->set_dev_attr(dev, attr, data);
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(iommu_set_dev_attr);
+
+/*
+ * APIs to attach/detach a domain to/from a device in the
+ * auxiliary mode.
+ */
+int iommu_attach_device_aux(struct iommu_domain *domain, struct device *dev)
+{
+	int ret = -ENODEV;
+
+	if (domain->ops->attach_dev_aux)
+		ret = domain->ops->attach_dev_aux(domain, dev);
+
+	if (!ret)
+		trace_attach_device_to_domain(dev);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_attach_device_aux);
+
+void iommu_detach_device_aux(struct iommu_domain *domain, struct device *dev)
+{
+	if (domain->ops->detach_dev_aux) {
+		domain->ops->detach_dev_aux(domain, dev);
+		trace_detach_device_from_domain(dev);
+	}
+}
+EXPORT_SYMBOL_GPL(iommu_detach_device_aux);

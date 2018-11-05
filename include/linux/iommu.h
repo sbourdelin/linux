@@ -126,6 +126,7 @@ enum iommu_attr {
 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
 	DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
 	DOMAIN_ATTR_MAX,
+	DOMAIN_ATTR_AUXD_ID,
 };
 
 /* These are the possible reserved region types */
@@ -156,6 +157,14 @@ struct iommu_resv_region {
 	enum iommu_resv_type	type;
 };
 
+/* Per device IOMMU attributions */
+enum iommu_dev_attr {
+	IOMMU_DEV_ATTR_AUXD_CAPABILITY,
+	IOMMU_DEV_ATTR_AUXD_ENABLED,
+	IOMMU_DEV_ATTR_AUXD_ENABLE,
+	IOMMU_DEV_ATTR_AUXD_DISABLE,
+};
+
 #ifdef CONFIG_IOMMU_API
 
 /**
@@ -183,6 +192,8 @@ struct iommu_resv_region {
  * @domain_window_enable: Configure and enable a particular window for a domain
  * @domain_window_disable: Disable a particular window for a domain
  * @of_xlate: add OF master IDs to iommu grouping
+ * @get_dev_attr: get per device IOMMU attributions
+ * @set_dev_attr: set per device IOMMU attributions
  * @pgsize_bitmap: bitmap of all possible supported page sizes
  */
 struct iommu_ops {
@@ -225,6 +236,15 @@ struct iommu_ops {
 
 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
 	bool (*is_attach_deferred)(struct iommu_domain *domain, struct device *dev);
+
+	/* Get/set per device IOMMU attributions */
+	int (*get_dev_attr)(struct device *dev,
+			    enum iommu_dev_attr attr, void *data);
+	int (*set_dev_attr)(struct device *dev,
+			    enum iommu_dev_attr attr, void *data);
+	/* Attach/detach aux domain */
+	int (*attach_dev_aux)(struct iommu_domain *domain, struct device *dev);
+	void (*detach_dev_aux)(struct iommu_domain *domain, struct device *dev);
 
 	unsigned long pgsize_bitmap;
 };
@@ -397,6 +417,16 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
 void iommu_fwspec_free(struct device *dev);
 int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
 const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode);
+
+int iommu_get_dev_attr(struct device *dev,
+		       enum iommu_dev_attr attr, void *data);
+int iommu_set_dev_attr(struct device *dev,
+		       enum iommu_dev_attr attr, void *data);
+
+extern int iommu_attach_device_aux(struct iommu_domain *domain,
+				   struct device *dev);
+extern void iommu_detach_device_aux(struct iommu_domain *domain,
+				    struct device *dev);
 
 #else /* CONFIG_IOMMU_API */
 
@@ -682,6 +712,28 @@ const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode)
 	return NULL;
 }
 
+static inline int
+iommu_get_dev_attr(struct device *dev, enum iommu_dev_attr attr, void *data)
+{
+	return -EINVAL;
+}
+
+static inline int
+iommu_set_dev_attr(struct device *dev, enum iommu_dev_attr attr, void *data)
+{
+	return -EINVAL;
+}
+
+static inline int
+iommu_attach_device_aux(struct iommu_domain *domain, struct device *dev)
+{
+	return -ENODEV;
+}
+
+static inline void
+iommu_detach_device_aux(struct iommu_domain *domain, struct device *dev)
+{
+}
 #endif /* CONFIG_IOMMU_API */
 
 #ifdef CONFIG_IOMMU_DEBUGFS
