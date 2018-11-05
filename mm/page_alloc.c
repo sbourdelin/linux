@@ -4429,14 +4429,27 @@ unsigned long get_zeroed_page(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(get_zeroed_page);
 
-void __free_pages(struct page *page, unsigned int order)
+/*
+ * Free a page by reducing its ref count by @nr.
+ * If its refcount reaches 0, then according to its order:
+ * order0: send to PCP;
+ * high order: directly send to Buddy.
+ */
+static inline void free_the_page(struct page *page, unsigned int order, int nr)
 {
-	if (put_page_testzero(page)) {
+	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);
+
+	if (page_ref_sub_and_test(page, nr)) {
 		if (order == 0)
 			free_unref_page(page);
 		else
 			__free_pages_ok(page, order);
 	}
+}
+
+void __free_pages(struct page *page, unsigned int order)
+{
+	free_the_page(page, order, 1);
 }
 
 EXPORT_SYMBOL(__free_pages);
@@ -4485,16 +4498,7 @@ static struct page *__page_frag_cache_refill(struct page_frag_cache *nc,
 
 void __page_frag_cache_drain(struct page *page, unsigned int count)
 {
-	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);
-
-	if (page_ref_sub_and_test(page, count)) {
-		unsigned int order = compound_order(page);
-
-		if (order == 0)
-			free_unref_page(page);
-		else
-			__free_pages_ok(page, order);
-	}
+	free_the_page(page, compound_order(page), count);
 }
 EXPORT_SYMBOL(__page_frag_cache_drain);
 
@@ -4559,14 +4563,7 @@ void page_frag_free(void *addr)
 {
 	struct page *page = virt_to_head_page(addr);
 
-	if (unlikely(put_page_testzero(page))) {
-		unsigned int order = compound_order(page);
-
-		if (order == 0)
-			free_unref_page(page);
-		else
-			__free_pages_ok(page, order);
-	}
+	free_the_page(page, compound_order(page), 1);
 }
 EXPORT_SYMBOL(page_frag_free);
 
