@@ -1485,7 +1485,8 @@ int skl_platform_register(struct device *dev)
 	}
 
 	if (!skl->use_tplg_pcm) {
-		dais = krealloc(skl->dais, sizeof(skl_fe_dai) +
+		devm_kfree(dev, skl->dais);
+		dais = devm_kcalloc(dev, skl->dais, sizeof(skl_fe_dai) +
 				sizeof(skl_platform_dai), GFP_KERNEL);
 		if (!dais) {
 			ret = -ENOMEM;
@@ -1518,8 +1519,6 @@ int skl_platform_unregister(struct device *dev)
 			kfree(modules);
 		}
 	}
-
-	kfree(skl->dais);
 
 	return 0;
 }
