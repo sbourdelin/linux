@@ -9278,7 +9278,7 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 	 * with dirty logging disabled in order to eliminate unnecessary GPA
 	 * logging in PML buffer (and potential PML buffer full VMEXT). This
 	 * guarantees leaving PML enabled during guest's lifetime won't have
-	 * any additonal overhead from PML when guest is running with dirty
+	 * any additional overhead from PML when guest is running with dirty
 	 * logging disabled for memory slots.
 	 *
 	 * kvm_x86_ops->slot_enable_log_dirty is called when switching new slot
@@ -9535,7 +9535,7 @@ static void kvm_del_async_pf_gfn(struct kvm_vcpu *vcpu, gfn_t gfn)
 				return;
 			k = kvm_async_pf_hash_fn(vcpu->arch.apf.gfns[j]);
 			/*
-			 * k lies cyclically in ]i,j]
+			 * k lies cyclically in [i,j]
 			 * |    i.k.j |
 			 * |....j i.k.| or  |.k..j i...|
 			 */

@@ -4249,7 +4249,7 @@ static inline bool is_last_gpte(struct kvm_mmu *mmu,
 				unsigned level, unsigned gpte)
 {
 	/*
-	 * The RHS has bit 7 set iff level < mmu->last_nonleaf_level.
+	 * The RHS has bit 7 set if level < mmu->last_nonleaf_level.
 	 * If it is clear, there are no large pages at this level, so clear
 	 * PT_PAGE_SIZE_MASK in gpte if that is the case.
 	 */
@@ -4257,7 +4257,7 @@ static inline bool is_last_gpte(struct kvm_mmu *mmu,
 
 	/*
 	 * PT_PAGE_TABLE_LEVEL always terminates.  The RHS has bit 7 set
-	 * iff level <= PT_PAGE_TABLE_LEVEL, which for our purpose means
+	 * if level <= PT_PAGE_TABLE_LEVEL, which for our purpose means
 	 * level == PT_PAGE_TABLE_LEVEL; set PT_PAGE_SIZE_MASK in gpte then.
 	 */
 	gpte |= level - PT_PAGE_TABLE_LEVEL - 1;
@@ -5656,7 +5656,7 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 	 * spte from present to present (changing the spte from present
 	 * to nonpresent will flush all the TLBs immediately), in other
 	 * words, the only case we care is mmu_spte_update() where we
-	 * haved checked SPTE_HOST_WRITEABLE | SPTE_MMU_WRITEABLE
+	 * have checked SPTE_HOST_WRITEABLE | SPTE_MMU_WRITEABLE
 	 * instead of PT_WRITABLE_MASK, that means it does not depend
 	 * on PT_WRITABLE_MASK anymore.
 	 */
