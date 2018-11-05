@@ -200,6 +200,15 @@ static struct ctl_table ipc_kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_ipc_sem_dointvec,
 	},
+	{
+		.procname	= "ipcid_mode",
+		.data		= &init_ipc_ns.ipcid_mode,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_ipc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 #ifdef CONFIG_CHECKPOINT_RESTORE
 	{
 		.procname	= "sem_next_id",
@@ -254,6 +263,7 @@ static int __init ipc_mni_extend(char *str)
 	ipc_mni = IPCMNI_EXTEND;
 	ipc_mni_shift = IPCMNI_EXTEND_SHIFT;
 	ipc_mni_extended = true;
+	init_ipc_ns.ipcid_mode = ipc_id_delete;
 	pr_info("IPCMNI extended to %d.\n", ipc_mni);
 	return 0;
 }

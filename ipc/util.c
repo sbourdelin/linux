@@ -195,7 +195,8 @@ static struct kern_ipc_perm *ipc_findkey(struct ipc_ids *ids, key_t key)
  * The caller must own kern_ipc_perm.lock.of the new object.
  * On error, the function returns a (negative) error code.
  */
-static inline int ipc_idr_alloc(struct ipc_ids *ids, struct kern_ipc_perm *new)
+static inline int ipc_idr_alloc(struct ipc_ids *ids, struct kern_ipc_perm *new,
+				int idmode)
 {
 	int idx, next_id = -1;
 
@@ -222,7 +223,7 @@ static inline int ipc_idr_alloc(struct ipc_ids *ids, struct kern_ipc_perm *new)
 	 */
 
 	if (next_id < 0) { /* !CHECKPOINT_RESTORE or next_id is unset */
-		if (!ipc_mni_extended || ids->deleted) {
+		if (idmode == ipc_id_legacy || ids->deleted) {
 			ids->seq++;
 			if (ids->seq > IPCID_SEQ_MAX)
 				ids->seq = 0;
@@ -255,7 +256,8 @@ static inline int ipc_idr_alloc(struct ipc_ids *ids, struct kern_ipc_perm *new)
  *
  * Called with writer ipc_ids.rwsem held.
  */
-int ipc_addid(struct ipc_ids *ids, struct kern_ipc_perm *new, int limit)
+int ipc_addid(struct ipc_ids *ids, struct kern_ipc_perm *new, int limit,
+	      int idmode)
 {
 	kuid_t euid;
 	kgid_t egid;
@@ -282,7 +284,7 @@ int ipc_addid(struct ipc_ids *ids, struct kern_ipc_perm *new, int limit)
 
 	new->deleted = false;
 
-	idx = ipc_idr_alloc(ids, new);
+	idx = ipc_idr_alloc(ids, new, idmode);
 	idr_preload_end();
 
 	if (idx >= 0 && new->key != IPC_PRIVATE) {

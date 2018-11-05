@@ -676,7 +676,8 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	shp->shm_creator = current;
 
 	/* ipc_addid() locks shp upon success. */
-	error = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
+	error = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni,
+			  ns->ipcid_mode);
 	if (error < 0)
 		goto no_id;
 

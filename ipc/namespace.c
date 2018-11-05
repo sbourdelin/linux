@@ -55,6 +55,8 @@ static struct ipc_namespace *create_ipc_ns(struct user_namespace *user_ns,
 	ns->user_ns = get_user_ns(user_ns);
 	ns->ucounts = ucounts;
 
+	ns->ipcid_mode = ipc_mni_extended ? ipc_id_delete : ipc_id_legacy;
+
 	err = mq_init_ns(ns);
 	if (err)
 		goto fail_put;

@@ -129,7 +129,8 @@ struct pid_namespace *ipc_seq_pid_ns(struct seq_file *);
 #define IPCID_SEQ_MAX	  (INT_MAX >> IPCMNI_SEQ_SHIFT)
 
 /* must be called with ids->rwsem acquired for writing */
-int ipc_addid(struct ipc_ids *, struct kern_ipc_perm *, int);
+int ipc_addid(struct ipc_ids *ids, struct kern_ipc_perm *new, int limit,
+	      int idmode);
 
 /* must be called with both locks acquired. */
 void ipc_rmid(struct ipc_ids *, struct kern_ipc_perm *);

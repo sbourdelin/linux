@@ -41,6 +41,7 @@ show up in /proc/sys/kernel:
 - hung_task_check_interval_secs
 - hung_task_warnings
 - hyperv_record_panic_msg
+- ipcid_mode
 - kexec_load_disabled
 - kptr_restrict
 - l2cr                        [ PPC only ]
@@ -396,6 +397,22 @@ Controls whether the panic kmsg data should be reported to Hyper-V.
 0: do not report panic kmsg data.
 
 1: report the panic kmsg data. This is the default behavior.
+
+==============================================================
+
+ipcid_mode:
+
+Controls how the IPC ids returned by msgget(), semget() and shmget()
+are being generated.
+
+0: legacy mode
+1: delete mode
+
+There are two components in an IPC id - an integer identifier and a
+sequence number. In the legacy mode, the sequence number is incremented
+every time a new id is generated. In the delete mode, the sequence number
+is only incremented if one or more ids have been previously deleted. The
+delete mode reduces the chance that a given id will be reused again.
 
 ==============================================================
 

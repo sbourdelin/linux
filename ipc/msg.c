@@ -161,7 +161,8 @@ static int newque(struct ipc_namespace *ns, struct ipc_params *params)
 	INIT_LIST_HEAD(&msq->q_senders);
 
 	/* ipc_addid() locks msq upon success. */
-	retval = ipc_addid(&msg_ids(ns), &msq->q_perm, ns->msg_ctlmni);
+	retval = ipc_addid(&msg_ids(ns), &msq->q_perm, ns->msg_ctlmni,
+			   ns->ipcid_mode);
 	if (retval < 0) {
 		ipc_rcu_putref(&msq->q_perm, msg_rcu_free);
 		return retval;

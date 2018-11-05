@@ -26,6 +26,15 @@ struct ipc_ids {
 	struct rhashtable key_ht;
 };
 
+/*
+ * IPC id generation mode for controlling how the IPC id returned by
+ * {msg,sem,shm}get() is being generated.
+ */
+enum ipc_id_mode {
+	ipc_id_legacy,	/* Sequence # incremented on every allocation */
+	ipc_id_delete,	/* Sequence # incremented only if an ID was deleted */
+};
+
 struct ipc_namespace {
 	refcount_t	count;
 	struct ipc_ids	ids[3];
@@ -38,6 +47,9 @@ struct ipc_namespace {
 	unsigned int	msg_ctlmni;
 	atomic_t	msg_bytes;
 	atomic_t	msg_hdrs;
+
+	/* IPC id generation mode */
+	unsigned int	ipcid_mode;
 
 	size_t		shm_ctlmax;
 	size_t		shm_ctlall;
