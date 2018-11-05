@@ -64,6 +64,7 @@ struct virtio_vsock {
 	struct virtio_vsock_event event_list[8];
 
 	u32 guest_cid;
+	bool mergeable;
 };
 
 static struct virtio_vsock *virtio_vsock_get(void)
@@ -256,6 +257,25 @@ virtio_transport_cancel_pkt(struct vsock_sock *vsk)
 	return 0;
 }
 
+static int fill_mergeable_rx_buff(struct virtqueue *vq)
+{
+	void *page = NULL;
+	struct scatterlist sg;
+	int err;
+
+	page = (void *)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	sg_init_one(&sg, page, PAGE_SIZE);
+
+	err = virtqueue_add_inbuf(vq, &sg, 1, page, GFP_KERNEL);
+	if (err < 0)
+		free_page((unsigned long) page);
+
+	return err;
+}
+
 static void virtio_vsock_rx_fill(struct virtio_vsock *vsock)
 {
 	int buf_len = VIRTIO_VSOCK_DEFAULT_RX_BUF_SIZE;
@@ -267,27 +287,33 @@ static void virtio_vsock_rx_fill(struct virtio_vsock *vsock)
 	vq = vsock->vqs[VSOCK_VQ_RX];
 
 	do {
-		pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
-		if (!pkt)
-			break;
+		if (vsock->mergeable) {
+			ret = fill_mergeable_rx_buff(vq);
+			if (ret)
+				break;
+		} else {
+			pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
+			if (!pkt)
+				break;
 
-		pkt->buf = kmalloc(buf_len, GFP_KERNEL);
-		if (!pkt->buf) {
-			virtio_transport_free_pkt(pkt);
-			break;
-		}
+			pkt->buf = kmalloc(buf_len, GFP_KERNEL);
+			if (!pkt->buf) {
+				virtio_transport_free_pkt(pkt);
+				break;
+			}
 
-		pkt->len = buf_len;
+			pkt->len = buf_len;
 
-		sg_init_one(&hdr, &pkt->hdr, sizeof(pkt->hdr));
-		sgs[0] = &hdr;
+			sg_init_one(&hdr, &pkt->hdr, sizeof(pkt->hdr));
+			sgs[0] = &hdr;
 
-		sg_init_one(&buf, pkt->buf, buf_len);
-		sgs[1] = &buf;
-		ret = virtqueue_add_sgs(vq, sgs, 0, 2, pkt, GFP_KERNEL);
-		if (ret) {
-			virtio_transport_free_pkt(pkt);
-			break;
+			sg_init_one(&buf, pkt->buf, buf_len);
+			sgs[1] = &buf;
+			ret = virtqueue_add_sgs(vq, sgs, 0, 2, pkt, GFP_KERNEL);
+			if (ret) {
+				virtio_transport_free_pkt(pkt);
+				break;
+			}
 		}
 		vsock->rx_buf_nr++;
 	} while (vq->num_free);
@@ -588,6 +614,9 @@ static int virtio_vsock_probe(struct virtio_device *vdev)
 	if (ret < 0)
 		goto out_vqs;
 
+	if (virtio_has_feature(vdev, VIRTIO_VSOCK_F_MRG_RXBUF))
+		vsock->mergeable = true;
+
 	vsock->rx_buf_nr = 0;
 	vsock->rx_buf_max_nr = 0;
 	atomic_set(&vsock->queued_replies, 0);
@@ -640,8 +669,12 @@ static void virtio_vsock_remove(struct virtio_device *vdev)
 	vdev->config->reset(vdev);
 
 	mutex_lock(&vsock->rx_lock);
-	while ((pkt = virtqueue_detach_unused_buf(vsock->vqs[VSOCK_VQ_RX])))
-		virtio_transport_free_pkt(pkt);
+	while ((pkt = virtqueue_detach_unused_buf(vsock->vqs[VSOCK_VQ_RX]))) {
+		if (vsock->mergeable)
+			free_page((unsigned long)(void *)pkt);
+		else
+			virtio_transport_free_pkt(pkt);
+	}
 	mutex_unlock(&vsock->rx_lock);
 
 	mutex_lock(&vsock->tx_lock);
@@ -683,6 +716,7 @@ static struct virtio_device_id id_table[] = {
 };
 
 static unsigned int features[] = {
+	VIRTIO_VSOCK_F_MRG_RXBUF,
 };
 
 static struct virtio_driver virtio_vsock_driver = {

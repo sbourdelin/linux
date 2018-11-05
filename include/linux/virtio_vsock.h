@@ -14,6 +14,9 @@
 #define VIRTIO_VSOCK_MAX_BUF_SIZE		0xFFFFFFFFUL
 #define VIRTIO_VSOCK_MAX_PKT_BUF_SIZE		(1024 * 64)
 
+/* Virtio-vsock feature */
+#define VIRTIO_VSOCK_F_MRG_RXBUF 0 /* Host can merge receive buffers. */
+
 enum {
 	VSOCK_VQ_RX     = 0, /* for host to guest data */
 	VSOCK_VQ_TX     = 1, /* for guest to host data */
