@@ -22,7 +22,8 @@
 #define VHOST_VSOCK_DEFAULT_HOST_CID	2
 
 enum {
-	VHOST_VSOCK_FEATURES = VHOST_FEATURES,
+	VHOST_VSOCK_FEATURES = VHOST_FEATURES |
+			(1ULL << VIRTIO_VSOCK_F_MRG_RXBUF),
 };
 
 /* Used to track all the vhost_vsock instances on the system. */
@@ -80,6 +81,68 @@ static struct vhost_vsock *vhost_vsock_get(u32 guest_cid)
 	return vsock;
 }
 
+static int get_rx_bufs(struct vhost_virtqueue *vq,
+		struct vring_used_elem *heads, int datalen,
+		unsigned *iovcount, unsigned int quota)
+{
+	unsigned int out, in;
+	int seg = 0;
+	int headcount = 0;
+	unsigned d;
+	int ret;
+	/*
+	 * len is always initialized before use since we are always called with
+	 * datalen > 0.
+	 */
+	u32 uninitialized_var(len);
+
+	while (datalen > 0 && headcount < quota) {
+		if (unlikely(seg >= UIO_MAXIOV)) {
+			ret = -ENOBUFS;
+			goto err;
+		}
+
+		ret = vhost_get_vq_desc(vq, vq->iov + seg,
+				ARRAY_SIZE(vq->iov) - seg, &out,
+				&in, NULL, NULL);
+		if (unlikely(ret < 0))
+			goto err;
+
+		d = ret;
+		if (d == vq->num) {
+			ret = 0;
+			goto err;
+		}
+
+		if (unlikely(out || in <= 0)) {
+			vq_err(vq, "unexpected descriptor format for RX: "
+					"out %d, in %d\n", out, in);
+			ret = -EINVAL;
+			goto err;
+		}
+
+		heads[headcount].id = cpu_to_vhost32(vq, d);
+		len = iov_length(vq->iov + seg, in);
+		heads[headcount].len = cpu_to_vhost32(vq, len);
+		datalen -= len;
+		++headcount;
+		seg += in;
+	}
+
+	heads[headcount - 1].len = cpu_to_vhost32(vq, len + datalen);
+	*iovcount = seg;
+
+	/* Detect overrun */
+	if (unlikely(datalen > 0)) {
+		ret = UIO_MAXIOV + 1;
+		goto err;
+	}
+	return headcount;
+err:
+	vhost_discard_vq_desc(vq, headcount);
+	return ret;
+}
+
 static void
 vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			    struct vhost_virtqueue *vq)
@@ -87,11 +150,23 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 	struct vhost_virtqueue *tx_vq = &vsock->vqs[VSOCK_VQ_TX];
 	bool added = false;
 	bool restart_tx = false;
+	int mergeable;
+	size_t vsock_hlen;
 
 	mutex_lock(&vq->mutex);
 
 	if (!vq->private_data)
 		goto out;
+
+	mergeable = vhost_has_feature(vq, VIRTIO_VSOCK_F_MRG_RXBUF);
+	/*
+	 * Guest fill page for rx vq in mergeable case, so it will not
+	 * allocate pkt structure, we should reserve size of pkt in advance.
+	 */
+	if (likely(mergeable))
+		vsock_hlen = sizeof(struct virtio_vsock_pkt);
+	else
+		vsock_hlen = sizeof(struct virtio_vsock_hdr);
 
 	/* Avoid further vmexits, we're already processing the virtqueue */
 	vhost_disable_notify(&vsock->dev, vq);
@@ -99,10 +174,10 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 	for (;;) {
 		struct virtio_vsock_pkt *pkt;
 		struct iov_iter iov_iter;
-		unsigned out, in;
+		unsigned out = 0, in = 0;
 		size_t nbytes;
 		size_t len;
-		int head;
+		s16 headcount;
 
 		spin_lock_bh(&vsock->send_pkt_list_lock);
 		if (list_empty(&vsock->send_pkt_list)) {
@@ -116,16 +191,9 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 		list_del_init(&pkt->list);
 		spin_unlock_bh(&vsock->send_pkt_list_lock);
 
-		head = vhost_get_vq_desc(vq, vq->iov, ARRAY_SIZE(vq->iov),
-					 &out, &in, NULL, NULL);
-		if (head < 0) {
-			spin_lock_bh(&vsock->send_pkt_list_lock);
-			list_add(&pkt->list, &vsock->send_pkt_list);
-			spin_unlock_bh(&vsock->send_pkt_list_lock);
-			break;
-		}
-
-		if (head == vq->num) {
+		headcount = get_rx_bufs(vq, vq->heads, vsock_hlen + pkt->len,
+				&in, likely(mergeable) ? UIO_MAXIOV : 1);
+		if (headcount <= 0) {
 			spin_lock_bh(&vsock->send_pkt_list_lock);
 			list_add(&pkt->list, &vsock->send_pkt_list);
 			spin_unlock_bh(&vsock->send_pkt_list_lock);
@@ -133,16 +201,10 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			/* We cannot finish yet if more buffers snuck in while
 			 * re-enabling notify.
 			 */
-			if (unlikely(vhost_enable_notify(&vsock->dev, vq))) {
+			if (!headcount && unlikely(vhost_enable_notify(&vsock->dev, vq))) {
 				vhost_disable_notify(&vsock->dev, vq);
 				continue;
 			}
-			break;
-		}
-
-		if (out) {
-			virtio_transport_free_pkt(pkt);
-			vq_err(vq, "Expected 0 output buffers, got %u\n", out);
 			break;
 		}
 
@@ -156,6 +218,19 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			break;
 		}
 
+		if (likely(mergeable)) {
+			pkt->mrg_rxbuf_hdr.num_buffers = cpu_to_le16(headcount);
+			nbytes = copy_to_iter(&pkt->mrg_rxbuf_hdr,
+					sizeof(pkt->mrg_rxbuf_hdr), &iov_iter);
+			if (nbytes != sizeof(pkt->mrg_rxbuf_hdr)) {
+				virtio_transport_free_pkt(pkt);
+				vq_err(vq, "Faulted on copying rxbuf hdr\n");
+				break;
+			}
+			iov_iter_advance(&iov_iter, (vsock_hlen -
+					sizeof(pkt->mrg_rxbuf_hdr) - sizeof(pkt->hdr)));
+		}
+
 		nbytes = copy_to_iter(pkt->buf, pkt->len, &iov_iter);
 		if (nbytes != pkt->len) {
 			virtio_transport_free_pkt(pkt);
@@ -163,7 +238,7 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			break;
 		}
 
-		vhost_add_used(vq, head, sizeof(pkt->hdr) + pkt->len);
+		vhost_add_used_n(vq, vq->heads, headcount);
 		added = true;
 
 		if (pkt->reply) {

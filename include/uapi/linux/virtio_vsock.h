@@ -63,6 +63,11 @@ struct virtio_vsock_hdr {
 	__le32	fwd_cnt;
 } __attribute__((packed));
 
+/* It add mergeable rx buffers feature */
+struct virtio_vsock_mrg_rxbuf_hdr {
+	__le16  num_buffers;    /* number of mergeable rx buffers */
+} __attribute__((packed));
+
 enum virtio_vsock_type {
 	VIRTIO_VSOCK_TYPE_STREAM = 1,
 };
