@@ -211,10 +211,17 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
 					   image->kernel_buf_len);
 	if (ret) {
 		pr_debug("kernel signature verification failed.\n");
-		goto out;
+	} else {
+		pr_debug("kernel signature verification successful.\n");
 	}
-	pr_debug("kernel signature verification successful.\n");
+#else
+	ret = -EPERM;
 #endif
+	if (ret && kernel_is_locked_down("kexec of unsigned images"))
+		goto out;
+	else
+		ret = 0;
+
 	/* It is possible that there no initramfs is being loaded */
 	if (!(flags & KEXEC_FILE_NO_INITRAMFS)) {
 		ret = kernel_read_file_from_fd(initrd_fd, &image->initrd_buf,
