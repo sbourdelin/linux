@@ -148,10 +148,12 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			    struct vhost_virtqueue *vq)
 {
 	struct vhost_virtqueue *tx_vq = &vsock->vqs[VSOCK_VQ_TX];
-	bool added = false;
 	bool restart_tx = false;
 	int mergeable;
 	size_t vsock_hlen;
+	int batch_count = 0;
+
+#define VHOST_VSOCK_BATCH 16
 
 	mutex_lock(&vq->mutex);
 
@@ -191,8 +193,9 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 		list_del_init(&pkt->list);
 		spin_unlock_bh(&vsock->send_pkt_list_lock);
 
-		headcount = get_rx_bufs(vq, vq->heads, vsock_hlen + pkt->len,
-				&in, likely(mergeable) ? UIO_MAXIOV : 1);
+		headcount = get_rx_bufs(vq, vq->heads + batch_count,
+				vsock_hlen + pkt->len, &in,
+				likely(mergeable) ? UIO_MAXIOV : 1);
 		if (headcount <= 0) {
 			spin_lock_bh(&vsock->send_pkt_list_lock);
 			list_add(&pkt->list, &vsock->send_pkt_list);
@@ -238,8 +241,12 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			break;
 		}
 
-		vhost_add_used_n(vq, vq->heads, headcount);
-		added = true;
+		batch_count += headcount;
+		if (batch_count > VHOST_VSOCK_BATCH) {
+			vhost_add_used_and_signal_n(&vsock->dev, vq,
+					vq->heads, batch_count);
+			batch_count = 0;
+		}
 
 		if (pkt->reply) {
 			int val;
@@ -258,8 +265,11 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 
 		virtio_transport_free_pkt(pkt);
 	}
-	if (added)
-		vhost_signal(&vsock->dev, vq);
+
+	if (batch_count) {
+		vhost_add_used_and_signal_n(&vsock->dev, vq,
+				vq->heads, batch_count);
+	}
 
 out:
 	mutex_unlock(&vq->mutex);
