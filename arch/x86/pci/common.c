@@ -67,7 +67,7 @@ static int pci_write(struct pci_bus *bus, unsigned int devfn, int where, int siz
 				  devfn, where, size, value);
 }
 
-struct pci_ops pci_root_ops = {
+struct pci_ops pci_root_ops __ro_after_init = {
 	.read = pci_read,
 	.write = pci_write,
 };
