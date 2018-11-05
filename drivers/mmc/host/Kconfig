@@ -977,3 +977,16 @@ config MMC_SDHCI_OMAP
 	  If you have a controller with this interface, say Y or M here.
 
 	  If unsure, say N.
+
+config MMC_SDHCI_EXTDMA
+        bool "Support external DMA in standard SD host controller"
+	depends on MMC_SDHCI
+	depends on DMA_ENGINE
+	help
+	  This is an option for using external DMA device via dmaengine
+	  framework.
+
+	  If you have a controller which supports using external DMA device
+	  for data transfer, can say Y.
+
+	  If unsure, say N.

@@ -14,6 +14,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/dmaengine.h>
 #include <linux/ktime.h>
 #include <linux/highmem.h>
 #include <linux/io.h>
@@ -1309,6 +1310,128 @@ static void sdhci_del_timer(struct sdhci_host *host, struct mmc_request *mrq)
 		del_timer(&host->timer);
 }
 
+#if IS_ENABLED(CONFIG_MMC_SDHCI_EXTDMA)
+static int sdhci_extdma_init_chan(struct sdhci_host *host)
+{
+	int ret = 0;
+	struct mmc_host *mmc = host->mmc;
+	struct sdhci_extdma *dma = &host->extdma;
+
+	dma->tx_chan = dma_request_chan(mmc->parent, "tx");
+	if (IS_ERR(dma->tx_chan)) {
+		ret = PTR_ERR(dma->tx_chan);
+		dma->tx_chan = NULL;
+		pr_warn("Failed to request TX DMA channel.\n");
+		return ret;
+	}
+
+	dma->rx_chan = dma_request_chan(mmc->parent, "rx");
+	if (IS_ERR(dma->rx_chan)) {
+		ret = PTR_ERR(dma->rx_chan);
+		if (ret == -EPROBE_DEFER && dma->tx_chan)
+			dma_release_channel(dma->tx_chan);
+
+		dma->rx_chan = NULL;
+		pr_warn("Failed to request RX DMA channel.\n");
+	}
+
+	return ret;
+}
+
+static inline struct dma_chan *
+sdhci_extdma_get_chan(struct sdhci_extdma *dma, struct mmc_data *data)
+{
+	return data->flags & MMC_DATA_WRITE ? dma->tx_chan : dma->rx_chan;
+}
+
+static int sdhci_extdma_setup(struct sdhci_host *host, struct mmc_command *cmd)
+{
+	int ret = 0, i;
+	struct dma_async_tx_descriptor *desc;
+	struct mmc_data *data = cmd->data;
+	struct dma_chan *chan;
+	struct dma_slave_config cfg;
+
+	if (!host->mapbase)
+		return -EINVAL;
+
+	cfg.src_addr = host->mapbase + SDHCI_BUFFER;
+	cfg.dst_addr = host->mapbase + SDHCI_BUFFER;
+	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	cfg.src_maxburst = data->blksz / 4;
+	cfg.dst_maxburst = data->blksz / 4;
+
+	/* Sanity check: all the SG entries must be aligned by block size. */
+	for (i = 0; i < data->sg_len; i++) {
+		if ((data->sg + i)->length % data->blksz)
+			return -EINVAL;
+	}
+
+	chan = sdhci_extdma_get_chan(&host->extdma, data);
+
+	ret = dmaengine_slave_config(chan, &cfg);
+	if (ret)
+		return ret;
+
+	desc = dmaengine_prep_slave_sg(chan, data->sg, data->sg_len,
+				       mmc_get_dma_dir(data),
+				       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+	if (!desc)
+		return -EINVAL;
+
+	desc->callback = NULL;
+	desc->callback_param = NULL;
+
+	dmaengine_submit(desc);
+
+	return 0;
+}
+
+static void sdhci_extdma_prepare_data(struct sdhci_host *host,
+				      struct mmc_command *cmd)
+{
+	host->flags |= SDHCI_REQ_USE_DMA;
+	sdhci_prepare_data(host, cmd);
+
+	if (sdhci_extdma_setup(host, cmd))
+		dev_err(mmc_dev(host->mmc), "MMC start dma failure\n");
+}
+
+static void sdhci_extdma_pre_transfer(struct sdhci_host *host,
+				      struct mmc_command *cmd)
+{
+	struct dma_chan *chan = sdhci_extdma_get_chan(&host->extdma, cmd->data);
+
+	if (cmd->opcode != MMC_SET_BLOCK_COUNT) {
+		sdhci_set_timeout(host, cmd);
+		dma_async_issue_pending(chan);
+	}
+}
+#else
+static int sdhci_extdma_init_chan(struct sdhci_host *host)
+{
+	return 0;
+}
+
+static void sdhci_extdma_prepare_data(struct sdhci_host *host,
+				      struct mmc_command *cmd)
+{
+	/* If SDHCI_EXTDMA not supported, PIO will be used */
+	sdhci_prepare_data(host, cmd);
+}
+
+static void sdhci_extdma_pre_transfer(struct sdhci_host *host,
+				      struct mmc_command *cmd)
+{}
+#endif
+
+void sdhci_switch_extdma(struct sdhci_host *host, bool en)
+{
+	host->use_extdma = en;
+}
+EXPORT_SYMBOL_GPL(sdhci_switch_extdma);
+
 void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 {
 	int flags;
@@ -1355,7 +1478,10 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		host->data_cmd = cmd;
 	}
 
-	sdhci_prepare_data(host, cmd);
+	if (host->use_extdma)
+		sdhci_extdma_prepare_data(host, cmd);
+	else
+		sdhci_prepare_data(host, cmd);
 
 	sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
 
@@ -1396,6 +1522,9 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	else
 		timeout += 10 * HZ;
 	sdhci_mod_timer(host, cmd->mrq, timeout);
+
+	if (host->use_extdma)
+		sdhci_extdma_pre_transfer(host, cmd);
 
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
 }
@@ -4131,6 +4260,12 @@ int sdhci_setup_host(struct sdhci_host *host)
 		ret = sdhci_allocate_bounce_buffer(host);
 		if (ret)
 			return ret;
+	}
+
+	if (host->use_extdma) {
+		ret = sdhci_extdma_init_chan(host);
+		if (ret)
+			goto unreg;
 	}
 
 	return 0;
