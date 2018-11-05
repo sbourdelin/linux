@@ -91,7 +91,7 @@
 #define PAB_INTX_START	5
 
 /* supported number of MSI interrupts */
-#define PCI_NUM_MSI	16
+#define PCI_NUM_MSI	256
 
 /* MSI registers */
 #define MSI_BASE_LO_OFFSET	0x04
@@ -174,7 +174,7 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
 	 * Do not read more than one device on the bus directly
 	 * attached to RC
 	 */
-	if ((bus->primary == pcie->root_bus_nr) && (devfn > 0))
+	if ((bus->number == pcie->root_bus_nr) && (devfn > 0))
 		return false;
 
 	return true;
