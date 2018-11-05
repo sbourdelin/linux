@@ -573,21 +573,16 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
 const struct arm64_cpu_capabilities arm64_errata[] = {
 #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
 	defined(CONFIG_ARM64_ERRATUM_827319) || \
-	defined(CONFIG_ARM64_ERRATUM_824069)
+	defined(CONFIG_ARM64_ERRATUM_824069) || \
+	defined(CONFIG_ARM64_ERRATUM_819472)
 	{
-	/* Cortex-A53 r0p[012] */
-		.desc = "ARM errata 826319, 827319, 824069",
+	/*
+	 * Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069
+	 * Cortex-A53 r0p[01] : ARM errata 819472
+	 */
+		.desc = "ARM errata 826319, 827319, 824069, 819472",
 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
 		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
-		.cpu_enable = cpu_enable_cache_maint_trap,
-	},
-#endif
-#ifdef CONFIG_ARM64_ERRATUM_819472
-	{
-	/* Cortex-A53 r0p[01] */
-		.desc = "ARM errata 819472",
-		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
-		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
 		.cpu_enable = cpu_enable_cache_maint_trap,
 	},
 #endif
