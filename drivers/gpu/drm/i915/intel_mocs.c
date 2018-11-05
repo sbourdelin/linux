@@ -44,6 +44,8 @@ struct drm_i915_mocs_table {
 #define LE_SCC(value)		((value) << 8)
 #define LE_PFM(value)		((value) << 11)
 #define LE_SCF(value)		((value) << 14)
+#define LE_CoS(value)		((value) << 15)
+#define LE_SSE(value)		((value) << 17)
 
 /* Defines for the tables (LNCFMOCS0 - LNCFMOCS31) - two entries per word */
 #define L3_ESC(value)		((value) << 0)
@@ -80,21 +82,21 @@ struct drm_i915_mocs_table {
  * LNCFCMOCS0 - LNCFCMOCS32 registers.
  *
  * These tables are intended to be kept reasonably consistent across
- * platforms. However some of the fields are not applicable to all of
- * them.
+ * HW platforms, and for ICL+, be identical across OSes. To achieve
+ * that, for Icelake and above, list of entries is published as part
+ * of bspec.
  *
  * Entries not part of the following tables are undefined as far as
- * userspace is concerned and shouldn't be relied upon.  For the time
- * being they will be implicitly initialized to the strictest caching
- * configuration (uncached) to guarantee forwards compatibility with
- * userspace programs written against more recent kernels providing
- * additional MOCS entries.
+ * userspace is concerned and shouldn't be relied upon.
  *
- * NOTE: These tables MUST start with being uncached and the length
- *       MUST be less than 63 as the last two registers are reserved
- *       by the hardware.  These tables are part of the kernel ABI and
- *       may only be updated incrementally by adding entries at the
- *       end.
+ * The last two entries are reserved by the hardware. For ICL+ they
+ * should be initialized according to bspec and never used, for older
+ * platforms they should never be written to.
+ *
+ * NOTE: These tables are part of bspec and defined as part of hardware
+ *       interface for ICL+. For older platforms, they are part of kernel
+ *       ABI. It is expected that existing entries will remain constant
+ *       and the tables will only be updated by adding new entries.
  */
 
 #define GEN9_MOCS_TABLE \
@@ -144,6 +146,222 @@ static const struct drm_i915_mocs_entry broxton_mocs_table[] = {
 	},
 };
 
+#define GEN11_MOCS_TABLE \
+	[0] = { \
+	  /* Base - Uncached (Deprecated) */ \
+	  .control_value = LE_CACHEABILITY(LE_UC) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[1] = { \
+	  /* Base - L3 + LeCC:PAT (Deprecated) */ \
+	  .control_value = LE_CACHEABILITY(LE_PAGETABLE) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[2] = { \
+	  /* Base - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[3] = { \
+	  /* Base - Uncached */ \
+	  .control_value = LE_CACHEABILITY(LE_UC) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[4] = { \
+	  /* Base - L3 */ \
+	  .control_value = LE_CACHEABILITY(LE_UC) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[5] = { \
+	  /* Base - LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[6] = { \
+	  /* Age 0 - LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(1) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[7] = { \
+	  /* Age 0 - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(1) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[8] = { \
+	  /* Age: Don't Chg. - LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(2) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[9] = { \
+	  /* Age: Don't Chg. - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(2) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[10] = { \
+	  /* No AOM - LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(1) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[11] = { \
+	  /* No AOM - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(1) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[12] = { \
+	  /* No AOM; Age 0 - LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(1) | LE_AOM(1) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[13] = { \
+	  /* No AOM; Age 0 - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(1) | LE_AOM(1) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[14] = { \
+	  /* No AOM; Age:DC - LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(2) | LE_AOM(1) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[15] = { \
+	  /* No AOM; Age:DC - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(2) | LE_AOM(1) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[18] = { \
+	  /* Self-Snoop - L3 + LLC */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(3), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[19] = { \
+	  /* Skip Caching - L3 + LLC(12.5%) */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(7) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[20] = { \
+	  /* Skip Caching - L3 + LLC(25%) */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(3) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[21] = { \
+	  /* Skip Caching - L3 + LLC(50%) */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(1) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[22] = { \
+	  /* Skip Caching - L3 + LLC(75%) */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(1) | LE_SCC(3) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[23] = { \
+	  /* Skip Caching - L3 + LLC(87.5%) */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(1) | LE_SCC(7) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB), \
+	}, \
+	[62] = { \
+	  /* HW Reserved - SW program but never use */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	}, \
+	[63] = { \
+	  /* HW Reserved - SW program but never use */ \
+	  .control_value = LE_CACHEABILITY(LE_WB) | \
+			   LE_TGT_CACHE(LE_TC_LLC) | \
+			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) | \
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0), \
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC), \
+	},
+
+static const struct drm_i915_mocs_entry icelake_mocs_table[] = {
+	GEN11_MOCS_TABLE
+	[16] = {
+	  /* Reserved - For future use */
+	  .control_value = LE_CACHEABILITY(LE_PAGETABLE) |
+			   LE_TGT_CACHE(LE_TC_PAGETABLE) |
+			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0),
+
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_DIRECT),
+	},
+	[17] = {
+	  /* Reserved - For future use */
+	  .control_value = LE_CACHEABILITY(LE_PAGETABLE) |
+			   LE_TGT_CACHE(LE_TC_PAGETABLE) |
+			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
+			   LE_PFM(0) | LE_SCF(0) | LE_CoS(0) | LE_SSE(0),
+
+	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_DIRECT),
+	},
+};
+
 /**
  * get_mocs_settings()
  * @dev_priv:	i915 device.
@@ -161,8 +379,11 @@ static bool get_mocs_settings(struct drm_i915_private *dev_priv,
 {
 	bool result = false;
 
-	if (IS_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv) ||
-	    IS_ICELAKE(dev_priv)) {
+	if (IS_ICELAKE(dev_priv)) {
+		table->size  = ARRAY_SIZE(icelake_mocs_table);
+		table->table = icelake_mocs_table;
+		result = true;
+	} else if (IS_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		table->size  = ARRAY_SIZE(skylake_mocs_table);
 		table->table = skylake_mocs_table;
 		result = true;
