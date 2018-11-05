@@ -95,7 +95,7 @@ struct coda_dev {
 	struct workqueue_struct	*workqueue;
 	struct v4l2_m2m_dev	*m2m_dev;
 	struct list_head	instances;
-	unsigned long		instance_mask;
+	struct ida		ida;
 	struct dentry		*debugfs_root;
 };
 
