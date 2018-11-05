@@ -2454,6 +2454,7 @@ static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 	info->domain = domain;
 	info->iommu = iommu;
 	info->pasid_table = NULL;
+	info->auxd_enabled = 0;
 
 	if (dev && dev_is_pci(dev)) {
 		struct pci_dev *pdev = to_pci_dev(info->dev);
@@ -5352,12 +5353,73 @@ static int intel_iommu_get_dev_attr(struct device *dev,
 				    enum iommu_dev_attr attr, void *data)
 {
 	int ret = 0;
-	bool *auxd_capable;
+	struct device_domain_info *info;
+	bool *auxd_capable, *auxd_enabled;
 
 	switch (attr) {
 	case IOMMU_DEV_ATTR_AUXD_CAPABILITY:
 		auxd_capable = data;
 		*auxd_capable = scalable_mode_support();
+		break;
+	case IOMMU_DEV_ATTR_AUXD_ENABLED:
+		auxd_enabled = data;
+		info = dev->archdata.iommu;
+		*auxd_enabled = info && info->auxd_enabled;
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+static int intel_iommu_enable_auxd(struct device *dev)
+{
+	struct device_domain_info *info;
+	struct dmar_domain *domain;
+	unsigned long flags;
+
+	if (!scalable_mode_support())
+		return -ENODEV;
+
+	domain = get_valid_domain_for_dev(dev);
+	if (!domain)
+		return -ENODEV;
+
+	spin_lock_irqsave(&device_domain_lock, flags);
+	info = dev->archdata.iommu;
+	info->auxd_enabled = 1;
+	spin_unlock_irqrestore(&device_domain_lock, flags);
+
+	return 0;
+}
+
+static int intel_iommu_disable_auxd(struct device *dev)
+{
+	struct device_domain_info *info;
+	unsigned long flags;
+
+	spin_lock_irqsave(&device_domain_lock, flags);
+	info = dev->archdata.iommu;
+	if (!WARN_ON(!info))
+		info->auxd_enabled = 0;
+	spin_unlock_irqrestore(&device_domain_lock, flags);
+
+	return 0;
+}
+
+static int intel_iommu_set_dev_attr(struct device *dev,
+				    enum iommu_dev_attr attr, void *data)
+{
+	int ret = 0;
+
+	switch (attr) {
+	case IOMMU_DEV_ATTR_AUXD_ENABLE:
+		ret = intel_iommu_enable_auxd(dev);
+		break;
+	case IOMMU_DEV_ATTR_AUXD_DISABLE:
+		ret = intel_iommu_disable_auxd(dev);
 		break;
 	default:
 		ret = -EINVAL;
@@ -5382,6 +5444,7 @@ const struct iommu_ops intel_iommu_ops = {
 	.put_resv_regions	= intel_iommu_put_resv_regions,
 	.device_group		= pci_device_group,
 	.get_dev_attr		= intel_iommu_get_dev_attr,
+	.set_dev_attr		= intel_iommu_set_dev_attr,
 	.pgsize_bitmap		= INTEL_IOMMU_PGSIZES,
 };
 
