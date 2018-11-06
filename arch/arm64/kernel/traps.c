@@ -113,7 +113,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 
 	if (tsk == current) {
 		frame.fp = (unsigned long)__builtin_frame_address(0);
-		frame.pc = (unsigned long)dump_backtrace;
+		frame.pc = (unsigned long)dump_backtrace + 4;
 	} else {
 		/*
 		 * task blocked in __switch_to
@@ -130,7 +130,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 	do {
 		/* skip until specified stack frame */
 		if (!skip) {
-			dump_backtrace_entry(frame.pc);
+			dump_backtrace_entry(frame.pc - 4);
 		} else if (frame.fp == regs->regs[29]) {
 			skip = 0;
 			/*
