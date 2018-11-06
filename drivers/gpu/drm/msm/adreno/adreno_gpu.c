@@ -475,34 +475,70 @@ int adreno_gpu_state_put(struct msm_gpu_state *state)
 
 #if defined(CONFIG_DEBUG_FS) || defined(CONFIG_DEV_COREDUMP)
 
-static void adreno_show_object(struct drm_printer *p, u32 *ptr, int len)
+static char *adreno_gpu_ascii85_encode(u32 *src, size_t len)
 {
-	char out[ASCII85_BUFSZ];
-	long l, datalen, i;
+	void *buf;
+	size_t buf_itr = 0;
+	long i, l;
 
-	if (!ptr || !len)
-		return;
+	if (!len)
+		return NULL;
+
+	l = ascii85_encode_len(len);
 
 	/*
-	 * Only dump the non-zero part of the buffer - rarely will any data
-	 * completely fill the entire allocated size of the buffer
+	 * ascii85 outputs either a 5 byte string or a 1 byte string. So we
+	 * account for the worst case of 5 bytes per dword plus the 1 for '\0'
 	 */
-	for (datalen = 0, i = 0; i < len >> 2; i++) {
-		if (ptr[i])
-			datalen = (i << 2) + 1;
-	}
+	buf = kvmalloc((l * 5) + 1, GFP_KERNEL);
+	if (!buf)
+		return NULL;
 
-	/* Skip printing the object if it is empty */
-	if (datalen == 0)
+	for (i = 0; i < l; i++)
+		buf_itr += ascii85_encode_to_buf(src[i], buf + buf_itr);
+
+	return buf;
+}
+
+/* len is expected to be in bytes */
+static void adreno_show_object(struct drm_printer *p, void **ptr, int len,
+		bool *encoded)
+{
+	if (!*ptr || !len)
 		return;
 
-	l = ascii85_encode_len(datalen);
+	if (!*encoded) {
+		long datalen, i;
+		u32 *buf = *ptr;
+
+		/*
+		 * Only dump the non-zero part of the buffer - rarely will
+		 * any data completely fill the entire allocated size of
+		 * the buffer.
+		 */
+		for (datalen = 0, i = 0; i < len >> 2; i++) {
+			if (buf[i])
+				datalen = ((i + 1) << 2);
+		}
+
+		/*
+		 * If we reach here, then the originally captured binary buffer
+		 * will be replaced with the ascii85 encoded string
+		 */
+		*ptr = adreno_gpu_ascii85_encode(buf, datalen);
+
+		kvfree(buf);
+
+		*encoded = true;
+	}
+
+	if (!*ptr)
+		return;
 
 	drm_puts(p, "    data: !!ascii85 |\n");
 	drm_puts(p, "     ");
 
-	for (i = 0; i < l; i++)
-		drm_puts(p, ascii85_encode(ptr[i], out));
+	drm_puts(p, *ptr);
 
 	drm_puts(p, "\n");
 }
@@ -534,8 +570,8 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 		drm_printf(p, "    wptr: %d\n", state->ring[i].wptr);
 		drm_printf(p, "    size: %d\n", MSM_GPU_RINGBUFFER_SZ);
 
-		adreno_show_object(p, state->ring[i].data,
-			state->ring[i].data_size);
+		adreno_show_object(p, &state->ring[i].data,
+			state->ring[i].data_size, &state->ring[i].encoded);
 	}
 
 	if (state->bos) {
@@ -546,8 +582,8 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 				state->bos[i].iova);
 			drm_printf(p, "    size: %zd\n", state->bos[i].size);
 
-			adreno_show_object(p, state->bos[i].data,
-				state->bos[i].size);
+			adreno_show_object(p, &state->bos[i].data,
+				state->bos[i].size, &state->bos[i].encoded);
 		}
 	}
 
