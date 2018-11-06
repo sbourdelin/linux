@@ -96,70 +96,56 @@ struct drm_i915_mocs_table {
  *       may only be updated incrementally by adding entries at the
  *       end.
  */
-static const struct drm_i915_mocs_entry skylake_mocs_table[] = {
-	[I915_MOCS_UNCACHED] = {
-	  /* 0x00000009 */
-	  .control_value = LE_CACHEABILITY(LE_UC) |
-			   LE_TGT_CACHE(LE_TC_LLC_ELLC) |
-			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
-			   LE_PFM(0) | LE_SCF(0),
 
-	  /* 0x0010 */
-	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC),
+#define MOCS_CONTROL_VALUE(lecc, tc, lrum, daom, ersc, scc, pfm, scf) \
+	(LE_CACHEABILITY(lecc) | LE_TGT_CACHE(tc) | \
+	LE_LRUM(lrum) | LE_AOM(daom) | LE_RSC(ersc) | LE_SCC(scc) | \
+	LE_PFM(pfm) | LE_SCF(scf))
+
+#define MOCS_L3CC_VALUE(esc, scc, l3cc) \
+	(L3_ESC(esc) | L3_SCC(scc) | L3_CACHEABILITY(l3cc))
+
+#define GEN9_MOCS_ENTRIES \
+	[I915_MOCS_UNCACHED] = { \
+	  /* 0x00000009 */ \
+	  .control_value = MOCS_CONTROL_VALUE(LE_UC, LE_TC_LLC_ELLC, \
+					      0, 0, 0, 0, 0, 0), \
+	  /* 0x0010 */ \
+	  .l3cc_value = MOCS_L3CC_VALUE(0, 0, L3_UC), \
+	}, \
+	[I915_MOCS_PTE] = { \
+	  /* 0x00000038 */ \
+	  .control_value = MOCS_CONTROL_VALUE(LE_PAGETABLE, LE_TC_LLC_ELLC, \
+					      3, 0, 0, 0, 0, 0), \
+	  /* 0x0030 */ \
+	  .l3cc_value = MOCS_L3CC_VALUE(0, 0, L3_WB), \
 	},
-	[I915_MOCS_PTE] = {
-	  /* 0x00000038 */
-	  .control_value = LE_CACHEABILITY(LE_PAGETABLE) |
-			   LE_TGT_CACHE(LE_TC_LLC_ELLC) |
-			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
-			   LE_PFM(0) | LE_SCF(0),
-	  /* 0x0030 */
-	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB),
-	},
+
+static const struct drm_i915_mocs_entry skylake_mocs_table[] = {
+	GEN9_MOCS_ENTRIES
 	[I915_MOCS_CACHED] = {
 	  /* 0x0000003b */
-	  .control_value = LE_CACHEABILITY(LE_WB) |
-			   LE_TGT_CACHE(LE_TC_LLC_ELLC) |
-			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
-			   LE_PFM(0) | LE_SCF(0),
+	  .control_value = MOCS_CONTROL_VALUE(LE_WB, LE_TC_LLC_ELLC,
+					      3, 0, 0, 0, 0, 0),
 	  /* 0x0030 */
-	  .l3cc_value =   L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB),
+	  .l3cc_value = MOCS_L3CC_VALUE(0, 0, L3_WB),
 	},
 };
 
 /* NOTE: the LE_TGT_CACHE is not used on Broxton */
 static const struct drm_i915_mocs_entry broxton_mocs_table[] = {
-	[I915_MOCS_UNCACHED] = {
-	  /* 0x00000009 */
-	  .control_value = LE_CACHEABILITY(LE_UC) |
-			   LE_TGT_CACHE(LE_TC_LLC_ELLC) |
-			   LE_LRUM(0) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
-			   LE_PFM(0) | LE_SCF(0),
-
-	  /* 0x0010 */
-	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_UC),
-	},
-	[I915_MOCS_PTE] = {
-	  /* 0x00000038 */
-	  .control_value = LE_CACHEABILITY(LE_PAGETABLE) |
-			   LE_TGT_CACHE(LE_TC_LLC_ELLC) |
-			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
-			   LE_PFM(0) | LE_SCF(0),
-
-	  /* 0x0030 */
-	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB),
-	},
+	GEN9_MOCS_ENTRIES
 	[I915_MOCS_CACHED] = {
 	  /* 0x00000039 */
-	  .control_value = LE_CACHEABILITY(LE_UC) |
-			   LE_TGT_CACHE(LE_TC_LLC_ELLC) |
-			   LE_LRUM(3) | LE_AOM(0) | LE_RSC(0) | LE_SCC(0) |
-			   LE_PFM(0) | LE_SCF(0),
-
+	  .control_value = MOCS_CONTROL_VALUE(LE_UC, LE_TC_LLC_ELLC,
+					      3, 0, 0, 0, 0, 0),
 	  /* 0x0030 */
-	  .l3cc_value =    L3_ESC(0) | L3_SCC(0) | L3_CACHEABILITY(L3_WB),
+	  .l3cc_value = MOCS_L3CC_VALUE(0, 0, L3_WB),
 	},
 };
+
+#undef MOCS_CONTROL_VALUE
+#undef MOCS_L3CC_VALUE
 
 /**
  * get_mocs_settings()
