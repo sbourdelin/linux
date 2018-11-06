@@ -39,6 +39,7 @@ struct jffs2_mount_opts {
 	 * latter users to write to the file system if the amount if the
 	 * available space is less then 'rp_size'. */
 	unsigned int rp_size;
+	unsigned int endian;
 };
 
 /* A struct for the overall file system control.  Pointers to

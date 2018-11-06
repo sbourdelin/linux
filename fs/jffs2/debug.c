@@ -787,50 +787,50 @@ __jffs2_dbg_dump_node(struct jffs2_sb_info *c, uint32_t ofs)
 		return;
 	}
 
-	printk(JFFS2_DBG "magic:\t%#04x\n", je16_to_cpu(node.u.magic));
-	printk(JFFS2_DBG "nodetype:\t%#04x\n", je16_to_cpu(node.u.nodetype));
-	printk(JFFS2_DBG "totlen:\t%#08x\n", je32_to_cpu(node.u.totlen));
-	printk(JFFS2_DBG "hdr_crc:\t%#08x\n", je32_to_cpu(node.u.hdr_crc));
+	printk(JFFS2_DBG "magic:\t%#04x\n", je16_to_cpu(c, node.u.magic));
+	printk(JFFS2_DBG "nodetype:\t%#04x\n", je16_to_cpu(c, node.u.nodetype));
+	printk(JFFS2_DBG "totlen:\t%#08x\n", je32_to_cpu(c, node.u.totlen));
+	printk(JFFS2_DBG "hdr_crc:\t%#08x\n", je32_to_cpu(c, node.u.hdr_crc));
 
 	crc = crc32(0, &node.u, sizeof(node.u) - 4);
-	if (crc != je32_to_cpu(node.u.hdr_crc)) {
+	if (crc != je32_to_cpu(c, node.u.hdr_crc)) {
 		JFFS2_ERROR("wrong common header CRC.\n");
 		return;
 	}
 
-	if (je16_to_cpu(node.u.magic) != JFFS2_MAGIC_BITMASK &&
-		je16_to_cpu(node.u.magic) != JFFS2_OLD_MAGIC_BITMASK)
+	if (je16_to_cpu(c, node.u.magic) != JFFS2_MAGIC_BITMASK &&
+		je16_to_cpu(c, node.u.magic) != JFFS2_OLD_MAGIC_BITMASK)
 	{
 		JFFS2_ERROR("wrong node magic: %#04x instead of %#04x.\n",
-			je16_to_cpu(node.u.magic), JFFS2_MAGIC_BITMASK);
+			je16_to_cpu(c, node.u.magic), JFFS2_MAGIC_BITMASK);
 		return;
 	}
 
-	switch(je16_to_cpu(node.u.nodetype)) {
+	switch(je16_to_cpu(c, node.u.nodetype)) {
 
 	case JFFS2_NODETYPE_INODE:
 
 		printk(JFFS2_DBG "the node is inode node\n");
-		printk(JFFS2_DBG "ino:\t%#08x\n", je32_to_cpu(node.i.ino));
-		printk(JFFS2_DBG "version:\t%#08x\n", je32_to_cpu(node.i.version));
+		printk(JFFS2_DBG "ino:\t%#08x\n", je32_to_cpu(c, node.i.ino));
+		printk(JFFS2_DBG "version:\t%#08x\n", je32_to_cpu(c, node.i.version));
 		printk(JFFS2_DBG "mode:\t%#08x\n", node.i.mode.m);
-		printk(JFFS2_DBG "uid:\t%#04x\n", je16_to_cpu(node.i.uid));
-		printk(JFFS2_DBG "gid:\t%#04x\n", je16_to_cpu(node.i.gid));
-		printk(JFFS2_DBG "isize:\t%#08x\n", je32_to_cpu(node.i.isize));
-		printk(JFFS2_DBG "atime:\t%#08x\n", je32_to_cpu(node.i.atime));
-		printk(JFFS2_DBG "mtime:\t%#08x\n", je32_to_cpu(node.i.mtime));
-		printk(JFFS2_DBG "ctime:\t%#08x\n", je32_to_cpu(node.i.ctime));
-		printk(JFFS2_DBG "offset:\t%#08x\n", je32_to_cpu(node.i.offset));
-		printk(JFFS2_DBG "csize:\t%#08x\n", je32_to_cpu(node.i.csize));
-		printk(JFFS2_DBG "dsize:\t%#08x\n", je32_to_cpu(node.i.dsize));
+		printk(JFFS2_DBG "uid:\t%#04x\n", je16_to_cpu(c, node.i.uid));
+		printk(JFFS2_DBG "gid:\t%#04x\n", je16_to_cpu(c, node.i.gid));
+		printk(JFFS2_DBG "isize:\t%#08x\n", je32_to_cpu(c, node.i.isize));
+		printk(JFFS2_DBG "atime:\t%#08x\n", je32_to_cpu(c, node.i.atime));
+		printk(JFFS2_DBG "mtime:\t%#08x\n", je32_to_cpu(c, node.i.mtime));
+		printk(JFFS2_DBG "ctime:\t%#08x\n", je32_to_cpu(c, node.i.ctime));
+		printk(JFFS2_DBG "offset:\t%#08x\n", je32_to_cpu(c, node.i.offset));
+		printk(JFFS2_DBG "csize:\t%#08x\n", je32_to_cpu(c, node.i.csize));
+		printk(JFFS2_DBG "dsize:\t%#08x\n", je32_to_cpu(c, node.i.dsize));
 		printk(JFFS2_DBG "compr:\t%#02x\n", node.i.compr);
 		printk(JFFS2_DBG "usercompr:\t%#02x\n", node.i.usercompr);
-		printk(JFFS2_DBG "flags:\t%#04x\n", je16_to_cpu(node.i.flags));
-		printk(JFFS2_DBG "data_crc:\t%#08x\n", je32_to_cpu(node.i.data_crc));
-		printk(JFFS2_DBG "node_crc:\t%#08x\n", je32_to_cpu(node.i.node_crc));
+		printk(JFFS2_DBG "flags:\t%#04x\n", je16_to_cpu(c, node.i.flags));
+		printk(JFFS2_DBG "data_crc:\t%#08x\n", je32_to_cpu(c, node.i.data_crc));
+		printk(JFFS2_DBG "node_crc:\t%#08x\n", je32_to_cpu(c, node.i.node_crc));
 
 		crc = crc32(0, &node.i, sizeof(node.i) - 8);
-		if (crc != je32_to_cpu(node.i.node_crc)) {
+		if (crc != je32_to_cpu(c, node.i.node_crc)) {
 			JFFS2_ERROR("wrong node header CRC.\n");
 			return;
 		}
@@ -839,20 +839,20 @@ __jffs2_dbg_dump_node(struct jffs2_sb_info *c, uint32_t ofs)
 	case JFFS2_NODETYPE_DIRENT:
 
 		printk(JFFS2_DBG "the node is dirent node\n");
-		printk(JFFS2_DBG "pino:\t%#08x\n", je32_to_cpu(node.d.pino));
-		printk(JFFS2_DBG "version:\t%#08x\n", je32_to_cpu(node.d.version));
-		printk(JFFS2_DBG "ino:\t%#08x\n", je32_to_cpu(node.d.ino));
-		printk(JFFS2_DBG "mctime:\t%#08x\n", je32_to_cpu(node.d.mctime));
+		printk(JFFS2_DBG "pino:\t%#08x\n", je32_to_cpu(c, node.d.pino));
+		printk(JFFS2_DBG "version:\t%#08x\n", je32_to_cpu(c, node.d.version));
+		printk(JFFS2_DBG "ino:\t%#08x\n", je32_to_cpu(c, node.d.ino));
+		printk(JFFS2_DBG "mctime:\t%#08x\n", je32_to_cpu(c, node.d.mctime));
 		printk(JFFS2_DBG "nsize:\t%#02x\n", node.d.nsize);
 		printk(JFFS2_DBG "type:\t%#02x\n", node.d.type);
-		printk(JFFS2_DBG "node_crc:\t%#08x\n", je32_to_cpu(node.d.node_crc));
-		printk(JFFS2_DBG "name_crc:\t%#08x\n", je32_to_cpu(node.d.name_crc));
+		printk(JFFS2_DBG "node_crc:\t%#08x\n", je32_to_cpu(c, node.d.node_crc));
+		printk(JFFS2_DBG "name_crc:\t%#08x\n", je32_to_cpu(c, node.d.name_crc));
 
 		node.d.name[node.d.nsize] = '\0';
 		printk(JFFS2_DBG "name:\t\"%s\"\n", node.d.name);
 
 		crc = crc32(0, &node.d, sizeof(node.d) - 8);
-		if (crc != je32_to_cpu(node.d.node_crc)) {
+		if (crc != je32_to_cpu(c, node.d.node_crc)) {
 			JFFS2_ERROR("wrong node header CRC.\n");
 			return;
 		}

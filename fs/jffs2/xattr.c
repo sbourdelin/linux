@@ -152,32 +152,32 @@ static int do_verify_xattr_datum(struct jffs2_sb_info *c, struct jffs2_xattr_dat
 		return rc ? rc : -EIO;
 	}
 	crc = crc32(0, &rx, sizeof(rx) - 4);
-	if (crc != je32_to_cpu(rx.node_crc)) {
+	if (crc != je32_to_cpu(c, rx.node_crc)) {
 		JFFS2_ERROR("node CRC failed at %#08x, read=%#08x, calc=%#08x\n",
-			    offset, je32_to_cpu(rx.hdr_crc), crc);
+			    offset, je32_to_cpu(c, rx.hdr_crc), crc);
 		xd->flags |= JFFS2_XFLAGS_INVALID;
 		return JFFS2_XATTR_IS_CORRUPTED;
 	}
-	totlen = PAD(sizeof(rx) + rx.name_len + 1 + je16_to_cpu(rx.value_len));
-	if (je16_to_cpu(rx.magic) != JFFS2_MAGIC_BITMASK
-	    || je16_to_cpu(rx.nodetype) != JFFS2_NODETYPE_XATTR
-	    || je32_to_cpu(rx.totlen) != totlen
-	    || je32_to_cpu(rx.xid) != xd->xid
-	    || je32_to_cpu(rx.version) != xd->version) {
+	totlen = PAD(sizeof(rx) + rx.name_len + 1 + je16_to_cpu(c, rx.value_len));
+	if (je16_to_cpu(c, rx.magic) != JFFS2_MAGIC_BITMASK
+	    || je16_to_cpu(c, rx.nodetype) != JFFS2_NODETYPE_XATTR
+	    || je32_to_cpu(c, rx.totlen) != totlen
+	    || je32_to_cpu(c, rx.xid) != xd->xid
+	    || je32_to_cpu(c, rx.version) != xd->version) {
 		JFFS2_ERROR("inconsistent xdatum at %#08x, magic=%#04x/%#04x, "
 			    "nodetype=%#04x/%#04x, totlen=%u/%u, xid=%u/%u, version=%u/%u\n",
-			    offset, je16_to_cpu(rx.magic), JFFS2_MAGIC_BITMASK,
-			    je16_to_cpu(rx.nodetype), JFFS2_NODETYPE_XATTR,
-			    je32_to_cpu(rx.totlen), totlen,
-			    je32_to_cpu(rx.xid), xd->xid,
-			    je32_to_cpu(rx.version), xd->version);
+			    offset, je16_to_cpu(c, rx.magic), JFFS2_MAGIC_BITMASK,
+			    je16_to_cpu(c, rx.nodetype), JFFS2_NODETYPE_XATTR,
+			    je32_to_cpu(c, rx.totlen), totlen,
+			    je32_to_cpu(c, rx.xid), xd->xid,
+			    je32_to_cpu(c, rx.version), xd->version);
 		xd->flags |= JFFS2_XFLAGS_INVALID;
 		return JFFS2_XATTR_IS_CORRUPTED;
 	}
 	xd->xprefix = rx.xprefix;
 	xd->name_len = rx.name_len;
-	xd->value_len = je16_to_cpu(rx.value_len);
-	xd->data_crc = je32_to_cpu(rx.data_crc);
+	xd->value_len = je16_to_cpu(c, rx.value_len);
+	xd->data_crc = je32_to_cpu(c, rx.data_crc);
 
 	spin_lock(&c->erase_completion_lock);
  complete:
@@ -301,18 +301,18 @@ static int save_xattr_datum(struct jffs2_sb_info *c, struct jffs2_xattr_datum *x
 
 	/* Setup raw-xattr */
 	memset(&rx, 0, sizeof(rx));
-	rx.magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
-	rx.nodetype = cpu_to_je16(JFFS2_NODETYPE_XATTR);
-	rx.totlen = cpu_to_je32(PAD(totlen));
-	rx.hdr_crc = cpu_to_je32(crc32(0, &rx, sizeof(struct jffs2_unknown_node) - 4));
+	rx.magic = cpu_to_je16(c, JFFS2_MAGIC_BITMASK);
+	rx.nodetype = cpu_to_je16(c, JFFS2_NODETYPE_XATTR);
+	rx.totlen = cpu_to_je32(c, PAD(totlen));
+	rx.hdr_crc = cpu_to_je32(c, crc32(0, &rx, sizeof(struct jffs2_unknown_node) - 4));
 
-	rx.xid = cpu_to_je32(xd->xid);
-	rx.version = cpu_to_je32(++xd->version);
+	rx.xid = cpu_to_je32(c, xd->xid);
+	rx.version = cpu_to_je32(c, ++xd->version);
 	rx.xprefix = xd->xprefix;
 	rx.name_len = xd->name_len;
-	rx.value_len = cpu_to_je16(xd->value_len);
-	rx.data_crc = cpu_to_je32(crc32(0, vecs[1].iov_base, vecs[1].iov_len));
-	rx.node_crc = cpu_to_je32(crc32(0, &rx, sizeof(struct jffs2_raw_xattr) - 4));
+	rx.value_len = cpu_to_je16(c, xd->value_len);
+	rx.data_crc = cpu_to_je32(c, crc32(0, vecs[1].iov_base, vecs[1].iov_len));
+	rx.node_crc = cpu_to_je32(c, crc32(0, &rx, sizeof(struct jffs2_raw_xattr) - 4));
 
 	rc = jffs2_flash_writev(c, vecs, 2, phys_ofs, &length, 0);
 	if (rc || totlen != length) {
@@ -464,24 +464,24 @@ static int verify_xattr_ref(struct jffs2_sb_info *c, struct jffs2_xattr_ref *ref
 	}
 	/* obsolete node */
 	crc = crc32(0, &rr, sizeof(rr) - 4);
-	if (crc != je32_to_cpu(rr.node_crc)) {
+	if (crc != je32_to_cpu(c, rr.node_crc)) {
 		JFFS2_ERROR("node CRC failed at %#08x, read=%#08x, calc=%#08x\n",
-			    offset, je32_to_cpu(rr.node_crc), crc);
+			    offset, je32_to_cpu(c, rr.node_crc), crc);
 		return JFFS2_XATTR_IS_CORRUPTED;
 	}
-	if (je16_to_cpu(rr.magic) != JFFS2_MAGIC_BITMASK
-	    || je16_to_cpu(rr.nodetype) != JFFS2_NODETYPE_XREF
-	    || je32_to_cpu(rr.totlen) != PAD(sizeof(rr))) {
+	if (je16_to_cpu(c, rr.magic) != JFFS2_MAGIC_BITMASK
+	    || je16_to_cpu(c, rr.nodetype) != JFFS2_NODETYPE_XREF
+	    || je32_to_cpu(c, rr.totlen) != PAD(sizeof(rr))) {
 		JFFS2_ERROR("inconsistent xref at %#08x, magic=%#04x/%#04x, "
 			    "nodetype=%#04x/%#04x, totlen=%u/%zu\n",
-			    offset, je16_to_cpu(rr.magic), JFFS2_MAGIC_BITMASK,
-			    je16_to_cpu(rr.nodetype), JFFS2_NODETYPE_XREF,
-			    je32_to_cpu(rr.totlen), PAD(sizeof(rr)));
+			    offset, je16_to_cpu(c, rr.magic), JFFS2_MAGIC_BITMASK,
+			    je16_to_cpu(c, rr.nodetype), JFFS2_NODETYPE_XREF,
+			    je32_to_cpu(c, rr.totlen), PAD(sizeof(rr)));
 		return JFFS2_XATTR_IS_CORRUPTED;
 	}
-	ref->ino = je32_to_cpu(rr.ino);
-	ref->xid = je32_to_cpu(rr.xid);
-	ref->xseqno = je32_to_cpu(rr.xseqno);
+	ref->ino = je32_to_cpu(c, rr.ino);
+	ref->xid = je32_to_cpu(c, rr.xid);
+	ref->xseqno = je32_to_cpu(c, rr.xseqno);
 	if (ref->xseqno > c->highest_xseqno)
 		c->highest_xseqno = (ref->xseqno & ~XREF_DELETE_MARKER);
 
@@ -511,22 +511,22 @@ static int save_xattr_ref(struct jffs2_sb_info *c, struct jffs2_xattr_ref *ref)
 	uint32_t xseqno, phys_ofs = write_ofs(c);
 	int ret;
 
-	rr.magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
-	rr.nodetype = cpu_to_je16(JFFS2_NODETYPE_XREF);
-	rr.totlen = cpu_to_je32(PAD(sizeof(rr)));
-	rr.hdr_crc = cpu_to_je32(crc32(0, &rr, sizeof(struct jffs2_unknown_node) - 4));
+	rr.magic = cpu_to_je16(c, JFFS2_MAGIC_BITMASK);
+	rr.nodetype = cpu_to_je16(c, JFFS2_NODETYPE_XREF);
+	rr.totlen = cpu_to_je32(c, PAD(sizeof(rr)));
+	rr.hdr_crc = cpu_to_je32(c, crc32(0, &rr, sizeof(struct jffs2_unknown_node) - 4));
 
 	xseqno = (c->highest_xseqno += 2);
 	if (is_xattr_ref_dead(ref)) {
 		xseqno |= XREF_DELETE_MARKER;
-		rr.ino = cpu_to_je32(ref->ino);
-		rr.xid = cpu_to_je32(ref->xid);
+		rr.ino = cpu_to_je32(c, ref->ino);
+		rr.xid = cpu_to_je32(c, ref->xid);
 	} else {
-		rr.ino = cpu_to_je32(ref->ic->ino);
-		rr.xid = cpu_to_je32(ref->xd->xid);
+		rr.ino = cpu_to_je32(c, ref->ic->ino);
+		rr.xid = cpu_to_je32(c, ref->xd->xid);
 	}
-	rr.xseqno = cpu_to_je32(xseqno);
-	rr.node_crc = cpu_to_je32(crc32(0, &rr, sizeof(rr) - 4));
+	rr.xseqno = cpu_to_je32(c, xseqno);
+	rr.node_crc = cpu_to_je32(c, crc32(0, &rr, sizeof(rr) - 4));
 
 	ret = jffs2_flash_write(c, phys_ofs, sizeof(rr), &length, (char *)&rr);
 	if (ret || sizeof(rr) != length) {

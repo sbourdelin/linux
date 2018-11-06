@@ -27,47 +27,79 @@
 #include "os-linux.h"
 #endif
 
-#define JFFS2_NATIVE_ENDIAN
+#define JFFS2_ENDIAN_NATIVE 0
+#define JFFS2_ENDIAN_LITTLE 1
+#define JFFS2_ENDIAN_BIG 2
 
 /* Note we handle mode bits conversion from JFFS2 (i.e. Linux) to/from
    whatever OS we're actually running on here too. */
 
-#if defined(JFFS2_NATIVE_ENDIAN)
-#define cpu_to_je16(x) ((jint16_t){x})
-#define cpu_to_je32(x) ((jint32_t){x})
-#define cpu_to_jemode(x) ((jmode_t){os_to_jffs2_mode(x)})
+static inline jint16_t
+cpu_to_je16(struct jffs2_sb_info *c, u16 x)
+{
+	if (c->mount_opts.endian  == JFFS2_ENDIAN_LITTLE)
+		return ((jint16_t){cpu_to_le16(x)});
+	else if (c->mount_opts.endian  == JFFS2_ENDIAN_BIG)
+		return ((jint16_t){cpu_to_be16(x)});
+	else
+		return ((jint16_t){x});
+}
 
-#define constant_cpu_to_je16(x) ((jint16_t){x})
-#define constant_cpu_to_je32(x) ((jint32_t){x})
+static inline jint32_t
+cpu_to_je32(struct jffs2_sb_info *c, u32 x)
+{
+	if (c->mount_opts.endian  == JFFS2_ENDIAN_LITTLE)
+		return ((jint32_t){cpu_to_le32(x)});
+	else if (c->mount_opts.endian  == JFFS2_ENDIAN_BIG)
+		return ((jint32_t){cpu_to_be32(x)});
+	else
+		return ((jint32_t){x});
+}
 
-#define je16_to_cpu(x) ((x).v16)
-#define je32_to_cpu(x) ((x).v32)
-#define jemode_to_cpu(x) (jffs2_to_os_mode((x).m))
-#elif defined(JFFS2_BIG_ENDIAN)
-#define cpu_to_je16(x) ((jint16_t){cpu_to_be16(x)})
-#define cpu_to_je32(x) ((jint32_t){cpu_to_be32(x)})
-#define cpu_to_jemode(x) ((jmode_t){cpu_to_be32(os_to_jffs2_mode(x))})
+static inline jmode_t
+cpu_to_jemode(struct jffs2_sb_info *c, u32 x)
+{
+	if (c->mount_opts.endian  == JFFS2_ENDIAN_LITTLE)
+		return ((jmode_t){cpu_to_le32(os_to_jffs2_mode(x))});
+	else if (c->mount_opts.endian  == JFFS2_ENDIAN_BIG)
+		return ((jmode_t){cpu_to_be32(os_to_jffs2_mode(x))});
+	else
+		return ((jmode_t){os_to_jffs2_mode(x)});
+}
 
-#define constant_cpu_to_je16(x) ((jint16_t){__constant_cpu_to_be16(x)})
-#define constant_cpu_to_je32(x) ((jint32_t){__constant_cpu_to_be32(x)})
 
-#define je16_to_cpu(x) (be16_to_cpu(x.v16))
-#define je32_to_cpu(x) (be32_to_cpu(x.v32))
-#define jemode_to_cpu(x) (be32_to_cpu(jffs2_to_os_mode((x).m)))
-#elif defined(JFFS2_LITTLE_ENDIAN)
-#define cpu_to_je16(x) ((jint16_t){cpu_to_le16(x)})
-#define cpu_to_je32(x) ((jint32_t){cpu_to_le32(x)})
-#define cpu_to_jemode(x) ((jmode_t){cpu_to_le32(os_to_jffs2_mode(x))})
+static inline u16
+je16_to_cpu(struct jffs2_sb_info *c, jint16_t x)
+{
+	if (c->mount_opts.endian  == JFFS2_ENDIAN_LITTLE)
+		return le16_to_cpu(x.v16);
+	else if (c->mount_opts.endian  == JFFS2_ENDIAN_BIG)
+		return be16_to_cpu(x.v16);
+	else
+		return ((x).v16);
+}
 
-#define constant_cpu_to_je16(x) ((jint16_t){__constant_cpu_to_le16(x)})
-#define constant_cpu_to_je32(x) ((jint32_t){__constant_cpu_to_le32(x)})
+static inline u32
+je32_to_cpu(struct jffs2_sb_info *c, jint32_t x)
+{
+	if (c->mount_opts.endian  == JFFS2_ENDIAN_LITTLE)
+		return le32_to_cpu(x.v32);
+	else if (c->mount_opts.endian  == JFFS2_ENDIAN_BIG)
+		return be32_to_cpu(x.v32);
+	else
+		return ((x).v32);
+}
 
-#define je16_to_cpu(x) (le16_to_cpu(x.v16))
-#define je32_to_cpu(x) (le32_to_cpu(x.v32))
-#define jemode_to_cpu(x) (le32_to_cpu(jffs2_to_os_mode((x).m)))
-#else
-#error wibble
-#endif
+static inline u32
+jemode_to_cpu(struct jffs2_sb_info *c, jmode_t x)
+{
+	if (c->mount_opts.endian  == JFFS2_ENDIAN_LITTLE)
+		return le32_to_cpu(jffs2_to_os_mode((x).m));
+	else if (c->mount_opts.endian  == JFFS2_ENDIAN_BIG)
+		return be32_to_cpu(jffs2_to_os_mode((x).m));
+	else
+		return jffs2_to_os_mode((x).m);
+}
 
 /* The minimal node header size */
 #define JFFS2_MIN_NODE_HEADER sizeof(struct jffs2_raw_dirent)
@@ -141,7 +173,7 @@ static inline struct jffs2_inode_cache *jffs2_raw_ref_to_ic(struct jffs2_raw_nod
 /* Dirent nodes should be REF_PRISTINE only if they are not a deletion
    dirent. Deletion dirents should be REF_NORMAL so that GC gets to
    throw them away when appropriate */
-#define dirent_node_state(rd)	( (je32_to_cpu((rd)->ino)?REF_PRISTINE:REF_NORMAL) )
+#define dirent_node_state(c, rd)	( (je32_to_cpu((c), (rd)->ino)?REF_PRISTINE:REF_NORMAL) )
 
 /* NB: REF_PRISTINE for an inode-less node (ref->next_in_ino == NULL) indicates
    it is an unknown node of type JFFS2_NODETYPE_RWCOMPAT_COPY, so it'll get
@@ -313,13 +345,14 @@ static inline int jffs2_blocks_use_vmalloc(struct jffs2_sb_info *c)
 
 #define PAD(x) (((x)+3)&~3)
 
-static inline int jffs2_encode_dev(union jffs2_device_node *jdev, dev_t rdev)
+static inline int jffs2_encode_dev(struct jffs2_sb_info *c,
+				union jffs2_device_node *jdev, dev_t rdev)
 {
 	if (old_valid_dev(rdev)) {
-		jdev->old_id = cpu_to_je16(old_encode_dev(rdev));
+		jdev->old_id = cpu_to_je16(c, old_encode_dev(rdev));
 		return sizeof(jdev->old_id);
 	} else {
-		jdev->new_id = cpu_to_je32(new_encode_dev(rdev));
+		jdev->new_id = cpu_to_je32(c, new_encode_dev(rdev));
 		return sizeof(jdev->new_id);
 	}
 }

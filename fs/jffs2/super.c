@@ -63,6 +63,18 @@ static void jffs2_i_init_once(void *foo)
 	inode_init_once(&f->vfs_inode);
 }
 
+static const char *jffs2_endianness(unsigned int endian)
+{
+	switch (endian) {
+	case JFFS2_ENDIAN_LITTLE:
+		return "little";
+	case JFFS2_ENDIAN_BIG:
+		return "big";
+	default:
+		return "native";
+	}
+}
+
 static const char *jffs2_compr_name(unsigned int compr)
 {
 	switch (compr) {
@@ -92,6 +104,8 @@ static int jffs2_show_options(struct seq_file *s, struct dentry *root)
 		seq_printf(s, ",compr=%s", jffs2_compr_name(opts->compr));
 	if (opts->rp_size)
 		seq_printf(s, ",rp_size=%u", opts->rp_size / 1024);
+	if (opts->endian)
+		seq_printf(s, ",force_endian=%s", jffs2_endianness(opts->endian));
 
 	return 0;
 }
@@ -161,17 +175,20 @@ static const struct export_operations jffs2_export_ops = {
  *
  * Opt_override_compr: override default compressor
  * Opt_rp_size: size of reserved pool in KiB
+ * Opt_force_endian: override endianness
  * Opt_err: just end of array marker
  */
 enum {
 	Opt_override_compr,
 	Opt_rp_size,
+	Opt_force_endian,
 	Opt_err,
 };
 
 static const match_table_t tokens = {
 	{Opt_override_compr, "compr=%s"},
 	{Opt_rp_size, "rp_size=%u"},
+	{Opt_force_endian, "force_endian=%s"},
 	{Opt_err, NULL},
 };
 
@@ -227,6 +244,19 @@ static int jffs2_parse_options(struct jffs2_sb_info *c, char *data)
 				return -EINVAL;
 			}
 			c->mount_opts.rp_size = opt;
+			break;
+		case Opt_force_endian:
+			name = match_strdup(&args[0]);
+
+			if (!name)
+				return -ENOMEM;
+			if (!strcmp(name, "little"))
+				c->mount_opts.endian = JFFS2_ENDIAN_LITTLE;
+			else if (!strcmp(name, "big"))
+				c->mount_opts.endian = JFFS2_ENDIAN_BIG;
+			else
+				c->mount_opts.endian = JFFS2_ENDIAN_NATIVE;
+			kfree(name);
 			break;
 		default:
 			pr_err("Error: unrecognized mount option '%s' or missing value\n",

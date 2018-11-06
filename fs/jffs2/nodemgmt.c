@@ -766,18 +766,18 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 			ref_offset(ref), retlen);
 		goto out_erase_sem;
 	}
-	if (PAD(je32_to_cpu(n.totlen)) != PAD(freed_len)) {
+	if (PAD(je32_to_cpu(c, n.totlen)) != PAD(freed_len)) {
 		pr_warn("Node totlen on flash (0x%08x) != totlen from node ref (0x%08x)\n",
-			je32_to_cpu(n.totlen), freed_len);
+			je32_to_cpu(c, n.totlen), freed_len);
 		goto out_erase_sem;
 	}
-	if (!(je16_to_cpu(n.nodetype) & JFFS2_NODE_ACCURATE)) {
+	if (!(je16_to_cpu(c, n.nodetype) & JFFS2_NODE_ACCURATE)) {
 		jffs2_dbg(1, "Node at 0x%08x was already marked obsolete (nodetype 0x%04x)\n",
-			  ref_offset(ref), je16_to_cpu(n.nodetype));
+			  ref_offset(ref), je16_to_cpu(c, n.nodetype));
 		goto out_erase_sem;
 	}
 	/* XXX FIXME: This is ugly now */
-	n.nodetype = cpu_to_je16(je16_to_cpu(n.nodetype) & ~JFFS2_NODE_ACCURATE);
+	n.nodetype = cpu_to_je16(c, je16_to_cpu(c, n.nodetype) & ~JFFS2_NODE_ACCURATE);
 	ret = jffs2_flash_write(c, ref_offset(ref), sizeof(n), &retlen, (char *)&n);
 	if (ret) {
 		pr_warn("Write error in obliterating obsoleted node at 0x%08x: %d\n",

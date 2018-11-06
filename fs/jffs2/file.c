@@ -164,24 +164,24 @@ static int jffs2_write_begin(struct file *filp, struct address_space *mapping,
 		mutex_lock(&f->sem);
 		memset(&ri, 0, sizeof(ri));
 
-		ri.magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
-		ri.nodetype = cpu_to_je16(JFFS2_NODETYPE_INODE);
-		ri.totlen = cpu_to_je32(sizeof(ri));
-		ri.hdr_crc = cpu_to_je32(crc32(0, &ri, sizeof(struct jffs2_unknown_node)-4));
+		ri.magic = cpu_to_je16(c, JFFS2_MAGIC_BITMASK);
+		ri.nodetype = cpu_to_je16(c, JFFS2_NODETYPE_INODE);
+		ri.totlen = cpu_to_je32(c, sizeof(ri));
+		ri.hdr_crc = cpu_to_je32(c, crc32(0, &ri, sizeof(struct jffs2_unknown_node)-4));
 
-		ri.ino = cpu_to_je32(f->inocache->ino);
-		ri.version = cpu_to_je32(++f->highest_version);
-		ri.mode = cpu_to_jemode(inode->i_mode);
-		ri.uid = cpu_to_je16(i_uid_read(inode));
-		ri.gid = cpu_to_je16(i_gid_read(inode));
-		ri.isize = cpu_to_je32(max((uint32_t)inode->i_size, pageofs));
-		ri.atime = ri.ctime = ri.mtime = cpu_to_je32(JFFS2_NOW());
-		ri.offset = cpu_to_je32(inode->i_size);
-		ri.dsize = cpu_to_je32(pageofs - inode->i_size);
-		ri.csize = cpu_to_je32(0);
+		ri.ino = cpu_to_je32(c, f->inocache->ino);
+		ri.version = cpu_to_je32(c, ++f->highest_version);
+		ri.mode = cpu_to_jemode(c, inode->i_mode);
+		ri.uid = cpu_to_je16(c, i_uid_read(inode));
+		ri.gid = cpu_to_je16(c, i_gid_read(inode));
+		ri.isize = cpu_to_je32(c, max((uint32_t)inode->i_size, pageofs));
+		ri.atime = ri.ctime = ri.mtime = cpu_to_je32(c, JFFS2_NOW());
+		ri.offset = cpu_to_je32(c, inode->i_size);
+		ri.dsize = cpu_to_je32(c, pageofs - inode->i_size);
+		ri.csize = cpu_to_je32(c, 0);
 		ri.compr = JFFS2_COMPR_ZERO;
-		ri.node_crc = cpu_to_je32(crc32(0, &ri, sizeof(ri)-8));
-		ri.data_crc = cpu_to_je32(0);
+		ri.node_crc = cpu_to_je32(c, crc32(0, &ri, sizeof(ri)-8));
+		ri.data_crc = cpu_to_je32(c, 0);
 
 		fn = jffs2_write_dnode(c, f, &ri, NULL, 0, ALLOC_NORMAL);
 
@@ -278,12 +278,12 @@ static int jffs2_write_end(struct file *filp, struct address_space *mapping,
 	}
 
 	/* Set the fields that the generic jffs2_write_inode_range() code can't find */
-	ri->ino = cpu_to_je32(inode->i_ino);
-	ri->mode = cpu_to_jemode(inode->i_mode);
-	ri->uid = cpu_to_je16(i_uid_read(inode));
-	ri->gid = cpu_to_je16(i_gid_read(inode));
-	ri->isize = cpu_to_je32((uint32_t)inode->i_size);
-	ri->atime = ri->ctime = ri->mtime = cpu_to_je32(JFFS2_NOW());
+	ri->ino = cpu_to_je32(c, inode->i_ino);
+	ri->mode = cpu_to_jemode(c, inode->i_mode);
+	ri->uid = cpu_to_je16(c, i_uid_read(inode));
+	ri->gid = cpu_to_je16(c, i_gid_read(inode));
+	ri->isize = cpu_to_je32(c, (uint32_t)inode->i_size);
+	ri->atime = ri->ctime = ri->mtime = cpu_to_je32(c, JFFS2_NOW());
 
 	/* In 2.4, it was already kmapped by generic_file_write(). Doesn't
 	   hurt to do it again. The alternative is ifdefs, which are ugly. */
@@ -308,7 +308,7 @@ static int jffs2_write_end(struct file *filp, struct address_space *mapping,
 			inode->i_size = pos + writtenlen;
 			inode->i_blocks = (inode->i_size + 511) >> 9;
 
-			inode->i_ctime = inode->i_mtime = ITIME(je32_to_cpu(ri->ctime));
+			inode->i_ctime = inode->i_mtime = ITIME(je32_to_cpu(c, ri->ctime));
 		}
 	}
 

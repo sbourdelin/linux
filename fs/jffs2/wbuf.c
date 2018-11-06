@@ -188,18 +188,18 @@ static struct jffs2_raw_node_ref **jffs2_incore_replace_raw(struct jffs2_sb_info
 	struct jffs2_full_dirent *fd;
 
 	dbg_noderef("incore_replace_raw: node at %p is {%04x,%04x}\n",
-		    node, je16_to_cpu(node->u.magic), je16_to_cpu(node->u.nodetype));
+		    node, je16_to_cpu(c, node->u.magic), je16_to_cpu(c, node->u.nodetype));
 
-	BUG_ON(je16_to_cpu(node->u.magic) != 0x1985 &&
-	       je16_to_cpu(node->u.magic) != 0);
+	BUG_ON(je16_to_cpu(c, node->u.magic) != 0x1985 &&
+	       je16_to_cpu(c, node->u.magic) != 0);
 
-	switch (je16_to_cpu(node->u.nodetype)) {
+	switch (je16_to_cpu(c, node->u.nodetype)) {
 	case JFFS2_NODETYPE_INODE:
 		if (f->metadata && f->metadata->raw == raw) {
 			dbg_noderef("Will replace ->raw in f->metadata at %p\n", f->metadata);
 			return &f->metadata->raw;
 		}
-		frag = jffs2_lookup_node_frag(&f->fragtree, je32_to_cpu(node->i.offset));
+		frag = jffs2_lookup_node_frag(&f->fragtree, je32_to_cpu(c, node->i.offset));
 		BUG_ON(!frag);
 		/* Find a frag which refers to the full_dnode we want to modify */
 		while (!frag->node || frag->node->raw != raw) {
@@ -220,7 +220,7 @@ static struct jffs2_raw_node_ref **jffs2_incore_replace_raw(struct jffs2_sb_info
 
 	default:
 		dbg_noderef("Don't care about replacing raw for nodetype %x\n",
-			    je16_to_cpu(node->u.nodetype));
+			    je16_to_cpu(c, node->u.nodetype));
 		break;
 	}
 	return NULL;
@@ -615,10 +615,10 @@ static int __jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad)
 
 		if ( c->wbuf_len + sizeof(struct jffs2_unknown_node) < c->wbuf_pagesize) {
 			struct jffs2_unknown_node *padnode = (void *)(c->wbuf + c->wbuf_len);
-			padnode->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
-			padnode->nodetype = cpu_to_je16(JFFS2_NODETYPE_PADDING);
-			padnode->totlen = cpu_to_je32(c->wbuf_pagesize - c->wbuf_len);
-			padnode->hdr_crc = cpu_to_je32(crc32(0, padnode, sizeof(*padnode)-4));
+			padnode->magic = cpu_to_je16(c, JFFS2_MAGIC_BITMASK);
+			padnode->nodetype = cpu_to_je16(c, JFFS2_NODETYPE_PADDING);
+			padnode->totlen = cpu_to_je32(c, c->wbuf_pagesize - c->wbuf_len);
+			padnode->hdr_crc = cpu_to_je32(c, crc32(0, padnode, sizeof(*padnode)-4));
 		}
 	}
 	/* else jffs2_flash_writev has actually filled in the rest of the
@@ -1019,12 +1019,16 @@ exit:
 /* For historical reasons we use only 8 bytes for OOB clean marker */
 #define OOB_CM_SIZE 8
 
-static const struct jffs2_unknown_node oob_cleanmarker =
+static struct jffs2_unknown_node oob_cleanmarker;
+
+static void jffs2_init_oob_cleanmarker(struct jffs2_sb_info *c)
 {
-	.magic = constant_cpu_to_je16(JFFS2_MAGIC_BITMASK),
-	.nodetype = constant_cpu_to_je16(JFFS2_NODETYPE_CLEANMARKER),
-	.totlen = constant_cpu_to_je32(8)
-};
+	if (!je16_to_cpu(c, oob_cleanmarker.magic)) {
+		oob_cleanmarker.magic = cpu_to_je16(c, JFFS2_MAGIC_BITMASK);
+		oob_cleanmarker.nodetype = cpu_to_je16(c, JFFS2_NODETYPE_CLEANMARKER);
+		oob_cleanmarker.totlen = cpu_to_je32(c, 8);
+	}
+}
 
 /*
  * Check, if the out of band area is empty. This function knows about the clean
@@ -1079,6 +1083,7 @@ int jffs2_check_nand_cleanmarker(struct jffs2_sb_info *c,
 	struct mtd_oob_ops ops;
 	int ret, cmlen = min_t(int, c->oobavail, OOB_CM_SIZE);
 
+	jffs2_init_oob_cleanmarker(c);
 	ops.mode = MTD_OPS_AUTO_OOB;
 	ops.ooblen = cmlen;
 	ops.oobbuf = c->oobbuf;
@@ -1104,6 +1109,7 @@ int jffs2_write_nand_cleanmarker(struct jffs2_sb_info *c,
 	struct mtd_oob_ops ops;
 	int cmlen = min_t(int, c->oobavail, OOB_CM_SIZE);
 
+	jffs2_init_oob_cleanmarker(c);
 	ops.mode = MTD_OPS_AUTO_OOB;
 	ops.ooblen = cmlen;
 	ops.oobbuf = (uint8_t *)&oob_cleanmarker;

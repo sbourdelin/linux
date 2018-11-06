@@ -51,26 +51,26 @@ int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	crc = crc32(0, ri, sizeof(*ri)-8);
 
 	jffs2_dbg(1, "Node read from %08x: node_crc %08x, calculated CRC %08x. dsize %x, csize %x, offset %x, buf %p\n",
-		  ref_offset(fd->raw), je32_to_cpu(ri->node_crc),
-		  crc, je32_to_cpu(ri->dsize), je32_to_cpu(ri->csize),
-		  je32_to_cpu(ri->offset), buf);
-	if (crc != je32_to_cpu(ri->node_crc)) {
+		  ref_offset(fd->raw), je32_to_cpu(c, ri->node_crc),
+		  crc, je32_to_cpu(c, ri->dsize), je32_to_cpu(c, ri->csize),
+		  je32_to_cpu(c, ri->offset), buf);
+	if (crc != je32_to_cpu(c, ri->node_crc)) {
 		pr_warn("Node CRC %08x != calculated CRC %08x for node at %08x\n",
-			je32_to_cpu(ri->node_crc), crc, ref_offset(fd->raw));
+			je32_to_cpu(c, ri->node_crc), crc, ref_offset(fd->raw));
 		ret = -EIO;
 		goto out_ri;
 	}
 	/* There was a bug where we wrote hole nodes out with csize/dsize
 	   swapped. Deal with it */
-	if (ri->compr == JFFS2_COMPR_ZERO && !je32_to_cpu(ri->dsize) &&
-	    je32_to_cpu(ri->csize)) {
+	if (ri->compr == JFFS2_COMPR_ZERO && !je32_to_cpu(c, ri->dsize) &&
+	    je32_to_cpu(c, ri->csize)) {
 		ri->dsize = ri->csize;
-		ri->csize = cpu_to_je32(0);
+		ri->csize = cpu_to_je32(c, 0);
 	}
 
-	D1(if(ofs + len > je32_to_cpu(ri->dsize)) {
+	D1(if(ofs + len > je32_to_cpu(c, ri->dsize)) {
 			pr_warn("jffs2_read_dnode() asked for %d bytes at %d from %d-byte node\n",
-				len, ofs, je32_to_cpu(ri->dsize));
+				len, ofs, je32_to_cpu(c, ri->dsize));
 		ret = -EINVAL;
 		goto out_ri;
 	});
@@ -87,18 +87,18 @@ int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	   Reading partial node and it's uncompressed - read into readbuf, check CRC, and copy
 	   Reading partial node and it's compressed - read into readbuf, check checksum, decompress to decomprbuf and copy
 	*/
-	if (ri->compr == JFFS2_COMPR_NONE && len == je32_to_cpu(ri->dsize)) {
+	if (ri->compr == JFFS2_COMPR_NONE && len == je32_to_cpu(c, ri->dsize)) {
 		readbuf = buf;
 	} else {
-		readbuf = kmalloc(je32_to_cpu(ri->csize), GFP_KERNEL);
+		readbuf = kmalloc(je32_to_cpu(c, ri->csize), GFP_KERNEL);
 		if (!readbuf) {
 			ret = -ENOMEM;
 			goto out_ri;
 		}
 	}
 	if (ri->compr != JFFS2_COMPR_NONE) {
-		if (len < je32_to_cpu(ri->dsize)) {
-			decomprbuf = kmalloc(je32_to_cpu(ri->dsize), GFP_KERNEL);
+		if (len < je32_to_cpu(c, ri->dsize)) {
+			decomprbuf = kmalloc(je32_to_cpu(c, ri->dsize), GFP_KERNEL);
 			if (!decomprbuf) {
 				ret = -ENOMEM;
 				goto out_readbuf;
@@ -110,36 +110,36 @@ int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		decomprbuf = readbuf;
 	}
 
-	jffs2_dbg(2, "Read %d bytes to %p\n", je32_to_cpu(ri->csize),
+	jffs2_dbg(2, "Read %d bytes to %p\n", je32_to_cpu(c, ri->csize),
 		  readbuf);
 	ret = jffs2_flash_read(c, (ref_offset(fd->raw)) + sizeof(*ri),
-			       je32_to_cpu(ri->csize), &readlen, readbuf);
+			       je32_to_cpu(c, ri->csize), &readlen, readbuf);
 
-	if (!ret && readlen != je32_to_cpu(ri->csize))
+	if (!ret && readlen != je32_to_cpu(c, ri->csize))
 		ret = -EIO;
 	if (ret)
 		goto out_decomprbuf;
 
-	crc = crc32(0, readbuf, je32_to_cpu(ri->csize));
-	if (crc != je32_to_cpu(ri->data_crc)) {
+	crc = crc32(0, readbuf, je32_to_cpu(c, ri->csize));
+	if (crc != je32_to_cpu(c, ri->data_crc)) {
 		pr_warn("Data CRC %08x != calculated CRC %08x for node at %08x\n",
-			je32_to_cpu(ri->data_crc), crc, ref_offset(fd->raw));
+			je32_to_cpu(c, ri->data_crc), crc, ref_offset(fd->raw));
 		ret = -EIO;
 		goto out_decomprbuf;
 	}
 	jffs2_dbg(2, "Data CRC matches calculated CRC %08x\n", crc);
 	if (ri->compr != JFFS2_COMPR_NONE) {
 		jffs2_dbg(2, "Decompress %d bytes from %p to %d bytes at %p\n",
-			  je32_to_cpu(ri->csize), readbuf,
-			  je32_to_cpu(ri->dsize), decomprbuf);
-		ret = jffs2_decompress(c, f, ri->compr | (ri->usercompr << 8), readbuf, decomprbuf, je32_to_cpu(ri->csize), je32_to_cpu(ri->dsize));
+			  je32_to_cpu(c, ri->csize), readbuf,
+			  je32_to_cpu(c, ri->dsize), decomprbuf);
+		ret = jffs2_decompress(c, f, ri->compr | (ri->usercompr << 8), readbuf, decomprbuf, je32_to_cpu(c, ri->csize), je32_to_cpu(c, ri->dsize));
 		if (ret) {
 			pr_warn("Error: jffs2_decompress returned %d\n", ret);
 			goto out_decomprbuf;
 		}
 	}
 
-	if (len < je32_to_cpu(ri->dsize)) {
+	if (len < je32_to_cpu(c, ri->dsize)) {
 		memcpy(buf, decomprbuf+ofs, len);
 	}
  out_decomprbuf:
