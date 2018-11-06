@@ -521,7 +521,8 @@ skip_nl_seq:
 	/* Now, NAT might want to mangle the packet, and register the
 	 * (possibly changed) expectation itself. */
 	nf_nat_ftp = rcu_dereference(nf_nat_ftp_hook);
-	if (nf_nat_ftp && ct->status & IPS_NAT_MASK)
+	if (nf_nat_ftp && (((ct->status & IPS_DST_NAT) && dir) ||
+			   ((ct->status & IPS_SRC_NAT) && !dir)))
 		ret = nf_nat_ftp(skb, ctinfo, search[dir][i].ftptype,
 				 protoff, matchoff, matchlen, exp);
 	else {
