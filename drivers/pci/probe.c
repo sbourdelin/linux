@@ -3156,6 +3156,34 @@ unsigned int pci_rescan_bus_bridge_resize(struct pci_dev *bridge)
 	return max;
 }
 
+/*
+ * Walks the PCI/PCIe tree to find the first instance of a PCIe device and
+ * hands off the PCIe bus to pcie_bus_configure_settings to walk the rest.
+ */
+static int pcie_rescan_bus_configure_settings(struct pci_dev *dev, void *data)
+{
+	if (pci_is_pcie(dev)) {
+		struct pci_bus *child, *bus = dev->bus;
+
+		list_for_each_entry(child, &bus->children, node)
+			pcie_bus_configure_settings(child);
+
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * pci_bus_configure_settings - Configure bus settings
+ * @bus: PCI/PCIE bus to configure
+ *
+ * Currently only configures PCIe bus settings related to MPS and MRRS.
+ */
+static void pci_bus_configure_settings(struct pci_bus *bus)
+{
+	pci_walk_bus(bus, pcie_rescan_bus_configure_settings, NULL);
+}
+
 /**
  * pci_rescan_bus - Scan a PCI bus for devices
  * @bus: PCI bus to scan
@@ -3171,6 +3199,7 @@ unsigned int pci_rescan_bus(struct pci_bus *bus)
 
 	max = pci_scan_child_bus(bus);
 	pci_assign_unassigned_bus_resources(bus);
+	pci_bus_configure_settings(bus);
 	pci_bus_add_devices(bus);
 
 	return max;
