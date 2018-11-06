@@ -8796,7 +8796,13 @@ static int patch_ca0132(struct hda_codec *codec)
 	}
 
 	if (spec->use_pci_mmio) {
+		/*
+		 * ifdef below needed due to lack of pci_iomap() decleration
+		 * for some archs when no PCI is defined
+		 */
+#ifdef CONFIG_PCI
 		spec->mem_base = pci_iomap(codec->bus->pci, 2, 0xC20);
+#endif
 		if (spec->mem_base == NULL) {
 			codec_warn(codec, "pci_iomap failed! Setting quirk to QUIRK_NONE.");
 			spec->quirk = QUIRK_NONE;
