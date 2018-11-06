@@ -14,6 +14,7 @@
  *  mem   ... memory access performance
  *  numa  ... NUMA scheduling and MM performance
  *  futex ... Futex performance
+ *  epoll ... Event poll performance
  */
 #include "perf.h"
 #include "util/util.h"
@@ -67,6 +68,12 @@ static struct bench futex_benchmarks[] = {
 	{ NULL,		NULL,						NULL			}
 };
 
+static struct bench epoll_benchmarks[] = {
+	{ "wait",	"Benchmark epoll concurrent epoll_waits",       bench_epoll_wait	},
+	{ "all",	"Run all futex benchmarks",			NULL			},
+	{ NULL,		NULL,						NULL			}
+};
+
 struct collection {
 	const char	*name;
 	const char	*summary;
@@ -80,6 +87,7 @@ static struct collection collections[] = {
 	{ "numa",	"NUMA scheduling and MM benchmarks",		numa_benchmarks		},
 #endif
 	{"futex",       "Futex stressing benchmarks",                   futex_benchmarks        },
+	{"epoll",       "Epoll stressing benchmarks",                   epoll_benchmarks        },
 	{ "all",	"All benchmarks",				NULL			},
 	{ NULL,		NULL,						NULL			}
 };
