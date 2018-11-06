@@ -102,6 +102,23 @@ Only the lists of names from directories are merged.  Other content
 such as metadata and extended attributes are reported for the upper
 directory only.  These attributes of the lower directory are hidden.
 
+credentials
+-----------
+
+By default, all access to the upper, lower and work directories is the
+recorded mounter's MAC and DAC credentials.  The incoming accesses are
+checked against the caller's credentials.
+
+override_creds mount flag turned off is reserved for when mounter and
+caller MAC or DAC credentials do not overlap.  Several unintended side
+effects will occur.  The caller with a lower privilege will not be
+able to delete files or directories, create nodes, or search some
+directories.  The caller with higher privilege can perform unexpected
+or unsecured operations.  The uneven security model where upperdir
+and workdir are opened at privilege, but accessed without, should only
+be used with strict understanding of the side effects and of the
+security policies.
+
 whiteouts and opaque directories
 --------------------------------
 
