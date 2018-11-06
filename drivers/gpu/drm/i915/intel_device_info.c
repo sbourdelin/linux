@@ -783,7 +783,7 @@ void intel_device_info_runtime_init(struct intel_device_info *info)
 		DRM_INFO("Display disabled (module parameter)\n");
 		info->num_pipes = 0;
 	} else if (info->num_pipes > 0 &&
-		   (GT_GEN(dev_priv, 7) || GT_GEN(dev_priv, 8)) &&
+		   (GT_GEN_RANGE(dev_priv, 7, 8)) &&
 		   HAS_PCH_SPLIT(dev_priv)) {
 		u32 fuse_strap = I915_READ(FUSE_STRAP);
 		u32 sfuse_strap = I915_READ(SFUSE_STRAP);

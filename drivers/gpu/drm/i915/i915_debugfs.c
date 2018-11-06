@@ -2030,7 +2030,7 @@ static int i915_swizzle_info(struct seq_file *m, void *data)
 	seq_printf(m, "bit6 swizzle for Y-tiling = %s\n",
 		   swizzle_string(dev_priv->mm.bit_6_swizzle_y));
 
-	if (GT_GEN(dev_priv, 3) || GT_GEN(dev_priv, 4)) {
+	if (GT_GEN_RANGE(dev_priv, 3, 4)) {
 		seq_printf(m, "DDC = 0x%08x\n",
 			   I915_READ(DCC));
 		seq_printf(m, "DDC2 = 0x%08x\n",
@@ -4262,7 +4262,7 @@ i915_cache_sharing_get(void *data, u64 *val)
 	struct drm_i915_private *dev_priv = data;
 	u32 snpcr;
 
-	if (!(GT_GEN(dev_priv, 6) || GT_GEN(dev_priv, 7)))
+	if (!(GT_GEN_RANGE(dev_priv, 6, 7)))
 		return -ENODEV;
 
 	intel_runtime_pm_get(dev_priv);
@@ -4282,7 +4282,7 @@ i915_cache_sharing_set(void *data, u64 val)
 	struct drm_i915_private *dev_priv = data;
 	u32 snpcr;
 
-	if (!(GT_GEN(dev_priv, 6) || GT_GEN(dev_priv, 7)))
+	if (!(GT_GEN_RANGE(dev_priv, 6, 7)))
 		return -ENODEV;
 
 	if (val > 3)

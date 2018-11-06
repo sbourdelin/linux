@@ -3449,7 +3449,7 @@ void i915_perf_init(struct drm_i915_private *dev_priv)
 		dev_priv->perf.oa.ops.read = gen8_oa_read;
 		dev_priv->perf.oa.ops.oa_hw_tail_read = gen8_oa_hw_tail_read;
 
-		if (GT_GEN(dev_priv, 8) || GT_GEN(dev_priv, 9)) {
+		if (GT_GEN_RANGE(dev_priv, 8, 9)) {
 			dev_priv->perf.oa.ops.is_valid_b_counter_reg =
 				gen7_is_valid_b_counter_addr;
 			dev_priv->perf.oa.ops.is_valid_mux_reg =
