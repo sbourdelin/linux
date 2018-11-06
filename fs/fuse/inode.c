@@ -166,9 +166,7 @@ void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
 
 	lockdep_assert_held(&fi->lock);
 
-	spin_lock(&fc->lock);
-	fi->attr_version = ++fc->attr_version;
-	spin_unlock(&fc->lock);
+	fi->attr_version = fuse_attr_version_inc_return(fc);
 
 	fi->i_time = attr_valid;
 	WRITE_ONCE(fi->inval_mask, 0);

@@ -775,6 +775,17 @@ static inline int invalid_nodeid(u64 nodeid)
 	return !nodeid || nodeid == FUSE_ROOT_ID;
 }
 
+static inline u64 fuse_attr_version_inc_return(struct fuse_conn *fc)
+{
+	u64 attr_version;
+
+	spin_lock(&fc->lock);
+	attr_version = ++fc->attr_version;
+	spin_unlock(&fc->lock);
+
+	return attr_version;
+}
+
 /** Device operations */
 extern const struct file_operations fuse_dev_operations;
 

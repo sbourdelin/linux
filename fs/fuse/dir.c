@@ -674,9 +674,7 @@ static int fuse_unlink(struct inode *dir, struct dentry *entry)
 		struct fuse_inode *fi = get_fuse_inode(inode);
 
 		spin_lock(&fi->lock);
-		spin_lock(&fc->lock);
-		fi->attr_version = ++fc->attr_version;
-		spin_unlock(&fc->lock);
+		fi->attr_version = fuse_attr_version_inc_return(fc);
 		/*
 		 * If i_nlink == 0 then unlink doesn't make sense, yet this can
 		 * happen if userspace filesystem is careless.  It would be
@@ -830,9 +828,7 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
 		struct fuse_inode *fi = get_fuse_inode(inode);
 
 		spin_lock(&fi->lock);
-		spin_lock(&fc->lock);
-		fi->attr_version = ++fc->attr_version;
-		spin_unlock(&fc->lock);
+		fi->attr_version = fuse_attr_version_inc_return(fc);
 		inc_nlink(inode);
 		spin_unlock(&fi->lock);
 		fuse_invalidate_attr(inode);
