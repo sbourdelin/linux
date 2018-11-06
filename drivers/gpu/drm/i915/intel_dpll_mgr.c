@@ -3212,9 +3212,9 @@ void intel_shared_dpll_init(struct drm_device *dev)
 		dpll_mgr = &icl_pll_mgr;
 	else if (IS_CANNONLAKE(dev_priv))
 		dpll_mgr = &cnl_pll_mgr;
-	else if (IS_GEN9_BC(dev_priv))
+	else if (GT_GEN9_BC(dev_priv))
 		dpll_mgr = &skl_pll_mgr;
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		dpll_mgr = &bxt_pll_mgr;
 	else if (HAS_DDI(dev_priv))
 		dpll_mgr = &hsw_pll_mgr;

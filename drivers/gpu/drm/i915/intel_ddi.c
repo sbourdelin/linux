@@ -728,7 +728,7 @@ static const struct ddi_buf_trans *
 intel_ddi_get_buf_trans_edp(struct drm_i915_private *dev_priv,
 			    enum port port, int *n_entries)
 {
-	if (IS_GEN9_BC(dev_priv)) {
+	if (GT_GEN9_BC(dev_priv)) {
 		const struct ddi_buf_trans *ddi_translations =
 			skl_get_buf_trans_edp(dev_priv, n_entries);
 		*n_entries = skl_buf_trans_num_entries(port, *n_entries);
@@ -764,7 +764,7 @@ static const struct ddi_buf_trans *
 intel_ddi_get_buf_trans_hdmi(struct drm_i915_private *dev_priv,
 			     int *n_entries)
 {
-	if (IS_GEN9_BC(dev_priv)) {
+	if (GT_GEN9_BC(dev_priv)) {
 		return skl_get_buf_trans_hdmi(dev_priv, n_entries);
 	} else if (IS_BROADWELL(dev_priv)) {
 		*n_entries = ARRAY_SIZE(bdw_ddi_translations_hdmi);
@@ -925,10 +925,10 @@ static int intel_ddi_hdmi_level(struct drm_i915_private *dev_priv, enum port por
 	} else if (IS_CANNONLAKE(dev_priv)) {
 		cnl_get_buf_trans_hdmi(dev_priv, &n_entries);
 		default_entry = n_entries - 1;
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		bxt_get_buf_trans_hdmi(dev_priv, &n_entries);
 		default_entry = n_entries - 1;
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		intel_ddi_get_buf_trans_hdmi(dev_priv, &n_entries);
 		default_entry = 8;
 	} else if (IS_BROADWELL(dev_priv)) {
@@ -979,7 +979,7 @@ static void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder,
 							      &n_entries);
 
 	/* If we're boosting the current, set bit 31 of trans1 */
-	if (IS_GEN9_BC(dev_priv) &&
+	if (GT_GEN9_BC(dev_priv) &&
 	    dev_priv->vbt.ddi_port_info[port].dp_boost_level)
 		iboost_bit = DDI_BUF_BALANCE_LEG_ENABLE;
 
@@ -1013,7 +1013,7 @@ static void intel_prepare_hdmi_ddi_buffers(struct intel_encoder *encoder,
 		level = n_entries - 1;
 
 	/* If we're boosting the current, set bit 31 of trans1 */
-	if (IS_GEN9_BC(dev_priv) &&
+	if (GT_GEN9_BC(dev_priv) &&
 	    dev_priv->vbt.ddi_port_info[port].hdmi_boost_level)
 		iboost_bit = DDI_BUF_BALANCE_LEG_ENABLE;
 
@@ -1741,9 +1741,9 @@ static void intel_ddi_clock_get(struct intel_encoder *encoder,
 		icl_ddi_clock_get(encoder, pipe_config);
 	else if (IS_CANNONLAKE(dev_priv))
 		cnl_ddi_clock_get(encoder, pipe_config);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		bxt_ddi_clock_get(encoder, pipe_config);
-	else if (IS_GEN9_BC(dev_priv))
+	else if (GT_GEN9_BC(dev_priv))
 		skl_ddi_clock_get(encoder, pipe_config);
 	else if (INTEL_GEN(dev_priv) <= 8)
 		hsw_ddi_clock_get(encoder, pipe_config);
@@ -2067,7 +2067,7 @@ bool intel_ddi_get_hw_state(struct intel_encoder *encoder,
 	DRM_DEBUG_KMS("No pipe for ddi port %c found\n", port_name(port));
 
 out:
-	if (ret && IS_GEN9_LP(dev_priv)) {
+	if (ret && GT_GEN9_LP(dev_priv)) {
 		tmp = I915_READ(BXT_PHY_CTL(port));
 		if ((tmp & (BXT_PHY_CMNLANE_POWERDOWN_ACK |
 			    BXT_PHY_LANE_POWERDOWN_ACK |
@@ -2254,7 +2254,7 @@ u8 intel_ddi_dp_voltage_max(struct intel_encoder *encoder)
 			cnl_get_buf_trans_edp(dev_priv, &n_entries);
 		else
 			cnl_get_buf_trans_dp(dev_priv, &n_entries);
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		if (encoder->type == INTEL_OUTPUT_EDP)
 			bxt_get_buf_trans_edp(dev_priv, &n_entries);
 		else
@@ -2736,7 +2736,7 @@ uint32_t ddi_signal_levels(struct intel_dp *intel_dp)
 	struct intel_encoder *encoder = &dport->base;
 	int level = intel_ddi_dp_level(intel_dp);
 
-	if (IS_GEN9_BC(dev_priv))
+	if (GT_GEN9_BC(dev_priv))
 		skl_ddi_set_iboost(encoder, level, encoder->type);
 
 	return DDI_BUF_TRANS_SELECT(level);
@@ -2877,7 +2877,7 @@ static void intel_ddi_clk_select(struct intel_encoder *encoder,
 		val = I915_READ(DPCLKA_CFGCR0);
 		val &= ~DPCLKA_CFGCR0_DDI_CLK_OFF(port);
 		I915_WRITE(DPCLKA_CFGCR0, val);
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		/* DDI -> PLL mapping  */
 		val = I915_READ(DPLL_CTRL2);
 
@@ -2906,7 +2906,7 @@ static void intel_ddi_clk_disable(struct intel_encoder *encoder)
 	} else if (IS_CANNONLAKE(dev_priv)) {
 		I915_WRITE(DPCLKA_CFGCR0, I915_READ(DPCLKA_CFGCR0) |
 			   DPCLKA_CFGCR0_DDI_CLK_OFF(port));
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		I915_WRITE(DPLL_CTRL2, I915_READ(DPLL_CTRL2) |
 			   DPLL_CTRL2_DDI_CLK_OFF(port));
 	} else if (INTEL_GEN(dev_priv) < 9) {
@@ -3075,7 +3075,7 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 					level, encoder->type);
 	else if (IS_CANNONLAKE(dev_priv))
 		cnl_ddi_vswing_sequence(encoder, level, encoder->type);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		bxt_ddi_vswing_sequence(encoder, level, encoder->type);
 	else
 		intel_prepare_dp_ddi_buffers(encoder, crtc_state);
@@ -3117,14 +3117,14 @@ static void intel_ddi_pre_enable_hdmi(struct intel_encoder *encoder,
 					level, INTEL_OUTPUT_HDMI);
 	else if (IS_CANNONLAKE(dev_priv))
 		cnl_ddi_vswing_sequence(encoder, level, INTEL_OUTPUT_HDMI);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		bxt_ddi_vswing_sequence(encoder, level, INTEL_OUTPUT_HDMI);
 	else
 		intel_prepare_hdmi_ddi_buffers(encoder, level);
 
 	icl_enable_phy_clock_gating(dig_port);
 
-	if (IS_GEN9_BC(dev_priv))
+	if (GT_GEN9_BC(dev_priv))
 		skl_ddi_set_iboost(encoder, level, INTEL_OUTPUT_HDMI);
 
 	intel_ddi_enable_pipe_clock(crtc_state);
@@ -3345,7 +3345,7 @@ static void intel_enable_ddi_hdmi(struct intel_encoder *encoder,
 			  connector->base.id, connector->name);
 
 	/* Display WA #1143: skl,kbl,cfl */
-	if (IS_GEN9_BC(dev_priv)) {
+	if (GT_GEN9_BC(dev_priv)) {
 		/*
 		 * For some reason these chicken bits have been
 		 * stuffed into a transcoder register, event though
@@ -3500,7 +3500,7 @@ intel_ddi_pre_pll_enable(struct intel_encoder *encoder,
 		intel_display_power_get(dev_priv,
 					intel_ddi_main_link_aux_domain(dig_port));
 
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		bxt_ddi_phy_set_lane_optim_mask(encoder,
 						crtc_state->lane_lat_optim_mask);
 
@@ -3704,7 +3704,7 @@ void intel_ddi_get_config(struct intel_encoder *encoder,
 
 	intel_ddi_clock_get(encoder, pipe_config);
 
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		pipe_config->lane_lat_optim_mask =
 			bxt_ddi_phy_get_lane_lat_optim_mask(encoder);
 
@@ -3745,7 +3745,7 @@ static bool intel_ddi_compute_config(struct intel_encoder *encoder,
 	else
 		ret = intel_dp_compute_config(encoder, pipe_config, conn_state);
 
-	if (IS_GEN9_LP(dev_priv) && ret)
+	if (GT_GEN9_LP(dev_priv) && ret)
 		pipe_config->lane_lat_optim_mask =
 			bxt_ddi_phy_calc_lane_lat_optim_mask(pipe_config->lane_count);
 
@@ -3952,7 +3952,7 @@ static bool intel_ddi_a_force_4_lanes(struct intel_digital_port *dport)
 	/* Broxton/Geminilake: Bspec says that DDI_A_4_LANES is the only
 	 *                     supported configuration
 	 */
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		return true;
 
 	/* Cannonlake: Most of SKUs don't support DDI_E, and the only

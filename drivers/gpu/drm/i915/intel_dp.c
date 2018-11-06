@@ -346,10 +346,10 @@ intel_dp_set_source_rates(struct intel_dp *intel_dp)
 			max_rate = cnl_max_source_rate(intel_dp);
 		else
 			max_rate = icl_max_source_rate(intel_dp);
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		source_rates = bxt_rates;
 		size = ARRAY_SIZE(bxt_rates);
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		source_rates = skl_rates;
 		size = ARRAY_SIZE(skl_rates);
 	} else if ((IS_HASWELL(dev_priv) && !IS_HSW_ULX(dev_priv)) ||
@@ -884,7 +884,7 @@ void intel_power_sequencer_reset(struct drm_i915_private *dev_priv)
 	struct intel_encoder *encoder;
 
 	if (WARN_ON(!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv) &&
-		    !IS_GEN9_LP(dev_priv)))
+		    !GT_GEN9_LP(dev_priv)))
 		return;
 
 	/*
@@ -905,7 +905,7 @@ void intel_power_sequencer_reset(struct drm_i915_private *dev_priv)
 		if (encoder->type != INTEL_OUTPUT_EDP)
 			continue;
 
-		if (IS_GEN9_LP(dev_priv))
+		if (GT_GEN9_LP(dev_priv))
 			intel_dp->pps_reset = true;
 		else
 			intel_dp->pps_pipe = INVALID_PIPE;
@@ -928,7 +928,7 @@ static void intel_pps_get_registers(struct intel_dp *intel_dp,
 
 	memset(regs, 0, sizeof(*regs));
 
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		pps_idx = bxt_power_sequencer_idx(intel_dp);
 	else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		pps_idx = vlv_power_sequencer_pipe(intel_dp);
@@ -937,7 +937,7 @@ static void intel_pps_get_registers(struct intel_dp *intel_dp,
 	regs->pp_stat = PP_STATUS(pps_idx);
 	regs->pp_on = PP_ON_DELAYS(pps_idx);
 	regs->pp_off = PP_OFF_DELAYS(pps_idx);
-	if (!IS_GEN9_LP(dev_priv) && !HAS_PCH_CNP(dev_priv) &&
+	if (!GT_GEN9_LP(dev_priv) && !HAS_PCH_CNP(dev_priv) &&
 	    !HAS_PCH_ICP(dev_priv))
 		regs->pp_div = PP_DIVISOR(pps_idx);
 }
@@ -3648,7 +3648,7 @@ intel_dp_set_signal_levels(struct intel_dp *intel_dp)
 	uint32_t signal_levels, mask = 0;
 	uint8_t train_set = intel_dp->train_set[0];
 
-	if (IS_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
 		signal_levels = bxt_signal_levels(intel_dp);
 	} else if (HAS_DDI(dev_priv)) {
 		signal_levels = ddi_signal_levels(intel_dp);
@@ -5026,9 +5026,9 @@ bool intel_digital_port_connected(struct intel_encoder *encoder)
 
 	if (INTEL_GEN(dev_priv) >= 11)
 		return icl_digital_port_connected(encoder);
-	else if (GT_GEN(dev_priv, 10) || IS_GEN9_BC(dev_priv))
+	else if (GT_GEN(dev_priv, 10) || GT_GEN9_BC(dev_priv))
 		return spt_digital_port_connected(encoder);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		return bxt_digital_port_connected(encoder);
 	else if (GT_GEN(dev_priv, 8))
 		return bdw_digital_port_connected(encoder);
@@ -5780,7 +5780,7 @@ intel_pps_readout_hw_state(struct intel_dp *intel_dp, struct edp_power_seq *seq)
 
 	pp_on = I915_READ(regs.pp_on);
 	pp_off = I915_READ(regs.pp_off);
-	if (!IS_GEN9_LP(dev_priv) && !HAS_PCH_CNP(dev_priv) &&
+	if (!GT_GEN9_LP(dev_priv) && !HAS_PCH_CNP(dev_priv) &&
 	    !HAS_PCH_ICP(dev_priv)) {
 		I915_WRITE(regs.pp_ctrl, pp_ctl);
 		pp_div = I915_READ(regs.pp_div);
@@ -5799,7 +5799,7 @@ intel_pps_readout_hw_state(struct intel_dp *intel_dp, struct edp_power_seq *seq)
 	seq->t10 = (pp_off & PANEL_POWER_DOWN_DELAY_MASK) >>
 		   PANEL_POWER_DOWN_DELAY_SHIFT;
 
-	if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv) ||
+	if (GT_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv) ||
 	    HAS_PCH_ICP(dev_priv)) {
 		seq->t11_t12 = ((pp_ctl & BXT_POWER_CYCLE_DELAY_MASK) >>
 				BXT_POWER_CYCLE_DELAY_SHIFT) * 1000;
@@ -5971,7 +5971,7 @@ intel_dp_init_panel_power_sequencer_registers(struct intel_dp *intel_dp,
 		 (seq->t10 << PANEL_POWER_DOWN_DELAY_SHIFT);
 	/* Compute the divisor for the pp clock, simply match the Bspec
 	 * formula. */
-	if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv) ||
+	if (GT_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv) ||
 	    HAS_PCH_ICP(dev_priv)) {
 		pp_div = I915_READ(regs.pp_ctrl);
 		pp_div &= ~BXT_POWER_CYCLE_DELAY_MASK;
@@ -6008,7 +6008,7 @@ intel_dp_init_panel_power_sequencer_registers(struct intel_dp *intel_dp,
 
 	I915_WRITE(regs.pp_on, pp_on);
 	I915_WRITE(regs.pp_off, pp_off);
-	if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv) ||
+	if (GT_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv) ||
 	    HAS_PCH_ICP(dev_priv))
 		I915_WRITE(regs.pp_ctrl, pp_div);
 	else
@@ -6017,7 +6017,7 @@ intel_dp_init_panel_power_sequencer_registers(struct intel_dp *intel_dp,
 	DRM_DEBUG_KMS("panel power sequencer register settings: PP_ON %#x, PP_OFF %#x, PP_DIV %#x\n",
 		      I915_READ(regs.pp_on),
 		      I915_READ(regs.pp_off),
-		      (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv)  ||
+		      (GT_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv)  ||
 		       HAS_PCH_ICP(dev_priv)) ?
 		      (I915_READ(regs.pp_ctrl) & BXT_POWER_CYCLE_DELAY_MASK) :
 		      I915_READ(regs.pp_div));

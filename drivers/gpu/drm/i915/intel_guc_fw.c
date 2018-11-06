@@ -109,7 +109,7 @@ static void guc_prepare_xfer(struct intel_guc *guc)
 				     GUC_ENABLE_READ_CACHE_FOR_WOPCM_DATA |
 				     GUC_ENABLE_MIA_CLOCK_GATING);
 
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		I915_WRITE(GEN9LP_GT_PM_CONFIG, GT_DOORBELL_ENABLE);
 	else
 		I915_WRITE(GEN9_GT_PM_CONFIG, GT_DOORBELL_ENABLE);

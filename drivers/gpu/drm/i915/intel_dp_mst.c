@@ -98,7 +98,7 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 
 	pipe_config->dp_m_n.tu = slots;
 
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		pipe_config->lane_lat_optim_mask =
 			bxt_ddi_phy_calc_lane_lat_optim_mask(pipe_config->lane_count);
 

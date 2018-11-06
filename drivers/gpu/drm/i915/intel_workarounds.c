@@ -300,7 +300,7 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 			    GEN9_PREEMPT_GPGPU_COMMAND_LEVEL);
 
 	/* WaClearHIZ_WM_CHICKEN3:bxt,glk */
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		WA_SET_BIT_MASKED(GEN9_WM_CHICKEN3, GEN9_FACTOR_IN_CLR_VAL_HIZ);
 
 	return 0;
@@ -620,7 +620,7 @@ static void gen9_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 		   BDW_DISABLE_HDC_INVALIDATION);
 
 	/* WaProgramL3SqcReg1DefaultForPerf:bxt,glk */
-	if (IS_GEN9_LP(dev_priv)) {
+	if (GT_GEN9_LP(dev_priv)) {
 		u32 val = I915_READ(GEN8_L3SQCREG1);
 
 		val &= ~L3_PRIO_CREDITS_MASK;

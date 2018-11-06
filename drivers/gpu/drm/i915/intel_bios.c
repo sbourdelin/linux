@@ -711,7 +711,7 @@ parse_psr(struct drm_i915_private *dev_priv, const struct bdb_header *bdb)
 	 * Old decimal value is wake up time in multiples of 100 us.
 	 */
 	if (bdb->version >= 205 &&
-	    (IS_GEN9_BC(dev_priv) || IS_GEMINILAKE(dev_priv) ||
+	    (GT_GEN9_BC(dev_priv) || IS_GEMINILAKE(dev_priv) ||
 	     INTEL_GEN(dev_priv) >= 10)) {
 		switch (psr_table->tp1_wakeup_time) {
 		case 0:
@@ -2070,7 +2070,7 @@ intel_bios_is_port_hpd_inverted(struct drm_i915_private *dev_priv,
 	const struct child_device_config *child;
 	int i;
 
-	if (WARN_ON_ONCE(!IS_GEN9_LP(dev_priv)))
+	if (WARN_ON_ONCE(!GT_GEN9_LP(dev_priv)))
 		return false;
 
 	for (i = 0; i < dev_priv->vbt.child_dev_num; i++) {

@@ -1528,7 +1528,7 @@ hdmi_port_clock_valid(struct intel_hdmi *hdmi,
 		return MODE_CLOCK_HIGH;
 
 	/* BXT DPLL can't generate 223-240 MHz */
-	if (IS_GEN9_LP(dev_priv) && clock > 223333 && clock < 240000)
+	if (GT_GEN9_LP(dev_priv) && clock > 223333 && clock < 240000)
 		return MODE_CLOCK_RANGE;
 
 	/* CHV DPLL can't generate 216-240 MHz */
@@ -2320,7 +2320,7 @@ static u8 intel_hdmi_ddc_pin(struct drm_i915_private *dev_priv,
 
 	if (IS_CHERRYVIEW(dev_priv))
 		ddc_pin = chv_port_to_ddc_pin(dev_priv, port);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		ddc_pin = bxt_port_to_ddc_pin(dev_priv, port);
 	else if (HAS_PCH_CNP(dev_priv))
 		ddc_pin = cnp_port_to_ddc_pin(dev_priv, port);

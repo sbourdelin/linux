@@ -1123,7 +1123,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		int max_freq;
 
 		rp_state_limits = I915_READ(GEN6_RP_STATE_LIMITS);
-		if (IS_GEN9_LP(dev_priv)) {
+		if (GT_GEN9_LP(dev_priv)) {
 			rp_state_cap = I915_READ(BXT_RP_STATE_CAP);
 			gt_perf_status = I915_READ(BXT_GT_PERF_STATUS);
 		} else {
@@ -1230,22 +1230,22 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		seq_printf(m, "Down threshold: %d%%\n",
 			   rps->power.down_threshold);
 
-		max_freq = (IS_GEN9_LP(dev_priv) ? rp_state_cap >> 0 :
+		max_freq = (GT_GEN9_LP(dev_priv) ? rp_state_cap >> 0 :
 			    rp_state_cap >> 16) & 0xff;
-		max_freq *= (IS_GEN9_BC(dev_priv) ||
+		max_freq *= (GT_GEN9_BC(dev_priv) ||
 			     INTEL_GEN(dev_priv) >= 10 ? GEN9_FREQ_SCALER : 1);
 		seq_printf(m, "Lowest (RPN) frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, max_freq));
 
 		max_freq = (rp_state_cap & 0xff00) >> 8;
-		max_freq *= (IS_GEN9_BC(dev_priv) ||
+		max_freq *= (GT_GEN9_BC(dev_priv) ||
 			     INTEL_GEN(dev_priv) >= 10 ? GEN9_FREQ_SCALER : 1);
 		seq_printf(m, "Nominal (RP1) frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, max_freq));
 
-		max_freq = (IS_GEN9_LP(dev_priv) ? rp_state_cap >> 16 :
+		max_freq = (GT_GEN9_LP(dev_priv) ? rp_state_cap >> 16 :
 			    rp_state_cap >> 0) & 0xff;
-		max_freq *= (IS_GEN9_BC(dev_priv) ||
+		max_freq *= (GT_GEN9_BC(dev_priv) ||
 			     INTEL_GEN(dev_priv) >= 10 ? GEN9_FREQ_SCALER : 1);
 		seq_printf(m, "Max non-overclocked (RP0) frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, max_freq));
@@ -1824,7 +1824,7 @@ static int i915_ring_freq_table(struct seq_file *m, void *unused)
 
 	min_gpu_freq = rps->min_freq;
 	max_gpu_freq = rps->max_freq;
-	if (IS_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
 		/* Convert GT frequency to 50 HZ units */
 		min_gpu_freq /= GEN9_FREQ_SCALER;
 		max_gpu_freq /= GEN9_FREQ_SCALER;
@@ -1839,7 +1839,7 @@ static int i915_ring_freq_table(struct seq_file *m, void *unused)
 				       &ia_freq);
 		seq_printf(m, "%d\t\t%d\t\t\t\t%d\n",
 			   intel_gpu_freq(dev_priv, (gpu_freq *
-						     (IS_GEN9_BC(dev_priv) ||
+						     (GT_GEN9_BC(dev_priv) ||
 						      INTEL_GEN(dev_priv) >= 10 ?
 						      GEN9_FREQ_SCALER : 1))),
 			   ((ia_freq >> 0) & 0xff) * 100,
@@ -2922,7 +2922,7 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 	seq_printf(m, "DC3 -> DC5 count: %d\n",
 		   I915_READ(IS_BROXTON(dev_priv) ? BXT_CSR_DC3_DC5_COUNT :
 						    SKL_CSR_DC3_DC5_COUNT));
-	if (!IS_GEN9_LP(dev_priv))
+	if (!GT_GEN9_LP(dev_priv))
 		seq_printf(m, "DC5 -> DC6 count: %d\n",
 			   I915_READ(SKL_CSR_DC5_DC6_COUNT));
 
@@ -4423,14 +4423,14 @@ static void gen9_sseu_device_status(struct drm_i915_private *dev_priv,
 
 		sseu->slice_mask |= BIT(s);
 
-		if (IS_GEN9_BC(dev_priv))
+		if (GT_GEN9_BC(dev_priv))
 			sseu->subslice_mask[s] =
 				INTEL_INFO(dev_priv)->sseu.subslice_mask[s];
 
 		for (ss = 0; ss < info->sseu.max_subslices; ss++) {
 			unsigned int eu_cnt;
 
-			if (IS_GEN9_LP(dev_priv)) {
+			if (GT_GEN9_LP(dev_priv)) {
 				if (!(s_reg[s] & (GEN9_PGCTL_SS_ACK(ss))))
 					/* skip disabled subslice */
 					continue;

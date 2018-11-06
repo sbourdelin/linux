@@ -2360,6 +2360,8 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define REVID_FOREVER		0xff
 #define INTEL_REVID(dev_priv)	((dev_priv)->drm.pdev->revision)
 
+#define IS_LP(dev_priv)		(INTEL_INFO(dev_priv)->is_lp)
+
 #define GEN_FOREVER (0)
 
 #define INTEL_GEN_MASK(s, e) ( \
@@ -2380,6 +2382,9 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define GT_GEN(dev_priv, n) \
 	(BUILD_BUG_ON_ZERO(!__builtin_constant_p(n)) + \
 	(!!((dev_priv)->info.gen_mask & BIT((n) - 1))))
+
+#define GT_GEN9_LP(dev_priv)	(GT_GEN(dev_priv, 9) && IS_LP(dev_priv))
+#define GT_GEN9_BC(dev_priv)	(GT_GEN(dev_priv, 9) && !IS_LP(dev_priv))
 
 /*
  * Return true if revision is in range [since,until] inclusive.
@@ -2531,10 +2536,6 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define IS_ICL_REVID(p, since, until) \
 	(IS_ICELAKE(p) && IS_REVID(p, since, until))
-
-#define IS_LP(dev_priv)	(INTEL_INFO(dev_priv)->is_lp)
-#define IS_GEN9_LP(dev_priv)	(GT_GEN(dev_priv, 9) && IS_LP(dev_priv))
-#define IS_GEN9_BC(dev_priv)	(GT_GEN(dev_priv, 9) && !IS_LP(dev_priv))
 
 #define ENGINE_MASK(id)	BIT(id)
 #define RENDER_RING	ENGINE_MASK(RCS)

@@ -581,7 +581,7 @@ static u32 gen9_dc_mask(struct drm_i915_private *dev_priv)
 	mask = DC_STATE_EN_UPTO_DC5;
 	if (INTEL_GEN(dev_priv) >= 11)
 		mask |= DC_STATE_EN_UPTO_DC6 | DC_STATE_EN_DC9;
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		mask |= DC_STATE_EN_DC9;
 	else
 		mask |= DC_STATE_EN_UPTO_DC6;
@@ -725,7 +725,7 @@ void gen9_enable_dc5(struct drm_i915_private *dev_priv)
 	DRM_DEBUG_KMS("Enabling DC5\n");
 
 	/* Wa Display #1183: skl,kbl,cfl */
-	if (IS_GEN9_BC(dev_priv))
+	if (GT_GEN9_BC(dev_priv))
 		I915_WRITE(GEN8_CHICKEN_DCPR_1, I915_READ(GEN8_CHICKEN_DCPR_1) |
 			   SKL_SELECT_ALTERNATE_DC_EXIT);
 
@@ -749,7 +749,7 @@ void skl_enable_dc6(struct drm_i915_private *dev_priv)
 	DRM_DEBUG_KMS("Enabling DC6\n");
 
 	/* Wa Display #1183: skl,kbl,cfl */
-	if (IS_GEN9_BC(dev_priv))
+	if (GT_GEN9_BC(dev_priv))
 		I915_WRITE(GEN8_CHICKEN_DCPR_1, I915_READ(GEN8_CHICKEN_DCPR_1) |
 			   SKL_SELECT_ALTERNATE_DC_EXIT);
 
@@ -841,7 +841,7 @@ static void gen9_dc_off_power_well_enable(struct drm_i915_private *dev_priv,
 
 	gen9_assert_dbuf_enabled(dev_priv);
 
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		bxt_verify_ddi_phy_power_wells(dev_priv);
 }
 
@@ -3027,10 +3027,10 @@ static uint32_t get_allowed_dc_mask(const struct drm_i915_private *dev_priv,
 		 * suspend/resume, so allow it unconditionally.
 		 */
 		mask = DC_STATE_EN_DC9;
-	} else if (GT_GEN(dev_priv, 10) || IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN(dev_priv, 10) || GT_GEN9_BC(dev_priv)) {
 		max_dc = 2;
 		mask = 0;
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		max_dc = 1;
 		mask = DC_STATE_EN_DC9;
 	} else {
@@ -3143,7 +3143,7 @@ int intel_power_domains_init(struct drm_i915_private *dev_priv)
 		err = set_power_wells(power_domains, glk_power_wells);
 	} else if (IS_BROXTON(dev_priv)) {
 		err = set_power_wells(power_domains, bxt_power_wells);
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		err = set_power_wells(power_domains, skl_power_wells);
 	} else if (IS_CHERRYVIEW(dev_priv)) {
 		err = set_power_wells(power_domains, chv_power_wells);
@@ -3814,9 +3814,9 @@ void intel_power_domains_init_hw(struct drm_i915_private *dev_priv, bool resume)
 		icl_display_core_init(dev_priv, resume);
 	} else if (IS_CANNONLAKE(dev_priv)) {
 		cnl_display_core_init(dev_priv, resume);
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		skl_display_core_init(dev_priv, resume);
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		bxt_display_core_init(dev_priv, resume);
 	} else if (IS_CHERRYVIEW(dev_priv)) {
 		mutex_lock(&power_domains->lock);
@@ -3945,9 +3945,9 @@ void intel_power_domains_suspend(struct drm_i915_private *dev_priv,
 		icl_display_core_uninit(dev_priv);
 	else if (IS_CANNONLAKE(dev_priv))
 		cnl_display_core_uninit(dev_priv);
-	else if (IS_GEN9_BC(dev_priv))
+	else if (GT_GEN9_BC(dev_priv))
 		skl_display_core_uninit(dev_priv);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		bxt_display_core_uninit(dev_priv);
 
 	power_domains->display_core_suspended = true;

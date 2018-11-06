@@ -3602,7 +3602,7 @@ static bool skl_needs_memory_bw_wa(struct intel_atomic_state *state)
 {
 	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
 
-	if (IS_GEN9_BC(dev_priv) || IS_BROXTON(dev_priv))
+	if (GT_GEN9_BC(dev_priv) || IS_BROXTON(dev_priv))
 		return true;
 
 	return false;
@@ -3611,7 +3611,7 @@ static bool skl_needs_memory_bw_wa(struct intel_atomic_state *state)
 static bool
 intel_has_sagv(struct drm_i915_private *dev_priv)
 {
-	return (IS_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) &&
+	return (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) &&
 		dev_priv->sagv_status != I915_SAGV_NOT_CONTROLLED;
 }
 
@@ -6894,7 +6894,7 @@ static bool sanitize_rc6(struct drm_i915_private *i915)
 		info->has_rc6 = 0;
 
 	if (info->has_rc6 &&
-	    IS_GEN9_LP(i915) && !bxt_check_bios_rc6_setup(i915)) {
+	    GT_GEN9_LP(i915) && !bxt_check_bios_rc6_setup(i915)) {
 		DRM_INFO("RC6 disabled by BIOS\n");
 		info->has_rc6 = 0;
 	}
@@ -6918,7 +6918,7 @@ static void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
 	/* All of these values are in units of 50MHz */
 
 	/* static values from HW: RP0 > RP1 > RPn (min_freq) */
-	if (IS_GEN9_LP(dev_priv)) {
+	if (GT_GEN9_LP(dev_priv)) {
 		u32 rp_state_cap = I915_READ(BXT_RP_STATE_CAP);
 		rps->rp0_freq = (rp_state_cap >> 16) & 0xff;
 		rps->rp1_freq = (rp_state_cap >>  8) & 0xff;
@@ -6934,7 +6934,7 @@ static void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
 
 	rps->efficient_freq = rps->rp1_freq;
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv) ||
-	    IS_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	    GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
 		u32 ddcc_status = 0;
 
 		if (sandybridge_pcode_read(dev_priv,
@@ -6947,7 +6947,7 @@ static void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
 					rps->max_freq);
 	}
 
-	if (IS_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
 		/* Store the frequency values in 16.66 MHZ units, which is
 		 * the natural hardware unit for SKL
 		 */
@@ -7285,7 +7285,7 @@ static void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
 
 	min_gpu_freq = rps->min_freq;
 	max_gpu_freq = rps->max_freq;
-	if (IS_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
 		/* Convert GT frequency to 50 HZ units */
 		min_gpu_freq /= GEN9_FREQ_SCALER;
 		max_gpu_freq /= GEN9_FREQ_SCALER;
@@ -7300,7 +7300,7 @@ static void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
 		const int diff = max_gpu_freq - gpu_freq;
 		unsigned int ia_freq = 0, ring_freq = 0;
 
-		if (IS_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+		if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
 			/*
 			 * ring_freq = 2 * GT. ring_freq is in 100MHz units
 			 * No floor required for ring frequency on SKL.
@@ -9885,7 +9885,7 @@ u64 intel_rc6_residency_ns(struct drm_i915_private *dev_priv,
 		time_hw = vlv_residency_raw(dev_priv, reg);
 	} else {
 		/* 833.33ns units on Gen9LP, 1.28us elsewhere. */
-		if (IS_GEN9_LP(dev_priv)) {
+		if (GT_GEN9_LP(dev_priv)) {
 			mul = 10000;
 			div = 12;
 		} else {

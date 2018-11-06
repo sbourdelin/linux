@@ -178,12 +178,12 @@ static bool get_mocs_settings(struct drm_i915_private *dev_priv,
 {
 	bool result = false;
 
-	if (IS_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv) ||
+	if (GT_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv) ||
 	    IS_ICELAKE(dev_priv)) {
 		table->size  = ARRAY_SIZE(skylake_mocs_table);
 		table->table = skylake_mocs_table;
 		result = true;
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		table->size  = ARRAY_SIZE(broxton_mocs_table);
 		table->table = broxton_mocs_table;
 		result = true;

@@ -3814,7 +3814,7 @@ enum i915_power_well_id {
 #define INTERVAL_1_33_US(us)	(((us) * 3)   >> 2)
 #define INTERVAL_0_833_US(us)	(((us) * 6) / 5)
 #define GT_INTERVAL_FROM_US(dev_priv, us) (INTEL_GEN(dev_priv) >= 9 ? \
-				(IS_GEN9_LP(dev_priv) ? \
+				(GT_GEN9_LP(dev_priv) ? \
 				INTERVAL_0_833_US(us) : \
 				INTERVAL_1_33_US(us)) : \
 				INTERVAL_1_28_US(us))
@@ -3823,7 +3823,7 @@ enum i915_power_well_id {
 #define INTERVAL_1_33_TO_US(interval)  (((interval) << 2) / 3)
 #define INTERVAL_0_833_TO_US(interval) (((interval) * 5)  / 6)
 #define GT_PM_INTERVAL_TO_US(dev_priv, interval) (INTEL_GEN(dev_priv) >= 9 ? \
-                           (IS_GEN9_LP(dev_priv) ? \
+                           (GT_GEN9_LP(dev_priv) ? \
                            INTERVAL_0_833_TO_US(interval) : \
                            INTERVAL_1_33_TO_US(interval)) : \
                            INTERVAL_1_28_TO_US(interval))

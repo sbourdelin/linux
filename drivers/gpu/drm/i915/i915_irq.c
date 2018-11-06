@@ -2791,7 +2791,7 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 				found = true;
 			}
 
-			if (IS_GEN9_LP(dev_priv)) {
+			if (GT_GEN9_LP(dev_priv)) {
 				tmp_mask = iir & BXT_DE_PORT_HOTPLUG_MASK;
 				if (tmp_mask) {
 					bxt_hpd_irq_handler(dev_priv, tmp_mask,
@@ -2807,7 +2807,7 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 				}
 			}
 
-			if (IS_GEN9_LP(dev_priv) && (iir & BXT_DE_PORT_GMBUS)) {
+			if (GT_GEN9_LP(dev_priv) && (iir & BXT_DE_PORT_GMBUS)) {
 				gmbus_irq_handler(dev_priv);
 				found = true;
 			}
@@ -4211,7 +4211,7 @@ static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
 		de_pipe_masked |= GEN9_DE_PIPE_IRQ_FAULT_ERRORS;
 		de_port_masked |= GEN9_AUX_CHANNEL_B | GEN9_AUX_CHANNEL_C |
 				  GEN9_AUX_CHANNEL_D;
-		if (IS_GEN9_LP(dev_priv))
+		if (GT_GEN9_LP(dev_priv))
 			de_port_masked |= BXT_DE_PORT_GMBUS;
 	} else {
 		de_pipe_masked |= GEN8_DE_PIPE_IRQ_FAULT_ERRORS;
@@ -4227,7 +4227,7 @@ static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
 					   GEN8_PIPE_FIFO_UNDERRUN;
 
 	de_port_enables = de_port_masked;
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		de_port_enables |= BXT_DE_PORT_HOTPLUG_MASK;
 	else if (IS_BROADWELL(dev_priv))
 		de_port_enables |= GEN8_PORT_DP_A_HOTPLUG;
@@ -4255,7 +4255,7 @@ static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
 
 		GEN3_IRQ_INIT(GEN11_DE_HPD_, ~de_hpd_masked, de_hpd_enables);
 		gen11_hpd_detection_setup(dev_priv);
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		bxt_hpd_detection_setup(dev_priv);
 	} else if (IS_BROADWELL(dev_priv)) {
 		ilk_hpd_detection_setup(dev_priv);
@@ -4898,7 +4898,7 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 		dev->driver->irq_uninstall = gen8_irq_reset;
 		dev->driver->enable_vblank = gen8_enable_vblank;
 		dev->driver->disable_vblank = gen8_disable_vblank;
-		if (IS_GEN9_LP(dev_priv))
+		if (GT_GEN9_LP(dev_priv))
 			dev_priv->display.hpd_irq_setup = bxt_hpd_irq_setup;
 		else if (HAS_PCH_SPT(dev_priv) || HAS_PCH_KBP(dev_priv) ||
 			 HAS_PCH_CNP(dev_priv))

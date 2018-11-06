@@ -2168,7 +2168,7 @@ static void gtt_write_workarounds(struct drm_i915_private *dev_priv)
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN8_L3_LRA_1_GPGPU_DEFAULT_VALUE_BDW);
 	else if (IS_CHERRYVIEW(dev_priv))
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN8_L3_LRA_1_GPGPU_DEFAULT_VALUE_CHV);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN9_L3_LRA_1_GPGPU_DEFAULT_VALUE_BXT);
 	else if (INTEL_GEN(dev_priv) >= 9)
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN9_L3_LRA_1_GPGPU_DEFAULT_VALUE_SKL);
@@ -3002,7 +3002,7 @@ static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 	 * resort to an uncached mapping. The WC issue is easily caught by the
 	 * readback check when writing GTT PTE entries.
 	 */
-	if (IS_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10)
 		ggtt->gsm = ioremap_nocache(phys_addr, size);
 	else
 		ggtt->gsm = ioremap_wc(phys_addr, size);
@@ -3303,7 +3303,7 @@ static void setup_private_pat(struct drm_i915_private *dev_priv)
 
 	if (INTEL_GEN(dev_priv) >= 10)
 		cnl_setup_private_ppat(ppat);
-	else if (IS_CHERRYVIEW(dev_priv) || IS_GEN9_LP(dev_priv))
+	else if (IS_CHERRYVIEW(dev_priv) || GT_GEN9_LP(dev_priv))
 		chv_setup_private_ppat(ppat);
 	else
 		bdw_setup_private_ppat(ppat);

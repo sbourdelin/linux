@@ -339,8 +339,8 @@ static void gen9_sseu_info_init(struct drm_i915_private *dev_priv)
 	sseu->slice_mask = (fuse2 & GEN8_F2_S_ENA_MASK) >> GEN8_F2_S_ENA_SHIFT;
 
 	/* BXT has a single slice and at most 3 subslices. */
-	sseu->max_slices = IS_GEN9_LP(dev_priv) ? 1 : 3;
-	sseu->max_subslices = IS_GEN9_LP(dev_priv) ? 3 : 4;
+	sseu->max_slices = GT_GEN9_LP(dev_priv) ? 1 : 3;
+	sseu->max_subslices = GT_GEN9_LP(dev_priv) ? 3 : 4;
 	sseu->max_eus_per_subslice = 8;
 
 	/*
@@ -409,12 +409,12 @@ static void gen9_sseu_info_init(struct drm_i915_private *dev_priv)
 	 * pair per subslice.
 	*/
 	sseu->has_slice_pg =
-		!IS_GEN9_LP(dev_priv) && hweight8(sseu->slice_mask) > 1;
+		!GT_GEN9_LP(dev_priv) && hweight8(sseu->slice_mask) > 1;
 	sseu->has_subslice_pg =
-		IS_GEN9_LP(dev_priv) && sseu_subslice_total(sseu) > 1;
+		GT_GEN9_LP(dev_priv) && sseu_subslice_total(sseu) > 1;
 	sseu->has_eu_pg = sseu->eu_per_subslice > 2;
 
-	if (IS_GEN9_LP(dev_priv)) {
+	if (GT_GEN9_LP(dev_priv)) {
 #define IS_SS_DISABLED(ss)	(!(sseu->subslice_mask[0] & BIT(ss)))
 		info->has_pooled_eu = hweight8(sseu->subslice_mask[0]) == 3;
 
@@ -671,7 +671,7 @@ static u32 read_timestamp_frequency(struct drm_i915_private *dev_priv)
 		if ((ctc_reg & CTC_SOURCE_PARAMETER_MASK) == CTC_SOURCE_DIVIDE_LOGIC) {
 			freq = read_reference_ts_freq(dev_priv);
 		} else {
-			freq = IS_GEN9_LP(dev_priv) ? f19_2_mhz : f24_mhz;
+			freq = GT_GEN9_LP(dev_priv) ? f19_2_mhz : f24_mhz;
 
 			/* Now figure out how the command stream's timestamp
 			 * register increments from this frequency (it might

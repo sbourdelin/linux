@@ -2565,7 +2565,7 @@ void intel_update_max_cdclk(struct drm_i915_private *dev_priv)
 			dev_priv->max_cdclk_freq = 652800;
 	} else if (IS_CANNONLAKE(dev_priv)) {
 		dev_priv->max_cdclk_freq = 528000;
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		u32 limit = I915_READ(SKL_DFSM) & SKL_DFSM_CDCLK_LIMIT_MASK;
 		int max_cdclk, vco;
 
@@ -2775,11 +2775,11 @@ void intel_init_cdclk_hooks(struct drm_i915_private *dev_priv)
 		dev_priv->display.set_cdclk = bdw_set_cdclk;
 		dev_priv->display.modeset_calc_cdclk =
 			bdw_modeset_calc_cdclk;
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		dev_priv->display.set_cdclk = bxt_set_cdclk;
 		dev_priv->display.modeset_calc_cdclk =
 			bxt_modeset_calc_cdclk;
-	} else if (IS_GEN9_BC(dev_priv)) {
+	} else if (GT_GEN9_BC(dev_priv)) {
 		dev_priv->display.set_cdclk = skl_set_cdclk;
 		dev_priv->display.modeset_calc_cdclk =
 			skl_modeset_calc_cdclk;
@@ -2796,9 +2796,9 @@ void intel_init_cdclk_hooks(struct drm_i915_private *dev_priv)
 		dev_priv->display.get_cdclk = icl_get_cdclk;
 	else if (IS_CANNONLAKE(dev_priv))
 		dev_priv->display.get_cdclk = cnl_get_cdclk;
-	else if (IS_GEN9_BC(dev_priv))
+	else if (GT_GEN9_BC(dev_priv))
 		dev_priv->display.get_cdclk = skl_get_cdclk;
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		dev_priv->display.get_cdclk = bxt_get_cdclk;
 	else if (IS_BROADWELL(dev_priv))
 		dev_priv->display.get_cdclk = bdw_get_cdclk;

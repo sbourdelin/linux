@@ -1322,7 +1322,7 @@ intel_get_dram_info(struct drm_i915_private *dev_priv)
 	 * This is only used for the level 0 watermark latency
 	 * w/a which does not apply to bxt/glk.
 	 */
-	dram_info->is_16gb_dimm = !IS_GEN9_LP(dev_priv);
+	dram_info->is_16gb_dimm = !GT_GEN9_LP(dev_priv);
 
 	if (INTEL_GEN(dev_priv) < 9 || IS_GEMINILAKE(dev_priv))
 		return;
@@ -1962,7 +1962,7 @@ static int i915_drm_suspend_late(struct drm_device *dev, bool hibernation)
 				    get_suspend_mode(dev_priv, hibernation));
 
 	ret = 0;
-	if (INTEL_GEN(dev_priv) >= 11 || IS_GEN9_LP(dev_priv))
+	if (INTEL_GEN(dev_priv) >= 11 || GT_GEN9_LP(dev_priv))
 		bxt_enable_dc9(dev_priv);
 	else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		hsw_enable_pc8(dev_priv);
@@ -2152,7 +2152,7 @@ static int i915_drm_resume_early(struct drm_device *dev)
 
 	intel_uncore_resume_early(dev_priv);
 
-	if (INTEL_GEN(dev_priv) >= 11 || IS_GEN9_LP(dev_priv)) {
+	if (INTEL_GEN(dev_priv) >= 11 || GT_GEN9_LP(dev_priv)) {
 		gen9_sanitize_dc_state(dev_priv);
 		bxt_disable_dc9(dev_priv);
 	} else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
@@ -2922,7 +2922,7 @@ static int intel_runtime_suspend(struct device *kdev)
 	if (INTEL_GEN(dev_priv) >= 11) {
 		icl_display_core_uninit(dev_priv);
 		bxt_enable_dc9(dev_priv);
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		bxt_display_core_uninit(dev_priv);
 		bxt_enable_dc9(dev_priv);
 	} else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
@@ -3018,7 +3018,7 @@ static int intel_runtime_resume(struct device *kdev)
 				 DC_STATE_EN_UPTO_DC5)
 				gen9_enable_dc5(dev_priv);
 		}
-	} else if (IS_GEN9_LP(dev_priv)) {
+	} else if (GT_GEN9_LP(dev_priv)) {
 		bxt_disable_dc9(dev_priv);
 		bxt_display_core_init(dev_priv, true);
 		if (dev_priv->csr.dmc_payload &&

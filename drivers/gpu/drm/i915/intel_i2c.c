@@ -93,9 +93,9 @@ static const struct gmbus_pin *get_gmbus_pin(struct drm_i915_private *dev_priv,
 		return &gmbus_pins_icp[pin];
 	else if (HAS_PCH_CNP(dev_priv))
 		return &gmbus_pins_cnp[pin];
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		return &gmbus_pins_bxt[pin];
-	else if (IS_GEN9_BC(dev_priv))
+	else if (GT_GEN9_BC(dev_priv))
 		return &gmbus_pins_skl[pin];
 	else if (IS_BROADWELL(dev_priv))
 		return &gmbus_pins_bdw[pin];
@@ -112,9 +112,9 @@ bool intel_gmbus_is_valid_pin(struct drm_i915_private *dev_priv,
 		size = ARRAY_SIZE(gmbus_pins_icp);
 	else if (HAS_PCH_CNP(dev_priv))
 		size = ARRAY_SIZE(gmbus_pins_cnp);
-	else if (IS_GEN9_LP(dev_priv))
+	else if (GT_GEN9_LP(dev_priv))
 		size = ARRAY_SIZE(gmbus_pins_bxt);
-	else if (IS_GEN9_BC(dev_priv))
+	else if (GT_GEN9_BC(dev_priv))
 		size = ARRAY_SIZE(gmbus_pins_skl);
 	else if (IS_BROADWELL(dev_priv))
 		size = ARRAY_SIZE(gmbus_pins_bdw);
@@ -576,7 +576,7 @@ do_gmbus_xfer(struct i2c_adapter *adapter, struct i2c_msg *msgs, int num,
 	int ret = 0;
 
 	/* Display WA #0868: skl,bxt,kbl,cfl,glk,cnl */
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		bxt_gmbus_clock_gating(dev_priv, false);
 	else if (HAS_PCH_SPT(dev_priv) ||
 		 HAS_PCH_KBP(dev_priv) || HAS_PCH_CNP(dev_priv))
@@ -686,7 +686,7 @@ timeout:
 
 out:
 	/* Display WA #0868: skl,bxt,kbl,cfl,glk,cnl */
-	if (IS_GEN9_LP(dev_priv))
+	if (GT_GEN9_LP(dev_priv))
 		bxt_gmbus_clock_gating(dev_priv, true);
 	else if (HAS_PCH_SPT(dev_priv) ||
 		 HAS_PCH_KBP(dev_priv) || HAS_PCH_CNP(dev_priv))
