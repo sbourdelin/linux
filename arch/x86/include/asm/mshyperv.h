@@ -386,7 +386,8 @@ static inline u64 hv_read_tsc_page_tsc(const struct ms_hyperv_tsc_page *tsc_pg,
 	 *   A special '0' value indicates the time source is unreliable and we
 	 *   need to use something else. The currently published specification
 	 *   versions (up to 4.0b) contain a mistake and wrongly claim '-1'
-	 *   instead of '0' as the special value, see commit c35b82ef0294.
+	 *   instead of '0' as the special value, see commit c35b82ef0294 (
+	 *   "drivers/hv: correct tsc page sequence invalid value").
 	 * - ReferenceTime =
 	 *        ((RDTSC() * ReferenceTscScale) >> 64) + ReferenceTscOffset
 	 * - READ ReferenceTscSequence again. In case its value has changed
