@@ -1794,8 +1794,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	if (!mmc_card_broken_hpi(card) &&
 	    card->ext_csd.cache_size > 0) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				EXT_CSD_CACHE_CTRL, 1,
-				card->ext_csd.generic_cmd6_time);
+				EXT_CSD_CACHE_CTRL, 1, 0);
 		if (err && err != -EBADMSG)
 			goto free_card;
 
