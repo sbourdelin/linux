@@ -329,9 +329,8 @@ static int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags)
 		return 0;
 	}
 
-	spin_lock(&dentry->d_lock);
-	cached_with_key = dentry->d_flags & DCACHE_ENCRYPTED_WITH_KEY;
-	spin_unlock(&dentry->d_lock);
+	cached_with_key = READ_ONCE(dentry->d_flags) &
+		DCACHE_ENCRYPTED_WITH_KEY;
 	dir_has_key = (d_inode(dir)->i_crypt_info != NULL);
 	dput(dir);
 
