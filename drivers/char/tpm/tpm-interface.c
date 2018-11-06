@@ -224,14 +224,14 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 
 	rc = tpm2_prepare_space(chip, space, ordinal, buf);
 	if (rc)
-		goto out;
+		goto out_idle;
 
 	rc = chip->ops->send(chip, buf, count);
 	if (rc < 0) {
 		if (rc != -EPIPE)
 			dev_err(&chip->dev,
 				"%s: tpm_send: error %d\n", __func__, rc);
-		goto out;
+		goto out_space;
 	}
 
 	if (chip->flags & TPM_CHIP_FLAG_IRQ)
@@ -247,7 +247,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 		if (chip->ops->req_canceled(chip, status)) {
 			dev_err(&chip->dev, "Operation Canceled\n");
 			rc = -ECANCELED;
-			goto out;
+			goto out_space;
 		}
 
 		tpm_msleep(TPM_TIMEOUT_POLL);
@@ -257,30 +257,27 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 	chip->ops->cancel(chip);
 	dev_err(&chip->dev, "Operation Timed out\n");
 	rc = -ETIME;
-	goto out;
+	goto out_space;
 
 out_recv:
 	len = chip->ops->recv(chip, buf, bufsiz);
 	if (len < 0) {
 		rc = len;
-		dev_err(&chip->dev,
-			"tpm_transmit: tpm_recv: error %d\n", rc);
-		goto out;
-	} else if (len < TPM_HEADER_SIZE) {
+		dev_err(&chip->dev, "tpm_transmit: tpm_recv: error %d\n", rc);
+	} else if (len < TPM_HEADER_SIZE || len != be32_to_cpu(header->length))
 		rc = -EFAULT;
-		goto out;
+
+out_space:
+	if (rc) {
+		tpm2_flush_space(chip);
+	} else {
+		rc = tpm2_commit_space(chip, space, ordinal, buf, &len);
+		if (rc)
+			dev_err(&chip->dev, "tpm2_commit_space: error %d\n",
+				rc);
 	}
 
-	if (len != be32_to_cpu(header->length)) {
-		rc = -EFAULT;
-		goto out;
-	}
-
-	rc = tpm2_commit_space(chip, space, ordinal, buf, &len);
-	if (rc)
-		dev_err(&chip->dev, "tpm2_commit_space: error %d\n", rc);
-
-out:
+out_idle:
 	/* may fail but do not override previous error value in rc */
 	tpm_go_idle(chip, flags);
 
