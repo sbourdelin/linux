@@ -36,7 +36,7 @@ static struct {
 	{ 0xc, " 64MB" },
 };
 
-static int tlb_seq_show(struct seq_file *file, void *iter)
+static int tlb_debugfs_show(struct seq_file *file, void *iter)
 {
 	unsigned int tlb_type = (unsigned int)file->private;
 	unsigned long addr1, addr2, data1, data2;
@@ -134,18 +134,7 @@ static int tlb_seq_show(struct seq_file *file, void *iter)
 	return 0;
 }
 
-static int tlb_debugfs_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, tlb_seq_show, inode->i_private);
-}
-
-static const struct file_operations tlb_debugfs_fops = {
-	.owner		= THIS_MODULE,
-	.open		= tlb_debugfs_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(tlb_debugfs);
 
 static int __init tlb_debugfs_init(void)
 {
