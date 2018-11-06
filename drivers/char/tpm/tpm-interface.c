@@ -268,14 +268,10 @@ out_recv:
 		rc = -EFAULT;
 
 out_space:
-	if (rc) {
+	if (rc)
 		tpm2_flush_space(chip);
-	} else {
+	else
 		rc = tpm2_commit_space(chip, space, ordinal, buf, &len);
-		if (rc)
-			dev_err(&chip->dev, "tpm2_commit_space: error %d\n",
-				rc);
-	}
 
 out_idle:
 	/* may fail but do not override previous error value in rc */
