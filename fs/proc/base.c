@@ -2891,6 +2891,17 @@ static int proc_pid_patch_state(struct seq_file *m, struct pid_namespace *ns,
 }
 #endif /* CONFIG_LIVEPATCH */
 
+void __weak arch_thread_state(struct seq_file *m, struct task_struct *task)
+{
+}
+
+static int proc_pid_thread_state(struct seq_file *m, struct pid_namespace *ns,
+				 struct pid *pid, struct task_struct *task)
+{
+	arch_thread_state(m, task);
+	return 0;
+}
+
 /*
  * Thread groups
  */
@@ -2992,6 +3003,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_LIVEPATCH
 	ONE("patch_state",  S_IRUSR, proc_pid_patch_state),
 #endif
+	ONE("thread_state",  S_IRUSR, proc_pid_thread_state),
 };
 
 static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
@@ -3370,6 +3382,7 @@ static const struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_LIVEPATCH
 	ONE("patch_state",  S_IRUSR, proc_pid_patch_state),
 #endif
+	ONE("thread_state",  S_IRUSR, proc_pid_thread_state),
 };
 
 static int proc_tid_base_readdir(struct file *file, struct dir_context *ctx)
