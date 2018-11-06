@@ -30,6 +30,10 @@
 
 #include "i915_drv.h"
 
+static long __i915_request_wait(struct i915_request *rq,
+				unsigned int flags,
+				long timeout);
+
 static const char *i915_fence_get_driver_name(struct dma_fence *fence)
 {
 	return "i915";
@@ -66,7 +70,7 @@ static signed long i915_fence_wait(struct dma_fence *fence,
 				   bool interruptible,
 				   signed long timeout)
 {
-	return i915_request_wait(to_request(fence), interruptible, timeout);
+	return __i915_request_wait(to_request(fence), interruptible, timeout);
 }
 
 static void i915_fence_release(struct dma_fence *fence)
@@ -1281,6 +1285,21 @@ static bool __i915_wait_request_check_and_reset(struct i915_request *request)
 long i915_request_wait(struct i915_request *rq,
 		       unsigned int flags,
 		       long timeout)
+{
+	long ret;
+
+	if (!lockdep_is_held(&rq->i915->drm.struct_mutex))
+		dma_fence_wait_acquire();
+	ret = __i915_request_wait(rq, flags, timeout);
+	if (!lockdep_is_held(&rq->i915->drm.struct_mutex))
+		dma_fence_wait_release();
+
+	return ret;
+}
+
+static long __i915_request_wait(struct i915_request *rq,
+				unsigned int flags,
+				long timeout)
 {
 	const int state = flags & I915_WAIT_INTERRUPTIBLE ?
 		TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE;
