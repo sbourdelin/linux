@@ -475,13 +475,27 @@ put_request:
 	fuse_put_request(fc, req);
 }
 
-static void queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
+static int queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
 {
 	bool kill = false;
 
 	if (test_bit(FR_FINISHED, &req->flags))
-		return;
+		return 0;
 	spin_lock(&fiq->waitq.lock);
+	/* Check for we've sent request to interrupt this req */
+	if (unlikely(!test_bit(FR_INTERRUPTED, &req->flags))) {
+		spin_unlock(&fiq->waitq.lock);
+		return -EINVAL;
+	}
+	/*
+	 * Interrupt may be queued from fuse_dev_do_read(), and
+	 * later requeued on other cpu by fuse_dev_do_write().
+	 * To make FR_INTERRUPTED bit visible for the requeuer
+	 * (under fiq->waitq.lock) we write it once again.
+	 */
+	barrier();
+	__set_bit(FR_INTERRUPTED, &req->flags);
+
 	if (list_empty(&req->intr_entry)) {
 		list_add_tail(&req->intr_entry, &fiq->interrupts);
 		/*
@@ -492,7 +506,7 @@ static void queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
 		if (test_bit(FR_FINISHED, &req->flags)) {
 			list_del_init(&req->intr_entry);
 			spin_unlock(&fiq->waitq.lock);
-			return;
+			return 0;
 		}
 		wake_up_locked(&fiq->waitq);
 		kill = true;
@@ -500,6 +514,7 @@ static void queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
 	spin_unlock(&fiq->waitq.lock);
 	if (kill)
 		kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
+	return (int)kill;
 }
 
 static void request_wait_answer(struct fuse_conn *fc, struct fuse_req *req)
@@ -1957,8 +1972,9 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 			nbytes = -EINVAL;
 		else if (oh.error == -ENOSYS)
 			fc->no_interrupt = 1;
-		else if (oh.error == -EAGAIN)
-			queue_interrupt(&fc->iq, req);
+		else if (oh.error == -EAGAIN &&
+			 queue_interrupt(&fc->iq, req) < 0)
+			nbytes = -EINVAL;
 
 		fuse_put_request(fc, req);
 		fuse_copy_finish(cs);
