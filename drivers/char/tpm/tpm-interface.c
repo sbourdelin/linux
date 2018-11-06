@@ -168,11 +168,7 @@ ssize_t tpm_transmit(struct tpm_chip *chip, u8 *buf, size_t bufsiz,
 	memcpy(save, buf, save_size);
 
 	for (;;) {
-		ret = tpm_chip_start(chip, flags);
-		if (ret)
-			return ret;
 		ret = tpm_try_transmit(chip, buf, bufsiz, flags);
-		tpm_chip_stop(chip, flags);
 
 		rc = be32_to_cpu(header->return_code);
 		if (rc != TPM2_RC_RETRY && rc != TPM2_RC_TESTING)
