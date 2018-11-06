@@ -5039,7 +5039,7 @@ bool intel_digital_port_connected(struct intel_encoder *encoder)
 	else if (GT_GEN(dev_priv, 5))
 		return ilk_digital_port_connected(encoder);
 
-	MISSING_CASE(INTEL_GEN(dev_priv));
+	MISSING_CASE(INTEL_INFO(dev_priv)->gen);
 	return false;
 }
 

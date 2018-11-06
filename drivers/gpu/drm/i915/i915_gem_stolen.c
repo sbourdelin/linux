@@ -404,7 +404,7 @@ int i915_gem_init_stolen(struct drm_i915_private *dev_priv)
 	reserved_base = stolen_top;
 	reserved_size = 0;
 
-	switch (INTEL_GEN(dev_priv)) {
+	switch (INTEL_INFO(dev_priv)->gen) {
 	case 2:
 	case 3:
 		break;

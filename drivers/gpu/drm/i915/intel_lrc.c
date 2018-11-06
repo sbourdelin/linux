@@ -1518,7 +1518,7 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 	if (GEM_DEBUG_WARN_ON(engine->id != RCS))
 		return -EINVAL;
 
-	switch (INTEL_GEN(engine->i915)) {
+	switch (INTEL_INFO(engine->i915)->gen) {
 	case 11:
 		return 0;
 	case 10:
@@ -1534,7 +1534,7 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 		wa_bb_fn[1] = NULL;
 		break;
 	default:
-		MISSING_CASE(INTEL_GEN(engine->i915));
+		MISSING_CASE(INTEL_INFO(engine->i915)->gen);
 		return 0;
 	}
 
@@ -2436,9 +2436,9 @@ static u32 intel_lr_indirect_ctx_offset(struct intel_engine_cs *engine)
 {
 	u32 indirect_ctx_offset;
 
-	switch (INTEL_GEN(engine->i915)) {
+	switch (INTEL_INFO(engine->i915)->gen) {
 	default:
-		MISSING_CASE(INTEL_GEN(engine->i915));
+		MISSING_CASE(INTEL_INFO(engine->i915)->gen);
 		/* fall through */
 	case 11:
 		indirect_ctx_offset =

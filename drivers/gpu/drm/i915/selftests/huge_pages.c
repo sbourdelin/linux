@@ -893,7 +893,7 @@ static struct i915_vma *
 gpu_write_dw(struct i915_vma *vma, u64 offset, u32 val)
 {
 	struct drm_i915_private *i915 = vma->vm->i915;
-	const int gen = INTEL_GEN(i915);
+	const int gen = INTEL_INFO(i915)->gen;
 	unsigned int count = vma->size >> PAGE_SHIFT;
 	struct drm_i915_gem_object *obj;
 	struct i915_vma *batch;

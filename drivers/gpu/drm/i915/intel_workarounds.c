@@ -538,7 +538,7 @@ int intel_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	else if (IS_ICELAKE(dev_priv))
 		err = icl_ctx_workarounds_init(dev_priv);
 	else
-		MISSING_CASE(INTEL_GEN(dev_priv));
+		MISSING_CASE(INTEL_INFO(dev_priv)->gen);
 	if (err)
 		return err;
 
@@ -937,7 +937,7 @@ void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 	else if (IS_ICELAKE(dev_priv))
 		icl_gt_workarounds_apply(dev_priv);
 	else
-		MISSING_CASE(INTEL_GEN(dev_priv));
+		MISSING_CASE(INTEL_INFO(dev_priv)->gen);
 }
 
 struct whitelist {
@@ -1054,7 +1054,7 @@ static struct whitelist *whitelist_build(struct intel_engine_cs *engine,
 	else if (IS_ICELAKE(i915))
 		icl_whitelist_build(w);
 	else
-		MISSING_CASE(INTEL_GEN(i915));
+		MISSING_CASE(INTEL_INFO(i915)->gen);
 
 	return w;
 }

@@ -43,7 +43,7 @@ static int i915_capabilities(struct seq_file *m, void *data)
 	const struct intel_device_info *info = INTEL_INFO(dev_priv);
 	struct drm_printer p = drm_seq_file_printer(m);
 
-	seq_printf(m, "gen: %d\n", INTEL_GEN(dev_priv));
+	seq_printf(m, "gen: %d\n", INTEL_INFO(dev_priv)->gen);
 	seq_printf(m, "platform: %s\n", intel_platform_name(info->platform));
 	seq_printf(m, "pch: %d\n", INTEL_PCH_TYPE(dev_priv));
 

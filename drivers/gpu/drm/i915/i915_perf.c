@@ -1236,7 +1236,7 @@ static int oa_get_render_ctx_id(struct i915_perf_stream *stream)
 	if (IS_ERR(ce))
 		return PTR_ERR(ce);
 
-	switch (INTEL_GEN(i915)) {
+	switch (INTEL_INFO(i915)->gen) {
 	case 7: {
 		/*
 		 * On Haswell we don't do any post processing of the reports
@@ -1292,7 +1292,7 @@ static int oa_get_render_ctx_id(struct i915_perf_stream *stream)
 	}
 
 	default:
-		MISSING_CASE(INTEL_GEN(i915));
+		MISSING_CASE(INTEL_INFO(i915)->gen);
 	}
 
 	DRM_DEBUG_DRIVER("filtering on ctx_id=0x%x ctx_id_mask=0x%x\n",

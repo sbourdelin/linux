@@ -564,7 +564,7 @@ static struct i915_vma *recursive_batch(struct drm_i915_private *i915)
 	struct i915_address_space *vm =
 		ctx->ppgtt ? &ctx->ppgtt->vm : &i915->ggtt.vm;
 	struct drm_i915_gem_object *obj;
-	const int gen = INTEL_GEN(i915);
+	const int gen = INTEL_INFO(i915)->gen;
 	struct i915_vma *vma;
 	u32 *cmd;
 	int err;

@@ -1718,7 +1718,7 @@ static void i915_error_capture_msg(struct drm_i915_private *dev_priv,
 
 	len = scnprintf(error->error_msg, sizeof(error->error_msg),
 			"GPU HANG: ecode %d:%d:0x%08x",
-			INTEL_GEN(dev_priv), engine_id, ecode);
+			INTEL_INFO(dev_priv)->gen, engine_id, ecode);
 
 	if (engine_id != -1 && error->engine[engine_id].context.pid)
 		len += scnprintf(error->error_msg + len,

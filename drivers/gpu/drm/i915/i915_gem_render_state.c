@@ -45,7 +45,7 @@ render_state_get_rodata(const struct intel_engine_cs *engine)
 	if (engine->id != RCS)
 		return NULL;
 
-	switch (INTEL_GEN(engine->i915)) {
+	switch (INTEL_INFO(engine->i915)->gen) {
 	case 6:
 		return &gen6_null_state;
 	case 7:

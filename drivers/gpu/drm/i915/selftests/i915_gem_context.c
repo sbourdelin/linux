@@ -253,7 +253,7 @@ static struct i915_vma *
 gpu_fill_dw(struct i915_vma *vma, u64 offset, unsigned long count, u32 value)
 {
 	struct drm_i915_gem_object *obj;
-	const int gen = INTEL_GEN(vma->vm->i915);
+	const int gen = INTEL_INFO(vma->vm->i915)->gen;
 	unsigned long n, size;
 	u32 *cmd;
 	int err;

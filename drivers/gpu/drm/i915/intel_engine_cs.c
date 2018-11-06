@@ -195,9 +195,9 @@ __intel_engine_context_size(struct drm_i915_private *dev_priv, u8 class)
 
 	switch (class) {
 	case RENDER_CLASS:
-		switch (INTEL_GEN(dev_priv)) {
+		switch (INTEL_INFO(dev_priv)->gen) {
 		default:
-			MISSING_CASE(INTEL_GEN(dev_priv));
+			MISSING_CASE(INTEL_INFO(dev_priv)->gen);
 			return DEFAULT_LR_CONTEXT_RENDER_SIZE;
 		case 11:
 			return GEN11_LR_CONTEXT_RENDER_SIZE;
@@ -245,7 +245,7 @@ static u32 __engine_mmio_base(struct drm_i915_private *i915,
 	int i;
 
 	for (i = 0; i < MAX_MMIO_BASES; i++)
-		if (INTEL_GEN(i915) >= bases[i].gen)
+		if (INTEL_INFO(i915)->gen >= bases[i].gen)
 			break;
 
 	GEM_BUG_ON(i == MAX_MMIO_BASES);
@@ -891,7 +891,7 @@ void intel_engine_get_instdone(struct intel_engine_cs *engine,
 
 	memset(instdone, 0, sizeof(*instdone));
 
-	switch (INTEL_GEN(dev_priv)) {
+	switch (INTEL_INFO(dev_priv)->gen) {
 	default:
 		instdone->instdone = I915_READ(RING_INSTDONE(mmio_base));
 
@@ -1189,7 +1189,7 @@ void intel_engine_lost_context(struct intel_engine_cs *engine)
 
 bool intel_engine_can_store_dword(struct intel_engine_cs *engine)
 {
-	switch (INTEL_GEN(engine->i915)) {
+	switch (INTEL_INFO(engine->i915)->gen) {
 	case 2:
 		return false; /* uses physical not virtual addresses */
 	case 3:
