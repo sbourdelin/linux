@@ -995,7 +995,7 @@ void fuse_update_ctime(struct inode *inode);
 
 int fuse_update_attributes(struct inode *inode, struct file *file);
 
-void fuse_flush_writepages(struct inode *inode);
+void fuse_flush_writepages(struct fuse_inode *fi);
 
 void fuse_set_nowrite(struct inode *inode);
 void fuse_release_nowrite(struct inode *inode);

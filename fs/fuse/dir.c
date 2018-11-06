@@ -1360,7 +1360,7 @@ static void __fuse_release_nowrite(struct inode *inode)
 
 	BUG_ON(fi->writectr != FUSE_NOWRITE);
 	fi->writectr = 0;
-	fuse_flush_writepages(inode);
+	fuse_flush_writepages(fi);
 }
 
 void fuse_release_nowrite(struct inode *inode)
