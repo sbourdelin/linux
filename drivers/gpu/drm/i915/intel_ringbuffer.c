@@ -407,7 +407,7 @@ static void intel_ring_setup_status_page(struct intel_engine_cs *engine)
 	POSTING_READ(mmio);
 
 	/* Flush the TLB for this page */
-	if (IS_GEN(dev_priv, 6, 7)) {
+	if (GT_GEN_RANGE(dev_priv, 6, 7)) {
 		i915_reg_t reg = RING_INSTPM(engine->mmio_base);
 
 		/* ring should be idle before issuing a sync flush*/
@@ -629,7 +629,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 	intel_whitelist_workarounds_apply(engine);
 
 	/* WaTimedSingleVertexDispatch:cl,bw,ctg,elk,ilk,snb */
-	if (IS_GEN(dev_priv, 4, 6))
+	if (GT_GEN_RANGE(dev_priv, 4, 6))
 		I915_WRITE(MI_MODE, _MASKED_BIT_ENABLE(VS_TIMER_DISPATCH));
 
 	/* We need to disable the AsyncFlip performance optimisations in order
@@ -638,7 +638,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 	 *
 	 * WaDisableAsyncFlipPerfMode:snb,ivb,hsw,vlv
 	 */
-	if (IS_GEN(dev_priv, 6, 7))
+	if (GT_GEN_RANGE(dev_priv, 6, 7))
 		I915_WRITE(MI_MODE, _MASKED_BIT_ENABLE(ASYNC_FLIP_PERF_DISABLE));
 
 	/* Required for the hardware to program scanline values for waiting */
@@ -663,7 +663,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 			   _MASKED_BIT_DISABLE(CM0_STC_EVICT_DISABLE_LRA_SNB));
 	}
 
-	if (IS_GEN(dev_priv, 6, 7))
+	if (GT_GEN_RANGE(dev_priv, 6, 7))
 		I915_WRITE(INSTPM, _MASKED_BIT_ENABLE(INSTPM_FORCE_ORDERING));
 
 	if (INTEL_GEN(dev_priv) >= 6)

@@ -2374,7 +2374,7 @@ intel_info(const struct drm_i915_private *dev_priv)
  *
  * Use GEN_FOREVER for unbound start and or end.
  */
-#define IS_GEN(dev_priv, s, e) \
+#define GT_GEN_RANGE(dev_priv, s, e) \
 	(!!((dev_priv)->info.gen_mask & INTEL_GEN_MASK((s), (e))))
 
 /*
