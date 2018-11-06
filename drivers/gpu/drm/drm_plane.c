@@ -170,8 +170,8 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 			     const char *name, ...)
 {
 	struct drm_mode_config *config = &dev->mode_config;
-	unsigned int format_modifier_count = 0;
-	int ret;
+	unsigned int format_modifier_count, in_modifier_count = 0;
+	int ret, i;
 
 	/* plane index is used with 32bit bitmasks */
 	if (WARN_ON(config->num_total_plane >= 32))
@@ -203,21 +203,42 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 
 	if (format_modifiers) {
 		const uint64_t *temp_modifiers = format_modifiers;
+
 		while (*temp_modifiers++ != DRM_FORMAT_MOD_INVALID)
-			format_modifier_count++;
+			in_modifier_count++;
 	}
 
-	plane->modifier_count = format_modifier_count;
-	plane->modifiers = kmalloc_array(format_modifier_count,
+	plane->modifiers = kmalloc_array(in_modifier_count,
 					 sizeof(format_modifiers[0]),
 					 GFP_KERNEL);
 
-	if (format_modifier_count && !plane->modifiers) {
+	if (in_modifier_count && !plane->modifiers) {
 		DRM_DEBUG_KMS("out of memory when allocating plane\n");
 		kfree(plane->format_types);
 		drm_mode_object_unregister(dev, &plane->base);
 		return -ENOMEM;
 	}
+
+	for (i = 0, format_modifier_count = 0; i < in_modifier_count; i++) {
+		int j;
+
+		for (j = 0; funcs->format_mod_supported && j < format_count; j++)
+			if (funcs->format_mod_supported(plane, formats[j],
+							format_modifiers[i]))
+				break;
+
+		if (j < format_count)
+			plane->modifiers[format_modifier_count++] =
+				format_modifiers[i];
+	}
+
+	if (format_modifier_count < in_modifier_count) {
+		size_t size;
+
+		size = format_modifier_count * sizeof(format_modifiers[0]);
+		plane->modifiers = krealloc(plane->modifiers, size, GFP_KERNEL);
+	}
+	plane->modifier_count = format_modifier_count;
 
 	if (name) {
 		va_list ap;
@@ -238,8 +259,6 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 
 	memcpy(plane->format_types, formats, format_count * sizeof(uint32_t));
 	plane->format_count = format_count;
-	memcpy(plane->modifiers, format_modifiers,
-	       format_modifier_count * sizeof(format_modifiers[0]));
 	plane->possible_crtcs = possible_crtcs;
 	plane->type = type;
 
