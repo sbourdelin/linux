@@ -610,6 +610,9 @@ static void fuse_aio_complete(struct fuse_io_priv *io, int err, ssize_t pos)
 static void fuse_aio_complete_req(struct fuse_conn *fc, struct fuse_req *req)
 {
 	struct fuse_io_priv *io = req->io;
+	struct kiocb *iocb = io->iocb;
+	struct file *file = iocb->ki_filp;
+	struct fuse_inode *fi = get_fuse_inode(file_inode(file));
 	ssize_t pos = -1;
 
 	fuse_release_user_pages(req, io->should_dirty);
@@ -625,6 +628,12 @@ static void fuse_aio_complete_req(struct fuse_conn *fc, struct fuse_req *req)
 	}
 
 	fuse_aio_complete(io, req->out.h.error, pos);
+
+	if (io->write) {
+		spin_lock(&fc->lock);
+		fi->writectr--;
+		spin_unlock(&fc->lock);
+	}
 }
 
 static size_t fuse_async_req_send(struct fuse_conn *fc, struct fuse_req *req,
@@ -966,6 +975,7 @@ static size_t fuse_send_write(struct fuse_req *req, struct fuse_io_priv *io,
 {
 	struct kiocb *iocb = io->iocb;
 	struct file *file = iocb->ki_filp;
+	struct fuse_inode *fi = get_fuse_inode(file_inode(file));
 	struct fuse_file *ff = file->private_data;
 	struct fuse_conn *fc = ff->fc;
 	struct fuse_write_in *inarg = &req->misc.write.in;
@@ -981,8 +991,12 @@ static size_t fuse_send_write(struct fuse_req *req, struct fuse_io_priv *io,
 		inarg->lock_owner = fuse_lock_owner_id(fc, owner);
 	}
 
-	if (io->async)
+	if (io->async) {
+		spin_lock(&fc->lock);
+		fi->writectr++;
+		spin_unlock(&fc->lock);
 		return fuse_async_req_send(fc, req, count, io);
+	}
 
 	fuse_request_send(fc, req);
 	return req->misc.write.out.size;
@@ -2904,8 +2918,10 @@ fuse_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	 * We cannot asynchronously extend the size of a file.
 	 * In such case the aio will behave exactly like sync io.
 	 */
-	if ((offset + count > i_size) && iov_iter_rw(iter) == WRITE)
+	if ((offset + count > i_size) && iov_iter_rw(iter) == WRITE) {
 		io->blocking = true;
+		io->async = false;
+	}
 
 	if (io->async && io->blocking) {
 		/*
