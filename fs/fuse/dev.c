@@ -1945,7 +1945,7 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 		goto err_unlock_pq;
 
 	req = request_find(fpq, oh.unique & ~FUSE_INT_REQ_BIT);
-	if (!req)
+	if (!req || !test_bit(FR_SENT, &req->flags))
 		goto err_unlock_pq;
 
 	/* Is it an interrupt reply ID? */
