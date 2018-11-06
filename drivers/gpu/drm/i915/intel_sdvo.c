@@ -1344,13 +1344,13 @@ static void intel_sdvo_pre_enable(struct intel_encoder *intel_encoder,
 		return;
 
 	/* Set the SDVO control regs. */
-	if (INTEL_GEN(dev_priv) >= 4) {
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER)) {
 		/* The real mode polarity is set by the SDVO commands, using
 		 * struct intel_sdvo_dtd. */
 		sdvox = SDVO_VSYNC_ACTIVE_HIGH | SDVO_HSYNC_ACTIVE_HIGH;
 		if (!HAS_PCH_SPLIT(dev_priv) && crtc_state->limited_color_range)
 			sdvox |= HDMI_COLOR_RANGE_16_235;
-		if (INTEL_GEN(dev_priv) < 5)
+		if (GT_GEN_RANGE(dev_priv, 0, 4))
 			sdvox |= SDVO_BORDER_ENABLE;
 	} else {
 		sdvox = I915_READ(intel_sdvo->sdvo_reg);
@@ -1367,11 +1367,11 @@ static void intel_sdvo_pre_enable(struct intel_encoder *intel_encoder,
 		sdvox |= SDVO_PIPE_SEL(crtc->pipe);
 
 	if (crtc_state->has_audio) {
-		WARN_ON_ONCE(INTEL_GEN(dev_priv) < 4);
+		WARN_ON_ONCE(GT_GEN_RANGE(dev_priv, 0, 3));
 		sdvox |= SDVO_AUDIO_ENABLE;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 4) {
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER)) {
 		/* done in crtc_mode_set as the dpll_md reg must be written early */
 	} else if (IS_I945G(dev_priv) || IS_I945GM(dev_priv) ||
 		   IS_G33(dev_priv) || IS_PINEVIEW(dev_priv)) {
@@ -1382,7 +1382,7 @@ static void intel_sdvo_pre_enable(struct intel_encoder *intel_encoder,
 	}
 
 	if (input_dtd.part2.sdvo_flags & SDVO_NEED_TO_STALL &&
-	    INTEL_GEN(dev_priv) < 5)
+	    GT_GEN_RANGE(dev_priv, 0, 4))
 		sdvox |= SDVO_STALL_SELECT;
 	intel_sdvo_write_sdvox(intel_sdvo, sdvox);
 }
@@ -2451,7 +2451,7 @@ intel_sdvo_add_hdmi_properties(struct intel_sdvo *intel_sdvo,
 	struct drm_i915_private *dev_priv = to_i915(connector->base.base.dev);
 
 	intel_attach_force_audio_property(&connector->base.base);
-	if (INTEL_GEN(dev_priv) >= 4 && IS_MOBILE(dev_priv)) {
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER) && IS_MOBILE(dev_priv)) {
 		intel_attach_broadcast_rgb_property(&connector->base.base);
 	}
 	intel_attach_aspect_ratio_property(&connector->base.base);
@@ -2521,7 +2521,7 @@ intel_sdvo_dvi_init(struct intel_sdvo *intel_sdvo, int device)
 	connector->connector_type = DRM_MODE_CONNECTOR_DVID;
 
 	/* gen3 doesn't do the hdmi bits in the SDVO register */
-	if (INTEL_GEN(dev_priv) >= 4 &&
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER) &&
 	    intel_sdvo_is_hdmi_connector(intel_sdvo, device)) {
 		connector->connector_type = DRM_MODE_CONNECTOR_HDMIA;
 		intel_sdvo_connector->is_hdmi = true;

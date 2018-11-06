@@ -129,12 +129,12 @@ static void intel_lvds_get_config(struct intel_encoder *encoder,
 
 	pipe_config->base.adjusted_mode.flags |= flags;
 
-	if (INTEL_GEN(dev_priv) < 5)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		pipe_config->gmch_pfit.lvds_border_bits =
 			tmp & LVDS_BORDER_ENABLE;
 
 	/* gen2/3 store dither state in pfit control, needs to match */
-	if (INTEL_GEN(dev_priv) < 4) {
+	if (GT_GEN_RANGE(dev_priv, 0, 3)) {
 		tmp = I915_READ(PFIT_CONTROL);
 
 		pipe_config->gmch_pfit.control |= tmp & PANEL_8TO6_DITHER_ENABLE;
@@ -179,7 +179,7 @@ static void intel_lvds_pps_get_hw_state(struct drm_i915_private *dev_priv,
 	/* Convert from 100ms to 100us units */
 	pps->t4 = val * 1000;
 
-	if (INTEL_GEN(dev_priv) <= 4 &&
+	if (GT_GEN_RANGE(dev_priv, 0, 4) &&
 	    pps->t1_t2 == 0 && pps->t5 == 0 && pps->t3 == 0 && pps->tx == 0) {
 		DRM_DEBUG_KMS("Panel power timings uninitialized, "
 			      "setting defaults\n");
@@ -393,7 +393,7 @@ static bool intel_lvds_compute_config(struct intel_encoder *intel_encoder,
 	unsigned int lvds_bpp;
 
 	/* Should never happen!! */
-	if (INTEL_GEN(dev_priv) < 4 && intel_crtc->pipe == 0) {
+	if (GT_GEN_RANGE(dev_priv, 0, 3) && intel_crtc->pipe == 0) {
 		DRM_ERROR("Can't support LVDS on pipe A\n");
 		return false;
 	}
@@ -810,7 +810,7 @@ static bool intel_lvds_supported(struct drm_i915_private *dev_priv)
 	 * Otherwise LVDS was only attached to mobile products,
 	 * except for the inglorious 830gm
 	 */
-	if (INTEL_GEN(dev_priv) <= 4 &&
+	if (GT_GEN_RANGE(dev_priv, 0, 4) &&
 	    IS_MOBILE(dev_priv) && !IS_I830(dev_priv))
 		return true;
 

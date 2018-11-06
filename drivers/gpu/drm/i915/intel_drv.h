@@ -2237,7 +2237,7 @@ static inline bool icl_is_nv12_y_plane(enum plane_id id)
 
 static inline bool icl_is_hdr_plane(struct intel_plane *plane)
 {
-	if (INTEL_GEN(to_i915(plane->base.dev)) < 11)
+	if (GT_GEN_RANGE(to_i915(plane->base.dev), 0, 10))
 		return false;
 
 	return plane->id < PLANE_SPRITE2;

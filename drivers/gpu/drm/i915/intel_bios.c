@@ -516,7 +516,7 @@ parse_driver_features(struct drm_i915_private *dev_priv,
 	if (!driver)
 		return;
 
-	if (INTEL_GEN(dev_priv) >= 5) {
+	if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		/*
 		 * Note that we consider BDB_DRIVER_FEATURE_INT_SDVO_LVDS
 		 * to mean "eDP". The VBT spec doesn't agree with that
@@ -712,7 +712,7 @@ parse_psr(struct drm_i915_private *dev_priv, const struct bdb_header *bdb)
 	 */
 	if (bdb->version >= 205 &&
 	    (GT_GEN9_BC(dev_priv) || IS_GEMINILAKE(dev_priv) ||
-	     INTEL_GEN(dev_priv) >= 10)) {
+	     GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))) {
 		switch (psr_table->tp1_wakeup_time) {
 		case 0:
 			dev_priv->vbt.psr.tp1_wakeup_time_us = 500;

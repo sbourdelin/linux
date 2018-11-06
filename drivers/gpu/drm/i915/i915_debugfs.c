@@ -762,7 +762,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 			   I915_READ(GEN8_PCU_IIR));
 		seq_printf(m, "PCU interrupt enable:\t%08x\n",
 			   I915_READ(GEN8_PCU_IER));
-	} else if (INTEL_GEN(dev_priv) >= 11) {
+	} else if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		seq_printf(m, "Master Interrupt Control:  %08x\n",
 			   I915_READ(GEN11_GFX_MSTR_IRQ));
 
@@ -783,7 +783,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 			   I915_READ(GEN11_DISPLAY_INT_CTL));
 
 		gen8_display_interrupt_info(m);
-	} else if (INTEL_GEN(dev_priv) >= 8) {
+	} else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		seq_printf(m, "Master Interrupt Control:\t%08x\n",
 			   I915_READ(GEN8_MASTER_IRQ));
 
@@ -879,7 +879,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 			   I915_READ(GTIMR));
 	}
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		seq_printf(m, "RCS Intr Mask:\t %08x\n",
 			   I915_READ(GEN11_RCS0_RSVD_INTR_MASK));
 		seq_printf(m, "BCS Intr Mask:\t %08x\n",
@@ -899,7 +899,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 		seq_printf(m, "Gunit/CSME Intr Mask:\t %08x\n",
 			   I915_READ(GEN11_GUNIT_CSME_INTR_MASK));
 
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		for_each_engine(engine, dev_priv, id) {
 			seq_printf(m,
 				   "Graphics Interrupt mask (%s):	%08x\n",
@@ -1111,7 +1111,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 			   "efficient (RPe) frequency: %d MHz\n",
 			   intel_gpu_freq(dev_priv, rps->efficient_freq));
 		mutex_unlock(&dev_priv->pcu_lock);
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		u32 rp_state_limits;
 		u32 gt_perf_status;
 		u32 rp_state_cap;
@@ -1135,7 +1135,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
 		reqf = I915_READ(GEN6_RPNSWREQ);
-		if (INTEL_GEN(dev_priv) >= 9)
+		if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 			reqf >>= 23;
 		else {
 			reqf &= ~GEN6_TURBO_DISABLE;
@@ -1162,7 +1162,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 
 		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 
-		if (INTEL_GEN(dev_priv) >= 11) {
+		if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 			pm_ier = I915_READ(GEN11_GPM_WGBOXPERF_INTR_ENABLE);
 			pm_imr = I915_READ(GEN11_GPM_WGBOXPERF_INTR_MASK);
 			/*
@@ -1171,7 +1171,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 			 */
 			pm_isr = 0;
 			pm_iir = 0;
-		} else if (INTEL_GEN(dev_priv) >= 8) {
+		} else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 			pm_ier = I915_READ(GEN8_GT_IER(2));
 			pm_imr = I915_READ(GEN8_GT_IMR(2));
 			pm_isr = I915_READ(GEN8_GT_ISR(2));
@@ -1194,14 +1194,14 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 
 		seq_printf(m, "PM IER=0x%08x IMR=0x%08x, MASK=0x%08x\n",
 			   pm_ier, pm_imr, pm_mask);
-		if (INTEL_GEN(dev_priv) <= 10)
+		if (GT_GEN_RANGE(dev_priv, 0, 10))
 			seq_printf(m, "PM ISR=0x%08x IIR=0x%08x\n",
 				   pm_isr, pm_iir);
 		seq_printf(m, "pm_intrmsk_mbz: 0x%08x\n",
 			   rps->pm_intrmsk_mbz);
 		seq_printf(m, "GT_PERF_STATUS: 0x%08x\n", gt_perf_status);
 		seq_printf(m, "Render p-state ratio: %d\n",
-			   (gt_perf_status & (INTEL_GEN(dev_priv) >= 9 ? 0x1ff00 : 0xff00)) >> 8);
+			   (gt_perf_status & (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER) ? 0x1ff00 : 0xff00)) >> 8);
 		seq_printf(m, "Render p-state VID: %d\n",
 			   gt_perf_status & 0xff);
 		seq_printf(m, "Render p-state limit: %d\n",
@@ -1233,20 +1233,20 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		max_freq = (GT_GEN9_LP(dev_priv) ? rp_state_cap >> 0 :
 			    rp_state_cap >> 16) & 0xff;
 		max_freq *= (GT_GEN9_BC(dev_priv) ||
-			     INTEL_GEN(dev_priv) >= 10 ? GEN9_FREQ_SCALER : 1);
+			     GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) ? GEN9_FREQ_SCALER : 1);
 		seq_printf(m, "Lowest (RPN) frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, max_freq));
 
 		max_freq = (rp_state_cap & 0xff00) >> 8;
 		max_freq *= (GT_GEN9_BC(dev_priv) ||
-			     INTEL_GEN(dev_priv) >= 10 ? GEN9_FREQ_SCALER : 1);
+			     GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) ? GEN9_FREQ_SCALER : 1);
 		seq_printf(m, "Nominal (RP1) frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, max_freq));
 
 		max_freq = (GT_GEN9_LP(dev_priv) ? rp_state_cap >> 16 :
 			    rp_state_cap >> 0) & 0xff;
 		max_freq *= (GT_GEN9_BC(dev_priv) ||
-			     INTEL_GEN(dev_priv) >= 10 ? GEN9_FREQ_SCALER : 1);
+			     GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) ? GEN9_FREQ_SCALER : 1);
 		seq_printf(m, "Max non-overclocked (RP0) frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, max_freq));
 		seq_printf(m, "Max overclocked frequency: %dMHz\n",
@@ -1288,13 +1288,13 @@ static void i915_instdone_info(struct drm_i915_private *dev_priv,
 	seq_printf(m, "\t\tINSTDONE: 0x%08x\n",
 		   instdone->instdone);
 
-	if (INTEL_GEN(dev_priv) <= 3)
+	if (GT_GEN_RANGE(dev_priv, 0, 3))
 		return;
 
 	seq_printf(m, "\t\tSC_INSTDONE: 0x%08x\n",
 		   instdone->slice_common);
 
-	if (INTEL_GEN(dev_priv) <= 6)
+	if (GT_GEN_RANGE(dev_priv, 0, 6))
 		return;
 
 	for_each_instdone_slice_subslice(dev_priv, slice, subslice)
@@ -1535,12 +1535,12 @@ static int gen6_drpc_info(struct seq_file *m)
 	trace_i915_reg_rw(false, GEN6_GT_CORE_STATUS, gt_core_status, 4, true);
 
 	rcctl1 = I915_READ(GEN6_RC_CONTROL);
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		gen9_powergate_enable = I915_READ(GEN9_PG_ENABLE);
 		gen9_powergate_status = I915_READ(GEN9_PWRGT_DOMAIN_STATUS);
 	}
 
-	if (INTEL_GEN(dev_priv) <= 7) {
+	if (GT_GEN_RANGE(dev_priv, 0, 7)) {
 		mutex_lock(&dev_priv->pcu_lock);
 		sandybridge_pcode_read(dev_priv, GEN6_PCODE_READ_RC6VIDS,
 				       &rc6vids);
@@ -1551,7 +1551,7 @@ static int gen6_drpc_info(struct seq_file *m)
 		   yesno(rcctl1 & GEN6_RC_CTL_RC1e_ENABLE));
 	seq_printf(m, "RC6 Enabled: %s\n",
 		   yesno(rcctl1 & GEN6_RC_CTL_RC6_ENABLE));
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		seq_printf(m, "Render Well Gating Enabled: %s\n",
 			yesno(gen9_powergate_enable & GEN9_RENDER_PG_ENABLE));
 		seq_printf(m, "Media Well Gating Enabled: %s\n",
@@ -1585,7 +1585,7 @@ static int gen6_drpc_info(struct seq_file *m)
 
 	seq_printf(m, "Core Power Down: %s\n",
 		   yesno(gt_core_status & GEN6_CORE_CPD_STATE_MASK));
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		seq_printf(m, "Render Power Well: %s\n",
 			(gen9_powergate_status &
 			 GEN9_PWRGT_RENDER_STATUS_MASK) ? "Up" : "Down");
@@ -1601,7 +1601,7 @@ static int gen6_drpc_info(struct seq_file *m)
 	print_rc6_res(m, "RC6+ residency since boot:", GEN6_GT_GFX_RC6p);
 	print_rc6_res(m, "RC6++ residency since boot:", GEN6_GT_GFX_RC6pp);
 
-	if (INTEL_GEN(dev_priv) <= 7) {
+	if (GT_GEN_RANGE(dev_priv, 0, 7)) {
 		seq_printf(m, "RC6   voltage: %dmV\n",
 			   GEN6_DECODE_RC6_VID(((rc6vids >> 0) & 0xff)));
 		seq_printf(m, "RC6+  voltage: %dmV\n",
@@ -1622,7 +1622,7 @@ static int i915_drpc_info(struct seq_file *m, void *unused)
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		err = vlv_drpc_info(m);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		err = gen6_drpc_info(m);
 	else
 		err = ironlake_drpc_info(m);
@@ -1664,11 +1664,11 @@ static int i915_fbc_status(struct seq_file *m, void *unused)
 	if (intel_fbc_is_active(dev_priv)) {
 		u32 mask;
 
-		if (INTEL_GEN(dev_priv) >= 8)
+		if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 			mask = I915_READ(IVB_FBC_STATUS2) & BDW_FBC_COMP_SEG_MASK;
-		else if (INTEL_GEN(dev_priv) >= 7)
+		else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 			mask = I915_READ(IVB_FBC_STATUS2) & IVB_FBC_COMP_SEG_MASK;
-		else if (INTEL_GEN(dev_priv) >= 5)
+		else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER))
 			mask = I915_READ(ILK_DPFC_STATUS) & ILK_DPFC_COMP_SEG_MASK;
 		else if (IS_G4X(dev_priv))
 			mask = I915_READ(DPFC_STATUS) & DPFC_COMP_SEG_MASK;
@@ -1689,7 +1689,7 @@ static int i915_fbc_false_color_get(void *data, u64 *val)
 {
 	struct drm_i915_private *dev_priv = data;
 
-	if (INTEL_GEN(dev_priv) < 7 || !HAS_FBC(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 0, 6) || !HAS_FBC(dev_priv))
 		return -ENODEV;
 
 	*val = dev_priv->fbc.false_color;
@@ -1702,7 +1702,7 @@ static int i915_fbc_false_color_set(void *data, u64 val)
 	struct drm_i915_private *dev_priv = data;
 	u32 reg;
 
-	if (INTEL_GEN(dev_priv) < 7 || !HAS_FBC(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 0, 6) || !HAS_FBC(dev_priv))
 		return -ENODEV;
 
 	mutex_lock(&dev_priv->fbc.lock);
@@ -1734,7 +1734,7 @@ static int i915_ips_status(struct seq_file *m, void *unused)
 	seq_printf(m, "Enabled by kernel parameter: %s\n",
 		   yesno(i915_modparams.enable_ips));
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		seq_puts(m, "Currently: unknown\n");
 	} else {
 		if (I915_READ(IPS_CTL) & IPS_ENABLE)
@@ -1756,7 +1756,7 @@ static int i915_sr_status(struct seq_file *m, void *unused)
 	intel_runtime_pm_get(dev_priv);
 	intel_display_power_get(dev_priv, POWER_DOMAIN_INIT);
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		/* no global SR status; inspect per-plane WM */;
 	else if (HAS_PCH_SPLIT(dev_priv))
 		sr_enabled = I915_READ(WM1_LP_ILK) & WM1_LP_SR_EN;
@@ -1824,7 +1824,7 @@ static int i915_ring_freq_table(struct seq_file *m, void *unused)
 
 	min_gpu_freq = rps->min_freq;
 	max_gpu_freq = rps->max_freq;
-	if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_BC(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		/* Convert GT frequency to 50 HZ units */
 		min_gpu_freq /= GEN9_FREQ_SCALER;
 		max_gpu_freq /= GEN9_FREQ_SCALER;
@@ -1840,7 +1840,7 @@ static int i915_ring_freq_table(struct seq_file *m, void *unused)
 		seq_printf(m, "%d\t\t%d\t\t\t\t%d\n",
 			   intel_gpu_freq(dev_priv, (gpu_freq *
 						     (GT_GEN9_BC(dev_priv) ||
-						      INTEL_GEN(dev_priv) >= 10 ?
+						      GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) ?
 						      GEN9_FREQ_SCALER : 1))),
 			   ((ia_freq >> 0) & 0xff) * 100,
 			   ((ia_freq >> 8) & 0xff) * 100);
@@ -2039,7 +2039,7 @@ static int i915_swizzle_info(struct seq_file *m, void *data)
 			   I915_READ16(C0DRB3));
 		seq_printf(m, "C1DRB3 = 0x%04x\n",
 			   I915_READ16(C1DRB3));
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		seq_printf(m, "MAD_DIMM_C0 = 0x%08x\n",
 			   I915_READ(MAD_DIMM_C0));
 		seq_printf(m, "MAD_DIMM_C1 = 0x%08x\n",
@@ -2048,7 +2048,7 @@ static int i915_swizzle_info(struct seq_file *m, void *data)
 			   I915_READ(MAD_DIMM_C2));
 		seq_printf(m, "TILECTL = 0x%08x\n",
 			   I915_READ(TILECTL));
-		if (INTEL_GEN(dev_priv) >= 8)
+		if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 			seq_printf(m, "GAMTARBMODE = 0x%08x\n",
 				   I915_READ(GAMTARBMODE));
 		else
@@ -2156,9 +2156,9 @@ static int i915_ppgtt_info(struct seq_file *m, void *data)
 
 	intel_runtime_pm_get(dev_priv);
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		gen8_ppgtt_info(m, dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_ppgtt_info(m, dev_priv);
 
 	list_for_each_entry_reverse(file, &dev->filelist, lhead) {
@@ -2269,7 +2269,7 @@ static int i915_rps_boost_info(struct seq_file *m, void *data)
 		   atomic_read(&rps->boosts));
 	mutex_unlock(&dev->filelist_mutex);
 
-	if (INTEL_GEN(dev_priv) >= 6 &&
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER) &&
 	    rps->enabled &&
 	    dev_priv->gt.active_requests) {
 		u32 rpup, rpupei;
@@ -2300,7 +2300,8 @@ static int i915_rps_boost_info(struct seq_file *m, void *data)
 static int i915_llc(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
-	const bool edram = INTEL_GEN(dev_priv) > 8;
+	const bool edram = GT_GEN_RANGE(dev_priv, 9,
+					GEN_FOREVER);
 
 	seq_printf(m, "LLC: %s\n", yesno(HAS_LLC(dev_priv)));
 	seq_printf(m, "%s: %lluMB\n", edram ? "eDRAM" : "eLLC",
@@ -2821,7 +2822,7 @@ static int i915_energy_uJ(struct seq_file *m, void *data)
 	unsigned long long power;
 	u32 units;
 
-	if (INTEL_GEN(dev_priv) < 6)
+	if (GT_GEN_RANGE(dev_priv, 0, 5))
 		return -ENODEV;
 
 	intel_runtime_pm_get(dev_priv);
@@ -2916,7 +2917,7 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 	seq_printf(m, "version: %d.%d\n", CSR_VERSION_MAJOR(csr->version),
 		   CSR_VERSION_MINOR(csr->version));
 
-	if (WARN_ON(INTEL_GEN(dev_priv) > 11))
+	if (WARN_ON(GT_GEN_RANGE(dev_priv, 12, GEN_FOREVER)))
 		goto out;
 
 	seq_printf(m, "DC3 -> DC5 count: %d\n",
@@ -3442,7 +3443,7 @@ static int i915_ddb_info(struct seq_file *m, void *unused)
 	enum pipe pipe;
 	int plane;
 
-	if (INTEL_GEN(dev_priv) < 9)
+	if (GT_GEN_RANGE(dev_priv, 0, 8))
 		return -ENODEV;
 
 	drm_modeset_lock_all(dev);
@@ -3811,7 +3812,7 @@ static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
 		 * - WM1+ latency values in 0.5us units
 		 * - latencies are in us on gen9/vlv/chv
 		 */
-		if (INTEL_GEN(dev_priv) >= 9 ||
+		if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER) ||
 		    IS_VALLEYVIEW(dev_priv) ||
 		    IS_CHERRYVIEW(dev_priv) ||
 		    IS_G4X(dev_priv))
@@ -3831,7 +3832,7 @@ static int pri_wm_latency_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = m->private;
 	const uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = dev_priv->wm.pri_latency;
@@ -3846,7 +3847,7 @@ static int spr_wm_latency_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = m->private;
 	const uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = dev_priv->wm.spr_latency;
@@ -3861,7 +3862,7 @@ static int cur_wm_latency_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = m->private;
 	const uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = dev_priv->wm.cur_latency;
@@ -3875,7 +3876,7 @@ static int pri_wm_latency_open(struct inode *inode, struct file *file)
 {
 	struct drm_i915_private *dev_priv = inode->i_private;
 
-	if (INTEL_GEN(dev_priv) < 5 && !IS_G4X(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 0, 4) && !IS_G4X(dev_priv))
 		return -ENODEV;
 
 	return single_open(file, pri_wm_latency_show, dev_priv);
@@ -3954,7 +3955,7 @@ static ssize_t pri_wm_latency_write(struct file *file, const char __user *ubuf,
 	struct drm_i915_private *dev_priv = m->private;
 	uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = dev_priv->wm.pri_latency;
@@ -3969,7 +3970,7 @@ static ssize_t spr_wm_latency_write(struct file *file, const char __user *ubuf,
 	struct drm_i915_private *dev_priv = m->private;
 	uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = dev_priv->wm.spr_latency;
@@ -3984,7 +3985,7 @@ static ssize_t cur_wm_latency_write(struct file *file, const char __user *ubuf,
 	struct drm_i915_private *dev_priv = m->private;
 	uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = dev_priv->wm.cur_latency;
@@ -4141,7 +4142,7 @@ i915_ring_test_irq_set(void *data, u64 val)
 	 * From icl, we can no longer individually mask interrupt generation
 	 * from each engine.
 	 */
-	if (INTEL_GEN(i915) >= 11)
+	if (GT_GEN_RANGE(i915, 11, GEN_FOREVER))
 		return -ENODEV;
 
 	val &= INTEL_INFO(i915)->ring_mask;
@@ -4519,7 +4520,7 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct sseu_dev_info sseu;
 
-	if (INTEL_GEN(dev_priv) < 8)
+	if (GT_GEN_RANGE(dev_priv, 0, 7))
 		return -ENODEV;
 
 	seq_puts(m, "SSEU Device Info\n");
@@ -4540,7 +4541,7 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 		broadwell_sseu_device_status(dev_priv, &sseu);
 	} else if (GT_GEN(dev_priv, 9)) {
 		gen9_sseu_device_status(dev_priv, &sseu);
-	} else if (INTEL_GEN(dev_priv) >= 10) {
+	} else if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		gen10_sseu_device_status(dev_priv, &sseu);
 	}
 
@@ -4555,7 +4556,7 @@ static int i915_forcewake_open(struct inode *inode, struct file *file)
 {
 	struct drm_i915_private *i915 = inode->i_private;
 
-	if (INTEL_GEN(i915) < 6)
+	if (GT_GEN_RANGE(i915, 0, 5))
 		return 0;
 
 	intel_runtime_pm_get(i915);
@@ -4568,7 +4569,7 @@ static int i915_forcewake_release(struct inode *inode, struct file *file)
 {
 	struct drm_i915_private *i915 = inode->i_private;
 
-	if (INTEL_GEN(i915) < 6)
+	if (GT_GEN_RANGE(i915, 0, 5))
 		return 0;
 
 	intel_uncore_forcewake_user_put(i915);
@@ -4664,7 +4665,7 @@ static int i915_drrs_ctl_set(void *data, u64 val)
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_crtc *crtc;
 
-	if (INTEL_GEN(dev_priv) < 7)
+	if (GT_GEN_RANGE(dev_priv, 0, 6))
 		return -ENODEV;
 
 	for_each_intel_crtc(dev, crtc) {

@@ -517,7 +517,7 @@ int intel_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 
 	dev_priv->workarounds.count = 0;
 
-	if (INTEL_GEN(dev_priv) < 8)
+	if (GT_GEN_RANGE(dev_priv, 0, 7))
 		err = 0;
 	else if (IS_BROADWELL(dev_priv))
 		err = bdw_ctx_workarounds_init(dev_priv);
@@ -749,7 +749,7 @@ static void wa_init_mcr(struct drm_i915_private *dev_priv)
 	 * something more complex that requires checking the range of every
 	 * MMIO read).
 	 */
-	if (INTEL_GEN(dev_priv) >= 10 &&
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) &&
 	    is_power_of_2(sseu->slice_mask)) {
 		/*
 		 * read FUSE3 for enabled L3 Bank IDs, if L3 Bank matches
@@ -772,7 +772,7 @@ static void wa_init_mcr(struct drm_i915_private *dev_priv)
 
 	mcr = I915_READ(GEN8_MCR_SELECTOR);
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		mcr_slice_subslice_mask = GEN11_MCR_SLICE_MASK |
 					  GEN11_MCR_SUBSLICE_MASK;
 	else
@@ -916,7 +916,7 @@ static void icl_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 
 void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) < 8)
+	if (GT_GEN_RANGE(dev_priv, 0, 7))
 		return;
 	else if (IS_BROADWELL(dev_priv))
 		bdw_gt_workarounds_apply(dev_priv);
@@ -1033,7 +1033,7 @@ static struct whitelist *whitelist_build(struct intel_engine_cs *engine,
 	w->count = 0;
 	w->nopid = i915_mmio_reg_offset(RING_NOPID(engine->mmio_base));
 
-	if (INTEL_GEN(i915) < 8)
+	if (GT_GEN_RANGE(i915, 0, 7))
 		return NULL;
 	else if (IS_BROADWELL(i915))
 		bdw_whitelist_build(w);

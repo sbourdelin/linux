@@ -349,7 +349,7 @@ static void ring_setup_phys_status_page(struct intel_engine_cs *engine)
 	u32 addr;
 
 	addr = lower_32_bits(phys);
-	if (INTEL_GEN(dev_priv) >= 4)
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		addr |= (phys >> 28) & 0xf0;
 
 	I915_WRITE(HWS_PGA, addr);
@@ -390,7 +390,7 @@ static void intel_ring_setup_status_page(struct intel_engine_cs *engine)
 		mmio = RING_HWS_PGA(engine->mmio_base);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		u32 mask = ~0u;
 
 		/*
@@ -428,7 +428,7 @@ static bool stop_ring(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 
-	if (INTEL_GEN(dev_priv) > 2) {
+	if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER)) {
 		I915_WRITE_MODE(engine, _MASKED_BIT_ENABLE(STOP_RING));
 		if (intel_wait_for_register(dev_priv,
 					    RING_MI_MODE(engine->mmio_base),
@@ -537,7 +537,7 @@ static int init_ring_common(struct intel_engine_cs *engine)
 		goto out;
 	}
 
-	if (INTEL_GEN(dev_priv) > 2)
+	if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER))
 		I915_WRITE_MODE(engine, _MASKED_BIT_DISABLE(STOP_RING));
 
 	/* Papering over lost _interrupts_ immediately following the restart */
@@ -666,7 +666,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 	if (GT_GEN_RANGE(dev_priv, 6, 7))
 		I915_WRITE(INSTPM, _MASKED_BIT_ENABLE(INSTPM_FORCE_ORDERING));
 
-	if (INTEL_GEN(dev_priv) >= 6)
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		I915_WRITE_IMR(engine, ~engine->irq_keep_mask);
 
 	return 0;
@@ -1457,7 +1457,7 @@ void intel_engine_cleanup(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 
-	WARN_ON(INTEL_GEN(dev_priv) > 2 &&
+	WARN_ON(GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER) &&
 		(I915_READ_MODE(engine) & MODE_IDLE) == 0);
 
 	intel_ring_unpin(engine->buffer);
@@ -2086,7 +2086,7 @@ static void intel_ring_init_semaphores(struct drm_i915_private *dev_priv,
 	if (!HAS_LEGACY_SEMAPHORES(dev_priv))
 		return;
 
-	GEM_BUG_ON(INTEL_GEN(dev_priv) < 6);
+	GEM_BUG_ON(GT_GEN_RANGE(dev_priv, 0, 5));
 	engine->semaphore.sync_to = gen6_ring_sync_to;
 	engine->semaphore.signal = gen6_signal;
 
@@ -2141,15 +2141,15 @@ static void intel_ring_init_semaphores(struct drm_i915_private *dev_priv,
 static void intel_ring_init_irq(struct drm_i915_private *dev_priv,
 				struct intel_engine_cs *engine)
 {
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		engine->irq_enable = gen6_irq_enable;
 		engine->irq_disable = gen6_irq_disable;
 		engine->irq_seqno_barrier = gen6_seqno_barrier;
-	} else if (INTEL_GEN(dev_priv) >= 5) {
+	} else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		engine->irq_enable = gen5_irq_enable;
 		engine->irq_disable = gen5_irq_disable;
 		engine->irq_seqno_barrier = gen5_seqno_barrier;
-	} else if (INTEL_GEN(dev_priv) >= 3) {
+	} else if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER)) {
 		engine->irq_enable = i9xx_irq_enable;
 		engine->irq_disable = i9xx_irq_disable;
 	} else {
@@ -2177,7 +2177,7 @@ static void intel_ring_default_vfuncs(struct drm_i915_private *dev_priv,
 				      struct intel_engine_cs *engine)
 {
 	/* gen8+ are only supported with execlists */
-	GEM_BUG_ON(INTEL_GEN(dev_priv) >= 8);
+	GEM_BUG_ON(GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER));
 
 	intel_ring_init_irq(dev_priv, engine);
 	intel_ring_init_semaphores(dev_priv, engine);
@@ -2205,9 +2205,9 @@ static void intel_ring_default_vfuncs(struct drm_i915_private *dev_priv,
 
 	engine->set_default_submission = i9xx_set_default_submission;
 
-	if (INTEL_GEN(dev_priv) >= 6)
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		engine->emit_bb_start = gen6_emit_bb_start;
-	else if (INTEL_GEN(dev_priv) >= 4)
+	else if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		engine->emit_bb_start = i965_emit_bb_start;
 	else if (IS_I830(dev_priv) || IS_I845G(dev_priv))
 		engine->emit_bb_start = i830_emit_bb_start;
@@ -2227,7 +2227,7 @@ int intel_init_render_ring_buffer(struct intel_engine_cs *engine)
 
 	engine->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		engine->init_context = intel_rcs_ctx_init;
 		engine->emit_flush = gen7_render_ring_flush;
 		if (GT_GEN(dev_priv, 6))
@@ -2235,7 +2235,7 @@ int intel_init_render_ring_buffer(struct intel_engine_cs *engine)
 	} else if (GT_GEN(dev_priv, 5)) {
 		engine->emit_flush = gen4_render_ring_flush;
 	} else {
-		if (INTEL_GEN(dev_priv) < 4)
+		if (GT_GEN_RANGE(dev_priv, 0, 3))
 			engine->emit_flush = gen2_render_ring_flush;
 		else
 			engine->emit_flush = gen4_render_ring_flush;
@@ -2260,7 +2260,7 @@ int intel_init_bsd_ring_buffer(struct intel_engine_cs *engine)
 
 	intel_ring_default_vfuncs(dev_priv, engine);
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		/* gen6 bsd needs a special wa for tail updates */
 		if (GT_GEN(dev_priv, 6))
 			engine->set_default_submission = gen6_bsd_set_default_submission;

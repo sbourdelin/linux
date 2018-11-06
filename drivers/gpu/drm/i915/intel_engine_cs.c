@@ -233,7 +233,7 @@ __intel_engine_context_size(struct drm_i915_private *dev_priv, u8 class)
 	case VIDEO_DECODE_CLASS:
 	case VIDEO_ENHANCEMENT_CLASS:
 	case COPY_ENGINE_CLASS:
-		if (INTEL_GEN(dev_priv) < 8)
+		if (GT_GEN_RANGE(dev_priv, 0, 7))
 			return 0;
 		return GEN8_LR_CONTEXT_OTHER_SIZE;
 	}
@@ -730,10 +730,10 @@ u64 intel_engine_get_active_head(const struct intel_engine_cs *engine)
 	struct drm_i915_private *dev_priv = engine->i915;
 	u64 acthd;
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		acthd = I915_READ64_2x32(RING_ACTHD(engine->mmio_base),
 					 RING_ACTHD_UDW(engine->mmio_base));
-	else if (INTEL_GEN(dev_priv) >= 4)
+	else if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		acthd = I915_READ(RING_ACTHD(engine->mmio_base));
 	else
 		acthd = I915_READ(ACTHD);
@@ -746,7 +746,7 @@ u64 intel_engine_get_last_batch_head(const struct intel_engine_cs *engine)
 	struct drm_i915_private *dev_priv = engine->i915;
 	u64 bbaddr;
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		bbaddr = I915_READ64_2x32(RING_BBADDR(engine->mmio_base),
 					  RING_BBADDR_UDW(engine->mmio_base));
 	else
@@ -762,7 +762,7 @@ int intel_engine_stop_cs(struct intel_engine_cs *engine)
 	const i915_reg_t mode = RING_MI_MODE(base);
 	int err;
 
-	if (INTEL_GEN(dev_priv) < 3)
+	if (GT_GEN_RANGE(dev_priv, 0, 2))
 		return -ENODEV;
 
 	GEM_TRACE("%s\n", engine->name);
@@ -815,7 +815,7 @@ u32 intel_calculate_mcr_s_ss_select(struct drm_i915_private *dev_priv)
 	if (GT_GEN(dev_priv, 10))
 		mcr_s_ss_select = GEN8_MCR_SLICE(slice) |
 				  GEN8_MCR_SUBSLICE(subslice);
-	else if (INTEL_GEN(dev_priv) >= 11)
+	else if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		mcr_s_ss_select = GEN11_MCR_SLICE(slice) |
 				  GEN11_MCR_SUBSLICE(subslice);
 	else
@@ -835,7 +835,7 @@ read_subslice_reg(struct drm_i915_private *dev_priv, int slice,
 	uint32_t ret;
 	enum forcewake_domains fw_domains;
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		mcr_slice_subslice_mask = GEN11_MCR_SLICE_MASK |
 					  GEN11_MCR_SUBSLICE_MASK;
 		mcr_slice_subslice_select = GEN11_MCR_SLICE(slice) |
@@ -950,7 +950,7 @@ static bool ring_is_idle(struct intel_engine_cs *engine)
 		idle = false;
 
 	/* No bit for gen2, so assume the CS parser is idle */
-	if (INTEL_GEN(dev_priv) > 2 && !(I915_READ_MODE(engine) & MODE_IDLE))
+	if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER) && !(I915_READ_MODE(engine) & MODE_IDLE))
 		idle = false;
 
 	intel_runtime_pm_put(dev_priv);
@@ -1297,13 +1297,13 @@ static void intel_engine_print_registers(const struct intel_engine_cs *engine,
 	drm_printf(m, "\tRING_CTL:   0x%08x%s\n",
 		   I915_READ(RING_CTL(engine->mmio_base)),
 		   I915_READ(RING_CTL(engine->mmio_base)) & (RING_WAIT | RING_WAIT_SEMAPHORE) ? " [waiting]" : "");
-	if (INTEL_GEN(engine->i915) > 2) {
+	if (GT_GEN_RANGE(engine->i915, 3, GEN_FOREVER)) {
 		drm_printf(m, "\tRING_MODE:  0x%08x%s\n",
 			   I915_READ(RING_MI_MODE(engine->mmio_base)),
 			   I915_READ(RING_MI_MODE(engine->mmio_base)) & (MODE_IDLE) ? " [idle]" : "");
 	}
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		drm_printf(m, "\tRING_IMR: %08x\n", I915_READ_IMR(engine));
 	}
 
@@ -1323,16 +1323,16 @@ static void intel_engine_print_registers(const struct intel_engine_cs *engine,
 	addr = intel_engine_get_last_batch_head(engine);
 	drm_printf(m, "\tBBADDR: 0x%08x_%08x\n",
 		   upper_32_bits(addr), lower_32_bits(addr));
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		addr = I915_READ64_2x32(RING_DMA_FADD(engine->mmio_base),
 					RING_DMA_FADD_UDW(engine->mmio_base));
-	else if (INTEL_GEN(dev_priv) >= 4)
+	else if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		addr = I915_READ(RING_DMA_FADD(engine->mmio_base));
 	else
 		addr = I915_READ(DMA_FADD_I8XX);
 	drm_printf(m, "\tDMA_FADDR: 0x%08x_%08x\n",
 		   upper_32_bits(addr), lower_32_bits(addr));
-	if (INTEL_GEN(dev_priv) >= 4) {
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER)) {
 		drm_printf(m, "\tIPEIR: 0x%08x\n",
 			   I915_READ(RING_IPEIR(engine->mmio_base)));
 		drm_printf(m, "\tIPEHR: 0x%08x\n",
@@ -1396,7 +1396,7 @@ static void intel_engine_print_registers(const struct intel_engine_cs *engine,
 		}
 		drm_printf(m, "\t\tHW active? 0x%x\n", execlists->active);
 		rcu_read_unlock();
-	} else if (INTEL_GEN(dev_priv) > 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		drm_printf(m, "\tPP_DIR_BASE: 0x%08x\n",
 			   I915_READ(RING_PP_DIR_BASE(engine)));
 		drm_printf(m, "\tPP_DIR_BASE_READ: 0x%08x\n",

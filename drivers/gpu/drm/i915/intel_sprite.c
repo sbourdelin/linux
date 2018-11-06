@@ -494,7 +494,7 @@ skl_program_plane(struct intel_plane *plane,
 
 	spin_lock_irqsave(&dev_priv->uncore.lock, irqflags);
 
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		I915_WRITE_FW(PLANE_COLOR_CTL(pipe, plane_id),
 			      plane_state->color_ctl);
 
@@ -522,7 +522,7 @@ skl_program_plane(struct intel_plane *plane,
 	I915_WRITE_FW(PLANE_AUX_DIST(pipe, plane_id),
 		      (plane_state->color_plane[1].offset - surf_addr) | aux_stride);
 
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		I915_WRITE_FW(PLANE_AUX_OFFSET(pipe, plane_id),
 			      (plane_state->color_plane[1].y << 16) |
 			       plane_state->color_plane[1].x);
@@ -1314,7 +1314,7 @@ g4x_sprite_check(struct intel_crtc_state *crtc_state,
 	int ret;
 
 	if (intel_fb_scalable(plane_state->base.fb)) {
-		if (INTEL_GEN(dev_priv) < 7) {
+		if (GT_GEN_RANGE(dev_priv, 0, 6)) {
 			min_scale = 1;
 			max_scale = 16 << 16;
 		} else if (IS_IVYBRIDGE(dev_priv)) {
@@ -1345,7 +1345,7 @@ g4x_sprite_check(struct intel_crtc_state *crtc_state,
 	if (ret)
 		return ret;
 
-	if (INTEL_GEN(dev_priv) >= 7)
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		plane_state->ctl = ivb_sprite_ctl(crtc_state, plane_state);
 	else
 		plane_state->ctl = g4x_sprite_ctl(crtc_state, plane_state);
@@ -1444,7 +1444,7 @@ static int skl_plane_check_fb(const struct intel_crtc_state *crtc_state,
 		 */
 		switch (fb->format->format) {
 		case DRM_FORMAT_RGB565:
-			if (INTEL_GEN(dev_priv) >= 11)
+			if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 				break;
 			/* fall through */
 		case DRM_FORMAT_C8:
@@ -1570,7 +1570,7 @@ static int skl_plane_check(struct intel_crtc_state *crtc_state,
 
 	plane_state->ctl = skl_plane_ctl(crtc_state, plane_state);
 
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		plane_state->color_ctl = glk_plane_color_ctl(crtc_state,
 							     plane_state);
 
@@ -1579,7 +1579,7 @@ static int skl_plane_check(struct intel_crtc_state *crtc_state,
 
 static bool has_dst_key_in_primary_plane(struct drm_i915_private *dev_priv)
 {
-	return INTEL_GEN(dev_priv) >= 9;
+	return GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER);
 }
 
 static void intel_plane_set_ckey(struct intel_plane_state *plane_state,
@@ -1603,7 +1603,7 @@ static void intel_plane_set_ckey(struct intel_plane_state *plane_state,
 	 * On SKL+ we want dst key enabled on
 	 * the primary and not on the sprite.
 	 */
-	if (INTEL_GEN(dev_priv) >= 9 && plane->id != PLANE_PRIMARY &&
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER) && plane->id != PLANE_PRIMARY &&
 	    set->flags & I915_SET_COLORKEY_DESTINATION)
 		key->flags = 0;
 }
@@ -1642,7 +1642,7 @@ int intel_sprite_set_colorkey_ioctl(struct drm_device *dev, void *data,
 	 * Also multiple planes can't do destination keying on the same
 	 * pipe simultaneously.
 	 */
-	if (INTEL_GEN(dev_priv) >= 9 &&
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER) &&
 	    to_intel_plane(plane)->id >= PLANE_SPRITE1 &&
 	    set->flags & I915_SET_COLORKEY_DESTINATION)
 		return -EINVAL;
@@ -1972,7 +1972,7 @@ static bool skl_plane_has_fbc(struct drm_i915_private *dev_priv,
 static bool skl_plane_has_planar(struct drm_i915_private *dev_priv,
 				 enum pipe pipe, enum plane_id plane_id)
 {
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		return plane_id <= PLANE_SPRITE3;
 
 	/* Display WA #0870: skl, bxt */
@@ -1994,7 +1994,7 @@ static bool skl_plane_has_ccs(struct drm_i915_private *dev_priv,
 	if (plane_id == PLANE_CURSOR)
 		return false;
 
-	if (INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		return true;
 
 	if (IS_GEMINILAKE(dev_priv))
@@ -2104,7 +2104,7 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 		DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_90 |
 		DRM_MODE_ROTATE_180 | DRM_MODE_ROTATE_270;
 
-	if (INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		supported_rotations |= DRM_MODE_REFLECT_X;
 
 	drm_plane_create_rotation_property(&plane->base,
@@ -2148,7 +2148,7 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 	int num_formats;
 	int ret;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		return skl_universal_plane_create(dev_priv, pipe,
 						  PLANE_SPRITE0 + sprite);
 
@@ -2168,7 +2168,7 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 		modifiers = i9xx_plane_format_modifiers;
 
 		plane_funcs = &vlv_sprite_funcs;
-	} else if (INTEL_GEN(dev_priv) >= 7) {
+	} else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		plane->max_stride = g4x_sprite_max_stride;
 		plane->update_plane = ivb_update_plane;
 		plane->disable_plane = ivb_disable_plane;

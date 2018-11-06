@@ -80,7 +80,7 @@ u32 i915_gem_fence_size(struct drm_i915_private *i915,
 
 	GEM_BUG_ON(!stride);
 
-	if (INTEL_GEN(i915) >= 4) {
+	if (GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 		stride *= i915_gem_tile_height(tiling);
 		GEM_BUG_ON(!IS_ALIGNED(stride, I965_FENCE_PAGE));
 		return roundup(size, stride);
@@ -120,7 +120,7 @@ u32 i915_gem_fence_alignment(struct drm_i915_private *i915, u32 size,
 	if (tiling == I915_TILING_NONE)
 		return I915_GTT_MIN_ALIGNMENT;
 
-	if (INTEL_GEN(i915) >= 4)
+	if (GT_GEN_RANGE(i915, 4, GEN_FOREVER))
 		return I965_FENCE_PAGE;
 
 	/*
@@ -148,10 +148,10 @@ i915_tiling_ok(struct drm_i915_gem_object *obj,
 	/* check maximum stride & object size */
 	/* i965+ stores the end address of the gtt mapping in the fence
 	 * reg, so dont bother to check the size */
-	if (INTEL_GEN(i915) >= 7) {
+	if (GT_GEN_RANGE(i915, 7, GEN_FOREVER)) {
 		if (stride / 128 > GEN7_FENCE_MAX_PITCH_VAL)
 			return false;
-	} else if (INTEL_GEN(i915) >= 4) {
+	} else if (GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 		if (stride / 128 > I965_FENCE_MAX_PITCH_VAL)
 			return false;
 	} else {

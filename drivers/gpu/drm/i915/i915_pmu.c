@@ -326,7 +326,7 @@ engine_event_status(struct intel_engine_cs *engine,
 	case I915_SAMPLE_WAIT:
 		break;
 	case I915_SAMPLE_SEMA:
-		if (INTEL_GEN(engine->i915) < 6)
+		if (GT_GEN_RANGE(engine->i915, 0, 5))
 			return -ENODEV;
 		break;
 	default:
@@ -346,7 +346,7 @@ config_status(struct drm_i915_private *i915, u64 config)
 			return -ENODEV;
 		/* Fall-through. */
 	case I915_PMU_REQUESTED_FREQUENCY:
-		if (INTEL_GEN(i915) < 6)
+		if (GT_GEN_RANGE(i915, 0, 5))
 			return -ENODEV;
 		break;
 	case I915_PMU_INTERRUPTS:
@@ -1036,7 +1036,7 @@ void i915_pmu_register(struct drm_i915_private *i915)
 {
 	int ret;
 
-	if (INTEL_GEN(i915) <= 2) {
+	if (GT_GEN_RANGE(i915, 0, 2)) {
 		DRM_INFO("PMU not supported for this GPU.");
 		return;
 	}

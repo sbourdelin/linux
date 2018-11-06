@@ -369,7 +369,7 @@ static void hsw_power_well_enable(struct drm_i915_private *dev_priv,
 	u32 val;
 
 	if (wait_fuses) {
-		pg = INTEL_GEN(dev_priv) >= 11 ? ICL_PW_CTL_IDX_TO_PG(pw_idx) :
+		pg = GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) ? ICL_PW_CTL_IDX_TO_PG(pw_idx) :
 						 SKL_PW_CTL_IDX_TO_PG(pw_idx);
 		/*
 		 * For PW1 we have to wait both for the PW0/PG0 fuse state
@@ -579,7 +579,7 @@ static u32 gen9_dc_mask(struct drm_i915_private *dev_priv)
 	u32 mask;
 
 	mask = DC_STATE_EN_UPTO_DC5;
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		mask |= DC_STATE_EN_UPTO_DC6 | DC_STATE_EN_DC9;
 	else if (GT_GEN9_LP(dev_priv))
 		mask |= DC_STATE_EN_DC9;
@@ -3019,7 +3019,7 @@ static uint32_t get_allowed_dc_mask(const struct drm_i915_private *dev_priv,
 	int requested_dc;
 	int max_dc;
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		max_dc = 2;
 		/*
 		 * DC9 has a separate HW flow from the rest of the DC states,
@@ -3220,7 +3220,7 @@ static void gen9_dbuf_disable(struct drm_i915_private *dev_priv)
 
 static u8 intel_dbuf_max_slices(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		return 1;
 	return 2;
 }
@@ -3826,7 +3826,7 @@ void intel_power_domains_init_hw(struct drm_i915_private *dev_priv, bool resume)
 		mutex_lock(&power_domains->lock);
 		vlv_cmnlane_wa(dev_priv);
 		mutex_unlock(&power_domains->lock);
-	} else if (IS_IVYBRIDGE(dev_priv) || INTEL_GEN(dev_priv) >= 7)
+	} else if (IS_IVYBRIDGE(dev_priv) || GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		intel_pch_reset_handshake(dev_priv, !HAS_PCH_NOP(dev_priv));
 
 	/*

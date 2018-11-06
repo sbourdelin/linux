@@ -184,7 +184,7 @@ int intel_uncore_live_selftests(struct drm_i915_private *i915)
 	/* Confirm the table we load is still valid */
 	err = intel_fw_table_check(i915->uncore.fw_domains_table,
 				   i915->uncore.fw_domains_table_entries,
-				   INTEL_GEN(i915) >= 9);
+				   GT_GEN_RANGE(i915, 9, GEN_FOREVER));
 	if (err)
 		return err;
 

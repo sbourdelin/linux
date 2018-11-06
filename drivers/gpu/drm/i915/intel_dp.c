@@ -339,7 +339,7 @@ intel_dp_set_source_rates(struct intel_dp *intel_dp)
 	/* This should only be done once */
 	WARN_ON(intel_dp->source_rates || intel_dp->num_source_rates);
 
-	if (INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		source_rates = cnl_rates;
 		size = ARRAY_SIZE(cnl_rates);
 		if (GT_GEN(dev_priv, 10))
@@ -535,7 +535,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	 * Output bpp is stored in 6.4 format so right shift by 4 to get the
 	 * integer value since we support only integer values of bpp.
 	 */
-	if ((INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) &&
+	if ((GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv)) &&
 	    drm_dp_sink_supports_dsc(intel_dp->dsc_dpcd)) {
 		if (intel_dp_is_edp(intel_dp)) {
 			dsc_max_output_bpp =
@@ -1549,7 +1549,7 @@ intel_dp_aux_init(struct intel_dp *intel_dp)
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct intel_encoder *encoder = &dig_port->base;
 
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		intel_dp->aux_ch_ctl_reg = skl_aux_ctl_reg;
 		intel_dp->aux_ch_data_reg = skl_aux_data_reg;
 	} else if (HAS_PCH_SPLIT(dev_priv)) {
@@ -1560,7 +1560,7 @@ intel_dp_aux_init(struct intel_dp *intel_dp)
 		intel_dp->aux_ch_data_reg = g4x_aux_data_reg;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		intel_dp->get_aux_clock_divider = skl_get_aux_clock_divider;
 	else if (IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))
 		intel_dp->get_aux_clock_divider = hsw_get_aux_clock_divider;
@@ -1569,7 +1569,7 @@ intel_dp_aux_init(struct intel_dp *intel_dp)
 	else
 		intel_dp->get_aux_clock_divider = g4x_get_aux_clock_divider;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		intel_dp->get_aux_send_ctl = skl_get_aux_send_ctl;
 	else
 		intel_dp->get_aux_send_ctl = g4x_get_aux_send_ctl;
@@ -1957,7 +1957,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 		intel_fixed_panel_mode(intel_connector->panel.fixed_mode,
 				       adjusted_mode);
 
-		if (INTEL_GEN(dev_priv) >= 9) {
+		if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 			int ret;
 
 			ret = skl_update_scaler_crtc(pipe_config);
@@ -3648,7 +3648,7 @@ intel_dp_set_signal_levels(struct intel_dp *intel_dp)
 	uint32_t signal_levels, mask = 0;
 	uint8_t train_set = intel_dp->train_set[0];
 
-	if (GT_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_LP(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		signal_levels = bxt_signal_levels(intel_dp);
 	} else if (HAS_DDI(dev_priv)) {
 		signal_levels = ddi_signal_levels(intel_dp);
@@ -3926,7 +3926,7 @@ intel_edp_init_dpcd(struct intel_dp *intel_dp)
 	intel_dp_set_common_rates(intel_dp);
 
 	/* Read the eDP DSC DPCD registers */
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		intel_dp_get_dsc_sink_cap(intel_dp);
 
 	return true;
@@ -5024,7 +5024,7 @@ bool intel_digital_port_connected(struct intel_encoder *encoder)
 			return g4x_digital_port_connected(encoder);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		return icl_digital_port_connected(encoder);
 	else if (GT_GEN(dev_priv, 10) || GT_GEN9_BC(dev_priv))
 		return spt_digital_port_connected(encoder);
@@ -5142,7 +5142,7 @@ intel_dp_detect(struct drm_connector *connector,
 	intel_dp_print_rates(intel_dp);
 
 	/* Read DP Sink DSC Cap DPCD regs for DP v1.4 */
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		intel_dp_get_dsc_sink_cap(intel_dp);
 
 	drm_dp_read_desc(&intel_dp->aux, &intel_dp->desc,
@@ -5720,10 +5720,10 @@ bool intel_dp_is_port_edp(struct drm_i915_private *dev_priv, enum port port)
 	 * eDP not supported on g4x. so bail out early just
 	 * for a bit extra safety in case the VBT is bonkers.
 	 */
-	if (INTEL_GEN(dev_priv) < 5)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		return false;
 
-	if (INTEL_GEN(dev_priv) < 9 && port == PORT_A)
+	if (GT_GEN_RANGE(dev_priv, 0, 8) && port == PORT_A)
 		return true;
 
 	return intel_bios_is_port_edp(dev_priv, port);
@@ -5741,7 +5741,7 @@ intel_dp_add_properties(struct intel_dp *intel_dp, struct drm_connector *connect
 	intel_attach_broadcast_rgb_property(connector);
 	if (HAS_GMCH_DISPLAY(dev_priv))
 		drm_connector_attach_max_bpc_property(connector, 6, 10);
-	else if (INTEL_GEN(dev_priv) >= 5)
+	else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER))
 		drm_connector_attach_max_bpc_property(connector, 6, 12);
 
 	if (intel_dp_is_edp(intel_dp)) {
@@ -6096,7 +6096,7 @@ static void intel_dp_set_drrs_state(struct drm_i915_private *dev_priv,
 		return;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 8 && !IS_CHERRYVIEW(dev_priv)) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER) && !IS_CHERRYVIEW(dev_priv)) {
 		switch (index) {
 		case DRRS_HIGH_RR:
 			intel_dp_set_m_n(crtc_state, M1_N1);
@@ -6108,7 +6108,7 @@ static void intel_dp_set_drrs_state(struct drm_i915_private *dev_priv,
 		default:
 			DRM_ERROR("Unsupported refreshrate type\n");
 		}
-	} else if (INTEL_GEN(dev_priv) > 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		i915_reg_t reg = PIPECONF(crtc_state->cpu_transcoder);
 		u32 val;
 
@@ -6381,7 +6381,7 @@ intel_dp_drrs_init(struct intel_connector *connector,
 	INIT_DELAYED_WORK(&dev_priv->drrs.work, intel_edp_drrs_downclock_work);
 	mutex_init(&dev_priv->drrs.mutex);
 
-	if (INTEL_GEN(dev_priv) <= 6) {
+	if (GT_GEN_RANGE(dev_priv, 0, 6)) {
 		DRM_DEBUG_KMS("DRRS supported for Gen7 and above\n");
 		return NULL;
 	}

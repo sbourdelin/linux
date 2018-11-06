@@ -97,7 +97,7 @@ semaphore_waits_for(struct intel_engine_cs *engine, u32 *seqno)
 	 * ringbuffer itself.
 	 */
 	head = I915_READ_HEAD(engine) & HEAD_ADDR;
-	backwards = (INTEL_GEN(dev_priv) >= 8) ? 5 : 4;
+	backwards = (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) ? 5 : 4;
 	vaddr = (void __iomem *)engine->buffer->vaddr;
 
 	for (i = backwards; i; --i) {

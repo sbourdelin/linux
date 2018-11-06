@@ -2573,9 +2573,9 @@ static uint32_t ilk_compute_fbc_wm(const struct intel_crtc_state *cstate,
 static unsigned int
 ilk_display_fifo_size(const struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		return 3072;
-	else if (INTEL_GEN(dev_priv) >= 7)
+	else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		return 768;
 	else
 		return 512;
@@ -2585,10 +2585,10 @@ static unsigned int
 ilk_plane_wm_reg_max(const struct drm_i915_private *dev_priv,
 		     int level, bool is_sprite)
 {
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		/* BDW primary/sprite plane watermarks */
 		return level == 0 ? 255 : 2047;
-	else if (INTEL_GEN(dev_priv) >= 7)
+	else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		/* IVB/HSW primary/sprite plane watermarks */
 		return level == 0 ? 127 : 1023;
 	else if (!is_sprite)
@@ -2602,7 +2602,7 @@ ilk_plane_wm_reg_max(const struct drm_i915_private *dev_priv,
 static unsigned int
 ilk_cursor_wm_reg_max(const struct drm_i915_private *dev_priv, int level)
 {
-	if (INTEL_GEN(dev_priv) >= 7)
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		return level == 0 ? 63 : 255;
 	else
 		return level == 0 ? 31 : 63;
@@ -2610,7 +2610,7 @@ ilk_cursor_wm_reg_max(const struct drm_i915_private *dev_priv, int level)
 
 static unsigned int ilk_fbc_wm_reg_max(const struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		return 31;
 	else
 		return 15;
@@ -2639,7 +2639,7 @@ static unsigned int ilk_plane_wm_max(const struct drm_device *dev,
 		 * FIFO size is only half of the self
 		 * refresh FIFO size on ILK/SNB.
 		 */
-		if (INTEL_GEN(dev_priv) <= 6)
+		if (GT_GEN_RANGE(dev_priv, 0, 6))
 			fifo_size /= 2;
 	}
 
@@ -2800,7 +2800,7 @@ hsw_compute_linetime_wm(const struct intel_crtc_state *cstate)
 static void intel_read_wm_latency(struct drm_i915_private *dev_priv,
 				  uint16_t wm[8])
 {
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		uint32_t val;
 		int ret, i;
 		int level, max_level = ilk_wm_max_level(dev_priv);
@@ -2894,14 +2894,14 @@ static void intel_read_wm_latency(struct drm_i915_private *dev_priv,
 		wm[2] = (sskpd >> 12) & 0xFF;
 		wm[3] = (sskpd >> 20) & 0x1FF;
 		wm[4] = (sskpd >> 32) & 0x1FF;
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		uint32_t sskpd = I915_READ(MCH_SSKPD);
 
 		wm[0] = (sskpd >> SSKPD_WM0_SHIFT) & SSKPD_WM_MASK;
 		wm[1] = (sskpd >> SSKPD_WM1_SHIFT) & SSKPD_WM_MASK;
 		wm[2] = (sskpd >> SSKPD_WM2_SHIFT) & SSKPD_WM_MASK;
 		wm[3] = (sskpd >> SSKPD_WM3_SHIFT) & SSKPD_WM_MASK;
-	} else if (INTEL_GEN(dev_priv) >= 5) {
+	} else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		uint32_t mltr = I915_READ(MLTR_ILK);
 
 		/* ILK primary LP0 latency is 700 ns */
@@ -2932,11 +2932,11 @@ static void intel_fixup_cur_wm_latency(struct drm_i915_private *dev_priv,
 int ilk_wm_max_level(const struct drm_i915_private *dev_priv)
 {
 	/* how many WM levels are we expecting */
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		return 7;
 	else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		return 4;
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		return 3;
 	else
 		return 2;
@@ -2961,7 +2961,7 @@ static void intel_print_wm_latency(struct drm_i915_private *dev_priv,
 		 * - latencies are in us on gen9.
 		 * - before then, WM1+ latency values are in 0.5us units
 		 */
-		if (INTEL_GEN(dev_priv) >= 9)
+		if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 			latency *= 10;
 		else if (level > 0)
 			latency *= 5;
@@ -3097,7 +3097,7 @@ static int ilk_compute_pipe_wm(struct intel_crtc_state *cstate)
 	usable_level = max_level;
 
 	/* ILK/SNB: LP2+ watermarks only w/o sprites */
-	if (INTEL_GEN(dev_priv) <= 6 && pipe_wm->sprites_enabled)
+	if (GT_GEN_RANGE(dev_priv, 0, 6) && pipe_wm->sprites_enabled)
 		usable_level = 1;
 
 	/* ILK/SNB/IVB: LP1+ watermarks only w/o scaling */
@@ -3242,12 +3242,12 @@ static void ilk_wm_merge(struct drm_device *dev,
 	int last_enabled_level = max_level;
 
 	/* ILK/SNB/IVB: LP1+ watermarks only w/ single pipe */
-	if ((INTEL_GEN(dev_priv) <= 6 || IS_IVYBRIDGE(dev_priv)) &&
+	if ((GT_GEN_RANGE(dev_priv, 0, 6) || IS_IVYBRIDGE(dev_priv)) &&
 	    config->num_pipes_active > 1)
 		last_enabled_level = 0;
 
 	/* ILK: FBC WM must be disabled always */
-	merged->fbc_wm_enabled = INTEL_GEN(dev_priv) >= 6;
+	merged->fbc_wm_enabled = GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER);
 
 	/* merge each WM1+ level */
 	for (level = 1; level <= max_level; level++) {
@@ -3337,7 +3337,7 @@ static void ilk_compute_wm_results(struct drm_device *dev,
 		if (r->enable)
 			results->wm_lp[wm_lp - 1] |= WM1_LP_SR_EN;
 
-		if (INTEL_GEN(dev_priv) >= 8)
+		if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 			results->wm_lp[wm_lp - 1] |=
 				r->fbc_val << WM1_LP_FBC_SHIFT_BDW;
 		else
@@ -3348,7 +3348,7 @@ static void ilk_compute_wm_results(struct drm_device *dev,
 		 * Always set WM1S_LP_EN when spr_val != 0, even if the
 		 * level is disabled. Doing otherwise could cause underruns.
 		 */
-		if (INTEL_GEN(dev_priv) <= 6 && r->spr_val) {
+		if (GT_GEN_RANGE(dev_priv, 0, 6) && r->spr_val) {
 			WARN_ON(wm_lp != 1);
 			results->wm_lp_spr[wm_lp - 1] = WM1S_LP_EN | r->spr_val;
 		} else
@@ -3553,7 +3553,7 @@ static void ilk_write_wm_values(struct drm_i915_private *dev_priv,
 	    previous->wm_lp_spr[0] != results->wm_lp_spr[0])
 		I915_WRITE(WM1S_LP_ILK, results->wm_lp_spr[0]);
 
-	if (INTEL_GEN(dev_priv) >= 7) {
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		if (dirty & WM_DIRTY_LP(2) && previous->wm_lp_spr[1] != results->wm_lp_spr[1])
 			I915_WRITE(WM2S_LP_IVB, results->wm_lp_spr[1]);
 		if (dirty & WM_DIRTY_LP(3) && previous->wm_lp_spr[2] != results->wm_lp_spr[2])
@@ -3585,7 +3585,7 @@ static u8 intel_enabled_dbuf_slices_num(struct drm_i915_private *dev_priv)
 	enabled_slices = 1;
 
 	/* Gen prior to GEN11 have only one DBuf slice */
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		return enabled_slices;
 
 	if (I915_READ(DBUF_CTL_S2) & DBUF_POWER_STATE)
@@ -3611,7 +3611,7 @@ static bool skl_needs_memory_bw_wa(struct intel_atomic_state *state)
 static bool
 intel_has_sagv(struct drm_i915_private *dev_priv)
 {
-	return (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) &&
+	return (GT_GEN9_BC(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) &&
 		dev_priv->sagv_status != I915_SAGV_NOT_CONTROLLED;
 }
 
@@ -3786,7 +3786,7 @@ static u16 intel_get_ddb_size(struct drm_i915_private *dev_priv,
 
 	WARN_ON(ddb_size == 0);
 
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		return ddb_size - 4; /* 4 blocks for bypass path allocation */
 
 	adjusted_mode = &cstate->base.adjusted_mode;
@@ -3896,7 +3896,7 @@ static void skl_ddb_entry_init_from_hw(struct drm_i915_private *dev_priv,
 {
 	u16 mask;
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		mask = ICL_DDB_ENTRY_MASK;
 	else
 		mask = SKL_DDB_ENTRY_MASK;
@@ -3936,7 +3936,7 @@ skl_ddb_get_hw_plane_state(struct drm_i915_private *dev_priv,
 				      val & PLANE_CTL_ALPHA_MASK);
 
 	val = I915_READ(PLANE_BUF_CFG(pipe, plane_id));
-	if (fourcc == DRM_FORMAT_NV12 && INTEL_GEN(dev_priv) < 11) {
+	if (fourcc == DRM_FORMAT_NV12 && GT_GEN_RANGE(dev_priv, 0, 10)) {
 		val2 = I915_READ(PLANE_NV12_BUF_CFG(pipe, plane_id));
 
 		skl_ddb_entry_init_from_hw(dev_priv,
@@ -4112,7 +4112,7 @@ int skl_check_pipe_max_pixel_rate(struct intel_crtc *intel_crtc,
 	crtc_clock = crtc_state->adjusted_mode.crtc_clock;
 	dotclk = to_intel_atomic_state(state)->cdclk.logical.cdclk;
 
-	if (IS_GEMINILAKE(dev_priv) || INTEL_GEN(dev_priv) >= 10)
+	if (IS_GEMINILAKE(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		dotclk *= 2;
 
 	pipe_max_pixel_rate = div_round_up_u32_fixed16(dotclk, pipe_downscale);
@@ -4394,7 +4394,7 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		return 0;
 	}
 
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		total_data_rate =
 			skl_get_total_relative_data_rate(cstate,
 							 plane_data_rate,
@@ -4476,7 +4476,7 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		uv_plane_blocks += div64_u64(alloc_size * uv_data_rate, total_data_rate);
 
 		/* Gen11+ uses a separate plane for UV watermarks */
-		WARN_ON(INTEL_GEN(dev_priv) >= 11 && uv_plane_blocks);
+		WARN_ON(GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) && uv_plane_blocks);
 
 		if (uv_data_rate) {
 			ddb->uv_plane[pipe][plane_id].start = start;
@@ -4509,7 +4509,7 @@ skl_wm_method1(const struct drm_i915_private *dev_priv, uint32_t pixel_rate,
 	wm_intermediate_val = latency * pixel_rate * cpp;
 	ret = div_fixed16(wm_intermediate_val, 1000 * dbuf_block_size);
 
-	if (INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		ret = add_fixed16_u32(ret, 1);
 
 	return ret;
@@ -4626,7 +4626,7 @@ skl_compute_plane_wm_params(const struct drm_i915_private *dev_priv,
 	wp->plane_pixel_rate = skl_adjusted_plane_pixel_rate(cstate,
 							     intel_pstate);
 
-	if (INTEL_GEN(dev_priv) >= 11 &&
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) &&
 	    fb->modifier == I915_FORMAT_MOD_Yf_TILED && wp->cpp == 8)
 		wp->dbuf_block_size = 256;
 	else
@@ -4661,7 +4661,7 @@ skl_compute_plane_wm_params(const struct drm_i915_private *dev_priv,
 					   wp->y_min_scanlines,
 					   wp->dbuf_block_size);
 
-		if (INTEL_GEN(dev_priv) >= 10)
+		if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 			interm_pbpl++;
 
 		wp->plane_blocks_per_line = div_fixed16(interm_pbpl,
@@ -4778,7 +4778,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 			res_blocks = result_prev->plane_res_b;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		if (wp->y_tiled) {
 			uint32_t extra_lines;
 			uint_fixed_16_16_t fp_min_disp_buf_needed;
@@ -4910,7 +4910,7 @@ static void skl_compute_transition_wm(const struct intel_crtc_state *cstate,
 		goto exit;
 
 	/* Transition WM are not recommended by HW team for GEN9 */
-	if (INTEL_GEN(dev_priv) <= 9)
+	if (GT_GEN_RANGE(dev_priv, 0, 9))
 		goto exit;
 
 	/* Transition WM don't make any sense if ipc is disabled */
@@ -4918,7 +4918,7 @@ static void skl_compute_transition_wm(const struct intel_crtc_state *cstate,
 		goto exit;
 
 	trans_min = 14;
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		trans_min = 4;
 
 	trans_offset_b = trans_min + trans_amount;
@@ -5132,7 +5132,7 @@ static void skl_write_plane_wm(struct intel_crtc *intel_crtc,
 	skl_write_wm_level(dev_priv, PLANE_WM_TRANS(pipe, plane_id),
 			   &wm->trans_wm);
 
-	if (wm->is_planar && INTEL_GEN(dev_priv) < 11) {
+	if (wm->is_planar && GT_GEN_RANGE(dev_priv, 0, 10)) {
 		skl_ddb_entry_write(dev_priv, PLANE_BUF_CFG(pipe, plane_id),
 				    &ddb->uv_plane[pipe][plane_id]);
 		skl_ddb_entry_write(dev_priv,
@@ -5141,7 +5141,7 @@ static void skl_write_plane_wm(struct intel_crtc *intel_crtc,
 	} else {
 		skl_ddb_entry_write(dev_priv, PLANE_BUF_CFG(pipe, plane_id),
 				    &ddb->plane[pipe][plane_id]);
-		if (INTEL_GEN(dev_priv) < 11)
+		if (GT_GEN_RANGE(dev_priv, 0, 10))
 			I915_WRITE(PLANE_NV12_BUF_CFG(pipe, plane_id), 0x0);
 	}
 }
@@ -5573,7 +5573,7 @@ static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
 	ilk_wm_merge(dev, &config, &max, &lp_wm_1_2);
 
 	/* 5/6 split only in single pipe config on IVB+ */
-	if (INTEL_GEN(dev_priv) >= 7 &&
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER) &&
 	    config.num_pipes_active == 1 && config.sprites_enabled) {
 		ilk_compute_wm_maximums(dev, 1, &config, INTEL_DDB_PART_5_6, &max);
 		ilk_wm_merge(dev, &config, &max, &lp_wm_5_6);
@@ -6176,7 +6176,7 @@ void ilk_wm_get_hw_state(struct drm_device *dev)
 	hw->wm_lp[2] = I915_READ(WM3_LP_ILK);
 
 	hw->wm_lp_spr[0] = I915_READ(WM1S_LP_ILK);
-	if (INTEL_GEN(dev_priv) >= 7) {
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		hw->wm_lp_spr[1] = I915_READ(WM2S_LP_IVB);
 		hw->wm_lp_spr[2] = I915_READ(WM3S_LP_IVB);
 	}
@@ -6406,7 +6406,7 @@ static u32 intel_rps_limits(struct drm_i915_private *dev_priv, u8 val)
 	 * the hw runs at the minimal clock before selecting the desired
 	 * frequency, if the down threshold expires in that window we will not
 	 * receive a down interrupt. */
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		limits = (rps->max_freq_softlimit) << 23;
 		if (val <= rps->min_freq_softlimit)
 			limits |= (rps->min_freq_softlimit) << 14;
@@ -6540,7 +6540,7 @@ void intel_rps_mark_interactive(struct drm_i915_private *i915, bool interactive)
 {
 	struct intel_rps *rps = &i915->gt_pm.rps;
 
-	if (INTEL_GEN(i915) < 6)
+	if (GT_GEN_RANGE(i915, 0, 5))
 		return;
 
 	mutex_lock(&rps->power.mutex);
@@ -6583,7 +6583,7 @@ static int gen6_set_rps(struct drm_i915_private *dev_priv, u8 val)
 	if (val != rps->cur_freq) {
 		gen6_set_rps_thresholds(dev_priv, val);
 
-		if (INTEL_GEN(dev_priv) >= 9)
+		if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 			I915_WRITE(GEN6_RPNSWREQ,
 				   GEN9_FREQUENCY(val));
 		else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
@@ -6934,7 +6934,7 @@ static void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
 
 	rps->efficient_freq = rps->rp1_freq;
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv) ||
-	    GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	    GT_GEN9_BC(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		u32 ddcc_status = 0;
 
 		if (sandybridge_pcode_read(dev_priv,
@@ -6947,7 +6947,7 @@ static void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
 					rps->max_freq);
 	}
 
-	if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_BC(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		/* Store the frequency values in 16.66 MHZ units, which is
 		 * the natural hardware unit for SKL
 		 */
@@ -7014,7 +7014,7 @@ static void gen9_enable_rc6(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 
 	/* 2b: Program RC6 thresholds.*/
-	if (INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		I915_WRITE(GEN6_RC6_WAKE_RATE_LIMIT, 54 << 16 | 85);
 		I915_WRITE(GEN10_MEDIA_WAKE_RATE_LIMIT, 150);
 	} else if (IS_SKYLAKE(dev_priv)) {
@@ -7285,7 +7285,7 @@ static void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
 
 	min_gpu_freq = rps->min_freq;
 	max_gpu_freq = rps->max_freq;
-	if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN9_BC(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		/* Convert GT frequency to 50 HZ units */
 		min_gpu_freq /= GEN9_FREQ_SCALER;
 		max_gpu_freq /= GEN9_FREQ_SCALER;
@@ -7300,13 +7300,13 @@ static void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
 		const int diff = max_gpu_freq - gpu_freq;
 		unsigned int ia_freq = 0, ring_freq = 0;
 
-		if (GT_GEN9_BC(dev_priv) || INTEL_GEN(dev_priv) >= 10) {
+		if (GT_GEN9_BC(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 			/*
 			 * ring_freq = 2 * GT. ring_freq is in 100MHz units
 			 * No floor required for ring frequency on SKL.
 			 */
 			ring_freq = gpu_freq;
-		} else if (INTEL_GEN(dev_priv) >= 8) {
+		} else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 			/* max(2 * GT, DDR). NB: GT is 50MHz units */
 			ring_freq = max(min_ring_freq, gpu_freq);
 		} else if (IS_HASWELL(dev_priv)) {
@@ -8323,7 +8323,7 @@ void intel_init_gt_powersave(struct drm_i915_private *dev_priv)
 		cherryview_init_gt_powersave(dev_priv);
 	else if (IS_VALLEYVIEW(dev_priv))
 		valleyview_init_gt_powersave(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_init_rps_frequencies(dev_priv);
 
 	/* Derive initial user preferences/limits from the hardware limits */
@@ -8378,7 +8378,7 @@ void intel_cleanup_gt_powersave(struct drm_i915_private *dev_priv)
  */
 void intel_suspend_gt_powersave(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) < 6)
+	if (GT_GEN_RANGE(dev_priv, 0, 5))
 		return;
 
 	/* gen6_rps_idle() will be called later to disable interrupts */
@@ -8390,9 +8390,9 @@ void intel_sanitize_gt_powersave(struct drm_i915_private *dev_priv)
 	dev_priv->gt_pm.rc6.enabled = true; /* force RC6 disabling */
 	intel_disable_gt_powersave(dev_priv);
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		gen11_reset_rps_interrupts(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_reset_rps_interrupts(dev_priv);
 }
 
@@ -8415,13 +8415,13 @@ static void intel_disable_rc6(struct drm_i915_private *dev_priv)
 	if (!dev_priv->gt_pm.rc6.enabled)
 		return;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		gen9_disable_rc6(dev_priv);
 	else if (IS_CHERRYVIEW(dev_priv))
 		cherryview_disable_rc6(dev_priv);
 	else if (IS_VALLEYVIEW(dev_priv))
 		valleyview_disable_rc6(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_disable_rc6(dev_priv);
 
 	dev_priv->gt_pm.rc6.enabled = false;
@@ -8434,13 +8434,13 @@ static void intel_disable_rps(struct drm_i915_private *dev_priv)
 	if (!dev_priv->gt_pm.rps.enabled)
 		return;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		gen9_disable_rps(dev_priv);
 	else if (IS_CHERRYVIEW(dev_priv))
 		cherryview_disable_rps(dev_priv);
 	else if (IS_VALLEYVIEW(dev_priv))
 		valleyview_disable_rps(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_disable_rps(dev_priv);
 	else if (IS_IRONLAKE_M(dev_priv))
 		ironlake_disable_drps(dev_priv);
@@ -8483,11 +8483,11 @@ static void intel_enable_rc6(struct drm_i915_private *dev_priv)
 		cherryview_enable_rc6(dev_priv);
 	else if (IS_VALLEYVIEW(dev_priv))
 		valleyview_enable_rc6(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 9)
+	else if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		gen9_enable_rc6(dev_priv);
 	else if (IS_BROADWELL(dev_priv))
 		gen8_enable_rc6(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_enable_rc6(dev_priv);
 
 	dev_priv->gt_pm.rc6.enabled = true;
@@ -8506,11 +8506,11 @@ static void intel_enable_rps(struct drm_i915_private *dev_priv)
 		cherryview_enable_rps(dev_priv);
 	} else if (IS_VALLEYVIEW(dev_priv)) {
 		valleyview_enable_rps(dev_priv);
-	} else if (INTEL_GEN(dev_priv) >= 9) {
+	} else if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		gen9_enable_rps(dev_priv);
 	} else if (IS_BROADWELL(dev_priv)) {
 		gen8_enable_rps(dev_priv);
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		gen6_enable_rps(dev_priv);
 	} else if (IS_IRONLAKE_M(dev_priv)) {
 		ironlake_enable_drps(dev_priv);
@@ -9444,7 +9444,7 @@ void intel_init_pm(struct drm_i915_private *dev_priv)
 		i915_ironlake_get_mem_freq(dev_priv);
 
 	/* For FIFO watermark updates */
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		skl_setup_wm_latency(dev_priv);
 		dev_priv->display.initial_watermarks = skl_initial_wm;
 		dev_priv->display.atomic_update_watermarks = skl_atomic_update_crtc_wm;
@@ -9590,7 +9590,7 @@ int sandybridge_pcode_read(struct drm_i915_private *dev_priv, u32 mbox, u32 *val
 	*val = I915_READ_FW(GEN6_PCODE_DATA);
 	I915_WRITE_FW(GEN6_PCODE_DATA, 0);
 
-	if (INTEL_GEN(dev_priv) > 6)
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		status = gen7_check_mailbox_status(dev_priv);
 	else
 		status = gen6_check_mailbox_status(dev_priv);
@@ -9638,7 +9638,7 @@ int sandybridge_pcode_write_timeout(struct drm_i915_private *dev_priv,
 
 	I915_WRITE_FW(GEN6_PCODE_DATA, 0);
 
-	if (INTEL_GEN(dev_priv) > 6)
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		status = gen7_check_mailbox_status(dev_priv);
 	else
 		status = gen6_check_mailbox_status(dev_priv);
@@ -9767,7 +9767,7 @@ static int chv_freq_opcode(struct drm_i915_private *dev_priv, int val)
 
 int intel_gpu_freq(struct drm_i915_private *dev_priv, int val)
 {
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		return DIV_ROUND_CLOSEST(val * GT_FREQUENCY_MULTIPLIER,
 					 GEN9_FREQ_SCALER);
 	else if (IS_CHERRYVIEW(dev_priv))
@@ -9780,7 +9780,7 @@ int intel_gpu_freq(struct drm_i915_private *dev_priv, int val)
 
 int intel_freq_opcode(struct drm_i915_private *dev_priv, int val)
 {
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		return DIV_ROUND_CLOSEST(val * GEN9_FREQ_SCALER,
 					 GT_FREQUENCY_MULTIPLIER);
 	else if (IS_CHERRYVIEW(dev_priv))
@@ -9926,7 +9926,7 @@ u32 intel_get_cagf(struct drm_i915_private *dev_priv, u32 rpstat)
 {
 	u32 cagf;
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		cagf = (rpstat & GEN9_CAGF_MASK) >> GEN9_CAGF_SHIFT;
 	else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		cagf = (rpstat & HSW_CAGF_MASK) >> HSW_CAGF_SHIFT;

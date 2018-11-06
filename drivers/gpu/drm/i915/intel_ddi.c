@@ -1369,7 +1369,7 @@ static int cnl_calc_wrpll_link(struct drm_i915_private *dev_priv,
 	uint32_t cfgcr0, cfgcr1;
 	uint32_t p0, p1, p2, dco_freq, ref_clock;
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		cfgcr0 = I915_READ(ICL_DPLL_CFGCR0(pll_id));
 		cfgcr1 = I915_READ(ICL_DPLL_CFGCR1(pll_id));
 	} else {
@@ -1745,7 +1745,7 @@ static void intel_ddi_clock_get(struct intel_encoder *encoder,
 		bxt_ddi_clock_get(encoder, pipe_config);
 	else if (GT_GEN9_BC(dev_priv))
 		skl_ddi_clock_get(encoder, pipe_config);
-	else if (INTEL_GEN(dev_priv) <= 8)
+	else if (GT_GEN_RANGE(dev_priv, 0, 8))
 		hsw_ddi_clock_get(encoder, pipe_config);
 }
 
@@ -2888,7 +2888,7 @@ static void intel_ddi_clk_select(struct intel_encoder *encoder,
 
 		I915_WRITE(DPLL_CTRL2, val);
 
-	} else if (INTEL_GEN(dev_priv) < 9) {
+	} else if (GT_GEN_RANGE(dev_priv, 0, 8)) {
 		I915_WRITE(PORT_CLK_SEL(port), hsw_pll_to_ddi_pll_sel(pll));
 	}
 
@@ -2909,7 +2909,7 @@ static void intel_ddi_clk_disable(struct intel_encoder *encoder)
 	} else if (GT_GEN9_BC(dev_priv)) {
 		I915_WRITE(DPLL_CTRL2, I915_READ(DPLL_CTRL2) |
 			   DPLL_CTRL2_DDI_CLK_OFF(port));
-	} else if (INTEL_GEN(dev_priv) < 9) {
+	} else if (GT_GEN_RANGE(dev_priv, 0, 8)) {
 		I915_WRITE(PORT_CLK_SEL(port), PORT_CLK_SEL_NONE);
 	}
 }
@@ -3084,7 +3084,7 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	if (!is_mst)
 		intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
 	intel_dp_start_link_train(intel_dp);
-	if (port != PORT_A || INTEL_GEN(dev_priv) >= 9)
+	if (port != PORT_A || GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		intel_dp_stop_link_train(intel_dp);
 
 	icl_enable_phy_clock_gating(dig_port);
@@ -3318,7 +3318,7 @@ static void intel_enable_ddi_dp(struct intel_encoder *encoder,
 	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
 	enum port port = encoder->port;
 
-	if (port == PORT_A && INTEL_GEN(dev_priv) < 9)
+	if (port == PORT_A && GT_GEN_RANGE(dev_priv, 0, 8))
 		intel_dp_stop_link_train(intel_dp);
 
 	intel_edp_backlight_on(crtc_state, conn_state);
@@ -3974,7 +3974,7 @@ intel_ddi_max_lanes(struct intel_digital_port *intel_dport)
 	enum port port = intel_dport->base.port;
 	int max_lanes = 4;
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		return max_lanes;
 
 	if (port == PORT_A || port == PORT_E) {
@@ -4060,7 +4060,7 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	for_each_pipe(dev_priv, pipe)
 		intel_encoder->crtc_mask |= BIT(pipe);
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		intel_dig_port->saved_port_bits = I915_READ(DDI_BUF_CTL(port)) &
 			DDI_BUF_PORT_REVERSAL;
 	else

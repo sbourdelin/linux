@@ -1475,11 +1475,11 @@ static int intel_hdmi_source_max_tmds_clock(struct intel_encoder *encoder)
 		&dev_priv->vbt.ddi_port_info[encoder->port];
 	int max_tmds_clock;
 
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		max_tmds_clock = 594000;
-	else if (INTEL_GEN(dev_priv) >= 8 || IS_HASWELL(dev_priv))
+	else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER) || IS_HASWELL(dev_priv))
 		max_tmds_clock = 300000;
-	else if (INTEL_GEN(dev_priv) >= 5)
+	else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER))
 		max_tmds_clock = 225000;
 	else
 		max_tmds_clock = 165000;
@@ -1578,7 +1578,7 @@ intel_hdmi_mode_valid(struct drm_connector *connector,
 						       true, force_dvi);
 
 		/* if we can't do 8,12bpc we may still be able to do 10bpc */
-		if (status != MODE_OK && INTEL_GEN(dev_priv) >= 11)
+		if (status != MODE_OK && GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 			status = hdmi_port_clock_valid(hdmi, clock * 5 / 4,
 						       true, force_dvi);
 	}
@@ -1601,7 +1601,7 @@ static bool hdmi_deep_color_possible(const struct intel_crtc_state *crtc_state,
 	if (HAS_GMCH_DISPLAY(dev_priv))
 		return false;
 
-	if (bpc == 10 && INTEL_GEN(dev_priv) < 11)
+	if (bpc == 10 && GT_GEN_RANGE(dev_priv, 0, 10))
 		return false;
 
 	if (crtc_state->pipe_bpp <= 8*3)
@@ -1796,7 +1796,7 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 
 	pipe_config->lane_count = 4;
 
-	if (scdc->scrambling.supported && (INTEL_GEN(dev_priv) >= 10 ||
+	if (scdc->scrambling.supported && (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) ||
 					   IS_GEMINILAKE(dev_priv))) {
 		if (scdc->scrambling.low_rates)
 			pipe_config->hdmi_scrambling = true;
@@ -2398,7 +2398,7 @@ void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 	connector->doublescan_allowed = 0;
 	connector->stereo_allowed = 1;
 
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		connector->ycbcr_420_allowed = true;
 
 	intel_hdmi->ddc_bus = intel_hdmi_ddc_pin(dev_priv, port);

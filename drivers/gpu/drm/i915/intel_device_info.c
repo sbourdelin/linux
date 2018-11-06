@@ -648,7 +648,7 @@ static u32 read_timestamp_frequency(struct drm_i915_private *dev_priv)
 	u32 f19_2_mhz = 19200;
 	u32 f24_mhz = 24000;
 
-	if (INTEL_GEN(dev_priv) <= 4) {
+	if (GT_GEN_RANGE(dev_priv, 0, 4)) {
 		/* PRMs say:
 		 *
 		 *     "The value in this register increments once every 16
@@ -656,7 +656,7 @@ static u32 read_timestamp_frequency(struct drm_i915_private *dev_priv)
 		 *      (“CLKCFG”) MCHBAR register)
 		 */
 		return dev_priv->rawclk_freq / 16;
-	} else if (INTEL_GEN(dev_priv) <= 8) {
+	} else if (GT_GEN_RANGE(dev_priv, 0, 8)) {
 		/* PRMs say:
 		 *
 		 *     "The PCU TSC counts 10ns increments; this timestamp
@@ -664,7 +664,7 @@ static u32 read_timestamp_frequency(struct drm_i915_private *dev_priv)
 		 *      rolling over every 1.5 hours).
 		 */
 		return f12_5_mhz;
-	} else if (INTEL_GEN(dev_priv) <= 9) {
+	} else if (GT_GEN_RANGE(dev_priv, 0, 9)) {
 		u32 ctc_reg = I915_READ(CTC_MODE);
 		u32 freq = 0;
 
@@ -682,7 +682,7 @@ static u32 read_timestamp_frequency(struct drm_i915_private *dev_priv)
 		}
 
 		return freq;
-	} else if (INTEL_GEN(dev_priv) <= 11) {
+	} else if (GT_GEN_RANGE(dev_priv, 0, 11)) {
 		u32 ctc_reg = I915_READ(CTC_MODE);
 		u32 freq = 0;
 
@@ -696,7 +696,7 @@ static u32 read_timestamp_frequency(struct drm_i915_private *dev_priv)
 		} else {
 			u32 rpm_config_reg = I915_READ(RPM_CONFIG0);
 
-			if (INTEL_GEN(dev_priv) <= 10)
+			if (GT_GEN_RANGE(dev_priv, 0, 10))
 				freq = gen10_get_crystal_clock_freq(dev_priv,
 								rpm_config_reg);
 			else
@@ -741,7 +741,7 @@ void intel_device_info_runtime_init(struct intel_device_info *info)
 		container_of(info, struct drm_i915_private, info);
 	enum pipe pipe;
 
-	if (INTEL_GEN(dev_priv) >= 10) {
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER)) {
 		for_each_pipe(dev_priv, pipe)
 			info->num_scalers[pipe] = 2;
 	} else if (GT_GEN(dev_priv, 9)) {
@@ -774,7 +774,7 @@ void intel_device_info_runtime_init(struct intel_device_info *info)
 	} else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		for_each_pipe(dev_priv, pipe)
 			info->num_sprites[pipe] = 2;
-	} else if (INTEL_GEN(dev_priv) >= 5 || IS_G4X(dev_priv)) {
+	} else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER) || IS_G4X(dev_priv)) {
 		for_each_pipe(dev_priv, pipe)
 			info->num_sprites[pipe] = 1;
 	}
@@ -851,7 +851,7 @@ void intel_device_info_runtime_init(struct intel_device_info *info)
 		gen9_sseu_info_init(dev_priv);
 	else if (GT_GEN(dev_priv, 10))
 		gen10_sseu_info_init(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 11)
+	else if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		gen11_sseu_info_init(dev_priv);
 
 	if (GT_GEN(dev_priv, 6) && intel_vtd_active()) {
@@ -883,7 +883,7 @@ void intel_device_info_init_mmio(struct drm_i915_private *dev_priv)
 	u32 media_fuse;
 	unsigned int i;
 
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		return;
 
 	media_fuse = ~I915_READ(GEN11_GT_VEBOX_VDBOX_DISABLE);

@@ -32,25 +32,25 @@
 static void i915_save_display(struct drm_i915_private *dev_priv)
 {
 	/* Display arbitration control */
-	if (INTEL_GEN(dev_priv) <= 4)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		dev_priv->regfile.saveDSPARB = I915_READ(DSPARB);
 
 	/* save FBC interval */
-	if (HAS_FBC(dev_priv) && INTEL_GEN(dev_priv) <= 4 && !IS_G4X(dev_priv))
+	if (HAS_FBC(dev_priv) && GT_GEN_RANGE(dev_priv, 0, 4) && !IS_G4X(dev_priv))
 		dev_priv->regfile.saveFBC_CONTROL = I915_READ(FBC_CONTROL);
 }
 
 static void i915_restore_display(struct drm_i915_private *dev_priv)
 {
 	/* Display arbitration */
-	if (INTEL_GEN(dev_priv) <= 4)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		I915_WRITE(DSPARB, dev_priv->regfile.saveDSPARB);
 
 	/* only restore FBC info on the platform that supports FBC*/
 	intel_fbc_global_disable(dev_priv);
 
 	/* restore FBC interval */
-	if (HAS_FBC(dev_priv) && INTEL_GEN(dev_priv) <= 4 && !IS_G4X(dev_priv))
+	if (HAS_FBC(dev_priv) && GT_GEN_RANGE(dev_priv, 0, 4) && !IS_G4X(dev_priv))
 		I915_WRITE(FBC_CONTROL, dev_priv->regfile.saveFBC_CONTROL);
 
 	i915_redisable_vga(dev_priv);
@@ -70,7 +70,7 @@ int i915_save_state(struct drm_i915_private *dev_priv)
 				     &dev_priv->regfile.saveGCDGMBUS);
 
 	/* Cache mode state */
-	if (INTEL_GEN(dev_priv) < 7)
+	if (GT_GEN_RANGE(dev_priv, 0, 6))
 		dev_priv->regfile.saveCACHE_MODE_0 = I915_READ(CACHE_MODE_0);
 
 	/* Memory Arbitration state */
@@ -114,7 +114,7 @@ int i915_restore_state(struct drm_i915_private *dev_priv)
 	i915_restore_display(dev_priv);
 
 	/* Cache mode state */
-	if (INTEL_GEN(dev_priv) < 7)
+	if (GT_GEN_RANGE(dev_priv, 0, 6))
 		I915_WRITE(CACHE_MODE_0, dev_priv->regfile.saveCACHE_MODE_0 |
 			   0xffff0000);
 

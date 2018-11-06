@@ -248,7 +248,7 @@ static void intel_atomic_setup_scaler(struct intel_crtc_scaler_state *scaler_sta
 			if (plane_state->linked_plane)
 				mode |= PS_PLANE_Y_SEL(plane_state->linked_plane->id);
 		}
-	} else if (INTEL_GEN(dev_priv) > 9 || IS_GEMINILAKE(dev_priv)) {
+	} else if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv)) {
 		mode = PS_SCALER_MODE_NORMAL;
 	} else if (num_scalers_need == 1 && intel_crtc->num_scalers > 1) {
 		/*

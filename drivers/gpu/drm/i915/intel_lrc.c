@@ -239,7 +239,7 @@ intel_lr_context_descriptor_update(struct i915_gem_context *ctx,
 	 * Consider updating oa_get_render_ctx_id in i915_perf.c when changing
 	 * anything below.
 	 */
-	if (INTEL_GEN(ctx->i915) >= 11) {
+	if (GT_GEN_RANGE(ctx->i915, 11, GEN_FOREVER)) {
 		GEM_BUG_ON(ctx->hw_id >= BIT(GEN11_SW_CTX_ID_WIDTH));
 		desc |= (u64)ctx->hw_id << GEN11_SW_CTX_ID_SHIFT;
 								/* bits 37-47 */
@@ -1587,7 +1587,7 @@ static void enable_execlists(struct intel_engine_cs *engine)
 	 * deeper FIFO it's not needed and it's not worth adding
 	 * more statements to the irq handler to support it.
 	 */
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		I915_WRITE(RING_MODE_GEN7(engine),
 			   _MASKED_BIT_DISABLE(GEN11_GFX_DISABLE_LEGACY_MODE));
 	else
@@ -2167,7 +2167,7 @@ logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 
 	engine->set_default_submission = intel_execlists_set_default_submission;
 
-	if (INTEL_GEN(engine->i915) < 11) {
+	if (GT_GEN_RANGE(engine->i915, 0, 10)) {
 		engine->irq_enable = gen8_logical_ring_enable_irq;
 		engine->irq_disable = gen8_logical_ring_disable_irq;
 	} else {
@@ -2186,7 +2186,7 @@ logical_ring_default_irqs(struct intel_engine_cs *engine)
 {
 	unsigned int shift = 0;
 
-	if (INTEL_GEN(engine->i915) < 11) {
+	if (GT_GEN_RANGE(engine->i915, 0, 10)) {
 		const u8 irq_shifts[] = {
 			[RCS]  = GEN8_RCS_IRQ_SHIFT,
 			[BCS]  = GEN8_BCS_IRQ_SHIFT,
@@ -2286,7 +2286,7 @@ int logical_render_ring_init(struct intel_engine_cs *engine)
 		engine->irq_keep_mask |= GT_RENDER_L3_PARITY_ERROR_INTERRUPT;
 
 	/* Override some for render ring. */
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		engine->init_hw = gen9_init_render_ring;
 	else
 		engine->init_hw = gen8_init_render_ring;
@@ -2340,7 +2340,7 @@ make_rpcs(struct drm_i915_private *dev_priv)
 	 * No explicit RPCS request is needed to ensure full
 	 * slice/subslice/EU enablement prior to Gen9.
 	*/
-	if (INTEL_GEN(dev_priv) < 9)
+	if (GT_GEN_RANGE(dev_priv, 0, 8))
 		return 0;
 
 	/*
@@ -2384,7 +2384,7 @@ make_rpcs(struct drm_i915_private *dev_priv)
 	if (INTEL_INFO(dev_priv)->sseu.has_slice_pg) {
 		u32 mask, val = slices;
 
-		if (INTEL_GEN(dev_priv) >= 11) {
+		if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 			mask = GEN11_RPCS_S_CNT_MASK;
 			val <<= GEN11_RPCS_S_CNT_SHIFT;
 		} else {
@@ -2483,7 +2483,7 @@ static void execlists_init_reg_state(u32 *regs,
 	CTX_REG(regs, CTX_CONTEXT_CONTROL, RING_CONTEXT_CONTROL(engine),
 		_MASKED_BIT_DISABLE(CTX_CTRL_ENGINE_CTX_RESTORE_INHIBIT) |
 		_MASKED_BIT_ENABLE(CTX_CTRL_INHIBIT_SYN_CTX_SWITCH));
-	if (INTEL_GEN(dev_priv) < 11) {
+	if (GT_GEN_RANGE(dev_priv, 0, 10)) {
 		regs[CTX_CONTEXT_CONTROL + 1] |=
 			_MASKED_BIT_DISABLE(CTX_CTRL_ENGINE_CTX_SAVE_INHIBIT |
 					    CTX_CTRL_RS_CTX_ENABLE);
@@ -2555,7 +2555,7 @@ static void execlists_init_reg_state(u32 *regs,
 	}
 
 	regs[CTX_END] = MI_BATCH_BUFFER_END;
-	if (INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		regs[CTX_END] |= BIT(0);
 }
 
@@ -2610,7 +2610,7 @@ populate_lr_context(struct i915_gem_context *ctx,
 	if (!engine->default_state)
 		regs[CTX_CONTEXT_CONTROL + 1] |=
 			_MASKED_BIT_ENABLE(CTX_CTRL_ENGINE_CTX_RESTORE_INHIBIT);
-	if (ctx == ctx->i915->preempt_context && INTEL_GEN(engine->i915) < 11)
+	if (ctx == ctx->i915->preempt_context && GT_GEN_RANGE(engine->i915, 0, 10))
 		regs[CTX_CONTEXT_CONTROL + 1] |=
 			_MASKED_BIT_ENABLE(CTX_CTRL_ENGINE_CTX_RESTORE_INHIBIT |
 					   CTX_CTRL_ENGINE_CTX_SAVE_INHIBIT);

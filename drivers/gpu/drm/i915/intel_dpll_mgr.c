@@ -211,7 +211,7 @@ void intel_disable_shared_dpll(const struct intel_crtc_state *crtc_state)
 	unsigned int crtc_mask = drm_crtc_mask(&crtc->base);
 
 	/* PCH only available on ILK+ */
-	if (INTEL_GEN(dev_priv) < 5)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		return;
 
 	if (pll == NULL)
@@ -1872,7 +1872,7 @@ static void intel_ddi_pll_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
-	if (INTEL_GEN(dev_priv) < 9) {
+	if (GT_GEN_RANGE(dev_priv, 0, 8)) {
 		uint32_t val = I915_READ(LCPLL_CTL);
 
 		/*
@@ -2213,7 +2213,7 @@ int cnl_hdmi_pll_ref_clock(struct drm_i915_private *dev_priv)
 	 * For ICL+, the spec states: if reference frequency is 38.4,
 	 * use 19.2 because the DPLL automatically divides that by 2.
 	 */
-	if (INTEL_GEN(dev_priv) >= 11 && ref_clock == 38400)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) && ref_clock == 38400)
 		ref_clock = 19200;
 
 	return ref_clock;

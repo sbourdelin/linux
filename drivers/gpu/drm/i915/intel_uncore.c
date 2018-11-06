@@ -449,7 +449,7 @@ u64 intel_uncore_edram_size(struct drm_i915_private *dev_priv)
 	/* The needed capability bits for size calculation
 	 * are not there with pre gen9 so return 128MB always.
 	 */
-	if (INTEL_GEN(dev_priv) < 9)
+	if (GT_GEN_RANGE(dev_priv, 0, 8))
 		return 128 * 1024 * 1024;
 
 	return gen9_edram_size(dev_priv);
@@ -459,7 +459,7 @@ static void intel_uncore_edram_detect(struct drm_i915_private *dev_priv)
 {
 	if (IS_HASWELL(dev_priv) ||
 	    IS_BROADWELL(dev_priv) ||
-	    INTEL_GEN(dev_priv) >= 9) {
+	    GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		dev_priv->edram_cap = __raw_i915_read32(dev_priv,
 							HSW_EDRAM_CAP);
 
@@ -877,7 +877,7 @@ find_fw_domain(struct drm_i915_private *dev_priv, u32 offset)
 	{ .start = (s), .end = (e), .domains = (d) }
 
 #define HAS_FWTABLE(dev_priv) \
-	(INTEL_GEN(dev_priv) >= 9 || \
+	(GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER) || \
 	 IS_CHERRYVIEW(dev_priv) || \
 	 IS_VALLEYVIEW(dev_priv))
 
@@ -1395,7 +1395,7 @@ static void fw_domain_fini(struct drm_i915_private *dev_priv,
 
 static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) <= 5 || intel_vgpu_active(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 0, 5) || intel_vgpu_active(dev_priv))
 		return;
 
 	if (GT_GEN(dev_priv, 6)) {
@@ -1409,7 +1409,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 		dev_priv->uncore.fw_clear = _MASKED_BIT_DISABLE(FORCEWAKE_KERNEL);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		int i;
 
 		dev_priv->uncore.funcs.force_wake_get =
@@ -1613,7 +1613,7 @@ void intel_uncore_init(struct drm_i915_private *dev_priv)
  */
 void intel_uncore_prune(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		enum forcewake_domains fw_domains = dev_priv->uncore.fw_domains;
 		enum forcewake_domain_id domain_id;
 		int i;
@@ -1744,7 +1744,7 @@ static void i915_stop_engines(struct drm_i915_private *dev_priv,
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
 
-	if (INTEL_GEN(dev_priv) < 3)
+	if (GT_GEN_RANGE(dev_priv, 0, 2))
 		return;
 
 	for_each_engine_masked(engine, dev_priv, engine_mask, id)
@@ -2117,7 +2117,7 @@ static int reset_engines(struct drm_i915_private *i915,
 			 unsigned int engine_mask,
 			 unsigned int retry)
 {
-	if (INTEL_GEN(i915) >= 11)
+	if (GT_GEN_RANGE(i915, 11, GEN_FOREVER))
 		return gen11_reset_engines(i915, engine_mask);
 	else
 		return gen6_reset_engines(i915, engine_mask, retry);
@@ -2169,9 +2169,9 @@ static reset_func intel_get_gpu_reset(struct drm_i915_private *dev_priv)
 	if (!i915_modparams.reset)
 		return NULL;
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		return gen8_reset_engines;
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		return gen6_reset_engines;
 	else if (GT_GEN(dev_priv, 5))
 		return ironlake_do_reset;
@@ -2179,7 +2179,7 @@ static reset_func intel_get_gpu_reset(struct drm_i915_private *dev_priv)
 		return g4x_do_reset;
 	else if (IS_G33(dev_priv) || IS_PINEVIEW(dev_priv))
 		return g33_do_reset;
-	else if (INTEL_GEN(dev_priv) >= 3)
+	else if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER))
 		return i915_do_reset;
 	else
 		return NULL;
@@ -2262,7 +2262,7 @@ bool intel_has_reset_engine(struct drm_i915_private *dev_priv)
 
 int intel_reset_guc(struct drm_i915_private *dev_priv)
 {
-	u32 guc_domain = INTEL_GEN(dev_priv) >= 11 ? GEN11_GRDOM_GUC :
+	u32 guc_domain = GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) ? GEN11_GRDOM_GUC :
 						     GEN9_GRDOM_GUC;
 	int ret;
 
@@ -2314,11 +2314,11 @@ intel_uncore_forcewake_for_read(struct drm_i915_private *dev_priv,
 	u32 offset = i915_mmio_reg_offset(reg);
 	enum forcewake_domains fw_domains;
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		fw_domains = __gen11_fwtable_reg_read_fw_domains(offset);
 	} else if (HAS_FWTABLE(dev_priv)) {
 		fw_domains = __fwtable_reg_read_fw_domains(offset);
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		fw_domains = __gen6_reg_read_fw_domains(offset);
 	} else {
 		WARN_ON(!GT_GEN_RANGE(dev_priv, 2, 5));
@@ -2337,7 +2337,7 @@ intel_uncore_forcewake_for_write(struct drm_i915_private *dev_priv,
 	u32 offset = i915_mmio_reg_offset(reg);
 	enum forcewake_domains fw_domains;
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		fw_domains = __gen11_fwtable_reg_write_fw_domains(offset);
 	} else if (HAS_FWTABLE(dev_priv) && !IS_VALLEYVIEW(dev_priv)) {
 		fw_domains = __fwtable_reg_write_fw_domains(offset);

@@ -156,7 +156,7 @@ static void intel_crt_set_dpms(struct intel_encoder *encoder,
 	const struct drm_display_mode *adjusted_mode = &crtc_state->base.adjusted_mode;
 	u32 adpa;
 
-	if (INTEL_GEN(dev_priv) >= 5)
+	if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER))
 		adpa = ADPA_HOTPLUG_BITS;
 	else
 		adpa = 0;
@@ -833,7 +833,7 @@ load_detect:
 	if (ret > 0) {
 		if (intel_crt_detect_ddc(connector))
 			status = connector_status_connected;
-		else if (INTEL_GEN(dev_priv) < 4)
+		else if (GT_GEN_RANGE(dev_priv, 0, 3))
 			status = intel_crt_load_detect(crt,
 				to_intel_crtc(connector->state->crtc)->pipe);
 		else if (i915_modparams.load_detect_test)
@@ -883,7 +883,7 @@ void intel_crt_reset(struct drm_encoder *encoder)
 	struct drm_i915_private *dev_priv = to_i915(encoder->dev);
 	struct intel_crt *crt = intel_encoder_to_crt(to_intel_encoder(encoder));
 
-	if (INTEL_GEN(dev_priv) >= 5) {
+	if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		u32 adpa;
 
 		adpa = I915_READ(crt->adpa_reg);

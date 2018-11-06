@@ -379,7 +379,7 @@ static int gpu_fill(struct drm_i915_gem_object *obj,
 	}
 
 	flags = 0;
-	if (INTEL_GEN(vm->i915) <= 5)
+	if (GT_GEN_RANGE(vm->i915, 0, 5))
 		flags |= I915_DISPATCH_SECURE;
 
 	err = engine->emit_bb_start(rq,
@@ -799,7 +799,7 @@ static int write_to_scratch(struct i915_gem_context *ctx,
 	}
 
 	*cmd++ = MI_STORE_DWORD_IMM_GEN4;
-	if (INTEL_GEN(i915) >= 8) {
+	if (GT_GEN_RANGE(i915, 8, GEN_FOREVER)) {
 		*cmd++ = lower_32_bits(offset);
 		*cmd++ = upper_32_bits(offset);
 	} else {
@@ -887,7 +887,7 @@ static int read_from_scratch(struct i915_gem_context *ctx,
 	}
 
 	memset(cmd, POISON_INUSE, PAGE_SIZE);
-	if (INTEL_GEN(i915) >= 8) {
+	if (GT_GEN_RANGE(i915, 8, GEN_FOREVER)) {
 		*cmd++ = MI_LOAD_REGISTER_MEM_GEN8;
 		*cmd++ = RCS_GPR0;
 		*cmd++ = lower_32_bits(offset);
@@ -984,7 +984,7 @@ static int igt_vm_isolation(void *arg)
 	u64 vm_total;
 	int err;
 
-	if (INTEL_GEN(i915) < 7)
+	if (GT_GEN_RANGE(i915, 0, 6))
 		return 0;
 
 	/*

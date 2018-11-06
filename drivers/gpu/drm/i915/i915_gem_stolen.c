@@ -52,7 +52,7 @@ int i915_gem_stolen_insert_node_in_range(struct drm_i915_private *dev_priv,
 		return -ENODEV;
 
 	/* WaSkipStolenMemoryFirstPage:bdw+ */
-	if (INTEL_GEN(dev_priv) >= 8 && start < 4096)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER) && start < 4096)
 		start = 4096;
 
 	mutex_lock(&dev_priv->mm.stolen_lock);
@@ -95,7 +95,7 @@ static int i915_adjust_stolen(struct drm_i915_private *dev_priv,
 	 */
 
 	/* Make sure we don't clobber the GTT if it's within stolen memory */
-	if (INTEL_GEN(dev_priv) <= 4 &&
+	if (GT_GEN_RANGE(dev_priv, 0, 4) &&
 	    !IS_G33(dev_priv) && !IS_PINEVIEW(dev_priv) && !IS_G4X(dev_priv)) {
 		struct resource stolen[2] = {*dsm, *dsm};
 		struct resource ggtt_res;
@@ -384,7 +384,7 @@ int i915_gem_init_stolen(struct drm_i915_private *dev_priv)
 		return 0;
 	}
 
-	if (intel_vtd_active() && INTEL_GEN(dev_priv) < 8) {
+	if (intel_vtd_active() && GT_GEN_RANGE(dev_priv, 0, 7)) {
 		DRM_INFO("DMAR active, disabling use of stolen memory\n");
 		return 0;
 	}

@@ -215,7 +215,7 @@ static int gamw_echo_dev_rw_ia_write(struct intel_vgpu *vgpu,
 {
 	u32 ips = (*(u32 *)p_data) & GAMW_ECO_ENABLE_64K_IPS_FIELD;
 
-	if (INTEL_GEN(vgpu->gvt->dev_priv) <= 10) {
+	if (GT_GEN_RANGE(vgpu->gvt->dev_priv, 0, 10)) {
 		if (ips == GAMW_ECO_ENABLE_64K_IPS_FIELD)
 			gvt_dbg_core("vgpu%d: ips enabled\n", vgpu->id);
 		else if (!ips)

@@ -91,7 +91,7 @@ void intel_psr_irq_control(struct drm_i915_private *dev_priv, u32 debug)
 	debug_mask = EDP_PSR_POST_EXIT(TRANSCODER_EDP) |
 		     EDP_PSR_PRE_ENTRY(TRANSCODER_EDP);
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		mask |= EDP_PSR_ERROR(TRANSCODER_A) |
 			EDP_PSR_ERROR(TRANSCODER_B) |
 			EDP_PSR_ERROR(TRANSCODER_C);
@@ -153,7 +153,7 @@ void intel_psr_irq_handler(struct drm_i915_private *dev_priv, u32 psr_iir)
 	enum transcoder cpu_transcoder;
 	ktime_t time_ns =  ktime_get();
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		transcoders |= BIT(TRANSCODER_A) |
 			       BIT(TRANSCODER_B) |
 			       BIT(TRANSCODER_C);
@@ -175,7 +175,7 @@ void intel_psr_irq_handler(struct drm_i915_private *dev_priv, u32 psr_iir)
 			DRM_DEBUG_KMS("[transcoder %s] PSR exit completed\n",
 				      transcoder_name(cpu_transcoder));
 
-			if (INTEL_GEN(dev_priv) >= 9) {
+			if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 				u32 val = I915_READ(PSR_EVENT(cpu_transcoder));
 				bool psr2_enabled = dev_priv->psr.psr2_enabled;
 
@@ -242,7 +242,7 @@ void intel_psr_init_dpcd(struct intel_dp *intel_dp)
 	WARN_ON(dev_priv->psr.dp);
 	dev_priv->psr.dp = intel_dp;
 
-	if (INTEL_GEN(dev_priv) >= 9 &&
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER) &&
 	    (intel_dp->psr_dpcd[0] == DP_PSR2_WITH_Y_COORD_IS_SUPPORTED)) {
 		bool y_req = intel_dp->psr_dpcd[1] &
 			     DP_PSR2_SU_Y_COORDINATE_REQUIRED;
@@ -350,7 +350,7 @@ static void intel_psr_enable_sink(struct intel_dp *intel_dp)
 
 	if (dev_priv->psr.link_standby)
 		dpcd_val |= DP_PSR_MAIN_LINK_ACTIVE;
-	if (!dev_priv->psr.psr2_enabled && INTEL_GEN(dev_priv) >= 8)
+	if (!dev_priv->psr.psr2_enabled && GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		dpcd_val |= DP_PSR_CRC_VERIFICATION;
 	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, dpcd_val);
 
@@ -405,7 +405,7 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 	else
 		val |= EDP_PSR_TP1_TP2_SEL;
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		val |= EDP_PSR_CRC_ENABLE;
 
 	val |= I915_READ(EDP_PSR_CTL) & EDP_PSR_RESTORE_PSR_ACTIVE_CTX_MASK;
@@ -429,7 +429,7 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	 * mesh at all with our frontbuffer tracking. And the hw alone isn't
 	 * good enough. */
 	val |= EDP_PSR2_ENABLE | EDP_SU_TRACK_ENABLE;
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		val |= EDP_Y_COORDINATE_ENABLE;
 
 	val |= EDP_PSR2_FRAME_BEFORE_SU(dev_priv->psr.sink_sync_latency + 1);
@@ -463,7 +463,7 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 	if (!dev_priv->psr.sink_psr2_support)
 		return false;
 
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) {
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv)) {
 		psr_max_h = 4096;
 		psr_max_v = 2304;
 	} else if (GT_GEN(dev_priv, 9)) {
@@ -543,7 +543,7 @@ static void intel_psr_activate(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		WARN_ON(I915_READ(EDP_PSR2_CTL) & EDP_PSR2_ENABLE);
 	WARN_ON(I915_READ(EDP_PSR_CTL) & EDP_PSR_ENABLE);
 	WARN_ON(dev_priv->psr.active);
@@ -594,7 +594,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 	       EDP_PSR_DEBUG_MASK_LPSP |
 	       EDP_PSR_DEBUG_MASK_MAX_SLEEP;
 
-	if (INTEL_GEN(dev_priv) < 11)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		mask |= EDP_PSR_DEBUG_MASK_DISP_REG_WRITE;
 
 	I915_WRITE(EDP_PSR_DEBUG, mask);
@@ -1063,7 +1063,7 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 		return;
 
 	if (i915_modparams.enable_psr == -1)
-		if (INTEL_GEN(dev_priv) < 9 || !dev_priv->vbt.psr.enable)
+		if (GT_GEN_RANGE(dev_priv, 0, 8) || !dev_priv->vbt.psr.enable)
 			i915_modparams.enable_psr = 0;
 
 	/* Set link_standby x link_off defaults */

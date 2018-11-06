@@ -264,7 +264,7 @@ static bool __intel_set_cpu_fifo_underrun_reporting(struct drm_device *dev,
 		ironlake_set_fifo_underrun_reporting(dev, pipe, enable);
 	else if (GT_GEN(dev_priv, 7))
 		ivybridge_set_fifo_underrun_reporting(dev, pipe, enable, old);
-	else if (INTEL_GEN(dev_priv) >= 8)
+	else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		broadwell_set_fifo_underrun_reporting(dev, pipe, enable);
 
 	return old;

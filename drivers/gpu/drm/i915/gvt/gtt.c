@@ -1025,12 +1025,12 @@ static bool vgpu_ips_enabled(struct intel_vgpu *vgpu)
 {
 	struct drm_i915_private *dev_priv = vgpu->gvt->dev_priv;
 
-	if (INTEL_GEN(dev_priv) == 9 || INTEL_GEN(dev_priv) == 10) {
+	if (GT_GEN(dev_priv, 9) || GT_GEN(dev_priv, 10)) {
 		u32 ips = vgpu_vreg_t(vgpu, GEN8_GAMW_ECO_DEV_RW_IA) &
 			GAMW_ECO_ENABLE_64K_IPS_FIELD;
 
 		return ips == GAMW_ECO_ENABLE_64K_IPS_FIELD;
-	} else if (INTEL_GEN(dev_priv) >= 11) {
+	} else if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		/* 64K paging only controlled by IPS bit in PTE now. */
 		return true;
 	} else

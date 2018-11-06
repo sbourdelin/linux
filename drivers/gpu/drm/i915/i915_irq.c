@@ -359,16 +359,16 @@ void gen5_disable_gt_irq(struct drm_i915_private *dev_priv, uint32_t mask)
 
 static i915_reg_t gen6_pm_iir(struct drm_i915_private *dev_priv)
 {
-	WARN_ON_ONCE(INTEL_GEN(dev_priv) >= 11);
+	WARN_ON_ONCE(GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER));
 
-	return INTEL_GEN(dev_priv) >= 8 ? GEN8_GT_IIR(2) : GEN6_PMIIR;
+	return GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER) ? GEN8_GT_IIR(2) : GEN6_PMIIR;
 }
 
 static i915_reg_t gen6_pm_imr(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		return GEN11_GPM_WGBOXPERF_INTR_MASK;
-	else if (INTEL_GEN(dev_priv) >= 8)
+	else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		return GEN8_GT_IMR(2);
 	else
 		return GEN6_PMIMR;
@@ -376,9 +376,9 @@ static i915_reg_t gen6_pm_imr(struct drm_i915_private *dev_priv)
 
 static i915_reg_t gen6_pm_ier(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		return GEN11_GPM_WGBOXPERF_INTR_ENABLE;
-	else if (INTEL_GEN(dev_priv) >= 8)
+	else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		return GEN8_GT_IER(2);
 	else
 		return GEN6_PMIER;
@@ -493,7 +493,7 @@ void gen6_enable_rps_interrupts(struct drm_i915_private *dev_priv)
 	spin_lock_irq(&dev_priv->irq_lock);
 	WARN_ON_ONCE(rps->pm_iir);
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		WARN_ON_ONCE(gen11_reset_one_iir(dev_priv, 0, GEN11_GTPM));
 	else
 		WARN_ON_ONCE(I915_READ(gen6_pm_iir(dev_priv)) & dev_priv->pm_rps_events);
@@ -527,7 +527,7 @@ void gen6_disable_rps_interrupts(struct drm_i915_private *dev_priv)
 	 * state of the worker can be discarded.
 	 */
 	cancel_work_sync(&rps->work);
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		gen11_reset_rps_interrupts(dev_priv);
 	else
 		gen6_reset_rps_interrupts(dev_priv);
@@ -668,7 +668,7 @@ u32 i915_pipestat_enable_mask(struct drm_i915_private *dev_priv,
 
 	lockdep_assert_held(&dev_priv->irq_lock);
 
-	if (INTEL_GEN(dev_priv) < 5)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		goto out;
 
 	/*
@@ -759,7 +759,7 @@ static void i915_enable_asle_pipestat(struct drm_i915_private *dev_priv)
 	spin_lock_irq(&dev_priv->irq_lock);
 
 	i915_enable_pipestat(dev_priv, PIPE_B, PIPE_LEGACY_BLC_EVENT_STATUS);
-	if (INTEL_GEN(dev_priv) >= 4)
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		i915_enable_pipestat(dev_priv, PIPE_A,
 				     PIPE_LEGACY_BLC_EVENT_STATUS);
 
@@ -1030,7 +1030,7 @@ static bool i915_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	if (stime)
 		*stime = ktime_get();
 
-	if (GT_GEN(dev_priv, 2) || IS_G4X(dev_priv) || INTEL_GEN(dev_priv) >= 5) {
+	if (GT_GEN(dev_priv, 2) || IS_G4X(dev_priv) || GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		/* No obvious pixelcount register. Only query vertical
 		 * scanout position from Display scan line register.
 		 */
@@ -1090,7 +1090,7 @@ static bool i915_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	else
 		position += vtotal - vbl_end;
 
-	if (GT_GEN(dev_priv, 2) || IS_G4X(dev_priv) || INTEL_GEN(dev_priv) >= 5) {
+	if (GT_GEN(dev_priv, 2) || IS_G4X(dev_priv) || GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		*vpos = position;
 		*hpos = 0;
 	} else {
@@ -1756,7 +1756,7 @@ static void display_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
 	 * don't trust that one either.
 	 */
 	if (pipe_crc->skipped <= 0 ||
-	    (INTEL_GEN(dev_priv) >= 8 && pipe_crc->skipped == 1)) {
+	    (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER) && pipe_crc->skipped == 1)) {
 		pipe_crc->skipped++;
 		spin_unlock(&pipe_crc->lock);
 		return;
@@ -1806,12 +1806,12 @@ static void i9xx_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
 {
 	uint32_t res1, res2;
 
-	if (INTEL_GEN(dev_priv) >= 3)
+	if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER))
 		res1 = I915_READ(PIPE_CRC_RES_RES1_I915(pipe));
 	else
 		res1 = 0;
 
-	if (INTEL_GEN(dev_priv) >= 5 || IS_G4X(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER) || IS_G4X(dev_priv))
 		res2 = I915_READ(PIPE_CRC_RES_RES2_G4X(pipe));
 	else
 		res2 = 0;
@@ -1840,7 +1840,7 @@ static void gen6_rps_irq_handler(struct drm_i915_private *dev_priv, u32 pm_iir)
 		spin_unlock(&dev_priv->irq_lock);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		return;
 
 	if (HAS_VEBOX(dev_priv)) {
@@ -2633,7 +2633,7 @@ static irqreturn_t ironlake_irq_handler(int irq, void *arg)
 	if (gt_iir) {
 		I915_WRITE(GTIIR, gt_iir);
 		ret = IRQ_HANDLED;
-		if (INTEL_GEN(dev_priv) >= 6)
+		if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 			snb_gt_irq_handler(dev_priv, gt_iir);
 		else
 			ilk_gt_irq_handler(dev_priv, gt_iir);
@@ -2643,13 +2643,13 @@ static irqreturn_t ironlake_irq_handler(int irq, void *arg)
 	if (de_iir) {
 		I915_WRITE(DEIIR, de_iir);
 		ret = IRQ_HANDLED;
-		if (INTEL_GEN(dev_priv) >= 7)
+		if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 			ivb_display_irq_handler(dev_priv, de_iir);
 		else
 			ilk_display_irq_handler(dev_priv, de_iir);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		u32 pm_iir = I915_READ(GEN6_PMIIR);
 		if (pm_iir) {
 			I915_WRITE(GEN6_PMIIR, pm_iir);
@@ -2753,7 +2753,7 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			DRM_ERROR("The master control interrupt lied (DE MISC)!\n");
 	}
 
-	if (INTEL_GEN(dev_priv) >= 11 && (master_ctl & GEN11_DE_HPD_IRQ)) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) && (master_ctl & GEN11_DE_HPD_IRQ)) {
 		iir = I915_READ(GEN11_DE_HPD_IIR);
 		if (iir) {
 			I915_WRITE(GEN11_DE_HPD_IIR, iir);
@@ -2774,16 +2774,16 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			ret = IRQ_HANDLED;
 
 			tmp_mask = GEN8_AUX_CHANNEL_A;
-			if (INTEL_GEN(dev_priv) >= 9)
+			if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 				tmp_mask |= GEN9_AUX_CHANNEL_B |
 					    GEN9_AUX_CHANNEL_C |
 					    GEN9_AUX_CHANNEL_D;
 
-			if (INTEL_GEN(dev_priv) >= 11)
+			if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 				tmp_mask |= ICL_AUX_CHANNEL_E;
 
 			if (IS_CNL_WITH_PORT_F(dev_priv) ||
-			    INTEL_GEN(dev_priv) >= 11)
+			    GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 				tmp_mask |= CNL_AUX_CHANNEL_F;
 
 			if (iir & tmp_mask) {
@@ -2844,7 +2844,7 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			intel_cpu_fifo_underrun_irq_handler(dev_priv, pipe);
 
 		fault_errors = iir;
-		if (INTEL_GEN(dev_priv) >= 9)
+		if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 			fault_errors &= GEN9_DE_PIPE_IRQ_FAULT_ERRORS;
 		else
 			fault_errors &= GEN8_DE_PIPE_IRQ_FAULT_ERRORS;
@@ -3246,7 +3246,7 @@ void i915_clear_error_registers(struct drm_i915_private *dev_priv)
 	if (!GT_GEN(dev_priv, 2))
 		I915_WRITE(PGTBL_ER, I915_READ(PGTBL_ER));
 
-	if (INTEL_GEN(dev_priv) < 4)
+	if (GT_GEN_RANGE(dev_priv, 0, 3))
 		I915_WRITE(IPEIR, I915_READ(IPEIR));
 	else
 		I915_WRITE(IPEIR_I965, I915_READ(IPEIR_I965));
@@ -3263,11 +3263,11 @@ void i915_clear_error_registers(struct drm_i915_private *dev_priv)
 		I915_WRITE(IIR, I915_MASTER_ERROR_INTERRUPT);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		I915_WRITE(GEN8_RING_FAULT_REG,
 			   I915_READ(GEN8_RING_FAULT_REG) & ~RING_FAULT_VALID);
 		POSTING_READ(GEN8_RING_FAULT_REG);
-	} else if (INTEL_GEN(dev_priv) >= 6) {
+	} else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		struct intel_engine_cs *engine;
 		enum intel_engine_id id;
 
@@ -3417,7 +3417,7 @@ static int ironlake_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
-	uint32_t bit = INTEL_GEN(dev_priv) >= 7 ?
+	uint32_t bit = GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER) ?
 		DE_PIPE_VBLANK_IVB(pipe) : DE_PIPE_VBLANK(pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
@@ -3479,7 +3479,7 @@ static void ironlake_disable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
-	uint32_t bit = INTEL_GEN(dev_priv) >= 7 ?
+	uint32_t bit = GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER) ?
 		DE_PIPE_VBLANK_IVB(pipe) : DE_PIPE_VBLANK(pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
@@ -3531,7 +3531,7 @@ static void ibx_irq_pre_postinstall(struct drm_device *dev)
 static void gen5_gt_irq_reset(struct drm_i915_private *dev_priv)
 {
 	GEN3_IRQ_RESET(GT);
-	if (INTEL_GEN(dev_priv) >= 6)
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		GEN3_IRQ_RESET(GEN6_PM);
 }
 
@@ -3932,12 +3932,12 @@ static void ilk_hpd_irq_setup(struct drm_i915_private *dev_priv)
 {
 	u32 hotplug_irqs, enabled_irqs;
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		hotplug_irqs = GEN8_PORT_DP_A_HOTPLUG;
 		enabled_irqs = intel_hpd_enabled_irqs(dev_priv, hpd_bdw);
 
 		bdw_update_port_irq(dev_priv, hotplug_irqs, enabled_irqs);
-	} else if (INTEL_GEN(dev_priv) >= 7) {
+	} else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		hotplug_irqs = DE_DP_A_HOTPLUG_IVB;
 		enabled_irqs = intel_hpd_enabled_irqs(dev_priv, hpd_ivb);
 
@@ -4050,7 +4050,7 @@ static void gen5_gt_irq_postinstall(struct drm_device *dev)
 
 	GEN3_IRQ_INIT(GT, dev_priv->gt_irq_mask, gt_irqs);
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		/*
 		 * RPS interrupts will get enabled/disabled on demand when RPS
 		 * itself is enabled/disabled.
@@ -4070,7 +4070,7 @@ static int ironlake_irq_postinstall(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	u32 display_mask, extra_mask;
 
-	if (INTEL_GEN(dev_priv) >= 7) {
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		display_mask = (DE_MASTER_IRQ_CONTROL | DE_GSE_IVB |
 				DE_PCH_EVENT_IVB | DE_AUX_CHANNEL_A_IVB);
 		extra_mask = (DE_PIPEC_VBLANK_IVB | DE_PIPEB_VBLANK_IVB |
@@ -4204,10 +4204,10 @@ static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
 	u32 de_misc_masked = GEN8_DE_EDP_PSR;
 	enum pipe pipe;
 
-	if (INTEL_GEN(dev_priv) <= 10)
+	if (GT_GEN_RANGE(dev_priv, 0, 10))
 		de_misc_masked |= GEN8_DE_MISC_GSE;
 
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER)) {
 		de_pipe_masked |= GEN9_DE_PIPE_IRQ_FAULT_ERRORS;
 		de_port_masked |= GEN9_AUX_CHANNEL_B | GEN9_AUX_CHANNEL_C |
 				  GEN9_AUX_CHANNEL_D;
@@ -4217,10 +4217,10 @@ static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
 		de_pipe_masked |= GEN8_DE_PIPE_IRQ_FAULT_ERRORS;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 11)
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		de_port_masked |= ICL_AUX_CHANNEL_E;
 
-	if (IS_CNL_WITH_PORT_F(dev_priv) || INTEL_GEN(dev_priv) >= 11)
+	if (IS_CNL_WITH_PORT_F(dev_priv) || GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER))
 		de_port_masked |= CNL_AUX_CHANNEL_F;
 
 	de_pipe_enables = de_pipe_masked | GEN8_PIPE_VBLANK |
@@ -4248,7 +4248,7 @@ static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
 	GEN3_IRQ_INIT(GEN8_DE_PORT_, ~de_port_masked, de_port_enables);
 	GEN3_IRQ_INIT(GEN8_DE_MISC_, ~de_misc_masked, de_misc_masked);
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		u32 de_hpd_masked = 0;
 		u32 de_hpd_enables = GEN11_DE_TC_HOTPLUG_MASK |
 				     GEN11_DE_TBT_HOTPLUG_MASK;
@@ -4827,16 +4827,16 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 	 *
 	 * TODO: verify if this can be reproduced on VLV,CHV.
 	 */
-	if (INTEL_GEN(dev_priv) <= 7)
+	if (GT_GEN_RANGE(dev_priv, 0, 7))
 		rps->pm_intrmsk_mbz |= GEN6_PM_RP_UP_EI_EXPIRED;
 
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		rps->pm_intrmsk_mbz |= GEN8_PMINTR_DISABLE_REDIRECT_TO_GUC;
 
 	if (GT_GEN(dev_priv, 2)) {
 		/* Gen2 doesn't have a hardware frame counter */
 		dev->max_vblank_count = 0;
-	} else if (IS_G4X(dev_priv) || INTEL_GEN(dev_priv) >= 5) {
+	} else if (IS_G4X(dev_priv) || GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		dev->max_vblank_count = 0xffffffff; /* full 32 bit counter */
 		dev->driver->get_vblank_counter = g4x_get_vblank_counter;
 	} else {
@@ -4883,7 +4883,7 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 		dev->driver->enable_vblank = i965_enable_vblank;
 		dev->driver->disable_vblank = i965_disable_vblank;
 		dev_priv->display.hpd_irq_setup = i915_hpd_irq_setup;
-	} else if (INTEL_GEN(dev_priv) >= 11) {
+	} else if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		dev->driver->irq_handler = gen11_irq_handler;
 		dev->driver->irq_preinstall = gen11_irq_reset;
 		dev->driver->irq_postinstall = gen11_irq_postinstall;
@@ -4891,7 +4891,7 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 		dev->driver->enable_vblank = gen8_enable_vblank;
 		dev->driver->disable_vblank = gen8_disable_vblank;
 		dev_priv->display.hpd_irq_setup = gen11_hpd_irq_setup;
-	} else if (INTEL_GEN(dev_priv) >= 8) {
+	} else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		dev->driver->irq_handler = gen8_irq_handler;
 		dev->driver->irq_preinstall = gen8_irq_reset;
 		dev->driver->irq_postinstall = gen8_irq_postinstall;

@@ -215,12 +215,12 @@ static int gpu_set(struct drm_i915_gem_object *obj,
 		return PTR_ERR(cs);
 	}
 
-	if (INTEL_GEN(i915) >= 8) {
+	if (GT_GEN_RANGE(i915, 8, GEN_FOREVER)) {
 		*cs++ = MI_STORE_DWORD_IMM_GEN4 | 1 << 22;
 		*cs++ = lower_32_bits(i915_ggtt_offset(vma) + offset);
 		*cs++ = upper_32_bits(i915_ggtt_offset(vma) + offset);
 		*cs++ = v;
-	} else if (INTEL_GEN(i915) >= 4) {
+	} else if (GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 		*cs++ = MI_STORE_DWORD_IMM_GEN4 | MI_USE_GGTT;
 		*cs++ = 0;
 		*cs++ = i915_ggtt_offset(vma) + offset;

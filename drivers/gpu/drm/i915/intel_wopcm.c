@@ -80,7 +80,7 @@ static inline u32 context_reserved_size(struct drm_i915_private *i915)
 {
 	if (GT_GEN9_LP(i915))
 		return BXT_WOPCM_RC6_CTX_RESERVED;
-	else if (INTEL_GEN(i915) >= 10)
+	else if (GT_GEN_RANGE(i915, 10, GEN_FOREVER))
 		return CNL_WOPCM_HW_CTX_RESERVED;
 	else
 		return 0;

@@ -150,7 +150,7 @@ static int emit_recurse_batch(struct hang *h,
 	}
 
 	batch = h->batch;
-	if (INTEL_GEN(i915) >= 8) {
+	if (GT_GEN_RANGE(i915, 8, GEN_FOREVER)) {
 		*batch++ = MI_STORE_DWORD_IMM_GEN4;
 		*batch++ = lower_32_bits(hws_address(hws, rq));
 		*batch++ = upper_32_bits(hws_address(hws, rq));
@@ -164,7 +164,7 @@ static int emit_recurse_batch(struct hang *h,
 		*batch++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
 		*batch++ = lower_32_bits(vma->node.start);
 		*batch++ = upper_32_bits(vma->node.start);
-	} else if (INTEL_GEN(i915) >= 6) {
+	} else if (GT_GEN_RANGE(i915, 6, GEN_FOREVER)) {
 		*batch++ = MI_STORE_DWORD_IMM_GEN4;
 		*batch++ = 0;
 		*batch++ = lower_32_bits(hws_address(hws, rq));
@@ -177,7 +177,7 @@ static int emit_recurse_batch(struct hang *h,
 		*batch++ = MI_ARB_CHECK;
 		*batch++ = MI_BATCH_BUFFER_START | 1 << 8;
 		*batch++ = lower_32_bits(vma->node.start);
-	} else if (INTEL_GEN(i915) >= 4) {
+	} else if (GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 		*batch++ = MI_STORE_DWORD_IMM_GEN4 | MI_USE_GGTT;
 		*batch++ = 0;
 		*batch++ = lower_32_bits(hws_address(hws, rq));
@@ -207,7 +207,7 @@ static int emit_recurse_batch(struct hang *h,
 	i915_gem_chipset_flush(h->i915);
 
 	flags = 0;
-	if (INTEL_GEN(vm->i915) <= 5)
+	if (GT_GEN_RANGE(vm->i915, 0, 5))
 		flags |= I915_DISPATCH_SECURE;
 
 	err = rq->engine->emit_bb_start(rq, vma->node.start, PAGE_SIZE, flags);

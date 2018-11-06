@@ -2138,7 +2138,7 @@ void intel_set_cdclk(struct drm_i915_private *dev_priv,
 static int intel_pixel_rate_to_cdclk(struct drm_i915_private *dev_priv,
 				     int pixel_rate)
 {
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		return DIV_ROUND_UP(pixel_rate, 2);
 	else if (GT_GEN(dev_priv, 9) ||
 		 IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))
@@ -2197,7 +2197,7 @@ int intel_crtc_compute_min_cdclk(const struct intel_crtc_state *crtc_state)
 	 * at probe time. If we probe without displays, we'll still end up using
 	 * the platform minimum CDCLK, failing audio probe.
 	 */
-	if (INTEL_GEN(dev_priv) >= 9)
+	if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		min_cdclk = max(2 * 96000, min_cdclk);
 
 	/*
@@ -2535,14 +2535,14 @@ static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
 {
 	int max_cdclk_freq = dev_priv->max_cdclk_freq;
 
-	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || IS_GEMINILAKE(dev_priv))
 		return 2 * max_cdclk_freq;
 	else if (GT_GEN(dev_priv, 9) ||
 		 IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))
 		return max_cdclk_freq;
 	else if (IS_CHERRYVIEW(dev_priv))
 		return max_cdclk_freq*95/100;
-	else if (INTEL_GEN(dev_priv) < 4)
+	else if (GT_GEN_RANGE(dev_priv, 0, 3))
 		return 2*max_cdclk_freq*90/100;
 	else
 		return max_cdclk_freq*90/100;

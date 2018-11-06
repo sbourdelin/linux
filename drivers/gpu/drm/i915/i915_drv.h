@@ -2600,8 +2600,8 @@ intel_info(const struct drm_i915_private *dev_priv)
 	(IS_CANNONLAKE(dev_priv) || \
 	 IS_SKL_GT3(dev_priv) || IS_SKL_GT4(dev_priv))
 
-#define HAS_GMBUS_IRQ(dev_priv) (INTEL_GEN(dev_priv) >= 4)
-#define HAS_GMBUS_BURST_READ(dev_priv) (INTEL_GEN(dev_priv) >= 10 || \
+#define HAS_GMBUS_IRQ(dev_priv) (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
+#define HAS_GMBUS_BURST_READ(dev_priv) (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER) || \
 					IS_GEMINILAKE(dev_priv) || \
 					IS_KABYLAKE(dev_priv))
 
@@ -2614,9 +2614,9 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define SUPPORTS_TV(dev_priv)		((dev_priv)->info.supports_tv)
 #define I915_HAS_HOTPLUG(dev_priv)	((dev_priv)->info.has_hotplug)
 
-#define HAS_FW_BLC(dev_priv) 	(INTEL_GEN(dev_priv) > 2)
+#define HAS_FW_BLC(dev_priv) 	(GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER))
 #define HAS_FBC(dev_priv)	((dev_priv)->info.has_fbc)
-#define HAS_CUR_FBC(dev_priv)	(!HAS_GMCH_DISPLAY(dev_priv) && INTEL_GEN(dev_priv) >= 7)
+#define HAS_CUR_FBC(dev_priv)	(!HAS_GMCH_DISPLAY(dev_priv) && GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 
 #define HAS_IPS(dev_priv)	(IS_HSW_ULT(dev_priv) || IS_BROADWELL(dev_priv))
 
@@ -2698,7 +2698,7 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define HAS_GMCH_DISPLAY(dev_priv) ((dev_priv)->info.has_gmch_display)
 
-#define HAS_LSPCON(dev_priv) (INTEL_GEN(dev_priv) >= 9)
+#define HAS_LSPCON(dev_priv) (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 
 /* DPF == dynamic parity feature */
 #define HAS_L3_DPF(dev_priv) ((dev_priv)->info.has_l3_dpf)
@@ -2721,7 +2721,7 @@ static inline bool intel_vtd_active(void)
 
 static inline bool intel_scanout_needs_vtd_wa(struct drm_i915_private *dev_priv)
 {
-	return INTEL_GEN(dev_priv) >= 6 && intel_vtd_active();
+	return GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER) && intel_vtd_active();
 }
 
 static inline bool
@@ -3309,7 +3309,7 @@ void i915_gem_flush_ggtt_writes(struct drm_i915_private *dev_priv);
 static inline void i915_gem_chipset_flush(struct drm_i915_private *dev_priv)
 {
 	wmb();
-	if (INTEL_GEN(dev_priv) < 6)
+	if (GT_GEN_RANGE(dev_priv, 0, 5))
 		intel_gtt_chipset_flush();
 }
 
@@ -3688,7 +3688,7 @@ static inline i915_reg_t i915_vgacntrl_reg(struct drm_i915_private *dev_priv)
 {
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		return VLV_VGACNTRL;
-	else if (INTEL_GEN(dev_priv) >= 5)
+	else if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER))
 		return CPU_VGACNTRL;
 	else
 		return VGACNTRL;
@@ -3848,7 +3848,7 @@ int remap_io_mapping(struct vm_area_struct *vma,
 
 static inline int intel_hws_csb_write_index(struct drm_i915_private *i915)
 {
-	if (INTEL_GEN(i915) >= 10)
+	if (GT_GEN_RANGE(i915, 10, GEN_FOREVER))
 		return CNL_HWS_CSB_WRITE_INDEX;
 	else
 		return I915_HWS_CSB_WRITE_INDEX;

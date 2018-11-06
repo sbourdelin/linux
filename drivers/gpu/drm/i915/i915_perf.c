@@ -3245,7 +3245,7 @@ int i915_perf_add_config_ioctl(struct drm_device *dev, void *data,
 		goto reg_err;
 	}
 
-	if (INTEL_GEN(dev_priv) < 8) {
+	if (GT_GEN_RANGE(dev_priv, 0, 7)) {
 		if (args->n_flex_regs != 0) {
 			err = -EINVAL;
 			goto reg_err;

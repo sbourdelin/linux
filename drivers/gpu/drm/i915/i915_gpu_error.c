@@ -411,13 +411,13 @@ static void error_print_instdone(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  INSTDONE: 0x%08x\n",
 		   ee->instdone.instdone);
 
-	if (ee->engine_id != RCS || INTEL_GEN(m->i915) <= 3)
+	if (ee->engine_id != RCS || GT_GEN_RANGE(m->i915, 0, 3))
 		return;
 
 	err_printf(m, "  SC_INSTDONE: 0x%08x\n",
 		   ee->instdone.slice_common);
 
-	if (INTEL_GEN(m->i915) <= 6)
+	if (GT_GEN_RANGE(m->i915, 0, 6))
 		return;
 
 	for_each_instdone_slice_subslice(m->i915, slice, subslice)
@@ -492,7 +492,7 @@ static void error_print_engine(struct drm_i915_error_state_buf *m,
 			   upper_32_bits(start), lower_32_bits(start),
 			   upper_32_bits(end), lower_32_bits(end));
 	}
-	if (INTEL_GEN(m->i915) >= 4) {
+	if (GT_GEN_RANGE(m->i915, 4, GEN_FOREVER)) {
 		err_printf(m, "  BBADDR: 0x%08x_%08x\n",
 			   (u32)(ee->bbaddr>>32), (u32)ee->bbaddr);
 		err_printf(m, "  BB_STATE: 0x%08x\n", ee->bbstate);
@@ -501,7 +501,7 @@ static void error_print_engine(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  INSTPM: 0x%08x\n", ee->instpm);
 	err_printf(m, "  FADDR: 0x%08x %08x\n", upper_32_bits(ee->faddr),
 		   lower_32_bits(ee->faddr));
-	if (INTEL_GEN(m->i915) >= 6) {
+	if (GT_GEN_RANGE(m->i915, 6, GEN_FOREVER)) {
 		err_printf(m, "  RC PSMI: 0x%08x\n", ee->rc_psmi);
 		err_printf(m, "  FAULT_REG: 0x%08x\n", ee->fault_reg);
 		err_printf(m, "  SYNC_0: 0x%08x\n",
@@ -515,7 +515,7 @@ static void error_print_engine(struct drm_i915_error_state_buf *m,
 	if (HAS_PPGTT(m->i915)) {
 		err_printf(m, "  GFX_MODE: 0x%08x\n", ee->vm_info.gfx_mode);
 
-		if (INTEL_GEN(m->i915) >= 8) {
+		if (GT_GEN_RANGE(m->i915, 8, GEN_FOREVER)) {
 			int i;
 			for (i = 0; i < 4; i++)
 				err_printf(m, "  PDP%d: 0x%016llx\n",
@@ -710,10 +710,10 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 	for (i = 0; i < error->nfence; i++)
 		err_printf(m, "  fence[%d] = %08llx\n", i, error->fence[i]);
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		err_printf(m, "ERROR: 0x%08x\n", error->error);
 
-		if (INTEL_GEN(dev_priv) >= 8)
+		if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 			err_printf(m, "FAULT_TLB_DATA: 0x%08x 0x%08x\n",
 				   error->fault_data1, error->fault_data0);
 
@@ -1106,10 +1106,10 @@ static void gem_record_fences(struct i915_gpu_state *error)
 	struct drm_i915_private *dev_priv = error->i915;
 	int i;
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		for (i = 0; i < dev_priv->num_fence_regs; i++)
 			error->fence[i] = I915_READ64(FENCE_REG_GEN6_LO(i));
-	} else if (INTEL_GEN(dev_priv) >= 4) {
+	} else if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER)) {
 		for (i = 0; i < dev_priv->num_fence_regs; i++)
 			error->fence[i] = I915_READ64(FENCE_REG_965_LO(i));
 	} else {
@@ -1190,9 +1190,9 @@ static void error_record_engine_registers(struct i915_gpu_state *error,
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		ee->rc_psmi = I915_READ(RING_PSMI_CTL(engine->mmio_base));
-		if (INTEL_GEN(dev_priv) >= 8) {
+		if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 			ee->fault_reg = I915_READ(GEN8_RING_FAULT_REG);
 		} else {
 			gen6_record_semaphore_state(engine, ee);
@@ -1200,13 +1200,13 @@ static void error_record_engine_registers(struct i915_gpu_state *error,
 		}
 	}
 
-	if (INTEL_GEN(dev_priv) >= 4) {
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER)) {
 		ee->faddr = I915_READ(RING_DMA_FADD(engine->mmio_base));
 		ee->ipeir = I915_READ(RING_IPEIR(engine->mmio_base));
 		ee->ipehr = I915_READ(RING_IPEHR(engine->mmio_base));
 		ee->instps = I915_READ(RING_INSTPS(engine->mmio_base));
 		ee->bbaddr = I915_READ(RING_BBADDR(engine->mmio_base));
-		if (INTEL_GEN(dev_priv) >= 8) {
+		if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 			ee->faddr |= (u64) I915_READ(RING_DMA_FADD_UDW(engine->mmio_base)) << 32;
 			ee->bbaddr |= (u64) I915_READ(RING_BBADDR_UDW(engine->mmio_base)) << 32;
 		}
@@ -1228,7 +1228,7 @@ static void error_record_engine_registers(struct i915_gpu_state *error,
 	ee->head = I915_READ_HEAD(engine);
 	ee->tail = I915_READ_TAIL(engine);
 	ee->ctl = I915_READ_CTL(engine);
-	if (INTEL_GEN(dev_priv) > 2)
+	if (GT_GEN_RANGE(dev_priv, 3, GEN_FOREVER))
 		ee->mode = I915_READ_MODE(engine);
 
 	if (!HWS_NEEDS_PHYSICAL(dev_priv)) {
@@ -1278,7 +1278,7 @@ static void error_record_engine_registers(struct i915_gpu_state *error,
 		else if (GT_GEN(dev_priv, 7))
 			ee->vm_info.pp_dir_base =
 				I915_READ(RING_PP_DIR_BASE(engine));
-		else if (INTEL_GEN(dev_priv) >= 8)
+		else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 			for (i = 0; i < 4; i++) {
 				ee->vm_info.pdp[i] =
 					I915_READ(GEN8_RING_PDP_UDW(engine, i));
@@ -1648,7 +1648,7 @@ static void capture_reg_state(struct i915_gpu_state *error)
 	if (GT_GEN(dev_priv, 7))
 		error->err_int = I915_READ(GEN7_ERR_INT);
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		error->fault_data0 = I915_READ(GEN8_FAULT_TLB_DATA0);
 		error->fault_data1 = I915_READ(GEN8_FAULT_TLB_DATA1);
 	}
@@ -1660,16 +1660,16 @@ static void capture_reg_state(struct i915_gpu_state *error)
 	}
 
 	/* 2: Registers which belong to multiple generations */
-	if (INTEL_GEN(dev_priv) >= 7)
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		error->forcewake = I915_READ_FW(FORCEWAKE_MT);
 
-	if (INTEL_GEN(dev_priv) >= 6) {
+	if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER)) {
 		error->derrmr = I915_READ(DERRMR);
 		error->error = I915_READ(ERROR_GEN6);
 		error->done_reg = I915_READ(DONE_REG);
 	}
 
-	if (INTEL_GEN(dev_priv) >= 5)
+	if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER))
 		error->ccid = I915_READ(CCID);
 
 	/* 3: Feature specific registers */
@@ -1679,7 +1679,7 @@ static void capture_reg_state(struct i915_gpu_state *error)
 	}
 
 	/* 4: Everything else */
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		error->ier = I915_READ(GEN8_DE_MISC_IER);
 		error->gtier[0] = I915_READ(GEN11_RENDER_COPY_INTR_ENABLE);
 		error->gtier[1] = I915_READ(GEN11_VCS_VECS_INTR_ENABLE);
@@ -1688,7 +1688,7 @@ static void capture_reg_state(struct i915_gpu_state *error)
 		error->gtier[4] = I915_READ(GEN11_CRYPTO_RSVD_INTR_ENABLE);
 		error->gtier[5] = I915_READ(GEN11_GUNIT_CSME_INTR_ENABLE);
 		error->ngtier = 6;
-	} else if (INTEL_GEN(dev_priv) >= 8) {
+	} else if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		error->ier = I915_READ(GEN8_DE_MISC_IER);
 		for (i = 0; i < 4; i++)
 			error->gtier[i] = I915_READ(GEN8_GT_IER(i));

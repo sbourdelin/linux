@@ -379,7 +379,7 @@ static int igt_partial_tiling(void *arg)
 		    tile.swizzle == I915_BIT_6_SWIZZLE_9_10_17)
 			continue;
 
-		if (INTEL_GEN(i915) <= 2) {
+		if (GT_GEN_RANGE(i915, 0, 2)) {
 			tile.height = 16;
 			tile.width = 128;
 			tile.size = 11;
@@ -394,9 +394,9 @@ static int igt_partial_tiling(void *arg)
 			tile.size = 12;
 		}
 
-		if (INTEL_GEN(i915) < 4)
+		if (GT_GEN_RANGE(i915, 0, 3))
 			max_pitch = 8192 / tile.width;
-		else if (INTEL_GEN(i915) < 7)
+		else if (GT_GEN_RANGE(i915, 0, 6))
 			max_pitch = 128 * I965_FENCE_MAX_PITCH_VAL / tile.width;
 		else
 			max_pitch = 128 * GEN7_FENCE_MAX_PITCH_VAL / tile.width;
@@ -409,7 +409,7 @@ static int igt_partial_tiling(void *arg)
 			if (err)
 				goto out_unlock;
 
-			if (pitch > 2 && INTEL_GEN(i915) >= 4) {
+			if (pitch > 2 && GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 				tile.stride = tile.width * (pitch - 1);
 				err = check_partial_mapping(obj, &tile, end);
 				if (err == -EINTR)
@@ -418,7 +418,7 @@ static int igt_partial_tiling(void *arg)
 					goto out_unlock;
 			}
 
-			if (pitch < max_pitch && INTEL_GEN(i915) >= 4) {
+			if (pitch < max_pitch && GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 				tile.stride = tile.width * (pitch + 1);
 				err = check_partial_mapping(obj, &tile, end);
 				if (err == -EINTR)
@@ -428,7 +428,7 @@ static int igt_partial_tiling(void *arg)
 			}
 		}
 
-		if (INTEL_GEN(i915) >= 4) {
+		if (GT_GEN_RANGE(i915, 4, GEN_FOREVER)) {
 			for_each_prime_number(pitch, max_pitch) {
 				tile.stride = tile.width * pitch;
 				err = check_partial_mapping(obj, &tile, end);

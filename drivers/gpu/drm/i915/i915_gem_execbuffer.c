@@ -2518,7 +2518,7 @@ i915_gem_execbuffer_ioctl(struct drm_device *dev, void *data,
 		exec2_list[i].relocs_ptr = exec_list[i].relocs_ptr;
 		exec2_list[i].alignment = exec_list[i].alignment;
 		exec2_list[i].offset = exec_list[i].offset;
-		if (INTEL_GEN(to_i915(dev)) < 4)
+		if (GT_GEN_RANGE(to_i915(dev), 0, 3))
 			exec2_list[i].flags = EXEC_OBJECT_NEEDS_FENCE;
 		else
 			exec2_list[i].flags = 0;

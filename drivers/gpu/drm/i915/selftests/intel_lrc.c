@@ -24,7 +24,7 @@ static int spinner_init(struct spinner *spin, struct drm_i915_private *i915)
 	void *vaddr;
 	int err;
 
-	GEM_BUG_ON(INTEL_GEN(i915) < 8);
+	GEM_BUG_ON(GT_GEN_RANGE(i915, 0, 7));
 
 	memset(spin, 0, sizeof(*spin));
 	spin->i915 = i915;

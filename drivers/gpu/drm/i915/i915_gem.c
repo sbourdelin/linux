@@ -171,7 +171,7 @@ static u32 __i915_gem_park(struct drm_i915_private *i915)
 
 	i915->gt.awake = false;
 
-	if (INTEL_GEN(i915) >= 6)
+	if (GT_GEN_RANGE(i915, 6, GEN_FOREVER))
 		gen6_rps_idle(i915);
 
 	intel_display_power_put(i915, POWER_DOMAIN_GT_IRQ);
@@ -226,7 +226,7 @@ void i915_gem_unpark(struct drm_i915_private *i915)
 
 	intel_enable_gt_powersave(i915);
 	i915_update_gfx_val(i915);
-	if (INTEL_GEN(i915) >= 6)
+	if (GT_GEN_RANGE(i915, 6, GEN_FOREVER))
 		gen6_rps_busy(i915);
 	i915_pmu_gt_unparked(i915);
 
@@ -489,7 +489,7 @@ i915_gem_object_wait_fence(struct dma_fence *fence,
 	 * each client to waitboost once in a busy period.
 	 */
 	if (rps_client && !i915_request_started(rq)) {
-		if (INTEL_GEN(rq->i915) >= 6)
+		if (GT_GEN_RANGE(rq->i915, 6, GEN_FOREVER))
 			gen6_rps_boost(rq, rps_client);
 	}
 
@@ -3338,7 +3338,7 @@ void i915_gem_set_wedged(struct drm_i915_private *i915)
 	i915->caps.scheduler = 0;
 
 	/* Even if the GPU reset fails, it should still stop the engines */
-	if (INTEL_GEN(i915) >= 5)
+	if (GT_GEN_RANGE(i915, 5, GEN_FOREVER))
 		intel_gpu_reset(i915, ALL_ENGINES);
 
 	/*
@@ -5054,7 +5054,7 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 	 * of the reset, so this could be applied to even earlier gen.
 	 */
 	err = -ENODEV;
-	if (INTEL_GEN(i915) >= 5 && intel_has_gpu_reset(i915))
+	if (GT_GEN_RANGE(i915, 5, GEN_FOREVER) && intel_has_gpu_reset(i915))
 		err = WARN_ON(intel_gpu_reset(i915, ALL_ENGINES));
 	if (!err)
 		intel_engines_sanitize(i915);
@@ -5216,7 +5216,7 @@ err_wedged:
 
 void i915_gem_init_swizzling(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) < 5 ||
+	if (GT_GEN_RANGE(dev_priv, 0, 4) ||
 	    dev_priv->mm.bit_6_swizzle_x == I915_BIT_6_SWIZZLE_NONE)
 		return;
 
@@ -5290,7 +5290,7 @@ int i915_gem_init_hw(struct drm_i915_private *dev_priv)
 	/* Double layer security blanket, see i915_gem_init() */
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
-	if (HAS_EDRAM(dev_priv) && INTEL_GEN(dev_priv) < 9)
+	if (HAS_EDRAM(dev_priv) && GT_GEN_RANGE(dev_priv, 0, 8))
 		I915_WRITE(HSW_IDICR, I915_READ(HSW_IDICR) | IDIHASHMSK(0xf));
 
 	if (IS_HASWELL(dev_priv))
@@ -5699,10 +5699,10 @@ i915_gem_load_init_fences(struct drm_i915_private *dev_priv)
 {
 	int i;
 
-	if (INTEL_GEN(dev_priv) >= 7 && !IS_VALLEYVIEW(dev_priv) &&
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER) && !IS_VALLEYVIEW(dev_priv) &&
 	    !IS_CHERRYVIEW(dev_priv))
 		dev_priv->num_fence_regs = 32;
-	else if (INTEL_GEN(dev_priv) >= 4 ||
+	else if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER) ||
 		 IS_I945G(dev_priv) || IS_I945GM(dev_priv) ||
 		 IS_G33(dev_priv) || IS_PINEVIEW(dev_priv))
 		dev_priv->num_fence_regs = 16;

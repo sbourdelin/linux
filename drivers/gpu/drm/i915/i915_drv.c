@@ -472,12 +472,12 @@ static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
 static int
 intel_alloc_mchbar_resource(struct drm_i915_private *dev_priv)
 {
-	int reg = INTEL_GEN(dev_priv) >= 4 ? MCHBAR_I965 : MCHBAR_I915;
+	int reg = GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER) ? MCHBAR_I965 : MCHBAR_I915;
 	u32 temp_lo, temp_hi = 0;
 	u64 mchbar_addr;
 	int ret;
 
-	if (INTEL_GEN(dev_priv) >= 4)
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		pci_read_config_dword(dev_priv->bridge_dev, reg + 4, &temp_hi);
 	pci_read_config_dword(dev_priv->bridge_dev, reg, &temp_lo);
 	mchbar_addr = ((u64)temp_hi << 32) | temp_lo;
@@ -504,7 +504,7 @@ intel_alloc_mchbar_resource(struct drm_i915_private *dev_priv)
 		return ret;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 4)
+	if (GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER))
 		pci_write_config_dword(dev_priv->bridge_dev, reg + 4,
 				       upper_32_bits(dev_priv->mch_res.start));
 
@@ -517,7 +517,7 @@ intel_alloc_mchbar_resource(struct drm_i915_private *dev_priv)
 static void
 intel_setup_mchbar(struct drm_i915_private *dev_priv)
 {
-	int mchbar_reg = INTEL_GEN(dev_priv) >= 4 ? MCHBAR_I965 : MCHBAR_I915;
+	int mchbar_reg = GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER) ? MCHBAR_I965 : MCHBAR_I915;
 	u32 temp;
 	bool enabled;
 
@@ -556,7 +556,7 @@ intel_setup_mchbar(struct drm_i915_private *dev_priv)
 static void
 intel_teardown_mchbar(struct drm_i915_private *dev_priv)
 {
-	int mchbar_reg = INTEL_GEN(dev_priv) >= 4 ? MCHBAR_I965 : MCHBAR_I915;
+	int mchbar_reg = GT_GEN_RANGE(dev_priv, 4, GEN_FOREVER) ? MCHBAR_I965 : MCHBAR_I915;
 
 	if (dev_priv->mchbar_need_disable) {
 		if (IS_I915G(dev_priv) || IS_I915GM(dev_priv)) {
@@ -964,7 +964,7 @@ static int i915_mmio_setup(struct drm_i915_private *dev_priv)
 	 * the register BAR remains the same size for all the earlier
 	 * generations up to Ironlake.
 	 */
-	if (INTEL_GEN(dev_priv) < 5)
+	if (GT_GEN_RANGE(dev_priv, 0, 4))
 		mmio_size = 512 * 1024;
 	else
 		mmio_size = 2 * 1024 * 1024;
@@ -1324,7 +1324,7 @@ intel_get_dram_info(struct drm_i915_private *dev_priv)
 	 */
 	dram_info->is_16gb_dimm = !GT_GEN9_LP(dev_priv);
 
-	if (INTEL_GEN(dev_priv) < 9 || IS_GEMINILAKE(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 0, 8) || IS_GEMINILAKE(dev_priv))
 		return;
 
 	/* Need to calculate bandwidth only for Gen9 */
@@ -1464,7 +1464,7 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 	 * device. The kernel then disables that interrupt source and so
 	 * prevents the other device from working properly.
 	 */
-	if (INTEL_GEN(dev_priv) >= 5) {
+	if (GT_GEN_RANGE(dev_priv, 5, GEN_FOREVER)) {
 		if (pci_enable_msi(pdev) < 0)
 			DRM_DEBUG_DRIVER("can't enable MSI");
 	}
@@ -1962,7 +1962,7 @@ static int i915_drm_suspend_late(struct drm_device *dev, bool hibernation)
 				    get_suspend_mode(dev_priv, hibernation));
 
 	ret = 0;
-	if (INTEL_GEN(dev_priv) >= 11 || GT_GEN9_LP(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) || GT_GEN9_LP(dev_priv))
 		bxt_enable_dc9(dev_priv);
 	else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		hsw_enable_pc8(dev_priv);
@@ -1989,7 +1989,7 @@ static int i915_drm_suspend_late(struct drm_device *dev, bool hibernation)
 	 * Fujitsu FSC S7110
 	 * Acer Aspire 1830T
 	 */
-	if (!(hibernation && INTEL_GEN(dev_priv) < 6))
+	if (!(hibernation && GT_GEN_RANGE(dev_priv, 0, 5)))
 		pci_set_power_state(pdev, PCI_D3hot);
 
 out:
@@ -2152,7 +2152,7 @@ static int i915_drm_resume_early(struct drm_device *dev)
 
 	intel_uncore_resume_early(dev_priv);
 
-	if (INTEL_GEN(dev_priv) >= 11 || GT_GEN9_LP(dev_priv)) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER) || GT_GEN9_LP(dev_priv)) {
 		gen9_sanitize_dc_state(dev_priv);
 		bxt_disable_dc9(dev_priv);
 	} else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
@@ -2919,7 +2919,7 @@ static int intel_runtime_suspend(struct device *kdev)
 	intel_uncore_suspend(dev_priv);
 
 	ret = 0;
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		icl_display_core_uninit(dev_priv);
 		bxt_enable_dc9(dev_priv);
 	} else if (GT_GEN9_LP(dev_priv)) {
@@ -3007,7 +3007,7 @@ static int intel_runtime_resume(struct device *kdev)
 	if (intel_uncore_unclaimed_mmio(dev_priv))
 		DRM_DEBUG_DRIVER("Unclaimed access during suspend, bios?\n");
 
-	if (INTEL_GEN(dev_priv) >= 11) {
+	if (GT_GEN_RANGE(dev_priv, 11, GEN_FOREVER)) {
 		bxt_disable_dc9(dev_priv);
 		icl_display_core_init(dev_priv, true);
 		if (dev_priv->csr.dmc_payload) {

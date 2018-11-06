@@ -2170,7 +2170,7 @@ static void gtt_write_workarounds(struct drm_i915_private *dev_priv)
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN8_L3_LRA_1_GPGPU_DEFAULT_VALUE_CHV);
 	else if (GT_GEN9_LP(dev_priv))
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN9_L3_LRA_1_GPGPU_DEFAULT_VALUE_BXT);
-	else if (INTEL_GEN(dev_priv) >= 9)
+	else if (GT_GEN_RANGE(dev_priv, 9, GEN_FOREVER))
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN9_L3_LRA_1_GPGPU_DEFAULT_VALUE_SKL);
 
 	/*
@@ -2185,7 +2185,7 @@ static void gtt_write_workarounds(struct drm_i915_private *dev_priv)
 	 * driver.
 	 */
 	if (HAS_PAGE_SIZES(dev_priv, I915_GTT_PAGE_SIZE_64K) &&
-	    INTEL_GEN(dev_priv) <= 10)
+	    GT_GEN_RANGE(dev_priv, 0, 10))
 		I915_WRITE(GEN8_GAMW_ECO_DEV_RW_IA,
 			   I915_READ(GEN8_GAMW_ECO_DEV_RW_IA) |
 			   GAMW_ECO_ENABLE_64K_IPS_FIELD);
@@ -2206,7 +2206,7 @@ int i915_ppgtt_init_hw(struct drm_i915_private *dev_priv)
 static struct i915_hw_ppgtt *
 __hw_ppgtt_create(struct drm_i915_private *i915)
 {
-	if (INTEL_GEN(i915) < 8)
+	if (GT_GEN_RANGE(i915, 0, 7))
 		return gen6_ppgtt_create(i915);
 	else
 		return gen8_ppgtt_create(i915);
@@ -2335,9 +2335,9 @@ static void gen8_check_faults(struct drm_i915_private *dev_priv)
 void i915_check_and_clear_faults(struct drm_i915_private *dev_priv)
 {
 	/* From GEN8 onwards we only have one 'All Engine Fault Register' */
-	if (INTEL_GEN(dev_priv) >= 8)
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER))
 		gen8_check_faults(dev_priv);
-	else if (INTEL_GEN(dev_priv) >= 6)
+	else if (GT_GEN_RANGE(dev_priv, 6, GEN_FOREVER))
 		gen6_check_faults(dev_priv);
 	else
 		return;
@@ -2352,7 +2352,7 @@ void i915_gem_suspend_gtt_mappings(struct drm_i915_private *dev_priv)
 	/* Don't bother messing with faults pre GEN6 as we have little
 	 * documentation supporting that it's a good idea.
 	 */
-	if (INTEL_GEN(dev_priv) < 6)
+	if (GT_GEN_RANGE(dev_priv, 0, 5))
 		return;
 
 	i915_check_and_clear_faults(dev_priv);
@@ -3002,7 +3002,7 @@ static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 	 * resort to an uncached mapping. The WC issue is easily caught by the
 	 * readback check when writing GTT PTE entries.
 	 */
-	if (GT_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN9_LP(dev_priv) || GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		ggtt->gsm = ioremap_nocache(phys_addr, size);
 	else
 		ggtt->gsm = ioremap_wc(phys_addr, size);
@@ -3301,7 +3301,7 @@ static void setup_private_pat(struct drm_i915_private *dev_priv)
 
 	ppat->i915 = dev_priv;
 
-	if (INTEL_GEN(dev_priv) >= 10)
+	if (GT_GEN_RANGE(dev_priv, 10, GEN_FOREVER))
 		cnl_setup_private_ppat(ppat);
 	else if (IS_CHERRYVIEW(dev_priv) || GT_GEN9_LP(dev_priv))
 		chv_setup_private_ppat(ppat);
@@ -3420,7 +3420,7 @@ static int gen6_gmch_probe(struct i915_ggtt *ggtt)
 		ggtt->vm.pte_encode = hsw_pte_encode;
 	else if (IS_VALLEYVIEW(dev_priv))
 		ggtt->vm.pte_encode = byt_pte_encode;
-	else if (INTEL_GEN(dev_priv) >= 7)
+	else if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER))
 		ggtt->vm.pte_encode = ivb_pte_encode;
 	else
 		ggtt->vm.pte_encode = snb_pte_encode;
@@ -3487,9 +3487,9 @@ int i915_ggtt_probe_hw(struct drm_i915_private *dev_priv)
 	ggtt->vm.i915 = dev_priv;
 	ggtt->vm.dma = &dev_priv->drm.pdev->dev;
 
-	if (INTEL_GEN(dev_priv) <= 5)
+	if (GT_GEN_RANGE(dev_priv, 0, 5))
 		ret = i915_gmch_probe(ggtt);
-	else if (INTEL_GEN(dev_priv) < 8)
+	else if (GT_GEN_RANGE(dev_priv, 0, 7))
 		ret = gen6_gmch_probe(ggtt);
 	else
 		ret = gen8_gmch_probe(ggtt);
@@ -3588,7 +3588,7 @@ out_gtt_cleanup:
 
 int i915_ggtt_enable_hw(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_GEN(dev_priv) < 6 && !intel_enable_gtt())
+	if (GT_GEN_RANGE(dev_priv, 0, 5) && !intel_enable_gtt())
 		return -EIO;
 
 	return 0;
@@ -3650,7 +3650,7 @@ void i915_gem_restore_gtt_mappings(struct drm_i915_private *dev_priv)
 	ggtt->vm.closed = false;
 	i915_ggtt_invalidate(dev_priv);
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER)) {
 		struct intel_ppat *ppat = &dev_priv->ppat;
 
 		bitmap_set(ppat->dirty, 0, ppat->max_entries);

@@ -146,7 +146,7 @@ static void ilk_load_csc_matrix(struct drm_crtc_state *crtc_state)
 	 * FIXME if there's a gamma LUT after the CSC, we should
 	 * do the range compression using the gamma LUT instead.
 	 */
-	if (INTEL_GEN(dev_priv) >= 8 || IS_HASWELL(dev_priv))
+	if (GT_GEN_RANGE(dev_priv, 8, GEN_FOREVER) || IS_HASWELL(dev_priv))
 		limited_color_range = intel_crtc_state->limited_color_range;
 
 	if (intel_crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
@@ -229,7 +229,7 @@ static void ilk_load_csc_matrix(struct drm_crtc_state *crtc_state)
 	I915_WRITE(PIPE_CSC_PREOFF_ME(pipe), 0);
 	I915_WRITE(PIPE_CSC_PREOFF_LO(pipe), 0);
 
-	if (INTEL_GEN(dev_priv) > 6) {
+	if (GT_GEN_RANGE(dev_priv, 7, GEN_FOREVER)) {
 		uint16_t postoff = 0;
 
 		if (limited_color_range)
