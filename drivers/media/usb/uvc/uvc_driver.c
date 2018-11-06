@@ -1883,6 +1883,8 @@ static void uvc_unregister_video(struct uvc_device *dev)
 		video_unregister_device(&stream->vdev);
 		video_unregister_device(&stream->meta.vdev);
 
+		destroy_workqueue(stream->async_wq);
+
 		uvc_debugfs_cleanup_stream(stream);
 	}
 }
