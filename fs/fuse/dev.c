@@ -468,6 +468,8 @@ put_request:
 
 static void queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
 {
+	bool kill = false;
+
 	spin_lock(&fiq->waitq.lock);
 	if (test_bit(FR_FINISHED, &req->flags)) {
 		spin_unlock(&fiq->waitq.lock);
@@ -476,9 +478,11 @@ static void queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
 	if (list_empty(&req->intr_entry)) {
 		list_add_tail(&req->intr_entry, &fiq->interrupts);
 		wake_up_locked(&fiq->waitq);
+		kill = true;
 	}
 	spin_unlock(&fiq->waitq.lock);
-	kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
+	if (kill)
+		kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
 }
 
 static void request_wait_answer(struct fuse_conn *fc, struct fuse_req *req)
