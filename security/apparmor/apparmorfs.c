@@ -977,7 +977,7 @@ static const struct file_operations aa_sfs_access = {
 	.llseek		= generic_file_llseek,
 };
 
-static int aa_sfs_seq_show(struct seq_file *seq, void *v)
+static int aa_sfs_seq_file_show(struct seq_file *seq, void *v)
 {
 	struct aa_sfs_entry *fs_file = seq->private;
 
@@ -1002,18 +1002,7 @@ static int aa_sfs_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static int aa_sfs_seq_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, aa_sfs_seq_show, inode->i_private);
-}
-
-const struct file_operations aa_sfs_seq_file_ops = {
-	.owner		= THIS_MODULE,
-	.open		= aa_sfs_seq_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(aa_sfs_seq_file);
 
 /*
  * profile based file operations
