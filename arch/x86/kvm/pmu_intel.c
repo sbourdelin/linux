@@ -44,11 +44,10 @@ static void reprogram_fixed_counters(struct kvm_pmu *pmu, u64 data)
 		u8 old_ctrl = fixed_ctrl_field(pmu->fixed_ctr_ctrl, i);
 		struct kvm_pmc *pmc;
 
-		pmc = get_fixed_pmc(pmu, MSR_CORE_PERF_FIXED_CTR0 + i);
-
 		if (old_ctrl == new_ctrl)
 			continue;
 
+		pmc = get_fixed_pmc(pmu, MSR_CORE_PERF_FIXED_CTR0 + i);
 		reprogram_fixed_counter(pmc, new_ctrl, i);
 	}
 
