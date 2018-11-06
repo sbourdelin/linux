@@ -62,47 +62,6 @@ unsigned long tpm_calc_ordinal_duration(struct tpm_chip *chip, u32 ordinal)
 }
 EXPORT_SYMBOL_GPL(tpm_calc_ordinal_duration);
 
-static int tpm_validate_command(struct tpm_chip *chip,
-				 struct tpm_space *space,
-				 const u8 *cmd,
-				 size_t len)
-{
-	const struct tpm_header *header = (const void *)cmd;
-	int i;
-	u32 cc;
-	u32 attrs;
-	unsigned int nr_handles;
-
-	if (len < TPM_HEADER_SIZE)
-		return -EINVAL;
-
-	if (!space)
-		return 0;
-
-	if (chip->flags & TPM_CHIP_FLAG_TPM2 && chip->nr_commands) {
-		cc = be32_to_cpu(header->ordinal);
-
-		i = tpm2_find_cc(chip, cc);
-		if (i < 0) {
-			dev_dbg(&chip->dev, "0x%04X is an invalid command\n",
-				cc);
-			return -EOPNOTSUPP;
-		}
-
-		attrs = chip->cc_attrs_tbl[i];
-		nr_handles =
-			4 * ((attrs >> TPM2_CC_ATTR_CHANDLES) & GENMASK(2, 0));
-		if (len < TPM_HEADER_SIZE + 4 * nr_handles)
-			goto err_len;
-	}
-
-	return 0;
-err_len:
-	dev_dbg(&chip->dev,
-		"%s: insufficient command length %zu", __func__, len);
-	return -EINVAL;
-}
-
 static int tpm_request_locality(struct tpm_chip *chip, unsigned int flags)
 {
 	int rc;
@@ -172,20 +131,8 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 	u32 count, ordinal;
 	unsigned long stop;
 
-	rc = tpm_validate_command(chip, space, buf, bufsiz);
-	if (rc == -EINVAL)
-		return rc;
-	/*
-	 * If the command is not implemented by the TPM, synthesize a
-	 * response with a TPM2_RC_COMMAND_CODE return for user-space.
-	 */
-	if (rc == -EOPNOTSUPP) {
-		header->length = cpu_to_be32(sizeof(*header));
-		header->tag = cpu_to_be16(TPM2_ST_NO_SESSIONS);
-		header->return_code = cpu_to_be32(TPM2_RC_COMMAND_CODE |
-						  TSS2_RESMGR_TPM_RC_LAYER);
-		return sizeof(*header);
-	}
+	if (bufsiz < TPM_HEADER_SIZE)
+		return -EINVAL;
 
 	if (bufsiz > TPM_BUFSIZE)
 		bufsiz = TPM_BUFSIZE;
@@ -200,7 +147,18 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
 		return -E2BIG;
 	}
 
-	rc = tpm2_prepare_space(chip, space, ordinal, buf);
+	rc = tpm2_prepare_space(chip, space, buf, bufsiz);
+	/*
+	 * If the command is not implemented by the TPM, synthesize a
+	 * response with a TPM2_RC_COMMAND_CODE return for user-space.
+	 */
+	if (rc == -EOPNOTSUPP) {
+		header->length = cpu_to_be32(sizeof(*header));
+		header->tag = cpu_to_be16(TPM2_ST_NO_SESSIONS);
+		header->return_code = cpu_to_be32(TPM2_RC_COMMAND_CODE |
+						  TSS2_RESMGR_TPM_RC_LAYER);
+		return sizeof(*header);
+	}
 	if (rc)
 		return rc;
 
@@ -249,7 +207,7 @@ out_space:
 	if (rc)
 		tpm2_flush_space(chip);
 	else
-		rc = tpm2_commit_space(chip, space, ordinal, buf, &len);
+		rc = tpm2_commit_space(chip, space, buf, &len);
 
 	return rc ? rc : len;
 }

@@ -264,13 +264,54 @@ static int tpm2_map_command(struct tpm_chip *chip, u32 cc, u8 *cmd)
 	return 0;
 }
 
-int tpm2_prepare_space(struct tpm_chip *chip, struct tpm_space *space, u32 cc,
-		       u8 *cmd)
+static int tpm_validate_command(struct tpm_chip *chip, struct tpm_space *space,
+				const u8 *cmd, size_t len)
+{
+	const struct tpm_input_header *header = (const void *)cmd;
+	int i;
+	u32 cc;
+	u32 attrs;
+	unsigned int nr_handles;
+
+	if (len < TPM_HEADER_SIZE)
+		return -EINVAL;
+
+	if (chip->nr_commands) {
+		cc = be32_to_cpu(header->ordinal);
+
+		i = tpm2_find_cc(chip, cc);
+		if (i < 0) {
+			dev_dbg(&chip->dev, "0x%04X is an invalid command\n",
+				cc);
+			return -EOPNOTSUPP;
+		}
+
+		attrs = chip->cc_attrs_tbl[i];
+		nr_handles =
+			4 * ((attrs >> TPM2_CC_ATTR_CHANDLES) & GENMASK(2, 0));
+		if (len < TPM_HEADER_SIZE + 4 * nr_handles)
+			goto err_len;
+	}
+
+	return cc;
+err_len:
+	dev_dbg(&chip->dev, "%s: insufficient command length %zu", __func__,
+		len);
+	return -EINVAL;
+}
+
+int tpm2_prepare_space(struct tpm_chip *chip, struct tpm_space *space, u8 *cmd,
+		       size_t cmdsiz)
 {
 	int rc;
+	int cc;
 
 	if (!space)
 		return 0;
+
+	cc = tpm_validate_command(chip, space, cmd, cmdsiz);
+	if (cc < 0)
+		return cc;
 
 	memcpy(&chip->work_space.context_tbl, &space->context_tbl,
 	       sizeof(space->context_tbl));
@@ -291,6 +332,7 @@ int tpm2_prepare_space(struct tpm_chip *chip, struct tpm_space *space, u32 cc,
 		return rc;
 	}
 
+	chip->last_cc = cc;
 	return 0;
 }
 
@@ -489,8 +531,8 @@ static int tpm2_save_space(struct tpm_chip *chip)
 	return 0;
 }
 
-int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
-		      u32 cc, u8 *buf, size_t *bufsiz)
+int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space, u8 *buf,
+		      size_t *bufsiz)
 {
 	struct tpm_header *header = (void *)buf;
 	int rc;
@@ -498,13 +540,13 @@ int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
 	if (!space)
 		return 0;
 
-	rc = tpm2_map_response_header(chip, cc, buf, *bufsiz);
+	rc = tpm2_map_response_header(chip, chip->last_cc, buf, *bufsiz);
 	if (rc) {
 		tpm2_flush_space(chip);
 		goto out;
 	}
 
-	rc = tpm2_map_response_body(chip, cc, buf, *bufsiz);
+	rc = tpm2_map_response_body(chip, chip->last_cc, buf, *bufsiz);
 	if (rc) {
 		tpm2_flush_space(chip);
 		goto out;
