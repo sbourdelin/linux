@@ -23,8 +23,12 @@ ascii85_encode(u32 in, char *out)
 {
 	int i;
 
-	if (in == 0)
-		return "z";
+	if (in == 0) {
+		out[0] = 'z';
+		out[1] = '\0';
+
+		return out;
+	}
 
 	out[5] = '\0';
 	for (i = 5; i--; ) {
@@ -33,6 +37,17 @@ ascii85_encode(u32 in, char *out)
 	}
 
 	return out;
+}
+
+static inline size_t
+ascii85_encode_to_buf(u32 in, char *out)
+{
+	ascii85_encode(in, out);
+
+	if (in == 0)
+		return 1;
+
+	return 5;
 }
 
 #endif
