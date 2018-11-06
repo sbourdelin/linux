@@ -450,7 +450,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 	bool test_remove = IS_ENABLED(CONFIG_DEBUG_TEST_DRIVER_REMOVE) &&
 			   !drv->suppress_bind_attrs;
 
-	if (defer_all_probes) {
+	if (unlikely(defer_all_probes)) {
 		/*
 		 * Value of defer_all_probes can be set only by
 		 * device_defer_all_probes_enable() which, in turn, will call
@@ -508,7 +508,7 @@ re_probe:
 			goto probe_failed;
 	}
 
-	if (test_remove) {
+	if (unlikely(test_remove)) {
 		test_remove = false;
 
 		if (dev->bus->remove)
