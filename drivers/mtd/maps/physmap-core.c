@@ -396,7 +396,7 @@ static int physmap_flash_of_init(struct platform_device *dev)
 #endif /* IS_ENABLED(CONFIG_MTD_PHYSMAP_OF) */
 
 static const char * const rom_probe_types[] = {
-	"cfi_probe", "jedec_probe", "qinfo_probe", "map_rom", NULL
+	"cfi_probe", "jedec_probe", "qinfo_probe", "map_rom",
 };
 
 static const char * const part_probe_types[] = {
@@ -524,7 +524,7 @@ static int physmap_flash_probe(struct platform_device *dev)
 		} else {
 			int j;
 
-			for (j = 0; ARRAY_SIZE(rom_probe_types); j++) {
+			for (j = 0; j < ARRAY_SIZE(rom_probe_types); j++) {
 				info->mtds[i] = do_map_probe(rom_probe_types[j],
 							     &info->maps[i]);
 				if (info->mtds[i])
