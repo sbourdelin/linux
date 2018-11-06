@@ -19,6 +19,7 @@
 #include <linux/export.h>
 #include <linux/hid.h>
 #include <linux/module.h>
+#include <linux/scatterlist.h>
 #include <linux/sched/signal.h>
 #include <linux/uio.h>
 #include <asm/unaligned.h>
@@ -219,6 +220,8 @@ struct ffs_io_data {
 
 	struct usb_ep *ep;
 	struct usb_request *req;
+	struct sg_table sgt;
+	bool use_sg;
 
 	struct ffs_data *ffs;
 };
@@ -750,6 +753,70 @@ static ssize_t ffs_copy_to_iter(void *data, int data_len, struct iov_iter *iter)
 	return ret;
 }
 
+/*
+ * allocate a virtually contiguous buffer and create a scatterlist describing it
+ * @sg_table	- pointer to a place to be filled with sg_table contents
+ * @size	- required buffer size
+ */
+static void *ffs_build_sg_list(struct sg_table *sg_table, size_t size)
+{
+	struct page **pages;
+	void *vaddr;
+	unsigned long ptr;
+	unsigned int n_pages;
+	int i;
+
+	vaddr = vmalloc(size);
+	if (!vaddr)
+		return NULL;
+
+	n_pages =  (PAGE_ALIGN((unsigned long)vaddr + size) -
+		((unsigned long)vaddr & PAGE_MASK))
+		>> PAGE_SHIFT;
+	pages = kvmalloc_array(n_pages, sizeof(struct page *), GFP_KERNEL);
+	if (!pages) {
+		vfree(vaddr);
+
+		return NULL;
+	}
+	for (i = 0, ptr = (unsigned long)vaddr & PAGE_MASK; i < n_pages;
+		++i, ptr += PAGE_SIZE)
+		pages[i] = vmalloc_to_page((void *)ptr);
+
+	if (sg_alloc_table_from_pages(sg_table, pages, n_pages,
+		((unsigned long)vaddr) & ~PAGE_MASK, size, GFP_KERNEL)) {
+		kvfree(pages);
+		vfree(vaddr);
+
+		return NULL;
+	}
+	kvfree(pages);
+
+	return vaddr;
+}
+
+static inline void *ffs_alloc_buffer(struct ffs_io_data *io_data,
+	size_t data_len)
+{
+	if (io_data->use_sg)
+		return ffs_build_sg_list(&io_data->sgt, data_len);
+
+	return kmalloc(data_len, GFP_KERNEL);
+}
+
+static inline void ffs_free_buffer(struct ffs_io_data *io_data)
+{
+	if (!io_data->buf)
+		return;
+
+	if (io_data->use_sg) {
+		sg_free_table(&io_data->sgt);
+		vfree(io_data->buf);
+	} else {
+		kfree(io_data->buf);
+	}
+}
+
 static void ffs_user_copy_worker(struct work_struct *work)
 {
 	struct ffs_io_data *io_data = container_of(work, struct ffs_io_data,
@@ -777,7 +844,7 @@ static void ffs_user_copy_worker(struct work_struct *work)
 
 	if (io_data->read)
 		kfree(io_data->to_free);
-	kfree(io_data->buf);
+	ffs_free_buffer(io_data);
 	kfree(io_data);
 }
 
@@ -933,6 +1000,7 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 		 * earlier
 		 */
 		gadget = epfile->ffs->gadget;
+		io_data->use_sg = gadget->sg_supported && data_len > PAGE_SIZE;
 
 		spin_lock_irq(&epfile->ffs->eps_lock);
 		/* In the meantime, endpoint got disabled or changed. */
@@ -949,7 +1017,7 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 			data_len = usb_ep_align_maybe(gadget, ep->ep, data_len);
 		spin_unlock_irq(&epfile->ffs->eps_lock);
 
-		data = kmalloc(data_len, GFP_KERNEL);
+		data = ffs_alloc_buffer(io_data, data_len);
 		if (unlikely(!data)) {
 			ret = -ENOMEM;
 			goto error_mutex;
@@ -989,8 +1057,16 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 		bool interrupted = false;
 
 		req = ep->req;
-		req->buf      = data;
+		if (io_data->use_sg) {
+			req->buf      = NULL;
+			req->sg	= io_data->sgt.sgl;
+			req->num_sgs = io_data->sgt.nents;
+		} else {
+			req->buf      = data;
+		}
 		req->length   = data_len;
+
+		io_data->buf = data;
 
 		req->context  = &done;
 		req->complete = ffs_epfile_io_complete;
@@ -1023,7 +1099,13 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 	} else if (!(req = usb_ep_alloc_request(ep->ep, GFP_ATOMIC))) {
 		ret = -ENOMEM;
 	} else {
-		req->buf      = data;
+		if (io_data->use_sg) {
+			req->buf      = NULL;
+			req->sg	= io_data->sgt.sgl;
+			req->num_sgs = io_data->sgt.nents;
+		} else {
+			req->buf      = data;
+		}
 		req->length   = data_len;
 
 		io_data->buf = data;
@@ -1053,7 +1135,7 @@ error_lock:
 error_mutex:
 	mutex_unlock(&epfile->mutex);
 error:
-	kfree(data);
+	ffs_free_buffer(io_data);
 	return ret;
 }
 
