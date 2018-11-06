@@ -1083,7 +1083,7 @@ static u32 g4x_sprite_ctl(const struct intel_crtc_state *crtc_state,
 
 	dvscntr = DVS_ENABLE | DVS_GAMMA_ENABLE;
 
-	if (IS_GEN6(dev_priv))
+	if (GT_GEN(dev_priv, 6))
 		dvscntr |= DVS_TRICKLE_FEED_DISABLE;
 
 	switch (fb->format->format) {
@@ -1979,7 +1979,7 @@ static bool skl_plane_has_planar(struct drm_i915_private *dev_priv,
 	if (IS_SKYLAKE(dev_priv) || IS_BROXTON(dev_priv))
 		return false;
 
-	if (IS_GEN9(dev_priv) && !IS_GEMINILAKE(dev_priv) && pipe == PIPE_C)
+	if (GT_GEN(dev_priv, 9) && !IS_GEMINILAKE(dev_priv) && pipe == PIPE_C)
 		return false;
 
 	if (plane_id != PLANE_PRIMARY && plane_id != PLANE_SPRITE0)
@@ -2188,7 +2188,7 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 		plane->check_plane = g4x_sprite_check;
 
 		modifiers = i9xx_plane_format_modifiers;
-		if (IS_GEN6(dev_priv)) {
+		if (GT_GEN(dev_priv, 6)) {
 			formats = snb_plane_formats;
 			num_formats = ARRAY_SIZE(snb_plane_formats);
 

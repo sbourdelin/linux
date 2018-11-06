@@ -466,7 +466,7 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) {
 		psr_max_h = 4096;
 		psr_max_v = 2304;
-	} else if (IS_GEN9(dev_priv)) {
+	} else if (GT_GEN(dev_priv, 9)) {
 		psr_max_h = 3640;
 		psr_max_v = 2304;
 	}
@@ -574,7 +574,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 	if (dev_priv->psr.psr2_enabled) {
 		u32 chicken = I915_READ(CHICKEN_TRANS(cpu_transcoder));
 
-		if (IS_GEN9(dev_priv) && !IS_GEMINILAKE(dev_priv))
+		if (GT_GEN(dev_priv, 9) && !IS_GEMINILAKE(dev_priv))
 			chicken |= (PSR2_VSC_ENABLE_PROG_HEADER
 				   | PSR2_ADD_VERTICAL_LINE_COUNT);
 
