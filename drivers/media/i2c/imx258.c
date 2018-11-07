@@ -62,11 +62,6 @@
 
 /* Test Pattern Control */
 #define IMX258_REG_TEST_PATTERN		0x0600
-#define IMX258_TEST_PATTERN_DISABLE	0
-#define IMX258_TEST_PATTERN_SOLID_COLOR	1
-#define IMX258_TEST_PATTERN_COLOR_BARS	2
-#define IMX258_TEST_PATTERN_GREY_COLOR	3
-#define IMX258_TEST_PATTERN_PN9		4
 
 /* Orientation */
 #define REG_MIRROR_FLIP_CONTROL		0x0101
@@ -504,18 +499,10 @@ static const struct imx258_reg mode_1048_780_regs[] = {
 
 static const char * const imx258_test_pattern_menu[] = {
 	"Disabled",
-	"Color Bars",
 	"Solid Color",
+	"Color Bars",
 	"Grey Color Bars",
 	"PN9"
-};
-
-static const int imx258_test_pattern_val[] = {
-	IMX258_TEST_PATTERN_DISABLE,
-	IMX258_TEST_PATTERN_COLOR_BARS,
-	IMX258_TEST_PATTERN_SOLID_COLOR,
-	IMX258_TEST_PATTERN_GREY_COLOR,
-	IMX258_TEST_PATTERN_PN9,
 };
 
 /* Configurations for supported link frequencies */
@@ -752,7 +739,6 @@ static int imx258_set_ctrl(struct v4l2_ctrl *ctrl)
 		container_of(ctrl->handler, struct imx258, ctrl_handler);
 	struct i2c_client *client = v4l2_get_subdevdata(&imx258->sd);
 	int ret = 0;
-
 	/*
 	 * Applying V4L2 control value only happens
 	 * when power is up for streaming
@@ -778,13 +764,10 @@ static int imx258_set_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_TEST_PATTERN:
 		ret = imx258_write_reg(imx258, IMX258_REG_TEST_PATTERN,
 				IMX258_REG_VALUE_16BIT,
-				imx258_test_pattern_val[ctrl->val]);
-
+				ctrl->val);
 		ret = imx258_write_reg(imx258, REG_MIRROR_FLIP_CONTROL,
 				IMX258_REG_VALUE_08BIT,
-				ctrl->val == imx258_test_pattern_val
-				[IMX258_TEST_PATTERN_DISABLE] ?
-				REG_CONFIG_MIRROR_FLIP :
+				!ctrl->val?REG_CONFIG_MIRROR_FLIP :
 				REG_CONFIG_FLIP_TEST_PATTERN);
 		break;
 	default:
@@ -1105,6 +1088,10 @@ static const struct v4l2_subdev_ops imx258_subdev_ops = {
 	.pad = &imx258_pad_ops,
 };
 
+static const struct media_entity_operations imx258_subdev_entity_ops = {
+	.link_validate = v4l2_subdev_link_validate,
+};
+
 static const struct v4l2_subdev_internal_ops imx258_internal_ops = {
 	.open = imx258_open,
 };
@@ -1250,6 +1237,7 @@ static int imx258_probe(struct i2c_client *client)
 
 	/* Initialize subdev */
 	imx258->sd.internal_ops = &imx258_internal_ops;
+	imx258->sd.entity.ops  = &imx258_subdev_entity_ops;
 	imx258->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	imx258->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
 
