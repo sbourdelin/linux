@@ -274,6 +274,15 @@ union fpregs_state {
 };
 
 /*
+ * This is per task AVX state data structure that indicates
+ * whether the task uses AVX instructions.
+ */
+struct avx_state {
+	unsigned int			state;
+	unsigned int			decay_count;
+};
+
+/*
  * Highest level per task FPU state data structure that
  * contains the FPU register state plus various FPU
  * state fields:
@@ -301,6 +310,14 @@ struct fpu {
 	 * is running then we should save into this context.
 	 */
 	unsigned char			initialized;
+
+	/*
+	 * @avx_state:
+	 *
+	 * This data structure indicates whether this context
+	 * contains AVX states
+	 */
+	struct avx_state		avx;
 
 	/*
 	 * @state:

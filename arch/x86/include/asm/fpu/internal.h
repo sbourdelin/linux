@@ -74,6 +74,12 @@ static __always_inline __pure bool use_fxsr(void)
 	return static_cpu_has(X86_FEATURE_FXSR);
 }
 
+static __always_inline __pure bool use_xgetbv1(void)
+{
+	return static_cpu_has(X86_FEATURE_OSXSAVE) &&
+		static_cpu_has(X86_FEATURE_XGETBV1);
+}
+
 /*
  * fpstate handling functions:
  */
@@ -102,6 +108,34 @@ static inline void fpstate_init_fxstate(struct fxregs_state *fx)
 	fx->mxcsr = MXCSR_DEFAULT;
 }
 extern void fpstate_sanitize_xstate(struct fpu *fpu);
+
+/*
+ * MXCSR and XCR definitions:
+ */
+
+extern unsigned int mxcsr_feature_mask;
+
+#define	XCR_XFEATURE_ENABLED_MASK	0x00000000
+#define	XINUSE_STATE_BITMAP_INDEX	0x00000001
+
+static inline u64 xgetbv(u32 index)
+{
+	u32 eax, edx;
+
+	asm volatile(".byte 0x0f,0x01,0xd0" /* xgetbv */
+		     : "=a" (eax), "=d" (edx)
+		     : "c" (index));
+	return eax + ((u64)edx << 32);
+}
+
+static inline void xsetbv(u32 index, u64 value)
+{
+	u32 eax = value;
+	u32 edx = value >> 32;
+
+	asm volatile(".byte 0x0f,0x01,0xd1" /* xsetbv */
+		     : : "a" (eax), "d" (edx), "c" (index));
+}
 
 #define user_insn(insn, output, input...)				\
 ({									\
@@ -275,6 +309,42 @@ static inline void copy_fxregs_to_kernel(struct fpu *fpu)
 		     : "D" (st), "m" (*st), "a" (lmask), "d" (hmask)	\
 		     : "memory")
 
+#define	AVX_STATE_DECAY_COUNT	3
+
+/*
+ * This function is called during context switch to update AVX component state
+ */
+static inline void update_avx_state(struct avx_state *avx)
+{
+	/*
+	 * Check if XGETBV with ECX = 1 supported. XGETBV with ECX = 1
+	 * returns the logical-AND of XCR0 and XINUSE. XINUSE is a bitmap
+	 * by which the processor tracks the status of various components.
+	 */
+	if (!use_xgetbv1()) {
+		avx->state = 0;
+		return;
+	}
+	/*
+	 * XINUSE is dynamic to track component state because VZEROUPPER
+	 * happens on every function end and reset the bitmap to the
+	 * initial configuration.
+	 *
+	 * State decay is introduced to solve the race condition between
+	 * context switch and a function end. State is aggressively set
+	 * once it's detected but need to be cleared by decay 3 context
+	 * switches
+	 */
+	if (xgetbv(XINUSE_STATE_BITMAP_INDEX) & XFEATURE_MASK_Hi16_ZMM) {
+		avx->state = 1;
+		avx->decay_count = AVX_STATE_DECAY_COUNT;
+	} else {
+		if (avx->decay_count)
+			avx->decay_count--;
+		else
+			avx->state = 0;
+	}
+}
 /*
  * This function is called only during boot time when x86 caps are not set
  * up and alternative can not be used yet.
@@ -411,6 +481,7 @@ static inline int copy_fpregs_to_fpstate(struct fpu *fpu)
 {
 	if (likely(use_xsave())) {
 		copy_xregs_to_kernel(&fpu->state.xsave);
+		update_avx_state(&fpu->avx);
 		return 1;
 	}
 
@@ -577,31 +648,5 @@ static inline void user_fpu_begin(void)
 	preempt_enable();
 }
 
-/*
- * MXCSR and XCR definitions:
- */
-
-extern unsigned int mxcsr_feature_mask;
-
-#define XCR_XFEATURE_ENABLED_MASK	0x00000000
-
-static inline u64 xgetbv(u32 index)
-{
-	u32 eax, edx;
-
-	asm volatile(".byte 0x0f,0x01,0xd0" /* xgetbv */
-		     : "=a" (eax), "=d" (edx)
-		     : "c" (index));
-	return eax + ((u64)edx << 32);
-}
-
-static inline void xsetbv(u32 index, u64 value)
-{
-	u32 eax = value;
-	u32 edx = value >> 32;
-
-	asm volatile(".byte 0x0f,0x01,0xd1" /* xsetbv */
-		     : : "a" (eax), "d" (edx), "c" (index));
-}
 
 #endif /* _ASM_X86_FPU_INTERNAL_H */
