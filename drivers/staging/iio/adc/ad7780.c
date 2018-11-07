@@ -31,6 +31,8 @@
 #define AD7780_PAT1	BIT(1)
 #define AD7780_PAT0	BIT(0)
 
+#define AD7170_PAT2	BIT(2)
+
 struct ad7780_chip_info {
 	struct iio_chan_spec	channel;
 	unsigned int		pattern_mask;
@@ -137,25 +139,25 @@ static const struct ad7780_chip_info ad7780_chip_info_tbl[] = {
 	[ID_AD7170] = {
 		.channel = AD7780_CHANNEL(12, 24),
 		.pattern = 0x5,
-		.pattern_mask = 0x7,
+		.pattern_mask = AD7780_PAT0 | AD7780_PAT1 | AD7170_PAT2,
 		.is_ad778x = false,
 	},
 	[ID_AD7171] = {
 		.channel = AD7780_CHANNEL(16, 24),
 		.pattern = 0x5,
-		.pattern_mask = 0x7,
+		.pattern_mask = AD7780_PAT0 | AD7780_PAT1 | AD7170_PAT2,
 		.is_ad778x = false,
 	},
 	[ID_AD7780] = {
 		.channel = AD7780_CHANNEL(24, 32),
 		.pattern = 0x1,
-		.pattern_mask = 0x3,
+		.pattern_mask = AD7780_PAT0 | AD7780_PAT1,
 		.is_ad778x = true,
 	},
 	[ID_AD7781] = {
 		.channel = AD7780_CHANNEL(20, 32),
 		.pattern = 0x1,
-		.pattern_mask = 0x3,
+		.pattern_mask = AD7780_PAT0 | AD7780_PAT1,
 		.is_ad778x = true,
 	},
 };
