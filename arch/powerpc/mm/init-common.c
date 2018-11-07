@@ -25,8 +25,19 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 
+static bool disable_kuep = !IS_ENABLED(CONFIG_PPC_KUEP);
+
+static int __init parse_nosmep(char *p)
+{
+	disable_kuep = true;
+	pr_warn("Disabling Kernel Userspace Execution Prevention\n");
+	return 0;
+}
+early_param("nosmep", parse_nosmep);
+
 void setup_kup(void)
 {
+	setup_kuep(disable_kuep);
 }
 
 static void pgd_ctor(void *addr)

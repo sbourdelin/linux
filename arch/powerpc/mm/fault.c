@@ -230,8 +230,9 @@ static bool bad_kernel_fault(bool is_exec, unsigned long error_code,
 	if (is_exec && (error_code & (DSISR_NOEXEC_OR_G | DSISR_KEYFAULT |
 				      DSISR_PROTFAULT))) {
 		printk_ratelimited(KERN_CRIT "kernel tried to execute"
-				   " exec-protected page (%lx) -"
+				   " %s page (%lx) -"
 				   "exploit attempt? (uid: %d)\n",
+				   address >= TASK_SIZE ? "exec-protected" : "user",
 				   address, from_kuid(&init_user_ns,
 						      current_uid()));
 	}
