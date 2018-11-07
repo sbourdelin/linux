@@ -1433,8 +1433,18 @@ good_area:
 		if (flags & FAULT_FLAG_ALLOW_RETRY) {
 			flags &= ~FAULT_FLAG_ALLOW_RETRY;
 			flags |= FAULT_FLAG_TRIED;
-			if (!fatal_signal_pending(tsk))
+			if (!signal_pending(tsk))
 				goto retry;
+			else if (!fatal_signal_pending(tsk))
+				/*
+				 * There is a signal for the task but
+				 * it's not fatal, let's return
+				 * directly to the userspace.  This
+				 * gives chance for signals like
+				 * SIGSTOP/SIGCONT to be handled
+				 * faster, e.g., with GDB.
+				 */
+				return;
 		}
 
 		/* User mode? Just return to handle the fatal exception */

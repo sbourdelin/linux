@@ -142,11 +142,14 @@ good_area:
 	fault = handle_mm_fault(vma, address, flags);
 
 	/* If Pagefault was interrupted by SIGKILL, exit page fault "early" */
-	if (unlikely(fatal_signal_pending(current))) {
-		if ((fault & VM_FAULT_ERROR) && !(fault & VM_FAULT_RETRY))
+	if (unlikely(fatal_signal_pending(current) && user_mode(regs))) {
+		/*
+		 * VM_FAULT_RETRY means we have released the mmap_sem,
+		 * otherwise we need to drop it before leaving
+		 */
+		if (!(fault & VM_FAULT_RETRY))
 			up_read(&mm->mmap_sem);
-		if (user_mode(regs))
-			return;
+		return;
 	}
 
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
