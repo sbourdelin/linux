@@ -1272,6 +1272,12 @@ static struct drm_dp_mst_branch *drm_dp_get_mst_branch_device(struct drm_dp_mst_
 	/* find the port by iterating down */
 
 	mutex_lock(&mgr->lock);
+
+	if (!mgr->mst_primary) {
+		mstb = NULL;
+		goto out;
+	}
+
 	mstb = mgr->mst_primary;
 
 	for (i = 0; i < lct - 1; i++) {
