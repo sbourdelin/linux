@@ -29,7 +29,7 @@ struct tegra_vde_h264_frame {
 	__u32 flags;
 
 	__u32 reserved;
-} __attribute__((packed));
+} __packed;
 
 struct tegra_vde_h264_decoder_ctx {
 	__s32 bitstream_data_fd;
@@ -61,7 +61,7 @@ struct tegra_vde_h264_decoder_ctx {
 	__u8  num_ref_idx_l1_active_minus1;
 
 	__u32 reserved;
-} __attribute__((packed));
+} __packed;
 
 #define VDE_IOCTL_BASE			('v' + 0x20)
 
