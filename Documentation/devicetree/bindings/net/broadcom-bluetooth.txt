@@ -18,7 +18,10 @@ Optional properties:
  - shutdown-gpios: GPIO specifier, used to enable the BT module
  - device-wakeup-gpios: GPIO specifier, used to wakeup the controller
  - host-wakeup-gpios: GPIO specifier, used to wakeup the host processor
- - clocks: clock specifier if external clock provided to the controller
+ - clocks and clock-names: clock specifier if external clocks are provided
+   - "txco": external reference clock
+   - "extclk": deprecated, replaced by "txco"
+   - "lpo": external low power 32.768 kHz clock
  - clock-names: should be "extclk"
 
 
