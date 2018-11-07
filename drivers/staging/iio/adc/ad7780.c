@@ -35,6 +35,7 @@ struct ad7780_chip_info {
 	struct iio_chan_spec	channel;
 	unsigned int		pattern_mask;
 	unsigned int		pattern;
+	u8			is_ad778x;
 };
 
 struct ad7780_state {
@@ -135,21 +136,25 @@ static const struct ad7780_chip_info ad7780_chip_info_tbl[] = {
 		.channel = AD7780_CHANNEL(12, 24),
 		.pattern = 0x5,
 		.pattern_mask = 0x7,
+		.is_ad778x = false,
 	},
 	[ID_AD7171] = {
 		.channel = AD7780_CHANNEL(16, 24),
 		.pattern = 0x5,
 		.pattern_mask = 0x7,
+		.is_ad778x = false,
 	},
 	[ID_AD7780] = {
 		.channel = AD7780_CHANNEL(24, 32),
 		.pattern = 0x1,
 		.pattern_mask = 0x3,
+		.is_ad778x = true,
 	},
 	[ID_AD7781] = {
 		.channel = AD7780_CHANNEL(20, 32),
 		.pattern = 0x1,
 		.pattern_mask = 0x3,
+		.is_ad778x = true,
 	},
 };
 
