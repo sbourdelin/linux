@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright (c) 2010-2012 Broadcom. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@
 
 #include <linux/types.h>
 
-typedef int32_t VCHI_MEM_HANDLE_T;
+typedef s32 VCHI_MEM_HANDLE_T;
 #define VCHI_MEM_HANDLE_INVALID 0
 
 #endif
