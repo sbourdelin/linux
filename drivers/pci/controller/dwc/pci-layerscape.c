@@ -280,6 +280,9 @@ static int __init ls_add_pcie_port(struct ls_pcie *pcie)
 
 	pp->ops = pcie->drvdata->ops;
 
+	/* FSL implements 6 windows */
+	pci->num_viewport = 6;
+
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
 		dev_err(dev, "failed to initialize host\n");
