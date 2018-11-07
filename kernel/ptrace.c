@@ -30,6 +30,10 @@
 #include <linux/cn_proc.h>
 #include <linux/compat.h>
 
+#ifdef CONFIG_HAVE_ARCH_TRACEHOOK
+#include <asm/syscall.h> /* For syscall_get_* */
+#endif
+
 /*
  * Access another process' address space via ptrace.
  * Source/target buffer must be kernel space,
@@ -890,6 +894,37 @@ static int ptrace_regset(struct task_struct *task, int req, unsigned int type,
 EXPORT_SYMBOL_GPL(task_user_regset_view);
 #endif
 
+#ifdef CONFIG_HAVE_ARCH_TRACEHOOK
+static int ptrace_get_syscall(struct task_struct *child, void __user *datavp)
+{
+	struct ptrace_syscall_info info;
+	struct pt_regs *regs = task_pt_regs(child);
+	unsigned long args[ARRAY_SIZE(info.entry_info.args)];
+	int i;
+
+	if (child->ptrace_message & PT_SYSCALL_ISENTERING) {
+		info.op = 0;
+		info.entry_info.nr = syscall_get_nr(child, regs);
+		info.entry_info.ip = instruction_pointer(task_pt_regs(child));
+		syscall_get_arguments(child, regs, 0, ARRAY_SIZE(args), args);
+		for (i = 0; i < ARRAY_SIZE(args); i++)
+			info.entry_info.args[i] = args[i];
+		info.entry_info.is_compat =
+			!!(child->ptrace_message & PT_SYSCALL_ISCOMPAT);
+	} else {
+		info.op = 1;
+		info.exit_info.rval = syscall_get_error(child, regs);
+		info.exit_info.is_error = !!info.exit_info.rval;
+		if (!info.exit_info.is_error) {
+			info.exit_info.rval =
+				syscall_get_return_value(child, regs);
+		}
+	}
+
+	return copy_to_user(datavp, &info, sizeof(info)) ? -EFAULT : 0;
+}
+#endif
+
 int ptrace_request(struct task_struct *child, long request,
 		   unsigned long addr, unsigned long data)
 {
@@ -1104,6 +1139,13 @@ int ptrace_request(struct task_struct *child, long request,
 	case PTRACE_SECCOMP_GET_METADATA:
 		ret = seccomp_get_metadata(child, addr, datavp);
 		break;
+
+#ifdef CONFIG_HAVE_ARCH_TRACEHOOK
+	case PTRACE_GET_SYSCALL_INFO:
+		if (child->ptrace & PT_IN_SYSCALL_STOP)
+			ret = ptrace_get_syscall(child, datavp);
+		break;
+#endif
 
 	default:
 		break;

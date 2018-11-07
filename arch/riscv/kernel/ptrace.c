@@ -156,7 +156,7 @@ long arch_ptrace(struct task_struct *child, long request,
 void do_syscall_trace_enter(struct pt_regs *regs)
 {
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
-		if (tracehook_report_syscall_entry(regs))
+		if (tracehook_report_syscall_entry(regs, false))
 			syscall_set_nr(current, regs, -1);
 
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS

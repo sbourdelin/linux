@@ -104,7 +104,7 @@ void user_disable_single_step(struct task_struct *child)
 asmlinkage int syscall_trace_enter(struct pt_regs *regs)
 {
 	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
-		if (tracehook_report_syscall_entry(regs))
+		if (tracehook_report_syscall_entry(regs, false))
 			forget_syscall(regs);
 	}
 	return regs->syscallno;

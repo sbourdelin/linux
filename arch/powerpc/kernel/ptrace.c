@@ -3282,7 +3282,7 @@ long do_syscall_trace_enter(struct pt_regs *regs)
 	 * below on the exit path.
 	 */
 	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
-	    tracehook_report_syscall_entry(regs))
+	    tracehook_report_syscall_entry(regs, is_compat_task()))
 		goto skip;
 
 	/* Run seccomp after ptrace; allow it to set gpr[3]. */

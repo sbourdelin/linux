@@ -21,9 +21,10 @@ extern int ptrace_access_vm(struct task_struct *tsk, unsigned long addr,
  * flags.  When the a task is stopped the ptracer owns task->ptrace.
  */
 
-#define PT_SEIZED	0x00010000	/* SEIZE used, enable new behavior */
-#define PT_PTRACED	0x00000001
-#define PT_DTRACE	0x00000002	/* delayed trace (used on m68k, i386) */
+#define PT_SEIZED		0x00010000	/* SEIZE used, enable new behavior */
+#define PT_PTRACED		0x00000001
+#define PT_DTRACE		0x00000002	/* delayed trace (used on m68k, i386) */
+#define PT_IN_SYSCALL_STOP	0x00000004	/* task is in a syscall-stop */
 
 #define PT_OPT_FLAG_SHIFT	3
 /* PT_TRACE_* event enable flags */
@@ -45,6 +46,15 @@ extern int ptrace_access_vm(struct task_struct *tsk, unsigned long addr,
 #define PT_SINGLESTEP		(1<<PT_SINGLESTEP_BIT)
 #define PT_BLOCKSTEP_BIT	30
 #define PT_BLOCKSTEP		(1<<PT_BLOCKSTEP_BIT)
+
+/*
+ * These flags are used in tracehook_report_syscall_* to store
+ * some information about current syscall-stop in task->ptrace_message.
+ * We can use ptrace_message because ptrace_message doesn't have to contain
+ * any specific value during syscall-stops.
+ */
+#define PT_SYSCALL_ISCOMPAT	0x00000001
+#define PT_SYSCALL_ISENTERING	0x00000002
 
 extern long arch_ptrace(struct task_struct *child, long request,
 			unsigned long addr, unsigned long data);

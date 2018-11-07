@@ -911,7 +911,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
 
 	if (dir == PTRACE_SYSCALL_EXIT)
 		tracehook_report_syscall_exit(regs, 0);
-	else if (tracehook_report_syscall_entry(regs))
+	else if (tracehook_report_syscall_entry(regs, false))
 		current_thread_info()->syscall = -1;
 
 	regs->ARM_ip = ip;

@@ -309,7 +309,7 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 long do_syscall_trace_enter(struct pt_regs *regs)
 {
 	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
-	    tracehook_report_syscall_entry(regs)) {
+	    tracehook_report_syscall_entry(regs, is_compat_task())) {
 		/*
 		 * Tracing decided this syscall should not happen or the
 		 * debugger stored an invalid system call number. Skip

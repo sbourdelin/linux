@@ -466,7 +466,7 @@ long arch_ptrace(struct task_struct *child, long request,
 unsigned long do_syscall_trace_enter(struct pt_regs *regs)
 {
 	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
-	    tracehook_report_syscall_entry(regs))
+	    tracehook_report_syscall_entry(regs, false))
 		return -1;
 
 	return regs->areg[2];

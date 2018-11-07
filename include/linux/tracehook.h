@@ -57,13 +57,16 @@ struct linux_binprm;
 /*
  * ptrace report for syscall entry and exit looks identical.
  */
-static inline int ptrace_report_syscall(struct pt_regs *regs)
+static inline int ptrace_report_syscall(struct pt_regs *regs,
+					unsigned long message)
 {
 	int ptrace = current->ptrace;
 
 	if (!(ptrace & PT_PTRACED))
 		return 0;
+	current->ptrace |= PT_IN_SYSCALL_STOP;
 
+	current->ptrace_message = message;
 	ptrace_notify(SIGTRAP | ((ptrace & PT_TRACESYSGOOD) ? 0x80 : 0));
 
 	/*
@@ -76,6 +79,7 @@ static inline int ptrace_report_syscall(struct pt_regs *regs)
 		current->exit_code = 0;
 	}
 
+	current->ptrace &= ~PT_IN_SYSCALL_STOP;
 	return fatal_signal_pending(current);
 }
 
@@ -99,9 +103,10 @@ static inline int ptrace_report_syscall(struct pt_regs *regs)
  * Called without locks, just after entering kernel mode.
  */
 static inline __must_check int tracehook_report_syscall_entry(
-	struct pt_regs *regs)
+	struct pt_regs *regs, bool is_compat)
 {
-	return ptrace_report_syscall(regs);
+	return ptrace_report_syscall(regs, PT_SYSCALL_ISENTERING |
+		(is_compat ? PT_SYSCALL_ISCOMPAT : 0));
 }
 
 /**
@@ -126,7 +131,7 @@ static inline void tracehook_report_syscall_exit(struct pt_regs *regs, int step)
 	if (step)
 		user_single_step_report(regs);
 	else
-		ptrace_report_syscall(regs);
+		ptrace_report_syscall(regs, 0);
 }
 
 /**

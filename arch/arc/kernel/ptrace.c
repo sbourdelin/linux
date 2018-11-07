@@ -293,7 +293,7 @@ long arch_ptrace(struct task_struct *child, long request,
 
 asmlinkage int syscall_trace_entry(struct pt_regs *regs)
 {
-	if (tracehook_report_syscall_entry(regs))
+	if (tracehook_report_syscall_entry(regs, false))
 		return ULONG_MAX;
 
 	return regs->r8;

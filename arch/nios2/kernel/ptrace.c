@@ -155,7 +155,8 @@ asmlinkage int do_syscall_trace_enter(void)
 	int ret = 0;
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
-		ret = tracehook_report_syscall_entry(task_pt_regs(current));
+		ret = tracehook_report_syscall_entry(task_pt_regs(current),
+						     false);
 
 	return ret;
 }

@@ -73,6 +73,28 @@ struct seccomp_metadata {
 	__u64 flags;		/* Output: filter's flags */
 };
 
+#define PTRACE_GET_SYSCALL_INFO 0x420f
+
+struct ptrace_syscall_info {
+	__u8 op; /* 0 for entry, 1 for exit */
+	__u8 __pad0[7];
+	union {
+		struct {
+			__u64 nr;
+			__u64 ip;
+			__u64 args[6];
+			__u8 is_compat;
+			__u8 __pad1[7];
+		} entry_info;
+		struct {
+			__s64 rval;
+			__u8 is_error;
+			__u8 __pad2[7];
+		} exit_info;
+	};
+};
+
+
 /* Read signals from a shared (process wide) queue */
 #define PTRACE_PEEKSIGINFO_SHARED	(1 << 0)
 

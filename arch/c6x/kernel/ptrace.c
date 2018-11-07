@@ -127,7 +127,7 @@ long arch_ptrace(struct task_struct *child, long request,
  */
 asmlinkage unsigned long syscall_trace_entry(struct pt_regs *regs)
 {
-	if (tracehook_report_syscall_entry(regs))
+	if (tracehook_report_syscall_entry(regs, false))
 		/* tracing decided this syscall should not happen, so
 		 * We'll return a bogus call number to get an ENOSYS
 		 * error, but leave the original number in

@@ -1117,7 +1117,7 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
 		user_exit();
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
-		ret = tracehook_report_syscall_entry(regs);
+		ret = tracehook_report_syscall_entry(regs, is_compat_task());
 
 	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
 		trace_sys_enter(regs, regs->u_regs[UREG_G1]);

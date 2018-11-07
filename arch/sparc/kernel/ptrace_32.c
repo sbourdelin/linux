@@ -452,7 +452,7 @@ asmlinkage int syscall_trace(struct pt_regs *regs, int syscall_exit_p)
 		if (syscall_exit_p)
 			tracehook_report_syscall_exit(regs, 0);
 		else
-			ret = tracehook_report_syscall_entry(regs);
+			ret = tracehook_report_syscall_entry(regs, false);
 	}
 
 	return ret;
