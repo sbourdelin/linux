@@ -346,6 +346,35 @@ int dw_pcie_host_init(struct pcie_port *pp)
 		dev_err(dev, "Missing *config* reg space\n");
 	}
 
+	/*
+	 * If vendor's platform driver has set the num_viewport and it is
+	 * not less than 2, skip getting the num_viewport from DT here.
+	 */
+	if (pci->num_viewport < 2) {
+		ret = of_property_read_u32(np, "num-viewport",
+					   &pci->num_viewport);
+		if (ret || pci->num_viewport < 2)
+			pci->num_viewport = 2;
+	}
+
+	/*
+	 * if there are only 2 viewports, assign the last viewport for
+	 * both CFG and IO window, otherwise assign the last 2 viewport
+	 * for CFG and IO window specific. And the rest viewports are
+	 * assigned to MEM windows.
+	 */
+	if (pci->num_viewport == 2) {
+		pp->cfg_idx = pp->io_idx = PCIE_ATU_REGION_INDEX1;
+		pp->mem_wins = 1;
+	} else {
+		pp->cfg_idx = pci->num_viewport - 1;
+		pp->io_idx = pci->num_viewport - 2;
+		pp->mem_wins = pci->num_viewport - 2;
+	}
+
+	dev_dbg(dev, "CFG win id: %d, I/O win id: %d, Total MEM win: %d\n",
+		pp->cfg_idx, pp->io_idx, pp->mem_wins);
+
 	bridge = pci_alloc_host_bridge(0);
 	if (!bridge)
 		return -ENOMEM;
@@ -377,10 +406,20 @@ int dw_pcie_host_init(struct pcie_port *pp)
 			}
 			break;
 		case IORESOURCE_MEM:
-			pp->mem = win->res;
-			pp->mem->name = "MEM";
-			pp->mem_size = resource_size(pp->mem);
-			pp->mem_bus_addr = pp->mem->start - win->offset;
+			if (win->res->flags & IORESOURCE_PREFETCH) {
+				pp->mem_perf = win->res;
+				pp->mem_perf->name = "MEM perf";
+				pp->mem_perf_size = resource_size(pp->mem_perf);
+				pp->mem_perf_bus_addr = pp->mem_perf->start -
+							win->offset;
+				pp->mem_perf_base = pp->mem_perf->start;
+			} else {
+				pp->mem = win->res;
+				pp->mem->name = "MEM";
+				pp->mem_size = resource_size(pp->mem);
+				pp->mem_bus_addr = pp->mem->start - win->offset;
+				pp->mem_base = pp->mem->start;
+			}
 			break;
 		case 0:
 			pp->cfg = win->res;
@@ -405,8 +444,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
 			goto error;
 		}
 	}
-
-	pp->mem_base = pp->mem->start;
 
 	if (!pp->va_cfg0_base) {
 		pp->va_cfg0_base = devm_pci_remap_cfgspace(dev,
@@ -534,12 +571,12 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
 		va_cfg_base = pp->va_cfg1_base;
 	}
 
-	dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+	dw_pcie_prog_outbound_atu(pci, pp->cfg_idx,
 				  type, cpu_addr,
 				  busdev, cfg_size);
 	ret = dw_pcie_read(va_cfg_base + where, size, val);
-	if (pci->num_viewport <= 2)
-		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+	if (pp->cfg_idx == pp->io_idx)
+		dw_pcie_prog_outbound_atu(pci, pp->io_idx,
 					  PCIE_ATU_TYPE_IO, pp->io_base,
 					  pp->io_bus_addr, pp->io_size);
 
@@ -573,12 +610,12 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
 		va_cfg_base = pp->va_cfg1_base;
 	}
 
-	dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+	dw_pcie_prog_outbound_atu(pci, pp->cfg_idx,
 				  type, cpu_addr,
 				  busdev, cfg_size);
 	ret = dw_pcie_write(va_cfg_base + where, size, val);
-	if (pci->num_viewport <= 2)
-		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+	if (pp->cfg_idx == pp->io_idx)
+		dw_pcie_prog_outbound_atu(pci, pp->io_idx,
 					  PCIE_ATU_TYPE_IO, pp->io_base,
 					  pp->io_bus_addr, pp->io_size);
 
@@ -652,6 +689,9 @@ static u8 dw_pcie_iatu_unroll_enabled(struct dw_pcie *pci)
 void dw_pcie_setup_rc(struct pcie_port *pp)
 {
 	u32 val, ctrl, num_ctrls;
+	u64 remain_size, base, win_size;
+	phys_addr_t bus_addr;
+	int i;
 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 
 	dw_pcie_setup(pci);
@@ -700,13 +740,42 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
 		dev_dbg(pci->dev, "iATU unroll: %s\n",
 			pci->iatu_unroll_enabled ? "enabled" : "disabled");
 
-		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX0,
-					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-					  pp->mem_bus_addr, pp->mem_size);
-		if (pci->num_viewport > 2)
-			dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX2,
-						  PCIE_ATU_TYPE_IO, pp->io_base,
-						  pp->io_bus_addr, pp->io_size);
+		/*
+		 * The maximum region size is 4 GB, and a region
+		 * must not cross a 4 GB boundary.
+		 */
+		win_size = SZ_4G - (pp->mem_base & (SZ_4G - 1));
+		win_size = min(win_size, pp->mem_size);
+		dw_pcie_prog_outbound_atu(pci, 0, PCIE_ATU_TYPE_MEM,
+					  pp->mem_base, pp->mem_bus_addr,
+					  win_size);
+		dev_dbg(pci->dev,
+			"iATU: non-pref MEM: win = %d: base = %llx, bus_addr = %pa, size = %llx\n",
+			0, pp->mem_base, &pp->mem_bus_addr, win_size);
+
+		/* Prefetchable range can be 64bit space */
+		remain_size = pp->mem_perf_size;
+		base = pp->mem_perf_base;
+		bus_addr = pp->mem_perf_bus_addr;
+		for (i = 1; remain_size > 0 && i < pp->mem_wins; i++) {
+			win_size = SZ_4G - (base & (SZ_4G - 1));
+			win_size = min(win_size, remain_size);
+			dw_pcie_prog_outbound_atu(pci, i, PCIE_ATU_TYPE_MEM,
+						  base, bus_addr, win_size);
+			dev_dbg(pci->dev, "iATU: pref MEM: win = %d: base = %llx, bus_addr = %pa, size = %llx\n",
+				i, base, &bus_addr, win_size);
+
+			base += win_size;
+			bus_addr += win_size;
+			remain_size -= win_size;
+		}
+
+		if (remain_size > 0)
+			dev_info(pci->dev, "iATU: MEM window isn't enough\n");
+
+		dw_pcie_prog_outbound_atu(pci, pp->io_idx, PCIE_ATU_TYPE_IO,
+					  pp->io_base, pp->io_bus_addr,
+					  pp->io_size);
 	}
 
 	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
