@@ -18,6 +18,10 @@ submitting code.  If you are submitting a driver, also read
 for device tree binding patches, read
 Documentation/devicetree/bindings/submitting-patches.txt.
 
+Some subsystems and maintainer trees have additional information about
+their workflow and expectations, see :ref:`Documentation/process
+<maintainer_handbooks_main>`.
+
 Many of these steps describe the default behavior of the ``git`` version
 control system; if you use ``git`` to prepare your patches, you'll find much
 of the mechanical work done for you, though you'll still need to prepare
