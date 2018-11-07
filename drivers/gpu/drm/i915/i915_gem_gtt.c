@@ -579,13 +579,13 @@ setup_scratch_page(struct i915_address_space *vm, gfp_t gfp)
 	 * page-table operating in 64K mode must point to a properly aligned 64K
 	 * region, including any PTEs which happen to point to scratch.
 	 *
-	 * This is only relevant for the 48b PPGTT where we support
+	 * This is only relevant for the 4-level PPGTT where we support
 	 * huge-gtt-pages, see also i915_vma_insert(). However, as we share the
 	 * scratch (read-only) between all vm, we create one 64k scratch page
 	 * for all.
 	 */
 	size = I915_GTT_PAGE_SIZE_4K;
-	if (i915_vm_is_48bit(vm) &&
+	if (i915_vm_is_4lvl(vm) &&
 	    HAS_PAGE_SIZES(vm->i915, I915_GTT_PAGE_SIZE_64K)) {
 		size = I915_GTT_PAGE_SIZE_64K;
 		gfp |= __GFP_NOWARN;
@@ -729,7 +729,7 @@ static void __pdp_fini(struct i915_page_directory_pointer *pdp)
 
 static inline bool use_4lvl(const struct i915_address_space *vm)
 {
-	return i915_vm_is_48bit(vm);
+	return i915_vm_is_4lvl(vm);
 }
 
 static struct i915_page_directory_pointer *
@@ -1607,38 +1607,14 @@ unwind:
  * space.
  *
  */
-static struct i915_hw_ppgtt *gen8_ppgtt_create(struct drm_i915_private *i915)
+static int gen8_ppgtt_create(struct i915_hw_ppgtt *ppgtt)
 {
-	struct i915_hw_ppgtt *ppgtt;
+	struct drm_i915_private *i915 = ppgtt->vm.i915;
 	int err;
-
-	ppgtt = kzalloc(sizeof(*ppgtt), GFP_KERNEL);
-	if (!ppgtt)
-		return ERR_PTR(-ENOMEM);
-
-	kref_init(&ppgtt->ref);
-
-	ppgtt->vm.i915 = i915;
-	ppgtt->vm.dma = &i915->drm.pdev->dev;
-
-	ppgtt->vm.total = HAS_FULL_48BIT_PPGTT(i915) ?
-		1ULL << 48 :
-		1ULL << 32;
-
-	/* From bdw, there is support for read-only pages in the PPGTT. */
-	ppgtt->vm.has_read_only = true;
-
-	i915_address_space_init(&ppgtt->vm, i915);
-
-	/* There are only few exceptions for gen >=6. chv and bxt.
-	 * And we are not sure about the latter so play safe for now.
-	 */
-	if (IS_CHERRYVIEW(i915) || IS_BROXTON(i915))
-		ppgtt->vm.pt_kmap_wc = true;
 
 	err = gen8_init_scratch(&ppgtt->vm);
 	if (err)
-		goto err_free;
+		return err;
 
 	if (use_4lvl(&ppgtt->vm)) {
 		err = setup_px(&ppgtt->vm, &ppgtt->pml4);
@@ -1662,7 +1638,6 @@ static struct i915_hw_ppgtt *gen8_ppgtt_create(struct drm_i915_private *i915)
 				goto err_scratch;
 			}
 		}
-
 		ppgtt->vm.allocate_va_range = gen8_ppgtt_alloc_3lvl;
 		ppgtt->vm.insert_entries = gen8_ppgtt_insert_3lvl;
 		ppgtt->vm.clear_range = gen8_ppgtt_clear_3lvl;
@@ -1674,18 +1649,11 @@ static struct i915_hw_ppgtt *gen8_ppgtt_create(struct drm_i915_private *i915)
 	ppgtt->vm.cleanup = gen8_ppgtt_cleanup;
 	ppgtt->debug_dump = gen8_dump_ppgtt;
 
-	ppgtt->vm.vma_ops.bind_vma    = ppgtt_bind_vma;
-	ppgtt->vm.vma_ops.unbind_vma  = ppgtt_unbind_vma;
-	ppgtt->vm.vma_ops.set_pages   = ppgtt_set_pages;
-	ppgtt->vm.vma_ops.clear_pages = clear_pages;
-
-	return ppgtt;
+	return 0;
 
 err_scratch:
 	gen8_free_scratch(&ppgtt->vm);
-err_free:
-	kfree(ppgtt);
-	return ERR_PTR(err);
+	return err;
 }
 
 static void gen6_dump_ppgtt(struct i915_hw_ppgtt *base, struct seq_file *m)
@@ -2106,24 +2074,10 @@ void gen6_ppgtt_unpin(struct i915_hw_ppgtt *base)
 	i915_vma_unpin(ppgtt->vma);
 }
 
-static struct i915_hw_ppgtt *gen6_ppgtt_create(struct drm_i915_private *i915)
+static int gen6_ppgtt_create(struct gen6_hw_ppgtt *ppgtt,
+			     struct i915_ggtt * const ggtt)
 {
-	struct i915_ggtt * const ggtt = &i915->ggtt;
-	struct gen6_hw_ppgtt *ppgtt;
 	int err;
-
-	ppgtt = kzalloc(sizeof(*ppgtt), GFP_KERNEL);
-	if (!ppgtt)
-		return ERR_PTR(-ENOMEM);
-
-	kref_init(&ppgtt->base.ref);
-
-	ppgtt->base.vm.i915 = i915;
-	ppgtt->base.vm.dma = &i915->drm.pdev->dev;
-
-	ppgtt->base.vm.total = I915_PDES * GEN6_PTES * I915_GTT_PAGE_SIZE;
-
-	i915_address_space_init(&ppgtt->base.vm, i915);
 
 	ppgtt->base.vm.allocate_va_range = gen6_alloc_va_range;
 	ppgtt->base.vm.clear_range = gen6_ppgtt_clear_range;
@@ -2131,30 +2085,20 @@ static struct i915_hw_ppgtt *gen6_ppgtt_create(struct drm_i915_private *i915)
 	ppgtt->base.vm.cleanup = gen6_ppgtt_cleanup;
 	ppgtt->base.debug_dump = gen6_dump_ppgtt;
 
-	ppgtt->base.vm.vma_ops.bind_vma    = ppgtt_bind_vma;
-	ppgtt->base.vm.vma_ops.unbind_vma  = ppgtt_unbind_vma;
-	ppgtt->base.vm.vma_ops.set_pages   = ppgtt_set_pages;
-	ppgtt->base.vm.vma_ops.clear_pages = clear_pages;
-
 	ppgtt->base.vm.pte_encode = ggtt->vm.pte_encode;
 
 	err = gen6_ppgtt_init_scratch(ppgtt);
 	if (err)
-		goto err_free;
+		return err;
 
 	ppgtt->vma = pd_vma_create(ppgtt, GEN6_PD_SIZE);
 	if (IS_ERR(ppgtt->vma)) {
 		err = PTR_ERR(ppgtt->vma);
-		goto err_scratch;
+		gen6_ppgtt_free_scratch(&ppgtt->base.vm);
+		return err;
 	}
 
-	return &ppgtt->base;
-
-err_scratch:
-	gen6_ppgtt_free_scratch(&ppgtt->base.vm);
-err_free:
-	kfree(ppgtt);
-	return ERR_PTR(err);
+	return 0;
 }
 
 static void gtt_write_workarounds(struct drm_i915_private *dev_priv)
@@ -2206,10 +2150,48 @@ int i915_ppgtt_init_hw(struct drm_i915_private *dev_priv)
 static struct i915_hw_ppgtt *
 __hw_ppgtt_create(struct drm_i915_private *i915)
 {
-	if (INTEL_GEN(i915) < 8)
-		return gen6_ppgtt_create(i915);
-	else
-		return gen8_ppgtt_create(i915);
+	struct gen6_hw_ppgtt *ppgtt;
+	struct i915_address_space *vm;
+	int err;
+
+	ppgtt = kzalloc(sizeof(*ppgtt), GFP_KERNEL);
+	if (!ppgtt)
+		return ERR_PTR(-ENOMEM);
+
+	vm = &ppgtt->base.vm;
+
+	kref_init(&ppgtt->base.ref);
+
+	vm->i915 = i915;
+	vm->dma = &i915->drm.pdev->dev;
+
+	vm->total = BIT_ULL(i915->info.ppgtt_bits);
+
+	/* From bdw, there is support for read-only pages in the PPGTT.  */
+	vm->has_read_only = (INTEL_GEN(i915) < 8) ? false : true;
+
+	i915_address_space_init(vm, i915);
+
+	/* There are only few exceptions for gen >= 6. chv and bxt.
+	 * And we are not sure abou the latter so play safe for now.
+	 */
+	if (IS_CHERRYVIEW(i915) || IS_BROXTON(i915))
+		vm->pt_kmap_wc = true;
+
+	err = (INTEL_GEN(i915) < 8) ?  gen6_ppgtt_create(ppgtt, &i915->ggtt) :
+		gen8_ppgtt_create(&ppgtt->base);
+
+	if (err) {
+		kfree(ppgtt);
+		return ERR_PTR(err);
+	}
+
+	vm->vma_ops.bind_vma    = ppgtt_bind_vma;
+	vm->vma_ops.unbind_vma  = ppgtt_unbind_vma;
+	vm->vma_ops.set_pages   = ppgtt_set_pages;
+	vm->vma_ops.clear_pages = clear_pages;
+
+	return &ppgtt->base;
 }
 
 struct i915_hw_ppgtt *

@@ -122,6 +122,7 @@ void intel_device_info_dump(const struct intel_device_info *info,
 		   info->gen);
 
 	intel_device_info_dump_flags(info, p);
+	drm_printf(p, "ppgttbits=0x%02x\n", info->ppgtt_bits);
 }
 
 void intel_device_info_dump_topology(const struct sseu_dev_info *sseu,

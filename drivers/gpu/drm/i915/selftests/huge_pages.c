@@ -1450,8 +1450,8 @@ static int igt_ppgtt_pin_update(void *arg)
 	 * huge-gtt-pages.
 	 */
 
-	if (!HAS_FULL_48BIT_PPGTT(dev_priv)) {
-		pr_info("48b PPGTT not supported, skipping\n");
+	if (!HAS_4LVL_PPGTT(dev_priv)) {
+		pr_info("Extended range PPGTT not supported, skipping\n");
 		return 0;
 	}
 
@@ -1723,8 +1723,8 @@ int i915_gem_huge_page_mock_selftests(void)
 		goto out_unlock;
 	}
 
-	if (!i915_vm_is_48bit(&ppgtt->vm)) {
-		pr_err("failed to create 48b PPGTT\n");
+	if (!i915_vm_is_4lvl(&ppgtt->vm)) {
+		pr_err("failed to create extended PPGTT\n");
 		err = -EINVAL;
 		goto out_close;
 	}

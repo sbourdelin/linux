@@ -192,6 +192,9 @@ struct intel_device_info {
 		u16 degamma_lut_size;
 		u16 gamma_lut_size;
 	} color;
+
+	/* Full PPGTT address range size */
+	int ppgtt_bits;
 };
 
 struct intel_driver_caps {
