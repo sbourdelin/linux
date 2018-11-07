@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_POWERPC_MMU_8XX_H_
 #define _ASM_POWERPC_MMU_8XX_H_
+
 /*
  * PPC8xx support
  */
@@ -119,6 +120,12 @@
  * We define all 16 groups so that all other bits of APG can take any value
  */
 #define MD_APG_INIT	0x44444444
+
+/*
+ * 0 => No user => 01 (all accesses performed according to page definition)
+ * 1 => User => 10 (all accesses performed according to swaped page definition)
+ */
+#define MD_APG_KUAP	0x66666666
 
 /* The effective page number register.  When read, contains the information
  * about the last instruction TLB miss.  When MD_RPN is written, bits in

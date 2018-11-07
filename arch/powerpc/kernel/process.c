@@ -1768,7 +1768,7 @@ void start_thread(struct pt_regs *regs, unsigned long start, unsigned long sp)
 	regs->trap &= ~1UL;
 
 #ifdef CONFIG_PPC32
-	regs->mq = 0;
+	regs->mq = MD_APG_KUAP;
 	regs->nip = start;
 	regs->msr = MSR_USER;
 #else

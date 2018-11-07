@@ -135,6 +135,29 @@ static inline pte_t pte_mkhuge(pte_t pte)
 }
 
 #define pte_mkhuge pte_mkhuge
+
+#ifdef CONFIG_PPC_KUAP
+static inline void lock_user_wr_access(void)
+{
+	mtspr(SPRN_MD_AP, MD_APG_KUAP);
+}
+
+static inline void unlock_user_wr_access(void)
+{
+	mtspr(SPRN_MD_AP, MD_APG_INIT);
+}
+
+static inline void lock_user_rd_access(void)
+{
+	mtspr(SPRN_MD_AP, MD_APG_KUAP);
+}
+
+static inline void unlock_user_rd_access(void)
+{
+	mtspr(SPRN_MD_AP, MD_APG_INIT);
+}
+#endif
+
 #endif
 
 #endif /* __KERNEL__ */

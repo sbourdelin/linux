@@ -155,6 +155,13 @@ transfer_to_handler:
 	mfspr	r2,SPRN_XER
 	stw	r12,_CTR(r11)
 	stw	r2,_XER(r11)
+#ifdef CONFIG_PPC_KUAP
+	mfspr	r2, SPRN_MD_AP
+	stw	r2, _MQ(r11)
+	lis	r2, MD_APG_KUAP@h
+	ori	r2, r2, MD_APG_KUAP@l
+	mtspr	SPRN_MD_AP, r2
+#endif
 	mfspr	r12,SPRN_SPRG_THREAD
 	addi	r2,r12,-THREAD
 	tovirt(r2,r2)			/* set r2 to current */
@@ -447,6 +454,10 @@ END_FTR_SECTION_IFSET(CPU_FTR_NEED_PAIRED_STWCX)
 	mtlr	r4
 	mtcr	r5
 	lwz	r7,_NIP(r1)
+#ifdef CONFIG_PPC_KUAP
+	lwz	r2, _MQ(r1)
+	mtspr	SPRN_MD_AP, r2
+#endif
 	lwz	r2,GPR2(r1)
 	lwz	r1,GPR1(r1)
 #if defined(CONFIG_PPC_8xx) && defined(CONFIG_PERF_EVENTS)
@@ -745,6 +756,10 @@ fast_exception_return:
 	mtcr	r10
 	lwz	r10,_LINK(r11)
 	mtlr	r10
+#ifdef CONFIG_PPC_KUAP
+	lwz	r10, _MQ(r11)
+	mtspr	SPRN_MD_AP, r10
+#endif
 	REST_GPR(10, r11)
 #if defined(CONFIG_PPC_8xx) && defined(CONFIG_PERF_EVENTS)
 	mtspr	SPRN_NRI, r0
@@ -997,6 +1012,10 @@ END_FTR_SECTION_IFSET(CPU_FTR_NEED_PAIRED_STWCX)
 	.globl exc_exit_restart
 exc_exit_restart:
 	lwz	r12,_NIP(r1)
+#ifdef CONFIG_PPC_KUAP
+	lwz	r10, _MQ(r1)
+	mtspr	SPRN_MD_AP, r10
+#endif
 #if defined(CONFIG_PPC_8xx) && defined(CONFIG_PERF_EVENTS)
 	mtspr	SPRN_NRI, r0
 #endif

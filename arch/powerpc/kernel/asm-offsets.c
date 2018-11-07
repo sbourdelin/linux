@@ -320,6 +320,7 @@ int main(void)
 	 */
 	STACK_PT_REGS_OFFSET(_DEAR, dar);
 	STACK_PT_REGS_OFFSET(_ESR, dsisr);
+	STACK_PT_REGS_OFFSET(_MQ, mq);
 #else /* CONFIG_PPC64 */
 	STACK_PT_REGS_OFFSET(SOFTE, softe);
 	STACK_PT_REGS_OFFSET(_PPR, ppr);
