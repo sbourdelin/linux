@@ -40,8 +40,8 @@ COMPAT_SYSCALL_DEFINE3(aarch32_statfs64, const char __user *, pathname,
 	 * arbitrary binaries may rely upon it, so we must do the same.
 	 * For more details, see commit:
 	 *
-	 * 713c481519f19df9 ("[ARM] 3108/2: old ABI compat: statfs64 and
-	 * fstatfs64")
+	 * commit 713c481519f19df9 ("[ARM] 3108/2: old ABI compat: statfs64
+	 * and fstatfs64")
 	 */
 	if (sz == 88)
 		sz = 84;
