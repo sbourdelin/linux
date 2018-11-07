@@ -19,6 +19,7 @@
 #include <asm/cpufeature.h>
 #include <asm/amd_nb.h>
 #include <asm/smp.h>
+#include <asm/cacheinfo.h>
 
 #include "cpu.h"
 
