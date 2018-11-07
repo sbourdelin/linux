@@ -1536,9 +1536,22 @@ static int adt7475_update_limits(struct i2c_client *client)
 	return 0;
 }
 
+static int adt7475_invert_pwm(struct i2c_client *client, int index)
+{
+	int ret;
+
+	ret = adt7475_read(PWM_CONFIG_REG(index));
+	if (ret < 0)
+		return ret;
+
+	return i2c_smbus_write_byte_data(client, PWM_CONFIG_REG(index),
+					 ret | BIT(4));
+}
+
 static int adt7475_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
+	struct device_node *of_node = client->dev.of_node;
 	enum chips chip;
 	static const char * const names[] = {
 		[adt7473] = "ADT7473",
@@ -1637,6 +1650,10 @@ static int adt7475_probe(struct i2c_client *client,
 	 */
 	for (i = 0; i < ADT7475_PWM_COUNT; i++)
 		adt7475_read_pwm(client, i);
+
+	if (of_node && of_property_read_bool(of_node, "invert-pwm"))
+		for (i = 0; i < ADT7475_PWM_COUNT; i++)
+			adt7475_invert_pwm(client, i);
 
 	/* Start monitoring */
 	switch (chip) {
