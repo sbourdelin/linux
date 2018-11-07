@@ -2582,11 +2582,13 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define HAS_EXECLISTS(dev_priv) HAS_LOGICAL_RING_CONTEXTS(dev_priv)
 
-#define INTEL_PPGTT(dev_priv) (INTEL_INFO(dev_priv)->ppgtt)
+#define INTEL_PPGTT_BITS(dev_priv) (INTEL_INFO(dev_priv)->ppgtt_bits)
 #define HAS_PPGTT(dev_priv) \
-	(INTEL_PPGTT(dev_priv) != INTEL_PPGTT_NONE)
+	(INTEL_PPGTT_BITS(dev_priv) != 0)
+/*
 #define HAS_FULL_PPGTT(dev_priv) \
-	(INTEL_PPGTT(dev_priv) >= INTEL_PPGTT_FULL)
+	(INTEL_PPGTT_BITS(dev_priv) >= 31)
+*/
 
 #define HAS_PAGE_SIZES(dev_priv, sizes) ({ \
 	GEM_BUG_ON((sizes) == 0); \

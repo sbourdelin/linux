@@ -1001,7 +1001,7 @@ static int exercise_ppgtt(struct drm_i915_private *dev_priv,
 	IGT_TIMEOUT(end_time);
 	int err;
 
-	if (!HAS_FULL_PPGTT(dev_priv))
+	if (INTEL_GEN(dev_priv) <= 6)
 		return 0;
 
 	file = mock_file(dev_priv);

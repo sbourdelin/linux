@@ -76,12 +76,6 @@ enum intel_platform {
 	INTEL_MAX_PLATFORMS
 };
 
-enum intel_ppgtt {
-	INTEL_PPGTT_NONE = I915_GEM_PPGTT_NONE,
-	INTEL_PPGTT_ALIASING = I915_GEM_PPGTT_ALIASING,
-	INTEL_PPGTT_FULL = I915_GEM_PPGTT_FULL,
-};
-
 #define DEV_INFO_FOR_EACH_FLAG(func) \
 	func(is_mobile); \
 	func(is_lp); \
@@ -159,7 +153,6 @@ struct intel_device_info {
 	enum intel_platform platform;
 	u32 platform_mask;
 
-	enum intel_ppgtt ppgtt;
 	unsigned int page_sizes; /* page sizes supported by the HW */
 
 	u32 display_mmio_offset;
@@ -192,7 +185,7 @@ struct intel_device_info {
 		u16 gamma_lut_size;
 	} color;
 
-	/* Full PPGTT address range size */
+	/* PPGTT address range size in number of bits */
 	int ppgtt_bits;
 };
 

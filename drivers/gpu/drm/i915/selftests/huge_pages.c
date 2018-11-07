@@ -1710,8 +1710,8 @@ int i915_gem_huge_page_mock_selftests(void)
 	if (!dev_priv)
 		return -ENOMEM;
 
-	/* Pretend to be a device which supports the 48b PPGTT */
-	mkwrite_device_info(dev_priv)->ppgtt = INTEL_PPGTT_FULL;
+	/* Pretend to be a device which supports the 63b PPGTT */
+	mkwrite_device_info(dev_priv)->ppgtt_bits = 63;
 
 	pdev = dev_priv->drm.pdev;
 	dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(39));

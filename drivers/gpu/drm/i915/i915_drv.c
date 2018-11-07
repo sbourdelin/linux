@@ -345,7 +345,12 @@ static int i915_getparam_ioctl(struct drm_device *dev, void *data,
 		value = HAS_WT(dev_priv);
 		break;
 	case I915_PARAM_HAS_ALIASING_PPGTT:
-		value = min_t(int, INTEL_PPGTT(dev_priv), I915_GEM_PPGTT_FULL);
+		if (INTEL_GEN(dev_priv) < 6)
+			value = I915_GEM_PPGTT_NONE;
+		else if (IS_GEN6(dev_priv))
+			value = I915_GEM_PPGTT_ALIASING;
+		else
+			value = I915_GEM_PPGTT_FULL;
 		break;
 	case I915_PARAM_HAS_SEMAPHORES:
 		value = HAS_LEGACY_SEMAPHORES(dev_priv);
