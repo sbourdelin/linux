@@ -372,6 +372,7 @@ void __init early_setup(unsigned long dt_ptr)
 	 */
 	btext_map();
 #endif /* CONFIG_PPC_EARLY_DEBUG_BOOTX */
+	setup_kup();
 }
 
 #ifdef CONFIG_SMP

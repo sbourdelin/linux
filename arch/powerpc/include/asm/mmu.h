@@ -268,6 +268,8 @@ static inline u16 get_mm_addr_key(struct mm_struct *mm, unsigned long address)
 }
 #endif /* CONFIG_PPC_MEM_KEYS */
 
+void setup_kup(void);
+
 #endif /* !__ASSEMBLY__ */
 
 /* The kernel use the constants below to index in the page sizes array.

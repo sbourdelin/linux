@@ -25,6 +25,10 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 
+void setup_kup(void)
+{
+}
+
 static void pgd_ctor(void *addr)
 {
 	memset(addr, 0, PGD_TABLE_SIZE);
