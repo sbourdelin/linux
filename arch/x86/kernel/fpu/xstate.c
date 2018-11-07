@@ -7,6 +7,7 @@
 #include <linux/cpu.h>
 #include <linux/mman.h>
 #include <linux/pkeys.h>
+#include <linux/seq_file.h>
 
 #include <asm/fpu/api.h>
 #include <asm/fpu/internal.h>
@@ -1244,4 +1245,16 @@ int copy_user_to_xstate(struct xregs_state *xsave, const void __user *ubuf)
 	xsave->header.xfeatures |= hdr.xfeatures;
 
 	return 0;
+}
+
+/*
+ * report AVX state
+ */
+void arch_thread_state(struct seq_file *m, struct task_struct *task)
+{
+	if (task->thread.fpu.avx.state)
+		seq_putc(m, '1');
+	else
+		seq_putc(m, '0');
+	seq_putc(m, '\n');
 }
