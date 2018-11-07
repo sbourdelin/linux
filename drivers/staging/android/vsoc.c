@@ -128,9 +128,10 @@ struct vsoc_device {
 
 static struct vsoc_device vsoc_dev;
 
-/*
- * TODO(ghartman): Add a /sys filesystem entry that summarizes the permissions.
- */
+static ssize_t permissions_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buf);
+static DEVICE_ATTR_RO(permissions);
 
 struct fd_scoped_permission_node {
 	struct fd_scoped_permission permission;
@@ -718,6 +719,37 @@ static ssize_t vsoc_write(struct file *filp, const char __user *buffer,
 	return len;
 }
 
+static ssize_t permissions_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buffer)
+{
+	struct fd_scoped_permission_node *node;
+	char *row;
+	int ret;
+	ssize_t written = 0;
+
+	row = kzalloc(sizeof(char) * 128, GFP_KERNEL);
+	if (!row)
+		return 0;
+	mutex_lock(&vsoc_dev.mtx);
+	list_for_each_entry(node, &vsoc_dev.permissions, list) {
+		ret = snprintf(row, 128, "%x\t%x\t%x\t%x\n",
+			       node->permission.begin_offset,
+			       node->permission.end_offset,
+			       node->permission.owner_offset,
+			       node->permission.owned_value);
+		if (ret < 0)
+			goto done;
+		memcpy(buffer + written, row, ret);
+		written += ret;
+	}
+
+done:
+	mutex_unlock(&vsoc_dev.mtx);
+	kfree(row);
+	return written;
+}
+
 static irqreturn_t vsoc_interrupt(int irq, void *region_data_v)
 {
 	struct vsoc_region_data *region_data =
@@ -942,6 +974,15 @@ static int vsoc_probe_device(struct pci_dev *pdev,
 		}
 		vsoc_dev.regions_data[i].device_created = true;
 	}
+	/*
+	 * Create permission attribute on device node.
+	 */
+	result = device_create_file(&pdev->dev, &dev_attr_permissions);
+	if (result) {
+		dev_err(&vsoc_dev.dev->dev, "device_create_file failed\n");
+		vsoc_remove_device(pdev);
+		return -EFAULT;
+	}
 	return 0;
 }
 
@@ -967,6 +1008,7 @@ static void vsoc_remove_device(struct pci_dev *pdev)
 	if (!pdev || !vsoc_dev.dev)
 		return;
 	dev_info(&pdev->dev, "remove_device\n");
+	device_remove_file(&pdev->dev, &dev_attr_permissions);
 	if (vsoc_dev.regions_data) {
 		for (i = 0; i < vsoc_dev.layout->region_count; ++i) {
 			if (vsoc_dev.regions_data[i].device_created) {
