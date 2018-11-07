@@ -276,6 +276,12 @@ void setup_kuep(bool disabled);
 static inline void setup_kuep(bool disabled) { }
 #endif
 
+#ifdef CONFIG_PPC_KUAP
+void setup_kuap(bool disabled);
+#else
+static inline void setup_kuap(bool disabled) { }
+#endif
+
 #endif /* !__ASSEMBLY__ */
 
 /* The kernel use the constants below to index in the page sizes array.
