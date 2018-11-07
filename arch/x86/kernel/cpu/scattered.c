@@ -9,6 +9,8 @@
 
 #include <asm/apic.h>
 
+#include "cpu.h"
+
 struct cpuid_bit {
 	u16 feature;
 	u8 reg;
