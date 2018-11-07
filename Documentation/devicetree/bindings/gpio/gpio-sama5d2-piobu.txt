@@ -1,0 +1,23 @@
+GPIO controller for SAMA5D2 PIOBU pins.
+
+This pins have the property of not losing their voltage
+during Backup/Self-refresh mode.
+
+These bindings should be set to a node in the dtsi file.
+
+Required properties:
+- compatible:		"syscon", "microchip,sama5d2-piobu"
+- #gpio-cells:		There are 2. The pin number is the
+			first, the second represents additional
+			parameters such as GPIO_ACTIVE_HIGH/LOW.
+- gpio-controller:	Marks the port as GPIO controller.
+
+Example:
+
+	secumod@fc040000 {
+		compatible = "syscon", "microchip,sama5d2-piobu";
+		reg = <0xfc040000 0x100>;
+
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
