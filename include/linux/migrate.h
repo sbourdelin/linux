@@ -61,7 +61,7 @@ static inline struct page *new_page_nodemask(struct page *page,
 
 #ifdef CONFIG_MIGRATION
 
-extern void putback_movable_pages(struct list_head *l);
+extern unsigned int putback_movable_pages(struct list_head *l);
 extern int migrate_page(struct address_space *mapping,
 			struct page *newpage, struct page *page,
 			enum migrate_mode mode);
@@ -82,7 +82,10 @@ extern int migrate_page_move_mapping(struct address_space *mapping,
 		int extra_count);
 #else
 
-static inline void putback_movable_pages(struct list_head *l) {}
+static inline unsigned int putback_movable_pages(struct list_head *l)
+{
+	return 0;
+}
 static inline int migrate_pages(struct list_head *l, new_page_t new,
 		free_page_t free, unsigned long private, enum migrate_mode mode,
 		int reason)

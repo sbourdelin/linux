@@ -164,12 +164,14 @@ void putback_movable_page(struct page *page)
  * built from lru, balloon, hugetlbfs page. See isolate_migratepages_range()
  * and isolate_huge_page().
  */
-void putback_movable_pages(struct list_head *l)
+unsigned int putback_movable_pages(struct list_head *l)
 {
 	struct page *page;
 	struct page *page2;
+	unsigned int nr_putback = 0;
 
 	list_for_each_entry_safe(page, page2, l, lru) {
+		nr_putback++;
 		if (unlikely(PageHuge(page))) {
 			putback_active_hugepage(page);
 			continue;
@@ -195,6 +197,8 @@ void putback_movable_pages(struct list_head *l)
 			putback_lru_page(page);
 		}
 	}
+
+	return nr_putback;
 }
 
 /*

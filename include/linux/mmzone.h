@@ -497,6 +497,10 @@ struct zone {
 	unsigned int		compact_considered;
 	unsigned int		compact_defer_shift;
 	int			compact_order_failed;
+
+#define COMPACT_QUEUE_LENGTH 16
+	unsigned long		compact_queue[COMPACT_QUEUE_LENGTH];
+	int			nr_compact;
 #endif
 
 #if defined CONFIG_COMPACTION || defined CONFIG_CMA

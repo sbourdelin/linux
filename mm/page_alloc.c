@@ -2214,6 +2214,9 @@ static bool steal_suitable_fallback(struct zone *zone, struct page *page,
 	boost_watermark(zone, false);
 	wakeup_kswapd(zone, 0, 0, zone_idx(zone));
 
+	if (start_type == MIGRATE_MOVABLE || old_block_type == MIGRATE_MOVABLE)
+		kcompactd_queue_migration(zone, page);
+
 	if ((alloc_flags & ALLOC_FRAGMENT_STALL) &&
 	    current_order < fragment_stall_order) {
 		return false;
@@ -6457,7 +6460,11 @@ static void pgdat_init_split_queue(struct pglist_data *pgdat) {}
 #ifdef CONFIG_COMPACTION
 static void pgdat_init_kcompactd(struct pglist_data *pgdat)
 {
+	int i;
+
 	init_waitqueue_head(&pgdat->kcompactd_wait);
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		pgdat->node_zones[i].nr_compact = 0;
 }
 #else
 static void pgdat_init_kcompactd(struct pglist_data *pgdat) {}

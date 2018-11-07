@@ -177,6 +177,7 @@ bool compaction_zonelist_suitable(struct alloc_context *ac, int order,
 extern int kcompactd_run(int nid);
 extern void kcompactd_stop(int nid);
 extern void wakeup_kcompactd(pg_data_t *pgdat, int order, int classzone_idx);
+extern void kcompactd_queue_migration(struct zone *zone, struct page *page);
 
 #else
 static inline void reset_isolation_suitable(pg_data_t *pgdat)
@@ -225,6 +226,9 @@ static inline void wakeup_kcompactd(pg_data_t *pgdat, int order, int classzone_i
 {
 }
 
+static inline void kcompactd_queue_migration(struct zone *zone, struct page *page)
+{
+}
 #endif /* CONFIG_COMPACTION */
 
 #if defined(CONFIG_COMPACTION) && defined(CONFIG_SYSFS) && defined(CONFIG_NUMA)

@@ -1915,6 +1915,12 @@ void compaction_unregister_node(struct node *node)
 
 static inline bool kcompactd_work_requested(pg_data_t *pgdat)
 {
+	int zoneid;
+
+	for (zoneid = 0; zoneid < MAX_NR_ZONES; zoneid++)
+		if (pgdat->node_zones[zoneid].nr_compact)
+			return true;
+
 	return pgdat->kcompactd_max_order > 0 || kthread_should_stop();
 }
 
@@ -1938,6 +1944,92 @@ static bool kcompactd_node_suitable(pg_data_t *pgdat)
 	return false;
 }
 
+static void kcompactd_migrate_block(struct compact_control *cc,
+	unsigned long pfn)
+{
+	unsigned long end = min(pfn + pageblock_nr_pages, zone_end_pfn(cc->zone));
+	unsigned long total_migrated = 0, total_failed = 0;
+
+	cc->migrate_pfn = pfn;
+	while (pfn && pfn < end) {
+		int err;
+		unsigned long nr_migrated, nr_failed = 0;
+
+		pfn = isolate_migratepages_range(cc, pfn, end);
+		if (!pfn)
+			break;
+
+		nr_migrated = cc->nr_migratepages;
+		err = migrate_pages(&cc->migratepages, compaction_alloc,
+				compaction_free, (unsigned long)cc,
+				cc->mode, MR_COMPACTION);
+		if (err) {
+			nr_failed = putback_movable_pages(&cc->migratepages);
+			nr_migrated -= nr_failed;
+		}
+		cc->nr_migratepages = 0;
+		total_migrated += nr_migrated;
+		total_failed += nr_failed;
+	}
+
+	trace_mm_compaction_kcompactd_migrated(zone_to_nid(cc->zone),
+		zone_idx(cc->zone), total_migrated, total_failed);
+}
+
+static void kcompactd_init_cc(struct compact_control *cc, struct zone *zone)
+{
+	cc->nr_freepages = 0;
+	cc->nr_migratepages = 0;
+	cc->total_migrate_scanned = 0;
+	cc->total_free_scanned = 0;
+	cc->zone = zone;
+	INIT_LIST_HEAD(&cc->freepages);
+	INIT_LIST_HEAD(&cc->migratepages);
+}
+
+static void kcompactd_do_queue(pg_data_t *pgdat)
+{
+	/*
+	 * With no special task, compact all zones so that a page of requested
+	 * order is allocatable.
+	 */
+	int zoneid;
+	struct zone *zone;
+	struct compact_control cc = {
+		.order = 0,
+		.total_migrate_scanned = 0,
+		.total_free_scanned = 0,
+		.classzone_idx = 0,
+		.mode = MIGRATE_SYNC,
+		.ignore_skip_hint = true,
+		.gfp_mask = GFP_KERNEL,
+	};
+	trace_mm_compaction_kcompactd_wake(pgdat->node_id, 0, -1);
+
+	migrate_prep();
+	for (zoneid = 0; zoneid < MAX_NR_ZONES; zoneid++) {
+		unsigned long pfn = ULONG_MAX;
+		int limit;
+
+		zone = &pgdat->node_zones[zoneid];
+		if (!populated_zone(zone))
+			continue;
+
+		kcompactd_init_cc(&cc, zone);
+		cc.free_pfn = pageblock_start_pfn(zone_end_pfn(zone) - 1);
+		limit = zone->nr_compact;
+		while (zone->nr_compact && limit--) {
+			unsigned long flags;
+
+			spin_lock_irqsave(&zone->lock, flags);
+			if (zone->nr_compact)
+				pfn = zone->compact_queue[--zone->nr_compact];
+			spin_unlock_irqrestore(&zone->lock, flags);
+			kcompactd_migrate_block(&cc, pfn);
+		}
+	}
+}
+
 static void kcompactd_do_work(pg_data_t *pgdat)
 {
 	/*
@@ -1957,7 +2049,6 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 	};
 	trace_mm_compaction_kcompactd_wake(pgdat->node_id, cc.order,
 							cc.classzone_idx);
-	count_compact_event(KCOMPACTD_WAKE);
 
 	for (zoneid = 0; zoneid <= cc.classzone_idx; zoneid++) {
 		int status;
@@ -1973,13 +2064,7 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 							COMPACT_CONTINUE)
 			continue;
 
-		cc.nr_freepages = 0;
-		cc.nr_migratepages = 0;
-		cc.total_migrate_scanned = 0;
-		cc.total_free_scanned = 0;
-		cc.zone = zone;
-		INIT_LIST_HEAD(&cc.freepages);
-		INIT_LIST_HEAD(&cc.migratepages);
+		kcompactd_init_cc(&cc, zone);
 
 		if (kthread_should_stop())
 			return;
@@ -2025,6 +2110,19 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 
 void wakeup_kcompactd(pg_data_t *pgdat, int order, int classzone_idx)
 {
+	int i;
+
+	/* Wake kcompact if there are compaction queue entries */
+	for (i = 0; i < MAX_NR_ZONES; i++) {
+		struct zone *zone = &pgdat->node_zones[i];
+
+		if (!managed_zone(zone))
+			continue;
+
+		if (zone->nr_compact)
+			goto wake;
+	}
+
 	if (!order)
 		return;
 
@@ -2044,6 +2142,7 @@ void wakeup_kcompactd(pg_data_t *pgdat, int order, int classzone_idx)
 	if (!kcompactd_node_suitable(pgdat))
 		return;
 
+wake:
 	trace_mm_compaction_wakeup_kcompactd(pgdat->node_id, order,
 							classzone_idx);
 	wake_up_interruptible(&pgdat->kcompactd_wait);
@@ -2076,11 +2175,41 @@ static int kcompactd(void *p)
 				kcompactd_work_requested(pgdat));
 
 		psi_memstall_enter(&pflags);
+		count_compact_event(KCOMPACTD_WAKE);
+		kcompactd_do_queue(pgdat);
 		kcompactd_do_work(pgdat);
 		psi_memstall_leave(&pflags);
 	}
 
 	return 0;
+}
+
+/*
+ * Queue a pageblock to have all movable pages migrated from. Note that
+ * kcompactd is not woken at this point. This assumes that kswapd has
+ * been woken to reclaim pages above the boosted watermark. kcompactd
+ * will be woken when kswapd has made progress.
+ */
+void kcompactd_queue_migration(struct zone *zone, struct page *page)
+{
+	unsigned long pfn = page_to_pfn(page) & ~(pageblock_nr_pages - 1);
+	int nr_queued = -1;
+
+	/* Do not overflow the queue */
+	if (zone->nr_compact == COMPACT_QUEUE_LENGTH)
+		goto trace;
+
+	/* Only queue a pageblock once */
+	for (nr_queued = 0; nr_queued < zone->nr_compact; nr_queued++) {
+		if (zone->compact_queue[nr_queued] == pfn)
+			return;
+	}
+
+	zone->compact_queue[zone->nr_compact++] = pfn;
+
+trace:
+	trace_mm_compaction_wakeup_kcompactd_queue(zone_to_nid(zone),
+		zone_idx(zone), pfn, nr_queued);
 }
 
 /*

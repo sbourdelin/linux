@@ -353,6 +353,68 @@ DEFINE_EVENT(kcompactd_wake_template, mm_compaction_kcompactd_wake,
 	TP_ARGS(nid, order, classzone_idx)
 );
 
+TRACE_EVENT(mm_compaction_wakeup_kcompactd_queue,
+
+	TP_PROTO(
+		int nid,
+		enum zone_type zoneid,
+		unsigned long pfn,
+		int nr_queued),
+
+	TP_ARGS(nid, pfn, zoneid, nr_queued),
+
+	TP_STRUCT__entry(
+		__field(int, nid)
+		__field(enum zone_type, zoneid)
+		__field(unsigned long, pfn)
+		__field(int, nr_queued)
+	),
+
+	TP_fast_assign(
+		__entry->nid = nid;
+		__entry->zoneid = zoneid;
+		__entry->pfn = pfn;
+		__entry->nr_queued = nr_queued;
+	),
+
+	TP_printk("nid=%d zoneid=%-8s pfn=%lu nr_queued=%d",
+		__entry->nid,
+		__print_symbolic(__entry->zoneid, ZONE_TYPE),
+		__entry->pfn,
+		__entry->nr_queued)
+);
+
+TRACE_EVENT(mm_compaction_kcompactd_migrated,
+
+	TP_PROTO(
+		int nid,
+		enum zone_type zoneid,
+		int nr_migrated,
+		int nr_failed),
+
+	TP_ARGS(nid, zoneid, nr_migrated, nr_failed),
+
+	TP_STRUCT__entry(
+		__field(int, nid)
+		__field(enum zone_type, zoneid)
+		__field(int, nr_migrated)
+		__field(int, nr_failed)
+	),
+
+	TP_fast_assign(
+		__entry->nid = nid;
+		__entry->zoneid = zoneid,
+		__entry->nr_migrated = nr_migrated;
+		__entry->nr_failed = nr_failed;
+	),
+
+	TP_printk("nid=%d zoneid=%-8s nr_migrated=%d nr_failed=%d",
+		__entry->nid,
+		__print_symbolic(__entry->zoneid, ZONE_TYPE),
+		__entry->nr_migrated,
+		__entry->nr_failed)
+);
+
 #endif /* _TRACE_COMPACTION_H */
 
 /* This part must be outside protection */
