@@ -2587,8 +2587,6 @@ intel_info(const struct drm_i915_private *dev_priv)
 	(INTEL_PPGTT(dev_priv) != INTEL_PPGTT_NONE)
 #define HAS_FULL_PPGTT(dev_priv) \
 	(INTEL_PPGTT(dev_priv) >= INTEL_PPGTT_FULL)
-#define HAS_4LVL_PPGTT(dev_priv)	\
-	(INTEL_PPGTT(dev_priv) >= INTEL_PPGTT_FULL_4LVL)
 
 #define HAS_PAGE_SIZES(dev_priv, sizes) ({ \
 	GEM_BUG_ON((sizes) == 0); \

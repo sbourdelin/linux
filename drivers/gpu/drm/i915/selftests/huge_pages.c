@@ -1450,7 +1450,7 @@ static int igt_ppgtt_pin_update(void *arg)
 	 * huge-gtt-pages.
 	 */
 
-	if (!HAS_4LVL_PPGTT(dev_priv)) {
+	if (INTEL_INFO(dev_priv)->ppgtt_bits <= 32) {
 		pr_info("Extended range PPGTT not supported, skipping\n");
 		return 0;
 	}
@@ -1711,7 +1711,7 @@ int i915_gem_huge_page_mock_selftests(void)
 		return -ENOMEM;
 
 	/* Pretend to be a device which supports the 48b PPGTT */
-	mkwrite_device_info(dev_priv)->ppgtt = INTEL_PPGTT_FULL_4LVL;
+	mkwrite_device_info(dev_priv)->ppgtt = INTEL_PPGTT_FULL;
 
 	pdev = dev_priv->drm.pdev;
 	dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(39));
