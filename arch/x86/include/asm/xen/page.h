@@ -9,7 +9,7 @@
 #include <linux/mm.h>
 #include <linux/device.h>
 
-#include <linux/uaccess.h>
+#include <asm/extable.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
@@ -91,15 +91,48 @@ clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
  * Helper functions to write or read unsigned long values to/from
  * memory, when the access may fault.
  */
+#ifdef CONFIG_X86_32
+#define __i "l"
+#define __r "k"
+#else
+#define __i "q"
+#define __r ""
+#endif
 static inline int xen_safe_write_ulong(unsigned long *addr, unsigned long val)
 {
-	return __put_user(val, (unsigned long __user *)addr);
+	int ret = 0;
+
+	asm volatile("1: mov"__i" %"__r"1,%2\n"
+		     "2:\n"
+		     ".section .fixup,\"ax\"\n"
+		     "3: mov %3,%0\n"
+		     "   jmp 2b\n"
+		     ".previous\n"
+		     _ASM_EXTABLE(1b, 3b)
+		     : "=r"(ret)
+		     : "r" (val), "m" (*addr), "i" (-1), "0" (ret));
+	return ret;
 }
 
 static inline int xen_safe_read_ulong(unsigned long *addr, unsigned long *val)
 {
-	return __get_user(*val, (unsigned long __user *)addr);
+	int ret = 0;
+	unsigned long rval;
+
+	asm volatile("1: mov"__i" %2,%"__r"1\n"
+		     "2:\n"
+		     ".section .fixup,\"ax\"\n"
+		     "3: mov %3,%0\n"
+		     "   jmp 2b\n"
+		     ".previous\n"
+		     _ASM_EXTABLE(1b, 3b)
+		     : "=r" (ret), "=r" (rval)
+		     : "m" (*addr), "i" (-1), "0" (ret));
+	*val = rval;
+	return ret;
 }
+#undef __i
+#undef __r
 
 #ifdef CONFIG_XEN_PV
 /*
