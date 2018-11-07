@@ -38,6 +38,7 @@
 #define HWCAP_FPU_DP		0x040000
 #define HWCAP_V2		0x080000
 #define HWCAP_DX_REGS		0x100000
+#define HWCAP_HWPRE		0x200000
 
 unsigned long cpu_id, cpu_rev, cpu_cfgid;
 char cpu_series;
@@ -73,6 +74,7 @@ static const char *hwcap_str[] = {
 	"dx_regs",
 	"fpu_dp",
 	"v2",
+	"hw_pre",
 	NULL,
 };
 
@@ -212,6 +214,11 @@ static void __init setup_cpuinfo(void)
 
 	if (__nds32__mfsr(NDS32_SR_MSC_CFG) & MSC_CFG_mskL2C)
 		elf_hwcap |= HWCAP_L2C;
+
+#ifdef CONFIG_HW_PRE
+	if (__nds32__mfsr(NDS32_SR_MISC_CTL) & MISC_CTL_makHWPRE_EN)
+		elf_hwcap |= HWCAP_HWPRE;
+#endif
 
 	tmp = __nds32__mfsr(NDS32_SR_CACHE_CTL);
 	if (!IS_ENABLED(CONFIG_CPU_DCACHE_DISABLE))
