@@ -1094,7 +1094,11 @@ struct kvm_x86_ops {
 	bool (*has_wbinvd_exit)(void);
 
 	u64 (*read_l1_tsc_offset)(struct kvm_vcpu *vcpu);
-	void (*write_tsc_offset)(struct kvm_vcpu *vcpu, u64 offset);
+	/*
+	 * Updates active guest TSC offset based on given L1 TSC offset
+	 * and returns actual TSC offset set for the active guest
+	 */
+	u64 (*write_tsc_offset)(struct kvm_vcpu *vcpu, u64 l1_offset);
 
 	void (*get_exit_info)(struct kvm_vcpu *vcpu, u64 *info1, u64 *info2);
 
