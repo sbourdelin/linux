@@ -541,8 +541,12 @@ static int get_next_event(struct cros_ec_device *ec_dev)
 	if (cmd_version == 1) {
 		ret = get_next_event_xfer(ec_dev, msg, cmd_version,
 				sizeof(struct ec_response_get_next_event_v1));
-		if (ret < 0 || msg->result != EC_RES_INVALID_VERSION)
+		if (ret < 0)
 			return ret;
+		if (msg->result == EC_RES_SUCCESS)
+			return 0;
+		if (msg->result != EC_RES_INVALID_VERSION)
+			return -ENODATA;
 
 		/* Fallback to version 0 for future send attempts */
 		cmd_version = 0;
@@ -550,8 +554,11 @@ static int get_next_event(struct cros_ec_device *ec_dev)
 
 	ret = get_next_event_xfer(ec_dev, msg, cmd_version,
 				  sizeof(struct ec_response_get_next_event));
-
-	return ret;
+	if (ret < 0)
+		return ret;
+	if (msg->result != EC_RES_SUCCESS)
+		return -ENODATA;
+	return 0;
 }
 
 static int get_keyboard_state_event(struct cros_ec_device *ec_dev)
