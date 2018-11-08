@@ -380,7 +380,7 @@ void __init files_init(void)
 void __init files_maxfiles_init(void)
 {
 	unsigned long n;
-	unsigned long totalram_pgs = totalram_pages;
+	unsigned long totalram_pgs = totalram_pages();
 	unsigned long memreserve = (totalram_pgs - nr_free_pages()) * 3/2;
 
 	memreserve = min(memreserve, totalram_pgs - 1);

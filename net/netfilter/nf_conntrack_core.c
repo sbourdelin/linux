@@ -2251,7 +2251,7 @@ static __always_inline unsigned int total_extension_size(void)
 
 int nf_conntrack_init_start(void)
 {
-	unsigned long totalram_pgs = totalram_pages;
+	unsigned long totalram_pgs = totalram_pages();
 	int max_factor = 8;
 	int ret = -ENOMEM;
 	int i;
