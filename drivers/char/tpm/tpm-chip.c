@@ -41,9 +41,6 @@ static int tpm_request_locality(struct tpm_chip *chip, unsigned int flags)
 {
 	int rc;
 
-	if (flags & TPM_TRANSMIT_NESTED)
-		return 0;
-
 	if (!chip->ops->request_locality)
 		return 0;
 
@@ -59,9 +56,6 @@ static void tpm_relinquish_locality(struct tpm_chip *chip, unsigned int flags)
 {
 	int rc;
 
-	if (flags & TPM_TRANSMIT_NESTED)
-		return;
-
 	if (!chip->ops->relinquish_locality)
 		return;
 
@@ -74,9 +68,6 @@ static void tpm_relinquish_locality(struct tpm_chip *chip, unsigned int flags)
 
 static int tpm_cmd_ready(struct tpm_chip *chip, unsigned int flags)
 {
-	if (flags & TPM_TRANSMIT_NESTED)
-		return 0;
-
 	if (!chip->ops->cmd_ready)
 		return 0;
 
@@ -85,9 +76,6 @@ static int tpm_cmd_ready(struct tpm_chip *chip, unsigned int flags)
 
 static int tpm_go_idle(struct tpm_chip *chip, unsigned int flags)
 {
-	if (flags & TPM_TRANSMIT_NESTED)
-		return 0;
-
 	if (!chip->ops->go_idle)
 		return 0;
 
@@ -169,7 +157,7 @@ int tpm_try_get_ops(struct tpm_chip *chip)
 		goto out_lock;
 
 	mutex_lock(&chip->tpm_mutex);
-	return 0;
+	return tpm_chip_start(chip, 0);
 out_lock:
 	up_read(&chip->ops_sem);
 	put_device(&chip->dev);
@@ -186,6 +174,7 @@ EXPORT_SYMBOL_GPL(tpm_try_get_ops);
  */
 void tpm_put_ops(struct tpm_chip *chip)
 {
+	tpm_chip_stop(chip, 0);
 	mutex_unlock(&chip->tpm_mutex);
 	up_read(&chip->ops_sem);
 	put_device(&chip->dev);
@@ -563,7 +552,11 @@ int tpm_chip_register(struct tpm_chip *chip)
 {
 	int rc;
 
+	rc = tpm_chip_start(chip, 0);
+	if (rc)
+		return rc;
 	rc = tpm_auto_startup(chip);
+	tpm_chip_stop(chip, 0);
 	if (rc)
 		return rc;
 
