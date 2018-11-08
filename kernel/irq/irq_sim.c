@@ -74,6 +74,7 @@ int irq_sim_init(struct irq_sim *sim, unsigned int num_irqs)
 	}
 
 	init_irq_work(&sim->work_ctx.work, irq_sim_handle_irq);
+	mutex_init(&sim->lock);
 	sim->irq_count = num_irqs;
 
 	return sim->irq_base;
@@ -142,10 +143,14 @@ EXPORT_SYMBOL_GPL(devm_irq_sim_init);
  */
 void irq_sim_fire(struct irq_sim *sim, unsigned int offset)
 {
+	mutex_lock(&sim->lock);
+
 	if (sim->irqs[offset].enabled) {
 		sim->work_ctx.irq = irq_sim_irqnum(sim, offset);
 		irq_work_queue(&sim->work_ctx.work);
 	}
+
+	mutex_unlock(&sim->lock);
 }
 EXPORT_SYMBOL_GPL(irq_sim_fire);
 

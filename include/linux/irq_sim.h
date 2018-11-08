@@ -29,6 +29,7 @@ struct irq_sim {
 	int			irq_base;
 	unsigned int		irq_count;
 	struct irq_sim_irq_ctx	*irqs;
+	struct mutex		lock;
 };
 
 int irq_sim_init(struct irq_sim *sim, unsigned int num_irqs);
