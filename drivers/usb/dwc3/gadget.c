@@ -1265,12 +1265,22 @@ static int __dwc3_gadget_get_frame(struct dwc3 *dwc)
 
 static int __dwc3_gadget_start_isoc(struct dwc3_ep *dep)
 {
+	u64 current_timestamp;
+	u64 diff_timestamp;
+	u32 elapsed_frames;
+
 	if (list_empty(&dep->pending_list)) {
 		dep->flags |= DWC3_EP_PENDING_REQUEST;
 		return -EAGAIN;
 	}
 
+	current_timestamp = ktime_get_ns();
+	diff_timestamp = current_timestamp - dep->frame_timestamp;
+	elapsed_frames = DIV_ROUND_UP_ULL(diff_timestamp, 125000);
+
+	dep->frame_number += elapsed_frames;
 	dep->frame_number = DWC3_ALIGN_FRAME(dep);
+
 	return __dwc3_gadget_kick_transfer(dep);
 }
 
@@ -2374,6 +2384,7 @@ static void dwc3_gadget_endpoint_frame_from_event(struct dwc3_ep *dep,
 		const struct dwc3_event_depevt *event)
 {
 	dep->frame_number = event->parameters;
+	dep->frame_timestamp = ktime_get_ns();
 }
 
 static void dwc3_gadget_endpoint_transfer_in_progress(struct dwc3_ep *dep,
