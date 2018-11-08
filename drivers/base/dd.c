@@ -472,6 +472,8 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 		 drv->bus->name, __func__, drv->name, dev_name(dev));
 	WARN_ON(!list_empty(&dev->devres_head));
 
+	/* clear async_probe flag as we are no longer deferring driver load */
+	dev->async_probe = false;
 re_probe:
 	dev->driver = drv;
 
@@ -771,6 +773,10 @@ static void __device_attach_async_helper(void *_dev, async_cookie_t cookie)
 
 	device_lock(dev);
 
+	/* nothing to do if async_probe has been cleared */
+	if (!dev->async_probe)
+		goto out_unlock;
+
 	if (dev->parent)
 		pm_runtime_get_sync(dev->parent);
 
@@ -781,7 +787,7 @@ static void __device_attach_async_helper(void *_dev, async_cookie_t cookie)
 
 	if (dev->parent)
 		pm_runtime_put(dev->parent);
-
+out_unlock:
 	device_unlock(dev);
 
 	put_device(dev);
@@ -826,6 +832,7 @@ static int __device_attach(struct device *dev, bool allow_async)
 			 */
 			dev_dbg(dev, "scheduling asynchronous probe\n");
 			get_device(dev);
+			dev->async_probe = true;
 			async_schedule(__device_attach_async_helper, dev);
 		} else {
 			pm_request_idle(dev);
@@ -971,62 +978,69 @@ EXPORT_SYMBOL_GPL(driver_attach);
  */
 static void __device_release_driver(struct device *dev, struct device *parent)
 {
-	struct device_driver *drv;
+	struct device_driver *drv = dev->driver;
 
-	drv = dev->driver;
-	if (drv) {
-		while (device_links_busy(dev)) {
-			__device_driver_unlock(dev, parent);
+	/*
+	 * In the event that we are asked to release the driver on an
+	 * interface that is still waiting on a probe we can just terminate
+	 * the probe by setting async_probe to false. When the async call
+	 * is finally completed it will see this state and just exit.
+	 */
+	dev->async_probe = false;
+	if (!drv)
+		return;
 
-			device_links_unbind_consumers(dev);
+	while (device_links_busy(dev)) {
+		__device_driver_unlock(dev, parent);
 
-			__device_driver_lock(dev, parent);
-			/*
-			 * A concurrent invocation of the same function might
-			 * have released the driver successfully while this one
-			 * was waiting, so check for that.
-			 */
-			if (dev->driver != drv)
-				return;
-		}
+		device_links_unbind_consumers(dev);
 
-		pm_runtime_get_sync(dev);
-		pm_runtime_clean_up_links(dev);
-
-		driver_sysfs_remove(dev);
-
-		if (dev->bus)
-			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
-						     BUS_NOTIFY_UNBIND_DRIVER,
-						     dev);
-
-		pm_runtime_put_sync(dev);
-
-		if (dev->bus && dev->bus->remove)
-			dev->bus->remove(dev);
-		else if (drv->remove)
-			drv->remove(dev);
-
-		device_links_driver_cleanup(dev);
-		arch_teardown_dma_ops(dev);
-
-		devres_release_all(dev);
-		dev->driver = NULL;
-		dev_set_drvdata(dev, NULL);
-		if (dev->pm_domain && dev->pm_domain->dismiss)
-			dev->pm_domain->dismiss(dev);
-		pm_runtime_reinit(dev);
-		dev_pm_set_driver_flags(dev, 0);
-
-		klist_remove(&dev->p->knode_driver);
-		device_pm_check_callbacks(dev);
-		if (dev->bus)
-			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
-						     BUS_NOTIFY_UNBOUND_DRIVER,
-						     dev);
-
-		kobject_uevent(&dev->kobj, KOBJ_UNBIND);
+		__device_driver_lock(dev, parent);
+		/*
+		 * A concurrent invocation of the same function might
+		 * have released the driver successfully while this one
+		 * was waiting, so check for that.
+		 */
+		if (dev->driver != drv)
+			return;
 	}
+
+	pm_runtime_get_sync(dev);
+	pm_runtime_clean_up_links(dev);
+
+	driver_sysfs_remove(dev);
+
+	if (dev->bus)
+		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+					     BUS_NOTIFY_UNBIND_DRIVER,
+					     dev);
+
+	pm_runtime_put_sync(dev);
+
+	if (dev->bus && dev->bus->remove)
+		dev->bus->remove(dev);
+	else if (drv->remove)
+		drv->remove(dev);
+
+	device_links_driver_cleanup(dev);
+	arch_teardown_dma_ops(dev);
+
+	devres_release_all(dev);
+	dev->driver = NULL;
+	dev_set_drvdata(dev, NULL);
+	if (dev->pm_domain && dev->pm_domain->dismiss)
+		dev->pm_domain->dismiss(dev);
+	pm_runtime_reinit(dev);
+	dev_pm_set_driver_flags(dev, 0);
+
+	klist_remove(&dev->p->knode_driver);
+	device_pm_check_callbacks(dev);
+	if (dev->bus)
+		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+					     BUS_NOTIFY_UNBOUND_DRIVER,
+					     dev);
+
+	kobject_uevent(&dev->kobj, KOBJ_UNBIND);
 }
 
 void device_release_driver_internal(struct device *dev,
