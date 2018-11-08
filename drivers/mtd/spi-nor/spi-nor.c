@@ -2233,7 +2233,7 @@ static int spi_nor_read_sfdp_dma_unsafe(struct spi_nor *nor, u32 addr,
 	void *dma_safe_buf;
 	int ret;
 
-	dma_safe_buf = kmalloc(len, GFP_KERNEL);
+	dma_safe_buf = kmalloc(len, GFP_KERNEL | GFP_DMA);
 	if (!dma_safe_buf)
 		return -ENOMEM;
 
@@ -3048,7 +3048,7 @@ static int spi_nor_parse_smpt(struct spi_nor *nor,
 
 	/* Read the Sector Map Parameter Table. */
 	len = smpt_header->length * sizeof(*smpt);
-	smpt = kzalloc(len, GFP_KERNEL);
+	smpt = kzalloc(len, GFP_KERNEL | GFP_DMA);
 	if (!smpt)
 		return -ENOMEM;
 
@@ -3135,7 +3135,7 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
 	if (header.nph) {
 		psize = header.nph * sizeof(*param_headers);
 
-		param_headers = kmalloc(psize, GFP_KERNEL);
+		param_headers = kmalloc(psize, GFP_KERNEL | GFP_DMA);
 		if (!param_headers)
 			return -ENOMEM;
 
