@@ -3461,11 +3461,10 @@ static u64 vmx_write_tsc_offset(struct kvm_vcpu *vcpu, u64 l1_offset)
 		struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
 		if (nested_cpu_has(vmcs12, CPU_BASED_USE_TSC_OFFSETING))
 			active_offset += vmcs12->tsc_offset;
-	} else {
-		trace_kvm_write_tsc_offset(vcpu->vcpu_id,
-					   vmcs_read64(TSC_OFFSET), l1_offset);
 	}
 
+	trace_kvm_write_tsc_offset(vcpu->vcpu_id,
+				   vmcs_read64(TSC_OFFSET), active_offset);
 	vmcs_write64(TSC_OFFSET, active_offset);
 	return active_offset;
 }
