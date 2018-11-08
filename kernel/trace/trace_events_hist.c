@@ -3950,8 +3950,8 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 			goto out;
 		}
 
-		if (hist_field->flags & HIST_FIELD_FL_VAR_REF) {
-			hist_err("Using variable references as keys not supported: ", field_str);
+		if (field_has_hist_vars(hist_field, 0))	{
+			hist_err("Using variable references in keys not supported: ", field_str);
 			destroy_hist_field(hist_field, 0);
 			ret = -EINVAL;
 			goto out;
