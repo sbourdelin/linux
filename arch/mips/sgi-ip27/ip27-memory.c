@@ -468,6 +468,7 @@ void __init paging_init(void)
 			max_low_pfn = end_pfn;
 	}
 	zones_size[ZONE_NORMAL] = max_low_pfn;
+	memblock_set_current_limit(PFN_PHYS(max_low_pfn));
 	free_area_init_nodes(zones_size);
 }
 

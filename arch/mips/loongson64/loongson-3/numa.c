@@ -265,6 +265,7 @@ void __init paging_init(void)
 	zones_size[ZONE_DMA32] = MAX_DMA32_PFN;
 #endif
 	zones_size[ZONE_NORMAL] = max_low_pfn;
+	memblock_set_current_limit(PFN_PHYS(max_low_pfn));
 	free_area_init_nodes(zones_size);
 }
 
