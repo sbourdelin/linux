@@ -673,23 +673,8 @@ void do_IRQ(struct pt_regs *regs)
 		set_irq_regs(old_regs);
 		return;
 	}
-
-	/* Prepare the thread_info in the irq stack */
-	irqtp->task = curtp->task;
-	irqtp->flags = 0;
-
-	/* Copy the preempt_count so that the [soft]irq checks work. */
-	irqtp->preempt_count = curtp->preempt_count;
-
 	/* Switch stack and call */
 	call_do_irq(regs, irqtp);
-
-	/* Restore stack limit */
-	irqtp->task = NULL;
-
-	/* Copy back updates to the thread_info */
-	if (irqtp->flags)
-		set_bits(irqtp->flags, &curtp->flags);
 
 	set_irq_regs(old_regs);
 }
@@ -711,7 +696,6 @@ struct thread_info *mcheckirq_ctx[NR_CPUS] __read_mostly;
 
 void exc_lvl_ctx_init(void)
 {
-	struct thread_info *tp;
 	int i, cpu_nr;
 
 	for_each_possible_cpu(i) {
@@ -726,20 +710,9 @@ void exc_lvl_ctx_init(void)
 #endif
 
 		memset((void *)critirq_ctx[cpu_nr], 0, THREAD_SIZE);
-		tp = critirq_ctx[cpu_nr];
-		tp->cpu = cpu_nr;
-		tp->preempt_count = 0;
-
 #ifdef CONFIG_BOOKE
 		memset((void *)dbgirq_ctx[cpu_nr], 0, THREAD_SIZE);
-		tp = dbgirq_ctx[cpu_nr];
-		tp->cpu = cpu_nr;
-		tp->preempt_count = 0;
-
 		memset((void *)mcheckirq_ctx[cpu_nr], 0, THREAD_SIZE);
-		tp = mcheckirq_ctx[cpu_nr];
-		tp->cpu = cpu_nr;
-		tp->preempt_count = HARDIRQ_OFFSET;
 #endif
 	}
 }
@@ -750,38 +723,20 @@ struct thread_info *hardirq_ctx[NR_CPUS] __read_mostly;
 
 void irq_ctx_init(void)
 {
-	struct thread_info *tp;
 	int i;
 
 	for_each_possible_cpu(i) {
 		memset((void *)softirq_ctx[i], 0, THREAD_SIZE);
-		tp = softirq_ctx[i];
-		tp->cpu = i;
-		klp_init_thread_info(tp);
-
 		memset((void *)hardirq_ctx[i], 0, THREAD_SIZE);
-		tp = hardirq_ctx[i];
-		tp->cpu = i;
-		klp_init_thread_info(tp);
 	}
 }
 
 void do_softirq_own_stack(void)
 {
-	struct thread_info *curtp, *irqtp;
+	struct thread_info *irqtp;
 
-	curtp = current_thread_info();
 	irqtp = softirq_ctx[smp_processor_id()];
-	irqtp->task = curtp->task;
-	irqtp->flags = 0;
 	call_do_softirq(irqtp);
-	irqtp->task = NULL;
-
-	/* Set any flag that may have been set on the
-	 * alternate stack
-	 */
-	if (irqtp->flags)
-		set_bits(irqtp->flags, &curtp->flags);
 }
 
 irq_hw_number_t virq_to_hw(unsigned int virq)
