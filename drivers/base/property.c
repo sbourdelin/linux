@@ -1111,7 +1111,14 @@ struct fwnode_handle *
 fwnode_get_named_child_node(const struct fwnode_handle *fwnode,
 			    const char *childname)
 {
-	return fwnode_call_ptr_op(fwnode, get_named_child_node, childname);
+	char name[FWNODE_NAME_MAX_SIZE];
+	struct fwnode_handle *child;
+
+	fwnode_for_each_child_node(fwnode, child)
+		if (!fwnode_get_name(child, name) &&
+		    !strcmp(name, childname))
+			return child;
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(fwnode_get_named_child_node);
 

@@ -587,23 +587,6 @@ static int acpi_data_get_property_array(const struct acpi_device_data *data,
 	return 0;
 }
 
-static struct fwnode_handle *
-acpi_fwnode_get_named_child_node(const struct fwnode_handle *fwnode,
-				 const char *childname)
-{
-	struct fwnode_handle *child;
-
-	/*
-	 * Find first matching named child node of this fwnode.
-	 * For ACPI this will be a data only sub-node.
-	 */
-	fwnode_for_each_child_node(fwnode, child)
-		if (acpi_data_node_match(child, childname))
-			return child;
-
-	return NULL;
-}
-
 /**
  * __acpi_node_get_property_reference - returns handle to the referenced object
  * @fwnode: Firmware node to get the property from
@@ -712,7 +695,7 @@ int __acpi_node_get_property_reference(const struct fwnode_handle *fwnode,
 			for (ref_fwnode = acpi_fwnode_handle(device);
 			     element < end && element->type == ACPI_TYPE_STRING;
 			     element++) {
-				ref_fwnode = acpi_fwnode_get_named_child_node(
+				ref_fwnode = fwnode_get_named_child_node(
 					ref_fwnode, element->string.pointer);
 				if (!ref_fwnode)
 					return -EINVAL;
@@ -1342,7 +1325,6 @@ acpi_fwnode_device_get_match_data(const struct fwnode_handle *fwnode,
 			acpi_fwnode_property_read_string_array,		\
 		.get_parent = acpi_node_get_parent,			\
 		.get_next_child_node = acpi_get_next_subnode,		\
-		.get_named_child_node = acpi_fwnode_get_named_child_node, \
 		.get_reference_args = acpi_fwnode_get_reference_args,	\
 		.graph_get_next_endpoint =				\
 			acpi_graph_get_next_endpoint,			\

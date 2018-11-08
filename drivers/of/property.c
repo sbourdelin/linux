@@ -895,20 +895,6 @@ of_fwnode_get_next_child_node(const struct fwnode_handle *fwnode,
 							    to_of_node(child)));
 }
 
-static struct fwnode_handle *
-of_fwnode_get_named_child_node(const struct fwnode_handle *fwnode,
-			       const char *childname)
-{
-	const struct device_node *node = to_of_node(fwnode);
-	struct device_node *child;
-
-	for_each_available_child_of_node(node, child)
-		if (!of_node_cmp(child->name, childname))
-			return of_fwnode_handle(child);
-
-	return NULL;
-}
-
 static int
 of_fwnode_get_reference_args(const struct fwnode_handle *fwnode,
 			     const char *prop, const char *nargs_prop,
@@ -1005,7 +991,6 @@ const struct fwnode_operations of_fwnode_ops = {
 	.property_read_string_array = of_fwnode_property_read_string_array,
 	.get_parent = of_fwnode_get_parent,
 	.get_next_child_node = of_fwnode_get_next_child_node,
-	.get_named_child_node = of_fwnode_get_named_child_node,
 	.get_reference_args = of_fwnode_get_reference_args,
 	.graph_get_next_endpoint = of_fwnode_graph_get_next_endpoint,
 	.graph_get_remote_endpoint = of_fwnode_graph_get_remote_endpoint,

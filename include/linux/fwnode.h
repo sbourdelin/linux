@@ -92,9 +92,6 @@ struct fwnode_operations {
 	struct fwnode_handle *
 	(*get_next_child_node)(const struct fwnode_handle *fwnode,
 			       struct fwnode_handle *child);
-	struct fwnode_handle *
-	(*get_named_child_node)(const struct fwnode_handle *fwnode,
-				const char *name);
 	int (*get_reference_args)(const struct fwnode_handle *fwnode,
 				  const char *prop, const char *nargs_prop,
 				  unsigned int nargs, unsigned int index,
