@@ -2345,6 +2345,10 @@ static int dwc3_gadget_ep_cleanup_completed_request(struct dwc3_ep *dep,
 
 	req->request.actual = req->request.length - req->remaining;
 
+	/* Report scheduled frame number for isoc transfers */
+	if (usb_endpoint_xfer_isoc(dep->endpoint.desc))
+		req->request.start_frame = dep->frame_number;
+
 	if (!dwc3_gadget_ep_request_completed(req) &&
 			req->num_pending_sgs) {
 		__dwc3_gadget_kick_transfer(dep);
