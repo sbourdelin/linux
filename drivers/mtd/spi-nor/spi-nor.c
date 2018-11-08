@@ -2156,7 +2156,7 @@ spi_nor_set_pp_settings(struct spi_nor_pp_command *pp,
  * @nor:	pointer to a 'struct spi_nor'
  * @addr:	offset in the serial flash memory
  * @len:	number of bytes to read
- * @buf:	buffer where the data is copied into
+ * @buf:	buffer where the data is copied into (dma-safe memory)
  *
  * Return: 0 on success, -errno otherwise.
  */
@@ -2863,11 +2863,16 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 					 u8 smpt_len)
 {
 	const u32 *ret;
+	u8 *dma_safe;
 	u32 addr;
 	int err;
 	u8 i, ncmds, nmaps;
 	u8 addr_width, read_opcode, read_dummy;
-	u8 read_data_mask, data_byte, map_id;
+	u8 read_data_mask, map_id;
+
+	dma_safe = kmalloc(sizeof(*dma_safe), GFP_KERNEL | GFP_DMA);
+	if (!dma_safe)
+		return ERR_PTR(-ENOMEM);
 
 	addr_width = nor->addr_width;
 	read_dummy = nor->read_dummy;
@@ -2885,7 +2890,7 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 		nor->read_opcode = SMPT_CMD_OPCODE(smpt[i]);
 		addr = smpt[i + 1];
 
-		err = spi_nor_read_raw(nor, addr, 1, &data_byte);
+		err = spi_nor_read_raw(nor, addr, 1, dma_safe);
 		if (err) {
 			ret = ERR_PTR(err);
 			goto out;
@@ -2895,7 +2900,7 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 		 * Build an index value that is used to select the Sector Map
 		 * Configuration that is currently in use.
 		 */
-		map_id = map_id << 1 | !!(data_byte & read_data_mask);
+		map_id = map_id << 1 | !!(*dma_safe & read_data_mask);
 		ncmds++;
 	}
 
@@ -2936,6 +2941,7 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 
 	/* fall through */
 out:
+	kfree(dma_safe);
 	nor->addr_width = addr_width;
 	nor->read_dummy = read_dummy;
 	nor->read_opcode = read_opcode;
