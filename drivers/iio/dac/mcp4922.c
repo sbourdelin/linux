@@ -29,8 +29,11 @@
 #define MCP4922_NUM_CHANNELS	2
 
 enum mcp4922_supported_device_ids {
+	ID_MCP4901,
 	ID_MCP4902,
+	ID_MCP4911,
 	ID_MCP4912,
+	ID_MCP4921,
 	ID_MCP4922,
 };
 
@@ -115,10 +118,22 @@ static int mcp4922_write_raw(struct iio_dev *indio_dev,
 	}
 }
 
-static const struct iio_chan_spec mcp4922_channels[3][MCP4922_NUM_CHANNELS] = {
-	[ID_MCP4902] = { MCP4922_CHAN(0, 8),	MCP4922_CHAN(1, 8) },
-	[ID_MCP4912] = { MCP4922_CHAN(0, 10),	MCP4922_CHAN(1, 10) },
-	[ID_MCP4922] = { MCP4922_CHAN(0, 12),	MCP4922_CHAN(1, 12) },
+static const unsigned int mcp4922_channel_counts[6] = {
+	[ID_MCP4901] = 1,
+	[ID_MCP4902] = 2,
+	[ID_MCP4911] = 1,
+	[ID_MCP4912] = 2,
+	[ID_MCP4921] = 1,
+	[ID_MCP4922] = 2,
+};
+
+static const struct iio_chan_spec mcp4922_channels[6][MCP4922_NUM_CHANNELS] = {
+	[ID_MCP4901] = { MCP4922_CHAN(0, 8),  {} },
+	[ID_MCP4902] = { MCP4922_CHAN(0, 8),  MCP4922_CHAN(1, 8) },
+	[ID_MCP4911] = { MCP4922_CHAN(0, 10), {} },
+	[ID_MCP4912] = { MCP4922_CHAN(0, 10), MCP4922_CHAN(1, 10) },
+	[ID_MCP4921] = { MCP4922_CHAN(0, 12), {} },
+	[ID_MCP4922] = { MCP4922_CHAN(0, 12), MCP4922_CHAN(1, 12) },
 };
 
 static const struct iio_info mcp4922_info = {
@@ -166,7 +181,7 @@ static int mcp4922_probe(struct spi_device *spi)
 	indio_dev->info = &mcp4922_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = mcp4922_channels[id->driver_data];
-	indio_dev->num_channels = MCP4922_NUM_CHANNELS;
+	indio_dev->num_channels = mcp4922_channel_counts[id->driver_data];
 	indio_dev->name = id->name;
 
 	ret = iio_device_register(indio_dev);
@@ -197,8 +212,11 @@ static int mcp4922_remove(struct spi_device *spi)
 }
 
 static const struct spi_device_id mcp4922_id[] = {
+	{"mcp4901", ID_MCP4901},
 	{"mcp4902", ID_MCP4902},
+	{"mcp4911", ID_MCP4911},
 	{"mcp4912", ID_MCP4912},
+	{"mcp4921", ID_MCP4921},
 	{"mcp4922", ID_MCP4922},
 	{}
 };
@@ -215,5 +233,5 @@ static struct spi_driver mcp4922_driver = {
 module_spi_driver(mcp4922_driver);
 
 MODULE_AUTHOR("Michael Welling <mwelling@ieee.org>");
-MODULE_DESCRIPTION("Microchip MCP4902, MCP4912, MCP4922 DAC");
+MODULE_DESCRIPTION("Microchip MCP49xx DAC");
 MODULE_LICENSE("GPL v2");
