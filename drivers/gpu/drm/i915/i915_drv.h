@@ -2792,6 +2792,7 @@ enum hpd_pin intel_hpd_pin_default(struct drm_i915_private *dev_priv,
 bool intel_hpd_disable(struct drm_i915_private *dev_priv, enum hpd_pin pin);
 void intel_hpd_enable(struct drm_i915_private *dev_priv, enum hpd_pin pin);
 void intel_hpd_suspend(struct drm_i915_private *dev_priv);
+void intel_hotplug_tc_wa_work(struct work_struct *__work);
 
 /* i915_irq.c */
 static inline void i915_queue_hangcheck(struct drm_i915_private *dev_priv)

@@ -342,6 +342,64 @@ static void i915_digport_work_func(struct work_struct *work)
 	}
 }
 
+#define TC_WA_DELAY_MSEC 150
+#define TC_WA_TRIES 5
+
+/*
+ * Test if TC dongle is responsive return true if so otherwise schedule a
+ * work to try again and return false
+ */
+static bool intel_hotplug_tc_wa_test(struct intel_dp *intel_dp)
+{
+	u8 buff;
+
+	intel_dp->tc_wa_count++;
+
+	if (drm_dp_dpcd_read(&intel_dp->aux, DP_DPCD_REV, &buff, 1) != 1)
+		goto not_responsive;
+
+	if (!drm_probe_ddc(&intel_dp->aux.ddc))
+		goto not_responsive;
+
+	return true;
+
+not_responsive:
+	if (intel_dp->tc_wa_count < TC_WA_TRIES) {
+		unsigned long delay;
+
+		delay = msecs_to_jiffies(TC_WA_DELAY_MSEC);
+		schedule_delayed_work(&intel_dp->tc_wa_work, delay);
+	} else {
+		DRM_DEBUG_KMS("TC not responsive, giving up\n");
+	}
+
+	return false;
+}
+
+void intel_hotplug_tc_wa_work(struct work_struct *__work)
+{
+	struct intel_dp *intel_dp = container_of(to_delayed_work(__work),
+						 struct intel_dp, tc_wa_work);
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+	struct drm_device *dev = &dev_priv->drm;
+	bool ret;
+
+	if (!intel_digital_port_connected(intel_encoder))
+		return;
+
+	mutex_lock(&dev->mode_config.mutex);
+	ret = intel_hotplug_tc_wa_test(intel_dp);
+	if (ret)
+		ret = intel_encoder->hotplug(intel_encoder, intel_connector);
+	mutex_unlock(&dev->mode_config.mutex);
+
+	if (ret)
+		drm_kms_helper_hotplug_event(dev);
+}
+
 /*
  * Handle hotplug events outside the interrupt handler proper.
  */
@@ -377,8 +435,26 @@ static void i915_hotplug_work_func(struct work_struct *work)
 			continue;
 		intel_encoder = intel_connector->encoder;
 		if (hpd_event_bits & (1 << intel_encoder->hpd_pin)) {
+			struct intel_digital_port *dig_port = enc_to_dig_port(&intel_encoder->base);
+
 			DRM_DEBUG_KMS("Connector %s (pin %i) received hotplug event.\n",
 				      connector->name, intel_encoder->hpd_pin);
+
+			/*
+			 * TC WA: TC dongles can takes some time to be
+			 * responsible, so let's try to do a DPCD read to check
+			 * if it is ready, otherwise try again in a few msecs.
+			 */
+			if (IS_ICELAKE(dev_priv) &&
+			    intel_digital_port_connected(intel_encoder) &&
+			    dig_port->tc_type != TC_PORT_LEGACY) {
+				struct intel_dp *intel_dp;
+
+				intel_dp = enc_to_intel_dp(&intel_encoder->base);
+				intel_dp->tc_wa_count = 0;
+				if (!intel_hotplug_tc_wa_test(intel_dp))
+					continue;
+			}
 
 			changed |= intel_encoder->hotplug(intel_encoder,
 							  intel_connector);

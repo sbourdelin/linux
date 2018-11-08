@@ -5307,6 +5307,7 @@ void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 {
 	struct intel_digital_port *intel_dig_port = enc_to_dig_port(encoder);
 	struct intel_dp *intel_dp = &intel_dig_port->dp;
+	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
 	intel_dp_mst_encoder_cleanup(intel_dig_port);
 	if (intel_dp_is_edp(intel_dp)) {
@@ -5323,6 +5324,15 @@ void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 			unregister_reboot_notifier(&intel_dp->edp_notifier);
 			intel_dp->edp_notifier.notifier_call = NULL;
 		}
+	} else {
+		/*
+		 * ICL TC legacy HDMI ports is destroyed by this callback so
+		 * it is necessary check if is DP before cancel delayed works
+		 * as it is not initialized for legacy HDMI ports.
+		 */
+		if (IS_ICELAKE(dev_priv) &&
+		    intel_dig_port->base.type == INTEL_OUTPUT_DP)
+			cancel_delayed_work_sync(&intel_dp->tc_wa_work);
 	}
 
 	intel_dp_aux_fini(intel_dp);
@@ -6685,6 +6695,10 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 		u32 temp = I915_READ(PEG_BAND_GAP_DATA);
 		I915_WRITE(PEG_BAND_GAP_DATA, (temp & ~0xf) | 0xd);
 	}
+
+	if (IS_ICELAKE(dev_priv) && !intel_dp_is_edp(intel_dp))
+		INIT_DELAYED_WORK(&intel_dp->tc_wa_work,
+				  intel_hotplug_tc_wa_work);
 
 	return true;
 

@@ -1138,7 +1138,11 @@ struct intel_dp {
 	int panel_power_cycle_delay;
 	int backlight_on_delay;
 	int backlight_off_delay;
-	struct delayed_work panel_vdd_work;
+	union {
+		struct delayed_work panel_vdd_work;
+		struct delayed_work tc_wa_work;
+	};
+	u8 tc_wa_count;
 	bool want_panel_vdd;
 	unsigned long last_power_on;
 	unsigned long last_backlight_off;
