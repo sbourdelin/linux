@@ -164,6 +164,7 @@
 				groups = "uart_tx_ao_a", "uart_rx_ao_a";
 				function = "uart_ao";
 			};
+			bias-disable;
 		};
 
 		i2c_ao_pins: i2c_mst_ao {
@@ -171,6 +172,7 @@
 				groups = "i2c_mst_sck_ao", "i2c_mst_sda_ao";
 				function = "i2c_mst_ao";
 			};
+			bias-disable;
 		};
 
 		ir_recv_pins: remote {
@@ -178,6 +180,7 @@
 				groups = "remote_input";
 				function = "remote";
 			};
+			bias-disable;
 		};
 
 		pwm_f_ao_pins: pwm-f-ao {
@@ -185,6 +188,7 @@
 				groups = "pwm_f_ao";
 				function = "pwm_f_ao";
 			};
+			bias-disable;
 		};
 	};
 };
@@ -239,6 +243,7 @@
 					"sd_d3_a", "sd_clk_a", "sd_cmd_a";
 				function = "sd_a";
 			};
+			bias-disable;
 		};
 
 		sd_b_pins: sd-b {
@@ -247,6 +252,7 @@
 					"sd_d3_b", "sd_clk_b", "sd_cmd_b";
 				function = "sd_b";
 			};
+			bias-disable;
 		};
 
 		sd_c_pins: sd-c {
@@ -255,6 +261,7 @@
 					"sd_d3_c", "sd_clk_c", "sd_cmd_c";
 				function = "sd_c";
 			};
+			bias-disable;
 		};
 
 		spi_nor_pins: nor {
@@ -262,6 +269,7 @@
 				groups = "nor_d", "nor_q", "nor_c", "nor_cs";
 				function = "nor";
 			};
+			bias-disable;
 		};
 
 		eth_pins: ethernet {
@@ -273,6 +281,7 @@
 					 "eth_mdc";
 				function = "ethernet";
 			};
+			bias-disable;
 		};
 
 		pwm_e_pins: pwm-e {
@@ -280,6 +289,7 @@
 				groups = "pwm_e";
 				function = "pwm_e";
 			};
+			bias-disable;
 		};
 
 		uart_a1_pins: uart-a1 {
@@ -288,6 +298,7 @@
 				       "uart_rx_a1";
 				function = "uart_a";
 			};
+			bias-disable;
 		};
 
 		uart_a1_cts_rts_pins: uart-a1-cts-rts {
@@ -296,6 +307,7 @@
 				       "uart_rts_a1";
 				function = "uart_a";
 			};
+			bias-disable;
 		};
 	};
 };
