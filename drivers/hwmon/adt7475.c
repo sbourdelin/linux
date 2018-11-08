@@ -23,6 +23,7 @@
 #include <linux/err.h>
 #include <linux/jiffies.h>
 #include <linux/util_macros.h>
+#include <linux/pwm.h>
 
 /* Indexes for the sysfs hooks */
 
@@ -1536,6 +1537,23 @@ static int adt7475_update_limits(struct i2c_client *client)
 	return 0;
 }
 
+static int adt7475_set_pwm_polarity(struct i2c_client *client, int index,
+				    enum pwm_polarity pol)
+{
+	int ret;
+
+	ret = adt7475_read(PWM_CONFIG_REG(index));
+	if (ret < 0)
+		return ret;
+
+	if (pol == PWM_POLARITY_INVERSED)
+		ret |= BIT(4);
+	else
+		ret &= ~BIT(4);
+
+	return i2c_smbus_write_byte_data(client, PWM_CONFIG_REG(index), ret);
+}
+
 static int adt7475_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1637,6 +1655,16 @@ static int adt7475_probe(struct i2c_client *client,
 	 */
 	for (i = 0; i < ADT7475_PWM_COUNT; i++)
 		adt7475_read_pwm(client, i);
+
+	if (client->dev.of_node) {
+		enum pwm_polarity polarity;
+
+		ret = of_property_read_u32(client->dev.of_node, "pwm-polarity",
+					   &polarity);
+		if (!ret)
+			for (i = 0; i < ADT7475_PWM_COUNT; i++)
+				adt7475_set_pwm_polarity(client, i, polarity);
+	}
 
 	/* Start monitoring */
 	switch (chip) {
