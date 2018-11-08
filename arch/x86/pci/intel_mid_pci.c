@@ -280,7 +280,7 @@ static void intel_mid_pci_irq_disable(struct pci_dev *dev)
 	}
 }
 
-static const struct pci_ops intel_mid_pci_ops __initconst = {
+static const struct pci_ops intel_mid_pci_ops = {
 	.read = pci_read,
 	.write = pci_write,
 };
@@ -297,7 +297,8 @@ int __init intel_mid_pci_init(void)
 	pci_mmcfg_late_init();
 	pcibios_enable_irq = intel_mid_pci_irq_enable;
 	pcibios_disable_irq = intel_mid_pci_irq_disable;
-	pci_root_ops = intel_mid_pci_ops;
+	pci_root_ops_ptr = &intel_mid_pci_ops;
+	pci_acpi_set_ops(&intel_mid_pci_ops);
 	pci_soc_mode = 1;
 	/* Continue with standard init */
 	acpi_noirq_set();

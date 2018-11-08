@@ -397,6 +397,11 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 	return 0;
 }
 
+void __init pci_acpi_set_ops(const struct pci_ops *ops)
+{
+	acpi_pci_root_ops.pci_ops = ops;
+}
+
 int __init pci_acpi_init(void)
 {
 	struct pci_dev *dev = NULL;

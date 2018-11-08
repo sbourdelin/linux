@@ -69,7 +69,7 @@ struct acpi_pci_root_info {
 };
 
 struct acpi_pci_root_ops {
-	struct pci_ops *pci_ops;
+	const struct pci_ops *pci_ops;
 	int (*init_info)(struct acpi_pci_root_info *info);
 	void (*release_info)(struct acpi_pci_root_info *info);
 	int (*prepare_resources)(struct acpi_pci_root_info *info);

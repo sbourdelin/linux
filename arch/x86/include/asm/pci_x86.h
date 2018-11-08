@@ -58,7 +58,8 @@ void pcibios_set_cache_line_size(void);
 /* pci-pc.c */
 
 extern int pcibios_last_bus;
-extern struct pci_ops pci_root_ops;
+extern const struct pci_ops pci_root_ops;
+extern const struct pci_ops *pci_root_ops_ptr;
 
 void pcibios_scan_specific_bus(int busn);
 
@@ -122,6 +123,7 @@ extern void __init dmi_check_skip_isa_align(void);
 
 /* some common used subsys_initcalls */
 extern int __init pci_acpi_init(void);
+extern void __init pci_acpi_set_ops(const struct pci_ops *ops);
 extern void __init pcibios_irq_init(void);
 extern int __init pcibios_init(void);
 extern int pci_legacy_init(void);

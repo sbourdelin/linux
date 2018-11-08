@@ -67,10 +67,11 @@ static int pci_write(struct pci_bus *bus, unsigned int devfn, int where, int siz
 				  devfn, where, size, value);
 }
 
-struct pci_ops pci_root_ops = {
+const struct pci_ops pci_root_ops = {
 	.read = pci_read,
 	.write = pci_write,
 };
+const struct pci_ops *pci_root_ops_ptr = &pci_root_ops;
 
 /*
  * This interrupt-safe spinlock protects all accesses to PCI configuration
@@ -467,7 +468,7 @@ void pcibios_scan_root(int busnum)
 	sd->node = x86_pci_root_bus_node(busnum);
 	x86_pci_root_bus_resources(busnum, &resources);
 	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
-	bus = pci_scan_root_bus(NULL, busnum, &pci_root_ops, sd, &resources);
+	bus = pci_scan_root_bus(NULL, busnum, pci_root_ops_ptr, sd, &resources);
 	if (!bus) {
 		pci_free_resource_list(&resources);
 		kfree(sd);
