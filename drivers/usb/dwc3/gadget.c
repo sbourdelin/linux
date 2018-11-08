@@ -2254,6 +2254,10 @@ static int dwc3_gadget_ep_reclaim_completed_trb(struct dwc3_ep *dep,
 	if (chain && (trb->ctrl & DWC3_TRB_CTRL_HWO))
 		trb->ctrl &= ~DWC3_TRB_CTRL_HWO;
 
+	/* Report scheduled frame number for isoc transfers */
+	if (usb_endpoint_xfer_isoc(dep->endpoint.desc))
+		req->request.start_frame = dep->frame_number;
+
 	/*
 	 * If we're dealing with unaligned size OUT transfer, we will be left
 	 * with one TRB pending in the ring. We need to manually clear HWO bit
