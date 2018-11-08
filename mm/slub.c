@@ -1872,7 +1872,7 @@ static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
  * Get a page from somewhere. Search in increasing NUMA distances.
  */
 static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
-		struct kmem_cache_cpu *c)
+		struct kmem_cache_cpu *c, int except)
 {
 #ifdef CONFIG_NUMA
 	struct zonelist *zonelist;
@@ -1881,6 +1881,9 @@ static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
 	enum zone_type high_zoneidx = gfp_zone(flags);
 	void *object;
 	unsigned int cpuset_mems_cookie;
+	nodemask_t nmask = node_states[N_MEMORY];
+
+	node_clear(except, nmask);
 
 	/*
 	 * The defrag ratio allows a configuration of the tradeoffs between
@@ -1907,7 +1910,8 @@ static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
 	do {
 		cpuset_mems_cookie = read_mems_allowed_begin();
 		zonelist = node_zonelist(mempolicy_slab_node(), flags);
-		for_each_zone_zonelist(zone, z, zonelist, high_zoneidx) {
+		for_each_zone_zonelist_nodemask(zone, z, zonelist,
+						high_zoneidx, &nmask) {
 			struct kmem_cache_node *n;
 
 			n = get_node(s, zone_to_nid(zone));
@@ -1925,6 +1929,7 @@ static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
 					 */
 					return object;
 				}
+				node_clear(zone_to_nid(zone), nmask);
 			}
 		}
 	} while (read_mems_allowed_retry(cpuset_mems_cookie));
@@ -1950,7 +1955,7 @@ static void *get_partial(struct kmem_cache *s, gfp_t flags, int node,
 	if (object || node != NUMA_NO_NODE)
 		return object;
 
-	return get_any_partial(s, flags, c);
+	return get_any_partial(s, flags, c, searchnode);
 }
 
 #ifdef CONFIG_PREEMPT
