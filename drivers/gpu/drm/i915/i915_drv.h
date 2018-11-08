@@ -3076,8 +3076,8 @@ enum i915_mm_subclass { /* lockdep subclass for obj->mm.lock */
 	I915_MM_SHRINKER
 };
 
-void __i915_gem_object_put_pages(struct drm_i915_gem_object *obj,
-				 enum i915_mm_subclass subclass);
+int __i915_gem_object_put_pages(struct drm_i915_gem_object *obj,
+				enum i915_mm_subclass subclass);
 void __i915_gem_object_invalidate(struct drm_i915_gem_object *obj);
 
 enum i915_map_type {
