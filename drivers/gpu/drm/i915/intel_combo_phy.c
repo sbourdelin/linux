@@ -199,7 +199,7 @@ void icl_combo_phys_init(struct drm_i915_private *dev_priv)
 {
 	enum port port;
 
-	for (port = PORT_A; port <= PORT_B; port++) {
+	for (port = PORT_A; intel_port_is_combophy(dev_priv, port); port++) {
 		u32 val;
 
 		if (icl_combo_phy_verify_state(dev_priv, port)) {
@@ -228,7 +228,7 @@ void icl_combo_phys_uninit(struct drm_i915_private *dev_priv)
 {
 	enum port port;
 
-	for (port = PORT_A; port <= PORT_B; port++) {
+	for (port = PORT_A; intel_port_is_combophy(dev_priv, port); port++) {
 		u32 val;
 
 		if (!icl_combo_phy_verify_state(dev_priv, port))
