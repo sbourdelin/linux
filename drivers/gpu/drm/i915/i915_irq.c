@@ -4995,7 +4995,6 @@ int intel_irq_install(struct drm_i915_private *dev_priv)
 void intel_irq_uninstall(struct drm_i915_private *dev_priv)
 {
 	drm_irq_uninstall(&dev_priv->drm);
-	intel_hpd_cancel_work(dev_priv);
 	intel_hpd_suspend(dev_priv);
 	dev_priv->runtime_pm.irqs_enabled = false;
 }

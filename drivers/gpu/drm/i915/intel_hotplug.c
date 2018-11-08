@@ -613,7 +613,7 @@ void intel_hpd_init_work(struct drm_i915_private *dev_priv)
 			  intel_hpd_irq_storm_reenable_work);
 }
 
-void intel_hpd_cancel_work(struct drm_i915_private *dev_priv)
+static void intel_hpd_cancel_work(struct drm_i915_private *dev_priv)
 {
 	spin_lock_irq(&dev_priv->irq_lock);
 
@@ -660,6 +660,8 @@ void intel_hpd_suspend(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_encoder *encoder;
+
+	intel_hpd_cancel_work(dev_priv);
 
 	for_each_intel_encoder(dev, encoder)
 		intel_digital_port_force_disconnection(encoder);
