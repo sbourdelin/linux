@@ -2863,7 +2863,7 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 	const u32 *ret = NULL;
 	u32 addr;
 	int err;
-	u8 i;
+	u8 i, ncmds, nmaps;
 	u8 addr_width, read_opcode, read_dummy;
 	u8 read_data_mask, data_byte, map_id;
 
@@ -2872,6 +2872,7 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 	read_opcode = nor->read_opcode;
 
 	map_id = 0;
+	ncmds = 0;
 	/* Determine if there are any optional Detection Command Descriptors */
 	for (i = 0; i < smpt_len; i += 2) {
 		if (smpt[i] & SMPT_DESC_TYPE_MAP)
@@ -2891,6 +2892,7 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 		 * Configuration that is currently in use.
 		 */
 		map_id = map_id << 1 | !!(data_byte & read_data_mask);
+		ncmds++;
 	}
 
 	/*
@@ -2900,7 +2902,16 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
 	 *
 	 * Find the matching configuration map.
 	 */
-	while (i < smpt_len) {
+	for (nmaps = 0; i < smpt_len; nmaps++) {
+		/*
+		 * The map selector is limited to a maximum of 8 bits, allowing
+		 * for a maximum of 256 possible map configurations. The total
+		 * number of map configurations should be addressable by the
+		 * total number of bits described by the detection commands.
+		 */
+		if (ncmds && nmaps >= (1 << (ncmds + 1)))
+			break;
+
 		if (SMPT_MAP_ID(smpt[i]) == map_id) {
 			ret = smpt + i;
 			break;
