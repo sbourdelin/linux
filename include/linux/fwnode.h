@@ -48,6 +48,8 @@ struct fwnode_reference_args {
 	u64 args[NR_FWNODE_REFERENCE_ARGS];
 };
 
+#define FWNODE_NAME_MAX_SIZE		32
+
 /**
  * struct fwnode_operations - Operations for fwnode interface
  * @get: Get a reference to an fwnode.
@@ -72,6 +74,7 @@ struct fwnode_reference_args {
 struct fwnode_operations {
 	struct fwnode_handle *(*get)(struct fwnode_handle *fwnode);
 	void (*put)(struct fwnode_handle *fwnode);
+	int (*get_name)(const struct fwnode_handle *fwnode, char *buf);
 	bool (*device_is_available)(const struct fwnode_handle *fwnode);
 	const void *(*device_get_match_data)(const struct fwnode_handle *fwnode,
 					     const struct device *dev);
