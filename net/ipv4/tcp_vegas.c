@@ -139,8 +139,7 @@ void tcp_vegas_state(struct sock *sk, u8 ca_state)
 }
 EXPORT_SYMBOL_GPL(tcp_vegas_state);
 
-/*
- * If the connection is idle and we are restarting,
+/* If the connection is idle and we are restarting,
  * then we don't want to do any Vegas calculations
  * until we get fresh RTT samples.  So when we
  * restart, we reset our Vegas state to a clean
@@ -223,7 +222,7 @@ static void tcp_vegas_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 			 * and the window we would like to have. This quantity
 			 * is the "Diff" from the Arizona Vegas papers.
 			 */
-			diff = tp->snd_cwnd * (rtt-vegas->baseRTT) / vegas->baseRTT;
+			diff = tp->snd_cwnd * (rtt - vegas->baseRTT) / vegas->baseRTT;
 
 			if (diff > gamma && tcp_in_slow_start(tp)) {
 				/* Going too fast. Time to slow down
@@ -237,7 +236,7 @@ static void tcp_vegas_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 				 * truncation robs us of full link
 				 * utilization.
 				 */
-				tp->snd_cwnd = min(tp->snd_cwnd, (u32)target_cwnd+1);
+				tp->snd_cwnd = min(tp->snd_cwnd, (u32)target_cwnd + 1);
 				tp->snd_ssthresh = tcp_vegas_ssthresh(tp);
 
 			} else if (tcp_in_slow_start(tp)) {
@@ -254,8 +253,7 @@ static void tcp_vegas_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 					 * we slow down.
 					 */
 					tp->snd_cwnd--;
-					tp->snd_ssthresh
-						= tcp_vegas_ssthresh(tp);
+					tp->snd_ssthresh = tcp_vegas_ssthresh(tp);
 				} else if (diff < alpha) {
 					/* We don't have enough extra packets
 					 * in the network, so speed up.
