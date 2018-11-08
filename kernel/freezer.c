@@ -148,6 +148,20 @@ bool freeze_task(struct task_struct *p)
 	return true;
 }
 
+void cancel_freezing_thaw_task(struct task_struct *p)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&freezer_lock, flags);
+	if (freezing(p)) {
+		spin_lock(&p->sighand->siglock);
+		recalc_sigpending_and_wake(p);
+		spin_unlock(&p->sighand->siglock);
+	} else if (frozen(p))
+		wake_up_process(p);
+	spin_unlock_irqrestore(&freezer_lock, flags);
+}
+
 void __thaw_task(struct task_struct *p)
 {
 	unsigned long flags;

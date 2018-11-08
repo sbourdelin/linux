@@ -57,6 +57,12 @@ static inline bool try_to_freeze_unsafe(void)
 	might_sleep();
 	if (likely(!freezing(current)))
 		return false;
+	/*
+	 * we are going to call do_exit() really soon,
+	 * we have a pending SIGKILL
+	 */
+	if (unlikely(current->signal->flags & SIGNAL_GROUP_EXIT))
+		return false;
 	return __refrigerator(false);
 }
 
@@ -68,6 +74,7 @@ static inline bool try_to_freeze(void)
 }
 
 extern bool freeze_task(struct task_struct *p);
+extern void cancel_freezing_thaw_task(struct task_struct *p);
 extern bool set_freezable(void);
 
 #ifdef CONFIG_CGROUP_FREEZER

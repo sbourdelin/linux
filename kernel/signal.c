@@ -41,6 +41,7 @@
 #include <linux/compiler.h>
 #include <linux/posix-timers.h>
 #include <linux/livepatch.h>
+#include <linux/freezer.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/signal.h>
@@ -1274,6 +1275,12 @@ int zap_other_threads(struct task_struct *p)
 		/* Don't bother with already dead threads */
 		if (t->exit_state)
 			continue;
+
+		/*
+		 * we can check sig->group_exit_task to detect de_thread,
+		 * but perhaps it doesn't hurt if the caller is do_group_exit
+		 */
+		cancel_freezing_thaw_task(t);
 		sigaddset(&t->pending.signal, SIGKILL);
 		signal_wake_up(t, 1);
 	}
