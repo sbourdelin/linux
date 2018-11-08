@@ -910,7 +910,9 @@ struct dev_links_info {
  * 		variants, which GPIO pins act in what additional roles, and so
  * 		on.  This shrinks the "Board Support Packages" (BSPs) and
  * 		minimizes board-specific #ifdefs in drivers.
- * @driver_data: Private pointer for driver specific info.
+ * @driver_data: Private pointer for driver specific info if driver is
+ *		non-NULL. Pointer to deferred driver to be attached if driver
+ *		is NULL.
  * @links:	Links to suppliers and consumers of this device.
  * @power:	For device power management.
  *		See Documentation/driver-api/pm/devices.rst for details.
@@ -1118,6 +1120,12 @@ static inline void *dev_get_drvdata(const struct device *dev)
 
 static inline void dev_set_drvdata(struct device *dev, void *data)
 {
+	/*
+	 * clear async_probe to prevent us from attempting to read driver_data
+	 * as a driver. We can reset this to true for the one case where we are
+	 * using this to record an actual driver.
+	 */
+	dev->async_probe = false;
 	dev->driver_data = data;
 }
 
