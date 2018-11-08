@@ -273,6 +273,7 @@ static inline void regulator_lock_dependent(struct regulator_dev *rdev)
 static struct device_node *of_get_regulator(struct device *dev, const char *supply)
 {
 	struct device_node *regnode = NULL;
+	struct device_node *child = NULL;
 	char prop_name[32]; /* 32 is max size of property name */
 
 	dev_dbg(dev, "Looking up %s-supply from device tree\n", supply);
@@ -281,6 +282,11 @@ static struct device_node *of_get_regulator(struct device *dev, const char *supp
 	regnode = of_parse_phandle(dev->of_node, prop_name, 0);
 
 	if (!regnode) {
+		for_each_child_of_node(dev->of_node, child) {
+			regnode = of_parse_phandle(child, prop_name, 0);
+			if (regnode)
+				return regnode;
+		}
 		dev_dbg(dev, "Looking up %s property in node %pOF failed\n",
 				prop_name, dev->of_node);
 		return NULL;
