@@ -36,7 +36,9 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 
-static bool shrinker_lock(struct drm_i915_private *i915, bool *unlock)
+static bool shrinker_lock(struct drm_i915_private *i915,
+			  unsigned int flags,
+			  bool *unlock)
 {
 	switch (mutex_trylock_recursive(&i915->drm.struct_mutex)) {
 	case MUTEX_TRYLOCK_RECURSIVE:
@@ -45,15 +47,11 @@ static bool shrinker_lock(struct drm_i915_private *i915, bool *unlock)
 
 	case MUTEX_TRYLOCK_FAILED:
 		*unlock = false;
-		preempt_disable();
-		do {
-			cpu_relax();
-			if (mutex_trylock(&i915->drm.struct_mutex)) {
-				*unlock = true;
-				break;
-			}
-		} while (!need_resched());
-		preempt_enable();
+		if (flags & I915_SHRINK_ACTIVE) {
+			mutex_lock_nested(&i915->drm.struct_mutex,
+					  I915_MM_SHRINKER);
+			*unlock = true;
+		}
 		return *unlock;
 
 	case MUTEX_TRYLOCK_SUCCESS:
@@ -160,7 +158,7 @@ i915_gem_shrink(struct drm_i915_private *i915,
 	unsigned long scanned = 0;
 	bool unlock;
 
-	if (!shrinker_lock(i915, &unlock))
+	if (!shrinker_lock(i915, flags, &unlock))
 		return 0;
 
 	/*
@@ -357,7 +355,7 @@ i915_gem_shrinker_scan(struct shrinker *shrinker, struct shrink_control *sc)
 
 	sc->nr_scanned = 0;
 
-	if (!shrinker_lock(i915, &unlock))
+	if (!shrinker_lock(i915, 0, &unlock))
 		return SHRINK_STOP;
 
 	freed = i915_gem_shrink(i915,
@@ -397,7 +395,7 @@ shrinker_lock_uninterruptible(struct drm_i915_private *i915, bool *unlock,
 	do {
 		if (i915_gem_wait_for_idle(i915,
 					   0, MAX_SCHEDULE_TIMEOUT) == 0 &&
-		    shrinker_lock(i915, unlock))
+		    shrinker_lock(i915, 0, unlock))
 			break;
 
 		schedule_timeout_killable(1);
