@@ -5043,6 +5043,25 @@ bool intel_digital_port_connected(struct intel_encoder *encoder)
 	return false;
 }
 
+/*
+ * intel_digital_port_force_disconnection - Used to force port disconnection or
+ * release any control from display driver before going to a state that driver
+ * will not handle interruptions.
+ */
+void intel_digital_port_force_disconnection(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_digital_port *dig_port;
+
+	dig_port = enc_to_dig_port(&encoder->base);
+	/* Skip fake MST ports */
+	if (!dig_port)
+		return;
+
+	if (INTEL_GEN(dev_priv) >= 11)
+		icl_tc_phy_disconnect(dev_priv, dig_port);
+}
+
 static struct edid *
 intel_dp_get_edid(struct intel_dp *intel_dp)
 {

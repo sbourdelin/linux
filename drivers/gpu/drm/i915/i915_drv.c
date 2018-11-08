@@ -1911,6 +1911,7 @@ static int i915_drm_suspend(struct drm_device *dev)
 
 	intel_runtime_pm_disable_interrupts(dev_priv);
 	intel_hpd_cancel_work(dev_priv);
+	intel_hpd_suspend(dev_priv);
 
 	intel_suspend_encoders(dev_priv);
 

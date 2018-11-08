@@ -655,3 +655,12 @@ void intel_hpd_enable(struct drm_i915_private *dev_priv, enum hpd_pin pin)
 	dev_priv->hotplug.stats[pin].state = HPD_ENABLED;
 	spin_unlock_irq(&dev_priv->irq_lock);
 }
+
+void intel_hpd_suspend(struct drm_i915_private *dev_priv)
+{
+	struct drm_device *dev = &dev_priv->drm;
+	struct intel_encoder *encoder;
+
+	for_each_intel_encoder(dev, encoder)
+		intel_digital_port_force_disconnection(encoder);
+}
