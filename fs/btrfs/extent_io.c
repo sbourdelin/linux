@@ -2403,10 +2403,7 @@ static int bio_readpage_error(struct bio *failed_bio, u64 phy_offset,
 void end_extent_writepage(struct page *page, int err, u64 start, u64 end)
 {
 	int uptodate = (err == 0);
-	struct extent_io_tree *tree;
 	int ret = 0;
-
-	tree = &BTRFS_I(page->mapping->host)->io_tree;
 
 	btrfs_writepage_endio_finish_ordered(page, start, end, NULL, uptodate);
 
