@@ -4739,6 +4739,8 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 	INIT_LIST_HEAD(&obj->lut_list);
 	INIT_LIST_HEAD(&obj->batch_pool_link);
 
+	init_rcu_head(&obj->rcu);
+
 	obj->ops = ops;
 
 	reservation_object_init(&obj->__builtin_resv);
@@ -4940,6 +4942,8 @@ static void __i915_gem_free_objects(struct drm_i915_private *i915,
 		reservation_object_fini(&obj->__builtin_resv);
 		drm_gem_object_release(&obj->base);
 		i915_gem_info_remove_obj(i915, obj->base.size);
+
+		destroy_rcu_head(&obj->rcu);
 
 		kfree(obj->bit_17);
 		i915_gem_object_free(obj);
