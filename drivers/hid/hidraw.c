@@ -107,8 +107,6 @@ out:
 
 /*
  * The first byte of the report buffer is expected to be a report number.
- *
- * This function is to be called with the minors_lock mutex held.
  */
 static ssize_t hidraw_send_report(struct file *file, const char __user *buffer, size_t count, unsigned char report_type)
 {
@@ -116,6 +114,8 @@ static ssize_t hidraw_send_report(struct file *file, const char __user *buffer, 
 	struct hid_device *dev;
 	__u8 *buf;
 	int ret = 0;
+
+	lockdep_assert_held(&minors_lock);
 
 	if (!hidraw_table[minor] || !hidraw_table[minor]->exist) {
 		ret = -ENODEV;
@@ -191,6 +191,8 @@ static ssize_t hidraw_get_report(struct file *file, char __user *buffer, size_t 
 	__u8 *buf;
 	int ret = 0, len;
 	unsigned char report_number;
+
+	lockdep_assert_held(&minors_lock);
 
 	if (!hidraw_table[minor] || !hidraw_table[minor]->exist) {
 		ret = -ENODEV;
