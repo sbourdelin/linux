@@ -1,0 +1,24 @@
+*ADT7475 hwmon sensor.
+
+Required properties:
+- compatible: One of
+	"adi,adt7473"
+	"adi,adt7475"
+	"adi,adt7476"
+	"adi,adt7490"
+
+- reg: I2C address
+
+optional properties:
+
+- pwm-polarity: This configures the polarity of the PWM. 0
+		(PWM_POLARITY_NORMAL) uses logic high for 100% duty cycle. 1
+                (PWM_POLARITY_INVERSED) uses logic low for 100% duty cycle.
+
+Example:
+
+hwmon@2e {
+	compatible = ;
+	reg = <0x2e>;
+	pwm-polarity = <1>;
+};
