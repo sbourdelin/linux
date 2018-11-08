@@ -54,3 +54,13 @@ config COMMON_CLK_AXG_AUDIO
 	help
 	  Support for the audio clock controller on AmLogic A113D devices,
 	  aka axg, Say Y if you want audio subsystem to work.
+
+config COMMON_CLK_G12A
+	bool
+	depends on COMMON_CLK_AMLOGIC
+	select RESET_CONTROLLER
+	select COMMON_CLK_REGMAP_MESON
+	select MFD_SYSCON
+	help
+	  Support for the clock controller on Amlogic S905D2 devices, aka g12a.
+	  Say Y if you want peripherals and CPU frequency scaling to work.
