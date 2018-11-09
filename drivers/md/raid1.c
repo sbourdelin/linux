@@ -1529,7 +1529,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 
 	r1_bio_write_done(r1_bio);
 
-	/* In case raid1d snuck in to freeze_array */
+	/* In case raid1d stuck in to freeze_array */
 	wake_up(&conf->wait_barrier);
 }
 
