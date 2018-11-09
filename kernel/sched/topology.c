@@ -3,6 +3,7 @@
  * Scheduler topology setup/handling methods
  */
 #include "sched.h"
+#include <linux/sparsemask.h>
 
 DEFINE_MUTEX(sched_domains_mutex);
 
@@ -441,6 +442,7 @@ static void update_top_cache_domain(int cpu)
 static void
 cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
 {
+	struct sparsemask *cfs_overload_cpus;
 	struct rq *rq = cpu_rq(cpu);
 	struct sched_domain *tmp;
 
@@ -481,6 +483,10 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
 	rcu_assign_pointer(rq->sd, sd);
 	dirty_sched_domain_sysctl(cpu);
 	destroy_sched_domains(tmp);
+
+	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
+	cfs_overload_cpus = (sd ? sd->shared->cfs_overload_cpus : NULL);
+	rcu_assign_pointer(rq->cfs_overload_cpus, cfs_overload_cpus);
 
 	update_top_cache_domain(cpu);
 }
@@ -1619,9 +1625,19 @@ static void __sdt_free(const struct cpumask *cpu_map)
 	}
 }
 
+#define ZALLOC_MASK(maskp, nelems, node)				  \
+	(!*(maskp) && !zalloc_sparsemask_node(maskp, nelems,		  \
+					      SPARSEMASK_DENSITY_DEFAULT, \
+					      GFP_KERNEL, node))	  \
+
 static int sd_llc_alloc(struct sched_domain *sd)
 {
-	/* Allocate sd->shared data here. Empty for now. */
+	struct sched_domain_shared *sds = sd->shared;
+	struct cpumask *span = sched_domain_span(sd);
+	int nid = cpu_to_node(cpumask_first(span));
+
+	if (ZALLOC_MASK(&sds->cfs_overload_cpus, nr_cpu_ids, nid))
+		return 1;
 
 	return 0;
 }
@@ -1633,7 +1649,8 @@ static void sd_llc_free(struct sched_domain *sd)
 	if (!sds)
 		return;
 
-	/* Free data here. Empty for now. */
+	free_sparsemask(sds->cfs_overload_cpus);
+	sds->cfs_overload_cpus = NULL;
 }
 
 static int sd_llc_alloc_all(const struct cpumask *cpu_map, struct s_data *d)
