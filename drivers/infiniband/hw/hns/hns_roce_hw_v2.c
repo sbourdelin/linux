@@ -4325,13 +4325,12 @@ static int hns_roce_mhop_alloc_eq(struct hns_roce_dev *hr_dev,
 				eqe_alloc = i * (buf_chk_sz / eq->eqe_size);
 				size = (eq->entries - eqe_alloc) * eq->eqe_size;
 			}
-			eq->buf[i] = dma_alloc_coherent(dev, size,
+			eq->buf[i] = dma_zalloc_coherent(dev, size,
 							&(eq->buf_dma[i]),
 							GFP_KERNEL);
 			if (!eq->buf[i])
 				goto err_dma_alloc_buf;
 
-			memset(eq->buf[i], 0, size);
 			*(eq->bt_l0 + i) = eq->buf_dma[i];
 
 			eq_buf_cnt++;
