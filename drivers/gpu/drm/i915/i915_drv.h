@@ -2579,6 +2579,8 @@ intel_info(const struct drm_i915_private *dev_priv)
 		((dev_priv)->info.has_logical_ring_elsq)
 #define HAS_LOGICAL_RING_PREEMPTION(dev_priv) \
 		((dev_priv)->info.has_logical_ring_preemption)
+#define HAS_HW_PREEMPT_TO_IDLE(dev_priv) \
+		((dev_priv)->info.has_hw_preempt_to_idle)
 
 #define HAS_EXECLISTS(dev_priv) HAS_LOGICAL_RING_CONTEXTS(dev_priv)
 

@@ -104,6 +104,7 @@ enum intel_ppgtt {
 	func(has_logical_ring_contexts); \
 	func(has_logical_ring_elsq); \
 	func(has_logical_ring_preemption); \
+	func(has_hw_preempt_to_idle); \
 	func(has_overlay); \
 	func(has_pooled_eu); \
 	func(has_psr); \

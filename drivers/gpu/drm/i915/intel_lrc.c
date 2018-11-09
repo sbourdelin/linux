@@ -155,6 +155,7 @@
 #define GEN8_CTX_STATUS_ACTIVE_IDLE	(1 << 3)
 #define GEN8_CTX_STATUS_COMPLETE	(1 << 4)
 #define GEN8_CTX_STATUS_LITE_RESTORE	(1 << 15)
+#define GEN11_CTX_STATUS_PREEMPT_IDLE	(1 << 29)
 
 #define GEN8_CTX_STATUS_COMPLETED_MASK \
 	 (GEN8_CTX_STATUS_COMPLETE | GEN8_CTX_STATUS_PREEMPTED)
@@ -500,29 +501,49 @@ static void port_assign(struct execlist_port *port, struct i915_request *rq)
 	port_set(port, port_pack(i915_request_get(rq), port_count(port)));
 }
 
-static void inject_preempt_context(struct intel_engine_cs *engine)
+static void execlist_send_preempt_to_idle(struct intel_engine_cs *engine)
 {
 	struct intel_engine_execlists *execlists = &engine->execlists;
-	struct intel_context *ce =
-		to_intel_context(engine->i915->preempt_context, engine);
-	unsigned int n;
-
-	GEM_BUG_ON(execlists->preempt_complete_status !=
-		   upper_32_bits(ce->lrc_desc));
-
-	/*
-	 * Switch to our empty preempt context so
-	 * the state of the GPU is known (idle).
-	 */
 	GEM_TRACE("%s\n", engine->name);
-	for (n = execlists_num_ports(execlists); --n; )
-		write_desc(execlists, 0, n);
 
-	write_desc(execlists, ce->lrc_desc, n);
+	if (HAS_HW_PREEMPT_TO_IDLE(engine->i915)) {
+		/*
+		 * hardware which HAS_HW_PREEMPT_TO_IDLE(), always also
+		 * HAS_LOGICAL_RING_ELSQ(), so we can assume ctrl_reg is set
+		 */
+		GEM_BUG_ON(execlists->ctrl_reg == NULL);
 
-	/* we need to manually load the submit queue */
-	if (execlists->ctrl_reg)
-		writel(EL_CTRL_LOAD, execlists->ctrl_reg);
+		/*
+		 * If we have hardware preempt-to-idle, we do not need to
+		 * inject any job to the hardware. We only set a flag.
+		 */
+		writel(EL_CTRL_PREEMPT_TO_IDLE, execlists->ctrl_reg);
+	} else {
+		struct intel_context *ce =
+			to_intel_context(engine->i915->preempt_context, engine);
+		unsigned int n;
+
+		GEM_BUG_ON(execlists->preempt_complete_status !=
+			   upper_32_bits(ce->lrc_desc));
+		GEM_BUG_ON((ce->lrc_reg_state[CTX_CONTEXT_CONTROL + 1] &
+			_MASKED_BIT_ENABLE(CTX_CTRL_ENGINE_CTX_RESTORE_INHIBIT |
+					   CTX_CTRL_ENGINE_CTX_SAVE_INHIBIT)) !=
+			_MASKED_BIT_ENABLE(CTX_CTRL_ENGINE_CTX_RESTORE_INHIBIT |
+					   CTX_CTRL_ENGINE_CTX_SAVE_INHIBIT));
+
+		/*
+		 * Switch to our empty preempt context so
+		 * the state of the GPU is known (idle).
+		 */
+		for (n = execlists_num_ports(execlists); --n; )
+			write_desc(execlists, 0, n);
+
+		write_desc(execlists, ce->lrc_desc, n);
+
+		/* we need to manually load the submit queue */
+		if (execlists->ctrl_reg)
+			writel(EL_CTRL_LOAD, execlists->ctrl_reg);
+	}
 
 	execlists_clear_active(execlists, EXECLISTS_ACTIVE_HWACK);
 	execlists_set_active(execlists, EXECLISTS_ACTIVE_PREEMPT);
@@ -595,7 +616,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			return;
 
 		if (need_preempt(engine, last, execlists->queue_priority)) {
-			inject_preempt_context(engine);
+			execlist_send_preempt_to_idle(engine);
 			return;
 		}
 
@@ -922,22 +943,43 @@ static void process_csb(struct intel_engine_cs *engine)
 			  execlists->active);
 
 		status = buf[2 * head];
-		if (status & (GEN8_CTX_STATUS_IDLE_ACTIVE |
-			      GEN8_CTX_STATUS_PREEMPTED))
-			execlists_set_active(execlists,
-					     EXECLISTS_ACTIVE_HWACK);
-		if (status & GEN8_CTX_STATUS_ACTIVE_IDLE)
-			execlists_clear_active(execlists,
-					       EXECLISTS_ACTIVE_HWACK);
+		/*
+		 * Check if preempted from idle to idle directly.
+		 * The STATUS_IDLE_ACTIVE flag is used to mark
+		 * such transition.
+		 */
+		if ((status & GEN8_CTX_STATUS_IDLE_ACTIVE) &&
+		     (status & GEN11_CTX_STATUS_PREEMPT_IDLE)) {
 
-		if (!(status & GEN8_CTX_STATUS_COMPLETED_MASK))
-			continue;
+			/*
+			 * We could not have COMPLETED anything
+			 * if we were idle before preemption.
+			 */
+			GEM_BUG_ON(status & GEN8_CTX_STATUS_COMPLETED_MASK);
+		} else {
+			if (status & (GEN8_CTX_STATUS_IDLE_ACTIVE |
+				      GEN8_CTX_STATUS_PREEMPTED))
+				execlists_set_active(execlists,
+						     EXECLISTS_ACTIVE_HWACK);
 
-		/* We should never get a COMPLETED | IDLE_ACTIVE! */
-		GEM_BUG_ON(status & GEN8_CTX_STATUS_IDLE_ACTIVE);
+			if (status & GEN8_CTX_STATUS_ACTIVE_IDLE)
+				execlists_clear_active(execlists,
+						       EXECLISTS_ACTIVE_HWACK);
 
-		if (status & GEN8_CTX_STATUS_COMPLETE &&
-		    buf[2*head + 1] == execlists->preempt_complete_status) {
+			if (!(status & GEN8_CTX_STATUS_COMPLETED_MASK))
+				continue;
+
+			/* We should never get a COMPLETED | IDLE_ACTIVE! */
+			GEM_BUG_ON(status & GEN8_CTX_STATUS_IDLE_ACTIVE);
+		}
+
+		/*
+		 * Check if preempted to real idle, either directly or
+		 * the preemptive context already finished executing
+		 */
+		if ((status & GEN11_CTX_STATUS_PREEMPT_IDLE) ||
+		    (status & GEN8_CTX_STATUS_COMPLETE &&
+		    buf[2*head + 1] == execlists->preempt_complete_status)) {
 			GEM_TRACE("%s preempt-idle\n", engine->name);
 			complete_preempt_context(execlists);
 			continue;
@@ -2150,7 +2192,8 @@ void intel_execlists_set_default_submission(struct intel_engine_cs *engine)
 	engine->unpark = NULL;
 
 	engine->flags |= I915_ENGINE_SUPPORTS_STATS;
-	if (engine->i915->preempt_context)
+	if (engine->i915->preempt_context ||
+	    HAS_HW_PREEMPT_TO_IDLE(engine->i915))
 		engine->flags |= I915_ENGINE_HAS_PREEMPTION;
 
 	engine->i915->caps.scheduler =

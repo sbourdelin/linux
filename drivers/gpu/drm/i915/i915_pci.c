@@ -600,7 +600,8 @@ static const struct intel_device_info intel_cannonlake_info = {
 			   TRANSCODER_DSI0_OFFSET, TRANSCODER_DSI1_OFFSET}, \
 	GEN(11), \
 	.ddb_size = 2048, \
-	.has_logical_ring_elsq = 1
+	.has_logical_ring_elsq = 1, \
+	.has_hw_preempt_to_idle = 1
 
 static const struct intel_device_info intel_icelake_11_info = {
 	GEN11_FEATURES,
