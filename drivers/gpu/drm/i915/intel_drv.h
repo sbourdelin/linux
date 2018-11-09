@@ -2086,8 +2086,7 @@ bool intel_display_power_get_if_enabled(struct drm_i915_private *dev_priv,
 					enum intel_display_power_domain domain);
 void intel_display_power_put(struct drm_i915_private *dev_priv,
 			     enum intel_display_power_domain domain);
-void icl_dbuf_slices_update(struct drm_i915_private *dev_priv,
-			    u8 req_slices);
+void intel_dbuf_slices_update(struct drm_i915_private *dev_priv, u8 req_slices);
 
 static inline void
 assert_rpm_device_not_suspended(struct drm_i915_private *dev_priv)

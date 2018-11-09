@@ -12644,23 +12644,23 @@ static void skl_update_crtcs(struct drm_atomic_state *state)
 	struct intel_crtc *intel_crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	struct intel_crtc_state *cstate;
-	unsigned int updated = 0;
+	unsigned int updated = 0, active_count = 0;
+	u8 required_slices;
 	bool progress;
 	enum pipe pipe;
 	int i;
-	u8 hw_enabled_slices = dev_priv->wm.skl_hw.ddb.enabled_slices;
-	u8 required_slices = intel_state->wm_results.ddb.enabled_slices;
-
 	const struct skl_ddb_entry *entries[I915_MAX_PIPES] = {};
 
-	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i)
+	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 		/* ignore allocations for crtc's that have been turned off. */
-		if (new_crtc_state->active)
+		if (new_crtc_state->active) {
+			active_count++;
 			entries[i] = &to_intel_crtc_state(old_crtc_state)->wm.skl.ddb;
+		}
+	}
 
-	/* If 2nd DBuf slice required, enable it here */
-	if (INTEL_GEN(dev_priv) >= 11 && required_slices > hw_enabled_slices)
-		icl_dbuf_slices_update(dev_priv, required_slices);
+	required_slices = active_count ? intel_state->wm_results.ddb.enabled_slices : 0;
+	intel_dbuf_slices_update(dev_priv, required_slices);
 
 	/*
 	 * Whenever the number of active pipes changes, we need to make sure we
@@ -12670,6 +12670,7 @@ static void skl_update_crtcs(struct drm_atomic_state *state)
 	 */
 	do {
 		progress = false;
+		active_count = 0;
 
 		for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 			bool vbl_wait = false;
@@ -12679,7 +12680,12 @@ static void skl_update_crtcs(struct drm_atomic_state *state)
 			cstate = to_intel_crtc_state(new_crtc_state);
 			pipe = intel_crtc->pipe;
 
-			if (updated & cmask || !cstate->base.active)
+			if (!cstate->base.active)
+				continue;
+
+			active_count++;
+
+			if (updated & cmask)
 				continue;
 
 			if (skl_ddb_allocation_overlaps(dev_priv,
@@ -12713,9 +12719,9 @@ static void skl_update_crtcs(struct drm_atomic_state *state)
 		}
 	} while (progress);
 
-	/* If 2nd DBuf slice is no more required disable it */
-	if (INTEL_GEN(dev_priv) >= 11 && required_slices < hw_enabled_slices)
-		icl_dbuf_slices_update(dev_priv, required_slices);
+
+	required_slices = active_count ? intel_state->wm_results.ddb.enabled_slices : 0;
+	intel_dbuf_slices_update(dev_priv, required_slices);
 }
 
 static void intel_atomic_helper_free_state(struct drm_i915_private *dev_priv)

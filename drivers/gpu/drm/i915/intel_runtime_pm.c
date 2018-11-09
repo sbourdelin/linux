@@ -3233,8 +3233,8 @@ static u8 intel_dbuf_max_slices(struct drm_i915_private *dev_priv)
 	return 2;
 }
 
-void icl_dbuf_slices_update(struct drm_i915_private *dev_priv,
-			    u8 req_slices)
+static void icl_dbuf_slices_update(struct drm_i915_private *dev_priv,
+				   const u8 req_slices)
 {
 	const u8 hw_enabled_slices = dev_priv->wm.skl_hw.ddb.enabled_slices;
 	bool ret;
@@ -3254,6 +3254,14 @@ void icl_dbuf_slices_update(struct drm_i915_private *dev_priv,
 
 	if (ret)
 		dev_priv->wm.skl_hw.ddb.enabled_slices = req_slices;
+}
+
+void intel_dbuf_slices_update(struct drm_i915_private *dev_priv, u8 slices)
+{
+	if (INTEL_GEN(dev_priv) < 11)
+		return;
+
+	icl_dbuf_slices_update(dev_priv, slices);
 }
 
 static void icl_dbuf_enable(struct drm_i915_private *dev_priv)
