@@ -8274,4 +8274,25 @@ bool set_hwpoison_free_buddy_page(struct page *page)
 
 	return hwpoisoned;
 }
+
+/*
+ * Reverse operation of set_hwpoison_free_buddy_page(), which is expected
+ * to work only on error pages isolated from buddy allocator.
+ */
+bool clear_hwpoison_free_buddy_page(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+	bool unpoisoned = false;
+
+	spin_lock(&zone->lock);
+	if (TestClearPageHWPoison(page)) {
+		unsigned long pfn = page_to_pfn(page);
+		int migratetype = get_pfnblock_migratetype(page, pfn);
+
+		__free_one_page(page, pfn, zone, 0, migratetype);
+		unpoisoned = true;
+	}
+	spin_unlock(&zone->lock);
+	return unpoisoned;
+}
 #endif

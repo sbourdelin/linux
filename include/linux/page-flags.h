@@ -382,11 +382,17 @@ PAGEFLAG(HWPoison, hwpoison, PF_ANY)
 TESTSCFLAG(HWPoison, hwpoison, PF_ANY)
 #define __PG_HWPOISON (1UL << PG_hwpoison)
 extern bool set_hwpoison_free_buddy_page(struct page *page);
+extern bool clear_hwpoison_free_buddy_page(struct page *page);
 #else
 PAGEFLAG_FALSE(HWPoison)
 static inline bool set_hwpoison_free_buddy_page(struct page *page)
 {
-	return 0;
+	return false;
+}
+
+static inline bool clear_hwpoison_free_buddy_page(struct page *page)
+{
+	return false;
 }
 #define __PG_HWPOISON 0
 #endif

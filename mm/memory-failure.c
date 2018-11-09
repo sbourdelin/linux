@@ -1590,8 +1590,9 @@ int unpoison_memory(unsigned long pfn)
 	}
 
 	if (!get_hwpoison_page(p)) {
-		if (TestClearPageHWPoison(p))
-			num_poisoned_pages_dec();
+		if (!clear_hwpoison_free_buddy_page(p))
+			return 0;
+		num_poisoned_pages_dec();
 		unpoison_pr_info("Unpoison: Software-unpoisoned free page %#lx\n",
 				 pfn, &unpoison_rs);
 		return 0;
