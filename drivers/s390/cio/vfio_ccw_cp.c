@@ -405,40 +405,6 @@ static int tic_target_chain_exists(struct ccw1 *tic, struct channel_program *cp)
 	return 0;
 }
 
-static int ccwchain_loop_tic(struct ccwchain *chain,
-			     struct channel_program *cp);
-
-static int ccwchain_handle_tic(struct ccw1 *tic, struct channel_program *cp)
-{
-	struct ccwchain *chain;
-	int len, ret;
-
-	/* May transfer to an existing chain. */
-	if (tic_target_chain_exists(tic, cp))
-		return 0;
-
-	/* Get chain length. */
-	len = ccwchain_calc_length(tic->cda, cp);
-	if (len < 0)
-		return len;
-
-	/* Need alloc a new chain for this one. */
-	chain = ccwchain_alloc(cp, len);
-	if (!chain)
-		return -ENOMEM;
-	chain->ch_iova = tic->cda;
-
-	/* Copy the new chain from user. */
-	ret = copy_ccw_from_iova(cp, chain->ch_ccw, tic->cda, len);
-	if (ret) {
-		ccwchain_free(chain);
-		return ret;
-	}
-
-	/* Loop for tics on this new chain. */
-	return ccwchain_loop_tic(chain, cp);
-}
-
 /* Loop for TICs. */
 static int ccwchain_loop_tic(struct ccwchain *chain, struct channel_program *cp)
 {
@@ -451,7 +417,10 @@ static int ccwchain_loop_tic(struct ccwchain *chain, struct channel_program *cp)
 		if (!ccw_is_tic(tic))
 			continue;
 
-		ret = ccwchain_handle_tic(tic, cp);
+		if (tic_target_chain_exists(tic, cp))
+			continue;
+
+		ret = process_channel_program(cp, tic->cda);
 		if (ret)
 			return ret;
 	}
