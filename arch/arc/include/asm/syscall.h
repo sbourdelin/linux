@@ -9,6 +9,7 @@
 #ifndef _ASM_ARC_SYSCALL_H
 #define _ASM_ARC_SYSCALL_H  1
 
+#include <uapi/linux/audit.h>
 #include <linux/err.h>
 #include <linux/sched.h>
 #include <asm/unistd.h>
@@ -66,6 +67,11 @@ syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
 		args[i++] = (*inside_ptregs);
 		inside_ptregs--;
 	}
+}
+
+static inline int syscall_get_arch(void)
+{
+	return AUDIT_ARCH_ARC;
 }
 
 #endif
