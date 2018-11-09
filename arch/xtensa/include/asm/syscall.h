@@ -8,6 +8,13 @@
  * Copyright (C) 2001 - 2007 Tensilica Inc.
  */
 
+#include <uapi/linux/audit.h>
+
+static inline int syscall_get_arch(void)
+{
+	return AUDIT_ARCH_XTENSA;
+}
+
 struct pt_regs;
 asmlinkage long xtensa_ptrace(long, long, long, long);
 asmlinkage long xtensa_sigreturn(struct pt_regs*);
