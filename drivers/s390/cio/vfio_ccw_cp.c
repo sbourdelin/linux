@@ -624,39 +624,10 @@ static int ccwchain_fetch_one(struct ccwchain *chain,
 	return ccwchain_fetch_direct(chain, idx, cp);
 }
 
-/**
- * cp_init() - allocate ccwchains for a channel program.
- * @cp: channel_program on which to perform the operation
- * @mdev: the mediated device to perform pin/unpin operations
- * @orb: control block for the channel program from the guest
- *
- * This creates one or more ccwchain(s), and copies the raw data of
- * the target channel program from @orb->cmd.iova to the new ccwchain(s).
- *
- * Limitations:
- * 1. Supports only prefetch enabled mode.
- * 2. Supports idal(c64) ccw chaining.
- * 3. Supports 4k idaw.
- *
- * Returns:
- *   %0 on success and a negative error value on failure.
- */
-int cp_init(struct channel_program *cp, struct device *mdev, union orb *orb)
+int process_channel_program(struct channel_program *cp, u32 iova)
 {
-	u64 iova = orb->cmd.cpa;
 	struct ccwchain *chain;
 	int len, ret;
-
-	/*
-	 * XXX:
-	 * Only support prefetch enable mode now.
-	 */
-	if (!orb->cmd.pfch)
-		return -EOPNOTSUPP;
-
-	INIT_LIST_HEAD(&cp->ccwchain_list);
-	memcpy(&cp->orb, orb, sizeof(*orb));
-	cp->mdev = mdev;
 
 	/* Get chain length. */
 	len = ccwchain_calc_length(iova, cp);
@@ -680,6 +651,47 @@ int cp_init(struct channel_program *cp, struct device *mdev, union orb *orb)
 	ret = ccwchain_loop_tic(chain, cp);
 	if (ret)
 		cp_free(cp);
+
+	return ret;
+}
+
+/**
+ * cp_init() - allocate ccwchains for a channel program.
+ * @cp: channel_program on which to perform the operation
+ * @mdev: the mediated device to perform pin/unpin operations
+ * @orb: control block for the channel program from the guest
+ *
+ * This creates one or more ccwchain(s), and copies the raw data of
+ * the target channel program from @orb->cmd.iova to the new ccwchain(s).
+ *
+ * Limitations:
+ * 1. Supports only prefetch enabled mode.
+ * 2. Supports idal(c64) ccw chaining.
+ * 3. Supports 4k idaw.
+ *
+ * Returns:
+ *   %0 on success and a negative error value on failure.
+ */
+int cp_init(struct channel_program *cp, struct device *mdev, union orb *orb)
+{
+	u32 cpa = orb->cmd.cpa;
+	int ret;
+
+	/*
+	 * XXX:
+	 * Only support prefetch enable mode now.
+	 */
+	if (!orb->cmd.pfch)
+		return -EOPNOTSUPP;
+
+	INIT_LIST_HEAD(&cp->ccwchain_list);
+	memcpy(&cp->orb, orb, sizeof(*orb));
+	cp->mdev = mdev;
+
+	ret = process_channel_program(cp, cpa);
+	if (ret)
+		return ret;
+
 	/* It is safe to force: if not set but idals used
 	 * ccwchain_calc_length returns an error.
 	 */

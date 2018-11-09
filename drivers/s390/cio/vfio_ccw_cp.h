@@ -32,6 +32,7 @@ struct channel_program {
 	struct device *mdev;
 };
 
+int process_channel_program(struct channel_program *cp, u32 cpa);
 extern int cp_init(struct channel_program *cp, struct device *mdev,
 		   union orb *orb);
 extern void cp_free(struct channel_program *cp);
