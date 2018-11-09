@@ -2701,7 +2701,7 @@ extern void shake_page(struct page *p, int access);
 extern atomic_long_t num_poisoned_pages __read_mostly;
 extern int soft_offline_page(struct page *page, int flags);
 
-
+#ifdef CONFIG_MEMORY_FAILURE
 /*
  * Error handlers for various types of pages.
  */
@@ -2736,6 +2736,17 @@ enum mf_action_page_type {
 	MF_MSG_DAX,
 	MF_MSG_UNKNOWN,
 };
+
+static inline void num_poisoned_pages_inc(void)
+{
+	atomic_long_inc(&num_poisoned_pages);
+}
+
+static inline void num_poisoned_pages_dec(void)
+{
+	atomic_long_dec(&num_poisoned_pages);
+}
+#endif
 
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) || defined(CONFIG_HUGETLBFS)
 extern void clear_huge_page(struct page *page,
