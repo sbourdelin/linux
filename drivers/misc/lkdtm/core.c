@@ -40,8 +40,11 @@
 #include <linux/interrupt.h>
 #include <linux/hrtimer.h>
 #include <linux/slab.h>
-#include <scsi/scsi_cmnd.h>
 #include <linux/debugfs.h>
+
+#ifdef CONFIG_BLOCK
+#include <scsi/scsi_cmnd.h>
+#endif
 
 #ifdef CONFIG_IDE
 #include <linux/ide.h>
@@ -101,7 +104,9 @@ static struct crashpoint crashpoints[] = {
 	CRASHPOINT("FS_DEVRW",		 "ll_rw_block"),
 	CRASHPOINT("MEM_SWAPOUT",	 "shrink_inactive_list"),
 	CRASHPOINT("TIMERADD",		 "hrtimer_start"),
+# ifdef CONFIG_BLOCK
 	CRASHPOINT("SCSI_DISPATCH_CMD",	 "scsi_dispatch_cmd"),
+# endif
 # ifdef CONFIG_IDE
 	CRASHPOINT("IDE_CORE_CP",	 "generic_ide_ioctl"),
 # endif
