@@ -21,6 +21,7 @@
 #include <linux/sort.h>
 #include <linux/slab.h>
 #include <linux/memblock.h>
+#include <linux/kmemleak.h>
 
 #define MAX_RESERVED_REGIONS	32
 static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
@@ -50,8 +51,10 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
 	}
 
 	*res_base = base;
-	if (nomap)
+	if (nomap) {
+		kmemleak_no_scan(__va(base));
 		return memblock_remove(base, size);
+	}
 	return 0;
 }
 
