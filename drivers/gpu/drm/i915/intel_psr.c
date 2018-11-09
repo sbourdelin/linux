@@ -904,8 +904,11 @@ int intel_psr_set_debugfs_mode(struct drm_i915_private *dev_priv,
 
 	intel_psr_irq_control(dev_priv, dev_priv->psr.debug);
 
-	if (dev_priv->psr.prepared && enable)
+	if (dev_priv->psr.prepared && enable) {
+		if (crtc_state)
+			intel_edp_drrs_disable(dp, crtc_state);
 		intel_psr_enable_locked(dev_priv, crtc_state);
+	}
 
 	mutex_unlock(&dev_priv->psr.lock);
 	return ret;
