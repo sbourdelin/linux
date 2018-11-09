@@ -46,10 +46,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
 	return 0;
 }
 
-struct usb_phy_roothub *usb_phy_roothub_alloc(struct device *dev)
+struct usb_phy_roothub *usb_phy_roothub_alloc(struct usb_hcd *hcd)
 {
 	struct usb_phy_roothub *phy_roothub;
 	int i, num_phys, err;
+	struct device *dev = hcd->self.sysdev;
 
 	if (!IS_ENABLED(CONFIG_GENERIC_PHY))
 		return NULL;
@@ -58,6 +59,9 @@ struct usb_phy_roothub *usb_phy_roothub_alloc(struct device *dev)
 					      "#phy-cells");
 	if (num_phys <= 0)
 		return NULL;
+
+	if (device_property_read_bool(dev, "phy-supplies-usb-clock"))
+		hcd->phy_supplies_usb_clock = 1;
 
 	phy_roothub = devm_kzalloc(dev, sizeof(*phy_roothub), GFP_KERNEL);
 	if (!phy_roothub)
@@ -162,26 +166,33 @@ void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub)
 }
 EXPORT_SYMBOL_GPL(usb_phy_roothub_power_off);
 
-int usb_phy_roothub_suspend(struct device *controller_dev,
+int usb_phy_roothub_suspend(struct usb_hcd *hcd,
 			    struct usb_phy_roothub *phy_roothub)
 {
+	struct device *controller_dev = hcd->self.sysdev;
+
 	usb_phy_roothub_power_off(phy_roothub);
 
-	/* keep the PHYs initialized so the device can wake up the system */
-	if (device_may_wakeup(controller_dev))
+	/*
+	 * keep the PHYs initialized so the device can wake up the system
+	 * or if needed to keep the USB clocks enabled.
+	 */
+	if (device_may_wakeup(controller_dev) || hcd->phy_supplies_usb_clock)
 		return 0;
 
 	return usb_phy_roothub_exit(phy_roothub);
 }
 EXPORT_SYMBOL_GPL(usb_phy_roothub_suspend);
 
-int usb_phy_roothub_resume(struct device *controller_dev,
+int usb_phy_roothub_resume(struct usb_hcd *hcd,
 			   struct usb_phy_roothub *phy_roothub)
 {
+	struct device *controller_dev = hcd->self.sysdev;
 	int err;
 
-	/* if the device can't wake up the system _exit was called */
-	if (!device_may_wakeup(controller_dev)) {
+	/* if _exit was called on suspend */
+	if (!device_may_wakeup(controller_dev) &&
+	    !hcd->phy_supplies_usb_clock) {
 		err = usb_phy_roothub_init(phy_roothub);
 		if (err)
 			return err;
@@ -190,7 +201,8 @@ int usb_phy_roothub_resume(struct device *controller_dev,
 	err = usb_phy_roothub_power_on(phy_roothub);
 
 	/* undo _init if _power_on failed */
-	if (err && !device_may_wakeup(controller_dev))
+	if (err && !device_may_wakeup(controller_dev)
+	    && !hcd->phy_supplies_usb_clock)
 		usb_phy_roothub_exit(phy_roothub);
 
 	return err;

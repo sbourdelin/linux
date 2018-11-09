@@ -157,6 +157,12 @@ struct usb_hcd {
 	 */
 	unsigned		skip_phy_initialization:1;
 
+	/*
+	 * Some phys supply the USB controller clocks and should not
+	 * have exit called on suspend.
+	 */
+	unsigned		phy_supplies_usb_clock:1;
+
 	/* The next flag is a stopgap, to be removed when all the HCDs
 	 * support the new root-hub polling mechanism. */
 	unsigned		uses_new_polling:1;
