@@ -142,9 +142,6 @@ int get_iommu_order(unsigned long size, struct iommu_table *tbl)
 struct scatterlist;
 
 #ifdef CONFIG_PPC64
-
-#define IOMMU_MAPPING_ERROR		(~(dma_addr_t)0x0)
-
 static inline void set_iommu_table_base(struct device *dev,
 					struct iommu_table *base)
 {
