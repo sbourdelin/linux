@@ -2,6 +2,9 @@ Generic USB HCD (Host Controller Device) Properties
 
 Optional properties:
 - phys: a list of all USB PHYs on this HCD
+- phy-supplies-usb-clock: boolean, used for SoCs where the PHY supplies
+  the usb controller clock. This will prevent the PHY exit from being
+  called on suspend.
 
 Example:
 	&usb1 {
