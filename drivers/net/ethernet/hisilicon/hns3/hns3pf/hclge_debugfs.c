@@ -7,6 +7,57 @@
 #include "hclge_main.h"
 #include "hnae3.h"
 
+static void hclge_print(struct hclge_dev *hdev, bool flag, char *true_buf,
+			char *false_buf)
+{
+	if (flag)
+		dev_info(&hdev->pdev->dev, "%s\n", true_buf);
+	else
+		dev_info(&hdev->pdev->dev, "%s\n", false_buf);
+}
+
+static void hclge_dbg_dump_promisc_cfg(struct hclge_dev *hdev, char *cmd_buf)
+{
+#define HCLGE_DBG_UC_MODE_B BIT(1)
+#define HCLGE_DBG_MC_MODE_B BIT(2)
+#define HCLGE_DBG_BC_MODE_B BIT(3)
+
+	struct hclge_promisc_cfg_cmd *req;
+	struct hclge_desc desc;
+	u16 vf_id;
+	int ret;
+
+	ret = kstrtou16(&cmd_buf[13], 10, &vf_id);
+	if (ret)
+		vf_id = 0;
+
+	if (vf_id >= hdev->num_req_vfs) {
+		dev_err(&hdev->pdev->dev, "vf_id (%u) is out of range(%u)\n",
+			vf_id, hdev->num_req_vfs);
+		return;
+	}
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_CFG_PROMISC_MODE, true);
+	req = (struct hclge_promisc_cfg_cmd *)desc.data;
+	req->vf_id = (u8)vf_id;
+
+	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
+	if (ret) {
+		dev_err(&hdev->pdev->dev,
+			"dump promisc mode fail, status is %d.\n", ret);
+		return;
+	}
+
+	dev_info(&hdev->pdev->dev, "vf(%u) promisc mode\n", req->vf_id);
+
+	hclge_print(hdev, req->flag & HCLGE_DBG_UC_MODE_B,
+		    "uc: enable", "uc: disable");
+	hclge_print(hdev, req->flag & HCLGE_DBG_MC_MODE_B,
+		    "mc: enable", "mc: disable");
+	hclge_print(hdev, req->flag & HCLGE_DBG_BC_MODE_B,
+		    "bc: enable", "bc: disable");
+}
+
 static void hclge_dbg_fd_tcam_read(struct hclge_dev *hdev, u8 stage,
 				   bool sel_x, u32 loc)
 {
@@ -68,6 +119,8 @@ int hclge_dbg_run_cmd(struct hnae3_handle *handle, char *cmd_buf)
 
 	if (strncmp(cmd_buf, "dump fd tcam", 12) == 0) {
 		hclge_dbg_fd_tcam(hdev);
+	} else if (strncmp(cmd_buf, "dump promisc", 12) == 0) {
+		hclge_dbg_dump_promisc_cfg(hdev, cmd_buf);
 	} else {
 		dev_info(&hdev->pdev->dev, "unknown command\n");
 		return -EINVAL;
