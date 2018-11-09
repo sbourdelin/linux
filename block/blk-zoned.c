@@ -123,6 +123,7 @@ static int blk_report_zones(struct gendisk *disk, sector_t sector,
 	unsigned int z = 0, n, nrz = *nr_zones;
 	sector_t capacity = get_capacity(disk);
 	int ret;
+	struct bvec_iter_all iter_all;
 
 	while (z < nrz && sector < capacity) {
 		n = nrz - z;
