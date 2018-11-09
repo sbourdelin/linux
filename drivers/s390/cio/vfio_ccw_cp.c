@@ -54,7 +54,7 @@ struct ccwchain {
  * @pa: pfn_array on which to perform the operation
  * @mdev: the mediated device to perform pin/unpin operations
  * @iova: target guest physical address
- * @len: number of bytes that should be pinned from @iova
+ * @len: number of pages that should be pinned from @iova
  *
  * Attempt to allocate memory for PFNs, and pin user pages in memory.
  *
@@ -80,10 +80,7 @@ static int pfn_array_alloc_pin(struct pfn_array *pa, struct device *mdev,
 		return -EINVAL;
 
 	pa->pa_iova = iova;
-
-	pa->pa_nr = ((iova & ~PAGE_MASK) + len + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
-	if (!pa->pa_nr)
-		return -EINVAL;
+	pa->pa_nr = len;
 
 	pa->pa_iova_pfn = kcalloc(pa->pa_nr,
 				  sizeof(*pa->pa_iova_pfn) +
@@ -209,7 +206,8 @@ static long copy_from_iova(struct device *mdev,
 	int i, ret;
 	unsigned long l, m;
 
-	ret = pfn_array_alloc_pin(&pa, mdev, iova, n);
+	ret = pfn_array_alloc_pin(&pa, mdev, iova,
+				  idal_nr_words((void *)(iova), n));
 	if (ret <= 0)
 		return ret;
 
