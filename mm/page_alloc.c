@@ -8187,10 +8187,55 @@ bool is_free_buddy_page(struct page *page)
 }
 
 #ifdef CONFIG_MEMORY_FAILURE
+
 /*
- * Set PG_hwpoison flag if a given page is confirmed to be a free page.  This
- * test is performed under the zone lock to prevent a race against page
- * allocation.
+ * Pick out a free page from buddy allocator. Unlike expand(), this
+ * function can choose the target page by @target which is not limited
+ * to the first page of some free block.
+ *
+ * This function changes zone state, so callers need to hold zone->lock.
+ */
+static inline void pickout_buddy_page(struct zone *zone, struct page *page,
+			struct page *target, int torder, int low, int high,
+			struct free_area *area, int migratetype)
+{
+	unsigned long size = 1 << high;
+	struct page *current_buddy, *next_page;
+
+	while (high > low) {
+		area--;
+		high--;
+		size >>= 1;
+
+		if (target >= &page[size]) { /* target is in higher buddy */
+			next_page = page + size;
+			current_buddy = page;
+		} else { /* target is in lower buddy */
+			next_page = page;
+			current_buddy = page + size;
+		}
+		VM_BUG_ON_PAGE(bad_range(zone, current_buddy), current_buddy);
+
+		if (set_page_guard(zone, &page[size], high, migratetype))
+			continue;
+
+		list_add(&current_buddy->lru, &area->free_list[migratetype]);
+		area->nr_free++;
+		set_page_order(current_buddy, high);
+		page = next_page;
+	}
+}
+
+/*
+ * Isolate hwpoisoned free page which actully does the following
+ *   - confirm that a given page is a free page under zone->lock,
+ *   - set PG_hwpoison flag,
+ *   - remove the page from buddy allocator, subdividing buddy page
+ *     of each order.
+ *
+ * Just setting PG_hwpoison flag is not safe enough for complete isolation
+ * because rapidly-changing memory allocator code is always with the
+ * risk of mishandling the flag and potential race.
  */
 bool set_hwpoison_free_buddy_page(struct page *page)
 {
@@ -8203,10 +8248,24 @@ bool set_hwpoison_free_buddy_page(struct page *page)
 	spin_lock_irqsave(&zone->lock, flags);
 	for (order = 0; order < MAX_ORDER; order++) {
 		struct page *page_head = page - (pfn & ((1 << order) - 1));
+		unsigned int forder = page_order(page_head);
+		struct free_area *area = &(zone->free_area[forder]);
 
-		if (PageBuddy(page_head) && page_order(page_head) >= order) {
-			if (!TestSetPageHWPoison(page))
-				hwpoisoned = true;
+		if (PageBuddy(page_head) && forder >= order) {
+			int migtype = get_pfnblock_migratetype(page_head,
+							page_to_pfn(page_head));
+			/*
+			 * TestSetPageHWPoison() will be used later when
+			 * reworking hard-offline part is finished.
+			 */
+			SetPageHWPoison(page);
+
+			list_del(&page_head->lru);
+			rmv_page_order(page_head);
+			area->nr_free--;
+			pickout_buddy_page(zone, page_head, page, 0, 0, forder,
+					area, migtype);
+			hwpoisoned = true;
 			break;
 		}
 	}

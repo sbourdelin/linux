@@ -1762,9 +1762,11 @@ static int __soft_offline_page(struct page *page)
 	if (ret == 1) {
 		put_hwpoison_page(page);
 		pr_info("soft_offline: %#lx: invalidated\n", pfn);
-		SetPageHWPoison(page);
-		num_poisoned_pages_inc();
-		return 0;
+		if (set_hwpoison_free_buddy_page(page)) {
+			num_poisoned_pages_inc();
+			return 0;
+		} else
+			return -EBUSY;
 	}
 
 	/*
