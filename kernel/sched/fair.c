@@ -3727,11 +3727,21 @@ static inline void update_misfit_status(struct task_struct *p, struct rq *rq)
 
 #define IF_SMP(statement)	statement
 
+static inline bool steal_enabled(void)
+{
+#ifdef CONFIG_NUMA
+	bool allow = static_branch_likely(&sched_steal_allow);
+#else
+	bool allow = true;
+#endif
+	return sched_feat(STEAL) && allow;
+}
+
 static void overload_clear(struct rq *rq)
 {
 	struct sparsemask *overload_cpus;
 
-	if (!sched_feat(STEAL))
+	if (!steal_enabled())
 		return;
 
 	rcu_read_lock();
@@ -3745,7 +3755,7 @@ static void overload_set(struct rq *rq)
 {
 	struct sparsemask *overload_cpus;
 
-	if (!sched_feat(STEAL))
+	if (!steal_enabled())
 		return;
 
 	rcu_read_lock();
@@ -9903,7 +9913,7 @@ static int try_steal(struct rq *dst_rq, struct rq_flags *dst_rf)
 	int stolen = 0;
 	struct sparsemask *overload_cpus;
 
-	if (!sched_feat(STEAL))
+	if (!steal_enabled())
 		return 0;
 
 	if (!cpu_active(dst_cpu))
