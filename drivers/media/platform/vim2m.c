@@ -245,9 +245,12 @@ static int device_process(struct vim2m_ctx *ctx,
 
 	if (in_vb->flags & V4L2_BUF_FLAG_TIMECODE)
 		out_vb->timecode = in_vb->timecode;
+	else if (in_vb->flags & V4L2_BUF_FLAG_COOKIE)
+		out_vb->cookie = in_vb->cookie;
 	out_vb->field = in_vb->field;
 	out_vb->flags = in_vb->flags &
 		(V4L2_BUF_FLAG_TIMECODE |
+		 V4L2_BUF_FLAG_COOKIE |
 		 V4L2_BUF_FLAG_KEYFRAME |
 		 V4L2_BUF_FLAG_PFRAME |
 		 V4L2_BUF_FLAG_BFRAME |
