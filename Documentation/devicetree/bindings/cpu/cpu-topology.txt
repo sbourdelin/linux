@@ -1,19 +1,19 @@
 ===========================================
-ARM topology binding description
+CPU topology binding description
 ===========================================
 
 ===========================================
 1 - Introduction
 ===========================================
 
-In an ARM system, the hierarchy of CPUs is defined through three entities that
+In an ARM/RISC-V system, the hierarchy of CPUs is defined through three entities that
 are used to describe the layout of physical CPUs in the system:
 
 - cluster
 - core
 - thread
 
-The cpu nodes (bindings defined in [1]) represent the devices that
+The cpu nodes (bindings defined in [1] for ARM or [2] for RISC-V) represent the devices that
 correspond to physical CPUs and are to be mapped to the hierarchy levels.
 
 The bottom hierarchy level sits at core or thread level depending on whether
@@ -24,11 +24,11 @@ threads existing in the system and map to the hierarchy level "thread" above.
 In systems where SMT is not supported "cpu" nodes represent all cores present
 in the system and map to the hierarchy level "core" above.
 
-ARM topology bindings allow one to associate cpu nodes with hierarchical groups
+CPU topology bindings allow one to associate cpu nodes with hierarchical groups
 corresponding to the system hierarchy; syntactically they are defined as device
 tree nodes.
 
-The remainder of this document provides the topology bindings for ARM, based
+The remainder of this document provides the topology bindings for ARM/RISC-V, based
 on the Devicetree Specification, available from:
 
 https://www.devicetree.org/specifications/
@@ -43,14 +43,14 @@ with bindings standardized in [1] is therefore considered invalid.
 2 - cpu-map node
 ===========================================
 
-The ARM CPU topology is defined within the cpu-map node, which is a direct
+The ARM/RISC-V CPU topology is defined within the cpu-map node, which is a direct
 child of the cpus node and provides a container where the actual topology
 nodes are listed.
 
 - cpu-map node
 
-	Usage: Optional - On ARM SMP systems provide CPUs topology to the OS.
-			  ARM uniprocessor systems do not require a topology
+	Usage: Optional - On SMP systems provide CPUs topology to the OS.
+			  Uniprocessor systems do not require a topology
 			  description and therefore should not define a
 			  cpu-map node.
 
@@ -470,6 +470,57 @@ cpus {
 	};
 };
 
+Example 3: HiFive Unleashed (RISC-V 64 bit, 4 core system)
+
+cpus {
+	#address-cells = <2>;
+	#size-cells = <2>;
+	compatible = "sifive,fu540g", "sifive,fu500";
+	model = "sifive,hifive-unleashed-a00";
+
+	...
+
+	cpu-map {
+		cluster0 {
+			core0 {
+				cpu = <&L12>;
+		 	};
+			core1 {
+				cpu = <&L15>;
+			};
+			core2 {
+				cpu0 = <&L18>;
+			};
+			core3 {
+				cpu0 = <&L21>;
+			};
+		};
+ 	};
+
+	L12: cpu@1 {
+		device_type = "cpu";
+		compatible = "sifive,rocket0", "riscv";
+		reg = <0x1>;
+	}
+
+	L15: cpu@2 {
+		device_type = "cpu";
+		compatible = "sifive,rocket0", "riscv";
+		reg = <0x2>;
+	}
+	L18: cpu@3 {
+		device_type = "cpu";
+		compatible = "sifive,rocket0", "riscv";
+		reg = <0x3>;
+	}
+	L21: cpu@4 {
+		device_type = "cpu";
+		compatible = "sifive,rocket0", "riscv";
+		reg = <0x4>;
+	}
+};
 ===============================================================================
 [1] ARM Linux kernel documentation
     Documentation/devicetree/bindings/arm/cpus.txt
+[1] RISC-V Linux kernel documentation
+    Documentation/devicetree/bindings/riscv/cpus.txt
