@@ -75,9 +75,8 @@ static int ixgbe_xsk_umem_dma_map(struct ixgbe_adapter *adapter,
 	dma_addr_t dma;
 
 	for (i = 0; i < umem->npgs; i++) {
-		dma = dma_map_page_attrs(dev, umem->pgs[i], 0, PAGE_SIZE,
-					 DMA_BIDIRECTIONAL, IXGBE_RX_DMA_ATTR);
-		if (dma_mapping_error(dev, dma))
+		if (dma_map_page_attrs(dev, umem->pgs[i], 0, PAGE_SIZE,
+				DMA_BIDIRECTIONAL, IXGBE_RX_DMA_ATTR, &dma))
 			goto out_unmap;
 
 		umem->pages[i].dma = dma;

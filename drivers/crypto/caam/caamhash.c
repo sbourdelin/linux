@@ -1693,11 +1693,9 @@ static int caam_hash_cra_init(struct crypto_tfm *tfm)
 	priv = dev_get_drvdata(ctx->jrdev->parent);
 	ctx->dir = priv->era >= 6 ? DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
 
-	dma_addr = dma_map_single_attrs(ctx->jrdev, ctx->sh_desc_update,
-					offsetof(struct caam_hash_ctx,
-						 sh_desc_update_dma),
-					ctx->dir, DMA_ATTR_SKIP_CPU_SYNC);
-	if (dma_mapping_error(ctx->jrdev, dma_addr)) {
+	if (dma_map_single_attrs(ctx->jrdev, ctx->sh_desc_update,
+			offsetof(struct caam_hash_ctx, sh_desc_update_dma),
+			ctx->dir, DMA_ATTR_SKIP_CPU_SYNC, &dma_addr)) {
 		dev_err(ctx->jrdev, "unable to map shared descriptors\n");
 		caam_jr_free(ctx->jrdev);
 		return -ENOMEM;

@@ -110,10 +110,12 @@ static void __map_single_talitos_ptr(struct device *dev,
 				     enum dma_data_direction dir,
 				     unsigned long attrs)
 {
-	dma_addr_t dma_addr = dma_map_single_attrs(dev, data, len, dir, attrs);
 	struct talitos_private *priv = dev_get_drvdata(dev);
 	bool is_sec1 = has_ftr_sec1(priv);
+	dma_addr_t dma_addr;
 
+	/* XXX: this driver badly needs error handling. */
+	dma_map_single_attrs(dev, data, len, dir, attrs, &dma_addr);
 	to_talitos_ptr(ptr, dma_addr, len, is_sec1);
 }
 

@@ -827,15 +827,8 @@ static bool iavf_alloc_mapped_page(struct iavf_ring *rx_ring,
 	}
 
 	/* map page for use */
-	dma = dma_map_page_attrs(rx_ring->dev, page, 0,
-				 iavf_rx_pg_size(rx_ring),
-				 DMA_FROM_DEVICE,
-				 IAVF_RX_DMA_ATTR);
-
-	/* if mapping failed free memory back to system since
-	 * there isn't much point in holding memory we can't use
-	 */
-	if (dma_mapping_error(rx_ring->dev, dma)) {
+	if (dma_map_page_attrs(rx_ring->dev, page, 0, iavf_rx_pg_size(rx_ring),
+			DMA_FROM_DEVICE, IAVF_RX_DMA_ATTR, &dma)) {
 		__free_pages(page, iavf_rx_pg_order(rx_ring));
 		rx_ring->rx_stats.alloc_page_failed++;
 		return false;

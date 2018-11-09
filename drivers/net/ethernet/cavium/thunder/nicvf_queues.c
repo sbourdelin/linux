@@ -213,17 +213,18 @@ ret:
 	if (rbdr->is_xdp && pgcache && pgcache->dma_addr) {
 		*rbuf = pgcache->dma_addr;
 	} else {
+		dma_addr_t addr;
 		/* HW will ensure data coherency, CPU sync not required */
-		*rbuf = (u64)dma_map_page_attrs(&nic->pdev->dev, nic->rb_page,
-						nic->rb_page_offset, buf_len,
-						DMA_FROM_DEVICE,
-						DMA_ATTR_SKIP_CPU_SYNC);
-		if (dma_mapping_error(&nic->pdev->dev, (dma_addr_t)*rbuf)) {
+		if (dma_map_page_attrs(&nic->pdev->dev, nic->rb_page,
+				nic->rb_page_offset, buf_len, DMA_FROM_DEVICE,
+				DMA_ATTR_SKIP_CPU_SYNC, &addr)) {
 			if (!nic->rb_page_offset)
 				__free_pages(nic->rb_page, 0);
 			nic->rb_page = NULL;
 			return -ENOMEM;
 		}
+
+		*rbuf = addr;
 		if (pgcache)
 			pgcache->dma_addr = *rbuf + XDP_PACKET_HEADROOM;
 		nic->rb_page_offset += buf_len;
@@ -1576,10 +1577,9 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct snd_queue *sq,
 	qentry = nicvf_get_nxt_sqentry(sq, qentry);
 	size = skb_is_nonlinear(skb) ? skb_headlen(skb) : skb->len;
 	/* HW will ensure data coherency, CPU sync not required */
-	dma_addr = dma_map_page_attrs(&nic->pdev->dev, virt_to_page(skb->data),
-				      offset_in_page(skb->data), size,
-				      DMA_TO_DEVICE, DMA_ATTR_SKIP_CPU_SYNC);
-	if (dma_mapping_error(&nic->pdev->dev, dma_addr)) {
+	if (dma_map_page_attrs(&nic->pdev->dev, virt_to_page(skb->data),
+			offset_in_page(skb->data), size, DMA_TO_DEVICE,
+			DMA_ATTR_SKIP_CPU_SYNC, &dma_addr)) {
 		nicvf_rollback_sq_desc(sq, qentry, subdesc_cnt);
 		return 0;
 	}
@@ -1597,12 +1597,9 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct snd_queue *sq,
 
 		qentry = nicvf_get_nxt_sqentry(sq, qentry);
 		size = skb_frag_size(frag);
-		dma_addr = dma_map_page_attrs(&nic->pdev->dev,
-					      skb_frag_page(frag),
-					      frag->page_offset, size,
-					      DMA_TO_DEVICE,
-					      DMA_ATTR_SKIP_CPU_SYNC);
-		if (dma_mapping_error(&nic->pdev->dev, dma_addr)) {
+		if (dma_map_page_attrs(&nic->pdev->dev, skb_frag_page(frag),
+				frag->page_offset, size, DMA_TO_DEVICE,
+				DMA_ATTR_SKIP_CPU_SYNC, &dma_addr)) {
 			/* Free entire chain of mapped buffers
 			 * here 'i' = frags mapped + above mapped skb->data
 			 */

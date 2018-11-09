@@ -60,11 +60,13 @@ void nfp_net_get_fw_version(struct nfp_net_fw_version *fw_ver,
 	put_unaligned_le32(reg, fw_ver);
 }
 
-static dma_addr_t nfp_net_dma_map_rx(struct nfp_net_dp *dp, void *frag)
+static int nfp_net_dma_map_rx(struct nfp_net_dp *dp, void *frag,
+		dma_addr_t *dma_handle)
 {
 	return dma_map_single_attrs(dp->dev, frag + NFP_NET_RX_BUF_HEADROOM,
 				    dp->fl_bufsz - NFP_NET_RX_BUF_NON_DATA,
-				    dp->rx_dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+				    dp->rx_dma_dir, DMA_ATTR_SKIP_CPU_SYNC,
+				    dma_handle);
 }
 
 static void
@@ -1188,8 +1190,7 @@ static void *nfp_net_rx_alloc_one(struct nfp_net_dp *dp, dma_addr_t *dma_addr)
 		return NULL;
 	}
 
-	*dma_addr = nfp_net_dma_map_rx(dp, frag);
-	if (dma_mapping_error(dp->dev, *dma_addr)) {
+	if (nfp_net_dma_map_rx(dp, frag, dma_addr)) {
 		nfp_net_free_frag(frag, dp->xdp_prog);
 		nn_dp_warn(dp, "Failed to map DMA RX buffer\n");
 		return NULL;
@@ -1215,8 +1216,7 @@ static void *nfp_net_napi_alloc_one(struct nfp_net_dp *dp, dma_addr_t *dma_addr)
 		frag = page_address(page);
 	}
 
-	*dma_addr = nfp_net_dma_map_rx(dp, frag);
-	if (dma_mapping_error(dp->dev, *dma_addr)) {
+	if (nfp_net_dma_map_rx(dp, frag, dma_addr)) {
 		nfp_net_free_frag(frag, dp->xdp_prog);
 		nn_dp_warn(dp, "Failed to map DMA RX buffer\n");
 		return NULL;

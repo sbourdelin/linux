@@ -662,9 +662,8 @@ static struct page *__bnxt_alloc_rx_page(struct bnxt *bp, dma_addr_t *mapping,
 	if (!page)
 		return NULL;
 
-	*mapping = dma_map_page_attrs(dev, page, 0, PAGE_SIZE, bp->rx_dir,
-				      DMA_ATTR_WEAK_ORDERING);
-	if (dma_mapping_error(dev, *mapping)) {
+	if (dma_map_page_attrs(dev, page, 0, PAGE_SIZE, bp->rx_dir,
+			DMA_ATTR_WEAK_ORDERING, mapping)) {
 		__free_page(page);
 		return NULL;
 	}
@@ -682,11 +681,9 @@ static inline u8 *__bnxt_alloc_rx_data(struct bnxt *bp, dma_addr_t *mapping,
 	if (!data)
 		return NULL;
 
-	*mapping = dma_map_single_attrs(&pdev->dev, data + bp->rx_dma_offset,
-					bp->rx_buf_use_size, bp->rx_dir,
-					DMA_ATTR_WEAK_ORDERING);
-
-	if (dma_mapping_error(&pdev->dev, *mapping)) {
+	if (dma_map_single_attrs(&pdev->dev, data + bp->rx_dma_offset,
+			bp->rx_buf_use_size, bp->rx_dir, DMA_ATTR_WEAK_ORDERING,
+			mapping)) {
 		kfree(data);
 		data = NULL;
 	}
@@ -787,10 +784,9 @@ static inline int bnxt_alloc_rx_page(struct bnxt *bp,
 			return -ENOMEM;
 	}
 
-	mapping = dma_map_page_attrs(&pdev->dev, page, offset,
-				     BNXT_RX_PAGE_SIZE, PCI_DMA_FROMDEVICE,
-				     DMA_ATTR_WEAK_ORDERING);
-	if (dma_mapping_error(&pdev->dev, mapping)) {
+	if (dma_map_page_attrs(&pdev->dev, page, offset,
+			BNXT_RX_PAGE_SIZE, PCI_DMA_FROMDEVICE,
+			DMA_ATTR_WEAK_ORDERING, &mapping)) {
 		__free_page(page);
 		return -EIO;
 	}

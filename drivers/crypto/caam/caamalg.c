@@ -3022,11 +3022,9 @@ static int caam_init_common(struct caam_ctx *ctx, struct caam_alg_entry *caam,
 	else
 		ctx->dir = DMA_TO_DEVICE;
 
-	dma_addr = dma_map_single_attrs(ctx->jrdev, ctx->sh_desc_enc,
-					offsetof(struct caam_ctx,
-						 sh_desc_enc_dma),
-					ctx->dir, DMA_ATTR_SKIP_CPU_SYNC);
-	if (dma_mapping_error(ctx->jrdev, dma_addr)) {
+	if (dma_map_single_attrs(ctx->jrdev, ctx->sh_desc_enc,
+			offsetof(struct caam_ctx, sh_desc_enc_dma),
+			ctx->dir, DMA_ATTR_SKIP_CPU_SYNC, &dma_addr)) {
 		dev_err(ctx->jrdev, "unable to map key, shared descriptors\n");
 		caam_jr_free(ctx->jrdev);
 		return -ENOMEM;

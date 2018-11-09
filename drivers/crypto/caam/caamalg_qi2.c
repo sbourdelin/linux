@@ -1336,10 +1336,9 @@ static int caam_cra_init(struct caam_ctx *ctx, struct caam_alg_entry *caam,
 	ctx->dev = caam->dev;
 	ctx->dir = uses_dkp ? DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
 
-	dma_addr = dma_map_single_attrs(ctx->dev, ctx->flc,
-					offsetof(struct caam_ctx, flc_dma),
-					ctx->dir, DMA_ATTR_SKIP_CPU_SYNC);
-	if (dma_mapping_error(ctx->dev, dma_addr)) {
+	if (dma_map_single_attrs(ctx->dev, ctx->flc,
+			offsetof(struct caam_ctx, flc_dma),
+			ctx->dir, DMA_ATTR_SKIP_CPU_SYNC, &dma_addr)) {
 		dev_err(ctx->dev, "unable to map key, shared descriptors\n");
 		return -ENOMEM;
 	}
@@ -4272,10 +4271,8 @@ static int caam_hash_cra_init(struct crypto_tfm *tfm)
 
 	ctx->dev = caam_hash->dev;
 
-	dma_addr = dma_map_single_attrs(ctx->dev, ctx->flc, sizeof(ctx->flc),
-					DMA_BIDIRECTIONAL,
-					DMA_ATTR_SKIP_CPU_SYNC);
-	if (dma_mapping_error(ctx->dev, dma_addr)) {
+	if (dma_map_single_attrs(ctx->dev, ctx->flc, sizeof(ctx->flc),
+			DMA_BIDIRECTIONAL, DMA_ATTR_SKIP_CPU_SYNC, &dma_addr)) {
 		dev_err(ctx->dev, "unable to map shared descriptors\n");
 		return -ENOMEM;
 	}
