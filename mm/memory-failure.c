@@ -772,6 +772,16 @@ static int me_swapcache_clean(struct page *p, unsigned long pfn)
 		return MF_FAILED;
 }
 
+static int me_huge_free_page(struct page *p)
+{
+	int rc = dissolve_free_huge_page(p);
+
+	if (!rc && set_hwpoison_free_buddy_page(p))
+		return MF_RECOVERED;
+	else
+		return MF_FAILED;
+}
+
 /*
  * Huge pages. Needs work.
  * Issues:
@@ -799,8 +809,7 @@ static int me_huge_page(struct page *p, unsigned long pfn)
 		 */
 		if (PageAnon(hpage))
 			put_page(hpage);
-		dissolve_free_huge_page(p);
-		res = MF_RECOVERED;
+		res = me_huge_free_page(p);
 		lock_page(hpage);
 	}
 
@@ -1108,8 +1117,11 @@ static int memory_failure_hugetlb(unsigned long pfn, int flags)
 			}
 		}
 		unlock_page(head);
-		dissolve_free_huge_page(p);
-		action_result(pfn, MF_MSG_FREE_HUGE, MF_DELAYED);
+
+		res = me_huge_free_page(p);
+		if (res == MF_FAILED)
+			num_poisoned_pages_dec();
+		action_result(pfn, MF_MSG_FREE_HUGE, res);
 		return 0;
 	}
 
@@ -1270,6 +1282,13 @@ int memory_failure(unsigned long pfn, int flags)
 	p = pfn_to_page(pfn);
 	if (PageHuge(p))
 		return memory_failure_hugetlb(pfn, flags);
+
+	if (set_hwpoison_free_buddy_page(p)) {
+		action_result(pfn, MF_MSG_BUDDY, MF_RECOVERED);
+		num_poisoned_pages_inc();
+		return 0;
+	}
+
 	if (TestSetPageHWPoison(p)) {
 		pr_err("Memory failure: %#lx: already hardware poisoned\n",
 			pfn);
@@ -1281,8 +1300,7 @@ int memory_failure(unsigned long pfn, int flags)
 
 	/*
 	 * We need/can do nothing about count=0 pages.
-	 * 1) it's a free page, and therefore in safe hand:
-	 *    prep_new_page() will be the gate keeper.
+	 * 1) it's a free page, and removed from buddy allocator.
 	 * 2) it's part of a non-compound high order page.
 	 *    Implies some kernel user: cannot stop them from
 	 *    R/W the page; let's pray that the page has been
@@ -1291,8 +1309,8 @@ int memory_failure(unsigned long pfn, int flags)
 	 * that may make page_ref_freeze()/page_ref_unfreeze() mismatch.
 	 */
 	if (!get_hwpoison_page(p)) {
-		if (is_free_buddy_page(p)) {
-			action_result(pfn, MF_MSG_BUDDY, MF_DELAYED);
+		if (set_hwpoison_free_buddy_page(p)) {
+			action_result(pfn, MF_MSG_BUDDY, MF_RECOVERED);
 			return 0;
 		} else {
 			action_result(pfn, MF_MSG_KERNEL_HIGH_ORDER, MF_IGNORED);
@@ -1330,8 +1348,8 @@ int memory_failure(unsigned long pfn, int flags)
 	 */
 	shake_page(p, 0);
 	/* shake_page could have turned it free. */
-	if (!PageLRU(p) && is_free_buddy_page(p)) {
-		action_result(pfn, MF_MSG_BUDDY_2ND, MF_DELAYED);
+	if (!PageLRU(p) && set_hwpoison_free_buddy_page(p)) {
+		action_result(pfn, MF_MSG_BUDDY_2ND, MF_RECOVERED);
 		return 0;
 	}
 
