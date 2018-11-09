@@ -123,6 +123,8 @@ struct msm_pinctrl_soc_data {
 	unsigned int ntiles;
 };
 
+int msm_pinctrl_suspend(struct device *dev);
+int msm_pinctrl_resume(struct device *dev);
 int msm_pinctrl_probe(struct platform_device *pdev,
 		      const struct msm_pinctrl_soc_data *soc_data);
 int msm_pinctrl_remove(struct platform_device *pdev);
