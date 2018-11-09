@@ -3448,6 +3448,8 @@ static int hns3_client_init(struct hnae3_handle *handle)
 
 	hns3_dcbnl_setup(handle);
 
+	hns3_dbg_init(handle);
+
 	/* MTU range: (ETH_MIN_MTU(kernel default) - 9706) */
 	netdev->max_mtu = HNS3_MAX_MTU - (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
 
@@ -3501,6 +3503,8 @@ static void hns3_client_uninit(struct hnae3_handle *handle, bool reset)
 		netdev_err(netdev, "uninit ring error\n");
 
 	hns3_put_ring_config(priv);
+
+	hns3_dbg_uninit(handle);
 
 	priv->ring_data = NULL;
 
@@ -4070,14 +4074,22 @@ static int __init hns3_init_module(void)
 
 	INIT_LIST_HEAD(&client.node);
 
+	hns3_dbg_register_debugfs(hns3_driver_name);
+
 	ret = hnae3_register_client(&client);
 	if (ret)
-		return ret;
+		goto err_reg_client;
 
 	ret = pci_register_driver(&hns3_driver);
 	if (ret)
-		hnae3_unregister_client(&client);
+		goto err_reg_driver;
 
+	return ret;
+
+err_reg_driver:
+	hnae3_unregister_client(&client);
+err_reg_client:
+	hns3_dbg_unregister_debugfs();
 	return ret;
 }
 module_init(hns3_init_module);
@@ -4090,6 +4102,7 @@ static void __exit hns3_exit_module(void)
 {
 	pci_unregister_driver(&hns3_driver);
 	hnae3_unregister_client(&client);
+	hns3_dbg_unregister_debugfs();
 }
 module_exit(hns3_exit_module);
 
