@@ -56,6 +56,7 @@ void nci_data_exchange_complete(struct nci_dev *ndev, struct sk_buff *skb,
 	/* data exchange is complete, stop the data timer */
 	del_timer_sync(&ndev->data_timer);
 	clear_bit(NCI_DATA_EXCHANGE_TO, &ndev->flags);
+	clear_bit(NCI_DATA_EXCHANGE, &ndev->flags);
 
 	if (cb) {
 		/* forward skb to nfc core */
@@ -66,6 +67,7 @@ void nci_data_exchange_complete(struct nci_dev *ndev, struct sk_buff *skb,
 		/* no waiting callback, free skb */
 		kfree_skb(skb);
 	}
+	return;
 
 exit:
 	clear_bit(NCI_DATA_EXCHANGE, &ndev->flags);
