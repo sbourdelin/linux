@@ -96,7 +96,7 @@ struct fuse_inode {
 	union {
 		/* Write related fields (regular file only) */
 		struct {
-			/* Files usable in writepage.  Protected by fc->lock */
+			/* Files usable in writepage.  Protected by fi->lock */
 			struct list_head write_files;
 
 			/* Writepages pending on truncate or fsync */
@@ -144,6 +144,9 @@ struct fuse_inode {
 
 	/** Lock for serializing lookup and readdir for back compatibility*/
 	struct mutex mutex;
+
+	/** Lock to protect write related fields */
+	spinlock_t lock;
 };
 
 /** FUSE inode state bits */
@@ -500,6 +503,8 @@ struct fuse_dev {
  * This structure is created, when the filesystem is mounted, and is
  * destroyed, when the client device is closed and the filesystem is
  * unmounted.
+ *
+ * Locking order: fuse_inode::lock -> fuse_conn::lock -> fuse_conn::bg_lock
  */
 struct fuse_conn {
 	/** Lock protecting accessess to  members of this structure */
