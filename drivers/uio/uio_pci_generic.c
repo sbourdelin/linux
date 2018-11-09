@@ -39,6 +39,14 @@ to_uio_pci_generic_dev(struct uio_info *info)
 	return container_of(info, struct uio_pci_generic_dev, info);
 }
 
+static int release(struct uio_info *info, struct inode *inode)
+{
+	struct uio_pci_generic_dev *gdev = to_uio_pci_generic_dev(info);
+	/* Stop the device from initiating further DMAs */
+	pci_clear_master(gdev->pdev);
+	return 0;
+}
+
 /* Interrupt handler. Read/modify/write the command register to disable
  * the interrupt. */
 static irqreturn_t irqhandler(int irq, struct uio_info *info)
@@ -78,6 +86,7 @@ static int probe(struct pci_dev *pdev,
 
 	gdev->info.name = "uio_pci_generic";
 	gdev->info.version = DRIVER_VERSION;
+	gdev->info.release = release;
 	gdev->pdev = pdev;
 	if (pdev->irq) {
 		gdev->info.irq = pdev->irq;
