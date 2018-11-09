@@ -1719,14 +1719,18 @@ static int soft_offline_huge_page(struct page *page, int flags)
 		/*
 		 * We set PG_hwpoison only when the migration source hugepage
 		 * was successfully dissolved, because otherwise hwpoisoned
-		 * hugepage remains on free hugepage list, then userspace will
-		 * find it as SIGBUS by allocation failure. That's not expected
-		 * in soft-offlining.
+		 * hugepage remains on free hugepage list. The allocator ignores
+		 * such a hwpoisoned page so it's never allocated, but it could
+		 * kill a process because of no-memory rather than hwpoison.
+		 * Soft-offline never impacts the userspace, so this is
+		 * undesired.
 		 */
 		ret = dissolve_free_huge_page(page);
 		if (!ret) {
 			if (set_hwpoison_free_buddy_page(page))
 				num_poisoned_pages_inc();
+			else
+				ret = -EBUSY;
 		}
 	}
 	return ret;
@@ -1804,6 +1808,11 @@ static int __soft_offline_page(struct page *page, int flags)
 				pfn, ret, page->flags, &page->flags);
 			if (ret > 0)
 				ret = -EIO;
+		} else {
+			if (set_hwpoison_free_buddy_page(page))
+				num_poisoned_pages_inc();
+			else
+				ret = -EBUSY;
 		}
 	} else {
 		pr_info("soft offline: %#lx: isolation failed: %d, page count %d, type %lx (%pGp)\n",
