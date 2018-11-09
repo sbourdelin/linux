@@ -1084,6 +1084,20 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 		if (INTEL_GEN(dev_priv) < 9 || !dev_priv->vbt.psr.enable)
 			i915_modparams.enable_psr = 0;
 
+	/*
+	 * If a PSR error happened and the driver is reloaded, the EDP_PSR_IIR
+	 * will still keep the error set even after the reset done in the
+	 * irq_preinstall and irq_uninstall hooks.
+	 * And enabling in this situation cause the screen to freeze in the
+	 * first time that PSR HW tries to activate so lets keep PSR disabled
+	 * to avoid any rendering problems.
+	 */
+	if (I915_READ(EDP_PSR_IIR) & EDP_PSR_ERROR(TRANSCODER_EDP)) {
+		DRM_DEBUG_KMS("PSR interruption error set\n");
+		dev_priv->psr.sink_not_reliable = true;
+		return;
+	}
+
 	/* Set link_standby x link_off defaults */
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		/* HSW and BDW require workarounds that we don't implement. */
