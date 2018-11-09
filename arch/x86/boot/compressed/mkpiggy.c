@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include <tools/le_byteshift.h>
 
 int main(int argc, char *argv[])
 {
@@ -61,7 +60,6 @@ int main(int argc, char *argv[])
 	}
 
 	ilen = ftell(f);
-	olen = get_unaligned_le32(&olen);
 
 	printf(".section \".rodata..compressed\",\"a\",@progbits\n");
 	printf(".globl z_input_len\n");
