@@ -8143,8 +8143,9 @@ __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
 		 * The HWPoisoned page may be not in buddy system, and
 		 * page_count() is not 0.
 		 */
-		if (unlikely(!PageBuddy(page) && PageHWPoison(page))) {
+		if (unlikely(!PageBuddy(page) && TestClearPageHWPoison(page))) {
 			pfn++;
+			num_poisoned_pages_dec();
 			SetPageReserved(page);
 			continue;
 		}
