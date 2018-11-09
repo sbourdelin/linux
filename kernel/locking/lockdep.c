@@ -624,6 +624,16 @@ static int static_obj(void *obj)
 }
 #endif
 
+static bool is_valid_lockdep_map(struct lockdep_map *lock)
+{
+	return static_obj(lock) || lock->dynamic;
+}
+
+static bool is_valid_key(struct lock_class_key *key)
+{
+	return static_obj(key) || key->dynamic;
+}
+
 /*
  * To make lock name printouts unique, we calculate a unique
  * class->name_version generation counter:
@@ -716,7 +726,7 @@ static bool assign_lock_key(struct lockdep_map *lock)
 		lock->key = (void *)can_addr;
 	else if (__is_module_percpu_address(addr, &can_addr))
 		lock->key = (void *)can_addr;
-	else if (static_obj(lock))
+	else if (is_valid_lockdep_map(lock))
 		lock->key = (void *)lock;
 	else {
 		/* Debug-check: all keys must be persistent! */
@@ -752,7 +762,7 @@ register_lock_class(struct lockdep_map *lock, unsigned int subclass, int force)
 	if (!lock->key) {
 		if (!assign_lock_key(lock))
 			return NULL;
-	} else if (!static_obj(lock->key)) {
+	} else if (!is_valid_key(lock->key)) {
 		return NULL;
 	}
 
@@ -3118,7 +3128,7 @@ static void __lockdep_init_map(struct lockdep_map *lock, const char *name,
 	/*
 	 * Sanity check, the lock-class key must be persistent:
 	 */
-	if (!static_obj(key)) {
+	if (!is_valid_key(key)) {
 		printk("BUG: key %px not in .data!\n", key);
 		/*
 		 * What it says above ^^^^^, I suggest you read it.

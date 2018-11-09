@@ -56,6 +56,7 @@ struct lockdep_subclass_key {
 
 struct lock_class_key {
 	struct lockdep_subclass_key	subkeys[MAX_LOCKDEP_SUBCLASSES];
+	bool				dynamic:1;
 };
 
 extern struct lock_class_key __lockdep_no_validate__;
@@ -153,6 +154,7 @@ struct lockdep_map {
 	int				cpu;
 	unsigned long			ip;
 #endif
+	bool				dynamic:1;
 };
 
 static inline void lockdep_copy_map(struct lockdep_map *to,
