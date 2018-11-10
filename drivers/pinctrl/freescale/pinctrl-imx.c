@@ -108,9 +108,6 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
 	new_map++;
 	for (i = j = 0; i < grp->num_pins; i++) {
 		pin = &((struct imx_pin *)(grp->data))[i];
-		new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
-		new_map[j].data.configs.group_or_pin =
-					pin_get_name(pctldev, pin->pin);
 
 		if (info->flags & IMX_USE_SCU) {
 			/*
@@ -126,7 +123,12 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
 			new_map[j].data.configs.num_configs = 1;
 		}
 
-		j++;
+		if (new_map[j].data.configs.num_configs) {
+			new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
+			new_map[j].data.configs.group_or_pin =
+				pin_get_name(pctldev, pin->pin);
+			j++;
+		}
 	}
 
 	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
