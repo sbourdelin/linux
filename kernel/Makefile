@@ -18,6 +18,7 @@ obj-$(CONFIG_MULTIUSER) += groups.o
 ifdef CONFIG_FUNCTION_TRACER
 # Do not trace internal ftrace files
 CFLAGS_REMOVE_irq_work.o = $(CC_FLAGS_FTRACE)
+CFLAGS_REMOVE_stackleak.o = $(CC_FLAGS_FTRACE)
 endif
 
 # Prevents flicker of uninteresting __do_softirq()/__local_bh_disable_ip()
