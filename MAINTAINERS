@@ -15775,6 +15775,7 @@ M:	Zoro Li <long17.cool@163.com>
 L:	linux-rtc@vger.kernel.org
 S:	Maintained
 F:	drivers/rtc/rtc-sd3078.c
+F:	Documentation/devicetree/bindings/rtc/rtc-sd3078.txt
 
 WIIMOTE HID DRIVER
 M:	David Herrmann <dh.herrmann@googlemail.com>
