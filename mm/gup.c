@@ -25,6 +25,50 @@ struct follow_page_context {
 	unsigned int page_mask;
 };
 
+static void pin_page_for_dma(struct page *page)
+{
+	int ret = 0;
+	struct zone *zone;
+
+	page = compound_head(page);
+	zone = page_zone(page);
+
+	spin_lock(zone_gup_lock(zone));
+
+	if (PageDmaPinned(page)) {
+		/* Page was not on an LRU list, because it was DMA-pinned. */
+		VM_BUG_ON_PAGE(PageLRU(page), page);
+
+		atomic_inc(&page->dma_pinned_count);
+		goto unlock_out;
+	}
+
+	/*
+	 * Note that page->dma_pinned_flags is unioned with page->lru.
+	 * The rules are: reading PageDmaPinned(page) is allowed even if
+	 * PageLRU(page) is true. That works because of pointer alignment:
+	 * the PageDmaPinned bit is less than the pointer alignment, so
+	 * either the page is on an LRU, or (maybe) the PageDmaPinned
+	 * bit is set.
+	 *
+	 * However, SetPageDmaPinned requires that the page is both locked,
+	 * and also, removed from the LRU.
+	 *
+	 * The other flag, PageDmaPinnedWasLru, is not used for
+	 * synchronization, and so is only read or written after we are
+	 * certain that the full page->dma_pinned_flags field is available.
+	 */
+	ret = isolate_lru_page(page);
+	if (ret == 0)
+		SetPageDmaPinnedWasLru(page);
+
+	atomic_set(&page->dma_pinned_count, 1);
+	SetPageDmaPinned(page);
+
+unlock_out:
+	spin_unlock(zone_gup_lock(zone));
+}
+
 static struct page *no_page_table(struct vm_area_struct *vma,
 		unsigned int flags)
 {
@@ -670,7 +714,7 @@ static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned int gup_flags, struct page **pages,
 		struct vm_area_struct **vmas, int *nonblocking)
 {
-	long ret = 0, i = 0;
+	long ret = 0, i = 0, j;
 	struct vm_area_struct *vma = NULL;
 	struct follow_page_context ctx = { NULL };
 
@@ -774,6 +818,10 @@ next_page:
 		nr_pages -= page_increm;
 	} while (nr_pages);
 out:
+	if (pages)
+		for (j = 0; j < i; j++)
+			pin_page_for_dma(pages[j]);
+
 	if (ctx.pgmap)
 		put_dev_pagemap(ctx.pgmap);
 	return i ? i : ret;
@@ -1852,7 +1900,7 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
 			struct page **pages)
 {
 	unsigned long addr, len, end;
-	int nr = 0, ret = 0;
+	int nr = 0, ret = 0, i;
 
 	start &= PAGE_MASK;
 	addr = start;
@@ -1872,6 +1920,9 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
 		local_irq_enable();
 		ret = nr;
 	}
+
+	for (i = 0; i < nr; i++)
+		pin_page_for_dma(pages[i]);
 
 	if (nr < nr_pages) {
 		/* Try to get the remaining pages with get_user_pages */

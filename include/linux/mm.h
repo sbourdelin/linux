@@ -950,6 +950,10 @@ static inline void put_page(struct page *page)
 {
 	page = compound_head(page);
 
+	VM_BUG_ON_PAGE(PageDmaPinned(page) &&
+		       page_ref_count(page) <
+				atomic_read(&page->dma_pinned_count),
+		       page);
 	/*
 	 * For devmap managed pages we need to catch refcount transition from
 	 * 2 to 1, when refcount reach one it means the page is free and we
@@ -964,21 +968,10 @@ static inline void put_page(struct page *page)
 }
 
 /*
- * put_user_page() - release a page that had previously been acquired via
- * a call to one of the get_user_pages*() functions.
- *
  * Pages that were pinned via get_user_pages*() must be released via
- * either put_user_page(), or one of the put_user_pages*() routines
- * below. This is so that eventually, pages that are pinned via
- * get_user_pages*() can be separately tracked and uniquely handled. In
- * particular, interactions with RDMA and filesystems need special
- * handling.
+ * one of these put_user_pages*() routines:
  */
-static inline void put_user_page(struct page *page)
-{
-	put_page(page);
-}
-
+void put_user_page(struct page *page);
 void put_user_pages_dirty(struct page **pages, unsigned long npages);
 void put_user_pages_dirty_lock(struct page **pages, unsigned long npages);
 void put_user_pages(struct page **pages, unsigned long npages);

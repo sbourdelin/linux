@@ -152,6 +152,51 @@ static void __put_user_pages_dirty(struct page **pages,
 }
 
 /*
+ * put_user_page() - release a page that had previously been acquired via
+ * a call to one of the get_user_pages*() functions.
+ *
+ * Usage: Pages that were pinned via get_user_pages*() must be released via
+ * either put_user_page(), or one of the put_user_pages*() routines
+ * below. This is so that eventually, pages that are pinned via
+ * get_user_pages*() can be separately tracked and uniquely handled. In
+ * particular, interactions with RDMA and filesystems need special
+ * handling.
+ */
+void put_user_page(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+
+	page = compound_head(page);
+
+	if (atomic_dec_and_test(&page->dma_pinned_count)) {
+		spin_lock(zone_gup_lock(zone));
+		/* Re-check while holding the lock, because
+		 * pin_page_for_dma() or get_page() may have snuck in right
+		 * after the atomic_dec_and_test, and raised the count
+		 * above zero again. If so, just leave the flag set. And
+		 * because the atomic_dec_and_test above already got the
+		 * accounting correct, no other action is required.
+		 */
+		VM_BUG_ON_PAGE(PageLRU(page), page);
+		VM_BUG_ON_PAGE(!PageDmaPinned(page), page);
+
+		if (atomic_read(&page->dma_pinned_count) == 0) {
+			ClearPageDmaPinned(page);
+
+			if (PageDmaPinnedWasLru(page)) {
+				ClearPageDmaPinnedWasLru(page);
+				putback_lru_page(page);
+			}
+		}
+
+		spin_unlock(zone_gup_lock(zone));
+	}
+
+	put_page(page);
+}
+EXPORT_SYMBOL(put_user_page);
+
+/*
  * put_user_pages_dirty() - for each page in the @pages array, make
  * that page (or its head page, if a compound page) dirty, if it was
  * previously listed as clean. Then, release the page using
@@ -903,6 +948,12 @@ void lru_add_page_tail(struct page *page, struct page *page_tail,
 	VM_BUG_ON_PAGE(!PageHead(page), page);
 	VM_BUG_ON_PAGE(PageCompound(page_tail), page);
 	VM_BUG_ON_PAGE(PageLRU(page_tail), page);
+
+	/*
+	 * LRU and PageDmaPinned are mutually exclusive: they use the
+	 * same fields in struct page, but for different purposes.
+	 */
+	VM_BUG_ON_PAGE(PageDmaPinned(page_tail), page);
 	VM_BUG_ON(NR_CPUS != 1 &&
 		  !spin_is_locked(&lruvec_pgdat(lruvec)->lru_lock));
 
@@ -941,6 +992,13 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 	int was_unevictable = TestClearPageUnevictable(page);
 
 	VM_BUG_ON_PAGE(PageLRU(page), page);
+
+	/*
+	 * LRU and PageDmaPinned are mutually exclusive: they use the
+	 * same fields in struct page, but for different purposes.
+	 */
+	if (PageDmaPinned(page))
+		return;
 
 	SetPageLRU(page);
 	/*
