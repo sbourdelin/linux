@@ -792,6 +792,7 @@ struct simple_attr {
 
 /* simple_attr_open is called by an actual attribute open file operation
  * to set the attribute specific access operations. */
+#undef simple_attr_open
 int simple_attr_open(struct inode *inode, struct file *file,
 		     int (*get)(void *, u64 *), int (*set)(void *, u64),
 		     const char *fmt)

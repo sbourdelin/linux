@@ -436,7 +436,7 @@ static int spufs_cntl_open(struct inode *inode, struct file *file)
 		ctx->cntl = inode->i_mapping;
 	mutex_unlock(&ctx->mapping_lock);
 	return simple_attr_open(inode, file, spufs_cntl_get,
-					spufs_cntl_set, "0x%08lx");
+					spufs_cntl_set, "0x%08llx");
 }
 
 static int

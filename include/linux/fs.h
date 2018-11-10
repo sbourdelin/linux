@@ -3387,7 +3387,6 @@ void simple_transaction_set(struct file *file, size_t n);
 #define DEFINE_SIMPLE_ATTRIBUTE(__fops, __get, __set, __fmt)		\
 static int __fops ## _open(struct inode *inode, struct file *file)	\
 {									\
-	__simple_attr_check_format(__fmt, 0ull);			\
 	return simple_attr_open(inode, file, __get, __set, __fmt);	\
 }									\
 static const struct file_operations __fops = {				\
@@ -3408,6 +3407,11 @@ void __simple_attr_check_format(const char *fmt, ...)
 int simple_attr_open(struct inode *inode, struct file *file,
 		     int (*get)(void *, u64 *), int (*set)(void *, u64),
 		     const char *fmt);
+#define simple_attr_open(inode, file, get, set, fmt) ({	\
+	if (0)						\
+		__simple_attr_check_format(fmt, 0ull);	\
+	simple_attr_open(inode, file, get, set, fmt);	\
+	})
 int simple_attr_release(struct inode *inode, struct file *file);
 ssize_t simple_attr_read(struct file *file, char __user *buf,
 			 size_t len, loff_t *ppos);
