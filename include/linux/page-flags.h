@@ -437,6 +437,67 @@ static __always_inline int __PageMovable(struct page *page)
 				PAGE_MAPPING_MOVABLE;
 }
 
+/*
+ * Because page->dma_pinned_flags is unioned with page->lru, any page that
+ * uses these flags must NOT be on an LRU. That's partly enforced by
+ * ClearPageDmaPinned, which gives the page back to LRU.
+ *
+ * PageDmaPinned is checked without knowing whether it is a tail page or a
+ * PageDmaPinned page. For that reason, PageDmaPinned avoids PageTail (the 0th
+ * bit in the first union of struct page), and instead uses bit 1 (0x2),
+ * rather than bit 0.
+ *
+ * PageDmaPinned can only be used if no other systems are using the same bit
+ * across the first struct page union. In this regard, it is similar to
+ * PageTail, and in fact, because of PageTail's constraint that bit 0 be left
+ * alone, bit 1 is also left alone so far: other union elements (ignoring tail
+ * pages) put pointers there, and pointer alignment leaves the lower two bits
+ * available.
+ *
+ * So, constraints include:
+ *
+ *     -- Only use PageDmaPinned on non-tail pages.
+ *     -- Remove the page from any LRU list first.
+ */
+#define PAGE_DMA_PINNED		0x2UL
+#define PAGE_DMA_PINNED_WAS_LRU	0x4UL
+
+static __always_inline int PageDmaPinned(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	return test_bit(PAGE_DMA_PINNED, &page->dma_pinned_flags);
+}
+
+static __always_inline void SetPageDmaPinned(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	set_bit(PAGE_DMA_PINNED, &page->dma_pinned_flags);
+}
+
+static __always_inline void ClearPageDmaPinned(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	clear_bit(PAGE_DMA_PINNED, &page->dma_pinned_flags);
+}
+
+static __always_inline int PageDmaPinnedWasLru(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	return test_bit(PAGE_DMA_PINNED_WAS_LRU, &page->dma_pinned_flags);
+}
+
+static __always_inline void SetPageDmaPinnedWasLru(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	set_bit(PAGE_DMA_PINNED_WAS_LRU, &page->dma_pinned_flags);
+}
+
+static __always_inline void ClearPageDmaPinnedWasLru(struct page *page)
+{
+	VM_BUG_ON(page != compound_head(page));
+	clear_bit(PAGE_DMA_PINNED_WAS_LRU, &page->dma_pinned_flags);
+}
+
 #ifdef CONFIG_KSM
 /*
  * A KSM page is one of those write-protected "shared pages" or "merged pages"
