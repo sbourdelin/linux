@@ -242,7 +242,7 @@ static inline uint64_t howmany_64(uint64_t x, uint32_t y)
 #endif /* XFS_WARN */
 #endif /* DEBUG */
 
-#define STATIC static noinline
+#define STATIC static
 
 #ifdef CONFIG_XFS_RT
 
