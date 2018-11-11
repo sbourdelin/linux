@@ -760,6 +760,46 @@ static void generic_metric(struct perf_stat_config *config,
 		print_metric(config, ctxp, NULL, NULL, "", 0);
 }
 
+static void cputime_color_name(struct perf_evsel *evsel,
+			       const char **color, const char **name,
+			       double ratio)
+{
+	if (perf_stat_evsel__is(evsel, CPUTIME_IDLE)) {
+		if (ratio < 0.8)
+			*color = PERF_COLOR_GREEN;
+		if (ratio < 0.5)
+			*color = PERF_COLOR_RED;
+		*name = "Idle";
+		return;
+	}
+
+	if (ratio > (MIN_GREEN / 100))
+		*color = PERF_COLOR_GREEN;
+	if (ratio > (MIN_RED / 100))
+		*color = PERF_COLOR_RED;
+
+	if (perf_stat_evsel__is(evsel, CPUTIME_GUEST))
+		*name = "Guest";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_GUEST_NICE))
+		*name = "Guest nice";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_IOWAIT))
+		*name = "IO wait";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_IRQ))
+		*name = "Irq";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_NICE))
+		*name = "Nice";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_SOFTIRQ))
+		*name = "Softirq";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_STEAL))
+		*name = "Steal";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_SYSTEM))
+		*name = "System";
+	else if (perf_stat_evsel__is(evsel, CPUTIME_USER))
+		*name = "User";
+	else
+		*name = "unknown";
+}
+
 void perf_stat__print_shadow_stats(struct perf_stat_config *config,
 				   struct perf_evsel *evsel,
 				   double avg, int cpu,
@@ -968,6 +1008,38 @@ void perf_stat__print_shadow_stats(struct perf_stat_config *config,
 		if (td_total_slots(ctx, cpu, st) > 0)
 			print_metric(config, ctxp, color, "%8.1f%%", name,
 					be_bound * 100.);
+		else
+			print_metric(config, ctxp, NULL, NULL, name, 0);
+	} else if (perf_stat_evsel__is(evsel, CPUTIME_GUEST)      ||
+		   perf_stat_evsel__is(evsel, CPUTIME_GUEST_NICE) ||
+		   perf_stat_evsel__is(evsel, CPUTIME_IDLE)       ||
+		   perf_stat_evsel__is(evsel, CPUTIME_IOWAIT)     ||
+		   perf_stat_evsel__is(evsel, CPUTIME_IRQ)        ||
+		   perf_stat_evsel__is(evsel, CPUTIME_NICE)       ||
+		   perf_stat_evsel__is(evsel, CPUTIME_SOFTIRQ)    ||
+		   perf_stat_evsel__is(evsel, CPUTIME_STEAL)      ||
+		   perf_stat_evsel__is(evsel, CPUTIME_SYSTEM)     ||
+		   perf_stat_evsel__is(evsel, CPUTIME_USER)) {
+
+		const char *name = NULL;
+
+		total = runtime_stat_avg(st, STAT_NSECS, ctx, cpu);
+		/* STAT_NSECS is usec, cputime in nsec, converting */
+		total *= 1e6;
+
+		if (total)
+			ratio = avg / total;
+
+		cputime_color_name(evsel, &color, &name, ratio);
+
+		/*
+		 * The cputime meassures are tricky, we can easily get some noise
+		 * over 100% ... so let's be proactive and don't confuse users ;-)
+		 */
+		ratio = min(1., ratio);
+
+		if (total)
+			print_metric(config, ctxp, color, "%8.1f%%", name, ratio * 100.);
 		else
 			print_metric(config, ctxp, NULL, NULL, name, 0);
 	} else if (evsel->metric_expr) {

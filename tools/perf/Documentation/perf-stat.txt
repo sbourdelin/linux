@@ -310,6 +310,71 @@ The output is SMI cycles%, equals to (aperf - unhalted core cycles) / aperf
 
 Users who wants to get the actual value can apply --no-metric-only.
 
+--top::
+--top-full:
+Measure cputime PMU events and display percentage of CPU utilization rates.
+
+The --top option displays rates for following events:
+  idle system user irq softirq iowait
+
+The --top-full option displays additional rates:
+  guest guest_nice nice steal
+
+Examples:
+  # perf stat --top
+  ^C
+   Performance counter stats for 'system wide':
+
+        Idle     System       User        Irq    Softirq    IO wait
+        1.3%      89.5%       7.4%       1.8%       0.1%       0.0%
+
+         7.282332605 seconds time elapsed
+
+  # perf stat --top-full
+  ^C
+   Performance counter stats for 'system wide':
+
+        Idle     System       User        Irq    Softirq    IO wait      Guest Guest nice       Nice      Steal
+        5.4%      85.4%       8.6%       0.5%       0.1%       0.0%       0.0%       0.0%       0.0%       0.0%
+
+         7.618359683 seconds time elapsed
+
+  # perf stat --top -I 1000
+  #           time       Idle     System       User        Irq    Softirq    IO wait
+       1.000525839       5.4%      85.3%       8.8%       0.4%       0.1%       0.0%
+       2.001032632       5.1%      85.7%       8.7%       0.4%       0.1%       0.0%
+       3.001388414       5.2%      85.7%       8.6%       0.4%       0.1%       0.0%
+       4.001758697       5.7%      85.2%       8.6%       0.5%       0.1%       0.0%
+
+  # perf stat --top -I 1000 -A
+  #           time CPU           Idle     System       User        Irq    Softirq    IO wait
+       1.000485174 CPU0          6.9%      84.0%       8.6%       0.5%       0.1%       0.0%
+       1.000485174 CPU1          5.5%      84.8%       9.1%       0.5%       0.1%       0.0%
+       1.000485174 CPU2          5.5%      86.6%       7.4%       0.5%       0.1%       0.0%
+       ...
+
+  # perf stat --top -I 1000 --per-core
+  #           time core         cpus       Idle     System       User        Irq    Softirq    IO wait
+       1.000450719 S0-C0           2       4.6%      87.0%       7.9%       0.4%       0.1%       0.0%
+       1.000450719 S0-C1           2       4.8%      86.3%       8.3%       0.4%       0.1%       0.0%
+       1.000450719 S0-C2           2       5.3%      86.3%       7.8%       0.4%       0.1%       0.0%
+       1.000450719 S0-C3           2       5.2%      85.5%       8.7%       0.4%       0.1%       0.0%
+       1.000450719 S0-C4           2       4.5%      86.7%       8.3%       0.4%       0.1%       0.0%
+
+  # perf stat --top ./perf bench sched messaging -l 10000
+  ...
+     Total time: 7.089 [sec]
+
+   Performance counter stats for './perf bench sched messaging -l 10000':
+
+        Idle     System       User        Irq    Softirq    IO wait
+        0.0%      90.1%       8.9%       0.5%       0.1%       0.0%
+
+         7.186366800 seconds time elapsed
+
+        14.527066000 seconds user
+       146.254278000 seconds sys
+
 EXAMPLES
 --------
 

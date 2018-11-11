@@ -89,6 +89,16 @@ static const char *id_str[PERF_STAT_EVSEL_ID__MAX] = {
 	ID(TOPDOWN_RECOVERY_BUBBLES, topdown-recovery-bubbles),
 	ID(SMI_NUM, msr/smi/),
 	ID(APERF, msr/aperf/),
+	ID(CPUTIME_GUEST,	cputime/guest/),
+	ID(CPUTIME_GUEST_NICE,	cputime/guest_nice/),
+	ID(CPUTIME_IDLE,	cputime/idle/),
+	ID(CPUTIME_IOWAIT,	cputime/iowait/),
+	ID(CPUTIME_IRQ,		cputime/irq/),
+	ID(CPUTIME_NICE,	cputime/nice/),
+	ID(CPUTIME_SOFTIRQ,	cputime/softirq/),
+	ID(CPUTIME_STEAL,	cputime/steal/),
+	ID(CPUTIME_SYSTEM,	cputime/system/),
+	ID(CPUTIME_USER,	cputime/user/),
 };
 #undef ID
 
