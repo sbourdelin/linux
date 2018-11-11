@@ -19,8 +19,8 @@
 
 /*
  * Locking scheme:
- *  - all ACL updates are protected by inode->i_mutex, which is taken before
- *    calling into this file.
+ *  - all ACL updates are protected by inode->i_mutex,
+ *    which is taken before calling into this file.
  */
 
 STATIC struct posix_acl *

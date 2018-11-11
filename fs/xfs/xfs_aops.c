@@ -81,8 +81,8 @@ xfs_finish_page_writeback(
 
 /*
  * We're now finished for good with this ioend structure.  Update the page
- * state, release holds on bios, and finally free up memory.  Do not use the
- * ioend after this.
+ * state, release holds on bios, and finally free up memory.
+ * Do not use the ioend after this.
  */
 STATIC void
 xfs_destroy_ioend(
@@ -464,18 +464,18 @@ allocate_blocks:
 }
 
 /*
- * Submit the bio for an ioend. We are passed an ioend with a bio attached to
- * it, and we submit that bio. The ioend may be used for multiple bio
- * submissions, so we only want to allocate an append transaction for the ioend
- * once. In the case of multiple bio submission, each bio will take an IO
- * reference to the ioend to ensure that the ioend completion is only done once
- * all bios have been submitted and the ioend is really done.
+ * Submit the bio for an ioend. We are passed an ioend with a bio attached
+ * to it, and we submit that bio. The ioend may be used for multiple bio
+ * submissions, so we only want to allocate an append transaction for the
+ * ioend once. In the case of multiple bio submission, each bio will take
+ * an IO reference to the ioend to ensure that the ioend completion is only
+ * done once all bios have been submitted and the ioend is really done.
  *
- * If @fail is non-zero, it means that we have a situation where some part of
- * the submission process has failed after we have marked paged for writeback
- * and unlocked them. In this situation, we need to fail the bio and ioend
- * rather than submit it to IO. This typically only happens on a filesystem
- * shutdown.
+ * If @fail is non-zero, it means that we have a situation where some part
+ * of the submission process has failed after we have marked paged for
+ * writeback and unlocked them. In this situation, we need to fail the bio
+ * and ioend rather than submit it to IO. This typically only happens
+ * on a filesystem shutdown.
  */
 STATIC int
 xfs_submit_ioend(
@@ -583,8 +583,8 @@ xfs_chain_bio(
 }
 
 /*
- * Test to see if we have an existing ioend structure that we could append to
- * first, otherwise finish off the current ioend and start another.
+ * Test to see if we have an existing ioend structure that we could append
+ * to first, otherwise finish off the current ioend and start another.
  */
 STATIC void
 xfs_add_to_ioend(
@@ -637,15 +637,16 @@ xfs_vm_invalidatepage(
 }
 
 /*
- * If the page has delalloc blocks on it, we need to punch them out before we
- * invalidate the page.  If we don't, we leave a stale delalloc mapping on the
- * inode that can trip up a later direct I/O read operation on the same region.
+ * If the page has delalloc blocks on it, we need to punch them out before
+ * we invalidate the page.  If we don't, we leave a stale delalloc mapping
+ * on the inode that can trip up a later direct I/O read operation on
+ * the same region.
  *
- * We prevent this by truncating away the delalloc regions on the page.  Because
- * they are delalloc, we can do this without needing a transaction. Indeed - if
- * we get ENOSPC errors, we have to be able to do this truncation without a
- * transaction as there is no space left for block reservation (typically why we
- * see a ENOSPC in writeback).
+ * We prevent this by truncating away the delalloc regions on the page.
+ * Because they are delalloc, we can do this without needing a transaction.
+ * Indeed - if we get ENOSPC errors, we have to be able to do this
+ * truncation without a transaction as there is no space left for block
+ * reservation (typically why we see a ENOSPC in writeback).
  */
 STATIC void
 xfs_aops_discard_page(
@@ -674,20 +675,20 @@ out_invalidate:
 }
 
 /*
- * We implement an immediate ioend submission policy here to avoid needing to
- * chain multiple ioends and hence nest mempool allocations which can violate
- * forward progress guarantees we need to provide. The current ioend we are
- * adding blocks to is cached on the writepage context, and if the new block
- * does not append to the cached ioend it will create a new ioend and cache that
- * instead.
+ * We implement an immediate ioend submission policy here to avoid needing
+ * to chain multiple ioends and hence nest mempool allocations which can
+ * violate forward progress guarantees we need to provide. The current
+ * ioend we are adding blocks to is cached on the writepage context,
+ * and if the new block does not append to the cached ioend it will create
+ * a new ioend and cache that instead.
  *
- * If a new ioend is created and cached, the old ioend is returned and queued
- * locally for submission once the entire page is processed or an error has been
- * detected.  While ioends are submitted immediately after they are completed,
- * batching optimisations are provided by higher level block plugging.
- *
- * At the end of a writeback pass, there will be a cached ioend remaining on the
- * writepage context that the caller will need to submit.
+ * If a new ioend is created and cached, the old ioend is returned and
+ * queued locally for submission once the entire page is processed or an
+ * error has been detected.  While ioends are submitted immediately
+ * after they are completed, batching optimisations are provided by higher
+ * level block plugging.
+ * At the end of a writeback pass, there will be a cached ioend remaining
+ * on the writepage context that the caller will need to submit.
  */
 static int
 xfs_writepage_map(
