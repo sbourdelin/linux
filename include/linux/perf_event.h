@@ -1162,6 +1162,8 @@ static inline int perf_callchain_store(struct perf_callchain_entry_ctx *ctx, u64
 	}
 }
 
+extern int __init perf_cputime_register(void);
+
 extern int sysctl_perf_event_paranoid;
 extern int sysctl_perf_event_mlock;
 extern int sysctl_perf_event_sample_rate;
