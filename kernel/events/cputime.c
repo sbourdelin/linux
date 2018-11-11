@@ -1,6 +1,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/sched.h>
 #include <linux/perf_event.h>
+#include <linux/tick.h>
 
 enum perf_cputime_id {
 	PERF_CPUTIME_USER,
@@ -102,11 +103,33 @@ static const struct attribute_group *cputime_attr_groups[] = {
 	NULL,
 };
 
+#ifdef CONFIG_NO_HZ_COMMON
+static u64 idle_fix(int cpu)
+{
+	u64 ticks;
+
+	if (!tick_nohz_tick_stopped_cpu(cpu))
+		return 0;
+
+	ticks = jiffies - tick_nohz_get_idle_jiffies_cpu(cpu);
+	return ticks * TICK_NSEC;
+}
+#else
+static u64 idle_fix(int cpu)
+{
+	return 0;
+}
+#endif
+
 static u64 cputime_read_counter(struct perf_event *event)
 {
 	int cpu = event->oncpu;
+	u64 val = kcpustat_cpu(cpu).cpustat[event->hw.config];
 
-	return kcpustat_cpu(cpu).cpustat[event->hw.config];
+	if (event->hw.config == PERF_CPUTIME_IDLE)
+		val += idle_fix(cpu);
+
+	return val;
 }
 
 static void perf_cputime_update(struct perf_event *event)
