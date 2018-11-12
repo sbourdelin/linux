@@ -776,7 +776,6 @@ static struct pxamci_platform_data magician_mci_info = {
 	.init			= magician_mci_init,
 	.exit			= magician_mci_exit,
 	.gpio_card_ro_invert	= 1,
-	.gpio_power		= EGPIO_MAGICIAN_SD_POWER,
 };
 
 static struct gpiod_lookup_table magician_mci_gpio_table = {
@@ -788,6 +787,12 @@ static struct gpiod_lookup_table magician_mci_gpio_table = {
 		 * 4, so we need offset 8+4=12 on that particular chip.
 		 */
 		GPIO_LOOKUP("htc-egpio-1", 12, "wp", GPIO_ACTIVE_HIGH),
+		/*
+		 * Power on EGPIO register 2 index 0, so this is on
+		 * the first HTC EGPIO chip starting at register 0 so we
+		 * need offset 2*8+0 = 16 on that chip.
+		 */
+		GPIO_LOOKUP("htc-egpio-0", 16, "power", GPIO_ACTIVE_HIGH),
 		{ },
 	},
 };

@@ -284,8 +284,6 @@ static inline void cmx270_init_ohci(void) {}
 #if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
 static struct pxamci_platform_data cmx270_mci_platform_data = {
 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
-	.gpio_power		= GPIO105_MMC_POWER,
-	.gpio_power_invert	= 1,
 };
 
 static struct gpiod_lookup_table cmx270_mci_gpio_table = {
@@ -293,6 +291,8 @@ static struct gpiod_lookup_table cmx270_mci_gpio_table = {
 	.table = {
 		/* Card detect on GPIO 83 */
 		GPIO_LOOKUP("gpio-pxa", 83, "cd", GPIO_ACTIVE_LOW),
+		/* Power on GPIO 105 */
+		GPIO_LOOKUP("gpio-pxa", 105, "power", GPIO_ACTIVE_LOW),
 		{ },
 	},
 };
