@@ -2564,6 +2564,10 @@ static size_t __vb2_perform_fileio(struct vb2_queue *q, char __user *data, size_
 		dprintk(5, "vb2_dqbuf result: %d\n", ret);
 		if (ret)
 			return ret;
+		if (fileio != q->fileio) {
+			dprintk(3, "fileio deallocated\n");
+			return -EFAULT;
+		}
 		fileio->dq_count += 1;
 
 		fileio->cur_index = index;
