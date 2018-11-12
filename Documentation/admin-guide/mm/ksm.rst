@@ -116,6 +116,21 @@ run
         Default: 0 (must be changed to 1 to activate KSM, except if
         CONFIG_SYSFS is disabled)
 
+mode
+        * set always to allow ksm deduplicate memory of every process
+        * set madvise to use only madvised memory
+
+        Default: madvise (dedupulicate only madvised memory as in
+        earlier releases)
+
+seeker_sleep_millisecs
+        how many milliseconds ksmd task seeker should sleep try another
+        task.
+        e.g. ``echo 1000 > /sys/kernel/mm/ksm/seeker_sleep_millisecs``
+
+        Default: 1000 (chosen for rate limit purposes)
+
+
 use_zero_pages
         specifies whether empty pages (i.e. allocated pages that only
         contain zeroes) should be treated specially.  When set to 1,
