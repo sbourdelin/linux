@@ -53,6 +53,16 @@ void cedrus_device_run(void *priv)
 		break;
 	}
 
+	run.dst->vb2_buf.timestamp = run.src->vb2_buf.timestamp;
+	if (run.src->flags & V4L2_BUF_FLAG_TIMECODE)
+		run.dst->timecode = run.src->timecode;
+	else if (run.src->flags & V4L2_BUF_FLAG_TAG)
+		run.dst->tag = run.src->tag;
+	run.dst->flags = run.src->flags &
+		(V4L2_BUF_FLAG_TIMECODE |
+		 V4L2_BUF_FLAG_TAG |
+		 V4L2_BUF_FLAG_TSTAMP_SRC_MASK);
+
 	dev->dec_ops[ctx->current_codec]->setup(ctx, &run);
 
 	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
