@@ -14,7 +14,7 @@
 
 #include <linux/bitops.h>
 #include <linux/delay.h>
-#include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/leds.h>
@@ -39,8 +39,6 @@
 #include "generic.h"
 
 #define GPIO114_INCOME_ETH_IRQ  (114)
-#define GPIO0_INCOME_SD_DETECT  (0)
-#define GPIO0_INCOME_SD_RO      (1)
 #define GPIO54_INCOME_LED_A     (54)
 #define GPIO55_INCOME_LED_B     (55)
 #define GPIO113_INCOME_TS_IRQ   (113)
@@ -52,13 +50,23 @@
 static struct pxamci_platform_data income_mci_platform_data = {
 	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
 	.gpio_power		= -1,
-	.gpio_card_detect	= GPIO0_INCOME_SD_DETECT,
-	.gpio_card_ro		= GPIO0_INCOME_SD_RO,
 	.detect_delay_ms	= 200,
+};
+
+static struct gpiod_lookup_table income_mci_gpio_table = {
+	.dev_id = "pxa2xx-mci.0",
+	.table = {
+		/* Card detect on GPIO 0 */
+		GPIO_LOOKUP("gpio-pxa", 0, "cd", GPIO_ACTIVE_LOW),
+		/* Write protect on GPIO 1 */
+		GPIO_LOOKUP("gpio-pxa", 1, "wp", GPIO_ACTIVE_LOW),
+		{ },
+	},
 };
 
 static void __init income_mmc_init(void)
 {
+	gpiod_add_lookup_table(&income_mci_gpio_table);
 	pxa_set_mci_info(&income_mci_platform_data);
 }
 #else

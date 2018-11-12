@@ -12,6 +12,7 @@
 #include <linux/platform_device.h>
 #include <linux/irq.h>
 #include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/delay.h>
 
 #include <linux/platform_data/rtc-v3020.h>
@@ -29,11 +30,6 @@
 
 /* physical address if local-bus attached devices */
 #define RTC_PHYS_BASE		(PXA_CS1_PHYS + (5 << 22))
-
-/* GPIO IRQ usage */
-#define GPIO83_MMC_IRQ		(83)
-
-#define CMX270_MMC_IRQ		PXA_GPIO_TO_IRQ(GPIO83_MMC_IRQ)
 
 /* MMC power enable */
 #define GPIO105_MMC_POWER	(105)
@@ -288,14 +284,22 @@ static inline void cmx270_init_ohci(void) {}
 #if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
 static struct pxamci_platform_data cmx270_mci_platform_data = {
 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
-	.gpio_card_detect	= GPIO83_MMC_IRQ,
-	.gpio_card_ro		= -1,
 	.gpio_power		= GPIO105_MMC_POWER,
 	.gpio_power_invert	= 1,
 };
 
+static struct gpiod_lookup_table cmx270_mci_gpio_table = {
+	.dev_id = "pxa2xx-mci.0",
+	.table = {
+		/* Card detect on GPIO 83 */
+		GPIO_LOOKUP("gpio-pxa", 83, "cd", GPIO_ACTIVE_LOW),
+		{ },
+	},
+};
+
 static void __init cmx270_init_mmc(void)
 {
+	gpiod_add_lookup_table(&cmx270_mci_gpio_table);
 	pxa_set_mci_info(&cmx270_mci_platform_data);
 }
 #else
