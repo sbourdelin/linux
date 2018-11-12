@@ -44,6 +44,7 @@ struct vb2_v4l2_buffer {
 	__u32			flags;
 	__u32			field;
 	struct v4l2_timecode	timecode;
+	__u64			tag;
 	__u32			sequence;
 	__s32			request_fd;
 	struct vb2_plane	planes[VB2_MAX_PLANES];
@@ -54,6 +55,23 @@ struct vb2_v4l2_buffer {
  */
 #define to_vb2_v4l2_buffer(vb) \
 	container_of(vb, struct vb2_v4l2_buffer, vb2_buf)
+
+/**
+ * vb2_find_tag() - Find buffer with given tag in the queue
+ *
+ * @q:		pointer to &struct vb2_queue with videobuf2 queue.
+ * @tag:	the tag to find. Only buffers in state DEQUEUED or DONE
+ *		are considered.
+ * @start_idx:	the start index (usually 0) in the buffer array to start
+ *		searching from. Note that there may be multiple buffers
+ *		with the same tag value, so you can restart the search
+ *		by setting @start_idx to the previously found index + 1.
+ *
+ * Returns the buffer index of the buffer with the given @tag, or
+ * -1 if no buffer with @tag was found.
+ */
+int vb2_find_tag(const struct vb2_queue *q, u64 tag,
+		    unsigned int start_idx);
 
 int vb2_querybuf(struct vb2_queue *q, struct v4l2_buffer *b);
 
