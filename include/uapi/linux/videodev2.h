@@ -912,6 +912,11 @@ struct v4l2_plane {
 	__u32			reserved[11];
 };
 
+struct v4l2_buffer_tag {
+	__u32 low;
+	__u32 high;
+};
+
 /**
  * struct v4l2_buffer - video buffer info
  * @index:	id number of the buffer
@@ -950,7 +955,10 @@ struct v4l2_buffer {
 	__u32			flags;
 	__u32			field;
 	struct timeval		timestamp;
-	struct v4l2_timecode	timecode;
+	union {
+		struct v4l2_timecode	timecode;
+		struct v4l2_buffer_tag	tag;
+	};
 	__u32			sequence;
 
 	/* memory location */
@@ -988,6 +996,8 @@ struct v4l2_buffer {
 #define V4L2_BUF_FLAG_IN_REQUEST		0x00000080
 /* timecode field is valid */
 #define V4L2_BUF_FLAG_TIMECODE			0x00000100
+/* tag field is valid */
+#define V4L2_BUF_FLAG_TAG			0x00000200
 /* Buffer is prepared for queuing */
 #define V4L2_BUF_FLAG_PREPARED			0x00000400
 /* Cache handling flags */
@@ -1006,6 +1016,31 @@ struct v4l2_buffer {
 #define V4L2_BUF_FLAG_LAST			0x00100000
 /* request_fd is valid */
 #define V4L2_BUF_FLAG_REQUEST_FD		0x00800000
+
+static inline void v4l2_buffer_set_tag(struct v4l2_buffer *buf, __u64 tag)
+{
+	buf->tag.high = tag >> 32;
+	buf->tag.low = tag & 0xffffffffULL;
+	buf->flags |= V4L2_BUF_FLAG_TAG;
+}
+
+static inline void v4l2_buffer_set_tag_ptr(struct v4l2_buffer *buf,
+					   const void *tag)
+{
+	v4l2_buffer_set_tag(buf, (__u64)tag);
+}
+
+static inline __u64 v4l2_buffer_get_tag(const struct v4l2_buffer *buf)
+{
+	if (!(buf->flags & V4L2_BUF_FLAG_TAG))
+		return 0;
+	return (((__u64)buf->tag.high) << 32) | (__u64)buf->tag.low;
+}
+
+static inline void *v4l2_buffer_get_tag_ptr(const struct v4l2_buffer *buf)
+{
+	return (void *)v4l2_buffer_get_tag(buf);
+}
 
 /**
  * struct v4l2_exportbuffer - export of video buffer as DMABUF file descriptor
