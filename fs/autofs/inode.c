@@ -275,7 +275,7 @@ static int autofs_apply_sbi_options(struct autofs_sb_info *sbi,
 	if (err < 0)
 		goto out_fput;
 
-	sbi->catatonic = 0;
+	sbi->flags &= ~AUTOFS_SBI_CATATONIC;
 
 	return 0;
 
@@ -299,7 +299,7 @@ static struct autofs_sb_info *autofs_alloc_sbi(struct super_block *s)
 	sbi->sb = s;
 	sbi->pipefd = -1;
 	sbi->pipe = NULL;
-	sbi->catatonic = 1;
+	sbi->flags = AUTOFS_SBI_CATATONIC;
 	set_autofs_type_indirect(&sbi->type);
 	mutex_init(&sbi->wq_mutex);
 	mutex_init(&sbi->pipe_mutex);
