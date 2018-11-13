@@ -2267,6 +2267,11 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		case COMP_RING_UNDERRUN:
 		case COMP_RING_OVERRUN:
 			goto cleanup;
+		case COMP_STOPPED_LENGTH_INVALID:
+			if ((ep->ep_state & EP_HAS_STREAMS) &&
+					(event->buffer == 0))
+				goto cleanup;
+			/* else fall through */
 		default:
 			xhci_err(xhci, "ERROR Transfer event for unknown stream ring slot %u ep %u\n",
 				 slot_id, ep_index);
