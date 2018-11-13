@@ -87,6 +87,8 @@ static int autofs_show_options(struct seq_file *m, struct dentry *root)
 		seq_printf(m, ",direct");
 	else
 		seq_printf(m, ",indirect");
+	if (sbi->flags & AUTOFS_SBI_STRICTEXPIRE)
+		seq_printf(m, ",strictexpire");
 #ifdef CONFIG_CHECKPOINT_RESTORE
 	if (sbi->pipe)
 		seq_printf(m, ",pipe_ino=%ld", file_inode(sbi->pipe)->i_ino);
@@ -116,11 +118,12 @@ struct autofs_fs_params {
 	bool pgrp_set;
 	int min_proto;
 	int max_proto;
+	bool strictexpire;
 	unsigned int type;
 };
 
 enum {Opt_err, Opt_fd, Opt_uid, Opt_gid, Opt_pgrp, Opt_minproto, Opt_maxproto,
-	Opt_indirect, Opt_direct, Opt_offset};
+	Opt_indirect, Opt_direct, Opt_offset, Opt_strictexpire};
 
 static const match_table_t tokens = {
 	{Opt_fd, "fd=%u"},
@@ -132,6 +135,7 @@ static const match_table_t tokens = {
 	{Opt_indirect, "indirect"},
 	{Opt_direct, "direct"},
 	{Opt_offset, "offset"},
+	{Opt_strictexpire, "strictexpire"},
 	{Opt_err, NULL}
 };
 
@@ -155,6 +159,7 @@ static int autofs_parse_options(char *options, struct autofs_fs_params *params)
 	params->max_proto = AUTOFS_MAX_PROTO_VERSION;
 
 	params->pgrp_set = false;
+	params->strictexpire = false;
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		int token;
@@ -209,6 +214,9 @@ static int autofs_parse_options(char *options, struct autofs_fs_params *params)
 			break;
 		case Opt_offset:
 			set_autofs_type_offset(&params->type);
+			break;
+		case Opt_strictexpire:
+			params->strictexpire = true;
 			break;
 		default:
 			return 1;
@@ -274,6 +282,9 @@ static int autofs_apply_sbi_options(struct autofs_sb_info *sbi,
 	err = autofs_prepare_pipe(sbi->pipe);
 	if (err < 0)
 		goto out_fput;
+
+	if (params->strictexpire)
+		sbi->flags |= AUTOFS_SBI_STRICTEXPIRE;
 
 	sbi->flags &= ~AUTOFS_SBI_CATATONIC;
 
