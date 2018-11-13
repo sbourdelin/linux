@@ -5441,9 +5441,6 @@ skl_compute_wm(struct drm_atomic_state *state)
 	bool changed = false;
 	int ret, i;
 
-	/* Clear all dirty flags */
-	results->dirty_pipes = 0;
-
 	ret = skl_ddb_add_affected_pipes(state, &changed);
 	if (ret || !changed)
 		return ret;
@@ -5496,6 +5493,7 @@ static void skl_atomic_update_crtc_wm(struct intel_atomic_state *state,
 	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
 	struct skl_pipe_wm *pipe_wm = &cstate->wm.skl.optimal;
 	const struct skl_ddb_allocation *ddb = &state->wm_results.ddb;
+	struct skl_ddb_values *results = &state->wm_results;
 	enum pipe pipe = crtc->pipe;
 	enum plane_id plane_id;
 
@@ -5512,6 +5510,10 @@ static void skl_atomic_update_crtc_wm(struct intel_atomic_state *state,
 			skl_write_cursor_wm(crtc, &pipe_wm->planes[plane_id],
 					    ddb);
 	}
+
+	/* Clear correspondent dirty bit */
+	results->dirty_pipes &= ~drm_crtc_mask(&crtc->base);
+
 }
 
 static void skl_initial_wm(struct intel_atomic_state *state,
