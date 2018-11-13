@@ -1500,6 +1500,10 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
 		dprintk(1, "fatal error occurred on queue\n");
 		return -EIO;
 	}
+	if (q->in_stop_streaming) {
+		dprintk(1, "stop_streaming is called\n");
+		return -EBUSY;
+	}
 
 	vb = q->bufs[index];
 
@@ -1831,8 +1835,11 @@ static void __vb2_queue_cancel(struct vb2_queue *q)
 	 * Tell driver to stop all transactions and release all queued
 	 * buffers.
 	 */
-	if (q->start_streaming_called)
+	if (q->start_streaming_called) {
+		q->in_stop_streaming = 1;
 		call_void_qop(q, stop_streaming, q);
+		q->in_stop_streaming = 0;
+	}
 
 	/*
 	 * If you see this warning, then the driver isn't cleaning up properly
@@ -2554,6 +2561,11 @@ static size_t __vb2_perform_fileio(struct vb2_queue *q, char __user *data, size_
 	if (q->waiting_in_dqbuf) {
 		dprintk(3, "another dup()ped fd is %s\n",
 			read ? "reading" : "writing");
+		return -EBUSY;
+	}
+
+	if (q->in_stop_streaming) {
+		dprintk(3, "stop_streaming is called\n");
 		return -EBUSY;
 	}
 
