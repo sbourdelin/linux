@@ -1429,21 +1429,25 @@ int btrfs_limit_qgroup(struct btrfs_trans_handle *trans,
 			qgroup->max_excl = limit->max_excl;
 		}
 	}
-	if (limit->flags & BTRFS_QGROUP_LIMIT_RSV_RFER) {
+	if (limit->flags & __BTRFS_QGROUP_LIMIT_RSV_RFER) {
 		if (limit->rsv_rfer == CLEAR_VALUE) {
-			qgroup->lim_flags &= ~BTRFS_QGROUP_LIMIT_RSV_RFER;
-			limit->flags &= ~BTRFS_QGROUP_LIMIT_RSV_RFER;
+			qgroup->lim_flags &= ~__BTRFS_QGROUP_LIMIT_RSV_RFER;
+			limit->flags &= ~__BTRFS_QGROUP_LIMIT_RSV_RFER;
 			qgroup->rsv_rfer = 0;
 		} else {
+			btrfs_warn_rl(fs_info,
+"BTRFS_QGROUP_LIMIT_RSV_RFER flag is deprecated, will not be supported in v5.1");
 			qgroup->rsv_rfer = limit->rsv_rfer;
 		}
 	}
-	if (limit->flags & BTRFS_QGROUP_LIMIT_RSV_EXCL) {
+	if (limit->flags & __BTRFS_QGROUP_LIMIT_RSV_EXCL) {
 		if (limit->rsv_excl == CLEAR_VALUE) {
-			qgroup->lim_flags &= ~BTRFS_QGROUP_LIMIT_RSV_EXCL;
-			limit->flags &= ~BTRFS_QGROUP_LIMIT_RSV_EXCL;
+			qgroup->lim_flags &= ~__BTRFS_QGROUP_LIMIT_RSV_EXCL;
+			limit->flags &= ~__BTRFS_QGROUP_LIMIT_RSV_EXCL;
 			qgroup->rsv_excl = 0;
 		} else {
+			btrfs_warn_rl(fs_info,
+"BTRFS_QGROUP_LIMIT_RSV_EXCL flag is deprecated, will not be supported in v5.1");
 			qgroup->rsv_excl = limit->rsv_excl;
 		}
 	}

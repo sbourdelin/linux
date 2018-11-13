@@ -59,12 +59,12 @@ struct btrfs_ioctl_vol_args {
  * struct btrfs_qgroup_limit.flags
  * struct btrfs_qgroup_limit_item.flags
  */
-#define BTRFS_QGROUP_LIMIT_MAX_RFER	(1ULL << 0)
-#define BTRFS_QGROUP_LIMIT_MAX_EXCL	(1ULL << 1)
-#define BTRFS_QGROUP_LIMIT_RSV_RFER	(1ULL << 2)
-#define BTRFS_QGROUP_LIMIT_RSV_EXCL	(1ULL << 3)
-#define BTRFS_QGROUP_LIMIT_RFER_CMPR	(1ULL << 4)
-#define BTRFS_QGROUP_LIMIT_EXCL_CMPR	(1ULL << 5)
+#define BTRFS_QGROUP_LIMIT_MAX_RFER	(1ULL << 0) /* reference (rfer) limit */
+#define BTRFS_QGROUP_LIMIT_MAX_EXCL	(1ULL << 1) /* exclusive (excl) limit */
+#define __BTRFS_QGROUP_LIMIT_RSV_RFER	(1ULL << 2) /* deprecated */
+#define __BTRFS_QGROUP_LIMIT_RSV_EXCL	(1ULL << 3) /* deprecated */
+#define BTRFS_QGROUP_LIMIT_RFER_CMPR	(1ULL << 4) /* compressed rfer limit */
+#define BTRFS_QGROUP_LIMIT_EXCL_CMPR	(1ULL << 5) /* compressed excl limit */
 
 struct btrfs_qgroup_limit {
 	__u64	flags;
