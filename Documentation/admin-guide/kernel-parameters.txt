@@ -3522,8 +3522,8 @@
 	pt.		[PARIDE]
 			See Documentation/blockdev/paride.txt.
 
-	pti=		[X86_64] Control Page Table Isolation of user and
-			kernel address spaces.  Disabling this feature
+	pti=		[X86_64,ARM64] Control Page Table Isolation of user
+			and kernel address spaces.  Disabling this feature
 			removes hardening, but improves performance of
 			system calls and interrupts.
 
@@ -3534,7 +3534,7 @@
 
 			Not specifying this option is equivalent to pti=auto.
 
-	nopti		[X86_64]
+	nopti		[X86_64,ARM64]
 			Equivalent to pti=off
 
 	pty.legacy_count=

@@ -978,13 +978,31 @@ static int __init parse_kpti(char *str)
 	bool enabled;
 	int ret = strtobool(str, &enabled);
 
-	if (ret)
+	if (ret) {
+		if (!strncmp(str, "auto", 4)) {
+			__kpti_forced = 0;
+			return 0;
+		}
 		return ret;
+	}
 
 	__kpti_forced = enabled ? 1 : -1;
 	return 0;
 }
 early_param("kpti", parse_kpti);
+
+static int __init parse_pti(char *str)
+{
+	return parse_kpti(str);
+}
+early_param("pti", parse_pti);
+
+static int __init parse_no_pti(char *p)
+{
+	__kpti_forced = -1;
+	return 0;
+}
+early_param("nopti", parse_no_pti);
 #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
 
 #ifdef CONFIG_ARM64_HW_AFDBM
