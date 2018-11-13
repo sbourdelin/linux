@@ -863,6 +863,13 @@ struct journal_s
 	struct buffer_head	*j_chkpt_bhs[JBD2_NR_BATCH];
 
 	/**
+	 * @j_loginfo_mutex:
+	 *
+	 * Semaphore for locking against concurrent update journal info.
+	 */
+	struct mutex		j_loginfo_mutex;
+
+	/**
 	 * @j_head:
 	 *
 	 * Journal head: identifies the first unused block in the journal.
@@ -1265,7 +1272,7 @@ int jbd2_journal_next_log_block(journal_t *, unsigned long long *);
 int jbd2_journal_get_log_tail(journal_t *journal, tid_t *tid,
 			      unsigned long *block);
 int __jbd2_update_log_tail(journal_t *journal, tid_t tid, unsigned long block);
-void jbd2_update_log_tail(journal_t *journal, tid_t tid, unsigned long block);
+int jbd2_update_log_tail(journal_t *journal, tid_t tid, unsigned long block);
 
 /* Commit management */
 extern void jbd2_journal_commit_transaction(journal_t *);
