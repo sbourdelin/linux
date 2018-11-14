@@ -130,6 +130,9 @@ enum {
 #define BRIDGE_VLAN_INFO_RANGE_BEGIN	(1<<3) /* VLAN is start of vlan range */
 #define BRIDGE_VLAN_INFO_RANGE_END	(1<<4) /* VLAN is end of vlan range */
 #define BRIDGE_VLAN_INFO_BRENTRY	(1<<5) /* Global bridge VLAN entry */
+#define BRIDGE_VLAN_INFO_PORT_STATS	(1<<6) /* Per-port VLAN stats */
+
+#define BRIDGE_VLAN_INFO_PRIVATE_FLAGS BRIDGE_VLAN_INFO_PORT_STATS
 
 struct bridge_vlan_info {
 	__u16 flags;

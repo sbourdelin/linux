@@ -573,6 +573,10 @@ static int br_process_vlan_info(struct net_bridge *br,
 	if (!vinfo_curr->vid || vinfo_curr->vid >= VLAN_VID_MASK)
 		return -EINVAL;
 
+	/* don't allow user-space control over private flags */
+	if (vinfo_curr->flags & BRIDGE_VLAN_INFO_PRIVATE_FLAGS)
+		return -EINVAL;
+
 	if (vinfo_curr->flags & BRIDGE_VLAN_INFO_RANGE_BEGIN) {
 		/* check if we are already processing a range */
 		if (*vinfo_last)
