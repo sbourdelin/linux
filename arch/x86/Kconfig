@@ -2821,6 +2821,20 @@ config TS5500
 
 endif # X86_32
 
+if X86_64
+config APU
+	bool "PCEngines APU System Support"
+	help
+	  This option enables system support for the PCEngines APU platform.
+	  At present this just sets up the reset button control on
+	  APU2/APU3 boards. However, other system specific setup should
+	  get added here.
+
+	  Note: You must still enable the drivers for GPIO and LED support
+	  (GPIO_APU & LEDS_APU) to actually use the LEDs and the GPIOs
+
+endif # X86_64
+
 config AMD_NB
 	def_bool y
 	depends on CPU_SUP_AMD && PCI
