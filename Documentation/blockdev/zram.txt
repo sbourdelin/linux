@@ -244,6 +244,25 @@ to backing storage rather than keeping it in memory.
 User should set up backing device via /sys/block/zramX/backing_dev
 before disksize setting.
 
+User can writeback idle pages to backing device. To use the feature,
+first, user need to mark zram slots allocated currently as idle.
+Afterward, slots not accessed since then will have still idle mark.
+Then, if user does,
+	"echo val > /sys/block/zramX/writeback"
+
+  val is combination of bits.
+
+  0th bit: hugepage writeback
+  1th bit: idlepage writeback
+
+  Thus,
+  1 -> hugepage writeback
+  2 -> idlepage writeabck
+  3 -> writeback both pages
+
+zram will writeback the idle/huge pages to backing device and free the
+memory space pages occupied so save memory.
+
 = memory tracking
 
 With CONFIG_ZRAM_MEMORY_TRACKING, user can know information of the
