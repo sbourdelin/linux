@@ -191,6 +191,13 @@
 		#clock-cells = <0>;
 	};
 
+	ap_rtc_clk: ap-rtc-clk {
+		compatible = "fixed-clock";
+		clock-frequency = <32768>;
+		clock-output-names = "xin32k";
+		#clock-cells = <0>;
+	};
+
 	amba {
 		compatible = "simple-bus";
 		#address-cells = <2>;
