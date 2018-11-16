@@ -2125,9 +2125,12 @@ int vb2_mmap(struct vb2_queue *q, struct vm_area_struct *vma)
 	/*
 	 * Find the plane corresponding to the offset passed by userspace.
 	 */
+	mutex_lock(&q->mmap_lock);
 	ret = __find_plane_by_offset(q, off, &buffer, &plane);
-	if (ret)
+	if (ret) {
+		mutex_unlock(&q->mmap_lock);
 		return ret;
+	}
 
 	vb = q->bufs[buffer];
 
@@ -2138,12 +2141,12 @@ int vb2_mmap(struct vb2_queue *q, struct vm_area_struct *vma)
 	 */
 	length = PAGE_ALIGN(vb->planes[plane].length);
 	if (length < (vma->vm_end - vma->vm_start)) {
+		mutex_unlock(&q->mmap_lock);
 		dprintk(1,
 			"MMAP invalid, as it would overflow buffer length\n");
 		return -EINVAL;
 	}
 
-	mutex_lock(&q->mmap_lock);
 	ret = call_memop(vb, mmap, vb->planes[plane].mem_priv, vma);
 	mutex_unlock(&q->mmap_lock);
 	if (ret)
