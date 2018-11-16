@@ -821,8 +821,12 @@ static void init_amd_zn(struct cpuinfo_x86 *c)
 	/*
 	 * Fix erratum 1076: CPB feature bit not being set in CPUID. It affects
 	 * all up to and including B1.
+	 *
+	 * Revision guide for Family 17h, Model 17 has not been released, but
+	 * Model 17, Stepping 0 have the same issue.
 	 */
-	if (c->x86_model <= 1 && c->x86_stepping <= 1)
+	if ((c->x86_model <= 1 && c->x86_stepping <= 1) ||	\
+		(c->x86_model == 17 && c->x86_stepping == 0))
 		set_cpu_cap(c, X86_FEATURE_CPB);
 }
 
