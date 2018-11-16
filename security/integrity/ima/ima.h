@@ -315,6 +315,7 @@ int ima_read_modsig(enum ima_hooks func, const void *buf, loff_t buf_len,
 		    int *xattr_len);
 int ima_get_modsig_hash(struct evm_ima_xattr_data *hdr, enum hash_algo *algo,
 			const u8 **hash, u8 *len);
+int ima_modsig_serialize_data(struct evm_ima_xattr_data **data, int *data_len);
 int ima_modsig_verify(const unsigned int keyring_id,
 		      struct evm_ima_xattr_data *hdr);
 void ima_free_xattr_data(struct evm_ima_xattr_data *hdr);
@@ -335,6 +336,12 @@ static inline int ima_read_modsig(enum ima_hooks func, const void *buf,
 static inline int ima_get_modsig_hash(struct evm_ima_xattr_data *hdr,
 				      enum hash_algo *algo, const u8 **hash,
 				      u8 *len)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int ima_modsig_serialize_data(struct evm_ima_xattr_data **data,
+					    int *data_len)
 {
 	return -EOPNOTSUPP;
 }
