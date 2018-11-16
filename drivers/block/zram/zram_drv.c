@@ -505,6 +505,8 @@ retry:
 	ret = blk_idx;
 out:
 	spin_unlock_irq(&zram->bitmap_lock);
+	if (ret != 0)
+		atomic64_inc(&zram->stats.bd_count);
 
 	return ret;
 }
@@ -518,6 +520,7 @@ static void free_block_bdev(struct zram *zram, unsigned long blk_idx)
 	was_set = test_and_clear_bit(blk_idx, zram->bitmap);
 	spin_unlock_irqrestore(&zram->bitmap_lock, flags);
 	WARN_ON_ONCE(!was_set);
+	atomic64_dec(&zram->stats.bd_count);
 }
 
 static void zram_page_end_io(struct bio *bio)
@@ -661,6 +664,7 @@ static ssize_t writeback_store(struct device *dev,
 			continue;
 		}
 
+		atomic64_inc(&zram->stats.bd_writes);
 		/*
 		 * We released zram_slot_lock so need to check if the slot was
 		 * changed. If there is freeing for the slot, we can catch it
@@ -748,6 +752,7 @@ static int read_from_bdev_sync(struct zram *zram, struct bio_vec *bvec,
 static int read_from_bdev(struct zram *zram, struct bio_vec *bvec,
 			unsigned long entry, struct bio *parent, bool sync)
 {
+	atomic64_inc(&zram->stats.bd_reads);
 	if (sync)
 		return read_from_bdev_sync(zram, bvec, entry, parent);
 	else
@@ -790,6 +795,7 @@ static int write_to_bdev(struct zram *zram, struct bio_vec *bvec,
 
 	submit_bio(bio);
 	*pentry = entry;
+	atomic64_inc(&zram->stats.bd_writes);
 
 	return 0;
 }
@@ -1053,6 +1059,25 @@ static ssize_t mm_stat_show(struct device *dev,
 	return ret;
 }
 
+#ifdef CONFIG_ZRAM_WRITEBACK
+static ssize_t bd_stat_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+	ssize_t ret;
+
+	down_read(&zram->init_lock);
+	ret = scnprintf(buf, PAGE_SIZE,
+			"%8llu %8llu %8llu\n",
+			(u64)atomic64_read(&zram->stats.bd_count),
+			(u64)atomic64_read(&zram->stats.bd_reads),
+			(u64)atomic64_read(&zram->stats.bd_writes));
+	up_read(&zram->init_lock);
+
+	return ret;
+}
+#endif
+
 static ssize_t debug_stat_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1073,6 +1098,9 @@ static ssize_t debug_stat_show(struct device *dev,
 
 static DEVICE_ATTR_RO(io_stat);
 static DEVICE_ATTR_RO(mm_stat);
+#ifdef CONFIG_ZRAM_WRITEBACK
+static DEVICE_ATTR_RO(bd_stat);
+#endif
 static DEVICE_ATTR_RO(debug_stat);
 
 static void zram_meta_free(struct zram *zram, u64 disksize)
@@ -1813,6 +1841,9 @@ static struct attribute *zram_disk_attrs[] = {
 #endif
 	&dev_attr_io_stat.attr,
 	&dev_attr_mm_stat.attr,
+#ifdef CONFIG_ZRAM_WRITEBACK
+	&dev_attr_bd_stat.attr,
+#endif
 	&dev_attr_debug_stat.attr,
 	NULL,
 };
