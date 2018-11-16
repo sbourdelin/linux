@@ -137,31 +137,34 @@ static int handle_async_copy(struct nfs42_copy_res *res,
 			     struct file *dst,
 			     nfs4_stateid *src_stateid)
 {
-	struct nfs4_copy_state *copy;
+	struct nfs4_copy_state *copy, *tmp_copy;
 	int status = NFS4_OK;
 	bool found_pending = false;
 	struct nfs_open_context *ctx = nfs_file_open_context(dst);
-
-	spin_lock(&server->nfs_client->cl_lock);
-	list_for_each_entry(copy, &server->nfs_client->pending_cb_stateids,
-				copies) {
-		if (memcmp(&res->write_res.stateid, &copy->stateid,
-				NFS4_STATEID_SIZE))
-			continue;
-		found_pending = true;
-		list_del(&copy->copies);
-		break;
-	}
-	if (found_pending) {
-		spin_unlock(&server->nfs_client->cl_lock);
-		goto out;
-	}
 
 	copy = kzalloc(sizeof(struct nfs4_copy_state), GFP_NOFS);
 	if (!copy) {
 		spin_unlock(&server->nfs_client->cl_lock);
 		return -ENOMEM;
 	}
+
+	spin_lock(&server->nfs_client->cl_lock);
+	list_for_each_entry(tmp_copy, &server->nfs_client->pending_cb_stateids,
+				copies) {
+		if (memcmp(&res->write_res.stateid, &tmp_copy->stateid,
+				NFS4_STATEID_SIZE))
+			continue;
+		found_pending = true;
+		list_del(&tmp_copy->copies);
+		break;
+	}
+	if (found_pending) {
+		spin_unlock(&server->nfs_client->cl_lock);
+		kfree(copy);
+		copy = tmp_copy;
+		goto out;
+	}
+
 	memcpy(&copy->stateid, &res->write_res.stateid, NFS4_STATEID_SIZE);
 	init_completion(&copy->completion);
 	copy->parent_state = ctx->state;
