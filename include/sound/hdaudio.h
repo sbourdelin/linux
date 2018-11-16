@@ -8,6 +8,7 @@
 
 #include <linux/device.h>
 #include <linux/interrupt.h>
+#include <linux/pci.h>
 #include <linux/pm_runtime.h>
 #include <linux/timecounter.h>
 #include <sound/core.h>
@@ -633,5 +634,10 @@ static inline unsigned int snd_array_index(struct snd_array *array, void *ptr)
 #define snd_array_for_each(array, idx, ptr) \
 	for ((idx) = 0, (ptr) = (array)->list; (idx) < (array)->used; \
 	     (ptr) = snd_array_elem(array, ++(idx)))
+
+/* shared resource with ASoC and legacy HD-audio drivers */
+#ifdef CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+const struct pci_driver *snd_hda_intel_probe(struct pci_dev *pci);
+#endif
 
 #endif /* __SOUND_HDAUDIO_H */

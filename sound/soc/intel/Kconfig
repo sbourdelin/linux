@@ -117,6 +117,14 @@ config SND_SOC_INTEL_SKYLAKE
 	  GeminiLake or CannonLake platform with the DSP enabled in the BIOS
 	  then enable this option by saying Y or m.
 
+config SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+	bool "Fallback legacy HD-audio binding"
+	depends on SND_SOC_INTEL_SKYLAKE
+	depends on SND_HDA_INTEL=y || SND_SOC_INTEL_SKYLAKE=SND_HDA_INTEL
+	help
+	  Fallback binding with the legacy HD-audio driver when no DSP is
+	  found
+
 config SND_SOC_ACPI_INTEL_MATCH
 	tristate
 	select SND_SOC_ACPI if ACPI
