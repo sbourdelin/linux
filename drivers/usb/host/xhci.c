@@ -970,6 +970,7 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 	unsigned int		delay = XHCI_MAX_HALT_USEC;
 	struct usb_hcd		*hcd = xhci_to_hcd(xhci);
 	u32			command;
+	u32			res;
 
 	if (!hcd->state)
 		return 0;
@@ -1025,10 +1026,32 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 	writel(command, &xhci->op_regs->command);
 	if (xhci_handshake(&xhci->op_regs->status,
 				STS_SAVE, 0, 10 * 1000)) {
+		if (xhci->quirks & XHCI_SNPS_BROKEN_SUSPEND) {
+		       /*
+			* AMD SNPS xHC 3.0 occasionally does not clear the
+			* SSS bit of USBSTS and when driver tries to poll
+			* to see if the xHC clears BIT(8) which never happens
+			* and driver assumes that controller is not responding
+			* and times out. To workaround this, its good to check
+			* if SRE and HCE bits are not set (as per xhci
+			* Section 5.4.2) and bypass the timeout.
+			*/
+
+			res = readl(&xhci->op_regs->status);
+			if (res & STS_SAVE) {
+				if (((res & STS_SRE) == 0) &&
+				    ((res & STS_HCE) == 0)) {
+					xhci->quirks |= XHCI_RESET_ON_RESUME;
+					goto complete_suspend;
+				}
+			}
+		}
+
 		xhci_warn(xhci, "WARN: xHC save state timeout\n");
 		spin_unlock_irq(&xhci->lock);
 		return -ETIMEDOUT;
 	}
+ complete_suspend:
 	spin_unlock_irq(&xhci->lock);
 
 	/*
@@ -1213,6 +1236,8 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 	usb_hcd_poll_rh_status(xhci->shared_hcd);
 	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
 	usb_hcd_poll_rh_status(hcd);
+	if (xhci->quirks & XHCI_SNPS_BROKEN_SUSPEND)
+		xhci->quirks &= ~XHCI_RESET_ON_RESUME;
 
 	return retval;
 }
