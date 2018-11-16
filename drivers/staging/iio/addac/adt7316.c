@@ -2103,8 +2103,7 @@ int adt7316_probe(struct device *dev, struct adt7316_bus *bus,
 {
 	struct adt7316_chip_info *chip;
 	struct iio_dev *indio_dev;
-	unsigned short *adt7316_platform_data = dev->platform_data;
-	int irq_type = IRQF_TRIGGER_LOW;
+	int irq_type;
 	int ret = 0;
 
 	indio_dev = devm_iio_device_alloc(dev, sizeof(*chip));
@@ -2148,8 +2147,22 @@ int adt7316_probe(struct device *dev, struct adt7316_bus *bus,
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
 	if (chip->bus.irq > 0) {
-		if (adt7316_platform_data[0])
-			irq_type = adt7316_platform_data[0];
+		irq_type =
+			irqd_get_trigger_type(irq_get_irq_data(chip->bus.irq));
+
+		switch (irq_type) {
+		case IRQF_TRIGGER_HIGH:
+		case IRQF_TRIGGER_RISING:
+			break;
+		case IRQF_TRIGGER_LOW:
+		case IRQF_TRIGGER_FALLING:
+			break;
+		default:
+			dev_info(dev, "mode %d unsupported, using IRQF_TRIGGER_LOW\n",
+				 irq_type);
+			irq_type = IRQF_TRIGGER_LOW;
+			break;
+		}
 
 		ret = devm_request_threaded_irq(dev, chip->bus.irq,
 						NULL,
