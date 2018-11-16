@@ -53,6 +53,11 @@ static size_t huge_class_size;
 
 static void zram_free_page(struct zram *zram, size_t index);
 
+static int zram_slot_trylock(struct zram *zram, u32 index)
+{
+	return bit_spin_trylock(ZRAM_LOCK, &zram->table[index].value);
+}
+
 static void zram_slot_lock(struct zram *zram, u32 index)
 {
 	bit_spin_lock(ZRAM_LOCK, &zram->table[index].value);
@@ -443,29 +448,45 @@ out:
 
 static unsigned long get_entry_bdev(struct zram *zram)
 {
-	unsigned long entry;
+	unsigned long blk_idx;
+	unsigned long ret = 0;
 
-	spin_lock(&zram->bitmap_lock);
 	/* skip 0 bit to confuse zram.handle = 0 */
-	entry = find_next_zero_bit(zram->bitmap, zram->nr_pages, 1);
-	if (entry == zram->nr_pages) {
-		spin_unlock(&zram->bitmap_lock);
-		return 0;
+	blk_idx = find_next_zero_bit(zram->bitmap, zram->nr_pages, 1);
+	if (blk_idx == zram->nr_pages)
+		goto retry;
+
+	spin_lock_irq(&zram->bitmap_lock);
+	if (test_bit(blk_idx, zram->bitmap)) {
+		spin_unlock_irq(&zram->bitmap_lock);
+		goto retry;
 	}
 
-	set_bit(entry, zram->bitmap);
-	spin_unlock(&zram->bitmap_lock);
+	set_bit(blk_idx, zram->bitmap);
+	ret = blk_idx;
+	goto out;
+retry:
+	spin_lock_irq(&zram->bitmap_lock);
+	blk_idx = find_next_zero_bit(zram->bitmap, zram->nr_pages, 1);
+	if (blk_idx == zram->nr_pages)
+		goto out;
 
-	return entry;
+	set_bit(blk_idx, zram->bitmap);
+	ret = blk_idx;
+out:
+	spin_unlock_irq(&zram->bitmap_lock);
+
+	return ret;
 }
 
 static void put_entry_bdev(struct zram *zram, unsigned long entry)
 {
 	int was_set;
+	unsigned long flags;
 
-	spin_lock(&zram->bitmap_lock);
+	spin_lock_irqsave(&zram->bitmap_lock, flags);
 	was_set = test_and_clear_bit(entry, zram->bitmap);
-	spin_unlock(&zram->bitmap_lock);
+	spin_unlock_irqrestore(&zram->bitmap_lock, flags);
 	WARN_ON_ONCE(!was_set);
 }
 
@@ -886,9 +907,10 @@ static ssize_t debug_stat_show(struct device *dev,
 
 	down_read(&zram->init_lock);
 	ret = scnprintf(buf, PAGE_SIZE,
-			"version: %d\n%8llu\n",
+			"version: %d\n%8llu %8llu\n",
 			version,
-			(u64)atomic64_read(&zram->stats.writestall));
+			(u64)atomic64_read(&zram->stats.writestall),
+			(u64)atomic64_read(&zram->stats.miss_free));
 	up_read(&zram->init_lock);
 
 	return ret;
@@ -1400,10 +1422,14 @@ static void zram_slot_free_notify(struct block_device *bdev,
 
 	zram = bdev->bd_disk->private_data;
 
-	zram_slot_lock(zram, index);
+	atomic64_inc(&zram->stats.notify_free);
+	if (!zram_slot_trylock(zram, index)) {
+		atomic64_inc(&zram->stats.miss_free);
+		return;
+	}
+
 	zram_free_page(zram, index);
 	zram_slot_unlock(zram, index);
-	atomic64_inc(&zram->stats.notify_free);
 }
 
 static int zram_rw_page(struct block_device *bdev, sector_t sector,
