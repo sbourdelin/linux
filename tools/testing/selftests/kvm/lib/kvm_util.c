@@ -586,14 +586,23 @@ void vm_userspace_mem_region_add(struct kvm_vm *vm,
 				 src_type == VM_MEM_SRC_ANONYMOUS_THP ?  huge_page_size : 1);
 
 	/* As needed perform madvise */
-	if (src_type == VM_MEM_SRC_ANONYMOUS || src_type == VM_MEM_SRC_ANONYMOUS_THP) {
+	if (src_type == VM_MEM_SRC_ANONYMOUS) {
+		/*
+		 * Neglect madvise error because it is ok to not have THP
+		 * support in this case.
+		 */
+		madvise(region->host_mem, npages * vm->page_size,
+			MADV_NOHUGEPAGE);
+	} else if (src_type == VM_MEM_SRC_ANONYMOUS_THP) {
 		ret = madvise(region->host_mem, npages * vm->page_size,
-			     src_type == VM_MEM_SRC_ANONYMOUS ? MADV_NOHUGEPAGE : MADV_HUGEPAGE);
+			MADV_HUGEPAGE);
 		TEST_ASSERT(ret == 0, "madvise failed,\n"
-			    "  addr: %p\n"
-			    "  length: 0x%lx\n"
-			    "  src_type: %x",
-			    region->host_mem, npages * vm->page_size, src_type);
+			"Does the kernel have CONFIG_TRANSPARENT_HUGEPAGE=y\n"
+			"  addr: %p\n"
+			"  length: 0x%lx\n"
+			"  src_type: %x\n",
+			region->host_mem, npages * vm->page_size,
+			src_type);
 	}
 
 	region->unused_phy_pages = sparsebit_alloc();
