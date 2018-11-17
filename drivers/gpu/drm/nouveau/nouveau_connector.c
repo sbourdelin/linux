@@ -1171,6 +1171,38 @@ nouveau_connector_hotplug(struct nvif_notify *notify)
 	return NVIF_NOTIFY_KEEP;
 }
 
+static int
+nouveau_connector_aux_pre_xfer(struct drm_dp_aux *obj)
+{
+	struct nouveau_connector *nv_connector =
+		container_of(obj, typeof(*nv_connector), aux);
+	struct nouveau_drm *drm = nouveau_drm(nv_connector->base.dev);
+	int ret;
+
+	if (nouveau_is_rpm_worker(drm))
+		return 0;
+
+	ret = pm_runtime_get_sync(drm->dev->dev);
+	if (ret < 0 && ret != -EAGAIN)
+		return ret;
+
+	return 0;
+}
+
+static void
+nouveau_connector_aux_post_xfer(struct drm_dp_aux *obj)
+{
+	struct nouveau_connector *nv_connector =
+		container_of(obj, typeof(*nv_connector), aux);
+	struct nouveau_drm *drm = nouveau_drm(nv_connector->base.dev);
+
+	if (nouveau_is_rpm_worker(drm))
+		return;
+
+	pm_runtime_mark_last_busy(drm->dev->dev);
+	pm_runtime_put_autosuspend(drm->dev->dev);
+}
+
 static ssize_t
 nouveau_connector_aux_xfer(struct drm_dp_aux *obj, struct drm_dp_aux_msg *msg)
 {
@@ -1341,6 +1373,10 @@ nouveau_connector_create(struct drm_device *dev, int index)
 	case DRM_MODE_CONNECTOR_DisplayPort:
 	case DRM_MODE_CONNECTOR_eDP:
 		nv_connector->aux.dev = dev->dev;
+		nv_connector->aux.pre_transfer =
+			nouveau_connector_aux_pre_xfer;
+		nv_connector->aux.post_transfer =
+			nouveau_connector_aux_post_xfer;
 		nv_connector->aux.transfer = nouveau_connector_aux_xfer;
 		ret = drm_dp_aux_register(&nv_connector->aux);
 		if (ret) {

@@ -859,12 +859,15 @@ nouveau_pmops_runtime_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct nouveau_drm *drm = nouveau_drm(drm_dev);
 	int ret;
 
 	if (!nouveau_pmops_runtime()) {
 		pm_runtime_forbid(dev);
 		return -EBUSY;
 	}
+
+	drm->rpm_task = current;
 
 	nouveau_switcheroo_optimus_dsm();
 	ret = nouveau_do_suspend(drm_dev, true);
@@ -873,6 +876,8 @@ nouveau_pmops_runtime_suspend(struct device *dev)
 	pci_ignore_hotplug(pdev);
 	pci_set_power_state(pdev, PCI_D3cold);
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_DYNAMIC_OFF;
+
+	drm->rpm_task = NULL;
 	return ret;
 }
 
@@ -881,6 +886,7 @@ nouveau_pmops_runtime_resume(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct nouveau_drm *drm = nouveau_drm(drm_dev);
 	struct nvif_device *device = &nouveau_drm(drm_dev)->client.device;
 	int ret;
 
@@ -889,11 +895,13 @@ nouveau_pmops_runtime_resume(struct device *dev)
 		return -EBUSY;
 	}
 
+	drm->rpm_task = current;
+
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
-		return ret;
+		goto out;
 	pci_set_master(pdev);
 
 	ret = nouveau_do_resume(drm_dev, true);
@@ -905,6 +913,8 @@ nouveau_pmops_runtime_resume(struct device *dev)
 	/* Monitors may have been connected / disconnected during suspend */
 	schedule_work(&nouveau_drm(drm_dev)->hpd_work);
 
+out:
+	drm->rpm_task = NULL;
 	return ret;
 }
 

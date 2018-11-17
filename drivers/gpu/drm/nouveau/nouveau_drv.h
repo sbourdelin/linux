@@ -212,6 +212,8 @@ struct nouveau_drm {
 	bool have_disp_power_ref;
 
 	struct dev_pm_domain vga_pm_domain;
+
+	struct task_struct *rpm_task;
 };
 
 static inline struct nouveau_drm *
@@ -230,6 +232,12 @@ nouveau_drm_use_coherent_gpu_mapping(struct nouveau_drm *drm)
 int nouveau_pmops_suspend(struct device *);
 int nouveau_pmops_resume(struct device *);
 bool nouveau_pmops_runtime(void);
+
+static inline bool
+nouveau_is_rpm_worker(struct nouveau_drm *drm)
+{
+	return drm->rpm_task == current;
+}
 
 #include <nvkm/core/tegra.h>
 
