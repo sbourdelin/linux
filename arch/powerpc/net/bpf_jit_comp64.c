@@ -1021,11 +1021,8 @@ out:
 	return fp;
 }
 
-/* Overriding bpf_jit_free() as we don't set images read-only. */
-void bpf_jit_free(struct bpf_prog *fp)
+/* Overriding bpf_jit_binary_free() as we don't set images read-only. */
+void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 {
-	if (fp->jited)
-		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
-
-	bpf_prog_unlock_free(fp);
+	module_memfree(hdr);
 }

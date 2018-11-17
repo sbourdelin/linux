@@ -646,25 +646,20 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	return hdr;
 }
 
-void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+void __weak bpf_jit_binary_free(struct bpf_binary_header *hdr)
 {
-	u32 pages = hdr->pages;
-
+	bpf_jit_binary_unlock_ro(hdr);
 	module_memfree(hdr);
-	bpf_jit_uncharge_modmem(pages);
 }
 
-/* This symbol is only overridden by archs that have different
- * requirements than the usual eBPF JITs, f.e. when they only
- * implement cBPF JIT, do not set images read-only, etc.
- */
-void __weak bpf_jit_free(struct bpf_prog *fp)
+void bpf_jit_free(struct bpf_prog *fp)
 {
 	if (fp->jited) {
 		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
+		u32 pages = hdr->pages;
 
-		bpf_jit_binary_unlock_ro(hdr);
 		bpf_jit_binary_free(hdr);
+		bpf_jit_uncharge_modmem(pages);
 
 		WARN_ON_ONCE(!bpf_prog_kallsyms_verify_off(fp));
 	}

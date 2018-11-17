@@ -1261,10 +1261,7 @@ out:
 	kfree(ctx.offsets);
 }
 
-void bpf_jit_free(struct bpf_prog *fp)
+void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 {
-	if (fp->jited)
-		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
-
-	bpf_prog_unlock_free(fp);
+	module_memfree(hdr);
 }
