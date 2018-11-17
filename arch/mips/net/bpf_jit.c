@@ -1264,7 +1264,7 @@ out:
 void bpf_jit_free(struct bpf_prog *fp)
 {
 	if (fp->jited)
-		module_memfree(fp->bpf_func);
+		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
 
 	bpf_prog_unlock_free(fp);
 }
