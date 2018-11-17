@@ -285,7 +285,7 @@ static void handle_prrn_event(s32 scope)
 	 * the RTAS event.
 	 */
 	pseries_devicetree_update(-scope);
-	numa_update_cpu_topology(false);
+	topology_schedule_update();
 }
 
 static void handle_rtas_event(const struct rtas_error_log *log)
