@@ -2248,6 +2248,7 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 {
 #ifdef CONFIG_SLUB_CPU_PARTIAL
 	struct page *oldpage;
+	unsigned long tid;
 	int pages;
 	int pobjects;
 
@@ -2255,8 +2256,12 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 	do {
 		pages = 0;
 		pobjects = 0;
-		oldpage = this_cpu_read(s->cpu_slab->partial);
 
+		tid = this_cpu_read(s->cpu_slab->tid);
+		/* read tid before reading oldpage */
+		barrier();
+
+		oldpage = this_cpu_read(s->cpu_slab->partial);
 		if (oldpage) {
 			pobjects = oldpage->pobjects;
 			pages = oldpage->pages;
@@ -2283,8 +2288,17 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 		page->pobjects = pobjects;
 		page->next = oldpage;
 
-	} while (this_cpu_cmpxchg(s->cpu_slab->partial, oldpage, page)
-								!= oldpage);
+		/* we dont' change tid, but want to make sure it didn't change
+		 * in between. We don't really hope alloc/free not happen on
+		 * this CPU, but don't want the first slab be removed from and
+		 * then re-added as head to this partial list. If that case
+		 * happened, pobjects may read 0xdead0000 when this slab is just
+		 * removed from kmem_cache_node by other CPU setting lru.prev
+		 * to LIST_POISON2.
+		 */
+	} while (this_cpu_cmpxchg_double(s->cpu_slab->partial, s->cpu_slab->tid,
+					 oldpage, tid, page, tid) == 0);
+
 	if (unlikely(!s->cpu_partial)) {
 		unsigned long flags;
 
