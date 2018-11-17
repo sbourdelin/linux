@@ -209,6 +209,15 @@ int phy_pm_runtime_put_sync(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(phy_pm_runtime_put_sync);
 
+bool phy_pm_runtime_enabled(struct phy *phy)
+{
+	if (!phy)
+		return false;
+
+	return pm_runtime_enabled(&phy->dev);
+}
+EXPORT_SYMBOL_GPL(phy_pm_runtime_enabled);
+
 void phy_pm_runtime_allow(struct phy *phy)
 {
 	if (!phy)
