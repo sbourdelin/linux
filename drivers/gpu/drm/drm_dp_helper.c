@@ -224,6 +224,10 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 	msg.buffer = buffer;
 	msg.size = size;
 
+	ret = drm_dp_aux_get(aux);
+	if (ret)
+		return ret;
+
 	mutex_lock(&aux->hw_mutex);
 
 	/*
@@ -265,6 +269,7 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 
 unlock:
 	mutex_unlock(&aux->hw_mutex);
+	drm_dp_aux_put(aux);
 	return ret;
 }
 

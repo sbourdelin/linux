@@ -1146,6 +1146,46 @@ struct drm_dp_aux {
 	struct mutex hw_mutex;
 	struct work_struct crc_work;
 	u8 crc_count;
+	/**
+	 * @pre_transfer:
+	 *
+	 * An optional callback for drivers that if implemented, will be
+	 * called before locking @hw_mutex and beginning a DP AUX transaction.
+	 *
+	 * Drivers can use this to perform any initialization that might be
+	 * required before the DP AUX channel is ready to be used, such as
+	 * waking up the device housing the AUX channel.
+	 *
+	 * This callback may be called more then once for a single
+	 * transaction.
+	 *
+	 * See also:
+	 * drm_dp_aux_get()
+	 * drm_dp_aux_put()
+	 *
+	 * Returns:
+	 *
+	 * 0 on success, negative error code on failure.
+	 */
+	int (*pre_transfer)(struct drm_dp_aux *aux);
+	/**
+	 * @post_transfer:
+	 *
+	 * An optional callback for drivers that if implemented, will be
+	 * called after having performed a DP AUX transaction.
+	 *
+	 * Drivers can use this to undo any initialization that was performed
+	 * by @pre_transfer, such as putting the device housing the DP AUX
+	 * channel back to sleep.
+	 *
+	 * This callback may be called more then once for a single
+	 * transaction.
+	 *
+	 * See also:
+	 * drm_dp_aux_get()
+	 * drm_dp_aux_put()
+	 */
+	void (*post_transfer)(struct drm_dp_aux *aux);
 	ssize_t (*transfer)(struct drm_dp_aux *aux,
 			    struct drm_dp_aux_msg *msg);
 	/**
@@ -1161,6 +1201,57 @@ struct drm_dp_aux {
 	 */
 	struct drm_dp_aux_cec cec;
 };
+
+/**
+ * drm_dp_aux_get() - Prepare a DP AUX channel for a transaction
+ * @aux: DisplayPort AUX channel to initialize
+ *
+ * If implemented by the driver, this function will invoke the
+ * &drm_dp_aux.pre_transfer callback for the given @aux device. This function
+ * can be used to setup the DP AUX channel before going under lock, in order
+ * to avoid lock inversion between the DP AUX channel setup and
+ * &drm_dp_aux.hw_mutex. This function is implicitly called by
+ * drm_dp_dpcd_read(), drm_dp_dpcd_readb(), drm_dp_dpcd_write(), and
+ * drm_dp_dpcd_writeb().
+ *
+ * Each call to drm_dp_aux_get() must have a matching drm_dp_aux_put() call to
+ * cleanup any resources that were required for the DP AUX transaction.
+ *
+ * See also:
+ * drm_dp_aux_put()
+ *
+ * Returns:
+ * 0 on success, negative error code on failure
+ */
+static inline int drm_dp_aux_get(struct drm_dp_aux *aux)
+{
+	if (aux->pre_transfer)
+		return aux->pre_transfer(aux);
+	else
+		return 0;
+}
+
+/**
+ * drm_dp_aux_put() - Cleanup after performing a transaction on a DP AUX
+ * channel
+ * @aux: DisplayPort AUX channel to cleanup
+ *
+ * If implemented by the driver, this function will invoke the
+ * &drm_dp_aux.post_transfer callback for the given @aux device. This function
+ * is implicitly called by drm_dp_dpcd_read(), drm_dp_dpcd_readb(),
+ * drm_dp_dpcd_write(), and drm_dp_dpcd_writeb().
+ *
+ * Each call to drm_dp_aux_get() must have a matching drm_dp_aux_put() call to
+ * cleanup any resources that were required for the DP AUX transaction.
+ *
+ * See also:
+ * drm_dp_aux_get()
+ */
+static inline void drm_dp_aux_put(struct drm_dp_aux *aux)
+{
+	if (aux->post_transfer)
+		aux->post_transfer(aux);
+}
 
 ssize_t drm_dp_dpcd_read(struct drm_dp_aux *aux, unsigned int offset,
 			 void *buffer, size_t size);
