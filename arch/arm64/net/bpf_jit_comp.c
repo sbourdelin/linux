@@ -940,3 +940,14 @@ out:
 					   tmp : orig_prog);
 	return prog;
 }
+
+void *bpf_jit_alloc_exec(unsigned long size)
+{
+	return vmalloc_exec(size);
+}
+
+void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+{
+	bpf_jit_binary_unlock_ro(hdr);
+	vfree(hdr);
+}
