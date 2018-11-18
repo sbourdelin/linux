@@ -18,6 +18,7 @@
 #include "gadget.h"
 #include "core.h"
 #include "host-export.h"
+#include "gadget-export.h"
 #include "drd.h"
 
 static inline struct cdns3_role_driver *cdns3_get_current_role_driver(struct cdns3 *cdns)
@@ -104,7 +105,8 @@ static int cdns3_core_init_role(struct cdns3 *cdns)
 	}
 
 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-		//TODO: implements device initialization
+		if (cdns3_gadget_init(cdns))
+			dev_info(dev, "doesn't support gadget\n");
 	}
 
 	if (!cdns->roles[CDNS3_ROLE_HOST] && !cdns->roles[CDNS3_ROLE_GADGET]) {
@@ -144,6 +146,7 @@ static irqreturn_t cdns3_irq(int irq, void *data)
 
 static void cdns3_remove_roles(struct cdns3 *cdns)
 {
+	cdns3_gadget_remove(cdns);
 	cdns3_host_remove(cdns);
 }
 
