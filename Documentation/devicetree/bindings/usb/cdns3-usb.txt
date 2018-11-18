@@ -1,0 +1,17 @@
+Binding for the Cadence USBSS-DRD controller
+
+Required properties:
+  - reg: Physical base address and size of the controller's register area.
+  - compatible: Should contain: "cdns,usb3"
+  - interrupts: Interrupt specifier. Refer to interrupt bindings.
+
+
+Example:
+	cdns3@f3000000 {
+		compatible = "cdns,usb3";
+		interrupts = <USB_IRQ  7 IRQ_TYPE_LEVEL_HIGH>;
+		reg = <0xf3000000 0x10000	//memory area for OTG/DRD registers
+			0xf3010000 0x10000	//memory area for HOST registers
+			0xf3020000 0x10000>;	//memory area for Device registers
+	};
+
