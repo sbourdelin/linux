@@ -2881,7 +2881,8 @@ inline ssize_t generic_write_checks(struct kiocb *iocb, struct iov_iter *from)
 	if (iocb->ki_flags & IOCB_APPEND)
 		iocb->ki_pos = i_size_read(inode);
 
-	if ((iocb->ki_flags & IOCB_NOWAIT) && !(iocb->ki_flags & IOCB_DIRECT))
+	if ((iocb->ki_flags & (IOCB_NOWAIT | IOCB_DIRECT)) ==
+	    IOCB_NOWAIT)
 		return -EINVAL;
 
 	count = iov_iter_count(from);
