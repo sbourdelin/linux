@@ -88,6 +88,7 @@
 #include <linux/fs_struct.h>
 #include <linux/slab.h>
 #include <linux/sched/autogroup.h>
+#include <linux/sched/signal.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/coredump.h>
 #include <linux/sched/debug.h>
@@ -95,6 +96,7 @@
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
 #include <trace/events/oom.h>
+#include <uapi/linux/procfd.h>
 #include "internal.h"
 #include "fd.h"
 
@@ -3032,10 +3034,41 @@ static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
 				   tgid_base_stuff, ARRAY_SIZE(tgid_base_stuff));
 }
 
+static int proc_tgid_open(struct inode *inode, struct file *file)
+{
+	/* grab reference to struct pid */
+	file->private_data = get_pid(proc_pid(inode));
+	return 0;
+}
+
+static int proc_tgid_release(struct inode *inode, struct file *file)
+{
+	struct pid *pid = file->private_data;
+	/* drop reference to struct pid */
+	put_pid(pid);
+	return 0;
+}
+
+static long proc_tgid_ioctl(struct file *file, unsigned int cmd,
+			    unsigned long arg)
+{
+	struct pid *pid = file->private_data;
+
+	switch (cmd) {
+	case PROC_FD_SIGNAL:
+		return kill_pid(pid, arg, 1);
+	default:
+		return -EINVAL;
+	}
+}
+
 static const struct file_operations proc_tgid_base_operations = {
+	.open		= proc_tgid_open,
 	.read		= generic_read_dir,
 	.iterate_shared	= proc_tgid_base_readdir,
 	.llseek		= generic_file_llseek,
+	.release	= proc_tgid_release,
+	.unlocked_ioctl	= proc_tgid_ioctl,
 };
 
 static struct dentry *proc_tgid_base_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
