@@ -3,6 +3,7 @@ Allwinner Clock Control Unit Binding
 
 Required properties :
 - compatible: must contain one of the following compatibles:
+		- "allwinner,suniv-f1c100s-ccu"
 		- "allwinner,sun4i-a10-ccu"
 		- "allwinner,sun5i-a10s-ccu"
 		- "allwinner,sun5i-a13-ccu"
