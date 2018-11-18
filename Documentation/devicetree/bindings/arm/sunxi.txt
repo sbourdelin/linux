@@ -3,6 +3,7 @@ Allwinner sunXi Platforms Device Tree Bindings
 Each device tree must specify which Allwinner SoC it uses,
 using one of the following compatible strings:
 
+  allwinner,suniv-f1c100s
   allwinner,sun4i-a10
   allwinner,sun5i-a10s
   allwinner,sun5i-a13
