@@ -2591,9 +2591,8 @@ omap_ep_setup(char *name, u8 addr, u8 type,
 	return buf;
 }
 
-static void omap_udc_release(struct device *dev)
+static void omap_udc_release(void)
 {
-	complete(udc->done);
 	kfree(udc);
 	udc = NULL;
 }
@@ -2900,16 +2899,14 @@ bad_on_1710:
 	}
 
 	create_proc_file();
-	status = usb_add_gadget_udc_release(&pdev->dev, &udc->gadget,
-			omap_udc_release);
+	status = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
 	if (!status)
 		return 0;
 
 	remove_proc_file();
 
 cleanup1:
-	kfree(udc);
-	udc = NULL;
+	omap_udc_release();
 
 cleanup0:
 	if (!IS_ERR_OR_NULL(xceiv))
@@ -2930,16 +2927,12 @@ cleanup0:
 
 static int omap_udc_remove(struct platform_device *pdev)
 {
-	DECLARE_COMPLETION_ONSTACK(done);
-
 	if (!udc)
 		return -ENODEV;
 
 	usb_del_gadget_udc(&udc->gadget);
 	if (udc->driver)
 		return -EBUSY;
-
-	udc->done = &done;
 
 	pullup_disable(udc);
 	if (!IS_ERR_OR_NULL(udc->transceiver)) {
@@ -2960,7 +2953,7 @@ static int omap_udc_remove(struct platform_device *pdev)
 	release_mem_region(pdev->resource[0].start,
 			pdev->resource[0].end - pdev->resource[0].start + 1);
 
-	wait_for_completion(&done);
+	omap_udc_release();
 
 	return 0;
 }
