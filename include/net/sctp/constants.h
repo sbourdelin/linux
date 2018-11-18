@@ -293,6 +293,9 @@ enum { SCTP_MAX_GABS = 16 };
 					 */
 #define SCTP_DEFAULT_MINSEGMENT 512	/* MTU size ... if no mtu disc */
 
+/* An association's fragmentation point should never be non-positive */
+#define SCTP_FRAG_POINT_MIN 1
+
 #define SCTP_SECRET_SIZE 32		/* Number of octets in a 256 bits. */
 
 #define SCTP_SIGNATURE_SIZE 20	        /* size of a SLA-1 signature */

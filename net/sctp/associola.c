@@ -1431,13 +1431,14 @@ void sctp_assoc_update_frag_point(struct sctp_association *asoc)
 
 void sctp_assoc_set_pmtu(struct sctp_association *asoc, __u32 pmtu)
 {
-	if (asoc->pathmtu != pmtu) {
-		asoc->pathmtu = pmtu;
-		sctp_assoc_update_frag_point(asoc);
-	}
+	pr_debug("%s: before asoc:%p, pmtu:%d, frag_point:%d\n",
+		__func__, asoc, asoc->pathmtu, asoc->frag_point);
 
-	pr_debug("%s: asoc:%p, pmtu:%d, frag_point:%d\n", __func__, asoc,
-		 asoc->pathmtu, asoc->frag_point);
+	asoc->pathmtu = pmtu;
+	sctp_assoc_update_frag_point(asoc);
+
+	pr_debug("%s: after asoc:%p, pmtu:%d, frag_point:%d\n",
+		__func__, asoc, asoc->pathmtu, asoc->frag_point);
 }
 
 /* Update the association's pmtu and frag_point by going through all the

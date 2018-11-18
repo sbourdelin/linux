@@ -190,6 +190,12 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	/* This is the biggest possible DATA chunk that can fit into
 	 * the packet
 	 */
+	if (asoc->frag_point < SCTP_FRAG_POINT_MIN) {
+		pr_warn("%s: asoc:%p->frag_point is less than allowed (%d<%d)",
+			__func__, asoc, asoc->frag_point, SCTP_FRAG_POINT_MIN);
+		pr_warn("forcing minimum value to avoid chunking endlessly");
+		asoc->frag_point = SCTP_FRAG_POINT_MIN;
+	}
 	max_data = asoc->frag_point;
 
 	/* If the the peer requested that we authenticate DATA chunks
