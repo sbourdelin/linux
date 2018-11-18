@@ -7,6 +7,7 @@ the pins includes drive strength and pull-up.
 
 Required properties:
 - compatible: Should be one of the following (depending on your SoC):
+  "allwinner,suniv-f1c100s-pinctrl"
   "allwinner,sun4i-a10-pinctrl"
   "allwinner,sun5i-a10s-pinctrl"
   "allwinner,sun5i-a13-pinctrl"
