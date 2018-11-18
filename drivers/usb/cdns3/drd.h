@@ -119,4 +119,7 @@ int cdns3_drd_init(struct cdns3 *cdns);
 int cdns3_drd_update_mode(struct cdns3 *cdns);
 irqreturn_t cdns3_drd_irq(struct cdns3 *cdns);
 
+void cdns3_debugfs_init(struct cdns3 *cdns);
+void cdns3_debugfs_exit(struct cdns3 *cdns);
+
 #endif /* __LINUX_CDNS3_DRD */
