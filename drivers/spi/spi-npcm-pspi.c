@@ -199,11 +199,11 @@ static void npcm_pspi_send(struct npcm_pspi *priv)
 	wsize = min(bytes_per_word(priv->bits_per_word), priv->tx_bytes);
 	priv->tx_bytes -= wsize;
 
-	if (priv->tx_buf) {
-		if (wsize == 1)
-			iowrite8(*priv->tx_buf, NPCM_PSPI_DATA + priv->base);
+	if (priv->tx_buf && wsize) {
 		if (wsize == 2)
 			iowrite16(*priv->tx_buf, NPCM_PSPI_DATA + priv->base);
+		else
+			iowrite8(*priv->tx_buf, NPCM_PSPI_DATA + priv->base);
 
 		priv->tx_buf += wsize;
 	}
@@ -217,11 +217,11 @@ static void npcm_pspi_recv(struct npcm_pspi *priv)
 	rsize = min(bytes_per_word(priv->bits_per_word), priv->rx_bytes);
 	priv->rx_bytes -= rsize;
 
-	if (priv->rx_buf) {
-		if (rsize == 1)
-			val = ioread8(priv->base + NPCM_PSPI_DATA);
+	if (priv->rx_buf && rsize) {
 		if (rsize == 2)
 			val = ioread16(priv->base + NPCM_PSPI_DATA);
+		else
+			val = ioread8(priv->base + NPCM_PSPI_DATA);
 
 		*priv->rx_buf = val;
 		priv->rx_buf += rsize;
