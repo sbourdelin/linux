@@ -1,6 +1,6 @@
 menuconfig ARCH_SUNXI
 	bool "Allwinner SoCs"
-	depends on ARCH_MULTI_V7
+	depends on ARCH_MULTI_V5 || ARCH_MULTI_V7
 	select ARCH_HAS_RESET_CONTROLLER
 	select CLKSRC_MMIO
 	select GENERIC_IRQ_CHIP
@@ -61,6 +61,18 @@ config ARCH_SUNXI_MC_SMP
 	default MACH_SUN9I || MACH_SUN8I
 	select ARM_CCI400_PORT_CTRL
 	select ARM_CPU_SUSPEND
+
+endif
+
+if ARCH_MULTI_V5
+
+config ARCH_SUNXI_V5
+	bool
+	select SUN4I_TIMER
+
+config MACH_SUNIV
+	bool "Allwinner new F-series (suniv) SoCs support"
+	select ARCH_SUNXI_V5
 
 endif
 
