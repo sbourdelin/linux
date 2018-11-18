@@ -444,6 +444,18 @@ config DEBUG_OBJECTS
 	  kernel to track the life time of various objects and validate
 	  the operations on those objects.
 
+config DEBUG_OBJECTS_POOL_SIZE
+	int "Debug objects pool size"
+	depends on DEBUG_OBJECTS_TIMERS || DEBUG_OBJECTS_WORK
+	default 1024
+	help
+	  Some debug objects are allocated during the early boot. Enable some
+	  config options may requires the sizes below,
+
+	  DEBUG_OBJECTS_TIMERS: No. CPUs x 2 (worker pool) + No. CPUs (hrtimer)
+	  DEBUG_OBJECTS_WORK:   No. CPUs x 2 (worker pool) x 6 (workqueue) +
+				No. CPUs x 2 (worker pool)
+
 config DEBUG_OBJECTS_SELFTEST
 	bool "Debug objects selftest"
 	depends on DEBUG_OBJECTS
