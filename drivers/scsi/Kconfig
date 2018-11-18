@@ -62,6 +62,19 @@ config SCSI_MQ_DEFAULT
 
 	  If unsure say Y.
 
+config SCSI_HWMON
+	bool "S.M.A.R.T. HWMON support"
+	depends on (SCSI=m && HWMON) || HWMON=y
+	help
+	  This options compiles in code to support temperature reading
+	  from a SCSI device using the S.M.A.R.T. (Self-Monitoring,
+	  Analysis and Reporting Technology) support for temperature
+	  sensors found in some hard drives. The drive will be probed
+	  to figure out if it has a temperature sensor, and if it does
+	  the kernel hardware monitor framework will be utilized to
+	  interact with the sensor. This work orthogonal to any userspace
+	  S.M.A.R.T. access tools.
+
 config SCSI_PROC_FS
 	bool "legacy /proc/scsi/ support"
 	depends on SCSI && PROC_FS

@@ -49,6 +49,7 @@
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
+#include "scsi_hwmon.h"
 
 #define ALLOC_FAILURE_MSG	KERN_ERR "%s: Allocation failure during" \
 	" SCSI scanning, some SCSI devices might not be configured\n"
@@ -998,6 +999,9 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 	if (!async && scsi_sysfs_add_sdev(sdev) != 0)
 		return SCSI_SCAN_NO_RESPONSE;
 
+	if (!async)
+		scsi_hwmon_probe(sdev);
+
 	return SCSI_SCAN_LUN_PRESENT;
 }
 
@@ -1707,6 +1711,7 @@ static void scsi_sysfs_add_devices(struct Scsi_Host *shost)
 		if (!scsi_host_scan_allowed(shost) ||
 		    scsi_sysfs_add_sdev(sdev) != 0)
 			__scsi_remove_device(sdev);
+		scsi_hwmon_probe(sdev);
 	}
 }
 
