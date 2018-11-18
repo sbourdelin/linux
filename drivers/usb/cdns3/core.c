@@ -17,6 +17,7 @@
 
 #include "gadget.h"
 #include "core.h"
+#include "host-export.h"
 #include "drd.h"
 
 static inline struct cdns3_role_driver *cdns3_get_current_role_driver(struct cdns3 *cdns)
@@ -98,7 +99,8 @@ static int cdns3_core_init_role(struct cdns3 *cdns)
 	}
 
 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-		//TODO: implements host initialization
+		if (cdns3_host_init(cdns))
+			dev_info(dev, "doesn't support host\n");
 	}
 
 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
@@ -142,7 +144,7 @@ static irqreturn_t cdns3_irq(int irq, void *data)
 
 static void cdns3_remove_roles(struct cdns3 *cdns)
 {
-	//TODO: implements this function
+	cdns3_host_remove(cdns);
 }
 
 static int cdns3_do_role_switch(struct cdns3 *cdns, enum cdns3_roles role)
@@ -410,6 +412,7 @@ static struct platform_driver cdns3_driver = {
 
 static int __init cdns3_driver_platform_register(void)
 {
+	cdns3_host_driver_init();
 	return platform_driver_register(&cdns3_driver);
 }
 module_init(cdns3_driver_platform_register);
