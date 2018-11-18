@@ -78,9 +78,9 @@ static void arche_platform_set_state(struct arche_platform_drvdata *arche_pdata,
 }
 
 /* Requires arche_pdata->wake_lock is held by calling context */
-static void arche_platform_set_wake_detect_state(
-				struct arche_platform_drvdata *arche_pdata,
-				enum svc_wakedetect_state state)
+static void
+arche_platform_set_wake_detect_state(struct arche_platform_drvdata *arche_pdata,
+				     enum svc_wakedetect_state state)
 {
 	arche_pdata->wake_detect_state = state;
 }
