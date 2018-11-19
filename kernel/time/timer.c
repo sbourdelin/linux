@@ -1674,12 +1674,13 @@ static inline void __run_timers(struct timer_base *base)
 	base->must_forward_clk = false;
 
 	while (time_after_eq(jiffies, base->clk)) {
+		int i;
 
 		levels = collect_expired_timers(base, heads);
 		base->clk++;
 
-		while (levels--)
-			expire_timers(base, heads + levels);
+		for (i = 0; i < levels; i++)
+			expire_timers(base, heads + i);
 	}
 	base->running_timer = NULL;
 	raw_spin_unlock_irq(&base->lock);
