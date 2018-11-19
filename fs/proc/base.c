@@ -394,11 +394,12 @@ static int proc_pid_wchan(struct seq_file *m, struct pid_namespace *ns,
 	wchan = get_wchan(task);
 	if (wchan && !lookup_symbol_name(wchan, symname)) {
 		seq_puts(m, symname);
+		seq_putc(m, '\n');
 		return 0;
 	}
 
 print0:
-	seq_putc(m, '0');
+	seq_puts(m, "0\n");
 	return 0;
 }
 #endif /* CONFIG_KALLSYMS */
