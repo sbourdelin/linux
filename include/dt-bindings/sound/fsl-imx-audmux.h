@@ -25,6 +25,14 @@
 #define MX51_AUDMUX_PORT6		5
 #define MX51_AUDMUX_PORT7		6
 
+#define MX6_AUDMUX_PORT1_SSI1		0
+#define MX6_AUDMUX_PORT2_SSI2		1
+#define MX6_AUDMUX_PORT3		2
+#define MX6_AUDMUX_PORT4		3
+#define MX6_AUDMUX_PORT5		4
+#define MX6_AUDMUX_PORT6		5
+#define MX6_AUDMUX_PORT7_SSI3		6
+
 /*
  * TFCSEL/RFCSEL (i.MX27) or TFSEL/TCSEL/RFSEL/RCSEL (i.MX31/51/53/6Q)
  * can be sourced from Rx/Tx.
