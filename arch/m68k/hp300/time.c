@@ -31,9 +31,6 @@
 #define	CLKMSB2		0x9
 #define	CLKMSB3		0xD
 
-/* This is for machines which generate the exact clock. */
-#define USECS_PER_JIFFY (1000000/HZ)
-
 #define INTVAL ((10000 / 4) - 1)
 
 static irqreturn_t hp300_tick(int irq, void *dev_id)
@@ -51,22 +48,6 @@ static irqreturn_t hp300_tick(int irq, void *dev_id)
 	/* Turn off the network and SCSI leds */
 	blinken_leds(0, 0xe0);
 	return IRQ_HANDLED;
-}
-
-u32 hp300_gettimeoffset(void)
-{
-  /* Read current timer 1 value */
-  unsigned char lsb, msb1, msb2;
-  unsigned short ticks;
-
-  msb1 = in_8(CLOCKBASE + 5);
-  lsb = in_8(CLOCKBASE + 7);
-  msb2 = in_8(CLOCKBASE + 5);
-  if (msb1 != msb2)
-    /* A carry happened while we were reading.  Read it again */
-    lsb = in_8(CLOCKBASE + 7);
-  ticks = INTVAL - ((msb2 << 8) | lsb);
-  return ((USECS_PER_JIFFY * ticks) / INTVAL) * 1000;
 }
 
 void __init hp300_sched_init(irq_handler_t vector)
