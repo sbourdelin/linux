@@ -69,6 +69,7 @@ struct usb_hub {
 	struct delayed_work	leds;
 	struct delayed_work	init_work;
 	struct work_struct      events;
+	struct timer_list	irq_urb_retry;
 	struct usb_port		**ports;
 };
 

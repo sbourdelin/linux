@@ -607,6 +607,22 @@ static int hub_port_status(struct usb_hub *hub, int port1,
 				   status, change, NULL);
 }
 
+static void hub_retry_irq_urb(struct timer_list *t)
+{
+	struct usb_hub *hub = from_timer(hub, t, irq_urb_retry);
+	int status;
+
+	if (hub->disconnected || hub->quiescing)
+		return;
+
+	dev_err(hub->intfdev, "retrying int urb\n");
+	status = usb_submit_urb(hub->urb, GFP_ATOMIC);
+	if (status && status != -ENODEV && status != -EPERM &&
+	    status != -ESHUTDOWN)
+		mod_timer(&hub->irq_urb_retry,
+			  jiffies + msecs_to_jiffies(MSEC_PER_SEC));
+}
+
 static void kick_hub_wq(struct usb_hub *hub)
 {
 	struct usb_interface *intf;
@@ -713,8 +729,12 @@ resubmit:
 		return;
 
 	status = usb_submit_urb(hub->urb, GFP_ATOMIC);
-	if (status != 0 && status != -ENODEV && status != -EPERM)
+	if (status != 0 && status != -ENODEV && status != -EPERM &&
+	    status != -ESHUTDOWN) {
 		dev_err(hub->intfdev, "resubmit --> %d\n", status);
+		mod_timer(&hub->irq_urb_retry,
+			  jiffies + msecs_to_jiffies(MSEC_PER_SEC));
+	}
 }
 
 /* USB 2.0 spec Section 11.24.2.3 */
@@ -1268,6 +1288,7 @@ static void hub_quiesce(struct usb_hub *hub, enum hub_quiescing_type type)
 	}
 
 	/* Stop hub_wq and related activity */
+	del_timer_sync(&hub->irq_urb_retry);
 	usb_kill_urb(hub->urb);
 	if (hub->has_indicators)
 		cancel_delayed_work_sync(&hub->leds);
@@ -1800,6 +1821,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	INIT_DELAYED_WORK(&hub->leds, led_work);
 	INIT_DELAYED_WORK(&hub->init_work, NULL);
 	INIT_WORK(&hub->events, hub_event);
+	timer_setup(&hub->irq_urb_retry, hub_retry_irq_urb, 0);
 	usb_get_intf(intf);
 	usb_get_dev(hdev);
 
