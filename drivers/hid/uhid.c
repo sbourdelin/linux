@@ -753,6 +753,15 @@ unlock:
 	return ret ? ret : count;
 }
 
+static ssize_t uhid_char_splice_write(struct pipe_inode_info *pipe,
+				      struct file *out,
+				      loff_t *ppos,
+				      size_t len,
+				      unsigned int flags)
+{
+	return -EOPNOTSUPP;
+}
+
 static __poll_t uhid_char_poll(struct file *file, poll_table *wait)
 {
 	struct uhid_device *uhid = file->private_data;
@@ -771,6 +780,7 @@ static const struct file_operations uhid_fops = {
 	.release	= uhid_char_release,
 	.read		= uhid_char_read,
 	.write		= uhid_char_write,
+	.splice_write	= uhid_char_splice_write,
 	.poll		= uhid_char_poll,
 	.llseek		= no_llseek,
 };
