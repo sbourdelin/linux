@@ -1,0 +1,9 @@
+This driver is in staging until the V4L controls stabilize.
+
+Given the V4L controls are part of the uABI, it's better
+to have the driver in staging, so users are aware of this
+driver having an unstable interface.
+
+Having proper userspace support for drivers like this that
+use JPEG_RAW and similar formats is also a requirement
+for moving out of staging.
