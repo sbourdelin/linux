@@ -467,20 +467,6 @@ static long restore_tm_sigcontexts(struct task_struct *tsk,
 	if (MSR_TM_RESV(msr))
 		return -EINVAL;
 
-	/* pull in MSR TS bits from user context */
-	regs->msr = (regs->msr & ~MSR_TS_MASK) | (msr & MSR_TS_MASK);
-
-	/*
-	 * Ensure that TM is enabled in regs->msr before we leave the signal
-	 * handler. It could be the case that (a) user disabled the TM bit
-	 * through the manipulation of the MSR bits in uc_mcontext or (b) the
-	 * TM bit was disabled because a sufficient number of context switches
-	 * happened whilst in the signal handler and load_tm overflowed,
-	 * disabling the TM bit. In either case we can end up with an illegal
-	 * TM state leading to a TM Bad Thing when we return to userspace.
-	 */
-	regs->msr |= MSR_TM;
-
 	/* pull in MSR LE from user context */
 	regs->msr = (regs->msr & ~MSR_LE) | (msr & MSR_LE);
 
@@ -572,6 +558,21 @@ static long restore_tm_sigcontexts(struct task_struct *tsk,
 	tm_enable();
 	/* Make sure the transaction is marked as failed */
 	tsk->thread.tm_texasr |= TEXASR_FS;
+
+	/* pull in MSR TS bits from user context */
+	regs->msr = (regs->msr & ~MSR_TS_MASK) | (msr & MSR_TS_MASK);
+
+	/*
+	 * Ensure that TM is enabled in regs->msr before we leave the signal
+	 * handler. It could be the case that (a) user disabled the TM bit
+	 * through the manipulation of the MSR bits in uc_mcontext or (b) the
+	 * TM bit was disabled because a sufficient number of context switches
+	 * happened whilst in the signal handler and load_tm overflowed,
+	 * disabling the TM bit. In either case we can end up with an illegal
+	 * TM state leading to a TM Bad Thing when we return to userspace.
+	 */
+	regs->msr |= MSR_TM;
+
 	/* This loads the checkpointed FP/VEC state, if used */
 	tm_recheckpoint(&tsk->thread);
 
