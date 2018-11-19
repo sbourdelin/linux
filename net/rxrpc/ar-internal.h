@@ -1140,66 +1140,47 @@ static inline bool after_eq(u32 seq1, u32 seq2)
  */
 extern unsigned int rxrpc_debug;
 
-#define dbgprintk(FMT,...) \
-	printk("[%-6.6s] "FMT"\n", current->comm ,##__VA_ARGS__)
+#if defined(__KDEBUG) || defined(CONFIG_AF_RXRPC_DEBUG)
+#define dbgprintk(fmt, ...)						\
+	printk(KERN_DEBUG "[%-6.6s] " fmt "\n", current->comm, ##__VA_ARGS__)
+#else
+#define dbgprintk(fmt, ...)						\
+	no_printk(KERN_DEBUG "[%-6.6s] " fmt "\n", current->comm, ##__VA_ARGS__)
+#endif
 
-#define kenter(FMT,...)	dbgprintk("==> %s("FMT")",__func__ ,##__VA_ARGS__)
-#define kleave(FMT,...)	dbgprintk("<== %s()"FMT"",__func__ ,##__VA_ARGS__)
-#define kdebug(FMT,...)	dbgprintk("    "FMT ,##__VA_ARGS__)
-#define kproto(FMT,...)	dbgprintk("### "FMT ,##__VA_ARGS__)
-#define knet(FMT,...)	dbgprintk("@@@ "FMT ,##__VA_ARGS__)
+#define kenter(fmt, ...)	dbgprintk("==> %s(" fmt ")", __func__, ##__VA_ARGS__)
+#define kleave(fmt, ...)	dbgprintk("<== %s()" fmt "", __func__, ##__VA_ARGS__)
+#define kdebug(fmt, ...)	dbgprintk("    " fmt, ##__VA_ARGS__)
+#define kproto(fmt, ...)	dbgprintk("### " fmt, ##__VA_ARGS__)
+#define knet(fmt, ...)		dbgprintk("@@@ " fmt, ##__VA_ARGS__)
 
+#if defined(__KDEBUG) || !defined(CONFIG_AF_RXRPC_DEBUG)
+#define _enter(fmt, ...)	kenter(fmt, ##__VA_ARGS__)
+#define _leave(fmt, ...)	kleave(fmt, ##__VA_ARGS__)
+#define _debug(fmt, ...)	kdebug(fmt, ##__VA_ARGS__)
+#define _proto(fmt, ...)	kproto(fmt, ##__VA_ARGS__)
+#define _net(fmt, ...)		knet(fmt, ##__VA_ARGS__)
 
-#if defined(__KDEBUG)
-#define _enter(FMT,...)	kenter(FMT,##__VA_ARGS__)
-#define _leave(FMT,...)	kleave(FMT,##__VA_ARGS__)
-#define _debug(FMT,...)	kdebug(FMT,##__VA_ARGS__)
-#define _proto(FMT,...)	kproto(FMT,##__VA_ARGS__)
-#define _net(FMT,...)	knet(FMT,##__VA_ARGS__)
+#else
 
-#elif defined(CONFIG_AF_RXRPC_DEBUG)
 #define RXRPC_DEBUG_KENTER	0x01
 #define RXRPC_DEBUG_KLEAVE	0x02
 #define RXRPC_DEBUG_KDEBUG	0x04
 #define RXRPC_DEBUG_KPROTO	0x08
 #define RXRPC_DEBUG_KNET	0x10
 
-#define _enter(FMT,...)					\
-do {							\
-	if (unlikely(rxrpc_debug & RXRPC_DEBUG_KENTER))	\
-		kenter(FMT,##__VA_ARGS__);		\
+#define RXRPC_DEBUG(TYPE, type, fmt, ...)				\
+do {									\
+	if (unlikely(rxrpc_debug & RXRPC_DEBUG_##TYPE))			\
+		type(fmt, ##__VA_ARGS__);				\
 } while (0)
 
-#define _leave(FMT,...)					\
-do {							\
-	if (unlikely(rxrpc_debug & RXRPC_DEBUG_KLEAVE))	\
-		kleave(FMT,##__VA_ARGS__);		\
-} while (0)
+#define _enter(fmt, ...)	RXRPC_DEBUG(KENTER, kenter, fmt, ##__VA_ARGS__)
+#define _leave(fmt, ...)	RXRPC_DEBUG(KLEAVE, kleave, fmt, ##__VA_ARGS__)
+#define _debug(fmt, ...)	RXRPC_DEBUG(KDEBUG, kdebug, fmt, ##__VA_ARGS__)
+#define _proto(fmt, ...)	RXRPC_DEBUG(KPROTO, kproto, fmt, ##__VA_ARGS__)
+#define _net(fmt, ...)		RXRPC_DEBUG(KNET, knet, fmt, ##__VA_ARGS__)
 
-#define _debug(FMT,...)					\
-do {							\
-	if (unlikely(rxrpc_debug & RXRPC_DEBUG_KDEBUG))	\
-		kdebug(FMT,##__VA_ARGS__);		\
-} while (0)
-
-#define _proto(FMT,...)					\
-do {							\
-	if (unlikely(rxrpc_debug & RXRPC_DEBUG_KPROTO))	\
-		kproto(FMT,##__VA_ARGS__);		\
-} while (0)
-
-#define _net(FMT,...)					\
-do {							\
-	if (unlikely(rxrpc_debug & RXRPC_DEBUG_KNET))	\
-		knet(FMT,##__VA_ARGS__);		\
-} while (0)
-
-#else
-#define _enter(FMT,...)	no_printk("==> %s("FMT")",__func__ ,##__VA_ARGS__)
-#define _leave(FMT,...)	no_printk("<== %s()"FMT"",__func__ ,##__VA_ARGS__)
-#define _debug(FMT,...)	no_printk("    "FMT ,##__VA_ARGS__)
-#define _proto(FMT,...)	no_printk("### "FMT ,##__VA_ARGS__)
-#define _net(FMT,...)	no_printk("@@@ "FMT ,##__VA_ARGS__)
 #endif
 
 /*
