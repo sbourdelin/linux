@@ -804,10 +804,17 @@ static ssize_t target_stat_transport_dev_name_show(struct config_item *item,
 	if (dev) {
 		wwn = &dev->t10_wwn;
 		/* scsiTransportDevName */
-		ret = snprintf(page, PAGE_SIZE, "%s+%s\n",
+		if (strlen(wwn->unit_serial)) {
+			ret = snprintf(page, PAGE_SIZE, "%s+%s\n",
 				tpg->se_tpg_tfo->tpg_get_wwn(tpg),
-				(strlen(wwn->unit_serial)) ? wwn->unit_serial :
+				wwn->unit_serial);
+		} else {
+			ret = snprintf(page, PAGE_SIZE, "%s+%."
+				__stringify(INQUIRY_VENDOR_IDENTIFIER_LEN)
+				"s\n",
+				tpg->se_tpg_tfo->tpg_get_wwn(tpg),
 				wwn->vendor);
+		}
 	}
 	rcu_read_unlock();
 	return ret;
