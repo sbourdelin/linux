@@ -139,8 +139,13 @@ static irqreturn_t q40_timer_int (int irq, void * dev)
 		*DAC_RIGHT=sval;
 	}
 
-	if (!ql_ticks)
+	if (!ql_ticks) {
+		unsigned long flags;
+
+		local_irq_save(flags);
 		q40_timer_routine(irq, dev);
+		local_irq_restore(flags);
+	}
 	return IRQ_HANDLED;
 }
 
