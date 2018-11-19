@@ -126,6 +126,8 @@ static void vbi_out_buf_request_complete(struct vb2_buffer *vb)
 
 const struct vb2_ops vivid_vbi_out_qops = {
 	.queue_setup		= vbi_out_queue_setup,
+	.queue_setup_lock	= vivid_queue_setup_lock,
+	.queue_setup_unlock	= vivid_queue_setup_unlock,
 	.buf_prepare		= vbi_out_buf_prepare,
 	.buf_queue		= vbi_out_buf_queue,
 	.start_streaming	= vbi_out_start_streaming,

@@ -231,6 +231,8 @@ static void vbi_cap_buf_request_complete(struct vb2_buffer *vb)
 
 const struct vb2_ops vivid_vbi_cap_qops = {
 	.queue_setup		= vbi_cap_queue_setup,
+	.queue_setup_lock	= vivid_queue_setup_lock,
+	.queue_setup_unlock	= vivid_queue_setup_unlock,
 	.buf_prepare		= vbi_cap_buf_prepare,
 	.buf_queue		= vbi_cap_buf_queue,
 	.start_streaming	= vbi_cap_start_streaming,

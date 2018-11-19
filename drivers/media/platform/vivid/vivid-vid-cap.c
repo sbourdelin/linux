@@ -271,6 +271,8 @@ static void vid_cap_buf_request_complete(struct vb2_buffer *vb)
 
 const struct vb2_ops vivid_vid_cap_qops = {
 	.queue_setup		= vid_cap_queue_setup,
+	.queue_setup_lock	= vivid_queue_setup_lock,
+	.queue_setup_unlock	= vivid_queue_setup_unlock,
 	.buf_prepare		= vid_cap_buf_prepare,
 	.buf_finish		= vid_cap_buf_finish,
 	.buf_queue		= vid_cap_buf_queue,

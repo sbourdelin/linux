@@ -475,6 +475,20 @@ static int vivid_fop_release(struct file *file)
 	return v4l2_fh_release(file);
 }
 
+void vivid_queue_setup_lock(struct vb2_queue *q)
+{
+	struct vivid_dev *dev = vb2_get_drv_priv(q);
+
+	mutex_lock(&dev->mutex);
+}
+
+void vivid_queue_setup_unlock(struct vb2_queue *q)
+{
+	struct vivid_dev *dev = vb2_get_drv_priv(q);
+
+	mutex_unlock(&dev->mutex);
+}
+
 static const struct v4l2_file_operations vivid_fops = {
 	.owner		= THIS_MODULE,
 	.open           = v4l2_fh_open,

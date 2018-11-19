@@ -318,6 +318,8 @@ static void sdr_cap_buf_request_complete(struct vb2_buffer *vb)
 
 const struct vb2_ops vivid_sdr_cap_qops = {
 	.queue_setup		= sdr_cap_queue_setup,
+	.queue_setup_lock	= vivid_queue_setup_lock,
+	.queue_setup_unlock	= vivid_queue_setup_unlock,
 	.buf_prepare		= sdr_cap_buf_prepare,
 	.buf_queue		= sdr_cap_buf_queue,
 	.start_streaming	= sdr_cap_start_streaming,
