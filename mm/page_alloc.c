@@ -1188,32 +1188,6 @@ static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 #endif
 }
 
-#ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
-static void __meminit init_reserved_page(unsigned long pfn)
-{
-	pg_data_t *pgdat;
-	int nid, zid;
-
-	if (!early_page_uninitialised(pfn))
-		return;
-
-	nid = early_pfn_to_nid(pfn);
-	pgdat = NODE_DATA(nid);
-
-	for (zid = 0; zid < MAX_NR_ZONES; zid++) {
-		struct zone *zone = &pgdat->node_zones[zid];
-
-		if (pfn >= zone->zone_start_pfn && pfn < zone_end_pfn(zone))
-			break;
-	}
-	__init_single_page(pfn_to_page(pfn), pfn, zid, nid);
-}
-#else
-static inline void init_reserved_page(unsigned long pfn)
-{
-}
-#endif /* CONFIG_DEFERRED_STRUCT_PAGE_INIT */
-
 /*
  * Initialised pages do not have PageReserved set. This function is
  * called for each range allocated by the bootmem allocator and
@@ -1228,8 +1202,6 @@ void __meminit reserve_bootmem_region(phys_addr_t start, phys_addr_t end)
 	for (; start_pfn < end_pfn; start_pfn++) {
 		if (pfn_valid(start_pfn)) {
 			struct page *page = pfn_to_page(start_pfn);
-
-			init_reserved_page(start_pfn);
 
 			/* Avoid false-positive PageTail() */
 			INIT_LIST_HEAD(&page->lru);
