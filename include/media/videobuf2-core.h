@@ -333,6 +333,20 @@ struct vb2_buffer {
  *			\*num_buffers are being allocated additionally to
  *			q->num_buffers. If either \*num_planes or the requested
  *			sizes are invalid callback must return %-EINVAL.
+ * @queue_setup_lock:	called from VIDIOC_REQBUFS() and VIDIOC_CREATE_BUFS()
+ *			to serialize @queue_setup with ioctls like
+ *			VIDIOC_S_FMT() that change the buffer size. Only
+ *			required if queue->lock differs from the mutex that is
+ *			used to serialize the ioctls that change the buffer
+ *			size. This callback should lock the ioctl serialization
+ *			mutex.
+ * @queue_setup_unlock:	called from VIDIOC_REQBUFS() and VIDIOC_CREATE_BUFS()
+ *			to serialize @queue_setup with ioctls like
+ *			VIDIOC_S_FMT() that change the buffer size. Only
+ *			required if queue->lock differs from the mutex that is
+ *			used to serialize the ioctls that change the buffer
+ *			size. This callback should unlock the ioctl
+ *			serialization mutex.
  * @wait_prepare:	release any locks taken while calling vb2 functions;
  *			it is called before an ioctl needs to wait for a new
  *			buffer to arrive; required to avoid a deadlock in
@@ -403,9 +417,12 @@ struct vb2_ops {
 	int (*queue_setup)(struct vb2_queue *q,
 			   unsigned int *num_buffers, unsigned int *num_planes,
 			   unsigned int sizes[], struct device *alloc_devs[]);
+	void (*queue_setup_lock)(struct vb2_queue *q);
+	void (*queue_setup_unlock)(struct vb2_queue *q);
 
 	void (*wait_prepare)(struct vb2_queue *q);
 	void (*wait_finish)(struct vb2_queue *q);
+
 
 	int (*buf_init)(struct vb2_buffer *vb);
 	int (*buf_prepare)(struct vb2_buffer *vb);
@@ -599,6 +616,8 @@ struct vb2_queue {
 	 * called. Used to check for unbalanced ops.
 	 */
 	u32				cnt_queue_setup;
+	u32				cnt_queue_setup_lock;
+	u32				cnt_queue_setup_unlock;
 	u32				cnt_wait_prepare;
 	u32				cnt_wait_finish;
 	u32				cnt_start_streaming;

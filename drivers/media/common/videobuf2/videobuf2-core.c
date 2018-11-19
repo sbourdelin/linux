@@ -465,7 +465,8 @@ static int __vb2_queue_free(struct vb2_queue *q, unsigned int buffers)
 	 */
 	if (q->num_buffers) {
 		bool unbalanced = q->cnt_start_streaming != q->cnt_stop_streaming ||
-				  q->cnt_wait_prepare != q->cnt_wait_finish;
+				  q->cnt_wait_prepare != q->cnt_wait_finish ||
+				  q->cnt_queue_setup_lock != q->cnt_queue_setup_unlock;
 
 		if (unbalanced || debug) {
 			pr_info("counters for queue %p:%s\n", q,
@@ -473,10 +474,14 @@ static int __vb2_queue_free(struct vb2_queue *q, unsigned int buffers)
 			pr_info("     setup: %u start_streaming: %u stop_streaming: %u\n",
 				q->cnt_queue_setup, q->cnt_start_streaming,
 				q->cnt_stop_streaming);
+			pr_info("     queue_setup_lock: %u queue_setup_unlock: %u\n",
+				q->cnt_queue_setup_lock, q->cnt_queue_setup_unlock);
 			pr_info("     wait_prepare: %u wait_finish: %u\n",
 				q->cnt_wait_prepare, q->cnt_wait_finish);
 		}
 		q->cnt_queue_setup = 0;
+		q->cnt_queue_setup_lock = 0;
+		q->cnt_queue_setup_unlock = 0;
 		q->cnt_wait_prepare = 0;
 		q->cnt_wait_finish = 0;
 		q->cnt_start_streaming = 0;
@@ -717,6 +722,7 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 	num_buffers = min_t(unsigned int, num_buffers, VB2_MAX_FRAME);
 	memset(q->alloc_devs, 0, sizeof(q->alloc_devs));
 	q->memory = memory;
+	call_void_qop(q, queue_setup_lock, q);
 
 	/*
 	 * Ask the driver how many buffers and planes per buffer it requires.
@@ -725,22 +731,27 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 	ret = call_qop(q, queue_setup, q, &num_buffers, &num_planes,
 		       plane_sizes, q->alloc_devs);
 	if (ret)
-		return ret;
+		goto unlock;
 
 	/* Check that driver has set sane values */
-	if (WARN_ON(!num_planes))
-		return -EINVAL;
+	if (WARN_ON(!num_planes)) {
+		ret = -EINVAL;
+		goto unlock;
+	}
 
 	for (i = 0; i < num_planes; i++)
-		if (WARN_ON(!plane_sizes[i]))
-			return -EINVAL;
+		if (WARN_ON(!plane_sizes[i])) {
+			ret = -EINVAL;
+			goto unlock;
+		}
 
 	/* Finally, allocate buffers and video memory */
 	allocated_buffers =
 		__vb2_queue_alloc(q, memory, num_buffers, num_planes, plane_sizes);
 	if (allocated_buffers == 0) {
 		dprintk(1, "memory allocation failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto unlock;
 	}
 
 	/*
@@ -775,19 +786,19 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 		 */
 	}
 
-	mutex_lock(&q->mmap_lock);
 	q->num_buffers = allocated_buffers;
+	call_void_qop(q, queue_setup_unlock, q);
 
 	if (ret < 0) {
 		/*
 		 * Note: __vb2_queue_free() will subtract 'allocated_buffers'
 		 * from q->num_buffers.
 		 */
+		mutex_lock(&q->mmap_lock);
 		__vb2_queue_free(q, allocated_buffers);
 		mutex_unlock(&q->mmap_lock);
 		return ret;
 	}
-	mutex_unlock(&q->mmap_lock);
 
 	/*
 	 * Return the number of successfully allocated buffers
@@ -795,8 +806,11 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 	 */
 	*count = allocated_buffers;
 	q->waiting_for_buffers = !q->is_output;
-
 	return 0;
+
+unlock:
+	call_void_qop(q, queue_setup_unlock, q);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(vb2_core_reqbufs);
 
@@ -813,10 +827,12 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
 		return -ENOBUFS;
 	}
 
+	call_void_qop(q, queue_setup_lock, q);
 	if (!q->num_buffers) {
 		if (q->waiting_in_dqbuf && *count) {
 			dprintk(1, "another dup()ped fd is waiting for a buffer\n");
-			return -EBUSY;
+			ret = -EBUSY;
+			goto unlock;
 		}
 		memset(q->alloc_devs, 0, sizeof(q->alloc_devs));
 		q->memory = memory;
@@ -837,14 +853,15 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
 	ret = call_qop(q, queue_setup, q, &num_buffers,
 		       &num_planes, plane_sizes, q->alloc_devs);
 	if (ret)
-		return ret;
+		goto unlock;
 
 	/* Finally, allocate buffers and video memory */
 	allocated_buffers = __vb2_queue_alloc(q, memory, num_buffers,
 				num_planes, plane_sizes);
 	if (allocated_buffers == 0) {
 		dprintk(1, "memory allocation failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto unlock;
 	}
 
 	/*
@@ -869,19 +886,19 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
 		 */
 	}
 
-	mutex_lock(&q->mmap_lock);
 	q->num_buffers += allocated_buffers;
+	call_void_qop(q, queue_setup_unlock, q);
 
 	if (ret < 0) {
 		/*
 		 * Note: __vb2_queue_free() will subtract 'allocated_buffers'
 		 * from q->num_buffers.
 		 */
+		mutex_lock(&q->mmap_lock);
 		__vb2_queue_free(q, allocated_buffers);
 		mutex_unlock(&q->mmap_lock);
 		return -ENOMEM;
 	}
-	mutex_unlock(&q->mmap_lock);
 
 	/*
 	 * Return the number of successfully allocated buffers
@@ -890,6 +907,10 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
 	*count = allocated_buffers;
 
 	return 0;
+
+unlock:
+	call_void_qop(q, queue_setup_unlock, q);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(vb2_core_create_bufs);
 
