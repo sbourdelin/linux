@@ -1526,6 +1526,8 @@ void icl_sanitize_encoder_pll_mapping(struct intel_encoder *encoder);
 
 unsigned int intel_fb_align_height(const struct drm_framebuffer *fb,
 				   int color_plane, unsigned int height);
+i915_reg_t gen9_chicken_trans_reg(struct drm_i915_private *dev_priv,
+				  enum transcoder trans);
 
 /* intel_audio.c */
 void intel_init_audio_hooks(struct drm_i915_private *dev_priv);

@@ -3380,6 +3380,42 @@ static void intel_enable_ddi_dp(struct intel_encoder *encoder,
 		intel_audio_codec_enable(encoder, crtc_state, conn_state);
 }
 
+i915_reg_t gen9_chicken_trans_reg(struct drm_i915_private *dev_priv,
+				  enum transcoder trans)
+{
+	static const i915_reg_t regs[] = {
+		[TRANSCODER_A] = CHICKEN_TRANS_A,
+		[TRANSCODER_B] = CHICKEN_TRANS_B,
+		[TRANSCODER_C] = CHICKEN_TRANS_C,
+		[TRANSCODER_EDP] = CHICKEN_TRANS_EDP,
+	};
+
+	WARN_ON(INTEL_GEN(dev_priv) < 9);
+
+	if (WARN_ON(trans >= ARRAY_SIZE(regs) || !regs[trans].reg))
+		trans = TRANSCODER_A;
+
+	return regs[trans];
+}
+
+static i915_reg_t
+gen9_chicken_trans_reg_by_port(struct drm_i915_private *dev_priv,
+			       enum port port)
+{
+	static const enum transcoder port_to_transcoder[] = {
+		[PORT_A] = TRANSCODER_EDP,
+		[PORT_B] = TRANSCODER_A,
+		[PORT_C] = TRANSCODER_B,
+		[PORT_D] = TRANSCODER_C,
+		[PORT_E] = TRANSCODER_A,
+	};
+
+	if (WARN_ON(port < PORT_A || port > PORT_E))
+		port = PORT_A;
+
+	return gen9_chicken_trans_reg(dev_priv, port_to_transcoder[port]);
+}
+
 static void intel_enable_ddi_hdmi(struct intel_encoder *encoder,
 				  const struct intel_crtc_state *crtc_state,
 				  const struct drm_connector_state *conn_state)
@@ -3403,17 +3439,10 @@ static void intel_enable_ddi_hdmi(struct intel_encoder *encoder,
 		 * the bits affect a specific DDI port rather than
 		 * a specific transcoder.
 		 */
-		static const enum transcoder port_to_transcoder[] = {
-			[PORT_A] = TRANSCODER_EDP,
-			[PORT_B] = TRANSCODER_A,
-			[PORT_C] = TRANSCODER_B,
-			[PORT_D] = TRANSCODER_C,
-			[PORT_E] = TRANSCODER_A,
-		};
-		enum transcoder transcoder = port_to_transcoder[port];
+		i915_reg_t reg = gen9_chicken_trans_reg_by_port(dev_priv, port);
 		u32 val;
 
-		val = I915_READ(CHICKEN_TRANS(transcoder));
+		val = I915_READ(reg);
 
 		if (port == PORT_E)
 			val |= DDIE_TRAINING_OVERRIDE_ENABLE |
@@ -3422,8 +3451,8 @@ static void intel_enable_ddi_hdmi(struct intel_encoder *encoder,
 			val |= DDI_TRAINING_OVERRIDE_ENABLE |
 				DDI_TRAINING_OVERRIDE_VALUE;
 
-		I915_WRITE(CHICKEN_TRANS(transcoder), val);
-		POSTING_READ(CHICKEN_TRANS(transcoder));
+		I915_WRITE(reg, val);
+		POSTING_READ(reg);
 
 		udelay(1);
 
@@ -3434,7 +3463,7 @@ static void intel_enable_ddi_hdmi(struct intel_encoder *encoder,
 			val &= ~(DDI_TRAINING_OVERRIDE_ENABLE |
 				 DDI_TRAINING_OVERRIDE_VALUE);
 
-		I915_WRITE(CHICKEN_TRANS(transcoder), val);
+		I915_WRITE(reg, val);
 	}
 
 	/* In HDMI/DVI mode, the port width, and swing/emphasis values
