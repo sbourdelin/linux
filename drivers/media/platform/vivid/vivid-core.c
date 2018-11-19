@@ -1075,7 +1075,8 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->mem_ops = vivid_mem_ops[allocator];
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
-		q->lock = &dev->mutex;
+		mutex_init(&dev->vb_vid_cap_q_lock);
+		q->lock = &dev->vb_vid_cap_q_lock;
 		q->dev = dev->v4l2_dev.dev;
 		q->supports_requests = true;
 
@@ -1096,7 +1097,8 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->mem_ops = vivid_mem_ops[allocator];
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
-		q->lock = &dev->mutex;
+		mutex_init(&dev->vb_vid_out_q_lock);
+		q->lock = &dev->vb_vid_out_q_lock;
 		q->dev = dev->v4l2_dev.dev;
 		q->supports_requests = true;
 
@@ -1117,7 +1119,8 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->mem_ops = vivid_mem_ops[allocator];
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
-		q->lock = &dev->mutex;
+		mutex_init(&dev->vb_vbi_cap_q_lock);
+		q->lock = &dev->vb_vbi_cap_q_lock;
 		q->dev = dev->v4l2_dev.dev;
 		q->supports_requests = true;
 
@@ -1138,7 +1141,8 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->mem_ops = vivid_mem_ops[allocator];
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
-		q->lock = &dev->mutex;
+		mutex_init(&dev->vb_vbi_out_q_lock);
+		q->lock = &dev->vb_vbi_out_q_lock;
 		q->dev = dev->v4l2_dev.dev;
 		q->supports_requests = true;
 
@@ -1158,7 +1162,8 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->mem_ops = vivid_mem_ops[allocator];
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 8;
-		q->lock = &dev->mutex;
+		mutex_init(&dev->vb_sdr_cap_q_lock);
+		q->lock = &dev->vb_sdr_cap_q_lock;
 		q->dev = dev->v4l2_dev.dev;
 		q->supports_requests = true;
 

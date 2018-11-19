@@ -385,8 +385,10 @@ struct vivid_dev {
 	struct v4l2_rect		compose_cap;
 	struct v4l2_rect		crop_bounds_cap;
 	struct vb2_queue		vb_vid_cap_q;
+	struct mutex			vb_vid_cap_q_lock;
 	struct list_head		vid_cap_active;
 	struct vb2_queue		vb_vbi_cap_q;
+	struct mutex			vb_vbi_cap_q_lock;
 	struct list_head		vbi_cap_active;
 
 	/* thread for generating video capture stream */
@@ -413,8 +415,10 @@ struct vivid_dev {
 	struct v4l2_rect		compose_out;
 	struct v4l2_rect		compose_bounds_out;
 	struct vb2_queue		vb_vid_out_q;
+	struct mutex			vb_vid_out_q_lock;
 	struct list_head		vid_out_active;
 	struct vb2_queue		vb_vbi_out_q;
+	struct mutex			vb_vbi_out_q_lock;
 	struct list_head		vbi_out_active;
 
 	/* video loop precalculated rectangles */
@@ -459,6 +463,7 @@ struct vivid_dev {
 
 	/* SDR capture */
 	struct vb2_queue		vb_sdr_cap_q;
+	struct mutex			vb_sdr_cap_q_lock;
 	struct list_head		sdr_cap_active;
 	u32				sdr_pixelformat; /* v4l2 format id */
 	unsigned			sdr_buffersize;
