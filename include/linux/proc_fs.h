@@ -73,6 +73,7 @@ struct proc_dir_entry *proc_create_net_single_write(const char *name, umode_t mo
 						    int (*show)(struct seq_file *, void *),
 						    proc_write_t write,
 						    void *data);
+extern bool proc_is_procfd(const struct file *file);
 
 #else /* CONFIG_PROC_FS */
 

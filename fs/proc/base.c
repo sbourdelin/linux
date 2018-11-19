@@ -3055,6 +3055,12 @@ static const struct file_operations proc_tgid_base_operations = {
 	.release	= proc_tgid_release,
 };
 
+bool proc_is_procfd(const struct file *file)
+{
+	return d_is_dir(file->f_path.dentry) &&
+	       (file->f_op == &proc_tgid_base_operations);
+}
+
 static struct dentry *proc_tgid_base_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
 {
 	return proc_pident_lookup(dir, dentry,

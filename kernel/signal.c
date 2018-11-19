@@ -19,7 +19,9 @@
 #include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
 #include <linux/sched/cputime.h>
+#include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/proc_fs.h>
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/coredump.h>
@@ -3286,6 +3288,16 @@ COMPAT_SYSCALL_DEFINE4(rt_sigtimedwait, compat_sigset_t __user *, uthese,
 }
 #endif
 
+static inline void prepare_kill_siginfo(int sig, struct kernel_siginfo *info)
+{
+	clear_siginfo(info);
+	info->si_signo = sig;
+	info->si_errno = 0;
+	info->si_code = SI_USER;
+	info->si_pid = task_tgid_vnr(current);
+	info->si_uid = from_kuid_munged(current_user_ns(), current_uid());
+}
+
 /**
  *  sys_kill - send a signal to a process
  *  @pid: the PID of the process
@@ -3295,14 +3307,66 @@ SYSCALL_DEFINE2(kill, pid_t, pid, int, sig)
 {
 	struct kernel_siginfo info;
 
-	clear_siginfo(&info);
-	info.si_signo = sig;
-	info.si_errno = 0;
-	info.si_code = SI_USER;
-	info.si_pid = task_tgid_vnr(current);
-	info.si_uid = from_kuid_munged(current_user_ns(), current_uid());
+	prepare_kill_siginfo(sig, &info);
 
 	return kill_something_info(sig, &info, pid);
+}
+
+/**
+ *  sys_procfd_signal - send a signal to a process through a process file
+ *                      descriptor
+ *  @fd: the file descriptor of the process
+ *  @sig: signal to be sent
+ *  @info: the signal info
+ *  @flags: future flags to be passed
+ */
+SYSCALL_DEFINE4(procfd_signal, int, fd, int, sig, siginfo_t __user *, info,
+		int, flags)
+{
+	int ret;
+	struct pid *pid;
+	kernel_siginfo_t kinfo;
+	struct fd f;
+
+	/* Enforce flags be set to 0 until we add an extension. */
+	if (flags)
+		return -EINVAL;
+
+	f = fdget_raw(fd);
+	if (!f.file)
+		return -EBADF;
+
+	ret = -EINVAL;
+	/* Is this a process file descriptor? */
+	if (!proc_is_procfd(f.file))
+		goto err;
+
+	pid = f.file->private_data;
+	if (!pid)
+		goto err;
+
+	if (info) {
+		ret = __copy_siginfo_from_user(sig, &kinfo, info);
+		if (unlikely(ret))
+			goto err;
+		/*
+		 * Not even root can pretend to send signals from the kernel.
+		 * Nor can they impersonate a kill()/tgkill(), which adds
+		 * source info.
+		 */
+		ret = -EPERM;
+		if ((kinfo.si_code >= 0 || kinfo.si_code == SI_TKILL) &&
+		    (task_pid(current) != pid))
+			goto err;
+	} else {
+		prepare_kill_siginfo(sig, &kinfo);
+	}
+
+	ret = kill_pid_info(sig, &kinfo, pid);
+
+err:
+	fdput(f);
+	return ret;
 }
 
 static int
