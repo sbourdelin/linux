@@ -30,8 +30,6 @@
  * with touchscreen controller
  */
 #define STMPE_REG_INT_STA		0x0B
-#define STMPE_REG_ADC_CTRL1		0x20
-#define STMPE_REG_ADC_CTRL2		0x21
 #define STMPE_REG_TSC_CTRL		0x40
 #define STMPE_REG_TSC_CFG		0x41
 #define STMPE_REG_FIFO_TH		0x4A
@@ -88,10 +86,6 @@ struct stmpe_touch {
 	struct input_dev *idev;
 	struct delayed_work work;
 	struct device *dev;
-	u8 sample_time;
-	u8 mod_12b;
-	u8 ref_sel;
-	u8 adc_freq;
 	u8 ave_ctrl;
 	u8 touch_det_delay;
 	u8 settling;
@@ -176,7 +170,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
 	input_report_key(ts->idev, BTN_TOUCH, 1);
 	input_sync(ts->idev);
 
-       /* flush the FIFO after we have read out our values. */
+	/* flush the FIFO after we have read out our values. */
 	__stmpe_reset_fifo(ts->stmpe);
 
 	/* reenable the tsc */
@@ -192,32 +186,13 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
 static int stmpe_init_hw(struct stmpe_touch *ts)
 {
 	int ret;
-	u8 adc_ctrl1, adc_ctrl1_mask, tsc_cfg, tsc_cfg_mask;
+	u8 tsc_cfg, tsc_cfg_mask;
 	struct stmpe *stmpe = ts->stmpe;
 	struct device *dev = ts->dev;
 
 	ret = stmpe_enable(stmpe, STMPE_BLOCK_TOUCHSCREEN | STMPE_BLOCK_ADC);
 	if (ret) {
 		dev_err(dev, "Could not enable clock for ADC and TS\n");
-		return ret;
-	}
-
-	adc_ctrl1 = STMPE_SAMPLE_TIME(ts->sample_time) |
-		    STMPE_MOD_12B(ts->mod_12b) | STMPE_REF_SEL(ts->ref_sel);
-	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
-			 STMPE_REF_SEL(0xff);
-
-	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL1,
-			adc_ctrl1_mask, adc_ctrl1);
-	if (ret) {
-		dev_err(dev, "Could not setup ADC\n");
-		return ret;
-	}
-
-	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL2,
-			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(ts->adc_freq));
-	if (ret) {
-		dev_err(dev, "Could not setup ADC\n");
 		return ret;
 	}
 
@@ -234,14 +209,14 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
 	}
 
 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_FRACTION_Z,
-			STMPE_FRACTION_Z(0xff), STMPE_FRACTION_Z(ts->fraction_z));
+		STMPE_FRACTION_Z(0xff), STMPE_FRACTION_Z(ts->fraction_z));
 	if (ret) {
 		dev_err(dev, "Could not config touch\n");
 		return ret;
 	}
 
 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_I_DRIVE,
-			STMPE_I_DRIVE(0xff), STMPE_I_DRIVE(ts->i_drive));
+		STMPE_I_DRIVE(0xff), STMPE_I_DRIVE(ts->i_drive));
 	if (ret) {
 		dev_err(dev, "Could not config touch\n");
 		return ret;
@@ -255,7 +230,7 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
 	}
 
 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CTRL,
-			STMPE_OP_MODE(0xff), STMPE_OP_MODE(OP_MOD_XYZ));
+		STMPE_OP_MODE(0xff), STMPE_OP_MODE(OP_MOD_XYZ));
 	if (ret) {
 		dev_err(dev, "Could not set mode\n");
 		return ret;
@@ -294,14 +269,6 @@ static void stmpe_ts_get_platform_info(struct platform_device *pdev,
 	u32 val;
 
 	if (np) {
-		if (!of_property_read_u32(np, "st,sample-time", &val))
-			ts->sample_time = val;
-		if (!of_property_read_u32(np, "st,mod-12b", &val))
-			ts->mod_12b = val;
-		if (!of_property_read_u32(np, "st,ref-sel", &val))
-			ts->ref_sel = val;
-		if (!of_property_read_u32(np, "st,adc-freq", &val))
-			ts->adc_freq = val;
 		if (!of_property_read_u32(np, "st,ave-ctrl", &val))
 			ts->ave_ctrl = val;
 		if (!of_property_read_u32(np, "st,touch-det-delay", &val))

@@ -134,6 +134,12 @@ struct stmpe {
 	u8 ier[2];
 	u8 oldier[2];
 	struct stmpe_platform_data *pdata;
+
+	/* For devices that use an ADC */
+	u8 sample_time;
+	u8 mod_12b;
+	u8 ref_sel;
+	u8 adc_freq;
 };
 
 extern int stmpe_reg_write(struct stmpe *stmpe, u8 reg, u8 data);
