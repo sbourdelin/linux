@@ -22,6 +22,7 @@
 extern void __chk_user_ptr(const volatile void __user *);
 extern void __chk_io_ptr(const volatile void __iomem *);
 # define ACCESS_PRIVATE(p, member) (*((typeof((p)->member) __force *) &(p)->member))
+# define __builtin_types_compatible_p(t1, t2)	(1)
 #else /* __CHECKER__ */
 # ifdef STRUCTLEAK_PLUGIN
 #  define __user __attribute__((user))
