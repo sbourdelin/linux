@@ -20,6 +20,8 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/list.h>
+#include <linux/list_sort.h>
 #include <linux/module.h>
 #include <linux/capability.h>
 #include <linux/errno.h>
@@ -32,6 +34,7 @@
 #include <linux/net.h>
 #include <linux/in6.h>
 #include <linux/netdevice.h>
+#include <linux/inetdevice.h>
 #include <linux/if_arp.h>
 #include <linux/icmpv6.h>
 #include <linux/init.h>
@@ -124,6 +127,228 @@ static struct net_device_stats *ip6_get_stats(struct net_device *dev)
 	return &dev->stats;
 }
 
+int
+ip6_get_addrport(struct iphdr *iph, __be32 *saddr4, __be32 *daddr4,
+		 __be16 *sport4, __be16 *dport4, __u8 *proto, int *icmperr)
+{
+	u8 *ptr;
+	struct iphdr *icmpiph = NULL;
+	struct tcphdr *tcph, *icmptcph;
+	struct udphdr *udph, *icmpudph;
+	struct icmphdr *icmph, *icmpicmph;
+
+	*icmperr = 0;
+	*saddr4 = iph->saddr;
+	*daddr4 = iph->daddr;
+	ptr = (u8 *)iph;
+	ptr += iph->ihl * 4;
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		*proto = IPPROTO_TCP;
+		tcph = (struct tcphdr *)ptr;
+		*sport4 = tcph->source;
+		*dport4 = tcph->dest;
+		break;
+	case IPPROTO_UDP:
+		*proto = IPPROTO_UDP;
+		udph = (struct udphdr *)ptr;
+		*sport4 = udph->source;
+		*dport4 = udph->dest;
+		break;
+	case IPPROTO_ICMP:
+		*proto = IPPROTO_ICMP;
+		icmph = (struct icmphdr *)ptr;
+		switch (icmph->type) {
+		case ICMP_DEST_UNREACH:
+		case ICMP_SOURCE_QUENCH:
+		case ICMP_TIME_EXCEEDED:
+		case ICMP_PARAMETERPROB:
+			*icmperr = 1;
+			ptr = (u8 *)icmph;
+			ptr += sizeof(struct icmphdr);
+			icmpiph = (struct iphdr *)ptr;
+			*saddr4 = icmpiph->saddr;
+			*daddr4 = icmpiph->daddr;
+			if (ntohs(iph->tot_len) < icmpiph->ihl * 4 + 12)
+				return -1;
+			ptr += icmpiph->ihl * 4;
+			switch (icmpiph->protocol) {
+			case IPPROTO_TCP:
+				*proto = IPPROTO_TCP;
+				icmptcph = (struct tcphdr *)ptr;
+				*sport4 = icmptcph->source;
+				*dport4 = icmptcph->dest;
+				break;
+			case IPPROTO_UDP:
+				*proto = IPPROTO_UDP;
+				icmpudph = (struct udphdr *)ptr;
+				*sport4 = icmpudph->source;
+				*dport4 = icmpudph->dest;
+				break;
+			case IPPROTO_ICMP:
+				*proto = IPPROTO_ICMP;
+				icmpicmph = (struct icmphdr *)ptr;
+				*sport4 = icmpicmph->un.echo.id;
+				*dport4 = icmpicmph->un.echo.id;
+				break;
+			default:
+				return -1;
+			}
+			break;
+		default:
+			*sport4 = icmph->un.echo.id;
+			*dport4 = icmph->un.echo.id;
+		}
+		break;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
+
+int
+ip6_mape_gen_addr6(struct ip6_tnl_rule *mr, struct in6_addr *addr6,
+		   __be32 addr4, __be16 port4)
+{
+	int i, pbw0, pbi0, pbi1;
+	__u32 addr[4];
+	__u32 psid = 0;
+	__u32 mask = 0;
+	__u32 a = ntohl(addr4);
+	__u16 p = ntohs(port4);
+	int psid_prefix_length = 0;
+	int psid_mask;
+	__u32 id0 = 0;
+	__u32 id1 = 0;
+
+	/* If we have no rule then we can return immediately */
+	if (!mr)
+		return -1;
+
+	psid_prefix_length = mr->ea_length - (32 - mr->ipv4_prefixlen);
+
+	/* In some configurations the PSID can overlap the IPv4 address
+	 * segment
+	 */
+	if (psid_prefix_length < 0)
+		a &= 0xffffffff << (psid_prefix_length * -1);
+
+	/* Find the PSID from the port by shifting the non-PSID bits out */
+	if (psid_prefix_length > 0) {
+		mask = 0xffffffff >> (32 - psid_prefix_length);
+		psid =
+		    (p >> (16 - psid_prefix_length - mr->psid_offset)) & mask;
+	}
+
+	/* We start with the IPv6 subnet provided for this rule */
+	for (i = 0; i < 4; ++i)
+		addr[i] = ntohl(mr->ipv6_subnet.s6_addr32[i]);
+
+	/* We then copy in the IPv4 host portion - pbw0 is the starting
+	 * 32 bit chunk, pbi0 is the offset into that chunk
+	 */
+	if (mr->ipv4_prefixlen < 32) {
+		pbw0 = mr->ipv6_prefixlen >> 5;
+		pbi0 = mr->ipv6_prefixlen & 0x1f;
+		addr[pbw0] |= (a << mr->ipv4_prefixlen) >> pbi0;
+		pbi1 = pbi0 - mr->ipv4_prefixlen;
+		if (pbi1 > 0)
+			addr[pbw0 + 1] |= a << (32 - pbi1);
+	}
+
+	/* The PSID may need to be inserted into the IPv6 address within the
+	 * top 64 bits. Again: pbw0 is the chunk, pbi0 is the offset.
+	 */
+	if ((psid_prefix_length - mr->psid_offset) > 0) {
+		psid_mask = mask;
+		pbw0 = (mr->ipv6_prefixlen + (32 - mr->ipv4_prefixlen)) >> 5;
+		pbi0 = (mr->ipv6_prefixlen + (32 - mr->ipv4_prefixlen)) & 0x1f;
+
+		pbi1 = pbi0 - (32 - psid_prefix_length);
+
+		if (pbi1 > 0) {
+			addr[pbw0] |= (psid >> pbi1);
+			addr[pbw0 + 1] |= (psid & psid_mask) << (32 - pbi1);
+		} else {
+			addr[pbw0] |= psid << (32 - pbi0 - psid_prefix_length);
+		}
+	}
+
+	/* The format of the interface id changes depending on version */
+	if (mr->version == MAP_VERSION_RFC) {
+		addr[2] |= (a >> 16);
+		addr[3] |= (a << 16);
+		addr[3] |= psid;
+	} else if (mr->version == MAP_VERSION_DRAFT3) {
+		id0 |= a >> 8;
+		id1 |= (a & 0xFF) << 24;
+		id1 |= psid << 8;
+		addr[2] |= id0;
+		addr[3] |= id1;
+	} else {
+		return -1;
+	}
+
+	/* Copy the formed address back into network order */
+	for (i = 0; i < 4; ++i)
+		addr6->s6_addr32[i] = htonl(addr[i]);
+
+	return 0;
+}
+
+static struct ip6_tnl_rule *ip6_tnl_rule_find(struct net_device *dev,
+					      __be32 _dst)
+{
+	struct ip6_tnl *t = netdev_priv(dev);
+	struct ip6_rule_list *pos = NULL;
+	u32 dst = ntohl(_dst);
+
+	list_for_each_entry(pos, &t->rules.list, list) {
+		int mask =
+		    0xFFFFFFFF ^ ((1 << (32 - pos->data.ipv4_prefixlen)) - 1);
+		if ((dst & mask) == ntohl(pos->data.ipv4_subnet.s_addr))
+			return &pos->data;
+	}
+	return NULL;
+}
+
+static void
+ip6_tnl_mape_dst(struct net_device *dev, struct sk_buff *skb,
+		 struct flowi6 *fl6)
+{
+	struct ip6_tnl *t = netdev_priv(dev);
+	struct iphdr *iph;
+	__be32 saddr4, daddr4, addr;
+	__be16 sport4, dport4, port;
+	__u8 proto;
+	int icmperr;
+	struct ip6_tnl_rule *mr = NULL;
+
+	/* If we have no rules then packets always go to the tunnel dst */
+	if (list_empty(&t->rules.list))
+		return;
+
+	/* Find the src / dst address / port (or ID for ICMP) */
+	iph = ip_hdr(skb);
+	ip6_get_addrport(iph, &saddr4, &daddr4, &sport4, &dport4, &proto,
+			 &icmperr);
+
+	if (icmperr) {
+		mr = ip6_tnl_rule_find(dev, saddr4);
+		addr = saddr4;
+		port = sport4;
+	} else {
+		mr = ip6_tnl_rule_find(dev, daddr4);
+		addr = daddr4;
+		port = dport4;
+	}
+
+	/* Generate an destination IPv6 address from the internal packet */
+	if (mr)
+		ip6_mape_gen_addr6(mr, &fl6->daddr, addr, port);
+}
+
 /**
  * ip6_tnl_lookup - fetch tunnel matching the end-point addresses
  *   @remote: the address of the tunnel exit-point
@@ -208,6 +433,33 @@ ip6_tnl_bucket(struct ip6_tnl_net *ip6n, const struct __ip6_tnl_parm *p)
 }
 
 /**
+ * ip6_tnl_bucket_r_any - get head of list matching given tunnel parameters
+ *   @p: parameters containing tunnel end-points
+ *
+ * Description:
+ *   ip6_tnl_bucket_r_any() returns the head of the list matching the
+ *   &struct in6_addr entry laddr in @p.
+ *
+ * Return: head of IPv6 tunnel list
+ **/
+
+static struct ip6_tnl __rcu **
+ip6_tnl_bucket_r_any(struct ip6_tnl_net *ip6n, const struct __ip6_tnl_parm *p)
+{
+	const struct in6_addr *local = &p->laddr;
+	unsigned int h = 0;
+	int prio = 0;
+	struct in6_addr any;
+
+	if (!ipv6_addr_any(local)) {
+		memset(&any, 0, sizeof(any));
+		prio = 1;
+		h = HASH(&any, local);
+	}
+	return &ip6n->tnls[prio][h];
+}
+
+/**
  * ip6_tnl_link - add tunnel to hash table
  *   @t: tunnel to be added
  **/
@@ -215,7 +467,12 @@ ip6_tnl_bucket(struct ip6_tnl_net *ip6n, const struct __ip6_tnl_parm *p)
 static void
 ip6_tnl_link(struct ip6_tnl_net *ip6n, struct ip6_tnl *t)
 {
-	struct ip6_tnl __rcu **tp = ip6_tnl_bucket(ip6n, &t->parms);
+	struct ip6_tnl __rcu **tp;
+
+	if (!list_empty(&t->rules.list))
+		tp = ip6_tnl_bucket_r_any(ip6n, &t->parms);
+	else
+		tp = ip6_tnl_bucket(ip6n, &t->parms);
 
 	if (t->parms.collect_md)
 		rcu_assign_pointer(ip6n->collect_md_tun, t);
@@ -233,6 +490,15 @@ ip6_tnl_unlink(struct ip6_tnl_net *ip6n, struct ip6_tnl *t)
 {
 	struct ip6_tnl __rcu **tp;
 	struct ip6_tnl *iter;
+
+	for (tp = ip6_tnl_bucket_r_any(ip6n, &t->parms);
+	     (iter = rtnl_dereference(*tp)) != NULL;
+	     tp = &iter->next) {
+		if (t == iter) {
+			rcu_assign_pointer(*tp, t->next);
+			return;
+		}
+	}
 
 	if (t->parms.collect_md)
 		rcu_assign_pointer(ip6n->collect_md_tun, NULL);
@@ -351,6 +617,16 @@ static struct ip6_tnl *ip6_tnl_locate(struct net *net,
 	struct ip6_tnl __rcu **tp;
 	struct ip6_tnl *t;
 	struct ip6_tnl_net *ip6n = net_generic(net, ip6_tnl_net_id);
+
+	for (tp = ip6_tnl_bucket_r_any(ip6n, p);
+	     (t = rtnl_dereference(*tp)) != NULL;
+	     tp = &t->next) {
+		if (ipv6_addr_equal(local, &t->parms.laddr)) {
+			if (create)
+				return ERR_PTR(-EEXIST);
+			return t;
+		}
+	}
 
 	for (tp = ip6_tnl_bucket(ip6n, p);
 	     (t = rtnl_dereference(*tp)) != NULL;
@@ -880,6 +1156,64 @@ static const struct tnl_ptk_info tpi_v4 = {
 	.proto = htons(ETH_P_IP),
 };
 
+static int ip6_tnl_ipv4_addr_match(struct ip6_tnl *t, __be32 addr)
+{
+	struct in_device *ind;
+	int ret = 0;
+
+	ind = in_dev_get(t->dev);
+	if (!ind)
+		return 0;
+
+	for_ifa(ind) {
+		if (ifa->ifa_address == addr) {
+			ret = 1;
+			break;
+		}
+	}
+	endfor_ifa(ind);
+	in_dev_put(ind);
+
+	return ret;
+}
+
+static int ip6_tnl_map_rule_validate(struct ip6_tnl *t, struct sk_buff *skb)
+{
+	struct ipv6hdr *ipv6h;
+	struct iphdr *iph;
+	__be32 src, dst;
+	__be16 sport, dport;
+	__u8 proto;
+	int icmperr;
+	struct ip6_tnl_rule *mr = NULL;
+	struct in6_addr src6 = { };
+
+	if (likely(list_empty(&t->rules.list)))
+		return 1;
+
+	iph = ipip_hdr(skb);
+	ip6_get_addrport(iph, &src, &dst, &sport, &dport, &proto, &icmperr);
+
+	/* Check if the destination of the packet is for the MAP-E tunnel. */
+	if (!ip6_tnl_ipv4_addr_match(t, dst))
+		return 0;
+
+	/* if the packet's destination is for the tunnel, we need to check
+	 * if the source ipv4 address matches any map rules. If there is
+	 * no matching rule, just return success (the packet is from br).
+	 * Otherwise, we check if the source ipv6 address is valid.
+	 */
+	mr = ip6_tnl_rule_find(t->dev, src);
+	if (mr) {
+		ip6_mape_gen_addr6(mr, &src6, src, sport);
+		ipv6h = ipv6_hdr(skb);
+		if (!ipv6_addr_equal(&src6, &ipv6h->saddr))
+			return 0;
+	}
+
+	return 1;
+}
+
 static int ipxip6_rcv(struct sk_buff *skb, u8 ipproto,
 		      const struct tnl_ptk_info *tpi,
 		      int (*dscp_ecn_decapsulate)(const struct ip6_tnl *t,
@@ -904,6 +1238,8 @@ static int ipxip6_rcv(struct sk_buff *skb, u8 ipproto,
 		if (!ip6_tnl_rcv_ctl(t, &ipv6h->daddr, &ipv6h->saddr))
 			goto drop;
 		if (iptunnel_pull_header(skb, 0, tpi->proto, false))
+			goto drop;
+		if (!ip6_tnl_map_rule_validate(t, skb))
 			goto drop;
 		if (t->parms.collect_md) {
 			tun_dst = ipv6_tun_rx_dst(skb, 0, 0, 0);
@@ -1090,6 +1426,12 @@ int ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev, __u8 dsfield,
 		 * routing decision depends on the current inner header value
 		 */
 		use_cache = true;
+	}
+
+	/* In MAP-E mode we need to always do a route lookup */
+	if (!list_empty(&t->rules.list)) {
+		use_cache = false;
+		ip6_tnl_mape_dst(dev, skb, fl6);
 	}
 
 	if (use_cache)
@@ -1863,6 +2205,8 @@ ip6_tnl_dev_init_gen(struct net_device *dev)
 	dev->min_mtu = ETH_MIN_MTU;
 	dev->max_mtu = IP6_MAX_MTU - dev->hard_header_len;
 
+	INIT_LIST_HEAD(&t->rules.list);
+
 	return 0;
 
 destroy_dst:
@@ -1968,6 +2312,95 @@ static void ip6_tnl_netlink_parms(struct nlattr *data[],
 
 	if (data[IFLA_IPTUN_FWMARK])
 		parms->fwmark = nla_get_u32(data[IFLA_IPTUN_FWMARK]);
+
+	if (data[IFLA_IPTUN_RULE_ACTION])
+		parms->rule_action = nla_get_u8(data[IFLA_IPTUN_RULE_ACTION]);
+
+	if (data[IFLA_IPTUN_RULE_VERSION])
+		parms->rule.version = nla_get_u8(data[IFLA_IPTUN_RULE_VERSION]);
+
+	if (data[IFLA_IPTUN_RULE_IPV6_PREFIX])
+		parms->rule.ipv6_subnet =
+		    nla_get_in6_addr(data[IFLA_IPTUN_RULE_IPV6_PREFIX]);
+
+	if (data[IFLA_IPTUN_RULE_IPV6_PREFIXLEN])
+		parms->rule.ipv6_prefixlen =
+		    nla_get_u8(data[IFLA_IPTUN_RULE_IPV6_PREFIXLEN]);
+
+	if (data[IFLA_IPTUN_RULE_IPV4_PREFIX])
+		parms->rule.ipv4_subnet.s_addr =
+		    nla_get_in_addr(data[IFLA_IPTUN_RULE_IPV4_PREFIX]);
+
+	if (data[IFLA_IPTUN_RULE_IPV4_PREFIXLEN])
+		parms->rule.ipv4_prefixlen =
+		    nla_get_u8(data[IFLA_IPTUN_RULE_IPV4_PREFIXLEN]);
+
+	if (data[IFLA_IPTUN_RULE_EA_LENGTH])
+		parms->rule.ea_length =
+		    nla_get_u8(data[IFLA_IPTUN_RULE_EA_LENGTH]);
+
+	if (data[IFLA_IPTUN_RULE_PSID_OFFSET])
+		parms->rule.psid_offset =
+		    nla_get_u8(data[IFLA_IPTUN_RULE_PSID_OFFSET]);
+}
+
+static int ip6_tnl_rule_cmp(void *unused, struct list_head *_a,
+			    struct list_head *_b)
+{
+	struct ip6_rule_list *a = list_entry(_a, struct ip6_rule_list, list);
+	struct ip6_rule_list *b = list_entry(_b, struct ip6_rule_list, list);
+	int diff;
+
+	diff = b->data.ipv4_prefixlen - a->data.ipv4_prefixlen;
+	if (!diff)
+		diff = b->data.ipv4_subnet.s_addr - a->data.ipv4_subnet.s_addr;
+
+	if (!diff)
+		diff = b->data.ipv6_prefixlen - a->data.ipv6_prefixlen;
+
+	if (!diff)
+		diff =
+		    memcmp(&b->data.ipv6_subnet, &a->data.ipv6_subnet,
+			   sizeof(b->data.ipv6_subnet));
+
+	if (!diff)
+		diff = b->data.ea_length - a->data.ea_length;
+
+	if (!diff)
+		diff = b->data.psid_offset - a->data.psid_offset;
+
+	return diff;
+}
+
+static void ip6_tnl_add_rule(struct net_device *dev,
+			     struct __ip6_tnl_parm *new_cfg)
+{
+	struct ip6_tnl *t = netdev_priv(dev);
+	struct ip6_rule_list *new_rule = kmalloc(sizeof(t->rules), GFP_KERNEL);
+
+	if (!new_rule)
+		return;
+
+	memcpy(&new_rule->data, &new_cfg->rule, sizeof(new_rule->data));
+	INIT_LIST_HEAD(&new_rule->list);
+	list_add(&new_rule->list, &t->rules.list);
+	list_sort(NULL, &t->rules.list, ip6_tnl_rule_cmp);
+}
+
+static void ip6_tnl_delete_rule(struct net_device *dev,
+				struct __ip6_tnl_parm *_old_rule)
+{
+	struct ip6_tnl *t = netdev_priv(dev);
+	struct ip6_rule_list *pos = NULL;
+	struct ip6_rule_list old_rule = { .data = _old_rule->rule };
+	struct ip6_rule_list *iter = NULL;
+
+	list_for_each_entry_safe(pos, iter, &t->rules.list, list) {
+		if (ip6_tnl_rule_cmp(NULL, &pos->list, &old_rule.list) == 0) {
+			list_del(&pos->list);
+			break;
+		}
+	}
 }
 
 static bool ip6_tnl_netlink_encap_parms(struct nlattr *data[],
@@ -2035,6 +2468,16 @@ static int ip6_tnl_newlink(struct net *src_net, struct net_device *dev,
 	err = ip6_tnl_create2(dev);
 	if (!err && tb[IFLA_MTU])
 		ip6_tnl_change_mtu(dev, nla_get_u32(tb[IFLA_MTU]));
+	if (!err && data[IFLA_IPTUN_RULE_ACTION]) {
+		switch (nla_get_u8(data[IFLA_IPTUN_RULE_ACTION])) {
+		case TUNNEL_RULE_ACTION_ADD:
+			ip6_tnl_add_rule(dev, &nt->parms);
+			break;
+		case TUNNEL_RULE_ACTION_DELETE:
+			ip6_tnl_delete_rule(dev, &nt->parms);
+			break;
+		}
+	}
 
 	return err;
 }
@@ -2048,6 +2491,7 @@ static int ip6_tnl_changelink(struct net_device *dev, struct nlattr *tb[],
 	struct net *net = t->net;
 	struct ip6_tnl_net *ip6n = net_generic(net, ip6_tnl_net_id);
 	struct ip_tunnel_encap ipencap;
+	int err;
 
 	if (dev == ip6n->fb_tnl_dev)
 		return -EINVAL;
@@ -2069,13 +2513,32 @@ static int ip6_tnl_changelink(struct net_device *dev, struct nlattr *tb[],
 	} else
 		t = netdev_priv(dev);
 
-	return ip6_tnl_update(t, &p);
+	err = ip6_tnl_update(t, &p);
+	if (!err && data[IFLA_IPTUN_RULE_ACTION]) {
+		switch (nla_get_u8(data[IFLA_IPTUN_RULE_ACTION])) {
+		case TUNNEL_RULE_ACTION_ADD:
+			ip6_tnl_add_rule(dev, &p);
+			break;
+		case TUNNEL_RULE_ACTION_DELETE:
+			ip6_tnl_delete_rule(dev, &p);
+			break;
+		}
+	}
+
+	return err;
 }
 
 static void ip6_tnl_dellink(struct net_device *dev, struct list_head *head)
 {
 	struct net *net = dev_net(dev);
 	struct ip6_tnl_net *ip6n = net_generic(net, ip6_tnl_net_id);
+	struct ip6_tnl *t = netdev_priv(dev);
+	struct ip6_rule_list *pos = NULL;
+	struct ip6_rule_list *iter = NULL;
+
+	list_for_each_entry_safe(pos, iter, &t->rules.list, list) {
+		list_del(&pos->list);
+	}
 
 	if (dev != ip6n->fb_tnl_dev)
 		unregister_netdevice_queue(dev, head);
@@ -2112,6 +2575,22 @@ static size_t ip6_tnl_get_size(const struct net_device *dev)
 		nla_total_size(0) +
 		/* IFLA_IPTUN_FWMARK */
 		nla_total_size(4) +
+		/* IFLA_IPTUN_RULE_VERSION */
+		nla_total_size(1) +
+		/* IFLA_IPTUN_RULE_ACTION */
+		nla_total_size(1) +
+		/* IFLA_IPTUN_RULE_IPV6_PREFIXLEN */
+		nla_total_size(1) +
+		/* IFLA_IPTUN_RULE_IPV4_PREFIXLEN */
+		nla_total_size(1) +
+		/* IFLA_IPTUN_RULE_EA_LENGTH */
+		nla_total_size(1) +
+		/* IFLA_IPTUN_RULE_PSID_OFFSET */
+		nla_total_size(1) +
+		/* IFLA_IPTUN_RULE_IPV6_PREFIX */
+		nla_total_size(sizeof(struct in6_addr)) +
+		/* IFLA_IPTUN_RULE_IPV4_PREFIX */
+		nla_total_size(sizeof(struct in6_addr)) +
 		0;
 }
 
@@ -2170,6 +2649,14 @@ static const struct nla_policy ip6_tnl_policy[IFLA_IPTUN_MAX + 1] = {
 	[IFLA_IPTUN_ENCAP_DPORT]	= { .type = NLA_U16 },
 	[IFLA_IPTUN_COLLECT_METADATA]	= { .type = NLA_FLAG },
 	[IFLA_IPTUN_FWMARK]		= { .type = NLA_U32 },
+	[IFLA_IPTUN_RULE_VERSION]	= { .type = NLA_U8 },
+	[IFLA_IPTUN_RULE_ACTION]	= { .type = NLA_U8 },
+	[IFLA_IPTUN_RULE_IPV6_PREFIXLEN] = { .type = NLA_U8 },
+	[IFLA_IPTUN_RULE_IPV4_PREFIXLEN] = { .type = NLA_U8 },
+	[IFLA_IPTUN_RULE_EA_LENGTH]	= { .type = NLA_U8 },
+	[IFLA_IPTUN_RULE_PSID_OFFSET]	= { .type = NLA_U8 },
+	[IFLA_IPTUN_RULE_IPV6_PREFIX]	= { .len = sizeof(struct in6_addr) },
+	[IFLA_IPTUN_RULE_IPV4_PREFIX]	= { .len = sizeof(struct in_addr) },
 };
 
 static struct rtnl_link_ops ip6_link_ops __read_mostly = {

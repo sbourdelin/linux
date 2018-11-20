@@ -18,6 +18,16 @@
 /* determine capability on a per-packet basis */
 #define IP6_TNL_F_CAP_PER_PACKET 0x40000
 
+struct ip6_tnl_rule {
+	u8 version;
+	struct in6_addr ipv6_subnet;
+	u8 ipv6_prefixlen;
+	struct in_addr ipv4_subnet;
+	u8 ipv4_prefixlen;
+	u8 ea_length;
+	u8 psid_offset;
+};
+
 struct __ip6_tnl_parm {
 	char name[IFNAMSIZ];	/* name of tunnel device */
 	int link;		/* ifindex of underlying L2 interface */
@@ -40,6 +50,13 @@ struct __ip6_tnl_parm {
 	__u8			erspan_ver;	/* ERSPAN version */
 	__u8			dir;	/* direction */
 	__u16			hwid;	/* hwid */
+	__u8			rule_action;
+	struct ip6_tnl_rule	rule;
+};
+
+struct ip6_rule_list {
+	struct list_head list;
+	struct ip6_tnl_rule data;
 };
 
 /* IPv6 tunnel */
@@ -63,6 +80,7 @@ struct ip6_tnl {
 	int encap_hlen; /* Encap header length (FOU,GUE) */
 	struct ip_tunnel_encap encap;
 	int mlink;
+	struct ip6_rule_list rules;
 };
 
 struct ip6_tnl_encap_ops {
