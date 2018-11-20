@@ -1485,7 +1485,7 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
 	u32 pch_ctl1, pch_ctl2, val;
-	bool alt;
+	bool alt, cpu_mode = false;
 
 	if (HAS_PCH_LPT(dev_priv))
 		alt = I915_READ(SOUTH_CHICKEN2) & LPT_PWM_GRANULARITY;
@@ -1507,12 +1507,40 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 
 	panel->backlight.min = get_backlight_min_vbt(connector);
 
-	val = lpt_get_backlight(connector);
+	panel->backlight.enabled = pch_ctl1 & BLM_PCH_PWM_ENABLE;
+	if (panel->backlight.enabled && HAS_PCH_LPT(dev_priv) &&
+	    (I915_READ(BLC_PWM_CPU_CTL2) & BLM_PWM_ENABLE) &&
+	    !WARN_ON(pch_ctl1 & BLM_PCH_OVERRIDE_ENABLE)) {
+		u32 freq;
+
+		cpu_mode = true;
+		/*
+		 * We're in cpu mode, convert to PCH units.
+		 *
+		 * Convert CPU pwm tick back to hz, back to new PCH units again.
+		 * this is the same formula as pch_hz_to_pwm, but the other way
+		 * around..
+		 */
+		val = pch_get_backlight(connector);
+		freq = DIV_ROUND_CLOSEST(KHz(dev_priv->rawclk_freq), val * 128);
+
+		val = lpt_hz_to_pwm(connector, freq);
+	} else
+		val = lpt_get_backlight(connector);
 	val = intel_panel_compute_brightness(connector, val);
 	panel->backlight.level = clamp(val, panel->backlight.min,
 				       panel->backlight.max);
 
-	panel->backlight.enabled = pch_ctl1 & BLM_PCH_PWM_ENABLE;
+	if (cpu_mode) {
+		u32 tmp;
+
+		/* Use PWM mode, instead of cpu clock */
+		lpt_set_backlight(connector->base.state, panel->backlight.level);
+		I915_WRITE(BLC_PWM_PCH_CTL1, pch_ctl1 | BLM_PCH_OVERRIDE_ENABLE);
+
+		tmp = I915_READ(BLC_PWM_CPU_CTL2);
+		I915_WRITE(BLC_PWM_CPU_CTL2, tmp & ~BLM_PWM_ENABLE);
+	}
 
 	return 0;
 }
