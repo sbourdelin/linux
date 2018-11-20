@@ -2081,8 +2081,8 @@ static const struct hda_controller_ops pci_hda_ops = {
 	.link_power = azx_intel_link_power,
 };
 
-static int azx_probe(struct pci_dev *pci,
-		     const struct pci_device_id *pci_id)
+static int __azx_probe(struct pci_dev *pci, const struct pci_device_id *pci_id,
+		       bool skip_shared)
 {
 	static int dev;
 	struct snd_card *card;
@@ -2090,6 +2090,10 @@ static int azx_probe(struct pci_dev *pci,
 	struct azx *chip;
 	bool schedule_probe;
 	int err;
+
+	/* skip the entry if it's shared with ASoC */
+	if (skip_shared && (pci_id->driver_data & AZX_DCAPS_INTEL_SHARED))
+		return -ENODEV;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
@@ -2156,6 +2160,12 @@ static int azx_probe(struct pci_dev *pci,
 out_free:
 	snd_card_free(card);
 	return err;
+}
+
+static int azx_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
+{
+	return __azx_probe(pci, pci_id,
+			   IS_ENABLED(CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT));
 }
 
 #ifdef CONFIG_PM
@@ -2649,5 +2659,23 @@ static struct pci_driver azx_driver = {
 		.pm = AZX_PM_OPS,
 	},
 };
+
+#ifdef CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+const struct pci_driver *
+snd_hda_intel_probe(struct pci_dev *pci)
+{
+	const struct pci_device_id *pci_id;
+	int ret;
+
+	pci_id = pci_match_id(azx_ids, pci);
+	if (!pci_id)
+		return ERR_PTR(-ENODEV);
+	ret = __azx_probe(pci, pci_id, false);
+	if (ret < 0)
+		return ERR_PTR(ret);
+	return &azx_driver;
+}
+EXPORT_SYMBOL_GPL(snd_hda_intel_probe);
+#endif
 
 module_pci_driver(azx_driver);

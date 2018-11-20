@@ -41,6 +41,21 @@
 #include "../../../soc/codecs/hdac_hda.h"
 #endif
 
+enum {
+	SKL_BIND_AUTO,		/* fallback to legacy driver */
+	SKL_BIND_LEGACY,	/* bind only with legacy driver */
+	SKL_BIND_ASOC		/* bind only with ASoC driver */
+};
+
+#ifdef CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+static const struct pci_driver *skl_fallback_driver;
+#define FALLBACK_PM_CALL(dev, method)					\
+	do {								\
+		if (skl_fallback_driver &&				\
+		    skl_fallback_driver->driver.pm->method)		\
+			return skl_fallback_driver->driver.pm->method(dev); \
+	} while (0)
+
 /*
  * initialize the PCI registers
  */
@@ -264,6 +279,9 @@ static int skl_suspend_late(struct device *dev)
 	struct hdac_bus *bus = pci_get_drvdata(pci);
 	struct skl *skl = bus_to_skl(bus);
 
+	if (skl_fallback_driver)
+		return 0;
+
 	return skl_suspend_late_dsp(skl);
 }
 
@@ -313,6 +331,8 @@ static int skl_suspend(struct device *dev)
 	struct skl *skl  = bus_to_skl(bus);
 	int ret = 0;
 
+	FALLBACK_PM_CALL(dev, suspend);
+
 	/*
 	 * Do not suspend if streams which are marked ignore suspend are
 	 * running, we need to save the state for these and continue
@@ -350,6 +370,8 @@ static int skl_resume(struct device *dev)
 	struct skl *skl  = bus_to_skl(bus);
 	struct hdac_ext_link *hlink = NULL;
 	int ret;
+
+	FALLBACK_PM_CALL(dev, resume);
 
 	/* Turned OFF in HDMI codec driver after codec reconfiguration */
 	if (IS_ENABLED(CONFIG_SND_SOC_HDAC_HDMI)) {
@@ -405,6 +427,8 @@ static int skl_runtime_suspend(struct device *dev)
 	struct pci_dev *pci = to_pci_dev(dev);
 	struct hdac_bus *bus = pci_get_drvdata(pci);
 
+	FALLBACK_PM_CALL(dev, runtime_suspend);
+
 	dev_dbg(bus->dev, "in %s\n", __func__);
 
 	return _skl_suspend(bus);
@@ -415,15 +439,24 @@ static int skl_runtime_resume(struct device *dev)
 	struct pci_dev *pci = to_pci_dev(dev);
 	struct hdac_bus *bus = pci_get_drvdata(pci);
 
+	FALLBACK_PM_CALL(dev, runtime_resume);
+
 	dev_dbg(bus->dev, "in %s\n", __func__);
 
 	return _skl_resume(bus);
+}
+
+static int skl_runtime_idle(struct device *dev)
+{
+	FALLBACK_PM_CALL(dev, runtime_idle);
+	return 0;
 }
 #endif /* CONFIG_PM */
 
 static const struct dev_pm_ops skl_pm = {
 	SET_SYSTEM_SLEEP_PM_OPS(skl_suspend, skl_resume)
-	SET_RUNTIME_PM_OPS(skl_runtime_suspend, skl_runtime_resume, NULL)
+	SET_RUNTIME_PM_OPS(skl_runtime_suspend, skl_runtime_resume,
+			   skl_runtime_idle)
 	.suspend_late = skl_suspend_late,
 };
 
@@ -980,8 +1013,8 @@ static int skl_first_init(struct hdac_bus *bus)
 	return skl_init_chip(bus, true);
 }
 
-static int skl_probe(struct pci_dev *pci,
-		     const struct pci_device_id *pci_id)
+static int __skl_probe(struct pci_dev *pci,
+		       const struct pci_device_id *pci_id)
 {
 	struct skl *skl;
 	struct hdac_bus *bus = NULL;
@@ -1060,12 +1093,38 @@ out_free:
 	return err;
 }
 
+static int skl_probe(struct pci_dev *pci,
+		     const struct pci_device_id *pci_id)
+{
+	int ret = -ENODEV;
+
+	if (skl_legacy_binding != SKL_BIND_LEGACY)
+		ret = __skl_probe(pci, pci_id);
+
+#ifdef CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+	if (ret < 0 && skl_legacy_binding != SKL_BIND_ASOC) {
+		skl_fallback_driver = snd_hda_intel_probe(pci);
+		ret = PTR_ERR_OR_ZERO(skl_fallback_driver);
+		if (ret)
+			skl_fallback_driver = NULL;
+	}
+#endif
+	return ret;
+}
+
 static void skl_shutdown(struct pci_dev *pci)
 {
 	struct hdac_bus *bus = pci_get_drvdata(pci);
 	struct hdac_stream *s;
 	struct hdac_ext_stream *stream;
 	struct skl *skl;
+
+#ifdef CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+	if (skl_fallback_driver) {
+		skl_fallback_driver->shutdown(pci);
+		return;
+	}
+#endif
 
 	if (!bus)
 		return;
@@ -1088,6 +1147,14 @@ static void skl_remove(struct pci_dev *pci)
 {
 	struct hdac_bus *bus = pci_get_drvdata(pci);
 	struct skl *skl = bus_to_skl(bus);
+
+#ifdef CONFIG_SND_SOC_INTEL_SKL_LEGACY_SUPPORT
+	if (skl_fallback_driver) {
+		skl_fallback_driver->remove(pci);
+		skl_fallback_driver = NULL;
+		return;
+	}
+#endif
 
 	release_firmware(skl->tplg);
 
