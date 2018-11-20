@@ -1125,6 +1125,80 @@ out_sockmap:
 	exit(1);
 }
 
+#define MAPINMAP_PROG "./test_mapinmap.o"
+static void test_mapinmap(void)
+{
+	struct bpf_program *prog;
+	struct bpf_object *obj;
+	struct bpf_map *map;
+	int mim_fd, fd;
+	int pos = 0;
+
+	obj = bpf_object__open(MAPINMAP_PROG);
+
+	fd = bpf_create_map(BPF_MAP_TYPE_HASH, sizeof(int), sizeof(int),
+			    2, 0);
+	if (fd < 0) {
+		printf("Failed to create hashmap '%s'!\n", strerror(errno));
+		exit(1);
+	}
+	printf("fd is %d\n", fd);
+
+	map = bpf_object__find_map_by_name(obj, "mim_array");
+	if (IS_ERR(map)) {
+		printf("Failed to load array of maps from test prog\n");
+		goto out_mapinmap;
+	}
+	bpf_map__add_inner_map_fd(map, fd);
+
+	map = bpf_object__find_map_by_name(obj, "mim_hash");
+	if (IS_ERR(map)) {
+		printf("Failed to load hash of maps from test prog\n");
+		goto out_mapinmap;
+	}
+	bpf_map__add_inner_map_fd(map, fd);
+
+
+	bpf_object__for_each_program(prog, obj) {
+		bpf_program__set_xdp(prog);
+	}
+	bpf_object__load(obj);
+
+	map = bpf_object__find_map_by_name(obj, "mim_array");
+	if (IS_ERR(map)) {
+		printf("Failed to load array of maps from test prog\n");
+		goto out_mapinmap;
+	}
+	mim_fd = bpf_map__fd(map);
+	if (mim_fd < 0) {
+		printf("Failed to get descriptor for array of maps\n");
+		goto out_mapinmap;
+	}
+
+	bpf_map_update_elem(mim_fd, &pos, &fd, 0);
+
+	map = bpf_object__find_map_by_name(obj, "mim_hash");
+	if (IS_ERR(map)) {
+		printf("Failed to load hash of maps from test prog\n");
+		goto out_mapinmap;
+	}
+	mim_fd = bpf_map__fd(map);
+	if (mim_fd < 0) {
+		printf("Failed to get descriptor for hash of maps\n");
+		goto out_mapinmap;
+	}
+	bpf_map_update_elem(mim_fd, &pos, &fd, 0);
+
+
+	close(fd);
+	bpf_object__close(obj);
+	return;
+
+out_mapinmap:
+	close(fd);
+	exit(1);
+}
+
 #define MAP_SIZE (32 * 1024)
 
 static void test_map_large(void)
@@ -1600,6 +1674,8 @@ static void run_all_tests(void)
 
 	test_queuemap(0, NULL);
 	test_stackmap(0, NULL);
+
+	test_mapinmap();
 }
 
 int main(void)
