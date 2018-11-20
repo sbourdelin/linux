@@ -93,11 +93,11 @@
 #define PCIE_ATU_UNR_UPPER_TARGET	0x18
 
 /* Register address builder */
-#define PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(region)	\
-			((0x3 << 20) | ((region) << 9))
+#define PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(region) \
+		((region) << 9)
 
-#define PCIE_GET_ATU_INB_UNR_REG_OFFSET(region)				\
-			((0x3 << 20) | ((region) << 9) | (0x1 << 8))
+#define PCIE_GET_ATU_INB_UNR_REG_OFFSET(region) \
+		(((region) << 9) | (0x1 << 8))
 
 #define MAX_MSI_IRQS			256
 #define MAX_MSI_IRQS_PER_CTRL		32
@@ -219,6 +219,8 @@ struct dw_pcie {
 	struct device		*dev;
 	void __iomem		*dbi_base;
 	void __iomem		*dbi_base2;
+	/* Used when iatu_unroll_enabled is true */
+	void __iomem		*atu_base;
 	u32			num_viewport;
 	u8			iatu_unroll_enabled;
 	struct pcie_port	pp;
@@ -287,6 +289,16 @@ static inline void dw_pcie_writel_dbi2(struct dw_pcie *pci, u32 reg, u32 val)
 static inline u32 dw_pcie_readl_dbi2(struct dw_pcie *pci, u32 reg)
 {
 	return __dw_pcie_read_dbi(pci, pci->dbi_base2, reg, 0x4);
+}
+
+static inline void dw_pcie_writel_atu(struct dw_pcie *pci, u32 reg, u32 val)
+{
+	__dw_pcie_write_dbi(pci, pci->atu_base, reg, 0x4, val);
+}
+
+static inline u32 dw_pcie_readl_atu(struct dw_pcie *pci, u32 reg)
+{
+	return __dw_pcie_read_dbi(pci, pci->atu_base, reg, 0x4);
 }
 
 static inline void dw_pcie_dbi_ro_wr_en(struct dw_pcie *pci)
