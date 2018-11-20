@@ -32,6 +32,9 @@
 #define PM_RSTC_WRCFG_FULL_RESET	0x00000020
 #define PM_RSTC_RESET			0x00000102
 
+#define PM_READ(reg) readl(pm->base + (reg))
+#define PM_WRITE(reg, val) writel(PM_PASSWORD | (val), pm->base + (reg))
+
 /*
  * The Raspberry Pi firmware uses the RSTS register to know which partition
  * to boot from. The partition value is spread into bits 0, 2, 4, 6, 8, 10.
@@ -54,7 +57,7 @@ static bool bcm2835_wdt_is_running(struct bcm2835_pm *pm)
 {
 	uint32_t cur;
 
-	cur = readl(pm->base + PM_RSTC);
+	cur = PM_READ(PM_RSTC);
 
 	return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
 }
@@ -67,11 +70,9 @@ static int bcm2835_wdt_start(struct watchdog_device *wdog)
 
 	spin_lock_irqsave(&pm->lock, flags);
 
-	writel(PM_PASSWORD | (SECS_TO_WDOG_TICKS(wdog->timeout) &
-			      PM_WDOG_TIME_SET), pm->base + PM_WDOG);
-	cur = readl(pm->base + PM_RSTC);
-	writel(PM_PASSWORD | (cur & PM_RSTC_WRCFG_CLR) |
-	       PM_RSTC_WRCFG_FULL_RESET, pm->base + PM_RSTC);
+	PM_WRITE(PM_WDOG, SECS_TO_WDOG_TICKS(wdog->timeout) & PM_WDOG_TIME_SET);
+	cur = PM_READ(PM_RSTC);
+	PM_WRITE(PM_RSTC, (cur & PM_RSTC_WRCFG_CLR) | PM_RSTC_WRCFG_FULL_RESET);
 
 	spin_unlock_irqrestore(&pm->lock, flags);
 
@@ -82,7 +83,7 @@ static int bcm2835_wdt_stop(struct watchdog_device *wdog)
 {
 	struct bcm2835_pm *pm = watchdog_get_drvdata(wdog);
 
-	writel(PM_PASSWORD | PM_RSTC_RESET, pm->base + PM_RSTC);
+	PM_WRITE(PM_RSTC, PM_RSTC_RESET);
 	return 0;
 }
 
@@ -90,7 +91,7 @@ static unsigned int bcm2835_wdt_get_timeleft(struct watchdog_device *wdog)
 {
 	struct bcm2835_pm *pm = watchdog_get_drvdata(wdog);
 
-	uint32_t ret = readl(pm->base + PM_WDOG);
+	uint32_t ret = PM_READ(PM_WDOG);
 	return WDOG_TICKS_TO_SECS(ret & PM_WDOG_TIME_SET);
 }
 
@@ -100,7 +101,7 @@ static void __bcm2835_restart(struct bcm2835_pm *pm)
 
 	/* use a timeout of 10 ticks (~150us) */
 	writel(10 | PM_PASSWORD, pm->base + PM_WDOG);
-	val = readl(pm->base + PM_RSTC);
+	val = PM_READ(PM_RSTC);
 	val &= PM_RSTC_WRCFG_CLR;
 	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
 	writel(val, pm->base + PM_RSTC);
@@ -159,7 +160,7 @@ static void bcm2835_power_off(void)
 	 * from the normal (full) reset. bootcode.bin will not reboot after a
 	 * hard reset.
 	 */
-	val = readl(pm->base + PM_RSTS);
+	val = PM_READ(PM_RSTS);
 	val |= PM_PASSWORD | PM_RSTS_RASPBERRYPI_HALT;
 	writel(val, pm->base + PM_RSTS);
 
