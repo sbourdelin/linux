@@ -31,6 +31,7 @@ struct wm8994_ldo {
 	struct wm8994 *wm8994;
 	struct regulator_consumer_supply supply;
 	struct regulator_init_data init_data;
+	struct gpio_desc *ena_gpiod;
 };
 
 #define WM8994_LDO1_MAX_SELECTOR 0x7
@@ -147,14 +148,19 @@ static int wm8994_ldo_probe(struct platform_device *pdev)
 	config.regmap = wm8994->regmap;
 	config.init_data = &ldo->init_data;
 
-	/* Look up LDO enable GPIO from the parent device node */
-	gpiod = devm_gpiod_get_optional(pdev->dev.parent,
-					id ? "wlf,ldo2ena" : "wlf,ldo1ena",
-					GPIOD_OUT_LOW |
-					GPIOD_FLAGS_BIT_NONEXCLUSIVE);
+	/*
+	 * Look up LDO enable GPIO from the parent device node, we can't
+	 * use devm because it assumes the device we want to allocate
+	 * against is the same one that holds the OF node
+	 */
+	gpiod = gpiod_get_optional(pdev->dev.parent,
+				   id ? "wlf,ldo2ena" : "wlf,ldo1ena",
+				   GPIOD_OUT_LOW |
+				   GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	if (IS_ERR(gpiod))
 		return PTR_ERR(gpiod);
 	config.ena_gpiod = gpiod;
+	ldo->ena_gpiod = gpiod;
 
 	/* Use default constraints if none set up */
 	if (!pdata || !pdata->ldo[id].init_data || wm8994->dev->of_node) {
@@ -184,11 +190,23 @@ static int wm8994_ldo_probe(struct platform_device *pdev)
 	return 0;
 
 err:
+	gpiod_put(gpiod);
 	return ret;
+}
+
+static int wm8994_ldo_remove(struct platform_device *pdev)
+{
+	struct wm8994_ldo *ldo = platform_get_drvdata(pdev);
+
+	if (ldo->ena_gpiod)
+		gpiod_put(ldo->ena_gpiod);
+
+	return 0;
 }
 
 static struct platform_driver wm8994_ldo_driver = {
 	.probe = wm8994_ldo_probe,
+	.remove = wm8994_ldo_remove,
 	.driver		= {
 		.name	= "wm8994-ldo",
 	},
