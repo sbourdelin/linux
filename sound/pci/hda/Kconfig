@@ -228,4 +228,44 @@ config SND_HDA_POWER_SAVE_DEFAULT
 
 endif
 
+if SND_HDA_INTEL
+
+config SND_HDA_INTEL_LEGACY_FALLBACK_SKL
+	bool
+	help
+	  This option enables HD-audio legacy fallback for
+	  Skylake machines
+
+config SND_HDA_INTEL_LEGACY_FALLBACK_APL
+	bool
+	help
+	  This option enables HD-audio legacy fallback for
+	  Broxton/ApolloLake machines
+
+config SND_HDA_INTEL_LEGACY_FALLBACK_KBL
+	bool
+	help
+	  This option enables HD-audio legacy fallback for
+	  KabyLake machines
+
+config SND_HDA_INTEL_LEGACY_FALLBACK_GLK
+	bool
+	help
+	  This option enables HD-audio legacy fallback for
+	  GeminiLake machines
+
+config SND_HDA_INTEL_LEGACY_FALLBACK_CNL
+	bool
+	help
+	  This option enables HD-audio legacy fallback for
+	  CannonLake machines
+
+config SND_HDA_INTEL_LEGACY_FALLBACK_CFL
+	bool
+	help
+	  This option enables HD-audio legacy fallback for
+	  CoffeeLake machines
+
+endif ## SND_HDA_INTEL
+
 endmenu
