@@ -814,10 +814,10 @@ static int vsc85xx_default_config(struct phy_device *phydev)
 	if (rc < 0)
 		goto out_unlock;
 
-	reg_val = phy_read(phydev, MSCC_PHY_RGMII_CNTL);
+	reg_val = __phy_read(phydev, MSCC_PHY_RGMII_CNTL);
 	reg_val &= ~(RGMII_RX_CLK_DELAY_MASK);
 	reg_val |= (RGMII_RX_CLK_DELAY_1_1_NS << RGMII_RX_CLK_DELAY_POS);
-	phy_write(phydev, MSCC_PHY_RGMII_CNTL, reg_val);
+	__phy_write(phydev, MSCC_PHY_RGMII_CNTL, reg_val);
 
 out_unlock:
 	rc = phy_restore_page(phydev, rc, rc > 0 ? 0 : rc);
