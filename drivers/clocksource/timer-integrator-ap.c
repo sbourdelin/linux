@@ -204,8 +204,6 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 		return err;
 	}
 
-	pri_node = of_find_node_by_path(path);
-
 	err = of_property_read_string(of_aliases,
 				"arm,timer-secondary", &path);
 	if (err) {
@@ -213,14 +211,18 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 		return err;
 	}
 
+	pri_node = of_find_node_by_path(path);
+	if (node == pri_node){
+		of_node_put(pri_node);
 
-	sec_node = of_find_node_by_path(path);
-
-	if (node == pri_node)
 		/* The primary timer lacks IRQ, use as clocksource */
 		return integrator_clocksource_init(rate, base);
+	}
 
+	sec_node = of_find_node_by_path(path);
 	if (node == sec_node) {
+		of_node_put(sec_node);
+
 		/* The secondary timer will drive the clock event */
 		irq = irq_of_parse_and_map(node, 0);
 		return integrator_clockevent_init(rate, base, irq);
