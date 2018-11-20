@@ -2738,10 +2738,6 @@ int regulator_force_disable(struct regulator *regulator)
 
 	regulator_unlock_dependent(rdev, &ww_ctx);
 
-	if (rdev->supply)
-		while (rdev->open_count--)
-			regulator_disable(rdev->supply);
-
 	return ret;
 }
 EXPORT_SYMBOL_GPL(regulator_force_disable);
