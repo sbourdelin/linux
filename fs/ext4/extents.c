@@ -1718,6 +1718,7 @@ ext4_can_extents_be_merged(struct inode *inode, struct ext4_extent *ex1,
 				struct ext4_extent *ex2)
 {
 	unsigned short ext1_ee_len, ext2_ee_len;
+	bool dioread_nolock = false;
 
 	if (ext4_ext_is_unwritten(ex1) != ext4_ext_is_unwritten(ex2))
 		return 0;
@@ -1741,10 +1742,15 @@ ext4_can_extents_be_merged(struct inode *inode, struct ext4_extent *ex1,
 	 * increment i_unwritten / set EXT4_STATE_DIO_UNWRITTEN only after
 	 * dropping i_data_sem. But reserved blocks should save us in that
 	 * case.
+	 *
+	 * In case of dioread_nolock, we allow merging extent for buffered
+	 * writes as the split happens in ext4_writepages (where blocks have
+	 * been reserved for updating extent) instead of endio.
 	 */
+	dioread_nolock = ext4_should_dioread_nolock(inode);
 	if (ext4_ext_is_unwritten(ex1) &&
 	    (ext4_test_inode_state(inode, EXT4_STATE_DIO_UNWRITTEN) ||
-	     atomic_read(&EXT4_I(inode)->i_unwritten) ||
+	     (!dioread_nolock && atomic_read(&EXT4_I(inode)->i_unwritten)) ||
 	     (ext1_ee_len + ext2_ee_len > EXT_UNWRITTEN_MAX_LEN)))
 		return 0;
 #ifdef AGGRESSIVE_TEST
