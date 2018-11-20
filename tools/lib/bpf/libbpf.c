@@ -163,6 +163,7 @@ struct bpf_map {
 	char *name;
 	size_t offset;
 	int map_ifindex;
+	int inner_map_fd;
 	struct bpf_map_def def;
 	__u32 btf_key_type_id;
 	__u32 btf_value_type_id;
@@ -1146,6 +1147,7 @@ bpf_object__create_maps(struct bpf_object *obj)
 		create_attr.btf_fd = 0;
 		create_attr.btf_key_type_id = 0;
 		create_attr.btf_value_type_id = 0;
+		create_attr.inner_map_fd = map->inner_map_fd;
 
 		if (obj->btf && !bpf_map_find_btf_info(map, obj->btf)) {
 			create_attr.btf_fd = btf__fd(obj->btf);
@@ -2560,6 +2562,11 @@ bool bpf_map__is_offload_neutral(struct bpf_map *map)
 void bpf_map__set_ifindex(struct bpf_map *map, __u32 ifindex)
 {
 	map->map_ifindex = ifindex;
+}
+
+void bpf_map__add_inner_map_fd(struct bpf_map *map, const int fd)
+{
+	map->inner_map_fd = fd;
 }
 
 static struct bpf_map *
