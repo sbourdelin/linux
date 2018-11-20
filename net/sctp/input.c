@@ -967,9 +967,15 @@ struct sctp_transport *sctp_epaddr_lookup_transport(
 	list = rhltable_lookup(&sctp_transport_hashtable, &arg,
 			       sctp_hash_params);
 
-	rhl_for_each_entry_rcu(t, tmp, list, node)
-		if (ep == t->asoc->ep)
+	rhl_for_each_entry_rcu(t, tmp, list, node) {
+		if (!sctp_transport_hold(t))
+			continue;
+		if (ep == t->asoc->ep) {
+			sctp_transport_put(t);
 			return t;
+		}
+		sctp_transport_put(t);
+	}
 
 	return NULL;
 }
