@@ -41,6 +41,7 @@ enum imx6_pcie_variants {
 
 struct imx6_pcie_drvdata {
 	enum imx6_pcie_variants variant;
+	int			dbi_length;
 };
 
 struct imx6_pcie {
@@ -937,6 +938,8 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 		break;
 	}
 
+	pci->dbi_length = imx6_pcie->drvdata->dbi_length;
+
 	/* Grab turnoff reset */
 	imx6_pcie->turnoff_reset = devm_reset_control_get_optional_exclusive(dev, "turnoff");
 	if (IS_ERR(imx6_pcie->turnoff_reset)) {
@@ -1004,7 +1007,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
 }
 
 static const struct imx6_pcie_drvdata drvdata[] = {
-	[IMX6Q] = { .variant = IMX6Q },
+	[IMX6Q] = { .variant = IMX6Q, .dbi_length = 0x15c },
 	[IMX6SX] = { .variant = IMX6SX },
 	[IMX6QP] = { .variant = IMX6QP },
 	[IMX7D] = { .variant = IMX7D },
