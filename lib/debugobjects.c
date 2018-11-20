@@ -23,7 +23,53 @@
 #define ODEBUG_HASH_BITS	14
 #define ODEBUG_HASH_SIZE	(1 << ODEBUG_HASH_BITS)
 
+/*
+ * Some debug objects are allocated during the early boot. Enabling some
+ * options like timers or workqueue objects may increase the size required
+ * significantly with large number of CPUs. For example,
+ *
+ * No. CPUs x 2 (worker pool) objects:
+ *
+ * start_kernel
+ *   workqueue_init_early
+ *     init_worker_pool
+ *       init_timer_key
+ *         debug_object_init
+ *
+ * No. CPUs objects (CONFIG_HIGH_RES_TIMERS):
+ *
+ * sched_init
+ *   hrtick_rq_init
+ *     hrtimer_init
+ *
+ * CONFIG_DEBUG_OBJECTS_WORK:
+ * No. CPUs x 6 (workqueue) objects:
+ *
+ * workqueue_init_early
+ *   alloc_workqueue
+ *     __alloc_workqueue_key
+ *       alloc_and_link_pwqs
+ *         init_pwq
+ *
+ * Also, plus No. CPUs objects:
+ *
+ * perf_event_init
+ *    __init_srcu_struct
+ *      init_srcu_struct_fields
+ *        init_srcu_struct_nodes
+ *          __init_work
+ *
+ * Increase the number a bit more in case the implmentatins are changed in
+ * the future.
+ */
+#if defined(CONFIG_NR_CPUS) && defined(CONFIG_DEBUG_OBJECTS_TIMERS) && \
+!defined(CONFIG_DEBUG_OBJECTS_WORK)
+#define ODEBUG_POOL_SIZE	(CONFIG_NR_CPUS * 10)
+#elif defined(CONFIG_NR_CPUS) && defined(CONFIG_DEBUG_OBJECTS_WORK)
+#define ODEBUG_POOL_SIZE	(CONFIG_NR_CPUS * 30)
+#else
 #define ODEBUG_POOL_SIZE	1024
+#endif /* CONFIG_NR_CPUS */
 #define ODEBUG_POOL_MIN_LEVEL	256
 
 #define ODEBUG_CHUNK_SHIFT	PAGE_SHIFT
@@ -58,8 +104,13 @@ static int			debug_objects_fixups __read_mostly;
 static int			debug_objects_warnings __read_mostly;
 static int			debug_objects_enabled __read_mostly
 				= CONFIG_DEBUG_OBJECTS_ENABLE_DEFAULT;
+/*
+ * This is only used after replaced static objects, so no need to scale it
+ * to use the early boot static pool size and it has already been scaled
+ * according to actual No. CPUs in the box within debug_objects_mem_init().
+ */
 static int			debug_objects_pool_size __read_mostly
-				= ODEBUG_POOL_SIZE;
+				= 1024;
 static int			debug_objects_pool_min_level __read_mostly
 				= ODEBUG_POOL_MIN_LEVEL;
 static struct debug_obj_descr	*descr_test  __read_mostly;
