@@ -84,8 +84,11 @@ bool is_directory(const char *base_path, const struct dirent *dent)
 {
 	char path[PATH_MAX];
 	struct stat st;
+	int len;
 
-	sprintf(path, "%s/%s", base_path, dent->d_name);
+	len = snprintf(path, sizeof(path), "%s/%s", base_path, dent->d_name);
+	assert((size_t)len < sizeof(path));
+
 	if (stat(path, &st))
 		return false;
 
