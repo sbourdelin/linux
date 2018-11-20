@@ -3325,6 +3325,9 @@ static void intel_pch_reset_handshake(struct drm_i915_private *dev_priv,
 	i915_reg_t reg;
 	u32 reset_bits, val;
 
+	if (!HAS_PCH_SPLIT(dev_priv))
+		return;
+
 	if (IS_IVYBRIDGE(dev_priv)) {
 		reg = GEN7_MSG_CTL;
 		reset_bits = WAIT_FOR_PCH_FLR_ACK | WAIT_FOR_PCH_RESET_ACK;
