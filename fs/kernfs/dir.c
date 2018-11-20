@@ -129,6 +129,9 @@ static int kernfs_path_from_node_locked(struct kernfs_node *kn_to,
 	size_t depth_from, depth_to, len = 0;
 	int i, j;
 
+	if (WARN_ON(!buf && buflen > 0))
+		return -EINVAL;
+
 	if (!kn_to)
 		return strlcpy(buf, "(null)", buflen);
 
