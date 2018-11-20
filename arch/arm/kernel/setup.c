@@ -949,6 +949,7 @@ static int __init init_machine_late(void)
 					      &system_serial);
 		if (ret)
 			system_serial = NULL;
+		of_node_put(root);
 	}
 
 	if (!system_serial)
