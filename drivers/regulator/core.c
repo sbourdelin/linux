@@ -1622,7 +1622,7 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
 	 * enable/disable calls.
 	 */
 	if (!regulator_ops_is_valid(rdev, REGULATOR_CHANGE_STATUS) &&
-	    _regulator_is_enabled(rdev))
+	    _regulator_is_enabled(rdev) > 0)
 		regulator->always_on = true;
 
 	regulator_unlock(rdev);
@@ -1811,7 +1811,7 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
 	}
 
 	/* Cascade always-on state to supply */
-	if (_regulator_is_enabled(rdev)) {
+	if (_regulator_is_enabled(rdev) > 0) {
 		ret = regulator_enable(rdev->supply);
 		if (ret < 0) {
 			_regulator_put(rdev->supply);
