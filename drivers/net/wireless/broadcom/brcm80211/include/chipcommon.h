@@ -269,6 +269,28 @@ struct chipcregs {
 /* GSIO (spi/i2c) present, rev >= 37 */
 #define	CC_CAP2_GSIO		0x00000002
 
+/* sr_control0, rev >= 48 */
+#define CC_SR_CTL0_ENABLE_MASK			BIT(0)
+#define CC_SR_CTL0_ENABLE_SHIFT		0
+#define CC_SR_CTL0_EN_SR_ENG_CLK_SHIFT	1 /* sr_clk to sr_memory enable */
+#define CC_SR_CTL0_RSRC_TRIGGER_SHIFT	2 /* Rising edge resource trigger 0 to
+					   * sr_engine
+					   */
+#define CC_SR_CTL0_MIN_DIV_SHIFT	6 /* Min division value for fast clk
+					   * in sr_engine
+					   */
+#define CC_SR_CTL0_EN_SBC_STBY_SHIFT		16
+#define CC_SR_CTL0_EN_SR_ALP_CLK_MASK_SHIFT	18
+#define CC_SR_CTL0_EN_SR_HT_CLK_SHIFT		19
+#define CC_SR_CTL0_ALLOW_PIC_SHIFT	20 /* Allow pic to separate power
+					    * domains
+					    */
+#define CC_SR_CTL0_MAX_SR_LQ_CLK_CNT_SHIFT	25
+#define CC_SR_CTL0_EN_MEM_DISABLE_FOR_SLEEP	30
+
+#define CC_SR_CTL1_SR_INIT_MASK		0x3FF
+#define CC_SR_CTL1_SR_INIT_SHIFT	0
+
 /* pmucapabilities */
 #define PCAP_REV_MASK	0x000000ff
 #define PCAP_RC_MASK	0x00001f00
@@ -292,6 +314,9 @@ struct chipcregs {
 /* retention_ctl PMU rev >= 15 */
 #define PMU_RCTL_MACPHY_DISABLE_MASK        (1 << 26)
 #define PMU_RCTL_LOGIC_DISABLE_MASK         (1 << 27)
+
+#define ECI_INLO_PKTDUR_MASK    0x000000f0 /* [7:4] - 4 bits */
+#define ECI_INLO_PKTDUR_SHIFT   4
 
 
 /*
