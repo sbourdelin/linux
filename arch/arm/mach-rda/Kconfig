@@ -4,5 +4,6 @@ menuconfig ARCH_RDA
 	select COMMON_CLK
 	select GENERIC_IRQ_CHIP
 	select RDA_INTC
+	select RDA_TIMER
 	help
 	  This enables support for the RDA Micro 8810PL SoC family.
