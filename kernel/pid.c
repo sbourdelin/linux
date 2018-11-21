@@ -174,6 +174,7 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 
 	for (i = ns->level; i >= 0; i--) {
 		int pid_min = 1;
+		unsigned int old_cursor;
 
 		idr_preload(GFP_KERNEL);
 		spin_lock_irq(&pidmap_lock);
@@ -182,7 +183,8 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 		 * init really needs pid 1, but after reaching the maximum
 		 * wrap back to RESERVED_PIDS
 		 */
-		if (idr_get_cursor(&tmp->idr) > RESERVED_PIDS)
+		old_cursor = idr_get_cursor(&tmp->idr);
+		if (old_cursor > RESERVED_PIDS)
 			pid_min = RESERVED_PIDS;
 
 		/*
@@ -191,6 +193,8 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 		 */
 		nr = idr_alloc_cyclic(&tmp->idr, NULL, pid_min,
 				      pid_max, GFP_ATOMIC);
+		if (unlikely(idr_get_cursor(&tmp->idr) <= old_cursor))
+			tmp->generation += 1;
 		spin_unlock_irq(&pidmap_lock);
 		idr_preload_end();
 
@@ -244,6 +248,16 @@ out_free:
 
 	kmem_cache_free(ns->pid_cachep, pid);
 	return ERR_PTR(retval);
+}
+
+u64 read_pid_generation(struct pid_namespace *ns)
+{
+	u64 generation;
+
+	spin_lock_irq(&pidmap_lock);
+	generation = ns->generation;
+	spin_unlock_irq(&pidmap_lock);
+	return generation;
 }
 
 void disable_pid_allocation(struct pid_namespace *ns)
@@ -449,6 +463,17 @@ struct pid *find_ge_pid(int nr, struct pid_namespace *ns)
 	return idr_get_next(&ns->idr, &nr);
 }
 
+#ifdef CONFIG_PROC_FS
+static int pid_generation_show(struct seq_file *m, void *v)
+{
+	u64 generation =
+		read_pid_generation(proc_pid_ns(file_inode(m->file)));
+	seq_printf(m, "%llu\n", generation);
+	return 0;
+
+};
+#endif
+
 void __init pid_idr_init(void)
 {
 	/* Verify no one has done anything silly: */
@@ -465,4 +490,13 @@ void __init pid_idr_init(void)
 
 	init_pid_ns.pid_cachep = KMEM_CACHE(pid,
 			SLAB_HWCACHE_ALIGN | SLAB_PANIC | SLAB_ACCOUNT);
+
+}
+
+void __init pid_proc_init(void)
+{
+	/* pid_idr_init is too early, so get a separate init function. */
+#ifdef CONFIG_PROC_FS
+	WARN_ON(!proc_create_single("pid_gen", 0, NULL, pid_generation_show));
+#endif
 }
