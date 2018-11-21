@@ -22,7 +22,7 @@
 #include <linux/slab.h>
 #include <linux/memblock.h>
 
-#define MAX_RESERVED_REGIONS	32
+#define MAX_RESERVED_REGIONS	CONFIG_MAX_OF_RESERVED_REGIONS
 static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
 static int reserved_mem_count;
 
@@ -245,6 +245,9 @@ static void __init __rmem_check_for_overlap(void)
 void __init fdt_init_reserved_mem(void)
 {
 	int i;
+
+	/* MAX_RESERVED_REGIONS should be bounded by INIT_MEMBLOCK_REGIONS */
+	BUILD_BUG_ON(MAX_RESERVED_REGIONS > INIT_MEMBLOCK_REGIONS);
 
 	/* check for overlapping reserved regions */
 	__rmem_check_for_overlap();
