@@ -21,6 +21,7 @@
 
 #include <linux/bitmap.h>
 #include <linux/bug.h>
+#include <linux/err.h>
 #include <linux/fwnode.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -36,12 +37,14 @@
  * @MEDIA_GRAPH_LINK:		Identify a media link
  * @MEDIA_GRAPH_INTF_DEVNODE:	Identify a media Kernel API interface via
  *				a device node
+ * @MEDIA_GRAPH_PROP:		Identify a media property
  */
 enum media_gobj_type {
 	MEDIA_GRAPH_ENTITY,
 	MEDIA_GRAPH_PAD,
 	MEDIA_GRAPH_LINK,
 	MEDIA_GRAPH_INTF_DEVNODE,
+	MEDIA_GRAPH_PROP,
 };
 
 #define MEDIA_BITS_PER_TYPE		8
@@ -65,6 +68,7 @@ enum media_gobj_type {
 struct media_gobj {
 	struct media_device	*mdev;
 	u32			id;
+	u16			topology_idx;
 	struct list_head	list;
 };
 
@@ -193,6 +197,7 @@ enum media_pad_signal_type {
  * @flags:	Pad flags, as defined in
  *		:ref:`include/uapi/linux/media.h <media_header>`
  *		(seek for ``MEDIA_PAD_FL_*``)
+ * @props:	The list pad properties
  */
 struct media_pad {
 	struct media_gobj graph_obj;	/* must be first field in struct */
@@ -200,6 +205,33 @@ struct media_pad {
 	u16 index;
 	enum media_pad_signal_type sig_type;
 	unsigned long flags;
+	struct list_head props;
+};
+
+/**
+ * struct media_prop - A media property graph object.
+ *
+ * @graph_obj:	Embedded structure containing the media object common data
+ * @list:	Linked list associated with the object that owns the link.
+ * @owner:	Graph object this property belongs to
+ * @index:	Property index for the owner property array, numbered
+ *		from 0 to n
+ * @type:	Property type
+ * @payload_size: Property payload size (i.e. additional bytes beyond this
+ *		struct)
+ * @props:	The list of sub-properties
+ * @name:	Property name
+ * @payload:	Property payload starts here
+ */
+struct media_prop {
+	struct media_gobj graph_obj;	/* must be first field in struct */
+	struct list_head list;
+	struct media_gobj *owner;
+	u32 type;
+	u32 payload_size;
+	struct list_head props;
+	char name[32];
+	u8 payload[];
 };
 
 /**
@@ -266,6 +298,7 @@ enum media_entity_type {
  * @flags:	Entity flags, as defined in
  *		:ref:`include/uapi/linux/media.h <media_header>`
  *		(seek for ``MEDIA_ENT_FL_*``)
+ * @inited:	This struct was initialized.
  * @num_pads:	Number of sink and source pads.
  * @num_links:	Total number of links, forward and back, enabled and disabled.
  * @num_backlinks: Number of backlinks
@@ -273,6 +306,7 @@ enum media_entity_type {
  *		re-used if entities are unregistered or registered again.
  * @pads:	Pads array with the size defined by @num_pads.
  * @links:	List of data links.
+ * @props:	List of entity properties.
  * @ops:	Entity operations.
  * @stream_count: Stream count for the entity.
  * @use_count:	Use count for the entity.
@@ -300,6 +334,7 @@ struct media_entity {
 	enum media_entity_type obj_type;
 	u32 function;
 	unsigned long flags;
+	bool inited;
 
 	u16 num_pads;
 	u16 num_links;
@@ -308,6 +343,7 @@ struct media_entity {
 
 	struct media_pad *pads;
 	struct list_head links;
+	struct list_head props;
 
 	const struct media_entity_operations *ops;
 
@@ -361,6 +397,20 @@ struct media_intf_devnode {
 	u32				major;
 	u32				minor;
 };
+
+/**
+ * media_entity_init() - initialize the media entity struct
+ *
+ * @entity:	pointer to &media_entity
+ */
+static inline void media_entity_init(struct media_entity *entity)
+{
+	INIT_LIST_HEAD(&entity->links);
+	INIT_LIST_HEAD(&entity->props);
+	entity->num_links = 0;
+	entity->num_backlinks = 0;
+	entity->inited = true;
+}
 
 /**
  * media_entity_id() - return the media entity graph object id
@@ -596,6 +646,15 @@ static inline bool media_entity_enum_intersects(
 		container_of(gobj, struct media_interface, graph_obj)
 
 /**
+ * gobj_to_prop - returns the struct &media_prop pointer from the
+ *	@gobj contained on it.
+ *
+ * @gobj: Pointer to the struct &media_gobj graph object
+ */
+#define gobj_to_prop(gobj) \
+		container_of(gobj, struct media_prop, graph_obj)
+
+/**
  * intf_to_devnode - returns the struct media_intf_devnode pointer from the
  *	@intf contained on it.
  *
@@ -774,6 +833,265 @@ int media_create_pad_links(const struct media_device *mdev,
 			   const bool allow_both_undefined);
 
 void __media_entity_remove_links(struct media_entity *entity);
+
+/**
+ * media_entity_add_prop() - Add property to entity
+ *
+ * @entity:	entity where to add the property
+ * @type:	property type
+ * @name:	property name
+ * @ptr:	property pointer to payload
+ * @payload_size: property payload size
+ *
+ * Returns the new property on success, or an error pointer on failure.
+ */
+struct media_prop *media_entity_add_prop(struct media_entity *ent, u32 type,
+		const char *name, const void *ptr, u32 payload_size);
+
+/**
+ * media_pad_add_prop() - Add property to pad
+ *
+ * @pad:	pad where to add the property
+ * @type:	property type
+ * @name:	property name
+ * @ptr:	property pointer to payload
+ * @payload_size: property payload size
+ *
+ * Returns the new property on success, or an error pointer on failure.
+ */
+struct media_prop *media_pad_add_prop(struct media_pad *pad, u32 type,
+		const char *name, const void *ptr, u32 payload_size);
+
+/**
+ * media_prop() - Add sub-property to property
+ *
+ * @prop:	property where to add the sub-property
+ * @type:	sub-property type
+ * @name:	sub-property name
+ * @ptr:	sub-property pointer to payload
+ * @payload_size: sub-property payload size
+ *
+ * Returns the new property on success, or an error pointer on failure.
+ */
+struct media_prop *media_prop_add_prop(struct media_prop *prop, u32 type,
+		const char *name, const void *ptr, u32 payload_size);
+
+/**
+ * media_entity_add_prop_group() - Add group property to entity
+ *
+ * @entity:	entity where to add the property
+ * @name:	property name
+ *
+ * Returns the new property on success, or an error pointer on failure.
+ */
+static inline struct media_prop *
+media_entity_add_prop_group(struct media_entity *entity, const char *name)
+{
+	return media_entity_add_prop(entity, MEDIA_PROP_TYPE_GROUP,
+				     name, NULL, 0);
+}
+
+/**
+ * media_entity_add_prop_u64() - Add u64 property to entity
+ *
+ * @entity:	entity where to add the property
+ * @name:	property name
+ * @val:	property value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_entity_add_prop_u64(struct media_entity *entity,
+					    const char *name, u64 val)
+{
+	struct media_prop *prop =
+		media_entity_add_prop(entity, MEDIA_PROP_TYPE_U64,
+				      name, &val, sizeof(val));
+
+	return PTR_ERR_OR_ZERO(prop);
+}
+
+/**
+ * media_entity_add_prop_s64() - Add s64 property to entity
+ *
+ * @entity:	entity where to add the property
+ * @name:	property name
+ * @val:	property value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_entity_add_prop_s64(struct media_entity *entity,
+					    const char *name, s64 val)
+{
+	struct media_prop *prop =
+		media_entity_add_prop(entity, MEDIA_PROP_TYPE_S64,
+				      name, &val, sizeof(val));
+
+	return PTR_ERR_OR_ZERO(prop);
+}
+
+/**
+ * media_entity_add_prop_string() - Add string property to entity
+ *
+ * @entity:	entity where to add the property
+ * @name:	property name
+ * @string:	property string value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_entity_add_prop_string(struct media_entity *entity,
+					const char *name, const char *string)
+{
+	struct media_prop *prop =
+		media_entity_add_prop(entity, MEDIA_PROP_TYPE_STRING,
+				      name, string, strlen(string) + 1);
+
+	return PTR_ERR_OR_ZERO(prop);
+}
+
+/**
+ * media_pad_add_prop_group() - Add group property to pad
+ *
+ * @pad:	pad where to add the property
+ * @name:	property name
+ *
+ * Returns the new property on success, or an error pointer on failure.
+ */
+static inline struct media_prop *media_pad_add_prop_group(struct media_pad *pad,
+					   const char *name)
+{
+	return media_pad_add_prop(pad, MEDIA_PROP_TYPE_GROUP,
+				  name, NULL, 0);
+}
+
+/**
+ * media_pad_add_prop_u64() - Add u64 property to pad
+ *
+ * @pad:	pad where to add the property
+ * @name:	property name
+ * @val:	property value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_pad_add_prop_u64(struct media_pad *pad,
+					 const char *name, u64 val)
+{
+	struct media_prop *prop =
+		media_pad_add_prop(pad, MEDIA_PROP_TYPE_U64,
+				   name, &val, sizeof(val));
+
+	return PTR_ERR_OR_ZERO(prop);
+}
+
+/**
+ * media_pad_add_prop_s64() - Add s64 property to pad
+ *
+ * @pad:	pad where to add the property
+ * @name:	property name
+ * @val:	property value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_pad_add_prop_s64(struct media_pad *pad,
+					 const char *name, s64 val)
+{
+	struct media_prop *prop =
+		media_pad_add_prop(pad, MEDIA_PROP_TYPE_S64,
+				   name, &val, sizeof(val));
+
+	return PTR_ERR_OR_ZERO(prop);
+}
+
+/**
+ * media_pad_add_prop_string() - Add string property to pad
+ *
+ * @pad:	pad where to add the property
+ * @name:	property name
+ * @string:	property string value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_pad_add_prop_string(struct media_pad *pad,
+					const char *name, const char *string)
+{
+	struct media_prop *prop =
+		media_pad_add_prop(pad, MEDIA_PROP_TYPE_STRING,
+				   name, string, strlen(string) + 1);
+
+	return PTR_ERR_OR_ZERO(prop);
+}
+
+/**
+ * media_prop_add_prop_group() - Add group sub-property to property
+ *
+ * @prop:	property where to add the sub-property
+ * @name:	sub-property name
+ *
+ * Returns the new property on success, or an error pointer on failure.
+ */
+static inline struct media_prop *
+media_prop_add_prop_group(struct media_prop *prop, const char *name)
+{
+	return media_prop_add_prop(prop, MEDIA_PROP_TYPE_GROUP,
+				  name, NULL, 0);
+}
+
+/**
+ * media_prop_add_prop_u64() - Add u64 property to property
+ *
+ * @prop:	property where to add the sub-property
+ * @name:	sub-property name
+ * @val:	sub-property value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_prop_add_prop_u64(struct media_prop *prop,
+					  const char *name, u64 val)
+{
+	struct media_prop *subprop =
+		media_prop_add_prop(prop, MEDIA_PROP_TYPE_U64,
+				    name, &val, sizeof(val));
+
+	return PTR_ERR_OR_ZERO(subprop);
+}
+
+/**
+ * media_prop_add_prop_s64() - Add s64 property to property
+ *
+ * @prop:	property where to add the sub-property
+ * @name:	sub-property name
+ * @val:	sub-property value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_prop_add_prop_s64(struct media_prop *prop,
+					  const char *name, s64 val)
+{
+	struct media_prop *subprop =
+		media_prop_add_prop(prop, MEDIA_PROP_TYPE_S64,
+				    name, &val, sizeof(val));
+
+	return PTR_ERR_OR_ZERO(subprop);
+}
+
+/**
+ * media_prop_add_prop_string() - Add string property to property
+ *
+ * @prop:	property where to add the sub-property
+ * @name:	sub-property name
+ * @string:	sub-property string value
+ *
+ * Returns 0 on success, or an error on failure.
+ */
+static inline int media_prop_add_prop_string(struct media_prop *prop,
+					     const char *name,
+					     const char *string)
+{
+	struct media_prop *subprop =
+		media_prop_add_prop(prop, MEDIA_PROP_TYPE_STRING,
+				    name, string, strlen(string) + 1);
+
+	return PTR_ERR_OR_ZERO(subprop);
+}
 
 /**
  * media_entity_remove_links() - remove all links associated with an entity

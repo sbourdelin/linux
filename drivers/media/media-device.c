@@ -235,6 +235,21 @@ static long media_device_setup_link(struct media_device *mdev, void *arg)
 	return __media_entity_setup_link(link, linkd->flags);
 }
 
+static void walk_props(struct list_head *head, u32 *prop_idx, u32 *payload_size)
+{
+	struct media_prop *prop;
+
+	if (list_empty(head))
+		return;
+
+	list_for_each_entry(prop, head, list) {
+		prop->graph_obj.topology_idx = (*prop_idx)++;
+		*payload_size += prop->payload_size;
+	}
+	list_for_each_entry(prop, head, list)
+		walk_props(&prop->props, prop_idx, payload_size);
+}
+
 static long media_device_get_topology(struct media_device *mdev, void *arg)
 {
 	struct media_v2_topology *topo = arg;
@@ -242,27 +257,96 @@ static long media_device_get_topology(struct media_device *mdev, void *arg)
 	struct media_interface *intf;
 	struct media_pad *pad;
 	struct media_link *link;
+	struct media_prop *prop, *subprop;
 	struct media_v2_entity kentity, __user *uentity;
 	struct media_v2_interface kintf, __user *uintf;
 	struct media_v2_pad kpad, __user *upad;
 	struct media_v2_link klink, __user *ulink;
+	struct media_v2_prop kprop, __user *uprop;
+	u32 payload_size = 0;
+	u32 payload_offset = 0;
+	u32 entity_idx = 0;
+	u32 interface_idx = 0;
+	u32 pad_idx = 0;
+	u32 link_idx = 0;
+	u32 prop_idx = 0;
 	unsigned int i;
 	int ret = 0;
 
 	topo->topology_version = mdev->topology_version;
 
-	/* Get entities and number of entities */
-	i = 0;
-	uentity = media_get_uptr(topo->ptr_entities);
+	/* Set entity/pad/link indices and number of entities */
 	media_device_for_each_entity(entity, mdev) {
-		i++;
-		if (ret || !uentity)
-			continue;
-
-		if (i > topo->num_entities) {
-			ret = -ENOSPC;
-			continue;
+		entity->graph_obj.topology_idx = entity_idx++;
+		walk_props(&entity->props, &prop_idx, &payload_size);
+		for (i = 0; i < entity->num_pads; i++) {
+			pad = entity->pads + i;
+			pad->graph_obj.topology_idx = pad_idx++;
+			walk_props(&pad->props, &prop_idx, &payload_size);
 		}
+		/* Note: links are ordered by source pad index */
+		list_for_each_entry(link, &entity->links, list)
+			if (!link->is_backlink)
+				link->graph_obj.topology_idx = link_idx++;
+	}
+	if (topo->ptr_entities && entity_idx > topo->num_entities)
+		ret = -ENOSPC;
+	topo->num_entities = entity_idx;
+	topo->reserved1 = 0;
+
+	/* Set interface/link indices and number of interfaces */
+	media_device_for_each_intf(intf, mdev) {
+		intf->graph_obj.topology_idx = interface_idx++;
+		list_for_each_entry(link, &intf->links, list)
+			link->graph_obj.topology_idx = link_idx++;
+	}
+
+	if (topo->ptr_interfaces && interface_idx > topo->num_interfaces)
+		ret = -ENOSPC;
+	topo->num_interfaces = interface_idx;
+	topo->reserved2 = 0;
+
+	/* Set number of pads */
+	if (topo->ptr_pads && pad_idx > topo->num_pads)
+		ret = -ENOSPC;
+	topo->num_pads = pad_idx;
+	topo->reserved3 = 0;
+
+	/* Set number of links */
+	if (topo->ptr_links && link_idx > topo->num_links)
+		ret = -ENOSPC;
+	topo->num_links = link_idx;
+	topo->reserved4 = 0;
+
+	/* Set number of properties */
+	if (topo->ptr_props &&
+	    (prop_idx > topo->num_props ||
+	     payload_size > topo->props_payload_size))
+		ret = -ENOSPC;
+	topo->num_props = prop_idx;
+	topo->props_payload_size = payload_size;
+
+	if (ret)
+		return ret;
+
+	/*
+	 * We use u16 for the graph object indices,
+	 * so check that it will fit in 16 bits.
+	 */
+	if (WARN_ON(entity_idx >= 0x10000 ||
+		    interface_idx >= 0x10000 ||
+		    pad_idx >= 0x10000 ||
+		    link_idx >= 0x10000 ||
+		    prop_idx >= 0x10000))
+		return -EINVAL;
+
+	/* Get entities and number of entities */
+	uentity = media_get_uptr(topo->ptr_entities);
+	if (!uentity)
+		goto skip_entities;
+
+	media_device_for_each_entity(entity, mdev) {
+		u16 idx = entity->graph_obj.topology_idx;
 
 		/* Copy fields to userspace struct if not error */
 		memset(&kentity, 0, sizeof(kentity));
@@ -270,27 +354,30 @@ static long media_device_get_topology(struct media_device *mdev, void *arg)
 		kentity.function = entity->function;
 		kentity.flags = entity->flags;
 		strscpy(kentity.name, entity->name,
-			sizeof(kentity.name));
+				sizeof(kentity.name));
+		if (entity->num_pads) {
+			kentity.pad_idx = entity->pads[0].graph_obj.topology_idx;
+			kentity.flags |= MEDIA_ENT_FL_PAD_IDX;
+		}
+		if (!list_empty(&entity->props)) {
+			prop = list_first_entry(&entity->props,
+						struct media_prop, list);
+			kentity.prop_idx = prop->graph_obj.topology_idx;
+			kentity.flags |= MEDIA_ENT_FL_PROP_IDX;
+		}
 
-		if (copy_to_user(uentity, &kentity, sizeof(kentity)))
-			ret = -EFAULT;
-		uentity++;
+		if (copy_to_user(uentity + idx, &kentity, sizeof(kentity)))
+			return -EFAULT;
 	}
-	topo->num_entities = i;
-	topo->reserved1 = 0;
+skip_entities:
 
 	/* Get interfaces and number of interfaces */
-	i = 0;
 	uintf = media_get_uptr(topo->ptr_interfaces);
-	media_device_for_each_intf(intf, mdev) {
-		i++;
-		if (ret || !uintf)
-			continue;
+	if (!uintf)
+		goto skip_interfaces;
 
-		if (i > topo->num_interfaces) {
-			ret = -ENOSPC;
-			continue;
-		}
+	media_device_for_each_intf(intf, mdev) {
+		u16 idx = intf->graph_obj.topology_idx;
 
 		memset(&kintf, 0, sizeof(kintf));
 
@@ -298,6 +385,12 @@ static long media_device_get_topology(struct media_device *mdev, void *arg)
 		kintf.id = intf->graph_obj.id;
 		kintf.intf_type = intf->type;
 		kintf.flags = intf->flags;
+		if (!list_empty(&intf->links)) {
+			link = list_first_entry(&intf->links,
+						struct media_link, list);
+			kintf.link_idx = link->graph_obj.topology_idx;
+			kintf.flags |= MEDIA_INTF_FL_LINK_IDX;
+		}
 
 		if (media_type(&intf->graph_obj) == MEDIA_GRAPH_INTF_DEVNODE) {
 			struct media_intf_devnode *devnode;
@@ -308,74 +401,115 @@ static long media_device_get_topology(struct media_device *mdev, void *arg)
 			kintf.devnode.minor = devnode->minor;
 		}
 
-		if (copy_to_user(uintf, &kintf, sizeof(kintf)))
-			ret = -EFAULT;
-		uintf++;
+		if (copy_to_user(uintf + idx, &kintf, sizeof(kintf)))
+			return -EFAULT;
 	}
-	topo->num_interfaces = i;
-	topo->reserved2 = 0;
+skip_interfaces:
 
 	/* Get pads and number of pads */
-	i = 0;
 	upad = media_get_uptr(topo->ptr_pads);
-	media_device_for_each_pad(pad, mdev) {
-		i++;
-		if (ret || !upad)
-			continue;
+	if (!upad)
+		goto skip_pads;
 
-		if (i > topo->num_pads) {
-			ret = -ENOSPC;
-			continue;
-		}
+	media_device_for_each_pad(pad, mdev) {
+		u16 idx = pad->graph_obj.topology_idx;
 
 		memset(&kpad, 0, sizeof(kpad));
 
 		/* Copy pad fields to userspace struct */
 		kpad.id = pad->graph_obj.id;
 		kpad.entity_id = pad->entity->graph_obj.id;
-		kpad.flags = pad->flags;
+		kpad.entity_idx = pad->entity->graph_obj.topology_idx;
+		kpad.flags = pad->flags | MEDIA_PAD_FL_ENTITY_IDX;
 		kpad.index = pad->index;
 
-		if (copy_to_user(upad, &kpad, sizeof(kpad)))
-			ret = -EFAULT;
-		upad++;
+		entity = pad->entity;
+		list_for_each_entry(link, &entity->links, list) {
+			if (link->source == pad) {
+				kpad.link_idx = link->graph_obj.topology_idx;
+				kpad.flags |= MEDIA_PAD_FL_LINK_IDX;
+				break;
+			}
+		}
+		if (!list_empty(&pad->props)) {
+			prop = list_first_entry(&pad->props,
+						struct media_prop, list);
+			kpad.prop_idx = prop->graph_obj.topology_idx;
+			kpad.flags |= MEDIA_PAD_FL_PROP_IDX;
+		}
+
+		if (copy_to_user(upad + idx, &kpad, sizeof(kpad)))
+			return -EFAULT;
 	}
-	topo->num_pads = i;
-	topo->reserved3 = 0;
+skip_pads:
 
 	/* Get links and number of links */
-	i = 0;
 	ulink = media_get_uptr(topo->ptr_links);
+	if (!ulink)
+		goto skip_links;
+
 	media_device_for_each_link(link, mdev) {
+		u16 idx;
+
 		if (link->is_backlink)
 			continue;
-
-		i++;
-
-		if (ret || !ulink)
-			continue;
-
-		if (i > topo->num_links) {
-			ret = -ENOSPC;
-			continue;
-		}
+		idx = link->graph_obj.topology_idx;
 
 		memset(&klink, 0, sizeof(klink));
 
 		/* Copy link fields to userspace struct */
 		klink.id = link->graph_obj.id;
 		klink.source_id = link->gobj0->id;
+		klink.source_idx = link->gobj0->topology_idx;
 		klink.sink_id = link->gobj1->id;
-		klink.flags = link->flags;
+		klink.sink_idx = link->gobj1->topology_idx;
+		klink.flags = link->flags | MEDIA_LNK_FL_SOURCE_IDX |
+					    MEDIA_LNK_FL_SINK_IDX;
 
-		if (copy_to_user(ulink, &klink, sizeof(klink)))
-			ret = -EFAULT;
-		ulink++;
+		if (copy_to_user(ulink + idx, &klink, sizeof(klink)))
+			return -EFAULT;
 	}
-	topo->num_links = i;
-	topo->reserved4 = 0;
+skip_links:
 
-	return ret;
+	/* Get properties and number of properties */
+	uprop = media_get_uptr(topo->ptr_props);
+	if (!uprop)
+		goto skip_props;
+
+	payload_offset = topo->num_props * sizeof(*uprop);
+	media_device_for_each_prop(prop, mdev) {
+		u16 idx = prop->graph_obj.topology_idx;
+
+		memset(&kprop, 0, sizeof(kprop));
+
+		/* Copy prop fields to userspace struct */
+		kprop.id = prop->graph_obj.id;
+		kprop.owner_id = prop->owner->id;
+		kprop.owner_idx = prop->owner->topology_idx;
+		kprop.type = prop->type;
+		kprop.payload_size = prop->payload_size;
+		if (prop->payload_size)
+			kprop.payload_offset =
+				payload_offset - idx * sizeof(*uprop);
+		memcpy(kprop.name, prop->name, sizeof(kprop.name));
+		kprop.flags = media_type(prop->owner);
+		if (!list_empty(&prop->props)) {
+			subprop = list_first_entry(&prop->props,
+						   struct media_prop, list);
+			kprop.prop_idx = subprop->graph_obj.topology_idx;
+			kprop.flags |= MEDIA_PROP_FL_PROP_IDX;
+		}
+
+		if (copy_to_user(uprop + idx, &kprop, sizeof(kprop)))
+			return -EFAULT;
+		if (copy_to_user((u8 __user *)uprop + payload_offset,
+				 prop->payload, prop->payload_size))
+			return -EFAULT;
+		payload_offset += prop->payload_size;
+	}
+skip_props:
+
+	return 0;
 }
 
 static long media_device_request_alloc(struct media_device *mdev,
@@ -408,9 +542,10 @@ static long copy_arg_to_user(void __user *uarg, void *karg, unsigned int cmd)
 /* Do acquire the graph mutex */
 #define MEDIA_IOC_FL_GRAPH_MUTEX	BIT(0)
 
-#define MEDIA_IOC_ARG(__cmd, func, fl, from_user, to_user)		\
+#define MEDIA_IOC_ARG(__cmd, alts, func, fl, from_user, to_user)	\
 	[_IOC_NR(MEDIA_IOC_##__cmd)] = {				\
 		.cmd = MEDIA_IOC_##__cmd,				\
+		.alternatives = (alts),					\
 		.fn = (long (*)(struct media_device *, void *))func,	\
 		.flags = fl,						\
 		.arg_from_user = from_user,				\
@@ -418,15 +553,24 @@ static long copy_arg_to_user(void __user *uarg, void *karg, unsigned int cmd)
 	}
 
 #define MEDIA_IOC(__cmd, func, fl)					\
-	MEDIA_IOC_ARG(__cmd, func, fl, copy_arg_from_user, copy_arg_to_user)
+	MEDIA_IOC_ARG(__cmd, NULL, func, fl, copy_arg_from_user, copy_arg_to_user)
+#define MEDIA_IOC_ALTS(__cmd, alts, func, fl)				\
+	MEDIA_IOC_ARG(__cmd, alts, func, fl, copy_arg_from_user, copy_arg_to_user)
 
 /* the table is indexed by _IOC_NR(cmd) */
 struct media_ioctl_info {
 	unsigned int cmd;
+	const unsigned int *alternatives;
 	unsigned short flags;
 	long (*fn)(struct media_device *dev, void *arg);
 	long (*arg_from_user)(void *karg, void __user *uarg, unsigned int cmd);
 	long (*arg_to_user)(void __user *uarg, void *karg, unsigned int cmd);
+};
+
+static const unsigned int topo_alts[] = {
+	/* Old MEDIA_IOC_G_TOPOLOGY without props support */
+	MEDIA_IOC_G_TOPOLOGY_OLD,
+	0
 };
 
 static const struct media_ioctl_info ioctl_info[] = {
@@ -435,6 +579,7 @@ static const struct media_ioctl_info ioctl_info[] = {
 	MEDIA_IOC(ENUM_LINKS, media_device_enum_links, MEDIA_IOC_FL_GRAPH_MUTEX),
 	MEDIA_IOC(SETUP_LINK, media_device_setup_link, MEDIA_IOC_FL_GRAPH_MUTEX),
 	MEDIA_IOC(G_TOPOLOGY, media_device_get_topology, MEDIA_IOC_FL_GRAPH_MUTEX),
+	MEDIA_IOC_ALTS(G_TOPOLOGY, topo_alts, media_device_get_topology, MEDIA_IOC_FL_GRAPH_MUTEX),
 	MEDIA_IOC(REQUEST_ALLOC, media_device_request_alloc, 0),
 };
 
@@ -448,17 +593,29 @@ static long media_device_ioctl(struct file *filp, unsigned int cmd,
 	char __karg[256], *karg = __karg;
 	long ret;
 
-	if (_IOC_NR(cmd) >= ARRAY_SIZE(ioctl_info)
-	    || ioctl_info[_IOC_NR(cmd)].cmd != cmd)
+	if (_IOC_NR(cmd) >= ARRAY_SIZE(ioctl_info))
 		return -ENOIOCTLCMD;
 
 	info = &ioctl_info[_IOC_NR(cmd)];
+
+	if (info->cmd != cmd) {
+		const unsigned int *p;
+
+		for (p = info->alternatives; p && *p; p++)
+			if (*p == cmd)
+				break;
+		if (!p || !*p)
+			return -ENOIOCTLCMD;
+	}
 
 	if (_IOC_SIZE(info->cmd) > sizeof(__karg)) {
 		karg = kmalloc(_IOC_SIZE(info->cmd), GFP_KERNEL);
 		if (!karg)
 			return -ENOMEM;
 	}
+	if (_IOC_SIZE(info->cmd) > _IOC_SIZE(cmd))
+		memset(karg + _IOC_SIZE(cmd), 0,
+		       _IOC_SIZE(info->cmd) - _IOC_SIZE(cmd));
 
 	if (info->arg_from_user) {
 		ret = info->arg_from_user(karg, arg, cmd);
@@ -571,6 +728,16 @@ static void media_device_release(struct media_devnode *devnode)
 	dev_dbg(devnode->parent, "Media device released\n");
 }
 
+static void init_prop_list(struct media_device *mdev, struct list_head *list)
+{
+	struct media_prop *prop;
+
+	list_for_each_entry(prop, list, list) {
+		media_gobj_create(mdev, MEDIA_GRAPH_PROP, &prop->graph_obj);
+		init_prop_list(mdev, &prop->props);
+	}
+}
+
 /**
  * media_device_register_entity - Register an entity with a media device
  * @mdev:	The media device
@@ -592,9 +759,8 @@ int __must_check media_device_register_entity(struct media_device *mdev,
 	/* Warn if we apparently re-register an entity */
 	WARN_ON(entity->graph_obj.mdev != NULL);
 	entity->graph_obj.mdev = mdev;
-	INIT_LIST_HEAD(&entity->links);
-	entity->num_links = 0;
-	entity->num_backlinks = 0;
+	if (!entity->inited)
+		media_entity_init(entity);
 
 	ret = ida_alloc_min(&mdev->entity_internal_idx, 1, GFP_KERNEL);
 	if (ret < 0)
@@ -608,10 +774,17 @@ int __must_check media_device_register_entity(struct media_device *mdev,
 	/* Initialize media_gobj embedded at the entity */
 	media_gobj_create(mdev, MEDIA_GRAPH_ENTITY, &entity->graph_obj);
 
+	/* Initialize objects at the props */
+	init_prop_list(mdev, &entity->props);
+
 	/* Initialize objects at the pads */
-	for (i = 0; i < entity->num_pads; i++)
+	for (i = 0; i < entity->num_pads; i++) {
 		media_gobj_create(mdev, MEDIA_GRAPH_PAD,
-			       &entity->pads[i].graph_obj);
+				  &entity->pads[i].graph_obj);
+
+		/* Initialize objects at the pad props */
+		init_prop_list(mdev, &entity->pads[i].props);
+	}
 
 	/* invoke entity_notify callbacks */
 	list_for_each_entry_safe(notify, next, &mdev->entity_notify, list)
@@ -640,6 +813,18 @@ int __must_check media_device_register_entity(struct media_device *mdev,
 }
 EXPORT_SYMBOL_GPL(media_device_register_entity);
 
+static void media_device_free_props(struct list_head *list)
+{
+	while (!list_empty(list)) {
+		struct media_prop *prop;
+
+		prop = list_first_entry(list, struct media_prop, list);
+		list_del(&prop->list);
+		media_gobj_destroy(&prop->graph_obj);
+		kfree(prop);
+	}
+}
+
 static void __media_device_unregister_entity(struct media_entity *entity)
 {
 	struct media_device *mdev = entity->graph_obj.mdev;
@@ -661,8 +846,13 @@ static void __media_device_unregister_entity(struct media_entity *entity)
 	__media_entity_remove_links(entity);
 
 	/* Remove all pads that belong to this entity */
-	for (i = 0; i < entity->num_pads; i++)
+	for (i = 0; i < entity->num_pads; i++) {
+		media_device_free_props(&entity->pads[i].props);
 		media_gobj_destroy(&entity->pads[i].graph_obj);
+	}
+
+	/* Remove all props that belong to this entity */
+	media_device_free_props(&entity->props);
 
 	/* Remove the entity */
 	media_gobj_destroy(&entity->graph_obj);
@@ -701,6 +891,7 @@ void media_device_init(struct media_device *mdev)
 	INIT_LIST_HEAD(&mdev->interfaces);
 	INIT_LIST_HEAD(&mdev->pads);
 	INIT_LIST_HEAD(&mdev->links);
+	INIT_LIST_HEAD(&mdev->props);
 	INIT_LIST_HEAD(&mdev->entity_notify);
 
 	mutex_init(&mdev->req_queue_mutex);
