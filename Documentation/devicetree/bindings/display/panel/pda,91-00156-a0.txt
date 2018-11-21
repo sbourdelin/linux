@@ -1,0 +1,7 @@
+PDA 91-00156-A0 5.0" WVGA TFT LCD panel
+
+Required properties:
+- compatible: should be "pda,91-00156-a0"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
