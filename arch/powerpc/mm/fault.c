@@ -575,8 +575,10 @@ good_area:
 			 */
 			flags &= ~FAULT_FLAG_ALLOW_RETRY;
 			flags |= FAULT_FLAG_TRIED;
-			if (!fatal_signal_pending(current))
+			if (!signal_pending(current))
 				goto retry;
+			else if (!fatal_signal_pending(current) && is_user)
+				return 0;
 		}
 
 		/*
