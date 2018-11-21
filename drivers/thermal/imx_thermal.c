@@ -648,14 +648,23 @@ static const struct of_device_id of_imx_thermal_match[] = {
 };
 MODULE_DEVICE_TABLE(of, of_imx_thermal_match);
 
+#ifdef CONFIG_CPU_FREQ
 /*
  * Create cooling device in case no #cooling-cells property is available in
  * CPU node
  */
 static int imx_thermal_register_legacy_cooling(struct imx_thermal_data *data)
 {
-	struct device_node *np = of_get_cpu_node(data->policy->cpu, NULL);
+	struct device_node *np;
 	int ret;
+
+	data->policy = cpufreq_cpu_get(0);
+	if (!data->policy) {
+		pr_debug("%s: CPUFreq policy not found\n", __func__);
+		return -EPROBE_DEFER;
+	}
+
+	np = of_get_cpu_node(data->policy->cpu, NULL);
 
 	if (!np || !of_find_property(np, "#cooling-cells", NULL)) {
 		data->cdev = cpufreq_cooling_register(data->policy);
@@ -668,6 +677,23 @@ static int imx_thermal_register_legacy_cooling(struct imx_thermal_data *data)
 
 	return 0;
 }
+
+static int imx_thermal_unregister_legacy_cooling(struct imx_thermal_data *data)
+{
+	cpufreq_cooling_unregister(data->cdev);
+	cpufreq_cpu_put(data->policy);
+}
+#else
+static inline int imx_thermal_register_legacy_cooling(struct imx_thermal_data *data)
+{
+	return 0;
+}
+
+static inline int imx_thermal_unregister_legacy_cooling(struct imx_thermal_data *data)
+{
+	return 0;
+}
+#endif
 
 static int imx_thermal_probe(struct platform_device *pdev)
 {
@@ -743,13 +769,9 @@ static int imx_thermal_probe(struct platform_device *pdev)
 	regmap_write(map, data->socdata->sensor_ctrl + REG_SET,
 		     data->socdata->power_down_mask);
 
-	data->policy = cpufreq_cpu_get(0);
-	if (!data->policy) {
-		pr_debug("%s: CPUFreq policy not found\n", __func__);
-		return -EPROBE_DEFER;
-	}
-
 	ret = imx_thermal_register_legacy_cooling(data);
+	if (ret == -EPROBE_DEFER)
+		return ret;
 	if (ret) {
 		dev_err(&pdev->dev,
 			"failed to register cpufreq cooling device: %d\n", ret);
@@ -830,8 +852,7 @@ thermal_zone_unregister:
 clk_disable:
 	clk_disable_unprepare(data->thermal_clk);
 cpufreq_put:
-	cpufreq_cooling_unregister(data->cdev);
-	cpufreq_cpu_put(data->policy);
+	imx_thermal_unregister_legacy_cooling(data);
 
 	return ret;
 }
