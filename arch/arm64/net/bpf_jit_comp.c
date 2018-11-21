@@ -940,3 +940,13 @@ out:
 					   tmp : orig_prog);
 	return prog;
 }
+
+void *bpf_jit_alloc_exec(unsigned long size)
+{
+	return vmalloc_exec(size);
+}
+
+void bpf_jit_free_exec(const void *addr)
+{
+	return vfree(size);
+}
