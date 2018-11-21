@@ -1017,8 +1017,9 @@ static int do_load(int argc, char **argv)
 err_close_obj:
 	bpf_object__close(obj);
 err_free_reuse_maps:
-	for (i = 0; i < old_map_fds; i++)
-		close(map_replace[i].fd);
+	if (map_replace)
+		for (i = 0; i < old_map_fds; i++)
+			close(map_replace[i].fd);
 	free(map_replace);
 	return -1;
 }
