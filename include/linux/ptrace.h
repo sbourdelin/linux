@@ -46,6 +46,14 @@ extern int ptrace_access_vm(struct task_struct *tsk, unsigned long addr,
 #define PT_BLOCKSTEP_BIT	30
 #define PT_BLOCKSTEP		(1<<PT_BLOCKSTEP_BIT)
 
+/*
+ * These values are used by tracehook_report_syscall_* to store
+ * information about current syscall-stop in task->ptrace_message
+ * for later use by PTRACE_GET_SYSCALL_INFO.
+ */
+#define PT_SYSCALL_IS_ENTERING  0x80000000U
+#define PT_SYSCALL_IS_EXITING   0x90000000U
+
 extern long arch_ptrace(struct task_struct *child, long request,
 			unsigned long addr, unsigned long data);
 extern int ptrace_readdata(struct task_struct *tsk, unsigned long src, char __user *dst, int len);
