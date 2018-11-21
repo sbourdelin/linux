@@ -13432,6 +13432,18 @@ static bool nested_vmx_nmi_window_exit(struct kvm_vcpu *vcpu)
 		  (GUEST_INTR_STATE_NMI | GUEST_INTR_STATE_MOV_SS));
 }
 
+static bool nested_vmx_intr_window_exit(struct kvm_vcpu *vcpu)
+{
+	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
+
+	return (vmcs12->cpu_based_vm_exec_control &
+		CPU_BASED_VIRTUAL_INTR_PENDING) &&
+		vmcs12->guest_activity_state != GUEST_ACTIVITY_WAIT_SIPI &&
+		(vmcs12->guest_rflags & X86_EFLAGS_IF) &&
+		!(vmcs12->guest_interruptibility_info &
+		  (GUEST_INTR_STATE_STI | GUEST_INTR_STATE_MOV_SS));
+}
+
 /*
  * nested_vmx_run() handles a nested entry, i.e., a VMLAUNCH or VMRESUME on L1
  * for running an L2 nested guest.
@@ -13524,12 +13536,13 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 
 	/*
 	 * If we're entering a halted L2 vcpu and the L2 vcpu won't be
-	 * awakened by event injection or by an NMI-window VM-exit,
-	 * halt the vcpu.
+	 * awakened by event injection or by an NMI-window VM-exit or
+	 * by an interrupt-window VM-exit, halt the vcpu.
 	 */
 	if ((vmcs12->guest_activity_state == GUEST_ACTIVITY_HLT) &&
 	    !(vmcs12->vm_entry_intr_info_field & INTR_INFO_VALID_MASK) &&
-	    !nested_vmx_nmi_window_exit(vcpu)) {
+	    !nested_vmx_nmi_window_exit(vcpu) &&
+	    !nested_vmx_intr_window_exit(vcpu)) {
 		vmx->nested.nested_run_pending = 0;
 		return kvm_vcpu_halt(vcpu);
 	}
