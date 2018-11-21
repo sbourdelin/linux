@@ -73,6 +73,24 @@
 			};
 		};
 	};
+
+	headphone_amp: headphone_amp {
+		compatible = "simple-audio-amplifier";
+		VCC-supply = <&reg_eldo1>;
+		sound-name-prefix = "HP";
+	};
+};
+
+&codec {
+	status = "okay";
+};
+
+&codec_analog {
+	status = "okay";
+};
+
+&dai {
+	status = "okay";
 };
 
 &de {
@@ -257,6 +275,23 @@
 
 &simplefb_hdmi {
 	vcc-hdmi-supply = <&reg_dldo1>;
+};
+
+&sound {
+	simple-audio-card,aux-devs = <&codec_analog>, <&headphone_amp>;
+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
+				    "Headphone", "Headphone Jack";
+	simple-audio-card,routing =
+			"Left DAC", "AIF1 Slot 0 Left",
+			"Right DAC", "AIF1 Slot 0 Right",
+			"HP INL", "HP",
+			"HP INR", "HP",
+			"Headphone Jack", "HP OUTL",
+			"Headphone Jack", "HP OUTR",
+			"AIF1 Slot 0 Left ADC", "Left ADC",
+			"AIF1 Slot 0 Right ADC", "Right ADC",
+			"MIC2", "Microphone Jack";
+	status = "okay";
 };
 
 /* On Euler connector */
