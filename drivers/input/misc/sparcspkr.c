@@ -205,11 +205,11 @@ static int bbc_beep_probe(struct platform_device *op)
 	info = &state->u.bbc;
 	info->clock_freq = of_getintprop_default(dp, "clock-frequency", 0);
 	if (!info->clock_freq)
-		goto out_free;
+		goto out_put_node;
 
 	info->regs = of_ioremap(&op->resource[0], 0, 6, "bbc beep");
 	if (!info->regs)
-		goto out_free;
+		goto out_put_node;
 
 	platform_set_drvdata(op, state);
 
@@ -217,11 +217,14 @@ static int bbc_beep_probe(struct platform_device *op)
 	if (err)
 		goto out_clear_drvdata;
 
+	of_node_put(dp);
+
 	return 0;
 
 out_clear_drvdata:
 	of_iounmap(&op->resource[0], info->regs, 6);
-
+out_put_node:
+	of_node_put(dp);
 out_free:
 	kfree(state);
 out_err:
