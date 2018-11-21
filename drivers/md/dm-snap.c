@@ -19,6 +19,7 @@
 #include <linux/vmalloc.h>
 #include <linux/log2.h>
 #include <linux/dm-kcopyd.h>
+#include <linux/dax.h>
 
 #include "dm.h"
 
@@ -2316,12 +2317,56 @@ static int origin_map(struct dm_target *ti, struct bio *bio)
 	return do_origin(o->dev, bio);
 }
 
+#if IS_ENABLED(CONFIG_DAX_DRIVER)
 static long origin_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
 		long nr_pages, void **kaddr, pfn_t *pfn)
 {
-	DMWARN("device does not support dax.");
-	return -EIO;
+	long ret = 0;
+	struct dm_origin *o = ti->private;
+	struct block_device *bdev = o->dev->bdev;
+	struct dax_device *dax_dev = o->dev->dax_dev;
+	sector_t sector = pgoff * PAGE_SECTORS;
+
+	ret = bdev_dax_pgoff(bdev, sector, nr_pages * PAGE_SIZE, &pgoff);
+	if (ret)
+		return ret;
+
+	return dax_direct_access(dax_dev, pgoff, nr_pages, kaddr, pfn);
 }
+
+static size_t origin_dax_copy_from_iter(struct dm_target *ti, pgoff_t pgoff,
+		void *addr, size_t bytes, struct iov_iter *i)
+{
+	struct dm_origin *o = ti->private;
+	struct block_device *bdev = o->dev->bdev;
+	struct dax_device *dax_dev = o->dev->dax_dev;
+	sector_t sector = pgoff * PAGE_SECTORS;
+
+	if (bdev_dax_pgoff(bdev, sector, ALIGN(bytes, PAGE_SIZE), &pgoff))
+		return 0;
+
+	return dax_copy_from_iter(dax_dev, pgoff, addr, bytes, i);
+}
+
+static size_t origin_dax_copy_to_iter(struct dm_target *ti, pgoff_t pgoff,
+		void *addr, size_t bytes, struct iov_iter *i)
+{
+	struct dm_origin *o = ti->private;
+	struct block_device *bdev = o->dev->bdev;
+	struct dax_device *dax_dev = o->dev->dax_dev;
+	sector_t sector = pgoff * PAGE_SECTORS;
+
+	if (bdev_dax_pgoff(bdev, sector, ALIGN(bytes, PAGE_SIZE), &pgoff))
+		return 0;
+
+	return dax_copy_to_iter(dax_dev, pgoff, addr, bytes, i);
+}
+
+#else
+#define origin_dax_direct_access NULL
+#define origin_dax_copy_from_iter NULL
+#define origin_dax_copy_to_iter NULL
+#endif
 
 /*
  * Set the target "max_io_len" field to the minimum of all the snapshots'
@@ -2383,6 +2428,8 @@ static struct target_type origin_target = {
 	.status  = origin_status,
 	.iterate_devices = origin_iterate_devices,
 	.direct_access = origin_dax_direct_access,
+	.dax_copy_to_iter = origin_dax_copy_to_iter,
+	.dax_copy_from_iter = origin_dax_copy_from_iter,
 };
 
 static struct target_type snapshot_target = {
