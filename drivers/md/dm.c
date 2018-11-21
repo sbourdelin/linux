@@ -1078,6 +1078,21 @@ static struct dm_target *dm_dax_get_live_target(struct mapped_device *md,
 	struct dm_target *ti;
 
 	map = dm_get_live_table(md, srcu_idx);
+	if (!map) {
+		/* Sometimes dm_swap_table couldn't be used in time.
+		 *
+		 * For example, during the origin construction of
+		 * dm-snapshot, the sys_ioctl table_load will try to
+		 * detect the lower device origin-real whether support
+		 * direct access or not. But origin-real device md's struct
+		 * dm-table pointer has not yet been assigned real address.
+		 * So hc_map has been used for get the address from
+		 * struct hash_cell directly.
+		 */
+		DMINFO("failed to get map, use hc_map insteadly");
+		map = md->hc_map;
+	}
+
 	if (!map)
 		return NULL;
 

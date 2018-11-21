@@ -1365,6 +1365,7 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 	if (hc->new_map)
 		old_map = hc->new_map;
 	hc->new_map = t;
+	hc->md->hc_map = hc->new_map;
 	up_write(&_hash_lock);
 
 	param->flags |= DM_INACTIVE_PRESENT_FLAG;

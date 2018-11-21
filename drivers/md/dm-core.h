@@ -40,6 +40,7 @@ struct mapped_device {
 	 * dereference.
 	 */
 	void __rcu *map;
+	struct dm_table *hc_map;
 
 	unsigned long flags;
 
