@@ -307,16 +307,21 @@ static void rcar_gen3_init_otg(struct rcar_gen3_chan *ch)
 	void __iomem *usb2_base = ch->base;
 	u32 val;
 
-	val = readl(usb2_base + USB2_VBCTRL);
-	writel(val | USB2_VBCTRL_DRVVBUSSEL, usb2_base + USB2_VBCTRL);
-	writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
-	rcar_gen3_control_otg_irq(ch, 1);
-	val = readl(usb2_base + USB2_ADPCTRL);
-	writel(val | USB2_ADPCTRL_IDPULLUP, usb2_base + USB2_ADPCTRL);
+	rcar_gen3_set_linectrl(ch, 0, 1);
 	val = readl(usb2_base + USB2_LINECTRL1);
-	rcar_gen3_set_linectrl(ch, 0, 0);
 	writel(val | USB2_LINECTRL1_DPRPD_EN | USB2_LINECTRL1_DMRPD_EN,
 	       usb2_base + USB2_LINECTRL1);
+
+	val = readl(usb2_base + USB2_VBCTRL);
+	writel(val | USB2_VBCTRL_DRVVBUSSEL, usb2_base + USB2_VBCTRL);
+	val = readl(usb2_base + USB2_ADPCTRL);
+	writel(val | USB2_ADPCTRL_IDPULLUP, usb2_base + USB2_ADPCTRL);
+
+	msleep(20);
+
+	writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
+
+	rcar_gen3_control_otg_irq(ch, 1);
 
 	rcar_gen3_device_recognition(ch);
 }
