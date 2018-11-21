@@ -127,6 +127,8 @@
 #define PHY_CTRL			(PORT_BASE + 0x14)
 #define PHY_CTRL_RESET_OFF		0
 #define PHY_CTRL_RESET_MSK		(0x1 << PHY_CTRL_RESET_OFF)
+#define CMD_HDR_PIR_OFF			8
+#define CMD_HDR_PIR_MSK			(0x1 << CMD_HDR_PIR_OFF)
 #define SL_CFG				(PORT_BASE + 0x84)
 #define AIP_LIMIT			(PORT_BASE + 0x90)
 #define SL_CONTROL			(PORT_BASE + 0x94)
@@ -333,6 +335,16 @@
 #define ITCT_HDR_RTOLT_OFF		48
 #define ITCT_HDR_RTOLT_MSK		(0xffffULL << ITCT_HDR_RTOLT_OFF)
 
+struct hisi_sas_protect_iu_v3_hw {
+	u32 dw0;
+	u32 lbrtcv;
+	u32 lbrtgv;
+	u32 dw3;
+	u32 dw4;
+	u32 dw5;
+	u32 rsv;
+};
+
 struct hisi_sas_complete_v3_hdr {
 	__le32 dw0;
 	__le32 dw1;
@@ -372,8 +384,26 @@ struct hisi_sas_err_record_v3 {
 	((fis.command == ATA_CMD_DEV_RESET) && \
 	((fis.control & ATA_SRST) != 0)))
 
+#define T10_INSRT_EN_OFF    0
+#define T10_INSRT_EN_MSK    (1 << T10_INSRT_EN_OFF)
+#define T10_RMV_EN_OFF	    1
+#define T10_RMV_EN_MSK	    (1 << T10_RMV_EN_OFF)
+#define T10_RPLC_EN_OFF	    2
+#define T10_RPLC_EN_MSK	    (1 << T10_RPLC_EN_OFF)
+#define T10_CHK_EN_OFF	    3
+#define T10_CHK_EN_MSK	    (1 << T10_CHK_EN_OFF)
+#define INCR_LBRT_OFF	    5
+#define INCR_LBRT_MSK	    (1 << INCR_LBRT_OFF)
+#define USR_DATA_BLOCK_SZ_OFF	20
+#define USR_DATA_BLOCK_SZ_MSK	(0x3 << USR_DATA_BLOCK_SZ_OFF)
+#define T10_CHK_MSK_OFF	    16
+
 static bool hisi_sas_intr_conv;
 MODULE_PARM_DESC(intr_conv, "interrupt converge enable (0-1)");
+
+static bool enable_dif_dix;
+module_param(enable_dif_dix, bool, 0444);
+MODULE_PARM_DESC(enable_dif_dix, "DIF/DIX enable (0-1)");
 
 static u32 hisi_sas_read32(struct hisi_hba *hisi_hba, u32 off)
 {
@@ -937,7 +967,107 @@ static void prep_prd_sge_v3_hw(struct hisi_hba *hisi_hba,
 
 	hdr->prd_table_addr = cpu_to_le64(hisi_sas_sge_addr_dma(slot));
 
-	hdr->sg_len = cpu_to_le32(n_elem << CMD_HDR_DATA_SGL_LEN_OFF);
+	hdr->sg_len |= cpu_to_le32(n_elem << CMD_HDR_DATA_SGL_LEN_OFF);
+}
+
+static void prep_prd_sge_dif_v3_hw(struct hisi_hba *hisi_hba,
+				  struct hisi_sas_slot *slot,
+				  struct hisi_sas_cmd_hdr *hdr,
+				  struct scatterlist *scatter,
+				  int n_elem)
+{
+	struct hisi_sas_sge_dif_page *sge_dif_page;
+	struct scatterlist *sg;
+	int i;
+
+	sge_dif_page = hisi_sas_sge_dif_addr_mem(slot);
+
+	for_each_sg(scatter, sg, n_elem, i) {
+		struct hisi_sas_sge *entry = &sge_dif_page->sge[i];
+
+		entry->addr = cpu_to_le64(sg_dma_address(sg));
+		entry->page_ctrl_0 = entry->page_ctrl_1 = 0;
+		entry->data_len = cpu_to_le32(sg_dma_len(sg));
+		entry->data_off = 0;
+	}
+
+	hdr->dif_prd_table_addr = cpu_to_le64(
+			hisi_sas_sge_dif_addr_dma(slot));
+
+	hdr->sg_len |= cpu_to_le32(n_elem << CMD_HDR_DIF_SGL_LEN_OFF);
+}
+
+static void fill_prot_v3_hw(struct scsi_cmnd *scsi_cmnd,
+			    struct hisi_sas_protect_iu_v3_hw *prot)
+{
+	u8 prot_type = scsi_get_prot_type(scsi_cmnd);
+	u8 prot_op = scsi_get_prot_op(scsi_cmnd);
+	unsigned int interval = scsi_prot_interval(scsi_cmnd);
+	u32 lbrt_chk_val;
+
+	if (interval == 4096)
+		lbrt_chk_val = (u32)(scsi_get_lba(scsi_cmnd) >> 3);
+	else
+		lbrt_chk_val = (u32)scsi_get_lba(scsi_cmnd);
+
+	switch (prot_op) {
+	case SCSI_PROT_READ_INSERT:
+		prot->dw0 |= T10_INSRT_EN_MSK;
+		prot->lbrtgv = lbrt_chk_val;
+		break;
+	case SCSI_PROT_READ_STRIP:
+		prot->dw0 |= (T10_RMV_EN_MSK | T10_CHK_EN_MSK);
+		prot->lbrtcv = lbrt_chk_val;
+		if (prot_type == SCSI_PROT_DIF_TYPE1)
+			prot->dw4 |= (0xc << 16);
+		else if (prot_type == SCSI_PROT_DIF_TYPE3)
+			prot->dw4 |= (0xfc << 16);
+		break;
+	case SCSI_PROT_READ_PASS:
+		prot->dw0 |= T10_CHK_EN_MSK;
+		prot->lbrtcv = lbrt_chk_val;
+		if (prot_type == SCSI_PROT_DIF_TYPE1)
+			prot->dw4 |= (0xc << 16);
+		else if (prot_type == SCSI_PROT_DIF_TYPE3)
+			prot->dw4 |= (0xfc << 16);
+		break;
+	case SCSI_PROT_WRITE_INSERT:
+		prot->dw0 |= T10_INSRT_EN_MSK;
+		prot->lbrtgv = lbrt_chk_val;
+		break;
+	case SCSI_PROT_WRITE_STRIP:
+		prot->dw0 |= (T10_RMV_EN_MSK | T10_CHK_EN_MSK);
+		prot->lbrtcv = lbrt_chk_val;
+		break;
+	case SCSI_PROT_WRITE_PASS:
+		prot->dw0 |= T10_CHK_EN_MSK;
+		prot->lbrtcv = lbrt_chk_val;
+		if (prot_type == SCSI_PROT_DIF_TYPE1)
+			prot->dw4 |= (0xc << 16);
+		else if (prot_type == SCSI_PROT_DIF_TYPE3)
+			prot->dw4 |= (0xfc << 16);
+		break;
+	default:
+		WARN(1, "prot_op(0x%x) is not valid\n", prot_op);
+		break;
+	}
+
+	switch (interval) {
+	case 512:
+		break;
+	case 4096:
+		prot->dw0 |= (0x1 << USR_DATA_BLOCK_SZ_OFF);
+		break;
+	case 520:
+		prot->dw0 |= (0x2 << USR_DATA_BLOCK_SZ_OFF);
+		break;
+	default:
+		WARN(1, "protection interval (0x%x) invalid\n",
+		     interval);
+		break;
+	}
+
+	prot->dw0 |= INCR_LBRT_MSK;
 }
 
 static void prep_ssp_v3_hw(struct hisi_hba *hisi_hba,
@@ -951,9 +1081,10 @@ static void prep_ssp_v3_hw(struct hisi_hba *hisi_hba,
 	struct sas_ssp_task *ssp_task = &task->ssp_task;
 	struct scsi_cmnd *scsi_cmnd = ssp_task->cmd;
 	struct hisi_sas_tmf_task *tmf = slot->tmf;
+	unsigned char prot_op = scsi_get_prot_op(scsi_cmnd);
 	int has_data = 0, priority = !!tmf;
 	u8 *buf_cmd;
-	u32 dw1 = 0, dw2 = 0;
+	u32 dw1 = 0, dw2 = 0, len = 0;
 
 	hdr->dw0 = cpu_to_le32((1 << CMD_HDR_RESP_REPORT_OFF) |
 			       (2 << CMD_HDR_TLR_CTRL_OFF) |
@@ -992,11 +1123,16 @@ static void prep_ssp_v3_hw(struct hisi_hba *hisi_hba,
 	hdr->dw2 = cpu_to_le32(dw2);
 	hdr->transfer_tags = cpu_to_le32(slot->idx);
 
-	if (has_data)
+	if (has_data) {
 		prep_prd_sge_v3_hw(hisi_hba, slot, hdr, task->scatter,
-					slot->n_elem);
+				   slot->n_elem);
 
-	hdr->data_transfer_len = cpu_to_le32(task->total_xfer_len);
+		if (scsi_prot_sg_count(scsi_cmnd))
+			prep_prd_sge_dif_v3_hw(hisi_hba, slot, hdr,
+					       scsi_prot_sglist(scsi_cmnd),
+					       slot->n_elem_dif);
+	}
+
 	hdr->cmd_table_addr = cpu_to_le64(hisi_sas_cmd_hdr_addr_dma(slot));
 	hdr->sts_buffer_addr = cpu_to_le64(hisi_sas_status_buf_addr_dma(slot));
 
@@ -1021,6 +1157,34 @@ static void prep_ssp_v3_hw(struct hisi_hba *hisi_hba,
 			break;
 		}
 	}
+
+	if (has_data && (prot_op != SCSI_PROT_NORMAL)) {
+		struct hisi_sas_protect_iu_v3_hw prot;
+		u8 *buf_cmd_prot;
+
+		hdr->dw7 |= 1 << CMD_HDR_ADDR_MODE_SEL_OFF;
+		hdr->dw1 |= CMD_HDR_PIR_MSK;
+		buf_cmd_prot = hisi_sas_cmd_hdr_addr_mem(slot) +
+			       sizeof(struct ssp_frame_hdr) +
+			       sizeof(struct ssp_command_iu);
+
+		memset(&prot, 0, sizeof(struct hisi_sas_protect_iu_v3_hw));
+		fill_prot_v3_hw(scsi_cmnd, &prot);
+		memcpy(buf_cmd_prot, &prot,
+		       sizeof(struct hisi_sas_protect_iu_v3_hw));
+
+		if ((prot_op == SCSI_PROT_READ_INSERT) ||
+		    (prot_op == SCSI_PROT_WRITE_INSERT) ||
+		    (prot_op == SCSI_PROT_WRITE_PASS) ||
+		    (prot_op == SCSI_PROT_READ_PASS)) {
+			unsigned int interval = scsi_prot_interval(scsi_cmnd);
+			unsigned int ilog2_interval = ilog2(interval);
+
+			len = (task->total_xfer_len >> ilog2_interval) * 8;
+		}
+	}
+
+	hdr->data_transfer_len = cpu_to_le32(task->total_xfer_len + len);
 }
 
 static void prep_smp_v3_hw(struct hisi_hba *hisi_hba,
@@ -2225,6 +2389,7 @@ static struct scsi_host_template sht_v3_hw = {
 	.bios_param		= sas_bios_param,
 	.this_id		= -1,
 	.sg_tablesize		= HISI_SAS_SGE_PAGE_CNT,
+	.sg_prot_tablesize	= HISI_SAS_SGE_PAGE_CNT,
 	.max_sectors		= SCSI_DEFAULT_MAX_SECTORS,
 	.use_clustering		= ENABLE_CLUSTERING,
 	.eh_device_reset_handler = sas_eh_device_reset_handler,
@@ -2284,6 +2449,7 @@ hisi_sas_shost_alloc_pci(struct pci_dev *pdev)
 	hisi_hba->dev = dev;
 	hisi_hba->shost = shost;
 	SHOST_TO_SAS_HA(shost) = &hisi_hba->sha;
+	hisi_hba->enable_dif_dix = enable_dif_dix;
 
 	timer_setup(&hisi_hba->timer, NULL, 0);
 
@@ -2394,6 +2560,19 @@ hisi_sas_v3_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	rc = hisi_hba->hw->hw_init(hisi_hba);
 	if (rc)
 		goto err_out_register_ha;
+
+	if (hisi_hba->enable_dif_dix) {
+		dev_info(dev, "Registering for DIF/DIX type 1/2/3 protection.\n");
+		scsi_host_set_prot(hisi_hba->shost,
+				   SHOST_DIF_TYPE1_PROTECTION |
+				   SHOST_DIF_TYPE2_PROTECTION |
+				   SHOST_DIF_TYPE3_PROTECTION |
+				   SHOST_DIX_TYPE1_PROTECTION |
+				   SHOST_DIX_TYPE2_PROTECTION |
+				   SHOST_DIX_TYPE3_PROTECTION);
+		scsi_host_set_guard(hisi_hba->shost,
+				    SHOST_DIX_GUARD_CRC);
+	}
 
 	scsi_scan_host(shost);
 
