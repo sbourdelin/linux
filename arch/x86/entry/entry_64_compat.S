@@ -361,17 +361,23 @@ ENTRY(entry_INT80_compat)
 
 	/* Need to switch before accessing the thread stack. */
 	SWITCH_TO_KERNEL_CR3 scratch_reg=%rdi
+
+	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rdi
+	subq	$8, %rdi
+	xorq	%rsp, %rdi
+	shrq	$PAGE_SHIFT, %rdi
+	jz	.Lint80_keep_stack
 	movq	%rsp, %rdi
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
-
 	pushq	6*8(%rdi)		/* regs->ss */
 	pushq	5*8(%rdi)		/* regs->rsp */
 	pushq	4*8(%rdi)		/* regs->eflags */
 	pushq	3*8(%rdi)		/* regs->cs */
 	pushq	2*8(%rdi)		/* regs->ip */
 	pushq	1*8(%rdi)		/* regs->orig_ax */
-
 	pushq	(%rdi)			/* pt_regs->di */
+.Lint80_keep_stack:
+
 	pushq	%rsi			/* pt_regs->si */
 	xorl	%esi, %esi		/* nospec   si */
 	pushq	%rdx			/* pt_regs->dx */

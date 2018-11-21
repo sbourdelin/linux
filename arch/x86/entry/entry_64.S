@@ -1380,6 +1380,12 @@ ENTRY(nmi)
 	swapgs
 	cld
 	SWITCH_TO_KERNEL_CR3 scratch_reg=%rdx
+
+	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rdx
+	subq	$8, %rdx
+	xorq	%rsp, %rdx
+	shrq	$PAGE_SHIFT, %rdx
+	jz	.Lnmi_keep_stack
 	movq	%rsp, %rdx
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
 	UNWIND_HINT_IRET_REGS base=%rdx offset=8
@@ -1389,6 +1395,8 @@ ENTRY(nmi)
 	pushq	2*8(%rdx)	/* pt_regs->cs */
 	pushq	1*8(%rdx)	/* pt_regs->rip */
 	UNWIND_HINT_IRET_REGS
+.Lnmi_keep_stack:
+
 	pushq   $-1		/* pt_regs->orig_ax */
 	PUSH_AND_CLEAR_REGS rdx=(%rdx)
 	ENCODE_FRAME_POINTER
