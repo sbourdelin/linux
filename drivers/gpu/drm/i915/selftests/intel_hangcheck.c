@@ -1171,7 +1171,7 @@ out_reset:
 		struct igt_wedge_me w;
 
 		/* The reset, even indirectly, should take less than 10ms. */
-		igt_wedge_on_timeout(&w, i915, HZ / 10 /* 100ms timeout*/)
+		igt_wedge_on_timeout(&w, i915, msecs_to_jiffies(100))
 			err = kthread_stop(tsk);
 
 		put_task_struct(tsk);
