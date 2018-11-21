@@ -3400,6 +3400,9 @@ bool mnt_may_suid(struct vfsmount *mnt)
 	 * prevents namespaces from trusting potentially unsafe
 	 * suid/sgid bits, file caps, or security labels that originate
 	 * in other namespaces.
+	 *
+	 * check_mnt() rejects MNT_NS_INTERNAL mounts; this means that suid
+	 * execution is blocked for files on internal mounts, e.g. memfds.
 	 */
 	return !(mnt->mnt_flags & MNT_NOSUID) && check_mnt(real_mount(mnt)) &&
 	       current_in_userns(mnt->mnt_sb->s_user_ns);
