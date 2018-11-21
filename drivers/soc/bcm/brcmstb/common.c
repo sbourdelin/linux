@@ -32,12 +32,15 @@ static const struct of_device_id brcmstb_machine_match[] = {
 bool soc_is_brcmstb(void)
 {
 	struct device_node *root;
+	bool rc;
 
 	root = of_find_node_by_path("/");
 	if (!root)
 		return false;
 
-	return of_match_node(brcmstb_machine_match, root) != NULL;
+	rc = of_match_node(brcmstb_machine_match, root) != NULL;
+	of_node_put(root);
+	return rc;
 }
 
 u32 brcmstb_get_family_id(void)
