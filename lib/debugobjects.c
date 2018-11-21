@@ -23,8 +23,80 @@
 #define ODEBUG_HASH_BITS	14
 #define ODEBUG_HASH_SIZE	(1 << ODEBUG_HASH_BITS)
 
-#define ODEBUG_POOL_SIZE	1024
+#define ODEBUG_DEFAULT_POOL	512
 #define ODEBUG_POOL_MIN_LEVEL	256
+
+/*
+ * Some debug objects are allocated during the early boot. Enabling some options
+ * like timers or workqueue objects may increase the size required significantly
+ * with large number of CPUs. For example (as today, 20 Nov. 2018),
+ *
+ * No. CPUs x 2 (worker pool) objects:
+ *
+ * start_kernel
+ *   workqueue_init_early
+ *     init_worker_pool
+ *       init_timer_key
+ *         debug_object_init
+ *
+ * No. CPUs objects (CONFIG_HIGH_RES_TIMERS):
+ *
+ * sched_init
+ *   hrtick_rq_init
+ *     hrtimer_init
+ *
+ * CONFIG_DEBUG_OBJECTS_WORK:
+ * No. CPUs x 6 (workqueue) objects:
+ *
+ * workqueue_init_early
+ *   alloc_workqueue
+ *     __alloc_workqueue_key
+ *       alloc_and_link_pwqs
+ *         init_pwq
+ *
+ * Also, plus No. CPUs objects:
+ *
+ * perf_event_init
+ *    __init_srcu_struct
+ *      init_srcu_struct_fields
+ *        init_srcu_struct_nodes
+ *          __init_work
+ *
+ * Increase the number a bit more in case the implmentatins are changed in the
+ * future, as it is better to avoid OOM than spending a bit more kernel memory
+ * that will/can be freed.
+ *
+ * With all debug objects config options selected except the workqueue and the
+ * timers, kernel reports,
+ * 64-CPU:  ODEBUG: 4 of 4 active objects replaced
+ * 256-CPU: ODEBUG: 4 of 4 active objects replaced
+ *
+ * all the options except the workqueue:
+ * 64-CPU:  ODEBUG: 466 of 466 active objects replaced
+ * 256-CPU: ODEBUG: 1810 of 1810 active objects replaced
+ *
+ * all the options except the timers:
+ * 64-CPU:  ODEBUG: 652 of 652 active objects replaced
+ * 256-CPU: ODEBUG: 2572 of 2572 active objects replaced
+ *
+ * all the options:
+ * 64-CPU:  ODEBUG: 1114 of 1114 active objects replaced
+ * 256-CPU: ODEBUG: 4378 of 4378 active objects replaced
+ */
+#ifdef CONFIG_DEBUG_OBJECTS_WORK
+#define ODEBUG_WORK_PCPU_CNT	10
+#else
+#define ODEBUG_WORK_PCPU_CNT	0
+#endif /* CONFIG_DEBUG_OBJECTS_WORK */
+
+#ifdef CONFIG_DEBUG_OBJECTS_TIMERS
+#define ODEBUG_TIMERS_PCPU_CNT	10
+#else
+#define ODEBUG_TIMERS_PCPU_CNT	0
+#endif /* CONFIG_DEBUG_OBJECTS_TIMERS */
+
+#define ODEBUG_POOL_SIZE	(ODEBUG_DEFAULT_POOL + CONFIG_NR_CPUS * \
+				(ODEBUG_TIMERS_PCPU_CNT + ODEBUG_WORK_PCPU_CNT))
 
 #define ODEBUG_CHUNK_SHIFT	PAGE_SHIFT
 #define ODEBUG_CHUNK_SIZE	(1 << ODEBUG_CHUNK_SHIFT)
@@ -58,8 +130,13 @@ static int			debug_objects_fixups __read_mostly;
 static int			debug_objects_warnings __read_mostly;
 static int			debug_objects_enabled __read_mostly
 				= CONFIG_DEBUG_OBJECTS_ENABLE_DEFAULT;
+/*
+ * This is only used after replaced static objects, so no need to scale it to
+ * use the early boot static pool size and it has already been scaled according
+ * to actual No. CPUs in the box within debug_objects_mem_init().
+ */
 static int			debug_objects_pool_size __read_mostly
-				= ODEBUG_POOL_SIZE;
+				= ODEBUG_DEFAULT_POOL;
 static int			debug_objects_pool_min_level __read_mostly
 				= ODEBUG_POOL_MIN_LEVEL;
 static struct debug_obj_descr	*descr_test  __read_mostly;
