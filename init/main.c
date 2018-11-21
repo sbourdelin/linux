@@ -730,6 +730,7 @@ asmlinkage __visible void __init start_kernel(void)
 	cgroup_init();
 	taskstats_init_early();
 	delayacct_init();
+	pid_proc_init();
 
 	check_bugs();
 
