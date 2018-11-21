@@ -99,6 +99,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
 		.compatible	= "allwinner,sun50i-a64-sram-c",
 		.data		= &sun50i_a64_sram_c.data,
 	},
+	{
+		.compatible	= "allwinner,suniv-f1c100s-sram-d",
+		.data		= &sun4i_a10_sram_d.data,
+	},
 	{}
 };
 
@@ -378,6 +382,10 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
 	{
 		.compatible = "allwinner,sun50i-a64-system-control",
 		.data = &sun50i_a64_sramc_variant,
+	},
+	{
+		.compatible = "allwinner,suniv-f1c100s-system-control",
+		.data = &sun4i_a10_sramc_variant,
 	},
 	{ },
 };
