@@ -90,6 +90,7 @@ struct clk {
 	unsigned long max_rate;
 	unsigned int exclusive_count;
 	struct hlist_node clks_node;
+	struct device_link *link;
 };
 
 /***           runtime pm          ***/
@@ -261,6 +262,25 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
 	return !clk ? NULL : clk->core->hw;
 }
 EXPORT_SYMBOL_GPL(__clk_get_hw);
+
+void __clk_device_link(struct device *consumer, struct clk *clk)
+{
+	if (!consumer || !clk || !clk->core)
+		return;
+
+	clk->link = device_link_add(consumer, clk->core->dev,
+				    DL_FLAG_STATELESS);
+}
+EXPORT_SYMBOL_GPL(__clk_device_link);
+
+void __clk_device_unlink(struct clk *clk)
+{
+	if (!clk || !clk->link)
+		return;
+
+	device_link_del(clk->link);
+}
+EXPORT_SYMBOL_GPL(__clk_device_unlink);
 
 unsigned int clk_hw_get_num_parents(const struct clk_hw *hw)
 {
