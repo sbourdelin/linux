@@ -36,6 +36,7 @@ do
 		-e 's/__attribute_const__([[:space:]]|$)/\1/g' \
 		-e 's@^#include <linux/compiler(|_types).h>@@' \
 		-e 's/(^|[^a-zA-Z0-9])__packed([^a-zA-Z0-9_]|$)/\1__attribute__((packed))\2/g' \
+		-e 's/(^|[^a-zA-Z0-9])__aligned(\([0-9 ]*\))([^a-zA-Z0-9_]|$)/\1__attribute__((aligned\2))\3/g' \
 		-e 's/(^|[[:space:](])(inline|asm|volatile)([[:space:](]|$)/\1__\2__\3/g' \
 		-e 's@#(ifndef|define|endif[[:space:]]*/[*])[[:space:]]*_UAPI@#\1 @' \
 		"$SRCDIR/$i" > "$OUTDIR/$FILE.sed" || exit 1
