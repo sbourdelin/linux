@@ -567,37 +567,28 @@ static struct attribute *__lb_cmds_attrs[] = {
 	NULL,
 };
 
-static bool ec_has_lightbar(struct cros_ec_dev *ec)
+static bool cros_ec_has_lightbar(struct cros_ec_dev *ec_dev)
 {
-	return !!get_lightbar_version(ec, NULL, NULL);
-}
-
-static umode_t cros_ec_lightbar_attrs_are_visible(struct kobject *kobj,
-						  struct attribute *a, int n)
-{
-	struct device *dev = container_of(kobj, struct device, kobj);
-	struct cros_ec_dev *ec = to_cros_ec_dev(dev);
-	struct platform_device *pdev = to_platform_device(ec->dev);
+	struct platform_device *pdev = to_platform_device(ec_dev->dev);
 	struct cros_ec_platform *pdata = pdev->dev.platform_data;
 	int is_cros_ec;
 
 	is_cros_ec = strcmp(pdata->ec_name, CROS_EC_DEV_NAME);
 
 	if (is_cros_ec != 0)
-		return 0;
+		return false;
 
-	/* Only instantiate this stuff if the EC has a lightbar */
-	if (ec_has_lightbar(ec)) {
-		ec_with_lightbar = ec;
-		return a->mode;
+	if (!!get_lightbar_version(ec_dev, NULL, NULL)) {
+		ec_with_lightbar = ec_dev;
+		return true;
 	}
-	return 0;
+
+	return false;
 }
 
 struct attribute_group cros_ec_lightbar_attr_group = {
 	.name = "lightbar",
 	.attrs = __lb_cmds_attrs,
-	.is_visible = cros_ec_lightbar_attrs_are_visible,
 };
 
 static int cros_ec_lightbar_probe(struct platform_device *pd)
@@ -610,6 +601,10 @@ static int cros_ec_lightbar_probe(struct platform_device *pd)
 		dev_err(dev, "No EC dev found\n");
 		return -EINVAL;
 	}
+
+	/* Only instantiate this stuff if the EC has a lightbar */
+	if (!cros_ec_has_lightbar(ec_dev))
+		return -ENODEV;
 
 	/* Take control of the lightbar from the EC. */
 	lb_manual_suspend_ctrl(ec_dev, 1);
