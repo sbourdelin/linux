@@ -11,7 +11,8 @@
  *  option) any later version.
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/export.h>
 #include <linux/device.h>
 #include <linux/input.h>
 #include <linux/irq.h>
@@ -416,13 +417,3 @@ err:
 	mfd_remove_devices(da9055->dev);
 	return ret;
 }
-
-void da9055_device_exit(struct da9055 *da9055)
-{
-	regmap_del_irq_chip(da9055->chip_irq, da9055->irq_data);
-	mfd_remove_devices(da9055->dev);
-}
-
-MODULE_DESCRIPTION("Core support for the DA9055 PMIC");
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("David Dajun Chen <dchen@diasemi.com>");
