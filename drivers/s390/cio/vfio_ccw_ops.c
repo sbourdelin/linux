@@ -3,9 +3,11 @@
  * Physical device callbacks for vfio_ccw
  *
  * Copyright IBM Corp. 2017
+ * Copyright Red Hat, Inc. 2018
  *
  * Author(s): Dong Jia Shi <bjsdjshi@linux.vnet.ibm.com>
  *            Xiao Feng Ren <renxiaof@linux.vnet.ibm.com>
+ *            Cornelia Huck <cohuck@redhat.com>
  */
 
 #include <linux/vfio.h>
@@ -157,9 +159,34 @@ static void vfio_ccw_mdev_release(struct mdev_device *mdev)
 {
 	struct vfio_ccw_private *private =
 		dev_get_drvdata(mdev_parent_dev(mdev));
+	int i;
 
 	vfio_unregister_notifier(mdev_dev(mdev), VFIO_IOMMU_NOTIFY,
 				 &private->nb);
+
+	for (i = 0; i < private->num_regions; i++)
+		private->region[i].ops->release(private, &private->region[i]);
+
+	private->num_regions = 0;
+	kfree(private->region);
+	private->region = NULL;
+}
+
+static ssize_t vfio_ccw_mdev_read_io_region(struct vfio_ccw_private *private,
+					    char __user *buf, size_t count,
+					    loff_t *ppos)
+{
+	loff_t pos = *ppos & VFIO_CCW_OFFSET_MASK;
+	struct ccw_io_region *region;
+
+	if (pos + count > sizeof(*region))
+		return -EINVAL;
+
+	region = private->io_region;
+	if (copy_to_user(buf, (void *)region + pos, count))
+		return -EFAULT;
+
+	return count;
 }
 
 static ssize_t vfio_ccw_mdev_read(struct mdev_device *mdev,
@@ -167,37 +194,41 @@ static ssize_t vfio_ccw_mdev_read(struct mdev_device *mdev,
 				  size_t count,
 				  loff_t *ppos)
 {
+	unsigned int index = VFIO_CCW_OFFSET_TO_INDEX(*ppos);
 	struct vfio_ccw_private *private;
-	struct ccw_io_region *region;
-
-	if (*ppos + count > sizeof(*region))
-		return -EINVAL;
 
 	private = dev_get_drvdata(mdev_parent_dev(mdev));
-	region = private->io_region;
-	if (copy_to_user(buf, (void *)region + *ppos, count))
-		return -EFAULT;
 
-	return count;
+	if (index >= VFIO_CCW_NUM_REGIONS + private->num_regions)
+		return -EINVAL;
+
+	switch (index) {
+	case VFIO_CCW_CONFIG_REGION_INDEX:
+		return vfio_ccw_mdev_read_io_region(private, buf, count, ppos);
+	default:
+		index -= VFIO_CCW_NUM_REGIONS;
+		return private->region[index].ops->read(private, buf, count,
+							ppos);
+	}
+
+	return -EINVAL;
 }
 
-static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
-				   const char __user *buf,
-				   size_t count,
-				   loff_t *ppos)
+static ssize_t vfio_ccw_mdev_write_io_region(struct vfio_ccw_private *private,
+					     const char __user *buf,
+					     size_t count, loff_t *ppos)
 {
-	struct vfio_ccw_private *private;
+	loff_t pos = *ppos & VFIO_CCW_OFFSET_MASK;
 	struct ccw_io_region *region;
 
-	if (*ppos + count > sizeof(*region))
+	if (pos + count > sizeof(*region))
 		return -EINVAL;
 
-	private = dev_get_drvdata(mdev_parent_dev(mdev));
 	if (private->state != VFIO_CCW_STATE_IDLE)
 		return -EACCES;
 
 	region = private->io_region;
-	if (copy_from_user((void *)region + *ppos, buf, count))
+	if (copy_from_user((void *)region + pos, buf, count))
 		return -EFAULT;
 
 	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_IO_REQ);
@@ -207,21 +238,55 @@ static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
 	}
 
 	return count;
+
 }
 
-static int vfio_ccw_mdev_get_device_info(struct vfio_device_info *info)
+static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
+				   const char __user *buf,
+				   size_t count,
+				   loff_t *ppos)
 {
+	unsigned int index = VFIO_CCW_OFFSET_TO_INDEX(*ppos);
+	struct vfio_ccw_private *private;
+
+	private = dev_get_drvdata(mdev_parent_dev(mdev));
+
+	if (index >= VFIO_CCW_NUM_REGIONS + private->num_regions)
+		return -EINVAL;
+
+	switch (index) {
+	case VFIO_CCW_CONFIG_REGION_INDEX:
+		return vfio_ccw_mdev_write_io_region(private, buf, count, ppos);
+	default:
+		index -= VFIO_CCW_NUM_REGIONS;
+		return private->region[index].ops->write(private, buf, count,
+							 ppos);
+	}
+
+	return -EINVAL;
+}
+
+static int vfio_ccw_mdev_get_device_info(struct vfio_device_info *info,
+					 struct mdev_device *mdev)
+{
+	struct vfio_ccw_private *private;
+
+	private = dev_get_drvdata(mdev_parent_dev(mdev));
 	info->flags = VFIO_DEVICE_FLAGS_CCW | VFIO_DEVICE_FLAGS_RESET;
-	info->num_regions = VFIO_CCW_NUM_REGIONS;
+	info->num_regions = VFIO_CCW_NUM_REGIONS + private->num_regions;
 	info->num_irqs = VFIO_CCW_NUM_IRQS;
 
 	return 0;
 }
 
 static int vfio_ccw_mdev_get_region_info(struct vfio_region_info *info,
-					 u16 *cap_type_id,
-					 void **cap_type)
+					 struct mdev_device *mdev,
+					 unsigned long arg)
 {
+	struct vfio_ccw_private *private;
+	int i;
+
+	private = dev_get_drvdata(mdev_parent_dev(mdev));
 	switch (info->index) {
 	case VFIO_CCW_CONFIG_REGION_INDEX:
 		info->offset = 0;
@@ -229,9 +294,51 @@ static int vfio_ccw_mdev_get_region_info(struct vfio_region_info *info,
 		info->flags = VFIO_REGION_INFO_FLAG_READ
 			      | VFIO_REGION_INFO_FLAG_WRITE;
 		return 0;
-	default:
-		return -EINVAL;
+	default: /* all other regions are handled via capability chain */
+	{
+		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
+		struct vfio_region_info_cap_type cap_type = {
+			.header.id = VFIO_REGION_INFO_CAP_TYPE,
+			.header.version = 1 };
+		int ret;
+
+		if (info->index >=
+		    VFIO_CCW_NUM_REGIONS + private->num_regions)
+			return -EINVAL;
+
+		i = info->index - VFIO_CCW_NUM_REGIONS;
+
+		info->offset = VFIO_CCW_INDEX_TO_OFFSET(info->index);
+		info->size = private->region[i].size;
+		info->flags = private->region[i].flags;
+
+		cap_type.type = private->region[i].type;
+		cap_type.subtype = private->region[i].subtype;
+
+		ret = vfio_info_add_capability(&caps, &cap_type.header,
+					       sizeof(cap_type));
+		if (ret)
+			return ret;
+
+		info->flags |= VFIO_REGION_INFO_FLAG_CAPS;
+		if (info->argsz < sizeof(*info) + caps.size) {
+			info->argsz = sizeof(*info) + caps.size;
+			info->cap_offset = 0;
+		} else {
+			vfio_info_cap_shift(&caps, sizeof(*info));
+			if (copy_to_user((void __user *)arg + sizeof(*info),
+					 caps.buf, caps.size)) {
+				kfree(caps.buf);
+				return -EFAULT;
+			}
+			info->cap_offset = sizeof(*info);
+		}
+
+		kfree(caps.buf);
+
 	}
+	}
+	return 0;
 }
 
 static int vfio_ccw_mdev_get_irq_info(struct vfio_irq_info *info)
@@ -308,6 +415,32 @@ static int vfio_ccw_mdev_set_irqs(struct mdev_device *mdev,
 	}
 }
 
+int vfio_ccw_register_dev_region(struct vfio_ccw_private *private,
+				 unsigned int subtype,
+				 const struct vfio_ccw_regops *ops,
+				 size_t size, u32 flags, void *data)
+{
+	struct vfio_ccw_region *region;
+
+	region = krealloc(private->region,
+			  (private->num_regions + 1) * sizeof(*region),
+			  GFP_KERNEL);
+	if (!region)
+		return -ENOMEM;
+
+	private->region = region;
+	private->region[private->num_regions].type = VFIO_REGION_TYPE_CCW;
+	private->region[private->num_regions].subtype = subtype;
+	private->region[private->num_regions].ops = ops;
+	private->region[private->num_regions].size = size;
+	private->region[private->num_regions].flags = flags;
+	private->region[private->num_regions].data = data;
+
+	private->num_regions++;
+
+	return 0;
+}
+
 static ssize_t vfio_ccw_mdev_ioctl(struct mdev_device *mdev,
 				   unsigned int cmd,
 				   unsigned long arg)
@@ -328,7 +461,7 @@ static ssize_t vfio_ccw_mdev_ioctl(struct mdev_device *mdev,
 		if (info.argsz < minsz)
 			return -EINVAL;
 
-		ret = vfio_ccw_mdev_get_device_info(&info);
+		ret = vfio_ccw_mdev_get_device_info(&info, mdev);
 		if (ret)
 			return ret;
 
@@ -337,8 +470,6 @@ static ssize_t vfio_ccw_mdev_ioctl(struct mdev_device *mdev,
 	case VFIO_DEVICE_GET_REGION_INFO:
 	{
 		struct vfio_region_info info;
-		u16 cap_type_id = 0;
-		void *cap_type = NULL;
 
 		minsz = offsetofend(struct vfio_region_info, offset);
 
@@ -348,8 +479,7 @@ static ssize_t vfio_ccw_mdev_ioctl(struct mdev_device *mdev,
 		if (info.argsz < minsz)
 			return -EINVAL;
 
-		ret = vfio_ccw_mdev_get_region_info(&info, &cap_type_id,
-						    &cap_type);
+		ret = vfio_ccw_mdev_get_region_info(&info, mdev, arg);
 		if (ret)
 			return ret;
 
