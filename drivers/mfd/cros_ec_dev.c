@@ -21,6 +21,7 @@
 #include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
@@ -400,7 +401,10 @@ static const struct mfd_cell cros_ec_platform_cells[] = {
 	{ .name = "cros-ec-debugfs" },
 	{ .name = "cros-ec-lightbar" },
 	{ .name = "cros-ec-sysfs" },
-	{ .name = "cros-ec-vbc" },
+};
+
+static const struct mfd_cell cros_ec_vbc_cells[] = {
+	{ .name = "cros-ec-vbc" }
 };
 
 static int ec_device_probe(struct platform_device *pdev)
@@ -409,6 +413,7 @@ static int ec_device_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct cros_ec_platform *ec_platform = dev_get_platdata(dev);
 	struct cros_ec_dev *ec = devm_kzalloc(dev, sizeof(*ec), GFP_KERNEL);
+	struct device_node *node;
 
 	if (!ec)
 		return retval;
@@ -491,6 +496,23 @@ static int ec_device_probe(struct platform_device *pdev)
 	if (retval)
 		dev_err(ec->dev,
 			"failed to add cros-ec platform devices: %d\n", retval);
+
+	/* Check whether this EC instance has a VBC NVRAM */
+	node = ec->ec_dev->dev->of_node;
+	if (IS_ENABLED(CONFIG_OF) && node) {
+		if (of_property_read_bool(node, "google,has-vbc-nvram")) {
+			dev_err(dev, "device VBC found.\n");
+			retval = devm_mfd_add_devices(ec->dev,
+					PLATFORM_DEVID_AUTO,
+					cros_ec_vbc_cells,
+					ARRAY_SIZE(cros_ec_vbc_cells),
+					NULL, 0, NULL);
+			if (retval)
+				dev_err(ec->dev,
+					"failed to add VBC devices: %d\n",
+					retval);
+		}
+	}
 
 	return 0;
 
