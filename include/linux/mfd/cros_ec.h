@@ -333,9 +333,6 @@ int cros_ec_get_next_event(struct cros_ec_device *ec_dev, bool *wake_event);
  */
 u32 cros_ec_get_host_event(struct cros_ec_device *ec_dev);
 
-/* sysfs stuff */
-extern struct attribute_group cros_ec_attr_group;
-
 /* Attach/detach attributes to the cros_class */
 extern int cros_ec_attach_attribute_group(struct cros_ec_dev *ec,
 					  struct attribute_group *attrs);
