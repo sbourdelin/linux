@@ -83,6 +83,7 @@ struct regulator_enable_gpio {
 	u32 enable_count;	/* a number of enabled shared GPIO */
 	u32 request_count;	/* a number of requested shared GPIO */
 	unsigned int ena_gpio_invert:1;
+	unsigned int locally_requested:1;
 };
 
 /*
@@ -2233,19 +2234,20 @@ static int regulator_ena_gpio_request(struct regulator_dev *rdev,
 		}
 	}
 
+	pin = kzalloc(sizeof(struct regulator_enable_gpio), GFP_KERNEL);
+	if (pin == NULL)
+		return -ENOMEM;
+
 	if (!config->ena_gpiod) {
 		ret = gpio_request_one(config->ena_gpio,
 				       GPIOF_DIR_OUT | config->ena_gpio_flags,
 				       rdev_get_name(rdev));
-		if (ret)
+		if (ret) {
+			kfree(pin);
 			return ret;
-	}
+		}
 
-	pin = kzalloc(sizeof(struct regulator_enable_gpio), GFP_KERNEL);
-	if (pin == NULL) {
-		if (!config->ena_gpiod)
-			gpio_free(config->ena_gpio);
-		return -ENOMEM;
+		pin->locally_requested = 1;
 	}
 
 	pin->gpiod = gpiod;
@@ -2270,7 +2272,8 @@ static void regulator_ena_gpio_free(struct regulator_dev *rdev)
 		if (pin->gpiod == rdev->ena_pin->gpiod) {
 			if (pin->request_count <= 1) {
 				pin->request_count = 0;
-				gpiod_put(pin->gpiod);
+				if (pin->locally_requested)
+					gpiod_put(pin->gpiod);
 				list_del(&pin->list);
 				kfree(pin);
 				rdev->ena_pin = NULL;
