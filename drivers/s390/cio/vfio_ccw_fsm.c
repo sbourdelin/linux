@@ -3,8 +3,10 @@
  * Finite state machine for vfio-ccw device handling
  *
  * Copyright IBM Corp. 2017
+ * Copyright Red Hat, Inc. 2018
  *
  * Author(s): Dong Jia Shi <bjsdjshi@linux.vnet.ibm.com>
+ *            Cornelia Huck <cohuck@redhat.com>
  */
 
 #include <linux/vfio.h>
@@ -68,6 +70,81 @@ static int fsm_io_helper(struct vfio_ccw_private *private)
 	return ret;
 }
 
+static int fsm_do_halt(struct vfio_ccw_private *private)
+{
+	struct subchannel *sch;
+	unsigned long flags;
+	int ccode;
+	int ret;
+
+	sch = private->sch;
+
+	spin_lock_irqsave(sch->lock, flags);
+	private->state = VFIO_CCW_STATE_BUSY;
+
+	/* Issue "Halt Subchannel" */
+	ccode = hsch(sch->schid);
+
+	switch (ccode) {
+	case 0:
+		/*
+		 * Initialize device status information
+		 */
+		sch->schib.scsw.cmd.actl |= SCSW_ACTL_HALT_PEND;
+		ret = 0;
+		break;
+	case 1:		/* Status pending */
+	case 2:		/* Busy */
+		ret = -EBUSY;
+		break;
+	case 3:		/* Device not operational */
+	{
+		ret = -ENODEV;
+		break;
+	}
+	default:
+		ret = ccode;
+	}
+	spin_unlock_irqrestore(sch->lock, flags);
+	return ret;
+}
+
+static int fsm_do_clear(struct vfio_ccw_private *private)
+{
+	struct subchannel *sch;
+	unsigned long flags;
+	int ccode;
+	int ret;
+
+	sch = private->sch;
+
+	spin_lock_irqsave(sch->lock, flags);
+	private->state = VFIO_CCW_STATE_BUSY;
+
+	/* Issue "Clear Subchannel" */
+	ccode = csch(sch->schid);
+
+	switch (ccode) {
+	case 0:
+		/*
+		 * Initialize device status information
+		 */
+		sch->schib.scsw.cmd.actl = SCSW_ACTL_CLEAR_PEND;
+		/* TODO: check what else we might need to clear */
+		ret = 0;
+		break;
+	case 3:		/* Device not operational */
+	{
+		ret = -ENODEV;
+		break;
+	}
+	default:
+		ret = ccode;
+	}
+	spin_unlock_irqrestore(sch->lock, flags);
+	return ret;
+}
+
 static void fsm_notoper(struct vfio_ccw_private *private,
 			enum vfio_ccw_event event)
 {
@@ -100,6 +177,20 @@ static void fsm_io_busy(struct vfio_ccw_private *private,
 			enum vfio_ccw_event event)
 {
 	private->io_region->ret_code = -EBUSY;
+}
+
+static void fsm_async_error(struct vfio_ccw_private *private,
+			    enum vfio_ccw_event event)
+{
+	pr_err("vfio-ccw: FSM: halt/clear request from state:%d\n",
+	       private->state);
+	private->cmd_region->ret_code = -EIO;
+}
+
+static void fsm_async_busy(struct vfio_ccw_private *private,
+			   enum vfio_ccw_event event)
+{
+	private->cmd_region->ret_code = -EBUSY;
 }
 
 static void fsm_disabled_irq(struct vfio_ccw_private *private,
@@ -166,11 +257,11 @@ static void fsm_io_request(struct vfio_ccw_private *private,
 		}
 		return;
 	} else if (scsw->cmd.fctl & SCSW_FCTL_HALT_FUNC) {
-		/* XXX: Handle halt. */
+		/* halt is handled via the async cmd region */
 		io_region->ret_code = -EOPNOTSUPP;
 		goto err_out;
 	} else if (scsw->cmd.fctl & SCSW_FCTL_CLEAR_FUNC) {
-		/* XXX: Handle clear. */
+		/* clear is handled via the async cmd region */
 		io_region->ret_code = -EOPNOTSUPP;
 		goto err_out;
 	}
@@ -181,6 +272,59 @@ err_out:
 			       io_region->ret_code, errstr);
 }
 
+/*
+ * Deal with a halt request from userspace.
+ */
+static void fsm_halt_request(struct vfio_ccw_private *private,
+			     enum vfio_ccw_event event)
+{
+	struct ccw_cmd_region *cmd_region = private->cmd_region;
+	int state = private->state;
+
+	private->state = VFIO_CCW_STATE_BOXED;
+
+	if (cmd_region->command != VFIO_CCW_ASYNC_CMD_HSCH) {
+		/* should not happen? */
+		cmd_region->ret_code = -EINVAL;
+		goto err_out;
+	}
+
+	cmd_region->ret_code = fsm_do_halt(private);
+	if (cmd_region->ret_code)
+		goto err_out;
+
+	return;
+
+err_out:
+	private->state = state;
+}
+
+/*
+ * Deal with a clear request from userspace.
+ */
+static void fsm_clear_request(struct vfio_ccw_private *private,
+			      enum vfio_ccw_event event)
+{
+	struct ccw_cmd_region *cmd_region = private->cmd_region;
+	int state = private->state;
+
+	private->state = VFIO_CCW_STATE_BOXED;
+
+	if (cmd_region->command != VFIO_CCW_ASYNC_CMD_CSCH) {
+		/* should not happen? */
+		cmd_region->ret_code = -EINVAL;
+		goto err_out;
+	}
+
+	cmd_region->ret_code = fsm_do_clear(private);
+	if (cmd_region->ret_code)
+		goto err_out;
+
+	return;
+
+err_out:
+	private->state = state;
+}
 /*
  * Got an interrupt for a normal io (state busy).
  */
@@ -204,26 +348,36 @@ fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS] = {
 	[VFIO_CCW_STATE_NOT_OPER] = {
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_nop,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_error,
+		[VFIO_CCW_EVENT_HALT_REQ]	= fsm_async_error,
+		[VFIO_CCW_EVENT_CLEAR_REQ]	= fsm_async_error,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_disabled_irq,
 	},
 	[VFIO_CCW_STATE_STANDBY] = {
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_error,
+		[VFIO_CCW_EVENT_HALT_REQ]	= fsm_async_error,
+		[VFIO_CCW_EVENT_CLEAR_REQ]	= fsm_async_error,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
 	},
 	[VFIO_CCW_STATE_IDLE] = {
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_request,
+		[VFIO_CCW_EVENT_HALT_REQ]	= fsm_halt_request,
+		[VFIO_CCW_EVENT_CLEAR_REQ]	= fsm_clear_request,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
 	},
 	[VFIO_CCW_STATE_BOXED] = {
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_busy,
+		[VFIO_CCW_EVENT_HALT_REQ]	= fsm_async_busy,
+		[VFIO_CCW_EVENT_CLEAR_REQ]	= fsm_async_busy,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
 	},
 	[VFIO_CCW_STATE_BUSY] = {
 		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_busy,
+		[VFIO_CCW_EVENT_HALT_REQ]	= fsm_halt_request,
+		[VFIO_CCW_EVENT_CLEAR_REQ]	= fsm_clear_request,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
 	},
 };
