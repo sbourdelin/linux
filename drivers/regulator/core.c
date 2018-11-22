@@ -80,6 +80,7 @@ struct regulator_map {
 struct regulator_enable_gpio {
 	struct list_head list;
 	struct gpio_desc *gpiod;
+	bool gpiod_needs_put;
 	u32 enable_count;	/* a number of enabled shared GPIO */
 	u32 request_count;	/* a number of requested shared GPIO */
 	unsigned int ena_gpio_invert:1;
@@ -2249,6 +2250,8 @@ static int regulator_ena_gpio_request(struct regulator_dev *rdev,
 	}
 
 	pin->gpiod = gpiod;
+	if (!config->ena_gpiod)
+		pin->gpiod_needs_put = true;
 	pin->ena_gpio_invert = config->ena_gpio_invert;
 	list_add(&pin->list, &regulator_ena_gpio_list);
 
@@ -2270,7 +2273,8 @@ static void regulator_ena_gpio_free(struct regulator_dev *rdev)
 		if (pin->gpiod == rdev->ena_pin->gpiod) {
 			if (pin->request_count <= 1) {
 				pin->request_count = 0;
-				gpiod_put(pin->gpiod);
+				if (pin->gpiod_needs_put)
+					gpiod_put(pin->gpiod);
 				list_del(&pin->list);
 				kfree(pin);
 				rdev->ena_pin = NULL;
