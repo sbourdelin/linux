@@ -1195,10 +1195,14 @@ bool intel_engine_can_store_dword(struct intel_engine_cs *engine)
 	case 3:
 		/* maybe only uses physical not virtual addresses */
 		return !(IS_I915G(engine->i915) || IS_I915GM(engine->i915));
+	case 4:
+	case 5:
+		/* no known limitations */
+		return true;
 	case 6:
 		return engine->class != VIDEO_DECODE_CLASS; /* b0rked */
 	default:
-		return true;
+		return engine->class != VIDEO_ENHANCEMENT_CLASS;/* incoherent */
 	}
 }
 
