@@ -230,6 +230,8 @@ struct gpio_desc {
 	const char		*label;
 	/* Name of the GPIO */
 	const char		*name;
+
+	unsigned int		n_users;
 };
 
 int gpiod_request(struct gpio_desc *desc, const char *label);

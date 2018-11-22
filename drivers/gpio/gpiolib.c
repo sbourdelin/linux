@@ -2407,6 +2407,13 @@ static bool gpiod_free_commit(struct gpio_desc *desc)
 
 	might_sleep();
 
+	if (desc->n_users > 1) {
+		desc->n_users--;
+		return true;
+	} else {
+		desc->n_users = 0;
+	}
+
 	gpiod_unexport(desc);
 
 	spin_lock_irqsave(&gpio_lock, flags);
@@ -4142,7 +4149,8 @@ struct gpio_desc *__must_check gpiod_get_index(struct device *dev,
 			 */
 			dev_info(dev, "nonexclusive access to GPIO for %s\n",
 				 con_id ? con_id : devname);
-			return desc;
+
+			goto done;
 		} else {
 			return ERR_PTR(status);
 		}
@@ -4154,6 +4162,9 @@ struct gpio_desc *__must_check gpiod_get_index(struct device *dev,
 		gpiod_put(desc);
 		return ERR_PTR(status);
 	}
+
+done:
+	desc->n_users++;
 
 	return desc;
 }
