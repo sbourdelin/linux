@@ -225,6 +225,8 @@ BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
 						    (void *) (long) unsafe_addr,
 						    sizeof(buf));
 			}
+			if (fmt[i] == '%')
+				i--;
 			continue;
 		}
 
