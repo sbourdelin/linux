@@ -177,7 +177,7 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 {
 	const char *path;
 	void __iomem *base;
-	int err;
+	int err,rc = 0;
 	int irq;
 	struct clk *clk;
 	unsigned long rate;
@@ -210,26 +210,34 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 				"arm,timer-secondary", &path);
 	if (err) {
 		pr_warn("Failed to read property\n");
-		return err;
+		rc = err;
+		goto out_put_pri_node;
 	}
 
 
 	sec_node = of_find_node_by_path(path);
 
-	if (node == pri_node)
+	if (node == pri_node){
 		/* The primary timer lacks IRQ, use as clocksource */
-		return integrator_clocksource_init(rate, base);
+		rc = integrator_clocksource_init(rate, base);
+		goto out;
+	}
 
 	if (node == sec_node) {
 		/* The secondary timer will drive the clock event */
 		irq = irq_of_parse_and_map(node, 0);
-		return integrator_clockevent_init(rate, base, irq);
+		rc = integrator_clockevent_init(rate, base, irq);
+		goto out;
 	}
 
 	pr_info("Timer @%p unused\n", base);
 	clk_disable_unprepare(clk);
+out:
+	of_node_put(sec_node);
+out_put_pri_node:
+	of_node_put(pri_node);
 
-	return 0;
+	return rc;
 }
 
 TIMER_OF_DECLARE(integrator_ap_timer, "arm,integrator-timer",
