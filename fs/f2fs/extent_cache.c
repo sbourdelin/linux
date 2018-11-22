@@ -743,7 +743,7 @@ void f2fs_drop_extent_tree(struct inode *inode)
 		f2fs_mark_inode_dirty_sync(inode, true);
 }
 
-void f2fs_destroy_extent_tree(struct inode *inode)
+void f2fs_destroy_extent_tree(struct inode *inode, bool force)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct extent_tree *et = F2FS_I(inode)->extent_tree;
@@ -751,6 +751,9 @@ void f2fs_destroy_extent_tree(struct inode *inode)
 
 	if (!et)
 		return;
+
+	if (force)
+		goto destroy_et;
 
 	if (inode->i_nlink && !is_bad_inode(inode) &&
 					atomic_read(&et->node_cnt)) {
@@ -761,6 +764,7 @@ void f2fs_destroy_extent_tree(struct inode *inode)
 		return;
 	}
 
+destroy_et:
 	/* free all extent info belong to this extent tree */
 	node_cnt = f2fs_destroy_extent_node(inode);
 

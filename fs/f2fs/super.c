@@ -3016,6 +3016,15 @@ static void f2fs_tuning_parameters(struct f2fs_sb_info *sbi)
 	sbi->readdir_ra = 1;
 }
 
+void f2fs_cleanup_extent_cache(struct f2fs_sb_info *sbi)
+{
+	struct super_block *sb = sbi->sb;
+	struct inode *inode, *next;
+
+	list_for_each_entry_safe(inode, next, &sb->s_inodes, i_sb_list)
+		f2fs_destroy_extent_tree(inode, true);
+}
+
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct f2fs_sb_info *sbi;
@@ -3402,6 +3411,7 @@ free_meta:
 	 * falls into an infinite loop in f2fs_sync_meta_pages().
 	 */
 	truncate_inode_pages_final(META_MAPPING(sbi));
+	f2fs_cleanup_extent_cache(sbi);
 	f2fs_unregister_sysfs(sbi);
 free_root_inode:
 	dput(sb->s_root);
