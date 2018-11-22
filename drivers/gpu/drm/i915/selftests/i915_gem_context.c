@@ -347,15 +347,12 @@ static int gpu_fill(struct drm_i915_gem_object *obj,
 	if (IS_ERR(vma))
 		return PTR_ERR(vma);
 
-	err = i915_gem_object_set_to_gtt_domain(obj, false);
-	if (err)
-		return err;
-
 	err = i915_vma_pin(vma, 0, 0, PIN_HIGH | PIN_USER);
 	if (err)
 		return err;
 
-	/* Within the GTT the huge objects maps every page onto
+	/*
+	 * Within the GTT the huge objects maps every page onto
 	 * its 1024 real pages (using phys_pfn = dma_pfn % 1024).
 	 * We set the nth dword within the page using the nth
 	 * mapping via the GTT - this should exercise the GTT mapping
@@ -396,13 +393,14 @@ static int gpu_fill(struct drm_i915_gem_object *obj,
 	if (err)
 		goto skip_request;
 
+	i915_gem_chipset_flush(vm->i915);
+	i915_request_add(rq);
+
 	i915_gem_object_set_active_reference(batch->obj);
 	i915_vma_unpin(batch);
 	i915_vma_close(batch);
 
 	i915_vma_unpin(vma);
-
-	i915_request_add(rq);
 
 	return 0;
 
@@ -531,10 +529,13 @@ create_test_object(struct i915_gem_context *ctx,
 
 	err = cpu_fill(obj, STACK_MAGIC);
 	if (err) {
-		pr_err("Failed to fill object with cpu, err=%d\n",
-		       err);
+		pr_err("Failed to fill object with cpu, err=%d\n", err);
 		return ERR_PTR(err);
 	}
+
+	err = i915_gem_object_set_to_gtt_domain(obj, false);
+	if (err)
+		return ERR_PTR(err);
 
 	list_add_tail(&obj->st_link, objects);
 	return obj;
@@ -843,10 +844,10 @@ static int write_to_scratch(struct i915_gem_context *ctx,
 		goto skip_request;
 
 	i915_gem_object_set_active_reference(obj);
+	i915_request_add(rq);
+
 	i915_vma_unpin(vma);
 	i915_vma_close(vma);
-
-	i915_request_add(rq);
 
 	return 0;
 
