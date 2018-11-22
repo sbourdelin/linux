@@ -3439,6 +3439,7 @@ void f2fs_update_extent_cache_range(struct dnode_of_data *dn,
 void f2fs_init_extent_cache_info(struct f2fs_sb_info *sbi);
 int __init f2fs_create_extent_cache(void);
 void f2fs_destroy_extent_cache(void);
+void f2fs_cleanup_zombie_list(struct f2fs_sb_info *sbi);
 
 /*
  * sysfs.c

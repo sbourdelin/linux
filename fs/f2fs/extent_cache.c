@@ -629,6 +629,27 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 		f2fs_mark_inode_dirty_sync(inode, true);
 }
 
+void f2fs_cleanup_zombie_list(struct f2fs_sb_info *sbi)
+{
+	struct extent_tree *et, *next;
+
+	mutex_lock(&sbi->extent_tree_lock);
+	list_for_each_entry_safe(et, next, &sbi->zombie_list, list) {
+		if (atomic_read(&et->node_cnt)) {
+			write_lock(&et->lock);
+			__free_extent_tree(sbi, et);
+			write_unlock(&et->lock);
+		}
+		f2fs_bug_on(sbi, atomic_read(&et->node_cnt));
+		list_del_init(&et->list);
+		radix_tree_delete(&sbi->extent_tree_root, et->ino);
+		kmem_cache_free(extent_tree_slab, et);
+		atomic_dec(&sbi->total_ext_tree);
+		atomic_dec(&sbi->total_zombie_tree);
+	}
+	mutex_unlock(&sbi->extent_tree_lock);
+}
+
 unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
 {
 	struct extent_tree *et, *next;

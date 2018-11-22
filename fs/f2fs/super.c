@@ -3023,6 +3023,11 @@ void f2fs_cleanup_extent_cache(struct f2fs_sb_info *sbi)
 
 	list_for_each_entry_safe(inode, next, &sb->s_inodes, i_sb_list)
 		f2fs_destroy_extent_tree(inode, true);
+
+	f2fs_cleanup_zombie_list(sbi);
+
+	f2fs_bug_on(sbi, !list_empty(&sbi->zombie_list));
+	f2fs_bug_on(sbi, !list_empty(&sbi->extent_list));
 }
 
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
