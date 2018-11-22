@@ -20,7 +20,7 @@ struct sched_domain;
 static inline
 unsigned long topology_get_cpu_scale(struct sched_domain *sd, int cpu)
 {
-	return per_cpu(cpu_scale, cpu);
+	return READ_ONCE(per_cpu(cpu_scale, cpu));
 }
 
 void topology_set_cpu_scale(unsigned int cpu, unsigned long capacity);
