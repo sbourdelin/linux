@@ -5239,6 +5239,12 @@ L:	linux-edac@vger.kernel.org
 S:	Maintained
 F:	drivers/edac/amd64_edac*
 
+EDAC-ARMADA
+M:	Jan Luebbe <jlu@pengutronix.de>
+L:	linux-edac@vger.kernel.org
+S:	Maintained
+F:	drivers/edac/armada_xp_*
+
 EDAC-CALXEDA
 M:	Robert Richter <rric@kernel.org>
 L:	linux-edac@vger.kernel.org
