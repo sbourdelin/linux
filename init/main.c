@@ -1180,5 +1180,6 @@ static noinline void __init kernel_init_freeable(void)
 	 */
 
 	integrity_load_keys();
+	set_xattrs_initrd();
 	load_default_modules();
 }

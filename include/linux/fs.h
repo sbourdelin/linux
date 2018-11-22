@@ -2894,6 +2894,7 @@ extern int do_pipe_flags(int *, int);
 	id(KEXEC_INITRAMFS, kexec-initramfs)	\
 	id(POLICY, security-policy)		\
 	id(X509_CERTIFICATE, x509-certificate)	\
+	id(XATTR, xattr)	\
 	id(MAX_ID, )
 
 #define __fid_enumify(ENUM, dummy) READING_ ## ENUM,
@@ -3156,6 +3157,7 @@ const char *simple_get_link(struct dentry *, struct inode *,
 extern const struct inode_operations simple_symlink_inode_operations;
 
 extern int iterate_dir(struct file *, struct dir_context *);
+extern void set_xattrs_initrd(void);
 
 extern int vfs_statx(int, const char __user *, int, struct kstat *, u32);
 extern int vfs_statx_fd(unsigned int, struct kstat *, u32, unsigned int);
