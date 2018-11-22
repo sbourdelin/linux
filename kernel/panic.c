@@ -45,6 +45,12 @@ int panic_on_warn __read_mostly;
 int panic_timeout = CONFIG_PANIC_TIMEOUT;
 EXPORT_SYMBOL_GPL(panic_timeout);
 
+#define PANIC_DUMP_TASK_INFO	0x00000001
+#define PANIC_DUMP_MEM_INFO	0x00000002
+#define PANIC_DUMP_TIMER_INFO	0x00000004
+#define PANIC_DUMP_LOCK_INFO	0x00000008
+static unsigned long panic_dump;
+
 ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
 EXPORT_SYMBOL(panic_notifier_list);
@@ -123,6 +129,23 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 		nmi_panic_self_stop(regs);
 }
 EXPORT_SYMBOL(nmi_panic);
+
+static void panic_dump_sys_info(void)
+{
+	if (panic_dump & PANIC_DUMP_TASK_INFO)
+		show_state();
+
+	if (panic_dump & PANIC_DUMP_MEM_INFO)
+		show_mem(0, NULL);
+
+	if (panic_dump & PANIC_DUMP_TIMER_INFO)
+		sysrq_timer_list_show();
+
+#ifdef COFNIG_LOCKDEP
+	if (panic_dump & PANIC_DUMP_LOCK_INFO)
+		debug_show_all_locks();
+#endif
+}
 
 /**
  *	panic - halt the system
@@ -249,6 +272,8 @@ void panic(const char *fmt, ...)
 	 */
 	debug_locks_off();
 	console_flush_on_panic();
+
+	panic_dump_sys_info();
 
 	if (!panic_blink)
 		panic_blink = no_blink;
@@ -654,6 +679,7 @@ void refcount_error_report(struct pt_regs *regs, const char *err)
 #endif
 
 core_param(panic, panic_timeout, int, 0644);
+core_param(panic_dump, panic_dump, ulong, 0644);
 core_param(pause_on_oops, pause_on_oops, int, 0644);
 core_param(panic_on_warn, panic_on_warn, int, 0644);
 core_param(crash_kexec_post_notifiers, crash_kexec_post_notifiers, bool, 0644);

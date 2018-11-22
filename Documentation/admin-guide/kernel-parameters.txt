@@ -3081,6 +3081,13 @@
 			timeout < 0: reboot immediately
 			Format: <timeout>
 
+	panic_dump=	Bitmask for dumping system info when panic happens.
+			User can chose combination of the following bits:
+			bit 0: dump all tasks info
+			bit 1: dump system memory info
+			bit 2: dump timer info
+			bit 3: dump locks info if CONFIG_LOCKDEP is on
+
 	panic_on_warn	panic() instead of WARN().  Useful to cause kdump
 			on a WARN().
 
