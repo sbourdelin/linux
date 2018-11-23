@@ -74,7 +74,8 @@ enum {
 	VHOST_NET_FEATURES = VHOST_FEATURES |
 			 (1ULL << VHOST_NET_F_VIRTIO_NET_HDR) |
 			 (1ULL << VIRTIO_NET_F_MRG_RXBUF) |
-			 (1ULL << VIRTIO_F_IOMMU_PLATFORM)
+			 (1ULL << VIRTIO_F_IOMMU_PLATFORM) |
+	                 (1ULL << VIRTIO_F_IN_ORDER)
 };
 
 enum {
@@ -971,7 +972,8 @@ static void handle_tx(struct vhost_net *net)
 	vhost_disable_notify(&net->dev, vq);
 	vhost_net_disable_vq(net, vq);
 
-	if (vhost_sock_zcopy(sock))
+	if (vhost_sock_zcopy(sock) &&
+	    !vhost_has_feature(vq, VIRTIO_F_IN_ORDER))
 		handle_tx_zerocopy(net, sock);
 	else
 		handle_tx_copy(net, sock);
