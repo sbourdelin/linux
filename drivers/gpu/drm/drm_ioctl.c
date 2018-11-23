@@ -31,6 +31,7 @@
 #include <drm/drm_ioctl.h>
 #include <drm/drmP.h>
 #include <drm/drm_auth.h>
+#include <drm/drm_modeset_helper_vtables.h>
 #include "drm_legacy.h"
 #include "drm_internal.h"
 #include "drm_crtc_internal.h"
@@ -229,6 +230,7 @@ static int drm_getcap(struct drm_device *dev, void *data, struct drm_file *file_
 {
 	struct drm_get_cap *req = data;
 	struct drm_crtc *crtc;
+	struct drm_plane *plane;
 
 	req->value = 0;
 
@@ -291,6 +293,15 @@ static int drm_getcap(struct drm_device *dev, void *data, struct drm_file *file_
 		break;
 	case DRM_CAP_CRTC_IN_VBLANK_EVENT:
 		req->value = 1;
+		break;
+	case DRM_CAP_ASYNC_UPDATE:
+		req->value = 1;
+		list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
+			if (!plane->helper_private->atomic_async_update) {
+				req->value = 0;
+				break;
+			}
+		}
 		break;
 	default:
 		return -EINVAL;
