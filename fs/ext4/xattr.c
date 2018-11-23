@@ -2973,7 +2973,7 @@ ext4_xattr_block_cache_insert(struct mb_cache *ea_block_cache,
 {
 	struct ext4_xattr_header *header = BHDR(bh);
 	__u32 hash = le32_to_cpu(header->h_hash);
-	int reusable = le32_to_cpu(header->h_refcount) <
+	bool reusable = le32_to_cpu(header->h_refcount) <
 		       EXT4_XATTR_REFCOUNT_MAX;
 	int error;
 
