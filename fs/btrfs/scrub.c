@@ -2516,13 +2516,26 @@ static int scrub_pages(struct scrub_ctx *sctx, u64 logical, u64 len,
 {
 	struct scrub_block *sblock;
 	int index;
+	bool pause_req = (atomic_read(&sctx->fs_info->scrub_pause_req) != 0);
+	unsigned int nofs_flag;
+	int ret = 0;
+
+	/*
+	 * In order to avoid deadlock with reclaim when there is a transaction
+	 * trying to pause scrub, use GFP_NOFS. The pausing request is done when
+	 * the transaction commit starts, and it blocks the transaction until
+	 * scrub is paused (done at specific points at scrub_stripe()).
+	 */
+	if (pause_req)
+		nofs_flag = memalloc_nofs_save();
 
 	sblock = kzalloc(sizeof(*sblock), GFP_KERNEL);
 	if (!sblock) {
 		spin_lock(&sctx->stat_lock);
 		sctx->stat.malloc_errors++;
 		spin_unlock(&sctx->stat_lock);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	/* one ref inside this function, plus one for each page added to
@@ -2542,7 +2555,8 @@ leave_nomem:
 			sctx->stat.malloc_errors++;
 			spin_unlock(&sctx->stat_lock);
 			scrub_block_put(sblock);
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto out;
 		}
 		BUG_ON(index >= SCRUB_MAX_PAGES_PER_BLOCK);
 		scrub_page_get(spage);
@@ -2581,12 +2595,11 @@ leave_nomem:
 	} else {
 		for (index = 0; index < sblock->page_count; index++) {
 			struct scrub_page *spage = sblock->pagev[index];
-			int ret;
 
 			ret = scrub_add_page_to_rd_bio(sctx, spage);
 			if (ret) {
 				scrub_block_put(sblock);
-				return ret;
+				goto out;
 			}
 		}
 
@@ -2596,7 +2609,10 @@ leave_nomem:
 
 	/* last one frees, either here or in bio completion for last page */
 	scrub_block_put(sblock);
-	return 0;
+ out:
+	if (pause_req)
+		memalloc_nofs_restore(nofs_flag);
+	return ret;
 }
 
 static void scrub_bio_end_io(struct bio *bio)
