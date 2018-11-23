@@ -7,6 +7,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/sched/task.h>
 #include <linux/magic.h>
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
@@ -25,7 +26,9 @@ static inline void *task_stack_page(const struct task_struct *task)
 
 static inline unsigned long *end_of_stack(const struct task_struct *task)
 {
-	return task->stack;
+	if (!IS_ENABLED(CONFIG_ARCH_TASK_STRUCT_ON_STACK) || task != &init_task)
+		return task->stack;
+	return (unsigned long *)(task + 1);
 }
 
 #elif !defined(__HAVE_THREAD_FUNCTIONS)
