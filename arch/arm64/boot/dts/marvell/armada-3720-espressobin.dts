@@ -49,6 +49,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pcie_pins>;
 	reset-gpios = <&gpiosb 3 GPIO_ACTIVE_HIGH>;
+	phys = <&comphy1 0>;
 };
 
 /* J6 */
