@@ -1,11 +1,9 @@
-/*
+/* SPDX-License-Identifier: GPL-2.0
+ *
  * max9867.c -- max9867 ALSA SoC Audio driver
  *
  * Copyright 2013-15 Maxim Integrated Products
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Copyright 2018 Ladislav Michl <ladis@linux-mips.org>
  */
 
 #include <linux/delay.h>
@@ -523,6 +521,6 @@ static struct i2c_driver max9867_i2c_driver = {
 
 module_i2c_driver(max9867_i2c_driver);
 
-MODULE_AUTHOR("anish kumar <yesanishhere@gmail.com>");
-MODULE_DESCRIPTION("ALSA SoC MAX9867 driver");
+MODULE_AUTHOR("Ladislav Michl <ladis@linux-mips.org>");
+MODULE_DESCRIPTION("ASoC MAX9867 driver");
 MODULE_LICENSE("GPL");
