@@ -71,6 +71,10 @@ Rockchip platforms device tree bindings
     Required root node properties:
       - compatible = "firefly,roc-rk3399-pc", "rockchip,rk3399";
 
+- FriendlyElec NanoPC-T4 board:
+    Required root node properties:
+      - compatible = "friendlyelec,nanopc-t4", "rockchip,rk3399";
+
 - ChipSPARK PopMetal-RK3288 board:
     Required root node properties:
       - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
