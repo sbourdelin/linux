@@ -1155,6 +1155,8 @@ static int stk_vidioc_streamon(struct file *filp,
 	if (dev->sio_bufs == NULL)
 		return -EINVAL;
 	dev->sequence = 0;
+	stk_initialise(dev);
+	stk_setup_format(dev);
 	return stk_start_stream(dev);
 }
 
