@@ -248,17 +248,6 @@ static int max9867_dai_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int max9867_prepare(struct snd_pcm_substream *substream,
-			 struct snd_soc_dai *dai)
-{
-	struct snd_soc_component *component = dai->component;
-	struct max9867_priv *max9867 = snd_soc_component_get_drvdata(component);
-
-	regmap_update_bits(max9867->regmap, MAX9867_PWRMAN,
-		MAX9867_SHTDOWN_MASK, MAX9867_SHTDOWN_MASK);
-	return 0;
-}
-
 static int max9867_mute(struct snd_soc_dai *dai, int mute)
 {
 	struct snd_soc_component *component = dai->component;
@@ -361,7 +350,6 @@ static int max9867_dai_set_fmt(struct snd_soc_dai *codec_dai,
 static const struct snd_soc_dai_ops max9867_dai_ops = {
 	.set_fmt = max9867_dai_set_fmt,
 	.set_sysclk	= max9867_set_dai_sysclk,
-	.prepare	= max9867_prepare,
 	.digital_mute	= max9867_mute,
 	.hw_params = max9867_dai_hw_params,
 };
@@ -391,27 +379,6 @@ static struct snd_soc_dai_driver max9867_dai[] = {
 	.symmetric_rates = 1,
 	}
 };
-
-#ifdef CONFIG_PM_SLEEP
-static int max9867_suspend(struct device *dev)
-{
-	struct max9867_priv *max9867 = dev_get_drvdata(dev);
-
-	/* Drop down to power saving mode when system is suspended */
-	regmap_update_bits(max9867->regmap, MAX9867_PWRMAN,
-		MAX9867_SHTDOWN_MASK, ~MAX9867_SHTDOWN_MASK);
-	return 0;
-}
-
-static int max9867_resume(struct device *dev)
-{
-	struct max9867_priv *max9867 = dev_get_drvdata(dev);
-
-	regmap_update_bits(max9867->regmap, MAX9867_PWRMAN,
-		MAX9867_SHTDOWN_MASK, MAX9867_SHTDOWN_MASK);
-	return 0;
-}
-#endif
 
 static const struct snd_soc_component_driver max9867_component = {
 	.controls		= max9867_snd_controls,
@@ -491,17 +458,38 @@ static int max9867_i2c_probe(struct i2c_client *i2c,
 	}
 	ret = regmap_read(max9867->regmap, MAX9867_REVISION, &reg);
 	if (ret < 0) {
-		dev_err(&i2c->dev, "Failed to read: %d\n", ret);
+		dev_err(&i2c->dev, "Failed to read revision: %d\n", ret);
 		return ret;
 	}
 	dev_info(&i2c->dev, "device revision: %x\n", reg);
-	ret = devm_snd_soc_register_component(&i2c->dev, &max9867_component,
-			max9867_dai, ARRAY_SIZE(max9867_dai));
+	ret = regmap_update_bits(max9867->regmap, MAX9867_PWRMAN,
+				 MAX9867_SHTDOWN, MAX9867_SHTDOWN);
 	if (ret < 0) {
-		dev_err(&i2c->dev, "Failed to register component: %d\n", ret);
+		dev_err(&i2c->dev, "Failed to enable: %d\n", ret);
 		return ret;
 	}
+	ret = devm_snd_soc_register_component(&i2c->dev, &max9867_component,
+			max9867_dai, ARRAY_SIZE(max9867_dai));
+	if (ret < 0)
+		dev_err(&i2c->dev, "Failed to register component: %d\n", ret);
 	return ret;
+}
+
+static int __maybe_unused max9867_suspend(struct device *dev)
+{
+	struct max9867_priv *max9867 = dev_get_drvdata(dev);
+
+	/* Drop down to power saving mode when system is suspended */
+	return regmap_update_bits(max9867->regmap, MAX9867_PWRMAN,
+				  MAX9867_SHTDOWN, 0);
+}
+
+static int __maybe_unused max9867_resume(struct device *dev)
+{
+	struct max9867_priv *max9867 = dev_get_drvdata(dev);
+
+	return regmap_update_bits(max9867->regmap, MAX9867_PWRMAN,
+				  MAX9867_SHTDOWN, MAX9867_SHTDOWN);
 }
 
 static const struct i2c_device_id max9867_i2c_id[] = {
