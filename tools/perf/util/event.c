@@ -1571,7 +1571,28 @@ struct map *thread__find_map(struct thread *thread, u8 cpumode, u64 addr,
 		 */
 		if (load_map)
 			map__load(al->map);
-		al->addr = al->map->map_ip(al->map, al->addr);
+
+		/*
+		 * When using -ffunction-sections, only .text gets loaded by
+		 * map_groups__find() into al->map. Consequently al->map address
+		 * range encompass the whole code.
+		 *
+		 * But map__load() has just loaded many function maps by
+		 * splitting al->map, which reduced al->map range drastically.
+		 * Very likely the target address is now in one of those newly
+		 * created function maps, so we need to lookup the map again
+		 * to find that new map.
+		 */
+		if (al->addr < al->map->start || al->addr >= al->map->end)
+			al->map = map_groups__find(mg, al->addr);
+
+		/*
+		 * The new map *ought* to exist because the initial al->map
+		 * contained that address and subsequently has been split into
+		 * many *contiguous* maps.
+		 */
+		if (al->map != NULL)
+			al->addr = al->map->map_ip(al->map, al->addr);
 	}
 
 	return al->map;
