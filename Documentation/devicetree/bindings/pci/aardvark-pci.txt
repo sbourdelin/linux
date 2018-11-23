@@ -24,6 +24,7 @@ contain the following properties:
 The following are optional properties:
 
  - reset-gpios: GPIO to reset the device
+ - phys: the PCIe PHY handle
 
 In addition, the Device Tree describing an Aardvark PCIe controller
 must include a sub-node that describes the legacy interrupt controller
@@ -55,6 +56,7 @@ Example:
 				<0 0 0 3 &pcie_intc 2>,
 				<0 0 0 4 &pcie_intc 3>;
 		reset-gpios = <&gpiosb 3 GPIO_ACTIVE_HIGH>;
+		phys = <&comphy1 0>;
 		pcie_intc: interrupt-controller {
 			interrupt-controller;
 			#interrupt-cells = <1>;
