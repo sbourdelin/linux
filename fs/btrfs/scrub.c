@@ -2517,7 +2517,13 @@ static int scrub_pages(struct scrub_ctx *sctx, u64 logical, u64 len,
 	struct scrub_block *sblock;
 	int index;
 
-	sblock = kzalloc(sizeof(*sblock), GFP_KERNEL);
+	/*
+	 * In order to avoid deadlock with reclaim when there is a transaction
+	 * trying to pause scrub, use GFP_NOFS. The pausing request is done when
+	 * the transaction commit starts, and it blocks the transaction until
+	 * scrub is paused (done at specific points at scrub_stripe()).
+	 */
+	sblock = kzalloc(sizeof(*sblock), GFP_NOFS);
 	if (!sblock) {
 		spin_lock(&sctx->stat_lock);
 		sctx->stat.malloc_errors++;
@@ -2535,7 +2541,7 @@ static int scrub_pages(struct scrub_ctx *sctx, u64 logical, u64 len,
 		struct scrub_page *spage;
 		u64 l = min_t(u64, len, PAGE_SIZE);
 
-		spage = kzalloc(sizeof(*spage), GFP_KERNEL);
+		spage = kzalloc(sizeof(*spage), GFP_NOFS);
 		if (!spage) {
 leave_nomem:
 			spin_lock(&sctx->stat_lock);
@@ -2562,7 +2568,7 @@ leave_nomem:
 			spage->have_csum = 0;
 		}
 		sblock->page_count++;
-		spage->page = alloc_page(GFP_KERNEL);
+		spage->page = alloc_page(GFP_NOFS);
 		if (!spage->page)
 			goto leave_nomem;
 		len -= l;
