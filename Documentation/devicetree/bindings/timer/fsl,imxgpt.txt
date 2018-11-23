@@ -2,17 +2,21 @@ Freescale i.MX General Purpose Timer (GPT)
 
 Required properties:
 
-- compatible : should be "fsl,<soc>-gpt"
-- reg : Specifies base physical address and size of the registers.
-- interrupts : A list of 4 interrupts; one per timer channel.
-- clocks : The clocks provided by the SoC to drive the timer.
+- compatible : should be "fsl,<soc>-gpt".
+- reg : specifies base physical address and size of the registers.
+- interrupts : should be the clock event device interrupt.
+- clocks : the clocks provided by the SoC to drive the timer, must contain
+           an entry for each entry in clock-names.
+- clock-names : must include an "per" or "osc_per" entry, and "ipg" entry
+                is optional according to SoC design.
 
 Example:
 
-gpt1: timer@10003000 {
-	compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-	reg = <0x10003000 0x1000>;
-	interrupts = <26>;
-	clocks = <&clks 46>, <&clks 61>;
+gpt: gpt@2098000 {
+	compatible = "fsl,imx6sx-gpt", "fsl,imx31-gpt";
+	reg = <0x02098000 0x4000>;
+	interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&clks IMX6SX_CLK_GPT_BUS>,
+		 <&clks IMX6SX_CLK_GPT_3M>;
 	clock-names = "ipg", "per";
 };
