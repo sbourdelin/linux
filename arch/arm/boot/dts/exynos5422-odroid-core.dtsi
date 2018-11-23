@@ -89,6 +89,11 @@
 	status = "okay";
 };
 
+&bus_g3d {
+	devfreq = <&bus_wcore>;
+	status = "okay";
+};
+
 &bus_jpeg {
 	devfreq = <&bus_wcore>;
 	status = "okay";

@@ -1047,6 +1047,14 @@
 			status = "disabled";
 		};
 
+		bus_g3d: bus_g3d {
+			compatible = "samsung,exynos-bus";
+			clocks = <&clock CLK_DOUT_ACLK_G3D>;
+			clock-names = "bus";
+			operating-points-v2 = <&bus_g3d_opp_table>;
+			status = "disabled";
+		};
+
 		bus_jpeg: bus_jpeg {
 			compatible = "samsung,exynos-bus";
 			clocks = <&clock CLK_DOUT_ACLK300_JPEG>;
@@ -1245,7 +1253,44 @@
 			};
 		};
 
-		bus_jpeg_opp_table: opp_table11 {
+		bus_g3d_opp_table: opp_table11 {
+			compatible = "operating-points-v2";
+
+			opp@600000000 {
+				opp-hz = /bits/ 64 <600000000>;
+				opp-microvolt = <1025000>;
+			};
+			opp@543000000 {
+				opp-hz = /bits/ 64 <543000000>;
+				opp-microvolt = <987500>;
+			};
+			opp@480000000 {
+				opp-hz = /bits/ 64 <480000000>;
+				opp-microvolt = <950000>;
+			};
+			opp@420000000 {
+				opp-hz = /bits/ 64 <420000000>;
+				opp-microvolt = <937500>;
+			};
+			opp@350000000 {
+				opp-hz = /bits/ 64 <350000000>;
+				opp-microvolt = <900000>;
+			};
+			opp@266000000 {
+				opp-hz = /bits/ 64 <266000000>;
+				opp-microvolt = <862500>;
+			};
+			opp@177000000 {
+				opp-hz = /bits/ 64 <177000000>;
+				opp-microvolt = <862500>;
+			};
+			opp@100000000 {
+				opp-hz = /bits/ 64 <100000000>;
+				opp-microvolt = <862500>;
+			};
+		};
+
+		bus_jpeg_opp_table: opp_table12 {
 			compatible = "operating-points-v2";
 
 			opp00 {
@@ -1262,7 +1307,7 @@
 			};
 		};
 
-		bus_jpeg_apb_opp_table: opp_table12 {
+		bus_jpeg_apb_opp_table: opp_table13 {
 			compatible = "operating-points-v2";
 
 			opp00 {
@@ -1279,7 +1324,7 @@
 			};
 		};
 
-		bus_disp1_fimd_opp_table: opp_table13 {
+		bus_disp1_fimd_opp_table: opp_table14 {
 			compatible = "operating-points-v2";
 
 			opp00 {
@@ -1290,7 +1335,7 @@
 			};
 		};
 
-		bus_disp1_opp_table: opp_table14 {
+		bus_disp1_opp_table: opp_table15 {
 			compatible = "operating-points-v2";
 
 			opp00 {
@@ -1304,7 +1349,7 @@
 			};
 		};
 
-		bus_gscl_opp_table: opp_table15 {
+		bus_gscl_opp_table: opp_table16 {
 			compatible = "operating-points-v2";
 
 			opp00 {
@@ -1318,7 +1363,7 @@
 			};
 		};
 
-		bus_mscl_opp_table: opp_table16 {
+		bus_mscl_opp_table: opp_table17 {
 			compatible = "operating-points-v2";
 
 			opp00 {
