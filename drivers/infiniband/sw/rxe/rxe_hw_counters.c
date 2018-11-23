@@ -48,6 +48,19 @@ static const char * const rxe_counter_name[] = {
 	[RXE_CNT_SEND_ERR]            =  "send_err",
 };
 
+static u64 rxe_stats_read_by_index(const struct rxe_dev *dev, int index)
+{
+	struct rxe_stats *stats;
+	u64 sum = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		stats = per_cpu_ptr(dev->pcpu_stats, cpu);
+		sum += stats->counters[index];
+	}
+	return sum;
+}
+
 int rxe_ib_get_hw_stats(struct ib_device *ibdev,
 			struct rdma_hw_stats *stats,
 			u8 port, int index)
@@ -58,8 +71,8 @@ int rxe_ib_get_hw_stats(struct ib_device *ibdev,
 	if (!port || !stats)
 		return -EINVAL;
 
-	for (cnt = 0; cnt  < ARRAY_SIZE(rxe_counter_name); cnt++)
-		stats->value[cnt] = dev->stats_counters[cnt];
+	for (cnt = 0; cnt < ARRAY_SIZE(rxe_counter_name); cnt++)
+		stats->value[cnt] = rxe_stats_read_by_index(dev, cnt);
 
 	return ARRAY_SIZE(rxe_counter_name);
 }

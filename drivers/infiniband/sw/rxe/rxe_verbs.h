@@ -376,6 +376,10 @@ struct rxe_port {
 	u32			qp_gsi_index;
 };
 
+struct rxe_stats {
+	u64	counters[RXE_NUM_OF_COUNTERS];
+};
+
 struct rxe_dev {
 	struct ib_device	ib_dev;
 	struct ib_device_attr	attr;
@@ -405,16 +409,18 @@ struct rxe_dev {
 	spinlock_t		mmap_offset_lock; /* guard mmap_offset */
 	int			mmap_offset;
 
-	u64			stats_counters[RXE_NUM_OF_COUNTERS];
-
+	struct rxe_stats	__percpu *pcpu_stats;
 	struct rxe_port		port;
 	struct list_head	list;
 	struct crypto_shash	*tfm;
 };
 
-static inline void rxe_counter_inc(struct rxe_dev *rxe, enum rxe_counters cnt)
+static inline void rxe_counter_inc(struct rxe_dev *rxe, enum rxe_counters index)
 {
-	rxe->stats_counters[cnt]++;
+	struct rxe_stats *stats;
+
+	stats = this_cpu_ptr(rxe->pcpu_stats);
+	stats->counters[index]++;
 }
 
 static inline struct rxe_dev *to_rdev(struct ib_device *dev)
