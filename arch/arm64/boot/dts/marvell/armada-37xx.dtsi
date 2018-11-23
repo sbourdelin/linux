@@ -266,6 +266,10 @@
 					function = "mii";
 				};
 
+				pcie_pins: pcie-pins {
+					groups = "pcie1";
+					function = "gpio";
+				};
 			};
 
 			eth0: ethernet@30000 {
