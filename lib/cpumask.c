@@ -206,7 +206,7 @@ unsigned int cpumask_local_spread(unsigned int i, int node)
 	/* Wrap: we always want a cpu. */
 	i %= num_online_cpus();
 
-	if (node == -1) {
+	if (node == NUMA_NO_NODE) {
 		for_each_cpu(cpu, cpu_online_mask)
 			if (i-- == 0)
 				return cpu;

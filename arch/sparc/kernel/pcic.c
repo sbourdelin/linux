@@ -476,7 +476,7 @@ static void pcic_map_pci_device(struct linux_pcic *pcic,
 	unsigned long flags;
 	int j;
 
-	if (node == 0 || node == -1) {
+	if (node == 0 || node == NUMA_NO_NODE) {
 		strcpy(namebuf, "???");
 	} else {
 		prom_getstring(node, "name", namebuf, 63); namebuf[63] = 0;
@@ -535,7 +535,7 @@ pcic_fill_irq(struct linux_pcic *pcic, struct pci_dev *dev, int node)
 	int i, ivec;
 	char namebuf[64];
 
-	if (node == 0 || node == -1) {
+	if (node == 0 || node == NUMA_NO_NODE) {
 		strcpy(namebuf, "???");
 	} else {
 		prom_getstring(node, "name", namebuf, sizeof(namebuf));
@@ -625,7 +625,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		node = pdev_to_pnode(&pcic->pbm, dev);
 		if(node == 0)
-			node = -1;
+			node = NUMA_NO_NODE;
 
 		/* cookies */
 		pcp = pci_devcookie_alloc();

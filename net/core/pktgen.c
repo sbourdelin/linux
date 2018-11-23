@@ -3625,7 +3625,7 @@ static int pktgen_add_device(struct pktgen_thread *t, const char *ifname)
 	pkt_dev->svlan_cfi = 0;
 	pkt_dev->svlan_id = 0xffff;
 	pkt_dev->burst = 1;
-	pkt_dev->node = -1;
+	pkt_dev->node = NUMA_NO_NODE;
 
 	err = pktgen_setup_dev(t->net, pkt_dev, ifname);
 	if (err)

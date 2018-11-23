@@ -344,7 +344,7 @@ sn_common_bus_fixup(struct pci_bus *bus,
 		printk(KERN_WARNING "on node %d but only %d nodes online."
 		       "Association set to undetermined.\n",
 		       controller->node, num_online_nodes());
-		controller->node = -1;
+		controller->node = NUMA_NO_NODE;
 	}
 }
 

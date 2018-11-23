@@ -1772,7 +1772,7 @@ static struct dmar_domain *alloc_domain(int flags)
 		return NULL;
 
 	memset(domain, 0, sizeof(*domain));
-	domain->nid = -1;
+	domain->nid = NUMA_NO_NODE;
 	domain->flags = flags;
 	domain->has_iotlb_device = false;
 	INIT_LIST_HEAD(&domain->devices);

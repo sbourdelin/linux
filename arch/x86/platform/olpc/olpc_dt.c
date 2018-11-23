@@ -29,10 +29,10 @@ static phandle __init olpc_dt_getsibling(phandle node)
 	const void *args[] = { (void *)node };
 	void *res[] = { &node };
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return 0;
 
-	if (olpc_ofw("peer", args, res) || (s32)node == -1)
+	if (olpc_ofw("peer", args, res) || (s32)node == NUMA_NO_NODE)
 		return 0;
 
 	return node;
@@ -43,10 +43,10 @@ static phandle __init olpc_dt_getchild(phandle node)
 	const void *args[] = { (void *)node };
 	void *res[] = { &node };
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return 0;
 
-	if (olpc_ofw("child", args, res) || (s32)node == -1) {
+	if (olpc_ofw("child", args, res) || (s32)node == NUMA_NO_NODE) {
 		pr_err("PROM: %s: fetching child failed!\n", __func__);
 		return 0;
 	}
@@ -60,7 +60,7 @@ static int __init olpc_dt_getproplen(phandle node, const char *prop)
 	int len;
 	void *res[] = { &len };
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return -1;
 
 	if (olpc_ofw("getproplen", args, res)) {
@@ -100,7 +100,7 @@ static int __init olpc_dt_nextprop(phandle node, char *prev, char *buf)
 
 	buf[0] = '\0';
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return -1;
 
 	if (olpc_ofw("nextprop", args, res) || success != 1)
@@ -115,7 +115,7 @@ static int __init olpc_dt_pkg2path(phandle node, char *buf,
 	const void *args[] = { (void *)node, buf, (void *)buflen };
 	void *res[] = { len };
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return -1;
 
 	if (olpc_ofw("package-to-path", args, res) || *len < 1)
@@ -176,7 +176,7 @@ static phandle __init olpc_dt_finddevice(const char *path)
 		return 0;
 	}
 
-	if ((s32) node == -1)
+	if ((s32) node == NUMA_NO_NODE)
 		return 0;
 
 	return node;

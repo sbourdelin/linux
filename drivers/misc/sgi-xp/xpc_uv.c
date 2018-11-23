@@ -61,7 +61,7 @@ static struct xpc_heartbeat_uv *xpc_heartbeat_uv;
 					 XPC_NOTIFY_MSG_SIZE_UV)
 #define XPC_NOTIFY_IRQ_NAME		"xpc_notify"
 
-static int xpc_mq_node = -1;
+static int xpc_mq_node = NUMA_NO_NODE;
 
 static struct xpc_gru_mq_uv *xpc_activate_mq_uv;
 static struct xpc_gru_mq_uv *xpc_notify_mq_uv;

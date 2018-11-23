@@ -777,7 +777,7 @@ void hfi1_dev_affinity_clean_up(struct hfi1_devdata *dd)
 	_dev_comp_vect_cpu_mask_clean_up(dd, entry);
 unlock:
 	mutex_unlock(&node_affinity.lock);
-	dd->node = -1;
+	dd->node = NUMA_NO_NODE;
 }
 
 /*

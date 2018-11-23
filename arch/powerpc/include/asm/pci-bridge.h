@@ -264,7 +264,7 @@ extern int pcibios_map_io_space(struct pci_bus *bus);
 #ifdef CONFIG_NUMA
 #define PHB_SET_NODE(PHB, NODE)		((PHB)->node = (NODE))
 #else
-#define PHB_SET_NODE(PHB, NODE)		((PHB)->node = -1)
+#define PHB_SET_NODE(PHB, NODE)		((PHB)->node = NUMA_NO_NODE)
 #endif
 
 #endif	/* CONFIG_PPC64 */

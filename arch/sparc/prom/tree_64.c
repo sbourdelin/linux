@@ -44,10 +44,10 @@ phandle prom_getchild(phandle node)
 {
 	phandle cnode;
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return 0;
 	cnode = __prom_getchild(node);
-	if ((s32)cnode == -1)
+	if ((s32)cnode == NUMA_NO_NODE)
 		return 0;
 	return cnode;
 }
@@ -57,10 +57,10 @@ inline phandle prom_getparent(phandle node)
 {
 	phandle cnode;
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return 0;
 	cnode = prom_node_to_node("parent", node);
-	if ((s32)cnode == -1)
+	if ((s32)cnode == NUMA_NO_NODE)
 		return 0;
 	return cnode;
 }
@@ -77,10 +77,10 @@ phandle prom_getsibling(phandle node)
 {
 	phandle sibnode;
 
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return 0;
 	sibnode = __prom_getsibling(node);
-	if ((s32)sibnode == -1)
+	if ((s32)sibnode == NUMA_NO_NODE)
 		return 0;
 
 	return sibnode;
@@ -241,7 +241,7 @@ char *prom_firstprop(phandle node, char *buffer)
 	unsigned long args[7];
 
 	*buffer = 0;
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return buffer;
 
 	args[0] = (unsigned long) prom_nextprop_name;
@@ -267,7 +267,7 @@ char *prom_nextprop(phandle node, const char *oprop, char *buffer)
 	unsigned long args[7];
 	char buf[32];
 
-	if ((s32)node == -1) {
+	if ((s32)node == NUMA_NO_NODE) {
 		*buffer = 0;
 		return buffer;
 	}
@@ -370,7 +370,7 @@ inline phandle prom_inst2pkg(int inst)
 	p1275_cmd_direct(args);
 
 	node = (int) args[4];
-	if ((s32)node == -1)
+	if ((s32)node == NUMA_NO_NODE)
 		return 0;
 	return node;
 }

@@ -675,7 +675,7 @@ __kthread_create_worker(int cpu, unsigned int flags,
 {
 	struct kthread_worker *worker;
 	struct task_struct *task;
-	int node = -1;
+	int node = NUMA_NO_NODE;
 
 	worker = kzalloc(sizeof(*worker), GFP_KERNEL);
 	if (!worker)

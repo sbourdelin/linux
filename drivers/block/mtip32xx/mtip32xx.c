@@ -4084,9 +4084,9 @@ static int get_least_used_cpu_on_node(int node)
 /* Helper for selecting a node in round robin mode */
 static inline int mtip_get_next_rr_node(void)
 {
-	static int next_node = -1;
+	static int next_node = NUMA_NO_NODE;
 
-	if (next_node == -1) {
+	if (next_node == NUMA_NO_NODE) {
 		next_node = first_online_node;
 		return next_node;
 	}

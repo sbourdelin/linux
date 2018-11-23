@@ -141,7 +141,7 @@ cpumask_of_pcibus(const struct pci_bus *bus)
 	int node;
 
 	node = __pcibus_to_node(bus);
-	return (node == -1) ? cpu_online_mask :
+	return (node == NUMA_NO_NODE) ? cpu_online_mask :
 			      cpumask_of_node(node);
 }
 #endif

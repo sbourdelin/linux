@@ -132,7 +132,7 @@ struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 		int nid = of_node_to_nid(dev);
 
 		if (nid < 0 || !node_online(nid))
-			nid = -1;
+			nid = NUMA_NO_NODE;
 
 		PHB_SET_NODE(phb, nid);
 	}

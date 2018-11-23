@@ -36,7 +36,7 @@ static void *__init alloc_paca_data(unsigned long size, unsigned long align,
 	 * which will put its paca in the right place.
 	 */
 	if (cpu == boot_cpuid) {
-		nid = -1;
+		nid = NUMA_NO_NODE;
 		memblock_set_bottom_up(true);
 	} else {
 		nid = early_cpu_to_node(cpu);

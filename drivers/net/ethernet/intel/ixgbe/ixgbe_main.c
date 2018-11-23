@@ -6414,7 +6414,7 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 {
 	struct device *dev = tx_ring->dev;
 	int orig_node = dev_to_node(dev);
-	int ring_node = -1;
+	int ring_node = NUMA_NO_NODE;
 	int size;
 
 	size = sizeof(struct ixgbe_tx_buffer) * tx_ring->count;
@@ -6508,7 +6508,7 @@ int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
 {
 	struct device *dev = rx_ring->dev;
 	int orig_node = dev_to_node(dev);
-	int ring_node = -1;
+	int ring_node = NUMA_NO_NODE;
 	int size;
 
 	size = sizeof(struct ixgbe_rx_buffer) * rx_ring->count;
