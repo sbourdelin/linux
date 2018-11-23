@@ -76,6 +76,12 @@
 #define VIRTIO_F_IOMMU_PLATFORM		33
 
 /*
+ * Device uses buffers in the same order in which they have been
+ * available.
+ */
+#define VIRTIO_F_IN_ORDER		35
+
+/*
  * Does the device support Single Root I/O Virtualization?
  */
 #define VIRTIO_F_SR_IOV			37
