@@ -2604,7 +2604,7 @@ static int do_test_file(unsigned int test_num)
 		goto done;
 	}
 
-	err = btf_get_from_id(info.btf_id, &btf);
+	err = btf__get_from_id(info.btf_id, &btf);
 	if (CHECK(err, "cannot get btf from kernel, err: %d", err))
 		goto done;
 
