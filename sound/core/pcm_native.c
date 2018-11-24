@@ -96,7 +96,7 @@ static DECLARE_RWSEM(snd_pcm_link_rwsem);
 static inline void down_write_nonblock(struct rw_semaphore *lock)
 {
 	while (!down_write_trylock(lock))
-		cond_resched();
+		msleep(1);
 }
 
 #define PCM_LOCK_DEFAULT	0
