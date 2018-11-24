@@ -83,7 +83,14 @@ static bool __ioremap_check_ram(struct resource *res)
 
 static int __ioremap_check_desc_other(struct resource *res)
 {
-	return (res->desc != IORES_DESC_NONE);
+	/*
+	 * The E820_TYPE_RESERVED was converted to the IORES_DESC_NONE
+	 * before the new IORES_DESC_RESERVED is added, so it contained
+	 * the e820 reserved type. In order to make it still work for
+	 * SEV, here keep it the same as before.
+	 */
+	return ((res->desc != IORES_DESC_NONE) ||
+		(res->desc != IORES_DESC_RESERVED));
 }
 
 static int __ioremap_res_check(struct resource *res, void *arg)
