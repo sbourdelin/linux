@@ -1217,7 +1217,7 @@ static size_t print_time(u64 ts, char *buf)
 {
 	unsigned long rem_nsec;
 
-	if (!printk_time)
+	if (!printk_time && buf)
 		return 0;
 
 	rem_nsec = do_div(ts, 1000000000);
