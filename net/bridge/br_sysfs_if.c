@@ -314,14 +314,14 @@ static ssize_t brport_store(struct kobject *kobj,
 	unsigned long val;
 	char *endp;
 
+	if (!p->dev || !p->br)
+		return -EINVAL;
+
 	if (!ns_capable(dev_net(p->dev)->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 
 	if (!rtnl_trylock())
 		return restart_syscall();
-
-	if (!p->dev || !p->br)
-		goto out_unlock;
 
 	if (brport_attr->store_raw) {
 		char *buf_copy;
