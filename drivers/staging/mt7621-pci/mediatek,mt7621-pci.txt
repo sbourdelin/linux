@@ -19,10 +19,6 @@ Required properties:
   See ../reset/reset.txt for details.
 - reset-names: Must be "pcie0", "pcie1", "pcieN"... based on the number of
   root ports.
-- clocks: Must contain an entry for each entry in clock-names.
-  See ../clocks/clock-bindings.txt for details.
-- clock-names: Must be "pcie0", "pcie1", "pcieN"... based on the number of
-  root ports.
 
 In addition, the device tree node must have sub-nodes describing each PCIe port
 interface, having the following mandatory properties:
@@ -69,8 +65,6 @@ Example for MT7621:
 
 		resets = <&rstctrl 24 &rstctrl 25 &rstctrl 26>;
 		reset-names = "pcie0", "pcie1", "pcie2";
-		clocks = <&clkctrl 24 &clkctrl 25 &clkctrl 26>;
-		clock-names = "pcie0", "pcie1", "pcie2";
 
 		pcie@0,0 {
 			reg = <0x0000 0 0 0 0>;
