@@ -41,8 +41,11 @@ static u32 clk_total;
 #define	CLKCR3		CLKCR1
 #define	CLKSR		CLKCR2
 #define	CLKMSB1		0x5
+#define	CLKLSB1		0x7
 #define	CLKMSB2		0x9
 #define	CLKMSB3		0xD
+
+#define	CLKSR_INT1	BIT(0)
 
 /* This is for machines which generate the exact clock. */
 
@@ -70,24 +73,29 @@ static irqreturn_t hp300_tick(int irq, void *dev_id)
 
 static u64 hp300_read_clk(struct clocksource *cs)
 {
-  unsigned long flags;
-  unsigned char lsb, msb1, msb2;
-  u32 ticks;
+	unsigned long flags;
+	unsigned char lsb, msb, msb_new;
+	u16 offset = 0;
+	u32 ticks;
 
-  local_irq_save(flags);
-  /* Read current timer 1 value */
-  msb1 = in_8(CLOCKBASE + 5);
-  lsb = in_8(CLOCKBASE + 7);
-  msb2 = in_8(CLOCKBASE + 5);
-  if (msb1 != msb2)
-    /* A carry happened while we were reading.  Read it again */
-    lsb = in_8(CLOCKBASE + 7);
+	local_irq_save(flags);
+	/* Read current timer 1 value */
+	msb = in_8(CLOCKBASE + CLKMSB1);
+again:
+	if ((in_8(CLOCKBASE + CLKSR) & CLKSR_INT1) && msb > 0)
+		offset = INTVAL;
+	lsb = in_8(CLOCKBASE + CLKLSB1);
+	msb_new = in_8(CLOCKBASE + CLKMSB1);
+	if (msb_new != msb) {
+		msb = msb_new;
+		goto again;
+	}
 
-  ticks = INTVAL - ((msb2 << 8) | lsb);
-  ticks += clk_total;
-  local_irq_restore(flags);
+	ticks = INTVAL - ((msb << 8) | lsb);
+	ticks += offset + clk_total;
+	local_irq_restore(flags);
 
-  return ticks;
+	return ticks;
 }
 
 void __init hp300_sched_init(irq_handler_t vector)
