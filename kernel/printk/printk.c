@@ -356,6 +356,9 @@ struct printk_log {
 	u8 facility;		/* syslog facility */
 	u8 flags:5;		/* internal record flags */
 	u8 level:3;		/* syslog level */
+#ifdef CONFIG_PRINTK_FROM
+	u32 from_id;            /* thread id or processor id */
+#endif
 }
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 __packed __aligned(4)
@@ -609,6 +612,12 @@ static int log_store(int facility, int level,
 
 	/* fill message */
 	msg = (struct printk_log *)(log_buf + log_next_idx);
+#ifdef CONFIG_PRINTK_FROM
+	if (in_task())
+		msg->from_id = current->pid;
+	else
+		msg->from_id = 0x80000000 + raw_smp_processor_id();
+#endif
 	memcpy(log_text(msg), text, text_len);
 	msg->text_len = text_len;
 	if (trunc_msg_len) {
@@ -690,9 +699,17 @@ static ssize_t msg_print_ext_header(char *buf, size_t size,
 
 	do_div(ts_usec, 1000);
 
+#ifdef CONFIG_PRINTK_FROM
+	return scnprintf(buf, size, "%u,%llu,%llu,%c,from=%c%u;",
+			 (msg->facility << 3) | msg->level, seq, ts_usec,
+			 msg->flags & LOG_CONT ? 'c' : '-',
+			 msg->from_id & 0x80000000 ? 'C' : 'T',
+			 msg->from_id & ~0x80000000);
+#else
 	return scnprintf(buf, size, "%u,%llu,%llu,%c;",
 		       (msg->facility << 3) | msg->level, seq, ts_usec,
 		       msg->flags & LOG_CONT ? 'c' : '-');
+#endif
 }
 
 static ssize_t msg_print_ext_body(char *buf, size_t size,
@@ -1024,6 +1041,9 @@ void log_buf_vmcoreinfo_setup(void)
 	VMCOREINFO_OFFSET(printk_log, len);
 	VMCOREINFO_OFFSET(printk_log, text_len);
 	VMCOREINFO_OFFSET(printk_log, dict_len);
+#ifdef CONFIG_PRINTK_FROM
+	VMCOREINFO_OFFSET(printk_log, from_id);
+#endif
 }
 #endif
 
@@ -1229,6 +1249,16 @@ static size_t print_time(u64 ts, char *buf)
 		       (unsigned long)ts, rem_nsec / 1000);
 }
 
+#ifdef CONFIG_PRINTK_FROM
+static size_t print_from(u32 id, char *buf)
+{
+	char tmp[16];
+
+	return sprintf(buf ? buf : tmp, "[%c%u] ", id & 0x80000000 ? 'C' : 'T',
+		       id & ~0x80000000);
+}
+#endif
+
 static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
 {
 	size_t len = 0;
@@ -1249,6 +1279,9 @@ static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
 	}
 
 	len += print_time(msg->ts_nsec, buf ? buf + len : NULL);
+#ifdef CONFIG_PRINTK_FROM
+	len += print_from(msg->from_id, buf ? buf + len : NULL);
+#endif
 	return len;
 }
 
