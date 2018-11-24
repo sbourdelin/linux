@@ -729,7 +729,7 @@ int efi_partition(struct parsed_partitions *state)
 				ARRAY_SIZE(ptes[i].partition_name));
 		info->volname[label_max] = 0;
 		while (label_count < label_max) {
-			u8 c = ptes[i].partition_name[label_count] & 0xff;
+			u8 c = le16_to_cpu(ptes[i].partition_name[label_count]) & 0xff;
 			if (c && !isprint(c))
 				c = '!';
 			info->volname[label_count] = c;
