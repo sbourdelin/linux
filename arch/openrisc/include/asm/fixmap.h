@@ -55,7 +55,7 @@ enum fixed_addresses {
 #define FIXADDR_START		(FIXADDR_TOP - FIXADDR_SIZE)
 
 #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
-#define __virt_to_fix(x)	((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
+#define __virt_to_fix(x)	((FIXADDR_TOP - ((x) & PAGE_MASK)) >> PAGE_SHIFT)
 
 /*
  * 'index to address' translation. If anyone tries to use the idx
