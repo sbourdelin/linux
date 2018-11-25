@@ -150,6 +150,7 @@ vxfs_bmap_indir(struct inode *ip, long indir, int size, long block)
 
 		if (block < off) {
 			brelse(bp);
+			bp = NULL;
 			continue;
 		}
 
@@ -186,6 +187,7 @@ vxfs_bmap_indir(struct inode *ip, long indir, int size, long block)
 			BUG();
 		}
 		brelse(bp);
+		bp = NULL;
 	}
 
 fail:
