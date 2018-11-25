@@ -4498,7 +4498,6 @@ out:
 		unlock_two_nondirectories(source, target);
 	else if (target)
 		inode_unlock(target);
-	dput(new_dentry);
 	if (!error) {
 		fsnotify_move(old_dir, new_dir, old_name.name, is_dir,
 			      !(flags & RENAME_EXCHANGE) ? target : NULL, old_dentry);
@@ -4507,6 +4506,7 @@ out:
 				      new_is_dir, NULL, new_dentry);
 		}
 	}
+	dput(new_dentry);
 	release_dentry_name_snapshot(&old_name);
 
 	return error;
