@@ -765,6 +765,7 @@ out:
 		}
 	}
 	kfree(connector_set);
+	connector_set = NULL;
 	drm_mode_destroy(dev, mode);
 	if (ret == -EDEADLK) {
 		ret = drm_modeset_backoff(&ctx);
