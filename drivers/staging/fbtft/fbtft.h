@@ -134,7 +134,6 @@ struct fbtft_display {
  */
 struct fbtft_platform_data {
 	struct fbtft_display display;
-	struct fbtft_gpio *gpios;
 	unsigned int rotate;
 	bool bgr;
 	unsigned int fps;

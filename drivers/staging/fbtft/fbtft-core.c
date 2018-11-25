@@ -70,92 +70,6 @@ void fbtft_dbg_hex(const struct device *dev, int groupsize,
 }
 EXPORT_SYMBOL(fbtft_dbg_hex);
 
-static unsigned long fbtft_request_gpios_match(struct fbtft_par *par,
-					       struct fbtft_gpio *gpio)
-{
-	int ret;
-	unsigned int val;
-
-	fbtft_par_dbg(DEBUG_REQUEST_GPIOS_MATCH, par, "%s('%s')\n",
-		      __func__, gpio->name);
-
-	if (strcasecmp(gpio->name, "reset") == 0) {
-		par->gpio.reset = gpio->gpio;
-		return GPIOD_OUT_HIGH;
-	} else if (strcasecmp(gpio->name, "dc") == 0) {
-		par->gpio.dc = gpio->gpio;
-		return GPIOD_OUT_LOW;
-	} else if (strcasecmp(gpio->name, "cs") == 0) {
-		par->gpio.cs = gpio->gpio;
-		return GPIOD_OUT_HIGH;
-	} else if (strcasecmp(gpio->name, "wr") == 0) {
-		par->gpio.wr = gpio->gpio;
-		return GPIOD_OUT_HIGH;
-	} else if (strcasecmp(gpio->name, "rd") == 0) {
-		par->gpio.rd = gpio->gpio;
-		return GPIOD_OUT_HIGH;
-	} else if (strcasecmp(gpio->name, "latch") == 0) {
-		par->gpio.latch = gpio->gpio;
-		return GPIOD_OUT_LOW;
-	} else if (gpio->name[0] == 'd' && gpio->name[1] == 'b') {
-		ret = kstrtouint(&gpio->name[2], 10, &val);
-		if (ret == 0 && val < 16) {
-			par->gpio.db[val] = gpio->gpio;
-			return GPIOD_OUT_LOW;
-		}
-	} else if (strcasecmp(gpio->name, "led") == 0) {
-		par->gpio.led[0] = gpio->gpio;
-		return GPIOD_OUT_LOW;
-	} else if (strcasecmp(gpio->name, "led_") == 0) {
-		par->gpio.led[0] = gpio->gpio;
-		return GPIOD_OUT_HIGH;
-	}
-
-	return FBTFT_GPIO_NO_MATCH;
-}
-
-static int fbtft_request_gpios(struct fbtft_par *par)
-{
-	struct fbtft_platform_data *pdata = par->pdata;
-	struct device *dev = par->info->device;
-	struct fbtft_gpio *gpio;
-	unsigned long flags;
-	int ret;
-
-	if (!(pdata && pdata->gpios))
-		return 0;
-
-	gpio = pdata->gpios;
-	while (gpio->name[0]) {
-		flags = FBTFT_GPIO_NO_MATCH;
-		/* if driver provides match function, try it first,
-		 * if no match use our own
-		 */
-		if (par->fbtftops.request_gpios_match)
-			flags = par->fbtftops.request_gpios_match(par, gpio);
-		if (flags == FBTFT_GPIO_NO_MATCH)
-			flags = fbtft_request_gpios_match(par, gpio);
-		if (flags != FBTFT_GPIO_NO_MATCH) {
-			gpio->gpio = devm_gpiod_get(dev,
-						    dev->driver->name, flags);
-			if (IS_ERR(gpio->gpio)) {
-				ret = PTR_ERR(gpio->gpio);
-				dev_err(dev,
-					"%s: Failed to request %s GPIO:%d\n",
-					__func__, gpio->name, ret);
-				return ret;
-
-			}
-			fbtft_par_dbg(DEBUG_REQUEST_GPIOS, par,
-				      "%s: '%s' GPIO\n",
-				      __func__, gpio->name);
-		}
-		gpio++;
-	}
-
-	return 0;
-}
-
 #ifdef CONFIG_OF
 static int fbtft_request_one_gpio(struct fbtft_par *par,
 				  const char *name, int index,
@@ -836,7 +750,6 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 	par->fbtftops.reset = fbtft_reset;
 	par->fbtftops.mkdirty = fbtft_mkdirty;
 	par->fbtftops.update_display = fbtft_update_display;
-	par->fbtftops.request_gpios = fbtft_request_gpios;
 	if (display->backlight)
 		par->fbtftops.register_backlight = fbtft_register_backlight;
 
