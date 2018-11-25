@@ -26,6 +26,8 @@
 #include <linux/vgaarb.h>
 #include <linux/vga_switcheroo.h>
 
+#include <drm/drm_atomic_helper.h>
+
 #include "i915_drv.h"
 #include "i915_selftest.h"
 
@@ -774,6 +776,9 @@ static void i915_pci_shutdown(struct pci_dev *pdev)
 	/* Cancel any outstanding rendering */
 	if (READ_ONCE(i915->gt.awake))
 		i915_gem_set_wedged(i915);
+
+	/* Disable active links to avoid confusing certain (Dell) monitors */
+	drm_atomic_helper_shutdown(&i915->drm);
 }
 
 static struct pci_driver i915_pci_driver = {
