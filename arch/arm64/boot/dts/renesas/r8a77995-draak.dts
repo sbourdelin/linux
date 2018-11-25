@@ -487,3 +487,14 @@
 		};
 	};
 };
+
+#define lvds_connector lvds1_out
+#include "../../../../arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi"
+
+&lvds1 {
+	status = "okay";
+};
+
+&{/panel/} {
+	backlight = <&backlight>;
+};
