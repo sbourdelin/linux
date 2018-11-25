@@ -763,11 +763,25 @@ static int i915_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return 0;
 }
 
+static void i915_pci_shutdown(struct pci_dev *pdev)
+{
+	struct drm_i915_private *i915;
+
+	i915 = pci_get_drvdata(pdev);
+	if (!i915) /* driver load aborted? */
+		return;
+
+	/* Cancel any outstanding rendering */
+	if (READ_ONCE(i915->gt.awake))
+		i915_gem_set_wedged(i915);
+}
+
 static struct pci_driver i915_pci_driver = {
 	.name = DRIVER_NAME,
 	.id_table = pciidlist,
 	.probe = i915_pci_probe,
 	.remove = i915_pci_remove,
+	.shutdown = i915_pci_shutdown,
 	.driver.pm = &i915_pm_ops,
 };
 
