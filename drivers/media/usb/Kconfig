@@ -41,6 +41,7 @@ if I2C && MEDIA_DIGITAL_TV_SUPPORT
 	comment "Digital TV USB devices"
 source "drivers/media/usb/dvb-usb/Kconfig"
 source "drivers/media/usb/dvb-usb-v2/Kconfig"
+source "drivers/media/usb/hdcapm/Kconfig"
 source "drivers/media/usb/ttusb-budget/Kconfig"
 source "drivers/media/usb/ttusb-dec/Kconfig"
 source "drivers/media/usb/siano/Kconfig"

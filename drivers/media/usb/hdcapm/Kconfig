@@ -1,0 +1,11 @@
+
+config VIDEO_HDCAPM
+	tristate "Startech HDCAPM support"
+	depends on VIDEO_DEV && VIDEO_V4L2
+	select VIDEO_MST3367 if MEDIA_SUBDRV_AUTOSELECT
+	select I2C_ALGOBIT
+	help
+	  This is a video4linux driver for Startech's HDCAPM USB device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hdpvr
