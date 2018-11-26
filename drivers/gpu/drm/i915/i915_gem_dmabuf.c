@@ -244,6 +244,7 @@ struct dma_buf *i915_gem_prime_export(struct drm_device *dev,
 
 	return drm_gem_dmabuf_export(dev, &exp_info);
 }
+EXPORT_SYMBOL_GPL(i915_gem_prime_export);
 
 static int i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj)
 {

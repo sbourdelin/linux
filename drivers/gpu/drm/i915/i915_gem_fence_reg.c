@@ -420,6 +420,7 @@ i915_reserve_fence(struct drm_i915_private *dev_priv)
 	list_del(&fence->link);
 	return fence;
 }
+EXPORT_SYMBOL_GPL(i915_reserve_fence);
 
 /**
  * i915_unreserve_fence - Reclaim a reserved fence
@@ -433,6 +434,7 @@ void i915_unreserve_fence(struct drm_i915_fence_reg *fence)
 
 	list_add(&fence->link, &fence->i915->mm.fence_list);
 }
+EXPORT_SYMBOL_GPL(i915_unreserve_fence);
 
 /**
  * i915_gem_revoke_fences - revoke fence state

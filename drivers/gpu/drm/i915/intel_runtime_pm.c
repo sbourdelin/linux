@@ -4004,6 +4004,7 @@ void intel_runtime_pm_get(struct drm_i915_private *dev_priv)
 	atomic_inc(&dev_priv->runtime_pm.wakeref_count);
 	assert_rpm_wakelock_held(dev_priv);
 }
+EXPORT_SYMBOL_GPL(intel_runtime_pm_get);
 
 /**
  * intel_runtime_pm_get_if_in_use - grab a runtime pm reference if device in use
@@ -4087,6 +4088,7 @@ void intel_runtime_pm_put(struct drm_i915_private *dev_priv)
 	pm_runtime_mark_last_busy(kdev);
 	pm_runtime_put_autosuspend(kdev);
 }
+EXPORT_SYMBOL_GPL(intel_runtime_pm_put);
 
 /**
  * intel_runtime_pm_enable - enable runtime pm

@@ -1957,6 +1957,7 @@ u32 *intel_ring_begin(struct i915_request *rq, unsigned int num_dwords)
 
 	return cs;
 }
+EXPORT_SYMBOL_GPL(intel_ring_begin);
 
 /* Align the ring tail to a cacheline boundary */
 int intel_ring_cacheline_align(struct i915_request *rq)

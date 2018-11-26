@@ -274,6 +274,7 @@ void i915_gem_context_release(struct kref *ref)
 	if (llist_add(&ctx->free_link, &i915->contexts.free_list))
 		queue_work(i915->wq, &i915->contexts.free_work);
 }
+EXPORT_SYMBOL_GPL(i915_gem_context_release);
 
 static void context_close(struct i915_gem_context *ctx)
 {
@@ -473,6 +474,7 @@ out:
 	mutex_unlock(&dev->struct_mutex);
 	return ctx;
 }
+EXPORT_SYMBOL_GPL(i915_gem_context_create_gvt);
 
 static void
 destroy_kernel_context(struct i915_gem_context **ctxp)

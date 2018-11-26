@@ -701,6 +701,7 @@ void *i915_gem_object_alloc(struct drm_i915_private *dev_priv)
 {
 	return kmem_cache_zalloc(dev_priv->objects, GFP_KERNEL);
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_alloc);
 
 void i915_gem_object_free(struct drm_i915_gem_object *obj)
 {
@@ -1029,6 +1030,7 @@ err_unpin:
 	i915_gem_object_unpin_pages(obj);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(i915_gem_obj_prepare_shmem_write);
 
 static void
 shmem_clflush_swizzled_range(char *addr, unsigned long length,
@@ -2764,6 +2766,7 @@ void __i915_gem_object_set_pages(struct drm_i915_gem_object *obj,
 	list_add(&obj->mm.link, &i915->mm.unbound_list);
 	spin_unlock(&i915->mm.obj_lock);
 }
+EXPORT_SYMBOL_GPL(__i915_gem_object_set_pages);
 
 static int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 {
@@ -2930,6 +2933,7 @@ err_unlock:
 	ptr = ERR_PTR(ret);
 	goto out_unlock;
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_pin_map);
 
 static int
 i915_gem_object_pwrite_gtt(struct drm_i915_gem_object *obj,
@@ -4041,6 +4045,7 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 	i915_gem_object_unpin_pages(obj);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_set_to_gtt_domain);
 
 /**
  * Changes the cache-level of an object across all VMA.
@@ -4406,6 +4411,7 @@ i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, bool write)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_set_to_cpu_domain);
 
 /* Throttle our rendering by waiting until the ring has completed our requests
  * emitted over 20 msec ago.
@@ -4535,6 +4541,7 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 
 	return vma;
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_ggtt_pin);
 
 static __always_inline unsigned int __busy_read_flag(unsigned int id)
 {
@@ -4758,6 +4765,7 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 
 	i915_gem_info_add_obj(to_i915(obj->base.dev), obj->base.size);
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_init);
 
 static const struct drm_i915_gem_object_ops i915_gem_object_ops = {
 	.flags = I915_GEM_OBJECT_HAS_STRUCT_PAGE |
@@ -4864,6 +4872,7 @@ fail:
 	i915_gem_object_free(obj);
 	return ERR_PTR(ret);
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_create);
 
 static bool discard_backing_storage(struct drm_i915_gem_object *obj)
 {
@@ -5061,6 +5070,7 @@ void __i915_gem_object_release_unless_active(struct drm_i915_gem_object *obj)
 	else
 		i915_gem_object_put(obj);
 }
+EXPORT_SYMBOL_GPL(__i915_gem_object_release_unless_active);
 
 void i915_gem_sanitize(struct drm_i915_private *i915)
 {
@@ -6168,6 +6178,7 @@ i915_gem_object_get_page(struct drm_i915_gem_object *obj, unsigned int n)
 	sg = i915_gem_object_get_sg(obj, n, &offset);
 	return nth_page(sg_page(sg), offset);
 }
+EXPORT_SYMBOL_GPL(i915_gem_object_get_page);
 
 /* Like i915_gem_object_get_page(), but mark the returned page dirty */
 struct page *

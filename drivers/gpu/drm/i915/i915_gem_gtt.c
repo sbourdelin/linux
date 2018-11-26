@@ -4040,6 +4040,7 @@ int i915_gem_gtt_insert(struct i915_address_space *vm,
 					   size, alignment, color,
 					   start, end, DRM_MM_INSERT_EVICT);
 }
+EXPORT_SYMBOL_GPL(i915_gem_gtt_insert);
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
 #include "selftests/mock_gtt.c"

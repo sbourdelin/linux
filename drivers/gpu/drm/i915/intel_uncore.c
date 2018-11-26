@@ -644,6 +644,7 @@ void intel_uncore_forcewake_get(struct drm_i915_private *dev_priv,
 	__intel_uncore_forcewake_get(dev_priv, fw_domains);
 	spin_unlock_irqrestore(&dev_priv->uncore.lock, irqflags);
 }
+EXPORT_SYMBOL_GPL(intel_uncore_forcewake_get);
 
 /**
  * intel_uncore_forcewake_user_get - claim forcewake on behalf of userspace
@@ -756,6 +757,7 @@ void intel_uncore_forcewake_put(struct drm_i915_private *dev_priv,
 	__intel_uncore_forcewake_put(dev_priv, fw_domains);
 	spin_unlock_irqrestore(&dev_priv->uncore.lock, irqflags);
 }
+EXPORT_SYMBOL_GPL(intel_uncore_forcewake_put);
 
 /**
  * intel_uncore_forcewake_put__locked - grab forcewake domain references
@@ -2388,6 +2390,7 @@ intel_uncore_forcewake_for_reg(struct drm_i915_private *dev_priv,
 
 	return fw_domains;
 }
+EXPORT_SYMBOL_GPL(intel_uncore_forcewake_for_reg);
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
 #include "selftests/mock_uncore.c"

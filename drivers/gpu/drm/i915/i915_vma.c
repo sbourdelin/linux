@@ -783,6 +783,7 @@ void i915_vma_close(struct i915_vma *vma)
 	 */
 	list_add_tail(&vma->closed_link, &vma->vm->i915->gt.closed_vma);
 }
+EXPORT_SYMBOL_GPL(i915_vma_close);
 
 void i915_vma_reopen(struct i915_vma *vma)
 {
@@ -1028,6 +1029,7 @@ int i915_vma_move_to_active(struct i915_vma *vma,
 	export_fence(vma, rq, flags);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(i915_vma_move_to_active);
 
 int i915_vma_unbind(struct i915_vma *vma)
 {

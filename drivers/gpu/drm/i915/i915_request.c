@@ -749,6 +749,7 @@ err_unpin:
 	intel_context_unpin(ce);
 	return ERR_PTR(ret);
 }
+EXPORT_SYMBOL_GPL(i915_request_alloc);
 
 static int
 i915_request_await_request(struct i915_request *to, struct i915_request *from)
@@ -1073,6 +1074,7 @@ void i915_request_add(struct i915_request *request)
 	if (prev && i915_request_completed(prev))
 		i915_request_retire_upto(prev);
 }
+EXPORT_SYMBOL_GPL(i915_request_add);
 
 static unsigned long local_clock_us(unsigned int *cpu)
 {
@@ -1339,6 +1341,7 @@ complete:
 
 	return timeout;
 }
+EXPORT_SYMBOL_GPL(i915_request_wait);
 
 static void ring_retire_requests(struct intel_ring *ring)
 {
