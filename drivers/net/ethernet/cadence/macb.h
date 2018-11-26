@@ -714,6 +714,9 @@
 		__v; \
 	})
 
+#define MACB_IDLE_MASK		(1 << MACB_IDLE_OFFSET)
+#define MACB_READ_NSR(bp)	macb_readl(bp, NSR)
+
 /* struct macb_dma_desc - Hardware DMA descriptor
  * @addr: DMA address of data buffer
  * @ctrl: Control and status bits
