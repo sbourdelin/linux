@@ -1905,6 +1905,8 @@ static struct pmu cpumf_sampling = {
 
 	.setup_aux    = aux_buffer_setup,
 	.free_aux     = aux_buffer_free,
+
+	.capabilities = PERF_PMU_CAP_EXCLUDE,
 };
 
 static void cpumf_measurement_alert(struct ext_code ext_code,

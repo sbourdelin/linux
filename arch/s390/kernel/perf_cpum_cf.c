@@ -667,6 +667,7 @@ static struct pmu cpumf_pmu = {
 	.start_txn    = cpumf_pmu_start_txn,
 	.commit_txn   = cpumf_pmu_commit_txn,
 	.cancel_txn   = cpumf_pmu_cancel_txn,
+	.capabilities = PERF_PMU_CAP_EXCLUDE,
 };
 
 static int cpumf_pmf_setup(unsigned int cpu, int flags)
