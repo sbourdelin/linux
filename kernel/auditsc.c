@@ -47,7 +47,6 @@
 #include <linux/init.h>
 #include <asm/types.h>
 #include <linux/atomic.h>
-#include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/mm.h>
 #include <linux/export.h>
@@ -55,7 +54,6 @@
 #include <linux/mount.h>
 #include <linux/socket.h>
 #include <linux/mqueue.h>
-#include <linux/audit.h>
 #include <linux/personality.h>
 #include <linux/time.h>
 #include <linux/netlink.h>
