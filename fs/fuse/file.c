@@ -1778,7 +1778,7 @@ static bool fuse_writepage_in_flight(struct fuse_req *new_req,
 	if (old_req->num_pages == 1 && old_req != first_req) {
 		struct backing_dev_info *bdi = inode_to_bdi(page->mapping->host);
 
-		copy_highpage(old_req->pages[0], page);
+		swap(old_req->pages[0], page);
 		spin_unlock(&fc->lock);
 
 		dec_wb_stat(&bdi->wb, WB_WRITEBACK);
