@@ -584,6 +584,9 @@ static int ad7280_attr_init(struct ad7280_state *st)
 				devm_kasprintf(&st->spi->dev, GFP_KERNEL,
 					       "in%d-in%d_balance_switch_en",
 					       index, index + 1);
+			if (st->iio_attr[cnt].dev_attr.attr.name  == NULL)
+				return -ENOMEM;
+
 			ad7280_attributes[cnt] =
 				&st->iio_attr[cnt].dev_attr.attr;
 			cnt++;
@@ -600,6 +603,9 @@ static int ad7280_attr_init(struct ad7280_state *st)
 				devm_kasprintf(&st->spi->dev, GFP_KERNEL,
 					       "in%d-in%d_balance_timer",
 					       index, index + 1);
+			if (st->iio_attr[cnt].dev_attr.attr.name == NULL)
+				return -ENOMEM;
+
 			ad7280_attributes[cnt] =
 				&st->iio_attr[cnt].dev_attr.attr;
 		}
