@@ -1581,6 +1581,7 @@ static struct pmu pmu = {
 	.start_txn	= sparc_pmu_start_txn,
 	.cancel_txn	= sparc_pmu_cancel_txn,
 	.commit_txn	= sparc_pmu_commit_txn,
+	.capabilities	= PERF_PMU_CAP_EXCLUDE,
 };
 
 void perf_event_print_debug(void)
