@@ -241,6 +241,9 @@ struct intel_vgpu {
 struct intel_gvt_gm {
 	unsigned long vgpu_allocated_low_gm_size;
 	unsigned long vgpu_allocated_high_gm_size;
+	unsigned long low_avail;
+	unsigned long high_avail;
+	unsigned long fence_avail;
 };
 
 struct intel_gvt_fence {
@@ -292,13 +295,15 @@ struct intel_gvt_firmware {
 
 #define NR_MAX_INTEL_VGPU_TYPES 20
 struct intel_vgpu_type {
-	char name[16];
+	const char *drv_name;
+	char name[32];
 	unsigned int avail_instance;
 	unsigned int low_gm_size;
 	unsigned int high_gm_size;
 	unsigned int fence;
 	unsigned int weight;
 	enum intel_vgpu_edid resolution;
+	unsigned int aggregation;
 };
 
 struct intel_gvt {
@@ -484,7 +489,7 @@ void intel_gvt_clean_vgpu_types(struct intel_gvt *gvt);
 struct intel_vgpu *intel_gvt_create_idle_vgpu(struct intel_gvt *gvt);
 void intel_gvt_destroy_idle_vgpu(struct intel_vgpu *vgpu);
 struct intel_vgpu *intel_gvt_create_vgpu(struct intel_gvt *gvt,
-					 struct intel_vgpu_type *type);
+					 struct intel_vgpu_type *type, unsigned int);
 void intel_gvt_destroy_vgpu(struct intel_vgpu *vgpu);
 void intel_gvt_release_vgpu(struct intel_vgpu *vgpu);
 void intel_gvt_reset_vgpu_locked(struct intel_vgpu *vgpu, bool dmlr,
@@ -563,7 +568,7 @@ struct intel_gvt_ops {
 	int (*emulate_mmio_write)(struct intel_vgpu *, u64, void *,
 				unsigned int);
 	struct intel_vgpu *(*vgpu_create)(struct intel_gvt *,
-				struct intel_vgpu_type *);
+					  struct intel_vgpu_type *, unsigned int);
 	void (*vgpu_destroy)(struct intel_vgpu *vgpu);
 	void (*vgpu_release)(struct intel_vgpu *vgpu);
 	void (*vgpu_reset)(struct intel_vgpu *);

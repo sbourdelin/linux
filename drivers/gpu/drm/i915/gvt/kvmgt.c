@@ -501,7 +501,9 @@ static void kvmgt_put_vfio_device(void *vgpu)
 	vfio_device_put(((struct intel_vgpu *)vgpu)->vdev.vfio_device);
 }
 
-static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
+static int intel_vgpu_create_internal(struct kobject *kobj,
+				      struct mdev_device *mdev,
+				      unsigned int instances)
 {
 	struct intel_vgpu *vgpu = NULL;
 	struct intel_vgpu_type *type;
@@ -520,7 +522,14 @@ static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
 		goto out;
 	}
 
-	vgpu = intel_gvt_ops->vgpu_create(gvt, type);
+	if (instances > type->aggregation) {
+		gvt_vgpu_err("wrong aggregation specified for type %s\n",
+						kobject_name(kobj));
+		ret = -EINVAL;
+		goto out;
+	}
+
+	vgpu = intel_gvt_ops->vgpu_create(gvt, type, instances);
 	if (IS_ERR_OR_NULL(vgpu)) {
 		ret = vgpu == NULL ? -EFAULT : PTR_ERR(vgpu);
 		gvt_err("failed to create intel vgpu: %d\n", ret);
@@ -536,6 +545,44 @@ static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
 		     dev_name(mdev_dev(mdev)));
 	ret = 0;
 
+out:
+	return ret;
+}
+
+static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
+{
+       return intel_vgpu_create_internal(kobj, mdev, 1);
+}
+
+static int intel_vgpu_create_with_instances(struct kobject *kobj,
+                                           struct mdev_device *mdev,
+                                           unsigned int instances)
+{
+       return intel_vgpu_create_internal(kobj, mdev, instances);
+}
+
+static int intel_vgpu_max_aggregated_instances(struct kobject *kobj,
+					       struct device *dev,
+					       unsigned int *max)
+{
+	struct intel_vgpu_type *type;
+	struct intel_gvt *gvt;
+	int ret = 0;
+
+	gvt = kdev_to_i915(dev)->gvt;
+
+	type = intel_gvt_ops->gvt_find_vgpu_type(gvt, kobject_name(kobj));
+	if (!type) {
+		gvt_err("failed to find type %s to create\n",
+						kobject_name(kobj));
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (type->aggregation <= 1)
+		*max = 1;
+	else
+		*max = type->aggregation;
 out:
 	return ret;
 }
@@ -1442,6 +1489,8 @@ static const struct attribute_group *intel_vgpu_groups[] = {
 static struct mdev_parent_ops intel_vgpu_ops = {
 	.mdev_attr_groups       = intel_vgpu_groups,
 	.create			= intel_vgpu_create,
+	.create_with_instances  = intel_vgpu_create_with_instances,
+	.max_aggregated_instances = intel_vgpu_max_aggregated_instances,
 	.remove			= intel_vgpu_remove,
 
 	.open			= intel_vgpu_open,

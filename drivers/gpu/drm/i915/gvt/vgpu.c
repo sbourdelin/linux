@@ -108,6 +108,7 @@ int intel_gvt_init_vgpu_types(struct intel_gvt *gvt)
 	unsigned int num_types;
 	unsigned int i, low_avail, high_avail;
 	unsigned int min_low;
+	const char *driver_name = dev_driver_string(&gvt->dev_priv->drm.pdev->dev);
 
 	/* vGPU type name is defined as GVTg_Vx_y which contains
 	 * physical GPU generation type (e.g V4 as BDW server, V5 as
@@ -125,10 +126,14 @@ int intel_gvt_init_vgpu_types(struct intel_gvt *gvt)
 	high_avail = gvt_hidden_sz(gvt) - HOST_HIGH_GM_SIZE;
 	num_types = sizeof(vgpu_types) / sizeof(vgpu_types[0]);
 
-	gvt->types = kcalloc(num_types, sizeof(struct intel_vgpu_type),
+	gvt->types = kcalloc(num_types + 1, sizeof(struct intel_vgpu_type),
 			     GFP_KERNEL);
 	if (!gvt->types)
 		return -ENOMEM;
+
+	gvt->gm.low_avail = low_avail;
+	gvt->gm.high_avail = high_avail;
+	gvt->gm.fence_avail = 32 - HOST_FENCE;
 
 	min_low = MB_TO_BYTES(32);
 	for (i = 0; i < num_types; ++i) {
@@ -147,6 +152,7 @@ int intel_gvt_init_vgpu_types(struct intel_gvt *gvt)
 		gvt->types[i].resolution = vgpu_types[i].edid;
 		gvt->types[i].avail_instance = min(low_avail / vgpu_types[i].low_mm,
 						   high_avail / vgpu_types[i].high_mm);
+		gvt->types[i].aggregation = 1;
 
 		if (IS_GEN8(gvt->dev_priv))
 			sprintf(gvt->types[i].name, "GVTg_V4_%s",
@@ -154,6 +160,7 @@ int intel_gvt_init_vgpu_types(struct intel_gvt *gvt)
 		else if (IS_GEN9(gvt->dev_priv))
 			sprintf(gvt->types[i].name, "GVTg_V5_%s",
 						vgpu_types[i].name);
+		gvt->types[i].drv_name = driver_name;
 
 		gvt_dbg_core("type[%d]: %s avail %u low %u high %u fence %u weight %u res %s\n",
 			     i, gvt->types[i].name,
@@ -164,7 +171,32 @@ int intel_gvt_init_vgpu_types(struct intel_gvt *gvt)
 			     vgpu_edid_str(gvt->types[i].resolution));
 	}
 
-	gvt->num_types = i;
+	/* add aggregation type */
+	gvt->types[i].low_gm_size = MB_TO_BYTES(32);
+	gvt->types[i].high_gm_size = MB_TO_BYTES(192);
+	gvt->types[i].fence = 2;
+	gvt->types[i].weight = 16;
+	gvt->types[i].resolution = GVT_EDID_1024_768;
+	gvt->types[i].avail_instance = min(low_avail / gvt->types[i].low_gm_size,
+					   high_avail / gvt->types[i].high_gm_size);
+	gvt->types[i].avail_instance = min(gvt->types[i].avail_instance,
+					   (32 - HOST_FENCE) / gvt->types[i].fence);
+	if (IS_GEN8(gvt->dev_priv))
+		strcat(gvt->types[i].name, "GVTg_V4_aggregate");
+	else if (IS_GEN9(gvt->dev_priv))
+		strcat(gvt->types[i].name, "GVTg_V5_aggregate");
+	gvt->types[i].drv_name = driver_name;
+
+	gvt_dbg_core("type[%d]: %s avail %u low %u high %u fence %u weight %u res %s\n",
+		     i, gvt->types[i].name,
+		     gvt->types[i].avail_instance,
+		     gvt->types[i].low_gm_size,
+		     gvt->types[i].high_gm_size, gvt->types[i].fence,
+		     gvt->types[i].weight,
+		     vgpu_edid_str(gvt->types[i].resolution));
+
+	gvt->types[i].aggregation = gvt->types[i].avail_instance;
+	gvt->num_types = ++i;
 	return 0;
 }
 
@@ -195,6 +227,8 @@ static void intel_gvt_update_vgpu_types(struct intel_gvt *gvt)
 		fence_min = fence_avail / gvt->types[i].fence;
 		gvt->types[i].avail_instance = min(min(low_gm_min, high_gm_min),
 						   fence_min);
+		if (gvt->types[i].aggregation > 1)
+			gvt->types[i].aggregation = gvt->types[i].avail_instance;
 
 		gvt_dbg_core("update type[%d]: %s avail %u low %u high %u fence %u\n",
 		       i, gvt->types[i].name,
@@ -464,7 +498,8 @@ out_free_vgpu:
  * pointer to intel_vgpu, error pointer if failed.
  */
 struct intel_vgpu *intel_gvt_create_vgpu(struct intel_gvt *gvt,
-				struct intel_vgpu_type *type)
+					 struct intel_vgpu_type *type,
+					 unsigned int instances)
 {
 	struct intel_vgpu_creation_params param;
 	struct intel_vgpu *vgpu;
@@ -480,6 +515,21 @@ struct intel_vgpu *intel_gvt_create_vgpu(struct intel_gvt *gvt,
 	/* XXX current param based on MB */
 	param.low_gm_sz = BYTES_TO_MB(param.low_gm_sz);
 	param.high_gm_sz = BYTES_TO_MB(param.high_gm_sz);
+
+	if (instances > 1 && instances <= type->aggregation) {
+		if (instances > type->avail_instance)
+			return ERR_PTR(-EINVAL);
+		param.low_gm_sz = min(param.low_gm_sz * instances,
+				      (u64)BYTES_TO_MB(gvt->gm.low_avail));
+		param.high_gm_sz = min(param.high_gm_sz * instances,
+				       (u64)BYTES_TO_MB(gvt->gm.high_avail));
+		param.fence_sz = min(param.fence_sz * instances,
+				     (u64)gvt->gm.fence_avail);
+		type->aggregation -= instances;
+		gvt_dbg_core("instances %d, low %lluMB, high %lluMB, fence %llu, left %u\n",
+			     instances, param.low_gm_sz, param.high_gm_sz, param.fence_sz,
+			     type->aggregation);
+	}
 
 	mutex_lock(&gvt->lock);
 	vgpu = __intel_gvt_create_vgpu(gvt, &param);
