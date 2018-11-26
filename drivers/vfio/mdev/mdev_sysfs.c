@@ -292,7 +292,17 @@ static ssize_t remove_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
+static ssize_t
+aggregated_instances_show(struct device *dev,
+			  struct device_attribute *attr,
+			  char *buf)
+{
+	struct mdev_device *mdev = to_mdev_device(dev);
+	return sprintf(buf, "%u\n", mdev->type_instances);
+}
+
 static DEVICE_ATTR_WO(remove);
+static DEVICE_ATTR_RO(aggregated_instances);
 
 static const struct attribute *mdev_device_attrs[] = {
 	&dev_attr_remove.attr,
@@ -301,6 +311,7 @@ static const struct attribute *mdev_device_attrs[] = {
 
 int  mdev_create_sysfs_files(struct device *dev, struct mdev_type *type)
 {
+	struct mdev_device *mdev = to_mdev_device(dev);
 	int ret;
 
 	ret = sysfs_create_link(type->devices_kobj, &dev->kobj, dev_name(dev));
@@ -315,8 +326,17 @@ int  mdev_create_sysfs_files(struct device *dev, struct mdev_type *type)
 	if (ret)
 		goto create_files_failed;
 
+	if (mdev->type_instances > 1) {
+		ret = sysfs_create_file(&dev->kobj,
+					&dev_attr_aggregated_instances.attr);
+		if (ret)
+			goto create_aggregated_failed;
+	}
+
 	return ret;
 
+create_aggregated_failed:
+	sysfs_remove_files(&dev->kobj, mdev_device_attrs);
 create_files_failed:
 	sysfs_remove_link(&dev->kobj, "mdev_type");
 type_link_failed:
