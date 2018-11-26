@@ -28,7 +28,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/elf.h>
 #include <linux/proc_fs.h>
 #include <linux/security.h>
 #include <linux/seq_file.h>
