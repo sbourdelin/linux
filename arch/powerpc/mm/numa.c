@@ -1063,7 +1063,8 @@ u64 memory_hotplug_max(void)
 
 struct topology_update_data {
 	struct topology_update_data *next;
-	unsigned int cpu;
+	unsigned int old_cpu;
+	unsigned int new_cpu;
 	int old_nid;
 	int new_nid;
 };
@@ -1253,13 +1254,13 @@ static int update_cpu_topology(void *data)
 
 	for (update = data; update; update = update->next) {
 		int new_nid = update->new_nid;
-		if (cpu != update->cpu)
+		if (cpu != update->new_cpu)
 			continue;
 
-		unmap_cpu_from_node(cpu);
-		map_cpu_to_node(cpu, new_nid);
-		set_cpu_numa_node(cpu, new_nid);
-		set_cpu_numa_mem(cpu, local_memory_node(new_nid));
+		unmap_cpu_from_node(update->old_cpu);
+		map_cpu_to_node(update->new_cpu, new_nid);
+		set_cpu_numa_node(update->new_cpu, new_nid);
+		set_cpu_numa_mem(update->new_cpu, local_memory_node(new_nid));
 		vdso_getcpu_init();
 	}
 
@@ -1283,7 +1284,7 @@ static int update_lookup_table(void *data)
 		int nid, base, j;
 
 		nid = update->new_nid;
-		base = cpu_first_thread_sibling(update->cpu);
+		base = cpu_first_thread_sibling(update->new_cpu);
 
 		for (j = 0; j < threads_per_core; j++) {
 			update_numa_cpu_lookup_table(base + j, nid);
@@ -1305,7 +1306,7 @@ int numa_update_cpu_topology(bool cpus_locked)
 	struct topology_update_data *updates, *ud;
 	cpumask_t updated_cpus;
 	struct device *dev;
-	int weight, new_nid, i = 0;
+	int weight, new_nid, i = 0, ii;
 
 	if (!prrn_enabled && !vphn_enabled && topology_inited)
 		return 0;
@@ -1349,12 +1350,16 @@ int numa_update_cpu_topology(bool cpus_locked)
 			continue;
 		}
 
+		ii = 0;
 		for_each_cpu(sibling, cpu_sibling_mask(cpu)) {
 			ud = &updates[i++];
 			ud->next = &updates[i];
-			ud->cpu = sibling;
 			ud->new_nid = new_nid;
 			ud->old_nid = numa_cpu_lookup_table[sibling];
+			ud->old_cpu = sibling;
+			ud->new_cpu = cpuremap_map_cpu(
+					get_hard_smp_processor_id(sibling),
+					ii++, new_nid);
 			cpumask_set_cpu(sibling, &updated_cpus);
 		}
 		cpu = cpu_last_thread_sibling(cpu);
@@ -1370,9 +1375,10 @@ int numa_update_cpu_topology(bool cpus_locked)
 	pr_debug("Topology update for the following CPUs:\n");
 	if (cpumask_weight(&updated_cpus)) {
 		for (ud = &updates[0]; ud; ud = ud->next) {
-			pr_debug("cpu %d moving from node %d "
-					  "to %d\n", ud->cpu,
-					  ud->old_nid, ud->new_nid);
+			pr_debug("cpu %d, node %d moving to"
+				 " cpu %d, node %d\n",
+				 ud->old_cpu, ud->old_nid,
+				 ud->new_cpu, ud->new_nid);
 		}
 	}
 
@@ -1409,13 +1415,20 @@ int numa_update_cpu_topology(bool cpus_locked)
 			     cpumask_of(raw_smp_processor_id()));
 
 	for (ud = &updates[0]; ud; ud = ud->next) {
-		unregister_cpu_under_node(ud->cpu, ud->old_nid);
-		register_cpu_under_node(ud->cpu, ud->new_nid);
+		unregister_cpu_under_node(ud->old_cpu, ud->old_nid);
+		register_cpu_under_node(ud->new_cpu, ud->new_nid);
 
-		dev = get_cpu_device(ud->cpu);
+		dev = get_cpu_device(ud->old_cpu);
 		if (dev)
 			kobject_uevent(&dev->kobj, KOBJ_CHANGE);
-		cpumask_clear_cpu(ud->cpu, &cpu_associativity_changes_mask);
+		cpumask_clear_cpu(ud->old_cpu, &cpu_associativity_changes_mask);
+		if (ud->old_cpu != ud->new_cpu) {
+			dev = get_cpu_device(ud->new_cpu);
+			if (dev)
+				kobject_uevent(&dev->kobj, KOBJ_CHANGE);
+			cpumask_clear_cpu(ud->new_cpu,
+				&cpu_associativity_changes_mask);
+		}
 		changed = 1;
 	}
 

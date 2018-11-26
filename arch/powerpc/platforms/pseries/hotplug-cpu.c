@@ -259,8 +259,13 @@ static int pseries_add_processor(struct device_node *np)
 	zalloc_cpumask_var(&tmp, GFP_KERNEL);
 
 	nthreads = len / sizeof(u32);
-	for (i = 0; i < nthreads; i++)
-		cpumask_set_cpu(i, tmp);
+	for (i = 0; i < nthreads; i++) {
+		int thread_index = be32_to_cpu(intserv[i]);
+		int nid = find_and_online_cpu_nid(thread_index, false);
+		int cpu = cpuremap_map_cpu(thread_index, i, nid);
+		cpumask_set_cpu(cpu, tmp);
+		cpuremap_reserve_cpu(cpu);
+	}
 
 	cpu_maps_update_begin();
 
@@ -333,6 +338,7 @@ static void pseries_remove_processor(struct device_node *np)
 			set_cpu_present(cpu, false);
 			set_hard_smp_processor_id(cpu, -1);
 			update_numa_cpu_lookup_table(cpu, -1);
+			cpuremap_release_cpu(cpu);
 			break;
 		}
 		if (cpu >= nr_cpu_ids)
@@ -346,7 +352,7 @@ static int dlpar_online_cpu(struct device_node *dn)
 {
 	int rc = 0;
 	unsigned int cpu;
-	int len, nthreads, i;
+	int len, nthreads, i, nid;
 	const __be32 *intserv;
 	u32 thread;
 
@@ -367,9 +373,11 @@ static int dlpar_online_cpu(struct device_node *dn)
 			cpu_maps_update_done();
 			timed_topology_update(1);
 			find_and_online_cpu_nid(cpu, true);
+			cpuremap_map_cpu(thread, i, nid);
 			rc = device_online(get_cpu_device(cpu));
 			if (rc)
 				goto out;
+			cpuremap_reserve_cpu(cpu);
 			cpu_maps_update_begin();
 
 			break;
@@ -541,6 +549,7 @@ static int dlpar_offline_cpu(struct device_node *dn)
 				rc = device_offline(get_cpu_device(cpu));
 				if (rc)
 					goto out;
+				cpuremap_release_cpu(cpu);
 				cpu_maps_update_begin();
 				break;
 
