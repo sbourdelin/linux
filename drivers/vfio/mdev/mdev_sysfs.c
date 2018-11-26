@@ -54,14 +54,21 @@ static const struct sysfs_ops mdev_type_sysfs_ops = {
 static ssize_t create_store(struct kobject *kobj, struct device *dev,
 			    const char *buf, size_t count)
 {
-	char *str;
+	char *str, *param, *opt = NULL;
 	uuid_le uuid;
 	int ret;
+	unsigned int instances = 1;
 
-	if ((count < UUID_STRING_LEN) || (count > UUID_STRING_LEN + 1))
+	if (count < UUID_STRING_LEN)
 		return -EINVAL;
 
-	str = kstrndup(buf, count, GFP_KERNEL);
+	if ((param = strnchr(buf, count, ',')) == NULL) {
+		if (count > UUID_STRING_LEN + 1)
+			return -EINVAL;
+	} else if (param - buf != UUID_STRING_LEN)
+		return -EINVAL;
+
+	str = kstrndup(buf, UUID_STRING_LEN, GFP_KERNEL);
 	if (!str)
 		return -ENOMEM;
 
@@ -70,7 +77,24 @@ static ssize_t create_store(struct kobject *kobj, struct device *dev,
 	if (ret)
 		return ret;
 
-	ret = mdev_device_create(kobj, dev, uuid);
+	if (param) {
+		opt = kstrndup(param + 1, count - UUID_STRING_LEN - 1,
+			       GFP_KERNEL);
+		if (!opt)
+			return -ENOMEM;
+		if (strncmp(opt, "aggregate=", 10)) {
+			kfree(opt);
+			return -EINVAL;
+		}
+		opt += 10;
+		if (kstrtouint(opt, 10, &instances)) {
+			kfree(opt);
+			return -EINVAL;
+		}
+		kfree(opt);
+	}
+
+	ret = mdev_device_create(kobj, dev, uuid, instances);
 	if (ret)
 		return ret;
 

@@ -31,6 +31,14 @@ struct mdev_device;
  *			@mdev: mdev_device structure on of mediated device
  *			      that is being created
  *			Returns integer: success (0) or error (< 0)
+ * @create_with_instances: Allocate aggregated instances' resources in parent device's
+ *			driver for a particular mediated device. Optional if aggregated
+ *                      resources are not supported.
+ *			@kobj: kobject of type for which 'create' is called.
+ *			@mdev: mdev_device structure on of mediated device
+ *			      that is being created
+ *                      @instances: number of instances to aggregate
+ *			Returns integer: success (0) or error (< 0)
  * @remove:		Called to free resources in parent device's driver for a
  *			a mediated device. It is mandatory to provide 'remove'
  *			ops.
@@ -71,6 +79,9 @@ struct mdev_parent_ops {
 	struct attribute_group **supported_type_groups;
 
 	int     (*create)(struct kobject *kobj, struct mdev_device *mdev);
+	int     (*create_with_instances)(struct kobject *kobj,
+					 struct mdev_device *mdev,
+					 unsigned int instances);
 	int     (*remove)(struct mdev_device *mdev);
 	int     (*open)(struct mdev_device *mdev);
 	void    (*release)(struct mdev_device *mdev);

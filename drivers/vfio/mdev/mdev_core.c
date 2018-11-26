@@ -104,12 +104,17 @@ static inline void mdev_put_parent(struct mdev_parent *parent)
 }
 
 static int mdev_device_create_ops(struct kobject *kobj,
-				  struct mdev_device *mdev)
+				  struct mdev_device *mdev,
+				  unsigned int instances)
 {
 	struct mdev_parent *parent = mdev->parent;
 	int ret;
 
-	ret = parent->ops->create(kobj, mdev);
+	if (instances > 1) {
+		ret = parent->ops->create_with_instances(kobj, mdev,
+							 instances);
+	} else
+		ret = parent->ops->create(kobj, mdev);
 	if (ret)
 		return ret;
 
@@ -276,7 +281,8 @@ static void mdev_device_release(struct device *dev)
 	kfree(mdev);
 }
 
-int mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid)
+int mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid,
+		       unsigned int instances)
 {
 	int ret;
 	struct mdev_device *mdev, *tmp;
@@ -286,6 +292,12 @@ int mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid)
 	parent = mdev_get_parent(type->parent);
 	if (!parent)
 		return -EINVAL;
+
+	if (instances > 1 &&
+	    !parent->ops->create_with_instances) {
+		ret = -EINVAL;
+		goto mdev_fail;
+	}
 
 	mutex_lock(&mdev_list_lock);
 
@@ -316,6 +328,7 @@ int mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid)
 	mdev->dev.bus     = &mdev_bus_type;
 	mdev->dev.release = mdev_device_release;
 	dev_set_name(&mdev->dev, "%pUl", uuid.b);
+	mdev->type_instances = instances;
 
 	ret = device_register(&mdev->dev);
 	if (ret) {
@@ -323,7 +336,7 @@ int mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid)
 		goto mdev_fail;
 	}
 
-	ret = mdev_device_create_ops(kobj, mdev);
+	ret = mdev_device_create_ops(kobj, mdev, instances);
 	if (ret)
 		goto create_fail;
 
