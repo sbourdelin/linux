@@ -271,7 +271,7 @@ static int bsg_init_rq(struct request_queue *q, struct request *req, gfp_t gfp)
 {
 	struct bsg_job *job = blk_mq_rq_to_pdu(req);
 
-	job->reply = kzalloc(SCSI_SENSE_BUFFERSIZE, gfp);
+	job->reply = kzalloc(BSG_REPLY_BUFFERSIZE, gfp);
 	if (!job->reply)
 		return -ENOMEM;
 	return 0;
@@ -285,7 +285,7 @@ static void bsg_initialize_rq(struct request *req)
 
 	memset(job, 0, sizeof(*job));
 	job->reply = reply;
-	job->reply_len = SCSI_SENSE_BUFFERSIZE;
+	job->reply_len = BSG_REPLY_BUFFERSIZE;
 	job->dd_data = job + 1;
 }
 

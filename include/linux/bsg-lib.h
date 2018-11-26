@@ -26,6 +26,8 @@
 #include <linux/blkdev.h>
 #include <scsi/scsi_request.h>
 
+#define BSG_REPLY_BUFFERSIZE	320
+
 struct request;
 struct device;
 struct scatterlist;
