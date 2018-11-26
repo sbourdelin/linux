@@ -1327,4 +1327,5 @@ void sctp_stream_interleave_init(struct sctp_stream *stream)
 	asoc = container_of(stream, struct sctp_association, stream);
 	stream->si = asoc->intl_enable ? &sctp_stream_interleave_1
 				       : &sctp_stream_interleave_0;
+	sctp_assoc_update_frag_point(asoc);
 }
