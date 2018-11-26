@@ -61,18 +61,6 @@ static void fa_free(struct flex_array *fa)
 		flex_array_free(fa);
 }
 
-static void fa_copy(struct flex_array *fa, struct flex_array *from,
-		    size_t index, size_t count)
-{
-	void *elem;
-
-	while (count--) {
-		elem = flex_array_get(from, index);
-		flex_array_put(fa, index, elem, 0);
-		index++;
-	}
-}
-
 static void fa_zero(struct flex_array *fa, size_t index, size_t count)
 {
 	void *elem;
@@ -135,6 +123,36 @@ static void sctp_stream_outq_migrate(struct sctp_stream *stream,
 		kfree(SCTP_SO(stream, i)->ext);
 }
 
+static void sctp_stream_in_copy(struct flex_array *fa,
+				struct sctp_stream *stream, __u16 count)
+{
+	size_t index = 0;
+	void *elem;
+
+	count = min(count, stream->incnt);
+	while (count--) {
+		elem = flex_array_get(stream->in, index);
+		flex_array_put(fa, index, elem, 0);
+		index++;
+	}
+}
+
+static void sctp_stream_out_copy(struct flex_array *fa,
+				 struct sctp_stream *stream, __u16 count)
+{
+	size_t index = 0;
+	void *elem;
+
+	count = min(count, stream->outcnt);
+	while (count--) {
+		elem = flex_array_get(stream->out, index);
+		flex_array_put(fa, index, elem, 0);
+		if (stream->out_curr == elem)
+			stream->out_curr = flex_array_get(fa, index);
+		index++;
+	}
+}
+
 static int sctp_stream_alloc_out(struct sctp_stream *stream, __u16 outcnt,
 				 gfp_t gfp)
 {
@@ -146,7 +164,7 @@ static int sctp_stream_alloc_out(struct sctp_stream *stream, __u16 outcnt,
 		return -ENOMEM;
 
 	if (stream->out) {
-		fa_copy(out, stream->out, 0, min(outcnt, stream->outcnt));
+		sctp_stream_out_copy(out, stream, outcnt);
 		fa_free(stream->out);
 	}
 
@@ -169,7 +187,7 @@ static int sctp_stream_alloc_in(struct sctp_stream *stream, __u16 incnt,
 		return -ENOMEM;
 
 	if (stream->in) {
-		fa_copy(in, stream->in, 0, min(incnt, stream->incnt));
+		sctp_stream_in_copy(in, stream, incnt);
 		fa_free(stream->in);
 	}
 
