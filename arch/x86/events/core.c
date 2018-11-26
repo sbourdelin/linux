@@ -2322,6 +2322,8 @@ static struct pmu pmu = {
 	.event_idx		= x86_pmu_event_idx,
 	.sched_task		= x86_pmu_sched_task,
 	.task_ctx_size          = sizeof(struct x86_perf_task_context),
+
+	.capabilities		= PERF_PMU_CAP_EXCLUDE,
 };
 
 void arch_perf_update_userpage(struct perf_event *event,
