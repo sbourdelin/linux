@@ -1254,6 +1254,7 @@ static int pi433_probe(struct spi_device *spi)
 	retval = cdev_add(device->cdev, device->devt, 1);
 	if (retval) {
 		dev_dbg(device->dev, "register of cdev failed");
+		cdev_del(device->cdev);
 		goto cdev_failed;
 	}
 
