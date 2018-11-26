@@ -4,6 +4,7 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
+#include <drm/drm_gem_shmem_helper.h>
 
 /**
  * compute_crc - Compute CRC value on output frame
@@ -91,21 +92,19 @@ static void compose_cursor(struct vkms_crc_data *cursor_crc,
 			   struct vkms_crc_data *primary_crc, void *vaddr_out)
 {
 	struct drm_gem_object *cursor_obj;
-	struct vkms_gem_object *cursor_vkms_obj;
+	void *vaddr;
 
 	cursor_obj = drm_gem_fb_get_obj(&cursor_crc->fb, 0);
-	cursor_vkms_obj = drm_gem_to_vkms_gem(cursor_obj);
+	vaddr = drm_gem_shmem_vmap(cursor_obj);
 
-	mutex_lock(&cursor_vkms_obj->pages_lock);
-	if (!cursor_vkms_obj->vaddr) {
+	if (IS_ERR(vaddr)) {
 		DRM_WARN("cursor plane vaddr is NULL");
-		goto out;
+		return;
 	}
 
-	blend(vaddr_out, cursor_vkms_obj->vaddr, primary_crc, cursor_crc);
+	blend(vaddr_out, vaddr, primary_crc, cursor_crc);
 
-out:
-	mutex_unlock(&cursor_vkms_obj->pages_lock);
+	drm_gem_shmem_vunmap(cursor_obj, vaddr);
 }
 
 static uint32_t _vkms_get_crc(struct vkms_crc_data *primary_crc,
@@ -113,8 +112,8 @@ static uint32_t _vkms_get_crc(struct vkms_crc_data *primary_crc,
 {
 	struct drm_framebuffer *fb = &primary_crc->fb;
 	struct drm_gem_object *gem_obj = drm_gem_fb_get_obj(fb, 0);
-	struct vkms_gem_object *vkms_obj = drm_gem_to_vkms_gem(gem_obj);
-	void *vaddr_out = kzalloc(vkms_obj->gem.size, GFP_KERNEL);
+	void *vaddr;
+	void *vaddr_out = kzalloc(gem_obj->size, GFP_KERNEL);
 	u32 crc = 0;
 
 	if (!vaddr_out) {
@@ -122,21 +121,20 @@ static uint32_t _vkms_get_crc(struct vkms_crc_data *primary_crc,
 		return 0;
 	}
 
-	mutex_lock(&vkms_obj->pages_lock);
-	if (WARN_ON(!vkms_obj->vaddr)) {
-		mutex_unlock(&vkms_obj->pages_lock);
+	vaddr = drm_gem_shmem_vmap(gem_obj);
+	if (WARN_ON(IS_ERR(vaddr))) {
 		kfree(vaddr_out);
 		return crc;
 	}
 
-	memcpy(vaddr_out, vkms_obj->vaddr, vkms_obj->gem.size);
-	mutex_unlock(&vkms_obj->pages_lock);
+	memcpy(vaddr_out, vaddr, gem_obj->size);
 
 	if (cursor_crc)
 		compose_cursor(cursor_crc, primary_crc, vaddr_out);
 
 	crc = compute_crc(vaddr_out, primary_crc);
 
+	drm_gem_shmem_vunmap(gem_obj, vaddr);
 	kfree(vaddr_out);
 
 	return crc;

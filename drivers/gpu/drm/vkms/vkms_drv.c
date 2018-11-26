@@ -19,6 +19,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
+#include <drm/drm_gem_shmem_helper.h>
 #include <drm/drm_fb_helper.h>
 #include "vkms_drv.h"
 
@@ -46,12 +47,6 @@ static const struct file_operations vkms_driver_fops = {
 	.release	= drm_release,
 };
 
-static const struct vm_operations_struct vkms_gem_vm_ops = {
-	.fault = vkms_gem_fault,
-	.open = drm_gem_vm_open,
-	.close = drm_gem_vm_close,
-};
-
 static void vkms_release(struct drm_device *dev)
 {
 	struct vkms_device *vkms = container_of(dev, struct vkms_device, drm);
@@ -64,12 +59,13 @@ static void vkms_release(struct drm_device *dev)
 }
 
 static struct drm_driver vkms_driver = {
-	.driver_features	= DRIVER_MODESET | DRIVER_ATOMIC | DRIVER_GEM,
+	.driver_features	= (DRIVER_MODESET |
+				   DRIVER_ATOMIC |
+				   DRIVER_GEM |
+				   DRIVER_PRIME),
 	.release		= vkms_release,
 	.fops			= &vkms_driver_fops,
-	.dumb_create		= vkms_dumb_create,
-	.gem_vm_ops		= &vkms_gem_vm_ops,
-	.gem_free_object_unlocked = vkms_gem_free_object,
+	DRM_GEM_SHMEM_DRIVER_OPS,
 	.get_vblank_timestamp	= vkms_get_vblank_timestamp,
 
 	.name			= DRIVER_NAME,
