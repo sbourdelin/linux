@@ -7367,6 +7367,7 @@ static void attach_tasks(struct lb_env *env)
 	rq_unlock(env->dst_rq, &rf);
 }
 
+#ifdef CONFIG_NO_HZ_COMMON
 static inline bool cfs_rq_has_blocked(struct cfs_rq *cfs_rq)
 {
 	if (cfs_rq->avg.load_avg)
@@ -7394,6 +7395,37 @@ static inline bool others_have_blocked(struct rq *rq)
 	return false;
 }
 
+static inline void update_rq_blocked_load(struct rq *rq, bool clear)
+{
+	rq->last_blocked_load_update_tick = jiffies;
+	if (clear)
+		rq->has_blocked_load = 0;
+}
+#else /* !CONFIG_NO_HZ_COMMON */
+static inline bool cfs_rq_has_blocked(struct cfs_rq *cfs_rq)
+{
+	return false;
+}
+
+static inline bool others_have_blocked(struct rq *rq)
+{
+	return false;
+}
+
+static inline void update_rq_blocked_load(struct rq *rq, bool clear)
+{
+}
+#endif /* CONFIG_NO_HZ_COMMON */
+
+static void update_others_load_avg(struct rq *rq)
+{
+	const struct sched_class *curr = rq->curr->sched_class;
+
+	update_rt_rq_load_avg(rq_clock_task(rq), rq, curr == &rt_sched_class);
+	update_dl_rq_load_avg(rq_clock_task(rq), rq, curr == &dl_sched_class);
+	update_irq_load_avg(rq, 0);
+}
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 
 static inline bool cfs_rq_is_decayed(struct cfs_rq *cfs_rq)
@@ -7417,7 +7449,6 @@ static void update_blocked_averages(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 	struct cfs_rq *cfs_rq, *pos;
-	const struct sched_class *curr_class;
 	struct rq_flags rf;
 	bool done = true;
 
@@ -7455,19 +7486,12 @@ static void update_blocked_averages(int cpu)
 			done = false;
 	}
 
-	curr_class = rq->curr->sched_class;
-	update_rt_rq_load_avg(rq_clock_task(rq), rq, curr_class == &rt_sched_class);
-	update_dl_rq_load_avg(rq_clock_task(rq), rq, curr_class == &dl_sched_class);
-	update_irq_load_avg(rq, 0);
+	update_others_load_avg(rq);
 	/* Don't need periodic decay once load/util_avg are null */
-	if (others_have_blocked(rq))
+	if (done && others_have_blocked(rq))
 		done = false;
 
-#ifdef CONFIG_NO_HZ_COMMON
-	rq->last_blocked_load_update_tick = jiffies;
-	if (done)
-		rq->has_blocked_load = 0;
-#endif
+	update_rq_blocked_load(rq, done);
 	rq_unlock_irqrestore(rq, &rf);
 }
 
@@ -7522,22 +7546,15 @@ static inline void update_blocked_averages(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 	struct cfs_rq *cfs_rq = &rq->cfs;
-	const struct sched_class *curr_class;
 	struct rq_flags rf;
 
 	rq_lock_irqsave(rq, &rf);
 	update_rq_clock(rq);
 	update_cfs_rq_load_avg(cfs_rq_clock_task(cfs_rq), cfs_rq);
 
-	curr_class = rq->curr->sched_class;
-	update_rt_rq_load_avg(rq_clock_task(rq), rq, curr_class == &rt_sched_class);
-	update_dl_rq_load_avg(rq_clock_task(rq), rq, curr_class == &dl_sched_class);
-	update_irq_load_avg(rq, 0);
-#ifdef CONFIG_NO_HZ_COMMON
-	rq->last_blocked_load_update_tick = jiffies;
-	if (!cfs_rq_has_blocked(cfs_rq) && !others_have_blocked(rq))
-		rq->has_blocked_load = 0;
-#endif
+	update_others_load_avg(rq);
+	update_rq_blocked_load(rq, !cfs_rq_has_blocked(cfs_rq) &&
+				   !others_have_blocked(rq));
 	rq_unlock_irqrestore(rq, &rf);
 }
 
