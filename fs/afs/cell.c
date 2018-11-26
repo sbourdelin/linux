@@ -637,6 +637,7 @@ again:
 		cell->state = AFS_CELL_ACTIVE;
 		smp_wmb();
 		clear_bit(AFS_CELL_FL_NOT_READY, &cell->flags);
+		smp_mb__after_atomic(); /* see comment for wake_up_bit() */
 		wake_up_bit(&cell->flags, AFS_CELL_FL_NOT_READY);
 		goto again;
 
@@ -678,6 +679,7 @@ reverse_deactivation:
 	cell->state = AFS_CELL_ACTIVE;
 	smp_wmb();
 	clear_bit(AFS_CELL_FL_NOT_READY, &cell->flags);
+	smp_mb__after_atomic(); /* see comment for wake_up_bit() */
 	wake_up_bit(&cell->flags, AFS_CELL_FL_NOT_READY);
 	_leave(" [deact->act]");
 	return;
