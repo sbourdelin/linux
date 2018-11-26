@@ -30,11 +30,9 @@
 #include <linux/init.h>
 #include <linux/signal.h>
 #include <linux/completion.h>
-#include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
-#include <linux/kthread.h>
 #include <linux/hardirq.h>
 #include <linux/mempolicy.h>
 #include <linux/freezer.h>
