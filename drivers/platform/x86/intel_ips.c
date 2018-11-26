@@ -1311,8 +1311,7 @@ static void ips_debugfs_init(struct ips_driver *ips)
 
 	ips->debug_root = debugfs_create_dir("ips", NULL);
 	if (!ips->debug_root) {
-		dev_err(ips->dev, "failed to create debugfs entries: %ld\n",
-			PTR_ERR(ips->debug_root));
+		dev_err(ips->dev, "failed to create debugfs entries\n")
 		return;
 	}
 
@@ -1325,8 +1324,7 @@ static void ips_debugfs_init(struct ips_driver *ips)
 					  ips->debug_root, node,
 					  &ips_debugfs_ops);
 		if (!ent) {
-			dev_err(ips->dev, "failed to create debug file: %ld\n",
-				PTR_ERR(ent));
+			dev_err(ips->dev, "failed to create debug file\n");
 			goto err_cleanup;
 		}
 	}
