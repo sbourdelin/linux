@@ -30,10 +30,11 @@
  *
  */
 
+#include <linux/init.h>
 #include <linux/types.h>
 #include <xen/xen.h>
 #include <linux/kthread.h>
-
+#include <linux/module.h>
 #include "i915_drv.h"
 #include "gvt.h"
 #include <linux/vfio.h>
@@ -216,8 +217,8 @@ int intel_gvt_init_host(void)
 	} else {
 #if IS_ENABLED(CONFIG_DRM_I915_GVT_KVMGT)
 		/* not in Xen. Try KVMGT */
-		intel_gvt_host.mpt = try_then_request_module(
-				symbol_get(kvmgt_mpt), "kvmgt");
+		request_module("kvmgt");
+		intel_gvt_host.mpt = &kvmgt_mpt;
 		intel_gvt_host.hypervisor_type = INTEL_GVT_HYPERVISOR_KVM;
 #endif
 	}
@@ -467,6 +468,51 @@ out_clean_idr:
 	return ret;
 }
 
+static struct drm_i915_private *i915_priv;
+
+static int __init i915_gvt_init(void)
+{
+	struct drm_i915_private *priv;
+
+	if (intel_gvt_init_host()) {
+		gvt_err("init host fail\n");
+		goto err1;
+	}
+
+	priv = i915_private_get();
+	if (!priv) {
+		gvt_err("get i915 private instance fail\n");
+		goto err1;
+	}
+		
+	if (intel_gvt_init_device(priv)) {
+		gvt_err("init device fail\n");
+		goto err2;
+	}
+	i915_priv = priv;
+	
+	printk("i915_gvt_init success\n");
+	return 0;
+err2:
+	i915_private_put(priv);
+err1:
+	return -1;
+}
+
+static void __exit i915_gvt_exit(void)
+{
+	if (!intel_gvt_active(i915_priv))
+		return;
+	intel_gvt_clean_device(i915_priv);
+	i915_private_put(i915_priv);
+}
+
+module_init(i915_gvt_init);
+module_exit(i915_gvt_exit);
+
 #if IS_ENABLED(CONFIG_DRM_I915_GVT_KVMGT)
 MODULE_SOFTDEP("pre: kvmgt");
 #endif
+
+MODULE_LICENSE("GPL and additional rights");
+MODULE_AUTHOR("Intel Corporation");

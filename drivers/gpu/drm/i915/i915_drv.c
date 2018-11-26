@@ -53,6 +53,7 @@
 #include "i915_vgpu.h"
 #include "intel_drv.h"
 #include "intel_uc.h"
+#include "intel_gvt.h"
 
 static struct drm_driver driver;
 
@@ -1023,6 +1024,8 @@ static int i915_driver_init_mmio(struct drm_i915_private *dev_priv)
 
 	intel_uncore_init(dev_priv);
 
+	intel_gvt_init_mmio(dev_priv);
+
 	intel_device_info_init_mmio(dev_priv);
 
 	intel_uncore_prune(dev_priv);
@@ -1055,11 +1058,6 @@ static void i915_driver_cleanup_mmio(struct drm_i915_private *dev_priv)
 	intel_uncore_fini(dev_priv);
 	i915_mmio_cleanup(dev_priv);
 	pci_dev_put(dev_priv->bridge_dev);
-}
-
-static void intel_sanitize_options(struct drm_i915_private *dev_priv)
-{
-	intel_gvt_sanitize_options(dev_priv);
 }
 
 static enum dram_rank skl_get_dimm_rank(u8 size, u32 rank)
@@ -1383,8 +1381,6 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 		}
 	}
 
-	intel_sanitize_options(dev_priv);
-
 	i915_perf_init(dev_priv);
 
 	ret = i915_ggtt_probe_hw(dev_priv);
@@ -1478,10 +1474,6 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 			DRM_DEBUG_DRIVER("can't enable MSI");
 	}
 
-	ret = intel_gvt_init(dev_priv);
-	if (ret)
-		goto err_msi;
-
 	intel_opregion_setup(dev_priv);
 	/*
 	 * Fill the dram structure to get the system raw bandwidth and
@@ -1492,10 +1484,6 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 
 	return 0;
 
-err_msi:
-	if (pdev->msi_enabled)
-		pci_disable_msi(pdev);
-	pm_qos_remove_request(&dev_priv->pm_qos);
 err_ggtt:
 	i915_ggtt_cleanup_hw(dev_priv);
 err_perf:
@@ -1677,6 +1665,25 @@ static void i915_driver_destroy(struct drm_i915_private *i915)
 	pci_set_drvdata(pdev, NULL);
 }
 
+static struct drm_i915_private *i915_priv_prime;
+
+struct drm_i915_private *i915_private_get(void)
+{
+	if (!i915_priv_prime)
+		return NULL;
+
+	try_module_get(i915_priv_prime->drm.dev->driver->owner);
+	return i915_priv_prime;
+}
+EXPORT_SYMBOL_GPL(i915_private_get);
+
+void i915_private_put(struct drm_i915_private *priv)
+{
+	if (priv)
+		module_put(priv->drm.dev->driver->owner);
+}
+EXPORT_SYMBOL_GPL(i915_private_put);
+
 /**
  * i915_driver_load - setup chip and create an initial config
  * @pdev: PCI device
@@ -1731,6 +1738,8 @@ int i915_driver_load(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	i915_welcome_messages(dev_priv);
 
+	i915_priv_prime = dev_priv;
+	
 	return 0;
 
 out_cleanup_hw:
@@ -1755,14 +1764,14 @@ void i915_driver_unload(struct drm_device *dev)
 
 	disable_rpm_wakeref_asserts(dev_priv);
 
+	intel_gvt_clean_mmio(dev_priv);
+	
 	i915_driver_unregister(dev_priv);
 
 	if (i915_gem_suspend(dev_priv))
 		DRM_ERROR("failed to idle hardware; continuing to unload!\n");
 
 	drm_atomic_helper_shutdown(dev);
-
-	intel_gvt_cleanup(dev_priv);
 
 	intel_modeset_cleanup(dev);
 

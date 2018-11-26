@@ -19,32 +19,17 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- */
+*/
 
 #ifndef _INTEL_GVT_H_
 #define _INTEL_GVT_H_
 
-struct intel_gvt;
-
-#ifdef CONFIG_DRM_I915_GVT
-int intel_gvt_init(struct drm_i915_private *dev_priv);
-void intel_gvt_cleanup(struct drm_i915_private *dev_priv);
-int intel_gvt_init_device(struct drm_i915_private *dev_priv);
-void intel_gvt_clean_device(struct drm_i915_private *dev_priv);
-int intel_gvt_init_host(void);
-void intel_gvt_sanitize_options(struct drm_i915_private *dev_priv);
+#if defined(CONFIG_DRM_I915_GVT) || defined(CONFIG_DRM_I915_GVT_MODULE)
+void intel_gvt_init_mmio(struct drm_i915_private *dev_priv);
+void intel_gvt_clean_mmio(struct drm_i915_private *dev_priv);
 #else
-static inline int intel_gvt_init(struct drm_i915_private *dev_priv)
-{
-	return 0;
-}
-static inline void intel_gvt_cleanup(struct drm_i915_private *dev_priv)
-{
-}
-
-static inline void intel_gvt_sanitize_options(struct drm_i915_private *dev_priv)
-{
-}
+static void intel_gvt_init_mmio(struct drm_i915_private *dev_priv) {}
+static void intel_gvt_clean_mmio(struct drm_i915_private *dev_priv) {}
 #endif
 
-#endif /* _INTEL_GVT_H_ */
+#endif

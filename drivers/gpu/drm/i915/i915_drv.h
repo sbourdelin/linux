@@ -81,8 +81,6 @@
 #include "i915_timeline.h"
 #include "i915_vma.h"
 
-#include "intel_gvt.h"
-
 /* General customization:
  */
 
@@ -1434,6 +1432,8 @@ struct intel_cdclk_state {
 	u8 voltage_level;
 };
 
+struct intel_gvt;
+
 struct drm_i915_private {
 	struct drm_device drm;
 
@@ -2015,6 +2015,9 @@ struct drm_i915_private {
 
 	struct i915_pmu pmu;
 
+#if defined(CONFIG_DRM_I915_GVT) || defined(CONFIG_DRM_I915_GVT_MODULE)
+	u32 *hw_init_mmio;
+#endif
 	/*
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch
 	 * will be rejected. Instead look for a better place.
@@ -3721,5 +3724,8 @@ static inline int intel_hws_csb_write_index(struct drm_i915_private *i915)
 	else
 		return I915_HWS_CSB_WRITE_INDEX;
 }
+
+struct drm_i915_private *i915_private_get(void);
+void i915_private_put(struct drm_i915_private *);
 
 #endif

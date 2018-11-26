@@ -70,7 +70,7 @@ static int mmio_snapshot_handler(struct intel_gvt *gvt, u32 offset, void *data)
 {
 	struct drm_i915_private *dev_priv = gvt->dev_priv;
 
-	*(u32 *)(data + offset) = I915_READ_NOTRACE(_MMIO(offset));
+	*(u32 *)(data + offset) = dev_priv->hw_init_mmio[offset >> 2];
 	return 0;
 }
 

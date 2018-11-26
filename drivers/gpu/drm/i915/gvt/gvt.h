@@ -480,6 +480,9 @@ static inline void intel_vgpu_write_pci_bar(struct intel_vgpu *vgpu,
 
 int intel_gvt_init_vgpu_types(struct intel_gvt *gvt);
 void intel_gvt_clean_vgpu_types(struct intel_gvt *gvt);
+extern int intel_gvt_init_device(struct drm_i915_private *dev_priv);
+extern void intel_gvt_clean_device(struct drm_i915_private *dev_priv);
+extern int intel_gvt_init_host(void);
 
 struct intel_vgpu *intel_gvt_create_idle_vgpu(struct intel_gvt *gvt);
 void intel_gvt_destroy_idle_vgpu(struct intel_vgpu *vgpu);
