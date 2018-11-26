@@ -4882,7 +4882,7 @@ static struct sock *sk_lookup(struct net *net, struct bpf_sock_tuple *tuple,
  */
 static unsigned long
 bpf_sk_lookup(struct sk_buff *skb, struct bpf_sock_tuple *tuple, u32 len,
-	      u8 proto, u64 netns_id, u64 flags)
+	      u8 proto, u32 netns_id, u64 flags)
 {
 	struct net *caller_net;
 	struct sock *sk = NULL;
@@ -4890,22 +4890,22 @@ bpf_sk_lookup(struct sk_buff *skb, struct bpf_sock_tuple *tuple, u32 len,
 	struct net *net;
 
 	family = len == sizeof(tuple->ipv4) ? AF_INET : AF_INET6;
-	if (unlikely(family == AF_UNSPEC || netns_id > U32_MAX || flags))
+	if (unlikely(family == AF_UNSPEC || flags))
 		goto out;
 
 	if (skb->dev)
 		caller_net = dev_net(skb->dev);
 	else
 		caller_net = sock_net(skb->sk);
-	if (netns_id) {
+	if (netns_id & BPF_F_SK_CURRENT_NS) {
+		net = caller_net;
+		sk = sk_lookup(net, tuple, skb, family, proto);
+	} else {
 		net = get_net_ns_by_id(caller_net, netns_id);
 		if (unlikely(!net))
 			goto out;
 		sk = sk_lookup(net, tuple, skb, family, proto);
 		put_net(net);
-	} else {
-		net = caller_net;
-		sk = sk_lookup(net, tuple, skb, family, proto);
 	}
 
 	if (sk)
@@ -4915,7 +4915,7 @@ out:
 }
 
 BPF_CALL_5(bpf_sk_lookup_tcp, struct sk_buff *, skb,
-	   struct bpf_sock_tuple *, tuple, u32, len, u64, netns_id, u64, flags)
+	   struct bpf_sock_tuple *, tuple, u32, len, u32, netns_id, u64, flags)
 {
 	return bpf_sk_lookup(skb, tuple, len, IPPROTO_TCP, netns_id, flags);
 }
@@ -4933,7 +4933,7 @@ static const struct bpf_func_proto bpf_sk_lookup_tcp_proto = {
 };
 
 BPF_CALL_5(bpf_sk_lookup_udp, struct sk_buff *, skb,
-	   struct bpf_sock_tuple *, tuple, u32, len, u64, netns_id, u64, flags)
+	   struct bpf_sock_tuple *, tuple, u32, len, u32, netns_id, u64, flags)
 {
 	return bpf_sk_lookup(skb, tuple, len, IPPROTO_UDP, netns_id, flags);
 }
