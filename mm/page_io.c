@@ -37,7 +37,7 @@ static struct bio *get_swap_bio(gfp_t gfp_flags,
 		struct block_device *bdev;
 
 		bio->bi_iter.bi_sector = map_swap_page(page, &bdev);
-		bio_set_dev(bio, bdev);
+		bio_set_dev_only(bio, bdev);
 		bio->bi_iter.bi_sector <<= PAGE_SHIFT - 9;
 		bio->bi_end_io = end_io;
 

@@ -487,6 +487,12 @@ extern const char *bio_devname(struct bio *bio, char *buffer);
 
 #define bio_set_dev(bio, bdev) 			\
 do {						\
+	bio_set_dev_only(bio, bdev);		\
+	bio_associate_blkg(bio);		\
+} while (0)
+
+#define bio_set_dev_only(bio, bdev)		\
+do {						\
 	if ((bio)->bi_disk != (bdev)->bd_disk)	\
 		bio_clear_flag(bio, BIO_THROTTLED);\
 	(bio)->bi_disk = (bdev)->bd_disk;	\
@@ -497,6 +503,7 @@ do {						\
 do {						\
 	(dst)->bi_disk = (src)->bi_disk;	\
 	(dst)->bi_partno = (src)->bi_partno;	\
+	bio_clone_blkcg_association(dst, src);	\
 } while (0)
 
 #define bio_dev(bio) \
