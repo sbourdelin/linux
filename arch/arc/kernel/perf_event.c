@@ -514,6 +514,7 @@ static int arc_pmu_device_probe(struct platform_device *pdev)
 		.start		= arc_pmu_start,
 		.stop		= arc_pmu_stop,
 		.read		= arc_pmu_read,
+		.capabilities	= PERF_PMU_CAP_EXCLUDE,
 	};
 
 	if (has_interrupts) {
