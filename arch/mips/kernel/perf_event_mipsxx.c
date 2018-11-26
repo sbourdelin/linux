@@ -670,6 +670,7 @@ static struct pmu pmu = {
 	.start		= mipspmu_start,
 	.stop		= mipspmu_stop,
 	.read		= mipspmu_read,
+	.capabilities	= PERF_PMU_CAP_EXCLUDE,
 };
 
 static unsigned int mipspmu_perf_event_encode(const struct mips_perf_event *pev)
