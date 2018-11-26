@@ -22,10 +22,8 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>
-#include <linux/audit.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
-#include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/netlink.h>
 #include <linux/sched.h>
