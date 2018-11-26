@@ -54,6 +54,12 @@ fall back to the default capacity value for every CPU. If cpufreq is not
 available, final capacities are calculated by directly using capacity-dmips-
 mhz values (normalized w.r.t. the highest value found while parsing the DT).
 
+If capacity-dmips-mhz is not specified or if the parsing fails, the
+default capacity value will be computed against the highest frequency.
+When all CPUs have the same OPP, they will have the same capacity
+value otherwise the capacity will be scaled down for CPUs having lower
+frequencies.
+
 ===========================================
 4 - Examples
 ===========================================
