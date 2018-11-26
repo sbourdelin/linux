@@ -957,7 +957,7 @@ struct ubuf_info *sock_zerocopy_alloc(struct sock *sk, size_t size)
 	uarg->len = 1;
 	uarg->bytelen = size;
 	uarg->zerocopy = 1;
-	refcount_set(&uarg->refcnt, 1);
+	refcount_set(&uarg->refcnt, sk->sk_type == SOCK_STREAM ? 1 : 0);
 	sock_hold(sk);
 
 	return uarg;
@@ -1097,6 +1097,13 @@ void sock_zerocopy_put_abort(struct ubuf_info *uarg)
 		atomic_dec(&sk->sk_zckey);
 		uarg->len--;
 
+		/* Stream socks hold a ref for the syscall, as skbs can be sent
+		 * and freed inside the loop, dropping refcnt to 0 inbetween.
+		 * Datagrams do not need this, but sock_zerocopy_put expects it.
+		 */
+		if (sk->sk_type != SOCK_STREAM && !refcount_read(&uarg->refcnt))
+			refcount_set(&uarg->refcnt, 1);
+
 		sock_zerocopy_put(uarg);
 	}
 }
@@ -1104,6 +1111,12 @@ EXPORT_SYMBOL_GPL(sock_zerocopy_put_abort);
 
 extern int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
 				   struct iov_iter *from, size_t length);
+
+int skb_zerocopy_iter_dgram(struct sk_buff *skb, struct msghdr *msg, int len)
+{
+	return __zerocopy_sg_from_iter(skb->sk, skb, &msg->msg_iter, len);
+}
+EXPORT_SYMBOL_GPL(skb_zerocopy_iter_dgram);
 
 int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
 			     struct msghdr *msg, int len,
