@@ -62,11 +62,8 @@
 #include <linux/pid.h>
 #include <linux/slab.h>
 
-#include <linux/audit.h>
-
 #include <net/sock.h>
 #include <net/netlink.h>
-#include <linux/skbuff.h>
 #ifdef CONFIG_SECURITY
 #include <linux/security.h>
 #endif
