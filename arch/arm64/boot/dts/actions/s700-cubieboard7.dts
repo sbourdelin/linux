@@ -37,3 +37,22 @@
 &uart3 {
 	status = "okay";
 };
+
+&sirq {
+	pinctrl-names = "default";
+	pinctrl-0 = <&sirq2_default>;
+};
+
+&pinctrl {
+	sirq2_default: sirq2_default {
+		pinmux {
+			groups = "sirq2_dummy";
+			function = "sirq2";
+		};
+
+		pinconf {
+			pins = "sirq2";
+			bias-pull-pin-default;
+		};
+	};
+};
