@@ -724,14 +724,45 @@ static struct snd_soc_dai_driver max98373_dai[] = {
 	}
 };
 
+static void max98373_reset(struct max98373_priv *max98373, struct device *dev)
+{
+	int ret, reg, count, delay;
+
+	count = 0;
+	while (true) {
+		/* Software Reset */
+		ret = regmap_update_bits(max98373->regmap,
+			MAX98373_R2000_SW_RESET,
+			MAX98373_SOFT_RESET,
+			MAX98373_SOFT_RESET);
+		if (ret)
+			dev_err(dev, "Reset command failed. (ret:%d)\n", ret);
+
+		delay = 10000 + (count * 30000);
+		usleep_range(delay, delay + 1000);
+
+		/* Software Reset Verification */
+		ret = regmap_read(max98373->regmap,
+			MAX98373_R21FF_REV_ID, &reg);
+		if (!ret) {
+			dev_info(dev, "Reset completed (retry:%d)\n", count);
+			break;
+		}
+
+		if (++count > 3)	{
+			dev_err(dev, "Reset failed. (ret:%d)\n", ret);
+			break;
+		}
+		usleep_range(10000, 11000);
+	}
+}
+
 static int max98373_probe(struct snd_soc_component *component)
 {
 	struct max98373_priv *max98373 = snd_soc_component_get_drvdata(component);
 
 	/* Software Reset */
-	regmap_write(max98373->regmap,
-		MAX98373_R2000_SW_RESET, MAX98373_SOFT_RESET);
-	usleep_range(10000, 11000);
+	max98373_reset(max98373, component->dev);
 
 	/* IV default slot configuration */
 	regmap_write(max98373->regmap,
@@ -818,9 +849,7 @@ static int max98373_resume(struct device *dev)
 {
 	struct max98373_priv *max98373 = dev_get_drvdata(dev);
 
-	regmap_write(max98373->regmap,
-		MAX98373_R2000_SW_RESET, MAX98373_SOFT_RESET);
-	usleep_range(10000, 11000);
+	max98373_reset(max98373, dev);
 	regcache_cache_only(max98373->regmap, false);
 	regcache_sync(max98373->regmap);
 	return 0;
