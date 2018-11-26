@@ -21,10 +21,8 @@
 
 #include <linux/file.h>
 #include <linux/kernel.h>
-#include <linux/audit.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
-#include <linux/fs.h>
 #include <linux/fsnotify_backend.h>
 #include <linux/namei.h>
 #include <linux/netlink.h>
