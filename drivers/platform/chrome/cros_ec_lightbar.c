@@ -43,7 +43,6 @@ static unsigned long lb_interval_jiffies = 50 * HZ / 1000;
  * If this is true, we won't do anything during suspend/resume.
  */
 static bool userspace_control;
-static struct cros_ec_dev *ec_with_lightbar;
 
 static ssize_t interval_msec_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
@@ -381,9 +380,6 @@ static int lb_manual_suspend_ctrl(struct cros_ec_dev *ec, uint8_t enable)
 	struct cros_ec_command *msg;
 	int ret;
 
-	if (ec != ec_with_lightbar)
-		return 0;
-
 	msg = alloc_lightbar_cmd_msg(ec);
 	if (!msg)
 		return -ENOMEM;
@@ -567,37 +563,26 @@ static struct attribute *__lb_cmds_attrs[] = {
 	NULL,
 };
 
-static bool ec_has_lightbar(struct cros_ec_dev *ec)
+static bool cros_ec_has_lightbar(struct cros_ec_dev *ec_dev)
 {
-	return !!get_lightbar_version(ec, NULL, NULL);
-}
-
-static umode_t cros_ec_lightbar_attrs_are_visible(struct kobject *kobj,
-						  struct attribute *a, int n)
-{
-	struct device *dev = container_of(kobj, struct device, kobj);
-	struct cros_ec_dev *ec = to_cros_ec_dev(dev);
-	struct platform_device *pdev = to_platform_device(ec->dev);
+	struct platform_device *pdev = to_platform_device(ec_dev->dev);
 	struct cros_ec_platform *pdata = pdev->dev.platform_data;
 	int is_cros_ec;
 
 	is_cros_ec = strcmp(pdata->ec_name, CROS_EC_DEV_NAME);
 
 	if (is_cros_ec != 0)
-		return 0;
+		return false;
 
-	/* Only instantiate this stuff if the EC has a lightbar */
-	if (ec_has_lightbar(ec)) {
-		ec_with_lightbar = ec;
-		return a->mode;
-	}
-	return 0;
+	if (!!get_lightbar_version(ec_dev, NULL, NULL))
+		return true;
+
+	return false;
 }
 
 struct attribute_group cros_ec_lightbar_attr_group = {
 	.name = "lightbar",
 	.attrs = __lb_cmds_attrs,
-	.is_visible = cros_ec_lightbar_attrs_are_visible,
 };
 
 static int cros_ec_lightbar_probe(struct platform_device *pd)
@@ -606,10 +591,9 @@ static int cros_ec_lightbar_probe(struct platform_device *pd)
 	struct device *dev = &pd->dev;
 	int ret;
 
-	if (!ec_dev) {
-		dev_err(dev, "No EC dev found\n");
-		return -EINVAL;
-	}
+	/* Only instantiate this stuff if the EC has a lightbar */
+	if (!cros_ec_has_lightbar(ec_dev))
+		return -ENODEV;
 
 	/* Take control of the lightbar from the EC. */
 	lb_manual_suspend_ctrl(ec_dev, 1);
@@ -640,7 +624,7 @@ static int __maybe_unused cros_ec_lightbar_resume(struct device *dev)
 {
 	struct cros_ec_dev *ec_dev = dev_get_drvdata(dev);
 
-	if (userspace_control || ec_dev != ec_with_lightbar)
+	if (userspace_control)
 		return 0;
 
 	return lb_send_empty_cmd(ec_dev, LIGHTBAR_CMD_RESUME);
@@ -650,7 +634,7 @@ static int __maybe_unused cros_ec_lightbar_suspend(struct device *dev)
 {
 	struct cros_ec_dev *ec_dev = dev_get_drvdata(dev);
 
-	if (userspace_control || ec_dev != ec_with_lightbar)
+	if (userspace_control)
 		return 0;
 
 	return lb_send_empty_cmd(ec_dev, LIGHTBAR_CMD_SUSPEND);
