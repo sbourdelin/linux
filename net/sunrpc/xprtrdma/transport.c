@@ -446,9 +446,10 @@ xprt_rdma_close(struct rpc_xprt *xprt)
 
 	dprintk("RPC:       %s: closing xprt %p\n", __func__, xprt);
 
-	if (test_and_clear_bit(RPCRDMA_IAF_REMOVING, &ia->ri_flags)) {
+	if (test_bit(RPCRDMA_IAF_REMOVING, &ia->ri_flags)) {
 		xprt_clear_connected(xprt);
 		rpcrdma_ia_remove(ia);
+		clear_bit(RPCRDMA_IAF_REMOVING, &ia->ri_flags);
 		return;
 	}
 	if (ep->rep_connected == -ENODEV)
