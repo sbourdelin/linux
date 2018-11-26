@@ -257,6 +257,8 @@ local_restart:
 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
 	bne	__sys_trace
 
+	str	r7, [tsk, #TI_SYSCALL]		@ update thread_info->syscall
+
 	invoke_syscall tbl, scno, r10, __ret_fast_syscall
 
 	add	r1, sp, #S_OFF
