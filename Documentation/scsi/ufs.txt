@@ -148,6 +148,14 @@ send SG_IO with the applicable sg_io_v4:
 	io_hdr_v4.request_len = request_len;
 	io_hdr_v4.request = (__u64)request_upiu;
 
+If you wish to write a descriptor, append it right after the bsg request, and
+indicate the total size (sizeof(struct ufs_bsg_request) + sizeof(descriptor))
+in the request_len. Similarly, If you wish to read a descriptor, indicate the
+total size (sizeof(struct ufs_bsg_reply) + sizeof(descriptor)) in the
+max_response_len. Expect to find it in the appropriate offset - right after the
+bsg reply, in the response.
+
+
 UFS Specifications can be found at,
 UFS - http://www.jedec.org/sites/default/files/docs/JESD220.pdf
 UFSHCI - http://www.jedec.org/sites/default/files/docs/JESD223.pdf

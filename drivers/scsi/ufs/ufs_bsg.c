@@ -36,6 +36,9 @@ static int ufs_bsg_verify_query_size(struct ufs_hba *hba,
 	if (desc_op == UPIU_QUERY_OPCODE_WRITE_DESC)
 		min_req_len += desc_len;
 
+	if (desc_op == UPIU_QUERY_OPCODE_READ_DESC)
+		min_rsp_len += desc_len;
+
 	if (min_req_len > request_len || min_rsp_len > reply_len) {
 		dev_err(hba->dev, "not enough space assigned\n");
 		return -EINVAL;
@@ -47,18 +50,15 @@ static int ufs_bsg_verify_query_size(struct ufs_hba *hba,
 static int ufs_bsg_verify_query_params(struct ufs_hba *hba,
 				       struct ufs_bsg_request *bsg_request,
 				       unsigned int request_len,
+				       struct ufs_bsg_reply *bsg_reply,
 				       unsigned int reply_len,
-				       uint8_t *desc_buff, int *desc_len,
+				       uint8_t **desc_buff, int *desc_len,
 				       enum query_opcode desc_op)
 {
 	struct utp_upiu_query *qr;
 
-	if (desc_op == UPIU_QUERY_OPCODE_READ_DESC) {
-		dev_err(hba->dev, "unsupported opcode %d\n", desc_op);
-		return -ENOTSUPP;
-	}
-
-	if (desc_op != UPIU_QUERY_OPCODE_WRITE_DESC)
+	if (desc_op != UPIU_QUERY_OPCODE_WRITE_DESC &&
+	    desc_op != UPIU_QUERY_OPCODE_READ_DESC)
 		goto out;
 
 	qr = &bsg_request->upiu_req.qr;
@@ -71,7 +71,8 @@ static int ufs_bsg_verify_query_params(struct ufs_hba *hba,
 				      desc_op))
 		return -EINVAL;
 
-	desc_buff = (uint8_t *)(bsg_request + 1);
+	*desc_buff = desc_op == UPIU_QUERY_OPCODE_WRITE_DESC ?
+		    (uint8_t *)(bsg_request + 1) : (uint8_t *)(bsg_reply + 1);
 
 out:
 	return 0;
@@ -102,8 +103,9 @@ static int ufs_bsg_request(struct bsg_job *job)
 	case UPIU_TRANSACTION_QUERY_REQ:
 		desc_op = bsg_request->upiu_req.qr.opcode;
 		ret = ufs_bsg_verify_query_params(hba, bsg_request, req_len,
-						  reply_len, desc_buff,
-						  &desc_len, desc_op);
+						  bsg_reply, reply_len,
+						  &desc_buff, &desc_len,
+						  desc_op);
 		if (ret)
 			goto out;
 
@@ -134,6 +136,9 @@ static int ufs_bsg_request(struct bsg_job *job)
 
 		break;
 	}
+
+	if (desc_buff)
+		bsg_reply->reply_payload_rcv_len = desc_len;
 
 out:
 	bsg_reply->result = ret;
