@@ -5623,9 +5623,10 @@ wake_affine_idle(int this_cpu, int prev_cpu, int sync)
 	 * on one CPU.
 	 */
 	if (available_idle_cpu(this_cpu) && cpus_share_cache(this_cpu, prev_cpu))
-		return available_idle_cpu(prev_cpu) ? prev_cpu : this_cpu;
+		return available_sched_idle_cpu(prev_cpu) ? prev_cpu : this_cpu;
 
-	if (sync && cpu_rq(this_cpu)->nr_running == 1)
+	if ((sync && cpu_rq(this_cpu)->nr_running == 1) ||
+	    cpu_only_has_sched_idle_tasks(this_cpu))
 		return this_cpu;
 
 	return nr_cpumask_bits;
@@ -5888,6 +5889,9 @@ find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this
 				latest_idle_timestamp = rq->idle_stamp;
 				shallowest_idle_cpu = i;
 			}
+		} else if (cpu_only_has_sched_idle_tasks(i) && !vcpu_is_preempted(i)) {
+			/* Prefer CPU with only SCHED_IDLE tasks */
+			return i;
 		} else if (shallowest_idle_cpu == -1) {
 			load = weighted_cpuload(cpu_rq(i));
 			if (load < min_load) {
@@ -6049,7 +6053,7 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
  */
 static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
 {
-	int cpu;
+	int cpu, last_idle_cpu = -1;
 
 	if (!static_branch_likely(&sched_smt_present))
 		return -1;
@@ -6057,11 +6061,18 @@ static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu(cpu, cpu_smt_mask(target)) {
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (available_idle_cpu(cpu))
-			return cpu;
+		if (!vcpu_is_preempted(cpu)) {
+			if (idle_cpu(cpu)) {
+				/* Prefer CPU with only SCHED_IDLE tasks */
+				last_idle_cpu = cpu;
+				continue;
+			}
+			if (cpu_only_has_sched_idle_tasks(cpu))
+				return cpu;
+		}
 	}
 
-	return -1;
+	return last_idle_cpu;
 }
 
 #else /* CONFIG_SCHED_SMT */
@@ -6089,7 +6100,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	u64 avg_cost, avg_idle;
 	u64 time, cost;
 	s64 delta;
-	int cpu, nr = INT_MAX;
+	int cpu, nr = INT_MAX, last_idle_cpu = -1;
 
 	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
 	if (!this_sd)
@@ -6116,12 +6127,23 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	time = local_clock();
 
 	for_each_cpu_wrap(cpu, sched_domain_span(sd), target) {
-		if (!--nr)
-			return -1;
+		if (!--nr) {
+			if (last_idle_cpu == -1)
+				return -1;
+			cpu = last_idle_cpu;
+			break;
+		}
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (available_idle_cpu(cpu))
-			break;
+		if (!vcpu_is_preempted(cpu)) {
+			if (idle_cpu(cpu)) {
+				/* Prefer CPU with only SCHED_IDLE tasks */
+				last_idle_cpu = cpu;
+				continue;
+			}
+			if (cpu_only_has_sched_idle_tasks(cpu))
+				break;
+		}
 	}
 
 	time = local_clock() - time;
@@ -6140,13 +6162,13 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 	struct sched_domain *sd;
 	int i, recent_used_cpu;
 
-	if (available_idle_cpu(target))
+	if (available_sched_idle_cpu(target))
 		return target;
 
 	/*
 	 * If the previous CPU is cache affine and idle, don't be stupid:
 	 */
-	if (prev != target && cpus_share_cache(prev, target) && available_idle_cpu(prev))
+	if (prev != target && cpus_share_cache(prev, target) && available_sched_idle_cpu(prev))
 		return prev;
 
 	/* Check a recently used CPU as a potential idle candidate: */
@@ -6154,7 +6176,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 	if (recent_used_cpu != prev &&
 	    recent_used_cpu != target &&
 	    cpus_share_cache(recent_used_cpu, target) &&
-	    available_idle_cpu(recent_used_cpu) &&
+	    available_sched_idle_cpu(recent_used_cpu) &&
 	    cpumask_test_cpu(p->recent_used_cpu, &p->cpus_allowed)) {
 		/*
 		 * Replace recent_used_cpu with prev as it is a potential

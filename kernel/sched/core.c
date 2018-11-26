@@ -4028,6 +4028,29 @@ int available_idle_cpu(int cpu)
 	return 1;
 }
 
+/* CPU only has SCHED_IDLE tasks enqueued */
+int cpu_only_has_sched_idle_tasks(int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+
+	return unlikely(rq->nr_running &&
+			rq->nr_running == rq->cfs.idle_h_nr_running);
+}
+
+int available_sched_idle_cpu(int cpu)
+{
+	if (vcpu_is_preempted(cpu))
+		return 0;
+
+	if (idle_cpu(cpu))
+		return 1;
+
+	if (cpu_only_has_sched_idle_tasks(cpu))
+		return 1;
+
+	return 0;
+}
+
 /**
  * idle_task - return the idle task for a given CPU.
  * @cpu: the processor in question.

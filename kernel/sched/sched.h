@@ -1828,6 +1828,9 @@ extern void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags);
 extern const_debug unsigned int sysctl_sched_nr_migrate;
 extern const_debug unsigned int sysctl_sched_migration_cost;
 
+extern int cpu_only_has_sched_idle_tasks(int cpu);
+extern int available_sched_idle_cpu(int cpu);
+
 #ifdef CONFIG_SCHED_HRTICK
 
 /*
