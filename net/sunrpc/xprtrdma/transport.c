@@ -450,6 +450,7 @@ xprt_rdma_close(struct rpc_xprt *xprt)
 		xprt_clear_connected(xprt);
 		rpcrdma_ia_remove(ia);
 		clear_bit(RPCRDMA_IAF_REMOVING, &ia->ri_flags);
+		rpc_wake_up_next(&xprt->backlog);
 		return;
 	}
 	if (ep->rep_connected == -ENODEV)

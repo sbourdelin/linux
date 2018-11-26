@@ -1171,7 +1171,7 @@ rpcrdma_buffer_create(struct rpcrdma_xprt *r_xprt)
 	INIT_LIST_HEAD(&buf->rb_allreqs);
 
 	rc = -ENOMEM;
-	for (i = 0; i < buf->rb_max_requests; i++) {
+	for (i = 0; i < RPCRDMA_MIN_SLOT_TABLE; i++) {
 		struct rpcrdma_req *req;
 
 		req = rpcrdma_req_create(buf, GFP_KERNEL);
@@ -1360,9 +1360,13 @@ rpcrdma_buffer_get(struct rpcrdma_buffer *buffers)
 	spin_lock(&buffers->rb_lock);
 	req = list_first_entry_or_null(&buffers->rb_send_bufs,
 				       struct rpcrdma_req, rl_list);
-	if (req)
-		list_del_init(&req->rl_list);
-	spin_unlock(&buffers->rb_lock);
+	if (req) {
+		list_del(&req->rl_list);
+		spin_unlock(&buffers->rb_lock);
+	} else {
+		spin_unlock(&buffers->rb_lock);
+		req = rpcrdma_req_create(buffers, GFP_NOFS);
+	}
 	return req;
 }
 
