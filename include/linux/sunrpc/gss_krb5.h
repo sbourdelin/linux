@@ -105,7 +105,6 @@ struct krb5_ctx {
 	struct crypto_sync_skcipher *acceptor_enc_aux;
 	struct crypto_sync_skcipher *initiator_enc_aux;
 	u8			Ksess[GSS_KRB5_MAX_KEYLEN]; /* session key */
-	u8			cksum[GSS_KRB5_MAX_KEYLEN];
 	s32			endtime;
 	atomic_t		seq_send;
 	atomic64_t		seq_send64;
@@ -235,11 +234,6 @@ enum seal_alg {
 	+ GSS_KRB5_MAX_CKSUM_LEN)
 
 u32
-make_checksum(struct krb5_ctx *kctx, char *header, int hdrlen,
-		struct xdr_buf *body, int body_offset, u8 *cksumkey,
-		unsigned int usage, struct xdr_netobj *cksumout);
-
-u32
 make_checksum_v2(struct krb5_ctx *, char *header, int hdrlen,
 		 struct xdr_buf *body, int body_offset, u8 *key,
 		 unsigned int usage, struct xdr_netobj *cksum);
@@ -268,25 +262,6 @@ krb5_decrypt(struct crypto_sync_skcipher *key,
 	     void *iv, void *in, void *out, int length); 
 
 int
-gss_encrypt_xdr_buf(struct crypto_sync_skcipher *tfm, struct xdr_buf *outbuf,
-		    int offset, struct page **pages);
-
-int
-gss_decrypt_xdr_buf(struct crypto_sync_skcipher *tfm, struct xdr_buf *inbuf,
-		    int offset);
-
-s32
-krb5_make_seq_num(struct krb5_ctx *kctx,
-		struct crypto_sync_skcipher *key,
-		int direction,
-		u32 seqnum, unsigned char *cksum, unsigned char *buf);
-
-s32
-krb5_get_seq_num(struct krb5_ctx *kctx,
-	       unsigned char *cksum,
-	       unsigned char *buf, int *direction, u32 *seqnum);
-
-int
 xdr_extend_head(struct xdr_buf *buf, unsigned int base, unsigned int shiftlen);
 
 u32
@@ -295,11 +270,6 @@ krb5_derive_key(const struct gss_krb5_enctype *gk5e,
 		struct xdr_netobj *outkey,
 		const struct xdr_netobj *in_constant,
 		gfp_t gfp_mask);
-
-u32
-gss_krb5_des3_make_key(const struct gss_krb5_enctype *gk5e,
-		       struct xdr_netobj *randombits,
-		       struct xdr_netobj *key);
 
 u32
 gss_krb5_aes_make_key(const struct gss_krb5_enctype *gk5e,
@@ -316,14 +286,5 @@ gss_krb5_aes_decrypt(struct krb5_ctx *kctx, u32 offset,
 		     struct xdr_buf *buf, u32 *plainoffset,
 		     u32 *plainlen);
 
-int
-krb5_rc4_setup_seq_key(struct krb5_ctx *kctx,
-		       struct crypto_sync_skcipher *cipher,
-		       unsigned char *cksum);
-
-int
-krb5_rc4_setup_enc_key(struct krb5_ctx *kctx,
-		       struct crypto_sync_skcipher *cipher,
-		       s32 seqnum);
 void
 gss_krb5_make_confounder(char *p, u32 conflen);
