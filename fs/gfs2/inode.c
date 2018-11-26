@@ -744,12 +744,13 @@ static int gfs2_create_inode(struct inode *dir, struct dentry *dentry,
 			       the gfs2 structures. */
 	if (default_acl) {
 		error = __gfs2_set_acl(inode, default_acl, ACL_TYPE_DEFAULT);
-		posix_acl_release(default_acl);
-	}
-	if (acl) {
 		if (!error)
-			error = __gfs2_set_acl(inode, acl, ACL_TYPE_ACCESS);
-		posix_acl_release(acl);
+			posix_acl_release(default_acl);
+	}
+	if (acl && !error) {
+		error = __gfs2_set_acl(inode, acl, ACL_TYPE_ACCESS);
+		if (!error)
+			posix_acl_release(acl);
 	}
 
 	if (error)
