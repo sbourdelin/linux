@@ -73,11 +73,10 @@ static u8 dw_pcie_ep_find_capability(struct dw_pcie *pci, u8 cap)
 	return __dw_pcie_ep_find_next_cap(pci, next_cap_ptr, cap);
 }
 
-static int dw_pcie_ep_write_header(struct pci_epc *epc, u8 func_no,
-				   struct pci_epf_header *hdr)
+static void dw_pcie_ep_write_header_regs(struct dw_pcie_ep *ep)
 {
-	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
 	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+	struct pci_epf_header *hdr = &(ep->cached_hdr);
 
 	dw_pcie_dbi_ro_wr_en(pci);
 	dw_pcie_writew_dbi(pci, PCI_VENDOR_ID, hdr->vendorid);
@@ -94,6 +93,19 @@ static int dw_pcie_ep_write_header(struct pci_epc *epc, u8 func_no,
 	dw_pcie_writeb_dbi(pci, PCI_INTERRUPT_PIN,
 			   hdr->interrupt_pin);
 	dw_pcie_dbi_ro_wr_dis(pci);
+}
+
+static int dw_pcie_ep_write_header(struct pci_epc *epc, u8 func_no,
+				   struct pci_epf_header *hdr)
+{
+	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
+
+	ep->cached_hdr = *hdr;
+
+	if (ep->hw_regs_not_available)
+		return 0;
+
+	dw_pcie_ep_write_header_regs(ep);
 
 	return 0;
 }
@@ -112,15 +124,21 @@ static int dw_pcie_ep_inbound_atu(struct dw_pcie_ep *ep, enum pci_barno bar,
 		return -EINVAL;
 	}
 
+	ep->cached_inbound_atus[free_win].bar = bar;
+	ep->cached_inbound_atus[free_win].cpu_addr = cpu_addr;
+	ep->cached_inbound_atus[free_win].as_type = as_type;
+	ep->cached_bars[bar].atu_index = free_win;
+	set_bit(free_win, ep->ib_window_map);
+
+	if (ep->hw_regs_not_available)
+		return 0;
+
 	ret = dw_pcie_prog_inbound_atu(pci, free_win, bar, cpu_addr,
 				       as_type);
 	if (ret < 0) {
 		dev_err(pci->dev, "Failed to program IB window\n");
 		return ret;
 	}
-
-	ep->bar_to_atu[bar] = free_win;
-	set_bit(free_win, ep->ib_window_map);
 
 	return 0;
 }
@@ -137,49 +155,54 @@ static int dw_pcie_ep_outbound_atu(struct dw_pcie_ep *ep, phys_addr_t phys_addr,
 		return -EINVAL;
 	}
 
+	ep->cached_outbound_atus[free_win].addr = phys_addr;
+	ep->cached_outbound_atus[free_win].pci_addr = pci_addr;
+	ep->cached_outbound_atus[free_win].size = size;
+	set_bit(free_win, ep->ob_window_map);
+
+	if (ep->hw_regs_not_available)
+		return 0;
+
 	dw_pcie_prog_outbound_atu(pci, free_win, PCIE_ATU_TYPE_MEM,
 				  phys_addr, pci_addr, size);
 
-	set_bit(free_win, ep->ob_window_map);
-	ep->outbound_addr[free_win] = phys_addr;
-
 	return 0;
+}
+
+static void dw_pcie_ep_clear_bar_regs(struct dw_pcie_ep *ep, u8 func_no,
+				      enum pci_barno bar)
+{
+	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+	int flags = ep->cached_bars[bar].flags;
+	u32 atu_index = ep->cached_bars[bar].atu_index;
+
+	__dw_pcie_ep_reset_bar(pci, bar, flags);
+
+	dw_pcie_disable_atu(pci, atu_index, DW_PCIE_REGION_INBOUND);
 }
 
 static void dw_pcie_ep_clear_bar(struct pci_epc *epc, u8 func_no,
 				 struct pci_epf_bar *epf_bar)
 {
 	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
-	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
 	enum pci_barno bar = epf_bar->barno;
-	u32 atu_index = ep->bar_to_atu[bar];
+	u32 atu_index = ep->cached_bars[bar].atu_index;
 
-	__dw_pcie_ep_reset_bar(pci, bar, epf_bar->flags);
-
-	dw_pcie_disable_atu(pci, atu_index, DW_PCIE_REGION_INBOUND);
 	clear_bit(atu_index, ep->ib_window_map);
+
+	if (ep->hw_regs_not_available)
+		return;
+
+	dw_pcie_ep_clear_bar_regs(ep, func_no, bar);
 }
 
-static int dw_pcie_ep_set_bar(struct pci_epc *epc, u8 func_no,
-			      struct pci_epf_bar *epf_bar)
+static void dw_pcie_ep_set_bar_regs(struct dw_pcie_ep *ep, u8 func_no,
+				    enum pci_barno bar)
 {
-	int ret;
-	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
 	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-	enum pci_barno bar = epf_bar->barno;
-	size_t size = epf_bar->size;
-	int flags = epf_bar->flags;
-	enum dw_pcie_as_type as_type;
+	size_t size = ep->cached_bars[bar].size;
+	int flags = ep->cached_bars[bar].flags;
 	u32 reg = PCI_BASE_ADDRESS_0 + (4 * bar);
-
-	if (!(flags & PCI_BASE_ADDRESS_SPACE))
-		as_type = DW_PCIE_AS_MEM;
-	else
-		as_type = DW_PCIE_AS_IO;
-
-	ret = dw_pcie_ep_inbound_atu(ep, bar, epf_bar->phys_addr, as_type);
-	if (ret)
-		return ret;
 
 	dw_pcie_dbi_ro_wr_en(pci);
 
@@ -192,6 +215,34 @@ static int dw_pcie_ep_set_bar(struct pci_epc *epc, u8 func_no,
 	}
 
 	dw_pcie_dbi_ro_wr_dis(pci);
+}
+
+static int dw_pcie_ep_set_bar(struct pci_epc *epc, u8 func_no,
+			      struct pci_epf_bar *epf_bar)
+{
+	int ret;
+	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
+	enum pci_barno bar = epf_bar->barno;
+	size_t size = epf_bar->size;
+	int flags = epf_bar->flags;
+	enum dw_pcie_as_type as_type;
+
+	if (!(flags & PCI_BASE_ADDRESS_SPACE))
+		as_type = DW_PCIE_AS_MEM;
+	else
+		as_type = DW_PCIE_AS_IO;
+
+	ret = dw_pcie_ep_inbound_atu(ep, bar, epf_bar->phys_addr, as_type);
+	if (ret)
+		return ret;
+
+	ep->cached_bars[bar].size = size;
+	ep->cached_bars[bar].flags = flags;
+
+	if (ep->hw_regs_not_available)
+		return 0;
+
+	dw_pcie_ep_set_bar_regs(ep, func_no, bar);
 
 	return 0;
 }
@@ -202,7 +253,7 @@ static int dw_pcie_find_index(struct dw_pcie_ep *ep, phys_addr_t addr,
 	u32 index;
 
 	for (index = 0; index < ep->num_ob_windows; index++) {
-		if (ep->outbound_addr[index] != addr)
+		if (ep->cached_outbound_atus[index].addr != addr)
 			continue;
 		*atu_index = index;
 		return 0;
@@ -223,8 +274,12 @@ static void dw_pcie_ep_unmap_addr(struct pci_epc *epc, u8 func_no,
 	if (ret < 0)
 		return;
 
-	dw_pcie_disable_atu(pci, atu_index, DW_PCIE_REGION_OUTBOUND);
 	clear_bit(atu_index, ep->ob_window_map);
+
+	if (ep->hw_regs_not_available)
+		return;
+
+	dw_pcie_disable_atu(pci, atu_index, DW_PCIE_REGION_OUTBOUND);
 }
 
 static int dw_pcie_ep_map_addr(struct pci_epc *epc, u8 func_no,
@@ -254,7 +309,10 @@ static int dw_pcie_ep_get_msi(struct pci_epc *epc, u8 func_no)
 		return -EINVAL;
 
 	reg = ep->msi_cap + PCI_MSI_FLAGS;
-	val = dw_pcie_readw_dbi(pci, reg);
+	if (ep->hw_regs_not_available)
+		val = ep->cached_msi_flags;
+	else
+		val = dw_pcie_readw_dbi(pci, reg);
 	if (!(val & PCI_MSI_FLAGS_ENABLE))
 		return -EINVAL;
 
@@ -273,12 +331,18 @@ static int dw_pcie_ep_set_msi(struct pci_epc *epc, u8 func_no, u8 interrupts)
 		return -EINVAL;
 
 	reg = ep->msi_cap + PCI_MSI_FLAGS;
-	val = dw_pcie_readw_dbi(pci, reg);
+	if (ep->hw_regs_not_available)
+		val = ep->cached_msi_flags;
+	else
+		val = dw_pcie_readw_dbi(pci, reg);
 	val &= ~PCI_MSI_FLAGS_QMASK;
 	val |= (interrupts << 1) & PCI_MSI_FLAGS_QMASK;
-	dw_pcie_dbi_ro_wr_en(pci);
-	dw_pcie_writew_dbi(pci, reg, val);
-	dw_pcie_dbi_ro_wr_dis(pci);
+	ep->cached_msi_flags = val;
+	if (!ep->hw_regs_not_available) {
+		dw_pcie_dbi_ro_wr_en(pci);
+		dw_pcie_writew_dbi(pci, reg, val);
+		dw_pcie_dbi_ro_wr_dis(pci);
+	}
 
 	return 0;
 }
@@ -293,7 +357,10 @@ static int dw_pcie_ep_get_msix(struct pci_epc *epc, u8 func_no)
 		return -EINVAL;
 
 	reg = ep->msix_cap + PCI_MSIX_FLAGS;
-	val = dw_pcie_readw_dbi(pci, reg);
+	if (ep->hw_regs_not_available)
+		val = ep->cached_msix_flags;
+	else
+		val = dw_pcie_readw_dbi(pci, reg);
 	if (!(val & PCI_MSIX_FLAGS_ENABLE))
 		return -EINVAL;
 
@@ -312,14 +379,46 @@ static int dw_pcie_ep_set_msix(struct pci_epc *epc, u8 func_no, u16 interrupts)
 		return -EINVAL;
 
 	reg = ep->msix_cap + PCI_MSIX_FLAGS;
-	val = dw_pcie_readw_dbi(pci, reg);
+	if (ep->hw_regs_not_available)
+		val = ep->cached_msix_flags;
+	else
+		val = dw_pcie_readw_dbi(pci, reg);
 	val &= ~PCI_MSIX_FLAGS_QSIZE;
 	val |= interrupts;
-	dw_pcie_dbi_ro_wr_en(pci);
-	dw_pcie_writew_dbi(pci, reg, val);
-	dw_pcie_dbi_ro_wr_dis(pci);
+	ep->cached_msix_flags = val;
+	if (!ep->hw_regs_not_available) {
+		dw_pcie_dbi_ro_wr_en(pci);
+		dw_pcie_writew_dbi(pci, reg, val);
+		dw_pcie_dbi_ro_wr_dis(pci);
+	}
 
 	return 0;
+}
+
+void dw_pcie_set_regs_available(struct dw_pcie *pci)
+{
+	struct dw_pcie_ep *ep = &(pci->ep);
+	int i;
+
+	ep->hw_regs_not_available = false;
+
+	dw_pcie_ep_write_header_regs(ep);
+	for_each_set_bit(i, ep->ib_window_map, ep->num_ib_windows) {
+		dw_pcie_prog_inbound_atu(pci, i,
+			ep->cached_inbound_atus[i].bar,
+			ep->cached_inbound_atus[i].cpu_addr,
+			ep->cached_inbound_atus[i].as_type);
+		dw_pcie_ep_set_bar_regs(ep, 0, ep->cached_inbound_atus[i].bar);
+	}
+	for_each_set_bit(i, ep->ob_window_map, ep->num_ob_windows)
+		dw_pcie_prog_outbound_atu(pci, i, PCIE_ATU_TYPE_MEM,
+			ep->cached_outbound_atus[i].addr,
+			ep->cached_outbound_atus[i].pci_addr,
+			ep->cached_outbound_atus[i].size);
+	dw_pcie_dbi_ro_wr_en(pci);
+	dw_pcie_writew_dbi(pci, PCI_MSI_FLAGS, ep->cached_msi_flags);
+	dw_pcie_writew_dbi(pci, PCI_MSIX_FLAGS, ep->cached_msix_flags);
+	dw_pcie_dbi_ro_wr_dis(pci);
 }
 
 static int dw_pcie_ep_raise_irq(struct pci_epc *epc, u8 func_no,
@@ -329,6 +428,9 @@ static int dw_pcie_ep_raise_irq(struct pci_epc *epc, u8 func_no,
 
 	if (!ep->ops->raise_irq)
 		return -EINVAL;
+
+	if (ep->hw_regs_not_available)
+		return -EAGAIN;
 
 	return ep->ops->raise_irq(ep, func_no, type, interrupt_num);
 }
@@ -391,6 +493,9 @@ int dw_pcie_ep_raise_msi_irq(struct dw_pcie_ep *ep, u8 func_no,
 	bool has_upper;
 	int ret;
 
+	if (ep->hw_regs_not_available)
+		return -EAGAIN;
+
 	if (!ep->msi_cap)
 		return -EINVAL;
 
@@ -435,6 +540,9 @@ int dw_pcie_ep_raise_msix_irq(struct dw_pcie_ep *ep, u8 func_no,
 	u64 tbl_addr, msg_addr, reg_u64;
 	void __iomem *msix_tbl;
 	int ret;
+
+	if (ep->hw_regs_not_available)
+		return -EAGAIN;
 
 	reg = ep->msix_cap + PCI_MSIX_TABLE;
 	tbl_offset = dw_pcie_readl_dbi(pci, reg);
@@ -494,7 +602,6 @@ void dw_pcie_ep_exit(struct dw_pcie_ep *ep)
 int dw_pcie_ep_init(struct dw_pcie_ep *ep)
 {
 	int ret;
-	void *addr;
 	struct pci_epc *epc;
 	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
 	struct device *dev = pci->dev;
@@ -539,11 +646,17 @@ int dw_pcie_ep_init(struct dw_pcie_ep *ep)
 	if (!ep->ob_window_map)
 		return -ENOMEM;
 
-	addr = devm_kcalloc(dev, ep->num_ob_windows, sizeof(phys_addr_t),
-			    GFP_KERNEL);
-	if (!addr)
+	ep->cached_inbound_atus = devm_kzalloc(dev,
+		sizeof(ep->cached_inbound_atus[0]) * ep->num_ib_windows,
+		GFP_KERNEL);
+	if (!ep->cached_inbound_atus)
 		return -ENOMEM;
-	ep->outbound_addr = addr;
+
+	ep->cached_outbound_atus = devm_kzalloc(dev,
+		sizeof(ep->cached_outbound_atus[0]) * ep->num_ob_windows,
+		GFP_KERNEL);
+	if (!ep->cached_outbound_atus)
+		return -ENOMEM;
 
 	epc = devm_pci_epc_create(dev, &epc_ops);
 	if (IS_ERR(epc)) {

@@ -192,8 +192,6 @@ struct dw_pcie_ep {
 	phys_addr_t		phys_base;
 	size_t			addr_size;
 	size_t			page_size;
-	u8			bar_to_atu[6];
-	phys_addr_t		*outbound_addr;
 	unsigned long		*ib_window_map;
 	unsigned long		*ob_window_map;
 	u32			num_ib_windows;
@@ -202,6 +200,25 @@ struct dw_pcie_ep {
 	phys_addr_t		msi_mem_phys;
 	u8			msi_cap;	/* MSI capability offset */
 	u8			msix_cap;	/* MSI-X capability offset */
+	bool			hw_regs_not_available;
+	struct pci_epf_header	cached_hdr;
+	struct {
+		size_t			size;
+		int			flags;
+		u8			atu_index;
+	}			cached_bars[6];
+	struct {
+		enum pci_barno		bar;
+		dma_addr_t		cpu_addr;
+		enum dw_pcie_as_type	as_type;
+	}			*cached_inbound_atus;
+	struct {
+		phys_addr_t		addr;
+		u64			pci_addr;
+		size_t			size;
+	}			*cached_outbound_atus;
+	u32			cached_msi_flags;
+	u32			cached_msix_flags;
 };
 
 struct dw_pcie_ops {
@@ -351,6 +368,7 @@ static inline int dw_pcie_allocate_domains(struct pcie_port *pp)
 void dw_pcie_ep_linkup(struct dw_pcie_ep *ep);
 int dw_pcie_ep_init(struct dw_pcie_ep *ep);
 void dw_pcie_ep_exit(struct dw_pcie_ep *ep);
+void dw_pcie_ep_set_regs_available(struct dw_pcie *pci);
 int dw_pcie_ep_raise_legacy_irq(struct dw_pcie_ep *ep, u8 func_no);
 int dw_pcie_ep_raise_msi_irq(struct dw_pcie_ep *ep, u8 func_no,
 			     u8 interrupt_num);
@@ -368,6 +386,10 @@ static inline int dw_pcie_ep_init(struct dw_pcie_ep *ep)
 }
 
 static inline void dw_pcie_ep_exit(struct dw_pcie_ep *ep)
+{
+}
+
+static inline void dw_pcie_ep_set_regs_available(struct dw_pcie *pci)
 {
 }
 
