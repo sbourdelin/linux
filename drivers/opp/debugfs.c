@@ -11,8 +11,6 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/debugfs.h>
-#include <linux/device.h>
-#include <linux/err.h>
 #include <linux/init.h>
 #include <linux/limits.h>
 #include <linux/slab.h>

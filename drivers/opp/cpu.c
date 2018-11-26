@@ -15,7 +15,6 @@
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
-#include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/export.h>
 #include <linux/slab.h>

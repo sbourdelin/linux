@@ -15,7 +15,6 @@
 
 #include <linux/cpu.h>
 #include <linux/errno.h>
-#include <linux/device.h>
 #include <linux/of_device.h>
 #include <linux/pm_domain.h>
 #include <linux/slab.h>

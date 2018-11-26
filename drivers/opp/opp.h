@@ -20,7 +20,6 @@
 #include <linux/list.h>
 #include <linux/limits.h>
 #include <linux/pm_opp.h>
-#include <linux/notifier.h>
 
 struct clk;
 struct regulator;
