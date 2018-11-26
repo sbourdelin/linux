@@ -1197,7 +1197,7 @@ static long vphn_get_associativity(unsigned long cpu,
 	return rc;
 }
 
-int find_and_online_cpu_nid(int cpu)
+int find_and_online_cpu_nid(int cpu, bool must_online)
 {
 	__be32 associativity[VPHN_ASSOC_BUFSIZE] = {0};
 	int new_nid;
@@ -1210,7 +1210,7 @@ int find_and_online_cpu_nid(int cpu)
 	if (new_nid < 0 || !node_possible(new_nid))
 		new_nid = first_online_node;
 
-	if (NODE_DATA(new_nid) == NULL) {
+	if (must_online && (NODE_DATA(new_nid) == NULL)) {
 #ifdef CONFIG_MEMORY_HOTPLUG
 		/*
 		 * Need to ensure that NODE_DATA is initialized for a node from
@@ -1337,7 +1337,7 @@ int numa_update_cpu_topology(bool cpus_locked)
 			continue;
 		}
 
-		new_nid = find_and_online_cpu_nid(cpu);
+		new_nid = find_and_online_cpu_nid(cpu, true);
 
 		if (new_nid == numa_cpu_lookup_table[cpu]) {
 			cpumask_andnot(&cpu_associativity_changes_mask,

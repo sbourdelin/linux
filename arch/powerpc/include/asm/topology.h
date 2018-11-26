@@ -90,7 +90,7 @@ static inline void update_numa_cpu_lookup_table(unsigned int cpu, int node) {}
 extern int start_topology_update(void);
 extern int stop_topology_update(void);
 extern int prrn_is_enabled(void);
-extern int find_and_online_cpu_nid(int cpu);
+extern int find_and_online_cpu_nid(int cpu, bool must_online);
 extern int timed_topology_update(int nsecs);
 extern void __init shared_proc_topology_init(void);
 #else
