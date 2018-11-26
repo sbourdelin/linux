@@ -1740,6 +1740,7 @@ static bool fuse_writepage_in_flight(struct fuse_req *new_req,
 {
 	struct fuse_conn *fc = get_fuse_conn(new_req->inode);
 	struct fuse_inode *fi = get_fuse_inode(new_req->inode);
+	struct fuse_req *first_req;
 	struct fuse_req *tmp;
 	struct fuse_req *old_req;
 	bool found = false;
@@ -1764,6 +1765,7 @@ static bool fuse_writepage_in_flight(struct fuse_req *new_req,
 	}
 
 	new_req->num_pages = 1;
+	first_req = old_req;
 	for (tmp = old_req; tmp != NULL; tmp = tmp->misc.write.next) {
 		BUG_ON(tmp->inode != new_req->inode);
 		curr_index = tmp->misc.write.in.offset >> PAGE_SHIFT;
@@ -1773,7 +1775,7 @@ static bool fuse_writepage_in_flight(struct fuse_req *new_req,
 		}
 	}
 
-	if (old_req->num_pages == 1 && test_bit(FR_PENDING, &old_req->flags)) {
+	if (old_req->num_pages == 1 && old_req != first_req) {
 		struct backing_dev_info *bdi = inode_to_bdi(page->mapping->host);
 
 		copy_highpage(old_req->pages[0], page);
