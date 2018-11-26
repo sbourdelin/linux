@@ -135,5 +135,36 @@ static inline void shared_proc_topology_init(void) {}
 #endif
 #endif
 
+#define CPUREMAP_NO_CPU		(~0)
+#define CPUREMAP_NO_THREAD	(~0)
+
+#ifdef CONFIG_CPUREMAP
+extern int cpuremap_thread_to_cpu(int thread_index);
+		/* Return CPUREMAP_NO_CPU if not found */
+extern int cpuremap_map_cpu(int thread_index, int in_core_ndx, int node);
+		/* Return CPUREMAP_NO_CPU if fails */
+extern int cpuremap_reserve_cpu(int cpu);
+		/* Return CPUREMAP_NO_CPU if fails */
+extern int cpuremap_release_cpu(int cpu);
+		/* Return CPUREMAP_NO_CPU if fails */
+extern int cpuremap_cpu_to_thread(int cpu);
+		/* Return CPUREMAP_NO_THREAD if not found */
+extern void cpuremap_init(void);
+		/* Identify necessary constants & alloc memory at boot */
+#else
+static inline int cpuremap_thread_to_cpu(int thread_index)
+{
+	return thread_index;
+}
+static inline int cpuremap_map_cpu(int thread_index, int in_core_ndx, int node)
+{
+	return thread_index;
+}
+static inline int cpuremap_reserve_cpu(int cpu) { return cpu; }
+static inline int cpuremap_release_cpu(int cpu) { return cpu; }
+static inline int cpuremap_cpu_to_thread(int cpu) { return cpu; }
+static inline void cpuremap_init(void) {}
+#endif
+
 #endif /* __KERNEL__ */
 #endif	/* _ASM_POWERPC_TOPOLOGY_H */

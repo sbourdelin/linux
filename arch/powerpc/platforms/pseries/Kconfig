@@ -145,3 +145,13 @@ config PAPR_SCM
 	tristate "Support for the PAPR Storage Class Memory interface"
 	help
 	  Enable access to hypervisor provided storage class memory.
+          Enable access to hypervisor provided storage class memory.
+
+config CPUREMAP
+        bool "Support for mapping hw cpu+node to kernel index"
+        depends on SMP && (PPC_PSERIES)
+        ---help---
+          Say Y here to be able to remap hw cpu+node to standardized
+          kernel CPUs at runtime on Pseries machines.
+
+          Say N if you are unsure.
