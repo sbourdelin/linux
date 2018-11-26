@@ -36,7 +36,6 @@ static int ec_major;
 
 static const struct attribute_group *cros_ec_groups[] = {
 	&cros_ec_attr_group,
-	&cros_ec_vbc_attr_group,
 	NULL,
 };
 
@@ -391,6 +390,7 @@ static const struct mfd_cell cros_usbpd_charger_cells[] = {
 
 static const struct mfd_cell cros_ec_platform_cells[] = {
 	{ .name = "cros-ec-lightbar" },
+	{ .name = "cros-ec-vbc" },
 };
 
 static int ec_device_probe(struct platform_device *pdev)
@@ -482,6 +482,18 @@ static int ec_device_probe(struct platform_device *pdev)
 		dev_warn(ec->dev,
 			 "failed to add cros-ec platform devices: %d\n",
 			 retval);
+
+	/* Check whether this EC instance has a VBC NVRAM */
+	node = ec->ec_dev->dev->of_node;
+	if (of_property_read_bool(node, "google,has-vbc-nvram")) {
+		retval = mfd_add_devices(ec->dev, PLATFORM_DEVID_AUTO,
+					 cros_ec_vbc_cells,
+					 ARRAY_SIZE(cros_ec_vbc_cells),
+					 NULL, 0, NULL);
+		if (retval)
+			dev_warn(ec->dev, "failed to add VBC devices: %d\n",
+				 retval);
+	}
 
 	if (cros_ec_debugfs_init(ec))
 		dev_warn(dev, "failed to create debugfs directory\n");
