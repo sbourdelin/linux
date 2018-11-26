@@ -472,7 +472,7 @@ struct rpcrdma_memreg_ops {
 	struct rpcrdma_mr_seg *
 			(*ro_map)(struct rpcrdma_xprt *,
 				  struct rpcrdma_mr_seg *, int, bool,
-				  struct rpcrdma_mr **);
+				  u32, struct rpcrdma_mr **);
 	int		(*ro_send)(struct rpcrdma_ia *ia,
 				   struct rpcrdma_req *req);
 	void		(*ro_reminv)(struct rpcrdma_rep *rep,
