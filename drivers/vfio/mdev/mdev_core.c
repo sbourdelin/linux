@@ -161,6 +161,25 @@ static int mdev_device_remove_cb(struct device *dev, void *data)
 	return mdev_device_remove(dev, data ? *(bool *)data : true);
 }
 
+int mdev_max_aggregated_instances(struct kobject *kobj, struct device *dev,
+				  unsigned int *m)
+{
+	struct mdev_parent *parent;
+	struct mdev_type *type = to_mdev_type(kobj);
+	int ret;
+
+	parent = mdev_get_parent(type->parent);
+	if (!parent)
+		return -EINVAL;
+
+	if (parent->ops->max_aggregated_instances) {
+		ret = parent->ops->max_aggregated_instances(kobj, dev, m);
+	} else
+		ret = -EINVAL;
+	mdev_put_parent(parent);
+	return ret;
+}
+
 /*
  * mdev_register_device : Register a device
  * @dev: device structure representing parent device.
