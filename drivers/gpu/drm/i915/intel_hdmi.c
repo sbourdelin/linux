@@ -486,6 +486,22 @@ static void intel_hdmi_set_avi_infoframe(struct intel_encoder *encoder,
 	else
 		frame.avi.colorspace = HDMI_COLORSPACE_RGB;
 
+	if (conn_state->colorspace == COLORIMETRY_DEFAULT) {
+		/* Set ITU 709 as default for HDMI */
+		frame.avi.colorimetry = COLORIMETRY_ITU_709;
+	} else if (conn_state->colorspace < COLORIMETRY_XV_YCC_601) {
+		frame.avi.colorimetry = conn_state->colorspace;
+	} else {
+		frame.avi.colorimetry = HDMI_COLORIMETRY_EXTENDED;
+		/*
+		 * Starting from extended list where COLORIMETRY_XV_YCC_601
+		 * is the first extended mode and its value is 0 as per HDMI
+		 * specification.
+		 */
+		frame.avi.extended_colorimetry = conn_state->colorspace -
+							COLORIMETRY_XV_YCC_601;
+	}
+
 	drm_hdmi_avi_infoframe_quant_range(&frame.avi, adjusted_mode,
 					   crtc_state->limited_color_range ?
 					   HDMI_QUANTIZATION_RANGE_LIMITED :
@@ -2135,6 +2151,8 @@ intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *c
 	intel_attach_force_audio_property(connector);
 	intel_attach_broadcast_rgb_property(connector);
 	intel_attach_aspect_ratio_property(connector);
+	intel_attach_colorspace_property(connector);
+
 	drm_connector_attach_content_type_property(connector);
 	connector->state->picture_aspect_ratio = HDMI_PICTURE_ASPECT_NONE;
 
