@@ -292,11 +292,11 @@ int test__bp_signal(struct test *test __maybe_unused, int subtest __maybe_unused
 bool test__bp_signal_is_supported(void)
 {
 /*
- * The powerpc so far does not have support to even create
+ * powerpc, s390 and arm so far does not have support to even create
  * instruction breakpoint using the perf event interface.
  * Once it's there we can release this.
  */
-#if defined(__powerpc__) || defined(__s390x__)
+#if defined(__powerpc__) || defined(__s390x__) || defined(__arm__)
 	return false;
 #else
 	return true;
