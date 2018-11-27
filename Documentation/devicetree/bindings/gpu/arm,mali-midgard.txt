@@ -18,6 +18,7 @@ Required properties:
     + "amlogic,meson-gxm-mali"
     + "rockchip,rk3288-mali"
     + "rockchip,rk3399-mali"
+    + "allwinner,sun50i-h6-mali"
 
 - reg : Physical base address of the device and length of the register area.
 
@@ -42,6 +43,18 @@ Optional properties:
 
 - operating-points-v2 : Refer to Documentation/devicetree/bindings/opp/opp.txt
   for details.
+
+
+Vendor-specific bindings
+------------------------
+
+The Mali GPU is integrated very differently from one SoC to
+another. In order to accomodate those differences, you have the option
+to specify one more vendor-specific compatible, among:
+
+  - allwinner,sun50i-h6-mali
+    Required properties:
+      * resets: phandle to the reset line for the GPU
 
 
 Example for a Mali-T760:
