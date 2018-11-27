@@ -257,6 +257,21 @@ static u8 intel_dp_get_sink_sync_latency(struct intel_dp *intel_dp)
 	return val;
 }
 
+static u16 intel_dp_get_su_x_granulartiy(struct intel_dp *intel_dp)
+{
+	u16 val = 0;
+	ssize_t r;
+
+	if (!(intel_dp->psr_dpcd[1] & DP_PSR2_SU_GRANULARITY_REQUIRED))
+		return val;
+
+	r = drm_dp_dpcd_read(&intel_dp->aux, DP_PSR2_SU_X_GRANULARITY, &val, 2);
+	if (r != 2)
+		DRM_WARN("Unable to read DP_PSR2_SU_X_GRANULARITY\n");
+
+	return val;
+}
+
 void intel_psr_init_dpcd(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv =
@@ -311,6 +326,8 @@ void intel_psr_init_dpcd(struct intel_dp *intel_dp)
 		if (dev_priv->psr.sink_psr2_support) {
 			dev_priv->psr.colorimetry_support =
 				intel_dp_get_colorimetry_status(intel_dp);
+			dev_priv->psr.su_x_granularity =
+				intel_dp_get_su_x_granulartiy(intel_dp);
 		}
 	}
 }
@@ -523,6 +540,21 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 			      crtc_hdisplay, crtc_vdisplay,
 			      psr_max_h, psr_max_v);
 		return false;
+	}
+
+	if (dev_priv->psr.su_x_granularity) {
+		/*
+		 * HW will always send full lines in SU blocks, so X will
+		 * always be 0 and we only need to check the width to validate
+		 * horizontal granularity.
+		 * About vertical granularity HW works by SU blocks starting
+		 * at each 4 lines with height of 4 lines, what eDP states
+		 * that sink should support.
+		 */
+		if (crtc_hdisplay % dev_priv->psr.su_x_granularity) {
+			DRM_DEBUG_KMS("PSR2 not enabled, HW can not match sink SU granularity requirement\n");
+			return false;
+		}
 	}
 
 	return true;
