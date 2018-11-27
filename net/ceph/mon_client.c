@@ -478,9 +478,10 @@ static void ceph_monc_handle_map(struct ceph_mon_client *monc,
 	}
 
 	client->monc.monmap = monmap;
-	kfree(old);
 
 	__ceph_monc_got_map(monc, CEPH_SUB_MONMAP, monc->monmap->epoch);
+	kfree(old);
+
 	client->have_fsid = true;
 
 out:
