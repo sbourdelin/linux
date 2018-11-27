@@ -850,6 +850,29 @@ static const struct drm_prop_enum_list hdmi_colorspace[] = {
 	{ COLORIMETRY_BT2020_CYCC, "BT2020_CYCC" },
 };
 
+static const struct drm_prop_enum_list dp_colorspace[] = {
+	/* For Default case, driver will set the colorspace */
+	{ COLORIMETRY_DEFAULT, "Default" },
+	/* Standard Definition Colorimetry based on CEA 861 */
+	{ COLORIMETRY_ITU_601, "ITU_601" },
+	{ COLORIMETRY_ITU_709, "ITU_709" },
+	/* Standard Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_601, "XV_YCC_601" },
+	/* High Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_709, "XV_YCC_709" },
+	/* Colorimetry based on IEC 61966-2-5 */
+	{ COLORIMETRY_OPRGB, "opRGB" },
+	/* DP MSA Colorimetry */
+	{ DP_COLORIMETRY_Y_CBCR_ITU_601, "YCBCR_ITU_601" },
+	{ DP_COLORIMETRY_Y_CBCR_ITU_709, "YCBCR_ITU_709" },
+	{ DP_COLORIMETRY_SRGB, "sRGB" },
+	{ DP_COLORIMETRY_RGB_WIDE_GAMUT, "RGB Wide Gamut" },
+	{ DP_COLORIMETRY_SCRGB, "scRGB" },
+	{ DP_COLORIMETRY_DCI_P3, "DCI-P3" },
+	{ DP_COLORIMETRY_CUSTOM_COLOR_PROFILE, "Custom Profile" },
+};
+
+
 /**
  * DOC: standard connector properties
  *
@@ -1452,6 +1475,14 @@ int drm_mode_create_colorspace_property(struct drm_connector *connector)
 						"Colorspace",
 						hdmi_colorspace,
 						ARRAY_SIZE(hdmi_colorspace));
+		if (!prop)
+			return -ENOMEM;
+	} else if (connector->connector_type == DRM_MODE_CONNECTOR_eDP ||
+		connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+
+		prop = drm_property_create_enum(dev, DRM_MODE_PROP_ENUM,
+						"Colorspace", dp_colorspace,
+						ARRAY_SIZE(dp_colorspace));
 		if (!prop)
 			return -ENOMEM;
 	}
