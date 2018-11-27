@@ -2,8 +2,17 @@ Generic USB HCD (Host Controller Device) Properties
 
 Optional properties:
 - phys: a list of all USB PHYs on this HCD
+- an alias of the form "usbN" may be defined to suggest the use of
+  busnumer "N" for this platform bus.
 
 Example:
+
+	aliases {
+		usb1 = "/usb@c5000000";
+		usb2 = "/usb@c5004000";
+		usb3 = "/usb@c5008000";
+	}
+
 	&usb1 {
 		phys = <&usb2_phy1>, <&usb3_phy1>;
 	};
