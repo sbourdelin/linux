@@ -732,6 +732,35 @@ static u8 get_ip_proto(struct sk_buff *skb, __be16 proto)
 					    ((struct ipv6hdr *)ip_p)->nexthdr;
 }
 
+static void mlx5e_csum_padding(struct sk_buff *skb, int network_depth,
+			       __be16 proto, bool has_fcs)
+{
+	u32 frame_len = has_fcs ? skb->len - ETH_FCS_LEN : skb->len;
+	void *ip_p = skb->data + network_depth;
+	u32 pad_offset, pad_len;
+	void *pad;
+
+	if (likely(frame_len > ETH_ZLEN))
+		return;
+
+	if (proto == htons(ETH_P_IP)) {
+		struct iphdr *ipv4 = ip_p;
+
+		pad_offset =  network_depth + be16_to_cpu(ipv4->tot_len);
+	} else if (proto == htons(ETH_P_IPV6)) {
+		struct ipv6hdr *ipv6 = ip_p;
+
+		pad_offset = network_depth + sizeof(struct ipv6hdr) +
+			     be16_to_cpu(ipv6->payload_len);
+	}
+
+	pad = skb->data + pad_offset;
+	pad_len = frame_len - pad_offset;
+
+	skb->csum = csum_block_add(skb->csum, csum_partial(pad, pad_len, 0),
+				   pad_offset);
+}
+
 static inline void mlx5e_handle_csum(struct net_device *netdev,
 				     struct mlx5_cqe64 *cqe,
 				     struct mlx5e_rq *rq,
@@ -772,6 +801,13 @@ static inline void mlx5e_handle_csum(struct net_device *netdev,
 			skb->csum = csum_block_add(skb->csum,
 						   (__force __wsum)mlx5e_get_fcs(skb),
 						   skb->len - ETH_FCS_LEN);
+
+		/* CQE csum doesn't cover padding octets. And the padding is
+		 * appended prior to calculating and appending the FCS field.
+		 */
+		mlx5e_csum_padding(skb, network_depth, proto,
+				   !!(netdev->features & NETIF_F_RXFCS));
+
 		stats->csum_complete++;
 		return;
 	}
