@@ -23,13 +23,13 @@ simple-panel.txt
 +-----------------+---------------------+-------------------------------------+
 | Identifier      | compatbile          | description                         |
 +=================+=====================+=====================================+
-| ETM0700G0DH6    | edt,etm070080dh6    | WVGA TFT Display with capacitive    |
+| ETM0700G0DH6    | edt,etm0700g0dh6    | WVGA TFT Display with capacitive    |
 |                 |                     | Touchscreen                         |
 +-----------------+---------------------+-------------------------------------+
-| ETM0700G0BDH6   | edt,etm070080bdh6   | Same as ETM0700G0DH6 but with       |
+| ETM0700G0BDH6   | edt,etm0700g0bdh6   | Same as ETM0700G0DH6 but with       |
 |                 |                     | inverted pixel clock.               |
 +-----------------+---------------------+-------------------------------------+
-| ETM0700G0EDH6   | edt,etm070080edh6   | Same display as the ETM0700G0BDH6,  |
+| ETM0700G0EDH6   | edt,etm0700g0edh6   | Same display as the ETM0700G0BDH6,  |
 |                 |                     | but with changed Hardware for the   |
 |                 |                     | backlight and the touch interface   |
 +-----------------+---------------------+-------------------------------------+
