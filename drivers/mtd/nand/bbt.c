@@ -27,7 +27,8 @@ int nanddev_bbt_init(struct nand_device *nand)
 	unsigned int nwords = DIV_ROUND_UP(nblocks * bits_per_block,
 					   BITS_PER_LONG);
 
-	nand->bbt.cache = kzalloc(nwords, GFP_KERNEL);
+	nand->bbt.cache = kzalloc(nwords * (BITS_PER_LONG / BITS_PER_BYTE),
+				  GFP_KERNEL);
 	if (!nand->bbt.cache)
 		return -ENOMEM;
 
