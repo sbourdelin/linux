@@ -998,6 +998,7 @@ static void usb_bus_init (struct usb_bus *bus)
 /**
  * usb_register_bus - registers the USB host controller with the usb core
  * @bus: pointer to the bus to register
+ * @suggested_busnum: suggested bus number to use for this bus (e.g. 1 for usb1)
  * Context: !in_interrupt()
  *
  * Assigns a bus number, and links the controller into usbcore data
@@ -1005,24 +1006,33 @@ static void usb_bus_init (struct usb_bus *bus)
  *
  * Return: 0 if successful. A negative error code otherwise.
  */
-static int usb_register_bus(struct usb_bus *bus)
+static int usb_register_bus(struct usb_bus *bus, int suggested_busnum)
 {
 	int result = -E2BIG;
+	int wantnum = suggested_busnum;
 	int busnum;
 
+	if ((wantnum < 1) || (wantnum >= USB_MAXBUS))
+		wantnum = 1;
+
 	mutex_lock(&usb_bus_idr_lock);
-	busnum = idr_alloc(&usb_bus_idr, bus, 1, USB_MAXBUS, GFP_KERNEL);
+	busnum = idr_alloc(&usb_bus_idr, bus, wantnum, USB_MAXBUS, GFP_KERNEL);
 	if (busnum < 0) {
 		pr_err("%s: failed to get bus number\n", usbcore_name);
 		goto error_find_busnum;
 	}
+	if ((suggested_busnum == wantnum) && (busnum != wantnum))
+		dev_warn(bus->controller,
+			"suggested USB bus number %d was already taken\n",
+			suggested_busnum);
 	bus->busnum = busnum;
 	mutex_unlock(&usb_bus_idr_lock);
 
 	usb_notify_add_bus(bus);
 
-	dev_info (bus->controller, "new USB bus registered, assigned bus "
-		  "number %d\n", bus->busnum);
+	dev_info(bus->controller,
+		"new USB bus registered, assigned bus number %d\n",
+		bus->busnum);
 	return 0;
 
 error_find_busnum:
@@ -1040,7 +1050,7 @@ error_find_busnum:
  */
 static void usb_deregister_bus (struct usb_bus *bus)
 {
-	dev_info (bus->controller, "USB bus %d deregistered\n", bus->busnum);
+	dev_info(bus->controller, "USB bus %d deregistered\n", bus->busnum);
 
 	/*
 	 * NOTE: make sure that all the devices are removed by the
@@ -2728,6 +2738,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 {
 	int retval;
 	struct usb_device *rhdev;
+	int bus_id = -1;
 
 	if (!hcd->skip_phy_initialization && usb_hcd_is_primary_hcd(hcd)) {
 		hcd->phy_roothub = usb_phy_roothub_alloc(hcd->self.sysdev);
@@ -2772,7 +2783,14 @@ int usb_add_hcd(struct usb_hcd *hcd,
 		goto err_create_buf;
 	}
 
-	retval = usb_register_bus(&hcd->self);
+	if (hcd->self.controller->of_node)
+		bus_id = of_alias_get_id(hcd->self.controller->of_node, "usb");
+
+	if (bus_id > 0)
+		dev_info(hcd->self.controller, "suggested busnum: usb%d\n",
+							bus_id);
+
+	retval = usb_register_bus(&hcd->self, bus_id);
 	if (retval < 0)
 		goto err_register_bus;
 
