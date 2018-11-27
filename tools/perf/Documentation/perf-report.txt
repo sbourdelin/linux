@@ -122,6 +122,7 @@ OPTIONS
 	- in_tx: branch in TSX transaction
 	- abort: TSX transaction abort.
 	- cycles: Cycles in basic block
+	- ipc: average ipc (instruction per cycle) of function
 
 	And default sort keys are changed to comm, dso_from, symbol_from, dso_to
 	and symbol_to, see '--branch-stack'.
