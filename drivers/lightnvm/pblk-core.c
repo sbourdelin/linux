@@ -1286,24 +1286,27 @@ int pblk_line_recov_alloc(struct pblk *pblk, struct pblk_line *line)
 	list_del(&line->list);
 
 	ret = pblk_line_prepare(pblk, line);
-	if (ret) {
-		list_add(&line->list, &l_mg->free_list);
-		spin_unlock(&l_mg->free_lock);
-		return ret;
-	}
-	spin_unlock(&l_mg->free_lock);
+	if (ret)
+		goto out;
 
 	ret = pblk_line_alloc_bitmaps(pblk, line);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (!pblk_line_init_bb(pblk, line, 0)) {
 		list_add(&line->list, &l_mg->free_list);
+		spin_unlock(&l_mg->free_lock);
 		return -EINTR;
 	}
+	spin_unlock(&l_mg->free_lock);
 
 	pblk_rl_free_lines_dec(&pblk->rl, line, true);
 	return 0;
+
+out:
+	list_add(&line->list, &l_mg->free_list);
+	spin_unlock(&l_mg->free_lock);
+	return ret;
 }
 
 void pblk_line_recov_close(struct pblk *pblk, struct pblk_line *line)
