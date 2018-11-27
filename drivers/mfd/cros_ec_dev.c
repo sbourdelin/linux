@@ -35,9 +35,14 @@
 #define CROS_MAX_DEV 128
 static int ec_major;
 
+static void cros_ec_dev_release(struct device *dev)
+{
+}
+
 static struct class cros_class = {
 	.owner          = THIS_MODULE,
 	.name           = "chromeos",
+	.dev_release	= cros_ec_dev_release,
 };
 
 /* Basic communication */
