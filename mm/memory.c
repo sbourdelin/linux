@@ -1524,12 +1524,14 @@ static vm_fault_t insert_pfn(struct vm_area_struct *vma, unsigned long addr,
 			pfn_t pfn, pgprot_t prot, bool mkwrite)
 {
 	struct mm_struct *mm = vma->vm_mm;
+	int retval;
 	pte_t *pte, entry;
 	spinlock_t *ptl;
 
 	pte = get_locked_pte(mm, addr, &ptl);
 	if (!pte)
 		return VM_FAULT_OOM;
+	retval = VM_FAULT_NOPAGE;
 	if (!pte_none(*pte)) {
 		if (mkwrite) {
 			/*
@@ -1567,9 +1569,10 @@ out_mkwrite:
 	set_pte_at(mm, addr, pte, entry);
 	update_mmu_cache(vma, addr, pte); /* XXX: why not for insert_page? */
 
+	retval = 0;
 out_unlock:
 	pte_unmap_unlock(pte, ptl);
-	return VM_FAULT_NOPAGE;
+	return retval;
 }
 
 /**
