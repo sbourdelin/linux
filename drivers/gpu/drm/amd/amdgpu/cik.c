@@ -1622,7 +1622,8 @@ static void cik_program_aspm(struct amdgpu_device *adev)
 			if (orig != data)
 				WREG32_PCIE(ixPCIE_LC_LINK_WIDTH_CNTL, data);
 
-			if (!disable_clkreq) {
+			if (!disable_clkreq &&
+			    !pci_is_root_bus(adev->pdev->bus)) {
 				struct pci_dev *root = adev->pdev->bus->self;
 				u32 lnkcap;
 
