@@ -1603,17 +1603,9 @@ static void enable_execlists(struct intel_engine_cs *engine)
 
 	I915_WRITE(RING_HWSTAM(engine->mmio_base), 0xffffffff);
 
-	/*
-	 * Make sure we're not enabling the new 12-deep CSB
-	 * FIFO as that requires a slightly updated handling
-	 * in the ctx switch irq. Since we're currently only
-	 * using only 2 elements of the enhanced execlists the
-	 * deeper FIFO it's not needed and it's not worth adding
-	 * more statements to the irq handler to support it.
-	 */
 	if (INTEL_GEN(dev_priv) >= 11)
 		I915_WRITE(RING_MODE_GEN7(engine),
-			   _MASKED_BIT_DISABLE(GEN11_GFX_DISABLE_LEGACY_MODE));
+			   _MASKED_BIT_ENABLE(GEN11_GFX_DISABLE_LEGACY_MODE));
 	else
 		I915_WRITE(RING_MODE_GEN7(engine),
 			   _MASKED_BIT_ENABLE(GFX_RUN_LIST_ENABLE));
@@ -2276,10 +2268,14 @@ static int logical_ring_init(struct intel_engine_cs *engine)
 			upper_32_bits(ce->lrc_desc);
 	}
 
-	execlists->csb_entries = GEN8_CSB_ENTRIES;
-
 	execlists->csb_read =
 		i915->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_PTR(engine));
+
+	if (INTEL_GEN(engine->i915) >= 11)
+		execlists->csb_entries = GEN11_CSB_ENTRIES;
+	else
+		execlists->csb_entries = GEN8_CSB_ENTRIES;
+
 	if (csb_force_mmio(i915)) {
 		execlists->csb_status = (u32 __force *)
 			(i915->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_BUF_LO(engine, 0)));
