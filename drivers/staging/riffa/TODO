@@ -1,0 +1,7 @@
+TODO:
+- optimize the driver code for further speed improvement although it can now achieve defined PCIe speed grade
+- solve all the coding style errors from scripts/checkpatch.pl
+- add vendor and device IDs for more supported devices after actual hardware testing 
+
+Please send any patches to Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+and Phung Cheng Fei <feiphung@hotmail.com>

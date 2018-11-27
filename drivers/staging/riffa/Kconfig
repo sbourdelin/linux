@@ -1,0 +1,5 @@
+config RIFFA_PCIE
+    tristate "a simple framework for communicating data from a host CPU to a FPGA via a PCI Express bus"
+    default n
+    help
+        Transfers data with full duplex capability using PCIe protocol
