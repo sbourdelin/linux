@@ -187,6 +187,9 @@
 
 #define DP_GUID				    0x030   /* 1.2 */
 
+#define DP_DSC_RC_PIXELS_PER_GROUP		3
+#define DP_DSC_SCALE_DECREMENT_INTERVAL_MAX	4095
+
 #define DP_DSC_SUPPORT                      0x060   /* DP 1.4 */
 # define DP_DSC_DECOMPRESSION_IS_SUPPORTED  (1 << 0)
 
