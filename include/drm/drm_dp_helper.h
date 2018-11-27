@@ -1364,6 +1364,7 @@ enum drm_dp_quirk {
 	 * to 16 bits. So will give a constant value (0x8000) for compatability.
 	 */
 	DP_DPCD_QUIRK_CONSTANT_N,
+	DP_DPCD_QUIRK_PSR_NOT_CURRENTLY_SUPPORTED,
 };
 
 /**
