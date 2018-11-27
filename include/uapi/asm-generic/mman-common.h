@@ -71,7 +71,8 @@
 
 #define PKEY_DISABLE_ACCESS	0x1
 #define PKEY_DISABLE_WRITE	0x2
-#define PKEY_ACCESS_MASK	(PKEY_DISABLE_ACCESS |\
-				 PKEY_DISABLE_WRITE)
-
+#define PKEY_DISABLE_EXECUTE	0x4
+#define PKEY_DISABLE_READ	0x8
+#define PKEY_ACCESS_MASK	0x0	/* arch can override and define its own
+					   mask bits */
 #endif /* __ASM_GENERIC_MMAN_COMMON_H */

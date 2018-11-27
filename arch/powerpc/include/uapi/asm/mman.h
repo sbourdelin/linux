@@ -31,9 +31,9 @@
 #define MAP_HUGETLB	0x40000		/* create a huge page mapping */
 
 /* Override any generic PKEY permission defines */
-#define PKEY_DISABLE_EXECUTE   0x4
 #undef PKEY_ACCESS_MASK
 #define PKEY_ACCESS_MASK       (PKEY_DISABLE_ACCESS |\
 				PKEY_DISABLE_WRITE  |\
+				PKEY_DISABLE_READ  |\
 				PKEY_DISABLE_EXECUTE)
 #endif /* _UAPI_ASM_POWERPC_MMAN_H */

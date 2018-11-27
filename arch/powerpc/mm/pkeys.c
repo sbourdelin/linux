@@ -62,14 +62,6 @@ int pkey_initialize(void)
 	int os_reserved, i;
 
 	/*
-	 * We define PKEY_DISABLE_EXECUTE in addition to the arch-neutral
-	 * generic defines for PKEY_DISABLE_ACCESS and PKEY_DISABLE_WRITE.
-	 * Ensure that the bits a distinct.
-	 */
-	BUILD_BUG_ON(PKEY_DISABLE_EXECUTE &
-		     (PKEY_DISABLE_ACCESS | PKEY_DISABLE_WRITE));
-
-	/*
 	 * pkey_to_vmflag_bits() assumes that the pkey bits are contiguous
 	 * in the vmaflag. Make sure that is really the case.
 	 */
@@ -259,6 +251,8 @@ int __arch_set_user_pkey_access(struct task_struct *tsk, int pkey,
 		new_amr_bits |= AMR_RD_BIT | AMR_WR_BIT;
 	else if (init_val & PKEY_DISABLE_WRITE)
 		new_amr_bits |= AMR_WR_BIT;
+	else if (init_val & PKEY_DISABLE_READ)
+		new_amr_bits |= AMR_RD_BIT;
 
 	init_amr(pkey, new_amr_bits);
 	return 0;
