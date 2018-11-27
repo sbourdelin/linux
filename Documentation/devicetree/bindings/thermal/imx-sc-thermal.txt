@@ -1,0 +1,33 @@
+* Temperature Monitor (TEMPMON) on NXP i.MX SoCs with System Controller
+
+Required properties:
+- compatible : Must be "nxp,imx8qxp-sc-thermal";
+- tsens-num : Total number of thermal sensors supported;
+- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
+
+Example:
+tsens: thermal-sensor {
+	compatible = "nxp,imx8qxp-sc-thermal";
+	tsens-num = <1>;
+	#thermal-sensor-cells = <1>;
+};
+
+thermal_zones: thermal-zones {
+	cpu-thermal0 {
+		polling-delay-passive = <250>;
+		polling-delay = <2000>;
+		thermal-sensors = <&tsens 355>;
+		trips {
+			cpu_alert0: trip0 {
+				temperature = <107000>;
+				hysteresis = <2000>;
+				type = "passive";
+			};
+			cpu_crit0: trip1 {
+				temperature = <127000>;
+				hysteresis = <2000>;
+				type = "critical";
+			};
+		};
+	};
+};
