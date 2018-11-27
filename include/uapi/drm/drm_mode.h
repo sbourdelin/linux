@@ -210,6 +210,39 @@ extern "C" {
 #define DRM_MODE_CONTENT_PROTECTION_DESIRED     1
 #define DRM_MODE_CONTENT_PROTECTION_ENABLED     2
 
+/*
+ * This is a consolidated colorimetry list supported by HDMI and
+ * DP protocol standard. The respective connectors will register
+ * a property with the subset of this list (supported by that
+ * respective protocol). Userspace will set the colorspace through
+ * a colorspace property which will be created and exposed to
+ * userspace.
+ */
+enum absolute_colorimetry_list {
+	/* For Default case, driver will set the colorspace */
+	COLORIMETRY_DEFAULT = 0,
+	/* CEA 861 Normal Colorimetry options */
+	COLORIMETRY_ITU_601,
+	COLORIMETRY_ITU_709,
+	/* CEA 861 Extended Colorimetry Options */
+	COLORIMETRY_XV_YCC_601,
+	COLORIMETRY_XV_YCC_709,
+	COLORIMETRY_S_YCC_601,
+	COLORIMETRY_OPYCC_601,
+	COLORIMETRY_OPRGB,
+	COLORIMETRY_BT2020_RGB,
+	COLORIMETRY_BT2020_YCC,
+	COLORIMETRY_BT2020_CYCC,
+	/* DP MSA Colorimetry Options */
+	DP_COLORIMETRY_Y_CBCR_ITU_601,
+	DP_COLORIMETRY_Y_CBCR_ITU_709,
+	DP_COLORIMETRY_SRGB,
+	DP_COLORIMETRY_RGB_WIDE_GAMUT,
+	DP_COLORIMETRY_SCRGB,
+	DP_COLORIMETRY_DCI_P3,
+	DP_COLORIMETRY_CUSTOM_COLOR_PROFILE,
+};
+
 struct drm_mode_modeinfo {
 	__u32 clock;
 	__u16 hdisplay;

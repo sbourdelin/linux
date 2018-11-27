@@ -826,6 +826,30 @@ static struct drm_prop_enum_list drm_cp_enum_list[] = {
 };
 DRM_ENUM_NAME_FN(drm_get_content_protection_name, drm_cp_enum_list)
 
+static const struct drm_prop_enum_list hdmi_colorspace[] = {
+	/* For Default case, driver will set the colorspace */
+	{ COLORIMETRY_DEFAULT, "Default" },
+	/* Standard Definition Colorimetry based on CEA 861 */
+	{ COLORIMETRY_ITU_601, "ITU_601" },
+	{ COLORIMETRY_ITU_709, "ITU_709" },
+	/* Standard Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_601, "XV_YCC_601" },
+	/* High Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_709, "XV_YCC_709" },
+	/* Colorimetry based on IEC 61966-2-1/Amendment 1 */
+	{ COLORIMETRY_S_YCC_601, "S_YCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 [33] */
+	{ COLORIMETRY_OPYCC_601, "opYCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 */
+	{ COLORIMETRY_OPRGB, "opRGB" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_RGB, "BT2020_RGB" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_YCC, "BT2020_YCC" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_CYCC, "BT2020_CYCC" },
+};
+
 /**
  * DOC: standard connector properties
  *
@@ -1400,6 +1424,43 @@ int drm_mode_create_aspect_ratio_property(struct drm_device *dev)
 	return 0;
 }
 EXPORT_SYMBOL(drm_mode_create_aspect_ratio_property);
+
+/**
+ * drm_mode_create_colorspace_property - create colorspace property
+ * Colorspace:
+ *     This property helps select a suitable colorspace based on the sink
+ *     capability. Modern sink devices support wider gamut like BT2020.
+ *     This helps switch to BT2020 mode if the BT2020 encoded video stream
+ *     is being played by the user, same for any other colorspace.
+ * @connector: connector to set property on.
+ *
+ * Called by a driver the first time it's needed, must be attached to desired
+ * connectors.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_mode_create_colorspace_property(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+			connector->connector_type == DRM_MODE_CONNECTOR_HDMIB) {
+
+		prop = drm_property_create_enum(dev, DRM_MODE_PROP_ENUM,
+						"Colorspace",
+						hdmi_colorspace,
+						ARRAY_SIZE(hdmi_colorspace));
+		if (!prop)
+			return -ENOMEM;
+	}
+
+	connector->colorspace_property = prop;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_mode_create_colorspace_property);
 
 /**
  * drm_mode_create_content_type_property - create content type property

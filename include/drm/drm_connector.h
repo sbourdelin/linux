@@ -497,6 +497,13 @@ struct drm_connector_state {
 	unsigned int content_protection;
 
 	/**
+	 * @colorspace: Connector property to request colorspace
+	 * change on Sink. This is most commonly used to switch to
+	 * wider color gamuts like BT2020.
+	 */
+	enum absolute_colorimetry_list colorspace;
+
+	/**
 	 * @writeback_job: Writeback job for writeback connectors
 	 *
 	 * Holds the framebuffer and out-fence for a writeback connector. As
@@ -978,6 +985,12 @@ struct drm_connector {
 	struct drm_property *content_protection_property;
 
 	/**
+	 * @colorspace_property: Connector property to set the suitable
+	 * colorspace supported by the sink.
+	 */
+	struct drm_property *colorspace_property;
+
+	/**
 	 * @path_blob_ptr:
 	 *
 	 * DRM blob property data for the DP MST path property. This should only
@@ -1272,6 +1285,7 @@ int drm_connector_attach_scaling_mode_property(struct drm_connector *connector,
 int drm_connector_attach_content_protection_property(
 		struct drm_connector *connector);
 int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
+int drm_mode_create_colorspace_property(struct drm_connector *connector);
 int drm_mode_create_content_type_property(struct drm_device *dev);
 void drm_hdmi_avi_infoframe_content_type(struct hdmi_avi_infoframe *frame,
 					 const struct drm_connector_state *conn_state);
