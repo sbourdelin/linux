@@ -802,16 +802,6 @@ int phy_device_register(struct phy_device *phydev)
 	if (err)
 		return err;
 
-	/* Deassert the reset signal */
-	phy_device_reset(phydev, 0);
-
-	/* Run all of the fixups for this PHY */
-	err = phy_scan_fixups(phydev);
-	if (err) {
-		pr_err("PHY %d failed to initialize\n", phydev->mdio.addr);
-		goto out;
-	}
-
 	err = device_add(&phydev->mdio.dev);
 	if (err) {
 		pr_err("PHY %d failed to add\n", phydev->mdio.addr);
@@ -821,8 +811,6 @@ int phy_device_register(struct phy_device *phydev)
 	return 0;
 
  out:
-	/* Assert the reset signal */
-	phy_device_reset(phydev, 1);
 
 	mdiobus_unregister_device(&phydev->mdio);
 	return err;
@@ -2202,16 +2190,8 @@ static int phy_probe(struct device *dev)
 	/* Set the state to READY by default */
 	phydev->state = PHY_READY;
 
-	if (phydev->drv->probe) {
-		/* Deassert the reset signal */
-		phy_device_reset(phydev, 0);
-
+	if (phydev->drv->probe)
 		err = phydev->drv->probe(phydev);
-		if (err) {
-			/* Assert the reset signal */
-			phy_device_reset(phydev, 1);
-		}
-	}
 
 	mutex_unlock(&phydev->lock);
 
