@@ -479,6 +479,7 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 static void hsw_activate_psr2(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+	struct i915_psr *psr = &dev_priv->psr;
 	u32 val;
 
 	/* Let's use 6 as the minimum to cover all known cases including the
@@ -486,8 +487,8 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	 */
 	int idle_frames = max(6, dev_priv->vbt.psr.idle_frames);
 
-	idle_frames = max(idle_frames, dev_priv->psr.sink_sync_latency + 1);
-	val = idle_frames << EDP_PSR2_IDLE_FRAME_SHIFT;
+	idle_frames = max(idle_frames, psr->sink_sync_latency + 1);
+	val = EDP_PSR2_IDLE_FRAMES_TO_DEEP_SLEEP(idle_frames);
 
 	/* FIXME: selective update is probably totally broken because it doesn't
 	 * mesh at all with our frontbuffer tracking. And the hw alone isn't
@@ -496,7 +497,7 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
 		val |= EDP_Y_COORDINATE_ENABLE;
 
-	val |= EDP_PSR2_FRAME_BEFORE_SU(dev_priv->psr.sink_sync_latency + 1);
+	val |= EDP_PSR2_FRAMES_BEFORE_ACTIVATE(psr->sink_sync_latency + 1);
 
 	if (dev_priv->vbt.psr.tp2_tp3_wakeup_time_us >= 0 &&
 	    dev_priv->vbt.psr.tp2_tp3_wakeup_time_us <= 50)
