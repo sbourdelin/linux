@@ -80,7 +80,10 @@ Optional properties:
   controller. It's expected that a mux state of 0 indicates device mode and a
   mux state of 1 indicates host mode.
 - mux-control-names: Shall be "usb_switch" if mux-controls is specified.
-- pinctrl-names: Names for optional pin modes in "default", "host", "device"
+- pinctrl-names: Names for optional pin modes in "default", "host", "device".
+  In case of HSIC-mode, "idle" and "active" pin modes are mandatory. In this
+  case, the "idle" state needs to pull down the data and strobe pin
+  and the "active" state needs to pull up the strobe pin.
 - pinctrl-n: alternate pin modes
 
 i.mx specific properties
@@ -110,4 +113,7 @@ Example:
 		phy-clkgate-delay-us = <400>;
 		mux-controls = <&usb_switch>;
 		mux-control-names = "usb_switch";
+		pinctrl-names = "idle", "active";
+		pinctrl-0 = <&pinctrl_usbh2_1>;
+		pinctrl-1 = <&pinctrl_usbh2_2>;
 	};
