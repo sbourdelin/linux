@@ -116,6 +116,9 @@ struct signal_struct {
 	unsigned int		is_child_subreaper:1;
 	unsigned int		has_child_subreaper:1;
 
+	/* Send SIGKILL to descendant processes on exit */
+	unsigned int		kill_descendants_on_exit:1;
+
 #ifdef CONFIG_POSIX_TIMERS
 
 	/* POSIX.1b Interval Timers */

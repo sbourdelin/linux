@@ -1340,6 +1340,12 @@ void setup_new_exec(struct linux_binprm * bprm)
 		current->pdeath_signal = 0;
 
 		/*
+		 * Do not send SIGKILL from privileged process as it may
+		 * have been requested by an unprivileged process.
+		 */
+		current->signal->kill_descendants_on_exit = 0;
+
+		/*
 		 * For secureexec, reset the stack limit to sane default to
 		 * avoid bad behavior from the prior rlimits. This has to
 		 * happen before arch_pick_mmap_layout(), which examines

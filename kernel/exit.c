@@ -692,6 +692,15 @@ static void forget_original_parent(struct task_struct *father,
 	list_splice_tail_init(&father->children, &reaper->children);
 }
 
+static int kill_descendant_visitor(struct task_struct *p, void *data)
+{
+	/* This may fail, e.g., when a descendant process gained privileges. */
+	group_send_sig_info(SIGKILL, SEND_SIG_NOINFO, p, PIDTYPE_TGID);
+
+	/* Always continue walking the process tree. */
+	return 1;
+}
+
 /*
  * Send signals to all our closest relatives so that they know
  * to properly mourn us..
@@ -701,6 +710,9 @@ static void exit_notify(struct task_struct *tsk, int group_dead)
 	bool autoreap;
 	struct task_struct *p, *n;
 	LIST_HEAD(dead);
+
+	if (group_dead && tsk->signal->kill_descendants_on_exit)
+		walk_process_tree(tsk, kill_descendant_visitor, NULL);
 
 	write_lock_irq(&tasklist_lock);
 	forget_original_parent(tsk, &dead);

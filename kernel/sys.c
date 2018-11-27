@@ -2478,6 +2478,17 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 			return -EINVAL;
 		error = arch_prctl_spec_ctrl_set(me, arg2, arg3);
 		break;
+	case PR_SET_KILL_DESCENDANTS_ON_EXIT:
+		if (arg3 || arg4 || arg5)
+			return -EINVAL;
+		me->signal->kill_descendants_on_exit = !!arg2;
+		break;
+	case PR_GET_KILL_DESCENDANTS_ON_EXIT:
+		if (arg3 || arg4 || arg5)
+			return -EINVAL;
+		error = put_user(me->signal->kill_descendants_on_exit,
+				 (int __user *)arg2);
+		break;
 	default:
 		error = -EINVAL;
 		break;
