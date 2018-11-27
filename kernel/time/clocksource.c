@@ -207,8 +207,8 @@ static void clocksource_watchdog(struct timer_list *unused)
 		}
 
 		local_irq_disable();
-		csnow = cs->read(cs);
 		wdnow = watchdog->read(watchdog);
+		csnow = cs->read(cs);
 		local_irq_enable();
 
 		/* Clocksource initialized ? */
