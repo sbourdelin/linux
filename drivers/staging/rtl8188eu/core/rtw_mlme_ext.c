@@ -3250,7 +3250,7 @@ static unsigned int OnAssocReq(struct adapter *padapter,
 	if (pstat->aid > 0) {
 		DBG_88E("  old AID %d\n", pstat->aid);
 	} else {
-		for (pstat->aid = 1; pstat->aid <= NUM_STA; pstat->aid++)
+		for (pstat->aid = 1; pstat->aid < NUM_STA; pstat->aid++)
 			if (pstapriv->sta_aid[pstat->aid - 1] == NULL)
 				break;
 
