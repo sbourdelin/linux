@@ -888,6 +888,7 @@ static void process_csb(struct intel_engine_cs *engine)
 	 */
 	head = execlists->csb_head;
 	tail = READ_ONCE(*execlists->csb_write);
+	GEM_DEBUG_BUG_ON(tail >= execlists->csb_entries);
 	GEM_TRACE("%s cs-irq head=%d, tail=%d\n", engine->name, head, tail);
 	if (unlikely(head == tail))
 		return;
