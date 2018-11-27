@@ -117,6 +117,13 @@ config GPIO_AMDPT
 	  driver for GPIO functionality on Promontory IOHub
 	  Require ACPI ASL code to enumerate as a platform device.
 
+config GPIO_APU
+	tristate "PC Engines APU2/APU3 GPIO support"
+	depends on X86
+	help
+	  Say Y here to support GPIO functionality on APU2/APU3 boards
+	  from PC Engines.
+
 config GPIO_ASPEED
 	tristate "Aspeed GPIO support"
 	depends on (ARCH_ASPEED || COMPILE_TEST) && OF_GPIO
