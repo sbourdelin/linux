@@ -629,7 +629,7 @@ static const struct intel_device_info intel_cannonlake_info = {
 static const struct intel_device_info intel_icelake_11_info = {
 	GEN11_FEATURES,
 	PLATFORM(INTEL_ICELAKE),
-	.is_alpha_support = 1,
+	.preliminary_support = 1,
 	.ring_mask = RENDER_RING | BLT_RING | VEBOX_RING | BSD_RING | BSD3_RING,
 };
 
@@ -723,10 +723,12 @@ static int i915_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		(struct intel_device_info *) ent->driver_data;
 	int err;
 
-	if (IS_ALPHA_SUPPORT(intel_info) && !i915_modparams.alpha_support) {
-		DRM_INFO("The driver support for your hardware in this kernel version is alpha quality\n"
-			 "See CONFIG_DRM_I915_ALPHA_SUPPORT or i915.alpha_support module parameter\n"
-			 "to enable support in this kernel version, or check for kernel updates.\n");
+	if (PRELIMINARY_SUPPORT(intel_info) &&
+	    !i915_modparams.preliminary_support) {
+		DRM_INFO("The driver support for your hardware in this kernel version was under\n"
+			 "preliminary stages of development. See CONFIG_DRM_I915_PRELIMINARY_SUPPORT\n"
+			 "or i915.preliminary_support module parameter to enable support in this kernel\n"
+			 " version, or check for kernel updates.\n");
 		return -ENODEV;
 	}
 

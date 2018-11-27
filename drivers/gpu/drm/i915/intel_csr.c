@@ -512,7 +512,7 @@ void intel_csr_ucode_init(struct drm_i915_private *dev_priv)
 
 	if (csr->fw_path == NULL) {
 		DRM_DEBUG_KMS("No known CSR firmware for platform, disabling runtime PM\n");
-		WARN_ON(!IS_ALPHA_SUPPORT(INTEL_INFO(dev_priv)));
+		WARN_ON(!PRELIMINARY_SUPPORT(INTEL_INFO(dev_priv)));
 
 		return;
 	}

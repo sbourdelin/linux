@@ -2325,7 +2325,7 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define IS_CNL_WITH_PORT_F(dev_priv)   (IS_CANNONLAKE(dev_priv) && \
 					(INTEL_DEVID(dev_priv) & 0x0004) == 0x0004)
 
-#define IS_ALPHA_SUPPORT(intel_info) ((intel_info)->is_alpha_support)
+#define PRELIMINARY_SUPPORT(intel_info) ((intel_info)->preliminary_support)
 
 #define SKL_REVID_A0		0x0
 #define SKL_REVID_B0		0x1

@@ -87,9 +87,11 @@ i915_param_named_unsafe(enable_psr, int, 0600,
 	"(0=disabled, 1=enabled) "
 	"Default: -1 (use per-chip default)");
 
-i915_param_named_unsafe(alpha_support, bool, 0400,
-	"Enable alpha quality driver support for latest hardware. "
-	"See also CONFIG_DRM_I915_ALPHA_SUPPORT.");
+i915_param_named_unsafe(preliminary_support, bool, 0400,
+	"Force the probe and the use of an unstable and preliminary driver."
+	"This flag protects brand new hardware from old preliminary software."
+	"Don't use this flag on production. Please upgrade your kernel instead."
+	"See also CONFIG_DRM_I915_PRELIMINARY_SUPPORT.");
 
 i915_param_named_unsafe(disable_power_well, int, 0400,
 	"Disable display power wells when possible "
