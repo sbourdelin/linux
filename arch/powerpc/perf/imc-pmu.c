@@ -459,7 +459,7 @@ static void nest_imc_counters_release(struct perf_event *event)
 
 static int nest_imc_event_init(struct perf_event *event)
 {
-	int chip_id, rc, node_id;
+	int chip_id, rc, node_id, nr_chips = num_possible_nodes();
 	u32 l_config, config = event->attr.config;
 	struct imc_mem_info *pcni;
 	struct imc_pmu *pmu;
@@ -503,7 +503,7 @@ static int nest_imc_event_init(struct perf_event *event)
 			break;
 		}
 		pcni++;
-	} while (pcni);
+	} while (--nr_chips);
 
 	if (!flag)
 		return -ENODEV;
