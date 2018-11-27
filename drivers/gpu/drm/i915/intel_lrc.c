@@ -767,6 +767,7 @@ execlists_cancel_port_requests(struct intel_engine_execlists * const execlists)
 
 static void reset_csb_pointers(struct intel_engine_execlists *execlists)
 {
+	u32 reset_val;
 	/*
 	 * After a reset, the HW starts writing into CSB entry [0]. We
 	 * therefore have to set our HEAD pointer back one entry so that
@@ -776,8 +777,19 @@ static void reset_csb_pointers(struct intel_engine_execlists *execlists)
 	 * inline comparison of our cached head position against the last HW
 	 * write works even before the first interrupt.
 	 */
-	execlists->csb_head = execlists->csb_write_reset;
-	WRITE_ONCE(*execlists->csb_write, execlists->csb_write_reset);
+	execlists->csb_head = execlists->csb_entries - 1;
+
+	if (execlists_mmio_mode(execlists)) {
+		const u32 mask = execlists->csb_entries == GEN8_CSB_ENTRIES ?
+			GEN8_CSB_WRITE_PTR_MASK :
+			GEN11_CSB_WRITE_PTR_MASK;
+
+		reset_val = _MASKED_FIELD(mask, execlists->csb_head);
+	} else {
+		reset_val = execlists->csb_head;
+	}
+
+	WRITE_ONCE(*execlists->csb_write, reset_val);
 }
 
 static void nop_submission_tasklet(unsigned long data)
@@ -895,7 +907,7 @@ static void process_csb(struct intel_engine_cs *engine)
 		unsigned int status;
 		unsigned int count;
 
-		if (++head == GEN8_CSB_ENTRIES)
+		if (++head == execlists->csb_entries)
 			head = 0;
 
 		/*
@@ -2264,6 +2276,8 @@ static int logical_ring_init(struct intel_engine_cs *engine)
 			upper_32_bits(ce->lrc_desc);
 	}
 
+	execlists->csb_entries = GEN8_CSB_ENTRIES;
+
 	execlists->csb_read =
 		i915->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_PTR(engine));
 	if (csb_force_mmio(i915)) {
@@ -2271,16 +2285,12 @@ static int logical_ring_init(struct intel_engine_cs *engine)
 			(i915->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_BUF_LO(engine, 0)));
 
 		execlists->csb_write = (u32 __force *)execlists->csb_read;
-		execlists->csb_write_reset =
-			_MASKED_FIELD(GEN8_CSB_WRITE_PTR_MASK,
-				      GEN8_CSB_ENTRIES - 1);
 	} else {
 		execlists->csb_status =
 			&engine->status_page.page_addr[I915_HWS_CSB_BUF0_INDEX];
 
 		execlists->csb_write =
 			&engine->status_page.page_addr[intel_hws_csb_write_index(i915)];
-		execlists->csb_write_reset = GEN8_CSB_ENTRIES - 1;
 	}
 	reset_csb_pointers(execlists);
 

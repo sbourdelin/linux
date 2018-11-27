@@ -339,13 +339,9 @@ struct intel_engine_execlists {
 	u32 preempt_complete_status;
 
 	/**
-	 * @csb_write_reset: reset value for CSB write pointer
-	 *
-	 * As the CSB write pointer maybe either in HWSP or as a field
-	 * inside an mmio register, we want to reprogram it slightly
-	 * differently to avoid later confusion.
+	 * @csb_entries: number of CSB entries
 	 */
-	u32 csb_write_reset;
+	u8 csb_entries;
 
 	/**
 	 * @csb_head: context status buffer head
@@ -712,6 +708,13 @@ execlists_is_active(const struct intel_engine_execlists *execlists,
 		    unsigned int bit)
 {
 	return test_bit(bit, (unsigned long *)&execlists->active);
+}
+
+static inline bool
+execlists_mmio_mode(const struct intel_engine_execlists * const execlists)
+{
+	return (unsigned long)execlists->csb_read ==
+		(unsigned long)execlists->csb_write;
 }
 
 void execlists_user_begin(struct intel_engine_execlists *execlists,

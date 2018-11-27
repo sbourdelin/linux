@@ -55,10 +55,11 @@
 #define GEN8_CSB_PTR_MASK 0x7
 #define GEN8_CSB_READ_PTR_MASK (GEN8_CSB_PTR_MASK << 8)
 #define GEN8_CSB_WRITE_PTR_MASK (GEN8_CSB_PTR_MASK << 0)
-#define GEN8_CSB_WRITE_PTR(csb_status) \
-	(((csb_status) & GEN8_CSB_WRITE_PTR_MASK) >> 0)
-#define GEN8_CSB_READ_PTR(csb_status) \
-	(((csb_status) & GEN8_CSB_READ_PTR_MASK) >> 8)
+
+#define GEN11_CSB_ENTRIES 12
+#define GEN11_CSB_PTR_MASK 0xf
+#define GEN11_CSB_READ_PTR_MASK (GEN11_CSB_PTR_MASK << 8)
+#define GEN11_CSB_WRITE_PTR_MASK (GEN11_CSB_PTR_MASK << 0)
 
 enum {
 	INTEL_CONTEXT_SCHEDULE_IN = 0,
