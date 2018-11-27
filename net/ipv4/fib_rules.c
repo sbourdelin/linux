@@ -220,7 +220,7 @@ static int fib4_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 	int err = -EINVAL;
 	struct fib4_rule *rule4 = (struct fib4_rule *) rule;
 
-	if (frh->tos & ~IPTOS_TOS_MASK) {
+	if (frh->tos & ~IPTOS_DSCP_MASK) {
 		NL_SET_ERR_MSG(extack, "Invalid tos");
 		goto errout;
 	}
