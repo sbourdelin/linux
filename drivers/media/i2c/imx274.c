@@ -1875,7 +1875,7 @@ static int imx274_probe(struct i2c_client *client,
 	imx274->client = client;
 	sd = &imx274->sd;
 	v4l2_i2c_subdev_init(sd, client, &imx274_subdev_ops);
-	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
+	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 
 	/* initialize subdev media pad */
 	imx274->pad.flags = MEDIA_PAD_FL_SOURCE;
