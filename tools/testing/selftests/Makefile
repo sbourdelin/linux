@@ -43,6 +43,7 @@ TARGETS += sysctl
 ifneq (1, $(quicktest))
 TARGETS += timers
 endif
+TARGETS += tpm
 TARGETS += user
 TARGETS += vm
 TARGETS += x86
