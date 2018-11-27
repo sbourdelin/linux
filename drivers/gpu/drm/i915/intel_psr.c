@@ -482,13 +482,13 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	struct i915_psr *psr = &dev_priv->psr;
 	u32 val;
 
-	/* Let's use 6 as the minimum to cover all known cases including the
-	 * off-by-one issue that HW has in some cases.
+	/* sink_sync_latency of 8 means source has to wait for more than 8
+	 * frames, we'll go with 9 frames for now
 	 */
-	int idle_frames = max(6, dev_priv->vbt.psr.idle_frames);
+	val = EDP_PSR2_FRAMES_BEFORE_ACTIVATE(psr->sink_sync_latency + 1);
 
-	idle_frames = max(idle_frames, psr->sink_sync_latency + 1);
-	val = EDP_PSR2_IDLE_FRAMES_TO_DEEP_SLEEP(idle_frames);
+	/* Avoid deep sleep as much as possible to avoid PSR2 idle state */
+	val |= EDP_PSR2_IDLE_FRAMES_TO_DEEP_SLEEP(15);
 
 	/* FIXME: selective update is probably totally broken because it doesn't
 	 * mesh at all with our frontbuffer tracking. And the hw alone isn't
@@ -496,8 +496,6 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	val |= EDP_PSR2_ENABLE | EDP_SU_TRACK_ENABLE;
 	if (INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
 		val |= EDP_Y_COORDINATE_ENABLE;
-
-	val |= EDP_PSR2_FRAMES_BEFORE_ACTIVATE(psr->sink_sync_latency + 1);
 
 	if (dev_priv->vbt.psr.tp2_tp3_wakeup_time_us >= 0 &&
 	    dev_priv->vbt.psr.tp2_tp3_wakeup_time_us <= 50)
