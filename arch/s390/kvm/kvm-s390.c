@@ -3531,6 +3531,10 @@ static int vcpu_post_run(struct kvm_vcpu *vcpu, int exit_reason)
 	vcpu->run->s.regs.gprs[15] = vcpu->arch.sie_block->gg15;
 
 	atomic_dec(&vcpu->kvm->arch.vcpus_in_sie);
+	if (vcpu->kvm->arch.gib_in_use &&
+	    !in_alert_list(vcpu->kvm->arch.gisa) &&
+	    !atomic_read(&vcpu->kvm->arch.vcpus_in_sie))
+		vcpu->kvm->arch.gisa->iam = vcpu->kvm->arch.iam;
 
 	if (exit_reason == -EINTR) {
 		VCPU_EVENT(vcpu, 3, "%s", "machine check");
