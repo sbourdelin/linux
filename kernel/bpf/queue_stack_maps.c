@@ -240,7 +240,7 @@ out:
 /* Called from syscall or from eBPF program */
 static void *queue_stack_map_lookup_elem(struct bpf_map *map, void *key)
 {
-	return NULL;
+	return ERR_PTR(-EOPNOTSUPP);
 }
 
 /* Called from syscall or from eBPF program */
