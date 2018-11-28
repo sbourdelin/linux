@@ -1412,6 +1412,8 @@ again:
 done:
 	ptr = phys_to_virt(alloc);
 
+/* Skip kmemleak for kasan_init() due to high volume. */
+#ifndef CONFIG_KASAN
 	/*
 	 * The min_count is set to 0 so that bootmem allocated blocks
 	 * are never reported as leaks. This is because many of these blocks
@@ -1419,6 +1421,7 @@ done:
 	 * looked up by kmemleak.
 	 */
 	kmemleak_alloc(ptr, size, 0, 0);
+#endif
 
 	return ptr;
 }
