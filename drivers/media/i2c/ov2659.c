@@ -1046,17 +1046,15 @@ static int ov2659_get_fmt(struct v4l2_subdev *sd,
 	dev_dbg(&client->dev, "ov2659_get_fmt\n");
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 		struct v4l2_mbus_framefmt *mf;
 
 		mf = v4l2_subdev_get_try_format(sd, cfg, 0);
+		if (IS_ERR(mf))
+			return PTR_ERR(mf);
 		mutex_lock(&ov2659->lock);
 		fmt->format = *mf;
 		mutex_unlock(&ov2659->lock);
 		return 0;
-#else
-	return -ENOTTY;
-#endif
 	}
 
 	mutex_lock(&ov2659->lock);
@@ -1126,12 +1124,10 @@ static int ov2659_set_fmt(struct v4l2_subdev *sd,
 	mutex_lock(&ov2659->lock);
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 		mf = v4l2_subdev_get_try_format(sd, cfg, fmt->pad);
+		if (IS_ERR(mf))
+			return PTR_ERR(mf);
 		*mf = fmt->format;
-#else
-		return -ENOTTY;
-#endif
 	} else {
 		s64 val;
 
