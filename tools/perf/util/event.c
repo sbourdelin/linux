@@ -1569,9 +1569,58 @@ struct map *thread__find_map(struct thread *thread, u8 cpumode, u64 addr,
 		 * Kernel maps might be changed when loading symbols so loading
 		 * must be done prior to using kernel maps.
 		 */
-		if (load_map)
+		if (load_map) {
+			/*
+			 * Note when using -ffunction-sections on the kernel:
+			 *
+			 * Only .text got loaded into al->map at this point.
+			 * Consequently al->map address range encompass the
+			 * whole image.
+			 *
+			 * map__load() will split this map into many function
+			 * maps by shrinking al->map accordingly.
+			 *
+			 * The split happens in dso_process_kernel_symbol()
+			 * where we call map_groups__find_by_name() to find an
+			 * existing map, but with -ffunction-sections and a
+			 * symbol belonging to a new (function) map, such map
+			 * doesn't exist yet so we end up creating one and
+			 * adjusting existing maps accordingly because
+			 * adjust_kernel_syms is set there.
+			 */
+
 			map__load(al->map);
-		al->addr = al->map->map_ip(al->map, al->addr);
+
+			/*
+			 * Note when using -ffunction-sections on the kernel:
+			 *
+			 * Very likely the target address will now be in one of
+			 * the newly created function maps but al->map still
+			 * points to .text which has been drastically shrank by
+			 * the split done in map__load()
+			 */
+			if (al->addr < al->map->start ||
+			    al->addr >= al->map->end) {
+				al->map = map_groups__find(mg, al->addr);
+
+				/*
+				 * map_groups__find() should always find a map
+				 * because the target address was initially
+				 * found in .text which got split by map__load()
+				 * *WITHOUT INTRODUCING ANY GAP*
+				 */
+				WARN_ONCE(al->map == NULL,
+					  "map__load created unexpected gaps!");
+			}
+		}
+
+		/*
+		 * In case the later call to map_groups__find() didn't find a
+		 * suitable map (it should always, but better be safe) we make
+		 * sure that al->map is still valid before deferencing it.
+		 */
+		if (al->map != NULL)
+			al->addr = al->map->map_ip(al->map, al->addr);
 	}
 
 	return al->map;
