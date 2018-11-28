@@ -3438,11 +3438,8 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 	if (data[IFLA_VXLAN_TTL])
 		conf->ttl = nla_get_u8(data[IFLA_VXLAN_TTL]);
 
-	if (data[IFLA_VXLAN_TTL_INHERIT]) {
-		if (changelink)
-			return -EOPNOTSUPP;
+	if (data[IFLA_VXLAN_TTL_INHERIT])
 		conf->flags |= VXLAN_F_TTL_INHERIT;
-	}
 
 	if (data[IFLA_VXLAN_LABEL])
 		conf->label = nla_get_be32(data[IFLA_VXLAN_LABEL]) &
@@ -3462,29 +3459,21 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 		conf->age_interval = nla_get_u32(data[IFLA_VXLAN_AGEING]);
 
 	if (data[IFLA_VXLAN_PROXY]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_PROXY]))
 			conf->flags |= VXLAN_F_PROXY;
 	}
 
 	if (data[IFLA_VXLAN_RSC]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_RSC]))
 			conf->flags |= VXLAN_F_RSC;
 	}
 
 	if (data[IFLA_VXLAN_L2MISS]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_L2MISS]))
 			conf->flags |= VXLAN_F_L2MISS;
 	}
 
 	if (data[IFLA_VXLAN_L3MISS]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_L3MISS]))
 			conf->flags |= VXLAN_F_L3MISS;
 	}
@@ -3527,50 +3516,33 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 	}
 
 	if (data[IFLA_VXLAN_UDP_ZERO_CSUM6_TX]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_UDP_ZERO_CSUM6_TX]))
 			conf->flags |= VXLAN_F_UDP_ZERO_CSUM6_TX;
 	}
 
 	if (data[IFLA_VXLAN_UDP_ZERO_CSUM6_RX]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_UDP_ZERO_CSUM6_RX]))
 			conf->flags |= VXLAN_F_UDP_ZERO_CSUM6_RX;
 	}
 
 	if (data[IFLA_VXLAN_REMCSUM_TX]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_REMCSUM_TX]))
 			conf->flags |= VXLAN_F_REMCSUM_TX;
 	}
 
 	if (data[IFLA_VXLAN_REMCSUM_RX]) {
-		if (changelink)
-			return -EOPNOTSUPP;
 		if (nla_get_u8(data[IFLA_VXLAN_REMCSUM_RX]))
 			conf->flags |= VXLAN_F_REMCSUM_RX;
 	}
 
-	if (data[IFLA_VXLAN_GBP]) {
-		if (changelink)
-			return -EOPNOTSUPP;
+	if (data[IFLA_VXLAN_GBP])
 		conf->flags |= VXLAN_F_GBP;
-	}
 
-	if (data[IFLA_VXLAN_GPE]) {
-		if (changelink)
-			return -EOPNOTSUPP;
+	if (data[IFLA_VXLAN_GPE])
 		conf->flags |= VXLAN_F_GPE;
-	}
 
-	if (data[IFLA_VXLAN_REMCSUM_NOPARTIAL]) {
-		if (changelink)
-			return -EOPNOTSUPP;
+	if (data[IFLA_VXLAN_REMCSUM_NOPARTIAL])
 		conf->flags |= VXLAN_F_REMCSUM_NOPARTIAL;
-	}
 
 	if (tb[IFLA_MTU]) {
 		if (changelink)
