@@ -3468,6 +3468,8 @@ static int vcpu_pre_run(struct kvm_vcpu *vcpu)
 		kvm_s390_patch_guest_per_regs(vcpu);
 	}
 
+	atomic_inc(&vcpu->kvm->arch.vcpus_in_sie);
+
 	vcpu->arch.sie_block->icptcode = 0;
 	cpuflags = atomic_read(&vcpu->arch.sie_block->cpuflags);
 	VCPU_EVENT(vcpu, 6, "entering sie flags %x", cpuflags);
@@ -3526,6 +3528,8 @@ static int vcpu_post_run(struct kvm_vcpu *vcpu, int exit_reason)
 
 	vcpu->run->s.regs.gprs[14] = vcpu->arch.sie_block->gg14;
 	vcpu->run->s.regs.gprs[15] = vcpu->arch.sie_block->gg15;
+
+	atomic_dec(&vcpu->kvm->arch.vcpus_in_sie);
 
 	if (exit_reason == -EINTR) {
 		VCPU_EVENT(vcpu, 3, "%s", "machine check");

@@ -848,6 +848,7 @@ struct kvm_arch{
 	DECLARE_BITMAP(cpu_feat, KVM_S390_VM_CPU_FEAT_NR_BITS);
 	struct kvm_s390_gisa *gisa;
 	int gib_in_use;
+	atomic_t vcpus_in_sie;
 };
 
 #define KVM_HVA_ERR_BAD		(-1UL)
