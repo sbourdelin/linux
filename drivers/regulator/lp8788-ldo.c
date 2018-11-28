@@ -502,7 +502,7 @@ static int lp8788_config_ldo_enable_mode(struct platform_device *pdev,
 	}
 
 	/* FIXME: check default mode for GPIO here: high or low? */
-	ldo->ena_gpiod = devm_gpiod_get_index_optional(&pdev->dev,
+	ldo->ena_gpiod = gpiod_get_index_optional(&pdev->dev,
 					       "enable",
 					       enable_id,
 					       GPIOD_OUT_HIGH |
@@ -548,6 +548,8 @@ static int lp8788_dldo_probe(struct platform_device *pdev)
 
 	rdev = devm_regulator_register(&pdev->dev, &lp8788_dldo_desc[id], &cfg);
 	if (IS_ERR(rdev)) {
+		if (ldo->ena_gpiod)
+			gpiod_put(ldo->ena_gpiod);
 		ret = PTR_ERR(rdev);
 		dev_err(&pdev->dev, "DLDO%d regulator register err = %d\n",
 				id + 1, ret);
