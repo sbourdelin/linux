@@ -2962,6 +2962,8 @@ void kvm_s390_gisa_init(struct kvm *kvm)
 {
 	if (css_general_characteristics.aiv) {
 		kvm->arch.gisa = &kvm->arch.sie_page2->gisa;
+		kvm->arch.iam = 0;
+		spin_lock_init(&kvm->arch.iam_ref_lock);
 		VM_EVENT(kvm, 3, "gisa 0x%pK initialized", kvm->arch.gisa);
 		kvm_s390_gisa_clear(kvm);
 		kvm->arch.gib_in_use = !!gib;
@@ -2973,7 +2975,49 @@ void kvm_s390_gisa_destroy(struct kvm *kvm)
 	if (!kvm->arch.gisa)
 		return;
 	kvm->arch.gisa = NULL;
+	kvm->arch.iam = 0;
 }
+
+int kvm_s390_gisc_register(struct kvm *kvm, u32 gisc)
+{
+	if (!kvm->arch.gib_in_use)
+		return -ENODEV;
+	if (gisc > MAX_ISC)
+		return -EINVAL;
+
+	spin_lock(&kvm->arch.iam_ref_lock);
+	if (kvm->arch.iam_ref_count[gisc] == 0)
+		kvm->arch.iam |= 0x80 >> gisc;
+	kvm->arch.iam_ref_count[gisc]++;
+	spin_unlock(&kvm->arch.iam_ref_lock);
+
+	return gib->nisc;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_gisc_register);
+
+int kvm_s390_gisc_unregister(struct kvm *kvm, u32 gisc)
+{
+	int rc = 0;
+
+	if (!kvm->arch.gib_in_use)
+		return -ENODEV;
+	if (gisc > MAX_ISC)
+		return -EINVAL;
+
+	spin_lock(&kvm->arch.iam_ref_lock);
+	if (kvm->arch.iam_ref_count[gisc] == 0) {
+		rc = -EFAULT;
+		goto out;
+	}
+	kvm->arch.iam_ref_count[gisc]--;
+	if (kvm->arch.iam_ref_count[gisc] == 0)
+		kvm->arch.iam &= ~(0x80 >> gisc);
+out:
+	spin_unlock(&kvm->arch.iam_ref_lock);
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_gisc_unregister);
 
 void kvm_s390_gib_destroy(void)
 {

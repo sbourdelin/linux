@@ -850,6 +850,9 @@ struct kvm_arch{
 	struct kvm_s390_gisa *gisa;
 	int gib_in_use;
 	atomic_t vcpus_in_sie;
+	u8 iam;
+	u32 iam_ref_count[MAX_ISC + 1];
+	spinlock_t iam_ref_lock;
 };
 
 #define KVM_HVA_ERR_BAD		(-1UL)
@@ -882,6 +885,9 @@ void kvm_arch_crypto_set_masks(struct kvm *kvm, unsigned long *apm,
 
 extern int sie64a(struct kvm_s390_sie_block *, u64 *);
 extern char sie_exit;
+
+extern int kvm_s390_gisc_register(struct kvm *kvm, u32 gisc);
+extern int kvm_s390_gisc_unregister(struct kvm *kvm, u32 gisc);
 
 static inline void kvm_arch_hardware_disable(void) {}
 static inline void kvm_arch_check_processor_compat(void *rtn) {}
