@@ -23,6 +23,7 @@ asmlinkage void chacha20_block_xor_ssse3(u32 *state, u8 *dst, const u8 *src,
 					 unsigned int len);
 asmlinkage void chacha20_4block_xor_ssse3(u32 *state, u8 *dst, const u8 *src,
 					  unsigned int len);
+asmlinkage void hchacha20_block_ssse3(const u32 *state, u32 *out);
 #ifdef CONFIG_AS_AVX2
 asmlinkage void chacha20_2block_xor_avx2(u32 *state, u8 *dst, const u8 *src,
 					 unsigned int len);
@@ -86,23 +87,19 @@ static void chacha20_dosimd(u32 *state, u8 *dst, const u8 *src,
 	}
 }
 
-static int chacha20_simd(struct skcipher_request *req)
+static int chacha20_simd_stream_xor(struct skcipher_request *req,
+				    struct chacha_ctx *ctx, u8 *iv)
 {
-	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
-	struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
-	u32 *state, state_buf[16 + 2] __aligned(8);
 	struct skcipher_walk walk;
+	u32 *state, state_buf[16 + 2] __aligned(8);
 	int err;
 
 	BUILD_BUG_ON(CHACHA20_STATE_ALIGN != 16);
 	state = PTR_ALIGN(state_buf + 0, CHACHA20_STATE_ALIGN);
 
-	if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
-		return crypto_chacha_crypt(req);
-
 	err = skcipher_walk_virt(&walk, req, false);
 
-	crypto_chacha_init(state, ctx, walk.iv);
+	crypto_chacha_init(state, ctx, iv);
 
 	while (walk.nbytes > 0) {
 		unsigned int nbytes = walk.nbytes;
@@ -121,21 +118,73 @@ static int chacha20_simd(struct skcipher_request *req)
 	return err;
 }
 
-static struct skcipher_alg alg = {
-	.base.cra_name		= "chacha20",
-	.base.cra_driver_name	= "chacha20-simd",
-	.base.cra_priority	= 300,
-	.base.cra_blocksize	= 1,
-	.base.cra_ctxsize	= sizeof(struct chacha_ctx),
-	.base.cra_module	= THIS_MODULE,
+static int chacha20_simd(struct skcipher_request *req)
+{
+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+	struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
 
-	.min_keysize		= CHACHA_KEY_SIZE,
-	.max_keysize		= CHACHA_KEY_SIZE,
-	.ivsize			= CHACHA_IV_SIZE,
-	.chunksize		= CHACHA_BLOCK_SIZE,
-	.setkey			= crypto_chacha20_setkey,
-	.encrypt		= chacha20_simd,
-	.decrypt		= chacha20_simd,
+	if (req->cryptlen <= CHACHA_BLOCK_SIZE || !irq_fpu_usable())
+		return crypto_chacha_crypt(req);
+
+	return chacha20_simd_stream_xor(req, ctx, req->iv);
+}
+
+static int xchacha20_simd(struct skcipher_request *req)
+{
+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+	struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
+	struct chacha_ctx subctx;
+	u32 *state, state_buf[16 + 2] __aligned(8);
+	u8 real_iv[16];
+
+	if (req->cryptlen <= CHACHA_BLOCK_SIZE || !irq_fpu_usable())
+		return crypto_xchacha_crypt(req);
+
+	BUILD_BUG_ON(CHACHA20_STATE_ALIGN != 16);
+	state = PTR_ALIGN(state_buf + 0, CHACHA20_STATE_ALIGN);
+	crypto_chacha_init(state, ctx, req->iv);
+
+	kernel_fpu_begin();
+	hchacha20_block_ssse3(state, subctx.key);
+	kernel_fpu_end();
+
+	memcpy(&real_iv[0], req->iv + 24, 8);
+	memcpy(&real_iv[8], req->iv + 16, 8);
+	return chacha20_simd_stream_xor(req, &subctx, real_iv);
+}
+
+static struct skcipher_alg algs[] = {
+	{
+		.base.cra_name		= "chacha20",
+		.base.cra_driver_name	= "chacha20-simd",
+		.base.cra_priority	= 300,
+		.base.cra_blocksize	= 1,
+		.base.cra_ctxsize	= sizeof(struct chacha_ctx),
+		.base.cra_module	= THIS_MODULE,
+
+		.min_keysize		= CHACHA_KEY_SIZE,
+		.max_keysize		= CHACHA_KEY_SIZE,
+		.ivsize			= CHACHA_IV_SIZE,
+		.chunksize		= CHACHA_BLOCK_SIZE,
+		.setkey			= crypto_chacha20_setkey,
+		.encrypt		= chacha20_simd,
+		.decrypt		= chacha20_simd,
+	}, {
+		.base.cra_name		= "xchacha20",
+		.base.cra_driver_name	= "xchacha20-simd",
+		.base.cra_priority	= 300,
+		.base.cra_blocksize	= 1,
+		.base.cra_ctxsize	= sizeof(struct chacha_ctx),
+		.base.cra_module	= THIS_MODULE,
+
+		.min_keysize		= CHACHA_KEY_SIZE,
+		.max_keysize		= CHACHA_KEY_SIZE,
+		.ivsize			= XCHACHA_IV_SIZE,
+		.chunksize		= CHACHA_BLOCK_SIZE,
+		.setkey			= crypto_chacha20_setkey,
+		.encrypt		= xchacha20_simd,
+		.decrypt		= xchacha20_simd,
+	},
 };
 
 static int __init chacha20_simd_mod_init(void)
@@ -148,12 +197,12 @@ static int __init chacha20_simd_mod_init(void)
 			    boot_cpu_has(X86_FEATURE_AVX2) &&
 			    cpu_has_xfeatures(XFEATURE_MASK_SSE | XFEATURE_MASK_YMM, NULL);
 #endif
-	return crypto_register_skcipher(&alg);
+	return crypto_register_skciphers(algs, ARRAY_SIZE(algs));
 }
 
 static void __exit chacha20_simd_mod_fini(void)
 {
-	crypto_unregister_skcipher(&alg);
+	crypto_unregister_skciphers(algs, ARRAY_SIZE(algs));
 }
 
 module_init(chacha20_simd_mod_init);
@@ -164,3 +213,5 @@ MODULE_AUTHOR("Martin Willi <martin@strongswan.org>");
 MODULE_DESCRIPTION("chacha20 cipher algorithm, SIMD accelerated");
 MODULE_ALIAS_CRYPTO("chacha20");
 MODULE_ALIAS_CRYPTO("chacha20-simd");
+MODULE_ALIAS_CRYPTO("xchacha20");
+MODULE_ALIAS_CRYPTO("xchacha20-simd");
