@@ -672,11 +672,9 @@ static int ov2680_get_fmt(struct v4l2_subdev *sd,
 	mutex_lock(&sensor->lock);
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 		fmt = v4l2_subdev_get_try_format(&sensor->sd, cfg, format->pad);
-#else
-		ret = -ENOTTY;
-#endif
+		if (IS_ERR(fmt))
+			return PTR_ERR(fmt);
 	} else {
 		fmt = &sensor->fmt;
 	}
@@ -695,9 +693,7 @@ static int ov2680_set_fmt(struct v4l2_subdev *sd,
 {
 	struct ov2680_dev *sensor = to_ov2680_dev(sd);
 	struct v4l2_mbus_framefmt *fmt = &format->format;
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 	struct v4l2_mbus_framefmt *try_fmt;
-#endif
 	const struct ov2680_mode_info *mode;
 	int ret = 0;
 
@@ -720,12 +716,11 @@ static int ov2680_set_fmt(struct v4l2_subdev *sd,
 	}
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 		try_fmt = v4l2_subdev_get_try_format(sd, cfg, 0);
-		format->format = *try_fmt;
-#else
-		ret = -ENOTTY;
-#endif
+		if (IS_ERR(try_fmt))
+			ret = PTR_ERR(try_fmt);
+		else
+			format->format = *try_fmt;
 
 		goto unlock;
 	}
