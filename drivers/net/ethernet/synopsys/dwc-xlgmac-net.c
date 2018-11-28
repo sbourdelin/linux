@@ -1180,6 +1180,7 @@ read_again:
 				netif_err(pdata, rx_err, netdev,
 					  "error in received packet\n");
 			dev_kfree_skb(skb);
+			skb = NULL;
 			goto next_packet;
 		}
 
@@ -1227,6 +1228,7 @@ read_again:
 			netif_err(pdata, rx_err, netdev,
 				  "packet length exceeds configured MTU\n");
 			dev_kfree_skb(skb);
+			skb = NULL;
 			goto next_packet;
 		}
 
