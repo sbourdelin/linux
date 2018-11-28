@@ -810,6 +810,7 @@ static int ov5695_set_fmt(struct v4l2_subdev *sd,
 			  struct v4l2_subdev_format *fmt)
 {
 	struct ov5695 *ov5695 = to_ov5695(sd);
+	struct v4l2_mbus_framefmt *try_fmt;
 	const struct ov5695_mode *mode;
 	s64 h_blank, vblank_def;
 
@@ -821,12 +822,12 @@ static int ov5695_set_fmt(struct v4l2_subdev *sd,
 	fmt->format.height = mode->height;
 	fmt->format.field = V4L2_FIELD_NONE;
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
-		*v4l2_subdev_get_try_format(sd, cfg, fmt->pad) = fmt->format;
-#else
-		mutex_unlock(&ov5695->mutex);
-		return -ENOTTY;
-#endif
+		try_fmt = v4l2_subdev_get_try_format(sd, cfg, fmt->pad);
+		if (IS_ERR(try_fmt)) {
+			mutex_unlock(&ov5695->mutex);
+			return PTR_ERR(try_fmt);
+		}
+		*try_fmt = fmt->format;
 	} else {
 		ov5695->cur_mode = mode;
 		h_blank = mode->hts_def - mode->width;
@@ -845,24 +846,25 @@ static int ov5695_set_fmt(struct v4l2_subdev *sd,
 
 static int ov5695_get_fmt(struct v4l2_subdev *sd,
 			  struct v4l2_subdev_pad_config *cfg,
-			  struct v4l2_subdev_format *fmt)
+			  struct v4l2_subdev_format *format)
 {
 	struct ov5695 *ov5695 = to_ov5695(sd);
+	struct v4l2_mbus_framefmt *fmt;
 	const struct ov5695_mode *mode = ov5695->cur_mode;
 
 	mutex_lock(&ov5695->mutex);
-	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
-		fmt->format = *v4l2_subdev_get_try_format(sd, cfg, fmt->pad);
-#else
-		mutex_unlock(&ov5695->mutex);
-		return -ENOTTY;
-#endif
+	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
+		fmt = v4l2_subdev_get_try_format(sd, cfg, format->pad);
+		if (IS_ERR(fmt)) {
+			mutex_unlock(&ov5695->mutex);
+			return PTR_ERR(fmt);
+		}
+		format->format = *fmt;
 	} else {
-		fmt->format.width = mode->width;
-		fmt->format.height = mode->height;
-		fmt->format.code = MEDIA_BUS_FMT_SBGGR10_1X10;
-		fmt->format.field = V4L2_FIELD_NONE;
+		format->format.width = mode->width;
+		format->format.height = mode->height;
+		format->format.code = MEDIA_BUS_FMT_SBGGR10_1X10;
+		format->format.field = V4L2_FIELD_NONE;
 	}
 	mutex_unlock(&ov5695->mutex);
 
