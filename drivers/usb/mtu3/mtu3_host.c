@@ -192,8 +192,16 @@ int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
 static void ssusb_host_setup(struct ssusb_mtk *ssusb)
 {
 	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
+	void __iomem *ibase = ssusb->ippc_base;
 
 	host_ports_num_get(ssusb);
+
+	/*
+	 * device ip is default power-on in fact
+	 * power down device ip, otherwise ip-sleep will fail
+	 */
+	if (ssusb->dr_mode == USB_DR_MODE_HOST)
+		mtu3_setbits(ibase, U3D_SSUSB_IP_PW_CTRL2, SSUSB_IP_DEV_PDN);
 
 	/*
 	 * power on host and power on/enable all ports
