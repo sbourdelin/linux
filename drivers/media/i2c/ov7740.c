@@ -780,9 +780,7 @@ static int ov7740_set_fmt(struct v4l2_subdev *sd,
 	struct ov7740 *ov7740 = container_of(sd, struct ov7740, subdev);
 	const struct ov7740_pixfmt *ovfmt;
 	const struct ov7740_framesize *fsize;
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 	struct v4l2_mbus_framefmt *mbus_fmt;
-#endif
 	int ret;
 
 	mutex_lock(&ov7740->mutex);
@@ -795,16 +793,15 @@ static int ov7740_set_fmt(struct v4l2_subdev *sd,
 		ret = ov7740_try_fmt_internal(sd, &format->format, NULL, NULL);
 		if (ret)
 			goto error;
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 		mbus_fmt = v4l2_subdev_get_try_format(sd, cfg, format->pad);
+		if (IS_ERR(mbus_fmt)) {
+			ret = PTR_ERR(mbus_fmt);
+			goto error;
+		}
 		*mbus_fmt = format->format;
 
 		mutex_unlock(&ov7740->mutex);
 		return 0;
-#else
-		ret = -ENOTTY;
-		goto error;
-#endif
 	}
 
 	ret = ov7740_try_fmt_internal(sd, &format->format, &ovfmt, &fsize);
@@ -827,20 +824,18 @@ static int ov7740_get_fmt(struct v4l2_subdev *sd,
 			  struct v4l2_subdev_format *format)
 {
 	struct ov7740 *ov7740 = container_of(sd, struct ov7740, subdev);
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 	struct v4l2_mbus_framefmt *mbus_fmt;
-#endif
 	int ret = 0;
 
 	mutex_lock(&ov7740->mutex);
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
 		mbus_fmt = v4l2_subdev_get_try_format(sd, cfg, 0);
-		format->format = *mbus_fmt;
-		ret = 0;
-#else
-		ret = -ENOTTY;
-#endif
+		if (IS_ERR(mbus_fmt)) {
+			ret = PTR_ERR(mbus_fmt);
+		} else {
+			format->format = *mbus_fmt;
+			ret = 0;
+		}
 	} else {
 		format->format = ov7740->format;
 	}
