@@ -221,14 +221,14 @@ static int irq_build_affinity_masks(const struct irq_affinity *affd,
 	return ret;
 }
 
-/**
+/*
  * irq_create_affinity_masks - Create affinity masks for multiqueue spreading
  * @nvecs:	The total number of vectors
  * @affd:	Description of the affinity requirements
  *
  * Returns the masks pointer or NULL if allocation failed.
  */
-struct cpumask *
+static struct cpumask *
 irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 {
 	int affvecs = nvecs - affd->pre_vectors - affd->post_vectors;
@@ -290,6 +290,42 @@ irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 outnodemsk:
 	free_node_to_cpumask(node_to_cpumask);
 	return masks;
+}
+
+/**
+ * irq_create_affinity_desc - Create affinity desc for multiqueue spreading
+ * @nvec:	The total number of vectors
+ * @affd:	Description of the affinity requirements
+ *
+ * Returns the irq_affinity_desc pointer or NULL if allocation failed.
+ */
+struct irq_affinity_desc *
+irq_create_affinity_desc(int nvec, const struct irq_affinity *affd)
+{
+	struct irq_affinity_desc *cur_affi_desc, *affi_desc = NULL;
+	struct cpumask *curmask, *masks = NULL;
+	int i;
+
+	masks = irq_create_affinity_masks(nvec, affd);
+	if (masks) {
+		affi_desc = kcalloc(nvec, sizeof(*affi_desc), GFP_KERNEL);
+		if (!affi_desc)
+			return NULL;
+
+		curmask = masks;
+		cur_affi_desc = affi_desc;
+		for (i = 0; i < nvec; i++) {
+			cpumask_copy(&cur_affi_desc->masks, curmask);
+			if (i >= affd->pre_vectors &&
+					i < nvec - affd->post_vectors)
+				cur_affi_desc->flags = 1;
+			curmask++;
+			cur_affi_desc++;
+		}
+		kfree(masks);
+	}
+
+	return affi_desc;
 }
 
 /**

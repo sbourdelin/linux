@@ -534,16 +534,15 @@ error_attrs:
 static struct msi_desc *
 msi_setup_entry(struct pci_dev *dev, int nvec, const struct irq_affinity *affd)
 {
-	struct cpumask *masks = NULL;
+	struct irq_affinity_desc *affi_desc = NULL;
 	struct msi_desc *entry;
 	u16 control;
 
 	if (affd)
-		masks = irq_create_affinity_masks(nvec, affd);
-
+		affi_desc = irq_create_affinity_desc(nvec, affd);
 
 	/* MSI Entry Initialization */
-	entry = alloc_msi_entry(&dev->dev, nvec, masks);
+	entry = alloc_msi_entry(&dev->dev, nvec, affi_desc);
 	if (!entry)
 		goto out;
 
@@ -567,7 +566,7 @@ msi_setup_entry(struct pci_dev *dev, int nvec, const struct irq_affinity *affd)
 		pci_read_config_dword(dev, entry->mask_pos, &entry->masked);
 
 out:
-	kfree(masks);
+	kfree(affi_desc);
 	return entry;
 }
 
@@ -672,15 +671,15 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
 			      struct msix_entry *entries, int nvec,
 			      const struct irq_affinity *affd)
 {
-	struct cpumask *curmsk, *masks = NULL;
+	struct irq_affinity_desc *cur_affi_desc, *affi_desc = NULL;
 	struct msi_desc *entry;
 	int ret, i;
 
 	if (affd)
-		masks = irq_create_affinity_masks(nvec, affd);
+		affi_desc = irq_create_affinity_desc(nvec, affd);
 
-	for (i = 0, curmsk = masks; i < nvec; i++) {
-		entry = alloc_msi_entry(&dev->dev, 1, curmsk);
+	for (i = 0, cur_affi_desc = affi_desc; i < nvec; i++) {
+		entry = alloc_msi_entry(&dev->dev, 1, cur_affi_desc);
 		if (!entry) {
 			if (!i)
 				iounmap(base);
@@ -701,12 +700,12 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
 		entry->mask_base		= base;
 
 		list_add_tail(&entry->list, dev_to_msi_list(&dev->dev));
-		if (masks)
-			curmsk++;
+		if (affi_desc)
+			cur_affi_desc++;
 	}
 	ret = 0;
 out:
-	kfree(masks);
+	kfree(affi_desc);
 	return ret;
 }
 
@@ -1264,7 +1263,7 @@ const struct cpumask *pci_irq_get_affinity(struct pci_dev *dev, int nr)
 
 		for_each_pci_msi_entry(entry, dev) {
 			if (i == nr)
-				return entry->affinity;
+				return &entry->affi_desc->masks;
 			i++;
 		}
 		WARN_ON_ONCE(1);
@@ -1272,11 +1271,11 @@ const struct cpumask *pci_irq_get_affinity(struct pci_dev *dev, int nr)
 	} else if (dev->msi_enabled) {
 		struct msi_desc *entry = first_pci_msi_entry(dev);
 
-		if (WARN_ON_ONCE(!entry || !entry->affinity ||
+		if (WARN_ON_ONCE(!entry || !entry->affi_desc ||
 				 nr >= entry->nvec_used))
 			return NULL;
 
-		return &entry->affinity[nr];
+		return &entry->affi_desc[nr].masks;
 	} else {
 		return cpu_possible_mask;
 	}

@@ -181,14 +181,33 @@ int __devm_irq_alloc_descs(struct device *dev, int irq, unsigned int from,
 			   unsigned int cnt, int node, struct module *owner,
 			   const struct cpumask *affinity)
 {
+	struct irq_affinity_desc *cur_affi_desc, *affi_desc = NULL;
+	const struct cpumask *curmask;
 	struct irq_desc_devres *dr;
-	int base;
+	int base, i;
 
 	dr = devres_alloc(devm_irq_desc_release, sizeof(*dr), GFP_KERNEL);
 	if (!dr)
 		return -ENOMEM;
 
-	base = __irq_alloc_descs(irq, from, cnt, node, owner, affinity);
+	if (affinity) {
+		affi_desc = kcalloc(cnt, sizeof(*affi_desc), GFP_KERNEL);
+		if (!affi_desc)
+			return -ENOMEM;
+
+		curmask = affinity;
+		cur_affi_desc = affi_desc;
+		for (i = 0; i < cnt; i++) {
+			cpumask_copy(&cur_affi_desc->masks, curmask);
+			cur_affi_desc->flags = 1;
+			curmask++;
+			cur_affi_desc++;
+		}
+	}
+
+	base = __irq_alloc_descs(irq, from, cnt, node, owner, affi_desc);
+	kfree(affi_desc);
+
 	if (base < 0) {
 		devres_free(dr);
 		return base;

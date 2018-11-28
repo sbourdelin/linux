@@ -21,13 +21,14 @@
  * alloc_msi_entry - Allocate an initialize msi_entry
  * @dev:	Pointer to the device for which this is allocated
  * @nvec:	The number of vectors used in this entry
- * @affinity:	Optional pointer to an affinity mask array size of @nvec
+ * @affi_desc:	Optional pointer to an affinity desc array size of @nvec
  *
- * If @affinity is not NULL then a an affinity array[@nvec] is allocated
- * and the affinity masks from @affinity are copied.
+ * If @affinity is not NULL then an affinity desc array[@nvec] is allocated
+ * and the affinity masks from @affi_desc are copied.
  */
 struct msi_desc *
-alloc_msi_entry(struct device *dev, int nvec, const struct cpumask *affinity)
+alloc_msi_entry(struct device *dev, int nvec,
+				const struct irq_affinity_desc *affi_desc)
 {
 	struct msi_desc *desc;
 
@@ -38,10 +39,10 @@ alloc_msi_entry(struct device *dev, int nvec, const struct cpumask *affinity)
 	INIT_LIST_HEAD(&desc->list);
 	desc->dev = dev;
 	desc->nvec_used = nvec;
-	if (affinity) {
-		desc->affinity = kmemdup(affinity,
-			nvec * sizeof(*desc->affinity), GFP_KERNEL);
-		if (!desc->affinity) {
+	if (affi_desc) {
+		desc->affi_desc = kmemdup(affi_desc,
+			nvec * sizeof(*desc->affi_desc), GFP_KERNEL);
+		if (!desc->affi_desc) {
 			kfree(desc);
 			return NULL;
 		}
@@ -52,7 +53,7 @@ alloc_msi_entry(struct device *dev, int nvec, const struct cpumask *affinity)
 
 void free_msi_entry(struct msi_desc *entry)
 {
-	kfree(entry->affinity);
+	kfree(entry->affi_desc);
 	kfree(entry);
 }
 
@@ -416,7 +417,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
 
 		virq = __irq_domain_alloc_irqs(domain, -1, desc->nvec_used,
 					       dev_to_node(dev), &arg, false,
-					       desc->affinity);
+					       desc->affi_desc);
 		if (virq < 0) {
 			ret = -ENOSPC;
 			if (ops->handle_error)
