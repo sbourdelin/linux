@@ -833,6 +833,7 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		u16 trueid;
 		u8 prefctl;
 		u8 idecfg;
+		u8 sbrev;
 
 		/* Try the second unmasking technique */
 		pci_read_config_byte(pdev, 0x4a, &idecfg);
@@ -846,9 +847,10 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 			if (lpc_bridge == NULL)
 				break;
 			pci_read_config_byte(pdev, 0x49, &prefctl);
+			sbrev = lpc_bridge->revision;
 			pci_dev_put(lpc_bridge);
 
-			if (lpc_bridge->revision == 0x10 && (prefctl & 0x80)) {
+			if (sbrev == 0x10 && (prefctl & 0x80)) {
 				chipset = &sis133_early;
 				break;
 			}
