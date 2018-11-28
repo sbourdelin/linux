@@ -227,10 +227,10 @@ static struct gpio_desc *lm363x_regulator_of_get_enable_gpio(struct device *dev,
 	 */
 	switch (id) {
 	case LM3632_LDO_POS:
-		return devm_gpiod_get_index_optional(dev, "enable", 0,
+		return gpiod_get_index_optional(dev, "enable", 0,
 				GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	case LM3632_LDO_NEG:
-		return devm_gpiod_get_index_optional(dev, "enable", 1,
+		return gpiod_get_index_optional(dev, "enable", 1,
 				GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	default:
 		return NULL;
@@ -263,6 +263,8 @@ static int lm363x_regulator_probe(struct platform_device *pdev)
 					 LM3632_EXT_EN_MASK,
 					 LM3632_EXT_EN_MASK);
 		if (ret) {
+			if (gpiod)
+				gpiod_put(gpiod);
 			dev_err(dev, "External pin err: %d\n", ret);
 			return ret;
 		}
@@ -270,6 +272,8 @@ static int lm363x_regulator_probe(struct platform_device *pdev)
 
 	rdev = devm_regulator_register(dev, &lm363x_regulator_desc[id], &cfg);
 	if (IS_ERR(rdev)) {
+		if (gpiod)
+			gpiod_put(gpiod);
 		ret = PTR_ERR(rdev);
 		dev_err(dev, "[%d] regulator register err: %d\n", id, ret);
 		return ret;
