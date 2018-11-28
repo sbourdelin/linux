@@ -1224,6 +1224,44 @@ static void soctherm_init(struct platform_device *pdev)
 	tegra_soctherm_throttle(&pdev->dev);
 }
 
+static bool tegra_soctherm_find_sensor_id(int sensor_id)
+{
+	int id;
+	bool ret = false;
+	struct of_phandle_args sensor_specs;
+	struct device_node *np, *sensor_np;
+
+	np = of_find_node_by_name(NULL, "thermal-zones");
+	if (!np)
+		return ret;
+
+	sensor_np = of_get_next_child(np, NULL);
+	for_each_available_child_of_node(np, sensor_np) {
+		if (of_parse_phandle_with_args(sensor_np, "thermal-sensors",
+						 "#thermal-sensor-cells",
+						 0, &sensor_specs))
+			continue;
+
+		if (sensor_specs.args_count != 1) {
+			WARN(sensor_specs.args_count > 1,
+			     "%s: wrong cells in sensor specifier %d\n",
+			     sensor_specs.np->name, sensor_specs.args_count);
+			continue;
+		} else {
+			id = sensor_specs.args[0];
+			if (sensor_id == id) {
+				ret = true;
+				break;
+			}
+		}
+	}
+
+	of_node_put(np);
+	of_node_put(sensor_np);
+
+	return ret;
+}
+
 static const struct of_device_id tegra_soctherm_of_match[] = {
 #ifdef CONFIG_ARCH_TEGRA_124_SOC
 	{
@@ -1365,13 +1403,15 @@ static int tegra_soctherm_probe(struct platform_device *pdev)
 		zone->sg = soc->ttgs[i];
 		zone->ts = tegra;
 
+		if (!tegra_soctherm_find_sensor_id(soc->ttgs[i]->id))
+			continue;
 		z = devm_thermal_zone_of_sensor_register(&pdev->dev,
 							 soc->ttgs[i]->id, zone,
 							 &tegra_of_thermal_ops);
 		if (IS_ERR(z)) {
 			err = PTR_ERR(z);
-			dev_err(&pdev->dev, "failed to register sensor: %d\n",
-				err);
+			dev_err(&pdev->dev, "failed to register sensor %s: %d\n",
+				soc->ttgs[i]->name, err);
 			goto disable_clocks;
 		}
 
@@ -1434,6 +1474,8 @@ static int __maybe_unused soctherm_resume(struct device *dev)
 		struct thermal_zone_device *tz;
 
 		tz = tegra->thermctl_tzs[soc->ttgs[i]->id];
+		if (!tz)
+			continue;
 		err = tegra_soctherm_set_hwtrips(dev, soc->ttgs[i], tz);
 		if (err) {
 			dev_err(&pdev->dev,
