@@ -963,7 +963,7 @@ static int wilc_spi_read_int(struct wilc *wilc, u32 *int_status)
 			dev_err(&spi->dev,
 				"Unexpected interrupt(2):j=%d,tmp=%x,mask=%x\n",
 				j, tmp, unknown_mask);
-				happened = 1;
+			happened = 1;
 		}
 
 		j++;
