@@ -1219,6 +1219,33 @@ acpi_graph_get_remote_endpoint(const struct fwnode_handle *__fwnode)
 	return acpi_graph_get_child_prop_value(fwnode, "endpoint", endpoint_nr);
 }
 
+static int
+acpi_fwnode_get_name(const struct fwnode_handle *fwnode, char *buf, size_t len)
+{
+	struct acpi_buffer buffer;
+	acpi_status status;
+
+	if (is_acpi_data_node(fwnode)) {
+		if (len < strlen(to_acpi_data_node(fwnode)->name) + 1)
+			return -EOVERFLOW;
+		sprintf(buf, "%s", to_acpi_data_node(fwnode)->name);
+		return 0;
+	}
+
+	if (len < ACPI_NAME_SIZE + 1)
+		return -EOVERFLOW;
+
+	buffer.length = ACPI_NAME_SIZE + 1;
+	buffer.pointer = buf;
+
+	status = acpi_get_name(to_acpi_device_node(fwnode)->handle,
+			       ACPI_SINGLE_NAME, &buffer);
+	if (ACPI_FAILURE(status))
+		return -ENXIO;
+
+	return 0;
+}
+
 static bool acpi_fwnode_device_is_available(const struct fwnode_handle *fwnode)
 {
 	if (!is_acpi_device_node(fwnode))
@@ -1310,6 +1337,7 @@ acpi_fwnode_device_get_match_data(const struct fwnode_handle *fwnode,
 
 #define DECLARE_ACPI_FWNODE_OPS(ops) \
 	const struct fwnode_operations ops = {				\
+		.get_name = acpi_fwnode_get_name,			\
 		.device_is_available = acpi_fwnode_device_is_available, \
 		.device_get_match_data = acpi_fwnode_device_get_match_data, \
 		.property_present = acpi_fwnode_property_present,	\
