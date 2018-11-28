@@ -967,6 +967,17 @@ static inline struct v4l2_rect
 		pad = 0;
 	return &cfg[pad].try_compose;
 }
+
+#else /* !defined(CONFIG_VIDEO_V4L2_SUBDEV_API) */
+
+static inline struct v4l2_mbus_framefmt
+*v4l2_subdev_get_try_format(struct v4l2_subdev *sd,
+			    struct v4l2_subdev_pad_config *cfg,
+			    unsigned int pad)
+{
+	return ERR_PTR(-ENOTTY);
+}
+
 #endif
 
 extern const struct v4l2_file_operations v4l2_subdev_fops;
