@@ -3374,6 +3374,23 @@ errout:
 	return err;
 }
 
+/* Set/clear flags based on attribute */
+static void vxlan_nl2flag(struct vxlan_config *conf, struct nlattr *tb[],
+			  int attrtype, unsigned long mask)
+{
+	unsigned long flags;
+
+	if (!tb[attrtype])
+		return;
+
+	if (nla_get_u8(tb[attrtype]))
+		flags = conf->flags | mask;
+	else
+		flags = conf->flags & ~mask;
+
+	conf->flags = flags;
+}
+
 static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 			 struct net_device *dev, struct vxlan_config *conf,
 			 bool changelink, struct netlink_ext_ack *extack)
@@ -3458,45 +3475,27 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 	if (data[IFLA_VXLAN_TTL])
 		conf->ttl = nla_get_u8(data[IFLA_VXLAN_TTL]);
 
-	if (data[IFLA_VXLAN_TTL_INHERIT])
-		conf->flags |= VXLAN_F_TTL_INHERIT;
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_TTL_INHERIT,
+		      VXLAN_F_TTL_INHERIT);
 
 	if (data[IFLA_VXLAN_LABEL])
 		conf->label = nla_get_be32(data[IFLA_VXLAN_LABEL]) &
 			     IPV6_FLOWLABEL_MASK;
 
-	if (data[IFLA_VXLAN_LEARNING]) {
-		if (nla_get_u8(data[IFLA_VXLAN_LEARNING]))
-			conf->flags |= VXLAN_F_LEARN;
-		else
-			conf->flags &= ~VXLAN_F_LEARN;
-	} else if (!changelink) {
+	if (data[IFLA_VXLAN_LEARNING])
+		vxlan_nl2flag(conf, data, IFLA_VXLAN_LEARNING,
+			      VXLAN_F_LEARN);
+	else if (!changelink)
 		/* default to learn on a new device */
 		conf->flags |= VXLAN_F_LEARN;
-	}
 
 	if (data[IFLA_VXLAN_AGEING])
 		conf->age_interval = nla_get_u32(data[IFLA_VXLAN_AGEING]);
 
-	if (data[IFLA_VXLAN_PROXY]) {
-		if (nla_get_u8(data[IFLA_VXLAN_PROXY]))
-			conf->flags |= VXLAN_F_PROXY;
-	}
-
-	if (data[IFLA_VXLAN_RSC]) {
-		if (nla_get_u8(data[IFLA_VXLAN_RSC]))
-			conf->flags |= VXLAN_F_RSC;
-	}
-
-	if (data[IFLA_VXLAN_L2MISS]) {
-		if (nla_get_u8(data[IFLA_VXLAN_L2MISS]))
-			conf->flags |= VXLAN_F_L2MISS;
-	}
-
-	if (data[IFLA_VXLAN_L3MISS]) {
-		if (nla_get_u8(data[IFLA_VXLAN_L3MISS]))
-			conf->flags |= VXLAN_F_L3MISS;
-	}
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_PROXY, VXLAN_F_PROXY);
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_RSC, VXLAN_F_RSC);
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_L2MISS, VXLAN_F_L2MISS);
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_L3MISS, VXLAN_F_L3MISS);
 
 	if (data[IFLA_VXLAN_LIMIT]) {
 		if (changelink) {
@@ -3514,8 +3513,8 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 					    "Cannot change metadata flag");
 			return -EOPNOTSUPP;
 		}
-		if (nla_get_u8(data[IFLA_VXLAN_COLLECT_METADATA]))
-			conf->flags |= VXLAN_F_COLLECT_METADATA;
+		vxlan_nl2flag(conf, data, IFLA_VXLAN_COLLECT_METADATA,
+			      VXLAN_F_COLLECT_METADATA);
 	}
 
 	if (data[IFLA_VXLAN_PORT_RANGE]) {
@@ -3553,34 +3552,26 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 			conf->flags |= VXLAN_F_UDP_ZERO_CSUM_TX;
 	}
 
-	if (data[IFLA_VXLAN_UDP_ZERO_CSUM6_TX]) {
-		if (nla_get_u8(data[IFLA_VXLAN_UDP_ZERO_CSUM6_TX]))
-			conf->flags |= VXLAN_F_UDP_ZERO_CSUM6_TX;
-	}
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_UDP_ZERO_CSUM6_TX,
+		      VXLAN_F_UDP_ZERO_CSUM6_TX);
 
-	if (data[IFLA_VXLAN_UDP_ZERO_CSUM6_RX]) {
-		if (nla_get_u8(data[IFLA_VXLAN_UDP_ZERO_CSUM6_RX]))
-			conf->flags |= VXLAN_F_UDP_ZERO_CSUM6_RX;
-	}
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_UDP_ZERO_CSUM6_RX,
+		      VXLAN_F_UDP_ZERO_CSUM6_RX);
 
-	if (data[IFLA_VXLAN_REMCSUM_TX]) {
-		if (nla_get_u8(data[IFLA_VXLAN_REMCSUM_TX]))
-			conf->flags |= VXLAN_F_REMCSUM_TX;
-	}
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_REMCSUM_TX,
+		      VXLAN_F_REMCSUM_TX);
 
-	if (data[IFLA_VXLAN_REMCSUM_RX]) {
-		if (nla_get_u8(data[IFLA_VXLAN_REMCSUM_RX]))
-			conf->flags |= VXLAN_F_REMCSUM_RX;
-	}
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_REMCSUM_RX,
+		      VXLAN_F_REMCSUM_RX);
 
-	if (data[IFLA_VXLAN_GBP])
-		conf->flags |= VXLAN_F_GBP;
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_GBP,
+		      VXLAN_F_GBP);
 
-	if (data[IFLA_VXLAN_GPE])
-		conf->flags |= VXLAN_F_GPE;
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_GPE,
+		      VXLAN_F_GPE);
 
-	if (data[IFLA_VXLAN_REMCSUM_NOPARTIAL])
-		conf->flags |= VXLAN_F_REMCSUM_NOPARTIAL;
+	vxlan_nl2flag(conf, data, IFLA_VXLAN_REMCSUM_NOPARTIAL,
+		      VXLAN_F_REMCSUM_NOPARTIAL);
 
 	if (tb[IFLA_MTU]) {
 		if (changelink) {
