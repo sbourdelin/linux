@@ -428,6 +428,10 @@ int kvm_arch_init(void *opaque)
 		goto out_unreg;
 	}
 
+	rc = kvm_s390_gib_init(GAL_ISC);
+	if (rc)
+		goto out_unreg;
+
 	kvm_s390_cpu_feat_init();
 
 	/* Register floating interrupt controller interface. */
