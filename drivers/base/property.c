@@ -680,6 +680,42 @@ void fwnode_handle_put(struct fwnode_handle *fwnode)
 EXPORT_SYMBOL_GPL(fwnode_handle_put);
 
 /**
+ * fwnode_get_name - Copy the name of an fwnode to a buffer
+ * @fwnode: Pointer to the node
+ * @buf: Buffer where the name is copied to
+ * @len: Size of the buffer
+ *
+ * Copies the node name of @fwnode to @buf. The routine attempts to first use
+ * the get_name fwnode op of @fwnode, and if it fails, the routine attempts to
+ * read a property "name".
+ *
+ * NOTE: @buf must be large enough to accommodate the name and trailing '\0'.
+ *
+ * Returns 0 on success or errno in case of an error.
+ */
+int fwnode_get_name(const struct fwnode_handle *fwnode, char *buf, size_t len)
+{
+	const char *name;
+	int ret;
+
+	ret = fwnode_call_int_op(fwnode, get_name, buf, len);
+	if (ret == 0 || ret == -EOVERFLOW)
+		return ret;
+
+	ret = fwnode_call_int_op(fwnode, property_read_string_array,
+				 "name", &name, 1);
+	if (ret)
+		return ret;
+
+	if (len < strlen(name) + 1)
+		return -EOVERFLOW;
+
+	sprintf(buf, "%s", name);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(fwnode_get_name);
+
+/**
  * fwnode_device_is_available - check if a device is available for use
  * @fwnode: Pointer to the fwnode of the device.
  */
