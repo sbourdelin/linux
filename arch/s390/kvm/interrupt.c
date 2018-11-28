@@ -31,6 +31,8 @@
 #define PFAULT_DONE 0x0680
 #define VIRTIO_PARAM 0x0d00
 
+static struct kvm_s390_gib *gib;
+
 /* handle external calls via sigp interpretation facility */
 static int sca_ext_call_pending(struct kvm_vcpu *vcpu, int *src_id)
 {
@@ -2899,6 +2901,7 @@ void kvm_s390_gisa_init(struct kvm *kvm)
 		kvm->arch.gisa = &kvm->arch.sie_page2->gisa;
 		VM_EVENT(kvm, 3, "gisa 0x%pK initialized", kvm->arch.gisa);
 		kvm_s390_gisa_clear(kvm);
+		kvm->arch.gib_in_use = !!gib;
 	}
 }
 
@@ -2907,4 +2910,38 @@ void kvm_s390_gisa_destroy(struct kvm *kvm)
 	if (!kvm->arch.gisa)
 		return;
 	kvm->arch.gisa = NULL;
+}
+
+void kvm_s390_gib_destroy(void)
+{
+	if (!gib)
+		return;
+	chsc_sgib(0);
+	free_page((unsigned long)gib);
+	gib = NULL;
+}
+
+int kvm_s390_gib_init(u8 nisc)
+{
+	if (!css_general_characteristics.aiv) {
+		KVM_EVENT(3, "%s", "gib not initialized, no AIV facility");
+		return 0;
+	}
+
+	gib = (struct kvm_s390_gib *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!gib) {
+		KVM_EVENT(3, "gib 0x%pK memory allocation failed", gib);
+		return -ENOMEM;
+	}
+
+	gib->nisc = nisc;
+	if (chsc_sgib((u32)(u64)gib)) {
+		KVM_EVENT(3, "gib 0x%pK AIV association failed", gib);
+		free_page((unsigned long)gib);
+		gib = NULL;
+		return -EIO;
+	}
+
+	KVM_EVENT(3, "gib 0x%pK (nisc=%d) initialized", gib, gib->nisc);
+	return 0;
 }
