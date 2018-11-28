@@ -30,9 +30,9 @@
 #define SKL_HUC_FW_MINOR 8
 #define SKL_BLD_NUM 2893
 
-#define KBL_HUC_FW_MAJOR 02
-#define KBL_HUC_FW_MINOR 00
-#define KBL_BLD_NUM 1810
+#define KBL_HUC_FW_MAJOR 03
+#define KBL_HUC_FW_MINOR 01
+#define KBL_BLD_NUM 2893
 
 #define HUC_FW_PATH(platform, major, minor, bld_num) \
 	"i915/" __stringify(platform) "_huc_ver" __stringify(major) "_" \
