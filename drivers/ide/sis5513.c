@@ -434,7 +434,6 @@ static int sis_find_family(struct pci_dev *dev)
 
 				lpc_bridge = pci_get_slot(dev->bus, 0x10); /* Bus 0, Dev 2, Fn 0 */
 				pci_read_config_byte(dev, 0x49, &prefctl);
-				pci_dev_put(lpc_bridge);
 
 				if (lpc_bridge->revision == 0x10 && (prefctl & 0x80)) {
 					printk(KERN_INFO DRV_NAME " %s: SiS 961B MuTIOL IDE UDMA133 controller\n",
@@ -445,6 +444,8 @@ static int sis_find_family(struct pci_dev *dev)
 						pci_name(dev));
 					chipset_family = ATA_100;
 				}
+
+				pci_dev_put(lpc_bridge);
 			}
 	}
 
