@@ -363,31 +363,12 @@ execlists_context_schedule_out(struct i915_request *rq, unsigned long status)
 	trace_i915_request_out(rq);
 }
 
-static void
-execlists_update_context_pdps(struct i915_hw_ppgtt *ppgtt, u32 *reg_state)
-{
-	ASSIGN_CTX_PDP(ppgtt, reg_state, 3);
-	ASSIGN_CTX_PDP(ppgtt, reg_state, 2);
-	ASSIGN_CTX_PDP(ppgtt, reg_state, 1);
-	ASSIGN_CTX_PDP(ppgtt, reg_state, 0);
-}
-
 static u64 execlists_update_context(struct i915_request *rq)
 {
-	struct i915_hw_ppgtt *ppgtt = rq->gem_context->ppgtt;
 	struct intel_context *ce = rq->hw_context;
-	u32 *reg_state = ce->lrc_reg_state;
 
-	reg_state[CTX_RING_TAIL+1] = intel_ring_set_tail(rq->ring, rq->tail);
-
-	/*
-	 * True 32b PPGTT with dynamic page allocation: update PDP
-	 * registers and point the unallocated PDPs to scratch page.
-	 * PML4 is allocated during ppgtt init, so this is not needed
-	 * in 48-bit mode.
-	 */
-	if (!i915_vm_is_48bit(&ppgtt->vm))
-		execlists_update_context_pdps(ppgtt, reg_state);
+	ce->lrc_reg_state[CTX_RING_TAIL + 1] =
+		intel_ring_set_tail(rq->ring, rq->tail);
 
 	/*
 	 * Make sure the context image is complete before we submit it to HW.
@@ -1233,6 +1214,64 @@ execlists_context_pin(struct intel_engine_cs *engine,
 	return __execlists_context_pin(engine, ctx, ce);
 }
 
+static int emit_pdps(struct i915_request *rq)
+{
+	const struct intel_engine_cs * const engine = rq->engine;
+	struct i915_hw_ppgtt * const ppgtt = rq->gem_context->ppgtt;
+	const unsigned int num_rings = INTEL_INFO(rq->i915)->num_rings;
+	struct intel_engine_cs *other;
+	enum intel_engine_id id;
+	u32 *cs;
+	int i;
+
+	if (!(ppgtt->pd_dirty_rings & intel_engine_flag(engine)))
+		return 0;
+
+	cs = intel_ring_begin(rq, 4 * (GEN8_3LVL_PDPES + num_rings) + 8);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	/*
+	 * Force the GPU (not just the local engine/powerwell!) to remain awake,
+	 * or else we may kill the machine with "timed out waiting for
+	 * forcewake ack request".
+	 */
+
+	*cs++ = MI_LOAD_REGISTER_IMM(num_rings);
+	for_each_engine(other, rq->i915, id) {
+		*cs++ = i915_mmio_reg_offset(RING_PSMI_CTL(other->mmio_base));
+		*cs++ = _MASKED_BIT_ENABLE(GEN6_PSMI_SLEEP_MSG_DISABLE);
+	}
+
+	*cs++ = MI_LOAD_REGISTER_IMM(2 * GEN8_3LVL_PDPES);
+	for (i = GEN8_3LVL_PDPES; i--; ) {
+		const dma_addr_t pd_daddr = i915_page_dir_dma_addr(ppgtt, i);
+
+		*cs++ = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(engine, i));
+		*cs++ = upper_32_bits(pd_daddr);
+		*cs++ = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, i));
+		*cs++ = lower_32_bits(pd_daddr);
+	}
+	*cs++ = MI_NOOP;
+
+	/* Posting read to flush the mmio before letting the GPU sleep again */
+	*cs++ = MI_STORE_REGISTER_MEM_GEN8 | MI_SRM_LRM_GLOBAL_GTT;
+	*cs++ = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, 0));
+	*cs++ = i915_ggtt_offset(engine->i915->gt.scratch);
+	*cs++ = 0;
+
+	*cs++ = MI_LOAD_REGISTER_IMM(num_rings);
+	for_each_engine(other, rq->i915, id) {
+		*cs++ = i915_mmio_reg_offset(RING_PSMI_CTL(other->mmio_base));
+		*cs++ = _MASKED_BIT_DISABLE(GEN6_PSMI_SLEEP_MSG_DISABLE);
+	}
+
+	intel_ring_advance(rq, cs);
+
+	ppgtt->pd_dirty_rings &= ~intel_engine_flag(engine);
+	return 0;
+}
+
 static int execlists_request_alloc(struct i915_request *request)
 {
 	int ret;
@@ -1249,12 +1288,21 @@ static int execlists_request_alloc(struct i915_request *request)
 	if (ret)
 		return ret;
 
-	/* Note that after this point, we have committed to using
+	/*
+	 * Note that after this point, we have committed to using
 	 * this request as it is being used to both track the
 	 * state of engine initialisation and liveness of the
 	 * golden renderstate above. Think twice before you try
 	 * to cancel/unwind this request now.
 	 */
+
+	if (!i915_vm_is_48bit(&request->gem_context->ppgtt->vm)) {
+		GEM_BUG_ON(intel_vgpu_active(request->i915));
+
+		ret = emit_pdps(request);
+		if (ret)
+			return ret;
+	}
 
 	request->reserved_space -= EXECLISTS_REQUEST_SIZE;
 	return 0;
@@ -1825,56 +1873,11 @@ static void execlists_reset_finish(struct intel_engine_cs *engine)
 		  atomic_read(&execlists->tasklet.count));
 }
 
-static int intel_logical_ring_emit_pdps(struct i915_request *rq)
-{
-	struct i915_hw_ppgtt *ppgtt = rq->gem_context->ppgtt;
-	struct intel_engine_cs *engine = rq->engine;
-	const int num_lri_cmds = GEN8_3LVL_PDPES * 2;
-	u32 *cs;
-	int i;
-
-	cs = intel_ring_begin(rq, num_lri_cmds * 2 + 2);
-	if (IS_ERR(cs))
-		return PTR_ERR(cs);
-
-	*cs++ = MI_LOAD_REGISTER_IMM(num_lri_cmds);
-	for (i = GEN8_3LVL_PDPES - 1; i >= 0; i--) {
-		const dma_addr_t pd_daddr = i915_page_dir_dma_addr(ppgtt, i);
-
-		*cs++ = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(engine, i));
-		*cs++ = upper_32_bits(pd_daddr);
-		*cs++ = i915_mmio_reg_offset(GEN8_RING_PDP_LDW(engine, i));
-		*cs++ = lower_32_bits(pd_daddr);
-	}
-
-	*cs++ = MI_NOOP;
-	intel_ring_advance(rq, cs);
-
-	return 0;
-}
-
 static int gen8_emit_bb_start(struct i915_request *rq,
 			      u64 offset, u32 len,
 			      const unsigned int flags)
 {
 	u32 *cs;
-	int ret;
-
-	/* Don't rely in hw updating PDPs, specially in lite-restore.
-	 * Ideally, we should set Force PD Restore in ctx descriptor,
-	 * but we can't. Force Restore would be a second option, but
-	 * it is unsafe in case of lite-restore (because the ctx is
-	 * not idle). PML4 is allocated during ppgtt init so this is
-	 * not needed in 48-bit.*/
-	if ((intel_engine_flag(rq->engine) & rq->gem_context->ppgtt->pd_dirty_rings) &&
-	    !i915_vm_is_48bit(&rq->gem_context->ppgtt->vm) &&
-	    !intel_vgpu_active(rq->i915)) {
-		ret = intel_logical_ring_emit_pdps(rq);
-		if (ret)
-			return ret;
-
-		rq->gem_context->ppgtt->pd_dirty_rings &= ~intel_engine_flag(rq->engine);
-	}
 
 	cs = intel_ring_begin(rq, 6);
 	if (IS_ERR(cs))
@@ -1907,6 +1910,7 @@ static int gen8_emit_bb_start(struct i915_request *rq,
 
 	*cs++ = MI_ARB_ON_OFF | MI_ARB_DISABLE;
 	*cs++ = MI_NOOP;
+
 	intel_ring_advance(rq, cs);
 
 	return 0;
@@ -2537,6 +2541,11 @@ static void execlists_init_reg_state(u32 *regs,
 		 * other PDP Descriptors are ignored.
 		 */
 		ASSIGN_CTX_PML4(ctx->ppgtt, regs);
+	} else {
+		ASSIGN_CTX_PDP(ctx->ppgtt, regs, 3);
+		ASSIGN_CTX_PDP(ctx->ppgtt, regs, 2);
+		ASSIGN_CTX_PDP(ctx->ppgtt, regs, 1);
+		ASSIGN_CTX_PDP(ctx->ppgtt, regs, 0);
 	}
 
 	if (rcs) {
