@@ -33,6 +33,7 @@
 #define VIRTIO_PARAM 0x0d00
 
 static struct kvm_s390_gib *gib;
+static unsigned int iam_clear_strategy;
 
 /* handle external calls via sigp interpretation facility */
 static int sca_ext_call_pending(struct kvm_vcpu *vcpu, int *src_id)
@@ -2895,6 +2896,73 @@ int kvm_s390_get_irq_state(struct kvm_vcpu *vcpu, __u8 __user *buf, int len)
 	return n;
 }
 
+static int iam_clear_strategy_ctl_handler(struct ctl_table *ctl, int write,
+					  void __user *buffer, size_t *lenp,
+					  loff_t *ppos)
+{
+	unsigned int strategy = iam_clear_strategy;
+	unsigned int min = 0;
+	unsigned int max = 2;
+	int rc;
+	struct ctl_table ctl_entry = {
+		.procname	= ctl->procname,
+		.data		= &strategy,
+		.maxlen		= sizeof(int),
+		.extra1		= &min,
+		.extra2		= &max,
+	};
+
+	rc = proc_douintvec_minmax(&ctl_entry, write, buffer, lenp, ppos);
+	if (rc < 0 || !write)
+		return rc;
+
+	if (iam_clear_strategy != strategy)
+		iam_clear_strategy = strategy;
+
+	return rc;
+}
+
+static struct ctl_table iam_clear_strategy_ctl_table[] = {
+	{
+		.procname	= "iam_clear_strategy",
+		.mode		= 0644,
+		.proc_handler	= iam_clear_strategy_ctl_handler,
+	},
+	{ },
+};
+
+static struct ctl_table s390_dir_table[] = {
+	{
+		.procname	= "s390",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= iam_clear_strategy_ctl_table,
+	},
+	{ },
+};
+
+void kvm_s390_try_clear_iam(struct kvm_vcpu *vcpu)
+{
+	if (!vcpu->kvm->arch.gib_in_use)
+		return;
+
+	switch (iam_clear_strategy) {
+	case 0: /* never clear IAM on SIE entry */
+		return;
+	case 1: /*
+		 * clear IAM on SIE entry when I/O interruptions
+		 * are not disabled by the vcpu PSW
+		 */
+		if (psw_ioint_disabled(vcpu))
+			return;
+	case 2: /* always clear IAM on SIE entry */
+		vcpu->kvm->arch.gisa->iam = 0;
+		return;
+	default:
+		break;
+	}
+}
+
 static void nullify_gisa(struct kvm_s390_gisa *gisa)
 {
 	memset(gisa, 0, sizeof(struct kvm_s390_gisa));
@@ -3078,6 +3146,7 @@ int kvm_s390_gib_init(u8 nisc)
 		goto out_unreg;
 	}
 
+	register_sysctl_table(s390_dir_table);
 	KVM_EVENT(3, "gib 0x%pK (nisc=%d) initialized", gib, gib->nisc);
 	return rc;
 

@@ -3474,6 +3474,7 @@ static int vcpu_pre_run(struct kvm_vcpu *vcpu)
 	}
 
 	atomic_inc(&vcpu->kvm->arch.vcpus_in_sie);
+	kvm_s390_try_clear_iam(vcpu);
 
 	vcpu->arch.sie_block->icptcode = 0;
 	cpuflags = atomic_read(&vcpu->arch.sie_block->cpuflags);
