@@ -1490,7 +1490,7 @@ static noinline u64 find_delalloc_range(struct extent_io_tree *tree,
 	struct rb_node *node;
 	struct extent_state *state;
 	u64 cur_start = *start;
-	u64 found = 0;
+	bool found = false;
 	u64 total_bytes = 0;
 
 	spin_lock(&tree->lock);
@@ -1501,8 +1501,7 @@ static noinline u64 find_delalloc_range(struct extent_io_tree *tree,
 	 */
 	node = tree_search(tree, cur_start);
 	if (!node) {
-		if (!found)
-			*end = (u64)-1;
+		*end = (u64)-1;
 		goto out;
 	}
 
@@ -1522,7 +1521,7 @@ static noinline u64 find_delalloc_range(struct extent_io_tree *tree,
 			*cached_state = state;
 			refcount_inc(&state->refs);
 		}
-		found++;
+		found = true;
 		*end = state->end;
 		cur_start = state->end + 1;
 		node = rb_next(node);
