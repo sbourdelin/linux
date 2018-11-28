@@ -27,8 +27,8 @@
 #define BXT_BLD_NUM 2893
 
 #define SKL_HUC_FW_MAJOR 01
-#define SKL_HUC_FW_MINOR 07
-#define SKL_BLD_NUM 1398
+#define SKL_HUC_FW_MINOR 8
+#define SKL_BLD_NUM 2893
 
 #define KBL_HUC_FW_MAJOR 02
 #define KBL_HUC_FW_MINOR 00
