@@ -2426,6 +2426,10 @@ void __weak ftrace_replace_code(int enable)
 
 	do_for_each_ftrace_rec(pg, rec) {
 
+		/* This loop can take minutes when sanitizers are enabled, so
+		 * lets make sure we allow RCU processing.
+		 */
+		cond_resched();
 		if (rec->flags & FTRACE_FL_DISABLED)
 			continue;
 
