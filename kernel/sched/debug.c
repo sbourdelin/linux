@@ -698,7 +698,7 @@ do {									\
 
 static const char *sched_tunable_scaling_names[] = {
 	"none",
-	"logaritmic",
+	"logarithmic",
 	"linear"
 };
 
