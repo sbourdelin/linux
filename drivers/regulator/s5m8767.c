@@ -528,7 +528,7 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 	struct device_node *pmic_np, *regulators_np, *reg_np;
 	struct sec_regulator_data *rdata;
 	struct sec_opmode_data *rmode;
-	unsigned int i, dvs_voltage_nr = 8, ret;
+	unsigned int i, j, dvs_voltage_nr = 8, ret;
 
 	pmic_np = iodev->dev->of_node;
 	if (!pmic_np) {
@@ -559,6 +559,7 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 
 	pdata->regulators = rdata;
 	pdata->opmode = rmode;
+	j = 0; /* Keeps track of populated elements for errorpath */
 	for_each_child_of_node(regulators_np, reg_np) {
 		for (i = 0; i < ARRAY_SIZE(regulators); i++)
 			if (!of_node_cmp(reg_np->name, regulators[i].name))
@@ -571,9 +572,7 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 			continue;
 		}
 
-		rdata->ext_control_gpiod = devm_gpiod_get_from_of_node(
-			&pdev->dev,
-			reg_np,
+		rdata->ext_control_gpiod = gpiod_get_from_of_node(reg_np,
 			"s5m8767,pmic-ext-control-gpios",
 			0,
 			GPIOD_OUT_HIGH | GPIOD_FLAGS_BIT_NONEXCLUSIVE,
@@ -597,6 +596,7 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 			rmode->mode = S5M8767_OPMODE_NORMAL_MODE;
 		}
 		rmode++;
+		j++;
 	}
 
 	of_node_put(regulators_np);
@@ -608,7 +608,8 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 				"s5m8767,pmic-buck2-dvs-voltage",
 				pdata->buck2_voltage, dvs_voltage_nr)) {
 			dev_err(iodev->dev, "buck2 voltages not specified\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto err_gpiod_put;
 		}
 	}
 
@@ -619,7 +620,8 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 				"s5m8767,pmic-buck3-dvs-voltage",
 				pdata->buck3_voltage, dvs_voltage_nr)) {
 			dev_err(iodev->dev, "buck3 voltages not specified\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto err_gpiod_put;
 		}
 	}
 
@@ -630,15 +632,18 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 				"s5m8767,pmic-buck4-dvs-voltage",
 				pdata->buck4_voltage, dvs_voltage_nr)) {
 			dev_err(iodev->dev, "buck4 voltages not specified\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto err_gpiod_put;
 		}
 	}
 
 	if (pdata->buck2_gpiodvs || pdata->buck3_gpiodvs ||
 						pdata->buck4_gpiodvs) {
 		ret = s5m8767_pmic_dt_parse_dvs_gpio(iodev, pdata, pmic_np);
-		if (ret)
-			return -EINVAL;
+		if (ret) {
+			ret = -EINVAL;
+			goto err_gpiod_put;
+		}
 
 		if (of_property_read_u32(pmic_np,
 				"s5m8767,pmic-buck-default-dvs-idx",
@@ -654,8 +659,10 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 	}
 
 	ret = s5m8767_pmic_dt_parse_ds_gpio(iodev, pdata, pmic_np);
-	if (ret)
-		return -EINVAL;
+	if (ret) {
+		ret = -EINVAL;
+		goto err_gpiod_put;
+	}
 
 	if (of_get_property(pmic_np, "s5m8767,pmic-buck2-ramp-enable", NULL))
 		pdata->buck2_ramp_enable = true;
@@ -674,6 +681,14 @@ static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
 	}
 
 	return 0;
+
+err_gpiod_put:
+	while (j) {
+		gpiod_put(rdata->ext_control_gpiod);
+		rdata--;
+		j--;
+	}
+	return ret;
 }
 #else
 static int s5m8767_pmic_dt_parse_pdata(struct platform_device *pdev,
