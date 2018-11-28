@@ -376,11 +376,11 @@ static struct tps65090_platform_data *tps65090_parse_dt_reg_data(
 				gflags = GPIOD_OUT_LOW;
 			gflags |= GPIOD_FLAGS_BIT_NONEXCLUSIVE;
 
-			rpdata->gpiod = devm_gpiod_get_from_of_node(&pdev->dev,
-								    tps65090_matches[idx].of_node,
-								    "dcdc-ext-control-gpios", 0,
-								    gflags,
-								    "tps65090");
+			rpdata->gpiod = gpiod_get_from_of_node(
+						tps65090_matches[idx].of_node,
+						"dcdc-ext-control-gpios", 0,
+						gflags,
+						"tps65090");
 			if (IS_ERR(rpdata->gpiod))
 				return ERR_CAST(rpdata->gpiod);
 			if (!rpdata->gpiod)
