@@ -3376,7 +3376,7 @@ errout:
 
 static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 			 struct net_device *dev, struct vxlan_config *conf,
-			 bool changelink)
+			 bool changelink, struct netlink_ext_ack *extack)
 {
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 
@@ -3389,40 +3389,60 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 	if (data[IFLA_VXLAN_ID]) {
 		__be32 vni = cpu_to_be32(nla_get_u32(data[IFLA_VXLAN_ID]));
 
-		if (changelink && (vni != conf->vni))
+		if (changelink && (vni != conf->vni)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_ID],
+					    "Cannot change vni");
 			return -EOPNOTSUPP;
+		}
 		conf->vni = cpu_to_be32(nla_get_u32(data[IFLA_VXLAN_ID]));
 	}
 
 	if (data[IFLA_VXLAN_GROUP]) {
-		if (changelink && (conf->remote_ip.sa.sa_family != AF_INET))
+		if (changelink && (conf->remote_ip.sa.sa_family != AF_INET)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_GROUP],
+					    "New group addr family does not match old group");
 			return -EOPNOTSUPP;
-
+		}
 		conf->remote_ip.sin.sin_addr.s_addr = nla_get_in_addr(data[IFLA_VXLAN_GROUP]);
 		conf->remote_ip.sa.sa_family = AF_INET;
 	} else if (data[IFLA_VXLAN_GROUP6]) {
-		if (!IS_ENABLED(CONFIG_IPV6))
+		if (!IS_ENABLED(CONFIG_IPV6)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_GROUP6],
+					    "IPv6 support not enabled in the kernel");
 			return -EPFNOSUPPORT;
+		}
 
-		if (changelink && (conf->remote_ip.sa.sa_family != AF_INET6))
+		if (changelink && (conf->remote_ip.sa.sa_family != AF_INET6)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_GROUP6],
+					    "New group addr family does not match old group");
 			return -EOPNOTSUPP;
+		}
 
 		conf->remote_ip.sin6.sin6_addr = nla_get_in6_addr(data[IFLA_VXLAN_GROUP6]);
 		conf->remote_ip.sa.sa_family = AF_INET6;
 	}
 
 	if (data[IFLA_VXLAN_LOCAL]) {
-		if (changelink && (conf->saddr.sa.sa_family != AF_INET))
+		if (changelink && (conf->saddr.sa.sa_family != AF_INET)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_LOCAL],
+					    "New local addr family does not match old");
 			return -EOPNOTSUPP;
+		}
 
 		conf->saddr.sin.sin_addr.s_addr = nla_get_in_addr(data[IFLA_VXLAN_LOCAL]);
 		conf->saddr.sa.sa_family = AF_INET;
 	} else if (data[IFLA_VXLAN_LOCAL6]) {
-		if (!IS_ENABLED(CONFIG_IPV6))
+		if (!IS_ENABLED(CONFIG_IPV6)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_LOCAL6],
+					    "IPv6 support not enabled in the kernel");
 			return -EPFNOSUPPORT;
+		}
 
-		if (changelink && (conf->saddr.sa.sa_family != AF_INET6))
+		if (changelink && (conf->saddr.sa.sa_family != AF_INET6)) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_LOCAL6],
+					    "New local6 addr family does not match old");
 			return -EOPNOTSUPP;
+		}
 
 		/* TODO: respect scope id */
 		conf->saddr.sin6.sin6_addr = nla_get_in6_addr(data[IFLA_VXLAN_LOCAL6]);
@@ -3479,14 +3499,21 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 	}
 
 	if (data[IFLA_VXLAN_LIMIT]) {
-		if (changelink)
+		if (changelink) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_LIMIT],
+					    "Cannot change limit");
 			return -EOPNOTSUPP;
+		}
 		conf->addrmax = nla_get_u32(data[IFLA_VXLAN_LIMIT]);
 	}
 
 	if (data[IFLA_VXLAN_COLLECT_METADATA]) {
-		if (changelink)
+		if (changelink) {
+			NL_SET_ERR_MSG_ATTR(extack,
+					    tb[IFLA_VXLAN_COLLECT_METADATA],
+					    "Cannot change metadata flag");
 			return -EOPNOTSUPP;
+		}
 		if (nla_get_u8(data[IFLA_VXLAN_COLLECT_METADATA]))
 			conf->flags |= VXLAN_F_COLLECT_METADATA;
 	}
@@ -3497,20 +3524,31 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 				= nla_data(data[IFLA_VXLAN_PORT_RANGE]);
 			conf->port_min = ntohs(p->low);
 			conf->port_max = ntohs(p->high);
-		} else {
+		else {
+			NL_SET_ERR_MSG_ATTR(extack,
+					    tb[IFLA_VXLAN_PORT_RANGE],
+					    "Cannot change port range");
 			return -EOPNOTSUPP;
 		}
 	}
 
 	if (data[IFLA_VXLAN_PORT]) {
-		if (changelink)
+		if (changelink) {
+			NL_SET_ERR_MSG_ATTR(extack,
+					    tb[IFLA_VXLAN_PORT],
+					    "Cannot change port");
 			return -EOPNOTSUPP;
+		}
 		conf->dst_port = nla_get_be16(data[IFLA_VXLAN_PORT]);
 	}
 
 	if (data[IFLA_VXLAN_UDP_CSUM]) {
-		if (changelink)
+		if (changelink) {
+			NL_SET_ERR_MSG_ATTR(extack,
+					    tb[IFLA_VXLAN_UDP_CSUM],
+					    "Cannot change udp csum");
 			return -EOPNOTSUPP;
+		}
 		if (!nla_get_u8(data[IFLA_VXLAN_UDP_CSUM]))
 			conf->flags |= VXLAN_F_UDP_ZERO_CSUM_TX;
 	}
@@ -3545,8 +3583,12 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 		conf->flags |= VXLAN_F_REMCSUM_NOPARTIAL;
 
 	if (tb[IFLA_MTU]) {
-		if (changelink)
+		if (changelink) {
+			NL_SET_ERR_MSG_ATTR(extack,
+					    tb[IFLA_MTU],
+					    "Cannot change mtu");
 			return -EOPNOTSUPP;
+		}
 		conf->mtu = nla_get_u32(tb[IFLA_MTU]);
 	}
 
@@ -3563,7 +3605,7 @@ static int vxlan_newlink(struct net *src_net, struct net_device *dev,
 	struct vxlan_config conf;
 	int err;
 
-	err = vxlan_nl2conf(tb, data, dev, &conf, false);
+	err = vxlan_nl2conf(tb, data, dev, &conf, false, extack);
 	if (err)
 		return err;
 
@@ -3583,7 +3625,7 @@ static int vxlan_changelink(struct net_device *dev, struct nlattr *tb[],
 	int err;
 
 	err = vxlan_nl2conf(tb, data,
-			    dev, &conf, true);
+			    dev, &conf, true, extack);
 	if (err)
 		return err;
 
