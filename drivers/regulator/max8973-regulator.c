@@ -632,7 +632,7 @@ static int max8973_probe(struct i2c_client *client,
 	struct max8973_chip *max;
 	bool pdata_from_dt = false;
 	unsigned int chip_id;
-	struct gpio_desc *gpiod;
+	struct gpio_desc *gpiod = NULL;
 	enum gpiod_flags gflags;
 	int ret;
 
@@ -759,9 +759,9 @@ static int max8973_probe(struct i2c_client *client,
 		else
 			gflags = GPIOD_OUT_LOW;
 		gflags |= GPIOD_FLAGS_BIT_NONEXCLUSIVE;
-		gpiod = devm_gpiod_get_optional(&client->dev,
-						"maxim,enable",
-						gflags);
+		gpiod = gpiod_get_optional(&client->dev,
+					   "maxim,enable",
+					   gflags);
 		if (IS_ERR(gpiod))
 			return PTR_ERR(gpiod);
 		if (gpiod) {
@@ -798,6 +798,8 @@ static int max8973_probe(struct i2c_client *client,
 
 	ret = max8973_init_dcdc(max, pdata);
 	if (ret < 0) {
+		if (gpiod)
+			gpiod_put(gpiod);
 		dev_err(max->dev, "Max8973 Init failed, err = %d\n", ret);
 		return ret;
 	}
@@ -811,6 +813,8 @@ static int max8973_probe(struct i2c_client *client,
 	/* Register the regulators */
 	rdev = devm_regulator_register(&client->dev, &max->desc, &config);
 	if (IS_ERR(rdev)) {
+		if (gpiod)
+			gpiod_put(gpiod);
 		ret = PTR_ERR(rdev);
 		dev_err(max->dev, "regulator register failed, err %d\n", ret);
 		return ret;
