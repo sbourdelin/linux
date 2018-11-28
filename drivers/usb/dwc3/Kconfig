@@ -48,6 +48,14 @@ config USB_DWC3_DUAL_ROLE
 
 endchoice
 
+config USB_DWC3_DEBUG_REG_PRINT
+	bool "Enable register name printing to the trace"
+	depends on (USB_DWC3 && DEBUG_FS)
+	default n
+	help
+	  Select this option if you want to enable trace logging with
+	  register name prints on register read and write.
+
 comment "Platform Glue Driver Support"
 
 config USB_DWC3_OMAP

@@ -734,6 +734,145 @@ static void dwc3_debugfs_create_endpoint_dirs(struct dwc3 *dwc,
 	}
 }
 
+#ifdef CONFIG_USB_DWC3_DEBUG_REG_PRINT
+/**
+ * dwc3_gadget_register_string - returns register name
+ * @offset: register offset
+ */
+const char *dwc3_gadget_register_string(u16 offset)
+{
+	if (offset >= DWC3_GTXFIFOSIZ(0) && offset < DWC3_GTXFIFOSIZ(32))
+		return "GTXFIFOSIZ ";
+	if (offset >= DWC3_GRXFIFOSIZ(0) && offset < DWC3_GRXFIFOSIZ(32))
+		return "GRXFIFOSIZ ";
+
+	switch (offset) {
+	case DWC3_GUSB2PHYCFG(0):
+		return "GUSB2PHYCFG(0) ";
+	case DWC3_GUSB2PHYACC(0):
+		return "GUSB2PHYACC(0) ";
+	case DWC3_GUSB3PIPECTL(0):
+		return "DWC3_GUSB3PIPECTL(0) ";
+	case DWC3_GUSB2I2CCTL(0):
+		return "DWC3_GUSB2I2CCTL(0) ";
+	case DWC3_DEPCMDPAR2:
+		return "DEPCMDPAR2 ";
+	case DWC3_DEPCMDPAR1:
+		return "DEPCMDPAR1 ";
+	case DWC3_DEPCMDPAR0:
+		return "DEPCMDPAR0 ";
+	case DWC3_DEPCMD:
+		return "DEPCMD ";
+	case DWC3_GSBUSCFG0:
+		return "GSBUSCFG0 ";
+	case DWC3_GSBUSCFG1:
+		return "GSBUSCFG1 ";
+	case DWC3_GTXTHRCFG:
+		return "GTXTHRCFG ";
+	case DWC3_GRXTHRCFG:
+		return "GRXTHRCFG ";
+	case DWC3_GCTL:
+		return "GCTL ";
+	case DWC3_GEVTEN:
+		return "GEVTEN ";
+	case DWC3_GSTS:
+		return "GSTS ";
+	case DWC3_GUCTL1:
+		return "GUCTL1 ";
+	case DWC3_GSNPSID:
+		return "GSNPSID ";
+	case DWC3_GGPIO:
+		return "GGPIO ";
+	case DWC3_GUID:
+		return "GUID ";
+	case DWC3_GUCTL:
+		return "GUCTL ";
+	case DWC3_GBUSERRADDR0:
+		return "GBUSERRADDR0 ";
+	case DWC3_GBUSERRADDR1:
+		return "GBUSERRADDR1 ";
+	case DWC3_GPRTBIMAP0:
+		return "GPRTBIMAP0 ";
+	case DWC3_GPRTBIMAP1:
+		return "GPRTBIMAP1 ";
+	case DWC3_GHWPARAMS0:
+		return "GHWPARAMS0 ";
+	case DWC3_GHWPARAMS1:
+		return "GHWPARAMS1 ";
+	case DWC3_GHWPARAMS2:
+		return "GHWPARAMS2 ";
+	case DWC3_GHWPARAMS3:
+		return "GHWPARAMS3 ";
+	case DWC3_GHWPARAMS4:
+		return "GHWPARAMS4 ";
+	case DWC3_GHWPARAMS5:
+		return "GHWPARAMS5 ";
+	case DWC3_GHWPARAMS6:
+		return "GHWPARAMS6 ";
+	case DWC3_GHWPARAMS7:
+		return "GHWPARAMS7 ";
+	case DWC3_GHWPARAMS8:
+		return "GHWPARAMS8 ";
+	case DWC3_GDBGFIFOSPACE:
+		return "GDBGFIFOSPACE ";
+	case DWC3_GDBGLTSSM:
+		return "GDBGLTSSM ";
+	case DWC3_GPRTBIMAP_HS0:
+		return "GPRTBIMAP_HS0 ";
+	case DWC3_GPRTBIMAP_HS1:
+		return "GPRTBIMAP_HS1 ";
+	case DWC3_GPRTBIMAP_FS0:
+		return "GPRTBIMAP_FS0 ";
+	case DWC3_GPRTBIMAP_FS1:
+		return "GPRTBIMAP_FS1 ";
+	case DWC3_GUCTL2:
+		return "GUCTL2 ";
+	case DWC3_VER_NUMBER:
+		return "VER_NUMBER ";
+	case DWC3_VER_TYPE:
+		return "VER_TYPE ";
+	case DWC3_DEV_IMOD(0):
+		return "DEV_IMOD ";
+	case DWC3_GEVNTADRLO(0):
+		return "GEVNTADRLO ";
+	case DWC3_GEVNTADRHI(0):
+		return "GEVNTADRHI ";
+	case DWC3_GEVNTSIZ(0):
+		return "GEVNTSIZ ";
+	case DWC3_GEVNTCOUNT(0):
+		return "GEVNTCOUNT ";
+	case DWC3_GFLADJ:
+		return "GFLADJ ";
+	case DWC3_DCFG:
+		return "DCFG ";
+	case DWC3_DCTL:
+		return "DCTL ";
+	case DWC3_DEVTEN:
+		return "DEVTEN ";
+	case DWC3_DSTS:
+		return "DSTS ";
+	case DWC3_DGCMDPAR:
+		return "DGCMDPAR ";
+	case DWC3_DGCMD:
+		return "DGCMD ";
+	case DWC3_DALEPENA:
+		return "DALEPENA ";
+	case DWC3_OCFG:
+		return "OCFG ";
+	case DWC3_OCTL:
+		return "OCTL ";
+	case DWC3_OEVT:
+		return "OEVT ";
+	case DWC3_OEVTEN:
+		return "OEVTEN ";
+	case DWC3_OSTS:
+		return "OSTS ";
+	default:
+		return "UNKNOWN ";
+	}
+}
+#endif
+
 void dwc3_debugfs_init(struct dwc3 *dwc)
 {
 	struct dentry		*root;

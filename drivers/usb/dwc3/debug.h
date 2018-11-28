@@ -75,6 +75,16 @@ dwc3_gadget_generic_cmd_string(u8 cmd)
 	}
 }
 
+#ifdef CONFIG_USB_DWC3_DEBUG_REG_PRINT
+const char *dwc3_gadget_register_string(u16 offset);
+#else
+static inline const char *
+dwc3_gadget_register_string(u16 offset)
+{
+	return "";
+}
+#endif
+
 /**
  * dwc3_gadget_link_string - returns link name
  * @link_state: link state code

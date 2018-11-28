@@ -32,8 +32,11 @@ DECLARE_EVENT_CLASS(dwc3_log_io,
 		__entry->offset = offset;
 		__entry->value = value;
 	),
-	TP_printk("addr %p value %08x", __entry->base + __entry->offset,
-			__entry->value)
+	TP_printk("%saddr %p value %08x",
+		  dwc3_gadget_register_string(__entry->offset),
+		  __entry->base + __entry->offset,
+		  __entry->value
+	)
 );
 
 DEFINE_EVENT(dwc3_log_io, dwc3_readl,
