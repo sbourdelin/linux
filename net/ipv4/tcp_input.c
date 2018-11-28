@@ -3043,7 +3043,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, u32 prior_fack,
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 prior_sacked = tp->sacked_out;
 	u32 reord = tp->snd_nxt; /* lowest acked un-retx un-sacked seq */
-	struct sk_buff *skb, *next;
+	struct sk_buff *skb, *tmp;
 	bool fully_acked = true;
 	long sack_rtt_us = -1L;
 	long seq_rtt_us = -1L;
@@ -3055,7 +3055,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, u32 prior_fack,
 
 	first_ackt = 0;
 
-	for (skb = skb_rb_first(&sk->tcp_rtx_queue); skb; skb = next) {
+	skb_rbtree_walk_safe(skb, &sk->tcp_rtx_queue, tmp) {
 		struct tcp_skb_cb *scb = TCP_SKB_CB(skb);
 		const u32 start_seq = scb->seq;
 		u8 sacked = scb->sacked;
@@ -3126,7 +3126,6 @@ static int tcp_clean_rtx_queue(struct sock *sk, u32 prior_fack,
 		if (!fully_acked)
 			break;
 
-		next = skb_rb_next(skb);
 		if (unlikely(skb == tp->retransmit_skb_hint))
 			tp->retransmit_skb_hint = NULL;
 		if (unlikely(skb == tp->lost_skb_hint))
