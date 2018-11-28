@@ -1031,7 +1031,7 @@ static int alloc_isa_irq_from_domain(struct irq_domain *domain,
 static int mp_map_pin_to_irq(u32 gsi, int idx, int ioapic, int pin,
 			     unsigned int flags, struct irq_alloc_info *info)
 {
-	int irq;
+	int irq = -EINVAL;
 	bool legacy = false;
 	struct irq_alloc_info tmp;
 	struct mp_chip_data *data;
