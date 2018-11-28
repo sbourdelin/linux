@@ -74,6 +74,8 @@ struct bpf_test {
 	int fixup_map_in_map[MAX_FIXUPS];
 	int fixup_cgroup_storage[MAX_FIXUPS];
 	int fixup_percpu_cgroup_storage[MAX_FIXUPS];
+	int fixup_map_queue[MAX_FIXUPS];
+	int fixup_map_stack[MAX_FIXUPS];
 	const char *errstr;
 	const char *errstr_unpriv;
 	uint32_t retval, retval_unpriv;
@@ -4610,6 +4612,38 @@ static struct bpf_test tests[] = {
 		.result = REJECT,
 		.errstr = "cannot pass map_type 7 into func bpf_map_lookup_elem",
 		.prog_type = BPF_PROG_TYPE_PERF_EVENT,
+	},
+	{
+		"prevent map lookup in queue map",
+		.insns = {
+			BPF_ST_MEM(BPF_DW, BPF_REG_10, -8, 0),
+			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
+			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
+			BPF_LD_MAP_FD(BPF_REG_1, 0),
+			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+				     BPF_FUNC_map_lookup_elem),
+			BPF_EXIT_INSN(),
+		},
+		.fixup_map_queue = { 3 },
+		.result = REJECT,
+		.errstr = "invalid stack type R2 off=-8 access_size=0",
+		.prog_type = BPF_PROG_TYPE_XDP,
+	},
+	{
+		"prevent map lookup in stack map",
+		.insns = {
+			BPF_ST_MEM(BPF_DW, BPF_REG_10, -8, 0),
+			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
+			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
+			BPF_LD_MAP_FD(BPF_REG_1, 0),
+			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+				     BPF_FUNC_map_lookup_elem),
+			BPF_EXIT_INSN(),
+		},
+		.fixup_map_stack = { 3 },
+		.result = REJECT,
+		.errstr = "invalid stack type R2 off=-8 access_size=0",
+		.prog_type = BPF_PROG_TYPE_XDP,
 	},
 	{
 		"prevent map lookup in prog array",
@@ -14048,6 +14082,8 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 	int *fixup_map_sockhash = test->fixup_map_sockhash;
 	int *fixup_map_xskmap = test->fixup_map_xskmap;
 	int *fixup_map_stacktrace = test->fixup_map_stacktrace;
+	int *fixup_map_queue = test->fixup_map_queue;
+	int *fixup_map_stack = test->fixup_map_stack;
 	int *fixup_prog1 = test->fixup_prog1;
 	int *fixup_prog2 = test->fixup_prog2;
 	int *fixup_map_in_map = test->fixup_map_in_map;
@@ -14167,6 +14203,22 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 			prog[*fixup_map_stacktrace].imm = map_fds[12];
 			fixup_map_stacktrace++;
 		} while (fixup_map_stacktrace);
+	}
+	if (*fixup_map_queue) {
+		map_fds[13] = create_map(BPF_MAP_TYPE_QUEUE, 0,
+					 sizeof(u32), 1);
+		do {
+			prog[*fixup_map_queue].imm = map_fds[13];
+			fixup_map_queue++;
+		} while (*fixup_map_queue);
+	}
+	if (*fixup_map_stack) {
+		map_fds[14] = create_map(BPF_MAP_TYPE_STACK, 0,
+					 sizeof(u32), 1);
+		do {
+			prog[*fixup_map_stack].imm = map_fds[14];
+			fixup_map_stack++;
+		} while (*fixup_map_stack);
 	}
 }
 
