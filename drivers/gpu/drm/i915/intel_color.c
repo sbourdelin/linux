@@ -108,10 +108,14 @@ static u64 *ctm_mult_by_limited(u64 *result, const u64 *input)
 	return result;
 }
 
-static void ilk_load_ycbcr_conversion_matrix(struct intel_crtc *intel_crtc)
+static void ilk_load_ycbcr_conversion_matrix(struct drm_crtc_state *crtc_state)
 {
+	struct drm_crtc *crtc = crtc_state->crtc;
+	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	int pipe = intel_crtc->pipe;
-	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
+	struct intel_crtc_state *intel_crtc_state =
+					to_intel_crtc_state(crtc_state);
 
 	I915_WRITE(PIPE_CSC_PREOFF_HI(pipe), 0);
 	I915_WRITE(PIPE_CSC_PREOFF_ME(pipe), 0);
@@ -129,7 +133,11 @@ static void ilk_load_ycbcr_conversion_matrix(struct intel_crtc *intel_crtc)
 	I915_WRITE(PIPE_CSC_POSTOFF_HI(pipe), POSTOFF_RGB_TO_YUV_HI);
 	I915_WRITE(PIPE_CSC_POSTOFF_ME(pipe), POSTOFF_RGB_TO_YUV_ME);
 	I915_WRITE(PIPE_CSC_POSTOFF_LO(pipe), POSTOFF_RGB_TO_YUV_LO);
-	I915_WRITE(PIPE_CSC_MODE(pipe), 0);
+
+	if (INTEL_GEN(dev_priv) >= 11)
+		intel_crtc_state->csc_mode |=  CSC_ENABLE;
+	else
+		intel_crtc_state->csc_mode = 0;
 }
 
 static void ilk_load_csc_matrix(struct drm_crtc_state *crtc_state)
@@ -151,7 +159,7 @@ static void ilk_load_csc_matrix(struct drm_crtc_state *crtc_state)
 
 	if (intel_crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
 	    intel_crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444) {
-		ilk_load_ycbcr_conversion_matrix(intel_crtc);
+		ilk_load_ycbcr_conversion_matrix(crtc_state);
 		return;
 	} else if (crtc_state->ctm) {
 		struct drm_color_ctm *ctm = crtc_state->ctm->data;
@@ -239,7 +247,10 @@ static void ilk_load_csc_matrix(struct drm_crtc_state *crtc_state)
 		I915_WRITE(PIPE_CSC_POSTOFF_ME(pipe), postoff);
 		I915_WRITE(PIPE_CSC_POSTOFF_LO(pipe), postoff);
 
-		I915_WRITE(PIPE_CSC_MODE(pipe), 0);
+		if (INTEL_GEN(dev_priv) >= 11)
+			intel_crtc_state->csc_mode |=  CSC_ENABLE;
+		else
+			intel_crtc_state->csc_mode = 0;
 	} else {
 		uint32_t mode = CSC_MODE_YUV_TO_RGB;
 
@@ -305,9 +316,15 @@ void intel_color_set_csc(struct drm_crtc_state *crtc_state)
 {
 	struct drm_device *dev = crtc_state->crtc->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc_state->crtc);
+	struct intel_crtc_state *intel_crtc_state =
+				to_intel_crtc_state(crtc_state);
+	enum pipe pipe = intel_crtc->pipe;
 
 	if (dev_priv->display.load_csc_matrix)
 		dev_priv->display.load_csc_matrix(crtc_state);
+
+	I915_WRITE(PIPE_CSC_MODE(pipe), intel_crtc_state->csc_mode);
 }
 
 /* Loads the legacy palette/gamma unit for the CRTC. */
@@ -734,6 +751,7 @@ void intel_color_init(struct drm_crtc *crtc)
 		dev_priv->display.load_csc_matrix = ilk_load_csc_matrix;
 		dev_priv->display.load_luts = glk_load_luts;
 	} else if (IS_ICELAKE(dev_priv)) {
+		dev_priv->display.load_csc_matrix = ilk_load_csc_matrix;
 		dev_priv->display.load_luts = icl_load_luts;
 	} else {
 		dev_priv->display.load_luts = i9xx_load_luts;

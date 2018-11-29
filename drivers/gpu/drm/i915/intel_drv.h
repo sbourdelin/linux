@@ -924,6 +924,9 @@ struct intel_crtc_state {
 	/* Gamma mode programmed on the pipe */
 	uint32_t gamma_mode;
 
+	/* CSC mode programmed on the pipe */
+	uint32_t csc_mode;
+
 	/* bitmask of visible planes (enum plane_id) */
 	u8 active_planes;
 	u8 nv12_planes;
