@@ -1929,7 +1929,7 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 
 	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
 
-	if (IS_ICELAKE(dev_priv) &&
+	if ((IS_ICELAKE(dev_priv) || IS_GEN9_BC(dev_priv)) &&
 	    !intel_digital_port_connected(encoder))
 		goto out;
 
