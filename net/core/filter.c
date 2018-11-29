@@ -4793,6 +4793,60 @@ static int bpf_push_seg6_encap(struct sk_buff *skb, u32 type, void *hdr, u32 len
 }
 #endif /* CONFIG_IPV6_SEG6_BPF */
 
+static int bpf_push_ip_encap(struct sk_buff *skb, void *hdr, u32 len)
+{
+	struct dst_entry *dst;
+	struct rtable *rt;
+	struct iphdr *iph;
+	struct net *net;
+	int err;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		return -EINVAL;  /* ETH_P_IPV6 not yet supported */
+
+	iph = (struct iphdr *)hdr;
+
+	if (unlikely(len < sizeof(struct iphdr) || len > LWTUNNEL_MAX_ENCAP_HSIZE))
+		return -EINVAL;
+	if (unlikely(iph->version != 4 || iph->ihl * 4 > len))
+		return -EINVAL;
+
+	if (skb->sk)
+		net = sock_net(skb->sk);
+	else {
+		net = dev_net(skb_dst(skb)->dev);
+	}
+	rt = ip_route_output(net, iph->daddr, 0, 0, 0);
+	if (IS_ERR(rt) || rt->dst.error)
+		return -EINVAL;
+	dst = &rt->dst;
+
+	skb_reset_inner_headers(skb);
+	skb->encapsulation = 1;
+
+	err = skb_cow_head(skb, len + LL_RESERVED_SPACE(dst->dev));
+	if (unlikely(err))
+		return err;
+
+	skb_push(skb, len);
+	skb_reset_network_header(skb);
+
+	iph = ip_hdr(skb);
+	memcpy(iph, hdr, len);
+
+	bpf_compute_data_pointers(skb);
+	if (iph->ihl * 4 < len)
+		skb_set_transport_header(skb, iph->ihl * 4);
+	skb->protocol = htons(ETH_P_IP);
+	if (!iph->check)
+		iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
+
+	skb_dst_drop(skb);
+	dst_hold(dst);
+	skb_dst_set(skb, dst);
+	return 0;
+}
+
 BPF_CALL_4(bpf_lwt_push_encap, struct sk_buff *, skb, u32, type, void *, hdr,
 	   u32, len)
 {
@@ -4802,6 +4856,8 @@ BPF_CALL_4(bpf_lwt_push_encap, struct sk_buff *, skb, u32, type, void *, hdr,
 	case BPF_LWT_ENCAP_SEG6_INLINE:
 		return bpf_push_seg6_encap(skb, type, hdr, len);
 #endif
+	case BPF_LWT_ENCAP_IP:
+		return bpf_push_ip_encap(skb, hdr, len);
 	default:
 		return -EINVAL;
 	}
@@ -5687,6 +5743,8 @@ lwt_xmit_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_l4_csum_replace_proto;
 	case BPF_FUNC_set_hash_invalid:
 		return &bpf_set_hash_invalid_proto;
+	case BPF_FUNC_lwt_push_encap:
+		return &bpf_lwt_push_encap_proto;
 	default:
 		return lwt_out_func_proto(func_id, prog);
 	}
