@@ -771,6 +771,10 @@ static void __device_attach_async_helper(void *_dev, async_cookie_t cookie)
 
 	device_lock(dev);
 
+	/* nothing to do if async_probe has been cleared */
+	if (!dev->async_probe)
+		goto out_unlock;
+
 	if (dev->parent)
 		pm_runtime_get_sync(dev->parent);
 
@@ -782,6 +786,9 @@ static void __device_attach_async_helper(void *_dev, async_cookie_t cookie)
 	if (dev->parent)
 		pm_runtime_put(dev->parent);
 
+	/* We made our attempt at an async_probe, clear the flag */
+	dev->async_probe = false;
+out_unlock:
 	device_unlock(dev);
 
 	put_device(dev);
@@ -826,6 +833,7 @@ static int __device_attach(struct device *dev, bool allow_async)
 			 */
 			dev_dbg(dev, "scheduling asynchronous probe\n");
 			get_device(dev);
+			dev->async_probe = true;
 			async_schedule(__device_attach_async_helper, dev);
 		} else {
 			pm_request_idle(dev);
@@ -925,6 +933,14 @@ EXPORT_SYMBOL_GPL(driver_attach);
 static void __device_release_driver(struct device *dev, struct device *parent)
 {
 	struct device_driver *drv;
+
+	/*
+	 * In the event that we are asked to release the driver on an
+	 * interface that is still waiting on a probe we can just terminate
+	 * the probe by setting async_probe to false. When the async call
+	 * is finally completed it will see this state and just exit.
+	 */
+	dev->async_probe = false;
 
 	drv = dev->driver;
 	if (drv) {

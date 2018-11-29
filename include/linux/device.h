@@ -957,6 +957,8 @@ struct dev_links_info {
  *              device.
  * @dma_coherent: this particular device is dma coherent, even if the
  *		architecture supports non-coherent devices.
+ * @async_probe: This device has an asynchronous probe event pending. Should
+ *		 only be updated while holding device lock.
  *
  * At the lowest level, every device in a Linux system is represented by an
  * instance of struct device. The device structure contains the information
@@ -1051,6 +1053,7 @@ struct device {
     defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL)
 	bool			dma_coherent:1;
 #endif
+	bool			async_probe:1;
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)
