@@ -107,7 +107,7 @@ static void __init mmu_patch_cmp_limit(s32 *site, unsigned long mapped)
 	patch_instruction_site(site, instr);
 }
 
-unsigned long __init mmu_mapin_ram(unsigned long top)
+unsigned long __init mmu_mapin_ram(unsigned long base, unsigned long top)
 {
 	unsigned long mapped;
 
