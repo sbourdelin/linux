@@ -1620,7 +1620,7 @@ static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
 
 	genpd->states = state;
 	genpd->state_count = 1;
-	genpd->free = state;
+	genpd->free_state = true;
 
 	return 0;
 }
@@ -1736,7 +1736,11 @@ static int genpd_remove(struct generic_pm_domain *genpd)
 	list_del(&genpd->gpd_list_node);
 	genpd_unlock(genpd);
 	cancel_work_sync(&genpd->power_off_work);
-	kfree(genpd->free);
+	if (genpd->free_state) {
+		kfree(genpd->states);
+		genpd->states = NULL;
+		genpd->state_count = 0;
+	}
 	pr_debug("%s: removed %s\n", __func__, genpd->name);
 
 	return 0;
