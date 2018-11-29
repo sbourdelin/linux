@@ -1706,7 +1706,6 @@ bool intel_bios_is_valid_vbt(const void *buf, size_t size)
 	bdb = get_bdb_header(vbt);
 	if (range_overflows_t(size_t, vbt->bdb_offset, bdb->bdb_size, size)) {
 		DRM_DEBUG_DRIVER("BDB incomplete\n");
-		return false;
 	}
 
 	return vbt;
