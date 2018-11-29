@@ -8662,18 +8662,60 @@ enum {
 #define   CHV_EU311_PG_ENABLE		(1 << 1)
 
 #define GEN9_SLICE_PGCTL_ACK(slice)	_MMIO(0x804c + (slice) * 0x4)
-#define GEN10_SLICE_PGCTL_ACK(slice)	_MMIO(0x804c + ((slice) / 3) * 0x34 + \
-					      ((slice) % 3) * 0x4)
+
+#define _CNL_SLICE0_PGCTL_ACK		0x804c
+#define _CNL_SLICE1_PGCTL_ACK		0x8050
+#define _CNL_SLICE2_PGCTL_ACK		0x8054
+#define _CNL_SLICE3_PGCTL_ACK		0x8080
+#define _CNL_SLICE4_PGCTL_ACK		0x8084
+#define _CNL_SLICE5_PGCTL_ACK		0x8088
+
+#define GEN10_SLICE_PGCTL_ACK(slice)	_MMIO(_PICK(slice, \
+						    _CNL_SLICE0_PGCTL_ACK, \
+						    _CNL_SLICE1_PGCTL_ACK, \
+						    _CNL_SLICE2_PGCTL_ACK, \
+						    _CNL_SLICE3_PGCTL_ACK, \
+						    _CNL_SLICE4_PGCTL_ACK, \
+						    _CNL_SLICE5_PGCTL_ACK))
+
 #define   GEN9_PGCTL_SLICE_ACK		(1 << 0)
 #define   GEN9_PGCTL_SS_ACK(subslice)	(1 << (2 + (subslice) * 2))
 #define   GEN10_PGCTL_VALID_SS_MASK(slice) ((slice) == 0 ? 0x7F : 0x1F)
 
 #define GEN9_SS01_EU_PGCTL_ACK(slice)	_MMIO(0x805c + (slice) * 0x8)
-#define GEN10_SS01_EU_PGCTL_ACK(slice)	_MMIO(0x805c + ((slice) / 3) * 0x30 + \
-					      ((slice) % 3) * 0x8)
+
+#define _CNL_SLICE0_SS01_EU_PGCTL_ACK		0x805c
+#define _CNL_SLICE1_SS01_EU_PGCTL_ACK		0x8064
+#define _CNL_SLICE2_SS01_EU_PGCTL_ACK		0x806c
+#define _CNL_SLICE3_SS01_EU_PGCTL_ACK		0x808c
+#define _CNL_SLICE4_SS01_EU_PGCTL_ACK		0x8094
+#define _CNL_SLICE5_SS01_EU_PGCTL_ACK		0x809c
+
+#define GEN10_SS01_EU_PGCTL_ACK(slice)	_MMIO(_PICK(slice, \
+						    _CNL_SLICE0_SS01_EU_PGCTL_ACK, \
+						    _CNL_SLICE1_SS01_EU_PGCTL_ACK, \
+						    _CNL_SLICE2_SS01_EU_PGCTL_ACK, \
+						    _CNL_SLICE3_SS01_EU_PGCTL_ACK, \
+						    _CNL_SLICE4_SS01_EU_PGCTL_ACK, \
+						    _CNL_SLICE5_SS01_EU_PGCTL_ACK))
+
 #define GEN9_SS23_EU_PGCTL_ACK(slice)	_MMIO(0x8060 + (slice) * 0x8)
-#define GEN10_SS23_EU_PGCTL_ACK(slice)	_MMIO(0x8060 + ((slice) / 3) * 0x30 + \
-					      ((slice) % 3) * 0x8)
+
+#define _CNL_SLICE0_SS23_EU_PGCTL_ACK		0x8060
+#define _CNL_SLICE1_SS23_EU_PGCTL_ACK		0x8068
+#define _CNL_SLICE2_SS23_EU_PGCTL_ACK		0x8070
+#define _CNL_SLICE3_SS23_EU_PGCTL_ACK		0x8090
+#define _CNL_SLICE4_SS23_EU_PGCTL_ACK		0x8098
+#define _CNL_SLICE5_SS23_EU_PGCTL_ACK		0x80a0
+
+#define GEN10_SS23_EU_PGCTL_ACK(slice)	_MMIO(_PICK(slice, \
+						    _CNL_SLICE0_SS23_EU_PGCTL_ACK, \
+						    _CNL_SLICE1_SS23_EU_PGCTL_ACK, \
+						    _CNL_SLICE2_SS23_EU_PGCTL_ACK, \
+						    _CNL_SLICE3_SS23_EU_PGCTL_ACK, \
+						    _CNL_SLICE4_SS23_EU_PGCTL_ACK, \
+						    _CNL_SLICE5_SS23_EU_PGCTL_ACK))
+
 #define   GEN9_PGCTL_SSA_EU08_ACK	(1 << 0)
 #define   GEN9_PGCTL_SSA_EU19_ACK	(1 << 2)
 #define   GEN9_PGCTL_SSA_EU210_ACK	(1 << 4)
