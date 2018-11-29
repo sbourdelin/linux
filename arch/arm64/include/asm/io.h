@@ -115,7 +115,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
 	 * later instructions. This ensures that a subsequent call to	\
 	 * udelay() will be ordered due to the ISB in get_cycles().	\
 	 */								\
-	asm volatile("eor	%0, %1, %1\n"				\
+	asm volatile("eor	%0, %x1, %x1\n"				\
 		     "cbnz	%0, ."					\
 		     : "=r" (tmp) : "r" (v) : "memory");		\
 })
