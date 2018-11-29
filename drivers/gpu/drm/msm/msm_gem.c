@@ -81,6 +81,8 @@ static struct page **get_pages(struct drm_gem_object *obj)
 		struct drm_device *dev = obj->dev;
 		struct page **p;
 		int npages = obj->size >> PAGE_SHIFT;
+		struct scatterlist *s;
+		int i;
 
 		if (use_pages(obj))
 			p = drm_gem_get_pages(obj);
@@ -104,12 +106,23 @@ static struct page **get_pages(struct drm_gem_object *obj)
 			return ptr;
 		}
 
-		/* For non-cached buffers, ensure the new pages are clean
+		/*
+		 * Some implementations of the DMA mapping ops expect
+		 * physical addresses of the pages to be stored as DMA
+		 * addresses of the sglist entries. To work around it,
+		 * set them here explicitly.
+		 */
+		for_each_sg(msm_obj->sgt->sgl, s, msm_obj->sgt->nents, i)
+			sg_dma_address(s) = sg_phys(s);
+
+		/*
+		 * For non-cached buffers, ensure the new pages are clean
 		 * because display controller, GPU, etc. are not coherent:
 		 */
-		if (msm_obj->flags & (MSM_BO_WC|MSM_BO_UNCACHED))
-			dma_map_sg(dev->dev, msm_obj->sgt->sgl,
-					msm_obj->sgt->nents, DMA_BIDIRECTIONAL);
+		if (msm_obj->flags & (MSM_BO_WC | MSM_BO_UNCACHED))
+			dma_sync_sg_for_device(dev->dev, msm_obj->sgt->sgl,
+					       msm_obj->sgt->nents,
+					       DMA_BIDIRECTIONAL);
 	}
 
 	return msm_obj->pages;
@@ -133,14 +146,16 @@ static void put_pages(struct drm_gem_object *obj)
 
 	if (msm_obj->pages) {
 		if (msm_obj->sgt) {
-			/* For non-cached buffers, ensure the new
+			/*
+			 * For non-cached buffers, ensure the new
 			 * pages are clean because display controller,
 			 * GPU, etc. are not coherent:
 			 */
-			if (msm_obj->flags & (MSM_BO_WC|MSM_BO_UNCACHED))
-				dma_unmap_sg(obj->dev->dev, msm_obj->sgt->sgl,
-					     msm_obj->sgt->nents,
-					     DMA_BIDIRECTIONAL);
+			if (msm_obj->flags & (MSM_BO_WC | MSM_BO_UNCACHED))
+				dma_sync_sg_for_cpu(obj->dev->dev,
+						    msm_obj->sgt->sgl,
+						    msm_obj->sgt->nents,
+						    DMA_BIDIRECTIONAL);
 
 			sg_free_table(msm_obj->sgt);
 			kfree(msm_obj->sgt);
