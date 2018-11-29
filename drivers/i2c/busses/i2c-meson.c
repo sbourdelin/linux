@@ -462,10 +462,15 @@ static const struct meson_i2c_data i2c_axg_data = {
 	.div_factor = 3,
 };
 
+static const struct meson_i2c_data i2c_g12a_data = {
+	.div_factor = 3,
+};
+
 static const struct of_device_id meson_i2c_match[] = {
 	{ .compatible = "amlogic,meson6-i2c", .data = &i2c_meson6_data },
 	{ .compatible = "amlogic,meson-gxbb-i2c", .data = &i2c_gxbb_data },
 	{ .compatible = "amlogic,meson-axg-i2c", .data = &i2c_axg_data },
+	{ .compatible = "amlogic,meson-g12a-i2c", .data = &i2c_g12a_data },
 	{},
 };
 
