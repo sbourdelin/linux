@@ -48,6 +48,7 @@
 
 #define INQUIRY_VENDOR_LEN			8
 #define INQUIRY_MODEL_LEN			16
+#define INQUIRY_REVISION_LEN			4
 
 /* Attempts before moving from SHORT to LONG */
 #define PYX_TRANSPORT_WINDOW_CLOSED_THRESHOLD	3
@@ -325,7 +326,7 @@ struct t10_wwn {
 	 */
 	char vendor[INQUIRY_VENDOR_LEN + 1];
 	char model[INQUIRY_MODEL_LEN + 1];
-	char revision[4];
+	char revision[INQUIRY_REVISION_LEN + 1];
 	char unit_serial[INQUIRY_VPD_SERIAL_LEN];
 	spinlock_t t10_vpd_lock;
 	struct se_device *t10_dev;

@@ -196,7 +196,9 @@ pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
 	BUILD_BUG_ON(sizeof(wwn->model) != INQUIRY_MODEL_LEN + 1);
 	memcpy(&wwn->model[0], &buf[16], INQUIRY_MODEL_LEN);
 	wwn->model[INQUIRY_MODEL_LEN] = '\0';
-	memcpy(&wwn->revision[0], &buf[32], sizeof(wwn->revision));
+	BUILD_BUG_ON(sizeof(wwn->revision) != INQUIRY_REVISION_LEN + 1);
+	memcpy(&wwn->revision[0], &buf[32], INQUIRY_REVISION_LEN);
+	wwn->revision[INQUIRY_REVISION_LEN] = '\0';
 }
 
 static int

@@ -741,7 +741,7 @@ static void scsi_dump_inquiry(struct se_device *dev)
 	buf[i] = '\0';
 	pr_debug("  Model: %s\n", buf);
 
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < INQUIRY_REVISION_LEN; i++)
 		if (wwn->revision[i] >= 0x20)
 			buf[i] = wwn->revision[i];
 		else
@@ -1011,6 +1011,7 @@ int target_configure_device(struct se_device *dev)
 	 */
 	BUILD_BUG_ON(sizeof(dev->t10_wwn.vendor) != INQUIRY_VENDOR_LEN + 1);
 	BUILD_BUG_ON(sizeof(dev->t10_wwn.model) != INQUIRY_MODEL_LEN + 1);
+	BUILD_BUG_ON(sizeof(dev->t10_wwn.revision) != INQUIRY_REVISION_LEN + 1);
 	if (!(dev->transport->transport_flags & TRANSPORT_FLAG_PASSTHROUGH)) {
 		strncpy(&dev->t10_wwn.vendor[0], "LIO-ORG", INQUIRY_VENDOR_LEN);
 		dev->t10_wwn.vendor[INQUIRY_VENDOR_LEN] = '\0';
@@ -1018,7 +1019,8 @@ int target_configure_device(struct se_device *dev)
 			dev->transport->inquiry_prod, INQUIRY_MODEL_LEN);
 		dev->t10_wwn.model[INQUIRY_MODEL_LEN] = '\0';
 		strncpy(&dev->t10_wwn.revision[0],
-			dev->transport->inquiry_rev, 4);
+			dev->transport->inquiry_rev, INQUIRY_REVISION_LEN);
+		dev->t10_wwn.revision[INQUIRY_REVISION_LEN] = '\0';
 	}
 
 	scsi_dump_inquiry(dev);

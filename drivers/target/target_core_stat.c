@@ -275,10 +275,10 @@ static ssize_t target_stat_lu_rev_show(struct config_item *item, char *page)
 {
 	struct se_device *dev = to_stat_lu_dev(item);
 	int i;
-	char str[sizeof(dev->t10_wwn.revision)+1];
+	char str[INQUIRY_REVISION_LEN+1];
 
 	/* scsiLuRevisionId */
-	for (i = 0; i < sizeof(dev->t10_wwn.revision); i++)
+	for (i = 0; i < INQUIRY_REVISION_LEN; i++)
 		str[i] = ISPRINT(dev->t10_wwn.revision[i]) ?
 			dev->t10_wwn.revision[i] : ' ';
 	str[i] = '\0';
