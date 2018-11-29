@@ -270,7 +270,8 @@ static int __init psci_features(u32 psci_func_id)
 #ifdef CONFIG_CPU_IDLE
 static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
 
-static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
+			struct device_node *cpu_node, int cpu)
 {
 	int i, ret, count = 0;
 	u32 *psci_states;
@@ -371,7 +372,7 @@ static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
 }
 #endif
 
-int psci_cpu_init_idle(unsigned int cpu)
+int psci_cpu_init_idle(struct cpuidle_driver *drv, unsigned int cpu)
 {
 	struct device_node *cpu_node;
 	int ret;
@@ -390,7 +391,7 @@ int psci_cpu_init_idle(unsigned int cpu)
 	if (!cpu_node)
 		return -ENODEV;
 
-	ret = psci_dt_cpu_init_idle(cpu_node, cpu);
+	ret = psci_dt_cpu_init_idle(drv, cpu_node, cpu);
 
 	of_node_put(cpu_node);
 
