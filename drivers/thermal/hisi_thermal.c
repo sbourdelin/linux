@@ -424,7 +424,7 @@ static int hi3660_thermal_probe(struct hisi_thermal_data *data)
 	struct platform_device *pdev = data->pdev;
 	struct device *dev = &pdev->dev;
 
-	data->nr_sensors = 2;
+	data->nr_sensors = 1;
 
 	data->sensor = devm_kzalloc(dev, sizeof(*data->sensor) *
 				    data->nr_sensors, GFP_KERNEL);
@@ -590,8 +590,13 @@ static int hisi_thermal_probe(struct platform_device *pdev)
 		}
 
 		ret = platform_get_irq_byname(pdev, sensor->irq_name);
-		if (ret < 0)
-			return ret;
+		if (ret <= 0) {
+			ret = platform_get_irq(pdev, 0);
+			if (ret <=  0) {
+				dev_err(dev, "Failed get interrupt: %d\n", ret);
+				return ret;
+			}
+		}
 
 		ret = devm_request_threaded_irq(dev, ret, NULL,
 						hisi_thermal_alarm_irq_thread,
