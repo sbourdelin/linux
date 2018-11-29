@@ -344,11 +344,11 @@ static int create_active(struct sock_mapping *map, int *evtchn)
 	init_waitqueue_head(&map->active.inflight_conn_req);
 
 	map->active.ring = (struct pvcalls_data_intf *)
-		__get_free_page(GFP_KERNEL | __GFP_ZERO);
+		__get_free_page(GFP_ATOMIC | __GFP_ZERO);
 	if (map->active.ring == NULL)
 		goto out_error;
 	map->active.ring->ring_order = PVCALLS_RING_ORDER;
-	bytes = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	bytes = (void *)__get_free_pages(GFP_ATOMIC | __GFP_ZERO,
 					PVCALLS_RING_ORDER);
 	if (bytes == NULL)
 		goto out_error;
