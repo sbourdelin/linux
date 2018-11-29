@@ -110,6 +110,37 @@ void mark_initmem_nx(void);
 static inline void mark_initmem_nx(void) { }
 #endif
 
+/*
+ * When used, PTE_FRAG_NR is defined in subarch pgtable.h
+ * so we are sure it is included when arriving here.
+ */
+#ifndef PTE_FRAG_NR
+#define PTE_FRAG_NR		1
+#define PTE_FRAG_SIZE_SHIFT	PAGE_SHIFT
+#define PTE_FRAG_SIZE		(1UL << PTE_FRAG_SIZE_SHIFT)
+#endif
+
+#if PTE_FRAG_NR != 1
+static inline void *pte_frag_get(mm_context_t *ctx)
+{
+	return ctx->pte_frag;
+}
+
+static inline void pte_frag_set(mm_context_t *ctx, void *p)
+{
+	ctx->pte_frag = p;
+}
+#else
+static inline void *pte_frag_get(mm_context_t *ctx)
+{
+	return NULL;
+}
+
+static inline void pte_frag_set(mm_context_t *ctx, void *p)
+{
+}
+#endif
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_POWERPC_PGTABLE_H */
