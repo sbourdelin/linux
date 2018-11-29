@@ -1264,6 +1264,7 @@ static void *lme2510_exit_int(struct dvb_usb_device *d)
 
 	if (st->lme_urb != NULL) {
 		usb_kill_urb(st->lme_urb);
+		usb_free_urb(st->lme_urb);
 		usb_free_coherent(d->udev, 128, st->buffer,
 				  st->lme_urb->transfer_dma);
 		info("Interrupt Service Stopped");
