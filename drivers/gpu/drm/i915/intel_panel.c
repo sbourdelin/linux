@@ -1835,7 +1835,8 @@ intel_panel_init_backlight_funcs(struct intel_panel *panel)
 	    intel_dp_aux_init_backlight_funcs(connector) == 0)
 		return;
 
-	if (connector->base.connector_type == DRM_MODE_CONNECTOR_DSI &&
+	if (IS_GEN9_LP(dev_priv) &&
+	    connector->base.connector_type == DRM_MODE_CONNECTOR_DSI &&
 	    intel_dsi_dcs_init_backlight_funcs(connector) == 0)
 		return;
 
