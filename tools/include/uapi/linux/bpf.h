@@ -232,6 +232,16 @@ enum bpf_attach_type {
  */
 #define BPF_F_STRICT_ALIGNMENT	(1U << 0)
 
+/* If BPF_F_ANY_ALIGNMENT is used in BPF_PROF_LOAD command, the
+ * verifier will allow any alignment whatsoever.  This bypasses
+ * what CONFIG_EFFICIENT_UNALIGNED_ACCESS would cause it to do.
+ * It is mostly used for testing when we want to validate the
+ * context and memory access aspects of the validator, but because
+ * of an unaligned access the alignment check would trigger before
+ * the one we are interested in.
+ */
+#define BPF_F_ANY_ALIGNMENT	(1U << 1)
+
 /* when bpf_ldimm64->src_reg == BPF_PSEUDO_MAP_FD, bpf_ldimm64->imm == fd */
 #define BPF_PSEUDO_MAP_FD	1
 
