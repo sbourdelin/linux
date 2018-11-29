@@ -15,6 +15,7 @@
 
 #include <linux/acpi.h>
 #include <linux/arm-smccc.h>
+#include <linux/cpu.h>
 #include <linux/cpuidle.h>
 #include <linux/errno.h>
 #include <linux/linkage.h>
@@ -199,8 +200,19 @@ static int psci_cpu_suspend(u32 state, unsigned long entry_point)
 
 static int psci_cpu_off(u32 state)
 {
+	struct device *dev;
 	int err;
 	u32 fn;
+
+	/*
+	 * When the hierarchical CPU topology is used, decrease the runtime PM
+	 * usage count for the current CPU, as to allow other parts in the
+	 * topology to enter low power states.
+	 */
+	if (psci_dt_topology) {
+		dev = get_cpu_device(smp_processor_id());
+		pm_runtime_put_sync_suspend(dev);
+	}
 
 	fn = psci_function_id[PSCI_FN_CPU_OFF];
 	err = invoke_psci_fn(fn, state, 0, 0);
@@ -209,6 +221,7 @@ static int psci_cpu_off(u32 state)
 
 static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
 {
+	struct device *dev;
 	int err;
 	u32 fn;
 
@@ -216,6 +229,13 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
 	/* Clear the domain state to start fresh. */
 	psci_set_domain_state(0);
+
+	/* Increase runtime PM usage count if the hierarchical CPU toplogy. */
+	if (!err && psci_dt_topology) {
+		dev = get_cpu_device(cpuid);
+		pm_runtime_get_sync(dev);
+	}
+
 	return psci_to_linux_errno(err);
 }
 
