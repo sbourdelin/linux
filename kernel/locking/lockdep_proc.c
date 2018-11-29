@@ -314,6 +314,8 @@ static int lockdep_stats_show(struct seq_file *m, void *v)
 	seq_printf(m, " irq-read-unsafe locks:         %11lu\n",
 			nr_irq_read_unsafe);
 
+	seq_printf(m, " zapped locks:                  %11lu\n",
+			nr_zapped_classes);
 	seq_printf(m, " uncategorized locks:           %11lu\n",
 			nr_uncategorized);
 	seq_printf(m, " unused locks:                  %11lu\n",

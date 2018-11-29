@@ -138,6 +138,7 @@ static struct lock_list list_entries[MAX_LOCKDEP_ENTRIES];
  * get freed - this significantly simplifies the debugging code.
  */
 unsigned long nr_lock_classes;
+unsigned long nr_zapped_classes;
 struct lock_class lock_classes[MAX_LOCKDEP_KEYS];
 
 static inline struct lock_class *hlock_class(struct held_lock *hlock)
@@ -372,6 +373,25 @@ static int verbose(struct lock_class *class)
 }
 
 /*
+ * Check the number of zapped classes and print a warning if it is
+ * more than 1/4 of the total.
+ */
+static void check_zapped_classes(void)
+{
+	if (nr_zapped_classes < nr_lock_classes/4)
+		return;
+	pr_warn("========================================================\n");
+	pr_warn("WARNING: %ld out of %ld locks have been destroyed\n",
+		nr_zapped_classes, nr_lock_classes);
+	pr_warn("through kernel module unload operations.\n");
+	pr_warn("The corresponding lockdep entries are not reusable.\n");
+	pr_warn("The system might have run out of lockdep entries because\n");
+	pr_warn("of repeated kernel module load and unload operations.\n");
+	pr_warn("Lockdep cannot support this particular use case.\n");
+	pr_warn("--------------------------------------------------------\n");
+}
+
+/*
  * Stack-trace: tightly packed array of stack backtrace
  * addresses. Protected by the graph_lock.
  */
@@ -417,6 +437,7 @@ static int save_trace(struct stack_trace *trace)
 			return 0;
 
 		print_lockdep_off("BUG: MAX_STACK_TRACE_ENTRIES too low!");
+		check_zapped_classes();
 		dump_stack();
 
 		return 0;
@@ -781,6 +802,7 @@ register_lock_class(struct lockdep_map *lock, unsigned int subclass, int force)
 		}
 
 		print_lockdep_off("BUG: MAX_LOCKDEP_KEYS too low!");
+		check_zapped_classes();
 		dump_stack();
 		return NULL;
 	}
@@ -847,6 +869,7 @@ static struct lock_list *alloc_list_entry(void)
 			return NULL;
 
 		print_lockdep_off("BUG: MAX_LOCKDEP_ENTRIES too low!");
+		check_zapped_classes();
 		dump_stack();
 		return NULL;
 	}
@@ -2183,6 +2206,7 @@ static inline int add_chain_cache(struct task_struct *curr,
 			return 0;
 
 		print_lockdep_off("BUG: MAX_LOCKDEP_CHAINS too low!");
+		check_zapped_classes();
 		dump_stack();
 		return 0;
 	}
@@ -2217,6 +2241,7 @@ static inline int add_chain_cache(struct task_struct *curr,
 			return 0;
 
 		print_lockdep_off("BUG: MAX_LOCKDEP_CHAIN_HLOCKS too low!");
+		check_zapped_classes();
 		dump_stack();
 		return 0;
 	}
@@ -4146,6 +4171,7 @@ static void zap_class(struct lock_class *class)
 
 	RCU_INIT_POINTER(class->key, NULL);
 	RCU_INIT_POINTER(class->name, NULL);
+	nr_zapped_classes++;
 }
 
 static inline int within(const void *addr, void *start, unsigned long size)
