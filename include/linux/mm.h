@@ -700,6 +700,15 @@ static inline compound_page_dtor *get_compound_page_dtor(struct page *page)
 	return compound_page_dtors[page[1].compound_dtor];
 }
 
+static inline int PageNormalCompound(struct page *page)
+{
+	if (!PageCompound(page))
+		return 0;
+
+	page = compound_head(page);
+	return page[1].compound_dtor == COMPOUND_PAGE_DTOR;
+}
+
 static inline unsigned int compound_order(struct page *page)
 {
 	if (!PageHead(page))
