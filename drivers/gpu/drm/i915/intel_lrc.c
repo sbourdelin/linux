@@ -818,8 +818,12 @@ static void execlists_cancel_requests(struct intel_engine_cs *engine)
 	/* Mark all executing requests as skipped. */
 	list_for_each_entry(rq, &engine->timeline.requests, link) {
 		GEM_BUG_ON(!rq->global_seqno);
-		if (!i915_request_completed(rq))
-			dma_fence_set_error(&rq->fence, -EIO);
+
+		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &rq->fence.flags))
+			continue;
+
+		dma_fence_set_error(&rq->fence, -EIO);
+		dma_fence_signal(&rq->fence);
 	}
 
 	/* Flush the queued requests to the timeline list (for retiring). */
@@ -830,14 +834,20 @@ static void execlists_cancel_requests(struct intel_engine_cs *engine)
 		priolist_for_each_request_consume(rq, rn, p, i) {
 			list_del_init(&rq->sched.link);
 
-			dma_fence_set_error(&rq->fence, -EIO);
 			__i915_request_submit(rq);
+
+			dma_fence_set_error(&rq->fence, -EIO);
+			dma_fence_signal(&rq->fence);
 		}
 
 		rb_erase_cached(&p->node, &execlists->queue);
 		if (p->priority != I915_PRIORITY_NORMAL)
 			kmem_cache_free(engine->i915->priorities, p);
 	}
+
+	intel_write_status_page(engine,
+				I915_GEM_HWS_INDEX,
+				intel_engine_last_submit(engine));
 
 	/* Remaining _unready_ requests will be nop'ed when submitted */
 
