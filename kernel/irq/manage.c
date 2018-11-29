@@ -1108,7 +1108,7 @@ static int irq_setup_forced_threading(struct irqaction *new)
 	return 0;
 }
 
-static int irq_request_resources(struct irq_desc *desc)
+int irq_request_resources(struct irq_desc *desc)
 {
 	struct irq_data *d = &desc->irq_data;
 	struct irq_chip *c = d->chip;
@@ -1116,7 +1116,7 @@ static int irq_request_resources(struct irq_desc *desc)
 	return c->irq_request_resources ? c->irq_request_resources(d) : 0;
 }
 
-static void irq_release_resources(struct irq_desc *desc)
+void irq_release_resources(struct irq_desc *desc)
 {
 	struct irq_data *d = &desc->irq_data;
 	struct irq_chip *c = d->chip;
