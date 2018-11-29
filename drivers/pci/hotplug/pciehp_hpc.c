@@ -515,7 +515,8 @@ static irqreturn_t pciehp_isr(int irq, void *dev_id)
 	struct controller *ctrl = (struct controller *)dev_id;
 	struct pci_dev *pdev = ctrl_dev(ctrl);
 	struct device *parent = pdev->dev.parent;
-	u16 status, events;
+	struct pci_dev *endpoint;
+	u16 status, events, link_status;
 
 	/*
 	 * Interrupts only occur in D3hot or shallower and only if enabled
@@ -524,6 +525,17 @@ static irqreturn_t pciehp_isr(int irq, void *dev_id)
 	if (pdev->current_state == PCI_D3cold ||
 	    (!(ctrl->slot_ctrl & PCI_EXP_SLTCTL_HPIE) && !pciehp_poll_mode))
 		return IRQ_NONE;
+
+	pcie_capability_read_word(pdev, PCI_EXP_LNKSTA, &link_status);
+
+	if (link_status & PCI_EXP_LNKSTA_LBMS) {
+		if (pdev->subordinate && pdev->subordinate->self)
+			endpoint = pdev->subordinate->self;
+		else
+			endpoint = pdev;
+		__pcie_print_link_status(endpoint, false);
+		pcie_capability_write_word(pdev, PCI_EXP_LNKSTA, link_status);
+	}
 
 	/*
 	 * Keep the port accessible by holding a runtime PM ref on its parent.
@@ -677,6 +689,24 @@ static int pciehp_poll(void *data)
 	return 0;
 }
 
+static bool pcie_link_bandwidth_notification_supported(struct controller *ctrl)
+{
+	int ret;
+	u32 cap;
+
+	ret = pcie_capability_read_dword(ctrl_dev(ctrl), PCI_EXP_LNKCAP, &cap);
+	return (ret == PCIBIOS_SUCCESSFUL) && (cap & PCI_EXP_LNKCAP_LBNC);
+}
+
+static void pcie_enable_link_bandwidth_notification(struct controller *ctrl)
+{
+	u16 lnk_ctl;
+
+	pcie_capability_read_word(ctrl_dev(ctrl), PCI_EXP_LNKCTL, &lnk_ctl);
+	lnk_ctl |= PCI_EXP_LNKCTL_LBMIE;
+	pcie_capability_write_word(ctrl_dev(ctrl), PCI_EXP_LNKCTL, lnk_ctl);
+}
+
 static void pcie_enable_notification(struct controller *ctrl)
 {
 	u16 cmd, mask;
@@ -713,6 +743,9 @@ static void pcie_enable_notification(struct controller *ctrl)
 	pcie_write_cmd_nowait(ctrl, cmd, mask);
 	ctrl_dbg(ctrl, "%s: SLOTCTRL %x write cmd %x\n", __func__,
 		 pci_pcie_cap(ctrl->pcie->port) + PCI_EXP_SLTCTL, cmd);
+
+	if (pcie_link_bandwidth_notification_supported(ctrl))
+		pcie_enable_link_bandwidth_notification(ctrl);
 }
 
 static void pcie_disable_notification(struct controller *ctrl)
