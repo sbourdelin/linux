@@ -339,7 +339,43 @@ static void bxt_exec_gpio(struct drm_i915_private *dev_priv,
 static void icl_exec_gpio(struct drm_i915_private *dev_priv,
 			  u8 gpio_source, u8 gpio_index, bool value)
 {
-	DRM_DEBUG_KMS("Skipping ICL GPIO element execution\n");
+	u32 val;
+
+	switch (gpio_index) {
+	case ICL_GPIO_DDSP_HPD_A:
+		val = I915_READ(SHOTPLUG_CTL_DDI);
+		val &= ~ICP_DDIA_HPD_ENABLE;
+		I915_WRITE(SHOTPLUG_CTL_DDI, val);
+		val = I915_READ(SHOTPLUG_CTL_DDI);
+
+		if (value)
+			val |= ICP_DDIA_HPD_OP_DRIVE_1;
+		else
+			val &= ~ICP_DDIA_HPD_OP_DRIVE_1;
+
+		I915_WRITE(SHOTPLUG_CTL_DDI, val);
+		break;
+	case ICL_GPIO_L_VDDEN_1:
+		val = I915_READ(ICP_PP_CONTROL(1));
+		if (value)
+			val |= PWR_STATE_TARGET;
+		else
+			val &= ~PWR_STATE_TARGET;
+		I915_WRITE(ICP_PP_CONTROL(1), val);
+		break;
+	case ICL_GPIO_L_BKLTEN_1:
+		val = I915_READ(ICP_PP_CONTROL(1));
+		if (value)
+			val |= BACKLIGHT_ENABLE;
+		else
+			val &= ~BACKLIGHT_ENABLE;
+		I915_WRITE(ICP_PP_CONTROL(1), val);
+		break;
+	default:
+		/* TODO: Add support for remaining GPIOs */
+		DRM_ERROR("Invalid GPIO no from VBT\n");
+		break;
+	}
 }
 
 static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
