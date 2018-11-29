@@ -1827,11 +1827,12 @@ static int ring_request_alloc(struct i915_request *request)
 	 */
 	request->reserved_space += LEGACY_REQUEST_SIZE;
 
-	ret = intel_ring_wait_for_space(request->ring, request->reserved_space);
+	ret = switch_context(request);
 	if (ret)
 		return ret;
 
-	ret = switch_context(request);
+	/* Unconditionally invalidate GPU caches and TLBs. */
+	ret = request->engine->emit_flush(request, EMIT_INVALIDATE);
 	if (ret)
 		return ret;
 
