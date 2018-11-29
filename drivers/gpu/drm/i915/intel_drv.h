@@ -1983,6 +1983,7 @@ int intel_panel_init(struct intel_panel *panel,
 		     struct drm_display_mode *fixed_mode,
 		     struct drm_display_mode *downclock_mode);
 void intel_panel_fini(struct intel_panel *panel);
+void intel_panel_restore_backlight(struct drm_i915_private *dev_priv);
 void intel_fixed_panel_mode(const struct drm_display_mode *fixed_mode,
 			    struct drm_display_mode *adjusted_mode);
 void intel_pch_panel_fitting(struct intel_crtc *crtc,

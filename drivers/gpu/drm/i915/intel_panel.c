@@ -1903,6 +1903,35 @@ intel_panel_init_backlight_funcs(struct intel_panel *panel)
 	}
 }
 
+void intel_panel_restore_backlight(struct drm_i915_private *dev_priv)
+{
+	struct intel_connector *connector;
+	struct drm_connector_list_iter conn_iter;
+
+	/* Kill all the work that may have been queued by hpd. */
+	drm_connector_list_iter_begin(&dev_priv->drm, &conn_iter);
+	for_each_intel_connector_iter(connector, &conn_iter) {
+		struct intel_panel *panel = &connector->panel;
+		const struct drm_connector_state *conn_state =
+			connector->base.state;
+
+		if (!panel->backlight.present)
+			continue;
+
+		if (panel->backlight.enabled && conn_state->crtc) {
+			const struct intel_crtc_state *crtc_state =
+				to_intel_crtc_state(conn_state->crtc->state);
+
+			intel_panel_enable_backlight(crtc_state, conn_state);
+		} else {
+			WARN(panel->backlight.enabled, "Backlight enabled without crtc\n");
+
+			intel_panel_disable_backlight(conn_state);
+		}
+	}
+	drm_connector_list_iter_end(&conn_iter);
+}
+
 int intel_panel_init(struct intel_panel *panel,
 		     struct drm_display_mode *fixed_mode,
 		     struct drm_display_mode *downclock_mode)
