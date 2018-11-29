@@ -116,6 +116,7 @@ config ARCH_MESON
 	select COMMON_CLK_GXBB
 	select COMMON_CLK_AXG
 	select MESON_IRQ_GPIO
+	select COMMON_CLK_G12A
 	help
 	  This enables support for the Amlogic S905 SoCs.
 
