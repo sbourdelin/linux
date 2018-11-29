@@ -1373,6 +1373,7 @@ static inline void skb_zcopy_abort(struct sk_buff *skb)
 static inline void skb_mark_not_on_list(struct sk_buff *skb)
 {
 	skb->next = NULL;
+	skb->prev = NULL;
 }
 
 static inline void skb_list_del_init(struct sk_buff *skb)
