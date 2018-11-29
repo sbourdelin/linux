@@ -20,6 +20,7 @@
 #include <linux/linkage.h>
 #include <linux/of.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 #include <linux/printk.h>
 #include <linux/psci.h>
 #include <linux/reboot.h>
@@ -319,6 +320,7 @@ int psci_dt_parse_state_node(struct device_node *np, u32 *state)
 
 #ifdef CONFIG_CPU_IDLE
 static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+static DEFINE_PER_CPU_READ_MOSTLY(u32, psci_rpm_state_id);
 
 static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
 			struct device_node *cpu_node, int cpu)
@@ -369,6 +371,9 @@ static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
 		ret = psci_dt_attach_cpu(cpu);
 		if (ret)
 			goto free_mem;
+
+		/* Store index of deepest state to later for runtime PM. */
+		per_cpu(psci_rpm_state_id, cpu) = drv->state_count - 1;
 	}
 
 	/* Idle states parsed correctly, initialize per-cpu pointer */
@@ -466,7 +471,9 @@ int psci_cpu_suspend_enter(unsigned long index)
 {
 	int ret;
 	u32 *state = __this_cpu_read(psci_power_state);
-	u32 composite_state = state[index - 1] | psci_get_domain_state();
+	u32 composite_state, rpm_state_id;
+	bool runtime_pm = false;
+	struct device *dev = NULL;
 
 	/*
 	 * idle state index 0 corresponds to wfi, should never be called
@@ -475,10 +482,28 @@ int psci_cpu_suspend_enter(unsigned long index)
 	if (WARN_ON_ONCE(!index))
 		return -EINVAL;
 
+	/*
+	 * Do runtime PM if we are using the hierarchical CPU toplogy, but only
+	 * when cpuidle have selected the deepest idle state for the CPU.
+	 */
+	if (psci_dt_topology) {
+		rpm_state_id = __this_cpu_read(psci_rpm_state_id);
+		runtime_pm = rpm_state_id == index;
+		if (runtime_pm) {
+			dev = get_cpu_device(smp_processor_id());
+			pm_runtime_put_sync_suspend(dev);
+		}
+	}
+
+	composite_state = state[index - 1] | psci_get_domain_state();
+
 	if (!psci_power_state_loses_context(composite_state))
 		ret = psci_ops.cpu_suspend(composite_state, 0);
 	else
 		ret = cpu_suspend(index, psci_suspend_finisher);
+
+	if (runtime_pm)
+		pm_runtime_get_sync(dev);
 
 	/* Clear the domain state to start fresh when back from idle. */
 	psci_set_domain_state(0);
