@@ -28,6 +28,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
+#include <media/v4l2-ioctl.h>
 #include <media/v4l2-common.h>
 
 #include <media/videobuf2-v4l2.h>
@@ -870,6 +871,16 @@ static inline bool vb2_queue_is_busy(struct video_device *vdev, struct file *fil
 	return vdev->queue->owner && vdev->queue->owner != file->private_data;
 }
 
+static void fill_buf_caps_vdev(struct video_device *vdev, u32 *caps)
+{
+	*caps = 0;
+	fill_buf_caps(vdev->queue, caps);
+	if (vdev->ioctl_ops->vidioc_prepare_buf)
+		*caps |= V4L2_BUF_CAP_SUPPORTS_PREPARE_BUF;
+	if (vdev->ioctl_ops->vidioc_create_bufs)
+		*caps |= V4L2_BUF_CAP_SUPPORTS_CREATE_BUFS;
+}
+
 /* vb2 ioctl helpers */
 
 int vb2_ioctl_reqbufs(struct file *file, void *priv,
@@ -878,7 +889,7 @@ int vb2_ioctl_reqbufs(struct file *file, void *priv,
 	struct video_device *vdev = video_devdata(file);
 	int res = vb2_verify_memory_type(vdev->queue, p->memory, p->type);
 
-	fill_buf_caps(vdev->queue, &p->capabilities);
+	fill_buf_caps_vdev(vdev, &p->capabilities);
 	if (res)
 		return res;
 	if (vb2_queue_is_busy(vdev, file))
@@ -900,7 +911,7 @@ int vb2_ioctl_create_bufs(struct file *file, void *priv,
 			p->format.type);
 
 	p->index = vdev->queue->num_buffers;
-	fill_buf_caps(vdev->queue, &p->capabilities);
+	fill_buf_caps_vdev(vdev, &p->capabilities);
 	/*
 	 * If count == 0, then just check if memory and type are valid.
 	 * Any -EBUSY result from vb2_verify_memory_type can be mapped to 0.
