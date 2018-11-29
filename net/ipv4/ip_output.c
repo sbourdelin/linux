@@ -881,8 +881,8 @@ static int __ip_append_data(struct sock *sk,
 	int csummode = CHECKSUM_NONE;
 	struct rtable *rt = (struct rtable *)cork->dst;
 	unsigned int wmem_alloc_delta = 0;
+	bool paged, extra_uref;
 	u32 tskey = 0;
-	bool paged;
 
 	skb = skb_peek_tail(queue);
 
@@ -921,12 +921,13 @@ static int __ip_append_data(struct sock *sk,
 		uarg = sock_zerocopy_realloc(sk, length, skb_zcopy(skb));
 		if (!uarg)
 			return -ENOBUFS;
+		extra_uref = true;
 		if (rt->dst.dev->features & NETIF_F_SG &&
 		    csummode == CHECKSUM_PARTIAL) {
 			paged = true;
 		} else {
 			uarg->zerocopy = 0;
-			skb_zcopy_set(skb, uarg);
+			skb_zcopy_set(skb, uarg, &extra_uref);
 		}
 	}
 
@@ -1020,7 +1021,7 @@ alloc_new_skb:
 			cork->tx_flags = 0;
 			skb_shinfo(skb)->tskey = tskey;
 			tskey = 0;
-			skb_zcopy_set(skb, uarg);
+			skb_zcopy_set(skb, uarg, &extra_uref);
 
 			/*
 			 *	Find where to start putting bytes.
@@ -1124,13 +1125,12 @@ alloc_new_skb:
 
 	if (wmem_alloc_delta)
 		refcount_add(wmem_alloc_delta, &sk->sk_wmem_alloc);
-	sock_zerocopy_put(uarg);
 	return 0;
 
 error_efault:
 	err = -EFAULT;
 error:
-	sock_zerocopy_put_abort(uarg);
+	sock_zerocopy_put_abort(uarg, extra_uref);
 	cork->length -= length;
 	IP_INC_STATS(sock_net(sk), IPSTATS_MIB_OUTDISCARDS);
 	refcount_add(wmem_alloc_delta, &sk->sk_wmem_alloc);

@@ -1258,7 +1258,7 @@ static int __ip6_append_data(struct sock *sk,
 	int csummode = CHECKSUM_NONE;
 	unsigned int maxnonfragsize, headersize;
 	unsigned int wmem_alloc_delta = 0;
-	bool paged;
+	bool paged, extra_uref;
 
 	skb = skb_peek_tail(queue);
 	if (!skb) {
@@ -1327,12 +1327,13 @@ emsgsize:
 		uarg = sock_zerocopy_realloc(sk, length, skb_zcopy(skb));
 		if (!uarg)
 			return -ENOBUFS;
+		extra_uref = true;
 		if (rt->dst.dev->features & NETIF_F_SG &&
 		    csummode == CHECKSUM_PARTIAL) {
 			paged = true;
 		} else {
 			uarg->zerocopy = 0;
-			skb_zcopy_set(skb, uarg);
+			skb_zcopy_set(skb, uarg, &extra_uref);
 		}
 	}
 
@@ -1459,7 +1460,7 @@ alloc_new_skb:
 			cork->tx_flags = 0;
 			skb_shinfo(skb)->tskey = tskey;
 			tskey = 0;
-			skb_zcopy_set(skb, uarg);
+			skb_zcopy_set(skb, uarg, &extra_uref);
 
 			/*
 			 *	Find where to start putting bytes
@@ -1562,13 +1563,12 @@ alloc_new_skb:
 
 	if (wmem_alloc_delta)
 		refcount_add(wmem_alloc_delta, &sk->sk_wmem_alloc);
-	sock_zerocopy_put(uarg);
 	return 0;
 
 error_efault:
 	err = -EFAULT;
 error:
-	sock_zerocopy_put_abort(uarg);
+	sock_zerocopy_put_abort(uarg, extra_uref);
 	cork->length -= length;
 	IP6_INC_STATS(sock_net(sk), rt->rt6i_idev, IPSTATS_MIB_OUTDISCARDS);
 	refcount_add(wmem_alloc_delta, &sk->sk_wmem_alloc);
