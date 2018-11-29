@@ -143,10 +143,14 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	count = 0;
 	connector_id = u64_to_user_ptr(card_res->connector_id_ptr);
+	DRM_DEBUG_KMS("GetResources: writing connectors start");
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		/* only expose writeback connectors if userspace understands them */
 		if (!file_priv->writeback_connectors &&
 		    (connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK))
+			continue;
+
+		if (READ_ONCE(connector->registration_state) != DRM_CONNECTOR_REGISTERED)
 			continue;
 
 		if (drm_lease_held(file_priv, connector->base.id)) {
@@ -155,10 +159,12 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 				drm_connector_list_iter_end(&conn_iter);
 				return -EFAULT;
 			}
+			DRM_DEBUG_KMS("GetResources: connector %s", connector->name);
 			count++;
 		}
 	}
 	card_res->count_connectors = count;
+	DRM_DEBUG_KMS("GetResources: writing connectors end - count %d", count);
 	drm_connector_list_iter_end(&conn_iter);
 
 	return ret;
