@@ -118,6 +118,8 @@ struct mtk_nor {
 	struct clk *nor_clk;
 };
 
+static const char * const probes[] = { "ofpart", NULL };
+
 static void mtk_nor_set_read_mode(struct mtk_nor *mtk_nor)
 {
 	struct spi_nor *nor = &mtk_nor->nor;
@@ -457,7 +459,7 @@ static int mtk_nor_init(struct mtk_nor *mtk_nor,
 	if (ret)
 		return ret;
 
-	return mtd_device_register(&nor->mtd, NULL, 0);
+	return mtd_device_parse_register(&nor->mtd, probes, NULL, NULL, 0);
 }
 
 static int mtk_nor_drv_probe(struct platform_device *pdev)
