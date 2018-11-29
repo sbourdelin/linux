@@ -622,6 +622,9 @@ tcf_match_indev(struct sk_buff *skb, int ifindex)
 
 unsigned int tcf_exts_num_actions(struct tcf_exts *exts);
 
+int tc_setup_flow_action(struct flow_action *flow_action,
+			 const struct tcf_exts *exts);
+
 int tc_setup_cb_call(struct tcf_block *block, struct tcf_exts *exts,
 		     enum tc_setup_type type, void *type_data, bool err_stop);
 
