@@ -83,7 +83,18 @@ static bool __ioremap_check_ram(struct resource *res)
 
 static int __ioremap_check_desc_other(struct resource *res)
 {
-	return (res->desc != IORES_DESC_NONE);
+	/*
+	 * But now, the 'E820_TYPE_RESERVED' type is converted to the new
+	 * descriptor 'IORES_DESC_RESERVED' instead of 'IORES_DESC_NONE',
+	 * it has been changed. And the value of 'mem_flags.desc_other'
+	 * is equal to 'true' if we don't strengthen the condition in this
+	 * function, that is wrong. Because originally it is equal to
+	 * 'false' for the same reserved type.
+	 *
+	 * So, that would be nice to keep it the same as before.
+	 */
+	return ((res->desc != IORES_DESC_NONE) &&
+		(res->desc != IORES_DESC_RESERVED));
 }
 
 static int __ioremap_res_check(struct resource *res, void *arg)

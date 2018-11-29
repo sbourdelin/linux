@@ -1000,7 +1000,7 @@ static void __init __reserve_region_with_split(struct resource *root,
 	res->start = start;
 	res->end = end;
 	res->flags = type | IORESOURCE_BUSY;
-	res->desc = IORES_DESC_NONE;
+	res->desc = IORES_DESC_RESERVED;
 
 	while (1) {
 
@@ -1035,7 +1035,7 @@ static void __init __reserve_region_with_split(struct resource *root,
 				next_res->start = conflict->end + 1;
 				next_res->end = end;
 				next_res->flags = type | IORESOURCE_BUSY;
-				next_res->desc = IORES_DESC_NONE;
+				next_res->desc = IORES_DESC_RESERVED;
 			}
 		} else {
 			res->start = conflict->end + 1;
@@ -1483,7 +1483,7 @@ static int __init reserve_setup(char *str)
 			res->start = io_start;
 			res->end = io_start + io_num - 1;
 			res->flags |= IORESOURCE_BUSY;
-			res->desc = IORES_DESC_NONE;
+			res->desc = IORES_DESC_RESERVED;
 			res->child = NULL;
 			if (request_resource(parent, res) == 0)
 				reserved = x+1;

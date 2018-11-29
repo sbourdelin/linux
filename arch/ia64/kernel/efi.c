@@ -1232,6 +1232,10 @@ efi_initialize_iomem_resources(struct resource *code_resource,
 				break;
 
 			case EFI_RESERVED_TYPE:
+				name = "reserved";
+				desc = IORES_DESC_RESERVED;
+				break;
+
 			case EFI_RUNTIME_SERVICES_CODE:
 			case EFI_RUNTIME_SERVICES_DATA:
 			case EFI_ACPI_RECLAIM_MEMORY:
