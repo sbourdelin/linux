@@ -114,7 +114,7 @@ int bpf_prog_test_run_skb(struct bpf_prog *prog, const union bpf_attr *kattr,
 	bool is_l2 = false, is_direct_pkt_access = false;
 	u32 size = kattr->test.data_size_in;
 	u32 repeat = kattr->test.repeat;
-	u32 retval, duration;
+	u32 retval, duration = 0;
 	int hh_len = ETH_HLEN;
 	struct sk_buff *skb;
 	struct sock *sk;
@@ -196,7 +196,7 @@ int bpf_prog_test_run_xdp(struct bpf_prog *prog, const union bpf_attr *kattr,
 	u32 repeat = kattr->test.repeat;
 	struct netdev_rx_queue *rxqueue;
 	struct xdp_buff xdp = {};
-	u32 retval, duration;
+	u32 retval, duration = 0;
 	void *data;
 	int ret;
 
