@@ -47,6 +47,7 @@
 #define INQUIRY_VPD_DEVICE_IDENTIFIER_LEN	254
 
 #define INQUIRY_VENDOR_LEN			8
+#define INQUIRY_MODEL_LEN			16
 
 /* Attempts before moving from SHORT to LONG */
 #define PYX_TRANSPORT_WINDOW_CLOSED_THRESHOLD	3
@@ -323,7 +324,7 @@ struct t10_wwn {
 	 * null terminator is always present.
 	 */
 	char vendor[INQUIRY_VENDOR_LEN + 1];
-	char model[16];
+	char model[INQUIRY_MODEL_LEN + 1];
 	char revision[4];
 	char unit_serial[INQUIRY_VPD_SERIAL_LEN];
 	spinlock_t t10_vpd_lock;

@@ -615,12 +615,12 @@ static void dev_set_t10_wwn_model_alias(struct se_device *dev)
 	const char *configname;
 
 	configname = config_item_name(&dev->dev_group.cg_item);
-	if (strlen(configname) >= 16) {
+	if (strlen(configname) >= INQUIRY_MODEL_LEN) {
 		pr_warn("dev[%p]: Backstore name '%s' is too long for "
 			"INQUIRY_MODEL, truncating to 16 bytes\n", dev,
 			configname);
 	}
-	snprintf(&dev->t10_wwn.model[0], 16, "%s", configname);
+	snprintf(&dev->t10_wwn.model[0], INQUIRY_MODEL_LEN, "%s", configname);
 }
 
 static ssize_t emulate_model_alias_store(struct config_item *item,
@@ -642,11 +642,13 @@ static ssize_t emulate_model_alias_store(struct config_item *item,
 	if (ret < 0)
 		return ret;
 
+	BUILD_BUG_ON(sizeof(dev->t10_wwn.model) != INQUIRY_MODEL_LEN + 1);
 	if (flag) {
 		dev_set_t10_wwn_model_alias(dev);
 	} else {
 		strncpy(&dev->t10_wwn.model[0],
-			dev->transport->inquiry_prod, 16);
+			dev->transport->inquiry_prod, INQUIRY_MODEL_LEN);
+		dev->t10_wwn.model[INQUIRY_MODEL_LEN] = '\0';
 	}
 	da->emulate_model_alias = flag;
 	return count;

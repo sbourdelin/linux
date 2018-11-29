@@ -720,7 +720,7 @@ void core_dev_free_initiator_node_lun_acl(
 static void scsi_dump_inquiry(struct se_device *dev)
 {
 	struct t10_wwn *wwn = &dev->t10_wwn;
-	char buf[17];
+	char buf[INQUIRY_MODEL_LEN + 1];
 	int i, device_type;
 	/*
 	 * Print Linux/SCSI style INQUIRY formatting to the kernel ring buffer
@@ -733,7 +733,7 @@ static void scsi_dump_inquiry(struct se_device *dev)
 	buf[i] = '\0';
 	pr_debug("  Vendor: %s\n", buf);
 
-	for (i = 0; i < 16; i++)
+	for (i = 0; i < INQUIRY_MODEL_LEN; i++)
 		if (wwn->model[i] >= 0x20)
 			buf[i] = wwn->model[i];
 		else
@@ -1010,11 +1010,13 @@ int target_configure_device(struct se_device *dev)
 	 * passthrough because this is being provided by the backend LLD.
 	 */
 	BUILD_BUG_ON(sizeof(dev->t10_wwn.vendor) != INQUIRY_VENDOR_LEN + 1);
+	BUILD_BUG_ON(sizeof(dev->t10_wwn.model) != INQUIRY_MODEL_LEN + 1);
 	if (!(dev->transport->transport_flags & TRANSPORT_FLAG_PASSTHROUGH)) {
 		strncpy(&dev->t10_wwn.vendor[0], "LIO-ORG", INQUIRY_VENDOR_LEN);
 		dev->t10_wwn.vendor[INQUIRY_VENDOR_LEN] = '\0';
 		strncpy(&dev->t10_wwn.model[0],
-			dev->transport->inquiry_prod, 16);
+			dev->transport->inquiry_prod, INQUIRY_MODEL_LEN);
+		dev->t10_wwn.model[INQUIRY_MODEL_LEN] = '\0';
 		strncpy(&dev->t10_wwn.revision[0],
 			dev->transport->inquiry_rev, 4);
 	}

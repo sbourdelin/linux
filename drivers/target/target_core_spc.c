@@ -116,7 +116,7 @@ spc_emulate_inquiry_std(struct se_cmd *cmd, unsigned char *buf)
 	memset(&buf[8], 0x20, 8 + 16 + 4);
 	memcpy(&buf[8], "LIO-ORG", sizeof("LIO-ORG") - 1);
 	memcpy(&buf[16], dev->t10_wwn.model,
-	       strnlen(dev->t10_wwn.model, 16));
+	       strnlen(dev->t10_wwn.model, INQUIRY_MODEL_LEN));
 	memcpy(&buf[32], dev->t10_wwn.revision,
 	       strnlen(dev->t10_wwn.revision, 4));
 	buf[4] = 31; /* Set additional length to 31 */

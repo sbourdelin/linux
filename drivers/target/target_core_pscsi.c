@@ -193,7 +193,9 @@ pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
 	BUILD_BUG_ON(sizeof(wwn->vendor) != INQUIRY_VENDOR_LEN + 1);
 	memcpy(&wwn->vendor[0], &buf[8], INQUIRY_VENDOR_LEN);
 	wwn->vendor[INQUIRY_VENDOR_LEN] = '\0';
-	memcpy(&wwn->model[0], &buf[16], sizeof(wwn->model));
+	BUILD_BUG_ON(sizeof(wwn->model) != INQUIRY_MODEL_LEN + 1);
+	memcpy(&wwn->model[0], &buf[16], INQUIRY_MODEL_LEN);
+	wwn->model[INQUIRY_MODEL_LEN] = '\0';
 	memcpy(&wwn->revision[0], &buf[32], sizeof(wwn->revision));
 }
 
@@ -835,7 +837,7 @@ static ssize_t pscsi_show_configfs_dev_params(struct se_device *dev, char *b)
 				bl += sprintf(b + bl, " ");
 		}
 		bl += sprintf(b + bl, " Model: ");
-		for (i = 0; i < 16; i++) {
+		for (i = 0; i < INQUIRY_MODEL_LEN; i++) {
 			if (ISPRINT(sd->model[i]))   /* printable character ? */
 				bl += sprintf(b + bl, "%c", sd->model[i]);
 			else

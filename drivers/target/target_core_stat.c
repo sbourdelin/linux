@@ -261,10 +261,10 @@ static ssize_t target_stat_lu_prod_show(struct config_item *item, char *page)
 {
 	struct se_device *dev = to_stat_lu_dev(item);
 	int i;
-	char str[sizeof(dev->t10_wwn.model)+1];
+	char str[INQUIRY_MODEL_LEN+1];
 
 	/* scsiLuProductId */
-	for (i = 0; i < sizeof(dev->t10_wwn.model); i++)
+	for (i = 0; i < INQUIRY_MODEL_LEN; i++)
 		str[i] = ISPRINT(dev->t10_wwn.model[i]) ?
 			dev->t10_wwn.model[i] : ' ';
 	str[i] = '\0';
