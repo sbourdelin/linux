@@ -327,7 +327,7 @@ static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
 	u32 *psci_states;
 	struct device_node *state_node;
 
-	psci_states = kcalloc(num_state_nodes, sizeof(*psci_states),
+	psci_states = kcalloc(CPUIDLE_STATE_MAX, sizeof(*psci_states),
 			GFP_KERNEL);
 	if (!psci_states)
 		return -ENOMEM;
@@ -349,6 +349,26 @@ static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
 	if (i != num_state_nodes) {
 		ret = -ENODEV;
 		goto free_mem;
+	}
+
+	/*
+	 * If the hierarchical CPU topology is used, let's attach the CPU device
+	 * to its corresponding PM domain. If OSI mode isn't supported, pick up
+	 * the additional cpuidle states, from the domain idle states described
+	 * in the hierarchical DT layout, as to enable the cpuidle driver to
+	 * manage them.
+	 */
+	if (psci_dt_topology) {
+		if (!psci_has_osi_support()) {
+			ret = psci_dt_pm_domains_parse_states(drv, cpu_node,
+							      psci_states);
+			if (ret)
+				goto free_mem;
+		}
+
+		ret = psci_dt_attach_cpu(cpu);
+		if (ret)
+			goto free_mem;
 	}
 
 	/* Idle states parsed correctly, initialize per-cpu pointer */
