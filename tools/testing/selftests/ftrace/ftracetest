@@ -173,8 +173,8 @@ strip_esc() {
 }
 
 prlog() { # messages
-  echo -e "$@"
-  [ "$LOG_FILE" ] && echo -e "$@" | strip_esc >> $LOG_FILE
+  /bin/echo -e "$@"
+  [ "$LOG_FILE" ] && /bin/echo -e "$@" | strip_esc >> $LOG_FILE
 }
 catlog() { #file
   cat $1
