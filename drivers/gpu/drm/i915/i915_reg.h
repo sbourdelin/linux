@@ -7058,6 +7058,9 @@ enum {
 #define GAMMA_MODE_MODE_12BIT	(2 << 0)
 #define GAMMA_MODE_MODE_SPLIT	(3 << 0)
 
+#define PRE_CSC_GAMMA_ENABLE	(1 << 31)
+#define POST_CSC_GAMMA_ENABLE	(1 << 30)
+
 /* DMC/CSR */
 #define CSR_PROGRAM(i)		_MMIO(0x80000 + (i) * 4)
 #define CSR_SSP_BASE_ADDR_GEN9	0x00002FC0
