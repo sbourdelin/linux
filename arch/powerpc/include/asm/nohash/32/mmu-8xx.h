@@ -190,6 +190,7 @@ typedef struct {
 	struct slice_mask mask_8m;
 # endif
 #endif
+	void *pte_frag;
 } mm_context_t;
 
 #define PHYS_IMMR_BASE (mfspr(SPRN_IMMR) & 0xfff80000)
