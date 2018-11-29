@@ -83,6 +83,8 @@ typedef struct {
 	unsigned long vdso_base;
 } mm_context_t;
 
+void update_bats(void);
+
 #endif /* !__ASSEMBLY__ */
 
 /* We happily ignore the smaller BATs on 601, we don't actually use
