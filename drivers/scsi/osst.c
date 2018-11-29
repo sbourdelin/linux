@@ -4698,7 +4698,7 @@ static int __os_scsi_tape_open(struct inode * inode, struct file * filp)
 						    STp->timeout, MAX_RETRIES, 1);
 			if ((SRpnt->sense[0] & 0x70) != 0x70 ||
 			    (SRpnt->sense[2] & 0x0f) == NOT_READY)
-			break;
+				break;
 
 			if ((SRpnt->sense[2] & 0x0f) == UNIT_ATTENTION) {
 				int j;
@@ -5567,13 +5567,13 @@ static int osst_copy_from_buffer(struct osst_buffer *st_bp, unsigned char *ptr)
 static void validate_options (void)
 {
   if (max_dev > 0)
-		osst_max_dev = max_dev;  
+	osst_max_dev = max_dev;
   if (write_threshold_kbs > 0)
-		osst_write_threshold = write_threshold_kbs * ST_KILOBYTE;
+	osst_write_threshold = write_threshold_kbs * ST_KILOBYTE;
   if (osst_write_threshold > osst_buffer_size)
-		osst_write_threshold = osst_buffer_size;
+	osst_write_threshold = osst_buffer_size;
   if (max_sg_segs >= OSST_FIRST_SG)
-		osst_max_sg_segs = max_sg_segs;
+	osst_max_sg_segs = max_sg_segs;
 #if DEBUG
   printk(OSST_DEB_MSG "osst :D: max tapes %d, write threshold %d, max s/g segs %d.\n",
 			   osst_max_dev, osst_write_threshold, osst_max_sg_segs);

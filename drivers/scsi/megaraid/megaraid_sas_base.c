@@ -1823,7 +1823,8 @@ void megasas_set_dynamic_target_properties(struct scsi_device *sdev,
 		raid = MR_LdRaidGet(ld, local_map_ptr);
 
 		if (raid->capability.ldPiMode == MR_PROT_INFO_TYPE_CONTROLLER)
-		blk_queue_update_dma_alignment(sdev->request_queue, 0x7);
+			blk_queue_update_dma_alignment(
+					sdev->request_queue, 0x7);
 
 		mr_device_priv_data->is_tm_capable =
 			raid->capability.tmCapable;

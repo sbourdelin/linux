@@ -5407,8 +5407,8 @@ void sym_complete_error(struct sym_hcb *np, struct sym_ccb *cp)
 		cp->sv_resid = 0;
 	}
 #ifdef DEBUG_2_0_X
-if (resid)
-	printf("XXXX RESID= %d - 0x%x\n", resid, resid);
+	if (resid)
+		printf("XXXX RESID= %d - 0x%x\n", resid, resid);
 #endif
 
 	/*
@@ -5531,8 +5531,8 @@ void sym_complete_ok (struct sym_hcb *np, struct sym_ccb *cp)
 	if (!SYM_SETUP_RESIDUAL_SUPPORT)
 		resid  = 0;
 #ifdef DEBUG_2_0_X
-if (resid)
-	printf("XXXX RESID= %d - 0x%x\n", resid, resid);
+	if (resid)
+		printf("XXXX RESID= %d - 0x%x\n", resid, resid);
 #endif
 
 	/*
