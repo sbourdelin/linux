@@ -2029,6 +2029,8 @@ static void intel_ddi_get_encoder_pipes(struct intel_encoder *encoder,
 	if (port == PORT_A) {
 		tmp = I915_READ(TRANS_DDI_FUNC_CTL(TRANSCODER_EDP));
 
+		WARN_ON(!(tmp & TRANS_DDI_FUNC_ENABLE));
+
 		switch (tmp & TRANS_DDI_EDP_INPUT_MASK) {
 		default:
 			MISSING_CASE(tmp & TRANS_DDI_EDP_INPUT_MASK);
@@ -2056,6 +2058,8 @@ static void intel_ddi_get_encoder_pipes(struct intel_encoder *encoder,
 
 		if ((tmp & TRANS_DDI_PORT_MASK) != TRANS_DDI_SELECT_PORT(port))
 			continue;
+
+		WARN_ON(!(tmp & TRANS_DDI_FUNC_ENABLE));
 
 		if ((tmp & TRANS_DDI_MODE_SELECT_MASK) ==
 		    TRANS_DDI_MODE_SELECT_DP_MST)
