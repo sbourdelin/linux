@@ -3330,6 +3330,8 @@ static void nop_complete_submit_request(struct i915_request *request)
 	__i915_request_submit(request);
 	intel_engine_init_global_seqno(request->engine, request->global_seqno);
 	spin_unlock_irqrestore(&request->engine->timeline.lock, flags);
+
+	dma_fence_signal(&request->fence);
 }
 
 void i915_gem_set_wedged(struct drm_i915_private *i915)
@@ -3392,19 +3394,8 @@ void i915_gem_set_wedged(struct drm_i915_private *i915)
 	synchronize_rcu();
 
 	for_each_engine(engine, i915, id) {
-		unsigned long flags;
-
-		/*
-		 * Mark all pending requests as complete so that any concurrent
-		 * (lockless) lookup doesn't try and wait upon the request as we
-		 * reset it.
-		 */
-		spin_lock_irqsave(&engine->timeline.lock, flags);
-		intel_engine_init_global_seqno(engine,
-					       intel_engine_last_submit(engine));
-		spin_unlock_irqrestore(&engine->timeline.lock, flags);
-
 		i915_gem_reset_finish_engine(engine);
+		intel_engine_wakeup(engine);
 	}
 
 out:

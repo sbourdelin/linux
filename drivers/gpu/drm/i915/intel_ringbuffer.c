@@ -750,8 +750,13 @@ static void cancel_requests(struct intel_engine_cs *engine)
 	/* Mark all submitted requests as skipped. */
 	list_for_each_entry(request, &engine->timeline.requests, link) {
 		GEM_BUG_ON(!request->global_seqno);
-		if (!i915_request_completed(request))
+		if (!i915_request_completed(request)) {
 			dma_fence_set_error(&request->fence, -EIO);
+			intel_write_status_page(engine,
+						I915_GEM_HWS_INDEX,
+						request->global_seqno);
+		}
+		dma_fence_signal(&request->fence);
 	}
 	/* Remaining _unready_ requests will be nop'ed when submitted */
 
