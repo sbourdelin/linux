@@ -267,11 +267,11 @@ static void lock_release_holdtime(struct held_lock *hlock)
 	else
 		lock_time_inc(&stats->write_holdtime, holdtime);
 }
-#else
+#else /* CONFIG_LOCK_STAT */
 static inline void lock_release_holdtime(struct held_lock *hlock)
 {
 }
-#endif
+#endif /* CONFIG_LOCK_STAT */
 
 /*
  * We keep a global list of all lock classes. The list only grows,
@@ -1699,7 +1699,7 @@ static void inc_chains(void)
 	}
 }
 
-#else
+#else /* defined(CONFIG_TRACE_IRQFLAGS) && defined(CONFIG_PROVE_LOCKING) */
 
 static inline int
 check_prev_add_irq(struct task_struct *curr, struct held_lock *prev,
@@ -1713,7 +1713,7 @@ static inline void inc_chains(void)
 	nr_process_chains++;
 }
 
-#endif
+#endif /* defined(CONFIG_TRACE_IRQFLAGS) && defined(CONFIG_PROVE_LOCKING) */
 
 static void
 print_deadlock_scenario(struct held_lock *nxt,
@@ -2115,7 +2115,7 @@ static void print_collision(struct task_struct *curr,
 	pr_warn("\nstack backtrace:\n");
 	dump_stack();
 }
-#endif
+#endif /* CONFIG_DEBUG_LOCKDEP */
 
 /*
  * Checks whether the chain and the current held locks are consistent
@@ -2357,14 +2357,14 @@ static int validate_chain(struct task_struct *curr, struct lockdep_map *lock,
 
 	return 1;
 }
-#else
+#else /* CONFIG_PROVE_LOCKING */
 static inline int validate_chain(struct task_struct *curr,
 	       	struct lockdep_map *lock, struct held_lock *hlock,
 		int chain_head, u64 chain_key)
 {
 	return 1;
 }
-#endif
+#endif /* CONFIG_PROVE_LOCKING */
 
 /*
  * We are building curr_chain_key incrementally, so double-check
@@ -4100,7 +4100,7 @@ void lock_acquired(struct lockdep_map *lock, unsigned long ip)
 	raw_local_irq_restore(flags);
 }
 EXPORT_SYMBOL_GPL(lock_acquired);
-#endif
+#endif /* CONFIG_LOCK_STAT */
 
 /*
  * Used by the testsuite, sanitize the validator state
