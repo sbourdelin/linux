@@ -58,7 +58,7 @@ void ucall_init(struct kvm_vm *vm, ucall_type_t type, void *arg)
 		start = 1ul << (vm->va_bits * 2 / 3);
 		end = 1ul << vm->va_bits;
 		step = 1ul << (vm->va_bits / 6);
-		for (gpa = start; gpa >= 0; gpa -= step) {
+		for (gpa = start; gpa < end; gpa -= step) {
 			if (ucall_mmio_init(vm, gpa & ~(vm->page_size - 1)))
 				return;
 		}
