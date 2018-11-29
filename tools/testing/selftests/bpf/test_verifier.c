@@ -3919,6 +3919,7 @@ static struct bpf_test tests[] = {
 		},
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"direct packet access: test21 (x += pkt_ptr, 2)",
@@ -3944,6 +3945,7 @@ static struct bpf_test tests[] = {
 		},
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"direct packet access: test22 (x += pkt_ptr, 3)",
@@ -3974,6 +3976,7 @@ static struct bpf_test tests[] = {
 		},
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"direct packet access: test23 (x += pkt_ptr, 4)",
@@ -4026,6 +4029,7 @@ static struct bpf_test tests[] = {
 		},
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"direct packet access: test25 (marking on <, good access)",
@@ -7733,6 +7737,7 @@ static struct bpf_test tests[] = {
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.retval = 0 /* csum_diff of 64-byte packet */,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"helper access to variable memory: size = 0 not allowed on NULL (!ARG_PTR_TO_MEM_OR_NULL)",
@@ -9695,6 +9700,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_data' > pkt_end, bad access 1",
@@ -9866,6 +9872,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_end < pkt_data', bad access 1",
@@ -9978,6 +9985,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_end >= pkt_data', bad access 1",
@@ -10035,6 +10043,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_data' <= pkt_end, bad access 1",
@@ -10147,6 +10156,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_meta' > pkt_data, bad access 1",
@@ -10318,6 +10328,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_data < pkt_meta', bad access 1",
@@ -10430,6 +10441,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_data >= pkt_meta', bad access 1",
@@ -10487,6 +10499,7 @@ static struct bpf_test tests[] = {
 		},
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"XDP pkt read, pkt_meta' <= pkt_data, bad access 1",
@@ -12406,6 +12419,7 @@ static struct bpf_test tests[] = {
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
 		.retval = 1,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"calls: pkt_ptr spill into caller stack 4",
@@ -12440,6 +12454,7 @@ static struct bpf_test tests[] = {
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
 		.retval = 1,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"calls: pkt_ptr spill into caller stack 5",
@@ -12585,6 +12600,7 @@ static struct bpf_test tests[] = {
 		},
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"calls: pkt_ptr spill into caller stack 9",
@@ -13508,6 +13524,7 @@ static struct bpf_test tests[] = {
 		},
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 		.result = ACCEPT,
+		.flags = F_LOAD_WITH_ANY_ALIGNMENT,
 	},
 	{
 		"reference tracking in call: free reference in subprog",
@@ -14328,6 +14345,11 @@ static void do_test_single(struct bpf_test *test, bool unpriv,
 			       strerror(errno));
 			goto fail_log;
 		}
+#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+		if (fd_prog >= 0 &&
+		    (test->flags & F_LOAD_WITH_ANY_ALIGNMENT))
+			goto test_ok;
+#endif
 	} else {
 		if (fd_prog >= 0) {
 			printf("FAIL\nUnexpected success to load!\n");
@@ -14361,6 +14383,9 @@ static void do_test_single(struct bpf_test *test, bool unpriv,
 			goto fail_log;
 		}
 	}
+#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+test_ok:
+#endif
 	(*passes)++;
 	printf("OK%s\n", reject_from_alignment ?
 	       " (NOTE: reject due to unknown alignment)" : "");
