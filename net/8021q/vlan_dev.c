@@ -135,7 +135,7 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 
 		stats = this_cpu_ptr(vlan->vlan_pcpu_stats);
 		u64_stats_update_begin(&stats->syncp);
-		stats->tx_packets++;
+		stats->tx_packets += max_t(u16, 1, skb_shinfo(skb)->gso_segs);
 		stats->tx_bytes += len;
 		u64_stats_update_end(&stats->syncp);
 	} else {

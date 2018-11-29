@@ -566,7 +566,7 @@ static netdev_tx_t macvlan_start_xmit(struct sk_buff *skb,
 
 		pcpu_stats = this_cpu_ptr(vlan->pcpu_stats);
 		u64_stats_update_begin(&pcpu_stats->syncp);
-		pcpu_stats->tx_packets++;
+		pcpu_stats->tx_packets += max_t(u16, 1, skb_shinfo(skb)->gso_segs);
 		pcpu_stats->tx_bytes += len;
 		u64_stats_update_end(&pcpu_stats->syncp);
 	} else {
