@@ -478,6 +478,8 @@ bool page_mapped(struct page *page)
 		return true;
 	if (PageHuge(page))
 		return false;
+	if (PageNormalCompound(page))
+		return false;
 	for (i = 0; i < hpage_nr_pages(page); i++) {
 		if (atomic_read(&page[i]._mapcount) >= 0)
 			return true;
