@@ -91,6 +91,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
 
 static DEFINE_PER_CPU(u32, domain_state);
 static u32 psci_cpu_suspend_feature;
+static bool psci_dt_topology;
 
 u32 psci_get_domain_state(void)
 {
@@ -736,6 +737,23 @@ int __init psci_dt_init(void)
 
 	init_fn = (psci_initcall_t)matched_np->data;
 	ret = init_fn(np);
+
+	of_node_put(np);
+	return ret;
+}
+
+int __init psci_dt_topology_init(void)
+{
+	struct device_node *np;
+	int ret;
+
+	np = of_find_matching_node_and_match(NULL, psci_of_match, NULL);
+	if (!np)
+		return -ENODEV;
+
+	/* Initialize the CPU PM domains based on topology described in DT. */
+	ret = psci_dt_init_pm_domains(np);
+	psci_dt_topology = ret > 0;
 
 	of_node_put(np);
 	return ret;
