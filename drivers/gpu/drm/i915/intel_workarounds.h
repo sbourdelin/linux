@@ -33,14 +33,14 @@ int intel_ctx_workarounds_emit(struct i915_request *rq);
 
 void intel_gt_workarounds_init(struct drm_i915_private *dev_priv);
 void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv);
-void intel_gt_workarounds_verify(struct drm_i915_private *dev_priv,
+bool intel_gt_workarounds_verify(struct drm_i915_private *dev_priv,
 				 const char *from);
 
 void intel_whitelist_workarounds_apply(struct intel_engine_cs *engine);
 
 void intel_engine_workarounds_init(struct intel_engine_cs *engine);
 void intel_engine_workarounds_apply(struct intel_engine_cs *engine);
-void intel_engine_workarounds_verify(struct intel_engine_cs *engine,
+bool intel_engine_workarounds_verify(struct intel_engine_cs *engine,
 				     const char *from);
 
 #endif

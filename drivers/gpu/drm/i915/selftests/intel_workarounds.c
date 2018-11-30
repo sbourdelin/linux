@@ -327,10 +327,100 @@ out:
 	return err;
 }
 
+static bool verify_gt_engine_wa(struct drm_i915_private *i915, const char *str)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	bool ok = true;
+
+	ok &= intel_gt_workarounds_verify(i915, str);
+
+	for_each_engine(engine, i915, id)
+		ok &= intel_engine_workarounds_verify(engine, str);
+
+	return ok;
+}
+
+static int
+live_gpu_reset_gt_engine_workarounds(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct i915_gpu_error *error = &i915->gpu_error;
+	bool ok;
+
+	if (!intel_has_gpu_reset(i915))
+		return 0;
+
+	pr_info("Verifying after GPU reset...\n");
+
+	set_bit(I915_RESET_BACKOFF, &error->flags);
+	set_bit(I915_RESET_HANDOFF, &error->flags);
+
+	ok = verify_gt_engine_wa(i915, "before reset");
+	if (!ok)
+		goto out;
+
+	intel_runtime_pm_get(i915);
+	i915_reset(i915, ~0, "live_workarounds");
+	intel_runtime_pm_put(i915);
+
+	ok = verify_gt_engine_wa(i915, "after reset");
+
+out:
+	clear_bit(I915_RESET_BACKOFF, &error->flags);
+
+	return ok ? 0 : -ESRCH;
+}
+
+static int
+live_engine_reset_gt_engine_workarounds(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct i915_gpu_error *error = &i915->gpu_error;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	bool ok;
+
+	if (!intel_has_reset_engine(i915))
+		return 0;
+
+	for_each_engine(engine, i915, id) {
+		pr_info("Verifying after %s reset...\n", engine->name);
+
+		set_bit(I915_RESET_BACKOFF, &error->flags);
+		set_bit(I915_RESET_ENGINE + engine->id, &error->flags);
+
+		ok = verify_gt_engine_wa(i915, "before reset");
+		if (!ok)
+			goto out;
+
+		intel_runtime_pm_get(i915);
+		i915_reset_engine(engine, "live_workarounds");
+		intel_runtime_pm_put(i915);
+
+		ok = verify_gt_engine_wa(i915, "after reset");
+		if (!ok)
+			goto out;
+
+		clear_bit(I915_RESET_ENGINE + engine->id, &error->flags);
+		clear_bit(I915_RESET_BACKOFF, &error->flags);
+	}
+
+out:
+	if (engine) {
+		clear_bit(I915_RESET_ENGINE + engine->id, &error->flags);
+		clear_bit(I915_RESET_BACKOFF, &error->flags);
+	}
+
+	return ok ? 0 : -ESRCH;
+}
+
 int intel_workarounds_live_selftests(struct drm_i915_private *i915)
 {
 	static const struct i915_subtest tests[] = {
 		SUBTEST(live_reset_whitelist),
+		SUBTEST(live_gpu_reset_gt_engine_workarounds),
+		SUBTEST(live_engine_reset_gt_engine_workarounds),
 	};
 	int err;
 

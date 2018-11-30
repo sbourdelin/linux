@@ -990,7 +990,7 @@ wa_fail(const struct i915_wa *wa, u32 cur, const char *name, const char *from)
 		  cur, cur & wa->mask, wa->val, wa->mask);
 }
 
-static void
+static bool
 wa_verify_bits(const struct i915_wa *wa, u32 cur, const char *name,
 	       const char *from)
 {
@@ -1001,30 +1001,35 @@ wa_verify_bits(const struct i915_wa *wa, u32 cur, const char *name,
 	while (bits) {
 		if ((bits & 1) && ((cur_ & 1) != (val_ & 1))) {
 			wa_fail(wa, cur, name, from);
-			break;
+			return false;
 		}
 
 		bits >>= 1;
 		cur_ >>= 1;
 		val_ >>= 1;
 	}
+
+	return true;
 }
 
-static void wa_list_verify(struct drm_i915_private *dev_priv,
+static bool wa_list_verify(struct drm_i915_private *dev_priv,
 			   const struct i915_wa_list *wal,
 			   const char *from)
 {
 	struct i915_wa *wa;
 	unsigned int i;
+	bool res = true;
 
 	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
-		wa_verify_bits(wa, I915_READ(wa->reg), wal->name, from);
+		res &= wa_verify_bits(wa, I915_READ(wa->reg), wal->name, from);
+
+	return res;
 }
 
-void intel_gt_workarounds_verify(struct drm_i915_private *dev_priv,
+bool intel_gt_workarounds_verify(struct drm_i915_private *dev_priv,
 				 const char *from)
 {
-	wa_list_verify(dev_priv, &dev_priv->gt_wa_list, from);
+	return wa_list_verify(dev_priv, &dev_priv->gt_wa_list, from);
 }
 
 struct whitelist {
@@ -1313,10 +1318,10 @@ void intel_engine_workarounds_apply(struct intel_engine_cs *engine)
 	wa_list_apply(engine->i915, &engine->wa_list);
 }
 
-void intel_engine_workarounds_verify(struct intel_engine_cs *engine,
+bool intel_engine_workarounds_verify(struct intel_engine_cs *engine,
 				     const char *from)
 {
-	wa_list_verify(engine->i915, &engine->wa_list, from);
+	return wa_list_verify(engine->i915, &engine->wa_list, from);
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
