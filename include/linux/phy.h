@@ -898,6 +898,16 @@ static inline bool phy_is_pseudo_fixed_link(struct phy_device *phydev)
 }
 
 /**
+ * phy_is_started - Convenience function for testing whether a PHY is in
+ * a started state
+ * @phydev: the phy_device struct
+ */
+static inline bool phy_is_started(struct phy_device *phydev)
+{
+	return phydev->state >= PHY_UP && phydev->state != PHY_HALTED;
+}
+
+/**
  * phy_write_mmd - Convenience function for writing a register
  * on an MMD on a given PHY.
  * @phydev: The phy_device struct

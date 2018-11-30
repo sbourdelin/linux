@@ -309,10 +309,11 @@ static int mdio_bus_phy_restore(struct device *dev)
 		return ret;
 
 	/* The PHY needs to renegotiate. */
-	phydev->link = 0;
-	phydev->state = PHY_UP;
-
-	phy_start_machine(phydev);
+	if (phy_is_started(phydev)) {
+		phydev->link = 0;
+		phydev->state = PHY_UP;
+		phy_start_machine(phydev);
+	}
 
 	return 0;
 }
