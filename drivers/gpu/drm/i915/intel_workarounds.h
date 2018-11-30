@@ -40,5 +40,7 @@ void intel_whitelist_workarounds_apply(struct intel_engine_cs *engine);
 
 void intel_engine_workarounds_init(struct intel_engine_cs *engine);
 void intel_engine_workarounds_apply(struct intel_engine_cs *engine);
+void intel_engine_workarounds_verify(struct intel_engine_cs *engine,
+				     const char *from);
 
 #endif

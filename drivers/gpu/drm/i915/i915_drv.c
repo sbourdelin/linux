@@ -2382,6 +2382,9 @@ int i915_reset_engine(struct intel_engine_cs *engine, const char *msg)
 	if (ret)
 		goto out;
 
+	/* Catch engine workarounds not restored by engine re-init. */
+	intel_engine_workarounds_verify(engine, engine->name);
+
 out:
 	intel_engine_cancel_stop_cs(engine);
 	i915_gem_reset_finish_engine(engine);
