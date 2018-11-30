@@ -1015,29 +1015,20 @@ bool intel_gt_workarounds_verify(struct drm_i915_private *dev_priv,
 	return wa_list_verify(dev_priv, &dev_priv->gt_wa_list, from);
 }
 
-struct whitelist {
-	i915_reg_t reg[RING_MAX_NONPRIV_SLOTS];
-	unsigned int count;
-	u32 nopid;
-};
-
-static void whitelist_reg(struct whitelist *w, i915_reg_t reg)
+static void
+whitelist_reg(struct i915_wa_list *wal, i915_reg_t reg)
 {
-	if (GEM_DEBUG_WARN_ON(w->count >= RING_MAX_NONPRIV_SLOTS))
+	struct i915_wa wa = {
+		.reg = reg
+	};
+
+	if (GEM_DEBUG_WARN_ON(wal->count >= RING_MAX_NONPRIV_SLOTS))
 		return;
 
-	w->reg[w->count++] = reg;
+	wal_add(wal, &wa);
 }
 
-static void bdw_whitelist_build(struct whitelist *w)
-{
-}
-
-static void chv_whitelist_build(struct whitelist *w)
-{
-}
-
-static void gen9_whitelist_build(struct whitelist *w)
+static void gen9_whitelist_build(struct i915_wa_list *w)
 {
 	/* WaVFEStateAfterPipeControlwithMediaStateClear:skl,bxt,glk,cfl */
 	whitelist_reg(w, GEN9_CTX_PREEMPT_REG);
@@ -1049,7 +1040,7 @@ static void gen9_whitelist_build(struct whitelist *w)
 	whitelist_reg(w, GEN8_HDC_CHICKEN1);
 }
 
-static void skl_whitelist_build(struct whitelist *w)
+static void skl_whitelist_build(struct i915_wa_list *w)
 {
 	gen9_whitelist_build(w);
 
@@ -1057,12 +1048,12 @@ static void skl_whitelist_build(struct whitelist *w)
 	whitelist_reg(w, GEN8_L3SQCREG4);
 }
 
-static void bxt_whitelist_build(struct whitelist *w)
+static void bxt_whitelist_build(struct i915_wa_list *w)
 {
 	gen9_whitelist_build(w);
 }
 
-static void kbl_whitelist_build(struct whitelist *w)
+static void kbl_whitelist_build(struct i915_wa_list *w)
 {
 	gen9_whitelist_build(w);
 
@@ -1070,7 +1061,7 @@ static void kbl_whitelist_build(struct whitelist *w)
 	whitelist_reg(w, GEN8_L3SQCREG4);
 }
 
-static void glk_whitelist_build(struct whitelist *w)
+static void glk_whitelist_build(struct i915_wa_list *w)
 {
 	gen9_whitelist_build(w);
 
@@ -1078,18 +1069,18 @@ static void glk_whitelist_build(struct whitelist *w)
 	whitelist_reg(w, GEN9_SLICE_COMMON_ECO_CHICKEN1);
 }
 
-static void cfl_whitelist_build(struct whitelist *w)
+static void cfl_whitelist_build(struct i915_wa_list *w)
 {
 	gen9_whitelist_build(w);
 }
 
-static void cnl_whitelist_build(struct whitelist *w)
+static void cnl_whitelist_build(struct i915_wa_list *w)
 {
 	/* WaEnablePreemptionGranularityControlByUMD:cnl */
 	whitelist_reg(w, GEN8_CS_CHICKEN1);
 }
 
-static void icl_whitelist_build(struct whitelist *w)
+static void icl_whitelist_build(struct i915_wa_list *w)
 {
 	/* WaAllowUMDToModifyHalfSliceChicken7:icl */
 	whitelist_reg(w, GEN9_HALF_SLICE_CHICKEN7);
@@ -1098,22 +1089,21 @@ static void icl_whitelist_build(struct whitelist *w)
 	whitelist_reg(w, GEN10_SAMPLER_MODE);
 }
 
-static struct whitelist *whitelist_build(struct intel_engine_cs *engine,
-					 struct whitelist *w)
+void intel_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *i915 = engine->i915;
+	struct i915_wa_list *w = &engine->whitelist;
 
 	GEM_BUG_ON(engine->id != RCS);
 
-	w->count = 0;
-	w->nopid = i915_mmio_reg_offset(RING_NOPID(engine->mmio_base));
+	wa_init_start(w, "whitelist");
 
 	if (INTEL_GEN(i915) < 8)
-		return NULL;
+		return;
 	else if (IS_BROADWELL(i915))
-		bdw_whitelist_build(w);
+		return;
 	else if (IS_CHERRYVIEW(i915))
-		chv_whitelist_build(w);
+		return;
 	else if (IS_SKYLAKE(i915))
 		skl_whitelist_build(w);
 	else if (IS_BROXTON(i915))
@@ -1131,37 +1121,30 @@ static struct whitelist *whitelist_build(struct intel_engine_cs *engine,
 	else
 		MISSING_CASE(INTEL_GEN(i915));
 
-	return w;
-}
-
-static void whitelist_apply(struct intel_engine_cs *engine,
-			    const struct whitelist *w)
-{
-	struct drm_i915_private *dev_priv = engine->i915;
-	const u32 base = engine->mmio_base;
-	unsigned int i;
-
-	if (!w)
-		return;
-
-	intel_uncore_forcewake_get(engine->i915, FORCEWAKE_ALL);
-
-	for (i = 0; i < w->count; i++)
-		I915_WRITE_FW(RING_FORCE_TO_NONPRIV(base, i),
-			      i915_mmio_reg_offset(w->reg[i]));
-
-	/* And clear the rest just in case of garbage */
-	for (; i < RING_MAX_NONPRIV_SLOTS; i++)
-		I915_WRITE_FW(RING_FORCE_TO_NONPRIV(base, i), w->nopid);
-
-	intel_uncore_forcewake_put(engine->i915, FORCEWAKE_ALL);
+	wa_init_finish(w);
 }
 
 void intel_whitelist_workarounds_apply(struct intel_engine_cs *engine)
 {
-	struct whitelist w;
+	struct drm_i915_private *dev_priv = engine->i915;
+	const struct i915_wa_list *wal = &engine->whitelist;
+	const u32 base = engine->mmio_base;
+	struct i915_wa *wa;
+	unsigned int i;
 
-	whitelist_apply(engine, whitelist_build(engine, &w));
+	if (!wal->count)
+		return;
+
+	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
+		I915_WRITE(RING_FORCE_TO_NONPRIV(base, i),
+			   i915_mmio_reg_offset(wa->reg));
+
+	/* And clear the rest just in case of garbage */
+	for (; i < RING_MAX_NONPRIV_SLOTS; i++)
+		I915_WRITE(RING_FORCE_TO_NONPRIV(base, i),
+			   i915_mmio_reg_offset(RING_NOPID(base)));
+
+	DRM_DEBUG_DRIVER("Applied %u %s workarounds\n", wal->count, wal->name);
 }
 
 static void rcs_engine_wa_init(struct intel_engine_cs *engine)
