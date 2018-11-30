@@ -218,12 +218,17 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 	/* hw clears the bit when it's done */
 	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
 		if (ktime_after(ktime_get(), timeout)) {
+			/* check it again, since there is a window between
+			   bit check and time check */
+			if (!(sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask))
+				break;
 			pr_err("%s: Reset 0x%x never completed.\n",
 				mmc_hostname(host->mmc), (int)mask);
 			sdhci_dumpregs(host);
 			return;
+		} else {
+			udelay(10);
 		}
-		udelay(10);
 	}
 }
 EXPORT_SYMBOL_GPL(sdhci_reset);
@@ -1398,9 +1403,10 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
 	else
 		timeout += 10 * HZ;
-	sdhci_mod_timer(host, cmd->mrq, timeout);
 
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+	/* setup timer after command to avoid fake timeout */
+	sdhci_mod_timer(host, cmd->mrq, timeout);
 }
 EXPORT_SYMBOL_GPL(sdhci_send_command);
 
@@ -1614,12 +1620,19 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
 	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
 		& SDHCI_CLOCK_INT_STABLE)) {
 		if (ktime_after(ktime_get(), timeout)) {
+			/* check it again since there is a window between
+			   status check and time check */
+			if ((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
+					& SDHCI_CLOCK_INT_STABLE)
+				break;
 			pr_err("%s: Internal clock never stabilised.\n",
 			       mmc_hostname(host->mmc));
 			sdhci_dumpregs(host);
 			return;
 		}
-		udelay(10);
+		else {
+			udelay(10);
+		}
 	}
 
 	clk |= SDHCI_CLOCK_CARD_EN;
