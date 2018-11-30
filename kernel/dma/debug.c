@@ -43,7 +43,12 @@
 
 /* allow architectures to override this if absolutely required */
 #ifndef PREALLOC_DMA_DEBUG_ENTRIES
+/* amount of DMA mappings on this driver is huge. */
+#ifdef	HNS_ENET
+#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 17)
+#else
 #define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+#endif
 #endif
 
 enum {
