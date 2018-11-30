@@ -2886,11 +2886,16 @@ int kvm_s390_get_irq_state(struct kvm_vcpu *vcpu, __u8 __user *buf, int len)
 	return n;
 }
 
+static void nullify_gisa(struct kvm_s390_gisa *gisa)
+{
+	memset(gisa, 0, sizeof(struct kvm_s390_gisa));
+	gisa->next_alert = (u32)(u64)gisa;
+}
+
 void kvm_s390_gisa_clear(struct kvm *kvm)
 {
 	if (kvm->arch.gisa) {
-		memset(kvm->arch.gisa, 0, sizeof(struct kvm_s390_gisa));
-		kvm->arch.gisa->next_alert = (u32)(u64)kvm->arch.gisa;
+		nullify_gisa(kvm->arch.gisa);
 		VM_EVENT(kvm, 3, "gisa 0x%pK cleared", kvm->arch.gisa);
 	}
 }
