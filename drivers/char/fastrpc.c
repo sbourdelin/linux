@@ -30,6 +30,8 @@
 #define FASTRPC_PHYS(p)	(p & 0xffffffff)
 #define FASTRPC_CTX_MAX (256)
 #define FASTRPC_CTXID_MASK (0xFF0)
+#define INIT_FILELEN_MAX (2*1024*1024)
+#define INIT_MEMLEN_MAX  (8*1024*1024)
 #define FASTRPC_DEVICE_NAME	"fastrpc"
 
 /* Retrives number of input buffers from the scalars parameter */
@@ -59,6 +61,14 @@
 
 #define FASTRPC_SCALARS(method, in, out) \
 		FASTRPC_BUILD_SCALARS(0, method, in, out, 0, 0)
+
+/* Remote Method id table */
+#define FASTRPC_RMID_INIT_ATTACH	0
+#define FASTRPC_RMID_INIT_RELEASE	1
+#define FASTRPC_RMID_INIT_CREATE	6
+#define FASTRPC_RMID_INIT_CREATE_ATTR	7
+#define FASTRPC_RMID_INIT_CREATE_STATIC	8
+
 #define cdev_to_cctx(d) container_of(d, struct fastrpc_channel_ctx, cdev)
 
 static const char *domains[FASTRPC_DEV_MAX] = { "adsp", "mdsp",
@@ -735,6 +745,130 @@ bail:
 
 	return err;
 }
+
+static int fastrpc_init_process(struct fastrpc_user *fl,
+				struct fastrpc_ioctl_init *init)
+{
+	struct fastrpc_ioctl_invoke *ioctl;
+	struct fastrpc_phy_page pages[1];
+	struct fastrpc_map *file = NULL, *mem = NULL;
+	struct fastrpc_buf *imem = NULL;
+	int err = 0;
+
+	ioctl = kzalloc(sizeof(*ioctl), GFP_KERNEL);
+	if (!ioctl)
+		return -ENOMEM;
+
+	if (init->flags == FASTRPC_INIT_ATTACH) {
+		remote_arg_t ra[1];
+		int tgid = fl->tgid;
+
+		ra[0].buf.pv = (void *)&tgid;
+		ra[0].buf.len = sizeof(tgid);
+		ioctl->handle = 1;
+		ioctl->sc = FASTRPC_SCALARS(FASTRPC_RMID_INIT_ATTACH, 1, 0);
+		ioctl->pra = ra;
+		fl->pd = 0;
+
+		err = fastrpc_internal_invoke(fl, 1, ioctl);
+		if (err)
+			goto bail;
+	} else if (init->flags == FASTRPC_INIT_CREATE) {
+		int memlen;
+		remote_arg_t ra[6];
+		int fds[6];
+		struct {
+			int pgid;
+			unsigned int namelen;
+			unsigned int filelen;
+			unsigned int pageslen;
+			int attrs;
+			int siglen;
+		} inbuf;
+
+		inbuf.pgid = fl->tgid;
+		inbuf.namelen = strlen(current->comm) + 1;
+		inbuf.filelen = init->filelen;
+		fl->pd = 1;
+
+		if (init->filelen) {
+			err = fastrpc_map_create(fl, init->filefd,
+						  init->file, init->filelen,
+						  &file);
+			if (err)
+				goto bail;
+		}
+		inbuf.pageslen = 1;
+
+		if (init->mem) {
+			err = -EINVAL;
+			pr_err("adsprpc: %s: %s: ERROR: donated memory allocated in userspace\n",
+				current->comm, __func__);
+			goto bail;
+		}
+		memlen = ALIGN(max(INIT_FILELEN_MAX, (int)init->filelen * 4),
+			       1024 * 1024);
+		err = fastrpc_buf_alloc(fl, fl->sctx->dev, memlen,
+					 &imem);
+		if (err)
+			goto bail;
+
+		fl->init_mem = imem;
+		inbuf.pageslen = 1;
+		ra[0].buf.pv = (void *)&inbuf;
+		ra[0].buf.len = sizeof(inbuf);
+		fds[0] = 0;
+
+		ra[1].buf.pv = (void *)current->comm;
+		ra[1].buf.len = inbuf.namelen;
+		fds[1] = 0;
+
+		ra[2].buf.pv = (void *)init->file;
+		ra[2].buf.len = inbuf.filelen;
+		fds[2] = init->filefd;
+
+		pages[0].addr = imem->phys;
+		pages[0].size = imem->size;
+
+		ra[3].buf.pv = (void *)pages;
+		ra[3].buf.len = 1 * sizeof(*pages);
+		fds[3] = 0;
+
+		inbuf.attrs = init->attrs;
+		ra[4].buf.pv = (void *)&(inbuf.attrs);
+		ra[4].buf.len = sizeof(inbuf.attrs);
+		fds[4] = 0;
+
+		inbuf.siglen = init->siglen;
+		ra[5].buf.pv = (void *)&(inbuf.siglen);
+		ra[5].buf.len = sizeof(inbuf.siglen);
+		fds[5] = 0;
+
+		ioctl->handle = 1;
+		ioctl->sc = FASTRPC_SCALARS(FASTRPC_RMID_INIT_CREATE, 4, 0);
+		if (init->attrs)
+			ioctl->sc = FASTRPC_SCALARS(
+					FASTRPC_RMID_INIT_CREATE_ATTR, 6, 0);
+		ioctl->pra = ra;
+		ioctl->fds = fds;
+		err = fastrpc_internal_invoke(fl, 1, ioctl);
+		if (err)
+			goto bail;
+	} else {
+		err = -ENOTTY;
+	}
+bail:
+	kfree(ioctl);
+
+	if (mem && err)
+		fastrpc_map_put(mem);
+
+	if (file)
+		fastrpc_map_put(file);
+
+	return err;
+}
+
 static struct fastrpc_session_ctx *fastrpc_session_alloc(
 					struct fastrpc_channel_ctx *cctx,
 					int secure)
@@ -769,12 +903,33 @@ static const struct of_device_id fastrpc_match_table[] = {
 	{}
 };
 
+static int fastrpc_release_current_dsp_process(struct fastrpc_user *fl)
+{
+	struct fastrpc_ioctl_invoke ioctl;
+	remote_arg_t ra[1];
+	int tgid = 0;
+
+	tgid = fl->tgid;
+	ra[0].buf.pv = (void *)&tgid;
+	ra[0].buf.len = sizeof(tgid);
+	ioctl.handle = 1;
+	ioctl.sc = FASTRPC_SCALARS(FASTRPC_RMID_INIT_RELEASE, 1, 0);
+	ioctl.pra = ra;
+	ioctl.fds = NULL;
+	ioctl.attrs = NULL;
+	ioctl.crc = NULL;
+
+	return fastrpc_internal_invoke(fl, 1, &ioctl);
+}
+
 static int fastrpc_device_release(struct inode *inode, struct file *file)
 {
 	struct fastrpc_user *fl = (struct fastrpc_user *)file->private_data;
 	struct fastrpc_channel_ctx *cctx = cdev_to_cctx(inode->i_cdev);
 	struct fastrpc_invoke_ctx *ctx, *n;
 	struct fastrpc_map *map, *m;
+
+	fastrpc_release_current_dsp_process(fl);
 
 	spin_lock(&cctx->lock);
 	list_del(&fl->user);
@@ -855,6 +1010,23 @@ static long fastrpc_device_ioctl(struct file *file, unsigned int cmd,
 			goto bail;
 		break;
 		}
+	case FASTRPC_IOCTL_INIT: {
+		struct fastrpc_ioctl_init init;
+
+		init.attrs = 0;
+		init.siglen = 0;
+		err = copy_from_user(&init, argp, sizeof(init));
+		if (err)
+			goto bail;
+		if (init.filelen > INIT_FILELEN_MAX)
+			goto bail;
+		if (init.memlen > INIT_MEMLEN_MAX)
+			goto bail;
+		err = fastrpc_init_process(fl, &init);
+		if (err)
+			goto bail;
+		}
+		break;
 default:
 		err = -ENOTTY;
 		pr_info("bad ioctl: %d\n", cmd);
