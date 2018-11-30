@@ -716,14 +716,15 @@ void intel_psr_enable(struct intel_dp *intel_dp,
 		goto unlock;
 	}
 
+	if (!psr_global_enabled(dev_priv->psr.debug)) {
+		DRM_DEBUG_KMS("PSR disabled by flag\n");
+		goto unlock;
+	}
+
 	dev_priv->psr.psr2_enabled = intel_psr2_enabled(dev_priv, crtc_state);
 	dev_priv->psr.busy_frontbuffer_bits = 0;
 	dev_priv->psr.prepared = true;
-
-	if (psr_global_enabled(dev_priv->psr.debug))
-		intel_psr_enable_locked(dev_priv, crtc_state);
-	else
-		DRM_DEBUG_KMS("PSR disabled by flag\n");
+	intel_psr_enable_locked(dev_priv, crtc_state);
 
 unlock:
 	mutex_unlock(&dev_priv->psr.lock);
