@@ -1406,6 +1406,8 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t gva, u64 error_code,
 int kvm_mmu_setup_spp_structure(struct kvm_vcpu *vcpu,
 				u32 access_map, gfn_t gfn);
 
+int kvm_mmu_get_spp_acsess_map(struct kvm *kvm, u32 *access_map, gfn_t gfn);
+
 void kvm_mmu_invlpg(struct kvm_vcpu *vcpu, gva_t gva);
 void kvm_mmu_invpcid_gva(struct kvm_vcpu *vcpu, gva_t gva, unsigned long pcid);
 void kvm_mmu_new_cr3(struct kvm_vcpu *vcpu, gpa_t new_cr3, bool skip_tlb_flush);

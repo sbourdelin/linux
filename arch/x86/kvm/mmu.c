@@ -4308,6 +4308,17 @@ static void mmu_spp_spte_set(u64 *sptep, u64 new_spte)
 	__set_spte(sptep, new_spte);
 }
 
+int kvm_mmu_get_spp_acsess_map(struct kvm *kvm, u32 *access_map, gfn_t gfn)
+{
+	struct kvm_memory_slot *slot;
+
+	slot = gfn_to_memslot(kvm, gfn);
+	*access_map = *gfn_to_subpage_wp_info(slot, gfn);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_mmu_get_spp_acsess_map);
+
 int kvm_mmu_setup_spp_structure(struct kvm_vcpu *vcpu,
 				u32 access_map, gfn_t gfn)
 {
@@ -4353,6 +4364,7 @@ out_unlock:
 	spin_unlock(&kvm->mmu_lock);
 	return -EFAULT;
 }
+EXPORT_SYMBOL_GPL(kvm_mmu_setup_spp_structure);
 
 int kvm_mmu_get_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
 {

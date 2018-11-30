@@ -9702,6 +9702,9 @@ static int handle_invpcid(struct kvm_vcpu *vcpu)
 static int handle_spp(struct kvm_vcpu *vcpu)
 {
 	unsigned long exit_qualification;
+	gpa_t gpa;
+	gfn_t gfn;
+	u32 map;
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 
@@ -9728,6 +9731,11 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 		 * SPP table here.
 		 */
 		pr_debug("SPP: %s: SPPT Miss!!!\n", __func__);
+
+		gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
+		gfn = gpa >> PAGE_SHIFT;
+		kvm_mmu_get_spp_acsess_map(vcpu->kvm, &map, gfn);
+		kvm_mmu_setup_spp_structure(vcpu, map, gfn);
 		return 1;
 	}
 
