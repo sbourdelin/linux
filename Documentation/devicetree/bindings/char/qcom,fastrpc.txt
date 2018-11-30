@@ -1,0 +1,73 @@
+Qualcomm Technologies, Inc. FastRPC Driver
+
+The FastRPC driver implements an IPC (Inter-Processor Communication)
+mechanism that allows for clients to transparently make remote method
+invocations across DSP and APPS boundaries. This enables developers
+to offload tasks to the DSP and free up the application processor for
+other tasks.
+
+- compatible:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "qcom,fastrpc"
+
+- reg
+	Usage: required
+	Value type: <u32>
+	Definition: DSP Processor ID.
+	Possible values are :
+			0 - ADSP
+			1 - MDSP
+			2 - SDSP
+			3 - CDSP
+
+= COMPUTE BANKS
+Each subnode of the Fastrpc node represents compute context banks avaiable
+on the dsp. The name of the nodes are not important. The properties of these
+nodes are defined by the individual bindings for the specific service
+- All Compute context banks MUST contain the following property:
+
+- compatible:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "qcom,fastrpc-compute-cb"
+
+- reg
+	Usage: required
+	Value type: <u32>
+	Definition: Context Bank ID.
+
+- secured:
+	Usage: Optional
+	Value type: <boolean>
+	Defination: Indicating context bank is secured
+
+- nsessions:
+	Usage: Optional
+	Value type: <u32>
+	Defination: A value indicating how many sessions can share this
+		    context bank. Defaults to 'One' when this property
+		    is not specified.
+
+Example:
+
+fastrpc {
+	compatible = "qcom,fastrpc";
+	qcom,smd-channels = "fastrpcsmd-apps-dsp";
+	reg = <0>; /* DOMAIN_ADSP */
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	cb@1 {
+		compatible = "qcom,fastrpc-compute-cb";
+		reg = <1>;
+		iommus = <&lpass_q6_smmu 1>;
+	};
+
+	cb@2 {
+		compatible = "qcom,fastrpc-compute-cb";
+		reg = <2>;
+		iommus = <&lpass_q6_smmu 2>;
+	};
+	...
+};
