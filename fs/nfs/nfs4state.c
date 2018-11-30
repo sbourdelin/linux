@@ -1509,6 +1509,9 @@ restart:
 		if (nfs_file_open_context(fl->fl_file)->state != state)
 			continue;
 		spin_unlock(&flctx->flc_lock);
+		lsp = fl->fl_u.nfs4_fl.owner;
+		if (lsp)
+			set_bit(NFS_LOCK_TRY_RECLAIM, &lsp->ls_flags);
 		status = ops->recover_lock(state, fl);
 		switch (status) {
 		case 0:
@@ -1592,7 +1595,8 @@ static int __nfs4_reclaim_open_state(struct nfs4_state_owner *sp, struct nfs4_st
 	if (!test_bit(NFS_DELEGATED_STATE, &state->flags)) {
 		spin_lock(&state->state_lock);
 		list_for_each_entry(lock, &state->lock_states, ls_locks) {
-			if (!test_bit(NFS_LOCK_INITIALIZED, &lock->ls_flags))
+			if (test_bit(NFS_LOCK_TRY_RECLAIM, &lock->ls_flags) &&
+			    !test_bit(NFS_LOCK_INITIALIZED, &lock->ls_flags))
 				pr_warn_ratelimited("NFS: %s: Lock reclaim failed!\n", __func__);
 		}
 		spin_unlock(&state->state_lock);
@@ -1693,6 +1697,7 @@ static void nfs4_clear_open_state(struct nfs4_state *state)
 	list_for_each_entry(lock, &state->lock_states, ls_locks) {
 		lock->ls_seqid.flags = 0;
 		clear_bit(NFS_LOCK_INITIALIZED, &lock->ls_flags);
+		clear_bit(NFS_LOCK_TRY_RECLAIM, &lock->ls_flags);
 	}
 	spin_unlock(&state->state_lock);
 }
