@@ -59,6 +59,7 @@ static inline unsigned int pe_order(enum page_entry_size pe_size)
 
 /* The order of a PMD entry */
 #define PMD_ORDER	(PMD_SHIFT - PAGE_SHIFT)
+#define PMD_ORDER_MASK	~((1UL << PMD_ORDER) - 1)
 
 static wait_queue_head_t wait_table[DAX_WAIT_TABLE_ENTRIES];
 
@@ -93,9 +94,13 @@ static unsigned long dax_to_pfn(void *entry)
 	return xa_to_value(entry) >> DAX_SHIFT;
 }
 
-static void *dax_make_entry(pfn_t pfn, unsigned long flags)
+static void *dax_make_entry(pfn_t pfn_t, unsigned long flags)
 {
-	return xa_mk_value(flags | (pfn_t_to_pfn(pfn) << DAX_SHIFT));
+	unsigned long pfn = pfn_t_to_pfn(pfn_t);
+
+	if (flags & DAX_PMD)
+		pfn &= PMD_ORDER_MASK;
+	return xa_mk_value(flags | (pfn << DAX_SHIFT));
 }
 
 static bool dax_is_locked(void *entry)
