@@ -341,10 +341,11 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
 	if (data->disable_oc) {
 		reg |= MX6_BM_OVER_CUR_DIS;
 	} else if (data->oc_polarity == 1) {
-		/* High active */
-		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
-	} else {
+		/* Low active */
 		reg &= ~(MX6_BM_OVER_CUR_DIS);
+		reg |= MX6_BM_OVER_CUR_POLARITY;
+	} else {
+		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
 	}
 	writel(reg, usbmisc->base + data->index * 4);
 
@@ -445,7 +446,10 @@ static int usbmisc_imx7d_init(struct imx_usbmisc_data *data)
 	if (data->disable_oc) {
 		reg |= MX6_BM_OVER_CUR_DIS;
 	} else if (data->oc_polarity == 1) {
-		/* High active */
+		/* Low active */
+		reg &= ~(MX6_BM_OVER_CUR_DIS);
+		reg |= MX6_BM_OVER_CUR_POLARITY;
+	else {
 		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
 	}
 	writel(reg, usbmisc->base);
