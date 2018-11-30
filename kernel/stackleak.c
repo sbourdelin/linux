@@ -102,7 +102,7 @@ asmlinkage void stackleak_erase(void)
 	current->lowest_stack = current_top_of_stack() - THREAD_SIZE/64;
 }
 
-void __used stackleak_track_stack(void)
+void __used notrace stackleak_track_stack(void)
 {
 	/*
 	 * N.B. stackleak_erase() fills the kernel stack with the poison value,
