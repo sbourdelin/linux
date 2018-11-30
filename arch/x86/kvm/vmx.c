@@ -12967,44 +12967,23 @@ static int nested_vmx_check_nmi_controls(struct vmcs12 *vmcs12)
 	return 0;
 }
 
-static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
-					struct vmcs12 *vmcs12)
+/*
+ * Checks related to VM-Execution Control Fields
+ */
+static int nested_check_vm_execution_controls(struct kvm_vcpu *vcpu,
+                                              struct vmcs12 *vmcs12)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
-	bool ia32e;
 
-	if (vmcs12->guest_activity_state != GUEST_ACTIVITY_ACTIVE &&
-	    vmcs12->guest_activity_state != GUEST_ACTIVITY_HLT)
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_cpu_has_vpid(vmcs12) && !vmcs12->virtual_processor_id)
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_io_bitmap_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_msr_bitmap_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_apic_access_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_tpr_shadow_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_apicv_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_msr_switch_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_pml_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_shadow_vmcs_controls(vcpu, vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (!vmx_control_verify(vmcs12->cpu_based_vm_exec_control,
+	if ((nested_cpu_has_vpid(vmcs12) && !vmcs12->virtual_processor_id) ||
+	    nested_vmx_check_io_bitmap_controls(vcpu, vmcs12) ||
+	    nested_vmx_check_msr_bitmap_controls(vcpu, vmcs12) ||
+	    nested_vmx_check_apic_access_controls(vcpu, vmcs12) ||
+	    nested_vmx_check_tpr_shadow_controls(vcpu, vmcs12) ||
+	    nested_vmx_check_apicv_controls(vcpu, vmcs12) ||
+	    nested_vmx_check_pml_controls(vcpu, vmcs12) ||
+	    nested_vmx_check_shadow_vmcs_controls(vcpu, vmcs12) ||
+	    !vmx_control_verify(vmcs12->cpu_based_vm_exec_control,
 				vmx->nested.msrs.procbased_ctls_low,
 				vmx->nested.msrs.procbased_ctls_high) ||
 	    (nested_cpu_has(vmcs12, CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) &&
@@ -13019,11 +12998,9 @@ static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
 				vmx->nested.msrs.exit_ctls_high) ||
 	    !vmx_control_verify(vmcs12->vm_entry_controls,
 				vmx->nested.msrs.entry_ctls_low,
-				vmx->nested.msrs.entry_ctls_high))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
-
-	if (nested_vmx_check_nmi_controls(vmcs12))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
+				vmx->nested.msrs.entry_ctls_high) ||
+	    nested_vmx_check_nmi_controls(vmcs12))
+		return -EINVAL;
 
 	if (nested_cpu_has_vmfunc(vmcs12)) {
 		if (vmcs12->vm_function_control &
@@ -13033,11 +13010,33 @@ static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
 		if (nested_cpu_has_eptp_switching(vmcs12)) {
 			if (!nested_cpu_has_ept(vmcs12) ||
 			    !page_address_valid(vcpu, vmcs12->eptp_list_address))
-				return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
+				return -EINVAL;
 		}
 	}
 
 	if (vmcs12->cr3_target_count > nested_cpu_vmx_misc_cr3_count(vcpu))
+		return -EINVAL;
+
+	if (nested_cpu_has_ept(vmcs12) &&
+	    !valid_ept_address(vcpu, vmcs12->ept_pointer))
+		return -EINVAL;
+
+	return 0;
+}
+
+static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
+					struct vmcs12 *vmcs12)
+{
+	bool ia32e;
+
+	if (vmcs12->guest_activity_state != GUEST_ACTIVITY_ACTIVE &&
+	    vmcs12->guest_activity_state != GUEST_ACTIVITY_HLT)
+		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
+
+	if (nested_check_vm_execution_controls(vcpu, vmcs12))
+		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
+
+	if (nested_vmx_check_msr_switch_controls(vcpu, vmcs12))
 		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
 
 	if (!nested_host_cr0_valid(vcpu, vmcs12->host_cr0) ||
@@ -13115,10 +13114,6 @@ static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
 				return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
 		}
 	}
-
-	if (nested_cpu_has_ept(vmcs12) &&
-	    !valid_ept_address(vcpu, vmcs12->ept_pointer))
-		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
 
 	return 0;
 }
