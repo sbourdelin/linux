@@ -64,7 +64,7 @@ static void macvtap_count_rx_dropped(struct tap_dev *tap)
 	struct macvtap_dev *vlantap = container_of(tap, struct macvtap_dev, tap);
 	struct macvlan_dev *vlan = &vlantap->vlan;
 
-	macvlan_count_rx(vlan, 0, 0, 0);
+	macvlan_count_rx(vlan, 1, 0, 0, 0);
 }
 
 static void macvtap_update_features(struct tap_dev *tap,

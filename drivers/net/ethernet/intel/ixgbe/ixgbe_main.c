@@ -1704,8 +1704,8 @@ void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 	if (netif_is_ixgbe(dev))
 		skb_record_rx_queue(skb, rx_ring->queue_index);
 	else
-		macvlan_count_rx(netdev_priv(dev), skb->len + ETH_HLEN, true,
-				 false);
+		macvlan_count_rx(netdev_priv(dev), skb_shinfo(skb)->gso_segs ?: 1,
+				 skb->len + ETH_HLEN, true, false);
 
 	skb->protocol = eth_type_trans(skb, dev);
 }

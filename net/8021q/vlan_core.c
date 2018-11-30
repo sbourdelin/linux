@@ -4,6 +4,7 @@
 #include <linux/if_vlan.h>
 #include <linux/netpoll.h>
 #include <linux/export.h>
+#include <net/sch_generic.h>
 #include "vlan.h"
 
 bool vlan_do_receive(struct sk_buff **skbp)
@@ -62,7 +63,7 @@ bool vlan_do_receive(struct sk_buff **skbp)
 	rx_stats = this_cpu_ptr(vlan_dev_priv(vlan_dev)->vlan_pcpu_stats);
 
 	u64_stats_update_begin(&rx_stats->syncp);
-	rx_stats->rx_packets++;
+	rx_stats->rx_packets += skb_shinfo(skb)->gso_segs ?: 1;
 	rx_stats->rx_bytes += skb->len;
 	if (skb->pkt_type == PACKET_MULTICAST)
 		rx_stats->rx_multicast++;

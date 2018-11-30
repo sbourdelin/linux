@@ -289,7 +289,8 @@ static void macvlan_broadcast(struct sk_buff *skb,
 					nskb, vlan, eth,
 					mode == MACVLAN_MODE_BRIDGE) ?:
 				      netif_rx_ni(nskb);
-			macvlan_count_rx(vlan, skb->len + ETH_HLEN,
+			macvlan_count_rx(vlan, skb_shinfo(skb)->gso_segs ?: 1,
+					 skb->len + ETH_HLEN,
 					 err == NET_RX_SUCCESS, true);
 		}
 	}
@@ -418,7 +419,8 @@ static void macvlan_forward_source_one(struct sk_buff *skb,
 		nskb->pkt_type = PACKET_HOST;
 
 	ret = netif_rx(nskb);
-	macvlan_count_rx(vlan, len, ret == NET_RX_SUCCESS, false);
+	macvlan_count_rx(vlan, skb_shinfo(skb)->gso_segs ?: 1, len,
+			 ret == NET_RX_SUCCESS, false);
 }
 
 static void macvlan_forward_source(struct sk_buff *skb,
@@ -505,7 +507,8 @@ static rx_handler_result_t macvlan_handle_frame(struct sk_buff **pskb)
 	ret = NET_RX_SUCCESS;
 	handle_res = RX_HANDLER_ANOTHER;
 out:
-	macvlan_count_rx(vlan, len, ret == NET_RX_SUCCESS, false);
+	macvlan_count_rx(vlan, skb_shinfo(skb)->gso_segs ?: 1, len,
+			 ret == NET_RX_SUCCESS, false);
 	return handle_res;
 }
 
@@ -553,7 +556,7 @@ static netdev_tx_t macvlan_start_xmit(struct sk_buff *skb,
 				      struct net_device *dev)
 {
 	struct macvlan_dev *vlan = netdev_priv(dev);
-	unsigned int len = skb->len;
+	unsigned int len = qdisc_skb_cb(skb)->pkt_len;
 	int ret;
 
 	if (unlikely(netpoll_tx_running(dev)))
@@ -566,7 +569,7 @@ static netdev_tx_t macvlan_start_xmit(struct sk_buff *skb,
 
 		pcpu_stats = this_cpu_ptr(vlan->pcpu_stats);
 		u64_stats_update_begin(&pcpu_stats->syncp);
-		pcpu_stats->tx_packets++;
+		pcpu_stats->tx_packets += skb_shinfo(skb)->gso_segs ?: 1;
 		pcpu_stats->tx_bytes += len;
 		u64_stats_update_end(&pcpu_stats->syncp);
 	} else {

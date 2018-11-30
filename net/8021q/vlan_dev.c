@@ -124,7 +124,7 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 	}
 
 	skb->dev = vlan->real_dev;
-	len = skb->len;
+	len = qdisc_skb_cb(skb)->pkt_len;
 	if (unlikely(netpoll_tx_running(dev)))
 		return vlan_netpoll_send_skb(vlan, skb);
 
@@ -135,7 +135,7 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 
 		stats = this_cpu_ptr(vlan->vlan_pcpu_stats);
 		u64_stats_update_begin(&stats->syncp);
-		stats->tx_packets++;
+		stats->tx_packets += skb_shinfo(skb)->gso_segs ?: 1;
 		stats->tx_bytes += len;
 		u64_stats_update_end(&stats->syncp);
 	} else {
