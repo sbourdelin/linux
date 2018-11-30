@@ -1453,6 +1453,7 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 
 	intel_uncore_sanitize(dev_priv);
 
+	intel_gt_workarounds_init(dev_priv);
 	i915_gem_load_init_fences(dev_priv);
 
 	/* On the 945G/GM, the chipset reports the MSI capability on the

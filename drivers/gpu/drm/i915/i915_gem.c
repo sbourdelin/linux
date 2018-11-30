@@ -5706,6 +5706,8 @@ void i915_gem_fini(struct drm_i915_private *dev_priv)
 	i915_gem_contexts_fini(dev_priv);
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
+	intel_wa_list_free(&dev_priv->gt_wa_list);
+
 	intel_cleanup_gt_powersave(dev_priv);
 
 	intel_uc_fini_misc(dev_priv);
