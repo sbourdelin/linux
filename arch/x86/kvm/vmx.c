@@ -12231,16 +12231,24 @@ static int nested_vmx_check_msr_switch(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
-static int nested_vmx_check_msr_switch_controls(struct kvm_vcpu *vcpu,
-						struct vmcs12 *vmcs12)
+static int nested_vmx_check_exit_msr_switch_controls(struct kvm_vcpu *vcpu,
+						     struct vmcs12 *vmcs12)
 {
 	if (nested_vmx_check_msr_switch(vcpu, vmcs12->vm_exit_msr_load_count,
 					vmcs12->vm_exit_msr_load_addr) ||
 	    nested_vmx_check_msr_switch(vcpu, vmcs12->vm_exit_msr_store_count,
-					vmcs12->vm_exit_msr_store_addr) ||
-	    nested_vmx_check_msr_switch(vcpu, vmcs12->vm_entry_msr_load_count,
-					vmcs12->vm_entry_msr_load_addr))
+					vmcs12->vm_exit_msr_store_addr))
 		return -EINVAL;
+
+	return 0;
+}
+
+static int nested_vmx_check_msr_switch_controls(struct kvm_vcpu *vcpu,
+                                                struct vmcs12 *vmcs12)
+{
+	if (nested_vmx_check_msr_switch(vcpu, vmcs12->vm_entry_msr_load_count,
+                                        vmcs12->vm_entry_msr_load_addr))
+                return -EINVAL;
 
 	return 0;
 }
@@ -13010,6 +13018,18 @@ static int nested_check_vm_execution_controls(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+/*
+ * Checks related to VM-Exit Control Fields
+ */
+static int nested_check_vm_exit_controls(struct kvm_vcpu *vcpu,
+                                         struct vmcs12 *vmcs12)
+{
+	if (nested_vmx_check_exit_msr_switch_controls(vcpu, vmcs12))
+		return -EINVAL;
+
+	return 0;
+}
+
 static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
 					struct vmcs12 *vmcs12)
 {
@@ -13019,7 +13039,8 @@ static int nested_check_vmentry_prereqs(struct kvm_vcpu *vcpu,
 	    vmcs12->guest_activity_state != GUEST_ACTIVITY_HLT)
 		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
 
-	if (nested_check_vm_execution_controls(vcpu, vmcs12))
+	if (nested_check_vm_execution_controls(vcpu, vmcs12) ||
+	    nested_check_vm_exit_controls(vcpu, vmcs12))
 		return VMXERR_ENTRY_INVALID_CONTROL_FIELD;
 
 	if (nested_vmx_check_msr_switch_controls(vcpu, vmcs12))
