@@ -130,6 +130,11 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 	old = aarch64_insn_gen_nop();
 	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
 
+	/* This function can take a long time when sanitizers are enabled, so
+	 * lets make sure we allow RCU processing.
+	 */
+	cond_resched();
+
 	return ftrace_modify_code(pc, old, new, true);
 }
 
@@ -187,6 +192,11 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
 	}
 
 	new = aarch64_insn_gen_nop();
+
+	/* This function can take a long time when sanitizers are enabled, so
+	 * lets make sure we allow RCU processing.
+	 */
+	cond_resched();
 
 	return ftrace_modify_code(pc, old, new, validate);
 }
