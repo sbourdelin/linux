@@ -18,6 +18,7 @@ struct i915_wa {
 struct i915_wa_list {
 	const char	*name;
 	unsigned int 	count;
+	unsigned int	wa_count;
 	struct i915_wa	*list;
 	unsigned int	__size;
 };
@@ -28,7 +29,7 @@ static inline void intel_wa_list_free(struct i915_wa_list *wal)
 	memset(wal, 0, sizeof(*wal));
 }
 
-int intel_ctx_workarounds_init(struct drm_i915_private *dev_priv);
+void intel_ctx_workarounds_init(struct drm_i915_private *dev_priv);
 int intel_ctx_workarounds_emit(struct i915_request *rq);
 
 void intel_gt_workarounds_init(struct drm_i915_private *dev_priv);
