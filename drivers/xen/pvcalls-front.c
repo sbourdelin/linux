@@ -335,7 +335,43 @@ int pvcalls_front_socket(struct socket *sock)
 	return ret;
 }
 
-static int create_active(struct sock_mapping *map, int *evtchn)
+struct sock_mapping_active_ring {
+	struct pvcalls_data_intf *ring;
+	RING_IDX ring_order;
+	void *bytes;
+};
+
+static int alloc_active_ring(struct sock_mapping_active_ring *active_ring)
+{
+	active_ring->ring = NULL;
+	active_ring->bytes = NULL;
+
+	active_ring->ring = (struct pvcalls_data_intf *)
+		__get_free_page(GFP_KERNEL | __GFP_ZERO);
+	if (active_ring->ring == NULL)
+		goto out_error;
+	active_ring->ring_order = PVCALLS_RING_ORDER;
+	active_ring->bytes = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+			PVCALLS_RING_ORDER);
+	if (active_ring->bytes == NULL)
+		goto out_error;
+
+	return 0;
+
+out_error:
+	free_pages((unsigned long)active_ring->bytes, active_ring->ring_order);
+	free_page((unsigned long)active_ring->ring);
+	return -ENOMEM;
+}
+
+static void free_active_ring(struct sock_mapping_active_ring *active_ring)
+{
+	free_pages((unsigned long)active_ring->bytes, active_ring->ring_order);
+	free_page((unsigned long)active_ring->ring);
+}
+
+static int create_active(struct sock_mapping *map, int *evtchn,
+		struct sock_mapping_active_ring *active_ring)
 {
 	void *bytes;
 	int ret = -ENOMEM, irq = -1, i;
@@ -343,15 +379,9 @@ static int create_active(struct sock_mapping *map, int *evtchn)
 	*evtchn = -1;
 	init_waitqueue_head(&map->active.inflight_conn_req);
 
-	map->active.ring = (struct pvcalls_data_intf *)
-		__get_free_page(GFP_KERNEL | __GFP_ZERO);
-	if (map->active.ring == NULL)
-		goto out_error;
-	map->active.ring->ring_order = PVCALLS_RING_ORDER;
-	bytes = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
-					PVCALLS_RING_ORDER);
-	if (bytes == NULL)
-		goto out_error;
+	map->active.ring = active_ring->ring;
+	map->active.ring->ring_order = active_ring->ring_order;
+	bytes = active_ring->bytes;
 	for (i = 0; i < (1 << PVCALLS_RING_ORDER); i++)
 		map->active.ring->ref[i] = gnttab_grant_foreign_access(
 			pvcalls_front_dev->otherend_id,
@@ -397,6 +427,7 @@ int pvcalls_front_connect(struct socket *sock, struct sockaddr *addr,
 	struct sock_mapping *map = NULL;
 	struct xen_pvcalls_request *req;
 	int notify, req_id, ret, evtchn;
+	struct sock_mapping_active_ring active_ring;
 
 	if (addr->sa_family != AF_INET || sock->type != SOCK_STREAM)
 		return -EOPNOTSUPP;
@@ -406,15 +437,21 @@ int pvcalls_front_connect(struct socket *sock, struct sockaddr *addr,
 		return PTR_ERR(map);
 
 	bedata = dev_get_drvdata(&pvcalls_front_dev->dev);
+	ret = alloc_active_ring(&active_ring);
+	if (ret < 0) {
+		pvcalls_exit_sock(sock);
+		return ret;
+	}
 
 	spin_lock(&bedata->socket_lock);
 	ret = get_request(bedata, &req_id);
 	if (ret < 0) {
 		spin_unlock(&bedata->socket_lock);
+		free_active_ring(&active_ring);
 		pvcalls_exit_sock(sock);
 		return ret;
 	}
-	ret = create_active(map, &evtchn);
+	ret = create_active(map, &evtchn, &active_ring);
 	if (ret < 0) {
 		spin_unlock(&bedata->socket_lock);
 		pvcalls_exit_sock(sock);
@@ -744,6 +781,7 @@ int pvcalls_front_accept(struct socket *sock, struct socket *newsock, int flags)
 	struct sock_mapping *map2 = NULL;
 	struct xen_pvcalls_request *req;
 	int notify, req_id, ret, evtchn, nonblock;
+	struct sock_mapping_active_ring active_ring;
 
 	map = pvcalls_enter_sock(sock);
 	if (IS_ERR(map))
@@ -780,12 +818,20 @@ int pvcalls_front_accept(struct socket *sock, struct socket *newsock, int flags)
 		}
 	}
 
+	ret = alloc_active_ring(&active_ring);
+	if (ret < 0) {
+		clear_bit(PVCALLS_FLAG_ACCEPT_INFLIGHT,
+				(void *)&map->passive.flags);
+		pvcalls_exit_sock(sock);
+		return ret;
+	}
 	spin_lock(&bedata->socket_lock);
 	ret = get_request(bedata, &req_id);
 	if (ret < 0) {
 		clear_bit(PVCALLS_FLAG_ACCEPT_INFLIGHT,
 			  (void *)&map->passive.flags);
 		spin_unlock(&bedata->socket_lock);
+		free_active_ring(&active_ring);
 		pvcalls_exit_sock(sock);
 		return ret;
 	}
@@ -794,10 +840,11 @@ int pvcalls_front_accept(struct socket *sock, struct socket *newsock, int flags)
 		clear_bit(PVCALLS_FLAG_ACCEPT_INFLIGHT,
 			  (void *)&map->passive.flags);
 		spin_unlock(&bedata->socket_lock);
+		free_active_ring(&active_ring);
 		pvcalls_exit_sock(sock);
 		return -ENOMEM;
 	}
-	ret = create_active(map2, &evtchn);
+	ret = create_active(map2, &evtchn, &active_ring);
 	if (ret < 0) {
 		kfree(map2);
 		clear_bit(PVCALLS_FLAG_ACCEPT_INFLIGHT,
