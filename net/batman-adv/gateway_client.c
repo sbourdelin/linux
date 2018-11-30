@@ -284,14 +284,16 @@ void batadv_gw_election(struct batadv_priv *bat_priv)
 		batadv_throw_uevent(bat_priv, BATADV_UEV_GW, BATADV_UEV_ADD,
 				    gw_addr);
 	} else {
-		batadv_dbg(BATADV_DBG_BATMAN, bat_priv,
-			   "Changing route to gateway %pM (bandwidth: %u.%u/%u.%u MBit, tq: %i)\n",
-			   next_gw->orig_node->orig,
-			   next_gw->bandwidth_down / 10,
-			   next_gw->bandwidth_down % 10,
-			   next_gw->bandwidth_up / 10,
-			   next_gw->bandwidth_up % 10,
-			   router_ifinfo->bat_iv.tq_avg);
+		if (next_gw) {
+			batadv_dbg(BATADV_DBG_BATMAN, bat_priv,
+				   "Changing route to gateway %pM (bandwidth: %u.%u/%u.%u MBit, tq: %i)\n",
+				    next_gw->orig_node->orig,
+				    next_gw->bandwidth_down / 10,
+				    next_gw->bandwidth_down % 10,
+				    next_gw->bandwidth_up / 10,
+				    next_gw->bandwidth_up % 10,
+				    router_ifinfo->bat_iv.tq_avg);
+		}
 		batadv_throw_uevent(bat_priv, BATADV_UEV_GW, BATADV_UEV_CHANGE,
 				    gw_addr);
 	}
