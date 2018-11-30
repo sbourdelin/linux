@@ -1,0 +1,12 @@
+/*?
+ * Text: "Failed to register FLIC rc=%d\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: return code of the FLIC registration call
+ * Description:
+ * The registration of the FLIC (Floating Interrupt Controller Interface)
+ * was not successful.
+ * User action:
+ * If this problem persists after a reload of the kvm kernel module, gather
+ * Linux debug data and contact your support organization.
+ */
