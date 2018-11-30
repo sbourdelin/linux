@@ -1668,6 +1668,87 @@ int kvm_arch_write_log_dirty(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static bool __rmap_open_subpage_bit(struct kvm *kvm,
+				    struct kvm_rmap_head *rmap_head)
+{
+	struct rmap_iterator iter;
+	bool flush = false;
+	u64 *sptep;
+	u64 spte;
+
+	for_each_rmap_spte(rmap_head, &iter, sptep) {
+		/*
+		 * SPP works only when the page is unwritable
+		 * and SPP bit is set
+		 */
+		flush |= spte_write_protect(sptep, false);
+		spte = *sptep | PT_SPP_MASK;
+		flush |= mmu_spte_update(sptep, spte);
+	}
+
+	return flush;
+}
+
+static int kvm_mmu_open_subpage_write_protect(struct kvm *kvm,
+					      struct kvm_memory_slot *slot,
+					      gfn_t gfn)
+{
+	struct kvm_rmap_head *rmap_head;
+	bool flush = false;
+
+	/*
+	 * we only support spp in a normal 4K level 1 page frame
+	 * If it a huge page, we drop it.
+	 */
+	rmap_head = __gfn_to_rmap(gfn, PT_PAGE_TABLE_LEVEL, slot);
+
+	if (!rmap_head->val)
+		return -EFAULT;
+
+	flush |= __rmap_open_subpage_bit(kvm, rmap_head);
+
+	if (flush)
+		kvm_flush_remote_tlbs(kvm);
+
+	return 0;
+}
+
+static bool __rmap_clear_subpage_bit(struct kvm *kvm,
+				     struct kvm_rmap_head *rmap_head)
+{
+	struct rmap_iterator iter;
+	bool flush = false;
+	u64 *sptep;
+	u64 spte;
+
+	for_each_rmap_spte(rmap_head, &iter, sptep) {
+		spte = (*sptep & ~PT_SPP_MASK) | PT_WRITABLE_MASK;
+		flush |= mmu_spte_update(sptep, spte);
+	}
+
+	return flush;
+}
+
+static int kvm_mmu_clear_subpage_write_protect(struct kvm *kvm,
+					       struct kvm_memory_slot *slot,
+					       gfn_t gfn)
+{
+	struct kvm_rmap_head *rmap_head;
+	bool flush = false;
+
+	rmap_head = __gfn_to_rmap(gfn, PT_PAGE_TABLE_LEVEL, slot);
+
+	if (!rmap_head->val)
+		return -EFAULT;
+
+	flush |= __rmap_clear_subpage_bit(kvm, rmap_head);
+
+	if (flush)
+		kvm_flush_remote_tlbs(kvm);
+
+	return 0;
+}
+
 bool kvm_mmu_slot_gfn_write_protect(struct kvm *kvm,
 				    struct kvm_memory_slot *slot, u64 gfn)
 {
@@ -4184,12 +4265,31 @@ int kvm_mmu_set_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
 	int npages = spp_info->npages;
 	struct kvm_memory_slot *slot;
 	u32 *wp_map;
+	int ret;
 	int i;
 
 	for (i = 0; i < npages; i++, gfn++) {
 		slot = gfn_to_memslot(kvm, gfn);
 		if (!slot)
 			return -EFAULT;
+
+		/*
+		 * open SPP bit in EPT leaf entry to write protect the
+		 * sub-pages in corresponding page
+		 */
+		if (access != (u32)((1ULL << 32) - 1))
+			ret = kvm_mmu_open_subpage_write_protect(kvm,
+					slot, gfn);
+		else
+			ret = kvm_mmu_clear_subpage_write_protect(kvm,
+					slot, gfn);
+
+		if (ret) {
+			pr_info("SPP ,didn't get the gfn:%llx from EPT leaf level1\n"
+				"Current we didn't support huge page on SPP\n"
+				"Please try to disable the huge page\n", gfn);
+			return -EFAULT;
+		}
 		wp_map = gfn_to_subpage_wp_info(slot, gfn);
 		*wp_map = access;
 	}
