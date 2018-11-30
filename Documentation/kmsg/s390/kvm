@@ -10,3 +10,15 @@
  * If this problem persists after a reload of the kvm kernel module, gather
  * Linux debug data and contact your support organization.
  */
+
+/*?
+ * Text: "Failed to initialize GIB rc=%d\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: return code of the GIB initialization call
+ * Description:
+ * The initialization if the GIB (Guest Information Block) was not successful.
+ * User action:
+ * If this problem persists after a reload of the kvm kernel module, gather
+ * Linux debug data and contact your support organization.
+ */

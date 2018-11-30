@@ -428,16 +428,24 @@ int kvm_arch_init(void *opaque)
 		goto out_debug_unreg;
 	}
 
+	rc = kvm_s390_gib_init(GAL_ISC);
+	if (rc) {
+		pr_err("Failed to initialize GIB rc=%d\n", rc);
+		goto out_debug_unreg;
+	}
+
 	kvm_s390_cpu_feat_init();
 
 	/* Register floating interrupt controller interface. */
 	rc = kvm_register_device_ops(&kvm_flic_ops, KVM_DEV_TYPE_FLIC);
 	if (rc) {
 		pr_err("Failed to register FLIC rc=%d\n", rc);
-		goto out_debug_unreg;
+		goto out_gib_destroy;
 	}
 	return 0;
 
+out_gib_destroy:
+	kvm_s390_gib_destroy();
 out_debug_unreg:
 	debug_unregister(kvm_s390_dbf);
 	return rc;
