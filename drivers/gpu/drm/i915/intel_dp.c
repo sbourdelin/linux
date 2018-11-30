@@ -4032,8 +4032,8 @@ static void intel_dp_get_dsc_sink_cap(struct intel_dp *intel_dp)
 					      &intel_dp->fec_capable) < 0)
 				DRM_ERROR("Failed to read FEC DPCD register\n");
 
-		DRM_DEBUG_KMS("FEC CAPABILITY: %x\n",
-			      intel_dp->fec_capable);
+			DRM_DEBUG_KMS("FEC CAPABILITY: %x\n",
+				      intel_dp->fec_capable);
 		}
 	}
 }
