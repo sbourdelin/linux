@@ -493,7 +493,7 @@ struct i915_psr {
 
 	u32 debug;
 	bool sink_support;
-	bool prepared, enabled;
+	bool enabled;
 	struct intel_dp *dp;
 	bool active;
 	struct work_struct work;
