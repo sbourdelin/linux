@@ -5,6 +5,8 @@
 
 #include <linux/types.h>
 
+#define FASTRPC_IOCTL_ALLOC_DMA_BUFF _IOWR('R', 1, struct fastrpc_ioctl_alloc_dma_buf)
+#define FASTRPC_IOCTL_FREE_DMA_BUFF _IOWR('R', 2, uint32_t)
 #define FASTRPC_IOCTL_INVOKE	_IOWR('R', 3, struct fastrpc_ioctl_invoke)
 #define FASTRPC_IOCTL_INIT	_IOWR('R', 4, struct fastrpc_ioctl_init)
 
@@ -69,6 +71,12 @@ struct fastrpc_ioctl_init {
 	int32_t memfd;		/* fd for the mem */
 	int attrs;
 	unsigned int siglen;
+};
+
+struct fastrpc_ioctl_alloc_dma_buf {
+	int     fd;	/* fd */
+	ssize_t size;	/* size */
+	uint32_t flags;	/* flags to map with */
 };
 
 #endif /* __QCOM_FASTRPC_H__ */
