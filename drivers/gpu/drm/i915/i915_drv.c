@@ -53,6 +53,7 @@
 #include "i915_vgpu.h"
 #include "intel_drv.h"
 #include "intel_uc.h"
+#include "intel_workarounds.h"
 
 static struct drm_driver driver;
 
@@ -2361,6 +2362,9 @@ int i915_reset_engine(struct intel_engine_cs *engine, const char *msg)
 				 engine->name, ret);
 		goto out;
 	}
+
+	/* Catch GT workarounds affected by engine reset. */
+	intel_gt_workarounds_verify(engine->i915, engine->name);
 
 	/*
 	 * The request that caused the hang is stuck on elsp, we know the
