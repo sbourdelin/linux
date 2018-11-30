@@ -47,10 +47,6 @@ static int fid;
 static int min_fsb;
 static int max_fsb;
 
-MODULE_AUTHOR("Sebastian Witt <se.witt@gmx.net>");
-MODULE_DESCRIPTION("nForce2 FSB changing cpufreq driver");
-MODULE_LICENSE("GPL");
-
 module_param(fid, int, 0444);
 module_param(min_fsb, int, 0444);
 
@@ -123,8 +119,6 @@ static void nforce2_write_pll(int pll)
 	/* Now write the value in all 64 registers */
 	for (temp = 0; temp <= 0x3f; temp++)
 		pci_write_config_dword(nforce2_dev, NFORCE2_PLLREG, pll);
-
-	return;
 }
 
 /**
@@ -436,6 +430,9 @@ static void __exit nforce2_exit(void)
 	cpufreq_unregister_driver(&nforce2_driver);
 }
 
+MODULE_AUTHOR("Sebastian Witt <se.witt@gmx.net>");
+MODULE_DESCRIPTION("nForce2 FSB changing cpufreq driver");
+MODULE_LICENSE("GPL");
+
 module_init(nforce2_init);
 module_exit(nforce2_exit);
-
