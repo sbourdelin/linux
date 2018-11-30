@@ -41,11 +41,6 @@
 #define HASH_FN_SHIFT   13
 #define HASH_FN_MASK    (HASH_SIZE - 1)
 
-/* allow architectures to override this if absolutely required */
-#ifndef PREALLOC_DMA_DEBUG_ENTRIES
-#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
-#endif
-
 enum {
 	dma_debug_single,
 	dma_debug_page,
@@ -132,7 +127,7 @@ static u32 min_free_entries;
 static u32 nr_total_entries;
 
 /* number of preallocated entries requested by kernel cmdline */
-static u32 nr_prealloc_entries = PREALLOC_DMA_DEBUG_ENTRIES;
+static u32 nr_prealloc_entries = CONFIG_PREALLOC_DMA_DEBUG_ENTRIES;
 
 /* debugfs dentry's for the stuff above */
 static struct dentry *dma_debug_dent        __read_mostly;
@@ -1063,7 +1058,7 @@ static __init int dma_debug_entries_cmdline(char *str)
 	if (!str)
 		return -EINVAL;
 	if (!get_option(&str, &nr_prealloc_entries))
-		nr_prealloc_entries = PREALLOC_DMA_DEBUG_ENTRIES;
+		nr_prealloc_entries = CONFIG_PREALLOC_DMA_DEBUG_ENTRIES;
 	return 0;
 }
 

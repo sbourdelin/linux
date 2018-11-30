@@ -1659,6 +1659,16 @@ config DMA_API_DEBUG
 
 	  If unsure, say N.
 
+config PREALLOC_DMA_DEBUG_ENTRIES
+	int "Preallocated DMA-API debugging entries"
+	depends on DMA_API_DEBUG
+	default 131072 if HNS_ENET
+	default 65536
+	help
+	  The number of preallocated entries for DMA-API debugging code. One
+	  entry is required per DMA-API allocation. Increase this if the DMA-API
+	  debugging code disables itself because the default is too low.
+
 config DMA_API_DEBUG_SG
 	bool "Debug DMA scatter-gather usage"
 	default y
