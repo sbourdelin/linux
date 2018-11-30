@@ -23,6 +23,7 @@
 #include <asm/gmap.h>
 #include <asm/switch_to.h>
 #include <asm/nmi.h>
+#include <asm/airq.h>
 #include "kvm-s390.h"
 #include "gaccess.h"
 #include "trace-s390.h"
@@ -1098,6 +1099,17 @@ int kvm_s390_handle_wait(struct kvm_vcpu *vcpu)
 	/* fast path */
 	if (kvm_arch_vcpu_runnable(vcpu))
 		return 0;
+
+	/*
+	 * This could be the single vcpu of the guest or the last vcpu
+	 * open for I/O interruptons going into wait state.
+	 */
+	if (vcpu->kvm->arch.gib_in_use &&
+	    !in_alert_list(vcpu->kvm->arch.gisa)) {
+		if (unlikely(kvm_s390_gisa_get_ipm(vcpu->kvm->arch.gisa)))
+			return 0;
+		vcpu->kvm->arch.gisa->iam = vcpu->kvm->arch.iam;
+	}
 
 	if (psw_interrupts_disabled(vcpu)) {
 		VCPU_EVENT(vcpu, 3, "%s", "disabled wait");
@@ -2904,7 +2916,7 @@ static void nullify_gisa(struct kvm_s390_gisa *gisa)
 #define NONE_GISA_ADDR 0x00000001UL
 #define GISA_ADDR_MASK 0xfffff000UL
 
-static void __maybe_unused process_gib_alert_list(void)
+static void process_gib_alert_list(void)
 {
 	u32 final, next_alert, origin = 0UL;
 	struct kvm_s390_gisa *gisa;
@@ -2953,6 +2965,9 @@ static void __maybe_unused process_gib_alert_list(void)
 void kvm_s390_gisa_clear(struct kvm *kvm)
 {
 	if (kvm->arch.gisa) {
+		kvm->arch.gisa->iam = 0;
+		while (in_alert_list(kvm->arch.gisa))
+			process_gib_alert_list();
 		nullify_gisa(kvm->arch.gisa);
 		VM_EVENT(kvm, 3, "gisa 0x%pK cleared", kvm->arch.gisa);
 	}
@@ -2964,9 +2979,9 @@ void kvm_s390_gisa_init(struct kvm *kvm)
 		kvm->arch.gisa = &kvm->arch.sie_page2->gisa;
 		kvm->arch.iam = 0;
 		spin_lock_init(&kvm->arch.iam_ref_lock);
-		VM_EVENT(kvm, 3, "gisa 0x%pK initialized", kvm->arch.gisa);
-		kvm_s390_gisa_clear(kvm);
+		nullify_gisa(kvm->arch.gisa);
 		kvm->arch.gib_in_use = !!gib;
+		VM_EVENT(kvm, 3, "gisa 0x%pK initialized", kvm->arch.gisa);
 	}
 }
 
@@ -2974,6 +2989,10 @@ void kvm_s390_gisa_destroy(struct kvm *kvm)
 {
 	if (!kvm->arch.gisa)
 		return;
+
+	kvm->arch.gisa->iam = 0;
+	while (in_alert_list(kvm->arch.gisa))
+		process_gib_alert_list();
 	kvm->arch.gisa = NULL;
 	kvm->arch.iam = 0;
 }
@@ -3019,36 +3038,65 @@ out:
 }
 EXPORT_SYMBOL_GPL(kvm_s390_gisc_unregister);
 
+static void gib_alert_irq_handler(struct airq_struct *airq)
+{
+	inc_irq_stat(IRQIO_GAL);
+	process_gib_alert_list();
+}
+
+static struct airq_struct gib_alert_irq = {
+	.handler = gib_alert_irq_handler,
+	.lsi_ptr = &gib_alert_irq.lsi_mask,
+};
+
 void kvm_s390_gib_destroy(void)
 {
 	if (!gib)
 		return;
 	chsc_sgib(0);
+	unregister_adapter_interrupt(&gib_alert_irq);
 	free_page((unsigned long)gib);
 	gib = NULL;
 }
 
 int kvm_s390_gib_init(u8 nisc)
 {
+	int rc = 0;
+
 	if (!css_general_characteristics.aiv) {
 		KVM_EVENT(3, "%s", "gib not initialized, no AIV facility");
-		return 0;
+		goto out;
 	}
 
 	gib = (struct kvm_s390_gib *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
 	if (!gib) {
 		KVM_EVENT(3, "gib 0x%pK memory allocation failed", gib);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	gib_alert_irq.isc = nisc;
+	if (register_adapter_interrupt(&gib_alert_irq)) {
+		KVM_EVENT(3, "gib 0x%pK GAI registration failed", gib);
+		rc = -EIO;
+		goto out_free;
 	}
 
 	gib->nisc = nisc;
 	if (chsc_sgib((u32)(u64)gib)) {
 		KVM_EVENT(3, "gib 0x%pK AIV association failed", gib);
-		free_page((unsigned long)gib);
-		gib = NULL;
-		return -EIO;
+		rc = -EIO;
+		goto out_unreg;
 	}
 
 	KVM_EVENT(3, "gib 0x%pK (nisc=%d) initialized", gib, gib->nisc);
-	return 0;
+	return rc;
+
+out_unreg:
+	unregister_adapter_interrupt(&gib_alert_irq);
+out_free:
+	free_page((unsigned long)gib);
+	gib = NULL;
+out:
+	return rc;
 }
