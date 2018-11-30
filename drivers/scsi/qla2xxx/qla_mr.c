@@ -1712,7 +1712,6 @@ qlafx00_tgt_detach(struct scsi_qla_host *vha, int tgt_id)
 int
 qlafx00_process_aen(struct scsi_qla_host *vha, struct qla_work_evt *evt)
 {
-	int rval = 0;
 	uint32_t aen_code, aen_data;
 
 	aen_code = FCH_EVT_VENDOR_UNIQUE;
@@ -1764,7 +1763,7 @@ qlafx00_process_aen(struct scsi_qla_host *vha, struct qla_work_evt *evt)
 	fc_host_post_event(vha->host, fc_get_event_number(),
 	    aen_code, aen_data);
 
-	return rval;
+	return 0;
 }
 
 static void
