@@ -510,6 +510,7 @@ static struct bus_type rpmsg_bus = {
 	.uevent		= rpmsg_uevent,
 	.probe		= rpmsg_dev_probe,
 	.remove		= rpmsg_dev_remove,
+	.dma_configure	= platform_dma_configure,
 };
 
 int rpmsg_register_device(struct rpmsg_device *rpdev)
