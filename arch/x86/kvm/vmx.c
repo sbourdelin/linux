@@ -9694,6 +9694,50 @@ static int handle_invpcid(struct kvm_vcpu *vcpu)
 	}
 }
 
+static int handle_spp(struct kvm_vcpu *vcpu)
+{
+	unsigned long exit_qualification;
+
+	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
+
+	/*
+	 * SPP VM exit happened while executing iret from NMI,
+	 * "blocked by NMI" bit has to be set before next VM entry.
+	 * There are errata that may cause this bit to not be set:
+	 * AAK134, BY25.
+	 */
+	if (!(to_vmx(vcpu)->idt_vectoring_info & VECTORING_INFO_VALID_MASK) &&
+	    (exit_qualification & SPPT_INTR_INFO_UNBLOCK_NMI))
+		vmcs_set_bits(GUEST_INTERRUPTIBILITY_INFO,
+			      GUEST_INTR_STATE_NMI);
+
+	pr_debug("SPP: SPP exit_qualification=%lx\n", exit_qualification);
+
+	vcpu->arch.exit_qualification = exit_qualification;
+
+	if (exit_qualification & SPPT_INDUCED_EXIT_TYPE) {
+		/*
+		 * SPPT Miss
+		 * We don't set SPP write access for the corresponding
+		 * GPA, if we haven't setup, we need to construct
+		 * SPP table here.
+		 */
+		pr_debug("SPP: %s: SPPT Miss!!!\n", __func__);
+		return 1;
+	}
+
+	/*
+	 * SPPT Misconfig
+	 * This is probably possible that your sppt table
+	 * set as a incorrect format
+	 */
+	WARN_ON(1);
+	vcpu->run->exit_reason = KVM_EXIT_UNKNOWN;
+	vcpu->run->hw.hardware_exit_reason = EXIT_REASON_SPP;
+	pr_alert("SPP: %s: SPPT Misconfiguration!!!\n", __func__);
+	return 0;
+}
+
 static int handle_pml_full(struct kvm_vcpu *vcpu)
 {
 	unsigned long exit_qualification;
@@ -9906,6 +9950,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_INVVPID]                 = handle_invvpid,
 	[EXIT_REASON_RDRAND]                  = handle_invalid_op,
 	[EXIT_REASON_RDSEED]                  = handle_invalid_op,
+	[EXIT_REASON_SPP]                     = handle_spp,
 	[EXIT_REASON_XSAVES]                  = handle_xsaves,
 	[EXIT_REASON_XRSTORS]                 = handle_xrstors,
 	[EXIT_REASON_PML_FULL]		      = handle_pml_full,
