@@ -8,6 +8,7 @@
 #include <linux/sched/jobctl.h>
 #include <linux/sched/task.h>
 #include <linux/cred.h>
+#include <linux/cgroup.h>
 
 /*
  * Types defining task->signal and task->sighand and APIs using them:
@@ -368,6 +369,8 @@ static inline int signal_pending_state(long state, struct task_struct *p)
 		return 0;
 	if (!signal_pending(p))
 		return 0;
+	if (unlikely(cgroup_task_frozen(p)))
+		return __fatal_signal_pending(p);
 
 	return (state & TASK_INTERRUPTIBLE) || __fatal_signal_pending(p);
 }

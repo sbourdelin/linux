@@ -411,6 +411,13 @@ static int ptrace_attach(struct task_struct *task, long request,
 	spin_lock(&task->sighand->siglock);
 
 	/*
+	 * If the process is frozen, let's wake it up to give it a chance
+	 * to enter the ptrace trap.
+	 */
+	if (cgroup_task_frozen(task))
+		wake_up_process(task);
+
+	/*
 	 * If the task is already STOPPED, set JOBCTL_TRAP_STOP and
 	 * TRAPPING, and kick it so that it transits to TRACED.  TRAPPING
 	 * will be cleared if the child completes the transition or any

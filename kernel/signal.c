@@ -41,6 +41,7 @@
 #include <linux/compiler.h>
 #include <linux/posix-timers.h>
 #include <linux/livepatch.h>
+#include <linux/cgroup.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/signal.h>
@@ -172,7 +173,7 @@ void recalc_sigpending_and_wake(struct task_struct *t)
 void recalc_sigpending(void)
 {
 	if (!recalc_sigpending_tsk(current) && !freezing(current) &&
-	    !klp_patch_pending(current))
+	    !klp_patch_pending(current) && !cgroup_task_frozen(current))
 		clear_thread_flag(TIF_SIGPENDING);
 
 }
@@ -2256,7 +2257,7 @@ static bool do_signal_stop(int signr)
 }
 
 /**
- * do_jobctl_trap - take care of ptrace jobctl traps
+ * do_jobctl_trap - take care of ptrace and cgroup freezer jobctl traps
  *
  * When PT_SEIZED, it's used for both group stop and explicit
  * SEIZE/INTERRUPT traps.  Both generate PTRACE_EVENT_STOP trap with
@@ -2266,26 +2267,44 @@ static bool do_signal_stop(int signr)
  * When !PT_SEIZED, it's used only for group stop trap with stop signal
  * number as exit_code and no siginfo.
  *
+ * When used with JOBCTL_TRAP_FREEZE, it puts the task into an interruptible
+ * sleep if only no fatal signals are pending.
+ *
  * CONTEXT:
  * Must be called with @current->sighand->siglock held, which may be
  * released and re-acquired before returning with intervening sleep.
  */
 static void do_jobctl_trap(void)
 {
+	struct sighand_struct *sighand = current->sighand;
 	struct signal_struct *signal = current->signal;
 	int signr = current->jobctl & JOBCTL_STOP_SIGMASK;
 
-	if (current->ptrace & PT_SEIZED) {
-		if (!signal->group_stop_count &&
-		    !(signal->flags & SIGNAL_STOP_STOPPED))
-			signr = SIGTRAP;
-		WARN_ON_ONCE(!signr);
-		ptrace_do_notify(signr, signr | (PTRACE_EVENT_STOP << 8),
-				 CLD_STOPPED);
-	} else {
-		WARN_ON_ONCE(!signr);
-		ptrace_stop(signr, CLD_STOPPED, 0, NULL);
-		current->exit_code = 0;
+	if (current->jobctl & (JOBCTL_TRAP_STOP | JOBCTL_TRAP_NOTIFY)) {
+		if (current->ptrace & PT_SEIZED) {
+			if (!signal->group_stop_count &&
+			    !(signal->flags & SIGNAL_STOP_STOPPED))
+				signr = SIGTRAP;
+			WARN_ON_ONCE(!signr);
+			ptrace_do_notify(signr,
+					 signr | (PTRACE_EVENT_STOP << 8),
+					 CLD_STOPPED);
+		} else {
+			WARN_ON_ONCE(!signr);
+			ptrace_stop(signr, CLD_STOPPED, 0, NULL);
+			current->exit_code = 0;
+		}
+	} else if (current->jobctl & JOBCTL_TRAP_FREEZE) {
+		/*
+		 * Enter the frozen state, unless the task is about to exit.
+		 */
+		if (fatal_signal_pending(current)) {
+			current->jobctl &= ~JOBCTL_TRAP_FREEZE;
+		} else {
+			spin_unlock_irq(&sighand->siglock);
+			cgroup_enter_frozen();
+			spin_lock_irq(&sighand->siglock);
+		}
 	}
 }
 
@@ -2401,10 +2420,21 @@ relock:
 		    do_signal_stop(0))
 			goto relock;
 
-		if (unlikely(current->jobctl & JOBCTL_TRAP_MASK)) {
+		if (unlikely(current->jobctl &
+			     (JOBCTL_TRAP_MASK | JOBCTL_TRAP_FREEZE))) {
 			do_jobctl_trap();
 			spin_unlock_irq(&sighand->siglock);
 			goto relock;
+		}
+
+		/*
+		 * If the task is leaving the frozen state, let's update
+		 * cgroup counters and reset the frozen bit.
+		 */
+		if (unlikely(cgroup_task_frozen(current))) {
+			spin_unlock_irq(&sighand->siglock);
+			cgroup_leave_frozen();
+			spin_lock_irq(&sighand->siglock);
 		}
 
 		signr = dequeue_signal(current, &current->blocked, &ksig->info);
