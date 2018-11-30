@@ -2316,6 +2316,7 @@ int logical_render_ring_init(struct intel_engine_cs *engine)
 			  ret);
 	}
 
+	intel_whitelist_workarounds_init(engine);
 	intel_engine_workarounds_init(engine);
 
 	return 0;
