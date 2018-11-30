@@ -1723,18 +1723,14 @@ static int __inject_io(struct kvm *kvm, struct kvm_s390_interrupt_info *inti)
 	return 0;
 }
 
-/*
- * Find a destination VCPU for a floating irq and kick it.
- */
-static void __floating_irq_kick(struct kvm *kvm, u64 type)
+static struct kvm_vcpu *__find_vcpu_for_floating_irq(struct kvm *kvm)
 {
 	struct kvm_s390_float_interrupt *fi = &kvm->arch.float_int;
-	struct kvm_vcpu *dst_vcpu;
 	int sigcpu, online_vcpus, nr_tries = 0;
 
 	online_vcpus = atomic_read(&kvm->online_vcpus);
 	if (!online_vcpus)
-		return;
+		return NULL;
 
 	/* find idle VCPUs first, then round robin */
 	sigcpu = find_first_bit(fi->idle_mask, online_vcpus);
@@ -1744,10 +1740,22 @@ static void __floating_irq_kick(struct kvm *kvm, u64 type)
 			fi->next_rr_cpu = (fi->next_rr_cpu + 1) % online_vcpus;
 			/* avoid endless loops if all vcpus are stopped */
 			if (nr_tries++ >= online_vcpus)
-				return;
+				return NULL;
 		} while (is_vcpu_stopped(kvm_get_vcpu(kvm, sigcpu)));
 	}
-	dst_vcpu = kvm_get_vcpu(kvm, sigcpu);
+	return kvm_get_vcpu(kvm, sigcpu);
+}
+
+/*
+ * Find a destination VCPU for a floating irq and kick it.
+ */
+static void __floating_irq_kick(struct kvm *kvm, u64 type)
+{
+	struct kvm_vcpu *dst_vcpu;
+
+	dst_vcpu = __find_vcpu_for_floating_irq(kvm);
+	if (!dst_vcpu)
+		return;
 
 	/* make the VCPU drop out of the SIE, or wake it up if sleeping */
 	switch (type) {
