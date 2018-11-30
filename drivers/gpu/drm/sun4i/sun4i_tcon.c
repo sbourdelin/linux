@@ -1159,20 +1159,20 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
 		 */
 		if (tcon->quirks->has_lvds_alt) {
 			tcon->lvds_pll = devm_clk_get(dev, "lvds-alt");
-			if (IS_ERR(tcon->lvds_pll)) {
-				if (PTR_ERR(tcon->lvds_pll) == -ENOENT) {
-					has_lvds_alt = false;
-				} else {
-					dev_err(dev, "Couldn't get the LVDS PLL\n");
-					return PTR_ERR(tcon->lvds_pll);
-				}
+			ret = PTR_ERR_OR_ZERO(tcon->lvds_pll);
+			if (ret == -ENOENT) {
+				has_lvds_alt = false;
+			} else if (ret) {
+				dev_err(dev, "Couldn't get the LVDS PLL\n");
+				return ret;
 			} else {
 				has_lvds_alt = true;
 			}
+		} else  {
+			has_lvds_alt = false;
 		}
 
-		if (!has_lvds_rst ||
-		    (tcon->quirks->has_lvds_alt && !has_lvds_alt)) {
+		if (!has_lvds_rst || !has_lvds_alt) {
 			dev_warn(dev, "Missing LVDS properties, Please upgrade your DT\n");
 			dev_warn(dev, "LVDS output disabled\n");
 			can_lvds = false;
