@@ -267,10 +267,10 @@ struct perf_evsel *perf_evsel__new_idx(struct perf_event_attr *attr, int idx)
 		 * The evsel->unit points to static alias->unit
 		 * so it's ok to use static string in here.
 		 */
-		static const char *unit = "msec";
+		static const char *unit = "nsec";
 
 		evsel->unit = unit;
-		evsel->scale = 1e-6;
+		evsel->scale = 1;
 	}
 
 	return evsel;
