@@ -2900,6 +2900,56 @@ static void nullify_gisa(struct kvm_s390_gisa *gisa)
 	gisa->next_alert = (u32)(u64)gisa;
 }
 
+#define NULL_GISA_ADDR 0x00000000UL
+#define NONE_GISA_ADDR 0x00000001UL
+#define GISA_ADDR_MASK 0xfffff000UL
+
+static void __maybe_unused process_gib_alert_list(void)
+{
+	u32 final, next_alert, origin = 0UL;
+	struct kvm_s390_gisa *gisa;
+	struct kvm_vcpu *vcpu;
+	struct kvm *kvm;
+
+	do {
+		/*
+		 * If the NONE_GISA_ADDR is still stored in the alert list
+		 * origin, we will leave the outer loop. No further GISA has
+		 * been added to the alert list by millicode while processing
+		 * the current alert list.
+		 */
+		final = (origin & NONE_GISA_ADDR);
+		/*
+		 * Cut off the alert list and store the NONE_GISA_ADDR in the
+		 * alert list origin to avoid further GAL interruptions.
+		 * A new alert list can be build up by millicode in parallel
+		 * for guests not in the yet cut-off alert list. When in the
+		 * final loop, store the NULL_GISA_ADDR instead. This will re-
+		 * enable GAL interruptions on the host again.
+		 */
+		for (origin = xchg(&gib->alert_list_origin,
+				   (!final) ? NONE_GISA_ADDR : NULL_GISA_ADDR);
+		     /* Loop through the just cut-off alert list. */
+		     origin & GISA_ADDR_MASK;
+		     origin = next_alert) {
+			gisa = (struct kvm_s390_gisa *)(u64)origin;
+			next_alert = gisa->next_alert;
+			/* Unlink the GISA from the alert list. */
+			gisa->next_alert = origin;
+			if (!kvm_s390_gisa_get_ipm(gisa))
+				continue;
+			/*
+			 * Wake-up an idle vcpu of the kvm this GISA
+			 * belongs to if available.
+			 */
+			kvm = container_of(gisa, struct sie_page2, gisa)->kvm;
+			vcpu = __find_vcpu_for_floating_irq(kvm);
+			if (vcpu)
+				kvm_s390_vcpu_wakeup(vcpu);
+		}
+	} while (!final);
+}
+
 void kvm_s390_gisa_clear(struct kvm *kvm)
 {
 	if (kvm->arch.gisa) {
