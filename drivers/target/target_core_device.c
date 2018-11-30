@@ -720,36 +720,17 @@ void core_dev_free_initiator_node_lun_acl(
 static void scsi_dump_inquiry(struct se_device *dev)
 {
 	struct t10_wwn *wwn = &dev->t10_wwn;
-	char buf[17];
-	int i, device_type;
+	int device_type = dev->transport->get_device_type(dev);
+
 	/*
 	 * Print Linux/SCSI style INQUIRY formatting to the kernel ring buffer
 	 */
-	for (i = 0; i < 8; i++)
-		if (wwn->vendor[i] >= 0x20)
-			buf[i] = wwn->vendor[i];
-		else
-			buf[i] = ' ';
-	buf[i] = '\0';
-	pr_debug("  Vendor: %s\n", buf);
-
-	for (i = 0; i < 16; i++)
-		if (wwn->model[i] >= 0x20)
-			buf[i] = wwn->model[i];
-		else
-			buf[i] = ' ';
-	buf[i] = '\0';
-	pr_debug("  Model: %s\n", buf);
-
-	for (i = 0; i < 4; i++)
-		if (wwn->revision[i] >= 0x20)
-			buf[i] = wwn->revision[i];
-		else
-			buf[i] = ' ';
-	buf[i] = '\0';
-	pr_debug("  Revision: %s\n", buf);
-
-	device_type = dev->transport->get_device_type(dev);
+	pr_debug("  Vendor: %-" __stringify(INQUIRY_VENDOR_LEN) "s\n",
+		wwn->vendor);
+	pr_debug("  Model: %-" __stringify(INQUIRY_MODEL_LEN) "s\n",
+		wwn->model);
+	pr_debug("  Revision: %-" __stringify(INQUIRY_REVISION_LEN) "s\n",
+		wwn->revision);
 	pr_debug("  Type:   %s ", scsi_device_type(device_type));
 }
 
@@ -1009,12 +990,16 @@ int target_configure_device(struct se_device *dev)
 	 * anything virtual (IBLOCK, FILEIO, RAMDISK), but not for TCM/pSCSI
 	 * passthrough because this is being provided by the backend LLD.
 	 */
+	BUILD_BUG_ON(sizeof(dev->t10_wwn.vendor) != INQUIRY_VENDOR_LEN + 1);
+	BUILD_BUG_ON(sizeof(dev->t10_wwn.model) != INQUIRY_MODEL_LEN + 1);
+	BUILD_BUG_ON(sizeof(dev->t10_wwn.revision) != INQUIRY_REVISION_LEN + 1);
 	if (!(dev->transport->transport_flags & TRANSPORT_FLAG_PASSTHROUGH)) {
-		strncpy(&dev->t10_wwn.vendor[0], "LIO-ORG", 8);
-		strncpy(&dev->t10_wwn.model[0],
-			dev->transport->inquiry_prod, 16);
-		strncpy(&dev->t10_wwn.revision[0],
-			dev->transport->inquiry_rev, 4);
+		strlcpy(dev->t10_wwn.vendor, "LIO-ORG",
+			sizeof(dev->t10_wwn.vendor));
+		strlcpy(dev->t10_wwn.model, dev->transport->inquiry_prod,
+			sizeof(dev->t10_wwn.model));
+		strlcpy(dev->t10_wwn.revision, dev->transport->inquiry_rev,
+			sizeof(dev->t10_wwn.revision));
 	}
 
 	scsi_dump_inquiry(dev);
