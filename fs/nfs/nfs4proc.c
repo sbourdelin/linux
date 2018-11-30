@@ -2323,6 +2323,7 @@ static void nfs4_open_prepare(struct rpc_task *task, void *calldata)
 		/* Fall through */
 	case NFS4_OPEN_CLAIM_FH:
 		task->tk_msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR];
+		nfs_copy_fh(&data->o_res.fh, data->o_arg.fh);
 	}
 	data->timestamp = jiffies;
 	if (nfs4_setup_sequence(data->o_arg.server->nfs_client,
@@ -2470,8 +2471,14 @@ static int _nfs4_recover_proc_open(struct nfs4_opendata *data)
 
 	nfs_fattr_map_and_free_names(NFS_SERVER(dir), &data->f_attr);
 
-	if (o_res->rflags & NFS4_OPEN_RESULT_CONFIRM)
+	if (o_res->rflags & NFS4_OPEN_RESULT_CONFIRM) {
+		if (data->o_arg.claim == NFS4_OPEN_CLAIM_PREVIOUS)
+			pr_err_ratelimited("NFS: Broken NFSv4 server %s is "
+					"requesting open confirmation for "
+					"OPEN(CLAIM_PREVIOUS)\n",
+					NFS_SERVER(dir)->nfs_client->cl_hostname);
 		status = _nfs4_proc_open_confirm(data);
+	}
 
 	return status;
 }
