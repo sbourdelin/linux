@@ -225,11 +225,46 @@ static void clocksource_watchdog(struct timer_list *unused)
 					     watchdog->shift);
 
 		delta = clocksource_delta(csnow, cs->cs_last, cs->mask);
+
+		/* If the cycle delta is beyond what we can safely
+		 * convert to nsecs, and the watchdog clocksource
+		 * suggests that we've overslept, skip checking this
+		 * iteration to avoid marking a clocksource as
+		 * unstable because of a severely delayed timer. */
+		if (delta > cs->max_cycles &&
+		    wd_nsec > 3 * jiffies_to_nsecs(WATCHDOG_INTERVAL)) {
+			pr_warn("timekeeping watchdog: Clocksource '%s' not checked due to apparent long timer delay:\n",
+				cs->name);
+			pr_warn("                      Delta %llx > max_cycles %llx, wd_nsec %lld\n",
+				delta, cs->max_cycles, wd_nsec);
+			continue;
+		}
+
 		cs_nsec = clocksource_cyc2ns(delta, cs->mult, cs->shift);
 		wdlast = cs->wd_last; /* save these in case we print them */
 		cslast = cs->cs_last;
 		cs->cs_last = csnow;
 		cs->wd_last = wdnow;
+
+		/* If the clocksource interval is far off from the
+		 * watchdog clocksource interval but the interval is
+		 * big enough that the watchdog may have wrapped
+		 * around (again due to a severely delayed timer),
+		 * skip this iteration.  For example, this saves us
+		 * from marking the TSC as unstable just because the
+		 * 32-bit HPET wrapped around on x86. */
+		if (abs(cs_nsec - wd_nsec) >
+		    clocksource_cyc2ns(watchdog->max_cycles, watchdog->mult,
+				       watchdog->shift) - WATCHDOG_THRESHOLD) {
+			pr_warn("timekeeping watchdog: Clocksource '%s' not checked due to apparent timer delay:\n",
+				cs->name);
+			pr_warn("                      Skew %lld watchdog wrap %lld\n",
+				abs(cs_nsec - wd_nsec),
+				clocksource_cyc2ns(watchdog->max_cycles,
+						   watchdog->mult,
+						   watchdog->shift));
+			continue;
+		}
 
 		if (atomic_read(&watchdog_reset_pending))
 			continue;
