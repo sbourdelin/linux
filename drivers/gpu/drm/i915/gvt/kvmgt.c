@@ -50,6 +50,7 @@
 #include "gvt.h"
 
 static const struct intel_gvt_ops *intel_gvt_ops;
+static struct intel_gvt *intel_gvt;
 
 /* helper macros copied from vfio-pci */
 #define VFIO_PCI_OFFSET_SHIFT   40
@@ -1459,8 +1460,10 @@ static int kvmgt_host_init(struct device *dev, void *gvt, const void *ops)
 	struct attribute_group **kvm_vgpu_type_groups;
 
 	intel_gvt_ops = ops;
+	intel_gvt = (struct intel_gvt *)gvt;
+
 	if (!intel_gvt_ops->get_gvt_attrs(&kvm_type_attrs,
-			&kvm_vgpu_type_groups))
+					  &kvm_vgpu_type_groups))
 		return -EFAULT;
 	intel_vgpu_ops.supported_type_groups = kvm_vgpu_type_groups;
 
@@ -1658,13 +1661,14 @@ static bool kvmgt_guest_exit(struct kvmgt_guest_info *info)
 
 static int kvmgt_attach_vgpu(void *vgpu, unsigned long *handle)
 {
-	/* nothing to do here */
+	if (!try_module_get(THIS_MODULE))
+		return -EINVAL;
 	return 0;
 }
 
 static void kvmgt_detach_vgpu(unsigned long handle)
 {
-	/* nothing to do here */
+	module_put(THIS_MODULE);
 }
 
 static int kvmgt_inject_msi(unsigned long handle, u32 addr, u16 data)
@@ -1849,7 +1853,8 @@ static bool kvmgt_is_valid_gfn(unsigned long handle, unsigned long gfn)
 	return ret;
 }
 
-struct intel_gvt_mpt kvmgt_mpt = {
+static struct intel_gvt_mpt kvmgt_mpt = {
+	.type = INTEL_GVT_HYPERVISOR_KVM,
 	.host_init = kvmgt_host_init,
 	.host_exit = kvmgt_host_exit,
 	.attach_vgpu = kvmgt_attach_vgpu,
@@ -1868,15 +1873,17 @@ struct intel_gvt_mpt kvmgt_mpt = {
 	.put_vfio_device = kvmgt_put_vfio_device,
 	.is_valid_gfn = kvmgt_is_valid_gfn,
 };
-EXPORT_SYMBOL_GPL(kvmgt_mpt);
 
 static int __init kvmgt_init(void)
 {
+	if (intel_gvt_register_hypervisor(&kvmgt_mpt) < 0)
+		return -ENODEV;
 	return 0;
 }
 
 static void __exit kvmgt_exit(void)
 {
+	intel_gvt_unregister_hypervisor();
 }
 
 module_init(kvmgt_init);
