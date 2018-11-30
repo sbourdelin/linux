@@ -206,6 +206,11 @@ static const union kvm_mmu_page_role mmu_base_role_mask = {
 		({ spte = mmu_spte_get_lockless(_walker.sptep); 1; });	\
 	     __shadow_walk_next(&(_walker), spte))
 
+#define for_each_shadow_spp_entry(_vcpu, _addr, _walker)    \
+	for (shadow_spp_walk_init(&(_walker), _vcpu, _addr);	\
+	     shadow_walk_okay(&(_walker));			\
+	     shadow_walk_next(&(_walker)))
+
 static struct kmem_cache *pte_list_desc_cache;
 static struct kmem_cache *mmu_page_header_cache;
 static struct percpu_counter kvm_total_used_mmu_pages;
@@ -476,6 +481,11 @@ static int is_shadow_present_pte(u64 pte)
 	return (pte != 0) && !is_mmio_spte(pte);
 }
 
+static int is_spp_mide_page_present(u64 pte)
+{
+	return pte & PT_PRESENT_MASK;
+}
+
 static int is_large_pte(u64 pte)
 {
 	return pte & PT_PAGE_SIZE_MASK;
@@ -493,6 +503,11 @@ static int is_last_spte(u64 pte, int level)
 static bool is_executable_pte(u64 spte)
 {
 	return (spte & (shadow_x_mask | shadow_nx_mask)) == shadow_x_mask;
+}
+
+static bool is_spp_spte(struct kvm_mmu_page *sp)
+{
+	return sp->role.spp;
 }
 
 static kvm_pfn_t spte_to_pfn(u64 pte)
@@ -2606,6 +2621,16 @@ static void shadow_walk_init(struct kvm_shadow_walk_iterator *iterator,
 				    addr);
 }
 
+static void shadow_spp_walk_init(struct kvm_shadow_walk_iterator *iterator,
+				 struct kvm_vcpu *vcpu, u64 addr)
+{
+	iterator->addr = addr;
+	iterator->shadow_addr = vcpu->arch.mmu->sppt_root;
+
+	/* SPP Table is a 4-level paging structure */
+	iterator->level = 4;
+}
+
 static bool shadow_walk_okay(struct kvm_shadow_walk_iterator *iterator)
 {
 	if (iterator->level < PT_PAGE_TABLE_LEVEL)
@@ -2656,6 +2681,18 @@ static void link_shadow_page(struct kvm_vcpu *vcpu, u64 *sptep,
 		mark_unsync(sptep);
 }
 
+static void link_spp_shadow_page(struct kvm_vcpu *vcpu, u64 *sptep,
+				 struct kvm_mmu_page *sp)
+{
+	u64 spte;
+
+	spte = __pa(sp->spt) | PT_PRESENT_MASK;
+
+	mmu_spte_set(sptep, spte);
+
+	mmu_page_add_parent_pte(vcpu, sp, sptep);
+}
+
 static void validate_direct_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 				   unsigned direct_access)
 {
@@ -2686,7 +2723,13 @@ static bool mmu_page_zap_pte(struct kvm *kvm, struct kvm_mmu_page *sp,
 
 	pte = *spte;
 	if (is_shadow_present_pte(pte)) {
-		if (is_last_spte(pte, sp->role.level)) {
+		if (is_spp_spte(sp)) {
+			if (sp->role.level == PT_PAGE_TABLE_LEVEL)
+				//spp page do not need to release rmap.
+				return true;
+			child = page_header(pte & PT64_BASE_ADDR_MASK);
+			drop_parent_pte(child, spte);
+		} else if (is_last_spte(pte, sp->role.level)) {
 			drop_spte(kvm, spte);
 			if (is_large_pte(pte))
 				--kvm->stat.lpages;
@@ -4240,6 +4283,77 @@ out_unlock:
 	return RET_PF_RETRY;
 }
 
+static u64 format_spp_spte(u32 spp_wp_bitmap)
+{
+	u64 new_spte = 0;
+	int i = 0;
+
+	/*
+	 * One 4K page contains 32 sub-pages, in SPP table L4E, old bits
+	 * are reserved, so we need to transfer u32 subpage write
+	 * protect bitmap to u64 SPP L4E format.
+	 */
+	while (i < 32) {
+		if (spp_wp_bitmap & (1ULL << i))
+			new_spte |= 1ULL << (i * 2);
+
+		i++;
+	}
+
+	return new_spte;
+}
+
+static void mmu_spp_spte_set(u64 *sptep, u64 new_spte)
+{
+	__set_spte(sptep, new_spte);
+}
+
+int kvm_mmu_setup_spp_structure(struct kvm_vcpu *vcpu,
+				u32 access_map, gfn_t gfn)
+{
+	struct kvm_shadow_walk_iterator iter;
+	struct kvm_mmu_page *sp;
+	gfn_t pseudo_gfn;
+	u64 old_spte, spp_spte;
+	struct kvm *kvm = vcpu->kvm;
+
+	spin_lock(&kvm->mmu_lock);
+
+	/* direct_map spp start */
+
+	if (!VALID_PAGE(vcpu->arch.mmu->sppt_root))
+		goto out_unlock;
+
+	for_each_shadow_spp_entry(vcpu, (u64)gfn << PAGE_SHIFT, iter) {
+		if (iter.level == PT_PAGE_TABLE_LEVEL) {
+			spp_spte = format_spp_spte(access_map);
+			old_spte = mmu_spte_get_lockless(iter.sptep);
+			if (old_spte != spp_spte) {
+				mmu_spp_spte_set(iter.sptep, spp_spte);
+				kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
+			}
+			break;
+		}
+
+		if (!is_spp_mide_page_present(*iter.sptep)) {
+			u64 base_addr = iter.addr;
+
+			base_addr &= PT64_LVL_ADDR_MASK(iter.level);
+			pseudo_gfn = base_addr >> PAGE_SHIFT;
+			sp = kvm_mmu_get_spp_page(vcpu, pseudo_gfn,
+						  iter.level - 1);
+			link_spp_shadow_page(vcpu, iter.sptep, sp);
+		}
+	}
+
+	spin_unlock(&kvm->mmu_lock);
+	return 0;
+
+out_unlock:
+	spin_unlock(&kvm->mmu_lock);
+	return -EFAULT;
+}
+
 int kvm_mmu_get_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
 {
 	u32 *access = spp_info->access_map;
@@ -4264,9 +4378,10 @@ int kvm_mmu_set_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
 	gfn_t gfn = spp_info->base_gfn;
 	int npages = spp_info->npages;
 	struct kvm_memory_slot *slot;
+	struct kvm_vcpu *vcpu;
 	u32 *wp_map;
 	int ret;
-	int i;
+	int i, j;
 
 	for (i = 0; i < npages; i++, gfn++) {
 		slot = gfn_to_memslot(kvm, gfn);
@@ -4290,6 +4405,10 @@ int kvm_mmu_set_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
 				"Please try to disable the huge page\n", gfn);
 			return -EFAULT;
 		}
+
+		kvm_for_each_vcpu(j, vcpu, kvm)
+			kvm_mmu_setup_spp_structure(vcpu, access, gfn);
+
 		wp_map = gfn_to_subpage_wp_info(slot, gfn);
 		*wp_map = access;
 	}
