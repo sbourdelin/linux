@@ -397,6 +397,8 @@ struct kvm_mmu {
 	void (*invlpg)(struct kvm_vcpu *vcpu, gva_t gva, hpa_t root_hpa);
 	void (*update_pte)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 			   u64 *spte, const void *pte);
+	int (*get_subpages)(struct kvm *kvm, struct kvm_subpage *spp_info);
+	int (*set_subpages)(struct kvm *kvm, struct kvm_subpage *spp_info);
 	hpa_t root_hpa;
 	hpa_t sppt_root;
 	union kvm_mmu_role mmu_role;
@@ -784,6 +786,7 @@ struct kvm_lpage_info {
 
 struct kvm_arch_memory_slot {
 	struct kvm_rmap_head *rmap[KVM_NR_PAGE_SIZES];
+	u32 *subpage_wp_info;
 	struct kvm_lpage_info *lpage_info[KVM_NR_PAGE_SIZES - 1];
 	unsigned short *gfn_track[KVM_PAGE_TRACK_MAX];
 };
@@ -1187,6 +1190,9 @@ struct kvm_x86_ops {
 
 	int (*nested_enable_evmcs)(struct kvm_vcpu *vcpu,
 				   uint16_t *vmcs_version);
+
+	int (*get_subpages)(struct kvm *kvm, struct kvm_subpage *spp_info);
+	int (*set_subpages)(struct kvm *kvm, struct kvm_subpage *spp_info);
 };
 
 struct kvm_arch_async_pf {
@@ -1399,6 +1405,9 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t gva, u64 error_code,
 void kvm_mmu_invlpg(struct kvm_vcpu *vcpu, gva_t gva);
 void kvm_mmu_invpcid_gva(struct kvm_vcpu *vcpu, gva_t gva, unsigned long pcid);
 void kvm_mmu_new_cr3(struct kvm_vcpu *vcpu, gpa_t new_cr3, bool skip_tlb_flush);
+
+int kvm_mmu_get_subpages(struct kvm *kvm, struct kvm_subpage *spp_info);
+int kvm_mmu_set_subpages(struct kvm *kvm, struct kvm_subpage *spp_info);
 
 void kvm_enable_tdp(void);
 void kvm_disable_tdp(void);

@@ -8024,6 +8024,11 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->enable_log_dirty_pt_masked = NULL;
 	}
 
+	if (!enable_ept_spp) {
+		kvm_x86_ops->get_subpages = NULL;
+		kvm_x86_ops->set_subpages = NULL;
+	}
+
 	if (!cpu_has_vmx_preemption_timer())
 		kvm_x86_ops->request_immediate_exit = __kvm_request_immediate_exit;
 
@@ -15033,6 +15038,18 @@ static int vmx_set_nested_state(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+static int vmx_get_subpages(struct kvm *kvm,
+			    struct kvm_subpage *spp_info)
+{
+	return kvm_get_subpages(kvm, spp_info);
+}
+
+static int vmx_set_subpages(struct kvm *kvm,
+			    struct kvm_subpage *spp_info)
+{
+	return kvm_set_subpages(kvm, spp_info);
+}
+
 static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -15180,6 +15197,9 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.enable_smi_window = enable_smi_window,
 
 	.nested_enable_evmcs = nested_enable_evmcs,
+
+	.get_subpages = vmx_get_subpages,
+	.set_subpages = vmx_set_subpages,
 };
 
 static void vmx_cleanup_l1d_flush(void)

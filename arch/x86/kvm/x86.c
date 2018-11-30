@@ -4507,6 +4507,44 @@ split_irqchip_unlock:
 	return r;
 }
 
+static int kvm_vm_ioctl_get_subpages(struct kvm *kvm,
+				     struct kvm_subpage *spp_info)
+{
+	return kvm_arch_get_subpages(kvm, spp_info);
+}
+
+static int kvm_vm_ioctl_set_subpages(struct kvm *kvm,
+				     struct kvm_subpage *spp_info)
+{
+	return kvm_arch_set_subpages(kvm, spp_info);
+}
+
+int kvm_get_subpages(struct kvm *kvm,
+		     struct kvm_subpage *spp_info)
+{
+	int ret;
+
+	mutex_lock(&kvm->slots_lock);
+	ret = kvm_mmu_get_subpages(kvm, spp_info);
+	mutex_unlock(&kvm->slots_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(kvm_get_subpages);
+
+int kvm_set_subpages(struct kvm *kvm,
+		     struct kvm_subpage *spp_info)
+{
+	int ret;
+
+	mutex_lock(&kvm->slots_lock);
+	ret = kvm_mmu_set_subpages(kvm, spp_info);
+	mutex_unlock(&kvm->slots_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(kvm_set_subpages);
+
 long kvm_arch_vm_ioctl(struct file *filp,
 		       unsigned int ioctl, unsigned long arg)
 {
@@ -4811,6 +4849,39 @@ set_identity_unlock:
 		if (copy_from_user(&hvevfd, argp, sizeof(hvevfd)))
 			goto out;
 		r = kvm_vm_ioctl_hv_eventfd(kvm, &hvevfd);
+	}
+	case KVM_SUBPAGES_GET_ACCESS: {
+		struct kvm_subpage spp_info;
+
+		r = -EFAULT;
+		if (copy_from_user(&spp_info, argp, sizeof(spp_info)))
+			goto out;
+
+		r = -EINVAL;
+		if (spp_info.npages == 0 ||
+		    spp_info.npages > SUBPAGE_MAX_BITMAP)
+			goto out;
+
+		r = kvm_vm_ioctl_get_subpages(kvm, &spp_info);
+		if (copy_to_user(argp, &spp_info, sizeof(spp_info))) {
+			r = -EFAULT;
+			goto out;
+		}
+		break;
+	}
+	case KVM_SUBPAGES_SET_ACCESS: {
+		struct kvm_subpage spp_info;
+
+		r = -EFAULT;
+		if (copy_from_user(&spp_info, argp, sizeof(spp_info)))
+			goto out;
+
+		r = -EINVAL;
+		if (spp_info.npages == 0 ||
+		    spp_info.npages > SUBPAGE_MAX_BITMAP)
+			goto out;
+
+		r = kvm_vm_ioctl_set_subpages(kvm, &spp_info);
 		break;
 	}
 	default:
@@ -9152,6 +9223,34 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 	kvm_hv_destroy_vm(kvm);
 }
 
+int kvm_subpage_create_memslot(struct kvm_memory_slot *slot,
+			       unsigned long npages)
+{
+	int lpages;
+
+	lpages = gfn_to_index(slot->base_gfn + npages - 1,
+			      slot->base_gfn, 1) + 1;
+
+	slot->arch.subpage_wp_info =
+	      kvzalloc(lpages * sizeof(*slot->arch.subpage_wp_info),
+		       GFP_KERNEL);
+
+	if (!slot->arch.subpage_wp_info)
+		return -ENOMEM;
+
+	return 0;
+}
+
+void kvm_subpage_free_memslot(struct kvm_memory_slot *free,
+			      struct kvm_memory_slot *dont)
+{
+	if (!dont || free->arch.subpage_wp_info !=
+		dont->arch.subpage_wp_info) {
+		kvfree(free->arch.subpage_wp_info);
+		free->arch.subpage_wp_info = NULL;
+	}
+}
+
 void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
 			   struct kvm_memory_slot *dont)
 {
@@ -9173,6 +9272,7 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
 	}
 
 	kvm_page_track_free_memslot(free, dont);
+	kvm_subpage_free_memslot(free, dont);
 }
 
 int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
@@ -9225,8 +9325,12 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 	if (kvm_page_track_create_memslot(slot, npages))
 		goto out_free;
 
-	return 0;
+	if (kvm_subpage_create_memslot(slot, npages))
+		goto out_free_page_track;
 
+	return 0;
+out_free_page_track:
+	kvm_page_track_free_memslot(slot, NULL);
 out_free:
 	for (i = 0; i < KVM_NR_PAGE_SIZES; ++i) {
 		kvfree(slot->arch.rmap[i]);
@@ -9711,6 +9815,24 @@ int kvm_arch_update_irqfd_routing(struct kvm *kvm, unsigned int host_irq,
 		return -EINVAL;
 
 	return kvm_x86_ops->update_pi_irte(kvm, host_irq, guest_irq, set);
+}
+
+int kvm_arch_get_subpages(struct kvm *kvm,
+			  struct kvm_subpage *spp_info)
+{
+	if (!kvm_x86_ops->get_subpages)
+		return -EINVAL;
+
+	return kvm_x86_ops->get_subpages(kvm, spp_info);
+}
+
+int kvm_arch_set_subpages(struct kvm *kvm,
+			  struct kvm_subpage *spp_info)
+{
+	if (!kvm_x86_ops->set_subpages)
+		return -EINVAL;
+
+	return kvm_x86_ops->set_subpages(kvm, spp_info);
 }
 
 bool kvm_vector_hashing_enabled(void)

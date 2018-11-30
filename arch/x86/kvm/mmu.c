@@ -1430,6 +1430,15 @@ out:
 	return sptep;
 }
 
+static u32 *gfn_to_subpage_wp_info(struct kvm_memory_slot *slot,
+				   gfn_t gfn)
+{
+	unsigned long idx;
+
+	idx = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
+	return &slot->arch.subpage_wp_info[idx];
+}
+
 #define for_each_rmap_spte(_rmap_head_, _iter_, _spte_)			\
 	for (_spte_ = rmap_get_first(_rmap_head_, _iter_);		\
 	     _spte_; _spte_ = rmap_get_next(_iter_))
@@ -4150,6 +4159,44 @@ out_unlock:
 	return RET_PF_RETRY;
 }
 
+int kvm_mmu_get_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
+{
+	u32 *access = spp_info->access_map;
+	gfn_t gfn = spp_info->base_gfn;
+	int npages = spp_info->npages;
+	struct kvm_memory_slot *slot;
+	int i;
+
+	for (i = 0; i < npages; i++, gfn++) {
+		slot = gfn_to_memslot(kvm, gfn);
+		if (!slot)
+			return -EFAULT;
+		access[i] = *gfn_to_subpage_wp_info(slot, gfn);
+	}
+
+	return i;
+}
+
+int kvm_mmu_set_subpages(struct kvm *kvm, struct kvm_subpage *spp_info)
+{
+	u32 access = spp_info->access_map[0];
+	gfn_t gfn = spp_info->base_gfn;
+	int npages = spp_info->npages;
+	struct kvm_memory_slot *slot;
+	u32 *wp_map;
+	int i;
+
+	for (i = 0; i < npages; i++, gfn++) {
+		slot = gfn_to_memslot(kvm, gfn);
+		if (!slot)
+			return -EFAULT;
+		wp_map = gfn_to_subpage_wp_info(slot, gfn);
+		*wp_map = access;
+	}
+
+	return i;
+}
+
 static void nonpaging_init_context(struct kvm_vcpu *vcpu,
 				   struct kvm_mmu *context)
 {
@@ -4844,6 +4891,8 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 	context->get_cr3 = get_cr3;
 	context->get_pdptr = kvm_pdptr_read;
 	context->inject_page_fault = kvm_inject_page_fault;
+	context->get_subpages = kvm_x86_ops->get_subpages;
+	context->set_subpages = kvm_x86_ops->set_subpages;
 
 	if (!is_paging(vcpu)) {
 		context->nx = false;
