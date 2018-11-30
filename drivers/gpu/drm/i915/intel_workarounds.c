@@ -55,6 +55,19 @@ static void wa_init_start(struct i915_wa_list *wal, const char *name)
 
 static void wa_init_finish(struct i915_wa_list *wal)
 {
+	/* Trim unused entries. */
+	if (wal->count < wal->__size) {
+		struct i915_wa *wa =
+			kcalloc(wal->count, sizeof(*wa), GFP_KERNEL);
+
+		if (wa) {
+			memcpy(wa, wal->list, sizeof(*wa) * wal->count);
+			kfree(wal->list);
+			wal->list = wa;
+			wal->__size = wal->count;
+		}
+	}
+
 	if (wal->count)
 		DRM_DEBUG_DRIVER("Initialized %u %s workarounds\n",
 				 wal->wa_count, wal->name);
