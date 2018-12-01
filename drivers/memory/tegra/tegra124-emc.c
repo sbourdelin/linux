@@ -1027,7 +1027,7 @@ static int emc_debug_rate_set(void *data, u64 rate)
 DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
 			emc_debug_rate_set, "%lld\n");
 
-static int emc_debug_supported_rates_show(struct seq_file *s, void *data)
+static int emc_supported_rates_show(struct seq_file *s, void *data)
 {
 	struct tegra_emc *emc = s->private;
 	const char *prefix = "";
@@ -1046,19 +1046,7 @@ static int emc_debug_supported_rates_show(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int emc_debug_supported_rates_open(struct inode *inode,
-					  struct file *file)
-{
-	return single_open(file, emc_debug_supported_rates_show,
-			   inode->i_private);
-}
-
-static const struct file_operations emc_debug_supported_rates_fops = {
-	.open = emc_debug_supported_rates_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(emc_supported_rates);
 
 static void emc_debugfs_init(struct device *dev, struct tegra_emc *emc)
 {
@@ -1083,7 +1071,7 @@ static void emc_debugfs_init(struct device *dev, struct tegra_emc *emc)
 		dev_err(dev, "failed to create debugfs entry\n");
 
 	file = debugfs_create_file("supported_rates", S_IRUGO, root, emc,
-				   &emc_debug_supported_rates_fops);
+				   &emc_supported_rates_fops);
 	if (!file)
 		dev_err(dev, "failed to create debugfs entry\n");
 }
