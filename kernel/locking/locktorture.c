@@ -790,7 +790,7 @@ lock_torture_print_module_parms(struct lock_torture_ops *cur_ops,
 {
 	pr_alert("%s" TORTURE_FLAG
 		 "--- %s%s: nwriters_stress=%d nreaders_stress=%d stat_interval=%d verbose=%d shuffle_interval=%d stutter=%d shutdown_secs=%d onoff_interval=%d onoff_holdoff=%d\n",
-		 torture_type, tag, cxt.debug_lock ? " [debug]": "",
+		 torture_type, tag, cxt.debug_lock ? " [debug]" : "",
 		 cxt.nrealwriters_stress, cxt.nrealreaders_stress, stat_interval,
 		 verbose, shuffle_interval, stutter, shutdown_secs,
 		 onoff_interval, onoff_holdoff);
