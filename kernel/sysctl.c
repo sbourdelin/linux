@@ -191,7 +191,7 @@ extern int no_unaligned_warning;
  * 	file position 0 and the value must be fully contained in the buffer
  * 	sent to the write syscall. If dealing with strings respect the file
  * 	position, but restrict this to the max length of the buffer, anything
- * 	passed the max lenght will be ignored. Multiple writes will append
+ * 	passed the max length will be ignored. Multiple writes will append
  * 	to the buffer.
  *
  * These write modes control how current file position affects the behavior of

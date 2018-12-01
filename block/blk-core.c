@@ -653,7 +653,7 @@ void blk_queue_bypass_start(struct request_queue *q)
 
 	/*
 	 * Queues start drained.  Skip actual draining till init is
-	 * complete.  This avoids lenghty delays during queue init which
+	 * complete.  This avoids lengthy delays during queue init which
 	 * can happen many times during boot.
 	 */
 	if (blk_queue_init_done(q)) {
