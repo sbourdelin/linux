@@ -114,7 +114,7 @@ static void fmc_sdb_dump_recursive(struct fmc_device *fmc, struct seq_file *s,
 	}
 }
 
-static int fmc_sdb_dump(struct seq_file *s, void *offset)
+static int fmc_sdb_dump_show(struct seq_file *s, void *offset)
 {
 	struct fmc_device *fmc = s->private;
 
@@ -131,22 +131,7 @@ static int fmc_sdb_dump(struct seq_file *s, void *offset)
 	return 0;
 }
 
-
-static int fmc_sdb_dump_open(struct inode *inode, struct file *file)
-{
-	struct fmc_device *fmc = inode->i_private;
-
-	return single_open(file, fmc_sdb_dump, fmc);
-}
-
-
-const struct file_operations fmc_dbgfs_sdb_dump = {
-	.owner = THIS_MODULE,
-	.open  = fmc_sdb_dump_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(fmc_sdb_dump);
 
 int fmc_debug_init(struct fmc_device *fmc)
 {
@@ -158,7 +143,7 @@ int fmc_debug_init(struct fmc_device *fmc)
 
 	fmc->dbg_sdb_dump = debugfs_create_file(FMC_DBG_SDB_DUMP, 0444,
 						fmc->dbg_dir, fmc,
-						&fmc_dbgfs_sdb_dump);
+						&fmc_sdb_dump_fops);
 	if (IS_ERR_OR_NULL(fmc->dbg_sdb_dump))
 		pr_err("FMC: Cannot create debugfs file %s\n",
 		       FMC_DBG_SDB_DUMP);
