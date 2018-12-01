@@ -1641,7 +1641,7 @@ int __cpuhp_state_add_instance_cpuslocked(enum cpuhp_state state,
 	lockdep_assert_cpus_held();
 
 	sp = cpuhp_get_step(state);
-	if (sp->multi_instance == false)
+	if (!sp->multi_instance)
 		return -EINVAL;
 
 	mutex_lock(&cpuhp_state_mutex);
