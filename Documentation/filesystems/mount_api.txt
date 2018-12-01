@@ -258,7 +258,7 @@ manage the filesystem context.  They are as follows:
  (*) int (*validate)(struct fs_context *fc);
 
      Called when all the options have been applied and the mount is about to
-     take place.  It is should check for inconsistencies from mount options and
+     take place.  It should check for inconsistencies from mount options and
      it is also allowed to do preliminary resource acquisition.  For instance,
      the core NFS module could load the NFS protocol module here.
 
@@ -438,7 +438,7 @@ returned.
  (*) int vfs_parse_fs_param(struct fs_context *fc,
 			    struct fs_parameter *param);
 
-     Supply a single mount parameter to the filesystem context.  This include
+     Supply a single mount parameter to the filesystem context.  This includes
      the specification of the source/device which is specified as the "source"
      parameter (which may be specified multiple times if the filesystem
      supports that).
@@ -533,7 +533,7 @@ The members are as follows:
      used in the values that the ->keys[] array maps to.
 
      It is expected that, for example, two parameters that are related, say
-     "acl" and "noacl" with have the same ID, but will be flagged to indicate
+     "acl" and "noacl" will have the same ID, but will be flagged to indicate
      that one is the inverse of the other.  The value can then be picked out
      from the parse result.
 
@@ -574,9 +574,9 @@ The members are as follows:
      For example:
 
 	static const struct fs_parameter_spec afs_param_specs[nr__afs_params] = {
-		[Opt_autocell]	= { fs_param_is flag },
+		[Opt_autocell]	= { fs_param_is_flag },
 		[Opt_bar]	= { fs_param_is_enum },
-		[Opt_dyn]	= { fs_param_is flag },
+		[Opt_dyn]	= { fs_param_is_flag },
 		[Opt_foo]	= { fs_param_is_bool, fs_param_neg_with_no },
 		[Opt_source]	= { fs_param_is_string },
 	};
@@ -725,7 +725,7 @@ process the parameters it is given.
 
  (*) bool fs_validate_description(const struct fs_parameter_description *desc);
 
-     This is validates the parameter description.  It returns true if the
+     This validates the parameter description.  It returns true if the
      description is good and false if it is not.
 
  (*) int fs_lookup_param(struct fs_context *fc,
