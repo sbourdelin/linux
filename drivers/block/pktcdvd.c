@@ -106,7 +106,7 @@ static struct dentry	*pkt_debugfs_root = NULL; /* /sys/kernel/debug/pktcdvd */
 /* forward declaration */
 static int pkt_setup_dev(dev_t dev, dev_t* pkt_dev);
 static int pkt_remove_dev(dev_t pkt_dev);
-static int pkt_seq_show(struct seq_file *m, void *p);
+static int pkt_debugfs_show(struct seq_file *m, void *p);
 
 static sector_t get_zone(sector_t sector, struct pktcdvd_device *pd)
 {
@@ -452,23 +452,7 @@ static void pkt_sysfs_cleanup(void)
 
  *******************************************************************/
 
-static int pkt_debugfs_seq_show(struct seq_file *m, void *p)
-{
-	return pkt_seq_show(m, p);
-}
-
-static int pkt_debugfs_fops_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, pkt_debugfs_seq_show, inode->i_private);
-}
-
-static const struct file_operations debug_fops = {
-	.open		= pkt_debugfs_fops_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-	.owner		= THIS_MODULE,
-};
+DEFINE_SHOW_ATTRIBUTE(pkt_debugfs);
 
 static void pkt_debugfs_dev_new(struct pktcdvd_device *pd)
 {
@@ -479,7 +463,8 @@ static void pkt_debugfs_dev_new(struct pktcdvd_device *pd)
 		return;
 
 	pd->dfs_f_info = debugfs_create_file("info", 0444,
-					     pd->dfs_d_root, pd, &debug_fops);
+					     pd->dfs_d_root, pd,
+					     &pkt_debugfs_fops);
 }
 
 static void pkt_debugfs_dev_remove(struct pktcdvd_device *pd)
@@ -2499,7 +2484,7 @@ static void pkt_init_queue(struct pktcdvd_device *pd)
 	q->queuedata = pd;
 }
 
-static int pkt_seq_show(struct seq_file *m, void *p)
+static int pkt_debugfs_show(struct seq_file *m, void *p)
 {
 	struct pktcdvd_device *pd = m->private;
 	char *msg;
@@ -2615,7 +2600,7 @@ static int pkt_new_dev(struct pktcdvd_device *pd, dev_t dev)
 		goto out_mem;
 	}
 
-	proc_create_single_data(pd->name, 0, pkt_proc, pkt_seq_show, pd);
+	proc_create_single_data(pd->name, 0, pkt_proc, pkt_debugfs_show, pd);
 	pkt_dbg(1, pd, "writer mapped to %s\n", bdevname(bdev, b));
 	return 0;
 
@@ -2626,7 +2611,8 @@ out_mem:
 	return ret;
 }
 
-static int pkt_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd, unsigned long arg)
+static int pkt_ioctl(struct block_device *bdev, fmode_t mode,
+		     unsigned int cmd, unsigned long arg)
 {
 	struct pktcdvd_device *pd = bdev->bd_disk->private_data;
 	int ret;
@@ -2859,7 +2845,8 @@ static void pkt_get_status(struct pkt_ctrl_command *ctrl_cmd)
 	mutex_unlock(&ctl_mutex);
 }
 
-static long pkt_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long pkt_ctl_ioctl(struct file *file, unsigned int cmd,
+			  unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	struct pkt_ctrl_command ctrl_cmd;
@@ -2897,7 +2884,8 @@ static long pkt_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 }
 
 #ifdef CONFIG_COMPAT
-static long pkt_ctl_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long pkt_ctl_compat_ioctl(struct file *file, unsigned int cmd,
+				  unsigned long arg)
 {
 	return pkt_ctl_ioctl(file, cmd, (unsigned long)compat_ptr(arg));
 }
