@@ -892,18 +892,7 @@ static int drbd_version_show(struct seq_file *m, void *ignored)
 	return 0;
 }
 
-static int drbd_version_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, drbd_version_show, NULL);
-}
-
-static const struct file_operations drbd_version_fops = {
-	.owner = THIS_MODULE,
-	.open = drbd_version_open,
-	.llseek = seq_lseek,
-	.read = seq_read,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(drbd_version);
 
 /* not __exit, may be indirectly called
  * from the module-load-failure path as well. */
