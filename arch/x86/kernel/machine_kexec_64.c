@@ -352,10 +352,24 @@ void machine_kexec(struct kimage *image)
 
 void arch_crash_save_vmcoreinfo(void)
 {
+	u64 sme_mask = sme_me_mask;
+
 	VMCOREINFO_NUMBER(phys_base);
 	VMCOREINFO_SYMBOL(init_top_pgt);
 	vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
 			pgtable_l5_enabled());
+	/*
+	 * Currently, the local variable 'sme_mask' stores the value of
+	 * sme_me_mask(bit 47), and also write the value of sme_mask to
+	 * the vmcoreinfo.
+	 * If need, the bit(sme_mask) might be redefined in the future,
+	 * but the 'bit63' will be reserved.
+	 * For example:
+	 * [ misc	   ][ enc bit  ][ other misc SME info       ]
+	 * 0000_0000_0000_0000_1000_0000_0000_0000_0000_0000_..._0000
+	 * 63   59   55   51   47   43   39   35   31   27   ... 3
+	 */
+	VMCOREINFO_NUMBER(sme_mask);
 
 #ifdef CONFIG_NUMA
 	VMCOREINFO_SYMBOL(node_data);
