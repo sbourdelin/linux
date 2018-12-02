@@ -1,0 +1,23 @@
+Analog Devices AD5933/AD5934 Impedance Converter, Network Analyzer
+
+https://www.analog.com/media/en/technical-documentation/data-sheets/AD5933.pdf
+https://www.analog.com/media/en/technical-documentation/data-sheets/AD5934.pdf
+
+Required properties:
+ - compatible : should be one of
+		"adi,ad5933"
+		"adi,ad5934"
+ - reg : the I2C address
+ - vdd-supply : supply reference for the device.
+
+Optional properties:
+ - vref_mv : default voltage reference.
+ - ext_clk_hz : external master clock for the system.
+
+Example:
+
+	impedance-analyzer@0d {
+		compatible = "adi,ad5933";
+		reg = <0x0d>;
+		vdd-supply = <&vdd_supply>;
+	};
