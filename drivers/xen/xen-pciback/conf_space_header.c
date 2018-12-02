@@ -150,20 +150,20 @@ static int rom_write(struct pci_dev *dev, int offset, u32 value, void *data)
 	if ((value | ~PCI_ROM_ADDRESS_MASK) == ~0U)
 		bar->which = 1;
 	else {
-		u32 tmpval;
-		err = pci_read_config_dword(dev, offset, &tmpval);
+		u32 newval = bar->val;
+
+		/* Allow enabling/disabling rom, if present */
+		if (newval & PCI_ROM_ADDRESS_MASK) {
+			newval &= ~PCI_ROM_ADDRESS_ENABLE;
+			newval |= value & PCI_ROM_ADDRESS_ENABLE;
+		}
+
+		err = pci_write_config_dword(dev, offset, newval);
 		if (err)
 			goto out;
-		if (tmpval != bar->val && value == bar->val) {
-			/* Allow restoration of bar value. */
-			err = pci_write_config_dword(dev, offset, bar->val);
-			if (err)
-				goto out;
-		}
+		bar->val = newval;
 		bar->which = 0;
 	}
-
-	/* Do we need to support enabling/disabling the rom address here? */
 
 out:
 	return err;
