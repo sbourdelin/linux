@@ -135,6 +135,7 @@ static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 
 static int rom_write(struct pci_dev *dev, int offset, u32 value, void *data)
 {
+	int err = 0;
 	struct pci_bar_info *bar = data;
 
 	if (unlikely(!bar)) {
@@ -150,17 +151,22 @@ static int rom_write(struct pci_dev *dev, int offset, u32 value, void *data)
 		bar->which = 1;
 	else {
 		u32 tmpval;
-		pci_read_config_dword(dev, offset, &tmpval);
+		err = pci_read_config_dword(dev, offset, &tmpval);
+		if (err)
+			goto out;
 		if (tmpval != bar->val && value == bar->val) {
 			/* Allow restoration of bar value. */
-			pci_write_config_dword(dev, offset, bar->val);
+			err = pci_write_config_dword(dev, offset, bar->val);
+			if (err)
+				goto out;
 		}
 		bar->which = 0;
 	}
 
 	/* Do we need to support enabling/disabling the rom address here? */
 
-	return 0;
+out:
+	return err;
 }
 
 /* For the BARs, only allow writes which write ~0 or
@@ -169,6 +175,7 @@ static int rom_write(struct pci_dev *dev, int offset, u32 value, void *data)
  */
 static int bar_write(struct pci_dev *dev, int offset, u32 value, void *data)
 {
+	int err = 0;
 	struct pci_bar_info *bar = data;
 	unsigned int pos = (offset - PCI_BASE_ADDRESS_0) / 4;
 	const struct resource *res = dev->resource;
@@ -193,15 +200,20 @@ static int bar_write(struct pci_dev *dev, int offset, u32 value, void *data)
 		bar->which = 1;
 	else {
 		u32 tmpval;
-		pci_read_config_dword(dev, offset, &tmpval);
+		err = pci_read_config_dword(dev, offset, &tmpval);
+		if (err)
+			goto out;
 		if (tmpval != bar->val && value == bar->val) {
 			/* Allow restoration of bar value. */
-			pci_write_config_dword(dev, offset, bar->val);
+			err = pci_write_config_dword(dev, offset, bar->val);
+			if (err)
+				goto out;
 		}
 		bar->which = 0;
 	}
 
-	return 0;
+out:
+	return err;
 }
 
 static int bar_read(struct pci_dev *dev, int offset, u32 * value, void *data)
