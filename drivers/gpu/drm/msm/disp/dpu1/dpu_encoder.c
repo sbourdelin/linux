@@ -1871,7 +1871,7 @@ void dpu_encoder_prepare_commit(struct drm_encoder *drm_enc)
 }
 
 #ifdef CONFIG_DEBUG_FS
-static int _dpu_encoder_status_show(struct seq_file *s, void *data)
+static int status_show(struct seq_file *s, void *data)
 {
 	struct dpu_encoder_virt *dpu_enc;
 	int i;
@@ -1910,11 +1910,7 @@ static int _dpu_encoder_status_show(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int _dpu_encoder_debugfs_status_open(struct inode *inode,
-		struct file *file)
-{
-	return single_open(file, _dpu_encoder_status_show, inode->i_private);
-}
+DEFINE_SHOW_ATTRIBUTE(status);
 
 static int _dpu_encoder_init_debugfs(struct drm_encoder *drm_enc)
 {
@@ -1922,13 +1918,6 @@ static int _dpu_encoder_init_debugfs(struct drm_encoder *drm_enc)
 	struct msm_drm_private *priv;
 	struct dpu_kms *dpu_kms;
 	int i;
-
-	static const struct file_operations debugfs_status_fops = {
-		.open =		_dpu_encoder_debugfs_status_open,
-		.read =		seq_read,
-		.llseek =	seq_lseek,
-		.release =	single_release,
-	};
 
 	char name[DPU_NAME_SIZE];
 
@@ -1951,7 +1940,7 @@ static int _dpu_encoder_init_debugfs(struct drm_encoder *drm_enc)
 
 	/* don't error check these */
 	debugfs_create_file("status", 0600,
-		dpu_enc->debugfs_root, dpu_enc, &debugfs_status_fops);
+		dpu_enc->debugfs_root, dpu_enc, &status_fops);
 
 	for (i = 0; i < dpu_enc->num_phys_encs; i++)
 		if (dpu_enc->phys_encs[i] &&

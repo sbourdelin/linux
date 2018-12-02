@@ -28,7 +28,7 @@ static int armada_debugfs_gem_linear_show(struct seq_file *m, void *data)
 	return 0;
 }
 
-static int armada_debugfs_reg_show(struct seq_file *m, void *data)
+static int reg_show(struct seq_file *m, void *data)
 {
 	struct drm_device *dev = m->private;
 	struct armada_private *priv = dev->dev_private;
@@ -50,18 +50,7 @@ static int armada_debugfs_reg_show(struct seq_file *m, void *data)
 	return 0;
 }
 
-static int armada_debugfs_reg_r_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, armada_debugfs_reg_show, inode->i_private);
-}
-
-static const struct file_operations fops_reg_r = {
-	.owner = THIS_MODULE,
-	.open = armada_debugfs_reg_r_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(reg);
 
 static int armada_debugfs_write(struct file *file, const char __user *ptr,
 	size_t len, loff_t *off)
@@ -119,12 +108,14 @@ int armada_drm_debugfs_init(struct drm_minor *minor)
 		return ret;
 
 	de = debugfs_create_file("reg", S_IFREG | S_IRUSR,
-				 minor->debugfs_root, minor->dev, &fops_reg_r);
+				 minor->debugfs_root, minor->dev,
+				 &reg_fops);
 	if (!de)
 		return -ENOMEM;
 
 	de = debugfs_create_file("reg_wr", S_IFREG | S_IWUSR,
-				 minor->debugfs_root, minor->dev, &fops_reg_w);
+				 minor->debugfs_root, minor->dev,
+				 &fops_reg_w);
 	if (!de)
 		return -ENOMEM;
 

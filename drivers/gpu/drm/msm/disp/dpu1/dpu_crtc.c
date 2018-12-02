@@ -1309,7 +1309,7 @@ int dpu_crtc_vblank(struct drm_crtc *crtc, bool en)
 }
 
 #ifdef CONFIG_DEBUG_FS
-static int _dpu_debugfs_status_show(struct seq_file *s, void *data)
+static int status_show(struct seq_file *s, void *data)
 {
 	struct dpu_crtc *dpu_crtc;
 	struct dpu_plane_state *pstate = NULL;
@@ -1428,24 +1428,6 @@ static int _dpu_debugfs_status_show(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int _dpu_debugfs_status_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, _dpu_debugfs_status_show, inode->i_private);
-}
-
-#define DEFINE_DPU_DEBUGFS_SEQ_FOPS(__prefix)                          \
-static int __prefix ## _open(struct inode *inode, struct file *file)	\
-{									\
-	return single_open(file, __prefix ## _show, inode->i_private);	\
-}									\
-static const struct file_operations __prefix ## _fops = {		\
-	.owner = THIS_MODULE,						\
-	.open = __prefix ## _open,					\
-	.release = single_release,					\
-	.read = seq_read,						\
-	.llseek = seq_lseek,						\
-}
-
 static int dpu_crtc_debugfs_state_show(struct seq_file *s, void *v)
 {
 	struct drm_crtc *crtc = (struct drm_crtc *) s->private;
@@ -1468,19 +1450,14 @@ static int dpu_crtc_debugfs_state_show(struct seq_file *s, void *v)
 
 	return 0;
 }
-DEFINE_DPU_DEBUGFS_SEQ_FOPS(dpu_crtc_debugfs_state);
+
+DEFINE_SHOW_ATTRIBUTE(dpu_crtc_debugfs_state);
+DEFINE_SHOW_ATTRIBUTE(status);
 
 static int _dpu_crtc_init_debugfs(struct drm_crtc *crtc)
 {
 	struct dpu_crtc *dpu_crtc;
 	struct dpu_kms *dpu_kms;
-
-	static const struct file_operations debugfs_status_fops = {
-		.open =		_dpu_debugfs_status_open,
-		.read =		seq_read,
-		.llseek =	seq_lseek,
-		.release =	single_release,
-	};
 
 	if (!crtc)
 		return -EINVAL;
@@ -1496,7 +1473,7 @@ static int _dpu_crtc_init_debugfs(struct drm_crtc *crtc)
 	/* don't error check these */
 	debugfs_create_file("status", 0400,
 			dpu_crtc->debugfs_root,
-			dpu_crtc, &debugfs_status_fops);
+			dpu_crtc, &status_fops);
 	debugfs_create_file("state", 0600,
 			dpu_crtc->debugfs_root,
 			&dpu_crtc->base,
