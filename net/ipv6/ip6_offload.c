@@ -270,6 +270,8 @@ out:
 
 	return pp;
 }
+INDIRECT_CALLABLE(ipv6_gro_receive, 2, struct sk_buff *, network_gro_receive,
+		  struct list_head *, struct sk_buff *);
 
 static struct sk_buff *sit_ip6ip6_gro_receive(struct list_head *head,
 					      struct sk_buff *skb)
@@ -327,6 +329,8 @@ out_unlock:
 
 	return err;
 }
+INDIRECT_CALLABLE(ipv6_gro_complete, 2, int, network_gro_complete,
+		  struct sk_buff *, int);
 
 static int sit_gro_complete(struct sk_buff *skb, int nhoff)
 {
