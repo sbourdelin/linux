@@ -36,10 +36,7 @@ static inline void syscall_set_return_value(struct task_struct *task,
 					    struct pt_regs *regs,
 					    int error, long val)
 {
-	if (error)
-		regs->r3 = -error;
-	else
-		regs->r3 = val;
+	regs->r3 = error ?: val;
 }
 
 static inline microblaze_reg_t microblaze_get_syscall_arg(struct pt_regs *regs,
