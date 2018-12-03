@@ -87,6 +87,10 @@ static int hpsa_simple_mode;
 module_param(hpsa_simple_mode, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(hpsa_simple_mode,
 	"Use 'simple mode' rather than 'performant mode'");
+static bool hpsa_disable_irq_affinity;
+module_param(hpsa_disable_irq_affinity, bool, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(hpsa_disable_irq_affinity,
+	"Turn off managed irq affinity. Allows smp_affinity to be changed.");
 
 /* define the PCI info for the cards we can control */
 static const struct pci_device_id hpsa_pci_device_id[] = {
@@ -7394,7 +7398,7 @@ fallback:
  */
 static int hpsa_interrupt_mode(struct ctlr_info *h)
 {
-	unsigned int flags = PCI_IRQ_LEGACY;
+	unsigned int flags;
 	int ret;
 
 	/* Some boards advertise MSI but don't really support it */
@@ -7405,17 +7409,20 @@ static int hpsa_interrupt_mode(struct ctlr_info *h)
 	case 0x40830E11:
 		break;
 	default:
+		flags = PCI_IRQ_MSIX;
+		if (!hpsa_disable_irq_affinity)
+			flags |= PCI_IRQ_AFFINITY;
 		ret = pci_alloc_irq_vectors(h->pdev, 1, MAX_REPLY_QUEUES,
-				PCI_IRQ_MSIX | PCI_IRQ_AFFINITY);
+				flags);
 		if (ret > 0) {
 			h->msix_vectors = ret;
 			return 0;
 		}
 
-		flags |= PCI_IRQ_MSI;
 		break;
 	}
 
+	flags = PCI_IRQ_LEGACY | PCI_IRQ_MSI;
 	ret = pci_alloc_irq_vectors(h->pdev, 1, 1, flags);
 	if (ret < 0)
 		return ret;
