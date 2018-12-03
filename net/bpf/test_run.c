@@ -14,21 +14,33 @@
 #include <net/tcp.h>
 
 static __always_inline u32 bpf_test_run_one(struct bpf_prog *prog, void *ctx,
-		struct bpf_cgroup_storage *storage[MAX_BPF_CGROUP_STORAGE_TYPE])
+		struct bpf_cgroup_storage *storage[MAX_BPF_CGROUP_STORAGE_TYPE],
+		struct bpf_flow_keys *flow_keys)
 {
 	u32 ret;
 
 	preempt_disable();
 	rcu_read_lock();
 	bpf_cgroup_storage_set(storage);
-	ret = BPF_PROG_RUN(prog, ctx);
+
+	switch (prog->type) {
+	case BPF_PROG_TYPE_FLOW_DISSECTOR:
+		ret = __skb_flow_bpf_dissect(prog, ctx, &flow_keys_dissector,
+					     flow_keys);
+		break;
+	default:
+		ret = BPF_PROG_RUN(prog, ctx);
+		break;
+	}
+
 	rcu_read_unlock();
 	preempt_enable();
 
 	return ret;
 }
 
-static u32 bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat, u32 *time)
+static u32 bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat, u32 *time,
+			struct bpf_flow_keys *flow_keys)
 {
 	struct bpf_cgroup_storage *storage[MAX_BPF_CGROUP_STORAGE_TYPE] = { 0 };
 	enum bpf_cgroup_storage_type stype;
@@ -49,7 +61,7 @@ static u32 bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat, u32 *time)
 		repeat = 1;
 	time_start = ktime_get_ns();
 	for (i = 0; i < repeat; i++) {
-		ret = bpf_test_run_one(prog, ctx, storage);
+		ret = bpf_test_run_one(prog, ctx, storage, flow_keys);
 		if (need_resched()) {
 			if (signal_pending(current))
 				break;
@@ -176,7 +188,7 @@ int bpf_prog_test_run_skb(struct bpf_prog *prog, const union bpf_attr *kattr,
 		__skb_push(skb, hh_len);
 	if (is_direct_pkt_access)
 		bpf_compute_data_pointers(skb);
-	retval = bpf_test_run(prog, skb, repeat, &duration);
+	retval = bpf_test_run(prog, skb, repeat, &duration, NULL);
 	if (!is_l2) {
 		if (skb_headroom(skb) < hh_len) {
 			int nhead = HH_DATA_ALIGN(hh_len - skb_headroom(skb));
@@ -223,11 +235,63 @@ int bpf_prog_test_run_xdp(struct bpf_prog *prog, const union bpf_attr *kattr,
 	rxqueue = __netif_get_rx_queue(current->nsproxy->net_ns->loopback_dev, 0);
 	xdp.rxq = &rxqueue->xdp_rxq;
 
-	retval = bpf_test_run(prog, &xdp, repeat, &duration);
+	retval = bpf_test_run(prog, &xdp, repeat, &duration, NULL);
 	if (xdp.data != data + XDP_PACKET_HEADROOM + NET_IP_ALIGN ||
 	    xdp.data_end != xdp.data + size)
 		size = xdp.data_end - xdp.data;
 	ret = bpf_test_finish(kattr, uattr, xdp.data, size, retval, duration);
 	kfree(data);
+	return ret;
+}
+
+int bpf_prog_test_run_flow_dissector(struct bpf_prog *prog,
+				     const union bpf_attr *kattr,
+				     union bpf_attr __user *uattr)
+{
+	struct bpf_flow_keys flow_keys = {};
+	u32 size = kattr->test.data_size_in;
+	u32 repeat = kattr->test.repeat;
+	u32 retval, duration;
+	struct sk_buff *skb;
+	struct sock *sk;
+	void *data;
+	int ret;
+
+	if (prog->type != BPF_PROG_TYPE_FLOW_DISSECTOR)
+		return -EINVAL;
+
+	data = bpf_test_init(kattr, size, NET_SKB_PAD + NET_IP_ALIGN,
+			     SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+	if (IS_ERR(data))
+		return PTR_ERR(data);
+
+	sk = kzalloc(sizeof(*sk), GFP_USER);
+	if (!sk) {
+		kfree(data);
+		return -ENOMEM;
+	}
+	sock_net_set(sk, current->nsproxy->net_ns);
+	sock_init_data(NULL, sk);
+
+	skb = build_skb(data, 0);
+	if (!skb) {
+		kfree(data);
+		kfree(sk);
+		return -ENOMEM;
+	}
+	skb->sk = sk;
+
+	skb_reserve(skb, NET_SKB_PAD + NET_IP_ALIGN);
+	__skb_put(skb, size);
+	skb->protocol = eth_type_trans(skb,
+				       current->nsproxy->net_ns->loopback_dev);
+	skb_reset_network_header(skb);
+
+	retval = bpf_test_run(prog, skb, repeat, &duration, &flow_keys);
+
+	ret = bpf_test_finish(kattr, uattr, &flow_keys, sizeof(flow_keys),
+			      retval, duration);
+	kfree_skb(skb);
+	kfree(sk);
 	return ret;
 }
