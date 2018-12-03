@@ -13,6 +13,7 @@
 #include <linux/skbuff.h>
 #include <net/udp.h>
 #include <net/protocol.h>
+#include <net/inet_common.h>
 
 static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 	netdev_features_t features,
@@ -477,6 +478,8 @@ flush:
 	NAPI_GRO_CB(skb)->flush = 1;
 	return NULL;
 }
+INDIRECT_CALLABLE(udp4_gro_receive, 1, struct sk_buff *, transport4_gro_receive,
+		  struct list_head *, struct sk_buff *);
 
 static int udp_gro_complete_segment(struct sk_buff *skb)
 {
@@ -536,6 +539,8 @@ static int udp4_gro_complete(struct sk_buff *skb, int nhoff)
 
 	return udp_gro_complete(skb, nhoff, udp4_lib_lookup_skb);
 }
+INDIRECT_CALLABLE(udp4_gro_complete, 1, int, transport4_gro_complete,
+		  struct sk_buff *, int);
 
 static const struct net_offload udpv4_offload = {
 	.callbacks = {

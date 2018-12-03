@@ -164,6 +164,8 @@ static int ipv6_exthdrs_len(struct ipv6hdr *iph,
 	return len;
 }
 
+INDIRECT_CALLABLE_DECLARE_2(struct sk_buff *, transport6_gro_receive,
+			    struct list_head *head, struct sk_buff *skb);
 static struct sk_buff *ipv6_gro_receive(struct list_head *head,
 					struct sk_buff *skb)
 {
@@ -260,7 +262,8 @@ not_same_flow:
 
 	skb_gro_postpull_rcsum(skb, iph, nlen);
 
-	pp = call_gro_receive(ops->callbacks.gro_receive, head, skb);
+	pp = indirect_call_gro_receive(transport6_gro_receive,
+				       ops->callbacks.gro_receive, head, skb);
 
 out_unlock:
 	rcu_read_unlock();
@@ -303,6 +306,8 @@ static struct sk_buff *ip4ip6_gro_receive(struct list_head *head,
 	return inet_gro_receive(head, skb);
 }
 
+INDIRECT_CALLABLE_DECLARE_2(int, transport6_gro_complete, struct sk_buff *skb,
+			    int);
 static int ipv6_gro_complete(struct sk_buff *skb, int nhoff)
 {
 	const struct net_offload *ops;
@@ -322,7 +327,8 @@ static int ipv6_gro_complete(struct sk_buff *skb, int nhoff)
 	if (WARN_ON(!ops || !ops->callbacks.gro_complete))
 		goto out_unlock;
 
-	err = ops->callbacks.gro_complete(skb, nhoff);
+	err = INDIRECT_CALL_2(ops->callbacks.gro_complete,
+			      transport6_gro_complete, skb, nhoff);
 
 out_unlock:
 	rcu_read_unlock();

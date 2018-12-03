@@ -9,6 +9,7 @@
  *
  *      TCPv6 GSO/GRO support
  */
+#include <linux/indirect_call_wrapper.h>
 #include <linux/skbuff.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
@@ -28,6 +29,8 @@ static struct sk_buff *tcp6_gro_receive(struct list_head *head,
 
 	return tcp_gro_receive(head, skb);
 }
+INDIRECT_CALLABLE(tcp6_gro_receive, 2, struct sk_buff *, transport6_gro_receive,
+		  struct list_head *, struct sk_buff *);
 
 static int tcp6_gro_complete(struct sk_buff *skb, int thoff)
 {
@@ -40,6 +43,8 @@ static int tcp6_gro_complete(struct sk_buff *skb, int thoff)
 
 	return tcp_gro_complete(skb);
 }
+INDIRECT_CALLABLE(tcp6_gro_complete, 2, int, transport6_gro_complete,
+		  struct sk_buff *, int);
 
 static struct sk_buff *tcp6_gso_segment(struct sk_buff *skb,
 					netdev_features_t features)

@@ -10,6 +10,7 @@
  *	TCPv4 GSO/GRO support
  */
 
+#include <linux/indirect_call_wrapper.h>
 #include <linux/skbuff.h>
 #include <net/tcp.h>
 #include <net/protocol.h>
@@ -317,6 +318,8 @@ static struct sk_buff *tcp4_gro_receive(struct list_head *head, struct sk_buff *
 
 	return tcp_gro_receive(head, skb);
 }
+INDIRECT_CALLABLE(tcp4_gro_receive, 2, struct sk_buff *, transport4_gro_receive,
+		  struct list_head *, struct sk_buff *);
 
 static int tcp4_gro_complete(struct sk_buff *skb, int thoff)
 {
@@ -332,6 +335,8 @@ static int tcp4_gro_complete(struct sk_buff *skb, int thoff)
 
 	return tcp_gro_complete(skb);
 }
+INDIRECT_CALLABLE(tcp4_gro_complete, 2, int, transport4_gro_complete,
+		  struct sk_buff *, int);
 
 static const struct net_offload tcpv4_offload = {
 	.callbacks = {

@@ -56,4 +56,11 @@ static inline void inet_ctl_sock_destroy(struct sock *sk)
 		sock_release(sk->sk_socket);
 }
 
+#define indirect_call_gro_receive(name, cb, head, skb)	\
+({							\
+	unlikely(gro_recursion_inc_test(skb)) ?		\
+		NAPI_GRO_CB(skb)->flush |= 1, NULL :	\
+		INDIRECT_CALL_2(cb, name, head, skb);	\
+})
+
 #endif

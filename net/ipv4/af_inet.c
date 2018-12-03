@@ -1385,6 +1385,8 @@ out:
 }
 EXPORT_SYMBOL(inet_gso_segment);
 
+INDIRECT_CALLABLE_DECLARE_2(struct sk_buff *, transport4_gro_receive,
+			    struct list_head *head, struct sk_buff *skb);
 struct sk_buff *inet_gro_receive(struct list_head *head, struct sk_buff *skb)
 {
 	const struct net_offload *ops;
@@ -1494,7 +1496,8 @@ struct sk_buff *inet_gro_receive(struct list_head *head, struct sk_buff *skb)
 	skb_gro_pull(skb, sizeof(*iph));
 	skb_set_transport_header(skb, skb_gro_offset(skb));
 
-	pp = call_gro_receive(ops->callbacks.gro_receive, head, skb);
+	pp = indirect_call_gro_receive(transport4_gro_receive,
+				       ops->callbacks.gro_receive, head, skb);
 
 out_unlock:
 	rcu_read_unlock();
@@ -1558,6 +1561,8 @@ int inet_recv_error(struct sock *sk, struct msghdr *msg, int len, int *addr_len)
 	return -EINVAL;
 }
 
+INDIRECT_CALLABLE_DECLARE_2(int, transport4_gro_complete, struct sk_buff *skb,
+			    int);
 int inet_gro_complete(struct sk_buff *skb, int nhoff)
 {
 	__be16 newlen = htons(skb->len - nhoff);
@@ -1583,7 +1588,9 @@ int inet_gro_complete(struct sk_buff *skb, int nhoff)
 	 * because any hdr with option will have been flushed in
 	 * inet_gro_receive().
 	 */
-	err = ops->callbacks.gro_complete(skb, nhoff + sizeof(*iph));
+	err = INDIRECT_CALL_2(ops->callbacks.gro_complete,
+			      transport4_gro_complete, skb,
+			      nhoff + sizeof(*iph));
 
 out_unlock:
 	rcu_read_unlock();

@@ -11,6 +11,7 @@
  */
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/indirect_call_wrapper.h>
 #include <net/protocol.h>
 #include <net/ipv6.h>
 #include <net/udp.h>
@@ -141,6 +142,8 @@ flush:
 	NAPI_GRO_CB(skb)->flush = 1;
 	return NULL;
 }
+INDIRECT_CALLABLE(udp6_gro_receive, 1, struct sk_buff *, transport6_gro_receive,
+		  struct list_head *, struct sk_buff *);
 
 static int udp6_gro_complete(struct sk_buff *skb, int nhoff)
 {
@@ -153,6 +156,8 @@ static int udp6_gro_complete(struct sk_buff *skb, int nhoff)
 
 	return udp_gro_complete(skb, nhoff, udp6_lib_lookup_skb);
 }
+INDIRECT_CALLABLE(udp6_gro_complete, 1, int, transport6_gro_complete,
+		  struct sk_buff *, int);
 
 static const struct net_offload udpv6_offload = {
 	.callbacks = {
