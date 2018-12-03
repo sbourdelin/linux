@@ -3531,6 +3531,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 
 	count_vm_event(PAGEOUTRUN);
 
+retry:
 	do {
 		unsigned long nr_reclaimed = sc.nr_reclaimed;
 		bool raise_priority = true;
@@ -3621,6 +3622,13 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		if (raise_priority || !nr_reclaimed)
 			sc.priority--;
 	} while (sc.priority >= 1);
+
+	if (!sc.nr_reclaimed && sc.memcg_low_skipped) {
+		sc.priority = DEF_PRIORITY;
+		sc.memcg_low_reclaim = 1;
+		sc.memcg_low_skipped = 0;
+		goto retry;
+	}
 
 	if (!sc.nr_reclaimed)
 		pgdat->kswapd_failures++;
