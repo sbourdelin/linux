@@ -35,7 +35,7 @@ static inline void syscall_rollback(struct task_struct *task,
 static inline long syscall_get_error(struct task_struct *task,
 				struct pt_regs *regs)
 {
-	return regs->r7 ? regs->r2 : 0;
+	return regs->r7 ? -regs->r2 : 0;
 }
 
 static inline long syscall_get_return_value(struct task_struct *task,
