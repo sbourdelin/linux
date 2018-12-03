@@ -779,7 +779,7 @@ int ipic_set_priority(unsigned int virq, unsigned int priority)
 
 	if (priority > 7)
 		return -EINVAL;
-	if (src > 127)
+	if (src >= ARRAY_SIZE(ipic_info))
 		return -EINVAL;
 	if (ipic_info[src].prio == 0)
 		return -EINVAL;
