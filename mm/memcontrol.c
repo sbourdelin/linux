@@ -5694,6 +5694,7 @@ struct cgroup_subsys memory_cgrp_subsys = {
  * mem_cgroup_protected - check if memory consumption is in the normal range
  * @root: the top ancestor of the sub-tree being checked
  * @memcg: the memory cgroup to check
+ * @min_excess: store the number of pages exceeding hard protection
  *
  * WARNING: This function is not stateless! It can only be used as part
  *          of a top-down tree iteration, not for isolated queries.
@@ -5761,7 +5762,8 @@ struct cgroup_subsys memory_cgrp_subsys = {
  * as memory.low is a best-effort mechanism.
  */
 enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
-						struct mem_cgroup *memcg)
+						struct mem_cgroup *memcg,
+						unsigned long *min_excess)
 {
 	struct mem_cgroup *parent;
 	unsigned long emin, parent_emin;
@@ -5827,8 +5829,11 @@ exit:
 		return MEMCG_PROT_MIN;
 	else if (usage <= elow)
 		return MEMCG_PROT_LOW;
-	else
+	else {
+		if (emin)
+			*min_excess = usage - emin;
 		return MEMCG_PROT_NONE;
+	}
 }
 
 /**

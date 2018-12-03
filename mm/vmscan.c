@@ -66,6 +66,9 @@ struct scan_control {
 	/* How many pages shrink_list() should reclaim */
 	unsigned long nr_to_reclaim;
 
+	/* How many pages hard protection allows */
+	unsigned long min_excess;
+
 	/*
 	 * Nodemask of nodes allowed by the caller. If NULL, all nodes
 	 * are scanned.
@@ -2503,9 +2506,13 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	unsigned long nr_to_scan;
 	enum lru_list lru;
 	unsigned long nr_reclaimed = 0;
-	unsigned long nr_to_reclaim = sc->nr_to_reclaim;
+	unsigned long nr_to_reclaim;
 	struct blk_plug plug;
 	bool scan_adjusted;
+
+	nr_to_reclaim = sc->nr_to_reclaim;
+	if (sc->min_excess)
+		nr_to_reclaim = min(nr_to_reclaim, sc->min_excess);
 
 	get_scan_count(lruvec, memcg, sc, nr, lru_pages);
 
@@ -2543,6 +2550,10 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 		}
 
 		cond_resched();
+
+		/* Abort proportional reclaim when hard protection applies */
+		if (sc->min_excess && nr_reclaimed >= sc->min_excess)
+			break;
 
 		if (nr_reclaimed < nr_to_reclaim || scan_adjusted)
 			continue;
@@ -2725,8 +2736,9 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 			unsigned long lru_pages;
 			unsigned long reclaimed;
 			unsigned long scanned;
+			unsigned long excess = 0;
 
-			switch (mem_cgroup_protected(root, memcg)) {
+			switch (mem_cgroup_protected(root, memcg, &excess)) {
 			case MEMCG_PROT_MIN:
 				/*
 				 * Hard protection.
@@ -2752,6 +2764,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 
 			reclaimed = sc->nr_reclaimed;
 			scanned = sc->nr_scanned;
+			sc->min_excess = excess;
 			shrink_node_memcg(pgdat, memcg, sc, &lru_pages);
 			node_lru_pages += lru_pages;
 

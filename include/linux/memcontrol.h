@@ -334,7 +334,8 @@ static inline bool mem_cgroup_disabled(void)
 }
 
 enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
-						struct mem_cgroup *memcg);
+						struct mem_cgroup *memcg,
+						unsigned long *min_excess);
 
 int mem_cgroup_try_charge(struct page *page, struct mm_struct *mm,
 			  gfp_t gfp_mask, struct mem_cgroup **memcgp,
@@ -818,7 +819,9 @@ static inline void memcg_memory_event_mm(struct mm_struct *mm,
 }
 
 static inline enum mem_cgroup_protection mem_cgroup_protected(
-	struct mem_cgroup *root, struct mem_cgroup *memcg)
+					struct mem_cgroup *root,
+					struct mem_cgroup *memcg,
+					unsigned long *min_excess)
 {
 	return MEMCG_PROT_NONE;
 }
