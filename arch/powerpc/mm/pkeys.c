@@ -415,3 +415,10 @@ bool arch_vma_access_permitted(struct vm_area_struct *vma, bool write,
 
 	return pkey_access_permitted(vma_pkey(vma), write, execute);
 }
+
+void arch_dup_pkeys(struct mm_struct *oldmm, struct mm_struct *mm)
+{
+	/* Duplicate the oldmm pkey state in mm: */
+	mm_pkey_allocation_map(mm) = mm_pkey_allocation_map(oldmm);
+	mm->context.execute_only_pkey = oldmm->context.execute_only_pkey;
+}
