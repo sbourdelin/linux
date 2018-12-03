@@ -282,6 +282,8 @@ struct sock *udp6_lib_lookup_skb(struct sk_buff *skb,
 				 inet6_sdif(skb), &udp_table, skb);
 }
 EXPORT_SYMBOL_GPL(udp6_lib_lookup_skb);
+INDIRECT_CALLABLE(udp6_lib_lookup_skb, 2, struct sock *, udp_lookup,
+		  struct sk_buff *skb, __be16 sport, __be16 dport);
 
 /* Must be called under rcu_read_lock().
  * Does increment socket refcount.

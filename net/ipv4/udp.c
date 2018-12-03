@@ -544,6 +544,8 @@ struct sock *udp4_lib_lookup_skb(struct sk_buff *skb,
 	return __udp4_lib_lookup_skb(skb, sport, dport, &udp_table);
 }
 EXPORT_SYMBOL_GPL(udp4_lib_lookup_skb);
+INDIRECT_CALLABLE(udp4_lib_lookup_skb, 1, struct sock *, udp_lookup,
+		  struct sk_buff *skb, __be16 sport, __be16 dport);
 
 /* Must be called under rcu_read_lock().
  * Does increment socket refcount.
