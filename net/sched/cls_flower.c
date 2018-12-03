@@ -1238,17 +1238,15 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	if (err)
 		goto errout_idr;
 
-	if (!tc_skip_sw(fnew->flags)) {
-		if (!fold && fl_lookup(fnew->mask, &fnew->mkey)) {
-			err = -EEXIST;
-			goto errout_mask;
-		}
-
-		err = rhashtable_insert_fast(&fnew->mask->ht, &fnew->ht_node,
-					     fnew->mask->filter_ht_params);
-		if (err)
-			goto errout_mask;
+	if (!fold && fl_lookup(fnew->mask, &fnew->mkey)) {
+		err = -EEXIST;
+		goto errout_mask;
 	}
+
+	err = rhashtable_insert_fast(&fnew->mask->ht, &fnew->ht_node,
+				     fnew->mask->filter_ht_params);
+	if (err)
+		goto errout_mask;
 
 	if (!tc_skip_hw(fnew->flags)) {
 		err = fl_hw_replace_filter(tp, fnew, extack);
