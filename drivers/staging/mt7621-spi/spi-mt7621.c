@@ -140,19 +140,16 @@ static int mt7621_spi_prepare(struct spi_device *spi, unsigned int speed)
 		reg |= MT7621_LSB_FIRST;
 
 	reg &= ~(MT7621_CPHA | MT7621_CPOL);
-	switch (spi->mode & (SPI_CPOL | SPI_CPHA)) {
-	case SPI_MODE_0:
-		break;
-	case SPI_MODE_1:
-		reg |= MT7621_CPHA;
-		break;
-	case SPI_MODE_2:
-		reg |= MT7621_CPOL;
-		break;
-	case SPI_MODE_3:
-		reg |= MT7621_CPOL | MT7621_CPHA;
-		break;
-	}
+
+	/* This SPI controller is designed for SPI flash only and
+	 * some bits are swizzled under other SPI modes due to
+	 * incorrect wiring inside the silicon. Reject all modes
+	 * except mode0 because they are broken.
+	 */
+
+	if ((spi->mode & (SPI_CPOL | SPI_CPHA)) != SPI_MODE_0)
+		return -EINVAL;
+
 	mt7621_spi_write(rs, MT7621_SPI_MASTER, reg);
 
 	return 0;
