@@ -235,6 +235,16 @@ static int __diag_virtio_hypercall(struct kvm_vcpu *vcpu)
 	return ret < 0 ? ret : 0;
 }
 
+static int __diag_set_control_prog_name(struct kvm_vcpu *vcpu)
+{
+	unsigned int reg = (vcpu->arch.sie_block->ipa & 0xf0) >> 4;
+	unsigned long cpc = vcpu->run->s.regs.gprs[reg];
+
+	vcpu->stat.diagnose_318++;
+	kvm_s390_set_cpc(vcpu->kvm, cpc);
+	return 0;
+}
+
 int kvm_s390_handle_diag(struct kvm_vcpu *vcpu)
 {
 	int code = kvm_s390_get_base_disp_rs(vcpu, NULL) & 0xffff;
@@ -254,6 +264,8 @@ int kvm_s390_handle_diag(struct kvm_vcpu *vcpu)
 		return __diag_page_ref_service(vcpu);
 	case 0x308:
 		return __diag_ipl_functions(vcpu);
+	case 0x318:
+		return __diag_set_control_prog_name(vcpu);
 	case 0x500:
 		return __diag_virtio_hypercall(vcpu);
 	default:

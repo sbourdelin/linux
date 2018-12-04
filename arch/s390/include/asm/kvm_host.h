@@ -229,7 +229,8 @@ struct kvm_s390_sie_block {
 	__u32	scaol;			/* 0x0064 */
 	__u8	reserved68;		/* 0x0068 */
 	__u8    epdx;			/* 0x0069 */
-	__u8    reserved6a[2];		/* 0x006a */
+	__u8    cpnc;			/* 0x006a */
+	__u8	reserved6b;		/* 0x006b */
 	__u32	todpr;			/* 0x006c */
 #define GISA_FORMAT1 0x00000001
 	__u32	gd;			/* 0x0070 */
@@ -391,6 +392,7 @@ struct kvm_vcpu_stat {
 	u64 diagnose_9c;
 	u64 diagnose_258;
 	u64 diagnose_308;
+	u64 diagnose_318;
 	u64 diagnose_500;
 	u64 diagnose_other;
 };
@@ -804,6 +806,14 @@ struct kvm_s390_vsie {
 	struct page *pages[KVM_MAX_VCPUS];
 };
 
+union kvm_s390_diag318_info {
+	u64 cpc;
+	struct {
+		u64 cpnc : 8;
+		u64 cpvc : 56;
+	};
+};
+
 struct kvm_arch{
 	void *sca;
 	int use_esca;
@@ -838,6 +848,7 @@ struct kvm_arch{
 	/* subset of available cpu features enabled by user space */
 	DECLARE_BITMAP(cpu_feat, KVM_S390_VM_CPU_FEAT_NR_BITS);
 	struct kvm_s390_gisa *gisa;
+	union kvm_s390_diag318_info diag318_info;
 };
 
 #define KVM_HVA_ERR_BAD		(-1UL)
