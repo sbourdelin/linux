@@ -108,6 +108,7 @@ enum rdma_node_type {
 	RDMA_NODE_RNIC,
 	RDMA_NODE_USNIC,
 	RDMA_NODE_USNIC_UDP,
+	RDMA_NODE_EFA,
 };
 
 enum {
@@ -119,14 +120,16 @@ enum rdma_transport_type {
 	RDMA_TRANSPORT_IB,
 	RDMA_TRANSPORT_IWARP,
 	RDMA_TRANSPORT_USNIC,
-	RDMA_TRANSPORT_USNIC_UDP
+	RDMA_TRANSPORT_USNIC_UDP,
+	RDMA_TRANSPORT_EFA,
 };
 
 enum rdma_protocol_type {
 	RDMA_PROTOCOL_IB,
 	RDMA_PROTOCOL_IBOE,
 	RDMA_PROTOCOL_IWARP,
-	RDMA_PROTOCOL_USNIC_UDP
+	RDMA_PROTOCOL_USNIC_UDP,
+	RDMA_PROTOCOL_EFA,
 };
 
 __attribute_const__ enum rdma_transport_type
@@ -538,6 +541,7 @@ static inline struct rdma_hw_stats *rdma_alloc_hw_stats_struct(
 #define RDMA_CORE_CAP_PROT_ROCE_UDP_ENCAP 0x00800000
 #define RDMA_CORE_CAP_PROT_RAW_PACKET   0x01000000
 #define RDMA_CORE_CAP_PROT_USNIC        0x02000000
+#define RDMA_CORE_CAP_PROT_EFA          0x04000000
 
 #define RDMA_CORE_PORT_IB_GRH_REQUIRED (RDMA_CORE_CAP_IB_GRH_REQUIRED \
 					| RDMA_CORE_CAP_PROT_ROCE     \
@@ -1095,6 +1099,7 @@ enum ib_qp_type {
 	IB_QPT_RAW_PACKET = 8,
 	IB_QPT_XRC_INI = 9,
 	IB_QPT_XRC_TGT,
+	IB_QPT_SRD,
 	IB_QPT_MAX,
 	IB_QPT_DRIVER = 0xFF,
 	/* Reserve a range for qp types internal to the low level driver.

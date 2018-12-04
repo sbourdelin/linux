@@ -206,6 +206,8 @@ rdma_node_get_transport(enum rdma_node_type node_type)
 		return RDMA_TRANSPORT_USNIC_UDP;
 	if (node_type == RDMA_NODE_RNIC)
 		return RDMA_TRANSPORT_IWARP;
+	if (node_type == RDMA_NODE_EFA)
+		return RDMA_TRANSPORT_EFA;
 
 	return RDMA_TRANSPORT_IB;
 }
