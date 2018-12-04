@@ -6745,12 +6745,24 @@ static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
 {
 	struct intel_connector *intel_connector;
 	struct drm_connector *connector;
+	struct drm_connector_state *conn_state;
+	struct drm_i915_private *dev_priv;
+	struct intel_crtc *crtc;
+	struct intel_crtc_state *crtc_state;
 
 	intel_connector = container_of(work, typeof(*intel_connector),
 				       modeset_retry_work);
 	connector = &intel_connector->base;
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id,
 		      connector->name);
+
+	dev_priv = to_i915(connector->dev);
+	conn_state = intel_connector->base.state;
+
+	crtc = to_intel_crtc(conn_state->crtc);
+	crtc_state = to_intel_crtc_state(crtc->base.state);
+
+	WARN_ON(!intel_crtc_has_dp_encoder(crtc_state));
 
 	/* Grab the locks before changing connector property*/
 	mutex_lock(&connector->dev->mode_config.mutex);
@@ -6760,6 +6772,21 @@ static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
 	drm_connector_set_link_status_property(connector,
 					       DRM_MODE_LINK_STATUS_BAD);
 	mutex_unlock(&connector->dev->mode_config.mutex);
+
+	/* Suppress underruns caused by re-training */
+	intel_set_cpu_fifo_underrun_reporting(dev_priv, crtc->pipe, false);
+	if (crtc_state->has_pch_encoder)
+		intel_set_pch_fifo_underrun_reporting(dev_priv,
+						      intel_crtc_pch_transcoder(crtc), false);
+
+	/* Keep underrun reporting disabled until things are stable */
+	intel_wait_for_vblank(dev_priv, crtc->pipe);
+
+	intel_set_cpu_fifo_underrun_reporting(dev_priv, crtc->pipe, true);
+	if (crtc_state->has_pch_encoder)
+		intel_set_pch_fifo_underrun_reporting(dev_priv,
+						      intel_crtc_pch_transcoder(crtc), true);
+
 	/* Send Hotplug uevent so userspace can reprobe */
 	drm_kms_helper_hotplug_event(connector->dev);
 }
