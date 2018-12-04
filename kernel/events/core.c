@@ -385,6 +385,7 @@ static atomic_t nr_namespaces_events __read_mostly;
 static atomic_t nr_task_events __read_mostly;
 static atomic_t nr_freq_events __read_mostly;
 static atomic_t nr_switch_events __read_mostly;
+static atomic_t nr_bpf_events __read_mostly;
 
 static LIST_HEAD(pmus);
 static DEFINE_MUTEX(pmus_lock);
@@ -4235,7 +4236,7 @@ static bool is_sb_event(struct perf_event *event)
 
 	if (attr->mmap || attr->mmap_data || attr->mmap2 ||
 	    attr->comm || attr->comm_exec ||
-	    attr->task ||
+	    attr->task || attr->bpf_event ||
 	    attr->context_switch)
 		return true;
 	return false;
@@ -4305,6 +4306,8 @@ static void unaccount_event(struct perf_event *event)
 		dec = true;
 	if (has_branch_stack(event))
 		dec = true;
+	if (event->attr.bpf_event)
+		atomic_dec(&nr_bpf_events);
 
 	if (dec) {
 		if (!atomic_add_unless(&perf_sched_count, -1, 1))
@@ -7650,6 +7653,122 @@ static void perf_log_throttle(struct perf_event *event, int enable)
 	perf_output_end(&handle);
 }
 
+/*
+ * bpf load/unload tracking
+ */
+
+struct perf_bpf_event {
+	struct bpf_prog *prog;
+
+	struct {
+		struct perf_event_header        header;
+		u32 type;
+		u32 flags;
+		u32 id;
+		u32 sub_id;
+		u8 tag[BPF_TAG_SIZE];
+		u64 addr;
+		u64 len;
+	} event_id;
+};
+
+static int perf_event_bpf_match(struct perf_event *event)
+{
+	return event->attr.bpf_event;
+}
+
+static void perf_event_bpf_output(struct perf_event *event,
+				   void *data)
+{
+	struct perf_bpf_event *bpf_event = data;
+	struct perf_output_handle handle;
+	struct perf_sample_data sample;
+	char name[KSYM_NAME_LEN];
+	int name_len;
+	int ret;
+
+	if (!perf_event_bpf_match(event))
+		return;
+
+	/* get prog name and round up to 64 bit aligned */
+	bpf_get_prog_name(bpf_event->prog, name);
+	name_len = strlen(name) + 1;
+	while (!IS_ALIGNED(name_len, sizeof(u64)))
+		name[name_len++] = '\0';
+	bpf_event->event_id.len += name_len;
+
+	perf_event_header__init_id(&bpf_event->event_id.header, &sample, event);
+	ret = perf_output_begin(&handle, event,
+				bpf_event->event_id.header.size);
+	if (ret)
+		return;
+
+	perf_output_put(&handle, bpf_event->event_id);
+
+	__output_copy(&handle, name, name_len);
+
+	perf_event__output_id_sample(event, &handle, &sample);
+
+	perf_output_end(&handle);
+}
+
+static void perf_event_bpf(struct perf_bpf_event *bpf_event)
+{
+	perf_iterate_sb(perf_event_bpf_output,
+		       bpf_event,
+		       NULL);
+}
+
+static void perf_event_bpf_event_subprog(
+	enum perf_bpf_event_type type,
+	struct bpf_prog *prog, u32 id, u32 sub_id)
+{
+	struct perf_bpf_event bpf_event = (struct perf_bpf_event){
+		.prog = prog,
+		.event_id = {
+			.header = {
+				.type = PERF_RECORD_BPF_EVENT,
+				.size = sizeof(bpf_event.event_id),
+			},
+			.type = type,
+			/* .flags = 0 */
+			.id = id,
+			.sub_id = sub_id,
+			.addr = (u64)prog->bpf_func,
+			.len = prog->jited_len,
+		},
+	};
+
+	memcpy(bpf_event.event_id.tag, prog->tag, BPF_TAG_SIZE);
+	perf_event_bpf(&bpf_event);
+}
+
+/*
+ * This is call per bpf_prog. In case of multiple sub programs,
+ * this function calls perf_event_bpf_event_subprog() multiple times
+ */
+void perf_event_bpf_event_prog(enum perf_bpf_event_type type,
+			       struct bpf_prog *prog)
+{
+	if (!atomic_read(&nr_bpf_events))
+		return;
+
+	if (type != PERF_BPF_EVENT_PROG_LOAD &&
+	    type != PERF_BPF_EVENT_PROG_UNLOAD)
+		return;
+
+	if (prog->aux->func_cnt == 0) {
+		perf_event_bpf_event_subprog(type, prog,
+					     prog->aux->id, 0);
+	} else {
+		int i;
+
+		for (i = 0; i < prog->aux->func_cnt; i++)
+			perf_event_bpf_event_subprog(type, prog->aux->func[i],
+						     prog->aux->id, i);
+	}
+}
+
 void perf_event_itrace_started(struct perf_event *event)
 {
 	event->attach_state |= PERF_ATTACH_ITRACE;
@@ -9900,6 +10019,8 @@ static void account_event(struct perf_event *event)
 		inc = true;
 	if (is_cgroup_event(event))
 		inc = true;
+	if (event->attr.bpf_event)
+		atomic_inc(&nr_bpf_events);
 
 	if (inc) {
 		/*
