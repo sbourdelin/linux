@@ -279,8 +279,6 @@ SECTIONS
 		__dynamic_start = .;
 		*(.dynamic)
 	}
-	.hash : AT(ADDR(.hash) - LOAD_OFFSET) { *(.hash) }
-	.interp : AT(ADDR(.interp) - LOAD_OFFSET) { *(.interp) }
 	.rela.dyn : AT(ADDR(.rela.dyn) - LOAD_OFFSET)
 	{
 		__rela_dyn_start = .;
@@ -392,5 +390,8 @@ SECTIONS
 		*(.gnu.version*)
 		*(.gnu.attributes)
 		*(.eh_frame)
+		*(.hash .gnu.hash)
+		*(.interp)
+		*(.dynstr)
 	}
 }
