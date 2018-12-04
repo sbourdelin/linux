@@ -20,6 +20,7 @@
 #include <linux/console.h>
 #include <linux/rtc.h>
 #include <linux/init.h>
+#include <linux/memblock.h>
 #include <linux/vt_kern.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -427,6 +428,8 @@ void __init config_amiga(void)
 					continue;
 				}
 				disabled_z2mem += m68k_memory[i].size;
+				memblock_remove(m68k_memory[i].addr,
+						m68k_memory[i].size);
 				m68k_num_memory--;
 				for (j = i; j < m68k_num_memory; j++)
 					m68k_memory[j] = m68k_memory[j+1];
