@@ -4248,6 +4248,12 @@ enum {
 #define EDP_PSR2_STATUS_STATE_MASK     (0xf << 28)
 #define EDP_PSR2_STATUS_STATE_SHIFT    28
 
+#define EDP_PSR2_SU_STATUS					_MMIO(0x6f914)
+#define EDP_PSR2_SU_STATUS2					_MMIO(0x6F918)
+#define EDP_PSR2_SU_STATUS3					_MMIO(0x6F91C)
+#define  EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_SHIFT(i)	((i) * 10)
+#define  EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_MASK(i)	(0x3FF << ((i) * 10))
+
 /* VGA port control */
 #define ADPA			_MMIO(0x61100)
 #define PCH_ADPA                _MMIO(0xe1100)
