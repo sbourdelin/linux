@@ -71,8 +71,11 @@ static bool psr_global_enabled(u32 debug)
 static bool intel_psr2_enabled(struct drm_i915_private *dev_priv,
 			       const struct intel_crtc_state *crtc_state)
 {
+	const u32 debug_mode = dev_priv->psr.debug & I915_PSR_DEBUG_MODE_MASK;
+
 	/* Disable PSR2 by default for all platforms */
-	if (i915_modparams.enable_psr == -1)
+	if (i915_modparams.enable_psr == -1 &&
+	    debug_mode != I915_PSR_DEBUG_ENABLE)
 		return false;
 
 	/* Cannot enable DSC and PSR2 simultaneously */
