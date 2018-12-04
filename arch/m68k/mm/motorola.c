@@ -233,6 +233,8 @@ void __init paging_init(void)
 			printk("Ignoring memory chunk at 0x%lx:0x%lx before the first chunk\n",
 				m68k_memory[i].addr, m68k_memory[i].size);
 			printk("Fix your bootloader or use a memfile to make use of this area!\n");
+			memblock_remove(m68k_memory[i].addr,
+					m68k_memory[i].size);
 			m68k_num_memory--;
 			memmove(m68k_memory + i, m68k_memory + i + 1,
 				(m68k_num_memory - i) * sizeof(struct m68k_mem_info));
