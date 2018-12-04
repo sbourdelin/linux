@@ -2419,10 +2419,18 @@ void __weak ftrace_replace_code(int enable)
 {
 	struct dyn_ftrace *rec;
 	struct ftrace_page *pg;
+	bool schedulable;
 	int failed;
 
 	if (unlikely(ftrace_disabled))
 		return;
+
+	/*
+	 * Some archs calls this function with interrupts or preemption
+	 * disabled. However, for other archs that can preempt, this can cause
+	 * an tremendous unneeded latency.
+	 */
+	schedulable = !irqs_disabled() && !preempt_count();
 
 	do_for_each_ftrace_rec(pg, rec) {
 
@@ -2435,6 +2443,8 @@ void __weak ftrace_replace_code(int enable)
 			/* Stop processing */
 			return;
 		}
+		if (schedulable)
+			cond_resched();
 	} while_for_each_ftrace_rec();
 }
 
