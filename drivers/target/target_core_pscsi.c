@@ -190,9 +190,15 @@ pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
 	/*
 	 * Use sdev->inquiry from drivers/scsi/scsi_scan.c:scsi_alloc_sdev()
 	 */
-	memcpy(&wwn->vendor[0], &buf[8], sizeof(wwn->vendor));
-	memcpy(&wwn->model[0], &buf[16], sizeof(wwn->model));
-	memcpy(&wwn->revision[0], &buf[32], sizeof(wwn->revision));
+	BUILD_BUG_ON(sizeof(wwn->vendor) != INQUIRY_VENDOR_LEN + 1);
+	snprintf(wwn->vendor, sizeof(wwn->vendor),
+		 "%." __stringify(INQUIRY_VENDOR_LEN) "s", &buf[8]);
+	BUILD_BUG_ON(sizeof(wwn->model) != INQUIRY_MODEL_LEN + 1);
+	snprintf(wwn->model, sizeof(wwn->model),
+		 "%." __stringify(INQUIRY_MODEL_LEN) "s", &buf[16]);
+	BUILD_BUG_ON(sizeof(wwn->revision) != INQUIRY_REVISION_LEN + 1);
+	snprintf(wwn->revision, sizeof(wwn->revision),
+		 "%." __stringify(INQUIRY_REVISION_LEN) "s", &buf[32]);
 }
 
 static int
@@ -826,21 +832,21 @@ static ssize_t pscsi_show_configfs_dev_params(struct se_device *dev, char *b)
 	if (sd) {
 		bl += sprintf(b + bl, "        ");
 		bl += sprintf(b + bl, "Vendor: ");
-		for (i = 0; i < 8; i++) {
+		for (i = 0; i < INQUIRY_VENDOR_LEN; i++) {
 			if (ISPRINT(sd->vendor[i]))   /* printable character? */
 				bl += sprintf(b + bl, "%c", sd->vendor[i]);
 			else
 				bl += sprintf(b + bl, " ");
 		}
 		bl += sprintf(b + bl, " Model: ");
-		for (i = 0; i < 16; i++) {
+		for (i = 0; i < INQUIRY_MODEL_LEN; i++) {
 			if (ISPRINT(sd->model[i]))   /* printable character ? */
 				bl += sprintf(b + bl, "%c", sd->model[i]);
 			else
 				bl += sprintf(b + bl, " ");
 		}
 		bl += sprintf(b + bl, " Rev: ");
-		for (i = 0; i < 4; i++) {
+		for (i = 0; i < INQUIRY_REVISION_LEN; i++) {
 			if (ISPRINT(sd->rev[i]))   /* printable character ? */
 				bl += sprintf(b + bl, "%c", sd->rev[i]);
 			else
