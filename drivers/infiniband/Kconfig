@@ -120,4 +120,6 @@ source "drivers/infiniband/hw/qedr/Kconfig"
 
 source "drivers/infiniband/hw/bnxt_re/Kconfig"
 
+source "drivers/infiniband/hw/efa/Kconfig"
+
 endif # INFINIBAND
