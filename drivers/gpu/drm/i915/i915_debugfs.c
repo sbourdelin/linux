@@ -2760,10 +2760,44 @@ static int i915_edp_psr_status(struct seq_file *m, void *data)
 		seq_printf(m, "Performance counter: %u\n", val);
 	}
 
-	if ((psr->debug & I915_PSR_DEBUG_IRQ) && !psr->psr2_enabled) {
-		seq_printf(m, "Last attempted entry at: %lld\n",
-			   psr->last_entry_attempt);
-		seq_printf(m, "Last exit at: %lld\n", psr->last_exit);
+	if (!psr->psr2_enabled) {
+		if (psr->debug & I915_PSR_DEBUG_IRQ) {
+			seq_printf(m, "Last attempted entry at: %lld\n",
+				   psr->last_entry_attempt);
+			seq_printf(m, "Last exit at: %lld\n", psr->last_exit);
+		}
+	} else {
+		u8 i;
+
+		val = I915_READ(EDP_PSR2_SU_STATUS);
+		seq_printf(m, "PSR2 SU status: 0x%08x\n", val);
+		for (i = 0; val && i < 3; i++) {
+			u32 num;
+
+			num = val & EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_MASK(i);
+			num = num >> EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_SHIFT(i);
+			seq_printf(m, "\tSU num blocks in frame N-%u: %u\n", i, num);
+		}
+
+		val = I915_READ(EDP_PSR2_SU_STATUS2);
+		seq_printf(m, "PSR2 SU status2: 0x%08x\n", val);
+		for (i = 0; val && i < 3; i++) {
+			u32 num;
+
+			num = val & EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_MASK(i);
+			num = num >> EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_SHIFT(i);
+			seq_printf(m, "\tSU num blocks in frame N-%u: %u\n", i + 3, num);
+		}
+
+		val = I915_READ(EDP_PSR2_SU_STATUS3);
+		seq_printf(m, "PSR2 SU status3: 0x%08x\n", val);
+		for (i = 0; val && i < 2; i++) {
+			u32 num;
+
+			num = val & EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_MASK(i);
+			num = num >> EDP_PSR2_SU_STATUS_NUM_SU_BLOCKS_IN_FRAME_SHIFT(i);
+			seq_printf(m, "\tSU num blocks in frame N-%u: %u\n", i + 6, num);
+		}
 	}
 
 unlock:
