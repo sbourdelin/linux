@@ -5088,6 +5088,79 @@ static int i915_hdcp_sink_capability_show(struct seq_file *m, void *data)
 }
 DEFINE_SHOW_ATTRIBUTE(i915_hdcp_sink_capability);
 
+static int i915_dsc_fec_support_show(struct seq_file *m, void *data)
+{
+	struct drm_connector *connector = m->private;
+	struct intel_encoder *encoder = intel_attached_encoder(connector);
+	struct intel_dp *intel_dp =
+		enc_to_intel_dp(&encoder->base);
+	struct intel_crtc *crtc;
+	struct intel_crtc_state *crtc_state;
+
+	if (connector->status != connector_status_connected)
+		return -ENODEV;
+
+	crtc = to_intel_crtc(encoder->base.crtc);
+	crtc_state = to_intel_crtc_state(crtc->base.state);
+	drm_modeset_lock(&crtc->base.mutex, NULL);
+	seq_printf(m, "DSC_Enabled: %s\n",
+		   yesno(crtc_state->dsc_params.compression_enable));
+	if (intel_dp->dsc_dpcd)
+		seq_printf(m, "DSC_Sink_Support: %s\n",
+			   yesno(drm_dp_sink_supports_dsc(intel_dp->dsc_dpcd)));
+	if (!intel_dp_is_edp(intel_dp))
+		seq_printf(m, "FEC_Sink_Support: %s\n",
+			   yesno(drm_dp_sink_supports_fec(intel_dp->fec_capable)));
+	drm_modeset_unlock(&crtc->base.mutex);
+
+	return 0;
+}
+
+static ssize_t i915_dsc_fec_support_write(struct file *file,
+					  const char __user *ubuf,
+					  size_t len, loff_t *offp)
+{
+	bool dsc_enable = false;
+	int ret;
+	struct drm_connector *connector =
+		((struct seq_file *)file->private_data)->private;
+	struct intel_encoder *encoder = intel_attached_encoder(connector);
+	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+
+	if (len == 0)
+		return 0;
+
+	DRM_DEBUG_DRIVER("Copied %d bytes from user to force DSC\n",
+			 (unsigned int)len);
+
+	ret = kstrtobool_from_user(ubuf, len, &dsc_enable);
+	if (ret < 0)
+		return ret;
+
+	DRM_DEBUG_DRIVER("Got %s for DSC Enable\n",
+			 (dsc_enable) ? "true" : "false");
+	intel_dp->force_dsc_en = dsc_enable;
+
+	*offp += len;
+	return len;
+}
+
+static int i915_dsc_fec_support_open(struct inode *inode,
+				     struct file *file)
+{
+	return single_open(file, i915_dsc_fec_support_show,
+			   inode->i_private);
+}
+
+static const struct file_operations i915_dsc_fec_support_fops = {
+	.owner = THIS_MODULE,
+	.open = i915_dsc_fec_support_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.write = i915_dsc_fec_support_write
+};
+
 /**
  * i915_debugfs_connector_add - add i915 specific connector debugfs files
  * @connector: pointer to a registered drm_connector
@@ -5100,6 +5173,7 @@ DEFINE_SHOW_ATTRIBUTE(i915_hdcp_sink_capability);
 int i915_debugfs_connector_add(struct drm_connector *connector)
 {
 	struct dentry *root = connector->debugfs_entry;
+	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 
 	/* The connector must have been registered beforehands. */
 	if (!root)
@@ -5123,6 +5197,12 @@ int i915_debugfs_connector_add(struct drm_connector *connector)
 		debugfs_create_file("i915_hdcp_sink_capability", S_IRUGO, root,
 				    connector, &i915_hdcp_sink_capability_fops);
 	}
+
+	if (INTEL_GEN(dev_priv) >= 10 &&
+	    (connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
+	     connector->connector_type == DRM_MODE_CONNECTOR_eDP))
+		debugfs_create_file("i915_dsc_fec_support", S_IRUGO, root,
+				    connector, &i915_dsc_fec_support_fops);
 
 	return 0;
 }
