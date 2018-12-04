@@ -2178,6 +2178,8 @@ static inline void zero_resv_unavail(void) {}
 #endif
 
 extern void set_dma_reserve(unsigned long new_dma_reserve);
+extern void memmap_init(unsigned long size, int nid,
+			unsigned long zone, unsigned long start_pfn);
 extern void memmap_init_zone(unsigned long, int, unsigned long, unsigned long,
 		enum memmap_context, struct vmem_altmap *);
 extern void setup_per_zone_wmarks(void);
