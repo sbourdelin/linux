@@ -2760,7 +2760,7 @@ static int i915_edp_psr_status(struct seq_file *m, void *data)
 		seq_printf(m, "Performance counter: %u\n", val);
 	}
 
-	if (psr->debug & I915_PSR_DEBUG_IRQ) {
+	if ((psr->debug & I915_PSR_DEBUG_IRQ) && !psr->psr2_enabled) {
 		seq_printf(m, "Last attempted entry at: %lld\n",
 			   psr->last_entry_attempt);
 		seq_printf(m, "Last exit at: %lld\n", psr->last_exit);
