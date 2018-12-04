@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <linux/kernel.h>
+#include <linux/bpf.h>
 
 #include "../perf.h"
 #include "build-id.h"
@@ -82,6 +83,25 @@ struct throttle_event {
 	u64 time;
 	u64 id;
 	u64 stream_id;
+};
+
+#ifndef KSYM_NAME_LEN
+#define KSYM_NAME_LEN 256
+#endif
+
+/* Record different types of bpf events, see enum perf_bpf_event_type */
+struct bpf_event {
+	struct perf_event_header header;
+	u32 type;
+	u32 flags;
+	u32 id;
+	u32 sub_id;
+
+	/* for bpf_prog types */
+	u8 tag[BPF_TAG_SIZE];  // prog tag
+	u64 addr;
+	u64 len;
+	char name[KSYM_NAME_LEN];
 };
 
 #define PERF_SAMPLE_MASK				\
@@ -651,6 +671,7 @@ union perf_event {
 	struct stat_round_event		stat_round;
 	struct time_conv_event		time_conv;
 	struct feature_event		feat;
+	struct bpf_event		bpf_event;
 };
 
 void perf_event__print_totals(void);
@@ -750,6 +771,10 @@ int perf_event__process_exit(struct perf_tool *tool,
 			     union perf_event *event,
 			     struct perf_sample *sample,
 			     struct machine *machine);
+int perf_event__process_bpf_event(struct perf_tool *tool,
+				  union perf_event *event,
+				  struct perf_sample *sample,
+				  struct machine *machine);
 int perf_tool__process_synth_event(struct perf_tool *tool,
 				   union perf_event *event,
 				   struct machine *machine,
@@ -814,6 +839,7 @@ size_t perf_event__fprintf_switch(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_thread_map(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_cpu_map(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_namespaces(union perf_event *event, FILE *fp);
+size_t perf_event__fprintf_bpf_event(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf(union perf_event *event, FILE *fp);
 
 int kallsyms__get_function_start(const char *kallsyms_filename,
