@@ -161,6 +161,12 @@
 
 #define ARM_V7S_TCR_PD1			BIT(5)
 
+#ifdef CONFIG_ZONE_DMA32
+#define ARM_V7S_TABLE_GFP_DMA GFP_DMA32
+#else
+#define ARM_V7S_TABLE_GFP_DMA GFP_DMA
+#endif
+
 typedef u32 arm_v7s_iopte;
 
 static bool selftest_running;
@@ -169,7 +175,7 @@ struct arm_v7s_io_pgtable {
 	struct io_pgtable	iop;
 
 	arm_v7s_iopte		*pgd;
-	struct kmem_cache	*l2_tables;
+	struct page_frag_cache	l2_tables;
 	spinlock_t		split_lock;
 };
 
@@ -198,13 +204,17 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
 	void *table = NULL;
 
 	if (lvl == 1)
-		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
+		table = (void *)__get_free_pages(
+			__GFP_ZERO | ARM_V7S_TABLE_GFP_DMA, get_order(size));
 	else if (lvl == 2)
-		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
+		table = page_frag_alloc(&data->l2_tables, size,
+				gfp | __GFP_ZERO | ARM_V7S_TABLE_GFP_DMA);
 	phys = virt_to_phys(table);
-	if (phys != (arm_v7s_iopte)phys)
+	if (phys != (arm_v7s_iopte)phys) {
 		/* Doesn't fit in PTE */
+		dev_err(dev, "Page table does not fit in PTE: %pa", &phys);
 		goto out_free;
+	}
 	if (table && !(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
 		if (dma_mapping_error(dev, dma))
@@ -227,7 +237,7 @@ out_free:
 	if (lvl == 1)
 		free_pages((unsigned long)table, get_order(size));
 	else
-		kmem_cache_free(data->l2_tables, table);
+		page_frag_free(table);
 	return NULL;
 }
 
@@ -244,7 +254,7 @@ static void __arm_v7s_free_table(void *table, int lvl,
 	if (lvl == 1)
 		free_pages((unsigned long)table, get_order(size));
 	else
-		kmem_cache_free(data->l2_tables, table);
+		page_frag_free(table);
 }
 
 static void __arm_v7s_pte_sync(arm_v7s_iopte *ptep, int num_entries,
@@ -515,7 +525,6 @@ static void arm_v7s_free_pgtable(struct io_pgtable *iop)
 			__arm_v7s_free_table(iopte_deref(pte, 1), 2, data);
 	}
 	__arm_v7s_free_table(data->pgd, 1, data);
-	kmem_cache_destroy(data->l2_tables);
 	kfree(data);
 }
 
@@ -729,17 +738,11 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
 	    !(cfg->quirks & IO_PGTABLE_QUIRK_NO_PERMS))
 			return NULL;
 
-	data = kmalloc(sizeof(*data), GFP_KERNEL);
+	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return NULL;
 
 	spin_lock_init(&data->split_lock);
-	data->l2_tables = kmem_cache_create("io-pgtable_armv7s_l2",
-					    ARM_V7S_TABLE_SIZE(2),
-					    ARM_V7S_TABLE_SIZE(2),
-					    SLAB_CACHE_DMA, NULL);
-	if (!data->l2_tables)
-		goto out_free_data;
 
 	data->iop.ops = (struct io_pgtable_ops) {
 		.map		= arm_v7s_map,
@@ -789,7 +792,6 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
 	return &data->iop;
 
 out_free_data:
-	kmem_cache_destroy(data->l2_tables);
 	kfree(data);
 	return NULL;
 }
