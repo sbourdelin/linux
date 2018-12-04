@@ -875,11 +875,11 @@ static const struct imx355_reg mode_820x616_regs[] = {
 };
 
 static const char * const imx355_test_pattern_menu[] = {
-	"Disabled",
-	"Solid Colour",
-	"Eight Vertical Colour Bars",
-	"Colour Bars With Fade to Grey",
-	"Pseudorandom Sequence (PN9)",
+	V4L2_TEST_PATTERN_DISABLED,
+	V4L2_TEST_PATTERN_SOLID_COLOUR,
+	V4L2_TEST_PATTERN_VERT_COLOUR_BARS,
+	V4L2_TEST_PATTERN_VERT_COLOUR_BARS_FADE_TO_GREY,
+	V4L2_TEST_PATTERN_PN9,
 };
 
 /* supported link frequencies */

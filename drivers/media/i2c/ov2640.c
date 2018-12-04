@@ -707,8 +707,8 @@ err:
 }
 
 static const char * const ov2640_test_pattern_menu[] = {
-	"Disabled",
-	"Eight Vertical Colour Bars",
+	V4L2_TEST_PATTERN_DISABLED,
+	V4L2_TEST_PATTERN_VERT_COLOUR_BARS,
 };
 
 /*
