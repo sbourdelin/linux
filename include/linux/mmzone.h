@@ -1085,6 +1085,10 @@ static inline unsigned long early_pfn_to_nid(unsigned long pfn)
 #error Allocator MAX_ORDER exceeds SECTION_SIZE
 #endif
 
+#if (pageblock_order + PAGE_SHIFT) > SECTION_SIZE_BITS
+#error Allocator pageblock_order exceeds SECTION_SIZE
+#endif
+
 static inline unsigned long pfn_to_section_nr(unsigned long pfn)
 {
 	return pfn >> PFN_SECTION_SHIFT;
