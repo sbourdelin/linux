@@ -57,6 +57,7 @@ struct rxe_dev *net_to_rxe(struct net_device *ndev)
 	list_for_each_entry(rxe, &rxe_dev_list, list) {
 		if (rxe->ndev == ndev) {
 			found = rxe;
+			kref_get(&rxe->ref_cnt);
 			break;
 		}
 	}
@@ -74,6 +75,7 @@ struct rxe_dev *get_rxe_by_name(const char *name)
 	list_for_each_entry(rxe, &rxe_dev_list, list) {
 		if (!strcmp(name, dev_name(&rxe->ib_dev.dev))) {
 			found = rxe;
+			kref_get(&rxe->ref_cnt);
 			break;
 		}
 	}
@@ -573,6 +575,21 @@ struct rxe_dev *rxe_net_add(struct net_device *ndev)
 	return rxe;
 }
 
+void rxe_net_remove(struct rxe_dev *rxe)
+{
+	bool already_removed;
+
+	spin_lock_bh(&dev_list_lock);
+	already_removed = list_empty(&rxe->list);
+	list_del_init(&rxe->list);
+	spin_unlock_bh(&dev_list_lock);
+
+	if (!already_removed) {
+		rxe_unregister_device(rxe);
+		rxe_dev_put(rxe);
+	}
+}
+
 void rxe_remove_all(void)
 {
 	spin_lock_bh(&dev_list_lock);
@@ -580,9 +597,10 @@ void rxe_remove_all(void)
 		struct rxe_dev *rxe =
 			list_first_entry(&rxe_dev_list, struct rxe_dev, list);
 
-		list_del(&rxe->list);
+		kref_get(&rxe->ref_cnt);
 		spin_unlock_bh(&dev_list_lock);
-		rxe_remove(rxe);
+		rxe_net_remove(rxe);
+		rxe_dev_put(rxe);
 		spin_lock_bh(&dev_list_lock);
 	}
 	spin_unlock_bh(&dev_list_lock);
@@ -637,8 +655,7 @@ static int rxe_notify(struct notifier_block *not_blk,
 
 	switch (event) {
 	case NETDEV_UNREGISTER:
-		list_del(&rxe->list);
-		rxe_remove(rxe);
+		rxe_net_remove(rxe);
 		break;
 	case NETDEV_UP:
 		rxe_port_up(rxe);
@@ -666,6 +683,7 @@ static int rxe_notify(struct notifier_block *not_blk,
 			event, ndev->name);
 		break;
 	}
+	rxe_dev_put(rxe);
 out:
 	return NOTIFY_OK;
 }

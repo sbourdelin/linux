@@ -137,8 +137,8 @@ static int rxe_param_set_remove(const char *val, const struct kernel_param *kp)
 		return -EINVAL;
 	}
 
-	list_del(&rxe->list);
-	rxe_remove(rxe);
+	rxe_net_remove(rxe);
+	rxe_dev_put(rxe);
 
 	return 0;
 }

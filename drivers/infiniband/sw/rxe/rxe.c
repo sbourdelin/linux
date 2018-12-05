@@ -331,14 +331,6 @@ err1:
 	return err;
 }
 
-/* called by the ifc layer to remove a device */
-void rxe_remove(struct rxe_dev *rxe)
-{
-	rxe_unregister_device(rxe);
-
-	rxe_dev_put(rxe);
-}
-
 static int __init rxe_module_init(void)
 {
 	int err;

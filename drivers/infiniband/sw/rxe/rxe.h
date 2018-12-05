@@ -96,7 +96,6 @@ static inline u32 rxe_crc32(struct rxe_dev *rxe,
 void rxe_set_mtu(struct rxe_dev *rxe, unsigned int dev_mtu);
 
 int rxe_add(struct rxe_dev *rxe, unsigned int mtu);
-void rxe_remove(struct rxe_dev *rxe);
 void rxe_remove_all(void);
 
 void rxe_rcv(struct sk_buff *skb);
