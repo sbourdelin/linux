@@ -381,7 +381,9 @@ static long media_device_get_topology(struct media_device *mdev, void *arg)
 static long media_device_request_alloc(struct media_device *mdev,
 				       int *alloc_fd)
 {
+#ifndef CONFIG_MEDIA_CONTROLLER_REQUEST_API
 	if (!mdev->ops || !mdev->ops->req_validate || !mdev->ops->req_queue)
+#endif
 		return -ENOTTY;
 
 	return media_request_alloc(mdev, alloc_fd);
