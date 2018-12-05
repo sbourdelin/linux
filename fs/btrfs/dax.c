@@ -198,10 +198,13 @@ vm_fault_t btrfs_dax_fault(struct vm_fault *vmf)
 	pfn_t pfn;
 	struct address_space *mapping = vmf->vma->vm_file->f_mapping;
 	XA_STATE(xas, &mapping->i_pages, vmf->pgoff);
+	unsigned long vaddr = vmf->address;
 	struct inode *inode = mapping->host;
 	loff_t pos = (loff_t)vmf->pgoff << PAGE_SHIFT;
 	void *entry = NULL;
 	vm_fault_t ret = 0;
+	struct extent_map *em;
+	struct dax_device *dax_dev;
 
 	if (pos > i_size_read(inode)) {
 		ret = VM_FAULT_SIGBUS;
@@ -214,21 +217,33 @@ vm_fault_t btrfs_dax_fault(struct vm_fault *vmf)
 		goto out;
 	}
 
-	if (!vmf->cow_page) {
+        em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, pos, PAGE_SIZE, 0);
+	if (em->block_start != EXTENT_MAP_HOLE)
+		dax_dev = fs_dax_get_by_bdev(em->bdev);
+
+	if (vmf->cow_page) {
+		sector_t sector;
+		if (em->block_start == EXTENT_MAP_HOLE) {
+			clear_user_highpage(vmf->cow_page, vaddr);
+			goto out;
+		}
+        	sector = (get_start_sect(em->bdev) << 9) + (em->block_start + (pos - em->start));
+		sector >>= 9;
+		ret = copy_user_dax(em->bdev, dax_dev, sector, PAGE_SIZE, vmf->cow_page, vaddr);
+		goto out;
+	} else {
         	sector_t sector;
-		struct extent_map *em;
-                em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, pos, PAGE_SIZE, 0);
 		if (em->block_start == EXTENT_MAP_HOLE) {
 			ret = dax_load_hole(&xas, mapping, entry, vmf);
 			goto out;
 		}
 	        sector = ((get_start_sect(em->bdev) << 9) +
 			  (em->block_start + (pos - em->start))) >> 9;
-		ret = dax_pfn(fs_dax_get_by_bdev(em->bdev), em->bdev, sector, PAGE_SIZE, &pfn);
+		ret = dax_pfn(dax_dev, em->bdev, sector, PAGE_SIZE, &pfn);
 		if (ret)
 			goto out;
 		dax_insert_entry(&xas, mapping, vmf, entry, pfn, 0, false);
-		ret = vmf_insert_mixed(vmf->vma, vmf->address, pfn);
+		ret = vmf_insert_mixed(vmf->vma, vaddr, pfn);
 	}
 out:
 	if (entry)
