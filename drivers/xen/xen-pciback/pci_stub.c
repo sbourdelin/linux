@@ -87,6 +87,55 @@ static struct pcistub_device *pcistub_device_alloc(struct pci_dev *dev)
 	return psdev;
 }
 
+/*
+ * Reset Xen internal MSI-X state by invoking PHYSDEVOP_{release, prepare}_msix.
+ */
+int pcistub_msix_reset(struct pci_dev *dev)
+{
+#ifdef CONFIG_PCI_MSI
+	if (dev->msix_cap) {
+		struct physdev_pci_device ppdev = {
+			.seg = pci_domain_nr(dev->bus),
+			.bus = dev->bus->number,
+			.devfn = dev->devfn
+		};
+		int err;
+		u16 val;
+
+		/*
+		 * Do a write first to flush Xen's internal state to hardware
+		 * such that the following read can infer whether MSI-X maskall
+		 * bit is set by Xen.
+		 */
+		pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &val);
+		pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, val);
+
+		pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &val);
+		if (!(val & PCI_MSIX_FLAGS_MASKALL))
+			return 0;
+
+		pr_info("Reset MSI-X state for device %04x:%02x:%02x.%d\n",
+			ppdev.seg, ppdev.bus, PCI_SLOT(ppdev.devfn),
+			PCI_FUNC(ppdev.devfn));
+
+		err = HYPERVISOR_physdev_op(PHYSDEVOP_release_msix, &ppdev);
+		if (err) {
+			dev_warn(&dev->dev, "MSI-X release failed (%d)\n",
+				 err);
+			return err;
+		}
+
+		err = HYPERVISOR_physdev_op(PHYSDEVOP_prepare_msix, &ppdev);
+		if (err) {
+			dev_err(&dev->dev, "MSI-X preparation failed (%d)\n",
+				err);
+			return err;
+		}
+	}
+#endif
+	return 0;
+}
+
 /* Don't call this directly as it's called by pcistub_device_put */
 static void pcistub_device_release(struct kref *kref)
 {

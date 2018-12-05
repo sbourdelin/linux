@@ -243,6 +243,16 @@ static int xen_pcibk_export_device(struct xen_pcibk_device *pdev,
 		goto out;
 	}
 
+	/*
+	 * Reset Xen's internal MSI-X state before exposing a device.
+	 *
+	 * In some cases, Xen's internal MSI-X state is not clean, which would
+	 * incur the new guest cannot receive MSIs.
+	 */
+	err = pcistub_msix_reset(dev);
+	if (err)
+		goto out;
+
 	err = xen_pcibk_add_pci_dev(pdev, dev, devid,
 				    xen_pcibk_publish_pci_dev);
 	if (err)
