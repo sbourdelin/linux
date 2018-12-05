@@ -231,6 +231,45 @@ vm_fault_t btrfs_dax_fault(struct vm_fault *vmf)
 		sector >>= 9;
 		ret = copy_user_dax(em->bdev, dax_dev, sector, PAGE_SIZE, vmf->cow_page, vaddr);
 		goto out;
+	} else if (vmf->flags & FAULT_FLAG_WRITE) {
+		pfn_t pfn;
+		struct extent_map *orig = em;
+		void *daddr;
+		sector_t dstart;
+		size_t maplen;
+		struct extent_changeset *data_reserved = NULL;
+		struct extent_state *cached_state = NULL;
+
+		ret = btrfs_delalloc_reserve_space(inode, &data_reserved, pos, PAGE_SIZE);
+		if (ret < 0)
+			return ret;
+		refcount_inc(&orig->refs);
+		lock_extent_bits(&BTRFS_I(inode)->io_tree, pos, pos + PAGE_SIZE, &cached_state);
+		/* Create an extent of page size */
+		ret = btrfs_get_extent_map_write(&em, NULL, inode, pos,
+				PAGE_SIZE);
+		if (ret < 0) {
+			free_extent_map(orig);
+			btrfs_delalloc_release_space(inode, data_reserved, pos,
+					PAGE_SIZE, true);
+			goto out;
+		}
+
+		dax_dev = fs_dax_get_by_bdev(em->bdev);
+		/* Calculate start address of destination extent */
+		dstart = (get_start_sect(em->bdev) << 9) + em->block_start;
+		maplen = dax_direct_access(dax_dev, PHYS_PFN(dstart),
+				1, &daddr, &pfn);
+
+		/* Copy the original contents into new destination */
+		copy_extent_page(orig, daddr, pos);
+		btrfs_update_ordered_extent(inode, pos, PAGE_SIZE, true);
+		dax_insert_entry(&xas, mapping, vmf, entry, pfn, 0, false);
+		ret = vmf_insert_mixed(vmf->vma, vaddr, pfn);
+		free_extent_map(orig);
+		unlock_extent_cached(&BTRFS_I(inode)->io_tree, pos, pos + PAGE_SIZE, &cached_state);
+		extent_changeset_free(data_reserved);
+		btrfs_delalloc_release_extents(BTRFS_I(inode), PAGE_SIZE, false);
 	} else {
         	sector_t sector;
 		if (em->block_start == EXTENT_MAP_HOLE) {
