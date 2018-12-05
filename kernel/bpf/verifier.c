@@ -3583,23 +3583,23 @@ static int check_alu_op(struct bpf_verifier_env *env, struct bpf_insn *insn)
 			return err;
 
 		if (BPF_SRC(insn->code) == BPF_X) {
-			if (BPF_CLASS(insn->code) == BPF_ALU64) {
-				/* case: R1 = R2
-				 * copy register state to dest reg
-				 */
-				regs[insn->dst_reg] = regs[insn->src_reg];
-				regs[insn->dst_reg].live |= REG_LIVE_WRITTEN;
-			} else {
-				/* R1 = (u32) R2 */
-				if (is_pointer_value(env, insn->src_reg)) {
-					verbose(env,
-						"R%d partial copy of pointer\n",
-						insn->src_reg);
-					return -EACCES;
-				}
-				mark_reg_unknown(env, regs, insn->dst_reg);
-				coerce_reg_to_size(&regs[insn->dst_reg], 4);
+			u8 dst_reg, src_reg = insn->src_reg;
+
+			/* Reject partial pointer copy on R1 = (u32) R2. */
+			if (BPF_CLASS(insn->code) == BPF_ALU &&
+			    is_pointer_value(env, src_reg)) {
+				verbose(env, "R%d partial copy of pointer\n",
+					src_reg);
+				return -EACCES;
 			}
+			dst_reg = insn->dst_reg;
+			regs[dst_reg] = regs[src_reg];
+			if (BPF_CLASS(insn->code) == BPF_ALU) {
+				/* Update type and range info. */
+				regs[dst_reg].type = SCALAR_VALUE;
+				coerce_reg_to_size(&regs[dst_reg], 4);
+			}
+			regs[dst_reg].live |= REG_LIVE_WRITTEN;
 		} else {
 			/* case: R = imm
 			 * remember the value we stored into this reg
