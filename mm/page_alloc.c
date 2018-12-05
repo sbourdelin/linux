@@ -6182,7 +6182,7 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 /*
  * Calculate the size of the zone->blockflags rounded to an unsigned long
  * Start by making sure zonesize is a multiple of pageblock_order by rounding
- * up. Then use 1 NR_PAGEBLOCK_BITS worth of bits per pageblock, finally
+ * up. Then use 1 NR_PAGEBLOCK_BITS width of bits per pageblock, finally
  * round what is now in bits to nearest long in bits, then return it in
  * bytes.
  */
@@ -6191,12 +6191,9 @@ static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned l
 	unsigned long usemapsize;
 
 	zonesize += zone_start_pfn & (pageblock_nr_pages-1);
-	usemapsize = roundup(zonesize, pageblock_nr_pages);
-	usemapsize = usemapsize >> pageblock_order;
+	usemapsize = DIV_ROUND_UP(zonesize, pageblock_nr_pages);
 	usemapsize *= NR_PAGEBLOCK_BITS;
-	usemapsize = roundup(usemapsize, 8 * sizeof(unsigned long));
-
-	return usemapsize / 8;
+	return BITS_TO_LONGS(usemapsize) * sizeof(unsigned long);
 }
 
 static void __ref setup_usemap(struct pglist_data *pgdat,
