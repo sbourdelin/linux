@@ -289,7 +289,7 @@ out_error:
 	return 0;
 }
 
-static int wd719x_chip_init(struct wd719x *wd)
+static int wd719x_chip_init(struct wd719x *wd, int can_sleep)
 {
 	int i, ret;
 	u32 risc_init[3];
@@ -318,7 +318,8 @@ static int wd719x_chip_init(struct wd719x *wd)
 
 	if (!wd->fw_virt)
 		wd->fw_virt = dma_alloc_coherent(&wd->pdev->dev, wd->fw_size,
-						 &wd->fw_phys, GFP_KERNEL);
+						 &wd->fw_phys, can_sleep ?
+						 GFP_KERNEL : GFP_ATOMIC);
 	if (!wd->fw_virt) {
 		ret = -ENOMEM;
 		goto wd719x_init_end;
@@ -510,7 +511,7 @@ static int wd719x_host_reset(struct scsi_cmnd *cmd)
 	dev_info(&wd->pdev->dev, "host reset requested\n");
 	spin_lock_irqsave(wd->sh->host_lock, flags);
 	/* Try to reinit the RISC */
-	if (wd719x_chip_init(wd) == 0)
+	if (wd719x_chip_init(wd, 0) == 0)
 		result = SUCCESS;
 	else
 		result = FAILED;
@@ -834,7 +835,7 @@ static int wd719x_board_found(struct Scsi_Host *sh)
 	/* read parameters from EEPROM */
 	wd719x_read_eeprom(wd);
 
-	ret = wd719x_chip_init(wd);
+	ret = wd719x_chip_init(wd, 1);
 	if (ret)
 		goto fail_free_irq;
 
