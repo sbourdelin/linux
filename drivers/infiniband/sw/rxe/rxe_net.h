@@ -48,5 +48,6 @@ void rxe_net_remove(struct rxe_dev *rxe);
 
 int rxe_net_init(void);
 void rxe_net_exit(void);
+void rxe_process_net_remove(struct work_struct *work);
 
 #endif /* RXE_NET_H */

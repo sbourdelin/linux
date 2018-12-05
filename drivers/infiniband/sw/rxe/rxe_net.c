@@ -643,6 +643,15 @@ void rxe_port_down(struct rxe_dev *rxe)
 	dev_info(&rxe->ib_dev.dev, "set down\n");
 }
 
+void rxe_process_net_remove(struct work_struct *work)
+{
+	struct rxe_dev *rxe;
+
+	rxe = container_of(work, struct rxe_dev, net_remove_work);
+	rxe_net_remove(rxe);
+	rxe_dev_put(rxe);
+}
+
 static int rxe_notify(struct notifier_block *not_blk,
 		      unsigned long event,
 		      void *arg)
@@ -655,7 +664,8 @@ static int rxe_notify(struct notifier_block *not_blk,
 
 	switch (event) {
 	case NETDEV_UNREGISTER:
-		rxe_net_remove(rxe);
+		kref_get(&rxe->ref_cnt);
+		schedule_work(&rxe->net_remove_work);
 		break;
 	case NETDEV_UP:
 		rxe_port_up(rxe);

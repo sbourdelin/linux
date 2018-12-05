@@ -280,6 +280,7 @@ static int rxe_init(struct rxe_dev *rxe)
 	spin_lock_init(&rxe->pending_lock);
 	INIT_LIST_HEAD(&rxe->pending_mmaps);
 	INIT_LIST_HEAD(&rxe->list);
+	INIT_WORK(&rxe->net_remove_work, rxe_process_net_remove);
 
 	mutex_init(&rxe->usdev_lock);
 
