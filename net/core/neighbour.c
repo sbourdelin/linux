@@ -1785,7 +1785,7 @@ static int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh,
 			goto out;
 		}
 
-		neigh = __neigh_lookup_errno(tbl, dst, dev);
+		neigh = __neigh_create(tbl, dst, dev, true);
 		if (IS_ERR(neigh)) {
 			err = PTR_ERR(neigh);
 			goto out;
