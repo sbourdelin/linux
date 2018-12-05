@@ -213,7 +213,10 @@ static u32 arp_hash(const void *pkey,
 		    const struct net_device *dev,
 		    __u32 *hash_rnd)
 {
-	return arp_hashfn(pkey, dev, hash_rnd);
+	u32 key = *(const u32 *)pkey;
+	u32 val = key ^ hash32_ptr(dev);
+
+	return val * hash_rnd[0];
 }
 
 static bool arp_key_eq(const struct neighbour *neigh, const void *pkey)

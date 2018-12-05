@@ -10,14 +10,6 @@
 
 extern struct neigh_table arp_tbl;
 
-static inline u32 arp_hashfn(const void *pkey, const struct net_device *dev, u32 *hash_rnd)
-{
-	u32 key = *(const u32 *)pkey;
-	u32 val = key ^ hash32_ptr(dev);
-
-	return val * hash_rnd[0];
-}
-
 static inline struct neighbour *__ipv4_neigh_lookup_noref(struct net_device *dev, u32 key)
 {
 	if (dev->flags & (IFF_LOOPBACK | IFF_POINTOPOINT))
