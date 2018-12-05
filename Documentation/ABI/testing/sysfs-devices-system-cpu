@@ -145,6 +145,8 @@ What:		/sys/devices/system/cpu/cpuX/cpuidle/stateN/name
 		/sys/devices/system/cpu/cpuX/cpuidle/stateN/power
 		/sys/devices/system/cpu/cpuX/cpuidle/stateN/time
 		/sys/devices/system/cpu/cpuX/cpuidle/stateN/usage
+		/sys/devices/system/cpu/cpuX/cpuidle/stateN/high
+		/sys/devices/system/cpu/cpuX/cpuidle/stateN/low
 Date:		September 2007
 KernelVersion:	v2.6.24
 Contact:	Linux power management list <linux-pm@vger.kernel.org>
@@ -166,6 +168,11 @@ Description:
 
 		usage: (RO) Number of times this state was entered (a count).
 
+		high: (RO) Number of times this state was entered, but the
+		      observed CPU target residency was too high for it (a count).
+
+		low: (RO) Number of times this state was entered, but the
+		     observed CPU target residency was too low for it (a count).
 
 What:		/sys/devices/system/cpu/cpuX/cpuidle/stateN/desc
 Date:		February 2008

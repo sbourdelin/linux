@@ -404,8 +404,18 @@ object corresponding to it, as follows:
 ``disable``
 	Whether or not this idle state is disabled.
 
+``high``
+	Total number of times this idle state had been asked for, but the
+	observed idle duration was certainly too short to match its target
+	residency.
+
 ``latency``
 	Exit latency of the idle state in microseconds.
+
+``low``
+	Total number of times this idle state had been asked for, but cerainly
+	a deeper idle state would have been a better match for the observed idle
+	duration.
 
 ``name``
 	Name of the idle state.
