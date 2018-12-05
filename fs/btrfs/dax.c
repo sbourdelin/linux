@@ -54,7 +54,12 @@ ssize_t btrfs_file_dax_read(struct kiocb *iocb, struct iov_iter *to)
 
                 BUG_ON(em->flags & EXTENT_FLAG_FS_MAPPING);
 
-                ret = em_dax_rw(inode, em, pos, len, to);
+		if (em->block_start == EXTENT_MAP_HOLE) {
+			u64 zero_len = min(em->len - (em->start - pos), len);
+			ret = iov_iter_zero(zero_len, to);
+		} else {
+			ret = em_dax_rw(inode, em, pos, len, to);
+		}
                 if (ret < 0)
                         goto out;
                 pos += ret;
