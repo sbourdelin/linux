@@ -454,6 +454,7 @@ static inline int neigh_hh_bridge(struct hh_cache *hh, struct sk_buff *skb)
 
 static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb)
 {
+	unsigned int hh_alen = 0;
 	unsigned int seq;
 	unsigned int hh_len;
 
@@ -461,14 +462,17 @@ static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb
 		seq = read_seqbegin(&hh->hh_lock);
 		hh_len = hh->hh_len;
 		if (likely(hh_len <= HH_DATA_MOD)) {
+			hh_alen = HH_DATA_MOD;
 			/* this is inlined by gcc */
 			memcpy(skb->data - HH_DATA_MOD, hh->hh_data, HH_DATA_MOD);
 		} else {
-			unsigned int hh_alen = HH_DATA_ALIGN(hh_len);
-
+			hh_alen = HH_DATA_ALIGN(hh_len);
 			memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
 		}
 	} while (read_seqretry(&hh->hh_lock, seq));
+
+	/* skb_push() won't panic if we have room for the unaligned size only */
+	BUG_ON(skb_headroom(skb) < hh_alen);
 
 	skb_push(skb, hh_len);
 	return dev_queue_xmit(skb);
