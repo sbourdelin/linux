@@ -135,10 +135,8 @@ static void csi2_enable(struct csi2_dev *csi2, bool enable)
 	}
 }
 
-static void csi2_set_lanes(struct csi2_dev *csi2)
+static void csi2_set_lanes(struct csi2_dev *csi2, int lanes)
 {
-	int lanes = csi2->bus.num_data_lanes;
-
 	writel(lanes - 1, csi2->base + CSI2_N_LANES);
 }
 
@@ -301,6 +299,9 @@ static void csi2ipu_gasket_init(struct csi2_dev *csi2)
 
 static int csi2_start(struct csi2_dev *csi2)
 {
+	const u32 mask = V4L2_MBUS_CSI2_LANE_MASK;
+	struct v4l2_mbus_config cfg;
+	int lanes = 0;
 	int ret;
 
 	ret = clk_prepare_enable(csi2->pix_clk);
@@ -316,7 +317,10 @@ static int csi2_start(struct csi2_dev *csi2)
 		goto err_disable_clk;
 
 	/* Step 4 */
-	csi2_set_lanes(csi2);
+	ret = v4l2_subdev_call(csi2->src_sd, video, g_mbus_config, &cfg);
+	if (ret == 0)
+		lanes = (cfg.flags & mask) >> __ffs(mask);
+	csi2_set_lanes(csi2, lanes ?: csi2->bus.num_data_lanes);
 	csi2_enable(csi2, true);
 
 	/* Step 5 */
