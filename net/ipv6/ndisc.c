@@ -311,7 +311,12 @@ static u32 ndisc_hash(const void *pkey,
 		      const struct net_device *dev,
 		      __u32 *hash_rnd)
 {
-	return ndisc_hashfn(pkey, dev, hash_rnd);
+	const u32 *p32 = pkey;
+
+	return (((p32[0] ^ hash32_ptr(dev)) * hash_rnd[0]) +
+		 (p32[1] * hash_rnd[1]) +
+		 (p32[2] * hash_rnd[2]) +
+		 (p32[3] * hash_rnd[3]));
 }
 
 static bool ndisc_key_eq(const struct neighbour *n, const void *pkey)

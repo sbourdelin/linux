@@ -364,16 +364,6 @@ static inline u8 *ndisc_opt_addr_data(struct nd_opt_hdr *p,
 				     ndisc_addr_option_pad(dev->type));
 }
 
-static inline u32 ndisc_hashfn(const void *pkey, const struct net_device *dev, __u32 *hash_rnd)
-{
-	const u32 *p32 = pkey;
-
-	return (((p32[0] ^ hash32_ptr(dev)) * hash_rnd[0]) +
-		(p32[1] * hash_rnd[1]) +
-		(p32[2] * hash_rnd[2]) +
-		(p32[3] * hash_rnd[3]));
-}
-
 static inline struct neighbour *__ipv6_neigh_lookup_noref(struct net_device *dev, const void *pkey)
 {
 	return __neigh_lookup_noref(&nd_tbl, pkey, dev);
