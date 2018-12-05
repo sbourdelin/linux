@@ -97,7 +97,7 @@ static int rxe_param_set_add(const char *val, const struct kernel_param *kp)
 		goto err;
 	}
 
-	rxe = rxe_net_add(ndev);
+	rxe = rxe_net_add("rxe%d", ndev);
 	if (!rxe) {
 		pr_err("failed to add %s\n", intf);
 		err = -EINVAL;
@@ -152,6 +152,6 @@ static const struct kernel_param_ops rxe_remove_ops = {
 };
 
 module_param_cb(add, &rxe_add_ops, NULL, 0200);
-MODULE_PARM_DESC(add, "Create RXE device over network interface");
+MODULE_PARM_DESC(add, "DEPRECATED.  Create RXE device over network interface");
 module_param_cb(remove, &rxe_remove_ops, NULL, 0200);
-MODULE_PARM_DESC(remove, "Remove RXE device over network interface");
+MODULE_PARM_DESC(remove, "DEPRECATED.  Remove RXE device over network interface");

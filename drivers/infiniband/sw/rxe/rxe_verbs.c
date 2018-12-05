@@ -1165,7 +1165,7 @@ static const struct attribute_group rxe_attr_group = {
 	.attrs = rxe_dev_attributes,
 };
 
-int rxe_register_device(struct rxe_dev *rxe)
+int rxe_register_device(struct rxe_dev *rxe, const char *ibdev_name)
 {
 	int err;
 	struct ib_device *dev = &rxe->ib_dev;
@@ -1273,7 +1273,7 @@ int rxe_register_device(struct rxe_dev *rxe)
 
 	rdma_set_device_sysfs_group(dev, &rxe_attr_group);
 	dev->driver_id = RDMA_DRIVER_RXE;
-	err = ib_register_device(dev, "rxe%d", NULL);
+	err = ib_register_device(dev, ibdev_name, NULL);
 	if (err) {
 		pr_warn("%s failed with error %d\n", __func__, err);
 		goto err1;
