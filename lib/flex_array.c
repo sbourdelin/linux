@@ -405,3 +405,61 @@ int flex_array_shrink(struct flex_array *fa)
 	return ret;
 }
 EXPORT_SYMBOL(flex_array_shrink);
+
+/**
+ * flex_array_resize - resize without the old elements memory changed
+ * @fa:		the flex array to resize
+ * @total:	total number of elements that this would change to
+ * @flags:	page allocation flags to use for base array
+ *
+ * This function can dynamically change total_nr_elements of a flex_array,
+ * and keep the old elements of the same memory. Returns 0 if it succeeds.
+ * Note that it won't do any memory allocation or shrinking for elements,
+ * which should be only done by flex_array_prealloc and flex_array_shrink.
+ *
+ * Locking must be provided by the caller.
+ */
+int flex_array_resize(struct flex_array *fa, unsigned int total, gfp_t flags)
+{
+	int nr;
+
+	if (total > FLEX_ARRAY_NR_BASE_PTRS * fa->elems_per_part)
+		return -EINVAL;
+
+	if (elements_fit_in_base(fa)) {
+		struct flex_array_part_p *part_p;
+
+		nr = fa->total_nr_elements;
+		fa->total_nr_elements = total;
+		if (elements_fit_in_base(fa))
+			return 0;
+
+		part_p = kzalloc(sizeof(*part_p), flags);
+		if (!part_p) {
+			fa->total_nr_elements = nr;
+			return -ENOMEM;
+		}
+
+		part_p->p_part[0] = (struct flex_array_part *)&fa->parts[0];
+		fa->part_p = part_p;
+	} else {
+		struct flex_array_part *part;
+
+		fa->total_nr_elements = total;
+		if (!elements_fit_in_base(fa))
+			return 0;
+
+		for (nr = 1; nr < FLEX_ARRAY_NR_BASE_PTRS; nr++) {
+			part = fa->parts[nr];
+			if (part) {
+				fa->parts[nr] = NULL;
+				kfree(part);
+			}
+		}
+
+		fa->part_p = (struct flex_array_part_p *)fa->parts[0];
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(flex_array_resize);

@@ -130,6 +130,17 @@ void *flex_array_get(struct flex_array *fa, unsigned int element_nr);
  */
 int flex_array_shrink(struct flex_array *fa);
 
+/**
+ * flex_array_resize() - Resize without the old elements memory changed
+ * @fa:		array to resize
+ * @total:	total number of elements that this would change to
+ * @flags:	page allocation flags to use for base array
+ *
+ * Return:	Returns 0 if it succeeds.
+ *
+ */
+int flex_array_resize(struct flex_array *fa, unsigned int total, gfp_t flags);
+
 #define flex_array_put_ptr(fa, nr, src, gfp) \
 	flex_array_put(fa, nr, (void *)&(src), gfp)
 
