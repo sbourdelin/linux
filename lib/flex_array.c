@@ -30,6 +30,10 @@ struct flex_array_part {
 	char elements[FLEX_ARRAY_PART_SIZE];
 };
 
+struct flex_array_part_p {
+	struct flex_array_part *p_part[FLEX_ARRAY_NR_BASE_PTRS];
+};
+
 /*
  * If a user requests an allocation which is small
  * enough, we may simply use the space in the
@@ -39,7 +43,7 @@ struct flex_array_part {
 static inline int elements_fit_in_base(struct flex_array *fa)
 {
 	int data_size = fa->element_size * fa->total_nr_elements;
-	if (data_size <= FLEX_ARRAY_BASE_BYTES_LEFT)
+	if (data_size <= FLEX_ARRAY_BASE_SIZE)
 		return 1;
 	return 0;
 }
@@ -105,13 +109,17 @@ struct flex_array *flex_array_alloc(int element_size, unsigned int total,
 	ret = kzalloc(sizeof(struct flex_array), flags);
 	if (!ret)
 		return NULL;
+	ret->part_p = kzalloc(sizeof(struct flex_array_part_p), flags);
+	if (!ret->part_p) {
+		kfree(ret);
+		return NULL;
+	}
 	ret->element_size = element_size;
 	ret->total_nr_elements = total;
 	ret->elems_per_part = elems_per_part;
 	ret->reciprocal_elems = reciprocal_elems;
 	if (elements_fit_in_base(ret) && !(flags & __GFP_ZERO))
-		memset(&ret->parts[0], FLEX_ARRAY_FREE,
-						FLEX_ARRAY_BASE_BYTES_LEFT);
+		memset(&ret->parts[0], FLEX_ARRAY_FREE, FLEX_ARRAY_BASE_SIZE);
 	return ret;
 }
 EXPORT_SYMBOL(flex_array_alloc);
@@ -148,6 +156,7 @@ EXPORT_SYMBOL(flex_array_free_parts);
 void flex_array_free(struct flex_array *fa)
 {
 	flex_array_free_parts(fa);
+	kfree(fa->part_p);
 	kfree(fa);
 }
 EXPORT_SYMBOL(flex_array_free);

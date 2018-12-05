@@ -7,9 +7,10 @@
 #include <asm/page.h>
 
 #define FLEX_ARRAY_PART_SIZE PAGE_SIZE
-#define FLEX_ARRAY_BASE_SIZE PAGE_SIZE
+#define FLEX_ARRAY_BASE_SIZE FLEX_ARRAY_PART_SIZE
 
 struct flex_array_part;
+struct flex_array_part_p;
 
 /*
  * This is meant to replace cases where an array-like
@@ -19,29 +20,17 @@ struct flex_array_part;
  */
 
 struct flex_array {
-	union {
-		struct {
-			int element_size;
-			int total_nr_elements;
-			int elems_per_part;
-			struct reciprocal_value reciprocal_elems;
-			struct flex_array_part *parts[];
-		};
-		/*
-		 * This little trick makes sure that
-		 * sizeof(flex_array) == PAGE_SIZE
-		 */
-		char padding[FLEX_ARRAY_BASE_SIZE];
-	};
+	int element_size;
+	int total_nr_elements;
+	int elems_per_part;
+	struct reciprocal_value reciprocal_elems;
+	struct flex_array_part_p *part_p;
+#define parts part_p->p_part
 };
-
-/* Number of bytes left in base struct flex_array, excluding metadata */
-#define FLEX_ARRAY_BASE_BYTES_LEFT					\
-	(FLEX_ARRAY_BASE_SIZE - offsetof(struct flex_array, parts))
 
 /* Number of pointers in base to struct flex_array_part pages */
 #define FLEX_ARRAY_NR_BASE_PTRS						\
-	(FLEX_ARRAY_BASE_BYTES_LEFT / sizeof(struct flex_array_part *))
+	(FLEX_ARRAY_BASE_SIZE / sizeof(struct flex_array_part *))
 
 /* Number of elements of size that fit in struct flex_array_part */
 #define FLEX_ARRAY_ELEMENTS_PER_PART(size)				\
