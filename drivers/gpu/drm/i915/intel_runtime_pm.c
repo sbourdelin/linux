@@ -336,16 +336,28 @@ static void hsw_wait_for_power_well_disable(struct drm_i915_private *dev_priv,
 	 * Bspec doesn't require waiting for PWs to get disabled, but still do
 	 * this for paranoia. The known cases where a PW will be forced on:
 	 * - a KVMR request on any power well via the KVMR request register
-	 * - a DMC request on PW1 and MISC_IO power wells via the BIOS and
-	 *   DEBUG request registers
+	 * - a debug request on any power well via the DEBUG request register
 	 * Skip the wait in case any of the request bits are set and print a
 	 * diagnostic message.
+	 *
+	 * Note that DMC firmware will also force on the PW1 BIOS request
+	 * on SKL-CNL, MISC_IO BIOS request on SKL-GLK (although MISC_IO
+	 * does not even exits on BXT/GLK so the bit doesn't stick),
+	 * and the PW1/MISC_IO debug request on BXT. We simply clear
+	 * those spurious requests in hsw_power_well_disable() to make
+	 * sure they don't waste power. Starting from ICL the DMC firmware
+	 * has been fixed to only force on the PW1 driver request bit.
 	 */
 	wait_for((disabled = !(I915_READ(regs->driver) &
 			       HSW_PWR_WELL_CTL_STATE(pw_idx))) ||
 		 (reqs = hsw_power_well_requesters(dev_priv, regs, pw_idx)), 1);
 	if (disabled)
 		return;
+
+	WARN(reqs & 3,
+	     "%s left on (bios:%d driver:%d kvmr:%d debug:%d)\n",
+	     power_well->desc->name,
+	     !!(reqs & 1), !!(reqs & 2), !!(reqs & 4), !!(reqs & 8));
 
 	DRM_DEBUG_KMS("%s forced on (bios:%d driver:%d kvmr:%d debug:%d)\n",
 		      power_well->desc->name,
@@ -409,6 +421,7 @@ static void hsw_power_well_disable(struct drm_i915_private *dev_priv,
 				   struct i915_power_well *power_well)
 {
 	const struct i915_power_well_regs *regs = power_well->desc->hsw.regs;
+	enum i915_power_well_id id = power_well->desc->id;
 	int pw_idx = power_well->desc->hsw.idx;
 	u32 val;
 
@@ -417,6 +430,24 @@ static void hsw_power_well_disable(struct drm_i915_private *dev_priv,
 
 	val = I915_READ(regs->driver);
 	I915_WRITE(regs->driver, val & ~HSW_PWR_WELL_CTL_REQ(pw_idx));
+	/*
+	 * On SKL-CNL DMC firmware forces on the BIOS request.
+	 * This wastes a bit of power so clear it.
+	 */
+	if (INTEL_GEN(dev_priv) < 11 &&
+	    (id == SKL_DISP_PW_1 || id == SKL_DISP_PW_MISC_IO)) {
+		val = I915_READ(regs->bios);
+		I915_WRITE(regs->bios, val & ~HSW_PWR_WELL_CTL_REQ(pw_idx));
+	}
+	/*
+	 * On BXT DMC firmware forces on the debug request.
+	 * This wastes a bit of power so clear it.
+	 */
+	if (IS_BROXTON(dev_priv) &&
+	    (id == SKL_DISP_PW_1 || id == SKL_DISP_PW_MISC_IO)) {
+		val = I915_READ(regs->debug);
+		I915_WRITE(regs->debug, val & ~HSW_PWR_WELL_CTL_REQ(pw_idx));
+	}
 	hsw_wait_for_power_well_disable(dev_priv, power_well);
 }
 
