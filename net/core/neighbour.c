@@ -151,9 +151,8 @@ bool neigh_remove_one(struct neighbour *ndel, struct neigh_table *tbl)
 
 	nht = rcu_dereference_protected(tbl->nht,
 					lockdep_is_held(&tbl->lock));
-	hash_val = tbl->hash(pkey, ndel->dev, nht->hash_rnd);
-	hash_val = hash_val >> (32 - nht->hash_shift);
 
+	hash_val = neigh_hash(tbl, nht, pkey, ndel->dev);
 	np = &nht->hash_buckets[hash_val];
 	while ((n = rcu_dereference_protected(*np,
 					      lockdep_is_held(&tbl->lock)))) {
@@ -434,10 +433,7 @@ static struct neigh_hash_table *neigh_hash_grow(struct neigh_table *tbl,
 						   lockdep_is_held(&tbl->lock));
 		     n != NULL;
 		     n = next) {
-			hash = tbl->hash(n->primary_key, n->dev,
-					 new_nht->hash_rnd);
-
-			hash >>= (32 - new_nht->hash_shift);
+			hash = neigh_hash(tbl, new_nht, n->primary_key, n->dev);
 			next = rcu_dereference_protected(n->next,
 						lockdep_is_held(&tbl->lock));
 
@@ -485,9 +481,9 @@ struct neighbour *neigh_lookup_nodev(struct neigh_table *tbl, struct net *net,
 	NEIGH_CACHE_STAT_INC(tbl, lookups);
 
 	rcu_read_lock_bh();
-	nht = rcu_dereference_bh(tbl->nht);
-	hash_val = tbl->hash(pkey, NULL, nht->hash_rnd) >> (32 - nht->hash_shift);
 
+	nht = rcu_dereference_bh(tbl->nht);
+	hash_val = neigh_hash(tbl, nht, pkey, NULL);
 	for (n = rcu_dereference_bh(nht->hash_buckets[hash_val]);
 	     n != NULL;
 	     n = rcu_dereference_bh(n->next)) {
@@ -553,13 +549,12 @@ struct neighbour *__neigh_create(struct neigh_table *tbl, const void *pkey,
 	if (atomic_read(&tbl->entries) > (1 << nht->hash_shift))
 		nht = neigh_hash_grow(tbl, nht->hash_shift + 1);
 
-	hash_val = tbl->hash(n->primary_key, dev, nht->hash_rnd) >> (32 - nht->hash_shift);
-
 	if (n->parms->dead) {
 		rc = ERR_PTR(-EINVAL);
 		goto out_tbl_unlock;
 	}
 
+	hash_val = neigh_hash(tbl, nht, n->primary_key, dev);
 	for (n1 = rcu_dereference_protected(nht->hash_buckets[hash_val],
 					    lockdep_is_held(&tbl->lock));
 	     n1 != NULL;
