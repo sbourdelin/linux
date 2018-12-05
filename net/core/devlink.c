@@ -3210,7 +3210,13 @@ static void devlink_param_unregister_one(struct devlink *devlink,
 	kfree(param_item);
 }
 
-static const struct devlink_param devlink_port_param_generic[] = {};
+static const struct devlink_param devlink_port_param_generic[] = {
+	{
+		.id = DEVLINK_PORT_PARAM_GENERIC_ID_WOL,
+		.name = DEVLINK_PORT_PARAM_GENERIC_WOL_NAME,
+		.type = DEVLINK_PORT_PARAM_GENERIC_WOL_TYPE,
+	},
+};
 
 static int devlink_port_param_generic_verify(const struct devlink_param *param)
 {

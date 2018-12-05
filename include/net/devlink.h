@@ -421,11 +421,28 @@ enum devlink_param_generic_id {
 }
 
 enum devlink_port_param_generic_id {
+	DEVLINK_PORT_PARAM_GENERIC_ID_WOL,
+
 	/* add new param generic ids above here */
 	__DEVLINK_PORT_PARAM_GENERIC_ID_MAX,
 	DEVLINK_PORT_PARAM_GENERIC_ID_MAX =
 	       __DEVLINK_PORT_PARAM_GENERIC_ID_MAX - 1,
 };
+
+#define DEVLINK_PORT_PARAM_GENERIC_WOL_NAME "wake-on-lan"
+#define DEVLINK_PORT_PARAM_GENERIC_WOL_TYPE DEVLINK_PARAM_TYPE_BOOL
+
+#define DEVLINK_PORT_PARAM_GENERIC(_id, _cmodes, _get, _set, _validate)	\
+{									\
+	.id = DEVLINK_PORT_PARAM_GENERIC_ID_##_id,			\
+	.name = DEVLINK_PORT_PARAM_GENERIC_##_id##_NAME,		\
+	.type = DEVLINK_PORT_PARAM_GENERIC_##_id##_TYPE,		\
+	.generic = true,						\
+	.supported_cmodes = _cmodes,					\
+	.get = _get,							\
+	.set = _set,							\
+	.validate = _validate,						\
+}
 
 struct devlink_region;
 
