@@ -816,6 +816,5 @@ out:
 void amdgpu_acpi_fini(struct amdgpu_device *adev)
 {
 	unregister_acpi_notifier(&adev->acpi_nb);
-	if (adev->atif)
-		kfree(adev->atif);
+	kfree(adev->atif);
 }
