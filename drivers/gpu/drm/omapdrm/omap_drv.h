@@ -73,6 +73,8 @@ struct omap_drm_private {
 
 	struct workqueue_struct *wq;
 
+	struct drm_atomic_state *suspend_state;
+
 	/* lock for obj_list below */
 	struct mutex list_lock;
 
