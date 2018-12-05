@@ -244,7 +244,7 @@ static void put_unlocked_entry(struct xa_state *xas, void *entry)
  * dropped the xa_lock, so we know the xa_state is stale and must be reset
  * before use.
  */
-static void dax_unlock_entry(struct xa_state *xas, void *entry)
+void dax_unlock_entry(struct xa_state *xas, void *entry)
 {
 	void *old;
 
@@ -256,6 +256,7 @@ static void dax_unlock_entry(struct xa_state *xas, void *entry)
 	BUG_ON(!dax_is_locked(old));
 	dax_wake_entry(xas, entry, false);
 }
+EXPORT_SYMBOL(dax_unlock_entry);
 
 /*
  * Return: The entry stored at this location before it was locked.
@@ -448,7 +449,7 @@ void dax_unlock_mapping_entry(struct page *page)
  * a VM_FAULT code, encoded as an xarray internal entry.  The ERR_PTR values
  * overlap with xarray value entries.
  */
-static void *grab_mapping_entry(struct xa_state *xas,
+void *grab_mapping_entry(struct xa_state *xas,
 		struct address_space *mapping, unsigned long size_flag)
 {
 	unsigned long index = xas->xa_index;
@@ -531,6 +532,7 @@ fallback:
 	xas_unlock_irq(xas);
 	return xa_mk_internal(VM_FAULT_FALLBACK);
 }
+EXPORT_SYMBOL(grab_mapping_entry);
 
 /**
  * dax_layout_busy_page - find first pinned page in @mapping
@@ -654,7 +656,7 @@ int dax_invalidate_mapping_entry_sync(struct address_space *mapping,
 	return __dax_invalidate_entry(mapping, index, false);
 }
 
-static int copy_user_dax(struct block_device *bdev, struct dax_device *dax_dev,
+int copy_user_dax(struct block_device *bdev, struct dax_device *dax_dev,
 		sector_t sector, size_t size, struct page *to,
 		unsigned long vaddr)
 {
@@ -679,6 +681,7 @@ static int copy_user_dax(struct block_device *bdev, struct dax_device *dax_dev,
 	dax_read_unlock(id);
 	return 0;
 }
+EXPORT_SYMBOL(copy_user_dax);
 
 /*
  * By this point grab_mapping_entry() has ensured that we have a locked entry
@@ -687,7 +690,7 @@ static int copy_user_dax(struct block_device *bdev, struct dax_device *dax_dev,
  * already in the tree, we will skip the insertion and just dirty the PMD as
  * appropriate.
  */
-static void *dax_insert_entry(struct xa_state *xas,
+void *dax_insert_entry(struct xa_state *xas,
 		struct address_space *mapping, struct vm_fault *vmf,
 		void *entry, pfn_t pfn, unsigned long flags, bool dirty)
 {
@@ -736,6 +739,7 @@ static void *dax_insert_entry(struct xa_state *xas,
 	xas_unlock_irq(xas);
 	return entry;
 }
+EXPORT_SYMBOL(dax_insert_entry);
 
 static inline
 unsigned long pgoff_address(pgoff_t pgoff, struct vm_area_struct *vma)
@@ -962,19 +966,18 @@ static sector_t dax_iomap_sector(struct iomap *iomap, loff_t pos)
 	return (iomap->addr + (pos & PAGE_MASK) - iomap->offset) >> 9;
 }
 
-static int dax_iomap_pfn(struct iomap *iomap, loff_t pos, size_t size,
-			 pfn_t *pfnp)
+int dax_pfn(struct dax_device *dax_dev, struct block_device *bdev,
+	    const sector_t sector, size_t size, pfn_t *pfnp)
 {
-	const sector_t sector = dax_iomap_sector(iomap, pos);
 	pgoff_t pgoff;
 	int id, rc;
 	long length;
 
-	rc = bdev_dax_pgoff(iomap->bdev, sector, size, &pgoff);
+	rc = bdev_dax_pgoff(bdev, sector, size, &pgoff);
 	if (rc)
 		return rc;
 	id = dax_read_lock();
-	length = dax_direct_access(iomap->dax_dev, pgoff, PHYS_PFN(size),
+	length = dax_direct_access(dax_dev, pgoff, PHYS_PFN(size),
 				   NULL, pfnp);
 	if (length < 0) {
 		rc = length;
@@ -993,6 +996,14 @@ out:
 	dax_read_unlock(id);
 	return rc;
 }
+EXPORT_SYMBOL(dax_pfn);
+
+static int dax_iomap_pfn(struct iomap *iomap, loff_t pos, size_t size,
+			 pfn_t *pfnp)
+{
+	const sector_t sector = dax_iomap_sector(iomap, pos);
+	return dax_pfn(iomap->dax_dev, iomap->bdev, sector, size, pfnp);
+}
 
 /*
  * The user has performed a load from a hole in the file.  Allocating a new
@@ -1001,7 +1012,7 @@ out:
  * If this page is ever written to we will re-fault and change the mapping to
  * point to real DAX storage instead.
  */
-static vm_fault_t dax_load_hole(struct xa_state *xas,
+vm_fault_t dax_load_hole(struct xa_state *xas,
 		struct address_space *mapping, void **entry,
 		struct vm_fault *vmf)
 {
@@ -1017,6 +1028,7 @@ static vm_fault_t dax_load_hole(struct xa_state *xas,
 	trace_dax_load_hole(inode, vmf, ret);
 	return ret;
 }
+EXPORT_SYMBOL(dax_load_hole);
 
 static bool dax_range_is_aligned(struct block_device *bdev,
 				 unsigned int offset, unsigned int length)
@@ -1195,7 +1207,7 @@ dax_iomap_rw(struct kiocb *iocb, struct iov_iter *iter,
 }
 EXPORT_SYMBOL_GPL(dax_iomap_rw);
 
-static vm_fault_t dax_fault_return(int error)
+vm_fault_t dax_fault_return(int error)
 {
 	if (error == 0)
 		return VM_FAULT_NOPAGE;
@@ -1203,6 +1215,7 @@ static vm_fault_t dax_fault_return(int error)
 		return VM_FAULT_OOM;
 	return VM_FAULT_SIGBUS;
 }
+EXPORT_SYMBOL(dax_fault_return);
 
 /*
  * MAP_SYNC on a dax mapping guarantees dirty metadata is

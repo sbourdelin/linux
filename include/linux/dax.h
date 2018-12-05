@@ -155,6 +155,22 @@ vm_fault_t dax_finish_sync_fault(struct vm_fault *vmf,
 int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index);
 int dax_invalidate_mapping_entry_sync(struct address_space *mapping,
 				      pgoff_t index);
+int dax_pfn(struct dax_device *dax_dev, struct block_device *bdev,
+	    const sector_t sector, size_t size, pfn_t *pfn);
+void *dax_insert_entry(struct xa_state *xas,
+	               struct address_space *mapping, struct vm_fault *vmf,
+	               void *entry, pfn_t pfn, unsigned long flags, bool dirty);
+void *grab_mapping_entry(struct xa_state *xas,
+	                 struct address_space *mapping,
+			 unsigned long size_flag);
+void dax_unlock_entry(struct xa_state *xas, void *entry);
+vm_fault_t dax_load_hole(struct xa_state *xas,
+			 struct address_space *mapping, void **entry,
+			 struct vm_fault *vmf);
+vm_fault_t dax_fault_return(int error);
+int copy_user_dax(struct block_device *bdev, struct dax_device *dax_dev,
+		sector_t sector, size_t size, struct page *to,
+		unsigned long vaddr);
 
 #ifdef CONFIG_FS_DAX
 int __dax_zero_page_range(struct block_device *bdev,
