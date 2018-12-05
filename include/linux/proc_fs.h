@@ -73,6 +73,9 @@ struct proc_dir_entry *proc_create_net_single_write(const char *name, umode_t mo
 						    int (*show)(struct seq_file *, void *),
 						    proc_write_t write,
 						    void *data);
+extern bool proc_is_tgid_procfd(const struct file *file);
+extern bool proc_is_tid_procfd(const struct file *file);
+extern struct pid *proc_pid(const struct inode *inode);
 
 #else /* CONFIG_PROC_FS */
 
@@ -113,6 +116,21 @@ static inline int remove_proc_subtree(const char *name, struct proc_dir_entry *p
 #define proc_create_net_data(name, mode, parent, ops, state_size, data) ({NULL;})
 #define proc_create_net(name, mode, parent, state_size, ops) ({NULL;})
 #define proc_create_net_single(name, mode, parent, show, data) ({NULL;})
+
+static inline bool proc_is_tgid_procfd(const struct file *file)
+{
+	return false;
+}
+
+static inline bool proc_is_tid_procfd(const struct file *file)
+{
+	return false;
+}
+
+static inline struct pid *proc_pid(const struct inode *inode)
+{
+	return NULL;
+}
 
 #endif /* CONFIG_PROC_FS */
 

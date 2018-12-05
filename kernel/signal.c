@@ -19,7 +19,9 @@
 #include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
 #include <linux/sched/cputime.h>
+#include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/proc_fs.h>
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/coredump.h>
@@ -3286,6 +3288,16 @@ COMPAT_SYSCALL_DEFINE4(rt_sigtimedwait, compat_sigset_t __user *, uthese,
 }
 #endif
 
+static inline void prepare_kill_siginfo(int sig, struct kernel_siginfo *info)
+{
+	clear_siginfo(info);
+	info->si_signo = sig;
+	info->si_errno = 0;
+	info->si_code = SI_USER;
+	info->si_pid = task_tgid_vnr(current);
+	info->si_uid = from_kuid_munged(current_user_ns(), current_uid());
+}
+
 /**
  *  sys_kill - send a signal to a process
  *  @pid: the PID of the process
@@ -3295,14 +3307,117 @@ SYSCALL_DEFINE2(kill, pid_t, pid, int, sig)
 {
 	struct kernel_siginfo info;
 
-	clear_siginfo(&info);
-	info.si_signo = sig;
-	info.si_errno = 0;
-	info.si_code = SI_USER;
-	info.si_pid = task_tgid_vnr(current);
-	info.si_uid = from_kuid_munged(current_user_ns(), current_uid());
+	prepare_kill_siginfo(sig, &info);
 
 	return kill_something_info(sig, &info, pid);
+}
+
+/*
+ * Verify that the signaler and signalee either are in the same pid namespace
+ * or that the signaler's pid namespace is an ancestor of the signalee's pid
+ * namespace.
+ */
+static bool may_signal_procfd(struct pid *pid)
+{
+	struct pid_namespace *active = task_active_pid_ns(current);
+	struct pid_namespace *p = ns_of_pid(pid);
+
+	for (;;) {
+		if (!p)
+			return false;
+		if (p == active)
+			break;
+		p = p->parent;
+	}
+
+	return true;
+}
+
+static int __copy_siginfo_from_user_generic(int signo, kernel_siginfo_t *kinfo,
+					    siginfo_t *info)
+{
+#ifdef CONFIG_COMPAT
+	/*
+	 * Avoid hooking up compat syscalls and instead handle necessary
+	 * conversions here.
+	 */
+	if (in_compat_syscall())
+		return __copy_siginfo_from_user32(
+			signo, kinfo, (struct compat_siginfo __user *)info);
+#endif
+	return __copy_siginfo_from_user(signo, kinfo, info);
+}
+
+/**
+ *  sys_procfd_send_signal - send a signal to a process through a process file
+ *                           descriptor
+ *  @procfd: the file descriptor of the process
+ *  @sig:    signal to be sent
+ *  @info:   the signal info
+ *  @flags:  future flags to be passed
+ *
+ *  Return: 0 on success, negative errno on failure
+ */
+SYSCALL_DEFINE4(procfd_send_signal, int, procfd, int, sig,
+		siginfo_t __user *, info, unsigned int, flags)
+{
+	int ret;
+	struct fd f;
+	struct pid *pid;
+	kernel_siginfo_t kinfo;
+
+	/* Enforce flags be set to 0 until we add an extension. */
+	if (flags)
+		return -EINVAL;
+
+	f = fdget_raw(procfd);
+	if (!f.file)
+		return -EBADF;
+
+	/*
+	 * Give userspace a way to detect whether /proc/<pid>/task/<tid> fds
+	 * are supported.
+	 */
+	ret = -EOPNOTSUPP;
+	if (proc_is_tid_procfd(f.file))
+		goto err;
+
+	/* Is this a procfd? */
+	ret = -EINVAL;
+	if (!proc_is_tgid_procfd(f.file))
+		goto err;
+
+	/* Without CONFIG_PROC_FS proc_pid() returns NULL. */
+	pid = proc_pid(file_inode(f.file));
+	if (!pid)
+		goto err;
+
+	if (!may_signal_procfd(pid))
+		goto err;
+
+	if (info) {
+		ret = __copy_siginfo_from_user_generic(sig, &kinfo, info);
+		if (unlikely(ret))
+			goto err;
+
+		/*
+		 * Not even root can pretend to send signals from the kernel.
+		 * Nor can they impersonate a kill()/tgkill(), which adds
+		 * source info.
+		 */
+		ret = -EPERM;
+		if ((kinfo.si_code >= 0 || kinfo.si_code == SI_TKILL) &&
+		    (task_pid(current) != pid))
+			goto err;
+	} else {
+		prepare_kill_siginfo(sig, &kinfo);
+	}
+
+	ret = kill_pid_info(sig, &kinfo, pid);
+
+err:
+	fdput(f);
+	return ret;
 }
 
 static int
