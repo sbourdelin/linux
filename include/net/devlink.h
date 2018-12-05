@@ -591,6 +591,8 @@ void devlink_port_params_unregister(struct devlink_port *devlink_port,
 int devlink_port_param_driverinit_value_set(struct devlink_port *devlink_port,
 					    u32 param_id,
 					    union devlink_param_value init_val);
+void devlink_port_param_value_changed(struct devlink_port *devlink_port,
+				      u32 param_id);
 struct devlink_region *devlink_region_create(struct devlink *devlink,
 					     const char *region_name,
 					     u32 region_max_snapshots,
@@ -860,6 +862,13 @@ static inline int
 devlink_port_param_driverinit_value_set(struct devlink_port *devlink_port,
 					u32 param_id,
 					union devlink_param_value init_val)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void
+devlink_port_param_value_changed(struct devlink_port *devlink_port,
+				 u32 param_id)
 {
 	return -EOPNOTSUPP;
 }
