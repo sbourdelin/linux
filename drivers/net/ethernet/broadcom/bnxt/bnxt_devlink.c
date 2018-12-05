@@ -26,6 +26,10 @@ enum bnxt_dl_param_id {
 	BNXT_DEVLINK_PARAM_ID_GRE_VER_CHECK,
 };
 
+enum bnxt_dl_port_param_id {
+	BNXT_DEVLINK_PORT_PARAM_ID_BASE = DEVLINK_PORT_PARAM_GENERIC_ID_MAX,
+};
+
 static const struct bnxt_dl_nvm_param nvm_params[] = {
 	{DEVLINK_PARAM_GENERIC_ID_ENABLE_SRIOV, NVM_OFF_ENABLE_SRIOV,
 	 BNXT_NVM_SHARED_CFG, 1},
@@ -37,6 +41,8 @@ static const struct bnxt_dl_nvm_param nvm_params[] = {
 	 NVM_OFF_MSIX_VEC_PER_PF_MIN, BNXT_NVM_SHARED_CFG, 7},
 	{BNXT_DEVLINK_PARAM_ID_GRE_VER_CHECK, NVM_OFF_DIS_GRE_VER_CHECK,
 	 BNXT_NVM_SHARED_CFG, 1},
+
+	{DEVLINK_PORT_PARAM_GENERIC_ID_WOL, NVM_OFF_WOL, BNXT_NVM_PORT_CFG, 1},
 };
 
 static int bnxt_hwrm_nvm_req(struct bnxt *bp, u32 param_id, void *msg,
@@ -188,6 +194,12 @@ static const struct devlink_param bnxt_dl_params[] = {
 			     NULL),
 };
 
+static const struct devlink_param bnxt_dl_port_params[] = {
+	DEVLINK_PORT_PARAM_GENERIC(WOL, BIT(DEVLINK_PARAM_CMODE_PERMANENT),
+				   bnxt_dl_nvm_param_get, bnxt_dl_nvm_param_set,
+				   NULL),
+};
+
 int bnxt_dl_register(struct bnxt *bp)
 {
 	struct devlink *dl;
@@ -225,8 +237,28 @@ int bnxt_dl_register(struct bnxt *bp)
 		goto err_dl_unreg;
 	}
 
+	rc = devlink_port_register(dl, &bp->dl_port, bp->pf.port_id);
+	if (rc) {
+		netdev_warn(bp->dev, "devlink_port_register failed. rc=%d",
+			    rc);
+		goto err_dl_param_unreg;
+	}
+	bp->dl_port.type = DEVLINK_PORT_TYPE_ETH;
+
+	rc = devlink_port_params_register(&bp->dl_port, bnxt_dl_port_params,
+					  ARRAY_SIZE(bnxt_dl_port_params));
+	if (rc) {
+		netdev_warn(bp->dev, "devlink_port_params_register failed. rc=%d",
+			    rc);
+		goto err_dl_port_unreg;
+	}
 	return 0;
 
+err_dl_port_unreg:
+	devlink_port_unregister(&bp->dl_port);
+err_dl_param_unreg:
+	devlink_params_unregister(dl, bnxt_dl_params,
+				  ARRAY_SIZE(bnxt_dl_params));
 err_dl_unreg:
 	devlink_unregister(dl);
 err_dl_free:
@@ -242,6 +274,9 @@ void bnxt_dl_unregister(struct bnxt *bp)
 	if (!dl)
 		return;
 
+	devlink_port_params_unregister(&bp->dl_port, bnxt_dl_port_params,
+				       ARRAY_SIZE(bnxt_dl_port_params));
+	devlink_port_unregister(&bp->dl_port);
 	devlink_params_unregister(dl, bnxt_dl_params,
 				  ARRAY_SIZE(bnxt_dl_params));
 	devlink_unregister(dl);
