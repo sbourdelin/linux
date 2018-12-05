@@ -2612,6 +2612,8 @@ struct ib_device {
 	 */
 	refcount_t refcount;
 	struct completion unreg_completion;
+
+	const struct rdma_link_ops     *link_ops;
 };
 
 struct ib_client {

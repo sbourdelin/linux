@@ -99,4 +99,17 @@ int rdma_nl_multicast(struct sk_buff *skb, unsigned int group, gfp_t flags);
  * Returns true on success or false if no listeners.
  */
 bool rdma_nl_chk_listeners(unsigned int group);
+
+struct rdma_link_ops {
+	struct list_head list;
+	const char *type;
+	struct ib_device *(*newlink)(const char *ibdev_name,
+				     const char *ndev_name);
+	int (*dellink)(struct ib_device *ibdev);
+};
+
+void rdma_link_register(struct rdma_link_ops *ops);
+void rdma_link_unregister(struct rdma_link_ops *ops);
+
+#define MODULE_ALIAS_RDMA_LINK(type) MODULE_ALIAS("rdma-link-" type)
 #endif /* _RDMA_NETLINK_H */
