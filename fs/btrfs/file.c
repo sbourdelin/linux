@@ -2227,8 +2227,18 @@ out:
 	return ret > 0 ? -EIO : ret;
 }
 
+static vm_fault_t btrfs_fault(struct vm_fault *vmf)
+{
+	struct inode *inode = vmf->vma->vm_file->f_mapping->host;
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return btrfs_dax_fault(vmf);
+#endif
+	return filemap_fault(vmf);
+}
+
 static const struct vm_operations_struct btrfs_file_vm_ops = {
-	.fault		= filemap_fault,
+	.fault		= btrfs_fault,
 	.map_pages	= filemap_map_pages,
 	.page_mkwrite	= btrfs_page_mkwrite,
 };
