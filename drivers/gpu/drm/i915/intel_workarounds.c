@@ -1178,7 +1178,10 @@ static void rcs_engine_wa_init(struct intel_engine_cs *engine)
 			    PMFLUSH_GAPL3UNBLOCK |
 			    PMFLUSHDONE_LNEBLK);
 
-		/* Wa_1406609255:icl (pre-prod) */
+		/*
+		 * Wa_1406609255:icl (pre-prod): GEN7_DISABLE_DEMAND_PREFETCH
+		 * Wa_1606682166:icl: GEN7_DISABLE_SAMPLER_PREFETCH
+		 */
 		if (IS_ICL_REVID(i915, ICL_REVID_A0, ICL_REVID_B0))
 			wa_write_or(wal,
 				    GEN7_SARCHKMD,
