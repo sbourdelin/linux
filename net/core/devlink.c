@@ -3147,12 +3147,12 @@ static int devlink_nl_cmd_param_set_doit(struct sk_buff *skb,
 }
 
 static int devlink_param_register_one(struct devlink *devlink,
+				      struct list_head *param_list,
 				      const struct devlink_param *param)
 {
 	struct devlink_param_item *param_item;
 
-	if (devlink_param_find_by_name(&devlink->param_list,
-				       param->name))
+	if (devlink_param_find_by_name(param_list, param->name))
 		return -EEXIST;
 
 	if (param->supported_cmodes == BIT(DEVLINK_PARAM_CMODE_DRIVERINIT))
@@ -3165,22 +3165,52 @@ static int devlink_param_register_one(struct devlink *devlink,
 		return -ENOMEM;
 	param_item->param = param;
 
-	list_add_tail(&param_item->list, &devlink->param_list);
+	list_add_tail(&param_item->list, param_list);
 	devlink_param_notify(devlink, param_item, DEVLINK_CMD_PARAM_NEW);
 	return 0;
 }
 
 static void devlink_param_unregister_one(struct devlink *devlink,
+					 struct list_head *param_list,
 					 const struct devlink_param *param)
 {
 	struct devlink_param_item *param_item;
 
-	param_item = devlink_param_find_by_name(&devlink->param_list,
-						param->name);
+	param_item = devlink_param_find_by_name(param_list, param->name);
 	WARN_ON(!param_item);
 	devlink_param_notify(devlink, param_item, DEVLINK_CMD_PARAM_DEL);
 	list_del(&param_item->list);
 	kfree(param_item);
+}
+
+static const struct devlink_param devlink_port_param_generic[] = {};
+
+static int devlink_port_param_generic_verify(const struct devlink_param *param)
+{
+	/* verify it matches generic parameter by id and name */
+	if (param->id > DEVLINK_PORT_PARAM_GENERIC_ID_MAX)
+		return -EINVAL;
+	if (strcmp(param->name, devlink_port_param_generic[param->id].name))
+		return -ENOENT;
+
+	WARN_ON(param->type != devlink_port_param_generic[param->id].type);
+
+	return 0;
+}
+
+static int devlink_port_param_driver_verify(const struct devlink_param *param)
+{
+	int i;
+
+	if (param->id <= DEVLINK_PORT_PARAM_GENERIC_ID_MAX)
+		return -EINVAL;
+	/* verify no such name in generic params */
+	for (i = 0; i <= DEVLINK_PORT_PARAM_GENERIC_ID_MAX; i++)
+		if (!strcmp(param->name,
+			    devlink_port_param_generic[param->id].name))
+			return -EEXIST;
+
+	return 0;
 }
 
 static int devlink_nl_region_snapshot_id_put(struct sk_buff *msg,
@@ -4503,7 +4533,8 @@ int devlink_params_register(struct devlink *devlink,
 			if (err)
 				goto rollback;
 		}
-		err = devlink_param_register_one(devlink, param);
+		err = devlink_param_register_one(devlink, &devlink->param_list,
+						 param);
 		if (err)
 			goto rollback;
 	}
@@ -4515,7 +4546,8 @@ rollback:
 	if (!i)
 		goto unlock;
 	for (param--; i > 0; i--, param--)
-		devlink_param_unregister_one(devlink, param);
+		devlink_param_unregister_one(devlink, &devlink->param_list,
+					     param);
 unlock:
 	mutex_unlock(&devlink->lock);
 	return err;
@@ -4537,7 +4569,8 @@ void devlink_params_unregister(struct devlink *devlink,
 
 	mutex_lock(&devlink->lock);
 	for (i = 0; i < params_count; i++, param++)
-		devlink_param_unregister_one(devlink, param);
+		devlink_param_unregister_one(devlink, &devlink->param_list,
+					     param);
 	mutex_unlock(&devlink->lock);
 }
 EXPORT_SYMBOL_GPL(devlink_params_unregister);
@@ -4655,6 +4688,87 @@ void devlink_param_value_str_fill(union devlink_param_value *dst_val,
 	WARN_ON(len >= __DEVLINK_PARAM_MAX_STRING_VALUE);
 }
 EXPORT_SYMBOL_GPL(devlink_param_value_str_fill);
+
+/**
+ *	devlink_port_params_register - register port configuration parameters
+ *
+ *	@devlink_port: devlink port
+ *	@params: configuration parameters array
+ *	@params_count: number of parameters provided
+ *
+ *	Register the configuration parameters supported by the port.
+ */
+int devlink_port_params_register(struct devlink_port *devlink_port,
+				 const struct devlink_param *params,
+				 size_t params_count)
+{
+	struct devlink *devlink = devlink_port->devlink;
+	const struct devlink_param *param = params;
+	int i, err;
+
+	INIT_LIST_HEAD(&devlink_port->param_list);
+	mutex_lock(&devlink->lock);
+	for (i = 0; i < params_count; i++) {
+		if (!param || !param->name || !param->supported_cmodes) {
+			err = -EINVAL;
+			goto rollback;
+		}
+		if (param->generic) {
+			err = devlink_port_param_generic_verify(param);
+			if (err)
+				goto rollback;
+		} else {
+			err = devlink_port_param_driver_verify(param);
+			if (err)
+				goto rollback;
+		}
+		err = devlink_param_register_one(devlink_port->devlink,
+						 &devlink_port->param_list,
+						 param);
+		if (err)
+			goto rollback;
+	}
+
+	mutex_unlock(&devlink->lock);
+	return 0;
+
+rollback:
+	if (!i)
+		goto unlock;
+	for (param--; i > 0; i--, param--)
+		devlink_param_unregister_one(devlink_port->devlink,
+					     &devlink_port->param_list,
+					     param);
+unlock:
+	mutex_unlock(&devlink->lock);
+	return err;
+}
+EXPORT_SYMBOL_GPL(devlink_port_params_register);
+
+/**
+ *	devlink_port_params_unregister - unregister port configuration
+ *	parameters
+ *
+ *	@devlink_port: devlink port
+ *	@params: configuration parameters array
+ *	@params_count: number of parameters provided
+ */
+void devlink_port_params_unregister(struct devlink_port *devlink_port,
+				    const struct devlink_param *params,
+				    size_t params_count)
+{
+	struct devlink *devlink = devlink_port->devlink;
+	const struct devlink_param *param = params;
+	int i;
+
+	mutex_lock(&devlink->lock);
+	for (i = 0; i < params_count; i++, param++)
+		devlink_param_unregister_one(devlink_port->devlink,
+					     &devlink_port->param_list,
+					     param);
+	mutex_unlock(&devlink->lock);
+}
+EXPORT_SYMBOL_GPL(devlink_port_params_unregister);
 
 /**
  *	devlink_region_create - create a new address region

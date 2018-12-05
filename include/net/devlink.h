@@ -48,6 +48,7 @@ struct devlink_port_attrs {
 
 struct devlink_port {
 	struct list_head list;
+	struct list_head param_list;
 	struct devlink *devlink;
 	unsigned index;
 	bool registered;
@@ -419,6 +420,13 @@ enum devlink_param_generic_id {
 	.validate = _validate,						\
 }
 
+enum devlink_port_param_generic_id {
+	/* add new param generic ids above here */
+	__DEVLINK_PORT_PARAM_GENERIC_ID_MAX,
+	DEVLINK_PORT_PARAM_GENERIC_ID_MAX =
+	       __DEVLINK_PORT_PARAM_GENERIC_ID_MAX - 1,
+};
+
 struct devlink_region;
 
 typedef void devlink_snapshot_data_dest_t(const void *data);
@@ -574,6 +582,12 @@ int devlink_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
 void devlink_param_value_changed(struct devlink *devlink, u32 param_id);
 void devlink_param_value_str_fill(union devlink_param_value *dst_val,
 				  const char *src);
+int devlink_port_params_register(struct devlink_port *devlink_port,
+				 const struct devlink_param *params,
+				 size_t params_count);
+void devlink_port_params_unregister(struct devlink_port *devlink_port,
+				    const struct devlink_param *params,
+				    size_t params_count);
 struct devlink_region *devlink_region_create(struct devlink *devlink,
 					     const char *region_name,
 					     u32 region_max_snapshots,
@@ -813,6 +827,21 @@ devlink_param_value_changed(struct devlink *devlink, u32 param_id)
 static inline void
 devlink_param_value_str_fill(union devlink_param_value *dst_val,
 			     const char *src)
+{
+}
+
+static inline int
+devlink_port_params_register(struct devlink_port *devlink_port,
+			     const struct devlink_param *params,
+			     size_t params_count)
+{
+	return 0;
+}
+
+static inline void
+devlink_port_params_unregister(struct devlink_port *devlink_port,
+			       const struct devlink_param *params,
+			       size_t params_count)
 {
 }
 
