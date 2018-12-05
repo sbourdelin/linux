@@ -23,11 +23,13 @@
  * Rob Clark <robdclark@gmail.com>
  */
 
-#define DEBUG /* for pr_debug() */
-
 #include <stdarg.h>
 #include <linux/seq_file.h>
 #include <drm/drmP.h>
+
+#ifndef CONFIG_DYNAMIC_DEBUG
+#define DEBUG /* for pr_debug() */
+#endif
 #include <drm/drm_print.h>
 
 void __drm_puts_coredump(struct drm_printer *p, const char *str)
