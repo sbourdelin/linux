@@ -490,6 +490,16 @@ static int gfar_set_mac_addr(struct net_device *dev, void *p)
 	return 0;
 }
 
+static int gfar_change_carrier(struct net_device *dev, bool new_carrier)
+{
+	struct phy_device *phydev = dev->phydev;
+
+	if (phydev && phydev->phy_link_change)
+		phydev->phy_link_change(phydev, new_carrier, 1);
+
+	return 0;
+}
+
 static const struct net_device_ops gfar_netdev_ops = {
 	.ndo_open = gfar_enet_open,
 	.ndo_start_xmit = gfar_start_xmit,
@@ -500,6 +510,7 @@ static const struct net_device_ops gfar_netdev_ops = {
 	.ndo_tx_timeout = gfar_timeout,
 	.ndo_do_ioctl = gfar_ioctl,
 	.ndo_get_stats = gfar_get_stats,
+	.ndo_change_carrier = gfar_change_carrier,
 	.ndo_set_mac_address = gfar_set_mac_addr,
 	.ndo_validate_addr = eth_validate_addr,
 #ifdef CONFIG_NET_POLL_CONTROLLER
