@@ -244,7 +244,7 @@ static int tps65218_probe(struct i2c_client *client,
 	ret = regmap_read(tps->regmap, TPS65218_REG_CHIPID, &chipid);
 	if (ret) {
 		dev_err(tps->dev, "Failed to read chipid: %d\n", ret);
-		return ret;
+		goto err_irq;
 	}
 
 	tps->rev = chipid & TPS65218_CHIPID_REV_MASK;
