@@ -2897,7 +2897,7 @@ static void megasas_build_ld_nonrw_fusion(struct megasas_instance *instance,
 	pRAID_Context->reg_lock_length    = 0;
 
 	if (fusion->fast_path_io && (
-		device_id < instance->fw_supported_vd_count)) {
+		device_id < instance->fw_supported_vd_count - 1)) {
 
 		ld = MR_TargetIdToLdGet(device_id, local_map_ptr);
 		if (ld >= instance->fw_supported_vd_count)
