@@ -747,7 +747,6 @@ static struct scsi_host_template virtscsi_host_template = {
 	.slave_alloc = virtscsi_device_alloc,
 
 	.dma_boundary = UINT_MAX,
-	.use_clustering = ENABLE_CLUSTERING,
 	.target_alloc = virtscsi_target_alloc,
 	.target_destroy = virtscsi_target_destroy,
 	.map_queues = virtscsi_map_queues,
