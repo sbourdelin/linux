@@ -31,12 +31,8 @@ EXPORT_SYMBOL(mcount)
 # define MCOUNT_FRAME			0	/* using frame = false */
 #endif
 
-ENTRY(function_hook)
-	ret
-END(function_hook)
 
-ENTRY(ftrace_caller)
-
+.macro save_mcount_regs
 #ifdef USING_FRAME_POINTER
 # ifdef CC_USING_FENTRY
 	/*
@@ -73,11 +69,9 @@ ENTRY(ftrace_caller)
 
 	movl	function_trace_op, %ecx
 	subl	$MCOUNT_INSN_SIZE, %eax
+	.endm
 
-.globl ftrace_call
-ftrace_call:
-	call	ftrace_stub
-
+.macro restore_mcount_regs
 	addl	$4, %esp			/* skip NULL pointer */
 	popl	%edx
 	popl	%ecx
@@ -90,6 +84,39 @@ ftrace_call:
 	addl	$4, %esp			/* skip parent ip */
 # endif
 #endif
+	.endm
+
+ENTRY(function_hook)
+#ifdef CONFIG_EARLY_BOOT_FUNCTION_TRACER
+	cmpl	$__PAGE_OFFSET, %esp
+	jb	early_boot_stub			/* Paging not enabled yet? */
+
+	cmpl	$ftrace_stub, ftrace_early_boot_trace_function
+	jnz early_boot_trace
+
+early_boot_stub:
+	ret
+
+early_boot_trace:
+	save_mcount_regs
+	call	*ftrace_early_boot_trace_function
+	restore_mcount_regs
+
+	jmp early_boot_stub
+#else
+	ret
+#endif
+END(function_hook)
+
+ENTRY(ftrace_caller)
+	save_mcount_regs
+
+.globl ftrace_call
+ftrace_call:
+	call	ftrace_stub
+
+	restore_mcount_regs
+
 .Lftrace_ret:
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 .globl ftrace_graph_call

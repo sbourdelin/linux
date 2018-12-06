@@ -19,6 +19,11 @@ config HAVE_FUNCTION_TRACER
 	help
 	  See Documentation/trace/ftrace-design.rst
 
+config HAVE_EARLY_BOOT_FTRACE
+        bool
+        help
+          See Documentation/trace/ftrace-design.txt
+
 config HAVE_FUNCTION_GRAPH_TRACER
 	bool
 	help
@@ -154,6 +159,52 @@ config FUNCTION_TRACER
 	  tracing is enabled by the administrator. If it's runtime disabled
 	  (the bootup default), then the overhead of the instructions is very
 	  small and not measurable even in micro-benchmarks.
+
+config EARLY_BOOT_FUNCTION_TRACER
+	bool "Early Boot Kernel Function Tracer"
+	depends on FUNCTION_TRACER
+	depends on HAVE_EARLY_BOOT_FTRACE
+	help
+	  Normally, function tracing can only start after memory has been
+	  initialized early in boot. If "ftrace=function" is added to the
+	  command line, then function tracing will start after memory setup.
+	  In order to trace functions before that, this option will
+	  have function tracing start before memory setup is complete, by
+	  placing the trace in a temporary buffer, which will be copied to
+	  the trace buffer after memory setup. The size of this temporary
+	  buffer is defined by EARLY_BOOT_FTRACE_BUF_SHIFT.
+
+config EARLY_BOOT_FTRACE_BUF_SHIFT
+	int "Temporary buffer size (17 => 128 KB, 24 => 16 MB)"
+	depends on EARLY_BOOT_FUNCTION_TRACER
+	range 8 24
+	default 19
+	help
+	  Select the size of the buffer to be used for storing function calls at
+	  early boot stage.
+	  The value defines the size as a power of 2, must be in a range of 8 to 24.
+	  Examples:
+	    20 =>   1 MB
+	    19 => 512 KB
+	    17 => 128 KB
+
+config EARLY_BOOT_FTRACE_FILTER_SHIFT
+	int "Temporary filter size (filter/notrace) (17 => 128 KB, 19 => 512 KB)"
+	depends on EARLY_BOOT_FUNCTION_TRACER
+	depends on FTRACE_MCOUNT_RECORD
+	range 0 19
+	default 17
+	help
+	  Select the size of the filter buffer to be used for filtering (trace/
+	  no trace) functions at early boot stage.
+	  Two buffers (trace and no_trace) will be created using this option.
+	  These following kernel parameters control filtering during bootup :
+	  "ftrace_filter", "ftrace_notrace".
+	  The value defines the size as a power of 2, must be in a range of 0 to 19.
+	  Examples:
+	    19 => 512 KB for each buffer
+	    18 => 256 KB for each buffer
+	    17 => 128 KB for each buffer
 
 config FUNCTION_GRAPH_TRACER
 	bool "Kernel Function Graph Tracer"

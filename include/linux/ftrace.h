@@ -239,6 +239,18 @@ static inline void ftrace_free_init_mem(void) { }
 static inline void ftrace_free_mem(struct module *mod, void *start, void *end) { }
 #endif /* CONFIG_FUNCTION_TRACER */
 
+#ifdef CONFIG_EARLY_BOOT_FUNCTION_TRACER
+extern void __init ftrace_early_boot_init(char *command_line);
+extern void __init ftrace_early_boot_shutdown(void);
+extern void __init ftrace_early_boot_fill_ringbuffer(void *data);
+extern inline bool __init is_ftrace_early_boot_activated(void);
+#else
+static inline void __init ftrace_early_boot_init(char *command_line) { }
+static inline void __init ftrace_early_boot_shutdown(void) { }
+static inline void __init ftrace_early_boot_fill_ringbuffer(void *data) { }
+static inline bool __init is_ftrace_early_boot_activated(void) { return false; }
+#endif
+
 #ifdef CONFIG_STACK_TRACER
 
 #define STACK_TRACE_ENTRIES 500
@@ -442,6 +454,10 @@ unsigned long ftrace_get_addr_new(struct dyn_ftrace *rec);
 unsigned long ftrace_get_addr_curr(struct dyn_ftrace *rec);
 
 extern ftrace_func_t ftrace_trace_function;
+
+#if defined(CONFIG_EARLY_BOOT_FUNCTION_TRACER) && defined(CONFIG_DYNAMIC_FTRACE)
+extern ftrace_func_t ftrace_early_boot_trace_function;
+#endif
 
 int ftrace_regex_open(struct ftrace_ops *ops, int flag,
 		  struct inode *inode, struct file *file);
@@ -716,7 +732,7 @@ static inline unsigned long get_lock_parent_ip(void)
 #ifdef CONFIG_FTRACE_MCOUNT_RECORD
 extern void ftrace_init(void);
 #else
-static inline void ftrace_init(void) { }
+static inline void ftrace_init(void) { ftrace_early_shutdown(); }
 #endif
 
 /*
