@@ -423,47 +423,56 @@ static inline void rxe_counter_inc(struct rxe_dev *rxe, enum rxe_counters cnt)
 
 static inline struct rxe_dev *to_rdev(struct ib_device *dev)
 {
-	return dev ? container_of(dev, struct rxe_dev, ib_dev) : NULL;
+	WARN_ONCE(!dev, "Invalid ib_device\n");
+	return container_of(dev, struct rxe_dev, ib_dev);
 }
 
 static inline struct rxe_ucontext *to_ruc(struct ib_ucontext *uc)
 {
-	return uc ? container_of(uc, struct rxe_ucontext, ibuc) : NULL;
+	WARN_ONCE(!uc, "Invalid ib_ucontext\n");
+	return container_of(uc, struct rxe_ucontext, ibuc);
 }
 
 static inline struct rxe_pd *to_rpd(struct ib_pd *pd)
 {
-	return pd ? container_of(pd, struct rxe_pd, ibpd) : NULL;
+	WARN_ONCE(!pd, "Invalid ib_PD\n");
+	return container_of(pd, struct rxe_pd, ibpd);
 }
 
 static inline struct rxe_ah *to_rah(struct ib_ah *ah)
 {
-	return ah ? container_of(ah, struct rxe_ah, ibah) : NULL;
+	WARN_ONCE(!ah, "Invalid ib_AH\n");
+	return container_of(ah, struct rxe_ah, ibah);
 }
 
 static inline struct rxe_srq *to_rsrq(struct ib_srq *srq)
 {
-	return srq ? container_of(srq, struct rxe_srq, ibsrq) : NULL;
+	WARN_ONCE(!srq, "Invalid ib_SRQ\n");
+	return container_of(srq, struct rxe_srq, ibsrq);
 }
 
 static inline struct rxe_qp *to_rqp(struct ib_qp *qp)
 {
-	return qp ? container_of(qp, struct rxe_qp, ibqp) : NULL;
+	WARN_ONCE(!qp, "Invalid ib_QP\n");
+	return container_of(qp, struct rxe_qp, ibqp);
 }
 
 static inline struct rxe_cq *to_rcq(struct ib_cq *cq)
 {
-	return cq ? container_of(cq, struct rxe_cq, ibcq) : NULL;
+	WARN_ONCE(!cq, "Invalid ib_CQ\n");
+	return container_of(cq, struct rxe_cq, ibcq);
 }
 
 static inline struct rxe_mem *to_rmr(struct ib_mr *mr)
 {
-	return mr ? container_of(mr, struct rxe_mem, ibmr) : NULL;
+	WARN_ONCE(!mr, "Invalid ib_MR\n");
+	return container_of(mr, struct rxe_mem, ibmr);
 }
 
 static inline struct rxe_mem *to_rmw(struct ib_mw *mw)
 {
-	return mw ? container_of(mw, struct rxe_mem, ibmw) : NULL;
+	WARN_ONCE(!mw, "Invalid ib_MW\n");
+	return container_of(mw, struct rxe_mem, ibmw);
 }
 
 int rxe_register_device(struct rxe_dev *rxe);
