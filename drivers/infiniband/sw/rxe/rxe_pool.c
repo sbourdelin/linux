@@ -246,7 +246,6 @@ int rxe_pool_cleanup(struct rxe_pool *pool)
 	unsigned long flags;
 
 	write_lock_irqsave(&pool->pool_lock, flags);
-	pool->state = RXE_POOL_STATE_INVALID;
 	if (atomic_read(&pool->num_elem) > 0)
 		pr_warn("%s pool destroyed with unfree'd elem\n",
 			pool_name(pool));
