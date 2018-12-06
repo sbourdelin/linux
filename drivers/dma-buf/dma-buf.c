@@ -1050,24 +1050,31 @@ static int dma_buf_debug_show(struct seq_file *s, void *unused)
 			fobj = rcu_dereference(robj->fence);
 			shared_count = fobj ? fobj->shared_count : 0;
 			fence = rcu_dereference(robj->fence_excl);
+			fence = dma_fence_get_rcu(fence);
 			if (!read_seqcount_retry(&robj->seq, seq))
 				break;
 			rcu_read_unlock();
 		}
-
-		if (fence)
+		if (fence) {
 			seq_printf(s, "\tExclusive fence: %s %s %ssignalled\n",
 				   fence->ops->get_driver_name(fence),
 				   fence->ops->get_timeline_name(fence),
 				   dma_fence_is_signaled(fence) ? "" : "un");
+			dma_fence_put(fence);
+		}
+
+		rcu_read_lock();
 		for (i = 0; i < shared_count; i++) {
 			fence = rcu_dereference(fobj->shared[i]);
 			if (!dma_fence_get_rcu(fence))
 				continue;
+			rcu_read_unlock();
 			seq_printf(s, "\tShared fence: %s %s %ssignalled\n",
 				   fence->ops->get_driver_name(fence),
 				   fence->ops->get_timeline_name(fence),
 				   dma_fence_is_signaled(fence) ? "" : "un");
+			dma_fence_put(fence);
+			rcu_read_lock();
 		}
 		rcu_read_unlock();
 
