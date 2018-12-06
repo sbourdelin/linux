@@ -140,7 +140,8 @@ ssize_t tpm_common_write(struct file *file, const char __user *buf,
 	 * tpm_read or a user_read_timer timeout. This also prevents split
 	 * buffered writes from blocking here.
 	 */
-	if (!priv->response_read || priv->command_enqueued) {
+	if ((!priv->response_read && priv->response_length) ||
+	    priv->command_enqueued) {
 		ret = -EBUSY;
 		goto out;
 	}
