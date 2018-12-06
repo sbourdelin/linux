@@ -91,9 +91,38 @@ Currently Available
 * large block (up to pagesize) support
 * efficient new ordered mode in JBD2 and ext4 (avoid using buffer head to force
   the ordering)
+* Encoding aware file names
+* Case insensitive file name lookups
 
 [1] Filesystems with a block size of 1k may see a limit imposed by the
 directory hash tree having a maximum depth of two.
+
+Encoding-aware file names and case-insensitive lookups
+======================================================
+
+Ext4 optionally supports filesystem-wide charset knowledge when handling
+file names, which allows the user to perform file system lookups using
+charset equivalent versions of the same file name, and optionally ensure
+that no invalid names are held by the filesystem.  charset encoding
+awareness is also essential for performing case-insensitive lookups,
+because it is what defines the casefold operation.
+
+The case-insensitive file name lookup feature is supported in a smaller
+granularity, on a per-directory basis, allowing the user to mix
+case-insensitive and case-sensitive directories in the same filesystem.
+It is enabled by flipping a file attribute on an empty directory.  For
+the reason stated above, the filesystem must have encoding enabled to
+use this feature.
+
+When we change from filenames as opaque byte sequences to seeing them as
+encoded strings we need to address what happens when a program tries to
+create a file with an invalid name.  The Natural Language System within
+the kernel leaves the decision of what to do in this case to the
+filesystem, which select its preferred behavior by enabling/disabling
+the strict mode in NLS.  When Ext4 encounters one of those strings, it
+falls back to considering the entire string as an opaque byte sequence,
+which still allows the user to operate on that file but the
+case-insensitive and equivalent sequence lookups won't work.
 
 Options
 =======
