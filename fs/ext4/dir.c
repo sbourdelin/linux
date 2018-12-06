@@ -670,6 +670,10 @@ static int ext4_d_compare(const struct dentry *dentry, unsigned int len,
 {
 	struct nls_table *charset = EXT4_SB(dentry->d_sb)->s_encoding;
 
+	if (IS_CASEFOLDED(dentry->d_parent->d_inode))
+		return nls_strncasecmp(charset, str, len, name->name,
+				       name->len);
+
 	return nls_strncmp(charset, str, len, name->name, name->len);
 }
 
@@ -679,16 +683,26 @@ static int ext4_d_hash(const struct dentry *dentry, struct qstr *q)
 	unsigned char *norm;
 	int len, ret = 0;
 
-	/* If normalization is TYPE_PLAIN, we can just reuse the vfs
-	 * hash. */
-	if (IS_NORMALIZATION_TYPE_ALL_PLAIN(charset))
-	    return 0;
+	if (!IS_CASEFOLDED(dentry->d_inode)) {
 
-	norm = kmalloc(PATH_MAX, GFP_ATOMIC);
-	if (!norm)
-		return -ENOMEM;
+		/* If normalization is TYPE_PLAIN, we can just reuse the
+		 * VFS hash.
+		 */
+		if (IS_NORMALIZATION_TYPE_ALL_PLAIN(charset))
+			return 0;
 
-	len = nls_normalize(charset, q->name, q->len, norm, PATH_MAX);
+		norm = kmalloc(PATH_MAX, GFP_ATOMIC);
+		if (!norm)
+			return -ENOMEM;
+
+		len = nls_normalize(charset, q->name, q->len, norm, PATH_MAX);
+	} else {
+		norm = kmalloc(PATH_MAX, GFP_ATOMIC);
+		if (!norm)
+			return -ENOMEM;
+
+		len = nls_casefold(charset, q->name, q->len, norm, PATH_MAX);
+	}
 
 	if (len < 0) {
 		ret = -EINVAL;

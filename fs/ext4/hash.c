@@ -282,7 +282,11 @@ int ext4fs_dirhash(const struct inode *dir, const char *name, int len,
 		if (!buff)
 			return -1;
 
-		dlen = nls_normalize(charset, name, len, buff, PATH_MAX);
+		if (!IS_CASEFOLDED(dir))
+			dlen = nls_normalize(charset, name, len, buff,
+					     PATH_MAX);
+		else
+			dlen = nls_casefold(charset, name, len, buff, PATH_MAX);
 
 		if (dlen < 0) {
 			kfree(buff);

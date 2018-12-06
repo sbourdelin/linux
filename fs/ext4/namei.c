@@ -1278,9 +1278,16 @@ static inline bool ext4_match(const struct inode *parent,
 
 #ifdef CONFIG_NLS
 	if (sbi->s_encoding) {
-		return !nls_strncmp(sbi->s_encoding,
-				    de->name, de->name_len,
-				    f.disk_name.name, f.disk_name.len);
+		if (!IS_CASEFOLDED(parent))
+			return !nls_strncmp(sbi->s_encoding,
+					    de->name, de->name_len,
+					    fname->disk_name.name,
+					    fname->disk_name.len);
+		else
+			return !nls_strncasecmp(sbi->s_encoding,
+						de->name, de->name_len,
+						fname->disk_name.name,
+						fname->disk_name.len);
 	}
 #endif
 
