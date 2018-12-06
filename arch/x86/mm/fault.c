@@ -604,23 +604,51 @@ static void show_ldttss(const struct desc_ptr *gdt, const char *name, u16 index)
 }
 
 /*
- * This helper function transforms the #PF error_code bits into
- * "[PROT] [USER]" type of descriptive, almost human-readable error strings:
+ * This maps the somewhat obscure error_code number to symbolic text:
+ *
+ * P = protection fault   (X86_PF_PROT)
+ * W = write access       (X86_PF_WRITE)
+ * U = user-mode access   (X86_PF_USER)
+ * S = supervisor mode    (X86_PF_RSVD)
+ * I = instruction fault  (X86_PF_INSTR)
+ * K = keys fault         (X86_PF_PK)
  */
-static void err_str_append(unsigned long error_code, char *buf, unsigned long mask, const char *txt)
+static const char error_code_chars[] = "PWUSIK";
+
+/*
+ * This helper function transforms the #PF error_code bits into " +P -W +U -R -I -K"
+ * type of descriptive, almost human-readable error strings:
+ */
+static void show_error_code(struct pt_regs *regs, unsigned long error_code)
 {
-	if (error_code & mask) {
-		if (buf[0])
-			strcat(buf, " ");
-		strcat(buf, txt);
+	unsigned int bit, mask;
+	char err_txt[6*3+1]; /* Fixed length of 6 bits decoded plus zero at the end */
+
+	/* We go from the X86_PF_PROT bit to the X86_PF_PK bit: */
+
+	for (bit = 0; bit < 6; bit++) {
+		unsigned int offset = bit*3;
+
+		err_txt[offset+0] = ' ';
+
+		mask = 1 << bit;
+		if (error_code & mask)
+			err_txt[offset+1] = '+';
+		else
+			err_txt[offset+1] = '-';
+
+		err_txt[offset+2] = error_code_chars[bit];
 	}
+
+	/* Close the string: */
+	err_txt[sizeof(err_txt)-1] = 0;
+
+	pr_alert("#PF error code: %s (%02lx)\n", err_txt, error_code);
 }
 
 static void
 show_fault_oops(struct pt_regs *regs, unsigned long error_code, unsigned long address)
 {
-	char err_txt[64];
-
 	if (!oops_may_print())
 		return;
 
@@ -648,20 +676,7 @@ show_fault_oops(struct pt_regs *regs, unsigned long error_code, unsigned long ad
 		 address < PAGE_SIZE ? "NULL pointer dereference" : "paging request",
 		 (void *)address);
 
-	err_txt[0] = 0;
-
-	/*
-	 * Note: length of these appended strings including the separation space and the
-	 * zero delimiter must fit into err_txt[].
-	 */
-	err_str_append(error_code, err_txt, X86_PF_PROT,  "[PROT]" );
-	err_str_append(error_code, err_txt, X86_PF_WRITE, "[WRITE]");
-	err_str_append(error_code, err_txt, X86_PF_USER,  "[USER]" );
-	err_str_append(error_code, err_txt, X86_PF_RSVD,  "[RSVD]" );
-	err_str_append(error_code, err_txt, X86_PF_INSTR, "[INSTR]");
-	err_str_append(error_code, err_txt, X86_PF_PK,    "[PK]"   );
-
-	pr_alert("#PF error: %s\n", error_code ? err_txt : "[normal kernel read fault]");
+	show_error_code(regs, error_code);
 
 	if (!(error_code & X86_PF_USER) && user_mode(regs)) {
 		struct desc_ptr idt, gdt;
@@ -698,8 +713,7 @@ show_fault_oops(struct pt_regs *regs, unsigned long error_code, unsigned long ad
 }
 
 static noinline void
-pgtable_bad(struct pt_regs *regs, unsigned long error_code,
-	    unsigned long address)
+pgtable_bad(struct pt_regs *regs, unsigned long error_code, unsigned long address)
 {
 	struct task_struct *tsk;
 	unsigned long flags;
@@ -719,8 +733,7 @@ pgtable_bad(struct pt_regs *regs, unsigned long error_code,
 	oops_end(flags, regs, sig);
 }
 
-static void set_signal_archinfo(unsigned long address,
-				unsigned long error_code)
+static void set_signal_archinfo(unsigned long address, unsigned long error_code)
 {
 	struct task_struct *tsk = current;
 
