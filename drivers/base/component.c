@@ -179,7 +179,7 @@ static int find_components(struct master *master)
 		c = find_component(master, mc->compare, mc->data);
 		if (!c) {
 			ret = -ENXIO;
-			break;
+			continue;
 		}
 
 		dev_dbg(master->dev, "found component %s, duplicate %u\n", dev_name(c->dev), !!c->master);
