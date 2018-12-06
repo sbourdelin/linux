@@ -25,6 +25,17 @@ static int nls_validate_flags(struct nls_table *table, unsigned int flags)
 	if (flags & NLS_STRICT_MODE && !table->ops->validate)
 		return -1;
 
+	if ((flags & NLS_NORMALIZATION_TYPE_MASK) && !table->ops->normalize)
+		return -1;
+
+	if ((flags & NLS_CASEFOLD_TYPE_MASK) && !table->ops->casefold)
+		return -1;
+
+	/* Reject unused flags */
+	if (flags & ~(NLS_CASEFOLD_TYPE_MASK | NLS_NORMALIZATION_TYPE_MASK |
+		      NLS_STRICT_MODE))
+		return -1;
+
 	return 0;
 }
 

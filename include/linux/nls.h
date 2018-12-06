@@ -4,6 +4,7 @@
 
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/errno.h>
 
 /* Unicode has changed over the years.  Unicode code points no longer
  * fit into 16 bits; as of Unicode 5 valid code points range from 0
@@ -65,6 +66,51 @@ struct nls_ops {
 	int (*strncasecmp)(const struct nls_table *charset,
 			   const unsigned char *str1, size_t len1,
 			   const unsigned char *str2, size_t len2);
+	/**
+	 * @normalize:
+	 *
+	 * Obtain the normalized form of a string, which can be used to
+	 * determine whether any two strings are equivalent.  The NLS
+	 * subsystem doesn't impose any constraint on the charsets
+	 * regarding what it means to be equivalent.  Unicode-based
+	 * charsets, for instance, are free to support one, a few or all
+	 * kinds of Unicode equivalences.  Different kinds of
+	 * normalizations can be specified using the nls_table flags.
+	 *
+	 * This hook is responsible for performing string validation if
+	 * the strict mode flag is set.  The only case where it is not
+	 * called by nls_core is when strict mode and normalization are
+	 * disabled, because in this case the normalization is
+	 * guaranteed to be the string identity.
+	 *
+	 * Not every charset implements this hook.  It is only required
+	 * if the charset supports strict mode or some kind of
+	 * normalization.
+	 *
+	 * If this operation cannot be executed for this charset,
+	 * -ENOTSUPP is returned.  If the sequence is invalid, -EINVAL
+	 * is returned.  Otherwise, this function returns the size of the
+	 * new string.
+	 **/
+	int (*normalize)(const struct nls_table *charset,
+			 const unsigned char *str, size_t len,
+			 unsigned char *dest, size_t dlen);
+	/**
+	 * @casefold:
+	 *
+	 * Casefold returns a version of the string that can be used to
+	 * perform case-insensitive comparisons.  The kind of casefold
+	 * algorithm that will be used is charset dependent, and can be
+	 * configured using the nls_table flags field.
+	 *
+	 * If this operation cannot be executed for this charset,
+	 * -ENOTSUPP is returned.  If the sequence fails, -EINVAL is
+	 * returned.  Otherwise, this function returns the size of the
+	 * new string.
+	 **/
+	int (*casefold)(const struct nls_table *charset,
+			const unsigned char *str, size_t len,
+			unsigned char *dest, size_t dlen);
 	unsigned char (*lowercase)(const struct nls_table *charset,
 				   unsigned int c);
 	unsigned char (*uppercase)(const struct nls_table *charset,
@@ -101,12 +147,36 @@ enum utf16_endian {
 	UTF16_BIG_ENDIAN
 };
 
+#define NLS_NORMALIZATION_TYPE(i)	((i & 0x7) << 1)
+#define NLS_CASEFOLD_TYPE(i)		((i & 0x7) << 4)
+
 #define NLS_STRICT_MODE			0x00000001
+#define NLS_NORMALIZATION_TYPE_PLAIN	NLS_NORMALIZATION_TYPE(0)
+#define NLS_NORMALIZATION_TYPE_MASK	0x0000000E
+#define NLS_CASEFOLD_TYPE_TOUPPER	NLS_CASEFOLD_TYPE(0)
+#define NLS_CASEFOLD_TYPE_MASK		0x00000070
 
 static inline int IS_STRICT_MODE(const struct nls_table *charset)
 {
 	return (charset->flags & NLS_STRICT_MODE);
 }
+
+#define NLS_NORMALIZATION_FUNCS(charset, type, i)			\
+static inline int							\
+IS_NORMALIZATION_TYPE_##charset##_##type(const struct nls_table *c)	\
+{									\
+	return ((c->flags & NLS_NORMALIZATION_TYPE_MASK) == i);		\
+}
+
+#define NLS_CASEFOLD_FUNCS(charset, type, i)			    	\
+static inline int							\
+IS_CASEFOLD_TYPE_##charset##_##type(const struct nls_table *c)		\
+{									\
+	return ((c->flags & NLS_CASEFOLD_TYPE_MASK) == i);		\
+}
+
+NLS_NORMALIZATION_FUNCS(ALL, PLAIN, NLS_NORMALIZATION_TYPE_PLAIN)
+NLS_CASEFOLD_FUNCS(ALL, TOUPPER, NLS_CASEFOLD_TYPE_TOUPPER)
 
 /* nls_base.c */
 extern int __register_nls(struct nls_charset *, struct module *);
@@ -211,6 +281,52 @@ static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
 		const unsigned char *s2, int len)
 {
 	return nls_strncasecmp(t, s1, len, s2, len);
+}
+
+static inline int nls_casefold(const struct nls_table *t,
+			       const unsigned char *str, size_t len,
+			       unsigned char *dest, size_t dlen)
+{
+	int i;
+
+	if (t->ops->casefold)
+		return t->ops->casefold(t, str, len, dest, dlen);
+
+	if (!IS_CASEFOLD_TYPE_ALL_TOUPPER(t))
+		return -ENOTSUPP;
+
+	if (IS_STRICT_MODE(t) && nls_validate(t, str, len))
+		return -EINVAL;
+
+	if (len > dlen)
+		return -EINVAL;
+
+	for (i = 0 ; i < len; i++)
+		dest[i] = nls_toupper(t, str[i]);
+
+	return len;
+}
+
+static inline int nls_normalize(const struct nls_table *t,
+				const unsigned char *str, size_t len,
+				unsigned char *dest, size_t dlen)
+{
+	if (t->ops->normalize)
+		return t->ops->normalize(t, str, len, dest, dlen);
+
+	if (!IS_NORMALIZATION_TYPE_ALL_PLAIN(t))
+		return -ENOTSUPP;
+
+	if (IS_STRICT_MODE(t) && nls_validate(t, str, len))
+		return -EINVAL;
+
+	if (len > dlen)
+		return -EINVAL;
+
+	/* If normalization are disabled, normalization is the
+	 * identity. */
+	strncpy(dest, str, len);
+	return len;
 }
 
 /*
