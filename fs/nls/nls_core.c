@@ -20,6 +20,14 @@ extern struct nls_charset default_charset;
 static struct nls_charset *charsets = &default_charset;
 static DEFINE_SPINLOCK(nls_lock);
 
+static int nls_validate_flags(struct nls_table *table, unsigned int flags)
+{
+	if (flags & NLS_STRICT_MODE && !table->ops->validate)
+		return -1;
+
+	return 0;
+}
+
 static struct nls_table *nls_load_table(struct nls_charset *charset,
 					const char *version,
 					unsigned int flags)
@@ -36,6 +44,9 @@ static struct nls_table *nls_load_table(struct nls_charset *charset,
 
 	if (IS_ERR(tbl))
 		return tbl;
+
+	if (nls_validate_flags(tbl, flags) < 0)
+		return ERR_PTR(-EINVAL);
 
 	tbl->flags = flags;
 	return tbl;

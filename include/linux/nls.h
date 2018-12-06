@@ -22,10 +22,22 @@ typedef u16 wchar_t;
 /* Arbitrary Unicode character */
 typedef u32 unicode_t;
 
+struct nls_table;
+
 struct nls_ops {
 	int (*uni2char) (wchar_t uni, unsigned char *out, int boundlen);
 	int (*char2uni) (const unsigned char *rawstring, int boundlen,
 			 wchar_t *uni);
+	/**
+	 * @validate:
+	 *
+	 * Returns 0 if the argument is a valid string in this charset.
+	 * Otherwise, return non-zero.
+	 *
+	 * This is required iff the charset supports strict mode.
+	 **/
+	int (*validate)(const struct nls_table *charset,
+			const unsigned char *str, size_t len);
 };
 
 struct nls_table {
@@ -59,6 +71,13 @@ enum utf16_endian {
 	UTF16_BIG_ENDIAN
 };
 
+#define NLS_STRICT_MODE			0x00000001
+
+static inline int IS_STRICT_MODE(const struct nls_table *charset)
+{
+	return (charset->flags & NLS_STRICT_MODE);
+}
+
 /* nls_base.c */
 extern int __register_nls(struct nls_charset *, struct module *);
 extern int unregister_nls(struct nls_charset *);
@@ -88,6 +107,12 @@ static inline int nls_char2uni(const struct nls_table *table,
 			       int boundlen, wchar_t *uni)
 {
 	return table->ops->char2uni(rawstring, boundlen, uni);
+}
+
+static inline int nls_validate(const struct nls_table *t, const unsigned char *str,
+			       const size_t len)
+{
+	return t->ops->validate(t, str, len);
 }
 
 static inline const char *nls_charset_name(const struct nls_table *table)
