@@ -353,7 +353,7 @@ static void perf_gtk__show_hists(GtkWidget *window, struct hists *hists,
 
 	g_object_unref(GTK_TREE_MODEL(store));
 
-	for (nd = rb_first(&hists->entries); nd; nd = rb_next(nd)) {
+	for (nd = rb_first_cached(&hists->entries); nd; nd = rb_next(nd)) {
 		struct hist_entry *h = rb_entry(nd, struct hist_entry, rb_node);
 		GtkTreeIter iter;
 		u64 total = hists__total_period(h->hists);
@@ -578,7 +578,7 @@ static void perf_gtk__show_hierarchy(GtkWidget *window, struct hists *hists,
 	gtk_tree_view_set_model(GTK_TREE_VIEW(view), GTK_TREE_MODEL(store));
 	g_object_unref(GTK_TREE_MODEL(store));
 
-	perf_gtk__add_hierarchy_entries(hists, &hists->entries, store,
+	perf_gtk__add_hierarchy_entries(hists, &hists->entries.rb_root, store,
 					NULL, &hpp, min_pcnt);
 
 	gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(view), TRUE);

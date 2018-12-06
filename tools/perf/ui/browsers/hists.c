@@ -49,7 +49,7 @@ static int hist_browser__get_folding(struct hist_browser *browser)
 	struct hists *hists = browser->hists;
 	int unfolded_rows = 0;
 
-	for (nd = rb_first(&hists->entries);
+	for (nd = rb_first_cached(&hists->entries);
 	     (nd = hists__filter_entries(nd, browser->min_pcnt)) != NULL;
 	     nd = rb_hierarchy_next(nd)) {
 		struct hist_entry *he =
@@ -267,7 +267,7 @@ static int hierarchy_count_rows(struct hist_browser *hb, struct hist_entry *he,
 	if (he->has_no_entry)
 		return 1;
 
-	node = rb_first(&he->hroot_out);
+	node = rb_first_cached(&he->hroot_out);
 	while (node) {
 		float percent;
 
@@ -372,7 +372,7 @@ static void hist_entry__init_have_children(struct hist_entry *he)
 		he->has_children = !RB_EMPTY_ROOT(&he->sorted_chain);
 		callchain__init_have_children(&he->sorted_chain);
 	} else {
-		he->has_children = !RB_EMPTY_ROOT(&he->hroot_out);
+		he->has_children = !RB_EMPTY_ROOT(&he->hroot_out.rb_root);
 	}
 
 	he->init_have_children = true;
