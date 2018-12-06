@@ -12,6 +12,7 @@
 #include <linux/string.h>
 #include <linux/nls.h>
 #include <linux/errno.h>
+#include <linux/slab.h>
 
 static const wchar_t charset2uni[256] = {
 	/* 0x00*/
@@ -117,6 +118,8 @@ static const unsigned char charset2upper[256] = {
 	0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f, /* 0x78-0x7f */
 };
 
+#define VALID_ASCII(c) (c < 128)
+
 static int uni2char(wchar_t uni, unsigned char *out, int boundlen)
 {
 	const unsigned char *uni2charset;
@@ -142,6 +145,16 @@ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
 	return 1;
 }
 
+static int ascii_validate(const struct nls_table *table,
+			  const unsigned char *str, size_t len)
+{
+	int i;
+	for (i = 0; i < len && str[i]; i++)
+		if (!VALID_ASCII(str[i]))
+			return -1;
+	return 0;
+}
+
 static unsigned char charset_tolower(const struct nls_table *table,
 				     unsigned int c){
 	return charset2lower[c];
@@ -152,11 +165,36 @@ static unsigned char charset_toupper(const struct nls_table *table,
 	return charset2upper[c];
 }
 
+static int ascii_casefold(const struct nls_table *charset,
+			  const unsigned char *str, size_t len,
+			  unsigned char *dest, size_t dlen)
+{
+	unsigned int i;
+
+	if (dlen < len)
+		return -EINVAL;
+
+	for (i = 0; i < len; i++) {
+		if (IS_STRICT_MODE(charset) && !VALID_ASCII(str[i]))
+			return -EINVAL;
+
+		if (IS_CASEFOLD_TYPE_ASCII_TOLOWER(charset))
+			dest[i] = charset_tolower(charset, str[i]);
+		else
+			dest[i] = charset_toupper(charset, str[i]);
+	}
+	dest[len] = '\0';
+
+	return len;
+}
+
 static const struct nls_ops charset_ops = {
+	.validate = ascii_validate,
 	.lowercase = charset_toupper,
 	.uppercase = charset_tolower,
 	.uni2char = uni2char,
 	.char2uni = char2uni,
+	.casefold = ascii_casefold,
 };
 
 static struct nls_charset nls_charset;
@@ -165,9 +203,21 @@ static struct nls_table table = {
 	.ops = &charset_ops,
 };
 
+struct nls_table *ascii_load_table(const char *version, unsigned int flags)
+{
+	if (flags & ~(NLS_STRICT_MODE) ||
+	    (flags & NLS_NORMALIZATION_TYPE_MASK) != NLS_NORMALIZATION_TYPE_PLAIN)
+		return ERR_PTR(-EINVAL);
+
+	table.flags = flags;
+	return &table;
+}
+
+
 static struct nls_charset nls_charset = {
 	.charset = "ascii",
 	.tables = &table,
+	.load_table = ascii_load_table,
 };
 
 static int __init init_nls_ascii(void)
