@@ -69,7 +69,7 @@
 #define CHV_COLORS \
 	.color = { .degamma_lut_size = 65, .gamma_lut_size = 257 }
 #define GLK_COLORS \
-	.color = { .degamma_lut_size = 0, .gamma_lut_size = 1024 }
+	.color = { .degamma_lut_size = 35, .gamma_lut_size = 1024 }
 
 /* Keep in gen based order, and chronological order within a gen */
 
