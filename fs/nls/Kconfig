@@ -626,4 +626,9 @@ config NLS_UTF8_NORMALIZATION
 	  Say Y here to enable utf8 NFKD normalization and casefolding
 	  support.
 
+config NLS_UTF8_NORMALIZATION_SELFTEST
+	tristate "Test UTF-8 normalization support"
+	depends on NLS_UTF8
+	default n
+
 endif # NLS

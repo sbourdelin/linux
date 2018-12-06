@@ -47,6 +47,7 @@ obj-$(CONFIG_NLS_KOI8_U)	+= nls_koi8-u.o nls_koi8-ru.o
 obj-$(CONFIG_NLS_UTF8)		+= nls_utf8.o
 nls_utf8-y			+= nls_utf8-core.o
 nls_utf8-$(CONFIG_NLS_UTF8_NORMALIZATION) += nls_utf8-norm.o
+obj-$(CONFIG_NLS_UTF8_NORMALIZATION_SELFTEST) += nls_utf8-selftest.o
 
 obj-$(CONFIG_NLS_MAC_CELTIC)    += mac-celtic.o
 obj-$(CONFIG_NLS_MAC_CENTEURO)  += mac-centeuro.o
