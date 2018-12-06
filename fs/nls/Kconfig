@@ -616,4 +616,14 @@ config NLS_UTF8
 	  input/output character sets. Say Y here for the UTF-8 encoding of
 	  the Unicode/ISO9646 universal character set.
 
+#
+# utf8 normalization
+#
+config NLS_UTF8_NORMALIZATION
+	bool "UTF-8 normalization and casefolding support"
+	depends on NLS_UTF8
+	help
+	  Say Y here to enable utf8 NFKD normalization and casefolding
+	  support.
+
 endif # NLS
