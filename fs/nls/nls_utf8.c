@@ -45,11 +45,17 @@ static const struct nls_ops charset_ops = {
 	.char2uni = char2uni,
 };
 
+static struct nls_charset nls_charset;
 static struct nls_table table = {
-	.charset	= "utf8",
+	.charset = &nls_charset,
 	.ops = &charset_ops,
 	.charset2lower	= identity,	/* no conversion */
 	.charset2upper	= identity,
+};
+
+static struct nls_charset nls_charset = {
+	.charset = "utf8",
+	.tables = &table,
 };
 
 static int __init init_nls_utf8(void)
@@ -58,12 +64,12 @@ static int __init init_nls_utf8(void)
 	for (i=0; i<256; i++)
 		identity[i] = i;
 
-        return register_nls(&table);
+        return register_nls(&nls_charset);
 }
 
 static void __exit exit_nls_utf8(void)
 {
-        unregister_nls(&table);
+        unregister_nls(&nls_charset);
 }
 
 module_init(init_nls_utf8)

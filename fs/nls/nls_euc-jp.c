@@ -554,9 +554,15 @@ static const struct nls_ops charset_ops = {
 	.char2uni = char2uni,
 };
 
+static struct nls_charset nls_charset;
 static struct nls_table table = {
-	.charset	= "euc-jp",
+	.charset = &nls_charset,
 	.ops = &charset_ops,
+};
+
+static struct nls_charset nls_charset = {
+	.charset = "euc-jp",
+	.tables = &table,
 };
 
 static int __init init_nls_euc_jp(void)
@@ -566,7 +572,7 @@ static int __init init_nls_euc_jp(void)
 	if (p_nls) {
 		table.charset2upper = p_nls->charset2upper;
 		table.charset2lower = p_nls->charset2lower;
-		return register_nls(&table);
+		return register_nls(&nls_charset);
 	}
 
 	return -EINVAL;
@@ -574,7 +580,7 @@ static int __init init_nls_euc_jp(void)
 
 static void __exit exit_nls_euc_jp(void)
 {
-	unregister_nls(&table);
+	unregister_nls(&nls_charset);
 	unload_nls(p_nls);
 }
 
