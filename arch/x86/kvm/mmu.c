@@ -5697,14 +5697,41 @@ restart:
 	return need_tlb_flush;
 }
 
+void zap_collapsible_sptes_fn(struct work_struct *work)
+{
+	struct kvm_memory_slot *memslot;
+	struct kvm_memslots *slots;
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct kvm_arch *ka = container_of(dwork, struct kvm_arch,
+					   kvm_mmu_zap_collapsible_sptes_work);
+	struct kvm *kvm = container_of(ka, struct kvm, arch);
+	int i;
+
+	mutex_lock(&kvm->slots_lock);
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		spin_lock(&kvm->mmu_lock);
+		slots = __kvm_memslots(kvm, i);
+		kvm_for_each_memslot(memslot, slots) {
+			slot_handle_leaf(kvm, (struct kvm_memory_slot *)memslot,
+				kvm_mmu_zap_collapsible_spte, true);
+			if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+				cond_resched_lock(&kvm->mmu_lock);
+		}
+		spin_unlock(&kvm->mmu_lock);
+	}
+	kvm->arch.zap_in_progress = false;
+	mutex_unlock(&kvm->slots_lock);
+}
+
+#define KVM_MMU_ZAP_DELAYED (60 * HZ)
 void kvm_mmu_zap_collapsible_sptes(struct kvm *kvm,
 				   const struct kvm_memory_slot *memslot)
 {
-	/* FIXME: const-ify all uses of struct kvm_memory_slot.  */
-	spin_lock(&kvm->mmu_lock);
-	slot_handle_leaf(kvm, (struct kvm_memory_slot *)memslot,
-			 kvm_mmu_zap_collapsible_spte, true);
-	spin_unlock(&kvm->mmu_lock);
+	if (!kvm->arch.zap_in_progress) {
+		kvm->arch.zap_in_progress = true;
+		schedule_delayed_work(&kvm->arch.kvm_mmu_zap_collapsible_sptes_work,
+			KVM_MMU_ZAP_DELAYED);
+	}
 }
 
 void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,

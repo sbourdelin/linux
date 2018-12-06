@@ -9017,6 +9017,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 
 	INIT_DELAYED_WORK(&kvm->arch.kvmclock_update_work, kvmclock_update_fn);
 	INIT_DELAYED_WORK(&kvm->arch.kvmclock_sync_work, kvmclock_sync_fn);
+	INIT_DELAYED_WORK(&kvm->arch.kvm_mmu_zap_collapsible_sptes_work,
+			zap_collapsible_sptes_fn);
+	kvm->arch.zap_in_progress = false;
 
 	kvm_hv_init_vm(kvm);
 	kvm_page_track_init(kvm);
@@ -9062,6 +9065,7 @@ void kvm_arch_sync_events(struct kvm *kvm)
 {
 	cancel_delayed_work_sync(&kvm->arch.kvmclock_sync_work);
 	cancel_delayed_work_sync(&kvm->arch.kvmclock_update_work);
+	cancel_delayed_work_sync(&kvm->arch.kvm_mmu_zap_collapsible_sptes_work);
 	kvm_free_pit(kvm);
 }
 
