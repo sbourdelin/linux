@@ -30,6 +30,9 @@ struct nls_ops {
 
 struct nls_table {
 	const struct nls_charset *charset;
+	unsigned int version;
+	unsigned int flags;
+
 	const struct nls_ops *ops;
 	const unsigned char *charset2lower;
 	const unsigned char *charset2upper;
@@ -42,6 +45,8 @@ struct nls_charset {
 	struct module *owner;
 	struct nls_table *tables;
 	struct nls_charset *next;
+	struct nls_table *(*load_table)(const char *version,
+					unsigned int flags);
 };
 
 /* this value hold the maximum octet of charset */
@@ -58,6 +63,9 @@ enum utf16_endian {
 extern int __register_nls(struct nls_charset *, struct module *);
 extern int unregister_nls(struct nls_charset *);
 extern struct nls_table *load_nls(char *);
+extern struct nls_table *load_nls_version(const char *charset,
+					  const char *version,
+					  unsigned int flags);
 extern void unload_nls(struct nls_table *);
 extern struct nls_table *load_nls_default(void);
 #define register_nls(nls) __register_nls((nls), THIS_MODULE)
