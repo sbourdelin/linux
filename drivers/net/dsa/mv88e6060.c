@@ -73,7 +73,23 @@ static const char *mv88e6060_get_name(struct mii_bus *bus, int sw_addr)
 static enum dsa_tag_protocol mv88e6060_get_tag_protocol(struct dsa_switch *ds,
 							int port)
 {
+  //return DSA_TAG_PROTO_QCA;
+  //return DSA_TAG_PROTO_TRAILER;
 	return DSA_TAG_PROTO_TRAILER;
+}
+
+static struct mv88e6060_priv *
+alloc_priv(struct device *dsa_dev, struct mii_bus *bus, int sw_addr)
+{
+  	struct mv88e6060_priv *priv;
+
+	priv = devm_kzalloc(dsa_dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return NULL;
+
+	priv->bus = bus;
+	priv->sw_addr = sw_addr;
+	return priv;
 }
 
 static const char *mv88e6060_drv_probe(struct device *dsa_dev,
@@ -81,18 +97,16 @@ static const char *mv88e6060_drv_probe(struct device *dsa_dev,
 				       void **_priv)
 {
 	struct mii_bus *bus = dsa_host_dev_to_mii_bus(host_dev);
-	struct mv88e6060_priv *priv;
 	const char *name;
 
 	name = mv88e6060_get_name(bus, sw_addr);
-	if (name) {
-		priv = devm_kzalloc(dsa_dev, sizeof(*priv), GFP_KERNEL);
-		if (!priv)
-			return NULL;
-		*_priv = priv;
-		priv->bus = bus;
-		priv->sw_addr = sw_addr;
-	}
+	
+	if (!name)
+		return NULL;
+
+	*_priv = alloc_priv(dsa_dev, bus, sw_addr);
+	if (!*_priv)
+		  return NULL;
 
 	return name;
 }
@@ -128,9 +142,12 @@ static int mv88e6060_switch_reset(struct dsa_switch *ds)
 
 		usleep_range(1000, 2000);
 	}
-	if (time_after(jiffies, timeout))
+	if (time_after(jiffies, timeout)) {
+		printk("e6060: reset timed out!\n");
 		return -ETIMEDOUT;
+	}
 
+	printk("e6060: reset ok\n");	
 	return 0;
 }
 
@@ -280,15 +297,94 @@ static struct dsa_switch_driver mv88e6060_switch_drv = {
 	.ops		= &mv88e6060_switch_ops,
 };
 
-static int __init mv88e6060_init(void)
+static int mv88e6060_probe(struct mdio_device *mdiodev)
 {
-	register_switch_driver(&mv88e6060_switch_drv);
+	struct device *dev = &mdiodev->dev;
+	struct device_node *np = dev->of_node;
+	const struct mv88e6060_info *compat_info;
+	struct mv88e6060_priv *chip;
+	u32 eeprom_len;
+	int err;
+
+	int addr = 0x10 /* mdiodev->addr */ ;
+
+	chip = alloc_priv(dev, mdiodev->bus, addr);
+	if (!chip)
+		return -ENOMEM;
+
+	{
+		char *name = mv88e6060_get_name(mdiodev->bus, addr);
+		printk("e6060: got name %s @ %lx %lx\n", name, mdiodev->bus, addr);
+	}
+	{
+	  	struct dsa_switch *ds;
+
+		ds = dsa_switch_alloc(dev, 6);
+		if (!ds)
+			return -ENOMEM;
+
+		ds->priv = chip;
+		ds->dev = dev;
+		ds->ops = &mv88e6060_switch_ops;
+		ds->ageing_time_min = 15000;
+		ds->ageing_time_max = 15000 * U8_MAX;
+
+		dev_set_drvdata(dev, ds);
+
+		return dsa_register_switch(ds);
+	}
+
+	printk("e6060: probe ok\n");
 	return 0;
 }
+
+static void mv88e6060_remove(struct mdio_device *mdiodev)
+{
+	struct dsa_switch *ds = dev_get_drvdata(&mdiodev->dev);
+	struct mv88e6060_chip *chip = ds->priv;
+
+	printk("e6060: remove.\n");
+	BUG();
+#if 0
+	mv88e6060_phy_destroy(chip);
+	mv88e6060_unregister_switch(chip);
+	mv88e6060_mdio_unregister(chip);
+#endif
+}
+
+static const struct of_device_id mv88e6060_of_match[] = {
+	{
+		.compatible = "marvell,mv88e6060",
+	},
+	{ /* sentinel */ },
+};
+
+MODULE_DEVICE_TABLE(of, mv88e6060_of_match);
+
+static struct mdio_driver mv88e6060_driver = {
+	.probe	= mv88e6060_probe,
+	.remove = mv88e6060_remove,
+	.mdiodrv.driver = {
+		.name = "mv88e6060",
+		.of_match_table = mv88e6060_of_match,
+	},
+};
+
+static int __init mv88e6060_init(void)
+{
+	int r;
+	printk("e6060: init\n");
+	register_switch_driver(&mv88e6060_switch_drv);
+	r = mdio_driver_register(&mv88e6060_driver);
+	printk("e6060: init %d\n", r);
+	return r;
+}
+
 module_init(mv88e6060_init);
 
 static void __exit mv88e6060_cleanup(void)
 {
+  	mdio_driver_unregister(&mv88e6060_driver);
 	unregister_switch_driver(&mv88e6060_switch_drv);
 }
 module_exit(mv88e6060_cleanup);
