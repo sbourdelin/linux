@@ -1231,6 +1231,20 @@ static void rcs_engine_wa_init(struct intel_engine_cs *engine)
 			    GEN8_L3SQCREG4,
 			    GEN8_LQSC_FLUSH_COHERENT_LINES);
 	}
+
+	if (IS_GEN8(i915)) {
+		/*
+		 * We need to disable the AsyncFlip performance optimisations
+		 * in order to use MI_WAIT_FOR_EVENT within the CS. It should
+		 * already be programmed to '1' on all products.
+		 *
+		 * WaDisableAsyncFlipPerfMode:snb,ivb,hsw,vlv,bdw,chv
+		 */
+		wa_masked_en(wal, MI_MODE, ASYNC_FLIP_PERF_DISABLE);
+
+		/* XXX Is not INSTPM per-context + non-priv for gen6+? */
+		wa_masked_en(wal, INSTPM, INSTPM_FORCE_ORDERING);
+	}
 }
 
 static void xcs_engine_wa_init(struct intel_engine_cs *engine)
