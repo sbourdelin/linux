@@ -1907,6 +1907,11 @@ i915_capture_gpu_state(struct drm_i915_private *i915)
 {
 	struct i915_gpu_state *error;
 
+	/* Check if GPU capture has been disabled */
+	error = READ_ONCE(i915->gpu_error.first_error);
+	if (IS_ERR(error))
+		return error;
+
 	error = kzalloc(sizeof(*error), GFP_ATOMIC);
 	if (!error)
 		return NULL;
@@ -1987,7 +1992,7 @@ i915_first_error_state(struct drm_i915_private *i915)
 
 	spin_lock_irq(&i915->gpu_error.lock);
 	error = i915->gpu_error.first_error;
-	if (error)
+	if (!IS_ERR_OR_NULL(error))
 		i915_gpu_state_get(error);
 	spin_unlock_irq(&i915->gpu_error.lock);
 
@@ -2000,10 +2005,11 @@ void i915_reset_error_state(struct drm_i915_private *i915)
 
 	spin_lock_irq(&i915->gpu_error.lock);
 	error = i915->gpu_error.first_error;
-	i915->gpu_error.first_error = NULL;
+	if (!IS_ERR_OR_NULL(error)) /* once disabled, always disabled */
+		i915->gpu_error.first_error = NULL;
 	spin_unlock_irq(&i915->gpu_error.lock);
 
-	if (!IS_ERR(error))
+	if (!IS_ERR_OR_NULL(error))
 		i915_gpu_state_put(error);
 }
 

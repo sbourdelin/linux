@@ -521,6 +521,9 @@ static ssize_t error_state_read(struct file *filp, struct kobject *kobj,
 	ssize_t ret;
 
 	gpu = i915_first_error_state(i915);
+	if (IS_ERR(gpu))
+		return PTR_ERR(gpu);
+
 	if (gpu) {
 		ret = i915_gpu_state_copy_to_buffer(gpu, buf, off, count);
 		i915_gpu_state_put(gpu);
