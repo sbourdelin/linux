@@ -365,7 +365,7 @@ void bpf_prog_kallsyms_del_all(struct bpf_prog *fp)
 }
 
 #ifdef CONFIG_BPF_JIT
-# define BPF_JIT_LIMIT_DEFAULT	(PAGE_SIZE * 40000)
+# define BPF_JIT_LIMIT_DEFAULT	(4096 * 40000)
 
 /* All BPF JIT sysctl knobs here. */
 int bpf_jit_enable   __read_mostly = IS_BUILTIN(CONFIG_BPF_JIT_ALWAYS_ON);
