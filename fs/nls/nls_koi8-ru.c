@@ -51,7 +51,7 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 	return n;
 }
 
-static const struct nls_ops charset_ops = {
+static struct nls_ops charset_ops = {
 	.uni2char = uni2char,
 	.char2uni = char2uni,
 };
@@ -72,8 +72,8 @@ static int __init init_nls_koi8_ru(void)
 	p_nls = load_nls("koi8-u");
 
 	if (p_nls) {
-		table.charset2upper = p_nls->charset2upper;
-		table.charset2lower = p_nls->charset2lower;
+		charset_ops.uppercase = p_nls->ops->uppercase;
+		charset_ops.lowercase = p_nls->ops->lowercase;
 		return register_nls(&nls_charset);
 	}
 
