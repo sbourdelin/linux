@@ -127,5 +127,11 @@
 #define RPM_SMD_BIMC_GPU_A_CLK			77
 #define RPM_SMD_QPIC_CLK			78
 #define RPM_SMD_QPIC_CLK_A			79
+#define RPM_SMD_BB_CLK3_PIN			80
+#define RPM_SMD_BB_CLK3_A_PIN			81
+#define RPM_SMD_RF_CLK3				82
+#define RPM_SMD_RF_CLK3_A			83
+#define RPM_SMD_RF_CLK3_PIN			84
+#define RPM_SMD_RF_CLK3_A_PIN			85
 
 #endif
