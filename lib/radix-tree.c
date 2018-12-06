@@ -789,7 +789,7 @@ void *__radix_tree_lookup(const struct radix_tree_root *root,
 		parent = entry_to_node(node);
 		offset = radix_tree_descend(parent, &node, index);
 		slot = parent->slots + offset;
-		if (parent->shift == 0)
+		if (!radix_tree_is_internal_node(node) && parent->shift == 0)
 			break;
 	}
 
