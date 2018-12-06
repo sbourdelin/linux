@@ -4232,7 +4232,7 @@ static int ioc_general(void __user *arg, char *cmnd)
 	gdth_ioctl_general gen;
 	gdth_ha_str *ha;
 	char *buf = NULL;
-	u64 paddr;
+	dma_addr_t paddr;
 	int rval;
 
 	if (copy_from_user(&gen, arg, sizeof(gdth_ioctl_general)))
@@ -4251,7 +4251,8 @@ static int ioc_general(void __user *arg, char *cmnd)
 	if (gen.data_len + gen.sense_len == 0)
 		goto execute;
 
-	buf = gdth_ioctl_alloc(ha, gen.data_len + gen.sense_len, FALSE, &paddr);
+        buf = pci_alloc_consistent(ha->pdev, gen.data_len + gen.sense_len,
+			&paddr);
 	if (!buf)
 		return -EFAULT;
 
@@ -4286,7 +4287,7 @@ execute:
 
 	rval = 0;
 out_free_buf:
-	gdth_ioctl_free(ha, gen.data_len+gen.sense_len, buf, paddr);
+	pci_free_consistent(ha->pdev, gen.data_len + gen.sense_len, buf, paddr);
 	return rval;
 }
  
