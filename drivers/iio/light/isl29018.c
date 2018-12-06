@@ -23,6 +23,7 @@
 #include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -95,6 +96,7 @@ struct isl29018_chip {
 	struct isl29018_scale	scale;
 	int			prox_scheme;
 	bool			suspended;
+	struct regulator	*vcc_reg;
 };
 
 static int isl29018_set_integration_time(struct isl29018_chip *chip,
@@ -735,6 +737,15 @@ static int isl29018_probe(struct i2c_client *client,
 
 	mutex_init(&chip->lock);
 
+	chip->vcc_reg = devm_regulator_get_optional(&client->dev, "vcc");
+	if (!IS_ERR(chip->vcc_reg)) {
+		err = regulator_enable(chip->vcc_reg);
+		if (err) {
+			dev_err(&client->dev, "failed to enable VCC regulator\n");
+			return err;
+		}
+	}
+
 	chip->type = dev_id;
 	chip->calibscale = 1;
 	chip->ucalibscale = 0;
@@ -768,6 +779,7 @@ static int isl29018_probe(struct i2c_client *client,
 static int isl29018_suspend(struct device *dev)
 {
 	struct isl29018_chip *chip = iio_priv(dev_get_drvdata(dev));
+	int ret;
 
 	mutex_lock(&chip->lock);
 
@@ -777,6 +789,14 @@ static int isl29018_suspend(struct device *dev)
 	 * So we do not have much to do here.
 	 */
 	chip->suspended = true;
+	if (!IS_ERR(chip->vcc_reg)) {
+		ret = regulator_disable(chip->vcc_reg);
+		if (ret) {
+			dev_err(dev, "failed to disable VCC regulator\n");
+			mutex_unlock(&chip->lock);
+			return ret;
+		}
+	}
 
 	mutex_unlock(&chip->lock);
 
@@ -789,6 +809,15 @@ static int isl29018_resume(struct device *dev)
 	int err;
 
 	mutex_lock(&chip->lock);
+
+	if (!IS_ERR(chip->vcc_reg)) {
+		err = regulator_enable(chip->vcc_reg);
+		if (err) {
+			dev_err(dev, "failed to enable VCC regulator\n");
+			mutex_unlock(&chip->lock);
+			return err;
+		}
+	}
 
 	err = isl29018_chip_init(chip);
 	if (!err)
