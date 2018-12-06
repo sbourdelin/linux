@@ -3,6 +3,7 @@
 #define _LINUX_NLS_H
 
 #include <linux/init.h>
+#include <linux/string.h>
 
 /* Unicode has changed over the years.  Unicode code points no longer
  * fit into 16 bits; as of Unicode 5 valid code points range from 0
@@ -38,6 +39,32 @@ struct nls_ops {
 	 **/
 	int (*validate)(const struct nls_table *charset,
 			const unsigned char *str, size_t len);
+	/**
+	 * @strncmp:
+	 *
+	 * strncmp is the function for case-sensitive string comparison.
+	 * It only needs to be implemented by charsets that want to do
+	 * some fancy comparisons, like normalization-insensitive.
+	 *
+	 * Returns 0 if str1 and str2 are equal, otherwise return
+	 * non-zero.
+	 **/
+	int (*strncmp)(const struct nls_table *charset,
+		       const unsigned char *str1, size_t len1,
+		       const unsigned char *str2, size_t len2);
+
+	/**
+	 * @strncasecmp:
+	 *
+	 * strncasecmp is the function for case-insensitive string
+	 * comparison.
+	 *
+	 * Returns 0 if str1 and str2 are equal, otherwise return
+	 * non-zero.
+	 **/
+	int (*strncasecmp)(const struct nls_table *charset,
+			   const unsigned char *str1, size_t len1,
+			   const unsigned char *str2, size_t len2);
 	unsigned char (*lowercase)(const struct nls_table *charset,
 				   unsigned int c);
 	unsigned char (*uppercase)(const struct nls_table *charset,
@@ -139,15 +166,51 @@ static inline unsigned char nls_toupper(const struct nls_table *t,
 	return nc ? nc : c;
 }
 
-static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
-		const unsigned char *s2, int len)
+static inline int nls_strncasecmp(struct nls_table *t,
+				  const unsigned char *s1, size_t len1,
+				  const unsigned char *s2, size_t len2)
 {
-	while (len--) {
+	if (t->ops->strncasecmp)
+		return t->ops->strncasecmp(t, s1, len1, s2, len2);
+
+	if (IS_STRICT_MODE(t) &&
+	    (nls_validate(t, s1, len1) || nls_validate(t, s1, len1)))
+		return -EINVAL;
+
+	if (len1 != len2)
+		return 1;
+
+	while (len1--) {
 		if (nls_tolower(t, *s1++) != nls_tolower(t, *s2++))
 			return 1;
 	}
 
 	return 0;
+}
+
+static inline int nls_strncmp(struct nls_table *t,
+			      const unsigned char *s1, size_t len1,
+			      const unsigned char *s2, size_t len2)
+{
+	if (t->ops->strncmp)
+		return t->ops->strncmp(t, s1, len1, s2, len2);
+
+	if (IS_STRICT_MODE(t) &&
+	    (nls_validate(t, s1, len1) || nls_validate(t, s1, len1)))
+		return -EINVAL;
+
+	if (len1 != len2)
+		return 1;
+
+	/* strnicmp did not return negative values. So let's keep the
+	 * abi for now */
+	return !!memcmp(s1, s2, len1);
+}
+
+static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
+		const unsigned char *s2, int len)
+{
+	return nls_strncasecmp(t, s1, len, s2, len);
 }
 
 /*
