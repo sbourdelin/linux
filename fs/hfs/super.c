@@ -151,9 +151,11 @@ static int hfs_show_options(struct seq_file *seq, struct dentry *root)
 	if (sbi->session >= 0)
 		seq_printf(seq, ",session=%u", sbi->session);
 	if (sbi->nls_disk)
-		seq_printf(seq, ",codepage=%s", sbi->nls_disk->charset);
+		seq_printf(seq, ",codepage=%s",
+			   nls_charset_name(sbi->nls_disk));
 	if (sbi->nls_io)
-		seq_printf(seq, ",iocharset=%s", sbi->nls_io->charset);
+		seq_printf(seq, ",iocharset=%s",
+			   nls_charset_name(sbi->nls_io));
 	if (sbi->s_quiet)
 		seq_printf(seq, ",quiet");
 	return 0;

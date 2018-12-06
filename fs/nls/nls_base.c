@@ -277,7 +277,7 @@ static struct nls_table *find_nls(char *charset)
 	struct nls_table *nls;
 	spin_lock(&nls_lock);
 	for (nls = tables; nls; nls = nls->next) {
-		if (!strcmp(nls->charset, charset))
+		if (!strcmp(nls_charset_name(nls), charset))
 			break;
 		if (nls->alias && !strcmp(nls->alias, charset))
 			break;
