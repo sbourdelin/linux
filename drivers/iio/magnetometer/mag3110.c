@@ -20,6 +20,7 @@
 #include <linux/iio/buffer.h>
 #include <linux/iio/triggered_buffer.h>
 #include <linux/delay.h>
+#include <linux/regulator/consumer.h>
 
 #define MAG3110_STATUS 0x00
 #define MAG3110_OUT_X 0x01 /* MSB first */
@@ -56,6 +57,7 @@ struct mag3110_data {
 	struct mutex lock;
 	u8 ctrl_reg1;
 	int sleep_val;
+	struct regulator *vcc_reg;
 };
 
 static int mag3110_request(struct mag3110_data *data)
@@ -469,17 +471,27 @@ static int mag3110_probe(struct i2c_client *client,
 	struct iio_dev *indio_dev;
 	int ret;
 
+	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
+	if (!indio_dev)
+		return -ENOMEM;
+
+	data = iio_priv(indio_dev);
+
+	data->vcc_reg = devm_regulator_get_optional(&client->dev, "vcc");
+	if (!IS_ERR(data->vcc_reg)) {
+		ret = regulator_enable(data->vcc_reg);
+		if (ret) {
+			dev_err(&client->dev, "failed to enable VCC regulator\n");
+			return ret;
+		}
+	}
+
 	ret = i2c_smbus_read_byte_data(client, MAG3110_WHO_AM_I);
 	if (ret < 0)
 		return ret;
 	if (ret != MAG3110_DEVICE_ID)
 		return -ENODEV;
 
-	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
-	if (!indio_dev)
-		return -ENOMEM;
-
-	data = iio_priv(indio_dev);
 	data->client = client;
 	mutex_init(&data->lock);
 
@@ -537,14 +549,39 @@ static int mag3110_remove(struct i2c_client *client)
 #ifdef CONFIG_PM_SLEEP
 static int mag3110_suspend(struct device *dev)
 {
-	return mag3110_standby(iio_priv(i2c_get_clientdata(
+	struct mag3110_data *data = iio_priv(i2c_get_clientdata(
+		to_i2c_client(dev)));
+	int ret;
+
+	ret = mag3110_standby(iio_priv(i2c_get_clientdata(
 		to_i2c_client(dev))));
+	if (ret)
+		return ret;
+
+	if (!IS_ERR(data->vcc_reg)) {
+		ret = regulator_disable(data->vcc_reg);
+		if (ret) {
+			dev_err(dev, "failed to disable VCC regulator\n");
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 static int mag3110_resume(struct device *dev)
 {
 	struct mag3110_data *data = iio_priv(i2c_get_clientdata(
 		to_i2c_client(dev)));
+	int ret;
+
+	if (!IS_ERR(data->vcc_reg)) {
+		ret = regulator_enable(data->vcc_reg);
+		if (ret) {
+			dev_err(dev, "failed to enable VCC regulator\n");
+			return ret;
+		}
+	}
 
 	return i2c_smbus_write_byte_data(data->client, MAG3110_CTRL_REG1,
 		data->ctrl_reg1);
