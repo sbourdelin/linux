@@ -3671,11 +3671,22 @@ static int ucc_geth_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	return phy_mii_ioctl(ugeth->phydev, rq, cmd);
 }
 
+static int ucc_geth_change_carrier(struct net_device *dev, bool new_carrier)
+{
+	struct phy_device *phydev = dev->phydev;
+
+	if (phydev && phydev->phy_link_change)
+		phydev->phy_link_change(phydev, new_carrier, 1);
+
+	return 0;
+}
+
 static const struct net_device_ops ucc_geth_netdev_ops = {
 	.ndo_open		= ucc_geth_open,
 	.ndo_stop		= ucc_geth_close,
 	.ndo_start_xmit		= ucc_geth_start_xmit,
 	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_change_carrier     = ucc_geth_change_carrier,
 	.ndo_set_mac_address	= ucc_geth_set_mac_addr,
 	.ndo_set_rx_mode	= ucc_geth_set_multi,
 	.ndo_tx_timeout		= ucc_geth_timeout,
