@@ -8,6 +8,7 @@
 
 struct mdio_gpio_platform_data {
 	int phy_mask;
+	int phy_ignore_ta_mask;
 };
 
 #endif /* __LINUX_MDIO_GPIO_PDATA_H */
