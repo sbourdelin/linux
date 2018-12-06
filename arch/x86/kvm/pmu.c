@@ -221,8 +221,8 @@ EXPORT_SYMBOL_GPL(reprogram_counter);
 void kvm_pmu_handle_event(struct kvm_vcpu *vcpu)
 {
 	struct kvm_pmu *pmu = vcpu_to_pmu(vcpu);
+	int bit, event_cpu;
 	u64 bitmask;
-	int bit;
 
 	bitmask = pmu->reprogram_pmi;
 
@@ -230,6 +230,16 @@ void kvm_pmu_handle_event(struct kvm_vcpu *vcpu)
 		struct kvm_pmc *pmc = kvm_x86_ops->pmu_ops->pmc_idx_to_pmc(pmu, bit);
 
 		if (unlikely(!pmc || !pmc->perf_event)) {
+			clear_bit(bit, (unsigned long *)&pmu->reprogram_pmi);
+			continue;
+		}
+
+		/*
+		 * It doesn't need to reprogram the counters unless
+		 * the CPU which vcpu runs on has changed.
+		 */
+		event_cpu = READ_ONCE(pmc->perf_event->oncpu);
+		if (event_cpu == vcpu->cpu) {
 			clear_bit(bit, (unsigned long *)&pmu->reprogram_pmi);
 			continue;
 		}
