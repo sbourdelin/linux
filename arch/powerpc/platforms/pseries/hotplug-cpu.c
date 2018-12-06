@@ -214,13 +214,21 @@ static void pseries_cpu_die(unsigned int cpu)
 			msleep(1);
 		}
 	} else if (get_preferred_offline_state(cpu) == CPU_STATE_OFFLINE) {
+		/*
+		 * If the current state is not offline yet, it means that the
+		 * dying CPU (which is in pseries_mach_cpu_die) didn't have a
+		 * chance to call rtas_stop_self yet and therefore it's too
+		 * early to query if the CPU is stopped.
+		 */
+		spin_event_timeout(get_cpu_current_state(cpu) == CPU_STATE_OFFLINE,
+				   100000, 100);
 
 		for (tries = 0; tries < 25; tries++) {
 			cpu_status = smp_query_cpu_stopped(pcpu);
 			if (cpu_status == QCSS_STOPPED ||
 			    cpu_status == QCSS_HARDWARE_ERROR)
 				break;
-			cpu_relax();
+			udelay(100);
 		}
 	}
 
