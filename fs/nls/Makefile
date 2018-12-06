@@ -46,6 +46,7 @@ obj-$(CONFIG_NLS_KOI8_U)	+= nls_koi8-u.o nls_koi8-ru.o
 
 obj-$(CONFIG_NLS_UTF8)		+= nls_utf8.o
 nls_utf8-y			+= nls_utf8-core.o
+nls_utf8-$(CONFIG_NLS_UTF8_NORMALIZATION) += nls_utf8-norm.o
 
 obj-$(CONFIG_NLS_MAC_CELTIC)    += mac-celtic.o
 obj-$(CONFIG_NLS_MAC_CENTEURO)  += mac-centeuro.o
@@ -59,6 +60,7 @@ obj-$(CONFIG_NLS_MAC_ROMANIAN)  += mac-romanian.o
 obj-$(CONFIG_NLS_MAC_ROMAN)     += mac-roman.o
 obj-$(CONFIG_NLS_MAC_TURKISH)   += mac-turkish.o
 
+$(obj)/nls_utf8-norm.o: $(obj)/utf8data.h
 $(obj)/utf8data.h: $(srctree)/$(src)/ucd/*.txt $(objtree)/scripts/mkutf8data FORCE
 	$(call cmd,mkutf8data)
 quiet_cmd_mkutf8data = MKUTF8DATA $@
