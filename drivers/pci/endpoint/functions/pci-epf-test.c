@@ -169,13 +169,11 @@ static int pci_epf_test_read(struct pci_epf_test *epf_test)
 		goto err_addr;
 	}
 
-	buf = kzalloc(reg->size, GFP_KERNEL);
+	buf = kmemdup(src_addr, reg->size, GFP_KERNEL);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto err_map_addr;
 	}
-
-	memcpy(buf, src_addr, reg->size);
 
 	crc32 = crc32_le(~0, buf, reg->size);
 	if (crc32 != reg->checksum)
