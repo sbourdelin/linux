@@ -269,8 +269,8 @@ int ntfs_nlstoucs(const ntfs_volume *vol, const char *ins,
 		ucs = kmem_cache_alloc(ntfs_name_cache, GFP_NOFS);
 		if (likely(ucs)) {
 			for (i = o = 0; i < ins_len; i += wc_len) {
-				wc_len = nls->char2uni(ins + i, ins_len - i,
-						&wc);
+				wc_len = nls_char2uni(nls, ins + i,
+						      ins_len - i, &wc);
 				if (likely(wc_len >= 0 &&
 						o < NTFS_MAX_NAME_LEN)) {
 					if (likely(wc)) {
@@ -355,8 +355,8 @@ int ntfs_ucstonls(const ntfs_volume *vol, const ntfschar *ins,
 				goto mem_err_out;
 		}
 		for (i = o = 0; i < ins_len; i++) {
-retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
-					ns_len - o);
+retry:			wc = nls_uni2char(nls, le16_to_cpu(ins[i]),
+						ns + o, ns_len - o);
 			if (wc > 0) {
 				o += wc;
 				continue;

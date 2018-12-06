@@ -28,12 +28,12 @@ static int uni2char(const wchar_t uni,
 		else if (uni == 0x255d || uni == 0x256c)
 			return 0;
 		else
-			return p_nls->uni2char(uni, out, boundlen);
+			return nls_uni2char(p_nls, uni, out, boundlen);
 		return 1;
 	}
 	else
 		/* fast path */
-		return p_nls->uni2char(uni, out, boundlen);
+		return nls_uni2char(p_nls, uni, out, boundlen);
 }
 
 static int char2uni(const unsigned char *rawstring, int boundlen,
@@ -47,7 +47,7 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 		return 1;
 	}
 
-	n = p_nls->char2uni(rawstring, boundlen, uni);
+	n = nls_char2uni(p_nls, rawstring, boundlen, uni);
 	return n;
 }
 

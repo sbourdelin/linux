@@ -190,7 +190,7 @@ int hfsplus_uni2asc(struct super_block *sb,
 				c0 = ':';
 				break;
 			}
-			res = nls->uni2char(c0, op, len);
+			res = nls_uni2char(nls, c0, op, len);
 			if (res < 0) {
 				if (res == -ENAMETOOLONG)
 					goto out;
@@ -233,7 +233,7 @@ same:
 			cc = c0;
 		}
 done:
-		res = nls->uni2char(cc, op, len);
+		res = nls_uni2char(nls, cc, op, len);
 		if (res < 0) {
 			if (res == -ENAMETOOLONG)
 				goto out;
@@ -256,7 +256,7 @@ out:
 static inline int asc2unichar(struct super_block *sb, const char *astr, int len,
 			      wchar_t *uc)
 {
-	int size = HFSPLUS_SB(sb)->nls->char2uni(astr, len, uc);
+	int size = nls_char2uni(HFSPLUS_SB(sb)->nls, astr, len, uc);
 	if (size <= 0) {
 		*uc = '?';
 		size = 1;
