@@ -51,6 +51,16 @@ static int rxe_query_device(struct ib_device *dev,
 	return 0;
 }
 
+static bool rxe_is_port_valid(struct rxe_dev *rxe, u8 port_num)
+{
+	if (unlikely(!rdma_is_port_valid(&rxe->ib_dev, port_num))) {
+		pr_warn("Invalid port number %d\n", port_num);
+		return 0;
+	}
+
+	return 1;
+}
+
 static int rxe_query_port(struct ib_device *dev,
 			  u8 port_num, struct ib_port_attr *attr)
 {
@@ -58,10 +68,8 @@ static int rxe_query_port(struct ib_device *dev,
 	struct rxe_port *port;
 	int rc = -EINVAL;
 
-	if (unlikely(port_num != 1)) {
-		pr_warn("invalid port_number %d\n", port_num);
+	if (unlikely(!rxe_is_port_valid(rxe, port_num)))
 		goto out;
-	}
 
 	port = &rxe->port;
 
@@ -104,11 +112,8 @@ static int rxe_query_pkey(struct ib_device *device,
 	struct rxe_dev *rxe = to_rdev(device);
 	struct rxe_port *port;
 
-	if (unlikely(port_num != 1)) {
-		dev_warn(device->dev.parent, "invalid port_num = %d\n",
-			 port_num);
+	if (unlikely(!rxe_is_port_valid(rxe, port_num)))
 		goto err1;
-	}
 
 	port = &rxe->port;
 
@@ -147,10 +152,8 @@ static int rxe_modify_port(struct ib_device *dev,
 	struct rxe_dev *rxe = to_rdev(dev);
 	struct rxe_port *port;
 
-	if (unlikely(port_num != 1)) {
-		pr_warn("invalid port_num = %d\n", port_num);
+	if (unlikely(!rxe_is_port_valid(rxe, port_num)))
 		goto err1;
-	}
 
 	port = &rxe->port;
 
