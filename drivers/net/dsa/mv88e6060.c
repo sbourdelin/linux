@@ -30,8 +30,10 @@ static int reg_read(struct dsa_switch *ds, int addr, int reg)
 		int __ret;					\
 								\
 		__ret = reg_read(ds, addr, reg);		\
-		if (__ret < 0)					\
+		if (__ret < 0) {				\
+			printk("mv88e6060: error reading %x/%x\n", addr, reg);	\
 			return __ret;				\
+		}						\
 		__ret;						\
 	})
 
@@ -48,8 +50,10 @@ static int reg_write(struct dsa_switch *ds, int addr, int reg, u16 val)
 		int __ret;					\
 								\
 		__ret = reg_write(ds, addr, reg, val);		\
-		if (__ret < 0)					\
+		if (__ret < 0)  {                               \
+			printk("mv88e6060: error writing %x/%x\n", addr, reg);	\
 			return __ret;				\
+		}						\
 	})
 
 static const char *mv88e6060_get_name(struct mii_bus *bus, int sw_addr)
