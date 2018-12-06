@@ -11085,7 +11085,19 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 	return n;
 }
 
+static unsigned char charset_tolower(const struct nls_table *table,
+				     unsigned int c){
+	return charset2lower[c];
+}
+
+static unsigned char charset_toupper(const struct nls_table *table,
+				     unsigned int c) {
+	return charset2upper[c];
+}
+
 static const struct nls_ops charset_ops = {
+	.lowercase = charset_toupper,
+	.uppercase = charset_tolower,
 	.uni2char = uni2char,
 	.char2uni = char2uni,
 };
@@ -11094,8 +11106,6 @@ static struct nls_charset nls_charset;
 static struct nls_table table = {
 	.charset = &nls_charset,
 	.ops = &charset_ops,
-	.charset2lower	= charset2lower,
-	.charset2upper	= charset2upper,
 };
 
 static struct nls_charset nls_charset = {

@@ -549,7 +549,7 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 	return euc_offset;
 }
 
-static const struct nls_ops charset_ops = {
+static struct nls_ops charset_ops = {
 	.uni2char = uni2char,
 	.char2uni = char2uni,
 };
@@ -570,8 +570,9 @@ static int __init init_nls_euc_jp(void)
 	p_nls = load_nls("cp932");
 
 	if (p_nls) {
-		table.charset2upper = p_nls->charset2upper;
-		table.charset2lower = p_nls->charset2lower;
+
+		charset_ops.uppercase = p_nls->ops->uppercase;
+		charset_ops.lowercase = p_nls->ops->lowercase;
 		return register_nls(&nls_charset);
 	}
 

@@ -38,6 +38,10 @@ struct nls_ops {
 	 **/
 	int (*validate)(const struct nls_table *charset,
 			const unsigned char *str, size_t len);
+	unsigned char (*lowercase)(const struct nls_table *charset,
+				   unsigned int c);
+	unsigned char (*uppercase)(const struct nls_table *charset,
+				   unsigned int c);
 };
 
 struct nls_table {
@@ -46,9 +50,8 @@ struct nls_table {
 	unsigned int flags;
 
 	const struct nls_ops *ops;
-	const unsigned char *charset2lower;
-	const unsigned char *charset2upper;
 	struct nls_table *next;
+
 };
 
 struct nls_charset {
@@ -120,16 +123,18 @@ static inline const char *nls_charset_name(const struct nls_table *table)
 	return table->charset->charset;
 }
 
-static inline unsigned char nls_tolower(struct nls_table *t, unsigned char c)
+static inline unsigned char nls_tolower(const struct nls_table *t,
+					unsigned char c)
 {
-	unsigned char nc = t->charset2lower[c];
+	unsigned char nc = t->ops->lowercase(t, c);
 
 	return nc ? nc : c;
 }
 
-static inline unsigned char nls_toupper(struct nls_table *t, unsigned char c)
+static inline unsigned char nls_toupper(const struct nls_table *t,
+					unsigned char c)
 {
-	unsigned char nc = t->charset2upper[c];
+	unsigned char nc = t->ops->uppercase(t, c);
 
 	return nc ? nc : c;
 }
