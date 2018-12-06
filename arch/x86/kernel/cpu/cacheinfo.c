@@ -121,7 +121,8 @@ enum _cache_type {
 	CTYPE_NULL = 0,
 	CTYPE_DATA = 1,
 	CTYPE_INST = 2,
-	CTYPE_UNIFIED = 3
+	CTYPE_UNIFIED = 3,
+	CTYPE_MAX = 4
 };
 
 union _cpuid4_leaf_eax {
@@ -635,7 +636,7 @@ static int find_num_cache_leaves(struct cpuinfo_x86 *c)
 		/* Do cpuid(op) loop to find out num_cache_leaves */
 		cpuid_count(op, i, &eax, &ebx, &ecx, &edx);
 		cache_eax.full = eax;
-	} while (cache_eax.split.type != CTYPE_NULL);
+	} while (cache_eax.split.type != CTYPE_NULL && i != CTYPE_MAX);
 	return i;
 }
 
