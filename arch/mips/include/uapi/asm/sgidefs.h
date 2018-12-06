@@ -40,6 +40,6 @@
  */
 #define _MIPS_SIM_ABI32		1
 #define _MIPS_SIM_NABI32	2
-#define _MIPS_SIM_ABI64		3
+#define _MIPS_SIM_ABIN64	3
 
 #endif /* __ASM_SGIDEFS_H */

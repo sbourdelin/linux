@@ -10,7 +10,7 @@
 
 #include <asm/sgidefs.h>
 
-#if _MIPS_SIM == _MIPS_SIM_ABI64
+#if _MIPS_SIM == _MIPS_SIM_ABIN64
 OUTPUT_FORMAT("elf64-tradlittlemips", "elf64-tradbigmips", "elf64-tradlittlemips")
 #elif _MIPS_SIM == _MIPS_SIM_NABI32
 OUTPUT_FORMAT("elf32-ntradlittlemips", "elf32-ntradbigmips", "elf32-ntradlittlemips")

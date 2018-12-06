@@ -87,7 +87,7 @@ struct stat64 {
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
-#if _MIPS_SIM == _MIPS_SIM_ABI64
+#if _MIPS_SIM == _MIPS_SIM_ABIN64
 
 /* The memory layout is the same as of struct stat64 of the 32-bit kernel.  */
 struct stat {
@@ -126,7 +126,7 @@ struct stat {
 	unsigned long		st_blocks;
 };
 
-#endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
+#endif /* _MIPS_SIM == _MIPS_SIM_ABIN64 */
 
 #define STAT_HAVE_NSEC 1
 

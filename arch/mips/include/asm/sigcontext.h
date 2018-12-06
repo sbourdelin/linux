@@ -11,7 +11,7 @@
 
 #include <uapi/asm/sigcontext.h>
 
-#if _MIPS_SIM == _MIPS_SIM_ABI64 || _MIPS_SIM == _MIPS_SIM_NABI32
+#if _MIPS_SIM == _MIPS_SIM_ABIN64 || _MIPS_SIM == _MIPS_SIM_NABI32
 
 struct sigcontext32 {
 	__u32		sc_regmask;	/* Unused */
@@ -33,5 +33,5 @@ struct sigcontext32 {
 	__u32		sc_hi3;
 	__u32		sc_lo3;
 };
-#endif /* _MIPS_SIM == _MIPS_SIM_ABI64 || _MIPS_SIM == _MIPS_SIM_NABI32 */
+#endif /* _MIPS_SIM == _MIPS_SIM_ABIN64 || _MIPS_SIM == _MIPS_SIM_NABI32 */
 #endif /* _ASM_SIGCONTEXT_H */

@@ -400,7 +400,7 @@
 #define __NR_O32_Linux			4000
 #define __NR_O32_Linux_syscalls		368
 
-#if _MIPS_SIM == _MIPS_SIM_ABI64
+#if _MIPS_SIM == _MIPS_SIM_ABIN64
 
 /*
  * Linux 64-bit syscalls are in the range from 5000 to 5999.
@@ -740,10 +740,10 @@
 #define __NR_syscalls			328
 #endif
 
-#endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
+#endif /* _MIPS_SIM == _MIPS_SIM_ABIN64 */
 
-#define __NR_64_Linux			5000
-#define __NR_64_Linux_syscalls		328
+#define __NR_N64_Linux			5000
+#define __NR_N64_Linux_syscalls		328
 
 #if _MIPS_SIM == _MIPS_SIM_NABI32
 

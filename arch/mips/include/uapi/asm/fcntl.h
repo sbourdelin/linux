@@ -57,7 +57,7 @@
  * contain all the same fields as struct flock.
  */
 
-#if _MIPS_SIM != _MIPS_SIM_ABI64
+#if _MIPS_SIM != _MIPS_SIM_ABIN64
 
 #include <linux/types.h>
 

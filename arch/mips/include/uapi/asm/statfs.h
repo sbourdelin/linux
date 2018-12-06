@@ -61,7 +61,7 @@ struct statfs64 {
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
-#if _MIPS_SIM == _MIPS_SIM_ABI64
+#if _MIPS_SIM == _MIPS_SIM_ABIN64
 
 struct statfs64 {			/* Same as struct statfs */
 	long		f_type;
@@ -96,6 +96,6 @@ struct compat_statfs64 {
 	__u32	f_spare[5];
 };
 
-#endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
+#endif /* _MIPS_SIM == _MIPS_SIM_ABIN64 */
 
 #endif /* _ASM_STATFS_H */

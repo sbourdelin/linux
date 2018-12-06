@@ -34,12 +34,12 @@
 #define T3		11
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
-#if _MIPS_SIM == _MIPS_SIM_ABI64 || _MIPS_SIM == _MIPS_SIM_NABI32
+#if _MIPS_SIM == _MIPS_SIM_ABIN64 || _MIPS_SIM == _MIPS_SIM_NABI32
 #define T0		12
 #define T1		13
 #define T2		14
 #define T3		15
-#endif /* _MIPS_SIM == _MIPS_SIM_ABI64 || _MIPS_SIM == _MIPS_SIM_NABI32 */
+#endif /* _MIPS_SIM == _MIPS_SIM_ABIN64 || _MIPS_SIM == _MIPS_SIM_NABI32 */
 
 #define S0		16
 #define S1		17
