@@ -1338,6 +1338,9 @@ struct ext4_super_block {
 /* Number of quota types we support */
 #define EXT4_MAXQUOTAS 3
 
+#define EXT4_ENC_ASCII		0
+#define EXT4_ENC_UTF8_11_0	1
+
 /*
  * fourth extended-fs super-block data in memory
  */
@@ -1387,6 +1390,10 @@ struct ext4_sb_info {
 	struct kobject s_kobj;
 	struct completion s_kobj_unregister;
 	struct super_block *s_sb;
+#ifdef CONFIG_NLS
+	struct nls_table *s_encoding;
+	__u16 s_encoding_flags;
+#endif
 
 	/* Journaling */
 	struct journal_s *s_journal;
