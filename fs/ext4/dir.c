@@ -26,6 +26,7 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/iversion.h>
+#include <linux/nls.h>
 #include "ext4.h"
 #include "xattr.h"
 
@@ -662,3 +663,47 @@ const struct file_operations ext4_dir_operations = {
 	.open		= ext4_dir_open,
 	.release	= ext4_release_dir,
 };
+
+#ifdef CONFIG_NLS
+static int ext4_d_compare(const struct dentry *dentry, unsigned int len,
+			  const char *str, const struct qstr *name)
+{
+	struct nls_table *charset = EXT4_SB(dentry->d_sb)->s_encoding;
+
+	return nls_strncmp(charset, str, len, name->name, name->len);
+}
+
+static int ext4_d_hash(const struct dentry *dentry, struct qstr *q)
+{
+	const struct nls_table *charset = EXT4_SB(dentry->d_sb)->s_encoding;
+	unsigned char *norm;
+	int len, ret = 0;
+
+	/* If normalization is TYPE_PLAIN, we can just reuse the vfs
+	 * hash. */
+	if (IS_NORMALIZATION_TYPE_ALL_PLAIN(charset))
+	    return 0;
+
+	norm = kmalloc(PATH_MAX, GFP_ATOMIC);
+	if (!norm)
+		return -ENOMEM;
+
+	len = nls_normalize(charset, q->name, q->len, norm, PATH_MAX);
+
+	if (len < 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	q->hash = full_name_hash(dentry, norm, len);
+
+out:
+	kfree (norm);
+	return ret;
+}
+
+const struct dentry_operations ext4_dentry_ops = {
+	.d_hash = ext4_d_hash,
+	.d_compare = ext4_d_compare,
+};
+#endif

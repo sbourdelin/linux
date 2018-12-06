@@ -1342,6 +1342,11 @@ struct ext4_super_block {
 #define EXT4_ENC_UTF8_11_0	1
 
 /*
+ * Flags for ext4_sb_info.s_encoding_flags.  Be careful when modifying
+ * these, as they must match their NLS counterpart. */
+#define EXT4_ENC_STRICT_MODE_FL	(1 << 0)
+
+/*
  * fourth extended-fs super-block data in memory
  */
 struct ext4_sb_info {
@@ -2387,8 +2392,8 @@ extern int ext4_check_all_de(struct inode *dir, struct buffer_head *bh,
 extern int ext4_sync_file(struct file *, loff_t, loff_t, int);
 
 /* hash.c */
-extern int ext4fs_dirhash(const char *name, int len, struct
-			  dx_hash_info *hinfo);
+extern int ext4fs_dirhash(const struct inode *dir, const char *name, int len,
+			  struct dx_hash_info *hinfo);
 
 /* ialloc.c */
 extern struct inode *__ext4_new_inode(handle_t *, struct inode *, umode_t,
@@ -2971,6 +2976,9 @@ static inline void ext4_unlock_group(struct super_block *sb,
 
 /* dir.c */
 extern const struct file_operations ext4_dir_operations;
+#ifdef CONFIG_NLS
+extern const struct dentry_operations ext4_dentry_ops;
+#endif
 
 /* file.c */
 extern const struct inode_operations ext4_file_inode_operations;
