@@ -13,6 +13,9 @@
 #define _ASM_UNISTD_H
 
 #include <uapi/asm/unistd.h>
+#include <asm/unistd_nr_n32.h>
+#include <asm/unistd_nr_n64.h>
+#include <asm/unistd_nr_o32.h>
 
 #ifndef __ASSEMBLY__
 
