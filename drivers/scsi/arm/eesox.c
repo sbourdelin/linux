@@ -486,7 +486,8 @@ static struct scsi_host_template eesox_template = {
 	.this_id			= 7,
 	.sg_tablesize			= SG_MAX_SEGMENTS,
 	.dma_boundary			= IOMD_DMA_BOUNDARY,
-	.use_clustering			= DISABLE_CLUSTERING,
+	.max_segment_size		= PAGE_SIZE,
+	.dma_boundary			= PAGE_SIZE - 1,
 	.proc_name			= "eesox",
 };
 

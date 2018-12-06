@@ -193,7 +193,8 @@ static struct scsi_host_template qlogicfas_driver_template = {
 	.can_queue		= 1,
 	.this_id		= -1,
 	.sg_tablesize		= SG_ALL,
-	.use_clustering		= DISABLE_CLUSTERING,
+	.max_segment_size	= PAGE_SIZE,
+	.dma_boundary		= PAGE_SIZE - 1,
 };
 
 static __init int qlogicfas_init(void)

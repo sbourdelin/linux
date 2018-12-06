@@ -5865,8 +5865,10 @@ static int sdebug_driver_probe(struct device *dev)
 	sdbg_host = to_sdebug_host(dev);
 
 	sdebug_driver_template.can_queue = sdebug_max_queue;
-	if (!sdebug_clustering)
-		sdebug_driver_template.use_clustering = DISABLE_CLUSTERING;
+	if (!sdebug_clustering) {
+		sdebug_driver_template.max_segment_size = PAGE_SIZE;
+		sdebug_driver_template.dma_boundary = PAGE_SIZE - 1;
+	}
 	hpnt = scsi_host_alloc(&sdebug_driver_template, sizeof(sdbg_host));
 	if (NULL == hpnt) {
 		pr_err("scsi_host_alloc failed\n");
