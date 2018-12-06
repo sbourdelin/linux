@@ -16,13 +16,18 @@
 #include <linux/kmod.h>
 #include <linux/spinlock.h>
 
-static struct nls_table default_table;
-static struct nls_table *tables = &default_table;
+extern struct nls_charset default_charset;
+static struct nls_charset *charsets = &default_charset;
 static DEFINE_SPINLOCK(nls_lock);
-
-int __register_nls(struct nls_table *nls, struct module *owner)
+static struct nls_table *nls_load_table(struct nls_charset *charset)
 {
-	struct nls_table ** tmp = &tables;
+	/* For now, return the default table, which is the first one found. */
+	return charset->tables;
+}
+
+int __register_nls(struct nls_charset *nls, struct module *owner)
+{
+	struct nls_charset **tmp = &charsets;
 
 	if (nls->next)
 		return -EBUSY;
@@ -36,16 +41,16 @@ int __register_nls(struct nls_table *nls, struct module *owner)
 		}
 		tmp = &(*tmp)->next;
 	}
-	nls->next = tables;
-	tables = nls;
+	nls->next = charsets;
+	charsets = nls;
 	spin_unlock(&nls_lock);
 	return 0;
 }
 EXPORT_SYMBOL(__register_nls);
 
-int unregister_nls(struct nls_table * nls)
+int unregister_nls(struct nls_charset * nls)
 {
-	struct nls_table ** tmp = &tables;
+	struct nls_charset **tmp = &charsets;
 
 	spin_lock(&nls_lock);
 	while (*tmp) {
@@ -60,31 +65,42 @@ int unregister_nls(struct nls_table * nls)
 	return -EINVAL;
 }
 
-static struct nls_table *find_nls(char *charset)
+static struct nls_charset *find_nls(const char *charset)
 {
-	struct nls_table *nls;
+	struct nls_charset *nls;
 	spin_lock(&nls_lock);
-	for (nls = tables; nls; nls = nls->next) {
-		if (!strcmp(nls_charset_name(nls), charset))
+	for (nls = charsets; nls; nls = nls->next) {
+		if (!strcmp(nls->charset, charset))
 			break;
 		if (nls->alias && !strcmp(nls->alias, charset))
 			break;
 	}
-	if (nls && !try_module_get(nls->owner))
-		nls = NULL;
+
+	if (!nls)
+		nls = ERR_PTR(-EINVAL);
+	else if (!try_module_get(nls->owner))
+		nls = ERR_PTR(-EBUSY);
+
 	spin_unlock(&nls_lock);
 	return nls;
 }
 
 struct nls_table *load_nls(char *charset)
 {
-	return try_then_request_module(find_nls(charset), "nls_%s", charset);
+	struct nls_charset *nls_charset;
+
+	nls_charset = try_then_request_module(find_nls(charset),
+					      "nls_%s", charset);
+	if (!IS_ERR(nls_charset))
+		return NULL;
+
+	return nls_load_table(nls_charset);
 }
 
 void unload_nls(struct nls_table *nls)
 {
 	if (nls)
-		module_put(nls->owner);
+		module_put(nls->charset->owner);
 }
 
 EXPORT_SYMBOL(unregister_nls);

@@ -9461,22 +9461,28 @@ static const struct nls_ops charset_ops = {
 	.char2uni = char2uni,
 };
 
+static struct nls_charset nls_charset;
 static struct nls_table table = {
-	.charset	= "cp950",
-	.alias		= "big5",
+	.charset = &nls_charset,
 	.ops = &charset_ops,
 	.charset2lower	= charset2lower,
 	.charset2upper	= charset2upper,
 };
 
+static struct nls_charset nls_charset = {
+	.alias = "big5",
+	.charset = "cp950",
+	.tables = &table,
+};
+
 static int __init init_nls_cp950(void)
 {
-	return register_nls(&table);
+	return register_nls(&nls_charset);
 }
 
 static void __exit exit_nls_cp950(void)
 {
-	unregister_nls(&table);
+	unregister_nls(&nls_charset);
 }
 
 module_init(init_nls_cp950)

@@ -17,7 +17,7 @@
 #include <asm/byteorder.h>
 #include <linux/nls.h>
 
-static struct nls_table default_table;
+struct nls_charset default_charset;
 
 struct utf8_table {
 	int     cmask;
@@ -453,10 +453,15 @@ static const struct nls_ops charset_ops = {
 };
 
 static struct nls_table default_table = {
-	.charset	= "default",
+	.charset = &default_charset,
 	.ops = &charset_ops,
 	.charset2lower	= charset2lower,
 	.charset2upper	= charset2upper,
+};
+
+struct nls_charset default_charset = {
+	.charset = "default",
+	.tables = &default_table,
 };
 
 /* Returns a simple default translation table */
