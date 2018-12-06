@@ -92,7 +92,7 @@ static int jfs_strtoUCS(wchar_t * to, const unsigned char *from, int len,
 				jfs_err("jfs_strtoUCS: char2uni returned %d.",
 					charlen);
 				jfs_err("charset = %s, char = 0x%x",
-					codepage->charset, *from);
+					nls_charset_name(codepage), *from);
 				return charlen;
 			}
 		}

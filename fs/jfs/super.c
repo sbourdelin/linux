@@ -736,7 +736,8 @@ static int jfs_show_options(struct seq_file *seq, struct dentry *root)
 	if (sbi->flag & JFS_DISCARD)
 		seq_printf(seq, ",discard=%u", sbi->minblks_trim);
 	if (sbi->nls_tab)
-		seq_printf(seq, ",iocharset=%s", sbi->nls_tab->charset);
+		seq_printf(seq, ",iocharset=%s",
+			   nls_charset_name(sbi->nls_tab));
 	if (sbi->flag & JFS_ERR_CONTINUE)
 		seq_printf(seq, ",errors=continue");
 	if (sbi->flag & JFS_ERR_PANIC)

@@ -297,7 +297,7 @@ name_err:
 	if (wc_len < 0) {
 		ntfs_error(vol->sb, "Name using character set %s contains "
 				"characters that cannot be converted to "
-				"Unicode.", nls->charset);
+				"Unicode.", nls_charset_name(nls));
 		i = -EILSEQ;
 	} else /* if (o >= NTFS_MAX_NAME_LEN) */ {
 		ntfs_error(vol->sb, "Name is too long (maximum length for a "
@@ -386,7 +386,8 @@ retry:			wc = nls_uni2char(nls, le16_to_cpu(ins[i]),
 conversion_err:
 	ntfs_error(vol->sb, "Unicode name contains characters that cannot be "
 			"converted to character set %s.  You might want to "
-			"try to use the mount option nls=utf8.", nls->charset);
+			"try to use the mount option nls=utf8.",
+			nls_charset_name(nls));
 	if (ns != *outs)
 		kfree(ns);
 	if (wc != -ENAMETOOLONG)
