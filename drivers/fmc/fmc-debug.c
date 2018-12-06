@@ -168,6 +168,5 @@ int fmc_debug_init(struct fmc_device *fmc)
 
 void fmc_debug_exit(struct fmc_device *fmc)
 {
-	if (fmc->dbg_dir)
-		debugfs_remove_recursive(fmc->dbg_dir);
+	debugfs_remove_recursive(fmc->dbg_dir);
 }
