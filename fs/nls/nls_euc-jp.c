@@ -413,7 +413,7 @@ static int uni2char(const wchar_t uni,
 
 	if (!p_nls)
 		return -EINVAL;
-	if ((n = p_nls->uni2char(uni, out, boundlen)) < 0)
+	if ((n = nls_uni2char(p_nls, uni, out, boundlen)) < 0)
 		return n;
 
 	/* translate SJIS into EUC-JP */
@@ -543,7 +543,7 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 		sjis_temp[1] = 0x00;
 	}
 
-	if ( (n = p_nls->char2uni(sjis_temp, sizeof(sjis_temp), uni)) < 0)
+	if ( (n = nls_char2uni(p_nls, sjis_temp, sizeof(sjis_temp), uni)) < 0)
 		return n;
 
 	return euc_offset;

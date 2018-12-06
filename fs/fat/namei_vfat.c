@@ -289,7 +289,7 @@ static inline int to_shortname_char(struct nls_table *nls,
 		return 1;
 	}
 
-	len = nls->uni2char(*src, buf, buf_size);
+	len = nls_uni2char(nls, *src, buf, buf_size);
 	if (len <= 0) {
 		info->valid = 0;
 		buf[0] = '_';
@@ -544,8 +544,8 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 				ip += 5;
 				i += 5;
 			} else {
-				charlen = nls->char2uni(ip, len - i,
-							(wchar_t *)op);
+				charlen = nls_char2uni(nls, ip, len - i,
+						       (wchar_t *)op);
 				if (charlen < 0)
 					return -EINVAL;
 				ip += charlen;
