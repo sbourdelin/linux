@@ -154,10 +154,10 @@ nf_conntrack_timestamp - BOOLEAN
 	Enable connection tracking flow timestamping.
 
 nf_conntrack_udp_timeout - INTEGER (seconds)
-	default 30
+	default 10
 
 nf_conntrack_udp_timeout_stream - INTEGER (seconds)
-	default 180
+	default 120
 
 	This extended timeout will be used in case there is an UDP stream
 	detected.
