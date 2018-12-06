@@ -397,6 +397,9 @@ static void unshadow_scb(struct kvm_vcpu *vcpu, struct vsie_page *vsie_page)
 	memcpy(scb_o->gcr, scb_s->gcr, 128);
 	scb_o->pp = scb_s->pp;
 
+	/* machine information */
+	scb_o->cpnc = scb_s->cpnc;
+
 	/* branch prediction */
 	if (test_kvm_facility(vcpu->kvm, 82)) {
 		scb_o->fpf &= ~FPF_BPBC;
@@ -473,6 +476,10 @@ static int shadow_scb(struct kvm_vcpu *vcpu, struct vsie_page *vsie_page)
 	scb_s->lctl = scb_o->lctl;
 	scb_s->svcc = scb_o->svcc;
 	scb_s->ictl = scb_o->ictl;
+
+	/* machine information */
+	scb_s->cpnc = scb_o->cpnc;
+
 	/*
 	 * SKEY handling functions can't deal with false setting of PTE invalid
 	 * bits. Therefore we cannot provide interpretation and would later
