@@ -346,3 +346,57 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
 	vunmap(cpu_addr);
 }
 #endif
+
+/*
+ * Dummy DMA ops always fail
+ */
+
+static int dma_dummy_mmap(struct device *dev, struct vm_area_struct *vma,
+			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
+			  unsigned long attrs)
+{
+	return -ENXIO;
+}
+
+static dma_addr_t dma_dummy_map_page(struct device *dev, struct page *page,
+				     unsigned long offset, size_t size,
+				     enum dma_data_direction dir,
+				     unsigned long attrs)
+{
+	return 0;
+}
+
+static int dma_dummy_map_sg(struct device *dev, struct scatterlist *sgl,
+			    int nelems, enum dma_data_direction dir,
+			    unsigned long attrs)
+{
+	return 0;
+}
+
+static dma_addr_t dma_dummy_map_resource(struct device *dev,
+					 phys_addr_t phys_addr, size_t size,
+					 enum dma_data_direction dir,
+					 unsigned long attrs)
+{
+	return 0;
+}
+
+static int dma_dummy_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
+{
+	return 1;
+}
+
+static int dma_dummy_supported(struct device *hwdev, u64 mask)
+{
+	return 0;
+}
+
+const struct dma_map_ops dma_dummy_ops = {
+	.mmap		= dma_dummy_mmap,
+	.map_page	= dma_dummy_map_page,
+	.map_sg		= dma_dummy_map_sg,
+	.map_resource	= dma_dummy_map_resource,
+	.mapping_error	= dma_dummy_mapping_error,
+	.dma_supported	= dma_dummy_supported,
+};
+EXPORT_SYMBOL(dma_dummy_ops);
