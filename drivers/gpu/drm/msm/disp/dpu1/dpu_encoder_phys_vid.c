@@ -707,7 +707,6 @@ static void dpu_encoder_phys_vid_irq_control(struct dpu_encoder_phys *phys_enc,
 		bool enable)
 {
 	struct dpu_encoder_phys_vid *vid_enc;
-	int ret;
 
 	if (!phys_enc)
 		return;
@@ -720,13 +719,8 @@ static void dpu_encoder_phys_vid_irq_control(struct dpu_encoder_phys *phys_enc,
 			    atomic_read(&phys_enc->vblank_refcount));
 
 	if (enable) {
-		ret = dpu_encoder_phys_vid_control_vblank_irq(phys_enc, true);
-		if (ret)
-			return;
-
 		dpu_encoder_helper_register_irq(phys_enc, INTR_IDX_UNDERRUN);
 	} else {
-		dpu_encoder_phys_vid_control_vblank_irq(phys_enc, false);
 		dpu_encoder_helper_unregister_irq(phys_enc, INTR_IDX_UNDERRUN);
 	}
 }

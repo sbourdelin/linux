@@ -347,7 +347,6 @@ static void dpu_encoder_phys_cmd_irq_control(struct dpu_encoder_phys *phys_enc,
 	if (enable) {
 		dpu_encoder_helper_register_irq(phys_enc, INTR_IDX_PINGPONG);
 		dpu_encoder_helper_register_irq(phys_enc, INTR_IDX_UNDERRUN);
-		dpu_encoder_phys_cmd_control_vblank_irq(phys_enc, true);
 
 		if (dpu_encoder_phys_cmd_is_master(phys_enc))
 			dpu_encoder_helper_register_irq(phys_enc,
@@ -358,7 +357,6 @@ static void dpu_encoder_phys_cmd_irq_control(struct dpu_encoder_phys *phys_enc,
 					INTR_IDX_CTL_START);
 
 		dpu_encoder_helper_unregister_irq(phys_enc, INTR_IDX_UNDERRUN);
-		dpu_encoder_phys_cmd_control_vblank_irq(phys_enc, false);
 		dpu_encoder_helper_unregister_irq(phys_enc, INTR_IDX_PINGPONG);
 	}
 }
