@@ -174,22 +174,43 @@ static const struct kset_uevent_ops bus_uevent_ops = {
 
 static struct kset *bus_kset;
 
+struct unbind_work {
+	struct work_struct work;
+	struct device *dev;
+};
+
+void unbind_work_fn(struct work_struct *work)
+{
+	struct unbind_work *unbind_work =
+		container_of(work, struct unbind_work, work);
+
+	device_release_driver(unbind_work->dev);
+	put_device(unbind_work->dev);
+}
+
 /* Manually detach a device from its associated driver. */
 static ssize_t unbind_store(struct device_driver *drv, const char *buf,
 			    size_t count)
 {
 	struct bus_type *bus = bus_get(drv->bus);
+	struct unbind_work *unbind_work;
 	struct device *dev;
 	int err = -ENODEV;
 
 	dev = bus_find_device_by_name(bus, NULL, buf);
 	if (dev && dev->driver == drv) {
-		if (dev->parent && dev->bus->need_parent_lock)
-			device_lock(dev->parent);
-		device_release_driver(dev);
-		if (dev->parent && dev->bus->need_parent_lock)
-			device_unlock(dev->parent);
-		err = count;
+		unbind_work = kmalloc(sizeof(*unbind_work), GFP_KERNEL);
+		if (unbind_work) {
+			unbind_work->dev = dev;
+			get_device(dev);
+			INIT_WORK(&unbind_work->work, unbind_work_fn);
+
+			schedule_work(&unbind_work->work);
+
+			err = count;
+		} else {
+			err = -ENOMEM;
+		}
 	}
 	put_device(dev);
 	bus_put(bus);
