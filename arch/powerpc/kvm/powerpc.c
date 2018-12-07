@@ -496,6 +496,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	int r;
 	/* Assume we're using HV mode when the HV module is loaded */
 	int hv_enabled = kvmppc_hv_ops ? 1 : 0;
+	int kvm_on_pseries = !cpu_has_feature(CPU_FTR_HVMODE);
 
 	if (kvm) {
 		/*
@@ -543,8 +544,11 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 #ifdef CONFIG_PPC_BOOK3S_64
 	case KVM_CAP_SPAPR_TCE:
 	case KVM_CAP_SPAPR_TCE_64:
-		/* fallthrough */
+		r = 1;
+		break;
 	case KVM_CAP_SPAPR_TCE_VFIO:
+		r = !kvm_on_pseries;
+		break;
 	case KVM_CAP_PPC_RTAS:
 	case KVM_CAP_PPC_FIXUP_HCALL:
 	case KVM_CAP_PPC_ENABLE_HCALL:
