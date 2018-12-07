@@ -144,6 +144,11 @@ MODULE_PARM_DESC(lockup_action, "Action to take when controller locked up.\n"
 	"\t\tSupported: none, reboot, panic\n"
 	"\t\tDefault: none");
 
+static bool pqi_disable_irq_affinity;
+module_param(pqi_disable_irq_affinity, bool, 0644);
+MODULE_PARM_DESC(pqi_disable_irq_affinity,
+	"\t\tTurn off managed irq affinity. Allows smp_affinity to be changed.");
+
 static char *raid_levels[] = {
 	"RAID-0",
 	"RAID-4",
@@ -3276,10 +3281,14 @@ static void pqi_free_irqs(struct pqi_ctrl_info *ctrl_info)
 static int pqi_enable_msix_interrupts(struct pqi_ctrl_info *ctrl_info)
 {
 	int num_vectors_enabled;
+	unsigned int flags = PCI_IRQ_MSIX;
+
+	if (!pqi_disable_irq_affinity)
+		flags |= PCI_IRQ_AFFINITY;
 
 	num_vectors_enabled = pci_alloc_irq_vectors(ctrl_info->pci_dev,
 			PQI_MIN_MSIX_VECTORS, ctrl_info->num_queue_groups,
-			PCI_IRQ_MSIX | PCI_IRQ_AFFINITY);
+			flags);
 	if (num_vectors_enabled < 0) {
 		dev_err(&ctrl_info->pci_dev->dev,
 			"MSI-X init failed with error %d\n",
@@ -5507,7 +5516,11 @@ static int pqi_map_queues(struct Scsi_Host *shost)
 {
 	struct pqi_ctrl_info *ctrl_info = shost_to_hba(shost);
 
-	return blk_mq_pci_map_queues(&shost->tag_set, ctrl_info->pci_dev, 0);
+	if (!pqi_disable_irq_affinity)
+		return blk_mq_pci_map_queues(&shost->tag_set,
+						ctrl_info->pci_dev, 0);
+	else
+		return 0;
 }
 
 static int pqi_getpciinfo_ioctl(struct pqi_ctrl_info *ctrl_info,
