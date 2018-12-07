@@ -31,6 +31,7 @@ comment "Multimedia core support"
 #
 config MEDIA_CAMERA_SUPPORT
 	bool "Cameras/video grabbers support"
+	select MEDIA_CONTROLLER
 	---help---
 	  Enable support for webcams and video grabbers.
 
@@ -38,6 +39,7 @@ config MEDIA_CAMERA_SUPPORT
 
 config MEDIA_ANALOG_TV_SUPPORT
 	bool "Analog TV support"
+	select MEDIA_CONTROLLER
 	---help---
 	  Enable analog TV support.
 
@@ -50,6 +52,7 @@ config MEDIA_ANALOG_TV_SUPPORT
 
 config MEDIA_DIGITAL_TV_SUPPORT
 	bool "Digital TV support"
+	select MEDIA_CONTROLLER
 	---help---
 	  Enable digital TV support.
 
@@ -95,7 +98,6 @@ source "drivers/media/cec/Kconfig"
 
 config MEDIA_CONTROLLER
 	bool "Media Controller API"
-	depends on MEDIA_CAMERA_SUPPORT || MEDIA_ANALOG_TV_SUPPORT || MEDIA_DIGITAL_TV_SUPPORT
 	---help---
 	  Enable the media controller API used to query media devices internal
 	  topology and configure it dynamically.
@@ -119,16 +121,11 @@ config VIDEO_DEV
 	tristate
 	depends on MEDIA_SUPPORT
 	depends on MEDIA_CAMERA_SUPPORT || MEDIA_ANALOG_TV_SUPPORT || MEDIA_RADIO_SUPPORT || MEDIA_SDR_SUPPORT
+	select VIDEO_V4L2_SUBDEV_API if MEDIA_CONTROLLER
 	default y
 
 config VIDEO_V4L2_SUBDEV_API
-	bool "V4L2 sub-device userspace API"
-	depends on VIDEO_DEV && MEDIA_CONTROLLER
-	---help---
-	  Enables the V4L2 sub-device pad-level userspace API used to configure
-	  video format, size and frame rate between hardware blocks.
-
-	  This API is mostly used by camera interfaces in embedded platforms.
+	bool
 
 source "drivers/media/v4l2-core/Kconfig"
 
