@@ -151,7 +151,7 @@ static  int sharp_ls_get_gpio_of(struct device *dev, int index, int val,
 
 	*gpiod = NULL;
 
-	gd = devm_gpiod_get_index(dev, desc, index, GPIOD_OUT_LOW);
+	gd = devm_gpiod_get_index_optional(dev, desc, index, GPIOD_OUT_LOW);
 	if (IS_ERR(gd))
 		return PTR_ERR(gd);
 
