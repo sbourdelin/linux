@@ -1452,8 +1452,13 @@ static int bpf_prog_load(union bpf_attr *attr, union bpf_attr __user *uattr)
 	if (CHECK_ATTR(BPF_PROG_LOAD))
 		return -EINVAL;
 
-	if (attr->prog_flags & ~BPF_F_STRICT_ALIGNMENT)
+	if (attr->prog_flags & ~(BPF_F_STRICT_ALIGNMENT | BPF_F_ANY_ALIGNMENT))
 		return -EINVAL;
+
+	if (!IS_ENABLED(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) &&
+	    (attr->prog_flags & BPF_F_ANY_ALIGNMENT) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 
 	/* copy eBPF program license from user space */
 	if (strncpy_from_user(license, u64_to_user_ptr(attr->license),
@@ -1555,6 +1560,8 @@ static int bpf_prog_load(union bpf_attr *attr, union bpf_attr __user *uattr)
 	return err;
 
 free_used_maps:
+	kvfree(prog->aux->func_info);
+	btf_put(prog->aux->btf);
 	bpf_prog_kallsyms_del_subprogs(prog);
 	free_used_maps(prog->aux);
 free_prog:
@@ -2076,6 +2083,12 @@ static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 				return -EFAULT;
 	}
 
+	if ((info.func_info_cnt || info.func_info_rec_size) &&
+	    info.func_info_rec_size != sizeof(struct bpf_func_info))
+		return -EINVAL;
+
+	info.func_info_rec_size = sizeof(struct bpf_func_info);
+
 	if (!capable(CAP_SYS_ADMIN)) {
 		info.jited_prog_len = 0;
 		info.xlated_prog_len = 0;
@@ -2219,35 +2232,23 @@ static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 		}
 	}
 
-	if (prog->aux->btf) {
-		u32 krec_size = sizeof(struct bpf_func_info);
-		u32 ucnt, urec_size;
-
+	if (prog->aux->btf)
 		info.btf_id = btf_id(prog->aux->btf);
 
-		ucnt = info.func_info_cnt;
-		info.func_info_cnt = prog->aux->func_info_cnt;
-		urec_size = info.func_info_rec_size;
-		info.func_info_rec_size = krec_size;
-		if (ucnt) {
-			/* expect passed-in urec_size is what the kernel expects */
-			if (urec_size != info.func_info_rec_size)
-				return -EINVAL;
+	ulen = info.func_info_cnt;
+	info.func_info_cnt = prog->aux->func_info_cnt;
+	if (info.func_info_cnt && ulen) {
+		if (bpf_dump_raw_ok()) {
+			char __user *user_finfo;
 
-			if (bpf_dump_raw_ok()) {
-				char __user *user_finfo;
-
-				user_finfo = u64_to_user_ptr(info.func_info);
-				ucnt = min_t(u32, info.func_info_cnt, ucnt);
-				if (copy_to_user(user_finfo, prog->aux->func_info,
-						 krec_size * ucnt))
-					return -EFAULT;
-			} else {
-				info.func_info_cnt = 0;
-			}
+			user_finfo = u64_to_user_ptr(info.func_info);
+			ulen = min_t(u32, info.func_info_cnt, ulen);
+			if (copy_to_user(user_finfo, prog->aux->func_info,
+					 info.func_info_rec_size * ulen))
+				return -EFAULT;
+		} else {
+			info.func_info = 0;
 		}
-	} else {
-		info.func_info_cnt = 0;
 	}
 
 done:
