@@ -32,6 +32,13 @@
 #define ENOTSUPP 524
 #endif
 
+#ifdef HAVE_GENHDR
+# include "autoconf.h"
+#else
+/* fallback to all features enabled */
+# define CONFIG_BPF_STREAM_PARSER 1
+#endif
+
 static int map_flags;
 
 #define CHECK(condition, tag, format...) ({				\
@@ -588,6 +595,7 @@ static void test_stackmap(int task, void *data)
 	close(fd);
 }
 
+#ifdef CONFIG_BPF_STREAM_PARSER
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
@@ -1079,6 +1087,7 @@ out_sockmap:
 	close(fd);
 	exit(1);
 }
+#endif
 
 #define MAP_SIZE (32 * 1024)
 
@@ -1541,7 +1550,9 @@ static void run_all_tests(void)
 	test_arraymap_percpu_many_keys();
 
 	test_devmap(0, NULL);
+#ifdef CONFIG_BPF_STREAM_PARSER
 	test_sockmap(0, NULL);
+#endif
 
 	test_map_large();
 	test_map_parallel();
