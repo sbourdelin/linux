@@ -64,6 +64,9 @@ static int __get_platform_enable_guc(struct drm_i915_private *i915)
 
 	/* Any platform specific fine-tuning can be done here */
 
+	/* HAX: Do not enable GuC submission in auto mode */
+	enable_guc &= ~ENABLE_GUC_SUBMISSION;
+
 	return enable_guc;
 }
 
