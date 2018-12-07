@@ -1182,7 +1182,7 @@ static int at91_twi_runtime_resume(struct device *dev)
 	return clk_prepare_enable(twi_dev->clk);
 }
 
-static int at91_twi_suspend_noirq(struct device *dev)
+static int at91_twi_suspend(struct device *dev)
 {
 	if (!pm_runtime_status_suspended(dev))
 		at91_twi_runtime_suspend(dev);
@@ -1190,7 +1190,7 @@ static int at91_twi_suspend_noirq(struct device *dev)
 	return 0;
 }
 
-static int at91_twi_resume_noirq(struct device *dev)
+static int at91_twi_resume(struct device *dev)
 {
 	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
 	int ret;
@@ -1210,8 +1210,8 @@ static int at91_twi_resume_noirq(struct device *dev)
 }
 
 static const struct dev_pm_ops at91_twi_pm = {
-	.suspend_noirq	= at91_twi_suspend_noirq,
-	.resume_noirq	= at91_twi_resume_noirq,
+	.suspend	= at91_twi_suspend,
+	.resume		= at91_twi_resume,
 	.runtime_suspend	= at91_twi_runtime_suspend,
 	.runtime_resume		= at91_twi_runtime_resume,
 };
