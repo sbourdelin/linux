@@ -385,7 +385,7 @@ void hv_process_channel_removal(struct vmbus_channel *channel)
 	struct vmbus_channel *primary_channel;
 	unsigned long flags;
 
-	BUG_ON(!mutex_is_locked(&vmbus_connection.channel_mutex));
+	lockdep_assert_held(&vmbus_connection.channel_mutex);
 	BUG_ON(!channel->rescind);
 
 	if (channel->target_cpu != get_cpu()) {

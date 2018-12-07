@@ -307,7 +307,7 @@ struct vmbus_channel *relid2channel(u32 relid)
 	struct list_head *cur, *tmp;
 	struct vmbus_channel *cur_sc;
 
-	BUG_ON(!mutex_is_locked(&vmbus_connection.channel_mutex));
+	lockdep_assert_held(&vmbus_connection.channel_mutex);
 
 	list_for_each_entry(channel, &vmbus_connection.chn_list, listentry) {
 		if (channel->offermsg.child_relid == relid) {
