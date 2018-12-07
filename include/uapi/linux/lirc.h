@@ -218,6 +218,7 @@ enum rc_proto {
 	RC_PROTO_XMP		= 21,
 	RC_PROTO_CEC		= 22,
 	RC_PROTO_IMON		= 23,
+	RC_PROTO_RCMM		= 24,
 };
 
 #endif

@@ -70,6 +70,8 @@ static const struct {
 	[RC_PROTO_CEC] = { .name = "cec", .repeat_period = 0 },
 	[RC_PROTO_IMON] = { .name = "imon",
 		.scancode_bits = 0x7fffffff, .repeat_period = 114 },
+	[RC_PROTO_RCMM] = { .name = "rcmm",
+		.scancode_bits = 0xffffffff, .repeat_period = 114 },
 };
 
 /* Used to keep track of known keymaps */
@@ -1006,6 +1008,7 @@ static const struct {
 	{ RC_PROTO_BIT_XMP,	"xmp",		"ir-xmp-decoder"	},
 	{ RC_PROTO_BIT_CEC,	"cec",		NULL			},
 	{ RC_PROTO_BIT_IMON,	"imon",		"ir-imon-decoder"	},
+	{ RC_PROTO_BIT_RCMM,	"rcmm",		"ir-rcmm-decoder"	},
 };
 
 /**

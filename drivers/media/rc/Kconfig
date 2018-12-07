@@ -133,6 +133,16 @@ config IR_IMON_DECODER
 	   remote control and you would like to use it with a raw IR
 	   receiver, or if you wish to use an encoder to transmit this IR.
 
+config IR_RCMM_DECODER
+	tristate "Enable IR raw decoder for the RC-MM protocol"
+	depends on RC_CORE
+	select BITREVERSE
+	default y
+
+	---help---
+	   Enable this option if you have IR with RC-MM protocol, and
+	   if the IR is decoded in software
+
 endif #RC_DECODERS
 
 menuconfig RC_DEVICES

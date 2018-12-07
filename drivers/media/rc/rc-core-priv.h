@@ -131,6 +131,11 @@ struct ir_raw_event_ctrl {
 		unsigned int bits;
 		bool stick_keyboard;
 	} imon;
+	struct rcmm_dec {
+		int state;
+		unsigned count;
+		u64 bits;
+	} rcmm;
 };
 
 /* Mutex for locking raw IR processing and handler change */
