@@ -760,13 +760,6 @@ gen11_dsi_set_transcoder_timings(struct intel_encoder *encoder,
 	vsync_end = adjusted_mode->crtc_vsync_end;
 	vsync_shift = hsync_start - htotal / 2;
 
-	if (intel_dsi->dual_link) {
-		hactive /= 2;
-		if (intel_dsi->dual_link == DSI_DUAL_LINK_FRONT_BACK)
-			hactive += intel_dsi->pixel_overlap;
-		htotal /= 2;
-	}
-
 	/* minimum hactive as per bspec: 256 pixels */
 	if (adjusted_mode->crtc_hdisplay < 256)
 		DRM_ERROR("hactive is less then 256 pixels\n");
@@ -793,11 +786,6 @@ gen11_dsi_set_transcoder_timings(struct intel_encoder *encoder,
 
 		if (hback_porch < 16)
 			DRM_ERROR("hback porch < 16 pixels\n");
-
-		if (intel_dsi->dual_link) {
-			hsync_start /= 2;
-			hsync_end /= 2;
-		}
 
 		for_each_dsi_port(port, intel_dsi->ports) {
 			dsi_trans = dsi_port_to_transcoder(port);
@@ -842,6 +830,64 @@ gen11_dsi_set_transcoder_timings(struct intel_encoder *encoder,
 		dsi_trans = dsi_port_to_transcoder(port);
 		I915_WRITE(VSYNCSHIFT(dsi_trans), vsync_shift);
 	}
+}
+
+static
+void
+gen11_dsi_calc_transcoder_timings(struct intel_encoder *encoder,
+				 const struct intel_crtc_state *pipe_config)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
+	struct drm_display_mode *adjusted_mode =
+					&pipe_config->base.adjusted_mode;
+	enum port port;
+	enum transcoder dsi_trans;
+	/* horizontal timings */
+	u16 htotal, hactive, hsync_start, hsync_end, hsync_size;
+	u16 hfront_porch, hback_porch;
+	/* vertical timings */
+	u16 vtotal, vactive, vsync_start, vsync_end, vsync_shift;
+
+	hactive = adjusted_mode->crtc_hdisplay;
+	htotal = adjusted_mode->crtc_htotal;
+	hsync_start = adjusted_mode->crtc_hsync_start;
+	hsync_end = adjusted_mode->crtc_hsync_end;
+	hsync_size  = hsync_end - hsync_start;
+	hfront_porch = (adjusted_mode->crtc_hsync_start -
+			adjusted_mode->crtc_hdisplay);
+	hback_porch = (adjusted_mode->crtc_htotal -
+		       adjusted_mode->crtc_hsync_end);
+	vactive = adjusted_mode->crtc_vdisplay;
+	vtotal = adjusted_mode->crtc_vtotal;
+	vsync_start = adjusted_mode->crtc_vsync_start;
+	vsync_end = adjusted_mode->crtc_vsync_end;
+	vsync_shift = hsync_start - htotal / 2;
+
+	if (intel_dsi->dual_link) {
+		hactive /= 2;
+		if (intel_dsi->dual_link == DSI_DUAL_LINK_FRONT_BACK)
+			hactive += intel_dsi->pixel_overlap;
+		htotal /= 2;
+	}
+
+	/* TRANS_HSYNC register to be programmed only for video mode */
+	if (intel_dsi->operation_mode == INTEL_DSI_VIDEO_MODE) {
+
+		if (intel_dsi->dual_link) {
+			hsync_start /= 2;
+			hsync_end /= 2;
+		}
+	}
+
+	adjusted_mode->crtc_hdisplay = hactive;
+	adjusted_mode->crtc_htotal = htotal;
+	adjusted_mode->crtc_hsync_start = hsync_start;
+	adjusted_mode->crtc_hsync_end = hsync_end;
+	adjusted_mode->crtc_vdisplay = vactive;
+	adjusted_mode->crtc_vtotal = vtotal;
+	adjusted_mode->crtc_vsync_start = vsync_start;
+	adjusted_mode->crtc_vsync_end = vsync_end;
 }
 
 static void gen11_dsi_enable_transcoder(struct intel_encoder *encoder)
@@ -1169,6 +1215,9 @@ static void gen11_dsi_get_config(struct intel_encoder *encoder,
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
+	struct drm_display_mode *adjusted_mode =
+					&pipe_config->base.adjusted_mode;
+	u32 bpp = mipi_dsi_pixel_format_to_bpp(intel_dsi->pixel_format);
 	u32 pll_id;
 
 	/* FIXME: adapt icl_ddi_clock_get() for DSI and use that? */
@@ -1176,6 +1225,19 @@ static void gen11_dsi_get_config(struct intel_encoder *encoder,
 	pipe_config->port_clock = cnl_calc_wrpll_link(dev_priv, pll_id);
 	pipe_config->base.adjusted_mode.crtc_clock = intel_dsi->pclk;
 	pipe_config->output_types |= BIT(INTEL_OUTPUT_DSI);
+	pipe_config->pipe_bpp = bpp;
+
+	if (intel_dsi->dual_link) {
+		adjusted_mode->crtc_hblank_start = adjusted_mode->crtc_hdisplay * 2;
+		adjusted_mode->crtc_hblank_end = adjusted_mode->crtc_htotal * 2;
+		adjusted_mode->crtc_vblank_start = adjusted_mode->crtc_vdisplay;
+		adjusted_mode->crtc_vblank_end = adjusted_mode->crtc_vtotal;
+	} else {
+		adjusted_mode->crtc_hblank_start = adjusted_mode->crtc_hdisplay;
+		adjusted_mode->crtc_hblank_end = adjusted_mode->crtc_htotal;
+		adjusted_mode->crtc_vblank_start = adjusted_mode->crtc_vdisplay;
+		adjusted_mode->crtc_vblank_end = adjusted_mode->crtc_vtotal;
+	}
 }
 
 static bool gen11_dsi_compute_config(struct intel_encoder *encoder,
@@ -1204,6 +1266,13 @@ static bool gen11_dsi_compute_config(struct intel_encoder *encoder,
 
 	pipe_config->clock_set = true;
 	pipe_config->port_clock = intel_dsi_bitrate(intel_dsi) / 5;
+	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
+
+	if (intel_dsi->dual_link) {
+		pipe_config->base.adjusted_mode.crtc_clock /= 2;
+	}
+
+	gen11_dsi_calc_transcoder_timings(encoder, pipe_config);
 
 	return true;
 }
