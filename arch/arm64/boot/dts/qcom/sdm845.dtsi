@@ -1598,6 +1598,11 @@
 					  <WAKE_TCS    3>,
 					  <CONTROL_TCS 1>;
 
+			qnoc: qnoc {
+				compatible = "qcom,sdm845-rsc-hlos";
+				#interconnect-cells = <1>;
+			};
+
 			rpmhcc: clock-controller {
 				compatible = "qcom,sdm845-rpmh-clk";
 				#clock-cells = <1>;
