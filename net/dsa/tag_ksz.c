@@ -39,7 +39,7 @@ static struct sk_buff *ksz_xmit(struct sk_buff *skb, struct net_device *dev)
 	int padlen;
 	u8 *tag;
 
-	padlen = (skb->len >= ETH_ZLEN) ? 0 : ETH_ZLEN - skb->len;
+	padlen = (skb->len >= VLAN_ETH_ZLEN) ? 0 : VLAN_ETH_ZLEN - skb->len;
 
 	if (skb_tailroom(skb) >= padlen + KSZ_INGRESS_TAG_LEN) {
 		/* Let dsa_slave_xmit() free skb */
