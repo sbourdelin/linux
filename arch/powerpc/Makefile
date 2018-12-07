@@ -410,6 +410,9 @@ archclean:
 
 archprepare: checkbin
 
+archheaders:
+	$(Q)$(MAKE) $(build)=arch/powerpc/kernel/syscalls all
+
 ifdef CONFIG_STACKPROTECTOR
 prepare: stack_protector_prepare
 
