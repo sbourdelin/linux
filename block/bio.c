@@ -649,6 +649,30 @@ struct bio *bio_clone_fast(struct bio *bio, gfp_t gfp_mask, struct bio_set *bs)
 EXPORT_SYMBOL(bio_clone_fast);
 
 /**
+ *	bio_set_task_prio - set bio's ioprio to task's ioprio, if any.
+ *	@bio: bio to set the ioprio of, can be NULL
+ *	@task: task of interest
+ *	@gfp_flags: allocation flags, used if allocation is necessary
+ *	@node: allocation node, used if allocation is necessary
+ */
+void bio_set_task_prio(struct bio *bio, struct task_struct *task,
+		       gfp_t gfp_flags, int node)
+{
+	struct io_context *ioc;
+
+	if (!bio)
+		return;
+
+	ioc = get_task_io_context(current, gfp_flags, node);
+	if (ioc) {
+		if (ioprio_valid(ioc->ioprio))
+			bio_set_prio(bio, ioc->ioprio);
+		put_io_context(ioc);
+	}
+}
+EXPORT_SYMBOL(bio_set_task_prio);
+
+/**
  *	bio_add_pc_page	-	attempt to add page to bio
  *	@q: the target queue
  *	@bio: destination bio
@@ -1664,15 +1688,32 @@ defer:
 }
 EXPORT_SYMBOL_GPL(bio_check_pages_dirty);
 
+void update_io_ticks(struct hd_struct *part, unsigned long now)
+{
+	unsigned long stamp;
+again:
+	stamp = READ_ONCE(part->stamp);
+	if (unlikely(stamp != now)) {
+		if (likely(cmpxchg(&part->stamp, stamp, now) == stamp)) {
+			__part_stat_add(part, io_ticks, 1);
+		}
+	}
+	if (part->partno) {
+		part = &part_to_disk(part)->part0;
+		goto again;
+	}
+}
+
 void generic_start_io_acct(struct request_queue *q, int op,
 			   unsigned long sectors, struct hd_struct *part)
 {
 	const int sgrp = op_stat_group(op);
-	int cpu = part_stat_lock();
 
-	part_round_stats(q, cpu, part);
-	part_stat_inc(cpu, part, ios[sgrp]);
-	part_stat_add(cpu, part, sectors[sgrp], sectors);
+	part_stat_lock();
+
+	update_io_ticks(part, jiffies);
+	part_stat_inc(part, ios[sgrp]);
+	part_stat_add(part, sectors[sgrp], sectors);
 	part_inc_in_flight(q, part, op_is_write(op));
 
 	part_stat_unlock();
@@ -1682,12 +1723,15 @@ EXPORT_SYMBOL(generic_start_io_acct);
 void generic_end_io_acct(struct request_queue *q, int req_op,
 			 struct hd_struct *part, unsigned long start_time)
 {
-	unsigned long duration = jiffies - start_time;
+	unsigned long now = jiffies;
+	unsigned long duration = now - start_time;
 	const int sgrp = op_stat_group(req_op);
-	int cpu = part_stat_lock();
 
-	part_stat_add(cpu, part, nsecs[sgrp], jiffies_to_nsecs(duration));
-	part_round_stats(q, cpu, part);
+	part_stat_lock();
+
+	update_io_ticks(part, now);
+	part_stat_add(part, nsecs[sgrp], jiffies_to_nsecs(duration));
+	part_stat_add(part, time_in_queue, duration);
 	part_dec_in_flight(q, part, op_is_write(req_op));
 
 	part_stat_unlock();
