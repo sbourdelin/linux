@@ -17,8 +17,8 @@ static char *pp_601(int k, int pp)
 	if (pp == 1)
 		return k ? "ROX" : "RWX";
 	if (pp == 2)
-		return k ? "RWX" : "RWX";
-	return k ? "ROX" : "ROX";
+		return "RWX";
+	return "ROX";
 }
 
 static void bat_show_601(struct seq_file *m, int idx, u32 lower, u32 upper)
