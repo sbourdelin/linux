@@ -157,7 +157,8 @@ static int fsl_guts_probe(struct platform_device *pdev)
 		of_property_read_string_index(root, "compatible", 0, &machine);
 	of_node_put(root);
 	if (machine)
-		soc_dev_attr.machine = devm_kstrdup(dev, machine, GFP_KERNEL);
+		soc_dev_attr.machine = devm_kstrdup_const(dev, machine,
+							  GFP_KERNEL);
 
 	svr = fsl_guts_get_svr();
 	soc_die = fsl_soc_die_match(svr, fsl_soc_die);
