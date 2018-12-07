@@ -1,0 +1,12 @@
+What:           /sys/kernel/uevent_features
+Date:           December 2018
+KernelVersion:  4.21
+Contact:        Linux kernel mailing list <linux-kernel@vger.kernel.org>
+Description:
+                Reading from this file returns space-separated list of
+                supported uevent features in current kernel.
+
+                Possible values:
+                        synthargs: passing additional variables for synthetic
+                                   uevents is supported (see also related
+                                   sysfs-uevent ABI documentation)
