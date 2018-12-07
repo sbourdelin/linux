@@ -1124,6 +1124,7 @@ static int at91_twi_probe(struct platform_device *pdev)
 	dev->adapter.quirks = &at91_twi_quirks;
 	dev->adapter.dev.parent = dev->dev;
 	dev->adapter.nr = pdev->id;
+	dev->adapter.bus_freq_hz = bus_clk_rate;
 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
 	dev->adapter.dev.of_node = pdev->dev.of_node;
 
