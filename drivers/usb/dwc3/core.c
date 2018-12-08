@@ -883,6 +883,39 @@ static void dwc3_set_incr_burst_type(struct dwc3 *dwc)
 }
 
 /**
+ * dwc3_enable_refclk_sof - Enable frame number tracking based on ref_clk
+ * @dwc: Pointer to our controller context structure
+ *
+ * Returns 0 on success, otherwise negative errno.
+ */
+static int dwc3_enable_refclk_sof(struct dwc3 *dwc)
+{
+	u8		refclk_period_ns;
+	u32		reg;
+
+	reg = dwc3_readl(dwc->regs, DWC3_GUCTL);
+	refclk_period_ns = DWC3_GUCTL_GET_REFCLKPER(reg);
+
+	/* Only valid for the following reference clock periods */
+	switch (refclk_period_ns) {
+	case DWC3_GUCTL_REFCLKPER_25NS:
+	case DWC3_GUCTL_REFCLKPER_41NS:
+	case DWC3_GUCTL_REFCLKPER_50NS:
+	case DWC3_GUCTL_REFCLKPER_52NS:
+	case DWC3_GUCTL_REFCLKPER_58NS:
+	case DWC3_GUCTL_REFCLKPER_62NS:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	reg = dwc3_readl(dwc->regs, DWC3_GFLADJ);
+	reg |= DWC3_GFLADJ_REFCLK_FLADJ;
+	dwc3_writel(dwc->regs, DWC3_GFLADJ, reg);
+	return 0;
+}
+
+/**
  * dwc3_core_init - Low-level initialization of DWC3 Core
  * @dwc: Pointer to our controller context structure
  *
@@ -967,6 +1000,22 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		reg &= ~DWC3_GUCTL_REFCLKPER(~0);
 		reg |= DWC3_GUCTL_REFCLKPER(dwc->refclk_period_ns);
 		dwc3_writel(dwc->regs, DWC3_GUCTL, reg);
+	}
+
+	/*
+	 * For peripheral controller, frame number tracking based on reference
+	 * clock is only introduced after DWC_usb31 version 1.80a.
+	 */
+	if (dwc->enable_refclk_sof &&
+	    (dwc->dr_mode != USB_DR_MODE_PERIPHERAL ||
+	     (dwc->dr_mode == USB_DR_MODE_PERIPHERAL &&
+	      dwc->revision >= DWC3_USB31_REVISION_180A))) {
+		ret = dwc3_enable_refclk_sof(dwc);
+		if (ret) {
+			dev_err(dwc->dev,
+				"can't enable ref_clk frame tracking\n");
+			goto err4;
+		}
 	}
 
 	/*
@@ -1261,6 +1310,8 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				"snps,usb3_lpm_capable");
 	dwc->usb2_lpm_disable = device_property_read_bool(dev,
 				"snps,usb2-lpm-disable");
+	dwc->enable_refclk_sof = device_property_read_bool(dev,
+				"snps,enable-refclk-sof");
 	device_property_read_u8(dev, "snps,refclk-period-ns",
 				&dwc->refclk_period_ns);
 	device_property_read_u8(dev, "snps,rx-thr-num-pkt-prd",

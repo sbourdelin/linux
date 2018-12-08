@@ -248,6 +248,14 @@
 /* Global User Control Register */
 #define DWC3_GUCTL_HSTINAUTORETRY	BIT(14)
 #define DWC3_GUCTL_REFCLKPER(n)		(((n) & 0x3ff) << 22)
+#define DWC3_GUCTL_GET_REFCLKPER(n)	(((n) & (0x3ff << 22)) >> 22)
+
+#define DWC3_GUCTL_REFCLKPER_25NS	25
+#define DWC3_GUCTL_REFCLKPER_41NS	41
+#define DWC3_GUCTL_REFCLKPER_50NS	50
+#define DWC3_GUCTL_REFCLKPER_52NS	52
+#define DWC3_GUCTL_REFCLKPER_58NS	58
+#define DWC3_GUCTL_REFCLKPER_62NS	62
 
 /* Global User Control 1 Register */
 #define DWC3_GUCTL1_TX_IPGAP_LINECHECK_DIS	BIT(28)
@@ -365,6 +373,7 @@
 #define DWC3_GHWPARAMS7_RAM2_DEPTH(n)	(((n) >> 16) & 0xffff)
 
 /* Global Frame Length Adjustment Register */
+#define DWC3_GFLADJ_REFCLK_FLADJ		BIT(23)
 #define DWC3_GFLADJ_30MHZ_SDBND_SEL		BIT(7)
 #define DWC3_GFLADJ_30MHZ_MASK			0x3f
 
@@ -1019,6 +1028,7 @@ struct dwc3_scratchpad_array {
  *			check during HS transmit.
  * @refclk_period_ns: if set, inform the controller this value as the reference
  *			clock period in nanoseconds.
+ * @enable_refclk_sof: set to enable frame number tracking based on the ref_clk
  * @tx_de_emphasis_quirk: set if we enable Tx de-emphasis quirk
  * @tx_de_emphasis: Tx de-emphasis value
  * 	0	- -6dB de-emphasis
@@ -1134,6 +1144,7 @@ struct dwc3 {
 #define DWC3_USB31_REVISION_120A	(0x3132302a | DWC3_REVISION_IS_DWC31)
 #define DWC3_USB31_REVISION_160A	(0x3136302a | DWC3_REVISION_IS_DWC31)
 #define DWC3_USB31_REVISION_170A	(0x3137302a | DWC3_REVISION_IS_DWC31)
+#define DWC3_USB31_REVISION_180A	(0x3138302a | DWC3_REVISION_IS_DWC31)
 
 	u32			version_type;
 
@@ -1191,6 +1202,7 @@ struct dwc3 {
 	unsigned		dis_start_transfer_quirk:1;
 	unsigned		usb3_lpm_capable:1;
 	unsigned		usb2_lpm_disable:1;
+	unsigned		enable_refclk_sof:1;
 
 	unsigned		disable_scramble_quirk:1;
 	unsigned		u2exit_lfps_quirk:1;
