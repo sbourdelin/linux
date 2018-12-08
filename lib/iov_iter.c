@@ -854,8 +854,18 @@ EXPORT_SYMBOL(_copy_from_iter_full_nocache);
 
 static inline bool page_copy_sane(struct page *page, size_t offset, size_t n)
 {
-	struct page *head = compound_head(page);
-	size_t v = n + offset + page_address(page) - page_address(head);
+	struct page *head;
+	size_t v = n + offset;
+
+	/*
+	 * Fast path if this is an order-0 page,
+	 * or if the copied area fits the first page of a compound one.
+	 */
+	if (likely(n <= v && v <= PAGE_SIZE))
+		return true;
+
+	head = compound_head(page);
+	v += (page - head) << PAGE_SHIFT;
 
 	if (likely(n <= v && v <= (PAGE_SIZE << compound_order(head))))
 		return true;
