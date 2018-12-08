@@ -962,6 +962,13 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		goto err4;
 	}
 
+	if (dwc->refclk_period_ns) {
+		reg = dwc3_readl(dwc->regs, DWC3_GUCTL);
+		reg &= ~DWC3_GUCTL_REFCLKPER(~0);
+		reg |= DWC3_GUCTL_REFCLKPER(dwc->refclk_period_ns);
+		dwc3_writel(dwc->regs, DWC3_GUCTL, reg);
+	}
+
 	/*
 	 * ENDXFER polling is available on version 3.10a and later of
 	 * the DWC_usb3 controller. It is NOT available in the
@@ -1254,6 +1261,8 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				"snps,usb3_lpm_capable");
 	dwc->usb2_lpm_disable = device_property_read_bool(dev,
 				"snps,usb2-lpm-disable");
+	device_property_read_u8(dev, "snps,refclk-period-ns",
+				&dwc->refclk_period_ns);
 	device_property_read_u8(dev, "snps,rx-thr-num-pkt-prd",
 				&rx_thr_num_pkt_prd);
 	device_property_read_u8(dev, "snps,rx-max-burst-prd",
