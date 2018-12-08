@@ -5,6 +5,7 @@
 #define _LINUX_BTF_H 1
 
 #include <linux/types.h>
+#include <uapi/linux/btf.h>
 
 struct btf;
 struct btf_type;
@@ -62,5 +63,14 @@ static inline const char *btf_name_by_offset(const struct btf *btf,
 	return NULL;
 }
 #endif
+
+static inline const struct btf_type *btf_orig_type(const struct btf *btf,
+						   const struct btf_type *t)
+{
+	while (t && BTF_INFO_KIND(t->info) == BTF_KIND_TYPEDEF)
+		t = btf_type_by_id(btf, t->type);
+
+	return t;
+}
 
 #endif
