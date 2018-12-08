@@ -3473,6 +3473,7 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 	struct ext4_extent zero_ex1, zero_ex2;
 	struct ext4_extent *ex, *abut_ex;
 	ext4_lblk_t ee_block, eof_block;
+	loff_t eof_size;
 	unsigned int ee_len, depth, map_len = map->m_len;
 	int allocated = 0, max_zeroout = 0;
 	int err = 0;
@@ -3483,7 +3484,8 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 		(unsigned long long)map->m_lblk, map_len);
 
 	sbi = EXT4_SB(inode->i_sb);
-	eof_block = (inode->i_size + inode->i_sb->s_blocksize - 1) >>
+	eof_size = min(inode->i_size, EXT4_I(inode)->i_disksize);
+	eof_block = (eof_size + inode->i_sb->s_blocksize - 1) >>
 		inode->i_sb->s_blocksize_bits;
 	if (eof_block < map->m_lblk + map_len)
 		eof_block = map->m_lblk + map_len;
@@ -3623,7 +3625,8 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 	WARN_ON(map->m_lblk < ee_block);
 	/*
 	 * It is safe to convert extent to initialized via explicit
-	 * zeroout only if extent is fully inside i_size or new_size.
+	 * zeroout only if extent is fully inside min(i_size, i_disksize)
+	 * or new_size.
 	 */
 	split_flag |= ee_block + ee_len <= eof_block ? EXT4_EXT_MAY_ZEROOUT : 0;
 
