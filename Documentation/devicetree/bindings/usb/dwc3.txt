@@ -101,6 +101,9 @@ Optional properties:
 			enable periodic ESS TX threshold.
  - snps,refclk-period-ns: if set, this value informs the controller of the
 			reference clock period in nanoseconds.
+ - snps,enable-refclk-sof: set to enable reference clock based frame number
+			tracking while in low power, allowing the controller to
+			suspend the PHY during low power states.
 
  - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be reallocated.
  - snps,incr-burst-type-adjustment: Value for INCR burst type of GSBUSCFG0
