@@ -28,10 +28,7 @@ static phandle __init olpc_dt_getsibling(phandle node)
 	const void *args[] = { (void *)node };
 	void *res[] = { &node };
 
-	if ((s32)node == -1)
-		return 0;
-
-	if (olpc_ofw("peer", args, res) || (s32)node == -1)
+	if (((s32)node == -1) || olpc_ofw("peer", args, res))
 		return 0;
 
 	return node;
