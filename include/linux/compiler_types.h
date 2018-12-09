@@ -161,6 +161,8 @@ struct ftrace_likely_data {
 #define __diag_error(compiler, version, option, comment) \
 	__diag_ ## compiler(version, error, option)
 
+#ifdef __KERNEL__
+
 #ifdef CONFIG_ENABLE_MUST_CHECK
 #define __must_check		__attribute__((__warn_unused_result__))
 #else
@@ -214,5 +216,7 @@ struct ftrace_likely_data {
  * noinline_for_stack instead.  For documentation reasons.
  */
 #define noinline_for_stack noinline
+
+#endif /* __KERNEL */
 
 #endif /* __LINUX_COMPILER_TYPES_H */
