@@ -5110,6 +5110,10 @@ static int mlx5_ib_alloc_counters(struct mlx5_ib_dev *dev)
 {
 	int err = 0;
 	int i;
+	bool is_shared;
+
+	is_shared = MLX5_CAP_GEN_64(dev->mdev, general_obj_types) &
+				MLX5_GENERAL_OBJ_TYPES_CAP_UCTX;
 
 	for (i = 0; i < dev->num_ports; i++) {
 		err = __mlx5_ib_alloc_counters(dev, &dev->port[i].cnts);
@@ -5119,8 +5123,10 @@ static int mlx5_ib_alloc_counters(struct mlx5_ib_dev *dev)
 		mlx5_ib_fill_counters(dev, dev->port[i].cnts.names,
 				      dev->port[i].cnts.offsets);
 
-		err = mlx5_core_alloc_q_counter(dev->mdev,
-						&dev->port[i].cnts.set_id);
+		err = mlx5_cmd_alloc_q_counter(dev->mdev,
+					       &dev->port[i].cnts.set_id,
+					       is_shared ?
+					       MLX5_SHARED_RESOURCE_UID : 0);
 		if (err) {
 			mlx5_ib_warn(dev,
 				     "couldn't allocate queue counter for port %d, err %d\n",
