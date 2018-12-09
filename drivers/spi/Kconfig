@@ -671,6 +671,16 @@ config SPI_STM32H7
 	  is not available, the driver automatically falls back to
 	  PIO mode.
 
+config SPI_STM32F4
+	tristate "STMicroelectronics STM32F4 SPI controller"
+	depends on ARCH_STM32 || COMPILE_TEST
+	help
+	  SPI driver for STMicroelectronics STM32F4 SoCs.
+
+	  STM32F4 SPI controller supports DMA and PIO modes. When DMA
+	  is not available, the driver automatically falls back to
+	  PIO mode.
+
 config SPI_STM32_QSPI
 	tristate "STMicroelectronics STM32 QUAD SPI controller"
 	depends on ARCH_STM32 || COMPILE_TEST
