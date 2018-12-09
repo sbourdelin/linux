@@ -1,22 +1,22 @@
 /*
- * STMicroelectronics STM32 SPI Controller driver (master mode only)
+ * STMicroelectronics STM32H7 SPI Controller driver (master mode only)
  *
  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
  * Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
  *
  * License terms: GPL V2.0.
  *
- * spi_stm32 driver is free software; you can redistribute it and/or modify it
+ * spi_stm32h7 driver is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
  *
- * spi_stm32 driver is distributed in the hope that it will be useful, but
+ * spi_stm32h7 driver is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
  * details.
  *
  * You should have received a copy of the GNU General Public License along with
- * spi_stm32 driver. If not, see <http://www.gnu.org/licenses/>.
+ * spi_stm32h7 driver. If not, see <http://www.gnu.org/licenses/>.
  */
 #include <linux/debugfs.h>
 #include <linux/clk.h>
@@ -31,7 +31,7 @@
 #include <linux/reset.h>
 #include <linux/spi/spi.h>
 
-#define DRIVER_NAME "spi_stm32"
+#define DRIVER_NAME "spi_stm32h7"
 
 /* STM32H7 SPI registers */
 #define STM32H7_SPI_CR1			0x00
@@ -1335,6 +1335,6 @@ static struct platform_driver stm32h7_spi_driver = {
 module_platform_driver(stm32h7_spi_driver);
 
 MODULE_ALIAS("platform:" DRIVER_NAME);
-MODULE_DESCRIPTION("STMicroelectronics STM32 SPI Controller driver");
+MODULE_DESCRIPTION("STMicroelectronics STM32H7 SPI Controller driver");
 MODULE_AUTHOR("Amelie Delaunay <amelie.delaunay@st.com>");
 MODULE_LICENSE("GPL v2");

@@ -661,13 +661,13 @@ config SPI_SPRD_ADI
 	help
 	  ADI driver based on SPI for Spreadtrum SoCs.
 
-config SPI_STM32
-	tristate "STMicroelectronics STM32 SPI controller"
+config SPI_STM32H7
+	tristate "STMicroelectronics STM32H7 SPI controller"
 	depends on ARCH_STM32 || COMPILE_TEST
 	help
-	  SPI driver for STMicroelectonics STM32 SoCs.
+	  SPI driver for STMicroelectronics STM32H7 SoCs.
 
-	  STM32 SPI controller supports DMA and PIO modes. When DMA
+	  STM32H7 SPI controller supports DMA and PIO modes. When DMA
 	  is not available, the driver automatically falls back to
 	  PIO mode.
 
