@@ -111,13 +111,17 @@ static int __init i8042_platform_init(void)
 	struct device_node *root = of_find_node_by_path("/");
 
 	if (!strcmp(root->name, "SUNW,JavaStation-1")) {
+		of_node_put(root);
 		/* Hardcoded values for MrCoffee.  */
 		i8042_kbd_irq = i8042_aux_irq = 13 | 0x20;
 		kbd_iobase = ioremap(0x71300060, 8);
 		if (!kbd_iobase)
 			return -ENODEV;
 	} else {
-		int err = platform_driver_register(&sparc_i8042_driver);
+		int err;
+
+		of_node_put(root);
+		err = platform_driver_register(&sparc_i8042_driver);
 		if (err)
 			return err;
 
