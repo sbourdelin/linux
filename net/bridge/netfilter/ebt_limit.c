@@ -69,6 +69,10 @@ static int ebt_limit_mt_check(const struct xt_mtchk_param *par)
 {
 	struct ebt_limit_info *info = par->matchinfo;
 
+	/* Do not reset state on unrelated table changes */
+	if (info->prev)
+		return 0;
+
 	/* Check for overflow. */
 	if (info->burst == 0 ||
 	    user2credits(info->avg * info->burst) < user2credits(info->avg)) {
@@ -105,7 +109,7 @@ static struct xt_match ebt_limit_mt_reg __read_mostly = {
 	.match		= ebt_limit_mt,
 	.checkentry	= ebt_limit_mt_check,
 	.matchsize	= sizeof(struct ebt_limit_info),
-	.usersize	= offsetof(struct ebt_limit_info, prev),
+	.usersize	= sizeof(struct ebt_limit_info),
 #ifdef CONFIG_COMPAT
 	.compatsize	= sizeof(struct ebt_compat_limit_info),
 #endif
