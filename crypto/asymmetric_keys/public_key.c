@@ -45,6 +45,7 @@ void public_key_free(struct public_key *key)
 {
 	if (key) {
 		kfree(key->key);
+		kfree(key->params);
 		kfree(key);
 	}
 }
@@ -124,6 +125,11 @@ static int software_key_query(const struct kernel_pkey_params *params,
 	if (ret < 0)
 		goto error_free_tfm;
 
+	ret = crypto_akcipher_set_params(tfm, pkey->algo, pkey->params,
+					 pkey->paramlen);
+	if (ret)
+		goto error_free_tfm;
+
 	len = crypto_akcipher_maxsize(tfm);
 	info->key_size = len * 8;
 	info->max_data_size = len;
@@ -179,6 +185,11 @@ static int software_key_eds_op(struct kernel_pkey_params *params,
 	else
 		ret = crypto_akcipher_set_pub_key(tfm,
 						  pkey->key, pkey->keylen);
+	if (ret)
+		goto error_free_req;
+
+	ret = crypto_akcipher_set_params(tfm, pkey->algo, pkey->params,
+					 pkey->paramlen);
 	if (ret)
 		goto error_free_req;
 
@@ -260,6 +271,11 @@ int public_key_verify_signature(const struct public_key *pkey,
 	else
 		ret = crypto_akcipher_set_pub_key(tfm,
 						  pkey->key, pkey->keylen);
+	if (ret)
+		goto error_free_req;
+
+	ret = crypto_akcipher_set_params(tfm, pkey->algo, pkey->params,
+					 pkey->paramlen);
 	if (ret)
 		goto error_free_req;
 
