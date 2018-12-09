@@ -140,7 +140,13 @@ extern unsigned long
 _copy_to_user(void __user *, const void *, unsigned long);
 #endif
 
-static __always_inline unsigned long __must_check
+#ifdef __CHECKER__
+#define uaccess_inline __attribute__((__noinline__))
+#else
+#define uaccess_inline __always_inline
+#endif
+
+static uaccess_inline unsigned long __must_check
 copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (likely(check_copy_size(to, n, false)))
@@ -148,7 +154,7 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 	return n;
 }
 
-static __always_inline unsigned long __must_check
+static uaccess_inline unsigned long __must_check
 copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (likely(check_copy_size(from, n, true)))
