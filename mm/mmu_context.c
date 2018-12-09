@@ -56,7 +56,6 @@ void unuse_mm(struct mm_struct *mm)
 
 	task_lock(tsk);
 	sync_mm_rss(mm);
-	tsk->mm = NULL;
 	/* active_mm is still 'mm' */
 	enter_lazy_tlb(mm, tsk);
 	task_unlock(tsk);
