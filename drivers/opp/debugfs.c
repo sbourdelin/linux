@@ -40,9 +40,9 @@ static bool opp_debug_create_supplies(struct dev_pm_opp *opp,
 				      struct dentry *pdentry)
 {
 	struct dentry *d;
-	int i;
+	int i = 0;
 
-	for (i = 0; i < opp_table->regulator_count; i++) {
+	do {
 		char name[15];
 
 		snprintf(name, sizeof(name), "supply-%d", i);
@@ -68,7 +68,9 @@ static bool opp_debug_create_supplies(struct dev_pm_opp *opp,
 		if (!debugfs_create_ulong("u_amp", S_IRUGO, d,
 					  &opp->supplies[i].u_amp))
 			return false;
-	}
+
+		i++;
+	} while (i < opp_table->regulator_count);
 
 	return true;
 }
