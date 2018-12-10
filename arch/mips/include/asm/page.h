@@ -263,4 +263,6 @@ extern int __virt_addr_valid(const volatile void *kaddr);
 #include <asm-generic/memory_model.h>
 #include <asm-generic/getorder.h>
 
+#define MAX_POSSIBLE_PHYSMEM_BITS 48
+
 #endif /* _ASM_PAGE_H */

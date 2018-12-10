@@ -80,23 +80,7 @@
  * as single (unsigned long) handle value.
  *
  * Note that object index <obj_idx> starts from 0.
- *
- * This is made more complicated by various memory models and PAE.
  */
-
-#ifndef MAX_POSSIBLE_PHYSMEM_BITS
-#ifdef MAX_PHYSMEM_BITS
-#define MAX_POSSIBLE_PHYSMEM_BITS MAX_PHYSMEM_BITS
-#else
-/*
- * If this definition of MAX_PHYSMEM_BITS is used, OBJ_INDEX_BITS will just
- * be PAGE_SHIFT
- */
-#define MAX_POSSIBLE_PHYSMEM_BITS BITS_PER_LONG
-#endif
-#endif
-
-#define _PFN_BITS		(MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
 
 /*
  * Memory for allocating for handle keeps object position by
@@ -116,6 +100,25 @@
  */
 #define OBJ_ALLOCATED_TAG 1
 #define OBJ_TAG_BITS 1
+
+/*
+ * MAX_POSSIBLE_PHYSMEM_BITS should be defined by all archs using zsmalloc:
+ * Trying to guess it from MAX_PHYSMEM_BITS, or considering it BITS_PER_LONG,
+ * proved to be wrong by not considering PAE capabilities, or using SPARSEMEM
+ * only headers, leading to bad object encoding due to object index overflow.
+ */
+#ifndef MAX_POSSIBLE_PHYSMEM_BITS
+ #define MAX_POSSIBLE_PHYSMEM_BITS BITS_PER_LONG
+ #error "MAX_POSSIBLE_PHYSMEM_BITS HAS to be defined by arch using zsmalloc";
+#else
+ #ifndef CONFIG_64BIT
+  #if (MAX_POSSIBLE_PHYSMEM_BITS >= (BITS_PER_LONG + PAGE_SHIFT - OBJ_TAG_BITS))
+   #error "MAX_POSSIBLE_PHYSMEM_BITS is wrong for this arch";
+  #endif
+ #endif
+#endif
+
+#define _PFN_BITS (MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
 #define OBJ_INDEX_BITS	(BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
 #define OBJ_INDEX_MASK	((_AC(1, UL) << OBJ_INDEX_BITS) - 1)
 

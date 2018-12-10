@@ -64,8 +64,6 @@ extern unsigned int ptrs_per_p4d;
 #define P4D_SIZE		(_AC(1, UL) << P4D_SHIFT)
 #define P4D_MASK		(~(P4D_SIZE - 1))
 
-#define MAX_POSSIBLE_PHYSMEM_BITS	52
-
 #else /* CONFIG_X86_5LEVEL */
 
 /*
@@ -153,5 +151,7 @@ extern unsigned int ptrs_per_p4d;
 #define EARLY_DYNAMIC_PAGE_TABLES	64
 
 #define PGD_KERNEL_START	((PAGE_SIZE / 2) / sizeof(pgd_t))
+
+#define MAX_POSSIBLE_PHYSMEM_BITS (pgtable_l5_enabled() ? 52 : 46)
 
 #endif /* _ASM_X86_PGTABLE_64_DEFS_H */

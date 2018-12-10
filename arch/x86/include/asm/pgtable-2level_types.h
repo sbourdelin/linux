@@ -38,4 +38,6 @@ typedef union {
 /* This covers all VMSPLIT_* and VMSPLIT_*_OPT variants */
 #define PGD_KERNEL_START	(CONFIG_PAGE_OFFSET >> PGDIR_SHIFT)
 
+#define MAX_POSSIBLE_PHYSMEM_BITS 32
+
 #endif /* _ASM_X86_PGTABLE_2LEVEL_DEFS_H */

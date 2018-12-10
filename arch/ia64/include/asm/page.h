@@ -235,4 +235,6 @@ get_order (unsigned long size)
 
 #define __HAVE_ARCH_GATE_AREA	1
 
+#define MAX_POSSIBLE_PHYSMEM_BITS 50
+
 #endif /* _ASM_IA64_PAGE_H */

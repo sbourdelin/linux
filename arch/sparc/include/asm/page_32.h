@@ -139,4 +139,6 @@ extern unsigned long pfn_base;
 #include <asm-generic/memory_model.h>
 #include <asm-generic/getorder.h>
 
+#define MAX_POSSIBLE_PHYSMEM_BITS 32
+
 #endif /* _SPARC_PAGE_H */

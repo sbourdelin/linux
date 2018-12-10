@@ -163,4 +163,6 @@ extern unsigned long PAGE_OFFSET;
 
 #include <asm-generic/getorder.h>
 
+#define MAX_POSSIBLE_PHYSMEM_BITS MAX_PHYS_ADDRESS_BITS
+
 #endif /* _SPARC64_PAGE_H */

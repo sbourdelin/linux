@@ -205,4 +205,6 @@ typedef struct page *pgtable_t;
 #define ARCH_SLAB_MINALIGN	8
 #endif
 
+#define MAX_POSSIBLE_PHYSMEM_BITS 32
+
 #endif /* __ASM_SH_PAGE_H */

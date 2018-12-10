@@ -64,4 +64,6 @@ typedef struct { pteval_t pgprot; } pgprot_t;
 #include <asm-generic/5level-fixup.h>
 #endif
 
+#define MAX_POSSIBLE_PHYSMEM_BITS CONFIG_ARM64_PA_BITS
+
 #endif	/* __ASM_PGTABLE_TYPES_H */

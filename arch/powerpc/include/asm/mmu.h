@@ -324,6 +324,8 @@ static inline u16 get_mm_addr_key(struct mm_struct *mm, unsigned long address)
 #define MAX_PHYSMEM_BITS        46
 #endif
 
+#define MAX_POSSIBLE_PHYSMEM_BITS MAX_PHYSMEM_BITS
+
 #ifdef CONFIG_PPC_BOOK3S_64
 #include <asm/book3s/64/mmu.h>
 #else /* CONFIG_PPC_BOOK3S_64 */

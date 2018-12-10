@@ -180,4 +180,6 @@ static inline int devmem_is_allowed(unsigned long pfn)
 #include <asm-generic/memory_model.h>
 #include <asm-generic/getorder.h>
 
+#define MAX_POSSIBLE_PHYSMEM_BITS CONFIG_MAX_PHYSMEM_BITS
+
 #endif /* _S390_PAGE_H */
