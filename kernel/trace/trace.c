@@ -8649,3 +8649,44 @@ __init static int tracing_set_default_clock(void)
 }
 late_initcall_sync(tracing_set_default_clock);
 #endif
+
+#ifdef CONFIG_EARLY_BOOT_FUNCTION_TRACER
+/*
+ * The early boot tracer should be the second trace array added,
+ */
+static __init struct trace_array *early_boot_trace_array(void)
+{
+	struct trace_array *tr;
+
+	if (list_empty(&ftrace_trace_arrays))
+		return NULL;
+
+	tr = list_entry(ftrace_trace_arrays.next,
+			typeof(*tr), list);
+	WARN_ON(!(tr->flags & TRACE_ARRAY_FL_GLOBAL));
+	return tr;
+}
+
+static __init int early_boot_tracer_init_tracefs(void)
+{
+	struct trace_array *tr;
+
+	if (!is_ftrace_early_boot_activated())
+		return 0;
+
+	if (instance_mkdir("early_boot"))
+		return 0;
+
+	tr = early_boot_trace_array();
+	if (!tr) {
+		pr_info("ftrace: early_boot array tracer not found\n");
+		return 0;
+	}
+	/* fill the ring buffer with early boot events */
+	ftrace_early_boot_fill_ringbuffer(tr);
+
+	return 0;
+}
+
+fs_initcall(early_boot_tracer_init_tracefs);
+#endif /* CONFIG_EARLY_BOOT_FUNCTION_TRACER */

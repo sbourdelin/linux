@@ -151,7 +151,21 @@ EXPORT_SYMBOL(mcount)
 #ifdef CONFIG_DYNAMIC_FTRACE
 
 ENTRY(function_hook)
+# ifdef CONFIG_EARLY_BOOT_FUNCTION_TRACER
+	cmpq $ftrace_stub, ftrace_early_boot_trace_function
+	jnz early_boot_trace
+
+early_boot_stub:
 	retq
+
+early_boot_trace:
+	save_mcount_regs
+	call *ftrace_early_boot_trace_function
+	restore_mcount_regs
+	jmp early_boot_stub
+# else
+	retq
+# endif
 ENDPROC(function_hook)
 
 ENTRY(ftrace_caller)

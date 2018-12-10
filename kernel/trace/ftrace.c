@@ -65,6 +65,11 @@
 #define FTRACE_HASH_DEFAULT_BITS 10
 #define FTRACE_HASH_MAX_BITS 12
 
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+extern unsigned long __start_mcount_loc[];
+extern unsigned long __stop_mcount_loc[];
+#endif
+
 #ifdef CONFIG_DYNAMIC_FTRACE
 #define INIT_OPS_HASH(opsname)	\
 	.func_hash		= &opsname.local_hash,			\
@@ -6126,10 +6131,10 @@ void __init ftrace_free_init_mem(void)
 
 void __init ftrace_init(void)
 {
-	extern unsigned long __start_mcount_loc[];
-	extern unsigned long __stop_mcount_loc[];
 	unsigned long count, flags;
 	int ret;
+
+    ftrace_early_boot_shutdown();
 
 	local_irq_save(flags);
 	ret = ftrace_dyn_arch_init();
@@ -7095,3 +7100,288 @@ void ftrace_graph_exit_task(struct task_struct *t)
 	kfree(ret_stack);
 }
 #endif
+
+
+#ifdef CONFIG_EARLY_BOOT_FUNCTION_TRACER
+
+#define EARLY_BOOT_BUFF_LEN ((1 << CONFIG_EARLY_BOOT_FTRACE_BUF_SHIFT) / \
+					sizeof(struct ftrace_early_boot_entry))
+
+struct ftrace_early_boot_entry {
+	unsigned long ip;
+	unsigned long parent_ip;
+	unsigned long long timestamp;
+};
+/*
+ * Only CPU0 is running in early stage, no need to have per-cpu buffer
+ */
+static struct ftrace_early_boot_entry ftrace_early_boot_entries[EARLY_BOOT_BUFF_LEN] __initdata;
+static const unsigned long EARLY_BOOT_BUFF_MAX __initconst = EARLY_BOOT_BUFF_LEN;
+static unsigned long early_boot_entries_count __initdata;
+static char tmp_cmdline[COMMAND_LINE_SIZE] __initdata;
+static bool ftrace_early_boot_activated __initdata = false;
+
+#ifdef CONFIG_DYNAMIC_FTRACE
+ftrace_func_t ftrace_early_boot_trace_function __read_mostly = ftrace_stub;
+#else
+# define ftrace_early_boot_trace_function ftrace_trace_function
+#endif
+
+inline bool __init is_ftrace_early_boot_activated(void)
+{
+	return ftrace_early_boot_activated;
+}
+
+static inline __init void ftrace_early_boot_disable(void)
+{
+	ftrace_early_boot_trace_function = ftrace_stub;
+}
+
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+#define EARLY_BOOT_FILTER_LEN ((1 << CONFIG_EARLY_BOOT_FTRACE_FILTER_SHIFT) / \
+					sizeof(unsigned long))
+
+struct ftrace_early_boot_filtering {
+	unsigned long list[EARLY_BOOT_FILTER_LEN];
+	char buf[COMMAND_LINE_SIZE];
+	int size;
+};
+
+static const unsigned long EARLY_BOOT_FILTER_MAX __initconst = EARLY_BOOT_FILTER_LEN;
+static struct ftrace_early_boot_filtering ftrace_data_notrace __initdata;
+static struct ftrace_early_boot_filtering ftrace_data_filter __initdata;
+
+static __init int ftrace_early_boot_filter_has_addr(unsigned long addr,
+	unsigned long *filter, int *size)
+{
+	int i;
+
+	for (i = 0; i < *size; i++) {
+		if (filter[i] == addr)
+			return 1;
+	}
+	return 0;
+}
+
+static __init int
+ftrace_early_boot_match_record(unsigned long ip, struct ftrace_glob *func_g)
+{
+	char str[KSYM_SYMBOL_LEN];
+	char *modname;
+
+	kallsyms_lookup(ip, NULL, NULL, &modname, str);
+	return ftrace_match(str, func_g);
+}
+
+static __init void
+ftrace_early_boot_regex(char *func, unsigned long *filter, int *size)
+{
+	struct ftrace_glob func_g = { .type = MATCH_FULL };
+	unsigned long *start = __start_mcount_loc;
+	unsigned long *end = __stop_mcount_loc;
+	unsigned long count;
+	unsigned long addr;
+	unsigned long *p;
+	int clear_filter = 0;
+
+	count = end - start;
+
+	if (!count)
+		return;
+
+	if (func) {
+		func_g.type = filter_parse_regex(func, strlen(func), &func_g.search,
+						 &clear_filter);
+		func_g.len = strlen(func_g.search);
+	}
+
+	p = start;
+	while (p < end) {
+		addr = ftrace_call_adjust(*p++);
+		if (!addr)
+			continue;
+
+		if ((*size) > EARLY_BOOT_FILTER_MAX)
+			return;
+
+		if (ftrace_early_boot_match_record(addr, &func_g)) {
+			if (!ftrace_early_boot_filter_has_addr(addr, filter, size))
+				filter[(*size)++] = addr;
+		}
+	}
+}
+
+static __init int ftrace_addr_compare(const void *a, const void *b)
+{
+	if (*(unsigned long *)a > *(unsigned long *)b)
+		return 1;
+	if (*(unsigned long *)a < *(unsigned long *)b)
+		return -1;
+
+	return 0;
+}
+
+static __init void ftrace_addr_swap(void *a, void *b, int size)
+{
+	unsigned long t = *(unsigned long *)a;
+	*(unsigned long *)a = *(unsigned long *)b;
+	*(unsigned long *)b = t;
+}
+
+static __init int set_ftrace_early_boot_filtering(void *data, char *str)
+{
+	struct ftrace_early_boot_filtering *ftrace_data = data;
+	char *func;
+	char *buf;
+
+	if (!ftrace_data)
+		return 0;
+	buf = ftrace_data->buf;
+	strlcpy(buf, str, COMMAND_LINE_SIZE);
+
+	while (buf) {
+		func = strsep(&buf, ",");
+		ftrace_early_boot_regex(func, ftrace_data->list, &ftrace_data->size);
+	}
+	/* sort filter to use binary search on it */
+	sort(ftrace_data->list, ftrace_data->size,
+		sizeof(unsigned long), ftrace_addr_compare, ftrace_addr_swap);
+
+	return 1;
+}
+
+#define ftrace_early_boot_bsearch_addr(addr, data) bsearch(&addr, data.list,\
+	data.size, sizeof(unsigned long), ftrace_addr_compare)
+
+#endif /* CONFIG_FTRACE_MCOUNT_RECORD */
+
+
+static __init void
+ftrace_function_early_boot_trace_call(unsigned long ip, unsigned long parent_ip,
+			struct ftrace_ops *op, struct pt_regs *regs)
+{
+	struct ftrace_early_boot_entry *entry;
+
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+	if (ftrace_data_notrace.size &&
+			ftrace_early_boot_bsearch_addr(ip, ftrace_data_notrace))
+		return;
+
+	if (ftrace_data_filter.size &&
+			!ftrace_early_boot_bsearch_addr(ip, ftrace_data_filter))
+		return;
+#endif
+
+	if (early_boot_entries_count >= EARLY_BOOT_BUFF_MAX) {
+		/* stop tracing when buffer is full */
+		ftrace_early_boot_disable();
+		return;
+	}
+
+	entry = &ftrace_early_boot_entries[early_boot_entries_count++];
+	entry->ip = ip;
+	entry->parent_ip = parent_ip;
+	entry->timestamp = trace_clock_local();
+}
+
+/*
+ * this will be used as __setup_param
+ */
+struct ftrace_early_boot_obs_param {
+	int (*setup_func)(void *data, char *str);
+	const char *str;
+	void *data;
+};
+static struct ftrace_early_boot_obs_param ftrace_early_boot_params[] __initdata = {
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+	{
+		.str = "ftrace_notrace",
+		.data = &ftrace_data_notrace,
+		.setup_func = set_ftrace_early_boot_filtering,
+	},
+	{
+		.str = "ftrace_filter",
+		.data = &ftrace_data_filter,
+		.setup_func = set_ftrace_early_boot_filtering,
+	},
+#endif
+};
+
+static __init int ftrace_do_early_boot_param(char *param, char *val,
+				 const char *unused, void *arg)
+{
+	int size = ARRAY_SIZE(ftrace_early_boot_params);
+	struct ftrace_early_boot_obs_param *p;
+	int i;
+
+	for (i = 0; i < size; i++) {
+		p = &ftrace_early_boot_params[i];
+		if (strcmp(param, p->str) == 0) {
+			p->setup_func(p->data, val);
+			return 0;
+		}
+	}
+	return 0;
+}
+
+void __init ftrace_early_boot_init(char *command_line)
+{
+	/* proceed only if function tracing was enabled */
+	if (!strstr(command_line, "ftrace=function "))
+		return;
+
+	strlcpy(tmp_cmdline, command_line, COMMAND_LINE_SIZE);
+	parse_args("ftrace early boot options", tmp_cmdline, NULL, 0, 0, 0, NULL,
+		ftrace_do_early_boot_param);
+
+	ftrace_early_boot_activated = true;
+	// After this point, we enable early function tracing
+	ftrace_early_boot_trace_function = ftrace_function_early_boot_trace_call;
+}
+
+void __init ftrace_early_boot_shutdown(void)
+{
+	// Disable early tracing
+	ftrace_early_boot_disable();
+
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+	pr_info("ftrace: early boot %lu entries, notrace=%d, filter=%d",
+		early_boot_entries_count,
+		ftrace_data_notrace.size,
+		ftrace_data_filter.size);
+#else
+	pr_info("ftrace: early boot %lu recorded entries", early_boot_entries_count);
+#endif
+}
+
+/*
+ * Will be passed to ringbuffer by early_boot_trace_clock
+ */
+static u64 early_timestamp __initdata;
+
+static __init u64 early_boot_trace_clock(void)
+{
+	return early_timestamp;
+}
+
+void __init ftrace_early_boot_fill_ringbuffer(void *data)
+{
+	struct ftrace_early_boot_entry *entry;
+	struct trace_array *tr = data;
+	int i;
+
+	if (ftrace_early_boot_entries <= 0)
+		return;
+
+	ring_buffer_set_clock(tr->trace_buffer.buffer, early_boot_trace_clock);
+
+	for (i = 0; i < early_boot_entries_count; i++) {
+		entry = &ftrace_early_boot_entries[i];
+		early_timestamp = entry->timestamp;
+		trace_function(tr, entry->ip, entry->parent_ip, 0, 0);
+	}
+
+	ring_buffer_set_clock(tr->trace_buffer.buffer, trace_clock_local);
+}
+
+#endif /* CONFIG_EARLY_BOOT_FUNCTION_TRACER */
