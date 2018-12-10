@@ -249,6 +249,7 @@ static int oldpiix_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 
 static const struct pci_device_id oldpiix_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, 0x1230), },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_82371AB), },
 
 	{ }	/* terminate list */
 };
