@@ -54,69 +54,6 @@ static struct gss_api_mech gss_kerberos_mech;	/* forward declaration */
 
 static const struct gss_krb5_enctype supported_gss_krb5_enctypes[] = {
 	/*
-	 * DES (All DES enctypes are mapped to the same gss functionality)
-	 */
-	{
-	  .etype = ENCTYPE_DES_CBC_RAW,
-	  .ctype = CKSUMTYPE_RSA_MD5,
-	  .name = "des-cbc-crc",
-	  .encrypt_name = "cbc(des)",
-	  .cksum_name = "md5",
-	  .encrypt = krb5_encrypt,
-	  .decrypt = krb5_decrypt,
-	  .mk_key = NULL,
-	  .signalg = SGN_ALG_DES_MAC_MD5,
-	  .sealalg = SEAL_ALG_DES,
-	  .keybytes = 7,
-	  .keylength = 8,
-	  .blocksize = 8,
-	  .conflen = 8,
-	  .cksumlength = 8,
-	  .keyed_cksum = 0,
-	},
-	/*
-	 * RC4-HMAC
-	 */
-	{
-	  .etype = ENCTYPE_ARCFOUR_HMAC,
-	  .ctype = CKSUMTYPE_HMAC_MD5_ARCFOUR,
-	  .name = "rc4-hmac",
-	  .encrypt_name = "ecb(arc4)",
-	  .cksum_name = "hmac(md5)",
-	  .encrypt = krb5_encrypt,
-	  .decrypt = krb5_decrypt,
-	  .mk_key = NULL,
-	  .signalg = SGN_ALG_HMAC_MD5,
-	  .sealalg = SEAL_ALG_MICROSOFT_RC4,
-	  .keybytes = 16,
-	  .keylength = 16,
-	  .blocksize = 1,
-	  .conflen = 8,
-	  .cksumlength = 8,
-	  .keyed_cksum = 1,
-	},
-	/*
-	 * 3DES
-	 */
-	{
-	  .etype = ENCTYPE_DES3_CBC_RAW,
-	  .ctype = CKSUMTYPE_HMAC_SHA1_DES3,
-	  .name = "des3-hmac-sha1",
-	  .encrypt_name = "cbc(des3_ede)",
-	  .cksum_name = "hmac(sha1)",
-	  .encrypt = krb5_encrypt,
-	  .decrypt = krb5_decrypt,
-	  .mk_key = gss_krb5_des3_make_key,
-	  .signalg = SGN_ALG_HMAC_SHA1_DES3_KD,
-	  .sealalg = SEAL_ALG_DES3KD,
-	  .keybytes = 21,
-	  .keylength = 24,
-	  .blocksize = 8,
-	  .conflen = 8,
-	  .cksumlength = 20,
-	  .keyed_cksum = 1,
-	},
-	/*
 	 * AES128
 	 */
 	{
@@ -227,15 +164,6 @@ get_key(const void *p, const void *end,
 	if (IS_ERR(p))
 		goto out_err;
 
-	switch (alg) {
-	case ENCTYPE_DES_CBC_CRC:
-	case ENCTYPE_DES_CBC_MD4:
-	case ENCTYPE_DES_CBC_MD5:
-		/* Map all these key types to ENCTYPE_DES_CBC_RAW */
-		alg = ENCTYPE_DES_CBC_RAW;
-		break;
-	}
-
 	if (!supported_gss_krb5_enctype(alg)) {
 		printk(KERN_WARNING "gss_kerberos_mech: unsupported "
 			"encryption key algorithm %d\n", alg);
@@ -271,81 +199,6 @@ out_err:
 	return p;
 }
 
-static int
-gss_import_v1_context(const void *p, const void *end, struct krb5_ctx *ctx)
-{
-	u32 seq_send;
-	int tmp;
-
-	p = simple_get_bytes(p, end, &ctx->initiate, sizeof(ctx->initiate));
-	if (IS_ERR(p))
-		goto out_err;
-
-	/* Old format supports only DES!  Any other enctype uses new format */
-	ctx->enctype = ENCTYPE_DES_CBC_RAW;
-
-	ctx->gk5e = get_gss_krb5_enctype(ctx->enctype);
-	if (ctx->gk5e == NULL) {
-		p = ERR_PTR(-EINVAL);
-		goto out_err;
-	}
-
-	/* The downcall format was designed before we completely understood
-	 * the uses of the context fields; so it includes some stuff we
-	 * just give some minimal sanity-checking, and some we ignore
-	 * completely (like the next twenty bytes): */
-	if (unlikely(p + 20 > end || p + 20 < p)) {
-		p = ERR_PTR(-EFAULT);
-		goto out_err;
-	}
-	p += 20;
-	p = simple_get_bytes(p, end, &tmp, sizeof(tmp));
-	if (IS_ERR(p))
-		goto out_err;
-	if (tmp != SGN_ALG_DES_MAC_MD5) {
-		p = ERR_PTR(-ENOSYS);
-		goto out_err;
-	}
-	p = simple_get_bytes(p, end, &tmp, sizeof(tmp));
-	if (IS_ERR(p))
-		goto out_err;
-	if (tmp != SEAL_ALG_DES) {
-		p = ERR_PTR(-ENOSYS);
-		goto out_err;
-	}
-	p = simple_get_bytes(p, end, &ctx->endtime, sizeof(ctx->endtime));
-	if (IS_ERR(p))
-		goto out_err;
-	p = simple_get_bytes(p, end, &seq_send, sizeof(seq_send));
-	if (IS_ERR(p))
-		goto out_err;
-	atomic_set(&ctx->seq_send, seq_send);
-	p = simple_get_netobj(p, end, &ctx->mech_used);
-	if (IS_ERR(p))
-		goto out_err;
-	p = get_key(p, end, ctx, &ctx->enc);
-	if (IS_ERR(p))
-		goto out_err_free_mech;
-	p = get_key(p, end, ctx, &ctx->seq);
-	if (IS_ERR(p))
-		goto out_err_free_key1;
-	if (p != end) {
-		p = ERR_PTR(-EFAULT);
-		goto out_err_free_key2;
-	}
-
-	return 0;
-
-out_err_free_key2:
-	crypto_free_sync_skcipher(ctx->seq);
-out_err_free_key1:
-	crypto_free_sync_skcipher(ctx->enc);
-out_err_free_mech:
-	kfree(ctx->mech_used.data);
-out_err:
-	return PTR_ERR(p);
-}
-
 static struct crypto_sync_skcipher *
 context_v2_alloc_cipher(struct krb5_ctx *ctx, const char *cname, u8 *key)
 {
@@ -374,124 +227,6 @@ set_cdata(u8 cdata[GSS_KRB5_K5CLENGTH], u32 usage, u8 seed)
 	cdata[2] = (usage>>8)&0xff;
 	cdata[3] = usage&0xff;
 	cdata[4] = seed;
-}
-
-static int
-context_derive_keys_des3(struct krb5_ctx *ctx, gfp_t gfp_mask)
-{
-	struct xdr_netobj c, keyin, keyout;
-	u8 cdata[GSS_KRB5_K5CLENGTH];
-	u32 err;
-
-	c.len = GSS_KRB5_K5CLENGTH;
-	c.data = cdata;
-
-	keyin.data = ctx->Ksess;
-	keyin.len = ctx->gk5e->keylength;
-	keyout.len = ctx->gk5e->keylength;
-
-	/* seq uses the raw key */
-	ctx->seq = context_v2_alloc_cipher(ctx, ctx->gk5e->encrypt_name,
-					   ctx->Ksess);
-	if (ctx->seq == NULL)
-		goto out_err;
-
-	ctx->enc = context_v2_alloc_cipher(ctx, ctx->gk5e->encrypt_name,
-					   ctx->Ksess);
-	if (ctx->enc == NULL)
-		goto out_free_seq;
-
-	/* derive cksum */
-	set_cdata(cdata, KG_USAGE_SIGN, KEY_USAGE_SEED_CHECKSUM);
-	keyout.data = ctx->cksum;
-	err = krb5_derive_key(ctx->gk5e, &keyin, &keyout, &c, gfp_mask);
-	if (err) {
-		dprintk("%s: Error %d deriving cksum key\n",
-			__func__, err);
-		goto out_free_enc;
-	}
-
-	return 0;
-
-out_free_enc:
-	crypto_free_sync_skcipher(ctx->enc);
-out_free_seq:
-	crypto_free_sync_skcipher(ctx->seq);
-out_err:
-	return -EINVAL;
-}
-
-/*
- * Note that RC4 depends on deriving keys using the sequence
- * number or the checksum of a token.  Therefore, the final keys
- * cannot be calculated until the token is being constructed!
- */
-static int
-context_derive_keys_rc4(struct krb5_ctx *ctx)
-{
-	struct crypto_shash *hmac;
-	char sigkeyconstant[] = "signaturekey";
-	int slen = strlen(sigkeyconstant) + 1;	/* include null terminator */
-	struct shash_desc *desc;
-	int err;
-
-	dprintk("RPC:       %s: entered\n", __func__);
-	/*
-	 * derive cksum (aka Ksign) key
-	 */
-	hmac = crypto_alloc_shash(ctx->gk5e->cksum_name, 0, 0);
-	if (IS_ERR(hmac)) {
-		dprintk("%s: error %ld allocating hash '%s'\n",
-			__func__, PTR_ERR(hmac), ctx->gk5e->cksum_name);
-		err = PTR_ERR(hmac);
-		goto out_err;
-	}
-
-	err = crypto_shash_setkey(hmac, ctx->Ksess, ctx->gk5e->keylength);
-	if (err)
-		goto out_err_free_hmac;
-
-
-	desc = kmalloc(sizeof(*desc) + crypto_shash_descsize(hmac), GFP_NOFS);
-	if (!desc) {
-		dprintk("%s: failed to allocate hash descriptor for '%s'\n",
-			__func__, ctx->gk5e->cksum_name);
-		err = -ENOMEM;
-		goto out_err_free_hmac;
-	}
-
-	desc->tfm = hmac;
-	desc->flags = 0;
-
-	err = crypto_shash_digest(desc, sigkeyconstant, slen, ctx->cksum);
-	kzfree(desc);
-	if (err)
-		goto out_err_free_hmac;
-	/*
-	 * allocate hash, and skciphers for data and seqnum encryption
-	 */
-	ctx->enc = crypto_alloc_sync_skcipher(ctx->gk5e->encrypt_name, 0, 0);
-	if (IS_ERR(ctx->enc)) {
-		err = PTR_ERR(ctx->enc);
-		goto out_err_free_hmac;
-	}
-
-	ctx->seq = crypto_alloc_sync_skcipher(ctx->gk5e->encrypt_name, 0, 0);
-	if (IS_ERR(ctx->seq)) {
-		crypto_free_sync_skcipher(ctx->enc);
-		err = PTR_ERR(ctx->seq);
-		goto out_err_free_hmac;
-	}
-
-	dprintk("RPC:       %s: returning success\n", __func__);
-
-	err = 0;
-
-out_err_free_hmac:
-	crypto_free_shash(hmac);
-out_err:
-	dprintk("RPC:       %s: returning %d\n", __func__, err);
-	return err;
 }
 
 static int
@@ -635,9 +370,6 @@ gss_import_v2_context(const void *p, const void *end, struct krb5_ctx *ctx,
 	p = simple_get_bytes(p, end, &ctx->enctype, sizeof(ctx->enctype));
 	if (IS_ERR(p))
 		goto out_err;
-	/* Map ENCTYPE_DES3_CBC_SHA1 to ENCTYPE_DES3_CBC_RAW */
-	if (ctx->enctype == ENCTYPE_DES3_CBC_SHA1)
-		ctx->enctype = ENCTYPE_DES3_CBC_RAW;
 	ctx->gk5e = get_gss_krb5_enctype(ctx->enctype);
 	if (ctx->gk5e == NULL) {
 		dprintk("gss_kerberos_mech: unsupported krb5 enctype %u\n",
@@ -665,10 +397,6 @@ gss_import_v2_context(const void *p, const void *end, struct krb5_ctx *ctx,
 	ctx->mech_used.len = gss_kerberos_mech.gm_oid.len;
 
 	switch (ctx->enctype) {
-	case ENCTYPE_DES3_CBC_RAW:
-		return context_derive_keys_des3(ctx, gfp_mask);
-	case ENCTYPE_ARCFOUR_HMAC:
-		return context_derive_keys_rc4(ctx);
 	case ENCTYPE_AES128_CTS_HMAC_SHA1_96:
 	case ENCTYPE_AES256_CTS_HMAC_SHA1_96:
 		return context_derive_keys_new(ctx, gfp_mask);
@@ -694,11 +422,7 @@ gss_import_sec_context_kerberos(const void *p, size_t len,
 	if (ctx == NULL)
 		return -ENOMEM;
 
-	if (len == 85)
-		ret = gss_import_v1_context(p, end, ctx);
-	else
-		ret = gss_import_v2_context(p, end, ctx, gfp_mask);
-
+	ret = gss_import_v2_context(p, end, ctx, gfp_mask);
 	if (ret == 0) {
 		ctx_id->internal_ctx_id = ctx;
 		if (endtime)
