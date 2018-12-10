@@ -1467,4 +1467,7 @@ static inline int of_overlay_notifier_unregister(struct notifier_block *nb)
 
 #endif
 
+int of_free_phandle_cache(void);
+void of_populate_phandle_cache(void);
+
 #endif /* _LINUX_OF_H */

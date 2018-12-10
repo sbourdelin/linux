@@ -338,6 +338,8 @@ void post_mobility_fixup(void)
 	if (rc)
 		printk(KERN_ERR "Post-mobility activate-fw failed: %d\n", rc);
 
+	of_free_phandle_cache();
+
 	rc = pseries_devicetree_update(MIGRATION_SCOPE);
 	if (rc)
 		printk(KERN_ERR "Post-mobility device tree update "
@@ -345,6 +347,8 @@ void post_mobility_fixup(void)
 
 	/* Possibly switch to a new RFI flush type */
 	pseries_setup_rfi_flush();
+
+	of_populate_phandle_cache();
 
 	return;
 }
