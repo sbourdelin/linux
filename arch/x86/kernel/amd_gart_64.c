@@ -155,9 +155,6 @@ static void flush_gart(void)
 
 #ifdef CONFIG_IOMMU_LEAK
 /* Debugging aid for drivers that don't free their IOMMU tables */
-static int leak_trace;
-static int iommu_leak_pages = 20;
-
 static void dump_leak(void)
 {
 	static int dump;
@@ -774,16 +771,6 @@ int __init gart_iommu_init(void)
 	if (!iommu_gart_bitmap)
 		panic("Cannot allocate iommu bitmap\n");
 
-#ifdef CONFIG_IOMMU_LEAK
-	if (leak_trace) {
-		int ret;
-
-		ret = dma_debug_resize_entries(iommu_pages);
-		if (ret)
-			pr_debug("PCI-DMA: Cannot trace all the entries\n");
-	}
-#endif
-
 	/*
 	 * Out of IOMMU space handling.
 	 * Reserve some invalid pages at the beginning of the GART.
@@ -853,16 +840,6 @@ void __init gart_parse_options(char *p)
 {
 	int arg;
 
-#ifdef CONFIG_IOMMU_LEAK
-	if (!strncmp(p, "leak", 4)) {
-		leak_trace = 1;
-		p += 4;
-		if (*p == '=')
-			++p;
-		if (isdigit(*p) && get_option(&p, &arg))
-			iommu_leak_pages = arg;
-	}
-#endif
 	if (isdigit(*p) && get_option(&p, &arg))
 		iommu_size = arg;
 	if (!strncmp(p, "fullflush", 9))
