@@ -181,6 +181,18 @@ struct bio {
 	 */
 	struct blkcg_gq		*bi_blkg;
 	struct bio_issue	bi_issue;
+#ifdef CONFIG_BLK_CGROUP_IOLATENCY
+	/*
+	 * blk-iolatency measure the time a bio takes between rq_qos_throttle()
+	 * and rq_qos_done_bio().  It attributes the time to the bio that gets
+	 * the request allowing any bios that can tag along via plug merging or
+	 * bio merging to be free (from blk-iolatency's perspective). This is
+	 * different from the time a bio takes from generic_make_request() to
+	 * the end of its life.  So, this also serves as a marker for which bios
+	 * should be processed by blk-iolatency.
+	 */
+	u64			bi_start;
+#endif /* CONFIG_BLK_CGROUP_IOLATENCY */
 #endif
 	union {
 #if defined(CONFIG_BLK_DEV_INTEGRITY)

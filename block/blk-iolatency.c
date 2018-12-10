@@ -463,6 +463,8 @@ static void blkcg_iolatency_throttle(struct rq_qos *rqos, struct bio *bio)
 	if (!blk_iolatency_enabled(blkiolat))
 		return;
 
+	bio->bi_start = ktime_get_ns();
+
 	while (blkg && blkg->parent) {
 		struct iolatency_grp *iolat = blkg_to_lat(blkg);
 		if (!iolat) {
@@ -480,17 +482,11 @@ static void blkcg_iolatency_throttle(struct rq_qos *rqos, struct bio *bio)
 }
 
 static void iolatency_record_time(struct iolatency_grp *iolat,
-				  struct bio_issue *issue, u64 now,
+				  struct bio *bio, u64 now,
 				  bool issue_as_root)
 {
-	u64 start = bio_issue_time(issue);
+	u64 start = bio->bi_start;
 	u64 req_time;
-
-	/*
-	 * Have to do this so we are truncated to the correct time that our
-	 * issue is truncated to.
-	 */
-	now = __bio_issue_time(now);
 
 	if (now <= start)
 		return;
@@ -593,7 +589,7 @@ static void blkcg_iolatency_done_bio(struct rq_qos *rqos, struct bio *bio)
 	bool enabled = false;
 
 	blkg = bio->bi_blkg;
-	if (!blkg)
+	if (!blkg || !bio->bi_start)
 		return;
 
 	iolat = blkg_to_lat(bio->bi_blkg);
@@ -612,8 +608,7 @@ static void blkcg_iolatency_done_bio(struct rq_qos *rqos, struct bio *bio)
 		atomic_dec(&rqw->inflight);
 		if (!enabled || iolat->min_lat_nsec == 0)
 			goto next;
-		iolatency_record_time(iolat, &bio->bi_issue, now,
-				      issue_as_root);
+		iolatency_record_time(iolat, bio, now, issue_as_root);
 		window_start = atomic64_read(&iolat->window_start);
 		if (now > window_start &&
 		    (now - window_start) >= iolat->cur_win_nsec) {
