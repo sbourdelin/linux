@@ -266,13 +266,13 @@ SECTIONS
 	}
 #ifdef CONFIG_RELOCATABLE
 	. = ALIGN(8);
+#ifdef CONFIG_PPC32
 	.dynsym : AT(ADDR(.dynsym) - LOAD_OFFSET)
 	{
-#ifdef CONFIG_PPC32
 		__dynamic_symtab = .;
-#endif
 		*(.dynsym)
 	}
+#endif
 	.dynamic : AT(ADDR(.dynamic) - LOAD_OFFSET)
 	{
 		__dynamic_start = .;
@@ -392,5 +392,8 @@ SECTIONS
 		*(.hash .gnu.hash)
 		*(.interp)
 		*(.dynstr)
+#ifndef CONFIG_PPC32
+		*(.dynsym)
+#endif
 	}
 }
