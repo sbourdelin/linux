@@ -313,11 +313,14 @@ struct scatterlist *rds_message_alloc_sgs(struct rds_message *rm, int nents)
 	struct scatterlist *sg_first = (struct scatterlist *) &rm[1];
 	struct scatterlist *sg_ret;
 
-	WARN_ON(rm->m_used_sgs + nents > rm->m_total_sgs);
-	WARN_ON(!nents);
-
-	if (rm->m_used_sgs + nents > rm->m_total_sgs)
+	if (rm->m_used_sgs + nents > rm->m_total_sgs) {
+		pr_warn("rds: alloc sgs failed! total %d used %d nents %d\n",
+			rm->m_total_sgs, rm->m_used_sgs, nents);
 		return NULL;
+	}
+
+	if (!nents)
+		pr_warn("rds: alloc sgs failed! nents 0\n");
 
 	sg_ret = &sg_first[rm->m_used_sgs];
 	sg_init_table(sg_ret, nents);
