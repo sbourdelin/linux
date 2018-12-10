@@ -5114,10 +5114,18 @@ static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
 	for (i = 0; i < BPF_REG_FP; i++)
 		cur->frame[cur->curframe]->regs[i].live = REG_LIVE_NONE;
 
-	/* all stack frames are accessible from callee, clear them all */
+	/* connect new state to parentage chain:
+	 *  - all stack frames are accessible from callee
+	 *  - even though other stack frames' registers are not accessible
+	 *    liveness must propagate through the callees' states otherwise
+	 *    not knowing the liveness callee may prune caller
+	 */
 	for (j = 0; j <= cur->curframe; j++) {
 		struct bpf_func_state *frame = cur->frame[j];
 		struct bpf_func_state *newframe = new->frame[j];
+
+		for (i = BPF_REG_6; i < BPF_REG_FP; i++)
+			frame->regs[i].parent = &newframe->regs[i];
 
 		for (i = 0; i < frame->allocated_stack / BPF_REG_SIZE; i++) {
 			frame->stack[i].spilled_ptr.live = REG_LIVE_NONE;
