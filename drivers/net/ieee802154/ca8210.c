@@ -727,14 +727,6 @@ static void ca8210_rx_done(struct cas_control *cas_ctl)
 
 	buf = cas_ctl->tx_in_buf;
 	len = buf[1] + 2;
-	if (len > CA8210_SPI_BUF_SIZE) {
-		dev_crit(
-			&priv->spi->dev,
-			"Received packet len (%d) erroneously long\n",
-			len
-		);
-		goto finish;
-	}
 
 	if (buf[0] & SPI_SYN) {
 		if (priv->sync_command_response) {
