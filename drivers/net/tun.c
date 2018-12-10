@@ -2494,12 +2494,11 @@ build:
 	skb_record_rx_queue(skb, tfile->queue_index);
 	netif_receive_skb(skb);
 
-	stats = get_cpu_ptr(tun->pcpu_stats);
+	stats = this_cpu_ptr(tun->pcpu_stats);
 	u64_stats_update_begin(&stats->syncp);
 	stats->rx_packets++;
 	stats->rx_bytes += skb->len;
 	u64_stats_update_end(&stats->syncp);
-	put_cpu_ptr(stats);
 
 	if (rxhash)
 		tun_flow_update(tun, rxhash, tfile);
