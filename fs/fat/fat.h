@@ -106,6 +106,23 @@ struct msdos_sb_info {
 
 #define FAT_CACHE_VALID	0	/* special case for valid cache */
 
+static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
+{
+	return sb->s_fs_info;
+}
+
+/*
+ * Definitions that depend on the variant of the FAT file system (i.e., whether
+ * this is FAT12, FAT16 or FAT32.
+ */
+
+#define FAT_FIRST_ENT(s, x)     ((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
+	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
+
+/* maximum number of clusters */
+#define MAX_FAT(s)      (MSDOS_SB(s)->fat_bits == 32 ? MAX_FAT32 : \
+	MSDOS_SB(s)->fat_bits == 16 ? MAX_FAT16 : MAX_FAT12)
+
 /*
  * MS-DOS file system inode data in memory
  */
@@ -136,11 +153,6 @@ struct fat_slot_info {
 	struct msdos_dir_entry *de;
 	struct buffer_head *bh;
 };
-
-static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
-{
-	return sb->s_fs_info;
-}
 
 static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
 {
