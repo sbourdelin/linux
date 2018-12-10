@@ -5542,6 +5542,21 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 			cond_resched();
 		}
 	}
+#ifdef CONFIG_SPARSEMEM
+	/*
+	 * If there is no zone spanning the rest of the section
+	 * then we should at least initialize those pages. Otherwise we
+	 * could blow up on a poisoned page in some paths which depend
+	 * on full sections being initialized (e.g. memory hotplug).
+	 */
+	if (end_pfn == max_pfn) {
+		while (end_pfn % PAGES_PER_SECTION) {
+			__init_single_page(pfn_to_page(end_pfn), end_pfn, zone,
+					   nid);
+			end_pfn++;
+		}
+	}
+#endif
 }
 
 #ifdef CONFIG_ZONE_DEVICE
