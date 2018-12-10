@@ -25,6 +25,7 @@
 #include <limits.h>
 
 #include <sys/capability.h>
+#include <tools/config.h>
 
 #include <linux/unistd.h>
 #include <linux/filter.h>
@@ -40,6 +41,9 @@
 # if defined(__i386) || defined(__x86_64) || defined(__s390x__) || defined(__aarch64__)
 #  define CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS 1
 # endif
+/* fallback to all features enabled */
+# define CONFIG_BPF_STREAM_PARSER 1
+# define CONFIG_XDP_SOCKETS 1
 #endif
 #include "bpf_rlimit.h"
 #include "bpf_rand.h"
@@ -86,6 +90,7 @@ struct bpf_test {
 	uint8_t flags;
 	__u8 data[TEST_DATA_LEN];
 	void (*fill_helper)(struct bpf_test *self);
+	bool config_disabled;
 };
 
 /* Note we want this to be 64 bit aligned so that the end of our array is
@@ -4639,6 +4644,7 @@ static struct bpf_test tests[] = {
 		.result = REJECT,
 		.errstr = "cannot pass map_type 15 into func bpf_map_lookup_elem",
 		.prog_type = BPF_PROG_TYPE_SOCK_OPS,
+		.config_disabled = !IS_BUILTIN(CONFIG_BPF_STREAM_PARSER),
 	},
 	{
 		"prevent map lookup in sockhash",
@@ -4655,6 +4661,7 @@ static struct bpf_test tests[] = {
 		.result = REJECT,
 		.errstr = "cannot pass map_type 18 into func bpf_map_lookup_elem",
 		.prog_type = BPF_PROG_TYPE_SOCK_OPS,
+		.config_disabled = !IS_BUILTIN(CONFIG_BPF_STREAM_PARSER),
 	},
 	{
 		"prevent map lookup in xskmap",
@@ -4671,6 +4678,7 @@ static struct bpf_test tests[] = {
 		.result = REJECT,
 		.errstr = "cannot pass map_type 17 into func bpf_map_lookup_elem",
 		.prog_type = BPF_PROG_TYPE_XDP,
+		.config_disabled = !IS_BUILTIN(CONFIG_XDP_SOCKETS),
 	},
 	{
 		"prevent map lookup in stack trace",
@@ -14536,6 +14544,13 @@ static int do_test(bool unpriv, unsigned int from, unsigned int to)
 
 	for (i = from; i < to; i++) {
 		struct bpf_test *test = &tests[i];
+
+		if (test->config_disabled) {
+			printf("#%d/u %s SKIP (missing required config)\n",
+			       i, test->descr);
+			skips++;
+			continue;
+		}
 
 		/* Program types that are not supported by non-root we
 		 * skip right away.
