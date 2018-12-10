@@ -24,6 +24,8 @@
 #include <linux/sched.h>
 #include <linux/sched/task_stack.h>
 #include <linux/tracehook.h>
+
+#define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
 
 enum riscv_regset {
