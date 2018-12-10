@@ -677,7 +677,7 @@ static void drm_dp_i2c_msg_write_status_update(struct drm_dp_aux_msg *msg)
 	 * rest of the message
 	 */
 	if ((msg->request & ~DP_AUX_I2C_MOT) == DP_AUX_I2C_WRITE) {
-		msg->request &= DP_AUX_I2C_MOT;
+		msg->request |= DP_AUX_I2C_MOT;
 		msg->request |= DP_AUX_I2C_WRITE_STATUS_UPDATE;
 	}
 }
