@@ -1413,7 +1413,7 @@ enum {
 	Opt_nowarn_on_error, Opt_mblk_io_submit,
 	Opt_lazytime, Opt_nolazytime, Opt_debug_want_extra_isize,
 	Opt_nomblk_io_submit, Opt_block_validity, Opt_noblock_validity,
-	Opt_inode_readahead_blks, Opt_journal_ioprio,
+	Opt_inode_readahead_blks, Opt_journal_ioprio, Opt_journal_writehint,
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 	Opt_max_dir_size_kb, Opt_nojournal_checksum, Opt_nombcache,
@@ -1489,6 +1489,7 @@ static const match_table_t tokens = {
 	{Opt_noblock_validity, "noblock_validity"},
 	{Opt_inode_readahead_blks, "inode_readahead_blks=%u"},
 	{Opt_journal_ioprio, "journal_ioprio=%u"},
+	{Opt_journal_writehint, "journal_writehint=%u"},
 	{Opt_auto_da_alloc, "auto_da_alloc=%u"},
 	{Opt_auto_da_alloc, "auto_da_alloc"},
 	{Opt_noauto_da_alloc, "noauto_da_alloc"},
@@ -1677,6 +1678,7 @@ static const struct mount_opts {
 	{Opt_journal_dev, 0, MOPT_NO_EXT2 | MOPT_GTE0},
 	{Opt_journal_path, 0, MOPT_NO_EXT2 | MOPT_STRING},
 	{Opt_journal_ioprio, 0, MOPT_NO_EXT2 | MOPT_GTE0},
+	{Opt_journal_writehint, 0, MOPT_NO_EXT2 | MOPT_GTE0},
 	{Opt_data_journal, EXT4_MOUNT_JOURNAL_DATA, MOPT_NO_EXT2 | MOPT_DATAJ},
 	{Opt_data_ordered, EXT4_MOUNT_ORDERED_DATA, MOPT_NO_EXT2 | MOPT_DATAJ},
 	{Opt_data_writeback, EXT4_MOUNT_WRITEBACK_DATA,
@@ -1718,7 +1720,8 @@ static const struct mount_opts {
 
 static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 			    substring_t *args, unsigned long *journal_devnum,
-			    unsigned int *journal_ioprio, int is_remount)
+			    unsigned int *journal_ioprio,
+			    enum rw_hint *journal_writehint, int is_remount)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	const struct mount_opts *m;
@@ -1897,6 +1900,13 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 		}
 		*journal_ioprio =
 			IOPRIO_PRIO_VALUE(IOPRIO_CLASS_BE, arg);
+	} else if (token == Opt_journal_writehint) {
+		if (arg < WRITE_LIFE_NOT_SET || arg > WRITE_LIFE_EXTREME) {
+			ext4_msg(sb, KERN_ERR, "Invalid journal write hint"
+				 " (must be 0-5)");
+			return -1;
+		}
+		*journal_writehint = arg;
 	} else if (token == Opt_test_dummy_encryption) {
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 		sbi->s_mount_flags |= EXT4_MF_TEST_DUMMY_ENCRYPTION;
@@ -1970,6 +1980,7 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 static int parse_options(char *options, struct super_block *sb,
 			 unsigned long *journal_devnum,
 			 unsigned int *journal_ioprio,
+			 enum rw_hint *journal_writehint,
 			 int is_remount)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
@@ -1990,7 +2001,8 @@ static int parse_options(char *options, struct super_block *sb,
 		args[0].to = args[0].from = NULL;
 		token = match_token(p, tokens, args);
 		if (handle_mount_opt(sb, p, token, args, journal_devnum,
-				     journal_ioprio, is_remount) < 0)
+				     journal_ioprio, journal_writehint,
+				     is_remount) < 0)
 			return 0;
 	}
 #ifdef CONFIG_QUOTA
@@ -3534,6 +3546,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	int err = 0;
 	unsigned int journal_ioprio = DEFAULT_JOURNAL_IOPRIO;
 	ext4_group_t first_not_zeroed;
+	enum rw_hint journal_writehint = WRITE_LIFE_NOT_SET;
 
 	if ((data && !orig_data) || !sbi)
 		goto out_free_base;
@@ -3694,7 +3707,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		if (!s_mount_opts)
 			goto failed_mount;
 		if (!parse_options(s_mount_opts, sb, &journal_devnum,
-				   &journal_ioprio, 0)) {
+				   &journal_ioprio, &journal_writehint, 0)) {
 			ext4_msg(sb, KERN_WARNING,
 				 "failed to parse options in superblock: %s",
 				 s_mount_opts);
@@ -3703,7 +3716,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	sbi->s_def_mount_opt = sbi->s_mount_opt;
 	if (!parse_options((char *) data, sb, &journal_devnum,
-			   &journal_ioprio, 0))
+			   &journal_ioprio, &journal_writehint, 0))
 		goto failed_mount;
 
 	if (test_opt(sb, DATA_FLAGS) == EXT4_MOUNT_JOURNAL_DATA) {
@@ -4264,6 +4277,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	set_task_ioprio(sbi->s_journal->j_task, journal_ioprio);
+
+	sbi->s_journal->j_writehint = journal_writehint;
 
 	sbi->s_journal->j_commit_callback = ext4_journal_commit_callback;
 
@@ -5120,6 +5135,7 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	int enable_quota = 0;
 	ext4_group_t g;
 	unsigned int journal_ioprio = DEFAULT_JOURNAL_IOPRIO;
+	enum rw_hint journal_writehint = WRITE_LIFE_NOT_SET;
 	int err = 0;
 #ifdef CONFIG_QUOTA
 	int i, j;
@@ -5158,7 +5174,11 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if (sbi->s_journal && sbi->s_journal->j_task->io_context)
 		journal_ioprio = sbi->s_journal->j_task->io_context->ioprio;
 
-	if (!parse_options(data, sb, NULL, &journal_ioprio, 1)) {
+	if (sbi->s_journal)
+		journal_writehint = sbi->s_journal->j_writehint;
+
+	if (!parse_options(data, sb, NULL, &journal_ioprio,
+			   &journal_writehint, 1)) {
 		err = -EINVAL;
 		goto restore_opts;
 	}
@@ -5221,6 +5241,7 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if (sbi->s_journal) {
 		ext4_init_journal_params(sb, sbi->s_journal);
 		set_task_ioprio(sbi->s_journal->j_task, journal_ioprio);
+		sbi->s_journal->j_writehint = journal_writehint;
 	}
 
 	if (*flags & SB_LAZYTIME)
