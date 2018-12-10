@@ -1098,6 +1098,9 @@ int regmap_fields_update_bits_base(struct regmap_field *field,  unsigned int id,
  * @type_reg_offset: Offset register for the irq type setting.
  * @type_rising_mask: Mask bit to configure RISING type irq.
  * @type_falling_mask: Mask bit to configure FALLING type irq.
+ * @type_level_low_mask: Mask bit to configure LEVEL_LOW type irq.
+ * @type_level_high_mask: Mask bit to configure LEVEL_HIGH type irq.
+ * @types_supported: logical OR of IRQ_TYPE_* flags indicating supported types.
  */
 struct regmap_irq {
 	unsigned int reg_offset;
@@ -1105,6 +1108,9 @@ struct regmap_irq {
 	unsigned int type_reg_offset;
 	unsigned int type_rising_mask;
 	unsigned int type_falling_mask;
+	unsigned int type_level_low_mask;
+	unsigned int type_level_high_mask;
+	unsigned int types_supported;
 };
 
 #define REGMAP_IRQ_REG(_irq, _off, _mask)		\

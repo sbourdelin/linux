@@ -30,6 +30,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 0,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[1] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE1,
@@ -37,6 +38,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 1,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[2] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE2,
@@ -44,6 +46,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 2,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[3] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE3,
@@ -51,6 +54,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 3,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[4] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE4,
@@ -58,6 +62,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 4,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[5] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE5,
@@ -65,6 +70,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 5,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[6] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE6,
@@ -72,6 +78,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 6,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 	[7] = {
 		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE7,
@@ -79,6 +86,7 @@ static const struct regmap_irq max77620_gpio_irqs[] = {
 		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
 		.reg_offset = 0,
 		.type_reg_offset = 7,
+		.types_supported = IRQ_TYPE_EDGE_BOTH;
 	},
 };
 

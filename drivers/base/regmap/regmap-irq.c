@@ -214,11 +214,17 @@ static int regmap_irq_set_type(struct irq_data *data, unsigned int type)
 	const struct regmap_irq *irq_data = irq_to_regmap_irq(d, data->hwirq);
 	int reg = irq_data->type_reg_offset / map->reg_stride;
 
-	if (!(irq_data->type_rising_mask | irq_data->type_falling_mask))
+	if ((irq_data->types_supported & type) != type)
+		return -ENOTSUPP;
+
+	if (!(irq_data->type_rising_mask | irq_data->type_falling_mask |
+	      irq_data->type_level_high_mask | irq_data->type_level_low_mask))
 		return 0;
 
 	d->type_buf[reg] &= ~(irq_data->type_falling_mask |
-					irq_data->type_rising_mask);
+			      irq_data->type_rising_mask |
+			      irq_data->type_level_low_mask |
+			      irq_data->type_level_high_mask);
 	switch (type) {
 	case IRQ_TYPE_EDGE_FALLING:
 		d->type_buf[reg] |= irq_data->type_falling_mask;
@@ -233,6 +239,13 @@ static int regmap_irq_set_type(struct irq_data *data, unsigned int type)
 					irq_data->type_rising_mask);
 		break;
 
+	case IRQ_TYPE_LEVEL_HIGH:
+		d->type_buf[reg] |= irq_data->type_level_high_mask;
+		break;
+
+	case IRQ_TYPE_LEVEL_LOW:
+		d->type_buf[reg] |= irq_data->type_level_low_mask;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -602,6 +615,8 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 
 	if (chip->num_type_reg) {
 		for (i = 0; i < chip->num_irqs; i++) {
+			if (!chip->irqs[i].types_supported)
+				continue;
 			reg = chip->irqs[i].type_reg_offset / map->reg_stride;
 			d->type_buf_def[reg] |= chip->irqs[i].type_rising_mask |
 					chip->irqs[i].type_falling_mask;
