@@ -116,12 +116,16 @@ static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
  * this is FAT12, FAT16 or FAT32.
  */
 
-#define FAT_FIRST_ENT(s, x)     ((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
-	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
+#define IS_FAT12(sbi) (sbi->fat_bits == 12)
+#define IS_FAT16(sbi) (sbi->fat_bits == 16)
+#define IS_FAT32(sbi) (sbi->fat_bits == 32)
+
+#define FAT_FIRST_ENT(s, x)     ((IS_FAT32(MSDOS_SB(s)) ? 0x0FFFFF00 : \
+	IS_FAT16(MSDOS_SB(s)) ? 0xFF00 : 0xF00) | (x))
 
 /* maximum number of clusters */
-#define MAX_FAT(s)      (MSDOS_SB(s)->fat_bits == 32 ? MAX_FAT32 : \
-	MSDOS_SB(s)->fat_bits == 16 ? MAX_FAT16 : MAX_FAT12)
+#define MAX_FAT(s)      (IS_FAT32(MSDOS_SB(s)) ? MAX_FAT32 : \
+	IS_FAT16(MSDOS_SB(s)) ? MAX_FAT16 : MAX_FAT12)
 
 /*
  * MS-DOS file system inode data in memory
@@ -269,7 +273,7 @@ static inline int fat_get_start(const struct msdos_sb_info *sbi,
 				const struct msdos_dir_entry *de)
 {
 	int cluster = le16_to_cpu(de->start);
-	if (sbi->fat_bits == 32)
+	if (IS_FAT32(sbi))
 		cluster |= (le16_to_cpu(de->starthi) << 16);
 	return cluster;
 }
