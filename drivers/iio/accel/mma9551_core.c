@@ -539,7 +539,8 @@ EXPORT_SYMBOL(mma9551_update_config_bits);
 int mma9551_gpio_config(struct i2c_client *client, enum mma9551_gpio_pin pin,
 			u8 app_id, u8 bitnum, int polarity)
 {
-	u8 reg, pol_mask, pol_val;
+	u8 reg, pol_val;
+	u8 pol_mask = 0;
 	int ret;
 
 	if (pin > mma9551_gpio_max) {
