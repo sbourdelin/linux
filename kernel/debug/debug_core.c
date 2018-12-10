@@ -703,7 +703,8 @@ kgdb_handle_exception(int evector, int signo, int ecode, struct pt_regs *regs)
 	 * reboot on panic. We don't want to get stuck waiting for input
 	 * on such systems, especially if its "just" an oops.
 	 */
-	if (signo != SIGTRAP && panic_timeout)
+	if (!IS_ENABLED(CONFIG_KGDB_ALWAYS_ENTER_ON_PANIC) &&
+	    signo != SIGTRAP && panic_timeout)
 		return 1;
 
 	memset(ks, 0, sizeof(struct kgdb_state));
@@ -843,7 +844,7 @@ static int kgdb_panic_event(struct notifier_block *self,
 	 * panic_timeout indicates the system should automatically
 	 * reboot on panic.
 	 */
-	if (panic_timeout)
+	if (!IS_ENABLED(CONFIG_KGDB_ALWAYS_ENTER_ON_PANIC) && panic_timeout)
 		return NOTIFY_DONE;
 
 	if (dbg_kdb_mode)

@@ -67,6 +67,16 @@ config KGDB_LOW_LEVEL_TRAP
          exception handler which will allow kgdb to step through a
          notify handler.
 
+config KGDB_ALWAYS_ENTER_ON_PANIC
+       bool "KGDB: Enter kgdb on panic even if reboot specified"
+       default n
+       help
+         If kgdb is enabled and the system is configured to reboot on
+         panic then there's a question of whether we should drop into
+         kgdb on panic or whether we should reboot on panic.  If you
+         say yes here then we'll enter kgdb.  If you say no here then
+         we'll reboot.
+
 config KGDB_KDB
 	bool "KGDB_KDB: include kdb frontend for kgdb"
 	default n
