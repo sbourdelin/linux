@@ -513,7 +513,6 @@ static void vhost_net_busy_poll(struct vhost_net *net,
 	struct socket *sock;
 	struct vhost_virtqueue *vq = poll_rx ? tvq : rvq;
 
-	mutex_lock_nested(&vq->mutex, poll_rx ? VHOST_NET_VQ_TX: VHOST_NET_VQ_RX);
 	vhost_disable_notify(&net->dev, vq);
 	sock = rvq->private_data;
 
@@ -543,8 +542,6 @@ static void vhost_net_busy_poll(struct vhost_net *net,
 		vhost_net_busy_poll_try_queue(net, vq);
 	else if (!poll_rx) /* On tx here, sock has no rx data. */
 		vhost_enable_notify(&net->dev, rvq);
-
-	mutex_unlock(&vq->mutex);
 }
 
 static int vhost_net_tx_get_vq_desc(struct vhost_net *net,
@@ -913,10 +910,16 @@ static void handle_tx_zerocopy(struct vhost_net *net, struct socket *sock)
 static void handle_tx(struct vhost_net *net)
 {
 	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_TX];
+	struct vhost_net_virtqueue *nvq_rx = &net->vqs[VHOST_NET_VQ_RX];
 	struct vhost_virtqueue *vq = &nvq->vq;
+	struct vhost_virtqueue *vq_rx = &nvq_rx->vq;
 	struct socket *sock;
 
+	mutex_lock_nested(&vq_rx->mutex, VHOST_NET_VQ_RX);
 	mutex_lock_nested(&vq->mutex, VHOST_NET_VQ_TX);
+	if (!vq->busyloop_timeout)
+		mutex_unlock(&vq_rx->mutex);
+
 	sock = vq->private_data;
 	if (!sock)
 		goto out;
@@ -933,6 +936,8 @@ static void handle_tx(struct vhost_net *net)
 		handle_tx_copy(net, sock);
 
 out:
+	if (vq->busyloop_timeout)
+		mutex_unlock(&vq_rx->mutex);
 	mutex_unlock(&vq->mutex);
 }
 
@@ -1060,7 +1065,9 @@ err:
 static void handle_rx(struct vhost_net *net)
 {
 	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_RX];
+	struct vhost_net_virtqueue *nvq_tx = &net->vqs[VHOST_NET_VQ_TX];
 	struct vhost_virtqueue *vq = &nvq->vq;
+	struct vhost_virtqueue *vq_tx = &nvq_tx->vq;
 	unsigned uninitialized_var(in), log;
 	struct vhost_log *vq_log;
 	struct msghdr msg = {
@@ -1086,6 +1093,9 @@ static void handle_rx(struct vhost_net *net)
 	int recv_pkts = 0;
 
 	mutex_lock_nested(&vq->mutex, VHOST_NET_VQ_RX);
+	if (vq->busyloop_timeout)
+		mutex_lock_nested(&vq_tx->mutex, VHOST_NET_VQ_TX);
+
 	sock = vq->private_data;
 	if (!sock)
 		goto out;
@@ -1200,6 +1210,8 @@ static void handle_rx(struct vhost_net *net)
 out:
 	vhost_net_signal_used(nvq);
 	mutex_unlock(&vq->mutex);
+	if (vq->busyloop_timeout)
+		mutex_unlock(&vq_tx->mutex);
 }
 
 static void handle_tx_kick(struct vhost_work *work)
