@@ -55,6 +55,7 @@ struct gpio_rcar_priv {
 #define POSNEG 0x20	/* Positive/Negative Logic Select Register */
 #define EDGLEVEL 0x24	/* Edge/level Select Register */
 #define FILONOFF 0x28	/* Chattering Prevention On/Off Register */
+#define OUTDTSEL 0x40	/* Output Data Select Register */
 #define BOTHEDGE 0x4c	/* One Edge/Both Edge Select Register */
 
 #define RCAR_MAX_GPIO_PER_BANK		32
@@ -234,6 +235,10 @@ static void gpio_rcar_config_general_input_output_mode(struct gpio_chip *chip,
 
 	/* Select Input Mode or Output Mode in INOUTSEL */
 	gpio_rcar_modify_bit(p, INOUTSEL, gpio, output);
+
+	/* Select General Output Register to output data in OUTDTSEL */
+	if (output)
+		gpio_rcar_modify_bit(p, OUTDTSEL, gpio, false);
 
 	spin_unlock_irqrestore(&p->lock, flags);
 }
