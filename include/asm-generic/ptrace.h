@@ -59,6 +59,10 @@ static inline void user_stack_pointer_set(struct pt_regs *regs,
 #define SET_FP(regs, val) (GET_FP(regs) = (val))
 #endif
 
+/*
+ * Unlike instruction_pointer and user_stack_pointer,
+ * frame_pointer is not universally available across architectures.
+ */
 static inline unsigned long frame_pointer(struct pt_regs *regs)
 {
 	return GET_FP(regs);
