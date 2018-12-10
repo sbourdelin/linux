@@ -352,11 +352,8 @@ static void free_spa(struct link *link)
 	pr_debug("Freeing SPA for %x:%x:%x\n", link->domain, link->bus,
 		link->dev);
 
-	if (spa && spa->spa_mem) {
-		free_pages((unsigned long) spa->spa_mem, spa->spa_order);
-		kfree(spa);
-		link->spa = NULL;
-	}
+	free_pages((unsigned long) spa->spa_mem, spa->spa_order);
+	kfree(spa);
 }
 
 static int alloc_link(struct pci_dev *dev, int PE_mask, struct link **out_link)
