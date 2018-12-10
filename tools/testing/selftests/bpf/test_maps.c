@@ -21,6 +21,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <linux/bpf.h>
+#include <tools/config.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -32,7 +33,15 @@
 #define ENOTSUPP 524
 #endif
 
+#ifdef HAVE_GENHDR
+# include "autoconf.h"
+#else
+/* fallback to all features enabled */
+# define CONFIG_BPF_STREAM_PARSER 1
+#endif
+
 static int map_flags;
+static int skips = 0;
 
 #define CHECK(condition, tag, format...) ({				\
 	int __ret = !!(condition);					\
@@ -40,6 +49,16 @@ static int map_flags;
 		printf("%s(%d):FAIL:%s ", __func__, __LINE__, tag);	\
 		printf(format);						\
 		exit(-1);						\
+	}								\
+})
+
+#define CHECK_CONFIG(opt) ({						\
+	if (!IS_BUILTIN(opt)) {						\
+		printf("%s SKIP "					\
+		       "(missing required config)\n",			\
+		       __func__);					\
+		skips++;						\
+		return;							\
 	}								\
 })
 
@@ -656,6 +675,8 @@ static void test_sockmap(int tasks, void *data)
 	__u32 key, value;
 	pid_t pid[tasks];
 	fd_set w;
+
+	CHECK_CONFIG(CONFIG_BPF_STREAM_PARSER);
 
 	/* Create some sockets to use with sockmap */
 	for (i = 0; i < 2; i++) {
@@ -1702,6 +1723,6 @@ int main(void)
 	map_flags = BPF_F_NO_PREALLOC;
 	run_all_tests();
 
-	printf("test_maps: OK\n");
+	printf("test_maps: OK, %d SKIPPED\n", skips);
 	return 0;
 }
