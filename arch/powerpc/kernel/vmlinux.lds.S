@@ -320,7 +320,6 @@ SECTIONS
 		DATA_DATA
 		*(.data.rel*)
 		*(.toc1)
-		*(.branch_lt)
 	}
 
 	.opd : AT(ADDR(.opd) - LOAD_OFFSET) {
@@ -392,6 +391,7 @@ SECTIONS
 		*(.hash .gnu.hash)
 		*(.interp)
 		*(.dynstr)
+		*(.branch_lt)
 #ifndef CONFIG_PPC32
 		*(.dynsym)
 #endif
