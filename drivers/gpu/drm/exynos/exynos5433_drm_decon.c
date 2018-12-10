@@ -83,14 +83,6 @@ static const enum drm_plane_type decon_win_types[WINDOWS_NR] = {
 	[CURSON_WIN] = DRM_PLANE_TYPE_CURSOR,
 };
 
-static const unsigned int capabilities[WINDOWS_NR] = {
-	0,
-	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-};
-
 static inline void decon_set_bits(struct decon_context *ctx, u32 reg, u32 mask,
 				  u32 val)
 {
@@ -314,12 +306,13 @@ static void decon_win_set_bldmod(struct decon_context *ctx, unsigned int win,
 	}
 }
 
-static void decon_win_set_pixfmt(struct decon_context *ctx, unsigned int win,
-				 struct drm_framebuffer *fb)
+static void decon_win_set_pixfmt(struct decon_context *ctx,
+				 struct exynos_drm_plane *plane)
 {
-	struct exynos_drm_plane plane = ctx->planes[win];
 	struct exynos_drm_plane_state *state =
-		to_exynos_plane_state(plane.base.state);
+		to_exynos_plane_state(plane->base.state);
+	unsigned int win = state->base.normalized_zpos + ctx->first_win;
+	struct drm_framebuffer *fb = state->base.fb;
 	unsigned int alpha = state->base.alpha;
 	unsigned int pixel_alpha;
 	unsigned long val;
@@ -402,7 +395,7 @@ static void decon_update_plane(struct exynos_drm_crtc *crtc,
 				to_exynos_plane_state(plane->base.state);
 	struct decon_context *ctx = crtc->ctx;
 	struct drm_framebuffer *fb = state->base.fb;
-	unsigned int win = plane->index;
+	unsigned int win = state->base.normalized_zpos + ctx->first_win;
 	unsigned int cpp = fb->format->cpp[0];
 	unsigned int pitch = fb->pitches[0];
 	dma_addr_t dma_addr = exynos_drm_fb_dma_addr(fb, 0);
@@ -446,25 +439,24 @@ static void decon_update_plane(struct exynos_drm_crtc *crtc,
 			| BIT_VAL(state->crtc.w * cpp, 14, 0);
 	writel(val, ctx->addr + DECON_VIDW0xADD2(win));
 
-	decon_win_set_pixfmt(ctx, win, fb);
+	decon_win_set_pixfmt(ctx, plane);
 
 	/* window enable */
 	decon_set_bits(ctx, DECON_WINCONx(win), WINCONx_ENWIN_F, ~0);
-}
-
-static void decon_disable_plane(struct exynos_drm_crtc *crtc,
-				struct exynos_drm_plane *plane)
-{
-	struct decon_context *ctx = crtc->ctx;
-	unsigned int win = plane->index;
-
-	decon_set_bits(ctx, DECON_WINCONx(win), WINCONx_ENWIN_F, 0);
 }
 
 static void decon_atomic_flush(struct exynos_drm_crtc *crtc)
 {
 	struct decon_context *ctx = crtc->ctx;
 	unsigned long flags;
+	int win = hweight32(crtc->base.state->plane_mask) + ctx->first_win;
+
+	/* disable windows corresponding to disabled planes */
+	for (; win < WINDOWS_NR; ++win) {
+		if (!readl(ctx->addr + DECON_WINCONx(win)) & WINCONx_ENWIN_F)
+			break;
+		decon_set_bits(ctx, DECON_WINCONx(win), WINCONx_ENWIN_F, 0);
+	}
 
 	spin_lock_irqsave(&ctx->vblank_lock, flags);
 
@@ -538,7 +530,7 @@ static void decon_disable(struct exynos_drm_crtc *crtc)
 	 * a destroyed buffer later.
 	 */
 	for (i = ctx->first_win; i < WINDOWS_NR; i++)
-		decon_disable_plane(crtc, &ctx->planes[i]);
+		decon_set_bits(ctx, DECON_WINCONx(i), WINCONx_ENWIN_F, 0);
 
 	decon_swreset(ctx);
 
@@ -607,7 +599,6 @@ static const struct exynos_drm_crtc_ops decon_crtc_ops = {
 	.disable_vblank		= decon_disable_vblank,
 	.atomic_begin		= decon_atomic_begin,
 	.update_plane		= decon_update_plane,
-	.disable_plane		= decon_disable_plane,
 	.mode_valid		= decon_mode_valid,
 	.atomic_flush		= decon_atomic_flush,
 };
@@ -628,7 +619,9 @@ static int decon_bind(struct device *dev, struct device *master, void *data)
 		ctx->configs[win].num_pixel_formats = ARRAY_SIZE(decon_formats);
 		ctx->configs[win].zpos = win - ctx->first_win;
 		ctx->configs[win].type = decon_win_types[win];
-		ctx->configs[win].capabilities = capabilities[win];
+		ctx->configs[win].capabilities = EXYNOS_DRM_PLANE_CAP_ZPOS
+					| EXYNOS_DRM_PLANE_CAP_WIN_BLEND
+					| EXYNOS_DRM_PLANE_CAP_PIX_BLEND;
 
 		ret = exynos_plane_init(drm_dev, &ctx->planes[win], win,
 					&ctx->configs[win]);
