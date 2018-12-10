@@ -8,6 +8,75 @@
  * Copyright (C) 2001 - 2007 Tensilica Inc.
  */
 
+#include <uapi/linux/audit.h>
+
+static inline int
+syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
+{
+	return regs->syscall;
+}
+
+static inline void
+syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
+		      unsigned int i, unsigned int n, unsigned long *args)
+{
+	switch (i) {
+	case 0:
+		if (!n--)
+			break;
+		*args++ = regs->areg[6];
+		/* fall through */
+	case 1:
+		if (!n--)
+			break;
+		*args++ = regs->areg[3];
+		/* fall through */
+	case 2:
+		if (!n--)
+			break;
+		*args++ = regs->areg[4];
+		/* fall through */
+	case 3:
+		if (!n--)
+			break;
+		*args++ = regs->areg[5];
+		/* fall through */
+	case 4:
+		if (!n--)
+			break;
+		*args++ = regs->areg[8];
+		/* fall through */
+	case 5:
+		if (!n--)
+			break;
+		*args++ = regs->areg[9];
+		/* fall through */
+	case 6:
+		if (!n--)
+			break;
+		/* fall through */
+	default:
+		BUG();
+	}
+}
+
+static inline long
+syscall_get_error(struct task_struct *task, struct pt_regs *regs)
+{
+	return IS_ERR_VALUE(regs->areg[2]) ? regs->areg[2] : 0;
+
+static inline long
+syscall_get_return_value(struct task_struct *task, struct pt_regs *regs)
+{
+	return regs->areg[2];
+}
+
+static inline int
+syscall_get_arch(void)
+{
+	return AUDIT_ARCH_XTENSA;
+}
+
 struct pt_regs;
 asmlinkage long xtensa_ptrace(long, long, long, long);
 asmlinkage long xtensa_sigreturn(struct pt_regs*);
