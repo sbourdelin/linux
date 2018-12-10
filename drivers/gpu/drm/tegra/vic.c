@@ -71,6 +71,34 @@ static int vic_runtime_suspend(struct device *dev)
 	return 0;
 }
 
+static int vic_load_firmware(struct vic *vic)
+{
+	struct host1x_client *client = &vic->client.base;
+	struct drm_device *dev = dev_get_drvdata(client->parent);
+	struct tegra_drm *tegra = dev->dev_private;
+	int err;
+
+	if (vic->falcon.data)
+		return 0;
+
+	vic->falcon.data = tegra;
+
+	err = falcon_read_firmware(&vic->falcon, vic->config->firmware);
+	if (err < 0)
+		goto err_cleanup;
+
+	err = falcon_load_firmware(&vic->falcon);
+	if (err < 0)
+		goto err_cleanup;
+
+	return 0;
+
+err_cleanup:
+	vic->falcon.data = NULL;
+
+	return err;
+}
+
 static int vic_boot(struct vic *vic)
 {
 	u32 fce_ucode_size, fce_bin_data_offset;
@@ -79,6 +107,10 @@ static int vic_boot(struct vic *vic)
 
 	if (vic->booted)
 		return 0;
+
+	err = vic_load_firmware(vic);
+	if (err < 0)
+		return err;
 
 	/* setup clockgating registers */
 	vic_writel(vic, CG_IDLE_CG_DLY_CNT(4) |
@@ -154,13 +186,6 @@ static int vic_init(struct host1x_client *client)
 		}
 
 		vic->domain = tegra->domain;
-	}
-
-	if (!vic->falcon.data) {
-		vic->falcon.data = tegra;
-		err = falcon_load_firmware(&vic->falcon);
-		if (err < 0)
-			goto detach;
 	}
 
 	vic->channel = host1x_channel_request(client->dev);
@@ -330,10 +355,6 @@ static int vic_probe(struct platform_device *pdev)
 	err = falcon_init(&vic->falcon);
 	if (err < 0)
 		return err;
-
-	err = falcon_read_firmware(&vic->falcon, vic->config->firmware);
-	if (err < 0)
-		goto exit_falcon;
 
 	platform_set_drvdata(pdev, vic);
 
