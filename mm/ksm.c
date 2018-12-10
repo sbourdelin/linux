@@ -294,6 +294,7 @@ static int ksm_nr_node_ids = 1;
 #define KSM_RUN_OFFLINE	4
 static unsigned long ksm_run = KSM_RUN_STOP;
 static void wait_while_offlining(void);
+static struct task_struct *ksm_task = NULL;
 
 static DECLARE_WAIT_QUEUE_HEAD(ksm_thread_wait);
 static DEFINE_MUTEX(ksm_thread_mutex);
@@ -2394,8 +2395,9 @@ static int ksm_scan_thread(void *nothing)
 	set_freezable();
 	set_user_nice(current, 5);
 
+	mutex_lock(&ksm_thread_mutex);
+	ksm_task = current;
 	while (!kthread_should_stop()) {
-		mutex_lock(&ksm_thread_mutex);
 		wait_while_offlining();
 		if (ksmd_should_run())
 			ksm_do_scan(ksm_thread_pages_to_scan);
@@ -2410,7 +2412,10 @@ static int ksm_scan_thread(void *nothing)
 			wait_event_freezable(ksm_thread_wait,
 				ksmd_should_run() || kthread_should_stop());
 		}
+		mutex_lock(&ksm_thread_mutex);
 	}
+	ksm_task = NULL;
+	mutex_unlock(&ksm_thread_mutex);
 	return 0;
 }
 
@@ -2823,7 +2828,11 @@ static ssize_t sleep_millisecs_store(struct kobject *kobj,
 	if (err || msecs > UINT_MAX)
 		return -EINVAL;
 
+	mutex_lock(&ksm_thread_mutex);
+	if (ksm_task)
+		wake_up_state(ksm_task, TASK_INTERRUPTIBLE);
 	ksm_thread_sleep_millisecs = msecs;
+	mutex_unlock(&ksm_thread_mutex);
 
 	return count;
 }
