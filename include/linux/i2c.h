@@ -680,6 +680,7 @@ struct i2c_adapter {
 	int timeout;			/* in jiffies */
 	int retries;
 	struct device dev;		/* the adapter device */
+	unsigned int is_suspended:1;	/* owned by the I2C core */
 
 	int nr;
 	char name[48];
@@ -760,6 +761,14 @@ static inline void
 i2c_unlock_bus(struct i2c_adapter *adapter, unsigned int flags)
 {
 	adapter->lock_ops->unlock_bus(adapter, flags);
+}
+
+static inline void i2c_mark_adapter_suspended(struct i2c_adapter *adap,
+					      bool suspended)
+{
+	i2c_lock_bus(adap, I2C_LOCK_ROOT_ADAPTER);
+	adap->is_suspended = suspended;
+	i2c_unlock_bus(adap, I2C_LOCK_ROOT_ADAPTER);
 }
 
 /*flags for the client struct: */
