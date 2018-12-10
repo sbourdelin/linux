@@ -58,22 +58,21 @@
 static int uverbs_response(struct uverbs_attr_bundle *attrs, const void *resp,
 			   size_t resp_len)
 {
-	u8 __user *cur = attrs->ucore.outbuf + resp_len;
-	u8 __user *end = attrs->ucore.outbuf + attrs->ucore.outlen;
-	int ret;
+	int ret = 0;
 
 	if (copy_to_user(attrs->ucore.outbuf, resp,
 			 min(attrs->ucore.outlen, resp_len)))
 		return -EFAULT;
 
-	/* Zero fill any extra memory that user space might have provided */
-	for (; cur < end; cur++) {
-		ret = put_user(0, cur);
-		if (ret)
-			return ret;
-	}
+	if (resp_len < attrs->ucore.outlen)
+		/*
+		 * Zero fill any extra memory that user
+		 * space might have provided.
+		 */
+		ret = clear_user(attrs->ucore.outbuf + resp_len,
+				 attrs->ucore.outlen - resp_len);
 
-	return 0;
+	return (ret) ? -EFAULT : 0;
 }
 
 /*
