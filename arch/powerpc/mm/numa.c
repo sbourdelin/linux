@@ -40,6 +40,7 @@
 #include <asm/setup.h>
 #include <asm/vdso.h>
 #include <asm/drmem.h>
+#include <asm/debugfs.h>
 
 static int numa_enabled = 1;
 
@@ -1089,6 +1090,107 @@ static long hcall_vphn(unsigned long cpu, u64 flags, __be32 *associativity)
 	return rc;
 }
 
+#ifdef CONFIG_DEBUG_FS
+static ssize_t vphn_lpar_cpu_file_read(struct file *filp, char __user *buf,
+		size_t len, loff_t *pos)
+{
+	int cpu = (long)filp->private_data;
+	__be32 associativity[VPHN_ASSOC_BUFSIZE] = {0};
+	int hwcpu = get_hard_smp_processor_id(cpu);
+	long int rc;
+
+	if (len != sizeof(associativity))
+		return -EINVAL;
+
+	rc = hcall_vphn(hwcpu, 1, associativity);
+	if (rc)
+		return -EFAULT;
+
+	rc = copy_to_user(buf, &associativity, sizeof(associativity));
+	if (rc)
+		return -EFAULT;
+
+	return sizeof(associativity);
+}
+
+static ssize_t vphn_hyp_cpu_file_read(struct file *filp, char __user *buf,
+		size_t len, loff_t *pos)
+{
+	int cpu = (long)filp->private_data;
+	__be32 associativity[VPHN_ASSOC_BUFSIZE] = {0};
+	long int rc;
+
+	if (len != sizeof(associativity))
+		return -EINVAL;
+
+	rc = hcall_vphn(cpu, 2, associativity);
+	if (rc)
+		return -EFAULT;
+
+	rc = copy_to_user(buf, &associativity, sizeof(associativity));
+	if (rc)
+		return -EFAULT;
+
+	return sizeof(associativity);
+}
+
+static const struct file_operations vphn_lpar_cpu_fops = {
+	.open		= simple_open,
+	.read		= vphn_lpar_cpu_file_read,
+	.llseek		= no_llseek,
+};
+
+static const struct file_operations vphn_hyp_cpu_fops = {
+	.open		= simple_open,
+	.read		= vphn_hyp_cpu_file_read,
+	.llseek		= no_llseek,
+};
+
+static int debug_init_vphn_entries(void)
+{
+	struct dentry *vphn_dir, *vphn_lpar_dir, *vphn_hyp_dir;
+	struct dentry *vphn_lpar_cpu_file, *vphn_hyp_cpu_file;
+	long cpu;
+	char name[10];
+
+	if (!firmware_has_feature(FW_FEATURE_SPLPAR))
+		return 0;
+
+	vphn_dir = debugfs_create_dir("vphn", powerpc_debugfs_root);
+	if (!vphn_dir) {
+		pr_warn("%s: can't create vphn debugfs root dir\n", __func__);
+		return -ENOMEM;
+	}
+
+	vphn_lpar_dir = debugfs_create_dir("lpar", vphn_dir);
+	vphn_hyp_dir = debugfs_create_dir("hyp", vphn_dir);
+	if (!vphn_lpar_dir || !vphn_hyp_dir) {
+		pr_warn("%s: can't create vphn dir\n", __func__);
+		goto err_remove_dir;
+	}
+
+	for_each_possible_cpu(cpu) {
+		sprintf(name, "cpu-%ld", cpu);
+		vphn_lpar_cpu_file = debugfs_create_file(name, 0400,
+				vphn_lpar_dir, (void *)cpu, &vphn_lpar_cpu_fops);
+		vphn_hyp_cpu_file = debugfs_create_file(name, 0400,
+				vphn_hyp_dir, (void *)cpu, &vphn_hyp_cpu_fops);
+		if (!vphn_lpar_cpu_file || !vphn_hyp_cpu_file) {
+			pr_warn("%s: can't create vphn cpu file\n", __func__);
+			goto err_remove_dir;
+		}
+	}
+
+	return 0;
+
+err_remove_dir:
+	debugfs_remove_recursive(vphn_dir);
+	return -ENOMEM;
+}
+#else
+static int debug_init_vphn_entries(void) { return 0; }
+#endif /* CONFIG_DEBUG_FS */
+
 /*
  * Change polling interval for associativity changes.
  */
@@ -1617,6 +1719,9 @@ static int topology_update_init(void)
 		topology_schedule_update();
 
 	if (!proc_create("powerpc/topology_updates", 0644, NULL, &topology_ops))
+		return -ENOMEM;
+
+	if (!debug_init_vphn_entries())
 		return -ENOMEM;
 
 	topology_inited = 1;
