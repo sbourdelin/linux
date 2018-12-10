@@ -1,4 +1,15 @@
 
+config DMA_MTK_UART
+	tristate "MediaTek SoCs APDMA support for UART"
+	depends on OF
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Support for the UART DMA engine found on MediaTek MTK SoCs.
+	  when 8250 mtk uart is enabled, and if you want to using DMA,
+	  you can enable the config. the DMA engine just only be used
+	  with MediaTek Socs.
+
 config MTK_HSDMA
 	tristate "MediaTek High-Speed DMA controller support"
 	depends on ARCH_MEDIATEK || COMPILE_TEST
