@@ -543,7 +543,7 @@ struct ufs_dev_info {
  */
 struct ufs_dev_desc {
 	u16 wmanufacturerid;
-	char model[MAX_MODEL_LEN + 1];
+	char *model;
 };
 
 /**
