@@ -91,3 +91,35 @@ Contact:	Lee Schermerhorn <lee.schermerhorn@hp.com>
 Description:
 		The node's huge page size control/query attributes.
 		See Documentation/admin-guide/mm/hugetlbpage.rst
+
+What:		/sys/devices/system/node/nodeX/primary_cpu_nodelist
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		The node list of CPUs that have primary access to this node's
+		memory. CPUs not in the list accessing this node's memory may
+		encounter a performance penalty.
+
+What:		/sys/devices/system/node/nodeX/primary_cpu_nodemask
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		The node map for CPUs that have primary access to this node's
+		memory. CPUs not in the list accessing this node's memory may
+		encounter a performance penalty.
+
+What:		/sys/devices/system/node/nodeX/primary_mem_nodelist
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		The list of memory nodes that this node has primary access.
+		Memory accesses from this node to nodes not in this list may
+		encounter a performance penalty.
+
+What:		/sys/devices/system/node/nodeX/primary_mem_nodemask
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		The map of memory nodes that this node has primary access.
+		Memory accesses from this node to nodes not in this map may
+		encounter a performance penalty.
