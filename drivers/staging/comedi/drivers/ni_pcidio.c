@@ -49,22 +49,12 @@
 
 /* defines for the PCI-DIO-32HS */
 
-#define Window_Address			4	/* W */
 #define Interrupt_And_Window_Status	4	/* R */
-#define IntStatus1				BIT(0)
-#define IntStatus2				BIT(1)
-#define WindowAddressStatus_mask		0x7c
 
 #define Master_DMA_And_Interrupt_Control 5	/* W */
-#define InterruptLine(x)			((x) & 3)
-#define OpenInt				BIT(2)
-#define Group_Status			5	/* R */
 #define DataLeft				BIT(0)
-#define Req					BIT(2)
-#define StopTrig				BIT(3)
 
 #define Group_1_Flags			6	/* R */
-#define Group_2_Flags			7	/* R */
 #define TransferReady				BIT(0)
 #define CountExpired				BIT(1)
 #define Waited					BIT(5)
@@ -75,43 +65,22 @@
   /* #define Paused */
 
 #define Group_1_First_Clear		6	/* W */
-#define Group_2_First_Clear		7	/* W */
 #define ClearWaited				BIT(3)
 #define ClearPrimaryTC				BIT(4)
 #define ClearSecondaryTC			BIT(5)
-#define DMAReset				BIT(6)
-#define FIFOReset				BIT(7)
-#define ClearAll				0xf8
 
 #define Group_1_FIFO			8	/* W */
-#define Group_2_FIFO			12	/* W */
 
 #define Transfer_Count			20
-#define Chip_ID_D			24
-#define Chip_ID_I			25
-#define Chip_ID_O			26
 #define Chip_Version			27
 #define Port_IO(x)			(28 + (x))
 #define Port_Pin_Directions(x)		(32 + (x))
 #define Port_Pin_Mask(x)		(36 + (x))
-#define Port_Pin_Polarities(x)		(40 + (x))
-
-#define Master_Clock_Routing		45
-#define RTSIClocking(x)			(((x) & 3) << 4)
 
 #define Group_1_Second_Clear		46	/* W */
-#define Group_2_Second_Clear		47	/* W */
 #define ClearExpired				BIT(0)
 
-#define Port_Pattern(x)			(48 + (x))
-
 #define Data_Path			64
-#define FIFOEnableA		BIT(0)
-#define FIFOEnableB		BIT(1)
-#define FIFOEnableC		BIT(2)
-#define FIFOEnableD		BIT(3)
-#define Funneling(x)		(((x) & 3) << 4)
-#define GroupDirection		BIT(7)
 
 #define Protocol_Register_1		65
 #define OpMode				Protocol_Register_1
@@ -120,8 +89,6 @@
 
 #define Protocol_Register_2		66
 #define ClockReg			Protocol_Register_2
-#define ClockLine(x)		(((x) & 3) << 5)
-#define InvertStopTrig		BIT(7)
 #define DataLatching(x)       (((x) & 3) << 5)
 
 #define Protocol_Register_3		67
@@ -132,27 +99,15 @@
 
 #define Protocol_Register_4		70
 #define ReqReg				Protocol_Register_4
-#define ReqConditioning(x)	(((x) & 7) << 3)
 
 #define Protocol_Register_5		71
 #define BlockMode			Protocol_Register_5
 
-#define FIFO_Control			72
-#define ReadyLevel(x)		((x) & 7)
-
 #define Protocol_Register_6		73
 #define LinePolarities			Protocol_Register_6
-#define InvertAck		BIT(0)
-#define InvertReq		BIT(1)
-#define InvertClock		BIT(2)
-#define InvertSerial		BIT(3)
-#define OpenAck		BIT(4)
-#define OpenClock		BIT(5)
 
 #define Protocol_Register_7		74
 #define AckSer				Protocol_Register_7
-#define AckLine(x)		(((x) & 3) << 2)
-#define ExchangePins		BIT(7)
 
 #define Interrupt_Control		75
   /* bits same as flags */
@@ -173,20 +128,9 @@ static inline unsigned int secondary_DMAChannel_bits(unsigned int channel)
 #define Transfer_Size_Control		77
 #define TransferWidth(x)	((x) & 3)
 #define TransferLength(x)	(((x) & 3) << 3)
-#define RequireRLevel		BIT(5)
 
 #define Protocol_Register_15		79
 #define DAQOptions			Protocol_Register_15
-#define StartSource(x)			((x) & 0x3)
-#define InvertStart				BIT(2)
-#define StopSource(x)				(((x) & 0x3) << 3)
-#define ReqStart				BIT(6)
-#define PreStart				BIT(7)
-
-#define Pattern_Detection		81
-#define DetectionMethod			BIT(0)
-#define InvertMatch				BIT(1)
-#define IE_Pattern_Detection			BIT(2)
 
 #define Protocol_Register_9		82
 #define ReqDelay			Protocol_Register_9
