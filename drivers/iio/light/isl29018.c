@@ -23,6 +23,7 @@
 #include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -95,6 +96,8 @@ struct isl29018_chip {
 	struct isl29018_scale	scale;
 	int			prox_scheme;
 	bool			suspended;
+	struct regulator	*vdd_reg;
+	struct regulator	*vdda_reg;
 };
 
 static int isl29018_set_integration_time(struct isl29018_chip *chip,
@@ -735,6 +738,34 @@ static int isl29018_probe(struct i2c_client *client,
 
 	mutex_init(&chip->lock);
 
+	chip->vdd_reg = devm_regulator_get_optional(&client->dev, "vdd");
+	if (!IS_ERR(chip->vdd_reg)) {
+		err = regulator_enable(chip->vdd_reg);
+		if (err) {
+			dev_err(&client->dev, "failed to enable VDD regulator\n");
+			return err;
+		}
+	} else {
+		err = PTR_ERR(chip->vdd_reg);
+		if (err != -ENODEV)
+			return err;
+	}
+
+	chip->vdda_reg = devm_regulator_get_optional(&client->dev, "vdda");
+	if (!IS_ERR(chip->vdda_reg)) {
+		err = regulator_enable(chip->vdda_reg);
+		if (err) {
+			dev_err(&client->dev, "failed to enable VDDA regulator\n");
+			if (!IS_ERR(chip->vdd_reg))
+				regulator_disable(chip->vdd_reg);
+			return err;
+		}
+	} else {
+		err = PTR_ERR(chip->vdda_reg);
+		if (err != -ENODEV)
+			return err;
+	}
+
 	chip->type = dev_id;
 	chip->calibscale = 1;
 	chip->ucalibscale = 0;
@@ -747,12 +778,12 @@ static int isl29018_probe(struct i2c_client *client,
 	if (IS_ERR(chip->regmap)) {
 		err = PTR_ERR(chip->regmap);
 		dev_err(&client->dev, "regmap initialization fails: %d\n", err);
-		return err;
+		goto disable_regulators;
 	}
 
 	err = isl29018_chip_init(chip);
 	if (err)
-		return err;
+		goto disable_regulators;
 
 	indio_dev->info = isl29018_chip_info_tbl[dev_id].indio_info;
 	indio_dev->channels = isl29018_chip_info_tbl[dev_id].channels;
@@ -761,13 +792,24 @@ static int isl29018_probe(struct i2c_client *client,
 	indio_dev->dev.parent = &client->dev;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
-	return devm_iio_device_register(&client->dev, indio_dev);
+	err = devm_iio_device_register(&client->dev, indio_dev);
+	if (!err)
+		return 0;
+
+disable_regulators:
+	if (!IS_ERR(chip->vdd_reg))
+		regulator_disable(chip->vdd_reg);
+	if (!IS_ERR(chip->vdda_reg))
+		regulator_disable(chip->vdda_reg);
+
+	return err;
 }
 
 #ifdef CONFIG_PM_SLEEP
 static int isl29018_suspend(struct device *dev)
 {
 	struct isl29018_chip *chip = iio_priv(dev_get_drvdata(dev));
+	int ret;
 
 	mutex_lock(&chip->lock);
 
@@ -777,6 +819,22 @@ static int isl29018_suspend(struct device *dev)
 	 * So we do not have much to do here.
 	 */
 	chip->suspended = true;
+	if (!IS_ERR(chip->vdd_reg)) {
+		ret = regulator_disable(chip->vdd_reg);
+		if (ret) {
+			dev_err(dev, "failed to disable VDD regulator\n");
+			mutex_unlock(&chip->lock);
+			return ret;
+		}
+	}
+	if (!IS_ERR(chip->vdda_reg)) {
+		ret = regulator_disable(chip->vdda_reg);
+		if (ret) {
+			dev_err(dev, "failed to disable VDDA regulator\n");
+			mutex_unlock(&chip->lock);
+			return ret;
+		}
+	}
 
 	mutex_unlock(&chip->lock);
 
@@ -789,6 +847,25 @@ static int isl29018_resume(struct device *dev)
 	int err;
 
 	mutex_lock(&chip->lock);
+
+	if (!IS_ERR(chip->vdd_reg)) {
+		err = regulator_enable(chip->vdd_reg);
+		if (err) {
+			dev_err(dev, "failed to enable VDD regulator\n");
+			mutex_unlock(&chip->lock);
+			return err;
+		}
+	}
+	if (!IS_ERR(chip->vdda_reg)) {
+		err = regulator_enable(chip->vdda_reg);
+		if (err) {
+			dev_err(dev, "failed to enable VDDA regulator\n");
+			if (!IS_ERR(chip->vdd_reg))
+				regulator_disable(chip->vdd_reg);
+			mutex_unlock(&chip->lock);
+			return err;
+		}
+	}
 
 	err = isl29018_chip_init(chip);
 	if (!err)
