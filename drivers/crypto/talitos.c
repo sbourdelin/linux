@@ -1668,8 +1668,11 @@ static struct talitos_edesc *ablkcipher_edesc_alloc(struct ablkcipher_request *
 	struct talitos_ctx *ctx = crypto_ablkcipher_ctx(cipher);
 	unsigned int ivsize = crypto_ablkcipher_ivsize(cipher);
 
+	if (ivsize)
+		memcpy(ctx->iv, areq->info, ivsize);
+
 	return talitos_edesc_alloc(ctx->dev, areq->src, areq->dst,
-				   areq->info, 0, areq->nbytes, 0, ivsize, 0,
+				   ctx->iv, 0, areq->nbytes, 0, ivsize, 0,
 				   areq->base.flags, encrypt);
 }
 
