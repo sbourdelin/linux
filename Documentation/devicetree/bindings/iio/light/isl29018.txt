@@ -15,7 +15,7 @@ Optional properties:
   Refer to interrupt-controller/interrupts.txt for generic interrupt client
   node bindings.
 
-  - vcc-supply: phandle to the regulator that provides power to the sensor.
+  - vdd-supply: phandle to the regulator that provides power to the sensor.
 
 Example:
 
