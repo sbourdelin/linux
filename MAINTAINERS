@@ -3629,6 +3629,30 @@ S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/bleung/chrome-platform.git
 F:	drivers/platform/chrome/
 
+CHROMEOS EC SUBDRIVERS
+M:	Benson Leung <bleung@chromium.org>
+M:	Enric Balletbo i Serra <enric.balletbo@collabora.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/extcon/extcon-usbc-cros-ec.txt
+F:	Documentation/devicetree/bindings/input/cros-ec-keyb.txt
+F:	Documentation/devicetree/bindings/pwm/google,cros-ec-pwm.txt
+F:	Documentation/devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt
+F:	Documentation/devicetree/bindings/mfd/cros-ec.txt
+F:	Documentation/ABI/testing/sysfs-bus-iio-cros-ec
+F:	drivers/extcon/extcon-usbc-cros-ec.c
+F:	drivers/i2c/busses/i2c-cros-ec-tunnel.c
+F:	drivers/iio/accel/cros_ec*
+F:	drivers/iio/common/cros_ec_sensors/
+F:	drivers/iio/light/cros_ec*
+F:	drivers/iio/pressure/cros_ec*
+F:	drivers/input/keyboard/cros_ec*
+F:	drivers/mfd/cros_ec*
+F:	drivers/power/supply/cros_usbpd-charger.c
+F:	drivers/pwm/pwm-cros-ec.c
+F:	drivers/rtc/rtc-cros-ec.c
+F:	include/linux/iio/common/cros_ec_sensors_core.h
+F:	include/linux/mfd/cros_ec*
+
 CIRRUS LOGIC AUDIO CODEC DRIVERS
 M:	Brian Austin <brian.austin@cirrus.com>
 M:	Paul Handrigan <Paul.Handrigan@cirrus.com>
