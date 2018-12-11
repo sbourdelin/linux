@@ -2664,10 +2664,14 @@ int rpc_clnt_setup_test_and_add_xprt(struct rpc_clnt *clnt,
 		goto out_err;
 
 	/* rpc_xprt_switch and rpc_xprt are deferrenced by add_xprt_test() */
-	xtest->add_xprt_test(clnt, xprt, xtest->data);
+	status = xtest->add_xprt_test(clnt, xprt, xtest->data);
+	if (status != 0)
+		goto out_err;
 
-	/* so that rpc_clnt_add_xprt does not call rpc_xprt_switch_add_xprt */
-	return 1;
+	xprt_put(xprt);
+	xprt_switch_put(xps);
+	/* so that rpc_clnt_add_xprt calls rpc_xprt_switch_add_xprt */
+	return 0;
 out_err:
 	xprt_put(xprt);
 	xprt_switch_put(xps);
