@@ -776,6 +776,22 @@ struct super_block *get_super_exclusive_thawed(struct block_device *bdev)
 EXPORT_SYMBOL(get_super_exclusive_thawed);
 
 /**
+ *	hold_sb - get superblock reference for active superblock
+ *	@sb: superblock to get reference for
+ *
+ *	Get reference to superblock. The caller must make sure the superblock
+ *	is currently active by other means (e.g. holding an active reference
+ * 	itself or holding namespace_sem preventing unmount).
+ */
+void hold_sb(struct super_block *sb)
+{
+	spin_lock(&sb_lock);
+	WARN_ON_ONCE(!atomic_read(&sb->s_active));
+	sb->s_count++;
+	spin_unlock(&sb_lock);
+}
+
+/**
  * get_active_super - get an active reference to the superblock of a device
  * @bdev: device to get the superblock for
  *
