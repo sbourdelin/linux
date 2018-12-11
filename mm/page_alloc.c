@@ -4129,14 +4129,14 @@ retry_cpuset:
 		 */
 		if (costly_order && (gfp_mask & __GFP_NORETRY)) {
 			/*
-			 * If compaction is deferred for high-order allocations,
-			 * it is because sync compaction recently failed. If
-			 * this is the case and the caller requested a THP
-			 * allocation, we do not want to heavily disrupt the
-			 * system, so we fail the allocation instead of entering
-			 * direct reclaim.
+			 * If compaction was skipped because of insufficient
+			 * free pages, proceed with reclaim and another
+			 * compaction attempt. If it failed for other reasons or
+			 * was deferred, do not reclaim and retry, as we do not
+			 * want to heavily disrupt the system for a costly
+			 * __GFP_NORETRY allocation such as THP.
 			 */
-			if (compact_result == COMPACT_DEFERRED)
+			if (compact_result != COMPACT_SKIPPED)
 				goto nopage;
 
 			/*
