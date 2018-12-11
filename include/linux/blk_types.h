@@ -188,6 +188,10 @@ struct bio {
 #endif
 	};
 
+#ifdef CONFIG_BLK_DEV_HW_RT_ENCRYPTION
+	void *bi_crypto_ctx;
+#endif
+
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
 
 	/*
