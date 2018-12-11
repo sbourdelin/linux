@@ -777,7 +777,7 @@ lpfc_debugfs_nvmestat_data(struct lpfc_vport *vport, char *buf, int size)
 	struct lpfc_nvme_lport *lport;
 	uint64_t data1, data2, data3;
 	uint64_t tot, totin, totout;
-	int cnt, i, maxch;
+	int cnt, i;
 	int len = 0;
 
 	if (phba->nvmet_support) {
@@ -919,10 +919,6 @@ lpfc_debugfs_nvmestat_data(struct lpfc_vport *vport, char *buf, int size)
 				atomic_read(&lport->fc4NvmeLsRequests),
 				atomic_read(&lport->fc4NvmeLsCmpls));
 
-		if (phba->cfg_nvme_io_channel < 32)
-			maxch = phba->cfg_nvme_io_channel;
-		else
-			maxch = 32;
 		totin = 0;
 		totout = 0;
 		for (i = 0; i < phba->cfg_nvme_io_channel; i++) {
