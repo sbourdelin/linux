@@ -3880,9 +3880,9 @@ static int bnxt_hwrm_do_send_msg(struct bnxt *bp, void *msg, u32 msg_len,
 	*valid = 0;
 	rc = le16_to_cpu(resp->error_code);
 	if (rc && !silent)
-		netdev_err(bp->dev, "hwrm req_type 0x%x seq id 0x%x error 0x%x\n",
-			   le16_to_cpu(resp->req_type),
-			   le16_to_cpu(resp->seq_id), rc);
+		netdev_info(bp->dev, "hwrm req_type 0x%x seq id 0x%x error 0x%x\n",
+			    le16_to_cpu(resp->req_type),
+			    le16_to_cpu(resp->seq_id), rc);
 	return rc;
 }
 
