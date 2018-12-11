@@ -1118,23 +1118,24 @@ void hfi1_dbg_ibdev_init(struct hfi1_ibdev *ibd)
 	char name[sizeof("port0counters") + 1];
 	char link[10];
 	struct hfi1_devdata *dd = dd_from_dev(ibd);
+	struct pci_dev *pdev = dd->pcidev;
 	struct hfi1_pportdata *ppd;
 	int unit = dd->unit;
 	int i, j;
 
 	if (!hfi1_dbg_root)
 		return;
-	snprintf(name, sizeof(name), "%s_%d", class_name(), unit);
+
 	snprintf(link, sizeof(link), "%d", unit);
-	ibd->hfi1_ibdev_dbg = debugfs_create_dir(name, hfi1_dbg_root);
+	ibd->hfi1_ibdev_dbg = debugfs_create_dir(pci_name(pdev), hfi1_dbg_root);
 	if (!ibd->hfi1_ibdev_dbg) {
-		pr_warn("create of %s failed\n", name);
+		pr_warn("create of %s failed\n", pci_name(pdev));
 		return;
 	}
 	ibd->hfi1_ibdev_link =
-		debugfs_create_symlink(link, hfi1_dbg_root, name);
+		debugfs_create_symlink(link, hfi1_dbg_root, pci_name(pdev));
 	if (!ibd->hfi1_ibdev_link) {
-		pr_warn("create of %s symlink failed\n", name);
+		pr_warn("create of %s symlink failed\n", pci_name(pdev));
 		return;
 	}
 	DEBUGFS_SEQ_FILE_CREATE(opcode_stats, ibd->hfi1_ibdev_dbg, ibd);
