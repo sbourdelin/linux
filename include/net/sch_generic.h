@@ -109,7 +109,13 @@ struct Qdisc {
 
 	spinlock_t		busylock ____cacheline_aligned_in_smp;
 	spinlock_t		seqlock;
-	struct rcu_head		rcu;
+	int			ifindex; /* cached interface index of parent net
+					  * device
+					  */
+	union {
+		struct rcu_head		rcu;
+		struct work_struct	work;
+	};
 };
 
 static inline void qdisc_refcount_inc(struct Qdisc *qdisc)
@@ -322,6 +328,7 @@ struct tcf_proto {
 	const struct tcf_proto_ops	*ops;
 	struct tcf_chain	*chain;
 	struct rcu_head		rcu;
+	struct work_struct	work;
 };
 
 struct qdisc_skb_cb {
@@ -399,6 +406,8 @@ tc_cls_offload_cnt_update(struct tcf_block *block, u32 *cnt,
 			tcf_block_offload_dec(block, flags);
 	}
 }
+
+bool tc_queue_proto_work(struct work_struct *work);
 
 static inline void qdisc_cb_private_validate(const struct sk_buff *skb, int sz)
 {
@@ -1175,12 +1184,15 @@ struct mini_Qdisc_pair {
 	struct mini_Qdisc miniq1;
 	struct mini_Qdisc miniq2;
 	struct mini_Qdisc __rcu **p_miniq;
+	struct tcf_proto *tp_head;
+	struct work_struct work;
 };
 
 void mini_qdisc_pair_swap(struct mini_Qdisc_pair *miniqp,
 			  struct tcf_proto *tp_head);
 void mini_qdisc_pair_init(struct mini_Qdisc_pair *miniqp, struct Qdisc *qdisc,
 			  struct mini_Qdisc __rcu **p_miniq);
+void mini_qdisc_pair_cleanup(struct mini_Qdisc_pair *miniqp);
 
 static inline void skb_tc_reinsert(struct sk_buff *skb, struct tcf_result *res)
 {
