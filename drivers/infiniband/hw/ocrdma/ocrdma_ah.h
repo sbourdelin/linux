@@ -53,7 +53,7 @@ enum {
 
 struct ib_ah *ocrdma_create_ah(struct ib_pd *pd, struct rdma_ah_attr *ah_attr,
 			       bool sleepable, struct ib_udata *udata);
-int ocrdma_destroy_ah(struct ib_ah *ah);
+int ocrdma_destroy_ah(struct ib_ah *ah, bool sleepable);
 int ocrdma_query_ah(struct ib_ah *ah, struct rdma_ah_attr *ah_attr);
 
 int ocrdma_process_mad(struct ib_device *,

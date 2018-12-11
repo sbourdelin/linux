@@ -2482,7 +2482,7 @@ static int ib_uverbs_create_ah(struct uverbs_attr_bundle *attrs)
 	return uobj_alloc_commit(uobj);
 
 err_copy:
-	rdma_destroy_ah(ah);
+	rdma_destroy_ah(ah, true);
 
 err_put:
 	uobj_put_obj_read(pd);

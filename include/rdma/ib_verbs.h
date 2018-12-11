@@ -2380,7 +2380,8 @@ struct ib_device {
 						struct rdma_ah_attr *ah_attr);
 	int                        (*query_ah)(struct ib_ah *ah,
 					       struct rdma_ah_attr *ah_attr);
-	int                        (*destroy_ah)(struct ib_ah *ah);
+	int                        (*destroy_ah)(struct ib_ah *ah,
+						 bool sleepable);
 	struct ib_srq *            (*create_srq)(struct ib_pd *pd,
 						 struct ib_srq_init_attr *srq_init_attr,
 						 struct ib_udata *udata);
@@ -3280,8 +3281,9 @@ int rdma_query_ah(struct ib_ah *ah, struct rdma_ah_attr *ah_attr);
 /**
  * rdma_destroy_ah - Destroys an address handle.
  * @ah: The address handle to destroy.
+ * @sleepable: In a sleepable context.
  */
-int rdma_destroy_ah(struct ib_ah *ah);
+int rdma_destroy_ah(struct ib_ah *ah, bool sleepable);
 
 /**
  * ib_create_srq - Creates a SRQ associated with the specified protection

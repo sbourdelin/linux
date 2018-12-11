@@ -131,7 +131,7 @@ int mlx5_ib_query_ah(struct ib_ah *ibah, struct rdma_ah_attr *ah_attr)
 	return 0;
 }
 
-int mlx5_ib_destroy_ah(struct ib_ah *ah)
+int mlx5_ib_destroy_ah(struct ib_ah *ah, bool sleepable)
 {
 	kfree(to_mah(ah));
 	return 0;

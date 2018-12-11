@@ -160,7 +160,7 @@ void rvt_free_mad_agents(struct rvt_dev_info *rdi)
 			ib_unregister_mad_agent(agent);
 		}
 		if (rvp->sm_ah) {
-			rdma_destroy_ah(&rvp->sm_ah->ibah);
+			rdma_destroy_ah(&rvp->sm_ah->ibah, true);
 			rvp->sm_ah = NULL;
 		}
 

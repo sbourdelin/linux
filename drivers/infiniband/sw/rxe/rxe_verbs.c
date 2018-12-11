@@ -287,7 +287,7 @@ static int rxe_query_ah(struct ib_ah *ibah, struct rdma_ah_attr *attr)
 	return 0;
 }
 
-static int rxe_destroy_ah(struct ib_ah *ibah)
+static int rxe_destroy_ah(struct ib_ah *ibah, bool sleepable)
 {
 	struct rxe_ah *ah = to_rah(ibah);
 

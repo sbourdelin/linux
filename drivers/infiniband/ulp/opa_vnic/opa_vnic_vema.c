@@ -606,7 +606,7 @@ static void vema_set(struct opa_vnic_vema_port *port,
 static void vema_send(struct ib_mad_agent *mad_agent,
 		      struct ib_mad_send_wc *mad_wc)
 {
-	rdma_destroy_ah(mad_wc->send_buf->ah);
+	rdma_destroy_ah(mad_wc->send_buf->ah, true);
 	ib_free_send_mad(mad_wc->send_buf);
 }
 
@@ -680,7 +680,7 @@ static void vema_recv(struct ib_mad_agent *mad_agent,
 	ib_free_send_mad(rsp);
 
 err_rsp:
-	rdma_destroy_ah(ah);
+	rdma_destroy_ah(ah, true);
 free_recv_mad:
 	ib_free_recv_mad(mad_wc);
 }
@@ -848,7 +848,7 @@ void opa_vnic_vema_send_trap(struct opa_vnic_adapter *adapter,
 	}
 
 err_sndbuf:
-	rdma_destroy_ah(ah);
+	rdma_destroy_ah(ah, false);
 err_exit:
 	v_err("Aborting trap\n");
 }

@@ -913,14 +913,16 @@ int rdma_query_ah(struct ib_ah *ah, struct rdma_ah_attr *ah_attr)
 }
 EXPORT_SYMBOL(rdma_query_ah);
 
-int rdma_destroy_ah(struct ib_ah *ah)
+int rdma_destroy_ah(struct ib_ah *ah, bool sleepable)
 {
 	const struct ib_gid_attr *sgid_attr = ah->sgid_attr;
 	struct ib_pd *pd;
 	int ret;
 
+	might_sleep_if(sleepable);
+
 	pd = ah->pd;
-	ret = ah->device->destroy_ah(ah);
+	ret = ah->device->destroy_ah(ah, sleepable);
 	if (!ret) {
 		atomic_dec(&pd->usecnt);
 		if (sgid_attr)
