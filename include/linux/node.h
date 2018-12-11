@@ -36,6 +36,27 @@ struct node_hmem_attrs {
 	unsigned int write_latency;
 };
 void node_set_perf_attrs(unsigned int nid, struct node_hmem_attrs *hmem_attrs);
+
+enum cache_associativity {
+	NODE_CACHE_DIRECT_MAP,
+	NODE_CACHE_INDEXED,
+	NODE_CACHE_OTHER,
+};
+
+enum cache_write_policy {
+	NODE_CACHE_WRITE_BACK,
+	NODE_CACHE_WRITE_THROUGH,
+	NODE_CACHE_WRITE_OTHER,
+};
+
+struct node_cache_attrs {
+	enum cache_associativity associativity;
+	enum cache_write_policy write_policy;
+	u64 size;
+	u16 line_size;
+	u8  level;
+};
+void node_add_cache(unsigned int nid, struct node_cache_attrs *cache_attrs);
 #endif
 
 struct node {
@@ -48,6 +69,8 @@ struct node {
 #endif
 #ifdef CONFIG_HMEM_REPORTING
 	struct node_hmem_attrs hmem_attrs;
+	struct list_head cache_attrs;
+	struct device *cache_dev;
 #endif
 };
 

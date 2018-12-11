@@ -17,6 +17,7 @@
 #include <linux/nodemask.h>
 #include <linux/cpu.h>
 #include <linux/device.h>
+#include <linux/pm_runtime.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
 
@@ -141,6 +142,143 @@ void node_set_perf_attrs(unsigned int nid, struct node_hmem_attrs *hmem_attrs)
 		pr_info("failed to add performance attribute group to node %d\n",
 			nid);
 }
+
+struct node_cache_info {
+	struct device dev;
+	struct list_head node;
+	struct node_cache_attrs cache_attrs;
+};
+#define to_cache_info(device) container_of(device, struct node_cache_info, dev)
+
+#define CACHE_ATTR(name, fmt) 							\
+static ssize_t name##_show(struct device *dev,					\
+			   struct device_attribute *attr,			\
+			   char *buf)						\
+{										\
+	return sprintf(buf, fmt "\n", to_cache_info(dev)->cache_attrs.name);	\
+}										\
+DEVICE_ATTR_RO(name);
+
+CACHE_ATTR(size, "%lld")
+CACHE_ATTR(level, "%d")
+CACHE_ATTR(line_size, "%d")
+CACHE_ATTR(associativity, "%d")
+CACHE_ATTR(write_policy, "%d")
+
+static struct attribute *cache_attrs[] = {
+	&dev_attr_level.attr,
+	&dev_attr_associativity.attr,
+	&dev_attr_size.attr,
+	&dev_attr_line_size.attr,
+	&dev_attr_write_policy.attr,
+	NULL,
+};
+
+const struct attribute_group node_cache_attrs_group = {
+	.attrs = cache_attrs,
+};
+
+const struct attribute_group *node_cache_attrs_groups[] = {
+	&node_cache_attrs_group,
+	NULL,
+};
+
+static void node_release(struct device *dev)
+{
+	kfree(dev);
+}
+
+static void node_cache_release(struct device *dev)
+{
+	struct node_cache_info *info = to_cache_info(dev);
+	kfree(info);
+}
+
+static void node_init_cache_dev(struct node *node)
+{
+	struct device *dev;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return;
+
+	dev->parent = &node->dev;
+	dev->release = node_release;
+	dev_set_name(dev, "side_cache");
+
+	if (device_register(dev)) {
+		kfree(dev);
+		return;
+	}
+	pm_runtime_no_callbacks(dev);
+	node->cache_dev = dev;
+}
+
+void node_add_cache(unsigned int nid, struct node_cache_attrs *cache_attrs)
+{
+	struct node_cache_info *info;
+	struct device *dev;
+	struct node *node;
+
+	if (!node_online(nid) || !node_devices[nid])
+		return;
+
+	node = node_devices[nid];
+	list_for_each_entry(info, &node->cache_attrs, node) {
+		if (info->cache_attrs.level == cache_attrs->level) {
+			dev_warn(&node->dev,
+				"attempt to add duplicate cache level:%d\n",
+				cache_attrs->level);
+			return;
+		}
+	}
+
+	if (!node->cache_dev)
+		node_init_cache_dev(node);
+	if (!node->cache_dev)
+		return;
+
+	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return;
+
+	dev = &info->dev;
+	dev->parent = node->cache_dev;
+	dev->release = node_cache_release;
+	dev->groups = node_cache_attrs_groups;
+	dev_set_name(dev, "index%d", cache_attrs->level);
+	info->cache_attrs = *cache_attrs;
+	if (device_register(dev)) {
+		dev_warn(&node->dev, "failed to add cache level:%d\n",
+			 cache_attrs->level);
+		kfree(info);
+		return;
+	}
+	pm_runtime_no_callbacks(dev);
+	list_add_tail(&info->node, &node->cache_attrs);
+}
+
+static void node_remove_caches(struct node *node)
+{
+	struct node_cache_info *info, *next;
+
+	if (!node->cache_dev)
+		return;
+
+	list_for_each_entry_safe(info, next, &node->cache_attrs, node) {
+		list_del(&info->node);
+		device_unregister(&info->dev);
+	}
+	device_unregister(node->cache_dev);
+}
+
+static void node_init_caches(unsigned int nid)
+{
+	INIT_LIST_HEAD(&node_devices[nid]->cache_attrs);
+}
+#else
+static void node_init_caches(unsigned int nid) { }
+static void node_remove_caches(struct node *node) { }
 #endif
 
 #define K(x) ((x) << (PAGE_SHIFT - 10))
@@ -389,6 +527,7 @@ static void node_device_release(struct device *dev)
 	 */
 	flush_work(&node->node_work);
 #endif
+	node_remove_caches(node);
 	kfree(node);
 }
 
@@ -711,6 +850,7 @@ int __register_one_node(int nid)
 
 	/* initialize work queue for memory hot plug */
 	init_node_hugetlb_work(nid);
+	node_init_caches(nid);
 
 	return error;
 }
