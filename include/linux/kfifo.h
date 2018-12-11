@@ -287,6 +287,71 @@ __kfifo_uint_must_check_helper( \
 )
 
 /**
+ * kfifo_read_index_in - returns the in index of the fifo
+ * @fifo: address of the kfifo to be used
+ *
+ * add memory read barrier to make sure the fifo->in index
+ * is fetched first before write data to the fifo, which
+ * is paired with the write barrier in kfifo_write_index_in
+ */
+#define kfifo_read_index_in(kfifo) \
+({ \
+	typeof((kfifo) + 1) __tmp = (kfifo); \
+	struct __kfifo *__kfifo = __tmp; \
+	unsigned int __val = READ_ONCE(__kfifo->in); \
+	smp_rmb(); \
+	__val; \
+})
+
+/**
+ * kfifo_write_index_in - updates the in index of the fifo
+ * @fifo: address of the kfifo to be used
+ *
+ * add memory write barrier to make sure the data entry is
+ * updated before increase the fifo->in
+ */
+#define kfifo_write_index_in(kfifo, val) \
+({ \
+	typeof((kfifo) + 1) __tmp = (kfifo); \
+	struct __kfifo *__kfifo = __tmp; \
+	unsigned int __val = (val); \
+	smp_wmb(); \
+	WRITE_ONCE(__kfifo->in, __val); \
+})
+
+/**
+ * kfifo_read_index_out - returns the out index of the fifo
+ * @fifo: address of the kfifo to be used
+ *
+ * add memory barrier to make sure the fifo->out index is
+ * fetched before read data from the fifo, which is paired
+ * with the memory barrier in kfifo_write_index_out
+ */
+#define kfifo_read_index_out(kfifo) \
+({ \
+	typeof((kfifo) + 1) __tmp = (kfifo); \
+	struct __kfifo *__kfifo = __tmp; \
+	unsigned int __val = smp_load_acquire(&__kfifo->out); \
+	__val; \
+})
+
+/**
+ * kfifo_write_index_out - updates the out index of the fifo
+ * @fifo: address of the kfifo to be used
+ *
+ * add memory barrier to make sure reading out the entry before
+ * update the fifo->out index to avoid overwitten the entry by
+ * the producer
+ */
+#define kfifo_write_index_out(kfifo, val) \
+({ \
+	typeof((kfifo) + 1) __tmp = (kfifo); \
+	struct __kfifo *__kfifo = __tmp; \
+	unsigned int __val = (val); \
+	smp_store_release(&__kfifo->out, __val); \
+})
+
+/**
  * kfifo_skip - skip output data
  * @fifo: address of the fifo to be used
  */
@@ -298,7 +363,7 @@ __kfifo_uint_must_check_helper( \
 	if (__recsize) \
 		__kfifo_skip_r(__kfifo, __recsize); \
 	else \
-		__kfifo->out++; \
+		kfifo_write_index_out(__kfifo, __kfifo->out++); \
 })
 
 /**
@@ -740,7 +805,8 @@ __kfifo_uint_must_check_helper( \
 	if (__recsize) \
 		__kfifo_dma_out_finish_r(__kfifo, __recsize); \
 	else \
-		__kfifo->out += __len / sizeof(*__tmp->type); \
+		kfifo_write_index_out(__kfifo, __kfifo->out \
+				+ (__len / sizeof(*__tmp->type))); \
 })
 
 /**

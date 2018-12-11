@@ -32,7 +32,12 @@
  */
 static inline unsigned int kfifo_unused(struct __kfifo *fifo)
 {
-	return (fifo->mask + 1) - (fifo->in - fifo->out);
+	/*
+	 * add memory barrier to make sure the index is fetched
+	 * before write to the buffer
+	 */
+	return (fifo->mask + 1) -
+		(fifo->in - kfifo_read_index_out(fifo));
 }
 
 int __kfifo_alloc(struct __kfifo *fifo, unsigned int size,
@@ -116,11 +121,6 @@ static void kfifo_copy_in(struct __kfifo *fifo, const void *src,
 
 	memcpy(fifo->data + off, src, l);
 	memcpy(fifo->data, src + l, len - l);
-	/*
-	 * make sure that the data in the fifo is up to date before
-	 * incrementing the fifo->in index counter
-	 */
-	smp_wmb();
 }
 
 unsigned int __kfifo_in(struct __kfifo *fifo,
@@ -133,7 +133,11 @@ unsigned int __kfifo_in(struct __kfifo *fifo,
 		len = l;
 
 	kfifo_copy_in(fifo, buf, len, fifo->in);
-	fifo->in += len;
+	/*
+	 * make sure that the data in the fifo is up to date before
+	 * incrementing the fifo->in index counter
+	 */
+	kfifo_write_index_in(fifo, fifo->in + len);
 	return len;
 }
 EXPORT_SYMBOL(__kfifo_in);
@@ -155,11 +159,6 @@ static void kfifo_copy_out(struct __kfifo *fifo, void *dst,
 
 	memcpy(dst, fifo->data + off, l);
 	memcpy(dst + l, fifo->data, len - l);
-	/*
-	 * make sure that the data is copied before
-	 * incrementing the fifo->out index counter
-	 */
-	smp_wmb();
 }
 
 unsigned int __kfifo_out_peek(struct __kfifo *fifo,
@@ -167,7 +166,7 @@ unsigned int __kfifo_out_peek(struct __kfifo *fifo,
 {
 	unsigned int l;
 
-	l = fifo->in - fifo->out;
+	l = kfifo_read_index_in(fifo) - fifo->out;
 	if (len > l)
 		len = l;
 
@@ -180,7 +179,11 @@ unsigned int __kfifo_out(struct __kfifo *fifo,
 		void *buf, unsigned int len)
 {
 	len = __kfifo_out_peek(fifo, buf, len);
-	fifo->out += len;
+	/*
+	 * make sure that the data in the fifo is fetched before
+	 * incrementing the fifo->out index counter
+	 */
+	kfifo_write_index_out(fifo, fifo->out + len);
 	return len;
 }
 EXPORT_SYMBOL(__kfifo_out);
@@ -210,11 +213,6 @@ static unsigned long kfifo_copy_from_user(struct __kfifo *fifo,
 		if (unlikely(ret))
 			ret = DIV_ROUND_UP(ret, esize);
 	}
-	/*
-	 * make sure that the data in the fifo is up to date before
-	 * incrementing the fifo->in index counter
-	 */
-	smp_wmb();
 	*copied = len - ret * esize;
 	/* return the number of elements which are not copied */
 	return ret;
@@ -241,7 +239,11 @@ int __kfifo_from_user(struct __kfifo *fifo, const void __user *from,
 		err = -EFAULT;
 	} else
 		err = 0;
-	fifo->in += len;
+	/*
+	 * make sure that the data in the fifo is up to date before
+	 * incrementing the fifo->in index counter
+	 */
+	kfifo_write_index_in(fifo, fifo->in + len);
 	return err;
 }
 EXPORT_SYMBOL(__kfifo_from_user);
@@ -270,11 +272,6 @@ static unsigned long kfifo_copy_to_user(struct __kfifo *fifo, void __user *to,
 		if (unlikely(ret))
 			ret = DIV_ROUND_UP(ret, esize);
 	}
-	/*
-	 * make sure that the data is copied before
-	 * incrementing the fifo->out index counter
-	 */
-	smp_wmb();
 	*copied = len - ret * esize;
 	/* return the number of elements which are not copied */
 	return ret;
@@ -291,7 +288,7 @@ int __kfifo_to_user(struct __kfifo *fifo, void __user *to,
 	if (esize != 1)
 		len /= esize;
 
-	l = fifo->in - fifo->out;
+	l = kfifo_read_index_in(fifo) - fifo->out;
 	if (len > l)
 		len = l;
 	ret = kfifo_copy_to_user(fifo, to, len, fifo->out, copied);
@@ -300,7 +297,11 @@ int __kfifo_to_user(struct __kfifo *fifo, void __user *to,
 		err = -EFAULT;
 	} else
 		err = 0;
-	fifo->out += len;
+	/*
+	 * make sure that the data is copied before
+	 * incrementing the fifo->out index counter
+	 */
+	kfifo_write_index_out(fifo, fifo->out + len);
 	return err;
 }
 EXPORT_SYMBOL(__kfifo_to_user);
@@ -384,7 +385,7 @@ unsigned int __kfifo_dma_out_prepare(struct __kfifo *fifo,
 {
 	unsigned int l;
 
-	l = fifo->in - fifo->out;
+	l = kfifo_read_index_in(fifo) - fifo->out;
 	if (len > l)
 		len = l;
 
@@ -457,7 +458,11 @@ unsigned int __kfifo_in_r(struct __kfifo *fifo, const void *buf,
 	__kfifo_poke_n(fifo, len, recsize);
 
 	kfifo_copy_in(fifo, buf, len, fifo->in + recsize);
-	fifo->in += len + recsize;
+	/*
+	 * make sure that the data in the fifo is up to date before
+	 * incrementing the fifo->in index counter
+	 */
+	kfifo_write_index_in(fifo, fifo->in + len + recsize);
 	return len;
 }
 EXPORT_SYMBOL(__kfifo_in_r);
@@ -479,7 +484,7 @@ unsigned int __kfifo_out_peek_r(struct __kfifo *fifo, void *buf,
 {
 	unsigned int n;
 
-	if (fifo->in == fifo->out)
+	if (kfifo_read_index_in(fifo) == fifo->out)
 		return 0;
 
 	return kfifo_out_copy_r(fifo, buf, len, recsize, &n);
@@ -491,11 +496,15 @@ unsigned int __kfifo_out_r(struct __kfifo *fifo, void *buf,
 {
 	unsigned int n;
 
-	if (fifo->in == fifo->out)
+	if (kfifo_read_index_in(fifo) == fifo->out)
 		return 0;
 
 	len = kfifo_out_copy_r(fifo, buf, len, recsize, &n);
-	fifo->out += n + recsize;
+	/*
+	 * make sure that the fifo data is fetched before
+	 * incrementing the fifo->out index counter
+	 */
+	kfifo_write_index_out(fifo, fifo->out + n + recsize);
 	return len;
 }
 EXPORT_SYMBOL(__kfifo_out_r);
@@ -505,7 +514,11 @@ void __kfifo_skip_r(struct __kfifo *fifo, size_t recsize)
 	unsigned int n;
 
 	n = __kfifo_peek_n(fifo, recsize);
-	fifo->out += n + recsize;
+	/*
+	 * make sure that the fifo data is fetched before
+	 * incrementing the fifo->out index counter
+	 */
+	kfifo_write_index_out(fifo, fifo->out + n + recsize);
 }
 EXPORT_SYMBOL(__kfifo_skip_r);
 
@@ -528,7 +541,11 @@ int __kfifo_from_user_r(struct __kfifo *fifo, const void __user *from,
 		*copied = 0;
 		return -EFAULT;
 	}
-	fifo->in += len + recsize;
+	/*
+	 * make sure that the data in the fifo is up to date before
+	 * incrementing the fifo->in index counter
+	 */
+	kfifo_write_index_in(fifo, fifo->in + len + recsize);
 	return 0;
 }
 EXPORT_SYMBOL(__kfifo_from_user_r);
@@ -539,7 +556,7 @@ int __kfifo_to_user_r(struct __kfifo *fifo, void __user *to,
 	unsigned long ret;
 	unsigned int n;
 
-	if (fifo->in == fifo->out) {
+	if (kfifo_read_index_in(fifo) == fifo->out) {
 		*copied = 0;
 		return 0;
 	}
@@ -553,7 +570,11 @@ int __kfifo_to_user_r(struct __kfifo *fifo, void __user *to,
 		*copied = 0;
 		return -EFAULT;
 	}
-	fifo->out += n + recsize;
+	/*
+	 * make sure that the data is copied before
+	 * incrementing the fifo->out index counter
+	 */
+	kfifo_write_index_out(fifo, fifo->out + n + recsize);
 	return 0;
 }
 EXPORT_SYMBOL(__kfifo_to_user_r);
@@ -577,7 +598,11 @@ void __kfifo_dma_in_finish_r(struct __kfifo *fifo,
 {
 	len = __kfifo_max_r(len, recsize);
 	__kfifo_poke_n(fifo, len, recsize);
-	fifo->in += len + recsize;
+	/*
+	 * make sure that the data in the fifo is updated before
+	 * incrementing the fifo->in index counter
+	 */
+	kfifo_write_index_in(fifo, fifo->in + len + recsize);
 }
 EXPORT_SYMBOL(__kfifo_dma_in_finish_r);
 
@@ -588,7 +613,7 @@ unsigned int __kfifo_dma_out_prepare_r(struct __kfifo *fifo,
 
 	len = __kfifo_max_r(len, recsize);
 
-	if (len + recsize > fifo->in - fifo->out)
+	if (len + recsize > kfifo_read_index_in(fifo) - fifo->out)
 		return 0;
 
 	return setup_sgl(fifo, sgl, nents, len, fifo->out + recsize);
@@ -600,6 +625,10 @@ void __kfifo_dma_out_finish_r(struct __kfifo *fifo, size_t recsize)
 	unsigned int len;
 
 	len = __kfifo_peek_n(fifo, recsize);
-	fifo->out += len + recsize;
+	/*
+	 * make sure that the data is copied before
+	 * incrementing the fifo->out index counter
+	 */
+	kfifo_write_index_out(fifo, fifo->out + len + recsize);
 }
 EXPORT_SYMBOL(__kfifo_dma_out_finish_r);
