@@ -1920,6 +1920,17 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 	struct request *same_queue_rq = NULL;
 	blk_qc_t cookie;
 
+	/*
+	 * The flag BIO_QUEUE_ENTERED is used for two purposes.  First, it
+	 * determines if a bio is being split and has already entered the queue.
+	 * This happens in blk_queue_split() where we can recursively call
+	 * generic_make_request().  The second use is to mark bios that will
+	 * call rq_qos_throttle() and subseqently blk_mq_get_request().  These
+	 * are the bios that fail plug-merging and bio-merging with the primary
+	 * use case for this being the blk-iolatency controller.
+	 */
+	bio_clear_flag(bio, BIO_QUEUE_ENTERED);
+
 	blk_queue_bounce(q, &bio);
 
 	blk_queue_split(q, &bio);
@@ -1934,6 +1945,7 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 	if (blk_mq_sched_bio_merge(q, bio))
 		return BLK_QC_T_NONE;
 
+	bio_set_flag(bio, BIO_QUEUE_ENTERED);
 	rq_qos_throttle(q, bio);
 
 	rq = blk_mq_get_request(q, bio, &data);
