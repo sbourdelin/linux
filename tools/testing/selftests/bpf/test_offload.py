@@ -208,7 +208,8 @@ def bpftool_prog_list_wait(expected=0, n_retry=20):
         if nprogs == expected:
             return
         time.sleep(0.05)
-    raise Exception("Time out waiting for program counts to stabilize want %d, have %d" % (expected, nprogs))
+    raise Exception("Time out waiting for program counts \
+to stabilize want %d, have %d" % (expected, nprogs))
 
 
 def bpftool_map_list_wait(expected=0, n_retry=20):
@@ -217,7 +218,8 @@ def bpftool_map_list_wait(expected=0, n_retry=20):
         if nmaps == expected:
             return
         time.sleep(0.05)
-    raise Exception("Time out waiting for map counts to stabilize want %d, have %d" % (expected, nmaps))
+    raise Exception("Time out waiting for map counts to \
+stabilize want %d, have %d" % (expected, nmaps))
 
 
 def bpftool_prog_load(sample, file_name, maps=[], prog_type="xdp", dev=None,
@@ -413,7 +415,8 @@ class NetdevSim:
             if nbound == bound and nprogs == total:
                 return
             time.sleep(0.05)
-        raise Exception("Time out waiting for program counts to stabilize want %d/%d, have %d bound, %d loaded" % (
+        raise Exception("Time out waiting for program counts to \
+stabilize want %d/%d, have %d bound, %d loaded" % (
             bound, total, nbound, nprogs))
 
     def set_ns(self, ns):
@@ -533,7 +536,7 @@ class NetdevSim:
         return ethtool(self, "-K", args, fail=fail)
 
 
-################################################################################
+###############################################################################
 def clean_up():
     global files, netns, devs
 
@@ -617,7 +620,8 @@ def check_extack_nsim(output, reference, args):
 
 
 def check_no_extack(res, needle):
-    fail((res[1] + res[2]).count(needle) or (res[1] + res[2]).count("Warning:"),
+    fail((res[1] + res[2]).count(needle) or (res[1] +
+         res[2]).count("Warning:"),
          "Found '%s' in command output, leaky extack?" % (needle))
 
 
@@ -778,8 +782,9 @@ try:
     start_test("Test TC replace bad flags...")
     for i in range(3):
         for j in range(3):
-            ret, _ = sim.cls_bpf_add_filter(obj, op="replace", prio=1, handle=1,
-                                            skip_sw=(j == 1), skip_hw=(j == 2),
+            ret, _ = sim.cls_bpf_add_filter(obj, op="replace", prio=1,
+                                            handle=1, skip_sw=(j == 1),
+                                            skip_hw=(j == 2),
                                             fail=False)
             fail(bool(ret) != bool(j),
                  "Software TC incorrect load in replace test, iteration %d" %
@@ -824,9 +829,11 @@ try:
     fail(dprog["state"] != "xlated", "Offloaded program state not translated")
     fail(dprog["loaded"] != "Y", "Offloaded program is not loaded")
 
-    start_test("Test disabling TC offloads is rejected while filters installed...")
+    start_test("Test disabling TC offloads is rejected while \
+filters installed...")
     ret, _ = sim.set_ethtool_tc_offloads(False, fail=False)
-    fail(ret == 0, "Driver should refuse to disable TC offloads with filters installed...")
+    fail(ret == 0, "Driver should refuse to disable TC offloads with filters \
+installed...")
 
     start_test("Test qdisc removal frees things...")
     sim.tc_flush_filters()
@@ -922,7 +929,8 @@ try:
     offload = bpf_pinned("/sys/fs/bpf/offload")
     ret, _, err = sim.set_xdp(offload, "drv", fail=False, include_stderr=True)
     fail(ret == 0, "attached offloaded XDP program to drv")
-    check_extack(err, "using device-bound program without HW_MODE flag is not supported.", args)
+    check_extack(err, "using device-bound program without HW_MODE flag is not \
+supported.", args)
     rm("/sys/fs/bpf/offload")
     sim.wait_for_flush()
 
@@ -1072,8 +1080,8 @@ try:
     delay_msec = 500
     sim.dfs["bpf_bind_verifier_delay"] = delay_msec
     start = time.time()
-    cmd_line = "tc filter add dev %s ingress bpf %s da skip_sw" % \
-               (sim['ifname'], obj)
+    cmd_line = "tc filter add dev %s ingress bpf %s da skip_sw" %
+    (sim['ifname'], obj)
     tc_proc = cmd(cmd_line, background=True, fail=False)
     # Wait for the verifier to start
     while sim.dfs_num_bound_progs() <= 2:
@@ -1244,7 +1252,8 @@ try:
     ret, _ = simA.set_xdp(progB, "offload", force=True, JSON=False, fail=False)
     fail(ret == 0, "cross-ASIC program allowed")
     for d in simB:
-        ret, _ = d.set_xdp(progA, "offload", force=True, JSON=False, fail=False)
+        ret, _ = d.set_xdp(progA, "offload", force=True, JSON=False,
+                           fail=False)
         fail(ret == 0, "cross-ASIC program allowed")
 
     start_test("Test multi-dev ASIC cross-dev install...")
