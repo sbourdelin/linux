@@ -429,10 +429,11 @@ out:
 	if (get_paca()->in_nmi > 1)
 		nmi_panic(regs, "Unrecoverable nested System Reset");
 #endif
+#ifdef MSR_RI
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
 		nmi_panic(regs, "Unrecoverable System Reset");
-
+#endif
 	if (!nested)
 		nmi_exit();
 
@@ -478,7 +479,9 @@ static inline int check_io_access(struct pt_regs *regs)
 			printk(KERN_DEBUG "%s bad port %lx at %p\n",
 			       (*nip & 0x100)? "OUT to": "IN from",
 			       regs->gpr[rb] - _IO_BASE, nip);
+#ifdef MSR_RI
 			regs->msr |= MSR_RI;
+#endif
 			regs->nip = extable_fixup(entry);
 			return 1;
 		}
@@ -763,10 +766,11 @@ void machine_check_exception(struct pt_regs *regs)
 	if (check_io_access(regs))
 		goto bail;
 
+#ifdef MSR_RI
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
 		nmi_panic(regs, "Unrecoverable Machine check");
-
+#endif
 	if (!nested)
 		nmi_exit();
 
