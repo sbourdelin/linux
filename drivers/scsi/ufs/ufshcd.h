@@ -193,6 +193,9 @@ struct ufshcd_lrb {
 	ktime_t compl_time_stamp;
 
 	bool req_abort_skip;
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+	int cci;
+#endif
 };
 
 /**
@@ -706,6 +709,9 @@ struct ufs_hba {
 
 	struct device		bsg_dev;
 	struct request_queue	*bsg_queue;
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+	struct ufshcd_crypto_ctx *cctx;
+#endif
 };
 
 /* Returns true if clocks can be gated. Otherwise false */

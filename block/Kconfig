@@ -224,4 +224,9 @@ config BLK_MQ_RDMA
 config BLK_PM
 	def_bool BLOCK && PM
 
+config BLK_DEV_HW_RT_ENCRYPTION
+	bool
+	depends on SCSI_UFSHCD_RT_ENCRYPTION
+	default n
+
 source block/Kconfig.iosched

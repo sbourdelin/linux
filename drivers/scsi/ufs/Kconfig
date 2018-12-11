@@ -136,3 +136,15 @@ config SCSI_UFS_BSG
 
 	  Select this if you need a bsg device node for your UFS controller.
 	  If unsure, say N.
+
+config SCSI_UFSHCD_RT_ENCRYPTION
+	bool "Universal Flash Storage Controller RT encryption support"
+	depends on SCSI_UFSHCD
+	default n
+	select BLK_DEV_HW_RT_ENCRYPTION if SCSI_UFSHCD_RT_ENCRYPTION
+	select BLK_DEV_DM if SCSI_UFSHCD_RT_ENCRYPTION
+	help
+	Universal Flash Storage Controller RT encryption support
+
+	Select this if you want to enable real time encryption on UFS controller
+	If unsure, say N.

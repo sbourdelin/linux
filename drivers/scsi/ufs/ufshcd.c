@@ -47,6 +47,9 @@
 #include "unipro.h"
 #include "ufs-sysfs.h"
 #include "ufs_bsg.h"
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+#include "ufshcd-crypto.h"
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ufs.h>
@@ -2196,6 +2199,14 @@ static void ufshcd_prepare_req_desc_hdr(struct ufshcd_lrb *lrbp,
 
 	dword_0 = data_direction | (lrbp->command_type
 				<< UPIU_COMMAND_TYPE_OFFSET);
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+	if (lrbp->cci >= 0) {
+		dword_0 |= (1 << CRYPTO_UTP_REQ_DESC_DWORD0_CE_SHIFT);
+		dword_0 |= ((lrbp->cci << CRYPTO_UTP_REQ_DESC_DWORD0_CCI_SHIFT)
+				& CRYPTO_UTP_REQ_DESC_DWORD0_CCI_MASK);
+	} else
+		dword_0 &= ~CRYPTO_UTP_REQ_DESC_DWORD0_CE_MASK;
+#endif
 	if (lrbp->intr_cmd)
 		dword_0 |= UTP_REQ_DESC_INT_CMD;
 
@@ -2460,6 +2471,12 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	lrbp->intr_cmd = !ufshcd_is_intr_aggr_allowed(hba) ? true : false;
 	lrbp->req_abort_skip = false;
 
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+	lrbp->cci = -1;
+	/* prepare block for crypto */
+	if (hba->capabilities & MASK_CRYPTO_SUPPORT)
+		ufshcd_prepare_for_crypto(hba, lrbp);
+#endif
 	ufshcd_comp_scsi_upiu(hba, lrbp);
 
 	err = ufshcd_map_sg(hba, lrbp);
@@ -8117,6 +8134,11 @@ void ufshcd_remove(struct ufs_hba *hba)
 	ufs_bsg_remove(hba);
 	ufs_sysfs_remove_nodes(hba->dev);
 	scsi_remove_host(hba->host);
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+	if (hba->capabilities & MASK_CRYPTO_SUPPORT)
+		ufshcd_crypto_remove(hba);
+#endif
+
 	/* disable interrupts */
 	ufshcd_disable_intr(hba, hba->intr_mask);
 	ufshcd_hba_stop(hba, true);
@@ -8351,7 +8373,10 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 		hba->ahit = FIELD_PREP(UFSHCI_AHIBERN8_TIMER_MASK, 150) |
 			    FIELD_PREP(UFSHCI_AHIBERN8_SCALE_MASK, 3);
 	}
-
+#ifdef CONFIG_SCSI_UFSHCD_RT_ENCRYPTION
+	if (hba->capabilities & MASK_CRYPTO_SUPPORT)
+		ufshcd_crypto_init(hba);
+#endif
 	/* Hold auto suspend until async scan completes */
 	pm_runtime_get_sync(dev);
 	atomic_set(&hba->scsi_block_reqs_cnt, 0);
