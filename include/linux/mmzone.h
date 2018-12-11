@@ -492,9 +492,9 @@ struct zone {
 	 * are skipped before trying again. The number attempted since
 	 * last failure is tracked with compact_considered.
 	 */
-	unsigned int		compact_considered;
-	unsigned int		compact_defer_shift;
-	int			compact_order_failed;
+	unsigned int		compact_considered[2];
+	unsigned int		compact_defer_shift[2];
+	int			compact_order_failed[2];
 #endif
 
 #if defined CONFIG_COMPACTION || defined CONFIG_CMA
