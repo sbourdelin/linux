@@ -2374,6 +2374,7 @@ struct ib_device {
 	int                        (*dealloc_pd)(struct ib_pd *pd);
 	struct ib_ah *             (*create_ah)(struct ib_pd *pd,
 						struct rdma_ah_attr *ah_attr,
+						bool sleepable,
 						struct ib_udata *udata);
 	int                        (*modify_ah)(struct ib_ah *ah,
 						struct rdma_ah_attr *ah_attr);
@@ -3180,11 +3181,13 @@ void ib_dealloc_pd(struct ib_pd *pd);
  * rdma_create_ah - Creates an address handle for the given address vector.
  * @pd: The protection domain associated with the address handle.
  * @ah_attr: The attributes of the address vector.
+ * @sleepable: In a sleepable context.
  *
  * The address handle is used to reference a local or global destination
  * in all UD QP post sends.
  */
-struct ib_ah *rdma_create_ah(struct ib_pd *pd, struct rdma_ah_attr *ah_attr);
+struct ib_ah *rdma_create_ah(struct ib_pd *pd, struct rdma_ah_attr *ah_attr,
+			     bool sleepable);
 
 /**
  * rdma_create_user_ah - Creates an address handle for the given address vector.
