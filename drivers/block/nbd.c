@@ -325,10 +325,14 @@ static void sock_shutdown(struct nbd_device *nbd)
 	struct nbd_config *config = nbd->config;
 	int i;
 
-	if (config->num_connections == 0)
+	if (config->num_connections == 0) {
+		clear_bit(NBD_BOUND, &config->runtime_flags);
 		return;
-	if (test_and_set_bit(NBD_DISCONNECTED, &config->runtime_flags))
+	}
+	if (test_and_set_bit(NBD_DISCONNECTED, &config->runtime_flags)) {
+		clear_bit(NBD_BOUND, &config->runtime_flags);
 		return;
+	}
 
 	for (i = 0; i < config->num_connections; i++) {
 		struct nbd_sock *nsock = config->socks[i];
@@ -1017,7 +1021,7 @@ static int nbd_reconnect_socket(struct nbd_device *nbd, unsigned long arg)
 		sockfd_put(old);
 
 		clear_bit(NBD_DISCONNECTED, &config->runtime_flags);
-
+		clear_bit(NBD_BOUND, &config->runtime_flags);
 		/* We take the tx_mutex in an error path in the recv_work, so we
 		 * need to queue_work outside of the tx_mutex.
 		 */
@@ -1089,6 +1093,7 @@ static int nbd_disconnect(struct nbd_device *nbd)
 	dev_info(disk_to_dev(nbd->disk), "NBD_DISCONNECT\n");
 	set_bit(NBD_DISCONNECT_REQUESTED, &config->runtime_flags);
 	send_disconnects(nbd);
+	clear_bit(NBD_BOUND, &config->runtime_flags);
 	return 0;
 }
 
