@@ -767,6 +767,7 @@ static int prealloc_memory(u32 num_entries)
 	int i;
 
 	for (i = 0; i < num_entries; ++i) {
+		cond_resched();
 		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
 		if (!entry)
 			goto out_err;
