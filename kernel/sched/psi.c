@@ -714,52 +714,19 @@ static int psi_io_show(struct seq_file *m, void *v)
 {
 	return psi_show(m, &psi_system, PSI_IO);
 }
+DEFINE_SHOW_ATTRIBUTE(psi_io);
 
 static int psi_memory_show(struct seq_file *m, void *v)
 {
 	return psi_show(m, &psi_system, PSI_MEM);
 }
+DEFINE_SHOW_ATTRIBUTE(psi_memory);
 
 static int psi_cpu_show(struct seq_file *m, void *v)
 {
 	return psi_show(m, &psi_system, PSI_CPU);
 }
-
-static int psi_io_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, psi_io_show, NULL);
-}
-
-static int psi_memory_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, psi_memory_show, NULL);
-}
-
-static int psi_cpu_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, psi_cpu_show, NULL);
-}
-
-static const struct file_operations psi_io_fops = {
-	.open           = psi_io_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release        = single_release,
-};
-
-static const struct file_operations psi_memory_fops = {
-	.open           = psi_memory_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release        = single_release,
-};
-
-static const struct file_operations psi_cpu_fops = {
-	.open           = psi_cpu_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release        = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(psi_cpu);
 
 static int __init psi_proc_init(void)
 {
