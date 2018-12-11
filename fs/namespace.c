@@ -1237,26 +1237,68 @@ struct vfsmount *mnt_clone_internal(const struct path *path)
 }
 
 #ifdef CONFIG_PROC_FS
+
+static bool mounts_trylock_super(struct proc_mounts *p, struct super_block *sb)
+{
+	if (p->locked_sb == sb)
+		return true;
+	if (p->locked_sb) {
+		drop_super(p->locked_sb);
+		p->locked_sb = NULL;
+	}
+	if (down_read_trylock(&sb->s_umount)) {
+		hold_sb(sb);
+		p->locked_sb = sb;
+		return true;
+	}
+	return false;
+}
+
 /* iterator; we want it to have access to namespace_sem, thus here... */
 static void *m_start(struct seq_file *m, loff_t *pos)
 {
 	struct proc_mounts *p = m->private;
+	struct mount *mount;
+	struct super_block *sb;
 
+restart:
 	down_read(&namespace_sem);
 	if (p->cached_event == p->ns->event) {
 		void *v = p->cached_mount;
 		if (*pos == p->cached_index)
-			return v;
+			goto lock_sb;
 		if (*pos == p->cached_index + 1) {
 			v = seq_list_next(v, &p->ns->list, &p->cached_index);
-			return p->cached_mount = v;
+			p->cached_mount = v;
+			goto lock_sb;
 		}
 	}
 
 	p->cached_event = p->ns->event;
 	p->cached_mount = seq_list_start(&p->ns->list, *pos);
 	p->cached_index = *pos;
-	return p->cached_mount;
+lock_sb:
+	if (!p->cached_mount)
+		return NULL;
+	mount = list_entry(p->cached_mount, struct mount, mnt_list);
+	sb = mount->mnt.mnt_sb;
+	if (mounts_trylock_super(p, sb))
+		return p->cached_mount;
+	/*
+	 * Trylock failed. Since namepace_sem ranks below s_umount (through
+	 * sb->s_umount > dir->i_rwsem > namespace_sem in the mount path), we
+	 * have to drop it, wait for s_umount and then try again to guarantee
+	 * forward progress.
+	 */
+	hold_sb(sb);
+	up_read(&namespace_sem);
+	down_read(&sb->s_umount);
+	/*
+	 * Sb may be dead by now but that just means we won't find it in any
+	 * mount and drop lock & reference anyway.
+	 */
+	p->locked_sb = sb;
+	goto restart;
 }
 
 static void *m_next(struct seq_file *m, void *v, loff_t *pos)
@@ -1277,7 +1319,16 @@ static int m_show(struct seq_file *m, void *v)
 {
 	struct proc_mounts *p = m->private;
 	struct mount *r = list_entry(v, struct mount, mnt_list);
-	return p->show(m, &r->mnt);
+	struct super_block *sb = r->mnt.mnt_sb;
+	int ret;
+
+	/* Protect show function against racing remount */
+	if (!mounts_trylock_super(p, sb))
+		return -EAGAIN;
+	ret = p->show(m, &r->mnt);
+	drop_super(sb);
+	p->locked_sb = NULL;
+	return ret;
 }
 
 const struct seq_operations mounts_op = {
