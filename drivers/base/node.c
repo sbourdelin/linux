@@ -99,6 +99,50 @@ static DEVICE_ATTR_RO(primary_cpu_nodelist);
 static DEVICE_ATTR(cpumap,  S_IRUGO, node_read_cpumask, NULL);
 static DEVICE_ATTR(cpulist, S_IRUGO, node_read_cpulist, NULL);
 
+#ifdef CONFIG_HMEM_REPORTING
+const struct attribute_group node_access_attrs_group;
+
+#define ACCESS_ATTR(name) 						\
+static ssize_t name##_show(struct device *dev,				\
+			   struct device_attribute *attr,		\
+			   char *buf)					\
+{									\
+	return sprintf(buf, "%d\n", to_node(dev)->hmem_attrs.name);	\
+}									\
+static DEVICE_ATTR_RO(name);
+
+ACCESS_ATTR(read_bandwidth)
+ACCESS_ATTR(read_latency)
+ACCESS_ATTR(write_bandwidth)
+ACCESS_ATTR(write_latency)
+
+static struct attribute *access_attrs[] = {
+	&dev_attr_read_bandwidth.attr,
+	&dev_attr_read_latency.attr,
+	&dev_attr_write_bandwidth.attr,
+	&dev_attr_write_latency.attr,
+	NULL,
+};
+
+const struct attribute_group node_access_attrs_group = {
+	.name		= "primary_initiator_access",
+	.attrs		= access_attrs,
+};
+
+void node_set_perf_attrs(unsigned int nid, struct node_hmem_attrs *hmem_attrs)
+{
+	struct node *node;
+
+	if (WARN_ON_ONCE(!node_online(nid)))
+		return;
+	node = node_devices[nid];
+	node->hmem_attrs = *hmem_attrs;
+	if (sysfs_create_group(&node->dev.kobj, &node_access_attrs_group))
+		pr_info("failed to add performance attribute group to node %d\n",
+			nid);
+}
+#endif
+
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 static ssize_t node_read_meminfo(struct device *dev,
 			struct device_attribute *attr, char *buf)

@@ -17,7 +17,26 @@
 
 #include <linux/device.h>
 #include <linux/cpumask.h>
+#include <linux/list.h>
 #include <linux/workqueue.h>
+
+#ifdef CONFIG_HMEM_REPORTING
+/**
+ * struct node_hmem_attrs - heterogeneous memory performance attributes
+ *
+ * read_bandwidth:	Read bandwidth in MB/s
+ * write_bandwidth:	Write bandwidth in MB/s
+ * read_latency:	Read latency in nanoseconds
+ * write_latency:	Write latency in nanoseconds
+ */
+struct node_hmem_attrs {
+	unsigned int read_bandwidth;
+	unsigned int write_bandwidth;
+	unsigned int read_latency;
+	unsigned int write_latency;
+};
+void node_set_perf_attrs(unsigned int nid, struct node_hmem_attrs *hmem_attrs);
+#endif
 
 struct node {
 	struct device	dev;
@@ -26,6 +45,9 @@ struct node {
 
 #if defined(CONFIG_MEMORY_HOTPLUG_SPARSE) && defined(CONFIG_HUGETLBFS)
 	struct work_struct	node_work;
+#endif
+#ifdef CONFIG_HMEM_REPORTING
+	struct node_hmem_attrs hmem_attrs;
 #endif
 };
 
