@@ -56,6 +56,46 @@ static inline ssize_t node_read_cpulist(struct device *dev,
 	return node_read_cpumap(dev, true, buf);
 }
 
+static ssize_t node_read_nodemap(nodemask_t *mask, bool list, char *buf)
+{
+	return list ? scnprintf(buf, PAGE_SIZE - 1, "%*pbl\n",
+				nodemask_pr_args(mask)) :
+		      scnprintf(buf, PAGE_SIZE - 1, "%*pb\n",
+				nodemask_pr_args(mask));
+}
+
+static ssize_t primary_mem_nodelist_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct node *n = to_node(dev);
+	return node_read_nodemap(&n->primary_mem_nodes, true, buf);
+}
+
+static ssize_t primary_mem_nodemask_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct node *n = to_node(dev);
+	return node_read_nodemap(&n->primary_mem_nodes, false, buf);
+}
+
+static ssize_t primary_cpu_nodelist_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct node *n = to_node(dev);
+	return node_read_nodemap(&n->primary_cpu_nodes, true, buf);
+}
+
+static ssize_t primary_cpu_nodemask_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct node *n = to_node(dev);
+	return node_read_nodemap(&n->primary_cpu_nodes, false, buf);
+}
+
+static DEVICE_ATTR_RO(primary_mem_nodelist);
+static DEVICE_ATTR_RO(primary_mem_nodemask);
+static DEVICE_ATTR_RO(primary_cpu_nodemask);
+static DEVICE_ATTR_RO(primary_cpu_nodelist);
 static DEVICE_ATTR(cpumap,  S_IRUGO, node_read_cpumask, NULL);
 static DEVICE_ATTR(cpulist, S_IRUGO, node_read_cpulist, NULL);
 
@@ -240,6 +280,10 @@ static struct attribute *node_dev_attrs[] = {
 	&dev_attr_numastat.attr,
 	&dev_attr_distance.attr,
 	&dev_attr_vmstat.attr,
+	&dev_attr_primary_mem_nodelist.attr,
+	&dev_attr_primary_mem_nodemask.attr,
+	&dev_attr_primary_cpu_nodemask.attr,
+	&dev_attr_primary_cpu_nodelist.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(node_dev);
@@ -370,6 +414,42 @@ int register_cpu_under_node(unsigned int cpu, unsigned int nid)
 	return sysfs_create_link(&obj->kobj,
 				 &node_devices[nid]->dev.kobj,
 				 kobject_name(&node_devices[nid]->dev.kobj));
+}
+
+int register_memory_node_under_compute_node(unsigned int m, unsigned int p)
+{
+	struct node *init, *targ;
+	char initiator[28]; /* "primary_initiator4294967295\0" */
+	char target[25]; /* "primary_target4294967295\0" */
+	int ret;
+
+	if (!node_online(p) || !node_online(m))
+		return -ENODEV;
+	if (m == p)
+		return 0;
+
+	snprintf(initiator, sizeof(initiator), "primary_initiator%d", p);
+	snprintf(target, sizeof(target), "primary_target%d", m);
+
+	init = node_devices[p];
+	targ = node_devices[m];
+
+	ret = sysfs_create_link(&init->dev.kobj, &targ->dev.kobj, target);
+	if (ret)
+		return ret;
+
+	ret = sysfs_create_link(&targ->dev.kobj, &init->dev.kobj, initiator);
+	if (ret)
+		goto err;
+
+	node_set(m, init->primary_mem_nodes);
+	node_set(p, targ->primary_cpu_nodes);
+
+	return 0;
+ err:
+	sysfs_remove_link(&node_devices[p]->dev.kobj,
+			  kobject_name(&node_devices[m]->dev.kobj));
+	return ret;
 }
 
 int unregister_cpu_under_node(unsigned int cpu, unsigned int nid)
@@ -579,6 +659,11 @@ int __register_one_node(int nid)
 		if (cpu_to_node(cpu) == nid)
 			register_cpu_under_node(cpu, nid);
 	}
+
+	if (node_state(nid, N_MEMORY))
+		node_set(nid, node_devices[nid]->primary_mem_nodes);
+	if (node_state(nid, N_CPU))
+		node_set(nid, node_devices[nid]->primary_cpu_nodes);
 
 	/* initialize work queue for memory hot plug */
 	init_node_hugetlb_work(nid);
