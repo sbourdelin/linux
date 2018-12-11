@@ -2621,6 +2621,10 @@ int ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode,
 		goto err_hif_stop;
 	}
 
+	if (test_bit(ATH10K_FW_FEATURE_WMI_10X,
+		     ar->normal_mode_fw.fw_file.fw_features)) {
+		set_bit(WMI_SERVICE_THERM_THROT, ar->wmi.svc_map);
+	}
 	/* Some firmware revisions do not properly set up hardware rx filter
 	 * registers.
 	 *
@@ -2919,11 +2923,13 @@ static void ath10k_core_register_work(struct work_struct *work)
 		goto err_debug_destroy;
 	}
 
-	status = ath10k_thermal_register(ar);
-	if (status) {
-		ath10k_err(ar, "could not register thermal device: %d\n",
-			   status);
-		goto err_spectral_destroy;
+	if (test_bit(WMI_SERVICE_THERM_THROT, ar->wmi.svc_map)) {
+		status = ath10k_thermal_register(ar);
+		if (status) {
+			ath10k_err(ar, "could not register thermal device: %d\n",
+				   status);
+			goto err_spectral_destroy;
+		}
 	}
 
 	set_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags);
@@ -2964,7 +2970,8 @@ void ath10k_core_unregister(struct ath10k *ar)
 	if (!test_bit(ATH10K_FLAG_CORE_REGISTERED, &ar->dev_flags))
 		return;
 
-	ath10k_thermal_unregister(ar);
+	if (test_bit(WMI_SERVICE_THERM_THROT, ar->wmi.svc_map))
+		ath10k_thermal_unregister(ar);
 	/* Stop spectral before unregistering from mac80211 to remove the
 	 * relayfs debugfs file cleanly. Otherwise the parent debugfs tree
 	 * would be already be free'd recursively, leading to a double free.

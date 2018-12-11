@@ -4800,7 +4800,8 @@ static int ath10k_start(struct ieee80211_hw *hw)
 	ath10k_regd_update(ar);
 
 	ath10k_spectral_start(ar);
-	ath10k_thermal_set_throttling(ar);
+	if (test_bit(WMI_SERVICE_THERM_THROT, ar->wmi.svc_map))
+		ath10k_thermal_set_throttling(ar);
 
 	ar->radar_conf_state = ATH10K_RADAR_CONFIRMATION_IDLE;
 
