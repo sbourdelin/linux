@@ -1328,6 +1328,7 @@ static void a5xx_gpu_state_get_hlsq_regs(struct msm_gpu *gpu,
 	msm_gem_kernel_put(dumper.bo, gpu->aspace, true);
 }
 
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_DEV_COREDUMP)
 static struct msm_gpu_state *a5xx_gpu_state_get(struct msm_gpu *gpu)
 {
 	struct a5xx_gpu_state *a5xx_state = kzalloc(sizeof(*a5xx_state),
@@ -1373,8 +1374,6 @@ int a5xx_gpu_state_put(struct msm_gpu_state *state)
 	return kref_put(&state->ref, a5xx_gpu_state_destroy);
 }
 
-
-#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_DEV_COREDUMP)
 void a5xx_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 		struct drm_printer *p)
 {
@@ -1456,13 +1455,13 @@ static const struct adreno_gpu_funcs funcs = {
 		.destroy = a5xx_destroy,
 #if defined(CONFIG_DEBUG_FS) || defined(CONFIG_DEV_COREDUMP)
 		.show = a5xx_show,
+		.gpu_state_get = a5xx_gpu_state_get,
+		.gpu_state_put = a5xx_gpu_state_put,
 #endif
 #if defined(CONFIG_DEBUG_FS)
 		.debugfs_init = a5xx_debugfs_init,
 #endif
 		.gpu_busy = a5xx_gpu_busy,
-		.gpu_state_get = a5xx_gpu_state_get,
-		.gpu_state_put = a5xx_gpu_state_put,
 	},
 	.get_timestamp = a5xx_get_timestamp,
 };
