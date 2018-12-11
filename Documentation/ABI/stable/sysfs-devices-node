@@ -123,3 +123,31 @@ Description:
 		The map of memory nodes that this node has primary access.
 		Memory accesses from this node to nodes not in this map may
 		encounter a performance penalty.
+
+What:		/sys/devices/system/node/nodeX/primary_initiator_access/read_bandwidth
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		Read bandwidth in MB/s available to memory initiators found in
+		primary_cpu_nodemask.
+
+What:		/sys/devices/system/node/nodeX/primary_initiator_access/read_latency
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		Read latency in nanosecondss available to memory initiators
+		found in primary_cpu_nodemask.
+
+What:		/sys/devices/system/node/nodeX/primary_initiator_access/write_bandwidth
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		Write bandwidth in MB/s available to memory initiators found in
+		primary_cpu_nodemask.
+
+What:		/sys/devices/system/node/nodeX/primary_initiator_access/write_latency
+Date:		December 2018
+Contact:	Keith Busch <keith.busch@intel.com>
+Description:
+		Write latency in nanosecondss available to memory initiators
+		found in primary_cpu_nodemask.
