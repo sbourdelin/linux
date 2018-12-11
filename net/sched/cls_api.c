@@ -180,6 +180,23 @@ static void tcf_proto_destroy_work(struct work_struct *work)
 	rtnl_unlock();
 }
 
+static bool tcf_proto_is_unlocked(const char *kind)
+{
+	const struct tcf_proto_ops *ops;
+	bool ret;
+
+	ops = tcf_proto_lookup_ops(kind, false, NULL);
+	/* On error return false to take rtnl lock. Proto lookup/create
+	 * functions will perform lookup again and properly handle errors.
+	 */
+	if (IS_ERR(ops))
+		return false;
+
+	ret = !!(ops->flags & TCF_PROTO_OPS_DOIT_UNLOCKED);
+	module_put(ops->owner);
+	return ret;
+}
+
 static struct tcf_proto *tcf_proto_create(const char *kind, u32 protocol,
 					  u32 prio, struct tcf_chain *chain,
 					  bool rtnl_held,
@@ -1310,13 +1327,18 @@ errout:
 	return ERR_PTR(err);
 }
 
-static void tcf_block_release(struct Qdisc *q, struct tcf_block *block)
+static void tcf_block_release(struct Qdisc *q, struct tcf_block *block,
+			      bool rtnl_held)
 {
 	if (!IS_ERR_OR_NULL(block))
 		tcf_block_refcnt_put(block);
 
-	if (q)
-		qdisc_put(q);
+	if (q) {
+		if (rtnl_held)
+			qdisc_put(q);
+		else
+			qdisc_put_unlocked(q);
+	}
 }
 
 struct tcf_block_owner_item {
@@ -1992,7 +2014,7 @@ static int tc_new_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 	void *fh;
 	int err;
 	int tp_created;
-	bool rtnl_held = true;
+	bool rtnl_held = false;
 
 	if (!netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
@@ -2011,6 +2033,7 @@ replay:
 	parent = t->tcm_parent;
 	tp = NULL;
 	cl = 0;
+	block = NULL;
 
 	if (prio == 0) {
 		/* If no priority is provided by the user,
@@ -2027,8 +2050,27 @@ replay:
 
 	/* Find head of filter chain. */
 
-	block = tcf_block_find(net, &q, &parent, &cl,
-			       t->tcm_ifindex, t->tcm_block_index, extack);
+	err = __tcf_qdisc_find(net, &q, &parent, t->tcm_ifindex, false, extack);
+	if (err)
+		return err;
+
+	/* Take rtnl mutex if rtnl_held was set to true on previous iteration,
+	 * block is shared (no qdisc found), qdisc is not unlocked, classifier
+	 * type is not specified, classifier is not unlocked.
+	 */
+	if (rtnl_held ||
+	    (q && !(q->ops->cl_ops->flags & QDISC_CLASS_OPS_DOIT_UNLOCKED)) ||
+	    !tca[TCA_KIND] || !tcf_proto_is_unlocked(nla_data(tca[TCA_KIND]))) {
+		rtnl_held = true;
+		rtnl_lock();
+	}
+
+	err = __tcf_qdisc_cl_find(q, parent, &cl, t->tcm_ifindex, extack);
+	if (err)
+		goto errout;
+
+	block = __tcf_block_find(net, q, cl, t->tcm_ifindex, t->tcm_block_index,
+				 extack);
 	if (IS_ERR(block)) {
 		err = PTR_ERR(block);
 		goto errout;
@@ -2147,10 +2189,19 @@ errout_tp:
 		if (!tp_created)
 			tcf_chain_put(chain);
 	}
-	tcf_block_release(q, block);
-	if (err == -EAGAIN)
+	tcf_block_release(q, block, rtnl_held);
+
+	if (rtnl_held)
+		rtnl_unlock();
+
+	if (err == -EAGAIN) {
+		/* Take rtnl lock in case EAGAIN is caused by concurrent flush
+		 * of target chain.
+		 */
+		rtnl_held = true;
 		/* Replay the request. */
 		goto replay;
+	}
 	return err;
 
 errout_locked:
@@ -2171,12 +2222,12 @@ static int tc_del_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 	struct Qdisc *q = NULL;
 	struct tcf_chain_info chain_info;
 	struct tcf_chain *chain = NULL;
-	struct tcf_block *block;
+	struct tcf_block *block = NULL;
 	struct tcf_proto *tp = NULL;
 	unsigned long cl = 0;
 	void *fh = NULL;
 	int err;
-	bool rtnl_held = true;
+	bool rtnl_held = false;
 
 	if (!netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
@@ -2197,8 +2248,27 @@ static int tc_del_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 
 	/* Find head of filter chain. */
 
-	block = tcf_block_find(net, &q, &parent, &cl,
-			       t->tcm_ifindex, t->tcm_block_index, extack);
+	err = __tcf_qdisc_find(net, &q, &parent, t->tcm_ifindex, false, extack);
+	if (err)
+		return err;
+
+	/* Take rtnl mutex if flushing whole chain, block is shared (no qdisc
+	 * found), qdisc is not unlocked, classifier type is not specified,
+	 * classifier is not unlocked.
+	 */
+	if (!prio ||
+	    (q && !(q->ops->cl_ops->flags & QDISC_CLASS_OPS_DOIT_UNLOCKED)) ||
+	    !tca[TCA_KIND] || !tcf_proto_is_unlocked(nla_data(tca[TCA_KIND]))) {
+		rtnl_held = true;
+		rtnl_lock();
+	}
+
+	err = __tcf_qdisc_cl_find(q, parent, &cl, t->tcm_ifindex, extack);
+	if (err)
+		goto errout;
+
+	block = __tcf_block_find(net, q, cl, t->tcm_ifindex, t->tcm_block_index,
+				 extack);
 	if (IS_ERR(block)) {
 		err = PTR_ERR(block);
 		goto errout;
@@ -2279,7 +2349,11 @@ errout:
 			tcf_proto_put(tp, NULL);
 		tcf_chain_put(chain);
 	}
-	tcf_block_release(q, block);
+	tcf_block_release(q, block, rtnl_held);
+
+	if (rtnl_held)
+		rtnl_unlock();
+
 	return err;
 
 errout_locked:
@@ -2300,12 +2374,12 @@ static int tc_get_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 	struct Qdisc *q = NULL;
 	struct tcf_chain_info chain_info;
 	struct tcf_chain *chain = NULL;
-	struct tcf_block *block;
+	struct tcf_block *block = NULL;
 	struct tcf_proto *tp = NULL;
 	unsigned long cl = 0;
 	void *fh = NULL;
 	int err;
-	bool rtnl_held = true;
+	bool rtnl_held = false;
 
 	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, rtm_tca_policy, extack);
 	if (err < 0)
@@ -2323,8 +2397,26 @@ static int tc_get_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 
 	/* Find head of filter chain. */
 
-	block = tcf_block_find(net, &q, &parent, &cl,
-			       t->tcm_ifindex, t->tcm_block_index, extack);
+	err = __tcf_qdisc_find(net, &q, &parent, t->tcm_ifindex, false, extack);
+	if (err)
+		return err;
+
+	/* Take rtnl mutex if block is shared (no qdisc found), qdisc is not
+	 * unlocked, classifier type is not specified, classifier is not
+	 * unlocked.
+	 */
+	if ((q && !(q->ops->cl_ops->flags & QDISC_CLASS_OPS_DOIT_UNLOCKED)) ||
+	    !tca[TCA_KIND] || !tcf_proto_is_unlocked(nla_data(tca[TCA_KIND]))) {
+		rtnl_held = true;
+		rtnl_lock();
+	}
+
+	err = __tcf_qdisc_cl_find(q, parent, &cl, t->tcm_ifindex, extack);
+	if (err)
+		goto errout;
+
+	block = __tcf_block_find(net, q, cl, t->tcm_ifindex, t->tcm_block_index,
+				 extack);
 	if (IS_ERR(block)) {
 		err = PTR_ERR(block);
 		goto errout;
@@ -2376,7 +2468,11 @@ errout:
 			tcf_proto_put(tp, NULL);
 		tcf_chain_put(chain);
 	}
-	tcf_block_release(q, block);
+	tcf_block_release(q, block, rtnl_held);
+
+	if (rtnl_held)
+		rtnl_unlock();
+
 	return err;
 }
 
@@ -2823,7 +2919,7 @@ replay:
 errout:
 	tcf_chain_put(chain);
 errout_block:
-	tcf_block_release(q, block);
+	tcf_block_release(q, block, true);
 	if (err == -EAGAIN)
 		/* Replay the request. */
 		goto replay;
@@ -3121,10 +3217,12 @@ static int __init tc_filter_init(void)
 	if (err)
 		goto err_rhash_setup_block_ht;
 
-	rtnl_register(PF_UNSPEC, RTM_NEWTFILTER, tc_new_tfilter, NULL, 0);
-	rtnl_register(PF_UNSPEC, RTM_DELTFILTER, tc_del_tfilter, NULL, 0);
+	rtnl_register(PF_UNSPEC, RTM_NEWTFILTER, tc_new_tfilter, NULL,
+		      RTNL_FLAG_DOIT_UNLOCKED);
+	rtnl_register(PF_UNSPEC, RTM_DELTFILTER, tc_del_tfilter, NULL,
+		      RTNL_FLAG_DOIT_UNLOCKED);
 	rtnl_register(PF_UNSPEC, RTM_GETTFILTER, tc_get_tfilter,
-		      tc_dump_tfilter, 0);
+		      tc_dump_tfilter, RTNL_FLAG_DOIT_UNLOCKED);
 	rtnl_register(PF_UNSPEC, RTM_NEWCHAIN, tc_ctl_chain, NULL, 0);
 	rtnl_register(PF_UNSPEC, RTM_DELCHAIN, tc_ctl_chain, NULL, 0);
 	rtnl_register(PF_UNSPEC, RTM_GETCHAIN, tc_ctl_chain,
