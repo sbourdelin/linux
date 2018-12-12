@@ -14605,7 +14605,7 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 	if (fb->format->format == DRM_FORMAT_NV12 &&
 	    (fb->width < SKL_MIN_YUV_420_SRC_W ||
 	     fb->height < SKL_MIN_YUV_420_SRC_H ||
-	     (fb->width % 4) != 0 || (fb->height % 4) != 0)) {
+	     (fb->pitches[0] % 4) != 0 || (fb->height % 4) != 0)) {
 		DRM_DEBUG_KMS("src dimensions not correct for NV12\n");
 		goto err;
 	}
