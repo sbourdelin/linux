@@ -121,6 +121,15 @@ LIBBPF_0.0.1 {
 		libbpf_prog_type_by_name;
 		libbpf_set_print;
 		libbpf_strerror;
+		xsk__peek_cons;
+		xsk__release_cons;
+		xsk__reserve_prod;
+		xsk__submit_prod;
+		xsk__get_data;
+		xsk__create_umem;
+		xsk__create_xdp_socket;
+		xsk__delete_umem;
+		xsk__delete_xdp_socket;
 	local:
 		*;
 };

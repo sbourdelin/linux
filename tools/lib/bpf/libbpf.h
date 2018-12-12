@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <sys/types.h>  // for size_t
 #include <linux/bpf.h>
+#include <linux/if_xdp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -354,6 +355,98 @@ bpf_prog_linfo__lfind_addr_func(const struct bpf_prog_linfo *prog_linfo,
 LIBBPF_API const struct bpf_line_info *
 bpf_prog_linfo__lfind(const struct bpf_prog_linfo *prog_linfo,
 		      __u32 insn_off, __u32 nr_skip);
+
+/* Do not access these members directly. Use the functions below. */
+struct xsk_prod_ring {
+	__u32 cached_prod;
+	__u32 cached_cons;
+	__u32 mask;
+	__u32 size;
+	__u32 *producer;
+	__u32 *consumer;
+	void *ring;
+};
+
+/* Do not access these members directly. Use the functions below. */
+struct xsk_cons_ring {
+	__u32 cached_prod;
+	__u32 cached_cons;
+	__u32 mask;
+	__u32 size;
+	__u32 *producer;
+	__u32 *consumer;
+	void *ring;
+};
+
+static inline __u64 *xsk__get_fill_desc(struct xsk_prod_ring *fill,
+				       __u64 idx)
+{
+	__u64 *descs = (__u64 *)fill->ring;
+
+	return &descs[idx & fill->mask];
+}
+
+static inline __u64 *xsk__get_completion_desc(struct xsk_cons_ring *comp,
+					     __u64 idx)
+{
+	__u64 *descs = (__u64 *)comp->ring;
+
+	return &descs[idx & comp->mask];
+}
+
+static inline struct xdp_desc *xsk__get_tx_desc(struct xsk_prod_ring *tx,
+					       __u64 idx)
+{
+	struct xdp_desc *descs = (struct xdp_desc *)tx->ring;
+
+	return &descs[idx & tx->mask];
+}
+
+static inline struct xdp_desc *xsk__get_rx_desc(struct xsk_cons_ring *rx,
+					       __u64 idx)
+{
+	struct xdp_desc *descs = (struct xdp_desc *)rx->ring;
+
+	return &descs[idx & rx->mask];
+}
+
+LIBBPF_API size_t xsk__peek_cons(struct xsk_cons_ring *ring, size_t nb,
+				__u32 *idx);
+LIBBPF_API void xsk__release_cons(struct xsk_cons_ring *ring);
+LIBBPF_API size_t xsk__reserve_prod(struct xsk_prod_ring *ring, size_t nb,
+				   __u32 *idx);
+LIBBPF_API void xsk__submit_prod(struct xsk_prod_ring *ring);
+
+LIBBPF_API void *xsk__get_data(void *umem_area, __u64 addr);
+
+#define XSK__DEFAULT_NUM_DESCS      2048
+#define XSK__DEFAULT_FRAME_SHIFT    11 /* 2048 bytes */
+#define XSK__DEFAULT_FRAME_SIZE     (1 << XSK__DEFAULT_FRAME_SHIFT)
+#define XSK__DEFAULT_FRAME_HEADROOM 0
+
+struct xsk_umem_config {
+	__u32 fq_size;
+	__u32 cq_size;
+	__u32 frame_size;
+	__u32 frame_headroom;
+};
+
+struct xsk_xdp_socket_config {
+	__u32 rx_size;
+	__u32 tx_size;
+};
+
+/* Set config to XSK_DEFAULT_CONFIG to get the default configuration. */
+LIBBPF_API int xsk__create_umem(void *umem_area, __u64 size,
+			       struct xsk_prod_ring *fq,
+			       struct xsk_cons_ring *cq,
+			       struct xsk_umem_config *config);
+LIBBPF_API int xsk__create_xdp_socket(int umem_fd, struct xsk_cons_ring *rx,
+				     struct xsk_prod_ring *tx,
+				     struct xsk_xdp_socket_config *config);
+/* Returns 0 for success. */
+LIBBPF_API int xsk__delete_umem(int fd);
+LIBBPF_API int xsk__delete_xdp_socket(int fd);
 
 #ifdef __cplusplus
 } /* extern "C" */
