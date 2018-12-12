@@ -1054,7 +1054,7 @@ static void rtl_op_bss_info_changed(struct ieee80211_hw *hw,
 					 "BSS_CHANGED_BEACON_ENABLED\n");
 
 				/*start hw beacon interrupt. */
-				/*rtlpriv->cfg->ops->set_bcn_reg(hw); */
+				rtlpriv->cfg->ops->set_bcn_reg(hw);
 				mac->beacon_enabled = 1;
 				rtlpriv->cfg->ops->update_interrupt_mask(hw,
 						rtlpriv->cfg->maps
