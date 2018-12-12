@@ -18,6 +18,7 @@
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/set_memory.h>
 #include <linux/debugobjects.h>
 #include <linux/kallsyms.h>
 #include <linux/list.h>
@@ -38,6 +39,11 @@
 
 #include "internal.h"
 
+struct vfree_work {
+	struct llist_node node;
+	void *addr;
+};
+
 struct vfree_deferred {
 	struct llist_head list;
 	struct work_struct wq;
@@ -50,9 +56,13 @@ static void free_work(struct work_struct *w)
 {
 	struct vfree_deferred *p = container_of(w, struct vfree_deferred, wq);
 	struct llist_node *t, *llnode;
+	struct vfree_work *cur;
 
-	llist_for_each_safe(llnode, t, llist_del_all(&p->list))
-		__vunmap((void *)llnode, 1);
+	llist_for_each_safe(llnode, t, llist_del_all(&p->list)) {
+		cur = container_of(llnode, struct vfree_work, node);
+		__vunmap(cur->addr, 1);
+		kfree(cur);
+	}
 }
 
 /*** Page table manipulation functions ***/
@@ -1494,6 +1504,48 @@ struct vm_struct *remove_vm_area(const void *addr)
 	return NULL;
 }
 
+/*
+ * This function handles unmapping and resetting the direct map as efficiently
+ * as it can with cross arch functions. The three categories of architectures
+ * are:
+ *   1. Architectures with no set_memory implementations and no direct map
+ *      permissions.
+ *   2. Architectures with set_memory implementations but no direct map
+ *      permissions
+ *   3. Architectures with set_memory implementations and direct map permissions
+ */
+void __weak arch_vunmap(struct vm_struct *area, int deallocate_pages)
+{
+	unsigned long addr = (unsigned long)area->addr;
+	int immediate = area->flags & VM_IMMEDIATE_UNMAP;
+	int special = area->flags & VM_HAS_SPECIAL_PERMS;
+
+	/*
+	 * In case of 2 and 3, use this general way of resetting the permissions
+	 * on the directmap. Do NX before RW, in case of X, so there is no W^X
+	 * violation window.
+	 *
+	 * For case 1 these will be noops.
+	 */
+	if (immediate)
+		set_memory_nx(addr, area->nr_pages);
+	if (deallocate_pages && special)
+		set_memory_rw(addr, area->nr_pages);
+
+	/* Always actually remove the area */
+	remove_vm_area(area->addr);
+
+	/*
+	 * Need to flush the TLB before freeing pages in the case of this flag.
+	 * As long as that's happening, unmap aliases.
+	 *
+	 * For 2 and 3, this will not be needed because of the set_memory_nx
+	 * above, because the stale TLBs will be NX.
+	 */
+	if (immediate && !IS_ENABLED(ARCH_HAS_SET_MEMORY))
+		vm_unmap_aliases();
+}
+
 static void __vunmap(const void *addr, int deallocate_pages)
 {
 	struct vm_struct *area;
@@ -1515,7 +1567,8 @@ static void __vunmap(const void *addr, int deallocate_pages)
 	debug_check_no_locks_freed(area->addr, get_vm_area_size(area));
 	debug_check_no_obj_freed(area->addr, get_vm_area_size(area));
 
-	remove_vm_area(addr);
+	arch_vunmap(area, deallocate_pages);
+
 	if (deallocate_pages) {
 		int i;
 
@@ -1542,8 +1595,15 @@ static inline void __vfree_deferred(const void *addr)
 	 * nother cpu's list.  schedule_work() should be fine with this too.
 	 */
 	struct vfree_deferred *p = raw_cpu_ptr(&vfree_deferred);
+	struct vfree_work *w = kmalloc(sizeof(struct vfree_work), GFP_ATOMIC);
 
-	if (llist_add((struct llist_node *)addr, &p->list))
+	/* If no memory for the deferred list node, give up */
+	if (!w)
+		return;
+
+	w->addr = (void *)addr;
+
+	if (llist_add(&w->node, &p->list))
 		schedule_work(&p->wq);
 }
 
@@ -1925,8 +1985,9 @@ EXPORT_SYMBOL(vzalloc_node);
 
 void *vmalloc_exec(unsigned long size)
 {
-	return __vmalloc_node(size, 1, GFP_KERNEL, PAGE_KERNEL_EXEC,
-			      NUMA_NO_NODE, __builtin_return_address(0));
+	return __vmalloc_node_range(size, 1, VMALLOC_START, VMALLOC_END,
+			GFP_KERNEL, PAGE_KERNEL_EXEC, VM_IMMEDIATE_UNMAP,
+			NUMA_NO_NODE, __builtin_return_address(0));
 }
 
 #if defined(CONFIG_64BIT) && defined(CONFIG_ZONE_DMA32)
