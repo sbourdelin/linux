@@ -624,6 +624,24 @@ int intel_color_check(struct drm_crtc *crtc,
 	gamma_length = INTEL_INFO(dev_priv)->color.gamma_lut_size;
 
 	/*
+	 * GLK and gen11 only accept a single value for red, green, and
+	 * blue in the degamma table.  Make sure userspace didn't try to
+	 * pass us something we can't handle.
+	 */
+	if (IS_GEMINILAKE(dev_priv) || INTEL_GEN(dev_priv) >= 11) {
+		if (!drm_color_lut_has_equal_channels(crtc_state->base.degamma_lut)) {
+			DRM_DEBUG_KMS("All degamma entries must have equal r/g/b\n");
+			return -EINVAL;
+		}
+	}
+
+	/* All platforms require that the degamma curve be non-decreasing */
+	if (!drm_color_lut_is_increasing(crtc_state->base.degamma_lut)) {
+		DRM_DEBUG_KMS("Degamma curve must never decrease.\n");
+		return -EINVAL;
+	}
+
+	/*
 	 * We allow both degamma & gamma luts at the right size or
 	 * NULL.
 	 */
