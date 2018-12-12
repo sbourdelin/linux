@@ -1480,8 +1480,15 @@ static int ubifs_migrate_page(struct address_space *mapping,
 		struct page *newpage, struct page *page, enum migrate_mode mode)
 {
 	int rc;
+	int extra_count;
 
-	rc = migrate_page_move_mapping(mapping, newpage, page, NULL, mode, 0);
+	/*
+	 * UBIFS is using PagePrivate() which can have different meanings across
+	 * filesystems. So here adjusting the 'extra_count' make it work.
+	 */
+	extra_count = 0 - page_has_private(page);
+	rc = migrate_page_move_mapping(mapping, newpage,
+			page, NULL, mode, extra_count);
 	if (rc != MIGRATEPAGE_SUCCESS)
 		return rc;
 
