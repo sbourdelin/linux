@@ -12,4 +12,6 @@ int bpfilter_ip_get_sockopt(struct sock *sk, int optname, char __user *optval,
 extern int (*bpfilter_process_sockopt)(struct sock *sk, int optname,
 				       char __user *optval,
 				       unsigned int optlen, bool is_set);
+extern int (*bpfilter_start_umh)(void);
+
 #endif

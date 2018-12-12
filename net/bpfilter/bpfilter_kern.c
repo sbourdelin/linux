@@ -87,7 +87,7 @@ out:
 	return ret;
 }
 
-static int __init load_umh(void)
+int start_umh(void)
 {
 	int err;
 
@@ -111,8 +111,18 @@ static int __init load_umh(void)
 	return 0;
 }
 
+static int __init load_umh(void)
+{
+	if (IS_ENABLED(CONFIG_INET))
+		bpfilter_start_umh = &start_umh;
+
+	return start_umh();
+}
+
 static void __exit fini_umh(void)
 {
+	if (IS_ENABLED(CONFIG_INET))
+		bpfilter_start_umh = NULL;
 	stop_umh();
 }
 module_init(load_umh);

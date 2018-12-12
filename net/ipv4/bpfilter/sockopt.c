@@ -10,6 +10,9 @@ int (*bpfilter_process_sockopt)(struct sock *sk, int optname,
 				unsigned int optlen, bool is_set);
 EXPORT_SYMBOL_GPL(bpfilter_process_sockopt);
 
+int (*bpfilter_start_umh)(void);
+EXPORT_SYMBOL_GPL(bpfilter_start_umh);
+
 static int bpfilter_mbox_request(struct sock *sk, int optname,
 				 char __user *optval,
 				 unsigned int optlen, bool is_set)
@@ -20,7 +23,8 @@ static int bpfilter_mbox_request(struct sock *sk, int optname,
 		if (err)
 			return err;
 		if (!bpfilter_process_sockopt)
-			return -ECHILD;
+			if (!bpfilter_start_umh || bpfilter_start_umh())
+				return -ECHILD;
 	}
 	return bpfilter_process_sockopt(sk, optname, optval, optlen, is_set);
 }
