@@ -3604,30 +3604,24 @@ struct ib_mr *bnxt_re_reg_user_mr(struct ib_pd *ib_pd, u64 start, u64 length,
 	}
 	mr->qplib_mr.total_size = length;
 
-	pbl_tbl = kcalloc(umem_pgs, sizeof(u64 *), GFP_KERNEL);
-	if (!pbl_tbl) {
-		rc = -ENOMEM;
-		goto free_umem;
-	}
-
 	page_shift = umem->page_shift;
 
 	if (!bnxt_re_page_size_ok(page_shift)) {
 		dev_err(rdev_to_dev(rdev), "umem page size unsupported!");
 		rc = -EFAULT;
-		goto fail;
+		goto free_umem;
 	}
 
-	if (!umem->hugetlb && length > BNXT_RE_MAX_MR_SIZE_LOW) {
-		dev_err(rdev_to_dev(rdev), "Requested MR Sz:%llu Max sup:%llu",
-			length,	(u64)BNXT_RE_MAX_MR_SIZE_LOW);
-		rc = -EINVAL;
-		goto fail;
-	}
 	if (umem->hugetlb && length > BNXT_RE_PAGE_SIZE_2M) {
 		page_shift = BNXT_RE_PAGE_SHIFT_2M;
 		dev_warn(rdev_to_dev(rdev), "umem hugetlb set page_size %x",
 			 1 << page_shift);
+	}
+
+	pbl_tbl = vmalloc(umem_pgs * sizeof(u64 *));
+	if (!pbl_tbl) {
+		rc = -EINVAL;
+		goto free_umem;
 	}
 
 	/* Map umem buf ptrs to the PBL */
@@ -3639,7 +3633,7 @@ struct ib_mr *bnxt_re_reg_user_mr(struct ib_pd *ib_pd, u64 start, u64 length,
 		goto fail;
 	}
 
-	kfree(pbl_tbl);
+	vfree(pbl_tbl);
 
 	mr->ib_mr.lkey = mr->qplib_mr.lkey;
 	mr->ib_mr.rkey = mr->qplib_mr.lkey;
@@ -3647,7 +3641,7 @@ struct ib_mr *bnxt_re_reg_user_mr(struct ib_pd *ib_pd, u64 start, u64 length,
 
 	return &mr->ib_mr;
 fail:
-	kfree(pbl_tbl);
+	vfree(pbl_tbl);
 free_umem:
 	ib_umem_release(umem);
 free_mrw:
