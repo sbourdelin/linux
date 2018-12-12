@@ -1158,7 +1158,7 @@ struct gfar_private {
 	int oldspeed;
 	int oldduplex;
 	int oldlink;
-
+	bool no_carrier;
 	uint32_t msg_enable;
 
 	struct work_struct reset_task;
