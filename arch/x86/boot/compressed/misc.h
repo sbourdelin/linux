@@ -116,3 +116,9 @@ static inline void console_init(void)
 void set_sev_encryption_mask(void);
 
 #endif
+
+/* acpi.c */
+#ifdef CONFIG_EARLY_PARSE_RSDP
+/* Max length of 64-bit hex address string is 18, prefix "0x" + 16 hex digit. */
+#define MAX_ADDRESS_LENGTH 18
+#endif

@@ -2138,6 +2138,16 @@ config X86_NEED_RELOCS
 	def_bool y
 	depends on RANDOMIZE_BASE || (X86_32 && RELOCATABLE)
 
+config EARLY_PARSE_RSDP
+	bool "Parse RSDP pointer on compressed period for KASLR"
+	def_bool y
+	depends on RANDOMIZE_BASE && MEMORY_HOTREMOVE
+	help
+	  This option parses RSDP in compressed period. Works
+	  for KASLR to get memory information from SRAT table and choose
+	  immovable memory to extract kernel.
+	  Say Y if you want to use both KASLR and memory-hotremove.
+
 config PHYSICAL_ALIGN
 	hex "Alignment value to which kernel should be aligned"
 	default "0x200000"
