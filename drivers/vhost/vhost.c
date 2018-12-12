@@ -368,6 +368,10 @@ static int vhost_worker(void *data)
 		}
 	}
 	unuse_mm(dev->mm);
+	/* current->mm needs to be processed by the later exit_mm() */
+	task_lock(current);
+	current->mm = dev->mm;
+	task_unlock(current);
 	set_fs(oldfs);
 	return 0;
 }
