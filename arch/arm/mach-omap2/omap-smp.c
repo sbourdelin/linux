@@ -173,12 +173,6 @@ static void omap4_secondary_init(unsigned int cpu)
 		/* Enable ACR to allow for ICUALLU workaround */
 		omap5_secondary_harden_predictor();
 	}
-
-	/*
-	 * Synchronise with the boot thread.
-	 */
-	spin_lock(&boot_lock);
-	spin_unlock(&boot_lock);
 }
 
 static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
@@ -186,12 +180,6 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
 	static struct clockdomain *cpu1_clkdm;
 	static bool booted;
 	static struct powerdomain *cpu1_pwrdm;
-
-	/*
-	 * Set synchronisation state between this boot processor
-	 * and the secondary one
-	 */
-	spin_lock(&boot_lock);
 
 	/*
 	 * Update the AuxCoreBoot0 with boot state for secondary core.
@@ -265,12 +253,6 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
 	}
 
 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-
-	/*
-	 * Now the secondary core is starting up let it run its
-	 * calibrations, then wait for it to finish
-	 */
-	spin_unlock(&boot_lock);
 
 	return 0;
 }
