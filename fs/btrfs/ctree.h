@@ -1152,6 +1152,17 @@ struct btrfs_subvolume_writers {
 #define BTRFS_ROOT_DEAD_RELOC_TREE	9
 
 /*
+ * Record swapped tree blocks of a file/subvolume tree for delayed subtree
+ * trace code. For detail check comment in fs/btrfs/qgroup.c.
+ */
+struct btrfs_qgroup_swapped_blocks {
+	spinlock_t lock;
+	struct rb_root blocks[BTRFS_MAX_LEVEL];
+	/* RM_EMPTY_ROOT() of above blocks[] */
+	bool swapped;
+};
+
+/*
  * in ram representation of the tree.  extent_root is used for all allocations
  * and for the extent tree extent_root root.
  */
@@ -1274,6 +1285,8 @@ struct btrfs_root {
 	spinlock_t qgroup_meta_rsv_lock;
 	u64 qgroup_meta_rsv_pertrans;
 	u64 qgroup_meta_rsv_prealloc;
+
+	struct btrfs_qgroup_swapped_blocks swapped_blocks;
 
 #ifdef CONFIG_BTRFS_FS_RUN_SANITY_TESTS
 	u64 alloc_bytenr;
