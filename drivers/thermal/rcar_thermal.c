@@ -31,8 +31,6 @@
 #include <linux/spinlock.h>
 #include <linux/thermal.h>
 
-#include "thermal_hwmon.h"
-
 #define IDLE_INTERVAL	5000
 
 #define COMMON_STR	0x00
@@ -64,6 +62,10 @@ struct rcar_thermal_chip {
 	unsigned int irq_per_ch : 1;
 	unsigned int needs_suspend_resume : 1;
 	unsigned int nirqs;
+};
+
+static struct thermal_zone_params rcar_thermal_params = {
+	.no_hwmon	= false,
 };
 
 static const struct rcar_thermal_chip rcar_thermal = {
@@ -470,9 +472,7 @@ static int rcar_thermal_remove(struct platform_device *pdev)
 	rcar_thermal_for_each_priv(priv, common) {
 		rcar_thermal_irq_disable(priv);
 		cancel_delayed_work_sync(&priv->work);
-		if (priv->chip->use_of_thermal)
-			thermal_remove_hwmon_sysfs(priv->zone);
-		else
+		if (!priv->chip->use_of_thermal)
 			thermal_zone_device_unregister(priv->zone);
 	}
 
@@ -566,32 +566,25 @@ static int rcar_thermal_probe(struct platform_device *pdev)
 		if (ret < 0)
 			goto error_unregister;
 
-		if (chip->use_of_thermal)
-			priv->zone = devm_thermal_zone_of_sensor_register(
+		if (chip->use_of_thermal) {
+			priv->zone =
+				devm_thermal_zone_of_sensor_register_params(
 						dev, i, priv,
-						&rcar_thermal_zone_of_ops);
-		else
+						&rcar_thermal_zone_of_ops,
+						&rcar_thermal_params);
+		} else {
 			priv->zone = thermal_zone_device_register(
 						"rcar_thermal",
 						1, 0, priv,
 						&rcar_thermal_zone_ops, NULL, 0,
 						idle);
+		}
+
 		if (IS_ERR(priv->zone)) {
 			dev_err(dev, "can't register thermal zone\n");
 			ret = PTR_ERR(priv->zone);
 			priv->zone = NULL;
 			goto error_unregister;
-		}
-
-		if (chip->use_of_thermal) {
-			/*
-			 * thermal_zone doesn't enable hwmon as default,
-			 * but, enable it here to keep compatible
-			 */
-			priv->zone->tzp->no_hwmon = false;
-			ret = thermal_add_hwmon_sysfs(priv->zone);
-			if (ret)
-				goto error_unregister;
 		}
 
 		rcar_thermal_irq_enable(priv);
