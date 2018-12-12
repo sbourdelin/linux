@@ -587,7 +587,7 @@ enum {
 
 struct nvme_sgl_desc {
 	__le64	addr;
-	__le32	length;
+	__le64	length;
 	__u8	rsvd[3];
 	__u8	type;
 };

@@ -44,7 +44,7 @@
  * require an sg allocation that needs more than a page of data.
  */
 #define NVME_MAX_KB_SZ	4096
-#define NVME_MAX_SEGS	127
+#define NVME_MAX_SEGS	88
 
 static int use_threaded_interrupts;
 module_param(use_threaded_interrupts, int, 0);
@@ -549,8 +549,8 @@ static void nvme_print_sgl(struct scatterlist *sgl, int nents)
 
 	for_each_sg(sgl, sg, nents, i) {
 		dma_addr_t phys = sg_phys(sg);
-		pr_warn("sg[%d] phys_addr:%pad offset:%d length:%d "
-			"dma_address:%pad dma_length:%d\n",
+		pr_warn("sg[%d] phys_addr:%pad offset:%lu length:%zu "
+			"dma_address:%pad dma_length:%zu\n",
 			i, &phys, sg->offset, sg->length, &sg_dma_address(sg),
 			sg_dma_len(sg));
 	}
@@ -563,7 +563,7 @@ static blk_status_t nvme_pci_setup_prps(struct nvme_dev *dev,
 	struct dma_pool *pool;
 	int length = blk_rq_payload_bytes(req);
 	struct scatterlist *sg = iod->sg;
-	int dma_len = sg_dma_len(sg);
+	u64 dma_len = sg_dma_len(sg);
 	u64 dma_addr = sg_dma_address(sg);
 	u32 page_size = dev->ctrl.page_size;
 	int offset = dma_addr & (page_size - 1);
