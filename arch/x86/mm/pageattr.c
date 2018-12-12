@@ -2248,9 +2248,7 @@ int set_pages_rw(struct page *page, int numpages)
 	return set_memory_rw(addr, numpages);
 }
 
-#ifdef CONFIG_DEBUG_PAGEALLOC
-
-static int __set_pages_p(struct page *page, int numpages)
+int set_pages_p_noflush(struct page *page, int numpages)
 {
 	unsigned long tempaddr = (unsigned long) page_address(page);
 	struct cpa_data cpa = { .vaddr = &tempaddr,
@@ -2269,7 +2267,7 @@ static int __set_pages_p(struct page *page, int numpages)
 	return __change_page_attr_set_clr(&cpa, 0);
 }
 
-static int __set_pages_np(struct page *page, int numpages)
+int set_pages_np_noflush(struct page *page, int numpages)
 {
 	unsigned long tempaddr = (unsigned long) page_address(page);
 	struct cpa_data cpa = { .vaddr = &tempaddr,
@@ -2288,6 +2286,7 @@ static int __set_pages_np(struct page *page, int numpages)
 	return __change_page_attr_set_clr(&cpa, 0);
 }
 
+#ifdef CONFIG_DEBUG_PAGEALLOC
 void __kernel_map_pages(struct page *page, int numpages, int enable)
 {
 	if (PageHighMem(page))
@@ -2303,9 +2302,9 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
 	 * and hence no memory allocations during large page split.
 	 */
 	if (enable)
-		__set_pages_p(page, numpages);
+		set_pages_p_noflush(page, numpages);
 	else
-		__set_pages_np(page, numpages);
+		set_pages_np_noflush(page, numpages);
 
 	/*
 	 * We should perform an IPI and flush all tlbs,

@@ -84,6 +84,8 @@ int set_pages_x(struct page *page, int numpages);
 int set_pages_nx(struct page *page, int numpages);
 int set_pages_ro(struct page *page, int numpages);
 int set_pages_rw(struct page *page, int numpages);
+int set_pages_np_noflush(struct page *page, int numpages);
+int set_pages_p_noflush(struct page *page, int numpages);
 
 extern int kernel_set_to_readonly;
 void set_kernel_text_rw(void);
