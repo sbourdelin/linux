@@ -9,9 +9,17 @@ int bpfilter_ip_set_sockopt(struct sock *sk, int optname, char __user *optval,
 			    unsigned int optlen);
 int bpfilter_ip_get_sockopt(struct sock *sk, int optname, char __user *optval,
 			    int __user *optlen);
-extern int (*bpfilter_process_sockopt)(struct sock *sk, int optname,
-				       char __user *optval,
-				       unsigned int optlen, bool is_set);
-extern int (*bpfilter_start_umh)(void);
+
+struct bpfilter_umh_ops {
+	int (*process_sockopt)(struct sock *sk, int optname,
+			       char __user *optval,
+			       unsigned int optlen, bool is_set);
+	int (*start_umh)(void);
+	/*
+	 * since ip_getsockopt() can run in parallel, serialize access to umh.
+	 */
+	struct mutex mutex;
+};
+extern struct bpfilter_umh_ops bpfilter_ops;
 
 #endif

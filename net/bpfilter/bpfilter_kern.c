@@ -14,8 +14,6 @@ extern char bpfilter_umh_start;
 extern char bpfilter_umh_end;
 
 static struct umh_info info;
-/* since ip_getsockopt() can run in parallel, serialize access to umh */
-static DEFINE_MUTEX(bpfilter_lock);
 
 static void shutdown_umh(struct umh_info *info)
 {
@@ -33,19 +31,12 @@ static void shutdown_umh(struct umh_info *info)
 	info->pid = 0;
 }
 
-static void __stop_umh(void)
-{
-	if (IS_ENABLED(CONFIG_INET)) {
-		bpfilter_process_sockopt = NULL;
-		shutdown_umh(&info);
-	}
-}
-
 static void stop_umh(void)
 {
-	mutex_lock(&bpfilter_lock);
-	__stop_umh();
-	mutex_unlock(&bpfilter_lock);
+	if (IS_ENABLED(CONFIG_INET)) {
+		bpfilter_ops.process_sockopt = NULL;
+		shutdown_umh(&info);
+	}
 }
 
 static int __bpfilter_process_sockopt(struct sock *sk, int optname,
@@ -63,13 +54,12 @@ static int __bpfilter_process_sockopt(struct sock *sk, int optname,
 	req.cmd = optname;
 	req.addr = (long __force __user)optval;
 	req.len = optlen;
-	mutex_lock(&bpfilter_lock);
 	if (!info.pid)
 		goto out;
 	n = __kernel_write(info.pipe_to_umh, &req, sizeof(req), &pos);
 	if (n != sizeof(req)) {
 		pr_err("write fail %zd\n", n);
-		__stop_umh();
+		stop_umh();
 		ret = -EFAULT;
 		goto out;
 	}
@@ -77,13 +67,12 @@ static int __bpfilter_process_sockopt(struct sock *sk, int optname,
 	n = kernel_read(info.pipe_from_umh, &reply, sizeof(reply), &pos);
 	if (n != sizeof(reply)) {
 		pr_err("read fail %zd\n", n);
-		__stop_umh();
+		stop_umh();
 		ret = -EFAULT;
 		goto out;
 	}
 	ret = reply.status;
 out:
-	mutex_unlock(&bpfilter_lock);
 	return ret;
 }
 
@@ -106,7 +95,7 @@ int start_umh(void)
 		return -EFAULT;
 	}
 	if (IS_ENABLED(CONFIG_INET))
-		bpfilter_process_sockopt = &__bpfilter_process_sockopt;
+		bpfilter_ops.process_sockopt = &__bpfilter_process_sockopt;
 
 	return 0;
 }
@@ -114,16 +103,18 @@ int start_umh(void)
 static int __init load_umh(void)
 {
 	if (IS_ENABLED(CONFIG_INET))
-		bpfilter_start_umh = &start_umh;
+		bpfilter_ops.start_umh = &start_umh;
 
 	return start_umh();
 }
 
 static void __exit fini_umh(void)
 {
+	mutex_lock(&bpfilter_ops.mutex);
 	if (IS_ENABLED(CONFIG_INET))
-		bpfilter_start_umh = NULL;
+		bpfilter_ops.start_umh = NULL;
 	stop_umh();
+	mutex_unlock(&bpfilter_ops.mutex);
 }
 module_init(load_umh);
 module_exit(fini_umh);
