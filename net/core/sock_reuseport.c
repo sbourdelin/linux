@@ -204,7 +204,7 @@ void reuseport_detach_sock(struct sock *sk)
 	if (reuse->reuseport_id)
 		bpf_sk_reuseport_detach(sk);
 
-	rcu_assign_pointer(sk->sk_reuseport_cb, NULL);
+	RCU_INIT_POINTER(sk->sk_reuseport_cb, NULL);
 
 	for (i = 0; i < reuse->num_socks; i++) {
 		if (reuse->socks[i] == sk) {
