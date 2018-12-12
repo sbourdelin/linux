@@ -44,14 +44,14 @@ config PSTORE_LZ4HC_COMPRESS
 	  This option enables LZ4HC (high compression) mode algorithm.
 
 config PSTORE_842_COMPRESS
-	bool "842 compression"
+	tristate "842 compression"
 	depends on PSTORE
 	select CRYPTO_842
 	help
 	  This option enables 842 compression algorithm support.
 
 config PSTORE_ZSTD_COMPRESS
-	bool "zstd compression"
+	tristate "zstd compression"
 	depends on PSTORE
 	select CRYPTO_ZSTD
 	help
