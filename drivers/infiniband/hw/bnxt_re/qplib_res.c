@@ -164,7 +164,7 @@ int bnxt_qplib_alloc_init_hwq(struct pci_dev *pdev, struct bnxt_qplib_hwq *hwq,
 			      u32 *elements, u32 element_size, u32 aux,
 			      u32 pg_size, enum bnxt_qplib_hwq_type hwq_type)
 {
-	u32 pages, slots, size, aux_pages = 0, aux_size = 0;
+	u32 pages, slots, size, aux_pages = 0, aux_size = 0, num_pdes, alloc_sz;
 	dma_addr_t *src_phys_ptr, **dst_virt_ptr;
 	int i, rc;
 
@@ -192,18 +192,41 @@ int bnxt_qplib_alloc_init_hwq(struct pci_dev *pdev, struct bnxt_qplib_hwq *hwq,
 	}
 
 	/* Alloc the 1st memory block; can be a PDL/PTL/PBL */
-	if (sghead && (pages == MAX_PBL_LVL_0_PGS))
+	if (sghead && pages == MAX_PBL_LVL_0_PGS) {
 		rc = __alloc_pbl(pdev, &hwq->pbl[PBL_LVL_0], sghead,
 				 pages, pg_size);
-	else
-		rc = __alloc_pbl(pdev, &hwq->pbl[PBL_LVL_0], NULL, 1, pg_size);
+	} else {
+		/*
+		 * Find out how many PDEs it takes to store all the PBLs(ptrs to
+		 * actual user pages).
+		 * We still need to allocate 1 contigous page to store all these
+		 * effectively logical PDEs though for HW access
+		 */
+		if (hwq_type == HWQ_TYPE_MR) {
+			num_pdes = pages >> MAX_PDL_LVL_SHIFT;
+			if (num_pdes) {
+				alloc_sz = num_pdes * pg_size;
+				dev_dbg(&pdev->dev, "num_pdes = %d alloc_sz 0x%x\n",
+					num_pdes, alloc_sz);
+				rc = __alloc_pbl(pdev, &hwq->pbl[PBL_LVL_0],
+						 NULL, 1, alloc_sz);
+
+			} else {
+				rc = __alloc_pbl(pdev, &hwq->pbl[PBL_LVL_0],
+						 NULL, 1, pg_size);
+			}
+		} else {
+			rc = __alloc_pbl(pdev, &hwq->pbl[PBL_LVL_0], NULL,
+					 1, pg_size);
+		}
+	}
 	if (rc)
 		goto fail;
 
 	hwq->level = PBL_LVL_0;
 
 	if (pages > MAX_PBL_LVL_0_PGS) {
-		if (pages > MAX_PBL_LVL_1_PGS) {
+		if (pages > MAX_PBL_LVL_1_PGS && hwq_type != HWQ_TYPE_MR) {
 			/* 2 levels of indirection */
 			rc = __alloc_pbl(pdev, &hwq->pbl[PBL_LVL_1], NULL,
 					 MAX_PBL_LVL_1_PGS_FOR_LVL_2, pg_size);
@@ -255,9 +278,24 @@ int bnxt_qplib_alloc_init_hwq(struct pci_dev *pdev, struct bnxt_qplib_hwq *hwq,
 			dst_virt_ptr =
 				(dma_addr_t **)hwq->pbl[PBL_LVL_0].pg_arr;
 			src_phys_ptr = hwq->pbl[PBL_LVL_1].pg_map_arr;
-			for (i = 0; i < hwq->pbl[PBL_LVL_1].pg_count; i++) {
-				dst_virt_ptr[PTR_PG(i)][PTR_IDX(i)] =
-					src_phys_ptr[i] | flag;
+
+			if (hwq_type == HWQ_TYPE_MR) {
+				/*
+				 * For MR it is expected that we supply only
+				 * 1 contigous page i.e only 1 entry in the PDL
+				 * that will contain all the PBLs for the user
+				 * supplied memory region
+				 */
+				for (i = 0; i < hwq->pbl[PBL_LVL_1].pg_count;
+				     i++) {
+					dst_virt_ptr[0][i] = src_phys_ptr[i] |
+								flag;
+				}
+			} else {
+				for (i = 0; i < hwq->pbl[PBL_LVL_1].pg_count;
+				     i++)
+					dst_virt_ptr[PTR_PG(i)][PTR_IDX(i)] =
+						src_phys_ptr[i] | flag;
 			}
 			if (hwq_type == HWQ_TYPE_QUEUE) {
 				/* Find the last pg of the size */

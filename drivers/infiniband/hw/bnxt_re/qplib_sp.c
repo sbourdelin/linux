@@ -668,11 +668,11 @@ int bnxt_qplib_reg_mr(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mr,
 		pages = pg_ptrs >> MAX_PBL_LVL_1_PGS_SHIFT;
 		if (!pages)
 			pages++;
-
-		if (pages > MAX_PBL_LVL_1_PGS) {
+		/* Limit max MR size to 256 GB eventhough HW supports more */
+		if (pages > MAX_PBL_LVL_2_PGS) {
 			dev_err(&res->pdev->dev,
 				"SP: Reg MR pages requested (0x%x) exceeded max (0x%x)\n",
-				pages, MAX_PBL_LVL_1_PGS);
+				pages, MAX_PBL_LVL_2_PGS);
 			return -ENOMEM;
 		}
 		/* Free the hwq if it already exist, must be a rereg */
@@ -684,7 +684,7 @@ int bnxt_qplib_reg_mr(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mr,
 		rc = bnxt_qplib_alloc_init_hwq(res->pdev, &mr->hwq, NULL, 0,
 					       &mr->hwq.max_elements,
 					       PAGE_SIZE, 0, PAGE_SIZE,
-					       HWQ_TYPE_CTX);
+					       HWQ_TYPE_MR);
 		if (rc) {
 			dev_err(&res->pdev->dev,
 				"SP: Reg MR memory allocation failed\n");

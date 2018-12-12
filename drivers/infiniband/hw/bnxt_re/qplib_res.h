@@ -55,12 +55,14 @@ extern const struct bnxt_qplib_gid bnxt_qplib_gid_zero;
 enum bnxt_qplib_hwq_type {
 	HWQ_TYPE_CTX,
 	HWQ_TYPE_QUEUE,
-	HWQ_TYPE_L2_CMPL
+	HWQ_TYPE_L2_CMPL,
+	HWQ_TYPE_MR
 };
 
 #define MAX_PBL_LVL_0_PGS		1
 #define MAX_PBL_LVL_1_PGS		512
 #define MAX_PBL_LVL_1_PGS_SHIFT		9
+#define MAX_PDL_LVL_SHIFT		9
 #define MAX_PBL_LVL_1_PGS_FOR_LVL_2	256
 #define MAX_PBL_LVL_2_PGS		(256 * 512)
 
