@@ -3072,6 +3072,9 @@ static void dwc2_hsotg_irq_enumdone(struct dwc2_hsotg *hsotg)
 
 	dev_dbg(hsotg->dev, "EnumDone (DSTS=0x%08x)\n", dsts);
 
+	/* Reset device address to zero */
+	dwc2_clear_bit(hsotg, DCFG, DCFG_DEVADDR_MASK);
+
 	/*
 	 * note, since we're limited by the size of transfer on EP0, and
 	 * it seems IN transfers must be a even number of packets we do
@@ -3613,9 +3616,6 @@ irq_retry:
 
 		/* Report disconnection if it is not already done. */
 		dwc2_hsotg_disconnect(hsotg);
-
-		/* Reset device address to zero */
-		dwc2_clear_bit(hsotg, DCFG, DCFG_DEVADDR_MASK);
 
 		if (usb_status & GOTGCTL_BSESVLD && connected)
 			dwc2_hsotg_core_init_disconnected(hsotg, true);
