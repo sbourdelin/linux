@@ -77,6 +77,11 @@ void choose_random_location(unsigned long input,
 			    unsigned long *output,
 			    unsigned long output_size,
 			    unsigned long *virt_addr);
+struct mem_vector {
+	unsigned long long start;
+	unsigned long long size;
+};
+
 /* cpuflags.c */
 bool has_cpuflag(int flag);
 #else
@@ -118,7 +123,17 @@ void set_sev_encryption_mask(void);
 #endif
 
 /* acpi.c */
+#ifdef CONFIG_RANDOMIZE_BASE
+/* Amount of immovable memory regions */
+int num_immovable_mem;
+#endif
+
 #ifdef CONFIG_EARLY_PARSE_RSDP
+void get_immovable_mem(void);
 /* Max length of 64-bit hex address string is 18, prefix "0x" + 16 hex digit. */
 #define MAX_ADDRESS_LENGTH 18
+#else
+static void get_immovable_mem(void)
+{
+}
 #endif
