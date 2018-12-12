@@ -1149,6 +1149,7 @@ struct btrfs_subvolume_writers {
 #define BTRFS_ROOT_FORCE_COW		6
 #define BTRFS_ROOT_MULTI_LOG_TASKS	7
 #define BTRFS_ROOT_DIRTY		8
+#define BTRFS_ROOT_DEAD_RELOC_TREE	9
 
 /*
  * in ram representation of the tree.  extent_root is used for all allocations
