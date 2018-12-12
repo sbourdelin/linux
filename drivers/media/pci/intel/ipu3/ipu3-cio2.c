@@ -1597,6 +1597,7 @@ static int cio2_queue_init(struct cio2_device *cio2, struct cio2_queue *q)
 
 	/* Initialize subdev */
 	v4l2_subdev_init(subdev, &cio2_subdev_ops);
+	subdev->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
 	subdev->flags = V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
 	subdev->owner = THIS_MODULE;
 	snprintf(subdev->name, sizeof(subdev->name),
