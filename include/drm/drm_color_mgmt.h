@@ -69,4 +69,7 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 				      u32 supported_ranges,
 				      enum drm_color_encoding default_encoding,
 				      enum drm_color_range default_range);
+
+bool drm_color_lut_has_equal_channels(struct drm_property_blob *lut);
+bool drm_color_lut_is_increasing(struct drm_property_blob *lut);
 #endif

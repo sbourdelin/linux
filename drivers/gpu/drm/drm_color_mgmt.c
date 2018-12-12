@@ -462,3 +462,56 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 	return 0;
 }
 EXPORT_SYMBOL(drm_plane_create_color_properties);
+
+/**
+ * drm_color_lut_has_equal_channels - check LUT for equal r/g/b values
+ * @lut: property blob containing LUT to check
+ *
+ * Helper to check whether the entries of a LUT all have equal values for the
+ * red, green, and blue channels.  Some hardware can only be programmed
+ * with a single value per LUT entry, which is assumed to apply to all
+ * three color components.
+ */
+bool drm_color_lut_has_equal_channels(struct drm_property_blob *lut)
+{
+	struct drm_color_lut *entry;
+	int i;
+
+	if (!lut)
+		return true;
+
+	entry = lut->data;
+	for (i = 0; i < drm_color_lut_size(lut); i++)
+		if (entry[i].red != entry[i].blue ||
+		    entry[i].red != entry[i].green)
+			return false;
+
+	return true;
+}
+EXPORT_SYMBOL(drm_color_lut_has_equal_channels);
+
+/**
+ * drm_color_lut_is_increasing - check that LUT is always flat/increasing
+ * @lut: LUT to check
+ *
+ * Helper to check whether the entries of a LUT are always flat or increasing
+ * (never decreasing).
+ */
+bool drm_color_lut_is_increasing(struct drm_property_blob *lut)
+{
+	struct drm_color_lut *entry;
+	int i;
+
+	if (!lut)
+		return true;
+
+	entry = lut->data;
+	for (i = 1; i < drm_color_lut_size(lut); i++)
+		if (entry[i].red < entry[i-1].red ||
+		    entry[i].green < entry[i-1].green ||
+		    entry[i].blue < entry[i-1].blue)
+			return false;
+
+	return true;
+}
+EXPORT_SYMBOL(drm_color_lut_is_increasing);
