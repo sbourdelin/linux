@@ -709,7 +709,7 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
 {
 	struct arm_v7s_io_pgtable *data;
 
-#ifdef PHYS_OFFSET
+#if defined(PHYS_OFFSET) && !defined(CONFIG_RANDOMIZE_BASE)
 	if (upper_32_bits(PHYS_OFFSET))
 		return NULL;
 #endif
