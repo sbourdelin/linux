@@ -1492,6 +1492,7 @@ static void xs_tcp_state_change(struct sock *sk)
 		if (sk->sk_err)
 			xprt_wake_pending_tasks(xprt, -sk->sk_err);
 		/* Trigger the socket release */
+		clear_bit(XPRT_CONNECTED, &xprt->state);
 		xs_tcp_force_close(xprt);
 	}
  out:
