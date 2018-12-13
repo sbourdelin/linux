@@ -1664,12 +1664,16 @@ static int common_nonsnoop(struct talitos_edesc *edesc,
 static struct talitos_edesc *ablkcipher_edesc_alloc(struct ablkcipher_request *
 						    areq, bool encrypt)
 {
+	void *req_ctx = ablkcipher_request_ctx(areq);
 	struct crypto_ablkcipher *cipher = crypto_ablkcipher_reqtfm(areq);
 	struct talitos_ctx *ctx = crypto_ablkcipher_ctx(cipher);
 	unsigned int ivsize = crypto_ablkcipher_ivsize(cipher);
 
+	if (ivsize)
+		memcpy(req_ctx, areq->info, ivsize);
+
 	return talitos_edesc_alloc(ctx->dev, areq->src, areq->dst,
-				   areq->info, 0, areq->nbytes, 0, ivsize, 0,
+				   req_ctx, 0, areq->nbytes, 0, ivsize, 0,
 				   areq->base.flags, encrypt);
 }
 
@@ -3066,6 +3070,13 @@ static int talitos_cra_init_ahash(struct crypto_tfm *tfm)
 	return 0;
 }
 
+static int talitos_cra_init_ablkcipher(struct crypto_tfm *tfm)
+{
+	tfm->crt_ablkcipher.reqsize = TALITOS_MAX_IV_LENGTH;
+
+	return talitos_cra_init(tfm);
+}
+
 static void talitos_cra_exit(struct crypto_tfm *tfm)
 {
 	struct talitos_ctx *ctx = crypto_tfm_ctx(tfm);
@@ -3149,7 +3160,7 @@ static struct talitos_crypto_alg *talitos_alg_alloc(struct device *dev,
 	switch (t_alg->algt.type) {
 	case CRYPTO_ALG_TYPE_ABLKCIPHER:
 		alg = &t_alg->algt.alg.crypto;
-		alg->cra_init = talitos_cra_init;
+		alg->cra_init = talitos_cra_init_ablkcipher;
 		alg->cra_exit = talitos_cra_exit;
 		alg->cra_type = &crypto_ablkcipher_type;
 		alg->cra_ablkcipher.setkey = ablkcipher_setkey;
