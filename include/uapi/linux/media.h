@@ -342,6 +342,58 @@ struct media_v2_link {
 	__u32 reserved[6];
 } __attribute__ ((packed));
 
+#define MEDIA_PROP_TYPE_GROUP	1
+#define MEDIA_PROP_TYPE_U64	2
+#define MEDIA_PROP_TYPE_S64	3
+#define MEDIA_PROP_TYPE_STRING	4
+
+#define MEDIA_OWNER_TYPE_ENTITY			0
+#define MEDIA_OWNER_TYPE_PAD			1
+#define MEDIA_OWNER_TYPE_LINK			2
+#define MEDIA_OWNER_TYPE_INTF			3
+#define MEDIA_OWNER_TYPE_PROP			4
+
+/**
+ * struct media_v2_prop - A media property
+ *
+ * @id:		The unique non-zero ID of this property
+ * @type:	Property type
+ * @owner_id:	The ID of the object this property belongs to
+ * @owner_type:	The type of the object this property belongs to
+ * @flags:	Property flags
+ * @name:	Property name
+ * @payload_size: Property payload size, 0 for U64/S64
+ * @payload_offset: Property payload starts at this offset from &prop.id.
+ *		This is 0 for U64/S64.
+ * @reserved:	Property reserved field, will be zeroed.
+ */
+struct media_v2_prop {
+	__u32 id;
+	__u32 type;
+	__u32 owner_id;
+	__u32 owner_type;
+	__u32 flags;
+	char name[32];
+	__u32 payload_size;
+	__u32 payload_offset;
+	__u32 reserved[18];
+} __attribute__ ((packed));
+
+static inline const char *media_prop2string(const struct media_v2_prop *prop)
+{
+	return (const char *)prop + prop->payload_offset;
+}
+
+static inline __u64 media_prop2u64(const struct media_v2_prop *prop)
+{
+	return *(const __u64 *)((const char *)prop + prop->payload_offset);
+}
+
+static inline __s64 media_prop2s64(const struct media_v2_prop *prop)
+{
+	return *(const __s64 *)((const char *)prop + prop->payload_offset);
+}
+
 struct media_v2_topology {
 	__u64 topology_version;
 
@@ -360,6 +412,10 @@ struct media_v2_topology {
 	__u32 num_links;
 	__u32 reserved4;
 	__u64 ptr_links;
+
+	__u32 num_props;
+	__u32 props_payload_size;
+	__u64 ptr_props;
 } __attribute__ ((packed));
 
 /* ioctls */
