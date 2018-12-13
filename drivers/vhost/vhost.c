@@ -368,6 +368,7 @@ static int vhost_worker(void *data)
 		}
 	}
 	unuse_mm(dev->mm);
+	mm_update_next_owner(dev->mm);
 	set_fs(oldfs);
 	return 0;
 }
