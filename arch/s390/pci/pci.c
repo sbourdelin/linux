@@ -731,6 +731,17 @@ struct dev_pm_ops pcibios_pm_ops = {
 };
 #endif /* CONFIG_HIBERNATE_CALLBACKS */
 
+#ifdef CONFIG_PCI_IOV
+int pcibios_sriov_add_vfs(struct pci_dev *pdev, u16 num_vfs)
+{
+	return 0;
+}
+
+void pcibios_sriov_del_vfs(struct pci_dev *pdev)
+{
+}
+#endif
+
 static int zpci_alloc_domain(struct zpci_dev *zdev)
 {
 	if (zpci_unique_uid) {
