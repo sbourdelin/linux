@@ -26,4 +26,6 @@ struct intel_soc_pmic {
 	struct device *dev;
 };
 
+int intel_soc_pmic_exec_mipi_pmic_seq_element(const u8 *data);
+
 #endif	/* __INTEL_SOC_PMIC_H__ */
