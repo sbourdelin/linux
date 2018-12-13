@@ -1480,8 +1480,17 @@ static int ubifs_migrate_page(struct address_space *mapping,
 		struct page *newpage, struct page *page, enum migrate_mode mode)
 {
 	int rc;
+	int extra_count = 0;
 
-	rc = migrate_page_move_mapping(mapping, newpage, page, NULL, mode, 0);
+	/*
+	 * UBIFS uses PG_private as marker and does not raise the page counter.
+	 * migrate_page_move_mapping() expects a incremented counter if
+	 * PG_private is set. Therefore pass -1 as extra_count for this case.
+	 */
+	if (page_has_private(page))
+		extra_count = -1;
+	rc = migrate_page_move_mapping(mapping, newpage, page,
+			NULL, mode, extra_count);
 	if (rc != MIGRATEPAGE_SUCCESS)
 		return rc;
 
