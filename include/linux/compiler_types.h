@@ -131,7 +131,13 @@ struct ftrace_likely_data {
 #endif
 
 #ifndef asm_volatile_goto
-#define asm_volatile_goto(x...) asm goto(x)
+#define asm_volatile_goto(x...) asm_inline goto(x)
+#endif
+
+#ifdef CONFIG_CC_HAS_ASM_INLINE
+# define asm_inline asm __inline__
+#else
+# define asm_inline asm
 #endif
 
 /* Are two types/vars the same type (ignoring qualifiers)? */
