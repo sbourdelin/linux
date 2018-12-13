@@ -29,6 +29,7 @@
 #include <drm/drm_edid.h>
 #include <drm/i915_drm.h>
 #include <linux/gpio/consumer.h>
+#include <linux/mfd/intel_soc_pmic.h>
 #include <linux/slab.h>
 #include <video/mipi_display.h>
 #include <asm/intel-mid.h>
@@ -371,7 +372,11 @@ static const u8 *mipi_exec_spi(struct intel_dsi *intel_dsi, const u8 *data)
 
 static const u8 *mipi_exec_pmic(struct intel_dsi *intel_dsi, const u8 *data)
 {
+#ifdef CONFIG_PMIC_OPREGION
+	intel_soc_pmic_exec_mipi_pmic_seq_element(data);
+#else
 	DRM_DEBUG_KMS("Skipping PMIC element execution\n");
+#endif
 
 	return data + 15;
 }
