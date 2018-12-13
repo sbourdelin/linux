@@ -924,7 +924,12 @@ EXPORT_SYMBOL(open_with_fake_path);
 static inline int build_open_flags(int flags, umode_t mode, struct open_flags *op)
 {
 	int lookup_flags = 0;
-	int acc_mode = ACC_MODE(flags);
+	int acc_mode;
+
+	if ((flags & (O_RDWR | O_WRONLY)) == (O_RDWR | O_WRONLY))
+		flags &= ~O_WRONLY;
+
+	acc_mode = ACC_MODE(flags);
 
 	/*
 	 * Clear out all open flags we don't know about so that we don't report
