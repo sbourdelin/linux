@@ -74,7 +74,8 @@
 &gmac0 {
 	phy-mode = "rgmii";
 	phy-addr = <0xffffffff>; /* probe for phy addr */
-
+	clocks = <&l4_mp_clk>, <&peri_emac_ptp_clk>;
+	clock-names = "stmmaceth", "ptp_ref";
 	/*
 	 * These skews assume the user's FPGA design is adding 600ps of delay
 	 * for TX_CLK on Arria 10.
