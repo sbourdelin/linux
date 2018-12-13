@@ -542,10 +542,13 @@ static blk_status_t dio_bio_complete(struct dio *dio, struct bio *bio)
 	blk_status_t err = bio->bi_status;
 
 	if (err) {
-		if (err == BLK_STS_AGAIN && (bio->bi_opf & REQ_NOWAIT))
-			dio->io_error = -EAGAIN;
-		else
-			dio->io_error = -EIO;
+		dio->io_error = -EIO;
+		if (bio->bi_opf & REQ_NOWAIT) {
+			if (err == BLK_STS_AGAIN)
+				dio->io_error = -EAGAIN;
+			else if (err == BLK_STS_NOTSUPP)
+				dio->io_error = -EOPNOTSUPP;
+		}
 	}
 
 	if (dio->is_async && dio->op == REQ_OP_READ && dio->should_dirty) {
