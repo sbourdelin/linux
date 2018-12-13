@@ -87,6 +87,8 @@ enum iio_modifier {
 	IIO_MOD_VOC,
 	IIO_MOD_LIGHT_UV,
 	IIO_MOD_LIGHT_DUV,
+	IIO_MOD_ETHANOL,
+	IIO_MOD_H2,
 };
 
 enum iio_event_type {
