@@ -1336,7 +1336,7 @@ static struct page *new_node_page(struct page *page, unsigned long private)
 	if (nodes_empty(nmask))
 		node_set(nid, nmask);
 
-	return new_page_nodemask(page, nid, &nmask);
+	return new_page_nodemask(page, next_memory_node(nid), &nmask);
 }
 
 #define NR_OFFLINE_AT_ONCE_PAGES	(256)
