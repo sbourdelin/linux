@@ -251,6 +251,70 @@ int media_entity_pads_init(struct media_entity *entity, u16 num_pads,
 }
 EXPORT_SYMBOL_GPL(media_entity_pads_init);
 
+static struct media_prop *media_create_prop(struct media_gobj *owner, u32 type,
+					    const char *name, const void *ptr,
+					    u32 payload_size)
+{
+	struct media_prop *prop = kzalloc(sizeof(*prop) + payload_size,
+					  GFP_KERNEL);
+
+	if (!prop)
+		return ERR_PTR(-ENOMEM);
+	prop->type = type;
+	strscpy(prop->name, name, sizeof(prop->name));
+	if (owner->mdev)
+		media_gobj_create(owner->mdev, MEDIA_GRAPH_PROP,
+				  &prop->graph_obj);
+	prop->owner = owner;
+	prop->payload_size = payload_size;
+	if (payload_size && ptr)
+		memcpy(prop->payload, ptr, payload_size);
+	INIT_LIST_HEAD(&prop->props);
+	return prop;
+}
+
+struct media_prop *media_entity_add_prop(struct media_entity *ent, u32 type,
+					 const char *name, const void *ptr,
+					 u32 payload_size)
+{
+	struct media_prop *prop;
+
+	if (!ent->inited)
+		media_entity_init(ent);
+	prop = media_create_prop(&ent->graph_obj, type,
+				 name, ptr, payload_size);
+	if (!IS_ERR(prop))
+		list_add_tail(&prop->list, &ent->props);
+	return prop;
+}
+EXPORT_SYMBOL_GPL(media_entity_add_prop);
+
+struct media_prop *media_pad_add_prop(struct media_pad *pad, u32 type,
+				      const char *name, const void *ptr,
+				      u32 payload_size)
+{
+	struct media_prop *prop = media_create_prop(&pad->graph_obj, type,
+						    name, ptr, payload_size);
+
+	if (!IS_ERR(prop))
+		list_add_tail(&prop->list, &pad->props);
+	return prop;
+}
+EXPORT_SYMBOL_GPL(media_pad_add_prop);
+
+struct media_prop *media_prop_add_prop(struct media_prop *prop, u32 type,
+				       const char *name, const void *ptr,
+				       u32 payload_size)
+{
+	struct media_prop *subprop = media_create_prop(&prop->graph_obj, type,
+						       name, ptr, payload_size);
+
+	if (!IS_ERR(subprop))
+		list_add_tail(&subprop->list, &prop->props);
+	return subprop;
+}
+EXPORT_SYMBOL_GPL(media_prop_add_prop);
+
 /* -----------------------------------------------------------------------------
  * Graph traversal
  */
