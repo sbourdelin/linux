@@ -515,6 +515,10 @@ iomap_is_partially_uptodate(struct page *page, unsigned long from,
 	first = from >> inode->i_blkbits;
 	last = (from + len - 1) >> inode->i_blkbits;
 
+	/* If page wasn't uptodate and range covers all blocks: no partial */
+	if (first == 0 && last == (PAGE_SIZE - 1) >> inode->i_blkbits)
+		return 0;
+
 	if (iop) {
 		for (i = first; i <= last; i++)
 			if (!test_bit(i, iop->uptodate))
