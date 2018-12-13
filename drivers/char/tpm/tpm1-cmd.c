@@ -449,11 +449,19 @@ int tpm1_get_timeouts(struct tpm_chip *chip)
 }
 
 #define TPM_ORD_PCR_EXTEND 20
-int tpm1_pcr_extend(struct tpm_chip *chip, u32 pcr_idx, const u8 *hash,
+int tpm1_pcr_extend(struct tpm_chip *chip, u32 pcr_idx, u32 count,
+		    const struct tpm_extend_digest *digests,
 		    const char *log_msg)
 {
 	struct tpm_buf buf;
+	u8 dummy_hash[TPM_DIGEST_SIZE] = { 0 };
+	const u8 *hash;
 	int rc;
+
+	hash = dummy_hash;
+	if (count)
+		memcpy(dummy_hash, digests[0].data,
+		       min(digests[0].size, (u16)sizeof(dummy_hash)));
 
 	rc = tpm_buf_init(&buf, TPM_TAG_RQU_COMMAND, TPM_ORD_PCR_EXTEND);
 	if (rc)
@@ -743,7 +751,6 @@ out:
  */
 int tpm1_pm_suspend(struct tpm_chip *chip, u32 tpm_suspend_pcr)
 {
-	u8 dummy_hash[TPM_DIGEST_SIZE] = { 0 };
 	struct tpm_buf buf;
 	unsigned int try;
 	int rc;
@@ -751,7 +758,7 @@ int tpm1_pm_suspend(struct tpm_chip *chip, u32 tpm_suspend_pcr)
 
 	/* for buggy tpm, flush pcrs with extend to selected dummy */
 	if (tpm_suspend_pcr)
-		rc = tpm1_pcr_extend(chip, tpm_suspend_pcr, dummy_hash,
+		rc = tpm1_pcr_extend(chip, tpm_suspend_pcr, 0, NULL,
 				     "extending dummy pcr before suspend");
 
 	rc = tpm_buf_init(&buf, TPM_TAG_RQU_COMMAND, TPM_ORD_SAVESTATE);

@@ -380,6 +380,9 @@ EXPORT_SYMBOL_GPL(trusted_tpm_send);
 static int pcrlock(const int pcrnum)
 {
 	unsigned char hash[SHA1_DIGEST_SIZE];
+	struct tpm_extend_digest digest = { .alg_id = TPM_ALG_SHA1,
+					    .size = sizeof(hash),
+					    .data = hash };
 	int ret;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -387,7 +390,7 @@ static int pcrlock(const int pcrnum)
 	ret = tpm_get_random(NULL, hash, SHA1_DIGEST_SIZE);
 	if (ret != SHA1_DIGEST_SIZE)
 		return ret;
-	return tpm_pcr_extend(NULL, pcrnum, hash) ? -EINVAL : 0;
+	return tpm_pcr_extend(NULL, pcrnum, 1, &digest) ? -EINVAL : 0;
 }
 
 /*
