@@ -551,7 +551,7 @@ static int read_sysfs_hex_int(char *path)
 	return strtol(vendor_id_buf, NULL, 0);
 }
 
-static int read_sysfs_netdev_hex_int(char *devname, const char *entry_name)
+int read_sysfs_netdev_hex_int(char *devname, const char *entry_name)
 {
 	char full_path[64];
 

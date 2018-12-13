@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <net/if.h>
 #include <sys/utsname.h>
 #include <sys/vfs.h>
 
@@ -22,6 +23,7 @@
 enum probe_component {
 	COMPONENT_UNSPEC,
 	COMPONENT_KERNEL,
+	COMPONENT_DEVICE,
 };
 
 #define MAX_HELPER_NAME_LEN 32
@@ -616,7 +618,8 @@ static bool probe_bpf_syscall(const char *define_prefix)
 
 static void
 prog_load(enum bpf_prog_type prog_type, const struct bpf_insn *insns,
-	  size_t insns_cnt, int kernel_version, char *buf, size_t buf_len)
+	  size_t insns_cnt, int kernel_version, char *buf, size_t buf_len,
+	  __u32 ifindex)
 {
 	struct bpf_load_program_attr xattr = {};
 	int fd;
@@ -634,6 +637,7 @@ prog_load(enum bpf_prog_type prog_type, const struct bpf_insn *insns,
 	xattr.insns_cnt = insns_cnt;
 	xattr.license = "GPL";
 	xattr.kern_version = kernel_version;
+	xattr.prog_ifindex = ifindex;
 
 	fd = bpf_load_program_xattr(&xattr, buf, buf_len);
 	if (fd >= 0)
@@ -642,7 +646,7 @@ prog_load(enum bpf_prog_type prog_type, const struct bpf_insn *insns,
 
 static void
 probe_prog_type(enum bpf_prog_type prog_type, int kernel_version,
-		bool *supported_types, const char *define_prefix)
+		bool *supported_types, const char *define_prefix, __u32 ifindex)
 {
 	char buf[4096], feat_name[128], define_name[128], plain_desc[128];
 	const char *plain_comment = "eBPF program_type ";
@@ -653,9 +657,22 @@ probe_prog_type(enum bpf_prog_type prog_type, int kernel_version,
 	size_t maxlen;
 	bool res;
 
+	if (ifindex)
+		/* Only test offload-able program types */
+		switch (prog_type) {
+		case BPF_PROG_TYPE_SCHED_CLS:
+			/* nfp returns -EINVAL on exit(0) with TC offload */
+			insns[0].imm = 2;
+			/* fall through */
+		case BPF_PROG_TYPE_XDP:
+			break;
+		default:
+			return;
+		}
+
 	errno = 0;
 	prog_load(prog_type, insns, ARRAY_SIZE(insns), kernel_version,
-		  buf, sizeof(buf));
+		  buf, sizeof(buf), ifindex);
 	res = (errno != EINVAL && errno != EOPNOTSUPP);
 
 	supported_types[prog_type] |= res;
@@ -675,7 +692,8 @@ probe_prog_type(enum bpf_prog_type prog_type, int kernel_version,
 }
 
 static void
-probe_map_type(enum bpf_map_type map_type, const char *define_prefix)
+probe_map_type(enum bpf_map_type map_type, const char *define_prefix,
+	       __u32 ifindex)
 {
 	char feat_name[128], define_name[128], plain_desc[128];
 	int key_size, value_size, max_entries, map_flags;
@@ -716,6 +734,12 @@ probe_map_type(enum bpf_map_type map_type, const char *define_prefix)
 	switch (map_type) {
 	case BPF_MAP_TYPE_ARRAY_OF_MAPS:
 	case BPF_MAP_TYPE_HASH_OF_MAPS:
+		/* TODO: probe for device, once libbpf has an API to create
+		 * map-in-map for offload
+		 */
+		if (ifindex)
+			break;
+
 		fd_inner = bpf_create_map(BPF_MAP_TYPE_HASH,
 					  sizeof(__u32), sizeof(__u32), 1, 0);
 		if (fd_inner < 0)
@@ -731,6 +755,7 @@ probe_map_type(enum bpf_map_type map_type, const char *define_prefix)
 		attr.value_size = value_size;
 		attr.max_entries = max_entries;
 		attr.map_flags = map_flags;
+		attr.map_ifindex = ifindex;
 
 		fd = bpf_create_map_xattr(&attr);
 		break;
@@ -757,7 +782,7 @@ probe_map_type(enum bpf_map_type map_type, const char *define_prefix)
 static void
 probe_helper(__u32 id, enum bpf_prog_type prog_type, const char *name,
 	     int kernel_version, bool *supported_types,
-	     const char *define_prefix)
+	     const char *define_prefix, __u32 ifindex, int vendor_id)
 {
 	char buf[4096], feat_name[128], define_name[128], plain_desc[128];
 	struct bpf_insn insns[2] = {
@@ -766,14 +791,34 @@ probe_helper(__u32 id, enum bpf_prog_type prog_type, const char *name,
 	};
 	bool res = false;
 
+	if (ifindex)
+		/* Only test helpers compatible with offload-able prog types */
+		switch (prog_type) {
+		case BPF_PROG_TYPE_XDP:
+		case BPF_PROG_TYPE_SCHED_CLS:
+			break;
+		default:
+			return;
+		}
+
 	if (!supported_types[prog_type])
 		goto do_print;
 
 	/* Reset buffer in case no debug info was written at previous probe */
 	*buf = '\0';
 	prog_load(prog_type, insns, ARRAY_SIZE(insns), kernel_version,
-		  buf, sizeof(buf));
+		  buf, sizeof(buf), ifindex);
 	res = !grep(buf, "invalid func ") && !grep(buf, "unknown func ");
+
+	if (ifindex)
+		switch (vendor_id) {
+		case 0x19ee: /* Netronome specific */
+			res = res && !grep(buf, "not supported by FW") &&
+				!grep(buf, "unsupported function id");
+			break;
+		default:
+			break;
+		}
 
 do_print:
 	sprintf(feat_name, "have_%s_helper", name);
@@ -790,7 +835,10 @@ static int do_probe(int argc, char **argv)
 	const char *define_prefix = NULL;
 	bool supported_types[128] = {};
 	int kernel_version;
+	__u32 ifindex = 0;
+	int vendor_id = 0;
 	unsigned int i;
+	char *ifname;
 
 	/* Detection assumes user has sufficient privileges (CAP_SYS_ADMIN).
 	 * Let's approximate, and restrict usage to root user only.
@@ -810,6 +858,24 @@ static int do_probe(int argc, char **argv)
 			}
 			target = COMPONENT_KERNEL;
 			NEXT_ARG();
+		} else if (is_prefix(*argv, "dev")) {
+			NEXT_ARG();
+
+			if (target != COMPONENT_UNSPEC || ifindex) {
+				p_err("component to probe already specified");
+				return -1;
+			}
+			if (!REQ_ARGS(1))
+				return -1;
+
+			target = COMPONENT_DEVICE;
+			ifname = GET_ARG();
+			ifindex = if_nametoindex(ifname);
+			if (!ifindex) {
+				p_err("unrecognized netdevice '%s': %s", ifname,
+				      strerror(errno));
+				return -1;
+			}
 		} else if (is_prefix(*argv, "macros") && !define_prefix) {
 			define_prefix = "";
 			NEXT_ARG();
@@ -828,7 +894,7 @@ static int do_probe(int argc, char **argv)
 				return -1;
 			define_prefix = GET_ARG();
 		} else {
-			p_err("expected no more arguments, 'kernel', 'macros' or 'prefix', got: '%s'?",
+			p_err("expected no more arguments, 'kernel', 'dev', 'macros' or 'prefix', got: '%s'?",
 			      *argv);
 			return -1;
 		}
@@ -858,6 +924,8 @@ static int do_probe(int argc, char **argv)
 		else
 			printf("\n");
 		break;
+	default:
+		break;
 	}
 
 	print_start_section("syscall_config",
@@ -865,6 +933,7 @@ static int do_probe(int argc, char **argv)
 			    "Scanning system call and kernel version...",
 			    define_prefix);
 
+	/* Get kernel version in all cases, we need it for kprobe programs */
 	kernel_version = probe_kernel_version(define_prefix);
 	if (!probe_bpf_syscall(define_prefix))
 		/* bpf() syscall unavailable, don't probe other BPF features */
@@ -878,7 +947,7 @@ static int do_probe(int argc, char **argv)
 	for (i = BPF_PROG_TYPE_SOCKET_FILTER;
 	     i < ARRAY_SIZE(prog_type_name); i++)
 		probe_prog_type(i, kernel_version, supported_types,
-				define_prefix);
+				define_prefix, ifindex);
 
 	print_end_then_start_section("map_types",
 				     "/*** eBPF map types ***/",
@@ -886,17 +955,21 @@ static int do_probe(int argc, char **argv)
 				     define_prefix);
 
 	for (i = BPF_MAP_TYPE_HASH; i < map_type_name_size; i++)
-		probe_map_type(i, define_prefix);
+		probe_map_type(i, define_prefix, ifindex);
 
 	print_end_then_start_section("helpers",
 				     "/*** eBPF helper functions ***/",
 				     "Scanning eBPF helper functions...",
 				     define_prefix);
 
+	if (ifindex)
+		vendor_id = read_sysfs_netdev_hex_int(ifname, "vendor");
+
 	for (i = 1; i < ARRAY_SIZE(helper_progtype_and_name); i++)
 		probe_helper(i, helper_progtype_and_name[i].progtype,
 			     helper_progtype_and_name[i].name,
-			     kernel_version, supported_types, define_prefix);
+			     kernel_version, supported_types, define_prefix,
+			     ifindex, vendor_id);
 
 exit_close_json:
 	if (json_output) {
@@ -917,8 +990,10 @@ static int do_help(int argc, char **argv)
 	}
 
 	fprintf(stderr,
-		"Usage: %s %s probe [kernel] [macros [prefix PREFIX]]\n"
+		"Usage: %s %s probe [COMPONENT] [macros [prefix PREFIX]]\n"
 		"       %s %s help\n"
+		"\n"
+		"       COMPONENT := { kernel | dev NAME }\n"
 		"",
 		bin_name, argv[-2], bin_name, argv[-2]);
 
