@@ -4,6 +4,7 @@
 
 #include <linux/atomic.h>
 #include <linux/bitmap.h>
+#include <linux/blkdev.h>
 #include <linux/mm.h>
 #include <linux/types.h>
 #include <linux/mm_types.h>
@@ -104,12 +105,13 @@ struct iomap_ops {
 
 /*
  * Structure allocate for each page when block size < PAGE_SIZE to track
- * sub-page uptodate status and I/O completions.
+ * sub-page uptodate status and I/O completions.  Allocate bitmap to
+ * accomodate blocks as small as SECTOR_SIZE
  */
 struct iomap_page {
 	atomic_t		read_count;
 	atomic_t		write_count;
-	DECLARE_BITMAP(uptodate, PAGE_SIZE / 512);
+	DECLARE_BITMAP(uptodate, PAGE_SIZE / SECTOR_SIZE);
 };
 
 static inline struct iomap_page *to_iomap_page(struct page *page)
