@@ -82,6 +82,7 @@ $(OUTPUT)/get_cgroup_id_user: cgroup_helpers.c
 $(OUTPUT)/test_cgroup_storage: cgroup_helpers.c
 $(OUTPUT)/test_netcnt: cgroup_helpers.c
 $(OUTPUT)/test_maps: probe_helpers.c
+$(OUTPUT)/test_verifier: probe_helpers.c
 
 .PHONY: force
 
