@@ -14221,10 +14221,20 @@ static int create_cgroup_storage(bool percpu)
 	return fd;
 }
 
+static bool skip_unsupported_map(int ret, enum bpf_map_type map_type)
+{
+	if (ret < 0 && !bpf_map_type_supported(map_type)) {
+		printf("SKIP (unsupported map type %d)\n", map_type);
+		skips++;
+		return true;
+	}
+	return false;
+}
+
 static char bpf_vlog[UINT_MAX >> 8];
 
-static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
-			  struct bpf_insn *prog, int *map_fds)
+static int do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
+			 struct bpf_insn *prog, int *map_fds)
 {
 	int *fixup_map_hash_8b = test->fixup_map_hash_8b;
 	int *fixup_map_hash_48b = test->fixup_map_hash_48b;
@@ -14309,6 +14319,9 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 
 	if (*fixup_cgroup_storage) {
 		map_fds[7] = create_cgroup_storage(false);
+		if (skip_unsupported_map(map_fds[7],
+					 BPF_MAP_TYPE_CGROUP_STORAGE))
+			return -1;
 		do {
 			prog[*fixup_cgroup_storage].imm = map_fds[7];
 			fixup_cgroup_storage++;
@@ -14317,6 +14330,9 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 
 	if (*fixup_percpu_cgroup_storage) {
 		map_fds[8] = create_cgroup_storage(true);
+		if (skip_unsupported_map(map_fds[8],
+					 BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE))
+			return -1;
 		do {
 			prog[*fixup_percpu_cgroup_storage].imm = map_fds[8];
 			fixup_percpu_cgroup_storage++;
@@ -14325,6 +14341,8 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 	if (*fixup_map_sockmap) {
 		map_fds[9] = create_map(BPF_MAP_TYPE_SOCKMAP, sizeof(int),
 					sizeof(int), 1);
+		if (skip_unsupported_map(map_fds[9], BPF_MAP_TYPE_SOCKMAP))
+			return -1;
 		do {
 			prog[*fixup_map_sockmap].imm = map_fds[9];
 			fixup_map_sockmap++;
@@ -14333,6 +14351,8 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 	if (*fixup_map_sockhash) {
 		map_fds[10] = create_map(BPF_MAP_TYPE_SOCKHASH, sizeof(int),
 					sizeof(int), 1);
+		if (skip_unsupported_map(map_fds[10], BPF_MAP_TYPE_SOCKHASH))
+			return -1;
 		do {
 			prog[*fixup_map_sockhash].imm = map_fds[10];
 			fixup_map_sockhash++;
@@ -14341,6 +14361,8 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 	if (*fixup_map_xskmap) {
 		map_fds[11] = create_map(BPF_MAP_TYPE_XSKMAP, sizeof(int),
 					sizeof(int), 1);
+		if (skip_unsupported_map(map_fds[11], BPF_MAP_TYPE_XSKMAP))
+			return -1;
 		do {
 			prog[*fixup_map_xskmap].imm = map_fds[11];
 			fixup_map_xskmap++;
@@ -14349,11 +14371,16 @@ static void do_test_fixup(struct bpf_test *test, enum bpf_map_type prog_type,
 	if (*fixup_map_stacktrace) {
 		map_fds[12] = create_map(BPF_MAP_TYPE_STACK_TRACE, sizeof(u32),
 					 sizeof(u64), 1);
+		if (skip_unsupported_map(map_fds[12],
+					 BPF_MAP_TYPE_STACK_TRACE))
+			return -1;
 		do {
 			prog[*fixup_map_stacktrace].imm = map_fds[12];
 			fixup_map_stacktrace++;
 		} while (fixup_map_stacktrace);
 	}
+
+	return 0;
 }
 
 static int set_admin(bool admin)
@@ -14401,7 +14428,8 @@ static void do_test_single(struct bpf_test *test, bool unpriv,
 
 	if (!prog_type)
 		prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
-	do_test_fixup(test, prog_type, prog, map_fds);
+	if (do_test_fixup(test, prog_type, prog, map_fds) < 0)
+		return;
 	prog_len = probe_filter_length(prog);
 
 	pflags = 0;
