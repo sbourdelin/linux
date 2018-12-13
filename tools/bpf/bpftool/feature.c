@@ -53,6 +53,37 @@ print_bool_feature(const char *feat_name, const char *define_name,
 }
 
 static void
+print_kernel_option(const char *name, const char *value,
+		    const char *define_prefix)
+{
+	char *endptr;
+	int res;
+
+	if (json_output) {
+		if (!value) {
+			jsonw_null_field(json_wtr, name);
+			return;
+		}
+		errno = 0;
+		res = strtol(value, &endptr, 0);
+		if (!errno && *endptr == '\n')
+			jsonw_int_field(json_wtr, name, res);
+		else
+			jsonw_string_field(json_wtr, name, value);
+	} else if (define_prefix) {
+		if (value)
+			printf("#define %s%s %s\n", define_prefix, name, value);
+		else
+			printf("#define %sNO_%s\n", define_prefix, name);
+	} else {
+		if (value)
+			printf("%s is set to %s\n", name, value);
+		else
+			printf("%s is not set\n", name);
+	}
+}
+
+static void
 print_start_section(const char *json_title, const char *define_comment,
 		    const char *plain_title, const char *define_prefix)
 {
@@ -298,6 +329,118 @@ static void probe_jit_kallsyms(const char *define_prefix)
 	}
 }
 
+static char *get_kernel_config_option(FILE *fd, const char *option)
+{
+	size_t line_n = 0, optlen = strlen(option);
+	char *res, *strval, *line = NULL;
+	ssize_t n;
+
+	rewind(fd);
+	while ((n = getline(&line, &line_n, fd)) > 0) {
+		if (strncmp(line, option, optlen))
+			continue;
+		/* Check we have at least '=', value, and '\n' */
+		if (strlen(line) < optlen + 3)
+			continue;
+		if (*(line + optlen) != '=')
+			continue;
+
+		/* Trim ending '\n' */
+		line[strlen(line) - 1] = '\0';
+
+		/* Copy and return config option value */
+		strval = line + optlen + 1;
+		res = strdup(strval);
+		free(line);
+		return res;
+	}
+	free(line);
+
+	return NULL;
+}
+
+static void probe_kernel_image_config(const char *define_prefix)
+{
+	const char * const options[] = {
+		"CONFIG_BPF",
+		"CONFIG_BPF_SYSCALL",
+		"CONFIG_HAVE_EBPF_JIT",
+		"CONFIG_BPF_JIT",
+		"CONFIG_BPF_JIT_ALWAYS_ON",
+		"CONFIG_NET",
+		"CONFIG_XDP_SOCKETS",
+		"CONFIG_CGROUPS",
+		"CONFIG_CGROUP_BPF",
+		"CONFIG_CGROUP_NET_CLASSID",
+		"CONFIG_BPF_EVENTS",
+		"CONFIG_LWTUNNEL_BPF",
+		"CONFIG_NET_ACT_BPF",
+		"CONFIG_NET_CLS_ACT",
+		"CONFIG_NET_CLS_BPF",
+		"CONFIG_NET_SCH_INGRESS",
+		"CONFIG_XFRM",
+		"CONFIG_SOCK_CGROUP_DATA",
+		"CONFIG_IP_ROUTE_CLASSID",
+		"CONFIG_IPV6_SEG6_BPF",
+		"CONFIG_FUNCTION_ERROR_INJECTION",
+		"CONFIG_BPF_KPROBE_OVERRIDE",
+		"CONFIG_BPF_LIRC_MODE2",
+		"CONFIG_NETFILTER_XT_MATCH_BPF",
+		"CONFIG_TEST_BPF",
+		"CONFIG_BPFILTER",
+		"CONFIG_BPFILTER_UMH",
+		"CONFIG_BPF_STREAM_PARSER",
+	};
+	char *value, *buf = NULL;
+	struct utsname utsn;
+	char path[PATH_MAX];
+	size_t i, n;
+	ssize_t ret;
+	FILE *fd;
+
+	if (uname(&utsn))
+		goto no_config;
+
+	snprintf(path, sizeof(path), "/boot/config-%s", utsn.release);
+
+	fd = fopen(path, "r");
+	if (!fd && errno == ENOENT) {
+		/* Sometimes config is at /proc/config */
+		fd = fopen("/proc/config", "r");
+	}
+	if (!fd) {
+		p_err("can't open kernel config file: %s", strerror(errno));
+		goto no_config;
+	}
+	/* Sanity checks */
+	ret = getline(&buf, &n, fd);
+	ret = getline(&buf, &n, fd);
+	if (!buf || !ret) {
+		p_err("can't read from kernel config file: %s",
+		      strerror(errno));
+		free(buf);
+		goto no_config;
+	}
+	if (strcmp(buf, "# Automatically generated file; DO NOT EDIT.\n")) {
+		p_err("can't find correct kernel config file");
+		free(buf);
+		goto no_config;
+	}
+	free(buf);
+
+	for (i = 0; i < ARRAY_SIZE(options); i++) {
+		value = get_kernel_config_option(fd, options[i]);
+		print_kernel_option(options[i], value, define_prefix);
+		free(value);
+	}
+	fclose(fd);
+	return;
+
+no_config:
+	for (i = 0; i < ARRAY_SIZE(options); i++)
+		print_kernel_option(options[i], NULL, define_prefix);
+}
+
 static int probe_kernel_version(const char *define_prefix)
 {
 	int version, subversion, patchlevel, code = 0;
@@ -402,6 +545,7 @@ static int do_probe(int argc, char **argv)
 		} else {
 			p_info("/* procfs not mounted, skipping related probes */");
 		}
+		probe_kernel_image_config(define_prefix);
 		if (json_output)
 			jsonw_end_object(json_wtr);
 		else
