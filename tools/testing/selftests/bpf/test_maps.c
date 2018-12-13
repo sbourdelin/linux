@@ -27,10 +27,13 @@
 
 #include "bpf_util.h"
 #include "bpf_rlimit.h"
+#include "probe_helpers.h"
 
 #ifndef ENOTSUPP
 #define ENOTSUPP 524
 #endif
+
+static int skips;
 
 static int map_flags;
 
@@ -725,6 +728,15 @@ static void test_sockmap(int tasks, void *data)
 			    sizeof(key), sizeof(value),
 			    6, 0);
 	if (fd < 0) {
+		if (!bpf_map_type_supported(BPF_MAP_TYPE_SOCKMAP)) {
+			printf("%s SKIP (unsupported map type BPF_MAP_TYPE_SOCKMAP)\n",
+			       __func__);
+			skips++;
+			for (i = 0; i < 6; i++)
+				close(sfd[i]);
+			return;
+		}
+
 		printf("Failed to create sockmap %i\n", fd);
 		goto out_sockmap;
 	}
@@ -1702,6 +1714,6 @@ int main(void)
 	map_flags = BPF_F_NO_PREALLOC;
 	run_all_tests();
 
-	printf("test_maps: OK\n");
+	printf("test_maps: OK, %d SKIPPED\n", skips);
 	return 0;
 }
