@@ -61,6 +61,19 @@ config IAQCORE
 	  iAQ-Core Continuous/Pulsed VOC (Volatile Organic Compounds)
 	  sensors
 
+config SENSIRION_SGP30
+	tristate "Sensirion SGPxx gas sensors"
+	depends on I2C
+	select CRC8
+	help
+	  Say Y here to build I2C interface support for the following
+	  Sensirion SGP gas sensors:
+	    * SGP30 gas sensor
+	    * SGPC3 low power gas sensor
+
+	  To compile this driver as module, choose M here: the
+	  module will be called sgp30.
+
 config VZ89X
 	tristate "SGX Sensortech MiCS VZ89X VOC sensor"
 	depends on I2C
