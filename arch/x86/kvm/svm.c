@@ -3439,12 +3439,6 @@ static void enter_svm_guest_mode(struct vcpu_svm *svm, u64 vmcb_gpa,
 	else
 		svm->vcpu.arch.hflags &= ~HF_HIF_MASK;
 
-	if (nested_vmcb->control.nested_ctl & SVM_NESTED_CTL_NP_ENABLE) {
-		kvm_mmu_unload(&svm->vcpu);
-		svm->nested.nested_cr3 = nested_vmcb->control.nested_cr3;
-		nested_svm_init_mmu_context(&svm->vcpu);
-	}
-
 	/* Load the nested guest state */
 	svm->vmcb->save.es = nested_vmcb->save.es;
 	svm->vmcb->save.cs = nested_vmcb->save.cs;
@@ -3459,6 +3453,12 @@ static void enter_svm_guest_mode(struct vcpu_svm *svm, u64 vmcb_gpa,
 	if (npt_enabled) {
 		svm->vmcb->save.cr3 = nested_vmcb->save.cr3;
 		svm->vcpu.arch.cr3 = nested_vmcb->save.cr3;
+
+		if (nested_vmcb->control.nested_ctl & SVM_NESTED_CTL_NP_ENABLE) {
+			kvm_mmu_unload(&svm->vcpu);
+			svm->nested.nested_cr3 = nested_vmcb->control.nested_cr3;
+			nested_svm_init_mmu_context(&svm->vcpu);
+		}
 	} else
 		(void)kvm_set_cr3(&svm->vcpu, nested_vmcb->save.cr3);
 
@@ -3543,17 +3543,6 @@ static bool nested_svm_vmrun(struct vcpu_svm *svm)
 	nested_vmcb = nested_svm_map(svm, svm->vmcb->save.rax, &page);
 	if (!nested_vmcb)
 		return false;
-
-	if (!nested_vmcb_checks(nested_vmcb)) {
-		nested_vmcb->control.exit_code    = SVM_EXIT_ERR;
-		nested_vmcb->control.exit_code_hi = 0;
-		nested_vmcb->control.exit_info_1  = 0;
-		nested_vmcb->control.exit_info_2  = 0;
-
-		nested_svm_unmap(page);
-
-		return false;
-	}
 
 	trace_kvm_nested_vmrun(svm->vmcb->save.rip, vmcb_gpa,
 			       nested_vmcb->save.rip,
@@ -3669,6 +3658,9 @@ static int vmrun_interception(struct vcpu_svm *svm)
 
 	if (!nested_svm_vmrun(svm))
 		return 1;
+
+	if (!nested_vmcb_checks(svm))
+		goto failed;
 
 	if (!nested_svm_vmrun_msrpm(svm))
 		goto failed;
