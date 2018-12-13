@@ -83,6 +83,35 @@ void riscv_timer_interrupt(void)
 	evdev->event_handler(evdev);
 }
 
+static void __init riscv_timebase_frequency(struct device_node *node,
+					    int hartid)
+{
+	u32 timebase;
+
+	if (!of_property_read_u32(node, "timebase-frequency", &timebase))
+		goto check;
+
+	/*
+	 * As per the DT specification, timebase-frequency should be present
+	 * under individual cpu node. Unfortunately, there are already available
+	 * HiFive Unleashed devices where the timebase-frequency entry is under
+	 * CPUs. check under parent "cpus" node to cover those devices.
+	 */
+	if (!of_property_read_u32(node->parent, "timebase-frequency",
+				  &timebase))
+		goto check;
+
+	panic("RISC-V system with no timebase-frequency in DTS for hart [%d]\n",
+	      hartid);
+
+check:
+	/* RISC-V ISA specification mandates that every cpu has a timer */
+	if (!riscv_timebase)
+		riscv_timebase = timebase;
+	else if (riscv_timebase && riscv_timebase != timebase)
+		pr_warn("RISC-V system with different timebase-frequency\n");
+}
+
 static int __init riscv_timer_init_dt(struct device_node *n)
 {
 	int cpuid, hartid, error;
@@ -90,10 +119,12 @@ static int __init riscv_timer_init_dt(struct device_node *n)
 
 	hartid = riscv_of_processor_hartid(n);
 	cpuid = riscv_hartid_to_cpuid(hartid);
+	riscv_timebase_frequency(n, hartid);
 
 	if (cpuid != smp_processor_id())
 		return 0;
 
+	/* This should be called only for boot cpu */
 	cs = per_cpu_ptr(&riscv_clocksource, cpuid);
 	clocksource_register_hz(cs, riscv_timebase);
 
