@@ -12,6 +12,7 @@
 #include <linux/mfd/intel_soc_pmic.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <asm/unaligned.h>
 #include "intel_pmic.h"
 
 #define CHT_WC_V1P05A_CTRL		0x6e3b
@@ -231,6 +232,29 @@ static int intel_cht_wc_pmic_update_power(struct regmap *regmap, int reg,
 	return regmap_update_bits(regmap, reg, bitmask, on ? 1 : 0);
 }
 
+static int intel_cht_wc_exec_mipi_pmic_seq_element(struct regmap *regmap,
+						   const u8 *data)
+{
+	u32 value, mask, reg_address, address;
+	u16 i2c_client_address;
+
+	/* byte 0 aka PMIC Flag is reserved */
+	i2c_client_address	= get_unaligned_le16(data + 1);
+	reg_address		= get_unaligned_le32(data + 3);
+	value			= get_unaligned_le32(data + 7);
+	mask			= get_unaligned_le32(data + 11);
+
+	if (i2c_client_address > 0xff || reg_address > 0xff) {
+		pr_warn("%s warning addresses too big client 0x%x reg 0x%x\n",
+			__func__, i2c_client_address, reg_address);
+		return -ERANGE;
+	}
+
+	address = (i2c_client_address << 8) | reg_address;
+
+	return regmap_update_bits(regmap, address, mask, value);
+}
+
 /*
  * The thermal table and ops are empty, we do not support the Thermal opregion
  * (DPTF) due to lacking documentation.
@@ -238,6 +262,7 @@ static int intel_cht_wc_pmic_update_power(struct regmap *regmap, int reg,
 static struct intel_pmic_opregion_data intel_cht_wc_pmic_opregion_data = {
 	.get_power		= intel_cht_wc_pmic_get_power,
 	.update_power		= intel_cht_wc_pmic_update_power,
+	.exec_mipi_pmic_seq_element = intel_cht_wc_exec_mipi_pmic_seq_element,
 	.power_table		= power_table,
 	.power_table_count	= ARRAY_SIZE(power_table),
 };
