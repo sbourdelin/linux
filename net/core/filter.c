@@ -2171,8 +2171,8 @@ static const struct bpf_func_proto bpf_msg_cork_bytes_proto = {
 BPF_CALL_4(bpf_msg_pull_data, struct sk_msg *, msg, u32, start,
 	   u32, end, u64, flags)
 {
-	u32 len = 0, offset = 0, copy = 0, poffset = 0, bytes = end - start;
 	u32 first_sge, last_sge, i, shift, bytes_sg_total;
+	u32 len = 0, offset = 0, copy = 0, poffset = 0;
 	struct scatterlist *sge;
 	u8 *raw, *to, *from;
 	struct page *page;
@@ -2197,7 +2197,7 @@ BPF_CALL_4(bpf_msg_pull_data, struct sk_msg *, msg, u32, start,
 	/* The start may point into the sg element so we need to also
 	 * account for the headroom.
 	 */
-	bytes_sg_total = start - offset + bytes;
+	bytes_sg_total = end - offset;
 	if (!msg->sg.copy[i] && bytes_sg_total <= len)
 		goto out;
 
@@ -2280,7 +2280,7 @@ BPF_CALL_4(bpf_msg_pull_data, struct sk_msg *, msg, u32, start,
 		      msg->sg.end - shift;
 out:
 	msg->data = sg_virt(&msg->sg.data[first_sge]) + start - offset;
-	msg->data_end = msg->data + bytes;
+	msg->data_end = msg->data + end - start;
 	return 0;
 }
 
