@@ -1156,6 +1156,10 @@ static int acm_probe(struct usb_interface *intf,
 		goto skip_normal_probe;
 	}
 
+	/* handle active handshake triggered by device */
+	if (quirks == DISABLE_ECHO)
+		acm_tty_driver->init_termios.c_lflag &= ~(ECHO);
+
 	/* normal probing*/
 	if (!buffer) {
 		dev_err(&intf->dev, "Weird descriptor references\n");
@@ -1655,7 +1659,10 @@ static const struct usb_device_id acm_ids[] = {
 	.driver_info = NO_UNION_NORMAL, /* has no union descriptor */
 	},
 	{ USB_DEVICE(0x0e8d, 0x0003), /* FIREFLY, MediaTek Inc; andrey.arapov@gmail.com */
-	.driver_info = NO_UNION_NORMAL, /* has no union descriptor */
+	.driver_info = DISABLE_ECHO, /* DISABLE ECHO in termios flag */
+	},
+	{ USB_DEVICE(0x0e8d, 0x2000), /* FIREFLY, MediaTek Inc; Preloader */
+	.driver_info = DISABLE_ECHO, /* DISABLE ECHO in termios flag */
 	},
 	{ USB_DEVICE(0x0e8d, 0x3329), /* MediaTek Inc GPS */
 	.driver_info = NO_UNION_NORMAL, /* has no union descriptor */
