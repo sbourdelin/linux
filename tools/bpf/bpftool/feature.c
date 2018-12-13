@@ -562,6 +562,86 @@ probe_prog_type(enum bpf_prog_type prog_type, int kernel_version,
 			   define_prefix);
 }
 
+static void
+probe_map_type(enum bpf_map_type map_type, const char *define_prefix)
+{
+	char feat_name[128], define_name[128], plain_desc[128];
+	int key_size, value_size, max_entries, map_flags;
+	const char *plain_comment = "eBPF map_type ";
+	struct bpf_create_map_attr attr = {};
+	int fd = -1, fd_inner;
+	size_t maxlen;
+	bool res;
+
+	key_size = sizeof(__u32);
+	value_size = sizeof(__u32);
+	max_entries = 1;
+	map_flags = 0;
+
+	switch (map_type) {
+	case BPF_MAP_TYPE_LPM_TRIE:
+		key_size = sizeof(__u64);
+		value_size = sizeof(__u64);
+		map_flags = BPF_F_NO_PREALLOC;
+		break;
+	case BPF_MAP_TYPE_STACK_TRACE:
+		value_size = sizeof(__u64);
+		break;
+	case BPF_MAP_TYPE_CGROUP_STORAGE:
+	case BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE:
+		key_size = sizeof(struct bpf_cgroup_storage_key);
+		value_size = sizeof(__u64);
+		max_entries = 0;
+		break;
+	case BPF_MAP_TYPE_QUEUE:
+	case BPF_MAP_TYPE_STACK:
+		key_size = 0;
+		break;
+	default:
+		break;
+	}
+
+	switch (map_type) {
+	case BPF_MAP_TYPE_ARRAY_OF_MAPS:
+	case BPF_MAP_TYPE_HASH_OF_MAPS:
+		fd_inner = bpf_create_map(BPF_MAP_TYPE_HASH,
+					  sizeof(__u32), sizeof(__u32), 1, 0);
+		if (fd_inner < 0)
+			break;
+		fd = bpf_create_map_in_map(map_type, "", sizeof(__u32),
+					   fd_inner, 1, 0);
+		close(fd_inner);
+		break;
+	default:
+		/* Note: No other restriction on map type probes for offload */
+		attr.map_type = map_type;
+		attr.key_size = key_size;
+		attr.value_size = value_size;
+		attr.max_entries = max_entries;
+		attr.map_flags = map_flags;
+
+		fd = bpf_create_map_xattr(&attr);
+		break;
+	}
+	if (fd >= 0)
+		close(fd);
+
+	res = fd >= 0;
+
+	maxlen = sizeof(plain_desc) - strlen(plain_comment) - 1;
+	if (strlen(map_type_name[map_type]) > maxlen) {
+		p_info("map type name too long");
+		return;
+	}
+
+	sprintf(feat_name, "have_%s_map_type", map_type_name[map_type]);
+	sprintf(define_name, "%s_map_type", map_type_name[map_type]);
+	uppercase(define_name, sizeof(define_name));
+	sprintf(plain_desc, "%s%s", plain_comment, map_type_name[map_type]);
+	print_bool_feature(feat_name, define_name, plain_desc, res,
+			   define_prefix);
+}
+
 static int do_probe(int argc, char **argv)
 {
 	enum probe_component target = COMPONENT_UNSPEC;
@@ -657,6 +737,14 @@ static int do_probe(int argc, char **argv)
 	     i < ARRAY_SIZE(prog_type_name); i++)
 		probe_prog_type(i, kernel_version, supported_types,
 				define_prefix);
+
+	print_end_then_start_section("map_types",
+				     "/*** eBPF map types ***/",
+				     "Scanning eBPF map types...",
+				     define_prefix);
+
+	for (i = BPF_MAP_TYPE_HASH; i < map_type_name_size; i++)
+		probe_map_type(i, define_prefix);
 
 exit_close_json:
 	if (json_output) {
