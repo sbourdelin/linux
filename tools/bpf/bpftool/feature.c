@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <sys/vfs.h>
 
 #include <linux/filter.h>
 #include <linux/limits.h>
@@ -13,10 +14,28 @@
 
 #include "main.h"
 
+#ifndef PROC_SUPER_MAGIC
+# define PROC_SUPER_MAGIC	0x9fa0
+#endif
+
 enum probe_component {
 	COMPONENT_UNSPEC,
 	COMPONENT_KERNEL,
 };
+
+/* Miscellaneous utility functions */
+
+static bool check_procfs(void)
+{
+	struct statfs st_fs;
+
+	if (statfs("/proc", &st_fs) < 0)
+		return false;
+	if ((unsigned long)st_fs.f_type != PROC_SUPER_MAGIC)
+		return false;
+
+	return true;
+}
 
 /* Printing utility functions */
 
@@ -48,6 +67,236 @@ print_start_section(const char *json_title, const char *define_comment,
 }
 
 /* Probing functions */
+
+static int read_procfs(const char *path)
+{
+	char *endptr, *line = NULL;
+	size_t len = 0;
+	FILE *fd;
+	int res;
+
+	fd = fopen(path, "r");
+	if (!fd)
+		return -1;
+
+	res = getline(&line, &len, fd);
+	fclose(fd);
+	if (res < 0)
+		return -1;
+
+	errno = 0;
+	res = strtol(line, &endptr, 10);
+	if (errno || *line == '\0' || *endptr != '\n')
+		res = -1;
+	free(line);
+
+	return res;
+}
+
+static void probe_unprivileged_disabled(const char *define_prefix)
+{
+	int res;
+
+	res = read_procfs("/proc/sys/kernel/unprivileged_bpf_disabled");
+	if (json_output) {
+		jsonw_int_field(json_wtr, "unprivileged_bpf_disabled", res);
+	} else if (define_prefix) {
+		printf("#define %sUNPRIVILEGED_BPF_DISABLED ", define_prefix);
+		switch (res) {
+		case 0:
+			printf("%sUNPRIVILEGED_BPF_DISABLED_OFF\n",
+			       define_prefix);
+			break;
+		case 1:
+			printf("%sUNPRIVILEGED_BPF_DISABLED_ON\n",
+			       define_prefix);
+			break;
+		case -1:
+			printf("%sUNPRIVILEGED_BPF_DISABLED_UNKNOWN\n",
+			       define_prefix);
+			break;
+		default:
+			printf("%d\n", res);
+		}
+		printf("#define  %sUNPRIVILEGED_BPF_DISABLED_OFF 0\n",
+		       define_prefix);
+		printf("#define  %sUNPRIVILEGED_BPF_DISABLED_ON 1\n",
+		       define_prefix);
+		printf("#define  %sUNPRIVILEGED_BPF_DISABLED_UNKNOWN -1\n",
+		       define_prefix);
+	} else {
+		switch (res) {
+		case 0:
+			printf("bpf() syscall for unprivileged users is enabled\n");
+			break;
+		case 1:
+			printf("bpf() syscall restricted to privileged users\n");
+			break;
+		case -1:
+			printf("Unable to retrieve required privileges for bpf() syscall\n");
+			break;
+		default:
+			printf("bpf() syscall restriction has unknown value %d\n", res);
+		}
+	}
+}
+
+static void probe_jit_enable(const char *define_prefix)
+{
+	int res;
+
+	res = read_procfs("/proc/sys/net/core/bpf_jit_enable");
+	if (json_output) {
+		jsonw_int_field(json_wtr, "bpf_jit_enable", res);
+	} else if (define_prefix) {
+		printf("#define %sJIT_COMPILER_ENABLE ", define_prefix);
+		switch (res) {
+		case 0:
+			printf("%sJIT_COMPILER_ENABLE_OFF\n", define_prefix);
+			break;
+		case 1:
+			printf("%sJIT_COMPILER_ENABLE_ON\n", define_prefix);
+			break;
+		case 2:
+			printf("%sJIT_COMPILER_ENABLE_ON_WITH_DEBUG\n",
+			       define_prefix);
+			break;
+		case -1:
+			printf("%sJIT_COMPILER_ENABLE_UNKNOWN\n",
+			       define_prefix);
+			break;
+		default:
+			printf("%d\n", res);
+		}
+		printf("#define  %sJIT_COMPILER_ENABLE_OFF 0\n", define_prefix);
+		printf("#define  %sJIT_COMPILER_ENABLE_ON 1\n", define_prefix);
+		printf("#define  %sJIT_COMPILER_ENABLE_ON_WITH_DEBUG 2\n",
+		       define_prefix);
+		printf("#define  %sJIT_COMPILER_ENABLE_UNKNOWN -1\n",
+		       define_prefix);
+	} else {
+		switch (res) {
+		case 0:
+			printf("JIT compiler is disabled\n");
+			break;
+		case 1:
+			printf("JIT compiler is enabled\n");
+			break;
+		case 2:
+			printf("JIT compiler is enabled with debugging traces in kernel logs\n");
+			break;
+		case -1:
+			printf("Unable to retrieve JIT-compiler status\n");
+			break;
+		default:
+			printf("JIT-compiler status has unknown value %d\n",
+			       res);
+		}
+	}
+}
+
+static void probe_jit_harden(const char *define_prefix)
+{
+	int res;
+
+	res = read_procfs("/proc/sys/net/core/bpf_jit_harden");
+	if (json_output) {
+		jsonw_int_field(json_wtr, "bpf_jit_harden", res);
+	} else if (define_prefix) {
+		printf("#define %sJIT_COMPILER_HARDEN ", define_prefix);
+		switch (res) {
+		case 0:
+			printf("%sJIT_COMPILER_HARDEN_OFF\n", define_prefix);
+			break;
+		case 1:
+			printf("%sJIT_COMPILER_HARDEN_FOR_UNPRIVILEGED\n",
+			       define_prefix);
+			break;
+		case 2:
+			printf("%sJIT_COMPILER_HARDEN_FOR_ALL_USERS\n",
+			       define_prefix);
+			break;
+		case -1:
+			printf("%sJIT_COMPILER_HARDEN_UNKNOWN\n",
+			       define_prefix);
+			break;
+		default:
+			printf("%d\n", res);
+		}
+		printf("#define  %sJIT_COMPILER_HARDEN_OFF 0\n", define_prefix);
+		printf("#define  %sJIT_COMPILER_HARDEN_FOR_UNPRIVILEGED 1\n",
+		       define_prefix);
+		printf("#define  %sJIT_COMPILER_HARDEN_FOR_ALL_USERS 2\n",
+		       define_prefix);
+		printf("#define  %sJIT_COMPILER_HARDEN_UNKNOWN -1\n",
+		       define_prefix);
+	} else {
+		switch (res) {
+		case 0:
+			printf("JIT compiler hardening is disabled\n");
+			break;
+		case 1:
+			printf("JIT compiler hardening is enabled for unprivileged users\n");
+			break;
+		case 2:
+			printf("JIT compiler hardening is enabled for all users\n");
+			break;
+		case -1:
+			printf("Unable to retrieve JIT hardening status\n");
+			break;
+		default:
+			printf("JIT hardening status has unknown value %d\n",
+			       res);
+		}
+	}
+}
+
+static void probe_jit_kallsyms(const char *define_prefix)
+{
+	int res;
+
+	res = read_procfs("/proc/sys/net/core/bpf_jit_kallsyms");
+	if (json_output) {
+		jsonw_int_field(json_wtr, "bpf_jit_kallsyms", res);
+	} else if (define_prefix) {
+		printf("#define %sJIT_COMPILER_KALLSYMS ", define_prefix);
+		switch (res) {
+		case 0:
+			printf("%sJIT_COMPILER_KALLSYMS_OFF\n", define_prefix);
+			break;
+		case 1:
+			printf("%sJIT_COMPILER_KALLSYMS_FOR_ROOT\n",
+			       define_prefix);
+			break;
+		case -1:
+			printf("%sJIT_COMPILER_KALLSYMS_UNKNOWN\n",
+			       define_prefix);
+			break;
+		default:
+			printf("%d\n", res);
+		}
+		printf("#define  %sJIT_COMPILER_KALLSYMS_OFF 0\n",
+		       define_prefix);
+		printf("#define  %sJIT_COMPILER_KALLSYMS_FOR_ROOT 1\n",
+		       define_prefix);
+		printf("#define  %sJIT_COMPILER_KALLSYMS_UNKNOWN -1\n",
+		       define_prefix);
+	} else {
+		switch (res) {
+		case 0:
+			printf("JIT compiler kallsyms exports are disabled\n");
+			break;
+		case 1:
+			printf("JIT compiler kallsyms exports are enabled for root\n");
+			break;
+		case -1:
+			printf("Unable to retrieve JIT kallsyms export status\n");
+			break;
+		default:
+			printf("JIT kallsyms exports status has unknown value %d\n", res);
+		}
+	}
+}
 
 static int probe_kernel_version(const char *define_prefix)
 {
@@ -137,6 +386,28 @@ static int do_probe(int argc, char **argv)
 
 	if (json_output)
 		jsonw_start_object(json_wtr);
+
+	switch (target) {
+	case COMPONENT_KERNEL:
+	case COMPONENT_UNSPEC:
+		print_start_section("system_config",
+				    "/*** System configuration ***/",
+				    "Scanning system configuration...",
+				    define_prefix);
+		if (check_procfs()) {
+			probe_unprivileged_disabled(define_prefix);
+			probe_jit_enable(define_prefix);
+			probe_jit_harden(define_prefix);
+			probe_jit_kallsyms(define_prefix);
+		} else {
+			p_info("/* procfs not mounted, skipping related probes */");
+		}
+		if (json_output)
+			jsonw_end_object(json_wtr);
+		else
+			printf("\n");
+		break;
+	}
 
 	print_start_section("syscall_config",
 			    "/*** System call and kernel version ***/",
