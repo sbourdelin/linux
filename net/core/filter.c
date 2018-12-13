@@ -5315,6 +5315,7 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 	}
 }
 
+#ifdef CONFIG_CGROUP_BPF
 static const struct bpf_func_proto *
 sock_filter_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
@@ -5364,6 +5365,7 @@ sock_addr_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return bpf_base_func_proto(func_id);
 	}
 }
+#endif
 
 static const struct bpf_func_proto *
 sk_filter_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
@@ -5382,6 +5384,7 @@ sk_filter_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	}
 }
 
+#ifdef CONFIG_CGROUP_BPF
 static const struct bpf_func_proto *
 cg_skb_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
@@ -5392,6 +5395,7 @@ cg_skb_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return sk_filter_func_proto(func_id, prog);
 	}
 }
+#endif
 
 static const struct bpf_func_proto *
 tc_cls_act_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
@@ -5790,6 +5794,7 @@ static bool sk_filter_is_valid_access(int off, int size,
 	return bpf_skb_is_valid_access(off, size, type, prog, info);
 }
 
+#ifdef CONFIG_CGROUP_BPF
 static bool cg_skb_is_valid_access(int off, int size,
 				   enum bpf_access_type type,
 				   const struct bpf_prog *prog,
@@ -5834,6 +5839,7 @@ static bool cg_skb_is_valid_access(int off, int size,
 
 	return bpf_skb_is_valid_access(off, size, type, prog, info);
 }
+#endif
 
 static bool lwt_is_valid_access(int off, int size,
 				enum bpf_access_type type,
@@ -5873,6 +5879,7 @@ static bool lwt_is_valid_access(int off, int size,
 	return bpf_skb_is_valid_access(off, size, type, prog, info);
 }
 
+#ifdef CONFIG_CGROUP_BPF
 /* Attach type specific accesses */
 static bool __sock_filter_check_attach_type(int off,
 					    enum bpf_access_type access_type,
@@ -5916,6 +5923,7 @@ read_only:
 full_access:
 	return true;
 }
+#endif
 
 static bool __sock_filter_check_size(int off, int size,
 				     struct bpf_insn_access_aux *info)
@@ -5944,6 +5952,7 @@ bool bpf_sock_is_valid_access(int off, int size, enum bpf_access_type type,
 	return true;
 }
 
+#ifdef CONFIG_CGROUP_BPF
 static bool sock_filter_is_valid_access(int off, int size,
 					enum bpf_access_type type,
 					const struct bpf_prog *prog,
@@ -5954,6 +5963,7 @@ static bool sock_filter_is_valid_access(int off, int size,
 	return __sock_filter_check_attach_type(off, type,
 					       prog->expected_attach_type);
 }
+#endif
 
 static int bpf_noop_prologue(struct bpf_insn *insn_buf, bool direct_write,
 			     const struct bpf_prog *prog)
@@ -6133,6 +6143,7 @@ void bpf_warn_invalid_xdp_action(u32 act)
 }
 EXPORT_SYMBOL_GPL(bpf_warn_invalid_xdp_action);
 
+#ifdef CONFIG_CGROUP_BPF
 static bool sock_addr_is_valid_access(int off, int size,
 				      enum bpf_access_type type,
 				      const struct bpf_prog *prog,
@@ -6219,6 +6230,7 @@ static bool sock_addr_is_valid_access(int off, int size,
 
 	return true;
 }
+#endif
 
 static bool sock_ops_is_valid_access(int off, int size,
 				     enum bpf_access_type type,
@@ -6955,6 +6967,7 @@ static u32 xdp_convert_ctx_access(enum bpf_access_type type,
 	SOCK_ADDR_LOAD_OR_STORE_NESTED_FIELD_SIZE_OFF(			       \
 		S, NS, F, NF, BPF_FIELD_SIZEOF(NS, NF), 0, TF)
 
+#ifdef CONFIG_CGROUP_BPF
 static u32 sock_addr_convert_ctx_access(enum bpf_access_type type,
 					const struct bpf_insn *si,
 					struct bpf_insn *insn_buf,
@@ -7043,6 +7056,7 @@ static u32 sock_addr_convert_ctx_access(enum bpf_access_type type,
 
 	return insn - insn_buf;
 }
+#endif
 
 static u32 sock_ops_convert_ctx_access(enum bpf_access_type type,
 				       const struct bpf_insn *si,
@@ -7569,6 +7583,7 @@ const struct bpf_prog_ops xdp_prog_ops = {
 	.test_run		= bpf_prog_test_run_xdp,
 };
 
+#ifdef CONFIG_CGROUP_BPF
 const struct bpf_verifier_ops cg_skb_verifier_ops = {
 	.get_func_proto		= cg_skb_func_proto,
 	.is_valid_access	= cg_skb_is_valid_access,
@@ -7578,6 +7593,7 @@ const struct bpf_verifier_ops cg_skb_verifier_ops = {
 const struct bpf_prog_ops cg_skb_prog_ops = {
 	.test_run		= bpf_prog_test_run_skb,
 };
+#endif
 
 const struct bpf_verifier_ops lwt_in_verifier_ops = {
 	.get_func_proto		= lwt_in_func_proto,
@@ -7620,6 +7636,7 @@ const struct bpf_prog_ops lwt_seg6local_prog_ops = {
 	.test_run		= bpf_prog_test_run_skb,
 };
 
+#ifdef CONFIG_CGROUP_BPF
 const struct bpf_verifier_ops cg_sock_verifier_ops = {
 	.get_func_proto		= sock_filter_func_proto,
 	.is_valid_access	= sock_filter_is_valid_access,
@@ -7637,6 +7654,7 @@ const struct bpf_verifier_ops cg_sock_addr_verifier_ops = {
 
 const struct bpf_prog_ops cg_sock_addr_prog_ops = {
 };
+#endif
 
 const struct bpf_verifier_ops sock_ops_verifier_ops = {
 	.get_func_proto		= sock_ops_func_proto,
