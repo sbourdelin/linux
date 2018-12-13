@@ -5182,8 +5182,14 @@ static bool icl_tc_port_connected(struct drm_i915_private *dev_priv,
 	bool is_legacy, is_typec, is_tbt;
 	u32 dpsp;
 
-	is_legacy = intel_dig_port->tc_legacy_port ||
+	/*
+	 * TODO: Depend only on the tc_legacy_port flag to identify legacy
+	 * ports, once we have an explicit detection method for legacy mode
+	 * (via VBT or a HW/FW register).
+	 */
+	intel_dig_port->tc_legacy_port |=
 		I915_READ(SDEISR) & SDE_TC_HOTPLUG_ICP(tc_port);
+	is_legacy = intel_dig_port->tc_legacy_port;
 
 	/*
 	 * The spec says we shouldn't be using the ISR bits for detecting
