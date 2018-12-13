@@ -1882,6 +1882,76 @@ out:
 	bpf_object__close(obj);
 }
 
+static void test_jset(void)
+{
+	/* LLVM does not seem to support JSET-like instructions so by hand.. */
+	static const struct bpf_insn insns[] = {
+		/* r0 = 0 */
+		BPF_MOV64_IMM(BPF_REG_0, 0),
+		/* prep for direct packet access via r2 */
+		BPF_LDX_MEM(BPF_W, BPF_REG_2, BPF_REG_1,
+			    offsetof(struct __sk_buff, data)),
+		BPF_LDX_MEM(BPF_W, BPF_REG_3, BPF_REG_1,
+			    offsetof(struct __sk_buff, data_end)),
+		BPF_MOV64_REG(BPF_REG_4, BPF_REG_2),
+		BPF_ALU64_IMM(BPF_ADD, BPF_REG_4, 8),
+		BPF_JMP_REG(BPF_JLE, BPF_REG_4, BPF_REG_3, 1),
+		BPF_EXIT_INSN(),
+
+		BPF_LDX_MEM(BPF_DW, BPF_REG_7, BPF_REG_2, 0),
+
+		/* reg, bit 63 or bit 0 set, taken */
+		BPF_LD_IMM64(BPF_REG_8, 0x8000000000000001),
+		BPF_JMP_REG(BPF_JSET, BPF_REG_7, BPF_REG_8, 1),
+		BPF_EXIT_INSN(),
+
+		/* reg, bit 62, not taken */
+		BPF_LD_IMM64(BPF_REG_8, 0x4000000000000000),
+		BPF_JMP_REG(BPF_JSET, BPF_REG_7, BPF_REG_8, 1),
+		BPF_JMP_IMM(BPF_JA, 0, 0, 1),
+		BPF_EXIT_INSN(),
+
+		/* imm, any bit set, taken */
+		BPF_JMP_IMM(BPF_JSET, BPF_REG_7, -1, 1),
+		BPF_EXIT_INSN(),
+
+		/* imm, bit 31 set, taken */
+		BPF_JMP_IMM(BPF_JSET, BPF_REG_7, 0x80000000, 1),
+		BPF_EXIT_INSN(),
+
+		/* all good - return r0 == 2 */
+		BPF_MOV64_IMM(BPF_REG_0, 2),
+		BPF_EXIT_INSN(),
+	};
+	__u32 duration = 0, retval;
+	__u64 data[8] = {};
+	int err, prog_fd;
+
+	prog_fd = bpf_load_program(BPF_PROG_TYPE_SCHED_CLS, insns,
+				   ARRAY_SIZE(insns), "GPL", 0, NULL, 0);
+	if (CHECK(prog_fd < 0, "jset", "load fd %d errno %d\n", prog_fd, errno))
+		return;
+
+#define TEST(val, name, res)						\
+	do {								\
+		data[0] = (val);					\
+		err = bpf_prog_test_run(prog_fd, 1, data, sizeof(data),	\
+					NULL, NULL, &retval, &duration); \
+		CHECK(err || retval != (res), (name),			\
+		      "err %d errno %d retval %d duration %d\n",	\
+		      err, errno, retval, duration);			\
+	} while (0)
+
+	TEST((1ULL << 63) | (1U << 31) | (1U << 0), "bit63+31+0", 2);
+	TEST((1ULL << 63) | (1U << 31), "bit63+31", 2);
+	TEST((1ULL << 31) | (1U << 0), "bit31+0", 2);
+	TEST((__u32)-1, "u32", 2);
+	TEST(~0x4000000000000000ULL, "~bit62", 2);
+	TEST(0, "zero", 0);
+	TEST(~0ULL, "all", 0);
+#undef TEST
+}
+
 int main(void)
 {
 	srand(time(NULL));
@@ -1909,6 +1979,7 @@ int main(void)
 	test_reference_tracking();
 	test_queue_stack_map(QUEUE);
 	test_queue_stack_map(STACK);
+	test_jset();
 
 	printf("Summary: %d PASSED, %d FAILED\n", pass_cnt, error_cnt);
 	return error_cnt ? EXIT_FAILURE : EXIT_SUCCESS;
