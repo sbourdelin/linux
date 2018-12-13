@@ -417,6 +417,7 @@ int vimc_ent_sd_register(struct vimc_ent_device *ved,
 			 const unsigned long *pads_flag,
 			 const struct v4l2_subdev_ops *sd_ops)
 {
+	struct media_prop *prop = NULL;
 	int ret;
 
 	/* Allocate the pads */
@@ -453,6 +454,55 @@ int vimc_ent_sd_register(struct vimc_ent_device *ved,
 			name, ret);
 		goto err_clean_m_ent;
 	}
+
+	ret = media_entity_add_prop_u64(&sd->entity, "u64", ~1);
+	if (!ret)
+		ret = media_entity_add_prop_s64(&sd->entity, "s64", -5);
+	if (!ret)
+		ret = media_entity_add_prop_string(&sd->entity, "string",
+						   sd->name);
+	if (!ret) {
+		prop = media_entity_add_prop_group(&sd->entity, "empty-group");
+		ret = PTR_ERR_OR_ZERO(prop);
+	}
+	if (!ret) {
+		prop = media_entity_add_prop_group(&sd->entity, "group");
+		ret = PTR_ERR_OR_ZERO(prop);
+	}
+	if (!ret)
+		ret = media_prop_add_prop_u64(prop, "u64", 42);
+	if (!ret)
+		ret = media_prop_add_prop_s64(prop, "s64", -42);
+	if (!ret)
+		ret = media_prop_add_prop_string(prop, "string", "42");
+	if (!ret)
+		ret = media_pad_add_prop_u64(&sd->entity.pads[num_pads - 1],
+					     "u64", ~1);
+	if (!ret)
+		ret = media_pad_add_prop_s64(&sd->entity.pads[num_pads - 1],
+					     "s64", -5);
+	if (!ret) {
+		prop = media_pad_add_prop_group(&sd->entity.pads[num_pads - 1],
+						"group");
+		ret = PTR_ERR_OR_ZERO(prop);
+	}
+	if (!ret)
+		ret = media_prop_add_prop_u64(prop, "u64", 24);
+	if (!ret)
+		ret = media_prop_add_prop_s64(prop, "s64", -24);
+	if (!ret)
+		ret = media_pad_add_prop_string(&sd->entity.pads[0],
+						"string", sd->name);
+	if (!ret)
+		ret = media_prop_add_prop_string(prop, "string", "24");
+	if (!ret) {
+		prop = media_prop_add_prop_group(prop, "subgroup");
+		ret = PTR_ERR_OR_ZERO(prop);
+	}
+	if (!ret)
+		ret = media_prop_add_prop_string(prop, "string", "substring");
+	if (ret)
+		goto err_clean_m_ent;
 
 	return 0;
 
