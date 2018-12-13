@@ -39,6 +39,10 @@ DESCRIPTION
 		  names when including the output of this command as a header
 		  file.
 
+		  Note that when probed, some eBPF helpers (e.g.
+		  **bpf_trace_printk**\ () or **bpf_probe_write_user**\ ()) may
+		  print warnings to kernel logs.
+
 	**bpftool feature help**
 		  Print short help message.
 

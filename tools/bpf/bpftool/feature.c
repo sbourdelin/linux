@@ -24,6 +24,113 @@ enum probe_component {
 	COMPONENT_KERNEL,
 };
 
+#define MAX_HELPER_NAME_LEN 32
+struct helper_param {
+	enum bpf_prog_type progtype;
+	const char name[MAX_HELPER_NAME_LEN];
+};
+
+/* helper_progtype_and_name[index] associates to the BPF helper function of id
+ * "index" a name and a program type to run this helper with. In order to probe
+ * helper availability for programs offloaded to a network device, use
+ * offload-compatible types (e.g. XDP) everywhere we can. Caveats: helper
+ * probing may fail currently if only TC (but not XDP) is supported for
+ * offload.
+ */
+static const struct helper_param helper_progtype_and_name[] = {
+	{ BPF_PROG_TYPE_XDP,		"no_helper_with_id_0" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_map_lookup_elem" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_map_update_elem" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_map_delete_elem" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_probe_read" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_ktime_get_ns" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_trace_printk" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_get_prandom_u32" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_get_smp_processor_id" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_store_bytes" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_l3_csum_replace" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_l4_csum_replace" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_tail_call" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_clone_redirect" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_current_pid_tgid" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_current_uid_gid" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_current_comm" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_get_cgroup_classid" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_vlan_push" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_vlan_pop" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_get_tunnel_key" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_set_tunnel_key" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_perf_event_read" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_redirect" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_get_route_realm" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_perf_event_output" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_load_bytes" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_stackid" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_csum_diff" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_get_tunnel_opt" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_set_tunnel_opt" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_change_proto" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_change_type" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_under_cgroup" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_get_hash_recalc" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_current_task" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_probe_write_user" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_current_task_under_cgroup" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_change_tail" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_pull_data" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_csum_update" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_set_hash_invalid" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_get_numa_node_id" },
+	{ BPF_PROG_TYPE_SK_SKB,		"bpf_skb_change_head" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_xdp_adjust_head" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_probe_read_str" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_get_socket_cookie" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_get_socket_uid" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_set_hash" },
+	{ BPF_PROG_TYPE_SOCK_OPS,	"bpf_setsockopt" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_adjust_room" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_redirect_map" },
+	{ BPF_PROG_TYPE_SK_SKB,		"bpf_sk_redirect_map" },
+	{ BPF_PROG_TYPE_SOCK_OPS,	"bpf_sock_map_update" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_xdp_adjust_meta" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_perf_event_read_value" },
+	{ BPF_PROG_TYPE_PERF_EVENT,	"bpf_perf_prog_read_value" },
+	{ BPF_PROG_TYPE_SOCK_OPS,	"bpf_getsockopt" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_override_return" },
+	{ BPF_PROG_TYPE_SOCK_OPS,	"bpf_sock_ops_cb_flags_set" },
+	{ BPF_PROG_TYPE_SK_MSG,		"bpf_msg_redirect_map" },
+	{ BPF_PROG_TYPE_SK_MSG,		"bpf_msg_apply_bytes" },
+	{ BPF_PROG_TYPE_SK_MSG,		"bpf_msg_cork_bytes" },
+	{ BPF_PROG_TYPE_SK_MSG,		"bpf_msg_pull_data" },
+	{ BPF_PROG_TYPE_CGROUP_SOCK_ADDR,	"bpf_bind" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_xdp_adjust_tail" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_get_xfrm_state" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_stack" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_load_bytes_relative" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_fib_lookup" },
+	{ BPF_PROG_TYPE_SOCK_OPS,	"bpf_sock_hash_update" },
+	{ BPF_PROG_TYPE_SK_MSG,		"bpf_msg_redirect_hash" },
+	{ BPF_PROG_TYPE_SK_SKB,		"bpf_sk_redirect_hash" },
+	{ BPF_PROG_TYPE_LWT_IN,		"bpf_lwt_push_encap" },
+	{ BPF_PROG_TYPE_LWT_SEG6LOCAL,	"bpf_lwt_seg6_store_bytes" },
+	{ BPF_PROG_TYPE_LWT_SEG6LOCAL,	"bpf_lwt_seg6_adjust_srh" },
+	{ BPF_PROG_TYPE_LWT_SEG6LOCAL,	"bpf_lwt_seg6_action" },
+	{ BPF_PROG_TYPE_LIRC_MODE2,	"bpf_rc_repeat" },
+	{ BPF_PROG_TYPE_LIRC_MODE2,	"bpf_rc_keydown" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_cgroup_id" },
+	{ BPF_PROG_TYPE_KPROBE,		"bpf_get_current_cgroup_id" },
+	{ BPF_PROG_TYPE_CGROUP_SKB,	"bpf_get_local_storage" },
+	{ BPF_PROG_TYPE_SK_REUSEPORT,	"bpf_sk_select_reuseport" },
+	{ BPF_PROG_TYPE_SCHED_CLS,	"bpf_skb_ancestor_cgroup_id" },
+	{ BPF_PROG_TYPE_SK_SKB,		"bpf_sk_lookup_tcp" },
+	{ BPF_PROG_TYPE_SK_SKB,		"bpf_sk_lookup_udp" },
+	{ BPF_PROG_TYPE_SK_SKB,		"bpf_sk_release" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_map_push_elem" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_map_pop_elem" },
+	{ BPF_PROG_TYPE_XDP,		"bpf_map_peek_elem" },
+	{ BPF_PROG_TYPE_SK_MSG,		"bpf_msg_push_data" },
+};
+
 /* Miscellaneous utility functions */
 
 static bool check_procfs(void)
@@ -44,6 +151,11 @@ static void uppercase(char *str, size_t len)
 
 	for (i = 0; i < len && str[i] != '\0'; i++)
 		str[i] = toupper(str[i]);
+}
+
+static bool grep(const char *buffer, const char *pattern)
+{
+	return !!strstr(buffer, pattern);
 }
 
 /* Printing utility functions */
@@ -642,6 +754,36 @@ probe_map_type(enum bpf_map_type map_type, const char *define_prefix)
 			   define_prefix);
 }
 
+static void
+probe_helper(__u32 id, enum bpf_prog_type prog_type, const char *name,
+	     int kernel_version, bool *supported_types,
+	     const char *define_prefix)
+{
+	char buf[4096], feat_name[128], define_name[128], plain_desc[128];
+	struct bpf_insn insns[2] = {
+		BPF_EMIT_CALL(id),
+		BPF_EXIT_INSN()
+	};
+	bool res = false;
+
+	if (!supported_types[prog_type])
+		goto do_print;
+
+	/* Reset buffer in case no debug info was written at previous probe */
+	*buf = '\0';
+	prog_load(prog_type, insns, ARRAY_SIZE(insns), kernel_version,
+		  buf, sizeof(buf));
+	res = !grep(buf, "invalid func ") && !grep(buf, "unknown func ");
+
+do_print:
+	sprintf(feat_name, "have_%s_helper", name);
+	sprintf(define_name, "%s_helper", name);
+	uppercase(define_name, sizeof(define_name));
+	sprintf(plain_desc, "eBPF helper %s", name);
+	print_bool_feature(feat_name, define_name, plain_desc, res,
+			   define_prefix);
+}
+
 static int do_probe(int argc, char **argv)
 {
 	enum probe_component target = COMPONENT_UNSPEC;
@@ -745,6 +887,16 @@ static int do_probe(int argc, char **argv)
 
 	for (i = BPF_MAP_TYPE_HASH; i < map_type_name_size; i++)
 		probe_map_type(i, define_prefix);
+
+	print_end_then_start_section("helpers",
+				     "/*** eBPF helper functions ***/",
+				     "Scanning eBPF helper functions...",
+				     define_prefix);
+
+	for (i = 1; i < ARRAY_SIZE(helper_progtype_and_name); i++)
+		probe_helper(i, helper_progtype_and_name[i].progtype,
+			     helper_progtype_and_name[i].name,
+			     kernel_version, supported_types, define_prefix);
 
 exit_close_json:
 	if (json_output) {
