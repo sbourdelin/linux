@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 /* Copyright (c) 2018 Netronome Systems, Inc. */
 
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -35,6 +36,14 @@ static bool check_procfs(void)
 		return false;
 
 	return true;
+}
+
+static void uppercase(char *str, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len && str[i] != '\0'; i++)
+		str[i] = toupper(str[i]);
 }
 
 /* Printing utility functions */
@@ -95,6 +104,19 @@ print_start_section(const char *json_title, const char *define_comment,
 	} else {
 		printf("%s\n", plain_title);
 	}
+}
+
+static void
+print_end_then_start_section(const char *json_title, const char *define_title,
+			     const char *plain_title, const char *define_prefix)
+{
+	if (json_output)
+		jsonw_end_object(json_wtr);
+	else
+		printf("\n");
+
+	print_start_section(json_title, define_title, plain_title,
+			    define_prefix);
 }
 
 /* Probing functions */
@@ -480,10 +502,73 @@ static bool probe_bpf_syscall(const char *define_prefix)
 	return res;
 }
 
+static void
+prog_load(enum bpf_prog_type prog_type, const struct bpf_insn *insns,
+	  size_t insns_cnt, int kernel_version, char *buf, size_t buf_len)
+{
+	struct bpf_load_program_attr xattr = {};
+	int fd;
+
+	switch (prog_type) {
+	case BPF_PROG_TYPE_CGROUP_SOCK_ADDR:
+		xattr.expected_attach_type = BPF_CGROUP_INET4_CONNECT;
+		break;
+	default:
+		break;
+	}
+
+	xattr.prog_type = prog_type;
+	xattr.insns = insns;
+	xattr.insns_cnt = insns_cnt;
+	xattr.license = "GPL";
+	xattr.kern_version = kernel_version;
+
+	fd = bpf_load_program_xattr(&xattr, buf, buf_len);
+	if (fd >= 0)
+		close(fd);
+}
+
+static void
+probe_prog_type(enum bpf_prog_type prog_type, int kernel_version,
+		bool *supported_types, const char *define_prefix)
+{
+	char buf[4096], feat_name[128], define_name[128], plain_desc[128];
+	const char *plain_comment = "eBPF program_type ";
+	struct bpf_insn insns[2] = {
+		BPF_MOV64_IMM(BPF_REG_0, 0),
+		BPF_EXIT_INSN()
+	};
+	size_t maxlen;
+	bool res;
+
+	errno = 0;
+	prog_load(prog_type, insns, ARRAY_SIZE(insns), kernel_version,
+		  buf, sizeof(buf));
+	res = (errno != EINVAL && errno != EOPNOTSUPP);
+
+	supported_types[prog_type] |= res;
+
+	maxlen = sizeof(plain_desc) - strlen(plain_comment) - 1;
+	if (strlen(prog_type_name[prog_type]) > maxlen) {
+		p_info("program type name too long");
+		return;
+	}
+
+	sprintf(feat_name, "have_%s_prog_type", prog_type_name[prog_type]);
+	sprintf(define_name, "%s_prog_type", prog_type_name[prog_type]);
+	uppercase(define_name, sizeof(define_name));
+	sprintf(plain_desc, "%s%s", plain_comment, prog_type_name[prog_type]);
+	print_bool_feature(feat_name, define_name, plain_desc, res,
+			   define_prefix);
+}
+
 static int do_probe(int argc, char **argv)
 {
 	enum probe_component target = COMPONENT_UNSPEC;
 	const char *define_prefix = NULL;
+	bool supported_types[128] = {};
+	int kernel_version;
+	unsigned int i;
 
 	/* Detection assumes user has sufficient privileges (CAP_SYS_ADMIN).
 	 * Let's approximate, and restrict usage to root user only.
@@ -558,9 +643,22 @@ static int do_probe(int argc, char **argv)
 			    "Scanning system call and kernel version...",
 			    define_prefix);
 
-	probe_kernel_version(define_prefix);
-	probe_bpf_syscall(define_prefix);
+	kernel_version = probe_kernel_version(define_prefix);
+	if (!probe_bpf_syscall(define_prefix))
+		/* bpf() syscall unavailable, don't probe other BPF features */
+		goto exit_close_json;
 
+	print_end_then_start_section("program_types",
+				     "/*** eBPF program types ***/",
+				     "Scanning eBPF program types...",
+				     define_prefix);
+
+	for (i = BPF_PROG_TYPE_SOCKET_FILTER;
+	     i < ARRAY_SIZE(prog_type_name); i++)
+		probe_prog_type(i, kernel_version, supported_types,
+				define_prefix);
+
+exit_close_json:
 	if (json_output) {
 		/* End current "section" of probes */
 		jsonw_end_object(json_wtr);
