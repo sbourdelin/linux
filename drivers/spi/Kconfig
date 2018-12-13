@@ -384,7 +384,7 @@ config SPI_FSL_ESPI
 
 config SPI_MESON_SPICC
 	tristate "Amlogic Meson SPICC controller"
-	depends on ARCH_MESON || COMPILE_TEST
+	depends on OF && COMMON_CLK && (ARCH_MESON || COMPILE_TEST)
 	help
 	  This enables master mode support for the SPICC (SPI communication
 	  controller) available in Amlogic Meson SoCs.
