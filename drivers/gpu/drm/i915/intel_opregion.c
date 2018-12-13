@@ -119,7 +119,7 @@ struct opregion_asle {
 	u64 fdss;
 	u32 fdsp;
 	u32 stat;
-	u64 rvda;	/* Physical address of raw vbt data */
+	u64 rvda;	/* Address of raw vbt data, relative from opregion */
 	u32 rvds;	/* Size of raw vbt data */
 	u8 rsvd[58];
 } __packed;
@@ -955,7 +955,13 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 
 	if (opregion->header->opregion_ver >= 2 && opregion->asle &&
 	    opregion->asle->rvda && opregion->asle->rvds) {
-		opregion->rvda = memremap(opregion->asle->rvda,
+		/*
+		 * rvda is unsigned, relative from opregion base, and should
+		 * never point within opregion.
+		 */
+		WARN_ON(opregion->asle->rvda < OPREGION_SIZE);
+
+		opregion->rvda = memremap(asls + opregion->asle->rvda,
 					  opregion->asle->rvds,
 					  MEMREMAP_WB);
 		vbt = opregion->rvda;
@@ -967,6 +973,8 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 			goto out;
 		} else {
 			DRM_DEBUG_KMS("Invalid VBT in ACPI OpRegion (RVDA)\n");
+			memunmap(opregion->rvda);
+			opregion->rvda = NULL;
 		}
 	}
 
