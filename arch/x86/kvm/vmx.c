@@ -6503,6 +6503,10 @@ static void vmx_compute_secondary_exec_control(struct vcpu_vmx *vmx)
 
 	if (vmx_rdtscp_supported()) {
 		bool rdtscp_enabled = guest_cpuid_has(vcpu, X86_FEATURE_RDTSCP);
+
+		vmx_set_intercept_for_msr(vmx->vmcs01.msr_bitmap, MSR_TSC_AUX,
+					  MSR_TYPE_R, !rdtscp_enabled);
+
 		if (!rdtscp_enabled)
 			exec_control &= ~SECONDARY_EXEC_RDTSCP;
 
