@@ -21,6 +21,7 @@
 
 #include <linux/bitmap.h>
 #include <linux/bug.h>
+#include <linux/err.h>
 #include <linux/fwnode.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -36,12 +37,14 @@
  * @MEDIA_GRAPH_LINK:		Identify a media link
  * @MEDIA_GRAPH_INTF_DEVNODE:	Identify a media Kernel API interface via
  *				a device node
+ * @MEDIA_GRAPH_PROP:		Identify a media property
  */
 enum media_gobj_type {
 	MEDIA_GRAPH_ENTITY,
 	MEDIA_GRAPH_PAD,
 	MEDIA_GRAPH_LINK,
 	MEDIA_GRAPH_INTF_DEVNODE,
+	MEDIA_GRAPH_PROP,
 };
 
 #define MEDIA_BITS_PER_TYPE		8
@@ -193,6 +196,7 @@ enum media_pad_signal_type {
  * @flags:	Pad flags, as defined in
  *		:ref:`include/uapi/linux/media.h <media_header>`
  *		(seek for ``MEDIA_PAD_FL_*``)
+ * @props:	The list pad properties
  */
 struct media_pad {
 	struct media_gobj graph_obj;	/* must be first field in struct */
@@ -200,6 +204,33 @@ struct media_pad {
 	u16 index;
 	enum media_pad_signal_type sig_type;
 	unsigned long flags;
+	struct list_head props;
+};
+
+/**
+ * struct media_prop - A media property graph object.
+ *
+ * @graph_obj:	Embedded structure containing the media object common data
+ * @list:	Linked list associated with the object that owns the link.
+ * @owner:	Graph object this property belongs to
+ * @index:	Property index for the owner property array, numbered
+ *		from 0 to n
+ * @type:	Property type
+ * @payload_size: Property payload size (i.e. additional bytes beyond this
+ *		struct)
+ * @props:	The list of sub-properties
+ * @name:	Property name
+ * @payload:	Property payload starts here
+ */
+struct media_prop {
+	struct media_gobj graph_obj;	/* must be first field in struct */
+	struct list_head list;
+	struct media_gobj *owner;
+	u32 type;
+	u32 payload_size;
+	struct list_head props;
+	char name[32];
+	u8 payload[];
 };
 
 /**
@@ -266,6 +297,7 @@ enum media_entity_type {
  * @flags:	Entity flags, as defined in
  *		:ref:`include/uapi/linux/media.h <media_header>`
  *		(seek for ``MEDIA_ENT_FL_*``)
+ * @inited:	Non-zero if this struct was initialized.
  * @num_pads:	Number of sink and source pads.
  * @num_links:	Total number of links, forward and back, enabled and disabled.
  * @num_backlinks: Number of backlinks
@@ -273,6 +305,7 @@ enum media_entity_type {
  *		re-used if entities are unregistered or registered again.
  * @pads:	Pads array with the size defined by @num_pads.
  * @links:	List of data links.
+ * @props:	List of entity properties.
  * @ops:	Entity operations.
  * @stream_count: Stream count for the entity.
  * @use_count:	Use count for the entity.
@@ -300,6 +333,7 @@ struct media_entity {
 	enum media_entity_type obj_type;
 	u32 function;
 	unsigned long flags;
+	unsigned int inited;
 
 	u16 num_pads;
 	u16 num_links;
@@ -308,6 +342,7 @@ struct media_entity {
 
 	struct media_pad *pads;
 	struct list_head links;
+	struct list_head props;
 
 	const struct media_entity_operations *ops;
 
@@ -361,6 +396,20 @@ struct media_intf_devnode {
 	u32				major;
 	u32				minor;
 };
+
+/**
+ * media_entity_init() - initialize the media entity struct
+ *
+ * @entity:	pointer to &media_entity
+ */
+static inline void media_entity_init(struct media_entity *entity)
+{
+	INIT_LIST_HEAD(&entity->links);
+	INIT_LIST_HEAD(&entity->props);
+	entity->num_links = 0;
+	entity->num_backlinks = 0;
+	entity->inited = true;
+}
 
 /**
  * media_entity_id() - return the media entity graph object id
@@ -594,6 +643,15 @@ static inline bool media_entity_enum_intersects(
  */
 #define gobj_to_intf(gobj) \
 		container_of(gobj, struct media_interface, graph_obj)
+
+/**
+ * gobj_to_prop - returns the struct &media_prop pointer from the
+ *	@gobj contained on it.
+ *
+ * @gobj: Pointer to the struct &media_gobj graph object
+ */
+#define gobj_to_prop(gobj) \
+		container_of(gobj, struct media_prop, graph_obj)
 
 /**
  * intf_to_devnode - returns the struct media_intf_devnode pointer from the
