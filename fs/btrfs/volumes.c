@@ -181,7 +181,8 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
  * chunk_mutex
  * -----------
  * protects chunks, adding or removing during allocation, trim or when a new
- * device is added/removed
+ * device is added/removed, and the list of resized devices at struct
+ * btrfs_fs_info::fs_devices::resized_devices
  *
  * cleaner_mutex
  * -------------
@@ -7380,10 +7381,6 @@ void btrfs_update_commit_device_size(struct btrfs_fs_info *fs_info)
 	struct btrfs_fs_devices *fs_devices = fs_info->fs_devices;
 	struct btrfs_device *curr, *next;
 
-	if (list_empty(&fs_devices->resized_devices))
-		return;
-
-	mutex_lock(&fs_devices->device_list_mutex);
 	mutex_lock(&fs_info->chunk_mutex);
 	list_for_each_entry_safe(curr, next, &fs_devices->resized_devices,
 				 resized_list) {
@@ -7391,7 +7388,6 @@ void btrfs_update_commit_device_size(struct btrfs_fs_info *fs_info)
 		curr->commit_total_bytes = curr->disk_total_bytes;
 	}
 	mutex_unlock(&fs_info->chunk_mutex);
-	mutex_unlock(&fs_devices->device_list_mutex);
 }
 
 /* Must be invoked during the transaction commit */

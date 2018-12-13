@@ -226,6 +226,7 @@ struct btrfs_fs_devices {
 	struct mutex device_list_mutex;
 	struct list_head devices;
 
+	/* protected by struct btrfs_fs_info::chunk_mutex */
 	struct list_head resized_devices;
 	/* devices not currently being allocated */
 	struct list_head alloc_list;
