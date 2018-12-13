@@ -436,6 +436,10 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 			ip4_frag_append_to_last_run(&qp->q, skb);
 		else
 			ip4_frag_create_run(&qp->q, skb);
+	} else if (offset == prev_tail->ip_defrag_offset &&
+		   skb->len == prev_tail->len) {
+		/* potential duplicate of last fragment */
+		goto err;
 	} else {
 		/* Binary search. Note that skb can become the first fragment,
 		 * but not the last (covered above).
@@ -449,8 +453,16 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 			else if (offset >= skb1->ip_defrag_offset +
 						FRAG_CB(skb1)->frag_run_len)
 				rbn = &parent->rb_right;
-			else /* Found an overlap with skb1. */
+			else {
+				/* check for potential duplicate */
+				while (skb1 && skb1->ip_defrag_offset < offset)
+					skb1 = FRAG_CB(skb1)->next_frag;
+				if (skb1 && offset == skb1->ip_defrag_offset &&
+				    skb->len == skb1->len)
+					goto err;
+				/* Found an overlap */
 				goto overlap;
+			}
 		} while (*rbn);
 		/* Here we have parent properly set, and rbn pointing to
 		 * one of its NULL left/right children. Insert skb.
