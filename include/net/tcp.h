@@ -1622,9 +1622,11 @@ bool tcp_fastopen_cookie_check(struct sock *sk, u16 *mss,
 			     struct tcp_fastopen_cookie *cookie);
 bool tcp_fastopen_defer_connect(struct sock *sk, int *err);
 #define TCP_FASTOPEN_KEY_LENGTH 16
+#define TCP_FASTOPEN_CTXT_LEN 2
 
 /* Fastopen key context */
 struct tcp_fastopen_context {
+	struct tcp_fastopen_context __rcu *next;
 	struct crypto_cipher	*tfm;
 	__u8			key[TCP_FASTOPEN_KEY_LENGTH];
 	struct rcu_head		rcu;

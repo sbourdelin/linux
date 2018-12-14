@@ -37,8 +37,14 @@ static void tcp_fastopen_ctx_free(struct rcu_head *head)
 {
 	struct tcp_fastopen_context *ctx =
 	    container_of(head, struct tcp_fastopen_context, rcu);
-	crypto_free_cipher(ctx->tfm);
-	kfree(ctx);
+
+	while (ctx) {
+		struct tcp_fastopen_context *prev = ctx;
+		/* We own ctx, thus no need to hold the Fastopen-lock */
+		ctx = rcu_dereference_protected(ctx->next, 1);
+		crypto_free_cipher(prev->tfm);
+		kfree(prev);
+	}
 }
 
 void tcp_fastopen_destroy_cipher(struct sock *sk)
@@ -64,6 +70,35 @@ void tcp_fastopen_ctx_destroy(struct net *net)
 
 	if (ctxt)
 		call_rcu(&ctxt->rcu, tcp_fastopen_ctx_free);
+}
+
+static struct tcp_fastopen_context *
+tcp_fastopen_cut_keypool(struct tcp_fastopen_context *ctx,
+			 spinlock_t *lock)
+{
+	int cnt = 0;
+
+	while (ctx) {
+		/* We iterate the list to see if we have more than
+		 * TCP_FASTOPEN_CTXT_LEN contexts. If we do, we remove the rest
+		 * of the list and free it later
+		 */
+
+		cnt++;
+		if (cnt >= TCP_FASTOPEN_CTXT_LEN) {
+			/* It's the last one, return the rest so it gets freed */
+			struct tcp_fastopen_context *prev = ctx;
+
+			ctx = rcu_dereference_protected(ctx->next,
+							lockdep_is_held(lock));
+			rcu_assign_pointer(prev->next, NULL);
+			break;
+		}
+		ctx = rcu_dereference_protected(ctx->next,
+						lockdep_is_held(lock));
+	}
+
+	return ctx;
 }
 
 int tcp_fastopen_reset_cipher(struct net *net, struct sock *sk,
@@ -96,13 +131,22 @@ error:		kfree(ctx);
 	spin_lock(&net->ipv4.tcp_fastopen_ctx_lock);
 	if (sk) {
 		q = &inet_csk(sk)->icsk_accept_queue.fastopenq;
+		rcu_assign_pointer(ctx->next, q->ctx);
+		rcu_assign_pointer(q->ctx, ctx);
+
 		octx = rcu_dereference_protected(q->ctx,
 			lockdep_is_held(&net->ipv4.tcp_fastopen_ctx_lock));
-		rcu_assign_pointer(q->ctx, ctx);
+
+		octx = tcp_fastopen_cut_keypool(octx, &net->ipv4.tcp_fastopen_ctx_lock);
 	} else {
+		rcu_assign_pointer(ctx->next, net->ipv4.tcp_fastopen_ctx);
+		rcu_assign_pointer(net->ipv4.tcp_fastopen_ctx, ctx);
+
 		octx = rcu_dereference_protected(net->ipv4.tcp_fastopen_ctx,
 			lockdep_is_held(&net->ipv4.tcp_fastopen_ctx_lock));
-		rcu_assign_pointer(net->ipv4.tcp_fastopen_ctx, ctx);
+
+		octx = tcp_fastopen_cut_keypool(octx,
+						&net->ipv4.tcp_fastopen_ctx_lock);
 	}
 	spin_unlock(&net->ipv4.tcp_fastopen_ctx_lock);
 
