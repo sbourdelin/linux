@@ -494,8 +494,8 @@ int apei_resources_request(struct apei_resources *resources,
 	if (rc)
 		goto nvs_res_fini;
 
+	apei_resources_init(&arch_res);
 	if (arch_apei_filter_addr) {
-		apei_resources_init(&arch_res);
 		rc = apei_get_arch_resources(&arch_res);
 		if (rc)
 			goto arch_res_fini;
