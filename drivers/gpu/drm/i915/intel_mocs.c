@@ -32,6 +32,7 @@ struct drm_i915_mocs_entry {
 
 struct drm_i915_mocs_table {
 	u32 size;
+	u32 n_entries;
 	const struct drm_i915_mocs_entry *table;
 };
 
@@ -55,9 +56,6 @@ struct drm_i915_mocs_table {
 /* Helper defines */
 #define GEN9_NUM_MOCS_ENTRIES	62  /* 62 out of 64 - 63 & 64 are reserved. */
 #define GEN11_NUM_MOCS_ENTRIES	64  /* 63-64 are reserved, but configured. */
-
-#define NUM_MOCS_ENTRIES(i915) \
-	(INTEL_GEN(i915) < 11 ? GEN9_NUM_MOCS_ENTRIES : GEN11_NUM_MOCS_ENTRIES)
 
 /* (e)LLC caching options */
 #define LE_0_PAGETABLE		_LE_CACHEABILITY(0)
@@ -283,14 +281,17 @@ static bool get_mocs_settings(struct drm_i915_private *dev_priv,
 
 	if (IS_ICELAKE(dev_priv)) {
 		table->size  = ARRAY_SIZE(icelake_mocs_table);
+		table->n_entries = GEN11_NUM_MOCS_ENTRIES;
 		table->table = icelake_mocs_table;
 		result = true;
 	} else if (IS_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		table->size  = ARRAY_SIZE(skylake_mocs_table);
+		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
 		table->table = skylake_mocs_table;
 		result = true;
 	} else if (IS_GEN9_LP(dev_priv)) {
 		table->size  = ARRAY_SIZE(broxton_mocs_table);
+		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
 		table->table = broxton_mocs_table;
 		result = true;
 	} else {
@@ -348,8 +349,6 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 	if (!get_mocs_settings(dev_priv, &table))
 		return;
 
-	GEM_BUG_ON(table.size > NUM_MOCS_ENTRIES(dev_priv));
-
 	for (index = 0; index < table.size; index++)
 		I915_WRITE(mocs_register(engine->id, index),
 			   table.table[index].control_value);
@@ -362,7 +361,7 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 	 * Entry 0 in the table is uncached - so we are just writing
 	 * that value to all the used entries.
 	 */
-	for (; index < NUM_MOCS_ENTRIES(dev_priv); index++)
+	for (; index < table.n_entries; index++)
 		I915_WRITE(mocs_register(engine->id, index),
 			   table.table[0].control_value);
 }
@@ -380,19 +379,18 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 static int emit_mocs_control_table(struct i915_request *rq,
 				   const struct drm_i915_mocs_table *table)
 {
-	struct drm_i915_private *i915 = rq->i915;
 	enum intel_engine_id engine = rq->engine->id;
 	unsigned int index;
 	u32 *cs;
 
-	if (WARN_ON(table->size > NUM_MOCS_ENTRIES(i915)))
+	if (GEM_WARN_ON(table->size > table->n_entries))
 		return -ENODEV;
 
-	cs = intel_ring_begin(rq, 2 + 2 * NUM_MOCS_ENTRIES(i915));
+	cs = intel_ring_begin(rq, 2 + 2 * table->n_entries);
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
-	*cs++ = MI_LOAD_REGISTER_IMM(NUM_MOCS_ENTRIES(i915));
+	*cs++ = MI_LOAD_REGISTER_IMM(table->n_entries);
 
 	for (index = 0; index < table->size; index++) {
 		*cs++ = i915_mmio_reg_offset(mocs_register(engine, index));
@@ -407,7 +405,7 @@ static int emit_mocs_control_table(struct i915_request *rq,
 	 * Entry 0 in the table is uncached - so we are just writing
 	 * that value to all the used entries.
 	 */
-	for (; index < NUM_MOCS_ENTRIES(i915); index++) {
+	for (; index < table->n_entries; index++) {
 		*cs++ = i915_mmio_reg_offset(mocs_register(engine, index));
 		*cs++ = table->table[0].control_value;
 	}
@@ -440,18 +438,17 @@ static inline u32 l3cc_combine(const struct drm_i915_mocs_table *table,
 static int emit_mocs_l3cc_table(struct i915_request *rq,
 				const struct drm_i915_mocs_table *table)
 {
-	struct drm_i915_private *i915 = rq->i915;
 	unsigned int i;
 	u32 *cs;
 
-	if (WARN_ON(table->size > NUM_MOCS_ENTRIES(i915)))
+	if (GEM_WARN_ON(table->size > table->n_entries))
 		return -ENODEV;
 
-	cs = intel_ring_begin(rq, 2 + NUM_MOCS_ENTRIES(i915));
+	cs = intel_ring_begin(rq, 2 + table->n_entries);
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
-	*cs++ = MI_LOAD_REGISTER_IMM(NUM_MOCS_ENTRIES(i915) / 2);
+	*cs++ = MI_LOAD_REGISTER_IMM(table->n_entries / 2);
 
 	for (i = 0; i < table->size/2; i++) {
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
@@ -470,7 +467,7 @@ static int emit_mocs_l3cc_table(struct i915_request *rq,
 	 * this will be uncached. Leave the last pair uninitialised as
 	 * they are reserved by the hardware.
 	 */
-	for (; i < NUM_MOCS_ENTRIES(i915) / 2; i++) {
+	for (; i < table->n_entries / 2; i++) {
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
 		*cs++ = l3cc_combine(table, 0, 0);
 	}
@@ -517,7 +514,7 @@ void intel_mocs_init_l3cc_table(struct drm_i915_private *dev_priv)
 	 * this will be uncached. Leave the last pair as initialised as
 	 * they are reserved by the hardware.
 	 */
-	for (; i < (NUM_MOCS_ENTRIES(dev_priv) / 2); i++)
+	for (; i < table.n_entries / 2; i++)
 		I915_WRITE(GEN9_LNCFCMOCS(i), l3cc_combine(&table, 0, 0));
 }
 
