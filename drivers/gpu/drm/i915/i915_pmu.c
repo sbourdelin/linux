@@ -493,14 +493,14 @@ static u64 get_rc6(struct drm_i915_private *i915)
 		 */
 		if (kdev->power.runtime_status == RPM_SUSPENDED) {
 			if (!i915->pmu.sample[__I915_SAMPLE_RC6_ESTIMATED].cur)
-				i915->pmu.suspended_jiffies_last =
-						  kdev->power.suspended_jiffies;
+				i915->pmu.suspended_time_last =
+					kdev->power.suspended_time;
 
-			val = kdev->power.suspended_jiffies -
-			      i915->pmu.suspended_jiffies_last;
-			val += jiffies - kdev->power.accounting_timestamp;
+			val = kdev->power.suspended_time -
+				i915->pmu.suspended_time_last;
+			val += ktime_to_ns(ktime_get()) -
+				kdev->power.accounting_timestamp;
 
-			val = jiffies_to_nsecs(val);
 			val += i915->pmu.sample[__I915_SAMPLE_RC6].cur;
 
 			i915->pmu.sample[__I915_SAMPLE_RC6_ESTIMATED].cur = val;
