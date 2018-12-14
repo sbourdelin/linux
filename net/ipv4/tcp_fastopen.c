@@ -176,6 +176,41 @@ static bool __tcp_fastopen_cookie_gen(struct sock *sk, const void *path,
 	return ok;
 }
 
+static void __tcp_fastopen_cookie_gen_with_ctx(struct request_sock *req,
+					       struct sk_buff *syn,
+					       struct tcp_fastopen_cookie *foc,
+					       struct tcp_fastopen_context *ctx)
+{
+	if (req->rsk_ops->family == AF_INET) {
+		const struct iphdr *iph = ip_hdr(syn);
+		__be32 path[4] = { iph->saddr, iph->daddr, 0, 0 };
+
+		crypto_cipher_encrypt_one(ctx->tfm, foc->val, (void *)path);
+		foc->len = TCP_FASTOPEN_COOKIE_SIZE;
+		return;
+	}
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (req->rsk_ops->family == AF_INET6) {
+		const struct ipv6hdr *ip6h = ipv6_hdr(syn);
+		struct tcp_fastopen_cookie tmp;
+		struct in6_addr *buf;
+		int i;
+
+		crypto_cipher_encrypt_one(ctx->tfm, tmp.val, (void *)&ip6h->saddr);
+
+		buf = &tmp.addr;
+		for (i = 0; i < 4; i++)
+			buf->s6_addr32[i] ^= ip6h->daddr.s6_addr32[i];
+
+		crypto_cipher_encrypt_one(ctx->tfm, foc->val, (void *)buf);
+		foc->len = TCP_FASTOPEN_COOKIE_SIZE;
+
+		return;
+	}
+#endif
+}
+
 /* Generate the fastopen cookie by doing aes128 encryption on both
  * the source and destination addresses. Pad 0s for IPv4 or IPv4-mapped-IPv6
  * addresses. For the longer IPv6 addresses use CBC-MAC.
@@ -254,6 +289,55 @@ void tcp_fastopen_add_skb(struct sock *sk, struct sk_buff *skb)
 
 	if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
 		tcp_fin(sk);
+}
+
+static bool tcp_fastopen_cookie_gen_search(struct sock *sk,
+					   struct request_sock *req,
+					   struct sk_buff *syn,
+					   struct tcp_fastopen_cookie *valid_foc,
+					   struct tcp_fastopen_cookie *orig)
+{
+	struct tcp_fastopen_cookie search_foc = { .len = -1 };
+	struct tcp_fastopen_cookie *foc = &search_foc;
+	struct tcp_fastopen_context *ctx;
+	int copied = 0;
+
+	rcu_read_lock();
+
+	ctx = rcu_dereference(inet_csk(sk)->icsk_accept_queue.fastopenq.ctx);
+	if (!ctx)
+		ctx = rcu_dereference(sock_net(sk)->ipv4.tcp_fastopen_ctx);
+
+	while (ctx) {
+		__tcp_fastopen_cookie_gen_with_ctx(req, syn, foc, ctx);
+
+		if (foc->len == orig->len &&
+		    !memcmp(foc->val, orig->val, foc->len)) {
+			rcu_read_unlock();
+
+			if (copied) {
+				struct net *net = read_pnet(&inet_rsk(req)->ireq_net);
+
+				NET_INC_STATS(net,
+					      LINUX_MIB_TCPFASTOPENPASSIVEALTKEY);
+			}
+			return true;
+		}
+
+		/* We need to check older possible cookies, thus set valid_foc
+		 * so that the latest one will be announced to the peer.
+		 */
+		if (!copied) {
+			memcpy(valid_foc, foc, sizeof(*foc));
+			copied = 1;
+		}
+
+		ctx = rcu_dereference(ctx->next);
+	}
+
+	rcu_read_unlock();
+
+	return false;
 }
 
 static struct sock *tcp_fastopen_create_child(struct sock *sk,
@@ -390,11 +474,11 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 	    tcp_fastopen_no_cookie(sk, dst, TFO_SERVER_COOKIE_NOT_REQD))
 		goto fastopen;
 
-	if (foc->len >= 0 &&  /* Client presents or requests a cookie */
-	    tcp_fastopen_cookie_gen(sk, req, skb, &valid_foc) &&
-	    foc->len == TCP_FASTOPEN_COOKIE_SIZE &&
-	    foc->len == valid_foc.len &&
-	    !memcmp(foc->val, valid_foc.val, foc->len)) {
+	if (foc->len == 0) {
+		/* Client requests a cookie. */
+		tcp_fastopen_cookie_gen(sk, req, skb, &valid_foc);
+	} else if (foc->len > 0 &&
+		   tcp_fastopen_cookie_gen_search(sk, req, skb, &valid_foc, foc)) {
 		/* Cookie is valid. Create a (full) child socket to accept
 		 * the data in SYN before returning a SYN-ACK to ack the
 		 * data. If we fail to create the socket, fall back and
@@ -406,7 +490,16 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 fastopen:
 		child = tcp_fastopen_create_child(sk, skb, req);
 		if (child) {
-			foc->len = -1;
+			if (valid_foc.len != -1) {
+				/* Client used an old cookie, we announce the
+				 * latests one to the client.
+				 */
+				valid_foc.exp = foc->exp;
+				*foc = valid_foc;
+			} else {
+				foc->len = -1;
+			}
+
 			NET_INC_STATS(sock_net(sk),
 				      LINUX_MIB_TCPFASTOPENPASSIVE);
 			return child;
