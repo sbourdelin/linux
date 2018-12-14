@@ -44,6 +44,15 @@
 
 int arch_update_cpu_topology(void);
 
+int arch_find_drc_match(struct device_node *dn,
+			bool (*usercb)(struct device_node *dn,
+				u32 drc_index, char *drc_name,
+				char *drc_type, u32 drc_power_domain,
+				void *data),
+			char *opt_drc_type, char *opt_drc_name,
+			bool match_drc_index, bool ck_php_type,
+			void *data);
+
 /* Conform to ACPI 2.0 SLIT distance definitions */
 #define LOCAL_DISTANCE		10
 #define REMOTE_DISTANCE		20
