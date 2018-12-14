@@ -91,9 +91,6 @@ struct of_drc_info {
 	u32 last_drc_index;
 };
 
-extern int of_read_drc_info_cell(struct property **prop,
-			const __be32 **curval, struct of_drc_info *data);
-
 
 /*
  * There are two methods for telling firmware what our capabilities are.

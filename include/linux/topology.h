@@ -50,7 +50,7 @@ int arch_find_drc_match(struct device_node *dn,
 				char *drc_type, u32 drc_power_domain,
 				void *data),
 			char *opt_drc_type, char *opt_drc_name,
-			bool match_drc_index, bool ck_php_type,
+			bool match_drc_index, bool add_slot,
 			void *data);
 
 /* Conform to ACPI 2.0 SLIT distance definitions */
