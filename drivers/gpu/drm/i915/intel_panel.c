@@ -1484,8 +1484,8 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
-	u32 pch_ctl1, pch_ctl2, val;
-	bool alt;
+	u32 cpu_ctl2, pch_ctl1, pch_ctl2, val;
+	bool alt, cpu_mode;
 
 	if (HAS_PCH_LPT(dev_priv))
 		alt = I915_READ(SOUTH_CHICKEN2) & LPT_PWM_GRANULARITY;
@@ -1499,6 +1499,8 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 	pch_ctl2 = I915_READ(BLC_PWM_PCH_CTL2);
 	panel->backlight.max = pch_ctl2 >> 16;
 
+	cpu_ctl2 = I915_READ(BLC_PWM_CPU_CTL2);
+
 	if (!panel->backlight.max)
 		panel->backlight.max = get_backlight_max_vbt(connector);
 
@@ -1507,12 +1509,42 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 
 	panel->backlight.min = get_backlight_min_vbt(connector);
 
-	val = lpt_get_backlight(connector);
+	panel->backlight.enabled = pch_ctl1 & BLM_PCH_PWM_ENABLE;
+
+	cpu_mode = panel->backlight.enabled && HAS_PCH_LPT(dev_priv) &&
+		   !(pch_ctl1 & BLM_PCH_OVERRIDE_ENABLE) &&
+		   (cpu_ctl2 & BLM_PWM_ENABLE);
+	if (cpu_mode) {
+		u32 freq;
+
+		/*
+		 * We're in cpu mode, convert to PCH units.
+		 *
+		 * Convert CPU pwm tick back to hz, back to new PCH units again.
+		 * this is the same formula as pch_hz_to_pwm, but the other way
+		 * around..
+		 */
+		val = pch_get_backlight(connector);
+		freq = DIV_ROUND_CLOSEST(KHz(dev_priv->rawclk_freq), val * 128);
+
+		DRM_DEBUG_KMS("Backlight PCH value: %u, converted to freq %u, converted to lpt units %u, minmax: %u/%u\n",
+			      val, freq, lpt_hz_to_pwm(connector, freq), panel->backlight.min, panel->backlight.max);
+
+		val = lpt_hz_to_pwm(connector, freq);
+	} else
+		val = lpt_get_backlight(connector);
 	val = intel_panel_compute_brightness(connector, val);
 	panel->backlight.level = clamp(val, panel->backlight.min,
 				       panel->backlight.max);
 
-	panel->backlight.enabled = pch_ctl1 & BLM_PCH_PWM_ENABLE;
+	if (cpu_mode) {
+		/* Write converted CPU PWM value to PCH override register */
+		lpt_set_backlight(connector->base.state, panel->backlight.level);
+		I915_WRITE(BLC_PWM_PCH_CTL1, pch_ctl1 | BLM_PCH_OVERRIDE_ENABLE);
+	}
+
+	if (cpu_ctl2 & BLM_PWM_ENABLE)
+		I915_WRITE(BLC_PWM_CPU_CTL2, cpu_ctl2 & ~BLM_PWM_ENABLE);
 
 	return 0;
 }
