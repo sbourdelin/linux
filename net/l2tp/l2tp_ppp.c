@@ -359,7 +359,10 @@ static int pppol2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 	struct sock *sk = (struct sock *) chan->private;
 	struct l2tp_session *session;
 	struct l2tp_tunnel *tunnel;
+	struct pppol2tp_session *ps;
 	int uhlen, headroom;
+	unsigned char *data;
+	bool is_lcp;
 
 	if (sock_flag(sk, SOCK_DEAD) || !(sk->sk_state & PPPOX_CONNECTED))
 		goto abort;
@@ -379,6 +382,15 @@ static int pppol2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 		   2;			/* 2 bytes for PPP_ALLSTATIONS & PPP_UI */
 	if (skb_cow_head(skb, headroom))
 		goto abort_put_sess;
+
+	ps = l2tp_session_priv(session);
+	data = skb->data;
+	is_lcp = ((data[0] << 8) + data[1]) == PPP_LCP &&
+		data[2] >= 1 && data[2] <= 7;
+
+	/* Compress protocol field if PFC is enabled */
+	if ((ps->flags & SC_COMP_PROT) && data[0] == 0x00 && !is_lcp)
+		__skb_pull(skb, 1);
 
 	/* Setup PPP header */
 	__skb_push(skb, 2);
