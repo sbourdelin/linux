@@ -248,17 +248,9 @@ static void get_recent_times(struct psi_group *group, int cpu, u32 *times)
 	}
 }
 
-static void calc_avgs(unsigned long avg[3], int missed_periods,
-		      u64 time, u64 period)
+static void calc_avgs(unsigned long avg[3], u64 time, u64 period)
 {
 	unsigned long pct;
-
-	/* Fill in zeroes for periods of no activity */
-	if (missed_periods) {
-		avg[0] = calc_load_n(avg[0], EXP_10s, 0, missed_periods);
-		avg[1] = calc_load_n(avg[1], EXP_60s, 0, missed_periods);
-		avg[2] = calc_load_n(avg[2], EXP_300s, 0, missed_periods);
-	}
 
 	/* Sample the most recent active period */
 	pct = div_u64(time * 100, period);
@@ -268,10 +260,9 @@ static void calc_avgs(unsigned long avg[3], int missed_periods,
 	avg[2] = calc_load(avg[2], EXP_300s, pct);
 }
 
-static bool update_stats(struct psi_group *group)
+static void update_stats(struct psi_group *group)
 {
 	u64 deltas[NR_PSI_STATES - 1] = { 0, };
-	unsigned long missed_periods = 0;
 	unsigned long nonidle_total = 0;
 	u64 now, expires, period;
 	int cpu;
@@ -321,8 +312,6 @@ static bool update_stats(struct psi_group *group)
 	expires = group->next_update;
 	if (now < expires)
 		goto out;
-	if (now - expires > psi_period)
-		missed_periods = div_u64(now - expires, psi_period);
 
 	/*
 	 * The periodic clock tick can get delayed for various
@@ -331,8 +320,8 @@ static bool update_stats(struct psi_group *group)
 	 * But the deltas we sample out of the per-cpu buckets above
 	 * are based on the actual time elapsing between clock ticks.
 	 */
-	group->next_update = expires + ((1 + missed_periods) * psi_period);
-	period = now - (group->last_update + (missed_periods * psi_period));
+	group->next_update = expires + psi_period;
+	period = now - group->last_update;
 	group->last_update = now;
 
 	for (s = 0; s < NR_PSI_STATES - 1; s++) {
@@ -359,18 +348,18 @@ static bool update_stats(struct psi_group *group)
 		if (sample > period)
 			sample = period;
 		group->total_prev[s] += sample;
-		calc_avgs(group->avg[s], missed_periods, sample, period);
+		calc_avgs(group->avg[s], sample, period);
 	}
 out:
 	mutex_unlock(&group->stat_lock);
-	return nonidle_total;
 }
 
 static void psi_update_work(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct psi_group *group;
-	bool nonidle;
+	unsigned long delay = 0;
+	u64 now;
 
 	dwork = to_delayed_work(work);
 	group = container_of(dwork, struct psi_group, clock_work);
@@ -383,17 +372,12 @@ static void psi_update_work(struct work_struct *work)
 	 * go - see calc_avgs() and missed_periods.
 	 */
 
-	nonidle = update_stats(group);
+	update_stats(group);
 
-	if (nonidle) {
-		unsigned long delay = 0;
-		u64 now;
-
-		now = sched_clock();
-		if (group->next_update > now)
-			delay = nsecs_to_jiffies(group->next_update - now) + 1;
-		schedule_delayed_work(dwork, delay);
-	}
+	now = sched_clock();
+	if (group->next_update > now)
+		delay = nsecs_to_jiffies(group->next_update - now) + 1;
+	schedule_delayed_work(dwork, delay);
 }
 
 static void record_times(struct psi_group_cpu *groupc, int cpu,
@@ -480,9 +464,6 @@ static void psi_group_change(struct psi_group *group, int cpu,
 			groupc->tasks[t]++;
 
 	write_seqcount_end(&groupc->seq);
-
-	if (!delayed_work_pending(&group->clock_work))
-		schedule_delayed_work(&group->clock_work, PSI_FREQ);
 }
 
 static struct psi_group *iterate_groups(struct task_struct *task, void **iter)
@@ -619,6 +600,8 @@ int psi_cgroup_alloc(struct cgroup *cgroup)
 	if (!cgroup->psi.pcpu)
 		return -ENOMEM;
 	group_init(&cgroup->psi);
+	schedule_delayed_work(&cgroup->psi.clock_work, PSI_FREQ);
+
 	return 0;
 }
 
@@ -761,12 +744,18 @@ static const struct file_operations psi_cpu_fops = {
 	.release        = single_release,
 };
 
-static int __init psi_proc_init(void)
+static int __init psi_late_init(void)
 {
+	if (static_branch_likely(&psi_disabled))
+		return 0;
+
+	schedule_delayed_work(&psi_system.clock_work, PSI_FREQ);
+
 	proc_mkdir("pressure", NULL);
 	proc_create("pressure/io", 0, NULL, &psi_io_fops);
 	proc_create("pressure/memory", 0, NULL, &psi_memory_fops);
 	proc_create("pressure/cpu", 0, NULL, &psi_cpu_fops);
+
 	return 0;
 }
-module_init(psi_proc_init);
+module_init(psi_late_init);
