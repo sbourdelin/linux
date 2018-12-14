@@ -3420,21 +3420,24 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		return 0;
 
 	case TCP_FASTOPEN_KEY: {
-		__u8 key[TCP_FASTOPEN_KEY_LENGTH];
+		__u8 key[TCP_FASTOPEN_KEY_LENGTH * TCP_FASTOPEN_CTXT_LEN];
 		struct tcp_fastopen_context *ctx;
+		unsigned int key_len = 0;
 
 		if (get_user(len, optlen))
 			return -EFAULT;
 
 		rcu_read_lock();
 		ctx = rcu_dereference(icsk->icsk_accept_queue.fastopenq.ctx);
-		if (ctx)
-			memcpy(key, ctx->key, sizeof(key));
-		else
-			len = 0;
+		while (ctx) {
+			memcpy(&key[key_len], ctx->key, TCP_FASTOPEN_KEY_LENGTH);
+
+			key_len += TCP_FASTOPEN_KEY_LENGTH;
+			ctx = rcu_dereference(ctx->next);
+		}
 		rcu_read_unlock();
 
-		len = min_t(unsigned int, len, sizeof(key));
+		len = min_t(unsigned int, len, key_len);
 		if (put_user(len, optlen))
 			return -EFAULT;
 		if (copy_to_user(optval, key, len))
