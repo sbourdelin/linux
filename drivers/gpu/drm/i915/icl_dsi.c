@@ -236,6 +236,16 @@ static void dsi_program_swing_and_deemphasis(struct intel_encoder *encoder)
 		tmp |= RCOMP_SCALAR(0x98);
 		I915_WRITE(ICL_PORT_TX_DW2_AUX(port), tmp);
 
+		tmp = I915_READ(ICL_PORT_TX_DW7_LN0(port));
+		tmp &= ~(N_SCALAR_MASK);
+		tmp |= N_SCALAR(0x7f);
+		I915_WRITE(ICL_PORT_TX_DW7_GRP(port), tmp);
+
+		tmp = I915_READ(ICL_PORT_TX_DW7_AUX(port));
+		tmp &= ~(N_SCALAR_MASK);
+		tmp |= N_SCALAR(0x7f);
+		I915_WRITE(ICL_PORT_TX_DW7_AUX(port), tmp);
+
 		tmp = I915_READ(ICL_PORT_TX_DW4_AUX(port));
 		tmp &= ~(POST_CURSOR_1_MASK | POST_CURSOR_2_MASK |
 			 CURSOR_COEFF_MASK);
