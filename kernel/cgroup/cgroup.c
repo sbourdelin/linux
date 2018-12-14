@@ -3430,7 +3430,101 @@ static int cgroup_cpu_pressure_show(struct seq_file *seq, void *v)
 {
 	return psi_show(seq, &seq_css(seq)->cgroup->psi, PSI_CPU);
 }
-#endif
+
+static ssize_t cgroup_pressure_write(struct kernfs_open_file *of, char *buf,
+					  size_t nbytes, enum psi_res res)
+{
+	enum psi_states state;
+	struct psi_trigger *old;
+	struct psi_trigger *new;
+	struct cgroup *cgrp;
+	u32 threshold_us;
+	u32 win_sz_us;
+	ssize_t ret;
+
+	cgrp = cgroup_kn_lock_live(of->kn, false);
+	if (!cgrp)
+		return -ENODEV;
+
+	cgroup_get(cgrp);
+	cgroup_kn_unlock(of->kn);
+
+	ret = psi_trigger_parse(buf, nbytes, res,
+				&state, &threshold_us, &win_sz_us);
+	if (ret) {
+		cgroup_put(cgrp);
+		return ret;
+	}
+
+	new = psi_trigger_create(&cgrp->psi,
+				state, threshold_us, win_sz_us);
+	if (IS_ERR(new)) {
+		cgroup_put(cgrp);
+		return PTR_ERR(new);
+	}
+
+	old = of->priv;
+	rcu_assign_pointer(of->priv, new);
+	if (old) {
+		synchronize_rcu();
+		psi_trigger_destroy(old);
+	}
+
+	cgroup_put(cgrp);
+
+	return nbytes;
+}
+
+static ssize_t cgroup_io_pressure_write(struct kernfs_open_file *of,
+					  char *buf, size_t nbytes,
+					  loff_t off)
+{
+	return cgroup_pressure_write(of, buf, nbytes, PSI_IO);
+}
+
+static ssize_t cgroup_memory_pressure_write(struct kernfs_open_file *of,
+					  char *buf, size_t nbytes,
+					  loff_t off)
+{
+	return cgroup_pressure_write(of, buf, nbytes, PSI_MEM);
+}
+
+static ssize_t cgroup_cpu_pressure_write(struct kernfs_open_file *of,
+					  char *buf, size_t nbytes,
+					  loff_t off)
+{
+	return cgroup_pressure_write(of, buf, nbytes, PSI_CPU);
+}
+
+static __poll_t cgroup_pressure_poll(struct kernfs_open_file *of,
+					  poll_table *pt)
+{
+	struct psi_trigger *t;
+	__poll_t ret;
+
+	rcu_read_lock();
+	t = rcu_dereference(of->priv);
+	if (t)
+		ret = psi_trigger_poll(t, of->file, pt);
+	else
+		ret = DEFAULT_POLLMASK | EPOLLERR | EPOLLPRI;
+	rcu_read_unlock();
+
+	return ret;
+}
+
+static void cgroup_pressure_release(struct kernfs_open_file *of)
+{
+	struct psi_trigger *t = of->priv;
+
+	if (!t)
+		return;
+
+	rcu_assign_pointer(of->priv, NULL);
+	synchronize_rcu();
+	psi_trigger_destroy(t);
+}
+#endif /* CONFIG_PSI */
 
 static int cgroup_file_open(struct kernfs_open_file *of)
 {
@@ -4579,18 +4673,27 @@ static struct cftype cgroup_base_files[] = {
 		.name = "io.pressure",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = cgroup_io_pressure_show,
+		.write = cgroup_io_pressure_write,
+		.poll = cgroup_pressure_poll,
+		.release = cgroup_pressure_release,
 	},
 	{
 		.name = "memory.pressure",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = cgroup_memory_pressure_show,
+		.write = cgroup_memory_pressure_write,
+		.poll = cgroup_pressure_poll,
+		.release = cgroup_pressure_release,
 	},
 	{
 		.name = "cpu.pressure",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = cgroup_cpu_pressure_show,
+		.write = cgroup_cpu_pressure_write,
+		.poll = cgroup_pressure_poll,
+		.release = cgroup_pressure_release,
 	},
-#endif
+#endif /* CONFIG_PSI */
 	{ }	/* terminate */
 };
 
