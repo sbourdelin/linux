@@ -83,8 +83,6 @@ out:
 	}
 
 	spin_unlock_irqrestore(&zone->lock, flags);
-	if (!ret)
-		drain_all_pages(zone);
 	return ret;
 }
 
