@@ -125,6 +125,7 @@ struct pppol2tp_session {
 						 * PPPoX socket */
 	struct sock		*__sk;		/* Copy of .sk, for cleanup */
 	struct rcu_head		rcu;		/* For asynchronous release */
+	int			flags;		/* accessed by PPPIOCGFLAGS */
 };
 
 static int pppol2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb);
@@ -1070,44 +1071,60 @@ static int pppol2tp_ioctl(struct socket *sock, unsigned int cmd,
 {
 	struct pppol2tp_ioc_stats stats;
 	struct l2tp_session *session;
+	struct pppol2tp_session *ps;
 	int val;
+	bool is_tunnel;
+
+	session = sock->sk->sk_user_data;
+	if (!session)
+		return -ENOTCONN;
+
+	ps = l2tp_session_priv(session);
+	is_tunnel = !session->session_id && !session->peer_session_id;
 
 	switch (cmd) {
 	case PPPIOCGMRU:
-	case PPPIOCGFLAGS:
-		session = sock->sk->sk_user_data;
-		if (!session)
-			return -ENOTCONN;
-
 		/* Not defined for tunnels */
-		if (!session->session_id && !session->peer_session_id)
+		if (is_tunnel)
 			return -ENOSYS;
 
 		if (put_user(0, (int __user *)arg))
 			return -EFAULT;
 		break;
-
-	case PPPIOCSMRU:
-	case PPPIOCSFLAGS:
-		session = sock->sk->sk_user_data;
-		if (!session)
-			return -ENOTCONN;
-
+	case PPPIOCGFLAGS:
 		/* Not defined for tunnels */
-		if (!session->session_id && !session->peer_session_id)
+		if (is_tunnel)
+			return -ENOSYS;
+
+		if (put_user(ps->flags, (int __user *)arg))
+			return -EFAULT;
+
+		l2tp_info(session, L2TP_MSG_CONTROL, "%s: get flags=%d\n",
+			  session->name, ps->flags);
+		break;
+	case PPPIOCSMRU:
+		/* Not defined for tunnels */
+		if (is_tunnel)
 			return -ENOSYS;
 
 		if (get_user(val, (int __user *)arg))
 			return -EFAULT;
 		break;
+	case PPPIOCSFLAGS:
+		/* Not defined for tunnels */
+		if (is_tunnel)
+			return -ENOSYS;
 
+		if (get_user(val, (int __user *)arg))
+			return -EFAULT;
+
+		ps->flags = val;
+		l2tp_info(session, L2TP_MSG_CONTROL, "%s: set flags=%d\n",
+			  session->name, ps->flags);
+		break;
 	case PPPIOCGL2TPSTATS:
-		session = sock->sk->sk_user_data;
-		if (!session)
-			return -ENOTCONN;
-
 		/* Session 0 represents the parent tunnel */
-		if (!session->session_id && !session->peer_session_id) {
+		if (is_tunnel) {
 			u32 session_id;
 			int err;
 
@@ -1132,7 +1149,6 @@ static int pppol2tp_ioctl(struct socket *sock, unsigned int cmd,
 		if (copy_to_user((void __user *)arg, &stats, sizeof(stats)))
 			return -EFAULT;
 		break;
-
 	default:
 		return -ENOIOCTLCMD;
 	}
