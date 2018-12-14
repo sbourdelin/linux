@@ -40,6 +40,11 @@ static DEFINE_IDA(input_ida);
 static LIST_HEAD(input_dev_list);
 static LIST_HEAD(input_handler_list);
 
+static void input_repeat_key(struct timer_list *t);
+static void input_debounce_key(struct timer_list *t);
+
+static int debounce = 20;
+
 /*
  * input_mutex protects access to both input_dev_list and input_handler_list.
  * This also causes input_[un]register_device and input_[un]register_handler
@@ -77,6 +82,7 @@ static void input_start_autorepeat(struct input_dev *dev, int code)
 	if (test_bit(EV_REP, dev->evbit) &&
 	    dev->rep[REP_PERIOD] && dev->rep[REP_DELAY] &&
 	    dev->timer.function) {
+		dev->timer.function = input_repeat_key;
 		dev->repeat_key = code;
 		mod_timer(&dev->timer,
 			  jiffies + msecs_to_jiffies(dev->rep[REP_DELAY]));
@@ -88,17 +94,41 @@ static void input_stop_autorepeat(struct input_dev *dev)
 	del_timer(&dev->timer);
 }
 
+static void input_start_debounce(struct input_dev *dev, int code)
+{
+	dev->timer.function = input_debounce_key;
+	dev->debounce_key = code;
+	mod_timer(&dev->timer,
+		  jiffies + msecs_to_jiffies(debounce));
+}
+
+static void input_stop_debounce(struct input_dev *dev)
+{
+	del_timer(&dev->timer);
+	dev->debounce_key = -1;
+}
+
 /*
  * Pass event first through all filters and then, if event has not been
  * filtered out, through all open handles. This function is called with
  * dev->event_lock held and interrupts disabled.
  */
-static unsigned int input_to_handler(struct input_handle *handle,
+static unsigned int input_to_handler(struct input_dev *dev, struct input_handle *handle,
 			struct input_value *vals, unsigned int count)
 {
 	struct input_handler *handler = handle->handler;
 	struct input_value *end = vals;
 	struct input_value *v;
+
+	if (!test_bit(EV_REP, dev->evbit) && test_bit(EV_KEY, dev->evbit) && debounce)
+		for (v = vals; v != vals + count; v++) {
+			if (v->type == EV_KEY && v->value == 0 && dev->debounce_key == -1) {
+				input_start_debounce(dev, v->code);
+				v->code = -2;
+			}
+			if (v->type == EV_KEY && v->value == 1 && dev->debounce_key == v->code)
+				input_stop_debounce(dev);
+		}
 
 	if (handler->filter) {
 		for (v = vals; v != vals + count; v++) {
@@ -117,8 +147,9 @@ static unsigned int input_to_handler(struct input_handle *handle,
 	if (handler->events)
 		handler->events(handle, vals, count);
 	else if (handler->event)
-		for (v = vals; v != vals + count; v++)
+		for (v = vals; v != vals + count; v++) {
 			handler->event(handle, v->type, v->code, v->value);
+		}
 
 	return count;
 }
@@ -141,11 +172,11 @@ static void input_pass_values(struct input_dev *dev,
 
 	handle = rcu_dereference(dev->grab);
 	if (handle) {
-		count = input_to_handler(handle, vals, count);
+		count = input_to_handler(dev, handle, vals, count);
 	} else {
 		list_for_each_entry_rcu(handle, &dev->h_list, d_node)
 			if (handle->open) {
-				count = input_to_handler(handle, vals, count);
+				count = input_to_handler(dev, handle, vals, count);
 				if (!count)
 					break;
 			}
@@ -200,6 +231,27 @@ static void input_repeat_key(struct timer_list *t)
 					msecs_to_jiffies(dev->rep[REP_PERIOD]));
 	}
 
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+}
+
+/*
+ * Generate software autorepeat event. Note that we take
+ * dev->event_lock here to avoid racing with input_event
+ * which may cause keys get "stuck".
+ */
+static void input_debounce_key(struct timer_list *t)
+{
+	struct input_dev *dev = from_timer(dev, t, timer);
+	unsigned long flags;
+
+	struct input_value vals[] =  {
+		{ EV_KEY, dev->debounce_key, 0 },
+		input_value_sync
+	};
+
+	spin_lock_irqsave(&dev->event_lock, flags);
+	input_pass_values(dev, vals, ARRAY_SIZE(vals));
+	input_stop_debounce(dev);
 	spin_unlock_irqrestore(&dev->event_lock, flags);
 }
 
@@ -2108,6 +2160,8 @@ int input_register_device(struct input_dev *dev)
 
 	/* Every input device generates EV_SYN/SYN_REPORT events. */
 	__set_bit(EV_SYN, dev->evbit);
+
+	dev->debounce_key = -1;
 
 	/* KEY_RESERVED is not supposed to be transmitted to userspace. */
 	__clear_bit(KEY_RESERVED, dev->keybit);
