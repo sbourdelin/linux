@@ -40,9 +40,7 @@ struct rq_qos_ops {
 	void (*done_bio)(struct rq_qos *, struct bio *);
 	void (*cleanup)(struct rq_qos *, struct bio *);
 	void (*exit)(struct rq_qos *);
-#ifdef CONFIG_BLK_DEBUG_FS
 	const struct blk_mq_debugfs_attr *debugfs_attrs;
-#endif
 };
 
 struct rq_depth {
