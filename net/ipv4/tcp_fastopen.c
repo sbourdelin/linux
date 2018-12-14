@@ -155,27 +155,6 @@ error:		kfree(ctx);
 	return err;
 }
 
-static bool __tcp_fastopen_cookie_gen(struct sock *sk, const void *path,
-				      struct tcp_fastopen_cookie *foc)
-{
-	struct tcp_fastopen_context *ctx;
-	bool ok = false;
-
-	rcu_read_lock();
-
-	ctx = rcu_dereference(inet_csk(sk)->icsk_accept_queue.fastopenq.ctx);
-	if (!ctx)
-		ctx = rcu_dereference(sock_net(sk)->ipv4.tcp_fastopen_ctx);
-
-	if (ctx) {
-		crypto_cipher_encrypt_one(ctx->tfm, foc->val, path);
-		foc->len = TCP_FASTOPEN_COOKIE_SIZE;
-		ok = true;
-	}
-	rcu_read_unlock();
-	return ok;
-}
-
 static void __tcp_fastopen_cookie_gen_with_ctx(struct request_sock *req,
 					       struct sk_buff *syn,
 					       struct tcp_fastopen_cookie *foc,
@@ -222,29 +201,21 @@ static bool tcp_fastopen_cookie_gen(struct sock *sk,
 				    struct sk_buff *syn,
 				    struct tcp_fastopen_cookie *foc)
 {
-	if (req->rsk_ops->family == AF_INET) {
-		const struct iphdr *iph = ip_hdr(syn);
+	struct tcp_fastopen_context *ctx;
+	bool ok = false;
 
-		__be32 path[4] = { iph->saddr, iph->daddr, 0, 0 };
-		return __tcp_fastopen_cookie_gen(sk, path, foc);
+	rcu_read_lock();
+
+	ctx = rcu_dereference(inet_csk(sk)->icsk_accept_queue.fastopenq.ctx);
+	if (!ctx)
+		ctx = rcu_dereference(sock_net(sk)->ipv4.tcp_fastopen_ctx);
+
+	if (ctx) {
+		__tcp_fastopen_cookie_gen_with_ctx(req, syn, foc, ctx);
+		ok = true;
 	}
-
-#if IS_ENABLED(CONFIG_IPV6)
-	if (req->rsk_ops->family == AF_INET6) {
-		const struct ipv6hdr *ip6h = ipv6_hdr(syn);
-		struct tcp_fastopen_cookie tmp;
-
-		if (__tcp_fastopen_cookie_gen(sk, &ip6h->saddr, &tmp)) {
-			struct in6_addr *buf = &tmp.addr;
-			int i;
-
-			for (i = 0; i < 4; i++)
-				buf->s6_addr32[i] ^= ip6h->daddr.s6_addr32[i];
-			return __tcp_fastopen_cookie_gen(sk, buf, foc);
-		}
-	}
-#endif
-	return false;
+	rcu_read_unlock();
+	return ok;
 }
 
 
