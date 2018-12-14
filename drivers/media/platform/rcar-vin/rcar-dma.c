@@ -1143,9 +1143,8 @@ static int rvin_set_stream(struct rvin_dev *vin, int on)
 	return ret;
 }
 
-static int rvin_start_streaming(struct vb2_queue *vq, unsigned int count)
+int rvin_start_streaming(struct rvin_dev *vin)
 {
-	struct rvin_dev *vin = vb2_get_drv_priv(vq);
 	unsigned long flags;
 	int ret;
 
@@ -1187,9 +1186,13 @@ out:
 	return ret;
 }
 
-static void rvin_stop_streaming(struct vb2_queue *vq)
+static int rvin_start_streaming_vq(struct vb2_queue *vq, unsigned int count)
 {
-	struct rvin_dev *vin = vb2_get_drv_priv(vq);
+	return rvin_start_streaming(vb2_get_drv_priv(vq));
+}
+
+void rvin_stop_streaming(struct rvin_dev *vin)
+{
 	unsigned long flags;
 	int retries = 0;
 
@@ -1238,12 +1241,17 @@ static void rvin_stop_streaming(struct vb2_queue *vq)
 			  vin->scratch_phys);
 }
 
+static void rvin_stop_streaming_vq(struct vb2_queue *vq)
+{
+	rvin_stop_streaming(vb2_get_drv_priv(vq));
+}
+
 static const struct vb2_ops rvin_qops = {
 	.queue_setup		= rvin_queue_setup,
 	.buf_prepare		= rvin_buffer_prepare,
 	.buf_queue		= rvin_buffer_queue,
-	.start_streaming	= rvin_start_streaming,
-	.stop_streaming		= rvin_stop_streaming,
+	.start_streaming	= rvin_start_streaming_vq,
+	.stop_streaming		= rvin_stop_streaming_vq,
 	.wait_prepare		= vb2_ops_wait_prepare,
 	.wait_finish		= vb2_ops_wait_finish,
 };
