@@ -250,6 +250,8 @@ static int get_port_device_capability(struct pci_dev *dev)
 	    pci_aer_available() && services & PCIE_PORT_SERVICE_AER)
 		services |= PCIE_PORT_SERVICE_DPC;
 
+	services |= PCIE_PORT_SERVICE_PMU;
+
 	return services;
 }
 
