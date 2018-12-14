@@ -52,6 +52,7 @@ struct mlx4_icm_chunk {
 	int			npages;
 	int			nsg;
 	struct scatterlist	mem[MLX4_ICM_CHUNK_LEN];
+	void			*buf[MLX4_ICM_CHUNK_LEN];
 };
 
 struct mlx4_icm {

@@ -72,7 +72,7 @@ static void mlx4_free_icm_coherent(struct mlx4_dev *dev, struct mlx4_icm_chunk *
 	for (i = 0; i < chunk->npages; ++i)
 		dma_free_coherent(&dev->persist->pdev->dev,
 				  chunk->mem[i].length,
-				  lowmem_page_address(sg_page(&chunk->mem[i])),
+				  chunk->buf[i],
 				  sg_dma_address(&chunk->mem[i]));
 }
 
@@ -95,9 +95,11 @@ void mlx4_free_icm(struct mlx4_dev *dev, struct mlx4_icm *icm, int coherent)
 	kfree(icm);
 }
 
-static int mlx4_alloc_icm_pages(struct scatterlist *mem, int order,
+static int mlx4_alloc_icm_pages(struct mlx4_icm_chunk *chunk, int order,
 				gfp_t gfp_mask, int node)
 {
+	struct scatterlist *mem = &chunk->mem[chunk->npages];
+	void **buf = &chunk->buf[chunk->npages];
 	struct page *page;
 
 	page = alloc_pages_node(node, gfp_mask, order);
@@ -108,25 +110,30 @@ static int mlx4_alloc_icm_pages(struct scatterlist *mem, int order,
 	}
 
 	sg_set_page(mem, page, PAGE_SIZE << order, 0);
+	*buf = lowmem_page_address(page);
 	return 0;
 }
 
-static int mlx4_alloc_icm_coherent(struct device *dev, struct scatterlist *mem,
-				    int order, gfp_t gfp_mask)
+static int mlx4_alloc_icm_coherent(struct device *dev,
+				   struct mlx4_icm_chunk *chunk, int order,
+				   gfp_t gfp_mask)
 {
-	void *buf = dma_alloc_coherent(dev, PAGE_SIZE << order,
-				       &sg_dma_address(mem), gfp_mask);
-	if (!buf)
+	struct scatterlist *mem = &chunk->mem[chunk->npages];
+	void **buf = &chunk->buf[chunk->npages];
+
+	*buf = dma_alloc_coherent(dev, PAGE_SIZE << order,
+				  &sg_dma_address(mem), gfp_mask);
+	if (!*buf)
 		return -ENOMEM;
 
-	if (offset_in_page(buf)) {
+	if (offset_in_page(*buf)) {
 		dma_free_coherent(dev, PAGE_SIZE << order,
-				  buf, sg_dma_address(mem));
+				  *buf, sg_dma_address(mem));
 		return -ENOMEM;
 	}
 
-	sg_set_buf(mem, buf, PAGE_SIZE << order);
 	sg_dma_len(mem) = PAGE_SIZE << order;
+	mem->length = PAGE_SIZE << order;
 	return 0;
 }
 
@@ -174,6 +181,7 @@ struct mlx4_icm *mlx4_alloc_icm(struct mlx4_dev *dev, int npages,
 			sg_init_table(chunk->mem, MLX4_ICM_CHUNK_LEN);
 			chunk->npages = 0;
 			chunk->nsg    = 0;
+			memset(chunk->buf, 0, sizeof(chunk->buf));
 			list_add_tail(&chunk->list, &icm->chunk_list);
 		}
 
@@ -186,11 +194,9 @@ struct mlx4_icm *mlx4_alloc_icm(struct mlx4_dev *dev, int npages,
 
 		if (coherent)
 			ret = mlx4_alloc_icm_coherent(&dev->persist->pdev->dev,
-						      &chunk->mem[chunk->npages],
-						      cur_order, mask);
+						      chunk, cur_order, mask);
 		else
-			ret = mlx4_alloc_icm_pages(&chunk->mem[chunk->npages],
-						   cur_order, mask,
+			ret = mlx4_alloc_icm_pages(chunk, cur_order, mask,
 						   dev->numa_node);
 
 		if (ret) {
@@ -316,11 +322,11 @@ void mlx4_table_put(struct mlx4_dev *dev, struct mlx4_icm_table *table, u32 obj)
 void *mlx4_table_find(struct mlx4_icm_table *table, u32 obj,
 			dma_addr_t *dma_handle)
 {
-	int offset, dma_offset, i;
+	int offset, dma_offset, i, length;
 	u64 idx;
 	struct mlx4_icm_chunk *chunk;
 	struct mlx4_icm *icm;
-	struct page *page = NULL;
+	void *addr = NULL;
 
 	if (!table->lowmem)
 		return NULL;
@@ -336,28 +342,29 @@ void *mlx4_table_find(struct mlx4_icm_table *table, u32 obj,
 
 	list_for_each_entry(chunk, &icm->chunk_list, list) {
 		for (i = 0; i < chunk->npages; ++i) {
+			length = chunk->mem[i].length;
 			if (dma_handle && dma_offset >= 0) {
-				if (sg_dma_len(&chunk->mem[i]) > dma_offset)
+				if (length > dma_offset)
 					*dma_handle = sg_dma_address(&chunk->mem[i]) +
 						dma_offset;
-				dma_offset -= sg_dma_len(&chunk->mem[i]);
+				dma_offset -= length;
 			}
 			/*
 			 * DMA mapping can merge pages but not split them,
 			 * so if we found the page, dma_handle has already
 			 * been assigned to.
 			 */
-			if (chunk->mem[i].length > offset) {
-				page = sg_page(&chunk->mem[i]);
+			if (length > offset) {
+				addr = chunk->buf[i] + offset;
 				goto out;
 			}
-			offset -= chunk->mem[i].length;
+			offset -= length;
 		}
 	}
 
 out:
 	mutex_unlock(&table->mutex);
-	return page ? lowmem_page_address(page) + offset : NULL;
+	return addr;
 }
 
 int mlx4_table_get_range(struct mlx4_dev *dev, struct mlx4_icm_table *table,
