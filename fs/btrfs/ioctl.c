@@ -4232,9 +4232,6 @@ static long btrfs_ioctl_scrub(struct file *file, void __user *arg)
 			      &sa->progress, sa->flags & BTRFS_SCRUB_READONLY,
 			      0);
 
-	if (copy_to_user(arg, sa, sizeof(*sa)))
-		ret = -EFAULT;
-
 	if (!(sa->flags & BTRFS_SCRUB_READONLY))
 		mnt_drop_write_file(file);
 out:
