@@ -22,7 +22,7 @@ int osf_partition(struct parsed_partitions *state)
 	unsigned char *data;
 	struct disklabel {
 		__le32 d_magic;
-		__le16 d_type,d_subtype;
+		__le16 d_type, d_subtype;
 		u8 d_typename[16];
 		u8 d_packname[16];
 		__le32 d_secsize;
@@ -50,14 +50,14 @@ int osf_partition(struct parsed_partitions *state)
 			u8  p_frag;
 			__le16 p_cpg;
 		} d_partitions[MAX_OSF_PARTITIONS];
-	} * label;
-	struct d_partition * partition;
+	} *label;
+	struct d_partition *partition;
 
 	data = read_part_sector(state, 0, &sect);
 	if (!data)
 		return -1;
 
-	label = (struct disklabel *) (data+64);
+	label = (struct disklabel *) (data + 64);
 	partition = label->d_partitions;
 	if (le32_to_cpu(label->d_magic) != DISKLABELMAGIC) {
 		put_dev_sector(sect);
@@ -74,7 +74,7 @@ int osf_partition(struct parsed_partitions *state)
 	}
 	for (i = 0 ; i < npartitions; i++, partition++) {
 		if (slot == state->limit)
-		        break;
+			break;
 		if (le32_to_cpu(partition->p_size))
 			put_partition(state, slot,
 				le32_to_cpu(partition->p_offset),
