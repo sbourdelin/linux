@@ -21,6 +21,7 @@ struct notifier_block;		/* in notifier.h */
 #define VM_UNINITIALIZED	0x00000020	/* vm_struct is not fully initialized */
 #define VM_NO_GUARD		0x00000040      /* don't add guard page */
 #define VM_KASAN		0x00000080      /* has allocated kasan shadow memory */
+#define VM_EXT_PAGES		0x00000100	/* pages array is not embedded */
 /* bits [20..32] reserved for arch specific ioremap internals */
 
 /*
@@ -132,7 +133,7 @@ extern struct vm_struct *__get_vm_area_caller(unsigned long size,
 					unsigned long flags,
 					unsigned long start, unsigned long end,
 					const void *caller);
-extern struct vm_struct *remove_vm_area(const void *addr);
+extern int remove_vm_area(const void *addr);
 extern struct vm_struct *find_vm_area(const void *addr);
 
 extern int map_vm_area(struct vm_struct *area, pgprot_t prot,

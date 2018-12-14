@@ -179,9 +179,7 @@ void __iounmap(void __iomem *addr)
 	if ((unsigned long) addr > CONFIG_NIOS2_IO_REGION_BASE)
 		return;
 
-	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
-	if (!p)
+	if (remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr)))
 		pr_err("iounmap: bad address %p\n", addr);
-	kfree(p);
 }
 EXPORT_SYMBOL(__iounmap);

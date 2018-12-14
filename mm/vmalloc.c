@@ -1388,12 +1388,20 @@ static void clear_vm_uninitialized_flag(struct vm_struct *vm)
 	vm->flags &= ~VM_UNINITIALIZED;
 }
 
+static void *__vmalloc_node(unsigned long size, unsigned long align,
+			    gfp_t gfp_mask, pgprot_t prot,
+			    int node, const void *caller);
+
 static struct vm_struct *__get_vm_area_node(unsigned long size,
 		unsigned long align, unsigned long flags, unsigned long start,
 		unsigned long end, int node, gfp_t gfp_mask, const void *caller)
 {
 	struct vmap_area *va;
 	struct vm_struct *area;
+	size_t area_size = sizeof(struct vmap_area) + sizeof(struct vm_struct);
+	unsigned long nr_pages = 0;
+	unsigned long pages_size;
+	struct page **pages = NULL;
 
 	BUG_ON(in_interrupt());
 	size = PAGE_ALIGN(size);
@@ -1404,17 +1412,55 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 		align = 1ul << clamp_t(int, get_count_order_long(size),
 				       PAGE_SHIFT, IOREMAP_MAX_ORDER);
 
-	area = kzalloc_node(sizeof(*area), gfp_mask & GFP_RECLAIM_MASK, node);
-	if (unlikely(!area))
+	if (flags & VM_UNINITIALIZED) {
+		nr_pages = size >> PAGE_SHIFT;
+		pages_size = nr_pages * sizeof(struct page *);
+
+		if (area_size + pages_size <= PAGE_SIZE) {
+			/* area->pages array can be embedded */
+			area_size += nr_pages * sizeof(struct page *);
+		} else {
+			/* area->pages array has to be allocated externally */
+			const gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) |
+				__GFP_ZERO;
+			const gfp_t highmem_mask =
+				(gfp_mask & (GFP_DMA | GFP_DMA32)) ?
+				0 : __GFP_HIGHMEM;
+
+			flags |= VM_EXT_PAGES;
+			pages = __vmalloc_node(pages_size, 1,
+					       nested_gfp | highmem_mask,
+					       PAGE_KERNEL, node, caller);
+			if (!pages)
+				return NULL;
+		}
+	}
+
+	/*
+	 * We allocate va, area and optionally area->pages at once.
+	 */
+	va = kzalloc_node(area_size, gfp_mask & GFP_RECLAIM_MASK, node);
+	if (unlikely(!va)) {
+		vfree(pages);
 		return NULL;
+	}
 
 	if (!(flags & VM_NO_GUARD))
 		size += PAGE_SIZE;
 
-	va = alloc_vmap_area(size, align, start, end, node, gfp_mask);
-	if (IS_ERR(va)) {
-		kfree(area);
+	if (init_vmap_area(va, size, align, start, end, node, gfp_mask)) {
+		vfree(pages);
+		kfree(va);
 		return NULL;
+	}
+
+	area = (struct vm_struct *)(va + 1);
+	if (flags & VM_UNINITIALIZED) {
+		area->nr_pages = nr_pages;
+		if (flags & VM_EXT_PAGES)
+			area->pages = pages;
+		else
+			area->pages = (struct page **)(area + 1);
 	}
 
 	setup_vmalloc_vm(area, va, flags, caller);
@@ -1480,7 +1526,7 @@ struct vm_struct *find_vm_area(const void *addr)
 	return NULL;
 }
 
-static struct vm_struct *__remove_vm_area(struct vmap_area *va)
+static void __remove_vm_area(struct vmap_area *va)
 {
 	struct vm_struct *vm = va->vm;
 
@@ -1494,8 +1540,6 @@ static struct vm_struct *__remove_vm_area(struct vmap_area *va)
 
 	kasan_free_shadow(vm);
 	free_unmap_vmap_area(va);
-
-	return vm;
 }
 
 /**
@@ -1503,19 +1547,18 @@ static struct vm_struct *__remove_vm_area(struct vmap_area *va)
  *	@addr:		base address
  *
  *	Search for the kernel VM area starting at @addr, and remove it.
- *	This function returns the found VM area, but using it is NOT safe
- *	on SMP machines, except for its size or flags.
  */
-struct vm_struct *remove_vm_area(const void *addr)
+int remove_vm_area(const void *addr)
 {
-	struct vm_struct *vm = NULL;
 	struct vmap_area *va;
 
 	va = find_vmap_area((unsigned long)addr);
-	if (va && va->flags & VM_VM_AREA)
-		vm = __remove_vm_area(va);
+	if (va && va->flags & VM_VM_AREA) {
+		__remove_vm_area(va);
+		return 0;
+	}
 
-	return vm;
+	return -EFAULT;
 }
 
 static void __vunmap(const void *addr, int deallocate_pages)
@@ -1552,10 +1595,11 @@ static void __vunmap(const void *addr, int deallocate_pages)
 			__free_pages(page, 0);
 		}
 
-		kvfree(area->pages);
+		if (area->flags & VM_EXT_PAGES)
+			kvfree(area->pages);
 	}
 
-	kfree(area);
+	WARN_ON(area != (struct vm_struct *)(va + 1));
 }
 
 static inline void __vfree_deferred(const void *addr)
@@ -1676,37 +1720,13 @@ void *vmap(struct page **pages, unsigned int count,
 }
 EXPORT_SYMBOL(vmap);
 
-static void *__vmalloc_node(unsigned long size, unsigned long align,
-			    gfp_t gfp_mask, pgprot_t prot,
-			    int node, const void *caller);
 static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 				 pgprot_t prot, int node)
 {
-	struct page **pages;
-	unsigned int nr_pages, array_size, i;
-	const gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
 	const gfp_t alloc_mask = gfp_mask | __GFP_NOWARN;
 	const gfp_t highmem_mask = (gfp_mask & (GFP_DMA | GFP_DMA32)) ?
-					0 :
-					__GFP_HIGHMEM;
-
-	nr_pages = get_vm_area_size(area) >> PAGE_SHIFT;
-	array_size = (nr_pages * sizeof(struct page *));
-
-	area->nr_pages = nr_pages;
-	/* Please note that the recursion is strictly bounded. */
-	if (array_size > PAGE_SIZE) {
-		pages = __vmalloc_node(array_size, 1, nested_gfp|highmem_mask,
-				PAGE_KERNEL, node, area->caller);
-	} else {
-		pages = kmalloc_node(array_size, nested_gfp, node);
-	}
-	area->pages = pages;
-	if (!area->pages) {
-		remove_vm_area(area->addr);
-		kfree(area);
-		return NULL;
-	}
+		0 : __GFP_HIGHMEM;
+	unsigned int i;
 
 	for (i = 0; i < area->nr_pages; i++) {
 		struct page *page;
@@ -1726,7 +1746,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			cond_resched();
 	}
 
-	if (map_vm_area(area, prot, pages))
+	if (map_vm_area(area, prot, area->pages))
 		goto fail;
 	return area->addr;
 
@@ -2377,10 +2397,7 @@ EXPORT_SYMBOL_GPL(alloc_vm_area);
 
 void free_vm_area(struct vm_struct *area)
 {
-	struct vm_struct *ret;
-	ret = remove_vm_area(area->addr);
-	BUG_ON(ret != area);
-	kfree(area);
+	BUG_ON(remove_vm_area(area->addr));
 }
 EXPORT_SYMBOL_GPL(free_vm_area);
 

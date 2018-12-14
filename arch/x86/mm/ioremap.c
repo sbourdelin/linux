@@ -433,9 +433,7 @@ void iounmap(volatile void __iomem *addr)
 	free_memtype(p->phys_addr, p->phys_addr + get_vm_area_size(p));
 
 	/* Finally remove it */
-	o = remove_vm_area((void __force *)addr);
-	BUG_ON(p != o || o == NULL);
-	kfree(p);
+	BUG_ON(remove_vm_area((void __force *)addr));
 }
 EXPORT_SYMBOL(iounmap);
 

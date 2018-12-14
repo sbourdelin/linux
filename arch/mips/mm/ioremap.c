@@ -190,16 +190,11 @@ void __iomem * __ioremap(phys_addr_t phys_addr, phys_addr_t size, unsigned long 
 
 void __iounmap(const volatile void __iomem *addr)
 {
-	struct vm_struct *p;
-
 	if (IS_KSEG1(addr))
 		return;
 
-	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
-	if (!p)
+	if (remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr)))
 		printk(KERN_ERR "iounmap: bad address %p\n", addr);
-
-	kfree(p);
 }
 
 EXPORT_SYMBOL(__ioremap);

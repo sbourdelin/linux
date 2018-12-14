@@ -106,7 +106,6 @@ static inline int iomapping_nontranslatable(unsigned long offset)
 void __iounmap(void __iomem *addr)
 {
 	unsigned long vaddr = (unsigned long __force)addr;
-	struct vm_struct *p;
 
 	/*
 	 * Nothing to do if there is no translatable mapping.
@@ -126,12 +125,7 @@ void __iounmap(void __iomem *addr)
 	if (pmb_unmap(addr) == 0)
 		return;
 
-	p = remove_vm_area((void *)(vaddr & PAGE_MASK));
-	if (!p) {
+	if (remove_vm_area((void *)(vaddr & PAGE_MASK)))
 		printk(KERN_ERR "%s: bad address %p\n", __func__, addr);
-		return;
-	}
-
-	kfree(p);
 }
 EXPORT_SYMBOL(__iounmap);

@@ -229,10 +229,7 @@ void sq_unmap(unsigned long vaddr)
 		/*
 		 * Tear down the VMA in the MMU case.
 		 */
-		struct vm_struct *vma;
-
-		vma = remove_vm_area((void *)(map->sq_addr & PAGE_MASK));
-		if (!vma) {
+		if (remove_vm_area((void *)(map->sq_addr & PAGE_MASK))) {
 			printk(KERN_ERR "%s: bad address 0x%08lx\n",
 			       __func__, map->sq_addr);
 			return;
