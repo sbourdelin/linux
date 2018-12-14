@@ -25,13 +25,18 @@
  *		callback.
  *		The job does NOT have to end before this callback returns
  *		(and it will be the usual case). When the job finishes,
- *		v4l2_m2m_job_finish() has to be called.
+ *		v4l2_m2m_job_writing() or v4l2_m2m_job_finish() has to be called.
  * @job_ready:	optional. Should return 0 if the driver does not have a job
  *		fully prepared to run yet (i.e. it will not be able to finish a
  *		transaction without sleeping). If not provided, it will be
  *		assumed that one source and one destination buffer are all
  *		that is required for the driver to perform one full transaction.
  *		This method may not sleep.
+ * @job_write:	optional. After v4l2_m2m_job_writing() was called, this callback
+ *		is called whenever a new capture buffer was queued so the result
+ *		of the job can be written to the newly queued buffer(s). Once the
+ *		full result has been written the job can be finished by calling
+ *		v4l2_m2m_job_finish().
  * @job_abort:	optional. Informs the driver that it has to abort the currently
  *		running transaction as soon as possible (i.e. as soon as it can
  *		stop the device safely; e.g. in the next interrupt handler),
@@ -44,6 +49,7 @@
 struct v4l2_m2m_ops {
 	void (*device_run)(void *priv);
 	int (*job_ready)(void *priv);
+	void (*job_write)(void *priv);
 	void (*job_abort)(void *priv);
 };
 
@@ -158,6 +164,25 @@ struct vb2_queue *v4l2_m2m_get_vq(struct v4l2_m2m_ctx *m2m_ctx,
  * src/dst buffer per transaction.
  */
 void v4l2_m2m_try_schedule(struct v4l2_m2m_ctx *m2m_ctx);
+
+/**
+ * v4l2_m2m_job_writing() - inform the framework that the result of the job
+ * is ready and is now being written to capture buffers
+ *
+ * @m2m_dev: opaque pointer to the internal data to handle M2M context
+ * @m2m_ctx: m2m context assigned to the instance given by struct &v4l2_m2m_ctx
+ *
+ * Called by a driver if the resulting data of the job is being written to
+ * capture buffers. This means that whenever a new capture buffer is queued
+ * up the &v4l2_m2m_ops->job_write callback is called. Once all the data has
+ * been written v4l2_m2m_job_finish() is called.
+ *
+ * This is typically only needed by stateful encoders where it is not known
+ * until the compressed data arrives how many capture buffers are needed to
+ * store the result and it has to wait for new capture buffers to be queued.
+ */
+void v4l2_m2m_job_writing(struct v4l2_m2m_dev *m2m_dev,
+			  struct v4l2_m2m_ctx *m2m_ctx);
 
 /**
  * v4l2_m2m_job_finish() - inform the framework that a job has been finished

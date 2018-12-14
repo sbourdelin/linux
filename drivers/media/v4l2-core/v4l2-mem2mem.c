@@ -43,8 +43,10 @@ module_param(debug, bool, 0644);
 #define TRANS_QUEUED		(1 << 0)
 /* Instance is currently running in hardware */
 #define TRANS_RUNNING		(1 << 1)
+/* Instance is writing the result */
+#define TRANS_WRITING		(1 << 2)
 /* Instance is currently aborting */
-#define TRANS_ABORT		(1 << 2)
+#define TRANS_ABORT		(1 << 3)
 
 
 /* Offset base for buffers on the destination queue - used to distinguish
@@ -253,9 +255,10 @@ EXPORT_SYMBOL(v4l2_m2m_get_curr_priv);
 static void v4l2_m2m_try_run(struct v4l2_m2m_dev *m2m_dev)
 {
 	unsigned long flags;
+	bool is_writing;
 
 	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
-	if (NULL != m2m_dev->curr_ctx) {
+	if (m2m_dev->curr_ctx) {
 		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
 		dprintk("Another instance is running, won't run now\n");
 		return;
@@ -274,6 +277,15 @@ static void v4l2_m2m_try_run(struct v4l2_m2m_dev *m2m_dev)
 
 	dprintk("Running job on m2m_ctx: %p\n", m2m_dev->curr_ctx);
 	m2m_dev->m2m_ops->device_run(m2m_dev->curr_ctx->priv);
+
+	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
+	is_writing = m2m_dev->curr_ctx &&
+		v4l2_m2m_num_dst_bufs_ready(m2m_dev->curr_ctx) &&
+		(m2m_dev->curr_ctx->job_flags & TRANS_WRITING);
+	spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
+
+	if (is_writing)
+		m2m_dev->m2m_ops->job_write(m2m_dev->curr_ctx->priv);
 }
 
 /*
@@ -326,8 +338,8 @@ static void __v4l2_m2m_try_queue(struct v4l2_m2m_dev *m2m_dev,
 	spin_unlock_irqrestore(&m2m_ctx->cap_q_ctx.rdy_spinlock, flags_cap);
 	spin_unlock_irqrestore(&m2m_ctx->out_q_ctx.rdy_spinlock, flags_out);
 
-	if (m2m_dev->m2m_ops->job_ready
-		&& (!m2m_dev->m2m_ops->job_ready(m2m_ctx->priv))) {
+	if (m2m_dev->m2m_ops->job_ready &&
+	    !m2m_dev->m2m_ops->job_ready(m2m_ctx->priv)) {
 		dprintk("Driver not ready\n");
 		goto job_unlock;
 	}
@@ -384,7 +396,8 @@ static void v4l2_m2m_device_run_work(struct work_struct *work)
  * @m2m_ctx: m2m context with jobs to be canceled
  *
  * In case of streamoff or release called on any context,
- * 1] If the context is currently running, then abort job will be called
+ * 1] If the context is currently running or writing, then abort job will be
+ *    called
  * 2] If the context is queued, then the context will be removed from
  *    the job_queue
  */
@@ -397,16 +410,19 @@ static void v4l2_m2m_cancel_job(struct v4l2_m2m_ctx *m2m_ctx)
 	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
 
 	m2m_ctx->job_flags |= TRANS_ABORT;
-	if (m2m_ctx->job_flags & TRANS_RUNNING) {
+	if (m2m_ctx->job_flags & (TRANS_RUNNING | TRANS_WRITING)) {
 		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
 		if (m2m_dev->m2m_ops->job_abort)
 			m2m_dev->m2m_ops->job_abort(m2m_ctx->priv);
+		if (m2m_ctx->job_flags & TRANS_WRITING)
+			v4l2_m2m_job_finish(m2m_dev, m2m_ctx);
 		dprintk("m2m_ctx %p running, will wait to complete\n", m2m_ctx);
-		wait_event(m2m_ctx->finished,
-				!(m2m_ctx->job_flags & TRANS_RUNNING));
+		wait_event(m2m_ctx->finished, !(m2m_ctx->job_flags &
+					(TRANS_RUNNING | TRANS_WRITING)));
 	} else if (m2m_ctx->job_flags & TRANS_QUEUED) {
 		list_del(&m2m_ctx->queue);
-		m2m_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING);
+		m2m_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING |
+					TRANS_WRITING);
 		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
 		dprintk("m2m_ctx: %p had been on queue and was removed\n",
 			m2m_ctx);
@@ -415,6 +431,26 @@ static void v4l2_m2m_cancel_job(struct v4l2_m2m_ctx *m2m_ctx)
 		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
 	}
 }
+
+void v4l2_m2m_job_writing(struct v4l2_m2m_dev *m2m_dev,
+			  struct v4l2_m2m_ctx *m2m_ctx)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
+	if (!m2m_dev->curr_ctx || m2m_dev->curr_ctx != m2m_ctx) {
+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
+		dprintk("Called by an instance not currently running\n");
+		return;
+	}
+
+	m2m_dev->curr_ctx->job_flags &= ~TRANS_RUNNING;
+	m2m_dev->curr_ctx->job_flags |= TRANS_WRITING;
+
+	spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
+}
+EXPORT_SYMBOL(v4l2_m2m_job_writing);
+
 
 void v4l2_m2m_job_finish(struct v4l2_m2m_dev *m2m_dev,
 			 struct v4l2_m2m_ctx *m2m_ctx)
@@ -429,7 +465,8 @@ void v4l2_m2m_job_finish(struct v4l2_m2m_dev *m2m_dev,
 	}
 
 	list_del(&m2m_dev->curr_ctx->queue);
-	m2m_dev->curr_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING);
+	m2m_dev->curr_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING |
+					  TRANS_WRITING);
 	wake_up(&m2m_dev->curr_ctx->finished);
 	m2m_dev->curr_ctx = NULL;
 
@@ -504,6 +541,10 @@ int v4l2_m2m_qbuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
 		return -EPERM;
 	}
 	ret = vb2_qbuf(vq, vdev->v4l2_dev->mdev, buf);
+	if (!ret && !V4L2_TYPE_IS_OUTPUT(vq->type) &&
+	    (m2m_ctx->job_flags & TRANS_WRITING))
+		m2m_ctx->m2m_dev->m2m_ops->job_write(m2m_ctx->priv);
+
 	if (!ret && !(buf->flags & V4L2_BUF_FLAG_IN_REQUEST))
 		v4l2_m2m_try_schedule(m2m_ctx);
 
