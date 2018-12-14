@@ -47,6 +47,15 @@ config PCIEAER_INJECT
 	  gotten from:
 	     http://www.kernel.org/pub/linux/utils/pci/aer-inject/
 
+config PCIE_HISI_PMU
+       tristate "PCI Express Root Port Performance Monitoring for Hisilicon Hip08"
+       depends on PCIEPORTBUS
+       help
+	 The hisilicon Hip08 platform has root ports with integrated
+	 transport layer performance measurement units. These are
+	 exposed within the memory map, so resources must be provided
+	 via ACPI DSDT.
+ 
 #
 # PCI Express ECRC
 #
