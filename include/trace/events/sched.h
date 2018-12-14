@@ -587,6 +587,33 @@ TRACE_EVENT(sched_wake_idle_without_ipi,
 
 	TP_printk("cpu=%d", __entry->cpu)
 );
+
+/*
+ * Tracepoint for RT throttling task.
+ */
+TRACE_EVENT(sched_rt_throttling,
+
+	TP_PROTO(struct task_struct *tsk, int cpu),
+
+	TP_ARGS(tsk, cpu),
+
+	TP_STRUCT__entry(
+		__array(char,	comm,	TASK_COMM_LEN)
+		__field(pid_t,	pid)
+		__field(int,	cpu)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+		__entry->pid	= tsk->pid;
+		__entry->cpu	= cpu;
+	),
+
+	TP_printk("comm=%s pid=%d cpu=%d",
+			__entry->comm, __entry->pid,
+			__entry->cpu)
+);
+
 #endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */

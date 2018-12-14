@@ -6,6 +6,7 @@
 #include "sched.h"
 
 #include "pelt.h"
+#include <trace/events/sched.h>
 
 int sched_rr_timeslice = RR_TIMESLICE;
 int sysctl_sched_rr_timeslice = (MSEC_PER_SEC / HZ) * RR_TIMESLICE;
@@ -928,7 +929,10 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 		 */
 		if (likely(rt_b->rt_runtime)) {
 			rt_rq->rt_throttled = 1;
-			printk_deferred_once("sched: RT throttling activated\n");
+			printk_deferred_once(
+				"sched: RT throttling activated for task pid %d (%s) on cpu:%d\n",
+				rt_rq->rq->curr->pid, rt_rq->rq->curr->comm, rt_rq->rq->cpu);
+			trace_sched_rt_throttling(rt_rq->rq->curr, rt_rq->rq->cpu);
 		} else {
 			/*
 			 * In case we did anyway, make it go away,
