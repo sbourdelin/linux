@@ -30,6 +30,11 @@
  * memory leak, please load these modules at your own risk -- some
  * amount of memory may leaked before the bug is patched.
  *
+ * NOTE - the __noclone attribute to those functions that are to be
+ * shared with other modules while being declared static. As livepatch
+ * needs the unmodified symbol names and the usual "static" would
+ * invoke gccs cloning mechanism that renames the functions this
+ * needs to be suppressed with the additional __noclone attribute.
  *
  * Usage
  * -----
@@ -96,15 +101,15 @@ MODULE_DESCRIPTION("Buggy module for shadow variable demo");
  * Keep a list of all the dummies so we can clean up any residual ones
  * on module exit
  */
-LIST_HEAD(dummy_list);
-DEFINE_MUTEX(dummy_list_mutex);
+static LIST_HEAD(dummy_list);
+static DEFINE_MUTEX(dummy_list_mutex);
 
 struct dummy {
 	struct list_head list;
 	unsigned long jiffies_expire;
 };
 
-noinline struct dummy *dummy_alloc(void)
+static __noclone noinline struct dummy *dummy_alloc(void)
 {
 	struct dummy *d;
 	void *leak;
@@ -125,7 +130,7 @@ noinline struct dummy *dummy_alloc(void)
 	return d;
 }
 
-noinline void dummy_free(struct dummy *d)
+static __noclone noinline void dummy_free(struct dummy *d)
 {
 	pr_info("%s: dummy @ %p, expired = %lx\n",
 		__func__, d, d->jiffies_expire);
@@ -133,7 +138,8 @@ noinline void dummy_free(struct dummy *d)
 	kfree(d);
 }
 
-noinline bool dummy_check(struct dummy *d, unsigned long jiffies)
+static __noclone noinline bool dummy_check(struct dummy *d,
+					   unsigned long jiffies)
 {
 	return time_after(jiffies, d->jiffies_expire);
 }
