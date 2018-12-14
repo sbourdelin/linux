@@ -282,11 +282,15 @@ static int proc_tcp_fastopen_key(struct ctl_table *table, int write,
 {
 	struct net *net = container_of(table->data, struct net,
 	    ipv4.sysctl_tcp_fastopen);
-	struct ctl_table tbl = { .maxlen = (TCP_FASTOPEN_KEY_LENGTH * 2 + 10) };
+	/* maxlen to print the list of keys in hex (*2), with a comma
+	 * in between (+ TCP_FASTOPEN_CTXT_LEN)
+	 */
+	struct ctl_table tbl = { .maxlen = (TCP_FASTOPEN_KEY_LENGTH * 2 * TCP_FASTOPEN_CTXT_LEN +
+					    TCP_FASTOPEN_CTXT_LEN + 10) };
 	struct tcp_fastopen_context *ctxt;
-	u32  user_key[4]; /* 16 bytes, matching TCP_FASTOPEN_KEY_LENGTH */
-	__le32 key[4];
-	int ret, i;
+	u32  user_key[TCP_FASTOPEN_CTXT_LEN * 4];
+	__le32 key[TCP_FASTOPEN_CTXT_LEN * 4];
+	int ret, i = 0, off = 0;
 
 	tbl.data = kmalloc(tbl.maxlen, GFP_KERNEL);
 	if (!tbl.data)
@@ -294,17 +298,28 @@ static int proc_tcp_fastopen_key(struct ctl_table *table, int write,
 
 	rcu_read_lock();
 	ctxt = rcu_dereference(net->ipv4.tcp_fastopen_ctx);
-	if (ctxt)
-		memcpy(key, ctxt->key, TCP_FASTOPEN_KEY_LENGTH);
-	else
-		memset(key, 0, sizeof(key));
+	while (ctxt) {
+		memcpy(&key[i], ctxt->key, TCP_FASTOPEN_KEY_LENGTH);
+		i += 4;
+		ctxt = rcu_dereference(ctxt->next);
+	}
 	rcu_read_unlock();
+
+	memset(&key[i], 0, sizeof(key) - i * sizeof(u32));
 
 	for (i = 0; i < ARRAY_SIZE(key); i++)
 		user_key[i] = le32_to_cpu(key[i]);
 
-	snprintf(tbl.data, tbl.maxlen, "%08x-%08x-%08x-%08x",
-		user_key[0], user_key[1], user_key[2], user_key[3]);
+	for (i = 0; i < TCP_FASTOPEN_CTXT_LEN; i++) {
+		off += snprintf(tbl.data + off, tbl.maxlen - off,
+				"%08x-%08x-%08x-%08x",
+				user_key[i * 4],
+				user_key[i * 4 + 1],
+				user_key[i * 4 + 2],
+				user_key[i * 4 + 3]);
+		if (i + 1 < TCP_FASTOPEN_CTXT_LEN)
+			off += snprintf(tbl.data + off, tbl.maxlen - off, ",");
+	}
 	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
 
 	if (write && ret == 0) {
@@ -923,7 +938,11 @@ static struct ctl_table ipv4_net_table[] = {
 		.procname	= "tcp_fastopen_key",
 		.mode		= 0600,
 		.data		= &init_net.ipv4.sysctl_tcp_fastopen,
-		.maxlen		= ((TCP_FASTOPEN_KEY_LENGTH * 2) + 10),
+		/* maxlen to print the list of keys in hex (*2), with a comma
+		 * in between (+ TCP_FASTOPEN_CTXT_LEN)
+		 */
+		.maxlen		= ((TCP_FASTOPEN_KEY_LENGTH * 2 * TCP_FASTOPEN_CTXT_LEN)
+				    + TCP_FASTOPEN_CTXT_LEN + 10),
 		.proc_handler	= proc_tcp_fastopen_key,
 	},
 	{
