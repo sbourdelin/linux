@@ -827,6 +827,13 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 					goto isolate_success;
 			}
 
+			/*
+			 * A reserved page is never freed and tend to be
+			 * clustered in the same pageblocks. Skip the block.
+			 */
+			if (PageReserved(page))
+				low_pfn = end_pfn;
+
 			goto isolate_fail;
 		}
 
