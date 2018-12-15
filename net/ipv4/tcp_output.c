@@ -3404,7 +3404,7 @@ static void tcp_connect_queue_skb(struct sock *sk, struct sk_buff *skb)
 	sk->sk_wmem_queued += skb->truesize;
 	sk_mem_charge(sk, skb->truesize);
 	tp->write_seq = tcb->end_seq;
-	tp->packets_out += tcp_skb_pcount(skb);
+	tp->packets_out += 1;
 }
 
 /* Build and send a SYN with data and (cached) Fast Open cookie. However,
@@ -3486,7 +3486,7 @@ static int tcp_send_syn_data(struct sock *sk, struct sk_buff *syn)
 
 	/* data was not sent, put it in write_queue */
 	__skb_queue_tail(&sk->sk_write_queue, syn_data);
-	tp->packets_out -= tcp_skb_pcount(syn_data);
+	tp->packets_out -= 1;
 
 fallback:
 	/* Send a regular SYN with Fast Open cookie request option */
