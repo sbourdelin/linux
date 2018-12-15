@@ -532,6 +532,10 @@ static void icl_ctx_workarounds_init(struct intel_engine_cs *engine)
 	if (IS_ICL_REVID(i915, ICL_REVID_A0, ICL_REVID_A0))
 		WA_SET_BIT_MASKED(GEN11_COMMON_SLICE_CHICKEN3,
 				  GEN11_BLEND_EMB_FIX_DISABLE_IN_RCC);
+
+	/* WaEnableFloatBlendOptimization:icl */
+	WA_SET_BIT_MASKED(GEN10_CACHE_MODE_SS,
+			  FLOAT_BLEND_OPTIMIZATION_ENABLE);
 }
 
 void intel_engine_init_ctx_wa(struct intel_engine_cs *engine)
