@@ -715,24 +715,6 @@ void phy_stop_machine(struct phy_device *phydev)
 }
 
 /**
- * phy_error - enter HALTED state for this PHY device
- * @phydev: target phy_device struct
- *
- * Moves the PHY to the HALTED state in response to a read
- * or write error, and tells the controller the link is down.
- * Must not be called from interrupt context, or while the
- * phydev->lock is held.
- */
-static void phy_error(struct phy_device *phydev)
-{
-	mutex_lock(&phydev->lock);
-	phydev->state = PHY_HALTED;
-	mutex_unlock(&phydev->lock);
-
-	phy_trigger_machine(phydev);
-}
-
-/**
  * phy_disable_interrupts - Disable the PHY interrupts from the PHY side
  * @phydev: target phy_device struct
  */
@@ -769,13 +751,12 @@ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
 	/* reschedule state queue work to run as soon as possible */
 	phy_trigger_machine(phydev);
 
-	if (phy_clear_interrupt(phydev))
-		goto phy_err;
-	return IRQ_HANDLED;
+	if (phy_clear_interrupt(phydev)) {
+		phydev_err(phydev, "failed to ack interrupt\n");
+		return IRQ_NONE;
+	}
 
-phy_err:
-	phy_error(phydev);
-	return IRQ_NONE;
+	return IRQ_HANDLED;
 }
 
 /**
@@ -821,16 +802,10 @@ EXPORT_SYMBOL(phy_start_interrupts);
  * phy_stop_interrupts - disable interrupts from a PHY device
  * @phydev: target phy_device struct
  */
-int phy_stop_interrupts(struct phy_device *phydev)
+void phy_stop_interrupts(struct phy_device *phydev)
 {
-	int err = phy_disable_interrupts(phydev);
-
-	if (err)
-		phy_error(phydev);
-
+	phy_disable_interrupts(phydev);
 	free_irq(phydev->irq, phydev);
-
-	return err;
 }
 EXPORT_SYMBOL(phy_stop_interrupts);
 
@@ -969,7 +944,8 @@ void phy_state_machine(struct work_struct *work)
 		phy_suspend(phydev);
 
 	if (err < 0)
-		phy_error(phydev);
+		phydev_err(phydev,
+			   "error %d executing PHY state machine\n", err);
 
 	if (old_state != phydev->state)
 		phydev_dbg(phydev, "PHY state change %s -> %s\n",
