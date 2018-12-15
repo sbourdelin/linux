@@ -61,6 +61,16 @@ config WILCO_EC
 	  To compile this driver as a module, choose M here: the
 	  module will be called wilco_ec.
 
+config WILCO_EC_SYSFS_RAW
+	bool "Enable raw access to EC via sysfs"
+	depends on WILCO_EC
+	default n
+	help
+	  If you say Y here, you get support for sending raw commands to
+	  the Wilco EC via sysfs.  These commands do not do any byte
+	  manipulation and allow for testing arbitrary commands.  This
+	  interface is intended for debug only and is disabled by default.
+
 config CROS_EC_CTL
         tristate
 

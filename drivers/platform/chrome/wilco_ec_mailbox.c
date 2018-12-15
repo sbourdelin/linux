@@ -44,12 +44,6 @@
 /* Version of EC protocol */
 #define EC_MAILBOX_PROTO_VERSION	3
 
-/* Normal commands have a maximum 32 bytes of data */
-#define EC_MAILBOX_DATA_SIZE		32
-
-/* Extended commands have 256 bytes of response data */
-#define EC_MAILBOX_DATA_SIZE_EXTENDED	256
-
 /* Number of header bytes to be counted as data bytes */
 #define EC_MAILBOX_DATA_EXTRA		2
 

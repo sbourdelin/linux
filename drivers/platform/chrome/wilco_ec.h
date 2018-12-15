@@ -20,6 +20,12 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 
+/* Normal commands have a maximum 32 bytes of data */
+#define EC_MAILBOX_DATA_SIZE		32
+
+/* Extended commands have 256 bytes of response data */
+#define EC_MAILBOX_DATA_SIZE_EXTENDED	256
+
 #define WILCO_EC_FLAG_NO_RESPONSE	BIT(0) /* EC does not respond */
 #define WILCO_EC_FLAG_EXTENDED_DATA	BIT(1) /* EC returns 256 data bytes */
 #define WILCO_EC_FLAG_RAW_REQUEST	BIT(2) /* Do not trim request data */

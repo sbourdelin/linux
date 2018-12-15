@@ -23,6 +23,126 @@
 #define EC_INFO_SIZE			 9
 #define EC_COMMAND_STEALTH_MODE		0xfc
 
+#ifdef CONFIG_WILCO_EC_SYSFS_RAW
+
+/* Raw data buffer, large enough to hold extended responses */
+static size_t raw_response_size;
+static u8 raw_response_data[EC_MAILBOX_DATA_SIZE_EXTENDED];
+
+/*
+ * raw: write a raw command and return the result
+ *
+ * Bytes 0-1 indicate the message type:
+ *  00 F0 = Execute Legacy Command
+ *  00 F2 = Read/Write NVRAM Property
+ * Byte 2 provides the command code
+ * Bytes 3+ consist of the data passed in the request
+ *
+ * example: read the EC info type 1:
+ *  # echo 00 f0 38 00 01 00 > raw
+ *  # cat raw
+ *  00 38 31 34 34 66 00 00 00 00 00 00 00 00 00 00 00...
+ */
+
+static ssize_t raw_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	ssize_t count = 0;
+
+	if (raw_response_size) {
+		int i;
+
+		for (i = 0; i < raw_response_size; ++i)
+			count += scnprintf(buf + count, PAGE_SIZE - count,
+					   "%02x ", raw_response_data[i]);
+
+		count += scnprintf(buf + count, PAGE_SIZE - count, "\n");
+
+		/* Only return response the first time it is read */
+		raw_response_size = 0;
+	}
+
+	return count;
+}
+
+static ssize_t raw_store(struct device *dev,
+			 struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct wilco_ec_device *ec = dev_get_drvdata(dev);
+	struct wilco_ec_message msg;
+	u8 raw_request_data[EC_MAILBOX_DATA_SIZE];
+	int in_offset = 0;
+	int out_offset = 0;
+	int ret;
+
+	while (in_offset < count) {
+		char word_buf[EC_MAILBOX_DATA_SIZE];
+		u8 byte;
+		int start_offset = in_offset;
+		int end_offset;
+
+		/* Find the start of the byte */
+		while (buf[start_offset] && isspace(buf[start_offset]))
+			start_offset++;
+		if (!buf[start_offset])
+			break;
+
+		/* Find the start of the next byte, if any */
+		end_offset = start_offset;
+		while (buf[end_offset] && !isspace(buf[end_offset]))
+			end_offset++;
+		if (start_offset > count || end_offset > count)
+			break;
+		if (start_offset > EC_MAILBOX_DATA_SIZE ||
+		    end_offset > EC_MAILBOX_DATA_SIZE)
+			break;
+
+		/* Copy to a new nul-terminated string */
+		memcpy(word_buf, buf + start_offset, end_offset - start_offset);
+		word_buf[end_offset - start_offset] = '\0';
+
+		/* Convert from hex string */
+		ret = kstrtou8(word_buf, 16, &byte);
+		if (ret)
+			break;
+
+		/* Fill this byte into the request buffer */
+		raw_request_data[out_offset++] = byte;
+		if (out_offset >= EC_MAILBOX_DATA_SIZE)
+			break;
+
+		in_offset = end_offset;
+	}
+	if (out_offset == 0)
+		return -EINVAL;
+
+	/* Clear response data buffer */
+	memset(raw_response_data, 0, EC_MAILBOX_DATA_SIZE_EXTENDED);
+
+	msg.type = raw_request_data[0] << 8 | raw_request_data[1];
+	msg.flags = WILCO_EC_FLAG_RAW;
+	msg.command = raw_request_data[2];
+	msg.request_data = raw_request_data + 3;
+	msg.request_size = out_offset - 3;
+	msg.response_data = raw_response_data;
+	msg.response_size = EC_MAILBOX_DATA_SIZE;
+
+	/* Telemetry commands use extended response data */
+	if (msg.type == WILCO_EC_MSG_TELEMETRY) {
+		msg.flags |= WILCO_EC_FLAG_EXTENDED_DATA;
+		msg.response_size = EC_MAILBOX_DATA_SIZE_EXTENDED;
+	}
+
+	ret = wilco_ec_mailbox(ec, &msg);
+	if (ret < 0)
+		return ret;
+	raw_response_size = ret;
+	return count;
+}
+
+#endif /* CONFIG_WILCO_EC_SYSFS_RAW */
+
 struct ec_info {
 	u8 index;
 	const char *label;
@@ -102,10 +222,16 @@ static ssize_t stealth_mode_store(struct device *dev,
 
 static DEVICE_ATTR_RO(version);
 static DEVICE_ATTR_WO(stealth_mode);
+#ifdef CONFIG_WILCO_EC_SYSFS_RAW
+static DEVICE_ATTR_RW(raw);
+#endif
 
 static struct attribute *wilco_ec_attrs[] = {
 	&dev_attr_version.attr,
 	&dev_attr_stealth_mode.attr,
+#ifdef CONFIG_WILCO_EC_SYSFS_RAW
+	&dev_attr_raw.attr,
+#endif
 	NULL
 };
 ATTRIBUTE_GROUPS(wilco_ec);
