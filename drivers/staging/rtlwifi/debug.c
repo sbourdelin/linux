@@ -79,24 +79,13 @@ struct rtl_debugfs_priv {
 
 static struct dentry *debugfs_topdir;
 
-static int rtl_debug_get_common(struct seq_file *m, void *v)
+static int common_show(struct seq_file *m, void *v)
 {
 	struct rtl_debugfs_priv *debugfs_priv = m->private;
 
 	return debugfs_priv->cb_read(m, v);
 }
-
-static int dl_debug_open_common(struct inode *inode, struct file *file)
-{
-	return single_open(file, rtl_debug_get_common, inode->i_private);
-}
-
-static const struct file_operations file_ops_common = {
-	.open = dl_debug_open_common,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(common);
 
 static int rtl_debug_get_mac_page(struct seq_file *m, void *v)
 {
@@ -439,7 +428,7 @@ static ssize_t rtl_debugfs_common_write(struct file *filp,
 	return debugfs_priv->cb_write(filp, buffer, count, loff);
 }
 
-static const struct file_operations file_ops_common_write = {
+static const struct file_operations common_write_fops = {
 	.owner = THIS_MODULE,
 	.write = rtl_debugfs_common_write,
 	.open = simple_open,
@@ -488,7 +477,7 @@ static int rtl_debugfs_open_rw(struct inode *inode, struct file *filp)
 	int ret = 0;
 
 	if (filp->f_mode & FMODE_READ)
-		ret = single_open(filp, rtl_debug_get_common, inode->i_private);
+		ret = single_open(filp, common_show, inode->i_private);
 	else
 		filp->private_data = inode->i_private;
 
@@ -509,7 +498,7 @@ static struct rtl_debugfs_priv rtl_debug_priv_phydm_cmd = {
 	.cb_data = 0,
 };
 
-static const struct file_operations file_ops_common_rw = {
+static const struct file_operations common_rw_fops = {
 	.owner = THIS_MODULE,
 	.open = rtl_debugfs_open_rw,
 	.release = rtl_debugfs_close_rw,
@@ -523,7 +512,7 @@ static const struct file_operations file_ops_common_rw = {
 		rtl_debug_priv_ ##name.rtlpriv = rtlpriv;		   \
 		debugfs_create_file(#name, mode, parent,		   \
 				    &rtl_debug_priv_ ##name,		   \
-				    &file_ops_ ##fopname);		   \
+				    &fopname ##fops);		   	   \
 	} while (0)
 
 #define RTL_DEBUGFS_ADD(name)						   \
