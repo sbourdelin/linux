@@ -2069,6 +2069,44 @@ extern void mem_init_print_info(const char *str);
 
 extern void reserve_bootmem_region(phys_addr_t start, phys_addr_t end);
 
+#ifdef CONFIG_SHUFFLE_PAGE_ALLOCATOR
+DECLARE_STATIC_KEY_FALSE(page_alloc_shuffle_key);
+extern void page_alloc_shuffle_enable(void);
+extern void __shuffle_free_memory(pg_data_t *pgdat, unsigned long start_pfn,
+		unsigned long end_pfn);
+static inline void shuffle_free_memory(pg_data_t *pgdat,
+		unsigned long start_pfn, unsigned long end_pfn)
+{
+	if (!static_branch_unlikely(&page_alloc_shuffle_key))
+		return;
+	__shuffle_free_memory(pgdat, start_pfn, end_pfn);
+}
+
+extern void __shuffle_zone(struct zone *z, unsigned long start_pfn,
+		unsigned long end_pfn);
+static inline void shuffle_zone(struct zone *z, unsigned long start_pfn,
+		unsigned long end_pfn)
+{
+	if (!static_branch_unlikely(&page_alloc_shuffle_key))
+		return;
+	__shuffle_zone(z, start_pfn, end_pfn);
+}
+#else
+static inline void shuffle_free_memory(pg_data_t *pgdat, unsigned long start_pfn,
+		unsigned long end_pfn)
+{
+}
+
+static inline void shuffle_zone(struct zone *z, unsigned long start_pfn,
+		unsigned long end_pfn)
+{
+}
+
+static inline void page_alloc_shuffle_enable(void)
+{
+}
+#endif
+
 /* Free the reserved page into the buddy system, so it gets managed. */
 static inline void __free_reserved_page(struct page *page)
 {

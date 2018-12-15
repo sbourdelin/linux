@@ -1595,6 +1595,8 @@ static int __init deferred_init_memmap(void *data)
 	}
 	pgdat_resize_unlock(pgdat, &flags);
 
+	shuffle_zone(zone, first_init_pfn, zone_end_pfn(zone));
+
 	/* Sanity check that the next zone really is unpopulated */
 	WARN_ON(++zid < MAX_NR_ZONES && populated_zone(++zone));
 
