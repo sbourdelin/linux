@@ -14,5 +14,6 @@ obj-$(CONFIG_CROS_EC_LPC)		+= cros_ec_lpcs.o
 obj-$(CONFIG_CROS_EC_PROTO)		+= cros_ec_proto.o
 
 wilco_ec-objs				:= wilco_ec_mailbox.o wilco_ec_event.o \
-					   wilco_ec_rtc.o wilco_ec_sysfs.o
+					   wilco_ec_rtc.o wilco_ec_legacy.o \
+					   wilco_ec_sysfs.o
 obj-$(CONFIG_WILCO_EC)			+= wilco_ec.o
