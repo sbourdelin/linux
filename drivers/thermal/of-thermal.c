@@ -443,7 +443,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
 }
 
 /**
- * thermal_zone_of_sensor_register - registers a sensor to a DT thermal zone
+ * thermal_zone_of_sensor_register_params - registers a sensor to a DT thermal
+ *					zone with thermal zone parameters
  * @dev: a valid struct device pointer of a sensor device. Must contain
  *       a valid .of_node, for the sensor node.
  * @sensor_id: a sensor identifier, in case the sensor IP has more
@@ -451,6 +452,7 @@ thermal_zone_of_add_sensor(struct device_node *zone,
  * @data: a private pointer (owned by the caller) that will be passed
  *        back, when a temperature reading is needed.
  * @ops: struct thermal_zone_of_device_ops *. Must contain at least .get_temp.
+ * @tzp: thermal zone platform parameters
  *
  * This function will search the list of thermal zones described in device
  * tree and look for the zone that refer to the sensor device pointed by
@@ -475,8 +477,9 @@ thermal_zone_of_add_sensor(struct device_node *zone,
  * check the return value with help of IS_ERR() helper.
  */
 struct thermal_zone_device *
-thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
-				const struct thermal_zone_of_device_ops *ops)
+thermal_zone_of_sensor_register_params(struct device *dev, int sensor_id,
+	void *data, const struct thermal_zone_of_device_ops *ops,
+	struct thermal_zone_params *tzp)
 {
 	struct device_node *np, *child, *sensor_np;
 	struct thermal_zone_device *tzd = ERR_PTR(-ENODEV);
@@ -529,6 +532,48 @@ exit:
 	of_node_put(np);
 
 	return tzd;
+}
+EXPORT_SYMBOL_GPL(thermal_zone_of_sensor_register_params);
+
+/**
+ * thermal_zone_of_sensor_register - registers a sensor to a DT thermal zone
+ * @dev: a valid struct device pointer of a sensor device. Must contain
+ *       a valid .of_node, for the sensor node.
+ * @sensor_id: a sensor identifier, in case the sensor IP has more
+ *             than one sensors
+ * @data: a private pointer (owned by the caller) that will be passed
+ *        back, when a temperature reading is needed.
+ * @ops: struct thermal_zone_of_device_ops *. Must contain at least .get_temp.
+ *
+ * This function will search the list of thermal zones described in device
+ * tree and look for the zone that refer to the sensor device pointed by
+ * @dev->of_node as temperature providers. For the zone pointing to the
+ * sensor node, the sensor will be added to the DT thermal zone device.
+ *
+ * The thermal zone temperature is provided by the @get_temp function
+ * pointer. When called, it will have the private pointer @data back.
+ *
+ * The thermal zone temperature trend is provided by the @get_trend function
+ * pointer. When called, it will have the private pointer @data back.
+ *
+ * TODO:
+ * 01 - This function must enqueue the new sensor instead of using
+ * it as the only source of temperature values.
+ *
+ * 02 - There must be a way to match the sensor with all thermal zones
+ * that refer to it.
+ *
+ * Return: On success returns a valid struct thermal_zone_device,
+ * otherwise, it returns a corresponding ERR_PTR(). Caller must
+ * check the return value with help of IS_ERR() helper.
+ */
+
+struct thermal_zone_device *
+thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
+				const struct thermal_zone_of_device_ops *ops)
+{
+	return thermal_zone_of_sensor_register_params(dev, sensor_id, data,
+						      ops, NULL);
 }
 EXPORT_SYMBOL_GPL(thermal_zone_of_sensor_register);
 
