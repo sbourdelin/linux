@@ -387,6 +387,10 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
 struct thermal_zone_device *devm_thermal_zone_of_sensor_register(
 		struct device *dev, int id, void *data,
 		const struct thermal_zone_of_device_ops *ops);
+struct thermal_zone_device *devm_thermal_zone_of_sensor_register_params(
+		struct device *dev, int id, void *data,
+		const struct thermal_zone_of_device_ops *ops,
+		struct thermal_zone_params *tzp);
 void devm_thermal_zone_of_sensor_unregister(struct device *dev,
 					    struct thermal_zone_device *tz);
 #else
@@ -414,6 +418,15 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
 static inline struct thermal_zone_device *devm_thermal_zone_of_sensor_register(
 		struct device *dev, int id, void *data,
 		const struct thermal_zone_of_device_ops *ops)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline struct thermal_zone_device *
+	devm_thermal_zone_of_sensor_register_params(
+		struct device *dev, int id, void *data,
+		const struct thermal_zone_of_device_ops *ops,
+		struct thermal_zone_params *tzp)
 {
 	return ERR_PTR(-ENODEV);
 }
