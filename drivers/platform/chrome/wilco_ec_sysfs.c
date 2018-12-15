@@ -18,6 +18,7 @@
 #include "wilco_ec.h"
 #include "wilco_ec_legacy.h"
 #include "wilco_ec_properties.h"
+#include "wilco_ec_adv_power.h"
 
 #define WILCO_EC_ATTR_RO(_name)						\
 __ATTR(_name, 0444, wilco_ec_##_name##_show, NULL)
@@ -82,6 +83,70 @@ struct attribute *wilco_ec_property_attrs[] = {
 ATTRIBUTE_GROUPS(wilco_ec_property);
 struct kobject *prop_dir_kobj;
 
+/* Make peakshift attrs, which live inside GOOG000C:00/properties/peakshift */
+
+struct kobj_attribute kobj_attr_peakshift_battery_threshold =
+	__ATTR(battery_threshold, 0644, wilco_ec_peakshift_batt_thresh_show,
+	       wilco_ec_peakshift_batt_thresh_store);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, prop_attr_peakshift, enable,
+			      PID_PEAKSHIFT);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_sunday, sunday,
+		    PID_PEAKSHIFT_SUNDAY_HOURS);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_monday, monday,
+		    PID_PEAKSHIFT_MONDAY_HOURS);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_tuesday, tuesday,
+		    PID_PEAKSHIFT_TUESDAY_HOURS);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_wednesday, wednesday,
+		    PID_PEAKSHIFT_WEDNESDAY_HOURS);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_thursday, thursday,
+		    PID_PEAKSHIFT_THURSDAY_HOURS);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_friday, friday,
+		    PID_PEAKSHIFT_FRIDAY_HOURS);
+PEAKSHIFT_ATTRIBUTE(prop_attr_peakshift_saturday, saturday,
+		    PID_PEAKSHIFT_SATURDAY_HOURS);
+
+struct attribute *wilco_ec_peakshift_attrs[] = {
+	&kobj_attr_peakshift_battery_threshold.attr,
+	&prop_attr_peakshift.kobj_attr.attr,
+	&prop_attr_peakshift_sunday.kobj_attr.attr,
+	&prop_attr_peakshift_monday.kobj_attr.attr,
+	&prop_attr_peakshift_tuesday.kobj_attr.attr,
+	&prop_attr_peakshift_wednesday.kobj_attr.attr,
+	&prop_attr_peakshift_thursday.kobj_attr.attr,
+	&prop_attr_peakshift_friday.kobj_attr.attr,
+	&prop_attr_peakshift_saturday.kobj_attr.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(wilco_ec_peakshift);
+struct kobject *peakshift_dir_kobj;
+
+/**
+ * Make peakshift attrs, which live inside
+ * GOOG000C:00/properties/advanced_battery_charging
+ */
+
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, prop_attr_abc, enable, PID_ABC_MODE);
+ABC_ATTRIBUTE(prop_attr_abc_sunday, sunday, PID_ABC_SUNDAY_HOURS);
+ABC_ATTRIBUTE(prop_attr_abc_monday, monday, PID_ABC_MONDAY_HOURS);
+ABC_ATTRIBUTE(prop_attr_abc_tuesday, tuesday, PID_ABC_TUESDAY_HOURS);
+ABC_ATTRIBUTE(prop_attr_abc_wednesday, wednesday, PID_ABC_WEDNESDAY_HOURS);
+ABC_ATTRIBUTE(prop_attr_abc_thursday, thursday, PID_ABC_THURSDAY_HOURS);
+ABC_ATTRIBUTE(prop_attr_abc_friday, friday, PID_ABC_FRIDAY_HOURS);
+ABC_ATTRIBUTE(prop_attr_abc_saturday, saturday, PID_ABC_SATURDAY_HOURS);
+
+struct attribute *wilco_ec_adv_batt_charging_attrs[] = {
+	&prop_attr_abc.kobj_attr.attr,
+	&prop_attr_abc_sunday.kobj_attr.attr,
+	&prop_attr_abc_monday.kobj_attr.attr,
+	&prop_attr_abc_tuesday.kobj_attr.attr,
+	&prop_attr_abc_wednesday.kobj_attr.attr,
+	&prop_attr_abc_thursday.kobj_attr.attr,
+	&prop_attr_abc_friday.kobj_attr.attr,
+	&prop_attr_abc_saturday.kobj_attr.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(wilco_ec_adv_batt_charging);
+struct kobject *adv_batt_charging_dir_kobj;
 
 /**
  * wilco_ec_sysfs_init() - Initialize the sysfs directories and attributes
@@ -112,9 +177,42 @@ int wilco_ec_sysfs_init(struct wilco_ec_device *ec)
 	if (ret)
 		goto rm_properties_dir;
 
+	// add the directory for adv batt charging into the properties directory
+	adv_batt_charging_dir_kobj = kobject_create_and_add(
+					"advanced_battery_charging",
+					prop_dir_kobj);
+	if (!adv_batt_charging_dir_kobj)
+		goto rm_properties_attrs;
+
+	// add the adv batt charging attributes into the abc directory
+	ret = sysfs_create_groups(adv_batt_charging_dir_kobj,
+				  wilco_ec_adv_batt_charging_groups);
+	if (ret)
+		goto rm_abc_dir;
+
+	// add the directory for peakshift into the properties directory
+	peakshift_dir_kobj = kobject_create_and_add("peakshift", prop_dir_kobj);
+	if (!peakshift_dir_kobj)
+		goto rm_abc_attrs;
+
+	// add the peakshift attributes into the peakshift directory
+	ret = sysfs_create_groups(peakshift_dir_kobj,
+				  wilco_ec_peakshift_groups);
+	if (ret)
+		goto rm_peakshift_dir;
+
 	return 0;
 
 /* Go upwards through the directory structure, cleaning up */
+rm_peakshift_dir:
+	kobject_put(peakshift_dir_kobj);
+rm_abc_attrs:
+	sysfs_remove_groups(adv_batt_charging_dir_kobj,
+			    wilco_ec_adv_batt_charging_groups);
+rm_abc_dir:
+	kobject_put(adv_batt_charging_dir_kobj);
+rm_properties_attrs:
+	sysfs_remove_groups(prop_dir_kobj, wilco_ec_property_groups);
 rm_properties_dir:
 	kobject_put(prop_dir_kobj);
 rm_toplevel_attrs:
@@ -129,6 +227,11 @@ void wilco_ec_sysfs_remove(struct wilco_ec_device *ec)
 	struct device *dev = ec->dev;
 
 	/* go upwards through the directory structure */
+	sysfs_remove_groups(peakshift_dir_kobj, wilco_ec_peakshift_groups);
+	kobject_put(peakshift_dir_kobj);
+	sysfs_remove_groups(adv_batt_charging_dir_kobj,
+			    wilco_ec_adv_batt_charging_groups);
+	kobject_put(adv_batt_charging_dir_kobj);
 	sysfs_remove_groups(prop_dir_kobj, wilco_ec_property_groups);
 	kobject_put(prop_dir_kobj);
 	sysfs_remove_groups(&dev->kobj, wilco_ec_toplevel_groups);
