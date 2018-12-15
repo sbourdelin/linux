@@ -15,6 +15,7 @@
 #include <linux/string.h>
 
 #include "thermal_core.h"
+#include "thermal_hwmon.h"
 
 /***   Private data structures to represent thermal device tree data ***/
 
@@ -518,8 +519,15 @@ thermal_zone_of_sensor_register_params(struct device *dev, int sensor_id,
 		if (sensor_specs.np == sensor_np && id == sensor_id) {
 			tzd = thermal_zone_of_add_sensor(child, sensor_np,
 							 data, ops);
-			if (!IS_ERR(tzd))
+			if (!IS_ERR(tzd)) {
+				tzd->tzp = tzp;
 				tzd->ops->set_mode(tzd, THERMAL_DEVICE_ENABLED);
+				if (!tzp || !tzp->no_hwmon) {
+					ret = thermal_add_hwmon_sysfs(tzd);
+					if (ret)
+						tzd = ERR_PTR(ret);
+				}
+			}
 
 			of_node_put(sensor_specs.np);
 			of_node_put(child);
@@ -601,6 +609,8 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
 		return;
 
 	tz = tzd->devdata;
+
+	thermal_remove_hwmon_sysfs(tzd);
 
 	/* no __thermal_zone, nothing to be done */
 	if (!tz)
