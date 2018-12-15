@@ -60,6 +60,10 @@ struct memblock_region {
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
 	int nid;
 #endif
+#ifdef CONFIG_HAVE_MEMBLOCK_CACHE_INFO
+	phys_addr_t cache_size;
+	bool direct_mapped;
+#endif
 };
 
 /**
@@ -316,6 +320,38 @@ static inline int memblock_get_region_node(const struct memblock_region *r)
 	return 0;
 }
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+
+#ifdef CONFIG_HAVE_MEMBLOCK_CACHE_INFO
+int memblock_set_sidecache(phys_addr_t base, phys_addr_t size,
+			   phys_addr_t cache_size, bool direct_mapped);
+
+static inline bool memblock_sidecache_direct_mapped(struct memblock_region *m)
+{
+	return m->direct_mapped;
+}
+
+static inline phys_addr_t memblock_sidecache_size(struct memblock_region *m)
+{
+	return m->cache_size;
+}
+#else
+static inline int memblock_set_sidecache(phys_addr_t base, phys_addr_t size,
+					 phys_addr_t cache_size,
+					 bool direct_mapped)
+{
+	return 0;
+}
+
+static inline phys_addr_t memblock_sidecache_size(struct memblock_region *m)
+{
+	return 0;
+}
+
+static inline bool memblock_sidecache_direct_mapped(struct memblock_region *m)
+{
+	return false;
+}
+#endif /* CONFIG_HAVE_MEMBLOCK_CACHE_INFO */
 
 /* Flags for memblock allocation APIs */
 #define MEMBLOCK_ALLOC_ANYWHERE	(~(phys_addr_t)0)

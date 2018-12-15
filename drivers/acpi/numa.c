@@ -40,6 +40,12 @@ static int pxm_to_node_map[MAX_PXM_DOMAINS]
 static int node_to_pxm_map[MAX_NUMNODES]
 			= { [0 ... MAX_NUMNODES - 1] = PXM_INVAL };
 
+struct mem_cacheinfo {
+	phys_addr_t size;
+	bool direct_mapped;
+};
+static struct mem_cacheinfo side_cached_pxms[MAX_PXM_DOMAINS] __initdata;
+
 unsigned char acpi_srat_revision __initdata;
 int acpi_numa __initdata;
 
@@ -262,6 +268,8 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	u64 start, end;
 	u32 hotpluggable;
 	int node, pxm;
+	u64 cache_size;
+	bool direct;
 
 	if (srat_disabled())
 		goto out_err;
@@ -306,6 +314,13 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	/* Mark hotplug range in memblock. */
 	if (hotpluggable && memblock_mark_hotplug(start, ma->length))
 		pr_warn("SRAT: Failed to mark hotplug range [mem %#010Lx-%#010Lx] in memblock\n",
+			(unsigned long long)start, (unsigned long long)end - 1);
+
+	cache_size = side_cached_pxms[pxm].size;
+	direct = side_cached_pxms[pxm].direct_mapped;
+	if (cache_size &&
+	    memblock_set_sidecache(start, ma->length, cache_size, direct))
+		pr_warn("SRAT: Failed to mark side cached range [mem %#010Lx-%#010Lx] in memblock\n",
 			(unsigned long long)start, (unsigned long long)end - 1);
 
 	max_possible_pfn = max(max_possible_pfn, PFN_UP(end - 1));
@@ -411,6 +426,18 @@ acpi_parse_memory_affinity(union acpi_subtable_headers * header,
 	return 0;
 }
 
+static int __init
+acpi_parse_cache(union acpi_subtable_headers *header, const unsigned long end)
+{
+	struct acpi_hmat_cache *c = (void *)header;
+	u32 attrs = (c->cache_attributes & ACPI_HMAT_CACHE_ASSOCIATIVITY) >> 8;
+
+	if (attrs == ACPI_HMAT_CA_DIRECT_MAPPED)
+		side_cached_pxms[c->memory_PD].direct_mapped = true;
+	side_cached_pxms[c->memory_PD].size += c->cache_size;
+	return 0;
+}
+
 static int __init acpi_parse_srat(struct acpi_table_header *table)
 {
 	struct acpi_table_srat *srat = (struct acpi_table_srat *)table;
@@ -459,6 +486,11 @@ int __init acpi_numa_init(void)
 		acpi_table_parse_entries_array(ACPI_SIG_SRAT,
 					sizeof(struct acpi_table_srat),
 					srat_proc, ARRAY_SIZE(srat_proc), 0);
+
+		acpi_table_parse_entries(ACPI_SIG_HMAT,
+					 sizeof(struct acpi_table_hmat),
+					 ACPI_HMAT_TYPE_CACHE,
+					 acpi_parse_cache, 0);
 
 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
 					    acpi_parse_memory_affinity, 0);
