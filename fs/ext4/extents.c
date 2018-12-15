@@ -1713,6 +1713,25 @@ static int ext4_ext_correct_indexes(handle_t *handle, struct inode *inode,
 	return err;
 }
 
+static int ext4_unwritten_extent_under_io(struct inode *inode,
+		ext4_lblk_t start, unsigned int len)
+{
+	/*
+	 * The check for IO to unwritten extent is somewhat racy as we
+	 * increment i_unwritten / set EXT4_STATE_DIO_UNWRITTEN only after
+	 * dropping i_data_sem. But reserved blocks should save us in that
+	 * case.
+	 */
+	if (atomic_read(&EXT4_I(inode)->i_unwritten) == 0)
+		return 0;
+
+	if (ext4_es_scan_range(inode, &ext4_es_is_under_io, start,
+	    start + len - 1))
+		return 1;
+
+	return 0;
+}
+
 int
 ext4_can_extents_be_merged(struct inode *inode, struct ext4_extent *ex1,
 				struct ext4_extent *ex2)
@@ -1744,8 +1763,9 @@ ext4_can_extents_be_merged(struct inode *inode, struct ext4_extent *ex1,
 	 */
 	if (ext4_ext_is_unwritten(ex1) &&
 	    (ext4_test_inode_state(inode, EXT4_STATE_DIO_UNWRITTEN) ||
-	     atomic_read(&EXT4_I(inode)->i_unwritten) ||
-	     (ext1_ee_len + ext2_ee_len > EXT_UNWRITTEN_MAX_LEN)))
+	    (ext1_ee_len + ext2_ee_len > EXT_UNWRITTEN_MAX_LEN) ||
+	    ext4_unwritten_extent_under_io(inode, le32_to_cpu(ex1->ee_block),
+					   ext1_ee_len + ext2_ee_len)))
 		return 0;
 #ifdef AGGRESSIVE_TEST
 	if (ext1_ee_len >= 4)

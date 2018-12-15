@@ -704,6 +704,16 @@ found:
 		    ext4_es_scan_range(inode, &ext4_es_is_delayed, map->m_lblk,
 				       map->m_lblk + map->m_len - 1))
 			status |= EXTENT_STATUS_DELAYED;
+		/*
+		 * Track unwritten extent under io. When io completes, we'll
+		 * convert unwritten extent to written, ext4_es_insert_extent()
+		 * will be called again to insert this written extent, then
+		 * EXTENT_STATUS_IO will be cleared automatically, see remove
+		 * logic in ext4_es_insert_extent().
+		 */
+		if ((status & EXTENT_STATUS_UNWRITTEN) && (flags &
+		    EXT4_GET_BLOCKS_IO_SUBMIT))
+			status |= EXTENT_STATUS_IO;
 		ret = ext4_es_insert_extent(inode, map->m_lblk, map->m_len,
 					    map->m_pblk, status);
 		if (ret < 0) {
@@ -2526,6 +2536,8 @@ static int mpage_map_and_submit_extent(handle_t *handle,
 	int err;
 	loff_t disksize;
 	int progress = 0;
+	ext4_lblk_t start = 0, end = 0, submitted = 0;
+	ext4_fsblk_t phy_start = 0;
 
 	mpd->io_submit.io_end->offset =
 				((loff_t)map->m_lblk) << inode->i_blkbits;
@@ -2565,13 +2577,27 @@ static int mpage_map_and_submit_extent(handle_t *handle,
 			return err;
 		}
 		progress = 1;
+
+		if (mpd->io_submit.io_end->flag & EXT4_IO_END_UNWRITTEN) {
+			start = mpd->map.m_lblk;
+			end = start + mpd->map.m_len - 1;
+			phy_start = mpd->map.m_pblk;
+		}
 		/*
 		 * Update buffer state, submit mapped pages, and get us new
 		 * extent to map
 		 */
 		err = mpage_map_and_submit_buffers(mpd);
-		if (err < 0)
+		if (err < 0) {
+			submitted = mpd->io_submit.io_end->size >>
+					inode->i_blkbits;
+			if (mpd->io_submit.io_end->flag & EXT4_IO_END_UNWRITTEN
+			    && submitted < (end - start + 1))
+				ext4_es_clear_io_status(inode,
+					start + submitted, end,
+					phy_start + submitted);
 			goto update_disksize;
+		}
 	} while (map->m_len);
 
 update_disksize:

@@ -36,6 +36,7 @@ enum {
 	ES_DELAYED_B,
 	ES_HOLE_B,
 	ES_REFERENCED_B,
+	ES_IO_B,
 	ES_FLAGS
 };
 
@@ -47,11 +48,13 @@ enum {
 #define EXTENT_STATUS_DELAYED	(1 << ES_DELAYED_B)
 #define EXTENT_STATUS_HOLE	(1 << ES_HOLE_B)
 #define EXTENT_STATUS_REFERENCED	(1 << ES_REFERENCED_B)
+#define EXTENT_STATUS_IO	(1 << ES_IO_B)
 
 #define ES_TYPE_MASK	((ext4_fsblk_t)(EXTENT_STATUS_WRITTEN | \
 			  EXTENT_STATUS_UNWRITTEN | \
 			  EXTENT_STATUS_DELAYED | \
-			  EXTENT_STATUS_HOLE) << ES_SHIFT)
+			  EXTENT_STATUS_HOLE | \
+			  EXTENT_STATUS_IO) << ES_SHIFT)
 
 struct ext4_sb_info;
 struct ext4_extent;
@@ -147,6 +150,8 @@ extern bool ext4_es_scan_range(struct inode *inode,
 extern bool ext4_es_scan_clu(struct inode *inode,
 			     int (*matching_fn)(struct extent_status *es),
 			     ext4_lblk_t lblk);
+extern int ext4_es_clear_io_status(struct inode *inode, ext4_lblk_t lblk,
+				   ext4_lblk_t end, ext4_fsblk_t block);
 
 static inline unsigned int ext4_es_status(struct extent_status *es)
 {
@@ -171,6 +176,11 @@ static inline int ext4_es_is_unwritten(struct extent_status *es)
 static inline int ext4_es_is_delayed(struct extent_status *es)
 {
 	return (ext4_es_type(es) & EXTENT_STATUS_DELAYED) != 0;
+}
+
+static inline int ext4_es_is_under_io(struct extent_status *es)
+{
+	return (ext4_es_type(es) & EXTENT_STATUS_IO) != 0;
 }
 
 static inline int ext4_es_is_hole(struct extent_status *es)

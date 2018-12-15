@@ -861,6 +861,38 @@ error:
 }
 
 /*
+ * When writing unwritten extents, we mark EXTENT_STATUS_IO in es,
+ * but if some errors happen and stop submitting IO, also need to
+ * clear EXTENT_STATUS_IO flag.
+ */
+int ext4_es_clear_io_status(struct inode *inode, ext4_lblk_t lblk,
+			    ext4_lblk_t end, ext4_fsblk_t block)
+{
+	struct ext4_es_tree *tree = &EXT4_I(inode)->i_es_tree;
+	struct extent_status *es;
+	unsigned int status;
+	int err = 0;
+
+	read_lock(&EXT4_I(inode)->i_es_lock);
+	es = __es_tree_search(&tree->root, lblk);
+	if (!es || es->es_lblk > end) {
+		read_unlock(&EXT4_I(inode)->i_es_lock);
+		return err;
+	}
+	status = ext4_es_type(es);
+	status &= ~EXTENT_STATUS_IO;
+	read_unlock(&EXT4_I(inode)->i_es_lock);
+
+	/*
+	 * Note ext4_es_insert_extent will remove es firstly and insert new es
+	 * with new status without EXTENT_STATUS_IO.
+	 */
+	err = ext4_es_insert_extent(inode, lblk, end - lblk + 1, block, status);
+	return err;
+}
+
+
+/*
  * ext4_es_cache_extent() inserts information into the extent status
  * tree if and only if there isn't information about the range in
  * question already.
@@ -1331,6 +1363,15 @@ static int es_do_reclaim_extents(struct ext4_inode_info *ei, ext4_lblk_t end,
 		 * fiemap, bigallic, and seek_data/hole need to use it.
 		 */
 		if (ext4_es_is_delayed(es))
+			goto next;
+
+		/*
+		 * We don't reclaim unwritten extent under io because we use
+		 * it to check whether we can merge other unwritten extents
+		 * who are not under io, and when io completes, then we can
+		 * reclaim this extent.
+		 */
+		if (ext4_es_is_under_io(es))
 			goto next;
 		if (ext4_es_is_referenced(es)) {
 			ext4_es_clear_referenced(es);
