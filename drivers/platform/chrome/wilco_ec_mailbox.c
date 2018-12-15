@@ -377,12 +377,23 @@ static int wilco_ec_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	/* Prepare to handle events */
+	if (wilco_ec_event_init(ec) < 0) {
+		dev_err(dev, "Failed to setup event handling\n");
+		wilco_ec_sysfs_remove(ec);
+		cros_ec_lpc_mec_destroy();
+		return -ENODEV;
+	}
+
 	return 0;
 }
 
 static int wilco_ec_remove(struct platform_device *pdev)
 {
 	struct wilco_ec_device *ec = platform_get_drvdata(pdev);
+
+	/* Stop handling EC events */
+	wilco_ec_event_remove(ec);
 
 	/* Remove sysfs attributes */
 	wilco_ec_sysfs_remove(ec);

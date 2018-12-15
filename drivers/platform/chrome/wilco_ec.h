@@ -18,7 +18,9 @@
 #define WILCO_EC_H
 
 #include <linux/device.h>
+#include <linux/input.h>
 #include <linux/kernel.h>
+#include <linux/list.h>
 #include <linux/rtc.h>
 
 /* Normal commands have a maximum 32 bytes of data */
@@ -47,6 +49,22 @@ enum wilco_ec_msg_type {
 };
 
 /**
+ * struct wilco_ec_event - EC extended events.
+ * @lock: Mutex to guard the list of events.
+ * @list: Queue of EC events to be provided to userspace.
+ * @attr: Sysfs attribute for userspace to read events.
+ * @count: Count of events in the queue.
+ * @input: Input device for hotkey events.
+ */
+struct wilco_ec_event {
+	struct mutex lock;
+	struct list_head list;
+	struct bin_attribute attr;
+	size_t count;
+	struct input_dev *input;
+};
+
+/**
  * struct wilco_ec_device - Wilco Embedded Controller handle.
  * @dev: Device handle.
  * @mailbox_lock: Mutex to ensure one mailbox command at a time.
@@ -57,6 +75,7 @@ enum wilco_ec_msg_type {
  *               is used to hold the request and the response.
  * @data_size: Size of the data buffer used for EC communication.
  * @rtc: RTC device handler.
+ * @event: EC extended event handler.
  */
 struct wilco_ec_device {
 	struct device *dev;
@@ -67,6 +86,7 @@ struct wilco_ec_device {
 	void *data_buffer;
 	size_t data_size;
 	struct rtc_device *rtc;
+	struct wilco_ec_event event;
 };
 
 /**
@@ -142,5 +162,19 @@ int wilco_ec_rtc_write(struct device *dev, struct rtc_time *tm);
  * Return: 0 for success or negative error code on failure.
  */
 int wilco_ec_rtc_sync(struct device *dev);
+
+/**
+ * wilco_ec_event_init() - Prepare to handle EC events.
+ * @ec: EC device.
+ *
+ * Return: 0 for success or negative error code on failure.
+ */
+int wilco_ec_event_init(struct wilco_ec_device *ec);
+
+/**
+ * wilco_ec_event_remove() - Remove EC event handler.
+ * @ec: EC device.
+ */
+void wilco_ec_event_remove(struct wilco_ec_device *ec);
 
 #endif /* WILCO_EC_H */
