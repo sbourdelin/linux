@@ -4038,9 +4038,13 @@ ext4_ext_handle_unwritten_extents(handle_t *handle, struct inode *inode,
 	/*
 	 * repeat fallocate creation request
 	 * we already have an unwritten extent
+	 *
+	 * With nodelalloc + dioread_nolock, write can also come here,
+	 * so make sure map is set with new to avoid exposing stale
+	 * data to reads.
 	 */
 	if (flags & EXT4_GET_BLOCKS_UNWRIT_EXT) {
-		map->m_flags |= EXT4_MAP_UNWRITTEN;
+		map->m_flags |= EXT4_MAP_UNWRITTEN | EXT4_MAP_NEW;
 		goto map_out;
 	}
 
