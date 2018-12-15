@@ -49,6 +49,18 @@ config CHROMEOS_TBMC
 	  To compile this driver as a module, choose M here: the
 	  module will be called chromeos_tbmc.
 
+config WILCO_EC
+	tristate "ChromeOS Wilco Embedded Controller"
+	depends on ACPI && (X86 || COMPILE_TEST)
+	select CROS_EC_LPC_MEC
+	help
+	  If you say Y here, you get support for talking to the Chrome OS
+	  Wilco EC over an eSPI bus. This uses a simple byte-level protocol
+	  with a checksum.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called wilco_ec.
+
 config CROS_EC_CTL
         tristate
 
@@ -86,7 +98,7 @@ config CROS_EC_LPC
 
 config CROS_EC_LPC_MEC
 	bool "ChromeOS Embedded Controller LPC Microchip EC (MEC) variant"
-	depends on CROS_EC_LPC
+	depends on CROS_EC_LPC || WILCO_EC
 	default n
 	help
 	  If you say Y here, a variant LPC protocol for the Microchip EC
