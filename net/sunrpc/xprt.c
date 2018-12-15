@@ -1866,9 +1866,7 @@ static void xprt_destroy_cb(struct work_struct *work)
 	rpc_destroy_wait_queue(&xprt->sending);
 	rpc_destroy_wait_queue(&xprt->backlog);
 	kfree(xprt->servername);
-	/*
-	 * Tear down transport state and free the rpc_xprt
-	 */
+	/* Tear down transport state and free the rpc_xprt */
 	xprt->ops->destroy(xprt);
 }
 
@@ -1881,9 +1879,7 @@ static void xprt_destroy(struct rpc_xprt *xprt)
 {
 	dprintk("RPC:       destroying transport %p\n", xprt);
 
-	/*
-	 * Exclude transport connect/disconnect handlers and autoclose
-	 */
+	/* Exclude transport connect/disconnect handlers and autoclose */
 	wait_on_bit_lock(&xprt->state, XPRT_LOCKED, TASK_UNINTERRUPTIBLE);
 
 	del_timer_sync(&xprt->timer);
