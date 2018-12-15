@@ -967,6 +967,7 @@ ssize_t jffs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 	struct jffs2_xattr_ref *ref, **pref;
 	struct jffs2_xattr_datum *xd;
 	const struct xattr_handler *xhandle;
+	char *orig_buffer = buffer;
 	const char *prefix;
 	ssize_t prefix_len, len, rc;
 	int retry = 0;
@@ -977,6 +978,7 @@ ssize_t jffs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 
 	down_read(&c->xattr_sem);
  retry:
+	buffer = orig_buffer;
 	len = 0;
 	for (ref=ic->xref, pref=&ic->xref; ref; pref=&ref->next, ref=ref->next) {
 		BUG_ON(ref->ic != ic);
