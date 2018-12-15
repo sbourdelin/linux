@@ -142,13 +142,32 @@ static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
+/*
+ * Functions that determine the variant of the FAT file system (i.e.,
+ * whether this is FAT12, FAT16 or FAT32.
+ */
+static inline bool IS_FAT12(const struct msdos_sb_info *sbi)
+{
+	return sbi->fat_bits == 12;
+}
+
+static inline bool IS_FAT16(const struct msdos_sb_info *sbi)
+{
+	return sbi->fat_bits == 16;
+}
+
+static inline bool IS_FAT32(const struct msdos_sb_info *sbi)
+{
+	return sbi->fat_bits == 32;
+}
+
 /* Maximum number of clusters */
 static inline u32 MAX_FAT(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	return sbi->fat_bits == 32 ? MAX_FAT32 :
-		sbi->fat_bits == 16 ? MAX_FAT16 : MAX_FAT12;
+	return IS_FAT32(sbi) ? MAX_FAT32 :
+		IS_FAT16(sbi) ? MAX_FAT16 : MAX_FAT12;
 }
 
 static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
@@ -266,7 +285,7 @@ static inline int fat_get_start(const struct msdos_sb_info *sbi,
 				const struct msdos_dir_entry *de)
 {
 	int cluster = le16_to_cpu(de->start);
-	if (sbi->fat_bits == 32)
+	if (IS_FAT32(sbi))
 		cluster |= (le16_to_cpu(de->starthi) << 16);
 	return cluster;
 }
