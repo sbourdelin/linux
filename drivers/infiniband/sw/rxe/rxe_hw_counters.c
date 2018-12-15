@@ -61,21 +61,20 @@ int rxe_ib_get_hw_stats(struct ib_device *ibdev,
 	if (!port || !stats)
 		return -EINVAL;
 
-	for (cnt = 0; cnt  < ARRAY_SIZE(rxe_counter_name); cnt++)
+	for (cnt = 0; cnt  < RXE_NUM_OF_COUNTERS; cnt++)
 		stats->value[cnt] = dev->stats_counters[cnt];
 
-	return ARRAY_SIZE(rxe_counter_name);
+	return RXE_NUM_OF_COUNTERS;
 }
 
 struct rdma_hw_stats *rxe_ib_alloc_hw_stats(struct ib_device *ibdev,
 					    u8 port_num)
 {
-	BUILD_BUG_ON(ARRAY_SIZE(rxe_counter_name) != RXE_NUM_OF_COUNTERS);
 	/* We support only per port stats */
 	if (!port_num)
 		return NULL;
 
 	return rdma_alloc_hw_stats_struct(rxe_counter_name,
-					  ARRAY_SIZE(rxe_counter_name),
+					  RXE_NUM_OF_COUNTERS,
 					  RDMA_HW_STATS_DEFAULT_LIFESPAN);
 }
