@@ -361,11 +361,23 @@ static int wilco_ec_probe(struct platform_device *pdev)
 	cros_ec_lpc_mec_init(ec->io_packet->start,
 			     ec->io_packet->start + EC_MAILBOX_DATA_SIZE);
 
+	/* Create sysfs attributes for userspace interaction */
+	if (wilco_ec_sysfs_init(ec) < 0) {
+		dev_err(dev, "Failed to create sysfs attributes\n");
+		cros_ec_lpc_mec_destroy();
+		return -ENODEV;
+	}
+
 	return 0;
 }
 
 static int wilco_ec_remove(struct platform_device *pdev)
 {
+	struct wilco_ec_device *ec = platform_get_drvdata(pdev);
+
+	/* Remove sysfs attributes */
+	wilco_ec_sysfs_remove(ec);
+
 	/* Teardown cros_ec interface */
 	cros_ec_lpc_mec_destroy();
 

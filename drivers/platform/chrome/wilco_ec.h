@@ -94,4 +94,18 @@ struct wilco_ec_message {
  */
 int wilco_ec_mailbox(struct wilco_ec_device *ec, struct wilco_ec_message *msg);
 
+/**
+ * wilco_ec_sysfs_init() - Create sysfs attributes.
+ * @ec: EC device.
+ *
+ * Return: 0 for success or negative error code on failure.
+ */
+int wilco_ec_sysfs_init(struct wilco_ec_device *ec);
+
+/**
+ * wilco_ec_sysfs_remove() - Remove sysfs attributes.
+ * @ec: EC device.
+ */
+void wilco_ec_sysfs_remove(struct wilco_ec_device *ec);
+
 #endif /* WILCO_EC_H */
