@@ -582,6 +582,7 @@ static int ubifs_write_end(struct file *file, struct address_space *mapping,
 	}
 
 	if (!PagePrivate(page)) {
+		get_page(page);
 		SetPagePrivate(page);
 		atomic_long_inc(&c->dirty_pg_cnt);
 		__set_page_dirty_nobuffers(page);
@@ -959,6 +960,7 @@ static int do_writepage(struct page *page, int len)
 	atomic_long_dec(&c->dirty_pg_cnt);
 	ClearPagePrivate(page);
 	ClearPageChecked(page);
+	put_page(page);
 
 	kunmap(page);
 	unlock_page(page);
@@ -1318,6 +1320,7 @@ static void ubifs_invalidatepage(struct page *page, unsigned int offset,
 	atomic_long_dec(&c->dirty_pg_cnt);
 	ClearPagePrivate(page);
 	ClearPageChecked(page);
+	put_page(page);
 }
 
 int ubifs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
@@ -1487,6 +1490,8 @@ static int ubifs_migrate_page(struct address_space *mapping,
 
 	if (PagePrivate(page)) {
 		ClearPagePrivate(page);
+		put_page(page);
+		get_page(newpage);
 		SetPagePrivate(newpage);
 	}
 
@@ -1513,6 +1518,7 @@ static int ubifs_releasepage(struct page *page, gfp_t unused_gfp_flags)
 	ubifs_assert(c, 0);
 	ClearPagePrivate(page);
 	ClearPageChecked(page);
+	put_page(page);
 	return 1;
 }
 
@@ -1582,6 +1588,7 @@ static vm_fault_t ubifs_vm_page_mkwrite(struct vm_fault *vmf)
 	else {
 		if (!PageChecked(page))
 			ubifs_convert_page_budget(c);
+		get_page(page);
 		SetPagePrivate(page);
 		atomic_long_inc(&c->dirty_pg_cnt);
 		__set_page_dirty_nobuffers(page);
