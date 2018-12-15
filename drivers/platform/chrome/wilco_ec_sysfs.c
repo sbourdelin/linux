@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/ctype.h>
-#include <linux/platform_device.h>
 #include <linux/sysfs.h>
 #include "wilco_ec.h"
 #include "wilco_ec_legacy.h"
+#include "wilco_ec_properties.h"
 
 #define WILCO_EC_ATTR_RO(_name)						\
 __ATTR(_name, 0444, wilco_ec_##_name##_show, NULL)
@@ -48,6 +47,42 @@ static struct attribute *wilco_ec_toplevel_attrs[] = {
 
 ATTRIBUTE_GROUPS(wilco_ec_toplevel);
 
+/* Make property attributes, which will live inside GOOG000C:00/properties/  */
+
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, bool_prop_attr_global_mic_mute_led,
+			      global_mic_mute_led, PID_GLOBAL_MIC_MUTE_LED);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, bool_prop_attr_fn_lock, fn_lock,
+			      PID_FN_LOCK);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, bool_prop_attr_nic, nic, PID_NIC);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, bool_prop_attr_ext_usb_port_en,
+			      ext_usb_port_en, PID_EXT_USB_PORT_EN);
+BOOLEAN_PROPERTY_WO_ATTRIBUTE(OP_SYNC, bool_prop_attr_wireless_sw_wlan,
+			      wireless_sw_wlan, PID_WIRELESS_SW_WLAN);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET,
+			      bool_prop_attr_auto_boot_on_trinity_dock_attach,
+			      auto_boot_on_trinity_dock_attach,
+			      PID_AUTO_BOOT_ON_TRINITY_DOCK_ATTACH);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, bool_prop_attr_ich_azalia_en,
+			      ich_azalia_en, PID_ICH_AZALIA_EN);
+BOOLEAN_PROPERTY_RW_ATTRIBUTE(OP_SET, bool_prop_attr_sign_of_life_kbbl,
+			      sign_of_life_kbbl, PID_SIGN_OF_LIFE_KBBL);
+
+struct attribute *wilco_ec_property_attrs[] = {
+	&bool_prop_attr_global_mic_mute_led.kobj_attr.attr,
+	&bool_prop_attr_fn_lock.kobj_attr.attr,
+	&bool_prop_attr_nic.kobj_attr.attr,
+	&bool_prop_attr_ext_usb_port_en.kobj_attr.attr,
+	&bool_prop_attr_wireless_sw_wlan.kobj_attr.attr,
+	&bool_prop_attr_auto_boot_on_trinity_dock_attach.kobj_attr.attr,
+	&bool_prop_attr_ich_azalia_en.kobj_attr.attr,
+	&bool_prop_attr_sign_of_life_kbbl.kobj_attr.attr,
+	NULL
+};
+
+ATTRIBUTE_GROUPS(wilco_ec_property);
+struct kobject *prop_dir_kobj;
+
+
 /**
  * wilco_ec_sysfs_init() - Initialize the sysfs directories and attributes
  * @dev: The device representing the EC
@@ -64,12 +99,29 @@ int wilco_ec_sysfs_init(struct wilco_ec_device *ec)
 
 	// add the top-level attributes
 	ret = sysfs_create_groups(&dev->kobj, wilco_ec_toplevel_groups);
-	if (ret) {
-		dev_err(dev, "failed to create sysfs filesystem!");
-		return -ENOMEM;
-	}
+	if (ret)
+		goto err;
+
+	// add the directory for properties
+	prop_dir_kobj = kobject_create_and_add("properties", &dev->kobj);
+	if (!prop_dir_kobj)
+		goto rm_toplevel_attrs;
+
+	// add the property attributes into the properties directory
+	ret = sysfs_create_groups(prop_dir_kobj, wilco_ec_property_groups);
+	if (ret)
+		goto rm_properties_dir;
 
 	return 0;
+
+/* Go upwards through the directory structure, cleaning up */
+rm_properties_dir:
+	kobject_put(prop_dir_kobj);
+rm_toplevel_attrs:
+	sysfs_remove_groups(&dev->kobj, wilco_ec_toplevel_groups);
+err:
+	dev_err(dev, "Failed to create sysfs filesystem!");
+	return -ENOMEM;
 }
 
 void wilco_ec_sysfs_remove(struct wilco_ec_device *ec)
@@ -77,5 +129,7 @@ void wilco_ec_sysfs_remove(struct wilco_ec_device *ec)
 	struct device *dev = ec->dev;
 
 	/* go upwards through the directory structure */
+	sysfs_remove_groups(prop_dir_kobj, wilco_ec_property_groups);
+	kobject_put(prop_dir_kobj);
 	sysfs_remove_groups(&dev->kobj, wilco_ec_toplevel_groups);
 }
