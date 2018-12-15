@@ -19,6 +19,7 @@
 #include "wilco_ec_legacy.h"
 #include "wilco_ec_properties.h"
 #include "wilco_ec_adv_power.h"
+#include "wilco_ec_telemetry.h"
 
 #define WILCO_EC_ATTR_RO(_name)						\
 __ATTR(_name, 0444, wilco_ec_##_name##_show, NULL)
@@ -46,7 +47,21 @@ static struct attribute *wilco_ec_toplevel_attrs[] = {
 	NULL
 };
 
-ATTRIBUTE_GROUPS(wilco_ec_toplevel);
+static struct bin_attribute telem_attr = TELEMETRY_BIN_ATTR(telemetry);
+static struct bin_attribute *telem_attrs[] = {
+	&telem_attr,
+	NULL
+};
+
+static const struct attribute_group wilco_ec_toplevel_group = {
+	.attrs = wilco_ec_toplevel_attrs,
+	.bin_attrs = telem_attrs,
+};
+
+static const struct attribute_group *wilco_ec_toplevel_groups[] = {
+	&wilco_ec_toplevel_group,
+	NULL,
+};
 
 /* Make property attributes, which will live inside GOOG000C:00/properties/  */
 

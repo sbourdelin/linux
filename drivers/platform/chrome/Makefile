@@ -17,5 +17,6 @@ wilco_ec-objs				:= wilco_ec_mailbox.o wilco_ec_event.o \
 					   wilco_ec_rtc.o wilco_ec_legacy.o \
 					   wilco_ec_sysfs.o \
 					   wilco_ec_properties.o \
-					   wilco_ec_adv_power.o
+					   wilco_ec_adv_power.o  \
+					   wilco_ec_telemetry.o
 obj-$(CONFIG_WILCO_EC)			+= wilco_ec.o
