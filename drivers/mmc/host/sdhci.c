@@ -36,6 +36,7 @@
 #include <linux/mmc/slot-gpio.h>
 
 #include "sdhci.h"
+#include "cqhci.h"
 
 #define DRIVER_NAME "sdhci"
 
@@ -3353,7 +3354,8 @@ void sdhci_cqe_enable(struct mmc_host *mmc)
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	ctrl &= ~SDHCI_CTRL_DMA_MASK;
-	if (host->flags & SDHCI_USE_64_BIT_DMA)
+	if ((host->flags & SDHCI_USE_64_BIT_DMA) ||
+			(host->quirks2 & SDHCI_QUIRK2_BROKEN_64_BIT_DMA))
 		ctrl |= SDHCI_CTRL_ADMA64;
 	else
 		ctrl |= SDHCI_CTRL_ADMA32;
@@ -3405,6 +3407,20 @@ void sdhci_cqe_disable(struct mmc_host *mmc, bool recovery)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 EXPORT_SYMBOL_GPL(sdhci_cqe_disable);
+
+u32 sdhci_cqhci_irq(struct sdhci_host *host, u32 intmask)
+{
+	int cmd_error = 0;
+	int data_error = 0;
+
+	if (!sdhci_cqe_irq(host, intmask, &cmd_error, &data_error))
+		return intmask;
+
+	cqhci_irq(host->mmc, intmask, cmd_error, data_error);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sdhci_cqhci_irq);
 
 bool sdhci_cqe_irq(struct sdhci_host *host, u32 intmask, int *cmd_error,
 		   int *data_error)
