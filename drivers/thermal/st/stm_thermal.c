@@ -20,7 +20,6 @@
 #include <linux/thermal.h>
 
 #include "../thermal_core.h"
-#include "../thermal_hwmon.h"
 
 /* DTS register offsets */
 #define DTS_CFGR1_OFFSET	0x0
@@ -101,6 +100,10 @@ struct stm_thermal_sensor {
 	unsigned int irq_enabled;
 	void __iomem *base;
 	int t0, fmt0, ramp_coeff;
+};
+
+static struct thermal_zone_params stm_tz_parms = {
+	.no_hwmon	= false,
 };
 
 static irqreturn_t stm_thermal_alarm_irq(int irq, void *sdata)
@@ -652,9 +655,8 @@ static int stm_thermal_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	sensor->th_dev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0,
-							      sensor,
-							      &stm_tz_ops);
+	sensor->th_dev = devm_thermal_zone_of_sensor_register_params(&pdev->dev,
+				0, sensor, &stm_tz_ops, &stm_tz_parms);
 
 	if (IS_ERR(sensor->th_dev)) {
 		dev_err(&pdev->dev, "%s: thermal zone sensor registering KO\n",
@@ -711,15 +713,6 @@ static int stm_thermal_probe(struct platform_device *pdev)
 		goto err_tz;
 	}
 
-	/*
-	 * Thermal_zone doesn't enable hwmon as default,
-	 * enable it here
-	 */
-	sensor->th_dev->tzp->no_hwmon = false;
-	ret = thermal_add_hwmon_sysfs(sensor->th_dev);
-	if (ret)
-		goto err_tz;
-
 	sensor->mode = THERMAL_DEVICE_ENABLED;
 
 	dev_info(&pdev->dev, "%s: Driver initialized successfully\n",
@@ -737,7 +730,6 @@ static int stm_thermal_remove(struct platform_device *pdev)
 	struct stm_thermal_sensor *sensor = platform_get_drvdata(pdev);
 
 	stm_thermal_sensor_off(sensor);
-	thermal_remove_hwmon_sysfs(sensor->th_dev);
 	thermal_zone_of_sensor_unregister(&pdev->dev, sensor->th_dev);
 
 	return 0;
