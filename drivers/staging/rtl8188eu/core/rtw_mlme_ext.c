@@ -22,17 +22,15 @@ static u8 null_addr[ETH_ALEN] = {0, 0, 0, 0, 0, 0};
 /**************************************************
 OUI definitions for the vendor specific IE
 ***************************************************/
-unsigned char RTW_WPA_OUI[] = {0x00, 0x50, 0xf2, 0x01};
-unsigned char WMM_OUI[] = {0x00, 0x50, 0xf2, 0x02};
-unsigned char WPS_OUI[] = {0x00, 0x50, 0xf2, 0x04};
-unsigned char P2P_OUI[] = {0x50, 0x6F, 0x9A, 0x09};
+const u8 RTW_WPA_OUI[] = {0x00, 0x50, 0xf2, 0x01};
+const u8 WPS_OUI[] = {0x00, 0x50, 0xf2, 0x04};
+static const u8 WMM_OUI[] = {0x00, 0x50, 0xf2, 0x02};
+static const u8 P2P_OUI[] = {0x50, 0x6F, 0x9A, 0x09};
 
-unsigned char WMM_PARA_OUI[] = {0x00, 0x50, 0xf2, 0x02, 0x01, 0x01};
+static const u8 WMM_PARA_OUI[] = {0x00, 0x50, 0xf2, 0x02, 0x01, 0x01};
 
-unsigned char WPA_TKIP_CIPHER[4] = {0x00, 0x50, 0xf2, 0x02};
-unsigned char RSN_TKIP_CIPHER[4] = {0x00, 0x0f, 0xac, 0x02};
-
-extern unsigned char REALTEK_96B_IE[];
+const u8 WPA_TKIP_CIPHER[4] = {0x00, 0x50, 0xf2, 0x02};
+const u8 RSN_TKIP_CIPHER[4] = {0x00, 0x0f, 0xac, 0x02};
 
 /********************************************************
 MCS rate definitions
@@ -5210,7 +5208,7 @@ u8 setkey_hdl(struct adapter *padapter, u8 *pbuf)
 	struct setkey_parm *pparm = (struct setkey_parm *)pbuf;
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
-	unsigned char null_sta[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	u8 null_sta[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 	/* main tx key for wep. */
 	if (pparm->set_tx)

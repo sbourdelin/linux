@@ -80,13 +80,8 @@
 #define		_48M_RATE_	10
 #define		_54M_RATE_	11
 
-
-extern unsigned char RTW_WPA_OUI[];
-extern unsigned char WMM_OUI[];
-extern unsigned char WPS_OUI[];
-extern unsigned char P2P_OUI[];
-
-extern unsigned char WMM_PARA_OUI[];
+extern const u8 RTW_WPA_OUI[];
+extern const u8 WPS_OUI[];
 
 /*  Channel Plan Type. */
 /*  Note: */
