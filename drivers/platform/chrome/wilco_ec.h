@@ -19,6 +19,7 @@
 
 #include <linux/device.h>
 #include <linux/kernel.h>
+#include <linux/rtc.h>
 
 /* Normal commands have a maximum 32 bytes of data */
 #define EC_MAILBOX_DATA_SIZE		32
@@ -55,6 +56,7 @@ enum wilco_ec_msg_type {
  * @data_buffer: Buffer used for EC communication.  The same buffer
  *               is used to hold the request and the response.
  * @data_size: Size of the data buffer used for EC communication.
+ * @rtc: RTC device handler.
  */
 struct wilco_ec_device {
 	struct device *dev;
@@ -64,6 +66,7 @@ struct wilco_ec_device {
 	struct resource *io_packet;
 	void *data_buffer;
 	size_t data_size;
+	struct rtc_device *rtc;
 };
 
 /**
@@ -113,5 +116,31 @@ int wilco_ec_sysfs_init(struct wilco_ec_device *ec);
  * @ec: EC device.
  */
 void wilco_ec_sysfs_remove(struct wilco_ec_device *ec);
+
+/**
+ * wilco_ec_rtc_read() - Fill RTC time structure with values from the EC.
+ * @dev: EC device.
+ * @tm: Returns RTC time from EC.
+ *
+ * Return: 0 for success or negative error code on failure.
+ */
+int wilco_ec_rtc_read(struct device *dev, struct rtc_time *tm);
+
+/**
+ * wilco_ec_rtc_write() - Write EC time/date from RTC time structure.
+ * @dev: EC device.
+ * @tm: RTC time to write to EC.
+ *
+ * Return: 0 for success or negative error code on failure.
+ */
+int wilco_ec_rtc_write(struct device *dev, struct rtc_time *tm);
+
+/**
+ * wilco_ec_rtc_sync() - Write EC time/date from system time.
+ * @dev: EC device.
+ *
+ * Return: 0 for success or negative error code on failure.
+ */
+int wilco_ec_rtc_sync(struct device *dev);
 
 #endif /* WILCO_EC_H */

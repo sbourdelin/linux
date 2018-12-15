@@ -33,6 +33,7 @@
 #include <linux/mfd/cros_ec_lpc_mec.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/rtc.h>
 #include "wilco_ec.h"
 
 /* Version of mailbox interface */
@@ -325,6 +326,11 @@ static struct resource *wilco_get_resource(struct platform_device *pdev,
 	return res;
 }
 
+static const struct rtc_class_ops wilco_ec_rtc_ops = {
+	.read_time = wilco_ec_rtc_read,
+	.set_time = wilco_ec_rtc_write,
+};
+
 static int wilco_ec_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -354,6 +360,15 @@ static int wilco_ec_probe(struct platform_device *pdev)
 	/* Initialize cros_ec register interface for communication */
 	cros_ec_lpc_mec_init(ec->io_packet->start,
 			     ec->io_packet->start + EC_MAILBOX_DATA_SIZE);
+
+	/* Install RTC driver */
+	ec->rtc = devm_rtc_device_register(ec->dev, "wilco_ec",
+					   &wilco_ec_rtc_ops, THIS_MODULE);
+	if (IS_ERR(ec->rtc)) {
+		dev_err(dev, "Failed to install RTC driver\n");
+		cros_ec_lpc_mec_destroy();
+		return PTR_ERR(ec->rtc);
+	}
 
 	/* Create sysfs attributes for userspace interaction */
 	if (wilco_ec_sysfs_init(ec) < 0) {
