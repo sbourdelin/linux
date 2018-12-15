@@ -787,7 +787,7 @@ u32 fwht_encode_frame(struct fwht_raw_frame *frm,
 
 	if (frm->components_num == 4) {
 		rlco_max = rlco + size / 2 - 256;
-		encoding = encode_plane(frm->alpha, ref_frm->alpha, &rlco,
+		encoding |= encode_plane(frm->alpha, ref_frm->alpha, &rlco,
 					rlco_max, cf, frm->height, frm->width,
 					frm->luma_alpha_step,
 					is_intra, next_is_intra);
