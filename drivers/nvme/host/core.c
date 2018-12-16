@@ -30,7 +30,7 @@
 #include <asm/unaligned.h>
 
 #define CREATE_TRACE_POINTS
-#include "trace.h"
+#include "trace_core.h"
 
 #include "nvme.h"
 #include "fabrics.h"
