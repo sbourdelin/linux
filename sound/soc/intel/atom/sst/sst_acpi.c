@@ -345,6 +345,18 @@ static int sst_acpi_probe(struct platform_device *pdev)
 	mach->mach_params.acpi_ipc_irq_index =
 		pdata->res_info->acpi_ipc_irq_index;
 
+	/* Fill sst platform data */
+	ctx->pdata = pdata;
+	strcpy(ctx->firmware_name, mach->fw_filename);
+
+	ret = sst_platform_get_resources(ctx);
+	if (ret)
+		return ret;
+
+	ret = sst_context_init(ctx);
+	if (ret < 0)
+		return ret;
+
 	plat_dev = platform_device_register_data(dev, pdata->platform, -1,
 						NULL, 0);
 	if (IS_ERR(plat_dev)) {
@@ -364,18 +376,6 @@ static int sst_acpi_probe(struct platform_device *pdev)
 			mach->drv_name);
 		return PTR_ERR(mdev);
 	}
-
-	/* Fill sst platform data */
-	ctx->pdata = pdata;
-	strcpy(ctx->firmware_name, mach->fw_filename);
-
-	ret = sst_platform_get_resources(ctx);
-	if (ret)
-		return ret;
-
-	ret = sst_context_init(ctx);
-	if (ret < 0)
-		return ret;
 
 	sst_configure_runtime_pm(ctx);
 	platform_set_drvdata(pdev, ctx);
