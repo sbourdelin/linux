@@ -638,8 +638,7 @@ static void pwm_backlight_shutdown(struct platform_device *pdev)
 	pwm_backlight_power_off(pb);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int pwm_backlight_suspend(struct device *dev)
+static int __maybe_unused pwm_bl_suspend(struct device *dev)
 {
 	struct backlight_device *bl = dev_get_drvdata(dev);
 	struct pwm_bl_data *pb = bl_get_data(bl);
@@ -655,7 +654,7 @@ static int pwm_backlight_suspend(struct device *dev)
 	return 0;
 }
 
-static int pwm_backlight_resume(struct device *dev)
+static int __maybe_unused pwm_bl_resume(struct device *dev)
 {
 	struct backlight_device *bl = dev_get_drvdata(dev);
 
@@ -663,21 +662,13 @@ static int pwm_backlight_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
-static const struct dev_pm_ops pwm_backlight_pm_ops = {
-#ifdef CONFIG_PM_SLEEP
-	.suspend = pwm_backlight_suspend,
-	.resume = pwm_backlight_resume,
-	.poweroff = pwm_backlight_suspend,
-	.restore = pwm_backlight_resume,
-#endif
-};
+static SIMPLE_DEV_PM_OPS(pwm_bl_pm_ops, pwm_bl_suspend, pwm_bl_resume);
 
 static struct platform_driver pwm_backlight_driver = {
 	.driver		= {
 		.name		= "pwm-backlight",
-		.pm		= &pwm_backlight_pm_ops,
+		.pm		= &pwm_bl_pm_ops,
 		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
 	},
 	.probe		= pwm_backlight_probe,
