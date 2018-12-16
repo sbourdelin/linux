@@ -12,7 +12,11 @@
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/ion.h>
 #include "ion.h"
+
+static struct ion_chunk_heap_cfg chunk_heap_cfg[MAX_NUM_OF_CHUNK_HEAPS];
+static unsigned int num_of_req_chunk_heaps;
 
 struct ion_chunk_heap {
 	struct ion_heap heap;
@@ -108,15 +112,15 @@ static struct ion_heap_ops chunk_heap_ops = {
 	.unmap_kernel = ion_heap_unmap_kernel,
 };
 
-struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
+static struct ion_heap *ion_chunk_heap_create(struct ion_chunk_heap_cfg *heap_cfg)
 {
 	struct ion_chunk_heap *chunk_heap;
 	int ret;
 	struct page *page;
 	size_t size;
 
-	page = pfn_to_page(PFN_DOWN(heap_data->base));
-	size = heap_data->size;
+	page = pfn_to_page(PFN_DOWN(heap_cfg->base));
+	size = heap_cfg->size;
 
 	ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
 	if (ret)
@@ -126,23 +130,27 @@ struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
 	if (!chunk_heap)
 		return ERR_PTR(-ENOMEM);
 
-	chunk_heap->chunk_size = (unsigned long)heap_data->priv;
+	chunk_heap->chunk_size = heap_cfg->chunk_size;
 	chunk_heap->pool = gen_pool_create(get_order(chunk_heap->chunk_size) +
 					   PAGE_SHIFT, -1);
 	if (!chunk_heap->pool) {
 		ret = -ENOMEM;
 		goto error_gen_pool_create;
 	}
-	chunk_heap->base = heap_data->base;
-	chunk_heap->size = heap_data->size;
+	chunk_heap->base = heap_cfg->base;
+	chunk_heap->size = heap_cfg->size;
+	chunk_heap->heap.name = heap_cfg->heap_name;
 	chunk_heap->allocated = 0;
 
-	gen_pool_add(chunk_heap->pool, chunk_heap->base, heap_data->size, -1);
+	gen_pool_add(chunk_heap->pool, chunk_heap->base, heap_cfg->size, -1);
 	chunk_heap->heap.ops = &chunk_heap_ops;
 	chunk_heap->heap.type = ION_HEAP_TYPE_CHUNK;
 	chunk_heap->heap.flags = ION_HEAP_FLAG_DEFER_FREE;
-	pr_debug("%s: base %pa size %zu\n", __func__,
-		 &chunk_heap->base, heap_data->size);
+
+	pr_info("%s: name %s base %pa size %zu\n", __func__,
+		heap_cfg->heap_name,
+		&heap_cfg->base,
+		heap_cfg->size);
 
 	return &chunk_heap->heap;
 
@@ -151,3 +159,73 @@ error_gen_pool_create:
 	return ERR_PTR(ret);
 }
 
+static int __init setup_heap(char *param)
+{
+	char *at_sign, *coma, *colon;
+	size_t size_to_copy;
+	struct ion_chunk_heap_cfg *cfg;
+
+	do {
+		cfg = &chunk_heap_cfg[num_of_req_chunk_heaps];
+
+		/* heap name */
+		colon = strchr(param, ':');
+		if (!colon)
+			return -EINVAL;
+
+		size_to_copy = min_t(size_t, MAX_CHUNK_HEAP_NAME_SIZE - 1,
+				     (colon - param));
+		strncpy(cfg->heap_name,	param, size_to_copy);
+		cfg->heap_name[size_to_copy] = '\0';
+
+		/* heap size */
+		cfg->size = memparse((colon + 1), &at_sign);
+		if ((colon + 1) == at_sign)
+			return -EINVAL;
+
+		/* heap base addr */
+		if (*at_sign == '@')
+			cfg->base = memparse(at_sign + 1, &coma);
+		else
+			return -EINVAL;
+
+		if (at_sign == coma)
+			return -EINVAL;
+
+		/* Chunk size */
+		cfg->chunk_size = PAGE_SIZE;
+
+		num_of_req_chunk_heaps++;
+
+		/* if one more heap configuration exists */
+		if (*coma == ',')
+			param = coma + 1;
+		else
+			param = NULL;
+	} while (num_of_req_chunk_heaps < MAX_NUM_OF_CHUNK_HEAPS && param);
+
+	return 0;
+}
+
+__setup("ion_chunk_heap=", setup_heap);
+
+int ion_add_chunk_heaps(struct ion_chunk_heap_cfg *cfg,
+			unsigned int num_of_heaps)
+{
+	unsigned int i;
+	struct ion_heap *heap;
+
+	for (i = 0; i < num_of_heaps; i++) {
+		heap = ion_chunk_heap_create(&cfg[i]);
+		if (heap)
+			ion_device_add_heap(heap);
+	}
+	return 0;
+}
+
+static int ion_add_chunk_heaps_from_boot_param(void)
+{
+	return ion_add_chunk_heaps(chunk_heap_cfg, num_of_req_chunk_heaps);
+}
+
+device_initcall(ion_add_chunk_heaps_from_boot_param);
