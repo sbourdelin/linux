@@ -256,12 +256,18 @@ static int pcie_phy_write(struct imx6_pcie *imx6_pcie, int addr, int data)
 	return 0;
 }
 
+static bool imx6_pcie_has_imx6_phy(struct imx6_pcie *imx6_pcie)
+{
+	return imx6_pcie->variant == IMX6Q ||
+	       imx6_pcie->variant == IMX6SX ||
+	       imx6_pcie->variant == IMX6QP;
+}
+
 static void imx6_pcie_reset_phy(struct imx6_pcie *imx6_pcie)
 {
 	u32 tmp;
 
-	if (imx6_pcie->variant == IMX7D ||
-	    imx6_pcie->variant == IMX8MQ)
+	if (!imx6_pcie_has_imx6_phy(imx6_pcie))
 		return;
 
 	pcie_phy_read(imx6_pcie, PHY_RX_OVRD_IN_LO, &tmp);
@@ -637,8 +643,7 @@ static int imx6_setup_phy_mpll(struct imx6_pcie *imx6_pcie)
 	int mult, div;
 	u32 val;
 
-	if (imx6_pcie->variant == IMX7D ||
-	    imx6_pcie->variant == IMX8MQ)
+	if (!imx6_pcie_has_imx6_phy(imx6_pcie))
 		return 0;
 
 	switch (phy_rate) {
