@@ -6823,6 +6823,7 @@ restart:
 		for_each_mem_pfn_range(i, nid, &start_pfn, &end_pfn, NULL) {
 			unsigned long size_pages;
 
+			zone_movable_pfn[nid] &= ~zone_movable_pfn_highestbit;
 			start_pfn = max(start_pfn, zone_movable_pfn[nid]);
 			if (start_pfn >= end_pfn)
 				continue;
@@ -6848,6 +6849,13 @@ restart:
 					 * not double account here
 					 */
 					zone_movable_pfn[nid] = end_pfn;
+
+					/*
+					 * Set highest bit to indicate it is
+					 * used for calculation.
+					 */
+					zone_movable_pfn[nid] |=
+						zone_movable_pfn_highestbit;
 					continue;
 				}
 				start_pfn = usable_startpfn;
@@ -6885,6 +6893,13 @@ restart:
 	usable_nodes--;
 	if (usable_nodes && required_kernelcore > usable_nodes)
 		goto restart;
+
+	/*
+	 * clear zone_movable_pfn if its highest bit is set
+	 */
+	for_each_node_state(nid, N_MEMORY)
+		if (zone_movable_pfn[nid] & zone_movable_pfn_highestbit)
+			zone_movable_pfn[nid] = 0;
 
 out2:
 	/* Align start of ZONE_MOVABLE on all nids to MAX_ORDER_NR_PAGES */
