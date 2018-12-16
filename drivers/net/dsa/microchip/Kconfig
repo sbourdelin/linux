@@ -14,3 +14,9 @@ config NET_DSA_MICROCHIP_KSZ9477_SPI
 	depends on NET_DSA_MICROCHIP_KSZ9477 && SPI
 	help
 	  Select to enable support for registering switches configured through SPI.
+
+config NET_DSA_MICROCHIP_KSZ9477_I2C
+	tristate "KSZ series I2C connected switch driver"
+	depends on NET_DSA_MICROCHIP_KSZ9477 && I2C
+	help
+	  Select to enable support for registering switches configured through I2C.
