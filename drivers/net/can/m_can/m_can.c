@@ -1492,9 +1492,9 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
 		m_can_write(priv, M_CAN_TXBAR, (1 << putidx));
 
 		/* stop network queue if fifo full */
-			if (m_can_tx_fifo_full(priv) ||
-			    m_can_next_echo_skb_occupied(dev, putidx))
-				netif_stop_queue(dev);
+		if (m_can_tx_fifo_full(priv) ||
+		    m_can_next_echo_skb_occupied(dev, putidx))
+			netif_stop_queue(dev);
 	}
 
 	return NETDEV_TX_OK;
