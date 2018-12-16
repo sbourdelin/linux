@@ -729,6 +729,8 @@ static void phy_error(struct phy_device *phydev)
 	phydev->state = PHY_HALTED;
 	mutex_unlock(&phydev->lock);
 
+	phydev_err(phydev, "stopping PHY state machine due to error\n");
+
 	phy_trigger_machine(phydev);
 }
 
