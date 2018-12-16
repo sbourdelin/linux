@@ -588,7 +588,7 @@ static int __fat_readdir(struct inode *inode, struct file *file,
 
 	bh = NULL;
 get_new:
-	if (fat_get_entry(inode, &cpos, &bh, &de) == -1)
+	if (fat_get_entry(inode, &cpos, &bh, &de) == -1 || !de->name[0])
 		goto end_of_dir;
 parse_record:
 	nr_slots = 0;
@@ -916,7 +916,8 @@ int fat_dir_empty(struct inode *dir)
 
 	bh = NULL;
 	cpos = 0;
-	while (fat_get_short_entry(dir, &cpos, &bh, &de) >= 0) {
+	while (fat_get_short_entry(dir, &cpos, &bh, &de) >= 0 &&
+	       de->name[0]) {
 		if (strncmp(de->name, MSDOS_DOT   , MSDOS_NAME) &&
 		    strncmp(de->name, MSDOS_DOTDOT, MSDOS_NAME)) {
 			result = -ENOTEMPTY;
@@ -961,7 +962,7 @@ int fat_scan(struct inode *dir, const unsigned char *name,
 	sinfo->slot_off = 0;
 	sinfo->bh = NULL;
 	while (fat_get_short_entry(dir, &sinfo->slot_off, &sinfo->bh,
-				   &sinfo->de) >= 0) {
+				   &sinfo->de) >= 0 && sinfo->de->name[0]) {
 		if (!strncmp(sinfo->de->name, name, MSDOS_NAME)) {
 			sinfo->slot_off -= sizeof(*sinfo->de);
 			sinfo->nr_slots = 1;
