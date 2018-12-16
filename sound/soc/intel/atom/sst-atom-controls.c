@@ -1531,7 +1531,7 @@ int sst_dsp_init_v2_dpcm(struct snd_soc_component *component)
 	snd_soc_dapm_new_widgets(dapm->card);
 
 	for (i = 0; i < gains; i++) {
-		sst_gains[i].mute = SST_GAIN_MUTE_DEFAULT;
+		sst_gains[i].mute = SST_GAIN_MUTE_DEFAULT ? true : false;
 		sst_gains[i].l_gain = SST_GAIN_VOLUME_DEFAULT;
 		sst_gains[i].r_gain = SST_GAIN_VOLUME_DEFAULT;
 		sst_gains[i].ramp_duration = SST_GAIN_RAMP_DURATION_DEFAULT;
