@@ -18,6 +18,7 @@
  */
 #include <linux/module.h>
 #include <linux/clk.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -978,11 +979,18 @@ static int emmaprp_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id __maybe_unused emmaprp_dt_ids[] = {
+	{ .compatible = "fsl,imx21-emmaprp", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, emmaprp_dt_ids);
+
 static struct platform_driver emmaprp_pdrv = {
 	.probe		= emmaprp_probe,
 	.remove		= emmaprp_remove,
 	.driver		= {
 		.name	= MEM2MEM_NAME,
+		.of_match_table = of_match_ptr(emmaprp_dt_ids),
 	},
 };
 module_platform_driver(emmaprp_pdrv);
