@@ -219,6 +219,8 @@ struct smc_sock {				/* smc sock container */
 						 * started, waiting for unsent
 						 * data to be sent
 						 */
+	struct mutex            clcsock_release_lock;
+						/* protects clcsock */
 };
 
 static inline struct smc_sock *smc_sk(const struct sock *sk)
