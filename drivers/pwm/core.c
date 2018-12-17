@@ -328,6 +328,9 @@ const char *pwm_get_mode_name(unsigned long modebit)
 	if (modebit == PWM_MODE_BIT(COMPLEMENTARY))
 		return "complementary";
 
+	if (modebit == PWM_MODE_BIT(PUSH_PULL))
+		return "push-pull";
+
 	return "normal";
 }
 
