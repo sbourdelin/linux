@@ -4219,6 +4219,7 @@ int btrfs_scrub_dev(struct btrfs_fs_info *fs_info, u64 devid, u64 start,
 	mutex_unlock(&fs_info->scrub_lock);
 
 	if (!is_dev_replace) {
+		btrfs_info(fs_info, "scrub: devid %llu %s", devid, "started");
 		/*
 		 * by holding device list mutex, we can
 		 * kick off writing super in log tree sync.
@@ -4240,6 +4241,10 @@ int btrfs_scrub_dev(struct btrfs_fs_info *fs_info, u64 devid, u64 start,
 
 	if (progress)
 		memcpy(progress, &sctx->stat, sizeof(*progress));
+
+	if (!is_dev_replace)
+		btrfs_info(fs_info, "scrub: devid %llu %s:%d",
+			   devid, ret ? "not finished":"finished", ret);
 
 	mutex_lock(&fs_info->scrub_lock);
 	dev->scrub_ctx = NULL;
