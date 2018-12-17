@@ -402,8 +402,7 @@ out_err:
  * rpcrdma_ia_remove - Handle device driver unload
  * @ia: interface adapter being removed
  *
- * Divest transport H/W resources associated with this adapter,
- * but allow it to be restored later.
+ * Callers must serialize calls to this function.
  */
 void
 rpcrdma_ia_remove(struct rpcrdma_ia *ia)
@@ -434,16 +433,23 @@ rpcrdma_ia_remove(struct rpcrdma_ia *ia)
 	ib_free_cq(ep->rep_attr.send_cq);
 	ep->rep_attr.send_cq = NULL;
 
-	/* The ULP is responsible for ensuring all DMA
-	 * mappings and MRs are gone.
+	/* The ib_drain_qp above guarantees that all posted
+	 * Receives have flushed, which returns the transport's
+	 * rpcrdma_reps to the rb_recv_bufs list.
 	 */
 	list_for_each_entry(rep, &buf->rb_recv_bufs, rr_list)
 		rpcrdma_dma_unmap_regbuf(rep->rr_rdmabuf);
+
+	/* DMA mapping happens in ->send_request with the
+	 * transport send lock held. Our caller is holding
+	 * the transport send lock.
+	 */
 	list_for_each_entry(req, &buf->rb_allreqs, rl_all) {
 		rpcrdma_dma_unmap_regbuf(req->rl_rdmabuf);
 		rpcrdma_dma_unmap_regbuf(req->rl_sendbuf);
 		rpcrdma_dma_unmap_regbuf(req->rl_recvbuf);
 	}
+
 	rpcrdma_mrs_destroy(buf);
 	ib_dealloc_pd(ia->ri_pd);
 	ia->ri_pd = NULL;
