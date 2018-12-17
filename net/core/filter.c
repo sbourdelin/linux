@@ -3415,6 +3415,17 @@ static int __bpf_tx_xdp_map(struct net_device *dev_rx, void *fwd,
 	return 0;
 }
 
+static void xdp_do_flush_xsk(struct bpf_redirect_info *ri)
+{
+#ifdef CONFIG_XDP_SOCKETS
+	struct xdp_sock *xsk = ri->xsk_to_flush;
+
+	ri->xsk_to_flush = NULL;
+	if (xsk)
+		xsk_flush(xsk);
+#endif
+}
+
 void xdp_do_flush_map(void)
 {
 	struct bpf_redirect_info *ri = this_cpu_ptr(&bpf_redirect_info);
@@ -3436,6 +3447,8 @@ void xdp_do_flush_map(void)
 			break;
 		}
 	}
+
+	xdp_do_flush_xsk(ri);
 }
 EXPORT_SYMBOL_GPL(xdp_do_flush_map);
 
@@ -3501,6 +3514,30 @@ err:
 	return err;
 }
 
+#ifdef CONFIG_XDP_SOCKETS
+static int xdp_do_xsk_redirect(struct net_device *dev, struct xdp_buff *xdp,
+			       struct bpf_prog *xdp_prog,
+			       struct bpf_redirect_info *ri)
+{
+	struct xdp_sock *xsk = ri->xsk;
+	int err;
+
+	ri->xsk = NULL;
+	ri->xsk_to_flush = xsk;
+
+	err = xsk_attached_rcv(xsk, xdp);
+	if (unlikely(err))
+		goto err;
+
+	_trace_xsk_redirect(dev, xdp_prog, xdp);
+	return 0;
+
+err:
+	_trace_xsk_redirect_err(dev, xdp_prog, xdp, err);
+	return err;
+}
+#endif /* CONFIG_XDP_SOCKETS */
+
 int xdp_do_redirect(struct net_device *dev, struct xdp_buff *xdp,
 		    struct bpf_prog *xdp_prog)
 {
@@ -3510,6 +3547,10 @@ int xdp_do_redirect(struct net_device *dev, struct xdp_buff *xdp,
 	if (likely(map))
 		return xdp_do_redirect_map(dev, xdp, xdp_prog, map, ri);
 
+#ifdef CONFIG_XDP_SOCKETS
+	if (ri->xsk)
+		return xdp_do_xsk_redirect(dev, xdp, xdp_prog, ri);
+#endif
 	return xdp_do_redirect_slow(dev, xdp, xdp_prog, ri);
 }
 EXPORT_SYMBOL_GPL(xdp_do_redirect);
@@ -3560,6 +3601,33 @@ err:
 	return err;
 }
 
+#ifdef CONFIG_XDP_SOCKETS
+static int xdp_do_generic_xsk_redirect(struct net_device *dev,
+				       struct xdp_buff *xdp,
+				       struct bpf_prog *xdp_prog,
+				       struct sk_buff *skb)
+{
+	struct bpf_redirect_info *ri = this_cpu_ptr(&bpf_redirect_info);
+	struct xdp_sock *xsk = ri->xsk;
+	int err;
+
+	ri->xsk = NULL;
+	ri->xsk_to_flush = NULL;
+
+	err = xsk_generic_attached_rcv(xsk, xdp);
+	if (err)
+		goto err;
+
+	consume_skb(skb);
+	_trace_xsk_redirect(dev, xdp_prog, xdp);
+	return 0;
+
+err:
+	_trace_xsk_redirect_err(dev, xdp_prog, xdp, err);
+	return err;
+}
+#endif /* CONFIG_XDP_SOCKETS */
+
 int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
 			    struct xdp_buff *xdp, struct bpf_prog *xdp_prog)
 {
@@ -3572,6 +3640,11 @@ int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
 	if (map)
 		return xdp_do_generic_redirect_map(dev, skb, xdp, xdp_prog,
 						   map);
+#ifdef CONFIG_XDP_SOCKETS
+	if (ri->xsk)
+		return xdp_do_generic_xsk_redirect(dev, xdp, xdp_prog, skb);
+#endif
+
 	ri->ifindex = 0;
 	fwd = dev_get_by_index_rcu(dev_net(dev), index);
 	if (unlikely(!fwd)) {
@@ -3638,6 +3711,29 @@ static const struct bpf_func_proto bpf_xdp_redirect_map_proto = {
 	.arg2_type      = ARG_ANYTHING,
 	.arg3_type      = ARG_ANYTHING,
 };
+
+#ifdef CONFIG_XDP_SOCKETS
+BPF_CALL_1(bpf_xdp_xsk_redirect, struct xdp_buff *, xdp)
+{
+	struct bpf_redirect_info *ri = this_cpu_ptr(&bpf_redirect_info);
+	struct xdp_sock *xsk;
+
+	xsk = READ_ONCE(xdp->rxq->dev->_rx[xdp->rxq->queue_index].xsk);
+	if (xsk) {
+		ri->xsk = xsk;
+		return XDP_REDIRECT;
+	}
+
+	return XDP_PASS;
+}
+
+static const struct bpf_func_proto bpf_xdp_xsk_redirect_proto = {
+	.func           = bpf_xdp_xsk_redirect,
+	.gpl_only       = false,
+	.ret_type       = RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+};
+#endif /* CONFIG_XDP_SOCKETS */
 
 static unsigned long bpf_skb_copy(void *dst_buff, const void *skb,
 				  unsigned long off, unsigned long len)
@@ -5511,6 +5607,10 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_xdp_sk_lookup_tcp_proto;
 	case BPF_FUNC_sk_release:
 		return &bpf_sk_release_proto;
+#endif
+#ifdef CONFIG_XDP_SOCKETS
+	case BPF_FUNC_xsk_redirect:
+		return &bpf_xdp_xsk_redirect_proto;
 #endif
 	default:
 		return bpf_base_func_proto(func_id);

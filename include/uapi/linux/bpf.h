@@ -2319,6 +2319,17 @@ union bpf_attr {
  *		"**y**".
  *	Return
  *		0
+ *
+ * int bpf_xsk_redirect(struct xdp_buff *xdp_md)
+ *	 Description
+ *		Redirect the packet to the attached XDP socket, if any.
+ *		An XDP socket can be attached to a network interface Rx
+ *		queue by passing the XDP_ATTACH option at bind point of
+ *		the socket.
+ *
+ *	Return
+ *		**XDP_REDIRECT** if there is an XDP socket attached to the Rx
+ *		queue receiving the frame, otherwise **XDP_PASS**.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -2413,7 +2424,8 @@ union bpf_attr {
 	FN(map_peek_elem),		\
 	FN(msg_push_data),		\
 	FN(msg_pop_data),		\
-	FN(rc_pointer_rel),
+	FN(rc_pointer_rel),		\
+	FN(xsk_redirect),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call

@@ -158,6 +158,67 @@ struct _bpf_dtab_netdev {
 	 trace_xdp_redirect_map_err(dev, xdp, devmap_ifindex(fwd, map),	\
 				    err, map, idx)
 
+DECLARE_EVENT_CLASS(xsk_redirect_template,
+
+	TP_PROTO(const struct net_device *dev,
+		 const struct bpf_prog *xdp,
+		 int err,
+		 struct xdp_buff *xbuff),
+
+	TP_ARGS(dev, xdp, err, xbuff),
+
+	TP_STRUCT__entry(
+		__field(int, prog_id)
+		__field(u32, act)
+		__field(int, ifindex)
+		__field(int, err)
+		__field(u32, queue_index)
+		__field(enum xdp_mem_type, mem_type)
+	),
+
+	TP_fast_assign(
+		__entry->prog_id	= xdp->aux->id;
+		__entry->act		= XDP_REDIRECT;
+		__entry->ifindex	= dev->ifindex;
+		__entry->err		= err;
+		__entry->queue_index	= xbuff->rxq->queue_index;
+		__entry->mem_type	= xbuff->rxq->mem.type;
+	),
+
+	TP_printk("prog_id=%d action=%s ifindex=%d err=%d queue_index=%d"
+		  " mem_type=%d",
+		  __entry->prog_id,
+		  __print_symbolic(__entry->act, __XDP_ACT_SYM_TAB),
+		  __entry->ifindex,
+		  __entry->err,
+		  __entry->queue_index,
+		  __entry->mem_type)
+);
+
+DEFINE_EVENT(xsk_redirect_template, xsk_redirect,
+	TP_PROTO(const struct net_device *dev,
+		 const struct bpf_prog *xdp,
+		 int err,
+		 struct xdp_buff *xbuff),
+
+	TP_ARGS(dev, xdp, err, xbuff)
+);
+
+DEFINE_EVENT(xsk_redirect_template, xsk_redirect_err,
+	TP_PROTO(const struct net_device *dev,
+		 const struct bpf_prog *xdp,
+		 int err,
+		 struct xdp_buff *xbuff),
+
+	TP_ARGS(dev, xdp, err, xbuff)
+);
+
+#define _trace_xsk_redirect(dev, xdp, xbuff)		\
+	 trace_xsk_redirect(dev, xdp, 0, xbuff)
+
+#define _trace_xsk_redirect_err(dev, xdp, xbuff, err)	\
+	 trace_xsk_redirect_err(dev, xdp, err, xbuff)
+
 TRACE_EVENT(xdp_cpumap_kthread,
 
 	TP_PROTO(int map_id, unsigned int processed,  unsigned int drops,
