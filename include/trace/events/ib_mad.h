@@ -251,6 +251,50 @@ TRACE_EVENT(ib_mad_recv_done_handler,
 	)
 );
 
+DECLARE_EVENT_CLASS(ib_mad_agent_template,
+	TP_PROTO(struct ib_mad_agent_private *agent),
+	TP_ARGS(agent),
+
+	TP_STRUCT__entry(
+		__array(char,           dev_name, IB_DEVICE_NAME_MAX)
+		__field(u8,             port_num)
+		__field(u32,            hi_tid)
+		__field(u8,             mgmt_class)
+		__field(u8,             mgmt_class_version)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->dev_name, agent->agent.device->name, IB_DEVICE_NAME_MAX);
+		__entry->port_num = agent->agent.port_num;
+		__entry->hi_tid = agent->agent.hi_tid;
+
+		if (agent->reg_req) {
+			__entry->mgmt_class = agent->reg_req->mgmt_class;
+			__entry->mgmt_class_version = agent->reg_req->mgmt_class_version;
+		} else {
+			__entry->mgmt_class = 0;
+			__entry->mgmt_class_version = 0;
+		}
+	),
+
+	TP_printk("%s:%d mad agent : hi_tid 0x%08x class 0x%02x class_ver 0x%02x",
+		__entry->dev_name, __entry->port_num,
+		__entry->hi_tid, __entry->mgmt_class, __entry->mgmt_class_version
+	)
+);
+DEFINE_EVENT(ib_mad_agent_template, ib_mad_recv_done_agent,
+	TP_PROTO(struct ib_mad_agent_private *agent),
+	TP_ARGS(agent));
+DEFINE_EVENT(ib_mad_agent_template, ib_mad_send_done_agent,
+	TP_PROTO(struct ib_mad_agent_private *agent),
+	TP_ARGS(agent));
+DEFINE_EVENT(ib_mad_agent_template, ib_mad_create_agent,
+	TP_PROTO(struct ib_mad_agent_private *agent),
+	TP_ARGS(agent));
+DEFINE_EVENT(ib_mad_agent_template, ib_mad_unregister_agent,
+	TP_PROTO(struct ib_mad_agent_private *agent),
+	TP_ARGS(agent));
+
 
 #endif /* _TRACE_IB_MAD_H */
 
