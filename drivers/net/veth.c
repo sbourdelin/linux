@@ -25,6 +25,10 @@
 #include <linux/ptr_ring.h>
 #include <linux/bpf_trace.h>
 #include <linux/net_tstamp.h>
+#include <net/xdp_sock.h>
+#include <linux/mm.h>
+#include <linux/slab.h>
+#include <net/page_pool.h>
 
 #define DRV_NAME	"veth"
 #define DRV_VERSION	"1.0"
@@ -53,6 +57,7 @@ struct veth_rq {
 	bool			rx_notify_masked;
 	struct ptr_ring		xdp_ring;
 	struct xdp_rxq_info	xdp_rxq;
+	struct xdp_umem *xsk_umem;
 };
 
 struct veth_priv {
@@ -61,6 +66,11 @@ struct veth_priv {
 	struct bpf_prog		*_xdp_prog;
 	struct veth_rq		*rq;
 	unsigned int		requested_headroom;
+
+	/* AF_XDP zero-copy */
+	struct xdp_umem **xsk_umems;
+	u16 num_xsk_umems_used;
+	u16 num_xsk_umems;
 };
 
 /*
@@ -742,10 +752,87 @@ static int veth_poll(struct napi_struct *napi, int budget)
 	struct veth_rq *rq =
 		container_of(napi, struct veth_rq, xdp_napi);
 	unsigned int xdp_xmit = 0;
-	int done;
+	int tx_budget = budget;
+	int done = 0;
 
+	/* tx: use netif_tx_napi_add or here? */
+	while (rq->xsk_umem && tx_budget--) {
+		struct veth_priv *priv, *peer_priv;
+		struct net_device *dev, *peer_dev;
+		unsigned int inner_xdp_xmit = 0;
+		unsigned int metasize = 0;
+		struct veth_rq *peer_rq;
+		struct xdp_frame *xdpf;
+		bool dropped = false;
+		struct sk_buff *skb;
+		struct page *page;
+		char *vaddr;
+		void *addr;
+		u32 len;
+
+		if (!xsk_umem_consume_tx_virtual(rq->xsk_umem, &vaddr, &len))
+			break;
+
+		page = dev_alloc_page();
+		if (!page)
+			return -ENOMEM;
+
+		addr = page_to_virt(page);
+		xdpf = addr;
+		memset(xdpf, 0, sizeof(*xdpf));
+
+		addr += sizeof(*xdpf);
+		memcpy(addr, vaddr, len);
+
+		xdpf->data = addr + metasize;
+		xdpf->len = len;
+		xdpf->headroom = 0;
+		xdpf->metasize = metasize;
+		xdpf->mem.type = MEM_TYPE_PAGE_SHARED;
+
+		/* Invoke peer rq to rcv */
+		dev = rq->dev;
+		priv = netdev_priv(dev);
+		peer_dev = priv->peer;
+		peer_priv = netdev_priv(peer_dev);
+		peer_rq = peer_priv->rq;
+
+		/* put into peer rq */
+		skb = veth_xdp_rcv_one(peer_rq, xdpf, &inner_xdp_xmit);
+		if (!skb) {
+			/* Peer side has XDP program attached */
+			if (inner_xdp_xmit & VETH_XDP_TX) {
+				/* Not supported */
+				xsk_umem_complete_tx(rq->xsk_umem, 1);
+				xsk_umem_consume_tx_done(rq->xsk_umem);
+				xdp_return_frame(xdpf);
+				goto skip_tx;
+			} else if (inner_xdp_xmit & VETH_XDP_REDIR) {
+				xdp_do_flush_map();
+			} else {
+				dropped = true;
+			}
+		} else {
+			/* Peer side has no XDP attached */
+			napi_gro_receive(&peer_rq->xdp_napi, skb);
+		}
+		xsk_umem_complete_tx(rq->xsk_umem, 1);
+		xsk_umem_consume_tx_done(rq->xsk_umem);
+
+		/* update peer stats */
+		u64_stats_update_begin(&peer_rq->stats.syncp);
+		peer_rq->stats.xdp_packets++;
+		peer_rq->stats.xdp_bytes += len;
+		if (dropped)
+			rq->stats.xdp_drops++;
+		u64_stats_update_end(&peer_rq->stats.syncp);
+		done++;
+	}
+
+skip_tx:
+	/* rx */
 	xdp_set_return_frame_no_direct();
-	done = veth_xdp_rcv(rq, budget, &xdp_xmit);
+	done += veth_xdp_rcv(rq, budget, &xdp_xmit);
 
 	if (done < budget && napi_complete_done(napi, done)) {
 		/* Write rx_notify_masked before reading ptr_ring */
@@ -1115,6 +1202,141 @@ static u32 veth_xdp_query(struct net_device *dev)
 	return 0;
 }
 
+static int veth_alloc_xsk_umems(struct net_device *dev)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+
+	if (priv->xsk_umems)
+		return 0;
+
+	priv->num_xsk_umems_used = 0;
+	priv->num_xsk_umems = dev->real_num_rx_queues;
+	priv->xsk_umems = kcalloc(priv->num_xsk_umems,
+				  sizeof(*priv->xsk_umems),
+				  GFP_KERNEL);
+	return 0;
+}
+
+static int veth_add_xsk_umem(struct net_device *dev,
+			     struct xdp_umem *umem,
+			     u16 qid)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+	int err;
+
+	err = veth_alloc_xsk_umems(dev);
+	if (err)
+		return err;
+
+	priv->xsk_umems[qid] = umem;
+	priv->num_xsk_umems_used++;
+	priv->rq[qid].xsk_umem = umem;
+
+	return 0;
+}
+
+static void veth_remove_xsk_umem(struct net_device *dev, u16 qid)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+
+	priv->xsk_umems[qid] = NULL;
+	priv->num_xsk_umems_used--;
+
+	if (priv->num_xsk_umems == 0) {
+		kfree(priv->xsk_umems);
+		priv->xsk_umems = NULL;
+		priv->num_xsk_umems = 0;
+	}
+}
+
+int veth_xsk_umem_query(struct net_device *dev, struct xdp_umem **umem,
+			u16 qid)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+
+	if (qid >= dev->real_num_rx_queues)
+		return -EINVAL;
+
+	if (priv->xsk_umems) {
+		if (qid >= priv->num_xsk_umems)
+			return -EINVAL;
+		*umem = priv->xsk_umems[qid];
+		return 0;
+	}
+
+	*umem = NULL;
+	return 0;
+}
+
+static int veth_xsk_umem_enable(struct net_device *dev,
+				struct xdp_umem *umem,
+				u16 qid)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+	struct xdp_umem_fq_reuse *reuseq;
+	int err = 0;
+
+	if (qid >= dev->real_num_rx_queues)
+		return -EINVAL;
+
+	if (priv->xsk_umems) {
+		if (qid >= priv->num_xsk_umems)
+			return -EINVAL;
+		if (priv->xsk_umems[qid])
+			return -EBUSY;
+	}
+
+	reuseq = xsk_reuseq_prepare(priv->rq[0].xdp_ring.size);
+	if (!reuseq)
+		return -ENOMEM;
+
+	xsk_reuseq_free(xsk_reuseq_swap(umem, reuseq));
+
+	/* Check if_running and disable/enable? */
+	err = veth_add_xsk_umem(dev, umem, qid);
+
+	return err;
+}
+
+static int veth_xsk_umem_disable(struct net_device *dev,
+				 u16 qid)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+
+	if (!priv->xsk_umems || qid >= priv->num_xsk_umems ||
+	    !priv->xsk_umems[qid])
+		return -EINVAL;
+
+	veth_remove_xsk_umem(dev, qid);
+	return 0;
+}
+
+int veth_xsk_umem_setup(struct net_device *dev, struct xdp_umem *umem,
+			u16 qid)
+{
+	return umem ? veth_xsk_umem_enable(dev, umem, qid) :
+		      veth_xsk_umem_disable(dev, qid);
+}
+
+int veth_xsk_async_xmit(struct net_device *dev, u32 qid)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+	struct veth_rq *rq;
+
+	rq = &priv->rq[qid];
+
+	if (qid >= dev->real_num_rx_queues)
+		return -ENXIO;
+
+	if (!priv->xsk_umems)
+		return -ENXIO;
+
+	if (!napi_if_scheduled_mark_missed(&rq->xdp_napi))
+		napi_schedule(&rq->xdp_napi);
+
+	return 0;
+}
+
 static int veth_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 {
 	switch (xdp->command) {
@@ -1123,6 +1345,26 @@ static int veth_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	case XDP_QUERY_PROG:
 		xdp->prog_id = veth_xdp_query(dev);
 		return 0;
+	case XDP_QUERY_XSK_UMEM:
+		return veth_xsk_umem_query(dev, &xdp->xsk.umem,
+					   xdp->xsk.queue_id);
+	case XDP_SETUP_XSK_UMEM: {
+		struct veth_priv *priv;
+		int err;
+
+		/* Enable XDP on both sides */
+		err = veth_enable_xdp(dev);
+		if (err)
+			return err;
+
+		priv = netdev_priv(dev);
+		err = veth_enable_xdp(priv->peer);
+		if (err)
+			return err;
+
+		return veth_xsk_umem_setup(dev, xdp->xsk.umem,
+					   xdp->xsk.queue_id);
+	}
 	default:
 		return -EINVAL;
 	}
@@ -1145,6 +1387,7 @@ static const struct net_device_ops veth_netdev_ops = {
 	.ndo_set_rx_headroom	= veth_set_rx_headroom,
 	.ndo_bpf		= veth_xdp,
 	.ndo_xdp_xmit		= veth_xdp_xmit,
+	.ndo_xsk_async_xmit	= veth_xsk_async_xmit,
 };
 
 #define VETH_FEATURES (NETIF_F_SG | NETIF_F_FRAGLIST | NETIF_F_HW_CSUM | \
