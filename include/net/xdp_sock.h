@@ -81,6 +81,7 @@ u64 *xsk_umem_peek_addr(struct xdp_umem *umem, u64 *addr);
 void xsk_umem_discard_addr(struct xdp_umem *umem);
 void xsk_umem_complete_tx(struct xdp_umem *umem, u32 nb_entries);
 bool xsk_umem_consume_tx(struct xdp_umem *umem, dma_addr_t *dma, u32 *len);
+bool xsk_umem_consume_tx_virtual(struct xdp_umem *umem, char **addr, u32 *len);
 void xsk_umem_consume_tx_done(struct xdp_umem *umem);
 struct xdp_umem_fq_reuse *xsk_reuseq_prepare(u32 nentries);
 struct xdp_umem_fq_reuse *xsk_reuseq_swap(struct xdp_umem *umem,
@@ -161,6 +162,12 @@ static inline void xsk_umem_complete_tx(struct xdp_umem *umem, u32 nb_entries)
 
 static inline bool xsk_umem_consume_tx(struct xdp_umem *umem, dma_addr_t *dma,
 				       u32 *len)
+{
+	return false;
+}
+
+static inline bool xsk_umem_consume_tx_virtual(struct xdp_umem *umem,
+					       char **dma, u32 *len)
 {
 	return false;
 }

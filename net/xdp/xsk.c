@@ -197,6 +197,30 @@ out:
 }
 EXPORT_SYMBOL(xsk_umem_consume_tx);
 
+bool xsk_umem_consume_tx_virtual(struct xdp_umem *umem, char **addr, u32 *len)
+{
+	struct xdp_desc desc;
+	struct xdp_sock *xs;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(xs, &umem->xsk_list, list) {
+		if (!xskq_peek_desc(xs->tx, &desc))
+			 continue;
+		if (xskq_produce_addr_lazy(umem->cq, desc.addr))
+			goto out;
+
+		*addr = xdp_umem_get_data(umem, desc.addr);
+		*len = desc.len;
+		xskq_discard_desc(xs->tx);
+		rcu_read_unlock();
+		return true;
+	}
+out:
+	rcu_read_unlock();
+	return false;
+}
+EXPORT_SYMBOL(xsk_umem_consume_tx_virtual);
+
 static int xsk_zc_xmit(struct sock *sk)
 {
 	struct xdp_sock *xs = xdp_sk(sk);
