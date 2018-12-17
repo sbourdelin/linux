@@ -94,6 +94,10 @@ struct rcar_gen3_thermal_priv {
 	void (*thermal_init)(struct rcar_gen3_thermal_tsc *tsc);
 };
 
+static struct thermal_zone_params rcar_gen3_tz_of_params = {
+	.no_hwmon	= false,
+};
+
 static inline u32 rcar_gen3_thermal_read(struct rcar_gen3_thermal_tsc *tsc,
 					 u32 reg)
 {
@@ -425,8 +429,8 @@ static int rcar_gen3_thermal_probe(struct platform_device *pdev)
 		priv->thermal_init(tsc);
 		rcar_gen3_thermal_calc_coefs(&tsc->coef, ptat, thcode[i]);
 
-		zone = devm_thermal_zone_of_sensor_register(dev, i, tsc,
-							    &rcar_gen3_tz_of_ops);
+		zone = devm_thermal_zone_of_sensor_register_params(dev, i, tsc,
+				&rcar_gen3_tz_of_ops, &rcar_gen3_tz_of_params);
 		if (IS_ERR(zone)) {
 			dev_err(dev, "Can't register thermal zone\n");
 			ret = PTR_ERR(zone);
