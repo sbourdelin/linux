@@ -357,6 +357,15 @@ config ACPI_TABLE_UPGRADE
 	  initrd, therefore it's safe to say Y.
 	  See Documentation/acpi/initrd_table_override.txt for details
 
+config ACPI_TABLE_UPGRADE_VIA_BUILTIN_INITRD
+	bool "Upgrade ACPI tables from built-in initrd"
+	depends on ACPI_TABLE_UPGRADE
+	depends on INITRAMFS_SOURCE!="" && INITRAMFS_COMPRESSION=""
+	def_bool n
+	help
+	  This option provides functionality to upgrade arbitrary ACPI tables
+	  from built-in uncompressed initrd.
+
 config ACPI_DEBUG
 	bool "Debug Statements"
 	help
