@@ -80,6 +80,22 @@ on the Qualcomm Hexagon core.
 		    reference to the pll-supply regulator to be held on behalf
 		    of the booting of the Hexagon core on MSM8996 SoCs
 
+- power-domains:
+	Usage: required
+	Value type: <phandle>
+	Definition: reference to the list of 2 power-domains for the modem
+		    sub-system on MSM8996 SoCs
+		    reference to the list of 4 power-domains for the modem
+		    sub-system on SDM845 SoCs
+
+- power-domain-names:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "cx", "mx" for the modem sub-system on MSM8996
+		    SoCs
+		    must be "cx", "mx", "mss", "load_state" for the modem
+		    sub-system on SDM845 SoCs
+
 - qcom,smem-states:
 	Usage: required
 	Value type: <phandle>
