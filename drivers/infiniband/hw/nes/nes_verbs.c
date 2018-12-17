@@ -733,7 +733,7 @@ static int nes_dealloc_pd(struct ib_pd *ibpd)
 	struct nes_device *nesdev = nesvnic->nesdev;
 	struct nes_adapter *nesadapter = nesdev->nesadapter;
 
-	if ((ibpd->uobject) && (ibpd->uobject->context)) {
+	if (rdma_is_user_pd(ibpd) && (ibpd->uobject->context)) {
 		nesucontext = to_nesucontext(ibpd->uobject->context);
 		nes_debug(NES_DBG_PD, "Clearing bit %u from allocated doorbells\n",
 				nespd->mmap_db_index);
