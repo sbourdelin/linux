@@ -425,7 +425,7 @@ static void __init gic_dist_init(void)
 
 static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
 {
-	int ret = -ENODEV;
+	int ret;
 	int i;
 
 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
@@ -459,7 +459,7 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
 		} while (!(typer & GICR_TYPER_LAST));
 	}
 
-	return ret ? -ENODEV : 0;
+	return -ENODEV;
 }
 
 static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
