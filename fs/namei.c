@@ -3495,6 +3495,8 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
 		goto out2;
 	file->f_path.mnt = path.mnt;
 	error = finish_open(file, child, NULL);
+	if (!error)
+		ima_post_create_tmpfile(file);
 out2:
 	mnt_drop_write(path.mnt);
 out:
