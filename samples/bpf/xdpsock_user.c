@@ -119,7 +119,7 @@ struct xdpsock {
 };
 
 static int num_socks;
-struct xdpsock *xsks[MAX_SOCKS];
+static struct xdpsock *xsks[MAX_SOCKS];
 
 static unsigned long get_nsecs(void)
 {
@@ -897,37 +897,21 @@ static void l2fwd(struct xdpsock *xsk)
 	}
 }
 
-int main(int argc, char **argv)
+static void setup_xdp_xskmap(const char *pathprefix)
 {
-	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-	struct bpf_prog_load_attr prog_load_attr = {
-		.prog_type	= BPF_PROG_TYPE_XDP,
-	};
-	int prog_fd, qidconf_map, xsks_map;
+	int prog_fd, qidconf_map, xsks_map, i, key = 0, err;
+	struct bpf_prog_load_attr prog_load_attr = {};
+	char bpf_objs_filename[256];
+	struct bpf_program *prog;
 	struct bpf_object *obj;
-	char xdp_filename[256];
 	struct bpf_map *map;
-	int i, ret, key = 0;
-	pthread_t pt;
 
-	parse_command_line(argc, argv);
-
-	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	snprintf(xdp_filename, sizeof(xdp_filename), "%s_kern.o", argv[0]);
-	prog_load_attr.file = xdp_filename;
+	snprintf(bpf_objs_filename, sizeof(bpf_objs_filename), "%s_kern.o",
+		 pathprefix);
+	prog_load_attr.file = bpf_objs_filename;
 
 	if (bpf_prog_load_xattr(&prog_load_attr, &obj, &prog_fd))
 		exit(EXIT_FAILURE);
-	if (prog_fd < 0) {
-		fprintf(stderr, "ERROR: no program found: %s\n",
-			strerror(prog_fd));
-		exit(EXIT_FAILURE);
-	}
 
 	map = bpf_object__find_map_by_name(obj, "qidconf_map");
 	qidconf_map = bpf_map__fd(map);
@@ -945,14 +929,51 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	err = bpf_map_update_elem(qidconf_map, &key, &opt_queue, 0);
+	if (err) {
+		fprintf(stderr, "ERROR: bpf_map_update_elem qidconf\n");
+		exit(EXIT_FAILURE);
+	}
+
+	/* Insert sockets into into the XSKMAP. */
+	for (i = 0; i < num_socks; i++) {
+		key = i;
+		err = bpf_map_update_elem(xsks_map, &key, &xsks[i]->sfd, 0);
+		if (err) {
+			fprintf(stderr, "ERROR: bpf_map_update_elem %d\n", i);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	prog = bpf_object__find_program_by_title(obj, "xdp_sock");
+	prog_fd = bpf_program__fd(prog);
+	if (prog_fd < 0) {
+		fprintf(stderr, "ERROR: no xdp_sock program found: %s\n",
+			strerror(prog_fd));
+		exit(EXIT_FAILURE);
+	}
+
 	if (bpf_set_link_xdp_fd(opt_ifindex, prog_fd, opt_xdp_flags) < 0) {
 		fprintf(stderr, "ERROR: link set xdp fd failed\n");
 		exit(EXIT_FAILURE);
 	}
+}
 
-	ret = bpf_map_update_elem(qidconf_map, &key, &opt_queue, 0);
-	if (ret) {
-		fprintf(stderr, "ERROR: bpf_map_update_elem qidconf\n");
+int main(int argc, char **argv)
+{
+	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+	pthread_t pt;
+	int ret;
+
+	signal(SIGINT, int_exit);
+	signal(SIGTERM, int_exit);
+	signal(SIGABRT, int_exit);
+
+	parse_command_line(argc, argv);
+
+	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
+			strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -964,19 +985,7 @@ int main(int argc, char **argv)
 		xsks[num_socks++] = xsk_configure(xsks[0]->umem);
 #endif
 
-	/* ...and insert them into the map. */
-	for (i = 0; i < num_socks; i++) {
-		key = i;
-		ret = bpf_map_update_elem(xsks_map, &key, &xsks[i]->sfd, 0);
-		if (ret) {
-			fprintf(stderr, "ERROR: bpf_map_update_elem %d\n", i);
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	signal(SIGINT, int_exit);
-	signal(SIGTERM, int_exit);
-	signal(SIGABRT, int_exit);
+	setup_xdp_xskmap(argv[0]);
 
 	setlocale(LC_ALL, "");
 
