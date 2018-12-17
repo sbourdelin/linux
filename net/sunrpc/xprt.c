@@ -685,6 +685,25 @@ void xprt_force_disconnect(struct rpc_xprt *xprt)
 }
 EXPORT_SYMBOL_GPL(xprt_force_disconnect);
 
+/**
+ * xprt_disconnect_nowake - force a call to xprt->ops->close
+ * @xprt: transport to disconnect
+ *
+ * The caller must ensure that xprt_wake_pending_tasks() is
+ * called later.
+ */
+void xprt_disconnect_nowake(struct rpc_xprt *xprt)
+{
+       /* Don't race with the test_bit() in xprt_clear_locked() */
+       spin_lock_bh(&xprt->transport_lock);
+       set_bit(XPRT_CLOSE_WAIT, &xprt->state);
+       /* Try to schedule an autoclose RPC call */
+       if (test_and_set_bit(XPRT_LOCKED, &xprt->state) == 0)
+               queue_work(xprtiod_workqueue, &xprt->task_cleanup);
+       spin_unlock_bh(&xprt->transport_lock);
+}
+EXPORT_SYMBOL_GPL(xprt_disconnect_nowake);
+
 static unsigned int
 xprt_connect_cookie(struct rpc_xprt *xprt)
 {
