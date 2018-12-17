@@ -1929,20 +1929,14 @@ M:	Andy Gross <andy.gross@linaro.org>
 M:	David Brown <david.brown@linaro.org>
 L:	linux-arm-msm@vger.kernel.org
 S:	Maintained
-F:	Documentation/devicetree/bindings/soc/qcom/
-F:	arch/arm/boot/dts/qcom-*.dts
-F:	arch/arm/boot/dts/qcom-*.dtsi
-F:	arch/arm/mach-qcom/
-F:	arch/arm64/boot/dts/qcom/*
+N:	qcom
+N:	msm
+X:	drivers/rtc/rtc-msm6242.c
+X:	drivers/net/wireless/broadcom/brcm80211/brcmsmac/
 F:	drivers/i2c/busses/i2c-qup.c
-F:	drivers/clk/qcom/
-F:	drivers/dma/qcom/
-F:	drivers/soc/qcom/
 F:	drivers/spi/spi-qup.c
-F:	drivers/tty/serial/msm_serial.c
 F:	drivers/*/pm8???-*
 F:	drivers/mfd/ssbi.c
-F:	drivers/firmware/qcom_scm*
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git
 
 ARM/RADISYS ENP2611 MACHINE SUPPORT
