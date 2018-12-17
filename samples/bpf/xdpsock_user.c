@@ -650,6 +650,7 @@ static struct option long_options[] = {
 	{"interval", required_argument, 0, 'n'},
 	{"zero-copy", no_argument, 0, 'z'},
 	{"copy", no_argument, 0, 'c'},
+	{"attach", no_argument, 0, 'a'},
 	{0, 0, 0, 0}
 };
 
@@ -670,6 +671,7 @@ static void usage(const char *prog)
 		"  -n, --interval=n	Specify statistics update interval (default 1 sec).\n"
 		"  -z, --zero-copy      Force zero-copy mode.\n"
 		"  -c, --copy           Force copy mode.\n"
+		"  -a, --attach		XDP_ATTACH mode.\n"
 		"\n";
 	fprintf(stderr, str, prog);
 	exit(EXIT_FAILURE);
@@ -682,7 +684,7 @@ static void parse_command_line(int argc, char **argv)
 	opterr = 0;
 
 	for (;;) {
-		c = getopt_long(argc, argv, "rtli:q:psSNn:cz", long_options,
+		c = getopt_long(argc, argv, "rtli:q:psSNn:cza", long_options,
 				&option_index);
 		if (c == -1)
 			break;
@@ -724,6 +726,9 @@ static void parse_command_line(int argc, char **argv)
 			break;
 		case 'c':
 			opt_xdp_bind_flags |= XDP_COPY;
+			break;
+		case 'a':
+			opt_xdp_bind_flags |= XDP_ATTACH;
 			break;
 		default:
 			usage(basename(argv[0]));
@@ -959,6 +964,45 @@ static void setup_xdp_xskmap(const char *pathprefix)
 	}
 }
 
+static void setup_xdp_attach(void)
+{
+	struct bpf_program *prog;
+	struct bpf_object *obj;
+	int prog_fd, err;
+
+	obj = bpf_object__open_builtin(BPF_PROG_TYPE_XDP);
+	if (!obj) {
+		fprintf(stderr, "ERROR: opening builtin XDP\n");
+		exit(EXIT_FAILURE);
+	}
+
+	prog = bpf_object__find_xdp_builtin_program(
+		obj,
+		LIBBPF_BUILTIN_XDP__XSK_REDIRECT);
+	if (!prog) {
+		fprintf(stderr, "ERROR: finding builtin XDP program\n");
+		exit(EXIT_FAILURE);
+	}
+
+	err = bpf_program__load(prog, "GPL", 0);
+	if (err) {
+		fprintf(stderr, "ERROR: error loading XDP program\n");
+		exit(EXIT_FAILURE);
+	}
+
+	prog_fd = bpf_program__fd(prog);
+	if (prog_fd < 0) {
+		fprintf(stderr, "ERROR: no xdp_sock program found: %s\n",
+			strerror(prog_fd));
+		exit(EXIT_FAILURE);
+	}
+
+	if (bpf_set_link_xdp_fd(opt_ifindex, prog_fd, opt_xdp_flags) < 0) {
+		fprintf(stderr, "ERROR: link set xdp fd failed\n");
+		exit(EXIT_FAILURE);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
@@ -981,11 +1025,19 @@ int main(int argc, char **argv)
 	xsks[num_socks++] = xsk_configure(NULL);
 
 #if RR_LB
+	if (opt_xdp_bind_flags & XDP_ATTACH) {
+		fprintf(stderr, "ERROR: Not supported by application!\n");
+		exit(EXIT_FAILURE);
+	}
+
 	for (i = 0; i < MAX_SOCKS - 1; i++)
 		xsks[num_socks++] = xsk_configure(xsks[0]->umem);
 #endif
 
-	setup_xdp_xskmap(argv[0]);
+	if (opt_xdp_bind_flags & XDP_ATTACH)
+		setup_xdp_attach();
+	else
+		setup_xdp_xskmap(argv[0]);
 
 	setlocale(LC_ALL, "");
 
