@@ -352,9 +352,10 @@ int dw_edma_v0_core_device_config(struct dma_chan *dchan)
 /* eDMA debugfs callbacks */
 int dw_edma_v0_core_debugfs_on(struct dw_edma_chip *chip)
 {
-	return 0;
+	return dw_edma_v0_debugfs_on(chip);
 }
 
 void dw_edma_v0_core_debugfs_off(void)
 {
+	dw_edma_v0_debugfs_off();
 }
