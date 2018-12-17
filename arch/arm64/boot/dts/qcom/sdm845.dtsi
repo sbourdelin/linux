@@ -1383,6 +1383,12 @@
 			qcom,halt-regs = <&tcsr_mutex_regs
 						0x23000 0x25000 0x24000>;
 
+			power-domains = <&aoss_qmp_pd AOSS_QMP_LS_MODEM>,
+					<&rpmhpd SDM845_CX>,
+					<&rpmhpd SDM845_MX>,
+					<&rpmhpd SDM845_MSS>;
+			power-domain-names = "load_state", "cx", "mx", "mss";
+
 			mba {
 				memory-region = <&mba_region>;
 			};
