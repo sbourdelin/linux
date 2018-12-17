@@ -713,8 +713,8 @@ static irqreturn_t ad7280_event_handler(int irq, void *private)
 				st->cell_threshhigh)
 				iio_push_event(indio_dev,
 					       IIO_EVENT_CODE(IIO_VOLTAGE,
-							1,
-							0,
+							      1,
+							      0,
 							IIO_EV_DIR_RISING,
 							IIO_EV_TYPE_THRESH,
 							0, 0, 0),
@@ -723,8 +723,8 @@ static irqreturn_t ad7280_event_handler(int irq, void *private)
 				st->cell_threshlow)
 				iio_push_event(indio_dev,
 					       IIO_EVENT_CODE(IIO_VOLTAGE,
-							1,
-							0,
+							      1,
+							      0,
 							IIO_EV_DIR_FALLING,
 							IIO_EV_TYPE_THRESH,
 							0, 0, 0),
@@ -732,18 +732,16 @@ static irqreturn_t ad7280_event_handler(int irq, void *private)
 		} else {
 			if (((channels[i] >> 11) & 0xFFF) >= st->aux_threshhigh)
 				iio_push_event(indio_dev,
-					       IIO_UNMOD_EVENT_CODE(
-							IIO_TEMP,
-							0,
+					       IIO_UNMOD_EVENT_CODE(IIO_TEMP,
+								    0,
 							IIO_EV_TYPE_THRESH,
 							IIO_EV_DIR_RISING),
 					       iio_get_time_ns(indio_dev));
 			else if (((channels[i] >> 11) & 0xFFF) <=
 				st->aux_threshlow)
 				iio_push_event(indio_dev,
-					       IIO_UNMOD_EVENT_CODE(
-							IIO_TEMP,
-							0,
+					       IIO_UNMOD_EVENT_CODE(IIO_TEMP,
+								    0,
 							IIO_EV_TYPE_THRESH,
 							IIO_EV_DIR_FALLING),
 					       iio_get_time_ns(indio_dev));
@@ -969,6 +967,6 @@ static struct spi_driver ad7280_driver = {
 };
 module_spi_driver(ad7280_driver);
 
-MODULE_AUTHOR("Michael Hennerich <michael.hennerich@analog.com>");
+MODULE_AUTHOR("Michael Hennerich <hennerich@blackfin.uclinux.org>");
 MODULE_DESCRIPTION("Analog Devices AD7280A");
 MODULE_LICENSE("GPL v2");
