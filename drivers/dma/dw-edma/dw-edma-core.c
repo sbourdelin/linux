@@ -14,6 +14,7 @@
 #include <linux/dma/edma.h>
 
 #include "dw-edma-core.h"
+#include "dw-edma-v0-core.h"
 #include "../dmaengine.h"
 #include "../virt-dma.h"
 
@@ -25,6 +26,22 @@
 		SET(dw->wr_edma, name, value);	\
 		SET(dw->rd_edma, name, value);	\
 	} while (0)
+
+static const struct dw_edma_core_ops dw_edma_v0_core_ops = {
+	/* eDMA management callbacks */
+	.off = dw_edma_v0_core_off,
+	.ch_count = dw_edma_v0_core_ch_count,
+	.ch_status = dw_edma_v0_core_ch_status,
+	.clear_done_int = dw_edma_v0_core_clear_done_int,
+	.clear_abort_int = dw_edma_v0_core_clear_abort_int,
+	.status_done_int = dw_edma_v0_core_status_done_int,
+	.status_abort_int = dw_edma_v0_core_status_abort_int,
+	.start = dw_edma_v0_core_start,
+	.device_config = dw_edma_v0_core_device_config,
+	/* eDMA debug fs callbacks */
+	.debugfs_on = dw_edma_v0_core_debugfs_on,
+	.debugfs_off = dw_edma_v0_core_debugfs_off,
+};
 
 static inline
 struct device *dchan2dev(struct dma_chan *dchan)
@@ -641,10 +658,14 @@ int dw_edma_probe(struct dw_edma_chip *chip)
 	raw_spin_lock_init(&dw->lock);
 
 	switch (dw->version) {
+	case 0:
+		ops = &dw_edma_v0_core_ops;
+		break;
 	default:
 		dev_err(chip->dev, ": unsupported version\n");
 		return -EPERM;
 	}
+	dw->ops = ops;
 
 	pm_runtime_get_sync(chip->dev);
 
