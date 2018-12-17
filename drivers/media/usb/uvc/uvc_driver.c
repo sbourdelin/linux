@@ -1123,11 +1123,11 @@ static int uvc_parse_standard_control(struct uvc_device *dev,
 		p = 0;
 		len = 8;
 
-		if (type == UVC_ITT_CAMERA) {
+		if ((type & 0x7fff) == UVC_ITT_CAMERA) {
 			n = buflen >= 15 ? buffer[14] : 0;
 			len = 15;
 
-		} else if (type == UVC_ITT_MEDIA_TRANSPORT_INPUT) {
+		} else if ((type & 0x7fff) == UVC_ITT_MEDIA_TRANSPORT_INPUT) {
 			n = buflen >= 9 ? buffer[8] : 0;
 			p = buflen >= 10 + n ? buffer[9+n] : 0;
 			len = 10;
