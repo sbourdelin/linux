@@ -174,7 +174,7 @@ static int wl12xx_sdio_power_off(struct wl12xx_sdio_glue *glue)
 {
 	struct sdio_func *func = dev_to_sdio_func(glue->dev);
 	struct mmc_card *card = func->card;
-	int error;
+	int error, retries = 5;
 
 	sdio_claim_host(func);
 	sdio_disable_func(func);
@@ -187,6 +187,17 @@ static int wl12xx_sdio_power_off(struct wl12xx_sdio_glue *glue)
 
 		return error;
 	}
+
+	/* Wait a bit to ensure the card gets power off. Otherwise
+	 * bringing interface down and up again may not power off the
+	 * card inbetween. And then firmware load will fail on trying
+	 * to bring the card up again. We need to wait between 30 - 40
+	 * ms for this based on measurements on HiKey board.
+	 */
+	do {
+		msleep(50);
+	} while (error == -EBUSY && !pm_runtime_suspended(&card->dev) &&
+		 retries--);
 
 	return 0;
 }
