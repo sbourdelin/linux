@@ -51,6 +51,9 @@ static DEFINE_SPINLOCK(device_state_lock);
 static struct workqueue_struct *hub_wq;
 static void hub_event(struct work_struct *work);
 
+/* synchronize hub_event and authorize_device operations */
+DEFINE_MUTEX(usb_authorize_mutex);
+
 /* synchronize hub-port add/remove and peering operations */
 DEFINE_MUTEX(usb_port_peer_mutex);
 
@@ -2548,6 +2551,7 @@ fail:
  */
 int usb_deauthorize_device(struct usb_device *usb_dev)
 {
+	mutex_lock(&usb_authorize_mutex);
 	usb_lock_device(usb_dev);
 	if (usb_dev->authorized == 0)
 		goto out_unauthorized;
@@ -2557,6 +2561,7 @@ int usb_deauthorize_device(struct usb_device *usb_dev)
 
 out_unauthorized:
 	usb_unlock_device(usb_dev);
+	mutex_unlock(&usb_authorize_mutex);
 	return 0;
 }
 
@@ -2565,6 +2570,7 @@ int usb_authorize_device(struct usb_device *usb_dev)
 {
 	int result = 0, c;
 
+	mutex_lock(&usb_authorize_mutex);
 	usb_lock_device(usb_dev);
 	if (usb_dev->authorized == 1)
 		goto out_authorized;
@@ -2606,6 +2612,7 @@ error_device_descriptor:
 error_autoresume:
 out_authorized:
 	usb_unlock_device(usb_dev);	/* complements locktree */
+	mutex_unlock(&usb_authorize_mutex);
 	return result;
 }
 
@@ -5330,6 +5337,7 @@ static void hub_event(struct work_struct *work)
 	hub_dev = hub->intfdev;
 	intf = to_usb_interface(hub_dev);
 
+	mutex_lock(&usb_authorize_mutex);
 	dev_dbg(hub_dev, "state %d ports %d chg %04x evt %04x\n",
 			hdev->state, hdev->maxchild,
 			/* NOTE: expects max 15 ports... */
@@ -5432,6 +5440,7 @@ out_autopm:
 	usb_autopm_put_interface_no_suspend(intf);
 out_hdev_lock:
 	usb_unlock_device(hdev);
+	mutex_unlock(&usb_authorize_mutex);
 
 	/* Balance the stuff in kick_hub_wq() and allow autosuspend */
 	usb_autopm_put_interface(intf);
