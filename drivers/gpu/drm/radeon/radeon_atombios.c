@@ -583,6 +583,12 @@ bool radeon_get_atom_connector_info_from_object_table(struct drm_device *dev)
 				ATOM_DEVICE_CV_SUPPORT)
 				continue;
 
+			if (con_obj_id >= ARRAY_SIZE(object_connector_convert)) {
+				DRM_ERROR("invalid con_obj_id %d for device tag 0x%04x\n",
+					  con_obj_id, le16_to_cpu(path->usDeviceTag));
+				continue;
+			}
+
 			/* IGP chips */
 			if ((rdev->flags & RADEON_IS_IGP) &&
 			    (con_obj_id ==
