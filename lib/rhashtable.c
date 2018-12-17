@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/log2.h>
 #include <linux/sched.h>
+#include <linux/sched/task_stack.h>
 #include <linux/rculist.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -1072,7 +1073,10 @@ int rhashtable_init(struct rhashtable *ht,
 
 	RCU_INIT_POINTER(ht->tbl, tbl);
 
-	INIT_WORK(&ht->run_work, rht_deferred_worker);
+	if (object_is_on_stack(ht))
+		INIT_WORK_ONSTACK(&ht->run_work, rht_deferred_worker);
+	else
+		INIT_WORK(&ht->run_work, rht_deferred_worker);
 
 	return 0;
 }
