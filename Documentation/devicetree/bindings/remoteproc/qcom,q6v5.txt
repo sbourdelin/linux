@@ -76,7 +76,9 @@ on the Qualcomm Hexagon core.
 	Usage: required
 	Value type: <phandle>
 	Definition: reference to the regulators to be held on behalf of the
-		    booting of the Hexagon core
+		    booting of the Hexagon core on MSM8916 SoCs
+		    reference to the pll-supply regulator to be held on behalf
+		    of the booting of the Hexagon core on MSM8996 SoCs
 
 - qcom,smem-states:
 	Usage: required
