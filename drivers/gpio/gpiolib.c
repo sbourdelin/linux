@@ -29,6 +29,8 @@
 #include <linux/timekeeping.h>
 #include <uapi/linux/gpio.h>
 
+#include <linux/nospec.h>
+
 #include "gpiolib.h"
 
 #define CREATE_TRACE_POINTS
@@ -576,6 +578,7 @@ static int linehandle_create(struct gpio_device *gdev, void __user *ip)
 			ret = -EINVAL;
 			goto out_free_descs;
 		}
+		offset = array_index_nospec(offset, gdev->ngpio);
 
 		desc = &gdev->descs[offset];
 		ret = gpiod_request(desc, lh->label);
@@ -910,6 +913,7 @@ static int lineevent_create(struct gpio_device *gdev, void __user *ip)
 		ret = -EINVAL;
 		goto out_free_label;
 	}
+	offset = array_index_nospec(offset, gdev->ngpio);
 
 	/* Return an error if a unknown flag is set */
 	if ((lflags & ~GPIOHANDLE_REQUEST_VALID_FLAGS) ||
@@ -1049,6 +1053,8 @@ static long gpio_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		if (lineinfo.line_offset >= gdev->ngpio)
 			return -EINVAL;
+		lineinfo.line_offset = array_index_nospec(lineinfo.line_offset,
+							  gdev->ngpio);
 
 		desc = &gdev->descs[lineinfo.line_offset];
 		if (desc->name) {
