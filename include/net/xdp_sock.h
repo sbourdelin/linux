@@ -61,6 +61,7 @@ struct xdp_sock {
 	struct xsk_queue *tx ____cacheline_aligned_in_smp;
 	struct list_head list;
 	bool zc;
+	bool attached;
 	/* Protects multiple processes in the control path */
 	struct mutex mutex;
 	/* Mutual exclusion of NAPI TX thread and sendmsg error paths
@@ -72,7 +73,9 @@ struct xdp_sock {
 
 struct xdp_buff;
 #ifdef CONFIG_XDP_SOCKETS
+int xsk_generic_attached_rcv(struct xdp_sock *xs, struct xdp_buff *xdp);
 int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp);
+int xsk_attached_rcv(struct xdp_sock *xs, struct xdp_buff *xdp);
 int xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp);
 void xsk_flush(struct xdp_sock *xs);
 bool xsk_is_setup_for_bpf_map(struct xdp_sock *xs);

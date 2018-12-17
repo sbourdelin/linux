@@ -100,17 +100,20 @@ static int __xsk_rcv_zc(struct xdp_sock *xs, struct xdp_buff *xdp, u32 len)
 	return err;
 }
 
-int xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
+int xsk_attached_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 {
-	u32 len;
-
-	if (xs->dev != xdp->rxq->dev || xs->queue_id != xdp->rxq->queue_index)
-		return -EINVAL;
-
-	len = xdp->data_end - xdp->data;
+	u32 len = xdp->data_end - xdp->data;
 
 	return (xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY) ?
 		__xsk_rcv_zc(xs, xdp, len) : __xsk_rcv(xs, xdp, len);
+}
+
+int xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
+{
+	if (xs->dev != xdp->rxq->dev || xs->queue_id != xdp->rxq->queue_index)
+		return -EINVAL;
+
+	return xsk_attached_rcv(xs, xdp);
 }
 
 void xsk_flush(struct xdp_sock *xs)
@@ -119,16 +122,13 @@ void xsk_flush(struct xdp_sock *xs)
 	xs->sk.sk_data_ready(&xs->sk);
 }
 
-int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
+int xsk_generic_attached_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 {
 	u32 metalen = xdp->data - xdp->data_meta;
 	u32 len = xdp->data_end - xdp->data;
 	void *buffer;
 	u64 addr;
 	int err;
-
-	if (xs->dev != xdp->rxq->dev || xs->queue_id != xdp->rxq->queue_index)
-		return -EINVAL;
 
 	if (!xskq_peek_addr(xs->umem->fq, &addr) ||
 	    len > xs->umem->chunk_size_nohr - XDP_PACKET_HEADROOM) {
@@ -150,6 +150,14 @@ int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 
 	xs->rx_dropped++;
 	return err;
+}
+
+int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
+{
+	if (xs->dev != xdp->rxq->dev || xs->queue_id != xdp->rxq->queue_index)
+		return -EINVAL;
+
+	return xsk_generic_attached_rcv(xs, xdp);
 }
 
 void xsk_umem_complete_tx(struct xdp_umem *umem, u32 nb_entries)
@@ -339,6 +347,19 @@ static int xsk_init_queue(u32 entries, struct xsk_queue **queue,
 	return 0;
 }
 
+static void xsk_detach(struct xdp_sock *xs)
+{
+	if (xs->attached)
+		WRITE_ONCE(xs->dev->_rx[xs->queue_id].xsk, NULL);
+}
+
+static int xsk_attach(struct xdp_sock *xs, struct net_device *dev, u16 qid)
+{
+	xs->attached = true;
+	WRITE_ONCE(dev->_rx[qid].xsk, xs);
+	return 0;
+}
+
 static int xsk_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
@@ -359,6 +380,7 @@ static int xsk_release(struct socket *sock)
 
 		/* Wait for driver to stop using the xdp socket. */
 		xdp_del_sk_umem(xs->umem, xs);
+		xsk_detach(xs);
 		xs->dev = NULL;
 		synchronize_net();
 		dev_put(dev);
@@ -432,7 +454,8 @@ static int xsk_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 		struct xdp_sock *umem_xs;
 		struct socket *sock;
 
-		if ((flags & XDP_COPY) || (flags & XDP_ZEROCOPY)) {
+		if ((flags & XDP_COPY) || (flags & XDP_ZEROCOPY) ||
+		    (flags & XDP_ATTACH)) {
 			/* Cannot specify flags for shared sockets. */
 			err = -EINVAL;
 			goto out_unlock;
@@ -478,6 +501,12 @@ static int xsk_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 		err = xdp_umem_assign_dev(xs->umem, dev, qid, flags);
 		if (err)
 			goto out_unlock;
+
+		if (flags & XDP_ATTACH) {
+			err = xsk_attach(xs, dev, qid);
+			if (err)
+				goto out_unlock;
+		}
 	}
 
 	xs->dev = dev;
