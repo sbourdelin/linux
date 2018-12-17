@@ -784,6 +784,7 @@ void sdhci_cqe_enable(struct mmc_host *mmc);
 void sdhci_cqe_disable(struct mmc_host *mmc, bool recovery);
 bool sdhci_cqe_irq(struct sdhci_host *host, u32 intmask, int *cmd_error,
 		   int *data_error);
+u32 sdhci_cqhci_irq(struct sdhci_host *host, u32 intmask);
 
 void sdhci_dumpregs(struct sdhci_host *host);
 void sdhci_enable_v4_mode(struct sdhci_host *host);
