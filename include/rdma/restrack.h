@@ -116,6 +116,10 @@ struct rdma_restrack_entry {
 	 * @type: various objects in restrack database
 	 */
 	enum rdma_restrack_type	type;
+	/**
+	 * @user: user resource
+	 */
+	bool			user;
 };
 
 /**
@@ -141,10 +145,16 @@ int rdma_restrack_count(struct rdma_restrack_root *res,
 			struct pid_namespace *ns);
 
 /**
- * rdma_restrack_add() - add object to the reource tracking database
+ * rdma_restrack_kadd() - add kernel object to the reource tracking database
  * @res:  resource entry
  */
-void rdma_restrack_add(struct rdma_restrack_entry *res);
+void rdma_restrack_kadd(struct rdma_restrack_entry *res);
+
+/**
+ * rdma_restrack_uadd() - add user object to the reource tracking database
+ * @res:  resource entry
+ */
+void rdma_restrack_uadd(struct rdma_restrack_entry *res);
 
 /**
  * rdma_restrack_del() - delete object from the reource tracking database
@@ -159,7 +169,7 @@ void rdma_restrack_del(struct rdma_restrack_entry *res);
  */
 static inline bool rdma_is_kernel_res(struct rdma_restrack_entry *res)
 {
-	return !res->task;
+	return !res->user;
 }
 
 /**
