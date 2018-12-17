@@ -242,6 +242,31 @@ struct bpf_object {
 };
 #define obj_elf_valid(o)	((o)->efile.elf)
 
+struct libbpf_builtin_prog {
+	const char *name;
+	const struct bpf_insn *insns;
+	size_t size;
+};
+
+/*
+ * Builtin XDP program: LIBBPF_BUILTIN_XDP__XSK_REDIRECT
+ *
+ * Trivial XDP program that calls bpf_xsk_redirect() on every received
+ * frame.
+ */
+static const struct bpf_insn builtin_xdp_xsk_redirect_insn[] = {
+	BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_xsk_redirect),
+	BPF_EXIT_INSN(),
+};
+
+static const struct libbpf_builtin_prog libbpf_builtin_xdp_prog[] = {
+	[LIBBPF_BUILTIN_XDP__XSK_REDIRECT] = {
+		"xdp_xsk_redirect",
+		&builtin_xdp_xsk_redirect_insn[0],
+		sizeof(builtin_xdp_xsk_redirect_insn)
+	},
+};
+
 void bpf_program__unload(struct bpf_program *prog)
 {
 	int i;
@@ -2989,4 +3014,64 @@ bpf_perf_event_read_simple(void *mmap_mem, size_t mmap_size, size_t page_size,
 
 	ring_buffer_write_tail(header, data_tail);
 	return ret;
+}
+
+struct bpf_object *bpf_object__open_builtin(enum bpf_prog_type prog_type)
+{
+	struct bpf_program *prog;
+	struct bpf_object *obj;
+	int err, i;
+
+	/* Right now, only XDP is supported. */
+	if (prog_type != BPF_PROG_TYPE_XDP)
+		return ERR_PTR(-EINVAL);
+
+	obj = bpf_object__new("", NULL, 0);
+	if (IS_ERR(obj))
+		return NULL;
+
+	CHECK_ERR(bpf_object__init_license(obj, (void *)"GPL", sizeof("GPL")),
+		  err, out);
+
+	for (i = 0; i < __LIBBPF_BUILTIN_XDP__END; i++) {
+		err = bpf_object__add_program(
+			obj,
+			(void *)libbpf_builtin_xdp_prog[i].insns,
+			libbpf_builtin_xdp_prog[i].size,
+			(char *)libbpf_builtin_xdp_prog[i].name, i);
+		if (err) {
+			pr_warning("failed to add builtin program %s\n",
+				   libbpf_builtin_xdp_prog[i].name);
+			goto out;
+		}
+	}
+
+	bpf_object__for_each_program(prog, obj) {
+		bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
+
+		prog->name = strdup(libbpf_builtin_xdp_prog[prog->idx].name);
+		if (!prog->name) {
+			pr_warning("failed to allocate memory for name %s\n",
+				   libbpf_builtin_xdp_prog[prog->idx].name);
+			goto out;
+		}
+	}
+
+	return obj;
+out:
+	bpf_object__close(obj);
+	return NULL;
+
+}
+
+struct bpf_program *bpf_object__find_xdp_builtin_program(
+	struct bpf_object *obj, enum libbpf_builtin_xdp_prog prog)
+{
+	if (!obj)
+		return NULL;
+
+	if (prog < 0 || prog >= __LIBBPF_BUILTIN_XDP__END)
+		return NULL;
+
+	return bpf_object__find_prog_by_idx(obj, prog);
 }

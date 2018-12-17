@@ -45,6 +45,15 @@ enum libbpf_errno {
 	__LIBBPF_ERRNO__END,
 };
 
+enum libbpf_builtin_xdp_prog {
+	/*
+	 * Trivial XDP program that calls bpf_xsk_redirect
+	 * unconditionally for every received packet.
+	 */
+	LIBBPF_BUILTIN_XDP__XSK_REDIRECT,
+	__LIBBPF_BUILTIN_XDP__END,
+};
+
 LIBBPF_API int libbpf_strerror(int err, char *buf, size_t size);
 
 /*
@@ -75,6 +84,8 @@ struct bpf_object *__bpf_object__open_xattr(struct bpf_object_open_attr *attr,
 LIBBPF_API struct bpf_object *bpf_object__open_buffer(void *obj_buf,
 						      size_t obj_buf_sz,
 						      const char *name);
+LIBBPF_API struct bpf_object *bpf_object__open_builtin(
+	enum bpf_prog_type prog_type);
 LIBBPF_API int bpf_object__pin_maps(struct bpf_object *obj, const char *path);
 LIBBPF_API int bpf_object__unpin_maps(struct bpf_object *obj,
 				      const char *path);
@@ -94,6 +105,9 @@ LIBBPF_API int bpf_object__btf_fd(const struct bpf_object *obj);
 
 LIBBPF_API struct bpf_program *
 bpf_object__find_program_by_title(struct bpf_object *obj, const char *title);
+LIBBPF_API struct bpf_program *
+bpf_object__find_xdp_builtin_program(struct bpf_object *obj,
+				     enum libbpf_builtin_xdp_prog prog);
 
 LIBBPF_API struct bpf_object *bpf_object__next(struct bpf_object *prev);
 #define bpf_object__for_each_safe(pos, tmp)			\
