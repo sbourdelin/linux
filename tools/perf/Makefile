@@ -16,7 +16,7 @@
 #
 # We don't want to pass along options like -j:
 #
-unexport MAKEFLAGS
+MAKEFLAGS := $(filter --j% -j,$(MAKEFLAGS))
 
 #
 # Do a parallel build with multiple jobs, based on the number of CPUs online
