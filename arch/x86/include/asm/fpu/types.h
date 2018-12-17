@@ -303,6 +303,13 @@ struct fpu {
 	unsigned char			initialized;
 
 	/*
+	 * @avx512_timestamp:
+	 *
+	 * Records the timestamp of AVX512 use during last context switch.
+	 */
+	u64				avx512_timestamp;
+
+	/*
 	 * @state:
 	 *
 	 * In-memory copy of all FPU registers that we save/restore
