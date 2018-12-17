@@ -39,13 +39,17 @@ on the Qualcomm Hexagon core.
 - clocks:
 	Usage: required
 	Value type: <phandle>
-	Definition: reference to the iface, bus and mem clocks to be held on
-		    behalf of the booting of the Hexagon core
+	Definition: reference to the list of 4 clocks for the modem sub-system
+		    reference to the list of 8 clocks for the modem sub-system
+		    on SDM845 SoCs
 
 - clock-names:
 	Usage: required
 	Value type: <stringlist>
-	Definition: must be "iface", "bus", "mem"
+	Definition: must be "iface", "bus", "mem", "xo" for the modem sub-system
+		    must be "iface", "bus", "mem", "gpll0_mss", "snoc_axi",
+		    "mnoc_axi", "prng", "xo" for the modem sub-system on SDM845
+		    SoCs
 
 - resets:
 	Usage: required
