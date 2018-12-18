@@ -665,3 +665,22 @@ int sdhci_pci_o2_resume(struct sdhci_pci_chip *chip)
 	return sdhci_pci_resume_host(chip);
 }
 #endif
+
+static const struct sdhci_ops sdhci_pci_o2_ops = {
+	.set_clock = sdhci_pci_o2_set_clock,
+	.enable_dma = sdhci_pci_enable_dma,
+	.set_bus_width = sdhci_set_bus_width,
+	.reset = sdhci_reset,
+	.set_uhs_signaling = sdhci_set_uhs_signaling,
+};
+
+const struct sdhci_pci_fixes sdhci_o2 = {
+	.probe = sdhci_pci_o2_probe,
+	.quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
+	.quirks2 = SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD,
+	.probe_slot = sdhci_pci_o2_probe_slot,
+#ifdef CONFIG_PM_SLEEP
+	.resume = sdhci_pci_o2_resume,
+#endif
+	.ops = &sdhci_pci_o2_ops,
+};

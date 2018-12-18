@@ -188,5 +188,6 @@ void sdhci_pci_o2_set_clock(struct sdhci_host *host, unsigned int clock);
 
 extern const struct sdhci_pci_fixes sdhci_arasan;
 extern const struct sdhci_pci_fixes sdhci_snps;
+extern const struct sdhci_pci_fixes sdhci_o2;
 
 #endif /* __SDHCI_PCI_H */
