@@ -1462,6 +1462,9 @@ static int f2fs_disable_checkpoint(struct f2fs_sb_info *sbi)
 
 	while (!f2fs_time_over(sbi, DISABLE_TIME)) {
 		err = f2fs_gc(sbi, true, false, NULL_SEGNO);
+
+		/* f2fs_gc guarantees unlock gc_mutex */
+		mutex_lock(&sbi->gc_mutex);
 		if (err == -ENODATA)
 			break;
 		if (err && err != -EAGAIN) {
