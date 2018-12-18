@@ -214,8 +214,6 @@ static int mergable_maps(struct extent_map *prev, struct extent_map *next)
 	      prev->block_start == EXTENT_MAP_HOLE) ||
 	     (next->block_start == EXTENT_MAP_INLINE &&
 	      prev->block_start == EXTENT_MAP_INLINE) ||
-	     (next->block_start == EXTENT_MAP_DELALLOC &&
-	      prev->block_start == EXTENT_MAP_DELALLOC) ||
 	     (next->block_start < EXTENT_MAP_LAST_BYTE - 1 &&
 	      next->block_start == extent_map_block_end(prev)))) {
 		return 1;
