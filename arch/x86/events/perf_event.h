@@ -877,7 +877,7 @@ struct event_constraint *
 x86_get_event_constraints(struct cpu_hw_events *cpuc, int idx,
 			  struct perf_event *event);
 
-struct intel_shared_regs *allocate_shared_regs(int cpu);
+void allocate_shared_regs(struct intel_shared_regs **pregs, int cpu);
 
 int intel_pmu_init(void);
 
@@ -1013,9 +1013,8 @@ static inline int intel_pmu_init(void)
 	return 0;
 }
 
-static inline struct intel_shared_regs *allocate_shared_regs(int cpu)
+static inline void allocate_shared_regs(struct intel_shared_regs **pregs, int cpu)
 {
-	return NULL;
 }
 
 static inline int is_ht_workaround_enabled(void)

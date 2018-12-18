@@ -2010,7 +2010,7 @@ static struct cpu_hw_events *allocate_fake_cpuc(void)
 
 	/* only needed, if we have extra_regs */
 	if (x86_pmu.extra_regs) {
-		cpuc->shared_regs = allocate_shared_regs(cpu);
+		allocate_shared_regs(&cpuc->shared_regs, cpu);
 		if (!cpuc->shared_regs)
 			goto error;
 	}

@@ -3398,13 +3398,16 @@ ssize_t intel_event_sysfs_show(char *page, u64 config)
 	return x86_event_sysfs_show(page, config, event);
 }
 
-struct intel_shared_regs *allocate_shared_regs(int cpu)
+void allocate_shared_regs(struct intel_shared_regs **pregs, int cpu)
 {
-	struct intel_shared_regs *regs;
+	struct intel_shared_regs *regs = *pregs;
 	int i;
 
-	regs = kzalloc_node(sizeof(struct intel_shared_regs),
-			    GFP_KERNEL, cpu_to_node(cpu));
+	if (regs)
+		memset(regs, 0, sizeof(struct intel_shared_regs));
+	else
+		regs = *pregs = kzalloc_node(sizeof(struct intel_shared_regs),
+					     GFP_KERNEL, cpu_to_node(cpu));
 	if (regs) {
 		/*
 		 * initialize the locks to keep lockdep happy
@@ -3414,20 +3417,21 @@ struct intel_shared_regs *allocate_shared_regs(int cpu)
 
 		regs->core_id = -1;
 	}
-	return regs;
 }
 
-static struct intel_excl_cntrs *allocate_excl_cntrs(int cpu)
+static void allocate_excl_cntrs(struct intel_excl_cntrs **pc, int cpu)
 {
-	struct intel_excl_cntrs *c;
+	struct intel_excl_cntrs *c = *pc;
 
-	c = kzalloc_node(sizeof(struct intel_excl_cntrs),
-			 GFP_KERNEL, cpu_to_node(cpu));
+	if (c)
+		memset(c, 0, sizeof(struct intel_excl_cntrs));
+	else
+		c = *pc = kzalloc_node(sizeof(struct intel_excl_cntrs),
+				       GFP_KERNEL, cpu_to_node(cpu));
 	if (c) {
 		raw_spin_lock_init(&c->lock);
 		c->core_id = -1;
 	}
-	return c;
 }
 
 static int intel_pmu_cpu_prepare(int cpu)
@@ -3435,7 +3439,7 @@ static int intel_pmu_cpu_prepare(int cpu)
 	struct cpu_hw_events *cpuc = &per_cpu(cpu_hw_events, cpu);
 
 	if (x86_pmu.extra_regs || x86_pmu.lbr_sel_map) {
-		cpuc->shared_regs = allocate_shared_regs(cpu);
+		allocate_shared_regs(&cpuc->shared_regs, cpu);
 		if (!cpuc->shared_regs)
 			goto err;
 	}
@@ -3443,11 +3447,14 @@ static int intel_pmu_cpu_prepare(int cpu)
 	if (x86_pmu.flags & PMU_FL_EXCL_CNTRS) {
 		size_t sz = X86_PMC_IDX_MAX * sizeof(struct event_constraint);
 
-		cpuc->constraint_list = kzalloc(sz, GFP_KERNEL);
+		if (cpuc->constraint_list)
+			memset(cpuc->constraint_list, 0, sz);
+		else
+			cpuc->constraint_list = kzalloc(sz, GFP_KERNEL);
 		if (!cpuc->constraint_list)
 			goto err_shared_regs;
 
-		cpuc->excl_cntrs = allocate_excl_cntrs(cpu);
+		allocate_excl_cntrs(&cpuc->excl_cntrs, cpu);
 		if (!cpuc->excl_cntrs)
 			goto err_constraint_list;
 
@@ -3559,18 +3566,6 @@ static void free_excl_cntrs(int cpu)
 
 static void intel_pmu_cpu_dying(int cpu)
 {
-	struct cpu_hw_events *cpuc = &per_cpu(cpu_hw_events, cpu);
-	struct intel_shared_regs *pc;
-
-	pc = cpuc->shared_regs;
-	if (pc) {
-		if (pc->core_id == -1 || --pc->refcnt == 0)
-			kfree(pc);
-		cpuc->shared_regs = NULL;
-	}
-
-	free_excl_cntrs(cpu);
-
 	fini_debug_store_on_cpu(cpu);
 
 	if (x86_pmu.counter_freezing)
