@@ -5355,6 +5355,9 @@ static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state,
 	if (hsw_pre_update_disable_ips(old_crtc_state, pipe_config))
 		hsw_disable_ips(old_crtc_state);
 
+	if (pipe_config->update_pipe && !pipe_config->enable_fbc)
+		intel_fbc_disable(crtc);
+
 	if (old_primary_state) {
 		struct intel_plane_state *new_primary_state =
 			intel_atomic_get_new_plane_state(old_intel_state,
