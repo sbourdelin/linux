@@ -394,6 +394,18 @@ config VIDEO_TC358743_CEC
 	  When selected the tc358743 will support the optional
 	  HDMI CEC feature.
 
+config VIDEO_TC358746
+	tristate "Toshiba TC358746 decoder"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && MEDIA_CONTROLLER
+	select V4L2_FWNODE
+	help
+	  Support for the Toshiba TC358746 PARALLEL to MIPI CSI-2 bridge.
+	  The bridge can work in both directions but currenty only the
+	  parallel-in / csi-out path is supported.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tc358746.
+
 config VIDEO_TVP514X
 	tristate "Texas Instruments TVP514x video decoder"
 	depends on VIDEO_V4L2 && I2C
