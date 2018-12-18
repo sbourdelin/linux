@@ -72,7 +72,7 @@ static void mlx4_free_icm_coherent(struct mlx4_dev *dev, struct mlx4_icm_chunk *
 	for (i = 0; i < chunk->npages; ++i)
 		dma_free_coherent(&dev->persist->pdev->dev,
 				  chunk->mem[i].length,
-				  lowmem_page_address(sg_page(&chunk->mem[i])),
+				  chunk->buf[i],
 				  sg_dma_address(&chunk->mem[i]));
 }
 
@@ -112,20 +112,20 @@ static int mlx4_alloc_icm_pages(struct scatterlist *mem, int order,
 }
 
 static int mlx4_alloc_icm_coherent(struct device *dev, struct scatterlist *mem,
-				    int order, gfp_t gfp_mask)
+				   void **buf, int order, gfp_t gfp_mask)
 {
-	void *buf = dma_alloc_coherent(dev, PAGE_SIZE << order,
-				       &sg_dma_address(mem), gfp_mask);
-	if (!buf)
+	*buf = dma_alloc_coherent(dev, PAGE_SIZE << order,
+				  &sg_dma_address(mem), gfp_mask);
+	if (!*buf)
 		return -ENOMEM;
 
-	if (offset_in_page(buf)) {
+	if (offset_in_page(*buf)) {
 		dma_free_coherent(dev, PAGE_SIZE << order,
-				  buf, sg_dma_address(mem));
+				  *buf, sg_dma_address(mem));
 		return -ENOMEM;
 	}
 
-	sg_set_buf(mem, buf, PAGE_SIZE << order);
+	mem->length = PAGE_SIZE << order;
 	sg_dma_len(mem) = PAGE_SIZE << order;
 	return 0;
 }
@@ -174,6 +174,7 @@ struct mlx4_icm *mlx4_alloc_icm(struct mlx4_dev *dev, int npages,
 			sg_init_table(chunk->mem, MLX4_ICM_CHUNK_LEN);
 			chunk->npages = 0;
 			chunk->nsg    = 0;
+			memset(chunk->buf, 0, sizeof(chunk->buf));
 			list_add_tail(&chunk->list, &icm->chunk_list);
 		}
 
@@ -187,6 +188,7 @@ struct mlx4_icm *mlx4_alloc_icm(struct mlx4_dev *dev, int npages,
 		if (coherent)
 			ret = mlx4_alloc_icm_coherent(&dev->persist->pdev->dev,
 						      &chunk->mem[chunk->npages],
+						      &chunk->buf[chunk->npages],
 						      cur_order, mask);
 		else
 			ret = mlx4_alloc_icm_pages(&chunk->mem[chunk->npages],
@@ -320,7 +322,8 @@ void *mlx4_table_find(struct mlx4_icm_table *table, u32 obj,
 	u64 idx;
 	struct mlx4_icm_chunk *chunk;
 	struct mlx4_icm *icm;
-	struct page *page = NULL;
+	struct page *page;
+	void *addr = NULL;
 
 	if (!table->lowmem)
 		return NULL;
@@ -348,7 +351,12 @@ void *mlx4_table_find(struct mlx4_icm_table *table, u32 obj,
 			 * been assigned to.
 			 */
 			if (chunk->mem[i].length > offset) {
-				page = sg_page(&chunk->mem[i]);
+				if (table->coherent) {
+					addr = chunk->buf[i];
+				} else {
+					page = sg_page(&chunk->mem[i]);
+					addr = lowmem_page_address(page);
+				}
 				goto out;
 			}
 			offset -= chunk->mem[i].length;
@@ -357,7 +365,7 @@ void *mlx4_table_find(struct mlx4_icm_table *table, u32 obj,
 
 out:
 	mutex_unlock(&table->mutex);
-	return page ? lowmem_page_address(page) + offset : NULL;
+	return addr ? addr + offset : NULL;
 }
 
 int mlx4_table_get_range(struct mlx4_dev *dev, struct mlx4_icm_table *table,
