@@ -184,6 +184,27 @@ TRACE_EVENT(nvme_async_event,
 
 #undef aer_name
 
+TRACE_EVENT(nvme_sq,
+	TP_PROTO(void *rq_disk, int qid, int sq_head, int sq_tail),
+	TP_ARGS(rq_disk, qid, sq_head, sq_tail),
+	TP_STRUCT__entry(
+		__array(char, disk, DISK_NAME_LEN)
+		__field(int, qid)
+		__field(int, sq_head)
+		__field(int, sq_tail)
+	),
+	TP_fast_assign(
+		__assign_disk_name(__entry->disk, rq_disk);
+		__entry->qid = qid;
+		__entry->sq_head = sq_head;
+		__entry->sq_tail = sq_tail;
+	),
+	TP_printk("nvme: %s qid=%d head=%d tail=%d",
+		__print_disk_name(__entry->disk),
+		__entry->qid, __entry->sq_head, __entry->sq_tail
+	)
+);
+
 #endif /* _TRACE_NVME_H */
 
 #undef TRACE_INCLUDE_PATH
