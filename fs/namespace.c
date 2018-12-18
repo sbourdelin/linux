@@ -1263,7 +1263,7 @@ static void *m_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct proc_mounts *p = m->private;
 
-	p->cached_mount = seq_list_next(v, &p->ns->list, pos);
+	p->cached_mount = seq_list_next(p->cached_mount, &p->ns->list, pos);
 	p->cached_index = *pos;
 	return p->cached_mount;
 }
@@ -1276,8 +1276,38 @@ static void m_stop(struct seq_file *m, void *v)
 static int m_show(struct seq_file *m, void *v)
 {
 	struct proc_mounts *p = m->private;
-	struct mount *r = list_entry(v, struct mount, mnt_list);
-	return p->show(m, &r->mnt);
+	struct mount *r;
+	struct super_block *sb;
+	int ret;
+
+restart:
+	r = list_entry(v, struct mount, mnt_list);
+	sb = r->mnt.mnt_sb;
+
+	/* Protect show function against racing remount */
+	if (mount_trylock_super(sb))
+		goto show;
+	/*
+	 * Trylock failed. Since namepace_sem ranks below s_umount (through
+	 * sb->s_umount > dir->i_rwsem > namespace_sem in the mount path), we
+	 * have to drop it, wait for s_umount and then try again to guarantee
+	 * forward progress.
+	 */
+	hold_sb(sb);
+	up_read(&namespace_sem);
+	down_read(&sb->s_umount);
+	down_read(&namespace_sem);
+	v = seq_list_start(&p->ns->list, p->cached_index);
+	if (!sb->s_root || v != p->cached_mount) {
+		drop_super(sb);
+		p->cached_event = p->ns->event;
+		p->cached_mount = v;
+		goto restart;
+	}
+show:
+	ret = p->show(m, &r->mnt);
+	drop_super(sb);
+	return ret;
 }
 
 const struct seq_operations mounts_op = {
