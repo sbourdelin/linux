@@ -113,6 +113,7 @@ const char *nvme_trace_parse_admin_cmd(struct trace_seq *p,
 		return nvme_trace_common(p, cdw10);
 	}
 }
+EXPORT_SYMBOL_GPL(nvme_trace_parse_admin_cmd);
 
 const char *nvme_trace_parse_nvm_cmd(struct trace_seq *p,
 				     u8 opcode, u8 *cdw10)
@@ -128,6 +129,7 @@ const char *nvme_trace_parse_nvm_cmd(struct trace_seq *p,
 		return nvme_trace_common(p, cdw10);
 	}
 }
+EXPORT_SYMBOL_GPL(nvme_trace_parse_nvm_cmd);
 
 const char *nvme_trace_disk_name(struct trace_seq *p, char *name)
 {
@@ -139,3 +141,4 @@ const char *nvme_trace_disk_name(struct trace_seq *p, char *name)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(nvme_trace_disk_name);
