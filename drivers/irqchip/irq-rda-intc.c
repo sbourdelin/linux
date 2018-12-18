@@ -85,7 +85,7 @@ static int __init rda8810_intc_init(struct device_node *node,
 				    struct device_node *parent)
 {
 	rda_intc_base = of_io_request_and_map(node, 0, "rda-intc");
-	if (!rda_intc_base)
+	if (IS_ERR(rda_intc_base))
 		return -ENXIO;
 
 	/* Mask all interrupt sources */
