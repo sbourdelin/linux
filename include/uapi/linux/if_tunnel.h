@@ -160,4 +160,10 @@ enum {
 };
 
 #define IFLA_VTI_MAX	(__IFLA_VTI_MAX - 1)
+
+#define TUNNEL_CSUM		__cpu_to_be16(0x01)
+#define TUNNEL_KEY		__cpu_to_be16(0x04)
+#define TUNNEL_SEQ		__cpu_to_be16(0x08)
+#define TUNNEL_DONT_FRAGMENT    __cpu_to_be16(0x0100)
+
 #endif /* _UAPI_IF_TUNNEL_H_ */
