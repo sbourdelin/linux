@@ -83,6 +83,8 @@
 
 #include <linux/uaccess.h>
 
+#include <linux/nospec.h>
+
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 
@@ -1205,6 +1207,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 			err = -EINVAL;
 			goto out_unfreeze;
 		}
+		type = array_index_nospec(type, MAX_LO_CRYPT);
 		xfer = xfer_funcs[type];
 		if (xfer == NULL) {
 			err = -EINVAL;
