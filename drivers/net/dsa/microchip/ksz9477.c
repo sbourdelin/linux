@@ -496,19 +496,33 @@ static int ksz9477_port_vlan_filtering(struct dsa_switch *ds, int port,
 				       bool flag)
 {
 	struct ksz_device *dev = ds->priv;
+	u32 vlan_table[3];
 
 	if (flag) {
+		vlan_table[0] = VLAN_VALID | 0;
+		vlan_table[1] = 0;
+		vlan_table[2] = dev->port_mask;
+		if (ksz9477_set_vlan_table(dev, 0, vlan_table)) {
+			dev_dbg(dev->dev, "Failed to set vlan table\n");
+			return 0;
+		}
 		ksz_port_cfg(dev, port, REG_PORT_LUE_CTRL,
-			     PORT_VLAN_LOOKUP_VID_0, true);
-		ksz9477_cfg32(dev, REG_SW_QM_CTRL__4, UNICAST_VLAN_BOUNDARY,
-			      true);
+			     (PORT_VLAN_LOOKUP_VID_0 | PORT_INGRESS_FILTER),
+			     true);
 		ksz_cfg(dev, REG_SW_LUE_CTRL_0, SW_VLAN_ENABLE, true);
 	} else {
+		/* VLAN 1 entry is required to run properly. */
+		vlan_table[0] = VLAN_VALID | 0;
+		vlan_table[1] = 0;
+		vlan_table[2] = dev->port_mask;
+		if (ksz9477_set_vlan_table(dev, 1, vlan_table)) {
+			dev_dbg(dev->dev, "Failed to set vlan table\n");
+			return 0;
+		}
 		ksz_cfg(dev, REG_SW_LUE_CTRL_0, SW_VLAN_ENABLE, false);
-		ksz9477_cfg32(dev, REG_SW_QM_CTRL__4, UNICAST_VLAN_BOUNDARY,
-			      false);
 		ksz_port_cfg(dev, port, REG_PORT_LUE_CTRL,
-			     PORT_VLAN_LOOKUP_VID_0, false);
+			     (PORT_VLAN_LOOKUP_VID_0 | PORT_INGRESS_FILTER),
+			     false);
 	}
 
 	return 0;
@@ -521,6 +535,7 @@ static void ksz9477_port_vlan_add(struct dsa_switch *ds, int port,
 	u32 vlan_table[3];
 	u16 vid;
 	bool untagged = vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED;
+	bool pvid = vlan->flags & BRIDGE_VLAN_INFO_PVID;
 
 	for (vid = vlan->vid_begin; vid <= vlan->vid_end; vid++) {
 		if (ksz9477_get_vlan_table(dev, vid, vlan_table)) {
@@ -533,7 +548,12 @@ static void ksz9477_port_vlan_add(struct dsa_switch *ds, int port,
 			vlan_table[1] |= BIT(port);
 		else
 			vlan_table[1] &= ~BIT(port);
-		vlan_table[1] &= ~(BIT(dev->cpu_port));
+
+		/* Keep host port untagged when setting pvid. */
+		if (untagged && pvid)
+			vlan_table[1] |= BIT(dev->cpu_port);
+		else
+			vlan_table[1] &= ~(BIT(dev->cpu_port));
 
 		vlan_table[2] |= BIT(port) | BIT(dev->cpu_port);
 
@@ -543,7 +563,7 @@ static void ksz9477_port_vlan_add(struct dsa_switch *ds, int port,
 		}
 
 		/* change PVID */
-		if (vlan->flags & BRIDGE_VLAN_INFO_PVID)
+		if (pvid)
 			ksz_pwrite16(dev, port, REG_PORT_DEFAULT_VID, vid);
 	}
 }
@@ -567,6 +587,10 @@ static int ksz9477_port_vlan_del(struct dsa_switch *ds, int port,
 		}
 
 		vlan_table[2] &= ~BIT(port);
+
+		/* Remove VLAN entry if no longer used. */
+		if (vid > 1 && !(vlan_table[2] & ~dev->host_mask))
+			vlan_table[0] &= ~VLAN_VALID;
 
 		if (pvid == vid)
 			pvid = 1;
@@ -1129,6 +1153,10 @@ static int ksz9477_setup(struct dsa_switch *ds)
 		dev_err(ds->dev, "failed to reset switch\n");
 		return ret;
 	}
+
+	/* Required for port partitioning. */
+	ksz9477_cfg32(dev, REG_SW_QM_CTRL__4, UNICAST_VLAN_BOUNDARY,
+		      true);
 
 	/* accept packet up to 2000bytes */
 	ksz_cfg(dev, REG_SW_MAC_CTRL_1, SW_LEGAL_PACKET_DISABLE, true);
