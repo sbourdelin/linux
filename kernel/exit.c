@@ -486,6 +486,7 @@ assign_new_owner:
 	task_unlock(c);
 	put_task_struct(c);
 }
+EXPORT_SYMBOL(mm_update_next_owner);
 #endif /* CONFIG_MEMCG */
 
 /*
