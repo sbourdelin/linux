@@ -104,6 +104,8 @@ extern bool trylock_super(struct super_block *sb);
 extern struct dentry *mount_fs(struct file_system_type *,
 			       int, const char *, void *);
 extern struct super_block *user_get_super(dev_t);
+extern void hold_sb(struct super_block *sb);
+extern bool mount_trylock_super(struct super_block *sb);
 
 /*
  * open.c
