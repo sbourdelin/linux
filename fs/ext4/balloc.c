@@ -364,7 +364,7 @@ static int ext4_validate_block_bitmap(struct super_block *sb,
 
 	if (buffer_verified(bh))
 		return 0;
-	if (EXT4_MB_GRP_BBITMAP_CORRUPT(grp))
+	if (ext4_mb_grp_bbitmap_corrupt(grp))
 		return -EFSCORRUPTED;
 
 	ext4_lock_group(sb, block_group);
@@ -699,7 +699,7 @@ ext4_fsblk_t ext4_count_free_clusters(struct super_block *sb)
 		grp = NULL;
 		if (EXT4_SB(sb)->s_group_info)
 			grp = ext4_get_group_info(sb, i);
-		if (!grp || !EXT4_MB_GRP_BBITMAP_CORRUPT(grp))
+		if (!grp || !ext4_mb_grp_bbitmap_corrupt(grp))
 			desc_count += ext4_free_group_clusters(sb, gdp);
 		brelse(bitmap_bh);
 		bitmap_bh = ext4_read_block_bitmap(sb, i);
@@ -729,7 +729,7 @@ ext4_fsblk_t ext4_count_free_clusters(struct super_block *sb)
 		grp = NULL;
 		if (EXT4_SB(sb)->s_group_info)
 			grp = ext4_get_group_info(sb, i);
-		if (!grp || !EXT4_MB_GRP_BBITMAP_CORRUPT(grp))
+		if (!grp || !ext4_mb_grp_bbitmap_corrupt(grp))
 			desc_count += ext4_free_group_clusters(sb, gdp);
 	}
 

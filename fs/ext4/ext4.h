@@ -2892,25 +2892,32 @@ struct ext4_group_info {
 #define EXT4_GROUP_INFO_IBITMAP_CORRUPT		\
 	(1 << EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT)
 
-#define EXT4_MB_GRP_NEED_INIT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_NEED_INIT_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_BBITMAP_CORRUPT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_IBITMAP_CORRUPT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_TEST_AND_SET_BBITMAP_CORRUPT(grp)	\
-	(test_and_set_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT, \
-			  &((grp)->bb_state)))
-#define EXT4_MB_GRP_TEST_AND_SET_IBITMAP_CORRUPT(grp)	\
-	(test_and_set_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, \
-			  &((grp)->bb_state)))
 
-#define EXT4_MB_GRP_WAS_TRIMMED(grp)	\
-	(test_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_SET_TRIMMED(grp)	\
-	(set_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_CLEAR_TRIMMED(grp)	\
-	(clear_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
+#define EXT4_MB_GROUP_STATE_FUNCS(name, statename)			\
+static inline int ext4_mb_grp_##name(struct ext4_group_info *grp)	\
+{									\
+	return test_bit(EXT4_GROUP_INFO_##statename##_BIT,		\
+			&(grp->bb_state));				\
+}									\
+static inline void ext4_mb_grp_set_##name(struct ext4_group_info *grp)	\
+{									\
+	set_bit(EXT4_GROUP_INFO_##statename##_BIT, &(grp->bb_state));	\
+}									\
+static inline void ext4_mb_grp_clear_##name(struct ext4_group_info *grp)\
+{									\
+	clear_bit(EXT4_GROUP_INFO_##statename##_BIT, &(grp->bb_state));	\
+}									\
+static inline int ext4_mb_grp_test_and_set_##name(struct ext4_group_info *grp) \
+{									\
+	return test_and_set_bit(EXT4_GROUP_INFO_##statename##_BIT,	\
+				&(grp->bb_state));			\
+}
+
+EXT4_MB_GROUP_STATE_FUNCS(need_init, NEED_INIT)
+EXT4_MB_GROUP_STATE_FUNCS(trimmed, WAS_TRIMMED)
+EXT4_MB_GROUP_STATE_FUNCS(bbitmap_corrupt, BBITMAP_CORRUPT)
+EXT4_MB_GROUP_STATE_FUNCS(ibitmap_corrupt, IBITMAP_CORRUPT)
+
 
 #define EXT4_MAX_CONTENTION		8
 #define EXT4_CONTENTION_THRESHOLD	2

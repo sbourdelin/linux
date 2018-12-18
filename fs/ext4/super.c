@@ -821,14 +821,14 @@ void ext4_mark_group_bitmap_corrupted(struct super_block *sb,
 	int ret;
 
 	if (flags & EXT4_GROUP_INFO_BBITMAP_CORRUPT) {
-		ret = EXT4_MB_GRP_TEST_AND_SET_BBITMAP_CORRUPT(grp);
+		ret = ext4_mb_grp_test_and_set_bbitmap_corrupt(grp);
 		if (!ret)
 			percpu_counter_sub(&sbi->s_freeclusters_counter,
 					   grp->bb_free);
 	}
 
 	if (flags & EXT4_GROUP_INFO_IBITMAP_CORRUPT) {
-		ret = EXT4_MB_GRP_TEST_AND_SET_IBITMAP_CORRUPT(grp);
+		ret = ext4_mb_grp_test_and_set_ibitmap_corrupt(grp);
 		if (!ret && gdp) {
 			int count;
 

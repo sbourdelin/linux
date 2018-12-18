@@ -86,7 +86,7 @@ static int ext4_validate_inode_bitmap(struct super_block *sb,
 
 	if (buffer_verified(bh))
 		return 0;
-	if (EXT4_MB_GRP_IBITMAP_CORRUPT(grp))
+	if (ext4_mb_grp_ibitmap_corrupt(grp))
 		return -EFSCORRUPTED;
 
 	ext4_lock_group(sb, block_group);
@@ -293,7 +293,7 @@ void ext4_free_inode(handle_t *handle, struct inode *inode)
 		bitmap_bh = NULL;
 		goto error_return;
 	}
-	if (unlikely(EXT4_MB_GRP_IBITMAP_CORRUPT(grp))) {
+	if (unlikely(ext4_mb_grp_ibitmap_corrupt(grp))) {
 		fatal = -EFSCORRUPTED;
 		goto error_return;
 	}
@@ -898,13 +898,13 @@ got_group:
 
 		grp = ext4_get_group_info(sb, group);
 		/* Skip groups with already-known suspicious inode tables */
-		if (EXT4_MB_GRP_IBITMAP_CORRUPT(grp))
+		if (ext4_mb_grp_ibitmap_corrupt(grp))
 			goto next_group;
 
 		brelse(inode_bitmap_bh);
 		inode_bitmap_bh = ext4_read_inode_bitmap(sb, group);
 		/* Skip groups with suspicious inode tables */
-		if (EXT4_MB_GRP_IBITMAP_CORRUPT(grp) ||
+		if (ext4_mb_grp_ibitmap_corrupt(grp) ||
 		    IS_ERR(inode_bitmap_bh)) {
 			inode_bitmap_bh = NULL;
 			goto next_group;
