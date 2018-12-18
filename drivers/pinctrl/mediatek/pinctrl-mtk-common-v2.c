@@ -290,7 +290,11 @@ static int mtk_xt_set_gpio_as_eint(void *data, unsigned long eint_n)
 		return err;
 
 	err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT, MTK_ENABLE);
-	if (err)
+
+	/* SMT doesn't support virtual GPIO, add err != -ENOTSUPP is used for
+	 * avoid return err when virtual gpio set SMT.
+	 */
+	if (err && err != -ENOTSUPP)
 		return err;
 
 	return 0;
