@@ -822,6 +822,40 @@ int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 	return memblock_add_range(&memblock.reserved, base, size, MAX_NUMNODES, 0);
 }
 
+#ifdef CONFIG_HAVE_MEMBLOCK_CACHE_INFO
+/**
+ * memblock_set_sidecache - set the system memory cache info
+ * @base: base address of the region
+ * @size: size of the region
+ * @cache_size: system side cache size in bytes
+ * @direct: true if the cache has direct mapped associativity
+ *
+ * This function isolates region [@base, @base + @size), and saves the cache
+ * information.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+int __init_memblock memblock_set_sidecache(phys_addr_t base, phys_addr_t size,
+			   phys_addr_t cache_size, bool direct_mapped)
+{
+	struct memblock_type *type = &memblock.memory;
+	int i, ret, start_rgn, end_rgn;
+
+	ret = memblock_isolate_range(type, base, size, &start_rgn, &end_rgn);
+	if (ret)
+		return ret;
+
+	for (i = start_rgn; i < end_rgn; i++) {
+		struct memblock_region *r = &type->regions[i];
+
+		r->cache_size = cache_size;
+		r->direct_mapped = direct_mapped;
+	}
+
+	return 0;
+}
+#endif
+
 /**
  * memblock_setclr_flag - set or clear flag for a memory region
  * @base: base address of the region

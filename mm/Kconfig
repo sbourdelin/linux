@@ -142,6 +142,9 @@ config ARCH_DISCARD_MEMBLOCK
 config MEMORY_ISOLATION
 	bool
 
+config HAVE_MEMBLOCK_CACHE_INFO
+	bool
+
 #
 # Only be set on architectures that have completely implemented memory hotplug
 # feature. If you are not sure, don't touch it.
