@@ -17,6 +17,7 @@
 #include <linux/poison.h>
 #include <linux/pfn.h>
 #include <linux/debugfs.h>
+#include <linux/shuffle.h>
 #include <linux/kmemleak.h>
 #include <linux/seq_file.h>
 #include <linux/memblock.h>
@@ -850,6 +851,12 @@ int __init_memblock memblock_set_sidecache(phys_addr_t base, phys_addr_t size,
 
 		r->cache_size = cache_size;
 		r->direct_mapped = direct_mapped;
+		/*
+		 * Enable randomization for amortizing direct-mapped
+		 * memory-side-cache conflicts.
+		 */
+		if (r->size > r->cache_size && r->direct_mapped)
+			page_alloc_shuffle(SHUFFLE_ENABLE);
 	}
 
 	return 0;
@@ -1971,8 +1978,15 @@ static unsigned long __init free_low_memory_core_early(void)
 	 *  low ram will be on Node1
 	 */
 	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end,
-				NULL)
+				NULL) {
+		pg_data_t *pgdat;
+
 		count += __free_memory_core(start, end);
+
+		for_each_online_pgdat(pgdat)
+			shuffle_free_memory(pgdat, PHYS_PFN(start),
+					PHYS_PFN(end));
+	}
 
 	return count;
 }

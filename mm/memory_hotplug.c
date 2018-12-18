@@ -23,6 +23,7 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 #include <linux/ioport.h>
+#include <linux/shuffle.h>
 #include <linux/delay.h>
 #include <linux/migrate.h>
 #include <linux/page-isolation.h>
@@ -894,6 +895,8 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 	pgdat_resize_lock(zone->zone_pgdat, &flags);
 	zone->zone_pgdat->node_present_pages += onlined_pages;
 	pgdat_resize_unlock(zone->zone_pgdat, &flags);
+
+	shuffle_zone(zone, pfn, zone_end_pfn(zone));
 
 	if (onlined_pages) {
 		node_states_set_node(nid, &arg);
