@@ -13,9 +13,12 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
 
+#define PCI_VENDOR_ID_REDHAT             0x1b36
+#define PCI_DEVICE_ID_REDHAT_PVPANIC     0x0101
 static void __iomem *base;
 
 #define PVPANIC_PANICKED        (1 << 0)
@@ -172,12 +175,76 @@ static struct platform_driver pvpanic_mmio_driver = {
 	.remove = pvpanic_mmio_remove,
 };
 
+#ifdef CONFIG_PCI
+static const struct pci_device_id pvpanic_pci_id_tbl[]  = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_REDHAT, PCI_DEVICE_ID_REDHAT_PVPANIC),},
+	{}
+};
+
+static int pvpanic_pci_probe(struct pci_dev *pdev,
+			     const struct pci_device_id *ent)
+{
+	int ret;
+
+	ret = pcim_enable_device(pdev);
+	if (ret < 0)
+		return ret;
+
+	ret = pcim_iomap_regions(pdev, 1 << 0, pci_name(pdev));
+	if (ret)
+		return ret;
+
+	base = pcim_iomap_table(pdev)[0];
+
+	atomic_notifier_chain_register(&panic_notifier_list,
+				       &pvpanic_panic_nb);
+	return 0;
+}
+
+static void pvpanic_pci_remove(struct pci_dev *pdev)
+{
+	atomic_notifier_chain_unregister(&panic_notifier_list,
+					 &pvpanic_panic_nb);
+}
+
+static struct pci_driver pvpanic_pci_driver = {
+	.name =         "pvpanic-pci",
+	.id_table =     pvpanic_pci_id_tbl,
+	.probe =        pvpanic_pci_probe,
+	.remove =       pvpanic_pci_remove,
+};
+
+static int pvpanic_register_pci_driver(void)
+{
+	return pci_register_driver(&pvpanic_pci_driver);
+}
+
+static void pvpanic_unregister_pci_driver(void)
+{
+	pci_unregister_driver(&pvpanic_pci_driver);
+}
+#else
+static int pvpanic_register_pci_driver(void)
+{
+	return 0;
+}
+
+static void pvpanic_unregister_pci_drvier(void) {}
+#endif
+
 static int __init pvpanic_mmio_init(void)
 {
+	int r1, r2;
+
 	if (acpi_disabled)
-		return platform_driver_register(&pvpanic_mmio_driver);
+		r1 = platform_driver_register(&pvpanic_mmio_driver);
 	else
-		return pvpanic_register_acpi_driver();
+		r1 = pvpanic_register_acpi_driver();
+	r2 = pvpanic_register_pci_driver();
+	if (r1 && r2) /* all drivers register failed */
+		return 1;
+	else
+		return 0;
 }
 
 static void __exit pvpanic_mmio_exit(void)
@@ -186,6 +253,7 @@ static void __exit pvpanic_mmio_exit(void)
 		platform_driver_unregister(&pvpanic_mmio_driver);
 	else
 		pvpanic_unregister_acpi_driver();
+	pvpanic_unregister_pci_driver();
 }
 
 module_init(pvpanic_mmio_init);
