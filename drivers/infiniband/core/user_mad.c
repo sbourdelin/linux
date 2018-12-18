@@ -61,6 +61,8 @@ MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("InfiniBand userspace MAD packet access");
 MODULE_LICENSE("Dual BSD/GPL");
 
+#define IB_UMAD_CLASS_NAME "infiniband_mad"
+
 enum {
 	IB_UMAD_MAX_PORTS  = RDMA_MAX_PORTS,
 	IB_UMAD_MAX_AGENTS = 32,
@@ -1338,7 +1340,7 @@ static int __init ib_umad_init(void)
 
 	ret = register_chrdev_region(base_umad_dev,
 				     IB_UMAD_NUM_FIXED_MINOR * 2,
-				     "infiniband_mad");
+				     IB_UMAD_CLASS_NAME);
 	if (ret) {
 		pr_err("couldn't register device number\n");
 		goto out;
@@ -1346,14 +1348,14 @@ static int __init ib_umad_init(void)
 
 	ret = alloc_chrdev_region(&dynamic_umad_dev, 0,
 				  IB_UMAD_NUM_DYNAMIC_MINOR * 2,
-				  "infiniband_mad");
+				  IB_UMAD_CLASS_NAME);
 	if (ret) {
 		pr_err("couldn't register dynamic device number\n");
 		goto out_alloc;
 	}
 	dynamic_issm_dev = dynamic_umad_dev + IB_UMAD_NUM_DYNAMIC_MINOR;
 
-	umad_class = class_create(THIS_MODULE, "infiniband_mad");
+	umad_class = class_create(THIS_MODULE, IB_UMAD_CLASS_NAME);
 	if (IS_ERR(umad_class)) {
 		ret = PTR_ERR(umad_class);
 		pr_err("couldn't create class infiniband_mad\n");
