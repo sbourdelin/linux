@@ -31,6 +31,9 @@ Required properties:
   device-specific version corresponding to the device first
   followed by the generic version.
 
+Optional properties:
+- pwdn-gpios: Power-down control GPIO
+
 Required nodes:
 
 This device has two video ports. Their connections are modeled using the OF
