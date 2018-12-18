@@ -3472,6 +3472,7 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 	struct ext4_map_blocks split_map;
 	struct ext4_extent zero_ex1, zero_ex2;
 	struct ext4_extent *ex, *abut_ex;
+	loff_t i_size, new_size;
 	ext4_lblk_t ee_block, eof_block;
 	unsigned int ee_len, depth, map_len = map->m_len;
 	int allocated = 0, max_zeroout = 0;
@@ -3483,7 +3484,8 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 		(unsigned long long)map->m_lblk, map_len);
 
 	sbi = EXT4_SB(inode->i_sb);
-	eof_block = (i_size_read(inode) + inode->i_sb->s_blocksize - 1) >>
+	i_size = i_size_read(inode);
+	eof_block = (i_size + inode->i_sb->s_blocksize - 1) >>
 		inode->i_sb->s_blocksize_bits;
 	if (eof_block < map->m_lblk + map_len)
 		eof_block = map->m_lblk + map_len;
@@ -3663,6 +3665,24 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 			if (err)
 				goto out;
 			split_map.m_len = allocated;
+
+			/*
+			 * Update the i_disksize if zeroout the tail of
+			 * the second extent. Otherwise i_disksize update
+			 * can be lost as the region may have been marked
+			 * unwritten before writing back.
+			 */
+			new_size = ((loff_t)(split_map.m_lblk +
+					     split_map.m_len)) <<
+					     PAGE_SHIFT;
+			if (new_size > i_size)
+				new_size = i_size;
+			if (new_size > EXT4_I(inode)->i_disksize) {
+				EXT4_I(inode)->i_disksize = new_size;
+				err = ext4_mark_inode_dirty(handle, inode);
+				if (err)
+					goto out;
+			}
 		}
 		if (split_map.m_lblk - ee_block + split_map.m_len <
 								max_zeroout) {
