@@ -1,0 +1,80 @@
+* Toshiba TC358746 Parallel to MIPI CSI2-TX or MIPI CSI2-RX to Parallel Bridge
+
+The Toshiba TC358746 is a bridge that converts a Parallel-in stream to MIPI CSI-2 TX
+or a MIPI CSI-2 RX stream into a Parallel-out. It is programmable through I2C.
+
+Required Properties:
+
+- compatible: should be "toshiba,tc358746"
+- reg: should be <0x0e>
+- clocks: should contain a phandle link to the reference clock source
+- clock-names: the clock input is named "refclk".
+
+Optional Properties:
+
+- reset-gpios: gpio phandle GPIO connected to the reset pin
+
+Parallel Endpoint:
+
+Required Properties:
+
+- reg: should be <0>
+- bus-width: the data bus width e.g. <8> for eight bit bus, or <16>
+	     for sixteen bit wide bus.
+
+MIPI CSI-2 Endpoint:
+
+Required Properties:
+
+- reg: should be <1>
+- data-lanes: should be <1 2 3 4> for four-lane operation,
+	      or <1 2> for two-lane operation
+- clock-lanes: should be <0>
+- link-frequencies: List of allowed link frequencies in Hz. Each frequency is
+		    expressed as a 64-bit big-endian integer. The frequency
+		    is half of the bps per lane due to DDR transmission.
+
+Optional Properties:
+
+- clock-noncontinuous: Presence of this boolean property decides whether the
+		       MIPI CSI-2 clock is continuous or non-continuous.
+
+For further information on the endpoint node properties, see
+Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+Example:
+
+&i2c {
+	tc358746: tc358746@0e {
+		reg = <0x0e>;
+		compatible = "toshiba,tc358746";
+		pinctrl-names = "default";
+		clocks = <&clk_cam_ref>;
+		clock-names = "refclk";
+		reset-gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			tc358746_parallel_in: endpoint {
+				bus-width = <8>;
+				remote-endpoint = <&micron_parallel_out>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			tc358746_mipi2_out: endpoint {
+				remote-endpoint = <&mipi_csi2_in>;
+				data-lanes = <1 2>;
+				clock-lanes = <0>;
+				clock-noncontinuous;
+				link-frequencies = /bits/ 64 <216000000>;
+			};
+		};
+	};
+};
