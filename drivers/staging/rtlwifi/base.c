@@ -1979,6 +1979,7 @@ void rtl_watchdog_wq_callback(void *data)
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
+	struct ieee80211_vif *vif = NULL;
 	bool busytraffic = false;
 	bool tx_busy_traffic = false;
 	bool rx_busy_traffic = false;
@@ -2130,7 +2131,8 @@ label_lps_done:
 			if (rtlpriv->link_info.roam_times >= 5) {
 				pr_err("AP off, try to reconnect now\n");
 				rtlpriv->link_info.roam_times = 0;
-				ieee80211_connection_loss(rtlpriv->mac80211.vif);
+				vif = rtlpriv->mac80211.vif;
+				ieee80211_connection_loss(vif);
 			}
 		} else {
 			rtlpriv->link_info.roam_times = 0;
