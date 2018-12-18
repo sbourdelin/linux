@@ -13,6 +13,8 @@
 #include <linux/regmap.h>
 #include <linux/math64.h>
 #include <linux/slab.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 
 #include <asm/div64.h>
 
@@ -347,6 +349,36 @@ static int clk_rcg2_set_floor_rate_and_parent(struct clk_hw *hw,
 	return __clk_rcg2_set_rate(hw, rate, FLOOR);
 }
 
+static int rcg2_list_rates_show(struct seq_file *m, void *unused)
+{
+	struct clk_rcg2 *rcg = m->private;
+	const struct freq_tbl *f;
+
+	if (rcg->freq_tbl)
+		for (f = rcg->freq_tbl; f->freq; f++)
+			seq_printf(m, "%lu\n", f->freq);
+
+	return 0;
+}
+
+static int rcg2_list_rates_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, rcg2_list_rates_show, inode->i_private);
+}
+
+static const struct file_operations rcg2_list_rates_fops = {
+	.open		= rcg2_list_rates_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static void clk_rcg2_debug_init(struct clk_hw *hw, struct dentry *dentry)
+{
+	debugfs_create_file("list_rates", 0444, dentry, to_clk_rcg2(hw),
+			    &rcg2_list_rates_fops);
+}
+
 const struct clk_ops clk_rcg2_ops = {
 	.is_enabled = clk_rcg2_is_enabled,
 	.get_parent = clk_rcg2_get_parent,
@@ -355,6 +387,7 @@ const struct clk_ops clk_rcg2_ops = {
 	.determine_rate = clk_rcg2_determine_rate,
 	.set_rate = clk_rcg2_set_rate,
 	.set_rate_and_parent = clk_rcg2_set_rate_and_parent,
+	.debug_init = clk_rcg2_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_ops);
 
