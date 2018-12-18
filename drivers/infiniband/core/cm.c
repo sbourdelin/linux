@@ -93,6 +93,8 @@ static const char * const ibcm_rej_reason_strs[] = {
 	[IB_CM_REJ_INVALID_ALT_FLOW_LABEL]	= "invalid alt flow label",
 };
 
+static DEFINE_IDA(cm_ida);
+
 const char *__attribute_const__ ibcm_reject_msg(int reason)
 {
 	size_t index = reason;
@@ -220,6 +222,7 @@ struct cm_device {
 	struct list_head list;
 	struct ib_device *ib_device;
 	struct device *device;
+	int devnum;
 	u8 ack_delay;
 	int going_down;
 	struct cm_port *port[0];
@@ -4368,13 +4371,12 @@ static void cm_add_one(struct ib_device *ib_device)
 	cm_dev->ib_device = ib_device;
 	cm_dev->ack_delay = ib_device->attrs.local_ca_ack_delay;
 	cm_dev->going_down = 0;
-	cm_dev->device = device_create(&cm_class, &ib_device->dev,
+	cm_dev->devnum = ida_alloc(&cm_ida, GFP_KERNEL);
+	cm_dev->device = device_create(&cm_class, ib_device->dev.parent,
 				       MKDEV(0, 0), NULL,
-				       "%s", dev_name(&ib_device->dev));
-	if (IS_ERR(cm_dev->device)) {
-		kfree(cm_dev);
-		return;
-	}
+				       "cm%d", cm_dev->devnum);
+	if (IS_ERR(cm_dev->device))
+		goto devreg;
 
 	set_bit(IB_MGMT_METHOD_SEND, reg_req.method_mask);
 	for (i = 1; i <= ib_device->phys_port_cnt; i++) {
@@ -4442,6 +4444,8 @@ error1:
 	}
 free:
 	device_unregister(cm_dev->device);
+devreg:
+	ida_free(&cm_ida, cm_dev->devnum);
 	kfree(cm_dev);
 }
 
@@ -4496,6 +4500,7 @@ static void cm_remove_one(struct ib_device *ib_device, void *client_data)
 	}
 
 	device_unregister(cm_dev->device);
+	ida_free(&cm_ida, cm_dev->devnum);
 	kfree(cm_dev);
 }
 
