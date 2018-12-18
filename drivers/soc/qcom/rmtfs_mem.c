@@ -132,6 +132,11 @@ static int qcom_rmtfs_mem_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static struct class rmtfs_class = {
+	.owner          = THIS_MODULE,
+	.name           = "rmtfs",
+};
+
 static const struct file_operations qcom_rmtfs_mem_fops = {
 	.owner = THIS_MODULE,
 	.open = qcom_rmtfs_mem_open,
@@ -173,9 +178,15 @@ static int qcom_rmtfs_mem_probe(struct platform_device *pdev)
 
 	}
 
+	ret  = class_register(&rmtfs_class);
+	if (ret)
+		return ret;
+
 	rmtfs_mem = kzalloc(sizeof(*rmtfs_mem), GFP_KERNEL);
-	if (!rmtfs_mem)
-		return -ENOMEM;
+	if (!rmtfs_mem) {
+		ret = -ENOMEM;
+		goto unregister_class;
+	}
 
 	rmtfs_mem->addr = rmem->base;
 	rmtfs_mem->client_id = client_id;
@@ -199,8 +210,8 @@ static int qcom_rmtfs_mem_probe(struct platform_device *pdev)
 
 	dev_set_name(&rmtfs_mem->dev, "qcom_rmtfs_mem%d", client_id);
 	rmtfs_mem->dev.id = client_id;
+	rmtfs_mem->dev.class = &rmtfs_class;
 	rmtfs_mem->dev.devt = MKDEV(MAJOR(qcom_rmtfs_mem_major), client_id);
-
 	ret = cdev_device_add(&rmtfs_mem->cdev, &rmtfs_mem->dev);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add cdev: %d\n", ret);
@@ -235,11 +246,13 @@ static int qcom_rmtfs_mem_probe(struct platform_device *pdev)
 
 	return 0;
 
+
 remove_cdev:
 	cdev_device_del(&rmtfs_mem->cdev, &rmtfs_mem->dev);
 put_device:
 	put_device(&rmtfs_mem->dev);
-
+unregister_class:
+	class_unregister(&rmtfs_class);
 	return ret;
 }
 
@@ -258,7 +271,7 @@ static int qcom_rmtfs_mem_remove(struct platform_device *pdev)
 
 	cdev_device_del(&rmtfs_mem->cdev, &rmtfs_mem->dev);
 	put_device(&rmtfs_mem->dev);
-
+	class_unregister(&rmtfs_class);
 	return 0;
 }
 
