@@ -2898,6 +2898,12 @@ struct ext4_group_info {
 	(test_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT, &((grp)->bb_state)))
 #define EXT4_MB_GRP_IBITMAP_CORRUPT(grp)	\
 	(test_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, &((grp)->bb_state)))
+#define EXT4_MB_GRP_TEST_AND_SET_BBITMAP_CORRUPT(grp)	\
+	(test_and_set_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT, \
+			  &((grp)->bb_state)))
+#define EXT4_MB_GRP_TEST_AND_SET_IBITMAP_CORRUPT(grp)	\
+	(test_and_set_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, \
+			  &((grp)->bb_state)))
 
 #define EXT4_MB_GRP_WAS_TRIMMED(grp)	\
 	(test_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
