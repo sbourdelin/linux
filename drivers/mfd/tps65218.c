@@ -211,6 +211,50 @@ static const struct of_device_id of_tps65218_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, of_tps65218_match_table);
 
+static void tps65218_options(struct tps65218 *tps)
+{
+	struct device *dev = tps->dev;
+	struct device_node *np = dev->of_node;
+	u32 pval;
+
+	if (!of_property_read_u32(np, "strict-supply-voltage", &pval)) {
+		tps65218_update_bits(tps, TPS65218_REG_CONFIG1,
+			TPS65218_CONFIG1_STRICT,
+			pval ? TPS65218_CONFIG1_STRICT : 0,
+			TPS65218_PROTECT_L1);
+		dev_dbg(dev, "tps65218 strict-supply-voltage: %d\n", pval);
+	}
+	if (!of_property_read_u32(np, "under-voltage-hysteresis", &pval)) {
+		if (pval != 400000 && pval != 200000) {
+			dev_err(dev,
+				 "under-voltage-hysteresis must be %d or %d\n",
+				 200000, 400000);
+		} else {
+			tps65218_update_bits(tps, TPS65218_REG_CONFIG2,
+				TPS65218_CONFIG2_UVLOHYS,
+				pval == 400000 ? TPS65218_CONFIG2_UVLOHYS : 0,
+				TPS65218_PROTECT_L1);
+		}
+		dev_dbg(dev, "tps65218 under-voltage-hysteresis: %d\n", pval);
+	}
+	if (!of_property_read_u32(np, "under-voltage-limit", &pval)) {
+		int i, vals[] = { 275, 295, 325, 335 };
+
+		for (i = 0; i < ARRAY_SIZE(vals); i++) {
+			if (pval == vals[i] * 10000)
+				break;
+		}
+		if (i < ARRAY_SIZE(vals)) {
+			tps65218_update_bits(tps, TPS65218_REG_CONFIG1,
+				TPS65218_CONFIG1_UVLO_MASK, i,
+				TPS65218_PROTECT_L1);
+		} else {
+			dev_err(dev, "Invalid under-voltage-limit: %d\n", pval);
+		}
+		dev_dbg(dev, "tps65218 under-voltage-limit: %d=%d\n", pval, i);
+	}
+}
+
 static int tps65218_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {
@@ -248,6 +292,8 @@ static int tps65218_probe(struct i2c_client *client,
 	}
 
 	tps->rev = chipid & TPS65218_CHIPID_REV_MASK;
+
+	tps65218_options(tps);
 
 	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
 			      ARRAY_SIZE(tps65218_cells), NULL, 0,
