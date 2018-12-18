@@ -15246,6 +15246,13 @@ S:	Maintained
 F:	drivers/media/i2c/tc358743*
 F:	include/media/i2c/tc358743.h
 
+TOSHIBA TC358746 DRIVER
+M:	Marco Felsch <kernel@pengutronix.de>
+L:	linux-media@vger.kernel.org
+S:	Odd Fixes
+F:	drivers/media/i2c/tc358746*
+F:	Documentation/devicetree/bindings/media/i2c/toshiba,tc358746.txt
+
 TOSHIBA WMI HOTKEYS DRIVER
 M:	Azael Avalos <coproscefalo@gmail.com>
 L:	platform-driver-x86@vger.kernel.org
