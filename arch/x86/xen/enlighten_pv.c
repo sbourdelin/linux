@@ -646,7 +646,7 @@ static bool __ref get_trap_addr(void **addr, unsigned int ist)
 
 	if (nr == ARRAY_SIZE(trap_array) &&
 	    *addr >= (void *)early_idt_handler_array[0] &&
-	    *addr < (void *)early_idt_handler_array[NUM_EXCEPTION_VECTORS]) {
+	    *addr < (void *)early_idt_handler_array[NUM_EXCEPTION_VECTORS - 1]) {
 		nr = (*addr - (void *)early_idt_handler_array[0]) /
 		     EARLY_IDT_HANDLER_SIZE;
 		*addr = (void *)xen_early_idt_handler_array[nr];
