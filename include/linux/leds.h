@@ -129,6 +129,9 @@ struct led_classdev {
 	struct mutex		led_access;
 };
 
+extern u32 *led_classdev_get_default_pattern(struct led_classdev *led_cdev,
+					     unsigned int *size);
+
 extern int of_led_classdev_register(struct device *parent,
 				    struct device_node *np,
 				    struct led_classdev *led_cdev);
