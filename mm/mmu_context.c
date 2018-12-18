@@ -60,5 +60,6 @@ void unuse_mm(struct mm_struct *mm)
 	/* active_mm is still 'mm' */
 	enter_lazy_tlb(mm, tsk);
 	task_unlock(tsk);
+	mm_update_next_owner(mm);
 }
 EXPORT_SYMBOL_GPL(unuse_mm);
