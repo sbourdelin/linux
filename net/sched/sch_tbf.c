@@ -505,12 +505,18 @@ static int tbf_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 static struct Qdisc *tbf_leaf(struct Qdisc *sch, unsigned long arg)
 {
 	struct tbf_sched_data *q = qdisc_priv(sch);
-	return q->qdisc;
+	if (arg == 1)
+		return q->qdisc;
+
+	return NULL;
 }
 
 static unsigned long tbf_find(struct Qdisc *sch, u32 classid)
 {
-	return 1;
+	if (TC_H_MIN(classid) == 1)
+		return 1;
+
+	return 0;
 }
 
 static void tbf_walk(struct Qdisc *sch, struct qdisc_walker *walker)
