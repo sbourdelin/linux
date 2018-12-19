@@ -98,6 +98,13 @@
 typedef struct { DECLARE_BITMAP(bits, MAX_NUMNODES); } nodemask_t;
 extern nodemask_t _unused_nodemask_arg_;
 
+#if MAX_NUMNODES > 1
+extern int nr_node_ids;
+extern int nr_online_nodes;
+#else
+#define nr_node_ids	MAX_NUMNODES
+#endif
+
 /**
  * nodemask_pr_args - printf args to output a nodemask
  * @maskp: nodemask to be printed
@@ -108,7 +115,7 @@ extern nodemask_t _unused_nodemask_arg_;
 				__nodemask_pr_bits(maskp)
 static inline unsigned int __nodemask_pr_numnodes(const nodemask_t *m)
 {
-	return m ? MAX_NUMNODES : 0;
+	return m ? nr_node_ids : 0;
 }
 static inline const unsigned long *__nodemask_pr_bits(const nodemask_t *m)
 {
@@ -443,9 +450,6 @@ static inline int next_memory_node(int nid)
 {
 	return next_node(nid, node_states[N_MEMORY]);
 }
-
-extern int nr_node_ids;
-extern int nr_online_nodes;
 
 static inline void node_set_online(int nid)
 {
