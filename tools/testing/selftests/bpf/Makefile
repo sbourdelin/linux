@@ -146,6 +146,10 @@ endif
 endif
 endif
 
+ifneq ($(BPF_SELFTEST_32BIT),)
+	LLC_FLAGS += -mattr=alu32
+endif
+
 # Have one program compiled without "-target bpf" to test whether libbpf loads
 # it successfully
 $(OUTPUT)/test_xdp.o: test_xdp.c
