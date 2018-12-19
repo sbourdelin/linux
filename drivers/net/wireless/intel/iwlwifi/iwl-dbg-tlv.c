@@ -196,11 +196,16 @@ static int iwl_parse_fw_dbg_tlv(struct iwl_trans *trans, const u8 *data,
 
 		switch (tlv_type) {
 		case IWL_UCODE_TLV_TYPE_BUFFER_ALLOCATION:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_HCMD:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_REGIONS:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_TRIGGERS:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_DEBUG_FLOW:
 			iwl_fw_dbg_copy_tlv(trans, tlv, true);
+			break;
 		default:
 			WARN_ONCE(1, "Invalid TLV %x\n", tlv_type);
 			break;

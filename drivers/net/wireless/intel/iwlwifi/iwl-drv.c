@@ -1091,12 +1091,17 @@ static int iwl_parse_tlv_firmware(struct iwl_drv *drv,
 			break;
 			}
 		case IWL_UCODE_TLV_TYPE_BUFFER_ALLOCATION:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_HCMD:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_REGIONS:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_TRIGGERS:
+		/* fall-through */
 		case IWL_UCODE_TLV_TYPE_DEBUG_FLOW:
 			if (iwlwifi_mod_params.enable_ini)
 				iwl_fw_dbg_copy_tlv(drv->trans, tlv, false);
+			break;
 		default:
 			IWL_DEBUG_INFO(drv, "unknown TLV: %d\n", tlv_type);
 			break;
