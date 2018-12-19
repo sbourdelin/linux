@@ -559,7 +559,7 @@ emit_bswap_uxt:
 	case BPF_JMP | BPF_JSLT | BPF_X:
 	case BPF_JMP | BPF_JSGE | BPF_X:
 	case BPF_JMP | BPF_JSLE | BPF_X:
-		emit(A64_CMP(1, dst, src), ctx);
+		emit(A64_CMP(!!imm, dst, src), ctx);
 emit_cond_jmp:
 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
 		check_imm19(jmp_offset);
@@ -614,9 +614,13 @@ emit_cond_jmp:
 	case BPF_JMP | BPF_JSLT | BPF_K:
 	case BPF_JMP | BPF_JSGE | BPF_K:
 	case BPF_JMP | BPF_JSLE | BPF_K:
-		emit_a64_mov_i(1, tmp, imm, ctx);
-		emit(A64_CMP(1, dst, tmp), ctx);
+	{
+		bool is_jmp32 = !!insn->src_reg;
+
+		emit_a64_mov_i(is_jmp32, tmp, imm, ctx);
+		emit(A64_CMP(is_jmp32, dst, tmp), ctx);
 		goto emit_cond_jmp;
+	}
 	case BPF_JMP | BPF_JSET | BPF_K:
 		emit_a64_mov_i(1, tmp, imm, ctx);
 		emit(A64_TST(1, dst, tmp), ctx);
