@@ -5,6 +5,7 @@ Required properties:
 	(a) "samsung,exynos4210-rotator" for Rotator IP in Exynos4210
 	(b) "samsung,exynos4212-rotator" for Rotator IP in Exynos4212/4412
 	(c) "samsung,exynos5250-rotator" for Rotator IP in Exynos5250
+	(d) "samsung,s5pv210-rotator" for Rotator IP in S5PV210
 
   - reg : Physical base address of the IP registers and length of memory
 	  mapped region.
