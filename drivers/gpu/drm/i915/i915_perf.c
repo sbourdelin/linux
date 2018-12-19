@@ -264,11 +264,11 @@
 #define OA_TAIL_MARGIN_NSEC	100000ULL
 #define INVALID_TAIL_PTR	0xffffffff
 
-/* frequency for checking whether the OA unit has written new reports to the
- * circular OA buffer...
+/* The default frequency for checking whether the OA unit has written new
+ * reports to the circular OA buffer...
  */
-#define POLL_FREQUENCY 200
-#define POLL_PERIOD (NSEC_PER_SEC / POLL_FREQUENCY)
+#define DEFAULT_POLL_FREQUENCY 200
+#define DEFAULT_POLL_PERIOD (NSEC_PER_SEC / DEFAULT_POLL_FREQUENCY)
 
 /* for sysctl proc_dointvec_minmax of dev.i915.perf_stream_paranoid */
 static int zero;
@@ -345,6 +345,8 @@ static const struct i915_oa_format gen8_plus_oa_formats[I915_OA_FORMAT_MAX] = {
  * @oa_format: An OA unit HW report format
  * @oa_periodic: Whether to enable periodic OA unit sampling
  * @oa_period_exponent: The OA unit sampling period is derived from this
+ * @poll_oa_period: The period at which the CPU will check for OA data
+ * availability
  *
  * As read_properties_unlocked() enumerates and validates the properties given
  * to open a stream of metrics the configuration is built up in the structure
@@ -361,6 +363,7 @@ struct perf_open_properties {
 	int oa_format;
 	bool oa_periodic;
 	int oa_period_exponent;
+	u64 poll_oa_period;
 };
 
 static void free_oa_config(struct drm_i915_private *dev_priv,
@@ -1902,7 +1905,7 @@ static void i915_oa_stream_enable(struct i915_perf_stream *stream)
 
 	if (dev_priv->perf.oa.periodic)
 		hrtimer_start(&dev_priv->perf.oa.poll_check_timer,
-			      ns_to_ktime(POLL_PERIOD),
+			      ns_to_ktime(stream->poll_oa_period),
 			      HRTIMER_MODE_REL_PINNED);
 }
 
@@ -2266,13 +2269,15 @@ static enum hrtimer_restart oa_poll_check_timer_cb(struct hrtimer *hrtimer)
 	struct drm_i915_private *dev_priv =
 		container_of(hrtimer, typeof(*dev_priv),
 			     perf.oa.poll_check_timer);
+	struct i915_perf_stream *stream = dev_priv->perf.oa.exclusive_stream;
 
 	if (oa_buffer_check_unlocked(dev_priv)) {
 		dev_priv->perf.oa.pollin = true;
 		wake_up(&dev_priv->perf.oa.poll_wq);
 	}
 
-	hrtimer_forward_now(hrtimer, ns_to_ktime(POLL_PERIOD));
+	hrtimer_forward_now(hrtimer,
+			    ns_to_ktime(stream->poll_oa_period));
 
 	return HRTIMER_RESTART;
 }
@@ -2593,6 +2598,7 @@ i915_perf_open_ioctl_locked(struct drm_i915_private *dev_priv,
 
 	stream->dev_priv = dev_priv;
 	stream->ctx = specific_ctx;
+	stream->poll_oa_period = props->poll_oa_period;
 
 	ret = i915_oa_stream_init(stream, param, props);
 	if (ret)
@@ -2669,6 +2675,7 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 	u32 i;
 
 	memset(props, 0, sizeof(struct perf_open_properties));
+	props->poll_oa_period = DEFAULT_POLL_PERIOD;
 
 	if (!n_props) {
 		DRM_DEBUG("No i915 perf properties given\n");
@@ -2771,6 +2778,14 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 
 			props->oa_periodic = true;
 			props->oa_period_exponent = value;
+			break;
+		case DRM_I915_PERF_PROP_POLL_OA_DELAY:
+			if (value < 100000 /* 100us */) {
+				DRM_DEBUG("OA availability timer too small (%lluns < 100us)\n",
+					  value);
+				return -EINVAL;
+			}
+			props->poll_oa_period = value;
 			break;
 		case DRM_I915_PERF_PROP_MAX:
 			MISSING_CASE(id);
