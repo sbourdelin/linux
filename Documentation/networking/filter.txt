@@ -939,6 +939,16 @@ in eBPF means function exit only. The eBPF program needs to store return
 value into register R0 before doing a BPF_EXIT. Class 6 in eBPF is currently
 unused and reserved for future use.
 
+And BPF_JMP has sub-opcode. When BPF_SRC(code) == BPF_X, the encoding is at
+insn->imm, starting from LSB. When BPF_SRC(code) == BPF_K, the encoding is at
+insn->src_reg, starting from LSB as well. Only one bit is used for sub-opcode at
+the moment, all other bits in imm and src_reg are still reserved and should be
+zeroed. The BPF_JMP sub-opcode is:
+
+  BPF_JMP_SUBOP_32BIT	0x1
+
+It means jump insn use 32-bit sub-register when doing comparison.
+
 For load and store instructions the 8-bit 'code' field is divided as:
 
   +--------+--------+-------------------+

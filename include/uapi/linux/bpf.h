@@ -42,6 +42,10 @@
 #define BPF_CALL	0x80	/* function call */
 #define BPF_EXIT	0x90	/* function return */
 
+/* jmp has sub-opcode */
+#define BPF_JMP_SUBOP_MASK	0x1
+#define BPF_JMP_SUBOP_32BIT	0x1
+
 /* Register numbers */
 enum {
 	BPF_REG_0 = 0,
