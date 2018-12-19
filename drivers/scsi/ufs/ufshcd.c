@@ -42,6 +42,7 @@
 #include <linux/nls.h>
 #include <linux/of.h>
 #include <linux/bitfield.h>
+#include <linux/thermal.h>
 #include "ufshcd.h"
 #include "ufs_quirks.h"
 #include "unipro.h"
@@ -4881,6 +4882,174 @@ out:
 	return err;
 }
 
+#ifdef CONFIG_THERMAL
+
+#define attr2milicelcius(attr) (((0xFF & attr) - 80) * 1000)
+#define dev_thermal_info dev_info
+
+static int ufshcd_thermal_get_temp(struct thermal_zone_device *device,
+				  int *temperature)
+{
+	struct ufs_hba *hba = (struct ufs_hba *)device->devdata;
+	u32 temp;
+
+	const int err = ufshcd_query_attr_retry(hba,
+			UPIU_QUERY_OPCODE_READ_ATTR,
+			QUERY_ATTR_IDN_ROUGH_TEMP,
+			0, 0, &temp);
+	if (err)
+		return -EINVAL;
+
+	*temperature = attr2milicelcius(temp);
+	return 0;
+}
+
+static int ufshcd_thermal_get_trip_temp(
+		struct thermal_zone_device *device,
+				 int trip, int *temp)
+{
+	struct ufs_hba *hba = (struct ufs_hba *)device->devdata;
+
+	if (trip < 0 || trip >= UFS_THERM_MAX_TRIPS)
+		return -EINVAL;
+
+	if (hba->thermal.trip[UFS_THERM_TOO_HIGH_TRIP].index == trip)
+		*temp = hba->thermal.trip[
+			UFS_THERM_TOO_HIGH_TRIP].temp_boundary;
+	else if (hba->thermal.trip[UFS_THERM_TOO_LOW_TRIP].index == trip)
+		*temp = hba->thermal.trip[UFS_THERM_TOO_LOW_TRIP].temp_boundary;
+
+	return 0;
+}
+
+static int ufshcd_thermal_get_trip_type(
+		struct thermal_zone_device *device,
+		int trip, enum thermal_trip_type *type)
+{
+	if (trip < 0 || trip >= UFS_THERM_MAX_TRIPS)
+		return -EINVAL;
+
+	*type = THERMAL_TRIP_PASSIVE;
+
+	return 0;
+}
+
+static void ufshcd_therm_exception_event_handler(struct ufs_hba *hba,
+						u32 exception_status)
+{
+	if (exception_status & MASK_EE_TOO_HIGH_TEMP) {
+		thermal_notify_framework(hba->thermal.zone,
+		hba->thermal.trip[UFS_THERM_TOO_HIGH_TRIP].index);
+		dev_thermal_info(hba->dev,
+				"High temperature raised\n");
+	} else if (exception_status & MASK_EE_TOO_LOW_TEMP) {
+		thermal_notify_framework(hba->thermal.zone,
+		hba->thermal.trip[UFS_THERM_TOO_LOW_TRIP].index);
+		dev_thermal_info(hba->dev,
+				"Low temperature raised\n");
+	}
+}
+
+static  struct thermal_zone_device_ops thermal_ops = {
+	.get_temp = ufshcd_thermal_get_temp,
+	.get_trip_temp = ufshcd_thermal_get_trip_temp,
+	.get_trip_type = ufshcd_thermal_get_trip_type,
+};
+
+static bool ufshcd_thermal_get_boundary(struct ufs_hba *hba,
+					int trip, int *boundary)
+{
+	const u32 atrib = ((trip == UFS_THERM_TOO_HIGH_TRIP) ?
+			QUERY_ATTR_IDN_TOO_HIGH_TEMP :
+			QUERY_ATTR_IDN_TOO_LOW_TEMP);
+	const int err = ufshcd_query_attr_retry(hba,
+			UPIU_QUERY_OPCODE_READ_ATTR,
+			atrib, 0, 0, boundary);
+	if (err) {
+		dev_err(hba->dev,
+		"Failed to get device too %s temperature boundary\n",
+		trip == UFS_THERM_TOO_HIGH_TRIP ? "high" : "low");
+		return false;
+	}
+
+	*boundary = attr2milicelcius(*boundary);
+
+	return true;
+}
+
+static int ufshcd_thermal_enable_ee(struct ufs_hba *hba, int trip)
+{
+	const u16 mask = ((trip == UFS_THERM_TOO_HIGH_TRIP) ?
+			MASK_EE_TOO_HIGH_TEMP : MASK_EE_TOO_LOW_TEMP);
+	const int err = ufshcd_enable_ee(hba, mask);
+
+	if (err) {
+		dev_err(hba->dev,
+		"%s: failed to enable theraml too %s exception event %d\n",
+		__func__, UFS_THERM_TOO_HIGH_TRIP == trip ?
+		"high" : "low", err);
+	}
+	return err;
+}
+
+static bool ufshcd_thermal_set_trip(struct ufs_hba *hba, int trip,
+						int *trip_count)
+{
+	int temp;
+
+	if (ufshcd_thermal_get_boundary(hba, trip, &temp)) {
+		hba->thermal.trip[trip].index = (*trip_count)++;
+		hba->thermal.trip[trip].temp_boundary = temp;
+		return (ufshcd_thermal_enable_ee(hba, trip) == 0);
+	}
+	return false;
+}
+
+static void ufshcd_thermal_register(struct ufs_hba *hba, int thermal_features)
+{
+	char name[] = "ufs_storage";
+	int trip_count = 0;
+
+	BUILD_BUG_ON(ARRAY_SIZE(name) >= THERMAL_NAME_LENGTH);
+
+	if (thermal_features & UFS_FEATURE_TOO_HIGH_TEMPERATURE)
+		ufshcd_thermal_set_trip(hba, UFS_THERM_TOO_HIGH_TRIP,
+				&trip_count);
+
+	if (thermal_features & UFS_FEATURE_TOO_LOW_TEMPERATURE)
+		ufshcd_thermal_set_trip(hba, UFS_THERM_TOO_LOW_TRIP,
+				&trip_count);
+
+	if (trip_count > 0) {
+		hba->thermal.zone = thermal_zone_device_register("ufs_storage",
+				trip_count, 0, hba, &thermal_ops, NULL, 0, 0);
+		if (IS_ERR(hba->thermal.zone)) {
+			dev_err(hba->dev, "Failed to register to thermal zone (err = %ld)\n",
+					PTR_ERR(hba->thermal.zone));
+			hba->thermal.zone = NULL;
+		} else
+			dev_thermal_info(hba->dev, "Succeeded to register to thermal zone");
+	}
+}
+
+static void ufshcd_thermal_zone_unregister(struct ufs_hba *hba)
+{
+	if (hba->thermal.zone) {
+		dev_dbg(hba->dev, "Thermal zone device unregister\n");
+		thermal_zone_device_unregister(hba->thermal.zone);
+		hba->thermal.zone = NULL;
+	}
+}
+#else
+static void ufshcd_thermal_register(struct ufs_hba *hba, int thermal_features)
+{
+}
+
+static void ufshcd_thermal_zone_unregister(struct ufs_hba *hba)
+{
+}
+#endif /* CONFIG_THERMAL */
+
 /**
  * ufshcd_enable_auto_bkops - Allow device managed BKOPS
  * @hba: per-adapter instance
@@ -5119,6 +5288,10 @@ static void ufshcd_exception_event_handler(struct work_struct *work)
 
 	if (status & MASK_EE_URGENT_BKOPS)
 		ufshcd_bkops_exception_event_handler(hba);
+#ifdef CONFIG_THERMAL
+	if (status & (MASK_EE_TOO_HIGH_TEMP | MASK_EE_TOO_LOW_TEMP))
+		ufshcd_therm_exception_event_handler(hba, status);
+#endif /* CONFIG_THERMAL */
 
 out:
 	scsi_unblock_requests(hba->host);
@@ -6856,6 +7029,9 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	 * context, no need to scan the host
 	 */
 	if (!ufshcd_eh_in_progress(hba) && !hba->pm_op_in_progress) {
+		const int thermal_features = (card.ufs_features &
+				(UFS_FEATURE_TOO_HIGH_TEMPERATURE |
+				UFS_FEATURE_TOO_LOW_TEMPERATURE));
 		bool flag;
 
 		/* clear any previous UFS device information */
@@ -6889,6 +7065,9 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 
 		scsi_scan_host(hba->host);
 		pm_runtime_put_sync(hba->dev);
+
+		if (ufshcd_thermal_management_enabled(hba) && thermal_features)
+			ufshcd_thermal_register(hba, thermal_features);
 	}
 
 	if (!hba->is_init_prefetch)
@@ -7442,6 +7621,7 @@ out:
 static void ufshcd_hba_exit(struct ufs_hba *hba)
 {
 	if (hba->is_powered) {
+		ufshcd_thermal_zone_unregister(hba);
 		ufshcd_variant_hba_exit(hba);
 		ufshcd_setup_vreg(hba, false);
 		ufshcd_suspend_clkscaling(hba);

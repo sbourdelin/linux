@@ -705,6 +705,9 @@ static struct attribute *ufs_sysfs_attributes[] = {
 	&dev_attr_ffu_status.attr,
 	&dev_attr_psa_state.attr,
 	&dev_attr_psa_data_size.attr,
+	&dev_attr_rough_temp.attr,
+	&dev_attr_too_high_temp.attr,
+	&dev_attr_too_low_temp.attr,
 	NULL,
 };
 

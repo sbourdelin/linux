@@ -447,6 +447,29 @@ struct ufs_stats {
 	struct ufs_uic_err_reg_hist dme_err;
 };
 
+enum {
+	UFS_THERM_TOO_HIGH_TRIP,
+	UFS_THERM_TOO_LOW_TRIP,
+	UFS_THERM_MAX_TRIPS,
+};
+
+#ifdef CONFIG_THERMAL
+/**
+ *struct ufs_thermal - thermal zone related data
+ * @tzone: thermal zone device data
+ * @trip.temp_boundary: temperature thresholds for report
+ * @trip.index: the trip enumeration
+ * @trip: trip array, high and low if supported
+ */
+struct ufs_thermal {
+	struct thermal_zone_device *zone;
+	struct {
+		int index;
+		int temp_boundary;
+	} trip[UFS_THERM_MAX_TRIPS];
+};
+#endif /*CONFIG_THERMAL*/
+
 /**
  * struct ufs_hba - per adapter private structure
  * @mmio_base: UFSHCI base register address
@@ -693,6 +716,8 @@ struct ufs_hba {
 	 */
 #define UFSHCD_CAP_KEEP_AUTO_BKOPS_ENABLED_EXCEPT_SUSPEND (1 << 5)
 
+#define UFSHCD_CAP_THERMAL_MANAGEMENT (1 << 6)
+
 	struct devfreq *devfreq;
 	struct ufs_clk_scaling clk_scaling;
 	bool is_sys_suspended;
@@ -706,6 +731,10 @@ struct ufs_hba {
 
 	struct device		bsg_dev;
 	struct request_queue	*bsg_queue;
+#ifdef CONFIG_THERMAL
+	/*Thermal data*/
+	struct ufs_thermal	thermal;
+#endif /*CONFIG_THERMAL*/
 };
 
 /* Returns true if clocks can be gated. Otherwise false */
@@ -724,6 +753,10 @@ static inline int ufshcd_is_clkscaling_supported(struct ufs_hba *hba)
 static inline bool ufshcd_can_autobkops_during_suspend(struct ufs_hba *hba)
 {
 	return hba->caps & UFSHCD_CAP_AUTO_BKOPS_SUSPEND;
+}
+static inline bool ufshcd_thermal_management_enabled(struct ufs_hba *hba)
+{
+	return hba->caps & UFSHCD_CAP_THERMAL_MANAGEMENT;
 }
 
 static inline bool ufshcd_is_intr_aggr_allowed(struct ufs_hba *hba)
