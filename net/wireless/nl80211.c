@@ -2278,6 +2278,12 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 		if (nl80211_send_pmsr_capa(rdev, msg))
 			goto nla_put_failure;
 
+		if (rdev->wiphy.akm_suites &&
+		    nla_put(msg, NL80211_ATTR_AKM_SUITES,
+			    sizeof(u32) * rdev->wiphy.n_akm_suites,
+			    rdev->wiphy.akm_suites))
+			goto nla_put_failure;
+
 		/* done */
 		state->split_start = 0;
 		break;
