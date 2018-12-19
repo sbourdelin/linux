@@ -5680,6 +5680,7 @@ void tcp_finish_connect(struct sock *sk, struct sk_buff *skb)
 	 * packet.
 	 */
 	tp->lsndtime = tcp_jiffies32;
+	tp->retrans_stamp = 0;
 
 	if (sock_flag(sk, SOCK_KEEPOPEN))
 		inet_csk_reset_keepalive_timer(sk, keepalive_time_when(tp));
