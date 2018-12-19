@@ -184,6 +184,9 @@ static int sysvipc_sem_proc_show(struct seq_file *s, void *it);
  */
 #define USE_GLOBAL_LOCK_HYSTERESIS	10
 
+static void complexmode_enter(struct sem_array *sma);
+static void complexmode_tryleave(struct sem_array *sma);
+
 /*
  * Locking:
  * a) global sem_lock() for read/write
@@ -232,9 +235,24 @@ void sem_init_ns(struct ipc_namespace *ns)
 }
 
 #ifdef CONFIG_IPC_NS
+
+static void freeary_lock(struct ipc_namespace *ns, struct kern_ipc_perm *ipcp)
+{
+	struct sem_array *sma = container_of(ipcp, struct sem_array, sem_perm);
+
+	/*
+	 * free_ipcs() isn't aware of sem_lock(), it calls ipc_lock_object()
+	 * directly. In order to stay compatible with sem_lock(), we must
+	 * upgrade from "simple" ipc_lock_object() to sem_lock(,,-1).
+	 */
+	complexmode_enter(sma);
+
+	freeary(ns, ipcp);
+}
+
 void sem_exit_ns(struct ipc_namespace *ns)
 {
-	free_ipcs(ns, &sem_ids(ns), freeary);
+	free_ipcs(ns, &sem_ids(ns), freeary_lock);
 	idr_destroy(&ns->ids[IPC_SEM_IDS].ipcs_idr);
 	rhashtable_destroy(&ns->ids[IPC_SEM_IDS].key_ht);
 }
@@ -374,7 +392,9 @@ static inline int sem_lock(struct sem_array *sma, struct sembuf *sops,
 		/* Complex operation - acquire a full lock */
 		ipc_lock_object(&sma->sem_perm);
 
-		/* Prevent parallel simple ops */
+		/* Prevent parallel simple ops.
+		 * This must be identical to freeary_lock().
+		 */
 		complexmode_enter(sma);
 		return SEM_GLOBAL_LOCK;
 	}
