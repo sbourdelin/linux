@@ -1702,6 +1702,7 @@ static struct scsi_host_template scsi_driver = {
 	.dma_boundary =		PAGE_SIZE-1,
 	.no_write_same =	1,
 	.track_queue_depth =	1,
+	.force_blk_mq =		1,
 };
 
 enum {
