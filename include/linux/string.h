@@ -15,6 +15,27 @@ extern void *vmemdup_user(const void __user *, size_t);
 extern void *memdup_user_nul(const void __user *, size_t);
 
 /*
+ * A common way to test a prefix of a string is to do:
+ *  strncmp(str, prefix, sizeof(prefix) - 1)
+ *
+ * But this can lead to bugs due to typos, or if prefix is a pointer
+ * and not a constant. Instead use strncmp_prefix().
+ */
+#define strncmp_prefix(str, prefix)					\
+	({								\
+		int ____strcmp_prefix_ret____;				\
+		char *____strcmp_prefix____ = prefix;			\
+		if (__builtin_constant_p(&prefix))			\
+			____strcmp_prefix_ret____ =			\
+				strncmp(str, prefix, sizeof(prefix) - 1); \
+		else							\
+			____strcmp_prefix_ret____ =			\
+				strncmp(str, ____strcmp_prefix____,	\
+					strlen(____strcmp_prefix____));	\
+		____strcmp_prefix_ret____;				\
+	})
+
+/*
  * Include machine specific inline routines
  */
 #include <asm/string.h>
