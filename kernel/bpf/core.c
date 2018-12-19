@@ -902,7 +902,13 @@ static int bpf_jit_blind_insn(const struct bpf_insn *from,
 			off -= 2;
 		*to++ = BPF_ALU64_IMM(BPF_MOV, BPF_REG_AX, imm_rnd ^ from->imm);
 		*to++ = BPF_ALU64_IMM(BPF_XOR, BPF_REG_AX, imm_rnd);
-		*to++ = BPF_JMP_REG(from->code, from->dst_reg, BPF_REG_AX, off);
+		*to = BPF_JMP_REG(from->code, from->dst_reg, BPF_REG_AX, off);
+		if (from->src_reg)
+			/* NOTE: BPF_K has been transformed into BPF_X,
+			 * mark imm instead of src_reg
+			 */
+			to->imm |= BPF_JMP_SUBOP_32BIT;
+		to++;
 		break;
 
 	case BPF_LD | BPF_IMM | BPF_DW:
