@@ -27,6 +27,14 @@ struct parm {
 	u8	width;
 };
 
+struct meson_sclk_div_data {
+	struct parm div;
+	struct parm hi;
+	unsigned int cached_div;
+	struct clk_duty cached_duty;
+	u8 flags;
+};
+
 static inline unsigned int meson_parm_read(struct regmap *map, struct parm *p)
 {
 	unsigned int val;
@@ -118,10 +126,10 @@ extern const struct clk_ops meson_clk_mpll_ro_ops;
 extern const struct clk_ops meson_clk_mpll_ops;
 extern const struct clk_ops meson_clk_phase_ops;
 extern const struct clk_ops meson_vid_pll_div_ro_ops;
+extern const struct clk_ops meson_sclk_div_ops;
 
 struct clk_hw *meson_clk_hw_register_input(struct device *dev,
 					   const char *of_name,
 					   const char *clk_name,
 					   unsigned long flags);
-
 #endif /* __CLKC_H */
