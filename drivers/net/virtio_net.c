@@ -2479,6 +2479,22 @@ static int virtnet_get_phys_port_name(struct net_device *dev, char *buf,
 	return 0;
 }
 
+static int virtnet_set_features(struct net_device *dev,
+				netdev_features_t features)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	int ret = 0;
+
+	if ((dev->features ^ features) & NETIF_F_LRO) {
+		if (features & NETIF_F_LRO)
+			ret = virtnet_restore_guest_offloads(vi);
+		else
+			ret = virtnet_clear_guest_offloads(vi);
+	}
+
+	return ret;
+}
+
 static const struct net_device_ops virtnet_netdev = {
 	.ndo_open            = virtnet_open,
 	.ndo_stop   	     = virtnet_close,
@@ -2493,6 +2509,7 @@ static const struct net_device_ops virtnet_netdev = {
 	.ndo_xdp_xmit		= virtnet_xdp_xmit,
 	.ndo_features_check	= passthru_features_check,
 	.ndo_get_phys_port_name	= virtnet_get_phys_port_name,
+	.ndo_set_features	= virtnet_set_features,
 };
 
 static void virtnet_config_changed_work(struct work_struct *work)
@@ -2942,6 +2959,11 @@ static int virtnet_probe(struct virtio_device *vdev)
 			dev->hw_features |= NETIF_F_TSO6;
 		if (virtio_has_feature(vdev, VIRTIO_NET_F_HOST_ECN))
 			dev->hw_features |= NETIF_F_TSO_ECN;
+		if (virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO4) &&
+		    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO6)) {
+			dev->hw_features |= NETIF_F_LRO;
+			dev->features |= NETIF_F_LRO;
+		}
 
 		dev->features |= NETIF_F_GSO_ROBUST;
 
