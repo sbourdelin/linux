@@ -31,6 +31,7 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/nospec.h>
 #include <sound/core.h>
 #include <sound/snd_wavefront.h>
 #include <sound/initval.h>
@@ -788,7 +789,8 @@ wavefront_send_patch (snd_wavefront_t *dev, wavefront_patch_info *header)
 
 	if (header->number >= ARRAY_SIZE(dev->patch_status))
 		return -EINVAL;
-
+	header->number = array_index_nospec(header->number,
+					    ARRAY_SIZE(dev->patch_status));
 	dev->patch_status[header->number] |= WF_SLOT_FILLED;
 
 	bptr = buf;
@@ -815,7 +817,8 @@ wavefront_send_program (snd_wavefront_t *dev, wavefront_patch_info *header)
 
 	if (header->number >= ARRAY_SIZE(dev->prog_status))
 		return -EINVAL;
-
+	header->number = array_index_nospec(header->number,
+					    ARRAY_SIZE(dev->prog_status));
 	dev->prog_status[header->number] = WF_SLOT_USED;
 
 	/* XXX need to zero existing SLOT_USED bit for program_status[i]
@@ -1194,6 +1197,10 @@ wavefront_send_alias (snd_wavefront_t *dev, wavefront_patch_info *header)
 		return -EIO;
 	}
 
+	if (header->number >= ARRAY_SIZE(dev->sample_status))
+		return -EINVAL;
+	header->number = array_index_nospec(header->number,
+					    ARRAY_SIZE(dev->sample_status));
 	dev->sample_status[header->number] = (WF_SLOT_FILLED|WF_ST_ALIAS);
 
 	return (0);
@@ -1245,6 +1252,10 @@ wavefront_send_multisample (snd_wavefront_t *dev, wavefront_patch_info *header)
 		return -EIO;
 	}
 
+	if (header->number >= ARRAY_SIZE(dev->sample_status))
+		return -EINVAL;
+	header->number = array_index_nospec(header->number,
+					    ARRAY_SIZE(dev->sample_status));
 	dev->sample_status[header->number] = (WF_SLOT_FILLED|WF_ST_MULTISAMPLE);
 
 	kfree(msample_hdr);
@@ -1539,12 +1550,13 @@ wavefront_synth_control (snd_wavefront_card_t *acard,
 
 	case WFC_IDENTIFY_SLOT_TYPE:
 		i = wc->wbuf[0] | (wc->wbuf[1] << 7);
-		if (i <0 || i >= WF_MAX_SAMPLE) {
+		if (i < 0 || i >= WF_MAX_SAMPLE) {
 			snd_printk ("invalid slot ID %d\n",
 				i);
 			wc->status = EINVAL;
 			return -EINVAL;
 		}
+		i = array_index_nospec(i, WF_MAX_SAMPLE);
 		wc->rbuf[0] = dev->sample_status[i];
 		wc->status = 0;
 		return 0;
