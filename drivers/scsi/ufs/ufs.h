@@ -168,6 +168,9 @@ enum attr_idn {
 	QUERY_ATTR_IDN_FFU_STATUS		= 0x14,
 	QUERY_ATTR_IDN_PSA_STATE		= 0x15,
 	QUERY_ATTR_IDN_PSA_DATA_SIZE		= 0x16,
+	QUERY_ATTR_IDN_ROUGH_TEMP		= 0x18,
+	QUERY_ATTR_IDN_TOO_HIGH_TEMP		= 0x19,
+	QUERY_ATTR_IDN_TOO_LOW_TEMP		= 0x1A,
 };
 
 /* Descriptor idn for Query requests */
@@ -354,6 +357,8 @@ enum power_desc_param_offset {
 enum {
 	MASK_EE_STATUS		= 0xFFFF,
 	MASK_EE_URGENT_BKOPS	= (1 << 2),
+	MASK_EE_TOO_HIGH_TEMP	= (1 << 3),
+	MASK_EE_TOO_LOW_TEMP	= (1 << 4),
 };
 
 /* Background operation status */
@@ -543,6 +548,9 @@ struct ufs_dev_info {
  */
 struct ufs_dev_desc {
 	u16 wmanufacturerid;
+	u16 ufs_features;
+#define UFS_FEATURE_TOO_HIGH_TEMPERATURE (1 << 4)
+#define UFS_FEATURE_TOO_LOW_TEMPERATURE (1 << 5)
 	char model[MAX_MODEL_LEN + 1];
 };
 

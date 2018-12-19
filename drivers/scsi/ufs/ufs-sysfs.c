@@ -684,6 +684,9 @@ UFS_ATTRIBUTE(exception_event_status, _EE_STATUS);
 UFS_ATTRIBUTE(ffu_status, _FFU_STATUS);
 UFS_ATTRIBUTE(psa_state, _PSA_STATE);
 UFS_ATTRIBUTE(psa_data_size, _PSA_DATA_SIZE);
+UFS_ATTRIBUTE(rough_temp, _ROUGH_TEMP);
+UFS_ATTRIBUTE(too_high_temp, _TOO_HIGH_TEMP);
+UFS_ATTRIBUTE(too_low_temp, _TOO_LOW_TEMP);
 
 static struct attribute *ufs_sysfs_attributes[] = {
 	&dev_attr_boot_lun_enabled.attr,

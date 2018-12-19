@@ -6431,6 +6431,8 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
 
+	dev_desc->ufs_features = desc_buf[DEVICE_DESC_PARAM_UFS_FEAT];
+
 	/* Zero-pad entire buffer for string termination. */
 	memset(desc_buf, 0, buff_len);
 
