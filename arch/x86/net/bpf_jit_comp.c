@@ -882,8 +882,12 @@ xadd:			if (is_imm8(insn->off))
 		case BPF_JMP | BPF_JSGE | BPF_X:
 		case BPF_JMP | BPF_JSLE | BPF_X:
 			/* cmp dst_reg, src_reg */
-			EMIT3(add_2mod(0x48, dst_reg, src_reg), 0x39,
-			      add_2reg(0xC0, dst_reg, src_reg));
+			if (!imm32) /* JMP32 */
+				EMIT1(add_2mod(0x48, dst_reg, src_reg));
+			else if (is_ereg(dst_reg) || is_ereg(src_reg))
+				EMIT1(add_2mod(0x40, dst_reg, src_reg));
+
+			EMIT2(0x39, add_2reg(0xC0, dst_reg, src_reg));
 			goto emit_cond_jmp;
 
 		case BPF_JMP | BPF_JSET | BPF_X:
@@ -909,7 +913,10 @@ xadd:			if (is_imm8(insn->off))
 		case BPF_JMP | BPF_JSGE | BPF_K:
 		case BPF_JMP | BPF_JSLE | BPF_K:
 			/* cmp dst_reg, imm8/32 */
-			EMIT1(add_1mod(0x48, dst_reg));
+			if (!src_reg) /* JMP32 */
+				EMIT1(add_1mod(0x48, dst_reg));
+			else if (is_ereg(dst_reg))
+				EMIT1(add_1mod(0x40, dst_reg));
 
 			if (is_imm8(imm32))
 				EMIT3(0x83, add_1reg(0xF8, dst_reg), imm32);
