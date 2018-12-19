@@ -1735,8 +1735,15 @@ EXPORT_SYMBOL(unregister_netdevice_notifier);
 static int call_netdevice_notifiers_info(unsigned long val,
 					 struct netdev_notifier_info *info)
 {
+	int rc;
+
 	ASSERT_RTNL();
-	return raw_notifier_call_chain(&netdev_chain, val, info);
+
+	trace_net_dev_notifier_entry(info, val);
+	rc = raw_notifier_call_chain(&netdev_chain, val, info);
+	trace_net_dev_notifier(info, rc, val);
+
+	return rc;
 }
 
 static int call_netdevice_notifiers_extack(unsigned long val,
