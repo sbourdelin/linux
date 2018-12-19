@@ -1113,6 +1113,12 @@ static inline void perf_event_task_sched_out(struct task_struct *prev,
 }
 
 extern void perf_event_mmap(struct vm_area_struct *vma);
+
+/* callback function to generate ksymbol name */
+typedef int (perf_ksymbol_get_name_f)(char *name, int name_len, void *data);
+extern void perf_event_ksymbol(int type, u64 addr, u64 len, bool unregister,
+			       perf_ksymbol_get_name_f get_name, void *data);
+
 extern struct perf_guest_info_callbacks *perf_guest_cbs;
 extern int perf_register_guest_info_callbacks(struct perf_guest_info_callbacks *callbacks);
 extern int perf_unregister_guest_info_callbacks(struct perf_guest_info_callbacks *callbacks);
