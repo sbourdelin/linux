@@ -2578,6 +2578,9 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 				struct net_device *uplink_dev = mlx5_eswitch_uplink_get_proto_dev(esw, REP_ETH);
 				struct net_device *uplink_upper = netdev_master_upper_dev_get(uplink_dev);
 
+				if (!mlx5e_eswitch_rep(out_dev))
+					return -EOPNOTSUPP;
+
 				if (uplink_upper &&
 				    netif_is_lag_master(uplink_upper) &&
 				    uplink_upper == out_dev)
