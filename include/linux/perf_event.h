@@ -1118,6 +1118,9 @@ extern void perf_event_mmap(struct vm_area_struct *vma);
 typedef int (perf_ksymbol_get_name_f)(char *name, int name_len, void *data);
 extern void perf_event_ksymbol(int type, u64 addr, u64 len, bool unregister,
 			       perf_ksymbol_get_name_f get_name, void *data);
+extern void perf_event_bpf_event(struct bpf_prog *prog,
+				 enum perf_bpf_event_type type,
+				 u16 flags);
 
 extern struct perf_guest_info_callbacks *perf_guest_cbs;
 extern int perf_register_guest_info_callbacks(struct perf_guest_info_callbacks *callbacks);
