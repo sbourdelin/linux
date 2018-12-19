@@ -127,9 +127,12 @@ int machine__process_mmap_event(struct machine *machine, union perf_event *event
 				struct perf_sample *sample);
 int machine__process_mmap2_event(struct machine *machine, union perf_event *event,
 				 struct perf_sample *sample);
+
 int machine__process_event(struct machine *machine, union perf_event *event,
 				struct perf_sample *sample);
-
+int machine__process_ksymbol(struct machine *machine,
+			     union perf_event *event,
+			     struct perf_sample *sample);
 typedef void (*machine__process_t)(struct machine *machine, void *data);
 
 struct machines {
