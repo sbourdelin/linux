@@ -13,12 +13,15 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/soc/qcom/irq.h>
 #include <linux/spinlock.h>
-#include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 
+#include "qcom-pdc.h"
+
 #define PDC_MAX_IRQS		126
+#define PDC_MAX_GPIO_IRQS	256
 
 #define CLEAR_INTR(reg, intr)	(reg & ~(1 << intr))
 #define ENABLE_INTR(reg, intr)	(reg | (1 << intr))
@@ -47,9 +50,8 @@ static u32 pdc_reg_read(int reg, u32 i)
 	return readl_relaxed(pdc_base + reg + i * sizeof(u32));
 }
 
-static void pdc_enable_intr(struct irq_data *d, bool on)
+static void pdc_enable_intr(irq_hw_number_t pin_out, bool on)
 {
-	int pin_out = d->hwirq;
 	u32 index, mask;
 	u32 enable;
 
@@ -65,13 +67,23 @@ static void pdc_enable_intr(struct irq_data *d, bool on)
 
 static void qcom_pdc_gic_mask(struct irq_data *d)
 {
-	pdc_enable_intr(d, false);
+	irq_hw_number_t hwirq = d->hwirq;
+
+	if (hwirq == ULONG_MAX)
+		return;
+
+	pdc_enable_intr(hwirq, false);
 	irq_chip_mask_parent(d);
 }
 
 static void qcom_pdc_gic_unmask(struct irq_data *d)
 {
-	pdc_enable_intr(d, true);
+	irq_hw_number_t hwirq = d->hwirq;
+
+	if (hwirq == ULONG_MAX)
+		return;
+
+	pdc_enable_intr(hwirq, true);
 	irq_chip_unmask_parent(d);
 }
 
@@ -111,8 +123,11 @@ enum pdc_irq_config_bits {
  */
 static int qcom_pdc_gic_set_type(struct irq_data *d, unsigned int type)
 {
-	int pin_out = d->hwirq;
+	irq_hw_number_t pin_out = d->hwirq;
 	enum pdc_irq_config_bits pdc_type;
+
+	if (pin_out == ULONG_MAX)
+		return 0;
 
 	switch (type) {
 	case IRQ_TYPE_EDGE_RISING:
@@ -157,7 +172,7 @@ static struct irq_chip qcom_pdc_gic_chip = {
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 };
 
-static irq_hw_number_t get_parent_hwirq(int pin)
+static irq_hw_number_t get_parent_hwirq(irq_hw_number_t pin)
 {
 	int i;
 	struct pdc_pin_region *region;
@@ -169,7 +184,6 @@ static irq_hw_number_t get_parent_hwirq(int pin)
 			return (region->parent_base + pin - region->pin_base);
 	}
 
-	WARN_ON(1);
 	return ~0UL;
 }
 
@@ -232,6 +246,73 @@ static const struct irq_domain_ops qcom_pdc_ops = {
 	.free		= irq_domain_free_irqs_common,
 };
 
+static irq_hw_number_t qcom_gpio_to_pdc_pin(struct irq_domain *domain,
+					    unsigned int gpio)
+{
+	struct device_node *dn = irq_domain_get_of_node(domain);
+	const struct of_device_id *match_id;
+	const struct pdc_gpio_pin_data *data;
+	unsigned int i;
+
+	match_id = of_match_node(pdc_gpio_match_table, dn);
+	if (!match_id)
+		return ULONG_MAX;
+
+	data = match_id->data;
+	if (!data)
+		return ULONG_MAX;
+
+	for (i = 0; i < data->size; i++)
+		if (gpio == data->map[i].gpio)
+			return data->map[i].pdc_pin;
+
+	return ULONG_MAX;
+}
+
+static int qcom_pdc_gpio_alloc(struct irq_domain *domain, unsigned int virq,
+			       unsigned int nr_irqs, void *data)
+{
+	struct qcom_irq_fwspec *qcom_fwspec = data;
+	struct irq_fwspec *fwspec = &qcom_fwspec->fwspec;
+	struct irq_fwspec parent_fwspec;
+	irq_hw_number_t hwirq, parent_hwirq;
+	unsigned int type;
+	int ret;
+
+	hwirq = qcom_gpio_to_pdc_pin(domain, fwspec->param[0]);
+	parent_hwirq = get_parent_hwirq(hwirq);
+
+	ret = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
+					    &qcom_pdc_gic_chip, NULL);
+	if (ret)
+		return ret;
+
+	if (hwirq == ULONG_MAX)
+		return 0;
+
+	qcom_fwspec->mask = true;
+
+	if (type & IRQ_TYPE_EDGE_BOTH)
+		type = IRQ_TYPE_EDGE_RISING;
+
+	if (type & IRQ_TYPE_LEVEL_MASK)
+		type = IRQ_TYPE_LEVEL_HIGH;
+
+	parent_fwspec.fwnode      = domain->parent->fwnode;
+	parent_fwspec.param_count = 3;
+	parent_fwspec.param[0]    = 0;
+	parent_fwspec.param[1]    = parent_hwirq;
+	parent_fwspec.param[2]    = type;
+
+	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+					    &parent_fwspec);
+}
+
+static const struct irq_domain_ops qcom_pdc_gpio_ops = {
+	.alloc		= qcom_pdc_gpio_alloc,
+	.free		= irq_domain_free_irqs_common,
+};
+
 static int pdc_setup_pin_mapping(struct device_node *np)
 {
 	int ret, n;
@@ -270,7 +351,7 @@ static int pdc_setup_pin_mapping(struct device_node *np)
 
 static int qcom_pdc_init(struct device_node *node, struct device_node *parent)
 {
-	struct irq_domain *parent_domain, *pdc_domain;
+	struct irq_domain *parent_domain, *pdc_domain, *pdc_gpio_domain;
 	int ret;
 
 	pdc_base = of_iomap(node, 0);
@@ -300,6 +381,18 @@ static int qcom_pdc_init(struct device_node *node, struct device_node *parent)
 		ret = -ENOMEM;
 		goto fail;
 	}
+
+	pdc_gpio_domain = irq_domain_create_hierarchy(parent_domain, 0,
+						      PDC_MAX_GPIO_IRQS,
+						      of_fwnode_handle(node),
+						      &qcom_pdc_gpio_ops, NULL);
+	if (!pdc_gpio_domain) {
+		pr_err("%pOF: GIC domain add failed for GPIO domain\n", node);
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	irq_domain_update_bus_token(pdc_gpio_domain, DOMAIN_BUS_WAKEUP);
 
 	return 0;
 
