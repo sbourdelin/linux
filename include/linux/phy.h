@@ -288,38 +288,38 @@ struct phy_device *mdiobus_scan(struct mii_bus *bus, int addr);
  *
  * NOLINK: PHY is up, but not currently plugged in.
  * - irq or timer will set RUNNING if link comes back
- * - phy_stop moves to HALTED
+ * - phy_stop moves to HALT
  *
  * FORCING: PHY is being configured with forced settings
  * - if link is up, move to RUNNING
  * - If link is down, we drop to the next highest setting, and
  *   retry (FORCING) after a timeout
- * - phy_stop moves to HALTED
+ * - phy_stop moves to HALT
  *
  * RUNNING: PHY is currently up, running, and possibly sending
  * and/or receiving packets
  * - irq or timer will set NOLINK if link goes down
- * - phy_stop moves to HALTED
+ * - phy_stop moves to HALT
  *
  * CHANGELINK: PHY experienced a change in link state
  * - timer moves to RUNNING if link
  * - timer moves to NOLINK if the link is down
- * - phy_stop moves to HALTED
+ * - phy_stop moves to HALT
  *
- * HALTED: PHY is up, but no polling or interrupts are done. Or
+ * HALT: PHY is up, but no polling or interrupts are done. Or
  * PHY is in an error state.
  *
- * - phy_start moves to RESUMING
+ * - moves to READY
  *
  * RESUMING: PHY was halted, but now wants to run again.
  * - If we are forcing, or aneg is done, timer moves to RUNNING
  * - If aneg is not done, timer moves to AN
- * - phy_stop moves to HALTED
+ * - phy_stop moves to HALT
  */
 enum phy_state {
 	PHY_DOWN = 0,
 	PHY_READY,
-	PHY_HALTED,
+	PHY_HALT,
 	PHY_UP,
 	PHY_RUNNING,
 	PHY_NOLINK,

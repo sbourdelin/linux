@@ -47,12 +47,12 @@ static const char *phy_state_to_str(enum phy_state st)
 	switch (st) {
 	PHY_STATE_STR(DOWN)
 	PHY_STATE_STR(READY)
+	PHY_STATE_STR(HALT)
 	PHY_STATE_STR(UP)
 	PHY_STATE_STR(RUNNING)
 	PHY_STATE_STR(NOLINK)
 	PHY_STATE_STR(FORCING)
 	PHY_STATE_STR(CHANGELINK)
-	PHY_STATE_STR(HALTED)
 	PHY_STATE_STR(RESUMING)
 	}
 
@@ -733,7 +733,7 @@ static void phy_error(struct phy_device *phydev)
 	WARN_ON(1);
 
 	mutex_lock(&phydev->lock);
-	phydev->state = PHY_HALTED;
+	phydev->state = PHY_HALT;
 	mutex_unlock(&phydev->lock);
 
 	phy_trigger_machine(phydev);
@@ -859,16 +859,11 @@ void phy_stop(struct phy_device *phydev)
 	if (phy_interrupt_is_valid(phydev))
 		phy_disable_interrupts(phydev);
 
-	phydev->state = PHY_HALTED;
+	phydev->state = PHY_HALT;
 
 	mutex_unlock(&phydev->lock);
 
 	phy_state_machine(&phydev->state_queue.work);
-
-	/* Cannot call flush_scheduled_work() here as desired because
-	 * of rtnl_lock(), but PHY_HALTED shall guarantee irq handler
-	 * will not reenable interrupts.
-	 */
 }
 EXPORT_SYMBOL(phy_stop);
 
@@ -888,29 +883,26 @@ void phy_start(struct phy_device *phydev)
 
 	mutex_lock(&phydev->lock);
 
-	switch (phydev->state) {
-	case PHY_READY:
-		phydev->state = PHY_UP;
-		break;
-	case PHY_HALTED:
+	if (phydev->state == PHY_READY) {
 		/* if phy was suspended, bring the physical link up again */
 		__phy_resume(phydev);
 
 		/* make sure interrupts are re-enabled for the PHY */
 		if (phy_interrupt_is_valid(phydev)) {
 			err = phy_enable_interrupts(phydev);
-			if (err < 0)
-				break;
+			if (err < 0) {
+				WARN_ON(1);
+				goto out;
+			}
 		}
-
-		phydev->state = PHY_RESUMING;
-		break;
-	default:
-		break;
+		phydev->state = PHY_UP;
+		phy_trigger_machine(phydev);
+	} else {
+		WARN(1, "called from state %s\n",
+		     phy_state_to_str(phydev->state));
 	}
+out:
 	mutex_unlock(&phydev->lock);
-
-	phy_trigger_machine(phydev);
 }
 EXPORT_SYMBOL(phy_start);
 
@@ -962,12 +954,13 @@ void phy_state_machine(struct work_struct *work)
 			phy_link_down(phydev, false);
 		}
 		break;
-	case PHY_HALTED:
+	case PHY_HALT:
 		if (phydev->link) {
 			phydev->link = 0;
 			phy_link_down(phydev, true);
 			do_suspend = true;
 		}
+		phydev->state = PHY_READY;
 		break;
 	}
 
@@ -990,7 +983,7 @@ void phy_state_machine(struct work_struct *work)
 	 * PHY, if PHY_IGNORE_INTERRUPT is set, then we will be moving
 	 * between states from phy_mac_interrupt().
 	 *
-	 * In state PHY_HALTED the PHY gets suspended, so rescheduling the
+	 * In state PHY_HALT the PHY gets suspended, so rescheduling the
 	 * state machine would be pointless and possibly error prone when
 	 * called from phy_disconnect() synchronously.
 	 */
