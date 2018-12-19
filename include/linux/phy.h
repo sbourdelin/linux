@@ -301,20 +301,10 @@ struct phy_device *mdiobus_scan(struct mii_bus *bus, int addr);
  * - irq or timer will set NOLINK if link goes down
  * - phy_stop moves to HALT
  *
- * CHANGELINK: PHY experienced a change in link state
- * - timer moves to RUNNING if link
- * - timer moves to NOLINK if the link is down
- * - phy_stop moves to HALT
- *
  * HALT: PHY is up, but no polling or interrupts are done. Or
  * PHY is in an error state.
  *
  * - moves to READY
- *
- * RESUMING: PHY was halted, but now wants to run again.
- * - If we are forcing, or aneg is done, timer moves to RUNNING
- * - If aneg is not done, timer moves to AN
- * - phy_stop moves to HALT
  */
 enum phy_state {
 	PHY_DOWN = 0,
@@ -324,8 +314,6 @@ enum phy_state {
 	PHY_RUNNING,
 	PHY_NOLINK,
 	PHY_FORCING,
-	PHY_CHANGELINK,
-	PHY_RESUMING
 };
 
 /**
