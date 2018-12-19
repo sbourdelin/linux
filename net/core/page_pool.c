@@ -233,7 +233,7 @@ void __page_pool_put_page(struct page_pool *pool,
 	 *
 	 * refcnt == 1 means page_pool owns page, and can recycle it.
 	 */
-	if (likely(page_ref_count(page) == 1)) {
+	if (likely(page_ref_count(page) == 1 && !page_is_pfmemalloc(page))) {
 		/* Read barrier done in page_ref_count / READ_ONCE */
 
 		if (allow_direct && in_serving_softirq())
@@ -259,8 +259,7 @@ void __page_pool_put_page(struct page_pool *pool,
 	 * doing refcnt based recycle tricks, meaning another process
 	 * will be invoking put_page.
 	 */
-	__page_pool_clean_page(pool, page);
-	put_page(page);
+	__page_pool_return_page(pool, page);
 }
 EXPORT_SYMBOL(__page_pool_put_page);
 
