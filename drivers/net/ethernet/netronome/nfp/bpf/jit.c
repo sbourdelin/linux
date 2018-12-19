@@ -1334,8 +1334,11 @@ wrp_test_reg(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta,
 
 	wrp_test_reg_one(nfp_prog, insn->dst_reg * 2, alu_op,
 			 insn->src_reg * 2, br_mask, insn->off);
-	wrp_test_reg_one(nfp_prog, insn->dst_reg * 2 + 1, alu_op,
-			 insn->src_reg * 2 + 1, br_mask, insn->off);
+	/* JMP64 */
+	if (!insn->imm) {
+		wrp_test_reg_one(nfp_prog, insn->dst_reg * 2 + 1, alu_op,
+				 insn->src_reg * 2 + 1, br_mask, insn->off);
+	}
 
 	return 0;
 }
@@ -1390,13 +1393,16 @@ static int cmp_imm(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 	else
 		emit_alu(nfp_prog, reg_none(), tmp_reg, alu_op, reg_a(reg));
 
-	tmp_reg = ur_load_imm_any(nfp_prog, imm >> 32, imm_b(nfp_prog));
-	if (!code->swap)
-		emit_alu(nfp_prog, reg_none(),
-			 reg_a(reg + 1), carry_op, tmp_reg);
-	else
-		emit_alu(nfp_prog, reg_none(),
-			 tmp_reg, carry_op, reg_a(reg + 1));
+	/* JMP64 */
+	if (!insn->src_reg) {
+		tmp_reg = ur_load_imm_any(nfp_prog, imm >> 32, imm_b(nfp_prog));
+		if (!code->swap)
+			emit_alu(nfp_prog, reg_none(),
+				 reg_a(reg + 1), carry_op, tmp_reg);
+		else
+			emit_alu(nfp_prog, reg_none(),
+				 tmp_reg, carry_op, reg_a(reg + 1));
+	}
 
 	emit_br(nfp_prog, code->br_mask, insn->off, 0);
 
@@ -1423,8 +1429,10 @@ static int cmp_reg(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 	}
 
 	emit_alu(nfp_prog, reg_none(), reg_a(areg), ALU_OP_SUB, reg_b(breg));
-	emit_alu(nfp_prog, reg_none(),
-		 reg_a(areg + 1), ALU_OP_SUB_C, reg_b(breg + 1));
+	/* JMP64 */
+	if (!insn->imm)
+		emit_alu(nfp_prog, reg_none(),
+			 reg_a(areg + 1), ALU_OP_SUB_C, reg_b(breg + 1));
 	emit_br(nfp_prog, code->br_mask, insn->off, 0);
 
 	return 0;
@@ -3023,7 +3031,8 @@ static int jeq_imm(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 {
 	const struct bpf_insn *insn = &meta->insn;
 	u64 imm = insn->imm; /* sign extend */
-	swreg or1, or2, tmp_reg;
+	swreg or1, or2, or1b, tmp_reg;
+	bool alu_flag_set = false;
 
 	or1 = reg_a(insn->dst_reg * 2);
 	or2 = reg_b(insn->dst_reg * 2 + 1);
@@ -3033,6 +3042,17 @@ static int jeq_imm(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 		emit_alu(nfp_prog, imm_a(nfp_prog),
 			 reg_a(insn->dst_reg * 2), ALU_OP_XOR, tmp_reg);
 		or1 = imm_a(nfp_prog);
+		alu_flag_set = true;
+	}
+
+	/* JMP32 */
+	if (insn->src_reg) {
+		if (!alu_flag_set) {
+			or1b = reg_b(insn->dst_reg * 2);
+			emit_alu(nfp_prog, reg_none(), reg_none(), ALU_OP_NONE,
+				 or1b);
+		}
+		goto jeq_imm_br_out;
 	}
 
 	if (imm >> 32) {
@@ -3043,6 +3063,7 @@ static int jeq_imm(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 	}
 
 	emit_alu(nfp_prog, reg_none(), or1, ALU_OP_OR, or2);
+jeq_imm_br_out:
 	emit_br(nfp_prog, BR_BEQ, insn->off, 0);
 
 	return 0;
@@ -3080,11 +3101,16 @@ static int jne_imm(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 {
 	const struct bpf_insn *insn = &meta->insn;
 	u64 imm = insn->imm; /* sign extend */
+	bool is_jmp32 = !!insn->src_reg;
 	swreg tmp_reg;
 
 	if (!imm) {
-		emit_alu(nfp_prog, reg_none(), reg_a(insn->dst_reg * 2),
-			 ALU_OP_OR, reg_b(insn->dst_reg * 2 + 1));
+		if (is_jmp32)
+			emit_alu(nfp_prog, reg_none(), reg_none(), ALU_OP_NONE,
+				 reg_b(insn->dst_reg * 2));
+		else
+			emit_alu(nfp_prog, reg_none(), reg_a(insn->dst_reg * 2),
+				 ALU_OP_OR, reg_b(insn->dst_reg * 2 + 1));
 		emit_br(nfp_prog, BR_BNE, insn->off, 0);
 		return 0;
 	}
@@ -3093,6 +3119,9 @@ static int jne_imm(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 	emit_alu(nfp_prog, reg_none(),
 		 reg_a(insn->dst_reg * 2), ALU_OP_XOR, tmp_reg);
 	emit_br(nfp_prog, BR_BNE, insn->off, 0);
+
+	if (is_jmp32)
+		return 0;
 
 	tmp_reg = ur_load_imm_any(nfp_prog, imm >> 32, imm_b(nfp_prog));
 	emit_alu(nfp_prog, reg_none(),
@@ -3108,10 +3137,14 @@ static int jeq_reg(struct nfp_prog *nfp_prog, struct nfp_insn_meta *meta)
 
 	emit_alu(nfp_prog, imm_a(nfp_prog), reg_a(insn->dst_reg * 2),
 		 ALU_OP_XOR, reg_b(insn->src_reg * 2));
-	emit_alu(nfp_prog, imm_b(nfp_prog), reg_a(insn->dst_reg * 2 + 1),
-		 ALU_OP_XOR, reg_b(insn->src_reg * 2 + 1));
-	emit_alu(nfp_prog, reg_none(),
-		 imm_a(nfp_prog), ALU_OP_OR, imm_b(nfp_prog));
+	/* JMP64 */
+	if (!insn->imm) {
+		emit_alu(nfp_prog, imm_b(nfp_prog),
+			 reg_a(insn->dst_reg * 2 + 1), ALU_OP_XOR,
+			 reg_b(insn->src_reg * 2 + 1));
+		emit_alu(nfp_prog, reg_none(), imm_a(nfp_prog), ALU_OP_OR,
+			 imm_b(nfp_prog));
+	}
 	emit_br(nfp_prog, BR_BEQ, insn->off, 0);
 
 	return 0;
