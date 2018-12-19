@@ -1186,21 +1186,25 @@ branch_ks:
 		/* lgfi %w1,imm (load sign extend imm) */
 		EMIT6_IMM(0xc0010000, REG_W1, imm);
 		/* cgrj %dst,%w1,mask,off */
-		EMIT6_PCREL(0xec000000, 0x0064, dst_reg, REG_W1, i, off, mask);
+		EMIT6_PCREL(0xec000000, src_reg ? 0x0076 : 0x0064,
+			    dst_reg, REG_W1, i, off, mask);
 		break;
 branch_ku:
 		/* lgfi %w1,imm (load sign extend imm) */
 		EMIT6_IMM(0xc0010000, REG_W1, imm);
 		/* clgrj %dst,%w1,mask,off */
-		EMIT6_PCREL(0xec000000, 0x0065, dst_reg, REG_W1, i, off, mask);
+		EMIT6_PCREL(0xec000000, src_reg ? 0x0077 : 0x0065,
+			    dst_reg, REG_W1, i, off, mask);
 		break;
 branch_xs:
 		/* cgrj %dst,%src,mask,off */
-		EMIT6_PCREL(0xec000000, 0x0064, dst_reg, src_reg, i, off, mask);
+		EMIT6_PCREL(0xec000000, imm ? 0x0076 : 0x0064,
+			    dst_reg, src_reg, i, off, mask);
 		break;
 branch_xu:
 		/* clgrj %dst,%src,mask,off */
-		EMIT6_PCREL(0xec000000, 0x0065, dst_reg, src_reg, i, off, mask);
+		EMIT6_PCREL(0xec000000, imm ? 0x0077 : 0x0065,
+			    dst_reg, src_reg, i, off, mask);
 		break;
 branch_oc:
 		/* brc mask,jmp_off (branch instruction needs 4 bytes) */
