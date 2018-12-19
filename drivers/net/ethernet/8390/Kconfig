@@ -142,6 +142,22 @@ config APNE
 	  To compile this driver as a module, choose M here: the module
 	  will be called apne.
 
+if APNE
+config APNE100MBIT
+	bool "PCMCIA NE2000 100MBit support"
+	default n
+	depends on ARM_ETHERH=n && AX88796=n && HYDRA=n && MAC8390=n
+	depends on MCF8390=n && NE2000=n && NE2K_PCI=n && PCMCIA_AXNET=n
+	depends on PCMCIA_PCNET=n && STNIC=n && ULTRA=n && WD80x3=n
+	depends on XSURF100=n && ZORRO8390=n
+	---help---
+	  This changes the driver to support ONLY 10/100Mbit cards (e.g. Netgear
+	  FA411, CNet Singlepoint).
+	  Cards that worked with the original version won't with this version.
+
+	  Say N, unless you absolutely know what you are doing.
+endif
+
 config PCMCIA_PCNET
 	tristate "NE2000 compatible PCMCIA support"
 	depends on PCMCIA

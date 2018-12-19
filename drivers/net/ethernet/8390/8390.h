@@ -222,4 +222,21 @@ struct ei_device {
 #define ENTSR_CDH 0x40	/* The collision detect "heartbeat" signal was lost. */
 #define ENTSR_OWC 0x80  /* There was an out-of-window collision. */
 
+/* Change the driver to support word access instead of byte access.
+ * Cards that work with byte access will not work with word access.
+ */
+#ifdef CONFIG_APNE100MBIT
+/* redefine inb to do word accesses */
+#undef inb
+#define inb(x) ((x) & 1 ? inw((x) - 1) & 0xff : inw(x) >> 8)
+#undef inb_p
+#define inb_p(x) inb(x)
+
+/* The following redefinition of outb isn't necessary, but may be faster on
+ * slow processors.
+ */
+#undef outb
+#define outb(x, y) raw_outb(x, (y) + GAYLE_IO + (((y) & 1) ? GAYLE_ODD : 0))
+#endif
+
 #endif /* _8390_h */
