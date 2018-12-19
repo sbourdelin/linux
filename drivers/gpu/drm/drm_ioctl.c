@@ -521,13 +521,17 @@ int drm_version(struct drm_device *dev, void *data,
  */
 int drm_ioctl_permit(u32 flags, struct drm_file *file_priv)
 {
+	const struct drm_device *dev = file_priv->minor->dev;
+
 	/* ROOT_ONLY is only for CAP_SYS_ADMIN */
 	if (unlikely((flags & DRM_ROOT_ONLY) && !capable(CAP_SYS_ADMIN)))
 		return -EACCES;
 
-	/* AUTH is only for authenticated or render client */
+	/* AUTH is only for authenticated/render capable master or render client */
 	if (unlikely((flags & DRM_AUTH) && !drm_is_render_client(file_priv) &&
-		     !file_priv->authenticated))
+		     !file_priv->authenticated &&
+		     !(drm_core_check_feature(dev, DRIVER_RENDER) &&
+		       (flags & DRM_RENDER_ALLOW))))
 		return -EACCES;
 
 	/* MASTER is only for master or control clients */
