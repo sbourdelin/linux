@@ -1526,8 +1526,14 @@ static ssize_t comm_write(struct file *file, const char __user *buf,
 	char buffer[TASK_COMM_LEN];
 	const size_t maxlen = sizeof(buffer) - 1;
 
+	if (*offset)
+		return -ENOSPC;
+
+	if (count > maxlen)
+		count = maxlen;
+
 	memset(buffer, 0, sizeof(buffer));
-	if (copy_from_user(buffer, buf, count > maxlen ? maxlen : count))
+	if (copy_from_user(buffer, buf, count))
 		return -EFAULT;
 
 	p = get_proc_task(inode);
@@ -1540,6 +1546,9 @@ static ssize_t comm_write(struct file *file, const char __user *buf,
 		count = -EINVAL;
 
 	put_task_struct(p);
+
+	if (count > 0)
+		*offset = count;
 
 	return count;
 }
