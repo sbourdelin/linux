@@ -248,6 +248,9 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 		cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
 	}
 
+	if (cq_host->ops->enable)
+		cq_host->ops->enable(mmc);
+
 	cqcfg &= ~(CQHCI_DCMD | CQHCI_TASK_DESC_SZ);
 
 	if (mmc->caps2 & MMC_CAP2_CQE_DCMD)
@@ -272,9 +275,6 @@ static void __cqhci_enable(struct cqhci_host *cq_host)
 	cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
 
 	mmc->cqe_on = true;
-
-	if (cq_host->ops->enable)
-		cq_host->ops->enable(mmc);
 
 	/* Ensure all writes are done before interrupts are enabled */
 	wmb();
@@ -561,6 +561,7 @@ static int cqhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	int tag = cqhci_tag(mrq);
 	struct cqhci_host *cq_host = mmc->cqe_private;
 	unsigned long flags;
+	u32 cqcfg = 0;
 
 	if (!cq_host->enabled) {
 		pr_err("%s: cqhci: not enabled\n", mmc_hostname(mmc));
@@ -579,8 +580,19 @@ static int cqhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 			pr_err("%s: cqhci: CQE failed to exit halt state\n",
 			       mmc_hostname(mmc));
 		}
+		/* Configuration must not be changed while enabled */
+		cqcfg = cqhci_readl(cq_host, CQHCI_CFG);
+		if (cqcfg & CQHCI_ENABLE) {
+			cqcfg &= ~CQHCI_ENABLE;
+			cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
+		}
+
 		if (cq_host->ops->enable)
 			cq_host->ops->enable(mmc);
+
+		cqcfg |= CQHCI_ENABLE;
+		cqhci_writel(cq_host, cqcfg, CQHCI_CFG);
+
 	}
 
 	if (mrq->data) {
