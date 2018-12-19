@@ -57,6 +57,7 @@
 #define ARG1	regs[BPF_REG_ARG1]
 #define CTX	regs[BPF_REG_CTX]
 #define IMM	insn->imm
+#define SRCNO	insn->src_reg
 
 /* No hurry in this branch
  *
@@ -1366,121 +1367,132 @@ out:
 		insn += insn->off;
 		CONT;
 	JMP_JEQ_X:
-		if (DST == SRC) {
+		if (DST == SRC || (IMM && (u32) DST == (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JEQ_K:
-		if (DST == IMM) {
+		if (DST == IMM || (SRCNO && (u32) DST == (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JNE_X:
-		if (DST != SRC) {
+		if ((!IMM && DST != SRC) || (IMM && (u32) DST != (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JNE_K:
-		if (DST != IMM) {
+		if ((!SRCNO && DST != IMM) ||
+		    (SRCNO && (u32) DST != (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JGT_X:
-		if (DST > SRC) {
+		if ((!IMM && DST > SRC) || (IMM && (u32) DST > (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JGT_K:
-		if (DST > IMM) {
+		if ((!SRCNO && DST > IMM) || (SRCNO && (u32) DST > (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JLT_X:
-		if (DST < SRC) {
+		if ((!IMM && DST < SRC) || (IMM && (u32) DST < (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JLT_K:
-		if (DST < IMM) {
+		if ((!SRCNO && DST < IMM) || (SRCNO && (u32) DST < (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JGE_X:
-		if (DST >= SRC) {
+		if ((!IMM && DST >= SRC) || (IMM && (u32) DST >= (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JGE_K:
-		if (DST >= IMM) {
+		if ((!SRCNO && DST >= IMM) ||
+		    (SRCNO && (u32) DST >= (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JLE_X:
-		if (DST <= SRC) {
+		if ((!IMM && DST <= SRC) || (IMM && (u32) DST <= (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JLE_K:
-		if (DST <= IMM) {
+		if ((!SRCNO && DST <= IMM) ||
+		    (SRCNO && (u32) DST <= (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSGT_X:
-		if (((s64) DST) > ((s64) SRC)) {
+		if ((!IMM && ((s64) DST) > (s64) SRC) ||
+		    (IMM && (s32) (u32) DST > (s32) (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSGT_K:
-		if (((s64) DST) > ((s64) IMM)) {
+		if ((!SRCNO && (s64) DST > (s64) IMM) ||
+		    (SRCNO && (s32) (u32) DST > (s32) (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSLT_X:
-		if (((s64) DST) < ((s64) SRC)) {
+		if ((!IMM && (s64) DST < (s64) SRC) ||
+		    (IMM && (s32) (u32) DST < (s32) (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSLT_K:
-		if (((s64) DST) < ((s64) IMM)) {
+		if ((!SRCNO && (s64) DST < (s64) IMM) ||
+		    (SRCNO && (s32) (u32) DST < (s32) (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSGE_X:
-		if (((s64) DST) >= ((s64) SRC)) {
+		if ((!IMM && (s64) DST >= (s64) SRC) ||
+		    (IMM && (s32) (u32) DST >= (s32) (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSGE_K:
-		if (((s64) DST) >= ((s64) IMM)) {
+		if ((!SRCNO && (s64) DST >= (s64) IMM) ||
+		    (SRCNO && (s32) (u32) DST >= (s32) (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSLE_X:
-		if (((s64) DST) <= ((s64) SRC)) {
+		if ((!IMM && (s64) DST <= (s64) SRC) ||
+		    (IMM && (s32) (u32) DST <= (s32) (u32) SRC)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
 		CONT;
 	JMP_JSLE_K:
-		if (((s64) DST) <= ((s64) IMM)) {
+		if ((!SRCNO && (s64) DST <= (s64) IMM) ||
+		    (SRCNO && (s32) (u32) DST <= (s32) (u32) IMM)) {
 			insn += insn->off;
 			CONT_JMP;
 		}
