@@ -255,6 +255,16 @@ void arch_setup_new_exec(void)
 	/* If cpuid was previously disabled for this task, re-enable it. */
 	if (test_thread_flag(TIF_NOCPUID))
 		enable_cpuid();
+
+	/*
+	 * Don't inherit TIF_SSBD across exec boundary unless speculative
+	 * store bypass is force-disabled (e.g. seccomp on).
+	 */
+	if (test_thread_flag(TIF_SSBD) &&
+	   !task_spec_ssb_force_disable(current)) {
+		clear_thread_flag(TIF_SSBD);
+		task_clear_spec_ssb_disable(current);
+	}
 }
 
 static inline void switch_to_bitmap(struct thread_struct *prev,

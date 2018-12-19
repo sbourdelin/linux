@@ -55,6 +55,9 @@ is selected by arg2 of :manpage:`prctl(2)` per task. arg3 is used to hand
 in the control value, i.e. either PR_SPEC_ENABLE or PR_SPEC_DISABLE or
 PR_SPEC_FORCE_DISABLE.
 
+When mitigation is enabled, its state will not be inherited on
+:manpage:`execve(2)` unless it is force-disabled.
+
 Common error codes
 ------------------
 ======= =================================================================
