@@ -52,6 +52,7 @@
 #include <linux/of_device.h>
 #include <linux/of_graph.h>
 #include <linux/pm.h>
+#include <linux/backlight.h>
 
 #include <drm/drm_panel.h>
 #include <drm/drmP.h>
@@ -196,6 +197,7 @@ struct rpi_touchscreen {
 	struct drm_panel base;
 	struct mipi_dsi_device *dsi;
 	struct i2c_client *i2c;
+	struct backlight_device *backlight;
 };
 
 static const struct drm_display_mode rpi_touchscreen_modes[] = {
@@ -256,7 +258,8 @@ static int rpi_touchscreen_disable(struct drm_panel *panel)
 {
 	struct rpi_touchscreen *ts = panel_to_ts(panel);
 
-	rpi_touchscreen_i2c_write(ts, REG_PWM, 0);
+	ts->backlight->props.brightness = 0;
+	backlight_update_status(ts->backlight);
 
 	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
 	udelay(1);
@@ -300,7 +303,8 @@ static int rpi_touchscreen_enable(struct drm_panel *panel)
 	msleep(100);
 
 	/* Turn on the backlight. */
-	rpi_touchscreen_i2c_write(ts, REG_PWM, 255);
+	ts->backlight->props.brightness = 255;
+	backlight_update_status(ts->backlight);
 
 	/* Default to the same orientation as the closed source
 	 * firmware used for the panel.  Runtime rotation
@@ -358,12 +362,26 @@ static const struct drm_panel_funcs rpi_touchscreen_funcs = {
 	.get_modes = rpi_touchscreen_get_modes,
 };
 
+static int raspberrypi_bl_update_status(struct backlight_device *bl)
+{
+	struct rpi_touchscreen *ts = bl_get_data(bl);
+
+	rpi_touchscreen_i2c_write(ts, REG_PWM, bl->props.brightness);
+
+	return 0;
+}
+
+static const struct backlight_ops raspberrypi_bl_ops = {
+	.update_status = raspberrypi_bl_update_status,
+};
+
 static int rpi_touchscreen_probe(struct i2c_client *i2c,
 				 const struct i2c_device_id *id)
 {
 	struct device *dev = &i2c->dev;
 	struct rpi_touchscreen *ts;
 	struct device_node *endpoint, *dsi_host_node;
+	struct backlight_properties props;
 	struct mipi_dsi_host *host;
 	int ret, ver;
 	struct mipi_dsi_device_info info = {
@@ -397,6 +415,17 @@ static int rpi_touchscreen_probe(struct i2c_client *i2c,
 
 	/* Turn off at boot, so we can cleanly sequence powering on. */
 	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
+
+	memset(&props, 0, sizeof(props));
+	props.type = BACKLIGHT_RAW;
+	props.max_brightness = 255;
+	ts->backlight = devm_backlight_device_register(dev, dev_name(dev), dev,
+						       ts, &raspberrypi_bl_ops,
+						       &props);
+	if (IS_ERR(ts->backlight)) {
+		dev_err(dev, "Failed to create backlight device\n");
+		return PTR_ERR(ts->backlight);
+	}
 
 	/* Look up the DSI host.  It needs to probe before we do. */
 	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
