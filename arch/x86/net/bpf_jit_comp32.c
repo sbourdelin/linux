@@ -2077,24 +2077,33 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			u8 dreg_hi = dstk ? IA32_EDX : dst_hi;
 			u8 sreg_lo = sstk ? IA32_ECX : src_lo;
 			u8 sreg_hi = sstk ? IA32_EBX : src_hi;
+			bool is_jmp64 = !imm32;
 
 			if (dstk) {
 				EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EAX),
 				      STACK_VAR(dst_lo));
-				EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EDX),
-				      STACK_VAR(dst_hi));
+				if (is_jmp64)
+					EMIT3(0x8B,
+					      add_2reg(0x40, IA32_EBP,
+						       IA32_EDX),
+					      STACK_VAR(dst_hi));
 			}
 
 			if (sstk) {
 				EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_ECX),
 				      STACK_VAR(src_lo));
-				EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EBX),
-				      STACK_VAR(src_hi));
+				if (is_jmp64)
+					EMIT3(0x8B,
+					      add_2reg(0x40, IA32_EBP,
+						       IA32_EBX),
+					      STACK_VAR(src_hi));
 			}
 
-			/* cmp dreg_hi,sreg_hi */
-			EMIT2(0x39, add_2reg(0xC0, dreg_hi, sreg_hi));
-			EMIT2(IA32_JNE, 2);
+			if (is_jmp64) {
+				/* cmp dreg_hi,sreg_hi */
+				EMIT2(0x39, add_2reg(0xC0, dreg_hi, sreg_hi));
+				EMIT2(IA32_JNE, 2);
+			}
 			/* cmp dreg_lo,sreg_lo */
 			EMIT2(0x39, add_2reg(0xC0, dreg_lo, sreg_lo));
 			goto emit_cond_jmp;
@@ -2169,23 +2178,28 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			u8 dreg_hi = dstk ? IA32_EDX : dst_hi;
 			u8 sreg_lo = IA32_ECX;
 			u8 sreg_hi = IA32_EBX;
+			bool is_jmp64 = !insn->src_reg;
 
 			if (dstk) {
 				EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EAX),
 				      STACK_VAR(dst_lo));
-				EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EDX),
-				      STACK_VAR(dst_hi));
+				if (is_jmp64)
+					EMIT3(0x8B,
+					      add_2reg(0x40, IA32_EBP,
+						       IA32_EDX),
+					      STACK_VAR(dst_hi));
 			}
 
-			hi = imm32 & (1<<31) ? (u32)~0 : 0;
 			/* mov ecx,imm32 */
 			EMIT2_off32(0xC7, add_1reg(0xC0, IA32_ECX), imm32);
-			/* mov ebx,imm32 */
-			EMIT2_off32(0xC7, add_1reg(0xC0, IA32_EBX), hi);
-
-			/* cmp dreg_hi,sreg_hi */
-			EMIT2(0x39, add_2reg(0xC0, dreg_hi, sreg_hi));
-			EMIT2(IA32_JNE, 2);
+			if (is_jmp64) {
+				hi = imm32 & (1 << 31) ? (u32)~0 : 0;
+				/* mov ebx,imm32 */
+				EMIT2_off32(0xC7, add_1reg(0xC0, IA32_EBX), hi);
+				/* cmp dreg_hi,sreg_hi */
+				EMIT2(0x39, add_2reg(0xC0, dreg_hi, sreg_hi));
+				EMIT2(IA32_JNE, 2);
+			}
 			/* cmp dreg_lo,sreg_lo */
 			EMIT2(0x39, add_2reg(0xC0, dreg_lo, sreg_lo));
 
