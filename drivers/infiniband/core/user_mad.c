@@ -1336,28 +1336,11 @@ static int __init ib_umad_init(void)
 {
 	int ret;
 
-	ret = register_chrdev_region(base_umad_dev,
-				     IB_UMAD_NUM_FIXED_MINOR * 2,
-				     "infiniband_mad");
-	if (ret) {
-		pr_err("couldn't register device number\n");
-		goto out;
-	}
-
-	ret = alloc_chrdev_region(&dynamic_umad_dev, 0,
-				  IB_UMAD_NUM_DYNAMIC_MINOR * 2,
-				  "infiniband_mad");
-	if (ret) {
-		pr_err("couldn't register dynamic device number\n");
-		goto out_alloc;
-	}
-	dynamic_issm_dev = dynamic_umad_dev + IB_UMAD_NUM_DYNAMIC_MINOR;
-
 	umad_class = class_create(THIS_MODULE, "infiniband_mad");
 	if (IS_ERR(umad_class)) {
 		ret = PTR_ERR(umad_class);
 		pr_err("couldn't create class infiniband_mad\n");
-		goto out_chrdev;
+		return ret;
 	}
 
 	umad_class->devnode = umad_devnode;
@@ -1368,37 +1351,50 @@ static int __init ib_umad_init(void)
 		goto out_class;
 	}
 
+	ret = register_chrdev_region(base_umad_dev,
+				     IB_UMAD_NUM_FIXED_MINOR * 2,
+				     umad_class->name);
+	if (ret) {
+		pr_err("couldn't register device number\n");
+		goto out_class;
+	}
+
+	ret = alloc_chrdev_region(&dynamic_umad_dev, 0,
+				  IB_UMAD_NUM_DYNAMIC_MINOR * 2,
+				  umad_class->name);
+	if (ret) {
+		pr_err("couldn't register dynamic device number\n");
+		goto out_alloc;
+	}
+	dynamic_issm_dev = dynamic_umad_dev + IB_UMAD_NUM_DYNAMIC_MINOR;
+
 	ret = ib_register_client(&umad_client);
 	if (ret) {
 		pr_err("couldn't register ib_umad client\n");
-		goto out_class;
+		goto out_chrdev;
 	}
 
 	return 0;
 
-out_class:
-	class_destroy(umad_class);
-
 out_chrdev:
 	unregister_chrdev_region(dynamic_umad_dev,
 				 IB_UMAD_NUM_DYNAMIC_MINOR * 2);
-
 out_alloc:
 	unregister_chrdev_region(base_umad_dev,
 				 IB_UMAD_NUM_FIXED_MINOR * 2);
-
-out:
+out_class:
+	class_destroy(umad_class);
 	return ret;
 }
 
 static void __exit ib_umad_cleanup(void)
 {
 	ib_unregister_client(&umad_client);
-	class_destroy(umad_class);
-	unregister_chrdev_region(base_umad_dev,
-				 IB_UMAD_NUM_FIXED_MINOR * 2);
 	unregister_chrdev_region(dynamic_umad_dev,
 				 IB_UMAD_NUM_DYNAMIC_MINOR * 2);
+	unregister_chrdev_region(base_umad_dev,
+				 IB_UMAD_NUM_FIXED_MINOR * 2);
+	class_destroy(umad_class);
 }
 
 module_init(ib_umad_init);
