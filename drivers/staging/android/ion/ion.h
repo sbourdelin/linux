@@ -208,6 +208,7 @@ int ion_heap_pages_zero(struct page *page, size_t size, pgprot_t pgprot);
 int ion_alloc(size_t len,
 	      unsigned int heap_id_mask,
 	      unsigned int flags);
+int ion_buffer_update(unsigned int fd, unsigned int flags);
 
 /**
  * ion_heap_init_shrinker

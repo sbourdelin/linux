@@ -447,6 +447,23 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 	return fd;
 }
 
+int ion_buffer_update(unsigned int fd, unsigned int flags)
+{
+	struct dma_buf *dmabuf;
+	struct ion_buffer *buffer;
+
+	dmabuf = dma_buf_get(fd);
+
+	if (!dmabuf)
+		return -EINVAL;
+
+	buffer = dmabuf->priv;
+	buffer->flags = flags;
+	dma_buf_put(dmabuf);
+
+	return 0;
+}
+
 int ion_query_heaps(struct ion_heap_query *query)
 {
 	struct ion_device *dev = internal_dev;

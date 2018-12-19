@@ -74,6 +74,20 @@ struct ion_allocation_data {
 	__u32 unused;
 };
 
+/**
+ * struct ion_buffer_flag_data - metadata passed from userspace for update
+ * buffer flags
+ * @fd:			file descriptor of the buffer
+ * @flags:		flags passed to the buffer
+ *
+ * Provided by userspace as an argument to the ioctl
+ */
+
+struct ion_buffer_flag_data {
+	__u32 fd;
+	__u32 flags;
+}
+
 #define MAX_HEAP_NAME			32
 
 /**
@@ -115,6 +129,14 @@ struct ion_heap_query {
 #define ION_IOC_ALLOC		_IOWR(ION_IOC_MAGIC, 0, \
 				      struct ion_allocation_data)
 
+/**
+ * DOC: ION_IOC_BUFFER_UPDATE - update the specified ion buffer flags
+ *
+ * Takes an ion_buffer_flag_data structure and returns the result of the
+ * buffer flag update operation.
+ */
+#define ION_IOC_BUFFER_UPDATE	_IOWR(ION_IOC_MAGIC, 1, \
+				      struct ion_buffer_flag_data)
 /**
  * DOC: ION_IOC_HEAP_QUERY - information about available heaps
  *

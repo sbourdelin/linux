@@ -12,6 +12,7 @@
 
 union ion_ioctl_arg {
 	struct ion_allocation_data allocation;
+	struct ion_buffer_flag_data update;
 	struct ion_heap_query query;
 };
 
@@ -83,6 +84,9 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		break;
 	}
+	case ION_IOC_BUFFER_UPDATE:
+		ret = ion_buffer_update(data.update.fd, data.update.flags);
+		break;
 	case ION_IOC_HEAP_QUERY:
 		ret = ion_query_heaps(&data.query);
 		break;
