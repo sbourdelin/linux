@@ -1575,11 +1575,20 @@ static int comm_open(struct inode *inode, struct file *filp)
 	return single_open(filp, comm_show, inode);
 }
 
+static loff_t comm_lseek(struct file *file, loff_t offset, int whence)
+{
+	/* SEEK_END for seq_files normally gets -EINVAL */
+	if (whence == SEEK_END && offset == 0)
+		return TASK_COMM_LEN - 1;
+
+	return seq_lseek(file, offset, whence);
+}
+
 static const struct file_operations proc_pid_set_comm_operations = {
 	.open		= comm_open,
 	.read		= seq_read,
 	.write		= comm_write,
-	.llseek		= seq_lseek,
+	.llseek		= comm_lseek,
 	.release	= single_release,
 };
 
