@@ -128,7 +128,8 @@ extern "C" {
 				 DRM_MODE_FLAG_HSKEW |		\
 				 DRM_MODE_FLAG_DBLCLK |		\
 				 DRM_MODE_FLAG_CLKDIV2 |	\
-				 DRM_MODE_FLAG_3D_MASK)
+				 DRM_MODE_FLAG_3D_MASK |	\
+				 DRM_MODE_FLAG_PIC_AR_MASK)
 
 /* DPMS flags */
 /* bit compatible with the xorg definitions. */
