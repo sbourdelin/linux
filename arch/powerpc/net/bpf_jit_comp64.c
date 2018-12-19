@@ -810,14 +810,20 @@ cond_branch:
 			case BPF_JMP | BPF_JEQ | BPF_X:
 			case BPF_JMP | BPF_JNE | BPF_X:
 				/* unsigned comparison */
-				PPC_CMPLD(dst_reg, src_reg);
+				if (!!imm) /* jmp32 */
+					PPC_CMPLW(dst_reg, src_reg);
+				else
+					PPC_CMPLD(dst_reg, src_reg);
 				break;
 			case BPF_JMP | BPF_JSGT | BPF_X:
 			case BPF_JMP | BPF_JSLT | BPF_X:
 			case BPF_JMP | BPF_JSGE | BPF_X:
 			case BPF_JMP | BPF_JSLE | BPF_X:
 				/* signed comparison */
-				PPC_CMPD(dst_reg, src_reg);
+				if (!!imm) /* jmp32 */
+					PPC_CMPW(dst_reg, src_reg);
+				else
+					PPC_CMPD(dst_reg, src_reg);
 				break;
 			case BPF_JMP | BPF_JSET | BPF_X:
 				PPC_AND_DOT(b2p[TMP_REG_1], dst_reg, src_reg);
@@ -828,34 +834,58 @@ cond_branch:
 			case BPF_JMP | BPF_JLT | BPF_K:
 			case BPF_JMP | BPF_JGE | BPF_K:
 			case BPF_JMP | BPF_JLE | BPF_K:
+			{
+				bool is_jmp32 = !!insn[i].src_reg;
+
 				/*
 				 * Need sign-extended load, so only positive
 				 * values can be used as imm in cmpldi
 				 */
-				if (imm >= 0 && imm < 32768)
-					PPC_CMPLDI(dst_reg, imm);
-				else {
+				if (imm >= 0 && imm < 32768) {
+					if (is_jmp32)
+						PPC_CMPLWI(dst_reg, imm);
+					else
+						PPC_CMPLDI(dst_reg, imm);
+				} else {
 					/* sign-extending load */
 					PPC_LI32(b2p[TMP_REG_1], imm);
 					/* ... but unsigned comparison */
-					PPC_CMPLD(dst_reg, b2p[TMP_REG_1]);
+					if (is_jmp32)
+						PPC_CMPLW(dst_reg,
+							  b2p[TMP_REG_1]);
+					else
+						PPC_CMPLD(dst_reg,
+							  b2p[TMP_REG_1]);
 				}
 				break;
+			}
 			case BPF_JMP | BPF_JSGT | BPF_K:
 			case BPF_JMP | BPF_JSLT | BPF_K:
 			case BPF_JMP | BPF_JSGE | BPF_K:
 			case BPF_JMP | BPF_JSLE | BPF_K:
+			{
+				bool is_jmp32 = !!insn[i].src_reg;
+
 				/*
 				 * signed comparison, so any 16-bit value
 				 * can be used in cmpdi
 				 */
-				if (imm >= -32768 && imm < 32768)
-					PPC_CMPDI(dst_reg, imm);
-				else {
+				if (imm >= -32768 && imm < 32768) {
+					if (is_jmp32)
+						PPC_CMPWI(dst_reg, imm);
+					else
+						PPC_CMPDI(dst_reg, imm);
+				} else {
 					PPC_LI32(b2p[TMP_REG_1], imm);
-					PPC_CMPD(dst_reg, b2p[TMP_REG_1]);
+					if (is_jmp32)
+						PPC_CMPW(dst_reg,
+							 b2p[TMP_REG_1]);
+					else
+						PPC_CMPD(dst_reg,
+							 b2p[TMP_REG_1]);
 				}
 				break;
+			}
 			case BPF_JMP | BPF_JSET | BPF_K:
 				/* andi does not sign-extend the immediate */
 				if (imm >= 0 && imm < 32768)
