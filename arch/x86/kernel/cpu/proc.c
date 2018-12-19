@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/smp.h>
+#include <linux/sort.h>
 #include <linux/timex.h>
 #include <linux/string.h>
 #include <linux/seq_file.h>
+#include <linux/spinlock.h>
 #include <linux/cpufreq.h>
 
 #include "cpu.h"
@@ -54,6 +56,76 @@ static void show_cpuinfo_misc(struct seq_file *m, struct cpuinfo_x86 *c)
 }
 #endif
 
+#define X86_NR_CAPS	(32*NCAPINTS)
+/*
+ * x86_cap_flags[] is an array of string pointers.  This
+ * (x86_sorted_cap_flags[]) is an array of array indexes
+ * *referring* to x86_cap_flags[] entries.  It is sorted
+ * to make it quick to print a sorted list of cpu flags in
+ * /proc/cpuinfo.
+ */
+static unsigned short x86_sorted_cap_flags[X86_NR_CAPS] = { -1, };
+static int x86_cmp_cap(const void *a_ptr, const void *b_ptr)
+{
+	unsigned short a = *(unsigned short *)a_ptr;
+	unsigned short b = *(unsigned short *)b_ptr;
+
+	/* Don't need to swap equal entries (presumably NULLs) */
+	if (x86_cap_flags[a] == x86_cap_flags[b])
+		return 0;
+	/* Put NULL elements at the end: */
+	if (x86_cap_flags[a] == NULL)
+		return -1;
+	if (x86_cap_flags[b] == NULL)
+		return 1;
+
+	return strcmp(x86_cap_flags[a], x86_cap_flags[b]);
+}
+
+static void x86_sort_cap_flags(void)
+{
+	static DEFINE_SPINLOCK(lock);
+	int i;
+
+	/*
+	 * It's possible that multiple threads could race
+	 * to here and both sort the list.  The lock keeps
+	 * them from trying to sort concurrently.
+	 */
+	spin_lock(&lock);
+
+	/* Initialize the list with 0->i, removing the -1's: */
+	for (i = 0; i < X86_NR_CAPS; i++)
+		x86_sorted_cap_flags[i] = i;
+
+	sort(x86_sorted_cap_flags, X86_NR_CAPS,
+	     sizeof(x86_sorted_cap_flags[0]),
+	     x86_cmp_cap, NULL);
+
+	spin_unlock(&lock);
+}
+
+static void show_cpuinfo_flags(struct seq_file *m, struct cpuinfo_x86 *c)
+{
+	int i;
+
+	if (x86_sorted_cap_flags[0] == (unsigned short)-1)
+		x86_sort_cap_flags();
+
+	seq_puts(m, "flags\t\t:");
+
+	for (i = 0; i < X86_NR_CAPS; i++) {
+		/*
+		 * Go through the flag list in alphabetical
+		 * order to make reading this field easier.
+		 */
+		int cap = x86_sorted_cap_flags[i];
+
+		if (cpu_has(c, cap) && x86_cap_flags[cap] != NULL)
+			seq_printf(m, " %s", x86_cap_flags[cap]);
+	}
+}
+
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
 	struct cpuinfo_x86 *c = v;
@@ -96,15 +168,11 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	show_cpuinfo_core(m, c, cpu);
 	show_cpuinfo_misc(m, c);
-
-	seq_puts(m, "flags\t\t:");
-	for (i = 0; i < 32*NCAPINTS; i++)
-		if (cpu_has(c, i) && x86_cap_flags[i] != NULL)
-			seq_printf(m, " %s", x86_cap_flags[i]);
+	show_cpuinfo_flags(m, c);
 
 	seq_puts(m, "\nbugs\t\t:");
 	for (i = 0; i < 32*NBUGINTS; i++) {
-		unsigned int bug_bit = 32*NCAPINTS + i;
+		unsigned int bug_bit = x86_NR_CAPS + i;
 
 		if (cpu_has_bug(c, bug_bit) && x86_bug_flags[i])
 			seq_printf(m, " %s", x86_bug_flags[i]);
