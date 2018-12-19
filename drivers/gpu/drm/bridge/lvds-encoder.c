@@ -11,11 +11,13 @@
 #include <drm/drm_bridge.h>
 #include <drm/drm_panel.h>
 
+#include <linux/gpio/consumer.h>
 #include <linux/of_graph.h>
 
 struct lvds_encoder {
 	struct drm_bridge bridge;
 	struct drm_bridge *panel_bridge;
+	struct gpio_desc *pwdn_gpio;
 };
 
 static int lvds_encoder_attach(struct drm_bridge *bridge)
@@ -28,8 +30,30 @@ static int lvds_encoder_attach(struct drm_bridge *bridge)
 				 bridge);
 }
 
+static void lvds_encoder_enable(struct drm_bridge *bridge)
+{
+	struct lvds_encoder *lvds_encoder = container_of(bridge,
+							 struct lvds_encoder,
+							 bridge);
+
+	if (lvds_encoder->pwdn_gpio)
+		gpiod_set_value_cansleep(lvds_encoder->pwdn_gpio, 0);
+}
+
+static void lvds_encoder_disable(struct drm_bridge *bridge)
+{
+	struct lvds_encoder *lvds_encoder = container_of(bridge,
+							 struct lvds_encoder,
+							 bridge);
+
+	if (lvds_encoder->pwdn_gpio)
+		gpiod_set_value_cansleep(lvds_encoder->pwdn_gpio, 1);
+}
+
 static struct drm_bridge_funcs funcs = {
 	.attach = lvds_encoder_attach,
+	.enable = lvds_encoder_enable,
+	.disable = lvds_encoder_disable,
 };
 
 static int lvds_encoder_probe(struct platform_device *pdev)
@@ -44,6 +68,16 @@ static int lvds_encoder_probe(struct platform_device *pdev)
 				    GFP_KERNEL);
 	if (!lvds_encoder)
 		return -ENOMEM;
+
+	lvds_encoder->pwdn_gpio = devm_gpiod_get_optional(&pdev->dev, "pwdn",
+							  GPIOD_OUT_HIGH);
+	if (IS_ERR(lvds_encoder->pwdn_gpio)) {
+		int err = PTR_ERR(lvds_encoder->pwdn_gpio);
+
+		if (err != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "pwdn GPIO failure: %d\n", err);
+		return err;
+	}
 
 	/* Locate the panel DT node. */
 	port = of_graph_get_port_by_id(pdev->dev.of_node, 1);
