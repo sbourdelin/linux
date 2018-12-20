@@ -408,7 +408,7 @@ int drm_crtc_add_crc_entry(struct drm_crtc *crtc, bool has_frame,
 		spin_unlock(&crc->lock);
 
 		if (!was_overflow)
-			DRM_ERROR("Overflow of CRC buffer, userspace reads too slow.\n");
+			DRM_INFO("Overflow of CRC buffer, userspace reads too slow.\n");
 
 		return -ENOBUFS;
 	}
