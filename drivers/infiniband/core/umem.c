@@ -164,6 +164,8 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	if (check_add_overflow(mm->pinned_vm, npages, &new_pinned) ||
 	    (new_pinned > lock_limit && !capable(CAP_IPC_LOCK))) {
 		up_write(&mm->mmap_sem);
+		pr_err_ratelimited("%s: Can't pin memory, requested %lu, limit %lu, ipc_lock off\n",
+				   __func__, new_pinned, lock_limit);
 		ret = -ENOMEM;
 		goto out;
 	}
