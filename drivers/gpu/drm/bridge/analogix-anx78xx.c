@@ -610,20 +610,20 @@ static int anx78xx_enable_interrupts(struct anx78xx *anx78xx)
 	return 0;
 }
 
-static void anx78xx_poweron(struct anx78xx *anx78xx)
+static int anx78xx_poweron(struct anx78xx *anx78xx)
 {
 	struct anx78xx_platform_data *pdata = &anx78xx->pdata;
-	int err;
+	int err = 0;
 
 	if (WARN_ON(anx78xx->powered))
-		return;
+		return err;
 
 	if (pdata->dvdd10) {
 		err = regulator_enable(pdata->dvdd10);
 		if (err) {
 			DRM_ERROR("Failed to enable DVDD10 regulator: %d\n",
 				  err);
-			return;
+			return err;
 		}
 
 		usleep_range(1000, 2000);
@@ -638,12 +638,18 @@ static void anx78xx_poweron(struct anx78xx *anx78xx)
 	gpiod_set_value_cansleep(pdata->gpiod_reset, 0);
 
 	/* Power on registers module */
-	anx78xx_set_bits(anx78xx->map[I2C_IDX_TX_P2], SP_POWERDOWN_CTRL_REG,
+	err = anx78xx_set_bits(anx78xx->map[I2C_IDX_TX_P2], SP_POWERDOWN_CTRL_REG,
 			 SP_HDCP_PD | SP_AUDIO_PD | SP_VIDEO_PD | SP_LINK_PD);
-	anx78xx_clear_bits(anx78xx->map[I2C_IDX_TX_P2], SP_POWERDOWN_CTRL_REG,
+	err |= anx78xx_clear_bits(anx78xx->map[I2C_IDX_TX_P2], SP_POWERDOWN_CTRL_REG,
 			   SP_REGISTER_PD | SP_TOTAL_PD);
+	if (err) { 
+		anx78xx_poweroff(anx78xx);
+		return err;
+	}
 
 	anx78xx->powered = true;
+
+	return err;
 }
 
 static void anx78xx_poweroff(struct anx78xx *anx78xx)
@@ -1144,7 +1150,9 @@ static irqreturn_t anx78xx_hpd_threaded_handler(int irq, void *data)
 	mutex_lock(&anx78xx->lock);
 
 	/* Cable is pulled, power on the chip */
-	anx78xx_poweron(anx78xx);
+	err = anx78xx_poweron(anx78xx);
+	if (err)
+		DRM_ERROR("Failed to power on the chip: %d\n", err);
 
 	err = anx78xx_enable_interrupts(anx78xx);
 	if (err)
@@ -1379,7 +1387,9 @@ static int anx78xx_i2c_probe(struct i2c_client *client,
 	}
 
 	/* Look for supported chip ID */
-	anx78xx_poweron(anx78xx);
+	err = anx78xx_poweron(anx78xx);
+	if (err)
+		goto err_poweroff;
 
 	err = regmap_read(anx78xx->map[I2C_IDX_TX_P2], SP_DEVICE_IDL_REG,
 			  &idl);
