@@ -125,8 +125,6 @@ void inet_twsk_hashdance(struct inet_timewait_sock *tw, struct sock *sk,
 	if (__sk_nulls_del_node_init_rcu(sk))
 		sock_prot_inuse_add(sock_net(sk), sk->sk_prot, -1);
 
-	spin_unlock(lock);
-
 	/* tw_refcnt is set to 3 because we have :
 	 * - one reference for bhash chain.
 	 * - one reference for ehash chain.
@@ -137,6 +135,8 @@ void inet_twsk_hashdance(struct inet_timewait_sock *tw, struct sock *sk,
 	 * so we are not allowed to use tw anymore.
 	 */
 	refcount_set(&tw->tw_refcnt, 3);
+
+	spin_unlock(lock);
 }
 EXPORT_SYMBOL_GPL(inet_twsk_hashdance);
 
