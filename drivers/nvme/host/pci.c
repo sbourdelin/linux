@@ -251,16 +251,25 @@ static int nvme_dbbuf_dma_alloc(struct nvme_dev *dev)
 static void nvme_dbbuf_dma_free(struct nvme_dev *dev)
 {
 	unsigned int mem_size = nvme_dbbuf_size(dev->db_stride);
+	unsigned int i;
 
 	if (dev->dbbuf_dbs) {
 		dma_free_coherent(dev->dev, mem_size,
 				  dev->dbbuf_dbs, dev->dbbuf_dbs_dma_addr);
 		dev->dbbuf_dbs = NULL;
+		for (i = dev->ctrl.queue_count - 1; i > 0; i--) {
+			dev->queues[i]->dbbuf_sq_db = NULL;
+			dev->queues[i]->dbbuf_cq_db = NULL;
+		}
 	}
 	if (dev->dbbuf_eis) {
 		dma_free_coherent(dev->dev, mem_size,
 				  dev->dbbuf_eis, dev->dbbuf_eis_dma_addr);
 		dev->dbbuf_eis = NULL;
+		for (i = dev->ctrl.queue_count - 1; i > 0; i--) {
+			dev->queues[i]->dbbuf_sq_ei = NULL;
+			dev->queues[i]->dbbuf_cq_ei = NULL;
+		}
 	}
 }
 
