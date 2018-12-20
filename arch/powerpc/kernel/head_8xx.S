@@ -337,8 +337,8 @@ InstructionTLBMiss:
 	rlwinm	r10, r10, 16, 0xfff8
 	cmpli	cr0, r10, PAGE_OFFSET@h
 #ifndef CONFIG_PIN_TLB_TEXT
-	/* It is assumed that kernel code fits into the first 8M page */
-0:	cmpli	cr7, r10, (PAGE_OFFSET + 0x0800000)@h
+	/* It is assumed that kernel code fits into the two first 8M pages */
+0:	cmpli	cr7, r10, (PAGE_OFFSET + 0x1000000)@h
 	patch_site	0b, patch__itlbmiss_linmem_top
 #endif
 #endif
@@ -907,6 +907,29 @@ initial_mmu:
 	li	r8, MI_BOOTINIT		/* Create RPN for address 0 */
 	mtspr	SPRN_MI_RPN, r8		/* Store TLB entry */
 
+	/* Map a second 8M page if needed */
+	lis	r9, _einittext@h
+	oris	r9, r9, _einittext@l
+	cmpli	cr0, r9, (PAGE_OFFSET + 0x8000000)@h
+	blt	1f
+
+#ifdef CONFIG_PIN_TLB_TEXT
+	lis	r8, MI_RSV4I@h
+	ori	r8, r8, 0x1d00
+
+	mtspr	SPRN_MI_CTR, r8	/* Set instruction MMU control */
+#endif
+
+	lis	r8, (KERNELBASE + 0x800000)@h	/* Create vaddr for TLB */
+	ori	r8, r8, MI_EVALID	/* Mark it valid */
+	mtspr	SPRN_MI_EPN, r8
+	li	r8, MI_PS8MEG /* Set 8M byte page */
+	ori	r8, r8, MI_SVALID	/* Make it valid */
+	mtspr	SPRN_MI_TWC, r8
+	li	r8, MI_BOOTINIT		/* Create RPN for address 0 */
+	addis	r8, r8, 0x80
+	mtspr	SPRN_MI_RPN, r8		/* Store TLB entry */
+1:
 	lis	r8, MI_APG_INIT@h	/* Set protection modes */
 	ori	r8, r8, MI_APG_INIT@l
 	mtspr	SPRN_MI_AP, r8

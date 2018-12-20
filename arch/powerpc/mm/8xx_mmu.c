@@ -118,6 +118,10 @@ unsigned long __init mmu_mapin_ram(unsigned long top)
 #endif
 	} else {
 		mapped = top & ~(LARGE_PAGE_SIZE_8M - 1);
+#ifndef CONFIG_PIN_TLB_TEXT
+		mmu_patch_cmp_limit(&patch__itlbmiss_linmem_top,
+				    _ALIGN(__pa(_einittext), 8 << 20));
+#endif
 	}
 
 	mmu_patch_cmp_limit(&patch__dtlbmiss_linmem_top, mapped);
