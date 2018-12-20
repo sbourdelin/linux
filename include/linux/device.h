@@ -1584,6 +1584,8 @@ do {									\
 extern __printf(3, 4)
 int probe_err(const struct device *dev, int err, const char *fmt, ...);
 
+#define probe_err_ptr(dev, ptr, args...) probe_err(dev, PTR_ERR(ptr), args)
+
 /* Create alias, so I can be autoloaded. */
 #define MODULE_ALIAS_CHARDEV(major,minor) \
 	MODULE_ALIAS("char-major-" __stringify(major) "-" __stringify(minor))
