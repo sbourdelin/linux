@@ -2895,25 +2895,56 @@ struct ext4_group_info {
 #define EXT4_GROUP_INFO_IBITMAP_CORRUPT		\
 	(1 << EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT)
 
-#define EXT4_MB_GRP_NEED_INIT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_NEED_INIT_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_BBITMAP_CORRUPT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_IBITMAP_CORRUPT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_TEST_AND_SET_BBITMAP_CORRUPT(grp)	\
-	(test_and_set_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT, \
-			  &((grp)->bb_state)))
-#define EXT4_MB_GRP_TEST_AND_SET_IBITMAP_CORRUPT(grp)	\
-	(test_and_set_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, \
-			  &((grp)->bb_state)))
 
-#define EXT4_MB_GRP_WAS_TRIMMED(grp)	\
-	(test_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_SET_TRIMMED(grp)	\
-	(set_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
-#define EXT4_MB_GRP_CLEAR_TRIMMED(grp)	\
-	(clear_bit(EXT4_GROUP_INFO_WAS_TRIMMED_BIT, &((grp)->bb_state)))
+#define EXT4_MB_GROUP_STATE_FUNCS(name, statename)			\
+static inline int ext4_mb_grp_##name(struct ext4_group_info *grp)	\
+{									\
+	return test_bit(EXT4_GROUP_INFO_##statename##_BIT,		\
+			&(grp->bb_state));				\
+}									\
+static inline void ext4_mb_grp_set_##name(struct ext4_group_info *grp)	\
+{									\
+	set_bit(EXT4_GROUP_INFO_##statename##_BIT, &(grp->bb_state));	\
+}									\
+static inline void ext4_mb_grp_clear_##name(struct ext4_group_info *grp)\
+{									\
+	clear_bit(EXT4_GROUP_INFO_##statename##_BIT, &(grp->bb_state));	\
+}									\
+static inline int ext4_mb_grp_test_and_set_##name(struct ext4_group_info *grp) \
+{									\
+	return test_and_set_bit(EXT4_GROUP_INFO_##statename##_BIT,	\
+				&(grp->bb_state));			\
+}
+
+
+/*
+ * Add these declarations here only so that these functions can be
+ * found by name.  Otherwise, they are very hard to locate.
+ */
+static inline int ext4_mb_grp_need_init(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_set_need_init(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_clear_need_init(struct ext4_group_info *grp);
+static inline int ext4_mb_grp_test_and_set_need_init(struct ext4_group_info *grp);
+EXT4_MB_GROUP_STATE_FUNCS(need_init, NEED_INIT)
+
+static inline int ext4_mb_grp_trimmed(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_set_trimmed(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_clear_trimmed(struct ext4_group_info *grp);
+static inline int ext4_mb_grp_test_and_set_trimmed(struct ext4_group_info *grp);
+EXT4_MB_GROUP_STATE_FUNCS(trimmed, WAS_TRIMMED)
+
+static inline int ext4_mb_grp_bbitmap_corrupt(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_set_bbitmap_corrupt(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_clear_bbitmap_corrupt(struct ext4_group_info *grp);
+static inline int ext4_mb_grp_test_and_set_bbitmap_corrupt(struct ext4_group_info *grp);
+EXT4_MB_GROUP_STATE_FUNCS(bbitmap_corrupt, BBITMAP_CORRUPT)
+
+static inline int ext4_mb_grp_ibitmap_corrupt(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_set_ibitmap_corrupt(struct ext4_group_info *grp);
+static inline void ext4_mb_grp_clear_ibitmap_corrupt(struct ext4_group_info *grp);
+static inline int ext4_mb_grp_test_and_set_ibitmap_corrupt(struct ext4_group_info *grp);
+EXT4_MB_GROUP_STATE_FUNCS(ibitmap_corrupt, IBITMAP_CORRUPT)
+
 
 #define EXT4_MAX_CONTENTION		8
 #define EXT4_CONTENTION_THRESHOLD	2

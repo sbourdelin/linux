@@ -622,7 +622,7 @@ static int __mb_check_buddy(struct ext4_buddy *e4b, char *file,
 			MB_CHECK_ASSERT(mb_test_bit(k, buddy2));
 		}
 	}
-	MB_CHECK_ASSERT(!EXT4_MB_GRP_NEED_INIT(e4b->bd_info));
+	MB_CHECK_ASSERT(!ext4_mb_grp_need_init(e4b->bd_info));
 	MB_CHECK_ASSERT(e4b->bd_info->bb_fragments == fragments);
 
 	grp = ext4_get_group_info(sb, e4b->bd_group);
@@ -755,7 +755,7 @@ void ext4_mb_generate_buddy(struct super_block *sb,
 	}
 	mb_set_largest_free_order(sb, grp);
 
-	clear_bit(EXT4_GROUP_INFO_NEED_INIT_BIT, &(grp->bb_state));
+	ext4_mb_grp_clear_need_init(grp);
 
 	period = get_cycles() - period;
 	spin_lock(&sbi->s_bal_lock);
@@ -857,7 +857,7 @@ static int ext4_mb_init_cache(struct page *page, char *incore, gfp_t gfp)
 		 * we must skip all initialized uptodate buddies on the page,
 		 * which may be currently in use by an allocating task.
 		 */
-		if (PageUptodate(page) && !EXT4_MB_GRP_NEED_INIT(grinfo)) {
+		if (PageUptodate(page) && !ext4_mb_grp_need_init(grinfo)) {
 			bh[i] = NULL;
 			continue;
 		}
@@ -1050,7 +1050,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group, gfp_t gfp)
 	 * page accessed.
 	 */
 	ret = ext4_mb_get_buddy_page_lock(sb, group, &e4b, gfp);
-	if (ret || !EXT4_MB_GRP_NEED_INIT(this_grp)) {
+	if (ret || !ext4_mb_grp_need_init(this_grp)) {
 		/*
 		 * somebody initialized the group
 		 * return without doing anything
@@ -1122,7 +1122,7 @@ ext4_mb_load_buddy_gfp(struct super_block *sb, ext4_group_t group,
 	e4b->bd_buddy_page = NULL;
 	e4b->bd_bitmap_page = NULL;
 
-	if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {
+	if (unlikely(ext4_mb_grp_need_init(grp))) {
 		/*
 		 * we need full data about the group
 		 * to make a good selection
@@ -1424,7 +1424,7 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 	BUG_ON(last >= (sb->s_blocksize << 3));
 	assert_spin_locked(ext4_group_lock_ptr(sb, e4b->bd_group));
 	/* Don't bother if the block group is corrupt. */
-	if (unlikely(EXT4_MB_GRP_BBITMAP_CORRUPT(e4b->bd_info)))
+	if (unlikely(ext4_mb_grp_bbitmap_corrupt(e4b->bd_info)))
 		return;
 
 	mb_check_buddy(e4b);
@@ -1833,7 +1833,7 @@ int ext4_mb_find_by_goal(struct ext4_allocation_context *ac,
 	if (err)
 		return err;
 
-	if (unlikely(EXT4_MB_GRP_BBITMAP_CORRUPT(e4b->bd_info))) {
+	if (unlikely(ext4_mb_grp_bbitmap_corrupt(e4b->bd_info))) {
 		ext4_mb_unload_buddy(e4b);
 		return 0;
 	}
@@ -2046,11 +2046,11 @@ static int ext4_mb_good_group(struct ext4_allocation_context *ac,
 	if (cr <= 2 && free < ac->ac_g_ex.fe_len)
 		return 0;
 
-	if (unlikely(EXT4_MB_GRP_BBITMAP_CORRUPT(grp)))
+	if (unlikely(ext4_mb_grp_bbitmap_corrupt(grp)))
 		return 0;
 
 	/* We only do this if the grp has never been initialized */
-	if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {
+	if (unlikely(ext4_mb_grp_need_init(grp))) {
 		int ret = ext4_mb_init_group(ac->ac_sb, group, GFP_NOFS);
 		if (ret)
 			return ret;
@@ -2304,7 +2304,7 @@ static int ext4_mb_seq_groups_show(struct seq_file *seq, void *v)
 
 	grinfo = ext4_get_group_info(sb, group);
 	/* Load the group info in memory only if not already loaded. */
-	if (unlikely(EXT4_MB_GRP_NEED_INIT(grinfo))) {
+	if (unlikely(ext4_mb_grp_need_init(grinfo))) {
 		err = ext4_mb_load_buddy(sb, group, &e4b);
 		if (err) {
 			seq_printf(seq, "#%-5u: I/O error\n", group);
@@ -2418,8 +2418,7 @@ int ext4_mb_add_groupinfo(struct super_block *sb, ext4_group_t group,
 		ext4_msg(sb, KERN_ERR, "can't allocate buddy mem");
 		goto exit_group_info;
 	}
-	set_bit(EXT4_GROUP_INFO_NEED_INIT_BIT,
-		&(meta_group_info[i]->bb_state));
+	ext4_mb_grp_set_need_init(meta_group_info[i]);
 
 	/*
 	 * initialize bb_free to be able to skip
@@ -2807,7 +2806,7 @@ static void ext4_free_data_in_buddy(struct super_block *sb,
 	 * is supported and the free blocks will be trimmed online.
 	 */
 	if (!test_opt(sb, DISCARD))
-		EXT4_MB_GRP_CLEAR_TRIMMED(db);
+		ext4_mb_grp_clear_trimmed(db);
 
 	if (!db->bb_free_root.rb_node) {
 		/* No more items in the per group rb tree
@@ -4790,7 +4789,7 @@ do_more:
 	overflow = 0;
 	ext4_get_group_no_and_offset(sb, block, &block_group, &bit);
 
-	if (unlikely(EXT4_MB_GRP_BBITMAP_CORRUPT(
+	if (unlikely(ext4_mb_grp_bbitmap_corrupt(
 			ext4_get_group_info(sb, block_group))))
 		return;
 
@@ -4896,7 +4895,7 @@ do_more:
 					 " with %d", block_group, bit, count,
 					 err);
 		} else
-			EXT4_MB_GRP_CLEAR_TRIMMED(e4b.bd_info);
+			ext4_mb_grp_clear_trimmed(e4b.bd_info);
 
 		ext4_lock_group(sb, block_group);
 		mb_clear_bits(bitmap_bh->b_data, bit, count_clusters);
@@ -5169,7 +5168,7 @@ ext4_trim_all_free(struct super_block *sb, ext4_group_t group,
 	bitmap = e4b.bd_bitmap;
 
 	ext4_lock_group(sb, group);
-	if (EXT4_MB_GRP_WAS_TRIMMED(e4b.bd_info) &&
+	if (ext4_mb_grp_trimmed(e4b.bd_info) &&
 	    minblocks >= atomic_read(&EXT4_SB(sb)->s_last_trim_minblks))
 		goto out;
 
@@ -5210,7 +5209,7 @@ ext4_trim_all_free(struct super_block *sb, ext4_group_t group,
 
 	if (!ret) {
 		ret = count;
-		EXT4_MB_GRP_SET_TRIMMED(e4b.bd_info);
+		ext4_mb_grp_set_trimmed(e4b.bd_info);
 	}
 out:
 	ext4_unlock_group(sb, group);
@@ -5273,7 +5272,7 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 	for (group = first_group; group <= last_group; group++) {
 		grp = ext4_get_group_info(sb, group);
 		/* We only do this if the grp has never been initialized */
-		if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {
+		if (unlikely(ext4_mb_grp_need_init(grp))) {
 			ret = ext4_mb_init_group(sb, group, GFP_NOFS);
 			if (ret)
 				break;
