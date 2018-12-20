@@ -88,6 +88,11 @@
 			reg = <0 0x86200000 0 0x2d00000>;
 			no-map;
 		};
+
+		pil_adsp_mem: memory@8b100000 {
+			reg = <0 0x8b100000 0 0x1a00000>;
+			no-map;
+		};
 	};
 
 	cpus {
