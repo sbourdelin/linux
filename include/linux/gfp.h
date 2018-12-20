@@ -442,6 +442,9 @@ static inline int gfp_zonelist(gfp_t flags)
 	return ZONELIST_FALLBACK;
 }
 
+extern struct zonelist *possible_zonelists[];
+extern int build_fallback_zonelists(int node);
+
 /*
  * We get the zone list from the current node and the gfp_mask.
  * This zone list contains a maximum of MAXNODES*MAX_NR_ZONES zones.
@@ -453,7 +456,12 @@ static inline int gfp_zonelist(gfp_t flags)
  */
 static inline struct zonelist *node_zonelist(int nid, gfp_t flags)
 {
-	return NODE_DATA(nid)->node_zonelists + gfp_zonelist(flags);
+	if (unlikely(!possible_zonelists[nid])) {
+		WARN_ONCE(1, "alloc from offline node: %d\n", nid);
+		if (unlikely(build_fallback_zonelists(nid)))
+			nid = first_online_node;
+	}
+	return possible_zonelists[nid] + gfp_zonelist(flags);
 }
 
 #ifndef HAVE_ARCH_FREE_PAGE

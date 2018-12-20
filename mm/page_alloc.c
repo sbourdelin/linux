@@ -121,6 +121,8 @@ nodemask_t node_states[NR_NODE_STATES] __read_mostly = {
 };
 EXPORT_SYMBOL(node_states);
 
+struct zonelist *possible_zonelists[MAX_NUMNODES] __read_mostly;
+
 /* Protect totalram_pages and zone->managed_pages */
 static DEFINE_SPINLOCK(managed_page_count_lock);
 
@@ -5180,7 +5182,6 @@ static int find_next_best_node(int node, nodemask_t *used_node_mask)
 	return best_node;
 }
 
-
 /*
  * Build zonelists ordered by node and zones within node.
  * This results in maximum locality--normal zone overflows into local
@@ -5222,6 +5223,7 @@ static void build_thisnode_zonelists(struct zonelist *node_zonelists,
 	zonerefs->zone_idx = 0;
 }
 
+
 /*
  * Build zonelists ordered by zone and nodes within zones.
  * This results in conserving DMA zone[s] until all Normal memory is
@@ -5229,7 +5231,8 @@ static void build_thisnode_zonelists(struct zonelist *node_zonelists,
  * may still exist in local DMA zone.
  */
 
-static void build_zonelists(struct zonelist *node_zonelists, int local_node)
+static void build_zonelists(struct zonelist *node_zonelists,
+	int local_node, bool exclude_self)
 {
 	static int node_order[MAX_NUMNODES];
 	int node, load, nr_nodes = 0;
@@ -5240,6 +5243,8 @@ static void build_zonelists(struct zonelist *node_zonelists, int local_node)
 	load = nr_online_nodes;
 	prev_node = local_node;
 	nodes_clear(used_mask);
+	if (exclude_self)
+		node_set(local_node, used_mask);
 
 	memset(node_order, 0, sizeof(node_order));
 	while ((node = find_next_best_node(local_node, &used_mask)) >= 0) {
@@ -5258,7 +5263,40 @@ static void build_zonelists(struct zonelist *node_zonelists, int local_node)
 	}
 
 	build_zonelists_in_node_order(node_zonelists, node_order, nr_nodes);
-	build_thisnode_zonelists(node_zonelists, local_node);
+	if (!exclude_self)
+		build_thisnode_zonelists(node_zonelists, local_node);
+	possible_zonelists[local_node] = node_zonelists;
+}
+
+/* this is rare case in which building zonelists for offline node, but
+ * there is dev used on it
+ */
+int build_fallback_zonelists(int node)
+{
+	static DEFINE_SPINLOCK(lock);
+	nodemask_t *used_mask;
+	struct zonelist *zl;
+	int ret = 0;
+
+	spin_lock(&lock);
+	if (unlikely(possible_zonelists[node] != NULL))
+		goto unlock;
+
+	used_mask = kmalloc(sizeof(nodemask_t), GFP_ATOMIC);
+	zl = kmalloc(sizeof(struct zonelist)*MAX_ZONELISTS, GFP_ATOMIC);
+	if (unlikely(!used_mask || !zl)) {
+		ret = -ENOMEM;
+		kfree(used_mask);
+		kfree(zl);
+		goto unlock;
+	}
+
+	__nodes_complement(used_mask, &node_online_map, MAX_NUMNODES);
+	build_zonelists(zl, node, true);
+	kfree(used_mask);
+unlock:
+	spin_unlock(&lock);
+	return ret;
 }
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
@@ -5283,7 +5321,8 @@ static void setup_min_unmapped_ratio(void);
 static void setup_min_slab_ratio(void);
 #else	/* CONFIG_NUMA */
 
-static void build_zonelists(struct zonelist *node_zonelists, int local_node)
+static void build_zonelists(struct zonelist *node_zonelists,
+	int local_node, bool _unused)
 {
 	int node, local_node;
 	struct zoneref *zonerefs;
@@ -5357,12 +5396,13 @@ static void __build_all_zonelists(void *data)
 	 * building zonelists is fine - no need to touch other nodes.
 	 */
 	if (self && !node_online(self->node_id)) {
-		build_zonelists(self->node_zonelists, self->node_id);
+		build_zonelists(self->node_zonelists, self->node_id, false);
 	} else {
 		for_each_online_node(nid) {
 			pg_data_t *pgdat = NODE_DATA(nid);
 
-			build_zonelists(pgdat->node_zonelists, pgdat->node_id);
+			build_zonelists(pgdat->node_zonelists, pgdat->node_id,
+				false);
 		}
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
