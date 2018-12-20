@@ -200,7 +200,7 @@ void i915_gem_unpark(struct drm_i915_private *i915)
 	GEM_TRACE("\n");
 
 	lockdep_assert_held(&i915->drm.struct_mutex);
-	GEM_BUG_ON(!i915->gt.active_requests);
+	GEM_BUG_ON(!i915->gt.reserved_requests);
 
 	if (i915->gt.awake)
 		return;

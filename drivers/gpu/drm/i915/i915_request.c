@@ -200,7 +200,7 @@ static int reserve_gt(struct drm_i915_private *i915)
 		}
 	}
 
-	if (!i915->gt.active_requests++)
+	if (!i915->gt.reserved_requests++)
 		i915_gem_unpark(i915);
 
 	return 0;
@@ -208,8 +208,8 @@ static int reserve_gt(struct drm_i915_private *i915)
 
 static void unreserve_gt(struct drm_i915_private *i915)
 {
-	GEM_BUG_ON(!i915->gt.active_requests);
-	if (!--i915->gt.active_requests)
+	GEM_BUG_ON(!i915->gt.reserved_requests);
+	if (!--i915->gt.reserved_requests)
 		i915_gem_park(i915);
 }
 
@@ -384,6 +384,8 @@ static void i915_request_retire(struct i915_request *request)
 
 	__retire_engine_upto(request->engine, request);
 
+	GEM_BUG_ON(!request->i915->gt.active_requests);
+	request->i915->gt.active_requests--;
 	unreserve_gt(request->i915);
 
 	i915_sched_node_fini(request->i915, &request->sched);
@@ -1010,6 +1012,8 @@ void i915_request_add(struct i915_request *request)
 							 &request->dep,
 							 0);
 	}
+
+	++request->i915->gt.active_requests;
 
 	spin_lock_irq(&timeline->lock);
 	list_add_tail(&request->link, &timeline->requests);
