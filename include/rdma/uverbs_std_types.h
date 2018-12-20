@@ -48,9 +48,20 @@
 #define uobj_get_type(_attrs, _object)                                         \
 	uapi_get_object((_attrs)->ufile->device->uapi, _object)
 
+static inline struct ib_uobject *
+uobj_attrs_set_context(struct ib_uobject *uobj,
+		      struct uverbs_attr_bundle *attrs)
+{
+	if (IS_ERR(uobj))
+		return uobj;
+	attrs->driver_udata.context = uobj->context;
+	return uobj;
+}
+
 #define uobj_get_read(_type, _id, _attrs)                                      \
-	rdma_lookup_get_uobject(uobj_get_type(_attrs, _type), (_attrs)->ufile, \
-				_uobj_check_id(_id), UVERBS_LOOKUP_READ)
+	uobj_attrs_set_context(rdma_lookup_get_uobject(                        \
+		uobj_get_type(_attrs, _type), (_attrs)->ufile,                 \
+			_uobj_check_id(_id), UVERBS_LOOKUP_READ), _attrs)
 
 #define ufd_get_read(_type, _fdnum, _attrs)                                    \
 	rdma_lookup_get_uobject(uobj_get_type(_attrs, _type), (_attrs)->ufile, \
@@ -68,8 +79,9 @@ static inline void *_uobj_get_obj_read(struct ib_uobject *uobj)
 		uobj_get_read(_type, _id, _attrs)))
 
 #define uobj_get_write(_type, _id, _attrs)                                     \
-	rdma_lookup_get_uobject(uobj_get_type(_attrs, _type), (_attrs)->ufile, \
-				_uobj_check_id(_id), UVERBS_LOOKUP_WRITE)
+	uobj_attrs_set_context(rdma_lookup_get_uobject(                        \
+		uobj_get_type(_attrs, _type), (_attrs)->ufile,                 \
+			_uobj_check_id(_id), UVERBS_LOOKUP_WRITE), _attrs)
 
 int __uobj_perform_destroy(const struct uverbs_api_object *obj, u32 id,
 			   const struct uverbs_attr_bundle *attrs);

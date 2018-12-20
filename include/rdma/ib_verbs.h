@@ -1540,7 +1540,35 @@ struct ib_udata {
 	void __user *outbuf;
 	size_t       inlen;
 	size_t       outlen;
+	struct ib_ucontext     *context;        /* associated user context */
 };
+
+/**
+ * _rdma_udata_context - Get ucontext from udata
+ * @udata: The udata object
+ * @warn: Warn true/false if ucontext is NULL
+ *
+ * NOTE:
+ * Most of the code should use rdma_udata_context which turn
+ * the NULL ucontext warning on. Use this function if you need
+ * to *test* if udata has ucontext and want to turn the warning
+ * off.
+ */
+static inline struct ib_ucontext *_rdma_udata_context(struct ib_udata *udata,
+						      bool warn)
+{
+	WARN_ON(warn && !udata->context);
+	return udata->context;
+}
+
+/**
+ * rdma_udata_context - Get ucontext from udata
+ * @udata: The udata object
+ *
+ * NOTE: Assume valid ucontext & warn if ucontext is NULL!
+ */
+#define rdma_udata_context(udata) \
+	_rdma_udata_context(udata, true)
 
 struct ib_pd {
 	u32			local_dma_lkey;

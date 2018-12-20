@@ -61,6 +61,7 @@ ib_uverbs_init_udata(struct ib_udata *udata,
 	udata->outbuf = obuf;
 	udata->inlen  = ilen;
 	udata->outlen = olen;
+	udata->context = NULL;
 }
 
 static inline void

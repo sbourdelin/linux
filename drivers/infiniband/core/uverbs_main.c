@@ -705,6 +705,7 @@ static ssize_t ib_uverbs_write(struct file *filp, const char __user *buf,
 				bundle.driver_udata.inbuf = buf + in_len;
 			else
 				bundle.driver_udata.inbuf = NULL;
+			bundle.driver_udata.context = NULL;
 		} else {
 			memset(&bundle.driver_udata, 0,
 			       sizeof(bundle.driver_udata));
