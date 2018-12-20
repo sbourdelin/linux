@@ -1250,7 +1250,7 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)
 	}
 
 	ret = dwc3_send_gadget_ep_cmd(dep, cmd, &params);
-	if (ret < 0) {
+	if (ret < 0 && ret != -EAGAIN) {
 		/*
 		 * FIXME we need to iterate over the list of requests
 		 * here and stop, unmap, free and del each of the linked
@@ -1259,10 +1259,9 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)
 		if (req->trb)
 			memset(req->trb, 0, sizeof(struct dwc3_trb));
 		dwc3_gadget_del_and_unmap_request(dep, req, ret);
-		return ret;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int __dwc3_gadget_get_frame(struct dwc3 *dwc)
