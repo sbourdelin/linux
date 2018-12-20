@@ -61,7 +61,7 @@ static LIST_HEAD(smk_ipv6_port_list);
 static struct kmem_cache *smack_inode_cache;
 int smack_enabled;
 
-#define A(s) {#s, sizeof(#s) - 1, Opt_##s}
+#define A(s) {"smack"#s, sizeof("smack"#s) - 1, Opt_##s}
 static struct {
 	const char *name;
 	int len;
