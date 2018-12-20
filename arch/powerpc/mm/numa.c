@@ -864,10 +864,19 @@ void __init initmem_init(void)
 
 	memblock_dump_all();
 
-	for_each_online_node(nid) {
+	/* Instance all possible nodes to overcome potential NULL reference
+	 * issue on node_zonelist() when using nr_cpus
+	 */
+	for_each_node(nid) {
 		unsigned long start_pfn, end_pfn;
 
-		get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
+		if (node_online(nid))
+			get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
+		else {
+			start_pfn = end_pfn = 0;
+			/* online it, so later zonelists[] will be built */
+			node_set_online(nid);
+		}
 		setup_node_data(nid, start_pfn, end_pfn);
 		sparse_memory_present_with_active_regions(nid);
 	}
