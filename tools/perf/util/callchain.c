@@ -258,7 +258,7 @@ int parse_callchain_record(const char *arg, struct callchain_param *param)
 
 	do {
 		/* Framepointer style */
-		if (!strncmp(name, "fp", sizeof("fp"))) {
+		if (!strcmp(name, "fp")) {
 			if (!strtok_r(NULL, ",", &saveptr)) {
 				param->record_mode = CALLCHAIN_FP;
 				ret = 0;
@@ -268,7 +268,7 @@ int parse_callchain_record(const char *arg, struct callchain_param *param)
 			break;
 
 		/* Dwarf style */
-		} else if (!strncmp(name, "dwarf", sizeof("dwarf"))) {
+		} else if (!strcmp(name, "dwarf")) {
 			const unsigned long default_stack_dump_size = 8192;
 
 			ret = 0;
@@ -283,7 +283,7 @@ int parse_callchain_record(const char *arg, struct callchain_param *param)
 				ret = get_stack_size(tok, &size);
 				param->dump_size = size;
 			}
-		} else if (!strncmp(name, "lbr", sizeof("lbr"))) {
+		} else if (!strcmp(name, "lbr")) {
 			if (!strtok_r(NULL, ",", &saveptr)) {
 				param->record_mode = CALLCHAIN_LBR;
 				ret = 0;
