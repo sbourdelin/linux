@@ -2720,7 +2720,9 @@ static int mspro_rw_multi_sector(struct scsi_cmnd *srb,
 		}
 
 		if (val & MS_INT_BREQ)
-			ms_send_cmd(chip, PRO_STOP, WAIT_INT);
+			retval = ms_send_cmd(chip, PRO_STOP, WAIT_INT);
+			if (retval != STATUS_SUCCESS)
+				return STATUS_FAIL;
 
 		if (val & (MS_CRC16_ERR | MS_RDY_TIMEOUT)) {
 			dev_dbg(rtsx_dev(chip), "MSPro CRC error, tune clock!\n");
