@@ -502,16 +502,16 @@ static void iw_cm_check_wildcard(struct sockaddr_storage *pm_addr,
  */
 static int iw_cm_map(struct iw_cm_id *cm_id, bool active)
 {
-	struct iwpm_dev_data pm_reg_msg;
+	struct iwpm_dev_data pm_reg_msg = {};
 	struct iwpm_sa_data pm_msg;
 	int status;
 
 	cm_id->m_local_addr = cm_id->local_addr;
 	cm_id->m_remote_addr = cm_id->remote_addr;
 
-	memcpy(pm_reg_msg.dev_name, dev_name(&cm_id->device->dev),
+	strncpy(pm_reg_msg.dev_name, dev_name(&cm_id->device->dev),
 	       sizeof(pm_reg_msg.dev_name));
-	memcpy(pm_reg_msg.if_name, cm_id->device->iwcm->ifname,
+	strncpy(pm_reg_msg.if_name, cm_id->device->iwcm->ifname,
 	       sizeof(pm_reg_msg.if_name));
 
 	if (iwpm_register_pid(&pm_reg_msg, RDMA_NL_IWCM) ||
