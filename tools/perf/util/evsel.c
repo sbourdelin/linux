@@ -215,12 +215,7 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
  */
 bool perf_evsel__is_function_event(struct perf_evsel *evsel)
 {
-#define FUNCTION_EVENT "ftrace:function"
-
-	return evsel->name &&
-	       !strncmp(FUNCTION_EVENT, evsel->name, sizeof(FUNCTION_EVENT));
-
-#undef FUNCTION_EVENT
+	return evsel->name && !strcmp("ftrace:function", evsel->name);
 }
 
 void perf_evsel__init(struct perf_evsel *evsel,
