@@ -25,6 +25,11 @@ enum probe_component {
 	COMPONENT_KERNEL,
 };
 
+#define BPF_HELPER_MAKE_ENTRY(name)	[BPF_FUNC_ ## name] = "bpf_" # name
+static const char * const helper_name[] = {
+	__BPF_FUNC_MAPPER(BPF_HELPER_MAKE_ENTRY)
+};
+
 /* Miscellaneous utility functions */
 
 static bool check_procfs(void)
@@ -418,6 +423,45 @@ static void probe_map_type(enum bpf_map_type map_type)
 	print_bool_feature(feat_name, plain_desc, res);
 }
 
+static void
+probe_helper(__u32 id, const char *name, int kernel_version,
+	     bool *supported_types)
+{
+	char feat_name[128], plain_desc[128];
+	unsigned int i;
+
+	sprintf(feat_name, "%s_compat_list", name);
+	sprintf(plain_desc,
+		"eBPF helper %s supported for program types:",
+		name);
+
+	if (json_output) {
+		jsonw_name(json_wtr, feat_name);
+		jsonw_start_array(json_wtr);
+	} else {
+		printf("%s", plain_desc);
+	}
+
+	for (i = BPF_PROG_TYPE_UNSPEC + 1;
+	     i < ARRAY_SIZE(prog_type_name); i++) {
+		if (!supported_types[i])
+			continue;
+
+		if (!bpf_probe_helper(id, i, kernel_version, 0))
+			continue;
+
+		if (json_output)
+			jsonw_string(json_wtr, prog_type_name[i]);
+		else
+			printf(" %s", prog_type_name[i]);
+	}
+
+	if (json_output)
+		jsonw_end_array(json_wtr);
+	else
+		printf("\n");
+}
+
 static int do_probe(int argc, char **argv)
 {
 	enum probe_component target = COMPONENT_UNSPEC;
@@ -493,6 +537,13 @@ static int do_probe(int argc, char **argv)
 
 	for (i = BPF_MAP_TYPE_UNSPEC + 1; i < map_type_name_size; i++)
 		probe_map_type(i);
+
+	print_end_then_start_section("helpers",
+				     "Scanning eBPF helper functions...");
+
+	for (i = 1; i < ARRAY_SIZE(helper_name); i++)
+		probe_helper(i, helper_name[i], kernel_version,
+			     supported_types);
 
 exit_close_json:
 	if (json_output) {

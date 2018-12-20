@@ -3,13 +3,48 @@
 /* Copyright (c) 2018 Netronome Systems, Inc. */
 
 #include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <net/if.h>
 
 #include <linux/filter.h>
 #include <linux/kernel.h>
 
 #include "bpf.h"
 #include "libbpf.h"
+
+static bool grep(const char *buffer, const char *pattern)
+{
+	return !!strstr(buffer, pattern);
+}
+
+static int get_vendor_id(int ifindex)
+{
+	char ifname[IF_NAMESIZE], path[64], buf[8];
+	ssize_t len;
+	int fd;
+
+	if (!if_indextoname(ifindex, ifname))
+		return -1;
+
+	snprintf(path, sizeof(path), "/sys/class/net/%s/device/vendor", ifname);
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	len = read(fd, buf, sizeof(buf));
+	close(fd);
+	if (len < 0)
+		return -1;
+	if (len >= (ssize_t)sizeof(buf))
+		return -1;
+	buf[len] = '\0';
+
+	return strtol(buf, NULL, 0);
+}
 
 static void
 prog_load(enum bpf_prog_type prog_type, const struct bpf_insn *insns,
@@ -111,4 +146,32 @@ bool bpf_probe_map_type(enum bpf_map_type map_type, __u32 ifindex)
 		close(fd);
 
 	return fd >= 0;
+}
+
+bool bpf_probe_helper(__u32 id, enum bpf_prog_type prog_type,
+		      int kernel_version, __u32 ifindex)
+{
+	struct bpf_insn insns[2] = {
+		BPF_EMIT_CALL(id),
+		BPF_EXIT_INSN()
+	};
+	char buf[4096] = {};
+	bool res;
+
+	prog_load(prog_type, insns, ARRAY_SIZE(insns), kernel_version,
+		  buf, sizeof(buf), ifindex);
+	res = !grep(buf, "invalid func ") && !grep(buf, "unknown func ");
+
+	if (ifindex) {
+		switch (get_vendor_id(ifindex)) {
+		case 0x19ee: /* Netronome specific */
+			res = res && !grep(buf, "not supported by FW") &&
+				!grep(buf, "unsupported function id");
+			break;
+		default:
+			break;
+		}
+	}
+
+	return res;
 }
