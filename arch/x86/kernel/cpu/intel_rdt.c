@@ -213,7 +213,8 @@ static inline void cache_alloc_hsw_probe(void)
 
 	if (wrmsr_safe(IA32_L3_CBM_BASE, max_cbm, 0))
 		return;
-	rdmsr(IA32_L3_CBM_BASE, l, h);
+	if (rdmsr_safe(IA32_L3_CBM_BASE, &l, &h))
+		return;
 
 	/* If all the bits were set in MSR, return success */
 	if (l != max_cbm)
