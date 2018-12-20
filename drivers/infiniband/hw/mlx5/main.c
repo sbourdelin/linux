@@ -5775,8 +5775,10 @@ int mlx5_ib_stage_init_init(struct mlx5_ib_dev *dev)
 	}
 
 	err = init_srcu_struct(&dev->mr_srcu);
-	if (err)
+	if (err) {
+		destroy_workqueue(dev->advise_mr_wq);
 		goto err_free_port;
+	}
 #endif
 
 	return 0;
