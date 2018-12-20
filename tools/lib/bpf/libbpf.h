@@ -355,6 +355,12 @@ LIBBPF_API const struct bpf_line_info *
 bpf_prog_linfo__lfind(const struct bpf_prog_linfo *prog_linfo,
 		      __u32 insn_off, __u32 nr_skip);
 
+/*
+ * Probe for supported system features
+ */
+LIBBPF_API bool bpf_probe_prog_type(enum bpf_prog_type prog_type,
+				    int kernel_version, __u32 ifindex);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
