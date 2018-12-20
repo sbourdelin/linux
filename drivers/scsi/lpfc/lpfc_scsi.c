@@ -4540,7 +4540,7 @@ lpfc_info(struct Scsi_Host *host)
 	memset(lpfcinfobuf, 0, sizeof(lpfcinfobuf));
 	if (phba && phba->pcidev){
 		/* Model Description */
-		scnprintf(tmp, sizeof(tmp), phba->ModelDesc);
+		strscpy(tmp, phba->ModelDesc, sizeof(tmp));
 		if (strlcat(lpfcinfobuf, tmp, sizeof(lpfcinfobuf)) >=
 		    sizeof(lpfcinfobuf))
 			goto buffer_done;
