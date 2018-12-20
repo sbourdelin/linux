@@ -1518,7 +1518,7 @@ void
 rpcrdma_post_recvs(struct rpcrdma_xprt *r_xprt, bool temp)
 {
 	struct rpcrdma_buffer *buf = &r_xprt->rx_buf;
-	struct ib_recv_wr *wr, *bad_wr;
+	struct ib_recv_wr *wr, *bad_wr = NULL;
 	int needed, count, rc;
 
 	rc = 0;
