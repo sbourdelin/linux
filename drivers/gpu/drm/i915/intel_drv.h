@@ -379,6 +379,39 @@ struct intel_hdcp_shim {
 	/* Detects panel's hdcp capability. This is optional for HDMI. */
 	int (*hdcp_capable)(struct intel_digital_port *intel_dig_port,
 			    bool *hdcp_capable);
+<<<<<<< HEAD
+=======
+
+	/* HDCP adaptation(DP/HDMI) required on the port */
+	enum hdcp_wired_protocol protocol;
+
+	/* Detects whether Panel is HDCP2.2 capable */
+	int (*hdcp_2_2_capable)(struct intel_digital_port *intel_dig_port,
+				bool *capable);
+
+	/* Write HDCP2.2 messages.
+	 * We are using HDMI msg-id numbers to identify HDCP2 messages, which *
+	 * will be remapped to DP AUX registers for DP. */
+	int (*write_2_2_msg)(struct intel_digital_port *intel_dig_port,
+			     void *buf, size_t size);
+
+	/* Read HDCP2.2 messages.
+	 * We are using HDMI msg-id numbers to identify HDCP2 messages, which *
+	 * will be remapped to DP AUX registers for DP.  */
+	int (*read_2_2_msg)(struct intel_digital_port *intel_dig_port,
+			    u8 msg_id, void *buf, size_t size);
+
+	/*
+	 * Implementation of DP HDCP2.2 Errata for the communication of stream
+	 * type to Receivers. In DP HDCP2.2 Stream type is one of the input to
+	 * the HDCP2.2 Cipher for En/De-Cryption. Not applicable for HDMI.
+	 */
+	int (*config_stream_type)(struct intel_digital_port *intel_dig_port,
+				  void *buf, size_t size);
+
+	/* HDCP2.2 Link Integrity Check */
+	int (*check_2_2_link)(struct intel_digital_port *intel_dig_port);
+>>>>>>> 4f9e07e71945... drm/doc: Move bridge link target to the right place
 };
 
 struct intel_hdcp {
