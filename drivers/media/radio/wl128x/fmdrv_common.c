@@ -35,10 +35,9 @@
 #include "fmdrv_v4l2.h"
 #include "fmdrv_common.h"
 #include <linux/ti_wilink_st.h>
+#include <linux/platform_device.h>
 #include "fmdrv_rx.h"
 #include "fmdrv_tx.h"
-
-struct fmdev *global_fmdev;
 
 /* Region info */
 static struct region_info region_configs[] = {
@@ -1615,23 +1614,19 @@ int fmc_release(struct fmdev *fmdev)
 	return ret;
 }
 
-/*
- * Module init function. Ask FM V4L module to register video device.
- * Allocate memory for FM driver context and RX RDS buffer.
- */
-static int __init fm_drv_init(void)
+static int wl128x_fm_probe(struct platform_device *dev)
 {
 	struct fmdev *fmdev = NULL;
 	int ret = -ENOMEM;
 
 	fmdbg("FM driver\n");
 
+	/* Allocate memory for FM driver context and RX RDS buffer. */
 	fmdev = kzalloc(sizeof(struct fmdev), GFP_KERNEL);
 	if (NULL == fmdev) {
 		fmerr("Can't allocate operation structure memory\n");
 		return ret;
 	}
-	global_fmdev = fmdev;
 	fmdev->rx.rds.buf_size = default_rds_buf * FM_RDS_BLK_SIZE;
 	fmdev->rx.rds.buff = kzalloc(fmdev->rx.rds.buf_size, GFP_KERNEL);
 	if (NULL == fmdev->rx.rds.buff) {
@@ -1639,6 +1634,7 @@ static int __init fm_drv_init(void)
 		goto rel_dev;
 	}
 
+	/* Ask FM V4L module to register video device. */
 	ret = fm_v4l2_init_video_device(fmdev, radio_nr);
 	if (ret < 0)
 		goto rel_rdsbuf;
@@ -1657,10 +1653,9 @@ rel_dev:
 	return ret;
 }
 
-/* Module exit function. Ask FM V4L module to unregister video device */
-static void __exit fm_drv_exit(void)
+static int wl128x_fm_remove(struct platform_device *dev)
 {
-	struct fmdev *fmdev = global_fmdev;
+	struct fmdev *fmdev = platform_get_drvdata(pdev);
 
 	/* Ask FM V4L module to unregister video device */
 	fm_v4l2_deinit_video_device(fmdev);
@@ -1668,12 +1663,19 @@ static void __exit fm_drv_exit(void)
 		kfree(fmdev->rx.rds.buff);
 		kfree(fmdev);
 	}
+
+	return 0;
 }
 
-module_init(fm_drv_init);
-module_exit(fm_drv_exit);
+static struct platform_driver wl128x_fm_drv = {
+	.driver	= {
+		.name	= "wl128x-fm",
+	},
+	.probe		= wl128x_fm_probe,
+	.remove		= wl128x_fm_remove,
+};
+module_platform_driver(wl128x_fm_drv);
 
-/* ------------- Module Info ------------- */
 MODULE_AUTHOR("Manjunatha Halli <manjunatha_halli@ti.com>");
 MODULE_DESCRIPTION("FM Driver for TI's Connectivity chip");
 MODULE_LICENSE("GPL");
