@@ -55,6 +55,7 @@
 #include <linux/sunrpc/xprt.h>
 
 #include "sunrpc.h"
+#include "netns.h"
 
 #define RPCDBG_FACILITY	RPCDBG_SVCXPRT
 
@@ -1608,6 +1609,7 @@ static struct svc_xprt *svc_bc_create_socket(struct svc_serv *serv,
 {
 	struct svc_sock *svsk;
 	struct svc_xprt *xprt;
+	struct sunrpc_net *sn = net_generic(net, sunrpc_net_id);
 
 	if (protocol != IPPROTO_TCP) {
 		printk(KERN_WARNING "svc: only TCP sockets"
@@ -1623,6 +1625,7 @@ static struct svc_xprt *svc_bc_create_socket(struct svc_serv *serv,
 	svc_xprt_init(net, &svc_tcp_bc_class, xprt, serv);
 	set_bit(XPT_CONG_CTRL, &svsk->sk_xprt.xpt_flags);
 
+	sn->bc_prep_reply_hdr = svc_tcp_prep_reply_hdr;
 	serv->sv_bc_xprt = xprt;
 
 	return xprt;

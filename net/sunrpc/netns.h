@@ -6,6 +6,7 @@
 #include <net/netns/generic.h>
 
 struct cache_detail;
+struct svc_rqst;
 
 struct sunrpc_net {
 	struct proc_dir_entry *proc_net_rpc;
@@ -33,6 +34,7 @@ struct sunrpc_net {
 	int pipe_version;
 	atomic_t pipe_users;
 	struct proc_dir_entry *use_gssp_proc;
+	void (*bc_prep_reply_hdr)(struct svc_rqst *);
 };
 
 extern unsigned int sunrpc_net_id;
