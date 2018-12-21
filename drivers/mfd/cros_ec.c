@@ -51,13 +51,16 @@ static const struct mfd_cell ec_pd_cell = {
 	.pdata_size = sizeof(pd_p),
 };
 
-static irqreturn_t ec_irq_thread(int irq, void *data)
+static bool ec_handle_event(struct cros_ec_device *ec_dev)
 {
-	struct cros_ec_device *ec_dev = data;
 	bool wake_event = true;
 	int ret;
+	bool ec_has_more_events = false;
 
 	ret = cros_ec_get_next_event(ec_dev, &wake_event);
+	if (ret > 0)
+		ec_has_more_events =
+			ec_dev->event_data.event_type & EC_MKBP_HAS_MORE_EVENTS;
 
 	/*
 	 * Signal only if wake host events or any interrupt if
@@ -70,6 +73,19 @@ static irqreturn_t ec_irq_thread(int irq, void *data)
 	if (ret > 0)
 		blocking_notifier_call_chain(&ec_dev->event_notifier,
 					     0, ec_dev);
+
+	return ec_has_more_events;
+}
+
+static irqreturn_t ec_irq_thread(int irq, void *data)
+{
+	struct cros_ec_device *ec_dev = data;
+	bool ec_has_more_events;
+
+	do {
+		ec_has_more_events = ec_handle_event(ec_dev);
+	} while (ec_has_more_events);
+
 	return IRQ_HANDLED;
 }
 
