@@ -34,11 +34,26 @@
 	module_param_named_unsafe(name, i915_modparams.name, T, perm); \
 	MODULE_PARM_DESC(name, desc)
 
-struct i915_params i915_modparams __read_mostly = {
+static struct i915_params i915_modparams __read_mostly = {
 #define MEMBER(T, member, value, ...) .member = (value),
 	I915_PARAMS_FOR_EACH(MEMBER)
 #undef MEMBER
 };
+
+int i915_params_modeset(void)
+{
+	return i915_modparams.modeset;
+}
+
+bool i915_params_verbose_state_checks(void)
+{
+	return i915_modparams.verbose_state_checks;
+}
+
+bool i915_params_alpha_support(void)
+{
+	return i915_modparams.alpha_support;
+}
 
 /*
  * Note: As a rule, keep module parameter sysfs permissions read-only
@@ -217,6 +232,9 @@ static __always_inline void dup_param(const char *type, void *x)
 
 void i915_params_copy(struct i915_params *dest, const struct i915_params *src)
 {
+	if (!src)
+		src = &i915_modparams;
+
 	*dest = *src;
 #define DUP(T, x, ...) dup_param(#T, &dest->x);
 	I915_PARAMS_FOR_EACH(DUP);

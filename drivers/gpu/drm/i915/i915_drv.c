@@ -1643,7 +1643,7 @@ i915_driver_create(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	/* Device parameters start as a copy of module parameters. */
-	i915_params_copy(&i915->params, &i915_modparams);
+	i915_params_copy(&i915->params, NULL);
 
 	i915->drm.pdev = pdev;
 	i915->drm.dev_private = i915;

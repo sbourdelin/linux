@@ -103,7 +103,7 @@
 #define I915_STATE_WARN(condition, format...) ({			\
 	int __ret_warn_on = !!(condition);				\
 	if (unlikely(__ret_warn_on))					\
-		if (!WARN(i915_modparams.verbose_state_checks, format))	\
+		if (!WARN(i915_params_verbose_state_checks(), format))	\
 			DRM_ERROR(format);				\
 	unlikely(__ret_warn_on);					\
 })
