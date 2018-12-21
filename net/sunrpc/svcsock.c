@@ -1626,7 +1626,7 @@ static struct svc_xprt *svc_bc_create_socket(struct svc_serv *serv,
 	set_bit(XPT_CONG_CTRL, &svsk->sk_xprt.xpt_flags);
 
 	sn->bc_prep_reply_hdr = svc_tcp_prep_reply_hdr;
-	serv->sv_bc_xprt = xprt;
+	serv->sv_bc_enabled = true;
 
 	return xprt;
 }
