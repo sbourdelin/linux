@@ -31,6 +31,7 @@
 #include <linux/phylink.h>
 #include <linux/platform_device.h>
 #include <linux/skbuff.h>
+#include <linux/bpf.h>
 #include <net/hwbm.h>
 #include "mvneta_bm.h"
 #include <net/ip.h>
@@ -454,6 +455,8 @@ struct mvneta_port {
 	bool neta_armada3700;
 	u16 rx_offset_correction;
 	const struct mbus_dram_target_info *dram_target_info;
+
+	struct bpf_prog *xdp_prog;
 };
 
 /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
@@ -626,6 +629,8 @@ struct mvneta_rx_queue {
 	/* error counters */
 	u32 skb_alloc_err;
 	u32 refill_err;
+
+	struct bpf_prog *xdp_prog;
 };
 
 static enum cpuhp_state online_hpstate;
@@ -2099,6 +2104,7 @@ static int mvneta_rx_hwbm(struct napi_struct *napi,
 	int rx_done;
 	u32 rcvd_pkts = 0;
 	u32 rcvd_bytes = 0;
+	struct bpf_prog *xdp_prog;
 
 	/* Get number of received packets */
 	rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
@@ -2138,6 +2144,29 @@ err_drop_frame:
 			mvneta_rx_error(pp, rx_desc);
 			/* leave the descriptor untouched */
 			continue;
+		}
+
+		xdp_prog = READ_ONCE(rxq->xdp_prog);
+		if (xdp_prog) {
+			struct xdp_buff xdp;
+			enum xdp_action act;
+
+			xdp.data = data + MVNETA_MH_SIZE + NET_SKB_PAD;
+			xdp.data_end = xdp.data + rx_bytes;
+
+			act = bpf_prog_run_xdp(xdp_prog, &xdp);
+			switch (act) {
+			case XDP_PASS:
+				break;
+			default:
+				bpf_warn_invalid_xdp_action(act);
+				/* fall through */
+			case XDP_DROP:
+				/* Return the buffer to the pool */
+				mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+						      rx_desc->buf_phys_addr);
+				continue;
+			}
 		}
 
 		if (rx_bytes <= rx_copybreak) {
@@ -2935,6 +2964,8 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
 
 	mvneta_rxq_hw_init(pp, rxq);
 
+	rxq->xdp_prog = pp->xdp_prog;
+
 	return 0;
 }
 
@@ -2961,6 +2992,7 @@ static void mvneta_rxq_deinit(struct mvneta_port *pp,
 	rxq->refill_num        = 0;
 	rxq->skb               = NULL;
 	rxq->left_size         = 0;
+	rxq->xdp_prog          = NULL;
 }
 
 static int mvneta_txq_sw_init(struct mvneta_port *pp,
@@ -3878,6 +3910,43 @@ static int mvneta_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return phylink_mii_ioctl(pp->phylink, ifr, cmd);
 }
 
+static int mvneta_xdp_set(struct net_device *dev, struct bpf_prog *xdp_prog)
+{
+	struct mvneta_port *pp = netdev_priv(dev);
+	struct bpf_prog *xdp_prog_old;
+	int queue;
+
+	if (!pp->bm_priv)
+		return -EINVAL;
+
+	xdp_prog_old = xchg(&pp->xdp_prog, xdp_prog);
+
+	for (queue = 0; queue < rxq_number; queue++) {
+		struct mvneta_rx_queue *rxq = &pp->rxqs[queue];
+		(void)xchg(&rxq->xdp_prog, pp->xdp_prog);
+	}
+
+	if (xdp_prog_old)
+		bpf_prog_put(xdp_prog_old);
+
+	return 0;
+}
+
+static int mvneta_bpf(struct net_device *dev, struct netdev_bpf *bpf)
+{
+	struct mvneta_port *pp = netdev_priv(dev);
+
+	switch (bpf->command) {
+	case XDP_SETUP_PROG:
+		return mvneta_xdp_set(dev, bpf->prog);
+	case XDP_QUERY_PROG:
+		bpf->prog_id = pp->xdp_prog ? pp->xdp_prog->aux->id : 0;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 /* Ethtool methods */
 
 /* Set link ksettings (phy address, speed) for ethtools */
@@ -4275,6 +4344,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
 	.ndo_fix_features    = mvneta_fix_features,
 	.ndo_get_stats64     = mvneta_get_stats64,
 	.ndo_do_ioctl        = mvneta_ioctl,
+	.ndo_bpf             = mvneta_bpf,
 };
 
 static const struct ethtool_ops mvneta_eth_tool_ops = {
