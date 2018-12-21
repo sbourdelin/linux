@@ -470,6 +470,14 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					  data_arg.data);
 	}
 	case I2C_RETRIES:
+		/*
+		 * The adapter->retries is defined as int type, and as
+		 * the upper limit for times of i2c transfer retry when
+		 * get -EAGAIN, it should not be set as minus value.
+		 */
+		if ((int)arg < 0)
+			return -EINVAL;
+
 		client->adapter->retries = arg;
 		break;
 	case I2C_TIMEOUT:
