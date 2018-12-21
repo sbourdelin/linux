@@ -57,7 +57,8 @@ typedef int (*libbpf_print_fn_t)(const char *, ...)
 
 LIBBPF_API void libbpf_set_print(libbpf_print_fn_t warn,
 				 libbpf_print_fn_t info,
-				 libbpf_print_fn_t debug);
+				 libbpf_print_fn_t debug,
+				 libbpf_print_fn_t out);
 
 /* Hide internal to user */
 struct bpf_object;

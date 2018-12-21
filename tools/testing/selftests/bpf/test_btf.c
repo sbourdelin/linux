@@ -5045,7 +5045,7 @@ int main(int argc, char **argv)
 		return err;
 
 	if (args.always_log)
-		libbpf_set_print(__base_pr, __base_pr, __base_pr);
+		libbpf_set_print(__base_pr, __base_pr, __base_pr, NULL);
 
 	if (args.raw_test)
 		err |= test_raw();

@@ -120,7 +120,7 @@ int main(int argc, char **argv)
 	int longindex = 0;
 	int opt;
 
-	libbpf_set_print(libbpf_warning, libbpf_info, NULL);
+	libbpf_set_print(libbpf_warning, libbpf_info, NULL, NULL);
 
 	/* Parse commands line args */
 	while ((opt = getopt_long(argc, argv, "hDq",
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 		switch (opt) {
 		case 'D':
 			libbpf_set_print(libbpf_warning, libbpf_info,
-					 libbpf_debug);
+					 libbpf_debug, NULL);
 			break;
 		case 'q': /* Use in scripting mode */
 			verbose = 0;

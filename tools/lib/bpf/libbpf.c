@@ -68,24 +68,30 @@ static int __base_pr(const char *format, ...)
 static __printf(1, 2) libbpf_print_fn_t __pr_warning = __base_pr;
 static __printf(1, 2) libbpf_print_fn_t __pr_info = __base_pr;
 static __printf(1, 2) libbpf_print_fn_t __pr_debug;
+static __printf(1, 2) libbpf_print_fn_t __pr_out = __base_pr;
+
+#define pr_fmt(fmt) "libbpf: " fmt
 
 #define __pr(func, fmt, ...)	\
 do {				\
 	if ((func))		\
-		(func)("libbpf: " fmt, ##__VA_ARGS__); \
+		(func)(fmt, ##__VA_ARGS__); \
 } while (0)
 
-#define pr_warning(fmt, ...)	__pr(__pr_warning, fmt, ##__VA_ARGS__)
-#define pr_info(fmt, ...)	__pr(__pr_info, fmt, ##__VA_ARGS__)
-#define pr_debug(fmt, ...)	__pr(__pr_debug, fmt, ##__VA_ARGS__)
+#define pr_warning(fmt, ...)	__pr(__pr_warning, pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_info(fmt, ...)	__pr(__pr_info, pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_debug(fmt, ...)	__pr(__pr_debug, pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_out(fmt, ...)	__pr(__pr_out, fmt, ##__VA_ARGS__)
 
 void libbpf_set_print(libbpf_print_fn_t warn,
 		      libbpf_print_fn_t info,
-		      libbpf_print_fn_t debug)
+		      libbpf_print_fn_t debug,
+		      libbpf_print_fn_t out)
 {
 	__pr_warning = warn;
 	__pr_info = info;
 	__pr_debug = debug;
+	__pr_out = out;
 }
 
 #define STRERR_BUFSIZE  128
@@ -2682,6 +2688,12 @@ int libbpf_prog_type_by_name(const char *name, enum bpf_prog_type *prog_type,
 		*expected_attach_type = section_names[i].expected_attach_type;
 		return 0;
 	}
+
+	pr_warning("failed to guess program type based on ELF section name '%s'\n", name);
+	pr_info("supported section(type) names are:");
+	for (i = 0; i < ARRAY_SIZE(section_names); i++)
+		pr_out(" %s", section_names[i].sec);
+	pr_out("\n");
 	return -EINVAL;
 }
 
@@ -2701,6 +2713,13 @@ int libbpf_attach_type_by_name(const char *name,
 		*attach_type = section_names[i].attach_type;
 		return 0;
 	}
+
+	pr_warning("failed to guess attach type based on ELF section name '%s'\n", name);
+	pr_info("attachable section(type) names are:");
+	for (i = 0; i < ARRAY_SIZE(section_names); i++)
+		if (section_names[i].is_attachable)
+			pr_out(" %s", section_names[i].sec);
+	pr_out("\n");
 	return -EINVAL;
 }
 
@@ -2907,8 +2926,6 @@ int bpf_prog_load_xattr(const struct bpf_prog_load_attr *attr,
 			err = bpf_program__identify_section(prog, &prog_type,
 							    &expected_attach_type);
 			if (err < 0) {
-				pr_warning("failed to guess program type based on section name %s\n",
-					   prog->section_name);
 				bpf_object__close(obj);
 				return -EINVAL;
 			}

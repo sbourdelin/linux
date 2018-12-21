@@ -1776,9 +1776,9 @@ static void test_reference_tracking()
 
 		/* Expect verifier failure if test name has 'fail' */
 		if (strstr(title, "fail") != NULL) {
-			libbpf_set_print(NULL, NULL, NULL);
+			libbpf_set_print(NULL, NULL, NULL, NULL);
 			err = !bpf_program__load(prog, "GPL", 0);
-			libbpf_set_print(printf, printf, NULL);
+			libbpf_set_print(printf, printf, NULL, NULL);
 		} else {
 			err = bpf_program__load(prog, "GPL", 0);
 		}

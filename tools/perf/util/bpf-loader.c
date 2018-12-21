@@ -61,7 +61,7 @@ bpf__prepare_load_buffer(void *obj_buf, size_t obj_buf_sz, const char *name)
 	if (!libbpf_initialized) {
 		libbpf_set_print(libbpf_warning,
 				 libbpf_info,
-				 libbpf_debug);
+				 libbpf_debug, NULL);
 		libbpf_initialized = true;
 	}
 
@@ -81,7 +81,7 @@ struct bpf_object *bpf__prepare_load(const char *filename, bool source)
 	if (!libbpf_initialized) {
 		libbpf_set_print(libbpf_warning,
 				 libbpf_info,
-				 libbpf_debug);
+				 libbpf_debug, NULL);
 		libbpf_initialized = true;
 	}
 
