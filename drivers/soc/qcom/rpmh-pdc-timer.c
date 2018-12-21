@@ -23,6 +23,7 @@ static resource_size_t cmd0_data_offset;
 static resource_size_t cmd1_data_offset;
 static uint64_t pdc_wakeup = ~0ULL;
 static raw_spinlock_t pdc_wakeup_lock;
+static int suspended;
 
 /* convert micro sec to ticks or clock cycles
  *
@@ -102,6 +103,9 @@ static int cpu_pm_notifier(struct notifier_block *b,
 {
 	uint64_t cpu_next_wakeup;
 
+	if (suspended)
+		return NOTIFY_DONE;
+
 	switch (cmd) {
 	case CPU_PM_ENTER:
 		cpu_next_wakeup = get_next_wakeup_cycles(smp_processor_id());
@@ -128,6 +132,25 @@ static int cpu_pm_notifier(struct notifier_block *b,
 static struct notifier_block cpu_pm_notifier_block = {
 	.notifier_call = cpu_pm_notifier,
 	.priority = -1, /* Should be last in the order of notifications */
+};
+
+static int pdc_timer_suspend(struct device *dev)
+{
+	suspended = true;
+	raw_spin_lock(&pdc_wakeup_lock);
+	pdc_wakeup = ~0ULL;
+	setup_pdc_wakeup_timer(pdc_wakeup);
+	raw_spin_unlock(&pdc_wakeup_lock);
+	return 0;
+}
+
+static int pdc_timer_resume(struct device *dev)
+{
+	suspended = false;
+	return 0;
+}
+static const struct dev_pm_ops pdc_timer_dev_pm_ops = {
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(pdc_timer_suspend, pdc_timer_resume)
 };
 
 static int pdc_timer_probe(struct platform_device *pdev)
@@ -176,6 +199,7 @@ static struct platform_driver pdc_timer_driver = {
 	.driver = {
 		.name = KBUILD_MODNAME,
 		.of_match_table = pdc_timer_drv_match,
+		.pm = &pdc_timer_dev_pm_ops,
 	},
 };
 builtin_platform_driver(pdc_timer_driver);
