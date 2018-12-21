@@ -98,6 +98,15 @@ config QCOM_RPMH
 	  of hardware components aggregate requests for these resources and
 	  help apply the aggregated state on the resource.
 
+config QCOM_RPMH_PDC_TIMER
+	bool "Qualcomm PDC Timer for RPM-Hardened based SoCs"
+	depends on CPU_PM
+	help
+	  Support for QCOM platform next wakeup timer programming when
+	  application processor enters SoC level deepest low power mode.
+	  The wakeup is programmed to PDC (Power Domain Controller)
+	  timer which is in always on power domain.
+
 config QCOM_SMEM
 	tristate "Qualcomm Shared Memory Manager (SMEM)"
 	depends on ARCH_QCOM || COMPILE_TEST
