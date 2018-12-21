@@ -1353,7 +1353,6 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 	retval = tty_ldisc_setup(tty, tty->link);
 	if (retval)
 		goto err_release_tty;
-	tty_ldisc_unlock(tty);
 	/* Return the tty locked so that it cannot vanish under the caller */
 	return tty;
 
@@ -1928,7 +1927,7 @@ EXPORT_SYMBOL_GPL(tty_kopen);
  *	  - concurrent tty removal from driver table
  */
 static struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
-					     struct file *filp)
+					     struct file *filp, bool *unlock)
 {
 	struct tty_struct *tty;
 	struct tty_driver *driver = NULL;
@@ -1972,6 +1971,7 @@ static struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
 		}
 	} else { /* Returns with the tty_lock held for now */
 		tty = tty_init_dev(driver, index);
+		*unlock = true;
 		mutex_unlock(&tty_mutex);
 	}
 out:
@@ -2009,6 +2009,7 @@ static int tty_open(struct inode *inode, struct file *filp)
 	int noctty, retval;
 	dev_t device = inode->i_rdev;
 	unsigned saved_flags = filp->f_flags;
+	bool unlock = false;
 
 	nonseekable_open(inode, filp);
 
@@ -2019,7 +2020,7 @@ retry_open:
 
 	tty = tty_open_current_tty(device, filp);
 	if (!tty)
-		tty = tty_open_by_driver(device, inode, filp);
+		tty = tty_open_by_driver(device, inode, filp, &unlock);
 
 	if (IS_ERR(tty)) {
 		tty_free_file(filp);
@@ -2044,6 +2045,10 @@ retry_open:
 	if (retval) {
 		tty_debug_hangup(tty, "open error %d, releasing\n", retval);
 
+		if (unlock) {
+			unlock = false;
+			tty_ldisc_unlock(tty);
+		}
 		tty_unlock(tty); /* need to call tty_release without BTM */
 		tty_release(inode, filp);
 		if (retval != -ERESTARTSYS)
@@ -2069,6 +2074,9 @@ retry_open:
 		  tty->driver->subtype == PTY_TYPE_MASTER);
 	if (!noctty)
 		tty_open_proc_set_tty(filp, tty);
+
+	if (unlock)
+		tty_ldisc_unlock(tty);
 	tty_unlock(tty);
 	return 0;
 }

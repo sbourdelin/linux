@@ -873,9 +873,11 @@ static int ptmx_open(struct inode *inode, struct file *filp)
 
 	tty_debug_hangup(tty, "opening (count=%d)\n", tty->count);
 
+	tty_ldisc_unlock(tty);
 	tty_unlock(tty);
 	return 0;
 err_release:
+	tty_ldisc_unlock(tty);
 	tty_unlock(tty);
 	// This will also put-ref the fsi
 	tty_release(inode, filp);

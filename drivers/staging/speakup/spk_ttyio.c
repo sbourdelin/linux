@@ -155,6 +155,7 @@ static int spk_ttyio_initialise_ldisc(struct spk_synth *synth)
 	else
 		ret = -ENODEV;
 
+	tty_ldisc_unlock(tty);
 	if (ret) {
 		tty_unlock(tty);
 		return ret;

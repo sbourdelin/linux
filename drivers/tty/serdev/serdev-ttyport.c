@@ -123,6 +123,7 @@ static int ttyport_open(struct serdev_controller *ctrl)
 	if (ret)
 		goto err_close;
 
+	tty_ldisc_unlock(tty);
 	tty_unlock(serport->tty);
 
 	/* Bring the UART into a known 8 bits no parity hw fc state */
@@ -145,6 +146,7 @@ static int ttyport_open(struct serdev_controller *ctrl)
 err_close:
 	tty->ops->close(tty, NULL);
 err_unlock:
+	tty_ldisc_unlock(tty);
 	tty_unlock(tty);
 	tty_release_struct(tty, serport->tty_idx);
 
