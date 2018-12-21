@@ -56,4 +56,7 @@ void kclist_add_remap(struct kcore_list *m, void *addr, void *vaddr, size_t sz)
 }
 #endif
 
+extern int register_mem_pfn_is_ram(int (*fn)(unsigned long pfn));
+extern void unregister_mem_pfn_is_ram(void);
+
 #endif /* _LINUX_KCORE_H */
