@@ -57,31 +57,6 @@
 
 static struct drm_driver driver;
 
-#if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-static unsigned int i915_load_fail_count;
-
-bool __i915_inject_load_failure(const char *func, int line)
-{
-	if (i915_load_fail_count >= i915_modparams.inject_load_failure)
-		return false;
-
-	if (++i915_load_fail_count == i915_modparams.inject_load_failure) {
-		DRM_INFO("Injecting failure at checkpoint %u [%s:%d]\n",
-			 i915_modparams.inject_load_failure, func, line);
-		i915_modparams.inject_load_failure = 0;
-		return true;
-	}
-
-	return false;
-}
-
-bool i915_error_injected(void)
-{
-	return i915_load_fail_count && !i915_modparams.inject_load_failure;
-}
-
-#endif
-
 #define FDO_BUG_URL "https://bugs.freedesktop.org/enter_bug.cgi?product=DRI"
 #define FDO_BUG_MSG "Please file a bug at " FDO_BUG_URL " against DRM/Intel " \
 		    "providing the dmesg log by booting with drm.debug=0xf"

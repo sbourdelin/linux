@@ -33,6 +33,7 @@ struct i915_selftest {
 	unsigned int random_seed;
 	int mock;
 	int live;
+	unsigned int inject_load_failure;
 };
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
@@ -77,6 +78,12 @@ int __i915_subtests(const char *caller,
 #define I915_SELFTEST_DECLARE(x) x
 #define I915_SELFTEST_ONLY(x) unlikely(x)
 
+bool __i915_inject_load_failure(const char *func, int line);
+#define i915_inject_load_failure() \
+	__i915_inject_load_failure(__func__, __LINE__)
+
+bool i915_error_injected(void);
+
 #else /* !IS_ENABLED(CONFIG_DRM_I915_SELFTEST) */
 
 static inline int i915_mock_selftests(void) { return 0; }
@@ -84,6 +91,9 @@ static inline int i915_live_selftests(struct pci_dev *pdev) { return 0; }
 
 #define I915_SELFTEST_DECLARE(x)
 #define I915_SELFTEST_ONLY(x) 0
+
+static inline int i915_inject_load_failure(void) { return false; }
+static inline int i915_error_injected(void) { return false; }
 
 #endif
 
