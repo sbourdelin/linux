@@ -33,7 +33,6 @@
 #include "fmdrv_tx.h"
 
 static struct video_device gradio_dev;
-static u8 radio_disconnected;
 
 /* -- V4L2 RADIO (/dev/radioX) device file operation interfaces --- */
 
@@ -47,7 +46,7 @@ static ssize_t fm_v4l2_fops_read(struct file *file, char __user * buf,
 
 	fmdev = video_drvdata(file);
 
-	if (!radio_disconnected) {
+	if (!fmdev->radio_disconnected) {
 		fmerr("FM device is already disconnected\n");
 		return -EIO;
 	}
@@ -126,13 +125,13 @@ static int fm_v4l2_fops_open(struct file *file)
 	int ret;
 	struct fmdev *fmdev = NULL;
 
+	fmdev = video_drvdata(file);
+
 	/* Don't allow multiple open */
-	if (radio_disconnected) {
+	if (fmdev->radio_disconnected) {
 		fmerr("FM device is already opened\n");
 		return -EBUSY;
 	}
-
-	fmdev = video_drvdata(file);
 
 	if (mutex_lock_interruptible(&fmdev->mutex))
 		return -ERESTARTSYS;
@@ -149,7 +148,7 @@ static int fm_v4l2_fops_open(struct file *file)
 		fmerr("Unable to load FM RX firmware\n");
 		goto open_unlock;
 	}
-	radio_disconnected = 1;
+	fmdev->radio_disconnected = 1;
 
 open_unlock:
 	mutex_unlock(&fmdev->mutex);
@@ -162,7 +161,7 @@ static int fm_v4l2_fops_release(struct file *file)
 	struct fmdev *fmdev;
 
 	fmdev = video_drvdata(file);
-	if (!radio_disconnected) {
+	if (!fmdev->radio_disconnected) {
 		fmdbg("FM device is already closed\n");
 		return 0;
 	}
@@ -179,7 +178,7 @@ static int fm_v4l2_fops_release(struct file *file)
 		fmerr("FM CORE release failed\n");
 		goto release_unlock;
 	}
-	radio_disconnected = 0;
+	fmdev->radio_disconnected = 0;
 
 release_unlock:
 	mutex_unlock(&fmdev->mutex);
