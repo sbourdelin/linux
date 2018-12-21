@@ -38,6 +38,8 @@
 #include "fmdrv_rx.h"
 #include "fmdrv_tx.h"
 
+struct fmdev *global_fmdev;
+
 /* Region info */
 static struct region_info region_configs[] = {
 	/* Europe/US */
@@ -1241,7 +1243,7 @@ static int fm_download_firmware(struct fmdev *fmdev, const u8 *fw_name)
 	set_bit(FM_FW_DW_INPROGRESS, &fmdev->flag);
 
 	ret = request_firmware(&fw_entry, fw_name,
-				&fmdev->radio_dev->dev);
+				&fmdev->radio_dev.dev);
 	if (ret < 0) {
 		fmerr("Unable to read firmware(%s) content\n", fw_name);
 		return ret;
@@ -1629,6 +1631,7 @@ static int __init fm_drv_init(void)
 		fmerr("Can't allocate operation structure memory\n");
 		return ret;
 	}
+	global_fmdev = fmdev;
 	fmdev->rx.rds.buf_size = default_rds_buf * FM_RDS_BLK_SIZE;
 	fmdev->rx.rds.buff = kzalloc(fmdev->rx.rds.buf_size, GFP_KERNEL);
 	if (NULL == fmdev->rx.rds.buff) {
@@ -1657,9 +1660,10 @@ rel_dev:
 /* Module exit function. Ask FM V4L module to unregister video device */
 static void __exit fm_drv_exit(void)
 {
-	struct fmdev *fmdev = NULL;
+	struct fmdev *fmdev = global_fmdev;
 
-	fmdev = fm_v4l2_deinit_video_device();
+	/* Ask FM V4L module to unregister video device */
+	fm_v4l2_deinit_video_device(fmdev);
 	if (fmdev != NULL) {
 		kfree(fmdev->rx.rds.buff);
 		kfree(fmdev);
