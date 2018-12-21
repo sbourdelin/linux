@@ -61,8 +61,8 @@ static void guc_fw_select(struct intel_uc_fw *guc_fw)
 	if (!HAS_GUC(dev_priv))
 		return;
 
-	if (i915_modparams.guc_firmware_path) {
-		guc_fw->path = i915_modparams.guc_firmware_path;
+	if (dev_priv->params.guc_firmware_path) {
+		guc_fw->path = dev_priv->params.guc_firmware_path;
 		guc_fw->major_ver_wanted = 0;
 		guc_fw->minor_ver_wanted = 0;
 	} else if (IS_SKYLAKE(dev_priv)) {

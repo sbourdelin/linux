@@ -1829,7 +1829,7 @@ static void capture_gen_state(struct i915_gpu_state *error)
 
 static void capture_params(struct i915_gpu_state *error)
 {
-	i915_params_copy(&error->params, &i915_modparams);
+	i915_params_copy(&error->params, &error->i915->params);
 }
 
 static unsigned long capture_find_epoch(const struct i915_gpu_state *error)
@@ -1922,7 +1922,7 @@ void i915_capture_error_state(struct drm_i915_private *i915,
 	struct i915_gpu_state *error;
 	unsigned long flags;
 
-	if (!i915_modparams.error_capture)
+	if (!i915->params.error_capture)
 		return;
 
 	if (READ_ONCE(i915->gpu_error.first_error))

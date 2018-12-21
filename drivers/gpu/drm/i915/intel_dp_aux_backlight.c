@@ -262,9 +262,10 @@ intel_dp_aux_display_control_capable(struct intel_connector *connector)
 
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector)
 {
+	struct drm_i915_private *dev_priv = to_i915(intel_connector->base.dev);
 	struct intel_panel *panel = &intel_connector->panel;
 
-	if (!i915_modparams.enable_dpcd_backlight)
+	if (!dev_priv->params.enable_dpcd_backlight)
 		return -ENODEV;
 
 	if (!intel_dp_aux_display_control_capable(intel_connector))

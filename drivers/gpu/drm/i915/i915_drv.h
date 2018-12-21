@@ -1415,6 +1415,9 @@ struct drm_i915_private {
 	struct kmem_cache *dependencies;
 	struct kmem_cache *priorities;
 
+	/* i915 device parameters */
+	struct i915_params params;
+
 	const struct intel_device_info info;
 	struct intel_driver_caps caps;
 
@@ -2628,7 +2631,7 @@ static inline void i915_queue_hangcheck(struct drm_i915_private *dev_priv)
 {
 	unsigned long delay;
 
-	if (unlikely(!i915_modparams.enable_hangcheck))
+	if (unlikely(!dev_priv->params.enable_hangcheck))
 		return;
 
 	/* Don't continually defer the hangcheck so that it is always run at

@@ -343,7 +343,7 @@ static int i915_getparam_ioctl(struct drm_device *dev, void *data,
 			return -ENODEV;
 		break;
 	case I915_PARAM_HAS_GPU_RESET:
-		value = i915_modparams.enable_hangcheck &&
+		value = dev_priv->params.enable_hangcheck &&
 			intel_has_gpu_reset(dev_priv);
 		if (value && intel_has_reset_engine(dev_priv))
 			value = 2;
@@ -1642,6 +1642,9 @@ i915_driver_create(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return ERR_PTR(err);
 	}
 
+	/* Device parameters start as a copy of module parameters. */
+	i915_params_copy(&i915->params, &i915_modparams);
+
 	i915->drm.pdev = pdev;
 	i915->drm.dev_private = i915;
 	pci_set_drvdata(pdev, &i915->drm);
@@ -1663,6 +1666,9 @@ static void i915_driver_destroy(struct drm_i915_private *i915)
 	struct pci_dev *pdev = i915->drm.pdev;
 
 	drm_dev_fini(&i915->drm);
+
+	i915_params_free(&i915->params);
+
 	kfree(i915);
 
 	/* And make sure we never chase our dangling pointer from pci_dev */
@@ -1692,7 +1698,7 @@ int i915_driver_load(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return PTR_ERR(dev_priv);
 
 	/* Disable nuclear pageflip by default on pre-ILK */
-	if (!i915_modparams.nuclear_pageflip && match_info->gen < 5)
+	if (!dev_priv->params.nuclear_pageflip && match_info->gen < 5)
 		dev_priv->drm.driver_features &= ~DRIVER_ATOMIC;
 
 	ret = pci_enable_device(pdev);
@@ -2221,7 +2227,7 @@ void i915_reset(struct drm_i915_private *i915,
 	}
 
 	if (!intel_has_gpu_reset(i915)) {
-		if (i915_modparams.reset)
+		if (i915->params.reset)
 			dev_err(i915->drm.dev, "GPU reset not supported\n");
 		else
 			DRM_DEBUG_DRIVER("GPU reset disabled\n");

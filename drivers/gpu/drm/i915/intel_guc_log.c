@@ -451,6 +451,7 @@ static void guc_log_capture_logs(struct intel_guc_log *log)
 int intel_guc_log_create(struct intel_guc_log *log)
 {
 	struct intel_guc *guc = log_to_guc(log);
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	struct i915_vma *vma;
 	u32 guc_log_size;
 	int ret;
@@ -487,7 +488,7 @@ int intel_guc_log_create(struct intel_guc_log *log)
 
 	log->vma = vma;
 
-	log->level = i915_modparams.guc_log_level;
+	log->level = dev_priv->params.guc_log_level;
 
 	return 0;
 

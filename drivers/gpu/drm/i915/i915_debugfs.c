@@ -226,7 +226,7 @@ _i915_param_create_file(struct dentry *parent, const char *name,
 static int i915_debugfs_params(struct drm_i915_private *dev_priv)
 {
 	struct drm_minor *minor = dev_priv->drm.primary;
-	struct i915_params *params = &i915_modparams;
+	struct i915_params *params = &dev_priv->params;
 	struct dentry *dir;
 
 	dir = debugfs_create_dir("i915_params", minor->debugfs_root);
@@ -261,7 +261,7 @@ static int i915_capabilities(struct seq_file *m, void *data)
 	intel_driver_caps_print(&dev_priv->caps, &p);
 
 	kernel_param_lock(THIS_MODULE);
-	i915_params_dump(&i915_modparams, &p);
+	i915_params_dump(&dev_priv->params, &p);
 	kernel_param_unlock(THIS_MODULE);
 
 	return 0;
@@ -1535,7 +1535,7 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 	if (waitqueue_active(&dev_priv->gpu_error.reset_queue))
 		seq_puts(m, "struct_mutex blocked for reset\n");
 
-	if (!i915_modparams.enable_hangcheck) {
+	if (!dev_priv->params.enable_hangcheck) {
 		seq_puts(m, "Hangcheck disabled\n");
 		return 0;
 	}
@@ -1941,7 +1941,7 @@ static int i915_ips_status(struct seq_file *m, void *unused)
 	intel_runtime_pm_get(dev_priv);
 
 	seq_printf(m, "Enabled by kernel parameter: %s\n",
-		   yesno(i915_modparams.enable_ips));
+		   yesno(dev_priv->params.enable_ips));
 
 	if (INTEL_GEN(dev_priv) >= 8) {
 		seq_puts(m, "Currently: unknown\n");

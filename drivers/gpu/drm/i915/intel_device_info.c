@@ -783,7 +783,7 @@ void intel_device_info_runtime_init(struct intel_device_info *info)
 			info->num_sprites[pipe] = 1;
 	}
 
-	if (i915_modparams.disable_display) {
+	if (dev_priv->params.disable_display) {
 		DRM_INFO("Display disabled (module parameter)\n");
 		info->num_pipes = 0;
 	} else if (HAS_DISPLAY(dev_priv) &&

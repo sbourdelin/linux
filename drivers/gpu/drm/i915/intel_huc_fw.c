@@ -60,8 +60,8 @@ static void huc_fw_select(struct intel_uc_fw *huc_fw)
 	if (!HAS_HUC(dev_priv))
 		return;
 
-	if (i915_modparams.huc_firmware_path) {
-		huc_fw->path = i915_modparams.huc_firmware_path;
+	if (dev_priv->params.huc_firmware_path) {
+		huc_fw->path = dev_priv->params.huc_firmware_path;
 		huc_fw->major_ver_wanted = 0;
 		huc_fw->minor_ver_wanted = 0;
 	} else if (IS_SKYLAKE(dev_priv)) {

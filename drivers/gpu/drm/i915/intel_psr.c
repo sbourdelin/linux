@@ -56,11 +56,11 @@
 #include "intel_drv.h"
 #include "i915_drv.h"
 
-static bool psr_global_enabled(u32 debug)
+static bool psr_global_enabled(struct drm_i915_private *dev_priv, u32 debug)
 {
 	switch (debug & I915_PSR_DEBUG_MODE_MASK) {
 	case I915_PSR_DEBUG_DEFAULT:
-		return i915_modparams.enable_psr;
+		return dev_priv->params.enable_psr;
 	case I915_PSR_DEBUG_DISABLE:
 		return false;
 	default:
@@ -72,7 +72,7 @@ static bool intel_psr2_enabled(struct drm_i915_private *dev_priv,
 			       const struct intel_crtc_state *crtc_state)
 {
 	/* Disable PSR2 by default for all platforms */
-	if (i915_modparams.enable_psr == -1)
+	if (dev_priv->params.enable_psr == -1)
 		return false;
 
 	/* Cannot enable DSC and PSR2 simultaneously */
@@ -721,7 +721,7 @@ void intel_psr_enable(struct intel_dp *intel_dp,
 	dev_priv->psr.prepared = true;
 	dev_priv->psr.pipe = to_intel_crtc(crtc_state->base.crtc)->pipe;
 
-	if (psr_global_enabled(dev_priv->psr.debug))
+	if (psr_global_enabled(dev_priv, dev_priv->psr.debug))
 		intel_psr_enable_locked(dev_priv, crtc_state);
 	else
 		DRM_DEBUG_KMS("PSR disabled by flag\n");
@@ -948,7 +948,7 @@ int intel_psr_set_debugfs_mode(struct drm_i915_private *dev_priv,
 	if (ret)
 		return ret;
 
-	enable = psr_global_enabled(val);
+	enable = psr_global_enabled(dev_priv, val);
 
 	if (!enable || switching_psr(dev_priv, crtc_state, mode))
 		intel_psr_disable_locked(dev_priv->psr.dp);
@@ -1118,9 +1118,9 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 	if (!dev_priv->psr.sink_support)
 		return;
 
-	if (i915_modparams.enable_psr == -1)
+	if (dev_priv->params.enable_psr == -1)
 		if (INTEL_GEN(dev_priv) < 9 || !dev_priv->vbt.psr.enable)
-			i915_modparams.enable_psr = 0;
+			dev_priv->params.enable_psr = 0;
 
 	/*
 	 * If a PSR error happened and the driver is reloaded, the EDP_PSR_IIR

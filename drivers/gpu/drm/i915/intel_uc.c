@@ -107,18 +107,18 @@ static void sanitize_options_early(struct drm_i915_private *i915)
 	struct intel_uc_fw *huc_fw = &i915->huc.fw;
 
 	/* A negative value means "use platform default" */
-	if (i915_modparams.enable_guc < 0)
-		i915_modparams.enable_guc = __get_platform_enable_guc(i915);
+	if (i915->params.enable_guc < 0)
+		i915->params.enable_guc = __get_platform_enable_guc(i915);
 
 	DRM_DEBUG_DRIVER("enable_guc=%d (submission:%s huc:%s)\n",
-			 i915_modparams.enable_guc,
+			 i915->params.enable_guc,
 			 yesno(intel_uc_is_using_guc_submission(i915)),
 			 yesno(intel_uc_is_using_huc(i915)));
 
 	/* Verify GuC firmware availability */
 	if (intel_uc_is_using_guc(i915) && !intel_uc_fw_is_selected(guc_fw)) {
 		DRM_WARN("Incompatible option detected: %s=%d, %s!\n",
-			 "enable_guc", i915_modparams.enable_guc,
+			 "enable_guc", i915->params.enable_guc,
 			 !HAS_GUC(i915) ? "no GuC hardware" :
 					  "no GuC firmware");
 	}
@@ -126,40 +126,40 @@ static void sanitize_options_early(struct drm_i915_private *i915)
 	/* Verify HuC firmware availability */
 	if (intel_uc_is_using_huc(i915) && !intel_uc_fw_is_selected(huc_fw)) {
 		DRM_WARN("Incompatible option detected: %s=%d, %s!\n",
-			 "enable_guc", i915_modparams.enable_guc,
+			 "enable_guc", i915->params.enable_guc,
 			 !HAS_HUC(i915) ? "no HuC hardware" :
 					  "no HuC firmware");
 	}
 
 	/* A negative value means "use platform/config default" */
-	if (i915_modparams.guc_log_level < 0)
-		i915_modparams.guc_log_level =
+	if (i915->params.guc_log_level < 0)
+		i915->params.guc_log_level =
 			__get_default_guc_log_level(i915);
 
-	if (i915_modparams.guc_log_level > 0 && !intel_uc_is_using_guc(i915)) {
+	if (i915->params.guc_log_level > 0 && !intel_uc_is_using_guc(i915)) {
 		DRM_WARN("Incompatible option detected: %s=%d, %s!\n",
-			 "guc_log_level", i915_modparams.guc_log_level,
+			 "guc_log_level", i915->params.guc_log_level,
 			 !HAS_GUC(i915) ? "no GuC hardware" :
 					  "GuC not enabled");
-		i915_modparams.guc_log_level = 0;
+		i915->params.guc_log_level = 0;
 	}
 
-	if (i915_modparams.guc_log_level > GUC_LOG_LEVEL_MAX) {
+	if (i915->params.guc_log_level > GUC_LOG_LEVEL_MAX) {
 		DRM_WARN("Incompatible option detected: %s=%d, %s!\n",
-			 "guc_log_level", i915_modparams.guc_log_level,
+			 "guc_log_level", i915->params.guc_log_level,
 			 "verbosity too high");
-		i915_modparams.guc_log_level = GUC_LOG_LEVEL_MAX;
+		i915->params.guc_log_level = GUC_LOG_LEVEL_MAX;
 	}
 
 	DRM_DEBUG_DRIVER("guc_log_level=%d (enabled:%s, verbose:%s, verbosity:%d)\n",
-			 i915_modparams.guc_log_level,
-			 yesno(i915_modparams.guc_log_level),
-			 yesno(GUC_LOG_LEVEL_IS_VERBOSE(i915_modparams.guc_log_level)),
-			 GUC_LOG_LEVEL_TO_VERBOSITY(i915_modparams.guc_log_level));
+			 i915->params.guc_log_level,
+			 yesno(i915->params.guc_log_level),
+			 yesno(GUC_LOG_LEVEL_IS_VERBOSE(i915->params.guc_log_level)),
+			 GUC_LOG_LEVEL_TO_VERBOSITY(i915->params.guc_log_level));
 
 	/* Make sure that sanitization was done */
-	GEM_BUG_ON(i915_modparams.enable_guc < 0);
-	GEM_BUG_ON(i915_modparams.guc_log_level < 0);
+	GEM_BUG_ON(i915->params.enable_guc < 0);
+	GEM_BUG_ON(i915->params.guc_log_level < 0);
 }
 
 void intel_uc_init_early(struct drm_i915_private *i915)
@@ -492,4 +492,22 @@ int intel_uc_resume(struct drm_i915_private *i915)
 	}
 
 	return 0;
+}
+
+bool intel_uc_is_using_guc(struct drm_i915_private *dev_priv)
+{
+	GEM_BUG_ON(dev_priv->params.enable_guc < 0);
+	return dev_priv->params.enable_guc > 0;
+}
+
+bool intel_uc_is_using_guc_submission(struct drm_i915_private *dev_priv)
+{
+	GEM_BUG_ON(dev_priv->params.enable_guc < 0);
+	return dev_priv->params.enable_guc & ENABLE_GUC_SUBMISSION;
+}
+
+bool intel_uc_is_using_huc(struct drm_i915_private *dev_priv)
+{
+	GEM_BUG_ON(dev_priv->params.enable_guc < 0);
+	return dev_priv->params.enable_guc & ENABLE_GUC_LOAD_HUC;
 }

@@ -1474,7 +1474,7 @@ int intel_hangcheck_live_selftests(struct drm_i915_private *i915)
 		return -EIO; /* we're long past hope of a successful reset */
 
 	intel_runtime_pm_get(i915);
-	saved_hangcheck = fetch_and_zero(&i915_modparams.enable_hangcheck);
+	saved_hangcheck = fetch_and_zero(&i915->params.enable_hangcheck);
 
 	err = i915_subtests(tests, i915);
 
@@ -1482,7 +1482,7 @@ int intel_hangcheck_live_selftests(struct drm_i915_private *i915)
 	igt_flush_test(i915, I915_WAIT_LOCKED);
 	mutex_unlock(&i915->drm.struct_mutex);
 
-	i915_modparams.enable_hangcheck = saved_hangcheck;
+	i915->params.enable_hangcheck = saved_hangcheck;
 	intel_runtime_pm_put(i915);
 
 	return err;
