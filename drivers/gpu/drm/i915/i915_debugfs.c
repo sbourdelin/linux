@@ -37,6 +37,201 @@ static inline struct drm_i915_private *node_to_i915(struct drm_info_node *node)
 	return to_i915(node->minor->dev);
 }
 
+/* int param */
+static int i915_param_int_show(struct seq_file *m, void *data)
+{
+	int *value = m->private;
+
+	seq_printf(m, "%d\n", *value);
+
+	return 0;
+}
+
+static int i915_param_int_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, i915_param_int_show, inode->i_private);
+}
+
+static ssize_t i915_param_int_write(struct file *file,
+				    const char __user *ubuf, size_t len,
+				    loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int *value = m->private;
+	int ret;
+
+	ret = kstrtoint_from_user(ubuf, len, 0, value);
+
+	return ret ?: len;
+}
+
+static const struct file_operations i915_param_int_fops = {
+	.owner = THIS_MODULE,
+	.open = i915_param_int_open,
+	.read = seq_read,
+	.write = i915_param_int_write,
+	.llseek = default_llseek,
+	.release = single_release,
+};
+
+static const struct file_operations i915_param_int_fops_ro = {
+	.owner = THIS_MODULE,
+	.open = i915_param_int_open,
+	.read = seq_read,
+	.llseek = default_llseek,
+	.release = single_release,
+};
+
+/* unsigned int param */
+static int i915_param_uint_show(struct seq_file *m, void *data)
+{
+	unsigned int *value = m->private;
+
+	seq_printf(m, "%u\n", *value);
+
+	return 0;
+}
+
+static int i915_param_uint_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, i915_param_uint_show, inode->i_private);
+}
+
+static ssize_t i915_param_uint_write(struct file *file,
+				    const char __user *ubuf, size_t len,
+				    loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	unsigned int *value = m->private;
+	int ret;
+
+	ret = kstrtouint_from_user(ubuf, len, 0, value);
+
+	return ret ?: len;
+}
+
+static const struct file_operations i915_param_uint_fops = {
+	.owner = THIS_MODULE,
+	.open = i915_param_uint_open,
+	.read = seq_read,
+	.write = i915_param_uint_write,
+	.llseek = default_llseek,
+	.release = single_release,
+};
+
+static const struct file_operations i915_param_uint_fops_ro = {
+	.owner = THIS_MODULE,
+	.open = i915_param_uint_open,
+	.read = seq_read,
+	.llseek = default_llseek,
+	.release = single_release,
+};
+
+/* char * param */
+static int i915_param_charp_show(struct seq_file *m, void *data)
+{
+	const char **s = m->private;
+
+	seq_printf(m, "%s\n", *s);
+
+	return 0;
+}
+
+static int i915_param_charp_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, i915_param_charp_show, inode->i_private);
+}
+
+static ssize_t i915_param_charp_write(struct file *file,
+				      const char __user *ubuf, size_t len,
+				      loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	char **s = m->private;
+	char *new, *old;
+
+	/* FIXME: racy */
+	old = *s;
+	new = strndup_user(ubuf, PAGE_SIZE);
+	if (IS_ERR(new))
+		return PTR_ERR(new);
+
+	*s = new;
+
+	kfree(old);
+
+	return len;
+}
+
+static const struct file_operations i915_param_charp_fops = {
+	.owner = THIS_MODULE,
+	.open = i915_param_charp_open,
+	.read = seq_read,
+	.write = i915_param_charp_write,
+	.llseek = default_llseek,
+	.release = single_release,
+};
+
+static const struct file_operations i915_param_charp_fops_ro = {
+	.owner = THIS_MODULE,
+	.open = i915_param_charp_open,
+	.read = seq_read,
+	.llseek = default_llseek,
+	.release = single_release,
+};
+
+static __always_inline void
+_i915_param_create_file(struct dentry *parent, const char *name,
+			const char *type, int mode, void *value)
+{
+	bool ro = !(mode & 0222);
+
+	if (!mode)
+		return;
+
+	if (!__builtin_strcmp(type, "bool"))
+		debugfs_create_bool(name, mode, parent, value);
+	else if (!__builtin_strcmp(type, "int"))
+		debugfs_create_file_unsafe(name, mode, parent, value,
+					   ro ? &i915_param_int_fops_ro :
+					   &i915_param_int_fops);
+	else if (!__builtin_strcmp(type, "unsigned int"))
+		debugfs_create_file_unsafe(name, mode, parent, value,
+					   ro ? &i915_param_uint_fops_ro :
+					   &i915_param_uint_fops);
+	else if (!__builtin_strcmp(type, "char *"))
+		debugfs_create_file(name, mode, parent, value,
+				    ro ? &i915_param_charp_fops_ro :
+				    &i915_param_charp_fops);
+	else
+		WARN(1, "no debugfs fops defined for param type %s (i915.%s)\n",
+		     type, name);
+}
+
+/* add a subdirectory with files for each i915 param */
+static int i915_debugfs_params(struct drm_i915_private *dev_priv)
+{
+	struct drm_minor *minor = dev_priv->drm.primary;
+	struct i915_params *params = &i915_modparams;
+	struct dentry *dir;
+
+	dir = debugfs_create_dir("i915_params", minor->debugfs_root);
+	if (!dir)
+		return -ENOMEM;
+
+	/*
+	 * Note: We could create files for params needing special handling
+	 * here. Set mode in params to 0 to skip the generic create file, or
+	 * just let the generic create file fail silently with -EEXIST.
+	 */
+
+#define REGISTER(T, x, unused, mode, ...) _i915_param_create_file(dir, #x, #T, mode, &params->x);
+	I915_PARAMS_FOR_EACH(REGISTER);
+#undef REGISTER
+
+	return 0;
+}
+
 static int i915_capabilities(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
@@ -4963,6 +5158,8 @@ int i915_debugfs_register(struct drm_i915_private *dev_priv)
 	struct drm_minor *minor = dev_priv->drm.primary;
 	struct dentry *ent;
 	int i;
+
+	i915_debugfs_params(dev_priv);
 
 	ent = debugfs_create_file("i915_forcewake_user", S_IRUSR,
 				  minor->debugfs_root, to_i915(minor->dev),
