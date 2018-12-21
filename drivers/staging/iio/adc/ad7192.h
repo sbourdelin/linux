@@ -35,13 +35,13 @@ struct ad7192_platform_data {
 	u16		vref_mv;
 	u8		clock_source_sel;
 	u32		ext_clk_hz;
-	bool		refin2_en;
-	bool		rej60_en;
-	bool		sinc3_en;
-	bool		chop_en;
-	bool		buf_en;
-	bool		unipolar_en;
-	bool		burnout_curr_en;
+	unsigned int	refin2_en : 1;
+	unsigned int	rej60_en : 1;
+	unsigned int	sinc3_en : 1;
+	unsigned int	chop_en : 1;
+	unsigned int	buf_en : 1;
+	unsigned int	unipolar_en : 1;
+	unsigned int	burnout_curr_en : 1;
 };
 
 #endif /* IIO_ADC_AD7192_H_ */
