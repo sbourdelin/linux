@@ -23,6 +23,17 @@
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
 
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		psci_reserved: psci-area@4000000 {
+		reg = <0x0 0x4000000 0x0 0x200000>;
+		no-map;
+		};
+	};
+
 	aliases {
 		ethernet0 = &cp0_eth0;
 		ethernet1 = &cp1_eth0;
