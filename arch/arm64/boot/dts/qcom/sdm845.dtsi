@@ -1588,6 +1588,9 @@
 			      <0x179d0000 0x10000>,
 			      <0x179e0000 0x10000>;
 			reg-names = "drv-0", "drv-1", "drv-2";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
 			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
@@ -1597,6 +1600,12 @@
 					  <SLEEP_TCS   3>,
 					  <WAKE_TCS    3>,
 					  <CONTROL_TCS 1>;
+
+			pdc_timer@38 {
+				compatible = "qcom,pdc-timer";
+				reg = <0x38 0x1>,
+				      <0x40 0x1>;
+			};
 
 			rpmhcc: clock-controller {
 				compatible = "qcom,sdm845-rpmh-clk";
