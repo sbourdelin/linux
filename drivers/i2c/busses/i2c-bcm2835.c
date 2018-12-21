@@ -298,6 +298,9 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 		return -ETIMEDOUT;
 	}
 
+	i2c_dev->curr_msg = NULL;
+	i2c_dev->num_msgs = 0;
+
 	if (!i2c_dev->msg_err)
 		return num;
 
