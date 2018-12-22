@@ -57,26 +57,6 @@ static void __init omap2420_n8x0_legacy_init(void)
 #endif
 
 #ifdef CONFIG_ARCH_OMAP3
-/*
- * Configures GPIOs 126, 127 and 129 to 1.8V mode instead of 3.0V
- * mode for MMC1 in case bootloader did not configure things.
- * Note that if the pins are used for MMC1, pbias-regulator
- * manages the IO voltage.
- */
-static void __init omap3_gpio126_127_129(void)
-{
-	u32 reg;
-
-	reg = omap_ctrl_readl(OMAP343X_CONTROL_PBIAS_LITE);
-	reg &= ~OMAP343X_PBIASLITEVMODE1;
-	reg |= OMAP343X_PBIASLITEPWRDNZ1;
-	omap_ctrl_writel(reg, OMAP343X_CONTROL_PBIAS_LITE);
-	if (cpu_is_omap3630()) {
-		reg = omap_ctrl_readl(OMAP34XX_CONTROL_WKUP_CTRL);
-		reg |= OMAP36XX_GPIO_IO_PWRDNZ;
-		omap_ctrl_writel(reg, OMAP34XX_CONTROL_WKUP_CTRL);
-	}
-}
 
 static void __init hsmmc2_internal_input_clk(void)
 {
@@ -300,7 +280,6 @@ static void __init omap3_tao3530_legacy_init(void)
 
 static void __init omap3_logicpd_torpedo_init(void)
 {
-	omap3_gpio126_127_129();
 	platform_device_register(&wl128x_device);
 	platform_device_register(&btwilink_device);
 }
