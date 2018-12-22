@@ -241,7 +241,6 @@ fail_links:
 	if (header->ctl_table == sysctl_mount_point)
 		clear_empty_dir(dir);
 	header->parent = NULL;
-	drop_sysctl_table(&dir->header);
 	return err;
 }
 
