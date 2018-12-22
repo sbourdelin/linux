@@ -415,14 +415,12 @@ static void bcm2835_dma_fill_cb_chain_with_sg(
 	}
 }
 
-static int bcm2835_dma_abort(void __iomem *chan_base)
+static void bcm2835_dma_abort(void __iomem *chan_base)
 {
-	unsigned long cs;
 	long int timeout = 10000;
 
-	cs = readl(chan_base + BCM2835_DMA_CS);
-	if (!(cs & BCM2835_DMA_ACTIVE))
-		return 0;
+	if (!(readl(chan_base + BCM2835_DMA_CS) & BCM2835_DMA_ACTIVE))
+		return;
 
 	/* Write 0 to the active bit - Pause the DMA */
 	writel(0, chan_base + BCM2835_DMA_CS);
@@ -433,7 +431,6 @@ static int bcm2835_dma_abort(void __iomem *chan_base)
 		cpu_relax();
 
 	writel(BCM2835_DMA_RESET, chan_base + BCM2835_DMA_CS);
-	return 0;
 }
 
 static void bcm2835_dma_start_desc(struct bcm2835_chan *c)
