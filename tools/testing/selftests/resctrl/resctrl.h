@@ -16,11 +16,18 @@
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <asm/unistd.h>
 #include <linux/perf_event.h>
+#include <sys/time.h>
+#include <math.h>
+#include <sys/wait.h>
+#include <sys/eventfd.h>
 
+#define MB			(1024 * 1024)
 #define RESCTRL_PATH		"/sys/fs/resctrl"
 #define PHYS_ID_PATH		"/sys/devices/system/cpu/cpu"
+#define CBM_MASK_PATH		"/sys/fs/resctrl/info"
 
 #define PARENT_EXIT(err_msg)			\
 	do {					\
@@ -46,18 +53,24 @@ struct resctrl_val_param {
 	char	ctrlgrp[64];
 	char	mongrp[64];
 	int	cpu_no;
-	int	span;
+	unsigned long long span;
 	int	mum_resctrlfs;
 	char	filename[64];
 	char	*bw_report;
+	unsigned long mask;
+	int	num_of_runs;
 	int	(*setup)(int num, ...);
+
 };
 
 pid_t bm_pid, ppid;
+extern char cbm_mask[256];
+extern unsigned long long_mask;
+extern char llc_occup_path[1024];
 
 int remount_resctrlfs(bool mum_resctrlfs);
 int umount_resctrlfs(void);
-char get_sock_num(int cpu_no);
+int get_sock_num(int cpu_no, char *sock_num);
 int validate_bw_report_request(char *bw_report);
 int validate_resctrl_feature_request(char *resctrl_val);
 int taskset_benchmark(pid_t bm_pid, int cpu_no);
@@ -68,12 +81,21 @@ int write_bm_pid_to_resctrl(pid_t bm_pid, char *ctrlgrp, char *mongrp,
 			    char *resctrl_val);
 int perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu,
 		    int group_fd, unsigned long flags);
-int run_fill_buf(int span, int malloc_and_init_memory, int memflush, int op);
-int membw_val(char **benchmark_cmd, struct resctrl_val_param *param);
+int run_fill_buf(unsigned long long span, int malloc_and_init_memory,
+		 int memflush, int op, char *resctrl_val);
+int resctrl_val(char **benchmark_cmd, struct resctrl_val_param *param);
 int mbm_bw_change(int span, int core_id, char *bw_report, char **benchmark_cmd);
 void tests_cleanup(void);
 void mbm_test_cleanup(void);
 int mba_schemata_change(int core_id, char *bw_report, char **benchmark_cmd);
 void mba_test_cleanup(void);
+int get_cbm_mask(char *cache_type);
+int get_cache_size(int cpu_no, int cache_num, unsigned long *cache_size);
+void ctrlc_handler(int signum, siginfo_t *info, void *ptr);
+int cqm_resctrl_val(int core_id, int n, char **benchmark_cmd);
+unsigned int count_bits(unsigned long n);
+void cqm_test_cleanup(void);
+int get_core_sibling(int cpu_no);
+int measure_cache_vals(struct resctrl_val_param *param, int bm_pid);
 
 #endif /* RESCTRL_H */

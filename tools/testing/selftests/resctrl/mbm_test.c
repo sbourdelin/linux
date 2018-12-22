@@ -36,6 +36,7 @@ show_bw_info(unsigned long *bw_imc, unsigned long *bw_resc, int span)
 	avg_bw_resc = sum_bw_resc / 4;
 	avg_diff = avg_bw_resc - avg_bw_imc;
 
+	printf("\nResults are displayed in (MB)\n");
 	printf("\nSpan (MB): %d \t", span);
 	printf("avg_bw_imc: %lu\t", avg_bw_imc);
 	printf("avg_bw_resc: %lu\t", avg_bw_resc);
@@ -131,7 +132,7 @@ int mbm_bw_change(int span, int core_id, char *bw_report, char **benchmark_cmd)
 
 	remove(RESULT_FILE_NAME);
 
-	ret = membw_val(benchmark_cmd, &param);
+	ret = resctrl_val(benchmark_cmd, &param);
 	if (ret)
 		return ret;
 

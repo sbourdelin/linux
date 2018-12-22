@@ -78,54 +78,63 @@ static void *malloc_and_init_memory(size_t s)
 	return p;
 }
 
-static void fill_cache_read(unsigned char *start_ptr, unsigned char *end_ptr)
+static void fill_one_span_read(unsigned char *start_ptr, unsigned char *end_ptr)
 {
-	while (1) {
-		unsigned char sum, *p;
+	unsigned char sum, *p;
 
-		p = start_ptr;
-		/* Read two chars in each cache line to stress cache */
-		while (p < (end_ptr - 1024)) {
-			sum += p[0] + p[32] + p[64] + p[96] + p[128] +
-			       p[160] + p[192] + p[224] + p[256] + p[288] +
-			       p[320] + p[352] + p[384] + p[416] + p[448] +
-			       p[480] + p[512] + p[544] + p[576] + p[608] +
-			       p[640] + p[672] + p[704] + p[736] + p[768] +
-			       p[800] + p[832] + p[864] + p[896] + p[928] +
-			       p[960] + p[992];
-			p += 1024;
-		}
+	sum = 0;
+	p = start_ptr;
+	while (p < end_ptr) {
+		sum += *p;
+		p += (CL_SIZE / 2);
 	}
 }
 
-static void fill_cache_write(unsigned char *start_ptr, unsigned char *end_ptr)
+static
+void fill_one_span_write(unsigned char *start_ptr, unsigned char *end_ptr)
 {
-	while (1) {
-		while (start_ptr < end_ptr) {
-			*start_ptr = '1';
-			start_ptr += (CL_SIZE / 2);
-		}
-		start_ptr = startptr;
+	unsigned char *p;
+
+	p = start_ptr;
+	while (p < end_ptr) {
+		*p = '1';
+		p += (CL_SIZE / 2);
 	}
 }
 
-static void
-fill_cache(unsigned long long buf_size, int malloc_and_init,
-	   int memflush, int op)
+static int fill_cache_read(unsigned char *start_ptr, unsigned char *end_ptr,
+			   char *resctrl_val)
+{
+	while (1)
+		fill_one_span_read(start_ptr, end_ptr);
+
+	return 0;
+}
+
+static int fill_cache_write(unsigned char *start_ptr, unsigned char *end_ptr,
+			    char *resctrl_val)
+{
+	while (1)
+		fill_one_span_write(start_ptr, end_ptr);
+
+	return 0;
+}
+
+static int
+fill_cache(unsigned long long buf_size, int malloc_and_init, int memflush,
+	   int op, char *resctrl_val)
 {
 	unsigned char *start_ptr, *end_ptr;
 	unsigned long long i;
+	int ret;
 
-	if (malloc_and_init) {
+	if (malloc_and_init)
 		start_ptr = malloc_and_init_memory(buf_size);
-		printf("Started benchmark with memalign\n");
-	} else {
+	else
 		start_ptr = malloc(buf_size);
-		printf("Started benchmark with malloc\n");
-	}
 
 	if (!start_ptr)
-		return;
+		return -1;
 
 	startptr = start_ptr;
 	end_ptr = start_ptr + buf_size;
@@ -142,24 +151,29 @@ fill_cache(unsigned long long buf_size, int malloc_and_init,
 	start_ptr = startptr;
 
 	/* Flush the memory before using to avoid "cache hot pages" effect */
-	if (memflush) {
+	if (memflush)
 		mem_flush(start_ptr, buf_size);
-		printf("Started benchmark with memflush\n");
-	} else {
-		printf("Started benchmark *without* memflush\n");
-	}
 
 	if (op == 0)
-		fill_cache_read(start_ptr, end_ptr);
+		ret = fill_cache_read(start_ptr, end_ptr, resctrl_val);
 	else
-		fill_cache_write(start_ptr, end_ptr);
+		ret = fill_cache_write(start_ptr, end_ptr, resctrl_val);
+
+	if (ret) {
+		printf("\n Errror in fill cache read/write...\n");
+		return -1;
+	}
 
 	free(startptr);
+
+	return 0;
 }
 
-int run_fill_buf(int span, int malloc_and_init_memory, int memflush, int op)
+int run_fill_buf(unsigned long long span, int malloc_and_init_memory,
+		 int memflush, int op, char *resctrl_val)
 {
-	unsigned long long cache_size = span * MB;
+	unsigned long long cache_size = span;
+	int ret;
 
 	/* set up ctrl-c handler */
 	if (signal(SIGINT, ctrl_handler) == SIG_ERR)
@@ -167,9 +181,12 @@ int run_fill_buf(int span, int malloc_and_init_memory, int memflush, int op)
 	if (signal(SIGHUP, ctrl_handler) == SIG_ERR)
 		printf("Failed to catch SIGHUP!\n");
 
-	printf("Cache size in Bytes = %llu\n", cache_size);
+	ret = fill_cache(cache_size, malloc_and_init_memory, memflush, op,
+			 resctrl_val);
+	if (ret) {
+		printf("\n Errror in fill cache\n");
+		return -1;
+	}
 
-	fill_cache(cache_size, malloc_and_init_memory, memflush, op);
-
-	return -1;
+	return 0;
 }

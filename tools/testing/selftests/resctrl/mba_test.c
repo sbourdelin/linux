@@ -57,6 +57,7 @@ static void show_mba_info(unsigned long *bw_imc, unsigned long *bw_resc)
 {
 	int allocation, failed = 0, runs;
 
+	printf("\nResults are displayed in (MB)\n");
 	/* Memory bandwidth from 100% down to 10% */
 	for (allocation = 0; allocation < ALLOCATION_MAX / ALLOCATION_STEP;
 	     allocation++) {
@@ -159,7 +160,7 @@ int mba_schemata_change(int core_id, char *bw_report, char **benchmark_cmd)
 
 	remove(RESULT_FILE_NAME);
 
-	ret = membw_val(benchmark_cmd, &param);
+	ret = resctrl_val(benchmark_cmd, &param);
 	if (ret)
 		return ret;
 
