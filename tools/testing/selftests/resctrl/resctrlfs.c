@@ -14,6 +14,7 @@
 #define RESCTRL_MBM		"L3 monitoring detected"
 #define RESCTRL_MBA		"MB allocation detected"
 #define RESCTRL_CQM		"L3 monitoring detected"
+#define RESCTRL_L3_CAT		"L3 allocation detected"
 #define MAX_RESCTRL_FEATURES	4
 #define CORE_SIBLINGS_PATH	"/sys/bus/cpu/devices/cpu"
 
@@ -475,6 +476,7 @@ int write_schemata(char *ctrlgrp, char *schemata, int cpu_no, char *resctrl_val)
 	int ret;
 
 	if ((strcmp(resctrl_val, "mba") == 0) ||
+	    (strcmp(resctrl_val, "cat") == 0) ||
 	    (strcmp(resctrl_val, "cqm") == 0)) {
 		if (!schemata) {
 			printf("Schemata empty, so not updating\n");
@@ -491,7 +493,7 @@ int write_schemata(char *ctrlgrp, char *schemata, int cpu_no, char *resctrl_val)
 		else
 			sprintf(controlgroup, "%s/schemata", RESCTRL_PATH);
 
-		if (!strcmp(resctrl_val, "cqm"))
+		if (!strcmp(resctrl_val, "cat") || !strcmp(resctrl_val, "cqm"))
 			sprintf(schema, "%s%c%c%s", "L3:", sock_num, '=',
 				schemata);
 		if (strcmp(resctrl_val, "mba") == 0)
@@ -529,7 +531,7 @@ int validate_resctrl_feature_request(char *resctrl_val)
 {
 	int resctrl_features_supported[MAX_RESCTRL_FEATURES] = {0, 0, 0, 0};
 	const char *resctrl_features_list[MAX_RESCTRL_FEATURES] = {
-			"mbm", "mba", "cqm"};
+			"mbm", "mba", "cat", "cqm"};
 	int i, valid_resctrl_feature = -1;
 	char line[1024];
 	FILE *fp;
@@ -570,6 +572,8 @@ int validate_resctrl_feature_request(char *resctrl_val)
 			resctrl_features_supported[0] = 1;
 		if ((strstr(line, RESCTRL_MBA)) != NULL)
 			resctrl_features_supported[1] = 1;
+		if ((strstr(line, RESCTRL_L3_CAT)) != NULL)
+			resctrl_features_supported[2] = 1;
 		if ((strstr(line, RESCTRL_CQM)) != NULL)
 			resctrl_features_supported[3] = 1;
 	}
