@@ -547,6 +547,10 @@ s32 __i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
 	int try;
 	s32 res;
 
+	if (WARN(device_is_suspended(adapter->dev.parent),
+		 "Accessing already suspended I2C/SMBus adapter"))
+		return -ESHUTDOWN;
+
 	/* If enabled, the following two tracepoints are conditional on
 	 * read_write and protocol.
 	 */
