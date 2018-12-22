@@ -465,7 +465,8 @@ static void bcm2835_dma_start_desc(struct bcm2835_chan *c)
 	c->desc = d = to_bcm2835_dma_desc(&vd->tx);
 
 	writel(d->cb_list[0].paddr, c->chan_base + BCM2835_DMA_ADDR);
-	writel(BCM2835_DMA_ACTIVE, c->chan_base + BCM2835_DMA_CS);
+	writel(BCM2835_DMA_ACTIVE | BCM2835_DMA_END,
+	       c->chan_base + BCM2835_DMA_CS);
 }
 
 static irqreturn_t bcm2835_dma_callback(int irq, void *data)
@@ -473,6 +474,7 @@ static irqreturn_t bcm2835_dma_callback(int irq, void *data)
 	struct bcm2835_chan *c = data;
 	struct bcm2835_desc *d;
 	unsigned long flags;
+	u32 cs;
 
 	/* check the shared interrupt */
 	if (c->irq_flags & IRQF_SHARED) {
@@ -486,11 +488,17 @@ static irqreturn_t bcm2835_dma_callback(int irq, void *data)
 	spin_lock_irqsave(&c->vc.lock, flags);
 
 	/* Acknowledge interrupt */
-	writel(BCM2835_DMA_INT, c->chan_base + BCM2835_DMA_CS);
+	cs = readl(c->chan_base + BCM2835_DMA_CS);
+	writel(cs, c->chan_base + BCM2835_DMA_CS);
 
 	d = c->desc;
 
-	if (d) {
+	/*
+	 * If this IRQ handler is threaded, clients may terminate descriptors
+	 * and issue new ones before the IRQ handler runs.  Avoid finalizing
+	 * such a newly issued descriptor by checking the END flag.
+	 */
+	if (d && cs & BCM2835_DMA_END) {
 		if (d->cyclic) {
 			/* call the cyclic callback */
 			vchan_cyclic_callback(&d->vd);
@@ -798,11 +806,7 @@ static int bcm2835_dma_terminate_all(struct dma_chan *chan)
 	list_del_init(&c->node);
 	spin_unlock(&d->lock);
 
-	/*
-	 * Stop DMA activity: we assume the callback will not be called
-	 * after bcm_dma_abort() returns (even if it does, it will see
-	 * c->desc is NULL and exit.)
-	 */
+	/* stop DMA activity */
 	if (c->desc) {
 		vchan_terminate_vdesc(&c->desc->vd);
 		c->desc = NULL;
