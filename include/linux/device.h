@@ -1138,6 +1138,11 @@ static inline int device_is_registered(struct device *dev)
 	return dev->kobj.state_in_sysfs;
 }
 
+static inline bool device_is_suspended(struct device *dev)
+{
+	return dev->power.is_suspended;
+}
+
 static inline void device_enable_async_suspend(struct device *dev)
 {
 	if (!dev->power.is_prepared)
