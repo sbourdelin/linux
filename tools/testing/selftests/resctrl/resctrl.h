@@ -73,5 +73,7 @@ int membw_val(char **benchmark_cmd, struct resctrl_val_param *param);
 int mbm_bw_change(int span, int core_id, char *bw_report, char **benchmark_cmd);
 void tests_cleanup(void);
 void mbm_test_cleanup(void);
+int mba_schemata_change(int core_id, char *bw_report, char **benchmark_cmd);
+void mba_test_cleanup(void);
 
 #endif /* RESCTRL_H */

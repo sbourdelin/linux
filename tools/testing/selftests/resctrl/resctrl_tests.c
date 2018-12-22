@@ -29,13 +29,14 @@ static void cmd_help(void)
 void tests_cleanup(void)
 {
 	mbm_test_cleanup();
+	mba_test_cleanup();
 }
 
 int main(int argc, char **argv)
 {
 	char benchmark_cmd_area[BENCHMARK_ARGS][BENCHMARK_ARG_SIZE];
 	int res, c, core_id = 0, span = 250, argc_new = argc, i;
-	bool has_ben = false, mbm_test = true;
+	bool has_ben = false, mbm_test = true, mba_test = true;
 	char *benchmark_cmd[BENCHMARK_ARGS];
 	char bw_report[64], bm_type[64];
 
@@ -47,9 +48,12 @@ int main(int argc, char **argv)
 			token = strtok(optarg, ",");
 
 			mbm_test = false;
+			mba_test = false;
 			while (token) {
 				if (!strcmp(token, "mbm")) {
 					mbm_test = true;
+				} else if (!strcmp(token, "mba")) {
+					mba_test = true;
 				} else {
 					printf("invalid argument\n");
 
@@ -117,6 +121,15 @@ int main(int argc, char **argv)
 		res = mbm_bw_change(span, core_id, bw_report, benchmark_cmd);
 		if (res)
 			printf("Error in running tests for mbm bw change!\n");
+	}
+
+	if (mba_test) {
+		printf("\nMBA Schemata Change Starting..\n");
+		if (!has_ben)
+			sprintf(benchmark_cmd[1], "%d", span);
+		res = mba_schemata_change(core_id, bw_report, benchmark_cmd);
+		if (res)
+			printf("Error in tests for mba-change-schemata!\n");
 	}
 
 	return 0;
