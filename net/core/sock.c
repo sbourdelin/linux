@@ -2751,6 +2751,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_sndtimeo		=	MAX_SCHEDULE_TIMEOUT;
 
 	sk->sk_stamp = SK_DEFAULT_STAMP;
+	seqlock_init(&sk->sk_stamp_seq);
 	atomic_set(&sk->sk_zckey, 0);
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
@@ -2848,15 +2849,27 @@ EXPORT_SYMBOL(lock_sock_fast);
 int sock_get_timestamp(struct sock *sk, struct timeval __user *userstamp)
 {
 	struct timeval tv;
+	unsigned int seq;
 
 	sock_enable_timestamp(sk, SOCK_TIMESTAMP);
-	tv = ktime_to_timeval(sk->sk_stamp);
+
+	do {
+		seq = read_seqbegin(&sk->sk_stamp_seq);
+		tv = ktime_to_timeval(sk->sk_stamp);
+	} while (read_seqretry(&sk->sk_stamp_seq, seq));
+
 	if (tv.tv_sec == -1)
 		return -ENOENT;
 	if (tv.tv_sec == 0) {
-		sk->sk_stamp = ktime_get_real();
-		tv = ktime_to_timeval(sk->sk_stamp);
+		ktime_t kt = ktime_get_real();
+
+		write_seqlock(&sk->sk_stamp_seq);
+		sk->sk_stamp = kt;
+		write_sequnlock(&sk->sk_stamp_seq);
+
+		tv = ktime_to_timeval(kt);
 	}
+
 	return copy_to_user(userstamp, &tv, sizeof(tv)) ? -EFAULT : 0;
 }
 EXPORT_SYMBOL(sock_get_timestamp);
@@ -2864,13 +2877,24 @@ EXPORT_SYMBOL(sock_get_timestamp);
 int sock_get_timestampns(struct sock *sk, struct timespec __user *userstamp)
 {
 	struct timespec ts;
+	unsigned int seq;
 
 	sock_enable_timestamp(sk, SOCK_TIMESTAMP);
-	ts = ktime_to_timespec(sk->sk_stamp);
+
+	do {
+		seq = read_seqbegin(&sk->sk_stamp_seq);
+		ts = ktime_to_timespec(sk->sk_stamp);
+	} while (read_seqretry(&sk->sk_stamp_seq, seq));
+
 	if (ts.tv_sec == -1)
 		return -ENOENT;
 	if (ts.tv_sec == 0) {
-		sk->sk_stamp = ktime_get_real();
+		ktime_t kt = ktime_get_real();
+
+		write_seqlock(&sk->sk_stamp_seq);
+		sk->sk_stamp = kt;
+		write_sequnlock(&sk->sk_stamp_seq);
+
 		ts = ktime_to_timespec(sk->sk_stamp);
 	}
 	return copy_to_user(userstamp, &ts, sizeof(ts)) ? -EFAULT : 0;

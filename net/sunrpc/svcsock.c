@@ -549,7 +549,9 @@ static int svc_udp_recvfrom(struct svc_rqst *rqstp)
 		/* Don't enable netstamp, sunrpc doesn't
 		   need that much accuracy */
 	}
+	write_seqlock(&svsk->sk_sk->sk_stamp_seq);
 	svsk->sk_sk->sk_stamp = skb->tstamp;
+	write_sequnlock(&svsk->sk_sk->sk_stamp_seq);
 	set_bit(XPT_DATA, &svsk->sk_xprt.xpt_flags); /* there may be more data... */
 
 	len  = skb->len;

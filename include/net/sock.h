@@ -298,6 +298,7 @@ struct sock_common {
   *	@sk_filter: socket filtering instructions
   *	@sk_timer: sock cleanup timer
   *	@sk_stamp: time stamp of last packet received
+  *	@sk_stamp_seq: lock for accessing sk_stamp
   *	@sk_tsflags: SO_TIMESTAMPING socket options
   *	@sk_tskey: counter to disambiguate concurrent tstamp requests
   *	@sk_zckey: counter to order MSG_ZEROCOPY notifications
@@ -474,6 +475,7 @@ struct sock {
 	const struct cred	*sk_peer_cred;
 	long			sk_rcvtimeo;
 	ktime_t			sk_stamp;
+	seqlock_t		sk_stamp_seq;
 	u16			sk_tsflags;
 	u8			sk_shutdown;
 	u32			sk_tskey;
@@ -2320,8 +2322,11 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 	    (hwtstamps->hwtstamp &&
 	     (sk->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE)))
 		__sock_recv_timestamp(msg, sk, skb);
-	else
+	else {
+		write_seqlock(&sk->sk_stamp_seq);
 		sk->sk_stamp = kt;
+		write_sequnlock(&sk->sk_stamp_seq);
+	}
 
 	if (sock_flag(sk, SOCK_WIFI_STATUS) && skb->wifi_acked_valid)
 		__sock_recv_wifi_status(msg, sk, skb);
@@ -2341,10 +2346,15 @@ static inline void sock_recv_ts_and_drops(struct msghdr *msg, struct sock *sk,
 
 	if (sk->sk_flags & FLAGS_TS_OR_DROPS || sk->sk_tsflags & TSFLAGS_ANY)
 		__sock_recv_ts_and_drops(msg, sk, skb);
-	else if (unlikely(sock_flag(sk, SOCK_TIMESTAMP)))
+	else if (unlikely(sock_flag(sk, SOCK_TIMESTAMP))) {
+		write_seqlock(&sk->sk_stamp_seq);
 		sk->sk_stamp = skb->tstamp;
-	else if (unlikely(sk->sk_stamp == SK_DEFAULT_STAMP))
+		write_sequnlock(&sk->sk_stamp_seq);
+	} else if (unlikely(sk->sk_stamp == SK_DEFAULT_STAMP)) {
+		write_seqlock(&sk->sk_stamp_seq);
 		sk->sk_stamp = 0;
+		write_sequnlock(&sk->sk_stamp_seq);
+	}
 }
 
 void __sock_tx_timestamp(__u16 tsflags, __u8 *tx_flags);
