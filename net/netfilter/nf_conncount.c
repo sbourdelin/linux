@@ -504,7 +504,7 @@ static void tree_gc_worker(struct work_struct *work)
 	struct rb_node *node;
 	unsigned int tree, next_tree, gc_count = 0;
 
-	tree = data->gc_tree % CONNCOUNT_LOCK_SLOTS;
+	tree = data->gc_tree % CONNCOUNT_SLOTS;
 	root = &data->root[tree];
 
 	rcu_read_lock();
@@ -515,7 +515,7 @@ static void tree_gc_worker(struct work_struct *work)
 	}
 	rcu_read_unlock();
 
-	spin_lock_bh(&nf_conncount_locks[tree]);
+	spin_lock_bh(&nf_conncount_locks[tree % CONNCOUNT_LOCK_SLOTS]);
 
 	if (gc_count) {
 		tree_nodes_free(root, gc_nodes, gc_count);
@@ -531,7 +531,7 @@ static void tree_gc_worker(struct work_struct *work)
 		schedule_work(work);
 	}
 
-	spin_unlock_bh(&nf_conncount_locks[tree]);
+	spin_unlock_bh(&nf_conncount_locks[tree % CONNCOUNT_LOCK_SLOTS]);
 }
 
 /* Count and return number of conntrack entries in 'net' with particular 'key'.
