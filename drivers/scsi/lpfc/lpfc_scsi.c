@@ -805,9 +805,7 @@ lpfc_new_scsi_buf_s4(struct lpfc_vport *vport, int num_to_alloc)
 	dma_addr_t pdma_phys_bpl;
 	uint16_t iotag, lxri = 0;
 	int bcnt, num_posted, sgl_size;
-	LIST_HEAD(prep_sblist);
 	LIST_HEAD(post_sblist);
-	LIST_HEAD(scsi_sblist);
 
 	sgl_size = phba->cfg_sg_dma_buf_size -
 		(sizeof(struct fcp_cmnd) + sizeof(struct fcp_rsp));
