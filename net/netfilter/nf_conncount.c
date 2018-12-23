@@ -380,6 +380,7 @@ insert_tree(struct net *net,
 				 * reclaimed by gc, insert a new tree node
 				 */
 				node_found = false;
+				parent = rb_parent(*rbnode);
 			}
 			break;
 		}
