@@ -2236,9 +2236,7 @@ lpfc_new_nvme_buf(struct lpfc_vport *vport, int num_to_alloc)
 	dma_addr_t pdma_phys_sgl;
 	uint16_t iotag, lxri = 0;
 	int bcnt, num_posted;
-	LIST_HEAD(prep_nblist);
 	LIST_HEAD(post_nblist);
-	LIST_HEAD(nvme_nblist);
 
 	for (bcnt = 0; bcnt < num_to_alloc; bcnt++) {
 		lpfc_ncmd = kzalloc(sizeof(struct lpfc_nvme_buf), GFP_KERNEL);
