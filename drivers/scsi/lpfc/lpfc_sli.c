@@ -3897,7 +3897,6 @@ lpfc_sli_abort_iocb_ring(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
 void
 lpfc_sli_abort_wqe_ring(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
 {
-	LIST_HEAD(completions);
 	struct lpfc_iocbq *iocb, *next_iocb;
 
 	if (pring->ringno == LPFC_ELS_RING)
