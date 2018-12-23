@@ -85,6 +85,6 @@ static struct platform_driver syscon_reboot_mode_driver = {
 };
 module_platform_driver(syscon_reboot_mode_driver);
 
-MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
+MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com>");
 MODULE_DESCRIPTION("SYSCON reboot mode driver");
 MODULE_LICENSE("GPL v2");

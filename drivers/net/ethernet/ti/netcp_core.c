@@ -2289,4 +2289,4 @@ module_platform_driver(netcp_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("TI NETCP driver for Keystone SOCs");
-MODULE_AUTHOR("Sandeep Nair <sandeep_n@ti.com");
+MODULE_AUTHOR("Sandeep Nair <sandeep_n@ti.com>");

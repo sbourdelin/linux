@@ -86,5 +86,5 @@ module_init(nft_masq_ipv4_module_init);
 module_exit(nft_masq_ipv4_module_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Arturo Borrero Gonzalez <arturo@debian.org");
+MODULE_AUTHOR("Arturo Borrero Gonzalez <arturo@debian.org>");
 MODULE_ALIAS_NFT_AF_EXPR(AF_INET, "masq");

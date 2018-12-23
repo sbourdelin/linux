@@ -317,6 +317,6 @@ static struct i2c_driver apds9802als_driver = {
 
 module_i2c_driver(apds9802als_driver);
 
-MODULE_AUTHOR("Anantha Narayanan <Anantha.Narayanan@intel.com");
+MODULE_AUTHOR("Anantha Narayanan <Anantha.Narayanan@intel.com>");
 MODULE_DESCRIPTION("Avago apds9802als ALS Driver");
 MODULE_LICENSE("GPL v2");

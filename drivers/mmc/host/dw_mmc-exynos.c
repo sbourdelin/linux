@@ -602,6 +602,6 @@ static struct platform_driver dw_mci_exynos_pltfm_driver = {
 module_platform_driver(dw_mci_exynos_pltfm_driver);
 
 MODULE_DESCRIPTION("Samsung Specific DW-MSHC Driver Extension");
-MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com");
+MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com>");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:dwmmc_exynos");

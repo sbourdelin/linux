@@ -331,5 +331,5 @@ static struct platform_driver clk_wzrd_driver = {
 module_platform_driver(clk_wzrd_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Soeren Brinkmann <soren.brinkmann@xilinx.com");
+MODULE_AUTHOR("Soeren Brinkmann <soren.brinkmann@xilinx.com>");
 MODULE_DESCRIPTION("Driver for the Xilinx Clocking Wizard IP core");

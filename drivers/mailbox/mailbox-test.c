@@ -443,5 +443,5 @@ static struct platform_driver mbox_test_driver = {
 module_platform_driver(mbox_test_driver);
 
 MODULE_DESCRIPTION("Generic Mailbox Testing Facility");
-MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org");
+MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org>");
 MODULE_LICENSE("GPL v2");

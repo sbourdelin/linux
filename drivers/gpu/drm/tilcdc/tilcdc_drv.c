@@ -675,6 +675,6 @@ static void __exit tilcdc_drm_fini(void)
 module_init(tilcdc_drm_init);
 module_exit(tilcdc_drm_fini);
 
-MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
+MODULE_AUTHOR("Rob Clark <robdclark@gmail.com>");
 MODULE_DESCRIPTION("TI LCD Controller DRM Driver");
 MODULE_LICENSE("GPL");

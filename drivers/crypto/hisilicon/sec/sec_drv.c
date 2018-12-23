@@ -1319,5 +1319,5 @@ module_platform_driver(sec_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Hisilicon Security Accelerators");
-MODULE_AUTHOR("Zaibo Xu <xuzaibo@huawei.com");
+MODULE_AUTHOR("Zaibo Xu <xuzaibo@huawei.com>");
 MODULE_AUTHOR("Jonathan Cameron <jonathan.cameron@huawei.com>");

@@ -225,6 +225,6 @@ static struct platform_driver wm831x_backlight_driver = {
 module_platform_driver(wm831x_backlight_driver);
 
 MODULE_DESCRIPTION("Backlight Driver for WM831x PMICs");
-MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com");
+MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:wm831x-backlight");

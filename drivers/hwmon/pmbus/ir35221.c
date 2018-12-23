@@ -143,6 +143,6 @@ static struct i2c_driver ir35221_driver = {
 
 module_i2c_driver(ir35221_driver);
 
-MODULE_AUTHOR("Samuel Mendoza-Jonas <sam@mendozajonas.com");
+MODULE_AUTHOR("Samuel Mendoza-Jonas <sam@mendozajonas.com>");
 MODULE_DESCRIPTION("PMBus driver for IR35221");
 MODULE_LICENSE("GPL");

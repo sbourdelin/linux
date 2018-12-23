@@ -510,5 +510,5 @@ module_platform_driver(sti_mbox_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("STMicroelectronics Mailbox Controller");
-MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org");
+MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org>");
 MODULE_ALIAS("platform:mailbox-sti");

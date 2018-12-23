@@ -321,5 +321,5 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Daniel Dickinson <openwrt@cshore.neomailbox.net>");
 MODULE_AUTHOR("Florian Fainelli <florian@openwrt.org>");
 MODULE_AUTHOR("Mike Albon <malbon@openwrt.org>");
-MODULE_AUTHOR("Jonas Gorski <jonas.gorski@gmail.com");
+MODULE_AUTHOR("Jonas Gorski <jonas.gorski@gmail.com>");
 MODULE_DESCRIPTION("MTD partitioning for BCM63XX CFE bootloaders");

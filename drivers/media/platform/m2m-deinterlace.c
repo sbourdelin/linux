@@ -24,7 +24,7 @@
 #define MEM2MEM_TEST_MODULE_NAME "mem2mem-deinterlace"
 
 MODULE_DESCRIPTION("mem2mem device which supports deinterlacing using dmaengine");
-MODULE_AUTHOR("Javier Martin <javier.martin@vista-silicon.com");
+MODULE_AUTHOR("Javier Martin <javier.martin@vista-silicon.com>");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.0.1");
 

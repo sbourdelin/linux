@@ -1666,6 +1666,6 @@ static struct i2c_driver si5351_driver = {
 };
 module_i2c_driver(si5351_driver);
 
-MODULE_AUTHOR("Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com");
+MODULE_AUTHOR("Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>");
 MODULE_DESCRIPTION("Silicon Labs Si5351A/B/C clock generator driver");
 MODULE_LICENSE("GPL");

@@ -122,6 +122,6 @@ static int __init abx500_clk_init(void)
 }
 arch_initcall(abx500_clk_init);
 
-MODULE_AUTHOR("Ulf Hansson <ulf.hansson@linaro.org");
+MODULE_AUTHOR("Ulf Hansson <ulf.hansson@linaro.org>");
 MODULE_DESCRIPTION("ABX500 clk driver");
 MODULE_LICENSE("GPL v2");

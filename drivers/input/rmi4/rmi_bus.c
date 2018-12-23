@@ -471,7 +471,7 @@ static void __exit rmi_bus_exit(void)
 }
 module_exit(rmi_bus_exit);
 
-MODULE_AUTHOR("Christopher Heiny <cheiny@synaptics.com");
-MODULE_AUTHOR("Andrew Duggan <aduggan@synaptics.com");
+MODULE_AUTHOR("Christopher Heiny <cheiny@synaptics.com>");
+MODULE_AUTHOR("Andrew Duggan <aduggan@synaptics.com>");
 MODULE_DESCRIPTION("RMI bus");
 MODULE_LICENSE("GPL");

@@ -1511,6 +1511,6 @@ static struct i2c_driver tscs42xx_i2c_driver = {
 
 module_i2c_driver(tscs42xx_i2c_driver);
 
-MODULE_AUTHOR("Tempo Semiconductor <steven.eckhoff.opensource@gmail.com");
+MODULE_AUTHOR("Tempo Semiconductor <steven.eckhoff.opensource@gmail.com>");
 MODULE_DESCRIPTION("ASoC TSCS42xx driver");
 MODULE_LICENSE("GPL");

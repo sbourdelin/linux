@@ -3878,4 +3878,4 @@ module_exit(keystone_gbe_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("TI NETCP ETHSS driver for Keystone SOCs");
-MODULE_AUTHOR("Sandeep Nair <sandeep_n@ti.com");
+MODULE_AUTHOR("Sandeep Nair <sandeep_n@ti.com>");

@@ -869,7 +869,7 @@ static struct usb_driver sr_driver = {
 
 module_usb_driver(sr_driver);
 
-MODULE_AUTHOR("Liu Junliang <liujunliang_ljl@163.com");
+MODULE_AUTHOR("Liu Junliang <liujunliang_ljl@163.com>");
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_DESCRIPTION("SR9800 USB 2.0 USB2NET Dev : http://www.corechip-sz.com");
 MODULE_LICENSE("GPL");

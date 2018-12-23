@@ -679,7 +679,7 @@ module_platform_driver(skylake_audio)
 
 /* Module information */
 MODULE_DESCRIPTION("Audio Machine driver-NAU88L25 & MAX98357A in I2S mode");
-MODULE_AUTHOR("Rohit Ainapure <rohit.m.ainapure@intel.com");
+MODULE_AUTHOR("Rohit Ainapure <rohit.m.ainapure@intel.com>");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:skl_n88l25_m98357a");
 MODULE_ALIAS("platform:kbl_n88l25_m98357a");

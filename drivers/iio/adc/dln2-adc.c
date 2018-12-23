@@ -710,7 +710,7 @@ static struct platform_driver dln2_adc_driver = {
 
 module_platform_driver(dln2_adc_driver);
 
-MODULE_AUTHOR("Jack Andersen <jackoalan@gmail.com");
+MODULE_AUTHOR("Jack Andersen <jackoalan@gmail.com>");
 MODULE_DESCRIPTION("Driver for the Diolan DLN2 ADC interface");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:dln2-adc");

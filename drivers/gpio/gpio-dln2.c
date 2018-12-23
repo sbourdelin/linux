@@ -519,7 +519,7 @@ static struct platform_driver dln2_gpio_driver = {
 
 module_platform_driver(dln2_gpio_driver);
 
-MODULE_AUTHOR("Daniel Baluta <daniel.baluta@intel.com");
+MODULE_AUTHOR("Daniel Baluta <daniel.baluta@intel.com>");
 MODULE_DESCRIPTION("Driver for the Diolan DLN2 GPIO interface");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:dln2-gpio");

@@ -389,6 +389,6 @@ int acpi_thermal_rel_misc_device_remove(acpi_handle handle)
 EXPORT_SYMBOL(acpi_thermal_rel_misc_device_remove);
 
 MODULE_AUTHOR("Zhang Rui <rui.zhang@intel.com>");
-MODULE_AUTHOR("Jacob Pan <jacob.jun.pan@intel.com");
+MODULE_AUTHOR("Jacob Pan <jacob.jun.pan@intel.com>");
 MODULE_DESCRIPTION("Intel acpi thermal rel misc dev driver");
 MODULE_LICENSE("GPL v2");

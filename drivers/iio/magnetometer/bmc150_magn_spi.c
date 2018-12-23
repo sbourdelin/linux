@@ -66,6 +66,6 @@ static struct spi_driver bmc150_magn_spi_driver = {
 };
 module_spi_driver(bmc150_magn_spi_driver);
 
-MODULE_AUTHOR("Daniel Baluta <daniel.baluta@intel.com");
+MODULE_AUTHOR("Daniel Baluta <daniel.baluta@intel.com>");
 MODULE_DESCRIPTION("BMC150 magnetometer SPI driver");
 MODULE_LICENSE("GPL v2");

@@ -496,6 +496,6 @@ static struct i2c_driver sensor_emc1403 = {
 
 module_i2c_driver(sensor_emc1403);
 
-MODULE_AUTHOR("Kalhan Trisal <kalhan.trisal@intel.com");
+MODULE_AUTHOR("Kalhan Trisal <kalhan.trisal@intel.com>");
 MODULE_DESCRIPTION("emc1403 Thermal Driver");
 MODULE_LICENSE("GPL v2");

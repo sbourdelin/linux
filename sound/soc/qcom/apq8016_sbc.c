@@ -261,6 +261,6 @@ static struct platform_driver apq8016_sbc_platform_driver = {
 };
 module_platform_driver(apq8016_sbc_platform_driver);
 
-MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org>");
 MODULE_DESCRIPTION("APQ8016 ASoC Machine Driver");
 MODULE_LICENSE("GPL v2");

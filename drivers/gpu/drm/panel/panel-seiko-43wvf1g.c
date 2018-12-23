@@ -366,6 +366,6 @@ static struct platform_driver seiko_panel_platform_driver = {
 };
 module_platform_driver(seiko_panel_platform_driver);
 
-MODULE_AUTHOR("Marco Franchi <marco.franchi@nxp.com");
+MODULE_AUTHOR("Marco Franchi <marco.franchi@nxp.com>");
 MODULE_DESCRIPTION("Seiko 43WVF1G panel driver");
 MODULE_LICENSE("GPL v2");

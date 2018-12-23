@@ -152,6 +152,6 @@ static struct i2c_driver hmc6352_driver = {
 
 module_i2c_driver(hmc6352_driver);
 
-MODULE_AUTHOR("Kalhan Trisal <kalhan.trisal@intel.com");
+MODULE_AUTHOR("Kalhan Trisal <kalhan.trisal@intel.com>");
 MODULE_DESCRIPTION("hmc6352 Compass Driver");
 MODULE_LICENSE("GPL v2");

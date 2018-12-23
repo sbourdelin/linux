@@ -32,7 +32,7 @@
 #define EMMAPRP_MODULE_NAME "mem2mem-emmaprp"
 
 MODULE_DESCRIPTION("Mem-to-mem device which supports eMMa-PrP present in mx2 SoCs");
-MODULE_AUTHOR("Javier Martin <javier.martin@vista-silicon.com");
+MODULE_AUTHOR("Javier Martin <javier.martin@vista-silicon.com>");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.0.1");
 

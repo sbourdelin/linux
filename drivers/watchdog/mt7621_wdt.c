@@ -189,5 +189,5 @@ static struct platform_driver mt7621_wdt_driver = {
 module_platform_driver(mt7621_wdt_driver);
 
 MODULE_DESCRIPTION("MediaTek MT762x hardware watchdog driver");
-MODULE_AUTHOR("John Crispin <john@phrozen.org");
+MODULE_AUTHOR("John Crispin <john@phrozen.org>");
 MODULE_LICENSE("GPL v2");
