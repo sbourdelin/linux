@@ -381,11 +381,15 @@ insert_tree(struct net *net,
 				 */
 				node_found = false;
 				parent = rb_parent(*rbnode);
+				gc_nodes[gc_count++] = rbconn;
 			}
 			break;
 		}
 
-		if (gc_count >= ARRAY_SIZE(gc_nodes))
+		/* Must keep one free array slot in case we find an
+		 * exact match that needs to be reclaimed.
+		 */
+		if (gc_count >= ARRAY_SIZE(gc_nodes) - 1)
 			continue;
 
 		if (nf_conncount_gc_list(net, &rbconn->list))
