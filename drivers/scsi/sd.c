@@ -206,6 +206,21 @@ cache_type_store(struct device *dev, struct device_attribute *attr,
 	sp = buffer_data[0] & 0x80 ? 1 : 0;
 	buffer_data[0] &= ~0x80;
 
+	/* From SBC-4 r15, 6.5.1 "Mode pages overview", description of
+	 * DEVICE-SPECIFIC PARAMETER field in the mode parameter header:
+	 *     ...
+	 *     The write protect (WP) bit for mode data sent with a MODE SELECT
+	 *     command shall be ignored by the device server.
+	 *     ...
+	 *     The DPOFUA bit is reserved for mode data sent with a MODE SELECT
+	 *     command.
+	 *     ...
+	 * All other bits are also reserved, and all reserved bits shall be set
+	 * to zero according to the same document. So, we can simply set this
+	 * field to zero for compatibility.
+	 */
+	data.device_specific = 0;
+
 	if (scsi_mode_select(sdp, 1, sp, 8, buffer_data, len, SD_TIMEOUT,
 			     SD_MAX_RETRIES, &data, &sshdr)) {
 		if (scsi_sense_valid(&sshdr))
