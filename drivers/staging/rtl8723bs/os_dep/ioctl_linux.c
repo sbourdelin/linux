@@ -2577,14 +2577,19 @@ static int rtw_wps_start(struct net_device *dev,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	struct iw_point *pdata = &wrqu->data;
 	u32   u32wps_start = 0;
-        unsigned int uintRet = 0;
 
 	if ((true == padapter->bDriverStopped) ||(true ==padapter->bSurpriseRemoved) || (NULL == pdata)) {
 		ret = -EINVAL;
 		goto exit;
 	}
 
-	uintRet = copy_from_user((void*)&u32wps_start, pdata->pointer, 4);
+	ret = copy_from_user((void *)&u32wps_start, pdata->pointer, 4);
+
+	if (ret) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
 	if (u32wps_start == 0)
 		u32wps_start = *extra;
 
