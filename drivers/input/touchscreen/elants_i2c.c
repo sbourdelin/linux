@@ -245,8 +245,22 @@ static int elants_i2c_calibrate(struct elants_data *ts)
 	ts->state = ELAN_WAIT_RECALIBRATION;
 	reinit_completion(&ts->cmd_done);
 
-	elants_i2c_send(client, w_flashkey, sizeof(w_flashkey));
-	elants_i2c_send(client, rek, sizeof(rek));
+	error = elants_i2c_send(client, w_flashkey, sizeof(w_flashkey));
+	if (error) {
+		dev_err(&client->dev,
+				"error in sending the w_flashkey command for calibration: %d\n",
+				error);
+		enable_irq(client->irq);
+		return error;
+	}
+  error = elants_i2c_send(client, rek, sizeof(rek));
+	if (error) {
+		dev_err(&client->dev,
+				"error in sending the rek command for calibration: %d\n",
+				error);
+		enable_irq(client->irq);
+		return error;
+	}
 
 	enable_irq(client->irq);
 
