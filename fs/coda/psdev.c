@@ -97,35 +97,38 @@ static long coda_psdev_ioctl(struct file * filp, unsigned int cmd, unsigned long
 static ssize_t coda_psdev_write(struct file *file, const char __user *buf, 
 				size_t nbytes, loff_t *off)
 {
-        struct venus_comm *vcp = (struct venus_comm *) file->private_data;
-        struct upc_req *req = NULL;
-        struct upc_req *tmp;
+	struct venus_comm *vcp = (struct venus_comm *) file->private_data;
+	struct upc_req *req = NULL;
+	struct upc_req *tmp;
 	struct list_head *lh;
 	struct coda_in_hdr hdr;
 	ssize_t retval = 0, count = 0;
 	int error;
 
-        /* Peek at the opcode, uniquefier */
+	/* Peek at the opcode, uniquefier */
 	if (copy_from_user(&hdr, buf, 2 * sizeof(u_long)))
-	        return -EFAULT;
+		return -EFAULT;
 
-        if (DOWNCALL(hdr.opcode)) {
+	if (DOWNCALL(hdr.opcode)) {
 		union outputArgs *dcbuf;
 		int size = sizeof(*dcbuf);
 
 		if  ( nbytes < sizeof(struct coda_out_hdr) ) {
 			pr_warn("coda_downcall opc %d uniq %d, not enough!\n",
-				hdr.opcode, hdr.unique);
+					hdr.opcode, hdr.unique);
 			count = nbytes;
 			goto out;
 		}
 		if ( nbytes > size ) {
 			pr_warn("downcall opc %d, uniq %d, too much!",
-				hdr.opcode, hdr.unique);
-		        nbytes = size;
+					hdr.opcode, hdr.unique);
+			nbytes = size;
 		}
 		CODA_ALLOC(dcbuf, union outputArgs *, nbytes);
-		if (copy_from_user(dcbuf, buf, nbytes)) {
+		*((struct coda_in_hdr *)dcbuf) = hdr;
+		if (copy_from_user(dcbuf + sizeof(hdr),
+					buf + sizeof(hdr),
+					nbytes - sizeof(hdr))) {
 			CODA_FREE(dcbuf, nbytes);
 			retval = -EFAULT;
 			goto out;
@@ -137,14 +140,14 @@ static ssize_t coda_psdev_write(struct file *file, const char __user *buf,
 		CODA_FREE(dcbuf, nbytes);
 		if (error) {
 			pr_warn("%s: coda_downcall error: %d\n",
-				__func__, error);
+					__func__, error);
 			retval = error;
 			goto out;
 		}
 		count = nbytes;
 		goto out;
 	}
-        
+
 	/* Look for the message on the processing queue. */
 	mutex_lock(&vcp->vc_mutex);
 	list_for_each(lh, &vcp->vc_processing) {
@@ -159,19 +162,19 @@ static ssize_t coda_psdev_write(struct file *file, const char __user *buf,
 
 	if (!req) {
 		pr_warn("%s: msg (%d, %d) not found\n",
-			__func__, hdr.opcode, hdr.unique);
+				__func__, hdr.opcode, hdr.unique);
 		retval = -ESRCH;
 		goto out;
 	}
 
-        /* move data into response buffer. */
+	/* move data into response buffer. */
 	if (req->uc_outSize < nbytes) {
 		pr_warn("%s: too much cnt: %d, cnt: %ld, opc: %d, uniq: %d.\n",
-			__func__, req->uc_outSize, (long)nbytes,
-			hdr.opcode, hdr.unique);
+				__func__, req->uc_outSize, (long)nbytes,
+				hdr.opcode, hdr.unique);
 		nbytes = req->uc_outSize; /* don't have more space! */
 	}
-        if (copy_from_user(req->uc_data, buf, nbytes)) {
+	if (copy_from_user(req->uc_data, buf, nbytes)) {
 		req->uc_flags |= CODA_REQ_ABORT;
 		wake_up(&req->uc_sleep);
 		retval = -EFAULT;
@@ -191,9 +194,9 @@ static ssize_t coda_psdev_write(struct file *file, const char __user *buf,
 			outp->fh = fget(outp->fd);
 	}
 
-        wake_up(&req->uc_sleep);
+	wake_up(&req->uc_sleep);
 out:
-        return(count ? count : retval);  
+	return(count ? count : retval);
 }
 
 /*
