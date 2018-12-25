@@ -60,6 +60,12 @@ test_create()
 		echo "$file has invalid size" >&2
 		exit 1
 	fi
+
+        rm $file 2>/dev/null
+        if [ $? -ne 0 ]; then
+                chattr -i $file
+                rm $file
+        fi
 }
 
 test_create_empty()
@@ -72,12 +78,24 @@ test_create_empty()
 		echo "$file can not be created without writing" >&2
 		exit 1
 	fi
+
+        rm $file 2>/dev/null
+        if [ $? -ne 0 ]; then
+                chattr -i $file
+                rm $file
+        fi
 }
 
 test_create_read()
 {
 	local file=$efivarfs_mount/$FUNCNAME-$test_guid
 	./create-read $file
+
+        rm $file 2>/dev/null
+        if [ $? -ne 0 ]; then
+                chattr -i $file
+                rm $file
+        fi
 }
 
 test_delete()
