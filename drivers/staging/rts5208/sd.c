@@ -2341,7 +2341,9 @@ switch_fail:
 				break;
 			}
 
-			sd_init_power(chip);
+			retval = sd_init_power(chip);
+			if (retval != STATUS_SUCCESS)
+				goto status_fail;
 
 			sd_dummy_clock(chip);
 		}
