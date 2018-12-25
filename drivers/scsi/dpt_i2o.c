@@ -1733,6 +1733,9 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 	if(copy_from_user(msg, user_msg, size)) {
 		return -EFAULT;
 	}
+	/* Ensure it is not changed in the second copy */
+	msg[0] = size;
+
 	get_user(reply_size, &user_reply[0]);
 	reply_size = reply_size>>16;
 	if(reply_size > REPLY_FRAME_SIZE){
