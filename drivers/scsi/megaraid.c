@@ -3396,7 +3396,6 @@ static int
 mega_m_to_n(void __user *arg, nitioctl_t *uioc)
 {
 	struct uioctl_t	uioc_mimd;
-	char	signature[8] = {0};
 	u8	opcode;
 	u8	subopcode;
 
@@ -3408,10 +3407,10 @@ mega_m_to_n(void __user *arg, nitioctl_t *uioc)
 	 * beginning of the structure.
 	 */
 
-	if( copy_from_user(signature, arg, 7) )
+	if (copy_from_user(&uioc_mimd, arg, 7))
 		return (-EFAULT);
 
-	if( memcmp(signature, "MEGANIT", 7) == 0 ) {
+	if (memcmp(&uioc_mimd, "MEGANIT", 7) == 0) {
 
 		/*
 		 * NOTE NOTE: The nit ioctl is still under flux because of
@@ -3421,7 +3420,7 @@ mega_m_to_n(void __user *arg, nitioctl_t *uioc)
 		 */
 		return -EINVAL;
 #if 0
-		if( copy_from_user(uioc, arg, sizeof(nitioctl_t)) )
+		if (copy_from_user(uioc, arg, sizeof(nitioctl_t)))
 			return (-EFAULT);
 		return 0;
 #endif
@@ -3432,7 +3431,10 @@ mega_m_to_n(void __user *arg, nitioctl_t *uioc)
 	 *
 	 * Get the user ioctl structure
 	 */
-	if( copy_from_user(&uioc_mimd, arg, sizeof(struct uioctl_t)) )
+	if (copy_from_user((char *)&uioc_mimd + sizeof(uioc->signature),
+				arg + sizeof(uioc->signature),
+				sizeof(struct uioctl_t) -
+				sizeof(uioc->signature)))
 		return (-EFAULT);
 
 
