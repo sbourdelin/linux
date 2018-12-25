@@ -752,7 +752,8 @@ static int stm_char_policy_set_ioctl(struct stm_file *stmf, void __user *arg)
 	if (!id)
 		return -ENOMEM;
 
-	if (copy_from_user(id, arg, size)) {
+	if (copy_from_user(id + sizeof(size),
+				arg + sizeof(size), size - sizeof(size))) {
 		ret = -EFAULT;
 		goto err_free;
 	}
