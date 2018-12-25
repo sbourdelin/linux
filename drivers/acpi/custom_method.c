@@ -26,17 +26,16 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 	static u32 max_size;
 	static u32 uncopied_bytes;
 
-	struct acpi_table_header table;
 	acpi_status status;
 
 	if (!(*ppos)) {
 		/* parse the table header to get the table length */
 		if (count <= sizeof(struct acpi_table_header))
 			return -EINVAL;
-		if (copy_from_user(&table, user_buf,
-				   sizeof(struct acpi_table_header)))
+		if (get_user(max_size,
+				&(struct acpi_table_header *)user_buf->length))
 			return -EFAULT;
-		uncopied_bytes = max_size = table.length;
+		uncopied_bytes = max_size;
 		buf = kzalloc(max_size, GFP_KERNEL);
 		if (!buf)
 			return -ENOMEM;
@@ -56,6 +55,8 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 		buf = NULL;
 		return -EFAULT;
 	}
+	/* Ensure table length is not changed in the second copy */
+	(struct acpi_table_header *)(buf + (*ppos))->length = max_size;
 
 	uncopied_bytes -= count;
 	*ppos += count;
