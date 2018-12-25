@@ -4447,7 +4447,7 @@ do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
  */
 static int sched_copy_attr(struct sched_attr __user *uattr, struct sched_attr *attr)
 {
-	u32 size;
+	u32 size, size_cp;
 	int ret;
 
 	if (!access_ok(VERIFY_WRITE, uattr, SCHED_ATTR_SIZE_VER0))
@@ -4460,15 +4460,17 @@ static int sched_copy_attr(struct sched_attr __user *uattr, struct sched_attr *a
 	if (ret)
 		return ret;
 
+	size_cp = size;
+
 	/* Bail out on silly large: */
 	if (size > PAGE_SIZE)
 		goto err_size;
 
 	/* ABI compatibility quirk: */
 	if (!size)
-		size = SCHED_ATTR_SIZE_VER0;
+		size_cp = SCHED_ATTR_SIZE_VER0;
 
-	if (size < SCHED_ATTR_SIZE_VER0)
+	else if (size < SCHED_ATTR_SIZE_VER0)
 		goto err_size;
 
 	/*
@@ -4483,7 +4485,7 @@ static int sched_copy_attr(struct sched_attr __user *uattr, struct sched_attr *a
 		unsigned char val;
 
 		addr = (void __user *)uattr + sizeof(*attr);
-		end  = (void __user *)uattr + size;
+		end  = (void __user *)uattr + size_cp;
 
 		for (; addr < end; addr++) {
 			ret = get_user(val, addr);
@@ -4492,12 +4494,16 @@ static int sched_copy_attr(struct sched_attr __user *uattr, struct sched_attr *a
 			if (val)
 				goto err_size;
 		}
-		size = sizeof(*attr);
+		size_cp = sizeof(*attr);
 	}
 
-	ret = copy_from_user(attr, uattr, size);
+	ret = copy_from_user(attr, uattr, size_cp);
 	if (ret)
 		return -EFAULT;
+
+	/* Sanity check if size was changed in user space */
+	if (attr->size != size)
+		return -EINVAL;
 
 	/*
 	 * XXX: Do we want to be lenient like existing syscalls; or do we want
