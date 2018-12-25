@@ -1847,6 +1847,8 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 			rcode = -EFAULT;
 			goto cleanup;
 		}
+		/* Ensure it is not changed in the second copy */
+		msg[0] = size;
 		sg_count = (size - sg_offset*4) / sizeof(struct sg_simple_element);
 
 		// TODO add 64 bit API
