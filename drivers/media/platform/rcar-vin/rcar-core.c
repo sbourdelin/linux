@@ -116,7 +116,6 @@ static int rvin_group_link_notify(struct media_link *link, u32 flags,
 						struct rvin_group, mdev);
 	unsigned int master_id, channel, mask_new, i;
 	unsigned int mask = ~0;
-	struct media_entity *entity;
 	struct video_device *vdev;
 	struct media_pad *csi_pad;
 	struct rvin_dev *vin = NULL;
@@ -130,11 +129,6 @@ static int rvin_group_link_notify(struct media_link *link, u32 flags,
 	if (!(flags & MEDIA_LNK_FL_ENABLED) ||
 	    !is_media_entity_v4l2_video_device(link->sink->entity))
 		return 0;
-
-	/* If any entity is in use don't allow link changes. */
-	media_device_for_each_entity(entity, &group->mdev)
-		if (entity->use_count)
-			return -EBUSY;
 
 	mutex_lock(&group->lock);
 
