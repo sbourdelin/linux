@@ -134,6 +134,12 @@ int led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 		led_set_brightness(led_cdev, LED_OFF);
 	}
 	if (trig) {
+		ret = device_add_groups(led_cdev->dev, trig->groups);
+		if (ret) {
+			dev_err(led_cdev->dev, "Failed to add trigger attributes\n");
+			goto err_add_groups;
+		}
+
 		write_lock_irqsave(&trig->leddev_list_lock, flags);
 		list_add_tail(&led_cdev->trig_list, &trig->led_cdevs);
 		write_unlock_irqrestore(&trig->leddev_list_lock, flags);
@@ -146,12 +152,6 @@ int led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 
 		if (ret)
 			goto err_activate;
-
-		ret = device_add_groups(led_cdev->dev, trig->groups);
-		if (ret) {
-			dev_err(led_cdev->dev, "Failed to add trigger attributes\n");
-			goto err_add_groups;
-		}
 	}
 
 	if (event) {
@@ -165,17 +165,18 @@ int led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 
 	return 0;
 
-err_add_groups:
-
+err_activate:
+	device_remove_groups(led_cdev->dev, trig->groups);
 	if (trig->deactivate)
 		trig->deactivate(led_cdev);
-err_activate:
 
 	led_cdev->trigger = NULL;
 	led_cdev->trigger_data = NULL;
 	write_lock_irqsave(&led_cdev->trigger->leddev_list_lock, flags);
 	list_del(&led_cdev->trig_list);
 	write_unlock_irqrestore(&led_cdev->trigger->leddev_list_lock, flags);
+
+err_add_groups:
 	led_set_brightness(led_cdev, LED_OFF);
 
 	return ret;
