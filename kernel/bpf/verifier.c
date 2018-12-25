@@ -2703,7 +2703,10 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 	/* after the call registers r0 - r5 were scratched */
 	for (i = 0; i < CALLER_SAVED_REGS; i++) {
 		mark_reg_not_init(env, caller->regs, caller_saved[i]);
-		check_reg_arg(env, caller_saved[i], DST_OP_NO_MARK);
+		err = check_reg_arg(env, caller_saved[i], DST_OP_NO_MARK);
+		if (err)
+			verbose(env,
+					"check_reg_arg() fails in setting caller saved regs\n");
 	}
 
 	/* only increment it after check_reg_arg() finished */
@@ -2926,7 +2929,10 @@ static int check_helper_call(struct bpf_verifier_env *env, int func_id, int insn
 	/* reset caller saved regs */
 	for (i = 0; i < CALLER_SAVED_REGS; i++) {
 		mark_reg_not_init(env, regs, caller_saved[i]);
-		check_reg_arg(env, caller_saved[i], DST_OP_NO_MARK);
+		err = check_reg_arg(env, caller_saved[i], DST_OP_NO_MARK);
+		if (err)
+			verbose(env,
+				"check_reg_arg() fails in resetting caller saved regs\n");
 	}
 
 	/* update return register (already marked as written above) */
@@ -4542,7 +4548,10 @@ static int check_ld_abs(struct bpf_verifier_env *env, struct bpf_insn *insn)
 	/* reset caller saved regs to unreadable */
 	for (i = 0; i < CALLER_SAVED_REGS; i++) {
 		mark_reg_not_init(env, regs, caller_saved[i]);
-		check_reg_arg(env, caller_saved[i], DST_OP_NO_MARK);
+		err = check_reg_arg(env, caller_saved[i], DST_OP_NO_MARK);
+		if (err)
+			verbose(env,
+				"check_reg_arg() fails in resetting caller saved regs to unreadable\n");
 	}
 
 	/* mark destination R0 register as readable, since it contains
