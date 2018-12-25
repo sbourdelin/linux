@@ -336,6 +336,24 @@ config MEMORY_FAILURE
 	  even when some of its memory has uncorrected errors. This requires
 	  special hardware support and typically ECC memory.
 
+config WARN_HIGH_ORDER
+	bool "Enable complains about high order memory allocations"
+	depends on !LOCKDEP
+	default n
+	help
+	  Enables warnings on high order memory allocations. This allows to
+	  determine users of large memory chunks and rework them to decrease
+	  allocation latency. Note, some debug options make kernel structures
+	  fat.
+
+config WARN_HIGH_ORDER_LEVEL
+	int "Define page order level considered as too high"
+	depends on WARN_HIGH_ORDER
+	default 3
+	help
+	  Defines page order starting which the system to complain about.
+	  Default is current PAGE_ALLOC_COSTLY_ORDER.
+
 config HWPOISON_INJECT
 	tristate "HWPoison pages injector"
 	depends on MEMORY_FAILURE && DEBUG_KERNEL && PROC_FS

@@ -176,6 +176,10 @@ extern int unaligned_dump_stack;
 extern int no_unaligned_warning;
 #endif
 
+#ifdef CONFIG_WARN_HIGH_ORDER
+extern int warn_order;
+#endif
+
 #ifdef CONFIG_PROC_SYSCTL
 
 /**
@@ -1674,6 +1678,17 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= (void *)&mmap_rnd_compat_bits_min,
 		.extra2		= (void *)&mmap_rnd_compat_bits_max,
+	},
+#endif
+#ifdef CONFIG_WARN_HIGH_ORDER
+	{
+		.procname	= "warn_high_order",
+		.data		= &warn_order,
+		.maxlen		= sizeof(warn_order),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one_hundred,
 	},
 #endif
 	{ }

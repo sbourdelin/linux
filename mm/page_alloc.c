@@ -4341,6 +4341,30 @@ static inline void finalise_ac(gfp_t gfp_mask, struct alloc_context *ac)
 					ac->high_zoneidx, ac->nodemask);
 }
 
+#ifdef CONFIG_WARN_HIGH_ORDER
+int warn_order = CONFIG_WARN_HIGH_ORDER_LEVEL;
+
+/*
+ * Complain if we allocate a high order page unless there is a __GFP_NOWARN
+ * flag provided.
+ *
+ * Shuts up after 32 complains.
+ */
+static __always_inline void warn_high_order(int order, gfp_t gfp_mask)
+{
+	static atomic_t warn_count = ATOMIC_INIT(32);
+
+	if (order >= warn_order && !(gfp_mask & __GFP_NOWARN))
+		WARN(atomic_dec_if_positive(&warn_count) >= 0,
+		     "order %d >= %d, gfp 0x%x\n",
+		     order, warn_order, gfp_mask);
+}
+#else
+static __always_inline void warn_high_order(int order, gfp_t gfp_mask)
+{
+}
+#endif
+
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
@@ -4361,6 +4385,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 		WARN_ON_ONCE(!(gfp_mask & __GFP_NOWARN));
 		return NULL;
 	}
+	warn_high_order(order, gfp_mask);
 
 	gfp_mask &= gfp_allowed_mask;
 	alloc_mask = gfp_mask;
