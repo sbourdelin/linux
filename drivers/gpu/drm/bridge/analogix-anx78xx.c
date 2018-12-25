@@ -638,10 +638,22 @@ static void anx78xx_poweron(struct anx78xx *anx78xx)
 	gpiod_set_value_cansleep(pdata->gpiod_reset, 0);
 
 	/* Power on registers module */
-	anx78xx_set_bits(anx78xx->map[I2C_IDX_TX_P2], SP_POWERDOWN_CTRL_REG,
-			 SP_HDCP_PD | SP_AUDIO_PD | SP_VIDEO_PD | SP_LINK_PD);
-	anx78xx_clear_bits(anx78xx->map[I2C_IDX_TX_P2], SP_POWERDOWN_CTRL_REG,
-			   SP_REGISTER_PD | SP_TOTAL_PD);
+	err = anx78xx_set_bits(anx78xx->map[I2C_IDX_TX_P2],
+			SP_POWERDOWN_CTRL_REG,
+			SP_HDCP_PD | SP_AUDIO_PD | SP_VIDEO_PD | SP_LINK_PD);
+	if (err) {
+		DRM_ERROR("Failed to set register bits: %d\n",
+				err);
+		return;
+	}
+	err = anx78xx_clear_bits(anx78xx->map[I2C_IDX_TX_P2],
+			SP_POWERDOWN_CTRL_REG,
+			SP_REGISTER_PD | SP_TOTAL_PD);
+	if (err) {
+		DRM_ERROR("Failed to clear register bits: %d\n",
+				err);
+		return;
+	}
 
 	anx78xx->powered = true;
 }
