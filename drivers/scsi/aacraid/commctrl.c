@@ -538,6 +538,8 @@ static int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 		rcode = -EFAULT;
 		goto cleanup;
 	}
+	/* Ensure user_srb->count is not changed */
+	user_srbcmd->count = fibsize;
 
 	flags = user_srbcmd->flags; /* from user in cpu order */
 	switch (flags & (SRB_DataIn | SRB_DataOut)) {
