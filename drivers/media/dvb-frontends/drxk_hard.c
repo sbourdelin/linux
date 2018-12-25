@@ -6612,7 +6612,9 @@ static int drxk_get_stats(struct dvb_frontend *fe)
 	if (status < 0)
 		goto error;
 	pkt_error_count = reg16;
-	write16(state, SCU_RAM_FEC_ACCUM_PKT_FAILURES__A, 0);
+	status = write16(state, SCU_RAM_FEC_ACCUM_PKT_FAILURES__A, 0);
+	if (status < 0)
+		goto error;
 
 	post_bit_err_count *= post_bit_error_scale;
 
