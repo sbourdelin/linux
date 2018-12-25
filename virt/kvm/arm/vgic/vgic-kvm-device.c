@@ -163,7 +163,7 @@ out:
 static int vgic_set_common_attr(struct kvm_device *dev,
 				struct kvm_device_attr *attr)
 {
-	int r;
+	int r = 0;
 
 	switch (attr->group) {
 	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
@@ -180,7 +180,6 @@ static int vgic_set_common_attr(struct kvm_device *dev,
 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
 		u32 val;
-		int ret = 0;
 
 		if (get_user(val, uaddr))
 			return -EFAULT;
@@ -199,14 +198,14 @@ static int vgic_set_common_attr(struct kvm_device *dev,
 		mutex_lock(&dev->kvm->lock);
 
 		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_spis)
-			ret = -EBUSY;
+			r = -EBUSY;
 		else
 			dev->kvm->arch.vgic.nr_spis =
 				val - VGIC_NR_PRIVATE_IRQS;
 
 		mutex_unlock(&dev->kvm->lock);
 
-		return ret;
+		return r;
 	}
 	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
 		switch (attr->attr) {
