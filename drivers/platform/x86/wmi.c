@@ -850,7 +850,8 @@ static long wmi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			buf->length, wblock->req_buf_size);
 
 	/* copy the structure from userspace */
-	if (copy_from_user(buf, input, wblock->req_buf_size)) {
+	if (copy_from_user(buf->data, input->data,
+				wblock->req_buf_size - sizeof(buf->length))) {
 		dev_dbg(&wblock->dev.dev, "Copy %llu from user failed\n",
 			wblock->req_buf_size);
 		ret = -EFAULT;
