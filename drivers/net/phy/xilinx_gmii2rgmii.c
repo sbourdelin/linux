@@ -58,7 +58,9 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
 	else
 		val |= BMCR_SPEED10;
 
-	mdiobus_write(bus, addr, XILINX_GMII2RGMII_REG, val);
+	err = mdiobus_write(bus, addr, XILINX_GMII2RGMII_REG, val);
+	if (err)
+		return err;
 
 	return 0;
 }
