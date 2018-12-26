@@ -55,6 +55,7 @@ static ssize_t memconsole_coreboot_read(char *buf, loff_t pos, size_t count)
 	} seg[2] = { {0}, {0} };
 	size_t done = 0;
 	int i;
+	int ret;
 
 	if (flags & OVERFLOW) {
 		if (cursor > size)	/* Shouldn't really happen, but... */
@@ -66,8 +67,10 @@ static ssize_t memconsole_coreboot_read(char *buf, loff_t pos, size_t count)
 	}
 
 	for (i = 0; i < ARRAY_SIZE(seg) && count > done; i++) {
-		done += memory_read_from_buffer(buf + done, count - done, &pos,
+		ret = memory_read_from_buffer(buf + done, count - done, &pos,
 			cbmem_console->body + seg[i].phys, seg[i].len);
+		if (ret >= 0)
+			done += ret;
 		pos -= seg[i].len;
 	}
 	return done;
