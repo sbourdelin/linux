@@ -60,7 +60,8 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
 	ssc->user++;
 	spin_unlock(&user_lock);
 
-	clk_prepare(ssc->clk);
+	if (clk_prepare(ssc->clk))
+		pr_err("ssc: failed to prepare clk.\n");
 
 	return ssc;
 }
