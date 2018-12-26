@@ -638,9 +638,6 @@ struct lpfc_sli4_hba {
 
 	/* Optimized Access Storage specific queues/structures */
 
-	struct lpfc_queue *oas_cq; /* OAS completion queue */
-	struct lpfc_queue *oas_wq; /* OAS Work queue */
-	struct lpfc_sli_ring *oas_ring;
 	uint64_t oas_next_lun;
 	uint8_t oas_next_tgt_wwpn[8];
 	uint8_t oas_next_vpt_wwpn[8];
