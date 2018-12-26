@@ -290,7 +290,9 @@ static int alarmtimer_suspend(struct device *dev)
 
 	/* Setup an rtc timer to fire that far in the future */
 	rtc_timer_cancel(rtc, &rtctimer);
-	rtc_read_time(rtc, &tm);
+	ret = rtc_read_time(rtc, &tm);
+	if (ret < 0)
+		return ret;
 	now = rtc_tm_to_ktime(tm);
 	now = ktime_add(now, min);
 
