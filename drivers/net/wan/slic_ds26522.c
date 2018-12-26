@@ -64,8 +64,9 @@ static u8 slic_read(struct spi_device *spi, u16 addr)
 	temp[0] = (u8)(((addr >> 8) & 0x7f) | 0x80);
 	temp[1] = (u8)(addr & 0xfe);
 
-	spi_write_then_read(spi, &temp[0], SLIC_TWO_LEN, &data,
-			    SLIC_TRANS_LEN);
+	if (spi_write_then_read(spi, &temp[0], SLIC_TWO_LEN, &data,
+			    SLIC_TRANS_LEN))
+		return -1;
 
 	data = bitrev8(data);
 	return data;
