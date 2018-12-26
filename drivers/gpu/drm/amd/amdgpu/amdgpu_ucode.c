@@ -422,13 +422,19 @@ static int amdgpu_ucode_patch_jt(struct amdgpu_firmware_info *ucode,
 
 int amdgpu_ucode_create_bo(struct amdgpu_device *adev)
 {
+	int ret;
+
 	if (adev->firmware.load_type != AMDGPU_FW_LOAD_DIRECT) {
-		amdgpu_bo_create_kernel(adev, adev->firmware.fw_size, PAGE_SIZE,
-			amdgpu_sriov_vf(adev) ? AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT,
-			&adev->firmware.fw_buf,
-			&adev->firmware.fw_buf_mc,
-			&adev->firmware.fw_buf_ptr);
-		if (!adev->firmware.fw_buf) {
+		ret =
+			amdgpu_bo_create_kernel(adev,
+			  adev->firmware.fw_size,
+			  PAGE_SIZE,
+			  amdgpu_sriov_vf(adev) ? AMDGPU_GEM_DOMAIN_VRAM :
+				AMDGPU_GEM_DOMAIN_GTT,
+			  &adev->firmware.fw_buf,
+			  &adev->firmware.fw_buf_mc,
+				&adev->firmware.fw_buf_ptr);
+		if (ret) {
 			dev_err(adev->dev, "failed to create kernel buffer for firmware.fw_buf\n");
 			return -ENOMEM;
 		} else if (amdgpu_sriov_vf(adev)) {
