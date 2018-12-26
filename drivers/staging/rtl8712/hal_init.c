@@ -45,7 +45,8 @@ static void rtl871x_load_fw_cb(const struct firmware *firmware, void *context)
 	}
 	padapter->fw = firmware;
 	/* firmware available - start netdev */
-	register_netdev(padapter->pnetdev);
+	if (register_netdev(padapter->pnetdev))
+		dev_err(&udev->dev, "r8712u: Registering netdev failed\n");
 }
 
 static const char firmware_file[] = "rtlwifi/rtl8712u.bin";
