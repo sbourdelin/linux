@@ -1846,7 +1846,13 @@ static byte facility_req(dword Id, word Number, DIVA_CAPI_ADAPTER *a,
 				break;
 
 			case S_HOLD:
-				api_parse(&parms->info[1], (word)parms->length, "ws", ss_parms);
+				if (api_parse(&parms->info[1],
+							(word)parms->length,
+							"ws", ss_parms)) {
+					dbug(1, dprintf("format wrong"));
+					Info = _WRONG_MESSAGE_FORMAT;
+					break;
+				}
 				if (plci && plci->State && plci->SuppState == IDLE)
 				{
 					plci->SuppState = HOLD_REQUEST;
