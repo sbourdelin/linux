@@ -689,7 +689,8 @@ lpfc_get_scsi_buf_s4(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp,
 
 	cpu = smp_processor_id();
 	if (cmnd && shost_use_blk_mq(cmnd->device->host) &&
-	    phba->cfg_enable_scsi_mq) {
+	    phba->cfg_enable_scsi_mq &&
+	    (phba->cfg_fcp_io_sched == LPFC_FCP_SCHED_BY_HDWQ)) {
 		tag = blk_mq_unique_tag(cmnd->request);
 		idx = blk_mq_unique_tag_to_hwq(tag);
 	} else {
