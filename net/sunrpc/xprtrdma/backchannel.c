@@ -285,6 +285,8 @@ void rpcrdma_bc_receive_call(struct rpcrdma_xprt *r_xprt,
 	__be32 *p;
 
 	p = xdr_inline_decode(&rep->rr_stream, 0);
+	if (unlikely(!p))
+		goto out_overflow;
 	size = xdr_stream_remaining(&rep->rr_stream);
 
 #ifdef RPCRDMA_BACKCHANNEL_DEBUG
