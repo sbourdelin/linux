@@ -1398,6 +1398,7 @@ static const struct rproc_hexagon_res msm8996_mss = {
 	.proxy_clk_names = (char*[]){
 			"xo",
 			"pnoc",
+			"qdss",
 			NULL
 	},
 	.active_clk_names = (char*[]){
@@ -1405,6 +1406,8 @@ static const struct rproc_hexagon_res msm8996_mss = {
 			"bus",
 			"mem",
 			"gpll0_mss_clk",
+			"snoc_axi",
+			"mnoc_axi",
 			NULL
 	},
 	.need_mem_protection = true,
